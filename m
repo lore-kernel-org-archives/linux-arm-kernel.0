@@ -1,248 +1,65 @@
-From: thommycheck@gmx.de (Thomas Kunze)
-Date: Tue, 10 Feb 2009 14:50:56 +0100
-Subject: [PATCH 6/9] add gpiolib support to ucb1x00
-Message-ID: <mailman.55.1254846767.2253.linux-arm-kernel@lists.infradead.org>
+From: s.neumann@raumfeld.com (Sven Neumann)
+Date: Wed, 6 May 2009 16:22:50 +0200
+Subject: [PATCH] ARM: pxafb: Use the passed fb_var_screeninfo struct in pxafb_pan_display()
+Message-ID: <mailman.88.1256193287.2253.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The old access methods to the gpios will be removed when
-all users has been converted. (mainly ucb1x00-ts)
+pxafb_pan_display() used to ignore the fb_var_screeninfo parameter. Now
+pass it to setup_base_frame() instead of pulling default values out of
+fb_info.
 
-Signed-off-by: Thomas Kunze <thommycheck@gmx.de>
+Signed-off-by: Sven Neumann <s.neumann@raumfeld.com>
+Signed-off-by: Daniel Mack <daniel@caiaq.de>
+Cc: Eric Miao <eric.y.miao@gmail.com>
 ---
- arch/arm/mach-sa1100/include/mach/mcp.h |    1 +
- drivers/mfd/mcp-sa11x0.c                |    1 +
- drivers/mfd/ucb1x00-core.c              |   87 ++++++++++++++++++++++++++++++-
- include/linux/mfd/mcp.h                 |    1 +
- include/linux/mfd/ucb1x00.h             |    3 +
- 5 files changed, 91 insertions(+), 2 deletions(-)
+ drivers/video/pxafb.c |   12 +++++++-----
+ 1 files changed, 7 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/include/mach/mcp.h b/arch/arm/mach-sa1100/include/mach/mcp.h
-index fb8b09a..ed1a331 100644
---- a/arch/arm/mach-sa1100/include/mach/mcp.h
-+++ b/arch/arm/mach-sa1100/include/mach/mcp.h
-@@ -16,6 +16,7 @@ struct mcp_plat_data {
- 	u32 mccr0;
- 	u32 mccr1;
- 	unsigned int sclk_rate;
-+	int gpio_base;
- };
+diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
+index 1820c4a..a20a7d4 100644
+--- a/drivers/video/pxafb.c
++++ b/drivers/video/pxafb.c
+@@ -80,7 +80,8 @@
+ static int pxafb_activate_var(struct fb_var_screeninfo *var,
+ 				struct pxafb_info *);
+ static void set_ctrlr_state(struct pxafb_info *fbi, u_int state);
+-static void setup_base_frame(struct pxafb_info *fbi, int branch);
++static void setup_base_frame(struct pxafb_info *fbi,
++                             struct fb_var_screeninfo *var, int branch);
+ static int setup_frame_dma(struct pxafb_info *fbi, int dma, int pal,
+ 			   unsigned long offset, size_t size);
  
- #endif
-diff --git a/drivers/mfd/mcp-sa11x0.c b/drivers/mfd/mcp-sa11x0.c
-index 2121898..2584272 100644
---- a/drivers/mfd/mcp-sa11x0.c
-+++ b/drivers/mfd/mcp-sa11x0.c
-@@ -163,6 +163,7 @@ static int mcp_sa11x0_probe(struct platform_device *pdev)
- 	mcp->dma_audio_wr	= DMA_Ser4MCP0Wr;
- 	mcp->dma_telco_rd	= DMA_Ser4MCP1Rd;
- 	mcp->dma_telco_wr	= DMA_Ser4MCP1Wr;
-+	mcp->gpio_base		= data->gpio_base;
+@@ -536,7 +537,7 @@ static int pxafb_pan_display(struct fb_var_screeninfo *var,
+ 	if (fbi->state != C_ENABLE)
+ 		return 0;
  
- 	platform_set_drvdata(pdev, mcp);
+-	setup_base_frame(fbi, 1);
++	setup_base_frame(fbi, var, 1);
  
-diff --git a/drivers/mfd/ucb1x00-core.c b/drivers/mfd/ucb1x00-core.c
-index 61f3933..e0d7700 100644
---- a/drivers/mfd/ucb1x00-core.c
-+++ b/drivers/mfd/ucb1x00-core.c
-@@ -25,11 +25,11 @@
- #include <linux/device.h>
- #include <linux/mutex.h>
- #include <linux/mfd/ucb1x00.h>
-+#include <linux/gpio.h>
- 
- #include <mach/dma.h>
- #include <mach/hardware.h>
- 
--
- static DEFINE_MUTEX(ucb1x00_mutex);
- static LIST_HEAD(ucb1x00_drivers);
- static LIST_HEAD(ucb1x00_devices);
-@@ -107,6 +107,60 @@ unsigned int ucb1x00_io_read(struct ucb1x00 *ucb)
- 	return ucb1x00_reg_read(ucb, UCB_IO_DATA);
+ 	if (fbi->lccr0 & LCCR0_SDS)
+ 		lcd_writel(fbi, FBR1, fbi->fdadr[dma + 1] | 0x1);
+@@ -1052,9 +1053,10 @@ static int setup_frame_dma(struct pxafb_info *fbi, int dma, int pal,
+ 	return 0;
  }
  
-+static void ucb1x00_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
-+{
-+	struct ucb1x00 *ucb = container_of(chip, struct ucb1x00, gpio);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&ucb->io_lock, flags);
-+	if (value)
-+		ucb->io_out |= 1 << offset;
-+	else
-+		ucb->io_out &= ~(1 << offset);
-+
-+	ucb1x00_reg_write(ucb, UCB_IO_DATA, ucb->io_out);
-+	spin_unlock_irqrestore(&ucb->io_lock, flags);
-+}
-+
-+static int ucb1x00_gpio_get(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct ucb1x00 *ucb = container_of(chip, struct ucb1x00, gpio);
-+	return ucb1x00_reg_read(ucb, UCB_IO_DATA) & (1 << offset);
-+}
-+
-+static int ucb1x00_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct ucb1x00 *ucb = container_of(chip, struct ucb1x00, gpio);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&ucb->io_lock, flags);
-+	ucb->io_dir &= ~(1 << offset);
-+	ucb1x00_reg_write(ucb, UCB_IO_DIR, ucb->io_dir);
-+	spin_unlock_irqrestore(&ucb->io_lock, flags);
-+
-+	return 0;
-+}
-+
-+static int ucb1x00_gpio_direction_output(struct gpio_chip *chip, unsigned offset
-+		, int value)
-+{
-+	struct ucb1x00 *ucb = container_of(chip, struct ucb1x00, gpio);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&ucb->io_lock, flags);
-+	ucb->io_dir |= (1 << offset);
-+	ucb1x00_reg_write(ucb, UCB_IO_DIR, ucb->io_dir);
-+
-+	if (value)
-+		ucb->io_out |= 1 << offset;
-+	else
-+		ucb->io_out &= ~(1 << offset);
-+	ucb1x00_reg_write(ucb, UCB_IO_DATA, ucb->io_out);
-+	spin_unlock_irqrestore(&ucb->io_lock, flags);
-+
-+	return 0;
-+}
-+
- /*
-  * UCB1300 data sheet says we must:
-  *  1. enable ADC	=> 5us (including reference startup time)
-@@ -475,6 +529,7 @@ static int ucb1x00_probe(struct mcp *mcp)
- 	struct ucb1x00_driver *drv;
- 	unsigned int id;
- 	int ret = -ENODEV;
-+	int temp;
- 
- 	mcp_enable(mcp);
- 	id = mcp_reg_read(mcp, UCB_ID);
-@@ -507,12 +562,27 @@ static int ucb1x00_probe(struct mcp *mcp)
- 		goto err_free;
- 	}
- 
-+	ucb->gpio.base = -1;
-+	if (mcp->gpio_base != 0) {
-+		ucb->gpio.label = dev_name(&ucb->dev);
-+		ucb->gpio.base = mcp->gpio_base;
-+		ucb->gpio.ngpio = 10;
-+		ucb->gpio.set = ucb1x00_gpio_set;
-+		ucb->gpio.get = ucb1x00_gpio_get;
-+		ucb->gpio.direction_input = ucb1x00_gpio_direction_input;
-+		ucb->gpio.direction_output = ucb1x00_gpio_direction_output;
-+		ret = gpiochip_add(&ucb->gpio);
-+		if (ret)
-+			goto err_free;
-+	} else
-+		dev_info(&ucb->dev, "gpio_base not set so no gpiolib support");
-+
- 	ret = request_irq(ucb->irq, ucb1x00_irq, IRQF_TRIGGER_RISING,
- 			  "UCB1x00", ucb);
- 	if (ret) {
- 		printk(KERN_ERR "ucb1x00: unable to grab irq%d: %d\n",
- 			ucb->irq, ret);
--		goto err_free;
-+		goto err_gpio;
- 	}
- 
- 	mcp_set_drvdata(mcp, ucb);
-@@ -521,6 +591,7 @@ static int ucb1x00_probe(struct mcp *mcp)
- 	if (ret)
- 		goto err_irq;
- 
-+
- 	INIT_LIST_HEAD(&ucb->devs);
- 	mutex_lock(&ucb1x00_mutex);
- 	list_add(&ucb->node, &ucb1x00_devices);
-@@ -528,10 +599,14 @@ static int ucb1x00_probe(struct mcp *mcp)
- 		ucb1x00_add_dev(ucb, drv);
- 	}
- 	mutex_unlock(&ucb1x00_mutex);
-+
- 	goto out;
- 
-  err_irq:
- 	free_irq(ucb->irq, ucb);
-+ err_gpio:
-+	if (ucb->gpio.base != -1)
-+		temp = gpiochip_remove(&ucb->gpio);
-  err_free:
- 	kfree(ucb);
-  err_disable:
-@@ -544,6 +619,7 @@ static void ucb1x00_remove(struct mcp *mcp)
+-static void setup_base_frame(struct pxafb_info *fbi, int branch)
++static void setup_base_frame(struct pxafb_info *fbi,
++                             struct fb_var_screeninfo *var,
++                             int branch)
  {
- 	struct ucb1x00 *ucb = mcp_get_drvdata(mcp);
- 	struct list_head *l, *n;
-+	int ret;
+-	struct fb_var_screeninfo *var = &fbi->fb.var;
+ 	struct fb_fix_screeninfo *fix = &fbi->fb.fix;
+ 	int nbytes, dma, pal, bpp = var->bits_per_pixel;
+ 	unsigned long offset;
+@@ -1332,7 +1334,7 @@ static int pxafb_activate_var(struct fb_var_screeninfo *var,
+ #endif
+ 		setup_parallel_timing(fbi, var);
  
- 	mutex_lock(&ucb1x00_mutex);
- 	list_del(&ucb->node);
-@@ -553,6 +629,12 @@ static void ucb1x00_remove(struct mcp *mcp)
- 	}
- 	mutex_unlock(&ucb1x00_mutex);
+-	setup_base_frame(fbi, 0);
++	setup_base_frame(fbi, var, 0);
  
-+	if (ucb->gpio.base != -1) {
-+		ret = gpiochip_remove(&ucb->gpio);
-+		if (ret)
-+			dev_err(&ucb->dev, "Can't remove gpio chip: %d\n", ret);
-+	}
-+
- 	free_irq(ucb->irq, ucb);
- 	device_unregister(&ucb->dev);
- }
-@@ -603,6 +685,7 @@ static int ucb1x00_resume(struct mcp *mcp)
- 	struct ucb1x00 *ucb = mcp_get_drvdata(mcp);
- 	struct ucb1x00_dev *dev;
- 
-+	ucb1x00_reg_write(ucb, UCB_IO_DIR, ucb->io_dir);
- 	mutex_lock(&ucb1x00_mutex);
- 	list_for_each_entry(dev, &ucb->devs, dev_node) {
- 		if (dev->drv->resume)
-diff --git a/include/linux/mfd/mcp.h b/include/linux/mfd/mcp.h
-index be95e09..ee49670 100644
---- a/include/linux/mfd/mcp.h
-+++ b/include/linux/mfd/mcp.h
-@@ -26,6 +26,7 @@ struct mcp {
- 	dma_device_t	dma_telco_rd;
- 	dma_device_t	dma_telco_wr;
- 	struct device	attached_device;
-+	int		gpio_base;
- };
- 
- struct mcp_ops {
-diff --git a/include/linux/mfd/ucb1x00.h b/include/linux/mfd/ucb1x00.h
-index eac3463..aa9c378 100644
---- a/include/linux/mfd/ucb1x00.h
-+++ b/include/linux/mfd/ucb1x00.h
-@@ -11,6 +11,8 @@
- #define UCB1200_H
- 
- #include <linux/mfd/mcp.h>
-+#include <linux/gpio.h>
-+
- #define UCB_IO_DATA	0x00
- #define UCB_IO_DIR	0x01
- 
-@@ -123,6 +125,7 @@ struct ucb1x00 {
- 	struct device		dev;
- 	struct list_head	node;
- 	struct list_head	devs;
-+	struct gpio_chip 	gpio;
- };
- 
- struct ucb1x00_driver;
+ 	fbi->reg_lccr0 = fbi->lccr0 |
+ 		(LCCR0_LDM | LCCR0_SFM | LCCR0_IUM | LCCR0_EFM |
 -- 
-1.6.0.4
-
-
---------------080106070900050803030700--
+1.6.5
