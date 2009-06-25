@@ -1,905 +1,536 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Tue, 30 Jun 2009 13:15:22 +0200
-Subject: [PATCH] video: add driver for PXA3xx 2D graphics accelerator
-Message-ID: <mailman.92.1256687723.2253.linux-arm-kernel@lists.infradead.org>
+Date: Thu, 25 Jun 2009 13:07:54 +0200
+Subject: [PATCH] USB: Add EHCI support for MX27 and MX31 based boards
+Message-ID: <mailman.93.1256688915.2253.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a driver for the the 2D graphics accelerator found on PXA3xx
-processors. Only resource mapping, interrupt handling and a simple ioctl
-handler is done by the kernel part, the rest of the logic is implemented
-in DirectFB userspace.
+The Freescale MX27 and MX31 SoCs have a EHCI controller onboard.
+The controller is capable of USB on the go. This patch adds
+a driver to support all three of them.
 
-Graphic applications benefit for line drawing, blend, and rectangle and
-triangle filling operations.
+Users have to pass details about serial interface configuration in the
+platform data.
 
-Measurements on a PXA303 using the df_dok benchmarking tool follow,
-where the value in square brackets show the CPU usage during that test.
+The USB OTG core used here is the ARC core, so the driver should
+be renamed and probably be merged with ehci-fsl.c eventually.
 
-Without accelerator:
-
-  Fill Rectangle                                 3.007 secs (  175.922 MPixel/sec) [100.3%]
-  Fill Rectangles [10]                           3.178 secs (  182.696 MPixel/sec) [100.0%]
-  Fill Triangles                                 3.023 secs (   99.232 MPixel/sec) [100.3%]
-  Blit                                           3.082 secs (   39.770 MPixel/sec) [100.0%]
-  Blit 180                                       3.115 secs (   28.994 MPixel/sec) [100.3%]
-  Blit with format conversion                    3.078 secs (   18.863 MPixel/sec) [100.0%]
-
-With accelerator:
-
-  Fill Rectangle                                 4.377 secs (*  88.433 MPixel/sec) [  5.9%]
-  Fill Rectangles [10]                           5.176 secs (*  87.245 MPixel/sec) [  0.5%]
-  Fill Triangles                                 3.025 secs (   87.437 MPixel/sec) [ 46.6%]
-  Blit                                          12.177 secs (*  22.250 MPixel/sec) [  1.3%]
-  Blit 180                                       8.421 secs (*  32.175 MPixel/sec) [  4.9%]
-  Blit with format conversion                    8.216 secs (*  40.045 MPixel/sec) [  2.5%]
-
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 Signed-off-by: Daniel Mack <daniel@caiaq.de>
-Cc: Denis Oliver Kropp <dok@directfb.org>
-Cc: Sven Neumann <s.neumann@raumfeld.com>
+Cc: Greg Kroah-Hartman <gregkh@suse.de>
+Cc: David Brownell <dbrownell@users.sourceforge.net>
+Cc: linux-usb at vger.kernel.org
 ---
- drivers/video/Kconfig      |   10 +
- drivers/video/Makefile     |    1 +
- drivers/video/pxa3xx-gcu.c |  772 ++++++++++++++++++++++++++++++++++++++++++++
- drivers/video/pxa3xx-gcu.h |   38 +++
- 4 files changed, 821 insertions(+), 0 deletions(-)
- create mode 100644 drivers/video/pxa3xx-gcu.c
- create mode 100644 drivers/video/pxa3xx-gcu.h
+ arch/arm/plat-mxc/Makefile                |    2 +
+ arch/arm/plat-mxc/ehci.c                  |   92 +++++++++
+ arch/arm/plat-mxc/include/mach/mxc_ehci.h |   37 ++++
+ drivers/usb/Kconfig                       |    1 +
+ drivers/usb/host/Kconfig                  |    7 +
+ drivers/usb/host/ehci-hcd.c               |    5 +
+ drivers/usb/host/ehci-mxc.c               |  296 +++++++++++++++++++++++++++++
+ 7 files changed, 440 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/ehci.c
+ create mode 100644 arch/arm/plat-mxc/include/mach/mxc_ehci.h
+ create mode 100644 drivers/usb/host/ehci-mxc.c
 
-diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-index 9bbb285..4facf93 100644
---- a/drivers/video/Kconfig
-+++ b/drivers/video/Kconfig
-@@ -1800,6 +1800,16 @@ config FB_PXA_PARAMETERS
- 
- 	  <file:Documentation/fb/pxafb.txt> describes the available parameters.
- 
-+config PXA3XX_GCU
-+	tristate "PXA3xx 2D graphics accelerator driver"
-+	depends on FB_PXA
-+	help
-+	  Kernelspace driver for the 2D graphics controller unit (GCU)
-+	  found on PXA3xx processors. There is a counterpart driver in the
-+	  DirectFB suite, see http://www.directfb.org/
+diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+index 545412f..20a9dba 100644
+--- a/arch/arm/plat-mxc/Makefile
++++ b/arch/arm/plat-mxc/Makefile
+@@ -10,3 +10,5 @@ obj-$(CONFIG_ARCH_MX2) += iomux-mx1-mx2.o dma-mx1-mx2.o
+ obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
+ obj-$(CONFIG_MXC_PWM)  += pwm.o
+ obj-$(CONFIG_MXC_ULPI) += ulpi.o
++obj-$(CONFIG_USB_EHCI_MXC)	+= ehci.o
 +
-+	  If you compile this as a module, it will be called pxa3xx_gcu.
-+
- config FB_MBX
- 	tristate "2700G LCD framebuffer support"
- 	depends on FB && ARCH_PXA
-diff --git a/drivers/video/Makefile b/drivers/video/Makefile
-index 80232e1..81e744c 100644
---- a/drivers/video/Makefile
-+++ b/drivers/video/Makefile
-@@ -99,6 +99,7 @@ obj-$(CONFIG_FB_CIRRUS)		  += cirrusfb.o
- obj-$(CONFIG_FB_ASILIANT)	  += asiliantfb.o
- obj-$(CONFIG_FB_PXA)		  += pxafb.o
- obj-$(CONFIG_FB_PXA168)		  += pxa168fb.o
-+obj-$(CONFIG_PXA3XX_GCU)	  += pxa3xx-gcu.o
- obj-$(CONFIG_FB_W100)		  += w100fb.o
- obj-$(CONFIG_FB_TMIO)		  += tmiofb.o
- obj-$(CONFIG_FB_AU1100)		  += au1100fb.o
-diff --git a/drivers/video/pxa3xx-gcu.c b/drivers/video/pxa3xx-gcu.c
+diff --git a/arch/arm/plat-mxc/ehci.c b/arch/arm/plat-mxc/ehci.c
 new file mode 100644
-index 0000000..54f0bdd
+index 0000000..41599be
 --- /dev/null
-+++ b/drivers/video/pxa3xx-gcu.c
-@@ -0,0 +1,772 @@
++++ b/arch/arm/plat-mxc/ehci.c
+@@ -0,0 +1,92 @@
 +/*
-+ *  pxa3xx-gc.c - Linux kernel module for PXA3xx graphics controllers
++ * Copyright (c) 2009 Daniel Mack <daniel@caiaq.de>
 + *
-+ *  This driver needs a DirectFB counterpart in user space, communication
-+ *  is handled via mmap()ed memory areas and an ioctl.
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License as published by the
++ * Free Software Foundation; either version 2 of the License, or (at your
++ * option) any later version.
 + *
-+ *  Copyright (c) 2009 Daniel Mack <daniel@caiaq.de>
-+ *  Copyright (c) 2009 Janine Kropp <nin@directfb.org>
-+ *  Copyright (c) 2009 Denis Oliver Kropp <dok@directfb.org>
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
++ * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
++ * for more details.
 + *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License as published by
-+ *  the Free Software Foundation; either version 2 of the License, or
-+ *  (at your option) any later version.
-+ *
-+ *  This program is distributed in the hope that it will be useful,
-+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *  GNU General Public License for more details.
-+ *
-+ *  You should have received a copy of the GNU General Public License
-+ *  along with this program; if not, write to the Free Software
-+ *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 + */
-+
-+/*
-+ * WARNING: This controller is attached to System Bus 2 of the PXA which
-+ * needs its arbiter to be enabled explictly (CKENB & 1<<9).
-+ * There is currently no way to do this from Linux, so you need to teach
-+ * your bootloader for now.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/version.h>
 +
 +#include <linux/platform_device.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/miscdevice.h>
-+#include <linux/interrupt.h>
-+#include <linux/spinlock.h>
-+#include <linux/uaccess.h>
-+#include <linux/ioctl.h>
-+#include <linux/delay.h>
-+#include <linux/sched.h>
-+#include <linux/clk.h>
-+#include <linux/fs.h>
 +#include <linux/io.h>
 +
-+#include "pxa3xx-gcu.h"
++#include <mach/hardware.h>
++#include <mach/mxc_ehci.h>
 +
-+#define DRV_NAME	"pxa3xx-gcu"
-+#define MISCDEV_MINOR	197
++#define USBCTRL_OTGBASE_OFFSET	0x600
 +
-+#define REG_GCCR	0x00
-+#define GCCR_SYNC_CLR	(1 << 9)
-+#define GCCR_BP_RST	(1 << 8)
-+#define GCCR_ABORT	(1 << 6)
-+#define GCCR_STOP	(1 << 4)
++#define MX31_OTG_SIC_SHIFT	29
++#define MX31_OTG_SIC_MASK	(0xf << MX31_OTG_SIC_SHIFT)
++#define MX31_OTG_PM_BIT		(1 << 24)
 +
-+#define REG_GCISCR	0x04
-+#define REG_GCIECR	0x08
-+#define REG_GCRBBR	0x20
-+#define REG_GCRBLR	0x24
-+#define REG_GCRBHR	0x28
-+#define REG_GCRBTR	0x2C
-+#define REG_GCRBEXHR	0x30
++#define MX31_H2_SIC_SHIFT	21
++#define MX31_H2_SIC_MASK	(0xf << MX31_H2_SIC_SHIFT)
++#define MX31_H2_PM_BIT		(1 << 16)
++#define MX31_H2_DT_BIT		(1 << 5)
 +
-+#define IE_EOB		(1 << 0)
-+#define IE_EEOB		(1 << 5)
-+#define IE_ALL		0xff
++#define MX31_H1_SIC_SHIFT	13
++#define MX31_H1_SIC_MASK	(0xf << MX31_H1_SIC_SHIFT)
++#define MX31_H1_PM_BIT		(1 << 8)
++#define MX31_H1_DT_BIT		(1 << 4)
 +
-+#define SHARED_SIZE	PAGE_ALIGN(sizeof(struct pxa3xx_gcu_shared))
-+
-+/* #define PXA3XX_GCU_DEBUG */
-+/* #define PXA3XX_GCU_DEBUG_TIMER */
-+
-+#ifdef PXA3XX_GCU_DEBUG
-+#define QDUMP(msg)					\
-+	do {						\
-+		QPRINT(priv, KERN_DEBUG, msg);		\
-+	} while (0)
-+#else
-+#define QDUMP(msg)	do {} while (0)
-+#endif
-+
-+#define QERROR(msg)					\
-+	do {						\
-+		QPRINT(priv, KERN_ERR, msg);		\
-+	} while (0)
-+
-+struct pxa3xx_gcu_batch {
-+	struct pxa3xx_gcu_batch *next;
-+	u32			*ptr;
-+	dma_addr_t		 phys;
-+	unsigned long		 length;
-+};
-+
-+struct pxa3xx_gcu_priv {
-+	void __iomem		 *mmio_base;
-+	struct clk		 *clk;
-+	struct pxa3xx_gcu_shared *shared;
-+	dma_addr_t		  shared_phys;
-+	struct resource		 *resource_mem;
-+	struct miscdevice	  misc_dev;
-+	struct file_operations	  misc_fops;
-+	wait_queue_head_t	  wait_idle;
-+	wait_queue_head_t	  wait_free;
-+	spinlock_t		  spinlock;
-+	struct timeval 		  base_time;
-+
-+	struct pxa3xx_gcu_batch *free;
-+
-+	struct pxa3xx_gcu_batch *ready;
-+	struct pxa3xx_gcu_batch *ready_last;
-+	struct pxa3xx_gcu_batch *running;
-+};
-+
-+static inline unsigned long
-+gc_readl(struct pxa3xx_gcu_priv *priv, unsigned int off)
++int mxc_set_usbcontrol(int port, unsigned int flags)
 +{
-+	return __raw_readl(priv->mmio_base + off);
-+}
++	unsigned int v;
 +
-+static inline void
-+gc_writel(struct pxa3xx_gcu_priv *priv, unsigned int off, unsigned long val)
-+{
-+	__raw_writel(val, priv->mmio_base + off);
-+}
++	if (cpu_is_mx31()) {
++		v = readl(IO_ADDRESS(MX31_OTG_BASE_ADDR +
++				     USBCTRL_OTGBASE_OFFSET));
 +
-+#define QPRINT(priv, level, msg)					\
-+	do {								\
-+		struct timeval tv;					\
-+		struct pxa3xx_gcu_shared *shared = priv->shared;	\
-+		u32 base = gc_readl(priv, REG_GCRBBR);			\
-+									\
-+		do_gettimeofday(&tv);					\
-+									\
-+		printk(level "%ld.%03ld.%03ld - %-17s: %-21s (%s, "	\
-+			"STATUS "					\
-+			"0x%02lx, B 0x%08lx [%ld], E %5ld, H %5ld, "	\
-+			"T %5ld)\n",					\
-+			tv.tv_sec - priv->base_time.tv_sec,		\
-+			tv.tv_usec / 1000, tv.tv_usec % 1000,		\
-+			__func__, msg,					\
-+			shared->hw_running ? "running" : "   idle",	\
-+			gc_readl(priv, REG_GCISCR),			\
-+			gc_readl(priv, REG_GCRBBR),			\
-+			gc_readl(priv, REG_GCRBLR),			\
-+			(gc_readl(priv, REG_GCRBEXHR) - base) / 4,	\
-+			(gc_readl(priv, REG_GCRBHR) - base) / 4,	\
-+			(gc_readl(priv, REG_GCRBTR) - base) / 4);	\
-+	} while (0)
++		switch (port) {
++		case 0:	/* OTG port */
++			v &= ~(MX31_OTG_SIC_MASK | MX31_OTG_PM_BIT);
++			v |= (flags & MXC_EHCI_INTERFACE_MASK)
++					<< MX31_OTG_SIC_SHIFT;
++			if (flags & MXC_EHCI_POWER_PINS_ENABLED)
++				v |= MX31_OTG_PM_BIT;
 +
-+static void
-+pxa3xx_gcu_reset(struct pxa3xx_gcu_priv *priv)
-+{
-+	QDUMP("RESET");
-+
-+	/* disable interrupts */
-+	gc_writel(priv, REG_GCIECR, 0);
-+
-+	/* reset hardware */
-+	gc_writel(priv, REG_GCCR, GCCR_ABORT);
-+	gc_writel(priv, REG_GCCR, 0);
-+
-+	memset(priv->shared, 0, SHARED_SIZE);
-+	priv->shared->buffer_phys = priv->shared_phys;
-+	priv->shared->magic = PXA3XX_GCU_SHARED_MAGIC;
-+
-+	do_gettimeofday(&priv->base_time);
-+
-+	/* set up the ring buffer pointers */
-+	gc_writel(priv, REG_GCRBLR, 0);
-+	gc_writel(priv, REG_GCRBBR, priv->shared_phys);
-+	gc_writel(priv, REG_GCRBTR, priv->shared_phys);
-+
-+	/* enable all IRQs except EOB */
-+	gc_writel(priv, REG_GCIECR, IE_ALL & ~IE_EOB);
-+}
-+
-+static void
-+dump_whole_state(struct pxa3xx_gcu_priv *priv)
-+{
-+	struct pxa3xx_gcu_shared *sh = priv->shared;
-+	u32 base = gc_readl(priv, REG_GCRBBR);
-+
-+	QDUMP("DUMP");
-+
-+	printk(KERN_DEBUG "== PXA3XX-GCU DUMP ==\n"
-+		"%s, STATUS 0x%02lx, B 0x%08lx [%ld], E %5ld, H %5ld, T %5ld\n",
-+		sh->hw_running ? "running" : "idle   ",
-+		gc_readl(priv, REG_GCISCR),
-+		gc_readl(priv, REG_GCRBBR),
-+		gc_readl(priv, REG_GCRBLR),
-+		(gc_readl(priv, REG_GCRBEXHR) - base) / 4,
-+		(gc_readl(priv, REG_GCRBHR) - base) / 4,
-+		(gc_readl(priv, REG_GCRBTR) - base) / 4);
-+}
-+
-+static void
-+flush_running(struct pxa3xx_gcu_priv *priv)
-+{
-+	struct pxa3xx_gcu_batch *running = priv->running;
-+	struct pxa3xx_gcu_batch *next;
-+
-+	while (running) {
-+		next = running->next;
-+		running->next = priv->free;
-+		priv->free = running;
-+		running = next;
-+	}
-+
-+	priv->running = NULL;
-+}
-+
-+static void
-+run_ready(struct pxa3xx_gcu_priv *priv)
-+{
-+	unsigned int num = 0;
-+	struct pxa3xx_gcu_shared *shared = priv->shared;
-+	struct pxa3xx_gcu_batch	*ready = priv->ready;
-+
-+	QDUMP("Start");
-+
-+	BUG_ON(!ready);
-+
-+	shared->buffer[num++] = 0x05000000;
-+
-+	while (ready) {
-+		shared->buffer[num++] = 0x00000001;
-+		shared->buffer[num++] = ready->phys;
-+		ready = ready->next;
-+	}
-+
-+	shared->buffer[num++] = 0x05000000;
-+	priv->running = priv->ready;
-+	priv->ready = priv->ready_last = NULL;
-+	gc_writel(priv, REG_GCRBLR, 0);
-+	shared->hw_running = 1;
-+
-+	/* ring base address */
-+	gc_writel(priv, REG_GCRBBR, shared->buffer_phys);
-+
-+	/* ring tail address */
-+	gc_writel(priv, REG_GCRBTR, shared->buffer_phys + num * 4);
-+
-+	/* ring length */
-+	gc_writel(priv, REG_GCRBLR, ((num + 63) & ~63) * 4);
-+}
-+
-+static irqreturn_t
-+pxa3xx_gcu_handle_irq(int irq, void *ctx)
-+{
-+	struct pxa3xx_gcu_priv *priv = ctx;
-+	struct pxa3xx_gcu_shared *shared = priv->shared;
-+	u32 status = gc_readl(priv, REG_GCISCR) & IE_ALL;
-+
-+	QDUMP("-Interrupt");
-+
-+	if (!status)
-+		return IRQ_NONE;
-+
-+	spin_lock(&priv->spinlock);
-+	shared->num_interrupts++;
-+
-+	if (status & IE_EEOB) {
-+		QDUMP(" [EEOB]");
-+
-+		flush_running(priv);
-+		wake_up_all(&priv->wait_free);
-+
-+		if (priv->ready) {
-+			run_ready(priv);
-+		} else {
-+			/* There is no more data prepared by the userspace.
-+			 * Set hw_running = 0 and wait for the next userspace
-+			 * kick-off */
-+			shared->num_idle++;
-+			shared->hw_running = 0;
-+
-+			QDUMP(" '-> Idle.");
-+
-+			/* set ring buffer length to zero */
-+			gc_writel(priv, REG_GCRBLR, 0);
-+
-+			wake_up_all(&priv->wait_idle);
-+		}
-+
-+		shared->num_done++;
-+	} else {
-+		QERROR(" [???]");
-+		dump_whole_state(priv);
-+	}
-+
-+	/* Clear the interrupt */
-+	gc_writel(priv, REG_GCISCR, status);
-+	spin_unlock(&priv->spinlock);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int
-+pxa3xx_gcu_wait_idle(struct pxa3xx_gcu_priv *priv)
-+{
-+	int ret = 0;
-+
-+	QDUMP("Waiting for idle...");
-+
-+	/* Does not need to be atomic. There's a lock in user space,
-+	 * but anyhow, this is just for statistics. */
-+	priv->shared->num_wait_idle++;
-+
-+	while (priv->shared->hw_running) {
-+		int num = priv->shared->num_interrupts;
-+		u32 rbexhr = gc_readl(priv, REG_GCRBEXHR);
-+
-+		ret = wait_event_interruptible_timeout(priv->wait_idle,
-+					!priv->shared->hw_running, HZ*4);
-+
-+		if (ret < 0)
 +			break;
++		case 1: /* H1 port */
++			v &= ~(MX31_H1_SIC_MASK | MX31_H1_PM_BIT);
++			v |= (flags & MXC_EHCI_INTERFACE_MASK)
++						<< MX31_H1_SIC_SHIFT;
++			if (flags & MXC_EHCI_POWER_PINS_ENABLED)
++				v |= MX31_H1_PM_BIT;
 +
-+		if (ret > 0)
-+			continue;
++			if (!(flags & MXC_EHCI_TTL_ENABLED))
++				v |= MX31_H1_DT_BIT;
 +
-+		if (gc_readl(priv, REG_GCRBEXHR) == rbexhr &&
-+		    priv->shared->num_interrupts == num) {
-+			QERROR("TIMEOUT");
-+			ret = -ETIMEDOUT;
++			break;
++		case 2:	/* H2 port */
++			v &= ~(MX31_H2_SIC_MASK | MX31_H2_PM_BIT);
++			v |= (flags & MXC_EHCI_INTERFACE_MASK)
++						<< MX31_H2_SIC_SHIFT;
++			if (!(flags & MXC_EHCI_POWER_PINS_ENABLED))
++				v |= MX31_H2_PM_BIT;
++
++			if (!(flags & MXC_EHCI_TTL_ENABLED))
++				v |= MX31_H2_DT_BIT;
++
 +			break;
 +		}
-+	}
 +
-+	QDUMP("done");
-+
-+	return ret;
-+}
-+
-+static int
-+pxa3xx_gcu_wait_free(struct pxa3xx_gcu_priv *priv)
-+{
-+	int ret = 0;
-+
-+	QDUMP("Waiting for free...");
-+
-+	/* Does not need to be atomic. There's a lock in user space,
-+	 * but anyhow, this is just for statistics. */
-+	priv->shared->num_wait_free++;
-+
-+	while (!priv->free) {
-+		u32 rbexhr = gc_readl(priv, REG_GCRBEXHR);
-+
-+		ret = wait_event_interruptible_timeout(priv->wait_free,
-+						       priv->free, HZ*4);
-+
-+		if (ret < 0)
-+			break;
-+
-+		if (ret > 0)
-+			continue;
-+
-+		if (gc_readl(priv, REG_GCRBEXHR) == rbexhr) {
-+			QERROR("TIMEOUT");
-+			ret = -ETIMEDOUT;
-+			break;
-+		}
-+	}
-+
-+	QDUMP("done");
-+
-+	return ret;
-+}
-+
-+/* Misc device layer */
-+
-+static ssize_t
-+pxa3xx_gcu_misc_write(struct file *filp, const char *buff,
-+		      size_t count, loff_t *offp)
-+{
-+	int ret;
-+	unsigned long flags;
-+	struct pxa3xx_gcu_batch	*buffer;
-+	struct pxa3xx_gcu_priv *priv =
-+		container_of(filp->f_op, struct pxa3xx_gcu_priv, misc_fops);
-+
-+	int words = count / 4;
-+
-+	/* Does not need to be atomic. There's a lock in user space,
-+	 * but anyhow, this is just for statistics. */
-+	priv->shared->num_writes++;
-+
-+	priv->shared->num_words += words;
-+
-+	/* Last word reserved for batch buffer end command */
-+	if (words >= PXA3XX_GCU_BATCH_WORDS)
-+		return -E2BIG;
-+
-+	/* Wait for a free buffer */
-+	if (!priv->free) {
-+		ret = pxa3xx_gcu_wait_free(priv);
-+		if (ret < 0)
-+			return ret;
-+	}
-+
-+	/*
-+	 * Get buffer from free list
-+	 */
-+	spin_lock_irqsave(&priv->spinlock, flags);
-+
-+	buffer = priv->free;
-+	priv->free = buffer->next;
-+
-+	spin_unlock_irqrestore(&priv->spinlock, flags);
-+
-+
-+	/* Copy data from user into buffer */
-+	ret = copy_from_user(buffer->ptr, buff, words * 4);
-+	if (ret) {
-+		spin_lock_irqsave(&priv->spinlock, flags);
-+		buffer->next = priv->free;
-+		priv->free = buffer;
-+		spin_unlock_irqrestore(&priv->spinlock, flags);
-+		return ret;
-+	}
-+
-+	buffer->length = words;
-+
-+	/* Append batch buffer end command */
-+	buffer->ptr[words] = 0x01000000;
-+
-+	/*
-+	 * Add buffer to ready list
-+	 */
-+	spin_lock_irqsave(&priv->spinlock, flags);
-+
-+	buffer->next = NULL;
-+
-+	if (priv->ready) {
-+		BUG_ON(priv->ready_last == NULL);
-+
-+		priv->ready_last->next = buffer;
-+	} else
-+		priv->ready = buffer;
-+
-+	priv->ready_last = buffer;
-+
-+	if (!priv->shared->hw_running)
-+		run_ready(priv);
-+
-+	spin_unlock_irqrestore(&priv->spinlock, flags);
-+
-+	return words * 4;
-+}
-+
-+
-+static int
-+pxa3xx_gcu_misc_ioctl(struct inode *inode, struct file *filp,
-+		 unsigned int cmd, unsigned long arg)
-+{
-+	unsigned long flags;
-+	struct pxa3xx_gcu_priv *priv =
-+		container_of(filp->f_op, struct pxa3xx_gcu_priv, misc_fops);
-+
-+	switch (cmd) {
-+	case PXA3XX_GCU_IOCTL_RESET:
-+		spin_lock_irqsave(&priv->spinlock, flags);
-+		pxa3xx_gcu_reset(priv);
-+		spin_unlock_irqrestore(&priv->spinlock, flags);
++		writel(v, IO_ADDRESS(MX31_OTG_BASE_ADDR +
++				     USBCTRL_OTGBASE_OFFSET));
 +		return 0;
-+
-+	case PXA3XX_GCU_IOCTL_WAIT_IDLE:
-+		return pxa3xx_gcu_wait_idle(priv);
 +	}
 +
-+	return -ENOSYS;
-+}
-+
-+static int
-+pxa3xx_gcu_misc_mmap(struct file *filp, struct vm_area_struct *vma)
-+{
-+	unsigned int size = vma->vm_end - vma->vm_start;
-+	struct pxa3xx_gcu_priv *priv =
-+		container_of(filp->f_op, struct pxa3xx_gcu_priv, misc_fops);
-+
-+	switch (vma->vm_pgoff) {
-+	case 0:
-+		/* hand out the shared data area */
-+		if (size != SHARED_SIZE)
-+			return -EINVAL;
-+
-+		return dma_mmap_coherent(NULL, vma,
-+			priv->shared, priv->shared_phys, size);
-+
-+	case SHARED_SIZE >> PAGE_SHIFT:
-+		/* hand out the MMIO base for direct register access
-+		 * from userspace */
-+		if (size != resource_size(priv->resource_mem))
-+			return -EINVAL;
-+
-+		vma->vm_flags |= VM_IO;
-+		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-+
-+		return io_remap_pfn_range(vma, vma->vm_start,
-+				priv->resource_mem->start >> PAGE_SHIFT,
-+				size, vma->vm_page_prot);
-+	}
-+
++	printk(KERN_WARNING
++		"%s() unable to setup USBCONTROL for this CPU\n", __func__);
 +	return -EINVAL;
 +}
++EXPORT_SYMBOL(mxc_set_usbcontrol);
 +
+diff --git a/arch/arm/plat-mxc/include/mach/mxc_ehci.h b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
+new file mode 100644
+index 0000000..8f79623
+--- /dev/null
++++ b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
+@@ -0,0 +1,37 @@
++#ifndef __INCLUDE_ASM_ARCH_MXC_EHCI_H
++#define __INCLUDE_ASM_ARCH_MXC_EHCI_H
 +
-+#ifdef PXA3XX_GCU_DEBUG_TIMER
-+static struct timer_list pxa3xx_gcu_debug_timer;
++/* values for portsc field */
++#define MXC_EHCI_PHY_LOW_POWER_SUSPEND	(1 << 23)
++#define MXC_EHCI_FORCE_FS		(1 << 24)
++#define MXC_EHCI_UTMI_8BIT		(0 << 28)
++#define MXC_EHCI_UTMI_16BIT		(1 << 28)
++#define MXC_EHCI_SERIAL			(1 << 29)
++#define MXC_EHCI_MODE_UTMI		(0 << 30)
++#define MXC_EHCI_MODE_PHILIPS		(1 << 30)
++#define MXC_EHCI_MODE_ULPI		(2 << 30)
++#define MXC_EHCI_MODE_SERIAL		(3 << 30)
 +
-+static void pxa3xx_gcu_debug_timedout(unsigned long ptr)
-+{
-+	struct pxa3xx_gcu_priv *priv = (struct pxa3xx_gcu_priv *) ptr;
++/* values for flags field */
++#define MXC_EHCI_INTERFACE_DIFF_UNI	(0 << 0)
++#define MXC_EHCI_INTERFACE_DIFF_BI	(1 << 0)
++#define MXC_EHCI_INTERFACE_SINGLE_UNI	(2 << 0)
++#define MXC_EHCI_INTERFACE_SINGLE_BI	(3 << 0)
++#define MXC_EHCI_INTERFACE_MASK		(0xf)
 +
-+	QERROR("Timer DUMP");
++#define MXC_EHCI_POWER_PINS_ENABLED	(1 << 5)
++#define MXC_EHCI_TTL_ENABLED		(1 << 6)
 +
-+	/* init the timer structure */
-+	init_timer(&pxa3xx_gcu_debug_timer);
-+	pxa3xx_gcu_debug_timer.function = pxa3xx_gcu_debug_timedout;
-+	pxa3xx_gcu_debug_timer.data = ptr;
-+	pxa3xx_gcu_debug_timer.expires = jiffies + 5*HZ; /* one second */
++struct mxc_usbh_platform_data {
++	int (*init)(struct platform_device *pdev);
++	int (*exit)(struct platform_device *pdev);
 +
-+	add_timer(&pxa3xx_gcu_debug_timer);
-+}
++	unsigned int		 portsc;
++	unsigned int		 flags;
++	struct otg_transceiver	*otg;
++};
 +
-+static void pxa3xx_gcu_init_debug_timer(void)
-+{
-+	pxa3xx_gcu_debug_timedout((unsigned long) &pxa3xx_gcu_debug_timer);
-+}
-+#else
-+static inline void pxa3xx_gcu_init_debug_timer(void) {}
++int mxc_set_usbcontrol(int port, unsigned int flags);
++
++#endif /* __INCLUDE_ASM_ARCH_MXC_EHCI_H */
++
+diff --git a/drivers/usb/Kconfig b/drivers/usb/Kconfig
+index 2407508..a3b7caf 100644
+--- a/drivers/usb/Kconfig
++++ b/drivers/usb/Kconfig
+@@ -60,6 +60,7 @@ config USB_ARCH_HAS_EHCI
+ 	default y if ARCH_IXP4XX
+ 	default y if ARCH_W90X900
+ 	default y if ARCH_AT91SAM9G45
++	default y if ARCH_MXC
+ 	default PCI
+ 
+ # ARM SA1111 chips have a non-PCI based "OHCI-compatible" USB host interface.
+diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+index 9b43b22..aeb4a4e 100644
+--- a/drivers/usb/host/Kconfig
++++ b/drivers/usb/host/Kconfig
+@@ -105,6 +105,13 @@ config USB_EHCI_FSL
+ 	---help---
+ 	  Variation of ARC USB block used in some Freescale chips.
+ 
++config USB_EHCI_MXC
++	bool "Support for Freescale on-chip EHCI USB controller"
++	depends on USB_EHCI_HCD && ARCH_MXC
++	select USB_EHCI_ROOT_HUB_TT
++	---help---
++	  Variation of ARC USB block used in some Freescale chips.
++
+ config USB_EHCI_HCD_PPC_OF
+ 	bool "EHCI support for PPC USB controller on OF platform bus"
+ 	depends on USB_EHCI_HCD && PPC_OF
+diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
+index 9835e07..170b7d1 100644
+--- a/drivers/usb/host/ehci-hcd.c
++++ b/drivers/usb/host/ehci-hcd.c
+@@ -1103,6 +1103,11 @@ MODULE_LICENSE ("GPL");
+ #define	PLATFORM_DRIVER		ehci_fsl_driver
+ #endif
+ 
++#ifdef CONFIG_USB_EHCI_MXC
++#include "ehci-mxc.c"
++#define PLATFORM_DRIVER		ehci_mxc_driver
 +#endif
 +
-+static int
-+add_buffer(struct platform_device *dev,
-+	   struct pxa3xx_gcu_priv *priv)
+ #ifdef CONFIG_SOC_AU1200
+ #include "ehci-au1xxx.c"
+ #define	PLATFORM_DRIVER		ehci_hcd_au1xxx_driver
+diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+new file mode 100644
+index 0000000..35c56f4
+--- /dev/null
++++ b/drivers/usb/host/ehci-mxc.c
+@@ -0,0 +1,296 @@
++/*
++ * Copyright (c) 2008 Sascha Hauer <s.hauer@pengutronix.de>, Pengutronix
++ * Copyright (c) 2009 Daniel Mack <daniel@caiaq.de>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License as published by the
++ * Free Software Foundation; either version 2 of the License, or (at your
++ * option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
++ * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
++ * for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++ */
++
++#include <linux/platform_device.h>
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/usb/otg.h>
++
++#include <mach/mxc_ehci.h>
++
++#define ULPI_VIEWPORT_OFFSET	0x170
++#define PORTSC_OFFSET		0x184
++#define USBMODE_OFFSET		0x1a8
++#define USBMODE_CM_HOST		3
++
++struct ehci_mxc_priv {
++	struct clk *usbclk, *ahbclk;
++	struct usb_hcd *hcd;
++};
++
++/* called during probe() after chip reset completes */
++static int ehci_mxc_setup(struct usb_hcd *hcd)
 +{
-+	struct pxa3xx_gcu_batch *buffer;
++	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
++	int retval;
 +
-+	buffer = kzalloc(sizeof(struct pxa3xx_gcu_batch), GFP_KERNEL);
-+	if (!buffer)
-+		return -ENOMEM;
++	/* EHCI registers start at offset 0x100 */
++	ehci->caps = hcd->regs + 0x100;
++	ehci->regs = hcd->regs + 0x100 +
++	    HC_LENGTH(ehci_readl(ehci, &ehci->caps->hc_capbase));
++	dbg_hcs_params(ehci, "reset");
++	dbg_hcc_params(ehci, "reset");
 +
-+	buffer->ptr = dma_alloc_coherent(&dev->dev, PXA3XX_GCU_BATCH_WORDS * 4,
-+					 &buffer->phys, GFP_KERNEL);
-+	if (!buffer->ptr) {
-+		kfree(buffer);
-+		return -ENOMEM;
-+	}
++	/* cache this readonly data; minimize chip reads */
++	ehci->hcs_params = ehci_readl(ehci, &ehci->caps->hcs_params);
 +
-+	buffer->next = priv->free;
++	retval = ehci_halt(ehci);
++	if (retval)
++		return retval;
 +
-+	priv->free = buffer;
++	/* data structure init */
++	retval = ehci_init(hcd);
++	if (retval)
++		return retval;
 +
++	hcd->has_tt = 1;
++
++	ehci->sbrn = 0x20;
++
++	ehci_reset(ehci);
++
++	ehci_port_power(ehci, 0);
 +	return 0;
 +}
 +
-+static void
-+free_buffers(struct platform_device *dev,
-+	     struct pxa3xx_gcu_priv *priv)
++static const struct hc_driver ehci_mxc_hc_driver = {
++	.description = hcd_name,
++	.product_desc = "Freescale On-Chip EHCI Host Controller",
++	.hcd_priv_size = sizeof(struct ehci_hcd),
++
++	/*
++	 * generic hardware linkage
++	 */
++	.irq = ehci_irq,
++	.flags = HCD_USB2 | HCD_MEMORY,
++
++	/*
++	 * basic lifecycle operations
++	 */
++	.reset = ehci_mxc_setup,
++	.start = ehci_run,
++	.stop = ehci_stop,
++	.shutdown = ehci_shutdown,
++
++	/*
++	 * managing i/o requests and associated device resources
++	 */
++	.urb_enqueue = ehci_urb_enqueue,
++	.urb_dequeue = ehci_urb_dequeue,
++	.endpoint_disable = ehci_endpoint_disable,
++
++	/*
++	 * scheduling support
++	 */
++	.get_frame_number = ehci_get_frame,
++
++	/*
++	 * root hub support
++	 */
++	.hub_status_data = ehci_hub_status_data,
++	.hub_control = ehci_hub_control,
++	.bus_suspend = ehci_bus_suspend,
++	.bus_resume = ehci_bus_resume,
++	.relinquish_port = ehci_relinquish_port,
++	.port_handed_over = ehci_port_handed_over,
++};
++
++static int ehci_mxc_drv_probe(struct platform_device *pdev)
 +{
-+	struct pxa3xx_gcu_batch *next, *buffer = priv->free;
++	struct mxc_usbh_platform_data *pdata = pdev->dev.platform_data;
++	struct usb_hcd *hcd;
++	struct resource *res;
++	int irq, ret, temp;
++	struct ehci_mxc_priv *priv;
++	struct device *dev = &pdev->dev;
 +
-+	while (buffer) {
-+		next = buffer->next;
++	dev_info(&pdev->dev, "initializing i.MX USB Controller\n");
 +
-+		dma_free_coherent(&dev->dev, PXA3XX_GCU_BATCH_WORDS * 4,
-+				  buffer->ptr, buffer->phys);
-+
-+		kfree(buffer);
-+
-+		buffer = next;
++	if (!pdata) {
++		dev_err(dev, "No platform data given, bailing out.\n");
++		return -EINVAL;
 +	}
 +
-+	priv->free = NULL;
-+}
++	irq = platform_get_irq(pdev, 0);
 +
-+static int __devinit
-+pxa3xx_gcu_probe(struct platform_device *dev)
-+{
-+	int i, ret, irq;
-+	struct resource *r;
-+	struct pxa3xx_gcu_priv *priv;
-+
-+	priv = kzalloc(sizeof(struct pxa3xx_gcu_priv), GFP_KERNEL);
-+	if (!priv)
++	hcd = usb_create_hcd(&ehci_mxc_hc_driver, dev, dev_name(dev));
++	if (!hcd)
 +		return -ENOMEM;
 +
-+	for (i = 0; i < 8; i++) {
-+		ret = add_buffer(dev, priv);
++	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
++	if (!priv) {
++		ret = -ENOMEM;
++		goto err_alloc;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_err(dev, "Found HC with no register addr. Check setup!\n");
++		ret = -ENODEV;
++		goto err_get_resource;
++	}
++
++	hcd->rsrc_start = res->start;
++	hcd->rsrc_len = resource_size(res);
++
++	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
++		dev_dbg(dev, "controller already in use\n");
++		ret = -EBUSY;
++		goto err_request_mem;
++	}
++
++	hcd->regs = ioremap(hcd->rsrc_start, hcd->rsrc_len);
++	if (!hcd->regs) {
++		dev_err(dev, "error mapping memory\n");
++		ret = -EFAULT;
++		goto err_ioremap;
++	}
++
++	/* enable clocks */
++	priv->usbclk = clk_get(dev, "usb");
++	if (IS_ERR(priv->usbclk)) {
++		ret = PTR_ERR(priv->usbclk);
++		goto err_clk;
++	}
++	clk_enable(priv->usbclk);
++
++	if (!cpu_is_mx35()) {
++		priv->ahbclk = clk_get(dev, "usb_ahb");
++		if (IS_ERR(priv->ahbclk)) {
++			ret = PTR_ERR(priv->ahbclk);
++			goto err_clk_ahb;
++		}
++		clk_enable(priv->ahbclk);
++	}
++
++	/* set USBMODE to host mode */
++	temp = readl(hcd->regs + USBMODE_OFFSET);
++	writel(temp | USBMODE_CM_HOST, hcd->regs + USBMODE_OFFSET);
++
++	/* set up the PORTSCx register */
++	writel(pdata->portsc, hcd->regs + PORTSC_OFFSET);
++	mdelay(10);
++
++	/* setup USBCONTROL. */
++	ret = mxc_set_usbcontrol(pdev->id, pdata->flags);
++	if (ret < 0)
++		goto err_init;
++
++	/* call platform specific init function */
++	if (pdata->init) {
++		ret = pdata->init(pdev);
 +		if (ret) {
-+			dev_err(&dev->dev, "failed to allocate DMA memory\n");
-+			goto err_free_priv;
++			dev_err(dev, "platform init failed\n");
++			goto err_init;
 +		}
 +	}
 +
-+	init_waitqueue_head(&priv->wait_idle);
-+	init_waitqueue_head(&priv->wait_free);
-+	spin_lock_init(&priv->spinlock);
++	/* most platforms need some time to settle changed IO settings */
++	mdelay(10);
 +
-+	/* we allocate the misc device structure as part of our own allocation,
-+	 * so we can get a pointer to our priv structure later on with
-+	 * container_of(). This isn't really necessary as we have a fixed minor
-+	 * number anyway, but this is to avoid statics. */
-+
-+	priv->misc_fops.owner	= THIS_MODULE;
-+	priv->misc_fops.write	= pxa3xx_gcu_misc_write;
-+	priv->misc_fops.ioctl	= pxa3xx_gcu_misc_ioctl;
-+	priv->misc_fops.mmap	= pxa3xx_gcu_misc_mmap;
-+
-+	priv->misc_dev.minor	= MISCDEV_MINOR,
-+	priv->misc_dev.name	= DRV_NAME,
-+	priv->misc_dev.fops	= &priv->misc_fops,
-+
-+	/* register misc device */
-+	ret = misc_register(&priv->misc_dev);
-+	if (ret < 0) {
-+		dev_err(&dev->dev, "misc_register() for minor %d failed\n",
-+			MISCDEV_MINOR);
-+		goto err_free_priv;
++	/* Initialize the transceiver */
++	if (pdata->otg) {
++		pdata->otg->io_priv = hcd->regs + ULPI_VIEWPORT_OFFSET;
++		if (otg_init(pdata->otg) != 0)
++			dev_err(dev, "unable to init transceiver\n");
++		else if (otg_set_vbus(pdata->otg, 1) != 0)
++			dev_err(dev, "unable to enable vbus on transceiver\n");
 +	}
 +
-+	/* handle IO resources */
-+	r = platform_get_resource(dev, IORESOURCE_MEM, 0);
-+	if (r == NULL) {
-+		dev_err(&dev->dev, "no I/O memory resource defined\n");
-+		ret = -ENODEV;
-+		goto err_misc_deregister;
-+	}
++	priv->hcd = hcd;
++	platform_set_drvdata(pdev, priv);
 +
-+	if (!request_mem_region(r->start, resource_size(r), dev->name)) {
-+		dev_err(&dev->dev, "failed to request I/O memory\n");
-+		ret = -EBUSY;
-+		goto err_misc_deregister;
-+	}
++	ret = usb_add_hcd(hcd, irq, IRQF_DISABLED | IRQF_SHARED);
++	if (ret)
++		goto err_add;
 +
-+	priv->mmio_base = ioremap_nocache(r->start, resource_size(r));
-+	if (!priv->mmio_base) {
-+		dev_err(&dev->dev, "failed to map I/O memory\n");
-+		ret = -EBUSY;
-+		goto err_free_mem_region;
-+	}
-+
-+	/* allocate dma memory */
-+	priv->shared = dma_alloc_coherent(&dev->dev, SHARED_SIZE,
-+					  &priv->shared_phys, GFP_KERNEL);
-+
-+	if (!priv->shared) {
-+		dev_err(&dev->dev, "failed to allocate DMA memory\n");
-+		ret = -ENOMEM;
-+		goto err_free_io;
-+	}
-+
-+	/* enable the clock */
-+	priv->clk = clk_get(&dev->dev, NULL);
-+	if (IS_ERR(priv->clk)) {
-+		dev_err(&dev->dev, "failed to get clock\n");
-+		ret = -ENODEV;
-+		goto err_free_dma;
-+	}
-+
-+	ret = clk_enable(priv->clk);
-+	if (ret < 0) {
-+		dev_err(&dev->dev, "failed to enable clock\n");
-+		goto err_put_clk;
-+	}
-+
-+	/* request the IRQ */
-+	irq = platform_get_irq(dev, 0);
-+	if (irq < 0) {
-+		dev_err(&dev->dev, "no IRQ defined\n");
-+		ret = -ENODEV;
-+		goto err_put_clk;
-+	}
-+
-+	ret = request_irq(irq, pxa3xx_gcu_handle_irq,
-+			  IRQF_DISABLED, DRV_NAME, priv);
-+	if (ret) {
-+		dev_err(&dev->dev, "request_irq failed\n");
-+		ret = -EBUSY;
-+		goto err_put_clk;
-+	}
-+
-+	platform_set_drvdata(dev, priv);
-+	priv->resource_mem = r;
-+	pxa3xx_gcu_reset(priv);
-+	pxa3xx_gcu_init_debug_timer();
-+
-+	dev_info(&dev->dev, "registered @0x%p, DMA 0x%p (%d bytes), IRQ %d\n",
-+			(void *) r->start, (void *) priv->shared_phys,
-+			SHARED_SIZE, irq);
 +	return 0;
 +
-+err_put_clk:
-+	clk_disable(priv->clk);
-+	clk_put(priv->clk);
-+
-+err_free_dma:
-+	dma_free_coherent(&dev->dev, SHARED_SIZE,
-+			priv->shared, priv->shared_phys);
-+
-+err_free_io:
-+	iounmap(priv->mmio_base);
-+
-+err_free_mem_region:
-+	release_mem_region(r->start, resource_size(r));
-+
-+err_misc_deregister:
-+	misc_deregister(&priv->misc_dev);
-+
-+err_free_priv:
-+	platform_set_drvdata(dev, NULL);
-+	free_buffers(dev, priv);
++err_add:
++	if (pdata && pdata->exit)
++		pdata->exit(pdev);
++err_init:
++	if (priv->ahbclk) {
++		clk_disable(priv->ahbclk);
++		clk_put(priv->ahbclk);
++	}
++err_clk_ahb:
++	clk_disable(priv->usbclk);
++	clk_put(priv->usbclk);
++err_clk:
++	iounmap(hcd->regs);
++err_ioremap:
++	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
++err_request_mem:
++err_get_resource:
 +	kfree(priv);
++err_alloc:
++	usb_put_hcd(hcd);
 +	return ret;
 +}
 +
-+static int __devexit
-+pxa3xx_gcu_remove(struct platform_device *dev)
++static int __exit ehci_mxc_drv_remove(struct platform_device *pdev)
 +{
-+	struct pxa3xx_gcu_priv *priv = platform_get_drvdata(dev);
-+	struct resource *r = priv->resource_mem;
++	struct mxc_usbh_platform_data *pdata = pdev->dev.platform_data;
++	struct ehci_mxc_priv *priv = platform_get_drvdata(pdev);
++	struct usb_hcd *hcd = priv->hcd;
 +
-+	pxa3xx_gcu_wait_idle(priv);
++	if (pdata && pdata->exit)
++		pdata->exit(pdev);
 +
-+	misc_deregister(&priv->misc_dev);
-+	dma_free_coherent(&dev->dev, SHARED_SIZE,
-+			priv->shared, priv->shared_phys);
-+	iounmap(priv->mmio_base);
-+	release_mem_region(r->start, resource_size(r));
-+	platform_set_drvdata(dev, NULL);
-+	clk_disable(priv->clk);
-+	free_buffers(dev, priv);
++	if (pdata->otg)
++		otg_shutdown(pdata->otg);
++
++	usb_remove_hcd(hcd);
++	iounmap(hcd->regs);
++	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
++	usb_put_hcd(hcd);
++	platform_set_drvdata(pdev, NULL);
++
++	clk_disable(priv->usbclk);
++	clk_put(priv->usbclk);
++	if (priv->ahbclk) {
++		clk_disable(priv->ahbclk);
++		clk_put(priv->ahbclk);
++	}
++
 +	kfree(priv);
 +
 +	return 0;
 +}
 +
-+static struct platform_driver pxa3xx_gcu_driver = {
-+	.probe	  = pxa3xx_gcu_probe,
-+	.remove	 = __devexit_p(pxa3xx_gcu_remove),
-+	.driver	 = {
-+		.owner  = THIS_MODULE,
-+		.name   = DRV_NAME,
++static void ehci_mxc_drv_shutdown(struct platform_device *pdev)
++{
++	struct ehci_mxc_priv *priv = platform_get_drvdata(pdev);
++	struct usb_hcd *hcd = priv->hcd;
++
++	if (hcd->driver->shutdown)
++		hcd->driver->shutdown(hcd);
++}
++
++MODULE_ALIAS("platform:mxc-ehci");
++
++static struct platform_driver ehci_mxc_driver = {
++	.probe = ehci_mxc_drv_probe,
++	.remove = __exit_p(ehci_mxc_drv_remove),
++	.shutdown = ehci_mxc_drv_shutdown,
++	.driver = {
++		   .name = "mxc-ehci",
 +	},
 +};
-+
-+static int __init
-+pxa3xx_gcu_init(void)
-+{
-+	return platform_driver_register(&pxa3xx_gcu_driver);
-+}
-+
-+static void __exit
-+pxa3xx_gcu_exit(void)
-+{
-+	platform_driver_unregister(&pxa3xx_gcu_driver);
-+}
-+
-+module_init(pxa3xx_gcu_init);
-+module_exit(pxa3xx_gcu_exit);
-+
-+MODULE_DESCRIPTION("PXA3xx graphics controller unit driver");
-+MODULE_LICENSE("GPL");
-+MODULE_ALIAS_MISCDEV(MISCDEV_MINOR);
-+MODULE_AUTHOR("Janine Kropp <nin@directfb.org>, "
-+		"Denis Oliver Kropp <dok@directfb.org>, "
-+		"Daniel Mack <daniel@caiaq.de>");
-diff --git a/drivers/video/pxa3xx-gcu.h b/drivers/video/pxa3xx-gcu.h
-new file mode 100644
-index 0000000..0428ed0
---- /dev/null
-+++ b/drivers/video/pxa3xx-gcu.h
-@@ -0,0 +1,38 @@
-+#ifndef __PXA3XX_GCU_H__
-+#define __PXA3XX_GCU_H__
-+
-+#include <linux/types.h>
-+
-+/* Number of 32bit words in display list (ring buffer). */
-+#define PXA3XX_GCU_BUFFER_WORDS  ((256 * 1024 - 256) / 4)
-+
-+/* To be increased when breaking the ABI */
-+#define PXA3XX_GCU_SHARED_MAGIC  0x30000001
-+
-+#define PXA3XX_GCU_BATCH_WORDS   8192
-+
-+struct pxa3xx_gcu_shared {
-+	u32            buffer[PXA3XX_GCU_BUFFER_WORDS];
-+
-+	bool           hw_running;
-+
-+	unsigned long  buffer_phys;
-+
-+	unsigned int   num_words;
-+	unsigned int   num_writes;
-+	unsigned int   num_done;
-+	unsigned int   num_interrupts;
-+	unsigned int   num_wait_idle;
-+	unsigned int   num_wait_free;
-+	unsigned int   num_idle;
-+
-+	u32            magic;
-+};
-+
-+/* Initialization and synchronization.
-+ * Hardware is started upon write(). */
-+#define PXA3XX_GCU_IOCTL_RESET		_IO('G', 0)
-+#define PXA3XX_GCU_IOCTL_WAIT_IDLE	_IO('G', 2)
-+
-+#endif /* __PXA3XX_GCU_H__ */
-+
 -- 
 1.6.5
