@@ -1,7 +1,7 @@
 From: daniel@caiaq.de (Daniel Mack)
 Date: Thu, 25 Jun 2009 13:27:40 +0200
 Subject: [PATCH] MXC: Add support for ULPI Viewports
-Message-ID: <mailman.98.1256912213.2253.linux-arm-kernel@lists.infradead.org>
+Message-ID: <mailman.111.1257410661.2253.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,8 +18,8 @@ Cc: linux-usb at vger.kernel.org
  arch/arm/plat-mxc/Kconfig             |    3 +
  arch/arm/plat-mxc/Makefile            |    1 +
  arch/arm/plat-mxc/include/mach/ulpi.h |    7 ++
- arch/arm/plat-mxc/ulpi.c              |  111 +++++++++++++++++++++++++++++++++
- 4 files changed, 122 insertions(+), 0 deletions(-)
+ arch/arm/plat-mxc/ulpi.c              |  113 +++++++++++++++++++++++++++++++++
+ 4 files changed, 124 insertions(+), 0 deletions(-)
  create mode 100644 arch/arm/plat-mxc/include/mach/ulpi.h
  create mode 100644 arch/arm/plat-mxc/ulpi.c
 
@@ -61,12 +61,13 @@ index 0000000..96b6ab4
 +
 diff --git a/arch/arm/plat-mxc/ulpi.c b/arch/arm/plat-mxc/ulpi.c
 new file mode 100644
-index 0000000..b6977b9
+index 0000000..582c6df
 --- /dev/null
 +++ b/arch/arm/plat-mxc/ulpi.c
-@@ -0,0 +1,111 @@
+@@ -0,0 +1,113 @@
 +/*
 + * Copyright 2008 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
++ * Copyright 2009 Daniel Mack <daniel@caiaq.de>
 + *
 + * This program is free software; you can redistribute it and/or
 + * modify it under the terms of the GNU General Public License
@@ -107,22 +108,20 @@ index 0000000..b6977b9
 +
 +static int ulpi_poll(void __iomem *view, u32 bit)
 +{
-+	uint32_t data;
 +	int timeout = 10000;
 +
-+	data = __raw_readl(view);
-+	while (data & bit) {
-+		if (!timeout--) {
-+			printk(KERN_WARNING
-+				"timeout polling for ULPI device\n");
-+			return -ETIMEDOUT;
-+		}
++	while (timeout--) {
++		u32 data = __raw_readl(view);
 +
-+		udelay(10);
-+		data = __raw_readl(view);
-+	}
++		if (!(data & bit))
++			return 0;
 +
-+	return (data >> ULPIVW_RDATA_SHIFT) & ULPIVW_RDATA_MASK;
++		cpu_relax();
++	};
++
++	printk(KERN_WARNING "timeout polling for ULPI device\n");
++
++	return -ETIMEDOUT;
 +}
 +
 +static int ulpi_read(struct otg_transceiver *otg, u32 reg)
@@ -136,7 +135,7 @@ index 0000000..b6977b9
 +
 +		/* wait for wakeup */
 +		ret = ulpi_poll(view, ULPIVW_WU);
-+		if (ret < 0)
++		if (ret)
 +			return ret;
 +	}
 +
@@ -144,7 +143,11 @@ index 0000000..b6977b9
 +	__raw_writel((ULPIVW_RUN | (reg << ULPIVW_ADDR_SHIFT)), view);
 +
 +	/* wait for completion */
-+	return ulpi_poll(view, ULPIVW_RUN);
++	ret = ulpi_poll(view, ULPIVW_RUN);
++	if (ret)
++		return ret;
++
++	return (__raw_readl(view) >> ULPIVW_RDATA_SHIFT) & ULPIVW_RDATA_MASK;
 +}
 +
 +static int ulpi_write(struct otg_transceiver *otg, u32 val, u32 reg)
@@ -157,7 +160,7 @@ index 0000000..b6977b9
 +		__raw_writel(ULPIVW_WU, view);
 +		/* wait for wakeup */
 +		ret = ulpi_poll(view, ULPIVW_WU);
-+		if (ret < 0)
++		if (ret)
 +			return ret;
 +	}
 +
@@ -166,15 +169,14 @@ index 0000000..b6977b9
 +		      ((val & ULPIVW_WDATA_MASK) << ULPIVW_WDATA_SHIFT)), view);
 +
 +	/* wait for completion */
-+	ret = ulpi_poll(view, ULPIVW_RUN);
-+
-+	return (ret < 0) ? ret : 0;
++	return ulpi_poll(view, ULPIVW_RUN);
 +}
 +
 +struct otg_io_access_ops mxc_ulpi_access_ops = {
 +	.read	= ulpi_read,
 +	.write	= ulpi_write,
 +};
++EXPORT_SYMBOL_GPL(mxc_ulpi_access_ops);
 +
 -- 
 1.6.5
