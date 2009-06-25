@@ -1,19 +1,13 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Thu, 25 Jun 2009 13:07:54 +0200
-Subject: [PATCH] USB: Add EHCI support for MX27 and MX31 based boards
-Message-ID: <mailman.93.1256688915.2253.linux-arm-kernel@lists.infradead.org>
+Date: Thu, 25 Jun 2009 13:27:40 +0200
+Subject: [PATCH] MXC: Add support for ULPI Viewports
+Message-ID: <mailman.98.1256912213.2253.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Freescale MX27 and MX31 SoCs have a EHCI controller onboard.
-The controller is capable of USB on the go. This patch adds
-a driver to support all three of them.
-
-Users have to pass details about serial interface configuration in the
-platform data.
-
-The USB OTG core used here is the ARC core, so the driver should
-be renamed and probably be merged with ehci-fsl.c eventually.
+The ARC USB OTG Core has support for accessing ULPI tranceivers
+through so called ULPI viewports. Export a set of function for use with
+the USB OTG framework.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 Signed-off-by: Daniel Mack <daniel@caiaq.de>
@@ -21,516 +15,166 @@ Cc: Greg Kroah-Hartman <gregkh@suse.de>
 Cc: David Brownell <dbrownell@users.sourceforge.net>
 Cc: linux-usb at vger.kernel.org
 ---
- arch/arm/plat-mxc/Makefile                |    2 +
- arch/arm/plat-mxc/ehci.c                  |   92 +++++++++
- arch/arm/plat-mxc/include/mach/mxc_ehci.h |   37 ++++
- drivers/usb/Kconfig                       |    1 +
- drivers/usb/host/Kconfig                  |    7 +
- drivers/usb/host/ehci-hcd.c               |    5 +
- drivers/usb/host/ehci-mxc.c               |  296 +++++++++++++++++++++++++++++
- 7 files changed, 440 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-mxc/ehci.c
- create mode 100644 arch/arm/plat-mxc/include/mach/mxc_ehci.h
- create mode 100644 drivers/usb/host/ehci-mxc.c
+ arch/arm/plat-mxc/Kconfig             |    3 +
+ arch/arm/plat-mxc/Makefile            |    1 +
+ arch/arm/plat-mxc/include/mach/ulpi.h |    7 ++
+ arch/arm/plat-mxc/ulpi.c              |  111 +++++++++++++++++++++++++++++++++
+ 4 files changed, 122 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/include/mach/ulpi.h
+ create mode 100644 arch/arm/plat-mxc/ulpi.c
 
+diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+index ca5c7c2..e8e92cb 100644
+--- a/arch/arm/plat-mxc/Kconfig
++++ b/arch/arm/plat-mxc/Kconfig
+@@ -69,6 +69,9 @@ config MXC_PWM
+ 	help
+ 	  Enable support for the i.MX PWM controller(s).
+ 
++config MXC_ULPI
++	bool
++
+ config ARCH_HAS_RNGA
+ 	bool
+ 	depends on ARCH_MXC
 diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
-index 545412f..20a9dba 100644
+index e3212c8..545412f 100644
 --- a/arch/arm/plat-mxc/Makefile
 +++ b/arch/arm/plat-mxc/Makefile
-@@ -10,3 +10,5 @@ obj-$(CONFIG_ARCH_MX2) += iomux-mx1-mx2.o dma-mx1-mx2.o
+@@ -9,3 +9,4 @@ obj-$(CONFIG_ARCH_MX1) += iomux-mx1-mx2.o dma-mx1-mx2.o
+ obj-$(CONFIG_ARCH_MX2) += iomux-mx1-mx2.o dma-mx1-mx2.o
  obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
  obj-$(CONFIG_MXC_PWM)  += pwm.o
- obj-$(CONFIG_MXC_ULPI) += ulpi.o
-+obj-$(CONFIG_USB_EHCI_MXC)	+= ehci.o
-+
-diff --git a/arch/arm/plat-mxc/ehci.c b/arch/arm/plat-mxc/ehci.c
++obj-$(CONFIG_MXC_ULPI) += ulpi.o
+diff --git a/arch/arm/plat-mxc/include/mach/ulpi.h b/arch/arm/plat-mxc/include/mach/ulpi.h
 new file mode 100644
-index 0000000..41599be
+index 0000000..96b6ab4
 --- /dev/null
-+++ b/arch/arm/plat-mxc/ehci.c
-@@ -0,0 +1,92 @@
++++ b/arch/arm/plat-mxc/include/mach/ulpi.h
+@@ -0,0 +1,7 @@
++#ifndef __MACH_ULPI_H
++#define __MACH_ULPI_H
++
++extern struct otg_io_access_ops mxc_ulpi_access_ops;
++
++#endif /* __MACH_ULPI_H */
++
+diff --git a/arch/arm/plat-mxc/ulpi.c b/arch/arm/plat-mxc/ulpi.c
+new file mode 100644
+index 0000000..b6977b9
+--- /dev/null
++++ b/arch/arm/plat-mxc/ulpi.c
+@@ -0,0 +1,111 @@
 +/*
-+ * Copyright (c) 2009 Daniel Mack <daniel@caiaq.de>
++ * Copyright 2008 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
 + *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License as published by the
-+ * Free Software Foundation; either version 2 of the License, or (at your
-+ * option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-+ * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
-+ * for more details.
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + *
 + * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software Foundation,
-+ * Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA  02110-1301, USA.
 + */
 +
-+#include <linux/platform_device.h>
++#include <linux/module.h>
++#include <linux/kernel.h>
 +#include <linux/io.h>
-+
-+#include <mach/hardware.h>
-+#include <mach/mxc_ehci.h>
-+
-+#define USBCTRL_OTGBASE_OFFSET	0x600
-+
-+#define MX31_OTG_SIC_SHIFT	29
-+#define MX31_OTG_SIC_MASK	(0xf << MX31_OTG_SIC_SHIFT)
-+#define MX31_OTG_PM_BIT		(1 << 24)
-+
-+#define MX31_H2_SIC_SHIFT	21
-+#define MX31_H2_SIC_MASK	(0xf << MX31_H2_SIC_SHIFT)
-+#define MX31_H2_PM_BIT		(1 << 16)
-+#define MX31_H2_DT_BIT		(1 << 5)
-+
-+#define MX31_H1_SIC_SHIFT	13
-+#define MX31_H1_SIC_MASK	(0xf << MX31_H1_SIC_SHIFT)
-+#define MX31_H1_PM_BIT		(1 << 8)
-+#define MX31_H1_DT_BIT		(1 << 4)
-+
-+int mxc_set_usbcontrol(int port, unsigned int flags)
-+{
-+	unsigned int v;
-+
-+	if (cpu_is_mx31()) {
-+		v = readl(IO_ADDRESS(MX31_OTG_BASE_ADDR +
-+				     USBCTRL_OTGBASE_OFFSET));
-+
-+		switch (port) {
-+		case 0:	/* OTG port */
-+			v &= ~(MX31_OTG_SIC_MASK | MX31_OTG_PM_BIT);
-+			v |= (flags & MXC_EHCI_INTERFACE_MASK)
-+					<< MX31_OTG_SIC_SHIFT;
-+			if (flags & MXC_EHCI_POWER_PINS_ENABLED)
-+				v |= MX31_OTG_PM_BIT;
-+
-+			break;
-+		case 1: /* H1 port */
-+			v &= ~(MX31_H1_SIC_MASK | MX31_H1_PM_BIT);
-+			v |= (flags & MXC_EHCI_INTERFACE_MASK)
-+						<< MX31_H1_SIC_SHIFT;
-+			if (flags & MXC_EHCI_POWER_PINS_ENABLED)
-+				v |= MX31_H1_PM_BIT;
-+
-+			if (!(flags & MXC_EHCI_TTL_ENABLED))
-+				v |= MX31_H1_DT_BIT;
-+
-+			break;
-+		case 2:	/* H2 port */
-+			v &= ~(MX31_H2_SIC_MASK | MX31_H2_PM_BIT);
-+			v |= (flags & MXC_EHCI_INTERFACE_MASK)
-+						<< MX31_H2_SIC_SHIFT;
-+			if (!(flags & MXC_EHCI_POWER_PINS_ENABLED))
-+				v |= MX31_H2_PM_BIT;
-+
-+			if (!(flags & MXC_EHCI_TTL_ENABLED))
-+				v |= MX31_H2_DT_BIT;
-+
-+			break;
-+		}
-+
-+		writel(v, IO_ADDRESS(MX31_OTG_BASE_ADDR +
-+				     USBCTRL_OTGBASE_OFFSET));
-+		return 0;
-+	}
-+
-+	printk(KERN_WARNING
-+		"%s() unable to setup USBCONTROL for this CPU\n", __func__);
-+	return -EINVAL;
-+}
-+EXPORT_SYMBOL(mxc_set_usbcontrol);
-+
-diff --git a/arch/arm/plat-mxc/include/mach/mxc_ehci.h b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-new file mode 100644
-index 0000000..8f79623
---- /dev/null
-+++ b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-@@ -0,0 +1,37 @@
-+#ifndef __INCLUDE_ASM_ARCH_MXC_EHCI_H
-+#define __INCLUDE_ASM_ARCH_MXC_EHCI_H
-+
-+/* values for portsc field */
-+#define MXC_EHCI_PHY_LOW_POWER_SUSPEND	(1 << 23)
-+#define MXC_EHCI_FORCE_FS		(1 << 24)
-+#define MXC_EHCI_UTMI_8BIT		(0 << 28)
-+#define MXC_EHCI_UTMI_16BIT		(1 << 28)
-+#define MXC_EHCI_SERIAL			(1 << 29)
-+#define MXC_EHCI_MODE_UTMI		(0 << 30)
-+#define MXC_EHCI_MODE_PHILIPS		(1 << 30)
-+#define MXC_EHCI_MODE_ULPI		(2 << 30)
-+#define MXC_EHCI_MODE_SERIAL		(3 << 30)
-+
-+/* values for flags field */
-+#define MXC_EHCI_INTERFACE_DIFF_UNI	(0 << 0)
-+#define MXC_EHCI_INTERFACE_DIFF_BI	(1 << 0)
-+#define MXC_EHCI_INTERFACE_SINGLE_UNI	(2 << 0)
-+#define MXC_EHCI_INTERFACE_SINGLE_BI	(3 << 0)
-+#define MXC_EHCI_INTERFACE_MASK		(0xf)
-+
-+#define MXC_EHCI_POWER_PINS_ENABLED	(1 << 5)
-+#define MXC_EHCI_TTL_ENABLED		(1 << 6)
-+
-+struct mxc_usbh_platform_data {
-+	int (*init)(struct platform_device *pdev);
-+	int (*exit)(struct platform_device *pdev);
-+
-+	unsigned int		 portsc;
-+	unsigned int		 flags;
-+	struct otg_transceiver	*otg;
-+};
-+
-+int mxc_set_usbcontrol(int port, unsigned int flags);
-+
-+#endif /* __INCLUDE_ASM_ARCH_MXC_EHCI_H */
-+
-diff --git a/drivers/usb/Kconfig b/drivers/usb/Kconfig
-index 2407508..a3b7caf 100644
---- a/drivers/usb/Kconfig
-+++ b/drivers/usb/Kconfig
-@@ -60,6 +60,7 @@ config USB_ARCH_HAS_EHCI
- 	default y if ARCH_IXP4XX
- 	default y if ARCH_W90X900
- 	default y if ARCH_AT91SAM9G45
-+	default y if ARCH_MXC
- 	default PCI
- 
- # ARM SA1111 chips have a non-PCI based "OHCI-compatible" USB host interface.
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 9b43b22..aeb4a4e 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -105,6 +105,13 @@ config USB_EHCI_FSL
- 	---help---
- 	  Variation of ARC USB block used in some Freescale chips.
- 
-+config USB_EHCI_MXC
-+	bool "Support for Freescale on-chip EHCI USB controller"
-+	depends on USB_EHCI_HCD && ARCH_MXC
-+	select USB_EHCI_ROOT_HUB_TT
-+	---help---
-+	  Variation of ARC USB block used in some Freescale chips.
-+
- config USB_EHCI_HCD_PPC_OF
- 	bool "EHCI support for PPC USB controller on OF platform bus"
- 	depends on USB_EHCI_HCD && PPC_OF
-diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-index 9835e07..170b7d1 100644
---- a/drivers/usb/host/ehci-hcd.c
-+++ b/drivers/usb/host/ehci-hcd.c
-@@ -1103,6 +1103,11 @@ MODULE_LICENSE ("GPL");
- #define	PLATFORM_DRIVER		ehci_fsl_driver
- #endif
- 
-+#ifdef CONFIG_USB_EHCI_MXC
-+#include "ehci-mxc.c"
-+#define PLATFORM_DRIVER		ehci_mxc_driver
-+#endif
-+
- #ifdef CONFIG_SOC_AU1200
- #include "ehci-au1xxx.c"
- #define	PLATFORM_DRIVER		ehci_hcd_au1xxx_driver
-diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
-new file mode 100644
-index 0000000..35c56f4
---- /dev/null
-+++ b/drivers/usb/host/ehci-mxc.c
-@@ -0,0 +1,296 @@
-+/*
-+ * Copyright (c) 2008 Sascha Hauer <s.hauer@pengutronix.de>, Pengutronix
-+ * Copyright (c) 2009 Daniel Mack <daniel@caiaq.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License as published by the
-+ * Free Software Foundation; either version 2 of the License, or (at your
-+ * option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-+ * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
-+ * for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software Foundation,
-+ * Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-+ */
-+
-+#include <linux/platform_device.h>
-+#include <linux/clk.h>
 +#include <linux/delay.h>
 +#include <linux/usb/otg.h>
 +
-+#include <mach/mxc_ehci.h>
++#include <mach/ulpi.h>
 +
-+#define ULPI_VIEWPORT_OFFSET	0x170
-+#define PORTSC_OFFSET		0x184
-+#define USBMODE_OFFSET		0x1a8
-+#define USBMODE_CM_HOST		3
++/* ULPIVIEW register bits */
++#define ULPIVW_WU		(1 << 31)	/* Wakeup */
++#define ULPIVW_RUN		(1 << 30)	/* read/write run */
++#define ULPIVW_WRITE		(1 << 29)	/* 0 = read  1 = write */
++#define ULPIVW_SS		(1 << 27)	/* SyncState */
++#define ULPIVW_PORT_MASK	0x07	/* Port field */
++#define ULPIVW_PORT_SHIFT	24
++#define ULPIVW_ADDR_MASK	0xff	/* data address field */
++#define ULPIVW_ADDR_SHIFT	16
++#define ULPIVW_RDATA_MASK	0xff	/* read data field */
++#define ULPIVW_RDATA_SHIFT	8
++#define ULPIVW_WDATA_MASK	0xff	/* write data field */
++#define ULPIVW_WDATA_SHIFT	0
 +
-+struct ehci_mxc_priv {
-+	struct clk *usbclk, *ahbclk;
-+	struct usb_hcd *hcd;
-+};
-+
-+/* called during probe() after chip reset completes */
-+static int ehci_mxc_setup(struct usb_hcd *hcd)
++static int ulpi_poll(void __iomem *view, u32 bit)
 +{
-+	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
-+	int retval;
++	uint32_t data;
++	int timeout = 10000;
 +
-+	/* EHCI registers start at offset 0x100 */
-+	ehci->caps = hcd->regs + 0x100;
-+	ehci->regs = hcd->regs + 0x100 +
-+	    HC_LENGTH(ehci_readl(ehci, &ehci->caps->hc_capbase));
-+	dbg_hcs_params(ehci, "reset");
-+	dbg_hcc_params(ehci, "reset");
-+
-+	/* cache this readonly data; minimize chip reads */
-+	ehci->hcs_params = ehci_readl(ehci, &ehci->caps->hcs_params);
-+
-+	retval = ehci_halt(ehci);
-+	if (retval)
-+		return retval;
-+
-+	/* data structure init */
-+	retval = ehci_init(hcd);
-+	if (retval)
-+		return retval;
-+
-+	hcd->has_tt = 1;
-+
-+	ehci->sbrn = 0x20;
-+
-+	ehci_reset(ehci);
-+
-+	ehci_port_power(ehci, 0);
-+	return 0;
-+}
-+
-+static const struct hc_driver ehci_mxc_hc_driver = {
-+	.description = hcd_name,
-+	.product_desc = "Freescale On-Chip EHCI Host Controller",
-+	.hcd_priv_size = sizeof(struct ehci_hcd),
-+
-+	/*
-+	 * generic hardware linkage
-+	 */
-+	.irq = ehci_irq,
-+	.flags = HCD_USB2 | HCD_MEMORY,
-+
-+	/*
-+	 * basic lifecycle operations
-+	 */
-+	.reset = ehci_mxc_setup,
-+	.start = ehci_run,
-+	.stop = ehci_stop,
-+	.shutdown = ehci_shutdown,
-+
-+	/*
-+	 * managing i/o requests and associated device resources
-+	 */
-+	.urb_enqueue = ehci_urb_enqueue,
-+	.urb_dequeue = ehci_urb_dequeue,
-+	.endpoint_disable = ehci_endpoint_disable,
-+
-+	/*
-+	 * scheduling support
-+	 */
-+	.get_frame_number = ehci_get_frame,
-+
-+	/*
-+	 * root hub support
-+	 */
-+	.hub_status_data = ehci_hub_status_data,
-+	.hub_control = ehci_hub_control,
-+	.bus_suspend = ehci_bus_suspend,
-+	.bus_resume = ehci_bus_resume,
-+	.relinquish_port = ehci_relinquish_port,
-+	.port_handed_over = ehci_port_handed_over,
-+};
-+
-+static int ehci_mxc_drv_probe(struct platform_device *pdev)
-+{
-+	struct mxc_usbh_platform_data *pdata = pdev->dev.platform_data;
-+	struct usb_hcd *hcd;
-+	struct resource *res;
-+	int irq, ret, temp;
-+	struct ehci_mxc_priv *priv;
-+	struct device *dev = &pdev->dev;
-+
-+	dev_info(&pdev->dev, "initializing i.MX USB Controller\n");
-+
-+	if (!pdata) {
-+		dev_err(dev, "No platform data given, bailing out.\n");
-+		return -EINVAL;
-+	}
-+
-+	irq = platform_get_irq(pdev, 0);
-+
-+	hcd = usb_create_hcd(&ehci_mxc_hc_driver, dev, dev_name(dev));
-+	if (!hcd)
-+		return -ENOMEM;
-+
-+	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-+	if (!priv) {
-+		ret = -ENOMEM;
-+		goto err_alloc;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(dev, "Found HC with no register addr. Check setup!\n");
-+		ret = -ENODEV;
-+		goto err_get_resource;
-+	}
-+
-+	hcd->rsrc_start = res->start;
-+	hcd->rsrc_len = resource_size(res);
-+
-+	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
-+		dev_dbg(dev, "controller already in use\n");
-+		ret = -EBUSY;
-+		goto err_request_mem;
-+	}
-+
-+	hcd->regs = ioremap(hcd->rsrc_start, hcd->rsrc_len);
-+	if (!hcd->regs) {
-+		dev_err(dev, "error mapping memory\n");
-+		ret = -EFAULT;
-+		goto err_ioremap;
-+	}
-+
-+	/* enable clocks */
-+	priv->usbclk = clk_get(dev, "usb");
-+	if (IS_ERR(priv->usbclk)) {
-+		ret = PTR_ERR(priv->usbclk);
-+		goto err_clk;
-+	}
-+	clk_enable(priv->usbclk);
-+
-+	if (!cpu_is_mx35()) {
-+		priv->ahbclk = clk_get(dev, "usb_ahb");
-+		if (IS_ERR(priv->ahbclk)) {
-+			ret = PTR_ERR(priv->ahbclk);
-+			goto err_clk_ahb;
++	data = __raw_readl(view);
++	while (data & bit) {
++		if (!timeout--) {
++			printk(KERN_WARNING
++				"timeout polling for ULPI device\n");
++			return -ETIMEDOUT;
 +		}
-+		clk_enable(priv->ahbclk);
++
++		udelay(10);
++		data = __raw_readl(view);
 +	}
 +
-+	/* set USBMODE to host mode */
-+	temp = readl(hcd->regs + USBMODE_OFFSET);
-+	writel(temp | USBMODE_CM_HOST, hcd->regs + USBMODE_OFFSET);
-+
-+	/* set up the PORTSCx register */
-+	writel(pdata->portsc, hcd->regs + PORTSC_OFFSET);
-+	mdelay(10);
-+
-+	/* setup USBCONTROL. */
-+	ret = mxc_set_usbcontrol(pdev->id, pdata->flags);
-+	if (ret < 0)
-+		goto err_init;
-+
-+	/* call platform specific init function */
-+	if (pdata->init) {
-+		ret = pdata->init(pdev);
-+		if (ret) {
-+			dev_err(dev, "platform init failed\n");
-+			goto err_init;
-+		}
-+	}
-+
-+	/* most platforms need some time to settle changed IO settings */
-+	mdelay(10);
-+
-+	/* Initialize the transceiver */
-+	if (pdata->otg) {
-+		pdata->otg->io_priv = hcd->regs + ULPI_VIEWPORT_OFFSET;
-+		if (otg_init(pdata->otg) != 0)
-+			dev_err(dev, "unable to init transceiver\n");
-+		else if (otg_set_vbus(pdata->otg, 1) != 0)
-+			dev_err(dev, "unable to enable vbus on transceiver\n");
-+	}
-+
-+	priv->hcd = hcd;
-+	platform_set_drvdata(pdev, priv);
-+
-+	ret = usb_add_hcd(hcd, irq, IRQF_DISABLED | IRQF_SHARED);
-+	if (ret)
-+		goto err_add;
-+
-+	return 0;
-+
-+err_add:
-+	if (pdata && pdata->exit)
-+		pdata->exit(pdev);
-+err_init:
-+	if (priv->ahbclk) {
-+		clk_disable(priv->ahbclk);
-+		clk_put(priv->ahbclk);
-+	}
-+err_clk_ahb:
-+	clk_disable(priv->usbclk);
-+	clk_put(priv->usbclk);
-+err_clk:
-+	iounmap(hcd->regs);
-+err_ioremap:
-+	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
-+err_request_mem:
-+err_get_resource:
-+	kfree(priv);
-+err_alloc:
-+	usb_put_hcd(hcd);
-+	return ret;
++	return (data >> ULPIVW_RDATA_SHIFT) & ULPIVW_RDATA_MASK;
 +}
 +
-+static int __exit ehci_mxc_drv_remove(struct platform_device *pdev)
++static int ulpi_read(struct otg_transceiver *otg, u32 reg)
 +{
-+	struct mxc_usbh_platform_data *pdata = pdev->dev.platform_data;
-+	struct ehci_mxc_priv *priv = platform_get_drvdata(pdev);
-+	struct usb_hcd *hcd = priv->hcd;
++	int ret;
++	void __iomem *view = otg->io_priv;
 +
-+	if (pdata && pdata->exit)
-+		pdata->exit(pdev);
++	/* make sure interface is running */
++	if (!(__raw_readl(view) & ULPIVW_SS)) {
++		__raw_writel(ULPIVW_WU, view);
 +
-+	if (pdata->otg)
-+		otg_shutdown(pdata->otg);
-+
-+	usb_remove_hcd(hcd);
-+	iounmap(hcd->regs);
-+	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
-+	usb_put_hcd(hcd);
-+	platform_set_drvdata(pdev, NULL);
-+
-+	clk_disable(priv->usbclk);
-+	clk_put(priv->usbclk);
-+	if (priv->ahbclk) {
-+		clk_disable(priv->ahbclk);
-+		clk_put(priv->ahbclk);
++		/* wait for wakeup */
++		ret = ulpi_poll(view, ULPIVW_WU);
++		if (ret < 0)
++			return ret;
 +	}
 +
-+	kfree(priv);
++	/* read the register */
++	__raw_writel((ULPIVW_RUN | (reg << ULPIVW_ADDR_SHIFT)), view);
 +
-+	return 0;
++	/* wait for completion */
++	return ulpi_poll(view, ULPIVW_RUN);
 +}
 +
-+static void ehci_mxc_drv_shutdown(struct platform_device *pdev)
++static int ulpi_write(struct otg_transceiver *otg, u32 val, u32 reg)
 +{
-+	struct ehci_mxc_priv *priv = platform_get_drvdata(pdev);
-+	struct usb_hcd *hcd = priv->hcd;
++	int ret;
++	void __iomem *view = otg->io_priv;
 +
-+	if (hcd->driver->shutdown)
-+		hcd->driver->shutdown(hcd);
++	/* make sure the interface is running */
++	if (!(__raw_readl(view) & ULPIVW_SS)) {
++		__raw_writel(ULPIVW_WU, view);
++		/* wait for wakeup */
++		ret = ulpi_poll(view, ULPIVW_WU);
++		if (ret < 0)
++			return ret;
++	}
++
++	__raw_writel((ULPIVW_RUN | ULPIVW_WRITE |
++		      (reg << ULPIVW_ADDR_SHIFT) |
++		      ((val & ULPIVW_WDATA_MASK) << ULPIVW_WDATA_SHIFT)), view);
++
++	/* wait for completion */
++	ret = ulpi_poll(view, ULPIVW_RUN);
++
++	return (ret < 0) ? ret : 0;
 +}
 +
-+MODULE_ALIAS("platform:mxc-ehci");
-+
-+static struct platform_driver ehci_mxc_driver = {
-+	.probe = ehci_mxc_drv_probe,
-+	.remove = __exit_p(ehci_mxc_drv_remove),
-+	.shutdown = ehci_mxc_drv_shutdown,
-+	.driver = {
-+		   .name = "mxc-ehci",
-+	},
++struct otg_io_access_ops mxc_ulpi_access_ops = {
++	.read	= ulpi_read,
++	.write	= ulpi_write,
 +};
++
 -- 
 1.6.5
