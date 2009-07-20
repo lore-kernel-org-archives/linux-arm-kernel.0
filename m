@@ -1,45 +1,63 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 24 Jul 2009 02:44:02 +0200
-Subject: [PATCH] pxaficp-ir - remove incorrect net_device_ops
-Message-ID: <mailman.1.1251088724.2309.linux-arm-kernel@lists.infradead.org>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Mon, 20 Jul 2009 11:18:43 +0200
+Subject: [PATCH] video: add PXA3xx accelerator ID
+Message-ID: <mailman.4.1252589202.2253.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes broken pxaficp-ir. The problem was in incorrect
-net_device_ops being specified which prevented the driver from
-operating. The symptoms were:
- - failing ifconfig for IrLAN, resulting in
-	SIOCSIFFLAGS: Cannot assign requested address
- - irattach working for IrCOMM, but the port stayed disabled
+Add ID 99 for PXA3xx frame buffers and report it in the pxa frame buffer
+conditionally, depending on a new flag in struct pxafb_mach_info.
 
-Moreover this patch corrects missing sysfs device link.
-
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+Signed-off-by: Daniel Mack <daniel@caiaq.de>
+Cc: Eric Miao <eric.miao@marvell.com>
+Cc: linux-fbdev-devel at lists.sourceforge.net
+Cc: Dennis Oliver Kropp <dok@directfb.org>
+Cc: Sven Neumann <s.neumann@raumfeld.com>
 ---
- drivers/net/irda/pxaficp_ir.c |    4 +---
- 1 files changed, 1 insertions(+), 3 deletions(-)
+ arch/arm/mach-pxa/include/mach/pxafb.h |    3 ++-
+ drivers/video/pxafb.c                  |    3 +++
+ include/linux/fb.h                     |    1 +
+ 3 files changed, 6 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/net/irda/pxaficp_ir.c b/drivers/net/irda/pxaficp_ir.c
-index 4edbdbe..f5b7d83 100644
---- a/drivers/net/irda/pxaficp_ir.c
-+++ b/drivers/net/irda/pxaficp_ir.c
-@@ -820,9 +820,6 @@ static const struct net_device_ops pxa_irda_netdev_ops = {
- 	.ndo_stop		= pxa_irda_stop,
- 	.ndo_start_xmit		= pxa_irda_hard_xmit,
- 	.ndo_do_ioctl		= pxa_irda_ioctl,
--	.ndo_change_mtu		= eth_change_mtu,
--	.ndo_validate_addr	= eth_validate_addr,
--	.ndo_set_mac_address	= eth_mac_addr,
- };
+diff --git a/arch/arm/mach-pxa/include/mach/pxafb.h b/arch/arm/mach-pxa/include/mach/pxafb.h
+index 6932720..f73061c 100644
+--- a/arch/arm/mach-pxa/include/mach/pxafb.h
++++ b/arch/arm/mach-pxa/include/mach/pxafb.h
+@@ -118,7 +118,8 @@ struct pxafb_mach_info {
+ 	u_int		fixed_modes:1,
+ 			cmap_inverse:1,
+ 			cmap_static:1,
+-			unused:29;
++			acceleration_enabled:1,
++			unused:28;
  
- static int pxa_irda_probe(struct platform_device *pdev)
-@@ -847,6 +844,7 @@ static int pxa_irda_probe(struct platform_device *pdev)
- 	if (!dev)
- 		goto err_mem_3;
+ 	/* The following should be defined in LCCR0
+ 	 *      LCCR0_Act or LCCR0_Pas          Active or Passive
+diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
+index 3951cc5..b65cc2d 100644
+--- a/drivers/video/pxafb.c
++++ b/drivers/video/pxafb.c
+@@ -2083,6 +2083,9 @@ static int __devinit pxafb_probe(struct platform_device *dev)
+ 		goto failed;
+ 	}
  
-+	SET_NETDEV_DEV(dev, &pdev->dev);
- 	si = netdev_priv(dev);
- 	si->dev = &pdev->dev;
- 	si->pdata = pdev->dev.platform_data;
++	if (cpu_is_pxa3xx() && inf->acceleration_enabled)
++		fbi->fb.fix.accel = FB_ACCEL_PXA3XX;
++
+ 	fbi->backlight_power = inf->pxafb_backlight_power;
+ 	fbi->lcd_power = inf->pxafb_lcd_power;
+ 
+diff --git a/include/linux/fb.h b/include/linux/fb.h
+index f847df9..a34bdf5 100644
+--- a/include/linux/fb.h
++++ b/include/linux/fb.h
+@@ -133,6 +133,7 @@ struct dentry;
+ #define FB_ACCEL_NEOMAGIC_NM2230 96	/* NeoMagic NM2230              */
+ #define FB_ACCEL_NEOMAGIC_NM2360 97	/* NeoMagic NM2360              */
+ #define FB_ACCEL_NEOMAGIC_NM2380 98	/* NeoMagic NM2380              */
++#define FB_ACCEL_PXA3XX		 99	/* PXA3xx			*/
+ 
+ #define FB_ACCEL_SAVAGE4        0x80	/* S3 Savage4                   */
+ #define FB_ACCEL_SAVAGE3D       0x81	/* S3 Savage3D                  */
 -- 
 1.6.3.3
