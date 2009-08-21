@@ -1,22 +1,32 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 21 Aug 2009 16:28:47 +0100
-Subject: [PATCH] ARM: Mailing lists have moved
-In-Reply-To: <1250868037.3311.106.camel@macbook.infradead.org>
-References: <1250855566.3311.100.camel@macbook.infradead.org>
-	<200908211513.48424.arnd@arndb.de>
-	<1250868037.3311.106.camel@macbook.infradead.org>
-Message-ID: <20090821152847.GD2850@sirena.org.uk>
+From: bgat@billgatliff.com (Bill Gatliff)
+Date: Fri, 21 Aug 2009 10:32:14 -0500
+Subject: i.MX35 Kernel without ARM EABI support  cannot execute init
+In-Reply-To: <20090821161240.GA20522@flaco.tsc-farm.upc.es>
+References: <1250865435.17931.20.camel@wks02-lin.nanotronic.local>
+	<20090821161240.GA20522@flaco.tsc-farm.upc.es>
+Message-ID: <4A8EBDFE.7010908@billgatliff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 21, 2009 at 04:20:37PM +0100, David Woodhouse wrote:
-> On Fri, 2009-08-21 at 15:13 +0200, Arnd Bergmann wrote:
+Hector Oron wrote:
+> Hello,
+>
+> On Fri, Aug 21, 2009 at 04:37:15PM +0200, hoefle marco wrote:
+>   
+>> When trying to boot the i.MX35 Kernel (with ARM EABI or without, the
+>> kernel panic remains exactly the same) using the emdebian rootfs I get
+>> this:
+>>
+>> Kernel panic - not syncing: Attempted to kill init!
+>> Has anybody an idea why this is not working?
+>>     
 
-> >  Otherwise we're risking a similar mess to what happened when the
-> > powerpc-dev and powerpc mailing lists were merged.
+I've seen something like this when the .config doesn't include a FP 
+emulation selection.
 
-> Hm?
 
-Lots of people posting on the list going "What is all this mail?  Make
-it stop!" and so on (not helped by the fact that since two lists were
-merged the overall volume increased).
+b.g.
+
+-- 
+Bill Gatliff
+bgat at billgatliff.com
