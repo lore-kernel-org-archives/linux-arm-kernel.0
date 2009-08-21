@@ -1,418 +1,439 @@
-From: davidjon@xenontk.org (David John)
-Date: Fri, 21 Aug 2009 18:11:12 +0530
-Subject: [PATCH] ARM: Mailing lists have moved
-In-Reply-To: <1250855566.3311.100.camel@macbook.infradead.org>
-References: <1250855566.3311.100.camel@macbook.infradead.org>
-Message-ID: <4A8E95E8.8010107@xenontk.org>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 21 Aug 2009 15:10:02 +0200
+Subject: [PATCH] watchdog: Add support for the Avionic Design Xanthos watchdog
+	timer.
+In-Reply-To: <20090821073105.GC29382@infomag.iguana.be>
+References: <20090821073105.GC29382@infomag.iguana.be>
+Message-ID: <1250860202-28187-1-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2009 05:22 PM, David Woodhouse wrote:
-> Russell no longer wants to maintain the mailing lists, so with his
-> blessing I have set up replacements at lists.infradead.org.
-> 
-> Erik was helping to moderate the old list, and will continue to moderate
-> the new one. Vince has kindly volunteered to do so too.
-> 
-> Signed-off-by: David Woodhouse <David.Woodhouse@intel.com>
-> Signed-off-by: Erik Mouw <mouw@nl.linux.org>
-> Signed-off-by: Vincent Sanders <vince@kyllikki.org>
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 60299a9..24f6134 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -497,7 +497,7 @@ F:	arch/arm/include/asm/floppy.h
->  
->  ARM PORT
->  M:	Russell King <linux@arm.linux.org.uk>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  W:	http://www.arm.linux.org.uk/
->  S:	Maintained
->  F:	arch/arm/
-> @@ -508,51 +508,51 @@ F:	drivers/mmc/host/mmci.*
->  
->  ARM/ADI ROADRUNNER MACHINE SUPPORT
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  F:	arch/arm/mach-ixp23xx/
->  F:	arch/arm/mach-ixp23xx/include/mach/
->  
->  ARM/ADS SPHERE MACHINE SUPPORT
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  
->  ARM/AFEB9260 MACHINE SUPPORT
->  M:	Sergey Lapin <slapin@ossfans.org>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  
->  ARM/AJECO 1ARM MACHINE SUPPORT
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  
->  ARM/ATMEL AT91RM9200 ARM ARCHITECTURE
->  M:	Andrew Victor <linux@maxim.org.za>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  W:	http://maxim.org.za/at91_26.html
->  S:	Maintained
->  
->  ARM/CIRRUS LOGIC EP93XX ARM ARCHITECTURE
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  
->  ARM/CIRRUS LOGIC EDB9315A MACHINE SUPPORT
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  
->  ARM/CLKDEV SUPPORT
->  M:	Russell King <linux@arm.linux.org.uk>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  F:	arch/arm/common/clkdev.c
->  F:	arch/arm/include/asm/clkdev.h
->  
->  ARM/COMPULAB CM-X270/EM-X270 and CM-X300 MACHINE SUPPORT
->  M:	Mike Rapoport <mike@compulab.co.il>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  
->  ARM/CORGI MACHINE SUPPORT
-> @@ -561,14 +561,14 @@ S:	Maintained
->  
->  ARM/CORTINA SYSTEMS GEMINI ARM ARCHITECTURE
->  M:	Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  T:	git git://gitorious.org/linux-gemini/mainline.git
->  S:	Maintained
->  F:	arch/arm/mach-gemini/
->  
->  ARM/EBSA110 MACHINE SUPPORT
->  M:	Russell King <linux@arm.linux.org.uk>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  W:	http://www.arm.linux.org.uk/
->  S:	Maintained
->  F:	arch/arm/mach-ebsa110/
-> @@ -586,13 +586,13 @@ F:	arch/arm/mach-pxa/ezx.c
->  
->  ARM/FARADAY FA526 PORT
->  M:	Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  F:	arch/arm/mm/*-fa*
->  
->  ARM/FOOTBRIDGE ARCHITECTURE
->  M:	Russell King <linux@arm.linux.org.uk>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  W:	http://www.arm.linux.org.uk/
->  S:	Maintained
->  F:	arch/arm/include/asm/hardware/dec21285.h
-> @@ -600,17 +600,17 @@ F:	arch/arm/mach-footbridge/
->  
->  ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
->  M:	Sascha Hauer <kernel@pengutronix.de>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  
->  ARM/GLOMATION GESBC9312SX MACHINE SUPPORT
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  
->  ARM/GUMSTIX MACHINE SUPPORT
->  M:	Steve Sakoman <sakoman@gmail.com>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  
->  ARM/H4700 (HP IPAQ HX4700) MACHINE SUPPORT
-> @@ -630,55 +630,55 @@ F:	arch/arm/mach-sa1100/include/mach/jornada720.h
->  ARM/INTEL IOP32X ARM ARCHITECTURE
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
->  M:	Dan Williams <dan.j.williams@intel.com>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Supported
->  
->  ARM/INTEL IOP33X ARM ARCHITECTURE
->  M:	Dan Williams <dan.j.williams@intel.com>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Supported
->  
->  ARM/INTEL IOP13XX ARM ARCHITECTURE
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
->  M:	Dan Williams <dan.j.williams@intel.com>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Supported
->  
->  ARM/INTEL IQ81342EX MACHINE SUPPORT
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
->  M:	Dan Williams <dan.j.williams@intel.com>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Supported
->  
->  ARM/INTEL IXP2000 ARM ARCHITECTURE
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  
->  ARM/INTEL IXDP2850 MACHINE SUPPORT
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  
->  ARM/INTEL IXP23XX ARM ARCHITECTURE
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  
->  ARM/INTEL XSC3 (MANZANO) ARM CORE
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
->  M:	Dan Williams <dan.j.williams@intel.com>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Supported
->  
->  ARM/IP FABRICS DOUBLE ESPRESSO MACHINE SUPPORT
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  
->  ARM/LOGICPD PXA270 MACHINE SUPPORT
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  
->  ARM/MAGICIAN MACHINE SUPPORT
-> @@ -687,7 +687,7 @@ S:	Maintained
->  
->  ARM/MIOA701 MACHINE SUPPORT
->  M:	Robert Jarzmik <robert.jarzmik@free.fr>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  F:	arch/arm/mach-pxa/mioa701.c
->  S:	Maintained
->  
-> @@ -728,18 +728,18 @@ S:	Maintained
->  
->  ARM/PT DIGITAL BOARD PORT
->  M:	Stefan Eletzhofer <stefan.eletzhofer@eletztrick.de>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  W:	http://www.arm.linux.org.uk/
->  S:	Maintained
->  
->  ARM/RADISYS ENP2611 MACHINE SUPPORT
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  
->  ARM/RISCPC ARCHITECTURE
->  M:	Russell King <linux@arm.linux.org.uk>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  W:	http://www.arm.linux.org.uk/
->  S:	Maintained
->  F:	arch/arm/common/time-acorn.c
-> @@ -758,7 +758,7 @@ S:	Maintained
->  
->  ARM/SAMSUNG ARM ARCHITECTURES
->  M:	Ben Dooks <ben-linux@fluff.org>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  W:	http://www.fluff.org/ben/linux/
->  S:	Maintained
->  F:	arch/arm/plat-s3c/
-> @@ -766,65 +766,65 @@ F:	arch/arm/plat-s3c24xx/
->  
->  ARM/S3C2410 ARM ARCHITECTURE
->  M:	Ben Dooks <ben-linux@fluff.org>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  W:	http://www.fluff.org/ben/linux/
->  S:	Maintained
->  F:	arch/arm/mach-s3c2410/
->  
->  ARM/S3C2440 ARM ARCHITECTURE
->  M:	Ben Dooks <ben-linux@fluff.org>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  W:	http://www.fluff.org/ben/linux/
->  S:	Maintained
->  F:	arch/arm/mach-s3c2440/
->  
->  ARM/S3C2442 ARM ARCHITECTURE
->  M:	Ben Dooks <ben-linux@fluff.org>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  W:	http://www.fluff.org/ben/linux/
->  S:	Maintained
->  F:	arch/arm/mach-s3c2442/
->  
->  ARM/S3C2443 ARM ARCHITECTURE
->  M:	Ben Dooks <ben-linux@fluff.org>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  W:	http://www.fluff.org/ben/linux/
->  S:	Maintained
->  F:	arch/arm/mach-s3c2443/
->  
->  ARM/S3C6400 ARM ARCHITECTURE
->  M:	Ben Dooks <ben-linux@fluff.org>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  W:	http://www.fluff.org/ben/linux/
->  S:	Maintained
->  F:	arch/arm/mach-s3c6400/
->  
->  ARM/S3C6410 ARM ARCHITECTURE
->  M:	Ben Dooks <ben-linux@fluff.org>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  W:	http://www.fluff.org/ben/linux/
->  S:	Maintained
->  F:	arch/arm/mach-s3c6410/
->  
->  ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  
->  ARM/THECUS N2100 MACHINE SUPPORT
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  
->  ARM/NUVOTON W90X900 ARM ARCHITECTURE
->  M:	Wan ZongShun <mcuos.com@gmail.com>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  W:	http://www.mcuos.com
->  S:	Maintained
->  
->  ARM/VFP SUPPORT
->  M:	Russell King <linux@arm.linux.org.uk>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  W:	http://www.arm.linux.org.uk/
->  S:	Maintained
->  F:	arch/arm/vfp/
-> @@ -923,7 +923,7 @@ F:	include/linux/atm*
->  
->  ATMEL AT91 MCI DRIVER
->  M:	Nicolas Ferre <nicolas.ferre@atmel.com>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  W:	http://www.atmel.com/products/AT91/
->  W:	http://www.at91.com/
->  S:	Maintained
-> @@ -1501,7 +1501,7 @@ F:	drivers/infiniband/hw/cxgb3/
->  
->  CYBERPRO FB DRIVER
->  M:	Russell King <linux@arm.linux.org.uk>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  W:	http://www.arm.linux.org.uk/
->  S:	Maintained
->  F:	drivers/video/cyber2000fb.*
-> @@ -2046,7 +2046,7 @@ F:	drivers/i2c/busses/i2c-cpm.c
->  FREESCALE IMX / MXC FRAMEBUFFER DRIVER
->  M:	Sascha Hauer <kernel@pengutronix.de>
->  L:	linux-fbdev-devel at lists.sourceforge.net (moderated for non-subscribers)
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  F:	arch/arm/plat-mxc/include/mach/imxfb.h
->  F:	drivers/video/imxfb.c
-> @@ -3398,7 +3398,7 @@ F:	include/linux/meye.h
->  
->  MOTOROLA IMX MMC/SD HOST CONTROLLER INTERFACE DRIVER
->  M:	Pavel Pisa <ppisa@pikron.com>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  F:	drivers/mmc/host/imxmmc.*
->  
-> @@ -4106,7 +4106,7 @@ F:	drivers/media/video/pvrusb2/
->  PXA2xx/PXA3xx SUPPORT
->  M:	Eric Miao <eric.y.miao@gmail.com>
->  M:	Russell King <linux@arm.linux.org.uk>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  F:	arch/arm/mach-pxa/
->  F:	drivers/pcmcia/pxa2xx*
-> @@ -4119,13 +4119,13 @@ F:	sound/soc/pxa
->  PXA168 SUPPORT
->  M:	Eric Miao <eric.y.miao@gmail.com>
->  M:	Jason Chagas <jason.chagas@marvell.com>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  T:	git git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git
->  S:	Maintained
->  
->  PXA910 SUPPORT
->  M:	Eric Miao <eric.y.miao@gmail.com>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  T:	git git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git
->  S:	Maintained
->  
-> @@ -4366,7 +4366,7 @@ F:	net/iucv/
->  
->  S3C24XX SD/MMC Driver
->  M:	Ben Dooks <ben-linux@fluff.org>
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Supported
->  F:	drivers/mmc/host/s3cmci.*
->  
-> @@ -4561,7 +4561,7 @@ F:	drivers/misc/sgi-xp/
->  SHARP LH SUPPORT (LH7952X & LH7A40X)
->  M:	Marc Singer <elf@buici.com>
->  W:	http://projects.buici.com/arm
-> -L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
-> +L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  F:	Documentation/arm/Sharp-LH/ADC-LH7-Touchscreen
->  F:	arch/arm/mach-lh7a40x/
-> 
+This patch adds support for the watchdog timer on Avionic Design Xanthos
+boards.
 
-Since we are changing mailing lists now, I have to say, can't the ARM
-_kernel_ mailing list just be hosted as an open list at
-linux-arm at vger.kernel.org and be done with? *Please*? All this moderating,
-subscribing, cross-posting and flaming is really troubling.
+Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 
-Regards,
-David.
+---
+ drivers/watchdog/Kconfig   |    7 +
+ drivers/watchdog/Makefile  |    1 +
+ drivers/watchdog/adx_wdt.c |  380 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 388 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index b1ccc04..378d518 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -266,6 +266,13 @@ config STMP3XXX_WATCHDOG
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called stmp3xxx_wdt.
+ 
++config ADX_WATCHDOG
++	tristate "Avionic Design Xanthos watchdog"
++	depends on ARCH_PXA_ADX
++	help
++	  Say Y here if you want support for the watchdog timer on Avionic
++	  Design Xanthos boards.
++
+ # AVR32 Architecture
+ 
+ config AT32AP700X_WDT
+diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+index 3d77429..f91719f 100644
+--- a/drivers/watchdog/Makefile
++++ b/drivers/watchdog/Makefile
+@@ -44,6 +44,7 @@ obj-$(CONFIG_DAVINCI_WATCHDOG) += davinci_wdt.o
+ obj-$(CONFIG_ORION_WATCHDOG) += orion_wdt.o
+ obj-$(CONFIG_COH901327_WATCHDOG) += coh901327_wdt.o
+ obj-$(CONFIG_STMP3XXX_WATCHDOG) += stmp3xxx_wdt.o
++obj-$(CONFIG_ADX_WATCHDOG) += adx_wdt.o
+ 
+ # AVR32 Architecture
+ obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
+diff --git a/drivers/watchdog/adx_wdt.c b/drivers/watchdog/adx_wdt.c
+new file mode 100644
+index 0000000..0abf7ca
+--- /dev/null
++++ b/drivers/watchdog/adx_wdt.c
+@@ -0,0 +1,380 @@
++/*
++ * linux/drivers/watchdog/adx_wdt.c
++ *
++ * Copyright (C) 2008-2009 Avionic Design GmbH
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/fs.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/miscdevice.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/types.h>
++#include <linux/uaccess.h>
++#include <linux/watchdog.h>
++
++#define WATCHDOG_NAME "adx-wdt"
++
++/* register offsets */
++#define	ADX_WDT_CONTROL		0x00
++#define	ADX_WDT_CONTROL_ENABLE	(1 << 0)
++#define	ADX_WDT_CONTROL_nRESET	(1 << 1)
++#define	ADX_WDT_TIMEOUT		0x08
++
++struct adx_wdt_nb;
++struct adx_wdt;
++
++struct adx_wdt_nb {
++	struct adx_wdt *wdt;
++};
++
++static struct platform_device *adx_wdt_dev;
++static unsigned long driver_open;
++
++#define	WDT_STATE_STOP	0
++#define	WDT_STATE_START	1
++
++struct adx_wdt {
++	void __iomem *base;
++	unsigned int irq;
++	unsigned long timeout;
++	struct adx_wdt_nb *nb;
++	unsigned int state;
++	unsigned int wake;
++	spinlock_t lock;
++};
++
++static struct watchdog_info adx_wdt_info = {
++	.identity = "Avionic Design Xanthos Watchdog",
++	.options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING,
++};
++
++static void adx_wdt_start_locked(struct adx_wdt *wdt)
++{
++	u32 ctrl;
++
++	ctrl = readl(wdt->base + ADX_WDT_CONTROL);
++	ctrl |= ADX_WDT_CONTROL_ENABLE;
++	writel(ctrl, wdt->base + ADX_WDT_CONTROL);
++	wdt->state = WDT_STATE_START;
++}
++
++static void adx_wdt_start(struct adx_wdt *wdt)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&wdt->lock, flags);
++	adx_wdt_start_locked(wdt);
++	spin_unlock_irqrestore(&wdt->lock, flags);
++}
++
++static void adx_wdt_stop_locked(struct adx_wdt *wdt)
++{
++	u32 ctrl;
++
++	ctrl = readl(wdt->base + ADX_WDT_CONTROL);
++	ctrl &= ~ADX_WDT_CONTROL_ENABLE;
++	writel(ctrl, wdt->base + ADX_WDT_CONTROL);
++	wdt->state = WDT_STATE_STOP;
++}
++
++static void adx_wdt_stop(struct adx_wdt *wdt)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&wdt->lock, flags);
++	adx_wdt_stop_locked(wdt);
++	spin_unlock_irqrestore(&wdt->lock, flags);
++}
++
++static void adx_wdt_set_timeout(struct adx_wdt *wdt, unsigned long timeout)
++{
++	unsigned long flags;
++	unsigned int state;
++
++	spin_lock_irqsave(&wdt->lock, flags);
++	state = wdt->state;
++	adx_wdt_stop_locked(wdt);
++	writel(timeout, wdt->base + ADX_WDT_TIMEOUT);
++
++	if (state == WDT_STATE_START)
++		adx_wdt_start_locked(wdt);
++
++	wdt->timeout = timeout;
++	spin_unlock_irqrestore(&wdt->lock, flags);
++}
++
++static void adx_wdt_keepalive(struct adx_wdt *wdt)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&wdt->lock, flags);
++	writel(wdt->timeout, wdt->base + ADX_WDT_TIMEOUT);
++	spin_unlock_irqrestore(&wdt->lock, flags);
++}
++
++static int adx_wdt_open(struct inode *inode, struct file *file)
++{
++	struct adx_wdt *wdt = platform_get_drvdata(adx_wdt_dev);
++
++	if (test_and_set_bit(0, &driver_open))
++		return -EBUSY;
++
++	adx_wdt_set_timeout(wdt, 30 * 1000);
++	adx_wdt_start(wdt);
++	file->private_data = wdt;
++
++	return nonseekable_open(inode, file);
++}
++
++static int adx_wdt_release(struct inode *inode, struct file *file)
++{
++	struct adx_wdt *wdt = file->private_data;
++
++	adx_wdt_stop(wdt);
++	clear_bit(0, &driver_open);
++
++	return 0;
++}
++
++static int adx_wdt_ioctl(struct inode *inode, struct file *file,
++		unsigned int cmd, unsigned long arg)
++{
++	struct adx_wdt *wdt = file->private_data;
++	void __user *argp = (void __user *)arg;
++	unsigned long __user *p = argp;
++	unsigned long timeout = 0;
++	unsigned int options;
++	int ret = -EINVAL;
++
++	switch (cmd) {
++	case WDIOC_GETSUPPORT:
++		if (copy_to_user(argp, &adx_wdt_info, sizeof(adx_wdt_info)))
++			return -EFAULT;
++		else
++			return 0;
++
++	case WDIOC_GETSTATUS:
++	case WDIOC_GETBOOTSTATUS:
++		return put_user(!!(0), p);
++
++	case WDIOC_KEEPALIVE:
++		adx_wdt_keepalive(wdt);
++		return 0;
++
++	case WDIOC_SETTIMEOUT:
++		if (get_user(timeout, p))
++			return -EFAULT;
++
++		adx_wdt_set_timeout(wdt, timeout * 1000);
++
++		/* fallthrough */
++	case WDIOC_GETTIMEOUT:
++		return put_user(timeout, p);
++
++	case WDIOC_SETOPTIONS:
++		if (copy_from_user(&options, argp, sizeof(options)))
++			return -EFAULT;
++
++		if (options & WDIOS_DISABLECARD) {
++			adx_wdt_stop(wdt);
++			ret = 0;
++		}
++
++		if (options & WDIOS_ENABLECARD) {
++			adx_wdt_start(wdt);
++			ret = 0;
++		}
++
++		return ret;
++
++	default:
++		break;
++	}
++
++	return -ENOTTY;
++}
++
++static ssize_t adx_wdt_write(struct file *file, const char __user *data,
++		size_t len, loff_t *ppos)
++{
++	struct adx_wdt *wdt = file->private_data;
++
++	if (len)
++		adx_wdt_keepalive(wdt);
++
++	return len;
++}
++
++static const struct file_operations adx_wdt_fops = {
++	.owner = THIS_MODULE,
++	.llseek = no_llseek,
++	.open = adx_wdt_open,
++	.release = adx_wdt_release,
++	.ioctl = adx_wdt_ioctl,
++	.write = adx_wdt_write,
++};
++
++static struct miscdevice adx_wdt_miscdev = {
++	.minor = WATCHDOG_MINOR,
++	.name = "watchdog",
++	.fops = &adx_wdt_fops,
++};
++
++static irqreturn_t adx_wdt_interrupt(int irq, void *dev_id)
++{
++	struct adx_wdt *wdt = dev_id;
++	unsigned long flags;
++
++	spin_lock_irqsave(&wdt->lock, flags);
++	writel(wdt->timeout, wdt->base + ADX_WDT_TIMEOUT);
++	spin_unlock_irqrestore(&wdt->lock, flags);
++
++	return IRQ_HANDLED;
++}
++
++static int __devinit adx_wdt_probe(struct platform_device *pdev)
++{
++	struct resource *res;
++	struct adx_wdt *wdt;
++	int ret = 0;
++
++	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
++	if (!wdt) {
++		dev_err(&pdev->dev, "cannot allocate WDT structure\n");
++		return -ENOMEM;
++	}
++
++	spin_lock_init(&wdt->lock);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_err(&pdev->dev, "cannot obtain I/O memory region\n");
++		return -ENXIO;
++	}
++
++	res = devm_request_mem_region(&pdev->dev, res->start,
++			res->end - res->start + 1, res->name);
++	if (!res) {
++		dev_err(&pdev->dev, "cannot request I/O memory region\n");
++		return -ENXIO;
++	}
++
++	wdt->base = devm_ioremap_nocache(&pdev->dev, res->start,
++			res->end - res->start + 1);
++	if (!wdt->base) {
++		dev_err(&pdev->dev, "cannot remap I/O memory region\n");
++		return -ENXIO;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
++	if (!res) {
++		dev_err(&pdev->dev, "cannot obtain IRQ\n");
++		return -ENXIO;
++	}
++
++	wdt->irq = res->start;
++
++	ret = devm_request_irq(&pdev->dev, wdt->irq, adx_wdt_interrupt,
++			IRQF_SHARED, WATCHDOG_NAME, wdt);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "cannot request IRQ\n");
++		return -ENXIO;
++	}
++
++	ret = misc_register(&adx_wdt_miscdev);
++	if (ret) {
++		dev_err(&pdev->dev, "cannot register miscdev on minor %d "
++				"(err=%d)\n", WATCHDOG_MINOR, ret);
++		return ret;
++	}
++
++	platform_set_drvdata(pdev, wdt);
++	adx_wdt_dev = pdev;
++
++	return 0;
++}
++
++static int __devexit adx_wdt_remove(struct platform_device *pdev)
++{
++	struct adx_wdt *wdt = platform_get_drvdata(pdev);
++
++	platform_set_drvdata(pdev, NULL);
++	misc_deregister(&adx_wdt_miscdev);
++	adx_wdt_stop(wdt);
++
++	return 0;
++}
++
++static void adx_wdt_shutdown(struct platform_device *pdev)
++{
++	struct adx_wdt *wdt = platform_get_drvdata(pdev);
++	adx_wdt_stop(wdt);
++}
++
++#ifdef CONFIG_PM
++static int adx_wdt_suspend(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct adx_wdt *wdt = platform_get_drvdata(pdev);
++
++	wdt->wake = (wdt->state == WDT_STATE_START) ? 1 : 0;
++	adx_wdt_stop(wdt);
++
++	return 0;
++}
++
++static int adx_wdt_resume(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct adx_wdt *wdt = platform_get_drvdata(pdev);
++
++	if (wdt->wake)
++		adx_wdt_start(wdt);
++
++	return 0;
++}
++
++static struct dev_pm_ops adx_wdt_pm_ops = {
++	.suspend = adx_wdt_suspend,
++	.resume = adx_wdt_resume,
++};
++
++#  define ADX_WDT_PM_OPS	(&adx_wdt_pm_ops)
++#else
++#  define ADX_WDT_PM_OPS	NULL
++#endif
++
++static struct platform_driver adx_wdt_driver = {
++	.probe = adx_wdt_probe,
++	.remove = __devexit_p(adx_wdt_remove),
++	.shutdown = adx_wdt_shutdown,
++	.driver = {
++		.name = WATCHDOG_NAME,
++		.owner = THIS_MODULE,
++		.pm = ADX_WDT_PM_OPS,
++	},
++};
++
++static int __init adx_wdt_init(void)
++{
++	return platform_driver_register(&adx_wdt_driver);
++}
++
++static void __exit adx_wdt_exit(void)
++{
++	platform_driver_unregister(&adx_wdt_driver);
++}
++
++module_init(adx_wdt_init);
++module_exit(adx_wdt_exit);
++
++MODULE_DESCRIPTION("Avionic Design Xanthos Watchdog Driver");
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("Thierry Reding <thierry.reding@avionic-design.de>");
++MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);
+-- 
+tg: (64f1607..) adx/watchdog (depends on: adx/master)
