@@ -1,97 +1,410 @@
-From: jic23@cam.ac.uk (Jonathan Cameron)
-Date: Sat, 4 Jul 2009 13:25:06 +0000
-Subject: [PATCH 02/10] ov7670: Temporary soc-camera support
-Message-ID: <mailman.99.1257097472.2253.linux-arm-kernel@lists.infradead.org>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Fri, 21 Aug 2009 12:52:46 +0100
+Subject: [PATCH] ARM: Mailing lists have moved
+Message-ID: <1250855566.3311.100.camel@macbook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jonathan Cameron <jic23@cam.ac.uk>
----
- drivers/media/video/ov7670.c |   50 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 50 insertions(+), 0 deletions(-)
+Russell no longer wants to maintain the mailing lists, so with his
+blessing I have set up replacements at lists.infradead.org.
 
-diff --git a/drivers/media/video/ov7670.c b/drivers/media/video/ov7670.c
-index 0e2184e..910a499 100644
---- a/drivers/media/video/ov7670.c
-+++ b/drivers/media/video/ov7670.c
-@@ -19,6 +19,8 @@
- #include <media/v4l2-chip-ident.h>
- #include <media/v4l2-i2c-drv.h>
+Erik was helping to moderate the old list, and will continue to moderate
+the new one. Vince has kindly volunteered to do so too.
+
+Signed-off-by: David Woodhouse <David.Woodhouse@intel.com>
+Signed-off-by: Erik Mouw <mouw@nl.linux.org>
+Signed-off-by: Vincent Sanders <vince@kyllikki.org>
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 60299a9..24f6134 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -497,7 +497,7 @@ F:	arch/arm/include/asm/floppy.h
  
-+#include <media/soc_camera.h>
-+#include <linux/autoconf.h>
+ ARM PORT
+ M:	Russell King <linux@arm.linux.org.uk>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ W:	http://www.arm.linux.org.uk/
+ S:	Maintained
+ F:	arch/arm/
+@@ -508,51 +508,51 @@ F:	drivers/mmc/host/mmci.*
  
- MODULE_AUTHOR("Jonathan Corbet <corbet@lwn.net>");
- MODULE_DESCRIPTION("A low-level driver for OmniVision ov7670 sensors");
-@@ -745,6 +747,10 @@ static int ov7670_s_fmt(struct v4l2_subdev *sd, struct v4l2_format *fmt)
- 	struct ov7670_info *info = to_state(sd);
- 	unsigned char com7, clkrc = 0;
+ ARM/ADI ROADRUNNER MACHINE SUPPORT
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+ F:	arch/arm/mach-ixp23xx/
+ F:	arch/arm/mach-ixp23xx/include/mach/
  
-+	ret = ov7670_init(sd, 0);
-+	if (ret)
-+		return ret;
-+
- 	ret = ov7670_try_fmt_internal(sd, fmt, &ovfmt, &wsize);
- 	if (ret)
- 		return ret;
-@@ -1239,6 +1245,41 @@ static const struct v4l2_subdev_ops ov7670_ops = {
- };
+ ARM/ADS SPHERE MACHINE SUPPORT
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
  
- /* ----------------------------------------------------------------------- */
-+static unsigned long ov7670_soc_query_bus_param(struct soc_camera_device *icd)
-+{
-+	struct soc_camera_link *icl = to_soc_camera_link(icd);
-+
-+	unsigned long flags = SOCAM_PCLK_SAMPLE_RISING | SOCAM_MASTER |
-+		SOCAM_VSYNC_ACTIVE_HIGH | SOCAM_HSYNC_ACTIVE_HIGH |
-+		SOCAM_DATAWIDTH_8 | SOCAM_DATA_ACTIVE_HIGH;
-+
-+	return soc_camera_apply_sensor_flags(icl, flags);
-+}
-+
-+/* This device only supports one bus option */
-+static int ov7670_soc_set_bus_param(struct soc_camera_device *icd,
-+				    unsigned long flags)
-+{
-+	return 0;
-+}
-+
-+static struct soc_camera_ops ov7670_soc_ops = {
-+	.set_bus_param = ov7670_soc_set_bus_param,
-+	.query_bus_param = ov7670_soc_query_bus_param,
-+};
-+
-+#define SETFOURCC(type) .name = (#type), .fourcc = (V4L2_PIX_FMT_ ## type)
-+static const struct soc_camera_data_format ov7670_soc_fmt_lists[] = {
-+	{
-+		SETFOURCC(YUYV),
-+		.depth = 16,
-+		.colorspace = V4L2_COLORSPACE_JPEG,
-+	}, {
-+		SETFOURCC(RGB565),
-+		.depth = 16,
-+		.colorspace = V4L2_COLORSPACE_SRGB,
-+	},
-+};
+ ARM/AFEB9260 MACHINE SUPPORT
+ M:	Sergey Lapin <slapin@ossfans.org>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
  
- static int ov7670_probe(struct i2c_client *client,
- 			const struct i2c_device_id *id)
-@@ -1246,7 +1287,16 @@ static int ov7670_probe(struct i2c_client *client,
- 	struct v4l2_subdev *sd;
- 	struct ov7670_info *info;
- 	int ret;
-+	struct soc_camera_device *icd = client->dev.platform_data;
-+
-+	if (!icd) {
-+		dev_err(&client->dev, "OV7670: missing soc-camera data!\n");
-+		return -EINVAL;
-+	}
+ ARM/AJECO 1ARM MACHINE SUPPORT
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
  
-+	icd->ops = &ov7670_soc_ops;
-+	icd->formats = ov7670_soc_fmt_lists;
-+	icd->num_formats = ARRAY_SIZE(ov7670_soc_fmt_lists);
- 	info = kzalloc(sizeof(struct ov7670_info), GFP_KERNEL);
- 	if (info == NULL)
- 		return -ENOMEM;
+ ARM/ATMEL AT91RM9200 ARM ARCHITECTURE
+ M:	Andrew Victor <linux@maxim.org.za>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ W:	http://maxim.org.za/at91_26.html
+ S:	Maintained
+ 
+ ARM/CIRRUS LOGIC EP93XX ARM ARCHITECTURE
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+ 
+ ARM/CIRRUS LOGIC EDB9315A MACHINE SUPPORT
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+ 
+ ARM/CLKDEV SUPPORT
+ M:	Russell King <linux@arm.linux.org.uk>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ F:	arch/arm/common/clkdev.c
+ F:	arch/arm/include/asm/clkdev.h
+ 
+ ARM/COMPULAB CM-X270/EM-X270 and CM-X300 MACHINE SUPPORT
+ M:	Mike Rapoport <mike@compulab.co.il>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+ 
+ ARM/CORGI MACHINE SUPPORT
+@@ -561,14 +561,14 @@ S:	Maintained
+ 
+ ARM/CORTINA SYSTEMS GEMINI ARM ARCHITECTURE
+ M:	Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ T:	git git://gitorious.org/linux-gemini/mainline.git
+ S:	Maintained
+ F:	arch/arm/mach-gemini/
+ 
+ ARM/EBSA110 MACHINE SUPPORT
+ M:	Russell King <linux@arm.linux.org.uk>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ W:	http://www.arm.linux.org.uk/
+ S:	Maintained
+ F:	arch/arm/mach-ebsa110/
+@@ -586,13 +586,13 @@ F:	arch/arm/mach-pxa/ezx.c
+ 
+ ARM/FARADAY FA526 PORT
+ M:	Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+ F:	arch/arm/mm/*-fa*
+ 
+ ARM/FOOTBRIDGE ARCHITECTURE
+ M:	Russell King <linux@arm.linux.org.uk>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ W:	http://www.arm.linux.org.uk/
+ S:	Maintained
+ F:	arch/arm/include/asm/hardware/dec21285.h
+@@ -600,17 +600,17 @@ F:	arch/arm/mach-footbridge/
+ 
+ ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
+ M:	Sascha Hauer <kernel@pengutronix.de>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+ 
+ ARM/GLOMATION GESBC9312SX MACHINE SUPPORT
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+ 
+ ARM/GUMSTIX MACHINE SUPPORT
+ M:	Steve Sakoman <sakoman@gmail.com>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+ 
+ ARM/H4700 (HP IPAQ HX4700) MACHINE SUPPORT
+@@ -630,55 +630,55 @@ F:	arch/arm/mach-sa1100/include/mach/jornada720.h
+ ARM/INTEL IOP32X ARM ARCHITECTURE
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+ M:	Dan Williams <dan.j.williams@intel.com>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Supported
+ 
+ ARM/INTEL IOP33X ARM ARCHITECTURE
+ M:	Dan Williams <dan.j.williams@intel.com>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Supported
+ 
+ ARM/INTEL IOP13XX ARM ARCHITECTURE
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+ M:	Dan Williams <dan.j.williams@intel.com>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Supported
+ 
+ ARM/INTEL IQ81342EX MACHINE SUPPORT
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+ M:	Dan Williams <dan.j.williams@intel.com>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Supported
+ 
+ ARM/INTEL IXP2000 ARM ARCHITECTURE
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+ 
+ ARM/INTEL IXDP2850 MACHINE SUPPORT
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+ 
+ ARM/INTEL IXP23XX ARM ARCHITECTURE
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+ 
+ ARM/INTEL XSC3 (MANZANO) ARM CORE
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+ M:	Dan Williams <dan.j.williams@intel.com>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Supported
+ 
+ ARM/IP FABRICS DOUBLE ESPRESSO MACHINE SUPPORT
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+ 
+ ARM/LOGICPD PXA270 MACHINE SUPPORT
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+ 
+ ARM/MAGICIAN MACHINE SUPPORT
+@@ -687,7 +687,7 @@ S:	Maintained
+ 
+ ARM/MIOA701 MACHINE SUPPORT
+ M:	Robert Jarzmik <robert.jarzmik@free.fr>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ F:	arch/arm/mach-pxa/mioa701.c
+ S:	Maintained
+ 
+@@ -728,18 +728,18 @@ S:	Maintained
+ 
+ ARM/PT DIGITAL BOARD PORT
+ M:	Stefan Eletzhofer <stefan.eletzhofer@eletztrick.de>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ W:	http://www.arm.linux.org.uk/
+ S:	Maintained
+ 
+ ARM/RADISYS ENP2611 MACHINE SUPPORT
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+ 
+ ARM/RISCPC ARCHITECTURE
+ M:	Russell King <linux@arm.linux.org.uk>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ W:	http://www.arm.linux.org.uk/
+ S:	Maintained
+ F:	arch/arm/common/time-acorn.c
+@@ -758,7 +758,7 @@ S:	Maintained
+ 
+ ARM/SAMSUNG ARM ARCHITECTURES
+ M:	Ben Dooks <ben-linux@fluff.org>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ W:	http://www.fluff.org/ben/linux/
+ S:	Maintained
+ F:	arch/arm/plat-s3c/
+@@ -766,65 +766,65 @@ F:	arch/arm/plat-s3c24xx/
+ 
+ ARM/S3C2410 ARM ARCHITECTURE
+ M:	Ben Dooks <ben-linux@fluff.org>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ W:	http://www.fluff.org/ben/linux/
+ S:	Maintained
+ F:	arch/arm/mach-s3c2410/
+ 
+ ARM/S3C2440 ARM ARCHITECTURE
+ M:	Ben Dooks <ben-linux@fluff.org>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ W:	http://www.fluff.org/ben/linux/
+ S:	Maintained
+ F:	arch/arm/mach-s3c2440/
+ 
+ ARM/S3C2442 ARM ARCHITECTURE
+ M:	Ben Dooks <ben-linux@fluff.org>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ W:	http://www.fluff.org/ben/linux/
+ S:	Maintained
+ F:	arch/arm/mach-s3c2442/
+ 
+ ARM/S3C2443 ARM ARCHITECTURE
+ M:	Ben Dooks <ben-linux@fluff.org>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ W:	http://www.fluff.org/ben/linux/
+ S:	Maintained
+ F:	arch/arm/mach-s3c2443/
+ 
+ ARM/S3C6400 ARM ARCHITECTURE
+ M:	Ben Dooks <ben-linux@fluff.org>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ W:	http://www.fluff.org/ben/linux/
+ S:	Maintained
+ F:	arch/arm/mach-s3c6400/
+ 
+ ARM/S3C6410 ARM ARCHITECTURE
+ M:	Ben Dooks <ben-linux@fluff.org>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ W:	http://www.fluff.org/ben/linux/
+ S:	Maintained
+ F:	arch/arm/mach-s3c6410/
+ 
+ ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+ 
+ ARM/THECUS N2100 MACHINE SUPPORT
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+ 
+ ARM/NUVOTON W90X900 ARM ARCHITECTURE
+ M:	Wan ZongShun <mcuos.com@gmail.com>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ W:	http://www.mcuos.com
+ S:	Maintained
+ 
+ ARM/VFP SUPPORT
+ M:	Russell King <linux@arm.linux.org.uk>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ W:	http://www.arm.linux.org.uk/
+ S:	Maintained
+ F:	arch/arm/vfp/
+@@ -923,7 +923,7 @@ F:	include/linux/atm*
+ 
+ ATMEL AT91 MCI DRIVER
+ M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ W:	http://www.atmel.com/products/AT91/
+ W:	http://www.at91.com/
+ S:	Maintained
+@@ -1501,7 +1501,7 @@ F:	drivers/infiniband/hw/cxgb3/
+ 
+ CYBERPRO FB DRIVER
+ M:	Russell King <linux@arm.linux.org.uk>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ W:	http://www.arm.linux.org.uk/
+ S:	Maintained
+ F:	drivers/video/cyber2000fb.*
+@@ -2046,7 +2046,7 @@ F:	drivers/i2c/busses/i2c-cpm.c
+ FREESCALE IMX / MXC FRAMEBUFFER DRIVER
+ M:	Sascha Hauer <kernel@pengutronix.de>
+ L:	linux-fbdev-devel at lists.sourceforge.net (moderated for non-subscribers)
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+ F:	arch/arm/plat-mxc/include/mach/imxfb.h
+ F:	drivers/video/imxfb.c
+@@ -3398,7 +3398,7 @@ F:	include/linux/meye.h
+ 
+ MOTOROLA IMX MMC/SD HOST CONTROLLER INTERFACE DRIVER
+ M:	Pavel Pisa <ppisa@pikron.com>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+ F:	drivers/mmc/host/imxmmc.*
+ 
+@@ -4106,7 +4106,7 @@ F:	drivers/media/video/pvrusb2/
+ PXA2xx/PXA3xx SUPPORT
+ M:	Eric Miao <eric.y.miao@gmail.com>
+ M:	Russell King <linux@arm.linux.org.uk>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+ F:	arch/arm/mach-pxa/
+ F:	drivers/pcmcia/pxa2xx*
+@@ -4119,13 +4119,13 @@ F:	sound/soc/pxa
+ PXA168 SUPPORT
+ M:	Eric Miao <eric.y.miao@gmail.com>
+ M:	Jason Chagas <jason.chagas@marvell.com>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git
+ S:	Maintained
+ 
+ PXA910 SUPPORT
+ M:	Eric Miao <eric.y.miao@gmail.com>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git
+ S:	Maintained
+ 
+@@ -4366,7 +4366,7 @@ F:	net/iucv/
+ 
+ S3C24XX SD/MMC Driver
+ M:	Ben Dooks <ben-linux@fluff.org>
+-L:	linux-arm-kernel at lists.arm.linux.org.uk (subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Supported
+ F:	drivers/mmc/host/s3cmci.*
+ 
+@@ -4561,7 +4561,7 @@ F:	drivers/misc/sgi-xp/
+ SHARP LH SUPPORT (LH7952X & LH7A40X)
+ M:	Marc Singer <elf@buici.com>
+ W:	http://projects.buici.com/arm
+-L:	linux-arm-kernel at lists.arm.linux.org.uk	(subscribers-only)
++L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+ F:	Documentation/arm/Sharp-LH/ADC-LH7-Touchscreen
+ F:	arch/arm/mach-lh7a40x/
+
 -- 
-1.6.3.3
+David Woodhouse                            Open Source Technology Centre
+David.Woodhouse at intel.com                              Intel Corporation
