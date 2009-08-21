@@ -1,35 +1,42 @@
 From: dwmw2@infradead.org (David Woodhouse)
-Date: Fri, 21 Aug 2009 17:00:23 +0100
-Subject: READ ME: How to stop all this extra linux-arm-kernel mail
-Message-ID: <1250870423.3311.164.camel@macbook.infradead.org>
+Date: Fri, 21 Aug 2009 17:02:01 +0100
+Subject: [PATCH] ARM: Mailing lists have moved
+In-Reply-To: <200908211731.24538.arnd@arndb.de>
+References: <1250855566.3311.100.camel@macbook.infradead.org>
+	<200908211513.48424.arnd@arndb.de>
+	<1250868037.3311.106.camel@macbook.infradead.org>
+	<200908211731.24538.arnd@arndb.de>
+Message-ID: <1250870521.3311.169.camel@macbook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-You are receiving this mail because your email address was subscribed to
-the old "linux-arm-kernel" mailing list.
+On Fri, 2009-08-21 at 17:31 +0200, Arnd Bergmann wrote:
+> Contrary to what you expect to be
+> the minimum level of intelligence required to subscribe to development
+> mailing list, a huge number of them subsequently flooded the list
+> with messages saying 'please unsubscribe me please' or the like.
+> Needless to say, there was a clear instruction on the bottom of each
+> mail telling you how to unsubscribe.
 
-It may have been configured _not_ to send you email, but unfortunately
-we lost that setting when the mailing lists were moved. We apologise for
-that.
+Hm. There's no accounting for the stupidity of the human animal.
 
-If you no longer want to receive this mail, here's how to unsubscribe...
+We considered doing it as a mass _invitation_ (which needs the
+subscriber to click the link to confirm) rather than a mass
+subscription. In general, I think it's better to err on the side of
+inclusion -- so I decided against that because I thought too many people
+wouldn't notice it and would fall off the lists as a result. Perhaps
+that was the wrong decision, but I suspect nothing is gained now by
+going back and changing things, even if I _did_ have the required
+information.
 
-You will have received an email a few hours ago, with a subject like
- 	Welcome to the "linux-arm-kernel" mailing list
+Even with the notification and the first major thread being "ARM Mailing
+lists have moved", you're right that there are probably a few people who
+are _so_ stupid that they can't manage to work it out. I've sent a mail
+with words of one syllable or fewer to each list, which might hopefully
+help -- but I'm sure there'll still be some.
 
-That email contains your password for the mailing list configuration.
-
-Go to http://lists.infradead.org/mailman/options/linux-arm-kernel and
-enter that password along with your email address, and click the
-'Unsubscribe' button. You will be sent one final mail, and after you
-click the link in it you will be unsubscribed.
-
-If you do not have your password, you can use the 'Remind' button to be
-sent another copy.
-
-If all else fails, you can email me in PRIVATE and I will help you.
-
-Again, we apologise for the inconvenience.
+When that happens, we'll unsubscribe them -- and send in the ninjas to
+ensure they don't accidentally breed.
 
 -- 
 dwmw2
