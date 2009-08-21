@@ -1,35 +1,35 @@
-From: davidjon@xenontk.org (David John)
-Date: Fri, 21 Aug 2009 21:26:45 +0530
-Subject: [PATCH] ARM: Mailing lists have moved
-In-Reply-To: <1250868957.3311.110.camel@macbook.infradead.org>
-References: <1250855566.3311.100.camel@macbook.infradead.org>	
-	<alpine.DEB.2.00.0908210925400.24646@utopia.booyaka.com>
-	<1250868957.3311.110.camel@macbook.infradead.org>
-Message-ID: <4A8EC3BD.3000107@xenontk.org>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Fri, 21 Aug 2009 17:00:23 +0100
+Subject: READ ME: How to stop all this extra linux-arm-kernel mail
+Message-ID: <1250870423.3311.164.camel@macbook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2009 09:05 PM, David Woodhouse wrote:
-> On Fri, 2009-08-21 at 09:27 -0600, Paul Walmsley wrote:
->>
->>
->>> Russell no longer wants to maintain the mailing lists, so with his
->>> blessing I have set up replacements at lists.infradead.org.
->>
->> Can you help us understand why the existing linux-arm at vger.kernel.org
->> list is not used for this?
-> 
-> Russell didn't want to do that, so I offered an alternative solution
-> preserving the three separate lists (l-a, l-a-kernel, l-a-toolchain).
-> 
+You are receiving this mail because your email address was subscribed to
+the old "linux-arm-kernel" mailing list.
 
-Would it be too much to ask that linux-arm at vger be used for ARM kernel
-development, with the other two lists at infradead? Maintaining multiple
-kernel development lists was one of the problems mentioned, with people
-unsure as to which list to subscribe to and having to subscribe to both
-lists in case mails were posted to the vger list.
+It may have been configured _not_ to send you email, but unfortunately
+we lost that setting when the mailing lists were moved. We apologise for
+that.
 
-Maintaining a _single_ kernel mailing list would be ideal.
+If you no longer want to receive this mail, here's how to unsubscribe...
 
-Regards,
-David.
+You will have received an email a few hours ago, with a subject like
+ 	Welcome to the "linux-arm-kernel" mailing list
+
+That email contains your password for the mailing list configuration.
+
+Go to http://lists.infradead.org/mailman/options/linux-arm-kernel and
+enter that password along with your email address, and click the
+'Unsubscribe' button. You will be sent one final mail, and after you
+click the link in it you will be unsubscribed.
+
+If you do not have your password, you can use the 'Remind' button to be
+sent another copy.
+
+If all else fails, you can email me in PRIVATE and I will help you.
+
+Again, we apologise for the inconvenience.
+
+-- 
+dwmw2
