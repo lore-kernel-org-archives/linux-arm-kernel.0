@@ -1,41 +1,40 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 21 Aug 2009 23:03:39 +0100
-Subject: [PATCH] ARM: Mailing lists have moved
-In-Reply-To: <4A8EC75D.6010203@billgatliff.com>
-References: <1250855566.3311.100.camel@macbook.infradead.org>
-	<alpine.DEB.2.00.0908210925400.24646@utopia.booyaka.com>
-	<1250868957.3311.110.camel@macbook.infradead.org>
-	<4A8EBFFD.5000307@billgatliff.com>
-	<1250870971.3311.173.camel@macbook.infradead.org>
-	<4A8EC75D.6010203@billgatliff.com>
-Message-ID: <20090821220339.GM25153@trinity.fluff.org>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Fri, 21 Aug 2009 15:34:29 -0700
+Subject: [PATCH] watchdog: Add support for the Avionic Design Xanthos
+	watchdog timer.
+In-Reply-To: <1250860202-28187-1-git-send-email-thierry.reding@avionic-design.de>
+References: <20090821073105.GC29382@infomag.iguana.be>
+	<1250860202-28187-1-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <20090821153429.2075e42d.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 21, 2009 at 11:12:13AM -0500, Bill Gatliff wrote:
-> David Woodhouse wrote:
-> >On Fri, 2009-08-21 at 10:40 -0500, Bill Gatliff wrote:
-> >  
-> >>Ok, so which of the new lists should former linux-arm-kernel subscribers 
-> >>be subscribed to?  I'm confused, I've seen mention of four different 
-> >>lists now: three at infraded, and one at vger.  :)
-> >>    
-> >
-> >Nothing has changed. There were always three lists: linux-arm (for
-> >userspace stuff), linux-arm-toolchain and linux-arm-kernel.
-> >
-> >If you were subscribed to linux-arm-kernel before, then you are already
-> >subscribed to linux-arm-kernel now. The list has just moved, that's all.
-> >  
+On Fri, 21 Aug 2009 15:10:02 +0200
+Thierry Reding <thierry.reding@avionic-design.de> wrote:
+
+> This patch adds support for the watchdog timer on Avionic Design Xanthos
+> boards.
 > 
-> Ok.  So help me understand what is the vger list for?  :)
+>
+> ...
+>
+> +static struct watchdog_info adx_wdt_info = {
+> +	.identity = "Avionic Design Xanthos Watchdog",
 
-To give Pavel and davem a warm feeling inside (although that maybe just
-the residual hatred of moderated mailing lists - god help them if they
-decide to submit stuff to other projects like ALSA).
+heh, that fits with zero bytes to spare.
 
--- 
-Ben
+>
+> ...
+>
+> +static const struct file_operations adx_wdt_fops = {
+> +	.owner = THIS_MODULE,
+> +	.llseek = no_llseek,
+> +	.open = adx_wdt_open,
+> +	.release = adx_wdt_release,
+> +	.ioctl = adx_wdt_ioctl,
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Nope.  All other watchdog drivers use .unlocked_ioctl and this one
+should as well, please.
+
+> +	.write = adx_wdt_write,
+> +};
