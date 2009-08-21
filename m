@@ -1,19 +1,24 @@
-From: rcrewe@plxtech.com (Richard Crewe)
-Date: Fri, 21 Aug 2009 16:07:34 +0100
-Subject: LDREX/STREX and pre-emption on SMP hardware
-Message-ID: <4A8EB836.3000406@plxtech.com>
+From: hector.oron@gmail.com (Hector Oron)
+Date: Fri, 21 Aug 2009 18:12:40 +0200
+Subject: i.MX35 Kernel without ARM EABI support  cannot execute init
+In-Reply-To: <1250865435.17931.20.camel@wks02-lin.nanotronic.local>
+References: <1250865435.17931.20.camel@wks02-lin.nanotronic.local>
+Message-ID: <20090821161240.GA20522@flaco.tsc-farm.upc.es>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Section A2.9.3 of the ARM architecture ref. manual seems to imply that 
-ldrex/strex instruction pairs won't work correctly if they are nested 
-due to pre-emption.
+Hello,
 
-Should a strex instruction be added to the low-level interrupt handler 
-or should all ldrex/strex instruction pairs be protected from 
-pre-emption by disabling interrupts?
+On Fri, Aug 21, 2009 at 04:37:15PM +0200, hoefle marco wrote:
+> When trying to boot the i.MX35 Kernel (with ARM EABI or without, the
+> kernel panic remains exactly the same) using the emdebian rootfs I get
+> this:
+> 
+> Kernel panic - not syncing: Attempted to kill init!
+> Has anybody an idea why this is not working?
 
-I have a suspicion that this may only cause problems on SMP systems.
+I have not much idea on what is missing, but Debian usually requires you to have an initrd image of your kernel and modules.
+I am sorry I can help much.
 
--- 
-Rich
+Cheers,
+		-- H?ctor Or?n
