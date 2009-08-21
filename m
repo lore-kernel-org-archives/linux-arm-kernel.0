@@ -1,21 +1,20 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 22 Aug 2009 01:05:52 +0200
-Subject: [PATCH] Convert WM97xx-battery to dev_pm_ops
-Message-ID: <200908220105.52244.marek.vasut@gmail.com>
+Date: Sat, 22 Aug 2009 01:07:55 +0200
+Subject: [PATCH] Fix mailing list entries for ARM/Palm devices
+Message-ID: <200908220107.55903.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi!
 
-Anton, are you fine with this one? Mark, in case Anton is ok, would you mind 
-applying? Thanks!
+we might as well apply this one. Thanks!
 
-Cheers!
-Marek Vasut
+Cheers
+Marek vasut
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: 0001-Convert-WM97xx-battery-to-dev_pm_ops.patch
+Name: 0001-Fix-mailing-list-entries-for-ARM-Palm-devices.patch
 Type: text/x-patch
-Size: 1661 bytes
+Size: 1045 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090822/10ad7529/attachment.bin>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090822/cf1ba162/attachment.bin>
