@@ -1,51 +1,19 @@
-From: marco.hoefle@nanotronic.ch (hoefle marco)
-Date: Fri, 21 Aug 2009 16:37:15 +0200
-Subject: i.MX35 Kernel without ARM EABI support  cannot execute init
-Message-ID: <1250865435.17931.20.camel@wks02-lin.nanotronic.local>
+From: rcrewe@plxtech.com (Richard Crewe)
+Date: Fri, 21 Aug 2009 16:07:34 +0100
+Subject: LDREX/STREX and pre-emption on SMP hardware
+Message-ID: <4A8EB836.3000406@plxtech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello everybody on the new mailing list,
-I have an issue with the ARM EABI kernel option.
-right now we have two ARM boards and two embedded linux distributions
-(Emdebian and OSELAS). The CPUs are PXA270 and Freescale i.MX35.
-The aim is to have emdebian on both boards.
-When trying to boot the i.MX35 Kernel (with ARM EABI or without, the
-kernel panic remains exactly the same) using the emdebian rootfs I get
-this:
+Section A2.9.3 of the ARM architecture ref. manual seems to imply that 
+ldrex/strex instruction pairs won't work correctly if they are nested 
+due to pre-emption.
 
-Kernel panic - not syncing: Attempted to kill init!
-Backtrace: 
-[<c0026430>] (dump_backtrace+0x0/0x10c) from [<c02515dc>] (dump_stack
-+0x18/0x1c)
- r7:c7817f54 r6:c7813c40 r5:c7813c40 r4:00000004
-[<c02515c4>] (dump_stack+0x0/0x1c) from [<c025161c>] (panic+0x3c/0x110)
-[<c02515e0>] (panic+0x0/0x110) from [<c0034a14>] (do_exit+0x6c/0x5b8)
- r3:c0301bd4 r2:c7813c40 r1:c7817d14 r0:c02b478a
-[<c00349a8>] (do_exit+0x0/0x5b8) from [<c0034fe0>] (do_group_exit
-+0x80/0xb4)
-[<c0034f60>] (do_group_exit+0x0/0xb4) from [<c003ea60>]
-(get_signal_to_deliver+0x2c0/0x2f0)
- r4:00000004
-[<c003e7a0>] (get_signal_to_deliver+0x0/0x2f0) from [<c0024ecc>]
-(do_signal+0x58/0x4e4)
-[<c0024e74>] (do_signal+0x0/0x4e4) from [<c0025384>] (do_notify_resume
-+0x2c/0x30)
-[<c0025358>] (do_notify_resume+0x0/0x30) from [<c0022dac>] (work_pending
-+0x1c/0x20)
+Should a strex instruction be added to the low-level interrupt handler 
+or should all ldrex/strex instruction pairs be protected from 
+pre-emption by disabling interrupts?
 
+I have a suspicion that this may only cause problems on SMP systems.
 
-The PXA270 kernel (same settings except ARM system type and ARM EABI
-disabled) boots the emdebian root file-system successfully.
-
-The i.MX35 Kernel boots with ARM EABI support the OSELAS file-system.
-Both Kernels are version 2.6.30.4 and were compiled with the same
-arm-linux-gnu-gcc compiler.
-
->From my understanding it should be possible to use the same root
-file-system on both CPUs.
-
-Has anybody an idea why this is not working?
-
-Thanks,
-Marco
+-- 
+Rich
