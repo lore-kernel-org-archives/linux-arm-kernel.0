@@ -1,52 +1,45 @@
-From: dxiao@broadcom.com (David Xiao)
-Date: Fri, 21 Aug 2009 14:29:06 -0700
-Subject: LDREX/STREX and pre-emption on SMP hardware
-In-Reply-To: <1250870319.10642.23.camel@pc1117.cambridge.arm.com>
-References: <4A8EB836.3000406@plxtech.com>
-	<1250869355.10642.10.camel@pc1117.cambridge.arm.com>
-	<20090821155011.GB8583@shareable.org>
-	<1250870319.10642.23.camel@pc1117.cambridge.arm.com>
-Message-ID: <1250890146.29685.18.camel@david-laptop>
+From: sam@ravnborg.org (Sam Ravnborg)
+Date: Fri, 21 Aug 2009 23:46:56 +0200
+Subject: [PATCH] ARM: Mailing lists have moved
+In-Reply-To: <4A8EC75D.6010203@billgatliff.com>
+References: <1250855566.3311.100.camel@macbook.infradead.org>
+	<alpine.DEB.2.00.0908210925400.24646@utopia.booyaka.com>
+	<1250868957.3311.110.camel@macbook.infradead.org>
+	<4A8EBFFD.5000307@billgatliff.com>
+	<1250870971.3311.173.camel@macbook.infradead.org>
+	<4A8EC75D.6010203@billgatliff.com>
+Message-ID: <20090821214656.GC16210@merkur.ravnborg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2009-08-21 at 08:58 -0700, Catalin Marinas wrote:
-> On Fri, 2009-08-21 at 16:50 +0100, Jamie Lokier wrote:
-> > Catalin Marinas wrote:
-> > > On Fri, 2009-08-21 at 16:07 +0100, Richard Crewe wrote:
-> > > > Section A2.9.3 of the ARM architecture ref. manual seems to imply that 
-> > > > ldrex/strex instruction pairs won't work correctly if they are nested 
-> > > > due to pre-emption.
-> > > > 
-> > > > Should a strex instruction be added to the low-level interrupt handler 
-> > > > or should all ldrex/strex instruction pairs be protected from 
-> > > > pre-emption by disabling interrupts?
-> > > 
-> > > There is no need to since preemption means rescheduling which implies a
-> > > call to the __switch_to function in entry-armv.S. This function clears
-> > > the exclusive monitor state explicitly.
-> > 
-> > What about when an interrupt handler uses ldrex/strex?  There is no
-> > call to __switch_to.
-> 
-> I don't see any issues with interrupt handlers, the exclusives should
-> work as expected.
-> 
-> The problem is with user apps using the exclusives and the same virtual
-> address could be used with LDREX/STREX in two different applications.
-> The (local) exclusive monitor may consider a LDREX in the one app and
-> STREX in the other app are part of the same pair and store the data
-> successfully.
-> 
-The DDI0406A ARM V7 Architecture Reference Manual (section A3.4.1) seems
-to indicate that the exclusive monitor is tagging/matching the physical
-memory address accessed by the LDREX/STREX instructions.
+On Fri, Aug 21, 2009 at 11:12:13AM -0500, Bill Gatliff wrote:
+> David Woodhouse wrote:
+>> On Fri, 2009-08-21 at 10:40 -0500, Bill Gatliff wrote:
+>>   
+>>> Ok, so which of the new lists should former linux-arm-kernel 
+>>> subscribers be subscribed to?  I'm confused, I've seen mention of 
+>>> four different lists now: three at infraded, and one at vger.  :)
+>>>     
+>>
+>> Nothing has changed. There were always three lists: linux-arm (for
+>> userspace stuff), linux-arm-toolchain and linux-arm-kernel.
+>>
+>> If you were subscribed to linux-arm-kernel before, then you are already
+>> subscribed to linux-arm-kernel now. The list has just moved, that's all.
+>>   
+>
+> Ok.  So help me understand what is the vger list for?  :)
 
-And in the same document (section A3.4.5), it seems to suggest that the
-reason we need to do CLREX during the context switch is that because the
-IsExclusiveLocal() implementation does not have to do memory
-address/size check, but just the exclusive state check.
+davem created that list as a response to some discussions about the moderation
+on the (now former) arm-kernel list.
+It never took of mainly because Russell wanted to keep the lists on
+the ARM machine he had to do some stability testing.
 
-Could you confirm that, Catalin? Thanks.
+Then the vger folks did some misconfiguration that made it
+defunct for a long time.
 
-David
+[I'm susprised why we did not just add a arm-toolchain at vger + arm-userspace at vger
+and be done with it. The mail admins cope with a lost of lists and thye would
+barely notice a few more]
+
+	Sam
