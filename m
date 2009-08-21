@@ -1,209 +1,40 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Sat, 22 Aug 2009 14:06:03 +0200 (MEST)
-Subject: [RFC/RFT 3/3] iop: enable generic time
-Message-ID: <200908221206.n7MC63eh029402@pilspetsen.it.uu.se>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 21 Aug 2009 16:46:19 +0100
+Subject: [PATCH] ARM: Mailing lists have moved
+In-Reply-To: <4A8EBFFD.5000307@billgatliff.com>
+References: <1250855566.3311.100.camel@macbook.infradead.org>
+	<alpine.DEB.2.00.0908210925400.24646@utopia.booyaka.com>
+	<1250868957.3311.110.camel@macbook.infradead.org>
+	<4A8EBFFD.5000307@billgatliff.com>
+Message-ID: <1250869579.10642.14.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This updates the IOP platform to use the kernel's generic time
-framework. With clockevent support in place, this reduces to
-selecting GENERIC_TIME and removing the platform's private timer
-->offset() operation (iop_gettimeoffset).
+On Fri, 2009-08-21 at 10:40 -0500, Bill Gatliff wrote:
+> David Woodhouse wrote:
+> > On Fri, 2009-08-21 at 09:27 -0600, Paul Walmsley wrote:
+> >   
+> >>     
+> >>> Russell no longer wants to maintain the mailing lists, so with his
+> >>> blessing I have set up replacements at lists.infradead.org.
+> >>>       
+> >> Can you help us understand why the existing linux-arm at vger.kernel.org
+> >> list is not used for this?
+> >>     
+> >
+> > Russell didn't want to do that, so I offered an alternative solution
+> > preserving the three separate lists (l-a, l-a-kernel, l-a-toolchain).
+> >   
+> 
+> Ok, so which of the new lists should former linux-arm-kernel subscribers 
+> be subscribed to?  I'm confused, I've seen mention of four different 
+> lists now: three at infraded, and one at vger.  :)
 
-Tested on n2100, compile-tested for all plat-iop machines.
+It looks like the linux-*@lists.arm.linux.org.uk have been moved to
+linux-*@lists.infradead.org with all the subscriptions transferred as
+well. So for kernel, it should be linux-arm-kernel at lists.infradead.org.
 
-Signed-off-by: Mikael Pettersson <mikpe@it.uu.se>
----
- arch/arm/Kconfig                          |    1 +
- arch/arm/include/asm/hardware/iop3xx.h    |    1 -
- arch/arm/mach-iop13xx/include/mach/time.h |    1 -
- arch/arm/mach-iop13xx/iq81340mc.c         |    1 -
- arch/arm/mach-iop13xx/iq81340sc.c         |    1 -
- arch/arm/mach-iop32x/em7210.c             |    1 -
- arch/arm/mach-iop32x/glantank.c           |    1 -
- arch/arm/mach-iop32x/iq31244.c            |    1 -
- arch/arm/mach-iop32x/iq80321.c            |    1 -
- arch/arm/mach-iop32x/n2100.c              |    1 -
- arch/arm/mach-iop33x/iq80331.c            |    1 -
- arch/arm/mach-iop33x/iq80332.c            |    1 -
- arch/arm/plat-iop/time.c                  |   29 -----------------------------
- 13 files changed, 1 insertion(+), 40 deletions(-)
+If unsure, cc LKML.
 
-diff -rupN linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/Kconfig linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/Kconfig
---- linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/Kconfig	2009-08-22 12:07:52.000000000 +0200
-+++ linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/Kconfig	2009-08-22 12:08:48.000000000 +0200
-@@ -737,6 +737,7 @@ config ARCH_ACORN
- config PLAT_IOP
- 	bool
- 	select GENERIC_CLOCKEVENTS
-+	select GENERIC_TIME
- 
- config PLAT_ORION
- 	bool
-diff -rupN linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/include/asm/hardware/iop3xx.h linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/include/asm/hardware/iop3xx.h
---- linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/include/asm/hardware/iop3xx.h	2009-08-22 12:07:52.000000000 +0200
-+++ linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/include/asm/hardware/iop3xx.h	2009-08-22 12:08:48.000000000 +0200
-@@ -233,7 +233,6 @@ extern int iop3xx_get_init_atu(void);
- void iop3xx_map_io(void);
- void iop_init_cp6_handler(void);
- void iop_init_time(unsigned long tickrate);
--unsigned long iop_gettimeoffset(void);
- 
- static inline void write_tmr0(u32 val)
- {
-diff -rupN linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/mach-iop13xx/include/mach/time.h linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/mach-iop13xx/include/mach/time.h
---- linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/mach-iop13xx/include/mach/time.h	2009-08-22 12:07:52.000000000 +0200
-+++ linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/mach-iop13xx/include/mach/time.h	2009-08-22 12:08:48.000000000 +0200
-@@ -20,7 +20,6 @@
- #define IOP13XX_CORE_FREQ_1200		(5 << 16)
- 
- void iop_init_time(unsigned long tickrate);
--unsigned long iop_gettimeoffset(void);
- 
- static inline unsigned long iop13xx_core_freq(void)
- {
-diff -rupN linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/mach-iop13xx/iq81340mc.c linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/mach-iop13xx/iq81340mc.c
---- linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/mach-iop13xx/iq81340mc.c	2008-10-11 10:43:49.000000000 +0200
-+++ linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/mach-iop13xx/iq81340mc.c	2009-08-22 12:08:48.000000000 +0200
-@@ -87,7 +87,6 @@ static void __init iq81340mc_timer_init(
- 
- static struct sys_timer iq81340mc_timer = {
-        .init       = iq81340mc_timer_init,
--       .offset     = iop_gettimeoffset,
- };
- 
- MACHINE_START(IQ81340MC, "Intel IQ81340MC")
-diff -rupN linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/mach-iop13xx/iq81340sc.c linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/mach-iop13xx/iq81340sc.c
---- linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/mach-iop13xx/iq81340sc.c	2008-10-11 10:43:49.000000000 +0200
-+++ linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/mach-iop13xx/iq81340sc.c	2009-08-22 12:08:48.000000000 +0200
-@@ -89,7 +89,6 @@ static void __init iq81340sc_timer_init(
- 
- static struct sys_timer iq81340sc_timer = {
-        .init       = iq81340sc_timer_init,
--       .offset     = iop_gettimeoffset,
- };
- 
- MACHINE_START(IQ81340SC, "Intel IQ81340SC")
-diff -rupN linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/mach-iop32x/em7210.c linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/mach-iop32x/em7210.c
---- linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/mach-iop32x/em7210.c	2008-10-11 10:43:49.000000000 +0200
-+++ linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/mach-iop32x/em7210.c	2009-08-22 12:08:48.000000000 +0200
-@@ -42,7 +42,6 @@ static void __init em7210_timer_init(voi
- 
- static struct sys_timer em7210_timer = {
- 	.init		= em7210_timer_init,
--	.offset		= iop_gettimeoffset,
- };
- 
- /*
-diff -rupN linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/mach-iop32x/glantank.c linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/mach-iop32x/glantank.c
---- linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/mach-iop32x/glantank.c	2008-12-25 15:54:13.000000000 +0100
-+++ linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/mach-iop32x/glantank.c	2009-08-22 12:08:48.000000000 +0200
-@@ -47,7 +47,6 @@ static void __init glantank_timer_init(v
- 
- static struct sys_timer glantank_timer = {
- 	.init		= glantank_timer_init,
--	.offset		= iop_gettimeoffset,
- };
- 
- 
-diff -rupN linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/mach-iop32x/iq31244.c linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/mach-iop32x/iq31244.c
---- linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/mach-iop32x/iq31244.c	2008-12-25 15:54:13.000000000 +0100
-+++ linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/mach-iop32x/iq31244.c	2009-08-22 12:08:48.000000000 +0200
-@@ -78,7 +78,6 @@ static void __init iq31244_timer_init(vo
- 
- static struct sys_timer iq31244_timer = {
- 	.init		= iq31244_timer_init,
--	.offset		= iop_gettimeoffset,
- };
- 
- 
-diff -rupN linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/mach-iop32x/iq80321.c linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/mach-iop32x/iq80321.c
---- linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/mach-iop32x/iq80321.c	2008-12-25 15:54:13.000000000 +0100
-+++ linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/mach-iop32x/iq80321.c	2009-08-22 12:08:48.000000000 +0200
-@@ -46,7 +46,6 @@ static void __init iq80321_timer_init(vo
- 
- static struct sys_timer iq80321_timer = {
- 	.init		= iq80321_timer_init,
--	.offset		= iop_gettimeoffset,
- };
- 
- 
-diff -rupN linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/mach-iop32x/n2100.c linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/mach-iop32x/n2100.c
---- linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/mach-iop32x/n2100.c	2008-12-25 15:54:13.000000000 +0100
-+++ linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/mach-iop32x/n2100.c	2009-08-22 12:08:48.000000000 +0200
-@@ -53,7 +53,6 @@ static void __init n2100_timer_init(void
- 
- static struct sys_timer n2100_timer = {
- 	.init		= n2100_timer_init,
--	.offset		= iop_gettimeoffset,
- };
- 
- 
-diff -rupN linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/mach-iop33x/iq80331.c linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/mach-iop33x/iq80331.c
---- linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/mach-iop33x/iq80331.c	2008-12-25 15:54:13.000000000 +0100
-+++ linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/mach-iop33x/iq80331.c	2009-08-22 12:08:48.000000000 +0200
-@@ -48,7 +48,6 @@ static void __init iq80331_timer_init(vo
- 
- static struct sys_timer iq80331_timer = {
- 	.init		= iq80331_timer_init,
--	.offset		= iop_gettimeoffset,
- };
- 
- 
-diff -rupN linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/mach-iop33x/iq80332.c linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/mach-iop33x/iq80332.c
---- linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/mach-iop33x/iq80332.c	2008-12-25 15:54:13.000000000 +0100
-+++ linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/mach-iop33x/iq80332.c	2009-08-22 12:08:48.000000000 +0200
-@@ -48,7 +48,6 @@ static void __init iq80332_timer_init(vo
- 
- static struct sys_timer iq80332_timer = {
- 	.init		= iq80332_timer_init,
--	.offset		= iop_gettimeoffset,
- };
- 
- 
-diff -rupN linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/plat-iop/time.c linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/plat-iop/time.c
---- linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/plat-iop/time.c	2009-08-22 12:07:52.000000000 +0200
-+++ linux-2.6.31-rc7.arm-iop-3-generictime/arch/arm/plat-iop/time.c	2009-08-22 12:08:48.000000000 +0200
-@@ -102,33 +102,6 @@ static struct clock_event_device iop_clo
- 	.set_mode	= iop_set_mode,
- };
- 
--static unsigned long ticks_per_usec;
--static unsigned long next_jiffy_time;
--
--unsigned long iop_gettimeoffset(void)
--{
--	unsigned long offset, temp;
--
--	/* enable cp6, if necessary, to avoid taking the overhead of an
--	 * undefined instruction trap
--	 */
--	asm volatile (
--	"mrc	p15, 0, %0, c15, c1, 0\n\t"
--	"tst	%0, #(1 << 6)\n\t"
--	"orreq	%0, %0, #(1 << 6)\n\t"
--	"mcreq	p15, 0, %0, c15, c1, 0\n\t"
--#ifdef CONFIG_CPU_XSCALE
--	"mrceq	p15, 0, %0, c15, c1, 0\n\t"
--	"moveq	%0, %0\n\t"
--	"subeq	pc, pc, #4\n\t"
--#endif
--	: "=r"(temp) : : "cc");
--
--	offset = next_jiffy_time - read_tcr1();
--
--	return offset / ticks_per_usec;
--}
--
- static irqreturn_t
- iop_timer_interrupt(int irq, void *dev_id)
- {
-@@ -160,8 +133,6 @@ void __init iop_init_time(unsigned long 
- 	u32 timer_ctl;
- 
- 	ticks_per_jiffy = (tick_rate + HZ/2) / HZ;
--	ticks_per_usec = tick_rate / 1000000;
--	next_jiffy_time = 0xffffffff;
- 	iop_tick_rate = tick_rate;
- 
- 	timer_ctl = IOP_TMR_EN | IOP_TMR_PRIVILEGED |
+-- 
+Catalin
