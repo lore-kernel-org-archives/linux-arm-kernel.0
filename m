@@ -1,24 +1,35 @@
-From: hector.oron@gmail.com (Hector Oron)
-Date: Fri, 21 Aug 2009 18:12:40 +0200
-Subject: i.MX35 Kernel without ARM EABI support  cannot execute init
-In-Reply-To: <1250865435.17931.20.camel@wks02-lin.nanotronic.local>
-References: <1250865435.17931.20.camel@wks02-lin.nanotronic.local>
-Message-ID: <20090821161240.GA20522@flaco.tsc-farm.upc.es>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Fri, 21 Aug 2009 16:20:37 +0100
+Subject: [PATCH] ARM: Mailing lists have moved
+In-Reply-To: <200908211513.48424.arnd@arndb.de>
+References: <1250855566.3311.100.camel@macbook.infradead.org>
+	<200908211513.48424.arnd@arndb.de>
+Message-ID: <1250868037.3311.106.camel@macbook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, Aug 21, 2009 at 04:37:15PM +0200, hoefle marco wrote:
-> When trying to boot the i.MX35 Kernel (with ARM EABI or without, the
-> kernel panic remains exactly the same) using the emdebian rootfs I get
-> this:
+On Fri, 2009-08-21 at 15:13 +0200, Arnd Bergmann wrote:
 > 
-> Kernel panic - not syncing: Attempted to kill init!
-> Has anybody an idea why this is not working?
+> I guess you subscribed everyone to the new list who was subscribed
+> to linux-arm-kernel at lists.arm.linux.org.uk before, but did not
+> move the "don't send any mail" flag.
+> 
+> I was only subscribed to the old list so that my own mails would
+> go through, but disabled reception of all other mails. No problem
+> for myself, but I think it would be good not to resubscribe anyone
+> who did not want to receive mails on the old list.
 
-I have not much idea on what is missing, but Debian usually requires you to have an initrd image of your kernel and modules.
-I am sorry I can help much.
+Hm, that would have been a good idea if I had that information. Still,
+it's done now -- people can easily unsubscribe.
 
-Cheers,
-		-- H?ctor Or?n
+Apologies to those inconvenienced, but it's probably better that way
+than for people to drop _off_ the list without noticing.
+
+>  Otherwise we're risking a similar mess to what happened when the
+> powerpc-dev and powerpc mailing lists were merged.
+
+Hm?
+
+-- 
+David Woodhouse                            Open Source Technology Centre
+David.Woodhouse at intel.com                              Intel Corporation
