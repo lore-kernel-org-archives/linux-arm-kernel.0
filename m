@@ -1,35 +1,29 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Fri, 21 Aug 2009 16:20:37 +0100
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 21 Aug 2009 09:27:33 -0600 (MDT)
 Subject: [PATCH] ARM: Mailing lists have moved
-In-Reply-To: <200908211513.48424.arnd@arndb.de>
+In-Reply-To: <1250855566.3311.100.camel@macbook.infradead.org>
 References: <1250855566.3311.100.camel@macbook.infradead.org>
-	<200908211513.48424.arnd@arndb.de>
-Message-ID: <1250868037.3311.106.camel@macbook.infradead.org>
+Message-ID: <alpine.DEB.2.00.0908210925400.24646@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2009-08-21 at 15:13 +0200, Arnd Bergmann wrote:
-> 
-> I guess you subscribed everyone to the new list who was subscribed
-> to linux-arm-kernel at lists.arm.linux.org.uk before, but did not
-> move the "don't send any mail" flag.
-> 
-> I was only subscribed to the old list so that my own mails would
-> go through, but disabled reception of all other mails. No problem
-> for myself, but I think it would be good not to resubscribe anyone
-> who did not want to receive mails on the old list.
+Hello David,
 
-Hm, that would have been a good idea if I had that information. Still,
-it's done now -- people can easily unsubscribe.
+On Fri, 21 Aug 2009, David Woodhouse wrote:
 
-Apologies to those inconvenienced, but it's probably better that way
-than for people to drop _off_ the list without noticing.
+> Russell no longer wants to maintain the mailing lists, so with his
+> blessing I have set up replacements at lists.infradead.org.
 
->  Otherwise we're risking a similar mess to what happened when the
-> powerpc-dev and powerpc mailing lists were merged.
+Can you help us understand why the existing linux-arm at vger.kernel.org list 
+is not used for this?
 
-Hm?
+> Erik was helping to moderate the old list, and will continue to moderate
+> the new one. Vince has kindly volunteered to do so too.
+>
+> Signed-off-by: David Woodhouse <David.Woodhouse@intel.com>
+> Signed-off-by: Erik Mouw <mouw@nl.linux.org>
+> Signed-off-by: Vincent Sanders <vince@kyllikki.org>
 
--- 
-David Woodhouse                            Open Source Technology Centre
-David.Woodhouse at intel.com                              Intel Corporation
+regards,
+
+- Paul
