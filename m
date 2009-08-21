@@ -1,29 +1,22 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 21 Aug 2009 09:27:33 -0600 (MDT)
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 21 Aug 2009 16:28:47 +0100
 Subject: [PATCH] ARM: Mailing lists have moved
-In-Reply-To: <1250855566.3311.100.camel@macbook.infradead.org>
+In-Reply-To: <1250868037.3311.106.camel@macbook.infradead.org>
 References: <1250855566.3311.100.camel@macbook.infradead.org>
-Message-ID: <alpine.DEB.2.00.0908210925400.24646@utopia.booyaka.com>
+	<200908211513.48424.arnd@arndb.de>
+	<1250868037.3311.106.camel@macbook.infradead.org>
+Message-ID: <20090821152847.GD2850@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello David,
+On Fri, Aug 21, 2009 at 04:20:37PM +0100, David Woodhouse wrote:
+> On Fri, 2009-08-21 at 15:13 +0200, Arnd Bergmann wrote:
 
-On Fri, 21 Aug 2009, David Woodhouse wrote:
+> >  Otherwise we're risking a similar mess to what happened when the
+> > powerpc-dev and powerpc mailing lists were merged.
 
-> Russell no longer wants to maintain the mailing lists, so with his
-> blessing I have set up replacements at lists.infradead.org.
+> Hm?
 
-Can you help us understand why the existing linux-arm at vger.kernel.org list 
-is not used for this?
-
-> Erik was helping to moderate the old list, and will continue to moderate
-> the new one. Vince has kindly volunteered to do so too.
->
-> Signed-off-by: David Woodhouse <David.Woodhouse@intel.com>
-> Signed-off-by: Erik Mouw <mouw@nl.linux.org>
-> Signed-off-by: Vincent Sanders <vince@kyllikki.org>
-
-regards,
-
-- Paul
+Lots of people posting on the list going "What is all this mail?  Make
+it stop!" and so on (not helped by the fact that since two lists were
+merged the overall volume increased).
