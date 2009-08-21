@@ -1,16 +1,15 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 21 Aug 2009 16:46:19 +0100
+From: bzolnier@gmail.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 21 Aug 2009 18:03:32 +0200
 Subject: [PATCH] ARM: Mailing lists have moved
 In-Reply-To: <4A8EBFFD.5000307@billgatliff.com>
 References: <1250855566.3311.100.camel@macbook.infradead.org>
-	<alpine.DEB.2.00.0908210925400.24646@utopia.booyaka.com>
 	<1250868957.3311.110.camel@macbook.infradead.org>
 	<4A8EBFFD.5000307@billgatliff.com>
-Message-ID: <1250869579.10642.14.camel@pc1117.cambridge.arm.com>
+Message-ID: <200908211803.32672.bzolnier@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2009-08-21 at 10:40 -0500, Bill Gatliff wrote:
+On Friday 21 August 2009 17:40:45 Bill Gatliff wrote:
 > David Woodhouse wrote:
 > > On Fri, 2009-08-21 at 09:27 -0600, Paul Walmsley wrote:
 > >   
@@ -30,11 +29,4 @@ On Fri, 2009-08-21 at 10:40 -0500, Bill Gatliff wrote:
 > be subscribed to?  I'm confused, I've seen mention of four different 
 > lists now: three at infraded, and one at vger.  :)
 
-It looks like the linux-*@lists.arm.linux.org.uk have been moved to
-linux-*@lists.infradead.org with all the subscriptions transferred as
-well. So for kernel, it should be linux-arm-kernel at lists.infradead.org.
-
-If unsure, cc LKML.
-
--- 
-Catalin
+You can always start a new one if you are not sure. :)
