@@ -1,36 +1,29 @@
-From: bgat@billgatliff.com (Bill Gatliff)
-Date: Fri, 21 Aug 2009 10:40:45 -0500
-Subject: [PATCH] ARM: Mailing lists have moved
-In-Reply-To: <1250868957.3311.110.camel@macbook.infradead.org>
-References: <1250855566.3311.100.camel@macbook.infradead.org>	
-	<alpine.DEB.2.00.0908210925400.24646@utopia.booyaka.com>
-	<1250868957.3311.110.camel@macbook.infradead.org>
-Message-ID: <4A8EBFFD.5000307@billgatliff.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 21 Aug 2009 16:42:35 +0100
+Subject: LDREX/STREX and pre-emption on SMP hardware
+In-Reply-To: <4A8EB836.3000406@plxtech.com>
+References: <4A8EB836.3000406@plxtech.com>
+Message-ID: <1250869355.10642.10.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David Woodhouse wrote:
-> On Fri, 2009-08-21 at 09:27 -0600, Paul Walmsley wrote:
->   
->>     
->>> Russell no longer wants to maintain the mailing lists, so with his
->>> blessing I have set up replacements at lists.infradead.org.
->>>       
->> Can you help us understand why the existing linux-arm at vger.kernel.org
->> list is not used for this?
->>     
->
-> Russell didn't want to do that, so I offered an alternative solution
-> preserving the three separate lists (l-a, l-a-kernel, l-a-toolchain).
->   
+On Fri, 2009-08-21 at 16:07 +0100, Richard Crewe wrote:
+> Section A2.9.3 of the ARM architecture ref. manual seems to imply that 
+> ldrex/strex instruction pairs won't work correctly if they are nested 
+> due to pre-emption.
+> 
+> Should a strex instruction be added to the low-level interrupt handler 
+> or should all ldrex/strex instruction pairs be protected from 
+> pre-emption by disabling interrupts?
 
-Ok, so which of the new lists should former linux-arm-kernel subscribers 
-be subscribed to?  I'm confused, I've seen mention of four different 
-lists now: three at infraded, and one at vger.  :)
+There is no need to since preemption means rescheduling which implies a
+call to the __switch_to function in entry-armv.S. This function clears
+the exclusive monitor state explicitly.
 
+> I have a suspicion that this may only cause problems on SMP systems.
 
-b.g.
+In some situations, there may be a problem on UP systems as LDREX/STREX
+are used on non-SMP kernels as well for some atomic operations.
 
 -- 
-Bill Gatliff
-bgat at billgatliff.com
+Catalin
