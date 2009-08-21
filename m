@@ -1,34 +1,26 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 21 Aug 2009 18:20:58 +0100
-Subject: ARM Architecture Reference Manual available for download
-In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901BEA754@mi8nycmail19.Mi8.com>
-References: <1250873955.10642.54.camel@pc1117.cambridge.arm.com>
-	<BD79186B4FD85F4B8E60E381CAEE190901BEA754@mi8nycmail19.Mi8.com>
-Message-ID: <1250875258.10642.58.camel@pc1117.cambridge.arm.com>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Fri, 21 Aug 2009 18:22:55 +0100
+Subject: [PATCH] ARM: Mailing lists have moved
+In-Reply-To: <1250874318.29546.85.camel@Joe-Laptop.home>
+References: <1250855566.3311.100.camel@macbook.infradead.org>
+	<alpine.DEB.2.00.0908210925400.24646@utopia.booyaka.com>
+	<1250868957.3311.110.camel@macbook.infradead.org>
+	<4A8EBFFD.5000307@billgatliff.com>
+	<1250870971.3311.173.camel@macbook.infradead.org>
+	<4A8EC75D.6010203@billgatliff.com>
+	<1250872415.3311.206.camel@macbook.infradead.org>
+	<1250874318.29546.85.camel@Joe-Laptop.home>
+Message-ID: <1250875375.3311.212.camel@macbook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2009-08-21 at 13:12 -0400, H Hartley Sweeten wrote:
-> On Friday, August 21, 2009 9:59 AM, Catalin Marinas wrote:
-> > Hi,
-> > 
-> > I thought people in the ARM Linux community may be interested - the
-> > latest ARM ARM (covering ARMv7) is now available for download to anyone
-> > who goes through a simple registration process (no approval required)
-> > and accepts a click-through license. Note that the Proprietary Notice in
-> > the ARM ARM was changed as well with the latest update.
-> > 
-> > To do this, go to http://infocenter.arm.com/ => ARM architecture =>
-> > Reference Manuals => ... => registration link (only name, e-mail address
-> > and company name are strictly required).
-> 
-> Thanks for the link.
-> 
-> Is the ARMv4T (I think that's what the ep93xx is based on) included in
-> any of the reference manuals?  If not is that manual available?
+On Fri, 2009-08-21 at 10:05 -0700, Joe Perches wrote:
+> I don't have a preference for that, but I do have
+> a preference for lists without arbitrary latencies
+> for manual moderation.
 
-That's the ARMv5 Architecture Reference Manual linked from the
-"Reference Manuals" page.
+I agree.
 
 -- 
-Catalin
+David Woodhouse                            Open Source Technology Centre
+David.Woodhouse at intel.com                              Intel Corporation
