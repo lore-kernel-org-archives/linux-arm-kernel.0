@@ -1,37 +1,37 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 21 Aug 2009 17:14:23 +0100
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Fri, 21 Aug 2009 17:31:30 +0100
 Subject: [PATCH] ARM: Mailing lists have moved
-In-Reply-To: <4A8EC75D.6010203@billgatliff.com>
+In-Reply-To: <20090821135345.GP21725@chipmunk>
 References: <1250855566.3311.100.camel@macbook.infradead.org>
-	<alpine.DEB.2.00.0908210925400.24646@utopia.booyaka.com>
-	<1250868957.3311.110.camel@macbook.infradead.org>
-	<4A8EBFFD.5000307@billgatliff.com>
-	<1250870971.3311.173.camel@macbook.infradead.org>
-	<4A8EC75D.6010203@billgatliff.com>
-Message-ID: <1250871264.10642.38.camel@pc1117.cambridge.arm.com>
+	<200908211513.48424.arnd@arndb.de> <20090821134049.GO21725@chipmunk>
+	<200908211543.31144.arnd@arndb.de>  <20090821135345.GP21725@chipmunk>
+Message-ID: <1250872290.3311.203.camel@macbook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2009-08-21 at 11:12 -0500, Bill Gatliff wrote:
-> David Woodhouse wrote:
-> > On Fri, 2009-08-21 at 10:40 -0500, Bill Gatliff wrote:
-> >   
-> >> Ok, so which of the new lists should former linux-arm-kernel subscribers 
-> >> be subscribed to?  I'm confused, I've seen mention of four different 
-> >> lists now: three at infraded, and one at vger.  :)
-> >>     
-> >
-> > Nothing has changed. There were always three lists: linux-arm (for
-> > userspace stuff), linux-arm-toolchain and linux-arm-kernel.
-> >
-> > If you were subscribed to linux-arm-kernel before, then you are already
-> > subscribed to linux-arm-kernel now. The list has just moved, that's all.
-> >   
-> 
-> Ok.  So help me understand what is the vger list for?  :)
+On Fri, 2009-08-21 at 14:53 +0100, Alexander Clouter wrote:
+> Fair enough, just thought we were contining the norm from before? 
 
-Backup - if after a few months of arguing dwmw2 gets upset as well and
-shuts the new lists down :-)
+It's fairly much as before -- although we may reconsider some of the
+controversial policies since my interpretation of the Data Protection
+Act differs from Russell's in some respects.
+
+>  I hope that does not mean we get the amount of spam we see on the MTD
+> mailing list?
+
+I don't think there'll be much change from before. I think the front end
+filtering is fairly much the same; the main difference between the lists
+is the moderators. The moderators of the ARM lists are very active and
+happy to filter things by hand -- like setting it to 'hold' messages
+from non-subscribers, then approving them manually, which catches a lot.
+I've been a bit lazy with the MTD list because I wanted to do as much as
+possible automatically (although Artem does a wonderful job in his spare
+time).
+
+It's about time I updated some of the things I _do_ do automatically,
+though; I've been neglecting that for a while too. You're the first
+person to complain to me; I'll take a look and see what I can do.
 
 -- 
-Catalin
+David Woodhouse                            Open Source Technology Centre
+David.Woodhouse at intel.com                              Intel Corporation
