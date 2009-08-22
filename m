@@ -1,27 +1,23 @@
-From: joe@perches.com (Joe Perches)
-Date: Fri, 21 Aug 2009 08:30:44 -0700
-Subject: [PATCH] ARM: Mailing lists have moved
-In-Reply-To: <1250868037.3311.106.camel@macbook.infradead.org>
-References: <1250855566.3311.100.camel@macbook.infradead.org>
-	<200908211513.48424.arnd@arndb.de>
-	<1250868037.3311.106.camel@macbook.infradead.org>
-Message-ID: <1250868644.29546.78.camel@Joe-Laptop.home>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sat, 22 Aug 2009 02:23:50 +0200
+Subject: [PATCH] Convert MMC subsys drivers to dev_pm_ops
+Message-ID: <200908220223.50588.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2009-08-21 at 16:20 +0100, David Woodhouse wrote:
-> On Fri, 2009-08-21 at 15:13 +0200, Arnd Bergmann wrote:
-> > I guess you subscribed everyone to the new list who was subscribed
-> > to linux-arm-kernel at lists.arm.linux.org.uk before, but did not
-> > move the "don't send any mail" flag.
-> Hm, that would have been a good idea if I had that information. Still,
-> it's done now -- people can easily unsubscribe.
+Hi,
 
-Hi David.
+This converts most of the drivers found in drivers/mmc/host to dev_pm_ops.
+Also, it contains some fixes for the probe/remove functions in some cases.
 
-Can I ask why you want to host this mailing list and if there's any
-advantage in hosting the list at infradead.org over vger.kernel.org?
+This needs testing, so I'd be very glad if the affected maintainers expressed 
+their opinion on this.
 
-Is this list going to be moderated?
-
-cheers, Joe
+Cheers!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-Convert-MMC-subsys-drivers-to-dev_pm_ops.patch
+Type: text/x-patch
+Size: 30733 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090822/485a29cf/attachment-0001.bin>
