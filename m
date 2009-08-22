@@ -1,74 +1,55 @@
-From: r.schwebel@pengutronix.de (Robert Schwebel)
-Date: Mon, 24 Aug 2009 12:17:39 +0200
-Subject: i.MX35 Kernel without ARM EABI support  cannot execute init
-In-Reply-To: <1250865435.17931.20.camel@wks02-lin.nanotronic.local>
-References: <1250865435.17931.20.camel@wks02-lin.nanotronic.local>
-Message-ID: <20090824101739.GH29655@pengutronix.de>
+From: ian_key@yahoo.com (Ian Key)
+Date: Sat, 22 Aug 2009 14:25:01 -0700 (PDT)
+Subject: [PATCH] ARM: Mailing lists have moved
+In-Reply-To: <200908211543.31144.arnd@arndb.de>
+References: <1250855566.3311.100.camel@macbook.infradead.org>
+	<200908211513.48424.arnd@arndb.de>
+	<20090821134049.GO21725@chipmunk>
+	<200908211543.31144.arnd@arndb.de>
+Message-ID: <710968.43140.qm@web51102.mail.re2.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marco,
+I've been lurking on this list for some time, trying to find the time to participate - sadly still lacking.
 
-On Fri, Aug 21, 2009 at 04:37:15PM +0200, hoefle marco wrote:
-> right now we have two ARM boards and two embedded linux distributions
-> (Emdebian and OSELAS). The CPUs are PXA270 and Freescale i.MX35. The
-> aim is to have emdebian on both boards.
+I'd like to thank Russell for doing an excellent job. It's not easy managing lists and pleasing people......
 
-Why? :-)
+Ian
 
-> When trying to boot the i.MX35 Kernel (with ARM EABI or without, the
-> kernel panic remains exactly the same) using the emdebian rootfs I get
-> this:
->
-> Kernel panic - not syncing: Attempted to kill init!
-> Backtrace:
-> [<c0026430>] (dump_backtrace+0x0/0x10c) from [<c02515dc>] (dump_stack
-> +0x18/0x1c)
->  r7:c7817f54 r6:c7813c40 r5:c7813c40 r4:00000004
-> [<c02515c4>] (dump_stack+0x0/0x1c) from [<c025161c>] (panic+0x3c/0x110)
-> [<c02515e0>] (panic+0x0/0x110) from [<c0034a14>] (do_exit+0x6c/0x5b8)
->  r3:c0301bd4 r2:c7813c40 r1:c7817d14 r0:c02b478a
-> [<c00349a8>] (do_exit+0x0/0x5b8) from [<c0034fe0>] (do_group_exit
-> +0x80/0xb4)
-> [<c0034f60>] (do_group_exit+0x0/0xb4) from [<c003ea60>]
-> (get_signal_to_deliver+0x2c0/0x2f0)
->  r4:00000004
-> [<c003e7a0>] (get_signal_to_deliver+0x0/0x2f0) from [<c0024ecc>]
-> (do_signal+0x58/0x4e4)
-> [<c0024e74>] (do_signal+0x0/0x4e4) from [<c0025384>] (do_notify_resume
-> +0x2c/0x30)
-> [<c0025358>] (do_notify_resume+0x0/0x30) from [<c0022dac>] (work_pending
-> +0x1c/0x20)
->
-> The PXA270 kernel (same settings except ARM system type and ARM EABI
-> disabled) boots the emdebian root file-system successfully.
->
-> The i.MX35 Kernel boots with ARM EABI support the OSELAS file-system.
-> Both Kernels are version 2.6.30.4 and were compiled with the same
-> arm-linux-gnu-gcc compiler.
->
-> >From my understanding it should be possible to use the same root
-> file-system on both CPUs.
->
-> Has anybody an idea why this is not working?
 
-Are you sure your toolchains generate the right code for your CPUs? If
-you want to have root fs for both, PXA270 and i.MX35, you probably need
-an ARMv4 Toolchain. Unfortunately, your "arm-linux-gnu-gcc" compiler
-name doesn't suggest anything about what code this compiler generates.
 
-If you use the OSELAS.BSP from Phytec which was made for the i.MX35, it
-was probably made with an ARM1136EJ-S compiler and builds optimized code
-for that CPU.
 
-However, within PTXdist / OSELAS.BSP one can build either specialized
-platforms for each of the CPUs (which basically means that you get a
-separate set of ipkg archives for each cpu) or use a "least common"
-v4t toolchain.
+________________________________
+From: Arnd Bergmann <arnd@arndb.de>
+To: Alexander Clouter <alex@digriz.org.uk>
+Cc: Russell King <linux@arm.linux.org.uk>; erikm at nl.linux.org; torvalds at linux-foundation.org; vince at kyllikki.org; linux-kernel at vger.kernel.org; David Woodhouse <dwmw2@infradead.org>; linux-arm-kernel at lists.infradead.org
+Sent: Friday, 21 August, 2009 14:43:30
+Subject: Re: [PATCH] ARM: Mailing lists have moved
 
-rsc
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+On Friday 21 August 2009, Alexander Clouter wrote:
+> 
+> I subscribed to the list so I can post to it, however I read the list 
+> via GMANE's NNTP gateway.  To prevent me having to 'read' posting from 
+> both my usenet client and email client, I enabled the 'don't send any 
+> mail' flag.
+> 
+> I am guessing there are others like me out there so this would be an 
+> awkward 'fix'.
+
+Well, since you no longer have to be subscribed if you want to post
+to the new list, and you can still read the list through an nntp gateway,
+I would assume that it works for you as well.
+
+    Arnd <><
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
+      
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090822/2b7c020b/attachment-0001.htm>
