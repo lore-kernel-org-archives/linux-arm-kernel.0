@@ -1,89 +1,208 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 22 Aug 2009 13:30:11 +0530
-Subject: [PATCH 1/2 v2] ARM: OMAP4: Fix NULL pointer dereference crash.
-Message-ID: <1250928012-5233-1-git-send-email-santosh.shilimkar@ti.com>
+From: wim@iguana.be (Wim Van Sebroeck)
+Date: Sat, 22 Aug 2009 10:18:06 +0200
+Subject: [PATCH] watchdog: Add support for the Avionic Design Xanthos
+	watchdog timer.
+In-Reply-To: <1250860202-28187-1-git-send-email-thierry.reding@avionic-design.de>
+References: <20090821073105.GC29382@infomag.iguana.be>
+	<1250860202-28187-1-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <20090822081806.GD29382@infomag.iguana.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After the patch series "[PATCH 00/14] OMAP PM fixes for .31-rc"
-merge in 2.6.31-rc5, the kernel crashed during boot on OMAP4430.
-This patch fixes it by adding UART4 support and related code.
-Without this patch omap_serial_init() would produce " NULL pointer
-dereference" and kernel crashes in the bootup on OMAP4430 platform.
+Hi Thierry,
 
-Some more info on the merge issue can be found here.
-More info- http://lkml.org/lkml/2009/8/20/192
+> + * linux/drivers/watchdog/adx_wdt.c
 
-Note: While merging this patch,"IO_ADDRESS" needs to be changed
-to "OMAP2_IO_ADDRESS" if the Tony's below series is already merged in.
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg15072.html
+Please change this to adx_wdt.c . If the tree get's moved then we don't want to review every driver to get this "fixed".
 
-Signed-off-by: Syed Rafiuddin <rafiuddin.syed@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
-Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
----
- arch/arm/mach-omap2/board-4430sdp.c |    2 +-
- arch/arm/mach-omap2/serial.c        |   27 ++++++++++++++++++++++++++-
- 2 files changed, 27 insertions(+), 2 deletions(-)
+> +struct adx_wdt_nb {
+> +	struct adx_wdt *wdt;
+> +};
 
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index b0c7402..1b22307 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -39,7 +39,7 @@ static struct platform_device *sdp4430_devices[] __initdata = {
- };
- 
- static struct omap_uart_config sdp4430_uart_config __initdata = {
--	.enabled_uarts	= (1 << 0) | (1 << 1) | (1 << 2),
-+	.enabled_uarts	= (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3),
- };
- 
- static struct omap_lcd_config sdp4430_lcd_config __initdata = {
-diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index a7421a5..e1be77b 100644
---- a/arch/arm/mach-omap2/serial.c
-+++ b/arch/arm/mach-omap2/serial.c
-@@ -112,7 +112,21 @@ static struct plat_serial8250_port serial_platform_data2[] = {
- 		.flags		= 0
- 	}
- };
--
-+#ifdef CONFIG_ARCH_OMAP4
-+static struct plat_serial8250_port serial_platform_data3[] = {
-+	{
-+		.membase	= IO_ADDRESS(OMAP_UART4_BASE),
-+		.mapbase	= OMAP_UART4_BASE,
-+		.irq		= 70,
-+		.flags		= UPF_BOOT_AUTOCONF,
-+		.iotype		= UPIO_MEM,
-+		.regshift	= 2,
-+		.uartclk	= OMAP24XX_BASE_BAUD * 16,
-+	}, {
-+		.flags		= 0
-+	}
-+};
-+#endif
- static inline unsigned int serial_read_reg(struct plat_serial8250_port *up,
- 					   int offset)
- {
-@@ -550,6 +564,17 @@ static struct omap_uart_state omap_uart[OMAP_MAX_NR_PORTS] = {
- 			},
- 		},
- 	},
-+#ifdef CONFIG_ARCH_OMAP4
-+	{
-+		.pdev = {
-+			.name			= "serial8250",
-+			.id			= PLAT8250_DEV_FOURPORT,
-+			.dev			= {
-+				.platform_data	= serial_platform_data3,
-+			},
-+		},
-+	},
-+#endif
- };
- 
- void __init omap_serial_init(void)
--- 
-1.5.4.7
+Is this being used?
+
+> +static void adx_wdt_set_timeout(struct adx_wdt *wdt, unsigned long timeout)
+> +{
+> +	unsigned long flags;
+> +	unsigned int state;
+> +
+> +	spin_lock_irqsave(&wdt->lock, flags);
+> +	state = wdt->state;
+> +	adx_wdt_stop_locked(wdt);
+> +	writel(timeout, wdt->base + ADX_WDT_TIMEOUT);
+> +
+> +	if (state == WDT_STATE_START)
+> +		adx_wdt_start_locked(wdt);
+> +
+> +	wdt->timeout = timeout;
+> +	spin_unlock_irqrestore(&wdt->lock, flags);
+> +}
+
+You implemented the timeout towards userspace indeed as seconds. Internally you are using milliseconds.
+I would prefer to see the conversion from seconds to milliseconds taking place in the adx_wdt_set_timeout function.
+This will make conversion to the new watchdog api easier.
+
+I just thought about having the internal timeout routines being in milliseconds.
+Most watchdogs use seconds anyway, so that would mean a lot of multiply and divide by 1000 or additional code that isn't going to be a benefit. So I prefer to stick to seconds.
+
+> +static int adx_wdt_open(struct inode *inode, struct file *file)
+> +{
+> +	struct adx_wdt *wdt = platform_get_drvdata(adx_wdt_dev);
+> +
+> +	if (test_and_set_bit(0, &driver_open))
+> +		return -EBUSY;
+> +
+> +	adx_wdt_set_timeout(wdt, 30 * 1000);
+> +	adx_wdt_start(wdt);
+> +	file->private_data = wdt;
+> +
+> +	return nonseekable_open(inode, file);
+> +}
+
+I prefer to have file->private_data = wdt; to be set before you start the watchdog.
+
+> +static int adx_wdt_ioctl(struct inode *inode, struct file *file,
+> +		unsigned int cmd, unsigned long arg)
+
+we use unlocked_ioctl. Ths should thus be:
+static long adx_wdt_ioctl(struct file *file, unsigned int cmd,
+						unsigned long arg)
+
+> +{
+> +	struct adx_wdt *wdt = file->private_data;
+> +	void __user *argp = (void __user *)arg;
+> +	unsigned long __user *p = argp;
+> +	unsigned long timeout = 0;
+> +	unsigned int options;
+> +	int ret = -EINVAL;
+> +
+> +	switch (cmd) {
+> +	case WDIOC_GETSUPPORT:
+> +		if (copy_to_user(argp, &adx_wdt_info, sizeof(adx_wdt_info)))
+> +			return -EFAULT;
+> +		else
+> +			return 0;
+> +
+> +	case WDIOC_GETSTATUS:
+> +	case WDIOC_GETBOOTSTATUS:
+> +		return put_user(!!(0), p);
+
+Why not just "return put_user(0, p);"?
+
+> +static const struct file_operations adx_wdt_fops = {
+> +	.owner = THIS_MODULE,
+> +	.llseek = no_llseek,
+> +	.open = adx_wdt_open,
+> +	.release = adx_wdt_release,
+> +	.ioctl = adx_wdt_ioctl,
+
+And then this becomes: .unlocked_ioctl = adx_wdt_ioctl,
+
+> +	.write = adx_wdt_write,
+> +};
+> +
+> +static struct miscdevice adx_wdt_miscdev = {
+> +	.minor = WATCHDOG_MINOR,
+> +	.name = "watchdog",
+> +	.fops = &adx_wdt_fops,
+> +};
+> +
+> +static irqreturn_t adx_wdt_interrupt(int irq, void *dev_id)
+> +{
+> +	struct adx_wdt *wdt = dev_id;
+> +	unsigned long flags;
+> +
+> +	spin_lock_irqsave(&wdt->lock, flags);
+> +	writel(wdt->timeout, wdt->base + ADX_WDT_TIMEOUT);
+> +	spin_unlock_irqrestore(&wdt->lock, flags);
+> +
+> +	return IRQ_HANDLED;
+> +}
+
+What's this for? a watchdog driver is controlled by userspace and not retriggered via an interrupt.
+It's userspace that needs to control wether or not we are in a stable situation or not.
+See discussion with Wan ZongShun 2 to 3 weeks ago.
+
+> +
+> +static int __devinit adx_wdt_probe(struct platform_device *pdev)
+> +{
+> +	struct resource *res;
+> +	struct adx_wdt *wdt;
+> +	int ret = 0;
+> +
+> +	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
+> +	if (!wdt) {
+> +		dev_err(&pdev->dev, "cannot allocate WDT structure\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	spin_lock_init(&wdt->lock);
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		dev_err(&pdev->dev, "cannot obtain I/O memory region\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	res = devm_request_mem_region(&pdev->dev, res->start,
+> +			res->end - res->start + 1, res->name);
+> +	if (!res) {
+> +		dev_err(&pdev->dev, "cannot request I/O memory region\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	wdt->base = devm_ioremap_nocache(&pdev->dev, res->start,
+> +			res->end - res->start + 1);
+> +	if (!wdt->base) {
+> +		dev_err(&pdev->dev, "cannot remap I/O memory region\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> +	if (!res) {
+> +		dev_err(&pdev->dev, "cannot obtain IRQ\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	wdt->irq = res->start;
+> +
+> +	ret = devm_request_irq(&pdev->dev, wdt->irq, adx_wdt_interrupt,
+> +			IRQF_SHARED, WATCHDOG_NAME, wdt);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "cannot request IRQ\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	ret = misc_register(&adx_wdt_miscdev);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "cannot register miscdev on minor %d "
+> +				"(err=%d)\n", WATCHDOG_MINOR, ret);
+> +		return ret;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, wdt);
+> +	adx_wdt_dev = pdev;
+
+Please put these 2 lines in front of the misc_register.
+
+> +
+> +	return 0;
+> +}
+> +
+> +static int __devexit adx_wdt_remove(struct platform_device *pdev)
+> +{
+> +	struct adx_wdt *wdt = platform_get_drvdata(pdev);
+> +
+> +	platform_set_drvdata(pdev, NULL);
+> +	misc_deregister(&adx_wdt_miscdev);
+> +	adx_wdt_stop(wdt);
+
+and put the platform_set_drvdata after the adx_wdt_stop.
+
+> +
+> +	return 0;
+> +}
+> +
+
+Thanks in advance,
+Wim.
