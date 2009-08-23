@@ -1,22 +1,44 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 23 Aug 2009 18:03:59 +0100
-Subject: [alsa-devel] [RFC][PATCH 1/3 v2] ARM: OMAP: DMA: Add support
-	for DMA channel self linking on OMAP1510
-In-Reply-To: <200908231756.13016.jkrzyszt@tis.icnet.pl>
-References: <200908101050.02530.jkrzyszt@tis.icnet.pl>
-	<200908231756.13016.jkrzyszt@tis.icnet.pl>
-Message-ID: <20090823170359.GA3488@sirena.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sun, 23 Aug 2009 16:26:23 +0100
+Subject: ARM Architecture Reference Manual available for download
+In-Reply-To: <20090822011047.GD22530@shareable.org>
+References: <20090822011047.GD22530@shareable.org>
+Message-ID: <1251041183.27032.24.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 23, 2009 at 05:56:12PM +0200, Janusz Krzysztofik wrote:
+On Sat, 2009-08-22 at 02:10 +0100, Jamie Lokier wrote:
+> Catalin Marinas wrote:
+> > I thought people in the ARM Linux community may be interested - the
+> > latest ARM ARM (covering ARMv7) is now available for download to anyone
+> > who goes through a simple registration process (no approval required)
+> > and accepts a click-through license. Note that the Proprietary Notice in
+> > the ARM ARM was changed as well with the latest update.
+> 
+> Can you give a brief summary of the license?  I don't want to register
+> just to find the license is unacceptable (again) because it would
+> prevent me from working on an emulator(!) or another device, such as
+> an FPGA, implementing the same instruction set.
 
-> I know it's not very fair to change the patch after others that depend on it
-> have already been applied, but I hope there will be no problems with accepting
-> the way I have reimplemented it. In any case, I'll appreciate any comments or
-> suggestions.
+Those explicit clauses seem to have been dropped from the new
+proprietary note but I can't tell whether they may be implied by other
+clauses. Apart from the standard no copying, intellectual property
+rights, no warranty etc., you get something about not using it to
+determine whether implementations of the ARM architecture infringe third
+party patents.
+        
+However, I'm *not authorised* to give any form of legal advise so you
+would need to either interpret it yourself or ask a lawyer.
+> 
+> > To do this, go to http://infocenter.arm.com/ => ARM architecture =>
+> > Reference Manuals => ... => registration link (only name, e-mail address
+> > and company name are strictly required).
+> 
+> Even if you don't have a company?
 
-It's not that it's not fair, at this point it's not possible - please
-make any changes you feel are required against current ASoC.  The patch
-has been applied for a little while now and is buried quite deep in the
-already published history.
+You could probably write something like "self-employed" in that field as
+there don't seem to be checks on it apart from its presence (the
+registration is instant, so no approval required).
+
+-- 
+Catalin
