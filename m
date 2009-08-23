@@ -1,44 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun, 23 Aug 2009 16:26:23 +0100
-Subject: ARM Architecture Reference Manual available for download
-In-Reply-To: <20090822011047.GD22530@shareable.org>
-References: <20090822011047.GD22530@shareable.org>
-Message-ID: <1251041183.27032.24.camel@pc1117.cambridge.arm.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Sun, 23 Aug 2009 20:38:05 +0200
+Subject: [alsa-devel] [RFC][PATCH 1/3 v2] ARM: OMAP: DMA: Add support for
+	DMA channel self linking on OMAP1510
+In-Reply-To: <20090823180543.GA6167@opensource.wolfsonmicro.com>
+References: <200908101050.02530.jkrzyszt@tis.icnet.pl>
+	<200908231945.40187.jkrzyszt@tis.icnet.pl>
+	<20090823180543.GA6167@opensource.wolfsonmicro.com>
+Message-ID: <200908232038.05593.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2009-08-22 at 02:10 +0100, Jamie Lokier wrote:
-> Catalin Marinas wrote:
-> > I thought people in the ARM Linux community may be interested - the
-> > latest ARM ARM (covering ARMv7) is now available for download to anyone
-> > who goes through a simple registration process (no approval required)
-> > and accepts a click-through license. Note that the Proprietary Notice in
-> > the ARM ARM was changed as well with the latest update.
-> 
-> Can you give a brief summary of the license?  I don't want to register
-> just to find the license is unacceptable (again) because it would
-> prevent me from working on an emulator(!) or another device, such as
-> an FPGA, implementing the same instruction set.
+Sunday 23 August 2009 20:05:43 Mark Brown wrote:
+> If none of your patches have been applied
 
-Those explicit clauses seem to have been dropped from the new
-proprietary note but I can't tell whether they may be implied by other
-clauses. Apart from the standard no copying, intellectual property
-rights, no warranty etc., you get something about not using it to
-determine whether implementations of the ARM architecture infringe third
-party patents.
-        
-However, I'm *not authorised* to give any form of legal advise so you
-would need to either interpret it yourself or ask a lawyer.
-> 
-> > To do this, go to http://infocenter.arm.com/ => ARM architecture =>
-> > Reference Manuals => ... => registration link (only name, e-mail address
-> > and company name are strictly required).
-> 
-> Even if you don't have a company?
+Mark,
 
-You could probably write something like "self-employed" in that field as
-there don't seem to be checks on it apart from its presence (the
-registration is instant, so no approval required).
+I did not say that. You have applied patches 2/3 [1] and 3/3 [2] from the 
+series.
 
--- 
-Catalin
+> then what are the other 
+> patches that depend on this? Nobody reported any issues in testing with 
+> the other OMAP patches.
+
+Dependency on patch 1/3 is not compile time, but run time, and OMAP1510 
+specific, that's probably why nobody has reported any issues.
+
+> I don't really mind which tree these go via but I rather suspect that
+> ALSA will be better given all the other changes and I also suspect that
+> you'll need to regenerate your changes against a current tree due to
+> those changes.
+
+arch/arm/plat-omap/dma.c has not been touched since 2009-05-28 in yours [3] 
+and since 2009-06-23 in Takashi's tree, so my patch, whether original or v2, 
+should still be up to date. That may change if it is to be pushed via OMAP 
+tree.
+
+Sorry for all that noise.
+
+Thanks,
+Janusz
+
+[1]http://git.kernel.org/?p=linux/kernel/git/broonie/sound-2.6.git;a=commit;h=64844a6ac8ddd586cb832fea7cf2e93e5e7e03f4
+[2]http://git.kernel.org/?p=linux/kernel/git/broonie/sound-2.6.git;a=commit;h=471e3dec3abe2d41e8c742046353fcb01bc2459e
+[3]http://git.kernel.org/?p=linux/kernel/git/broonie/sound-2.6.git;a=commit;h=44169075e6eaa87bab6a296209d8d0610879b394
+[4]http://git.kernel.org/?p=linux/kernel/git/tiwai/sound-2.6.git;a=commit;h=aecedb94b366d6fb5e2a17ca18a5dc78e593198e
