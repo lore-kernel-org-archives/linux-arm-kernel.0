@@ -1,46 +1,64 @@
 From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Sun, 23 Aug 2009 20:38:05 +0200
-Subject: [alsa-devel] [RFC][PATCH 1/3 v2] ARM: OMAP: DMA: Add support for
-	DMA channel self linking on OMAP1510
-In-Reply-To: <20090823180543.GA6167@opensource.wolfsonmicro.com>
+Date: Sun, 23 Aug 2009 17:56:12 +0200
+Subject: [RFC][PATCH 1/3 v2] ARM: OMAP: DMA: Add support for DMA channel self
+	linking on OMAP1510
+In-Reply-To: <200908101050.02530.jkrzyszt@tis.icnet.pl>
 References: <200908101050.02530.jkrzyszt@tis.icnet.pl>
-	<200908231945.40187.jkrzyszt@tis.icnet.pl>
-	<20090823180543.GA6167@opensource.wolfsonmicro.com>
-Message-ID: <200908232038.05593.jkrzyszt@tis.icnet.pl>
+Message-ID: <200908231756.13016.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sunday 23 August 2009 20:05:43 Mark Brown wrote:
-> If none of your patches have been applied
+Implement DMA channel self linking on OMAP1510 using AUTO_INIT and REPEAT
+flags of the DMA CCR register.
 
-Mark,
+Created against linux-2.6.31-rc5.
 
-I did not say that. You have applied patches 2/3 [1] and 3/3 [2] from the 
-series.
+Tested on Amstrad Delta.
 
-> then what are the other 
-> patches that depend on this? Nobody reported any issues in testing with 
-> the other OMAP patches.
+Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
 
-Dependency on patch 1/3 is not compile time, but run time, and OMAP1510 
-specific, that's probably why nobody has reported any issues.
+---
+I'm sorry, but the original patch appears to have an issue. To be honest, I
+started with the one I submit here as v2, got pretty good results, then
+modified it in order to better fit into existing framework, and did not test
+it well enough after the change.
 
-> I don't really mind which tree these go via but I rather suspect that
-> ALSA will be better given all the other changes and I also suspect that
-> you'll need to regenerate your changes against a current tree due to
-> those changes.
+The problem reveals itself when an application keeps a stream open while
+cycling through playing sounds. I don't know if that particular application
+may just behave wrong, however, I know that setting AUTO_INIT and REPEAT
+flags once after opening a stream and unsetting them once before closing it
+gives stable, correct results, while redoing it for every single piece of
+sound without closing the stream in between, like the current patch does,
+results in inaccurate transfer startups and random application hangups.
 
-arch/arm/plat-omap/dma.c has not been touched since 2009-05-28 in yours [3] 
-and since 2009-06-23 in Takashi's tree, so my patch, whether original or v2, 
-should still be up to date. That may change if it is to be pushed via OMAP 
-tree.
+I know it's not very fair to change the patch after others that depend on it
+have already been applied, but I hope there will be no problems with accepting
+the way I have reimplemented it. In any case, I'll appreciate any comments or
+suggestions.
 
-Sorry for all that noise.
-
-Thanks,
-Janusz
-
-[1]http://git.kernel.org/?p=linux/kernel/git/broonie/sound-2.6.git;a=commit;h=64844a6ac8ddd586cb832fea7cf2e93e5e7e03f4
-[2]http://git.kernel.org/?p=linux/kernel/git/broonie/sound-2.6.git;a=commit;h=471e3dec3abe2d41e8c742046353fcb01bc2459e
-[3]http://git.kernel.org/?p=linux/kernel/git/broonie/sound-2.6.git;a=commit;h=44169075e6eaa87bab6a296209d8d0610879b394
-[4]http://git.kernel.org/?p=linux/kernel/git/tiwai/sound-2.6.git;a=commit;h=aecedb94b366d6fb5e2a17ca18a5dc78e593198e
+--- linux-2.6.31-rc5/arch/arm/plat-omap/dma.c.orig	2009-08-23 02:24:46.000000000 +0200
++++ linux-2.6.31-rc5/arch/arm/plat-omap/dma.c	2009-08-23 14:53:48.000000000 +0200
+@@ -1131,6 +1131,11 @@ int omap_dma_running(void)
+ void omap_dma_link_lch(int lch_head, int lch_queue)
+ {
+ 	if (omap_dma_in_1510_mode()) {
++		if (lch_head == lch_queue) {
++			dma_write(dma_read(CCR(lch_head)) | (3 << 8),
++								CCR(lch_head));
++			return;
++		}
+ 		printk(KERN_ERR "DMA linking is not supported in 1510 mode\n");
+ 		BUG();
+ 		return;
+@@ -1153,6 +1158,11 @@ EXPORT_SYMBOL(omap_dma_link_lch);
+ void omap_dma_unlink_lch(int lch_head, int lch_queue)
+ {
+ 	if (omap_dma_in_1510_mode()) {
++		if (lch_head == lch_queue) {
++			dma_write(dma_read(CCR(lch_head)) & ~(3 << 8),
++								CCR(lch_head));
++			return;
++		}
+ 		printk(KERN_ERR "DMA linking is not supported in 1510 mode\n");
+ 		BUG();
+ 		return;
