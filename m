@@ -1,40 +1,45 @@
-From: a.beregalov@gmail.com (Alexander Beregalov)
-Date: Mon, 24 Aug 2009 18:56:00 +0400
-Subject: [PATCH 2/2] irda/sa1100_ir: fix broken netdev_ops conversion
-Message-ID: <1251125760-6547-1-git-send-email-a.beregalov@gmail.com>
+From: dxiao@broadcom.com (David Xiao)
+Date: Mon, 24 Aug 2009 10:14:03 -0700
+Subject: LDREX/STREX and pre-emption on SMP hardware
+In-Reply-To: <1251128692.28977.17.camel@pc1117.cambridge.arm.com>
+References: <4A8EB836.3000406@plxtech.com>
+	<1250869355.10642.10.camel@pc1117.cambridge.arm.com>
+	<20090821155011.GB8583@shareable.org>
+	<1250870319.10642.23.camel@pc1117.cambridge.arm.com>
+	<1250890146.29685.18.camel@david-laptop>
+	<1251128692.28977.17.camel@pc1117.cambridge.arm.com>
+Message-ID: <1251134043.31975.23.camel@david-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is based on commit d2f3ad4 (pxaficp-ir: remove incorrect
-net_device_ops). Do the same for sa1100_ir.
-Untested.
+On Mon, 2009-08-24 at 08:44 -0700, Catalin Marinas wrote:
+> On Fri, 2009-08-21 at 14:29 -0700, David Xiao wrote:
+> > The DDI0406A ARM V7 Architecture Reference Manual (section A3.4.1) seems
+> > to indicate that the exclusive monitor is tagging/matching the physical
+> > memory address accessed by the LDREX/STREX instructions.
+> > 
+> > And in the same document (section A3.4.5), it seems to suggest that the
+> > reason we need to do CLREX during the context switch is that because the
+> > IsExclusiveLocal() implementation does not have to do memory
+> > address/size check, but just the exclusive state check.
+> 
+> Yes, that's correct. And the reason we don't need this in interrupt
+> handlers is that we would never call a STREX without a preceding LDREX
+> or just a LDREX without a being followed by a STREX and interrupt
+> handlers are in the worst case nested rather than freely preemptible.
+> 
 
-Signed-off-by: Alexander Beregalov <a.beregalov@gmail.com>
----
- drivers/net/irda/sa1100_ir.c |    4 ----
- 1 files changed, 0 insertions(+), 4 deletions(-)
+If an IRQ handler is registered with IRQF_DISABLED, then the handling of
+this IRQ will not be preempted by any other IRQ handlers; however, if it
+is not using that flag, which is the common case, that IRQ handler could
+be interrupted/preempted by another different IRQ handler though.
 
-diff --git a/drivers/net/irda/sa1100_ir.c b/drivers/net/irda/sa1100_ir.c
-index 2aeb2e6..b039cb0 100644
---- a/drivers/net/irda/sa1100_ir.c
-+++ b/drivers/net/irda/sa1100_ir.c
-@@ -24,7 +24,6 @@
- #include <linux/init.h>
- #include <linux/errno.h>
- #include <linux/netdevice.h>
--#include <linux/etherdevice.h>
- #include <linux/slab.h>
- #include <linux/rtnetlink.h>
- #include <linux/interrupt.h>
-@@ -881,9 +880,6 @@ static const struct net_device_ops sa1100_irda_netdev_ops = {
- 	.ndo_stop		= sa1100_irda_stop,
- 	.ndo_start_xmit		= sa1100_irda_hard_xmit,
- 	.ndo_do_ioctl		= sa1100_irda_ioctl,
--	.ndo_change_mtu		= eth_change_mtu,
--	.ndo_validate_addr	= eth_validate_addr,
--	.ndo_set_mac_address	= eth_mac_addr,
- };
- 
- static int sa1100_irda_probe(struct platform_device *pdev)
--- 
-1.6.4
+Meanwhile, if we could assume that interrupt handlers are always using
+the LDREX/CLREX in pairs, then the same thing could be assumed for any
+other contexts in the system, kernel/user threads. Therefore, I do not
+think that we can make that assumption.
+  
+Given that, I think we need to add the same CLREX for the switching of
+the ISR context as well.
+
+David
