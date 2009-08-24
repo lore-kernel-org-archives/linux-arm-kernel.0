@@ -1,44 +1,28 @@
-From: jhnikula@gmail.com (Jarkko Nikula)
-Date: Mon, 24 Aug 2009 08:49:20 +0300
-Subject: [alsa-devel] [RFC][PATCH 1/3 v2] ARM: OMAP: DMA: Add support
-	for DMA channel self linking on OMAP1510
-In-Reply-To: <20090823184943.GA6994@opensource.wolfsonmicro.com>
-References: <200908101050.02530.jkrzyszt@tis.icnet.pl>
-	<200908231945.40187.jkrzyszt@tis.icnet.pl>
-	<20090823180543.GA6167@opensource.wolfsonmicro.com>
-	<200908232038.05593.jkrzyszt@tis.icnet.pl>
-	<20090823184943.GA6994@opensource.wolfsonmicro.com>
-Message-ID: <20090824084920.c99c561a.jhnikula@gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Sun, 23 Aug 2009 22:57:43 -0700 (PDT)
+Subject: [PATCH] pxaficp-ir - remove incorrect net_device_ops
+In-Reply-To: <20090824043831.GA2473@orion>
+References: <a4423d670908231055o2bb65fe0le2c33fe94b660b38@mail.gmail.com>
+	<20090823.184924.26788268.davem@davemloft.net>
+	<20090824043831.GA2473@orion>
+Message-ID: <20090823.225743.135339409.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 23 Aug 2009 19:49:43 +0100
-Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+From: Alexander Beregalov <a.beregalov@gmail.com>
+Date: Mon, 24 Aug 2009 08:38:31 +0400
 
-> On Sun, Aug 23, 2009 at 08:38:05PM +0200, Janusz Krzysztofik wrote:
-> > Sunday 23 August 2009 20:05:43 Mark Brown wrote:
+> Subject: [PATCH] pxaficp-ir - remove incorrect net_device_ops
 > 
-> > > then what are the other 
-> > > patches that depend on this? Nobody reported any issues in testing with 
-> > > the other OMAP patches.
+> This patch fixes broken pxaficp-ir. The problem was in incorrect
+> net_device_ops being specified which prevented the driver from
+> operating. The symptoms were:
+>  - failing ifconfig for IrLAN, resulting in
+> 	SIOCSIFFLAGS: Cannot assign requested address
+>  - irattach working for IrCOMM, but the port stayed disabled
 > 
-> > Dependency on patch 1/3 is not compile time, but run time, and OMAP1510 
-> > specific, that's probably why nobody has reported any issues.
+> Moreover this patch corrects missing sysfs device link.
 > 
-> OK, given that and the fact that you're reporting that none of these
-> files are afected by any of the other patches it sounds like it'd be
-> better to keep it in the OMAP tree unless Tony says otherwse.
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 
-Yep, Janusz's commits 64844a6ac8ddd586cb832fea7cf2e93e5e7e03f4 and
-471e3dec3abe2d41e8c742046353fcb01bc2459e do not cause problems on other
-OMAPs but will cause that ASoC on 1510 is broken until his DMA
-patch(es) are applied. I'm sure you Janusz will ping Tony until he'll
-apply them :-)
-
-We should remember that arch/arm/plat-omap/mcbsp.c changes done via
-ALSA tree has been an exception and that's only for simpler procedure.
-McBSP is not so critical if sources goes out-of-sync but DMA is.
-
-
--- 
-Jarkko
+Applied, thanks.
