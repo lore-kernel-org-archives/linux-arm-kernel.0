@@ -1,28 +1,126 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 24 Aug 2009 23:06:13 +0100
-Subject: [alsa-devel] [RFC][PATCH 1/3 v2] ARM: OMAP: DMA: Add support
-	for DMA channel self linking on OMAP1510
-In-Reply-To: <20090824124902.GH7069@atomide.com>
-References: <200908101050.02530.jkrzyszt@tis.icnet.pl>
-	<200908231945.40187.jkrzyszt@tis.icnet.pl>
-	<20090823180543.GA6167@opensource.wolfsonmicro.com>
-	<200908232038.05593.jkrzyszt@tis.icnet.pl>
-	<20090823184943.GA6994@opensource.wolfsonmicro.com>
-	<20090824084920.c99c561a.jhnikula@gmail.com>
-	<20090824124902.GH7069@atomide.com>
-Message-ID: <20090824220612.GB4338@sirena.org.uk>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Tue, 25 Aug 2009 01:07:15 +0200
+Subject: [RFC/RFT 1/3] iop: clocksource support
+In-Reply-To: <200908221204.n7MC4t2v029350@pilspetsen.it.uu.se>
+References: <200908221204.n7MC4t2v029350@pilspetsen.it.uu.se>
+Message-ID: <63386a3d0908241607t4546b488oa19f43fbbef0ade5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 24, 2009 at 03:49:03PM +0300, Tony Lindgren wrote:
+Tjenare Mikael,
 
-> > We should remember that arch/arm/plat-omap/mcbsp.c changes done via
-> > ALSA tree has been an exception and that's only for simpler procedure.
-> > McBSP is not so critical if sources goes out-of-sync but DMA is.
+2009/8/22 Mikael Pettersson <mikpe@it.uu.se>:
 
-> Sorry for the delay in replying. I'm OK for these to go in via the alsa
-> tree as there are not currently other patches pending in the mcbsp or
-> dma area for omap. So I think it's better merge all the audio related
-> patches together in this case.
+> This updates the IOP platform to expose the free-running
+> timer 1 as a clocksource object. This timer is now also
+> properly initialised, which requires a new write_tcr1()
+> function from the mach implementation code. Apart from the
+> explicit initialisation, there is no functional change in
+> how timer 1 is programmed.
+>
+> The one concern I have is whether the clocksource .shift
+> value of 20 is appropriate for timer frequencies in the
+> 200/266/333 MHz range which seem to be typical for IOP.
+>
+> Tested on n2100, compile-tested for all plat-iop machines.
+>
+> Signed-off-by: Mikael Pettersson <mikpe@it.uu.se>
+> ---
+> ?arch/arm/include/asm/hardware/iop3xx.h ? ?| ? ?5 +++++
+> ?arch/arm/mach-iop13xx/include/mach/time.h | ? ?5 +++++
+> ?arch/arm/plat-iop/time.c ? ? ? ? ? ? ? ? ?| ? 27 +++++++++++++++++++++++++++
+> ?3 files changed, 37 insertions(+)
+>
+> diff -rupN linux-2.6.31-rc7/arch/arm/include/asm/hardware/iop3xx.h linux-2.6.31-rc7.arm-iop-1-clocksource/arch/arm/include/asm/hardware/iop3xx.h
+> --- linux-2.6.31-rc7/arch/arm/include/asm/hardware/iop3xx.h ? ? 2008-10-11 10:43:49.000000000 +0200
+> +++ linux-2.6.31-rc7.arm-iop-1-clocksource/arch/arm/include/asm/hardware/iop3xx.h ? ? ? 2009-08-22 12:06:28.000000000 +0200
+> @@ -259,6 +259,11 @@ static inline u32 read_tcr1(void)
+> ? ? ? ?return val;
+> ?}
+>
+> +static inline void write_tcr1(u32 val)
+> +{
+> + ? ? ? asm volatile("mcr p6, 0, %0, c3, c1, 0" : : "r" (val));
+> +}
+> +
+> ?static inline void write_trr0(u32 val)
+> ?{
+> ? ? ? ?asm volatile("mcr p6, 0, %0, c4, c1, 0" : : "r" (val));
+> diff -rupN linux-2.6.31-rc7/arch/arm/mach-iop13xx/include/mach/time.h linux-2.6.31-rc7.arm-iop-1-clocksource/arch/arm/mach-iop13xx/include/mach/time.h
+> --- linux-2.6.31-rc7/arch/arm/mach-iop13xx/include/mach/time.h ?2008-12-25 15:54:13.000000000 +0100
+> +++ linux-2.6.31-rc7.arm-iop-1-clocksource/arch/arm/mach-iop13xx/include/mach/time.h ? ?2009-08-22 12:06:28.000000000 +0200
+> @@ -90,6 +90,11 @@ static inline u32 read_tcr1(void)
+> ? ? ? ?return val;
+> ?}
+>
+> +static inline void write_tcr1(u32 val)
+> +{
+> + ? ? ? asm volatile("mcr p6, 0, %0, c3, c9, 0" : : "r" (val));
+> +}
+> +
+> ?static inline void write_trr0(u32 val)
+> ?{
+> ? ? ? ?asm volatile("mcr p6, 0, %0, c4, c9, 0" : : "r" (val));
+> diff -rupN linux-2.6.31-rc7/arch/arm/plat-iop/time.c linux-2.6.31-rc7.arm-iop-1-clocksource/arch/arm/plat-iop/time.c
+> --- linux-2.6.31-rc7/arch/arm/plat-iop/time.c ? 2008-12-25 15:54:14.000000000 +0100
+> +++ linux-2.6.31-rc7.arm-iop-1-clocksource/arch/arm/plat-iop/time.c ? ? 2009-08-22 12:06:28.000000000 +0200
+> @@ -19,6 +19,7 @@
+> ?#include <linux/init.h>
+> ?#include <linux/timex.h>
+> ?#include <linux/io.h>
+> +#include <linux/clocksource.h>
+> ?#include <mach/hardware.h>
+> ?#include <asm/irq.h>
+> ?#include <asm/uaccess.h>
+> @@ -26,6 +27,23 @@
+> ?#include <asm/mach/time.h>
+> ?#include <mach/time.h>
+>
+> +/*
+> + * IOP clocksource (free-running timer 1).
+> + */
+> +static cycle_t iop_clocksource_read(struct clocksource *unused)
+> +{
+> + ? ? ? return 0xffffffffu - read_tcr1();
 
-Applied, thanks.
+So tcr1 counts downwards and wraps around?
+
+> +}
+> +
+> +static struct clocksource iop_clocksource = {
+> + ? ? ? .name ? ? ? ? ? = "iop_timer1",
+> + ? ? ? .rating ? ? ? ? = 300,
+> + ? ? ? .read ? ? ? ? ? = iop_clocksource_read,
+> + ? ? ? .mask ? ? ? ? ? = CLOCKSOURCE_MASK(32),
+> + ? ? ? .shift ? ? ? ? ?= 20, ? /* ??? crude guesstimate */
+
+Calculate this using the algorithm in arch/mips/kernel/time.c
+they have a dynamically changing clocksource...
+
+> + ? ? ? .flags ? ? ? ? ?= CLOCK_SOURCE_IS_CONTINUOUS,
+> +};
+> +
+> ?static unsigned long ticks_per_jiffy;
+> ?static unsigned long ticks_per_usec;
+> ?static unsigned long next_jiffy_time;
+> @@ -99,8 +117,17 @@ void __init iop_init_time(unsigned long
+> ? ? ? ? */
+> ? ? ? ?write_trr0(ticks_per_jiffy - 1);
+> ? ? ? ?write_tmr0(timer_ctl);
+> +
+> + ? ? ? /*
+> + ? ? ? ?* Set up free-running clocksource timer 1.
+> + ? ? ? ?*/
+> ? ? ? ?write_trr1(0xffffffff);
+> + ? ? ? write_tcr1(0xffffffff);
+> ? ? ? ?write_tmr1(timer_ctl);
+> + ? ? ? iop_clocksource.mult =
+> + ? ? ? ? ? ? ? clocksource_hz2mult(tick_rate,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? iop_clocksource.shift);
+> + ? ? ? clocksource_register(&iop_clocksource);
+>
+> ? ? ? ?setup_irq(IRQ_IOP_TIMER0, &iop_timer_irq);
+> ?}
+>
+
+Linus Walleij
