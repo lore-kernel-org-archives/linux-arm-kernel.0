@@ -1,91 +1,44 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 24 Aug 2009 10:21:26 +0530
-Subject: [PATCH 1/2 v3] ARM: OMAP4: Fix NULL pointer dereference crash.
-Message-ID: <1251089486-25239-1-git-send-email-santosh.shilimkar@ti.com>
+From: jhnikula@gmail.com (Jarkko Nikula)
+Date: Mon, 24 Aug 2009 08:49:20 +0300
+Subject: [alsa-devel] [RFC][PATCH 1/3 v2] ARM: OMAP: DMA: Add support
+	for DMA channel self linking on OMAP1510
+In-Reply-To: <20090823184943.GA6994@opensource.wolfsonmicro.com>
+References: <200908101050.02530.jkrzyszt@tis.icnet.pl>
+	<200908231945.40187.jkrzyszt@tis.icnet.pl>
+	<20090823180543.GA6167@opensource.wolfsonmicro.com>
+	<200908232038.05593.jkrzyszt@tis.icnet.pl>
+	<20090823184943.GA6994@opensource.wolfsonmicro.com>
+Message-ID: <20090824084920.c99c561a.jhnikula@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After the patch series "[PATCH 00/14] OMAP PM fixes for .31-rc"
-merge in 2.6.31-rc5, the kernel crashed during boot on OMAP4430.
-This patch fixes it by adding UART4 support and related code.
-Without this patch omap_serial_init() would produce " NULL pointer
-dereference" and kernel crashes in the bootup on OMAP4430 platform.
+On Sun, 23 Aug 2009 19:49:43 +0100
+Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
 
-Some more info on the merge issue can be found here.
-More info- http://lkml.org/lkml/2009/8/20/192
+> On Sun, Aug 23, 2009 at 08:38:05PM +0200, Janusz Krzysztofik wrote:
+> > Sunday 23 August 2009 20:05:43 Mark Brown wrote:
+> 
+> > > then what are the other 
+> > > patches that depend on this? Nobody reported any issues in testing with 
+> > > the other OMAP patches.
+> 
+> > Dependency on patch 1/3 is not compile time, but run time, and OMAP1510 
+> > specific, that's probably why nobody has reported any issues.
+> 
+> OK, given that and the fact that you're reporting that none of these
+> files are afected by any of the other patches it sounds like it'd be
+> better to keep it in the OMAP tree unless Tony says otherwse.
 
-Note: While merging this patch,"IO_ADDRESS" needs to be changed
-to "OMAP2_IO_ADDRESS" if the Tony's below series is already merged in.
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg15072.html
+Yep, Janusz's commits 64844a6ac8ddd586cb832fea7cf2e93e5e7e03f4 and
+471e3dec3abe2d41e8c742046353fcb01bc2459e do not cause problems on other
+OMAPs but will cause that ASoC on 1510 is broken until his DMA
+patch(es) are applied. I'm sure you Janusz will ping Tony until he'll
+apply them :-)
 
-id = 3 instead of "PLAT8250_DEV_FOURPORT" as suggested by Kevin.
+We should remember that arch/arm/plat-omap/mcbsp.c changes done via
+ALSA tree has been an exception and that's only for simpler procedure.
+McBSP is not so critical if sources goes out-of-sync but DMA is.
 
-Signed-off-by: Syed Rafiuddin <rafiuddin.syed@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
-Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
----
- arch/arm/mach-omap2/board-4430sdp.c |    2 +-
- arch/arm/mach-omap2/serial.c        |   27 ++++++++++++++++++++++++++-
- 2 files changed, 27 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index b0c7402..1b22307 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -39,7 +39,7 @@ static struct platform_device *sdp4430_devices[] __initdata = {
- };
- 
- static struct omap_uart_config sdp4430_uart_config __initdata = {
--	.enabled_uarts	= (1 << 0) | (1 << 1) | (1 << 2),
-+	.enabled_uarts	= (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3),
- };
- 
- static struct omap_lcd_config sdp4430_lcd_config __initdata = {
-diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index a7421a5..e1be77b 100644
---- a/arch/arm/mach-omap2/serial.c
-+++ b/arch/arm/mach-omap2/serial.c
-@@ -112,7 +112,21 @@ static struct plat_serial8250_port serial_platform_data2[] = {
- 		.flags		= 0
- 	}
- };
--
-+#ifdef CONFIG_ARCH_OMAP4
-+static struct plat_serial8250_port serial_platform_data3[] = {
-+	{
-+		.membase	= IO_ADDRESS(OMAP_UART4_BASE),
-+		.mapbase	= OMAP_UART4_BASE,
-+		.irq		= 70,
-+		.flags		= UPF_BOOT_AUTOCONF,
-+		.iotype		= UPIO_MEM,
-+		.regshift	= 2,
-+		.uartclk	= OMAP24XX_BASE_BAUD * 16,
-+	}, {
-+		.flags		= 0
-+	}
-+};
-+#endif
- static inline unsigned int serial_read_reg(struct plat_serial8250_port *up,
- 					   int offset)
- {
-@@ -550,6 +564,17 @@ static struct omap_uart_state omap_uart[OMAP_MAX_NR_PORTS] = {
- 			},
- 		},
- 	},
-+#ifdef CONFIG_ARCH_OMAP4
-+	{
-+		.pdev = {
-+			.name			= "serial8250",
-+			.id			= 3,
-+			.dev			= {
-+				.platform_data	= serial_platform_data3,
-+			},
-+		},
-+	},
-+#endif
- };
- 
- void __init omap_serial_init(void)
 -- 
-1.5.4.7
+Jarkko
