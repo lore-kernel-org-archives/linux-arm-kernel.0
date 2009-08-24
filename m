@@ -1,41 +1,33 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Mon, 24 Aug 2009 12:52:17 -0700 (PDT)
-Subject: ARM subarch submissions for next merge window
-In-Reply-To: <877hwtnxdx.fsf@deeprootsystems.com>
-References: <877hwtnxdx.fsf@deeprootsystems.com>
-Message-ID: <alpine.LFD.2.01.0908241249200.3158@localhost.localdomain>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Mon, 24 Aug 2009 22:12:32 +0100
+Subject: LDREX/STREX and pre-emption on SMP hardware
+In-Reply-To: <1250870319.10642.23.camel@pc1117.cambridge.arm.com>
+References: <4A8EB836.3000406@plxtech.com>
+	<1250869355.10642.10.camel@pc1117.cambridge.arm.com>
+	<20090821155011.GB8583@shareable.org>
+	<1250870319.10642.23.camel@pc1117.cambridge.arm.com>
+Message-ID: <20090824211232.GA9150@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Catalin Marinas wrote:
+> BTW, some time ago I sent a patch to clear the exclusive monitor at
+> every exception entry (interrupt, aborts etc.) but wasn't accepted. The
+> main reason for that was to be able to only use STR for atomic_set()
+> rather than the combination of LDREX/STREX we have now.
 
+Would CLREX+STR work, and would it be an improvement?
 
-On Mon, 24 Aug 2009, Kevin Hilman wrote:
-> 
-> After some discussions on linux-arm-kernel during the last merge
-> window, a suggestion from Alan Cox[1], and a willingness to try it
-> from Russell[2], some ARM subarch maintainers would like to push our
-> platform-specific code directly to you for the next merge window.
-> 
-> Any changes that affect common ARM code will still be pushed via
-> Russell, only our platform-specific code will be submitted directly.
-> 
-> Also our platform code is still posted and reviewed on
-> linux-arm-kernel as well as being included in linux-next. Only the
-> merge path will change slightly.
-> 
-> Any problems with this?
+> A similar reason for STR used in application signal handlers which
+> are usually invoked without a __switch_to call (unless the signal
+> handler is in a different application from the running one).
 
-I don't have any issues with it, as long as the subarch trees are clean 
-and clear.
+How about adding CLREX to the signal handling path?  Not exception
+entry, but the part which sets up the signal frame.
 
-Part of that is the normal "git cleanliness" issue in general (ie I don't 
-want to see ugly back-merges of my random kernel-of-the-day or see that 
-something was rebased just five minutes ago and clearly had no testing), 
-but the other part is obviously that if there then ends up being 
-complaints where people end up stepping on each others toes, I would want 
-a top-level maintainer to step in.
+If userspace can use STR for atomic_set normally, it's quite obscure
+(and very difficult to detect) that that's fine everywhere except in
+signal handlers, and even more obscure if it means siglongjmp() and
+setcontext() can cause unrelated atomic ops to fail.
 
-But I guess that as long as it's clearly just platform-specific files, 
-that won't be a problem.
-
-		Linus
+-- Jamie
