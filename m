@@ -1,29 +1,30 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 24 Aug 2009 16:40:10 +0300
-Subject: ARM subarch submissions for next merge window
-Message-ID: <877hwtnxdx.fsf@deeprootsystems.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 24 Aug 2009 16:44:52 +0100
+Subject: LDREX/STREX and pre-emption on SMP hardware
+In-Reply-To: <1250890146.29685.18.camel@david-laptop>
+References: <4A8EB836.3000406@plxtech.com>
+	<1250869355.10642.10.camel@pc1117.cambridge.arm.com>
+	<20090821155011.GB8583@shareable.org>
+	<1250870319.10642.23.camel@pc1117.cambridge.arm.com>
+	<1250890146.29685.18.camel@david-laptop>
+Message-ID: <1251128692.28977.17.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+On Fri, 2009-08-21 at 14:29 -0700, David Xiao wrote:
+> The DDI0406A ARM V7 Architecture Reference Manual (section A3.4.1) seems
+> to indicate that the exclusive monitor is tagging/matching the physical
+> memory address accessed by the LDREX/STREX instructions.
+> 
+> And in the same document (section A3.4.5), it seems to suggest that the
+> reason we need to do CLREX during the context switch is that because the
+> IsExclusiveLocal() implementation does not have to do memory
+> address/size check, but just the exclusive state check.
 
-After some discussions on linux-arm-kernel during the last merge
-window, a suggestion from Alan Cox[1], and a willingness to try it
-from Russell[2], some ARM subarch maintainers would like to push our
-platform-specific code directly to you for the next merge window.
+Yes, that's correct. And the reason we don't need this in interrupt
+handlers is that we would never call a STREX without a preceding LDREX
+or just a LDREX without a being followed by a STREX and interrupt
+handlers are in the worst case nested rather than freely preemptible.
 
-Any changes that affect common ARM code will still be pushed via
-Russell, only our platform-specific code will be submitted directly.
-
-Also our platform code is still posted and reviewed on
-linux-arm-kernel as well as being included in linux-next. Only the
-merge path will change slightly.
-
-Any problems with this?
-
-Kevin
- maintainer: arch/arm/mach-davinci/*
- developer: arch/arm/mach-omap2/*
-
-[1] http://marc.info/?l=linux-arm-kernel&m=124472557106678&w=2
-[2] http://marc.info/?l=linux-kernel&m=124472614607233&w=2
+-- 
+Catalin
