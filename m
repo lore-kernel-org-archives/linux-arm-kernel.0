@@ -1,47 +1,31 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 24 Aug 2009 15:39:39 +0300
-Subject: [PATCH 1/2 v2] ARM: OMAP4: Fix NULL pointer dereference crash.
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02BA434EC2@dbde02.ent.ti.com>
-	(Santosh Shilimkar's message of "Mon\,
-	24 Aug 2009 17\:56\:00 +0530")
-References: <1250928012-5233-1-git-send-email-santosh.shilimkar@ti.com>
-	<87hbvytich.fsf@deeprootsystems.com>
-	<87pralqvnp.fsf@deeprootsystems.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02BA434EC2@dbde02.ent.ti.com>
-Message-ID: <87tyzxper8.fsf@deeprootsystems.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 24 Aug 2009 14:47:03 +0200
+Subject: [PATCH] pxaficp-ir - remove incorrect net_device_ops
+In-Reply-To: <20090823.225743.135339409.davem@davemloft.net>
+References: <a4423d670908231055o2bb65fe0le2c33fe94b660b38@mail.gmail.com>
+	<20090824043831.GA2473@orion>
+	<20090823.225743.135339409.davem@davemloft.net>
+Message-ID: <200908241447.03117.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
-
->> >>  static inline unsigned int serial_read_reg(struct plat_serial8250_port
->> *up,
->> >>  					   int offset)
->> >>  {
->> >> @@ -550,6 +564,17 @@ static struct omap_uart_state
->> omap_uart[OMAP_MAX_NR_PORTS] = {
->> >>  			},
->> >>  		},
->> >>  	},
->> >> +#ifdef CONFIG_ARCH_OMAP4
->> >> +	{
->> >> +		.pdev = {
->> >> +			.name			= "serial8250",
->> >> +			.id			= PLAT8250_DEV_FOURPORT,
->> >
->> > This should not be FOURPORT, it should just be a number.  In this case,
->> > it should be 3 (the others start from zero.)
->> 
->> Santosh,
->> 
->> I've changed the .id field to '3' and will queue up this fix for the
->> next merge window along with my fixes queue[1].  Please let me know if you
->> want to do otherwise.
+Dne Po 24. srpna 2009 07:57:43 David Miller napsal(a):
+> From: Alexander Beregalov <a.beregalov@gmail.com>
+> Date: Mon, 24 Aug 2009 08:38:31 +0400
 >
-> This is fine Kevin. Thanks !!
+> > Subject: [PATCH] pxaficp-ir - remove incorrect net_device_ops
+> >
+> > This patch fixes broken pxaficp-ir. The problem was in incorrect
+> > net_device_ops being specified which prevented the driver from
+> > operating. The symptoms were:
+> >  - failing ifconfig for IrLAN, resulting in
+> > 	SIOCSIFFLAGS: Cannot assign requested address
+> >  - irattach working for IrCOMM, but the port stayed disabled
+> >
+> > Moreover this patch corrects missing sysfs device link.
+> >
+> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 >
-> Bye the way I have also posted v3 version in which I changed the .id field to 3.
+> Applied, thanks.
 
-Yeah, saw that after I replied.  Thanks!
-
-Kevin
+Thank you.
