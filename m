@@ -1,33 +1,24 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Mon, 24 Aug 2009 22:12:32 +0100
-Subject: LDREX/STREX and pre-emption on SMP hardware
-In-Reply-To: <1250870319.10642.23.camel@pc1117.cambridge.arm.com>
-References: <4A8EB836.3000406@plxtech.com>
-	<1250869355.10642.10.camel@pc1117.cambridge.arm.com>
-	<20090821155011.GB8583@shareable.org>
-	<1250870319.10642.23.camel@pc1117.cambridge.arm.com>
-Message-ID: <20090824211232.GA9150@shareable.org>
+From: dave@chronolytics.com (David F. Carlson)
+Date: Mon, 24 Aug 2009 17:49:30 -0400 (EDT)
+Subject: 6410 issues with samsung-ap-2.6
+Message-ID: <200908242149.n7OLnU6d017655@chronolytics.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas wrote:
-> BTW, some time ago I sent a patch to clear the exclusive monitor at
-> every exception entry (interrupt, aborts etc.) but wasn't accepted. The
-> main reason for that was to be able to only use STR for atomic_set()
-> rather than the combination of LDREX/STREX we have now.
 
-Would CLREX+STR work, and would it be an improvement?
+List-ies,
 
-> A similar reason for STR used in application signal handlers which
-> are usually invoked without a __switch_to call (unless the signal
-> handler is in a different application from the running one).
+I am (trying) to use the recently released git kki_ap/samsung-ap-2.6 which is supposedly a decent 6410 tree.
 
-How about adding CLREX to the signal handling path?  Not exception
-entry, but the part which sets up the signal frame.
+I am having trouble with the the input gpio_keys code that does a "gpio_to_irq()" to get the gpio to irq mapping.
 
-If userspace can use STR for atomic_set normally, it's quite obscure
-(and very difficult to detect) that that's fine everywhere except in
-signal handlers, and even more obscure if it means siglongjmp() and
-setcontext() can cause unrelated atomic ops to fail.
+This call always fails for the 6410 (ENXIO).  I see no code for the 6410 to get a irq.
 
--- Jamie
+Is there a better tree to integrate my 6410-based device with?  (I am having other "issues" with this git tree and the samsung folks are not helpful...)
+
+Thanks in advance,
+
+David F. Carlson    Chronolytics, Inc.  Rochester, NY
+mailto:dave at chronolytics.com            http://www.chronolytics.com
+
+"The faster I go, the behinder I get." --Lewis Carroll
