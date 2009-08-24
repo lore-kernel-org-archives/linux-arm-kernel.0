@@ -1,28 +1,18 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 23 Aug 2009 22:57:43 -0700 (PDT)
-Subject: [PATCH] pxaficp-ir - remove incorrect net_device_ops
-In-Reply-To: <20090824043831.GA2473@orion>
-References: <a4423d670908231055o2bb65fe0le2c33fe94b660b38@mail.gmail.com>
-	<20090823.184924.26788268.davem@davemloft.net>
-	<20090824043831.GA2473@orion>
-Message-ID: <20090823.225743.135339409.davem@davemloft.net>
+From: riku.voipio@iki.fi (Riku Voipio)
+Date: Mon, 24 Aug 2009 10:35:25 +0300
+Subject: [PATCH] ARM: Mailing lists have moved
+In-Reply-To: <1250855566.3311.100.camel@macbook.infradead.org>
+References: <1250855566.3311.100.camel@macbook.infradead.org>
+Message-ID: <20090824073525.GA21356@kos.to>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexander Beregalov <a.beregalov@gmail.com>
-Date: Mon, 24 Aug 2009 08:38:31 +0400
+On Fri, Aug 21, 2009 at 12:52:46PM +0100, David Woodhouse wrote:
+> Russell no longer wants to maintain the mailing lists, so with his
+> blessing I have set up replacements at lists.infradead.org.
 
-> Subject: [PATCH] pxaficp-ir - remove incorrect net_device_ops
-> 
-> This patch fixes broken pxaficp-ir. The problem was in incorrect
-> net_device_ops being specified which prevented the driver from
-> operating. The symptoms were:
->  - failing ifconfig for IrLAN, resulting in
-> 	SIOCSIFFLAGS: Cannot assign requested address
->  - irattach working for IrCOMM, but the port stayed disabled
-> 
-> Moreover this patch corrects missing sysfs device link.
-> 
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> Erik was helping to moderate the old list, and will continue to moderate
+> the new one. Vince has kindly volunteered to do so too.
 
-Applied, thanks.
+I take it that the archives will appear here: http://lists.infradead.org/
+and the netiquette linked there applies also for the moved arm lists?
