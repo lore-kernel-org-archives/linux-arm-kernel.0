@@ -1,24 +1,28 @@
-From: dave@chronolytics.com (David F. Carlson)
-Date: Mon, 24 Aug 2009 17:49:30 -0400 (EDT)
-Subject: 6410 issues with samsung-ap-2.6
-Message-ID: <200908242149.n7OLnU6d017655@chronolytics.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 24 Aug 2009 23:06:13 +0100
+Subject: [alsa-devel] [RFC][PATCH 1/3 v2] ARM: OMAP: DMA: Add support
+	for DMA channel self linking on OMAP1510
+In-Reply-To: <20090824124902.GH7069@atomide.com>
+References: <200908101050.02530.jkrzyszt@tis.icnet.pl>
+	<200908231945.40187.jkrzyszt@tis.icnet.pl>
+	<20090823180543.GA6167@opensource.wolfsonmicro.com>
+	<200908232038.05593.jkrzyszt@tis.icnet.pl>
+	<20090823184943.GA6994@opensource.wolfsonmicro.com>
+	<20090824084920.c99c561a.jhnikula@gmail.com>
+	<20090824124902.GH7069@atomide.com>
+Message-ID: <20090824220612.GB4338@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Aug 24, 2009 at 03:49:03PM +0300, Tony Lindgren wrote:
 
-List-ies,
+> > We should remember that arch/arm/plat-omap/mcbsp.c changes done via
+> > ALSA tree has been an exception and that's only for simpler procedure.
+> > McBSP is not so critical if sources goes out-of-sync but DMA is.
 
-I am (trying) to use the recently released git kki_ap/samsung-ap-2.6 which is supposedly a decent 6410 tree.
+> Sorry for the delay in replying. I'm OK for these to go in via the alsa
+> tree as there are not currently other patches pending in the mcbsp or
+> dma area for omap. So I think it's better merge all the audio related
+> patches together in this case.
 
-I am having trouble with the the input gpio_keys code that does a "gpio_to_irq()" to get the gpio to irq mapping.
-
-This call always fails for the 6410 (ENXIO).  I see no code for the 6410 to get a irq.
-
-Is there a better tree to integrate my 6410-based device with?  (I am having other "issues" with this git tree and the samsung folks are not helpful...)
-
-Thanks in advance,
-
-David F. Carlson    Chronolytics, Inc.  Rochester, NY
-mailto:dave at chronolytics.com            http://www.chronolytics.com
-
-"The faster I go, the behinder I get." --Lewis Carroll
+Applied, thanks.
