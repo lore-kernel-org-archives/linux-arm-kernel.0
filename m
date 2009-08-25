@@ -1,38 +1,31 @@
-From: mishal@softerra.com (Mikhail Lodygin)
-Date: Tue, 25 Aug 2009 19:35:10 +0300
-Subject: 6410 issues with samsung-ap-2.6
-In-Reply-To: <200908242149.n7OLnU6d017655@chronolytics.com>
-References: <200908242149.n7OLnU6d017655@chronolytics.com>
-Message-ID: <4A9412BE.40305@softerra.com>
+From: bgat@billgatliff.com (Bill Gatliff)
+Date: Tue, 25 Aug 2009 14:48:58 -0500
+Subject: ARM subarch submissions for next merge window
+In-Reply-To: <alpine.LFD.2.01.0908241249200.3158@localhost.localdomain>
+References: <877hwtnxdx.fsf@deeprootsystems.com>
+	<alpine.LFD.2.01.0908241249200.3158@localhost.localdomain>
+Message-ID: <4A94402A.1090003@billgatliff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Have you tried mainstream kernel? Samsung's kernel is for reference
-purposes only I believe.
-I hanvn't use keys functionality but gpio and interrupt works well in
-mainstream.
-Mikhail.
-David F. Carlson wrote:
-> List-ies,
->
-> I am (trying) to use the recently released git kki_ap/samsung-ap-2.6 which is supposedly a decent 6410 tree.
->
-> I am having trouble with the the input gpio_keys code that does a "gpio_to_irq()" to get the gpio to irq mapping.
->
-> This call always fails for the 6410 (ENXIO).  I see no code for the 6410 to get a irq.
->
-> Is there a better tree to integrate my 6410-based device with?  (I am having other "issues" with this git tree and the samsung folks are not helpful...)
->
-> Thanks in advance,
->
-> David F. Carlson    Chronolytics, Inc.  Rochester, NY
-> mailto:dave at chronolytics.com            http://www.chronolytics.com
->
-> "The faster I go, the behinder I get." --Lewis Carroll
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Linus Torvalds wrote:
+> On Mon, 24 Aug 2009, Kevin Hilman wrote:
 >   
+>> After some discussions on linux-arm-kernel during the last merge
+>> window, a suggestion from Alan Cox[1], and a willingness to try it
+>> from Russell[2], some ARM subarch maintainers would like to push our
+>> platform-specific code directly to you for the next merge window.
+>>     
+
+How do you define "subarch maintainer"?  If I have a new platform port, 
+but am heretofore unknown to linux-arm-kernel, do I still send a pull 
+request to Linus directly?  Or are the subarch maintainers the guys like 
+Russell, Nico, Tony, etc. and _they_ are the ones that get to send pull 
+requests directly to the Benevolent Dictator for Life?
+
+
+b.g.
+
+-- 
+Bill Gatliff
+bgat at billgatliff.com
