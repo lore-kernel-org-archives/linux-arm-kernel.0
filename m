@@ -1,220 +1,38 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Tue, 25 Aug 2009 01:12:44 +0200
-Subject: [RFC/RFT 2/3] iop: clockevent support
-In-Reply-To: <200908221205.n7MC5Trg029367@pilspetsen.it.uu.se>
-References: <200908221205.n7MC5Trg029367@pilspetsen.it.uu.se>
-Message-ID: <63386a3d0908241612w540e68d6o56a9ca188a93b86@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 25 Aug 2009 09:33:50 +0100
+Subject: LDREX/STREX and pre-emption on SMP hardware
+In-Reply-To: <20090824211232.GA9150@shareable.org>
+References: <4A8EB836.3000406@plxtech.com>
+	<1250869355.10642.10.camel@pc1117.cambridge.arm.com>
+	<20090821155011.GB8583@shareable.org>
+	<1250870319.10642.23.camel@pc1117.cambridge.arm.com>
+	<20090824211232.GA9150@shareable.org>
+Message-ID: <1251189230.15678.9.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tjenare,
+On Mon, 2009-08-24 at 22:12 +0100, Jamie Lokier wrote:
+> Catalin Marinas wrote:
+> > BTW, some time ago I sent a patch to clear the exclusive monitor at
+> > every exception entry (interrupt, aborts etc.) but wasn't accepted. The
+> > main reason for that was to be able to only use STR for atomic_set()
+> > rather than the combination of LDREX/STREX we have now.
+> 
+> Would CLREX+STR work, and would it be an improvement?
 
-2009/8/22 Mikael Pettersson <mikpe@it.uu.se>:
-> This updates the IOP platform to expose the interrupting
-> timer 0 as a clockevent object. The timer interrupt handler
-> is changed to call the clockevent ->event_handler() instead
-> of timer_tick(), and ->set_next_event() and ->set_mode()
-> operations are added to allow the mode of the timer to be
-> updated (required for ONESHOT/NOHZ mode).
->
-> Timer 0 must now be properly initialised, which requires a
-> new write_tcr0() function from the mach implementation code.
->
-> Initial setup of timer 0 is also rewritten to be more robust.
->
-> On concern I have is whether the clockevent .shift
-> value of 20 is appropriate for timer frequencies in the
-> 200/266/333 MHz range which seem to be typical for IOP.
->
-> Another concern I have is what the exact state changes needed
-> for CLK_EVT_MODE_ONESHOT and ->set_next_event are. Right now I
-> disable the timer both for CLK_EVT_MODE_ONESHOT and at the start
-> of ->set_next_event. One of these may be redundant.
->
-> Tested on n2100, compile-tested for all plat-iop machines.
->
-> Signed-off-by: Mikael Pettersson <mikpe@it.uu.se>
-> ---
-> ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?1
-> ?arch/arm/include/asm/hardware/iop3xx.h ? ?| ? ?5 +
-> ?arch/arm/mach-iop13xx/include/mach/time.h | ? ?5 +
-> ?arch/arm/plat-iop/time.c ? ? ? ? ? ? ? ? ?| ? 82 ++++++++++++++++++++++++++----
-> ?4 files changed, 84 insertions(+), 9 deletions(-)
->
-> diff -rupN linux-2.6.31-rc7.arm-iop-1-clocksource/arch/arm/Kconfig linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/Kconfig
-> --- linux-2.6.31-rc7.arm-iop-1-clocksource/arch/arm/Kconfig ? ? 2009-08-22 11:13:37.000000000 +0200
-> +++ linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/Kconfig ? ? 2009-08-22 12:07:52.000000000 +0200
-> @@ -736,6 +736,7 @@ config ARCH_ACORN
->
-> ?config PLAT_IOP
-> ? ? ? ?bool
-> + ? ? ? select GENERIC_CLOCKEVENTS
->
-> ?config PLAT_ORION
-> ? ? ? ?bool
-> diff -rupN linux-2.6.31-rc7.arm-iop-1-clocksource/arch/arm/include/asm/hardware/iop3xx.h linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/include/asm/hardware/iop3xx.h
-> --- linux-2.6.31-rc7.arm-iop-1-clocksource/arch/arm/include/asm/hardware/iop3xx.h ? ? ? 2009-08-22 12:06:28.000000000 +0200
-> +++ linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/include/asm/hardware/iop3xx.h ? ? ? 2009-08-22 12:07:52.000000000 +0200
-> @@ -252,6 +252,11 @@ static inline u32 read_tcr0(void)
-> ? ? ? ?return val;
-> ?}
->
-> +static inline void write_tcr0(u32 val)
-> +{
-> + ? ? ? asm volatile("mcr p6, 0, %0, c2, c1, 0" : : "r" (val));
-> +}
-> +
-> ?static inline u32 read_tcr1(void)
-> ?{
-> ? ? ? ?u32 val;
-> diff -rupN linux-2.6.31-rc7.arm-iop-1-clocksource/arch/arm/mach-iop13xx/include/mach/time.h linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/mach-iop13xx/include/mach/time.h
-> --- linux-2.6.31-rc7.arm-iop-1-clocksource/arch/arm/mach-iop13xx/include/mach/time.h ? ?2009-08-22 12:06:28.000000000 +0200
-> +++ linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/mach-iop13xx/include/mach/time.h ? ?2009-08-22 12:07:52.000000000 +0200
-> @@ -83,6 +83,11 @@ static inline u32 read_tcr0(void)
-> ? ? ? ?return val;
-> ?}
->
-> +static inline void write_tcr0(u32 val)
-> +{
-> + ? ? ? asm volatile("mcr p6, 0, %0, c2, c9, 0" : : "r" (val));
-> +}
-> +
-> ?static inline u32 read_tcr1(void)
-> ?{
-> ? ? ? ?u32 val;
-> diff -rupN linux-2.6.31-rc7.arm-iop-1-clocksource/arch/arm/plat-iop/time.c linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/plat-iop/time.c
-> --- linux-2.6.31-rc7.arm-iop-1-clocksource/arch/arm/plat-iop/time.c ? ? 2009-08-22 12:06:28.000000000 +0200
-> +++ linux-2.6.31-rc7.arm-iop-2-clockevents/arch/arm/plat-iop/time.c ? ? 2009-08-22 12:07:52.000000000 +0200
-> @@ -20,6 +20,7 @@
-> ?#include <linux/timex.h>
-> ?#include <linux/io.h>
-> ?#include <linux/clocksource.h>
-> +#include <linux/clockchips.h>
-> ?#include <mach/hardware.h>
-> ?#include <asm/irq.h>
-> ?#include <asm/uaccess.h>
-> @@ -44,7 +45,63 @@ static struct clocksource iop_clocksourc
-> ? ? ? ?.flags ? ? ? ? ?= CLOCK_SOURCE_IS_CONTINUOUS,
-> ?};
->
-> +/*
-> + * IOP clockevents (interrupting timer 0).
-> + */
-> +static int iop_set_next_event(unsigned long delta,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct clock_event_device *unused)
-> +{
-> + ? ? ? u32 tmr = IOP_TMR_EN | IOP_TMR_PRIVILEGED
-> + ? ? ? ? ? ? ? | IOP_TMR_RELOAD | IOP_TMR_RATIO_1_1;
-> +
-> + ? ? ? BUG_ON(delta == 0);
-> + ? ? ? write_tmr0(tmr & ~(IOP_TMR_EN | IOP_TMR_RELOAD));
-> + ? ? ? write_tcr0(delta);
-> + ? ? ? write_tmr0((tmr & ~IOP_TMR_RELOAD) | IOP_TMR_EN);
-> +
-> + ? ? ? return 0;
-> +}
-> +
-> ?static unsigned long ticks_per_jiffy;
-> +
-> +static void iop_set_mode(enum clock_event_mode mode,
-> + ? ? ? ? ? ? ? ? ? ? ? ?struct clock_event_device *unused)
-> +{
-> + ? ? ? u32 tmr = IOP_TMR_EN | IOP_TMR_PRIVILEGED
-> + ? ? ? ? ? ? ? | IOP_TMR_RELOAD | IOP_TMR_RATIO_1_1;
-> +
-> + ? ? ? switch (mode) {
-> + ? ? ? case CLOCK_EVT_MODE_PERIODIC:
-> + ? ? ? ? ? ? ? write_tmr0(tmr & ~IOP_TMR_EN);
-> + ? ? ? ? ? ? ? write_tcr0(ticks_per_jiffy - 1);
-> + ? ? ? ? ? ? ? tmr |= (IOP_TMR_RELOAD | IOP_TMR_EN);
-> + ? ? ? ? ? ? ? break;
-> + ? ? ? case CLOCK_EVT_MODE_ONESHOT:
-> + ? ? ? ? ? ? ? /* ->set_next_event sets period and enables timer */
-> + ? ? ? ? ? ? ? tmr &= ~(IOP_TMR_RELOAD | IOP_TMR_EN);
-> + ? ? ? ? ? ? ? break;
-> + ? ? ? case CLOCK_EVT_MODE_RESUME:
-> + ? ? ? ? ? ? ? tmr |= IOP_TMR_EN;
-> + ? ? ? ? ? ? ? break;
-> + ? ? ? case CLOCK_EVT_MODE_SHUTDOWN:
-> + ? ? ? case CLOCK_EVT_MODE_UNUSED:
-> + ? ? ? default:
-> + ? ? ? ? ? ? ? tmr &= ~IOP_TMR_EN;
-> + ? ? ? ? ? ? ? break;
-> + ? ? ? }
-> +
-> + ? ? ? write_tmr0(tmr);
-> +}
-> +
-> +static struct clock_event_device iop_clockevent = {
-> + ? ? ? .name ? ? ? ? ? = "iop_timer0",
-> + ? ? ? .features ? ? ? = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-> + ? ? ? .rating ? ? ? ? = 300,
-> + ? ? ? .shift ? ? ? ? ?= 20, ? /* ??? crude guesstimate */
+IMHO, yes. You use CLREX at every exception entry and make the
+atomic_set() function simply use STR. But the argument was that
+atomic_set() isn't used very often anyway.
 
-Same thing as for clocksource, see
-arch/mips/kernel/time.c
+> > A similar reason for STR used in application signal handlers which
+> > are usually invoked without a __switch_to call (unless the signal
+> > handler is in a different application from the running one).
+> 
+> How about adding CLREX to the signal handling path?  Not exception
+> entry, but the part which sets up the signal frame.
 
-> + ? ? ? .set_next_event = iop_set_next_event,
-> + ? ? ? .set_mode ? ? ? = iop_set_mode,
-> +};
-> +
-> ?static unsigned long ticks_per_usec;
-> ?static unsigned long next_jiffy_time;
->
-> @@ -75,13 +132,12 @@ unsigned long iop_gettimeoffset(void)
-> ?static irqreturn_t
-> ?iop_timer_interrupt(int irq, void *dev_id)
-> ?{
-> + ? ? ? struct clock_event_device *evt;
-> +
-> ? ? ? ?write_tisr(1);
->
-> - ? ? ? while ((signed long)(next_jiffy_time - read_tcr1())
-> - ? ? ? ? ? ? ? >= ticks_per_jiffy) {
-> - ? ? ? ? ? ? ? timer_tick();
-> - ? ? ? ? ? ? ? next_jiffy_time -= ticks_per_jiffy;
-> - ? ? ? }
-> + ? ? ? evt = &iop_clockevent;
-> + ? ? ? evt->event_handler(evt);
->
-> ? ? ? ?return IRQ_HANDLED;
-> ?}
-> @@ -112,10 +168,20 @@ void __init iop_init_time(unsigned long
-> ? ? ? ? ? ? ? ? ? ? ? ?IOP_TMR_RELOAD | IOP_TMR_RATIO_1_1;
->
-> ? ? ? ?/*
-> - ? ? ? ?* We use timer 0 for our timer interrupt, and timer 1 as
-> - ? ? ? ?* monotonic counter for tracking missed jiffies.
-> + ? ? ? ?* Set up interrupting clockevent timer 0.
-> ? ? ? ? */
-> + ? ? ? write_tmr0(timer_ctl & ~IOP_TMR_EN);
-> + ? ? ? setup_irq(IRQ_IOP_TIMER0, &iop_timer_irq);
-> + ? ? ? iop_clockevent.mult =
-> + ? ? ? ? ? ? ? div_sc(tick_rate, NSEC_PER_SEC, iop_clockevent.shift);
-> + ? ? ? iop_clockevent.max_delta_ns =
-> + ? ? ? ? ? ? ? clockevent_delta2ns(0xfffffffe, &iop_clockevent);
-> + ? ? ? iop_clockevent.min_delta_ns =
-> + ? ? ? ? ? ? ? clockevent_delta2ns(0xf, &iop_clockevent);
-> + ? ? ? iop_clockevent.cpumask = cpumask_of(0);
-> + ? ? ? clockevents_register_device(&iop_clockevent);
-> ? ? ? ?write_trr0(ticks_per_jiffy - 1);
-> + ? ? ? write_tcr0(ticks_per_jiffy - 1);
-> ? ? ? ?write_tmr0(timer_ctl);
->
-> ? ? ? ?/*
-> @@ -128,6 +194,4 @@ void __init iop_init_time(unsigned long
-> ? ? ? ? ? ? ? ?clocksource_hz2mult(tick_rate,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?iop_clocksource.shift);
-> ? ? ? ?clocksource_register(&iop_clocksource);
-> -
-> - ? ? ? setup_irq(IRQ_IOP_TIMER0, &iop_timer_irq);
-> ?}
->
+Yes, that's the solution, only that I've never had the time to revisit
+it and send another patch.
 
-If this works, why not throw in an implementation of sched_clock()
-too while you're at it? Look in arch/arm/plat-omap/common.c
-to see how a simple clocksource can be used for sched_clock().
-That will improve the precision of the kernel scheduling.
-
-Eder,
-Linus Walleij
+-- 
+Catalin
