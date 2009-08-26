@@ -1,19 +1,53 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 25 Aug 2009 20:39:55 -0700 (PDT)
-Subject: [PATCH 2/2] irda/sa1100_ir: fix broken netdev_ops conversion
-In-Reply-To: <1251125760-6547-1-git-send-email-a.beregalov@gmail.com>
-References: <1251125760-6547-1-git-send-email-a.beregalov@gmail.com>
-Message-ID: <20090825.203955.125407912.davem@davemloft.net>
+From: rob@emanuele.us (Robert Emanuele)
+Date: Tue, 25 Aug 2009 21:24:05 -0700
+Subject: ARM Git Tree (at91sam9g45 patches)
+In-Reply-To: <0F5F73E36031FD46AD3F2E6948F0C0A00188E074@frimb01.corp.atmel.com>
+References: <9f53b4330908251727q1bc1accfk12a9a8d25407791@mail.gmail.com>
+	<0F5F73E36031FD46AD3F2E6948F0C0A00188E074@frimb01.corp.atmel.com>
+Message-ID: <9f53b4330908252124n168bd094k84f2691ec1a0a0ea@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexander Beregalov <a.beregalov@gmail.com>
-Date: Mon, 24 Aug 2009 18:56:00 +0400
+Thank you for pointing me towards those patches.  I've been looking at
+those.  Some of the work I have is with the 2.6.29 and 2.6.30 kernel
+versions.  I was wondering if there were any trees or patchsets
+against those versions.
 
-> This patch is based on commit d2f3ad4 (pxaficp-ir: remove incorrect
-> net_device_ops). Do the same for sa1100_ir.
-> Untested.
-> 
-> Signed-off-by: Alexander Beregalov <a.beregalov@gmail.com>
+Thanks,
 
-Applied.
+Rob
+
+On Tue, Aug 25, 2009 at 6:15 PM, Xu, Hong<Hong.Xu@atmel.com> wrote:
+> Hi Robert,
+> Actually Atmel has made experimental patch to support at91sam9g45-ekes board and will push the changes to the upstream tree in the near future. I suggest you have a look at
+> ?http://www.linux4sam.org/twiki/bin/view/Linux4SAM/LinuxKernel#Linux4SAM_Experimental_Patches
+>
+> BR,
+> Hong Xu
+>> -----Original Message-----
+>> From: linux-arm-kernel-bounces at lists.infradead.org
+>> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Robert
+>> Emanuele
+>> Sent: 2009?8?26? 8:27
+>> To: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-kernel at vger.kernel.org
+>> Subject: ARM Git Tree (at91sam9g45 patches)
+>>
+>> Greetings,
+>>
+>> I'm working with the Atmel at91sam9g45-ekes board which is new. ?I was
+>> wondering if there was a git tree with the current ARM patches that
+>> contains the at91sam9g45 code? ?Russell lists "Applied" patches at
+>> http://www.arm.linux.org.uk/developer/patches/ . ?Where are these
+>> applied to? ?If there isn't a tree, is there an elegant way to get the
+>> latest patch sets that I could apply to Linus's tree?
+>>
+>> Thank you,
+>>
+>> Rob
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
