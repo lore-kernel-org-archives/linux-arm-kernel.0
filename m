@@ -1,41 +1,19 @@
-From: Hong.Xu@atmel.com (Xu, Hong)
-Date: Wed, 26 Aug 2009 03:15:26 +0200
-Subject: ARM Git Tree (at91sam9g45 patches)
-In-Reply-To: <9f53b4330908251727q1bc1accfk12a9a8d25407791@mail.gmail.com>
-References: <9f53b4330908251727q1bc1accfk12a9a8d25407791@mail.gmail.com>
-Message-ID: <0F5F73E36031FD46AD3F2E6948F0C0A00188E074@frimb01.corp.atmel.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 25 Aug 2009 20:39:55 -0700 (PDT)
+Subject: [PATCH 2/2] irda/sa1100_ir: fix broken netdev_ops conversion
+In-Reply-To: <1251125760-6547-1-git-send-email-a.beregalov@gmail.com>
+References: <1251125760-6547-1-git-send-email-a.beregalov@gmail.com>
+Message-ID: <20090825.203955.125407912.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
-Actually Atmel has made experimental patch to support at91sam9g45-ekes board and will push the changes to the upstream tree in the near future. I suggest you have a look at
- http://www.linux4sam.org/twiki/bin/view/Linux4SAM/LinuxKernel#Linux4SAM_Experimental_Patches
+From: Alexander Beregalov <a.beregalov@gmail.com>
+Date: Mon, 24 Aug 2009 18:56:00 +0400
 
-BR,
-Hong Xu
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org
-> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Robert
-> Emanuele
-> Sent: 2009?8?26? 8:27
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Subject: ARM Git Tree (at91sam9g45 patches)
+> This patch is based on commit d2f3ad4 (pxaficp-ir: remove incorrect
+> net_device_ops). Do the same for sa1100_ir.
+> Untested.
 > 
-> Greetings,
-> 
-> I'm working with the Atmel at91sam9g45-ekes board which is new.  I was
-> wondering if there was a git tree with the current ARM patches that
-> contains the at91sam9g45 code?  Russell lists "Applied" patches at
-> http://www.arm.linux.org.uk/developer/patches/ .  Where are these
-> applied to?  If there isn't a tree, is there an elegant way to get the
-> latest patch sets that I could apply to Linus's tree?
-> 
-> Thank you,
-> 
-> Rob
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Signed-off-by: Alexander Beregalov <a.beregalov@gmail.com>
+
+Applied.
