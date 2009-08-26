@@ -1,39 +1,49 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 26 Aug 2009 10:56:28 +0200
-Subject: [PATCH] Make MMCI driver compile without gpiolib
-Message-ID: <1251276988-27882-1-git-send-email-linus.walleij@stericsson.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 26 Aug 2009 11:45:32 +0200
+Subject: ARM Git Tree (at91sam9g45 patches)
+In-Reply-To: <4A94FDDD.205@atmel.com>
+References: <9f53b4330908251727q1bc1accfk12a9a8d25407791@mail.gmail.com>	<4A9488FB.60603@eukrea.com>
+	<4A94FDDD.205@atmel.com>
+Message-ID: <4A95043C.9040807@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recent addition of optional gpiolib support to check if a
-card was inserted or write protected was really not optional.
-It needs this ifdef to become optional so that U300 compiles,
-for example.
+Hi all,
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- drivers/mmc/host/mmci.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+I respond to myself...
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 5eb86a8..a923ee2 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -619,6 +619,7 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
- 	writel(0, host->base + MMCIMASK1);
- 	writel(0xfff, host->base + MMCICLEAR);
- 
-+#ifdef CONFIG_GPIOLIB
- 	if (gpio_is_valid(plat->gpio_cd)) {
- 		ret = gpio_request(plat->gpio_cd, DRIVER_NAME " (cd)");
- 		if (ret == 0)
-@@ -637,6 +638,7 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
- 		else if (ret != -ENOSYS)
- 			goto err_gpio_wp;
- 	}
-+#endif
- 
- 	ret = request_irq(dev->irq[0], mmci_irq, IRQF_SHARED, DRIVER_NAME " (cmd)", host);
- 	if (ret)
+Nicolas Ferre :
+> Eric B?nard :
+>> Hi Robert,
+>>
+>> Robert Emanuele wrote :
+>>> I'm working with the Atmel at91sam9g45-ekes board which is new.  I was
+>>> wondering if there was a git tree with the current ARM patches that
+>>> contains the at91sam9g45 code?  Russell lists "Applied" patches at
+>>> http://www.arm.linux.org.uk/developer/patches/ .  Where are these
+>>> applied to?  If there isn't a tree, is there an elegant way to get the
+>>> latest patch sets that I could apply to Linus's tree?
+>>>
+>> you will find the files that you can apply using git am here :
+>> ftp://ftp.arm.linux.org.uk/pub/armlinux/kernel/git-cur/
+> 
+> Yes, devel branch contains 9g45 patches.
+> 
+> Another place where you can find quite all drivers that I submitted
+> during the past weeks is in the linux-next tree:
+> 
+> http://git.kernel.org/?p=linux/kernel/git/next/linux-next.git;a=summary
+> 
+> FYI, I am building a patchset collecting all those submitted patches
+> against 2.6.30 + Andrew Victor -at91 patch.
+> It is not finished at the moment but I can send it in private.
+
+In fact I baked an archive that stores a snapshot of my work:
+ftp://www.linux4sam.org/devel/linux/2630_lnx4sam_patchset-tmp_20090826.tgz
+
+It is against vanilla 2.6.30
++ -at91 patch (from: http://maxim.org.za/at91_26.html of course)
+
+Regards,
 -- 
-1.6.2.1
+Nicolas Ferre
