@@ -1,41 +1,28 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 26 Aug 2009 11:18:21 +0200
+Date: Wed, 26 Aug 2009 11:25:29 +0200
 Subject: ARM Git Tree (at91sam9g45 patches)
-In-Reply-To: <4A9488FB.60603@eukrea.com>
-References: <9f53b4330908251727q1bc1accfk12a9a8d25407791@mail.gmail.com>
-	<4A9488FB.60603@eukrea.com>
-Message-ID: <4A94FDDD.205@atmel.com>
+In-Reply-To: <9E4512BFD9E74B73A1118E4B0EDE04E9@aeglos>
+References: <9f53b4330908251727q1bc1accfk12a9a8d25407791@mail.gmail.com><0F5F73E36031FD46AD3F2E6948F0C0A00188E074@frimb01.corp.atmel.com>	<9f53b4330908252124n168bd094k84f2691ec1a0a0ea@mail.gmail.com>
+	<9E4512BFD9E74B73A1118E4B0EDE04E9@aeglos>
+Message-ID: <4A94FF89.3000402@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric B?nard :
-> Hi Robert,
-> 
-> Robert Emanuele wrote :
->> I'm working with the Atmel at91sam9g45-ekes board which is new.  I was
->> wondering if there was a git tree with the current ARM patches that
->> contains the at91sam9g45 code?  Russell lists "Applied" patches at
->> http://www.arm.linux.org.uk/developer/patches/ .  Where are these
->> applied to?  If there isn't a tree, is there an elegant way to get the
->> latest patch sets that I could apply to Linus's tree?
->>
-> you will find the files that you can apply using git am here :
-> ftp://ftp.arm.linux.org.uk/pub/armlinux/kernel/git-cur/
+Ulf Samuelsson :
+ > Another important fix is that the AT91bootstrap provides a
+> working Rom Code Replacement.bin.
+> The one that has been on the Atmel home page is (was) broken.
+> I pointed this out last week so they may have changed it by now.
 
-Yes, devel branch contains 9g45 patches.
+Yes it is available now here (take the _13 revision):
+http://www.atmel.com/dyn/resources/prod_documents/AT91SAM9G45_RomCode_Replacement_13.zip
 
-Another place where you can find quite all drivers that I submitted
-during the past weeks is in the linux-next tree:
+Related documentation is here:
+"Errata on AT91SAM9G45 Engineering Sample Devices Errata"
+http://www.atmel.com/dyn/resources/prod_documents/doc6485.pdf
 
-http://git.kernel.org/?p=linux/kernel/git/next/linux-next.git;a=summary
-
-FYI, I am building a patchset collecting all those submitted patches
-against 2.6.30 + Andrew Victor -at91 patch.
-It is not finished at the moment but I can send it in private.
-
-I am in contact with Ulf and others for OE and Buildroot inclusion.
-
-This patchset will be available in linux4sam.org in a few weeks.
+Note that all this is not needed with final releases of this chip (not
+-ES marking).
 
 Best regards,
 -- 
