@@ -1,28 +1,30 @@
-From: rob@emanuele.us (Robert Emanuele)
-Date: Wed, 26 Aug 2009 21:21:32 -0700
-Subject: ARM Git Tree (at91sam9g45 patches)
-In-Reply-To: <9f53b4330908262117o20f36743v82be8a07fc81535d@mail.gmail.com>
-References: <9f53b4330908251727q1bc1accfk12a9a8d25407791@mail.gmail.com>
-	<4A9488FB.60603@eukrea.com> <4A94FDDD.205@atmel.com>
-	<4A95043C.9040807@atmel.com> <20090826103225.GB29500@tamay-dogan.net>
-	<9f53b4330908262117o20f36743v82be8a07fc81535d@mail.gmail.com>
-Message-ID: <9f53b4330908262121p7d59a82bs1d358072d4a5cef1@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 26 Aug 2009 23:19:59 -0700
+Subject: [PATCH-v2][RFC] OMAP4: Keypad Support for OMAP4430
+In-Reply-To: <47940.192.168.10.88.1251196743.squirrel@dbdmail.itg.ti.com>
+References: <47940.192.168.10.88.1251196743.squirrel@dbdmail.itg.ti.com>
+Message-ID: <20090827065208.9B1C0526EC9@mailhub.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Oh by the way, Nicolas, thanks for putting DMA support into the
-atmel_mci driver!
+On Tue, Aug 25, 2009 at 04:09:03PM +0530, Syed Rafiuddin wrote:
+> From: Syed Rafiuddin <rafiuddin.syed@ti.com>
+> 
+> Resending with correct Subject.
+> 
+> This patch Adds Keypad support on OMAP4.And adds
+> OMAP4 register addresses and configures them for OMAP4.
+> 
+> 
+> This patch has been updated as per the comments received from
+> Trilok Soni to remove GPIO based omap2 keypad logic from omap_keypad.c
+> (http://www.mail-archive.com/linux-omap at vger.kernel.org/msg14570.html)
+> Matrix_keypad.c (gpio based keypad driver) can be used in OMAP2,
+> which is not tested on OMAP2 since unavailability of omap2 target's.
+> 
 
-On Wed, Aug 26, 2009 at 9:17 PM, Robert Emanuele<rob@emanuele.us> wrote:
-> Thanks for all the info!
->
-> I'm going to play with the linux-next tree and the snapshot at
-> ftp://www.linux4sam.org/devel/linux/2630_lnx4sam_patchset-tmp_20090826.tgz
->
-> In related news, retrieving the linux-next tree stalls via http yet
-> its fine over git.
->
-> Thanks,
->
-> Rob
->
+So has omap2 been switched over to matrix-keypad? Otherwise ripping
+omap2 support from omap-keypad is premature.
+
+-- 
+Dmitry
