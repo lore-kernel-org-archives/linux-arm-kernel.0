@@ -1,39 +1,32 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 27 Aug 2009 23:53:56 +0200 (CEST)
-Subject: How to work out the cause of a DMA Bus Error (QCI PXA320)?
-In-Reply-To: <20090827182308.19411cv37br99zvw@webmail.tu-cottbus.de>
-References: <20090827182308.19411cv37br99zvw@webmail.tu-cottbus.de>
-Message-ID: <Pine.LNX.4.64.0908272347140.4808@axis700.grange>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 28 Aug 2009 08:54:03 +0900
+Subject: 6410 issues with samsung-ap-2.6
+In-Reply-To: <20090827204650.48cb46f1@taxman.wild-wind.fr.eu.org>
+References: <200908242149.n7OLnU6d017655@chronolytics.com>
+	<20090827204650.48cb46f1@taxman.wild-wind.fr.eu.org>
+Message-ID: <9c9fda240908271654v57bb1b18q6ef6707552d2dcb2@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Aug 2009, Judith Baumgarten wrote:
+Hi
 
-> Hi,
-> 
-> I'm still working on the pxa_camera driver for PXA320.
+On Fri, Aug 28, 2009 at 3:46 AM, Marc Zyngier<maz@misterjones.org> wrote:
+> On Mon, 24 Aug 2009 17:49:30 -0400 (EDT)
+> "David F. Carlson" <dave@chronolytics.com> wrote:
+>
+>> I am having trouble with the the input gpio_keys code that does a
+>> "gpio_to_irq()" to get the gpio to irq mapping.
+>>
+>> This call always fails for the 6410 (ENXIO). ?I see no code for the
+>> 6410 to get a irq.
+>
+> Just checked in mainline, and there is support there for gpio_to_irq(),
+> at least for gpio bank N. It shouldn't be too hard to add support for
+> the two remaining banks.
+>
 
-Is this a new driver or an extension to pxa270?
+Right, it's not hard to add. It will be supported.
+Internally it's tested and works well.
 
-> At the moment I can
-> capture some frames (RAW mode), but then I get a DMA Bus Error. Has anyone an
-> idea how to deal with that error or work out the specific cause?
-> The manual says, that if an error occures the channel is stopped until it's
-> reprogrammed and the corresponding RUN bit is set, but there are no RUN bits
-> in QCI DMA. So I don't see a chance to start it again...
-
-I think we also had some DMA issues on pxa270, but we fixed them latest 
-with these patches:
-
-"V4L/DVB (11322): pxa_camera: Fix overrun condition on last buffer"
-"V4L/DVB (11321): pxa_camera: Redesign DMA handling"
-
-if you're writing a new driver, have a look t pxa270 and at those patches 
-specifically.
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Thank you,
+Kyungmin Park
