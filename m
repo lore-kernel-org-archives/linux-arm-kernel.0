@@ -1,38 +1,73 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 27 Aug 2009 15:35:37 +0200
-Subject: [PATCH 5/5] PalmGSM: add basic Centro support
-In-Reply-To: <1251333811-22360-6-git-send-email-sleep_walker@suse.cz>
-References: <1251333811-22360-1-git-send-email-sleep_walker@suse.cz>
-	<1251333811-22360-5-git-send-email-sleep_walker@suse.cz>
-	<1251333811-22360-6-git-send-email-sleep_walker@suse.cz>
-Message-ID: <200908271535.37959.marek.vasut@gmail.com>
+From: dave@chronolytics.com (David F. Carlson)
+Date: Thu, 27 Aug 2009 09:57:04 -0400 (EDT)
+Subject: Discussion request for new Samsung SoCs maintaining
+In-Reply-To: <24498970.196691251371216483.JavaMail.weblogic@epml12>
+Message-ID: <200908271357.n7RDv4U9028131@chronolytics.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 27. srpna 2009 02:43:31 Tom?? ?ech napsal(a):
-> From: Tom?? ?ech <sleep walker@suse.cz>
->
-> ---
-...
-> +	{
-> +		.name			= "centro:green:led",
-> +		.default_trigger	= "mmc0",
-> +		.gpio			= GPIO_NR_PALMGSM_GREEN_LED,
-> +	},
-> +	{
-> +		.name			= "centro:keybbl:keybbl",
 
-Should be 'centro:white:keybbl' I think...see Documentation/leds-class.txt
-> +		.default_trigger	= "none",
-> +		.active_low		= 1,
-> +		.gpio			= GPIO_NR_CENTRO_KEYB_BL,
-> +	},
+My 2c...
 
-And there is also that red led on the device, does it work already too?
-> +};
-> +
-> +static struct gpio_led_platform_data centro_gpio_led_info = {
-> +	.leds		= centro_gpio_leds,
-> +	.num_leds	= ARRAY_SIZE(centro_gpio_leds),
-> +};
-...
+I have been working with the 6410 tree in several places.  A merge of samsung tree would be greatly appreciated.
+
+Please remember that since I am working SmartQ and there are 3 other 6410 based MACHs in Ben's next-s3c tree.  
+
+So, please, MACH_SMDK6410 != CPU_6410 and
+            MACH_SMDK6410 != PLAT_64XX.
+
+The common peripheral support needs to be factored out so that "thin" MACH configs can set some per-MACH GPIOs/chipsets (LCD, power,etc.)
+
+Thanks
+
+David F. Carlson    Chronolytics, Inc.  Rochester, NY
+mailto:dave at chronolytics.com            http://www.chronolytics.com
+
+"The faster I go, the behinder I get." --Lewis Carroll
+> So that, we are considering the following platform structure to manage our new SoCs.
+> (All names are tentative)
+> 
+> linux
+>   |
+>   +-- arch
+>         |
+>         +-- arm
+>               |
+>               +-- plat-samsung2
+>               |
+>               +-- mach-samsung2
+>               |         |
+>               |         +-- mach-smdk6440.c
+>               |         +-- mach-smdkc100.c
+>               |         +-- ...
+>               |
+>               +-- plat-samsung3
+>               |
+>               +-- mach-samsung3
+>               |         |
+>               |         +-- mach-smdk6442.c
+>               |         +-- mach-smdkc110.c
+>               |         +-- ...
+> 
+> This layout is based on the time of products, not what the core is in.
+> (The names like plat-samsung2 are not decided, just be used to explain our layout)
+> 
+> The plat-samsung2 and plat-samsung3 directories include common implementations for those groups, as you guess, mach-samsung2 and mach-samsung3 directories support board specific files.
+> 
+> Anyone has better idea?
+> 
+> We hope and need to discuss our ideas more and more, continuously, so tell us your opinions and something like this freely about this and, because s3c6410 supports is already in the mainline, we should handle this SoC specially.
+> 
+> Also we are considering the single binary compilation/operation for the same arm architecture.
+> Finally, we should talk with Ben Dooks who is a maintainer of s3c24xx series, so hope Ben's reply especially :)
+> 
+> Thank you,
+> --
+> Jinsung, Yang <jsgood@samsung.com>
+> Samsung Electronics, Co., Ltd.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
