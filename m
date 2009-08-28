@@ -1,60 +1,46 @@
 From: laforge@gnumonks.org (Harald Welte)
-Date: Fri, 28 Aug 2009 12:19:49 +0900
+Date: Fri, 28 Aug 2009 12:34:24 +0900
 Subject: Discussion request for new Samsung SoCs maintaining
-In-Reply-To: <4A967FB0.8090502@billgatliff.com>
+In-Reply-To: <200908271357.n7RDv4U9028131@chronolytics.com>
 References: <24498970.196691251371216483.JavaMail.weblogic@epml12>
-	<4A967FB0.8090502@billgatliff.com>
-Message-ID: <20090828031949.GF3928@prithivi.gnumonks.org>
+	<200908271357.n7RDv4U9028131@chronolytics.com>
+Message-ID: <20090828033424.GH3928@prithivi.gnumonks.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bill,
+Hi David,
 
-On Thu, Aug 27, 2009 at 07:44:32AM -0500, Bill Gatliff wrote:
-> Jinsung Yang wrote:
->> The second problem is that even though same family, the features like the
->> memory map and internal devices (IPs) are very different.  For example,
->> s5p6442 and s5pc110 have different arm core, but internal devices are very
->> similar. 
->>
->> Otherwise, although s5p6440 and s5p6442 are in the same family, architecture
->> and similar names, internal devices are very different.  It makes to be hard
->> to integrate codes in a same platform directory.
->
-> The AT91 and AVR32 SoCs have the same problem: very different cores  
-> (different instruction set architectures, actually), but compatible  
-> peripherals.  Their solution has been to embrace the platform and other  
-> device models heavily, which I think is the appropriate one.  I think  
-> this approach will work for you as well.
+On Thu, Aug 27, 2009 at 09:57:04AM -0400, David F. Carlson wrote:
+ 
+> I have been working with the 6410 tree in several places.  A merge of samsung
+> tree would be greatly appreciated.
 
-I think the existing s3c (mainline and samsung tree) and s5p (samsung tree)
-is already using the device model and platform devices quite extensively - much
-due to Ben Dooks great work in that area.
+Thanks.  Please note that this work is just starting, and it is a learning
+curve for most people inside the samsung soc linux team as they have not
+participated in the mainline development process so far.  So it will probably
+a slow but steady start.
 
-All that is in the plat-X and are
-* the actual platform devices for the various integrated peripherals (IPs)
-* the clock structure
-* dma support
-* gpio support
-* irq support
-* core power management support
+Though the decision has been made, and they will work on this from now on
+throughout the coming months.
 
-There are no real 'drivers' in those directories, at least unless you call the
-DMA and VIC support a driver.
+> Please remember that since I am working SmartQ and there are 3 other 6410
+> based MACHs in Ben's next-s3c tree.  
+> 
+> So, please, MACH_SMDK6410 != CPU_6410 and
+>             MACH_SMDK6410 != PLAT_64XX.
 
-The actual drivers for the IPs are all in the driver/ directory, and they are
-using different platform device names (in case of completely different hardware)
-or platform_data to define which variant of an otherwise similar IP is used.
+Yes, this is a common accident/mistake in the current code.  We'll try to sort
+them out before submitting patches for review.  But even if they persist, I'm
+sure you or others will be happy to point those out at that time.
 
-However, even in this core platform/arch code, there is a lot of copy+paste
-going on if we extend the current model.  Samsung has a 2.6.29 derived kernel
-branch that does this, and you will see many files that are copied from
-plat-s5p64xx into plat-s5pc1xx, and later into plat-s5pc110.
+> The common peripheral support needs to be factored out so that "thin" MACH
+> configs can set some per-MACH GPIOs/chipsets (LCD, power,etc.)
 
-I hope later today we can push that tree to git.kernel.org.  Anyone who's
-interested can then look at it and see that it is far from being optimal.
+That sounds definitely useful, but it's probably another topic on its own.
+Right now the aim is to get the code cleaned up and submitted.  Samsung is
+only working/testing with the SMDK's.  Once more and more machines will get
+mainline, there can probably be more code sharing among them.
 
-Regards,
 -- 
 - Harald Welte <laforge@gnumonks.org>           http://laforge.gnumonks.org/
 ============================================================================
