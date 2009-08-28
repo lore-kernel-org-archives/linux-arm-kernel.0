@@ -1,44 +1,34 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 28 Aug 2009 09:00:49 -0700
-Subject: [PATCH 0/2] OMAP: misc. fixes for 2.6.32
-In-Reply-To: <1251448127-27336-1-git-send-email-khilman@deeprootsystems.com>
-References: <1251448127-27336-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <20090828160049.GI25828@atomide.com>
+Date: Fri, 28 Aug 2009 09:16:45 -0700
+Subject: [PATCH-v2][RFC] OMAP4: Keypad Support for OMAP4430
+In-Reply-To: <20090827065208.9B1C0526EC9@mailhub.coreip.homeip.net>
+References: <47940.192.168.10.88.1251196743.squirrel@dbdmail.itg.ti.com>
+	<20090827065208.9B1C0526EC9@mailhub.coreip.homeip.net>
+Message-ID: <20090828161645.GM25828@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@deeprootsystems.com> [090828 01:28]:
-> Tony,
+* Dmitry Torokhov <dmitry.torokhov@gmail.com> [090826 23:20]:
+> On Tue, Aug 25, 2009 at 04:09:03PM +0530, Syed Rafiuddin wrote:
+> > From: Syed Rafiuddin <rafiuddin.syed@ti.com>
+> > 
+> > Resending with correct Subject.
+> > 
+> > This patch Adds Keypad support on OMAP4.And adds
+> > OMAP4 register addresses and configures them for OMAP4.
+> > 
+> > 
+> > This patch has been updated as per the comments received from
+> > Trilok Soni to remove GPIO based omap2 keypad logic from omap_keypad.c
+> > (http://www.mail-archive.com/linux-omap at vger.kernel.org/msg14570.html)
+> > Matrix_keypad.c (gpio based keypad driver) can be used in OMAP2,
+> > which is not tested on OMAP2 since unavailability of omap2 target's.
+> > 
 > 
-> I pushed a couple more fixes to my pm-upstream/fixes-32 branch.  You've
-> already pulled this branch into your for-next, so a re-pull will get
-> you just these two additional patches.
+> So has omap2 been switched over to matrix-keypad? Otherwise ripping
+> omap2 support from omap-keypad is premature.
 
-OK, I need to rebuild the omap for-next as there are few compilation
-issues in at least the omap3-upstream series.
-
-Regards,
+Hmm yeah that should be a separate patch that swithces 24xx to use
+the GPIO keypad driver and removes the related logic from this patch.
 
 Tony
- 
-> Thanks,
-> 
-> Kevin
-> 
-> 
-> Reddy, Teerth (1):
->   OMAP3: PM: add T2 interrupt line mux setting, and enable on 3430SDP
-> 
-> Vikram Pandita (1):
->   OMAP: Zoom2: release debug board detect gpio line
-> 
->  arch/arm/mach-omap2/board-3430sdp.c         |    6 ++++++
->  arch/arm/mach-omap2/board-zoom-debugboard.c |    7 ++++---
->  arch/arm/mach-omap2/mux.c                   |    5 +++++
->  arch/arm/plat-omap/include/mach/mux.h       |    3 +++
->  4 files changed, 18 insertions(+), 3 deletions(-)
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
