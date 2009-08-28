@@ -1,41 +1,44 @@
 From: sleep_walker@suse.cz (=?utf-8?q?Tom=C3=A1=C5=A1_=27Sleep=5FWalker=27?=
 	=?utf-8?q?_=C4=8Cech?=)
-Date: Fri, 28 Aug 2009 22:13:40 +0200
-Subject: [PATCH 4/5] PalmGSM: generalisation of Treo680 code to PalmGSM
-In-Reply-To: <alpine.DEB.2.00.0908271025300.27084@localhost.localdomain>
+Date: Fri, 28 Aug 2009 22:18:28 +0200
+Subject: [PATCH 5/5] PalmGSM: add basic Centro support
+In-Reply-To: <200908271535.37959.marek.vasut@gmail.com>
 References: <1251333811-22360-1-git-send-email-sleep_walker@suse.cz>
-	<1251333811-22360-5-git-send-email-sleep_walker@suse.cz>
-	<alpine.DEB.2.00.0908271025300.27084@localhost.localdomain>
-Message-ID: <200908282213.40873.sleep_walker@suse.cz>
+	<1251333811-22360-6-git-send-email-sleep_walker@suse.cz>
+	<200908271535.37959.marek.vasut@gmail.com>
+Message-ID: <200908282218.28263.sleep_walker@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Dne ?t 27. srpna 2009 04:31:42 Eric Miao napsal(a):
-> 
-> On Thu, 27 Aug 2009, Tom?? ?ech wrote:
-> 
+Dne ?t 27. srpna 2009 15:35:37 Marek Vasut napsal(a):
+> Dne ?t 27. srpna 2009 02:43:31 Tom?? ?ech napsal(a):
 > > From: Tom?? ?ech <sleep walker@suse.cz>
 > >
 > > ---
-> > arch/arm/mach-pxa/Kconfig                |    5 +
-> > arch/arm/mach-pxa/Makefile               |    2 +-
-> > arch/arm/mach-pxa/include/mach/palmgsm.h |   60 ++++
-> > arch/arm/mach-pxa/include/mach/treo680.h |   49 ---
-> > arch/arm/mach-pxa/palmgsm.c              |  559 ++++++++++++++++++++++++++++++
-> > arch/arm/mach-pxa/treo680.c              |  528 ----------------------------
+> ...
+> > +	{
+> > +		.name			= "centro:green:led",
+> > +		.default_trigger	= "mmc0",
+> > +		.gpio			= GPIO_NR_PALMGSM_GREEN_LED,
+> > +	},
+> > +	{
+> > +		.name			= "centro:keybbl:keybbl",
 > 
-> I don't actually care too much about the naming - as long as 685 can stay 
-> within treo680.c, I don't see any problem with that. The real question is:
-> is palmgsm.c the proper name for all these devices?
+> Should be 'centro:white:keybbl' I think...see Documentation/leds-class.txt
 
-Well, actually your completely right. PalmGSM is not fitting for all devices to come, more fitting would be something like Palm smartphones because there are CDMA devices to come too. On the other hand, this name is the best I found so far. If you don't mind I would even so...
+I read it and I created the name accordingly, but if you don't accept this name, I would ommit color (centro::keybbl) - its color is white, but the buttons are light grey, dark grey and blue :)
+I don't care much about that...
 
-> And you may want to try the switch '-M' in 'git format-patch' or 'git 
-> diff'.
+> > +		.default_trigger	= "none",
+> > +		.active_low		= 1,
+> > +		.gpio			= GPIO_NR_CENTRO_KEYB_BL,
+> > +	},
+> 
+> And there is also that red led on the device, does it work already too?
 
-Ah, right, thanks.
+It seems that red led is out of my control now - it seems to be attached to GSM chip. It can be turned off only when power source is unplugged and GSM chip is powered down now. This is to be found.
 
 Best regards,
 
