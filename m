@@ -1,37 +1,40 @@
-From: broonie@sirena.org.uk (Mark Brown)
-Date: Fri, 28 Aug 2009 13:45:59 +0100
-Subject: Discussion request for new Samsung SoCs maintaining
-In-Reply-To: <20090828032714.GG3928@prithivi.gnumonks.org>
-References: <24498970.196691251371216483.JavaMail.weblogic@epml12>
-	<20090827131405.GB12506@sirena.org.uk>
-	<20090828032714.GG3928@prithivi.gnumonks.org>
-Message-ID: <20090828124558.GA15007@sirena.org.uk>
+From: hongjiujing@126.com (tommy.hong)
+Date: Fri, 28 Aug 2009 21:09:17 +0800 (CST)
+Subject: Latest Samsung soc s3c6410 fb1 test failed
+Message-ID: <32366586.1033641251464957952.JavaMail.coremail@bj126app18.126.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 28, 2009 at 12:27:14PM +0900, Harald Welte wrote:
-> Hi Mark, Jin-Sung and others,
+hi,all!
 
-> > It would seem to be much better to integrate your work with the existing
-> > support for your CPUs rather than starting from scratch - there's an
-> > awful lot of continuity in the IPs and it'd seem strange to ignore that.
-> > What are the factors that are pushing you towards starting from scratch?
+I am tommy,i have test samsung soc kernelfor s3c6410 ,code is from kernel.git(samsung-ap-2.6)!
 
-> Nobody is proposing to start from scratch, don't worry.  Right now the plan
-> is as follows:
+Now i met a question about s3c6410 framerbuffer fb1 test !
 
-This all sounds a lot better than the original mail - like I said in my
-reply it'd be good to describe anything in terms of how it relates to
-the existing support rather than in greenfield terms.  It'd probably
-make things a lot clearer, or more concrete at least.
+I try to test fb1 !attachment is my test C file!
 
-> > > Finally, we should talk with Ben Dooks who is a maintainer of s3c24xx
-> > > series, so hope Ben's reply especially :)
 
-> > You probably want to CC him on messages like this - I've added him here.
+1st test:
+ ./fb1-test /dev/fb1 0 0 200 200
 
-> I've already sent him a mail about a week ago about what's happening at Samsung
-> at the moment, so he should be generally aware.  But yes, explicit Cc is
-> still not a bad idea.
+LCD draw operation result is wrong!!
 
-I'd say it's very important to keep folks in the loop.
+2nd test:
+
+ ./fb1-test /dev/fb1 0 0 200 200
+
+LCD draw operation result is write!
+
+is it my test file wrong or driver missed some issue?
+
+thanks!
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090828/027b2a1f/attachment-0001.htm>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: fb-test1.tar.gz
+Type: application/x-gzip
+Size: 10847 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090828/027b2a1f/attachment-0001.gz>
