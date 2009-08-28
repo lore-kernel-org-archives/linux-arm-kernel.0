@@ -1,51 +1,62 @@
-From: bgat@billgatliff.com (Bill Gatliff)
-Date: Thu, 27 Aug 2009 20:32:57 -0500
-Subject: [PATCH] watchdog: Add support for the Avionic Design Xanthos
-	watchdog timer.
-In-Reply-To: <20090827204448.GL29382@infomag.iguana.be>
-References: <20090821073105.GC29382@infomag.iguana.be>
-	<1250860202-28187-1-git-send-email-thierry.reding@avionic-design.de>
-	<20090822081806.GD29382@infomag.iguana.be>
-	<20090824090407.GA24894@avionic-design.de>
-	<20090827202314.GJ29382@infomag.iguana.be>
-	<4A96ED32.7000108@billgatliff.com>
-	<20090827204448.GL29382@infomag.iguana.be>
-Message-ID: <4A9733C9.9090900@billgatliff.com>
+From: laforge@gnumonks.org (Harald Welte)
+Date: Fri, 28 Aug 2009 12:19:49 +0900
+Subject: Discussion request for new Samsung SoCs maintaining
+In-Reply-To: <4A967FB0.8090502@billgatliff.com>
+References: <24498970.196691251371216483.JavaMail.weblogic@epml12>
+	<4A967FB0.8090502@billgatliff.com>
+Message-ID: <20090828031949.GF3928@prithivi.gnumonks.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wim Van Sebroeck wrote:
-> Hi Bill,
+Hi Bill,
+
+On Thu, Aug 27, 2009 at 07:44:32AM -0500, Bill Gatliff wrote:
+> Jinsung Yang wrote:
+>> The second problem is that even though same family, the features like the
+>> memory map and internal devices (IPs) are very different.  For example,
+>> s5p6442 and s5pc110 have different arm core, but internal devices are very
+>> similar. 
+>>
+>> Otherwise, although s5p6440 and s5p6442 are in the same family, architecture
+>> and similar names, internal devices are very different.  It makes to be hard
+>> to integrate codes in a same platform directory.
 >
->   
->>> This is the only thing I'm still struggling with: the goal of a watchdog device driver is to make sure that the system reboots when the system isn't stable anymore. So why should you then trigger the interrupt?
->>>   
->>>       
->> ... because a hard reboot might not be the way he wants to resolve the  
->> situation.
->>     
->
-> If your system is unstable then sending a keepalive to the watchdog during this interrupt is not going to change anything neither... Or am I missing something?
->   
+> The AT91 and AVR32 SoCs have the same problem: very different cores  
+> (different instruction set architectures, actually), but compatible  
+> peripherals.  Their solution has been to embrace the platform and other  
+> device models heavily, which I think is the appropriate one.  I think  
+> this approach will work for you as well.
 
-All I'm saying is that it isn't always a given that a watchdog timeout 
-should universally issue a hardware reset.  I've worked with systems 
-where doing so would be a Really Bad Idea, and what we wanted instead 
-was the ability to know when the watchdog timer had expired so that we 
-could wrest control of the system away from the application.
+I think the existing s3c (mainline and samsung tree) and s5p (samsung tree)
+is already using the device model and platform devices quite extensively - much
+due to Ben Dooks great work in that area.
 
-Put another way, it isn't always the case that the _system_ has become 
-unstable.  It's more likely that the _application_ has, and there are 
-other ways to fix that than by issuing a hardware reset.
+All that is in the plat-X and are
+* the actual platform devices for the various integrated peripherals (IPs)
+* the clock structure
+* dma support
+* gpio support
+* irq support
+* core power management support
 
-In the bigger picture, getting all the benefits out of a watchdog timer 
-while at the same time avoiding their limitations can be a tricky 
-business.  They're misused far more often than used properly, 
-unfortunately.  I sense that you and I both recognize that.
+There are no real 'drivers' in those directories, at least unless you call the
+DMA and VIC support a driver.
 
+The actual drivers for the IPs are all in the driver/ directory, and they are
+using different platform device names (in case of completely different hardware)
+or platform_data to define which variant of an otherwise similar IP is used.
 
-b.g.
+However, even in this core platform/arch code, there is a lot of copy+paste
+going on if we extend the current model.  Samsung has a 2.6.29 derived kernel
+branch that does this, and you will see many files that are copied from
+plat-s5p64xx into plat-s5pc1xx, and later into plat-s5pc110.
 
+I hope later today we can push that tree to git.kernel.org.  Anyone who's
+interested can then look at it and see that it is far from being optimal.
+
+Regards,
 -- 
-Bill Gatliff
-bgat at billgatliff.com
+- Harald Welte <laforge@gnumonks.org>           http://laforge.gnumonks.org/
+============================================================================
+"Privacy in residential applications is a desirable marketing option."
+                                                  (ETSI EN 300 175-7 Ch. A6)
