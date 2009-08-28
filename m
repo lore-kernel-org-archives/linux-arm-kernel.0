@@ -1,48 +1,37 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 28 Aug 2009 11:28:47 +0300
-Subject: [PATCH 2/2] OMAP: Zoom2: release debug board detect gpio line
-In-Reply-To: <1251448127-27336-2-git-send-email-khilman@deeprootsystems.com>
-References: <1251448127-27336-1-git-send-email-khilman@deeprootsystems.com>
-	<1251448127-27336-2-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1251448127-27336-3-git-send-email-khilman@deeprootsystems.com>
+From: broonie@sirena.org.uk (Mark Brown)
+Date: Fri, 28 Aug 2009 13:45:59 +0100
+Subject: Discussion request for new Samsung SoCs maintaining
+In-Reply-To: <20090828032714.GG3928@prithivi.gnumonks.org>
+References: <24498970.196691251371216483.JavaMail.weblogic@epml12>
+	<20090827131405.GB12506@sirena.org.uk>
+	<20090828032714.GG3928@prithivi.gnumonks.org>
+Message-ID: <20090828124558.GA15007@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vikram Pandita <vikram.pandita@ti.com>
+On Fri, Aug 28, 2009 at 12:27:14PM +0900, Harald Welte wrote:
+> Hi Mark, Jin-Sung and others,
 
-Release the Dbg board detection gpio once its purpose is served
+> > It would seem to be much better to integrate your work with the existing
+> > support for your CPUs rather than starting from scratch - there's an
+> > awful lot of continuity in the IPs and it'd seem strange to ignore that.
+> > What are the factors that are pushing you towards starting from scratch?
 
-Signed-off-by: Vikram Pandita <vikram.pandita@ti.com>
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
----
- arch/arm/mach-omap2/board-zoom-debugboard.c |    7 ++++---
- 1 files changed, 4 insertions(+), 3 deletions(-)
+> Nobody is proposing to start from scratch, don't worry.  Right now the plan
+> is as follows:
 
-diff --git a/arch/arm/mach-omap2/board-zoom-debugboard.c b/arch/arm/mach-omap2/board-zoom-debugboard.c
-index e0948c9..1f13e2a 100644
---- a/arch/arm/mach-omap2/board-zoom-debugboard.c
-+++ b/arch/arm/mach-omap2/board-zoom-debugboard.c
-@@ -129,6 +129,7 @@ static inline void __init zoom2_init_quaduart(void)
- static inline int omap_zoom2_debugboard_detect(void)
- {
- 	int debug_board_detect = 0;
-+	int ret = 1;
- 
- 	debug_board_detect = ZOOM2_SMSC911X_GPIO;
- 
-@@ -140,10 +141,10 @@ static inline int omap_zoom2_debugboard_detect(void)
- 	gpio_direction_input(debug_board_detect);
- 
- 	if (!gpio_get_value(debug_board_detect)) {
--		gpio_free(debug_board_detect);
--		return 0;
-+		ret = 0;
- 	}
--	return 1;
-+	gpio_free(debug_board_detect);
-+	return ret;
- }
- 
- static struct platform_device *zoom2_devices[] __initdata = {
--- 
-1.6.4
+This all sounds a lot better than the original mail - like I said in my
+reply it'd be good to describe anything in terms of how it relates to
+the existing support rather than in greenfield terms.  It'd probably
+make things a lot clearer, or more concrete at least.
+
+> > > Finally, we should talk with Ben Dooks who is a maintainer of s3c24xx
+> > > series, so hope Ben's reply especially :)
+
+> > You probably want to CC him on messages like this - I've added him here.
+
+> I've already sent him a mail about a week ago about what's happening at Samsung
+> at the moment, so he should be generally aware.  But yes, explicit Cc is
+> still not a bad idea.
+
+I'd say it's very important to keep folks in the loop.
