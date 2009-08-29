@@ -1,45 +1,24 @@
-From: sleep_walker@suse.cz (=?utf-8?q?Tom=C3=A1=C5=A1_=27Sleep=5FWalker=27?=
-	=?utf-8?q?_=C4=8Cech?=)
-Date: Fri, 28 Aug 2009 22:18:28 +0200
-Subject: [PATCH 5/5] PalmGSM: add basic Centro support
-In-Reply-To: <200908271535.37959.marek.vasut@gmail.com>
-References: <1251333811-22360-1-git-send-email-sleep_walker@suse.cz>
-	<1251333811-22360-6-git-send-email-sleep_walker@suse.cz>
-	<200908271535.37959.marek.vasut@gmail.com>
-Message-ID: <200908282218.28263.sleep_walker@suse.cz>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 28 Aug 2009 23:41:43 -0500
+Subject: ARM kernel IRC channel
+Message-ID: <20090829044142.GA12768@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+I've asked around a bit and received the answer that there is no good
+generic ARM-kernel IRC channel besides a few distro-specific ones.
 
-Dne ?t 27. srpna 2009 15:35:37 Marek Vasut napsal(a):
-> Dne ?t 27. srpna 2009 02:43:31 Tom?? ?ech napsal(a):
-> > From: Tom?? ?ech <sleep walker@suse.cz>
-> >
-> > ---
-> ...
-> > +	{
-> > +		.name			= "centro:green:led",
-> > +		.default_trigger	= "mmc0",
-> > +		.gpio			= GPIO_NR_PALMGSM_GREEN_LED,
-> > +	},
-> > +	{
-> > +		.name			= "centro:keybbl:keybbl",
-> 
-> Should be 'centro:white:keybbl' I think...see Documentation/leds-class.txt
+My background is from PPC, where we have two channels for kernel-centric
+discussions (#ppc64 and #mklinux). They are a great complement to the
+mailing lists for hashing out details more in real-time, as well as
+for handling some questions.
 
-I read it and I created the name accordingly, but if you don't accept this name, I would ommit color (centro::keybbl) - its color is white, but the buttons are light grey, dark grey and blue :)
-I don't care much about that...
+Also, it's been great as a way to get a bit of social interaction between
+submaintainers, developers and others in the arch community. Moving over
+into the ARM world, I'm definitely missing that.
 
-> > +		.default_trigger	= "none",
-> > +		.active_low		= 1,
-> > +		.gpio			= GPIO_NR_CENTRO_KEYB_BL,
-> > +	},
-> 
-> And there is also that red led on the device, does it work already too?
+In lack of better options I've created #armlinux on FreeNode. Come on
+over, time will tell if it's useful or not.
 
-It seems that red led is out of my control now - it seems to be attached to GSM chip. It can be turned off only when power source is unplugged and GSM chip is powered down now. This is to be found.
 
-Best regards,
-
-Tomas Cech
+-Olof
