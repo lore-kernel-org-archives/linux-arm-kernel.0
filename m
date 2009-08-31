@@ -1,88 +1,98 @@
-From: dsaxena@laptop.org (Deepak Saxena)
-Date: Sat, 19 Sep 2009 13:13:33 -0700
-Subject: [PATCH] Set proper console speed on resume if console suspend
-Message-ID: <mailman.100.1257153760.2253.linux-arm-kernel@lists.infradead.org>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Tue, 01 Sep 2009 08:33:54 +1200
+Subject: AT91SAM9260: How to output PCK0 clock on a GPIO pin
+In-Reply-To: <b7beacff65dbf47b5e36c3480ec11085@colcan.ca>
+References: <fb43ffa34296dae697dbadb98e53bdc1@colcan.ca>	<4A9C0136.3080102@gabaedevelopment.com>	<bb8f28f395b9416e1c2b1877be6f3baf@colcan.ca>	<20090831233312.2d2a6676@realm>
+	<b7beacff65dbf47b5e36c3480ec11085@colcan.ca>
+Message-ID: <4A9C33B2.9060002@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-is disabled
+Pedro I. Sanchez wrote:
+> On Mon, 31 Aug 2009 23:33:12 +0400, Sergey Matyukevich <geomatsi@gmail.com>
+> wrote:
+>> Hi,
+>>  
+>>> And how do I turn on the PMC clocks for the GPIO?
+>> Assigning gpio pin PC6 to TIOB2 peripheral is only a part of the work.
+>> Timer counters may operate in different modes. Take a look at
+>> the datasheet for at91sam9260, timer counters are covered in chapter 34. 
+>> It looks like 'waveform mode' is what you need (see 34.5.10, 34.5.11).
+>> Before you get desired output on PC6 pin you will have to turn on
+>> waveform operating mode for TIOB2 and to configure its wave shapes.
+>>  
+>> Thanks,
+>> Sergey
+> 
+> Thanks Sergey,
+> 
+> So are the following statements correct?
+> 
+> 1. The pck0 clock I've been playing with has nothing to do with the clock I
+> want on PC6 (TIOB2).
+> 
+> 2. I have to use instead the "tc2_clk" as defined in
+> arch/arm/mach-at-91/at91sam9260.c.
+> 
+> 3. I have to access the TC_CMR register directly to set things up. I mean,
+> there are no macros already defined to access these structures.
 
-Commit b5b82df6, from May 2007, breaks no_console_suspend on the OLPC
-XO laptop. Basically what happens is that upon returning from resume,
-serial8250_resume_port() will reconfigure the port for high speed
-mode and all console output will be garbled, making debug of the
-resume path painful. This patch modifies uart_resume_port() to
-reset the port to the state it was in before we suspended.
+Attached is a driver for outputting pwm's using the timer counters on
+the at91 (sorry its not a proper patch, but this is just hauled out of
+an old kernel we have). The driver is written for the 2.6.20 and does
+not use the new at91 timer counter library. I think it should be
+reasonably easy to port  to the mainline kernel (if you want to do this
+for mainline inclusion, I'm happy to lend a hand).
 
-Original patch by Marcelo Tosatti
+To output a pwm on PC6, add the following code to your board file:
 
-Second patch by Deepak then reworked by Alan to fit with the tty changes
-before it got submitted. Also fixed the console path to set c_i/ospeed as
-some drivers require the termios fields are valid
+static struct at91_pwm_data pwm_data[] = {
+	{
+		.channel	= 2,
+		.clock_div	= AT91_TC_SCLK,
+		.period		= 500000,	/* Milliseconds */
+		.tiob_duty	= 50,		/* Percentage */
+		.tio		= AT91_TIOB,
+	},
+};
 
-Signed-off-by: Deepak Saxena <dsaxena@laptop.org>
-Signed-off-by: Alan Cox <alan@linux.intel.com>
-Signed-off-by: Greg Kroah-Hartman <gregkh@suse.de>
----
- drivers/serial/serial_core.c |   32 ++++++++++++++++++--------------
- 1 files changed, 18 insertions(+), 14 deletions(-)
+and in your board init function:
 
-diff --git a/drivers/serial/serial_core.c b/drivers/serial/serial_core.c
-index 3fd0134..2514d00 100644
---- a/drivers/serial/serial_core.c
-+++ b/drivers/serial/serial_core.c
-@@ -2068,11 +2068,29 @@ int uart_resume_port(struct uart_driver *drv,
-struct uart_port *uport)
- 	struct tty_port *port =3D &state->port;
- 	struct device *tty_dev;
- 	struct uart_match match =3D {uport, drv};
-+	struct ktermios termios;
+at91_add_device_pwm(pwm_data, ARRAY_SIZE(pwm_data));
 
- 	mutex_lock(&port->mutex);
+The driver also exports the period, duty and raw ra, rb and rc counter
+values via sysfs.
 
- 	if (!console_suspend_enabled && uart_console(uport)) {
- 		/* no need to resume serial console, it wasn't suspended */
-+		/*
-+		 * First try to use the console cflag setting.
-+		 */
-+		memset(&termios, 0, sizeof(struct ktermios));
-+		termios.c_cflag =3D uport->cons->cflag;
-+		/*
-+		 * If that's unset, use the tty termios setting.
-+		 */
-+		if (termios.c_cflag =3D=3D 0)
-+			termios =3D *state->port.tty->termios;
-+		else {
-+			termios.c_ispeed =3D termios.c_ospeed =3D
-+				tty_termios_input_baud_rate(&termios);
-+			termios.c_ispeed =3D termios.c_ospeed =3D
-+				tty_termios_baud_rate(&termios);
-+		}
-+		uport->ops->set_termios(uport, &termios, NULL);
- 		mutex_unlock(&port->mutex);
- 		return 0;
- 	}
-@@ -2089,20 +2107,6 @@ int uart_resume_port(struct uart_driver *drv,
-struct uart_port *uport)
- 	 * Re-enable the console device after suspending.
- 	 */
- 	if (uart_console(uport)) {
--		struct ktermios termios;
--
--		/*
--		 * First try to use the console cflag setting.
--		 */
--		memset(&termios, 0, sizeof(struct ktermios));
--		termios.c_cflag =3D uport->cons->cflag;
--
--		/*
--		 * If that's unset, use the tty termios setting.
--		 */
--		if (port->tty && termios.c_cflag =3D=3D 0)
--			termios =3D *port->tty->termios;
--
- 		uart_change_pm(state, 0);
- 		uport->ops->set_termios(uport, &termios, NULL);
- 		console_start(uport->cons);
---=20
-1.5.6.5
+HTH,
+~Ryan
+
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+       Ryan Mallon                              Unit 5, Amuri Park
+       Phone: +64 3 3779127                     404 Barbadoes St
+       Fax:   +64 3 3779135                     PO Box 13 889
+       Email: ryan at bluewatersys.com             Christchurch, 8013
+       Web:   http://www.bluewatersys.com       New Zealand
+       Freecall Australia  1800 148 751         USA 1800 261 2934
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: at91_pwm.c
+Type: text/x-csrc
+Size: 13254 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090901/973113b0/attachment.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: at91sam9260_devices.c
+Type: text/x-csrc
+Size: 3307 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090901/973113b0/attachment-0001.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: board.h
+Type: text/x-chdr
+Size: 587 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090901/973113b0/attachment-0002.bin>
