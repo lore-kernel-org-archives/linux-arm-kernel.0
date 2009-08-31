@@ -1,36 +1,30 @@
-From: smunnings@gabaedevelopment.com (Stephen Munnings)
-Date: Mon, 31 Aug 2009 14:44:19 -0400
-Subject: AT91SAM9260: How to output PCK0 clock on a GPIO pin
-In-Reply-To: <bb8f28f395b9416e1c2b1877be6f3baf@colcan.ca>
-References: <fb43ffa34296dae697dbadb98e53bdc1@colcan.ca>
-	<4A9C0136.3080102@gabaedevelopment.com>
-	<bb8f28f395b9416e1c2b1877be6f3baf@colcan.ca>
-Message-ID: <4A9C1A03.2050908@gabaedevelopment.com>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Mon, 31 Aug 2009 19:46:29 +0100
+Subject: [PATCH] ARM: Mailing lists have moved
+In-Reply-To: <20090831183305.479FE834A950@gemini.denx.de>
+References: <1250855566.3311.100.camel@macbook.infradead.org>
+	<20090824073525.GA21356@kos.to>
+	<1251100978.25155.18.camel@macbook.infradead.org>
+	<20090824083242.GA26725@elf.ucw.cz>
+	<1251106506.25155.43.camel@macbook.infradead.org>
+	<f17812d70908310022v1338899bibd3f6f9b5ff4ca5e@mail.gmail.com>
+	<1251705959.16594.88.camel@macbook.infradead.org>
+	<20090831183305.479FE834A950@gemini.denx.de>
+Message-ID: <1251744389.16594.276.camel@macbook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pedro I. Sanchez wrote:
->> But, I also found that you must have the PMC clock for the GPIOC bank 
->> running before GPIO (even the configuration, it seems) will work.
->> I am not sure if I had this issue in Linux, or only in the loaders, but 
->> I did have to turn on the PMC clocks to get any GPIO based things working.
->>     
->> The standard boot loader only seems to turn on GPIOA, but I am also 
->> using GPIOB and GPIOC, and I had to turn on the PMC clocks for those
->> also before I could get very far.
->>
->> Stephen Munnings
->>     
->
-> Thanks Stephen,
->
-> And how do I turn on the PMC clocks for the GPIO?
->
->   
-I did some more searching, and it appears that Linux for at91 turns on 
-all the GPIO PMC clocks as part
-of its initialization.  So, the problem appears to not be the PMC clocks.
-(It does it in /arch/arm/mach-at91/gpio.c in function at91_gpio_init() )
+On Mon, 2009-08-31 at 20:33 +0200, Wolfgang Denk wrote:
+> IIRC mail headers are case sensitive, and what I see in the messages
+> is not "List-Id", but "List-id:"; RFC2919 uses the former format.
 
-I do presume that you have the appropriate support configured into your 
-kernel when you compiled it.
+That's interesting. Can you check that's what you actually have in your
+mailbox files? I see "List-Id:".
+
+(Well, I do see 'List-id:' in Evolution, but who'd use Evolution if they
+wanted to reliably see what their email actually _says_? You should see
+the mess it makes of the nicely formatted spam reports from
+SpamAssassin.)
+
+-- 
+dwmw2
