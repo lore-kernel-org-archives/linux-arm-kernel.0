@@ -1,20 +1,34 @@
 From: sleep_walker@suse.cz (=?utf-8?q?Tom=C3=A1=C5=A1=20=C4=8Cech?=)
-Date: Mon, 31 Aug 2009 19:25:56 +0200
-Subject: update Treo680, generalise it and add Centro support - round 2
-Message-ID: <1251739561-28972-1-git-send-email-sleep_walker@suse.cz>
+Date: Mon, 31 Aug 2009 19:25:59 +0200
+Subject: [PATCH 3/5] Treo680: fix freed GPIO in treo680_irda_shutdown()
+In-Reply-To: <1251739561-28972-3-git-send-email-sleep_walker@suse.cz>
+References: <1251739561-28972-1-git-send-email-sleep_walker@suse.cz>
+	<1251739561-28972-2-git-send-email-sleep_walker@suse.cz>
+	<1251739561-28972-3-git-send-email-sleep_walker@suse.cz>
+Message-ID: <1251739561-28972-4-git-send-email-sleep_walker@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Tom?? ?ech <sleep walker@suse.cz>
 
-this is second round of patch set updating Treo680, generalising it and adding support for Palm Centro.
 
-Changes since last time:
- - patch set generated properly (with respect of file renames)
- - fixed name of keyboard backlight LED (now treo680:white:keybbl, centro:white:keybbl)
+Signed-off-by: Tom?? ?ech <sleep_walker@suse.cz>
+---
+ arch/arm/mach-pxa/treo680.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Thanks for your time and comments.
-
-Best regards,
-
-Tomas Cech
+diff --git a/arch/arm/mach-pxa/treo680.c b/arch/arm/mach-pxa/treo680.c
+index 57bccc3..d88114c 100644
+--- a/arch/arm/mach-pxa/treo680.c
++++ b/arch/arm/mach-pxa/treo680.c
+@@ -325,7 +325,7 @@ err1:
+ 
+ static void treo680_irda_shutdown(struct device *dev)
+ {
+-	gpio_free(GPIO_NR_TREO680_AMP_EN);
++	gpio_free(GPIO_NR_TREO680_IR_EN);
+ }
+ 
+ static struct pxaficp_platform_data treo680_ficp_info = {
+-- 
+1.6.3.3
