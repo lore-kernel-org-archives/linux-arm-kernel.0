@@ -1,23 +1,20 @@
-From: broonie@sirena.org.uk (Mark Brown)
-Date: Mon, 31 Aug 2009 18:21:58 +0100
-Subject: [PATCH] ARM: Mailing lists have moved
-In-Reply-To: <f17812d70908310052u4132a8a5md67fc76373d1d8bf@mail.gmail.com>
-References: <1250855566.3311.100.camel@macbook.infradead.org>
-	<20090824073525.GA21356@kos.to>
-	<1251100978.25155.18.camel@macbook.infradead.org>
-	<20090824083242.GA26725@elf.ucw.cz>
-	<1251106506.25155.43.camel@macbook.infradead.org>
-	<f17812d70908310022v1338899bibd3f6f9b5ff4ca5e@mail.gmail.com>
-	<20090831075625.GA4197@dodger.lab.datenfreihafen.org>
-	<f17812d70908310052u4132a8a5md67fc76373d1d8bf@mail.gmail.com>
-Message-ID: <20090831172157.GA21926@sirena.org.uk>
+From: sleep_walker@suse.cz (=?utf-8?q?Tom=C3=A1=C5=A1=20=C4=8Cech?=)
+Date: Mon, 31 Aug 2009 19:25:56 +0200
+Subject: update Treo680, generalise it and add Centro support - round 2
+Message-ID: <1251739561-28972-1-git-send-email-sleep_walker@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 31, 2009 at 03:52:08PM +0800, Eric Miao wrote:
+Hi,
 
-> Strange enough. Gmail usually did this right for me in other mailing
-> list.
+this is second round of patch set updating Treo680, generalising it and adding support for Palm Centro.
 
-Is GMail doing deuplication of messages and picking the wrong copy to do
-the filing with by any chance?
+Changes since last time:
+ - patch set generated properly (with respect of file renames)
+ - fixed name of keyboard backlight LED (now treo680:white:keybbl, centro:white:keybbl)
+
+Thanks for your time and comments.
+
+Best regards,
+
+Tomas Cech
