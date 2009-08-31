@@ -1,42 +1,91 @@
-From: geomatsi@gmail.com (Sergey Matyukevich)
-Date: Tue, 1 Sep 2009 00:35:46 +0400
-Subject: AT91SAM9260: How to output PCK0 clock on a GPIO pin
-In-Reply-To: <b7beacff65dbf47b5e36c3480ec11085@colcan.ca>
-References: <fb43ffa34296dae697dbadb98e53bdc1@colcan.ca>
-	<4A9C0136.3080102@gabaedevelopment.com>
-	<bb8f28f395b9416e1c2b1877be6f3baf@colcan.ca>
-	<20090831233312.2d2a6676@realm>
-	<b7beacff65dbf47b5e36c3480ec11085@colcan.ca>
-Message-ID: <20090901003546.14313e09@realm>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Tue, 1 Sep 2009 00:02:11 +0200
+Subject: [PATCH 2/2] U300 AB3100 boardinfo
+In-Reply-To: <1251724267.4254.73.camel@finisterre.sirena.org.uk>
+References: <1251667855-31806-1-git-send-email-linus.walleij@stericsson.com>
+	<1251724267.4254.73.camel@finisterre.sirena.org.uk>
+Message-ID: <63386a3d0908311502v386339d2oc13b5fd880444b18@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2009/8/31 Mark Brown <broonie@opensource.wolfsonmicro.com>:
 
+> On Sun, 2009-08-30 at 23:30 +0200, Linus Walleij wrote:
+>
+>> ?arch/arm/mach-u300/Makefile ? ?| ? ?1 +
+>> ?arch/arm/mach-u300/i2c.c ? ? ? | ?304 ++++++++++++++++++++++++++++++++++++++++
+>> ?arch/arm/mach-u300/regulator.c | ?150 ++++++++++++++++++++
+>
+> Is mach-u300 for all machines with a given processor or is it for a
+> specific system?
 
-> So are the following statements correct?
-> 
-> 1. The pck0 clock I've been playing with has nothing to do with the
-> clock I want on PC6 (TIOB2).
+It is a series of systems (U330, U365, U335) but they all feature the same
+connections and rails to the AB3100 circuit so regulator-wise they are
+identical.
 
-Yes. PCK's (programmable clocks) are assigned to different pins:  
-PB30, PC1 for PCK0 and to  PB31, PC2 for PCK1. 
-For PCK see ch. 26 of at91sam9260 datasheet.
+>> +static struct regulator_consumer_supply supply_ldo_c[] = {
+>> + ? ? {
+>> + ? ? ? ? ? ? .dev_name = "ab3100-codec",
+>> + ? ? ? ? ? ? .supply = "vaudio", /* Powers the codec */
+>> + ? ? },
+>> +};
+>
+> Does the CODEC really take a single supply called vaudio or are there
+> several inputs to the CODEC?
 
-> 2. I have to use instead the "tc2_clk" as defined in
-> arch/arm/mach-at-91/at91sam9260.c.
+It's only one actually.
 
-Yes
+>> + ? ? ? ? ? ? /* Buck converter in sleep mode routing and constraints */
+>> + ? ? ? ? ? ? {
+>> + ? ? ? ? ? ? ? ? ? ? .constraints = {
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? .min_uV = 0,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? .max_uV = 1800000,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? .valid_modes_mask = REGULATOR_MODE_NORMAL,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? .valid_ops_mask =
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? REGULATOR_CHANGE_VOLTAGE |
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? REGULATOR_CHANGE_STATUS,
+>> + ? ? ? ? ? ? ? ? ? ? },
+>> + ? ? ? ? ? ? ? ? ? ? .num_consumer_supplies = ARRAY_SIZE(supply_buck_sleep),
+>> + ? ? ? ? ? ? ? ? ? ? .consumer_supplies = supply_buck_sleep,
+>> + ? ? ? ? ? ? },
+>
+> Hrm, I didn't pick this up when reading the regulator driver but does
+> this mean that you're registering two different regulators for the same
+> buck convertor?
 
-> 3. I have to access the TC_CMR register directly to set things up. I
-> mean, there are no macros already defined to access these structures.
+Yeah I did. So I removed the sleep mode "regulators" and added
+the set_suspend_voltage() hook instead. Works like a charm.
 
-You have to 'ioremap' required registers and write to those
-registers directly using memory-writing macroses iowriteXX.
+>> +/*
+>> + * Hog the regulators needed to power up the board.
+>> + */
+>> +static int __init u300_init_boardpower(void)
+>> +{
+>> + ? ? int err;
+>> + ? ? u32 val;
+>> +
+>> + ? ? pr_info("U300: setting up board power\n");
+>> + ? ? radio_power = regulator_get(NULL, "vrad");
+>> + ? ? if (IS_ERR(radio_power)) {
+>> + ? ? ? ? ? ? pr_err("could not get vrad\n");
+>> + ? ? ? ? ? ? return PTR_ERR(radio_power);
+>> + ? ? }
+>> + ? ? err = regulator_enable(radio_power);
+>> + ? ? if (err) {
+>> + ? ? ? ? ? ? pr_err("could not enable vrad\n");
+>> + ? ? ? ? ? ? return err;
+>> + ? ? }
+>
+> This all looks like it can be supported with the existing constraints
+> code; look at boot_on and always_on. Normally the only thing that should
+> need deviceless supplies like you have here is cpufreq (due to the fact
+> that there's no struct device available for cpufreq to use).
 
-But at first decide what you need, TIOB or PCK. If you don't need all
-the power of Ryan Mallon's pwm driver (see below in the thread) and
-all you need is clocking output on GPIO pin, then you might be happy
-with PCK. Note that PMC_PCK registers allows several dividers, if
-original clock is too high.
+I switched to using always_on and boot_on and it's just as good.
+Though I kept one of them: vana15, because disabling that
+regulator is what I use for shutdown hook for the system.
 
-Sergey 
+Thanks for all the great comments Mark, v3 is due in a minute.
+
+Yours,
+Linus Walleij
