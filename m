@@ -1,20 +1,21 @@
-From: smunnings@gabaedevelopment.com (Stephen Munnings)
-Date: Mon, 31 Aug 2009 15:58:50 -0400
+From: psanchez@fosstel.com (Pedro I. Sanchez)
+Date: Mon, 31 Aug 2009 16:03:42 -0400
 Subject: AT91SAM9260: How to output PCK0 clock on a GPIO pin
 In-Reply-To: <20090831233312.2d2a6676@realm>
-References: <fb43ffa34296dae697dbadb98e53bdc1@colcan.ca>	<4A9C0136.3080102@gabaedevelopment.com>	<bb8f28f395b9416e1c2b1877be6f3baf@colcan.ca>
+References: <fb43ffa34296dae697dbadb98e53bdc1@colcan.ca>
+	<4A9C0136.3080102@gabaedevelopment.com>
+	<bb8f28f395b9416e1c2b1877be6f3baf@colcan.ca>
 	<20090831233312.2d2a6676@realm>
-Message-ID: <4A9C2B7A.7070306@gabaedevelopment.com>
+Message-ID: <b7beacff65dbf47b5e36c3480ec11085@colcan.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sergey Matyukevich wrote:
+On Mon, 31 Aug 2009 23:33:12 +0400, Sergey Matyukevich <geomatsi@gmail.com>
+wrote:
 > Hi,
 >  
->   
 >> And how do I turn on the PMC clocks for the GPIO?
->>     
->
+> 
 > Assigning gpio pin PC6 to TIOB2 peripheral is only a part of the work.
 > Timer counters may operate in different modes. Take a look at
 > the datasheet for at91sam9260, timer counters are covered in chapter 34. 
@@ -24,18 +25,22 @@ Sergey Matyukevich wrote:
 >  
 > Thanks,
 > Sergey
->   
-hmmmm....
 
-PCK0 is *not*  a TC pin - it is a clock output from the Power Management 
-Controller.
-(Section 25.6)
-It should be as easy as dividing down one of the primary clock sources 
-and then enabling
-the appropriate GPIO pin as the appropriate peripheral.
+Thanks Sergey,
 
-Ahah - there is the problem.....  PCK0 is not available on PC6 - it must 
-be set as peripheral B
-on pin PC1 or PB30 as Peripheral A - no other choices available...
+So are the following statements correct?
 
-PC6 is indeed TIOB2 (one of the counter timers)
+1. The pck0 clock I've been playing with has nothing to do with the clock I
+want on PC6 (TIOB2).
+
+2. I have to use instead the "tc2_clk" as defined in
+arch/arm/mach-at-91/at91sam9260.c.
+
+3. I have to access the TC_CMR register directly to set things up. I mean,
+there are no macros already defined to access these structures.
+
+
+Thanks,
+
+-- 
+Pedro
