@@ -1,50 +1,110 @@
 From: psanchez@fosstel.com (Pedro I. Sanchez)
-Date: Mon, 31 Aug 2009 17:06:09 -0400
+Date: Mon, 31 Aug 2009 17:09:03 -0400
 Subject: AT91SAM9260: How to output PCK0 clock on a GPIO pin
-In-Reply-To: <20090901003546.14313e09@realm>
-References: <fb43ffa34296dae697dbadb98e53bdc1@colcan.ca>
-	<4A9C0136.3080102@gabaedevelopment.com>
-	<bb8f28f395b9416e1c2b1877be6f3baf@colcan.ca>
+In-Reply-To: <4A9C3637.9000802@gabaedevelopment.com>
+References: <fb43ffa34296dae697dbadb98e53bdc1@colcan.ca>	<4A9C0136.3080102@gabaedevelopment.com>	<bb8f28f395b9416e1c2b1877be6f3baf@colcan.ca>
 	<20090831233312.2d2a6676@realm>
-	<b7beacff65dbf47b5e36c3480ec11085@colcan.ca>
-	<20090901003546.14313e09@realm>
-Message-ID: <9088b8e176c52c4c5832d549f766934d@colcan.ca>
+	<4A9C2B7A.7070306@gabaedevelopment.com>
+	<af2c0bf49afa409b64cb313bb77bae9e@colcan.ca>
+	<4A9C3637.9000802@gabaedevelopment.com>
+Message-ID: <909511f89deea5c6700d7d51d6e96d34@colcan.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 1 Sep 2009 00:35:46 +0400, Sergey Matyukevich <geomatsi@gmail.com>
-wrote:
->> So are the following statements correct?
->> 
->> 1. The pck0 clock I've been playing with has nothing to do with the
->> clock I want on PC6 (TIOB2).
-> 
-> Yes. PCK's (programmable clocks) are assigned to different pins:  
-> PB30, PC1 for PCK0 and to  PB31, PC2 for PCK1. 
-> For PCK see ch. 26 of at91sam9260 datasheet.
-> 
->> 2. I have to use instead the "tc2_clk" as defined in
->> arch/arm/mach-at-91/at91sam9260.c.
-> 
-> Yes
-> 
->> 3. I have to access the TC_CMR register directly to set things up. I
->> mean, there are no macros already defined to access these structures.
-> 
-> You have to 'ioremap' required registers and write to those
-> registers directly using memory-writing macroses iowriteXX.
-> 
-> But at first decide what you need, TIOB or PCK. If you don't need all
-> the power of Ryan Mallon's pwm driver (see below in the thread) and
-> all you need is clocking output on GPIO pin, then you might be happy
-> with PCK. Note that PMC_PCK registers allows several dividers, if
-> original clock is too high.
-> 
-> Sergey
+On Mon, 31 Aug 2009 16:44:39 -0400, Stephen Munnings
+<smunnings@gabaedevelopment.com> wrote:
+> Pedro I. Sanchez wrote:
+>> On Mon, 31 Aug 2009 15:58:50 -0400, Stephen Munnings
+>> <smunnings@gabaedevelopment.com> wrote:
+>>   
+>>> Sergey Matyukevich wrote:
+>>>     
+>>>> Hi,
+>>>>  
+>>>>   
+>>>>       
+>>>>> And how do I turn on the PMC clocks for the GPIO?
+>>>>>     
+>>>>>         
+>>>> Assigning gpio pin PC6 to TIOB2 peripheral is only a part of the work.
+>>>> Timer counters may operate in different modes. Take a look at
+>>>> the datasheet for at91sam9260, timer counters are covered in chapter
+>>>> 34.
+>>>>       
+>>
+>>   
+>>>> It looks like 'waveform mode' is what you need (see 34.5.10, 34.5.11).
+>>>> Before you get desired output on PC6 pin you will have to turn on
+>>>> waveform operating mode for TIOB2 and to configure its wave shapes.
+>>>>  
+>>>> Thanks,
+>>>> Sergey
+>>>>   
+>>>>       
+>>> hmmmm....
+>>>
+>>> PCK0 is *not*  a TC pin - it is a clock output from the Power
+Management
+>>>
+>>> Controller.
+>>> (Section 25.6)
+>>> It should be as easy as dividing down one of the primary clock sources 
+>>> and then enabling
+>>> the appropriate GPIO pin as the appropriate peripheral.
+>>>
+>>> Ahah - there is the problem.....  PCK0 is not available on PC6 - it
+must
+>>>
+>>> be set as peripheral B
+>>> on pin PC1 or PB30 as Peripheral A - no other choices available...
+>>>
+>>> PC6 is indeed TIOB2 (one of the counter timers)
+>>>     
+>>
+>> OK, I see this thread unfolding, thank you!
+>>
+>> This is what I have now to test pck0 on PC1:
+>>
+>> at91_set_B_periph(AT91_PIN_PC1, 0);
+>> pck0=clk_get(NULL, "pck0");
+>> pll=clk_get(NULL, "plla");
+>> clk_set_parent(pck0, pll);
+>> clk_set_rate(pck0, 50000000);
+>> clk_enable(pck0);
+>>
+>> But I don't get a clean clock on PC1. In the end I will still need to
+get
+>> the TC clock on PC6 but I for the time being I want to be able to
+>> generate
+>> any clock out first!
+>>
+>> Is there something else to do?
+>>
+>>   
+> The code here will try to give you a 50Mhz signal.
+> That might not be feasible on a 9260.
+> This might be the source of not getting a "clean" clock on PC1.
+> Try adjusting it for something that your chip (9260) can reasonably 
+> generate.
+> Also, at 50Mhz, there can be all kinds of termination, ringing, and 
+> other problems.
+> To get "just any clean signal", try a frequency much lower.
+> Depending on which pll you use as parent, and what frequency it is 
+> already running at,
+> try for around 1Mhz to get a "nice clean signal".
+> The signal of PCK will try to be a "square wave".
+> You will find that the PCK signal programming is easier (but much more 
+> limited) than
+> programming the TC signals.
+> The TC signals are much more flexible in their range, etc., but take 
+> more work to set up.
+> This is a pretty common trade off.
 
-Well, the board I'm working on, as well several others already on my shelf
-:-(, is already wired to use PC6 so I have to go the TC way. So this is the
-way to go for me.
+Well, good news! I got the clean clock on PC1 (3.014 MHz), not at the rate
+I requested (1 MHz), but very clean. I'll have to figure out the clock
+divider thing now to get the right values.
+
+Anyway, this is a big step for me. Thanks once more!
 
 -- 
 Pedro
