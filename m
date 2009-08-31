@@ -1,74 +1,48 @@
-From: psanchez@fosstel.com (Pedro I. Sanchez)
-Date: Mon, 31 Aug 2009 15:02:01 -0400
-Subject: AT91SAM9260: How to output PCK0 clock on a GPIO pin
-In-Reply-To: <4A9C1A03.2050908@gabaedevelopment.com>
-References: <fb43ffa34296dae697dbadb98e53bdc1@colcan.ca>
-	<4A9C0136.3080102@gabaedevelopment.com>
-	<bb8f28f395b9416e1c2b1877be6f3baf@colcan.ca>
-	<4A9C1A03.2050908@gabaedevelopment.com>
-Message-ID: <8af7bfc16c944615552acda12c469e9f@colcan.ca>
+From: wd@denx.de (Wolfgang Denk)
+Date: Mon, 31 Aug 2009 21:08:29 +0200
+Subject: [PATCH] ARM: Mailing lists have moved
+In-Reply-To: <1251744389.16594.276.camel@macbook.infradead.org>
+References: <1250855566.3311.100.camel@macbook.infradead.org>
+	<20090824073525.GA21356@kos.to>
+	<1251100978.25155.18.camel@macbook.infradead.org>
+	<20090824083242.GA26725@elf.ucw.cz>
+	<1251106506.25155.43.camel@macbook.infradead.org>
+	<f17812d70908310022v1338899bibd3f6f9b5ff4ca5e@mail.gmail.com>
+	<1251705959.16594.88.camel@macbook.infradead.org>
+	<20090831183305.479FE834A950@gemini.denx.de>
+	<1251744389.16594.276.camel@macbook.infradead.org>
+Message-ID: <20090831190829.CDCF8834A950@gemini.denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 31 Aug 2009 14:44:19 -0400, Stephen Munnings
-<smunnings@gabaedevelopment.com> wrote:
-> Pedro I. Sanchez wrote:
->>> But, I also found that you must have the PMC clock for the GPIOC bank 
->>> running before GPIO (even the configuration, it seems) will work.
->>> I am not sure if I had this issue in Linux, or only in the loaders, but
+Dear David,
 
->>> I did have to turn on the PMC clocks to get any GPIO based things
->>> working.
->>>     
->>> The standard boot loader only seems to turn on GPIOA, but I am also 
->>> using GPIOB and GPIOC, and I had to turn on the PMC clocks for those
->>> also before I could get very far.
->>>
->>> Stephen Munnings
->>>     
->>
->> Thanks Stephen,
->>
->> And how do I turn on the PMC clocks for the GPIO?
->>
->>   
-> I did some more searching, and it appears that Linux for at91 turns on 
-> all the GPIO PMC clocks as part
-> of its initialization.  So, the problem appears to not be the PMC clocks.
-> (It does it in /arch/arm/mach-at91/gpio.c in function at91_gpio_init() )
+In message <1251744389.16594.276.camel@macbook.infradead.org> you wrote:
+> On Mon, 2009-08-31 at 20:33 +0200, Wolfgang Denk wrote:
+> > IIRC mail headers are case sensitive, and what I see in the messages
+> > is not "List-Id", but "List-id:"; RFC2919 uses the former format.
 > 
-> I do presume that you have the appropriate support configured into your 
-> kernel when you compiled it.
+> That's interesting. Can you check that's what you actually have in your
+> mailbox files? I see "List-Id:".
 
-$ grep -i clocks .config
-CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
+Argh... the actual files have "List-Id:", indeed. Sorry for the false
+alarm.
 
-$ grep -i gpio .config
-CONFIG_GENERIC_GPIO=y
-# CONFIG_MTD_NAND_GPIO is not set
-CONFIG_I2C_GPIO=m
-CONFIG_SPI_GPIO=m
-CONFIG_ARCH_REQUIRE_GPIOLIB=y
-CONFIG_GPIOLIB=y
-CONFIG_GPIO_SYSFS=y
-# Memory mapped GPIO expanders:
-# I2C GPIO expanders:
-CONFIG_GPIO_MAX732X=m
-CONFIG_GPIO_PCA953X=m
-CONFIG_GPIO_PCF857X=m
-# PCI GPIO expanders:
-# SPI GPIO expanders:
-CONFIG_GPIO_MAX7301=m
-CONFIG_GPIO_MCP23S08=m
-# CONFIG_HTC_EGPIO is not set
-CONFIG_LEDS_GPIO=y
+> (Well, I do see 'List-id:' in Evolution, but who'd use Evolution if they
+> wanted to reliably see what their email actually _says_? You should see
+> the mess it makes of the nicely formatted spam reports from
+> SpamAssassin.)
 
-I presume I don't need any to modprobe any of these available gpio modules.
-Certainly the gpio user space interface via /sys/class/gpio works well.
+I'm not using Evolution, but exmh / nmh. I was not aware before that
+it does such changes when displaying header contents. Arghhh...
 
-Any other suggestions?
+Best regards,
 
-Thanks,
+Wolfgang Denk
 
 -- 
-Pedro
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+A morsel of genuine history is a  thing  so  rare  as  to  be  always
+valuable.                                          - Thomas Jefferson
