@@ -1,77 +1,87 @@
-From: judith.baumgarten@tu-cottbus.de (Judith Baumgarten)
-Date: Mon, 31 Aug 2009 18:30:42 +0200
-Subject: How to work out the cause of a DMA Bus Error (QCI PXA320)?
-In-Reply-To: <87iqg7ixcp.fsf@free.fr>
-References: <20090827182308.19411cv37br99zvw@webmail.tu-cottbus.de>
-	<Pine.LNX.4.64.0908272347140.4808@axis700.grange>
-	<87iqg7ixcp.fsf@free.fr>
-Message-ID: <20090831183042.26357169rn4rl5ma@webmail.tu-cottbus.de>
+From: smunnings@gabaedevelopment.com (Stephen Munnings)
+Date: Mon, 31 Aug 2009 12:58:30 -0400
+Subject: AT91SAM9260: How to output PCK0 clock on a GPIO pin
+In-Reply-To: <fb43ffa34296dae697dbadb98e53bdc1@colcan.ca>
+References: <fb43ffa34296dae697dbadb98e53bdc1@colcan.ca>
+Message-ID: <4A9C0136.3080102@gabaedevelopment.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Zitat von Robert Jarzmik <robert.jarzmik@free.fr>:
-
-> Guennadi Liakhovetski <g.liakhovetski@gmx.de> writes:
+Pedro I. Sanchez wrote:
+> Hello,
 >
->> On Thu, 27 Aug 2009, Judith Baumgarten wrote:
->>
->>> Hi,
->>>
->>> I'm still working on the pxa_camera driver for PXA320.
->>
->> Is this a new driver or an extension to pxa270?
-> Good question :)
-It's an extension to the existing one (kernel 2.6.28.7).
-
->>> At the moment I can
->>> capture some frames (RAW mode), but then I get a DMA Bus Error.  
->>> Has anyone an
->>> idea how to deal with that error or work out the specific cause?
->>> The manual says, that if an error occures the channel is stopped until it's
->>> reprogrammed and the corresponding RUN bit is set, but there are  
->>> no RUN bits
->>> in QCI DMA. So I don't see a chance to start it again...
->>
->> I think we also had some DMA issues on pxa270, but we fixed them latest
->> with these patches:
->>
->> "V4L/DVB (11322): pxa_camera: Fix overrun condition on last buffer"
->> "V4L/DVB (11321): pxa_camera: Redesign DMA handling"
->>
->> if you're writing a new driver, have a look t pxa270 and at those patches
->> specifically.
+> I'm trying to get a clock on pin PC6 of my AT1SAM9260-based board and I
+> would like some advice on how to do it. For all purposes this board can be
+> considered to be a clone of the sam9260ek evaluation board.
 >
-I implemented the most important things of that patches and it seems  
-to solve some of the errors (The error occurs later).
-
-> You know, that little beast of PXA320 has a _dedicated_ 4-channel  
-> DMA controller
-> (with dedicated registers CIDADR, CIDSADR, ...). Maybe the rules we followed
-> for pxa270 are not all true anymore.
-Yes I know. The rules are almost the same, except that I can't say,  
-stop DMA at the end of the sglist with that DDADR_STOP bit.
+> I see doing this as a two-step process: First, link pin PC6 to the PCK0
+> clock. Second, program and enable the clock. My kernel module has the
+> following code (I'm using kernel 2.26.29.3):
 >
-> I would suggest to Judith to scan with care PXA3xx manual, volume  
-> III, chapter
-> 3.4.5. To help debugging, you could add sysfs entries for CI* registers in
-> 3.5.28.
-Could you explain how to create these entries in sysfs? They could be  
-really helpfull, because it seems, that it's a timing problem. If I  
-insert two or three printks it works for over 30 minutes (I stopped it  
-then).
+> Step 1:
+>
+> at91_set_A_periph(AT91_PIN_PC6, 0);
+>
+> I'm taking this piece of code from somewhere else. is this all I need to do
+> for step 1?
+>
+>
+> Step 2:
+>
+> pck0 = clk_get(NULL, "pck0");
+> if (IS_ERR(pck0)) {
+> pr_err("%s: Failed to get PCK0\n", __func__);
+> ret = PTR_ERR(pck0);
+> goto err;
+> }
+> pllb = clk_get(NULL, "pllb");
+> if (IS_ERR(pllb)) {
+> pr_err("%s: Failed to get PLLB\n", __func__);
+> ret = PTR_ERR(pllb);
+> goto err_pllb;
+> }
+> ret = clk_set_parent(pck0, pllb);
+> if (ret != 0) {
+> pr_err("%s: Failed to set PCK0 parent\n", __func__);
+> goto err_parent;
+> }
+> clk_set_rate(pck0, 11289600);
+> clk_enable(pck0);
+> clk_put(pllb);
+>
+>
+> Neither step fails. Step 2 gives me a printout "PCK0 rate 6000000Hz" which
+> is not what I expected, some clock divisor must be in the way, but at least
+> it is a clock of some kind. Unfortunately nothing is output on pin PC6.
+>
+> Could you provide me with some advice on how to do this properly?
+>
+> Thank you,
+>
+>   
+Here is the code I use to get PC1 to be 50Mhz (from PLLA which is 
+running at 800Mhz - this is actually on a 9G20, not a 9620)
 
-> Ah, and you're right, there is no "RUN" bit in CICMDx. I suspect, after a 30s
-> reading of the specification, that reloading CIDADR with a correct value will
-> trigger the DMA transfer (QCI DMA FIFO threshold -> DMA request line  
-> assert ->
-> DMA transfer).
-Yes you are right. It starts again, if I load a new Descriptor but I  
-always get fifo overruns then. I will try to implement the overflow  
-handling of chapter 3.4.5.3 exactly. At the moment I didn't use the  
-CICR0_DIS...
+    pck0 = clk_get(NULL, "pck0");
+    plla = clk_get(NULL, "plla");
 
-Thanks
-Judith
+    at91_set_B_periph(AT91_PIN_PC1, 0);    /* PCK0 */
 
-----------------------------------------------------------------
-This message was sent using IMP, the Internet Messaging Program.
+    clk_set_parent(pck0, plla);
+    clk_set_rate(pck0, 50000000);
+    clk_enable(pck0);
+
+There are some differences (I use PC1, not PC6; I use PLLA, not PLLB, etc.,)
+
+I am not sure what the "clk_put(pllb)" does for you.  I certainly did 
+not need something like that. (PLLA was already running just fine)
+
+But, I also found that you must have the PMC clock for the GPIOC bank 
+running before GPIO (even the configuration, it seems) will work.
+I am not sure if I had this issue in Linux, or only in the loaders, but 
+I did have to turn on the PMC clocks to get any GPIO based things working.
+The standard boot loader only seems to turn on GPIOA, but I am also 
+using GPIOB and GPIOC, and I had to turn on the PMC clocks for those
+also before I could get very far.
+
+Stephen Munnings
