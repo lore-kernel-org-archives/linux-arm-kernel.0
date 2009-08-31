@@ -1,107 +1,64 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 31 Aug 2009 14:11:07 +0100
-Subject: [PATCH 2/2] U300 AB3100 boardinfo
-In-Reply-To: <1251667855-31806-1-git-send-email-linus.walleij@stericsson.com>
-	(sfid-20090830_223118_061062_2D83C043)
-References: <1251667855-31806-1-git-send-email-linus.walleij@stericsson.com>
-	(sfid-20090830_223118_061062_2D83C043)
-Message-ID: <1251724267.4254.73.camel@finisterre.sirena.org.uk>
+From: psanchez@fosstel.com (Pedro I. Sanchez)
+Date: Mon, 31 Aug 2009 11:32:38 -0400
+Subject: AT91SAM9260: How to output PCK0 clock on a GPIO pin
+Message-ID: <fb43ffa34296dae697dbadb98e53bdc1@colcan.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2009-08-30 at 23:30 +0200, Linus Walleij wrote:
+Hello,
 
->  arch/arm/mach-u300/Makefile    |    1 +
->  arch/arm/mach-u300/i2c.c       |  304 ++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-u300/regulator.c |  150 ++++++++++++++++++++
+I'm trying to get a clock on pin PC6 of my AT1SAM9260-based board and I
+would like some advice on how to do it. For all purposes this board can be
+considered to be a clone of the sam9260ek evaluation board.
 
-Is mach-u300 for all machines with a given processor or is it for a
-specific system?
+I see doing this as a two-step process: First, link pin PC6 to the PCK0
+clock. Second, program and enable the clock. My kernel module has the
+following code (I'm using kernel 2.26.29.3):
 
-> +static struct regulator_consumer_supply supply_ldo_c[] = {
-> +	{
-> +		.dev_name = "ab3100-codec",
-> +		.supply = "vaudio", /* Powers the codec */
-> +	},
-> +};
+Step 1:
 
-Does the CODEC really take a single supply called vaudio or are there
-several inputs to the CODEC? Since it's integrated into the chip it's
-not unreasonable for there to be only one supply (the digital is likely
-to be powered internally and one analogue supply is plausible) but it's
-common for there to be multiple supplies.
+at91_set_A_periph(AT91_PIN_PC6, 0);
 
-> +		/* Buck converter routing and constraints */
-> +		{
-> +			.constraints = {
-> +				.min_uV = 0,
-> +				.max_uV = 1800000,
-> +				.valid_modes_mask = REGULATOR_MODE_NORMAL,
-> +				.valid_ops_mask =
-> +				REGULATOR_CHANGE_VOLTAGE |
-> +				REGULATOR_CHANGE_STATUS,
-> +			},
-> +			.num_consumer_supplies = ARRAY_SIZE(supply_buck),
-> +			.consumer_supplies = supply_buck,
-> +		},
+I'm taking this piece of code from somewhere else. is this all I need to do
+for step 1?
 
-I'd strongly expect that the minimum voltage for the core is higher than
-the one you're setting here - normally you'd set the lowest voltage it
-can operate at.
 
-> +		/* Buck converter in sleep mode routing and constraints */
-> +		{
-> +			.constraints = {
-> +				.min_uV = 0,
-> +				.max_uV = 1800000,
-> +				.valid_modes_mask = REGULATOR_MODE_NORMAL,
-> +				.valid_ops_mask =
-> +				REGULATOR_CHANGE_VOLTAGE |
-> +				REGULATOR_CHANGE_STATUS,
-> +			},
-> +			.num_consumer_supplies = ARRAY_SIZE(supply_buck_sleep),
-> +			.consumer_supplies = supply_buck_sleep,
-> +		},
+Step 2:
 
-Hrm, I didn't pick this up when reading the regulator driver but does
-this mean that you're registering two different regulators for the same
-buck convertor? The regulator API already provides separate
-configuration for suspend mode. This is currently mostly only used to
-set up regulators that have explicit suspend support but (as with and
-probably as part of the sequencing) the core will at some point end up
-providing soft support for this for use when the hardware doesn't
-support this explicitly for some reason.
+pck0 = clk_get(NULL, "pck0");
+if (IS_ERR(pck0)) {
+pr_err("%s: Failed to get PCK0\n", __func__);
+ret = PTR_ERR(pck0);
+goto err;
+}
+pllb = clk_get(NULL, "pllb");
+if (IS_ERR(pllb)) {
+pr_err("%s: Failed to get PLLB\n", __func__);
+ret = PTR_ERR(pllb);
+goto err_pllb;
+}
+ret = clk_set_parent(pck0, pllb);
+if (ret != 0) {
+pr_err("%s: Failed to set PCK0 parent\n", __func__);
+goto err_parent;
+}
+clk_set_rate(pck0, 11289600);
+clk_enable(pck0);
+clk_put(pllb);
 
-Probably we should have the core use the vanilla setup functions if
-there's no support in the driver; we probably also need a way to force
-the core to do the configuration via the runtime modes even if the
-regulator has explicit suspend support in case the board has opted not
-to use that.
 
-> +/*
-> + * Hog the regulators needed to power up the board.
-> + */
-> +static int __init u300_init_boardpower(void)
-> +{
-> +	int err;
-> +	u32 val;
-> +
-> +	pr_info("U300: setting up board power\n");
-> +	radio_power = regulator_get(NULL, "vrad");
-> +	if (IS_ERR(radio_power)) {
-> +		pr_err("could not get vrad\n");
-> +		return PTR_ERR(radio_power);
-> +	}
-> +	err = regulator_enable(radio_power);
-> +	if (err) {
-> +		pr_err("could not enable vrad\n");
-> +		return err;
-> +	}
+Neither step fails. Step 2 gives me a printout "PCK0 rate 6000000Hz" which
+is not what I expected, some clock divisor must be in the way, but at least
+it is a clock of some kind. Unfortunately nothing is output on pin PC6.
 
-This all looks like it can be supported with the existing constraints
-code; look at boot_on and always_on. Normally the only thing that should
-need deviceless supplies like you have here is cpufreq (due to the fact
-that there's no struct device available for cpufreq to use).
+Could you provide me with some advice on how to do this properly?
 
-Is there some problem with the existing support that you're trying to
-work around here?
+Thank you,
+
+-- 
+Pedro
+
+
+
+-- 
+Pedro I. Sanchez
