@@ -1,35 +1,63 @@
-From: wd@denx.de (Wolfgang Denk)
-Date: Mon, 31 Aug 2009 20:33:05 +0200
-Subject: [PATCH] ARM: Mailing lists have moved
-In-Reply-To: <1251705959.16594.88.camel@macbook.infradead.org>
-References: <1250855566.3311.100.camel@macbook.infradead.org>
-	<20090824073525.GA21356@kos.to>
-	<1251100978.25155.18.camel@macbook.infradead.org>
-	<20090824083242.GA26725@elf.ucw.cz>
-	<1251106506.25155.43.camel@macbook.infradead.org>
-	<f17812d70908310022v1338899bibd3f6f9b5ff4ca5e@mail.gmail.com>
-	<1251705959.16594.88.camel@macbook.infradead.org>
-Message-ID: <20090831183305.479FE834A950@gemini.denx.de>
+From: sleep_walker@suse.cz (=?utf-8?q?Tom=C3=A1=C5=A1_=27Sleep=5FWalker=27?=
+	=?utf-8?q?_=C4=8Cech?=)
+Date: Mon, 31 Aug 2009 20:34:53 +0200
+Subject: [PATCH 2/5] Treo680: remove unused LCD power GPIO
+In-Reply-To: <200908311934.51750.marek.vasut@gmail.com>
+References: <1251739561-28972-1-git-send-email-sleep_walker@suse.cz>
+	<1251739561-28972-3-git-send-email-sleep_walker@suse.cz>
+	<200908311934.51750.marek.vasut@gmail.com>
+Message-ID: <200908312034.53369.sleep_walker@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear David Woodhouse,
+Hi,
 
-In message <1251705959.16594.88.camel@macbook.infradead.org> you wrote:
->
-> But the List-Id header definitely does seem to be present.
+Dne Po 31. srpna 2009 19:34:51 Marek Vasut napsal(a):
+> Dne Po 31. srpna 2009 19:25:58 Tom?? ?ech napsal(a):
+> > From: Tom?? ?ech <sleep walker@suse.cz>
+> >
+> >
+> > Signed-off-by: Tom?? ?ech <sleep_walker@suse.cz>
+> > ---
+> >  arch/arm/mach-pxa/treo680.c |   10 +---------
+> >  1 files changed, 1 insertions(+), 9 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-pxa/treo680.c b/arch/arm/mach-pxa/treo680.c
+> > index 050ad8e..57bccc3 100644
+> > --- a/arch/arm/mach-pxa/treo680.c
+> > +++ b/arch/arm/mach-pxa/treo680.c
+> > @@ -254,16 +254,9 @@ static int treo680_backlight_init(struct device *dev)
+> >  	ret = gpio_direction_output(GPIO_NR_TREO680_BL_POWER, 0);
+> >  	if (ret)
+> >  		goto err2;
+> > -	ret = gpio_request(GPIO_NR_TREO680_LCD_POWER, "LCD POWER");
+> > -	if (ret)
+> > -		goto err2;
+> > -	ret = gpio_direction_output(GPIO_NR_TREO680_LCD_POWER, 0);
+> > -	if (ret)
+> > -		goto err3;
+> >
+> >  	return 0;
+> > -err3:
+> > -	gpio_free(GPIO_NR_TREO680_LCD_POWER);
+> > +
+> >  err2:
+> >  	gpio_free(GPIO_NR_TREO680_BL_POWER);
+> >  err:
+> > @@ -279,7 +272,6 @@ static int treo680_backlight_notify(int brightness)
+> >  static void treo680_backlight_exit(struct device *dev)
+> >  {
+> >  	gpio_free(GPIO_NR_TREO680_BL_POWER);
+> > -	gpio_free(GPIO_NR_TREO680_LCD_POWER);
+> >  }
+> >
+> >  static struct platform_pwm_backlight_data treo680_backlight_data = {
+> 
+> Why was that GPIO there before then? Does this have any effect on the boot 
+> problems you are experiencing with Centro/T680? Otherwise seems OK to me
 
-IIRC mail headers are case sensitive, and what I see in the messages is
-not "List-Id", but "List-id:"; RFC2919 uses the former format.
+I used it first in brightness setting for 0 value. I found it not good idea. I removed it from function, but I wanted to keep GPIO registered and direction set. But it can work well even without that and I'd like to add some function to export some control GPIOs through /sys/class/gpio interface (bluetooth power, GSM power, GSM reset...) - this GPIO will be also exported there...
 
 Best regards,
 
-Wolfgang Denk
-
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
-"What terrible way to die."
-"There are no good ways."
-	-- Sulu and Kirk, "That Which Survives", stardate unknown
+Tomas Cech
