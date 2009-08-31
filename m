@@ -1,46 +1,44 @@
-From: psanchez@fosstel.com (Pedro I. Sanchez)
-Date: Mon, 31 Aug 2009 16:03:42 -0400
-Subject: AT91SAM9260: How to output PCK0 clock on a GPIO pin
-In-Reply-To: <20090831233312.2d2a6676@realm>
-References: <fb43ffa34296dae697dbadb98e53bdc1@colcan.ca>
-	<4A9C0136.3080102@gabaedevelopment.com>
-	<bb8f28f395b9416e1c2b1877be6f3baf@colcan.ca>
-	<20090831233312.2d2a6676@realm>
-Message-ID: <b7beacff65dbf47b5e36c3480ec11085@colcan.ca>
+From: broonie@sirena.org.uk (Mark Brown)
+Date: Mon, 31 Aug 2009 21:06:07 +0100
+Subject: [PATCH] watchdog: Add support for the Avionic Design Xanthos
+	watchdog timer.
+In-Reply-To: <20090831123500.GN29382@infomag.iguana.be>
+References: <20090821073105.GC29382@infomag.iguana.be>
+	<1250860202-28187-1-git-send-email-thierry.reding@avionic-design.de>
+	<20090822081806.GD29382@infomag.iguana.be>
+	<20090824090407.GA24894@avionic-design.de>
+	<20090827202314.GJ29382@infomag.iguana.be>
+	<4A96ED32.7000108@billgatliff.com>
+	<20090827204448.GL29382@infomag.iguana.be>
+	<4A9733C9.9090900@billgatliff.com>
+	<20090831123500.GN29382@infomag.iguana.be>
+Message-ID: <20090831200606.GB21926@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 31 Aug 2009 23:33:12 +0400, Sergey Matyukevich <geomatsi@gmail.com>
-wrote:
-> Hi,
->  
->> And how do I turn on the PMC clocks for the GPIO?
-> 
-> Assigning gpio pin PC6 to TIOB2 peripheral is only a part of the work.
-> Timer counters may operate in different modes. Take a look at
-> the datasheet for at91sam9260, timer counters are covered in chapter 34. 
-> It looks like 'waveform mode' is what you need (see 34.5.10, 34.5.11).
-> Before you get desired output on PC6 pin you will have to turn on
-> waveform operating mode for TIOB2 and to configure its wave shapes.
->  
-> Thanks,
-> Sergey
+On Mon, Aug 31, 2009 at 02:35:00PM +0200, Wim Van Sebroeck wrote:
 
-Thanks Sergey,
+> So if (and I can imagine that certain embedded applications might need
+> this) a system is wanted to restart unstable applications, then (for me)
+> this means that you want another functionality then what we have now.
+> This can be an extension of the current watchdog API, but it's not said
+> that this is the best solution.
 
-So are the following statements correct?
+Given the presentation of the hardware there's a fairly strong
+expectation from the user side that the functionality would appear via
+the watchdog API.  In common configurations there's a very strong
+integration between the less serious watchdog actions and the shutdowns
+or resets that they generate so trying to run them via different APIs
+would cause issues - each API would want some idea what the other was
+doing.
 
-1. The pck0 clock I've been playing with has nothing to do with the clock I
-want on PC6 (TIOB2).
-
-2. I have to use instead the "tc2_clk" as defined in
-arch/arm/mach-at-91/at91sam9260.c.
-
-3. I have to access the TC_CMR register directly to set things up. I mean,
-there are no macros already defined to access these structures.
-
-
-Thanks,
-
--- 
-Pedro
+Indeed, one common use of the options that don't cause a hard reset or
+shutdown is to extend the length of time that the watchdog can run for -
+watchdogs that support this functionality normally take configurable
+actions on both of the first two expiries of the watchdog (sometimes
+more).  A system might configure the first expiry to generate an
+interrupt and only reset the system if the watchdog still hasn't been
+updated after another period.  Sometimes the first period will be used
+to try to give the system a chance to recover more gracefully than a
+hard reset allows but a lot of the time it'll just be ignored so the
+watchdog can run for longer before it resets.
