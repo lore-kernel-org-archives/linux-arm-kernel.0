@@ -1,47 +1,40 @@
-From: sleep_walker@suse.cz (=?utf-8?q?Tom=C3=A1=C5=A1_=27Sleep=5FWalker=27?=
-	=?utf-8?q?_=C4=8Cech?=)
-Date: Mon, 31 Aug 2009 13:06:42 +0200
-Subject: [PATCH 4/5] PalmGSM: generalisation of Treo680 code to PalmGSM
-In-Reply-To: <20090831104350.GB1353@ucw.cz>
-References: <1251333811-22360-1-git-send-email-sleep_walker@suse.cz>
-	<200908282213.40873.sleep_walker@suse.cz>
-	<20090831104350.GB1353@ucw.cz>
-Message-ID: <200908311306.43005.sleep_walker@suse.cz>
+From: wim@iguana.be (Wim Van Sebroeck)
+Date: Mon, 31 Aug 2009 13:58:37 +0200
+Subject: [PATCH] watchdog: Add support for the Avionic Design Xanthos
+	watchdog timer.
+In-Reply-To: <20090828061108.GA1649@avionic-design.de>
+References: <20090821073105.GC29382@infomag.iguana.be>
+	<1250860202-28187-1-git-send-email-thierry.reding@avionic-design.de>
+	<20090822081806.GD29382@infomag.iguana.be>
+	<20090824090407.GA24894@avionic-design.de>
+	<20090827202314.GJ29382@infomag.iguana.be>
+	<4A96ED32.7000108@billgatliff.com>
+	<20090827204448.GL29382@infomag.iguana.be>
+	<20090828061108.GA1649@avionic-design.de>
+Message-ID: <20090831115837.GL29382@infomag.iguana.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Thierry,
 
-Dne Po 31. srpna 2009 12:43:50 Pavel Machek napsal(a):
-> On Fri 2009-08-28 22:13:40, Tom???? 'Sleep_Walker' ??ech wrote:
-> > Hi,
+> > >> This is the only thing I'm still struggling with: the goal of a watchdog device driver is to make sure that the system reboots when the system isn't stable anymore. So why should you then trigger the interrupt?
+> > >>   
+> > >
+> > > ... because a hard reboot might not be the way he wants to resolve the  
+> > > situation.
 > > 
-> > Dne ??t 27. srpna 2009 04:31:42 Eric Miao napsal(a):
-> > > 
-> > > On Thu, 27 Aug 2009, Tom???? ??ech wrote:
-> > > 
-> > > > From: Tom???? ??ech <sleep walker@suse.cz>
-> > > >
-> > > > ---
-> > > > arch/arm/mach-pxa/Kconfig                |    5 +
-> > > > arch/arm/mach-pxa/Makefile               |    2 +-
-> > > > arch/arm/mach-pxa/include/mach/palmgsm.h |   60 ++++
-> > > > arch/arm/mach-pxa/include/mach/treo680.h |   49 ---
-> > > > arch/arm/mach-pxa/palmgsm.c              |  559 ++++++++++++++++++++++++++++++
-> > > > arch/arm/mach-pxa/treo680.c              |  528 ----------------------------
-> > > 
-> > > I don't actually care too much about the naming - as long as 685 can stay 
-> > > within treo680.c, I don't see any problem with that. The real question is:
-> > > is palmgsm.c the proper name for all these devices?
-> > 
-> > Well, actually your completely right. PalmGSM is not fitting for all devices to come, more fitting would be something like Palm smartphones because there are CDMA devices to come too. On the other hand, this name is the best I found so far. If you don't mind I would even so...
-> >
+> > If your system is unstable then sending a keepalive to the watchdog during
+> > this interrupt is not going to change anything neither... Or am I missing
+> > something?
 > 
-> I believe treo680 was better name then. Don't change it if you don't
-> need to...
+> In this case, writing the timeout value to the watchdog is not actually a
+> keepalive. This is in fact the mechanism used to reset/acknowledge the
+> watchdog's interrupt.
 
-But I need to have different generic name - treo680 will be occupied by Treo680 specific stuff, which makes more sense, doesn't it?
+I'm still puzzled. I have seen a number of watchdog devices that have the option to either reboot the system or generate an interrupt.
+They can be set via toggling the correct bits of some configuration register.
 
-Best regards,
+How does this hardware works? Is there a datasheet available somewhere?
 
-Tomas Cech
+Kind regards,
+Wim.
