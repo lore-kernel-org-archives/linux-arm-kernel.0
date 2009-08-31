@@ -1,34 +1,66 @@
 From: dan.j.williams@intel.com (Dan Williams)
-Date: Mon, 31 Aug 2009 08:40:37 -0700
-Subject: [PATCH v2 0/4] Asynchronous raid6 acceleration (part 2 of 3)
-Message-ID: <20090831153946.1068.86702.stgit@dwillia2-linux.ch.intel.com>
+Date: Mon, 31 Aug 2009 08:40:42 -0700
+Subject: [PATCH v2 1/4] iop-adma: cleanup iop_adma_run_tx_complete_actions
+In-Reply-To: <20090831153946.1068.86702.stgit@dwillia2-linux.ch.intel.com>
+References: <20090831153946.1068.86702.stgit@dwillia2-linux.ch.intel.com>
+Message-ID: <20090831154042.1068.4140.stgit@dwillia2-linux.ch.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RAID6 acceleration support for the iop13xx ADMA engines.  The iop13xx platform
-has three Application DMA engines providing support for offloading raid
-operations.  Channel0 and Channel1 support memcpy and xor.  Channel2 adds pq
-support.
+Replace 'desc->async_tx.' with 'tx->'
 
-The combined series is available at:
+[ Impact: pure cleanup ]
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/djbw/async_tx.git raid6
-
-The changes since v1 are:
-1/ Fix the case for continuing a p-disabled pq calculation
-2/ A lockdep annotation for teaching lockdep about iop-adma cross channel
-   dependency submissions.
+Signed-off-by: Dan Williams <dan.j.williams@intel.com>
 ---
+ drivers/dma/iop-adma.c |   19 ++++++++++---------
+ 1 files changed, 10 insertions(+), 9 deletions(-)
 
-Dan Williams (4):
-      iop-adma: P+Q self test
-      iop-adma: P+Q support for iop13xx adma engines
-      iop-adma: fix lockdep false positive
-      iop-adma: cleanup iop_adma_run_tx_complete_actions
-
-
- arch/arm/include/asm/hardware/iop3xx-adma.h |   76 +++++
- arch/arm/include/asm/hardware/iop_adma.h    |    1 
- arch/arm/mach-iop13xx/include/mach/adma.h   |  107 +++++++
- drivers/dma/iop-adma.c                      |  437 ++++++++++++++++++++++++---
- 4 files changed, 577 insertions(+), 44 deletions(-)
+diff --git a/drivers/dma/iop-adma.c b/drivers/dma/iop-adma.c
+index 4496bc6..ce45f3f 100644
+--- a/drivers/dma/iop-adma.c
++++ b/drivers/dma/iop-adma.c
+@@ -61,17 +61,18 @@ static dma_cookie_t
+ iop_adma_run_tx_complete_actions(struct iop_adma_desc_slot *desc,
+ 	struct iop_adma_chan *iop_chan, dma_cookie_t cookie)
+ {
+-	BUG_ON(desc->async_tx.cookie < 0);
+-	if (desc->async_tx.cookie > 0) {
+-		cookie = desc->async_tx.cookie;
+-		desc->async_tx.cookie = 0;
++	struct dma_async_tx_descriptor *tx = &desc->async_tx;
++
++	BUG_ON(tx->cookie < 0);
++	if (tx->cookie > 0) {
++		cookie = tx->cookie;
++		tx->cookie = 0;
+ 
+ 		/* call the callback (must not sleep or submit new
+ 		 * operations to this channel)
+ 		 */
+-		if (desc->async_tx.callback)
+-			desc->async_tx.callback(
+-				desc->async_tx.callback_param);
++		if (tx->callback)
++			tx->callback(tx->callback_param);
+ 
+ 		/* unmap dma addresses
+ 		 * (unmap_single vs unmap_page?)
+@@ -81,7 +82,7 @@ iop_adma_run_tx_complete_actions(struct iop_adma_desc_slot *desc,
+ 			struct device *dev =
+ 				&iop_chan->device->pdev->dev;
+ 			u32 len = unmap->unmap_len;
+-			enum dma_ctrl_flags flags = desc->async_tx.flags;
++			enum dma_ctrl_flags flags = tx->flags;
+ 			u32 src_cnt;
+ 			dma_addr_t addr;
+ 			dma_addr_t dest;
+@@ -115,7 +116,7 @@ iop_adma_run_tx_complete_actions(struct iop_adma_desc_slot *desc,
+ 	}
+ 
+ 	/* run dependent operations */
+-	dma_run_dependencies(&desc->async_tx);
++	dma_run_dependencies(tx);
+ 
+ 	return cookie;
+ }
