@@ -1,30 +1,23 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 31 Aug 2009 19:33:20 +0200
-Subject: [PATCH 1/5] Treo680: pxamci simplify to use GPIO
-In-Reply-To: <1251739561-28972-2-git-send-email-sleep_walker@suse.cz>
-References: <1251739561-28972-1-git-send-email-sleep_walker@suse.cz>
-	<1251739561-28972-2-git-send-email-sleep_walker@suse.cz>
-Message-ID: <200908311933.20134.marek.vasut@gmail.com>
+From: sleep_walker@suse.cz (=?utf-8?q?Tom=C3=A1=C5=A1_=27Sleep=5FWalker=27?=
+	=?utf-8?q?_=C4=8Cech?=)
+Date: Mon, 31 Aug 2009 19:33:47 +0200
+Subject: update Treo680, generalise it and add Centro support - round 2
+Message-ID: <200908311933.47363.sleep_walker@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne Po 31. srpna 2009 19:25:57 Tom?? ?ech napsal(a):
-> From: Tom?? ?ech <sleep walker@suse.cz>
->
->
-> Signed-off-by: Tom?? ?ech <sleep_walker@suse.cz>
-> ---
->  arch/arm/mach-pxa/treo680.c |   84
-> ++---------------------------------------- 1 files changed, 4
-> insertions(+), 80 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/treo680.c b/arch/arm/mach-pxa/treo680.c
-> index a06f19e..050ad8e 100644
-> --- a/arch/arm/mach-pxa/treo680.c
-> +++ b/arch/arm/mach-pxa/treo680.c
+Hi,
 
-...
+it seems that introduction e-mail didn't reach, so:
 
-Seems OK to me
+this is second round of patch set updating Treo680, generalising it and adding support for Palm Centro. Since this is based on Eric's PXA kernel tree, there is not applied commit 'Treo680: fix freed GPIO in treo680_irda_shutdown()' yet. For Russel's tree this can be just ommited.
 
-Acked-by: Marek Vasut <marek.vasut@gmail.com>
+Changes since last time:
+ - patch set generated properly (with respect of file renames)
+ - fixed name of keyboard backlight LED (now treo680:white:keybbl, centro:white:keybbl)
+
+Thanks for your time and comments.
+
+Best regards,
+
+Tomas Cech
