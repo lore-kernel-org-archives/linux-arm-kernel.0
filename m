@@ -1,63 +1,36 @@
-From: sleep_walker@suse.cz (=?utf-8?q?Tom=C3=A1=C5=A1_=27Sleep=5FWalker=27?=
-	=?utf-8?q?_=C4=8Cech?=)
-Date: Mon, 31 Aug 2009 20:34:53 +0200
-Subject: [PATCH 2/5] Treo680: remove unused LCD power GPIO
-In-Reply-To: <200908311934.51750.marek.vasut@gmail.com>
-References: <1251739561-28972-1-git-send-email-sleep_walker@suse.cz>
-	<1251739561-28972-3-git-send-email-sleep_walker@suse.cz>
-	<200908311934.51750.marek.vasut@gmail.com>
-Message-ID: <200908312034.53369.sleep_walker@suse.cz>
+From: smunnings@gabaedevelopment.com (Stephen Munnings)
+Date: Mon, 31 Aug 2009 14:44:19 -0400
+Subject: AT91SAM9260: How to output PCK0 clock on a GPIO pin
+In-Reply-To: <bb8f28f395b9416e1c2b1877be6f3baf@colcan.ca>
+References: <fb43ffa34296dae697dbadb98e53bdc1@colcan.ca>
+	<4A9C0136.3080102@gabaedevelopment.com>
+	<bb8f28f395b9416e1c2b1877be6f3baf@colcan.ca>
+Message-ID: <4A9C1A03.2050908@gabaedevelopment.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Pedro I. Sanchez wrote:
+>> But, I also found that you must have the PMC clock for the GPIOC bank 
+>> running before GPIO (even the configuration, it seems) will work.
+>> I am not sure if I had this issue in Linux, or only in the loaders, but 
+>> I did have to turn on the PMC clocks to get any GPIO based things working.
+>>     
+>> The standard boot loader only seems to turn on GPIOA, but I am also 
+>> using GPIOB and GPIOC, and I had to turn on the PMC clocks for those
+>> also before I could get very far.
+>>
+>> Stephen Munnings
+>>     
+>
+> Thanks Stephen,
+>
+> And how do I turn on the PMC clocks for the GPIO?
+>
+>   
+I did some more searching, and it appears that Linux for at91 turns on 
+all the GPIO PMC clocks as part
+of its initialization.  So, the problem appears to not be the PMC clocks.
+(It does it in /arch/arm/mach-at91/gpio.c in function at91_gpio_init() )
 
-Dne Po 31. srpna 2009 19:34:51 Marek Vasut napsal(a):
-> Dne Po 31. srpna 2009 19:25:58 Tom?? ?ech napsal(a):
-> > From: Tom?? ?ech <sleep walker@suse.cz>
-> >
-> >
-> > Signed-off-by: Tom?? ?ech <sleep_walker@suse.cz>
-> > ---
-> >  arch/arm/mach-pxa/treo680.c |   10 +---------
-> >  1 files changed, 1 insertions(+), 9 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-pxa/treo680.c b/arch/arm/mach-pxa/treo680.c
-> > index 050ad8e..57bccc3 100644
-> > --- a/arch/arm/mach-pxa/treo680.c
-> > +++ b/arch/arm/mach-pxa/treo680.c
-> > @@ -254,16 +254,9 @@ static int treo680_backlight_init(struct device *dev)
-> >  	ret = gpio_direction_output(GPIO_NR_TREO680_BL_POWER, 0);
-> >  	if (ret)
-> >  		goto err2;
-> > -	ret = gpio_request(GPIO_NR_TREO680_LCD_POWER, "LCD POWER");
-> > -	if (ret)
-> > -		goto err2;
-> > -	ret = gpio_direction_output(GPIO_NR_TREO680_LCD_POWER, 0);
-> > -	if (ret)
-> > -		goto err3;
-> >
-> >  	return 0;
-> > -err3:
-> > -	gpio_free(GPIO_NR_TREO680_LCD_POWER);
-> > +
-> >  err2:
-> >  	gpio_free(GPIO_NR_TREO680_BL_POWER);
-> >  err:
-> > @@ -279,7 +272,6 @@ static int treo680_backlight_notify(int brightness)
-> >  static void treo680_backlight_exit(struct device *dev)
-> >  {
-> >  	gpio_free(GPIO_NR_TREO680_BL_POWER);
-> > -	gpio_free(GPIO_NR_TREO680_LCD_POWER);
-> >  }
-> >
-> >  static struct platform_pwm_backlight_data treo680_backlight_data = {
-> 
-> Why was that GPIO there before then? Does this have any effect on the boot 
-> problems you are experiencing with Centro/T680? Otherwise seems OK to me
-
-I used it first in brightness setting for 0 value. I found it not good idea. I removed it from function, but I wanted to keep GPIO registered and direction set. But it can work well even without that and I'd like to add some function to export some control GPIOs through /sys/class/gpio interface (bluetooth power, GSM power, GSM reset...) - this GPIO will be also exported there...
-
-Best regards,
-
-Tomas Cech
+I do presume that you have the appropriate support configured into your 
+kernel when you compiled it.
