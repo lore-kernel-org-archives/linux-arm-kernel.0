@@ -1,30 +1,18 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Tue, 1 Sep 2009 21:16:20 +0800
-Subject: My first patch to the mailist, but being held
-Message-ID: <e68bb3470909010616n74326317s49c27e8c8cbcbc4a@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Sep 2009 14:38:12 +0100
+Subject: Discussion request for new Samsung SoCs maintaining
+In-Reply-To: <4A967FB0.8090502@billgatliff.com>
+References: <24498970.196691251371216483.JavaMail.weblogic@epml12>
+	<4A967FB0.8090502@billgatliff.com>
+Message-ID: <20090901133812.GP19719@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hmm, this patch have been in Russell's list a few days, now I want to
-'CC' to the list,
-but being held.
+On Thu, Aug 27, 2009 at 07:44:32AM -0500, Bill Gatliff wrote:
+> I'm not sure I have any useful suggestion for this part.  It would have  
+> been nice to have a "mach-a8" and "mach-arm11" for these situations,
 
---------
-
-Your mail to 'linux-arm-kernel' with the subject
-
-   Re: [PATCH v2] ARM: Add common files of platform definition and
-cpu     implementing
-
-Is being held until the list moderator can review it for approval.
-
-The reason it is being held:
-
-   Message body is too big: 55015 bytes with a limit of 40 KB
-
-Either the message will get posted to the list, or you will receive
-notification of the moderator's decision.  If you would like to cancel
-this posting, please visit the following URL:
-
--- 
-Wan z.s
+A8 and ARM11 are CPU types and we already have a perfectly good
+abstraction for these.  Should the Realview ARM11 end up in mach-arm11
+and the Realview Cortex A8 end up in mach-a8?  Clearly, it's just
+wrong.
