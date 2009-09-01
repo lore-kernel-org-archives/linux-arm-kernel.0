@@ -1,53 +1,85 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Tue, 1 Sep 2009 22:44:29 +0800
-Subject: My first patch to the mailist, but being held
-In-Reply-To: <f17812d70909010734h5c6420e1jc881b59528deda79@mail.gmail.com>
-References: <e68bb3470909010616n74326317s49c27e8c8cbcbc4a@mail.gmail.com>
-	<f17812d70909010655t139a10d1y7b421cd244d91737@mail.gmail.com>
-	<e68bb3470909010705v2219191dtce02f6bfc29d9647@mail.gmail.com>
-	<1251814118.16594.292.camel@macbook.infradead.org>
-	<e68bb3470909010725n4ddc05c4k3534f1e8661dfa23@mail.gmail.com>
-	<f17812d70909010734h5c6420e1jc881b59528deda79@mail.gmail.com>
-Message-ID: <e68bb3470909010744l1a66db5m8ef24dc8473218db@mail.gmail.com>
+From: sleep_walker@suse.cz (=?utf-8?q?Tom=C3=A1=C5=A1_=27Sleep=5FWalker=27?=
+	=?utf-8?q?_=C4=8Cech?=)
+Date: Tue, 1 Sep 2009 18:14:02 +0200
+Subject: [PATCH 2/5] Treo680: remove unused LCD power GPIO
+In-Reply-To: <4A9D0896.2000007@gmail.com>
+References: <1251739561-28972-1-git-send-email-sleep_walker@suse.cz>
+	<200909011256.10882.sleep_walker@suse.cz>
+	<4A9D0896.2000007@gmail.com>
+Message-ID: <200909011814.03109.sleep_walker@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Eric,
+Hi,
 
-
-2009/9/1 Eric Miao <eric.y.miao@gmail.com>:
-> On Tue, Sep 1, 2009 at 10:25 PM, Wan ZongShun<mcuos.com@gmail.com> wrote:
->> Dear David,
->>
->> 2009/9/1 David Woodhouse <dwmw2@infradead.org>:
->>> On Tue, 2009-09-01 at 22:05 +0800, Wan ZongShun wrote:
->>>>
->>>> Yes, I think so too, due to I never meet this type 'held' in LAKML and
->>>> LKML, so I am amazed at this 'held' in the list.
->>>
->>> Not all of the mailman settings were imported from the old list to the
->>> new one. If the moderators want to increase the size limit, they are
->>> free to do that -- the hardware can certainly cope.
->>>
->>> But Eric is right that patches above 40KiB are fairly suspect anyway --
->>> why is it so large?
->>
->> The patch is one of the series patches of changing my w90x900 platform
->> architecture, originally, I submitted nine patches to mend my
->> platform, Russell has reviewed them and
->> hoped me to re-arrange the patches, so I Integrated the nine patches
->> into three ones.
->>
->> I just ignore the size of patch issue.
->>
+Dne ?t 1. z??? 2009 13:42:14 Eric Miao napsal(a):
+> Tom?? 'Sleep_Walker' ?ech wrote:
+> > Hi,
+> > 
+> > Dne ?t 1. z??? 2009 11:49:24 Eric Miao napsal(a):
+> >> Tom?? 'Sleep_Walker' ?ech wrote:
+> >>> Hi,
+> >>>
+> >>> Dne Po 31. srpna 2009 19:34:51 Marek Vasut napsal(a):
+> >>>> Dne Po 31. srpna 2009 19:25:58 Tom?? ?ech napsal(a):
+> >>>>> From: Tom?? ?ech <sleep walker@suse.cz>
+> >>>>>
+> >>>>>
+> >>>>> Signed-off-by: Tom?? ?ech <sleep_walker@suse.cz>
+> >>>>> ---
+> >>>>>  arch/arm/mach-pxa/treo680.c |   10 +---------
+> >>>>>  1 files changed, 1 insertions(+), 9 deletions(-)
+> >>>>>
+> >>>>> diff --git a/arch/arm/mach-pxa/treo680.c b/arch/arm/mach-pxa/treo680.c
+> >>>>> index 050ad8e..57bccc3 100644
+> >>>>> --- a/arch/arm/mach-pxa/treo680.c
+> >>>>> +++ b/arch/arm/mach-pxa/treo680.c
+> >>>>> @@ -254,16 +254,9 @@ static int treo680_backlight_init(struct device *dev)
+> >>>>>  	ret = gpio_direction_output(GPIO_NR_TREO680_BL_POWER, 0);
+> >>>>>  	if (ret)
+> >>>>>  		goto err2;
+> >>>>> -	ret = gpio_request(GPIO_NR_TREO680_LCD_POWER, "LCD POWER");
+> >>>>> -	if (ret)
+> >>>>> -		goto err2;
+> >>>>> -	ret = gpio_direction_output(GPIO_NR_TREO680_LCD_POWER, 0);
+> >>>>> -	if (ret)
+> >>>>> -		goto err3;
+> >>>>>
+> >>>>>  	return 0;
+> >>>>> -err3:
+> >>>>> -	gpio_free(GPIO_NR_TREO680_LCD_POWER);
+> >>>>> +
+> >>>>>  err2:
+> >>>>>  	gpio_free(GPIO_NR_TREO680_BL_POWER);
+> >>>>>  err:
+> >>>>> @@ -279,7 +272,6 @@ static int treo680_backlight_notify(int brightness)
+> >>>>>  static void treo680_backlight_exit(struct device *dev)
+> >>>>>  {
+> >>>>>  	gpio_free(GPIO_NR_TREO680_BL_POWER);
+> >>>>> -	gpio_free(GPIO_NR_TREO680_LCD_POWER);
+> >>>>>  }
+> >>>>>
+> >>>>>  static struct platform_pwm_backlight_data treo680_backlight_data = {
+> >>>> Why was that GPIO there before then? Does this have any effect on the boot 
+> >>>> problems you are experiencing with Centro/T680? Otherwise seems OK to me
+> >>> I used it first in brightness setting for 0 value. I found it not good idea. I removed it from function, but I wanted to keep GPIO registered and direction set. But it can work well even without that and I'd like to add some function to export some control GPIOs through /sys/class/gpio interface (bluetooth power, GSM power, GSM reset...) - this GPIO will be also exported there...
+> >>>
+> >> The name sounds like a GPIO for the power of the LCD panel itself,
+> >> does it make sense to have this somewhere in the LCD power_{on,off}
+> >> hooks?
+> >>
+> > 
+> > Yes, it would be much better.
+> > I was looking for the right place - did you mean pxafb_mach_info.pxafb_lcd_power?
+> > 
+> 
+> I think so.
 >
-> You can try 'git format-patch -M' to shrink the size of the patch significantly
-> if renaming is involved.
->
 
-I have done this, thanks.
+There can be problem with this. It's easy to create such function, but there is no place for initialization so I would need to call gpio_register() and gpio_direction_output() in machine init function or even elsewhere which I find a bit nasty. Should I try to update pxafb to support LCD power through GPIO too or go nasty way?
 
+Thanks
 
+Best regards,
 
--- 
-Wan z.s
+Tomas Cech
