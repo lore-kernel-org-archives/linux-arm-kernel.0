@@ -1,85 +1,99 @@
-From: sleep_walker@suse.cz (=?utf-8?q?Tom=C3=A1=C5=A1_=27Sleep=5FWalker=27?=
-	=?utf-8?q?_=C4=8Cech?=)
-Date: Tue, 1 Sep 2009 18:14:02 +0200
-Subject: [PATCH 2/5] Treo680: remove unused LCD power GPIO
-In-Reply-To: <4A9D0896.2000007@gmail.com>
-References: <1251739561-28972-1-git-send-email-sleep_walker@suse.cz>
-	<200909011256.10882.sleep_walker@suse.cz>
-	<4A9D0896.2000007@gmail.com>
-Message-ID: <200909011814.03109.sleep_walker@suse.cz>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Tue, 1 Sep 2009 18:34:50 +0200
+Subject: [RFC/RFT 2/3] iop: clockevent support
+In-Reply-To: <20090901122511.GL19719@n2100.arm.linux.org.uk>
+References: <200908221205.n7MC5Trg029367@pilspetsen.it.uu.se>
+	<20090901122511.GL19719@n2100.arm.linux.org.uk>
+Message-ID: <19101.19754.704539.682297@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Russell King - ARM Linux writes:
+ > On Sat, Aug 22, 2009 at 02:05:29PM +0200, Mikael Pettersson wrote:
+ > > +/*
+ > > + * IOP clockevents (interrupting timer 0).
+ > > + */
+ > > +static int iop_set_next_event(unsigned long delta,
+ > > +			      struct clock_event_device *unused)
+ > > +{
+ > > +	u32 tmr = IOP_TMR_EN | IOP_TMR_PRIVILEGED
+ > > +		| IOP_TMR_RELOAD | IOP_TMR_RATIO_1_1;
+ > > +
+ > > +	BUG_ON(delta == 0);
+ > > +	write_tmr0(tmr & ~(IOP_TMR_EN | IOP_TMR_RELOAD));
+ > > +	write_tcr0(delta);
+ > > +	write_tmr0((tmr & ~IOP_TMR_RELOAD) | IOP_TMR_EN);
+ > 
+ > Hmm, not sure you should be clearing TMR_RELOAD here.  I thought
+ > periodic clock events were initialized by a call to set_mode followed
+ > by a call to set_next_event.
 
-Dne ?t 1. z??? 2009 13:42:14 Eric Miao napsal(a):
-> Tom?? 'Sleep_Walker' ?ech wrote:
-> > Hi,
-> > 
-> > Dne ?t 1. z??? 2009 11:49:24 Eric Miao napsal(a):
-> >> Tom?? 'Sleep_Walker' ?ech wrote:
-> >>> Hi,
-> >>>
-> >>> Dne Po 31. srpna 2009 19:34:51 Marek Vasut napsal(a):
-> >>>> Dne Po 31. srpna 2009 19:25:58 Tom?? ?ech napsal(a):
-> >>>>> From: Tom?? ?ech <sleep walker@suse.cz>
-> >>>>>
-> >>>>>
-> >>>>> Signed-off-by: Tom?? ?ech <sleep_walker@suse.cz>
-> >>>>> ---
-> >>>>>  arch/arm/mach-pxa/treo680.c |   10 +---------
-> >>>>>  1 files changed, 1 insertions(+), 9 deletions(-)
-> >>>>>
-> >>>>> diff --git a/arch/arm/mach-pxa/treo680.c b/arch/arm/mach-pxa/treo680.c
-> >>>>> index 050ad8e..57bccc3 100644
-> >>>>> --- a/arch/arm/mach-pxa/treo680.c
-> >>>>> +++ b/arch/arm/mach-pxa/treo680.c
-> >>>>> @@ -254,16 +254,9 @@ static int treo680_backlight_init(struct device *dev)
-> >>>>>  	ret = gpio_direction_output(GPIO_NR_TREO680_BL_POWER, 0);
-> >>>>>  	if (ret)
-> >>>>>  		goto err2;
-> >>>>> -	ret = gpio_request(GPIO_NR_TREO680_LCD_POWER, "LCD POWER");
-> >>>>> -	if (ret)
-> >>>>> -		goto err2;
-> >>>>> -	ret = gpio_direction_output(GPIO_NR_TREO680_LCD_POWER, 0);
-> >>>>> -	if (ret)
-> >>>>> -		goto err3;
-> >>>>>
-> >>>>>  	return 0;
-> >>>>> -err3:
-> >>>>> -	gpio_free(GPIO_NR_TREO680_LCD_POWER);
-> >>>>> +
-> >>>>>  err2:
-> >>>>>  	gpio_free(GPIO_NR_TREO680_BL_POWER);
-> >>>>>  err:
-> >>>>> @@ -279,7 +272,6 @@ static int treo680_backlight_notify(int brightness)
-> >>>>>  static void treo680_backlight_exit(struct device *dev)
-> >>>>>  {
-> >>>>>  	gpio_free(GPIO_NR_TREO680_BL_POWER);
-> >>>>> -	gpio_free(GPIO_NR_TREO680_LCD_POWER);
-> >>>>>  }
-> >>>>>
-> >>>>>  static struct platform_pwm_backlight_data treo680_backlight_data = {
-> >>>> Why was that GPIO there before then? Does this have any effect on the boot 
-> >>>> problems you are experiencing with Centro/T680? Otherwise seems OK to me
-> >>> I used it first in brightness setting for 0 value. I found it not good idea. I removed it from function, but I wanted to keep GPIO registered and direction set. But it can work well even without that and I'd like to add some function to export some control GPIOs through /sys/class/gpio interface (bluetooth power, GSM power, GSM reset...) - this GPIO will be also exported there...
-> >>>
-> >> The name sounds like a GPIO for the power of the LCD panel itself,
-> >> does it make sense to have this somewhere in the LCD power_{on,off}
-> >> hooks?
-> >>
-> > 
-> > Yes, it would be much better.
-> > I was looking for the right place - did you mean pxafb_mach_info.pxafb_lcd_power?
-> > 
-> 
-> I think so.
->
+It's my understanding that ->set_next_event() is only used for
+ONESHOT events. At least that's what I concluded after studying
+other implementations like the plat-orion and mach-ixp4xx ones.
 
-There can be problem with this. It's easy to create such function, but there is no place for initialization so I would need to call gpio_register() and gpio_direction_output() in machine init function or even elsewhere which I find a bit nasty. Should I try to update pxafb to support LCD power through GPIO too or go nasty way?
+But I could be wrong. The clockevents API is very poorly documented, IMO.
 
-Thanks
+ > > +static void iop_set_mode(enum clock_event_mode mode,
+ > > +			 struct clock_event_device *unused)
+ > > +{
+ > > +	u32 tmr = IOP_TMR_EN | IOP_TMR_PRIVILEGED
+ > > +		| IOP_TMR_RELOAD | IOP_TMR_RATIO_1_1;
+ > > +
+ > > +	switch (mode) {
+ > > +	case CLOCK_EVT_MODE_PERIODIC:
+ > > +		write_tmr0(tmr & ~IOP_TMR_EN);
+ > > +		write_tcr0(ticks_per_jiffy - 1);
+ > > +		tmr |= (IOP_TMR_RELOAD | IOP_TMR_EN);
+ > > +		break;
+ > > +	case CLOCK_EVT_MODE_ONESHOT:
+ > > +		/* ->set_next_event sets period and enables timer */
+ > > +		tmr &= ~(IOP_TMR_RELOAD | IOP_TMR_EN);
+ > > +		break;
+ > > +	case CLOCK_EVT_MODE_RESUME:
+ > > +		tmr |= IOP_TMR_EN;
+ > > +		break;
+ > > +	case CLOCK_EVT_MODE_SHUTDOWN:
+ > > +	case CLOCK_EVT_MODE_UNUSED:
+ > > +	default:
+ > > +		tmr &= ~IOP_TMR_EN;
+ > 
+ > Doesn't this result in the clock mode being overwritten upon
+ > resume/shutdown?  tmr, being a local variable, will always be
+ > initialized with IOP_TMR_RELOAD etc.
 
-Best regards,
+Correct. For shutdown that shouldn't be a problem. I interpreted
+'resume' as resume from suspend-to-ram, which I don't think is
+supported by plat-iop, so I basically ignored it.
 
-Tomas Cech
+An earlier version of the code used a read_tmr0() function, but
+I replaced it with a hardcoded value to avoid having to add yet
+another function to the mach implementation. Also, apart possibly
+from the resume case, the value written to TMR should only depend
+on the 'mode' parameter.
+
+I'll reintroduce read_tmr0() and rewrite this function to be more
+read-modify-write like.
+
+ > > @@ -75,13 +132,12 @@ unsigned long iop_gettimeoffset(void)
+ > >  static irqreturn_t
+ > >  iop_timer_interrupt(int irq, void *dev_id)
+ > >  {
+ > > +	struct clock_event_device *evt;
+ > > +
+ > >  	write_tisr(1);
+ > >  
+ > > -	while ((signed long)(next_jiffy_time - read_tcr1())
+ > > -		>= ticks_per_jiffy) {
+ > > -		timer_tick();
+ > > -		next_jiffy_time -= ticks_per_jiffy;
+ > > -	}
+ > > +	evt = &iop_clockevent;
+ > 
+ > You can use 'dev_id' here, and when registering the interrupt, pass
+ > iop_clockevent via the dev_id field in iop_timer_irq.
+
+The implementations I studied don't use that feature, but using the
+dev_id parameter will be cleaner and faster. Thanks, I'll make that change.
+
+/Mikael
