@@ -1,25 +1,32 @@
 From: risingsunxy@googlemail.com (Xu Yang)
-Date: Tue, 1 Sep 2009 11:29:11 +0200
+Date: Tue, 1 Sep 2009 11:30:51 +0200
 Subject: arm linux porting effort
-In-Reply-To: <4A9CE50D.40905@googlemail.com>
+In-Reply-To: <e68bb3470909010222ka8c25b7ha2fef9e9b54a54b@mail.gmail.com>
 References: <ab40e9c0909010154i3cf6e51duf155fd3ca04ff92@mail.gmail.com>
-	<4A9CE50D.40905@googlemail.com>
-Message-ID: <ab40e9c0909010229y3aa6e149v5db94ba90ff972b9@mail.gmail.com>
+	<e68bb3470909010222ka8c25b7ha2fef9e9b54a54b@mail.gmail.com>
+Message-ID: <ab40e9c0909010230v1f3500edr21b92040c3f54284@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Dirk,
+hi ZongShun,
 
-thanks a lot for your good advice.
+you mean I can just put all the corresponding platform related folders
+and files in the right place and compile , then it is done?
 
-I will look at this and try:-)
+thanks,
 
 Best regards,
 
 Yang
 
-2009/9/1, Dirk Behme <dirk.behme@googlemail.com>:
-> Xu Yang wrote:
+2009/9/1, Wan ZongShun <mcuos.com@gmail.com>:
+> Hi,
+>
+> It is easy to do this.
+> Actually, regarding this, there is no need to ask for other,
+> Just do it.
+>
+> 2009/9/1, Xu Yang <risingsunxy@googlemail.com>:
 > > hi guys,
 > >
 > > we already have linux kernel 2.6.29 running on our own arm1176
@@ -29,13 +36,20 @@ Yang
 > >
 > > anyone any ideas? or any hints?
 > >
+> > thanks,
+> >
+> > best regards,
+> >
+> >
+> > Yang
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
 >
-> From 2.6.29 to 2.6.30 you could try to let git do the work. Try to git merge
-> (or rebase?), resolve the conflicts, build, boot and check if everything is
-> still working. If you create an extra branch for this, you will break
-> nothing and will know the effort afterwards ;)
 >
-> Best regards
->
-> Dirk
+> --
+> Wan z.s
 >
