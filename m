@@ -1,64 +1,45 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 01 Sep 2009 17:49:24 +0800
-Subject: [PATCH 2/5] Treo680: remove unused LCD power GPIO
-In-Reply-To: <200908312034.53369.sleep_walker@suse.cz>
+Date: Tue, 01 Sep 2009 17:52:24 +0800
+Subject: [PATCH 3/5] Treo680: fix freed GPIO in treo680_irda_shutdown()
+In-Reply-To: <200908311936.30705.marek.vasut@gmail.com>
 References: <1251739561-28972-1-git-send-email-sleep_walker@suse.cz>
 	<1251739561-28972-3-git-send-email-sleep_walker@suse.cz>
-	<200908311934.51750.marek.vasut@gmail.com>
-	<200908312034.53369.sleep_walker@suse.cz>
-Message-ID: <4A9CEE24.9080304@gmail.com>
+	<1251739561-28972-4-git-send-email-sleep_walker@suse.cz>
+	<200908311936.30705.marek.vasut@gmail.com>
+Message-ID: <4A9CEED8.1000705@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tom?? 'Sleep_Walker' ?ech wrote:
-> Hi,
+Marek Vasut wrote:
+> Dne Po 31. srpna 2009 19:25:59 Tom?? ?ech napsal(a):
+>> From: Tom?? ?ech <sleep walker@suse.cz>
+>>
+>>
+>> Signed-off-by: Tom?? ?ech <sleep_walker@suse.cz>
+>> ---
+>>  arch/arm/mach-pxa/treo680.c |    2 +-
+>>  1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-pxa/treo680.c b/arch/arm/mach-pxa/treo680.c
+>> index 57bccc3..d88114c 100644
+>> --- a/arch/arm/mach-pxa/treo680.c
+>> +++ b/arch/arm/mach-pxa/treo680.c
+>> @@ -325,7 +325,7 @@ err1:
+>>
+>>  static void treo680_irda_shutdown(struct device *dev)
+>>  {
+>> -	gpio_free(GPIO_NR_TREO680_AMP_EN);
+>> +	gpio_free(GPIO_NR_TREO680_IR_EN);
+>>  }
+>>
+>>  static struct pxaficp_platform_data treo680_ficp_info = {
 > 
-> Dne Po 31. srpna 2009 19:34:51 Marek Vasut napsal(a):
->> Dne Po 31. srpna 2009 19:25:58 Tom?? ?ech napsal(a):
->>> From: Tom?? ?ech <sleep walker@suse.cz>
->>>
->>>
->>> Signed-off-by: Tom?? ?ech <sleep_walker@suse.cz>
->>> ---
->>>  arch/arm/mach-pxa/treo680.c |   10 +---------
->>>  1 files changed, 1 insertions(+), 9 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-pxa/treo680.c b/arch/arm/mach-pxa/treo680.c
->>> index 050ad8e..57bccc3 100644
->>> --- a/arch/arm/mach-pxa/treo680.c
->>> +++ b/arch/arm/mach-pxa/treo680.c
->>> @@ -254,16 +254,9 @@ static int treo680_backlight_init(struct device *dev)
->>>  	ret = gpio_direction_output(GPIO_NR_TREO680_BL_POWER, 0);
->>>  	if (ret)
->>>  		goto err2;
->>> -	ret = gpio_request(GPIO_NR_TREO680_LCD_POWER, "LCD POWER");
->>> -	if (ret)
->>> -		goto err2;
->>> -	ret = gpio_direction_output(GPIO_NR_TREO680_LCD_POWER, 0);
->>> -	if (ret)
->>> -		goto err3;
->>>
->>>  	return 0;
->>> -err3:
->>> -	gpio_free(GPIO_NR_TREO680_LCD_POWER);
->>> +
->>>  err2:
->>>  	gpio_free(GPIO_NR_TREO680_BL_POWER);
->>>  err:
->>> @@ -279,7 +272,6 @@ static int treo680_backlight_notify(int brightness)
->>>  static void treo680_backlight_exit(struct device *dev)
->>>  {
->>>  	gpio_free(GPIO_NR_TREO680_BL_POWER);
->>> -	gpio_free(GPIO_NR_TREO680_LCD_POWER);
->>>  }
->>>
->>>  static struct platform_pwm_backlight_data treo680_backlight_data = {
->> Why was that GPIO there before then? Does this have any effect on the boot 
->> problems you are experiencing with Centro/T680? Otherwise seems OK to me
+> ...
 > 
-> I used it first in brightness setting for 0 value. I found it not good idea. I removed it from function, but I wanted to keep GPIO registered and direction set. But it can work well even without that and I'd like to add some function to export some control GPIOs through /sys/class/gpio interface (bluetooth power, GSM power, GSM reset...) - this GPIO will be also exported there...
+> Seems OK to me, I think the first three patches can go in as is, Eric, could 
+> you merge them? Thanks
 > 
+> Acked-by: Marek Vasut <marek.vasut@gmail.com>
 
-The name sounds like a GPIO for the power of the LCD panel itself,
-does it make sense to have this somewhere in the LCD power_{on,off}
-hooks?
+This has been merged by Russell in his patch tracking system, so really
+don't need to go via my tree now.
