@@ -1,72 +1,64 @@
-From: hemanthv@ti.com (Hemanth V)
-Date: Tue, 1 Sep 2009 15:17:47 +0530
-Subject: [PATCH v2][RFC] OMAP4: sDMA driver: descriptor autoloading feature
-References: <0680EC522D0CC943BC586913CF3768C0037CE47C07@dbde02.ent.ti.com>
-Message-ID: <04ab01ca2ae9$445220a0$LocalHost@wipultra793>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 01 Sep 2009 17:49:24 +0800
+Subject: [PATCH 2/5] Treo680: remove unused LCD power GPIO
+In-Reply-To: <200908312034.53369.sleep_walker@suse.cz>
+References: <1251739561-28972-1-git-send-email-sleep_walker@suse.cz>
+	<1251739561-28972-3-git-send-email-sleep_walker@suse.cz>
+	<200908311934.51750.marek.vasut@gmail.com>
+	<200908312034.53369.sleep_walker@suse.cz>
+Message-ID: <4A9CEE24.9080304@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------ Original Message ----- 
-From: "S, Venkatraman" <svenkatr@ti.com>
-To: <linux-omap@vger.kernel.org>
-Cc: <linux-arm-kernel@lists.infradead.org>; "Shilimkar, Santosh" 
-<santosh.shilimkar@ti.com>
-Sent: Thursday, August 27, 2009 4:41 PM
-Subject: [PATCH v2][RFC] OMAP4: sDMA driver: descriptor autoloading feature
+Tom?? 'Sleep_Walker' ?ech wrote:
+> Hi,
+> 
+> Dne Po 31. srpna 2009 19:34:51 Marek Vasut napsal(a):
+>> Dne Po 31. srpna 2009 19:25:58 Tom?? ?ech napsal(a):
+>>> From: Tom?? ?ech <sleep walker@suse.cz>
+>>>
+>>>
+>>> Signed-off-by: Tom?? ?ech <sleep_walker@suse.cz>
+>>> ---
+>>>  arch/arm/mach-pxa/treo680.c |   10 +---------
+>>>  1 files changed, 1 insertions(+), 9 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-pxa/treo680.c b/arch/arm/mach-pxa/treo680.c
+>>> index 050ad8e..57bccc3 100644
+>>> --- a/arch/arm/mach-pxa/treo680.c
+>>> +++ b/arch/arm/mach-pxa/treo680.c
+>>> @@ -254,16 +254,9 @@ static int treo680_backlight_init(struct device *dev)
+>>>  	ret = gpio_direction_output(GPIO_NR_TREO680_BL_POWER, 0);
+>>>  	if (ret)
+>>>  		goto err2;
+>>> -	ret = gpio_request(GPIO_NR_TREO680_LCD_POWER, "LCD POWER");
+>>> -	if (ret)
+>>> -		goto err2;
+>>> -	ret = gpio_direction_output(GPIO_NR_TREO680_LCD_POWER, 0);
+>>> -	if (ret)
+>>> -		goto err3;
+>>>
+>>>  	return 0;
+>>> -err3:
+>>> -	gpio_free(GPIO_NR_TREO680_LCD_POWER);
+>>> +
+>>>  err2:
+>>>  	gpio_free(GPIO_NR_TREO680_BL_POWER);
+>>>  err:
+>>> @@ -279,7 +272,6 @@ static int treo680_backlight_notify(int brightness)
+>>>  static void treo680_backlight_exit(struct device *dev)
+>>>  {
+>>>  	gpio_free(GPIO_NR_TREO680_BL_POWER);
+>>> -	gpio_free(GPIO_NR_TREO680_LCD_POWER);
+>>>  }
+>>>
+>>>  static struct platform_pwm_backlight_data treo680_backlight_data = {
+>> Why was that GPIO there before then? Does this have any effect on the boot 
+>> problems you are experiencing with Centro/T680? Otherwise seems OK to me
+> 
+> I used it first in brightness setting for 0 value. I found it not good idea. I removed it from function, but I wanted to keep GPIO registered and direction set. But it can work well even without that and I'd like to add some function to export some control GPIOs through /sys/class/gpio interface (bluetooth power, GSM power, GSM reset...) - this GPIO will be also exported there...
+> 
 
-
-> (Updated version of previous patch: 
-> http://marc.info/?l=linux-omap&m=125012097403050&w=2)
-> Add sDMA driver support for descriptor autoloading feature.
-> Descriptor autoloading is OMAP4 sDMA hardware capability that can be 
-> exploited for scatter gather scenarios.
->
-> The feature works as described below
-> 1) A sDMA channel is programmed to be in 'linked list' mode
-> 2) The client (sDMA user) provides a list of descriptors in a linked list 
-> format
-> 3) Each of the 'descriptor' (element in the linked list) contains an 
-> updated set of DMA configuration register values
-> 4) Client starts DMA transfer
-> 5) sDMA controller loads the first element to its register configuration 
-> memory and executes the transfer
-> 6) After completion, loads the next element (in linked list) to 
-> configuration memory and executes the transfer, without MCU intervention.
-> 7) Interrupt is generated after all transfers are completed; this can be 
-> configured to be done differently.
->
-> Configurations and additional features
-> 1) Fast mode & non-fast mode
->       Fast mode/non-fast decides on how the first transfer begins. In 
-> non-fast mode, the first element in the linked list is loaded only after 
-> completing the transfer according to the configurations already in the 
-> sDMA channel registers. In fast mode, the loading of the first element 
-> precedes the transfer.
->
-> 2) Pause / resume of transfers
->       A transfer can be paused after a descriptor set has been loaded, 
-> provided the 'pause bit' is set in the linked list element.
-> An ongoing transfer cannot be paused. If the 'pause bit' is set, transfer 
-> is not started after loading the register set from memory.
-> Such a transfer can be resumed later.
->
-> 3) Descriptor types
->       3 possible configurations of descriptors (initialized as linked list 
-> elements) are possible. Type 1 provides the maximum flexibility, which 
-> contains most register definitions of a DMA logical channel. Fewer options 
-> are present in type 2. Type 3 can just modify source/destinations address 
-> of transfers. In all transfers, unmodified registers settings are 
-> maintained for the next transfer.
->
-> Patch provides options / API for
-> 1) Setting up a descriptor loading for DMA channel for sg type transfers
-> 2) configuration with linked list elements
-> 3) Starting / pause and resume of the said transfers, query state
-> 4) Closing/Releasing the DMA channel
->
-> The patches are generated against kernel 2.6.31-rc1, tested on OMAP4 
-> simulator platform.
-
-It might be easier to understand the APIs if you could provide an example. 
-Could you take example of a contiguous/non-contiguous buffer and explain how 
-the desciptor based DMA could be used on this. 
+The name sounds like a GPIO for the power of the LCD panel itself,
+does it make sense to have this somewhere in the LCD power_{on,off}
+hooks?
