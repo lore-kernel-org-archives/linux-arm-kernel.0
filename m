@@ -1,77 +1,48 @@
 From: sleep_walker@suse.cz (=?utf-8?q?Tom=C3=A1=C5=A1_=27Sleep=5FWalker=27?=
 	=?utf-8?q?_=C4=8Cech?=)
-Date: Tue, 1 Sep 2009 12:56:10 +0200
-Subject: [PATCH 2/5] Treo680: remove unused LCD power GPIO
-In-Reply-To: <4A9CEE24.9080304@gmail.com>
-References: <1251739561-28972-1-git-send-email-sleep_walker@suse.cz>
-	<200908312034.53369.sleep_walker@suse.cz>
-	<4A9CEE24.9080304@gmail.com>
-Message-ID: <200909011256.10882.sleep_walker@suse.cz>
+Date: Tue, 1 Sep 2009 12:56:45 +0200
+Subject: [PATCH 4/5] PalmGSM: generalisation of Treo680 code to PalmGSM
+In-Reply-To: <20090901000716.GD2985@elf.ucw.cz>
+References: <1251333811-22360-1-git-send-email-sleep_walker@suse.cz>
+	<200908311306.43005.sleep_walker@suse.cz>
+	<20090901000716.GD2985@elf.ucw.cz>
+Message-ID: <200909011256.45442.sleep_walker@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Ahoj! :)
 
-Dne ?t 1. z??? 2009 11:49:24 Eric Miao napsal(a):
-> Tom?? 'Sleep_Walker' ?ech wrote:
-> > Hi,
+Dne ?t 1. z??? 2009 02:07:16 Pavel Machek napsal(a):
+> Ahoj! / Hi!
+> 
+> > > > > > arch/arm/mach-pxa/Kconfig                |    5 +
+> > > > > > arch/arm/mach-pxa/Makefile               |    2 +-
+> > > > > > arch/arm/mach-pxa/include/mach/palmgsm.h |   60 ++++
+> > > > > > arch/arm/mach-pxa/include/mach/treo680.h |   49 ---
+> > > > > > arch/arm/mach-pxa/palmgsm.c              |  559 ++++++++++++++++++++++++++++++
+> > > > > > arch/arm/mach-pxa/treo680.c              |  528 ----------------------------
+> > > > > 
+> > > > > I don't actually care too much about the naming - as long as 685 can stay 
+> > > > > within treo680.c, I don't see any problem with that. The real question is:
+> > > > > is palmgsm.c the proper name for all these devices?
+> > > > 
+> > > > Well, actually your completely right. PalmGSM is not fitting for all devices to come, more fitting would be something like Palm smartphones because there are CDMA devices to come too. On the other hand, this name is the best I found so far. If you don't mind I would even so...
+> > > >
+> > > 
+> > > I believe treo680 was better name then. Don't change it if you don't
+> > > need to...
 > > 
-> > Dne Po 31. srpna 2009 19:34:51 Marek Vasut napsal(a):
-> >> Dne Po 31. srpna 2009 19:25:58 Tom?? ?ech napsal(a):
-> >>> From: Tom?? ?ech <sleep walker@suse.cz>
-> >>>
-> >>>
-> >>> Signed-off-by: Tom?? ?ech <sleep_walker@suse.cz>
-> >>> ---
-> >>>  arch/arm/mach-pxa/treo680.c |   10 +---------
-> >>>  1 files changed, 1 insertions(+), 9 deletions(-)
-> >>>
-> >>> diff --git a/arch/arm/mach-pxa/treo680.c b/arch/arm/mach-pxa/treo680.c
-> >>> index 050ad8e..57bccc3 100644
-> >>> --- a/arch/arm/mach-pxa/treo680.c
-> >>> +++ b/arch/arm/mach-pxa/treo680.c
-> >>> @@ -254,16 +254,9 @@ static int treo680_backlight_init(struct device *dev)
-> >>>  	ret = gpio_direction_output(GPIO_NR_TREO680_BL_POWER, 0);
-> >>>  	if (ret)
-> >>>  		goto err2;
-> >>> -	ret = gpio_request(GPIO_NR_TREO680_LCD_POWER, "LCD POWER");
-> >>> -	if (ret)
-> >>> -		goto err2;
-> >>> -	ret = gpio_direction_output(GPIO_NR_TREO680_LCD_POWER, 0);
-> >>> -	if (ret)
-> >>> -		goto err3;
-> >>>
-> >>>  	return 0;
-> >>> -err3:
-> >>> -	gpio_free(GPIO_NR_TREO680_LCD_POWER);
-> >>> +
-> >>>  err2:
-> >>>  	gpio_free(GPIO_NR_TREO680_BL_POWER);
-> >>>  err:
-> >>> @@ -279,7 +272,6 @@ static int treo680_backlight_notify(int brightness)
-> >>>  static void treo680_backlight_exit(struct device *dev)
-> >>>  {
-> >>>  	gpio_free(GPIO_NR_TREO680_BL_POWER);
-> >>> -	gpio_free(GPIO_NR_TREO680_LCD_POWER);
-> >>>  }
-> >>>
-> >>>  static struct platform_pwm_backlight_data treo680_backlight_data = {
-> >> Why was that GPIO there before then? Does this have any effect on the boot 
-> >> problems you are experiencing with Centro/T680? Otherwise seems OK to me
-> > 
-> > I used it first in brightness setting for 0 value. I found it not good idea. I removed it from function, but I wanted to keep GPIO registered and direction set. But it can work well even without that and I'd like to add some function to export some control GPIOs through /sys/class/gpio interface (bluetooth power, GSM power, GSM reset...) - this GPIO will be also exported there...
+> > But I need to have different generic name - treo680 will be occupied by Treo680 specific stuff, which makes more sense, doesn't it?
 > > 
 > 
-> The name sounds like a GPIO for the power of the LCD panel itself,
-> does it make sense to have this somewhere in the LCD power_{on,off}
-> hooks?
+> And rename generic code to treo.c? Then you could have treo.c for
+> generic code, and treo680.c / treo685.c for specific models...
 > 
+> palmgsm.c sounds like driver for their GSM chip...
+> 									Pavel
+> 
+OK, treo.c would be best (even though that one model has name Centro), I'll recreate patch set. I'm just a bit afraid of treo650_, treo680, treo700p_, treo755p_ and treo_ naming (the code will be a bit more worse to read), but right - this is the best name.
 
-Yes, it would be much better.
-I was looking for the right place - did you mean pxafb_mach_info.pxafb_lcd_power?
-
-Thanks
-
-Best regards,
+Thanks!
 
 Tomas Cech
