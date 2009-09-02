@@ -1,21 +1,59 @@
-From: laforge@gnumonks.org (Harald Welte)
-Date: Wed, 2 Sep 2009 21:01:59 +0900
-Subject: Samsung S3C6410 mainline merge coordination
-In-Reply-To: <19987914.1168001251884594226.JavaMail.coremail@bj126app54.126.com>
-References: <20090902031719.GK3838@prithivi.gnumonks.org>
-	<19987914.1168001251884594226.JavaMail.coremail@bj126app54.126.com>
-Message-ID: <20090902120159.GT32606@prithivi.gnumonks.org>
+From: saaguirre@ti.com (Aguirre Rodriguez, Sergio Alberto)
+Date: Wed, 2 Sep 2009 07:21:47 -0500
+Subject: [PATCH] ARM: request_irq() failure ignored in
+	omap_uart_enable_irqs()
+In-Reply-To: <4A9D5731.20909@gmail.com>
+References: <4A9D3D2A.1060609@gmail.com> <4A9D4769.5060907@ru.mvista.com>
+	<4A9D5731.20909@gmail.com>
+Message-ID: <A24693684029E5489D1D202277BE89444BFBAEE3@dlee02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 02, 2009 at 05:43:14PM +0800, tommy.hong wrote:
+(Resending to new ML)
 
-> does it support X kdrive 2D accelerate ?
+From: Roel Kluin [mailto:roel.kluin at gmail.com]
+Sent: Tuesday, September 01, 2009 12:18 PM
+> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+> index a7421a5..ed683d9 100644
+> --- a/arch/arm/mach-omap2/serial.c
+> +++ b/arch/arm/mach-omap2/serial.c
+> @@ -471,11 +471,18 @@ void omap_uart_enable_irqs(int enable)
 
-X / kdrive is not part of the linux kernel.  Therefore, it is unrelated
-to the Linux kernel code that we are working on.
--- 
-- Harald Welte <laforge@gnumonks.org>           http://laforge.gnumonks.org/
-============================================================================
-"Privacy in residential applications is a desirable marketing option."
-                                                  (ETSI EN 300 175-7 Ch. A6)
+Wouldn't it make more sense to return int, instead of void here?
+
+The caller would never know if the call internally failed.
+
+Just a thought...
+
+Regards,
+Sergio
+
+>  	int ret;
+>  	struct omap_uart_state *uart;
+> 
+> -	list_for_each_entry(uart, &uart_list, node) {
+> -		if (enable)
+> +	if (enable) {
+> +		list_for_each_entry(uart, &uart_list, node) {
+>  			ret = request_irq(uart->p->irq, omap_uart_interrupt,
+>  				IRQF_SHARED, "serial idle", (void *)uart);
+> -		else
+> +			if (ret < 0) {
+> +				printk(KERN_ERR "omap_uart_enable_irqs: failed to
+> request IRQ%i (%i)\n",
+> +						uart->p->irq, ret);
+> +				return;
+> +			}
+> +		}
+> +	} else {
+> +		list_for_each_entry(uart, &uart_list, node)
+>  			free_irq(uart->p->irq, (void *)uart);
+>  	}
+>  }
+> 
+> 
+> -------------------------------------------------------------------
+> List admin: http://lists.arm.linux.org.uk/mailman/listinfo/linux-arm-
+> kernel
+> FAQ:        http://www.arm.linux.org.uk/mailinglists/faq.php
+> Etiquette:  http://www.arm.linux.org.uk/mailinglists/etiquette.php
