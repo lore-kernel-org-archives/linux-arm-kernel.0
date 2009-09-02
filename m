@@ -1,73 +1,36 @@
-From: ralf@linux-mips.org (Ralf Baechle)
-Date: Wed, 2 Sep 2009 16:15:37 +0100
-Subject: [RFC/RFT 1/3] iop: clocksource support
-In-Reply-To: <63386a3d0909011448k6f221118k81cc7d993c65ac20@mail.gmail.com>
-References: <200908221204.n7MC4t2v029350@pilspetsen.it.uu.se>
-	<63386a3d0908241607t4546b488oa19f43fbbef0ade5@mail.gmail.com>
-	<19101.33037.189854.375398@pilspetsen.it.uu.se>
-	<63386a3d0909011448k6f221118k81cc7d993c65ac20@mail.gmail.com>
-Message-ID: <20090902151537.GA12951@linux-mips.org>
+From: nico@cam.org (Nicolas Pitre)
+Date: Wed, 02 Sep 2009 11:52:33 -0400 (EDT)
+Subject: ARM highmem stuff - 5687/1
+In-Reply-To: <20090902135355.GB12595@n2100.arm.linux.org.uk>
+References: <20090902135355.GB12595@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.0909021009010.6044@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 01, 2009 at 11:48:57PM +0200, Linus Walleij wrote:
+On Wed, 2 Sep 2009, Russell King - ARM Linux wrote:
 
-> > ?> Calculate this using the algorithm in arch/mips/kernel/time.c
-> > ?> they have a dynamically changing clocksource...
-> >
-> > The algorithm always computes the largest shift/mult pair that
-> > solves the equation:
-> >
-> > ? ? ? ?// 0 <= shift && shift <= 32
-> > ? ? ? ?u64 mult = ((u64)1E9 << shift) / hz;
-> > ? ? ? ?(mult >> 32) == 0
-> >
-> > Can I assume that this is to minimize precision loss?
-> 
-> So I think, I asked the question of how to calculate div but noone
-> answered IIRC, then I found the MIPS code and it contained this
-> clue. Ralf Baechle from the MIPS camp wrote this code so lets
-> ask him.
+> Do we need a similar fix for flush_anon_page()?
 
-The code you're talking about is in arch/mips/kernel/time.c:
+Hmmmm... Maybe.  Especially since the only usage of flush_anon_page() is 
+in __get_user_pages() where the page passed to flush_anon_page() may or 
+may not be kmapped (it is not explicitly kmapped in that function, but 
+non atomic kmaps are lazily unmapped and would still require to be 
+flushed if their mapping is still there).  However, in 
+__get_user_pages(), there is a flush_dcache_page() right after the call 
+to flush_anon_page(), so the __cpuc_flush_dcache_page() in 
+__flush_anon_page() appears redundant to me and could simply be removed 
+entirely.
 
-[...]
-void __init clocksource_set_clock(struct clocksource *cs, unsigned int clock)
-{
-	u64 temp;
-	u32 shift;
+> In both cases, can we just avoid calling __cpuc_flush_dcache_page() if 
+> PageHighMem(page) is true rather than checking page_address(page) is 
+> non-zero?
 
-	/* Find a shift value */
-	for (shift = 32; shift > 0; shift--) {
-		temp = (u64) NSEC_PER_SEC << shift;
-		do_div(temp, clock);
-		if ((temp >> 32) == 0)
-			break;
-	}
-	cs->shift = shift;
-	cs->mult = (u32) temp;
-}
+No.  Like I say above, unlike with kunmap_atomic(), the cache is 
+untouched by kunmap().  This is because kmap() and kunmap() can be used 
+repeatedly on the same set of pages and their actual mappings don't need 
+to be flushed and removed between those calls.  However if a 
+flush_dcache_page() is required on a highmem page that still has a valid 
+kmap mapping then the flush is relevant.
 
-void __cpuinit clockevent_set_clock(struct clock_event_device *cd,
-	unsigned int clock)
-{
-	u64 temp;
-	u32 shift;
 
-	/* Find a shift value */
-	for (shift = 32; shift > 0; shift--) {
-		temp = (u64) clock << shift;
-		do_div(temp, NSEC_PER_SEC);
-		if ((temp >> 32) == 0)
-			break;
-	}
-	cd->shift = shift;
-	cd->mult = (u32) temp;
-}
-[...]
-
-The algorithm tries to minimize the loss of precision.  Like two years ago
-I had already agreed with Thomas Gleixner to move this function into
-generic code but somehow that never happened.
-
-  Ralf
+Nicolas
