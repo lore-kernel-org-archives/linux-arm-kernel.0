@@ -1,67 +1,45 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 2 Sep 2009 20:16:26 +0100
+Date: Wed, 2 Sep 2009 20:22:14 +0100
 Subject: Samsung S3C6410 mainline merge coordination
-In-Reply-To: <200909021203.n82C3USg020804@chronolytics.com>
+In-Reply-To: <20090902121158.GU32606@prithivi.gnumonks.org>
 References: <20090902031719.GK3838@prithivi.gnumonks.org>
-	<200909021203.n82C3USg020804@chronolytics.com>
-Message-ID: <20090902191626.GP25153@trinity.fluff.org>
+	<20090902100500.GA4012@sirena.org.uk>
+	<20090902121158.GU32606@prithivi.gnumonks.org>
+Message-ID: <20090902192214.GQ25153@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 02, 2009 at 08:03:30AM -0400, David F. Carlson wrote:
+On Wed, Sep 02, 2009 at 09:11:58PM +0900, Harald Welte wrote:
+> Hi Mark,
 > 
-> 
-> According to Harald Welte:
+> On Wed, Sep 02, 2009 at 11:05:01AM +0100, Mark Brown wrote:
+>  
+> > > === Sound ===
+> > > * needs further investigation, there are many different drivers/versions/options
 > > 
-> > === plat-s3c/gpio.c ===
-> > * off-by-one error, send fix mainline
+> > Merge any changes in with the mainline drivers - there's relatively
+> > little difference from the s3c24xx IPs.  There's a reasonable chance
+> > I'll get round to this myself for the 64xx series since I have one which
+> > I'm using for some of my development.
 > 
-> I have added the bank-k and bank-l and submitted the patch to Ben.
-> > 
-> > === suspend-to-ram ===
-> > * port to mainline and test, submit mainline
-> 
-> Another s3c issue that needs to be addressed further is the number of special purpose pins for power management, audio/video codec, otg detect, etc. that vary from mach to mach.  Many of the drivers do not have a means to use the mach-specific gpios -- and yet most are required to useful function.
-> 
-> The mach I am using has a whole "kluge" driver to handle the mach-specific gpios.  Oi.  These will have to be knocked down one by one for a decent save-restore to work.
+> please note there are something like four different versions of the audio IP
+> core in Samsung SoCs.  I myself am not familiar with the detailed technical
+> differences.  So in any case we'll try to submit the current code in a way
+> that will not create conflicts or issues with code that is pending further
+> down the road for s5pc100. or s5pc110.
 
-I'm not sure what you are complaining about here (not helped by your mail
-client's inability to wrap to something readable on a terminal - i.e. 76
-characters per line).
-
-Most GPIO setup is done in the bootloader, but there is more that sometimes
-needs to be done in either the board file or occasionally the driver. The
-drivers that need help with this, get passed a callback function with the
-platform data to do the necessary setup (see the sdhci callbacks, i2c, etc).
-
-I belive we've got this pretty much under control.
-
-> I am also working on a "canonical" PWM backlight driver using the pwm_bl lcd support and the 6410 pwm timer support in next-s3c.  It is mostly working and should be ready to push soon.
-
-I belive Peter Korsgaard's patch has already been merged to move the s3c24xx
-pwm code into the s3c.
+There's pretty good support for the style that was first in the s3c2412,
+which I belive was the last of the two-channel I2S blocks.
  
-> I have a fairly decent SmartQ5/7 config and mach-smartq init file.  Much of this work (that I can test) can be back ported to the smdk6410 (that I can't test. :-)
-> 
-> > === video / multimedia ===
-> > * needs a lot of thought
-> > * support standard mainlien architecture wherever possible
-> > ** 2D accelerated framebuffer
-> > ** DRI/DRM/TTM/KMS
-> > ** V4L
-> 
-> I have a "port" to next-s3c of the exiting sansumg-ap-2.6 media drivers.  They load.  It is a start anyway...  Another downside to these drivers is that their memory is statically allocated a boot-time.  I have asked Ben to consider taking this "port" into next-s3c as a basis for common work since it won't get better until people can work it.
+> Apparently there are also features like operating the SoC codec in slave mode
+> as well as different clock configurations wich mainline is missing.
 
-Not desperately interested at the moment, thought needs to be put into
-these drivers and they can generally live on their own.
+I've run an WM8530 in slave mode on an S3C6410, so it was working last
+time I tried it. It was one of the test cases to check the code out before
+it was submitted.
 
-> I am not sure the g2d driver is particular useful for a accel X driver.  The fifo mechanism with polling might work better than an ioctl-like interrupt blit-only based one.  It seems kinda expensive to trap the the kernel for every 2d-op.  Kinda like MSWindows then.  :-)
-
-The best I can think of at the moment is that the kernel implements a way
-to share the harware and that userspace libraries sort out the actuall
-acceleration. There has been at least two attempts I know of to try and
-export fbdev calls outside of the kernel and this seems to have fallen
-rather flat.
+What we don't yet have in the mainline is any of the 'V40' which are for
+5.1 style I2S links (multiple tx paths).
 
 -- 
 Ben
