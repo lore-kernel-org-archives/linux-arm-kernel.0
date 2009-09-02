@@ -1,52 +1,56 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Wed, 2 Sep 2009 22:44:35 +0900
+From: broonie@sirena.org.uk (Mark Brown)
+Date: Wed, 2 Sep 2009 14:45:23 +0100
 Subject: Samsung S3C6410 mainline merge coordination
 In-Reply-To: <20090902121158.GU32606@prithivi.gnumonks.org>
 References: <20090902031719.GK3838@prithivi.gnumonks.org>
 	<20090902100500.GA4012@sirena.org.uk>
 	<20090902121158.GU32606@prithivi.gnumonks.org>
-Message-ID: <1b68c6790909020644k757827f4kf590779f384ceccb@mail.gmail.com>
+Message-ID: <20090902134523.GA19113@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 2, 2009 at 9:11 PM, Harald Welte<laforge@gnumonks.org> wrote:
+On Wed, Sep 02, 2009 at 09:11:58PM +0900, Harald Welte wrote:
 > On Wed, Sep 02, 2009 at 11:05:01AM +0100, Mark Brown wrote:
->> > === Sound ===
->> > * needs further investigation, there are many different drivers/versions/options
->>
->> Merge any changes in with the mainline drivers - there's relatively
->> little difference from the s3c24xx IPs. ?There's a reasonable chance
->> I'll get round to this myself for the 64xx series since I have one which
->> I'm using for some of my development.
->
+
+> > Merge any changes in with the mainline drivers - there's relatively
+> > little difference from the s3c24xx IPs.  There's a reasonable chance
+> > I'll get round to this myself for the 64xx series since I have one which
+> > I'm using for some of my development.
+
+> please note there are something like four different versions of the audio IP
+> core in Samsung SoCs.  I myself am not familiar with the detailed technical
+
+Yes, there's at least four IIS blocks I'm aware of - but there's a lot
+of shared stuff in the devices I've seen and the programming models
+haven't varied radically between them.  A lot of the time it's been more
+at the level of slightly incompatible register maps than anything else.
+Some of the SoCs have a mix'n'match of IP versions too which makes it
+harder to find a clean break to flip over at.
+
+I'm open to other suggestions but I'd need to see some sort of
+persuasive argument that the platform support should be forked -
+obviously, having two different sets of drivers makes for more
+maintinance work which would be unfortunate.
+
 > Apparently there are also features like operating the SoC codec in slave mode
 > as well as different clock configurations wich mainline is missing.
 
-Yes, none of mainline SMDK supports SoC-Slave mode or sourcing I2S IP with
-various possible clocks(PCLK, EPLL, CDCLK) etc yet. Samsung tree has
-implemented
-and fully tested these features for 6410, 6440 and C100.
+Yes, the current drivers aren't entirely complete.  Most of what's
+needed is relatively minor, and much of it is largely outside the audio
+driver itself like the selection of alternate chip internal clock
+sources which is more an issue in the clock API.
 
-My idea is to submit only "better enabled" I2S driver with Slave support.
-Clock sourcing related patch maybe later added when the EPLL etc clock
-support has been submitted.
+> If you (Mark) would want to work on this, pleaes coordinate with Jaswinder so
+> there is no duplication of work.  I believe the most current driver source is
+> the one in the 2.6.29-samsung branch - but that one already has the s5pc stuff,
+> which will have to be removed for mainline right now.
 
-An issue though.
-In the long run, I see I2S drivers segregated by the I2S spec version
-they implement....
-S3C2410 has I2S-2.0, S3C6410 has I2S-3.2 and I2S-4.0, S5P6440 has
-I2S-4.0, S5PC100 has
-I2S-3.2 and I2S-5.1 and so on. That is, we have something like
-samsung-i2s_v20.c, samsung-i2s_v32.c,
-samsung-i2s_v40.c, samsung-i2s_v51.c.
-SoC specific register addresses and other peculiarities maybe
-differentiated by defines in coresp. header files.
-Let Samsung come with as many SoCs as it wishes, I2S support will
-simply end up in header files. Also, that we
-can do away with using s3c24xx stuff in 64xx and S5Pxxxx code.
-For now, I haven't implemented h/w mixing and 5.1 channel support so
-v32 and v40 are just the same.
-Whereas, mainline s3c-i2s approach currently concentrates on
-extracting common code in one file(s3c-i2s-v2.c) or so do i think.
+The easiest thing will just be if he monitors alsa-devel; any work will
+be visible there.  I don't envisage doing anything massively substantial
+myself in the immediate future.
 
-I sincerely seek to discuss this issue.
+I think the major thing here is to bring the Samsung code up to current
+kernel versions and start contributing to mainline as soon as possible -
+the problem here is divergent development.  There's other people with an
+interest in mainline support for audio on these processors too and the
+more rapidly things converge on a single tree the better.
