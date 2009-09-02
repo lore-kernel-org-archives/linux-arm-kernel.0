@@ -1,43 +1,24 @@
-From: laforge@gnumonks.org (Harald Welte)
-Date: Wed, 2 Sep 2009 21:15:59 +0900
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Wed, 02 Sep 2009 14:46:37 +0200
 Subject: Samsung S3C6410 mainline merge coordination
-In-Reply-To: <2accc2ff0909020251u4f242742k13aa74f03251b992@mail.gmail.com>
-References: <20090902031719.GK3838@prithivi.gnumonks.org>
-	<2accc2ff0909020251u4f242742k13aa74f03251b992@mail.gmail.com>
-Message-ID: <20090902121559.GV32606@prithivi.gnumonks.org>
+In-Reply-To: <200909021203.n82C3USg020804@chronolytics.com> (David F.
+	Carlson's message of "Wed\, 2 Sep 2009 08\:03\:30 -0400 \(EDT\)")
+References: <200909021203.n82C3USg020804@chronolytics.com>
+Message-ID: <877hwhpl8y.fsf@macbook.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nelson,
+>>>>> "David" == David F Carlson <dave@chronolytics.com> writes:
 
-On Wed, Sep 02, 2009 at 04:51:56AM -0500, Nelson Castillo wrote:
-> > * port existing s3c_ts driver to use s3c_adc_register()
-> > ** has anyone been doing wokr on this already? ben?
-> 
-> (jumping in)
-> 
-> I worked on this starting from some work done by other members of this
-> list. This is the ported version of the driver. It depends on the
-> touchscreen filters developed by Andy Green and enhanced by me while
-> working at Openmoko. I've already applied most of Andrew Morton's
-> feedback (a lot) to the TS filters but I haven't submitted them again
-> for upstream review (A filter still needs to be modified and I know
-> how to do it but I haven't finished this change).
+Hi,
 
-Hi, thanks for your feedback.  I think it is somewhat "dangerous" to create a
-dependency from s3c2410_ts (which schould be renamed to s3c_ts by now) to the
-ts_filter work.
+ David> I am also working on a "canonical" PWM backlight driver using
+ David> the pwm_bl lcd support and the 6410 pwm timer support in
+ David> next-s3c.  It is mostly working and should be ready to push
+ David> soon.
 
-I'd personally prefer to decouple those two, i.e. first submit the s3c_ts based
-on adc.c without ts_filter, and then add the ts_filter core (plus support
-for s3c_ts) later on.
+What are you missing from the generic pwm-backlight driver? That's what
+I'm using on the hmt.
 
-I suppose you don't mind, so we'll go ahead with this and submit s3c_ts this
-way.
-
-Regards,
 -- 
-- Harald Welte <laforge@gnumonks.org>           http://laforge.gnumonks.org/
-============================================================================
-"Privacy in residential applications is a desirable marketing option."
-                                                  (ETSI EN 300 175-7 Ch. A6)
+Bye, Peter Korsgaard
