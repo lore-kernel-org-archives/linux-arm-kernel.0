@@ -1,26 +1,53 @@
-From: hjk@linutronix.de (Hans J. Koch)
-Date: Wed, 2 Sep 2009 19:50:47 +0200
-Subject: AC97 on  i.MX27
-In-Reply-To: <OF744AA145.8166D38C-ONC1257625.0041CD11-C1257625.0041F924@phytec.de>
-References: <OF744AA145.8166D38C-ONC1257625.0041CD11-C1257625.0041F924@phytec.de>
-Message-ID: <20090902175046.GB3249@bluebox.local>
+From: nico@cam.org (Nicolas Pitre)
+Date: Wed, 02 Sep 2009 13:59:43 -0400 (EDT)
+Subject: ARM highmem stuff - 5687/1
+In-Reply-To: <alpine.LFD.2.00.0909021009010.6044@xanadu.home>
+References: <20090902135355.GB12595@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.0909021009010.6044@xanadu.home>
+Message-ID: <alpine.LFD.2.00.0909021331450.6044@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 02, 2009 at 01:59:50PM +0200, Jan Weitzel wrote:
-> Hello, 
-> I am trying to get an Wolfson WM9712L working with AC97 on a i.MX27. I saw 
-> some patches for 2.6.22 on the list. Does anybody have further worked on 
-> this, or is it a good point to start from? 
+On Wed, 2 Sep 2009, Nicolas Pitre wrote:
 
-Well, I've got it working with a UCB1400 codec/touch controller on a
-Garz&Fricke Neso board. But that's a bunch of patches on top of that
-dungheap of a Freescale queue. Really not worth posting that. It's
-basically Lothar's version with two or three fixes, mostly touchscreen
-related (we never used it for audio).
+> On Wed, 2 Sep 2009, Russell King - ARM Linux wrote:
+> 
+> > Do we need a similar fix for flush_anon_page()?
+> 
+> Hmmmm... Maybe.  Especially since the only usage of flush_anon_page() is 
+> in __get_user_pages() where the page passed to flush_anon_page() may or 
+> may not be kmapped (it is not explicitly kmapped in that function, but 
+> non atomic kmaps are lazily unmapped and would still require to be 
+> flushed if their mapping is still there).  However, in 
+> __get_user_pages(), there is a flush_dcache_page() right after the call 
+> to flush_anon_page(), so the __cpuc_flush_dcache_page() in 
+> __flush_anon_page() appears redundant to me and could simply be removed 
+> entirely.
 
-So yes, Lothar's patch is a good starting point. You might also have a
-look at Sascha's git tree, maybe he picked something up.
+Something like this:
 
-Thanks,
-Hans
+    [ARM] remove redundant cache flush from __flush_anon_page()
+    
+    The only usage of flush_anon_page() is in __get_user_pages() where
+    a call to flush_dcache_page() is performed immediately after the call
+    to flush_anon_page().  This makes the __cpuc_flush_dcache_page() in
+    __flush_anon_page() redundant.
+    
+    Signed-off-by: Nicolas Pitre <nico@marvell.com>
+
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index 575f3ad..c0f4039 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -262,11 +262,4 @@ void __flush_anon_page(struct vm_area_struct *vma, struct page *page, unsigned l
+ 		 */
+ 		flush_pfn_alias(pfn, vmaddr);
+ 	}
+-
+-	/*
+-	 * Invalidate kernel mapping.  No data should be contained
+-	 * in this mapping of the page.  FIXME: this is overkill
+-	 * since we actually ask for a write-back and invalidate.
+-	 */
+-	__cpuc_flush_dcache_page(page_address(page));
+ }
