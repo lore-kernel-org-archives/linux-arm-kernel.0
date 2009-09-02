@@ -1,37 +1,24 @@
 From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Wed, 2 Sep 2009 23:39:54 +0200
-Subject: [PATCH 2/2] U300 AB3100 boardinfo v3
-In-Reply-To: <20090902184234.GB10581@rakim.wolfsonmicro.main>
-References: <1251756324-24216-1-git-send-email-linus.walleij@stericsson.com>
-	<20090902184234.GB10581@rakim.wolfsonmicro.main>
-Message-ID: <63386a3d0909021439k784bc80et7e5cfa38987afefb@mail.gmail.com>
+Date: Wed, 2 Sep 2009 23:44:05 +0200
+Subject: [linux-pm] Montreal Linux Power Management Mini-Summit, July 13,
+	2009 - Meeting Notes
+In-Reply-To: <4A9E2EA7.8080700@st.com>
+References: <alpine.LFD.2.00.0905211430220.4390@localhost.localdomain>
+	<alpine.LFD.2.00.0907301801240.17818@localhost.localdomain>
+	<63386a3d0909011522m7a175d3eyb3bbe8a29a5fd104@mail.gmail.com>
+	<4A9E2EA7.8080700@st.com>
+Message-ID: <63386a3d0909021444i575f02a9n65c6c0a91e2a51f5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/9/2 Mark Brown <broonie@opensource.wolfsonmicro.com>:
+2009/9/2 Francesco VIRLINZI <francesco.virlinzi@st.com>:
 
-> On Tue, Sep 01, 2009 at 12:05:24AM +0200, Linus Walleij wrote:
->> This defines regulator platform data and board power
->> regulator hogs for the ST-Ericsson U300 platform.
->
-> This is pretty much OK, just...
->
->> +static struct regulator_consumer_supply supply_ldo_a[] = {
->> + ? ? {
->> + ? ? ? ? ? ? .dev = NULL,
->> + ? ? ? ? ? ? .supply = "vrad", /* Powers the radio */
->> + ? ? },
->> +};
->
-> Now you're using the regulator init stuff to set the voltages you should
-> be able to drop most of the deviceless supplies. ?I'd expect that you'd
-> want to keep the CPU core supplies for cpufreq support but the others
-> shouldn't need to be defined. ?The names can be set in the constraints
-> - if set there they will be displayed to user space which normally makes
-> the diagnostics easier to follow for board users.
+> I'm going to present a generic linux clock framework during the CELF-Europe
+> ?@
+> http://www.embeddedlinuxconference.com/elc_europe09/sessions.html#Virlinzi
 
-OK I'll drop them. I've got some other small fixups here so will push a v4
-once we clarified the initsettings too.
+Great stuff, are the patches already available or will you hold them
+until after your seminar?
 
 Yours,
 Linus Walleij
