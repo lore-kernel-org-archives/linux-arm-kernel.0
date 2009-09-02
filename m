@@ -1,28 +1,40 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 2 Sep 2009 20:10:26 +0100
-Subject: Samsung S3C6410 mainline merge coordination
-In-Reply-To: <20090902120159.GT32606@prithivi.gnumonks.org>
-References: <20090902031719.GK3838@prithivi.gnumonks.org>
-	<19987914.1168001251884594226.JavaMail.coremail@bj126app54.126.com>
-	<20090902120159.GT32606@prithivi.gnumonks.org>
-Message-ID: <20090902191026.GO25153@trinity.fluff.org>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Wed, 2 Sep 2009 21:10:48 +0200
+Subject: [lm-sensors] [PATCH] hwmon: Disable s3c-hwmon build for S3C64xx
+In-Reply-To: <1251110906-19010-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1251110906-19010-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <20090902211048.5c424d07@hyperion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 02, 2009 at 09:01:59PM +0900, Harald Welte wrote:
-> On Wed, Sep 02, 2009 at 05:43:14PM +0800, tommy.hong wrote:
-> 
-> > does it support X kdrive 2D accelerate ?
-> 
-> X / kdrive is not part of the linux kernel.  Therefore, it is unrelated
-> to the Linux kernel code that we are working on.
+Hi Mark,
 
-Unfortunately it seems that pretty much no-one uses the fb driver
-acceleration, I'm not even sure if it has even been exported outside
-the kernel, so isn't really a lot of use.
+On Mon, 24 Aug 2009 11:48:26 +0100, Mark Brown wrote:
+> The s3c-hwmon driver depends on the arch/arm implementation of the core
+> ADC support for the chip.  Since the S3C64xx version has not yet been
+> merged disable building of the driver on S3C64xx for now.
+> 
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+>  drivers/hwmon/Kconfig |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
+> index a54407b..fa94b56 100644
+> --- a/drivers/hwmon/Kconfig
+> +++ b/drivers/hwmon/Kconfig
+> @@ -704,7 +704,7 @@ config SENSORS_SHT15
+>  
+>  config SENSORS_S3C
+>  	tristate "S3C24XX/S3C64XX Inbuilt ADC"
+> -	depends on ARCH_S3C2410 || ARCH_S3C64XX
+> +	depends on ARCH_S3C2410
+>  	help
+>  	  If you say yes here you get support for the on-board ADCs of
+>  	  the Samsung S3C24XX or S3C64XX series of SoC
+
+I presume this is meant for 2.6.31 and should be sent to Linus very
+quickly?
 
 -- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Jean Delvare
