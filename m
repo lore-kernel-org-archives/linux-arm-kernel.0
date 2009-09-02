@@ -1,35 +1,30 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 2 Sep 2009 14:28:51 +0800
-Subject: [PATCH 2/5] Treo680: remove unused LCD power GPIO
-In-Reply-To: <f17812d70909012325h42a834cqad3627fb3e4fe62d@mail.gmail.com>
-References: <1251739561-28972-1-git-send-email-sleep_walker@suse.cz>
-	<200909011256.10882.sleep_walker@suse.cz> <4A9D0896.2000007@gmail.com>
-	<200909011814.03109.sleep_walker@suse.cz>
-	<f17812d70909012325h42a834cqad3627fb3e4fe62d@mail.gmail.com>
-Message-ID: <f17812d70909012328y78176439kd0b6f139020e9e5d@mail.gmail.com>
+From: arhuaco@freaks-unidos.net (Nelson Castillo)
+Date: Wed, 2 Sep 2009 04:51:56 -0500
+Subject: Samsung S3C6410 mainline merge coordination
+In-Reply-To: <20090902031719.GK3838@prithivi.gnumonks.org>
+References: <20090902031719.GK3838@prithivi.gnumonks.org>
+Message-ID: <2accc2ff0909020251u4f242742k13aa74f03251b992@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(sorry this might be html,send from my g1).
-currently, I dont think gpio for pxafb is necessary, request and init in
-board_init() should be just ok.
+> * port existing s3c_ts driver to use s3c_adc_register()
+> ** has anyone been doing wokr on this already? ben?
 
-On Sep 2, 2009 12:14 AM, "Tom?? &apos;Sleep_Walker&apos; ?ech" <
-sleep_walker@suse.cz> wrote:
+(jumping in)
 
-Hi,
+I worked on this starting from some work done by other members of this
+list. This is the ported version of the driver. It depends on the
+touchscreen filters developed by Andy Green and enhanced by me while
+working at Openmoko. I've already applied most of Andrew Morton's
+feedback (a lot) to the TS filters but I haven't submitted them again
+for upstream review (A filter still needs to be modified and I know
+how to do it but I haven't finished this change).
 
-Dne ?t 1. z??? 2009 13:42:14 Eric Miao napsal(a):
+http://nelson-patches.googlecode.com/svn/trunk/openmoko/kernel/ts-with-s3c-adc/s3c2410_ts.c
+http://nelson-patches.googlecode.com/svn/trunk/openmoko/kernel/ts-with-s3c-adc/
 
-> Tom?? 'Sleep_Walker' ?ech wrote: > > Hi, > > > > Dne ?t 1. z??? 2009
-11:49:24 Eric Miao napsal(a)...
-There can be problem with this. It's easy to create such function, but there
-is no place for initialization so I would need to call gpio_register() and
-gpio_direction_output() in machine init function or even elsewhere which I
-find a bit nasty. Should I try to update pxafb to support LCD power through
-GPIO too or go nasty way?
+One problem here is that we need to find a way to do this in a cleaner way:
 
-Thanks Best regards, Tomas Cech
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090902/6d8e7e61/attachment.htm>
+http://nelson-patches.googlecode.com/svn/trunk/openmoko/kernel/ts-with-s3c-adc/s3c-adc-add-delay.patch
+
+Nelson.-
