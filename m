@@ -1,156 +1,214 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Wed,  2 Sep 2009 22:47:54 +0200
-Subject: [PATCH 1/5] USB OTG: add support for ulpi connected external
-	transceivers
-In-Reply-To: <1251924478-30651-1-git-send-email-daniel@caiaq.de>
+Date: Wed,  2 Sep 2009 22:47:58 +0200
+Subject: [PATCH 5/5] MX3: add USB support for lilly1131
+In-Reply-To: <1251924478-30651-5-git-send-email-daniel@caiaq.de>
 References: <1251924478-30651-1-git-send-email-daniel@caiaq.de>
-Message-ID: <1251924478-30651-2-git-send-email-daniel@caiaq.de>
+	<1251924478-30651-2-git-send-email-daniel@caiaq.de>
+	<1251924478-30651-3-git-send-email-daniel@caiaq.de>
+	<1251924478-30651-4-git-send-email-daniel@caiaq.de>
+	<1251924478-30651-5-git-send-email-daniel@caiaq.de>
+Message-ID: <1251924478-30651-6-git-send-email-daniel@caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for OTG transceivers directly connected to the ULPI
-interface. In particular, the following details are added
-
-- a struct for low level io functions (read/write)
-- a priv field to be used as 'viewport' by low level access functions
-- an (*init) and (*shutdown) callbacks, along with static inline helpers
-- a (*set_vbus) callback to switch the port power on and off
-- a flags field for per-transceiver settings
-- some defines for the flags bitmask to configure platform specific
-  details
+This adds support for OTG, host1 and host2 ports on lilly1131.
 
 Signed-off-by: Daniel Mack <daniel@caiaq.de>
-Cc: Greg Kroah-Hartman <gregkh@suse.de>
-Cc: David Brownell <dbrownell@users.sourceforge.net>
-Cc: linux-usb at vger.kernel.org
 ---
- include/linux/usb/otg.h |   68 ++++++++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 67 insertions(+), 1 deletions(-)
+ arch/arm/mach-mx3/Kconfig     |    1 +
+ arch/arm/mach-mx3/mx31lilly.c |  147 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 148 insertions(+), 0 deletions(-)
 
-diff --git a/include/linux/usb/otg.h b/include/linux/usb/otg.h
-index 2443c0e..52bb917 100644
---- a/include/linux/usb/otg.h
-+++ b/include/linux/usb/otg.h
-@@ -33,6 +33,23 @@ enum usb_otg_state {
- 	OTG_STATE_A_VBUS_ERR,
+diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
+index 851f245..d69fa73 100644
+--- a/arch/arm/mach-mx3/Kconfig
++++ b/arch/arm/mach-mx3/Kconfig
+@@ -68,6 +68,7 @@ config MACH_MX31MOBOARD
+ config MACH_MX31LILLY
+ 	bool "Support MX31 LILLY-1131 platforms (INCO startec)"
+ 	select ARCH_MX31
++	select MXC_ULPI
+ 	help
+ 	  Include support for mx31 based LILLY1131 modules. This includes
+ 	  specific configurations for the board and its peripherals.
+diff --git a/arch/arm/mach-mx3/mx31lilly.c b/arch/arm/mach-mx3/mx31lilly.c
+index 4230251..e75c232 100644
+--- a/arch/arm/mach-mx3/mx31lilly.c
++++ b/arch/arm/mach-mx3/mx31lilly.c
+@@ -31,6 +31,10 @@
+ #include <linux/interrupt.h>
+ #include <linux/smsc911x.h>
+ #include <linux/mtd/physmap.h>
++#include <linux/delay.h>
++#include <linux/gpio.h>
++#include <linux/usb/otg.h>
++#include <linux/usb/ulpi.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -41,6 +45,8 @@
+ #include <mach/common.h>
+ #include <mach/iomux-mx3.h>
+ #include <mach/board-mx31lilly.h>
++#include <mach/mxc_ehci.h>
++#include <mach/ulpi.h>
+ 
+ #include "devices.h"
+ 
+@@ -105,6 +111,137 @@ static struct platform_device physmap_flash_device = {
+ 	.num_resources = 1,
  };
  
-+#define USB_OTG_PULLUP_ID		(1 << 0)
-+#define USB_OTG_PULLDOWN_DP		(1 << 1)
-+#define USB_OTG_PULLDOWN_DM		(1 << 2)
-+#define USB_OTG_EXT_VBUS_INDICATOR	(1 << 3)
-+#define USB_OTG_DRV_VBUS		(1 << 4)
-+#define USB_OTG_DRV_VBUS_EXT		(1 << 5)
++/* USB */
 +
-+struct otg_transceiver;
++#define USB_PAD_CFG (PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST | PAD_CTL_HYS_CMOS | \
++			PAD_CTL_ODE_CMOS | PAD_CTL_100K_PU)
 +
-+/* for transceivers connected thru an ULPI interface, the user must
-+ * provide access ops
-+ */
-+struct otg_io_access_ops {
-+	int (*read)(struct otg_transceiver *otg, u32 reg);
-+	int (*write)(struct otg_transceiver *otg, u32 val, u32 reg);
-+};
-+
- /*
-  * the otg driver needs to interact with both device side and host side
-  * usb controllers.  it decides which controller is active@a given
-@@ -42,6 +59,7 @@ enum usb_otg_state {
- struct otg_transceiver {
- 	struct device		*dev;
- 	const char		*label;
-+	unsigned int		 flags;
- 
- 	u8			default_a;
- 	enum usb_otg_state	state;
-@@ -49,10 +67,17 @@ struct otg_transceiver {
- 	struct usb_bus		*host;
- 	struct usb_gadget	*gadget;
- 
-+	struct otg_io_access_ops	*io_ops;
-+	void __iomem			*io_priv;
-+
- 	/* to pass extra port status to the root hub */
- 	u16			port_status;
- 	u16			port_change;
- 
-+	/* initialize/shutdown the OTG controller */
-+	int	(*init)(struct otg_transceiver *otg);
-+	void	(*shutdown)(struct otg_transceiver *otg);
-+
- 	/* bind/unbind the host controller */
- 	int	(*set_host)(struct otg_transceiver *otg,
- 				struct usb_bus *host);
-@@ -65,6 +90,10 @@ struct otg_transceiver {
- 	int	(*set_power)(struct otg_transceiver *otg,
- 				unsigned mA);
- 
-+	/* effective for A-peripheral, ignored for B devices */
-+	int	(*set_vbus)(struct otg_transceiver *otg,
-+				bool enabled);
-+
- 	/* for non-OTG B devices: set transceiver into suspend mode */
- 	int	(*set_suspend)(struct otg_transceiver *otg,
- 				int suspend);
-@@ -85,6 +114,38 @@ extern int otg_set_transceiver(struct otg_transceiver *);
- extern void usb_nop_xceiv_register(void);
- extern void usb_nop_xceiv_unregister(void);
- 
-+/* helpers for direct access thru low-level io interface */
-+static inline int otg_io_read(struct otg_transceiver *otg, u32 reg)
++static int usbotg_init(struct platform_device *pdev)
 +{
-+	if (otg->io_ops && otg->io_ops->read)
-+		return otg->io_ops->read(otg, reg);
++	unsigned int pins[] = {
++		MX31_PIN_USBOTG_DATA0__USBOTG_DATA0,
++		MX31_PIN_USBOTG_DATA1__USBOTG_DATA1,
++		MX31_PIN_USBOTG_DATA2__USBOTG_DATA2,
++		MX31_PIN_USBOTG_DATA3__USBOTG_DATA3,
++		MX31_PIN_USBOTG_DATA4__USBOTG_DATA4,
++		MX31_PIN_USBOTG_DATA5__USBOTG_DATA5,
++		MX31_PIN_USBOTG_DATA6__USBOTG_DATA6,
++		MX31_PIN_USBOTG_DATA7__USBOTG_DATA7,
++		MX31_PIN_USBOTG_CLK__USBOTG_CLK,
++		MX31_PIN_USBOTG_DIR__USBOTG_DIR,
++		MX31_PIN_USBOTG_NXT__USBOTG_NXT,
++		MX31_PIN_USBOTG_STP__USBOTG_STP,
++	};
 +
-+	return -EINVAL;
-+}
++	mxc_iomux_setup_multiple_pins(pins, ARRAY_SIZE(pins), "USB OTG");
 +
-+static inline int otg_io_write(struct otg_transceiver *otg, u32 reg, u32 val)
-+{
-+	if (otg->io_ops && otg->io_ops->write)
-+		return otg->io_ops->write(otg, reg, val);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA0, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA1, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA2, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA3, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA4, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA5, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA6, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA7, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_CLK, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DIR, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_NXT, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_STP, USB_PAD_CFG);
 +
-+	return -EINVAL;
-+}
++	mxc_iomux_set_gpr(MUX_PGP_USB_4WIRE, true);
++	mxc_iomux_set_gpr(MUX_PGP_USB_COMMON, true);
 +
-+static inline int
-+otg_init(struct otg_transceiver *otg)
-+{
-+	if (otg->init)
-+		return otg->init(otg);
++	/* chip select */
++	mxc_iomux_alloc_pin(IOMUX_MODE(MX31_PIN_DTR_DCE2, IOMUX_CONFIG_GPIO),
++				"USBOTG_CS");
++	gpio_request(IOMUX_TO_GPIO(MX31_PIN_DTR_DCE2), "USBH1 CS");
++	gpio_direction_output(IOMUX_TO_GPIO(MX31_PIN_DTR_DCE2), 0);
 +
 +	return 0;
 +}
 +
-+static inline void
-+otg_shutdown(struct otg_transceiver *otg)
++static int usbh1_init(struct platform_device *pdev)
 +{
-+	if (otg->shutdown)
-+		otg->shutdown(otg);
++	int pins[] = {
++		MX31_PIN_CSPI1_MOSI__USBH1_RXDM,
++		MX31_PIN_CSPI1_MISO__USBH1_RXDP,
++		MX31_PIN_CSPI1_SS0__USBH1_TXDM,
++		MX31_PIN_CSPI1_SS1__USBH1_TXDP,
++		MX31_PIN_CSPI1_SS2__USBH1_RCV,
++		MX31_PIN_CSPI1_SCLK__USBH1_OEB,
++		MX31_PIN_CSPI1_SPI_RDY__USBH1_FS,
++	};
++
++	mxc_iomux_setup_multiple_pins(pins, ARRAY_SIZE(pins), "USB H1");
++
++	mxc_iomux_set_pad(MX31_PIN_CSPI1_MOSI, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_CSPI1_MISO, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_CSPI1_SS0, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_CSPI1_SS1, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_CSPI1_SS2, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_CSPI1_SCLK, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_CSPI1_SPI_RDY, USB_PAD_CFG);
++
++	mxc_iomux_set_gpr(MUX_PGP_USB_SUSPEND, true);
++
++	return 0;
 +}
++
++static int usbh2_init(struct platform_device *pdev)
++{
++	int pins[] = {
++		MX31_PIN_USBH2_DATA0__USBH2_DATA0,
++		MX31_PIN_USBH2_DATA1__USBH2_DATA1,
++		MX31_PIN_USBH2_CLK__USBH2_CLK,
++		MX31_PIN_USBH2_DIR__USBH2_DIR,
++		MX31_PIN_USBH2_NXT__USBH2_NXT,
++		MX31_PIN_USBH2_STP__USBH2_STP,
++	};
++
++	mxc_iomux_setup_multiple_pins(pins, ARRAY_SIZE(pins), "USB H2");
++
++	mxc_iomux_set_pad(MX31_PIN_USBH2_CLK, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBH2_DIR, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBH2_NXT, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBH2_STP, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA0, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA1, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_SRXD6, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_STXD6, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_SFS3, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_SCK3, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_SRXD3, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_STXD3, USB_PAD_CFG);
++
++	mxc_iomux_set_gpr(MUX_PGP_UH2, true);
++
++	/* chip select */
++	mxc_iomux_alloc_pin(IOMUX_MODE(MX31_PIN_DTR_DCE1, IOMUX_CONFIG_GPIO),
++				"USBH2_CS");
++	gpio_request(IOMUX_TO_GPIO(MX31_PIN_DTR_DCE1), "USBH2 CS");
++	gpio_direction_output(IOMUX_TO_GPIO(MX31_PIN_DTR_DCE1), 0);
++
++	return 0;
++}
++
++static struct mxc_usbh_platform_data usbotg_pdata = {
++	.init	= usbotg_init,
++	.portsc	= MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
++	.flags	= MXC_EHCI_POWER_PINS_ENABLED,
++};
++
++static struct mxc_usbh_platform_data usbh1_pdata = {
++	.init	= usbh1_init,
++	.portsc	= MXC_EHCI_MODE_UTMI | MXC_EHCI_SERIAL,
++	.flags	= MXC_EHCI_POWER_PINS_ENABLED | MXC_EHCI_INTERFACE_SINGLE_UNI,
++};
++
++static struct mxc_usbh_platform_data usbh2_pdata = {
++	.init	= usbh2_init,
++	.portsc	= MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
++	.flags	= MXC_EHCI_POWER_PINS_ENABLED,
++};
++
+ static struct platform_device *devices[] __initdata = {
+ 	&smsc91x_device,
+ 	&physmap_flash_device,
+@@ -132,6 +269,16 @@ static void __init mx31lilly_board_init(void)
+ 	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_MISO__SDA, "I2C SDA");
  
- /* for usb host and peripheral controller drivers */
- extern struct otg_transceiver *otg_get_transceiver(void);
-@@ -97,6 +158,12 @@ otg_start_hnp(struct otg_transceiver *otg)
- 	return otg->start_hnp(otg);
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
++
++	/* USB */
++	usbotg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
++				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
++	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
++				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
++
++	mxc_register_device(&mxc_otg_host, &usbotg_pdata);
++	mxc_register_device(&mxc_usbh1, &usbh1_pdata);
++	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
  }
  
-+/* Context: can sleep */
-+static inline int
-+otg_set_vbus(struct otg_transceiver *otg, bool enabled)
-+{
-+	return otg->set_vbus(otg, enabled);
-+}
- 
- /* for HCDs */
- static inline int
-@@ -105,7 +172,6 @@ otg_set_host(struct otg_transceiver *otg, struct usb_bus *host)
- 	return otg->set_host(otg, host);
- }
- 
--
- /* for usb peripheral controller drivers */
- 
- /* Context: can sleep */
+ static void __init mx31lilly_timer_init(void)
 -- 
 1.6.3.3
