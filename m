@@ -1,24 +1,26 @@
 From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Wed, 02 Sep 2009 14:46:37 +0200
+Date: Wed, 02 Sep 2009 14:49:00 +0200
 Subject: Samsung S3C6410 mainline merge coordination
-In-Reply-To: <200909021203.n82C3USg020804@chronolytics.com> (David F.
-	Carlson's message of "Wed\, 2 Sep 2009 08\:03\:30 -0400 \(EDT\)")
-References: <200909021203.n82C3USg020804@chronolytics.com>
-Message-ID: <877hwhpl8y.fsf@macbook.be.48ers.dk>
+In-Reply-To: <20090902031719.GK3838@prithivi.gnumonks.org> (Harald Welte's
+	message of "Wed\, 2 Sep 2009 12\:17\:19 +0900")
+References: <20090902031719.GK3838@prithivi.gnumonks.org>
+Message-ID: <873a75pl4z.fsf@macbook.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "David" == David F Carlson <dave@chronolytics.com> writes:
+>>>>> "Harald" == Harald Welte <laforge@gnumonks.org> writes:
 
 Hi,
 
- David> I am also working on a "canonical" PWM backlight driver using
- David> the pwm_bl lcd support and the 6410 pwm timer support in
- David> next-s3c.  It is mostly working and should be ready to push
- David> soon.
+ Harald> === NAND ===
+ Harald> * mainline currently uses same driver for s3c24xx and s3c64xx
+ Harald> ** samsung uses a new driver for 2450, 6400, 6410 (and later)
+ Harald> * does it make sense to extend the mainline driver with new SoC support
+ Harald>   or should we rather split the mainline driver?
 
-What are you missing from the generic pwm-backlight driver? That's what
-I'm using on the hmt.
+The nand controllers in the different variants are afaik very similar,
+that's why I added 64xx support to s3c2410.c. What would a split gain
+us?
 
 -- 
 Bye, Peter Korsgaard
