@@ -1,19 +1,101 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 2 Sep 2009 16:07:03 +0200
-Subject: AC97 on  i.MX27
-In-Reply-To: <OF744AA145.8166D38C-ONC1257625.0041CD11-C1257625.0041F924@phytec.de>
-References: <OF744AA145.8166D38C-ONC1257625.0041CD11-C1257625.0041F924@phytec.de>
-Message-ID: <200909021607.03679.marek.vasut@gmail.com>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Wed,  2 Sep 2009 20:19:58 +0300
+Subject: [PATCH] ARM: copy_page.S: take into account the size of the cache line
+In-Reply-To: <20090902132423.GA12595@n2100.arm.linux.org.uk>
+References: <20090902132423.GA12595@n2100.arm.linux.org.uk>
+Message-ID: <1251911998-3112-1-git-send-email-kirill@shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne St 2. z??? 2009 13:59:50 Jan Weitzel napsal(a):
-> Hello,
-> I am trying to get an Wolfson WM9712L working with AC97 on a i.MX27. I saw
-> some patches for 2.6.22 on the list. Does anybody have further worked on
-> this, or is it a good point to start from?
+Optimized version of copy_page() was written with assumption that cache
+line size is 32 bytes. On Cortex-A8 cache line size is 64 bytes.
 
-WM9712 is supported by mainline kernel since long ago.
->
-> Kind Regards
-> Jan Weitzel
+This patch tries to generalize copy_page() to work with any cache line
+size if cache line size is multiple of 16 and page size is multiple of
+two cache line size.
+
+After this optimization we've got ~25% speedup on OMAP3(tested in
+userspace).
+
+There is test for kernelspace which trigger copy-on-write after fork():
+
+ #include <stdlib.h>
+ #include <string.h>
+ #include <unistd.h>
+
+ #define BUF_SIZE (10000*4096)
+ #define NFORK 200
+
+ int main(int argc, char **argv)
+ {
+         char *buf = malloc(BUF_SIZE);
+         int i;
+
+         memset(buf, 0, BUF_SIZE);
+
+         for(i = 0; i < NFORK; i++) {
+                 if (fork()) {
+                         wait(NULL);
+                 } else {
+                         int j;
+
+                         for(j = 0; j < BUF_SIZE; j+= 4096)
+                                 buf[j] = (j & 0xFF) + 1;
+                         break;
+                 }
+         }
+
+         free(buf);
+         return 0;
+ }
+
+Before optimization this test takes ~66 seconds, after optimization
+takes ~56 seconds.
+
+Signed-off-by: Siarhei Siamashka <siarhei.siamashka@nokia.com>
+Signed-off-by: Kirill A. Shutemov <kirill@shutemov.name>
+---
+ arch/arm/lib/copy_page.S |   16 ++++++++--------
+ 1 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/lib/copy_page.S b/arch/arm/lib/copy_page.S
+index 6ae04db..6ee2f67 100644
+--- a/arch/arm/lib/copy_page.S
++++ b/arch/arm/lib/copy_page.S
+@@ -12,8 +12,9 @@
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
+ #include <asm/asm-offsets.h>
++#include <asm/cache.h>
+ 
+-#define COPY_COUNT (PAGE_SZ/64 PLD( -1 ))
++#define COPY_COUNT (PAGE_SZ / (2 * L1_CACHE_BYTES) PLD( -1 ))
+ 
+ 		.text
+ 		.align	5
+@@ -26,17 +27,16 @@
+ ENTRY(copy_page)
+ 		stmfd	sp!, {r4, lr}			@	2
+ 	PLD(	pld	[r1, #0]		)
+-	PLD(	pld	[r1, #32]		)
++	PLD(	pld	[r1, #L1_CACHE_BYTES]		)
+ 		mov	r2, #COPY_COUNT			@	1
+ 		ldmia	r1!, {r3, r4, ip, lr}		@	4+1
+-1:	PLD(	pld	[r1, #64]		)
+-	PLD(	pld	[r1, #96]		)
+-2:		stmia	r0!, {r3, r4, ip, lr}		@	4
+-		ldmia	r1!, {r3, r4, ip, lr}		@	4+1
+-		stmia	r0!, {r3, r4, ip, lr}		@	4
+-		ldmia	r1!, {r3, r4, ip, lr}		@	4+1
++1:	PLD(	pld	[r1, #2 * L1_CACHE_BYTES])
++	PLD(	pld	[r1, #3 * L1_CACHE_BYTES])
++2:
++	.rept	(2 * L1_CACHE_BYTES / 16 - 1)
+ 		stmia	r0!, {r3, r4, ip, lr}		@	4
+ 		ldmia	r1!, {r3, r4, ip, lr}		@	4
++	.endr
+ 		subs	r2, r2, #1			@	1
+ 		stmia	r0!, {r3, r4, ip, lr}		@	4
+ 		ldmgtia	r1!, {r3, r4, ip, lr}		@	4
+-- 
+1.6.4.2
