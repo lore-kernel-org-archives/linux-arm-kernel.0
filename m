@@ -1,26 +1,47 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Wed, 02 Sep 2009 14:49:00 +0200
-Subject: Samsung S3C6410 mainline merge coordination
-In-Reply-To: <20090902031719.GK3838@prithivi.gnumonks.org> (Harald Welte's
-	message of "Wed\, 2 Sep 2009 12\:17\:19 +0900")
-References: <20090902031719.GK3838@prithivi.gnumonks.org>
-Message-ID: <873a75pl4z.fsf@macbook.be.48ers.dk>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Wed,  2 Sep 2009 19:11:52 +0300
+Subject: [PATCH 1/2] ARM: Introduce ARM_L1_CACHE_SHIFT to define cache line
+	size
+Message-ID: <1251907913-16261-1-git-send-email-kirill@shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Harald" == Harald Welte <laforge@gnumonks.org> writes:
+Currently kernel believes that all ARM CPUs have L1_CACHE_SHIFT == 5.
+It's not true at least for CPUs based on Cortex-A8.
 
-Hi,
+List of CPUs with cache line size != 32 should be expanded later.
 
- Harald> === NAND ===
- Harald> * mainline currently uses same driver for s3c24xx and s3c64xx
- Harald> ** samsung uses a new driver for 2450, 6400, 6410 (and later)
- Harald> * does it make sense to extend the mainline driver with new SoC support
- Harald>   or should we rather split the mainline driver?
+Signed-off-by: Kirill A. Shutemov <kirill@shutemov.name>
+---
+ arch/arm/include/asm/cache.h |    2 +-
+ arch/arm/mm/Kconfig          |    5 +++++
+ 2 files changed, 6 insertions(+), 1 deletions(-)
 
-The nand controllers in the different variants are afaik very similar,
-that's why I added 64xx support to s3c2410.c. What would a split gain
-us?
-
+diff --git a/arch/arm/include/asm/cache.h b/arch/arm/include/asm/cache.h
+index feaa75f..2ee7743 100644
+--- a/arch/arm/include/asm/cache.h
++++ b/arch/arm/include/asm/cache.h
+@@ -4,7 +4,7 @@
+ #ifndef __ASMARM_CACHE_H
+ #define __ASMARM_CACHE_H
+ 
+-#define L1_CACHE_SHIFT		5
++#define L1_CACHE_SHIFT		(CONFIG_ARM_L1_CACHE_SHIFT)
+ #define L1_CACHE_BYTES		(1 << L1_CACHE_SHIFT)
+ 
+ /*
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 83c025e..3c37d4c 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -771,3 +771,8 @@ config CACHE_XSC3L2
+ 	select OUTER_CACHE
+ 	help
+ 	  This option enables the L2 cache on XScale3.
++
++config ARM_L1_CACHE_SHIFT
++	int
++	default 6 if ARCH_OMAP3
++	default 5
 -- 
-Bye, Peter Korsgaard
+1.6.3.4
