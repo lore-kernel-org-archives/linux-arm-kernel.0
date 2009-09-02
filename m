@@ -1,63 +1,30 @@
-From: francesco.virlinzi@st.com (Francesco VIRLINZI)
-Date: Wed, 02 Sep 2009 10:36:55 +0200
-Subject: [linux-pm] Montreal Linux Power Management Mini-Summit, July
-	13,	2009 - 	Meeting Notes
-In-Reply-To: <63386a3d0909011522m7a175d3eyb3bbe8a29a5fd104@mail.gmail.com>
-References: <alpine.LFD.2.00.0905211430220.4390@localhost.localdomain>	<alpine.LFD.2.00.0907301801240.17818@localhost.localdomain>
-	<63386a3d0909011522m7a175d3eyb3bbe8a29a5fd104@mail.gmail.com>
-Message-ID: <4A9E2EA7.8080700@st.com>
+From: sleep_walker@suse.cz (=?utf-8?q?Tom=C3=A1=C5=A1_=27Sleep=5FWalker=27?=
+	=?utf-8?q?_=C4=8Cech?=)
+Date: Wed, 2 Sep 2009 10:45:07 +0200
+Subject: [PATCH 2/5] Treo680: remove unused LCD power GPIO
+In-Reply-To: <f17812d70909012328y78176439kd0b6f139020e9e5d@mail.gmail.com>
+References: <1251739561-28972-1-git-send-email-sleep_walker@suse.cz>
+	<f17812d70909012325h42a834cqad3627fb3e4fe62d@mail.gmail.com>
+	<f17812d70909012328y78176439kd0b6f139020e9e5d@mail.gmail.com>
+Message-ID: <200909021045.07505.sleep_walker@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus
-FYI:
-I'm going to present a generic linux clock framework during the CELF-Europe
-  @
-http://www.embeddedlinuxconference.com/elc_europe09/sessions.html#Virlinzi
+Hi,
+Dne St 2. z??? 2009 08:28:51 Eric Miao napsal(a):
+> (sorry this might be html,send from my g1).
+> currently, I dont think gpio for pxafb is necessary, request and init in
+> board_init() should be just ok.
 
-It's integrated in the LDM via platform_driver and platform_device.
+ok then. Here goes patch.
 
-It would be a proposal but it doesn't use the CPUFreq.
+Best regards,
 
-It uses struct clk to identify each phisical the clock in the system
-  and it adds clock information to the platform_device to link each
-  device to the clock it uses.
-
-Regards
-  Francesco
-
-On 09/02/2009 12:22 AM, Linus Walleij wrote:
-> 2009/7/31 Len Brown<lenb@kernel.org>:
->
->    
->> A Linux Power Management "mini-summit" was held on July 13th, 2009 -
->> on the first day of the Montreal Linux Symposium.
->> (...)
->>      
->    
->> SH running cpufreq on top of clock framework
->>         cpufreq has notifiers, clock framework does not
->>      
-> Hm! Paul can you elaborate on what that was about.
->
-> I've felt a need for clock notifiers and we've cheated by using
-> CPUfreq because it so happens that the clocking in system-wide
-> and whenever the CPU freq change so may the other clocks.
->
-> But if I put code into a PrimeCell MMC/SPI/I2C driver or whatever and
-> use CPUfreq that's very unelegant, and for other platforms where
-> the CPU freq don't change when this particular device clk freq
-> change plain misleading.
->
-> A clk pre/postchange notifier pair would really help and would
-> make for elegant drivers that can handle clock freq transitions.
->
-> Has anyone poked at this?
->
-> Linus Walleij
-> _______________________________________________
-> linux-pm mailing list
-> linux-pm at lists.linux-foundation.org
-> https://lists.linux-foundation.org/mailman/listinfo/linux-pm
->
->    
+Tomas Cech
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-Treo680-move-LCD-power-GPIO-to-proper-place.patch
+Type: text/x-patch
+Size: 2734 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090902/3286c3b4/attachment.bin>
