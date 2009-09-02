@@ -1,33 +1,63 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 2 Sep 2009 10:22:09 +0200
-Subject: My first patch to the mailist, but being held
-In-Reply-To: <1251814118.16594.292.camel@macbook.infradead.org>
-References: <e68bb3470909010616n74326317s49c27e8c8cbcbc4a@mail.gmail.com>
-	<f17812d70909010655t139a10d1y7b421cd244d91737@mail.gmail.com>
-	<e68bb3470909010705v2219191dtce02f6bfc29d9647@mail.gmail.com>
-	<1251814118.16594.292.camel@macbook.infradead.org>
-Message-ID: <20090902082208.GA1695@ucw.cz>
+From: francesco.virlinzi@st.com (Francesco VIRLINZI)
+Date: Wed, 02 Sep 2009 10:36:55 +0200
+Subject: [linux-pm] Montreal Linux Power Management Mini-Summit, July
+	13,	2009 - 	Meeting Notes
+In-Reply-To: <63386a3d0909011522m7a175d3eyb3bbe8a29a5fd104@mail.gmail.com>
+References: <alpine.LFD.2.00.0905211430220.4390@localhost.localdomain>	<alpine.LFD.2.00.0907301801240.17818@localhost.localdomain>
+	<63386a3d0909011522m7a175d3eyb3bbe8a29a5fd104@mail.gmail.com>
+Message-ID: <4A9E2EA7.8080700@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Linus
+FYI:
+I'm going to present a generic linux clock framework during the CELF-Europe
+  @
+http://www.embeddedlinuxconference.com/elc_europe09/sessions.html#Virlinzi
 
-> > Yes, I think so too, due to I never meet this type 'held' in LAKML and
-> > LKML, so I am amazed at this 'held' in the list.
-> 
-> Not all of the mailman settings were imported from the old list to the
-> new one. If the moderators want to increase the size limit, they are
-> free to do that -- the hardware can certainly cope.
+It's integrated in the LDM via platform_driver and platform_device.
 
-Could we do that?
+It would be a proposal but it doesn't use the CPUFreq.
 
-> But Eric is right that patches above 40KiB are fairly suspect anyway --
-> why is it so large?
+It uses struct clk to identify each phisical the clock in the system
+  and it adds clock information to the platform_device to link each
+  device to the clock it uses.
 
-Not all patches are for inclusion, some are for comments, and some
-drivers are fairly big (dream camera). lkml has limit 400KB iirc, so
-40KB is very low...
+Regards
+  Francesco
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+On 09/02/2009 12:22 AM, Linus Walleij wrote:
+> 2009/7/31 Len Brown<lenb@kernel.org>:
+>
+>    
+>> A Linux Power Management "mini-summit" was held on July 13th, 2009 -
+>> on the first day of the Montreal Linux Symposium.
+>> (...)
+>>      
+>    
+>> SH running cpufreq on top of clock framework
+>>         cpufreq has notifiers, clock framework does not
+>>      
+> Hm! Paul can you elaborate on what that was about.
+>
+> I've felt a need for clock notifiers and we've cheated by using
+> CPUfreq because it so happens that the clocking in system-wide
+> and whenever the CPU freq change so may the other clocks.
+>
+> But if I put code into a PrimeCell MMC/SPI/I2C driver or whatever and
+> use CPUfreq that's very unelegant, and for other platforms where
+> the CPU freq don't change when this particular device clk freq
+> change plain misleading.
+>
+> A clk pre/postchange notifier pair would really help and would
+> make for elegant drivers that can handle clock freq transitions.
+>
+> Has anyone poked at this?
+>
+> Linus Walleij
+> _______________________________________________
+> linux-pm mailing list
+> linux-pm at lists.linux-foundation.org
+> https://lists.linux-foundation.org/mailman/listinfo/linux-pm
+>
+>    
