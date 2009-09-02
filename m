@@ -1,101 +1,78 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Wed,  2 Sep 2009 20:19:58 +0300
-Subject: [PATCH] ARM: copy_page.S: take into account the size of the cache line
-In-Reply-To: <20090902132423.GA12595@n2100.arm.linux.org.uk>
-References: <20090902132423.GA12595@n2100.arm.linux.org.uk>
-Message-ID: <1251911998-3112-1-git-send-email-kirill@shutemov.name>
+From: broonie@sirena.org.uk (Mark Brown)
+Date: Wed, 2 Sep 2009 15:47:00 +0100
+Subject: Samsung S3C6410 mainline merge coordination
+In-Reply-To: <1b68c6790909020644k757827f4kf590779f384ceccb@mail.gmail.com>
+References: <20090902031719.GK3838@prithivi.gnumonks.org>
+	<20090902100500.GA4012@sirena.org.uk>
+	<20090902121158.GU32606@prithivi.gnumonks.org>
+	<1b68c6790909020644k757827f4kf590779f384ceccb@mail.gmail.com>
+Message-ID: <20090902144700.GD4012@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Optimized version of copy_page() was written with assumption that cache
-line size is 32 bytes. On Cortex-A8 cache line size is 64 bytes.
+On Wed, Sep 02, 2009 at 10:44:35PM +0900, jassi brar wrote:
 
-This patch tries to generalize copy_page() to work with any cache line
-size if cache line size is multiple of 16 and page size is multiple of
-two cache line size.
+> Yes, none of mainline SMDK supports SoC-Slave mode or sourcing I2S IP with
+> various possible clocks(PCLK, EPLL, CDCLK) etc yet. Samsung tree has
+> implemented
+> and fully tested these features for 6410, 6440 and C100.
 
-After this optimization we've got ~25% speedup on OMAP3(tested in
-userspace).
+There's existing users in mainline with the S3C24xx working as slave,
+including some for which I have hardware so I'm fairly confident that
+that should work.
 
-There is test for kernelspace which trigger copy-on-write after fork():
+I've also had reports that the S3C64xx works as slave in mainline, the
+code certainly claims that it should work.  At the minute it's limited
+to only one of the external clock sources and one of the internal clock
+sources, though (I'd need to go and look to see which).
 
- #include <stdlib.h>
- #include <string.h>
- #include <unistd.h>
+> My idea is to submit only "better enabled" I2S driver with Slave support.
 
- #define BUF_SIZE (10000*4096)
- #define NFORK 200
+In general it's much better (and certainly standard practice within
+Linux) to enhance and refactor existing drivers incrementally rather
+than provide entirely new drivers.  The idea is to avoid confusion
+between the variants and issues that can come from replacing one set of
+problems with another.
 
- int main(int argc, char **argv)
- {
-         char *buf = malloc(BUF_SIZE);
-         int i;
+Sometimes a flag day is unavoidable but it's best to at least explore
+other options first.
 
-         memset(buf, 0, BUF_SIZE);
+> In the long run, I see I2S drivers segregated by the I2S spec version
+> they implement....
+> S3C2410 has I2S-2.0, S3C6410 has I2S-3.2 and I2S-4.0, S5P6440 has
+> I2S-4.0, S5PC100 has
+> I2S-3.2 and I2S-5.1 and so on. That is, we have something like
+> samsung-i2s_v20.c, samsung-i2s_v32.c,
+> samsung-i2s_v40.c, samsung-i2s_v51.c.
 
-         for(i = 0; i < NFORK; i++) {
-                 if (fork()) {
-                         wait(NULL);
-                 } else {
-                         int j;
+It really depends on how much difference there is between the blocks at
+what point it becomes worth forking a new driver - in many cases the
+newer blocks are close to register compatible with the older ones so
+a forked driver would have more in common with the original driver than
+the differences.  Where that is the case it makes sense to try to keep
+things together but if conditional code begins to dominate some or all
+of the driver then that suggests forking the relevant bits.
 
-                         for(j = 0; j < BUF_SIZE; j+= 4096)
-                                 buf[j] = (j & 0xFF) + 1;
-                         break;
-                 }
-         }
+One example of what may end up making most sense is that we get a driver
+per variant but also a core which factors out all the bits that stay the
+same between different variants (possibly multiple versions thereof).
 
-         free(buf);
-         return 0;
- }
+> SoC specific register addresses and other peculiarities maybe
+> differentiated by defines in coresp. header files.
+> Let Samsung come with as many SoCs as it wishes, I2S support will
+> simply end up in header files. Also, that we
 
-Before optimization this test takes ~66 seconds, after optimization
-takes ~56 seconds.
+Build time stuff like this does greatly increase the number of
+configurations that need to be compiled in order to achieve build
+coverage which is a bit of a problem, not just for testing but also for
+things like distro kernels.  There's limitations due to the underlying
+arch/arm stuff but we'd want to at least track what that can do and not
+introduce any new limits in the audio drivers.
 
-Signed-off-by: Siarhei Siamashka <siarhei.siamashka@nokia.com>
-Signed-off-by: Kirill A. Shutemov <kirill@shutemov.name>
----
- arch/arm/lib/copy_page.S |   16 ++++++++--------
- 1 files changed, 8 insertions(+), 8 deletions(-)
+> Whereas, mainline s3c-i2s approach currently concentrates on
+> extracting common code in one file(s3c-i2s-v2.c) or so do i think.
 
-diff --git a/arch/arm/lib/copy_page.S b/arch/arm/lib/copy_page.S
-index 6ae04db..6ee2f67 100644
---- a/arch/arm/lib/copy_page.S
-+++ b/arch/arm/lib/copy_page.S
-@@ -12,8 +12,9 @@
- #include <linux/linkage.h>
- #include <asm/assembler.h>
- #include <asm/asm-offsets.h>
-+#include <asm/cache.h>
- 
--#define COPY_COUNT (PAGE_SZ/64 PLD( -1 ))
-+#define COPY_COUNT (PAGE_SZ / (2 * L1_CACHE_BYTES) PLD( -1 ))
- 
- 		.text
- 		.align	5
-@@ -26,17 +27,16 @@
- ENTRY(copy_page)
- 		stmfd	sp!, {r4, lr}			@	2
- 	PLD(	pld	[r1, #0]		)
--	PLD(	pld	[r1, #32]		)
-+	PLD(	pld	[r1, #L1_CACHE_BYTES]		)
- 		mov	r2, #COPY_COUNT			@	1
- 		ldmia	r1!, {r3, r4, ip, lr}		@	4+1
--1:	PLD(	pld	[r1, #64]		)
--	PLD(	pld	[r1, #96]		)
--2:		stmia	r0!, {r3, r4, ip, lr}		@	4
--		ldmia	r1!, {r3, r4, ip, lr}		@	4+1
--		stmia	r0!, {r3, r4, ip, lr}		@	4
--		ldmia	r1!, {r3, r4, ip, lr}		@	4+1
-+1:	PLD(	pld	[r1, #2 * L1_CACHE_BYTES])
-+	PLD(	pld	[r1, #3 * L1_CACHE_BYTES])
-+2:
-+	.rept	(2 * L1_CACHE_BYTES / 16 - 1)
- 		stmia	r0!, {r3, r4, ip, lr}		@	4
- 		ldmia	r1!, {r3, r4, ip, lr}		@	4
-+	.endr
- 		subs	r2, r2, #1			@	1
- 		stmia	r0!, {r3, r4, ip, lr}		@	4
- 		ldmgtia	r1!, {r3, r4, ip, lr}		@	4
--- 
-1.6.4.2
+Pretty much since for the v2-v4 range the differences are mostly in the
+addition of new features and compatibility is fairly strong.  Like I
+say, if it gets to be more trouble than it's worth to maintain things
+like this that's the time to start splitting out separate drivers.
