@@ -1,59 +1,46 @@
-From: saaguirre@ti.com (Aguirre Rodriguez, Sergio Alberto)
-Date: Wed, 2 Sep 2009 07:21:47 -0500
-Subject: [PATCH] ARM: request_irq() failure ignored in
-	omap_uart_enable_irqs()
-In-Reply-To: <4A9D5731.20909@gmail.com>
-References: <4A9D3D2A.1060609@gmail.com> <4A9D4769.5060907@ru.mvista.com>
-	<4A9D5731.20909@gmail.com>
-Message-ID: <A24693684029E5489D1D202277BE89444BFBAEE3@dlee02.ent.ti.com>
+From: laforge@gnumonks.org (Harald Welte)
+Date: Wed, 2 Sep 2009 21:11:58 +0900
+Subject: Samsung S3C6410 mainline merge coordination
+In-Reply-To: <20090902100500.GA4012@sirena.org.uk>
+References: <20090902031719.GK3838@prithivi.gnumonks.org>
+	<20090902100500.GA4012@sirena.org.uk>
+Message-ID: <20090902121158.GU32606@prithivi.gnumonks.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Resending to new ML)
+Hi Mark,
 
-From: Roel Kluin [mailto:roel.kluin at gmail.com]
-Sent: Tuesday, September 01, 2009 12:18 PM
-> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-> index a7421a5..ed683d9 100644
-> --- a/arch/arm/mach-omap2/serial.c
-> +++ b/arch/arm/mach-omap2/serial.c
-> @@ -471,11 +471,18 @@ void omap_uart_enable_irqs(int enable)
+On Wed, Sep 02, 2009 at 11:05:01AM +0100, Mark Brown wrote:
+ 
+> > === Sound ===
+> > * needs further investigation, there are many different drivers/versions/options
+> 
+> Merge any changes in with the mainline drivers - there's relatively
+> little difference from the s3c24xx IPs.  There's a reasonable chance
+> I'll get round to this myself for the 64xx series since I have one which
+> I'm using for some of my development.
 
-Wouldn't it make more sense to return int, instead of void here?
+please note there are something like four different versions of the audio IP
+core in Samsung SoCs.  I myself am not familiar with the detailed technical
+differences.  So in any case we'll try to submit the current code in a way
+that will not create conflicts or issues with code that is pending further
+down the road for s5pc100. or s5pc110.
 
-The caller would never know if the call internally failed.
+Apparently there are also features like operating the SoC codec in slave mode
+as well as different clock configurations wich mainline is missing.
 
-Just a thought...
+Jaswinder (you know him from previous mails) today stated he will look into
+this.  We have just not defined yet in detail what features will be submitted
+and what are the priorities.
+
+If you (Mark) would want to work on this, pleaes coordinate with Jaswinder so
+there is no duplication of work.  I believe the most current driver source is
+the one in the 2.6.29-samsung branch - but that one already has the s5pc stuff,
+which will have to be removed for mainline right now.
 
 Regards,
-Sergio
-
->  	int ret;
->  	struct omap_uart_state *uart;
-> 
-> -	list_for_each_entry(uart, &uart_list, node) {
-> -		if (enable)
-> +	if (enable) {
-> +		list_for_each_entry(uart, &uart_list, node) {
->  			ret = request_irq(uart->p->irq, omap_uart_interrupt,
->  				IRQF_SHARED, "serial idle", (void *)uart);
-> -		else
-> +			if (ret < 0) {
-> +				printk(KERN_ERR "omap_uart_enable_irqs: failed to
-> request IRQ%i (%i)\n",
-> +						uart->p->irq, ret);
-> +				return;
-> +			}
-> +		}
-> +	} else {
-> +		list_for_each_entry(uart, &uart_list, node)
->  			free_irq(uart->p->irq, (void *)uart);
->  	}
->  }
-> 
-> 
-> -------------------------------------------------------------------
-> List admin: http://lists.arm.linux.org.uk/mailman/listinfo/linux-arm-
-> kernel
-> FAQ:        http://www.arm.linux.org.uk/mailinglists/faq.php
-> Etiquette:  http://www.arm.linux.org.uk/mailinglists/etiquette.php
+-- 
+- Harald Welte <laforge@gnumonks.org>           http://laforge.gnumonks.org/
+============================================================================
+"Privacy in residential applications is a desirable marketing option."
+                                                  (ETSI EN 300 175-7 Ch. A6)
