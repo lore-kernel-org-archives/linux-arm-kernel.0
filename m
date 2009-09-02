@@ -1,75 +1,26 @@
-From: nico@cam.org (Nicolas Pitre)
-Date: Wed, 02 Sep 2009 13:31:06 -0400 (EDT)
-Subject: ARM highmem stuff - 5687/1
-In-Reply-To: <alpine.LFD.2.00.0909021009010.6044@xanadu.home>
-References: <20090902135355.GB12595@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0909021009010.6044@xanadu.home>
-Message-ID: <alpine.LFD.2.00.0909021321160.6044@xanadu.home>
+From: hjk@linutronix.de (Hans J. Koch)
+Date: Wed, 2 Sep 2009 19:50:47 +0200
+Subject: AC97 on  i.MX27
+In-Reply-To: <OF744AA145.8166D38C-ONC1257625.0041CD11-C1257625.0041F924@phytec.de>
+References: <OF744AA145.8166D38C-ONC1257625.0041CD11-C1257625.0041F924@phytec.de>
+Message-ID: <20090902175046.GB3249@bluebox.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Sep 2009, Nicolas Pitre wrote:
+On Wed, Sep 02, 2009 at 01:59:50PM +0200, Jan Weitzel wrote:
+> Hello, 
+> I am trying to get an Wolfson WM9712L working with AC97 on a i.MX27. I saw 
+> some patches for 2.6.22 on the list. Does anybody have further worked on 
+> this, or is it a good point to start from? 
 
-> On Wed, 2 Sep 2009, Russell King - ARM Linux wrote:
-> 
-> > Do we need a similar fix for flush_anon_page()?
-> 
-> Hmmmm... Maybe.  Especially since the only usage of flush_anon_page() is 
-> in __get_user_pages() where the page passed to flush_anon_page() may or 
-> may not be kmapped (it is not explicitly kmapped in that function, but 
-> non atomic kmaps are lazily unmapped and would still require to be 
-> flushed if their mapping is still there).  However, in 
-> __get_user_pages(), there is a flush_dcache_page() right after the call 
-> to flush_anon_page(), so the __cpuc_flush_dcache_page() in 
-> __flush_anon_page() appears redundant to me and could simply be removed 
-> entirely.
+Well, I've got it working with a UCB1400 codec/touch controller on a
+Garz&Fricke Neso board. But that's a bunch of patches on top of that
+dungheap of a Freescale queue. Really not worth posting that. It's
+basically Lothar's version with two or three fixes, mostly touchscreen
+related (we never used it for audio).
 
-This made me think about a race that exists with the highmem kmap 
-business though...
+So yes, Lothar's patch is a good starting point. You might also have a
+look at Sascha's git tree, maybe he picked something up.
 
-Let's suppose a highmem page is kmap'd with kmap().  A pkmap entry is 
-used, the page mapped to it, and the virtual cache is dirtied.  Then 
-kunmap() is used which does virtually nothing except for decrementing a 
-usage count.
-
-Then, let's suppose the _same_ page gets mapped using kmap_atomic().  
-It is therefore mapped onto a fixmap entry instead, which has a 
-different virtual address unaware of the dirty data for that page 
-sitting in the pkmap mapping.
-
-Fortunately the fix is simple:
-
-diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-index a34954d..73cae57 100644
---- a/arch/arm/mm/highmem.c
-+++ b/arch/arm/mm/highmem.c
-@@ -40,11 +40,16 @@ void *kmap_atomic(struct page *page, enum km_type type)
- {
- 	unsigned int idx;
- 	unsigned long vaddr;
-+	void *kmap;
- 
- 	pagefault_disable();
- 	if (!PageHighMem(page))
- 		return page_address(page);
- 
-+	kmap = kmap_high_get(page);
-+	if (kmap)
-+		return kmap;
-+
- 	idx = type + KM_TYPE_NR * smp_processor_id();
- 	vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
- #ifdef CONFIG_DEBUG_HIGHMEM
-@@ -80,6 +85,9 @@ void kunmap_atomic(void *kvaddr, enum km_type type)
- #else
- 		(void) idx;  /* to kill a warning */
- #endif
-+	} else if (vaddr >= PKMAP_ADDR(0) && vaddr < PKMAP_ADDR(LAST_PKMAP)) {
-+		/* this address was obtained through kmap_high_get() */
-+		kunmap_high(pte_page(pkmap_page_table[PKMAP_NR(vaddr)]));
- 	}
- 	pagefault_enable();
- }
-
-
-Nicolas
+Thanks,
+Hans
