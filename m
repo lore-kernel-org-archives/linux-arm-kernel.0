@@ -1,53 +1,28 @@
-From: nico@cam.org (Nicolas Pitre)
-Date: Wed, 02 Sep 2009 13:59:43 -0400 (EDT)
-Subject: ARM highmem stuff - 5687/1
-In-Reply-To: <alpine.LFD.2.00.0909021009010.6044@xanadu.home>
-References: <20090902135355.GB12595@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0909021009010.6044@xanadu.home>
-Message-ID: <alpine.LFD.2.00.0909021331450.6044@xanadu.home>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 2 Sep 2009 19:42:35 +0100
+Subject: [PATCH 2/2] U300 AB3100 boardinfo v3
+In-Reply-To: <1251756324-24216-1-git-send-email-linus.walleij@stericsson.com>
+References: <1251756324-24216-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20090902184234.GB10581@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Sep 2009, Nicolas Pitre wrote:
+On Tue, Sep 01, 2009 at 12:05:24AM +0200, Linus Walleij wrote:
+> This defines regulator platform data and board power
+> regulator hogs for the ST-Ericsson U300 platform.
 
-> On Wed, 2 Sep 2009, Russell King - ARM Linux wrote:
-> 
-> > Do we need a similar fix for flush_anon_page()?
-> 
-> Hmmmm... Maybe.  Especially since the only usage of flush_anon_page() is 
-> in __get_user_pages() where the page passed to flush_anon_page() may or 
-> may not be kmapped (it is not explicitly kmapped in that function, but 
-> non atomic kmaps are lazily unmapped and would still require to be 
-> flushed if their mapping is still there).  However, in 
-> __get_user_pages(), there is a flush_dcache_page() right after the call 
-> to flush_anon_page(), so the __cpuc_flush_dcache_page() in 
-> __flush_anon_page() appears redundant to me and could simply be removed 
-> entirely.
+This is pretty much OK, just...
 
-Something like this:
+> +static struct regulator_consumer_supply supply_ldo_a[] = {
+> +	{
+> +		.dev = NULL,
+> +		.supply = "vrad", /* Powers the radio */
+> +	},
+> +};
 
-    [ARM] remove redundant cache flush from __flush_anon_page()
-    
-    The only usage of flush_anon_page() is in __get_user_pages() where
-    a call to flush_dcache_page() is performed immediately after the call
-    to flush_anon_page().  This makes the __cpuc_flush_dcache_page() in
-    __flush_anon_page() redundant.
-    
-    Signed-off-by: Nicolas Pitre <nico@marvell.com>
-
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index 575f3ad..c0f4039 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -262,11 +262,4 @@ void __flush_anon_page(struct vm_area_struct *vma, struct page *page, unsigned l
- 		 */
- 		flush_pfn_alias(pfn, vmaddr);
- 	}
--
--	/*
--	 * Invalidate kernel mapping.  No data should be contained
--	 * in this mapping of the page.  FIXME: this is overkill
--	 * since we actually ask for a write-back and invalidate.
--	 */
--	__cpuc_flush_dcache_page(page_address(page));
- }
+Now you're using the regulator init stuff to set the voltages you should
+be able to drop most of the deviceless supplies.  I'd expect that you'd
+want to keep the CPU core supplies for cpufreq support but the others
+shouldn't need to be defined.  The names can be set in the constraints
+- if set there they will be displayed to user space which normally makes
+the diagnostics easier to follow for board users.
