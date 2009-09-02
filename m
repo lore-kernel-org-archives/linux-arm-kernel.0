@@ -1,24 +1,30 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Wed, 2 Sep 2009 23:44:05 +0200
-Subject: [linux-pm] Montreal Linux Power Management Mini-Summit, July 13,
-	2009 - Meeting Notes
-In-Reply-To: <4A9E2EA7.8080700@st.com>
-References: <alpine.LFD.2.00.0905211430220.4390@localhost.localdomain>
-	<alpine.LFD.2.00.0907301801240.17818@localhost.localdomain>
-	<63386a3d0909011522m7a175d3eyb3bbe8a29a5fd104@mail.gmail.com>
-	<4A9E2EA7.8080700@st.com>
-Message-ID: <63386a3d0909021444i575f02a9n65c6c0a91e2a51f5@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 2 Sep 2009 22:55:33 +0100
+Subject: [PATCH 1/2] AB3100 regulator support v3
+In-Reply-To: <63386a3d0909021437pe94b5a5m20a63fbad396cd13@mail.gmail.com>
+References: <1251756258-23917-1-git-send-email-linus.walleij@stericsson.com>
+	<20090902172438.GA1190@rakim.wolfsonmicro.main>
+	<63386a3d0909021437pe94b5a5m20a63fbad396cd13@mail.gmail.com>
+Message-ID: <20090902215533.GA18527@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/9/2 Francesco VIRLINZI <francesco.virlinzi@st.com>:
+On Wed, Sep 02, 2009 at 11:37:00PM +0200, Linus Walleij wrote:
 
-> I'm going to present a generic linux clock framework during the CELF-Europe
-> ?@
-> http://www.embeddedlinuxconference.com/elc_europe09/sessions.html#Virlinzi
+> The sleep settings are driven by two HW lines, so a regulator
+> can react by suspending the regulator on line A or B disjunct
+> either (logical ||) or both (logical &&). (You don't alter that in
+> runtime so no API has been developed here.)
 
-Great stuff, are the patches already available or will you hold them
-until after your seminar?
+OK, that's fine - it's setting things outside the normal API flow which
+is all that I was asking.
 
-Yours,
-Linus Walleij
+> And I don't see any way for the core (set_machine_constraints)
+> to set regulators to *off* by default if they happen to be on at
+> boot.
+
+That'd be a boot_off constraint if someone requires it.  So far nobody
+has - there's not going to be many cases where it's appropriate to do
+so, normally either you want to leave the supplies on for the device
+driver that's taking control of the device or it does no harm to wait
+till the end of init.
