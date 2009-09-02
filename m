@@ -1,97 +1,67 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 2 Sep 2009 23:24:07 +0200
-Subject: [PATCH 4/4] video: add driver for PXA3xx 2D graphics accelerator
-In-Reply-To: <20090722120433.GA9464@buzzloop.caiaq.de>
-References: <1247159091-28697-4-git-send-email-daniel@caiaq.de>
-	<1247159091-28697-5-git-send-email-daniel@caiaq.de>
-	<4A56F02D.1000007@gmail.com>
-	<20090718080736.GL13236@buzzloop.caiaq.de>
-	<4A63E08F.4090409@gmail.com>
-	<20090720102239.GA3809@buzzloop.caiaq.de>
-	<4A645A38.1080008@gmail.com>
-	<20090720134703.GE19257@buzzloop.caiaq.de>
-	<4A64830F.2020701@gmail.com>
-	<20090722120433.GA9464@buzzloop.caiaq.de>
-Message-ID: <20090902212407.GJ9410@buzzloop.caiaq.de>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Wed, 2 Sep 2009 23:37:00 +0200
+Subject: [PATCH 1/2] AB3100 regulator support v3
+In-Reply-To: <20090902172438.GA1190@rakim.wolfsonmicro.main>
+References: <1251756258-23917-1-git-send-email-linus.walleij@stericsson.com>
+	<20090902172438.GA1190@rakim.wolfsonmicro.main>
+Message-ID: <63386a3d0909021437pe94b5a5m20a63fbad396cd13@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 22, 2009 at 02:04:33PM +0200, Daniel Mack wrote:
-> On Mon, Jul 20, 2009 at 10:45:35PM +0800, Eric Miao wrote:
-> > Daniel Mack wrote:
-> > >> Cool - I'll find a time slot to test this, and maybe someone else wants to
-> > >> have a try either. Thanks.
-> > > 
-> > > Will that accelerator ID patch (the one I sent today) go thru your
-> > > channel or are the fbdev people supposed to pick it?
-> > > 
-> > 
-> > Better to go through fbdev people - or at least I need an Ack before it
-> > goes through my tree.
-> > 
-> > Krzysztof Cc'ed.
-> 
-> Krzysztof,
-> 
-> resending this because I don't known whether you got the first copy of
-> that patch.
+2009/9/2 Mark Brown <broonie@opensource.wolfsonmicro.com>:
 
-I'm sending this patch for the the forth time now, this time with the
-fbdev-devel list copied. Maybe that helps.
+> This looks basically good - my only concern is if the initialisation
+> data supplied for the regulators is just setting up the things that can
+> be set up via the API or if there's other stuff going on (this was my
+> reason for the question I asked the other day). ?If there's other stuff
+> being configured then I'm happy with the patch modulo the static thing.
 
-This is fairly simple, but it's blocking the pxa3xx-gcu driver to be
-merged.
+OK so this array:
 
-Any feedback is appreciated.
++       /* Set up regulators */
++       for (i = 0; i < ARRAY_SIZE(ab3100_reg_init_order); i++) {
++               err = ab3100_set_register_interruptible(ab3100,
++                                       ab3100_reg_init_order[i],
++                                       plfdata->reg_initvals[i]);
 
-Thanks,
-Daniel
+The initvals are one-byte registers for each regulator plus 2 bytes
+of sleep settings for LDO E and BUCK respectively.
 
->From 8b200756251e3dcdc91d506e9dbc9846ccaa91d3 Mon Sep 17 00:00:00 2001
-From: Daniel Mack <daniel@caiaq.de>
-Date: Mon, 20 Jul 2009 11:18:43 +0200
-Subject: [PATCH] video: add PXA3xx accelerator ID
+The sleep settings are driven by two HW lines, so a regulator
+can react by suspending the regulator on line A or B disjunct
+either (logical ||) or both (logical &&). (You don't alter that in
+runtime so no API has been developed here.)
 
-Add ID 99 for PXA3xx frame buffers and use it in pxafb when running on a
-pxa with acceleration enabled.
+Apart from that it's just default-zero undefined bits and default
+voltage and default on/off setting. It is mainly written here so
+that we have a known state, eventhough the boot loader should
+have set them up (thus boot_on for some of them). But I like
+to be on the safe side. If you for example download the kernel
+through something like JTAG you may not have executed the
+boot loader, and the reset power-on defaults can be bad,
+for example have regulators enabled that should not be.
 
-Signed-off-by: Daniel Mack <daniel@caiaq.de>
-Cc: Eric Miao <eric.miao@marvell.com>
-Cc: linux-fbdev-devel at lists.sourceforge.net
-Cc: Dennis Oliver Kropp <dok@directfb.org>
-Cc: Sven Neumann <s.neumann@raumfeld.com>
----
- drivers/video/pxafb.c |    5 +++++
- include/linux/fb.h    |    1 +
- 2 files changed, 6 insertions(+), 0 deletions(-)
+Currently the framework will enable the .boot_on regulators
+effectively setting this one bit right for all regulators.
 
-diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
-index 3951cc5..922ed8a 100644
---- a/drivers/video/pxafb.c
-+++ b/drivers/video/pxafb.c
-@@ -2083,6 +2083,11 @@ static int __devinit pxafb_probe(struct platform_device *dev)
- 		goto failed;
- 	}
- 
-+#ifdef CONFIG_PXA3XX_GCU
-+	if (cpu_is_pxa3xx())
-+		fbi->fb.fix.accel = FB_ACCEL_PXA3XX;
-+#endif
-+
- 	fbi->backlight_power = inf->pxafb_backlight_power;
- 	fbi->lcd_power = inf->pxafb_lcd_power;
- 
-diff --git a/include/linux/fb.h b/include/linux/fb.h
-index f847df9..a34bdf5 100644
---- a/include/linux/fb.h
-+++ b/include/linux/fb.h
-@@ -133,6 +133,7 @@ struct dentry;
- #define FB_ACCEL_NEOMAGIC_NM2230 96	/* NeoMagic NM2230              */
- #define FB_ACCEL_NEOMAGIC_NM2360 97	/* NeoMagic NM2360              */
- #define FB_ACCEL_NEOMAGIC_NM2380 98	/* NeoMagic NM2380              */
-+#define FB_ACCEL_PXA3XX		 99	/* PXA3xx			*/
- 
- #define FB_ACCEL_SAVAGE4        0x80	/* S3 Savage4                   */
- #define FB_ACCEL_SAVAGE3D       0x81	/* S3 Savage3D                  */
--- 
-1.6.3.1
+For *some* of the boot_on regulators I could also use .apply_uV
+to set the voltage bits of course, but only if min_uV
+and max_uV is the same which is not the case for all
+regulators that are default on here.
+
+And I don't see any way for the core (set_machine_constraints)
+to set regulators to *off* by default if they happen to be on at
+boot.
+
+So my conclusion is that the array of initial settings is really
+needed to:
+
+- Set sleep config bits (you don't want to alter this runtime BTW)
+- Set some default voltage levels on variable regulators
+- Set some regulators default off
+- Thus establish a known initial state
+
+OK?
+
+Yours,
+Linus Walleij
