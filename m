@@ -1,46 +1,33 @@
-From: bgat@billgatliff.com (Bill Gatliff)
-Date: Tue, 01 Sep 2009 21:25:20 -0500
-Subject: Montreal Linux Power Management Mini-Summit, July 13, 2009 -
-	Meeting Notes
-In-Reply-To: <63386a3d0909011522m7a175d3eyb3bbe8a29a5fd104@mail.gmail.com>
-References: <alpine.LFD.2.00.0905211430220.4390@localhost.localdomain>	<alpine.LFD.2.00.0907301801240.17818@localhost.localdomain>
-	<63386a3d0909011522m7a175d3eyb3bbe8a29a5fd104@mail.gmail.com>
-Message-ID: <4A9DD790.50302@billgatliff.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 2 Sep 2009 10:22:09 +0200
+Subject: My first patch to the mailist, but being held
+In-Reply-To: <1251814118.16594.292.camel@macbook.infradead.org>
+References: <e68bb3470909010616n74326317s49c27e8c8cbcbc4a@mail.gmail.com>
+	<f17812d70909010655t139a10d1y7b421cd244d91737@mail.gmail.com>
+	<e68bb3470909010705v2219191dtce02f6bfc29d9647@mail.gmail.com>
+	<1251814118.16594.292.camel@macbook.infradead.org>
+Message-ID: <20090902082208.GA1695@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote:
-> I've felt a need for clock notifiers and we've cheated by using
-> CPUfreq because it so happens that the clocking in system-wide
-> and whenever the CPU freq change so may the other clocks.
->
-> But if I put code into a PrimeCell MMC/SPI/I2C driver or whatever and
-> use CPUfreq that's very unelegant, and for other platforms where
-> the CPU freq don't change when this particular device clk freq
-> change plain misleading.
->
-> A clk pre/postchange notifier pair would really help and would
-> make for elegant drivers that can handle clock freq transitions.
->   
+Hi!
 
-A lot of ARM chips have peripherals that are driven by PLLs that run 
-quasi-independently of the CPU clock.
+> > Yes, I think so too, due to I never meet this type 'held' in LAKML and
+> > LKML, so I am amazed at this 'held' in the list.
+> 
+> Not all of the mailman settings were imported from the old list to the
+> new one. If the moderators want to increase the size limit, they are
+> free to do that -- the hardware can certainly cope.
 
-If I guess correctly at what is being described above, a notifier chain 
-for the users of a clock would be a clean way for peripherals to deal 
-with clock speed *and* CPU speed changes, indeed.  A clock source that 
-was affected by cpufreq would place itself on the cpufreq notifier 
-chain, and also provide a notifier chain for peripherals that are driven 
-by that clock.  When a cpufreq notification arrived, if the clock 
-couldn't adjust for the cpufreq change it would use its notifier chain 
-to tell all downstream peripherals about it.
+Could we do that?
 
-A lot of peripherals could then focus just on the clock notifier chain, 
-and would no longer care about cpufreq.  I like it.
+> But Eric is right that patches above 40KiB are fairly suspect anyway --
+> why is it so large?
 
-
-b.g.
+Not all patches are for inclusion, some are for comments, and some
+drivers are fairly big (dream camera). lkml has limit 400KB iirc, so
+40KB is very low...
 
 -- 
-Bill Gatliff
-bgat at billgatliff.com
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
