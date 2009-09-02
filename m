@@ -1,42 +1,39 @@
 From: laforge@gnumonks.org (Harald Welte)
-Date: Wed, 2 Sep 2009 21:11:58 +0900
+Date: Wed, 2 Sep 2009 21:15:59 +0900
 Subject: Samsung S3C6410 mainline merge coordination
-In-Reply-To: <20090902100500.GA4012@sirena.org.uk>
+In-Reply-To: <2accc2ff0909020251u4f242742k13aa74f03251b992@mail.gmail.com>
 References: <20090902031719.GK3838@prithivi.gnumonks.org>
-	<20090902100500.GA4012@sirena.org.uk>
-Message-ID: <20090902121158.GU32606@prithivi.gnumonks.org>
+	<2accc2ff0909020251u4f242742k13aa74f03251b992@mail.gmail.com>
+Message-ID: <20090902121559.GV32606@prithivi.gnumonks.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Nelson,
 
-On Wed, Sep 02, 2009 at 11:05:01AM +0100, Mark Brown wrote:
- 
-> > === Sound ===
-> > * needs further investigation, there are many different drivers/versions/options
+On Wed, Sep 02, 2009 at 04:51:56AM -0500, Nelson Castillo wrote:
+> > * port existing s3c_ts driver to use s3c_adc_register()
+> > ** has anyone been doing wokr on this already? ben?
 > 
-> Merge any changes in with the mainline drivers - there's relatively
-> little difference from the s3c24xx IPs.  There's a reasonable chance
-> I'll get round to this myself for the 64xx series since I have one which
-> I'm using for some of my development.
+> (jumping in)
+> 
+> I worked on this starting from some work done by other members of this
+> list. This is the ported version of the driver. It depends on the
+> touchscreen filters developed by Andy Green and enhanced by me while
+> working at Openmoko. I've already applied most of Andrew Morton's
+> feedback (a lot) to the TS filters but I haven't submitted them again
+> for upstream review (A filter still needs to be modified and I know
+> how to do it but I haven't finished this change).
 
-please note there are something like four different versions of the audio IP
-core in Samsung SoCs.  I myself am not familiar with the detailed technical
-differences.  So in any case we'll try to submit the current code in a way
-that will not create conflicts or issues with code that is pending further
-down the road for s5pc100. or s5pc110.
+Hi, thanks for your feedback.  I think it is somewhat "dangerous" to create a
+dependency from s3c2410_ts (which schould be renamed to s3c_ts by now) to the
+ts_filter work.
 
-Apparently there are also features like operating the SoC codec in slave mode
-as well as different clock configurations wich mainline is missing.
+I'd personally prefer to decouple those two, i.e. first submit the s3c_ts based
+on adc.c without ts_filter, and then add the ts_filter core (plus support
+for s3c_ts) later on.
 
-Jaswinder (you know him from previous mails) today stated he will look into
-this.  We have just not defined yet in detail what features will be submitted
-and what are the priorities.
-
-If you (Mark) would want to work on this, pleaes coordinate with Jaswinder so
-there is no duplication of work.  I believe the most current driver source is
-the one in the 2.6.29-samsung branch - but that one already has the s5pc stuff,
-which will have to be removed for mainline right now.
+I suppose you don't mind, so we'll go ahead with this and submit s3c_ts this
+way.
 
 Regards,
 -- 
