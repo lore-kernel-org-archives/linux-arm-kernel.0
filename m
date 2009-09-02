@@ -1,40 +1,97 @@
-From: dave@chronolytics.com (David F. Carlson)
-Date: Wed, 2 Sep 2009 17:25:36 -0400 (EDT)
-Subject: Samsung S3C6410 mainline merge coordination
-In-Reply-To: <20090902161252.GD2367@trinity.fluff.org>
-Message-ID: <200909022125.n82LPaVP029138@chronolytics.com>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Wed, 2 Sep 2009 23:24:07 +0200
+Subject: [PATCH 4/4] video: add driver for PXA3xx 2D graphics accelerator
+In-Reply-To: <20090722120433.GA9464@buzzloop.caiaq.de>
+References: <1247159091-28697-4-git-send-email-daniel@caiaq.de>
+	<1247159091-28697-5-git-send-email-daniel@caiaq.de>
+	<4A56F02D.1000007@gmail.com>
+	<20090718080736.GL13236@buzzloop.caiaq.de>
+	<4A63E08F.4090409@gmail.com>
+	<20090720102239.GA3809@buzzloop.caiaq.de>
+	<4A645A38.1080008@gmail.com>
+	<20090720134703.GE19257@buzzloop.caiaq.de>
+	<4A64830F.2020701@gmail.com>
+	<20090722120433.GA9464@buzzloop.caiaq.de>
+Message-ID: <20090902212407.GJ9410@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry about my long line formatting...
-
-According to Ben Dooks:
+On Wed, Jul 22, 2009 at 02:04:33PM +0200, Daniel Mack wrote:
+> On Mon, Jul 20, 2009 at 10:45:35PM +0800, Eric Miao wrote:
+> > Daniel Mack wrote:
+> > >> Cool - I'll find a time slot to test this, and maybe someone else wants to
+> > >> have a try either. Thanks.
+> > > 
+> > > Will that accelerator ID patch (the one I sent today) go thru your
+> > > channel or are the fbdev people supposed to pick it?
+> > > 
+> > 
+> > Better to go through fbdev people - or at least I need an Ack before it
+> > goes through my tree.
+> > 
+> > Krzysztof Cc'ed.
 > 
-> > === video / multimedia ===
-> > * needs a lot of thought
-> > * support standard mainlien architecture wherever possible
-> > ** 2D accelerated framebuffer
-> > ** DRI/DRM/TTM/KMS
-> > ** V4L
+> Krzysztof,
 > 
-> I am not really sure if there is any current support for using
-> hardware blocks for decoding video data. I think that having some
-> form of framework for doing these as well as allowing blocks to be
-> chained togehter would be useful.
-> 
-> Again this is something that needs to be taken up with the relevant
-> community (assuming there is one) to come to a good solution.
->  
+> resending this because I don't known whether you got the first copy of
+> that patch.
 
-I have source to a mplayer which uses the MFC/PP as the video codec for the 
-four video encodings it supports.  A hd video with MFC decode utilizes ~30% of 
-the 6410 and without the HW assist utilizes all the CPU and still drops 
-frames.  This is all within Xwin using the fbdev.
+I'm sending this patch for the the forth time now, this time with the
+fbdev-devel list copied. Maybe that helps.
 
-This MFC/PP driver pair is useful to users now.  I am sorry they are not 
-good enough for the next-s3c.
+This is fairly simple, but it's blocking the pxa3xx-gcu driver to be
+merged.
 
-David F. Carlson    Chronolytics, Inc.  Rochester, NY
-mailto:dave at chronolytics.com            http://www.chronolytics.com
+Any feedback is appreciated.
 
-"The faster I go, the behinder I get." --Lewis Carroll
+Thanks,
+Daniel
+
+>From 8b200756251e3dcdc91d506e9dbc9846ccaa91d3 Mon Sep 17 00:00:00 2001
+From: Daniel Mack <daniel@caiaq.de>
+Date: Mon, 20 Jul 2009 11:18:43 +0200
+Subject: [PATCH] video: add PXA3xx accelerator ID
+
+Add ID 99 for PXA3xx frame buffers and use it in pxafb when running on a
+pxa with acceleration enabled.
+
+Signed-off-by: Daniel Mack <daniel@caiaq.de>
+Cc: Eric Miao <eric.miao@marvell.com>
+Cc: linux-fbdev-devel at lists.sourceforge.net
+Cc: Dennis Oliver Kropp <dok@directfb.org>
+Cc: Sven Neumann <s.neumann@raumfeld.com>
+---
+ drivers/video/pxafb.c |    5 +++++
+ include/linux/fb.h    |    1 +
+ 2 files changed, 6 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
+index 3951cc5..922ed8a 100644
+--- a/drivers/video/pxafb.c
++++ b/drivers/video/pxafb.c
+@@ -2083,6 +2083,11 @@ static int __devinit pxafb_probe(struct platform_device *dev)
+ 		goto failed;
+ 	}
+ 
++#ifdef CONFIG_PXA3XX_GCU
++	if (cpu_is_pxa3xx())
++		fbi->fb.fix.accel = FB_ACCEL_PXA3XX;
++#endif
++
+ 	fbi->backlight_power = inf->pxafb_backlight_power;
+ 	fbi->lcd_power = inf->pxafb_lcd_power;
+ 
+diff --git a/include/linux/fb.h b/include/linux/fb.h
+index f847df9..a34bdf5 100644
+--- a/include/linux/fb.h
++++ b/include/linux/fb.h
+@@ -133,6 +133,7 @@ struct dentry;
+ #define FB_ACCEL_NEOMAGIC_NM2230 96	/* NeoMagic NM2230              */
+ #define FB_ACCEL_NEOMAGIC_NM2360 97	/* NeoMagic NM2360              */
+ #define FB_ACCEL_NEOMAGIC_NM2380 98	/* NeoMagic NM2380              */
++#define FB_ACCEL_PXA3XX		 99	/* PXA3xx			*/
+ 
+ #define FB_ACCEL_SAVAGE4        0x80	/* S3 Savage4                   */
+ #define FB_ACCEL_SAVAGE3D       0x81	/* S3 Savage3D                  */
+-- 
+1.6.3.1
