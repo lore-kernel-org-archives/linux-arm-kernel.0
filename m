@@ -1,51 +1,63 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Thu, 3 Sep 2009 22:15:21 +0200
-Subject: [linux-pm] Montreal Linux Power Management Mini-Summit, July 13,
-	2009 - Meeting Notes
-In-Reply-To: <20090903171213.GB9507@n2100.arm.linux.org.uk>
+From: r-woodruff2@ti.com (Woodruff, Richard)
+Date: Thu, 3 Sep 2009 16:28:49 -0500
+Subject: [linux-pm] Montreal Linux Power Management Mini-Summit, July
+	13, 	2009 - Meeting Notes
+In-Reply-To: <63386a3d0909031315v77d2a2d0x490b15aa839f7339@mail.gmail.com>
 References: <alpine.LFD.2.00.0905211430220.4390@localhost.localdomain>
 	<alpine.LFD.2.00.0907301801240.17818@localhost.localdomain>
 	<63386a3d0909011522m7a175d3eyb3bbe8a29a5fd104@mail.gmail.com>
-	<4A9E2EA7.8080700@st.com>
-	<20090902215832.GB21292@n2100.arm.linux.org.uk>
-	<4A9FD7C7.7070301@st.com>
-	<20090903171213.GB9507@n2100.arm.linux.org.uk>
-Message-ID: <63386a3d0909031315v77d2a2d0x490b15aa839f7339@mail.gmail.com>
+	<4A9E2EA7.8080700@st.com>	<20090902215832.GB21292@n2100.arm.linux.org.uk>
+	<4A9FD7C7.7070301@st.com>	<20090903171213.GB9507@n2100.arm.linux.org.uk>
+	<63386a3d0909031315v77d2a2d0x490b15aa839f7339@mail.gmail.com>
+Message-ID: <13B9B4C6EF24D648824FF11BE8967162039A899EC7@dlee02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/9/3 Russell King - ARM Linux <linux@arm.linux.org.uk>:
 
-> [Francesco's blurb]
-> ? The main goals are to manage:
-> ? 1. each clock and the operations that the clock support
-> ? 2. the clocks tree and the hierarchical relationships
-> ? 3. the clock-device relationships
-> ? 4. the clock rate change propagation
-> ? 5. in an architecture independent way.
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Linus Walleij
+> Sent: Thursday, September 03, 2009 3:15 PM
+> To: Russell King - ARM Linux
 
-> Point 4 is something that OMAP might be able to use, though OMAP already
-> does this within its clk API implementation without notification of
-> drivers - the clock rates are driven by drivers requesting rates for
-> their own clocks rather than one driver influencing the clock rate for
-> another.
+> 2009/9/3 Russell King - ARM Linux <linux@arm.linux.org.uk>:
 >
-> That said, PXA could do with some notification of core state changes,
-> which influences which clocks are available and the rate which they
-> run at. ?It's something that is going to have some progress over the
-> next year or so, and it could result in the clk API being extended
-> with an optional API to support this.
+> > [Francesco's blurb]
+> >   The main goals are to manage:
+> >   1. each clock and the operations that the clock support
+> >   2. the clocks tree and the hierarchical relationships
+> >   3. the clock-device relationships
+> >   4. the clock rate change propagation
+> >   5. in an architecture independent way.
+>
+> > Point 4 is something that OMAP might be able to use, though OMAP already
+> > does this within its clk API implementation without notification of
+> > drivers - the clock rates are driven by drivers requesting rates for
+> > their own clocks rather than one driver influencing the clock rate for
+> > another.
+> >
+> > That said, PXA could do with some notification of core state changes,
+> > which influences which clocks are available and the rate which they
+> > run at.  It's something that is going to have some progress over the
+> > next year or so, and it could result in the clk API being extended
+> > with an optional API to support this.
+>
+> We need something like (4) for U300 as well, we have the same
+> issue with core state propagating changes to several clocks, which
+> is mainly why I asked about this thing from the SuperH people.
+>
+> > My biggest mistake, however, when designing the API was not to provide
+> > a standard (but optional) implementation for clk_get() and clk_put(),
+> > which I have now done with clkdev.  (arch/arm/common/clkdev.c)
 
-We need something like (4) for U300 as well, we have the same
-issue with core state propagating changes to several clocks, which
-is mainly why I asked about this thing from the SuperH people.
+If you are not careful notifications can turn into a graph with cycles.  p_start: Driver A changes shared root speed. Then driver B gets notification of change.  Driver B then tries to adjust clock to get back into range for its device; Driver a gets notification of speed change: goto p_start.
 
-> My biggest mistake, however, when designing the API was not to provide
-> a standard (but optional) implementation for clk_get() and clk_put(),
-> which I have now done with clkdev. ?(arch/arm/common/clkdev.c)
+Older OMAP clock code mainly called a simple recalc method as part of an internal propagate rate which happens as part of clk_set_rate. Only exporting 'safe' rates as returned by the clk_round_rate call can make a set_rate(valid_rate) calls work with out issue.
 
-If other SoCs like SuperH (obviously) and maybe PowerPC, etc need this
-as well, could it be relocated to something like drivers/clk and include/linux?
-That sounds like fulfilling (5) for (3).
+Both the good and the bad of the clock frame work is it hides clock node details from the driver. This allows the driver to talk in rates and not worry about upper structure. The inflexible is, sometimes you would like to add and remove nodes. If I plug in some hw-module which is deriving its clock from a processor clock, it would be nice to write that driver to add the node for its local clock and then just use the standard apis. To do this however requires you to understand the node structure at the driver (clk_install_node, clk_remove_node).
 
-Linus Walleij
+Paul Walmsley offered some patches with notifiers for OMAP recently which you might look at.  TI had also added a pre/post notifier which was used with clock changes in a different layer just above clock in a resource freamwork.  As it turns out for OMAP3, the notifiers are not needed very often as there are many independent DPLLs.  Back in OMAP2 however they were more important as most everything was derived from a single DPLL.
+
+Some of the clock abuse which happened by allowing the specifying of physical I+F clocks for a devices instead of a single virtual clock can be useful.  In some cases it is important for the driver to sequence its internal clocks as part of init or shutdown.  Handling them as a single entity isn't always doable.  Sometimes you could factor that code out but not always.
+
+Regards,
+Richard W.
