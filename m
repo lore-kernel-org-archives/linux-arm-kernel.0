@@ -1,45 +1,31 @@
-From: francesco.virlinzi@st.com (Francesco VIRLINZI)
-Date: Fri, 04 Sep 2009 09:34:38 +0200
-Subject: [linux-pm] Montreal Linux Power Management Mini-Summit, July
-	13, 2009 -  Meeting Notes
-In-Reply-To: <20090903171213.GB9507@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.00.0905211430220.4390@localhost.localdomain>
-	<alpine.LFD.2.00.0907301801240.17818@localhost.localdomain>
-	<63386a3d0909011522m7a175d3eyb3bbe8a29a5fd104@mail.gmail.com>
-	<4A9E2EA7.8080700@st.com>
-	<20090902215832.GB21292@n2100.arm.linux.org.uk>
-	<4A9FD7C7.7070301@st.com>
-	<20090903171213.GB9507@n2100.arm.linux.org.uk>
-Message-ID: <4AA0C30E.4080908@st.com>
+From: broonie@sirena.org.uk (Mark Brown)
+Date: Thu, 3 Sep 2009 12:06:52 +0100
+Subject: Samsung S3C6410 mainline merge coordination
+In-Reply-To: <4A9F0BEE.1060904@samsung.com>
+References: <20090902031719.GK3838@prithivi.gnumonks.org>
+	<20090902100500.GA4012@sirena.org.uk>
+	<20090902121158.GU32606@prithivi.gnumonks.org>
+	<1b68c6790909020644k757827f4kf590779f384ceccb@mail.gmail.com>
+	<4A9F0BEE.1060904@samsung.com>
+Message-ID: <20090903110652.GB2954@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russel.
-Thanks for your feedback.
+On Thu, Sep 03, 2009 at 09:21:02AM +0900, Joonyoung Shim wrote:
+> On 9/2/2009 10:44 PM, jassi brar wrote:
 
-I know several point are already covered by other cf implementation.
-And I didn't create a new API... I use the same API linux already has.
-> Point 4 is something that OMAP might be able to use, though OMAP already
-> does this within its clk API implementation without notification of
-> drivers - the clock rates are driven by drivers requesting rates for
-> their own clocks rather than one driver influencing the clock rate for
-> another.
->    
-This is the major feature of cf ( without this point the cf is just an other
-  cf...)... Moreover it's required when clocks are shared resource....
-If each device has its own clock... than also this feature isn't really 
-important
-  because each driver can manage its own clock.
+> > S3C2410 has I2S-2.0, S3C6410 has I2S-3.2 and I2S-4.0, S5P6440 has
+> > I2S-4.0, S5PC100 has
 
-Basically the cf manages each clock operation (enable/disable/set_rate),
-  as a transaction with several states.
+> I wonder what mean the numbers(2.0, 3.2, 4.0, 5.1). Does it mean I2S 
+> version simply? If it is version, what is the differences of each I2S
+> version?
 
-During the transaction all the clock frequencies are evaluated (before
-  the real change) and all the devices can check if they agree the new
-  clock rate.
-Moreover this is done also in hierarchical manner (i.e.: if you change
-  a PLL which several clock child).
-Basically the clock propagation involves both clocks and devices.
-
-Regards
-  Francesco
+It's just the version numbers for the IP blocks.  The differences tend
+to be in the addition of new features to the blocks, plus occasional
+reorganisations of the register maps.  For example, the v4.0 block added
+two extra data out lines for 5.1 audio support.  Since you work at
+Samsung I suspect your best bet for documentation on what's going on is
+to find an internal source - sadly the datasheets and other detailed
+collateral are not public but I'd expect that they are available within
+Samsung.
