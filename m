@@ -1,29 +1,31 @@
 From: laforge@gnumonks.org (Harald Welte)
-Date: Thu, 3 Sep 2009 13:33:25 +0900
+Date: Thu, 3 Sep 2009 13:31:30 +0900
 Subject: Samsung S3C6410 mainline merge coordination
-In-Reply-To: <2accc2ff0909022038t64c08d3dodb21dc4ff1f2915b@mail.gmail.com>
-References: <20090902031719.GK3838@prithivi.gnumonks.org>
-	<20090902161252.GD2367@trinity.fluff.org>
-	<20090902231839.GC32606@prithivi.gnumonks.org>
-	<2accc2ff0909022038t64c08d3dodb21dc4ff1f2915b@mail.gmail.com>
-Message-ID: <20090903043325.GH3917@prithivi.gnumonks.org>
+In-Reply-To: <7641737.122161251944382753.JavaMail.coremail@bj126app17.126.com>
+References: <20090903015608.GB3917@prithivi.gnumonks.org>
+	<20090902031719.GK3838@prithivi.gnumonks.org>
+	<200909021203.n82C3USg020804@chronolytics.com>
+	<20090902191626.GP25153@trinity.fluff.org>
+	<7641737.122161251944382753.JavaMail.coremail@bj126app17.126.com>
+Message-ID: <20090903043130.GG3917@prithivi.gnumonks.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 02, 2009 at 10:38:30PM -0500, Nelson Castillo wrote:
+Hi Tommy,
 
-> If it helps I can send a simplified version of the driver that does
-> not depend on filtering.
+On Thu, Sep 03, 2009 at 10:19:42AM +0800, tommy.hong wrote:
+ 
+> Some guy finish s3c6410 X driver which use g2d driver!
+> http://wiki.maemo.org/Mer/Hardware/SmartQ5/XAA
 
-I would like to see that one and see it go forward.
+thanks, that's indeed very interesting.  In fact, the entire SmartQ devices
+sound interesting, I have to see if I can get hold of one either in Korea
+or Germany.
 
-> Since we don't know Ben's version of the driver then I guess it's Ben's call.
+by the way, as a friendly note: Please do not full-quote when responding to
+e-mails. 
 
-Yes, indeed. 
-
-Ben: Is your code visible in some public git tree somwhere?  This
-would help others to have a look at it.
-
+Regards,
 -- 
 - Harald Welte <laforge@gnumonks.org>           http://laforge.gnumonks.org/
 ============================================================================
