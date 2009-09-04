@@ -1,70 +1,73 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 5 Sep 2009 11:49:56 +0200
-Subject: [PATCH] Add RGB555X and RGB565X formats to pxa-camera
-In-Reply-To: <Pine.LNX.4.64.0909051037300.4670@axis700.grange>
-References: <200908031031.00676.marek.vasut@gmail.com>
-	<200909050926.48309.marek.vasut@gmail.com>
-	<Pine.LNX.4.64.0909051037300.4670@axis700.grange>
-Message-ID: <200909051149.56343.marek.vasut@gmail.com>
+From: madhu.cr@ti.com (Madhusudhan)
+Date: Fri, 4 Sep 2009 14:43:44 -0500
+Subject: [PATCH] OMAP4: MMC driver support on OMAP4
+In-Reply-To: <20090904193347.GD15715@atomide.com>
+References: <34590.192.168.10.89.1251897876.squirrel@dbdmail.itg.ti.com>
+	<20090904121912.4b4e2b5a.akpm@linux-foundation.org>
+	<FCCFB4CDC6E5564B9182F639FC35608702F9B8A526@dbde02.ent.ti.com>
+	<20090904193347.GD15715@atomide.com>
+Message-ID: <00d801ca2d98$033a9410$544ff780@am.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne So 5. z??? 2009 10:55:55 Guennadi Liakhovetski napsal(a):
-> On Sat, 5 Sep 2009, Marek Vasut wrote:
-> > > > >  drivers/media/video/pxa_camera.c |    4 ++++
-> > > > >  1 files changed, 4 insertions(+), 0 deletions(-)
-> > > > >
-> > > > > diff --git a/drivers/media/video/pxa_camera.c
-> > > > > b/drivers/media/video/pxa_camera.c
-> > > > > index 46e0d8a..de0fc8a 100644
-> > > > > --- a/drivers/media/video/pxa_camera.c
-> > > > > +++ b/drivers/media/video/pxa_camera.c
-> > > > > @@ -1222,6 +1222,8 @@ static int required_buswidth(const struct
-> > > > > soc_camera_data_format *fmt)
-> > > > >  	case V4L2_PIX_FMT_YVYU:
-> > > > >  	case V4L2_PIX_FMT_RGB565:
-> > > > >  	case V4L2_PIX_FMT_RGB555:
-> > > > > +	case V4L2_PIX_FMT_RGB565X:
-> > > > > +	case V4L2_PIX_FMT_RGB555X:
-> > > > >  		return 8;
-> > > > >  	default:
-> > > > >  		return fmt->depth;
-> > > > > @@ -1260,6 +1262,8 @@ static int pxa_camera_get_formats(struct
-> > > > > soc_camera_device *icd, int idx,
-> > > > >  	case V4L2_PIX_FMT_YVYU:
-> > > > >  	case V4L2_PIX_FMT_RGB565:
-> > > > >  	case V4L2_PIX_FMT_RGB555:
-> > > > > +	case V4L2_PIX_FMT_RGB565X:
-> > > > > +	case V4L2_PIX_FMT_RGB555X:
-> > > > >  		formats++;
-> > > > >  		if (xlate) {
-> > > > >  			xlate->host_fmt = icd->formats + idx;
-> >
-> > What should we do with this patch? Any updates? I spoke to Guennadi and
-> > he thinks it's not a good idea to apply it (as pxaqci doesnt support
-> > those formats). But to my understanding, those formats are endian-swapped
-> > versions of the other ones without X at the end so there shouldnt be a
-> > problem with it.
->
-> Marek, please, look in PXA270 datasheet. To support a specific pixel
-> format means, e.g., to be able to process it further, according to this
-> format's particular colour component ordering. Process further can mean
-> convert to another format, extract various information from the data
-> (statistics, etc.)... Now RGB555 looks like (from wikipedia)
->
-> 15  14  13  12  11  10  09  08  07  06  05  04  03  02  01  00
-> R4  R3  R2  R1  R0  G4  G3  G2  G1  G1  B4  B3  B2  B1  B1  --
->
-> (Actually, I thought bit 15 was unused, but it doesn't matter for this
-> discussion.) Now, imagine what happens if you swap the two bytes. I don't
-> think the PXA will still be able to meaningfully process that format.
->
 
-Not on the pxa side, but on the camera side -- Bs and Rs swapped in the diagram 
-above.
-> Thanks
-> Guennadi
-> ---
-> Guennadi Liakhovetski, Ph.D.
-> Freelance Open-Source Software Developer
-> http://www.open-technology.de/
+
+> -----Original Message-----
+> From: Tony Lindgren [mailto:tony at atomide.com]
+> Sent: Friday, September 04, 2009 2:34 PM
+> To: Pandita, Vikram
+> Cc: Andrew Morton; Kadiyala, Kishore; linux-kernel at vger.kernel.org; linux-
+> omap at vger.kernel.org; jarkko.lavinen at nokia.com; Chikkature Rajashekar,
+> Madhusudhan; linux-arm-kernel at lists.arm.linux.org.uk; linux-arm-
+> kernel at lists.infradead.org; linux-mmc at vger.kernel.org
+> Subject: Re: [PATCH] OMAP4: MMC driver support on OMAP4
+> 
+> * Pandita, Vikram <vikram.pandita@ti.com> [090904 12:24]:
+> > Andrew/Kishore
+> >
+> > >-----Original Message-----
+> > >From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Andrew
+> > >Morton
+> > >Sent: Friday, September 04, 2009 2:19 PM
+> > >
+> > >On Wed, 2 Sep 2009 18:54:36 +0530 (IST)
+> > >"kishore kadiyala" <kishore.kadiyala@ti.com> wrote:
+> > >
+> > >> This Patch adds basic support for all 5 MMC controllers on OMAP4.
+> > >>
+> > >> -Kishore
+> > >>
+> > >> Signed-off-by: Kishore Kadiyala <kishore.kadiyala@ti.com>
+> > >> ---
+> > >> This patch doesn't include mmc-regulator support
+> > >>
+> > >
+> > >This looks like an ARM patch more than an MMC patch.  I grabbed it as
+> > >an MMC thing but hopefully someone else will grab it for a more
+> > >appropriate tree.
+> >
+> > A patch split is required:
+> >
+> > >>  arch/arm/mach-omap2/devices.c          |   42
+> +++++++++++++++++++++++++++++----
+> > >>  arch/arm/plat-omap/include/mach/irqs.h |    2 +
+> > >>  arch/arm/plat-omap/include/mach/mmc.h  |    9 ++++++-
+> >
+> > These files will go through linux-omap -> arm: to RMK
+> >
+> > >>  drivers/mmc/host/Kconfig               |    6 ++--
+> > >>  drivers/mmc/host/omap_hsmmc.c          |   10 +++++++
+> > >>  5 files changed, 60 insertions(+), 9 deletions(-)
+> >
+> > These files can go through Andrew.
+> 
+> No need to split it IMHO, it's best to merge it all together
+> via Andrew's MMC queue as it should not conflict with other
+> arch/arm/*omap* stuff.
+> 
+> Acked-by: Tony Lindgren <tony@atomide.com>
+
+Request to add my ACK.
+
+Acked-by: Madhusudhan Chikkature <madhu.cr@ti.com>
