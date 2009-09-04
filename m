@@ -1,36 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Sep 2009 19:33:11 +0100
-Subject: ARM highmem stuff - 5687/1
-In-Reply-To: <alpine.LFD.2.00.0909021009010.6044@xanadu.home>
-References: <20090902135355.GB12595@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0909021009010.6044@xanadu.home>
-Message-ID: <20090904183311.GA10316@n2100.arm.linux.org.uk>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 4 Sep 2009 21:05:38 +0200 (CEST)
+Subject: [PATCH] Add RGB555X and RGB565X formats to pxa-camera
+In-Reply-To: <4A76DF29.1050008@compulab.co.il>
+References: <200908031031.00676.marek.vasut@gmail.com>
+	<4A76CB7C.10401@gmail.com>
+	<Pine.LNX.4.64.0908031415370.5310@axis700.grange>
+	<4A76DF29.1050008@compulab.co.il>
+Message-ID: <Pine.LNX.4.64.0909042102200.4501@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 02, 2009 at 11:52:33AM -0400, Nicolas Pitre wrote:
-> On Wed, 2 Sep 2009, Russell King - ARM Linux wrote:
+On Mon, 3 Aug 2009, Mike Rapoport wrote:
+
+> > 2. Mike, while reviewing this patch I came across code in 
+> > pxa_camera_setup_cicr(), introduced by your earlier patch:
+> > 
+> > 	case V4L2_PIX_FMT_RGB555:
+> > 		cicr1 |= CICR1_RGB_BPP_VAL(1) | CICR1_RGBT_CONV_VAL(2) |
+> > 			CICR1_TBIT | CICR1_COLOR_SP_VAL(1);
+> > 		break;
+> > 
+> > Why are you enabling the RGB to RGBT conversion here unconditionally? 
+> > Generally, what are the advantages of configuring CICR1 for a specific RGB 
+> > format compared to using just a raw capture? Do I understand it right, 
+> > that ATM we are not using any of those features?
 > 
-> > Do we need a similar fix for flush_anon_page()?
-> 
-> Hmmmm... Maybe.  Especially since the only usage of flush_anon_page() is 
-> in __get_user_pages() where the page passed to flush_anon_page() may or 
-> may not be kmapped (it is not explicitly kmapped in that function, but 
-> non atomic kmaps are lazily unmapped and would still require to be 
-> flushed if their mapping is still there).  However, in 
-> __get_user_pages(), there is a flush_dcache_page() right after the call 
-> to flush_anon_page(), so the __cpuc_flush_dcache_page() in 
-> __flush_anon_page() appears redundant to me and could simply be removed 
-> entirely.
+> As far as I remember I've tried to overlay the captured imagery using pxa
+> overlay1. Most probably it's left here after those tries.
 
-I'm not sure this is right.  It looks to me as if it is possible for
-a page have both a mapping _and_ be an anonymous page - which can happen
-if the page is an anonymous page which has been placed into the swapcache.
+Mike, could you, please, verify that those bits are indeed unneeded and 
+provide patch to remove them?
 
-In this case, flush_dcache_page() may just set the PG_dcache_dirty bit
-without flushing anything.
-
-I do know that flush_anon_page() was required to stabilise the list server.
-With the list server now effectively redundant, I've no way to test this
-stuff, so I'm going to leave the duplicate flushing in place and won't
-apply your patch.
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
