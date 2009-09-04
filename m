@@ -1,39 +1,30 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 4 Sep 2009 21:05:38 +0200 (CEST)
-Subject: [PATCH] Add RGB555X and RGB565X formats to pxa-camera
-In-Reply-To: <4A76DF29.1050008@compulab.co.il>
-References: <200908031031.00676.marek.vasut@gmail.com>
-	<4A76CB7C.10401@gmail.com>
-	<Pine.LNX.4.64.0908031415370.5310@axis700.grange>
-	<4A76DF29.1050008@compulab.co.il>
-Message-ID: <Pine.LNX.4.64.0909042102200.4501@axis700.grange>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Fri, 4 Sep 2009 12:19:12 -0700
+Subject: [PATCH] OMAP4: MMC driver support on OMAP4
+In-Reply-To: <34590.192.168.10.89.1251897876.squirrel@dbdmail.itg.ti.com>
+References: <34590.192.168.10.89.1251897876.squirrel@dbdmail.itg.ti.com>
+Message-ID: <20090904121912.4b4e2b5a.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 3 Aug 2009, Mike Rapoport wrote:
+On Wed, 2 Sep 2009 18:54:36 +0530 (IST)
+"kishore kadiyala" <kishore.kadiyala@ti.com> wrote:
 
-> > 2. Mike, while reviewing this patch I came across code in 
-> > pxa_camera_setup_cicr(), introduced by your earlier patch:
-> > 
-> > 	case V4L2_PIX_FMT_RGB555:
-> > 		cicr1 |= CICR1_RGB_BPP_VAL(1) | CICR1_RGBT_CONV_VAL(2) |
-> > 			CICR1_TBIT | CICR1_COLOR_SP_VAL(1);
-> > 		break;
-> > 
-> > Why are you enabling the RGB to RGBT conversion here unconditionally? 
-> > Generally, what are the advantages of configuring CICR1 for a specific RGB 
-> > format compared to using just a raw capture? Do I understand it right, 
-> > that ATM we are not using any of those features?
+> This Patch adds basic support for all 5 MMC controllers on OMAP4.
 > 
-> As far as I remember I've tried to overlay the captured imagery using pxa
-> overlay1. Most probably it's left here after those tries.
+> -Kishore
+> 
+> Signed-off-by: Kishore Kadiyala <kishore.kadiyala@ti.com>
+> ---
+> This patch doesn't include mmc-regulator support
+> 
+>  arch/arm/mach-omap2/devices.c          |   42 +++++++++++++++++++++++++++++----
+>  arch/arm/plat-omap/include/mach/irqs.h |    2 +
+>  arch/arm/plat-omap/include/mach/mmc.h  |    9 ++++++-
+>  drivers/mmc/host/Kconfig               |    6 ++--
+>  drivers/mmc/host/omap_hsmmc.c          |   10 +++++++
+>  5 files changed, 60 insertions(+), 9 deletions(-)
 
-Mike, could you, please, verify that those bits are indeed unneeded and 
-provide patch to remove them?
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+This looks like an ARM patch more than an MMC patch.  I grabbed it as
+an MMC thing but hopefully someone else will grab it for a more
+appropriate tree.
