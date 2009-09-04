@@ -1,36 +1,45 @@
-From: arhuaco@freaks-unidos.net (Nelson Castillo)
-Date: Fri, 4 Sep 2009 02:15:17 -0500
-Subject: Samsung S3C6410 mainline merge coordination
-In-Reply-To: <20090903043325.GH3917@prithivi.gnumonks.org>
-References: <20090902031719.GK3838@prithivi.gnumonks.org>
-	<20090902161252.GD2367@trinity.fluff.org>
-	<20090902231839.GC32606@prithivi.gnumonks.org>
-	<2accc2ff0909022038t64c08d3dodb21dc4ff1f2915b@mail.gmail.com>
-	<20090903043325.GH3917@prithivi.gnumonks.org>
-Message-ID: <2accc2ff0909040015q4ba7e170j4e6e4fc345882e10@mail.gmail.com>
+From: francesco.virlinzi@st.com (Francesco VIRLINZI)
+Date: Fri, 04 Sep 2009 09:34:38 +0200
+Subject: [linux-pm] Montreal Linux Power Management Mini-Summit, July
+	13, 2009 -  Meeting Notes
+In-Reply-To: <20090903171213.GB9507@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.00.0905211430220.4390@localhost.localdomain>
+	<alpine.LFD.2.00.0907301801240.17818@localhost.localdomain>
+	<63386a3d0909011522m7a175d3eyb3bbe8a29a5fd104@mail.gmail.com>
+	<4A9E2EA7.8080700@st.com>
+	<20090902215832.GB21292@n2100.arm.linux.org.uk>
+	<4A9FD7C7.7070301@st.com>
+	<20090903171213.GB9507@n2100.arm.linux.org.uk>
+Message-ID: <4AA0C30E.4080908@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 2, 2009 at 11:33 PM, Harald Welte<laforge@gnumonks.org> wrote:
-> On Wed, Sep 02, 2009 at 10:38:30PM -0500, Nelson Castillo wrote:
->
->> If it helps I can send a simplified version of the driver that does
->> not depend on filtering.
->
-> I would like to see that one and see it go forward.
+Hi Russel.
+Thanks for your feedback.
 
-Harald, I replaced the filter framework with a simple filter that is
-in the same driver. It's not better than all the filters (it doesn't
-mix information from X and Y) but I'm surprised with the results I'm
-seeing. It filters the nasty noise most of the times in my tests.
+I know several point are already covered by other cf implementation.
+And I didn't create a new API... I use the same API linux already has.
+> Point 4 is something that OMAP might be able to use, though OMAP already
+> does this within its clk API implementation without notification of
+> drivers - the clock rates are driven by drivers requesting rates for
+> their own clocks rather than one driver influencing the clock rate for
+> another.
+>    
+This is the major feature of cf ( without this point the cf is just an other
+  cf...)... Moreover it's required when clocks are shared resource....
+If each device has its own clock... than also this feature isn't really 
+important
+  because each driver can manage its own clock.
 
-http://nelson-patches.googlecode.com/svn/trunk/openmoko/kernel/ts-with-s3c-adc/s3c2410_ts_simple_filter.c
+Basically the cf manages each clock operation (enable/disable/set_rate),
+  as a transaction with several states.
 
-I tested with a GTA02 (andy-tracking branch / 2.6.29-rc3). Some
-required patches I used are in the same directory.
+During the transaction all the clock frequencies are evaluated (before
+  the real change) and all the devices can check if they agree the new
+  clock rate.
+Moreover this is done also in hierarchical manner (i.e.: if you change
+  a PLL which several clock child).
+Basically the clock propagation involves both clocks and devices.
 
-s3c-adc-cleanup.patch and s3c-adc-control-remaining-conversions.patch
-were already merged by Ben and are in the Linus tree.
-
-I won't be able to further improve it in the next few days.... It
-might be useful as a starting point.
+Regards
+  Francesco
