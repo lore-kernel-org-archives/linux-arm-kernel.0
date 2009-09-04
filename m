@@ -1,42 +1,36 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 4 Sep 2009 07:48:58 +0200
+From: arhuaco@freaks-unidos.net (Nelson Castillo)
+Date: Fri, 4 Sep 2009 02:15:17 -0500
 Subject: Samsung S3C6410 mainline merge coordination
-In-Reply-To: <20090903095142.GB3302@digital-scurf.org>
+In-Reply-To: <20090903043325.GH3917@prithivi.gnumonks.org>
 References: <20090902031719.GK3838@prithivi.gnumonks.org>
-	<19987914.1168001251884594226.JavaMail.coremail@bj126app54.126.com>
-	<20090902120159.GT32606@prithivi.gnumonks.org>
-	<20090902191026.GO25153@trinity.fluff.org>
-	<20090902222641.GY32606@prithivi.gnumonks.org>
-	<20090903095142.GB3302@digital-scurf.org>
-Message-ID: <20090904054857.GA1542@ucw.cz>
+	<20090902161252.GD2367@trinity.fluff.org>
+	<20090902231839.GC32606@prithivi.gnumonks.org>
+	<2accc2ff0909022038t64c08d3dodb21dc4ff1f2915b@mail.gmail.com>
+	<20090903043325.GH3917@prithivi.gnumonks.org>
+Message-ID: <2accc2ff0909040015q4ba7e170j4e6e4fc345882e10@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Wed, Sep 2, 2009 at 11:33 PM, Harald Welte<laforge@gnumonks.org> wrote:
+> On Wed, Sep 02, 2009 at 10:38:30PM -0500, Nelson Castillo wrote:
+>
+>> If it helps I can send a simplified version of the driver that does
+>> not depend on filtering.
+>
+> I would like to see that one and see it go forward.
 
-> > > > > does it support X kdrive 2D accelerate ?
-> > > > X / kdrive is not part of the linux kernel.  Therefore, it is unrelated
-> > > > to the Linux kernel code that we are working on.
-> > > Unfortunately it seems that pretty much no-one uses the fb driver
-> > > acceleration, I'm not even sure if it has even been exported outside
-> > > the kernel, so isn't really a lot of use.
-> > having cursor acceleration and things like bitblit for srolling is a real
-> > pleasure if you ever happen to work for more than 5 minutes on the framebuffer
-> > console, especially on a system that already has a quite high load at that time.
-> > It sort-of is a standard feature, and at least in the x86/PCI/AGP world, I
-> > am not awaer that any framebuffer driver would not support it.  That's why I
-> > had it on my todo list.
-> 
-> Simtec produced a set of patches to expose the Linux Kernel FB acceleration
-> primitives to userland, only to be told that it was unlikely they'd be accepted
-> due to them having never been exposed before.  (Yes, it was a case of 'We have
-> always done it this way, why would we want to change?')
+Harald, I replaced the filter framework with a simple filter that is
+in the same driver. It's not better than all the filters (it doesn't
+mix information from X and Y) but I'm surprised with the results I'm
+seeing. It filters the nasty noise most of the times in my tests.
 
-If the performance is good enough that way (is it?), then the
-interface makes sense. With all the work on kernel mode setting,
-climaate probably changed; and even if not, people can be convinced
-with good arguments.
+http://nelson-patches.googlecode.com/svn/trunk/openmoko/kernel/ts-with-s3c-adc/s3c2410_ts_simple_filter.c
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+I tested with a GTA02 (andy-tracking branch / 2.6.29-rc3). Some
+required patches I used are in the same directory.
+
+s3c-adc-cleanup.patch and s3c-adc-control-remaining-conversions.patch
+were already merged by Ben and are in the Linus tree.
+
+I won't be able to further improve it in the next few days.... It
+might be useful as a starting point.
