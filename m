@@ -1,52 +1,60 @@
-From: vikram.pandita@ti.com (Pandita, Vikram)
-Date: Sat, 5 Sep 2009 00:53:21 +0530
-Subject: [PATCH] OMAP4: MMC driver support on OMAP4
-In-Reply-To: <20090904121912.4b4e2b5a.akpm@linux-foundation.org>
-References: <34590.192.168.10.89.1251897876.squirrel@dbdmail.itg.ti.com>
-	<20090904121912.4b4e2b5a.akpm@linux-foundation.org>
-Message-ID: <FCCFB4CDC6E5564B9182F639FC35608702F9B8A526@dbde02.ent.ti.com>
+From: nico@cam.org (Nicolas Pitre)
+Date: Fri, 04 Sep 2009 15:33:53 -0400 (EDT)
+Subject: ARM highmem stuff - 5687/1
+In-Reply-To: <20090904183311.GA10316@n2100.arm.linux.org.uk>
+References: <20090902135355.GB12595@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.0909021009010.6044@xanadu.home>
+	<20090904183311.GA10316@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.0909041447020.6044@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew/Kishore
+On Fri, 4 Sep 2009, Russell King - ARM Linux wrote:
 
->-----Original Message-----
-From: linux-omap-owner@vger.kernel.org [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Andrew
->Morton
->Sent: Friday, September 04, 2009 2:19 PM
->
->On Wed, 2 Sep 2009 18:54:36 +0530 (IST)
->"kishore kadiyala" <kishore.kadiyala@ti.com> wrote:
->
->> This Patch adds basic support for all 5 MMC controllers on OMAP4.
->>
->> -Kishore
->>
->> Signed-off-by: Kishore Kadiyala <kishore.kadiyala@ti.com>
->> ---
->> This patch doesn't include mmc-regulator support
->>
->
->This looks like an ARM patch more than an MMC patch.  I grabbed it as
->an MMC thing but hopefully someone else will grab it for a more
->appropriate tree.
+> On Wed, Sep 02, 2009 at 11:52:33AM -0400, Nicolas Pitre wrote:
+> > On Wed, 2 Sep 2009, Russell King - ARM Linux wrote:
+> > 
+> > > Do we need a similar fix for flush_anon_page()?
+> > 
+> > Hmmmm... Maybe.  Especially since the only usage of flush_anon_page() is 
+> > in __get_user_pages() where the page passed to flush_anon_page() may or 
+> > may not be kmapped (it is not explicitly kmapped in that function, but 
+> > non atomic kmaps are lazily unmapped and would still require to be 
+> > flushed if their mapping is still there).  However, in 
+> > __get_user_pages(), there is a flush_dcache_page() right after the call 
+> > to flush_anon_page(), so the __cpuc_flush_dcache_page() in 
+> > __flush_anon_page() appears redundant to me and could simply be removed 
+> > entirely.
+> 
+> I'm not sure this is right.  It looks to me as if it is possible for
+> a page have both a mapping _and_ be an anonymous page - which can happen
+> if the page is an anonymous page which has been placed into the swapcache.
 
-A patch split is required:
+Hmmm...  Right.  However...
 
->>  arch/arm/mach-omap2/devices.c          |   42 +++++++++++++++++++++++++++++----
->>  arch/arm/plat-omap/include/mach/irqs.h |    2 +
->>  arch/arm/plat-omap/include/mach/mmc.h  |    9 ++++++-
+> In this case, flush_dcache_page() may just set the PG_dcache_dirty bit
+> without flushing anything.
 
-These files will go through linux-omap -> arm: to RMK
+But only if there is indeed a mapping and it is unmapped.  In which case 
+isn't the flush going to happen before the page gets mapped into user 
+space anyway?
 
->>  drivers/mmc/host/Kconfig               |    6 ++--
->>  drivers/mmc/host/omap_hsmmc.c          |   10 +++++++
->>  5 files changed, 60 insertions(+), 9 deletions(-)
+> I do know that flush_anon_page() was required to stabilise the list server.
 
-These files can go through Andrew.
+Do you mean __cpuc_flush_dcache_page() inside flush_anon_page()?
 
->
->--
->To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->the body of a message to majordomo at vger.kernel.org
->More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Might this be because the page can still be dirty by not being mapped 
+yet and therefore PG_dcache_dirty is still set at the moment 
+flush_anon_page() is called, and then some IO is performed on that page 
+using DMA to swap it out for example?  Is that possible? If so that 
+would look more logical to me if the call to __cpuc_flush_dcache_page() 
+was conditional on the PG_dcache_dirty bit.
+
+> With the list server now effectively redundant, I've no way to test this
+> stuff, so I'm going to leave the duplicate flushing in place and won't
+> apply your patch.
+
+If my assertion above is true, then I agree that the patch is wrong.
+
+
+Nicolas
