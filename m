@@ -1,33 +1,42 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 05 Sep 2009 08:27:33 +0000 (GMT)
-Subject: [PATCH 1/3] s3c64xx: Fix S3C64XX_CLKDIV0_ARM_MASK value
-Message-ID: <30516562.529311252139253359.JavaMail.weblogic@epml18>
+Date: Sat, 05 Sep 2009 08:30:31 +0000 (GMT)
+Subject: [PATCH 2/3] s3c64xx: Fix fclk source
+Message-ID: <3146299.529361252139431583.JavaMail.weblogic@epml18>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-The value of S3C64XX_CLKDIV0_ARM_MASK is wrong. This patch fixes                                
-this values, S3C6400_CLKDIV0_ARM_MASK and S3C6410_CLKDIV0_ARM_MASK.                             
+This patch fixes fclk source from mpll to apll.
+According to 'Fig 3-2. The block diagram of clock generator' of 6400/6410 UM,
+the source of ARM_CLK is APLL, that goes through MUX_APLL and DIV_APLL.
 
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>                                               
----     
- arch/arm/plat-s3c64xx/include/plat/regs-clock.h |    4 ++--                                    
- 1 files changed, 2 insertions(+), 2 deletions(-)                                               
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/plat-s3c64xx/s3c6400-clock.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-s3c64xx/include/plat/regs-clock.h b/arch/arm/plat-s3c64xx/include/plat/regs-clock.h
-index a8777a7..ff46e7f 100644                                                                   
---- a/arch/arm/plat-s3c64xx/include/plat/regs-clock.h                                           
-+++ b/arch/arm/plat-s3c64xx/include/plat/regs-clock.h
-@@ -51,8 +51,8 @@
- #define S3C6400_CLKDIV0_HCLK_SHIFT     (8)                                                     
- #define S3C6400_CLKDIV0_MPLL_MASK      (0x1 << 4)                                              
- #define S3C6400_CLKDIV0_MPLL_SHIFT     (4)                                                     
--#define S3C6400_CLKDIV0_ARM_MASK       (0x3 << 0)                                              
--#define S3C6410_CLKDIV0_ARM_MASK       (0x7 << 0)                                              
-+#define S3C6400_CLKDIV0_ARM_MASK       (0x7 << 0)
-+#define S3C6410_CLKDIV0_ARM_MASK       (0xf << 0)                                              
- #define S3C6400_CLKDIV0_ARM_SHIFT      (0)                                                     
- 
- /* CLKDIV1 */                                                                                  
+diff --git a/arch/arm/plat-s3c64xx/s3c6400-clock.c b/arch/arm/plat-s3c64xx/s3c6400-clock.c
+index 9745852..a898325 100644
+--- a/arch/arm/plat-s3c64xx/s3c6400-clock.c
++++ b/arch/arm/plat-s3c64xx/s3c6400-clock.c
+@@ -663,6 +663,7 @@ void __init_or_cpufreq s3c6400_setup_clocks(void)
+        unsigned long mpll;
+        unsigned int ptr;
+        u32 clkdiv0;
++       u32 clkdiv0_arm;
+
+        printk(KERN_DEBUG "%s: registering clocks\n", __func__);
+
+@@ -681,7 +682,9 @@ void __init_or_cpufreq s3c6400_setup_clocks(void)
+        mpll = s3c6400_get_pll(xtal, __raw_readl(S3C_MPLL_CON));
+        apll = s3c6400_get_pll(xtal, __raw_readl(S3C_APLL_CON));
+
+-       fclk = mpll;
++       /* DIVarm clk divider mask starts at bit0, so no need to shift */
++       clkdiv0_arm = clkdiv0 & armclk_mask;
++       fclk = apll / (clkdiv0_arm + 1);
+
+        printk(KERN_INFO "S3C64XX: PLL settings, A=%ld, M=%ld, E=%ld\n",
+               apll, mpll, epll);
 -- 
 1.5.3.4
