@@ -1,42 +1,62 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 05 Sep 2009 08:30:31 +0000 (GMT)
-Subject: [PATCH 2/3] s3c64xx: Fix fclk source
-Message-ID: <3146299.529361252139431583.JavaMail.weblogic@epml18>
+Date: Sat, 05 Sep 2009 08:33:11 +0000 (GMT)
+Subject: [PATCH 3/3] s3c64xx: Add SYNCMUX codes for selection source of HCLKx2
+Message-ID: <18082112.529381252139591299.JavaMail.weblogic@epml18>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-This patch fixes fclk source from mpll to apll.
+This patch adds SYNCMUX codes for selection source of HCLKx2.
 According to 'Fig 3-2. The block diagram of clock generator' of 6400/6410 UM,
-the source of ARM_CLK is APLL, that goes through MUX_APLL and DIV_APLL.
+the source of HCLKx2 is DOUT_APLL or MOUT_MPLL that is decided by SYNCMUX.
+If synchronous mode, it is DOUT_APLL and if asynchronous mode, it is MOUT_MPLL.
 
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/plat-s3c64xx/s3c6400-clock.c |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
+ arch/arm/plat-s3c64xx/include/plat/regs-clock.h |    4 ++++
+ arch/arm/plat-s3c64xx/s3c6400-clock.c           |    8 +++++++-
+ 2 files changed, 11 insertions(+), 1 deletions(-)
 
+diff --git a/arch/arm/plat-s3c64xx/include/plat/regs-clock.h b/arch/arm/plat-s3c64xx/include/plat/regs-clock.h
+index ff46e7f..2c3224c 100644
+--- a/arch/arm/plat-s3c64xx/include/plat/regs-clock.h
++++ b/arch/arm/plat-s3c64xx/include/plat/regs-clock.h
+@@ -33,6 +33,7 @@
+ #define S3C_PCLK_GATE          S3C_CLKREG(0x34)
+ #define S3C_SCLK_GATE          S3C_CLKREG(0x38)
+ #define S3C_MEM0_GATE          S3C_CLKREG(0x3C)
++#define S3C_OTHERS             S3C_CLKREG(0x900)
+
+ /* CLKDIV0 */
+ #define S3C6400_CLKDIV0_MFC_MASK       (0xf << 28)
+@@ -182,6 +183,9 @@
+ #define S3C_CLKCON_SCLK_CAM            (1<<2)
+ #define S3C_CLKCON_SCLK_JPEG           (1<<1)
+
++/* OTHERS */
++#define S3C_OTHERS_SYNCMUXSEL_SYNC     (1<<6)
++
+ /* CLKSRC */
+
+ #define S3C6400_CLKSRC_APLL_MOUT       (1 << 0)
 diff --git a/arch/arm/plat-s3c64xx/s3c6400-clock.c b/arch/arm/plat-s3c64xx/s3c6400-clock.c
-index 9745852..a898325 100644
+index a898325..0da2781 100644
 --- a/arch/arm/plat-s3c64xx/s3c6400-clock.c
 +++ b/arch/arm/plat-s3c64xx/s3c6400-clock.c
-@@ -663,6 +663,7 @@ void __init_or_cpufreq s3c6400_setup_clocks(void)
-        unsigned long mpll;
-        unsigned int ptr;
-        u32 clkdiv0;
-+       u32 clkdiv0_arm;
-
-        printk(KERN_DEBUG "%s: registering clocks\n", __func__);
-
-@@ -681,7 +682,9 @@ void __init_or_cpufreq s3c6400_setup_clocks(void)
-        mpll = s3c6400_get_pll(xtal, __raw_readl(S3C_MPLL_CON));
-        apll = s3c6400_get_pll(xtal, __raw_readl(S3C_APLL_CON));
-
--       fclk = mpll;
-+       /* DIVarm clk divider mask starts at bit0, so no need to shift */
-+       clkdiv0_arm = clkdiv0 & armclk_mask;
-+       fclk = apll / (clkdiv0_arm + 1);
-
+@@ -689,7 +689,13 @@ void __init_or_cpufreq s3c6400_setup_clocks(void)
         printk(KERN_INFO "S3C64XX: PLL settings, A=%ld, M=%ld, E=%ld\n",
                apll, mpll, epll);
+
+-       hclk2 = mpll / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK2);
++       if (__raw_readl(S3C_OTHERS) & S3C_OTHERS_SYNCMUXSEL_SYNC) {
++               /* Synchronous mode */
++               hclk2 = apll / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK2);
++       } else {
++               /* Asynchronous mode */
++               hclk2 = mpll / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK2);
++       }
+        hclk = hclk2 / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK);
+        pclk = hclk2 / GET_DIV(clkdiv0, S3C6400_CLKDIV0_PCLK);
+
 -- 
 1.5.3.4
+                                                                             
