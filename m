@@ -1,54 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 4 Sep 2009 12:33:47 -0700
-Subject: [PATCH] OMAP4: MMC driver support on OMAP4
-In-Reply-To: <FCCFB4CDC6E5564B9182F639FC35608702F9B8A526@dbde02.ent.ti.com>
-References: <34590.192.168.10.89.1251897876.squirrel@dbdmail.itg.ti.com>
-	<20090904121912.4b4e2b5a.akpm@linux-foundation.org>
-	<FCCFB4CDC6E5564B9182F639FC35608702F9B8A526@dbde02.ent.ti.com>
-Message-ID: <20090904193347.GD15715@atomide.com>
+From: jsgood.yang@samsung.com (=?UTF-8?B?7JaR7KeE7ISx?=)
+Date: Sat, 05 Sep 2009 22:24:12 +0900
+Subject: [PATCH 01/12] [ARM][S3C6410] keypad memory map support
+Message-ID: <00a001ca2e2c$28b48b80$7a1da280$%yang@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pandita, Vikram <vikram.pandita@ti.com> [090904 12:24]:
-> Andrew/Kishore
-> 
-> >-----Original Message-----
-> >From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Andrew
-> >Morton
-> >Sent: Friday, September 04, 2009 2:19 PM
-> >
-> >On Wed, 2 Sep 2009 18:54:36 +0530 (IST)
-> >"kishore kadiyala" <kishore.kadiyala@ti.com> wrote:
-> >
-> >> This Patch adds basic support for all 5 MMC controllers on OMAP4.
-> >>
-> >> -Kishore
-> >>
-> >> Signed-off-by: Kishore Kadiyala <kishore.kadiyala@ti.com>
-> >> ---
-> >> This patch doesn't include mmc-regulator support
-> >>
-> >
-> >This looks like an ARM patch more than an MMC patch.  I grabbed it as
-> >an MMC thing but hopefully someone else will grab it for a more
-> >appropriate tree.
-> 
-> A patch split is required:
-> 
-> >>  arch/arm/mach-omap2/devices.c          |   42 +++++++++++++++++++++++++++++----
-> >>  arch/arm/plat-omap/include/mach/irqs.h |    2 +
-> >>  arch/arm/plat-omap/include/mach/mmc.h  |    9 ++++++-
-> 
-> These files will go through linux-omap -> arm: to RMK
-> 
-> >>  drivers/mmc/host/Kconfig               |    6 ++--
-> >>  drivers/mmc/host/omap_hsmmc.c          |   10 +++++++
-> >>  5 files changed, 60 insertions(+), 9 deletions(-)
-> 
-> These files can go through Andrew.
+This patch introduces keypad memory map for new keypad driver.
+Also the new keypad driver will be provided to the mainline soon.
 
-No need to split it IMHO, it's best to merge it all together
-via Andrew's MMC queue as it should not conflict with other
-arch/arm/*omap* stuff.
+Signed-off-by: Jinsung Yang <jsgood.yang@samsung.com>
+Signed-off-by: Kyeongil Kim <ki0351.kim@samsung.com>
+---
+ arch/arm/mach-s3c6400/include/mach/map.h |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+diff --git a/arch/arm/mach-s3c6400/include/mach/map.h b/arch/arm/mach-s3c6400/include/mach/map.h
+index 5057d99..d935570 100644
+--- a/arch/arm/mach-s3c6400/include/mach/map.h
++++ b/arch/arm/mach-s3c6400/include/mach/map.h
+@@ -65,6 +65,10 @@
+ #define S3C_VA_VIC0		(S3C_VA_IRQ + 0x00)
+ #define S3C_VA_VIC1		(S3C_VA_IRQ + 0x10000)
+ 
++/* keypad */
++#define S3C64XX_PA_KEYPAD	(0x7E00A000)
++#define S3C64XX_SZ_KEYPAD	SZ_4K
++
+ /* compatibiltiy defines. */
+ #define S3C_PA_TIMER		S3C64XX_PA_TIMER
+ #define S3C_PA_HSMMC0		S3C64XX_PA_HSMMC0
+@@ -75,5 +79,7 @@
+ #define S3C_PA_FB		S3C64XX_PA_FB
+ #define S3C_PA_USBHOST		S3C64XX_PA_USBHOST
+ #define S3C_PA_USB_HSOTG	S3C64XX_PA_USB_HSOTG
++#define S3C_PA_KEYPAD		S3C64XX_PA_KEYPAD
++#define S3C_SZ_KEYPAD		S3C64XX_SZ_KEYPAD
+ 
+ #endif /* __ASM_ARCH_6400_MAP_H */
+-- 
+1.6.2.5
