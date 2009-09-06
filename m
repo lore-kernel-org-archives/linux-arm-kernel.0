@@ -1,16 +1,38 @@
-From: sleep_walker@suse.cz (=?utf-8?q?Tom=C3=A1=C5=A1_=27Sleep=5FWalker=27?=
-	=?utf-8?q?_=C4=8Cech?=)
-Date: Sun, 6 Sep 2009 10:27:14 +0200
-Subject: [PATCH 2/5] Treo680: remove unused LCD power GPIO
-In-Reply-To: <f17812d70909042143s12195d86pc46406c1d09d7210@mail.gmail.com>
-References: <1251739561-28972-1-git-send-email-sleep_walker@suse.cz>
-	<200909031721.44214.sleep_walker@suse.cz>
-	<f17812d70909042143s12195d86pc46406c1d09d7210@mail.gmail.com>
-Message-ID: <200909061027.14902.sleep_walker@suse.cz>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Sun, 6 Sep 2009 18:52:55 +0200 (CEST)
+Subject: [PATCH] Add RGB555X and RGB565X formats to pxa-camera
+In-Reply-To: <200909060550.23681.marek.vasut@gmail.com>
+References: <200908031031.00676.marek.vasut@gmail.com>
+	<200909052317.24048.marek.vasut@gmail.com>
+	<Pine.LNX.4.64.0909052358080.4670@axis700.grange>
+	<200909060550.23681.marek.vasut@gmail.com>
+Message-ID: <Pine.LNX.4.64.0909061755020.10484@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> OK, applied, with printk(KERN_ERR changed to pr_err()
-Thanks.
+On Sun, 6 Sep 2009, Marek Vasut wrote:
 
-Tomas Cech
+> Ah damn, I see what you mean. What the camera does is it swaps the RED and BLUE 
+> channel:
+> 15  14  13  12  11  10  09  08  07  06  05  04  03  02  01  00
+> B4  B3  B2  B1  B0  G4  G3  G2  G1  G1  R4  R3  R2  R1  R1  --
+> so it's more a BGR555/565 then. I had to patch fswebcam for this.
+
+Ok, this is, of course, something different. In this case you, probably, 
+could deceive the PXA to handle blue as red and the other way round, but 
+still, I would prefer not to do that. Hence my suggestion remains - pass 
+these formats as raw data.
+
+The only case when you might want to put the PXA into RGB555 mode, while 
+feeding BGR555 to it, is you want to use the QCI to set the transparency 
+bit for you. But we currently do not support this any way, not in a 
+configurable way at least. You would need to implement some sort of a 
+"global (one-bit) alpha" control for pxa_camera to use this. Any need for 
+this?
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
