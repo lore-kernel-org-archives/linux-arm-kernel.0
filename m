@@ -1,54 +1,57 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Sun, 06 Sep 2009 09:03:32 +0300
-Subject: [PATCH] Add RGB555X and RGB565X formats to pxa-camera
-In-Reply-To: <Pine.LNX.4.64.0909042102200.4501@axis700.grange>
-References: <200908031031.00676.marek.vasut@gmail.com>
-	<4A76CB7C.10401@gmail.com>
-	<Pine.LNX.4.64.0908031415370.5310@axis700.grange>
-	<4A76DF29.1050008@compulab.co.il>
-	<Pine.LNX.4.64.0909042102200.4501@axis700.grange>
-Message-ID: <4AA350B4.30204@compulab.co.il>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 6 Sep 2009 08:19:45 +0200
+Subject: zaurus c3000 aka spitz: fix resume (fwd)
+Message-ID: <20090906061934.GA1822@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
+Maillist rejected it, reposting...
 
-Guennadi Liakhovetski wrote:
-> On Mon, 3 Aug 2009, Mike Rapoport wrote:
-> 
->>> 2. Mike, while reviewing this patch I came across code in 
->>> pxa_camera_setup_cicr(), introduced by your earlier patch:
->>>
->>> 	case V4L2_PIX_FMT_RGB555:
->>> 		cicr1 |= CICR1_RGB_BPP_VAL(1) | CICR1_RGBT_CONV_VAL(2) |
->>> 			CICR1_TBIT | CICR1_COLOR_SP_VAL(1);
->>> 		break;
->>>
->>> Why are you enabling the RGB to RGBT conversion here unconditionally? 
->>> Generally, what are the advantages of configuring CICR1 for a specific RGB 
->>> format compared to using just a raw capture? Do I understand it right, 
->>> that ATM we are not using any of those features?
->> As far as I remember I've tried to overlay the captured imagery using pxa
->> overlay1. Most probably it's left here after those tries.
-> 
-> Mike, could you, please, verify that those bits are indeed unneeded and 
-> provide patch to remove them?
+(Could we get slightly higher limit on #of recipients for lakml?)
+								Pavel
 
-Unfortunately, I don't have the sensor handy at the time :( The one I've used
-then is now broken (physically) and there's no replacement for it :(
+----- Forwarded message from Pavel Machek <pavel@ucw.cz> -----
 
-> Thanks
-> Guennadi
-> ---
-> Guennadi Liakhovetski, Ph.D.
-> Freelance Open-Source Software Developer
-> http://www.open-technology.de/
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+From: Pavel Machek <pavel@ucw.cz>
+To: rpurdie at rpsys.net, lenz at cs.wisc.edu,
+	kernel list <linux-kernel@vger.kernel.org>, Dirk at Opfer-Online.de,
+	arminlitzel at web.de, Cyril Hrubis <metan@ucw.cz>,
+	thommycheck at gmail.com,
+	linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+	dbaryshkov at gmail.com, omegamoon at gmail.com, eric.miao at marvell.com,
+	utx at penguin.cz, Russell King <rmk@arm.linux.org.uk>
+Subject: zaurus c3000 aka spitz: fix resume
+
+
+sharpsl_pm.c code tries to read battery state very early during
+resume, but those battery meters are connected on SPI and that's only
+resumed way later.
+
+Replace the check with simple checking of battery fatal signal, that
+actually works at this stage.
+
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
+
+--- linux-rc/arch/arm.ofic/mach-pxa/sharpsl_pm.c	2009-08-28 00:19:10.000000000 +0200
++++ linux-rc/arch/arm/mach-pxa/sharpsl_pm.c	2009-09-04 11:18:33.000000000 +0200
+@@ -678,8 +678,8 @@
+ 		dev_dbg(sharpsl_pm.dev, "User triggered wakeup in offline charger.\n");
+ 	}
+ 
+-	if ((!sharpsl_pm.machinfo->read_devdata(SHARPSL_STATUS_LOCK)) || (sharpsl_fatal_check() < 0) )
+-	{
++	if ((!sharpsl_pm.machinfo->read_devdata(SHARPSL_STATUS_LOCK)) || 
++	    (!sharpsl_pm.machinfo->read_devdata(SHARPSL_STATUS_FATAL)))	{
+ 		dev_err(sharpsl_pm.dev, "Fatal condition. Suspend.\n");
+ 		corgi_goto_sleep(alarm_time, alarm_enable, state);
+ 		return 1;
 
 -- 
-Sincerely yours,
-Mike.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+
+----- End forwarded message -----
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
