@@ -1,57 +1,16 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 6 Sep 2009 08:19:45 +0200
-Subject: zaurus c3000 aka spitz: fix resume (fwd)
-Message-ID: <20090906061934.GA1822@ucw.cz>
+From: sleep_walker@suse.cz (=?utf-8?q?Tom=C3=A1=C5=A1_=27Sleep=5FWalker=27?=
+	=?utf-8?q?_=C4=8Cech?=)
+Date: Sun, 6 Sep 2009 10:27:14 +0200
+Subject: [PATCH 2/5] Treo680: remove unused LCD power GPIO
+In-Reply-To: <f17812d70909042143s12195d86pc46406c1d09d7210@mail.gmail.com>
+References: <1251739561-28972-1-git-send-email-sleep_walker@suse.cz>
+	<200909031721.44214.sleep_walker@suse.cz>
+	<f17812d70909042143s12195d86pc46406c1d09d7210@mail.gmail.com>
+Message-ID: <200909061027.14902.sleep_walker@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maillist rejected it, reposting...
+> OK, applied, with printk(KERN_ERR changed to pr_err()
+Thanks.
 
-(Could we get slightly higher limit on #of recipients for lakml?)
-								Pavel
-
------ Forwarded message from Pavel Machek <pavel@ucw.cz> -----
-
-From: Pavel Machek <pavel@ucw.cz>
-To: rpurdie at rpsys.net, lenz at cs.wisc.edu,
-	kernel list <linux-kernel@vger.kernel.org>, Dirk at Opfer-Online.de,
-	arminlitzel at web.de, Cyril Hrubis <metan@ucw.cz>,
-	thommycheck at gmail.com,
-	linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
-	dbaryshkov at gmail.com, omegamoon at gmail.com, eric.miao at marvell.com,
-	utx at penguin.cz, Russell King <rmk@arm.linux.org.uk>
-Subject: zaurus c3000 aka spitz: fix resume
-
-
-sharpsl_pm.c code tries to read battery state very early during
-resume, but those battery meters are connected on SPI and that's only
-resumed way later.
-
-Replace the check with simple checking of battery fatal signal, that
-actually works at this stage.
-
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
-
---- linux-rc/arch/arm.ofic/mach-pxa/sharpsl_pm.c	2009-08-28 00:19:10.000000000 +0200
-+++ linux-rc/arch/arm/mach-pxa/sharpsl_pm.c	2009-09-04 11:18:33.000000000 +0200
-@@ -678,8 +678,8 @@
- 		dev_dbg(sharpsl_pm.dev, "User triggered wakeup in offline charger.\n");
- 	}
- 
--	if ((!sharpsl_pm.machinfo->read_devdata(SHARPSL_STATUS_LOCK)) || (sharpsl_fatal_check() < 0) )
--	{
-+	if ((!sharpsl_pm.machinfo->read_devdata(SHARPSL_STATUS_LOCK)) || 
-+	    (!sharpsl_pm.machinfo->read_devdata(SHARPSL_STATUS_FATAL)))	{
- 		dev_err(sharpsl_pm.dev, "Fatal condition. Suspend.\n");
- 		corgi_goto_sleep(alarm_time, alarm_enable, state);
- 		return 1;
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
-
------ End forwarded message -----
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Tomas Cech
