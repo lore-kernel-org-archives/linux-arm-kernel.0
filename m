@@ -1,56 +1,55 @@
 From: kmpark@infradead.org (Kyungmin Park)
-Date: Mon, 7 Sep 2009 09:08:22 +0900
-Subject: [PATCH 07/12] [ARM][S3C6410] Add definition of keypad platform
-	data
-In-Reply-To: <00a901ca2e2d$004e7bf0$00eb73d0$%yang@samsung.com>
-References: <00a901ca2e2d$004e7bf0$00eb73d0$%yang@samsung.com>
-Message-ID: <9c9fda240909061708v5fa6e280wc764f037e3f8e51a@mail.gmail.com>
+Date: Mon, 7 Sep 2009 09:08:39 +0900
+Subject: [PATCH 01/12] [ARM][S3C6410] keypad memory map support
+In-Reply-To: <00a001ca2e2c$28b48b80$7a1da280$%yang@samsung.com>
+References: <00a001ca2e2c$28b48b80$7a1da280$%yang@samsung.com>
+Message-ID: <9c9fda240909061708m1cc96da0k4611a34c92596f67@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/9/5 ??? <jsgood.yang@samsung.com>:
-> This patch includes platform data header of keypad driver and
-> extern definition of function to set platform data.
->
-> Signed-off-by: Jinsung Yang <jsgood.yang@samsung.com>
-> Signed-off-by: Kyeongil Kim <ki0351.kim@samsung.com>
-> ---
-> ?arch/arm/plat-s3c/include/plat/keypad.h | ? 14 ++++++++++++++
-> ?1 files changed, 14 insertions(+), 0 deletions(-)
-> ?create mode 100644 arch/arm/plat-s3c/include/plat/keypad.h
->
-> diff --git a/arch/arm/plat-s3c/include/plat/keypad.h b/arch/arm/plat-s3c/include/plat/keypad.h
-> new file mode 100644
-> index 0000000..caf2417
-> --- /dev/null
-> +++ b/arch/arm/plat-s3c/include/plat/keypad.h
-> @@ -0,0 +1,14 @@
-> +#ifndef __ASM_PLAT_S3C_KEYPAD_H
-> +#define __ASM_PLAT_S3C_KEYPAD_H
+Hi,
 
-Also you missed the copyright here.
-
-> +
-> +struct s3c_platform_keypad {
-> + ? ? ? int nr_rows;
-> + ? ? ? int nr_cols;
-> + ? ? ? int max_keys;
-> + ? ? ? int max_masks;
-> + ? ? ? int delay;
-> +};
-
-Don't you need the keymap at here?
-And please consider s5pc1xx series. you already aware the s5pc1xx
-series keypad.
-Also add the cfg_gpio at here.
+First, where's keypad driver source codes?
+Second, why how many patches are needed? I think only two patch, one
+for keypad related, another is smdkc100 board specific.
 
 Thank you,
 Kyungmin Park
 
+
+2009/9/5 ??? <jsgood.yang@samsung.com>:
+> This patch introduces keypad memory map for new keypad driver.
+> Also the new keypad driver will be provided to the mainline soon.
+>
+> Signed-off-by: Jinsung Yang <jsgood.yang@samsung.com>
+> Signed-off-by: Kyeongil Kim <ki0351.kim@samsung.com>
+> ---
+> ?arch/arm/mach-s3c6400/include/mach/map.h | ? ?6 ++++++
+> ?1 files changed, 6 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-s3c6400/include/mach/map.h b/arch/arm/mach-s3c6400/include/mach/map.h
+> index 5057d99..d935570 100644
+> --- a/arch/arm/mach-s3c6400/include/mach/map.h
+> +++ b/arch/arm/mach-s3c6400/include/mach/map.h
+> @@ -65,6 +65,10 @@
+> ?#define S3C_VA_VIC0 ? ? ? ? ? ?(S3C_VA_IRQ + 0x00)
+> ?#define S3C_VA_VIC1 ? ? ? ? ? ?(S3C_VA_IRQ + 0x10000)
+>
+> +/* keypad */
+> +#define S3C64XX_PA_KEYPAD ? ? ?(0x7E00A000)
+> +#define S3C64XX_SZ_KEYPAD ? ? ?SZ_4K
 > +
-> +extern void s3c_keypad_set_platdata(struct s3c_platform_keypad *pd);
-> +
-> +#endif /* __ASM_PLAT_S3C_KEYPAD_H */
+> ?/* compatibiltiy defines. */
+> ?#define S3C_PA_TIMER ? ? ? ? ? S3C64XX_PA_TIMER
+> ?#define S3C_PA_HSMMC0 ? ? ? ? ?S3C64XX_PA_HSMMC0
+> @@ -75,5 +79,7 @@
+> ?#define S3C_PA_FB ? ? ? ? ? ? ?S3C64XX_PA_FB
+> ?#define S3C_PA_USBHOST ? ? ? ? S3C64XX_PA_USBHOST
+> ?#define S3C_PA_USB_HSOTG ? ? ? S3C64XX_PA_USB_HSOTG
+> +#define S3C_PA_KEYPAD ? ? ? ? ?S3C64XX_PA_KEYPAD
+> +#define S3C_SZ_KEYPAD ? ? ? ? ?S3C64XX_SZ_KEYPAD
+>
+> ?#endif /* __ASM_ARCH_6400_MAP_H */
 > --
 > 1.6.2.5
 >
