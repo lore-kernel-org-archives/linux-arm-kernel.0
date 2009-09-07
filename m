@@ -1,98 +1,45 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Mon, 7 Sep 2009 12:15:37 +0900
-Subject: [PATCH 01/12] [ARM][S3C6410] keypad memory map support
-In-Reply-To: <000e01ca2f5d$664607d0$32d21770$%yang@samsung.com>
-References: <00a001ca2e2c$28b48b80$7a1da280$%yang@samsung.com>
-	<9c9fda240909061708m1cc96da0k4611a34c92596f67@mail.gmail.com>
-	<000e01ca2f5d$664607d0$32d21770$%yang@samsung.com>
-Message-ID: <9c9fda240909062015qfd27859m86ac24c8777363c5@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 7 Sep 2009 06:46:04 +0200
+Subject: [PATCH] Add RGB555X and RGB565X formats to pxa-camera
+In-Reply-To: <Pine.LNX.4.64.0909062004160.10484@axis700.grange>
+References: <200908031031.00676.marek.vasut@gmail.com>
+	<200909061951.44629.marek.vasut@gmail.com>
+	<Pine.LNX.4.64.0909062004160.10484@axis700.grange>
+Message-ID: <200909070646.04642.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 7, 2009 at 10:49 AM, Jinsung Yang<jsgood.yang@samsung.com> wrote:
->> -----Original Message-----
->> From: kyungmin78 at gmail.com [mailto:kyungmin78 at gmail.com] On Behalf Of
->> Kyungmin Park
->> Sent: Monday, September 07, 2009 9:09 AM
->> To: ???
->> Cc: ben-linux at fluff.org; ???/AP???/E3/????; linux-arm-
->> kernel at lists.infradead.org
->> Subject: Re: [PATCH 01/12] [ARM][S3C6410] keypad memory map support
->>
->> Hi,
->>
->> First, where's keypad driver source codes?
->> Second, why how many patches are needed? I think only two patch, one
->> for keypad related, another is smdkc100 board specific.
+Dne Ne 6. z??? 2009 20:15:17 Guennadi Liakhovetski napsal(a):
+> On Sun, 6 Sep 2009, Marek Vasut wrote:
+> > Dne Ne 6. z??? 2009 18:52:55 Guennadi Liakhovetski napsal(a):
+> > > On Sun, 6 Sep 2009, Marek Vasut wrote:
+> > > > Ah damn, I see what you mean. What the camera does is it swaps the
+> > > > RED and BLUE channel:
+> > > > 15  14  13  12  11  10  09  08  07  06  05  04  03  02  01  00
+> > > > B4  B3  B2  B1  B0  G4  G3  G2  G1  G1  R4  R3  R2  R1  R1  --
+> > > > so it's more a BGR555/565 then. I had to patch fswebcam for this.
+> > >
+> > > Ok, this is, of course, something different. In this case you,
+> > > probably, could deceive the PXA to handle blue as red and the other way
+> > > round, but still, I would prefer not to do that. Hence my suggestion
+> > > remains - pass these formats as raw data.
+> >
+> > Which is bogus from the camera point of view.
 >
-> I sent keypad source code to the linux-input mailing lists and Ben Dooks as cc.
+> Not at all. This just means: the subdevice provides a pixel format, that
+> the bridge (PXA) knows nothing specific about, but it can just pass it
+> one-to-one (as raw data) to the user - don't see anything bogus in this.
+> Different bridges have support for different pixel colour formats, but, I
+> think, all bridges can pass data as raw (pass-through). Some bridges can
+> _only_ do this, so, this is actually the default video-capture mode.
 
-I see.
-
-> I have to send keypad driver also to arm-linux as public? I'm not sure..
-
-For who only subscribe the arm list. It's not problem to post two
-mailing list with same topic.
-If only input patches are merged and arm doesn't, then what happens?
-
-> And, the reason why I sent many patches is that we should split all changes as change-set based.
-> Even though these changes are related just with single topic (keypad), the details should be published as individual change-set.
-
-I agree Mark Brown's opinion from input mailing list. Please consider
-what's the concept of change-set vs change one.
-
-Thank you,
-Kyungmin Park
-
-> Harald who is supporting our team's mainline work has recommended that.
+But then you'll have to tell your software how to process the raw data (in what 
+format they are). If there was this RGB565X passthrough support, the software 
+could at least check if you are not forcing it to process nonsense.
 >
->>
->> Thank you,
->> Kyungmin Park
->>
->>
->> 2009/9/5 ??? <jsgood.yang@samsung.com>:
->> > This patch introduces keypad memory map for new keypad driver.
->> > Also the new keypad driver will be provided to the mainline soon.
->> >
->> > Signed-off-by: Jinsung Yang <jsgood.yang@samsung.com>
->> > Signed-off-by: Kyeongil Kim <ki0351.kim@samsung.com>
->> > ---
->> >  arch/arm/mach-s3c6400/include/mach/map.h |    6 ++++++
->> >  1 files changed, 6 insertions(+), 0 deletions(-)
->> >
->> > diff --git a/arch/arm/mach-s3c6400/include/mach/map.h b/arch/arm/mach-
->> s3c6400/include/mach/map.h
->> > index 5057d99..d935570 100644
->> > --- a/arch/arm/mach-s3c6400/include/mach/map.h
->> > +++ b/arch/arm/mach-s3c6400/include/mach/map.h
->> > @@ -65,6 +65,10 @@
->> >  #define S3C_VA_VIC0            (S3C_VA_IRQ + 0x00)
->> >  #define S3C_VA_VIC1            (S3C_VA_IRQ + 0x10000)
->> >
->> > +/* keypad */
->> > +#define S3C64XX_PA_KEYPAD      (0x7E00A000)
->> > +#define S3C64XX_SZ_KEYPAD      SZ_4K
->> > +
->> >  /* compatibiltiy defines. */
->> >  #define S3C_PA_TIMER           S3C64XX_PA_TIMER
->> >  #define S3C_PA_HSMMC0          S3C64XX_PA_HSMMC0
->> > @@ -75,5 +79,7 @@
->> >  #define S3C_PA_FB              S3C64XX_PA_FB
->> >  #define S3C_PA_USBHOST         S3C64XX_PA_USBHOST
->> >  #define S3C_PA_USB_HSOTG       S3C64XX_PA_USB_HSOTG
->> > +#define S3C_PA_KEYPAD          S3C64XX_PA_KEYPAD
->> > +#define S3C_SZ_KEYPAD          S3C64XX_SZ_KEYPAD
->> >
->> >  #endif /* __ASM_ARCH_6400_MAP_H */
->> > --
->> > 1.6.2.5
->> >
->> >
->> > _______________________________________________
->> > linux-arm-kernel mailing list
->> > linux-arm-kernel at lists.infradead.org
->> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->> >
->
->
+> Thanks
+> Guennadi
+> ---
+> Guennadi Liakhovetski, Ph.D.
+> Freelance Open-Source Software Developer
+> http://www.open-technology.de/
