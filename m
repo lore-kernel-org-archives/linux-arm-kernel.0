@@ -1,62 +1,29 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 7 Sep 2009 14:10:04 +0200 (CEST)
-Subject: [PATCH] Add RGB555X and RGB565X formats to pxa-camera
-In-Reply-To: <200909071353.43080.marek.vasut@gmail.com>
-References: <200908031031.00676.marek.vasut@gmail.com>
-	<200909071050.11531.marek.vasut@gmail.com>
-	<m2iqfvkqbl.fsf@arbois.toulouse.it.atosorigin.com>
-	<200909071353.43080.marek.vasut@gmail.com>
-Message-ID: <Pine.LNX.4.64.0909071407530.6597@axis700.grange>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Mon, 7 Sep 2009 14:24:37 +0100
+Subject: [PATCH 0/4] s3c6410: Samsung 6410 clock configuration fixes.
+In-Reply-To: <1252326311-5647-1-git-send-email-thomas.ab@samsung.com>
+References: <1252326311-5647-1-git-send-email-thomas.ab@samsung.com>
+Message-ID: <20090907132437.GF2367@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Sep 2009, Marek Vasut wrote:
-
-> Dne Po 7. z??? 2009 12:21:50 Robert Jarzmik napsal(a):
-> > Marek Vasut <marek.vasut@gmail.com> writes:
-> > > How's it supposed to get BGR555 if the pxa-camera doesnt support that ?
-> > > Will the v4l2 layer convert it or something ?
-> >
-> > In pxa_camera.c, function pxa_camera_get_formats() :
-> > >         default:
-> > >                 /* Generic pass-through */
-> > >                 formats++;
-> > >                 if (xlate) {
-> > >                         xlate->host_fmt = icd->formats + idx;
-> > >                         xlate->cam_fmt = icd->formats + idx;
-> > >                         xlate->buswidth = icd->formats[idx].depth;
-> > >                         xlate++;
-> > >                         dev_dbg(ici->dev,
-> > >                                 "Providing format %s in pass-through
-> > > mode\n", icd->formats[idx].name);
-> > >                 }
-> > >         }
-> >
-> > "Pass-through" means that if a sensors provides a cc, ie. BGR555 for
-> > example, the bridge (pxa_camera) will "forward" to RAM the image in the
-> > very same cc (ie. BGR555). In that case, the bridge is a dummy "sensor to
-> > RAM" bus translator if you prefer.
-> >
-> > Marek, you should activate debug trace and watch for yourself. You can
-> > trust Guennadi, when he says it will work, well ... it will work.
-> >
-> > If it's out of technical curiousity, check the function above.  If you're
-> > even more curious, there was a thread in linux-media about "RFC: bus
-> > configuration setup for sub-devices", a very interesting one, especially
-> > considering the "pass-through" issue.
+On Mon, Sep 07, 2009 at 09:25:11PM +0900, Thomas Abraham wrote:
+> This patch series fixes issues in the Samsung's 6410 clock configuration
+> code. These patches are required for the correct functioning of the 
+> s3c6410 SDHCI driver. The following patches are included in this 
+> patch series.
 > 
-> That one should work for RGB565X ? (the piece of code you posted ?) It's 
-> interesting it didnt work for me ... ok, I'll take it it works then, whatever. 
-> I'll test it again when I have time.
+> [PATCH 1/4] s3c6410: use correct divider_shift in setrate_clksrc()
+> [PATCH 2/4] s3c6410: update clk->parent when setting clock source
+> [PATCH 3/4] s3c6410: Fix divider value calculation in s3c64xx_roundrate_clksrc
+> [PATCH 4/4] s3c6410: Remove redundant mpll parent assignment.
 
-No, that one cannot work with rgb565x or any other format, not supported 
-by pxa directly and not complying to bus-width = bit-depth. But it will 
-work with the new imagebus API. Either see my explanations in a previous 
-mail, or check the patches I posted recently to the list.
+A brief review seems to indicate they are ok, it is just whether this
+late in the release cycle it is worth trying to push them as fixes or
+adding them to the -next tree for 2.6.31 inclusion.
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
