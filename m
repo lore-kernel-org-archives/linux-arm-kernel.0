@@ -1,22 +1,24 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 8 Sep 2009 00:08:13 +0800
-Subject: zaurus c3000 aka spitz: fix resume
-In-Reply-To: <1252243938.4136.26.camel@utx.utx.cz>
-References: <20090906052840.GF1324@ucw.cz>
-	<1252243938.4136.26.camel@utx.utx.cz>
-Message-ID: <f17812d70909070908l26541562iec36a117c155aa08@mail.gmail.com>
+Date: Tue, 8 Sep 2009 00:09:58 +0800
+Subject: [GIT PULL] pxa: 1 fix for zaurus resume
+Message-ID: <f17812d70909070909q556e6cbcu84d9dc14ccb8691b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 6, 2009 at 9:32 PM, Stanislav Brabec<utx@penguin.cz> wrote:
-> Pavel Machek wrote:
->> sharpsl_pm.c code tries to read battery state very early during
->> resume, but those battery meters are connected on SPI and that's only
->> resumed way later.
->>
->> Replace the check with simple checking of battery fatal signal, that
->> actually works at this stage.
->
-> Tested on:
+Russell,
 
-Applied to 'fix'.
+This is a bit late, please consider this fix for zaurus resume in .31.
+
+The following changes since commit 422bef879e84104fee6dc68ded0e371dbeb5f88e:
+  Linus Torvalds (1):
+        Linux 2.6.31-rc7
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
+
+Pavel Machek (1):
+      [ARM] pxa/sharpsl_pm: zaurus c3000 aka spitz: fix resume
+
+ arch/arm/mach-pxa/sharpsl_pm.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
