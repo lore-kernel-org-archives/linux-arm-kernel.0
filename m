@@ -1,7 +1,7 @@
 From: somshekar@celestialsys.com (Somshekar ChandrashekarKadam)
-Date: Mon, 7 Sep 2009 19:37:44 +0530
-Subject: No subject
-Message-ID: <5af5975c16d54553aca8541160715298@dr116.cyberspaceindia.com>
+Date: Mon, 7 Sep 2009 19:40:02 +0530
+Subject: ARM1176 aaci-pl041 AC97 register read timeout
+Message-ID: <5a3b573b9a1a4119b9115561e992678c@dr116.cyberspaceindia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,7 +16,9 @@ I think reboot command is not implemented. ?
 
 Work done locally here.
 
-Implemented reboot by setting  8th bit of SYS_RESETCTL (reset control register 0x10000040). It works fine when given command reboot.
+Implemented
+reboot by setting  8th bit of SYS_RESETCTL (reset control register
+0x10000040). It works fine when given command reboot.
 
 Issue Faced
 
@@ -133,7 +135,6 @@ aaci-pl041 fpga:04: ac97 read back fail.  retry
 aaci-pl041 fpga:04: ac97 read back fail.  retry
 aaci-pl041 fpga:04: wrong ac97 register read back 
 
-
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090907/092b9ae9/attachment-0001.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090907/1ac50928/attachment.htm>
