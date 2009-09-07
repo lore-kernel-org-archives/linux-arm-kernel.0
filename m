@@ -1,70 +1,49 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Mon, 7 Sep 2009 19:09:55 +0900
-Subject: [PATCH 09/12] [ARM][S3C6410] Add definitions of keypad register
-In-Reply-To: <002201ca2fa3$02487c40$06d974c0$%yang@samsung.com>
-References: <00a701ca2e2d$0031cc30$00956490$%yang@samsung.com>
-	<9c9fda240909061656i17a63cb6m95462bea6f33ae0c@mail.gmail.com>
-	<002201ca2fa3$02487c40$06d974c0$%yang@samsung.com>
-Message-ID: <9c9fda240909070309i3dbf4820jb5b53cfeabc478c2@mail.gmail.com>
+From: s.hauer@pengutronix.de (s.hauer at pengutronix.de)
+Date: Mon, 7 Sep 2009 12:20:06 +0200
+Subject: Patches for Freescale MXC SoCs and direct ULPI communication [v3]
+In-Reply-To: <4A9FE3C6.3050609@epfl.ch>
+References: <1251924478-30651-1-git-send-email-daniel@caiaq.de>
+	<4A9FE3C6.3050609@epfl.ch>
+Message-ID: <20090907102006.GB31592@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 7, 2009 at 7:07 PM, Jinsung Yang<jsgood.yang@samsung.com> wrote:
-> Hi,
+Hi,
+
+Back from holiday...
+
+On Thu, Sep 03, 2009 at 05:41:58PM +0200, Valentin Longchamp wrote:
+> Hi Daniel,
 >
->> Can you re-organize it as each register. I mean KEYIFCON fileds first,
->> KEYIFSTRCLR files second and so on.
+> Daniel Mack wrote:
+>> Sorry for the long delay on this issue.
 >>
->> Can't figure out well
+>> Here comes another round of four patches to support the EHCI ports on
+>> Freescale's MX2/MX3 SoCs.
 >>
+>> The difference to the last version I've sent is that the ISP1504
+>> specific drivers has become a generic ULPI driver now with all the
+>> defines renamed.
+>>
+>> Also the driver does not set DRV_VBUS and DRV_VBUS_EXT blindly
+>> anymore but uses a flags field in the otg_transceiver struct which can
+>> be specified when creating the device. This allows the adaption of the
+>> code to a wider variety of applications.
+>>
+>> As a reference, I've added a patch to add board specific support code
+>> for the lilly1131 module.
 >
-> I'm not sure what you tell me about..
-> Do you mean something like that?
->
-> #define REG1
-> #define REG1_FIELD1
-> #define REG1_FIELD2
->
-> #define REG2
-> #define REG2_FIELD1
-> #define REG2_FIELD2
->
-> #define REG3
-> #define REG3_FIELD1
-> #define REG3_FIELD2
->
-> Or like this?
-> #define REG1
-> #define REG2
-> #define REG3
->
-> #define REG1_FIELD1
-> #define REG1_FIELD2
-> #define REG2_FIELD1
-> #define REG2_FIELD2
-> #define REG3_FIELD1
-> #define REG3_FIELD2
->
+> I have such a patch for mx31moboard too. Sascha, should I send it to you  
+> now or wait ?
 
-latter
+Please wait till it's clear that the patches go in the way they are,
+otherwise I end up keeping patches that still need fixups.
 
- #define REG1_OFFSET
- #define REG2_OFFSET
- #define REG3_OFFSET
+Sascha
 
-/* REG1 field */
-#define REG1_FIELD1
-#define REG1_FIELD2
 
-/* REG2 field */
-#define REG2_FIELD1
-#define REG2_FIELD2
-
-/* REG3 field */
-#define REG3_FIELD1
-#define REG3_FIELD2
-
-How about to review the another keypad drivers?
-
-Thank you,
-Kyungmin Park
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
