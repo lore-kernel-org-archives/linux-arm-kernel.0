@@ -1,44 +1,34 @@
 From: jsgood.yang@samsung.com (Jinsung Yang)
-Date: Mon, 07 Sep 2009 19:07:29 +0900
-Subject: [PATCH 09/12] [ARM][S3C6410] Add definitions of keypad register
-In-Reply-To: <9c9fda240909061656i17a63cb6m95462bea6f33ae0c@mail.gmail.com>
-References: <00a701ca2e2d$0031cc30$00956490$%yang@samsung.com>
-	<9c9fda240909061656i17a63cb6m95462bea6f33ae0c@mail.gmail.com>
-Message-ID: <002201ca2fa3$02487c40$06d974c0$%yang@samsung.com>
+Date: Mon, 07 Sep 2009 19:10:29 +0900
+Subject: [PATCH 08/12] [ARM][S3C6410] Add platform device support for
+	keypad driver
+In-Reply-To: <9c9fda240909061705iae69c65v392af035b29b6549@mail.gmail.com>
+References: <00a801ca2e2d$00429510$00c7bf30$%yang@samsung.com>
+	<9c9fda240909061705iae69c65v392af035b29b6549@mail.gmail.com>
+Message-ID: <002301ca2fa3$6d900450$48b00cf0$%yang@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi
 
-> Can you re-organize it as each register. I mean KEYIFCON fileds first,
-> KEYIFSTRCLR files second and so on.
+> Where's the copyright? Don't forget to add copyright
+
+Sorry, I'll add it.
+> > +void __init s3c_keypad_set_platdata(struct s3c_platform_keypad *pd)
+> > +{
+> > +       struct s3c_platform_keypad *npd;
+> > +
+> > +       if (!pd)
+> > +               pd = &default_keypad_data;
 > 
-> Can't figure out well
+> If you want to set the default it. just assign it at platform_device
+> directly. No need to check pd at here.
 > 
+Ok, got it. I will modify with following your comments.
 
-I'm not sure what you tell me about..
-Do you mean something like that?
-
-#define REG1
-#define REG1_FIELD1
-#define REG1_FIELD2
-
-#define REG2
-#define REG2_FIELD1
-#define REG2_FIELD2
-
-#define REG3
-#define REG3_FIELD1
-#define REG3_FIELD2
-
-Or like this?
-#define REG1
-#define REG2
-#define REG3
-
-#define REG1_FIELD1
-#define REG1_FIELD2
-#define REG2_FIELD1
-#define REG2_FIELD2
-#define REG3_FIELD1
-#define REG3_FIELD2
+Best Regards
+--
+Jinsung, Yang <jsgood.yang@samsung.com>
+AP Development Team
+System LSI, Semiconductor Business
+SAMSUNG Electronics Co., LTD
