@@ -1,140 +1,34 @@
-From: somshekar@celestialsys.com (Somshekar ChandrashekarKadam)
-Date: Mon, 7 Sep 2009 19:40:02 +0530
-Subject: ARM1176 aaci-pl041 AC97 register read timeout
-Message-ID: <5a3b573b9a1a4119b9115561e992678c@dr116.cyberspaceindia.com>
+From: srinidhikasagar@gmail.com (srinidhi kasagar)
+Date: Mon, 7 Sep 2009 16:23:57 +0530
+Subject: [PATCH] pl022: fix id for ST vendor
+In-Reply-To: <747C1E83C744F44E9ACFB89FAEEC2C7B11BA7DD366@EXDCVYMBSTM005.EQ1STM.local>
+References: <747C1E83C744F44E9ACFB89FAEEC2C7B11BA7DD366@EXDCVYMBSTM005.EQ1STM.local>
+Message-ID: <b328b2050909070353iff50c2ar15415bbb4e934ce5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin Marinas,
+This fixes the wrong id being used for ST derivative in PL022 driver.
 
-I am working on ARM1176 Realview board.
-Kernel stable arm 2.6.28
+Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+---
+ drivers/spi/amba-pl022.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-My first query
-
-I think reboot command is not implemented. ?
-
-Work done locally here.
-
-Implemented
-reboot by setting  8th bit of SYS_RESETCTL (reset control register
-0x10000040). It works fine when given command reboot.
-
-Issue Faced
-
-ASLA works fine when done hard poweroff and poweron. ALSA detected properly and works fine.When I do a soft reboot using reboot command.  when kernel boots up it doesn't detect ALSA device itself with the
-following messages. It is not able to read AC97 Register failing
-because of timeout. I tried increasing the timeout and udelay still the
-same case. Messages are shown below a the end.I also tried setting the various depth of a soft reset like 
-(1=SYSRST rest logic tile, 2=PLLLOCK reset PLL, 4=PBRESET board reset,
-same as pressing reset button). still ALSA does not work.Now I am confused on this. Please throw some light on this or any pointer will be useful.It is not able to read AC97 Register failing
-because of timeout. routine (/*
- * Read an AC'97 register.
- */
-static unsigned short aaci_ac97_read(struct snd_ac97 *ac97, unsigned short reg)) 
-I hope i have made myself clear. 
-Thanks In Advance
-
-Messages when ALSA not detected
-
-====================================================
-
-When sound doesn't work I see following in boot log:
-
-Advanced Linux Sound Architecture Driver Version 1.0.18rc3.
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: wrong ac97 register read back (0 != 7c)
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: wrong ac97 register read back (0 != 7e)
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: wrong ac97 register read back (0 != 7c)
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: wrong ac97 register read back (0 != 7e)
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: wrong ac97 register read back (0 != 1c)
-port 1 high speed
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: wrong ac97 register read back (0 != 7c)
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: wrong ac97 register read back (0 != 7e)
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: wrong ac97 register read back (0 != 1c)
-usb 1-1: new high speed USB device using isp1760 and address 2
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: ac97 read back fail.  retry
-aaci-pl041 fpga:04: wrong ac97 register read back 
-
+diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
+index da76797..1d51b49 100644
+--- a/drivers/spi/amba-pl022.c
++++ b/drivers/spi/amba-pl022.c
+@@ -1828,7 +1828,7 @@ static struct amba_id pl022_ids[] = {
+                * ST Micro derivative, this has 32bit wide
+                * and 32 locations deep TX/RX FIFO
+                */
+-               .id     = 0x00108022,
++               .id     = 0x01080022,
+               .mask   = 0xffffffff,
+               .data   = &vendor_st,
+       },
+--
+1.6.3.GIT
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090907/1ac50928/attachment.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090907/b1351be0/attachment.htm>
