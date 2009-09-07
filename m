@@ -1,41 +1,61 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Mon, 7 Sep 2009 22:24:48 +0900
-Subject: Discussion request for new Samsung SoCs maintaining
-In-Reply-To: <20090901133812.GP19719@n2100.arm.linux.org.uk>
-References: <24498970.196691251371216483.JavaMail.weblogic@epml12>
-	<4A967FB0.8090502@billgatliff.com>
-	<20090901133812.GP19719@n2100.arm.linux.org.uk>
-Message-ID: <9c9fda240909070624q33bda480g17aabcfa452578d0@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 07 Sep 2009 16:29:32 +0100
+Subject: Kernel related (?) user space crash at ARM11 MPCore
+In-Reply-To: <1251707405.7930.7.camel@pc1117.cambridge.arm.com>
+References: <4A7AEEB6.5060903@googlemail.com>
+	<1250184014.14019.40.camel@pc1117.cambridge.arm.com>
+	<1250501311.9858.24.camel@pc1117.cambridge.arm.com>
+	<20090817140422.GA10764@n2100.arm.linux.org.uk>
+	<1251548848.5030.11.camel@pc1117.cambridge.arm.com>
+	<1251707405.7930.7.camel@pc1117.cambridge.arm.com>
+Message-ID: <1252337372.23780.73.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
+Hi Russell,
 
-On Tue, Sep 1, 2009 at 10:38 PM, Russell King - ARM
-Linux<linux@arm.linux.org.uk> wrote:
-> On Thu, Aug 27, 2009 at 07:44:32AM -0500, Bill Gatliff wrote:
->> I'm not sure I have any useful suggestion for this part. ?It would have
->> been nice to have a "mach-a8" and "mach-arm11" for these situations,
->
-> A8 and ARM11 are CPU types and we already have a perfectly good
-> abstraction for these. ?Should the Realview ARM11 end up in mach-arm11
-> and the Realview Cortex A8 end up in mach-a8? ?Clearly, it's just
-> wrong.
+On Mon, 2009-08-31 at 09:30 +0100, Catalin Marinas wrote: 
+> On Sat, 2009-08-29 at 13:27 +0100, Catalin Marinas wrote:
+> > It looks like this is causing the problem. Setting the protection to RW
+> > and writing data (not instructions) causes the text page to be COW'ed
+> > (page mapped with MAP_PRIVATE). Some cache flushing is missing on VIPT
+> > caches during page copying for COW. With ARM11MPCore, the D-cache is
+> > write-allocate so it never makes it to the main memory for the I-cache
+> > to pick.
+> > 
+> > I'll look again next week on where to best add the flushing (or just
+> > modify the dynamic linker to avoid COW on text pages). Any suggestions?
+> 
+> After talking to the toolchain people, it seems that the dynamic linker
+> is just doing whatever the ELF file says regarding the relocations. The
+> problem in this case is that when compiling with -pie, one of the crt*.o
+> files (and _start) used in PIE applications is not position-independent.
+> 
+> I think this was fixed (but not released yet) by CodeSourcery but you
+> can get this behaviour if some files of an executable were not compiled
+> with -fpic. So the mprotect cache flushing patch that I posted looks
+> like a valid workaround.
 
-How about to finish the this issues.
-Even though Ben don't give any opinion, we have to decide how to add
-next new SoCs and drivers.
+There is a glibc patch to allow fully position-independent code and
+avoid CoW for text pages:
 
-First, decide the proper platform directory.
-1. use the plat-s3c,
-2. rename plat-samsung or
-3. create new plat-samsung.
+http://sourceware.org/ml/libc-ports/2008-10/msg00009.html
 
-Second, who maintains the new SoCs?
-1. maintain the all samsung SoCs as before by Ben
-2. maintain s3c24xx and s3c64xx by Ben. others (s5pc1xx series) by Samsung.
+We tested it and it seems to solve the problem without requiring a
+kernel patch.
 
-Please give your opinions.
+Any opinion on whether the ARM kernel should support dynamic shared
+objects where not all objects are position-independent? IOW, whether
+text relocations are allowed to be resolved at run-time rather than
+compile (static link) time for the dynamic shared objects? AFAICT, there
+isn't anything in the ARM EABI which would prevent this, so a kernel
+patch may be needed.
 
-Thank you,
-Kyungmin Park
+There is a similar situation for RWX pages and CoW. In this case, the
+copy_user_highpage() function should probably be modified to clean the
+D-cache and invalidate the I-cache.
+
+Thanks.
+
+-- 
+Catalin
