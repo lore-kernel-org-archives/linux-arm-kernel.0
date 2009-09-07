@@ -1,49 +1,50 @@
-From: s.hauer@pengutronix.de (s.hauer at pengutronix.de)
-Date: Mon, 7 Sep 2009 12:20:06 +0200
-Subject: Patches for Freescale MXC SoCs and direct ULPI communication [v3]
-In-Reply-To: <4A9FE3C6.3050609@epfl.ch>
-References: <1251924478-30651-1-git-send-email-daniel@caiaq.de>
-	<4A9FE3C6.3050609@epfl.ch>
-Message-ID: <20090907102006.GB31592@pengutronix.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 07 Sep 2009 12:21:50 +0200
+Subject: [PATCH] Add RGB555X and RGB565X formats to pxa-camera
+In-Reply-To: <200909071050.11531.marek.vasut@gmail.com> (Marek Vasut's message
+	of "Mon\, 7 Sep 2009 10\:50\:11 +0200")
+References: <200908031031.00676.marek.vasut@gmail.com>
+	<200909070646.04642.marek.vasut@gmail.com>
+	<Pine.LNX.4.64.0909070818480.4822@axis700.grange>
+	<200909071050.11531.marek.vasut@gmail.com>
+Message-ID: <m2iqfvkqbl.fsf@arbois.toulouse.it.atosorigin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Marek Vasut <marek.vasut@gmail.com> writes:
 
-Back from holiday...
+> How's it supposed to get BGR555 if the pxa-camera doesnt support that ? Will the 
+> v4l2 layer convert it or something ?
 
-On Thu, Sep 03, 2009 at 05:41:58PM +0200, Valentin Longchamp wrote:
-> Hi Daniel,
->
-> Daniel Mack wrote:
->> Sorry for the long delay on this issue.
->>
->> Here comes another round of four patches to support the EHCI ports on
->> Freescale's MX2/MX3 SoCs.
->>
->> The difference to the last version I've sent is that the ISP1504
->> specific drivers has become a generic ULPI driver now with all the
->> defines renamed.
->>
->> Also the driver does not set DRV_VBUS and DRV_VBUS_EXT blindly
->> anymore but uses a flags field in the otg_transceiver struct which can
->> be specified when creating the device. This allows the adaption of the
->> code to a wider variety of applications.
->>
->> As a reference, I've added a patch to add board specific support code
->> for the lilly1131 module.
->
-> I have such a patch for mx31moboard too. Sascha, should I send it to you  
-> now or wait ?
+In pxa_camera.c, function pxa_camera_get_formats() :
+>         default:
+>                 /* Generic pass-through */
+>                 formats++;
+>                 if (xlate) {
+>                         xlate->host_fmt = icd->formats + idx;
+>                         xlate->cam_fmt = icd->formats + idx;
+>                         xlate->buswidth = icd->formats[idx].depth;
+>                         xlate++;
+>                         dev_dbg(ici->dev,
+>                                 "Providing format %s in pass-through mode\n",
+>                                 icd->formats[idx].name);
+>                 }
+>         }
 
-Please wait till it's clear that the patches go in the way they are,
-otherwise I end up keeping patches that still need fixups.
+"Pass-through" means that if a sensors provides a cc, ie. BGR555 for example,
+the bridge (pxa_camera) will "forward" to RAM the image in the very same cc
+(ie. BGR555). In that case, the bridge is a dummy "sensor to RAM" bus translator
+if you prefer.
 
-Sascha
+Marek, you should activate debug trace and watch for yourself. You can trust
+Guennadi, when he says it will work, well ... it will work.
 
+If it's out of technical curiousity, check the function above.  If you're even
+more curious, there was a thread in linux-media about "RFC: bus configuration
+setup for sub-devices", a very interesting one, especially considering the
+"pass-through" issue.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Cheers.
+
+--
+Robert
