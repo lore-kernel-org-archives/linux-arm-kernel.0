@@ -1,41 +1,52 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 7 Sep 2009 13:39:45 +0200
-Subject: zaurus c3000 aka spitz: fix resume
-In-Reply-To: <1252243938.4136.26.camel@utx.utx.cz>
-References: <20090906052840.GF1324@ucw.cz>
-	<1252243938.4136.26.camel@utx.utx.cz>
-Message-ID: <20090907113945.GN23450@elf.ucw.cz>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 7 Sep 2009 13:53:42 +0200
+Subject: [PATCH] Add RGB555X and RGB565X formats to pxa-camera
+In-Reply-To: <m2iqfvkqbl.fsf@arbois.toulouse.it.atosorigin.com>
+References: <200908031031.00676.marek.vasut@gmail.com>
+	<200909071050.11531.marek.vasut@gmail.com>
+	<m2iqfvkqbl.fsf@arbois.toulouse.it.atosorigin.com>
+Message-ID: <200909071353.43080.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Dne Po 7. z??? 2009 12:21:50 Robert Jarzmik napsal(a):
+> Marek Vasut <marek.vasut@gmail.com> writes:
+> > How's it supposed to get BGR555 if the pxa-camera doesnt support that ?
+> > Will the v4l2 layer convert it or something ?
+>
+> In pxa_camera.c, function pxa_camera_get_formats() :
+> >         default:
+> >                 /* Generic pass-through */
+> >                 formats++;
+> >                 if (xlate) {
+> >                         xlate->host_fmt = icd->formats + idx;
+> >                         xlate->cam_fmt = icd->formats + idx;
+> >                         xlate->buswidth = icd->formats[idx].depth;
+> >                         xlate++;
+> >                         dev_dbg(ici->dev,
+> >                                 "Providing format %s in pass-through
+> > mode\n", icd->formats[idx].name);
+> >                 }
+> >         }
+>
+> "Pass-through" means that if a sensors provides a cc, ie. BGR555 for
+> example, the bridge (pxa_camera) will "forward" to RAM the image in the
+> very same cc (ie. BGR555). In that case, the bridge is a dummy "sensor to
+> RAM" bus translator if you prefer.
+>
+> Marek, you should activate debug trace and watch for yourself. You can
+> trust Guennadi, when he says it will work, well ... it will work.
+>
+> If it's out of technical curiousity, check the function above.  If you're
+> even more curious, there was a thread in linux-media about "RFC: bus
+> configuration setup for sub-devices", a very interesting one, especially
+> considering the "pass-through" issue.
 
-> > sharpsl_pm.c code tries to read battery state very early during
-> > resume, but those battery meters are connected on SPI and that's only
-> > resumed way later.
-> > 
-> > Replace the check with simple checking of battery fatal signal, that
-> > actually works at this stage.
-> 
-> Tested on:
-> - SL-C3200
-> - snapshot e07cccf4046978df10f2e13fe2b99b2f9b3a65db
-> - Reverted: 15bce40cb3133bcc07d548013df97e4653d363c1 (manual merge)
-> - Applied your patch.
-> - Config is here:
->   http://www.penguin.cz/~utx/zaurus/feed/images/spitz/config-2.6.31-rc9-spitz
-> 
-> Here is a big progress:
-> - Zaurus goes from resume.
-
-Ouch, it seems Eric Miao's emails are currently bouncing :-(.
-									Pavel
-This is an automatically generated Delivery Status Notification.
-
-Delivery to the following recipients failed.
-
-       ymiao3 at marvell.com
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+That one should work for RGB565X ? (the piece of code you posted ?) It's 
+interesting it didnt work for me ... ok, I'll take it it works then, whatever. 
+I'll test it again when I have time.
+>
+> Cheers.
+>
+> --
+> Robert
