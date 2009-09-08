@@ -1,58 +1,33 @@
 From: thomas.ab@samsung.com (thomas.ab at samsung.com)
-Date: Tue,  8 Sep 2009 15:51:26 +0900
-Subject: [PATCH 3/8] s3c6410: sdhci: Set parent clock,
-	source clock and sdhci module speed.
-Message-ID: <1252392686-31135-1-git-send-email-thomas.ab@samsung.com>
+Date: Tue,  8 Sep 2009 15:55:10 +0900
+Subject: [PATCH 5/8] s3c6410: sdhci: Removing unused host_caps entry from
+	sdhci0 platform data
+Message-ID: <1252392910-31200-1-git-send-email-thomas.ab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thomas Abraham <thomas.ab@samsung.com>
 
-This patch sets the parent clock, source clock and sdhci module
-clock speed for 6410 sdhci controller.
+This patch removes the unused 'host_caps' entry from the sdhci0
+platform data.
 
 Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
 ---
- drivers/mmc/host/sdhci-s3c.c |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
+ arch/arm/plat-s3c/dev-hsmmc.c |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-index 50997d2..db1bb93 100644
---- a/drivers/mmc/host/sdhci-s3c.c
-+++ b/drivers/mmc/host/sdhci-s3c.c
-@@ -22,6 +22,8 @@
+diff --git a/arch/arm/plat-s3c/dev-hsmmc.c b/arch/arm/plat-s3c/dev-hsmmc.c
+index 357ec60..647ca09 100644
+--- a/arch/arm/plat-s3c/dev-hsmmc.c
++++ b/arch/arm/plat-s3c/dev-hsmmc.c
+@@ -39,8 +39,6 @@ static u64 s3c_device_hsmmc_dmamask = 0xffffffffUL;
  
- #include <plat/sdhci.h>
- #include <plat/regs-sdhci.h>
-+#include <plat/clock.h>
-+#include <plat/cpu.h>
- 
- #include "sdhci.h"
- 
-@@ -221,6 +223,7 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
- 	struct sdhci_host *host;
- 	struct sdhci_s3c *sc;
- 	struct resource *res;
-+	struct clk *clk_mmc, *clk_parent;
- 	int ret, irq, ptr, clks;
- 
- 	if (!pdata) {
-@@ -240,6 +243,16 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
- 		return -ENOENT;
- 	}
- 
-+	/* Set the SDHCI controller clock rate */
-+	clk_mmc = clk_get(dev, pdata->clk_source_name);
-+	clk_parent = clk_get(dev, pdata->clk_parent_name);
-+        if (!clk_mmc || !clk_parent) {
-+                dev_err(dev, "could not obtain clock information");
-+                return -ENXIO;
-+        }
-+	clk_set_parent(clk_mmc, clk_parent);
-+	clk_set_rate(clk_mmc, pdata->clk_speed);
-+
- 	host = sdhci_alloc_host(dev, sizeof(struct sdhci_s3c));
- 	if (IS_ERR(host)) {
- 		dev_err(dev, "sdhci_alloc_host() failed\n");
+ struct s3c_sdhci_platdata s3c_hsmmc0_def_platdata = {
+ 	.max_width		= 4,
+-	.host_caps		= (MMC_CAP_4_BIT_DATA |
+-				  MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED),
+ 	.clk_parent_name	= "dout_mpll",
+ 	.clk_source_name 	= "mmc_bus",
+ 	.clk_speed		= 50*MHZ,
 -- 
 1.5.3.4
