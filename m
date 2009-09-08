@@ -1,32 +1,21 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 8 Sep 2009 00:32:08 +0200
-Subject: zaurus c3000 aka spitz: fix resume
-In-Reply-To: <f17812d70909070908l26541562iec36a117c155aa08@mail.gmail.com>
-References: <20090906052840.GF1324@ucw.cz>
-	<1252243938.4136.26.camel@utx.utx.cz>
-	<f17812d70909070908l26541562iec36a117c155aa08@mail.gmail.com>
-Message-ID: <20090907223208.GC695@elf.ucw.cz>
+From: thomas.ab@samsung.com (thomas.ab at samsung.com)
+Date: Tue,  8 Sep 2009 14:24:59 +0900
+Subject: [PATCH 0/4] s3c6410: Samsung 6410 clock configuration fixes.
+Message-ID: <1252387499-9200-1-git-send-email-thomas.ab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2009-09-08 00:08:13, Eric Miao wrote:
-> On Sun, Sep 6, 2009 at 9:32 PM, Stanislav Brabec<utx@penguin.cz> wrote:
-> > Pavel Machek wrote:
-> >> sharpsl_pm.c code tries to read battery state very early during
-> >> resume, but those battery meters are connected on SPI and that's only
-> >> resumed way later.
-> >>
-> >> Replace the check with simple checking of battery fatal signal, that
-> >> actually works at this stage.
-> >
-> > Tested on:
-> 
-> Applied to 'fix'.
+From: Thomas Abraham <thomas.ab@samsung.com>
 
-Thanks. Is there still chance to push it to 2.6.31? That would help a
-lot. Alternatively, we could push it to the -stable tree at least...
+This patch series fixes issues in the Samsung's 6410 clock configuration
+code. These patches are required for the correct functioning of the 
+s3c6410 SDHCI driver. The following patches are included in this 
+patch series.
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+[PATCH 1/4] s3c6410: use correct divider_shift in setrate_clksrc()
+[PATCH 2/4] s3c6410: update clk->parent when setting clock source
+[PATCH 3/4] s3c6410: Fix divider value calculation in s3c64xx_roundrate_clksrc
+[PATCH 4/4] s3c6410: Remove redundant mpll parent assignment.
+
+--
+1.5.3.4
