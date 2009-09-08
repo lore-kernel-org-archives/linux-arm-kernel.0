@@ -1,36 +1,58 @@
 From: thomas.ab@samsung.com (thomas.ab at samsung.com)
-Date: Tue,  8 Sep 2009 15:52:49 +0900
-Subject: [PATCH 4/8] s3c6410: sdhci: Enable ADMA feature in 6410 sdhci
-	controller.
-Message-ID: <1252392769-31159-1-git-send-email-thomas.ab@samsung.com>
+Date: Tue,  8 Sep 2009 15:51:26 +0900
+Subject: [PATCH 3/8] s3c6410: sdhci: Set parent clock,
+	source clock and sdhci module speed.
+Message-ID: <1252392686-31135-1-git-send-email-thomas.ab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thomas Abraham <thomas.ab@samsung.com>
 
-This patch enables ADMA feature in 6410 SDHCI controller
-driver.
+This patch sets the parent clock, source clock and sdhci module
+clock speed for 6410 sdhci controller.
+
+Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
 ---
- drivers/mmc/host/sdhci-s3c.c |    7 +------
- 1 files changed, 1 insertions(+), 6 deletions(-)
+ drivers/mmc/host/sdhci-s3c.c |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-index db1bb93..7f5b64e 100644
+index 50997d2..db1bb93 100644
 --- a/drivers/mmc/host/sdhci-s3c.c
 +++ b/drivers/mmc/host/sdhci-s3c.c
-@@ -329,12 +329,7 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
- 	host->irq = irq;
+@@ -22,6 +22,8 @@
  
- 	/* Setup quirks for the controller */
--
--	/* Currently with ADMA enabled we are getting some length
--	 * interrupts that are not being dealt with, do disable
--	 * ADMA until this is sorted out. */
--	host->quirks |= SDHCI_QUIRK_BROKEN_ADMA;
--	host->quirks |= SDHCI_QUIRK_32BIT_ADMA_SIZE;
-+	host->quirks |= SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC;
+ #include <plat/sdhci.h>
+ #include <plat/regs-sdhci.h>
++#include <plat/clock.h>
++#include <plat/cpu.h>
  
- #ifndef CONFIG_MMC_SDHCI_S3C_DMA
+ #include "sdhci.h"
  
+@@ -221,6 +223,7 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+ 	struct sdhci_host *host;
+ 	struct sdhci_s3c *sc;
+ 	struct resource *res;
++	struct clk *clk_mmc, *clk_parent;
+ 	int ret, irq, ptr, clks;
+ 
+ 	if (!pdata) {
+@@ -240,6 +243,16 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+ 		return -ENOENT;
+ 	}
+ 
++	/* Set the SDHCI controller clock rate */
++	clk_mmc = clk_get(dev, pdata->clk_source_name);
++	clk_parent = clk_get(dev, pdata->clk_parent_name);
++        if (!clk_mmc || !clk_parent) {
++                dev_err(dev, "could not obtain clock information");
++                return -ENXIO;
++        }
++	clk_set_parent(clk_mmc, clk_parent);
++	clk_set_rate(clk_mmc, pdata->clk_speed);
++
+ 	host = sdhci_alloc_host(dev, sizeof(struct sdhci_s3c));
+ 	if (IS_ERR(host)) {
+ 		dev_err(dev, "sdhci_alloc_host() failed\n");
 -- 
 1.5.3.4
