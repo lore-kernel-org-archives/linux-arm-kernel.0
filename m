@@ -1,31 +1,19 @@
-From: nico@cam.org (Nicolas Pitre)
-Date: Tue, 08 Sep 2009 14:25:01 -0400 (EDT)
-Subject: [GIT PULL] pxa: 1 fix for zaurus resume
-In-Reply-To: <20090908102309.GC23361@n2100.arm.linux.org.uk>
-References: <f17812d70909070909q556e6cbcu84d9dc14ccb8691b@mail.gmail.com>
-	<20090908102309.GC23361@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.0909081419360.6044@xanadu.home>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Wed, 9 Sep 2009 00:02:38 +0200
+Subject: [PATCH] pl022: fix id for ST vendor
+In-Reply-To: <b328b2050909070353iff50c2ar15415bbb4e934ce5@mail.gmail.com>
+References: <747C1E83C744F44E9ACFB89FAEEC2C7B11BA7DD366@EXDCVYMBSTM005.EQ1STM.local>
+	<b328b2050909070353iff50c2ar15415bbb4e934ce5@mail.gmail.com>
+Message-ID: <63386a3d0909081502g25ff9cc8g4840836c5c94cdb2@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Sep 2009, Russell King - ARM Linux wrote:
+2009/9/7 srinidhi kasagar <srinidhikasagar@gmail.com>:
 
-> On Tue, Sep 08, 2009 at 12:09:58AM +0800, Eric Miao wrote:
-> > This is a bit late, please consider this fix for zaurus resume in .31.
-> 
-> It's not late; the 19th August deadline was there to ensure that if the
-> merge window opened while I was away, people wouldn't be complaining
-> that stuff hadn't been merged.
+> This fixes the wrong id being used for ST derivative in PL022 driver.
+>
+> Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
 
-In that case, could you pull this:
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
 
-	git://git.marvell.com/orion for-rmk
-
-It contains a single patch:
-
-	[ARM] orion5x: Add LaCie NAS 2Big Network support
-
-on top of what you already have.
-
-
-Nicolas
+Linus Walleij
