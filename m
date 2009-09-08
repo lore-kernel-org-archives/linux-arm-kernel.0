@@ -1,34 +1,31 @@
-From: srinidhikasagar@gmail.com (srinidhi kasagar)
-Date: Mon, 7 Sep 2009 16:23:57 +0530
-Subject: [PATCH] pl022: fix id for ST vendor
-In-Reply-To: <747C1E83C744F44E9ACFB89FAEEC2C7B11BA7DD366@EXDCVYMBSTM005.EQ1STM.local>
-References: <747C1E83C744F44E9ACFB89FAEEC2C7B11BA7DD366@EXDCVYMBSTM005.EQ1STM.local>
-Message-ID: <b328b2050909070353iff50c2ar15415bbb4e934ce5@mail.gmail.com>
+From: nico@cam.org (Nicolas Pitre)
+Date: Tue, 08 Sep 2009 14:25:01 -0400 (EDT)
+Subject: [GIT PULL] pxa: 1 fix for zaurus resume
+In-Reply-To: <20090908102309.GC23361@n2100.arm.linux.org.uk>
+References: <f17812d70909070909q556e6cbcu84d9dc14ccb8691b@mail.gmail.com>
+	<20090908102309.GC23361@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.0909081419360.6044@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes the wrong id being used for ST derivative in PL022 driver.
+On Tue, 8 Sep 2009, Russell King - ARM Linux wrote:
 
-Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
----
- drivers/spi/amba-pl022.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+> On Tue, Sep 08, 2009 at 12:09:58AM +0800, Eric Miao wrote:
+> > This is a bit late, please consider this fix for zaurus resume in .31.
+> 
+> It's not late; the 19th August deadline was there to ensure that if the
+> merge window opened while I was away, people wouldn't be complaining
+> that stuff hadn't been merged.
 
-diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
-index da76797..1d51b49 100644
---- a/drivers/spi/amba-pl022.c
-+++ b/drivers/spi/amba-pl022.c
-@@ -1828,7 +1828,7 @@ static struct amba_id pl022_ids[] = {
-                * ST Micro derivative, this has 32bit wide
-                * and 32 locations deep TX/RX FIFO
-                */
--               .id     = 0x00108022,
-+               .id     = 0x01080022,
-               .mask   = 0xffffffff,
-               .data   = &vendor_st,
-       },
---
-1.6.3.GIT
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090907/b1351be0/attachment.htm>
+In that case, could you pull this:
+
+	git://git.marvell.com/orion for-rmk
+
+It contains a single patch:
+
+	[ARM] orion5x: Add LaCie NAS 2Big Network support
+
+on top of what you already have.
+
+
+Nicolas
