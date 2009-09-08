@@ -1,41 +1,36 @@
 From: thomas.ab@samsung.com (thomas.ab at samsung.com)
-Date: Tue,  8 Sep 2009 15:47:38 +0900
-Subject: [PATCH 2/8] s3c6410: sdhci: Adding additional data in sdhci platform
-	data structure.
-Message-ID: <1252392458-23921-1-git-send-email-thomas.ab@samsung.com>
+Date: Tue,  8 Sep 2009 15:52:49 +0900
+Subject: [PATCH 4/8] s3c6410: sdhci: Enable ADMA feature in 6410 sdhci
+	controller.
+Message-ID: <1252392769-31159-1-git-send-email-thomas.ab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thomas Abraham <thomas.ab@samsung.com>
 
-This patch adds additional information about the parent clock
-name, sdhci clock name and desired sdhci operating frequency
-in the sdhci platform data structure.
-
-Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+This patch enables ADMA feature in 6410 SDHCI controller
+driver.
 ---
- arch/arm/plat-s3c/dev-hsmmc.c |    9 ++++++---
- 1 files changed, 6 insertions(+), 3 deletions(-)
+ drivers/mmc/host/sdhci-s3c.c |    7 +------
+ 1 files changed, 1 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/plat-s3c/dev-hsmmc.c b/arch/arm/plat-s3c/dev-hsmmc.c
-index 4c05b39..357ec60 100644
---- a/arch/arm/plat-s3c/dev-hsmmc.c
-+++ b/arch/arm/plat-s3c/dev-hsmmc.c
-@@ -38,9 +38,12 @@ static struct resource s3c_hsmmc_resource[] = {
- static u64 s3c_device_hsmmc_dmamask = 0xffffffffUL;
+diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+index db1bb93..7f5b64e 100644
+--- a/drivers/mmc/host/sdhci-s3c.c
++++ b/drivers/mmc/host/sdhci-s3c.c
+@@ -329,12 +329,7 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+ 	host->irq = irq;
  
- struct s3c_sdhci_platdata s3c_hsmmc0_def_platdata = {
--	.max_width	= 4,
--	.host_caps	= (MMC_CAP_4_BIT_DATA |
--			   MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED),
-+	.max_width		= 4,
-+	.host_caps		= (MMC_CAP_4_BIT_DATA |
-+				  MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED),
-+	.clk_parent_name	= "dout_mpll",
-+	.clk_source_name 	= "mmc_bus",
-+	.clk_speed		= 50*MHZ,
- };
+ 	/* Setup quirks for the controller */
+-
+-	/* Currently with ADMA enabled we are getting some length
+-	 * interrupts that are not being dealt with, do disable
+-	 * ADMA until this is sorted out. */
+-	host->quirks |= SDHCI_QUIRK_BROKEN_ADMA;
+-	host->quirks |= SDHCI_QUIRK_32BIT_ADMA_SIZE;
++	host->quirks |= SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC;
  
- struct platform_device s3c_device_hsmmc0 = {
+ #ifndef CONFIG_MMC_SDHCI_S3C_DMA
+ 
 -- 
 1.5.3.4
