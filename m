@@ -1,116 +1,116 @@
-From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Wed, 9 Sep 2009 10:56:47 +0400
-Subject: [PATCH] SA1100: fix multimachine kernel issue
-Message-ID: <mailman.3.1252500869.2253.linux-arm-kernel@lists.infradead.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed,  9 Sep 2009 13:55:54 +0100
+Subject: [PATCH] SMDK6410: Hook up regulator supplies for WM8580
+Message-ID: <1252500954-24678-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Zaurus Collie and Siemens Simpad both have machine-specific hacks
-in arch/arm/boot/compressed/head-sa1100.S which force their respective
-machine ID regardless of what bootloader passes (or not passes - that's
-the reason these hacks are here - a workaround for broken bootloaders).
-This breaks booting multimachine kernel on other machines. So forbid
-selecting other machines in Kconfig if SA1100_COLLIE or SA1100_SIMPAD
-are selected.
+DVDD is supplied by supplies derived from the PMIC, AVDD and PVDD are
+supplied from the main wall supply on the base board which runs at
+5V. No option is currently supported for running without a PMIC card,
+the assumption is that the regulator API will be built out when no
+soft PMIC card is in use.
 
-Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
+To ease merge issues since this uses the newly added dev_name supply
+configuration from the regulator API (currently in -next only) the
+fixed voltage regulator is ifdefed out when the regulator API is not
+enabled.
+
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/mach-sa1100/Kconfig |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+ arch/arm/mach-s3c6410/mach-smdk6410.c |   52 +++++++++++++++++++++++++++++++++
+ 1 files changed, 52 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/Kconfig b/arch/arm/mach-sa1100/Kconfig
-index 81ffff7..d4e4fea 100644
---- a/arch/arm/mach-sa1100/Kconfig
-+++ b/arch/arm/mach-sa1100/Kconfig
-@@ -4,6 +4,7 @@ menu "SA11x0 Implementations"
+diff --git a/arch/arm/mach-s3c6410/mach-smdk6410.c b/arch/arm/mach-s3c6410/mach-smdk6410.c
+index ea51dbe..72776ff 100644
+--- a/arch/arm/mach-s3c6410/mach-smdk6410.c
++++ b/arch/arm/mach-s3c6410/mach-smdk6410.c
+@@ -25,6 +25,7 @@
+ #include <linux/gpio.h>
+ #include <linux/delay.h>
+ #include <linux/smsc911x.h>
++#include <linux/regulator/fixed.h>
  
- config SA1100_ASSABET
- 	bool "Assabet"
-+	depends on !SA1100_COLLIE && !SA1100_SIMPAD
- 	help
- 	  Say Y here if you are using the Intel(R) StrongARM(R) SA-1110
- 	  Microprocessor Development Board (also known as the Assabet).
-@@ -19,6 +20,7 @@ config ASSABET_NEPONSET
+ #ifdef CONFIG_SMDK6410_WM1190_EV1
+ #include <linux/mfd/wm8350/core.h>
+@@ -184,6 +185,43 @@ static struct platform_device smdk6410_smsc911x = {
+ 	},
+ };
  
- config SA1100_CERF
- 	bool "CerfBoard"
-+	depends on !SA1100_COLLIE && !SA1100_SIMPAD
- 	help
- 	  The Intrinsyc CerfBoard is based on the StrongARM 1110 (Discontinued).
- 	  More information is available at:
-@@ -53,6 +55,7 @@ config SA1100_COLLIE
++#ifdef CONFIG_REGULATOR
++static struct regulator_consumer_supply smdk6410_b_pwr_5v_consumers[] = {
++	{
++		/* WM8580 */
++		.supply = "PVDD",
++		.dev_name = "0-001b",
++	},
++	{
++		/* WM8580 */
++		.supply = "AVDD",
++		.dev_name = "0-001b",
++	},
++};
++
++static struct regulator_init_data smdk6410_b_pwr_5v_data = {
++	.constraints = {
++		.always_on = 1,
++	},
++	.num_consumer_supplies = ARRAY_SIZE(smdk6410_b_pwr_5v_consumers),
++	.consumer_supplies = smdk6410_b_pwr_5v_consumers,
++};
++
++static struct fixed_voltage_config smdk6410_b_pwr_5v_pdata = {
++	.supply_name = "B_PWR_5V",
++	.microvolts = 5000000,
++	.init_data = &smdk6410_b_pwr_5v_data,
++};
++
++static struct platform_device smdk6410_b_pwr_5v = {
++	.name          = "reg-fixed-voltage",
++	.id            = -1,
++	.dev = {
++		.platform_data = &smdk6410_b_pwr_5v_pdata,
++	},
++};
++#endif
++
+ static struct map_desc smdk6410_iodesc[] = {};
  
- config SA1100_H3100
- 	bool "Compaq iPAQ H3100"
-+	depends on !SA1100_COLLIE && !SA1100_SIMPAD
- 	help
- 	  Say Y here if you intend to run this kernel on the Compaq iPAQ
- 	  H3100 handheld computer.  Information about this machine and the
-@@ -63,6 +66,7 @@ config SA1100_H3100
+ static struct platform_device *smdk6410_devices[] __initdata = {
+@@ -198,6 +236,10 @@ static struct platform_device *smdk6410_devices[] __initdata = {
+ 	&s3c_device_fb,
+ 	&s3c_device_usb,
+ 	&s3c_device_usb_hsotg,
++
++#ifdef CONFIG_REGULATOR
++	&smdk6410_b_pwr_5v,
++#endif
+ 	&smdk6410_lcd_powerdev,
  
- config SA1100_H3600
- 	bool "Compaq iPAQ H3600/H3700"
-+	depends on !SA1100_COLLIE && !SA1100_SIMPAD
- 	help
- 	  Say Y here if you intend to run this kernel on the Compaq iPAQ
- 	  H3600 handheld computer.  Information about this machine and the
-@@ -78,6 +82,7 @@ config SA1100_H3XXX
+ 	&smdk6410_smsc911x,
+@@ -232,6 +274,14 @@ static struct regulator_init_data wm8350_dcdc3_data = {
+ };
  
- config SA1100_BADGE4
- 	bool "HP Labs BadgePAD 4"
-+	depends on !SA1100_COLLIE && !SA1100_SIMPAD
- 	select SA1111
- 	help
- 	  Say Y here if you want to build a kernel for the HP Laboratories
-@@ -85,6 +90,7 @@ config SA1100_BADGE4
+ /* USB, EXT, PCM, ADC/DAC, USB, MMC */
++static struct regulator_consumer_supply wm8350_dcdc4_consumers[] = {
++	{
++		/* WM8580 */
++		.supply = "DVDD",
++		.dev_name = "0-001b",
++	},
++};
++
+ static struct regulator_init_data wm8350_dcdc4_data = {
+ 	.constraints = {
+ 		.name = "PVDD_HI/PVDD_EXT/PVDD_SYS/PVCCM2MTV",
+@@ -239,6 +289,8 @@ static struct regulator_init_data wm8350_dcdc4_data = {
+ 		.max_uV = 3000000,
+ 		.always_on = 1,
+ 	},
++	.num_consumer_supplies = ARRAY_SIZE(wm8350_dcdc4_consumers),
++	.consumer_supplies = wm8350_dcdc4_consumers,
+ };
  
- config SA1100_JORNADA720
- 	bool "HP Jornada 720"
-+	depends on !SA1100_COLLIE && !SA1100_SIMPAD
- 	select SA1111
- 	help
- 	  Say Y here if you want to build a kernel for the HP Jornada 720
-@@ -103,12 +109,14 @@ config SA1100_JORNADA720_SSP
- 
- config SA1100_HACKKIT
- 	bool "HackKit Core CPU Board"
-+	depends on !SA1100_COLLIE && !SA1100_SIMPAD
- 	help
- 	  Say Y here to support the HackKit Core CPU Board
- 	  <http://hackkit.eletztrick.de>;
- 
- config SA1100_LART
- 	bool "LART"
-+	depends on !SA1100_COLLIE && !SA1100_SIMPAD
- 	help
- 	  Say Y here if you are using the Linux Advanced Radio Terminal
- 	  (also known as the LART).  See <http://www.lartmaker.nl/> for
-@@ -116,6 +124,7 @@ config SA1100_LART
- 
- config SA1100_PLEB
- 	bool "PLEB"
-+	depends on !SA1100_COLLIE && !SA1100_SIMPAD
- 	help
- 	  Say Y here if you are using version 1 of the Portable Linux
- 	  Embedded Board (also known as PLEB).
-@@ -124,6 +133,7 @@ config SA1100_PLEB
- 
- config SA1100_SHANNON
- 	bool "Shannon"
-+	depends on !SA1100_COLLIE && !SA1100_SIMPAD
- 	help
- 	  The Shannon (also known as a Tuxscreen, and also as a IS2630) was a
- 	  limited edition webphone produced by Philips. The Shannon is a SA1100
-@@ -132,6 +142,7 @@ config SA1100_SHANNON
- 
- config SA1100_SIMPAD
- 	bool "Simpad"
-+	depends on !SA1100_COLLIE
- 	help
- 	  The SIEMENS webpad SIMpad is based on the StrongARM 1110. There
- 	  are two different versions CL4 and SL4. CL4 has 32MB RAM and 16MB
+ /* ARM core */
 -- 
-1.6.3.4
-
-
---2oS5YaxWCcQjTEyO--
+1.6.3.3
