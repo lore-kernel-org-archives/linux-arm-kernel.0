@@ -1,29 +1,29 @@
-From: dwalker@fifo99.com (Daniel Walker)
-Date: Wed, 09 Sep 2009 07:49:00 -0700
-Subject: [patch for 2.6.31] zaurus c3000 aka spitz: fix resume
-In-Reply-To: <20090909075024.GA1400@ucw.cz>
-References: <20090909075024.GA1400@ucw.cz>
-Message-ID: <1252507740.14793.115.camel@desktop>
+From: wim@iguana.be (Wim Van Sebroeck)
+Date: Wed, 9 Sep 2009 17:01:59 +0200
+Subject: [PATCH 0/3] [ARM] Watchdog support for Samsung 6410 SoC
+In-Reply-To: <1252494216-6434-1-git-send-email-laforge@gnumonks.org>
+References: <1252494216-6434-1-git-send-email-laforge@gnumonks.org>
+Message-ID: <20090909150159.GA25057@infomag.iguana.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2009-09-09 at 09:50 +0200, Pavel Machek wrote:
-> Hi, Linus!
+Hi Harald,
+
+> From: Harald Welte <laforge@gnumonks.org>
 > 
-> Spitz resume was broken for year or likely two, and it would be very
-> nice to fix it for 2.6.31 release. One liner is below, and it really
-> can not harm. It already is in Eric's fix queue, so pulling that for
-> .31 should work, too.
+> This patch series extends the existing watchdog timer support on
+> Samsung 24xx SoC's to Samsung 6410 SoC. This patch series includes
+> the following patches.
 > 
-> Do you think you could take it?
+> [PATCH 1/3] [ARM] s3c: move watchdog dev from plat-24xx into plat-s3c
+> [PATCH 2/3] watchdog: Samsung SoC Watchdog is not s3c24xx specific
+> [PATCH 3/3] [ARM] Enable watchdog platform device on SMDK6410 
 
-One checkpatch error here..
+The patches are OK for me.
 
-ERROR: trailing whitespace
-#77: FILE: arch/arm/mach-pxa/sharpsl_pm.c:681:
-+^Iif ((!sharpsl_pm.machinfo->read_devdata(SHARPSL_STATUS_LOCK)) || $
+Hi Russell, Ben,
 
-total: 1 errors, 0 warnings, 10 lines checked
+Are they also ok for you? How will we get this mainline? Patch 2 is something that can go via the watchdog tree, but the other patches could probably better go via the arm tree.
 
-
-Daniel
+Kind regards,
+Wim.
