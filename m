@@ -1,23 +1,25 @@
-From: gardner.ben@gmail.com (Ben Gardner)
-Date: Wed, 9 Sep 2009 18:28:42 -0500
-Subject: [PATCH 3/4] i2c/chips: Remove deprecated pca9539-driver
-In-Reply-To: <1252531371-14866-4-git-send-email-w.sang@pengutronix.de>
+From: vapier.adi@gmail.com (Mike Frysinger)
+Date: Wed, 9 Sep 2009 19:54:34 -0400
+Subject: [Uclinux-dist-devel] Removing deprecated drivers from
+	drivers/i2c/chips
+In-Reply-To: <1252531371-14866-1-git-send-email-w.sang@pengutronix.de>
 References: <1252531371-14866-1-git-send-email-w.sang@pengutronix.de>
-	<1252531371-14866-4-git-send-email-w.sang@pengutronix.de>
-Message-ID: <808c8e9d0909091628v3681c0cch50759d24393e570a@mail.gmail.com>
+Message-ID: <8bd0f97a0909091654h290180e5ob79178583aca143f@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 9, 2009 at 4:22 PM, Wolfram Sang<w.sang@pengutronix.de> wrote:
-> The pca9539-driver in drivers/i2c/chips which just exports its registers to
-> sysfs is superseeded by drivers/gpio/pca953x.c which properly uses the gpiolib.
-> As this driver has been deprecated for more than a year, finally remove it.
+On Wed, Sep 9, 2009 at 17:22, Wolfram Sang wrote:
+> continuing the quest to clean up and ultimately remove the drivers/i2c/chips
+> directory, this patch series removes three drivers for GPIO-expanders which are
+> obsoleted and marked as deprecated for more than a year. The newer (and better)
+> drivers can be found in drivers/gpio.
 >
-> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> Cc: Ben Gardner <gardner.ben@gmail.com>
-> Cc: Jean Delvare <khali@linux-fr.org>
+> As it is ensured that the newer drivers cover the same i2c_device_ids, all
+> platform_devices will still match. Some defconfig updates may be necessary
+> though, but according to [1] this is left to the arch|platform-maintainers
+> (also as most defconfigs are quite outdated). For that reason, I put the
+> relevant arch-mailing-lists to Cc. Comments are welcome.
 
-Acked-by: Ben Gardner <gardner.ben@gmail.com>
-
-Thanks for taking care of this.
-Ben
+the Blackfin defconfigs refer to an input driver for the PCF8574, not
+the I2C client driver
+-mike
