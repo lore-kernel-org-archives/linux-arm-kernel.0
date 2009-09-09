@@ -1,24 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 Sep 2009 19:23:40 +0100
-Subject: [patch for 2.6.31] zaurus c3000 aka spitz: fix resume
-In-Reply-To: <f17812d70909090737n4315d0cbh82c0a63e9222fdb5@mail.gmail.com>
-References: <20090909075024.GA1400@ucw.cz>
-	<f17812d70909090737n4315d0cbh82c0a63e9222fdb5@mail.gmail.com>
-Message-ID: <20090909182340.GA5235@n2100.arm.linux.org.uk>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed,  9 Sep 2009 23:22:47 +0200
+Subject: Removing deprecated drivers from drivers/i2c/chips
+Message-ID: <1252531371-14866-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 09, 2009 at 10:37:41PM +0800, Eric Miao wrote:
-> On Wed, Sep 9, 2009 at 3:50 PM, Pavel Machek<pavel@ucw.cz> wrote:
-> > Hi, Linus!
-> >
-> > Spitz resume was broken for year or likely two, and it would be very
-> > nice to fix it for 2.6.31 release. One liner is below, and it really
-> > can not harm. It already is in Eric's fix queue, so pulling that for
-> > .31 should work, too.
-> >
-> 
-> This should be sitting in rmk's git tree and I'm not sure if Russell
-> has sent the pull request already.
+Hi,
 
-It's just Pavel being his obnoxious impatient self...
+continuing the quest to clean up and ultimately remove the drivers/i2c/chips
+directory, this patch series removes three drivers for GPIO-expanders which are
+obsoleted and marked as deprecated for more than a year. The newer (and better)
+drivers can be found in drivers/gpio.
+
+As it is ensured that the newer drivers cover the same i2c_device_ids, all
+platform_devices will still match. Some defconfig updates may be necessary
+though, but according to [1] this is left to the arch|platform-maintainers
+(also as most defconfigs are quite outdated). For that reason, I put the
+relevant arch-mailing-lists to Cc. Comments are welcome.
+
+Regards,
+
+   Wolfram
+
+[1] http://lkml.org/lkml/2009/5/7/34
