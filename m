@@ -1,31 +1,37 @@
 From: laforge@gnumonks.org (laforge at gnumonks.org)
-Date: Wed,  9 Sep 2009 20:07:32 +0900
-Subject: [PATCH 3/3] [ARM] Enable watchdog platform device on SMDK6410
-Message-ID: <1252494452-7356-1-git-send-email-laforge@gnumonks.org>
+Date: Wed,  9 Sep 2009 20:06:16 +0900
+Subject: [PATCH 2/3] watchdog: Samsung SoC Watchdog is not s3c24xx specific
+Message-ID: <1252494376-7333-1-git-send-email-laforge@gnumonks.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Harald Welte <laforge@gnumonks.org>
 
-This patch adds watchdog in the list of platform devices for Samsung's
-6410 SoC.
+Kconfig change to make sure we can build the watchdog driver
+on s3c64xx based machines.
 
 Signed-off-by: Harald Welte <laforge@gnumonks.org>
 ---
- arch/arm/mach-s3c6410/mach-smdk6410.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ drivers/watchdog/Kconfig |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-s3c6410/mach-smdk6410.c b/arch/arm/mach-s3c6410/mach-smdk6410.c
-index bc9a7de..fafffce 100644
---- a/arch/arm/mach-s3c6410/mach-smdk6410.c
-+++ b/arch/arm/mach-s3c6410/mach-smdk6410.c
-@@ -184,6 +184,7 @@ static struct platform_device *smdk6410_devices[] __initdata = {
- 	&s3c_device_fb,
- 	&s3c_device_usb,
- 	&s3c_device_usb_hsotg,
-+	&s3c_device_wdt,
- 	&smdk6410_lcd_powerdev,
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index b1ccc04..c6cf548 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -139,10 +139,10 @@ config KS8695_WATCHDOG
+ 	  system when the timeout is reached.
  
- 	&smdk6410_smsc911x,
+ config S3C2410_WATCHDOG
+-	tristate "S3C2410 Watchdog"
+-	depends on ARCH_S3C2410
++	tristate "Samsung SoC Watchdog"
++	depends on ARCH_S3C2410 || ARCH_S3C64XX
+ 	help
+-	  Watchdog timer block in the Samsung S3C2410 chips. This will
++	  Watchdog timer block in the Samsung SoC chips. This will
+ 	  reboot the system when the timer expires with the watchdog
+ 	  enabled.
+ 
 -- 
 1.5.3.4
