@@ -1,32 +1,34 @@
-From: jsgood.yang@samsung.com (Jinsung Yang)
-Date: Wed, 09 Sep 2009 18:22:43 +0900
-Subject: ARM Cortex-based multi-core support?
-In-Reply-To: <1252486591.24414.1.camel@pc1117.cambridge.arm.com>
-References: <008d01ca3128$0b012e00$21038a00$%yang@samsung.com>
-	<1252486591.24414.1.camel@pc1117.cambridge.arm.com>
-Message-ID: <000601ca312f$16046090$420d21b0$%yang@samsung.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Wed, 9 Sep 2009 11:35:02 +0200
+Subject: [PATCH 1/2] AB3100 regulator support v4
+In-Reply-To: <63386a3d0909081507n7071761fyb7c8350072129fcd@mail.gmail.com>
+References: <1251982396-23790-1-git-send-email-linus.walleij@stericsson.com>
+	<1251987348.6735.49.camel@odin>
+	<63386a3d0909081507n7071761fyb7c8350072129fcd@mail.gmail.com>
+Message-ID: <20090909093500.GC4292@sortiz.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thank you Catalin,
+Hi Linus,
 
-> -----Original Message-----
-> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
-> Sent: Wednesday, September 09, 2009 5:57 PM
-> To: Jinsung Yang
-> Cc: linux-arm-kernel at lists.infradead.org
-> Subject: Re: ARM Cortex-based multi-core support?
+On Wed, Sep 09, 2009 at 12:07:05AM +0200, Linus Walleij wrote:
+> 009/9/3 Liam Girdwood <lrg@slimlogic.co.uk>:
 > 
-> On Wed, 2009-09-09 at 17:32 +0900, Jinsung Yang wrote:
-> > I'm researching that the latest kernel can support ARM cortex based
-> > multi-core platform..
-> > First, just I need to know current status.. someone knows?
+> > Samuel, are you happy for this to go via mfd for simpler merging ?
+> > If so :-
+> >
+> > Signed-off-by: Liam Girdwood <lrg@slimlogic.co.uk>
 > 
-> AFAICT, it's all supported and works fine (with a few minor issues like
-> the recent thread on non position-independent dynamic shared objects, if
-> your toolchain generates such things).
-> 
+> OK with you Sam?
+Yes, applied to my for-next branch. There were a couple checkpatch 80+
+character line length warnings, but I'm not that picky :)
 
-Which platform codes are valuable for reference in the mainline?
---
-Jinsung Yang
+Cheers,
+Samuel.
+
+
+> Linus Walleij
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
