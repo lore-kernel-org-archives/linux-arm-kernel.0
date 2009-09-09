@@ -1,34 +1,31 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Wed, 9 Sep 2009 13:17:18 +0200
-Subject: [PATCH 1/2] AB3100 regulator support v4
-In-Reply-To: <20090909093500.GC4292@sortiz.org>
-References: <1251982396-23790-1-git-send-email-linus.walleij@stericsson.com>
-	<1251987348.6735.49.camel@odin>
-	<63386a3d0909081507n7071761fyb7c8350072129fcd@mail.gmail.com>
-	<20090909093500.GC4292@sortiz.org>
-Message-ID: <63386a3d0909090417l742cfa88u9747558c3e04d08d@mail.gmail.com>
+From: laforge@gnumonks.org (laforge at gnumonks.org)
+Date: Wed,  9 Sep 2009 20:07:32 +0900
+Subject: [PATCH 3/3] [ARM] Enable watchdog platform device on SMDK6410
+Message-ID: <1252494452-7356-1-git-send-email-laforge@gnumonks.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/9/9 Samuel Ortiz <sameo@linux.intel.com>:
+From: Harald Welte <laforge@gnumonks.org>
 
-> On Wed, Sep 09, 2009 at 12:07:05AM +0200, Linus Walleij wrote:
->> 009/9/3 Liam Girdwood <lrg@slimlogic.co.uk>:
->>
->> > Samuel, are you happy for this to go via mfd for simpler merging ?
->> > If so :-
->> >
->> > Signed-off-by: Liam Girdwood <lrg@slimlogic.co.uk>
->>
->> OK with you Sam?
->
-> Yes, applied to my for-next branch. There were a couple checkpatch 80+
-> character line length warnings, but I'm not that picky :)
+This patch adds watchdog in the list of platform devices for Samsung's
+6410 SoC.
 
-Thanks a lot Sam, I think all these warnings are of the type where
-dev_*(); messages get more than 80 characters long, and that has
-been indicated by Linus (the other one) and some subsystem maintainers
-to be undesireable to break across lines in order to avoid hassles
-when grep:ing for error strings in the kernel tree.
+Signed-off-by: Harald Welte <laforge@gnumonks.org>
+---
+ arch/arm/mach-s3c6410/mach-smdk6410.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Linus Walleij
+diff --git a/arch/arm/mach-s3c6410/mach-smdk6410.c b/arch/arm/mach-s3c6410/mach-smdk6410.c
+index bc9a7de..fafffce 100644
+--- a/arch/arm/mach-s3c6410/mach-smdk6410.c
++++ b/arch/arm/mach-s3c6410/mach-smdk6410.c
+@@ -184,6 +184,7 @@ static struct platform_device *smdk6410_devices[] __initdata = {
+ 	&s3c_device_fb,
+ 	&s3c_device_usb,
+ 	&s3c_device_usb_hsotg,
++	&s3c_device_wdt,
+ 	&smdk6410_lcd_powerdev,
+ 
+ 	&smdk6410_smsc911x,
+-- 
+1.5.3.4
