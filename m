@@ -1,35 +1,19 @@
-From: jsgood.yang@samsung.com (Jinsung Yang)
-Date: Wed, 09 Sep 2009 20:13:14 +0900
-Subject: [PATCH 0/4] Fixed keypad driver for Samsung SoC
-Message-ID: <000d01ca313e$867e7bd0$937b7370$%yang@samsung.com>
+From: laforge@gnumonks.org (laforge at gnumonks.org)
+Date: Wed,  9 Sep 2009 20:03:36 +0900
+Subject: [PATCH 0/3] [ARM] Watchdog support for Samsung 6410 SoC
+Message-ID: <1252494216-6434-1-git-send-email-laforge@gnumonks.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jinsung Yang <jsgood.yang@samsung.com>
+From: Harald Welte <laforge@gnumonks.org>
 
-To Dmitry:
-This patch series are including new Samsung SoC keypad driver with fixing wrong implementations which commented by you.
-All changes and adds are in single patch.
+This patch series extends the existing watchdog timer support on
+Samsung 24xx SoC's to Samsung 6410 SoC. This patch series includes
+the following patches.
 
-[PATCH 1/4] [INPUT][KEYBOARD] Samsung keypad driver support
+[PATCH 1/3] [ARM] s3c: move watchdog dev from plat-24xx into plat-s3c
+[PATCH 2/3] watchdog: Samsung SoC Watchdog is not s3c24xx specific
+[PATCH 3/3] [ARM] Enable watchdog platform device on SMDK6410 
 
-This patch depends on following architecture patches:
-
-[PATCH 2/4] [ARM][S3C] Add definition for keypad platform data
-[PATCH 3/4] [ARM][S3C] Add definition for keypad register
-[PATCH 4/4] [ARM][S3C] Add support keypad platform data
-
-To Ben:
-As you know, I sent to you 12 patches for keypad driver some days ago,
-however I need to change several patch files with following guidance:
-
-This [PATCH 2/4] must be used instead of old [PATCH 07/12]
-This [PATCH 3/4] must be used instead of old [PATCH 09/12]
-This [PATCH 4/4] must be used instead of old both [PATCH 11/12] and [PATCH 12/12]
-
-Best Regards
---
-Jinsung, Yang <jsgood.yang@samsung.com>
-AP Development Team
-System LSI, Semiconductor Business
-SAMSUNG Electronics Co., LTD
+-- 
+1.5.3.4
