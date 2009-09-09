@@ -1,30 +1,33 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 9 Sep 2009 12:52:55 +0100
-Subject: [PATCH 1/4] [INPUT][KEYBOARD] Samsung keypad driver support
-In-Reply-To: <1252494663-17624-1-git-send-email-jsgood.yang@samsung.com>
-References: <1252494663-17624-1-git-send-email-jsgood.yang@samsung.com>
-Message-ID: <20090909115255.GB9548@sirena.org.uk>
+From: mad_soft@inbox.ru (Dmitry Artamonow)
+Date: Wed, 9 Sep 2009 16:54:20 +0400
+Subject: Collie/Simpad hacks in head-sa1100.S break booting on other machines
+Message-ID: <20090909125420.GA13915@rainbow>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 09, 2009 at 08:11:03PM +0900, jsgood.yang at samsung.com wrote:
+Hello!
 
-> +#ifdef CONFIG_PM
-> +static int s3c_keypad_suspend(struct platform_device *dev, pm_message_t state)
-> +{
-> +	struct s3c_keypad *keypad = platform_get_drvdata(pdev);
-> +
-> +	keypad->keyifcon = readl(keypad->regs + S3C_KEYIFCON);
-> +	keypad->keyiffc = readl(keypad->regs + S3C_KEYIFFC);
-> +
-> +	disable_irq(IRQ_KEYPAD);
-> +	clk_disable(keypad->clk);
-> +
-> +	return 0;
-> +}
+When trying to boot kernel with both CONFIG_SA1100_COLLIE and
+CONFIG_SA1100_H3600 compiled in on iPaq h3600, I suddenly have been
+bitten by this hack in arch/arm/boot/compressed/head-sa1100.S:
 
-This will unconditionally enable the clock but the clock is only enabled
-while the input device is opened.  This may create confusion or generate
-warnings with the clock API so it'd be better to avoid doing this.
+#ifdef CONFIG_SA1100_COLLIE
+                mov     r7, #MACH_TYPE_COLLIE
+#endif
 
-A similar problem exists in the resume function.
+Yes, it's silently sets machine ID to MACH_TYPE_COLLIE on _any_ SA1100 machine
+if CONFIG_SA1100_COLLIE is set. And there's also similar hack (or broken
+bootloader workaround, if you like) for Simpad.
+
+I don't know if these hacks are needed anymore (for Collie with stock
+bootloader probably yes, for Simpad I don't know as I don't have this
+hardware), but I think something should be done at least to prevent
+selecting other machines if CONFIG_SA1100_COLLIE or CONFIG_SA1100_SIMPAD
+selected. Please find not very elegant, but working patch in attahment.
+It just adds "depends on !SA1100_COLLIE && !SA1100_SIMPAD" to every other
+machine. Sadly, I'm not an expert in kconfig - maybe there's a better way
+to do that?
+
+-- 
+Best regards,
+Dmitry "MAD" Artamonow
