@@ -1,25 +1,33 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed,  9 Sep 2009 23:22:47 +0200
-Subject: Removing deprecated drivers from drivers/i2c/chips
-Message-ID: <1252531371-14866-1-git-send-email-w.sang@pengutronix.de>
+Date: Wed,  9 Sep 2009 23:22:48 +0200
+Subject: [PATCH 1/4] gpio/pcf857x: copy i2c_device_id from old pcf8574-driver
+In-Reply-To: <1252531371-14866-1-git-send-email-w.sang@pengutronix.de>
+References: <1252531371-14866-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <1252531371-14866-2-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The deprecated pcf8574 driver is going to be removed. Make sure this
+replacement-driver inherits all i2c_device_ids for a smooth transition.
 
-continuing the quest to clean up and ultimately remove the drivers/i2c/chips
-directory, this patch series removes three drivers for GPIO-expanders which are
-obsoleted and marked as deprecated for more than a year. The newer (and better)
-drivers can be found in drivers/gpio.
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+Cc: David Brownell <dbrownell@users.sourceforge.net>
+Cc: Jean Delvare <khali@linux-fr.org>
+---
+ drivers/gpio/pcf857x.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-As it is ensured that the newer drivers cover the same i2c_device_ids, all
-platform_devices will still match. Some defconfig updates may be necessary
-though, but according to [1] this is left to the arch|platform-maintainers
-(also as most defconfigs are quite outdated). For that reason, I put the
-relevant arch-mailing-lists to Cc. Comments are welcome.
-
-Regards,
-
-   Wolfram
-
-[1] http://lkml.org/lkml/2009/5/7/34
+diff --git a/drivers/gpio/pcf857x.c b/drivers/gpio/pcf857x.c
+index 9525724..3f1ec1e 100644
+--- a/drivers/gpio/pcf857x.c
++++ b/drivers/gpio/pcf857x.c
+@@ -28,6 +28,7 @@
+ 
+ static const struct i2c_device_id pcf857x_id[] = {
+ 	{ "pcf8574", 8 },
++	{ "pcf8574a", 8 },
+ 	{ "pca8574", 8 },
+ 	{ "pca9670", 8 },
+ 	{ "pca9672", 8 },
+-- 
+1.6.3.3
