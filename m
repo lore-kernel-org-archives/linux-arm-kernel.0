@@ -1,31 +1,35 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Thu, 10 Sep 2009 12:49:37 +0200
-Subject: Removing deprecated drivers from drivers/i2c/chips
-In-Reply-To: <1252531371-14866-1-git-send-email-w.sang@pengutronix.de>
+From: bart.vanassche@gmail.com (Bart Van Assche)
+Date: Thu, 10 Sep 2009 12:52:17 +0200
+Subject: [PATCH 2/4] i2c/chips: Remove deprecated pcf8575-driver
+In-Reply-To: <1252531371-14866-3-git-send-email-w.sang@pengutronix.de>
 References: <1252531371-14866-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <20090910124937.7b3df062@hyperion.delvare>
+	<1252531371-14866-3-git-send-email-w.sang@pengutronix.de>
+Message-ID: <e2e108260909100352l2a30438fj9f0297c1974c0192@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+On Wed, Sep 9, 2009 at 11:22 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+>
+> The pcf8575-driver in drivers/i2c/chips which just exports its register to
+> sysfs is superseeded by drivers/gpio/pcf857x.c which properly uses the gpiolib.
+> As this driver has been deprecated for more than a year, finally remove it.
+>
+> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+> Cc: Bart Van Assche <bart.vanassche@gmail.com>
+> Cc: Jean Delvare <khali@linux-fr.org>
+> ---
+> ?Documentation/i2c/chips/pcf8575 | ? 69 --------------
+> ?drivers/i2c/chips/Kconfig ? ? ? | ? 18 ----
+> ?drivers/i2c/chips/Makefile ? ? ?| ? ?1 -
+> ?drivers/i2c/chips/pcf8575.c ? ? | ?198 ---------------------------------------
+> ?4 files changed, 0 insertions(+), 286 deletions(-)
+> ?delete mode 100644 Documentation/i2c/chips/pcf8575
+> ?delete mode 100644 drivers/i2c/chips/pcf8575.c
 
-On Wed,  9 Sep 2009 23:22:47 +0200, Wolfram Sang wrote:
-> continuing the quest to clean up and ultimately remove the drivers/i2c/chips
-> directory, this patch series removes three drivers for GPIO-expanders which are
-> obsoleted and marked as deprecated for more than a year. The newer (and better)
-> drivers can be found in drivers/gpio.
-> 
-> As it is ensured that the newer drivers cover the same i2c_device_ids, all
-> platform_devices will still match. Some defconfig updates may be necessary
-> though, but according to [1] this is left to the arch|platform-maintainers
-> (also as most defconfigs are quite outdated). For that reason, I put the
-> relevant arch-mailing-lists to Cc. Comments are welcome.
+This patch removes the documentation file
+Documentation/i2c/chips/pcf8575 while there is no documentation under
+Documentation/ for the drivers/gpio/pcf857x.c driver. Shouldn't proper
+documentation for the pcf857x driver be added to the kernel tree
+before the pcf8575 driver is removed ?
 
-Looks very good, I'll apply the 3 patches removing the legacy drivers.
-
-Not sure about the patch to drivers/gpio/pcf857x.c, as there is no gpio
-tree and no maintainer either AFAIK, I guess I shall pick it too?
-
-Thanks,
--- 
-Jean Delvare
+Bart.
