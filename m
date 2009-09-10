@@ -1,38 +1,49 @@
-From: nico@cam.org (Nicolas Pitre)
-Date: Thu, 10 Sep 2009 17:25:59 -0400 (EDT)
-Subject: ARM linux mailing lists FAQ about floating point support.
-In-Reply-To: <761ea48b0909101415x233ae1fcka079b46b348028d1@mail.gmail.com>
-References: <4AA94A40.408@xenomai.org>
-	<alpine.LFD.2.00.0909101625120.6044@xanadu.home>
-	<4AA9613F.5050103@xenomai.org>
-	<alpine.LFD.2.00.0909101634520.6044@xanadu.home>
-	<4AA967A3.2020107@xenomai.org>
-	<alpine.LFD.2.00.0909101659400.6044@xanadu.home>
-	<761ea48b0909101415x233ae1fcka079b46b348028d1@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.0909101724170.6044@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 10 Sep 2009 23:41:59 +0100
+Subject: [patch for 2.6.31] zaurus c3000 aka spitz: fix resume
+In-Reply-To: <20090910191932.GA23721@elf.ucw.cz>
+References: <20090909075024.GA1400@ucw.cz>
+	<f17812d70909090737n4315d0cbh82c0a63e9222fdb5@mail.gmail.com>
+	<20090909182340.GA5235@n2100.arm.linux.org.uk>
+	<20090910191932.GA23721@elf.ucw.cz>
+Message-ID: <20090910224159.GA4360@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Sep 2009, Laurent Desnogues wrote:
-
-> On Thu, Sep 10, 2009 at 11:03 PM, Nicolas Pitre <nico@cam.org> wrote:
-> > On Thu, 10 Sep 2009, Gilles Chanteperdrix wrote:
-> >
-> >> Right, it does not work, so, what does:
-> >> "Allows the mixing of softfloat and hardfloat code"
-> >>
-> >> is supposed to mean here for instance:
-> >> http://www.eurotech-inc.com/embedded-eabi-linux.asp
-> >
-> > As I just posted, it looks like gcc only implemented the soft-float ABI
-> > when using VFP. ?So if your CPU is VFP capable then using
-> > -mfloat-abi=softfp should produce actual VFP instructions while still
-> > passing function arguments around using non VFP registers.
+On Thu, Sep 10, 2009 at 09:19:32PM +0200, Pavel Machek wrote:
+> On Wed 2009-09-09 19:23:40, Russell King - ARM Linux wrote:
+> > On Wed, Sep 09, 2009 at 10:37:41PM +0800, Eric Miao wrote:
+> > > On Wed, Sep 9, 2009 at 3:50 PM, Pavel Machek<pavel@ucw.cz> wrote:
+> > > > Hi, Linus!
+> > > >
+> > > > Spitz resume was broken for year or likely two, and it would be very
+> > > > nice to fix it for 2.6.31 release. One liner is below, and it really
+> > > > can not harm. It already is in Eric's fix queue, so pulling that for
+> > > > .31 should work, too.
+> > > >
+> > > 
+> > > This should be sitting in rmk's git tree and I'm not sure if Russell
+> > > has sent the pull request already.
+> > 
+> > It's just Pavel being his obnoxious impatient self...
 > 
-> Didn't latest CodeSourcery ARM toolchain (2009q1) add hardfp?
+> Aha, Russell, being polite and helpful, as usual.
+> 
+> Only that, you know, you missed the deadline, so... perhaps I had
+> reason to be impatient?
 
-I don't know.  If so then the FAQ entry about not being able to mix 
-hard-float and soft-float would still apply when using that mode.
+I missed the deadline because I was waiting on others to sort out telling
+me whether a bugfix patch was actually correct, and then it took several
+days and mails to get an attributation line out of them.  I finally got
+that yesterday, and since I'm not doing kernel work (in fact, I'm hardly
+in front of the computer at the moment) these things are going to _HAVE_
+to wait until this weekend.
 
+By agreement with Linus, I do not send pull requests more often than once
+a week, absolute maximum.  So if I've something pending in the queue, I
+hold off sending the queue until that issue is resolved.
 
-Nicolas
+Don't like it?  Tough.  This is the workflow that I've been forced into
+by other flame wars.  It would be my personal preference to ensure that
+fixes make their way in a timely manner into mainline, but due to that,
+it's just not possible.
