@@ -1,46 +1,32 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 10 Sep 2009 10:14:21 +0800
-Subject: Collie/Simpad hacks in head-sa1100.S break booting on other
-	machines
-In-Reply-To: <20090909125420.GA13915@rainbow>
-References: <20090909125420.GA13915@rainbow>
-Message-ID: <f17812d70909091914y4c44a29j1204c67904143efd@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 10 Sep 2009 08:26:09 +0200
+Subject: [Uclinux-dist-devel] Removing deprecated drivers from
+	drivers/i2c/chips
+In-Reply-To: <8bd0f97a0909091654h290180e5ob79178583aca143f@mail.gmail.com>
+References: <1252531371-14866-1-git-send-email-w.sang@pengutronix.de>
+	<8bd0f97a0909091654h290180e5ob79178583aca143f@mail.gmail.com>
+Message-ID: <20090910062609.GA26454@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 9, 2009 at 8:54 PM, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
-> Hello!
->
-> When trying to boot kernel with both CONFIG_SA1100_COLLIE and
-> CONFIG_SA1100_H3600 compiled in on iPaq h3600, I suddenly have been
-> bitten by this hack in arch/arm/boot/compressed/head-sa1100.S:
->
-> #ifdef CONFIG_SA1100_COLLIE
-> ? ? ? ? ? ? ? ?mov ? ? r7, #MACH_TYPE_COLLIE
-> #endif
->
-> Yes, it's silently sets machine ID to MACH_TYPE_COLLIE on _any_ SA1100 machine
-> if CONFIG_SA1100_COLLIE is set. And there's also similar hack (or broken
-> bootloader workaround, if you like) for Simpad.
->
-> I don't know if these hacks are needed anymore (for Collie with stock
-> bootloader probably yes, for Simpad I don't know as I don't have this
-> hardware), but I think something should be done at least to prevent
-> selecting other machines if CONFIG_SA1100_COLLIE or CONFIG_SA1100_SIMPAD
-> selected. Please find not very elegant, but working patch in attahment.
-> It just adds "depends on !SA1100_COLLIE && !SA1100_SIMPAD" to every other
-> machine. Sadly, I'm not an expert in kconfig - maybe there's a better way
-> to do that?
->
+> the Blackfin defconfigs refer to an input driver for the PCF8574, not
+> the I2C client driver
 
-Sadly, this doesn't look like a correct approach. Remember that machines
-can just be compiled into a single vmlinux all together without excluding
-each other.
+Yup, I am aware of that. With the exception of:
 
-This is true on pxa25x/pxa27x with Sharp Zaurus due to their lack of a
-compliant boot loader, so that dirty hack is there to detect which model
-is.
+blackfin/configs/PNAV-10_defconfig:773:CONFIG_SENSORS_PCF8574=m
 
-A good fix would be to the bootloader to tell the kernel about the correct
-machine ID, and if that's difficult, a compromised one would be a short
-block of detection code which doesn't conflict with other machines.
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090910/8230bb17/attachment.sig>
