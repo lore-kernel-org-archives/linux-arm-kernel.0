@@ -1,26 +1,40 @@
-From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
-Date: Thu, 10 Sep 2009 22:27:43 +0200
-Subject: ARM linux mailing lists FAQ about floating point support.
-In-Reply-To: <alpine.LFD.2.00.0909101625120.6044@xanadu.home>
-References: <4AA94A40.408@xenomai.org>
-	<alpine.LFD.2.00.0909101625120.6044@xanadu.home>
-Message-ID: <4AA9613F.5050103@xenomai.org>
+From: dcbw@redhat.com (Dan Williams)
+Date: Thu, 10 Sep 2009 13:33:09 -0700
+Subject: about HAL and USB EVDO usbserial problem
+In-Reply-To: <14959928.480571252500507211.JavaMail.coremail@bj126app76.126.com>
+References: <14959928.480571252500507211.JavaMail.coremail@bj126app76.126.com>
+Message-ID: <1252614789.13201.42.camel@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Pitre wrote:
-> On Thu, 10 Sep 2009, Gilles Chanteperdrix wrote:
+On Wed, 2009-09-09 at 20:48 +0800, tommy.hong wrote:
+> hi,all!
 > 
->> Hi,
->>
->> It seems the FAQ here:
->> http://www.arm.linux.org.uk/mailinglists/faq.php#f4
->>
->> is a bit outdated, since it does not mention that EABI solves the issue.
+> Now i met a problem with usb evdo card!
 > 
-> And just how would EABI solve the issue?
+> When i insmod usbserial with vendor id and product id,pppd connect OK
+> with ttyUSB1 and can access internet with ppp0!
 
-By allowing to mix soft-float and hard-float programs with only one libc?
+You really, really want to add that card's IDs to the proper kernel
+drivers.  Doing so will allow NetworkManager to see and manage the
+interface.  *Plus* you'll get much higher speeds.  usbserial simply
+isn't capable of nor designed for the higher speeds of 3G cards.
 
--- 
-					    Gilles.
+What card is it?  If I know that, I can suggest what driver to add the
+IDs to.
+
+> But I want to use Networkmanager with ppp,because ppp0 isn't a
+> standard platform device ,it is kernel virtual net
+> (/sys/device/virtual/net/ppp0),causes HAL can't know it is a real
+> network,Networkmanager depend on HAL!
+> 
+> Serveral days ago i have fix marvell8686 driver kernel hotplug
+> bug,does usbserial driver miss similiar issue ?
+
+Marvell vendor driver, or the upstream libertas driver?  Upstream
+drivers are the only ones we guarantee to really support since they have
+been vetted by kernel developers and tested by numerous people.  I test
+the libertas driver regularly and it works well with NM.  I don't know
+anything about the state of the marvell vendor driver.
+
+Dan
