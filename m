@@ -1,45 +1,28 @@
 From: nico@cam.org (Nicolas Pitre)
-Date: Thu, 10 Sep 2009 16:57:26 -0400 (EDT)
+Date: Thu, 10 Sep 2009 17:03:02 -0400 (EDT)
 Subject: ARM linux mailing lists FAQ about floating point support.
-In-Reply-To: <4AA9652F.5000007@xenomai.org>
+In-Reply-To: <4AA967A3.2020107@xenomai.org>
 References: <4AA94A40.408@xenomai.org>
 	<alpine.LFD.2.00.0909101625120.6044@xanadu.home>
 	<4AA9613F.5050103@xenomai.org>
 	<alpine.LFD.2.00.0909101634520.6044@xanadu.home>
-	<4AA9652F.5000007@xenomai.org>
-Message-ID: <alpine.LFD.2.00.0909101652020.6044@xanadu.home>
+	<4AA967A3.2020107@xenomai.org>
+Message-ID: <alpine.LFD.2.00.0909101659400.6044@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, 10 Sep 2009, Gilles Chanteperdrix wrote:
 
-> Nicolas Pitre wrote:
-> > On Thu, 10 Sep 2009, Gilles Chanteperdrix wrote:
-> > 
-> >> Nicolas Pitre wrote:
-> >>> On Thu, 10 Sep 2009, Gilles Chanteperdrix wrote:
-> >>>
-> >>>> Hi,
-> >>>>
-> >>>> It seems the FAQ here:
-> >>>> http://www.arm.linux.org.uk/mailinglists/faq.php#f4
-> >>>>
-> >>>> is a bit outdated, since it does not mention that EABI solves the issue.
-> >>> And just how would EABI solve the issue?
-> >> By allowing to mix soft-float and hard-float programs with only one libc?
-> > 
-> > Err... How?
+> Right, it does not work, so, what does:
+> "Allows the mixing of softfloat and hardfloat code"
 > 
-> Well, I read somewhere that EABI allows mixing soft-float and hard-float
-> code and must have assumed it was true. But you made me doubt.
-> 
-> But since compiling both a hard-float program and a soft-float program
-> with the same toolchain does not produce any compilation or link-edition
-> error, I still tend to think it is true.
+> is supposed to mean here for instance:
+> http://www.eurotech-inc.com/embedded-eabi-linux.asp
 
-Well, actually it seems that gcc can only do -mfloat-abi=softfp and 
-surprizingly -mfloat-abi=hard is unimplemented for VFP.  So in that case 
-mixing soft and hard float objects is fine.
+As I just posted, it looks like gcc only implemented the soft-float ABI 
+when using VFP.  So if your CPU is VFP capable then using 
+-mfloat-abi=softfp should produce actual VFP instructions while still 
+passing function arguments around using non VFP registers.
 
 
 Nicolas
