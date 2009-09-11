@@ -1,32 +1,46 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Fri, 11 Sep 2009 17:20:19 +0200
-Subject: [PATCH] video: add PXA3xx accelerator ID [v2]
-In-Reply-To: <20090910133327.GA9410@buzzloop.caiaq.de>
-References: <20090910132630.GZ9410@buzzloop.caiaq.de>
-	<Pine.LNX.4.64.0909101530120.4458@axis700.grange>
-	<20090910133327.GA9410@buzzloop.caiaq.de>
-Message-ID: <20090911152019.GZ18340@buzzloop.caiaq.de>
+From: bgat@billgatliff.com (Bill Gatliff)
+Date: Fri, 11 Sep 2009 10:20:23 -0500
+Subject: smsc911x.c driver and SMP (was Re: Kernel related (?) user space
+	crash at ARM11 MPCore)
+In-Reply-To: <1252674034.29620.30.camel@pc1117.cambridge.arm.com>
+References: <4A7AEEB6.5060903@googlemail.com>	
+	<1249981883.27150.14.camel@pc1117.cambridge.arm.com>	
+	<4A818CBC.8040000@googlemail.com>	
+	<1250006770.30628.1.camel@pc1117.cambridge.arm.com>	
+	<4A819C54.3080606@googlemail.com>	
+	<1250009043.30628.9.camel@pc1117.cambridge.arm.com>	
+	<87ab25vazg.fsf@brigitte.kvy.fi>	
+	<1250080338.20332.32.camel@pc1117.cambridge.arm.com>	
+	<87k518yc8a.fsf@brigitte.kvy.fi>	
+	<1252660898.3354.16.camel@pc1117.cambridge.arm.com>	
+	<4AAA48CA.9040405@billgatliff.com>
+	<1252674034.29620.30.camel@pc1117.cambridge.arm.com>
+Message-ID: <4AAA6AB7.60808@billgatliff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 10, 2009 at 03:33:27PM +0200, Daniel Mack wrote:
-> On Thu, Sep 10, 2009 at 03:31:34PM +0200, Guennadi Liakhovetski wrote:
-> > > +	if (cpu_is_pxa3xx() && inf->acceleration_enabled)
-> > > +		fbi->fb.fix.accel = FB_ACCEL_PXA3XX;
-> > > +
-> > 
-> > Ok, now remove 'cpu_is_pxa3xx() && ' above and you should be good to go:-) 
-> > What if tomorrow pxa4xx comes (ok, Eric will disagree, but wtill:-))
-> 
-> Don't know. I left it in there intentionally, but I'm fine to remove it.
-> Or Eric does it when applying ;) Eric?
+Catalin Marinas wrote:
+> On Fri, 2009-09-11 at 07:55 -0500, Bill Gatliff wrote:
+>   
+>>
+>> Why take the lock in smsc911x_tx_writefifo?  It looks like you take the 
+>> same lock again in smsc911x_reg_write.
+>>     
+>
+> Ah, ok, I haven't tried the 16-bit mode, only the 32-bit one and was
+> working fine, no deadlocks. But I can't say whether that's the right
+> fix, it's better for SMSC to look into it.
+>
+>   
 
-What I was considering are cases where a kernel binary that works on
-both PXA3xx and other PXAs shares the same pxafb_mach_info struct across
-different board support code. The accel flag would then be set for wrong
-platforms.
+I certainly won't object to SMSC taking a look at it.  :)  But your 
+changes pass the common-sense test AFAICT, apart from my question above.
 
-But this might be academic, that's why I don't have a strong opinion on
-that :)
 
-Daniel
+
+
+b.g.
+
+-- 
+Bill Gatliff
+bgat at billgatliff.com
