@@ -1,87 +1,24 @@
-From: p.osciak@samsung.com (Pawel Osciak)
-Date: Fri, 11 Sep 2009 20:05:04 +0200
-Subject: [PATCH 7/7] [ARM] s3c-fb: Added color key blending.
-Message-ID: <E4D3F24EA6C9E54F817833EAE0D912AC0771185D5E@bssrvexch01.BS.local>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 11 Sep 2009 21:56:35 +0200
+Subject: [patch] zaurus family: battery cleanups
+In-Reply-To: <1252507631.14793.113.camel@desktop>
+References: <20090909073904.GE1327@ucw.cz> <1252507631.14793.113.camel@desktop>
+Message-ID: <20090911195635.GD8137@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This feature allows blending based on color key value.
-Pixels with key value get blended with alpha1, while the rest
-gets blended with alpha0.
+On Wed 2009-09-09 07:47:11, Daniel Walker wrote:
+> On Wed, 2009-09-09 at 09:39 +0200, Pavel Machek wrote:
+> > This cleans up battery code to conform to codingstyle. The only real
+> > change is that we should now refuse to charge if we can't read battery
+> > temperature.
+> 
+> This patch has a number of checkpatch errors. Mostly trailing
+> whitespace, or just spacing issues..
 
-Reviewed-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Reviewed-by: Kyungmin Park <kyungmin.park@samsung.com>
-Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
-
----
- arch/arm/plat-s3c/include/plat/s3c-fb.h |    2 ++
- drivers/video/s3c-fb.c                  |   27 ++++++++++++++++++++++++++-
- 2 files changed, 28 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/plat-s3c/include/plat/s3c-fb.h b/arch/arm/plat-s3c/include/plat/s3c-fb.h
-index 080524d..def54ec 100644
---- a/arch/arm/plat-s3c/include/plat/s3c-fb.h
-+++ b/arch/arm/plat-s3c/include/plat/s3c-fb.h
-@@ -67,6 +67,8 @@ typedef enum s3c_fb_alpha_mode {
- #define S3CFB_IOCTL_SET_COLOR_KEY_MODE	_IO(S3CFB_IOCTL_MAGIC, 2)
- /* param: 1 - on, 0 - off */
- #define S3CFB_IOCTL_COLOR_KEY_ENABLE	_IO(S3CFB_IOCTL_MAGIC, 3)
-+/* param: 1 - on, 0 - off */
-+#define S3CFB_IOCTL_COLOR_KEY_BLEND_ENABLE _IO(S3CFB_IOCTL_MAGIC, 8)
- 
- 
- /* Param: s3c_fb_source */
-diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
-index 6721f20..5ea6a5b 100644
---- a/drivers/video/s3c-fb.c
-+++ b/drivers/video/s3c-fb.c
-@@ -926,7 +926,8 @@ static int s3c_fb_color_key_enable(struct s3c_fb_win *win, int enable)
- 	int keycon0_reg;
- 
- 	if (! has_colorkey(win->index)) {
--		dev_err(sfb->dev, "Window does not support color keying\n");
-+		dev_err(sfb->dev, "Window %d does not support color keying\n",
-+			win->index);
- 		return -EINVAL;
- 	}
- 
-@@ -941,6 +942,27 @@ static int s3c_fb_color_key_enable(struct s3c_fb_win *win, int enable)
- 	return 0;
- }
- 
-+static int s3c_fb_color_key_blending_enable(struct s3c_fb_win *win, int enable)
-+{
-+	struct s3c_fb *sfb = win->parent;
-+	int keycon0_reg;
-+
-+	if (! has_colorkey(win->index)) {
-+		dev_err(sfb->dev, "Window %d does not support color keying\n",
-+			win->index);
-+		return -EINVAL;
-+	}
-+
-+	keycon0_reg = readl(sfb->regs + WxKEYCON0(win->index));
-+	if (enable)
-+		keycon0_reg |= WxKEYCON0_KEYBL_EN;
-+	else
-+		keycon0_reg &= ~WxKEYCON0_KEYBL_EN;
-+
-+	writel(keycon0_reg, sfb->regs + WxKEYCON0(win->index));
-+
-+	return 0;
-+}
- static int s3c_fb_set_color_key_mode(struct s3c_fb_win *win,
- 				     enum s3c_fb_color_key_mode mode)
- {
-@@ -1115,6 +1137,9 @@ static int s3c_fb_ioctl(struct fb_info *info, unsigned int cmd,
- 	case S3CFB_IOCTL_COLOR_KEY_ENABLE:
- 		return s3c_fb_color_key_enable(win, arg);
- 
-+	case S3CFB_IOCTL_COLOR_KEY_BLEND_ENABLE:
-+		return s3c_fb_color_key_blending_enable(win, arg);
-+
- 
- 	case S3CFB_IOCTL_SET_SOURCE:
- 		return s3c_fb_set_source(win, arg);
+Well, original code has problems, too, and I'm trying to slowly clean
+that up.
+								Pavel
 -- 
-1.6.4.2.253.g0b1fac
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
