@@ -1,44 +1,45 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 11 Sep 2009 17:06:29 +0100
-Subject: smsc911x.c driver and SMP (was Re: Kernel related (?) user
-	space crash at ARM11 MPCore)
-In-Reply-To: <4AAA6AB7.60808@billgatliff.com>
-References: <4A7AEEB6.5060903@googlemail.com>
-	<1249981883.27150.14.camel@pc1117.cambridge.arm.com>
-	<4A818CBC.8040000@googlemail.com>
-	<1250006770.30628.1.camel@pc1117.cambridge.arm.com>
-	<4A819C54.3080606@googlemail.com>
-	<1250009043.30628.9.camel@pc1117.cambridge.arm.com>
-	<87ab25vazg.fsf@brigitte.kvy.fi>
-	<1250080338.20332.32.camel@pc1117.cambridge.arm.com>
-	<87k518yc8a.fsf@brigitte.kvy.fi>
-	<1252660898.3354.16.camel@pc1117.cambridge.arm.com>
-	<4AAA48CA.9040405@billgatliff.com>
-	<1252674034.29620.30.camel@pc1117.cambridge.arm.com>
-	<4AAA6AB7.60808@billgatliff.com>
-Message-ID: <1252685189.29620.33.camel@pc1117.cambridge.arm.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sat, 12 Sep 2009 00:12:52 +0800
+Subject: [PATCH] video: add PXA3xx accelerator ID [v2]
+In-Reply-To: <Pine.LNX.4.64.0909101530120.4458@axis700.grange>
+References: <20090910132630.GZ9410@buzzloop.caiaq.de>
+	<Pine.LNX.4.64.0909101530120.4458@axis700.grange>
+Message-ID: <f17812d70909110912q41c45dcfl8410e3fb51ec7e9c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2009-09-11 at 10:20 -0500, Bill Gatliff wrote:
-> Catalin Marinas wrote:
-> > On Fri, 2009-09-11 at 07:55 -0500, Bill Gatliff wrote:
-> >> Why take the lock in smsc911x_tx_writefifo?  It looks like you take the 
-> >> same lock again in smsc911x_reg_write.
-> >
-> > Ah, ok, I haven't tried the 16-bit mode, only the 32-bit one and was
-> > working fine, no deadlocks. But I can't say whether that's the right
-> > fix, it's better for SMSC to look into it.
-> 
-> I certainly won't object to SMSC taking a look at it.  :)  But your 
-> changes pass the common-sense test AFAICT, apart from my question above.
+> Ok, now remove 'cpu_is_pxa3xx() && ' above and you should be good to go:-)
+> What if tomorrow pxa4xx comes (ok, Eric will disagree, but wtill:-))
 
-Fixed it with this new commit (I'm not posting the patch here as it's
-not meant for review on this list):
+It is not likely to be pxa4xx, (chinese people don't like '4', and there are
+a lot chinese in Marvell, Shhh..... don't let them know I said this ;-)
 
-http://www.linux-arm.org/git?p=linux-2.6.git;a=commitdiff;h=3cc8ee538f6727d1f6773fff6d8e31bc5522bfee
+Still, I guess having a cpu_is_pxa3xx() should be OK here.
 
-Thanks for spotting the problem.
-
--- 
-Catalin
+>
+>> ? ? ? fbi->backlight_power = inf->pxafb_backlight_power;
+>> ? ? ? fbi->lcd_power = inf->pxafb_lcd_power;
+>>
+>> diff --git a/include/linux/fb.h b/include/linux/fb.h
+>> index f847df9..a34bdf5 100644
+>> --- a/include/linux/fb.h
+>> +++ b/include/linux/fb.h
+>> @@ -133,6 +133,7 @@ struct dentry;
+>> ?#define FB_ACCEL_NEOMAGIC_NM2230 96 ?/* NeoMagic NM2230 ? ? ? ? ? ? ?*/
+>> ?#define FB_ACCEL_NEOMAGIC_NM2360 97 ?/* NeoMagic NM2360 ? ? ? ? ? ? ?*/
+>> ?#define FB_ACCEL_NEOMAGIC_NM2380 98 ?/* NeoMagic NM2380 ? ? ? ? ? ? ?*/
+>> +#define FB_ACCEL_PXA3XX ? ? ? ? ? ? ? 99 ? ? /* PXA3xx ? ? ? ? ? ? ? ? ? ? ? */
+>>
+>> ?#define FB_ACCEL_SAVAGE4 ? ? ? ?0x80 /* S3 Savage4 ? ? ? ? ? ? ? ? ? */
+>> ?#define FB_ACCEL_SAVAGE3D ? ? ? 0x81 /* S3 Savage3D ? ? ? ? ? ? ? ? ?*/
+>> --
+>> 1.6.3.3
+>>
+>
+> Thanks
+> Guennadi
+> ---
+> Guennadi Liakhovetski, Ph.D.
+> Freelance Open-Source Software Developer
+> http://www.open-technology.de/
+>
