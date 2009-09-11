@@ -1,57 +1,99 @@
 From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Fri, 11 Sep 2009 11:36:45 +0200
-Subject: [PATCH RESEND 2.6.31] ixp4xx: arch_idle() documentation fixup
-Message-ID: <19114.6701.7384.620663@pilspetsen.it.uu.se>
+Date: Fri, 11 Sep 2009 11:38:35 +0200
+Subject: [PATCH RESEND 2.6.31] ixp4xx: timer and clocks cleanups
+Message-ID: <19114.6811.800442.888146@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 [2nd attempt to send this, we seem to be having major issues
 with outgoing email, my apologies if you see this twice]
 
-The body of the mach-ixp4xx arch_idle() is mysteriously
-disabled by an #if 0 .. #endif. Normally one would expect
-to find a call to cpu_do_idle() there, but that call is
-disabled, even though cpu_do_idle() is implemented for
-XScale cores (and ixp4xx is one).
+This patch does a few simple cleanups of the ixp4xx timer
+and clocksource/clockevent code in mach-ixp4xx/common.c:
 
-The explanation can be found in the ixp42x developer's manual
-which states that the XScale core clock and power management
-registers aren't implemented on ixp42x [3.5.2.2].
+- ixp4xx_clocksource_init() is static and always returns 0,
+  which is ignored by its only caller: make it return void
+- ixp4xx_clockevent_init(): ditto
+- ixp4xx_get_cycles() is only referenced locally: make it static
+- use the ixp4xx_timer_irq.dev_id field to pass &clockevent_ixp4xx
+  to ixp4xx_timer_interrupt() via its dev_id parameter, allowing
+  the code in ixp4xx_timer_interrupt() to be smaller and faster
 
-Also, the disabled code has suffered from bit rot:
-- it checks hlt_counter which is obsolete, as that variable
-  and all related code now is private to kernel/process.c
-- it passes too many parameters to cpu_do_idle()
-
-So this patch:
-- adds a comment before the #if 0 to explain why
-  cpu_do_idle() mustn't be called on ixp4xx
-- removes the obsolete test of hlt_counter and the
-  obsolete parameter to cpu_do_idle()
-
-This is purely a documentation fixup and changes no
-generated code. Even so, it has been tested on an
-ixp420 machine (ds101).
+Tested on an ixp420 machine (ds101).
 
 Signed-off-by: Mikael Pettersson <mikpe@it.uu.se>
 ---
- arch/arm/mach-ixp4xx/include/mach/system.h |    6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/mach-ixp4xx/common.c |   16 +++++++---------
+ 1 file changed, 7 insertions(+), 9 deletions(-)
 
-diff -rupN linux-2.6.31/arch/arm/mach-ixp4xx/include/mach/system.h linux-2.6.31.arm-ixp4xx-arch_idle-cleanup/arch/arm/mach-ixp4xx/include/mach/system.h
---- linux-2.6.31/arch/arm/mach-ixp4xx/include/mach/system.h	2009-06-10 12:00:43.000000000 +0200
-+++ linux-2.6.31.arm-ixp4xx-arch_idle-cleanup/arch/arm/mach-ixp4xx/include/mach/system.h	2009-09-10 23:38:04.000000000 +0200
-@@ -13,9 +13,11 @@
+diff -rupN linux-2.6.31/arch/arm/mach-ixp4xx/common.c linux-2.6.31.arm-ixp4xx-timer-cleanups/arch/arm/mach-ixp4xx/common.c
+--- linux-2.6.31/arch/arm/mach-ixp4xx/common.c	2009-06-10 12:00:43.000000000 +0200
++++ linux-2.6.31.arm-ixp4xx-timer-cleanups/arch/arm/mach-ixp4xx/common.c	2009-09-10 23:25:06.000000000 +0200
+@@ -41,8 +41,8 @@
+ #include <asm/mach/irq.h>
+ #include <asm/mach/time.h>
  
- static inline void arch_idle(void)
+-static int __init ixp4xx_clocksource_init(void);
+-static int __init ixp4xx_clockevent_init(void);
++static void __init ixp4xx_clocksource_init(void);
++static void __init ixp4xx_clockevent_init(void);
+ static struct clock_event_device clockevent_ixp4xx;
+ 
+ /*************************************************************************
+@@ -267,7 +267,7 @@ void __init ixp4xx_init_irq(void)
+ 
+ static irqreturn_t ixp4xx_timer_interrupt(int irq, void *dev_id)
  {
-+	/* ixp4xx does not implement the XScale PWRMODE register,
-+	 * so it must not call cpu_do_idle() here.
-+	 */
- #if 0
--	if (!hlt_counter)
--		cpu_do_idle(0);
-+	cpu_do_idle();
- #endif
+-	struct clock_event_device *evt = &clockevent_ixp4xx;
++	struct clock_event_device *evt = dev_id;
+ 
+ 	/* Clear Pending Interrupt by writing '1' to it */
+ 	*IXP4XX_OSST = IXP4XX_OSST_TIMER_1_PEND;
+@@ -281,6 +281,7 @@ static struct irqaction ixp4xx_timer_irq
+ 	.name		= "timer1",
+ 	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+ 	.handler	= ixp4xx_timer_interrupt,
++	.dev_id		= &clockevent_ixp4xx,
+ };
+ 
+ void __init ixp4xx_timer_init(void)
+@@ -401,7 +402,7 @@ void __init ixp4xx_sys_init(void)
+ /*
+  * clocksource
+  */
+-cycle_t ixp4xx_get_cycles(struct clocksource *cs)
++static cycle_t ixp4xx_get_cycles(struct clocksource *cs)
+ {
+ 	return *IXP4XX_OSTS;
+ }
+@@ -416,14 +417,12 @@ static struct clocksource clocksource_ix
+ };
+ 
+ unsigned long ixp4xx_timer_freq = FREQ;
+-static int __init ixp4xx_clocksource_init(void)
++static void __init ixp4xx_clocksource_init(void)
+ {
+ 	clocksource_ixp4xx.mult =
+ 		clocksource_hz2mult(ixp4xx_timer_freq,
+ 				    clocksource_ixp4xx.shift);
+ 	clocksource_register(&clocksource_ixp4xx);
+-
+-	return 0;
  }
  
+ /*
+@@ -479,7 +478,7 @@ static struct clock_event_device clockev
+ 	.set_next_event	= ixp4xx_set_next_event,
+ };
+ 
+-static int __init ixp4xx_clockevent_init(void)
++static void __init ixp4xx_clockevent_init(void)
+ {
+ 	clockevent_ixp4xx.mult = div_sc(FREQ, NSEC_PER_SEC,
+ 					clockevent_ixp4xx.shift);
+@@ -490,5 +489,4 @@ static int __init ixp4xx_clockevent_init
+ 	clockevent_ixp4xx.cpumask = cpumask_of(0);
+ 
+ 	clockevents_register_device(&clockevent_ixp4xx);
+-	return 0;
+ }
