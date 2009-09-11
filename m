@@ -1,25 +1,26 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Fri, 11 Sep 2009 19:56:58 +0200
-Subject: [GIT PULL] PXA changes for this merge window
-In-Reply-To: <alpine.DEB.2.00.0909120055460.26978@sl400-karmic>
-References: <alpine.DEB.2.00.0909120055460.26978@sl400-karmic>
-Message-ID: <20090911175658.GP9410@buzzloop.caiaq.de>
+From: p.osciak@samsung.com (Pawel Osciak)
+Date: Fri, 11 Sep 2009 20:04:45 +0200
+Subject: [PATCH 0/7] [ARM] s3c-fb: Various s3c-fb updates.
+Message-ID: <E4D3F24EA6C9E54F817833EAE0D912AC0771185D57@bssrvexch01.BS.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Hello,
+this patch series adds some new features to the driver, as well as fixes to the existing register handling (patch 4/7).
+It is rebased onto my previous patchset ([PATCH v2 0/3] v2: s3c-fb panning and vsync support).
 
-On Sat, Sep 12, 2009 at 12:58:35AM +0800, Eric Miao wrote:
-> Daniel Mack (7):
->       [ARM] pxa: add MFP_PULL_FLOAT
->       [ARM] pxa: add clock definition for graphics controller
->       [ARM] pxa: add device definition for graphics controller
->       [ARM] pxa: rename GCU IRQ for consistency
->       [ARM] pxafb: use resource_size() function
->       [ARM] pxa/colibri: add NAND config for Colibri PXA3xx boards
->       [ARM] pxafb: add accelerator ID for PXA3xx GCU
+The series contains:
 
-What do you think about the gcu driver itself? Is it a good idea to take
-that one, too?
+[PATCH 1/7] [ARM] s3c-fb: Added colorkey support
+[PATCH 2/7] [ARM] s3c-fb: Added window source selection.
+[PATCH 3/7] [ARM] s3c-fb: Added support for alpha blending.
+[PATCH 4/7] [ARM] s3c-fb: Corrected and added new VIDOSD register macros.
+[PATCH 5/7] [ARM] s3c-fb: Added missing window enabled state updates.
+[PATCH 6/7] [ARM] s3c-fb: Added debugfs interface.
+[PATCH 7/7] [ARM] s3c-fb: Added color key blending.
 
-Daniel
+Best regards
+--
+Pawel Osciak
+Linux Platform Group
+Samsung Poland R&D Center
