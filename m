@@ -1,60 +1,37 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 12 Sep 2009 21:31:15 +0200
-Subject: [PATCH 2/2] PalmTreo: add Palm Centro 685 support
-In-Reply-To: <1252670222-25233-3-git-send-email-sleep_walker@suse.cz>
-References: <1252670222-25233-1-git-send-email-sleep_walker@suse.cz>
-	<1252670222-25233-2-git-send-email-sleep_walker@suse.cz>
-	<1252670222-25233-3-git-send-email-sleep_walker@suse.cz>
-Message-ID: <200909122131.15359.marek.vasut@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 12 Sep 2009 21:54:54 +0200
+Subject: calls to notify_die missing -> ftrace_dump_on_oops non-functional
+Message-ID: <20090912195454.GA32429@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne P? 11. z??? 2009 13:57:02 Tom?? ?ech napsal(a):
-> From: Tom?? ?ech <sleep walker@suse.cz>
->
->
-> Signed-off-by: Tom?? ?ech <sleep_walker@suse.cz>
-> ---
->  arch/arm/mach-pxa/Kconfig                 |   13 ++-
->  arch/arm/mach-pxa/include/mach/palmtreo.h |    7 ++
->  arch/arm/mach-pxa/palmtreo.c              |  161
-> +++++++++++++++++++++++++++++ arch/arm/mm/mmu.c                         |  
->  2 +-
->  4 files changed, 181 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-> index ce6519c..57eceb8 100644
-> --- a/arch/arm/mach-pxa/Kconfig
-> +++ b/arch/arm/mach-pxa/Kconfig
-> @@ -425,6 +425,17 @@ config PALM_TREO
->  	bool
->  	depends on ARCH_PXA_PALM
->
-> +config MACH_CENTRO
-> +	bool "Palm Centro 685 (GSM)"
-> +	default y
-> +	depends on ARCH_PXA_PALM
-> +	select PXA27x
-> +	select IWMMXT
-> +	select PALM_TREO
-> +	help
-> +	  Say Y here if you intend to run this kernel on Palm Centro 685 (GSM)
-> +	  smartphone.
-> +
->  config MACH_TREO680
->  	bool "Palm Treo 680"
->  	default y
-> @@ -433,7 +444,7 @@ config MACH_TREO680
->  	select IWMMXT
->  	select PALM_TREO
->  	help
-> -	  Say Y here if you intend to run this kernel on Palm Treo 680
-> +	  Say Y here if you intend to run this kernel on Palm Treo 680 (GSM)
+Hello,
 
-This change certainly should not be in this patch, maybe in previous one ?
+I noticed yesterday that ARM doesn't call notify_die (added in
 
->  	  smartphone.
->
->  config MACH_PALMLD
-...
-Cheers!
+	1eeb66a (move die notifier handling to common code)
+
+).
+
+As ftrace_dump_on_oops depends on this function being called I don't get
+an ftrace dump in my oopses.
+
+Locally I added
+
+	notify_die(DIE_OOPS, str, regs, err, current->thread.trap_no, SIGSEGV);
+
+at the end of __die() in arch/arm/kernel/traps.c but I think this is not
+completely correct because---assuming I understood it
+correctly---notify_die returning NOTIFY_STOP should stop the process
+dying.  Christoph, is this correct?
+
+Dying on ARM looks quite different to dying on x86.  Russell, what's
+your position here?  Would you accept a patch that makes them more
+similar?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
