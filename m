@@ -1,45 +1,79 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 12 Sep 2009 15:53:03 +0100
-Subject: [PATCH v2 RESEND 1/2] ARM: Introduce ARM_L1_CACHE_SHIFT to
-	define cache line size
-In-Reply-To: <cc557aab0909120738t725fa53cm9277010e656c8ea4@mail.gmail.com>
-References: <1252771155-5828-1-git-send-email-kirill@shutemov.name>
-	<a9bd121a726831bc30f4ec04235eda667e602615.1252770642.git.kirill@shutemov.name>
-	<4AABA3F7.2050301@ru.mvista.com>
-	<cc557aab0909120712j354238c3oe3396591287b5562@mail.gmail.com>
-	<4AABAE4D.6050909@ru.mvista.com>
-	<cc557aab0909120738t725fa53cm9277010e656c8ea4@mail.gmail.com>
-Message-ID: <20090912145303.GA15899@n2100.arm.linux.org.uk>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sat, 12 Sep 2009 21:29:06 +0200
+Subject: [PATCH 1/2] PalmTreo: generalisation of Treo680 code
+In-Reply-To: <1252670222-25233-2-git-send-email-sleep_walker@suse.cz>
+References: <1252670222-25233-1-git-send-email-sleep_walker@suse.cz>
+	<1252670222-25233-2-git-send-email-sleep_walker@suse.cz>
+Message-ID: <200909122129.06685.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 12, 2009 at 05:38:31PM +0300, Kirill A. Shutemov wrote:
-> On Sat, Sep 12, 2009 at 5:21 PM, Sergei Shtylyov
-> <sshtylyov@ru.mvista.com> wrote:
-> > Hello.
-> >
-> > Kirill A. Shutemov wrote:
-> >> You can write anything in your .config (like 2+3), so I think parens is
-> >> needed.
-> >>
-> >
-> > ?You can -- but that won't be an integer option.
-> 
-> But kernel will be still compilable, but broken.
-> 
-> I think parens for defines from .config is a good practice.
+Dne P? 11. z??? 2009 13:57:01 Tom?? ?ech napsal(a):
+> From: Tom?? ?ech <sleep walker@suse.cz>
+>
+> Signed-off-by: Tom?? ?ech <sleep_walker@suse.cz>
+> ---
+>  arch/arm/mach-pxa/Kconfig                   |    5 +
+>  arch/arm/mach-pxa/Makefile                  |    2 +-
+>  arch/arm/mach-pxa/include/mach/palmtreo.h   |   60 ++++++++
+>  arch/arm/mach-pxa/include/mach/treo680.h    |   49 -------
+>  arch/arm/mach-pxa/{treo680.c => palmtreo.c} |  202
+> ++++++++++++++++----------- 5 files changed, 183 insertions(+), 135
+> deletions(-)
+>  create mode 100644 arch/arm/mach-pxa/include/mach/palmtreo.h
+>  delete mode 100644 arch/arm/mach-pxa/include/mach/treo680.h
+>  rename arch/arm/mach-pxa/{treo680.c => palmtreo.c} (69%)
+>
+...
+> -static struct gpio_led_platform_data gpio_led_info = {
+> -	.leds		= gpio_leds,
+> -	.num_leds	= ARRAY_SIZE(gpio_leds),
+> +static struct gpio_led_platform_data treo680_gpio_led_info = {
+> +	.leds		= treo680_gpio_leds,
+> +	.num_leds	= ARRAY_SIZE(treo680_gpio_leds),
+>  };
 
-However, defines are not taken from .config.  The .config file is processed
-by the kernel configurator, which writes out the autoconf.h header.  It does
-this by re-evaluating the contents of .config against all the Kconfig files.
-It does not merely copy .config to autoconf.h.
+Be careful so you dont run into symbol redefinition here (gpio_led_info) in case 
+the kernel supports more than this one device ...
+>
+>  static struct platform_device treo680_leds = {
+>  	.name   = "leds-gpio",
+>  	.id     = -1,
+>  	.dev    = {
+> -		.platform_data  = &gpio_led_info,
+> +		.platform_data  = &treo680_gpio_led_info,
+>  	}
+>  };
+...
+> +#endif /* CONFIG_MACH_TREO680 */
+> +
+>  /* setup udc GPIOs initial state */
+> -static void __init treo680_udc_init(void)
+> +static void __init treo_udc_init(void)
+>  {
+> -	if (!gpio_request(GPIO_NR_TREO680_USB_PULLUP, "UDC Vbus")) {
+> -		gpio_direction_output(GPIO_NR_TREO680_USB_PULLUP, 1);
+> -		gpio_free(GPIO_NR_TREO680_USB_PULLUP);
+> +	if (!gpio_request(GPIO_NR_TREO_USB_PULLUP, "UDC Vbus")) {
+> +		gpio_direction_output(GPIO_NR_TREO_USB_PULLUP, 1);
+> +		gpio_free(GPIO_NR_TREO_USB_PULLUP);
+>  	}
+>  }
+>
 
-In fact, if you try to write '2+3' into your .config, Kconfig will reject
-it.  Eg:
+Is this really needed or is it just a copy-paste from other Palm device?
 
-.config:210:warning: symbol value '127+1' invalid for OMAP_32K_TIMER_HZ
+> -static void __init treo680_lcd_power_init(void)
+> +static void __init treo_lcd_power_init(void)
+>  {
+>  	int ret;
+>
+> -	ret = gpio_request(GPIO_NR_TREO680_LCD_POWER, "LCD POWER");
+> +	ret = gpio_request(GPIO_NR_TREO_LCD_POWER, "LCD POWER");
+>  	if (ret) {
+>  		pr_err("Treo680: LCD power GPIO request failed!\n");
+>  		return;
+>  	}
+...
 
-and then it asks you to provide a valid value instead.
-
-So yes, as pointed out, the parens are not required since Kconfig will
-ensure that the symbol is a simple integer.
+Cheers!
