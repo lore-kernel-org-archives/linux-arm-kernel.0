@@ -1,37 +1,50 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 12 Sep 2009 21:54:54 +0200
-Subject: calls to notify_die missing -> ftrace_dump_on_oops non-functional
-Message-ID: <20090912195454.GA32429@pengutronix.de>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Sat, 12 Sep 2009 23:48:30 +0300
+Subject: [PATCH v3 1/2] ARM: Introduce ARM_L1_CACHE_SHIFT to define cache line
+	size
+Message-ID: <188e5f14411c04ec999ef25bfe3616f77f1387b0.1252788311.git.kirill@shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Currently kernel believes that all ARM CPUs have L1_CACHE_SHIFT == 5.
+It's not true at least for CPUs based on Cortex-A8.
 
-I noticed yesterday that ARM doesn't call notify_die (added in
+List of CPUs with cache line size != 32 should be expanded later.
 
-	1eeb66a (move die notifier handling to common code)
+V2:
+  - remove unnecessary parens
 
-).
+Signed-off-by: Kirill A. Shutemov <kirill@shutemov.name>
+---
+ arch/arm/include/asm/cache.h |    2 +-
+ arch/arm/mm/Kconfig          |    5 +++++
+ 2 files changed, 6 insertions(+), 1 deletions(-)
 
-As ftrace_dump_on_oops depends on this function being called I don't get
-an ftrace dump in my oopses.
-
-Locally I added
-
-	notify_die(DIE_OOPS, str, regs, err, current->thread.trap_no, SIGSEGV);
-
-at the end of __die() in arch/arm/kernel/traps.c but I think this is not
-completely correct because---assuming I understood it
-correctly---notify_die returning NOTIFY_STOP should stop the process
-dying.  Christoph, is this correct?
-
-Dying on ARM looks quite different to dying on x86.  Russell, what's
-your position here?  Would you accept a patch that makes them more
-similar?
-
-Best regards
-Uwe
-
+diff --git a/arch/arm/include/asm/cache.h b/arch/arm/include/asm/cache.h
+index feaa75f..66c160b 100644
+--- a/arch/arm/include/asm/cache.h
++++ b/arch/arm/include/asm/cache.h
+@@ -4,7 +4,7 @@
+ #ifndef __ASMARM_CACHE_H
+ #define __ASMARM_CACHE_H
+ 
+-#define L1_CACHE_SHIFT		5
++#define L1_CACHE_SHIFT		CONFIG_ARM_L1_CACHE_SHIFT
+ #define L1_CACHE_BYTES		(1 << L1_CACHE_SHIFT)
+ 
+ /*
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 83c025e..3c37d4c 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -771,3 +771,8 @@ config CACHE_XSC3L2
+ 	select OUTER_CACHE
+ 	help
+ 	  This option enables the L2 cache on XScale3.
++
++config ARM_L1_CACHE_SHIFT
++	int
++	default 6 if ARCH_OMAP3
++	default 5
 -- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+1.6.4.2
