@@ -1,41 +1,29 @@
-From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Sat, 12 Sep 2009 17:36:55 +0400
-Subject: [PATCH v2 RESEND 1/2] ARM: Introduce ARM_L1_CACHE_SHIFT to define
-	cache line size
-In-Reply-To: <a9bd121a726831bc30f4ec04235eda667e602615.1252770642.git.kirill@shutemov.name>
-References: <1252771155-5828-1-git-send-email-kirill@shutemov.name>
-	<a9bd121a726831bc30f4ec04235eda667e602615.1252770642.git.kirill@shutemov.name>
-Message-ID: <4AABA3F7.2050301@ru.mvista.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 12 Sep 2009 15:48:13 +0200
+Subject: [PATCH v2 RESEND 2/2] ARM: copy_page.S: take into account the
+	size of the cache line
+In-Reply-To: <306c1f489fbdca8d52676e8a40ded02607f76096.1252770642.git.kirill@shutemov.name>
+References: <a9bd121a726831bc30f4ec04235eda667e602615.1252770642.git.kirill@shutemov.name>
+	<306c1f489fbdca8d52676e8a40ded02607f76096.1252770642.git.kirill@shutemov.name>
+Message-ID: <20090912134813.GA32514@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hello,
 
-Kirill A. Shutemov wrote:
+Just two minor nitpicks:
 
-> Currently kernel believes that all ARM CPUs have L1_CACHE_SHIFT == 5.
-> It's not true at least for CPUs based on Cortex-A8.
->
-> List of CPUs with cache line size != 32 should be expanded later.
->
-> Signed-off-by: Kirill A. Shutemov <kirill@shutemov.name>
-> ---
->  arch/arm/include/asm/cache.h |    2 +-
->  arch/arm/mm/Kconfig          |    5 +++++
->  2 files changed, 6 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/include/asm/cache.h b/arch/arm/include/asm/cache.h
-> index feaa75f..2ee7743 100644
-> --- a/arch/arm/include/asm/cache.h
-> +++ b/arch/arm/include/asm/cache.h
-> @@ -4,7 +4,7 @@
->  #ifndef __ASMARM_CACHE_H
->  #define __ASMARM_CACHE_H
->  
-> -#define L1_CACHE_SHIFT		5
-> +#define L1_CACHE_SHIFT		(CONFIG_ARM_L1_CACHE_SHIFT)
->   
+> V2:
+>   - include <asm/cahce.h>
+s/cahce/cache/
+>   - remove unnecessary parens and fix style
+s/parens/parenthesis/
 
-   Parens not needed.
+Note I didn't look at the patch.
 
-WBR, Sergei
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
