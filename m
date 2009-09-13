@@ -1,61 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun, 13 Sep 2009 22:24:13 +0100
-Subject: LDREX/STREX and pre-emption on *non*-SMP hardware
-In-Reply-To: <20090913194938.GA30195@shareable.org>
-References: <20090913194938.GA30195@shareable.org>
-Message-ID: <1252877053.16083.5.camel@pc1117.cambridge.arm.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sun, 13 Sep 2009 23:28:47 +0200
+Subject: [PATCH] arm: remove unused code in delay.S
+In-Reply-To: <1252875960-21512-1-git-send-email-felipe.contreras@gmail.com>
+References: <1252875960-21512-1-git-send-email-felipe.contreras@gmail.com>
+Message-ID: <200909132328.47079.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2009-09-13 at 20:49 +0100, Jamie Lokier wrote:
-> Catalin Marinas wrote:
-> > Yes, but the exclusives are not affected (see below).
-> > 
-> > > Meanwhile, if we could assume that interrupt handlers are always using
-> > > the LDREX/CLREX in pairs, then the same thing could be assumed for any
-> > > other contexts in the system, kernel/user threads. Therefore, I do not
-> > > think that we can make that assumption.
-> > 
-> > In user space you can get (T1, T2 are threads):
-> > 
-> > T1			T2
-> > LDREX
-> > 			LDREX
-> > STREX (succeeds)
-> > 			STREX (fails)
-> > 
-> > So the STREX in T1 shouldn't really succeed because there was a context
-> > switch and LDREX in T2 (this particular case may not be a problem but if
-> > you create a situation with 3 threads that is incorrect).
+Dne Ne 13. z??? 2009 23:05:59 Felipe Contreras napsal(a):
+> Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
+> ---
+>  arch/arm/lib/delay.S |   16 ----------------
+>  1 files changed, 0 insertions(+), 16 deletions(-)
 > 
-> Hey, wait a moment.  It's true that with >=2 CPUs, another CPU could
-> write the location used by T1, so T1's STREX should not succeed.
+> diff --git a/arch/arm/lib/delay.S b/arch/arm/lib/delay.S
+> index 8d6a876..b741eb4 100644
+> --- a/arch/arm/lib/delay.S
+> +++ b/arch/arm/lib/delay.S
+> @@ -42,22 +42,6 @@ ENTRY(__const_udelay)				@ 0 <= r0 <= 0x7fffff06
+>  @ Delay routine
+>  ENTRY(__delay)
+>  		subs	r0, r0, #1
+> -#if 0
+> -		movls	pc, lr
+> -		subs	r0, r0, #1
+> -		movls	pc, lr
+> -		subs	r0, r0, #1
+> -		movls	pc, lr
+> -		subs	r0, r0, #1
+> -		movls	pc, lr
+> -		subs	r0, r0, #1
+> -		movls	pc, lr
+> -		subs	r0, r0, #1
+> -		movls	pc, lr
+> -		subs	r0, r0, #1
+> -		movls	pc, lr
+> -		subs	r0, r0, #1
+> -#endif
+>  		bhi	__delay
+>  		mov	pc, lr
+>  ENDPROC(__udelay)
 > 
-> But what about a single CPU system?
-> 
-> Even with 3 or more threads, I do not see how any sequence could
-> result in the STREX succeeding wrongly, because it can only be wrong
-> if there's an intermediate write to the same location, and we've
-> established that all writes to that location (including atomic_set)
-> use STREX.  And in principle, even if atomic_set is changed in future,
-> all paths leading to it must clear the monitor flag somehow.
-> 
-> In other words, it looks like CLREX is not required in __switch_to()
-> on single CPU systems.
+Hi
 
-With two or more threads, you can have something like below, even on UP
-systems:
-
-T1			T2
-LDREX
-			LDREX
- 			STREX (succeeds)
-			LDREX
-STREX (succeeds)
-			STREX (fails)
-
-Thread T2 perform two successive atomic modifications but the context
-switch happens during the second one, so STREX in T1 should not succeed.
-
--- 
-Catalin
+why was this code there in the first place ?
