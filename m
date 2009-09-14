@@ -1,7 +1,7 @@
 From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Mon, 14 Sep 2009 18:50:15 +0300
+Date: Mon, 14 Sep 2009 19:06:55 +0300
 Subject: [PATCH] arm: remove unused code in delay.S
-In-Reply-To: <20090914152129.GI21580@n2100.arm.linux.org.uk>
+In-Reply-To: <20090914153616.GD3164@pengutronix.de>
 References: <1252875960-21512-1-git-send-email-felipe.contreras@gmail.com>
 	<20090913230008.GC30169@n2100.arm.linux.org.uk>
 	<20090914002100.GD30621@shareable.org>
@@ -11,13 +11,12 @@ References: <1252875960-21512-1-git-send-email-felipe.contreras@gmail.com>
 	<94a0d4530909140738t7e4d646r134cfd884da21348@mail.gmail.com>
 	<20090914144028.GG21580@n2100.arm.linux.org.uk>
 	<94a0d4530909140814w36f7f5f0td2c25db07fbd4e57@mail.gmail.com>
-	<20090914152129.GI21580@n2100.arm.linux.org.uk>
-Message-ID: <94a0d4530909140850h3ec1bde2ifc05ff7d340f96fe@mail.gmail.com>
+	<20090914153616.GD3164@pengutronix.de>
+Message-ID: <94a0d4530909140906v72865664w3976766e57bf2aa3@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2009 at 6:21 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+On Mon, Sep 14, 2009 at 6:36 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
 > On Mon, Sep 14, 2009 at 06:14:08PM +0300, Felipe Contreras wrote:
 >> On Mon, Sep 14, 2009 at 5:40 PM, Russell King - ARM Linux
 >> <linux@arm.linux.org.uk> wrote:
@@ -69,33 +68,33 @@ On Mon, Sep 14, 2009 at 6:21 PM, Russell King - ARM Linux
 >> It makes the code less understandable. I'm not sure about linux's
 >> practices, but an #if 0 generally means somebody is being lazy.
 >
-> I would agree with you if it was a complicated bit of code, but it
-> isn't. ?It is a simple count to zero (or overflow) and terminate
-> loop. ?And it's certainly not about me being lazy.
+> And what about a comment like "Try including the following code if ..."? I
+> think I saw this somewhere else in the kernel and I'd be fine with that. So,
+> while I generally agree that "#if 0" looks suspicious, there are a few cases
+> for it, though they need documentation IMHO.
 
-Maybe it's not complicated to you, but not everyone is so literate
-about ARM assembly code (e.g. me). When I first looked at the code I
-didn't even realize there was an #if 0 there, which yes, I grant is a
-problem of my editor, but the issue wouldn't have happened if the code
-wasn't there in the first place.
+I agree. I don't think the current form is acceptable, at the very
+least there should be a comment: enable the following code if ...
 
-And I'm not saying your are being lazy, if anything it's probably the
-people using this code. They should figure a way to avoid patching the
-code. However, these users are hypothetical at this point.
+Then the next question arises: why not make it a configuration option?
+To which the answer seems to be: because very very few people would
+care about this.
 
-> Unless there is a strong argument for removing it, the code stays as
-> is.
->
-> So far, the argument is basically "it's a #if 0, we must get rid of
-> it" which is a religous argument, not a technical one. ?The fact is
-> that (as I said above) keeping it there provides the code for when
-> people want to enable it. ?That's a technical reason for keeping it.
->
-> Please can we now move to something more productive instead of this
-> religous argument?
+Which would then be followed by: if we don't care enough about this
+code in order to have a configuration option to actually use it; why
+do we have it all?
 
-I don't think a good argument has been stated, I'll try to do that on
-Wolfram's reply.
+The minority that would make use of this code is theoretical, and
+these users by definition know they need this code, therefore, if the
+code is not there, they'll notice, then, if the change is acceptable
+by them, they will just revert the patch and not complain, if it's
+unacceptable, then they will complain and the code can be
+re-introduced. The issue will sort itself out.
+
+If it turns out nobody complains about removing this code you would
+have made the linux kernel 16 lines cleaner for free.
+
+Cheers.
 
 -- 
 Felipe Contreras
