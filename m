@@ -1,83 +1,169 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Sep 2009 16:21:29 +0100
-Subject: [PATCH] arm: remove unused code in delay.S
-In-Reply-To: <94a0d4530909140814w36f7f5f0td2c25db07fbd4e57@mail.gmail.com>
-References: <1252875960-21512-1-git-send-email-felipe.contreras@gmail.com>
-	<200909132328.47079.marek.vasut@gmail.com>
-	<20090913230008.GC30169@n2100.arm.linux.org.uk>
-	<20090914002100.GD30621@shareable.org>
-	<20090914081001.GB14519@n2100.arm.linux.org.uk>
-	<94a0d4530909140558nd8d2c47lc9954563c80a574f@mail.gmail.com>
-	<20090914140059.GC21580@n2100.arm.linux.org.uk>
-	<94a0d4530909140738t7e4d646r134cfd884da21348@mail.gmail.com>
-	<20090914144028.GG21580@n2100.arm.linux.org.uk>
-	<94a0d4530909140814w36f7f5f0td2c25db07fbd4e57@mail.gmail.com>
-Message-ID: <20090914152129.GI21580@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 14 Sep 2009 16:35:12 +0100
+Subject: LDREX/STREX and pre-emption on SMP hardware
+In-Reply-To: <1252930881.16853.99.camel@pc1117.cambridge.arm.com>
+References: <4A8EB836.3000406@plxtech.com>
+	<1250869355.10642.10.camel@pc1117.cambridge.arm.com>
+	<20090821155011.GB8583@shareable.org>
+	<1250870319.10642.23.camel@pc1117.cambridge.arm.com>
+	<1250890146.29685.18.camel@david-laptop>
+	<1251128692.28977.17.camel@pc1117.cambridge.arm.com>
+	<1251134043.31975.23.camel@david-laptop>
+	<1251135709.28977.40.camel@pc1117.cambridge.arm.com>
+	<20090914014353.GA4762@shareable.org>
+	<20090914100056.GC16644@n2100.arm.linux.org.uk>
+	<1252922773.16853.62.camel@pc1117.cambridge.arm.com>
+	<1252928832.16853.96.camel@pc1117.cambridge.arm.com>
+	<1252930881.16853.99.camel@pc1117.cambridge.arm.com>
+Message-ID: <1252942512.16853.128.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2009 at 06:14:08PM +0300, Felipe Contreras wrote:
-> On Mon, Sep 14, 2009 at 5:40 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Mon, Sep 14, 2009 at 05:38:32PM +0300, Felipe Contreras wrote:
-> >> On Mon, Sep 14, 2009 at 5:00 PM, Russell King - ARM Linux
-> >> <linux@arm.linux.org.uk> wrote:
-> >> > On Mon, Sep 14, 2009 at 03:58:24PM +0300, Felipe Contreras wrote:
-> >> >> On Mon, Sep 14, 2009 at 11:10 AM, Russell King - ARM Linux
-> >> >> <linux@arm.linux.org.uk> wrote:
-> >> >> > On Mon, Sep 14, 2009 at 01:21:00AM +0100, Jamie Lokier wrote:
-> >> >> >> Russell King - ARM Linux wrote:
-> >> >> >> > On Sun, Sep 13, 2009 at 11:28:47PM +0200, Marek Vasut wrote:
-> >> >> >> > > > ? ? ? ? ? ? ? ? bhi ? ? __delay
-> >> >> >> > > > ? ? ? ? ? ? ? ? mov ? ? pc, lr
-> >> >> >> > > > ?ENDPROC(__udelay)
-> >> >> >> > > >
-> >> >> >> > > Hi
-> >> >> >> > >
-> >> >> >> > > why was this code there in the first place ?
-> >> >> >> >
-> >> >> >> > To make the delay loop more stable and predictable on older CPUs.
-> >> >> >>
-> >> >> >> So why has it been commented out, if it's needed for that?
-> >> >> >
-> >> >> > We moved on and it penalises later CPUs, leading to udelay providing
-> >> >> > shorter delays than requested.
-> >> >> >
-> >> >> > So the choice was either stable and predictable on older CPUs but
-> >> >> > buggy on newer CPUs, or correct on all CPUs but gives unnecessarily
-> >> >> > longer delays on older CPUs.
-> >> >>
-> >> >> Why not add an #ifdef CPU_V4 or whatever?
-> >> >
-> >> > Because then you get it whenever you configure for V4 as the lowest
-> >> > denominator CPU, which leads to the buggy behaviour on better CPUs.
-> >> > It's far better to leave it as is and just accept that the old CPUs
-> >> > will have longer than necessary delays. ?If people really really
-> >> > care (and there's likely to only be a small minority of them now)
-> >> > changing the '0' to a '1' is a very simple change for them to carry
-> >> > in their local tree. ?Unlike getting the right unrolling etc.
-> >>
-> >> Well, they can also 'git revert' this patch. If somebody really cares
-> >> I think they should shout now and provide a better patch, otherwise
-> >> this one should be merged.
-> >
-> > On the other hand, having the code there as it currently stands is not
-> > harmful in any way, so leaving it there is just as easy.
-> 
-> It makes the code less understandable. I'm not sure about linux's
-> practices, but an #if 0 generally means somebody is being lazy.
+On Mon, 2009-09-14 at 13:21 +0100, Catalin Marinas wrote:
+> And here's an untested patch to clear the exclusive monitor on the
+> exception return path. If you are OK with the idea, I'll do some testing
+> before pushing it for upstream:
 
-I would agree with you if it was a complicated bit of code, but it
-isn't.  It is a simple count to zero (or overflow) and terminate
-loop.  And it's certainly not about me being lazy.
+That's an update that compiles. It takes care of the fact that a dummy
+STREX may actually succeed even if a previous LDREX didn't use the same
+address (it's not as nice as having a CLREX but that's the situation
+with non-ARMv6K hardware):
 
-Unless there is a strong argument for removing it, the code stays as
-is.
 
-So far, the argument is basically "it's a #if 0, we must get rid of
-it" which is a religous argument, not a technical one.  The fact is
-that (as I said above) keeping it there provides the code for when
-people want to enable it.  That's a technical reason for keeping it.
+Clear the exclusive monitor when returning from an exception
 
-Please can we now move to something more productive instead of this
-religous argument?
+From: Catalin Marinas <catalin.marinas@arm.com>
+
+The patch adds a CLREX or dummy STREX to the exception return path. This
+is needed because several atomic/locking operations use a pair of
+LDREX/STREXEQ and the EQ condition may not always be satisfied. This
+would leave the exclusive monitor status set and may cause problems with
+atomic/locking operations in the interrupted code.
+
+With this patch, the atomic_set() operation can be a simple STR
+instruction (on SMP systems, the global exclusive monitor is cleared by
+STR anyway). Clearing the exclusive monitor during context switch is no
+longer needed as this is handled by the exception return path anyway.
+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Reported-by: Jamie Lokier <jamie@shareable.org>
+---
+ arch/arm/include/asm/atomic.h  |   21 ++-------------------
+ arch/arm/kernel/entry-armv.S   |    7 -------
+ arch/arm/kernel/entry-header.S |   14 ++++++++++++++
+ 3 files changed, 16 insertions(+), 26 deletions(-)
+
+diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
+index 9ed2377..74045f4 100644
+--- a/arch/arm/include/asm/atomic.h
++++ b/arch/arm/include/asm/atomic.h
+@@ -20,30 +20,15 @@
+ #ifdef __KERNEL__
+ 
+ #define atomic_read(v)	((v)->counter)
++#define atomic_set(v,i)	(((v)->counter) = (i))
+ 
+ #if __LINUX_ARM_ARCH__ >= 6
+ 
+ /*
+  * ARMv6 UP and SMP safe atomic ops.  We use load exclusive and
+  * store exclusive to ensure that these are atomic.  We may loop
+- * to ensure that the update happens.  Writing to 'v->counter'
+- * without using the following operations WILL break the atomic
+- * nature of these ops.
++ * to ensure that the update happens.
+  */
+-static inline void atomic_set(atomic_t *v, int i)
+-{
+-	unsigned long tmp;
+-
+-	__asm__ __volatile__("@ atomic_set\n"
+-"1:	ldrex	%0, [%1]\n"
+-"	strex	%0, %2, [%1]\n"
+-"	teq	%0, #0\n"
+-"	bne	1b"
+-	: "=&r" (tmp)
+-	: "r" (&v->counter), "r" (i)
+-	: "cc");
+-}
+-
+ static inline void atomic_add(int i, atomic_t *v)
+ {
+ 	unsigned long tmp;
+@@ -163,8 +148,6 @@ static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
+ #error SMP not supported on pre-ARMv6 CPUs
+ #endif
+ 
+-#define atomic_set(v,i)	(((v)->counter) = (i))
+-
+ static inline int atomic_add_return(int i, atomic_t *v)
+ {
+ 	unsigned long flags;
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 468425f..a7196d2 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -736,13 +736,6 @@ ENTRY(__switch_to)
+ #ifdef CONFIG_MMU
+ 	ldr	r6, [r2, #TI_CPU_DOMAIN]
+ #endif
+-#if __LINUX_ARM_ARCH__ >= 6
+-#ifdef CONFIG_CPU_32v6K
+-	clrex
+-#else
+-	strex	r5, r4, [ip]			@ Clear exclusive monitor
+-#endif
+-#endif
+ #if defined(CONFIG_HAS_TLS_REG)
+ 	mcr	p15, 0, r3, c13, c0, 3		@ set TLS register
+ #elif !defined(CONFIG_TLS_REG_EMUL)
+diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+index a4eaf4f..e17e3c3 100644
+--- a/arch/arm/kernel/entry-header.S
++++ b/arch/arm/kernel/entry-header.S
+@@ -76,13 +76,25 @@
+ #ifndef CONFIG_THUMB2_KERNEL
+ 	.macro	svc_exit, rpsr
+ 	msr	spsr_cxsf, \rpsr
++#if defined(CONFIG_CPU_32v6K)
++	clrex					@ clear the exclusive monitor
+ 	ldmia	sp, {r0 - pc}^			@ load r0 - pc, cpsr
++#elif defined (CONFIG_CPU_V6)
++	ldr	r0, [sp]
++	strex	r1, r2, [sp]			@ clear the exclusive monitor
++	ldmib	sp, {r1 - pc}^			@ load r1 - pc, cpsr
++#endif
+ 	.endm
+ 
+ 	.macro	restore_user_regs, fast = 0, offset = 0
+ 	ldr	r1, [sp, #\offset + S_PSR]	@ get calling cpsr
+ 	ldr	lr, [sp, #\offset + S_PC]!	@ get pc
+ 	msr	spsr_cxsf, r1			@ save in spsr_svc
++#if defined(CONFIG_CPU_32v6K)
++	clrex					@ clear the exclusive monitor
++#elif defined (CONFIG_CPU_V6)
++	strex	r1, r2, [sp]			@ clear the exclusive monitor
++#endif
+ 	.if	\fast
+ 	ldmdb	sp, {r1 - lr}^			@ get calling r1 - lr
+ 	.else
+@@ -98,6 +110,7 @@
+ 	.endm
+ #else	/* CONFIG_THUMB2_KERNEL */
+ 	.macro	svc_exit, rpsr
++	clrex					@ clear the exclusive monitor
+ 	ldr	r0, [sp, #S_SP]			@ top of the stack
+ 	ldr	r1, [sp, #S_PC]			@ return address
+ 	tst	r0, #4				@ orig stack 8-byte aligned?
+@@ -110,6 +123,7 @@
+ 	.endm
+ 
+ 	.macro	restore_user_regs, fast = 0, offset = 0
++	clrex					@ clear the exclusive monitor
+ 	mov	r2, sp
+ 	load_user_sp_lr r2, r3, \offset + S_SP	@ calling sp, lr
+ 	ldr	r1, [sp, #\offset + S_PSR]	@ get calling cpsr
+
+
+-- 
+Catalin
