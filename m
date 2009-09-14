@@ -1,22 +1,48 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Mon, 14 Sep 2009 15:33:27 +0200
-Subject: [PATCH 2/8] s3c6410: sdhci: Adding additional data in sdhci
-	platform data structure.
-In-Reply-To: <06AE2DFB461F4BBD8937AC1512295974@sisodomain.com>
-References: <4AABC6A7.6050707@gmail.com>
-	<06AE2DFB461F4BBD8937AC1512295974@sisodomain.com>
-Message-ID: <4AAE4627.3090306@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Sep 2009 15:00:59 +0100
+Subject: [PATCH] arm: remove unused code in delay.S
+In-Reply-To: <94a0d4530909140558nd8d2c47lc9954563c80a574f@mail.gmail.com>
+References: <1252875960-21512-1-git-send-email-felipe.contreras@gmail.com>
+	<200909132328.47079.marek.vasut@gmail.com>
+	<20090913230008.GC30169@n2100.arm.linux.org.uk>
+	<20090914002100.GD30621@shareable.org>
+	<20090914081001.GB14519@n2100.arm.linux.org.uk>
+	<94a0d4530909140558nd8d2c47lc9954563c80a574f@mail.gmail.com>
+Message-ID: <20090914140059.GC21580@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas P. Abraham schreef:
-> Hi Maurus,
->
-> The patch "[PATCH 6/8] s3c6410: sdhci: Modify platform data for 
-> sdhci-1" was submitted to populate the hsmmc1 platform data.
-Oh, I am sorry. I based myself upon 
-http://git.kernel.org/?p=linux/kernel/git/kki_ap/linux-2.6-samsung.git;a=shortlog;h=s3c6410-all
-and probably forget to look at the actual patches you posted :)
+On Mon, Sep 14, 2009 at 03:58:24PM +0300, Felipe Contreras wrote:
+> On Mon, Sep 14, 2009 at 11:10 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Mon, Sep 14, 2009 at 01:21:00AM +0100, Jamie Lokier wrote:
+> >> Russell King - ARM Linux wrote:
+> >> > On Sun, Sep 13, 2009 at 11:28:47PM +0200, Marek Vasut wrote:
+> >> > > > ? ? ? ? ? ? ? ? bhi ? ? __delay
+> >> > > > ? ? ? ? ? ? ? ? mov ? ? pc, lr
+> >> > > > ?ENDPROC(__udelay)
+> >> > > >
+> >> > > Hi
+> >> > >
+> >> > > why was this code there in the first place ?
+> >> >
+> >> > To make the delay loop more stable and predictable on older CPUs.
+> >>
+> >> So why has it been commented out, if it's needed for that?
+> >
+> > We moved on and it penalises later CPUs, leading to udelay providing
+> > shorter delays than requested.
+> >
+> > So the choice was either stable and predictable on older CPUs but
+> > buggy on newer CPUs, or correct on all CPUs but gives unnecessarily
+> > longer delays on older CPUs.
+> 
+> Why not add an #ifdef CPU_V4 or whatever?
 
-Regards,
-Maurus Cuelenaere
+Because then you get it whenever you configure for V4 as the lowest
+denominator CPU, which leads to the buggy behaviour on better CPUs.
+It's far better to leave it as is and just accept that the old CPUs
+will have longer than necessary delays.  If people really really
+care (and there's likely to only be a small minority of them now)
+changing the '0' to a '1' is a very simple change for them to carry
+in their local tree.  Unlike getting the right unrolling etc.
