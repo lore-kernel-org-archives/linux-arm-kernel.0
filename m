@@ -1,36 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Sep 2009 12:11:52 +0100
-Subject: What's inside the pxa tree for this merge window
-In-Reply-To: <Pine.LNX.4.64.0909141259290.4359@axis700.grange>
-References: <f17812d70909100446h17a1903fy74941945dbfc6943@mail.gmail.com>
-	<Pine.LNX.4.64.0909141259290.4359@axis700.grange>
-Message-ID: <20090914111152.GD16644@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 14 Sep 2009 12:47:12 +0100
+Subject: LDREX/STREX and pre-emption on SMP hardware
+In-Reply-To: <1252922773.16853.62.camel@pc1117.cambridge.arm.com>
+References: <4A8EB836.3000406@plxtech.com>
+	<1250869355.10642.10.camel@pc1117.cambridge.arm.com>
+	<20090821155011.GB8583@shareable.org>
+	<1250870319.10642.23.camel@pc1117.cambridge.arm.com>
+	<1250890146.29685.18.camel@david-laptop>
+	<1251128692.28977.17.camel@pc1117.cambridge.arm.com>
+	<1251134043.31975.23.camel@david-laptop>
+	<1251135709.28977.40.camel@pc1117.cambridge.arm.com>
+	<20090914014353.GA4762@shareable.org>
+	<20090914100056.GC16644@n2100.arm.linux.org.uk>
+	<1252922773.16853.62.camel@pc1117.cambridge.arm.com>
+Message-ID: <1252928832.16853.96.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2009 at 01:03:33PM +0200, Guennadi Liakhovetski wrote:
-> Hi Eric,
-> 
-> On Thu, 10 Sep 2009, Eric Miao wrote:
-> 
-> > Here's the preview of request-pull result, please let me know if there
-> > is anything missed, thanks.
+On Mon, 2009-09-14 at 11:06 +0100, Catalin Marinas wrote:
+> On Mon, 2009-09-14 at 11:00 +0100, Russell King - ARM Linux wrote:
+> > It doesn't matter though - consider two threads using LDREX on the same
+> > location:
 > > 
-> > URL: git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git
+> > 	T1		T2
+> > 	LDREX
+> > 			LDREX
+> > 			STREXEQ (not satsified)
+> > 	STREX
 > 
-> [snip]
+> As I replied to Jamie on a similar issue, you can have:
 > 
-> > Guennadi Liakhovetski (3):
-> >       [ARM] pxa/pcm990: convert pcm990 to soc-camera as platform-device
-> >       [ARM] pxa/mioa701: convert mioa701 to the new platform-device soc-camera interface
-> >       [ARM] pxa/em-x270: convert em-x270 to soc-camera as platform-device
+> T1			T2
+> LDREX
+> 			LDREX
+> 			STREXEQ (satisfied, succeeds)
+> 			LDREX
+> 			STREXEQ (not satisfied)
+> STREX (succeeds)
 > 
-> Could you please try to push your tree to Linus as early in the merge 
-> cycle as possible? The v4l tree depends on the above patches, and sh 
-> depends on v4l. Is your tree going to Linus via Russell or directly?
+> Though this may be an unlikely sequence.
 
-The request was for me to merge it into my tree.  However, last Saturday
-I asked Linus to pull my tree... still waiting, so I'm not going to merge
-anything further until that's reached some resolution.
+Searching for STREXEQ, it looks like there are several other locking
+functions using it in spinlock.h. Do we have a real problem with these?
 
-It's a very bad idea to change trees after a pull request has been sent.
+-- 
+Catalin
