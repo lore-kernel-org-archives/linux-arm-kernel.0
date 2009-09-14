@@ -1,20 +1,26 @@
 From: jamie@shareable.org (Jamie Lokier)
-Date: Mon, 14 Sep 2009 01:20:05 +0100
-Subject: 'bx lr' vs 'mov pc,lr'
-In-Reply-To: <94a0d4530909131711hf068509x900f19b5dfe8141d@mail.gmail.com>
-References: <94a0d4530909131455x7a33cbaaw402642fb2e63c6d6@mail.gmail.com>
-	<20090913225835.GB30169@n2100.arm.linux.org.uk>
-	<94a0d4530909131711hf068509x900f19b5dfe8141d@mail.gmail.com>
-Message-ID: <20090914002005.GC30621@shareable.org>
+Date: Mon, 14 Sep 2009 01:21:00 +0100
+Subject: [PATCH] arm: remove unused code in delay.S
+In-Reply-To: <20090913230008.GC30169@n2100.arm.linux.org.uk>
+References: <1252875960-21512-1-git-send-email-felipe.contreras@gmail.com>
+	<200909132328.47079.marek.vasut@gmail.com>
+	<20090913230008.GC30169@n2100.arm.linux.org.uk>
+Message-ID: <20090914002100.GD30621@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe Contreras wrote:
-> > Why do you want bx? ?bx isn't available on older CPUs.
+Russell King - ARM Linux wrote:
+> On Sun, Sep 13, 2009 at 11:28:47PM +0200, Marek Vasut wrote:
+> > >  		bhi	__delay
+> > >  		mov	pc, lr
+> > >  ENDPROC(__udelay)
+> > > 
+> > Hi
+> > 
+> > why was this code there in the first place ?
 > 
-> Isn't it faster? I don't know if it would make sense to try it on
-> newer CPUs.
+> To make the delay loop more stable and predictable on older CPUs.
 
-That's interesting.  Do you know if it's faster?
+So why has it been commented out, if it's needed for that?
 
 -- Jamie
