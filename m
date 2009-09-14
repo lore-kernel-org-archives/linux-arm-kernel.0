@@ -1,5 +1,5 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Sep 2009 09:53:24 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Sep 2009 11:00:56 +0100
 Subject: LDREX/STREX and pre-emption on SMP hardware
 In-Reply-To: <20090914014353.GA4762@shareable.org>
 References: <4A8EB836.3000406@plxtech.com>
@@ -11,11 +11,11 @@ References: <4A8EB836.3000406@plxtech.com>
 	<1251134043.31975.23.camel@david-laptop>
 	<1251135709.28977.40.camel@pc1117.cambridge.arm.com>
 	<20090914014353.GA4762@shareable.org>
-Message-ID: <1252918404.16853.23.camel@pc1117.cambridge.arm.com>
+Message-ID: <20090914100056.GC16644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2009-09-14 at 02:43 +0100, Jamie Lokier wrote:
+On Mon, Sep 14, 2009 at 02:43:53AM +0100, Jamie Lokier wrote:
 > Catalin Marinas wrote:
 > > With interrupts (I1, I2 interrupt handlers)
 > > 
@@ -46,37 +46,27 @@ On Mon, 2009-09-14 at 02:43 +0100, Jamie Lokier wrote:
 > In the case where ptr->counter != old, STREX is not executed, and the
 > do{...}while loop does not loop.  Thus LDREX/STREX aren't paired.
 
-I think you are correct here, though we may not have code to trigger
-this (but it needs to be fixed anyway).
+It doesn't matter though - consider two threads using LDREX on the same
+location:
 
-> A simple solution is to either call CLREXNE after STREXEQ, or change
-> STREXEQ to STREX and change the logic so that if ptr->counter != old,
-> the value it tries to store is what it read.  The latter uses fewer
-> instructions - and even eliminates the do...while, making it really
-> compact, but may cause more cache line dirtying.
+	T1		T2
+	LDREX
+			LDREX
+			STREXEQ (not satsified)
+	STREX
 
-The do...while loop is still needed for the case where STREX fails
-because of a STREX on a different thread of execution (same CPU or a
-different one).
 
-I would prefer the CLREXNE because of cache line dirtying (which is even
-more expensive on SMP). But on ARM1136 you may not have the CLREX
-instruction, so either dummy STREX would be useful. Maybe you could make
-it conditional on CONFIG_CPU_32v6K.
+T1's STREX ultimately succeeds.  The value stored there hasn't changed
+since it did the LDREX, so it's perfectly fine for the STREX to occur.
+This is really no different from this case:
 
-Alternatively, a return from exception could clear the exclusive monitor
-- this would also allow us to use STR for atomic_set() (if it has any
-benefits). It also solves a similar issue with user-space atomic
-operations in signal handlers (I had some past discussion with Hans
-Boehm on the atomic and memory model in C++0x and they intend to use STR
-for atomic set).
+	T1		T2
+	LDREX
+			LDREX
+	STREX (succeeds)
+			STREX (fails)
 
-I'm more in favour of the latter option as there isn't really any
-significant performance impact but I remember Russell objected to it in
-the past. If that's still the case, I would prefer the conditional
-compilation with STREX and CLREXNE.
 
-Russell, any opinion here?
-
--- 
-Catalin
+What is not fine is for there to be STREX instructions without a
+preceding LDREX unless it can be guaranteed that the location being
+stored to doesn't matter whether the store succeeds or not.
