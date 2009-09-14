@@ -1,26 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Sep 2009 00:01:03 +0100
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Mon, 14 Sep 2009 03:11:11 +0300
 Subject: 'bx lr' vs 'mov pc,lr'
-In-Reply-To: <94a0d4530909131556j49824b84ubddc13237f2d0bdd@mail.gmail.com>
+In-Reply-To: <20090913225835.GB30169@n2100.arm.linux.org.uk>
 References: <94a0d4530909131455x7a33cbaaw402642fb2e63c6d6@mail.gmail.com>
-	<20090913221500.GB5398@digital-scurf.org>
-	<94a0d4530909131556j49824b84ubddc13237f2d0bdd@mail.gmail.com>
-Message-ID: <20090913230103.GD30169@n2100.arm.linux.org.uk>
+	<20090913225835.GB30169@n2100.arm.linux.org.uk>
+Message-ID: <94a0d4530909131711hf068509x900f19b5dfe8141d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2009 at 01:56:16AM +0300, Felipe Contreras wrote:
-> On Mon, Sep 14, 2009 at 1:15 AM, Daniel Silverstone
-> <dsilvers@simtec.co.uk> wrote:
-> > On Mon, Sep 14, 2009 at 12:55:24AM +0300, Felipe Contreras wrote:
-> >> I noticed that in 'arch/arm/lib/delay.S' we are using 'mov pc, lr'
-> >> instead of 'bx lr'. Why? It looks like 'mov pc, lr' is used all over
-> >> the place, but I can't find out what's the reason.
-> >
-> > I'd guess at the reason being that not all ARM processors whose ports use
-> > arch/arm/lib/delay.S support the bx instruction, whereas the 'mov pc, lr'
-> > instruction is universally supported.
-> 
-> Are there really processors that don't support 'bx'? Can you give some examples?
+On Mon, Sep 14, 2009 at 1:58 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Sep 14, 2009 at 12:55:24AM +0300, Felipe Contreras wrote:
+>> I noticed that in 'arch/arm/lib/delay.S' we are using 'mov pc, lr'
+>> instead of 'bx lr'. Why? It looks like 'mov pc, lr' is used all over
+>> the place, but I can't find out what's the reason.
+>
+> Why do you want bx? ?bx isn't available on older CPUs.
 
-Any ARMv3 CPU and any ARMv4 which doesn't support Thumb.  Eg, StrongARM.
+Isn't it faster? I don't know if it would make sense to try it on newer CPUs.
+
+-- 
+Felipe Contreras
