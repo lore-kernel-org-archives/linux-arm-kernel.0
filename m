@@ -1,142 +1,38 @@
-From: jh80.chung@gmail.com (Jae hoon Chung)
-Date: Mon, 14 Sep 2009 14:22:27 +0900
-Subject: [PATCH 1/4] [INPUT][KEYBOARD] Samsung keypad driver support
-In-Reply-To: <1252494663-17624-1-git-send-email-jsgood.yang@samsung.com>
-References: <1252494663-17624-1-git-send-email-jsgood.yang@samsung.com>
-Message-ID: <91990fe20909132222t292578abi5d2867312a5be095@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 14 Sep 2009 09:35:14 +0200
+Subject: 'bx lr' vs 'mov pc,lr'
+In-Reply-To: <94a0d4530909131847g2295b93by47de1785cc2f34b4@mail.gmail.com>
+References: <94a0d4530909131455x7a33cbaaw402642fb2e63c6d6@mail.gmail.com>
+	<20090913225835.GB30169@n2100.arm.linux.org.uk>
+	<94a0d4530909131711hf068509x900f19b5dfe8141d@mail.gmail.com>
+	<20090914002005.GC30621@shareable.org>
+	<94a0d4530909131847g2295b93by47de1785cc2f34b4@mail.gmail.com>
+Message-ID: <20090914073514.GA15883@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi...
+On Mon, Sep 14, 2009 at 04:47:35AM +0300, Felipe Contreras wrote:
+> On Mon, Sep 14, 2009 at 3:20 AM, Jamie Lokier <jamie@shareable.org> wrote:
+> > Felipe Contreras wrote:
+> >> > Why do you want bx? ?bx isn't available on older CPUs.
+> >>
+> >> Isn't it faster? I don't know if it would make sense to try it on
+> >> newer CPUs.
+> >
+> > That's interesting. ?Do you know if it's faster?
+> 
+> Nope, I'm assuming because of this:
+> http://newsgroups.derkeiler.com/Archive/Comp/comp.sys.arm/2006-04/msg00031.html
 
-I have some question to you.
+For ARM9EJ-S the docs can be found at
 
-> +static int s3c_keypad_scan(struct s3c_keypad *keypad, u32 *keymask_low,
-> +                               u32 *keymask_high)
-> +{
-> +       struct s3c_platform_keypad *pdata = keypad->pdata;
-> +       int i, j = 0;
-> +       u32 cval, rval, cfg;
-> +
-> +       for (i = 0; i < pdata->nr_cols; i++) {
-> +               cval = readl(keypad->regs + S3C_KEYIFCOL);
-> +               cval |= S3C_KEYIF_COL_DMASK;
-> +               cval &= ~(1 << i);
-> +               writel(cval, keypad->regs + S3C_KEYIFCOL);
-> +               udelay(pdata->delay);
-> +
-> +               rval = ~(readl(keypad->regs + S3C_KEYIFROW)) &
-> +                       S3C_KEYIF_ROW_DMASK;
-> +
-> +               if ((i * pdata->nr_rows) < pdata->max_masks)
-> +                       *keymask_low |= (rval << (i * pdata->nr_rows));
-> +               else {
-> +                       *keymask_high |= (rval << (j * pdata->nr_rows));
-> +                       j++;
-> +               }
-> +       }
-> +
-> +       cfg = readl(keypad->regs + S3C_KEYIFCOL);
-> +       cfg &= ~S3C_KEYIF_COL_MASK_ALL;
-> +       writel(cfg, keypad->regs + S3C_KEYIFCOL);
-> +
-> +       return 0;
-> +}
-> +
-> +static void s3c_keypad_timer_handler(unsigned long data)
-> +{
-> +       struct s3c_keypad *keypad = (struct s3c_keypad *)data;
-> +       struct s3c_platform_keypad *pdata = keypad->pdata;
-> +       struct input_dev *input = keypad->dev;
-> +       u32 keymask_low = 0, keymask_high = 0;
-> +       u32 press_mask_low, press_mask_high;
-> +       u32 release_mask_low, release_mask_high, code, cfg;
-> +       int i;
-> +
-> +       s3c_keypad_scan(keypad, &keymask_low, &keymask_high);
-> +
-> +       if (keymask_low != keypad->prevmask_low) {
-> +               press_mask_low = ((keymask_low ^ keypad->prevmask_low) &
-> +                                       keymask_low);
-> +               release_mask_low = ((keymask_low ^ keypad->prevmask_low) &
-> +                                       keypad->prevmask_low);
-> +
-> +               i = 0;
-> +               while (press_mask_low) {
-> +                       if (press_mask_low & 1) {
-> +                               code = keypad->keycodes[i];
-> +                               input_report_key(input, code, 1);
-> +                               dev_dbg(&input->dev, "low pressed: %d\n", i);
-> +                       }
-> +                       press_mask_low >>= 1;
-> +                       i++;
-> +               }
-> +
-> +               i = 0;
-> +               while (release_mask_low) {
-> +                       if (release_mask_low & 1) {
-> +                               code = keypad->keycodes[i];
-> +                               input_report_key(input, code, 0);
-> +                               dev_dbg(&input->dev, "low released: %d\n", i);
-> +                       }
-> +                       release_mask_low >>= 1;
-> +                       i++;
-> +               }
-> +               keypad->prevmask_low = keymask_low;
-> +       }
-> +
-> +       if (keymask_high != keypad->prevmask_high) {
-> +               press_mask_high = ((keymask_high ^ keypad->prevmask_high) &
-> +                                       keymask_high);
-> +               release_mask_high = ((keymask_high ^ keypad->prevmask_high) &
-> +                                       keypad->prevmask_high);
-> +
-> +               i = 0;
-> +               while (press_mask_high) {
-> +                       if (press_mask_high & 1) {
-> +                               code = keypad->keycodes[i + pdata->max_masks];
-> +                               input_report_key(input, code, 1);
-> +                               dev_dbg(&input->dev, "high pressed: %d %d\n",
-> +                                       keypad->keycodes[i + pdata->max_masks],
-> +                                       i);
-> +                       }
-> +                       press_mask_high >>= 1;
-> +                       i++;
-> +               }
-> +
-> +               i = 0;
-> +               while (release_mask_high) {
-> +                       if (release_mask_high & 1) {
-> +                               code = keypad->keycodes[i + pdata->max_masks];
-> +                               input_report_key(input, code, 0);
-> +                               dev_dbg(&input->dev, "high released: %d\n",
-> +                                       keypad->keycodes[i + pdata->max_masks]);
-> +                       }
-> +                       release_mask_high >>= 1;
-> +                       i++;
-> +               }
-> +               keypad->prevmask_high = keymask_high;
-> +       }
-> +
-> +       if (keymask_low | keymask_high) {
-> +               mod_timer(&keypad->timer, jiffies + HZ / 10);
-> +       } else {
-> +               cfg = readl(keypad->regs + S3C_KEYIFCON);
-> +               cfg &= ~S3C_KEYIF_CON_MASK_ALL;
-> +               cfg |= (S3C_KEYIF_INT_F_EN | S3C_KEYIF_INT_R_EN |
-> +                               S3C_KEYIF_DF_EN | S3C_KEYIF_FC_EN);
-> +               writel(cfg, keypad->regs + S3C_KEYIFCON);
-> +       }
-> +}
+	http://infocenter.arm.com/help/topic/com.arm.doc.ddi0222b/I1028171.html
 
-> To unsubscribe from this list: send the line "unsubscribe linux-input" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+.  bx takes 3 cycles, mov (with dest=pc) takes 4 cycles.
 
+Best regards
+Uwe
 
-I understood  your code that used the keymask_low & keymask_high.
-why did you use to distinguish  a keymask_low & keymask_high?
-In your code, that variable saved all value of row_val , then you are
-searching the value of pressed row_val...
-i think it is unnecessary.
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
