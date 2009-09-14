@@ -1,38 +1,30 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Mon, 14 Sep 2009 15:59:52 +0300
-Subject: 'bx lr' vs 'mov pc,lr'
-In-Reply-To: <20090914073514.GA15883@pengutronix.de>
-References: <94a0d4530909131455x7a33cbaaw402642fb2e63c6d6@mail.gmail.com>
-	<20090913225835.GB30169@n2100.arm.linux.org.uk>
-	<94a0d4530909131711hf068509x900f19b5dfe8141d@mail.gmail.com>
-	<20090914002005.GC30621@shareable.org>
-	<94a0d4530909131847g2295b93by47de1785cc2f34b4@mail.gmail.com>
-	<20090914073514.GA15883@pengutronix.de>
-Message-ID: <94a0d4530909140559l27ec5fddof3102a519e30819@mail.gmail.com>
+From: risingsunxy@googlemail.com (Xu Yang)
+Date: Mon, 14 Sep 2009 15:05:30 +0200
+Subject: bus_id in linux2.6.30
+Message-ID: <ab40e9c0909140605w340fb646t163a6bc0687751b1@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/9/14 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> On Mon, Sep 14, 2009 at 04:47:35AM +0300, Felipe Contreras wrote:
->> On Mon, Sep 14, 2009 at 3:20 AM, Jamie Lokier <jamie@shareable.org> wrote:
->> > Felipe Contreras wrote:
->> >> > Why do you want bx? ?bx isn't available on older CPUs.
->> >>
->> >> Isn't it faster? I don't know if it would make sense to try it on
->> >> newer CPUs.
->> >
->> > That's interesting. ?Do you know if it's faster?
->>
->> Nope, I'm assuming because of this:
->> http://newsgroups.derkeiler.com/Archive/Comp/comp.sys.arm/2006-04/msg00031.html
->
-> For ARM9EJ-S the docs can be found at
->
-> ? ? ? ?http://infocenter.arm.com/help/topic/com.arm.doc.ddi0222b/I1028171.html
->
-> . ?bx takes 3 cycles, mov (with dest=pc) takes 4 cycles.
+Hi guys,
 
-Couldn't we have a 'return' macro that uses the relevant one?
+in kernel 2.6.30,  struct device, there is no member bus_id any more.
+but in the drivers for the older version 2.6.29 for example, this
+bus_id is still used.
 
--- 
-Felipe Contreras
+I found a patch
+
+http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=1fa5ae857bb14f6046205171d98506d8112dd74e
+
+which can get rid of the bus_id.
+
+after I check the kernel source, I found that in the 2.6.30.5 it seems
+that this patch is already applied.
+
+does this mean we can just directly delete the bus_id used in the
+drivers for the older version kernel?
+
+thanks,
+
+Best regards,
+
+Yang
