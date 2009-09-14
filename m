@@ -1,30 +1,26 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Mon, 14 Sep 2009 02:44:04 +0100
-Subject: LDREX/STREX and pre-emption on *non*-SMP hardware
-In-Reply-To: <1252877053.16083.5.camel@pc1117.cambridge.arm.com>
-References: <20090913194938.GA30195@shareable.org>
-	<1252877053.16083.5.camel@pc1117.cambridge.arm.com>
-Message-ID: <20090914014404.GE30621@shareable.org>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Mon, 14 Sep 2009 04:47:35 +0300
+Subject: 'bx lr' vs 'mov pc,lr'
+In-Reply-To: <20090914002005.GC30621@shareable.org>
+References: <94a0d4530909131455x7a33cbaaw402642fb2e63c6d6@mail.gmail.com>
+	<20090913225835.GB30169@n2100.arm.linux.org.uk>
+	<94a0d4530909131711hf068509x900f19b5dfe8141d@mail.gmail.com>
+	<20090914002005.GC30621@shareable.org>
+Message-ID: <94a0d4530909131847g2295b93by47de1785cc2f34b4@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas wrote:
-> > But what about a single CPU system?
-> 
-> With two or more threads, you can have something like below, even on UP
-> systems:
-> 
-> T1			T2
-> LDREX
-> 			LDREX
->  			STREX (succeeds)
-> 			LDREX
-> STREX (succeeds)
-> 			STREX (fails)
-> 
-> Thread T2 perform two successive atomic modifications but the context
-> switch happens during the second one, so STREX in T1 should not succeed.
+On Mon, Sep 14, 2009 at 3:20 AM, Jamie Lokier <jamie@shareable.org> wrote:
+> Felipe Contreras wrote:
+>> > Why do you want bx? ?bx isn't available on older CPUs.
+>>
+>> Isn't it faster? I don't know if it would make sense to try it on
+>> newer CPUs.
+>
+> That's interesting. ?Do you know if it's faster?
 
-That's very convincing, and you are right of course.  Thanks!
+Nope, I'm assuming because of this:
+http://newsgroups.derkeiler.com/Archive/Comp/comp.sys.arm/2006-04/msg00031.html
 
--- Jamie
+-- 
+Felipe Contreras
