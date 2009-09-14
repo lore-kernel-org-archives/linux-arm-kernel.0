@@ -1,73 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Sep 2009 11:06:13 +0100
-Subject: LDREX/STREX and pre-emption on SMP hardware
-In-Reply-To: <20090914100056.GC16644@n2100.arm.linux.org.uk>
-References: <4A8EB836.3000406@plxtech.com>
-	<1250869355.10642.10.camel@pc1117.cambridge.arm.com>
-	<20090821155011.GB8583@shareable.org>
-	<1250870319.10642.23.camel@pc1117.cambridge.arm.com>
-	<1250890146.29685.18.camel@david-laptop>
-	<1251128692.28977.17.camel@pc1117.cambridge.arm.com>
-	<1251134043.31975.23.camel@david-laptop>
-	<1251135709.28977.40.camel@pc1117.cambridge.arm.com>
-	<20090914014353.GA4762@shareable.org>
-	<20090914100056.GC16644@n2100.arm.linux.org.uk>
-Message-ID: <1252922773.16853.62.camel@pc1117.cambridge.arm.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 14 Sep 2009 13:03:33 +0200 (CEST)
+Subject: What's inside the pxa tree for this merge window
+In-Reply-To: <f17812d70909100446h17a1903fy74941945dbfc6943@mail.gmail.com>
+References: <f17812d70909100446h17a1903fy74941945dbfc6943@mail.gmail.com>
+Message-ID: <Pine.LNX.4.64.0909141259290.4359@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2009-09-14 at 11:00 +0100, Russell King - ARM Linux wrote:
-> On Mon, Sep 14, 2009 at 02:43:53AM +0100, Jamie Lokier wrote:
-> > Catalin Marinas wrote:
-> > > With interrupts (I1, I2 interrupt handlers)
-> > > 
-> > > I1			I2
-> > > LDREX
-> > > 			LDREX
-> > > 			STREX (succeeds)
-> > > STREX (fails)
-> > > 
-> > > In the interrupt case, they are nested so the STREX in I2 is always
-> > > executed before STREX in I1 (you can extrapolate with several nested
-> > > interrupts).
-> > 
-> > This assumes LDREX/STREX are always called in pairs.  But this is in
-> > fact _not_ the case.  Take a look at atomic_cmpxchg:
-> > 
-> > 	do {
-> > 		__asm__ __volatile__("@ atomic_cmpxchg\n"
-> > 		"ldrex	%1, [%2]\n"
-> > 		"mov	%0, #0\n"
-> > 		"teq	%1, %3\n"
-> > 		"strexeq %0, %4, [%2]\n"
-> > 		    : "=&r" (res), "=&r" (oldval)
-> > 		    : "r" (&ptr->counter), "Ir" (old), "r" (new)
-> > 		    : "cc");
-> > 	} while (res);
-> > 
-> > In the case where ptr->counter != old, STREX is not executed, and the
-> > do{...}while loop does not loop.  Thus LDREX/STREX aren't paired.
+Hi Eric,
+
+On Thu, 10 Sep 2009, Eric Miao wrote:
+
+> Here's the preview of request-pull result, please let me know if there
+> is anything missed, thanks.
 > 
-> It doesn't matter though - consider two threads using LDREX on the same
-> location:
-> 
-> 	T1		T2
-> 	LDREX
-> 			LDREX
-> 			STREXEQ (not satsified)
-> 	STREX
+> URL: git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git
 
-As I replied to Jamie on a similar issue, you can have:
+[snip]
 
-T1			T2
-LDREX
-			LDREX
-			STREXEQ (satisfied, succeeds)
-			LDREX
-			STREXEQ (not satisfied)
-STREX (succeeds)
+> Guennadi Liakhovetski (3):
+>       [ARM] pxa/pcm990: convert pcm990 to soc-camera as platform-device
+>       [ARM] pxa/mioa701: convert mioa701 to the new platform-device soc-camera interface
+>       [ARM] pxa/em-x270: convert em-x270 to soc-camera as platform-device
 
-Though this may be an unlikely sequence.
+Could you please try to push your tree to Linus as early in the merge 
+cycle as possible? The v4l tree depends on the above patches, and sh 
+depends on v4l. Is your tree going to Linus via Russell or directly?
 
--- 
-Catalin
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
