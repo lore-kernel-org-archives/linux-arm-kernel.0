@@ -1,41 +1,65 @@
-From: bgat@billgatliff.com (Bill Gatliff)
-Date: Mon, 14 Sep 2009 14:30:51 -0500
-Subject: LDREX/STREX and pre-emption on SMP hardware
-In-Reply-To: <1252933052.16853.114.camel@pc1117.cambridge.arm.com>
-References: <4A8EB836.3000406@plxtech.com>	
-	<1250869355.10642.10.camel@pc1117.cambridge.arm.com>	
-	<20090821155011.GB8583@shareable.org>	
-	<1250870319.10642.23.camel@pc1117.cambridge.arm.com>	
-	<1250890146.29685.18.camel@david-laptop>	
-	<1251128692.28977.17.camel@pc1117.cambridge.arm.com>	
-	<1251134043.31975.23.camel@david-laptop>	
-	<1251135709.28977.40.camel@pc1117.cambridge.arm.com>	
-	<20090914014353.GA4762@shareable.org>	
-	<20090914100056.GC16644@n2100.arm.linux.org.uk>	
-	<1252922773.16853.62.camel@pc1117.cambridge.arm.com>	
-	<1252928832.16853.96.camel@pc1117.cambridge.arm.com>	
-	<1252930881.16853.99.camel@pc1117.cambridge.arm.com>	
-	<4AAE3A81.5010101@billgatliff.com>
-	<1252933052.16853.114.camel@pc1117.cambridge.arm.com>
-Message-ID: <4AAE99EB.4060805@billgatliff.com>
+From: pierre@ossman.eu (Pierre Ossman)
+Date: Mon, 14 Sep 2009 21:51:40 +0200
+Subject: EXT_CSD  Register : CSD_STRUCTURE vs CSD_CSD_REV
+In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B02F6454333@dbde02.ent.ti.com>
+References: <2A3DCF3DA181AD40BDE86A3150B27B6B02F6454333@dbde02.ent.ti.com>
+Message-ID: <20090914215140.7efe4671@mjolnir.ossman.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas wrote:
-> Apart from the switch_to and atomic_set modifications, the patch cannot
-> do more harm. As for these functions, I don't see any reason why the
-> modifications would not be correct but we can delay the merging until we
-> are sure (anyway, the more people looking at the patch, the better).
->   
+On Mon, 14 Sep 2009 20:34:35 +0530
+"Ghorai, Sukumar" <s-ghorai@ti.com> wrote:
 
-Clearly, you understand the fundamentals behind my question--- and you 
-have a pretty satisfactory answer as well.
+> Hello,
+> 
+> I am working in Linux MMC driver.
+> Recently I came across one 16GB MMC card where EXT_CSD Register having EXT_CSD_REV[192] field as ZERO, which is valid according to Specification. But card is not working due to following reason -
+> 
+>  1.  As we know there are two fields in Extended CSD Register -  CSD_STRUCTURE Version[194] & EXT_CSD_REV Revision [192].
+> 
+> 
+>  1.  In mmc.c/ mmc_read_ext_csd ()
+>     *   Implementation expecting EXT_CSD_REV non zero (e.g. >3 in current code)
+>     *   I think it could be checking for CSD_STRUCTURE version.
+>     *   Because EXT_CSD_REV having Zero is the valid Field.
+>     *   This is the way it's done in other OS too.
 
-That's all I was after, really.  Carry on.  :)
+The opposite, it expects the version to be below 3 as those are the
+only ones it knows about. Checking the CSD version for the EXT_CSD
+would just be silly.
 
+> 
+> 
+>  1.  To check the high capacity card.
+>     *   We could check in access mode from OCR.  This is not in Linux exactly and steps to check the EXT_CSD_REV.
+>     *   This is done in some other OS too.
+> 
 
-b.g.
+Checking the OCR is insufficient if I remember the spec correctly, so
+we ignore it completely. The EXT_CSD needs to be correct for high
+capacity to work anyway.
 
+> So do you think we can update the code to check the CSD_STRUCTURE Version? Please let us know your opinion.
+
+No, as that would violate the spec and possibly misinterpret some cards
+as high-capacity.
+
+To handle your card you would have to build some kind of quirks system
+so that the kernel can identify that this card is buggy and compensate
+for it.
+
+Rgds
 -- 
-Bill Gatliff
-bgat at billgatliff.com
+     -- Pierre Ossman
+
+  WARNING: This correspondence is being monitored by the
+  Swedish government. Make sure your server uses encryption
+  for SMTP traffic and consider using PGP for end-to-end
+  encryption.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090914/ff3cf783/attachment.sig>
