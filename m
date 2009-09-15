@@ -1,26 +1,66 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Tue, 15 Sep 2009 20:21:05 +0900
-Subject: [PATCH 08/10] S3C64XX I2S: Return correct codec clock
-In-Reply-To: <20090915110635.GI22878@rakim.wolfsonmicro.main>
-References: <1253008960-10666-1-git-send-email-jassi.brar@samsung.com>
-	<20090915110635.GI22878@rakim.wolfsonmicro.main>
-Message-ID: <1b68c6790909150421y7c78ad8dt2703bd039fcd39b@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 15 Sep 2009 13:33:47 +0200
+Subject: [patch for 2.6.31] zaurus c3000 aka spitz: fix resume
+In-Reply-To: <f17812d70909101819o2467c5a6jf65579cd9aebb1e@mail.gmail.com>
+References: <20090909075024.GA1400@ucw.cz>
+	<f17812d70909090737n4315d0cbh82c0a63e9222fdb5@mail.gmail.com>
+	<20090909182340.GA5235@n2100.arm.linux.org.uk>
+	<20090910191932.GA23721@elf.ucw.cz>
+	<20090910224159.GA4360@n2100.arm.linux.org.uk>
+	<f17812d70909101819o2467c5a6jf65579cd9aebb1e@mail.gmail.com>
+Message-ID: <20090915113347.GC1328@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2009 at 8:06 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Tue, Sep 15, 2009 at 07:02:40PM +0900, Jassi wrote:
->
->> - ? ? return i2s->iis_cclk;
->> + ? ? if(iismod & S3C64XX_IISMOD_IMS_SYSMUX)
->> + ? ? ? ? ? ? return i2s->iis_cclk;
->> + ? ? else
->> + ? ? ? ? ? ? return i2s->iis_pclk;
->
-> There's three possible clocks here according to the datasheet - PCLK,
-> CLKAUDIO and I2SCLK - so this will still give the wrong clock some of
-> the time. ?Also, please use checkpatch
-Yes, but the existing code doesn't consider I2SCLK at all.
-The infra isn't there to provide the clock pointer anyhow.
-Will use checkpatch, thanks.
+On Fri 2009-09-11 09:19:19, Eric Miao wrote:
+> On Fri, Sep 11, 2009 at 6:41 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Thu, Sep 10, 2009 at 09:19:32PM +0200, Pavel Machek wrote:
+> >> On Wed 2009-09-09 19:23:40, Russell King - ARM Linux wrote:
+> >> > On Wed, Sep 09, 2009 at 10:37:41PM +0800, Eric Miao wrote:
+> >> > > On Wed, Sep 9, 2009 at 3:50 PM, Pavel Machek<pavel@ucw.cz> wrote:
+> >> > > > Hi, Linus!
+> >> > > >
+> >> > > > Spitz resume was broken for year or likely two, and it would be very
+> >> > > > nice to fix it for 2.6.31 release. One liner is below, and it really
+> >> > > > can not harm. It already is in Eric's fix queue, so pulling that for
+> >> > > > .31 should work, too.
+> >> > > >
+> >> > >
+> >> > > This should be sitting in rmk's git tree and I'm not sure if Russell
+> >> > > has sent the pull request already.
+> >> >
+> >> > It's just Pavel being his obnoxious impatient self...
+> >>
+> >> Aha, Russell, being polite and helpful, as usual.
+> >>
+> >> Only that, you know, you missed the deadline, so... perhaps I had
+> >> reason to be impatient?
+> >
+> > I missed the deadline because I was waiting on others to sort out telling
+> > me whether a bugfix patch was actually correct, and then it took several
+> > days and mails to get an attributation line out of them. ??I finally got
+> > that yesterday, and since I'm not doing kernel work (in fact, I'm hardly
+> > in front of the computer at the moment) these things are going to _HAVE_
+> > to wait until this weekend.
+> >
+> > By agreement with Linus, I do not send pull requests more often than once
+> > a week, absolute maximum. ??So if I've something pending in the queue, I
+> > hold off sending the queue until that issue is resolved.
+> >
+> > Don't like it? ??Tough. ??This is the workflow that I've been forced into
+> > by other flame wars. ??It would be my personal preference to ensure that
+> > fixes make their way in a timely manner into mainline, but due to that,
+> > it's just not possible.
+> >
+> 
+> Pavel,
+> 
+> It is still possible to get this into the stable release so take easy.
+
+Ok, so can you (or Russell?) add cc: stable at kernel.org header so that
+stable is notified when patch is merged?
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
