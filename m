@@ -1,44 +1,31 @@
 From: jassi.brar@samsung.com (Jassi)
-Date: Tue, 15 Sep 2009 19:01:25 +0900
-Subject: [PATCH 7/7] S3C64XX DMA: AUTOSTART flag implementation
-Message-ID: <1253008885-7690-1-git-send-email-jassi.brar@samsung.com>
+Date: Tue, 15 Sep 2009 19:01:18 +0900
+Subject: [PATCH 1/7] S3C64XX DMA: struct s3c64xx_dma_buff debugged
+Message-ID: <1253008878-7490-1-git-send-email-jassi.brar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implemented the S3C2410_DMAF_AUTOSTART flag as is available for S3C24XX
-Dma driver.
+'struct pl080s_lli' should be the member of struct s3c64xx_dma_buff
+rather than 'struct pl080_lli'.
+Corrected the typo mistake.
 
 Signed-Off-by: Jassi <jassi.brar@samsung.com>
 ---
- arch/arm/mach-s3c6400/include/mach/dma.h |    1 +
- arch/arm/plat-s3c64xx/dma.c              |    3 +++
- 2 files changed, 4 insertions(+), 0 deletions(-)
+ arch/arm/plat-s3c64xx/include/plat/dma-plat.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-s3c6400/include/mach/dma.h b/arch/arm/mach-s3c6400/include/mach/dma.h
-index 1067619..b96e663 100644
---- a/arch/arm/mach-s3c6400/include/mach/dma.h
-+++ b/arch/arm/mach-s3c6400/include/mach/dma.h
-@@ -67,6 +67,7 @@ static __inline__ int s3c_dma_has_circular(void)
- }
+diff --git a/arch/arm/plat-s3c64xx/include/plat/dma-plat.h b/arch/arm/plat-s3c64xx/include/plat/dma-plat.h
+index 0c30dd9..8f76a1e 100644
+--- a/arch/arm/plat-s3c64xx/include/plat/dma-plat.h
++++ b/arch/arm/plat-s3c64xx/include/plat/dma-plat.h
+@@ -26,7 +26,7 @@ struct s3c64xx_dma_buff {
+ 	struct s3c64xx_dma_buff *next;
  
- #define S3C2410_DMAF_CIRCULAR		(1 << 0)
-+#define S3C2410_DMAF_AUTOSTART		(1 << 1)
+ 	void			*pw;
+-	struct pl080_lli	*lli;
++	struct pl080s_lli	*lli;
+ 	dma_addr_t		 lli_dma;
+ };
  
- #include <plat/dma.h>
- 
-diff --git a/arch/arm/plat-s3c64xx/dma.c b/arch/arm/plat-s3c64xx/dma.c
-index 727072b..49bcfb8 100644
---- a/arch/arm/plat-s3c64xx/dma.c
-+++ b/arch/arm/plat-s3c64xx/dma.c
-@@ -394,6 +394,9 @@ int s3c2410_dma_enqueue(unsigned int channel, void *id,
- 		chan->end = buff;
- 
- 		s3c64xx_lli_to_regs(chan, lli);
-+
-+		if (chan->flags & S3C2410_DMAF_AUTOSTART)
-+			return s3c2410_dma_ctrl(channel, S3C2410_DMAOP_START);
- 	}
- 
- 	local_irq_restore(flags);
 -- 
 1.6.2.5
