@@ -1,82 +1,48 @@
-From: s-ghorai@ti.com (Ghorai, Sukumar)
-Date: Tue, 15 Sep 2009 08:16:34 +0530
-Subject: EXT_CSD  Register : CSD_STRUCTURE vs CSD_CSD_REV
-In-Reply-To: <20090914215140.7efe4671@mjolnir.ossman.eu>
-References: <2A3DCF3DA181AD40BDE86A3150B27B6B02F6454333@dbde02.ent.ti.com>
-	<20090914215140.7efe4671@mjolnir.ossman.eu>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B02F64543C4@dbde02.ent.ti.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 15 Sep 2009 08:30:12 +0200 (CEST)
+Subject: What's inside the pxa tree for this merge window
+In-Reply-To: <20090914111152.GD16644@n2100.arm.linux.org.uk>
+References: <f17812d70909100446h17a1903fy74941945dbfc6943@mail.gmail.com>
+	<Pine.LNX.4.64.0909141259290.4359@axis700.grange>
+	<20090914111152.GD16644@n2100.arm.linux.org.uk>
+Message-ID: <Pine.LNX.4.64.0909150829100.4640@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pierre,
+On Mon, 14 Sep 2009, Russell King - ARM Linux wrote:
 
-Thanks for the information.
-
-And what I understood from MMCA specification is that - 
-EXT_CSD_REV: Defines the fixed parameters. related to the EXT_CSD, according to its revision. Nothing to do with MMCA specification version or > 4GB card.
-
-SO, I need just one more help from you to browse the MMCA specification where it's mentioned that if Card is >4GB then EXT_CSD_REV Revision should be > 2 (Rev 1.2)?
-
-And again the fact I mentioned in my previous email that below fact is from Symbian OS too.
-
-So please reply sometime to helping me understand better.
-
-Thanks & regards,
-Ghorai 
-
------Original Message-----
-From: Pierre Ossman [mailto:pierre at ossman.eu] 
-Sent: 2009-09-15 01:22
-To: Ghorai, Sukumar
-Cc: linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Chikkature Rajashekar, Madhusudhan; Benjamin.Telya at sandisk.com; drzeus-list at drzeus.cx; Pandita, Vikram; Joshi, Rhishi; Sawant, Anand; Raju, Veeramanikandan
-Subject: Re: EXT_CSD Register : CSD_STRUCTURE vs CSD_CSD_REV
-
-On Mon, 14 Sep 2009 20:34:35 +0530
-"Ghorai, Sukumar" <s-ghorai@ti.com> wrote:
-
-> Hello,
+> On Mon, Sep 14, 2009 at 01:03:33PM +0200, Guennadi Liakhovetski wrote:
+> > Hi Eric,
+> > 
+> > On Thu, 10 Sep 2009, Eric Miao wrote:
+> > 
+> > > Here's the preview of request-pull result, please let me know if there
+> > > is anything missed, thanks.
+> > > 
+> > > URL: git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git
+> > 
+> > [snip]
+> > 
+> > > Guennadi Liakhovetski (3):
+> > >       [ARM] pxa/pcm990: convert pcm990 to soc-camera as platform-device
+> > >       [ARM] pxa/mioa701: convert mioa701 to the new platform-device soc-camera interface
+> > >       [ARM] pxa/em-x270: convert em-x270 to soc-camera as platform-device
+> > 
+> > Could you please try to push your tree to Linus as early in the merge 
+> > cycle as possible? The v4l tree depends on the above patches, and sh 
+> > depends on v4l. Is your tree going to Linus via Russell or directly?
 > 
-> I am working in Linux MMC driver.
-> Recently I came across one 16GB MMC card where EXT_CSD Register having EXT_CSD_REV[192] field as ZERO, which is valid according to Specification. But card is not working due to following reason -
+> The request was for me to merge it into my tree.  However, last Saturday
+> I asked Linus to pull my tree... still waiting, so I'm not going to merge
+> anything further until that's reached some resolution.
 > 
->  1.  As we know there are two fields in Extended CSD Register -  CSD_STRUCTURE Version[194] & EXT_CSD_REV Revision [192].
-> 
-> 
->  1.  In mmc.c/ mmc_read_ext_csd ()
->     *   Implementation expecting EXT_CSD_REV non zero (e.g. >3 in current code)
->     *   I think it could be checking for CSD_STRUCTURE version.
->     *   Because EXT_CSD_REV having Zero is the valid Field.
->     *   This is the way it's done in other OS too.
+> It's a very bad idea to change trees after a pull request has been sent.
 
-The opposite, it expects the version to be below 3 as those are the
-only ones it knows about. Checking the CSD version for the EXT_CSD
-would just be silly.
+Ic, Eric, when would you be pushing your tree then?
 
-> 
-> 
->  1.  To check the high capacity card.
->     *   We could check in access mode from OCR.  This is not in Linux exactly and steps to check the EXT_CSD_REV.
->     *   This is done in some other OS too.
-> 
-
-Checking the OCR is insufficient if I remember the spec correctly, so
-we ignore it completely. The EXT_CSD needs to be correct for high
-capacity to work anyway.
-
-> So do you think we can update the code to check the CSD_STRUCTURE Version? Please let us know your opinion.
-
-No, as that would violate the spec and possibly misinterpret some cards
-as high-capacity.
-
-To handle your card you would have to build some kind of quirks system
-so that the kernel can identify that this card is buggy and compensate
-for it.
-
-Rgds
--- 
-     -- Pierre Ossman
-
-  WARNING: This correspondence is being monitored by the
-  Swedish government. Make sure your server uses encryption
-  for SMTP traffic and consider using PGP for end-to-end
-  encryption.
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
