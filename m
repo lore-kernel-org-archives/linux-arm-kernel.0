@@ -1,60 +1,34 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 15 Sep 2009 09:55:45 +0200 (CEST)
-Subject: What's inside the pxa tree for this merge window
-In-Reply-To: <20090915073456.GA9208@n2100.arm.linux.org.uk>
-References: <f17812d70909100446h17a1903fy74941945dbfc6943@mail.gmail.com>
-	<Pine.LNX.4.64.0909141259290.4359@axis700.grange>
-	<20090914111152.GD16644@n2100.arm.linux.org.uk>
-	<Pine.LNX.4.64.0909150829100.4640@axis700.grange>
-	<f17812d70909142350p11a0e9d8ra3e4b031124e3f70@mail.gmail.com>
-	<20090915073456.GA9208@n2100.arm.linux.org.uk>
-Message-ID: <Pine.LNX.4.64.0909150950350.4640@axis700.grange>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Tue, 15 Sep 2009 12:37:59 +0300
+Subject: [RFC] ptrace: system call number interpretation during
+	PTRACE_SET_SYSCALL request handling
+In-Reply-To: <20080601083036.GD5818@flint.arm.linux.org.uk>
+References: <484047C3.4090509@gmail.com>
+	<20080601083036.GD5818@flint.arm.linux.org.uk>
+Message-ID: <cc557aab0909150237u451eaab0v82f08eb65ef706a2@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 Sep 2009, Russell King - ARM Linux wrote:
+On Sun, Jun 1, 2008 at 11:30 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, May 30, 2008 at 09:30:27PM +0300, Volodymyr G. Lukiianyk wrote:
+>> I've encountered a problem while running strace on the kernel with
+>> CONFIG_AEABI not set. This problem can be worked around in userspace,
+>> but it looks like the correct place for a fix is the kernel.
+>
+> I'm really nervous about this. ?I need to check what my own strace
+> patches do - and if they don't suffer from this problem I'd say that
+> the bug lies in userspace.
 
-> On Tue, Sep 15, 2009 at 02:50:36PM +0800, Eric Miao wrote:
-> > On Tue, Sep 15, 2009 at 2:30 PM, Guennadi Liakhovetski
-> > <g.liakhovetski@gmx.de> wrote:
-> > > On Mon, 14 Sep 2009, Russell King - ARM Linux wrote:
-> > >
-> > >> The request was for me to merge it into my tree. ?However, last Saturday
-> > >> I asked Linus to pull my tree... still waiting, so I'm not going to merge
-> ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-> > >> anything further until that's reached some resolution.
-> ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-> > >>
-> > >> It's a very bad idea to change trees after a pull request has been sent.
-> > >
-> > > Ic, Eric, when would you be pushing your tree then?
-> > >
-> > 
-> > Request has already been sent.
-> 
-> It seems from your following email (to the pull request) that neither of
-> you actually read what I said.  The relevent bit is underlined with ^'s.
-> 
-> It has now been merged, so I can now start merging stuff into my tree
-> again.
+Any results? Do we need to workaround it in user space or it will be
+fixed in kernel?
 
-I did read it, what I wasn't sure about is after
-
-Eric has sent a pull request to you
-you have sent a pull request to Linus
-Linus has merged your tree
-you can (and will) now pull further trees
-
-whether you will be sending another pull request to Linus in this merge 
-window and if so - approximately when. Or whether because Eric's request 
-has missed your first pull request it now has to be pulled directly by 
-Linus to make it in this window. After this your reply it seems to be the 
-former, so, I'm hoping you'll be sending a next pull request to Linus with 
-PXA patches in your tree some time soon in this merge window.
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+> Yes, for a long time I've had patches to strace to add proper ARM
+> support and fix a load of issues with it, but I've never been able
+> to get them integrated into strace itself.
+>
+> -------------------------------------------------------------------
+> List admin: http://lists.arm.linux.org.uk/mailman/listinfo/linux-arm-kernel
+> FAQ: ? ? ? ?http://www.arm.linux.org.uk/mailinglists/faq.php
+> Etiquette: ?http://www.arm.linux.org.uk/mailinglists/etiquette.php
+>
