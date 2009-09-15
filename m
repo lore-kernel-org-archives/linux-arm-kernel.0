@@ -1,23 +1,23 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 15 Sep 2009 12:52:05 +0100
-Subject: [PATCH 4/7] S3C64XX DMA: S3C2410_DMAF_CIRCULAR disable
-In-Reply-To: <1b68c6790909150401k4bc958edl7eea0062a4d4fd38@mail.gmail.com>
-References: <1253008882-7587-1-git-send-email-jassi.brar@samsung.com>
-	<20090915100751.GC22878@rakim.wolfsonmicro.main>
-	<1b68c6790909150401k4bc958edl7eea0062a4d4fd38@mail.gmail.com>
-Message-ID: <20090915115205.GM22878@rakim.wolfsonmicro.main>
+Date: Tue, 15 Sep 2009 12:56:18 +0100
+Subject: [PATCH 08/10] S3C64XX I2S: Return correct codec clock
+In-Reply-To: <1b68c6790909150421y7c78ad8dt2703bd039fcd39b@mail.gmail.com>
+References: <1253008960-10666-1-git-send-email-jassi.brar@samsung.com>
+	<20090915110635.GI22878@rakim.wolfsonmicro.main>
+	<1b68c6790909150421y7c78ad8dt2703bd039fcd39b@mail.gmail.com>
+Message-ID: <20090915115618.GN22878@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2009 at 08:01:39PM +0900, jassi brar wrote:
-> On Tue, Sep 15, 2009 at 7:07 PM, Mark Brown
+On Tue, Sep 15, 2009 at 08:21:05PM +0900, jassi brar wrote:
+> On Tue, Sep 15, 2009 at 8:06 PM, Mark Brown
 
-> > ?Though I'm a bit concerned that if something has
-> > actually tried to set up circular DMA it might get upset if that's
-> > ignored (not that I've looked in detail).
+> > There's three possible clocks here according to the datasheet - PCLK,
+> > CLKAUDIO and I2SCLK - so this will still give the wrong clock some of
+> > the time. ?Also, please use checkpatch
 
-> That shudn't be an issue.
-> S3C64xx dma isn't used by any code other than I2S which doesn't
-> have any machine driver.
+> Yes, but the existing code doesn't consider I2SCLK at all.
+> The infra isn't there to provide the clock pointer anyhow.
 
-I'd expect that to change very soon, though?
+Please put a comment there explaining that, or ideally code that returns
+an error in those cases, to make it clearer what's being done.
