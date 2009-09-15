@@ -1,60 +1,47 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 16 Sep 2009 00:44:32 +0100
-Subject: [PATCH 6/7] S3C64XX DMA: dbg_showbuffs cleanup
-In-Reply-To: <1253008884-7657-1-git-send-email-jassi.brar@samsung.com>
-References: <1253008884-7657-1-git-send-email-jassi.brar@samsung.com>
-Message-ID: <20090915234432.GC13508@trinity.fluff.org>
+Date: Wed, 16 Sep 2009 00:55:25 +0100
+Subject: [PATCH 1/7] S3C64XX DMA: struct s3c64xx_dma_buff debugged
+In-Reply-To: <1253008878-7490-1-git-send-email-jassi.brar@samsung.com>
+References: <1253008878-7490-1-git-send-email-jassi.brar@samsung.com>
+Message-ID: <20090915235525.GD13508@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2009 at 07:01:24PM +0900, Jassi wrote:
-> Removed unused variable and cleaned up.
-> 
+On Tue, Sep 15, 2009 at 07:01:18PM +0900, Jassi wrote:
+> 'struct pl080s_lli' should be the member of struct s3c64xx_dma_buff
+> rather than 'struct pl080_lli'.
+> Corrected the typo mistake.
+
+applied to next-s3c64xx-fixes, with some edits to the description.
+ 
 > Signed-Off-by: Jassi <jassi.brar@samsung.com>
 > ---
->  arch/arm/plat-s3c64xx/dma.c |   14 ++++----------
->  1 files changed, 4 insertions(+), 10 deletions(-)
+>  arch/arm/plat-s3c64xx/include/plat/dma-plat.h |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/plat-s3c64xx/dma.c b/arch/arm/plat-s3c64xx/dma.c
-> index e68469d..727072b 100644
-> --- a/arch/arm/plat-s3c64xx/dma.c
-> +++ b/arch/arm/plat-s3c64xx/dma.c
-> @@ -71,20 +71,14 @@ static void show_lli(struct pl080s_lli *lli)
->  static void dbg_showbuffs(struct s3c2410_dma_chan *chan)
->  {
->  	struct s3c64xx_dma_buff *ptr;
-> -	struct s3c64xx_dma_buff *end;
-
-you are right that the end is not used.
-  
->  	pr_debug("DMA%d: buffs next %p, curr %p, end %p\n",
->  		 chan->number, chan->next, chan->curr, chan->end);
+> diff --git a/arch/arm/plat-s3c64xx/include/plat/dma-plat.h b/arch/arm/plat-s3c64xx/include/plat/dma-plat.h
+> index 0c30dd9..8f76a1e 100644
+> --- a/arch/arm/plat-s3c64xx/include/plat/dma-plat.h
+> +++ b/arch/arm/plat-s3c64xx/include/plat/dma-plat.h
+> @@ -26,7 +26,7 @@ struct s3c64xx_dma_buff {
+>  	struct s3c64xx_dma_buff *next;
 >  
-> -	ptr = chan->next;
-> -	end = chan->end;
-> -
-> -	if (debug_show_buffs) {
-> -		for (; ptr != NULL; ptr = ptr->next) {
-> -			pr_debug("DMA%d: %08x ",
-> -				 chan->number, ptr->lli_dma);
-> -			show_lli(ptr->lli);
-> -		}
-> +	for (ptr = chan->curr; debug_show_buffs && ptr != NULL; ptr = ptr->next) {
-
-this isn't a very nice change, for a start this means debug_show_buffs
-is going to end up being evaluated each loop and secondly these sort of
-changes do not help the code readability and can introduce bugs of their
-own.
-
-> +		pr_debug("DMA%d: %08x \n",
-> +			 chan->number, ptr->lli_dma);
-> +		show_lli(ptr->lli);
->  	}
->  }
+>  	void			*pw;
+> -	struct pl080_lli	*lli;
+> +	struct pl080s_lli	*lli;
+>  	dma_addr_t		 lli_dma;
+>  };
 >  
 > -- 
 > 1.6.2.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
+-- 
 -- 
 Ben
 
