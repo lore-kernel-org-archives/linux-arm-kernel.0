@@ -1,36 +1,35 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Wed, 16 Sep 2009 00:47:34 +0200
-Subject: [PATCH] arm: remove unused code in delay.S
-In-Reply-To: <1253053609.3273.139.camel@linux-1lbu> (Steve Chen's message of
-	"Tue, 15 Sep 2009 17:26:49 -0500")
-References: <1252875960-21512-1-git-send-email-felipe.contreras@gmail.com>
-	<20090915103739.GA19519@elf.ucw.cz>
-	<1253017761.3273.117.camel@linux-1lbu>
-	<200909151541.08852.marek.vasut@gmail.com>
-	<1253032210.3273.128.camel@linux-1lbu>
-	<94a0d4530909151158y489a96e3x63ff932c713822b0@mail.gmail.com>
-	<1253043875.3273.131.camel@linux-1lbu>
-	<m3k4zzdimy.fsf@intrepid.localdomain>
-	<1253053609.3273.139.camel@linux-1lbu>
-Message-ID: <m33a6nddvd.fsf@intrepid.localdomain>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Wed, 16 Sep 2009 00:34:30 +0100
+Subject: Samsung S3C6410 / SmartQ / 2D acceleration / Xorg
+In-Reply-To: <20090910054942.GB5797@prithivi.gnumonks.org>
+References: <20090902031719.GK3838@prithivi.gnumonks.org>
+	<200909021203.n82C3USg020804@chronolytics.com>
+	<20090910054942.GB5797@prithivi.gnumonks.org>
+Message-ID: <20090915233430.GA13508@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Steve Chen <schen@mvista.com> writes:
+On Thu, Sep 10, 2009 at 02:49:42PM +0900, Harald Welte wrote:
+> Dear David,
+> 
+> > I have a fairly decent SmartQ5/7 config and mach-smartq init file.  Much of
+> > this work (that I can test) can be back ported to the smdk6410 (that I can't
+> > test. :-)
+> 
+> So you're hacking on the SmartQ devices?  I recently discovered that they exist and I was
+> very intrigued in buying one. 
 
-> If I know for sure that these are the processors that need that block of
-> code, your suggestion makes perfect sense.  Unfortunately, I don't know.
+[snip]
+ 
+> yes, a regular userspace Xorg EXA driver makes probably much more sense.
+> If the polling turns out to waste too many cycles, we can still think of some
+> interrupt-to-userspace delivery mechanism where we don't need to busy-wait
+> in the Xorg driver.
 
-Then I wouldn't write "Accurate delays". "Different", maybe.
-"Accurate", we don't know.
+does uio support wait-for-interrupt?
 
-> My primary goals are
->
-> 1.  Put a stop to this thread (so far I have failed miserably)
-> 2.  Document that block of code.
-> 3.  If it makes someone's life easier.. it would be a bonus.
-
-Uncertain comments don't make life easier. Just write what's certain,
-or nothing if nothing is.
 -- 
-Krzysztof Halasa
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
