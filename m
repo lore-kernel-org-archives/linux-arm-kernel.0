@@ -1,63 +1,53 @@
-From: s-ghorai@ti.com (Ghorai, Sukumar)
-Date: Mon, 14 Sep 2009 20:34:35 +0530
-Subject: EXT_CSD  Register : CSD_STRUCTURE vs CSD_CSD_REV
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B02F6454333@dbde02.ent.ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 15 Sep 2009 13:15:40 +0100
+Subject: [PATCH 09/10] S3C64XX I2S: Set parent links for clock audio-bus.
+In-Reply-To: <1b68c6790909150442m5aaf826fy73a9c48bd2fabbf2@mail.gmail.com>
+References: <1253008961-10698-1-git-send-email-jassi.brar@samsung.com>
+	<20090915111204.GJ22878@rakim.wolfsonmicro.main>
+	<1b68c6790909150442m5aaf826fy73a9c48bd2fabbf2@mail.gmail.com>
+Message-ID: <20090915121539.GO22878@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Sep 15, 2009 at 08:42:32PM +0900, jassi brar wrote:
+> On Tue, Sep 15, 2009 at 8:12 PM, Mark Brown
 
-I am working in Linux MMC driver.
-Recently I came across one 16GB MMC card where EXT_CSD Register having EXT_CSD_REV[192] field as ZERO, which is valid according to Specification. But card is not working due to following reason -
+> > code? ?It seems bad form for the audio driver to be looking at clock
+> > configuration outside its domain.
 
- 1.  As we know there are two fields in Extended CSD Register -  CSD_STRUCTURE Version[194] & EXT_CSD_REV Revision [192].
+> I understand that.
+> Even without this patch it sources FOUTepll by default.
+> This is not meant to be forever.  I patched it because
+> I didn't want to get stuck making platform perfect to push the idea.
 
+I'm not saying don't touch this, I'm saying that this doesn't belong in
+this driver.
 
- 1.  In mmc.c/ mmc_read_ext_csd ()
-    *   Implementation expecting EXT_CSD_REV non zero (e.g. >3 in current code)
-    *   I think it could be checking for CSD_STRUCTURE version.
-    *   Because EXT_CSD_REV having Zero is the valid Field.
-    *   This is the way it's done in other OS too.
+> > The mout/fout connection in particular isn't audio local, there's way
+> > more EPLL users than just the audio.
 
+> Ofcourse, but i think those drivers and requirements are far off that
+> may need EPLL.
 
- 1.  To check the high capacity card.
-    *   We could check in access mode from OCR.  This is not in Linux exactly and steps to check the EXT_CSD_REV.
-    *   This is done in some other OS too.
+Are you sure?  UART, USB, MMC and SPI all have options to clock off EPLL
+- I've worked with designs that were actively using it for at least USB.
 
-So do you think we can update the code to check the CSD_STRUCTURE Version? Please let us know your opinion.
+> EPLL is a shared but unused resource. Using EPLL gives far more accurate clocks
+> and we shudn't keep hands off just because there is no arbiter.
 
-[cid:image001.gif at 01CA357A.C599E580]
-[cid:image002.gif at 01CA357A.C599E580]
+That doesn't seem like it's going to work so well, especially if Samsung
+are actively pushing more drivers into mainline - if two drivers start
+trying to play about with this simultaneously then what'll happen is
+that users who end up trying to use those drivers together will have to
+deal with the fallout.
 
-Thanks & regards,
-Sukumar Ghorai
+> If not here, i favor controlling it from machine specific code.
 
--------------------------------------------------------------------------------------
+Well, for the EPLL mux/PLL connection I'm not sure why we're not just
+doing it in the default clock setup - I had thought that that was being
+done by default already to be honest but I've not checked.
 
-WTSD, Texas Instruments,
-
-#66/3 Bagmane Tech Park, CVRaman Nagar, Bangalore, India-560093.
-
-Voice: +91-80-25048868
-
-http://www.india.ti.com<http://www.india.ti.com/>
-
--------------------------------------------------------------------------------------
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090914/27668f3e/attachment-0001.htm>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: image001.gif
-Type: image/gif
-Size: 15335 bytes
-Desc: image001.gif
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090914/27668f3e/attachment-0002.gif>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: image002.gif
-Type: image/gif
-Size: 10512 bytes
-Desc: image002.gif
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090914/27668f3e/attachment-0003.gif>
+For anything where there's serious decisions to be taken it does need to
+be machine-specific but if the clock implementation were to choose
+sensible defaults I wouldn't see any problem with that, though I don't
+know what Ben thinks.
