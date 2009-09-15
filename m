@@ -1,18 +1,33 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 15 Sep 2009 13:30:12 +0100
-Subject: [PATCH 06/10] S3C I2S: LRCLK polarity option.
-In-Reply-To: <1253008958-10601-1-git-send-email-jassi.brar@samsung.com>
-References: <1253008958-10601-1-git-send-email-jassi.brar@samsung.com>
-Message-ID: <20090915123012.GQ22878@rakim.wolfsonmicro.main>
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Tue, 15 Sep 2009 21:35:48 +0900
+Subject: [PATCH 10/10] S3C64XX I2S: En/Disable codec clocks.
+In-Reply-To: <20090915114936.GK22878@rakim.wolfsonmicro.main>
+References: <1253008962-10730-1-git-send-email-jassi.brar@samsung.com>
+	<20090915114936.GK22878@rakim.wolfsonmicro.main>
+Message-ID: <1b68c6790909150535p777f93d4pc416f65dd8dbced4@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2009 at 07:02:38PM +0900, Jassi wrote:
-> 1) Explicitly set LRCLK polarity for I2S Vs LSM/MSB modes.
-> 2) Convert from numerical to bit-field values for BCLK selection.
-> 3) Use proper error checking for return value from clk_get
-
-> Signed-Off-by: Jassi <jassi.brar@samsung.com>
-
-I'll apply this for 2.6.33 - the errors aren't that serious (I'd be
-surprised to see anyone choose left or right justified modes at all).
+On Tue, Sep 15, 2009 at 8:49 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Tue, Sep 15, 2009 at 07:02:42PM +0900, Jassi wrote:
+>
+>> ? ? ? switch (clk_id) {
+>> ? ? ? case S3C64XX_CLKSRC_PCLK:
+>> ? ? ? ? ? ? ? iismod &= ~S3C64XX_IISMOD_IMS_SYSMUX;
+>> + ? ? ? ? ? ? clk_disable(i2s->iis_cclk);
+>> ? ? ? ? ? ? ? break;
+>>
+>> ? ? ? case S3C64XX_CLKSRC_MUX:
+>> ? ? ? ? ? ? ? iismod |= S3C64XX_IISMOD_IMS_SYSMUX;
+>> + ? ? ? ? ? ? clk_enable(i2s->iis_cclk);
+>> ? ? ? ? ? ? ? break;
+>
+> I'd expect that this will cause trouble eventually - machine drivers
+> tend to call set_sysclk() repeatedly, meaning that the clock will be
+> repeatedly enabled or disabled. ?Eventually this will overflow the
+> counter the clock API is using, perhaps even cause it to complain loudly
+> about errors (eg, if the use count drops below zero). ?A local reference
+> count should deal with those issues, or checking to see if iismod
+> actualy changed before updating the clock API.
+Yes, this was a bad idea.
