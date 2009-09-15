@@ -1,29 +1,22 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Tue, 15 Sep 2009 20:04:05 +0900
-Subject: [PATCH 5/7] S3C64XX DMA: TC-IRQ implemented.
-In-Reply-To: <20090915101355.GD22878@rakim.wolfsonmicro.main>
-References: <1253008883-7624-1-git-send-email-jassi.brar@samsung.com>
-	<20090915101355.GD22878@rakim.wolfsonmicro.main>
-Message-ID: <1b68c6790909150404i4b3579feofa95c023ce22b204@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 15 Sep 2009 12:06:35 +0100
+Subject: [PATCH 08/10] S3C64XX I2S: Return correct codec clock
+In-Reply-To: <1253008960-10666-1-git-send-email-jassi.brar@samsung.com>
+References: <1253008960-10666-1-git-send-email-jassi.brar@samsung.com>
+Message-ID: <20090915110635.GI22878@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2009 at 7:13 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Tue, Sep 15, 2009 at 07:01:23PM +0900, Jassi wrote:
->
->> + ? ? ? ? ? ? if (errstat & bit)
->> + ? ? ? ? ? ? ? ? ? ? writel(bit, dmac->regs + PL080_ERR_CLEAR);
->
-> The old code would complain in the logs on error, which seems like a
-> reasonable approach if we've no better idea what to do - it at least
-> tells people something about what might be going on if things break.
-Yes, some debug mssg wud be better.
+On Tue, Sep 15, 2009 at 07:02:40PM +0900, Jassi wrote:
 
->> + ? ? ? ? ? ? chan = dmac->channels + offs;
->> + ? ? ? ? ? ? if(chan->curr == NULL)
->> + ? ? ? ? ? ? ? ? ? ? continue;
->
-> It's probably a good idea to run your patches through
-> scripts/checkpatch.pl before submitting them.
-ahhhh.... my me!!
+> -	return i2s->iis_cclk;
+> +	if(iismod & S3C64XX_IISMOD_IMS_SYSMUX)
+> +		return i2s->iis_cclk;
+> +	else
+> +		return i2s->iis_pclk;
+
+There's three possible clocks here according to the datasheet - PCLK,
+CLKAUDIO and I2SCLK - so this will still give the wrong clock some of
+the time.  Also, please use checkpatch.
+
+Ideally we wouldn't have to export the clock at all, of course.
