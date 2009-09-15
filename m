@@ -1,23 +1,44 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 15 Sep 2009 11:17:16 +0100
-Subject: [PATCH 01/10] S3C64XX I2S: S3C64XX_PA_IISV4 defined
-In-Reply-To: <1253008953-10441-1-git-send-email-jassi.brar@samsung.com>
-References: <1253008953-10441-1-git-send-email-jassi.brar@samsung.com>
-Message-ID: <20090915101716.GE22878@rakim.wolfsonmicro.main>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 15 Sep 2009 12:37:39 +0200
+Subject: [PATCH] arm: remove unused code in delay.S
+In-Reply-To: <94a0d4530909140814w36f7f5f0td2c25db07fbd4e57@mail.gmail.com>
+References: <1252875960-21512-1-git-send-email-felipe.contreras@gmail.com>
+	<200909132328.47079.marek.vasut@gmail.com>
+	<20090913230008.GC30169@n2100.arm.linux.org.uk>
+	<20090914002100.GD30621@shareable.org>
+	<20090914081001.GB14519@n2100.arm.linux.org.uk>
+	<94a0d4530909140558nd8d2c47lc9954563c80a574f@mail.gmail.com>
+	<20090914140059.GC21580@n2100.arm.linux.org.uk>
+	<94a0d4530909140738t7e4d646r134cfd884da21348@mail.gmail.com>
+	<20090914144028.GG21580@n2100.arm.linux.org.uk>
+	<94a0d4530909140814w36f7f5f0td2c25db07fbd4e57@mail.gmail.com>
+Message-ID: <20090915103739.GA19519@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2009 at 07:02:33PM +0900, Jassi wrote:
-> Defined the missing S3C64XX_PA_IISV4 conditionally for 6410 as
-> it's not avaialble for 6400
 
-> Signed-Off-by: Jassi <jassi.brar@samsung.com>
+> >> > Because then you get it whenever you configure for V4 as the lowest
+> >> > denominator CPU, which leads to the buggy behaviour on better CPUs.
+> >> > It's far better to leave it as is and just accept that the old CPUs
+> >> > will have longer than necessary delays. ?If people really really
+> >> > care (and there's likely to only be a small minority of them now)
+> >> > changing the '0' to a '1' is a very simple change for them to carry
+> >> > in their local tree. ?Unlike getting the right unrolling etc.
+> >>
+> >> Well, they can also 'git revert' this patch. If somebody really cares
+> >> I think they should shout now and provide a better patch, otherwise
+> >> this one should be merged.
+> >
+> > On the other hand, having the code there as it currently stands is not
+> > harmful in any way, so leaving it there is just as easy.
+> 
+> It makes the code less understandable. I'm not sure about linux's
+> practices, but an #if 0 generally means somebody is being lazy.
 
->  #define S3C64XX_PA_IIS1		(0x7F003000)
-> +#ifdef CONFIG_CPU_S3C6410
-> +#define S3C64XX_PA_IISV4	(0x7F00D000)
-> +#endif
+Not in this case, as you was explained to you. You may want to add
+explaining comment above #if 0....
+								Pavel
 
-I'm not sure what the roadmap for future CPUs looks like but might this
-better done with the inverse test so we don't have to add every single
-new CPU to the ifdefs.  TBH I'm not sure if the ifdefs are worth it.
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
