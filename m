@@ -1,32 +1,23 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 15 Sep 2009 12:49:36 +0100
-Subject: [PATCH 10/10] S3C64XX I2S: En/Disable codec clocks.
-In-Reply-To: <1253008962-10730-1-git-send-email-jassi.brar@samsung.com>
-References: <1253008962-10730-1-git-send-email-jassi.brar@samsung.com>
-Message-ID: <20090915114936.GK22878@rakim.wolfsonmicro.main>
+Date: Tue, 15 Sep 2009 12:52:05 +0100
+Subject: [PATCH 4/7] S3C64XX DMA: S3C2410_DMAF_CIRCULAR disable
+In-Reply-To: <1b68c6790909150401k4bc958edl7eea0062a4d4fd38@mail.gmail.com>
+References: <1253008882-7587-1-git-send-email-jassi.brar@samsung.com>
+	<20090915100751.GC22878@rakim.wolfsonmicro.main>
+	<1b68c6790909150401k4bc958edl7eea0062a4d4fd38@mail.gmail.com>
+Message-ID: <20090915115205.GM22878@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2009 at 07:02:42PM +0900, Jassi wrote:
+On Tue, Sep 15, 2009 at 08:01:39PM +0900, jassi brar wrote:
+> On Tue, Sep 15, 2009 at 7:07 PM, Mark Brown
 
->  	switch (clk_id) {
->  	case S3C64XX_CLKSRC_PCLK:
->  		iismod &= ~S3C64XX_IISMOD_IMS_SYSMUX;
-> +		clk_disable(i2s->iis_cclk);
->  		break;
->  
->  	case S3C64XX_CLKSRC_MUX:
->  		iismod |= S3C64XX_IISMOD_IMS_SYSMUX;
-> +		clk_enable(i2s->iis_cclk);
->  		break;
+> > ?Though I'm a bit concerned that if something has
+> > actually tried to set up circular DMA it might get upset if that's
+> > ignored (not that I've looked in detail).
 
-I'd expect that this will cause trouble eventually - machine drivers
-tend to call set_sysclk() repeatedly, meaning that the clock will be
-repeatedly enabled or disabled.  Eventually this will overflow the
-counter the clock API is using, perhaps even cause it to complain loudly
-about errors (eg, if the use count drops below zero).  A local reference
-count should deal with those issues, or checking to see if iismod
-actualy changed before updating the clock API.
+> That shudn't be an issue.
+> S3C64xx dma isn't used by any code other than I2S which doesn't
+> have any machine driver.
 
-Ideally we'd be able to stop the clock while the IIS interface is idle
-for a small power saving.
+I'd expect that to change very soon, though?
