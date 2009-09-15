@@ -1,57 +1,46 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 15 Sep 2009 11:44:17 +0100
-Subject: [PATCH 03/10] S3C64XX I2S: Codec Clock Gating Option
-In-Reply-To: <1253008955-10505-1-git-send-email-jassi.brar@samsung.com>
-References: <1253008955-10505-1-git-send-email-jassi.brar@samsung.com>
-Message-ID: <20090915104417.GF22878@rakim.wolfsonmicro.main>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Tue, 15 Sep 2009 13:47:01 +0300
+Subject: [PATCH] arm: remove unused code in delay.S
+In-Reply-To: <20090915103739.GA19519@elf.ucw.cz>
+References: <1252875960-21512-1-git-send-email-felipe.contreras@gmail.com>
+	<20090913230008.GC30169@n2100.arm.linux.org.uk>
+	<20090914002100.GD30621@shareable.org>
+	<20090914081001.GB14519@n2100.arm.linux.org.uk>
+	<94a0d4530909140558nd8d2c47lc9954563c80a574f@mail.gmail.com>
+	<20090914140059.GC21580@n2100.arm.linux.org.uk>
+	<94a0d4530909140738t7e4d646r134cfd884da21348@mail.gmail.com>
+	<20090914144028.GG21580@n2100.arm.linux.org.uk>
+	<94a0d4530909140814w36f7f5f0td2c25db07fbd4e57@mail.gmail.com>
+	<20090915103739.GA19519@elf.ucw.cz>
+Message-ID: <94a0d4530909150347h642772bvc8175109393e905f@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2009 at 07:02:35PM +0900, Jassi wrote:
-> In SoC-Master mode, CODCLK maybe gated out as MCLK of the CODEC.
-> In SoC-Slave mode, CODCLK needs to be cut-off from PAD inorder
-> to avoid collision with MCLK from CODEC.
-> Option to gate/block CODCLK is implemented in this patch.
+On Tue, Sep 15, 2009 at 1:37 PM, Pavel Machek <pavel@ucw.cz> wrote:
+>
+>> >> > Because then you get it whenever you configure for V4 as the lowest
+>> >> > denominator CPU, which leads to the buggy behaviour on better CPUs.
+>> >> > It's far better to leave it as is and just accept that the old CPUs
+>> >> > will have longer than necessary delays. ?If people really really
+>> >> > care (and there's likely to only be a small minority of them now)
+>> >> > changing the '0' to a '1' is a very simple change for them to carry
+>> >> > in their local tree. ?Unlike getting the right unrolling etc.
+>> >>
+>> >> Well, they can also 'git revert' this patch. If somebody really cares
+>> >> I think they should shout now and provide a better patch, otherwise
+>> >> this one should be merged.
+>> >
+>> > On the other hand, having the code there as it currently stands is not
+>> > harmful in any way, so leaving it there is just as easy.
+>>
+>> It makes the code less understandable. I'm not sure about linux's
+>> practices, but an #if 0 generally means somebody is being lazy.
+>
+> Not in this case, as you was explained to you. You may want to add
+> explaining comment above #if 0....
 
-Just to confuse matters the datasheet appears to use both CODCLK and
-CDCLK to refer to the same signal (as far as I can tell, anyway -
-there's only a couple of references to CODCLK).  The drivers are
-currently using CDCLK as the name, it'd be better to stick with just
-one.
+Yes, but I've no idea in which situations somebody might want to
+enable that code. Old chips? Which old chips?
 
-In terms of functionality it might be clearer to describe what's going
-on here as switching the function of CDCLK from being an input to being
-an output.  The actual implementation appears to be done by gating the
-output of the internal clock signal to the CDCLK pin but in terms of
-what the user can see externally the clock isn't gated, it's still
-active but it changed direction.
-
-> +#define S3C64XX_IISMOD_CDCLK_EXT	(1 << 12)
-> +
-
-The datasheet calls this bit CDLKCON - it'd be better to preserve that
-naming unless there is a good reason to diverge?
-
-> @@ -99,6 +99,14 @@ static int s3c64xx_i2s_set_sysclk(struct snd_soc_dai *cpu_dai,
->  		iismod |= S3C64XX_IISMOD_IMS_SYSMUX;
->  		break;
->  
-> +	case S3C64XX_CODCLKSRC_INT:
-> +		iismod &= ~S3C64XX_IISMOD_CDCLK_EXT;
-> +		break;
-> +
-> +	case S3C64XX_CODCLKSRC_EXT:
-> +		iismod |= S3C64XX_IISMOD_CDCLK_EXT;
-> +		break;
-> +
-
-This should really be done using the direction parameter - clk_id should
-specify that CDCLK should be used and the direction parameter be used to
-say if it's an input or output.
-
-Ideally this would also be more joined up with the rest of the
-configuration so the machine driver could just specify the master clock
-for the IIS block and have all the clock switching (the system
-controller mux and IMS) updated appropriately.  That should make it
-easier for users to set up the clocking since they don't need to worry
-about the implementation details of the IIS block.
+-- 
+Felipe Contreras
