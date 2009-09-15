@@ -1,40 +1,75 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 15 Sep 2009 14:33:29 +0100
-Subject: [PATCH 09/10] S3C64XX I2S: Set parent links for clock audio-bus.
-In-Reply-To: <1b68c6790909150557q53bf9843g38bf41fcaf5beca3@mail.gmail.com>
-References: <1253008961-10698-1-git-send-email-jassi.brar@samsung.com>
-	<20090915111204.GJ22878@rakim.wolfsonmicro.main>
-	<1b68c6790909150442m5aaf826fy73a9c48bd2fabbf2@mail.gmail.com>
-	<20090915121539.GO22878@rakim.wolfsonmicro.main>
-	<1b68c6790909150557q53bf9843g38bf41fcaf5beca3@mail.gmail.com>
-Message-ID: <20090915133329.GT22878@rakim.wolfsonmicro.main>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 15 Sep 2009 15:41:08 +0200
+Subject: [PATCH] arm: remove unused code in delay.S
+In-Reply-To: <1253017761.3273.117.camel@linux-1lbu>
+References: <1252875960-21512-1-git-send-email-felipe.contreras@gmail.com>
+	<20090915103739.GA19519@elf.ucw.cz>
+	<1253017761.3273.117.camel@linux-1lbu>
+Message-ID: <200909151541.08852.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2009 at 09:57:05PM +0900, jassi brar wrote:
-> On Tue, Sep 15, 2009 at 9:15 PM, Mark Brown
+Dne ?t 15. z??? 2009 14:29:21 Steve Chen napsal(a):
+> On Tue, 2009-09-15 at 12:37 +0200, Pavel Machek wrote:
+> > > >> > Because then you get it whenever you configure for V4 as the
+> > > >> > lowest denominator CPU, which leads to the buggy behaviour on
+> > > >> > better CPUs. It's far better to leave it as is and just accept
+> > > >> > that the old CPUs will have longer than necessary delays.  If
+> > > >> > people really really care (and there's likely to only be a small
+> > > >> > minority of them now) changing the '0' to a '1' is a very simple
+> > > >> > change for them to carry in their local tree.  Unlike getting the
+> > > >> > right unrolling etc.
+> > > >>
+> > > >> Well, they can also 'git revert' this patch. If somebody really
+> > > >> cares I think they should shout now and provide a better patch,
+> > > >> otherwise this one should be merged.
+> > > >
+> > > > On the other hand, having the code there as it currently stands is
+> > > > not harmful in any way, so leaving it there is just as easy.
+> > >
+> > > It makes the code less understandable. I'm not sure about linux's
+> > > practices, but an #if 0 generally means somebody is being lazy.
+> >
+> > Not in this case, as you was explained to you. You may want to add
+> > explaining comment above #if 0....
+> > 								Pavel
+> 
+> Perhaps we can document with something like..
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index aef63c8..ca8d535 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -813,6 +813,14 @@ config ARM_ERRATA_460075
+>  	  ACTLR register. Note that setting specific bits in the ACTLR
+> register
+>  	  may not be available in non-secure mode.
+> 
+> +config OLD_CPU_DELAY
+> +	depends on CPU_32v3 || CPU_32v4 || CPU_32v4T
+> +	bool "Accurate delays for older CPU"
+> +	def_bool n
+> +	help
+> +	  Enable if observing longer than expected delays and need more
+> +	  accurate delays on older CPUs.
+> +
+>  endmenu
+> 
+>  source "arch/arm/common/Kconfig"
+> diff --git a/arch/arm/lib/delay.S b/arch/arm/lib/delay.S
+> index 8d6a876..8b3fa63 100644
+> --- a/arch/arm/lib/delay.S
+> +++ b/arch/arm/lib/delay.S
+> @@ -42,7 +42,7 @@ ENTRY(__const_udelay)				@ 0 <= r0 <= 0x7fffff06
+>  @ Delay routine
+>  ENTRY(__delay)
+>  		subs	r0, r0, #1
+> -#if 0
+> +#if CONFIG_OLD_CPU_DELAY
 
-> > Are you sure? ?UART, USB, MMC and SPI all have options to clock off EPLL
-> > - I've worked with designs that were actively using it for at least USB.
+ifdef please
 
-> In mainline?
-> All these devices do have option to source from EPLL but they don't
-> seem to use it.
-
-I'd hope that given the active efforts that Samsung are making to push
-things into mainline anything that isn't in mainline will be there
-sooner rather than later.  Given that it seems better to avoid things
-like this which will create issues after merge to mainline without
-consideration for how things are supposed to work after the merge.
-
-> > trying to play about with this simultaneously then what'll happen is
-> > that users who end up trying to use those drivers together will have to
-> > deal with the fallout.
-
-> as i said in another reply, current set of patches are meant to be as
-> simple as possible.
-> once that is done I am all to implement and support new features.
-
-Something with this much of a system wide effect really isn't a good
-idea - the wider the effect of what you're doing the worse the effect of
-any breakage that is introduced.
+>  		movls	pc, lr
+>  		subs	r0, r0, #1
+>  		movls	pc, lr
+> 
