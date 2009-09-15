@@ -1,33 +1,41 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 16 Sep 2009 00:34:30 +0100
-Subject: Samsung S3C6410 / SmartQ / 2D acceleration / Xorg
-In-Reply-To: <20090910054942.GB5797@prithivi.gnumonks.org>
-References: <20090902031719.GK3838@prithivi.gnumonks.org>
-	<200909021203.n82C3USg020804@chronolytics.com>
-	<20090910054942.GB5797@prithivi.gnumonks.org>
-Message-ID: <20090915233430.GA13508@trinity.fluff.org>
+Date: Wed, 16 Sep 2009 00:41:27 +0100
+Subject: [PATCH 4/4] s3c6410: Remove redundant mpll parent assignment.
+In-Reply-To: <1252388401-31529-1-git-send-email-thomas.ab@samsung.com>
+References: <1252388401-31529-1-git-send-email-thomas.ab@samsung.com>
+Message-ID: <20090915234127.GA24720@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 10, 2009 at 02:49:42PM +0900, Harald Welte wrote:
-> Dear David,
+On Tue, Sep 08, 2009 at 02:40:01PM +0900, thomas.ab at samsung.com wrote:
+> From: Thomas Abraham <thomas.ab@samsung.com>
 > 
-> > I have a fairly decent SmartQ5/7 config and mach-smartq init file.  Much of
-> > this work (that I can test) can be back ported to the smdk6410 (that I can't
-> > test. :-)
-> 
-> So you're hacking on the SmartQ devices?  I recently discovered that they exist and I was
-> very intrigued in buying one. 
+> This patch removes the redundant MPLL parent assignment
+> in the function s3c6400_register_clocks.
 
-[snip]
+Where is the other assignment being done from?
  
-> yes, a regular userspace Xorg EXA driver makes probably much more sense.
-> If the polling turns out to waste too many cycles, we can still think of some
-> interrupt-to-userspace delivery mechanism where we don't need to busy-wait
-> in the Xorg driver.
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> ---
+>  arch/arm/plat-s3c64xx/s3c6400-clock.c |    1 -
+>  1 files changed, 0 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/plat-s3c64xx/s3c6400-clock.c b/arch/arm/plat-s3c64xx/s3c6400-clock.c
+> index 9745852..72c03ab 100644
+> --- a/arch/arm/plat-s3c64xx/s3c6400-clock.c
+> +++ b/arch/arm/plat-s3c64xx/s3c6400-clock.c
+> @@ -758,6 +758,5 @@ void __init s3c6400_register_clocks(unsigned armclk_divlimit)
+>  		}
+>  	}
+>  
+> -	clk_mpll.parent = &clk_mout_mpll.clk;
+>  	clk_epll.parent = &clk_mout_epll.clk;
+>  }
+> -- 
+> 1.5.3.4
+> 
 
-does uio support wait-for-interrupt?
-
+-- 
 -- 
 Ben
 
