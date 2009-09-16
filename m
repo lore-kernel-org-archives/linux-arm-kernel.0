@@ -1,41 +1,83 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Wed, 16 Sep 2009 09:50:59 +0900
-Subject: [PATCH 01/10] S3C64XX I2S: S3C64XX_PA_IISV4 defined
-In-Reply-To: <20090916000925.GB24720@trinity.fluff.org>
-References: <1253008953-10441-1-git-send-email-jassi.brar@samsung.com>
-	<20090916000925.GB24720@trinity.fluff.org>
-Message-ID: <1b68c6790909151750q3b2ca864k944d567d76f0eb4c@mail.gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Wed, 16 Sep 2009 01:52:01 +0100
+Subject: [PATCH 8/8] s3c6410: sdhci: Updating sdhci_s3c_remove module exit
+	function
+In-Reply-To: <1252393355-31920-1-git-send-email-thomas.ab@samsung.com>
+References: <1252393355-31920-1-git-send-email-thomas.ab@samsung.com>
+Message-ID: <20090916005201.GT13508@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 16, 2009 at 9:09 AM, Ben Dooks <ben-linux@fluff.org> wrote:
-> On Tue, Sep 15, 2009 at 07:02:33PM +0900, Jassi wrote:
->> Defined the missing S3C64XX_PA_IISV4 conditionally for 6410 as
->> it's not avaialble for 6400
->>
->> Signed-Off-by: Jassi <jassi.brar@samsung.com>
->> ---
->> ?arch/arm/mach-s3c6400/include/mach/map.h | ? ?3 +++
->> ?1 files changed, 3 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-s3c6400/include/mach/map.h b/arch/arm/mach-s3c6400/include/mach/map.h
->> index 5057d99..775577a 100644
->> --- a/arch/arm/mach-s3c6400/include/mach/map.h
->> +++ b/arch/arm/mach-s3c6400/include/mach/map.h
->> @@ -44,6 +44,9 @@
->> ?#define S3C64XX_PA_SYSCON ? ?(0x7E00F000)
->> ?#define S3C64XX_PA_IIS0 ? ? ? ? ? ? ?(0x7F002000)
->> ?#define S3C64XX_PA_IIS1 ? ? ? ? ? ? ?(0x7F003000)
->> +#ifdef CONFIG_CPU_S3C6410
->> +#define S3C64XX_PA_IISV4 ? ? (0x7F00D000)
->> +#endif
->
-> Does this really need to be #ifdef'd out? You might want to avoid
-> building the device setup code, or similar if it is only for a s3c6400
-> but this should be done by the machine Kconfig chosing to build the
-> support in for the machines that do need it.
->
-> I see no good reason for this to be applied.
-In my second post in this thread, i already said the ifdef had better
-be dropped.
-So, you want me to resend patch without the ifdef?
+On Tue, Sep 08, 2009 at 04:02:35PM +0900, thomas.ab at samsung.com wrote:
+> From: Thomas Abraham <thomas.ab@samsung.com>
+> 
+> This patch populates the sdhci_s3c_remove function in the
+> s3c sdhci driver. This will allow s3c sdhci driver to be
+> used as a module.
+> 
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> ---
+>  drivers/mmc/host/sdhci-s3c.c |   26 ++++++++++++++++++++++++++
+>  1 files changed, 26 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> index 7f5b64e..80e8c38 100644
+> --- a/drivers/mmc/host/sdhci-s3c.c
+> +++ b/drivers/mmc/host/sdhci-s3c.c
+> @@ -380,9 +380,35 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+>  
+>  static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
+>  {
+> +	struct sdhci_host *host =  platform_get_drvdata(pdev);
+> +	struct sdhci_s3c *sc = sdhci_priv(host);
+> +	int ptr, dead = 0;
+> +	u32 scratch;
+> +
+> +	scratch = readl(host->ioaddr + SDHCI_INT_STATUS);
+> +	if (scratch == (u32)-1)
+> +		dead = 1;
+> +
+> +	sdhci_remove_host(host, dead);
+> +
+> +	for (ptr = 0; ptr < 3; ptr++) {
+
+ptr < ARRRAY_SIZE(sc->clk_bus)
+
+you probably also need to check for the validity of the clock
+and skip it if it is not in used.
+
+> +		clk_disable(sc->clk_bus[ptr]);
+> +		clk_put(sc->clk_bus[ptr]);
+> +	}
+> +	clk_disable(sc->clk_io);
+> +	clk_put(sc->clk_io);
+> +
+> +	iounmap(host->ioaddr);
+> +	release_resource(sc->ioarea);
+> +	kfree(sc->ioarea);
+> +
+> +	sdhci_free_host(host);
+> +	platform_set_drvdata(pdev, NULL);
+> +
+>  	return 0;
+>  }
+>  
+> +
+>  #ifdef CONFIG_PM
+>  
+>  static int sdhci_s3c_suspend(struct platform_device *dev, pm_message_t pm)
+> -- 
+> 1.5.3.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
