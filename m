@@ -1,61 +1,77 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 16 Sep 2009 01:14:39 +0100
-Subject: [PATCH 05/10] S3C I2S: lrsync function made to work with IRQs
-	disabled.
-In-Reply-To: <1253008957-10569-1-git-send-email-jassi.brar@samsung.com>
-References: <1253008957-10569-1-git-send-email-jassi.brar@samsung.com>
-Message-ID: <20090916001439.GD24720@trinity.fluff.org>
+Date: Wed, 16 Sep 2009 01:17:09 +0100
+Subject: [PATCH 09/10] S3C64XX I2S: Set parent links for clock audio-bus.
+In-Reply-To: <1253008961-10698-1-git-send-email-jassi.brar@samsung.com>
+References: <1253008961-10698-1-git-send-email-jassi.brar@samsung.com>
+Message-ID: <20090916001709.GE24720@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2009 at 07:02:37PM +0900, Jassi wrote:
-> s3c2412_snd_lrsync() maybe reached with IRQs disabled and if LRCLK
-> is dead due to improper initialization of CPU or CODEC, the system
-> gets stuck in the loop because jiffies may never get updated.
-> Implemented counter based wait mechanism for atleast the same
-> timeout period.
+On Tue, Sep 15, 2009 at 07:02:41PM +0900, Jassi wrote:
+> Explicitly route audio-bus from FOUTepll via MOUTepll.
 > 
 > Signed-Off-by: Jassi <jassi.brar@samsung.com>
 > ---
->  sound/soc/s3c24xx/s3c-i2s-v2.c |   16 ++++++++++------
->  1 files changed, 10 insertions(+), 6 deletions(-)
+>  sound/soc/s3c24xx/s3c64xx-i2s.c |   22 ++++++++++++++++++++++
+>  1 files changed, 22 insertions(+), 0 deletions(-)
 > 
-> diff --git a/sound/soc/s3c24xx/s3c-i2s-v2.c b/sound/soc/s3c24xx/s3c-i2s-v2.c
-> index aa7af0b..8865bc7 100644
-> --- a/sound/soc/s3c24xx/s3c-i2s-v2.c
-> +++ b/sound/soc/s3c24xx/s3c-i2s-v2.c
-> @@ -230,6 +230,8 @@ static void s3c2412_snd_rxctrl(struct s3c_i2sv2_info *i2s, int on)
->  	pr_debug("%s: IIS: CON=%x MOD=%x FIC=%x\n", __func__, con, mod, fic);
->  }
->  
-> +#define msecs_to_loops(t) (loops_per_jiffy / 1000 * HZ * t)
-> +
->  /*
->   * Wait for the LR signal to allow synchronisation to the L/R clock
->   * from the codec. May only be needed for slave mode.
-> @@ -237,19 +239,21 @@ static void s3c2412_snd_rxctrl(struct s3c_i2sv2_info *i2s, int on)
->  static int s3c2412_snd_lrsync(struct s3c_i2sv2_info *i2s)
+> diff --git a/sound/soc/s3c24xx/s3c64xx-i2s.c b/sound/soc/s3c24xx/s3c64xx-i2s.c
+> index 66f4ded..71aeb33 100644
+> --- a/sound/soc/s3c24xx/s3c64xx-i2s.c
+> +++ b/sound/soc/s3c24xx/s3c64xx-i2s.c
+> @@ -254,6 +254,7 @@ static __devinit int s3c64xx_iis_dev_probe(struct platform_device *pdev)
 >  {
->  	u32 iiscon;
-> -	unsigned long timeout = jiffies + msecs_to_jiffies(5);
-> +	unsigned long loops = msecs_to_loops(5);
+>  	struct s3c_i2sv2_info *i2s;
+>  	struct snd_soc_dai *dai;
+> +	struct clk *cm, *cf;
+>  	int ret;
 >  
->  	pr_debug("Entered %s\n", __func__);
+>  	if (pdev->id >= ARRAY_SIZE(s3c64xx_i2s)) {
+> @@ -275,6 +276,21 @@ static __devinit int s3c64xx_iis_dev_probe(struct platform_device *pdev)
+>  		goto err;
+>  	}
 >  
-> -	while (1) {
-> +	while (--loops) {
->  		iiscon = readl(i2s->regs + S3C2412_IISCON);
->  		if (iiscon & S3C2412_IISCON_LRINDEX)
->  			break;
+> +	cm = clk_get(NULL, "mout_epll");
+> +	if (IS_ERR(cm)) {
+> +		dev_err(&pdev->dev, "failed to get mout_epll\n");
+> +		ret = PTR_ERR(cm);
+> +		goto mout_err;
+> +	}
+> +	clk_set_parent(i2s->iis_cclk, cm);
+> +	cf = clk_get(NULL, "fout_epll");
+> +	if (IS_ERR(cf)) {
+> +		dev_err(&pdev->dev, "failed to get fout_epll\n");
+> +		ret = PTR_ERR(cf);
+> +		goto fout_err;
+> +	}
+> +	clk_set_parent(cm, cf);
+> +
+>  	ret = s3c_i2sv2_probe(pdev, dai, i2s, 0);
+>  	if (ret)
+>  		goto err_clk;
+> @@ -283,11 +299,17 @@ static __devinit int s3c64xx_iis_dev_probe(struct platform_device *pdev)
+>  	if (ret != 0)
+>  		goto err_i2sv2;
 >  
-> -		if (timeout < jiffies) {
-> -			printk(KERN_ERR "%s: timeout\n", __func__);
-> -			return -ETIMEDOUT;
-> -		}
-> +	   	cpu_relax();
+> +	clk_put(cf);
+> +	clk_put(cm);
+>  	return 0;
+>  
+>  err_i2sv2:
+>  	/* Not implemented for I2Sv2 core yet */
+>  err_clk:
+> +	clk_put(cf);
+> +fout_err:
+> +	clk_put(cm);
+> +mout_err:
+>  	clk_put(i2s->iis_cclk);
+>  err:
+>  	return ret;
 
-I don't think cpu_relax() gives a defined 'timeout' length, thus this
-loop is of a very indeterminate length of timeout.
+This is the wrong place to be changing the clocks, it is making a policy
+for _all_ boards that may use this code. It either belongs in the board
+setup code, possibly in the board specific ASoC glue driver (maybe with
+a common library if enough do it).
 
 -- 
 Ben
