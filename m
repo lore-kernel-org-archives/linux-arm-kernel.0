@@ -1,85 +1,158 @@
-From: schen@mvista.com (Steve Chen)
-Date: Wed, 16 Sep 2009 09:49:14 -0500
-Subject: [PATCH] arm: remove unused code in delay.S
-In-Reply-To: <m3ljkfoywm.fsf@intrepid.localdomain>
-References: <1252875960-21512-1-git-send-email-felipe.contreras@gmail.com>
-	<20090915103739.GA19519@elf.ucw.cz>
-	<1253017761.3273.117.camel@linux-1lbu>
-	<200909151541.08852.marek.vasut@gmail.com>
-	<1253032210.3273.128.camel@linux-1lbu>
-	<94a0d4530909151158y489a96e3x63ff932c713822b0@mail.gmail.com>
-	<1253043875.3273.131.camel@linux-1lbu>
-	<m3k4zzdimy.fsf@intrepid.localdomain>
-	<1253053609.3273.139.camel@linux-1lbu>
-	<m33a6nddvd.fsf@intrepid.localdomain>
-	<1253089566.3273.152.camel@linux-1lbu>
-	<m3ljkfoywm.fsf@intrepid.localdomain>
-Message-ID: <1253112555.3273.164.camel@linux-1lbu>
+From: schindele@nentec.de (Juergen Schindele)
+Date: Wed, 16 Sep 2009 17:01:16 +0200
+Subject: Problems with pthread on ARM/PXA270
+In-Reply-To: <f17812d70909160714j1f691361k2a71d57d847e6e05@mail.gmail.com>
+References: <200909160926.02036.schindele@nentec.de>
+	<f17812d70909160714j1f691361k2a71d57d847e6e05@mail.gmail.com>
+Message-ID: <200909161701.16898.schindele@nentec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2009-09-16 at 14:30 +0200, Krzysztof Halasa wrote:
-> Steve Chen <schen@mvista.com> writes:
+Am Mittwoch, 16. September 2009 schrieb Eric Miao:
+> Don't remember we had such problems before. What kind of system
+> and libraries are you using?
+thanks for your reply.
+System is custom PXA270 platform.
+with codesourcery compiler (see below)
+and glibc 2.5 with pthread.
+I dont know what more information to give ?  
 > 
-> > +config OLD_CPU_DELAY
-> > +	depends on CPU_32v3 || CPU_32v4 || CPU_32v4T
-> > +	bool "Accurate delays for some older CPUs"
-> > +	def_bool n
-> > +	help
-> > +	  Try enable this if observing longer than expected delays and need
-> > +	  more accuracy.  May cause instability in some CPUs.
-> > +
 > 
-> There is still this uncertain "accurate" in the text. Why don't just
+> On Wed, Sep 16, 2009 at 3:26 PM, Juergen Schindele <schindele@nentec.de> wrote:
+> > Hello all,
+> > we tried to implement a thread based software on our PXA270 based platform but
+> > we had trouble with pthreads. So i modyfied a tiny progam to test. This little progam creates
+> > 10 threads and each thread does print something (an index an a pointer to itself).
+> >
+> > On my PC with Suse 11.0 Linux (kernel 2.6.27) this works fine as supposed to.
+> > Each thread has his turn and print his own values.
+> >
+> > But on our pxa270 platform the thread switch does not (or really rarely) happen
+> > and only one thread is printing always the same values. So i suppose thread
+> > switching is not working!
+> >
+> > Any hints or experiences are welcome !!!
+> >
+> > we use codesourcery compiler
+> > arm-none-linux-gnueabi-gcc (CodeSourcery Sourcery G++ Lite 2007q1-10) 4.2.0 20070413 (prerelease)
+> > Copyright (C) 2007 Free Software Foundation, Inc.
+> > This is free software; see the source for copying conditions. ?There is NO
+> > warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+> >
+> > and here the C-code compiled with ?"arm-none-linux-gnueabi-gcc -o test test.c -lpthread"
+> >
+> > #include <errno.h>
+> > #include <error.h>
+> > #include <stdio.h>
+> > #include <stdlib.h>
+> > #include <pthread.h>
+> > #include <time.h>
+> >
+> > #define NUM_THREADS 10
+> > #define NUM_ITERS ? 50
+> > #define TIMEOUT_NS ?100000000L
+> >
+> > static void *thread (void *);
+> > static int argument[NUM_THREADS];
+> > static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+> > static pthread_attr_t defaultattr;
+> >
+> > static void * print_thread (void *arg)
+> > {
+> > ? ?int i;
+> > ? ?int number = *((int*)arg);
+> >
+> > ? ?for (;;) {
+> > ? ? ? ?pthread_t self = pthread_self ();
+> > ? ? ? ?printf ("Thread %d is [%d]\n", number, self);
+> > ? ?}
+> > }
+> >
+> > int main (void)
+> > {
+> > ? ?pthread_t th;
+> > ? ?int i, retvalue;
+> >
+> > ? ?struct sched_param param;
+> > ? ?pthread_attr_init(&defaultattr);
+> >
+> > ? ?pthread_attr_setschedpolicy(&defaultattr, SCHED_RR);
+> >
+> > ? ?param.sched_priority = 10;
+> > ? ?if ((retvalue = pthread_attr_setschedparam(&defaultattr, &param))!=0) {
+> > ? ? ? ?printf ("ERROR\n");
+> > ? ? ? ?exit (0);
+> > ? ?}
+> >
+> > ? ?for (i = 0; i < NUM_THREADS; i++)
+> > ? ?{
+> > ? ? ? ?argument[i] = i;
+> > ? ? ? ?if (pthread_create (&th, &defaultattr, print_thread, &argument[i]) != 0)
+> > ? ? ? ? ? ?error (EXIT_FAILURE, 0, "cannot create thread");
+> > ? ? ? ?printf ("Thread [%d]\n", i);
+> > ? ?}
+> >
+> > ? ?while (1) {
+> > ? ? ? ?;
+> > ? ?}
+> >
+> > ? ?/* notreached */
+> > ? ?return 0;
+> > }
+> >
+> > --------------------------------------------------------------
+> > J?rgen Schindele
+> > Software-Entwicklung
+> >
+> > NENTEC Netzwerktechnologie GmbH
+> > Greschbachstr. 12
+> > 76229 Karlsruhe
+> > Deutschland
+> > Telefon: +49 721 94249-51
+> > Telefax: +49 721 94249-10
+> > E-Mail: ?schindele at nentec.de
+> > WEB: ? ? www.nentec.de
+> >
+> > Gesch?ftsf?hrung: Klaus Becker, Roland Knapp
+> > Sitz der Gesellschaft: Karlsruhe
+> > Handelsregister: Amtsgericht Mannheim HRB 107658
+> > --------------------------------------------------------------
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
 > 
-> +	bool "Different delay() code for some older CPUs"
+> 
 
-Sounds good.  I also update text under help to better quantify
-"accuracy".  Updated patch below.  Separately, as Russel pointed out,
-this should only be done by experienced people, so we even bother with
-this patch since the only people should touch this are the people who
-knows all the details.
 
-Document #if 0 code block in delay.S and make it selectable for compile.
 
-Signed-off-by: Steve Chen <schen@mvista.com>
+-- 
+--------------------------------------------------------------
+J?rgen Schindele  
+Software-Entwicklung
 
----
-
- arch/arm/Kconfig     |    8 ++++++++
- arch/arm/lib/delay.S |    2 +-
- 2 files changed, 9 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index aef63c8..ca8d535 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -813,6 +813,14 @@ config ARM_ERRATA_460075
- 	  ACTLR register. Note that setting specific bits in the ACTLR
-register
- 	  may not be available in non-secure mode.
+NENTEC Netzwerktechnologie GmbH
+Greschbachstr. 12
+76229 Karlsruhe
+Deutschland
+Telefon: +49 721 94249-51
+Telefax: +49 721 94249-10
+E-Mail:  schindele at nentec.de
+WEB:     www.nentec.de
  
-+config OLD_CPU_DELAY
-+	depends on CPU_32v3 || CPU_32v4 || CPU_32v4T
-+	bool "Different delay() code for some older CPUs"
-+	def_bool n
-+	help
-+	  Try enable this if observing longer than expected delays.  This code
-+	  improves accuracy for some CPUs while cause instability in others.
-+
- endmenu
+Gesch?ftsf?hrung: Klaus Becker, Roland Knapp
+Sitz der Gesellschaft: Karlsruhe
+Handelsregister: Amtsgericht Mannheim HRB 107658
  
- source "arch/arm/common/Kconfig"
-diff --git a/arch/arm/lib/delay.S b/arch/arm/lib/delay.S
-index 8d6a876..67e679b 100644
---- a/arch/arm/lib/delay.S
-+++ b/arch/arm/lib/delay.S
-@@ -42,7 +42,7 @@ ENTRY(__const_udelay)				@ 0 <= r0 <= 0x7fffff06
- @ Delay routine
- ENTRY(__delay)
- 		subs	r0, r0, #1
--#if 0
-+#ifdef CONFIG_OLD_CPU_DELAY
- 		movls	pc, lr
- 		subs	r0, r0, #1
- 		movls	pc, lr
+Diese E-Mail enth?lt vertrauliche oder rechtlich gesch?tzte Informationen.
+Wenn Sie nicht der vorgesehene Empf?nger sind, informieren Sie bitte sofort
+den Absender und l?schen Sie diese E-Mail. Das unbefugte Kopieren dieser E-Mail
+oder die unbefugte Weitergabe der enthaltenen Informationen ist nicht gestattet.
+ 
+The information contained in this message is confidential or protected by law.
+If you are not the intended recipient, please contact the sender and delete this
+message. Any unauthorised copying of this message or unauthorised distribution of
+the information contained herein is prohibited.
+--------------------------------------------------------------
