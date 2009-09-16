@@ -1,64 +1,48 @@
-From: frederic.riss@gmail.com (=?ISO-8859-1?Q?Fr=E9d=E9ric?= RISS)
-Date: Wed, 16 Sep 2009 07:21:16 +0200
-Subject: [PATCH] arm: Make kprobes unregistration SMP safe
-Message-ID: <1253078476.5021.65.camel@funkybook>
+From: kyungmin.park@samsung.com (Kyungmin Park)
+Date: Wed, 16 Sep 2009 14:45:39 +0900
+Subject: [PATCH] [S5PC100] Use memory base as 0x30000000
+Message-ID: <20090916054539.GA6242@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM kprobes use an illegal instruction to trigger kprobes. In the
-current implementation, there's a race between the unregistration of a
-kprobe and the illegal instruction exception handler if they run at the
-same time on different cores. 
+To work with next SoCs s5pc110, we decide to use 0x3000'0000 as base memory
+address
+Also we posted u-boot patch for the smdkc100 board,
+It set the base memory as 0x3000'0000
 
-When reading the value of the undefined instruction, the exception
-handler might get the original legal instruction as just patched
-concurrently by arch_disarm_kprobe(). When this happen the kprobe
-handler won't run, and thus the exception handler will oops because it
-believe it just hit an undefined instruction in kernel space.
-
-The following patch synchronizes the code patching in the kprobes
-unregistration using stop_machine and thus avoids the above race.
-
-Signed-off-by: Frederic RISS <frederic.riss@gmail.com>
-
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
-
-diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
-index d28513f..6ada87d 100644
---- a/arch/arm/kernel/kprobes.c
-+++ b/arch/arm/kernel/kprobes.c
-@@ -22,6 +22,7 @@
- #include <linux/kernel.h>
- #include <linux/kprobes.h>
- #include <linux/module.h>
-+#include <linux/stop_machine.h>
- #include <linux/stringify.h>
- #include <asm/traps.h>
- #include <asm/cacheflush.h>
-@@ -83,10 +84,24 @@ void __kprobes arch_arm_kprobe(struct kprobe *p)
- 	flush_insns(p->addr, 1);
- }
+diff --git a/arch/arm/mach-s5pc100/Makefile.boot b/arch/arm/mach-s5pc100/Makefile.boot
+index ff90aa1..b0909e3 100644
+--- a/arch/arm/mach-s5pc100/Makefile.boot
++++ b/arch/arm/mach-s5pc100/Makefile.boot
+@@ -1,2 +1,2 @@
+-   zreladdr-y	:= 0x20008000
+-params_phys-y	:= 0x20000100
++   zreladdr-y	:= 0x30008000
++params_phys-y	:= 0x30000100
+diff --git a/arch/arm/mach-s5pc100/include/mach/map.h b/arch/arm/mach-s5pc100/include/mach/map.h
+index 9e9f391..4f82430 100644
+--- a/arch/arm/mach-s5pc100/include/mach/map.h
++++ b/arch/arm/mach-s5pc100/include/mach/map.h
+@@ -54,7 +54,7 @@
+ #define S5PC100_PA_IIC		(0xEC100000)
  
-+/*
-+ * The actual disarming is done here on each CPU and synchronized using
-+ * stop_machine. This synchronization is necessary on SMP to avoid removing
-+ * a probe between the moment the 'Undefined Instruction' exception is raised
-+ * and the moment the exception handler reads the faulting instruction from
-+ * memory.
-+ */
-+int __kprobes __arch_disarm_kprobe(void *p)
-+{
-+	struct kprobe *kp = p;
-+	*kp->addr = kp->opcode;
-+	flush_insns(kp->addr, 1);
-+	return 0;
-+}
-+
- void __kprobes arch_disarm_kprobe(struct kprobe *p)
- {
--	*p->addr = p->opcode;
--	flush_insns(p->addr, 1);
-+	stop_machine(__arch_disarm_kprobe, p, &cpu_online_map);
- }
+ /* ETC */
+-#define S5PC100_PA_SDRAM	(0x20000000)
++#define S5PC100_PA_SDRAM	(0x30000000)
  
- void __kprobes arch_remove_kprobe(struct kprobe *p)
+ /* compatibility defines. */
+ #define S3C_PA_UART		S5PC100_PA_UART
+diff --git a/arch/arm/mach-s5pc100/include/mach/memory.h b/arch/arm/mach-s5pc100/include/mach/memory.h
+index 4b60d18..3f54d30 100644
+--- a/arch/arm/mach-s5pc100/include/mach/memory.h
++++ b/arch/arm/mach-s5pc100/include/mach/memory.h
+@@ -13,6 +13,6 @@
+ #ifndef __ASM_ARCH_MEMORY_H
+ #define __ASM_ARCH_MEMORY_H
+ 
+-#define PHYS_OFFSET     	UL(0x20000000)
++#define PHYS_OFFSET		UL(0x30000000)
+ 
+ #endif
