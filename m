@@ -1,47 +1,64 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 16 Sep 2009 01:54:42 +0100
-Subject: [PATCH 0/8] s3c6410: sdhci: Update Samsung 6410 SDHCI driver.
-In-Reply-To: <1252388710-28478-1-git-send-email-thomas.ab@samsung.com>
-References: <1252388710-28478-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <20090916005442.GV13508@trinity.fluff.org>
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Wed, 16 Sep 2009 09:56:04 +0900
+Subject: [PATCH 02/10] S3C64XX I2S: declared i2s_v4
+In-Reply-To: <20090916001220.GC24720@trinity.fluff.org>
+References: <1253008954-10473-1-git-send-email-jassi.brar@samsung.com>
+	<20090916001220.GC24720@trinity.fluff.org>
+Message-ID: <1b68c6790909151756p2f15575bj75218abdda14335c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 08, 2009 at 02:45:10PM +0900, thomas.ab at samsung.com wrote:
-> From: Thomas Abraham <thomas.ab@samsung.com>
-> 
-> This patch series updates Samsung's 6410 SDHCI driver. This patch series
-> adds clock configuration code in the sdhci driver, adds ADMA support and 
-> adds module exit functionality. This patch set includes the following
-> patches
-
-couple of things
-
-1) s3c should be capitalised to fit in with how the rest of the patch
-   submissions are
-
-2) Please keep feature removal and their fixups together to make sure
-   that from one change to another the kernel keeps compiling.
- 
-> [PATCH 1/8] s3c6410: sdhci: Adding additional elements in sdhci platform data structure.
-> [PATCH 2/8] s3c6410: sdhci: Adding additional data in sdhci platform data structure.
-> [PATCH 3/8] s3c6410: sdhci: Set parent clock, source clock and sdhci module speed.
-> [PATCH 4/8] s3c6410: sdhci: Enable ADMA feature in 6410 sdhci controller.
-> [PATCH 5/8] s3c6410: sdhci: Removing unused host_caps entry from sdhci0 platform data
-> [PATCH 6/8] s3c6410: sdhci: Modify platform data for sdhci-1
-> [PATCH 7/8] s3c6410: sdhci: Remove host_caps field from sdhci platform data structure
-> [PATCH 8/8] s3c6410: sdhci: Updating sdhci_s3c_remove module exit function
-> 
-> This patch sets depends on the following patches for proper functioning.
-> 
-> [PATCH 1/4] s3c6410: use correct divider_shift in setrate_clksrc()
-> [PATCH 2/4] s3c6410: update clk->parent when setting clock source
-> [PATCH 3/4] s3c6410: Fix divider value calculation in s3c64xx_roundrate_clksrc
-> [PATCH 4/4] s3c6410: Remove redundant mpll parent assignment.
-> [PATCH] sdhci: Add new quirk in sdhci driver and update ADMA descriptor build.
-
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+On Wed, Sep 16, 2009 at 9:12 AM, Ben Dooks <ben-linux@fluff.org> wrote:
+> On Tue, Sep 15, 2009 at 07:02:34PM +0900, Jassi wrote:
+>> For now, I2S-v4 is simply enumerated as third I2S controller of S3C6410
+>> rather than a special device.
+>> Also, Declared I2S-v4 device for SMDK6410.
+>>
+>> Signed-Off-by: Jassi <jassi.brar@samsung.com>
+>> ---
+>> ?arch/arm/mach-s3c6410/mach-smdk6410.c | ? ?1 +
+>> ?arch/arm/plat-s3c/dev-audio.c ? ? ? ? | ? ?6 ++++--
+>> ?2 files changed, 5 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-s3c6410/mach-smdk6410.c b/arch/arm/mach-s3c6410/mach-smdk6410.c
+>> index bc9a7de..108ba37 100644
+>> --- a/arch/arm/mach-s3c6410/mach-smdk6410.c
+>> +++ b/arch/arm/mach-s3c6410/mach-smdk6410.c
+>> @@ -181,6 +181,7 @@ static struct platform_device *smdk6410_devices[] __initdata = {
+>> ?#endif
+>> ? ? ? &s3c_device_i2c0,
+>> ? ? ? &s3c_device_i2c1,
+>> + ? ? &s3c64xx_device_iisv4,
+>> ? ? ? &s3c_device_fb,
+>> ? ? ? &s3c_device_usb,
+>> ? ? ? &s3c_device_usb_hsotg,
+>> diff --git a/arch/arm/plat-s3c/dev-audio.c b/arch/arm/plat-s3c/dev-audio.c
+>> index 1322beb..28c030c 100644
+>> --- a/arch/arm/plat-s3c/dev-audio.c
+>> +++ b/arch/arm/plat-s3c/dev-audio.c
+>> @@ -51,6 +51,7 @@ struct platform_device s3c64xx_device_iis1 = {
+>> ?};
+>> ?EXPORT_SYMBOL(s3c64xx_device_iis1);
+>>
+>> +#ifdef CONFIG_CPU_S3C6410
+>> ?static struct resource s3c64xx_iisv4_resource[] = {
+>> ? ? ? [0] = {
+>> ? ? ? ? ? ? ? .start = S3C64XX_PA_IISV4,
+>> @@ -60,9 +61,10 @@ static struct resource s3c64xx_iisv4_resource[] = {
+>> ?};
+>>
+>> ?struct platform_device s3c64xx_device_iisv4 = {
+>> - ? ? .name ? ? ? ? ? ? = "s3c64xx-iis-v4",
+>> - ? ? .id ? ? ? ? ? ? ? = -1,
+>> + ? ? .name ? ? ? ? ? ? = "s3c64xx-iis",
+>> + ? ? .id ? ? ? ? ? ? ? = 2,
+>
+> I'd like to see how much different the two drivers are, and whether they
+> need to be seperated into their own modules.
+>
+> Changing the name to s3c64xx-iis means that the module auto-load may end
+> up loading the wrong module. Holding off on this change until we se what
+> needs to be done for this block.
+For now, my idea is to first lay ground for I2S-v4 controller.
+It is easier for implement 6channels support when we already have the
+controller working for 2channels.
