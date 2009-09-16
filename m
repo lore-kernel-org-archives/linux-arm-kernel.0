@@ -1,51 +1,81 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Wed, 16 Sep 2009 09:46:53 +0900
-Subject: [PATCH 6/7] S3C64XX DMA: dbg_showbuffs cleanup
-In-Reply-To: <20090915234432.GC13508@trinity.fluff.org>
-References: <1253008884-7657-1-git-send-email-jassi.brar@samsung.com>
-	<20090915234432.GC13508@trinity.fluff.org>
-Message-ID: <1b68c6790909151746o5a9c127cq114f6ad29122921c@mail.gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Wed, 16 Sep 2009 01:46:56 +0100
+Subject: [PATCH 3/8] s3c6410: sdhci: Set parent clock,
+	source clock and sdhci module speed.
+In-Reply-To: <1252392686-31135-1-git-send-email-thomas.ab@samsung.com>
+References: <1252392686-31135-1-git-send-email-thomas.ab@samsung.com>
+Message-ID: <20090916004656.GQ13508@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 16, 2009 at 8:44 AM, Ben Dooks <ben-linux@fluff.org> wrote:
-> On Tue, Sep 15, 2009 at 07:01:24PM +0900, Jassi wrote:
->> Removed unused variable and cleaned up.
->>
->> Signed-Off-by: Jassi <jassi.brar@samsung.com>
->> ---
->> ?arch/arm/plat-s3c64xx/dma.c | ? 14 ++++----------
->> ?1 files changed, 4 insertions(+), 10 deletions(-)
->>
->> diff --git a/arch/arm/plat-s3c64xx/dma.c b/arch/arm/plat-s3c64xx/dma.c
->> index e68469d..727072b 100644
->> --- a/arch/arm/plat-s3c64xx/dma.c
->> +++ b/arch/arm/plat-s3c64xx/dma.c
->> @@ -71,20 +71,14 @@ static void show_lli(struct pl080s_lli *lli)
->> ?static void dbg_showbuffs(struct s3c2410_dma_chan *chan)
->> ?{
->> ? ? ? struct s3c64xx_dma_buff *ptr;
->> - ? ? struct s3c64xx_dma_buff *end;
->
-> you are right that the end is not used.
->
->> ? ? ? pr_debug("DMA%d: buffs next %p, curr %p, end %p\n",
->> ? ? ? ? ? ? ? ?chan->number, chan->next, chan->curr, chan->end);
->>
->> - ? ? ptr = chan->next;
->> - ? ? end = chan->end;
->> -
->> - ? ? if (debug_show_buffs) {
->> - ? ? ? ? ? ? for (; ptr != NULL; ptr = ptr->next) {
->> - ? ? ? ? ? ? ? ? ? ? pr_debug("DMA%d: %08x ",
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?chan->number, ptr->lli_dma);
->> - ? ? ? ? ? ? ? ? ? ? show_lli(ptr->lli);
->> - ? ? ? ? ? ? }
->> + ? ? for (ptr = chan->curr; debug_show_buffs && ptr != NULL; ptr = ptr->next) {
->
-> this isn't a very nice change, for a start this means debug_show_buffs
-> is going to end up being evaluated each loop and secondly these sort of
-> changes do not help the code readability and can introduce bugs of their
-> own.
-yes and i knew the counter will be evaluated for every loop.
-i wanted to keep the counter and not change much the code.
+On Tue, Sep 08, 2009 at 03:51:26PM +0900, thomas.ab at samsung.com wrote:
+> From: Thomas Abraham <thomas.ab@samsung.com>
+> 
+> This patch sets the parent clock, source clock and sdhci module
+> clock speed for 6410 sdhci controller.
+
+The driver should really be presented with a correct list of sources
+for mmc_bus in the platform data (ok, the last post was incorrect as
+I forgot the mux on mmc_bus as well as the mux in the driver block).
+
+Any static setup of mmc_bus can be done in the machine setup code,
+otherwise please look at how the choices for the SDHCI mux is presented.
+ 
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> ---
+>  drivers/mmc/host/sdhci-s3c.c |   13 +++++++++++++
+>  1 files changed, 13 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> index 50997d2..db1bb93 100644
+> --- a/drivers/mmc/host/sdhci-s3c.c
+> +++ b/drivers/mmc/host/sdhci-s3c.c
+> @@ -22,6 +22,8 @@
+>  
+>  #include <plat/sdhci.h>
+>  #include <plat/regs-sdhci.h>
+> +#include <plat/clock.h>
+> +#include <plat/cpu.h>
+>  
+>  #include "sdhci.h"
+>  
+> @@ -221,6 +223,7 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+>  	struct sdhci_host *host;
+>  	struct sdhci_s3c *sc;
+>  	struct resource *res;
+> +	struct clk *clk_mmc, *clk_parent;
+>  	int ret, irq, ptr, clks;
+>  
+>  	if (!pdata) {
+> @@ -240,6 +243,16 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+>  		return -ENOENT;
+>  	}
+>  
+> +	/* Set the SDHCI controller clock rate */
+> +	clk_mmc = clk_get(dev, pdata->clk_source_name);
+> +	clk_parent = clk_get(dev, pdata->clk_parent_name);
+> +        if (!clk_mmc || !clk_parent) {
+> +                dev_err(dev, "could not obtain clock information");
+> +                return -ENXIO;
+> +        }
+> +	clk_set_parent(clk_mmc, clk_parent);
+> +	clk_set_rate(clk_mmc, pdata->clk_speed);
+> +
+>  	host = sdhci_alloc_host(dev, sizeof(struct sdhci_s3c));
+>  	if (IS_ERR(host)) {
+>  		dev_err(dev, "sdhci_alloc_host() failed\n");
+> -- 
+> 1.5.3.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
