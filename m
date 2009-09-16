@@ -1,76 +1,28 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 16 Sep 2009 17:13:09 -0400
-Subject: [PATCH] ep93xx: define EP93XX_*_PHYS_BASE with macros
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901CBF431@mi8nycmail19.Mi8.com>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Wed, 16 Sep 2009 23:46:56 +0200
+Subject: Samsung S3C6410 / SmartQ / 2D acceleration / Xorgy
+In-Reply-To: <mailman.1668.1253069003.2256.linux-arm-kernel@lists.infradead.org>
+References: <mailman.1668.1253069003.2256.linux-arm-kernel@lists.infradead.org>
+Message-ID: <4AB15CD0.2050104@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the #define's for the EP93XX_*_PHYS_BASE addresses to use
-macros for easier readability.
+Op 16-09-09 04:43, linux-arm-kernel-request at lists.infradead.org schreef:
+> I am not sure about uio.  Sorry.
+>
+> The main problem is the g2d fifo is 32 commands deep.  And some of the
+> x11perf tests are running in our XAA s3c driver @ ~2e6 ops/sec.  That is is
+> lot of interrupts for user or kernel context.:-)
+>
+> Sometimes polling is better.  1/2:-)
+>
+> We are 1 stupid bug away from a release of s3c Xwindows fbdev + XAA +
+> Xvideo (using the samsung s3c-pp) and HW cursor with alpha blend.
+>    
 
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Ryan Mallon <ryan@bluewatersys.com>
+This sounds great!
 
----
+Do you have any code available?
 
-diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-index ea78e90..ff46238 100644
---- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-+++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-@@ -52,22 +52,24 @@
- #define EP93XX_AHB_VIRT_BASE		0xfef00000
- #define EP93XX_AHB_SIZE			0x00100000
- 
-+#define EP93XX_AHB_PHYS(x)		(EP93XX_AHB_PHYS_BASE + (x))
- #define EP93XX_AHB_IOMEM(x)		IOMEM(EP93XX_AHB_VIRT_BASE + (x))
- 
- #define EP93XX_APB_PHYS_BASE		0x80800000
- #define EP93XX_APB_VIRT_BASE		0xfed00000
- #define EP93XX_APB_SIZE			0x00200000
- 
-+#define EP93XX_APB_PHYS(x)		(EP93XX_APB_PHYS_BASE + (x))
- #define EP93XX_APB_IOMEM(x)		IOMEM(EP93XX_APB_VIRT_BASE + (x))
- 
- 
- /* AHB peripherals */
- #define EP93XX_DMA_BASE			EP93XX_AHB_IOMEM(0x00000000)
- 
--#define EP93XX_ETHERNET_PHYS_BASE	(EP93XX_AHB_PHYS_BASE + 0x00010000)
-+#define EP93XX_ETHERNET_PHYS_BASE	EP93XX_AHB_PHYS(0x00010000)
- #define EP93XX_ETHERNET_BASE		EP93XX_AHB_IOMEM(0x00010000)
- 
--#define EP93XX_USB_PHYS_BASE		(EP93XX_AHB_PHYS_BASE + 0x00020000)
-+#define EP93XX_USB_PHYS_BASE		EP93XX_AHB_PHYS(0x00020000)
- #define EP93XX_USB_BASE			EP93XX_AHB_IOMEM(0x00020000)
- 
- #define EP93XX_RASTER_BASE		EP93XX_AHB_IOMEM(0x00030000)
-@@ -133,13 +135,13 @@
- 
- #define EP93XX_IRDA_BASE		EP93XX_APB_IOMEM(0x000b0000)
- 
--#define EP93XX_UART1_PHYS_BASE		(EP93XX_APB_PHYS_BASE + 0x000c0000)
-+#define EP93XX_UART1_PHYS_BASE		EP93XX_APB_PHYS(0x000c0000)
- #define EP93XX_UART1_BASE		EP93XX_APB_IOMEM(0x000c0000)
- 
--#define EP93XX_UART2_PHYS_BASE		(EP93XX_APB_PHYS_BASE + 0x000d0000)
-+#define EP93XX_UART2_PHYS_BASE		EP93XX_APB_PHYS(0x000d0000)
- #define EP93XX_UART2_BASE		EP93XX_APB_IOMEM(0x000d0000)
- 
--#define EP93XX_UART3_PHYS_BASE		(EP93XX_APB_PHYS_BASE + 0x000e0000)
-+#define EP93XX_UART3_PHYS_BASE		EP93XX_APB_PHYS(0x000e0000)
- #define EP93XX_UART3_BASE		EP93XX_APB_IOMEM(0x000e0000)
- 
- #define EP93XX_KEY_MATRIX_BASE		EP93XX_APB_IOMEM(0x000f0000)
-@@ -147,10 +149,10 @@
- #define EP93XX_ADC_BASE			EP93XX_APB_IOMEM(0x00100000)
- #define EP93XX_TOUCHSCREEN_BASE		EP93XX_APB_IOMEM(0x00100000)
- 
--#define EP93XX_PWM_PHYS_BASE		(EP93XX_APB_PHYS_BASE + 0x00110000)
-+#define EP93XX_PWM_PHYS_BASE		EP93XX_APB_PHYS(0x00110000)
- #define EP93XX_PWM_BASE			EP93XX_APB_IOMEM(0x00110000)
- 
--#define EP93XX_RTC_PHYS_BASE		(EP93XX_APB_PHYS_BASE + 0x00120000)
-+#define EP93XX_RTC_PHYS_BASE		EP93XX_APB_PHYS(0x00120000)
- #define EP93XX_RTC_BASE			EP93XX_APB_IOMEM(0x00120000)
- 
- #define EP93XX_SYSCON_BASE		EP93XX_APB_IOMEM(0x00130000) 
+Regards,
+Maurus Cuelenaere
