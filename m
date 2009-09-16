@@ -1,34 +1,64 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Wed, 16 Sep 2009 14:16:54 +0900
-Subject: [PATCH 08/10] S3C64XX I2S: Return correct codec clock
-In-Reply-To: <20090915115618.GN22878@rakim.wolfsonmicro.main>
-References: <1253008960-10666-1-git-send-email-jassi.brar@samsung.com>
-	<20090915110635.GI22878@rakim.wolfsonmicro.main>
-	<1b68c6790909150421y7c78ad8dt2703bd039fcd39b@mail.gmail.com>
-	<20090915115618.GN22878@rakim.wolfsonmicro.main>
-Message-ID: <1b68c6790909152216od3f372ftc2fa3db488e6996@mail.gmail.com>
+From: frederic.riss@gmail.com (=?ISO-8859-1?Q?Fr=E9d=E9ric?= RISS)
+Date: Wed, 16 Sep 2009 07:21:16 +0200
+Subject: [PATCH] arm: Make kprobes unregistration SMP safe
+Message-ID: <1253078476.5021.65.camel@funkybook>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2009 at 8:56 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Tue, Sep 15, 2009 at 08:21:05PM +0900, jassi brar wrote:
->> On Tue, Sep 15, 2009 at 8:06 PM, Mark Brown
->
->> > There's three possible clocks here according to the datasheet - PCLK,
->> > CLKAUDIO and I2SCLK - so this will still give the wrong clock some of
->> > the time. ?Also, please use checkpatch
->
->> Yes, but the existing code doesn't consider I2SCLK at all.
->> The infra isn't there to provide the clock pointer anyhow.
->
-> Please put a comment there explaining that, or ideally code that returns
-> an error in those cases, to make it clearer what's being done.
+ARM kprobes use an illegal instruction to trigger kprobes. In the
+current implementation, there's a race between the unregistration of a
+kprobe and the illegal instruction exception handler if they run at the
+same time on different cores. 
 
-Wait, there is no option for selecting I2SCLK in the manual. That is
-behind the MUX along with Mpll/Epll Out etc.
-In the driver we actually have all the correct options : PCLK or
-CLKAUDIO(which is the output of the MUX).
+When reading the value of the undefined instruction, the exception
+handler might get the original legal instruction as just patched
+concurrently by arch_disarm_kprobe(). When this happen the kprobe
+handler won't run, and thus the exception handler will oops because it
+believe it just hit an undefined instruction in kernel space.
 
-The IMS bit can select only either PCLK or CLKAUDIO.So, i guess
- the patch is fine as it is.
+The following patch synchronizes the code patching in the kprobes
+unregistration using stop_machine and thus avoids the above race.
+
+Signed-off-by: Frederic RISS <frederic.riss@gmail.com>
+
+---
+
+diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
+index d28513f..6ada87d 100644
+--- a/arch/arm/kernel/kprobes.c
++++ b/arch/arm/kernel/kprobes.c
+@@ -22,6 +22,7 @@
+ #include <linux/kernel.h>
+ #include <linux/kprobes.h>
+ #include <linux/module.h>
++#include <linux/stop_machine.h>
+ #include <linux/stringify.h>
+ #include <asm/traps.h>
+ #include <asm/cacheflush.h>
+@@ -83,10 +84,24 @@ void __kprobes arch_arm_kprobe(struct kprobe *p)
+ 	flush_insns(p->addr, 1);
+ }
+ 
++/*
++ * The actual disarming is done here on each CPU and synchronized using
++ * stop_machine. This synchronization is necessary on SMP to avoid removing
++ * a probe between the moment the 'Undefined Instruction' exception is raised
++ * and the moment the exception handler reads the faulting instruction from
++ * memory.
++ */
++int __kprobes __arch_disarm_kprobe(void *p)
++{
++	struct kprobe *kp = p;
++	*kp->addr = kp->opcode;
++	flush_insns(kp->addr, 1);
++	return 0;
++}
++
+ void __kprobes arch_disarm_kprobe(struct kprobe *p)
+ {
+-	*p->addr = p->opcode;
+-	flush_insns(p->addr, 1);
++	stop_machine(__arch_disarm_kprobe, p, &cpu_online_map);
+ }
+ 
+ void __kprobes arch_remove_kprobe(struct kprobe *p)
