@@ -1,142 +1,65 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 16 Sep 2009 01:23:21 +0100
-Subject: [PATCH 5/7] S3C64XX DMA: TC-IRQ implemented.
-In-Reply-To: <1253008883-7624-1-git-send-email-jassi.brar@samsung.com>
-References: <1253008883-7624-1-git-send-email-jassi.brar@samsung.com>
-Message-ID: <20090916002321.GM13508@trinity.fluff.org>
+Date: Wed, 16 Sep 2009 01:28:32 +0100
+Subject: [PATCH 4/7] S3C64XX DMA: S3C2410_DMAF_CIRCULAR disable
+In-Reply-To: <1253008882-7587-1-git-send-email-jassi.brar@samsung.com>
+References: <1253008882-7587-1-git-send-email-jassi.brar@samsung.com>
+Message-ID: <20090916002832.GN13508@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2009 at 07:01:23PM +0900, Jassi wrote:
-> The available irq handler simply doesn't work. The Dma state-machine
-> is broken. This patch fixes it.
+On Tue, Sep 15, 2009 at 07:01:22PM +0900, Jassi wrote:
+> S3C2410_DMAF_CIRCULAR requires that we don't free buffer
+> resources after TC-IRQ because we will revisit the buffer.
+> During simple long term playback/capture, like movie-play,
+> this may block those resources(kmem/dma_pool) unncessarily.
+> This is especially a problem since we allocate them in IRQ
+> context.
+> For now, we disable the option and free buff resources after
+> it's TC-IRQ. Also, chan->curr will point to the active buffer
+> while chan->next is rendered useless.
 
-A better explanation would have been nice, so I could actually evaluate
-what is going on here.
+This would have been better changing the sound driver and ensuring
+it does not allocate as much memory for buffering audio.
 
-> Also, chan->curr,next,end pointer manipulation is protected.
-
-Should have been a seperate patch, I would have been able to apply that
-reasonably easily.
+The whole point of the circular buffer is it is allocated once and
+then used until the end of playback. If what you are saying is right,
+and resources are running out then somewhere either the SoC layer is
+losing them or between the DMA and the I2S driver we are losing
+buffers. This points to a bug in the resource management of one of
+them.
  
 > Signed-Off-by: Jassi <jassi.brar@samsung.com>
 > ---
->  arch/arm/plat-s3c64xx/dma.c |   61 +++++++++++++++++++++++++++---------------
->  1 files changed, 39 insertions(+), 22 deletions(-)
+>  arch/arm/plat-s3c64xx/dma.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
 > 
 > diff --git a/arch/arm/plat-s3c64xx/dma.c b/arch/arm/plat-s3c64xx/dma.c
-> index 02bc82b..e68469d 100644
+> index 266a107..02bc82b 100644
 > --- a/arch/arm/plat-s3c64xx/dma.c
 > +++ b/arch/arm/plat-s3c64xx/dma.c
-> @@ -339,6 +339,7 @@ int s3c2410_dma_enqueue(unsigned int channel, void *id,
->  	struct s3c64xx_dma_buff *next;
->  	struct s3c64xx_dma_buff *buff;
->  	struct pl080s_lli *lli;
-> +	unsigned long flags;
->  	int ret;
+> @@ -375,10 +375,12 @@ int s3c2410_dma_enqueue(unsigned int channel, void *id,
+>  		end->next = buff;
+>  		endlli->next_lli = buff->lli_dma;
 >  
->  	WARN_ON(!chan);
-> @@ -366,6 +367,8 @@ int s3c2410_dma_enqueue(unsigned int channel, void *id,
->  
->  	s3c64xx_dma_fill_lli(chan, lli, data, size);
->  
-> +	local_irq_save(flags);
-> +
->  	if ((next = chan->next) != NULL) {
->  		struct s3c64xx_dma_buff *end = chan->end;
->  		struct pl080s_lli *endlli = end->lli;
-> @@ -399,6 +402,8 @@ int s3c2410_dma_enqueue(unsigned int channel, void *id,
->  		s3c64xx_lli_to_regs(chan, lli);
->  	}
->  
-> +	local_irq_restore(flags);
-> +
->  	show_lli(lli);
->  
->  	dbg_showchan(chan);
-> @@ -562,27 +567,13 @@ int s3c2410_dma_free(unsigned int channel, struct s3c2410_dma_client *client)
->  
->  EXPORT_SYMBOL(s3c2410_dma_free);
->  
-> -
-> -static void s3c64xx_dma_tcirq(struct s3c64xx_dmac *dmac, int offs)
-> -{
-> -	struct s3c2410_dma_chan *chan = dmac->channels + offs;
-> -
-> -	/* note, we currently do not bother to work out which buffer
-> -	 * or buffers have been completed since the last tc-irq. */
-> -
-> -	if (chan->callback_fn)
-> -		(chan->callback_fn)(chan, chan->curr->pw, 0, S3C2410_RES_OK);
-> -}
-
-I belive a callback is necessary for the audio code to update the
-current dma position of the stream. I also thought this worked?
-
-> -static void s3c64xx_dma_errirq(struct s3c64xx_dmac *dmac, int offs)
-> -{
-> -	printk(KERN_DEBUG "%s: offs %d\n", __func__, offs);
-> -}
-> -
->  static irqreturn_t s3c64xx_dma_irq(int irq, void *pw)
->  {
-> +	struct s3c64xx_dma_buff *buff;
->  	struct s3c64xx_dmac *dmac = pw;
-> -	u32 tcstat, errstat;
-> +	struct s3c2410_dma_chan *chan;
-> +	enum s3c2410_dma_buffresult res;
-> +	u32 tcstat, errstat, val;
->  	u32 bit;
->  	int offs;
->  
-> @@ -590,15 +581,41 @@ static irqreturn_t s3c64xx_dma_irq(int irq, void *pw)
->  	errstat = readl(dmac->regs + PL080_ERR_STATUS);
->  
->  	for (offs = 0, bit = 1; offs < 8; offs++, bit <<= 1) {
-> +
-> +		if (!(errstat & bit) && !(tcstat & bit))
-> +			continue;
-> +
-> +		res = S3C2410_RES_ERR;
-> +
-> +		if (errstat & bit)
-> +			writel(bit, dmac->regs + PL080_ERR_CLEAR);
-> +
->  		if (tcstat & bit) {
->  			writel(bit, dmac->regs + PL080_TC_CLEAR);
-> -			s3c64xx_dma_tcirq(dmac, offs);
-> +			res = S3C2410_RES_OK;
+> +#if 0
+>  		if (chan->flags & S3C2410_DMAF_CIRCULAR) {
+>  			struct s3c64xx_dma_buff *curr = chan->curr;
+>  			lli->next_lli = curr->lli_dma;
 >  		}
+> +#endif
 >  
-> -		if (errstat & bit) {
-> -			s3c64xx_dma_errirq(dmac, offs);
-> -			writel(bit, dmac->regs + PL080_ERR_CLEAR);
-> +		chan = dmac->channels + offs;
-> +		if(chan->curr == NULL)
-> +			continue;
-> +
-> +		buff = chan->curr;
-> +		if (chan->curr != chan->end) {
-> +			BUG_ON(chan->curr->next == NULL);
-> +			chan->curr = chan->curr->next;
-> +
-> +			val = readl(chan->regs + PL080S_CH_CONFIG);
-> +			if (!(val & PL080_CONFIG_ACTIVE)) {
-> +				s3c64xx_lli_to_regs(chan, chan->curr->lli);
-> +				val |= PL080_CONFIG_ENABLE;
-> +				writel(val, chan->regs + PL080S_CH_CONFIG);
-> +			}
-> +		} else {
-> +			chan->curr = chan->next = chan->end = NULL;
->  		}
-> +
-> +		s3c64xx_dma_bufffdone(chan, buff, res);
-> +		s3c64xx_dma_freebuff(buff);
->  	}
+>  		if (next == chan->curr) {
+>  			writel(buff->lli_dma, chan->regs + PL080_CH_LLI);
+> -- 
+> 1.6.2.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Hmm, this looks like a train wreck. Please do not move code around
-like this.
-
+-- 
 -- 
 Ben
 
