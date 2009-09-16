@@ -1,74 +1,34 @@
-From: tabbott@ksplice.com (Tim Abbott)
-Date: Wed, 16 Sep 2009 16:40:05 -0400
-Subject: [PATCH v3 1/2] arm: convert to use __HEAD and HEAD_TEXT macros.
-In-Reply-To: <1253133606-24918-1-git-send-email-tabbott@ksplice.com>
-References: <1253133606-24918-1-git-send-email-tabbott@ksplice.com>
-Message-ID: <1253133606-24918-2-git-send-email-tabbott@ksplice.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 16 Sep 2009 21:59:27 +0100
+Subject: [PATCH] arm: new W macro to WORD_ACCESS
+In-Reply-To: <20090916175812.GA18993@Chamillionaire.breakpoint.cc>
+References: <200909161601.35662.elendil@planet.nl>
+	<20090916175812.GA18993@Chamillionaire.breakpoint.cc>
+Message-ID: <1253134767.19743.3.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This has the consequence of changing the section name used for head
-code from ".text.head" to ".head.text".  Since this commit changes all
-users in the architecture, this change should be harmless.
+On Wed, 2009-09-16 at 19:58 +0200, Sebastian Andrzej Siewior wrote:
+> As reported by Frans Pop the new global macro W on ARM which is included
+> via
+> |arch/arm/include/asm/uaccess.h:20
+> |include/linux/uaccess.h:5
+> |include/linux/crypto.h:26
+> |crypto/cast6.c:23
+> 
+> leads to a build error because the crypto/cast6.c defines a function
+> which is named W.
 
-The .text.head output section is eliminated and the head text code is
-included at the start of the .init output section.
+This was already reported by Alexey Dobriyan and I included his patch in
+my Thumb-2 branch (and -next for now):
 
-Signed-off-by: Tim Abbott <tabbott@ksplice.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Linus Torvalds <torvalds@linux-foundation.org>
----
- arch/arm/kernel/head-nommu.S  |    2 +-
- arch/arm/kernel/head.S        |    2 +-
- arch/arm/kernel/vmlinux.lds.S |    8 +++-----
- 3 files changed, 5 insertions(+), 7 deletions(-)
+http://linux-arm.org/git?p=linux-2.6.git;a=commitdiff;h=4fb3c2e2ab3549308a1b1663296d165e45d72ba5
 
-diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-index e5dfc28..573b803 100644
---- a/arch/arm/kernel/head-nommu.S
-+++ b/arch/arm/kernel/head-nommu.S
-@@ -32,7 +32,7 @@
-  * numbers for r1.
-  *
-  */
--	.section ".text.head", "ax"
-+	__HEAD
- ENTRY(stext)
- 	setmode	PSR_F_BIT | PSR_I_BIT | SVC_MODE, r9 @ ensure svc mode
- 						@ and irqs disabled
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 38ccbe1..eb62bf9 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -74,7 +74,7 @@
-  * crap here - that's what the boot loader (or in extreme, well justified
-  * circumstances, zImage) is for.
-  */
--	.section ".text.head", "ax"
-+	__HEAD
- ENTRY(stext)
- 	setmode	PSR_F_BIT | PSR_I_BIT | SVC_MODE, r9 @ ensure svc mode
- 						@ and irqs disabled
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 5cc4812..d3fbd98 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -24,13 +24,11 @@ SECTIONS
- #else
- 	. = PAGE_OFFSET + TEXT_OFFSET;
- #endif
--	.text.head : {
--		_stext = .;
--		_sinittext = .;
--		*(.text.head)
--	}
- 
- 	.init : {			/* Init code and data		*/
-+		_stext = .;
-+		_sinittext = .;
-+			HEAD_TEXT
- 			INIT_TEXT
- 		_einittext = .;
- 		__proc_info_begin = .;
+Since this macro is only used in ARM assembly code, the patch simply
+adds some ifdefs around it.
+
+Russell, if you are OK with Alexey's patch, I'll send you a pull request
+(though for only one patch, alternatively just merge it manually).
+
 -- 
-1.6.3.3
+Catalin
