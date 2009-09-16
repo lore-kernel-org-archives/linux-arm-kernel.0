@@ -1,146 +1,28 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Wed, 16 Sep 2009 11:43:15 +0900
-Subject: [PATCH 5/7] S3C64XX DMA: TC-IRQ implemented.
-In-Reply-To: <20090916002321.GM13508@trinity.fluff.org>
-References: <1253008883-7624-1-git-send-email-jassi.brar@samsung.com>
-	<20090916002321.GM13508@trinity.fluff.org>
-Message-ID: <1b68c6790909151943u23b7c776w9e033f86c52b7570@mail.gmail.com>
+From: jassi.brar@samsung.com (Jassi)
+Date: Wed, 16 Sep 2009 13:47:49 +0900
+Subject: [PATCH] S3C64XX I2S: S3C64XX_PA_IISV4 defined
+Message-ID: <1253076469-20172-1-git-send-email-jassi.brar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 16, 2009 at 9:23 AM, Ben Dooks <ben-linux@fluff.org> wrote:
-> On Tue, Sep 15, 2009 at 07:01:23PM +0900, Jassi wrote:
->> Also, chan->curr,next,end pointer manipulation is protected.
->
-> Should have been a seperate patch, I would have been able to apply that
-> reasonably easily.
-Ok, will resend as a separate patch.
+Defined the missing S3C64XX_PA_IISV4.
 
+Signed-off-by: Jassi <jassi.brar@samsung.com>
+---
+ arch/arm/mach-s3c6400/include/mach/map.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
->> Signed-Off-by: Jassi <jassi.brar@samsung.com>
->> ---
->> ?arch/arm/plat-s3c64xx/dma.c | ? 61 +++++++++++++++++++++++++++---------------
->> ?1 files changed, 39 insertions(+), 22 deletions(-)
->>
->> diff --git a/arch/arm/plat-s3c64xx/dma.c b/arch/arm/plat-s3c64xx/dma.c
->> index 02bc82b..e68469d 100644
->> --- a/arch/arm/plat-s3c64xx/dma.c
->> +++ b/arch/arm/plat-s3c64xx/dma.c
->> @@ -339,6 +339,7 @@ int s3c2410_dma_enqueue(unsigned int channel, void *id,
->> ? ? ? struct s3c64xx_dma_buff *next;
->> ? ? ? struct s3c64xx_dma_buff *buff;
->> ? ? ? struct pl080s_lli *lli;
->> + ? ? unsigned long flags;
->> ? ? ? int ret;
->>
->> ? ? ? WARN_ON(!chan);
->> @@ -366,6 +367,8 @@ int s3c2410_dma_enqueue(unsigned int channel, void *id,
->>
->> ? ? ? s3c64xx_dma_fill_lli(chan, lli, data, size);
->>
->> + ? ? local_irq_save(flags);
->> +
->> ? ? ? if ((next = chan->next) != NULL) {
->> ? ? ? ? ? ? ? struct s3c64xx_dma_buff *end = chan->end;
->> ? ? ? ? ? ? ? struct pl080s_lli *endlli = end->lli;
->> @@ -399,6 +402,8 @@ int s3c2410_dma_enqueue(unsigned int channel, void *id,
->> ? ? ? ? ? ? ? s3c64xx_lli_to_regs(chan, lli);
->> ? ? ? }
->>
->> + ? ? local_irq_restore(flags);
->> +
->> ? ? ? show_lli(lli);
->>
->> ? ? ? dbg_showchan(chan);
->> @@ -562,27 +567,13 @@ int s3c2410_dma_free(unsigned int channel, struct s3c2410_dma_client *client)
->>
->> ?EXPORT_SYMBOL(s3c2410_dma_free);
->>
->> -
->> -static void s3c64xx_dma_tcirq(struct s3c64xx_dmac *dmac, int offs)
->> -{
->> - ? ? struct s3c2410_dma_chan *chan = dmac->channels + offs;
->> -
->> - ? ? /* note, we currently do not bother to work out which buffer
->> - ? ? ?* or buffers have been completed since the last tc-irq. */
->> -
->> - ? ? if (chan->callback_fn)
->> - ? ? ? ? ? ? (chan->callback_fn)(chan, chan->curr->pw, 0, S3C2410_RES_OK);
->> -}
->
-> I belive a callback is necessary for the audio code to update the
-> current dma position of the stream. I also thought this worked?
-Of course, it is necessary. And my patch doesn't skip that.
-Instead of special wrapper for callback during TC-IRQ, I make use of
-the existing function s3c64xx_dma_buffdone with return code as per the
-IRQ status.
-Also, with the patch, callback_fn is called for each buffer
-that was enqueued.
-
->> -static void s3c64xx_dma_errirq(struct s3c64xx_dmac *dmac, int offs)
->> -{
->> - ? ? printk(KERN_DEBUG "%s: offs %d\n", __func__, offs);
->> -}
->> -
->> ?static irqreturn_t s3c64xx_dma_irq(int irq, void *pw)
->> ?{
->> + ? ? struct s3c64xx_dma_buff *buff;
->> ? ? ? struct s3c64xx_dmac *dmac = pw;
->> - ? ? u32 tcstat, errstat;
->> + ? ? struct s3c2410_dma_chan *chan;
->> + ? ? enum s3c2410_dma_buffresult res;
->> + ? ? u32 tcstat, errstat, val;
->> ? ? ? u32 bit;
->> ? ? ? int offs;
->>
->> @@ -590,15 +581,41 @@ static irqreturn_t s3c64xx_dma_irq(int irq, void *pw)
->> ? ? ? errstat = readl(dmac->regs + PL080_ERR_STATUS);
->>
->> ? ? ? for (offs = 0, bit = 1; offs < 8; offs++, bit <<= 1) {
->> +
->> + ? ? ? ? ? ? if (!(errstat & bit) && !(tcstat & bit))
->> + ? ? ? ? ? ? ? ? ? ? continue;
->> +
->> + ? ? ? ? ? ? res = S3C2410_RES_ERR;
->> +
->> + ? ? ? ? ? ? if (errstat & bit)
->> + ? ? ? ? ? ? ? ? ? ? writel(bit, dmac->regs + PL080_ERR_CLEAR);
->> +
->> ? ? ? ? ? ? ? if (tcstat & bit) {
->> ? ? ? ? ? ? ? ? ? ? ? writel(bit, dmac->regs + PL080_TC_CLEAR);
->> - ? ? ? ? ? ? ? ? ? ? s3c64xx_dma_tcirq(dmac, offs);
->> + ? ? ? ? ? ? ? ? ? ? res = S3C2410_RES_OK;
->> ? ? ? ? ? ? ? }
->>
->> - ? ? ? ? ? ? if (errstat & bit) {
->> - ? ? ? ? ? ? ? ? ? ? s3c64xx_dma_errirq(dmac, offs);
->> - ? ? ? ? ? ? ? ? ? ? writel(bit, dmac->regs + PL080_ERR_CLEAR);
->> + ? ? ? ? ? ? chan = dmac->channels + offs;
->> + ? ? ? ? ? ? if(chan->curr == NULL)
->> + ? ? ? ? ? ? ? ? ? ? continue;
->> +
->> + ? ? ? ? ? ? buff = chan->curr;
->> + ? ? ? ? ? ? if (chan->curr != chan->end) {
->> + ? ? ? ? ? ? ? ? ? ? BUG_ON(chan->curr->next == NULL);
->> + ? ? ? ? ? ? ? ? ? ? chan->curr = chan->curr->next;
->> +
->> + ? ? ? ? ? ? ? ? ? ? val = readl(chan->regs + PL080S_CH_CONFIG);
->> + ? ? ? ? ? ? ? ? ? ? if (!(val & PL080_CONFIG_ACTIVE)) {
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? s3c64xx_lli_to_regs(chan, chan->curr->lli);
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? val |= PL080_CONFIG_ENABLE;
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? writel(val, chan->regs + PL080S_CH_CONFIG);
->> + ? ? ? ? ? ? ? ? ? ? }
->> + ? ? ? ? ? ? } else {
->> + ? ? ? ? ? ? ? ? ? ? chan->curr = chan->next = chan->end = NULL;
->> ? ? ? ? ? ? ? }
->> +
->> + ? ? ? ? ? ? s3c64xx_dma_bufffdone(chan, buff, res);
->> + ? ? ? ? ? ? s3c64xx_dma_freebuff(buff);
->> ? ? ? }
->
-> Hmm, this looks like a train wreck. Please do not move code around
-> like this.
-Please have a parallel look at the driver with and without the patch
-to see the overall picture.
-I know the reviewer shudn't need to do that, but its code modified
-more than moved.
+diff --git a/arch/arm/mach-s3c6400/include/mach/map.h b/arch/arm/mach-s3c6400/include/mach/map.h
+index 5057d99..c8eeed1 100644
+--- a/arch/arm/mach-s3c6400/include/mach/map.h
++++ b/arch/arm/mach-s3c6400/include/mach/map.h
+@@ -44,6 +44,7 @@
+ #define S3C64XX_PA_SYSCON	(0x7E00F000)
+ #define S3C64XX_PA_IIS0		(0x7F002000)
+ #define S3C64XX_PA_IIS1		(0x7F003000)
++#define S3C64XX_PA_IISV4	(0x7F00D000)
+ #define S3C64XX_PA_TIMER	(0x7F006000)
+ #define S3C64XX_PA_IIC0		(0x7F004000)
+ #define S3C64XX_PA_IIC1		(0x7F00F000)
+-- 
+1.6.2.5
