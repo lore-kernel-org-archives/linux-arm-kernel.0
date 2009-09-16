@@ -1,72 +1,38 @@
-From: jamessteward@optusnet.com.au (James)
-Date: Thu, 17 Sep 2009 08:54:44 +1000
-Subject: [arm-gnu] Problems with pthread on ARM/PXA270
-In-Reply-To: <200909160926.02036.schindele@nentec.de>
-References: <200909160926.02036.schindele@nentec.de>
-Message-ID: <1253141684.6443.27.camel@Ubuntu-Desktop>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 16 Sep 2009 19:25:04 -0400
+Subject: [PATCH] Include device.h in VIC driver
+In-Reply-To: <1252927430-23866-1-git-send-email-linus.walleij@stericsson.com>
+References: <1252927430-23866-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901CBF463@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, 2009-09-16 at 09:26 +0200, Juergen Schindele wrote:
-> we tried to implement a thread based software on our PXA270 based platform but
-> we had trouble with pthreads. So i modyfied a tiny progam to test. This little progam creates
-> 10 threads and each thread does print something (an index an a pointer to itself). 
+On Monday, September 14, 2009 4:24 AM, Linus Walleij wrote:
+>
+> Currently build with the next head fails on archs using PL190
+> VIC because when we include amba/bus.h we need to include
+> device.h first.
 > 
-> On my PC with Suse 11.0 Linux (kernel 2.6.27) this works fine as supposed to.
-> Each thread has his turn and print his own values.
+
+The same problem is seen on the ep93xx platform.  This does fix the
+issue.
+
+Tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+
+> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> ---
+>  arch/arm/common/vic.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
-> But on our pxa270 platform the thread switch does not (or really rarely) happen
-> and only one thread is printing always the same values. So i suppose thread
-> switching is not working!
-> 
-> Any hints or experiences are welcome !!!
-
-I'm not a very thread aware programmer so please don't shoot me, but I
-was wondering, why would a thread give up control after printing its
-values?  Your program has them doing a tight loop with no sleep, or
-yield.
-
-I added a usleep(1) just after the printf("Thread...."), and the results
-on my Linux Ubuntu-Desktop 2.6.24-24-generic #1 SMP Tue Aug 18 17:04:53
-UTC 2009 i686 GNU/Linux are much better, but still not one message per
-thread.  I changed the usleep to a sched_yield() and got still better
-results, but still not what I'd expect from RR.
-
-So what does it look like on your Suse box?  Do you get one message per
-thread in turn?  I.e.
-Thread 0 is [...]
-Thread 1 is [...]
-Thread 2 is [...]
-Thread 3 is [...]
-etc.?
-
-Or do you get, say, 100 messages from thread 0, then 100 from thread 1,
-etc.?
-
-Are you running with superuser privileges?  My manpage tells me that
-SCHED_RR is only available if run with superuser privileges.
-
-Out of curiosity, I got rid of the printf in the thread, and added a
-global array of ints, as in int counter[NUM_THREADS];  Then made the
-threads increment their counter each loop, and got the main while loop
-to print the counter values.
-
-Without a sched_yield() or usleep() in the thread loop, the values
-increase at a phenomenal rate.  With a sched_yield() the values increase
-at about 1/100th the speed.
-
-I once had some interesting problems running a program with just two
-threads, one doing I/O to an ISA bus, the other handling a socket
-interface, on a dual core machine.  To get more predictable performance,
-I ended up building a single threaded program and using select for the
-whole lot, thereby implementing my own scheduling policy, effectively.
-
-In any case, I think there's more going on with threads than meets the
-eye.  IMHO, they're evil, and should be left for Bill's programmers, who
-are sadly bound to using them due to the lack of better ways on that
-platform ;-)
-
-Regards,
-James.
+> diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
+> index 920ced0..f232941 100644
+> --- a/arch/arm/common/vic.c
+> +++ b/arch/arm/common/vic.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/list.h>
+>  #include <linux/io.h>
+>  #include <linux/sysdev.h>
+> +#include <linux/device.h>
+>  #include <linux/amba/bus.h>
+>  
+>  #include <asm/mach/irq.h>
