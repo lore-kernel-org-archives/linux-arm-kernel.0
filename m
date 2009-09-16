@@ -1,22 +1,20 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Wed, 16 Sep 2009 22:03:54 +0200
-Subject: [PATCH] MAINTAINERS: Move ARM lists to infradead
-In-Reply-To: <1253125008.2567.32.camel@Joe-Laptop.home> (Joe Perches's message
-	of "Wed, 16 Sep 2009 11:16:47 -0700")
-References: <1253117388.2567.17.camel@Joe-Laptop.home>
-	<20090916181018.GA19728@Chamillionaire.breakpoint.cc>
-	<1253125008.2567.32.camel@Joe-Laptop.home>
-Message-ID: <m3d45qpsgl.fsf@intrepid.localdomain>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 16 Sep 2009 21:12:30 +0100
+Subject: [PATCH 03/10] S3C64XX I2S: Codec Clock Gating Option
+In-Reply-To: <20090916110246.GD3589@rakim.wolfsonmicro.main>
+References: <1253008955-10505-1-git-send-email-jassi.brar@samsung.com>
+	<20090915104417.GF22878@rakim.wolfsonmicro.main>
+	<1b68c6790909151837x35cc7171y42c6a612975052ee@mail.gmail.com>
+	<20090916110246.GD3589@rakim.wolfsonmicro.main>
+Message-ID: <20090916201230.GJ3589@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joe Perches <joe@perches.com> writes:
+On Wed, Sep 16, 2009 at 12:02:46PM +0100, Mark Brown wrote:
 
-> I believe it's still moderated.
+> There's no meaningful extra effort required to do this properly and
+> given that all this patch does is implement an external interface it's
+> better to just get it right rather than spend the effort on fixups (and
+> merge issues).
 
-Does that matter to the point we have to put it in the file?
-Non-spam from non-subscribers passes through, right? The "moderated for
-non-subscribers" suggests that one should subscribe prior to posting,
-which is IMHO not the case.
--- 
-Krzysztof Halasa
+I added the following patch to implement this, not tested yet.
