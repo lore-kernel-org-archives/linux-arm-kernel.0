@@ -1,71 +1,43 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 16 Sep 2009 01:04:44 +0100
-Subject: [PATCH 3/3] s3c64xx: Add SYNCMUX codes for selection source of
-	HCLKx2
-In-Reply-To: <18082112.529381252139591299.JavaMail.weblogic@epml18>
-References: <18082112.529381252139591299.JavaMail.weblogic@epml18>
-Message-ID: <20090916000444.GL13508@trinity.fluff.org>
+Date: Wed, 16 Sep 2009 01:09:25 +0100
+Subject: [PATCH 01/10] S3C64XX I2S: S3C64XX_PA_IISV4 defined
+In-Reply-To: <1253008953-10441-1-git-send-email-jassi.brar@samsung.com>
+References: <1253008953-10441-1-git-send-email-jassi.brar@samsung.com>
+Message-ID: <20090916000925.GB24720@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 05, 2009 at 08:33:11AM +0000, Kukjin Kim wrote:
-> This patch adds SYNCMUX codes for selection source of HCLKx2.
-> According to 'Fig 3-2. The block diagram of clock generator' of 6400/6410 UM,
-> the source of HCLKx2 is DOUT_APLL or MOUT_MPLL that is decided by SYNCMUX.
-> If synchronous mode, it is DOUT_APLL and if asynchronous mode, it is MOUT_MPLL.
-
-Please make sure these descriptions wrap at or before 77 characters.
- 
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+On Tue, Sep 15, 2009 at 07:02:33PM +0900, Jassi wrote:
+> Defined the missing S3C64XX_PA_IISV4 conditionally for 6410 as
+> it's not avaialble for 6400
+> 
+> Signed-Off-by: Jassi <jassi.brar@samsung.com>
 > ---
->  arch/arm/plat-s3c64xx/include/plat/regs-clock.h |    4 ++++
->  arch/arm/plat-s3c64xx/s3c6400-clock.c           |    8 +++++++-
->  2 files changed, 11 insertions(+), 1 deletions(-)
+>  arch/arm/mach-s3c6400/include/mach/map.h |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/plat-s3c64xx/include/plat/regs-clock.h b/arch/arm/plat-s3c64xx/include/plat/regs-clock.h
-> index ff46e7f..2c3224c 100644
-> --- a/arch/arm/plat-s3c64xx/include/plat/regs-clock.h
-> +++ b/arch/arm/plat-s3c64xx/include/plat/regs-clock.h
-> @@ -33,6 +33,7 @@
->  #define S3C_PCLK_GATE          S3C_CLKREG(0x34)
->  #define S3C_SCLK_GATE          S3C_CLKREG(0x38)
->  #define S3C_MEM0_GATE          S3C_CLKREG(0x3C)
-> +#define S3C_OTHERS             S3C_CLKREG(0x900)
-> 
->  /* CLKDIV0 */
->  #define S3C6400_CLKDIV0_MFC_MASK       (0xf << 28)
-> @@ -182,6 +183,9 @@
->  #define S3C_CLKCON_SCLK_CAM            (1<<2)
->  #define S3C_CLKCON_SCLK_JPEG           (1<<1)
-> 
-> +/* OTHERS */
-> +#define S3C_OTHERS_SYNCMUXSEL_SYNC     (1<<6)
-> +
->  /* CLKSRC */
-> 
->  #define S3C6400_CLKSRC_APLL_MOUT       (1 << 0)
-> diff --git a/arch/arm/plat-s3c64xx/s3c6400-clock.c b/arch/arm/plat-s3c64xx/s3c6400-clock.c
-> index a898325..0da2781 100644
-> --- a/arch/arm/plat-s3c64xx/s3c6400-clock.c
-> +++ b/arch/arm/plat-s3c64xx/s3c6400-clock.c
-> @@ -689,7 +689,13 @@ void __init_or_cpufreq s3c6400_setup_clocks(void)
->         printk(KERN_INFO "S3C64XX: PLL settings, A=%ld, M=%ld, E=%ld\n",
->                apll, mpll, epll);
-> 
-> -       hclk2 = mpll / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK2);
-> +       if (__raw_readl(S3C_OTHERS) & S3C_OTHERS_SYNCMUXSEL_SYNC) {
-> +               /* Synchronous mode */
-> +               hclk2 = apll / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK2);
-> +       } else {
-> +               /* Asynchronous mode */
-> +               hclk2 = mpll / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK2);
-> +       }
->         hclk = hclk2 / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK);
->         pclk = hclk2 / GET_DIV(clkdiv0, S3C6400_CLKDIV0_PCLK);
+> diff --git a/arch/arm/mach-s3c6400/include/mach/map.h b/arch/arm/mach-s3c6400/include/mach/map.h
+> index 5057d99..775577a 100644
+> --- a/arch/arm/mach-s3c6400/include/mach/map.h
+> +++ b/arch/arm/mach-s3c6400/include/mach/map.h
+> @@ -44,6 +44,9 @@
+>  #define S3C64XX_PA_SYSCON	(0x7E00F000)
+>  #define S3C64XX_PA_IIS0		(0x7F002000)
+>  #define S3C64XX_PA_IIS1		(0x7F003000)
+> +#ifdef CONFIG_CPU_S3C6410
+> +#define S3C64XX_PA_IISV4	(0x7F00D000)
+> +#endif
 
-It should also be noted that the clk->parent of hclk2 should also be
-correctly setup and any necessary changes to the clock code be made
-to reflect this.
+Does this really need to be #ifdef'd out? You might want to avoid
+building the device setup code, or similar if it is only for a s3c6400
+but this should be done by the machine Kconfig chosing to build the
+support in for the machines that do need it.
+
+I see no good reason for this to be applied.
+
+>  #define S3C64XX_PA_TIMER	(0x7F006000)
+>  #define S3C64XX_PA_IIC0		(0x7F004000)
+>  #define S3C64XX_PA_IIC1		(0x7F00F000)
 
 -- 
 Ben
