@@ -1,64 +1,60 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Wed, 16 Sep 2009 09:56:04 +0900
-Subject: [PATCH 02/10] S3C64XX I2S: declared i2s_v4
-In-Reply-To: <20090916001220.GC24720@trinity.fluff.org>
-References: <1253008954-10473-1-git-send-email-jassi.brar@samsung.com>
-	<20090916001220.GC24720@trinity.fluff.org>
-Message-ID: <1b68c6790909151756p2f15575bj75218abdda14335c@mail.gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Wed, 16 Sep 2009 01:58:17 +0100
+Subject: [PATCH] s3c64xx: Fix S3C64XX_CLKDIV0_ARM_MASK value
+In-Reply-To: <1253061316-15939-1-git-send-email-kgene@samsung.com>
+References: <1253061316-15939-1-git-send-email-kgene@samsung.com>
+Message-ID: <20090916005817.GG24720@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 16, 2009 at 9:12 AM, Ben Dooks <ben-linux@fluff.org> wrote:
-> On Tue, Sep 15, 2009 at 07:02:34PM +0900, Jassi wrote:
->> For now, I2S-v4 is simply enumerated as third I2S controller of S3C6410
->> rather than a special device.
->> Also, Declared I2S-v4 device for SMDK6410.
->>
->> Signed-Off-by: Jassi <jassi.brar@samsung.com>
->> ---
->> ?arch/arm/mach-s3c6410/mach-smdk6410.c | ? ?1 +
->> ?arch/arm/plat-s3c/dev-audio.c ? ? ? ? | ? ?6 ++++--
->> ?2 files changed, 5 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-s3c6410/mach-smdk6410.c b/arch/arm/mach-s3c6410/mach-smdk6410.c
->> index bc9a7de..108ba37 100644
->> --- a/arch/arm/mach-s3c6410/mach-smdk6410.c
->> +++ b/arch/arm/mach-s3c6410/mach-smdk6410.c
->> @@ -181,6 +181,7 @@ static struct platform_device *smdk6410_devices[] __initdata = {
->> ?#endif
->> ? ? ? &s3c_device_i2c0,
->> ? ? ? &s3c_device_i2c1,
->> + ? ? &s3c64xx_device_iisv4,
->> ? ? ? &s3c_device_fb,
->> ? ? ? &s3c_device_usb,
->> ? ? ? &s3c_device_usb_hsotg,
->> diff --git a/arch/arm/plat-s3c/dev-audio.c b/arch/arm/plat-s3c/dev-audio.c
->> index 1322beb..28c030c 100644
->> --- a/arch/arm/plat-s3c/dev-audio.c
->> +++ b/arch/arm/plat-s3c/dev-audio.c
->> @@ -51,6 +51,7 @@ struct platform_device s3c64xx_device_iis1 = {
->> ?};
->> ?EXPORT_SYMBOL(s3c64xx_device_iis1);
->>
->> +#ifdef CONFIG_CPU_S3C6410
->> ?static struct resource s3c64xx_iisv4_resource[] = {
->> ? ? ? [0] = {
->> ? ? ? ? ? ? ? .start = S3C64XX_PA_IISV4,
->> @@ -60,9 +61,10 @@ static struct resource s3c64xx_iisv4_resource[] = {
->> ?};
->>
->> ?struct platform_device s3c64xx_device_iisv4 = {
->> - ? ? .name ? ? ? ? ? ? = "s3c64xx-iis-v4",
->> - ? ? .id ? ? ? ? ? ? ? = -1,
->> + ? ? .name ? ? ? ? ? ? = "s3c64xx-iis",
->> + ? ? .id ? ? ? ? ? ? ? = 2,
->
-> I'd like to see how much different the two drivers are, and whether they
-> need to be seperated into their own modules.
->
-> Changing the name to s3c64xx-iis means that the module auto-load may end
-> up loading the wrong module. Holding off on this change until we se what
-> needs to be done for this block.
-For now, my idea is to first lay ground for I2S-v4 controller.
-It is easier for implement 6channels support when we already have the
-controller working for 2channels.
+On Wed, Sep 16, 2009 at 09:35:16AM +0900, Kukjin Kim wrote:
+> From: Kukjin Kim <kgene.kim@samsung.com>
+> 
+> The value of S3C64XX_CLKDIV0_ARM_MASK is wrong. This patch fixes
+> this values, S3C6400_CLKDIV0_ARM_MASK and S3C6410_CLKDIV0_ARM_MASK.
+
+Would have been better worded as:
+
+Fix the values of S3C6400_CLKDIV0_ARM_MASK and S3C6410_CLKDIV0_ARM_MASK.
+ 
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+
+Real email address, ie kgene.kim at samsung.com in signoff.
+
+> ---
+>  arch/arm/plat-s3c64xx/include/plat/regs-clock.h |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/plat-s3c64xx/include/plat/regs-clock.h b/arch/arm/plat-s3c64xx/include/plat/regs-clock.h
+> index a8777a7..ff46e7f 100644
+> --- a/arch/arm/plat-s3c64xx/include/plat/regs-clock.h
+> +++ b/arch/arm/plat-s3c64xx/include/plat/regs-clock.h
+> @@ -51,8 +51,8 @@
+>  #define S3C6400_CLKDIV0_HCLK_SHIFT	(8)
+>  #define S3C6400_CLKDIV0_MPLL_MASK	(0x1 << 4)
+>  #define S3C6400_CLKDIV0_MPLL_SHIFT	(4)
+> -#define S3C6400_CLKDIV0_ARM_MASK	(0x3 << 0)
+> -#define S3C6410_CLKDIV0_ARM_MASK	(0x7 << 0)
+> +#define S3C6400_CLKDIV0_ARM_MASK	(0x7 << 0)
+> +#define S3C6410_CLKDIV0_ARM_MASK	(0xf << 0)
+>  #define S3C6400_CLKDIV0_ARM_SHIFT	(0)
+>  
+>  /* CLKDIV1 */
+> -- 
+> 1.5.3.4
+> 
+
+-- 
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 189 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090916/0737da83/attachment.sig>
