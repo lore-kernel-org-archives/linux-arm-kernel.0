@@ -1,48 +1,75 @@
 From: kyungmin.park@samsung.com (Kyungmin Park)
-Date: Wed, 16 Sep 2009 14:45:39 +0900
-Subject: [PATCH] [S5PC100] Use memory base as 0x30000000
-Message-ID: <20090916054539.GA6242@july>
+Date: Wed, 16 Sep 2009 14:59:36 +0900
+Subject: [PATCH] Samsung SoCs: Cpu detection support (v3)
+Message-ID: <20090916055936.GA13338@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To work with next SoCs s5pc110, we decide to use 0x3000'0000 as base memory
-address
-Also we posted u-boot patch for the smdkc100 board,
-It set the base memory as 0x3000'0000
+Store the CPU ID to cpu_id variable and use it to detect CPU
+
+On S3C64XX, Some pheripherals such as OneNAND have different configuration
+and handle it differently to do this it needs to detect CPU ID.
+
+Also S5PC1XX is supported.
 
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
-diff --git a/arch/arm/mach-s5pc100/Makefile.boot b/arch/arm/mach-s5pc100/Makefile.boot
-index ff90aa1..b0909e3 100644
---- a/arch/arm/mach-s5pc100/Makefile.boot
-+++ b/arch/arm/mach-s5pc100/Makefile.boot
-@@ -1,2 +1,2 @@
--   zreladdr-y	:= 0x20008000
--params_phys-y	:= 0x20000100
-+   zreladdr-y	:= 0x30008000
-+params_phys-y	:= 0x30000100
-diff --git a/arch/arm/mach-s5pc100/include/mach/map.h b/arch/arm/mach-s5pc100/include/mach/map.h
-index 9e9f391..4f82430 100644
---- a/arch/arm/mach-s5pc100/include/mach/map.h
-+++ b/arch/arm/mach-s5pc100/include/mach/map.h
-@@ -54,7 +54,7 @@
- #define S5PC100_PA_IIC		(0xEC100000)
+diff --git a/arch/arm/plat-s3c/init.c b/arch/arm/plat-s3c/init.c
+index 6790edf..b3bc18f 100644
+--- a/arch/arm/plat-s3c/init.c
++++ b/arch/arm/plat-s3c/init.c
+@@ -31,6 +31,45 @@
  
- /* ETC */
--#define S5PC100_PA_SDRAM	(0x20000000)
-+#define S5PC100_PA_SDRAM	(0x30000000)
+ static struct cpu_table *cpu;
  
- /* compatibility defines. */
- #define S3C_PA_UART		S5PC100_PA_UART
-diff --git a/arch/arm/mach-s5pc100/include/mach/memory.h b/arch/arm/mach-s5pc100/include/mach/memory.h
-index 4b60d18..3f54d30 100644
---- a/arch/arm/mach-s5pc100/include/mach/memory.h
-+++ b/arch/arm/mach-s5pc100/include/mach/memory.h
-@@ -13,6 +13,6 @@
- #ifndef __ASM_ARCH_MEMORY_H
- #define __ASM_ARCH_MEMORY_H
++static unsigned long cpu_id;
++
++unsigned long samsung_cpu_id(void)
++{
++        return cpu_id;
++}
++EXPORT_SYMBOL(samsung_cpu_id);
++
++static void __init set_cpu_id(unsigned int idcode)
++{
++	/*
++	 * cpu_id encoding is as follows
++	 * cpu_id & 0xff000000 -> S3C Class (24xx/64xx/C1xx)
++	 * cpu_id & 0xfff00000 -> S3C Sub Class (241x/244x)
++	 * cpu_id & 0xffff0000 -> S3C Type (2410/2440/6400/6410/C100/C110)
++	 *
++	 * Remains[15:0] are reserved
++	 *
++	 * 24xx/64xx is started from 0x30000000
++	 * C1xx is started from 0x40000000
++	 *
++	 * Exception:
++	 *  Store Revision A to 1 such as
++	 *  s3c2410A to s3c2411
++	 *  s3c2440A to s3c2441
++	 */
++	if ((idcode >> 28) == 0x4)
++		cpu_id = 0xC0000000 | ((idcode & 0x00fff000) << 4);
++	else
++		cpu_id = (idcode & 0x0ffff000) << 4;
++
++	if (idcode == 0x32410002 || idcode == 0x32440001)
++		cpu_id |= (0x1 << 16);
++	if (idcode == 0x32440aaa)       /* s3c2442 */
++		cpu_id |= (0x2 << 16);
++	if (idcode == 0x0)              /* s3c2400 */
++		cpu_id |= (0x2400 << 16);
++}
++
+ static struct cpu_table * __init s3c_lookup_cpu(unsigned long idcode,
+ 						struct cpu_table *tab,
+ 						unsigned int count)
+@@ -53,6 +92,8 @@ void __init s3c_init_cpu(unsigned long idcode,
+ 		panic("Unknown S3C24XX CPU");
+ 	}
  
--#define PHYS_OFFSET     	UL(0x20000000)
-+#define PHYS_OFFSET		UL(0x30000000)
++	set_cpu_id(idcode);
++
+ 	printk("CPU %s (id 0x%08lx)\n", cpu->name, idcode);
  
- #endif
+ 	if (cpu->map_io == NULL || cpu->init == NULL) {
