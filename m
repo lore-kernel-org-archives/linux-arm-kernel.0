@@ -1,34 +1,76 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 16 Sep 2009 21:59:27 +0100
-Subject: [PATCH] arm: new W macro to WORD_ACCESS
-In-Reply-To: <20090916175812.GA18993@Chamillionaire.breakpoint.cc>
-References: <200909161601.35662.elendil@planet.nl>
-	<20090916175812.GA18993@Chamillionaire.breakpoint.cc>
-Message-ID: <1253134767.19743.3.camel@pc1117.cambridge.arm.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 16 Sep 2009 17:13:09 -0400
+Subject: [PATCH] ep93xx: define EP93XX_*_PHYS_BASE with macros
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901CBF431@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2009-09-16 at 19:58 +0200, Sebastian Andrzej Siewior wrote:
-> As reported by Frans Pop the new global macro W on ARM which is included
-> via
-> |arch/arm/include/asm/uaccess.h:20
-> |include/linux/uaccess.h:5
-> |include/linux/crypto.h:26
-> |crypto/cast6.c:23
-> 
-> leads to a build error because the crypto/cast6.c defines a function
-> which is named W.
+Change the #define's for the EP93XX_*_PHYS_BASE addresses to use
+macros for easier readability.
 
-This was already reported by Alexey Dobriyan and I included his patch in
-my Thumb-2 branch (and -next for now):
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <ryan@bluewatersys.com>
 
-http://linux-arm.org/git?p=linux-2.6.git;a=commitdiff;h=4fb3c2e2ab3549308a1b1663296d165e45d72ba5
+---
 
-Since this macro is only used in ARM assembly code, the patch simply
-adds some ifdefs around it.
-
-Russell, if you are OK with Alexey's patch, I'll send you a pull request
-(though for only one patch, alternatively just merge it manually).
-
--- 
-Catalin
+diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+index ea78e90..ff46238 100644
+--- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
++++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+@@ -52,22 +52,24 @@
+ #define EP93XX_AHB_VIRT_BASE		0xfef00000
+ #define EP93XX_AHB_SIZE			0x00100000
+ 
++#define EP93XX_AHB_PHYS(x)		(EP93XX_AHB_PHYS_BASE + (x))
+ #define EP93XX_AHB_IOMEM(x)		IOMEM(EP93XX_AHB_VIRT_BASE + (x))
+ 
+ #define EP93XX_APB_PHYS_BASE		0x80800000
+ #define EP93XX_APB_VIRT_BASE		0xfed00000
+ #define EP93XX_APB_SIZE			0x00200000
+ 
++#define EP93XX_APB_PHYS(x)		(EP93XX_APB_PHYS_BASE + (x))
+ #define EP93XX_APB_IOMEM(x)		IOMEM(EP93XX_APB_VIRT_BASE + (x))
+ 
+ 
+ /* AHB peripherals */
+ #define EP93XX_DMA_BASE			EP93XX_AHB_IOMEM(0x00000000)
+ 
+-#define EP93XX_ETHERNET_PHYS_BASE	(EP93XX_AHB_PHYS_BASE + 0x00010000)
++#define EP93XX_ETHERNET_PHYS_BASE	EP93XX_AHB_PHYS(0x00010000)
+ #define EP93XX_ETHERNET_BASE		EP93XX_AHB_IOMEM(0x00010000)
+ 
+-#define EP93XX_USB_PHYS_BASE		(EP93XX_AHB_PHYS_BASE + 0x00020000)
++#define EP93XX_USB_PHYS_BASE		EP93XX_AHB_PHYS(0x00020000)
+ #define EP93XX_USB_BASE			EP93XX_AHB_IOMEM(0x00020000)
+ 
+ #define EP93XX_RASTER_BASE		EP93XX_AHB_IOMEM(0x00030000)
+@@ -133,13 +135,13 @@
+ 
+ #define EP93XX_IRDA_BASE		EP93XX_APB_IOMEM(0x000b0000)
+ 
+-#define EP93XX_UART1_PHYS_BASE		(EP93XX_APB_PHYS_BASE + 0x000c0000)
++#define EP93XX_UART1_PHYS_BASE		EP93XX_APB_PHYS(0x000c0000)
+ #define EP93XX_UART1_BASE		EP93XX_APB_IOMEM(0x000c0000)
+ 
+-#define EP93XX_UART2_PHYS_BASE		(EP93XX_APB_PHYS_BASE + 0x000d0000)
++#define EP93XX_UART2_PHYS_BASE		EP93XX_APB_PHYS(0x000d0000)
+ #define EP93XX_UART2_BASE		EP93XX_APB_IOMEM(0x000d0000)
+ 
+-#define EP93XX_UART3_PHYS_BASE		(EP93XX_APB_PHYS_BASE + 0x000e0000)
++#define EP93XX_UART3_PHYS_BASE		EP93XX_APB_PHYS(0x000e0000)
+ #define EP93XX_UART3_BASE		EP93XX_APB_IOMEM(0x000e0000)
+ 
+ #define EP93XX_KEY_MATRIX_BASE		EP93XX_APB_IOMEM(0x000f0000)
+@@ -147,10 +149,10 @@
+ #define EP93XX_ADC_BASE			EP93XX_APB_IOMEM(0x00100000)
+ #define EP93XX_TOUCHSCREEN_BASE		EP93XX_APB_IOMEM(0x00100000)
+ 
+-#define EP93XX_PWM_PHYS_BASE		(EP93XX_APB_PHYS_BASE + 0x00110000)
++#define EP93XX_PWM_PHYS_BASE		EP93XX_APB_PHYS(0x00110000)
+ #define EP93XX_PWM_BASE			EP93XX_APB_IOMEM(0x00110000)
+ 
+-#define EP93XX_RTC_PHYS_BASE		(EP93XX_APB_PHYS_BASE + 0x00120000)
++#define EP93XX_RTC_PHYS_BASE		EP93XX_APB_PHYS(0x00120000)
+ #define EP93XX_RTC_BASE			EP93XX_APB_IOMEM(0x00120000)
+ 
+ #define EP93XX_SYSCON_BASE		EP93XX_APB_IOMEM(0x00130000) 
