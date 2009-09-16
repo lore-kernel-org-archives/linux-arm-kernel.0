@@ -1,158 +1,23 @@
-From: schindele@nentec.de (Juergen Schindele)
-Date: Wed, 16 Sep 2009 17:01:16 +0200
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 16 Sep 2009 23:06:47 +0800
 Subject: Problems with pthread on ARM/PXA270
-In-Reply-To: <f17812d70909160714j1f691361k2a71d57d847e6e05@mail.gmail.com>
+In-Reply-To: <200909161701.16898.schindele@nentec.de>
 References: <200909160926.02036.schindele@nentec.de>
 	<f17812d70909160714j1f691361k2a71d57d847e6e05@mail.gmail.com>
-Message-ID: <200909161701.16898.schindele@nentec.de>
+	<200909161701.16898.schindele@nentec.de>
+Message-ID: <f17812d70909160806l5e4ce5e9t4c7cfea5ca714b91@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 16. September 2009 schrieb Eric Miao:
-> Don't remember we had such problems before. What kind of system
-> and libraries are you using?
-thanks for your reply.
-System is custom PXA270 platform.
-with codesourcery compiler (see below)
-and glibc 2.5 with pthread.
-I dont know what more information to give ?  
-> 
-> 
-> On Wed, Sep 16, 2009 at 3:26 PM, Juergen Schindele <schindele@nentec.de> wrote:
-> > Hello all,
-> > we tried to implement a thread based software on our PXA270 based platform but
-> > we had trouble with pthreads. So i modyfied a tiny progam to test. This little progam creates
-> > 10 threads and each thread does print something (an index an a pointer to itself).
-> >
-> > On my PC with Suse 11.0 Linux (kernel 2.6.27) this works fine as supposed to.
-> > Each thread has his turn and print his own values.
-> >
-> > But on our pxa270 platform the thread switch does not (or really rarely) happen
-> > and only one thread is printing always the same values. So i suppose thread
-> > switching is not working!
-> >
-> > Any hints or experiences are welcome !!!
-> >
-> > we use codesourcery compiler
-> > arm-none-linux-gnueabi-gcc (CodeSourcery Sourcery G++ Lite 2007q1-10) 4.2.0 20070413 (prerelease)
-> > Copyright (C) 2007 Free Software Foundation, Inc.
-> > This is free software; see the source for copying conditions. ?There is NO
-> > warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-> >
-> > and here the C-code compiled with ?"arm-none-linux-gnueabi-gcc -o test test.c -lpthread"
-> >
-> > #include <errno.h>
-> > #include <error.h>
-> > #include <stdio.h>
-> > #include <stdlib.h>
-> > #include <pthread.h>
-> > #include <time.h>
-> >
-> > #define NUM_THREADS 10
-> > #define NUM_ITERS ? 50
-> > #define TIMEOUT_NS ?100000000L
-> >
-> > static void *thread (void *);
-> > static int argument[NUM_THREADS];
-> > static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-> > static pthread_attr_t defaultattr;
-> >
-> > static void * print_thread (void *arg)
-> > {
-> > ? ?int i;
-> > ? ?int number = *((int*)arg);
-> >
-> > ? ?for (;;) {
-> > ? ? ? ?pthread_t self = pthread_self ();
-> > ? ? ? ?printf ("Thread %d is [%d]\n", number, self);
-> > ? ?}
-> > }
-> >
-> > int main (void)
-> > {
-> > ? ?pthread_t th;
-> > ? ?int i, retvalue;
-> >
-> > ? ?struct sched_param param;
-> > ? ?pthread_attr_init(&defaultattr);
-> >
-> > ? ?pthread_attr_setschedpolicy(&defaultattr, SCHED_RR);
-> >
-> > ? ?param.sched_priority = 10;
-> > ? ?if ((retvalue = pthread_attr_setschedparam(&defaultattr, &param))!=0) {
-> > ? ? ? ?printf ("ERROR\n");
-> > ? ? ? ?exit (0);
-> > ? ?}
-> >
-> > ? ?for (i = 0; i < NUM_THREADS; i++)
-> > ? ?{
-> > ? ? ? ?argument[i] = i;
-> > ? ? ? ?if (pthread_create (&th, &defaultattr, print_thread, &argument[i]) != 0)
-> > ? ? ? ? ? ?error (EXIT_FAILURE, 0, "cannot create thread");
-> > ? ? ? ?printf ("Thread [%d]\n", i);
-> > ? ?}
-> >
-> > ? ?while (1) {
-> > ? ? ? ?;
-> > ? ?}
-> >
-> > ? ?/* notreached */
-> > ? ?return 0;
-> > }
-> >
-> > --------------------------------------------------------------
-> > J?rgen Schindele
-> > Software-Entwicklung
-> >
-> > NENTEC Netzwerktechnologie GmbH
-> > Greschbachstr. 12
-> > 76229 Karlsruhe
-> > Deutschland
-> > Telefon: +49 721 94249-51
-> > Telefax: +49 721 94249-10
-> > E-Mail: ?schindele at nentec.de
-> > WEB: ? ? www.nentec.de
-> >
-> > Gesch?ftsf?hrung: Klaus Becker, Roland Knapp
-> > Sitz der Gesellschaft: Karlsruhe
-> > Handelsregister: Amtsgericht Mannheim HRB 107658
-> > --------------------------------------------------------------
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >
-> 
-> 
+On Wed, Sep 16, 2009 at 11:01 PM, Juergen Schindele <schindele@nentec.de> wrote:
+> Am Mittwoch, 16. September 2009 schrieb Eric Miao:
+>> Don't remember we had such problems before. What kind of system
+>> and libraries are you using?
+> thanks for your reply.
+> System is custom PXA270 platform.
+> with codesourcery compiler (see below)
+> and glibc 2.5 with pthread.
+> I dont know what more information to give ?
 
-
-
--- 
---------------------------------------------------------------
-J?rgen Schindele  
-Software-Entwicklung
-
-NENTEC Netzwerktechnologie GmbH
-Greschbachstr. 12
-76229 Karlsruhe
-Deutschland
-Telefon: +49 721 94249-51
-Telefax: +49 721 94249-10
-E-Mail:  schindele at nentec.de
-WEB:     www.nentec.de
- 
-Gesch?ftsf?hrung: Klaus Becker, Roland Knapp
-Sitz der Gesellschaft: Karlsruhe
-Handelsregister: Amtsgericht Mannheim HRB 107658
- 
-Diese E-Mail enth?lt vertrauliche oder rechtlich gesch?tzte Informationen.
-Wenn Sie nicht der vorgesehene Empf?nger sind, informieren Sie bitte sofort
-den Absender und l?schen Sie diese E-Mail. Das unbefugte Kopieren dieser E-Mail
-oder die unbefugte Weitergabe der enthaltenen Informationen ist nicht gestattet.
- 
-The information contained in this message is confidential or protected by law.
-If you are not the intended recipient, please contact the sender and delete this
-message. Any unauthorised copying of this message or unauthorised distribution of
-the information contained herein is prohibited.
---------------------------------------------------------------
+Like which kernel version, where do you get the glibc-2.5 and pthread binary,
+or you compiled it from scratch, and with which compiler of which version?
