@@ -1,28 +1,34 @@
-From: jassi.brar@samsung.com (Jassi)
-Date: Wed, 16 Sep 2009 13:47:49 +0900
-Subject: [PATCH] S3C64XX I2S: S3C64XX_PA_IISV4 defined
-Message-ID: <1253076469-20172-1-git-send-email-jassi.brar@samsung.com>
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Wed, 16 Sep 2009 14:16:54 +0900
+Subject: [PATCH 08/10] S3C64XX I2S: Return correct codec clock
+In-Reply-To: <20090915115618.GN22878@rakim.wolfsonmicro.main>
+References: <1253008960-10666-1-git-send-email-jassi.brar@samsung.com>
+	<20090915110635.GI22878@rakim.wolfsonmicro.main>
+	<1b68c6790909150421y7c78ad8dt2703bd039fcd39b@mail.gmail.com>
+	<20090915115618.GN22878@rakim.wolfsonmicro.main>
+Message-ID: <1b68c6790909152216od3f372ftc2fa3db488e6996@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Defined the missing S3C64XX_PA_IISV4.
+On Tue, Sep 15, 2009 at 8:56 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Tue, Sep 15, 2009 at 08:21:05PM +0900, jassi brar wrote:
+>> On Tue, Sep 15, 2009 at 8:06 PM, Mark Brown
+>
+>> > There's three possible clocks here according to the datasheet - PCLK,
+>> > CLKAUDIO and I2SCLK - so this will still give the wrong clock some of
+>> > the time. ?Also, please use checkpatch
+>
+>> Yes, but the existing code doesn't consider I2SCLK at all.
+>> The infra isn't there to provide the clock pointer anyhow.
+>
+> Please put a comment there explaining that, or ideally code that returns
+> an error in those cases, to make it clearer what's being done.
 
-Signed-off-by: Jassi <jassi.brar@samsung.com>
----
- arch/arm/mach-s3c6400/include/mach/map.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Wait, there is no option for selecting I2SCLK in the manual. That is
+behind the MUX along with Mpll/Epll Out etc.
+In the driver we actually have all the correct options : PCLK or
+CLKAUDIO(which is the output of the MUX).
 
-diff --git a/arch/arm/mach-s3c6400/include/mach/map.h b/arch/arm/mach-s3c6400/include/mach/map.h
-index 5057d99..c8eeed1 100644
---- a/arch/arm/mach-s3c6400/include/mach/map.h
-+++ b/arch/arm/mach-s3c6400/include/mach/map.h
-@@ -44,6 +44,7 @@
- #define S3C64XX_PA_SYSCON	(0x7E00F000)
- #define S3C64XX_PA_IIS0		(0x7F002000)
- #define S3C64XX_PA_IIS1		(0x7F003000)
-+#define S3C64XX_PA_IISV4	(0x7F00D000)
- #define S3C64XX_PA_TIMER	(0x7F006000)
- #define S3C64XX_PA_IIC0		(0x7F004000)
- #define S3C64XX_PA_IIC1		(0x7F00F000)
--- 
-1.6.2.5
+The IMS bit can select only either PCLK or CLKAUDIO.So, i guess
+ the patch is fine as it is.
