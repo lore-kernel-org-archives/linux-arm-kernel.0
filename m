@@ -1,16 +1,22 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 16 Sep 2009 20:37:20 +0100
-Subject: [PATCH 04/10] S3C64XX I2S: I2S controller-2 clock declare
-In-Reply-To: <1253008956-10537-1-git-send-email-jassi.brar@samsung.com>
-References: <1253008956-10537-1-git-send-email-jassi.brar@samsung.com>
-Message-ID: <20090916193720.GD6257@sirena.org.uk>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Wed, 16 Sep 2009 22:03:54 +0200
+Subject: [PATCH] MAINTAINERS: Move ARM lists to infradead
+In-Reply-To: <1253125008.2567.32.camel@Joe-Laptop.home> (Joe Perches's message
+	of "Wed, 16 Sep 2009 11:16:47 -0700")
+References: <1253117388.2567.17.camel@Joe-Laptop.home>
+	<20090916181018.GA19728@Chamillionaire.breakpoint.cc>
+	<1253125008.2567.32.camel@Joe-Laptop.home>
+Message-ID: <m3d45qpsgl.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2009 at 07:02:36PM +0900, Jassi wrote:
-> Defined main clock for I2S controller-2 for S3C6410.
+Joe Perches <joe@perches.com> writes:
 
-> Signed-Off-by: Jassi <jassi.brar@samsung.com>
+> I believe it's still moderated.
 
-You're also going to need to ensure that the audio-bus clock is handled
-befoer the IISv4 driver is going to probe.
+Does that matter to the point we have to put it in the file?
+Non-spam from non-subscribers passes through, right? The "moderated for
+non-subscribers" suggests that one should subscribe prior to posting,
+which is IMHO not the case.
+-- 
+Krzysztof Halasa
