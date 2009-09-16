@@ -1,8 +1,7 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Wed, 16 Sep 2009 14:30:01 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 16 Sep 2009 14:47:21 +0100
 Subject: [PATCH] arm: remove unused code in delay.S
-In-Reply-To: <1253089566.3273.152.camel@linux-1lbu> (Steve Chen's message of
-	"Wed, 16 Sep 2009 03:26:06 -0500")
+In-Reply-To: <m3k4zzdimy.fsf@intrepid.localdomain>
 References: <1252875960-21512-1-git-send-email-felipe.contreras@gmail.com>
 	<20090915103739.GA19519@elf.ucw.cz>
 	<1253017761.3273.117.camel@linux-1lbu>
@@ -11,26 +10,30 @@ References: <1252875960-21512-1-git-send-email-felipe.contreras@gmail.com>
 	<94a0d4530909151158y489a96e3x63ff932c713822b0@mail.gmail.com>
 	<1253043875.3273.131.camel@linux-1lbu>
 	<m3k4zzdimy.fsf@intrepid.localdomain>
-	<1253053609.3273.139.camel@linux-1lbu>
-	<m33a6nddvd.fsf@intrepid.localdomain>
-	<1253089566.3273.152.camel@linux-1lbu>
-Message-ID: <m3ljkfoywm.fsf@intrepid.localdomain>
+Message-ID: <20090916134721.GA11218@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Steve Chen <schen@mvista.com> writes:
+On Tue, Sep 15, 2009 at 11:04:37PM +0200, Krzysztof Halasa wrote:
+> Steve Chen <schen@mvista.com> writes:
+> 
+> > +config OLD_CPU_DELAY
+> > +	depends on CPU_32v3 || CPU_32v4 || CPU_32v4T
+> > +	bool "Accurate delays"
+> > +	def_bool n
+> > +	help
+> > +	  Enable if observing longer than expected delays and need more
+> > +	  accuracy.  This only applies to older CPUs.
+> > +
+> 
+> If it's that simple then why not enable the extra delay code
+> unconditionally when compiling for those CPUs?
 
-> +config OLD_CPU_DELAY
-> +	depends on CPU_32v3 || CPU_32v4 || CPU_32v4T
-> +	bool "Accurate delays for some older CPUs"
-> +	def_bool n
-> +	help
-> +	  Try enable this if observing longer than expected delays and need
-> +	  more accuracy.  May cause instability in some CPUs.
-> +
+Because it's really not that clear cut.  Eg, ARM610 and ARM710 work
+better with it, but StrongARM suffers from delays being too short.
+Having a kernel configured for all those processors used to be common
+(since the Acorn RiscPC had pluggable CPU cards, which could be one
+of those processors.)
 
-There is still this uncertain "accurate" in the text. Why don't just
-
-+	bool "Different delay() code for some older CPUs"
--- 
-Krzysztof Halasa
+It's really something that only experienced people should worry
+about, and not Joe "kernel-builder" Bloggs.
