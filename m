@@ -1,51 +1,64 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 16 Sep 2009 02:07:53 +0100
-Subject: [PATCH 01/10] S3C64XX I2S: S3C64XX_PA_IISV4 defined
-In-Reply-To: <1b68c6790909151750q3b2ca864k944d567d76f0eb4c@mail.gmail.com>
-References: <1253008953-10441-1-git-send-email-jassi.brar@samsung.com>
-	<20090916000925.GB24720@trinity.fluff.org>
-	<1b68c6790909151750q3b2ca864k944d567d76f0eb4c@mail.gmail.com>
-Message-ID: <20090916010753.GK24720@trinity.fluff.org>
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Wed, 16 Sep 2009 10:37:09 +0900
+Subject: [PATCH 03/10] S3C64XX I2S: Codec Clock Gating Option
+In-Reply-To: <20090915104417.GF22878@rakim.wolfsonmicro.main>
+References: <1253008955-10505-1-git-send-email-jassi.brar@samsung.com>
+	<20090915104417.GF22878@rakim.wolfsonmicro.main>
+Message-ID: <1b68c6790909151837x35cc7171y42c6a612975052ee@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 16, 2009 at 09:50:59AM +0900, jassi brar wrote:
-> On Wed, Sep 16, 2009 at 9:09 AM, Ben Dooks <ben-linux@fluff.org> wrote:
-> > On Tue, Sep 15, 2009 at 07:02:33PM +0900, Jassi wrote:
-> >> Defined the missing S3C64XX_PA_IISV4 conditionally for 6410 as
-> >> it's not avaialble for 6400
-> >>
-> >> Signed-Off-by: Jassi <jassi.brar@samsung.com>
-> >> ---
-> >> ?arch/arm/mach-s3c6400/include/mach/map.h | ? ?3 +++
-> >> ?1 files changed, 3 insertions(+), 0 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mach-s3c6400/include/mach/map.h b/arch/arm/mach-s3c6400/include/mach/map.h
-> >> index 5057d99..775577a 100644
-> >> --- a/arch/arm/mach-s3c6400/include/mach/map.h
-> >> +++ b/arch/arm/mach-s3c6400/include/mach/map.h
-> >> @@ -44,6 +44,9 @@
-> >> ?#define S3C64XX_PA_SYSCON ? ?(0x7E00F000)
-> >> ?#define S3C64XX_PA_IIS0 ? ? ? ? ? ? ?(0x7F002000)
-> >> ?#define S3C64XX_PA_IIS1 ? ? ? ? ? ? ?(0x7F003000)
-> >> +#ifdef CONFIG_CPU_S3C6410
-> >> +#define S3C64XX_PA_IISV4 ? ? (0x7F00D000)
-> >> +#endif
-> >
-> > Does this really need to be #ifdef'd out? You might want to avoid
-> > building the device setup code, or similar if it is only for a s3c6400
-> > but this should be done by the machine Kconfig chosing to build the
-> > support in for the machines that do need it.
-> >
-> > I see no good reason for this to be applied.
-> In my second post in this thread, i already said the ifdef had better
-> be dropped.
-> So, you want me to resend patch without the ifdef?
+On Tue, Sep 15, 2009 at 7:44 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Tue, Sep 15, 2009 at 07:02:35PM +0900, Jassi wrote:
+>> In SoC-Master mode, CODCLK maybe gated out as MCLK of the CODEC.
+>> In SoC-Slave mode, CODCLK needs to be cut-off from PAD inorder
+>> to avoid collision with MCLK from CODEC.
+>> Option to gate/block CODCLK is implemented in this patch.
 
-Yes. remove #ifdef.
- 
--- 
-Ben
+> In terms of functionality it might be clearer to describe what's going
+> on here as switching the function of CDCLK from being an input to being
+> an output. ?The actual implementation appears to be done by gating the
+> output of the internal clock signal to the CDCLK pin but in terms of
+> what the user can see externally the clock isn't gated, it's still
+> active but it changed direction.
+The bit IISMOD[12], if cleared, gates the RCLK towards  the Xi2sCDCLK.
+If this bit is set, it simply disconnects the RCLK and Xi2sCDCLK.
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+If the I2S controller wants to use clock from Xi2sCDCLK via
+"audio-bus" through the MUX, then we want RCLK to be disconnected and
+we set this bit 1.
+If we provide the MCLK of the CODEC from RCLK of I2S controller, we
+connect RCLK to Xi2sCDCLK which is usually connected to the MCLK of
+the CODEC, In this case we gate RCLK by clearing this bit (note that
+it is a not-gate)
+
+>> +#define S3C64XX_IISMOD_CDCLK_EXT ? ? (1 << 12)
+>> +
+>
+> The datasheet calls this bit CDLKCON - it'd be better to preserve that
+> naming unless there is a good reason to diverge?
+CON is better used for register defines.
+This is but one bit: CodecClock is Internal or External.
+So, yes, minor but some reason for that.
+Btw, I have already notified this issue to our technical writers.
+
+>> @@ -99,6 +99,14 @@ static int s3c64xx_i2s_set_sysclk(struct snd_soc_dai *cpu_dai,
+>> ? ? ? ? ? ? ? iismod |= S3C64XX_IISMOD_IMS_SYSMUX;
+>> ? ? ? ? ? ? ? break;
+>>
+>> + ? ? case S3C64XX_CODCLKSRC_INT:
+>> + ? ? ? ? ? ? iismod &= ~S3C64XX_IISMOD_CDCLK_EXT;
+>> + ? ? ? ? ? ? break;
+>> +
+>> + ? ? case S3C64XX_CODCLKSRC_EXT:
+>> + ? ? ? ? ? ? iismod |= S3C64XX_IISMOD_CDCLK_EXT;
+>> + ? ? ? ? ? ? break;
+>> +
+>
+> This should really be done using the direction parameter - clk_id should
+> specify that CDCLK should be used and the direction parameter be used to
+> say if it's an input or output.
+Again, the patch aims to simply fit in the place. For the current
+state and design of our driver this change is least intrusive and most
+simple.
