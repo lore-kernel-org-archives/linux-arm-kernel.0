@@ -1,104 +1,30 @@
-From: wg@grandegger.com (Wolfgang Grandegger)
-Date: Wed, 16 Sep 2009 12:07:48 +0200
-Subject: [PATCH 3/3] at91_can: add driver for Atmel's CAN controller on
-	AT91SAM9263
-In-Reply-To: <1253094405-3216-4-git-send-email-mkl@pengutronix.de>
-References: <1253094405-3216-1-git-send-email-mkl@pengutronix.de>	<1253094405-3216-2-git-send-email-mkl@pengutronix.de>	<1253094405-3216-3-git-send-email-mkl@pengutronix.de>
-	<1253094405-3216-4-git-send-email-mkl@pengutronix.de>
-Message-ID: <4AB0B8F4.50301@grandegger.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 16 Sep 2009 11:22:10 +0100
+Subject: [PATCH 02/10] S3C64XX I2S: declared i2s_v4
+In-Reply-To: <20090916001220.GC24720@trinity.fluff.org>
+References: <1253008954-10473-1-git-send-email-jassi.brar@samsung.com>
+	<20090916001220.GC24720@trinity.fluff.org>
+Message-ID: <20090916102210.GB3589@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Kleine-Budde wrote:
-> This patch add the driver for the SoC CAN controller in Atmel's AT91SAM9263.
-> 
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+On Wed, Sep 16, 2009 at 01:12:20AM +0100, Ben Dooks wrote:
+> On Tue, Sep 15, 2009 at 07:02:34PM +0900, Jassi wrote:
 
-I already reviewed at91_can.c on the Socket-CAN ML and it's almost OK
-from the Socket-CAN point of view. I just realized two minor issues:
+> > -	.id		  = -1,
+> > +	.name		  = "s3c64xx-iis",
+> > +	.id		  = 2,
 
-> ---
->  drivers/net/can/Kconfig    |    6 +
->  drivers/net/can/Makefile   |    1 +
->  drivers/net/can/at91_can.c | 1177 ++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 1184 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/net/can/at91_can.c
-> 
-> diff --git a/drivers/net/can/Kconfig b/drivers/net/can/Kconfig
-> index 0900743..b6d2af1 100644
-> --- a/drivers/net/can/Kconfig
-> +++ b/drivers/net/can/Kconfig
-> @@ -82,6 +82,12 @@ config CAN_KVASER_PCI
->  	  This driver is for the the PCIcanx and PCIcan cards (1, 2 or
->  	  4 channel) from Kvaser (http://www.kvaser.com).
->  
-> +config CAN_AT91
-> +	tristate "Atmel AT91 onchip CAN controller"
-> +	depends on CAN && ARCH_AT91SAM9263
+> I'd like to see how much different the two drivers are, and whether they
+> need to be seperated into their own modules.
 
-It should depend on CAN_DEV because it used the CAN device driver interface.
+There's substantial overlap (mostly IISv4 just adds new register bits to
+control the additional channels), but the trick would be how the driver
+is supposed to work out that it's handling an IISv4 device and enable
+the additional functionality.
 
-> +	---help---
-> +	  This is a driver for the SoC CAN controller in Atmel's AT91SAM9263.
-> +
->  config CAN_DEBUG_DEVICES
->  	bool "CAN devices debugging messages"
->  	depends on CAN
-> diff --git a/drivers/net/can/Makefile b/drivers/net/can/Makefile
-> index 523a941..3a54a12 100644
-> --- a/drivers/net/can/Makefile
-> +++ b/drivers/net/can/Makefile
-> @@ -8,5 +8,6 @@ obj-$(CONFIG_CAN_DEV)		+= can-dev.o
->  can-dev-y			:= dev.o
->  
->  obj-$(CONFIG_CAN_SJA1000)	+= sja1000/
-> +obj-$(CONFIG_CAN_AT91)		+= at91_can.o
->  
->  ccflags-$(CONFIG_CAN_DEBUG_DEVICES) := -DDEBUG
-> diff --git a/drivers/net/can/at91_can.c b/drivers/net/can/at91_can.c
-> new file mode 100644
-> index 0000000..cd1e8cb
-> --- /dev/null
-> +++ b/drivers/net/can/at91_can.c
-> @@ -0,0 +1,1177 @@
-> +/*
-> + * at91_can.c - CAN network driver for AT91 SoC CAN controller
-> + *
-> + * (C) 2007 by Hans J. Koch <hjk@linutronix.de>
-> + * (C) 2008, 2009 by Marc Kleine-Budde <kernel@pengutronix.de>
-> + *
-> + * This software may be distributed under the terms of the GNU General
-> + * Public License ("GPL") version 2 as distributed in the 'COPYING'
-> + * file from the main directory of the linux kernel source.
-> + *
-> + * Send feedback to <socketcan-users@lists.berlios.de>
+> Changing the name to s3c64xx-iis means that the module auto-load may end
+> up loading the wrong module. Holding off on this change until we se what
+> needs to be done for this block.
 
-This driver uses platform data. Could you please add some description on
-how they should be used, e.g. like for the MCP251x:
-
- * Your platform definition file should specify something like:
- *
- * static struct mcp251x_platform_data mcp251x_info = {
- *         .oscillator_frequency = 8000000,
- *         .board_specific_setup = &mcp251x_setup,
- *         .model = CAN_MCP251X_MCP2510,
- *         .power_enable = mcp251x_power_enable,
- *         .transceiver_enable = NULL,
- * };
- *
- * static struct spi_board_info spi_board_info[] = {
- *         {
- *                 .modalias      = "mcp251x",
- *                 .platform_data = &mcp251x_info,
- *                 .irq           = IRQ_EINT13,
- *                 .max_speed_hz  = 2*1000*1000,
- *                 .chip_select   = 2,
- *         },
- * };
- *
- * Please see mcp251x.h for a description of the fields in
- * struct mcp251x_platform_data.
-
-I find that really useful.
-
-Wolfgang.
+It's certainly not a long-term solution as-is.
