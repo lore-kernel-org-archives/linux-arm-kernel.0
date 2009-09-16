@@ -1,32 +1,85 @@
-From: dan@debian.org (Daniel Jacobowitz)
-Date: Wed, 16 Sep 2009 10:40:51 -0400
-Subject: Problems with pthread on ARM/PXA270
-In-Reply-To: <200909160926.02036.schindele@nentec.de>
-References: <200909160926.02036.schindele@nentec.de>
-Message-ID: <20090916144051.GA19307@caradoc.them.org>
+From: schen@mvista.com (Steve Chen)
+Date: Wed, 16 Sep 2009 09:49:14 -0500
+Subject: [PATCH] arm: remove unused code in delay.S
+In-Reply-To: <m3ljkfoywm.fsf@intrepid.localdomain>
+References: <1252875960-21512-1-git-send-email-felipe.contreras@gmail.com>
+	<20090915103739.GA19519@elf.ucw.cz>
+	<1253017761.3273.117.camel@linux-1lbu>
+	<200909151541.08852.marek.vasut@gmail.com>
+	<1253032210.3273.128.camel@linux-1lbu>
+	<94a0d4530909151158y489a96e3x63ff932c713822b0@mail.gmail.com>
+	<1253043875.3273.131.camel@linux-1lbu>
+	<m3k4zzdimy.fsf@intrepid.localdomain>
+	<1253053609.3273.139.camel@linux-1lbu>
+	<m33a6nddvd.fsf@intrepid.localdomain>
+	<1253089566.3273.152.camel@linux-1lbu>
+	<m3ljkfoywm.fsf@intrepid.localdomain>
+Message-ID: <1253112555.3273.164.camel@linux-1lbu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 16, 2009 at 09:26:01AM +0200, Juergen Schindele wrote:
-> Hello all,
-> we tried to implement a thread based software on our PXA270 based platform but
-> we had trouble with pthreads. So i modyfied a tiny progam to test. This little progam creates
-> 10 threads and each thread does print something (an index an a pointer to itself). 
+On Wed, 2009-09-16 at 14:30 +0200, Krzysztof Halasa wrote:
+> Steve Chen <schen@mvista.com> writes:
 > 
-> On my PC with Suse 11.0 Linux (kernel 2.6.27) this works fine as supposed to.
-> Each thread has his turn and print his own values.
+> > +config OLD_CPU_DELAY
+> > +	depends on CPU_32v3 || CPU_32v4 || CPU_32v4T
+> > +	bool "Accurate delays for some older CPUs"
+> > +	def_bool n
+> > +	help
+> > +	  Try enable this if observing longer than expected delays and need
+> > +	  more accuracy.  May cause instability in some CPUs.
+> > +
 > 
-> But on our pxa270 platform the thread switch does not (or really rarely) happen
-> and only one thread is printing always the same values. So i suppose thread
-> switching is not working!
+> There is still this uncertain "accurate" in the text. Why don't just
 > 
-> Any hints or experiences are welcome !!!
+> +	bool "Different delay() code for some older CPUs"
 
-It's just a wild guess, but check your sched_clock implementation.  I
-fixed a similar problem in QEMU last week; the kernel used to function
-OK with sched_clock always returning zero, but some time between
-2.6.25 and 2.6.28 became dependent on it.
+Sounds good.  I also update text under help to better quantify
+"accuracy".  Updated patch below.  Separately, as Russel pointed out,
+this should only be done by experienced people, so we even bother with
+this patch since the only people should touch this are the people who
+knows all the details.
 
--- 
-Daniel Jacobowitz
-CodeSourcery
+Document #if 0 code block in delay.S and make it selectable for compile.
+
+Signed-off-by: Steve Chen <schen@mvista.com>
+
+---
+
+ arch/arm/Kconfig     |    8 ++++++++
+ arch/arm/lib/delay.S |    2 +-
+ 2 files changed, 9 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index aef63c8..ca8d535 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -813,6 +813,14 @@ config ARM_ERRATA_460075
+ 	  ACTLR register. Note that setting specific bits in the ACTLR
+register
+ 	  may not be available in non-secure mode.
+ 
++config OLD_CPU_DELAY
++	depends on CPU_32v3 || CPU_32v4 || CPU_32v4T
++	bool "Different delay() code for some older CPUs"
++	def_bool n
++	help
++	  Try enable this if observing longer than expected delays.  This code
++	  improves accuracy for some CPUs while cause instability in others.
++
+ endmenu
+ 
+ source "arch/arm/common/Kconfig"
+diff --git a/arch/arm/lib/delay.S b/arch/arm/lib/delay.S
+index 8d6a876..67e679b 100644
+--- a/arch/arm/lib/delay.S
++++ b/arch/arm/lib/delay.S
+@@ -42,7 +42,7 @@ ENTRY(__const_udelay)				@ 0 <= r0 <= 0x7fffff06
+ @ Delay routine
+ ENTRY(__delay)
+ 		subs	r0, r0, #1
+-#if 0
++#ifdef CONFIG_OLD_CPU_DELAY
+ 		movls	pc, lr
+ 		subs	r0, r0, #1
+ 		movls	pc, lr
