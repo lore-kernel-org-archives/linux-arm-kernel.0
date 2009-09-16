@@ -1,77 +1,51 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 16 Sep 2009 01:43:59 +0100
-Subject: [PATCH 2/8] s3c6410: sdhci: Adding additional data in sdhci
-	platform data structure.
-In-Reply-To: <1252392458-23921-1-git-send-email-thomas.ab@samsung.com>
-References: <1252392458-23921-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <20090916004359.GP13508@trinity.fluff.org>
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Wed, 16 Sep 2009 09:46:53 +0900
+Subject: [PATCH 6/7] S3C64XX DMA: dbg_showbuffs cleanup
+In-Reply-To: <20090915234432.GC13508@trinity.fluff.org>
+References: <1253008884-7657-1-git-send-email-jassi.brar@samsung.com>
+	<20090915234432.GC13508@trinity.fluff.org>
+Message-ID: <1b68c6790909151746o5a9c127cq114f6ad29122921c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 08, 2009 at 03:47:38PM +0900, thomas.ab at samsung.com wrote:
-> From: Thomas Abraham <thomas.ab@samsung.com>
-> 
-> This patch adds additional information about the parent clock
-> name, sdhci clock name and desired sdhci operating frequency
-> in the sdhci platform data structure.
-
-This would have been better off being a series of adding the max field
-and the clock fields seperately, and fixing up their platform data at
-the same time.
-
-The addiiton of the clock information is not necessary due to the
-following:
-
-1) There are four clock choices here, not just one.
-
-2) The mmc_bus is a fixed clock name, it should not be up to the
-   driver to change it, it is registered by the clock core code for
-   the relevant architecture.
-
-3) struct s3c_sdhci_platdata already has a `char **` pointer to an
-   array of clock names for (1). Setup by functions such as the
-   s3c_sdhci0_set_platdata. It does however seem to be missing a
-   documentation point in the data.
-
-I'd apply the max-frequency change, but not the clock change.
- 
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> ---
->  arch/arm/plat-s3c/dev-hsmmc.c |    9 ++++++---
->  1 files changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/plat-s3c/dev-hsmmc.c b/arch/arm/plat-s3c/dev-hsmmc.c
-> index 4c05b39..357ec60 100644
-> --- a/arch/arm/plat-s3c/dev-hsmmc.c
-> +++ b/arch/arm/plat-s3c/dev-hsmmc.c
-> @@ -38,9 +38,12 @@ static struct resource s3c_hsmmc_resource[] = {
->  static u64 s3c_device_hsmmc_dmamask = 0xffffffffUL;
->  
->  struct s3c_sdhci_platdata s3c_hsmmc0_def_platdata = {
-> -	.max_width	= 4,
-> -	.host_caps	= (MMC_CAP_4_BIT_DATA |
-> -			   MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED),
-> +	.max_width		= 4,
-> +	.host_caps		= (MMC_CAP_4_BIT_DATA |
-> +				  MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED),
-> +	.clk_parent_name	= "dout_mpll",
-> +	.clk_source_name 	= "mmc_bus",
-> +	.clk_speed		= 50*MHZ,
->  };
->  
->  struct platform_device s3c_device_hsmmc0 = {
-> -- 
-> 1.5.3.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+On Wed, Sep 16, 2009 at 8:44 AM, Ben Dooks <ben-linux@fluff.org> wrote:
+> On Tue, Sep 15, 2009 at 07:01:24PM +0900, Jassi wrote:
+>> Removed unused variable and cleaned up.
+>>
+>> Signed-Off-by: Jassi <jassi.brar@samsung.com>
+>> ---
+>> ?arch/arm/plat-s3c64xx/dma.c | ? 14 ++++----------
+>> ?1 files changed, 4 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/arch/arm/plat-s3c64xx/dma.c b/arch/arm/plat-s3c64xx/dma.c
+>> index e68469d..727072b 100644
+>> --- a/arch/arm/plat-s3c64xx/dma.c
+>> +++ b/arch/arm/plat-s3c64xx/dma.c
+>> @@ -71,20 +71,14 @@ static void show_lli(struct pl080s_lli *lli)
+>> ?static void dbg_showbuffs(struct s3c2410_dma_chan *chan)
+>> ?{
+>> ? ? ? struct s3c64xx_dma_buff *ptr;
+>> - ? ? struct s3c64xx_dma_buff *end;
+>
+> you are right that the end is not used.
+>
+>> ? ? ? pr_debug("DMA%d: buffs next %p, curr %p, end %p\n",
+>> ? ? ? ? ? ? ? ?chan->number, chan->next, chan->curr, chan->end);
+>>
+>> - ? ? ptr = chan->next;
+>> - ? ? end = chan->end;
+>> -
+>> - ? ? if (debug_show_buffs) {
+>> - ? ? ? ? ? ? for (; ptr != NULL; ptr = ptr->next) {
+>> - ? ? ? ? ? ? ? ? ? ? pr_debug("DMA%d: %08x ",
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?chan->number, ptr->lli_dma);
+>> - ? ? ? ? ? ? ? ? ? ? show_lli(ptr->lli);
+>> - ? ? ? ? ? ? }
+>> + ? ? for (ptr = chan->curr; debug_show_buffs && ptr != NULL; ptr = ptr->next) {
+>
+> this isn't a very nice change, for a start this means debug_show_buffs
+> is going to end up being evaluated each loop and secondly these sort of
+> changes do not help the code readability and can introduce bugs of their
+> own.
+yes and i knew the counter will be evaluated for every loop.
+i wanted to keep the counter and not change much the code.
