@@ -1,38 +1,118 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Wed, 16 Sep 2009 20:50:07 +0900
-Subject: [PATCH 08/10] S3C64XX I2S: Return correct codec clock
-In-Reply-To: <20090916110937.GE3589@rakim.wolfsonmicro.main>
-References: <1253008960-10666-1-git-send-email-jassi.brar@samsung.com>
-	<20090915110635.GI22878@rakim.wolfsonmicro.main>
-	<1b68c6790909150421y7c78ad8dt2703bd039fcd39b@mail.gmail.com>
-	<20090915115618.GN22878@rakim.wolfsonmicro.main>
-	<1b68c6790909152216od3f372ftc2fa3db488e6996@mail.gmail.com>
-	<20090916110937.GE3589@rakim.wolfsonmicro.main>
-Message-ID: <1b68c6790909160450w14f5cd9w355a9a6114d4bbb4@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 16 Sep 2009 13:59:33 +0200
+Subject: [PATCH 4/5] at91/USB: USB drivers modifications for at91sam9g10
+In-Reply-To: <1245341772-1689-5-git-send-email-nicolas.ferre@atmel.com>
+References: <1245341772-1689-1-git-send-email-nicolas.ferre@atmel.com>
+	<1245341772-1689-5-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <4AB0D325.9080407@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 16, 2009 at 8:09 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Wed, Sep 16, 2009 at 02:16:54PM +0900, jassi brar wrote:
->
->> Wait, there is no option for selecting I2SCLK in the manual. That is
->> behind the MUX along with Mpll/Epll Out etc.
->> In the driver we actually have all the correct options : PCLK or
->> CLKAUDIO(which is the output of the MUX).
->
->> The IMS bit can select only either PCLK or CLKAUDIO.So, i guess
->
-> The datasheet I have says an IMS setting of 11 selects I2SCLK and an IMS
-> setting of 01 selects CLKAUDIOx. ?This seems odd to say the least but is
-> consistent with the move to a 2 bit register field for IMS rather than
-> adding a second register field for selection of master mode clock.
-> Could just be poor documentation, but it could be a restriction on the
-> clock that can be used in slave mode or an error in the diagram.
-Poor documentation, i guess, for i am myself unaware of any such limitation.
-Revamping documentation is another part of the initiative.
+Hi,
 
->> ?the patch is fine as it is.
->
-> It at least needs checkpatch issues fixing.
-Ok, will resend. thanks.
+Here is a little "ping" about integration of this patch.
+
+Nicolas Ferre :
+> From: Hong Xu <hong.xu@atmel.com>
+> 
+> Modify both host and gadget USB drivers for at91sam9g10.
+> This add a clock management equivalent to at91sam9261 on usb drivers.
+> It also add the way of handling gadget pull-ups (like the at91sam9261).
+
+I wonder if we can consider its inclusion as at91sam9g10 is now
+integrated in mainline.
+Do you want me to split this in several pieces for host/gadget split.
+
+Thanks.
+
+> Signed-off-by: Hong Xu <hong.xu@atmel.com>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  drivers/usb/gadget/at91_udc.c |    6 +++---
+>  drivers/usb/host/ohci-at91.c  |   10 +++++-----
+>  2 files changed, 8 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
+> index 0b2bb8f..bfed3d9 100644
+> --- a/drivers/usb/gadget/at91_udc.c
+> +++ b/drivers/usb/gadget/at91_udc.c
+> @@ -892,7 +892,7 @@ static void pullup(struct at91_udc *udc, int is_on)
+>  
+>  			txvc |= AT91_UDP_TXVC_PUON;
+>  			at91_udp_write(udc, AT91_UDP_TXVC, txvc);
+> -		} else if (cpu_is_at91sam9261()) {
+> +		} else if (cpu_is_at91sam9261() || cpu_is_at91sam9g10()) {
+>  			u32	usbpucr;
+>  
+>  			usbpucr = at91_sys_read(AT91_MATRIX_USBPUCR);
+> @@ -910,7 +910,7 @@ static void pullup(struct at91_udc *udc, int is_on)
+>  
+>  			txvc &= ~AT91_UDP_TXVC_PUON;
+>  			at91_udp_write(udc, AT91_UDP_TXVC, txvc);
+> -		} else if (cpu_is_at91sam9261()) {
+> +		} else if (cpu_is_at91sam9261() || cpu_is_at91sam9g10()) {
+>  			u32	usbpucr;
+>  
+>  			usbpucr = at91_sys_read(AT91_MATRIX_USBPUCR);
+> @@ -1692,7 +1692,7 @@ static int __init at91udc_probe(struct platform_device *pdev)
+>  		udc->ep[3].maxpacket = 64;
+>  		udc->ep[4].maxpacket = 512;
+>  		udc->ep[5].maxpacket = 512;
+> -	} else if (cpu_is_at91sam9261()) {
+> +	} else if (cpu_is_at91sam9261() || cpu_is_at91sam9g10()) {
+>  		udc->ep[3].maxpacket = 64;
+>  	} else if (cpu_is_at91sam9263()) {
+>  		udc->ep[0].maxpacket = 64;
+> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+> index b29b0fe..fb64def 100644
+> --- a/drivers/usb/host/ohci-at91.c
+> +++ b/drivers/usb/host/ohci-at91.c
+> @@ -35,7 +35,7 @@ extern int usb_disabled(void);
+>  
+>  static void at91_start_clock(void)
+>  {
+> -	if (cpu_is_at91sam9261())
+> +	if (cpu_is_at91sam9261() || cpu_is_at91sam9g10())
+>  		clk_enable(hclk);
+>  	clk_enable(iclk);
+>  	clk_enable(fclk);
+> @@ -46,7 +46,7 @@ static void at91_stop_clock(void)
+>  {
+>  	clk_disable(fclk);
+>  	clk_disable(iclk);
+> -	if (cpu_is_at91sam9261())
+> +	if (cpu_is_at91sam9261() || cpu_is_at91sam9g10())
+>  		clk_disable(hclk);
+>  	clocked = 0;
+>  }
+> @@ -142,7 +142,7 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+>  
+>  	iclk = clk_get(&pdev->dev, "ohci_clk");
+>  	fclk = clk_get(&pdev->dev, "uhpck");
+> -	if (cpu_is_at91sam9261())
+> +	if (cpu_is_at91sam9261() || cpu_is_at91sam9g10())
+>  		hclk = clk_get(&pdev->dev, "hck0");
+>  
+>  	at91_start_hc(pdev);
+> @@ -156,7 +156,7 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+>  	/* Error handling */
+>  	at91_stop_hc(pdev);
+>  
+> -	if (cpu_is_at91sam9261())
+> +	if (cpu_is_at91sam9261() || cpu_is_at91sam9g10())
+>  		clk_put(hclk);
+>  	clk_put(fclk);
+>  	clk_put(iclk);
+> @@ -193,7 +193,7 @@ static void usb_hcd_at91_remove(struct usb_hcd *hcd,
+>  	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
+>  	usb_put_hcd(hcd);
+>  
+> -	if (cpu_is_at91sam9261())
+> +	if (cpu_is_at91sam9261() || cpu_is_at91sam9g10())
+>  		clk_put(hclk);
+>  	clk_put(fclk);
+>  	clk_put(iclk);
+
+
+-- 
+Nicolas Ferre
