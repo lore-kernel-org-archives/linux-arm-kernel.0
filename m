@@ -1,12 +1,12 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 16 Sep 2009 12:47:22 +0200
+Date: Wed, 16 Sep 2009 12:45:59 +0200
 Subject: [PATCH 3/3] at91_can: add driver for Atmel's CAN controller on
 	AT91SAM9263
 In-Reply-To: <4AB0B8F4.50301@grandegger.com>
 References: <1253094405-3216-1-git-send-email-mkl@pengutronix.de>	<1253094405-3216-2-git-send-email-mkl@pengutronix.de>	<1253094405-3216-3-git-send-email-mkl@pengutronix.de>
 	<1253094405-3216-4-git-send-email-mkl@pengutronix.de>
 	<4AB0B8F4.50301@grandegger.com>
-Message-ID: <4AB0C23A.8070502@pengutronix.de>
+Message-ID: <4AB0C1E7.9070708@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
