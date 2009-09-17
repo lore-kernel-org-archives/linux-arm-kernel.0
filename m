@@ -1,999 +1,404 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 17 Sep 2009 17:16:59 +0900
-Subject: [PATCH] Samsung SoCs: OneNAND support
-Message-ID: <20090917081659.GA28591@july>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 17 Sep 2009 10:23:53 +0200
+Subject: [PATCH] U300 AB3100 boardinfo v5
+Message-ID: <1253175833-28673-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-S3C64XX, S5PC1XX series OneNAND driver support
+This defines regulator platform data and board power
+regulator hogs for the ST-Ericsson U300 platform.
 
-S3C6400, S3C6410, and S5PC100 use own OneNAND controller by AHB bus
-BTW, S5PC110 use generic OneNAND APIs.
-
-This is based on Samsung SoCs cpu detection.
-
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: Liam Girdwood <lrg@slimlogic.co.uk>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
-diff --git a/arch/arm/plat-s3c/include/plat/regs-onenand.h b/arch/arm/plat-s3c/include/plat/regs-onenand.h
-new file mode 100644
-index 0000000..943b51c
---- /dev/null
-+++ b/arch/arm/plat-s3c/include/plat/regs-onenand.h
-@@ -0,0 +1,75 @@
-+/*
-+ * linux/arch/arm/plat-s3c/include/plat/regs-onenand.h
-+ *
-+ *  Copyright (C) 2008-2009 Samsung Electronics
-+ *  Kyungmin Park <kyungmin.park@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#ifndef __SAMSUNG_ONENAND_H__
-+#define __SAMSUNG_ONENAND_H__
-+
-+#include <mach/hardware.h>
-+
-+/*
-+ * OneNAND Controller
-+ */
-+#define S3C64XX_ONENAND0_BASE	0x70100000
-+#define S3C64XX_ONENAND1_BASE	0x70200000
-+#define S5PC100_ONENAND_BASE	0xE7100000
-+#define S5PC110_ONENAND_BASE	0xB0000000
-+
-+#ifdef CONFIG_ARCH_S3C64XX
-+#define SAMSUNG_ONENAND_BASE	S3C64XX_ONENAND0_BASE
-+#endif
-+#ifdef CONFIG_ARCH_S5PC1XX
-+#define SAMSUNG_ONENAND_BASE	S5PC100_ONENAND_BASE
-+#endif
-+
-+#define MEM_CFG_OFFSET		0x0000
-+#define BURST_LEN_OFFSET	0x0010
-+#define MEM_RESET_OFFSET	0x0020
-+#define INT_ERR_STAT_OFFSET	0x0030
-+#define INT_ERR_MASK_OFFSET	0x0040
-+#define INT_ERR_ACK_OFFSET	0x0050
-+#define ECC_ERR_STAT_OFFSET	0x0060
-+#define MANUFACT_ID_OFFSET	0x0070
-+#define DEVICE_ID_OFFSET	0x0080
-+#define DATA_BUF_SIZE_OFFSET	0x0090
-+#define BOOT_BUF_SIZE_OFFSET	0x00A0
-+#define BUF_AMOUNT_OFFSET	0x00B0
-+#define TECH_OFFSET		0x00C0
-+#define FBA_WIDTH_OFFSET	0x00D0
-+#define FPA_WIDTH_OFFSET	0x00E0
-+#define FSA_WIDTH_OFFSET	0x00F0
-+#define TRANS_SPARE_OFFSET	0x0140
-+#define DBS_DFS_WIDTH_OFFSET	0x0160
-+#define INT_PIN_ENABLE_OFFSET	0x01A0
-+#define ACC_CLOCK_OFFSET	0x01C0
-+#define FLASH_VER_ID_OFFSET	0x01F0
-+#define FLASH_AUX_CNTRL_OFFSET	0x0300		/* s3c64xx only */
-+
-+#define ONENAND_MEM_RESET_HOT	0x3
-+#define ONENAND_MEM_RESET_COLD	0x2
-+#define ONENAND_MEM_RESET_WARM	0x1
-+
-+#define CACHE_OP_ERR		(1 << 13)
-+#define RST_CMP			(1 << 12)
-+#define RDY_ACT			(1 << 11)
-+#define INT_ACT			(1 << 10)
-+#define UNSUP_CMD		(1 << 9)
-+#define LOCKED_BLK		(1 << 8)
-+#define BLK_RW_CMP		(1 << 7)
-+#define ERS_CMP			(1 << 6)
-+#define PGM_CMP			(1 << 5)
-+#define LOAD_CMP		(1 << 4)
-+#define ERS_FAIL		(1 << 3)
-+#define PGM_FAIL		(1 << 2)
-+#define INT_TO			(1 << 1)
-+#define LD_FAIL_ECC_ERR		(1 << 0)
-+
-+#define TSRF			(1 << 0)
-+
-+#endif
-diff --git a/drivers/mtd/onenand/Kconfig b/drivers/mtd/onenand/Kconfig
-index 79fa79e..74ad1a9 100644
---- a/drivers/mtd/onenand/Kconfig
-+++ b/drivers/mtd/onenand/Kconfig
-@@ -34,6 +34,13 @@ config MTD_ONENAND_OMAP2
- 	  Support for a OneNAND flash device connected to an OMAP2/OMAP3 CPU
- 	  via the GPMC memory controller.
+ChangeLog v4->v5
+
+- Forgot the Makefile and new regulator.c file, mea culpa.
+---
+ arch/arm/mach-u300/Makefile    |    1 +
+ arch/arm/mach-u300/i2c.c       |  248 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-u300/regulator.c |   88 ++++++++++++++
+ 3 files changed, 337 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-u300/regulator.c
+
+diff --git a/arch/arm/mach-u300/Makefile b/arch/arm/mach-u300/Makefile
+index 885b5c0..fab46fe 100644
+--- a/arch/arm/mach-u300/Makefile
++++ b/arch/arm/mach-u300/Makefile
+@@ -12,3 +12,4 @@ obj-$(CONFIG_MMC)                 += mmc.o
+ obj-$(CONFIG_SPI_PL022)           += spi.o
+ obj-$(CONFIG_MACH_U300_SPIDUMMY)  += dummyspichip.o
+ obj-$(CONFIG_I2C_STU300)          += i2c.o
++obj-$(CONFIG_REGULATOR_AB3100)    += regulator.o
+diff --git a/arch/arm/mach-u300/i2c.c b/arch/arm/mach-u300/i2c.c
+index 10be1f8..7bc2503 100644
+--- a/arch/arm/mach-u300/i2c.c
++++ b/arch/arm/mach-u300/i2c.c
+@@ -9,13 +9,256 @@
+  */
+ #include <linux/kernel.h>
+ #include <linux/i2c.h>
++#include <linux/mfd/ab3100.h>
++#include <linux/regulator/machine.h>
++#include <linux/amba/bus.h>
+ #include <mach/irqs.h>
  
-+config MTD_ONENAND_SAMSUNG
-+        tristate "OneNAND on Samsung SOC controller support"
-+        depends on MTD_ONENAND && (ARCH_S3C64XX || ARCH_S5PC1XX)
-+        help
-+          Support for a OneNAND flash device connected to an Samsung SOC
-+          S3C64XX/S5PC1XX controller.
-+
- config MTD_ONENAND_OTP
- 	bool "OneNAND OTP Support"
- 	select HAVE_MTD_OTP
-diff --git a/drivers/mtd/onenand/Makefile b/drivers/mtd/onenand/Makefile
-index 64b6cc6..2b7884c 100644
---- a/drivers/mtd/onenand/Makefile
-+++ b/drivers/mtd/onenand/Makefile
-@@ -8,6 +8,7 @@ obj-$(CONFIG_MTD_ONENAND)		+= onenand.o
- # Board specific.
- obj-$(CONFIG_MTD_ONENAND_GENERIC)	+= generic.o
- obj-$(CONFIG_MTD_ONENAND_OMAP2)		+= omap2.o
-+obj-$(CONFIG_MTD_ONENAND_SAMSUNG)       += samsung.o
- 
- # Simulator
- obj-$(CONFIG_MTD_ONENAND_SIM)		+= onenand_sim.o
-diff --git a/drivers/mtd/onenand/samsung.c b/drivers/mtd/onenand/samsung.c
-new file mode 100644
-index 0000000..8c4204d
---- /dev/null
-+++ b/drivers/mtd/onenand/samsung.c
-@@ -0,0 +1,835 @@
 +/*
-+ * S3C64XX/S5PC1XX OneNAND driver
-+ *
-+ *  Copyright (C) 2008-2009 Samsung Electronics
-+ *  Kyungmin Park <kyungmin.park@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Implementation:
-+ *	Emulate the pseudo BufferRAM
++ * Initial settings of ab3100 registers.
++ * Common for below LDO regulator settings are that
++ * bit 7-5 controls voltage. Bit 4 turns regulator ON(1) or OFF(0).
++ * Bit 3-2 controls sleep enable and bit 1-0 controls sleep mode.
 + */
 +
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/sched.h>
-+#include <linux/mtd/mtd.h>
-+#include <linux/mtd/onenand.h>
-+#include <linux/mtd/partitions.h>
-+
-+#include <asm/mach/flash.h>
-+#include <plat/regs-onenand.h>
-+
-+#include <asm/io.h>
-+
-+#include <mach/cpu.h>
-+
-+#ifdef SAMSUNG_DEBUG
-+#define DPRINTK(format, args...)					\
-+do {									\
-+	printk("%s[%d]: " format "\n", __func__, __LINE__, ##args);	\
-+} while (0)
-+#else
-+#define DPRINTK(...)			do { } while (0)
-+#endif
-+
-+#define S3C64XX_AHB_ADDR		0x20000000
-+#define S5PC100_AHB_ADDR		0xB0000000
-+
-+#define ONENAND_ERASE_STATUS		0x00
-+#define ONENAND_MULTI_ERASE_SET		0x01
-+#define ONENAND_ERASE_START		0x03
-+#define ONENAND_UNLOCK_START		0x08
-+#define ONENAND_UNLOCK_END		0x09
-+#define ONENAND_LOCK_START		0x0A
-+#define ONENAND_LOCK_END		0x0B
-+#define ONENAND_LOCK_TIGHT_START	0x0C
-+#define ONENAND_LOCK_TIGHT_END		0x0D
-+#define ONENAND_UNLOCK_ALL		0x0E
-+#define ONENAND_OTP_ACCESS		0x12
-+#define ONENAND_SPARE_ACCESS_ONLY	0x13
-+#define ONENAND_MAIN_ACCESS_ONLY	0x14
-+#define ONENAND_ERASE_VERIFY		0x15
-+#define ONENAND_MAIN_SPARE_ACCESS	0x16
-+#define ONENAND_PIPELINE_READ		0x4000
-+
-+#if defined(CONFIG_ARCH_S3C64XX)
-+#define MAP_00				(0x0 << 24)
-+#define MAP_01				(0x1 << 24)
-+#define MAP_10				(0x2 << 24)
-+#define MAP_11				(0x3 << 24)
-+#elif defined(CONFIG_ARCH_S5PC1XX)
-+#define MAP_00				(0x0 << 26)
-+#define MAP_01				(0x1 << 26)
-+#define MAP_10				(0x2 << 26)
-+#define MAP_11				(0x3 << 26)
-+#endif
-+
-+/* The 'addr' is byte address. It makes a 16-bit word */
-+#define CMD_MAP_00(addr)		(MAP_00 | ((addr) << 1))
-+#define CMD_MAP_01(mem_addr)		(MAP_01 | (mem_addr))
-+#define CMD_MAP_10(mem_addr)		(MAP_10 | (mem_addr))
-+#define CMD_MAP_11(addr)		(MAP_11 | ((addr) << 2))
-+
-+#define S3C6400_FBA_SHIFT		10
-+#define S3C6400_FPA_SHIFT		4
-+#define S3C6400_FSA_SHIFT		2
-+
-+#define S3C6410_FBA_SHIFT		12
-+#define S3C6410_FPA_SHIFT		6
-+#define S3C6410_FSA_SHIFT		4
-+
-+#define S5PC100_FBA_SHIFT		13
-+#define S5PC100_FPA_SHIFT		7
-+#define S5PC100_FSA_SHIFT		5
-+
-+struct s3c_onenand {
-+	struct mtd_info	*mtd;
-+	void __iomem	*base;
-+	void __iomem	*ahb_addr;
-+	int		bootram_command;
-+	void __iomem	*page_buf;
-+	void __iomem	*oob_buf;
-+	unsigned int	(*mem_addr)(int fba, int fpa, int fsa);
-+#ifdef CONFIG_MTD_PARTITIONS
-+	struct mtd_partition *parts;
-+#endif
-+};
-+
-+static struct s3c_onenand *onenand;
-+
-+#ifdef CONFIG_MTD_PARTITIONS
-+static const char *part_probes[] = { "cmdlinepart", NULL, };
-+#endif
-+
-+static int s3c_read_reg(int offset)
-+{
-+	return readl(onenand->base + offset);
-+}
-+
-+static void s3c_write_reg(int value, int offset)
-+{
-+	writel(value, onenand->base + offset);
-+}
-+
-+static int s3c_read_cmd(unsigned int cmd)
-+{
-+	return readl(onenand->ahb_addr + cmd);
-+}
-+
-+static void s3c_write_cmd(int value, unsigned int cmd)
-+{
-+	writel(value, onenand->ahb_addr + cmd);
-+}
-+
-+#ifdef SAMSUNG_DEBUG
-+static void s3c_dump_reg(void)
-+{
-+	int i;
-+
-+	for (i = 0; i < 0x400; i += 0x40) {
-+		printk("0x%08X: 0x%08x 0x%08x 0x%08x 0x%08x\n",
-+			(unsigned int) onenand->base + i,
-+			s3c_read_reg(i), s3c_read_reg(i + 0x10),
-+			s3c_read_reg(i + 0x20), s3c_read_reg(i + 0x30));
-+	}
-+}
-+#endif
-+
-+static unsigned int s3c6400_mem_addr(int fba, int fpa, int fsa)
-+{
-+	return (fba << S3C6400_FBA_SHIFT) | (fpa << S3C6400_FPA_SHIFT) |
-+		(fsa << S3C6400_FSA_SHIFT);
-+}
-+
-+static unsigned int s3c6410_mem_addr(int fba, int fpa, int fsa)
-+{
-+	return (fba << S3C6410_FBA_SHIFT) | (fpa << S3C6410_FPA_SHIFT) |
-+		(fsa << S3C6410_FSA_SHIFT);
-+}
-+
-+static unsigned int s5pc100_mem_addr(int fba, int fpa, int fsa)
-+{
-+	return (fba << S5PC100_FBA_SHIFT) | (fpa << S5PC100_FPA_SHIFT) |
-+		(fsa << S5PC100_FSA_SHIFT);
-+}
-+
-+static void s3c_onenand_reset(void)
-+{
-+	unsigned long timeout = 0x10000;
-+	int stat;
-+
-+	s3c_write_reg(ONENAND_MEM_RESET_COLD, MEM_RESET_OFFSET);
-+	while (1 && timeout--) {
-+		stat = s3c_read_reg(INT_ERR_STAT_OFFSET);
-+		if (stat & RST_CMP)
-+			break;
-+	}
-+	stat = s3c_read_reg(INT_ERR_STAT_OFFSET);
-+	s3c_write_reg(stat, INT_ERR_ACK_OFFSET);
-+
-+	/* Clear interrupt */
-+	s3c_write_reg(0x0, INT_ERR_ACK_OFFSET);
-+	/* Clear the ECC status */
-+	s3c_write_reg(0x0, ECC_ERR_STAT_OFFSET);
-+}
-+
-+static unsigned short s3c_onenand_readw(void __iomem * addr)
-+{
-+	struct onenand_chip *this = onenand->mtd->priv;
-+	int reg = addr - this->base;
-+	int word_addr = reg >> 1;
-+	int value;
-+
-+	/* It's used for probing time */
-+	switch (reg) {
-+	case ONENAND_REG_MANUFACTURER_ID:
-+		return s3c_read_reg(MANUFACT_ID_OFFSET);
-+	case ONENAND_REG_DEVICE_ID:
-+		return s3c_read_reg(DEVICE_ID_OFFSET);
-+	case ONENAND_REG_VERSION_ID:
-+		return s3c_read_reg(FLASH_VER_ID_OFFSET);
-+	case ONENAND_REG_DATA_BUFFER_SIZE:
-+		return s3c_read_reg(DATA_BUF_SIZE_OFFSET);
-+	case ONENAND_REG_TECHNOLOGY:
-+		return s3c_read_reg(TECH_OFFSET);
-+	case ONENAND_REG_SYS_CFG1:
-+		return s3c_read_reg(MEM_CFG_OFFSET);
-+
-+	/* Used at unlock all status */
-+	case ONENAND_REG_CTRL_STATUS:
-+		return 0;
-+
-+	case ONENAND_REG_WP_STATUS:
-+		return ONENAND_WP_US;
-+
-+	default:
-+		break;
-+	}
-+
-+	/* BootRAM access control */
-+	if ((unsigned int) addr < ONENAND_DATARAM && onenand->bootram_command) {
-+		if (word_addr == 0)
-+			return s3c_read_reg(MANUFACT_ID_OFFSET);
-+		if (word_addr == 1)
-+			return s3c_read_reg(DEVICE_ID_OFFSET);
-+		if (word_addr == 2)
-+			return s3c_read_reg(FLASH_VER_ID_OFFSET);
-+	}
-+
-+	value = s3c_read_cmd(CMD_MAP_11(word_addr)) & 0xffff;
-+	printk(KERN_INFO "s3c_onenand_readw:  Illegal access"
-+		" at reg 0x%x, value 0x%x\n", word_addr, value);
-+	return value;
-+}
-+
-+static void s3c_onenand_writew(unsigned short value, void __iomem * addr)
-+{
-+	struct onenand_chip *this = onenand->mtd->priv;
-+	int reg = addr - this->base;
-+	int word_addr = reg >> 1;
-+
-+	/* It's used for probing time */
-+	switch (reg) {
-+	case ONENAND_REG_SYS_CFG1:
-+		s3c_write_reg(value, MEM_CFG_OFFSET);
-+		return;
-+
-+	case ONENAND_REG_START_ADDRESS1:
-+	case ONENAND_REG_START_ADDRESS2:
-+		return;
-+
-+	/* Lock/lock-tight/unlock/unlock_all */
-+	case ONENAND_REG_START_BLOCK_ADDRESS:
-+		return;
-+
-+	default:
-+		break;
-+	}
-+
-+	/* BootRAM access control */
-+	if ((unsigned int) addr < ONENAND_DATARAM) {
-+		if (value == ONENAND_CMD_READID) {
-+			onenand->bootram_command = 1;
-+			return;
-+		}
-+		if (value == ONENAND_CMD_RESET) {
-+			s3c_write_reg(ONENAND_MEM_RESET_COLD, MEM_RESET_OFFSET);
-+			onenand->bootram_command = 0;
-+			return;
-+		}
-+	}
-+
-+	printk(KERN_INFO "s3c_onenand_writew: Illegal access"
-+		" at reg 0x%x, value 0x%x\n", word_addr, value);
-+
-+	s3c_write_cmd(value, CMD_MAP_11(word_addr));
-+}
-+
-+static int s3c_onenand_wait(struct mtd_info *mtd, int state)
-+{
-+	unsigned int flags = INT_ACT;
-+	unsigned int stat, ecc;
-+	unsigned long timeout;
-+
-+	switch (state) {
-+	case FL_READING:
-+		flags |= BLK_RW_CMP | LOAD_CMP;
-+		break;
-+	case FL_WRITING:
-+		flags |= BLK_RW_CMP | PGM_CMP;
-+		break;
-+	case FL_ERASING:
-+		flags |= BLK_RW_CMP | ERS_CMP;
-+		break;
-+	case FL_LOCKING:
-+		flags |= BLK_RW_CMP;
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	/* The 20 msec is enough */
-+	timeout = jiffies + msecs_to_jiffies(20);
-+	while (time_before(jiffies, timeout)) {
-+		stat = s3c_read_reg(INT_ERR_STAT_OFFSET);
-+		if (stat & flags)
-+			break;
-+
-+		if (state != FL_READING)
-+			cond_resched();
-+	}
-+	/* To get correct interrupt status in timeout case */
-+	stat = s3c_read_reg(INT_ERR_STAT_OFFSET);
-+	s3c_write_reg(stat, INT_ERR_ACK_OFFSET);
-+
-+	/*
-+	 * 	
-+	 * In the Spec. it checks the controller status first
-+	 * However if you get the correct information in case of
-+	 * power off recovery (POR) test, it should read ECC status first
-+	 */
-+	if (stat & LOAD_CMP) {
-+		ecc = s3c_read_reg(ECC_ERR_STAT_OFFSET);
-+		if (ecc & ONENAND_ECC_4BIT_UNCORRECTABLE) {
-+			printk(KERN_INFO "onenand_wait: ECC error = 0x%04x\n", ecc);
-+			mtd->ecc_stats.failed++;
-+			return -EBADMSG;
-+		}
-+	}
-+
-+	if (stat & (LOCKED_BLK | ERS_FAIL | PGM_FAIL | LD_FAIL_ECC_ERR)) {
-+		printk(KERN_INFO "s3c_onenand_wait: controller error = 0x%04x\n", stat);
-+		if (stat & LOCKED_BLK)
-+			printk(KERN_INFO "s3c_onenand_wait: it's locked error = 0x%04x\n", stat);
-+
-+		return -EIO;
-+	}
-+
-+	return 0;
-+}
-+
-+static int s3c_onenand_command(struct mtd_info *mtd, int cmd, loff_t addr,
-+                           size_t len)
-+{
-+	struct onenand_chip *this = mtd->priv;
-+	unsigned int *m, *s;
-+	int fba, fpa, fsa = 0;
-+	unsigned int mem_addr;
-+	int i, mcount, scount;
-+	int index;
-+
-+	fba = (int) (addr >> this->erase_shift);
-+	fpa = (int) (addr >> this->page_shift);
-+	fpa &= this->page_mask;
-+
-+	mem_addr = onenand->mem_addr(fba, fpa, fsa);
-+
-+	switch (cmd) {
-+	case ONENAND_CMD_READ:
-+	case ONENAND_CMD_READOOB:
-+	case ONENAND_CMD_BUFFERRAM:
-+		ONENAND_SET_NEXT_BUFFERRAM(this);
-+	default:
-+		break;
-+	}
-+
-+	index = ONENAND_CURRENT_BUFFERRAM(this);
-+
-+	/*
-+	 * Emulate Two BufferRAMs and access with 4 bytes pointer
-+	 */
-+	m = (unsigned int *) onenand->page_buf;
-+	s = (unsigned int *) onenand->oob_buf;
-+
-+	if (index) {
-+		m += (this->writesize >> 2);
-+		s += (mtd->oobsize >> 2);
-+	}
-+
-+	mcount = mtd->writesize >> 2;
-+	scount = mtd->oobsize >> 2;
-+
-+	switch (cmd) {
-+	case ONENAND_CMD_READ:
-+		/* Main */
-+		for (i = 0; i < mcount; i++)
-+			*m++ = s3c_read_cmd(CMD_MAP_01(mem_addr));
-+		return 0;
-+
-+	case ONENAND_CMD_READOOB:
-+		s3c_write_reg(TSRF, TRANS_SPARE_OFFSET);
-+		/* Main */
-+		for (i = 0; i < mcount; i++)
-+			*m++ = s3c_read_cmd(CMD_MAP_01(mem_addr));
-+
-+		/* Spare */
-+		for (i = 0; i < scount; i++)
-+			*s++ = s3c_read_cmd(CMD_MAP_01(mem_addr));
-+
-+		s3c_write_reg(0, TRANS_SPARE_OFFSET);
-+		return 0;
-+
-+	case ONENAND_CMD_PROG:
-+		/* Main */
-+		for (i = 0; i < mcount; i++)
-+			s3c_write_cmd(*m++, CMD_MAP_01(mem_addr));
-+		return 0;
-+
-+	case ONENAND_CMD_PROGOOB:
-+		s3c_write_reg(TSRF, TRANS_SPARE_OFFSET);
-+
-+		/* Main - dummy write */
-+		for (i = 0; i < mcount; i++)
-+			s3c_write_cmd(0xffffffff, CMD_MAP_01(mem_addr));
-+
-+		/* Spare */
-+		for (i = 0; i < scount; i++)
-+			s3c_write_cmd(*s++, CMD_MAP_01(mem_addr));
-+
-+		s3c_write_reg(0, TRANS_SPARE_OFFSET);
-+		return 0;
-+
-+	case ONENAND_CMD_UNLOCK_ALL:
-+		s3c_write_cmd(ONENAND_UNLOCK_ALL, CMD_MAP_10(mem_addr));
-+		return 0;
-+
-+	case ONENAND_CMD_ERASE:
-+		s3c_write_cmd(ONENAND_ERASE_START, CMD_MAP_10(mem_addr));
-+		return 0;
-+
-+	default:
-+		break;
-+	}
-+
-+	return 0;
-+}
-+
-+static unsigned char *s3c_get_bufferram(struct mtd_info *mtd, int area)
-+{
-+	struct onenand_chip *this = mtd->priv;
-+	int index = ONENAND_CURRENT_BUFFERRAM(this);
-+	unsigned char *p;
-+
-+	if (area == ONENAND_DATARAM) {
-+		p = (unsigned char *) onenand->page_buf;
-+		if (index == 1)
-+			p += this->writesize;
-+	} else {
-+		p = (unsigned char *) onenand->oob_buf;
-+		if (index == 1)
-+			p += mtd->oobsize;
-+	}
-+
-+	return p;
-+}
-+
-+static int onenand_read_bufferram(struct mtd_info *mtd, int area,
-+				  unsigned char *buffer, int offset,
-+				  size_t count)
-+{
-+	unsigned char *p;
-+
-+	p = s3c_get_bufferram(mtd, area);
-+	memcpy(buffer, p + offset, count);
-+	return 0;
-+}
-+
-+static int onenand_write_bufferram(struct mtd_info *mtd, int area,
-+				   const unsigned char *buffer, int offset,
-+				   size_t count)
-+{
-+	unsigned char *p;
-+
-+	p = s3c_get_bufferram(mtd, area);
-+	memcpy(p + offset, buffer, count);
-+	return 0;
-+}
-+
-+static int s5pc110_read_bufferram(struct mtd_info *mtd, int area,
-+                unsigned char *buffer, int offset, size_t count)
-+{
-+        struct onenand_chip *this = mtd->priv;
-+        void __iomem *bufferram;
-+        void __iomem *p;
-+
-+        p = bufferram = this->base + area;
-+        if (ONENAND_CURRENT_BUFFERRAM(this)) {
-+                if (area == ONENAND_DATARAM)
-+                        p += this->writesize;
-+                else
-+                        p += mtd->oobsize;
-+        }
-+
-+        if (count != mtd->writesize) {
-+                /* Copy the bufferram to memory to prevent unaligned access */
-+                memcpy(this->page_buf, bufferram, mtd->writesize);
-+                p = this->page_buf + offset;
-+        }
-+
-+        memcpy(buffer, p, count);
-+
-+        return 0;
-+}
-+
-+static int s3c_onenand_bbt_wait(struct mtd_info *mtd, int state)
-+{
-+	unsigned int flags = INT_ACT | LOAD_CMP;
-+	unsigned int stat;
-+	unsigned long timeout;
-+
-+	/* The 20 msec is enough */
-+	timeout = jiffies + msecs_to_jiffies(20);
-+	while (time_before(jiffies, timeout)) {
-+		stat = s3c_read_reg(INT_ERR_STAT_OFFSET);
-+		if (stat & flags)
-+			break;
-+	}
-+	/* To get correct interrupt status in timeout case */
-+	stat = s3c_read_reg(INT_ERR_STAT_OFFSET);
-+	s3c_write_reg(stat, INT_ERR_ACK_OFFSET);
-+
-+	if (stat & LD_FAIL_ECC_ERR) {
-+		s3c_onenand_reset();
-+		return ONENAND_BBT_READ_ERROR;
-+	}
-+
-+	if (stat & LOAD_CMP) {
-+		int ecc = s3c_read_reg(ECC_ERR_STAT_OFFSET);
-+		if (ecc & ONENAND_ECC_4BIT_UNCORRECTABLE) {
-+			s3c_onenand_reset();
-+			return ONENAND_BBT_READ_ERROR;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static void s3c_onenand_check_lock_status(struct mtd_info *mtd)
-+{
-+	struct onenand_chip *this = mtd->priv;
-+	unsigned int block, end;
-+	int tmp;
-+
-+	end = this->chipsize >> this->erase_shift;
-+
-+	for (block = 0; block < end; block++) {
-+		tmp = s3c_read_cmd(CMD_MAP_01(onenand->mem_addr(block, 0, 0)));
-+
-+		if (s3c_read_reg(INT_ERR_STAT_OFFSET) & LOCKED_BLK) {
-+			printk("block %d is write-protected!\n", block);
-+			s3c_write_reg(LOCKED_BLK, INT_ERR_ACK_OFFSET);
-+		}
-+	}
-+}
-+
-+static void s3c_onenand_do_lock_cmd(struct mtd_info *mtd, loff_t ofs, size_t len, int cmd)
-+{
-+	struct onenand_chip *this = mtd->priv;
-+	int start, end, start_mem_addr, end_mem_addr;
-+
-+	start = ofs >> this->erase_shift;
-+	start_mem_addr = onenand->mem_addr(start, 0, 0);
-+	end = start + (len >> this->erase_shift) - 1;
-+	end_mem_addr = onenand->mem_addr(end, 0, 0);
-+
-+	if (cmd == ONENAND_CMD_LOCK) {
-+		s3c_write_cmd(ONENAND_LOCK_START, CMD_MAP_10(start_mem_addr));
-+		s3c_write_cmd(ONENAND_LOCK_END, CMD_MAP_10(end_mem_addr));
-+	} else {
-+		s3c_write_cmd(ONENAND_UNLOCK_START, CMD_MAP_10(start_mem_addr));
-+		s3c_write_cmd(ONENAND_UNLOCK_END, CMD_MAP_10(end_mem_addr));
-+	}
-+
-+	this->wait(mtd, FL_LOCKING);
-+}
-+
-+static void s3c_unlock_all(struct mtd_info *mtd)
-+{
-+	struct onenand_chip *this = mtd->priv;
-+	loff_t ofs = 0;
-+	size_t len = this->chipsize;
-+
-+	if (this->options & ONENAND_HAS_UNLOCK_ALL) {
-+		/* Write unlock command */
-+		this->command(mtd, ONENAND_CMD_UNLOCK_ALL, 0, 0);
-+
-+		/* No need to check return value */
-+		this->wait(mtd, FL_LOCKING);
-+
-+		/* Workaround for all block unlock in DDP */
-+		if (!ONENAND_IS_DDP(this)) {
-+			s3c_onenand_check_lock_status(mtd);
-+			return;
-+		}
-+
-+		/* All blocks on another chip */
-+		ofs = this->chipsize >> 1;
-+		len = this->chipsize >> 1;
-+	}
-+
-+	s3c_onenand_do_lock_cmd(mtd, ofs, len, ONENAND_CMD_UNLOCK);
-+
-+	s3c_onenand_check_lock_status(mtd);
-+}
-+
-+static void s3c_onenand_setup(struct mtd_info *mtd)
-+{
-+	struct onenand_chip *this = mtd->priv;
-+
-+	onenand->mtd = mtd;
-+
-+	if (cpu_is_s3c6400())
-+		onenand->mem_addr = s3c6400_mem_addr;
-+	if (cpu_is_s3c6410())
-+		onenand->mem_addr = s3c6410_mem_addr;
-+	if (cpu_is_s5pc100())
-+		onenand->mem_addr = s5pc100_mem_addr;
-+	if (cpu_is_s5pc110()) {
-+		/* Use generic onenand functions */
-+		this->read_bufferram = s5pc110_read_bufferram;
-+		return;
-+	}
-+
-+	this->read_word = s3c_onenand_readw;
-+	this->write_word = s3c_onenand_writew;
-+
-+	this->wait = s3c_onenand_wait;
-+	this->bbt_wait = s3c_onenand_bbt_wait;
-+	this->unlock_all = s3c_unlock_all;
-+	this->command = s3c_onenand_command;
-+
-+	this->read_bufferram = onenand_read_bufferram;
-+	this->write_bufferram = onenand_write_bufferram;
-+}
-+
-+static int s3c_onenand_probe(struct platform_device *pdev)
-+{
-+	struct onenand_platform_data *pdata;
-+	struct onenand_chip *this;
-+	struct mtd_info *mtd;
-+	struct resource *r;
-+	int size, err;
-+	unsigned long ahb_addr = 0, ahb_addr_size;
-+
-+	if (!(cpu_is_s3c64xx() || cpu_is_s5pc1xx()))
-+		return -ENODEV;
-+
-+	pdata = pdev->dev.platform_data;
-+	/* No need to check pdata. the platform data is optional */
-+
-+	size = sizeof(struct mtd_info) + sizeof(struct onenand_chip);
-+	mtd = kzalloc(size, GFP_KERNEL);
-+	if (!mtd) {
-+		dev_err(&pdev->dev, "failed to allocate memory\n");
-+		return -ENOMEM;
-+	}
-+
-+	onenand = kzalloc(sizeof(struct s3c_onenand), GFP_KERNEL);
-+	if (!onenand) {
-+		err = -ENOMEM;
-+		goto onenand_fail;
-+	}
-+
-+	this = (struct onenand_chip *) &mtd[1];
-+	mtd->priv = this;
-+	mtd->dev.parent = &pdev->dev;
-+	mtd->owner = THIS_MODULE;
-+
-+	s3c_onenand_setup(mtd);
-+
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!r) {
-+		dev_err(&pdev->dev, "no resource defined\n");
-+		return -ENXIO;
-+		goto resource_failed;
-+	}
-+
-+	r = request_mem_region(r->start, resource_size(r), pdev->name);
-+	if (!r) {
-+		dev_err(&pdev->dev, "failed to request memory resource\n");
-+		err = -EBUSY;
-+		goto request_failed;
-+	}
-+
-+	onenand->base = ioremap(r->start, resource_size(r));
-+	if (!onenand->base) {
-+		err = -EFAULT;
-+		goto ioremap_failed;
-+	}
-+	/* Set onenand_chip also */
-+	this->base = onenand->base;
-+
-+	if (cpu_is_s3c64xx()) {
-+		ahb_addr = S3C64XX_AHB_ADDR;
-+		ahb_addr_size = SZ_64M;
-+	} else if (cpu_is_s5pc100()) {
-+		ahb_addr = S5PC100_AHB_ADDR;
-+		ahb_addr_size = SZ_256M - SZ_32M;
-+	}
-+
-+	/*
-+	 * We only used as followings
-+	 * S5PC100				S3C64XX
-+	 * MAP_01 0xB4000000 ~ 0xB4FFFFFF	0x21000000 ~ 0x21FFFFFF
-+	 * MAP_10 0xB8000000 ~ 0xB8FFFFFF	0x22000000 ~ 0x22FFFFFF
-+	 * MAP_11 0xBC000000 ~ 0xBCFFFFFF	0x23000000 ~ 0x23FFFFFF
-+	 */
-+	if (ahb_addr) {
-+		onenand->ahb_addr = ioremap(ahb_addr, ahb_addr_size);
-+		if (!onenand->ahb_addr) {
-+			err = -EINVAL;
-+			goto ahb_failed;
-+		}
-+
-+		/* Allocate 4KiB BufferRAM */
-+		onenand->page_buf = kzalloc(SZ_4K * sizeof(char), GFP_KERNEL);
-+		if (!onenand->page_buf) {
-+			err = -ENOMEM;
-+			goto page_buf_fail;
-+		}
-+
-+		/* Allocate 128 SpareRAM */
-+		onenand->oob_buf = kzalloc(128 * sizeof(char), GFP_KERNEL);
-+		if (!onenand->oob_buf) {
-+			err = -ENOMEM;
-+			goto oob_buf_fail;
-+		}
-+	}
-+
-+	if (onenand_scan(mtd, 1)) {
-+		err = -EFAULT;
-+		goto scan_failed;
-+	}
-+
-+	if (ahb_addr) {
-+		/* S3C don't handle subpage write */
-+		mtd->subpage_sft = 0;
-+		this->subpagesize = mtd->writesize;
-+	}
-+
-+	if (s3c_read_reg(MEM_CFG_OFFSET) & ONENAND_SYS_CFG1_SYNC_READ)
-+		printk(KERN_INFO "OneNAND Sync. Burst Read enabled\n");
-+
-+#ifdef CONFIG_MTD_PARTITIONS
-+	err = parse_mtd_partitions(mtd, part_probes, &onenand->parts, 0);
-+	if (err > 0)
-+		add_mtd_partitions(mtd, onenand->parts, err);
-+	else if (err <= 0 && pdata && pdata->parts)
-+		add_mtd_partitions(mtd, pdata->parts, pdata->nr_parts);
-+	else
-+#endif
-+		err = add_mtd_device(mtd);
-+
-+	platform_set_drvdata(pdev, mtd);
-+
-+	return 0;
-+scan_failed:
-+	kfree(onenand->oob_buf);
-+oob_buf_fail:
-+	kfree(onenand->page_buf);
-+page_buf_fail:
-+	if (onenand->ahb_addr)
-+		iounmap(onenand->ahb_addr);
-+ahb_failed:
-+	iounmap(onenand->base);
-+ioremap_failed:
-+	release_mem_region(r->start, resource_size(r));
-+request_failed:
-+resource_failed:
-+	kfree(onenand);
-+onenand_fail:
-+	kfree(mtd);
-+	return err;
-+}
-+
-+static int __devexit s3c_onenand_remove(struct platform_device *pdev)
-+{
-+	struct mtd_info *mtd = platform_get_drvdata(pdev);
-+
-+	onenand_release(mtd);
-+	if (onenand->ahb_addr)
-+		iounmap(onenand->ahb_addr);
-+	iounmap(onenand->base);
-+	platform_set_drvdata(pdev, NULL);
-+	kfree(onenand->oob_buf);
-+	kfree(onenand->page_buf);
-+	kfree(onenand);
-+	kfree(mtd);
-+	return 0;
-+}
-+
-+static int s3c_pm_ops_suspend(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct mtd_info *mtd = platform_get_drvdata(pdev);
-+	struct onenand_chip *this = mtd->priv;
-+
-+	this->wait(mtd, FL_PM_SUSPENDED);
-+	return mtd->suspend(mtd);
-+}
-+
-+static  int s3c_pm_ops_resume(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct mtd_info *mtd = platform_get_drvdata(pdev);
-+	struct onenand_chip *this = mtd->priv;
-+
-+	mtd->resume(mtd);
-+	this->unlock_all(mtd);
-+	return 0;
-+}
-+
-+static struct dev_pm_ops s3c_pm_ops = {
-+	.suspend	= s3c_pm_ops_suspend,
-+	.resume		= s3c_pm_ops_resume,
-+};
-+
-+static struct platform_driver s3c_onenand_driver = {
-+	.driver         = {
-+		.name	= "samsung-onenand",
-+		.pm	= &s3c_pm_ops,
++/* LDO_A 0x16: 2.75V, ON, SLEEP_A, SLEEP OFF GND */
++#define LDO_A_SETTING		0x16
++/* LDO_C 0x10: 2.65V, ON, SLEEP_A or B, SLEEP full power */
++#define LDO_C_SETTING		0x10
++/* LDO_D 0x10: 2.65V, ON, sleep mode not used */
++#define LDO_D_SETTING		0x10
++/* LDO_E 0x10: 1.8V, ON, SLEEP_A or B, SLEEP full power */
++#define LDO_E_SETTING		0x10
++/* LDO_E SLEEP 0x00: 1.8V, not used, SLEEP_A or B, not used */
++#define LDO_E_SLEEP_SETTING	0x00
++/* LDO_F 0xD0: 2.5V, ON, SLEEP_A or B, SLEEP full power */
++#define LDO_F_SETTING		0xD0
++/* LDO_G 0x00: 2.85V, OFF, SLEEP_A or B, SLEEP full power */
++#define LDO_G_SETTING		0x00
++/* LDO_H 0x18: 2.75V, ON, SLEEP_B, SLEEP full power */
++#define LDO_H_SETTING		0x18
++/* LDO_K 0x00: 2.75V, OFF, SLEEP_A or B, SLEEP full power */
++#define LDO_K_SETTING		0x00
++/* LDO_EXT 0x00: Voltage not set, OFF, not used, not used */
++#define LDO_EXT_SETTING		0x00
++/* BUCK 0x7D: 1.2V, ON, SLEEP_A and B, SLEEP low power */
++#define BUCK_SETTING	0x7D
++/* BUCK SLEEP 0xAC: 1.05V, Not used, SLEEP_A and B, Not used */
++#define BUCK_SLEEP_SETTING	0xAC
++
++static struct regulator_consumer_supply supply_ldo_c[] = {
++	{
++		.dev_name = "ab3100-codec",
++		.supply = "vaudio", /* Powers the codec */
 +	},
-+	.probe          = s3c_onenand_probe,
-+	.remove         = __devexit_p(s3c_onenand_remove),
 +};
 +
-+static int __init s3c_onenand_init(void)
-+{
-+	return platform_driver_register(&s3c_onenand_driver);
-+}
-+
-+static void __exit s3c_onenand_exit(void)
-+{
-+	platform_driver_unregister(&s3c_onenand_driver);
-+}
-+
-+module_init(s3c_onenand_init);
-+module_exit(s3c_onenand_exit);
-+
-+MODULE_LICENSE("GPL");
-+MODULE_AUTHOR("Kyungmin Park <kyungmin.park@samsung.com>");
-+MODULE_DESCRIPTION("Samsung S3C64XX/S5PC1XX OneNAND controller support");
-+MODULE_ALIAS("platform:samsung-onenand");
-diff --git a/include/linux/mtd/onenand.h b/include/linux/mtd/onenand.h
-index 8ed8733..e35909b 100644
---- a/include/linux/mtd/onenand.h
-+++ b/include/linux/mtd/onenand.h
-@@ -214,4 +214,14 @@ unsigned onenand_block(struct onenand_chip *this, loff_t addr);
- loff_t onenand_addr(struct onenand_chip *this, int block);
- int flexonenand_region(struct mtd_info *mtd, loff_t addr);
- 
-+struct mtd_partition;
-+
-+struct onenand_platform_data {
-+	void		(*mmcontrol)(struct mtd_info *mtd, int sync_read);
-+	int		(*read_bufferram)(struct mtd_info *mtd, int area,
-+			unsigned char *buffer, int offset, size_t count);
-+	struct mtd_partition *parts;
-+	unsigned int	nr_parts;
++/*
++ * This one needs to be a supply so we can turn it off
++ * in order to shut down the system.
++ */
++static struct regulator_consumer_supply supply_ldo_d[] = {
++	{
++		.dev = NULL,
++		.supply = "vana15", /* Powers the SoC (CPU etc) */
++	},
 +};
 +
- #endif	/* __LINUX_MTD_ONENAND_H */
-diff --git a/include/linux/mtd/onenand_regs.h b/include/linux/mtd/onenand_regs.h
-index 86a6bbe..a69d140 100644
---- a/include/linux/mtd/onenand_regs.h
-+++ b/include/linux/mtd/onenand_regs.h
-@@ -206,6 +206,7 @@
- #define ONENAND_ECC_1BIT_ALL		(0x5555)
- #define ONENAND_ECC_2BIT		(1 << 1)
- #define ONENAND_ECC_2BIT_ALL		(0xAAAA)
-+#define ONENAND_ECC_4BIT_UNCORRECTABLE	(0x1010)
- #define FLEXONENAND_UNCORRECTABLE_ERROR	(0x1010)
++static struct regulator_consumer_supply supply_ldo_g[] = {
++	{
++		.dev_name = "mmci",
++		.supply = "vmmc", /* Powers MMC/SD card */
++	},
++};
++
++static struct regulator_consumer_supply supply_ldo_h[] = {
++	{
++		.dev_name = "xgam_pdi",
++		.supply = "vdisp", /* Powers camera, display etc */
++	},
++};
++
++static struct regulator_consumer_supply supply_ldo_k[] = {
++	{
++		.dev_name = "irda",
++		.supply = "vir", /* Power IrDA */
++	},
++};
++
++/*
++ * This is a placeholder for whoever wish to use the
++ * external power.
++ */
++static struct regulator_consumer_supply supply_ldo_ext[] = {
++	{
++		.dev = NULL,
++		.supply = "vext", /* External power */
++	},
++};
++
++/* Preset (hardware defined) voltages for these regulators */
++#define LDO_A_VOLTAGE 2750000
++#define LDO_C_VOLTAGE 2650000
++#define LDO_D_VOLTAGE 2650000
++
++static struct ab3100_platform_data ab3100_plf_data = {
++	.reg_constraints = {
++		/* LDO A routing and constraints */
++		{
++			.constraints = {
++				.name = "vrad",
++				.min_uV = LDO_A_VOLTAGE,
++				.max_uV = LDO_A_VOLTAGE,
++				.valid_modes_mask = REGULATOR_MODE_NORMAL,
++				.always_on = 1,
++				.boot_on = 1,
++			},
++		},
++		/* LDO C routing and constraints */
++		{
++			.constraints = {
++				.min_uV = LDO_C_VOLTAGE,
++				.max_uV = LDO_C_VOLTAGE,
++				.valid_modes_mask = REGULATOR_MODE_NORMAL,
++			},
++			.num_consumer_supplies = ARRAY_SIZE(supply_ldo_c),
++			.consumer_supplies = supply_ldo_c,
++		},
++		/* LDO D routing and constraints */
++		{
++			.constraints = {
++				.min_uV = LDO_D_VOLTAGE,
++				.max_uV = LDO_D_VOLTAGE,
++				.valid_modes_mask = REGULATOR_MODE_NORMAL,
++				/*
++				 * Actually this is boot_on but we need
++				 * to reference count it externally to
++				 * be able to shut down the system.
++				 */
++			},
++			.num_consumer_supplies = ARRAY_SIZE(supply_ldo_d),
++			.consumer_supplies = supply_ldo_d,
++		},
++		/* LDO E routing and constraints */
++		{
++			.constraints = {
++				.name = "vio",
++				.min_uV = 1800000,
++				.max_uV = 1800000,
++				.valid_modes_mask = REGULATOR_MODE_NORMAL,
++				.valid_ops_mask =
++				REGULATOR_CHANGE_VOLTAGE |
++				REGULATOR_CHANGE_STATUS,
++				.always_on = 1,
++				.boot_on = 1,
++			},
++		},
++		/* LDO F routing and constraints */
++		{
++			.constraints = {
++				.name = "vana25",
++				.min_uV = 2500000,
++				.max_uV = 2500000,
++				.valid_modes_mask = REGULATOR_MODE_NORMAL,
++				.valid_ops_mask =
++				REGULATOR_CHANGE_VOLTAGE |
++				REGULATOR_CHANGE_STATUS,
++				.always_on = 1,
++				.boot_on = 1,
++			},
++		},
++		/* LDO G routing and constraints */
++		{
++			.constraints = {
++				.min_uV = 1500000,
++				.max_uV = 2850000,
++				.valid_modes_mask = REGULATOR_MODE_NORMAL,
++				.valid_ops_mask =
++				REGULATOR_CHANGE_VOLTAGE |
++				REGULATOR_CHANGE_STATUS,
++			},
++			.num_consumer_supplies = ARRAY_SIZE(supply_ldo_g),
++			.consumer_supplies = supply_ldo_g,
++		},
++		/* LDO H routing and constraints */
++		{
++			.constraints = {
++				.min_uV = 1200000,
++				.max_uV = 2750000,
++				.valid_modes_mask = REGULATOR_MODE_NORMAL,
++				.valid_ops_mask =
++				REGULATOR_CHANGE_VOLTAGE |
++				REGULATOR_CHANGE_STATUS,
++			},
++			.num_consumer_supplies = ARRAY_SIZE(supply_ldo_h),
++			.consumer_supplies = supply_ldo_h,
++		},
++		/* LDO K routing and constraints */
++		{
++			.constraints = {
++				.min_uV = 1800000,
++				.max_uV = 2750000,
++				.valid_modes_mask = REGULATOR_MODE_NORMAL,
++				.valid_ops_mask =
++				REGULATOR_CHANGE_VOLTAGE |
++				REGULATOR_CHANGE_STATUS,
++			},
++			.num_consumer_supplies = ARRAY_SIZE(supply_ldo_k),
++			.consumer_supplies = supply_ldo_k,
++		},
++		/* External regulator interface. No fixed voltage specified.
++		 * If we knew the voltage of the external regulator and it
++		 * was connected on the board, we could add the (fixed)
++		 * voltage for it here.
++		 */
++		{
++			.constraints = {
++				.min_uV = 0,
++				.max_uV = 0,
++				.valid_modes_mask = REGULATOR_MODE_NORMAL,
++				.valid_ops_mask =
++				REGULATOR_CHANGE_STATUS,
++			},
++			.num_consumer_supplies = ARRAY_SIZE(supply_ldo_ext),
++			.consumer_supplies = supply_ldo_ext,
++		},
++		/* Buck converter routing and constraints */
++		{
++			.constraints = {
++				.name = "vcore",
++				.min_uV = 1200000,
++				.max_uV = 1800000,
++				.valid_modes_mask = REGULATOR_MODE_NORMAL,
++				.valid_ops_mask =
++				REGULATOR_CHANGE_VOLTAGE |
++				REGULATOR_CHANGE_STATUS,
++				.always_on = 1,
++				.boot_on = 1,
++			},
++		},
++	},
++	.reg_initvals = {
++		LDO_A_SETTING,
++		LDO_C_SETTING,
++		LDO_E_SETTING,
++		LDO_E_SLEEP_SETTING,
++		LDO_F_SETTING,
++		LDO_G_SETTING,
++		LDO_H_SETTING,
++		LDO_K_SETTING,
++		LDO_EXT_SETTING,
++		BUCK_SETTING,
++		BUCK_SLEEP_SETTING,
++		LDO_D_SETTING,
++	},
++};
++
+ static struct i2c_board_info __initdata bus0_i2c_board_info[] = {
+ 	{
+ 		.type = "ab3100",
+ 		.addr = 0x48,
+ 		.irq = IRQ_U300_IRQ0_EXT,
++		.platform_data = &ab3100_plf_data,
+ 	},
+ };
  
- /*
+@@ -38,6 +281,11 @@ void __init u300_i2c_register_board_devices(void)
+ {
+ 	i2c_register_board_info(0, bus0_i2c_board_info,
+ 				ARRAY_SIZE(bus0_i2c_board_info));
++	/*
++	 * This makes the core shut down all unused regulators
++	 * after all the initcalls have completed.
++	 */
++	regulator_has_full_constraints();
+ 	i2c_register_board_info(1, bus1_i2c_board_info,
+ 				ARRAY_SIZE(bus1_i2c_board_info));
+ }
+diff --git a/arch/arm/mach-u300/regulator.c b/arch/arm/mach-u300/regulator.c
+new file mode 100644
+index 0000000..9c53f01
+--- /dev/null
++++ b/arch/arm/mach-u300/regulator.c
+@@ -0,0 +1,88 @@
++/*
++ * arch/arm/mach-u300/regulator.c
++ *
++ * Copyright (C) 2009 ST-Ericsson AB
++ * License terms: GNU General Public License (GPL) version 2
++ * Handle board-bound regulators and board power not related
++ * to any devices.
++ * Author: Linus Walleij <linus.walleij@stericsson.com>
++ */
++#include <linux/device.h>
++#include <linux/signal.h>
++#include <linux/err.h>
++#include <linux/regulator/consumer.h>
++/* Those are just for writing in syscon */
++#include <linux/io.h>
++#include <mach/hardware.h>
++#include <mach/syscon.h>
++
++/*
++ * Regulators that power the board and chip and which are
++ * not copuled to specific drivers are hogged in these
++ * instances.
++ */
++static struct regulator *main_power_15;
++
++/*
++ * This function is used from pm.h to shut down the system by
++ * resetting all regulators in turn and then disable regulator
++ * LDO D (main power).
++ */
++void u300_pm_poweroff(void)
++{
++	sigset_t old, all;
++
++	sigfillset(&all);
++	if (!sigprocmask(SIG_BLOCK, &all, &old)) {
++		/* Disable LDO D to shut down the system */
++		if (main_power_15)
++			regulator_disable(main_power_15);
++		else
++			pr_err("regulator not available to shut down system\n");
++		(void) sigprocmask(SIG_SETMASK, &old, NULL);
++	}
++	return;
++}
++
++/*
++ * Hog the regulators needed to power up the board.
++ */
++static int __init u300_init_boardpower(void)
++{
++	int err;
++	u32 val;
++
++	pr_info("U300: setting up board power\n");
++	main_power_15 = regulator_get(NULL, "vana15");
++	if (IS_ERR(main_power_15)) {
++		pr_err("could not get vana15");
++		return PTR_ERR(main_power_15);
++	}
++	err = regulator_enable(main_power_15);
++	if (err) {
++		pr_err("could not enable vana15\n");
++		return err;
++	}
++
++	/*
++	 * On U300 a special system controller register pulls up the DC
++	 * until the vana15 (LDO D) regulator comes up. At this point, all
++	 * regulators are set and we do not need power control via
++	 * DC ON anymore. This function will likely be moved whenever
++	 * the rest of the U300 power management is implemented.
++	 */
++	pr_info("U300: disable system controller pull-up\n");
++	val = readw(U300_SYSCON_VBASE + U300_SYSCON_PMCR);
++	val &= ~U300_SYSCON_PMCR_DCON_ENABLE;
++	writew(val, U300_SYSCON_VBASE + U300_SYSCON_PMCR);
++
++	/* Register globally exported PM poweroff hook */
++	pm_power_off = u300_pm_poweroff;
++
++	return 0;
++}
++
++/*
++ * So at module init time we hog the regulator!
++ */
++module_init(u300_init_boardpower);
+-- 
+1.6.2.1
