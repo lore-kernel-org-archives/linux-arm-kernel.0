@@ -1,36 +1,47 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 17 Sep 2009 08:06:00 +0200
-Subject: [PATCH v2] arm: mmu fix unused variable highmem when HIGHMEM is not
-	enable
-In-Reply-To: <alpine.LFD.2.00.0909162216550.24133@xanadu.home>
-References: <alpine.LFD.2.00.0909162216550.24133@xanadu.home>
-Message-ID: <1253167560-3670-1-git-send-email-plagnioj@jcrosoft.com>
+From: schindele@nentec.de (Juergen Schindele)
+Date: Thu, 17 Sep 2009 09:35:31 +0200
+Subject: Problems with pthread on ARM/PXA270
+In-Reply-To: <f17812d70909160806l5e4ce5e9t4c7cfea5ca714b91@mail.gmail.com>
+References: <200909160926.02036.schindele@nentec.de>
+	<200909161701.16898.schindele@nentec.de>
+	<f17812d70909160806l5e4ce5e9t4c7cfea5ca714b91@mail.gmail.com>
+Message-ID: <200909170935.31570.schindele@nentec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
----
- arch/arm/mm/mmu.c |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
-
-v2:
-Fix stupid typo
-
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 4426ee6..ce77023 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -687,7 +687,10 @@ __early_param("vmalloc=", early_vmalloc);
+Am Mittwoch, 16. September 2009 schrieb Eric Miao:
+> On Wed, Sep 16, 2009 at 11:01 PM, Juergen Schindele <schindele@nentec.de> wrote:
+> > Am Mittwoch, 16. September 2009 schrieb Eric Miao:
+> >> Don't remember we had such problems before. What kind of system
+> >> and libraries are you using?
+> > thanks for your reply.
+> > System is custom PXA270 platform.
+> > with codesourcery compiler (see below)
+> > and glibc 2.5 with pthread.
+> > I dont know what more information to give ?
+> 
+> Like which kernel version, where do you get the glibc-2.5 and pthread binary,
+Sorry forgot that completely !
+Kernel version tested is 2.6.16 and 2.6.20 (sorry no newer version available yet)
+Compiler , GlibC, pthread all come from Codesourcery precompiled in a package
+ "CodeSourcery Sourcery G++ Lite 2007q1-10" downloadable for free.
+Compiler version is as mentioned before :
+arm-none-linux-gnueabi-gcc (CodeSourcery Sourcery G++ Lite 2007q1-10) 4.2.0 20070413 (prerelease)
  
- static void __init sanity_check_meminfo(void)
- {
--	int i, j, highmem = 0;
-+	int i, j;
-+#ifdef CONFIG_HIGHMEM
-+	int highmem = 0;
-+#endif
+--------------------------------------------------------------
+J?rgen Schindele  
+Software-Entwicklung
+
+NENTEC Netzwerktechnologie GmbH
+Greschbachstr. 12
+76229 Karlsruhe
+Deutschland
+Telefon: +49 721 94249-51
+Telefax: +49 721 94249-10
+E-Mail:  schindele at nentec.de
+WEB:     www.nentec.de
  
- 	for (i = 0, j = 0; i < meminfo.nr_banks; i++) {
- 		struct membank *bank = &meminfo.bank[j];
--- 
-1.6.4
+Gesch?ftsf?hrung: Klaus Becker, Roland Knapp
+Sitz der Gesellschaft: Karlsruhe
+Handelsregister: Amtsgericht Mannheim HRB 107658
+--------------------------------------------------------------
