@@ -1,85 +1,104 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Thu, 17 Sep 2009 11:31:01 +0300
-Subject: [PATCH] Samsung SoCs: OneNAND support
-In-Reply-To: <20090917081659.GA28591@july>
-References: <20090917081659.GA28591@july>
-Message-ID: <4AB1F3C5.7000309@gmail.com>
+From: rene.wolf@mbda-systems.de (Wolf, Rene, HRO-GP)
+Date: Thu, 17 Sep 2009 10:26:42 +0200
+Subject: SPI, DMA and an i.MX31
+Message-ID: <87077C4F48609F4392621D9F99DDE20901202DFF@tesla.star.galaxy.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/17/2009 11:16 AM, Kyungmin Park wrote:
-> +static int s3c_onenand_wait(struct mtd_info *mtd, int state)
-> +{
-> +	unsigned int flags = INT_ACT;
-> +	unsigned int stat, ecc;
-> +	unsigned long timeout;
-> +
-> +	switch (state) {
-> +	case FL_READING:
-> +		flags |= BLK_RW_CMP | LOAD_CMP;
-> +		break;
-> +	case FL_WRITING:
-> +		flags |= BLK_RW_CMP | PGM_CMP;
-> +		break;
-> +	case FL_ERASING:
-> +		flags |= BLK_RW_CMP | ERS_CMP;
-> +		break;
-> +	case FL_LOCKING:
-> +		flags |= BLK_RW_CMP;
-> +		break;
-> +	default:
-> +		break;
-> +	}
-> +
-> +	/* The 20 msec is enough */
-> +	timeout = jiffies + msecs_to_jiffies(20);
-> +	while (time_before(jiffies, timeout)) {
-> +		stat = s3c_read_reg(INT_ERR_STAT_OFFSET);
-> +		if (stat&  flags)
-> +			break;
-> +
-> +		if (state != FL_READING)
-> +			cond_resched();
-> +	}
-> +	/* To get correct interrupt status in timeout case */
-> +	stat = s3c_read_reg(INT_ERR_STAT_OFFSET);
-> +	s3c_write_reg(stat, INT_ERR_ACK_OFFSET);
-> +
-> +	/*
-> +	 * 	
-> +	 * In the Spec. it checks the controller status first
-> +	 * However if you get the correct information in case of
-> +	 * power off recovery (POR) test, it should read ECC status first
-> +	 */
-> +	if (stat&  LOAD_CMP) {
-> +		ecc = s3c_read_reg(ECC_ERR_STAT_OFFSET);
-> +		if (ecc&  ONENAND_ECC_4BIT_UNCORRECTABLE) {
-> +			printk(KERN_INFO "onenand_wait: ECC error = 0x%04x\n", ecc);
+Hello everyone!
 
-Copy-paste error? Also see below.
+First of all this is my first post to this mailing list and I hope
+I'm not screwing it :-).
+I'm using the qong board from denx.de and their kernel in version
+2.6.31 (should be equal to kernel.org). So, this is about the freescale
+i.MX31 (ARM11), its SPI and (S)DMA. The goal is to do DMA-transfer
+between the SPI and some buffer in memory. I'm quite new to drivers
+under Linux, so I first tried to find out how DMA works here.
 
-> +			mtd->ecc_stats.failed++;
-> +			return -EBADMSG;
-> +		}
-> +	}
-> +
-> +	if (stat&  (LOCKED_BLK | ERS_FAIL | PGM_FAIL | LD_FAIL_ECC_ERR)) {
-> +		printk(KERN_INFO "s3c_onenand_wait: controller error = 0x%04x\n", stat);
-> +		if (stat&  LOCKED_BLK)
-> +			printk(KERN_INFO "s3c_onenand_wait: it's locked error = 0x%04x\n", stat);
+By this point I already worked with traditional MCU-DMAs, programing
+them by hand with no OS (did so on an STM32 ARM Cortex-m3).
+That would work something like that (for transmitting data
+over SPI):
+- get some buffer, fill in data.
+- Tell SPI that it's going to be DMAed
+- Tell DMA to communicate with SPI
+- Tell DMA source pointer and set auto increment
+- Tell DMA dest. (spi->tx) and set fixed
+- Tell DMA count and length of word.
+- Start transfer.
 
-Very quick comment. Could you please avoid this style of putting function
-name to the printk? We have lots of this in onenand_base.c, and they are
-often wrong, because function names change.
+Now from books like "Essential Linux Device Drivers" and
+"Linux Device Drivers" + "/usr/src/linux/Documentation/DMA-API.txt"
++ an example (/u/s/l/drivers/spi/atmel_spi.c) I got the following
+idea how this might work under Linux (all those 'spi->cfg' are
+figuratively :-)
+- Get some buffer (buf=kmalloc or so...), fill in data
+- Register buffer with system ( dma_map_single() )
+- Tell SPI that it's going to be DMAed ( writel(spi->cfg, flags) )
+- Tell DMA to communicate with SPI ( writel(dma->cfg, flags) )
+- Tell DMA source pointer (+ autoinc.) ( writel(dma->src, &buf) )
+- Tell DMA dest. (+ fixed) ( writel(dma->dest, &(spi->buf)) )
+- Tell DMA count and length of words. (...)
+- Start transfer. (...)
 
-Could we please use dev_printk(), dev_dbg() and the like instead? You'll have
-to do some more work and make MTD a bit more linux-device-model-friendly, but
-someone has to do this :-)
+Am I right so far?
 
-But in the worst case, use at least %s + __func__.
+As far as I can tell this is mostly writing registers by hand,
+there is no common API for setting stuff like src., dest., count,
+device... is there? May be I missed, or didn't understand it.
 
-And you could also clean things up similarly for onenenand.
+Then I checked the (S)DMA that's inside the i.MX31 and how to do
+the above. That SmartDMA is quite a nice piece of hardware: a
+RISC processor with its own memory and it includes 32 threads
+(DMA channels), scheduled by hardware. Pretty cool but that means
+it has its own assembly language and needs some startup code ....
 
--- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+Looking around I found stuff like:
+/u/s/l/arch/arm/plat-mxc/dma-mx1-mx2.c
+though nothing for i.MX31. But then there is that:
+http://osdir.com/ml/android-porting/2009-03/msg00251.html
+http://lists.infradead.org/pipermail/linux-mtd/2009-May/025801.html
+http://marc.info/?l=linux-arm-kernel&m=118003963232016&w=2
+in those boot-msgs there is a line 'Using SDMA I.API'. At least
+the 3rd one seams to be using LTIB.
+
+So I guess there is no SDMA support for the i.MX31 and SPI unless
+I switch to LTIB or do the SDMA-(errr...)-programing myself. Though
+I would love to do the programing (I actually called freescale about
+the SDMA API manual, cause they do not have it online), I don't have
+time to do either of the two options. I would then resort to
+interrupt-driven SPI for my task.
+
+
+It would be nice if someone could give me a clue on my guess
+about the basic concept for DMA+Linux. And if there really is no
+SPI<->DMA support readily available for the i.MX31 (actually there
+seems to be one for the IPU. There's a switch in the .config under:
+'# DMA Devices' -> 'CONFIG_MX3_IPU=y' but as far as I recall the
+i.MX31 manual this DMA serving the IPU is a different one.)
+
+Any hints are welcome, even 'rtfm' :-) (coz then I know I
+missed something)
+
+
+Thanks a lot!
+
+Cheers
+Rene
+
+
+
+Rene Wolf
+LFK-Lenkflugk?rpersysteme GmbH
+Human Resources Operations & Policy, HRO
+Landshuter Stra?e 26, 85716 Unterschlei?heim, GERMANY
+Phone: +49 89 3179 8337
+Fax: +49 8252 99 8964
+E-Mail: rene.wolf at mbda-systems.de
+
+http://www.mbda.net
+
+Chairman of the Supervisory Board: Antoine Bouvier
+Managing Director: Werner Kaltenegger
+Registered Office: Schrobenhausen
+Commercial Register: Amtsgericht Ingolstadt, HRB 4365
