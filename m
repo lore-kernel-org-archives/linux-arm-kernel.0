@@ -1,96 +1,21 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 17 Sep 2009 18:45:53 +0900
-Subject: [PATCH] Samsung SoCs: OneNAND support
-In-Reply-To: <4AB1F3C5.7000309@gmail.com>
-References: <20090917081659.GA28591@july> <4AB1F3C5.7000309@gmail.com>
-Message-ID: <9c9fda240909170245u2b21b898v11c3316726746464@mail.gmail.com>
+From: wg@grandegger.com (Wolfgang Grandegger)
+Date: Thu, 17 Sep 2009 11:48:25 +0200
+Subject: [PATCH 3/3] at91_can: add driver for Atmel's CAN controller on
+	AT91SAM9263
+In-Reply-To: <1253180254-11910-4-git-send-email-mkl@pengutronix.de>
+References: <1253180254-11910-1-git-send-email-mkl@pengutronix.de>	<1253180254-11910-2-git-send-email-mkl@pengutronix.de>	<1253180254-11910-3-git-send-email-mkl@pengutronix.de>
+	<1253180254-11910-4-git-send-email-mkl@pengutronix.de>
+Message-ID: <4AB205E9.3090902@grandegger.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 17, 2009 at 5:31 PM, Artem Bityutskiy <dedekind1@gmail.com> wrote:
-> On 09/17/2009 11:16 AM, Kyungmin Park wrote:
->>
->> +static int s3c_onenand_wait(struct mtd_info *mtd, int state)
->> +{
->> + ? ? ? unsigned int flags = INT_ACT;
->> + ? ? ? unsigned int stat, ecc;
->> + ? ? ? unsigned long timeout;
->> +
->> + ? ? ? switch (state) {
->> + ? ? ? case FL_READING:
->> + ? ? ? ? ? ? ? flags |= BLK_RW_CMP | LOAD_CMP;
->> + ? ? ? ? ? ? ? break;
->> + ? ? ? case FL_WRITING:
->> + ? ? ? ? ? ? ? flags |= BLK_RW_CMP | PGM_CMP;
->> + ? ? ? ? ? ? ? break;
->> + ? ? ? case FL_ERASING:
->> + ? ? ? ? ? ? ? flags |= BLK_RW_CMP | ERS_CMP;
->> + ? ? ? ? ? ? ? break;
->> + ? ? ? case FL_LOCKING:
->> + ? ? ? ? ? ? ? flags |= BLK_RW_CMP;
->> + ? ? ? ? ? ? ? break;
->> + ? ? ? default:
->> + ? ? ? ? ? ? ? break;
->> + ? ? ? }
->> +
->> + ? ? ? /* The 20 msec is enough */
->> + ? ? ? timeout = jiffies + msecs_to_jiffies(20);
->> + ? ? ? while (time_before(jiffies, timeout)) {
->> + ? ? ? ? ? ? ? stat = s3c_read_reg(INT_ERR_STAT_OFFSET);
->> + ? ? ? ? ? ? ? if (stat& ?flags)
->> + ? ? ? ? ? ? ? ? ? ? ? break;
->> +
->> + ? ? ? ? ? ? ? if (state != FL_READING)
->> + ? ? ? ? ? ? ? ? ? ? ? cond_resched();
->> + ? ? ? }
->> + ? ? ? /* To get correct interrupt status in timeout case */
->> + ? ? ? stat = s3c_read_reg(INT_ERR_STAT_OFFSET);
->> + ? ? ? s3c_write_reg(stat, INT_ERR_ACK_OFFSET);
->> +
->> + ? ? ? /*
->> + ? ? ? ?*
->> + ? ? ? ?* In the Spec. it checks the controller status first
->> + ? ? ? ?* However if you get the correct information in case of
->> + ? ? ? ?* power off recovery (POR) test, it should read ECC status first
->> + ? ? ? ?*/
->> + ? ? ? if (stat& ?LOAD_CMP) {
->> + ? ? ? ? ? ? ? ecc = s3c_read_reg(ECC_ERR_STAT_OFFSET);
->> + ? ? ? ? ? ? ? if (ecc& ?ONENAND_ECC_4BIT_UNCORRECTABLE) {
->> + ? ? ? ? ? ? ? ? ? ? ? printk(KERN_INFO "onenand_wait: ECC error =
->> 0x%04x\n", ecc);
->
-> Copy-paste error? Also see below.
+Marc Kleine-Budde wrote:
+> This patch add the driver for the SoC CAN controller in Atmel's AT91SAM9263.
+> 
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 
-Nice catch.
+Signed-off-by: Wolfgang Grandegger <wg@grandegger.com>
 
->
->> + ? ? ? ? ? ? ? ? ? ? ? mtd->ecc_stats.failed++;
->> + ? ? ? ? ? ? ? ? ? ? ? return -EBADMSG;
->> + ? ? ? ? ? ? ? }
->> + ? ? ? }
->> +
->> + ? ? ? if (stat& ?(LOCKED_BLK | ERS_FAIL | PGM_FAIL | LD_FAIL_ECC_ERR)) {
->> + ? ? ? ? ? ? ? printk(KERN_INFO "s3c_onenand_wait: controller error =
->> 0x%04x\n", stat);
->> + ? ? ? ? ? ? ? if (stat& ?LOCKED_BLK)
->> + ? ? ? ? ? ? ? ? ? ? ? printk(KERN_INFO "s3c_onenand_wait: it's locked
->> error = 0x%04x\n", stat);
->
-> Very quick comment. Could you please avoid this style of putting function
-> name to the printk? We have lots of this in onenand_base.c, and they are
-> often wrong, because function names change.
->
-> Could we please use dev_printk(), dev_dbg() and the like instead? You'll
-> have
-> to do some more work and make MTD a bit more linux-device-model-friendly,
-> but
-> someone has to do this :-)
->
-> But in the worst case, use at least %s + __func__.
->
-> And you could also clean things up similarly for onenenand.
+Thanks for your contribution.
 
-Okay I will use the your recommended. After more review. I will resend it.
-
-Thank you,
-Kyungmin Park
+Wolfgang.
