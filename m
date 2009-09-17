@@ -1,123 +1,88 @@
-From: schindele@nentec.de (Juergen Schindele)
-Date: Thu, 17 Sep 2009 15:06:17 +0200
-Subject: Problems with pthread on ARM/PXA270
-In-Reply-To: <8A7F3A77D8BF9540ACA37A8B8BD36A7353F3B189@palmail02.lsi.com>
-References: <200909160926.02036.schindele@nentec.de>
-	<200909170935.31570.schindele@nentec.de>
-	<8A7F3A77D8BF9540ACA37A8B8BD36A7353F3B189@palmail02.lsi.com>
-Message-ID: <200909171506.17800.schindele@nentec.de>
+From: wg@grandegger.com (Wolfgang Grandegger)
+Date: Thu, 17 Sep 2009 15:14:22 +0200
+Subject: [PATCH 1/3] at91sam9263: add at91_can device to generic device
+	definition
+In-Reply-To: <1253180254-11910-2-git-send-email-mkl@pengutronix.de>
+References: <1253180254-11910-1-git-send-email-mkl@pengutronix.de>
+	<1253180254-11910-2-git-send-email-mkl@pengutronix.de>
+Message-ID: <4AB2362E.3070509@grandegger.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 17. September 2009 schrieb Beckwith, Stephen (Stephen):
-> Greetings All,
->   I will quickly add the following to this thread, as it seems related.
-> Platform:
->   Custom ARM9 SoC using Montavista Linux Release 3.1, a 2.4.21 Linux Kernel.  Montavista tool chain and libraries.
-Stephen thanks for your comment.
-I tested with Montavista toolchain and 2.6.12 kernel too but without success.
-Perhaps this is arm/arch implementation dependant ??? 
+Marc Kleine-Budde wrote:
+> This patch adds the device definition for the at91_can device to
+> the generic device definiton file for the at91sam9263.
 > 
-> Problem:
->   When we try and execute a pthread_create, "when loaded as a .so", the thread will be created, but will not "return" to the main thread for further processing, we basically get "stuck" in this  new thread.  In the "real" case, this is an ISR thread, would hang on waiting for an interrupt.  For testing, I use Sleep and prints to document program flow.
-As you see the example i sent in first mail i build a simple application, so it should work.
-Can you please test this little prog on your environment/platform ?
->    However, IF I use the "exact same code" and build the program as an application, it works just fine dandy. . .   The thread gets spawned, prints it's initial hello, then goes into the while (1) sleep/print incrementing value loop.  The thread returns to the "Main" and we spawn 2 more threads and they work just fine (based upon interleaving printouts)
-This seems to be dependant of memory location or what ?
-What parameters do you use for creating your threads ?
+> Signed-off-by: Hans J. Koch <hjk@linutronix.de>
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> ---
+>  arch/arm/mach-at91/at91sam9263_devices.c |   36 ++++++++++++++++++++++++++++++
+>  arch/arm/mach-at91/include/mach/board.h  |    6 +++++
+>  2 files changed, 42 insertions(+), 0 deletions(-)
 > 
-> NOTE:
->   For our "normal" development we use an external host processor (PowerPC based) to control the SoC and the ability to create threads from a .so has worked in this setup (using same MVL 3.1 kernel/toolchain) for the past 4+ years on 10's of platforms. So we suspected some issue/problem with the MVL setup
-> 
-> 
-> Now, we are migrating to a new ARM11 based SoC and I am in the process of re-testing this functionality.  
-> This new platform will be based upon 2.6.28 kernel release and CodeSourcery G++ Lite 2008q3-72 tools/libraries.
-> I'm in the process of setting this up on an ARM RealView EB.  
-> 
-> Details to follow.
-> 
-> Regards,
-> Stephen Beckwith
-> 
-> 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Juergen Schindele
-> Sent: Thursday, September 17, 2009 3:36 AM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Eric Miao
-> Subject: Re: Problems with pthread on ARM/PXA270
-> 
-> Am Mittwoch, 16. September 2009 schrieb Eric Miao:
-> > On Wed, Sep 16, 2009 at 11:01 PM, Juergen Schindele <schindele@nentec.de> wrote:
-> > > Am Mittwoch, 16. September 2009 schrieb Eric Miao:
-> > >> Don't remember we had such problems before. What kind of system
-> > >> and libraries are you using?
-> > > thanks for your reply.
-> > > System is custom PXA270 platform.
-> > > with codesourcery compiler (see below)
-> > > and glibc 2.5 with pthread.
-> > > I dont know what more information to give ?
-> > 
-> > Like which kernel version, where do you get the glibc-2.5 and pthread binary,
-> Sorry forgot that completely !
-> Kernel version tested is 2.6.16 and 2.6.20 (sorry no newer version available yet)
-> Compiler , GlibC, pthread all come from Codesourcery precompiled in a package
->  "CodeSourcery Sourcery G++ Lite 2007q1-10" downloadable for free.
-> Compiler version is as mentioned before :
-> arm-none-linux-gnueabi-gcc (CodeSourcery Sourcery G++ Lite 2007q1-10) 4.2.0 20070413 (prerelease)
+> diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+> index b7f2332..6026c2e 100644
+> --- a/arch/arm/mach-at91/at91sam9263_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9263_devices.c
+> @@ -757,6 +757,42 @@ void __init at91_add_device_ac97(struct atmel_ac97_data *data)
+>  void __init at91_add_device_ac97(struct atmel_ac97_data *data) {}
+>  #endif
 >  
-> --------------------------------------------------------------
-> J?rgen Schindele  
-> Software-Entwicklung
-> 
-> NENTEC Netzwerktechnologie GmbH
-> Greschbachstr. 12
-> 76229 Karlsruhe
-> Deutschland
-> Telefon: +49 721 94249-51
-> Telefax: +49 721 94249-10
-> E-Mail:  schindele at nentec.de
-> WEB:     www.nentec.de
+> +/* --------------------------------------------------------------------
+> + *  CAN Controller
+> + * -------------------------------------------------------------------- */
+> +
+> +#if defined(CONFIG_CAN_AT91) || defined(CONFIG_CAN_AT91_MODULE)
+> +static struct resource can_resources[] = {
+> +	[0] = {
+> +		.start	= AT91SAM9263_BASE_CAN,
+> +		.end	= AT91SAM9263_BASE_CAN + SZ_16K - 1,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.start	= AT91SAM9263_ID_CAN,
+> +		.end	= AT91SAM9263_ID_CAN,
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +static struct platform_device at91sam9263_can_device = {
+> +	.name		= "at91_can",
+> +	.id		= -1,
+> +	.resource	= can_resources,
+> +	.num_resources	= ARRAY_SIZE(can_resources),
+> +};
+> +
+> +void __init at91_add_device_can(struct at91_can_data *data)
+> +{
+> +	at91_set_A_periph(AT91_PIN_PA13, 0);	/* CANTX */
+> +	at91_set_A_periph(AT91_PIN_PA14, 0);	/* CANRX */
+> +	at91sam9263_can_device.dev.platform_data = data;
+> +
+> +	platform_device_register(&at91sam9263_can_device);
+> +}
+> +#else
+> +void __init at91_add_device_can(struct at91_can_data *data) {}
+> +#endif
 >  
-> Gesch?ftsf?hrung: Klaus Becker, Roland Knapp
-> Sitz der Gesellschaft: Karlsruhe
-> Handelsregister: Amtsgericht Mannheim HRB 107658
-> --------------------------------------------------------------
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
+>  /* --------------------------------------------------------------------
+>   *  LCD Controller
+> diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
+> index e6afff8..134731c 100644
+> --- a/arch/arm/mach-at91/include/mach/board.h
+> +++ b/arch/arm/mach-at91/include/mach/board.h
+> @@ -179,6 +179,12 @@ extern void __init at91_add_device_isi(void);
+>   /* Touchscreen Controller */
+>  extern void __init at91_add_device_tsadcc(void);
+>  
+> +/* CAN */
+> +struct at91_can_data {
+> +	void (*transceiver_switch)(int on);
+> +};
+> +extern void __init at91_add_device_can(struct at91_can_data *data);
+> +
+>   /* LEDs */
+>  extern void __init at91_init_leds(u8 cpu_led, u8 timer_led);
+>  extern void __init at91_gpio_leds(struct gpio_led *leds, int nr);
 
-
-
--- 
---------------------------------------------------------------
-J?rgen Schindele  
-Software-Entwicklung
-
-NENTEC Netzwerktechnologie GmbH
-Greschbachstr. 12
-76229 Karlsruhe
-Deutschland
-Telefon: +49 721 94249-51
-Telefax: +49 721 94249-10
-E-Mail:  schindele at nentec.de
-WEB:     www.nentec.de
- 
-Gesch?ftsf?hrung: Klaus Becker, Roland Knapp
-Sitz der Gesellschaft: Karlsruhe
-Handelsregister: Amtsgericht Mannheim HRB 107658
- 
-Diese E-Mail enth?lt vertrauliche oder rechtlich gesch?tzte Informationen.
-Wenn Sie nicht der vorgesehene Empf?nger sind, informieren Sie bitte sofort
-den Absender und l?schen Sie diese E-Mail. Das unbefugte Kopieren dieser E-Mail
-oder die unbefugte Weitergabe der enthaltenen Informationen ist nicht gestattet.
- 
-The information contained in this message is confidential or protected by law.
-If you are not the intended recipient, please contact the sender and delete this
-message. Any unauthorised copying of this message or unauthorised distribution of
-the information contained herein is prohibited.
---------------------------------------------------------------
+Acked-by: Wolfgang Grandegger <wg@grandegger.com>
