@@ -1,7 +1,7 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Thu, 17 Sep 2009 20:32:57 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Sep 2009 20:41:19 +0100
 Subject: [PATCH] arm: remove unused code in delay.S
-In-Reply-To: <20090916134721.GA11218@n2100.arm.linux.org.uk>
+In-Reply-To: <20090917193257.GA10599@shareable.org>
 References: <1252875960-21512-1-git-send-email-felipe.contreras@gmail.com>
 	<20090915103739.GA19519@elf.ucw.cz>
 	<1253017761.3273.117.camel@linux-1lbu>
@@ -11,40 +11,50 @@ References: <1252875960-21512-1-git-send-email-felipe.contreras@gmail.com>
 	<1253043875.3273.131.camel@linux-1lbu>
 	<m3k4zzdimy.fsf@intrepid.localdomain>
 	<20090916134721.GA11218@n2100.arm.linux.org.uk>
-Message-ID: <20090917193257.GA10599@shareable.org>
+	<20090917193257.GA10599@shareable.org>
+Message-ID: <20090917194119.GA12510@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Tue, Sep 15, 2009 at 11:04:37PM +0200, Krzysztof Halasa wrote:
-> > Steve Chen <schen@mvista.com> writes:
+On Thu, Sep 17, 2009 at 08:32:57PM +0100, Jamie Lokier wrote:
+> Russell King - ARM Linux wrote:
+> > On Tue, Sep 15, 2009 at 11:04:37PM +0200, Krzysztof Halasa wrote:
+> > > Steve Chen <schen@mvista.com> writes:
+> > > 
+> > > > +config OLD_CPU_DELAY
+> > > > +	depends on CPU_32v3 || CPU_32v4 || CPU_32v4T
+> > > > +	bool "Accurate delays"
+> > > > +	def_bool n
+> > > > +	help
+> > > > +	  Enable if observing longer than expected delays and need more
+> > > > +	  accuracy.  This only applies to older CPUs.
+> > > > +
+> > > 
+> > > If it's that simple then why not enable the extra delay code
+> > > unconditionally when compiling for those CPUs?
 > > 
-> > > +config OLD_CPU_DELAY
-> > > +	depends on CPU_32v3 || CPU_32v4 || CPU_32v4T
-> > > +	bool "Accurate delays"
-> > > +	def_bool n
-> > > +	help
-> > > +	  Enable if observing longer than expected delays and need more
-> > > +	  accuracy.  This only applies to older CPUs.
-> > > +
+> > Because it's really not that clear cut.  Eg, ARM610 and ARM710 work
+> > better with it, but StrongARM suffers from delays being too short.
+> > Having a kernel configured for all those processors used to be common
+> > (since the Acorn RiscPC had pluggable CPU cards, which could be one
+> > of those processors.)
 > > 
-> > If it's that simple then why not enable the extra delay code
-> > unconditionally when compiling for those CPUs?
+> > It's really something that only experienced people should worry
+> > about, and not Joe "kernel-builder" Bloggs.
 > 
-> Because it's really not that clear cut.  Eg, ARM610 and ARM710 work
-> better with it, but StrongARM suffers from delays being too short.
-> Having a kernel configured for all those processors used to be common
-> (since the Acorn RiscPC had pluggable CPU cards, which could be one
-> of those processors.)
-> 
-> It's really something that only experienced people should worry
-> about, and not Joe "kernel-builder" Bloggs.
+> I'm confused now.  If I'm building a "generic" kernel to run on
+> several different systems, including some ARM710s and some StrongARMs,
+> do I include the code or not?
 
-I'm confused now.  If I'm building a "generic" kernel to run on
-several different systems, including some ARM710s and some StrongARMs,
-do I include the code or not?
+You should not - because with the code enabled, StrongARM will violate
+the guarantee that udelay() shall return after _at_ _least_ the delay
+asked for.
 
-Btw, do you know where PT110 fits in?  Is it like StrongARM (SA110)?
+However, for short delays, ARM710 will provide a delay unnecessarily in
+excess of the requested delay - which conforms to the required guarantee
+but is not desirable for some applications (eg, where you're using
+udelay() to time hardware signals for clocking data.)
 
-Thanks,
--- Jamie
+> Btw, do you know where PT110 fits in?  Is it like StrongARM (SA110)?
+
+No idea.
