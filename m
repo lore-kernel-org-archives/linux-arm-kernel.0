@@ -1,93 +1,61 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 17 Sep 2009 19:02:09 +0900
-Subject: [PATCH] Samsung SoCs: OneNAND support
-In-Reply-To: <9c9fda240909170245u2b21b898v11c3316726746464@mail.gmail.com>
-References: <20090917081659.GA28591@july> <4AB1F3C5.7000309@gmail.com>
-	<9c9fda240909170245u2b21b898v11c3316726746464@mail.gmail.com>
-Message-ID: <9c9fda240909170302q47b306edn2d73b03243757ce1@mail.gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 17 Sep 2009 12:04:59 +0200
+Subject: [PATCH V2 0/3] at91_can: add support for Atmel's CAN controller
+	on AT91SAM9263
+In-Reply-To: <4AB20679.2040602@grandegger.com>
+References: <1253180254-11910-1-git-send-email-mkl@pengutronix.de>
+	<4AB20679.2040602@grandegger.com>
+Message-ID: <4AB209CB.10707@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 17, 2009 at 6:45 PM, Kyungmin Park <kmpark@infradead.org> wrote:
-> On Thu, Sep 17, 2009 at 5:31 PM, Artem Bityutskiy <dedekind1@gmail.com> wrote:
->> On 09/17/2009 11:16 AM, Kyungmin Park wrote:
->>>
->>> +static int s3c_onenand_wait(struct mtd_info *mtd, int state)
->>> +{
->>> + ? ? ? unsigned int flags = INT_ACT;
->>> + ? ? ? unsigned int stat, ecc;
->>> + ? ? ? unsigned long timeout;
->>> +
->>> + ? ? ? switch (state) {
->>> + ? ? ? case FL_READING:
->>> + ? ? ? ? ? ? ? flags |= BLK_RW_CMP | LOAD_CMP;
->>> + ? ? ? ? ? ? ? break;
->>> + ? ? ? case FL_WRITING:
->>> + ? ? ? ? ? ? ? flags |= BLK_RW_CMP | PGM_CMP;
->>> + ? ? ? ? ? ? ? break;
->>> + ? ? ? case FL_ERASING:
->>> + ? ? ? ? ? ? ? flags |= BLK_RW_CMP | ERS_CMP;
->>> + ? ? ? ? ? ? ? break;
->>> + ? ? ? case FL_LOCKING:
->>> + ? ? ? ? ? ? ? flags |= BLK_RW_CMP;
->>> + ? ? ? ? ? ? ? break;
->>> + ? ? ? default:
->>> + ? ? ? ? ? ? ? break;
->>> + ? ? ? }
->>> +
->>> + ? ? ? /* The 20 msec is enough */
->>> + ? ? ? timeout = jiffies + msecs_to_jiffies(20);
->>> + ? ? ? while (time_before(jiffies, timeout)) {
->>> + ? ? ? ? ? ? ? stat = s3c_read_reg(INT_ERR_STAT_OFFSET);
->>> + ? ? ? ? ? ? ? if (stat& ?flags)
->>> + ? ? ? ? ? ? ? ? ? ? ? break;
->>> +
->>> + ? ? ? ? ? ? ? if (state != FL_READING)
->>> + ? ? ? ? ? ? ? ? ? ? ? cond_resched();
->>> + ? ? ? }
->>> + ? ? ? /* To get correct interrupt status in timeout case */
->>> + ? ? ? stat = s3c_read_reg(INT_ERR_STAT_OFFSET);
->>> + ? ? ? s3c_write_reg(stat, INT_ERR_ACK_OFFSET);
->>> +
->>> + ? ? ? /*
->>> + ? ? ? ?*
->>> + ? ? ? ?* In the Spec. it checks the controller status first
->>> + ? ? ? ?* However if you get the correct information in case of
->>> + ? ? ? ?* power off recovery (POR) test, it should read ECC status first
->>> + ? ? ? ?*/
->>> + ? ? ? if (stat& ?LOAD_CMP) {
->>> + ? ? ? ? ? ? ? ecc = s3c_read_reg(ECC_ERR_STAT_OFFSET);
->>> + ? ? ? ? ? ? ? if (ecc& ?ONENAND_ECC_4BIT_UNCORRECTABLE) {
->>> + ? ? ? ? ? ? ? ? ? ? ? printk(KERN_INFO "onenand_wait: ECC error =
->>> 0x%04x\n", ecc);
->>
->> Copy-paste error? Also see below.
->
-> Nice catch.
->
->>
->>> + ? ? ? ? ? ? ? ? ? ? ? mtd->ecc_stats.failed++;
->>> + ? ? ? ? ? ? ? ? ? ? ? return -EBADMSG;
->>> + ? ? ? ? ? ? ? }
->>> + ? ? ? }
->>> +
->>> + ? ? ? if (stat& ?(LOCKED_BLK | ERS_FAIL | PGM_FAIL | LD_FAIL_ECC_ERR)) {
->>> + ? ? ? ? ? ? ? printk(KERN_INFO "s3c_onenand_wait: controller error =
->>> 0x%04x\n", stat);
->>> + ? ? ? ? ? ? ? if (stat& ?LOCKED_BLK)
->>> + ? ? ? ? ? ? ? ? ? ? ? printk(KERN_INFO "s3c_onenand_wait: it's locked
->>> error = 0x%04x\n", stat);
->>
->> Very quick comment. Could you please avoid this style of putting function
->> name to the printk? We have lots of this in onenand_base.c, and they are
->> often wrong, because function names change.
->>
->> Could we please use dev_printk(), dev_dbg() and the like instead? You'll
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-FYI: In case of MTD,
-dev_printk(), dev_dbg() not working. I used &mtd->dev,
+Wolfgang Grandegger wrote:
+>> This patch series adds support for the Atmel CAN controller as found
+>> on the AT91SAM9263.
+>>
+>> It adds the at91_can to the generic device definition, activates the CAN
+>> controller on the at91sam9263ek and adds the driver itself.
+>>
+>> Changes since V1:
+>> - let Kconfig depend on CAN_DEV
+>> - add example how driver is used in baord file
+>>
+>> Please review and consider for inclusion.
+> 
+> A Vx patch suffix would be nice next time.
 
-Do you know how to set the dev instead of &mtd->dev?
+Sorry, missed that. I was in a hurry, because they wanted to reboot the
+server....
 
-Thank you,
-Kyungmin Park
+>> cheers, Marc
+>>
+>> Marc Kleine-Budde (3):
+>>       at91sam9263: add at91_can device to generic device definition
+>>       at91sam9263ek: activate at91 CAN controller
+>>       at91_can: add driver for Atmel's CAN controller on AT91SAM9263
+> 
+> I have just added my "signed-off-by" for the Socket-CAN patch #3. Don't
+> known who will take care of the other patches.
+
+Thanks Wolfgang.
+
+Andrew, are the first two going throught the arm tree?
+
+cheers, Marc
+
+- --
+Pengutronix e.K.                         | Marc Kleine-Budde           |
+Linux Solutions for Science and Industry | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund                 | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686         | http://www.pengutronix.de   |
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.9 (GNU/Linux)
+Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org
+
+iEYEARECAAYFAkqyCMwACgkQjTAFq1RaXHP/bACfbWSs52bkNoPICUMTufN8lA4v
+yqIAoI0VIrCZKEHja/XEOLHum51zpJ4V
+=dn2a
+-----END PGP SIGNATURE-----
