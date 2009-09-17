@@ -1,231 +1,548 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 17 Sep 2009 14:07:45 +0200
-Subject: [PATCH 2/5] U300 syscon register updates
-Message-ID: <1253189265-30931-1-git-send-email-linus.walleij@stericsson.com>
+Date: Thu, 17 Sep 2009 14:07:56 +0200
+Subject: [PATCH 3/5] Revamped U300 padmux API
+Message-ID: <1253189276-31190-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds in a few new register and defines for improved padmux
-support and some figures that were plain wrong on the targeted
-U300 platforms.
+This abstracts the hackish padmux API on the U300 platform into
+something more manageable. It provides a way for drivers to
+activate/deactivate a certain padmux setting. It will also switch
+the users of the old API over to using the new style, pushing
+muxing into the apropriate setup files.
 
 Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 ---
- arch/arm/mach-u300/include/mach/syscon.h |  120 ++++++++++++++++++++++++++++--
- 1 files changed, 113 insertions(+), 7 deletions(-)
+ arch/arm/mach-u300/gpio.c   |   13 --
+ arch/arm/mach-u300/mmc.c    |   16 ++
+ arch/arm/mach-u300/padmux.c |  395 ++++++++++++++++++++++++++++++++++++++-----
+ arch/arm/mach-u300/padmux.h |   28 +++-
+ 4 files changed, 392 insertions(+), 60 deletions(-)
 
-diff --git a/arch/arm/mach-u300/include/mach/syscon.h b/arch/arm/mach-u300/include/mach/syscon.h
-index 1c90d1b..7444f5c 100644
---- a/arch/arm/mach-u300/include/mach/syscon.h
-+++ b/arch/arm/mach-u300/include/mach/syscon.h
-@@ -240,8 +240,13 @@
- #define U300_SYSCON_PMC1LR_CDI_MASK				(0xC000)
- #define U300_SYSCON_PMC1LR_CDI_CDI				(0x0000)
- #define U300_SYSCON_PMC1LR_CDI_EMIF				(0x4000)
-+#ifdef CONFIG_MACH_U300_BS335
-+#define U300_SYSCON_PMC1LR_CDI_CDI2				(0x8000)
-+#define U300_SYSCON_PMC1LR_CDI_WCDMA_APP_GPIO			(0xC000)
-+#elif CONFIG_MACH_U300_BS365
- #define U300_SYSCON_PMC1LR_CDI_GPIO				(0x8000)
- #define U300_SYSCON_PMC1LR_CDI_WCDMA				(0xC000)
-+#endif
- #define U300_SYSCON_PMC1LR_PDI_MASK				(0x3000)
- #define U300_SYSCON_PMC1LR_PDI_PDI				(0x0000)
- #define U300_SYSCON_PMC1LR_PDI_EGG				(0x1000)
-@@ -345,19 +350,69 @@
- #define U300_SYSCON_MMCR_MASK					(0x0003)
- #define U300_SYSCON_MMCR_MMC_FB_CLK_SEL_ENABLE			(0x0002)
- #define U300_SYSCON_MMCR_MSPRO_FREQSEL_ENABLE			(0x0001)
--
-+/* Pull up/down control (R/W) */
-+#define U300_SYSCON_PUCR					(0x104)
-+#define U300_SYSCON_PUCR_EMIF_1_WAIT_N_PU_ENABLE		(0x0200)
-+#define U300_SYSCON_PUCR_EMIF_1_NFIF_READY_PU_ENABLE		(0x0100)
-+#define U300_SYSCON_PUCR_EMIF_1_16BIT_PU_ENABLE			(0x0080)
-+#define U300_SYSCON_PUCR_EMIF_1_8BIT_PU_ENABLE			(0x0040)
-+#define U300_SYSCON_PUCR_KEY_IN_PU_EN_MASK			(0x003F)
-+/* Padmux 2 control */
-+#define U300_SYSCON_PMC2R					(0x100)
-+#define U300_SYSCON_PMC2R_APP_MISC_0_MASK			(0x00C0)
-+#define U300_SYSCON_PMC2R_APP_MISC_0_APP_GPIO			(0x0000)
-+#define U300_SYSCON_PMC2R_APP_MISC_0_EMIF_SDRAM			(0x0040)
-+#define U300_SYSCON_PMC2R_APP_MISC_0_MMC			(0x0080)
-+#define U300_SYSCON_PMC2R_APP_MISC_0_CDI2			(0x00C0)
-+#define U300_SYSCON_PMC2R_APP_MISC_1_MASK			(0x0300)
-+#define U300_SYSCON_PMC2R_APP_MISC_1_APP_GPIO			(0x0000)
-+#define U300_SYSCON_PMC2R_APP_MISC_1_EMIF_SDRAM			(0x0100)
-+#define U300_SYSCON_PMC2R_APP_MISC_1_MMC			(0x0200)
-+#define U300_SYSCON_PMC2R_APP_MISC_1_CDI2			(0x0300)
-+#define U300_SYSCON_PMC2R_APP_MISC_2_MASK			(0x0C00)
-+#define U300_SYSCON_PMC2R_APP_MISC_2_APP_GPIO			(0x0000)
-+#define U300_SYSCON_PMC2R_APP_MISC_2_EMIF_SDRAM			(0x0400)
-+#define U300_SYSCON_PMC2R_APP_MISC_2_MMC			(0x0800)
-+#define U300_SYSCON_PMC2R_APP_MISC_2_CDI2			(0x0C00)
-+#define U300_SYSCON_PMC2R_APP_MISC_3_MASK			(0x3000)
-+#define U300_SYSCON_PMC2R_APP_MISC_3_APP_GPIO			(0x0000)
-+#define U300_SYSCON_PMC2R_APP_MISC_3_EMIF_SDRAM			(0x1000)
-+#define U300_SYSCON_PMC2R_APP_MISC_3_MMC			(0x2000)
-+#define U300_SYSCON_PMC2R_APP_MISC_3_CDI2			(0x3000)
-+#define U300_SYSCON_PMC2R_APP_MISC_4_MASK			(0xC000)
-+#define U300_SYSCON_PMC2R_APP_MISC_4_APP_GPIO			(0x0000)
-+#define U300_SYSCON_PMC2R_APP_MISC_4_EMIF_SDRAM			(0x4000)
-+#define U300_SYSCON_PMC2R_APP_MISC_4_MMC			(0x8000)
-+#define U300_SYSCON_PMC2R_APP_MISC_4_ACC_GPIO			(0xC000)
- /* TODO: More SYSCON registers missing */
- #define U300_SYSCON_PMC3R					(0x10c)
- #define U300_SYSCON_PMC3R_APP_MISC_11_MASK			(0xc000)
- #define U300_SYSCON_PMC3R_APP_MISC_11_SPI			(0x4000)
- #define U300_SYSCON_PMC3R_APP_MISC_10_MASK			(0x3000)
- #define U300_SYSCON_PMC3R_APP_MISC_10_SPI			(0x1000)
--/* TODO: Missing other configs, I just added the SPI stuff */
--
-+/* TODO: Missing other configs */
-+#define U300_SYSCON_PMC4R					(0x168)
-+#define U300_SYSCON_PMC4R_APP_MISC_12_MASK			(0x0003)
-+#define U300_SYSCON_PMC4R_APP_MISC_12_APP_GPIO			(0x0000)
-+#define U300_SYSCON_PMC4R_APP_MISC_13_MASK			(0x000C)
-+#define U300_SYSCON_PMC4R_APP_MISC_13_CDI			(0x0000)
-+#define U300_SYSCON_PMC4R_APP_MISC_13_SMIA			(0x0004)
-+#define U300_SYSCON_PMC4R_APP_MISC_13_SMIA2			(0x0008)
-+#define U300_SYSCON_PMC4R_APP_MISC_13_APP_GPIO			(0x000C)
-+#define U300_SYSCON_PMC4R_APP_MISC_14_MASK			(0x0030)
-+#define U300_SYSCON_PMC4R_APP_MISC_14_CDI			(0x0000)
-+#define U300_SYSCON_PMC4R_APP_MISC_14_SMIA			(0x0010)
-+#define U300_SYSCON_PMC4R_APP_MISC_14_CDI2			(0x0020)
-+#define U300_SYSCON_PMC4R_APP_MISC_14_APP_GPIO			(0x0030)
-+#define U300_SYSCON_PMC4R_APP_MISC_16_MASK			(0x0300)
-+#define U300_SYSCON_PMC4R_APP_MISC_16_APP_GPIO_13		(0x0000)
-+#define U300_SYSCON_PMC4R_APP_MISC_16_APP_UART1_CTS		(0x0100)
-+#define U300_SYSCON_PMC4R_APP_MISC_16_EMIF_1_STATIC_CS5_N	(0x0200)
- /* SYS_0_CLK_CONTROL first clock control 16bit (R/W) */
- #define U300_SYSCON_S0CCR					(0x120)
- #define U300_SYSCON_S0CCR_FIELD_MASK				(0x43FF)
- #define U300_SYSCON_S0CCR_CLOCK_REQ				(0x4000)
-+#define U300_SYSCON_S0CCR_CLOCK_REQ_MONITOR			(0x2000)
- #define U300_SYSCON_S0CCR_CLOCK_INV				(0x0200)
- #define U300_SYSCON_S0CCR_CLOCK_FREQ_MASK			(0x01E0)
- #define U300_SYSCON_S0CCR_CLOCK_SELECT_MASK			(0x001E)
-@@ -375,6 +430,7 @@
- #define U300_SYSCON_S1CCR					(0x124)
- #define U300_SYSCON_S1CCR_FIELD_MASK				(0x43FF)
- #define U300_SYSCON_S1CCR_CLOCK_REQ				(0x4000)
-+#define U300_SYSCON_S1CCR_CLOCK_REQ_MONITOR			(0x2000)
- #define U300_SYSCON_S1CCR_CLOCK_INV				(0x0200)
- #define U300_SYSCON_S1CCR_CLOCK_FREQ_MASK			(0x01E0)
- #define U300_SYSCON_S1CCR_CLOCK_SELECT_MASK			(0x001E)
-@@ -393,6 +449,7 @@
- #define U300_SYSCON_S2CCR_FIELD_MASK				(0xC3FF)
- #define U300_SYSCON_S2CCR_CLK_STEAL				(0x8000)
- #define U300_SYSCON_S2CCR_CLOCK_REQ				(0x4000)
-+#define U300_SYSCON_S2CCR_CLOCK_REQ_MONITOR			(0x2000)
- #define U300_SYSCON_S2CCR_CLOCK_INV				(0x0200)
- #define U300_SYSCON_S2CCR_CLOCK_FREQ_MASK			(0x01E0)
- #define U300_SYSCON_S2CCR_CLOCK_SELECT_MASK			(0x001E)
-@@ -425,6 +482,44 @@
- #define U300_SYSCON_MCR_PMGEN_CR_0_EMIF_0_SDRAM			(0x000C)
- #define U300_SYSCON_MCR_PM1G_MODE_ENABLE			(0x0002)
- #define U300_SYSCON_MCR_PMTG5_MODE_ENABLE			(0x0001)
-+/* SC_PLL_IRQ_CONTROL 16bit (R/W) */
-+#define U300_SYSCON_PICR					(0x0130)
-+#define U300_SYSCON_PICR_MASK					(0x00FF)
-+#define U300_SYSCON_PICR_FORCE_PLL208_LOCK_LOW_ENABLE		(0x0080)
-+#define U300_SYSCON_PICR_FORCE_PLL208_LOCK_HIGH_ENABLE		(0x0040)
-+#define U300_SYSCON_PICR_FORCE_PLL13_LOCK_LOW_ENABLE		(0x0020)
-+#define U300_SYSCON_PICR_FORCE_PLL13_LOCK_HIGH_ENABLE		(0x0010)
-+#define U300_SYSCON_PICR_IRQMASK_PLL13_UNLOCK_ENABLE		(0x0008)
-+#define U300_SYSCON_PICR_IRQMASK_PLL13_LOCK_ENABLE		(0x0004)
-+#define U300_SYSCON_PICR_IRQMASK_PLL208_UNLOCK_ENABLE		(0x0002)
-+#define U300_SYSCON_PICR_IRQMASK_PLL208_LOCK_ENABLE		(0x0001)
-+/* SC_PLL_IRQ_STATUS 16 bit (R/-) */
-+#define U300_SYSCON_PISR					(0x0134)
-+#define U300_SYSCON_PISR_MASK					(0x000F)
-+#define U300_SYSCON_PISR_PLL13_UNLOCK_IND			(0x0008)
-+#define U300_SYSCON_PISR_PLL13_LOCK_IND				(0x0004)
-+#define U300_SYSCON_PISR_PLL208_UNLOCK_IND			(0x0002)
-+#define U300_SYSCON_PISR_PLL208_LOCK_IND			(0x0001)
-+/* SC_PLL_IRQ_CLEAR 16 bit (-/W) */
-+#define U300_SYSCON_PICLR					(0x0138)
-+#define U300_SYSCON_PICLR_MASK					(0x000F)
-+#define U300_SYSCON_PICLR_RWMASK				(0x0000)
-+#define U300_SYSCON_PICLR_PLL13_UNLOCK_SC			(0x0008)
-+#define U300_SYSCON_PICLR_PLL13_LOCK_SC				(0x0004)
-+#define U300_SYSCON_PICLR_PLL208_UNLOCK_SC			(0x0002)
-+#define U300_SYSCON_PICLR_PLL208_LOCK_SC			(0x0001)
-+/* CAMIF_CONTROL 16 bit (-/W) */
-+#define U300_SYSCON_CICR					(0x013C)
-+#define U300_SYSCON_CICR_MASK					(0x0FFF)
-+#define U300_SYSCON_CICR_APP_SUBLVDS_TESTMODE_MASK		(0x0F00)
-+#define U300_SYSCON_CICR_APP_SUBLVDS_TESTMODE_PORT1		(0x0C00)
-+#define U300_SYSCON_CICR_APP_SUBLVDS_TESTMODE_PORT0		(0x0300)
-+#define U300_SYSCON_CICR_APP_SUBLVDS_RESCON_MASK		(0x00F0)
-+#define U300_SYSCON_CICR_APP_SUBLVDS_RESCON_PORT1		(0x00C0)
-+#define U300_SYSCON_CICR_APP_SUBLVDS_RESCON_PORT0		(0x0030)
-+#define U300_SYSCON_CICR_APP_SUBLVDS_PWR_DWN_N_MASK		(0x000F)
-+#define U300_SYSCON_CICR_APP_SUBLVDS_PWR_DWN_N_PORT1		(0x000C)
-+#define U300_SYSCON_CICR_APP_SUBLVDS_PWR_DWN_N_PORT0		(0x0003)
- /* Clock activity observability register 0 */
- #define U300_SYSCON_C0OAR					(0x140)
- #define U300_SYSCON_C0OAR_MASK					(0xFFFF)
-@@ -513,7 +608,7 @@
- /**
-  * CPU medium frequency in MHz
-  */
--#define SYSCON_CPU_CLOCK_MEDIUM  104
-+#define SYSCON_CPU_CLOCK_MEDIUM   52
- /**
-  * CPU low frequency in MHz
-  */
-@@ -527,7 +622,7 @@
- /**
-  * EMIF medium frequency in MHz
-  */
--#define SYSCON_EMIF_CLOCK_MEDIUM 104
-+#define SYSCON_EMIF_CLOCK_MEDIUM  52
- /**
-  * EMIF low frequency in MHz
-  */
-@@ -541,7 +636,7 @@
- /**
-  * AHB medium frequency in MHz
-  */
--#define SYSCON_AHB_CLOCK_MEDIUM   52
-+#define SYSCON_AHB_CLOCK_MEDIUM   26
- /**
-  * AHB low frequency in MHz
-  */
-@@ -553,6 +648,15 @@ enum syscon_busmaster {
-   SYSCON_BM_VIDEO_ENC
- };
+diff --git a/arch/arm/mach-u300/gpio.c b/arch/arm/mach-u300/gpio.c
+index 308cdb1..63c8f27 100644
+--- a/arch/arm/mach-u300/gpio.c
++++ b/arch/arm/mach-u300/gpio.c
+@@ -25,11 +25,6 @@
+ #include <linux/platform_device.h>
+ #include <linux/gpio.h>
  
-+/* Selectr a resistor or a set of resistors */
-+enum syscon_pull_up_down {
-+  SYSCON_PU_KEY_IN_EN,
-+  SYSCON_PU_EMIF_1_8_BIT_EN,
-+  SYSCON_PU_EMIF_1_16_BIT_EN,
-+  SYSCON_PU_EMIF_1_NFIF_READY_EN,
-+  SYSCON_PU_EMIF_1_NFIF_WAIT_N_EN,
+-/* Need access to SYSCON registers for PADmuxing */
+-#include <mach/syscon.h>
+-
+-#include "padmux.h"
+-
+ /* Reference to GPIO block clock */
+ static struct clk *clk;
+ 
+@@ -606,14 +601,6 @@ static int __init gpio_probe(struct platform_device *pdev)
+ 	writel(U300_GPIO_CR_BLOCK_CLKRQ_ENABLE, virtbase + U300_GPIO_CR);
+ #endif
+ 
+-	/* Set up some padmuxing here */
+-#ifdef CONFIG_MMC
+-	pmx_set_mission_mode_mmc();
+-#endif
+-#ifdef CONFIG_SPI_PL022
+-	pmx_set_mission_mode_spi();
+-#endif
+-
+ 	gpio_set_initial_values();
+ 
+ 	for (num_irqs = 0 ; num_irqs < U300_GPIO_NUM_PORTS; num_irqs++) {
+diff --git a/arch/arm/mach-u300/mmc.c b/arch/arm/mach-u300/mmc.c
+index bbfcb1a..70f0ca5 100644
+--- a/arch/arm/mach-u300/mmc.c
++++ b/arch/arm/mach-u300/mmc.c
+@@ -22,6 +22,7 @@
+ 
+ #include <linux/amba/mmci.h>
+ #include "mmc.h"
++#include "padmux.h"
+ 
+ struct mmci_card_event {
+ 	struct input_dev *mmc_input;
+@@ -146,6 +147,7 @@ int __devinit mmc_init(struct amba_device *adev)
+ {
+ 	struct mmci_card_event *mmci_card;
+ 	struct device *mmcsd_device = &adev->dev;
++	struct pmx *pmx;
+ 	int ret = 0;
+ 
+ 	mmci_card = kzalloc(sizeof(struct mmci_card_event), GFP_KERNEL);
+@@ -209,6 +211,20 @@ int __devinit mmc_init(struct amba_device *adev)
+ 
+ 	input_set_drvdata(mmci_card->mmc_input, mmci_card);
+ 
++	/*
++	 * Setup padmuxing for MMC. Since this must always be
++	 * compiled into the kernel, pmx is never released.
++	 */
++	pmx = pmx_get(mmcsd_device, U300_APP_PMX_MMC_SETTING);
++
++	if (IS_ERR(pmx))
++		pr_warning("Could not get padmux handle\n");
++	else {
++		ret = pmx_activate(mmcsd_device, pmx);
++		if (IS_ERR_VALUE(ret))
++			pr_warning("Could not activate padmuxing\n");
++	}
++
+ 	ret = gpio_register_callback(U300_GPIO_PIN_MMC_CD, mmci_callback,
+ 				     mmci_card);
+ 
+diff --git a/arch/arm/mach-u300/padmux.c b/arch/arm/mach-u300/padmux.c
+index f366456..4c93c6c 100644
+--- a/arch/arm/mach-u300/padmux.c
++++ b/arch/arm/mach-u300/padmux.c
+@@ -6,53 +6,362 @@
+  * Copyright (C) 2009 ST-Ericsson AB
+  * License terms: GNU General Public License (GPL) version 2
+  * U300 PADMUX functions
+- * Author: Linus Walleij <linus.walleij@stericsson.com>
+- *
++ * Author: Martin Persson <martin.persson@stericsson.com>
+  */
+-#include <linux/io.h>
++
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/device.h>
+ #include <linux/err.h>
++#include <linux/errno.h>
++#include <linux/io.h>
++#include <linux/mutex.h>
++#include <linux/string.h>
++#include <linux/bug.h>
++#include <linux/debugfs.h>
++#include <linux/seq_file.h>
+ #include <mach/u300-regs.h>
+ #include <mach/syscon.h>
+-
+ #include "padmux.h"
+ 
+-/* Set the PAD MUX to route the MMC reader correctly to GPIO0. */
+-void pmx_set_mission_mode_mmc(void)
+-{
+-	u16 val;
+-
+-	val = readw(U300_SYSCON_VBASE + U300_SYSCON_PMC1LR);
+-	val &= ~U300_SYSCON_PMC1LR_MMCSD_MASK;
+-	writew(val, U300_SYSCON_VBASE + U300_SYSCON_PMC1LR);
+-	val = readw(U300_SYSCON_VBASE + U300_SYSCON_PMC1HR);
+-	val &= ~U300_SYSCON_PMC1HR_APP_GPIO_1_MASK;
+-	val |= U300_SYSCON_PMC1HR_APP_GPIO_1_MMC;
+-	writew(val, U300_SYSCON_VBASE + U300_SYSCON_PMC1HR);
+-}
+-
+-void pmx_set_mission_mode_spi(void)
+-{
+-	u16 val;
+-
+-	/* Set up padmuxing so the SPI port and its chipselects are active */
+-	val = readw(U300_SYSCON_VBASE + U300_SYSCON_PMC1HR);
+-	/*
+-	 * Activate the SPI port (disable the use of these pins for generic
+-	 * GPIO, DSP, AAIF
+-	 */
+-	val &= ~U300_SYSCON_PMC1HR_APP_SPI_2_MASK;
+-	val |= U300_SYSCON_PMC1HR_APP_SPI_2_SPI;
+-	/*
+-	 * Use GPIO pin SPI CS1 for CS1 actually (it can be used for other
+-	 * things also)
+-	 */
+-	val &= ~U300_SYSCON_PMC1HR_APP_SPI_CS_1_MASK;
+-	val |= U300_SYSCON_PMC1HR_APP_SPI_CS_1_SPI;
+-	/*
+-	 * Use GPIO pin SPI CS2 for CS2 actually (it can be used for other
+-	 * things also)
+-	 */
+-	val &= ~U300_SYSCON_PMC1HR_APP_SPI_CS_2_MASK;
+-	val |= U300_SYSCON_PMC1HR_APP_SPI_CS_2_SPI;
+-	writew(val, U300_SYSCON_VBASE + U300_SYSCON_PMC1HR);
++static DEFINE_MUTEX(pmx_mutex);
++
++const u32 pmx_registers[] = {
++	(U300_SYSCON_VBASE + U300_SYSCON_PMC1LR),
++	(U300_SYSCON_VBASE + U300_SYSCON_PMC1HR),
++	(U300_SYSCON_VBASE + U300_SYSCON_PMC2R),
++	(U300_SYSCON_VBASE + U300_SYSCON_PMC3R),
++	(U300_SYSCON_VBASE + U300_SYSCON_PMC4R)
 +};
 +
- /*
-  * Note that this array must match the order of the array "clk_reg"
-  * in syscon.c
-@@ -575,6 +679,7 @@ enum syscon_clk {
-   SYSCON_CLKCONTROL_SPI,
-   SYSCON_CLKCONTROL_I2S0_CORE,
-   SYSCON_CLKCONTROL_I2S1_CORE,
-+  SYSCON_CLKCONTROL_UART1,
-   SYSCON_CLKCONTROL_AAIF,
-   SYSCON_CLKCONTROL_AHB,
-   SYSCON_CLKCONTROL_APEX,
-@@ -604,7 +709,8 @@ enum syscon_sysclk_mode {
++/* High level functionality */
++
++/* Lazy dog:
++ * onmask = {
++ *   {"PMC1LR" mask, "PMC1LR" value},
++ *   {"PMC1HR" mask, "PMC1HR" value},
++ *   {"PMC2R"  mask, "PMC2R"  value},
++ *   {"PMC3R"  mask, "PMC3R"  value},
++ *   {"PMC4R"  mask, "PMC4R"  value}
++ * }
++ */
++static struct pmx mmc_setting = {
++	.setting = U300_APP_PMX_MMC_SETTING,
++	.default_on = false,
++	.activated = false,
++	.name = "MMC",
++	.onmask = {
++		   {U300_SYSCON_PMC1LR_MMCSD_MASK,
++		    U300_SYSCON_PMC1LR_MMCSD_MMCSD},
++		   {0, 0},
++		   {0, 0},
++		   {0, 0},
++		   {U300_SYSCON_PMC4R_APP_MISC_12_MASK,
++		    U300_SYSCON_PMC4R_APP_MISC_12_APP_GPIO}
++		   },
++};
++
++static struct pmx spi_setting = {
++	.setting = U300_APP_PMX_SPI_SETTING,
++	.default_on = false,
++	.activated = false,
++	.name = "SPI",
++	.onmask = {{0, 0},
++		   {U300_SYSCON_PMC1HR_APP_SPI_2_MASK |
++		    U300_SYSCON_PMC1HR_APP_SPI_CS_1_MASK |
++		    U300_SYSCON_PMC1HR_APP_SPI_CS_2_MASK,
++		    U300_SYSCON_PMC1HR_APP_SPI_2_SPI |
++		    U300_SYSCON_PMC1HR_APP_SPI_CS_1_SPI |
++		    U300_SYSCON_PMC1HR_APP_SPI_CS_2_SPI},
++		   {0, 0},
++		   {0, 0},
++		   {0, 0}
++		   },
++};
++
++/* Available padmux settings */
++static struct pmx *pmx_settings[] = {
++	&mmc_setting,
++	&spi_setting,
++};
++
++static void update_registers(struct pmx *pmx, bool activate)
++{
++	u16 regval, val, mask;
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(pmx_registers); i++) {
++		if (activate)
++			val = pmx->onmask[i].val;
++		else
++			val = 0;
++
++		mask = pmx->onmask[i].mask;
++		if (mask != 0) {
++			regval = readw(pmx_registers[i]);
++			regval &= ~mask;
++			regval |= val;
++			writew(regval, pmx_registers[i]);
++		}
++	}
++}
++
++struct pmx *pmx_get(struct device *dev, enum pmx_settings setting)
++{
++	int i;
++	struct pmx *pmx = ERR_PTR(-ENOENT);
++
++	if (dev == NULL)
++		return ERR_PTR(-EINVAL);
++
++	mutex_lock(&pmx_mutex);
++	for (i = 0; i < ARRAY_SIZE(pmx_settings); i++) {
++
++		if (setting == pmx_settings[i]->setting) {
++
++			if (pmx_settings[i]->dev != NULL) {
++				WARN(1, "padmux: required setting "
++				     "in use by another consumer\n");
++			} else {
++				pmx = pmx_settings[i];
++				pmx->dev = dev;
++				dev_dbg(dev, "padmux: setting nr %d is now "
++					"bound to %s and ready to use\n",
++					setting, dev_name(dev));
++				break;
++			}
++		}
++	}
++	mutex_unlock(&pmx_mutex);
++
++	return pmx;
++}
++EXPORT_SYMBOL(pmx_get);
++
++int pmx_put(struct device *dev, struct pmx *pmx)
++{
++	int i;
++	int ret = -ENOENT;
++
++	if (pmx == NULL || dev == NULL)
++		return -EINVAL;
++
++	mutex_lock(&pmx_mutex);
++	for (i = 0; i < ARRAY_SIZE(pmx_settings); i++) {
++
++		if (pmx->setting == pmx_settings[i]->setting) {
++
++			if (dev != pmx->dev) {
++				WARN(1, "padmux: cannot release handle as "
++					"it is bound to another consumer\n");
++				ret = -EINVAL;
++				break;
++			} else {
++				pmx_settings[i]->dev = NULL;
++				ret = 0;
++				break;
++			}
++		}
++	}
++	mutex_unlock(&pmx_mutex);
++
++	return ret;
++}
++EXPORT_SYMBOL(pmx_put);
++
++int pmx_activate(struct device *dev, struct pmx *pmx)
++{
++	int i, j, ret;
++	ret = 0;
++
++	if (pmx == NULL || dev == NULL)
++		return -EINVAL;
++
++	mutex_lock(&pmx_mutex);
++
++	/* Make sure the required bits are not used */
++	for (i = 0; i < ARRAY_SIZE(pmx_settings); i++) {
++
++		if (pmx_settings[i]->dev == NULL || pmx_settings[i] == pmx)
++			continue;
++
++		for (j = 0; j < ARRAY_SIZE(pmx_registers); j++) {
++
++			if (pmx_settings[i]->onmask[j].mask & pmx->
++				onmask[j].mask) {
++				/* More than one entry on the same bits */
++				WARN(1, "padmux: cannot activate "
++					"setting. Bit conflict with "
++					"an active setting\n");
++
++				ret = -EUSERS;
++				goto exit;
++			}
++		}
++	}
++	update_registers(pmx, true);
++	pmx->activated = true;
++	dev_dbg(dev, "padmux: setting nr %d is activated\n",
++		pmx->setting);
++
++exit:
++	mutex_unlock(&pmx_mutex);
++	return ret;
++}
++EXPORT_SYMBOL(pmx_activate);
++
++int pmx_deactivate(struct device *dev, struct pmx *pmx)
++{
++	int i;
++	int ret = -ENOENT;
++
++	if (pmx == NULL || dev == NULL)
++		return -EINVAL;
++
++	mutex_lock(&pmx_mutex);
++	for (i = 0; i < ARRAY_SIZE(pmx_settings); i++) {
++
++		if (pmx_settings[i]->dev == NULL)
++			continue;
++
++		if (pmx->setting == pmx_settings[i]->setting) {
++
++			if (dev != pmx->dev) {
++				WARN(1, "padmux: cannot deactivate "
++				     "pmx setting as it was activated "
++				     "by another consumer\n");
++
++				ret = -EBUSY;
++				continue;
++			} else {
++				update_registers(pmx, false);
++				pmx_settings[i]->dev = NULL;
++				pmx->activated = false;
++				ret = 0;
++				dev_dbg(dev, "padmux: setting nr %d is deactivated",
++					pmx->setting);
++				break;
++			}
++		}
++	}
++	mutex_unlock(&pmx_mutex);
++
++	return ret;
++}
++EXPORT_SYMBOL(pmx_deactivate);
++
++/*
++ * For internal use only. If it is to be exported,
++ * it should be reentrant. Notice that pmx_activate
++ * (i.e. runtime settings) always override default settings.
++ */
++static int pmx_set_default(void)
++{
++	/* Used to identify several entries on the same bits */
++	u16 modbits[ARRAY_SIZE(pmx_registers)];
++
++	int i, j;
++
++	memset(modbits, 0, ARRAY_SIZE(pmx_registers) * sizeof(u16));
++
++	for (i = 0; i < ARRAY_SIZE(pmx_settings); i++) {
++
++		if (!pmx_settings[i]->default_on)
++			continue;
++
++		for (j = 0; j < ARRAY_SIZE(pmx_registers); j++) {
++
++			/* Make sure there is only one entry on the same bits */
++			if (modbits[j] & pmx_settings[i]->onmask[j].mask) {
++				BUG();
++				return -EUSERS;
++			}
++			modbits[j] |= pmx_settings[i]->onmask[j].mask;
++		}
++		update_registers(pmx_settings[i], true);
++	}
++	return 0;
+ }
++
++#if (defined(CONFIG_DEBUG_FS) && defined(CONFIG_U300_DEBUG))
++static int pmx_show(struct seq_file *s, void *data)
++{
++	int i;
++	seq_printf(s, "-------------------------------------------------\n");
++	seq_printf(s, "SETTING     BOUND TO DEVICE               STATE\n");
++	seq_printf(s, "-------------------------------------------------\n");
++	mutex_lock(&pmx_mutex);
++	for (i = 0; i < ARRAY_SIZE(pmx_settings); i++) {
++		/* Format pmx and device name nicely */
++		char cdp[33];
++		int chars;
++
++		chars = snprintf(&cdp[0], 17, "%s", pmx_settings[i]->name);
++		while (chars < 16) {
++			cdp[chars] = ' ';
++			chars++;
++		}
++		chars = snprintf(&cdp[16], 17, "%s", pmx_settings[i]->dev ?
++				dev_name(pmx_settings[i]->dev) : "N/A");
++		while (chars < 16) {
++			cdp[chars+16] = ' ';
++			chars++;
++		}
++		cdp[32] = '\0';
++
++		seq_printf(s,
++			"%s\t%s\n",
++			&cdp[0],
++			pmx_settings[i]->activated ?
++			"ACTIVATED" : "DEACTIVATED"
++			);
++
++	}
++	mutex_unlock(&pmx_mutex);
++	return 0;
++}
++
++static int pmx_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, pmx_show, NULL);
++}
++
++static const struct file_operations pmx_operations = {
++	.owner		= THIS_MODULE,
++	.open		= pmx_open,
++	.read		= seq_read,
++	.llseek		= seq_lseek,
++	.release	= single_release,
++};
++
++static int __init init_pmx_read_debugfs(void)
++{
++	/* Expose a simple debugfs interface to view pmx settings */
++	(void) debugfs_create_file("padmux", S_IFREG | S_IRUGO,
++				   NULL, NULL,
++				   &pmx_operations);
++	return 0;
++}
++
++/*
++ * This needs to come in after the core_initcall(),
++ * because debugfs is not available until
++ * the subsystems come up.
++ */
++module_init(init_pmx_read_debugfs);
++#endif
++
++static int __init pmx_init(void)
++{
++	int ret;
++
++	ret = pmx_set_default();
++
++	if (IS_ERR_VALUE(ret))
++		pr_crit("padmux: default settings could not be set\n");
++
++	return 0;
++}
++
++/* Should be initialized before consumers */
++core_initcall(pmx_init);
+diff --git a/arch/arm/mach-u300/padmux.h b/arch/arm/mach-u300/padmux.h
+index 8c2099a..6e8b860 100644
+--- a/arch/arm/mach-u300/padmux.h
++++ b/arch/arm/mach-u300/padmux.h
+@@ -6,14 +6,34 @@
+  * Copyright (C) 2009 ST-Ericsson AB
+  * License terms: GNU General Public License (GPL) version 2
+  * U300 PADMUX API
+- * Author: Linus Walleij <linus.walleij@stericsson.com>
+- *
++ * Author: Martin Persson <martin.persson@stericsson.com>
+  */
  
- enum syscon_sysclk_req {
-   SYSCON_SYSCLKREQ_DISABLED,
--  SYSCON_SYSCLKREQ_ACTIVE_LOW
-+  SYSCON_SYSCLKREQ_ACTIVE_LOW,
-+  SYSCON_SYSCLKREQ_MONITOR
- };
+ #ifndef __MACH_U300_PADMUX_H
+ #define __MACH_U300_PADMUX_H
  
- enum syscon_clk_mode {
+-void pmx_set_mission_mode_mmc(void);
+-void pmx_set_mission_mode_spi(void);
++enum pmx_settings {
++	U300_APP_PMX_MMC_SETTING,
++	U300_APP_PMX_SPI_SETTING
++};
++
++struct pmx_onmask {
++	u16 mask;		/* Mask bits */
++	u16 val;		/* Value when active */
++};
++
++struct pmx {
++	struct device *dev;
++	enum pmx_settings setting;
++	char *name;
++	bool activated;
++	bool default_on;
++	struct pmx_onmask onmask[];
++};
++
++struct pmx *pmx_get(struct device *dev, enum pmx_settings setting);
++int pmx_put(struct device *dev, struct pmx *pmx);
++int pmx_activate(struct device *dev, struct pmx *pmx);
++int pmx_deactivate(struct device *dev, struct pmx *pmx);
+ 
+ #endif
 -- 
 1.6.2.1
