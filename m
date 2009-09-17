@@ -1,59 +1,50 @@
-From: wg@grandegger.com (Wolfgang Grandegger)
-Date: Thu, 17 Sep 2009 15:14:55 +0200
-Subject: [PATCH 2/3] at91sam9263ek: activate at91 CAN controller
-In-Reply-To: <1253180254-11910-3-git-send-email-mkl@pengutronix.de>
-References: <1253180254-11910-1-git-send-email-mkl@pengutronix.de>	<1253180254-11910-2-git-send-email-mkl@pengutronix.de>
-	<1253180254-11910-3-git-send-email-mkl@pengutronix.de>
-Message-ID: <4AB2364F.60700@grandegger.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Thu, 17 Sep 2009 20:32:57 +0100
+Subject: [PATCH] arm: remove unused code in delay.S
+In-Reply-To: <20090916134721.GA11218@n2100.arm.linux.org.uk>
+References: <1252875960-21512-1-git-send-email-felipe.contreras@gmail.com>
+	<20090915103739.GA19519@elf.ucw.cz>
+	<1253017761.3273.117.camel@linux-1lbu>
+	<200909151541.08852.marek.vasut@gmail.com>
+	<1253032210.3273.128.camel@linux-1lbu>
+	<94a0d4530909151158y489a96e3x63ff932c713822b0@mail.gmail.com>
+	<1253043875.3273.131.camel@linux-1lbu>
+	<m3k4zzdimy.fsf@intrepid.localdomain>
+	<20090916134721.GA11218@n2100.arm.linux.org.uk>
+Message-ID: <20090917193257.GA10599@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Kleine-Budde wrote:
-> This patch activates the at91 CAN controller for the at91sam9263ek
-> development board.
+Russell King - ARM Linux wrote:
+> On Tue, Sep 15, 2009 at 11:04:37PM +0200, Krzysztof Halasa wrote:
+> > Steve Chen <schen@mvista.com> writes:
+> > 
+> > > +config OLD_CPU_DELAY
+> > > +	depends on CPU_32v3 || CPU_32v4 || CPU_32v4T
+> > > +	bool "Accurate delays"
+> > > +	def_bool n
+> > > +	help
+> > > +	  Enable if observing longer than expected delays and need more
+> > > +	  accuracy.  This only applies to older CPUs.
+> > > +
+> > 
+> > If it's that simple then why not enable the extra delay code
+> > unconditionally when compiling for those CPUs?
 > 
-> Signed-off-by: Hans J. Koch <hjk@linutronix.de>
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> ---
->  arch/arm/mach-at91/board-sam9263ek.c |   19 +++++++++++++++++++
->  1 files changed, 19 insertions(+), 0 deletions(-)
+> Because it's really not that clear cut.  Eg, ARM610 and ARM710 work
+> better with it, but StrongARM suffers from delays being too short.
+> Having a kernel configured for all those processors used to be common
+> (since the Acorn RiscPC had pluggable CPU cards, which could be one
+> of those processors.)
 > 
-> diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
-> index 57d5252..e6268b3 100644
-> --- a/arch/arm/mach-at91/board-sam9263ek.c
-> +++ b/arch/arm/mach-at91/board-sam9263ek.c
-> @@ -400,6 +400,23 @@ static struct gpio_led ek_pwm_led[] = {
->  	}
->  };
->  
-> +/*
-> + * CAN
-> + */
-> +static void sam9263ek_transceiver_switch(int on)
-> +{
-> +	if (on) {
-> +		at91_set_gpio_output(AT91_PIN_PA18, 1); /* CANRXEN */
-> +		at91_set_gpio_output(AT91_PIN_PA19, 0); /* CANRS */
-> +	} else {
-> +		at91_set_gpio_output(AT91_PIN_PA18, 0); /* CANRXEN */
-> +		at91_set_gpio_output(AT91_PIN_PA19, 1); /* CANRS */
-> +	}
-> +}
-> +
-> +static struct at91_can_data ek_can_data = {
-> +	.transceiver_switch = sam9263ek_transceiver_switch,
-> +};
->  
->  static void __init ek_board_init(void)
->  {
-> @@ -431,6 +448,8 @@ static void __init ek_board_init(void)
->  	/* LEDs */
->  	at91_gpio_leds(ek_leds, ARRAY_SIZE(ek_leds));
->  	at91_pwm_leds(ek_pwm_led, ARRAY_SIZE(ek_pwm_led));
-> +	/* CAN */
-> +	at91_add_device_can(&ek_can_data);
->  }
->  
->  MACHINE_START(AT91SAM9263EK, "Atmel AT91SAM9263-EK")
+> It's really something that only experienced people should worry
+> about, and not Joe "kernel-builder" Bloggs.
 
-Acked-by: Wolfgang Grandegger <wg@grandegger.com>
+I'm confused now.  If I'm building a "generic" kernel to run on
+several different systems, including some ARM710s and some StrongARMs,
+do I include the code or not?
+
+Btw, do you know where PT110 fits in?  Is it like StrongARM (SA110)?
+
+Thanks,
+-- Jamie
