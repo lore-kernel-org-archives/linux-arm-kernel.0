@@ -1,154 +1,231 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 17 Sep 2009 14:08:26 +0200
-Subject: [PATCH 5/5] U300 I2C board setup
-Message-ID: <1253189306-31709-1-git-send-email-linus.walleij@stericsson.com>
+Date: Thu, 17 Sep 2009 14:07:45 +0200
+Subject: [PATCH 2/5] U300 syscon register updates
+Message-ID: <1253189265-30931-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This sets up the U300 I2C subdevices so that the AB3100
-analog baseband ASIC is properly detected and also the
-camera devices in the U335 reference design get properly
-registered.
+This adds in a few new register and defines for improved padmux
+support and some figures that were plain wrong on the targeted
+U300 platforms.
 
 Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
-----
-This is meant to be applied on top of the previous SPI board
-info patch but can probably be applied cleanly by itself as
-well.
 ---
- arch/arm/mach-u300/Makefile |    1 +
- arch/arm/mach-u300/core.c   |    8 ++++++--
- arch/arm/mach-u300/i2c.c    |   43 +++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-u300/i2c.h    |   23 +++++++++++++++++++++++
- 4 files changed, 73 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/mach-u300/i2c.c
- create mode 100644 arch/arm/mach-u300/i2c.h
+ arch/arm/mach-u300/include/mach/syscon.h |  120 ++++++++++++++++++++++++++++--
+ 1 files changed, 113 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-u300/Makefile b/arch/arm/mach-u300/Makefile
-index 4941f89..885b5c0 100644
---- a/arch/arm/mach-u300/Makefile
-+++ b/arch/arm/mach-u300/Makefile
-@@ -11,3 +11,4 @@ obj-$(CONFIG_ARCH_U300)	          += u300.o
- obj-$(CONFIG_MMC)                 += mmc.o
- obj-$(CONFIG_SPI_PL022)           += spi.o
- obj-$(CONFIG_MACH_U300_SPIDUMMY)  += dummyspichip.o
-+obj-$(CONFIG_I2C_STU300)          += i2c.o
-diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
-index 8019aa6..be60d6d 100644
---- a/arch/arm/mach-u300/core.c
-+++ b/arch/arm/mach-u300/core.c
-@@ -33,6 +33,7 @@
- #include "clock.h"
- #include "mmc.h"
- #include "spi.h"
-+#include "i2c.h"
- 
- /*
-  * Static I/O mappings that are needed for booting the U300 platforms. The
-@@ -379,14 +380,14 @@ static struct platform_device wdog_device = {
- };
- 
- static struct platform_device i2c0_device = {
--	.name = "stddci2c",
-+	.name = "stu300",
- 	.id = 0,
- 	.num_resources = ARRAY_SIZE(i2c0_resources),
- 	.resource = i2c0_resources,
- };
- 
- static struct platform_device i2c1_device = {
--	.name = "stddci2c",
-+	.name = "stu300",
- 	.id = 1,
- 	.num_resources = ARRAY_SIZE(i2c1_resources),
- 	.resource = i2c1_resources,
-@@ -625,6 +626,9 @@ void __init u300_init_devices(void)
- 
- 	u300_assign_physmem();
- 
-+	/* Register subdevices on the I2C buses */
-+	u300_i2c_register_board_devices();
-+
- 	/* Register subdevices on the SPI bus */
- 	u300_spi_register_board_devices();
- 
-diff --git a/arch/arm/mach-u300/i2c.c b/arch/arm/mach-u300/i2c.c
-new file mode 100644
-index 0000000..10be1f8
---- /dev/null
-+++ b/arch/arm/mach-u300/i2c.c
-@@ -0,0 +1,43 @@
-+/*
-+ * arch/arm/mach-u300/i2c.c
-+ *
-+ * Copyright (C) 2009 ST-Ericsson AB
-+ * License terms: GNU General Public License (GPL) version 2
-+ *
-+ * Register board i2c devices
-+ * Author: Linus Walleij <linus.walleij@stericsson.com>
-+ */
-+#include <linux/kernel.h>
-+#include <linux/i2c.h>
-+#include <mach/irqs.h>
-+
-+static struct i2c_board_info __initdata bus0_i2c_board_info[] = {
-+	{
-+		.type = "ab3100",
-+		.addr = 0x48,
-+		.irq = IRQ_U300_IRQ0_EXT,
-+	},
-+};
-+
-+static struct i2c_board_info __initdata bus1_i2c_board_info[] = {
+diff --git a/arch/arm/mach-u300/include/mach/syscon.h b/arch/arm/mach-u300/include/mach/syscon.h
+index 1c90d1b..7444f5c 100644
+--- a/arch/arm/mach-u300/include/mach/syscon.h
++++ b/arch/arm/mach-u300/include/mach/syscon.h
+@@ -240,8 +240,13 @@
+ #define U300_SYSCON_PMC1LR_CDI_MASK				(0xC000)
+ #define U300_SYSCON_PMC1LR_CDI_CDI				(0x0000)
+ #define U300_SYSCON_PMC1LR_CDI_EMIF				(0x4000)
 +#ifdef CONFIG_MACH_U300_BS335
-+	{
-+		.type = "fwcam",
-+		.addr = 0x10,
-+	},
-+	{
-+		.type = "fwcam",
-+		.addr = 0x5d,
-+	},
-+#else
-+	{ },
++#define U300_SYSCON_PMC1LR_CDI_CDI2				(0x8000)
++#define U300_SYSCON_PMC1LR_CDI_WCDMA_APP_GPIO			(0xC000)
++#elif CONFIG_MACH_U300_BS365
+ #define U300_SYSCON_PMC1LR_CDI_GPIO				(0x8000)
+ #define U300_SYSCON_PMC1LR_CDI_WCDMA				(0xC000)
 +#endif
+ #define U300_SYSCON_PMC1LR_PDI_MASK				(0x3000)
+ #define U300_SYSCON_PMC1LR_PDI_PDI				(0x0000)
+ #define U300_SYSCON_PMC1LR_PDI_EGG				(0x1000)
+@@ -345,19 +350,69 @@
+ #define U300_SYSCON_MMCR_MASK					(0x0003)
+ #define U300_SYSCON_MMCR_MMC_FB_CLK_SEL_ENABLE			(0x0002)
+ #define U300_SYSCON_MMCR_MSPRO_FREQSEL_ENABLE			(0x0001)
+-
++/* Pull up/down control (R/W) */
++#define U300_SYSCON_PUCR					(0x104)
++#define U300_SYSCON_PUCR_EMIF_1_WAIT_N_PU_ENABLE		(0x0200)
++#define U300_SYSCON_PUCR_EMIF_1_NFIF_READY_PU_ENABLE		(0x0100)
++#define U300_SYSCON_PUCR_EMIF_1_16BIT_PU_ENABLE			(0x0080)
++#define U300_SYSCON_PUCR_EMIF_1_8BIT_PU_ENABLE			(0x0040)
++#define U300_SYSCON_PUCR_KEY_IN_PU_EN_MASK			(0x003F)
++/* Padmux 2 control */
++#define U300_SYSCON_PMC2R					(0x100)
++#define U300_SYSCON_PMC2R_APP_MISC_0_MASK			(0x00C0)
++#define U300_SYSCON_PMC2R_APP_MISC_0_APP_GPIO			(0x0000)
++#define U300_SYSCON_PMC2R_APP_MISC_0_EMIF_SDRAM			(0x0040)
++#define U300_SYSCON_PMC2R_APP_MISC_0_MMC			(0x0080)
++#define U300_SYSCON_PMC2R_APP_MISC_0_CDI2			(0x00C0)
++#define U300_SYSCON_PMC2R_APP_MISC_1_MASK			(0x0300)
++#define U300_SYSCON_PMC2R_APP_MISC_1_APP_GPIO			(0x0000)
++#define U300_SYSCON_PMC2R_APP_MISC_1_EMIF_SDRAM			(0x0100)
++#define U300_SYSCON_PMC2R_APP_MISC_1_MMC			(0x0200)
++#define U300_SYSCON_PMC2R_APP_MISC_1_CDI2			(0x0300)
++#define U300_SYSCON_PMC2R_APP_MISC_2_MASK			(0x0C00)
++#define U300_SYSCON_PMC2R_APP_MISC_2_APP_GPIO			(0x0000)
++#define U300_SYSCON_PMC2R_APP_MISC_2_EMIF_SDRAM			(0x0400)
++#define U300_SYSCON_PMC2R_APP_MISC_2_MMC			(0x0800)
++#define U300_SYSCON_PMC2R_APP_MISC_2_CDI2			(0x0C00)
++#define U300_SYSCON_PMC2R_APP_MISC_3_MASK			(0x3000)
++#define U300_SYSCON_PMC2R_APP_MISC_3_APP_GPIO			(0x0000)
++#define U300_SYSCON_PMC2R_APP_MISC_3_EMIF_SDRAM			(0x1000)
++#define U300_SYSCON_PMC2R_APP_MISC_3_MMC			(0x2000)
++#define U300_SYSCON_PMC2R_APP_MISC_3_CDI2			(0x3000)
++#define U300_SYSCON_PMC2R_APP_MISC_4_MASK			(0xC000)
++#define U300_SYSCON_PMC2R_APP_MISC_4_APP_GPIO			(0x0000)
++#define U300_SYSCON_PMC2R_APP_MISC_4_EMIF_SDRAM			(0x4000)
++#define U300_SYSCON_PMC2R_APP_MISC_4_MMC			(0x8000)
++#define U300_SYSCON_PMC2R_APP_MISC_4_ACC_GPIO			(0xC000)
+ /* TODO: More SYSCON registers missing */
+ #define U300_SYSCON_PMC3R					(0x10c)
+ #define U300_SYSCON_PMC3R_APP_MISC_11_MASK			(0xc000)
+ #define U300_SYSCON_PMC3R_APP_MISC_11_SPI			(0x4000)
+ #define U300_SYSCON_PMC3R_APP_MISC_10_MASK			(0x3000)
+ #define U300_SYSCON_PMC3R_APP_MISC_10_SPI			(0x1000)
+-/* TODO: Missing other configs, I just added the SPI stuff */
+-
++/* TODO: Missing other configs */
++#define U300_SYSCON_PMC4R					(0x168)
++#define U300_SYSCON_PMC4R_APP_MISC_12_MASK			(0x0003)
++#define U300_SYSCON_PMC4R_APP_MISC_12_APP_GPIO			(0x0000)
++#define U300_SYSCON_PMC4R_APP_MISC_13_MASK			(0x000C)
++#define U300_SYSCON_PMC4R_APP_MISC_13_CDI			(0x0000)
++#define U300_SYSCON_PMC4R_APP_MISC_13_SMIA			(0x0004)
++#define U300_SYSCON_PMC4R_APP_MISC_13_SMIA2			(0x0008)
++#define U300_SYSCON_PMC4R_APP_MISC_13_APP_GPIO			(0x000C)
++#define U300_SYSCON_PMC4R_APP_MISC_14_MASK			(0x0030)
++#define U300_SYSCON_PMC4R_APP_MISC_14_CDI			(0x0000)
++#define U300_SYSCON_PMC4R_APP_MISC_14_SMIA			(0x0010)
++#define U300_SYSCON_PMC4R_APP_MISC_14_CDI2			(0x0020)
++#define U300_SYSCON_PMC4R_APP_MISC_14_APP_GPIO			(0x0030)
++#define U300_SYSCON_PMC4R_APP_MISC_16_MASK			(0x0300)
++#define U300_SYSCON_PMC4R_APP_MISC_16_APP_GPIO_13		(0x0000)
++#define U300_SYSCON_PMC4R_APP_MISC_16_APP_UART1_CTS		(0x0100)
++#define U300_SYSCON_PMC4R_APP_MISC_16_EMIF_1_STATIC_CS5_N	(0x0200)
+ /* SYS_0_CLK_CONTROL first clock control 16bit (R/W) */
+ #define U300_SYSCON_S0CCR					(0x120)
+ #define U300_SYSCON_S0CCR_FIELD_MASK				(0x43FF)
+ #define U300_SYSCON_S0CCR_CLOCK_REQ				(0x4000)
++#define U300_SYSCON_S0CCR_CLOCK_REQ_MONITOR			(0x2000)
+ #define U300_SYSCON_S0CCR_CLOCK_INV				(0x0200)
+ #define U300_SYSCON_S0CCR_CLOCK_FREQ_MASK			(0x01E0)
+ #define U300_SYSCON_S0CCR_CLOCK_SELECT_MASK			(0x001E)
+@@ -375,6 +430,7 @@
+ #define U300_SYSCON_S1CCR					(0x124)
+ #define U300_SYSCON_S1CCR_FIELD_MASK				(0x43FF)
+ #define U300_SYSCON_S1CCR_CLOCK_REQ				(0x4000)
++#define U300_SYSCON_S1CCR_CLOCK_REQ_MONITOR			(0x2000)
+ #define U300_SYSCON_S1CCR_CLOCK_INV				(0x0200)
+ #define U300_SYSCON_S1CCR_CLOCK_FREQ_MASK			(0x01E0)
+ #define U300_SYSCON_S1CCR_CLOCK_SELECT_MASK			(0x001E)
+@@ -393,6 +449,7 @@
+ #define U300_SYSCON_S2CCR_FIELD_MASK				(0xC3FF)
+ #define U300_SYSCON_S2CCR_CLK_STEAL				(0x8000)
+ #define U300_SYSCON_S2CCR_CLOCK_REQ				(0x4000)
++#define U300_SYSCON_S2CCR_CLOCK_REQ_MONITOR			(0x2000)
+ #define U300_SYSCON_S2CCR_CLOCK_INV				(0x0200)
+ #define U300_SYSCON_S2CCR_CLOCK_FREQ_MASK			(0x01E0)
+ #define U300_SYSCON_S2CCR_CLOCK_SELECT_MASK			(0x001E)
+@@ -425,6 +482,44 @@
+ #define U300_SYSCON_MCR_PMGEN_CR_0_EMIF_0_SDRAM			(0x000C)
+ #define U300_SYSCON_MCR_PM1G_MODE_ENABLE			(0x0002)
+ #define U300_SYSCON_MCR_PMTG5_MODE_ENABLE			(0x0001)
++/* SC_PLL_IRQ_CONTROL 16bit (R/W) */
++#define U300_SYSCON_PICR					(0x0130)
++#define U300_SYSCON_PICR_MASK					(0x00FF)
++#define U300_SYSCON_PICR_FORCE_PLL208_LOCK_LOW_ENABLE		(0x0080)
++#define U300_SYSCON_PICR_FORCE_PLL208_LOCK_HIGH_ENABLE		(0x0040)
++#define U300_SYSCON_PICR_FORCE_PLL13_LOCK_LOW_ENABLE		(0x0020)
++#define U300_SYSCON_PICR_FORCE_PLL13_LOCK_HIGH_ENABLE		(0x0010)
++#define U300_SYSCON_PICR_IRQMASK_PLL13_UNLOCK_ENABLE		(0x0008)
++#define U300_SYSCON_PICR_IRQMASK_PLL13_LOCK_ENABLE		(0x0004)
++#define U300_SYSCON_PICR_IRQMASK_PLL208_UNLOCK_ENABLE		(0x0002)
++#define U300_SYSCON_PICR_IRQMASK_PLL208_LOCK_ENABLE		(0x0001)
++/* SC_PLL_IRQ_STATUS 16 bit (R/-) */
++#define U300_SYSCON_PISR					(0x0134)
++#define U300_SYSCON_PISR_MASK					(0x000F)
++#define U300_SYSCON_PISR_PLL13_UNLOCK_IND			(0x0008)
++#define U300_SYSCON_PISR_PLL13_LOCK_IND				(0x0004)
++#define U300_SYSCON_PISR_PLL208_UNLOCK_IND			(0x0002)
++#define U300_SYSCON_PISR_PLL208_LOCK_IND			(0x0001)
++/* SC_PLL_IRQ_CLEAR 16 bit (-/W) */
++#define U300_SYSCON_PICLR					(0x0138)
++#define U300_SYSCON_PICLR_MASK					(0x000F)
++#define U300_SYSCON_PICLR_RWMASK				(0x0000)
++#define U300_SYSCON_PICLR_PLL13_UNLOCK_SC			(0x0008)
++#define U300_SYSCON_PICLR_PLL13_LOCK_SC				(0x0004)
++#define U300_SYSCON_PICLR_PLL208_UNLOCK_SC			(0x0002)
++#define U300_SYSCON_PICLR_PLL208_LOCK_SC			(0x0001)
++/* CAMIF_CONTROL 16 bit (-/W) */
++#define U300_SYSCON_CICR					(0x013C)
++#define U300_SYSCON_CICR_MASK					(0x0FFF)
++#define U300_SYSCON_CICR_APP_SUBLVDS_TESTMODE_MASK		(0x0F00)
++#define U300_SYSCON_CICR_APP_SUBLVDS_TESTMODE_PORT1		(0x0C00)
++#define U300_SYSCON_CICR_APP_SUBLVDS_TESTMODE_PORT0		(0x0300)
++#define U300_SYSCON_CICR_APP_SUBLVDS_RESCON_MASK		(0x00F0)
++#define U300_SYSCON_CICR_APP_SUBLVDS_RESCON_PORT1		(0x00C0)
++#define U300_SYSCON_CICR_APP_SUBLVDS_RESCON_PORT0		(0x0030)
++#define U300_SYSCON_CICR_APP_SUBLVDS_PWR_DWN_N_MASK		(0x000F)
++#define U300_SYSCON_CICR_APP_SUBLVDS_PWR_DWN_N_PORT1		(0x000C)
++#define U300_SYSCON_CICR_APP_SUBLVDS_PWR_DWN_N_PORT0		(0x0003)
+ /* Clock activity observability register 0 */
+ #define U300_SYSCON_C0OAR					(0x140)
+ #define U300_SYSCON_C0OAR_MASK					(0xFFFF)
+@@ -513,7 +608,7 @@
+ /**
+  * CPU medium frequency in MHz
+  */
+-#define SYSCON_CPU_CLOCK_MEDIUM  104
++#define SYSCON_CPU_CLOCK_MEDIUM   52
+ /**
+  * CPU low frequency in MHz
+  */
+@@ -527,7 +622,7 @@
+ /**
+  * EMIF medium frequency in MHz
+  */
+-#define SYSCON_EMIF_CLOCK_MEDIUM 104
++#define SYSCON_EMIF_CLOCK_MEDIUM  52
+ /**
+  * EMIF low frequency in MHz
+  */
+@@ -541,7 +636,7 @@
+ /**
+  * AHB medium frequency in MHz
+  */
+-#define SYSCON_AHB_CLOCK_MEDIUM   52
++#define SYSCON_AHB_CLOCK_MEDIUM   26
+ /**
+  * AHB low frequency in MHz
+  */
+@@ -553,6 +648,15 @@ enum syscon_busmaster {
+   SYSCON_BM_VIDEO_ENC
+ };
+ 
++/* Selectr a resistor or a set of resistors */
++enum syscon_pull_up_down {
++  SYSCON_PU_KEY_IN_EN,
++  SYSCON_PU_EMIF_1_8_BIT_EN,
++  SYSCON_PU_EMIF_1_16_BIT_EN,
++  SYSCON_PU_EMIF_1_NFIF_READY_EN,
++  SYSCON_PU_EMIF_1_NFIF_WAIT_N_EN,
 +};
 +
-+void __init u300_i2c_register_board_devices(void)
-+{
-+	i2c_register_board_info(0, bus0_i2c_board_info,
-+				ARRAY_SIZE(bus0_i2c_board_info));
-+	i2c_register_board_info(1, bus1_i2c_board_info,
-+				ARRAY_SIZE(bus1_i2c_board_info));
-+}
-diff --git a/arch/arm/mach-u300/i2c.h b/arch/arm/mach-u300/i2c.h
-new file mode 100644
-index 0000000..485c02e
---- /dev/null
-+++ b/arch/arm/mach-u300/i2c.h
-@@ -0,0 +1,23 @@
-+/*
-+ * arch/arm/mach-u300/i2c.h
-+ *
-+ * Copyright (C) 2009 ST-Ericsson AB
-+ * License terms: GNU General Public License (GPL) version 2
-+ *
-+ * Register board i2c devices
-+ * Author: Linus Walleij <linus.walleij@stericsson.com>
-+ */
-+
-+#ifndef MACH_U300_I2C_H
-+#define MACH_U300_I2C_H
-+
-+#ifdef CONFIG_I2C_STU300
-+void __init u300_i2c_register_board_devices(void);
-+#else
-+/* Compile out this stuff if no I2C adapter is available */
-+static inline void __init u300_i2c_register_board_devices(void)
-+{
-+}
-+#endif
-+
-+#endif
+ /*
+  * Note that this array must match the order of the array "clk_reg"
+  * in syscon.c
+@@ -575,6 +679,7 @@ enum syscon_clk {
+   SYSCON_CLKCONTROL_SPI,
+   SYSCON_CLKCONTROL_I2S0_CORE,
+   SYSCON_CLKCONTROL_I2S1_CORE,
++  SYSCON_CLKCONTROL_UART1,
+   SYSCON_CLKCONTROL_AAIF,
+   SYSCON_CLKCONTROL_AHB,
+   SYSCON_CLKCONTROL_APEX,
+@@ -604,7 +709,8 @@ enum syscon_sysclk_mode {
+ 
+ enum syscon_sysclk_req {
+   SYSCON_SYSCLKREQ_DISABLED,
+-  SYSCON_SYSCLKREQ_ACTIVE_LOW
++  SYSCON_SYSCLKREQ_ACTIVE_LOW,
++  SYSCON_SYSCLKREQ_MONITOR
+ };
+ 
+ enum syscon_clk_mode {
 -- 
 1.6.2.1
