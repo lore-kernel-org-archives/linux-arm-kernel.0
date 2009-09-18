@@ -1,37 +1,23 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 18 Sep 2009 18:27:11 +0200
-Subject: [PATCH] arm: fix compilation of entry-common.S for older CPUs
-In-Reply-To: <1253285745-4198-1-git-send-email-mad_soft@inbox.ru>
-References: <1253285745-4198-1-git-send-email-mad_soft@inbox.ru>
-Message-ID: <20090918162711.GA31263@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Sep 2009 17:31:11 +0100
+Subject: [PATCH] arch/arm/common/vic.c: code reorganization
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901D41EF4@mi8nycmail19.Mi8.com>
+References: <BD79186B4FD85F4B8E60E381CAEE190901CBF46D@mi8nycmail19.Mi8.com>
+	<63386a3d0909180155s3032d6e7jc18b36e1b62a288f@mail.gmail.com>
+	<BD79186B4FD85F4B8E60E381CAEE190901D41EF4@mi8nycmail19.Mi8.com>
+Message-ID: <20090918163111.GA2284@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, Sep 18, 2009 at 06:55:45PM +0400, Dmitry Artamonow wrote:
-> Commit 181f817eaaca4c1f introduced some new code to entry-common.S
-> Sadly, this new code uses 'bx' instruction which is available only on
-> ARMv5 and higher CPUs. This causes following compilation errors when
-> building kernel for StrongARM (ARMv4):
+On Fri, Sep 18, 2009 at 12:23:26PM -0400, H Hartley Sweeten wrote:
+> The only thing I can think of that might keep it from applying is if
+> your -next tree has the patch you posted to include device.h in the
+> driver.  That patch is of course needed so that the file will build
+> but I have not seen anything about someone picking it up yet.  That
+> patch will fuzz mine by one line.
 > 
-> arch/arm/kernel/entry-common.S: Assembler messages:
-> arch/arm/kernel/entry-common.S:129: Error: selected processor does not
->  support `bx ip'
-> arch/arm/kernel/entry-common.S:138: Error: selected processor does not
->  support `bx ip'
-> 
-> Fix these errors by using 'mov pc' instead of 'bx'.
-> 
-> Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> I was hoping your patch would get merged soon to fix the build.  I
+> was then planning on rebasing this patch.  I just wanted to get this
+> out now for any comments.
 
-I wonder if newer glibc's have the same problem as the code is taken
-more or less from there ...
-
-Thanks
-Uwe
-
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+The patch adding device.h to vic.c is queued for this Saturday's push.
