@@ -1,20 +1,30 @@
-From: sveinung84@users.sourceforge.net (Sveinung Kvilhaugsvik)
-Date: Fri, 18 Sep 2009 16:37:39 +0200
-Subject: What is the status on s3c2442b support?
-Message-ID: <fbec40cf0909180737r48687a45o4b6ba4dc68ed4fa6@mail.gmail.com>
+From: aaro.koskinen@nokia.com (Aaro Koskinen)
+Date: Fri, 18 Sep 2009 17:52:51 +0300
+Subject: [PATCH 1/2] ARM: Pass IFSR register to do_PrefetchAbort()
+In-Reply-To: <cc557aab0909180445o33b6792ewf62a4f5e7589547@mail.gmail.com>
+References: <f00f1348d91d2403ea0f1c5f05b3ac713664fe7b.1253281256.git.kirill@shutemov.name>	
+	<alpine.DEB.1.00.0909181422370.11448@ak-desktop>
+	<cc557aab0909180445o33b6792ewf62a4f5e7589547@mail.gmail.com>
+Message-ID: <4AB39EC3.4050202@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hello,
 
-What is the status on the patch in
-http://marc.info/?t=124198900000003&r=1&w=2 (Introduce s3c2442b CPU)?
-As far as I understand from [1] this patch is all that is needed to
-make Linux boot on the Openmoko Neo Freerunner. Is it stuck here or
-someplace else? Are there a technical reason to not merge it? Is there
-a chance to get it into 2.6.32? Anything I can do to help it get in?
+Kirill A. Shutemov wrote:
+>>  #ifdef CONFIG_CPU_PABRT_NOIFAR
+>> -# ifdef CPU_PABORT_HANDLER
+>> +# ifdef CPU_PABORT_HANDLER_IFAR
+>>  #  define MULTI_PABORT 1
+>>  # else
+>> -#  define CPU_PABORT_HANDLER(reg, insn)        mov reg, insn
+>> +#  define CPU_PABORT_HANDLER_IFAR(reg, insn)   mov reg, insn
+>> +#  define CPU_PABORT_HANDLER_IFSR(reg)         mrc p15, 0, reg, cr5, cr0, 1
+> 
+> It's incorrect. We have IFSR only on ARMv7.
 
-[1] http://kerneltrap.org/mailarchive/openmoko-kernel/2009/7/29/6268823/thread#mid-6268823
+It seems my assumption on the availability of that register was wrong, 
+but I think it's available at least on ARMv6, and also that IFAR can be 
+optional...
 
-Sincerely
-Sveinung Kvilhaugsvik
+A.
