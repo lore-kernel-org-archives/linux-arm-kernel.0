@@ -1,32 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Sep 2009 20:44:03 +0100
-Subject: [PATCH] arm: Make kprobes unregistration SMP safe
-In-Reply-To: <alpine.LFD.2.00.0909172039070.24133@xanadu.home>
-References: <1253078476.5021.65.camel@funkybook>
-	<alpine.LFD.2.00.0909172039070.24133@xanadu.home>
-Message-ID: <20090918194403.GC6601@n2100.arm.linux.org.uk>
+From: akpm@linux-foundation.org (akpm at linux-foundation.org)
+Date: Fri, 18 Sep 2009 12:44:19 -0700
+Subject: [patch 3/3] spitz: fix touchscreen max presure
+Message-ID: <200909181944.n8IJiJSQ008789@imap1.linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 17, 2009 at 08:40:10PM -0400, Nicolas Pitre wrote:
-> On Wed, 16 Sep 2009, Fr?d?ric RISS wrote:
-> 
-> > ARM kprobes use an illegal instruction to trigger kprobes. In the
-> > current implementation, there's a race between the unregistration of a
-> > kprobe and the illegal instruction exception handler if they run at the
-> > same time on different cores. 
-> > 
-> > When reading the value of the undefined instruction, the exception
-> > handler might get the original legal instruction as just patched
-> > concurrently by arch_disarm_kprobe(). When this happen the kprobe
-> > handler won't run, and thus the exception handler will oops because it
-> > believe it just hit an undefined instruction in kernel space.
-> > 
-> > The following patch synchronizes the code patching in the kprobes
-> > unregistration using stop_machine and thus avoids the above race.
-> > 
-> > Signed-off-by: Frederic RISS <frederic.riss@gmail.com>
-> 
-> Acked-by: Nicolas Pitre <nico@fluxnic.net>
+From: Pavel Machek <pavel@ucw.cz>
 
-Fr?d?ric, please submit to the patch system, thanks.
+This fixes max_pressure for spitz's touchscreen, and is requirement
+for getting reasonable pressure numbers from touchscreen driver.
+
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
+Cc: Russell King <rmk@arm.linux.org.uk>                                        
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+---
+
+ arch/arm/mach-pxa/spitz.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff -puN arch/arm/mach-pxa/spitz.c~spitz-fix-touchscreen-max-presure arch/arm/mach-pxa/spitz.c
+--- a/arch/arm/mach-pxa/spitz.c~spitz-fix-touchscreen-max-presure
++++ a/arch/arm/mach-pxa/spitz.c
+@@ -296,6 +296,7 @@ static struct ads7846_platform_data spit
+ 	.vref_delay_usecs	= 100,
+ 	.x_plate_ohms		= 419,
+ 	.y_plate_ohms		= 486,
++	.pressure_max		= 1024,
+ 	.gpio_pendown		= SPITZ_GPIO_TP_INT,
+ 	.wait_for_sync		= spitz_wait_for_hsync,
+ };
+_
