@@ -1,26 +1,18 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Fri, 18 Sep 2009 13:48:48 +0100
-Subject: [arm-gnu] Problems with pthread on ARM/PXA270
-In-Reply-To: <20090918075355.GA13044@pengutronix.de>
-References: <200909160926.02036.schindele@nentec.de>
-	<1253141684.6443.27.camel@Ubuntu-Desktop>
-	<20090918075355.GA13044@pengutronix.de>
-Message-ID: <20090918124848.GA1631@shareable.org>
+From: avictor.za@gmail.com (Andrew Victor)
+Date: Fri, 18 Sep 2009 15:52:16 +0200
+Subject: [PATCH] at91: add AC97 support to at91sam9rl and at91sam9rlek
+	board
+In-Reply-To: <1253122902-15647-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1253122902-15647-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <cd73a99e0909180652j6d5c8061p8d85b65b6558a7cd@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe Kleine-K?nig wrote:
-> On Thu, Sep 17, 2009 at 08:54:44AM +1000, James wrote:
-> > Are you running with superuser privileges?  My manpage tells me that
-> > SCHED_RR is only available if run with superuser privileges.
-> Note that pthread_attr_setschedpolicy has a return value that tells you
-> if the function was successful.
+hi Nicolas,
 
-And that SCHED_RR has a time quantum returned by sched_rr_get_interval
-which is not guaranteed to be small.  However, if it is a small time
-and it's not switching that's a bug in either libc or the kernel.
+> Add the support of AC97 on the at91sam9rl chip and -ek board.
+> It will share the code with AVR32 ac97c alsa driver "atmel_ac97c".
+>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Note that printf() does locking which may complicate things.  Try
-opening separate outputs for each thread, or using write().
-
--- Jamie
+Acked-by: Andrew Victor <linux@maxim.org.za>
