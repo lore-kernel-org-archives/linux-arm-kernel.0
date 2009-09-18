@@ -1,46 +1,55 @@
 From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Mon, 28 Sep 2009 23:41:22 +0400
+Date: Fri, 18 Sep 2009 18:29:05 +0400
 Subject: [PATCH] arm: fix compilation of entry-common.S for older CPUs
-In-Reply-To: <20090918162711.GA31263@pengutronix.de>
-References: <1253285745-4198-1-git-send-email-mad_soft@inbox.ru>
-	<20090918162711.GA31263@pengutronix.de>
-Message-ID: <20090928194121.GA12304@rainbow>
+Message-ID: <mailman.45.1254166892.2253.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18:27 Fri 18 Sep     , Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Fri, Sep 18, 2009 at 06:55:45PM +0400, Dmitry Artamonow wrote:
-> > Commit 181f817eaaca4c1f introduced some new code to entry-common.S
-> > Sadly, this new code uses 'bx' instruction which is available only on
-> > ARMv5 and higher CPUs. This causes following compilation errors when
-> > building kernel for StrongARM (ARMv4):
-> > 
-> > arch/arm/kernel/entry-common.S: Assembler messages:
-> > arch/arm/kernel/entry-common.S:129: Error: selected processor does not
-> >  support `bx ip'
-> > arch/arm/kernel/entry-common.S:138: Error: selected processor does not
-> >  support `bx ip'
-> > 
-> > Fix these errors by using 'mov pc' instead of 'bx'.
-> > 
-> > Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
-> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> 
-> I wonder if newer glibc's have the same problem as the code is taken
-> more or less from there ...
-> 
-> Thanks
-> Uwe
+Commit 181f817eaaca4c1f introduced some new code to entry-common.S
+Sadly, this new code uses 'bx' instruction which is available only on
+ARMv5 and higher CPUs. This causes following compilation errors when
+building kernel for StrongARM (ARMv4):
 
-Russell, are you ok with this fix? Should I submit patch to your patch
-tracker?
+arch/arm/kernel/entry-common.S: Assembler messages:
+arch/arm/kernel/entry-common.S:129: Error: selected processor does not
+ support `bx ip'
+arch/arm/kernel/entry-common.S:138: Error: selected processor does not
+ support `bx ip'
 
-(It seems that first time around patch didn't get through to you, due to your
-server being picky about SMTP servers without matching reverse DNS, so
-in case you haven't seen the patch on the list, I'm attaching it here again)
+Fix these errors by using 'mov pc' instead of 'bx'.
 
+Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
+---
+ arch/arm/kernel/entry-common.S |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+Please note that I haven't tested this change on hardware as I don't
+have needed toolchain (GCC 4.4+).
+
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 807cfeb..825db52 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -126,7 +126,7 @@ ENTRY(__gnu_mcount_nc)
+ 	cmp r0, r2
+ 	bne gnu_trace
+ 	ldmia sp!, {r0-r3, ip, lr}
+-	bx ip
++	mov pc, ip
+ 
+ gnu_trace:
+ 	ldr r1, [sp, #20]			@ lr of instrumented routine
+@@ -135,7 +135,7 @@ gnu_trace:
+ 	mov lr, pc
+ 	mov pc, r2
+ 	ldmia sp!, {r0-r3, ip, lr}
+-	bx ip
++	mov pc, ip
+ 
+ ENTRY(mcount)
+ 	stmdb sp!, {r0-r3, lr}
 -- 
-Best regards,
-Dmitry "MAD" Artamonow
+1.6.3.4
+
+
+--envbJBWh7q8WU6mo--
