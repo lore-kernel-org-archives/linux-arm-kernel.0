@@ -1,25 +1,32 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Sep 2009 20:35:27 +0100
-Subject: [PATCH] locomo.c: CodingStyle cleanups
-In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901CBF46C@mi8nycmail19.Mi8.com>
-References: <BD79186B4FD85F4B8E60E381CAEE190901CBF46C@mi8nycmail19.Mi8.com>
-Message-ID: <20090918193527.GB6601@n2100.arm.linux.org.uk>
+Date: Fri, 18 Sep 2009 20:44:03 +0100
+Subject: [PATCH] arm: Make kprobes unregistration SMP safe
+In-Reply-To: <alpine.LFD.2.00.0909172039070.24133@xanadu.home>
+References: <1253078476.5021.65.camel@funkybook>
+	<alpine.LFD.2.00.0909172039070.24133@xanadu.home>
+Message-ID: <20090918194403.GC6601@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 16, 2009 at 08:31:00PM -0400, H Hartley Sweeten wrote:
-> EXPORT* macros should follow immediately after the closing function
-> brace line.
+On Thu, Sep 17, 2009 at 08:40:10PM -0400, Nicolas Pitre wrote:
+> On Wed, 16 Sep 2009, Fr?d?ric RISS wrote:
 > 
-> The prototype for locomo_chip_driver() is not needed since the static
-> (inline) function is located earlier in the file.
+> > ARM kprobes use an illegal instruction to trigger kprobes. In the
+> > current implementation, there's a race between the unregistration of a
+> > kprobe and the illegal instruction exception handler if they run at the
+> > same time on different cores. 
+> > 
+> > When reading the value of the undefined instruction, the exception
+> > handler might get the original legal instruction as just patched
+> > concurrently by arch_disarm_kprobe(). When this happen the kprobe
+> > handler won't run, and thus the exception handler will oops because it
+> > believe it just hit an undefined instruction in kernel space.
+> > 
+> > The following patch synchronizes the code patching in the kprobes
+> > unregistration using stop_machine and thus avoids the above race.
+> > 
+> > Signed-off-by: Frederic RISS <frederic.riss@gmail.com>
 > 
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: John Lenz <lenz@cs.wisc.edu>
-> 
-> ---
-> 
-> I originally sent this to the wrong list...
+> Acked-by: Nicolas Pitre <nico@fluxnic.net>
 
-Ok.  I guess as there isn't a specific sa11x0 maintainer, it might as well
-go to the patch system direct.  (and might as well drop John's CC)
+Fr?d?ric, please submit to the patch system, thanks.
