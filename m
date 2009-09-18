@@ -1,44 +1,84 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 18 Sep 2009 03:05:56 +0200
-Subject: generalise Treo680 code and add support for Palm Centro - round 3
-In-Reply-To: <200909172308.40734.sleep_walker@suse.cz>
-References: <1252670222-25233-1-git-send-email-sleep_walker@suse.cz>
-	<200909172308.40734.sleep_walker@suse.cz>
-Message-ID: <200909180305.56427.marek.vasut@gmail.com>
+From: s-ghorai@ti.com (Ghorai, Sukumar)
+Date: Fri, 18 Sep 2009 08:11:34 +0530
+Subject: EXT_CSD  Register : CSD_STRUCTURE vs CSD_CSD_REV
+References: <2A3DCF3DA181AD40BDE86A3150B27B6B02F6454333@dbde02.ent.ti.com>
+	<20090914215140.7efe4671@mjolnir.ossman.eu>
+Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B02F64D7C63@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 17. z??? 2009 23:08:40 Tom?? 'Sleep_Walker' ?ech napsal(a):
-> Hi,
-> 
-> Dne P? 11. z??? 2009 13:57:00 Tom?? ?ech napsal(a):
-> > Hi,
-> >
-> > this is round 3 of generalisation Treo680 code and consequential add Palm
-> > Centro 685 support.
-> >
-> > Changes since last round:
-> > 	- filename is now palmtreo.c to remain Palm devices consistency
-> > 	- generic functions are now beginning with treo_ (instead of previous
-> > palmgsm_) - pxamci_platform_data now contains also '.gpio_card_ro		= -1,'
-> > - added MAINTAINERS entry
-> > 	- reduced patchset (patches preceding these are already applied)
-> >
-> > Thanks for your time.
-> >
-> > Round 3 - fight!
-> 
-> Any progress here?
 
-No, stop reopening! (people familiar with glibc will understand here ;-) )
+HI,
 
-Eric, could you merge this with my ack then ?
+Thanks for the information.
 
-Thanks
+And what I understood from MMCA specification is that - 
+EXT_CSD_REV: Defines the fixed parameters. related to the EXT_CSD, according to its revision. Nothing to do with MMCA specification version or > 4GB card.
+
+SO, I need just one more help from you to browse the MMCA specification where it's mentioned that if Card is >4GB then EXT_CSD_REV Revision should be > 2 (Rev 1.2)?
+
+And again the fact I mentioned in my previous email that below fact is from Symbian OS too.
+
+So please reply and help me to understand better.
+
+Thanks & regards,
+Ghorai 
+
+-----Original Message-----
+From: Pierre Ossman [mailto:pierre at ossman.eu] 
+Sent: 2009-09-15 01:22
+To: Ghorai, Sukumar
+Cc: linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Chikkature Rajashekar, Madhusudhan; Benjamin.Telya at sandisk.com; drzeus-list at drzeus.cx; Pandita, Vikram; Joshi, Rhishi; Sawant, Anand; Raju, Veeramanikandan
+Subject: Re: EXT_CSD Register : CSD_STRUCTURE vs CSD_CSD_REV
+
+On Mon, 14 Sep 2009 20:34:35 +0530
+"Ghorai, Sukumar" <s-ghorai@ti.com> wrote:
+
+> Hello,
 > 
-> Thanks.
+> I am working in Linux MMC driver.
+> Recently I came across one 16GB MMC card where EXT_CSD Register having EXT_CSD_REV[192] field as ZERO, which is valid according to Specification. But card is not working due to following reason -
 > 
-> Best regards,
+>  1.  As we know there are two fields in Extended CSD Register -  CSD_STRUCTURE Version[194] & EXT_CSD_REV Revision [192].
 > 
-> Tomas Cech
 > 
+>  1.  In mmc.c/ mmc_read_ext_csd ()
+>     *   Implementation expecting EXT_CSD_REV non zero (e.g. >3 in current code)
+>     *   I think it could be checking for CSD_STRUCTURE version.
+>     *   Because EXT_CSD_REV having Zero is the valid Field.
+>     *   This is the way it's done in other OS too.
+
+The opposite, it expects the version to be below 3 as those are the
+only ones it knows about. Checking the CSD version for the EXT_CSD
+would just be silly.
+
+> 
+> 
+>  1.  To check the high capacity card.
+>     *   We could check in access mode from OCR.  This is not in Linux exactly and steps to check the EXT_CSD_REV.
+>     *   This is done in some other OS too.
+> 
+
+Checking the OCR is insufficient if I remember the spec correctly, so
+we ignore it completely. The EXT_CSD needs to be correct for high
+capacity to work anyway.
+
+> So do you think we can update the code to check the CSD_STRUCTURE Version? Please let us know your opinion.
+
+No, as that would violate the spec and possibly misinterpret some cards
+as high-capacity.
+
+To handle your card you would have to build some kind of quirks system
+so that the kernel can identify that this card is buggy and compensate
+for it.
+
+[Ghorai] Would you please help me to browse the MMCA specification where it's mentioned that if Card is >4GB then EXT_CSD_REV Revision should be > 2 (Rev 1.2)?
+
+Rgds
+-- 
+-- Pierre Ossman
+
+  WARNING: This correspondence is being monitored by the
+  Swedish government. Make sure your server uses encryption
+  for SMTP traffic and consider using PGP for end-to-end
+  encryption.
