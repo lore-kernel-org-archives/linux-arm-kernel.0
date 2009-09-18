@@ -1,19 +1,23 @@
-From: avictor.za@gmail.com (Andrew Victor)
-Date: Fri, 18 Sep 2009 15:53:33 +0200
-Subject: [PATCH] at91: add AC97 support to at91sam9g45 series and
-	at91sam9m10g45ek board
-In-Reply-To: <1253122902-15647-2-git-send-email-nicolas.ferre@atmel.com>
-References: <1253122902-15647-1-git-send-email-nicolas.ferre@atmel.com>
-	<1253122902-15647-2-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <cd73a99e0909180653p29ea4e4u2866436ea4a7e22d@mail.gmail.com>
+From: dan@debian.org (Daniel Jacobowitz)
+Date: Fri, 18 Sep 2009 10:10:04 -0400
+Subject: Problems with pthread on ARM/PXA270
+In-Reply-To: <200909181206.59595.schindele@nentec.de>
+References: <200909160926.02036.schindele@nentec.de>
+	<20090916144051.GA19307@caradoc.them.org>
+	<200909181206.59595.schindele@nentec.de>
+Message-ID: <20090918141004.GA6988@caradoc.them.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Nicolas,
+On Fri, Sep 18, 2009 at 12:06:59PM +0200, Juergen Schindele wrote:
+> sched_clock is apparently not implemented the same way in all kernel versions.
+> What about thread implementation in codesourcery compiler ? Are they 
+> "linux-threads" or "Native Posix thread library" or is it possible that there 
+> are important bugfixes til the version i use ???
 
-> Add the support of AC97 on the at91sam9g45 chip series and -ek board.
-> It will share the code with AVR32 ac97c alsa driver "atmel_ac97c".
->
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+NPTL in any recent version.  I don't remember for the ancient version
+you said you were using; consider an update.
 
-Acked-by: Andrew Victor <linux@maxim.org.za>
+-- 
+Daniel Jacobowitz
+CodeSourcery
