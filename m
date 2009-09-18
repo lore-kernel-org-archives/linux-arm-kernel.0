@@ -1,52 +1,33 @@
-From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Fri, 18 Sep 2009 18:55:45 +0400
-Subject: [PATCH] arm: fix compilation of entry-common.S for older CPUs
-Message-ID: <1253285745-4198-1-git-send-email-mad_soft@inbox.ru>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 18 Sep 2009 12:23:26 -0400
+Subject: [PATCH] arch/arm/common/vic.c: code reorganization
+In-Reply-To: <63386a3d0909180155s3032d6e7jc18b36e1b62a288f@mail.gmail.com>
+References: <BD79186B4FD85F4B8E60E381CAEE190901CBF46D@mi8nycmail19.Mi8.com>
+	<63386a3d0909180155s3032d6e7jc18b36e1b62a288f@mail.gmail.com>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901D41EF4@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 181f817eaaca4c1f introduced some new code to entry-common.S
-Sadly, this new code uses 'bx' instruction which is available only on
-ARMv5 and higher CPUs. This causes following compilation errors when
-building kernel for StrongARM (ARMv4):
+On Friday, September 18, 2009 1:56 AM, Linus Walleij wrote:
+> 2009/9/17 H Hartley Sweeten <hartleys@visionengravers.com>:
+>
+>> This reorganizes the vic.c code in anticipation of a future patch
+>> to use struct vic_device as the data stored in set_irq_chip_data().
+>
+> This doesn't apply cleanly to -next anymore, can you send an
+> updated version and I'll test it?
 
-arch/arm/kernel/entry-common.S: Assembler messages:
-arch/arm/kernel/entry-common.S:129: Error: selected processor does not
- support `bx ip'
-arch/arm/kernel/entry-common.S:138: Error: selected processor does not
- support `bx ip'
+Hmm... Applies fine to -next here.
 
-Fix these errors by using 'mov pc' instead of 'bx'.
+The only thing I can think of that might keep it from applying is if
+your -next tree has the patch you posted to include device.h in the
+driver.  That patch is of course needed so that the file will build
+but I have not seen anything about someone picking it up yet.  That
+patch will fuzz mine by one line.
 
-Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
----
- arch/arm/kernel/entry-common.S |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+I was hoping your patch would get merged soon to fix the build.  I
+was then planning on rebasing this patch.  I just wanted to get this
+out now for any comments.
 
-Please note that I haven't tested this change on hardware as I don't
-have needed toolchain (GCC 4.4+).
-
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 807cfeb..825db52 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -126,7 +126,7 @@ ENTRY(__gnu_mcount_nc)
- 	cmp r0, r2
- 	bne gnu_trace
- 	ldmia sp!, {r0-r3, ip, lr}
--	bx ip
-+	mov pc, ip
- 
- gnu_trace:
- 	ldr r1, [sp, #20]			@ lr of instrumented routine
-@@ -135,7 +135,7 @@ gnu_trace:
- 	mov lr, pc
- 	mov pc, r2
- 	ldmia sp!, {r0-r3, ip, lr}
--	bx ip
-+	mov pc, ip
- 
- ENTRY(mcount)
- 	stmdb sp!, {r0-r3, lr}
--- 
-1.6.3.4
+Regards,
+Hartley
