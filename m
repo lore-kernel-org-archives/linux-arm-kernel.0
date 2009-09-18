@@ -1,47 +1,52 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 18 Sep 2009 16:38:18 +0100
-Subject: [PATCH 1/2] ARM: Pass IFSR register to do_PrefetchAbort()
-In-Reply-To: <cc557aab0909180808p675c182eke41b23019a609b9a@mail.gmail.com>
-References: <f00f1348d91d2403ea0f1c5f05b3ac713664fe7b.1253281256.git.kirill@shutemov.name>
-	<alpine.DEB.1.00.0909181422370.11448@ak-desktop>
-	<cc557aab0909180445o33b6792ewf62a4f5e7589547@mail.gmail.com>
-	<4AB39EC3.4050202@nokia.com>
-	<cc557aab0909180808p675c182eke41b23019a609b9a@mail.gmail.com>
-Message-ID: <1253288298.9567.45.camel@pc1117.cambridge.arm.com>
+From: mad_soft@inbox.ru (Dmitry Artamonow)
+Date: Fri, 18 Sep 2009 18:55:45 +0400
+Subject: [PATCH] arm: fix compilation of entry-common.S for older CPUs
+Message-ID: <1253285745-4198-1-git-send-email-mad_soft@inbox.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2009-09-18 at 18:08 +0300, Kirill A. Shutemov wrote:
-> On Fri, Sep 18, 2009 at 5:52 PM, Aaro Koskinen <aaro.koskinen@nokia.com> wrote:
-> > Hello,
-> >
-> > Kirill A. Shutemov wrote:
-> >>>
-> >>>  #ifdef CONFIG_CPU_PABRT_NOIFAR
-> >>> -# ifdef CPU_PABORT_HANDLER
-> >>> +# ifdef CPU_PABORT_HANDLER_IFAR
-> >>>  #  define MULTI_PABORT 1
-> >>>  # else
-> >>> -#  define CPU_PABORT_HANDLER(reg, insn)        mov reg, insn
-> >>> +#  define CPU_PABORT_HANDLER_IFAR(reg, insn)   mov reg, insn
-> >>> +#  define CPU_PABORT_HANDLER_IFSR(reg)         mrc p15, 0, reg, cr5,
-> >>> cr0, 1
-> >>
-> >> It's incorrect. We have IFSR only on ARMv7.
-> >
-> > It seems my assumption on the availability of that register was wrong, but I
-> > think it's available at least on ARMv6, and also that IFAR can be
-> > optional...
-> 
-> I can't find anything in ARMv6-M Architecture Reference Manual by
-> keywords "ifar" or "ifsr".
+Commit 181f817eaaca4c1f introduced some new code to entry-common.S
+Sadly, this new code uses 'bx' instruction which is available only on
+ARMv5 and higher CPUs. This causes following compilation errors when
+building kernel for StrongARM (ARMv4):
 
-ARMv6-M is for the M-profile CPUs (Thumb or Thumb-2 only ISA, no MMU ,
-it doesn't even have CP15).
+arch/arm/kernel/entry-common.S: Assembler messages:
+arch/arm/kernel/entry-common.S:129: Error: selected processor does not
+ support `bx ip'
+arch/arm/kernel/entry-common.S:138: Error: selected processor does not
+ support `bx ip'
 
-You would need to check the A profile. Try the ARMv7-AR reference manual
-(now freely available, though it needs a click-through) which has a
-section on differences with the ARMv6 as well.
+Fix these errors by using 'mov pc' instead of 'bx'.
 
+Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
+---
+ arch/arm/kernel/entry-common.S |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+Please note that I haven't tested this change on hardware as I don't
+have needed toolchain (GCC 4.4+).
+
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 807cfeb..825db52 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -126,7 +126,7 @@ ENTRY(__gnu_mcount_nc)
+ 	cmp r0, r2
+ 	bne gnu_trace
+ 	ldmia sp!, {r0-r3, ip, lr}
+-	bx ip
++	mov pc, ip
+ 
+ gnu_trace:
+ 	ldr r1, [sp, #20]			@ lr of instrumented routine
+@@ -135,7 +135,7 @@ gnu_trace:
+ 	mov lr, pc
+ 	mov pc, r2
+ 	ldmia sp!, {r0-r3, ip, lr}
+-	bx ip
++	mov pc, ip
+ 
+ ENTRY(mcount)
+ 	stmdb sp!, {r0-r3, lr}
 -- 
-Catalin
+1.6.3.4
