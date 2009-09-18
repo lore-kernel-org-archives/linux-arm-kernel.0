@@ -1,13 +1,15 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 18 Sep 2009 20:39:22 +0200
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 18 Sep 2009 21:09:20 +0200
 Subject: [PATCH v3] arm: remove unused code in delay.S
 In-Reply-To: <1253292418.3273.257.camel@linux-1lbu>
 References: <1253292418.3273.257.camel@linux-1lbu>
-Message-ID: <20090918183922.GL29905@game.jcrosoft.org>
+Message-ID: <20090918190920.GB11461@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:46 Fri 18 Sep     , Steve Chen wrote:
+Hello Steve,
+
+On Fri, Sep 18, 2009 at 11:46:58AM -0500, Steve Chen wrote:
 > Document #if 0 code block in delay.S and make it selectable for compile.
 > 
 > Signed-off-by: Steve Chen <schen@mvista.com>
@@ -30,7 +32,42 @@ On 11:46 Fri 18 Sep     , Steve Chen wrote:
 > +	depends on CPU_32v3 || CPU_32v4 || CPU_32v4T
 > +	bool "Different delay() code for some older CPUs"
 > +	def_bool n
-IIRC it will be no by default
+as already noted, n is the default (that would better be expressed using
+"default n" btw).
 
-Best Regards,
-J.
+> +	help
+> +	  Enable this if observing longer than expected delays.  This code
+> +	  improves delay accuracy for some CPUs.  However, it can also cause
+> +	  delay duration to be too short for others which leads to stability
+> +	  issues.
+> +
+> +	  In other words, do not enable unless you can guarantee that the
+> +	  processor (or ALL of the processors if building a generic kernel)
+> +	  delays for at least the time requested after enabling.
+> +
+> +	  ARM610 and ARM710 are known to benefit from enabling this option.
+> +	  It should not be enabled for StrongARMs, because it is known
+> +	  to produce too short delays on those.
+> +
+> +	  Lastly, below are 2 lists.  The first list contains the processors
+> +	  that would benefit from enabling this flag, and the second list
+> +	  contains processor that are known to have issues.  Please note that
+> +	  both lists are by no means complete.  Entries are expected to be
+> +	  added and refined.  If you like to update the list, please send a
+> +	  patch to Linux ARM mailing list.
+I'd delete the last three sentences.
+
+> +	  CPUs should enable this flag
+> +		ARM610
+> +		ARM710
+> +
+> +	  CPUs should disable this flag
+> +		StrongARM
+everything armv5+ ?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
