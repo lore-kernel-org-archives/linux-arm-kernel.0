@@ -1,34 +1,33 @@
 From: akpm@linux-foundation.org (akpm at linux-foundation.org)
-Date: Fri, 18 Sep 2009 12:44:18 -0700
-Subject: [patch 2/3] STMP3xxx: deallocation with negative index of
-	descriptors[]
-Message-ID: <200909181944.n8IJiI6k008786@imap1.linux-foundation.org>
+Date: Fri, 18 Sep 2009 12:44:17 -0700
+Subject: [patch 1/3] s3c: fix check of index into s3c_gpios[]
+Message-ID: <200909181944.n8IJiHEe008747@imap1.linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Roel Kluin <roel.kluin@gmail.com>
 
-The last deallocation is invalid. In the last iteration, i is -1.
+The check of the s3c_gpios[] index had an off-by-one.
 
 Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
-Acked-by: dmitry pervushin <dpervushin@embeddedalley.com>
+Acked-by: Ben Dooks <ben-linux@fluff.org>
 Cc: Russell King <rmk@arm.linux.org.uk>
 Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
 ---
 
- arch/arm/plat-stmp3xxx/dma.c |    2 +-
+ arch/arm/plat-s3c/gpio.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff -puN arch/arm/plat-stmp3xxx/dma.c~stmp3xxx-deallocation-with-negative-index-of-descriptors arch/arm/plat-stmp3xxx/dma.c
---- a/arch/arm/plat-stmp3xxx/dma.c~stmp3xxx-deallocation-with-negative-index-of-descriptors
-+++ a/arch/arm/plat-stmp3xxx/dma.c
-@@ -264,7 +264,7 @@ int stmp3xxx_dma_make_chain(int ch, stru
- 					stmp3xxx_dma_free_command(ch,
- 								  &descriptors
- 								  [i]);
--				} while (i-- >= 0);
-+				} while (i-- > 0);
- 			}
- 			return err;
- 		}
+diff -puN arch/arm/plat-s3c/gpio.c~s3c-fix-check-of-index-into-s3c_gpios arch/arm/plat-s3c/gpio.c
+--- a/arch/arm/plat-s3c/gpio.c~s3c-fix-check-of-index-into-s3c_gpios
++++ a/arch/arm/plat-s3c/gpio.c
+@@ -28,7 +28,7 @@ static __init void s3c_gpiolib_track(str
+ 
+ 	gpn = chip->chip.base;
+ 	for (i = 0; i < chip->chip.ngpio; i++, gpn++) {
+-		BUG_ON(gpn > ARRAY_SIZE(s3c_gpios));
++		BUG_ON(gpn >= ARRAY_SIZE(s3c_gpios));
+ 		s3c_gpios[gpn] = chip;
+ 	}
+ }
 _
