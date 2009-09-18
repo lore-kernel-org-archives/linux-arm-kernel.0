@@ -1,66 +1,72 @@
-From: schen@mvista.com (Steve Chen)
-Date: Thu, 17 Sep 2009 17:25:04 -0500
-Subject: [PATCH v2] arm: remove unused code in delay.S
-In-Reply-To: <20090917213723.GC10599@shareable.org>
-References: <1253017761.3273.117.camel@linux-1lbu>
-	<200909151541.08852.marek.vasut@gmail.com>
-	<1253032210.3273.128.camel@linux-1lbu>
-	<94a0d4530909151158y489a96e3x63ff932c713822b0@mail.gmail.com>
-	<1253043875.3273.131.camel@linux-1lbu>
-	<m3k4zzdimy.fsf@intrepid.localdomain>
-	<20090916134721.GA11218@n2100.arm.linux.org.uk>
-	<20090917193257.GA10599@shareable.org>
-	<20090917194119.GA12510@n2100.arm.linux.org.uk>
-	<1253222978.3273.236.camel@linux-1lbu>
-	<20090917213723.GC10599@shareable.org>
-Message-ID: <1253226304.3273.249.camel@linux-1lbu>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 17 Sep 2009 20:40:10 -0400 (EDT)
+Subject: [PATCH] arm: Make kprobes unregistration SMP safe
+In-Reply-To: <1253078476.5021.65.camel@funkybook>
+References: <1253078476.5021.65.camel@funkybook>
+Message-ID: <alpine.LFD.2.00.0909172039070.24133@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2009-09-17 at 22:37 +0100, Jamie Lokier wrote:
-> Steve Chen wrote:
-> > +	help
-> > +	  Enable this if observing longer than expected delays.  This code
-> > +	  improves delay accuracy for some CPUs.  However, it can also cause
-> > +	  delay duration to be too short for others which leads to stability
-> > +	  issues.
-> > +
-> > +	  In other words, do not enable unless you can guarantee that the
-> > +	  processor (or ALL of the processors if building a generic kernel)
-> > +	  delays for at least the time requested after enabling.
-> > +
-> >  endmenu
+On Wed, 16 Sep 2009, Fr?d?ric RISS wrote:
+
+> ARM kprobes use an illegal instruction to trigger kprobes. In the
+> current implementation, there's a race between the unregistration of a
+> kprobe and the illegal instruction exception handler if they run at the
+> same time on different cores. 
 > 
-> It would be very helpful to mention which CPUs are affected.
-> Ok, we don't know exactly...
+> When reading the value of the undefined instruction, the exception
+> handler might get the original legal instruction as just patched
+> concurrently by arch_disarm_kprobe(). When this happen the kprobe
+> handler won't run, and thus the exception handler will oops because it
+> believe it just hit an undefined instruction in kernel space.
 > 
-> But Russell has stated that ARM610 and ARM710 benefit from enabling
-> the code, and that it specifically must not be enabled for StrongARM.
+> The following patch synchronizes the code patching in the kprobes
+> unregistration using stop_machine and thus avoids the above race.
 > 
-> Here's an additional paragraph to add on the end:
+> Signed-off-by: Frederic RISS <frederic.riss@gmail.com>
+
+Acked-by: Nicolas Pitre <nico@fluxnic.net>
+
+> ---
 > 
-> 	ARM610 and ARM710 are known to benefit from enabling this option.
-> 	It should not be enabled for StrongARMs, because it is known
-> 	to produce too short delays on those.
+> diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
+> index d28513f..6ada87d 100644
+> --- a/arch/arm/kernel/kprobes.c
+> +++ b/arch/arm/kernel/kprobes.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/kernel.h>
+>  #include <linux/kprobes.h>
+>  #include <linux/module.h>
+> +#include <linux/stop_machine.h>
+>  #include <linux/stringify.h>
+>  #include <asm/traps.h>
+>  #include <asm/cacheflush.h>
+> @@ -83,10 +84,24 @@ void __kprobes arch_arm_kprobe(struct kprobe *p)
+>  	flush_insns(p->addr, 1);
+>  }
+>  
+> +/*
+> + * The actual disarming is done here on each CPU and synchronized using
+> + * stop_machine. This synchronization is necessary on SMP to avoid removing
+> + * a probe between the moment the 'Undefined Instruction' exception is raised
+> + * and the moment the exception handler reads the faulting instruction from
+> + * memory.
+> + */
+> +int __kprobes __arch_disarm_kprobe(void *p)
+> +{
+> +	struct kprobe *kp = p;
+> +	*kp->addr = kp->opcode;
+> +	flush_insns(kp->addr, 1);
+> +	return 0;
+> +}
+> +
+>  void __kprobes arch_disarm_kprobe(struct kprobe *p)
+>  {
+> -	*p->addr = p->opcode;
+> -	flush_insns(p->addr, 1);
+> +	stop_machine(__arch_disarm_kprobe, p, &cpu_online_map);
+>  }
+>  
+>  void __kprobes arch_remove_kprobe(struct kprobe *p)
 > 
-Sure, I can add this paragraph in the next revision.
-
-> Maybe you can adjust the config selectors and default to match?
-
-I'm not sure about this one.  For one thing, in the last e-mail between
-you and Russel I saw
-
->> Btw, do you know where PT110 fits in?  Is it like StrongARM (SA110)?
-> No idea.
-
-Not to mention the difficulties to account for all the possible
-permutations for kernels that is built for multiple CPUs.  Perhaps we
-can start a list of the processors that should have this flag enabled
-and the list of processors should have the flag disabled (instead of the
-paragraph you suggested).  This way, people can just add to the list as
-they experiment with this flag on whatever CPU version that they worked
-on.
-
-Regards,
-
-Steve
+> 
