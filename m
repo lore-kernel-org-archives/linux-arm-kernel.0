@@ -1,7 +1,9 @@
 From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 18 Sep 2009 15:18:55 -0400
+Date: Fri, 18 Sep 2009 15:29:10 -0400
 Subject: [PATCH] ep93xx: update i2c support
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901D41F55@mi8nycmail19.Mi8.com>
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901D41F55@mi8nycmail19.Mi8.com>
+References: <BD79186B4FD85F4B8E60E381CAEE190901D41F55@mi8nycmail19.Mi8.com>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901D41F5D@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,8 +15,11 @@ Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 
 ---
 
+V2 - __raw_write should be __raw_writel
+
+
 diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index 16b92c3..d115000 100644
+index 16b92c3..49e74b6 100644
 --- a/arch/arm/mach-ep93xx/core.c
 +++ b/arch/arm/mach-ep93xx/core.c
 @@ -549,12 +549,13 @@ void __init ep93xx_register_eth(struct ep93xx_eth_data *data, int copy_addr)
@@ -52,7 +57,7 @@ index 16b92c3..d115000 100644
 +	ep93xx_i2c_data.sda_is_open_drain = sda_is_open_drain;
 +	ep93xx_i2c_data.scl_is_open_drain = scl_is_open_drain;
 +
-+	__raw_write((sda_is_open_drain<<1) | (scl_is_open_drain<<0)),
++	__raw_writel((sda_is_open_drain<<1) | (scl_is_open_drain<<0)),
 +			EP93XX_GPIO_EEDRIVE);
 +
 +	/*
