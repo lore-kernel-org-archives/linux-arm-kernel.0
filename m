@@ -1,24 +1,123 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Fri, 18 Sep 2009 22:54:33 +0200
-Subject: [PATCH 0/5] U300 rebased boardconfig
-In-Reply-To: <20090918204259.GL6601@n2100.arm.linux.org.uk>
-References: <1253189203-30406-1-git-send-email-linus.walleij@stericsson.com>
-	<20090918204259.GL6601@n2100.arm.linux.org.uk>
-Message-ID: <63386a3d0909181354t4cdf94cdodbd78e02f3c3d3df@mail.gmail.com>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Fri, 18 Sep 2009 23:55:42 +0300
+Subject: [PATCH 1/2] ARM: Pass IFSR register to do_PrefetchAbort()
+Message-ID: <c9f73fa56a41bc1051cd347cc453081235e3d776.1253307263.git.kirill@shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/9/18 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+It needed for proper prefetch abort handling on ARMv7.
 
-> The old u300 branch merges just fine. ?Are there any changes in this
-> which weren't previously submitted?
+Signed-off-by: Kirill A. Shutemov <kirill@shutemov.name>
+---
+ arch/arm/include/asm/glue.h    |   10 ++++++++--
+ arch/arm/kernel/entry-armv.S   |   14 ++++----------
+ arch/arm/kernel/entry-common.S |    8 ++++++--
+ arch/arm/mm/fault.c            |    2 +-
+ 4 files changed, 19 insertions(+), 15 deletions(-)
 
-Wow OK I rephrase so that it not only applies but also compiles...
-
-I changed the first sched_clock patch so that it compiles with
-the revised clocksource framework.
-
-The others didn't really change, so if you can revert just the sched_clock
-one and replace it with the new one everything should be fine.
-
-Linus Walleij
+diff --git a/arch/arm/include/asm/glue.h b/arch/arm/include/asm/glue.h
+index a0e39d5..5bfaf6f 100644
+--- a/arch/arm/include/asm/glue.h
++++ b/arch/arm/include/asm/glue.h
+@@ -130,7 +130,10 @@
+ # ifdef CPU_PABORT_HANDLER
+ #  define MULTI_PABORT 1
+ # else
+-#  define CPU_PABORT_HANDLER(reg, insn)	mrc p15, 0, reg, cr6, cr0, 2
++#  define CPU_PABORT_HANDLER(addr, ifsr, insn) \
++	mrc	p15, 0, addr, c6, c0, 2 ; \
++	mrc	p15, 0, ifsr, c5, c0, 1
++
+ # endif
+ #endif
+ 
+@@ -138,7 +141,10 @@
+ # ifdef CPU_PABORT_HANDLER
+ #  define MULTI_PABORT 1
+ # else
+-#  define CPU_PABORT_HANDLER(reg, insn)	mov reg, insn
++#define __hash_5 #5
++#  define CPU_PABORT_HANDLER(addr, ifsr, insn) \
++	mov	addr, insn ; \
++	mov	ifsr, __hash_5
+ # endif
+ #endif
+ 
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 3d727a8..335ae58 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -303,22 +303,16 @@ __pabt_svc:
+ 	tst	r3, #PSR_I_BIT
+ 	biceq	r9, r9, #PSR_I_BIT
+ 
+-	@
+-	@ set args, then call main handler
+-	@
+-	@  r0 - address of faulting instruction
+-	@  r1 - pointer to registers on stack
+-	@
+ #ifdef MULTI_PABORT
+ 	mov	r0, r2			@ pass address of aborted instruction.
+ 	ldr	r4, .LCprocfns
+ 	mov	lr, pc
+ 	ldr	pc, [r4, #PROCESSOR_PABT_FUNC]
+ #else
+-	CPU_PABORT_HANDLER(r0, r2)
++	CPU_PABORT_HANDLER(r0, r1, r2)
+ #endif
+ 	msr	cpsr_c, r9			@ Maybe enable interrupts
+-	mov	r1, sp				@ regs
++	mov	r2, sp				@ regs
+ 	bl	do_PrefetchAbort		@ call abort handler
+ 
+ 	@
+@@ -697,10 +691,10 @@ __pabt_usr:
+ 	mov	lr, pc
+ 	ldr	pc, [r4, #PROCESSOR_PABT_FUNC]
+ #else
+-	CPU_PABORT_HANDLER(r0, r2)
++	CPU_PABORT_HANDLER(r0, r1, r2)
+ #endif
+ 	enable_irq				@ Enable interrupts
+-	mov	r1, sp				@ regs
++	mov	r2, sp				@ regs
+ 	bl	do_PrefetchAbort		@ call abort handler
+  UNWIND(.fnend		)
+ 	/* fall through */
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 807cfeb..931ab9a 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -426,10 +426,14 @@ sys_mmap2:
+ ENDPROC(sys_mmap2)
+ 
+ ENTRY(pabort_ifar)
+-		mrc	p15, 0, r0, cr6, cr0, 2
+-ENTRY(pabort_noifar)
++		mrc	p15, 0, r0, c6, c0, 2		@ get IFAR
++		mrc	p15, 0, r1, c5, c0, 1		@ get IFSR
+ 		mov	pc, lr
+ ENDPROC(pabort_ifar)
++ENTRY(pabort_noifar)
++		/* simulate IFSR with section translation fault status */
++		mov	r1, #5
++		mov	pc, lr
+ ENDPROC(pabort_noifar)
+ 
+ #ifdef CONFIG_OABI_COMPAT
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index cc8829d..5e27462 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -506,7 +506,7 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ }
+ 
+ asmlinkage void __exception
+-do_PrefetchAbort(unsigned long addr, struct pt_regs *regs)
++do_PrefetchAbort(unsigned long addr, int ifsr, struct pt_regs *regs)
+ {
+ 	do_translation_fault(addr, 0, regs);
+ }
+-- 
+1.6.4.4
