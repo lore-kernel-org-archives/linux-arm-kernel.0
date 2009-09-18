@@ -1,33 +1,18 @@
-From: akpm@linux-foundation.org (akpm at linux-foundation.org)
-Date: Fri, 18 Sep 2009 12:44:17 -0700
-Subject: [patch 1/3] s3c: fix check of index into s3c_gpios[]
-Message-ID: <200909181944.n8IJiHEe008747@imap1.linux-foundation.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Sep 2009 20:58:56 +0100
+Subject: [PATCH 0/3] [ARM] Watchdog support for Samsung 6410 SoC
+In-Reply-To: <20090909150159.GA25057@infomag.iguana.be>
+References: <1252494216-6434-1-git-send-email-laforge@gnumonks.org>
+	<20090909150159.GA25057@infomag.iguana.be>
+Message-ID: <20090918195856.GE6601@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roel Kluin <roel.kluin@gmail.com>
+On Wed, Sep 09, 2009 at 05:01:59PM +0200, Wim Van Sebroeck wrote:
+> Hi Russell, Ben,
+> 
+> Are they also ok for you? How will we get this mainline? Patch 2 is
+> something that can go via the watchdog tree, but the other patches
+> could probably better go via the arm tree.
 
-The check of the s3c_gpios[] index had an off-by-one.
-
-Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
-Acked-by: Ben Dooks <ben-linux@fluff.org>
-Cc: Russell King <rmk@arm.linux.org.uk>
-Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
----
-
- arch/arm/plat-s3c/gpio.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff -puN arch/arm/plat-s3c/gpio.c~s3c-fix-check-of-index-into-s3c_gpios arch/arm/plat-s3c/gpio.c
---- a/arch/arm/plat-s3c/gpio.c~s3c-fix-check-of-index-into-s3c_gpios
-+++ a/arch/arm/plat-s3c/gpio.c
-@@ -28,7 +28,7 @@ static __init void s3c_gpiolib_track(str
- 
- 	gpn = chip->chip.base;
- 	for (i = 0; i < chip->chip.ngpio; i++, gpn++) {
--		BUG_ON(gpn > ARRAY_SIZE(s3c_gpios));
-+		BUG_ON(gpn >= ARRAY_SIZE(s3c_gpios));
- 		s3c_gpios[gpn] = chip;
- 	}
- }
-_
+I think it's for Ben to comment on rather than myself.
