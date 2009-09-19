@@ -1,46 +1,78 @@
-From: s-ghorai@ti.com (Sukumar Ghorai)
-Date: Mon, 14 Sep 2009 14:28:01 +0530
-Subject: [PATCH] There is small problem to support the MMC card >4 GByte.
-Message-ID: <mailman.10.1253362965.2253.linux-arm-kernel@lists.infradead.org>
+From: schen@mvista.com (Steve Chen)
+Date: Sat, 19 Sep 2009 07:55:29 -0500
+Subject: [PATCH v4] arm: remove unused code in delay.S
+In-Reply-To: <20090918205349.GM29905@game.jcrosoft.org>
+References: <1253292418.3273.257.camel@linux-1lbu>
+	<20090918190920.GB11461@pengutronix.de>
+	<1253305534.3273.283.camel@linux-1lbu>
+	<20090918205349.GM29905@game.jcrosoft.org>
+Message-ID: <1253364929.3273.298.camel@linux-1lbu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-EXT_CSD_REV could be any value <=3D2 and are valid as per MMCA Specificatio=
-n. And it was checking for CSD_STRUCTURE filed of EXT_CSD register.
+Document #if 0 code block in delay.S and make it selectable for compile.
 
-Signed-off-by: Sukumar Ghorai <s-ghorai@ti.com>
+Signed-off-by: Steve Chen <schen@mvista.com>
+Reviewed-by: Felipe Contreras <felipe.contreras@gmail.com>
+Reviewed-by: Jamie Lokier <jamie@shareable.org>
+Reviewed-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Reviewed-by: Krzysztof Halasa <khc@pm.waw.pl>
+Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
+Reviewed-by: Pavel Machek <pavel@ucw.cz>
+Reviewed-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
+Reviewed-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
 ---
- drivers/mmc/core/mmc.c  |    2 +-
- include/linux/mmc/mmc.h |    1 +
- 2 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-index 06084db..7b22a2e 100644
---- a/drivers/mmc/core/mmc.c
-+++ b/drivers/mmc/core/mmc.c
-@@ -216,7 +216,7 @@ static int mmc_read_ext_csd(struct mmc_card *card)
-                goto out;
-        }
+ arch/arm/Kconfig     |   23 +++++++++++++++++++++++
+ arch/arm/lib/delay.S |    2 +-
+ 2 files changed, 24 insertions(+), 1 deletions(-)
 
--       if (ext_csd_struct >=3D 2) {
-+       if (ext_csd[EXT_CSD_STRUCT_REV] >=3D 2) {
-                card->ext_csd.sectors =3D
-                        ext_csd[EXT_CSD_SEC_CNT + 0] << 0 |
-                        ext_csd[EXT_CSD_SEC_CNT + 1] << 8 |
-diff --git a/include/linux/mmc/mmc.h b/include/linux/mmc/mmc.h
-index 14b81f3..c4e97a9 100644
---- a/include/linux/mmc/mmc.h
-+++ b/include/linux/mmc/mmc.h
-@@ -252,6 +252,7 @@ struct _mmc_csd {
- #define EXT_CSD_BUS_WIDTH      183     /* R/W */
- #define EXT_CSD_HS_TIMING      185     /* R/W */
- #define EXT_CSD_CARD_TYPE      196     /* RO */
-+#define EXT_CSD_STRUCT_REV 194     /* RO */
- #define EXT_CSD_REV            192     /* RO */
- #define EXT_CSD_SEC_CNT                212     /* RO, 4 bytes */
-
---
-1.5.4.7
-
-Thanks Regards,
-Ghorai
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index aef63c8..9a5a49a 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -813,6 +813,29 @@ config ARM_ERRATA_460075
+ 	  ACTLR register. Note that setting specific bits in the ACTLR
+register
+ 	  may not be available in non-secure mode.
+ 
++config OLD_CPU_DELAY
++	depends on CPU_32v3 || CPU_32v4 || CPU_32v4T
++	bool "Different delay() code for some older CPUs"
++	help
++	  Enable this if observing longer than expected delays.  This code
++	  improves delay accuracy for some CPUs.  However, it can also cause
++	  delay duration to be too short for others which leads to stability
++	  issues.
++
++	  In other words, do not enable unless you can guarantee that the
++	  processor (or ALL of the processors if building a generic kernel)
++	  delays for at least the time requested after enabling.
++
++	  ARM610 and ARM710 are known to benefit from enabling this option.
++	  It should not be enabled for StrongARMs, because it is known
++	  to produce too short delays on those.
++
++	  CPUs should enable this flag
++		ARM610 (rmk)
++		ARM710 (rmk)
++
++	  CPUs should disable this flag
++		StrongARM (rmk)
+ endmenu
+ 
+ source "arch/arm/common/Kconfig"
+diff --git a/arch/arm/lib/delay.S b/arch/arm/lib/delay.S
+index 8d6a876..67e679b 100644
+--- a/arch/arm/lib/delay.S
++++ b/arch/arm/lib/delay.S
+@@ -42,7 +42,7 @@ ENTRY(__const_udelay)				@ 0 <= r0 <= 0x7fffff06
+ @ Delay routine
+ ENTRY(__delay)
+ 		subs	r0, r0, #1
+-#if 0
++#ifdef CONFIG_OLD_CPU_DELAY
+ 		movls	pc, lr
+ 		subs	r0, r0, #1
+ 		movls	pc, lr
