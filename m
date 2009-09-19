@@ -1,46 +1,50 @@
-From: schen@mvista.com (Steve Chen)
-Date: Sat, 19 Sep 2009 09:09:48 -0500
-Subject: [PATCH v4] arm: remove unused code in delay.S
-In-Reply-To: <20090919134731.GA11231@pengutronix.de>
-References: <1253292418.3273.257.camel@linux-1lbu>
-	<20090918190920.GB11461@pengutronix.de>
-	<1253305534.3273.283.camel@linux-1lbu>
-	<20090918205349.GM29905@game.jcrosoft.org>
-	<1253364929.3273.298.camel@linux-1lbu>
-	<20090919134731.GA11231@pengutronix.de>
-Message-ID: <1253369389.3273.304.camel@linux-1lbu>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 19 Sep 2009 22:38:34 +0100
+Subject: free_memmap() and sparsemem
+In-Reply-To: <20090918210547.GM6601@n2100.arm.linux.org.uk>
+References: <1252493855.24414.30.camel@pc1117.cambridge.arm.com>
+	<20090918210547.GM6601@n2100.arm.linux.org.uk>
+Message-ID: <1253396314.31733.16.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2009-09-19 at 15:47 +0200, Uwe Kleine-K?nig wrote:
-> Hello Steve,
-> 
-> On Sat, Sep 19, 2009 at 07:55:29AM -0500, Steve Chen wrote:
-> > Document #if 0 code block in delay.S and make it selectable for compile.
+On Fri, 2009-09-18 at 22:05 +0100, Russell King - ARM Linux wrote:
+> On Wed, Sep 09, 2009 at 11:57:35AM +0100, Catalin Marinas wrote:
+> > I haven't followed the full thread on omap and memory holes but I got an
+> > issue on RealView PBX with sparsemem enabled (patches not pushed yet for
+> > mainline). Basically I'm using this configuration:
 > > 
-> > Signed-off-by: Steve Chen <schen@mvista.com>
-> > Reviewed-by: Felipe Contreras <felipe.contreras@gmail.com>
-> > Reviewed-by: Jamie Lokier <jamie@shareable.org>
-> > Reviewed-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > Reviewed-by: Krzysztof Halasa <khc@pm.waw.pl>
-> > Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
-> > Reviewed-by: Pavel Machek <pavel@ucw.cz>
-> > Reviewed-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
-> > Reviewed-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> I'm very surprised you added these Reviewed-by: tags.
+> > 256MB @ 0x00000000 -> PAGE_OFFSET
+> > 512MB @ 0x20000000 -> PAGE_OFFSET + 0x10000000
+> > 256MB @ 0x80000000 -> PAGE_OFFSET + 0x20000000
+> > 
+> > I could only use two banks (the second at 0x70000000) but I need the
+> > first 256MB for DMA (since Linux only accepts DMA zone to be at the
+> > bottom). The phys_to_virt/virt_to_phys macros were modified to provide a
+> > contiguous translation to virtual addresses.
 > 
-> IMO you should not add them without the explicit permission and request
-> of the corresponding person.  (That means that at least mine should not
-> be there.)
-> 
-> Moreover Reviewed-by: has a meaning (described in
-> Documentation/SubmittingPatches).
-> 
+> I normally say to keep these translation macros simple, so that conversions
+> are as fast as possible.
 
-My only intention was to give credit to all who contributed (at least try).  I already
-sent out a patch with all Reviewed-by tags removed.  I can add back in anyone who wish
-to be added.
+I'd like to keep them simple as well but the physical blocks are too far
+apart.
 
-Regards,
+> There's also no point using sparsemem if you're going to make the virtual
+> memory space contiguous - it just buys you complexity with no advantage.
+> Sparsemem is about a sparse virtual space, not a sparse physical space.
 
-Steve
+My reason for sparsemem is a smaller mem_map table (I don't want to keep
+page structures for 1GB between 0x40000000 and 0x80000000). Do you have
+a better suggestion here?
+
+> So at the end of it, your patch has nothing to do with sparsemem, but is
+> a problem with non-linear v:p translations.
+
+I would say it has to do with non-contiguous physical map, nothing
+related to the virtual translation here as the code in question only
+deals with pfn. The problem appears when sparesemem is enabled because
+the mem_map is no longer a contiguous array (could be for both sparsemem
+and discontigmem but I only tried the former).
+
+-- 
+Catalin
