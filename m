@@ -1,133 +1,68 @@
 From: rubini-list@gnudd.com (Alessandro Rubini)
-Date: Sun, 20 Sep 2009 23:18:49 +0200
-Subject: [PATCH 2/3] mtd: unify status enum from three headers
+Date: Sun, 20 Sep 2009 23:18:59 +0200
+Subject: [PATCH 3/3] ARM Nomadik: use new OneNand name and pdata
 In-Reply-To: <cover.1253481164.git.rubini@unipv.it>
 References: <cover.1253481164.git.rubini@unipv.it>
-Message-ID: <76d4b7a30354d0395de737427674d87fc5c9cb4d.1253481164.git.rubini@
+Message-ID: <d22509d683d17011ba497a62617fe65bad314b9b.1253481164.git.rubini@
 	unipv.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Alessandro Rubini <rubini@unipv.it>
 
-nand.h, onenand.h and flashchip.h defined enumeration types
-for chip status using the same symbolic names. This prevented
-a board file to include more than one of them. In particular,
-no nand and onenand platform devices could live in the same file.
-This patch augments flashchip.h with a few status values in order
-to cover all cases, so nand.h and onenand.h can use flstate_t
-without declaring their own status enum.
+This enables the onenand with the new platform device name.
+Moreover, it fixes a related typo that doesn't deserve a
+separate patch.
 
 Signed-off-by: Alessandro Rubini <rubini@unipv.it>
+Acked-by: Andrea Gallo <andrea.gallo@stericsson.com>
 ---
- include/linux/mtd/flashchip.h |    7 +++++++
- include/linux/mtd/nand.h      |   17 ++---------------
- include/linux/mtd/onenand.h   |   19 ++-----------------
- 3 files changed, 11 insertions(+), 32 deletions(-)
+ arch/arm/mach-nomadik/board-nhk8815.c |   11 ++++++-----
+ 1 files changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/include/linux/mtd/flashchip.h b/include/linux/mtd/flashchip.h
-index d4f38c5..f350a48 100644
---- a/include/linux/mtd/flashchip.h
-+++ b/include/linux/mtd/flashchip.h
-@@ -38,6 +38,13 @@ typedef enum {
- 	FL_XIP_WHILE_ERASING,
- 	FL_XIP_WHILE_WRITING,
- 	FL_SHUTDOWN,
-+	/* These 2 come from nand_state_t, which has been unified here */
-+	FL_READING,
-+	FL_CACHEDPRG,
-+	/* These 2 come from onenand_state_t, which has been unified here */
-+	FL_RESETING,
-+	FL_OTPING,
-+
- 	FL_UNKNOWN
- } flstate_t;
- 
-diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-index d87ada5..2476078 100644
---- a/include/linux/mtd/nand.h
-+++ b/include/linux/mtd/nand.h
-@@ -21,6 +21,7 @@
- #include <linux/wait.h>
- #include <linux/spinlock.h>
+diff --git a/arch/arm/mach-nomadik/board-nhk8815.c b/arch/arm/mach-nomadik/board-nhk8815.c
+index 6bfd537..781b915 100644
+--- a/arch/arm/mach-nomadik/board-nhk8815.c
++++ b/arch/arm/mach-nomadik/board-nhk8815.c
+@@ -18,6 +18,7 @@
+ #include <linux/gpio.h>
  #include <linux/mtd/mtd.h>
-+#include <linux/mtd/flashchip.h>
- #include <linux/mtd/bbm.h>
+ #include <linux/mtd/nand.h>
++#include <linux/mtd/onenand.h>
+ #include <linux/mtd/partitions.h>
+ #include <linux/io.h>
+ #include <asm/sizes.h>
+@@ -142,7 +143,7 @@ static struct mtd_partition nhk8815_onenand_partitions[] = {
+ 	}
+ };
  
- struct mtd_info;
-@@ -203,20 +204,6 @@ typedef enum {
- #define NAND_CI_CHIPNR_MSK	0x03
- #define NAND_CI_CELLTYPE_MSK	0x0C
+-static struct flash_platform_data nhk8815_onenand_data = {
++static struct onenand_platform_data nhk8815_onenand_data = {
+ 	.parts		= nhk8815_onenand_partitions,
+ 	.nr_parts	= ARRAY_SIZE(nhk8815_onenand_partitions),
+ };
+@@ -156,7 +157,7 @@ static struct resource nhk8815_onenand_resource[] = {
+ };
  
--/*
-- * nand_state_t - chip states
-- * Enumeration for NAND flash chip state
-- */
--typedef enum {
--	FL_READY,
--	FL_READING,
--	FL_WRITING,
--	FL_ERASING,
--	FL_SYNCING,
--	FL_CACHEDPRG,
--	FL_PM_SUSPENDED,
--} nand_state_t;
--
- /* Keep gcc happy */
- struct nand_chip;
+ static struct platform_device nhk8815_onenand_device = {
+-	.name		= "onenand",
++	.name		= "onenand-flash",
+ 	.id		= -1,
+ 	.dev		= {
+ 		.platform_data	= &nhk8815_onenand_data,
+@@ -167,10 +168,10 @@ static struct platform_device nhk8815_onenand_device = {
  
-@@ -403,7 +390,7 @@ struct nand_chip {
- 	uint8_t		cellinfo;
- 	int		badblockpos;
- 
--	nand_state_t	state;
-+	flstate_t	state;
- 
- 	uint8_t		*oob_poi;
- 	struct nand_hw_control  *controller;
-diff --git a/include/linux/mtd/onenand.h b/include/linux/mtd/onenand.h
-index 4e49f33..f57e29e 100644
---- a/include/linux/mtd/onenand.h
-+++ b/include/linux/mtd/onenand.h
-@@ -14,6 +14,7 @@
- 
- #include <linux/spinlock.h>
- #include <linux/completion.h>
-+#include <linux/mtd/flashchip.h>
- #include <linux/mtd/onenand_regs.h>
- #include <linux/mtd/bbm.h>
- 
-@@ -25,22 +26,6 @@ extern int onenand_scan(struct mtd_info *mtd, int max_chips);
- /* Free resources held by the OneNAND device */
- extern void onenand_release(struct mtd_info *mtd);
- 
--/*
-- * onenand_state_t - chip states
-- * Enumeration for OneNAND flash chip state
-- */
--typedef enum {
--	FL_READY,
--	FL_READING,
--	FL_WRITING,
--	FL_ERASING,
--	FL_SYNCING,
--	FL_LOCKING,
--	FL_RESETING,
--	FL_OTPING,
--	FL_PM_SUSPENDED,
--} onenand_state_t;
--
- /**
-  * struct onenand_bufferram - OneNAND BufferRAM Data
-  * @blockpage:		block & page address in BufferRAM
-@@ -137,7 +122,7 @@ struct onenand_chip {
- 
- 	spinlock_t		chip_lock;
- 	wait_queue_head_t	wq;
--	onenand_state_t		state;
-+	flstate_t		state;
- 	unsigned char		*page_buf;
- 	unsigned char		*oob_buf;
+ static void __init nhk8815_onenand_init(void)
+ {
+-#ifdef CONFIG_ONENAND
++#ifdef CONFIG_MTD_ONENAND
+        /* Set up SMCS0 for OneNand */
+-       writel(0x000030db, FSMC_BCR0);
+-       writel(0x02100551, FSMC_BTR0);
++	writel(0x000030db, FSMC_BCR(0));
++	writel(0x02100551, FSMC_BTR(0));
+ #endif
+ }
  
 -- 
 1.6.0.2
