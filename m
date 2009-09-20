@@ -1,60 +1,77 @@
-From: sebastian@breakpoint.cc (Sebastian Andrzej Siewior)
-Date: Sun, 20 Sep 2009 21:40:12 +0200
-Subject: [PATCH v2] arm: export "W" macro just for assembly code
-In-Reply-To: <20090918193422.GA6601@n2100.arm.linux.org.uk>
-References: <20090917091237.8258.29171.stgit@pc1117.cambridge.arm.com>
-	<20090918193422.GA6601@n2100.arm.linux.org.uk>
-Message-ID: <20090920194012.GA22062@Chamillionaire.breakpoint.cc>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Sun, 20 Sep 2009 22:13:24 +0200
+Subject: [PATCH] [TRIVIAL] Changes to IRQs.
+In-Reply-To: <alpine.LNX.2.00.0909202042300.17028@wotan.suse.de> (Jiri
+	Kosina's message of "Sun, 20 Sep 2009 20:43:50 +0200 (CEST)")
+References: <m34oqx4s0e.fsf@intrepid.localdomain>
+	<alpine.LNX.2.00.0909202042300.17028@wotan.suse.de>
+Message-ID: <m3vdjds7bv.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexey Dobriyan <adobriyan@gmail.com>
+Jiri Kosina <jkosina@suse.cz> writes:
 
-The W macro which got introduced in 0becb08 aka "Thumb-2: Add macros for
-the unified assembler syntax" clashes with the W function in
-crypto/cast6.c since commit 8b59278 aka "Thumb-2: Implement the unified
-arch/arm/lib functions" due to the following include path:
-|arch/arm/include/asm/unified.h <---
-|arch/arm/include/asm/uaccess.h:20
-|include/linux/uaccess.h:5
-|include/linux/crypto.h:26
-|crypto/cast6.c:23
+> This doesn't really qualify for trivial queue, adding ARM addressess to CC
+> (I hope I got them right after the latest flame :P) at least for the ARM
+> bits.
 
-This patch allows the usage of the new W macro only in assembly files
-since it is the place where it is used.
+(Fixed the arm ml address, and lkml too (my mistake)).
 
-[sebastian at breakpoint]: patch description
-Signed-off-by: Alexey Dobriyan <adobriyan@gmail.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Sebastian Andrzej Siewior <sebastian@breakpoint.cc>
----
-Russel, I've added a new patch description for this patch since my
-rename edition was a little larger.
+But you noticed, of course, that the only real change is that to the
+arch/arm/plat-orion/gpio.c? Just asking to make sure as the patch may
+look longer than it is.
 
- arch/arm/include/asm/unified.h |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+>> +++ b/Documentation/DocBook/genericirq.tmpl
+>> @@ -417,8 +417,8 @@ desc->chip->end();
+>>        </para>
+>>        <para>
+>>  	To make use of the split implementation, replace the call to
+>> -	__do_IRQ by a call to desc->chip->handle_irq() and associate
+>> -        the appropriate handler function to desc->chip->handle_irq().
+>> +	__do_IRQ by a call to desc->handle_irq() and associate
+>> +        the appropriate handler function to desc->handle_irq().
 
-diff --git a/arch/arm/include/asm/unified.h b/arch/arm/include/asm/unified.h
-index 073e85b..bc63116 100644
---- a/arch/arm/include/asm/unified.h
-+++ b/arch/arm/include/asm/unified.h
-@@ -35,7 +35,9 @@
- 
- #define ARM(x...)
- #define THUMB(x...)	x
-+#ifdef __ASSEMBLY__
- #define W(instr)	instr.w
-+#endif
- #define BSYM(sym)	sym + 1
- 
- #else	/* !CONFIG_THUMB2_KERNEL */
-@@ -45,7 +47,9 @@
- 
- #define ARM(x...)	x
- #define THUMB(x...)
-+#ifdef __ASSEMBLY__
- #define W(instr)	instr
-+#endif
- #define BSYM(sym)	sym
- 
- #endif	/* CONFIG_THUMB2_KERNEL */
+Only the comment fix, the code has been changed long ago.
+
+>> +++ b/arch/arm/include/asm/hw_irq.h
+>> @@ -10,14 +10,6 @@ static inline void ack_bad_irq(int irq)
+>>  	irq_err_count++;
+>>  }
+>>  
+>> -/*
+>> - * Obsolete inline function for calling irq descriptor handlers.
+>> - */
+>> -static inline void desc_handle_irq(unsigned int irq, struct irq_desc *desc)
+>> -{
+>> -	desc->handle_irq(irq, desc);
+>> -}
+
+IIRC there had been no users of this function for some time, one has
+been added recently...
+
+>> +++ b/arch/arm/plat-orion/gpio.c
+>> @@ -354,6 +354,6 @@ void orion_gpio_irq_handler(int pinoff)
+>>  			polarity ^= 1 << (pin & 31);
+>>  			writel(polarity, GPIO_IN_POL(pin));
+>>  		}
+>> -		desc_handle_irq(irq, desc);
+>> +		desc->handle_irq(irq, desc);
+>>  	}
+>>  }
+
+That's the one. I've little doubt someone did that by mistake.
+
+>> +++ b/include/linux/irq.h
+>> @@ -281,7 +281,7 @@ extern irqreturn_t handle_IRQ_event(unsigned int irq, struct irqaction *action);
+>>  
+>>  /*
+>>   * Built-in IRQ handlers for various IRQ types,
+>> - * callable via desc->chip->handle_irq()
+>> + * callable via desc->handle_irq()
+
+The code has been changed long ago, the patch only fixes comments.
+
+But of course I'm not insisting, just wanted to flush my queue of such
+things out.
+-- 
+Krzysztof Halasa
