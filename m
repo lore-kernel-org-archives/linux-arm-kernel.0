@@ -1,77 +1,38 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Sun, 20 Sep 2009 22:13:24 +0200
-Subject: [PATCH] [TRIVIAL] Changes to IRQs.
-In-Reply-To: <alpine.LNX.2.00.0909202042300.17028@wotan.suse.de> (Jiri
-	Kosina's message of "Sun, 20 Sep 2009 20:43:50 +0200 (CEST)")
-References: <m34oqx4s0e.fsf@intrepid.localdomain>
-	<alpine.LNX.2.00.0909202042300.17028@wotan.suse.de>
-Message-ID: <m3vdjds7bv.fsf@intrepid.localdomain>
+From: rubini-list@gnudd.com (Alessandro Rubini)
+Date: Sun, 20 Sep 2009 23:18:27 +0200
+Subject: [PATCH 0/3] Allow Nand and OneNand to coexist
+References: <20090920170130.GA19668@mail.gnudd.com>
+Message-ID: <cover.1253480933.git.rubini@unipv.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jiri Kosina <jkosina@suse.cz> writes:
+These three patches are a possible solution to the problem I had with
+Nand and OneNand in the nhk-8815.c source file, as described in my
+previous RFC post.
 
-> This doesn't really qualify for trivial queue, adding ARM addressess to CC
-> (I hope I got them right after the latest flame :P) at least for the ARM
-> bits.
+The first patch fixes code duplication between nand.h and
+bbm.h. Actually, it replicates a fix I made to U-Boot some months ago
+for the same reason. Without it, we have the same structure (with the
+same name) declared in two different headers.
 
-(Fixed the arm ml address, and lkml too (my mistake)).
+The second patch unifies nand_state_t and onenand_state_t into
+flstate_t. Most states were exactly the same, and no user of those
+types is affected by having more states than needed.  This avoid
+redefinition errors for FL_READY and similar values. I chose to
+keep flstate_t (the NOR one), as it's name is the most generic.
 
-But you noticed, of course, that the only real change is that to the
-arch/arm/plat-orion/gpio.c? Just asking to make sure as the patch may
-look longer than it is.
+The third, trivial patch, enables OneNand for Nomadik, including both
+<linux/mtd/nand.h> and <linux/mtd/onenand.h>, since it's now possible
+to do it.
 
->> +++ b/Documentation/DocBook/genericirq.tmpl
->> @@ -417,8 +417,8 @@ desc->chip->end();
->>        </para>
->>        <para>
->>  	To make use of the split implementation, replace the call to
->> -	__do_IRQ by a call to desc->chip->handle_irq() and associate
->> -        the appropriate handler function to desc->chip->handle_irq().
->> +	__do_IRQ by a call to desc->handle_irq() and associate
->> +        the appropriate handler function to desc->handle_irq().
+Alessandro Rubini (3):
+  mtd: use bbm.h in nand.h
+  mtd: unify status enum from three headers
+  ARM Nomadik: use new OneNand name and pdata
 
-Only the comment fix, the code has been changed long ago.
-
->> +++ b/arch/arm/include/asm/hw_irq.h
->> @@ -10,14 +10,6 @@ static inline void ack_bad_irq(int irq)
->>  	irq_err_count++;
->>  }
->>  
->> -/*
->> - * Obsolete inline function for calling irq descriptor handlers.
->> - */
->> -static inline void desc_handle_irq(unsigned int irq, struct irq_desc *desc)
->> -{
->> -	desc->handle_irq(irq, desc);
->> -}
-
-IIRC there had been no users of this function for some time, one has
-been added recently...
-
->> +++ b/arch/arm/plat-orion/gpio.c
->> @@ -354,6 +354,6 @@ void orion_gpio_irq_handler(int pinoff)
->>  			polarity ^= 1 << (pin & 31);
->>  			writel(polarity, GPIO_IN_POL(pin));
->>  		}
->> -		desc_handle_irq(irq, desc);
->> +		desc->handle_irq(irq, desc);
->>  	}
->>  }
-
-That's the one. I've little doubt someone did that by mistake.
-
->> +++ b/include/linux/irq.h
->> @@ -281,7 +281,7 @@ extern irqreturn_t handle_IRQ_event(unsigned int irq, struct irqaction *action);
->>  
->>  /*
->>   * Built-in IRQ handlers for various IRQ types,
->> - * callable via desc->chip->handle_irq()
->> + * callable via desc->handle_irq()
-
-The code has been changed long ago, the patch only fixes comments.
-
-But of course I'm not insisting, just wanted to flush my queue of such
-things out.
--- 
-Krzysztof Halasa
+ arch/arm/mach-nomadik/board-nhk8815.c |   11 ++--
+ include/linux/mtd/bbm.h               |   35 ++++++------
+ include/linux/mtd/flashchip.h         |    7 +++
+ include/linux/mtd/nand.h              |   93 +-------------------------------
+ include/linux/mtd/onenand.h           |   19 +------
+ 5 files changed, 36 insertions(+), 129 deletions(-)
