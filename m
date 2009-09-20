@@ -1,98 +1,73 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun, 20 Sep 2009 23:02:12 +0100
+Date: Sun, 20 Sep 2009 23:46:03 +0100
 Subject: Kernel related (?) user space crash at ARM11 MPCore
-In-Reply-To: <20090920093139.GA1704@n2100.arm.linux.org.uk>
-References: <4A7AEEB6.5060903@googlemail.com>	<1250184014.14019.40.camel@pc1117.cambridge.arm.com>	<1250501311.9858.24.camel@pc1117.cambridge.arm.com>	<20090817140422.GA10764@n2100.arm.linux.org.uk>	<1250529916.11185.80.camel@pc1117.cambridge.arm.com>	<20090919224022.GA738@n2100.arm.linux.org.uk>	<1253435940.498.15.camel@pc1117.cambridge.arm.com>
-	<20090920093139.GA1704@n2100.arm.linux.org.uk>
-Message-ID: <4AB6A664.3010704@arm.com>
+In-Reply-To: <20090920190227.GB5413@n2100.arm.linux.org.uk>
+References: <4A7AEEB6.5060903@googlemail.com>	<1250184014.14019.40.camel@pc1117.cambridge.arm.com>	<1250501311.9858.24.camel@pc1117.cambridge.arm.com>	<20090817140422.GA10764@n2100.arm.linux.org.uk>	<1250529916.11185.80.camel@pc1117.cambridge.arm.com>	<20090919224022.GA738@n2100.arm.linux.org.uk>	<1253435940.498.15.camel@pc1117.cambridge.arm.com>	<20090920093139.GA1704@n2100.arm.linux.org.uk>
+	<20090920190227.GB5413@n2100.arm.linux.org.uk>
+Message-ID: <4AB6B0AB.8040307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Russell King - ARM Linux wrote:
-> On Sun, Sep 20, 2009 at 09:39:00AM +0100, Catalin Marinas wrote:
->> On Sat, 2009-09-19 at 23:40 +0100, Russell King - ARM Linux wrote:
->>> On Mon, Aug 17, 2009 at 06:25:16PM +0100, Catalin Marinas wrote:
->>>> Assuming that the dynamic linker does instruction modifications as well
->>>> and expects the mprotect(RX) to flush the caches, the patch below
->>>> appears to fix the problem (not intensively tested). Note that I don't
->>>> say this is the right fix but it may work around the problem until
->>>> further investigation into the dynamic linker.
->>> Having now re-read the start of the thread, and put all the pieces
->>> together, the problem is not to do with SMP per-se, or Icache
->>> problems.
- >>
->> It's the I-D cache coherency.
+> On Sun, Sep 20, 2009 at 10:31:39AM +0100, Russell King - ARM Linux wrote:
+>> On Sun, Sep 20, 2009 at 09:39:00AM +0100, Catalin Marinas wrote:
+>>> I don't think it's recommended to clean the D-cache (and invalidate the
+>>> I-cache) every time in copy_user_highpage, therefore cache maintenance
+>>> via mprotect -> change_protection -> flush_cache_range may be a better
+>>> option.
+>> I really don't believe so - try it yourself - run some benchmarks on your
+>> ARMv6 or v7 system, comparing the results both with and without the patch.
+>> Especially pay attention to the process creation/shell script performance.
+>> I think you'll find that with your patch, it'll be worse than ARM systems
+>> running at similar clock rates with VIVT caches.
 > 
-> You may be right, but the current evidence does not support that.
-> If what you say is true, then all current ARMv6 and ARMv7 non-SMP
-> systems would be affected.  So far, the bug report is only against
-> SMP systems, where the cache is always forced to write allocate mode.
-
-It is quite unlikely, though not impossible, for the I-cache to have 
-stale entries. That's mainly because by the time a page cache page is 
-reused for a different file, the corresponding I-cache entries are long 
-gone. You could try on a software model to limit the amount of RAM and 
-increase the I-cache size (I think AEM supports pseudo-infinite caches).
-
-Data (instruction opcodes) not reaching the RAM because of 
-write-allocate D-cache is the main issue, but it would be better to 
-cover the I-cache coherency to avoid hard to reproduce bugs on some 
-hardware configurations.
-
->>> I'd like to request that someone who can prove that the program works
->>> on ARMv6/v7 hardware does the following test:
->>>
->>> 1. boot the system with cachepolicy=writealloc
->>> 2. re-test the program
- >>
->> I don't think this would work. All the non-SMP v6/v7 processors I'm
->> aware of only support read-allocate caches, even if you try to force
->> write-allocate. On the SMP ones (Cortex-A9, ARM11MPCore), write-allocate
->> is the default.
+> The figures reveal a 10% reduction in the performance of execve - that's
+> quite a nasty hit, basically meaning shell scripts will run about 10%
+> slower (shell scripts typically exec lots of programs.)
 > 
-> Are you sure - I thought some of them did support write allocate.
+> Using my proposal measures more favourably - there is no measurable impact
+> on execve itself (maybe a 0.5% reduction, which I consider to be in the
+> measurement noise), but a 5.5% reduction in the performance of fork()+exit()
+> - this is using __cpuc_coherent_kern_range() in
+> v6_copy_user_highpage_nonaliasing() to ensure the new page is fully
+> coherent.
 
-I'm not entirely sure but that's what I recall. Anyway, you can run a UP 
-kernel on ARM11MPCore.
+Thanks for running these benchmarks. The results on both your and my 
+patch are affected by invalidating the whole I-cache in 
+v6_coherent_user_range() rather than doing it by line (that's historical 
+because of some erratum on ARM1136 - maybe we should fix this).
 
->> I also recall that the cachepolicy argument was only affecting the
->> kernel mapping rather than the user one. Is this still the case?
-> 
-> Since changing the ptebits stuff, it affects everything.
+Another thing that's affecting the performance of my patch as it 
+currently is (and withtout changing generic code) - the D-cache flushing 
+generates a fault in some situations which takes time to process. I can 
+fix this by using the VAtoPA translation registers in the 
+coherent_user_range function.
 
-Great.
+Anyway, I think it depends on the type of applications you are running. 
+I personally don't see shell performance too important, so we may 
+disagree on the best fix here.
 
->>> I think what we need to do is to ensure that the copy_user_highpage
->>> function is writing back data to the backing RAM, so it is visible
->>> to the I-cache when COWs of executable pages occur.  However, while
->>> we can pass this the vma, the vm_flags can't currently be used to
->>> detect COW of temporarily non-executable pages - which is what we
->>> want to detect to avoid having to clean the cache on every page
->>> copy.
- >>
->> copy_user_highpage() would work if we can detect the VM_EXEC flag but in
->> this case, the linker does mprotect(RW) before writing to the page (BTW,
->> this function could be fixed as well for RWX pages).
-> 
-> "can't currently be used" - yes, I'm aware of this.  
+For a web server (Apache) where you have plenty of forks, your patch 
+might affect the performance quite a lot as you get many 
+copy_user_highpage() calls for CoW (BTW, unrelated to this issue, 
+www.linux-arm.org, including the Git server, is hosted on a set of 
+Marvell MV78100 boards - http://www.linux-arm.org/Main/LinuxArmOrg).
 
-Sorry, I missed that line (too early in the morning).
+While we can choose benchmarks to show that either option is bad, we 
+should probably try to get an optimal solution.
 
-> We could arrange
-> to remember that the region had executable permission, and use that as
-> a trigger for additional handling in copy_user_highpage().
+My view is that something similar to flush_dcache_page + 
+update_mmu_cache would be better (though maybe not these functions 
+directly but could try to reuse PG_arch_1).
 
-Can the current dirty mechanism used for UP kernels be extended to cover 
-this? The copy_user_highpage() could mark the page as dirty and later 
-flush_cache_range() called via mprotect() could check this bit, similar 
-to update_mmu_cache(). This would work on Cortex-A9 (where cache 
-operations are detected by the snoop unit) but not on ARM11MPCore, where 
-we can do it non-lazily.
+> One thing I have noticed: it takes the Realview SMP board _two_ attempts
+> to boot a kernel.  The first attempt tends to cause a spontaneous reboot
+> when the CLCD controller is enabled, or possibly a hang.  The second
+> attempt seems to always run fine.
 
-We have the mechanism in place already, we could call 
-flush_dcache_page(to) in copy_user_highpage() (which makes sense since 
-the kernel is writing to a page visible to the user). Ideally, 
-change_protection() should call update_mmu_cache() as well.
+I noticed this as well only on RealView EB but not all boards. The other 
+SMP boards I have are fine. It could be a hardware bug, I don't see 
+anything obvious in Linux.
 
 -- 
 Catalin
