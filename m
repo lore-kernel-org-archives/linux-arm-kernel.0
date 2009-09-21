@@ -1,59 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Sep 2009 21:09:23 +0100
-Subject: What's inside the pxa tree for this merge window
-In-Reply-To: <Pine.LNX.4.64.0909212111490.17328@axis700.grange>
-References: <f17812d70909100446h17a1903fy74941945dbfc6943@mail.gmail.com>
-	<1253256227.4407.7.camel@pc-matejk>
-	<20090918074551.GA26058@n2100.arm.linux.org.uk>
-	<Pine.LNX.4.64.0909212111490.17328@axis700.grange>
-Message-ID: <20090921200923.GF30821@n2100.arm.linux.org.uk>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Mon, 21 Sep 2009 21:10:43 +0100
+Subject: Kernel related (?) user space crash at ARM11 MPCore
+In-Reply-To: <20090921100751.GF27357@n2100.arm.linux.org.uk>
+References: <20090919224022.GA738@n2100.arm.linux.org.uk>
+	<1253435940.498.15.camel@pc1117.cambridge.arm.com>
+	<20090920093139.GA1704@n2100.arm.linux.org.uk>
+	<20090920190227.GB5413@n2100.arm.linux.org.uk>
+	<4AB6B0AB.8040307@arm.com> <20090921083109.GC20006@shareable.org>
+	<1253522944.1541.3.camel@pc1117.cambridge.arm.com>
+	<20090921085425.GC27357@n2100.arm.linux.org.uk>
+	<1253526263.1541.32.camel@pc1117.cambridge.arm.com>
+	<20090921100751.GF27357@n2100.arm.linux.org.uk>
+Message-ID: <20090921201043.GA14700@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 21, 2009 at 09:19:46PM +0200, Guennadi Liakhovetski wrote:
-> On Fri, 18 Sep 2009, Russell King - ARM Linux wrote:
-> 
-> > On Fri, Sep 18, 2009 at 08:43:47AM +0200, Matej Kenda wrote:
-> > > On Thu, 2009-09-10 at 19:46 +0800, Eric Miao wrote:
-> > > > Here's the preview of request-pull result, please let me know if there
-> > > > is anything missed, thanks.
-> > > > 
-> > > > URL: git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git
-> > > > 
-> > > > 
-> > > > Matej Kenda (2):
-> > > >       [ARM] pxa: add support for the IskraTel XCEP board
-> > > >       [ARM] pxa: add defconfig for IskraTel XCEP board
-> > > 
-> > > Eric, what is the current status of this request? Do I need to repost
-> > > the patches to included into 2.6.32?
-> > > 
-> > > Russell discarded them from his patch system, because they are on your
-> > > list.
+Russell King - ARM Linux wrote:
+> On Mon, Sep 21, 2009 at 10:44:23AM +0100, Catalin Marinas wrote:
+> > I would still call this I-D cache coherency issue since the two caches
+> > have a different view of the RAM but I agree that the D-cache is the one
+> > holding the data (with a slight chance for the I-cache not to be in sync
+> > with main RAM, though we could treat it separately).
 > > 
-> > I discarded them _because_ Eric handled them, which is what I said in the
-> > comments when I discarded them.
+> > We can sort out the D-cache issue with your approach for cleaning it in
+> > the copy_user_highpage() function, but, as I said, we affect the
+> > standard CoW mechanism for data pages quite a lot.
 > 
-> Ok, I did do my best to get patches in the right order in the mainline, 
-> but it all failed. AFAICS, v4l and sh are already in the mainline with a 
-> _wrongly_ resolved mefge conflict, which, most likely, breaks the 
-> sh_mobile_ceu_camera.c driver, and the three PXA platforms, patches for 
-> which should have been applied before both those trees and still haven't 
-> been applied are broken until the patches do get in and the later those 
-> patches get applied the longer the interval with the broken for them 
-> bisection is going to be.
+> Let me restate my approach more clearly:
+> 
+> 1. Remember that a VMA has been executable.
+> 2. Only do the additional handing if the VMA has been executable.
 
-Meanwhile I have to consider that we have several bug fixes outstanding,
-and since I can't send Linus a pull request every day (max once a week)
-I have to be very careful about when I send stuff.
+Sorry, I'm a little confused, and I'm trying to understand what I can
+safely assume is reliable when using mprotect.
 
-So I only get _two_ opportunities during a merge window to send a pull
-request.
+If the problem is data in the D-cache not being flushed to be read as
+data from a text page (i.e. nothing to do with I-cache, it's all about
+the D-cache between different mappings), why is the previous
+executableness of the VMA relevant to the solution?
 
-I'm going to wait until tomorrow before sending my final pull for this
-window, which is the penultimate day before the window closes.
+And here's a little something:
 
-Don't blame me for these delays - it's not my choice to impose such
-delays.  I'd really like to fix those broken platforms right now.  I
-just can't do so without causing additional delays for other issues.
-Blame Linus for imposing the "max one pull a week" rule on me.
+http://www.mail-archive.com/aufs-users at lists.sourceforge.net/msg02093.html
+
+It's about MIPS, but has an awful lot of things in common with the bug
+being discussed in this thread: dynamic linker, constants embedded in
+the code, using mprotect rx->rw->rx, missing I-cache flush, only
+affects COW, copy_user_highpage(), is worked around by switching the
+cache from write-back to write-through...
+
+Useful?
+
+I found that while searching to see if mprotect rw->rx implies I-cache
+flush.  On IRIX it's explicitly documented to, in fact it has
+PROT_EXEC_NOFLUSH in case you want to optimise that away :-) Haven't
+found anything to confirm or deny it for Linux or anything else,
+though.
+
+Hopefully it's clear that munmap of the region, followed by mmap
+PROT_READ|PROTE_EXEC to restore the mapping with different permissions
+(when it has a backing file) - hopefully it's clear that _that_ will
+do the needed I-cache flush.
+
+-- Jamie
