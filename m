@@ -1,48 +1,33 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Sep 2009 22:38:02 +0100
-Subject: Kernel related (?) user space crash at ARM11 MPCore
-In-Reply-To: <20090921100751.GF27357@n2100.arm.linux.org.uk>
-References: <20090919224022.GA738@n2100.arm.linux.org.uk>
-	<1253435940.498.15.camel@pc1117.cambridge.arm.com>
-	<20090920093139.GA1704@n2100.arm.linux.org.uk>
-	<20090920190227.GB5413@n2100.arm.linux.org.uk>
-	<4AB6B0AB.8040307@arm.com> <20090921083109.GC20006@shareable.org>
-	<1253522944.1541.3.camel@pc1117.cambridge.arm.com>
-	<20090921085425.GC27357@n2100.arm.linux.org.uk>
-	<1253526263.1541.32.camel@pc1117.cambridge.arm.com>
-	<20090921100751.GF27357@n2100.arm.linux.org.uk>
-Message-ID: <20090921213802.GH30821@n2100.arm.linux.org.uk>
+Date: Mon, 21 Sep 2009 22:40:31 +0100
+Subject: [PATCH V2 0/3] at91_can: add support for Atmel's CAN
+	controller on AT91SAM9263
+In-Reply-To: <cd73a99e0909211431k37429a70o4efaac7104f7d526@mail.gmail.com>
+References: <1253180254-11910-1-git-send-email-mkl@pengutronix.de>
+	<4AB20679.2040602@grandegger.com> <4AB209CB.10707@pengutronix.de>
+	<cd73a99e0909211431k37429a70o4efaac7104f7d526@mail.gmail.com>
+Message-ID: <20090921214031.GI30821@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 21, 2009 at 11:07:51AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Sep 21, 2009 at 10:44:23AM +0100, Catalin Marinas wrote:
-> > I would still call this I-D cache coherency issue since the two caches
-> > have a different view of the RAM but I agree that the D-cache is the one
-> > holding the data (with a slight chance for the I-cache not to be in sync
-> > with main RAM, though we could treat it separately).
-> > 
-> > We can sort out the D-cache issue with your approach for cleaning it in
-> > the copy_user_highpage() function, but, as I said, we affect the
-> > standard CoW mechanism for data pages quite a lot.
+On Mon, Sep 21, 2009 at 11:31:19PM +0200, Andrew Victor wrote:
+> hi Marc,
 > 
-> Let me restate my approach more clearly:
+> >>> Marc Kleine-Budde (3):
+> >>> ? ? ? at91sam9263: add at91_can device to generic device definition
+> >>> ? ? ? at91sam9263ek: activate at91 CAN controller
+> >>> ? ? ? at91_can: add driver for Atmel's CAN controller on AT91SAM9263
+> >>
+> >> I have just added my "signed-off-by" for the Socket-CAN patch #3. Don't
+> >> known who will take care of the other patches.
+> >
+> > Thanks Wolfgang.
+> >
+> > Andrew, are the first two going throught the arm tree?
 > 
-> 1. Remember that a VMA has been executable.
-> 2. Only do the additional handing if the VMA has been executable.
+> That would be best.
+> Please submit them to Russell King's patch system.
 
-Well, there's a problem with this approach.  Any binary which executes
-with read-implies-exec (in other words, the majority of those around)
-results in any region with read permission also getting exec permission.
-
-So, mprotect(rw) actually ends up as mprotect(rwx), which means that
-effectively _all_ VMAs have been executable.
-
-This approach won't work as well as I'd hope, since this means every
-COW fault ends up triggering the cache flush.
-
-However, the same problem affects Catalin's approach too - with these
-binaries, every VMA has VM_EXEC set, which means every VMA gets the
-cache flushing treatment whenever flush_cache_range() is called.
-
-This is a nasty problem to solve...
+While we're at at91 stuff, please can someone see about fixing the
+AC97 breakage with at91cap9adk_defconfig please, or confirming that
+patches I already have fix this?
