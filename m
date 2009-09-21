@@ -1,29 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Sep 2009 16:38:01 +0100
-Subject: [PATCH v3 1/2] ARM: Introduce ARM_L1_CACHE_SHIFT to define
-	cache line size
-In-Reply-To: <cc557aab0909210419x795d407erfc07ad0f4550ed88@mail.gmail.com>
-References: <188e5f14411c04ec999ef25bfe3616f77f1387b0.1252788311.git.kirill@shutemov.name>
-	<20090921083724.GA27357@n2100.arm.linux.org.uk>
-	<cc557aab0909210419x795d407erfc07ad0f4550ed88@mail.gmail.com>
-Message-ID: <20090921153801.GD30821@n2100.arm.linux.org.uk>
+From: ramaxlo@gmail.com (Ramax Lo)
+Date: Tue, 22 Sep 2009 00:04:16 +0800
+Subject: [PATCH] S3C24XX: Define a macro to avoid compilation error
+In-Reply-To: <>
+References: <>
+Message-ID: <1253549056-25322-1-git-send-email-ramaxlo@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 21, 2009 at 02:19:57PM +0300, Kirill A. Shutemov wrote:
-> On Mon, Sep 21, 2009 at 11:37 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Sat, Sep 12, 2009 at 11:48:30PM +0300, Kirill A. Shutemov wrote:
-> >> Currently kernel believes that all ARM CPUs have L1_CACHE_SHIFT == 5.
-> >> It's not true at least for CPUs based on Cortex-A8.
-> >
-> > Please send this to the patch system. ?There's no need to add the "V2"
-> > comments to it when you do.
-> >
-> 
-> #5716, #5717
-> 
-> BTW, I ,my pathes without change log in your git tree. Commits 910a17e
-> and dca230f. What is wrong with it?
+Define a macro to avoid the following error during kernel build process
+for platforms other than s3c2410:
 
-No need to resend them - sorry, I'd forgotten I'd merged them.
+arch/arm/plat-s3c24xx/cpu.c:84: error: ?s3c2410a_init? undeclared here (not in a function)
+
+Signed-off-by: Ramax Lo <ramaxlo@gmail.com>
+---
+ arch/arm/plat-s3c24xx/include/plat/s3c2410.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-s3c24xx/include/plat/s3c2410.h b/arch/arm/plat-s3c24xx/include/plat/s3c2410.h
+index b6deeef..82ab4aa 100644
+--- a/arch/arm/plat-s3c24xx/include/plat/s3c2410.h
++++ b/arch/arm/plat-s3c24xx/include/plat/s3c2410.h
+@@ -27,6 +27,7 @@ extern void s3c2410_init_clocks(int xtal);
+ #define s3c2410_init_uarts NULL
+ #define s3c2410_map_io NULL
+ #define s3c2410_init NULL
++#define s3c2410a_init NULL
+ #endif
+ 
+ extern int s3c2410_baseclk_add(void);
+-- 
+1.5.4.3
