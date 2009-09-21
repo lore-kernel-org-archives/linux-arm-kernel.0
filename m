@@ -1,67 +1,134 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 21 Sep 2009 12:40:01 +0200
-Subject: [PATCH] at91: at91sam9g45 family: identify several chip versions
-Message-ID: <1253529601-15474-1-git-send-email-nicolas.ferre@atmel.com>
+From: aaro.koskinen@nokia.com (Aaro Koskinen)
+Date: Mon, 21 Sep 2009 12:37:26 +0300
+Subject: [PATCH v3 1/2] ARM: Pass IFSR register to do_PrefetchAbort()
+In-Reply-To: <2f6c0105e623b9134adbb2e849e8074722903fb9.1253530731.git.kirill@shutemov.name>
+References: <2f6c0105e623b9134adbb2e849e8074722903fb9.1253530731.git.kirill@shutemov.name>
+Message-ID: <4AB74956.8070708@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cpu_is_xxx() macros are identifying generic at91sam9g45 chip. This patch adds
-the capacity to differentiate Engineering Samples and final lots through the
-inclusion of  at91_cpu_fully_identify() and the related chip IDs with chip
-version field preserved.
+Hi,
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/include/mach/cpu.h     |    9 +++++++++
- arch/avr32/mach-at32ap/include/mach/cpu.h |    1 +
- 2 files changed, 10 insertions(+), 0 deletions(-)
+Kirill A. Shutemov wrote:
+> It needed for proper prefetch abort handling on ARMv7.
+> 
+> Instruction fault status register (IFSR) was introduced on ARMv7.
 
-diff --git a/arch/arm/mach-at91/include/mach/cpu.h b/arch/arm/mach-at91/include/mach/cpu.h
-index 6d8c1b9..5a06501 100644
---- a/arch/arm/mach-at91/include/mach/cpu.h
-+++ b/arch/arm/mach-at91/include/mach/cpu.h
-@@ -25,6 +25,8 @@
- #define ARCH_ID_AT91SAM9G20	0x019905a0
- #define ARCH_ID_AT91SAM9RL64	0x019b03a0
- #define ARCH_ID_AT91SAM9G45	0x819b05a0
-+#define ARCH_ID_AT91SAM9G45MRL	0x819b05a2	/* aka 9G45-ES2 & non ES lots */
-+#define ARCH_ID_AT91SAM9G45ES	0x819b05a1	/* 9G45-ES (Engineering Sample) */
- #define ARCH_ID_AT91CAP9	0x039A03A0
- 
- #define ARCH_ID_AT91SAM9XE128	0x329973a0
-@@ -43,6 +45,11 @@ static inline unsigned long at91_cpu_identify(void)
- 	return (at91_sys_read(AT91_DBGU_CIDR) & ~AT91_CIDR_VERSION);
- }
- 
-+static inline unsigned long at91_cpu_fully_identify(void)
-+{
-+	return at91_sys_read(AT91_DBGU_CIDR);
-+}
-+
- #define ARCH_EXID_AT91SAM9M11	0x00000001
- #define ARCH_EXID_AT91SAM9M10	0x00000002
- #define ARCH_EXID_AT91SAM9G45	0x00000004
-@@ -120,8 +127,10 @@ static inline unsigned long at91cap9_rev_identify(void)
- 
- #ifdef CONFIG_ARCH_AT91SAM9G45
- #define cpu_is_at91sam9g45()	(at91_cpu_identify() == ARCH_ID_AT91SAM9G45)
-+#define cpu_is_at91sam9g45es()	(at91_cpu_fully_identify() == ARCH_ID_AT91SAM9G45ES)
- #else
- #define cpu_is_at91sam9g45()	(0)
-+#define cpu_is_at91sam9g45es()	(0)
- #endif
- 
- #ifdef CONFIG_ARCH_AT91CAP9
-diff --git a/arch/avr32/mach-at32ap/include/mach/cpu.h b/arch/avr32/mach-at32ap/include/mach/cpu.h
-index c253e9b..9c96a13 100644
---- a/arch/avr32/mach-at32ap/include/mach/cpu.h
-+++ b/arch/avr32/mach-at32ap/include/mach/cpu.h
-@@ -33,5 +33,6 @@
- #define cpu_is_at91cap9()	(0)
- #define cpu_is_at91sam9g10()	(0)
- #define cpu_is_at91sam9g45()	(0)
-+#define cpu_is_at91sam9g45es()	(0)
- 
- #endif /* __ASM_ARCH_CPU_H */
--- 
-1.5.6.5
+According to the ARMv7-AR reference manual it's available in ARMv6
+(see chapter G.7).
+
+> For older CPU we simulate IFSR with translation fault status. It
+> allows to generalize code.
+> 
+> Signed-off-by: Kirill A. Shutemov <kirill@shutemov.name>
+> ---
+>  arch/arm/include/asm/glue.h    |   10 ++++++++--
+>  arch/arm/kernel/entry-armv.S   |   14 ++++----------
+>  arch/arm/kernel/entry-common.S |    8 ++++++--
+>  arch/arm/mm/fault.c            |    2 +-
+>  4 files changed, 19 insertions(+), 15 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/glue.h b/arch/arm/include/asm/glue.h
+> index a0e39d5..5bfaf6f 100644
+> --- a/arch/arm/include/asm/glue.h
+> +++ b/arch/arm/include/asm/glue.h
+> @@ -130,7 +130,10 @@
+>  # ifdef CPU_PABORT_HANDLER
+>  #  define MULTI_PABORT 1
+>  # else
+> -#  define CPU_PABORT_HANDLER(reg, insn)	mrc p15, 0, reg, cr6, cr0, 2
+> +#  define CPU_PABORT_HANDLER(addr, ifsr, insn) \
+> +	mrc	p15, 0, addr, c6, c0, 2 ; \
+> +	mrc	p15, 0, ifsr, c5, c0, 1
+> +
+>  # endif
+>  #endif
+>  
+> @@ -138,7 +141,10 @@
+>  # ifdef CPU_PABORT_HANDLER
+>  #  define MULTI_PABORT 1
+>  # else
+> -#  define CPU_PABORT_HANDLER(reg, insn)	mov reg, insn
+> +#define __hash_5 #5
+> +#  define CPU_PABORT_HANDLER(addr, ifsr, insn) \
+> +	mov	addr, insn ; \
+> +	mov	ifsr, __hash_5
+>  # endif
+>  #endif
+>  
+> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+> index 3d727a8..335ae58 100644
+> --- a/arch/arm/kernel/entry-armv.S
+> +++ b/arch/arm/kernel/entry-armv.S
+> @@ -303,22 +303,16 @@ __pabt_svc:
+>  	tst	r3, #PSR_I_BIT
+>  	biceq	r9, r9, #PSR_I_BIT
+>  
+> -	@
+> -	@ set args, then call main handler
+> -	@
+> -	@  r0 - address of faulting instruction
+> -	@  r1 - pointer to registers on stack
+> -	@
+>  #ifdef MULTI_PABORT
+>  	mov	r0, r2			@ pass address of aborted instruction.
+>  	ldr	r4, .LCprocfns
+>  	mov	lr, pc
+>  	ldr	pc, [r4, #PROCESSOR_PABT_FUNC]
+>  #else
+> -	CPU_PABORT_HANDLER(r0, r2)
+> +	CPU_PABORT_HANDLER(r0, r1, r2)
+>  #endif
+>  	msr	cpsr_c, r9			@ Maybe enable interrupts
+> -	mov	r1, sp				@ regs
+> +	mov	r2, sp				@ regs
+>  	bl	do_PrefetchAbort		@ call abort handler
+>  
+>  	@
+> @@ -697,10 +691,10 @@ __pabt_usr:
+>  	mov	lr, pc
+>  	ldr	pc, [r4, #PROCESSOR_PABT_FUNC]
+>  #else
+> -	CPU_PABORT_HANDLER(r0, r2)
+> +	CPU_PABORT_HANDLER(r0, r1, r2)
+>  #endif
+>  	enable_irq				@ Enable interrupts
+> -	mov	r1, sp				@ regs
+> +	mov	r2, sp				@ regs
+>  	bl	do_PrefetchAbort		@ call abort handler
+>   UNWIND(.fnend		)
+>  	/* fall through */
+> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+> index 807cfeb..931ab9a 100644
+> --- a/arch/arm/kernel/entry-common.S
+> +++ b/arch/arm/kernel/entry-common.S
+> @@ -426,10 +426,14 @@ sys_mmap2:
+>  ENDPROC(sys_mmap2)
+>  
+>  ENTRY(pabort_ifar)
+> -		mrc	p15, 0, r0, cr6, cr0, 2
+> -ENTRY(pabort_noifar)
+> +		mrc	p15, 0, r0, c6, c0, 2		@ get IFAR
+> +		mrc	p15, 0, r1, c5, c0, 1		@ get IFSR
+>  		mov	pc, lr
+>  ENDPROC(pabort_ifar)
+> +ENTRY(pabort_noifar)
+> +		/* simulate IFSR with section translation fault status */
+> +		mov	r1, #5
+> +		mov	pc, lr
+>  ENDPROC(pabort_noifar)
+>  
+>  #ifdef CONFIG_OABI_COMPAT
+> diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+> index cc8829d..5e27462 100644
+> --- a/arch/arm/mm/fault.c
+> +++ b/arch/arm/mm/fault.c
+> @@ -506,7 +506,7 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+>  }
+>  
+>  asmlinkage void __exception
+> -do_PrefetchAbort(unsigned long addr, struct pt_regs *regs)
+> +do_PrefetchAbort(unsigned long addr, int ifsr, struct pt_regs *regs)
+>  {
+>  	do_translation_fault(addr, 0, regs);
+>  }
