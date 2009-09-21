@@ -1,54 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Sep 2009 10:30:37 +0100
-Subject: [PATCH] Don't disable irqs in set_next_event and set_mode
-	callbacks
-In-Reply-To: <20090921091614.GA25422@pengutronix.de>
-References: <1253518763-15087-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20090921090400.GD27357@n2100.arm.linux.org.uk>
-	<20090921091614.GA25422@pengutronix.de>
-Message-ID: <20090921093037.GE27357@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 21 Sep 2009 12:40:01 +0200
+Subject: [PATCH] at91: at91sam9g45 family: identify several chip versions
+Message-ID: <1253529601-15474-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 21, 2009 at 11:16:14AM +0200, Uwe Kleine-K?nig wrote:
-> On Mon, Sep 21, 2009 at 10:04:00AM +0100, Russell King - ARM Linux wrote:
-> > On Mon, Sep 21, 2009 at 09:39:22AM +0200, Uwe Kleine-K?nig wrote:
-> > > These functions are called with irqs already off.
-> > > 
-> > > at91rm2000 had a WARN_ON_ONCE if irqs were enabled since Nov 2008 with
-> > > noone reporting having hit it.
-> > 
-> > It might be useful to document these clockevent interfaces.  There's
-> > at least a few ARM clockevent implementations which don't set the
-> > periodic interval when set_next_event() is called - probably because
-> > it wasn't realised that it was required.
-> I'm a bit confused now as AFAIK set_next_event isn't called in periodic
-> mode.
-> 
-> You mean they don't start the timer if mode==CLOCK_EVT_MODE_PERIODIC in
-> .set_mode?
-> It looks as if pxa is such an implementation, it does nothing in this
-> case.
+cpu_is_xxx() macros are identifying generic at91sam9g45 chip. This patch adds
+the capacity to differentiate Engineering Samples and final lots through the
+inclusion of  at91_cpu_fully_identify() and the related chip IDs with chip
+version field preserved.
 
-PXA doesn't support periodic mode - the hardware is incapable of providing
-periodic interrupts without software support, so we only support it in
-one-shot mode (that's actually what the hardware provides.)
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/include/mach/cpu.h     |    9 +++++++++
+ arch/avr32/mach-at32ap/include/mach/cpu.h |    1 +
+ 2 files changed, 10 insertions(+), 0 deletions(-)
 
-I'm talking about this kind of thing:
-
-        case CLOCK_EVT_MODE_PERIODIC:
-                /* timer load already set up */
-                ctrl = TWD_TIMER_CONTROL_ENABLE | TWD_TIMER_CONTROL_IT_ENABLE
-                        | TWD_TIMER_CONTROL_PERIODIC;
-                break;
-        case CLOCK_EVT_MODE_ONESHOT:
-                /* period set, and timer enabled in 'next_event' hook */
-                ctrl = TWD_TIMER_CONTROL_IT_ENABLE | TWD_TIMER_CONTROL_ONESHOT;
-                break;
-
-The first comment is not true if we ever switch to oneshot mode - the
-reload register is overwritten.  If we then switch back to periodic
-mode, we'll interrupt at whatever periodic rate which was programmed
-by the oneshot code.  OMAP mpu_timer1 looks to be the same.
-
-Nomadik only works because it doesn't support periodic mode.
+diff --git a/arch/arm/mach-at91/include/mach/cpu.h b/arch/arm/mach-at91/include/mach/cpu.h
+index 6d8c1b9..5a06501 100644
+--- a/arch/arm/mach-at91/include/mach/cpu.h
++++ b/arch/arm/mach-at91/include/mach/cpu.h
+@@ -25,6 +25,8 @@
+ #define ARCH_ID_AT91SAM9G20	0x019905a0
+ #define ARCH_ID_AT91SAM9RL64	0x019b03a0
+ #define ARCH_ID_AT91SAM9G45	0x819b05a0
++#define ARCH_ID_AT91SAM9G45MRL	0x819b05a2	/* aka 9G45-ES2 & non ES lots */
++#define ARCH_ID_AT91SAM9G45ES	0x819b05a1	/* 9G45-ES (Engineering Sample) */
+ #define ARCH_ID_AT91CAP9	0x039A03A0
+ 
+ #define ARCH_ID_AT91SAM9XE128	0x329973a0
+@@ -43,6 +45,11 @@ static inline unsigned long at91_cpu_identify(void)
+ 	return (at91_sys_read(AT91_DBGU_CIDR) & ~AT91_CIDR_VERSION);
+ }
+ 
++static inline unsigned long at91_cpu_fully_identify(void)
++{
++	return at91_sys_read(AT91_DBGU_CIDR);
++}
++
+ #define ARCH_EXID_AT91SAM9M11	0x00000001
+ #define ARCH_EXID_AT91SAM9M10	0x00000002
+ #define ARCH_EXID_AT91SAM9G45	0x00000004
+@@ -120,8 +127,10 @@ static inline unsigned long at91cap9_rev_identify(void)
+ 
+ #ifdef CONFIG_ARCH_AT91SAM9G45
+ #define cpu_is_at91sam9g45()	(at91_cpu_identify() == ARCH_ID_AT91SAM9G45)
++#define cpu_is_at91sam9g45es()	(at91_cpu_fully_identify() == ARCH_ID_AT91SAM9G45ES)
+ #else
+ #define cpu_is_at91sam9g45()	(0)
++#define cpu_is_at91sam9g45es()	(0)
+ #endif
+ 
+ #ifdef CONFIG_ARCH_AT91CAP9
+diff --git a/arch/avr32/mach-at32ap/include/mach/cpu.h b/arch/avr32/mach-at32ap/include/mach/cpu.h
+index c253e9b..9c96a13 100644
+--- a/arch/avr32/mach-at32ap/include/mach/cpu.h
++++ b/arch/avr32/mach-at32ap/include/mach/cpu.h
+@@ -33,5 +33,6 @@
+ #define cpu_is_at91cap9()	(0)
+ #define cpu_is_at91sam9g10()	(0)
+ #define cpu_is_at91sam9g45()	(0)
++#define cpu_is_at91sam9g45es()	(0)
+ 
+ #endif /* __ASM_ARCH_CPU_H */
+-- 
+1.5.6.5
