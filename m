@@ -1,82 +1,78 @@
-From: schen@mvista.com (Steve Chen)
-Date: Tue, 22 Sep 2009 05:47:29 -0500
-Subject: [PATCH v5] arm: remove unused code in delay.S
-In-Reply-To: <1253369076.3273.299.camel@linux-1lbu>
-References: <1253292418.3273.257.camel@linux-1lbu>
-	<20090918190920.GB11461@pengutronix.de>
-	<1253305534.3273.283.camel@linux-1lbu>
-	<20090918205349.GM29905@game.jcrosoft.org>
-	<1253364929.3273.298.camel@linux-1lbu>
-	<1253369076.3273.299.camel@linux-1lbu>
-Message-ID: <1253616449.3273.318.camel@linux-1lbu>
+From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
+Date: Tue, 22 Sep 2009 04:06:51 +0530
+Subject: [PATCH 0/3] [ARM] ST-Ericsson's U8500 SMP platform, new patch set
+Message-ID: <1253572611.21542.41.camel@vinay-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document #if 0 code block in delay.S and make it selectable for compile.
+From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
 
-Comments by 
-Felipe Contreras <felipe.contreras@gmail.com>
-Jamie Lokier <jamie@shareable.org>
-Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Krzysztof Halasa <khc@pm.waw.pl>
-Marek Vasut <marek.vasut@gmail.com>
-Pavel Machek <pavel@ucw.cz>
-Sergei Shtylyov <sshtylyov@ru.mvista.com>
-Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+This adds a new machine support for ST-Ericsson's U8500 platform. This is
+an entry level patch which has bindings to existing modules like GIC, SCU,
+TWD, PL011 UART. This also adds a new SPI device STw4500 which uses ARM pl022
+bus driver. The patch is based on v2.6.31 kernel and tested on mop500 hardware
+with SMP enabled.
 
-Signed-off-by: Steve Chen <schen@mvista.com>
+srinidhi kasagar (3):
+  [ARM]: U8500 core machine support
+  mfd: add U8500 STw4500 SPI device support
+  pl022: fix peripheral id for ST vendor
 
----
-
- arch/arm/Kconfig     |   23 +++++++++++++++++++++++
- arch/arm/lib/delay.S |    2 +-
- 2 files changed, 24 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index aef63c8..9a5a49a 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -813,6 +813,29 @@ config ARM_ERRATA_460075
- 	  ACTLR register. Note that setting specific bits in the ACTLR
-register
- 	  may not be available in non-secure mode.
- 
-+config OLD_CPU_DELAY
-+	depends on CPU_32v3 || CPU_32v4 || CPU_32v4T
-+	bool "Different delay() code for some older CPUs"
-+	help
-+	  Enable this if observing longer than expected delays.  This code
-+	  improves delay accuracy for some CPUs.  However, it can also cause
-+	  delay duration to be too short for others which leads to stability
-+	  issues.
-+
-+	  In other words, do not enable unless you can guarantee that the
-+	  processor (or ALL of the processors if building a generic kernel)
-+	  delays for at least the time requested after enabling.
-+
-+	  ARM610 and ARM710 are known to benefit from enabling this option.
-+	  It should not be enabled for StrongARMs, because it is known
-+	  to produce too short delays on those.
-+
-+	  CPUs should enable this flag
-+		ARM610 (rmk)
-+		ARM710 (rmk)
-+
-+	  CPUs should disable this flag
-+		StrongARM (rmk)
- endmenu
- 
- source "arch/arm/common/Kconfig"
-diff --git a/arch/arm/lib/delay.S b/arch/arm/lib/delay.S
-index 8d6a876..67e679b 100644
---- a/arch/arm/lib/delay.S
-+++ b/arch/arm/lib/delay.S
-@@ -42,7 +42,7 @@ ENTRY(__const_udelay)				@ 0 <= r0 <= 0x7fffff06
- @ Delay routine
- ENTRY(__delay)
- 		subs	r0, r0, #1
--#if 0
-+#ifdef CONFIG_OLD_CPU_DELAY
- 		movls	pc, lr
- 		subs	r0, r0, #1
- 		movls	pc, lr
+ arch/arm/Kconfig                                   |   22 ++-
+ arch/arm/Makefile                                  |    1 +
+ arch/arm/mach-ux500/Kconfig                        |   15 ++
+ arch/arm/mach-ux500/Makefile                       |    8 +
+ .../{mach-footbridge => mach-ux500}/Makefile.boot  |    0
+ arch/arm/mach-ux500/board-mop500.c                 |  147 ++++++++++++++++
+ arch/arm/mach-ux500/clock.c                        |   87 ++++++++++
+ arch/arm/mach-ux500/clock.h                        |   13 ++
+ arch/arm/mach-ux500/cpu-u8500.c                    |   78 +++++++++
+ arch/arm/mach-ux500/headsmp.S                      |   38 ++++
+ .../include/mach/clkdev.h                          |    0
+ arch/arm/mach-ux500/include/mach/debug-macro.S     |   22 +++
+ arch/arm/mach-ux500/include/mach/entry-macro.S     |   80 +++++++++
+ arch/arm/mach-ux500/include/mach/hardware.h        |  129 ++++++++++++++
+ arch/arm/mach-ux500/include/mach/io.h              |   22 +++
+ arch/arm/mach-ux500/include/mach/irqs.h            |   71 ++++++++
+ arch/arm/mach-ux500/include/mach/memory.h          |   18 ++
+ arch/arm/mach-ux500/include/mach/mtu.h             |   53 ++++++
+ arch/arm/mach-ux500/include/mach/setup.h           |   22 +++
+ arch/arm/mach-ux500/include/mach/smp.h             |   29 +++
+ arch/arm/mach-ux500/include/mach/system.h          |   25 +++
+ arch/arm/mach-ux500/include/mach/timex.h           |    6 +
+ arch/arm/mach-ux500/include/mach/uncompress.h      |   58 +++++++
+ arch/arm/mach-ux500/include/mach/vmalloc.h         |   18 ++
+ arch/arm/mach-ux500/localtimer.c                   |   28 +++
+ arch/arm/mach-ux500/platsmp.c                      |  181 ++++++++++++++++++++
+ arch/arm/mach-ux500/timer.c                        |  167 ++++++++++++++++++
+ drivers/mfd/Kconfig                                |   10 +
+ drivers/mfd/Makefile                               |    1 +
+ drivers/mfd/stw4500.c                              |  137 +++++++++++++++
+ drivers/spi/amba-pl022.c                           |    2 +-
+ 31 files changed, 1483 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/mach-ux500/Kconfig
+ create mode 100644 arch/arm/mach-ux500/Makefile
+ copy arch/arm/{mach-footbridge => mach-ux500}/Makefile.boot (100%)
+ create mode 100644 arch/arm/mach-ux500/board-mop500.c
+ create mode 100644 arch/arm/mach-ux500/clock.c
+ create mode 100644 arch/arm/mach-ux500/clock.h
+ create mode 100644 arch/arm/mach-ux500/cpu-u8500.c
+ create mode 100644 arch/arm/mach-ux500/headsmp.S
+ copy arch/arm/{mach-ep93xx => mach-ux500}/include/mach/clkdev.h (100%)
+ create mode 100644 arch/arm/mach-ux500/include/mach/debug-macro.S
+ create mode 100644 arch/arm/mach-ux500/include/mach/entry-macro.S
+ create mode 100644 arch/arm/mach-ux500/include/mach/hardware.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/io.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/irqs.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/memory.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/mtu.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/setup.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/smp.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/system.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/timex.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/uncompress.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/vmalloc.h
+ create mode 100644 arch/arm/mach-ux500/localtimer.c
+ create mode 100644 arch/arm/mach-ux500/platsmp.c
+ create mode 100644 arch/arm/mach-ux500/timer.c
+ create mode 100755 drivers/mfd/stw4500.c
