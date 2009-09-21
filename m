@@ -1,134 +1,55 @@
-From: aaro.koskinen@nokia.com (Aaro Koskinen)
-Date: Mon, 21 Sep 2009 12:37:26 +0300
-Subject: [PATCH v3 1/2] ARM: Pass IFSR register to do_PrefetchAbort()
-In-Reply-To: <2f6c0105e623b9134adbb2e849e8074722903fb9.1253530731.git.kirill@shutemov.name>
-References: <2f6c0105e623b9134adbb2e849e8074722903fb9.1253530731.git.kirill@shutemov.name>
-Message-ID: <4AB74956.8070708@nokia.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Mon, 21 Sep 2009 10:41:45 +0100
+Subject: Kernel related (?) user space crash at ARM11 MPCore
+In-Reply-To: <20090921084155.GB27357@n2100.arm.linux.org.uk>
+References: <1250501311.9858.24.camel@pc1117.cambridge.arm.com>
+	<20090817140422.GA10764@n2100.arm.linux.org.uk>
+	<1250529916.11185.80.camel@pc1117.cambridge.arm.com>
+	<20090919224022.GA738@n2100.arm.linux.org.uk>
+	<1253435940.498.15.camel@pc1117.cambridge.arm.com>
+	<20090920093139.GA1704@n2100.arm.linux.org.uk>
+	<20090920190227.GB5413@n2100.arm.linux.org.uk>
+	<4AB6B0AB.8040307@arm.com> <20090921083109.GC20006@shareable.org>
+	<20090921084155.GB27357@n2100.arm.linux.org.uk>
+Message-ID: <20090921094145.GA32152@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Kirill A. Shutemov wrote:
-> It needed for proper prefetch abort handling on ARMv7.
+Russell King - ARM Linux wrote:
+> On Mon, Sep 21, 2009 at 09:31:09AM +0100, Jamie Lokier wrote:
+> > I'm not able to tell from this thread, and I don't have the hardware
+> > to test either:
+> > 
+> > I have some userspace ARM code which modifies instructions and data
+> > used by those instructions in a few pages, using mprotect() to make
+> > them writable, modify, and make them PROT_READ|PROT_EXEC again.
+> > 
+> > There is no execution of the modified code _during_ the modification,
+> > only afterwards.
 > 
-> Instruction fault status register (IFSR) was introduced on ARMv7.
+> We've had a syscall to handle the cache issues to do with self
+> modifying code - __ARM_NR_cacheflush.  See the comments associated
+> with 'cacheflush' in arch/arm/kernel/traps.c about how to use it.
+> This is the situation which the syscall was designed to address back
+> in the 1990s.
 
-According to the ARMv7-AR reference manual it's available in ARMv6
-(see chapter G.7).
+Understood already.  Other archs have a similar call.  My question was
+multiple questions, specifically in response to this thread:
 
-> For older CPU we simulate IFSR with translation fault status. It
-> allows to generalize code.
-> 
-> Signed-off-by: Kirill A. Shutemov <kirill@shutemov.name>
-> ---
->  arch/arm/include/asm/glue.h    |   10 ++++++++--
->  arch/arm/kernel/entry-armv.S   |   14 ++++----------
->  arch/arm/kernel/entry-common.S |    8 ++++++--
->  arch/arm/mm/fault.c            |    2 +-
->  4 files changed, 19 insertions(+), 15 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/glue.h b/arch/arm/include/asm/glue.h
-> index a0e39d5..5bfaf6f 100644
-> --- a/arch/arm/include/asm/glue.h
-> +++ b/arch/arm/include/asm/glue.h
-> @@ -130,7 +130,10 @@
->  # ifdef CPU_PABORT_HANDLER
->  #  define MULTI_PABORT 1
->  # else
-> -#  define CPU_PABORT_HANDLER(reg, insn)	mrc p15, 0, reg, cr6, cr0, 2
-> +#  define CPU_PABORT_HANDLER(addr, ifsr, insn) \
-> +	mrc	p15, 0, addr, c6, c0, 2 ; \
-> +	mrc	p15, 0, ifsr, c5, c0, 1
-> +
->  # endif
->  #endif
->  
-> @@ -138,7 +141,10 @@
->  # ifdef CPU_PABORT_HANDLER
->  #  define MULTI_PABORT 1
->  # else
-> -#  define CPU_PABORT_HANDLER(reg, insn)	mov reg, insn
-> +#define __hash_5 #5
-> +#  define CPU_PABORT_HANDLER(addr, ifsr, insn) \
-> +	mov	addr, insn ; \
-> +	mov	ifsr, __hash_5
->  # endif
->  #endif
->  
-> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> index 3d727a8..335ae58 100644
-> --- a/arch/arm/kernel/entry-armv.S
-> +++ b/arch/arm/kernel/entry-armv.S
-> @@ -303,22 +303,16 @@ __pabt_svc:
->  	tst	r3, #PSR_I_BIT
->  	biceq	r9, r9, #PSR_I_BIT
->  
-> -	@
-> -	@ set args, then call main handler
-> -	@
-> -	@  r0 - address of faulting instruction
-> -	@  r1 - pointer to registers on stack
-> -	@
->  #ifdef MULTI_PABORT
->  	mov	r0, r2			@ pass address of aborted instruction.
->  	ldr	r4, .LCprocfns
->  	mov	lr, pc
->  	ldr	pc, [r4, #PROCESSOR_PABT_FUNC]
->  #else
-> -	CPU_PABORT_HANDLER(r0, r2)
-> +	CPU_PABORT_HANDLER(r0, r1, r2)
->  #endif
->  	msr	cpsr_c, r9			@ Maybe enable interrupts
-> -	mov	r1, sp				@ regs
-> +	mov	r2, sp				@ regs
->  	bl	do_PrefetchAbort		@ call abort handler
->  
->  	@
-> @@ -697,10 +691,10 @@ __pabt_usr:
->  	mov	lr, pc
->  	ldr	pc, [r4, #PROCESSOR_PABT_FUNC]
->  #else
-> -	CPU_PABORT_HANDLER(r0, r2)
-> +	CPU_PABORT_HANDLER(r0, r1, r2)
->  #endif
->  	enable_irq				@ Enable interrupts
-> -	mov	r1, sp				@ regs
-> +	mov	r2, sp				@ regs
->  	bl	do_PrefetchAbort		@ call abort handler
->   UNWIND(.fnend		)
->  	/* fall through */
-> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-> index 807cfeb..931ab9a 100644
-> --- a/arch/arm/kernel/entry-common.S
-> +++ b/arch/arm/kernel/entry-common.S
-> @@ -426,10 +426,14 @@ sys_mmap2:
->  ENDPROC(sys_mmap2)
->  
->  ENTRY(pabort_ifar)
-> -		mrc	p15, 0, r0, cr6, cr0, 2
-> -ENTRY(pabort_noifar)
-> +		mrc	p15, 0, r0, c6, c0, 2		@ get IFAR
-> +		mrc	p15, 0, r1, c5, c0, 1		@ get IFSR
->  		mov	pc, lr
->  ENDPROC(pabort_ifar)
-> +ENTRY(pabort_noifar)
-> +		/* simulate IFSR with section translation fault status */
-> +		mov	r1, #5
-> +		mov	pc, lr
->  ENDPROC(pabort_noifar)
->  
->  #ifdef CONFIG_OABI_COMPAT
-> diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-> index cc8829d..5e27462 100644
-> --- a/arch/arm/mm/fault.c
-> +++ b/arch/arm/mm/fault.c
-> @@ -506,7 +506,7 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
->  }
->  
->  asmlinkage void __exception
-> -do_PrefetchAbort(unsigned long addr, struct pt_regs *regs)
-> +do_PrefetchAbort(unsigned long addr, int ifsr, struct pt_regs *regs)
->  {
->  	do_translation_fault(addr, 0, regs);
->  }
+  - Whether sys_cacheflush is necessary when doing mprotect RW->RX
+    after writing new code, or does the mprotect imply it (I presume
+    _mmap_ always does);
+
+  - If a kernel bug has been uncovered which makes sys_cacheflush
+    insufficient for that in some obscure case under discussion with
+    COW pages;
+
+  - Whether it is necessary if only the data words in a code+data
+    page are modified (similar to ELF PLT updates), in principle, and
+
+  - If the above answer is no, with only the data words written, the
+    bug under discussion, is sys_cacheflush necessary to work with
+    unfixed kernels?
+
+Thanks,
+-- Jamie
