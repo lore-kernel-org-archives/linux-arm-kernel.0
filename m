@@ -1,36 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Sep 2009 23:31:04 +0100
+From: jamie@shareable.org (Jamie Lokier)
+Date: Mon, 21 Sep 2009 23:33:38 +0100
 Subject: Kernel related (?) user space crash at ARM11 MPCore
-In-Reply-To: <20090921221229.GF14700@shareable.org>
-References: <20090920190227.GB5413@n2100.arm.linux.org.uk>
+In-Reply-To: <20090921213802.GH30821@n2100.arm.linux.org.uk>
+References: <1253435940.498.15.camel@pc1117.cambridge.arm.com>
+	<20090920093139.GA1704@n2100.arm.linux.org.uk>
+	<20090920190227.GB5413@n2100.arm.linux.org.uk>
 	<4AB6B0AB.8040307@arm.com> <20090921083109.GC20006@shareable.org>
 	<1253522944.1541.3.camel@pc1117.cambridge.arm.com>
 	<20090921085425.GC27357@n2100.arm.linux.org.uk>
 	<1253526263.1541.32.camel@pc1117.cambridge.arm.com>
 	<20090921100751.GF27357@n2100.arm.linux.org.uk>
-	<20090921201043.GA14700@shareable.org> <4AB7F716.2070206@arm.com>
-	<20090921221229.GF14700@shareable.org>
-Message-ID: <20090921223104.GJ30821@n2100.arm.linux.org.uk>
+	<20090921213802.GH30821@n2100.arm.linux.org.uk>
+Message-ID: <20090921223338.GH14700@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 21, 2009 at 11:12:29PM +0100, Jamie Lokier wrote:
-> Btw, regarding "non-aliasing", it's pretty clear that it does alias
-> the I-cache ;-), in much the same way as different addresses alias in
-> the D-cache with an "aliasing" cache.  That may well be a clue as to
-> clean, systematic and sane way of ensuring all the cache ops are in
-> all the right places.
+Russell King - ARM Linux wrote:
+> On Mon, Sep 21, 2009 at 11:07:51AM +0100, Russell King - ARM Linux wrote:
+> > On Mon, Sep 21, 2009 at 10:44:23AM +0100, Catalin Marinas wrote:
+> > > I would still call this I-D cache coherency issue since the two caches
+> > > have a different view of the RAM but I agree that the D-cache is the one
+> > > holding the data (with a slight chance for the I-cache not to be in sync
+> > > with main RAM, though we could treat it separately).
+> > > 
+> > > We can sort out the D-cache issue with your approach for cleaning it in
+> > > the copy_user_highpage() function, but, as I said, we affect the
+> > > standard CoW mechanism for data pages quite a lot.
+> > 
+> > Let me restate my approach more clearly:
+> > 
+> > 1. Remember that a VMA has been executable.
+> > 2. Only do the additional handing if the VMA has been executable.
+> 
+> Well, there's a problem with this approach.  Any binary which executes
+> with read-implies-exec (in other words, the majority of those around)
+> results in any region with read permission also getting exec permission.
+> 
+> So, mprotect(rw) actually ends up as mprotect(rwx), which means that
+> effectively _all_ VMAs have been executable.
+> 
+> This approach won't work as well as I'd hope, since this means every
+> COW fault ends up triggering the cache flush.
+> 
+> However, the same problem affects Catalin's approach too - with these
+> binaries, every VMA has VM_EXEC set, which means every VMA gets the
+> cache flushing treatment whenever flush_cache_range() is called.
+> 
+> This is a nasty problem to solve...
 
-If you want your kernel to flush the I and D caches on every page fault,
-process creation and exit, be my guest.  I'd rather have a system with
-some reasonable performance left in it rather than being relegated back
-to the days of VIVT caches.
+Would it be so harmful if mprotect(rw) were treated as mprotect(rw),
+while mprotect(r) is treated as mprotect(rx)?  Sure, someone _could_
+exec from rw pages, but they _should not_ be doing so if they haven't
+set PROT_EXEC.
 
-The key thing is to work out the _minimum_ amount of cache flushing,
-not just throw cache flushing blindly in.
+PROT_READ implying PROT_READ|PROT_EXEC may be needed for historical
+compatibility reasons, but PROT_READ|PROT_WRITE implying
+PROT_READ|PROT_WRITE|PROT_EXEC - there might not be any code doing that.
 
-MPCore, btw, is PIPT write allocate harvard.  In other words, it is
-fully coherent with virtual mappings - the only things it isn't
-coherent with is the instruction cache and DMA.  It'd be absolutely
-stupid to have to throw the heavy weights of flushing large amounts
-of cache for what is basically a small localized problem.
+I would guess (but it's just a guess) that the sort of people who
+execute code from a PROT_WRITE segment would have known to set
+PROT_EXEC, and the main cause for concern would be if there are
+executables which have writable data immediately after the text
+segment, in the same page, to save space in an executable.  Has that
+happened?  Even that would be of no concern if that page is always
+mapped PROT_EXEC by the loaders.
+
+Hmm :/  Actually I'm quite surprised read-implies-exec is needed.
+
+-- Jamie
