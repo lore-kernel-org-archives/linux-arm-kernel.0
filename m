@@ -1,34 +1,47 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Mon, 21 Sep 2009 20:18:26 +0200
-Subject: [PULL REQ] IXP4xx
-Message-ID: <m3eiq0duvh.fsf@intrepid.localdomain>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 21 Sep 2009 21:19:46 +0200 (CEST)
+Subject: What's inside the pxa tree for this merge window
+In-Reply-To: <20090918074551.GA26058@n2100.arm.linux.org.uk>
+References: <f17812d70909100446h17a1903fy74941945dbfc6943@mail.gmail.com>
+	<1253256227.4407.7.camel@pc-matejk>
+	<20090918074551.GA26058@n2100.arm.linux.org.uk>
+Message-ID: <Pine.LNX.4.64.0909212111490.17328@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+On Fri, 18 Sep 2009, Russell King - ARM Linux wrote:
 
-Please pull from my IXP4xx tree. This is rather trivial, and based on
-your current HEAD to eliminate a conflict. Thanks.
+> On Fri, Sep 18, 2009 at 08:43:47AM +0200, Matej Kenda wrote:
+> > On Thu, 2009-09-10 at 19:46 +0800, Eric Miao wrote:
+> > > Here's the preview of request-pull result, please let me know if there
+> > > is anything missed, thanks.
+> > > 
+> > > URL: git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git
+> > > 
+> > > 
+> > > Matej Kenda (2):
+> > >       [ARM] pxa: add support for the IskraTel XCEP board
+> > >       [ARM] pxa: add defconfig for IskraTel XCEP board
+> > 
+> > Eric, what is the current status of this request? Do I need to repost
+> > the patches to included into 2.6.32?
+> > 
+> > Russell discarded them from his patch system, because they are on your
+> > list.
+> 
+> I discarded them _because_ Eric handled them, which is what I said in the
+> comments when I discarded them.
 
-The following changes since commit 43c1266ce4dc06bfd236cec31e11e9ecd69c0bef:
-  Linus Torvalds (1):
-        Merge branch 'perfcounters-rename-for-linus' of git://git.kernel.org/.../tip/linux-2.6-tip
+Ok, I did do my best to get patches in the right order in the mainline, 
+but it all failed. AFAICS, v4l and sh are already in the mainline with a 
+_wrongly_ resolved mefge conflict, which, most likely, breaks the 
+sh_mobile_ceu_camera.c driver, and the three PXA platforms, patches for 
+which should have been applied before both those trees and still haven't 
+been applied are broken until the patches do get in and the later those 
+patches get applied the longer the interval with the broken for them 
+bisection is going to be.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/chris/linux-2.6.git ixp4xx
-
-Krzysztof Ha?asa (1):
-      Add MAINTAINERS entry for ARM/INTEL IXP4xx arch support.
-
-Mikael Pettersson (2):
-      ixp4xx: timer and clocks cleanups
-      ixp4xx: arch_idle() documentation fixup
-
- MAINTAINERS                                |    7 +++++++
- arch/arm/mach-ixp4xx/common.c              |   16 +++++++---------
- arch/arm/mach-ixp4xx/include/mach/system.h |    6 ++++--
- 3 files changed, 18 insertions(+), 11 deletions(-)
-
--- 
-Krzysztof Halasa
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski
