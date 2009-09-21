@@ -1,47 +1,127 @@
-From: shinel@foxmail.com (Shine Liu)
-Date: Mon, 21 Sep 2009 15:57:10 +0800
-Subject: [PATCH] ARM:S3C24XX: Fix a wrong dependency in Kconfig which leads
-	to a compile time error
-Message-ID: <1253519830.5804.31.camel@shinel>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Mon, 21 Sep 2009 14:05:23 +0300
+Subject: [PATCH v3 1/2] ARM: Pass IFSR register to do_PrefetchAbort()
+Message-ID: <2f6c0105e623b9134adbb2e849e8074722903fb9.1253530731.git.kirill@shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+It needed for proper prefetch abort handling on ARMv7.
 
-There's a small mistake in arch/arm/plat-s3c24xx/Kconfig leads to a
-compile time error when compiling kernel for S3C24XX mach:
+Instruction fault status register (IFSR) was introduced on ARMv7.
+For older CPU we simulate IFSR with translation fault status. It
+allows to generalize code.
 
-  LD      .tmp_vmlinux1
-arch/arm/mach-s3c2440/built-in.o: In function `mini2440_map_io':
-mach-mini2440.c:(.init.text+0x4a0): undefined reference to `s3c_device_nand'
-arch/arm/mach-s3c2440/built-in.o:(.init.data+0x78c): undefined reference to `s3c_device_nand'
-arch/arm/plat-s3c24xx/built-in.o: In function `s3c244x_map_io':
-common-smdk.c:(.init.text+0x8e4): undefined reference to `s3c_device_nand'
-arch/arm/plat-s3c24xx/built-in.o: In function `smdk_machine_init':
-common-smdk.c:(.init.text+0xe44): undefined reference to `s3c_device_nand'
-arch/arm/plat-s3c24xx/built-in.o:(.init.data+0x18c): undefined reference to `s3c_device_nand'
-make: *** [.tmp_vmlinux1] Error 1
+Signed-off-by: Kirill A. Shutemov <kirill@shutemov.name>
+---
+ arch/arm/include/asm/glue.h    |   10 ++++++++--
+ arch/arm/kernel/entry-armv.S   |   14 ++++----------
+ arch/arm/kernel/entry-common.S |    8 ++++++--
+ arch/arm/mm/fault.c            |    2 +-
+ 4 files changed, 19 insertions(+), 15 deletions(-)
 
-The bug was introduced by the patch:
-http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commitdiff;h=db616eb67604242c11bfbb331bb143bfe4a2e386
-
-Both kernel 2.6.31 and latest linux-next (next-20090918) has the defect.
-The following patch will fixed this bug.
-
-
-
-Signed-off-by: Shine Liu <shinel@foxmail.com>
-Signed-off-by: Shine Liu <liuxian@redflag-linux.com>
-----------------------------------------------------
-
---- a/arch/arm/plat-s3c24xx/Kconfig	2009-09-21 15:09:59.000000000 +0800
-+++ b/arch/arm/plat-s3c24xx/Kconfig	2009-09-21 15:10:09.000000000 +0800
-@@ -10,7 +10,7 @@
- 	default y
- 	select NO_IOPORT
- 	select ARCH_REQUIRE_GPIOLIB
--	select S3C_DEVICE_NAND
-+	select S3C_DEV_NAND
- 	help
- 	  Base platform code for any Samsung S3C24XX device
+diff --git a/arch/arm/include/asm/glue.h b/arch/arm/include/asm/glue.h
+index a0e39d5..5bfaf6f 100644
+--- a/arch/arm/include/asm/glue.h
++++ b/arch/arm/include/asm/glue.h
+@@ -130,7 +130,10 @@
+ # ifdef CPU_PABORT_HANDLER
+ #  define MULTI_PABORT 1
+ # else
+-#  define CPU_PABORT_HANDLER(reg, insn)	mrc p15, 0, reg, cr6, cr0, 2
++#  define CPU_PABORT_HANDLER(addr, ifsr, insn) \
++	mrc	p15, 0, addr, c6, c0, 2 ; \
++	mrc	p15, 0, ifsr, c5, c0, 1
++
+ # endif
+ #endif
  
+@@ -138,7 +141,10 @@
+ # ifdef CPU_PABORT_HANDLER
+ #  define MULTI_PABORT 1
+ # else
+-#  define CPU_PABORT_HANDLER(reg, insn)	mov reg, insn
++#define __hash_5 #5
++#  define CPU_PABORT_HANDLER(addr, ifsr, insn) \
++	mov	addr, insn ; \
++	mov	ifsr, __hash_5
+ # endif
+ #endif
+ 
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 3d727a8..335ae58 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -303,22 +303,16 @@ __pabt_svc:
+ 	tst	r3, #PSR_I_BIT
+ 	biceq	r9, r9, #PSR_I_BIT
+ 
+-	@
+-	@ set args, then call main handler
+-	@
+-	@  r0 - address of faulting instruction
+-	@  r1 - pointer to registers on stack
+-	@
+ #ifdef MULTI_PABORT
+ 	mov	r0, r2			@ pass address of aborted instruction.
+ 	ldr	r4, .LCprocfns
+ 	mov	lr, pc
+ 	ldr	pc, [r4, #PROCESSOR_PABT_FUNC]
+ #else
+-	CPU_PABORT_HANDLER(r0, r2)
++	CPU_PABORT_HANDLER(r0, r1, r2)
+ #endif
+ 	msr	cpsr_c, r9			@ Maybe enable interrupts
+-	mov	r1, sp				@ regs
++	mov	r2, sp				@ regs
+ 	bl	do_PrefetchAbort		@ call abort handler
+ 
+ 	@
+@@ -697,10 +691,10 @@ __pabt_usr:
+ 	mov	lr, pc
+ 	ldr	pc, [r4, #PROCESSOR_PABT_FUNC]
+ #else
+-	CPU_PABORT_HANDLER(r0, r2)
++	CPU_PABORT_HANDLER(r0, r1, r2)
+ #endif
+ 	enable_irq				@ Enable interrupts
+-	mov	r1, sp				@ regs
++	mov	r2, sp				@ regs
+ 	bl	do_PrefetchAbort		@ call abort handler
+  UNWIND(.fnend		)
+ 	/* fall through */
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 807cfeb..931ab9a 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -426,10 +426,14 @@ sys_mmap2:
+ ENDPROC(sys_mmap2)
+ 
+ ENTRY(pabort_ifar)
+-		mrc	p15, 0, r0, cr6, cr0, 2
+-ENTRY(pabort_noifar)
++		mrc	p15, 0, r0, c6, c0, 2		@ get IFAR
++		mrc	p15, 0, r1, c5, c0, 1		@ get IFSR
+ 		mov	pc, lr
+ ENDPROC(pabort_ifar)
++ENTRY(pabort_noifar)
++		/* simulate IFSR with section translation fault status */
++		mov	r1, #5
++		mov	pc, lr
+ ENDPROC(pabort_noifar)
+ 
+ #ifdef CONFIG_OABI_COMPAT
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index cc8829d..5e27462 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -506,7 +506,7 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ }
+ 
+ asmlinkage void __exception
+-do_PrefetchAbort(unsigned long addr, struct pt_regs *regs)
++do_PrefetchAbort(unsigned long addr, int ifsr, struct pt_regs *regs)
+ {
+ 	do_translation_fault(addr, 0, regs);
+ }
+-- 
+1.6.4.4
