@@ -1,24 +1,25 @@
-From: rubini@unipv.it (Alessandro Rubini)
-Date: Mon, 21 Sep 2009 12:48:14 +0200
-Subject: [PATCH] Don't disable irqs in set_next_event and set_mode
-	callbacks
-In-Reply-To: <20090921093037.GE27357@n2100.arm.linux.org.uk>
-References: <20090921093037.GE27357@n2100.arm.linux.org.uk>
-	<1253518763-15087-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20090921090400.GD27357@n2100.arm.linux.org.uk>
-	<20090921091614.GA25422@pengutronix.de>
-Message-ID: <20090921104813.GA13788@mail.gnudd.com>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Mon, 21 Sep 2009 14:19:57 +0300
+Subject: [PATCH v3 1/2] ARM: Introduce ARM_L1_CACHE_SHIFT to define cache
+	line size
+In-Reply-To: <20090921083724.GA27357@n2100.arm.linux.org.uk>
+References: <188e5f14411c04ec999ef25bfe3616f77f1387b0.1252788311.git.kirill@shutemov.name>
+	<20090921083724.GA27357@n2100.arm.linux.org.uk>
+Message-ID: <cc557aab0909210419x795d407erfc07ad0f4550ed88@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Nomadik only works because it doesn't support periodic mode.
+On Mon, Sep 21, 2009 at 11:37 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sat, Sep 12, 2009 at 11:48:30PM +0300, Kirill A. Shutemov wrote:
+>> Currently kernel believes that all ARM CPUs have L1_CACHE_SHIFT == 5.
+>> It's not true at least for CPUs based on Cortex-A8.
+>
+> Please send this to the patch system. ?There's no need to add the "V2"
+> comments to it when you do.
+>
 
-s/periodic/one-shot/
+#5716, #5717
 
-Uwe, I can't test it as my board is currently unavailable, but I have
-no problems in removing the irqsave stuff if not needed. Actually,
-I use the atmel code as a reference, so I got the irqsave from there.
-
-Feel free to add my acked-by if you think it's worth.
-
-/alessandro
+BTW, I ,my pathes without change log in your git tree. Commits 910a17e
+and dca230f. What is wrong with it?
