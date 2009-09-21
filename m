@@ -1,78 +1,32 @@
 From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
-Date: Tue, 22 Sep 2009 04:06:51 +0530
-Subject: [PATCH 0/3] [ARM] ST-Ericsson's U8500 SMP platform, new patch set
-Message-ID: <1253572611.21542.41.camel@vinay-desktop>
+Date: Tue, 22 Sep 2009 04:07:19 +0530
+Subject: [PATCH 3/3] pl022: fix peripheral id for ST vendor
+Message-ID: <1253572639.21542.47.camel@vinay-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
 
-This adds a new machine support for ST-Ericsson's U8500 platform. This is
-an entry level patch which has bindings to existing modules like GIC, SCU,
-TWD, PL011 UART. This also adds a new SPI device STw4500 which uses ARM pl022
-bus driver. The patch is based on v2.6.31 kernel and tested on mop500 hardware
-with SMP enabled.
+This fixes the wrong peripheral id being used in pl022
+driver for ST derivative
 
-srinidhi kasagar (3):
-  [ARM]: U8500 core machine support
-  mfd: add U8500 STw4500 SPI device support
-  pl022: fix peripheral id for ST vendor
+Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+---
+ drivers/spi/amba-pl022.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
- arch/arm/Kconfig                                   |   22 ++-
- arch/arm/Makefile                                  |    1 +
- arch/arm/mach-ux500/Kconfig                        |   15 ++
- arch/arm/mach-ux500/Makefile                       |    8 +
- .../{mach-footbridge => mach-ux500}/Makefile.boot  |    0
- arch/arm/mach-ux500/board-mop500.c                 |  147 ++++++++++++++++
- arch/arm/mach-ux500/clock.c                        |   87 ++++++++++
- arch/arm/mach-ux500/clock.h                        |   13 ++
- arch/arm/mach-ux500/cpu-u8500.c                    |   78 +++++++++
- arch/arm/mach-ux500/headsmp.S                      |   38 ++++
- .../include/mach/clkdev.h                          |    0
- arch/arm/mach-ux500/include/mach/debug-macro.S     |   22 +++
- arch/arm/mach-ux500/include/mach/entry-macro.S     |   80 +++++++++
- arch/arm/mach-ux500/include/mach/hardware.h        |  129 ++++++++++++++
- arch/arm/mach-ux500/include/mach/io.h              |   22 +++
- arch/arm/mach-ux500/include/mach/irqs.h            |   71 ++++++++
- arch/arm/mach-ux500/include/mach/memory.h          |   18 ++
- arch/arm/mach-ux500/include/mach/mtu.h             |   53 ++++++
- arch/arm/mach-ux500/include/mach/setup.h           |   22 +++
- arch/arm/mach-ux500/include/mach/smp.h             |   29 +++
- arch/arm/mach-ux500/include/mach/system.h          |   25 +++
- arch/arm/mach-ux500/include/mach/timex.h           |    6 +
- arch/arm/mach-ux500/include/mach/uncompress.h      |   58 +++++++
- arch/arm/mach-ux500/include/mach/vmalloc.h         |   18 ++
- arch/arm/mach-ux500/localtimer.c                   |   28 +++
- arch/arm/mach-ux500/platsmp.c                      |  181 ++++++++++++++++++++
- arch/arm/mach-ux500/timer.c                        |  167 ++++++++++++++++++
- drivers/mfd/Kconfig                                |   10 +
- drivers/mfd/Makefile                               |    1 +
- drivers/mfd/stw4500.c                              |  137 +++++++++++++++
- drivers/spi/amba-pl022.c                           |    2 +-
- 31 files changed, 1483 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/mach-ux500/Kconfig
- create mode 100644 arch/arm/mach-ux500/Makefile
- copy arch/arm/{mach-footbridge => mach-ux500}/Makefile.boot (100%)
- create mode 100644 arch/arm/mach-ux500/board-mop500.c
- create mode 100644 arch/arm/mach-ux500/clock.c
- create mode 100644 arch/arm/mach-ux500/clock.h
- create mode 100644 arch/arm/mach-ux500/cpu-u8500.c
- create mode 100644 arch/arm/mach-ux500/headsmp.S
- copy arch/arm/{mach-ep93xx => mach-ux500}/include/mach/clkdev.h (100%)
- create mode 100644 arch/arm/mach-ux500/include/mach/debug-macro.S
- create mode 100644 arch/arm/mach-ux500/include/mach/entry-macro.S
- create mode 100644 arch/arm/mach-ux500/include/mach/hardware.h
- create mode 100644 arch/arm/mach-ux500/include/mach/io.h
- create mode 100644 arch/arm/mach-ux500/include/mach/irqs.h
- create mode 100644 arch/arm/mach-ux500/include/mach/memory.h
- create mode 100644 arch/arm/mach-ux500/include/mach/mtu.h
- create mode 100644 arch/arm/mach-ux500/include/mach/setup.h
- create mode 100644 arch/arm/mach-ux500/include/mach/smp.h
- create mode 100644 arch/arm/mach-ux500/include/mach/system.h
- create mode 100644 arch/arm/mach-ux500/include/mach/timex.h
- create mode 100644 arch/arm/mach-ux500/include/mach/uncompress.h
- create mode 100644 arch/arm/mach-ux500/include/mach/vmalloc.h
- create mode 100644 arch/arm/mach-ux500/localtimer.c
- create mode 100644 arch/arm/mach-ux500/platsmp.c
- create mode 100644 arch/arm/mach-ux500/timer.c
- create mode 100755 drivers/mfd/stw4500.c
+diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
+index da76797..1d51b49 100644
+--- a/drivers/spi/amba-pl022.c
++++ b/drivers/spi/amba-pl022.c
+@@ -1828,7 +1828,7 @@ static struct amba_id pl022_ids[] = {
+ 		 * ST Micro derivative, this has 32bit wide
+ 		 * and 32 locations deep TX/RX FIFO
+ 		 */
+-		.id	= 0x00108022,
++		.id	= 0x01080022,
+ 		.mask	= 0xffffffff,
+ 		.data	= &vendor_st,
+ 	},
+-- 
+1.6.3.GIT
