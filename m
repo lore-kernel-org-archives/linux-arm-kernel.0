@@ -1,70 +1,59 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Mon, 21 Sep 2009 23:33:38 +0100
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 21 Sep 2009 23:34:53 +0100
 Subject: Kernel related (?) user space crash at ARM11 MPCore
-In-Reply-To: <20090921213802.GH30821@n2100.arm.linux.org.uk>
-References: <1253435940.498.15.camel@pc1117.cambridge.arm.com>
-	<20090920093139.GA1704@n2100.arm.linux.org.uk>
-	<20090920190227.GB5413@n2100.arm.linux.org.uk>
-	<4AB6B0AB.8040307@arm.com> <20090921083109.GC20006@shareable.org>
-	<1253522944.1541.3.camel@pc1117.cambridge.arm.com>
-	<20090921085425.GC27357@n2100.arm.linux.org.uk>
-	<1253526263.1541.32.camel@pc1117.cambridge.arm.com>
-	<20090921100751.GF27357@n2100.arm.linux.org.uk>
-	<20090921213802.GH30821@n2100.arm.linux.org.uk>
-Message-ID: <20090921223338.GH14700@shareable.org>
+In-Reply-To: <20090921221229.GF14700@shareable.org>
+References: <20090920093139.GA1704@n2100.arm.linux.org.uk>	<20090920190227.GB5413@n2100.arm.linux.org.uk>	<4AB6B0AB.8040307@arm.com>
+	<20090921083109.GC20006@shareable.org>	<1253522944.1541.3.camel@pc1117.cambridge.arm.com>	<20090921085425.GC27357@n2100.arm.linux.org.uk>	<1253526263.1541.32.camel@pc1117.cambridge.arm.com>	<20090921100751.GF27357@n2100.arm.linux.org.uk>	<20090921201043.GA14700@shareable.org>
+	<4AB7F716.2070206@arm.com> <20090921221229.GF14700@shareable.org>
+Message-ID: <4AB7FF8D.6040404@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Mon, Sep 21, 2009 at 11:07:51AM +0100, Russell King - ARM Linux wrote:
-> > On Mon, Sep 21, 2009 at 10:44:23AM +0100, Catalin Marinas wrote:
-> > > I would still call this I-D cache coherency issue since the two caches
-> > > have a different view of the RAM but I agree that the D-cache is the one
-> > > holding the data (with a slight chance for the I-cache not to be in sync
-> > > with main RAM, though we could treat it separately).
-> > > 
-> > > We can sort out the D-cache issue with your approach for cleaning it in
-> > > the copy_user_highpage() function, but, as I said, we affect the
-> > > standard CoW mechanism for data pages quite a lot.
-> > 
-> > Let me restate my approach more clearly:
-> > 
-> > 1. Remember that a VMA has been executable.
-> > 2. Only do the additional handing if the VMA has been executable.
+Jamie Lokier wrote:
+> Catalin Marinas wrote:
+>> A possible scenario (though more code analysis is needed to be entirely 
+>> sure) with writing instructions and not calling sys_cacheflush():
+>>
+>> - application mmap's a file (shared mapping, otherwise the data written 
+>> to private mappings is lost when unmapping)
+>> - app writes some instructions to text pages. We don't get CoW because 
+>> of the shared mapping but we don't get D-cache cleaning either
+>> - app unmap's the page but the kernel keeps the physical page in its 
+>> page cache. The flush_cache_page() on non-aliasing VIPT doesn't do 
+>> anything on ARM
+>> - app mmap's the page with PROT_READ|PROT_EXEC
+>> - app executes from the page generating a prefetch abort. The kernel 
+>> finds the page in its page cache and maps it into user space, calling 
+>> update_mmu_cache(). However, the dirty bit isn't set (since the kernel 
+>> hasn't touched the page) and the lazy D-cache flushing in 
+>> update_mmu_cache isn't triggered, leaving the I-cache with old entries 
+>> directly from RAM.
 > 
-> Well, there's a problem with this approach.  Any binary which executes
-> with read-implies-exec (in other words, the majority of those around)
-> results in any region with read permission also getting exec permission.
-> 
-> So, mprotect(rw) actually ends up as mprotect(rwx), which means that
-> effectively _all_ VMAs have been executable.
-> 
-> This approach won't work as well as I'd hope, since this means every
-> COW fault ends up triggering the cache flush.
-> 
-> However, the same problem affects Catalin's approach too - with these
-> binaries, every VMA has VM_EXEC set, which means every VMA gets the
-> cache flushing treatment whenever flush_cache_range() is called.
-> 
-> This is a nasty problem to solve...
+> Why isn't the dirty bit set by the last step?
 
-Would it be so harmful if mprotect(rw) were treated as mprotect(rw),
-while mprotect(r) is treated as mprotect(rx)?  Sure, someone _could_
-exec from rw pages, but they _should not_ be doing so if they haven't
-set PROT_EXEC.
+By dirty here I mean the PG_arch_1 bit set by flush_dcache_page() which 
+won't happen at step 2.
 
-PROT_READ implying PROT_READ|PROT_EXEC may be needed for historical
-compatibility reasons, but PROT_READ|PROT_WRITE implying
-PROT_READ|PROT_WRITE|PROT_EXEC - there might not be any code doing that.
+> The dirty bit must be set by the writes in the second step, otherwise
+> how does the kernel know not to discard those writes under memory
+> pressure?
 
-I would guess (but it's just a guess) that the sort of people who
-execute code from a PROT_WRITE segment would have known to set
-PROT_EXEC, and the main cause for concern would be if there are
-executables which have writable data immediately after the text
-segment, in the same page, to save space in an executable.  Has that
-happened?  Even that would be of no concern if that page is always
-mapped PROT_EXEC by the loaders.
+That's another dirty bit (I think PG_dirty) but it isn't taken into 
+account by update_mmu_cache(). As I said, more in-depth code analysis 
+here is needed to be entirely sure.
 
-Hmm :/  Actually I'm quite surprised read-implies-exec is needed.
+> Btw, regarding "non-aliasing", it's pretty clear that it does alias
+> the I-cache ;-), 
 
--- Jamie
+We just refer to D-cache aliasing here.
+
+> in much the same way as different addresses alias in
+> the D-cache with an "aliasing" cache.  That may well be a clue as to
+> clean, systematic and sane way of ensuring all the cache ops are in
+> all the right places.
+
+We should indeed favour correctness but there may be some corner cases 
+which aren't used anyway, so we shouldn't penalise normal usage.
+
+-- 
+Catalin
