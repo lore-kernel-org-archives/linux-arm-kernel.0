@@ -1,52 +1,39 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Mon, 21 Sep 2009 16:58:32 +0200
-Subject: [PATCH] watchdog: Add support for the Avionic Design Xanthos
-	watchdog timer.
-In-Reply-To: <20090831115837.GL29382@infomag.iguana.be>
-References: <20090821073105.GC29382@infomag.iguana.be>
-	<1250860202-28187-1-git-send-email-thierry.reding@avionic-design.de>
-	<20090822081806.GD29382@infomag.iguana.be>
-	<20090824090407.GA24894@avionic-design.de>
-	<20090827202314.GJ29382@infomag.iguana.be>
-	<4A96ED32.7000108@billgatliff.com>
-	<20090827204448.GL29382@infomag.iguana.be>
-	<20090828061108.GA1649@avionic-design.de>
-	<20090831115837.GL29382@infomag.iguana.be>
-Message-ID: <20090921145832.GA4211@avionic-design.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Sep 2009 16:01:03 +0100
+Subject: [PATCH 3/3] Move MMCI header to amba include dir
+In-Reply-To: <1252529727-7957-1-git-send-email-linus.walleij@stericsson.com>
+References: <1252529727-7957-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20090921150103.GB30821@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Wim Van Sebroeck wrote:
-> Hi Thierry,
-> 
-> > > >> This is the only thing I'm still struggling with: the goal of a watchdog device driver is to make sure that the system reboots when the system isn't stable anymore. So why should you then trigger the interrupt?
-> > > >>   
-> > > >
-> > > > ... because a hard reboot might not be the way he wants to resolve the  
-> > > > situation.
-> > > 
-> > > If your system is unstable then sending a keepalive to the watchdog during
-> > > this interrupt is not going to change anything neither... Or am I missing
-> > > something?
-> > 
-> > In this case, writing the timeout value to the watchdog is not actually a
-> > keepalive. This is in fact the mechanism used to reset/acknowledge the
-> > watchdog's interrupt.
-> 
-> I'm still puzzled. I have seen a number of watchdog devices that have the option to either reboot the system or generate an interrupt.
-> They can be set via toggling the correct bits of some configuration register.
-> 
-> How does this hardware works? Is there a datasheet available somewhere?
+On Wed, Sep 09, 2009 at 10:55:27PM +0200, Linus Walleij wrote:
+> This moves the mmci platform data definition struct away from
+> arch/arm/include/asm/mach/mmc.h into the more proper place among
+> the other primecells in include/linux/amba/mmci.h and at the same
+> time renames it to "mmci.h", and also the struct in this file
+> confusingly named mmc_platform_data has been renamed
+> mmci_platform_data for clarity.
 
-It works exactly the same way. The bit defined by ADX_WDT_CONTROL_nRESET
-controls this behaviour. If set, the watchdog will only generate an
-interrupt, if cleared (the default) it will reboot the system.
+Not sure what's happened, but this patch appears to conflict with
+another, resulting in:
 
-There's currently no real datasheet available. The register definitions at
-the top of adx_wdt.c are pretty much all of the documentation we currently
-have, I'm afraid.
+arch/arm/mach-versatile/core.c:372: error: variable 'mmc0_plat_data' has initializer but incomplete type
+arch/arm/mach-versatile/core.c:373: error: unknown field 'ocr_mask' specified in initializer
+arch/arm/mach-versatile/core.c:373: warning: excess elements in struct initializer
+arch/arm/mach-versatile/core.c:373: warning: (near initialization for 'mmc0_plat_data')
+arch/arm/mach-versatile/core.c:374: error: unknown field 'status' specified in initializer
+arch/arm/mach-versatile/core.c:374: warning: excess elements in struct initializer
+arch/arm/mach-versatile/core.c:374: warning: (near initialization for 'mmc0_plat_data')
+arch/arm/mach-versatile/core.c:375: error: unknown field 'gpio_wp' specified in initializer
+arch/arm/mach-versatile/core.c:375: warning: excess elements in struct initializer
+arch/arm/mach-versatile/core.c:375: warning: (near initialization for 'mmc0_plat_data')
+arch/arm/mach-versatile/core.c:376: error: unknown field 'gpio_cd' specified in initializer
+arch/arm/mach-versatile/core.c:376: warning: excess elements in struct initializer
+arch/arm/mach-versatile/core.c:376: warning: (near initialization for 'mmc0_plat_data')
 
-> Kind regards,
-> Wim.
+arch/arm/mach-realview/realview_eb.c:40:26: error: asm/mach/mmc.h: No such file or directory
+arch/arm/mach-realview/realview_pb1176.c:40:26: error: asm/mach/mmc.h: No such file or directory
+arch/arm/mach-realview/realview_pb11mp.c:41:26: error: asm/mach/mmc.h: No such file or directory
 
-Thierry
+so I'm going to drop it for the time being.
