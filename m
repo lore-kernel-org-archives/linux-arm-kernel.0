@@ -1,33 +1,22 @@
-From: ramaxlo@gmail.com (Ramax Lo)
-Date: Tue, 22 Sep 2009 00:04:16 +0800
-Subject: [PATCH] S3C24XX: Define a macro to avoid compilation error
-In-Reply-To: <>
-References: <>
-Message-ID: <1253549056-25322-1-git-send-email-ramaxlo@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Sep 2009 17:35:31 +0100
+Subject: [PATCH v4 2/2] ARM: Proper prefetch abort handling on ARMv6
+	and ARMv7
+In-Reply-To: <8f6baf3261f6bde5b50142cbdf48b2e9e0821892.1253557409.git.kirill@shutemov.name>
+References: <490fc9117572828816ebfec0200d7aad9e91075b.1253557409.git.kirill@shutemov.name>
+	<8f6baf3261f6bde5b50142cbdf48b2e9e0821892.1253557409.git.kirill@shutemov.name>
+Message-ID: <20090921163531.GE30821@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define a macro to avoid the following error during kernel build process
-for platforms other than s3c2410:
+On Mon, Sep 21, 2009 at 09:24:09PM +0300, Kirill A. Shutemov wrote:
+> Currently, on ARMv6 and ARMv7, if an application tries to execute
+> code (or garbage) on non-executable page it hangs. It caused by
+> incorrect prefetch abort handling. Now every prefetch abort
+> processes as a translation fault.
 
-arch/arm/plat-s3c24xx/cpu.c:84: error: ?s3c2410a_init? undeclared here (not in a function)
+Please ensure that your patches apply on top of this set of patches:
 
-Signed-off-by: Ramax Lo <ramaxlo@gmail.com>
----
- arch/arm/plat-s3c24xx/include/plat/s3c2410.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+http://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/arm.diff
 
-diff --git a/arch/arm/plat-s3c24xx/include/plat/s3c2410.h b/arch/arm/plat-s3c24xx/include/plat/s3c2410.h
-index b6deeef..82ab4aa 100644
---- a/arch/arm/plat-s3c24xx/include/plat/s3c2410.h
-+++ b/arch/arm/plat-s3c24xx/include/plat/s3c2410.h
-@@ -27,6 +27,7 @@ extern void s3c2410_init_clocks(int xtal);
- #define s3c2410_init_uarts NULL
- #define s3c2410_map_io NULL
- #define s3c2410_init NULL
-+#define s3c2410a_init NULL
- #endif
- 
- extern int s3c2410_baseclk_add(void);
--- 
-1.5.4.3
+Thanks.
