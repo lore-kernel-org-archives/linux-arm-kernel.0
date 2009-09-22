@@ -1,31 +1,33 @@
 From: jaswinder@kernel.org (Jaswinder Singh Rajput)
-Date: Tue, 22 Sep 2009 18:37:01 +0530
-Subject: [PATCH] ARM: includecheck fix: mach-davinci, board-dm365-evm.c
-Message-ID: <1253624821.3784.8.camel@ht.satnam>
+Date: Tue, 22 Sep 2009 18:41:40 +0530
+Subject: [PATCH] ARM: includecheck fix: mach-bcmring, core.c
+In-Reply-To: <1253623861.3784.4.camel@ht.satnam>
+References: <1253623861.3784.4.camel@ht.satnam>
+Message-ID: <1253625100.3784.10.camel@ht.satnam>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Cc to linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 
-fix the following 'make includecheck' warning:
-
-  arch/arm/mach-davinci/board-dm365-evm.c: mach/common.h is included more than once.
-
-Signed-off-by: Jaswinder Singh Rajput <jaswinderrajput@gmail.com>
----
- arch/arm/mach-davinci/board-dm365-evm.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index a1d5e7d..52dd804 100644
---- a/arch/arm/mach-davinci/board-dm365-evm.c
-+++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -35,7 +35,6 @@
- #include <mach/common.h>
- #include <mach/i2c.h>
- #include <mach/serial.h>
--#include <mach/common.h>
- #include <mach/mmc.h>
- #include <mach/nand.h>
- 
--- 
-1.6.0.6
+On Tue, 2009-09-22 at 18:21 +0530, Jaswinder Singh Rajput wrote:
+> fix the following 'make includecheck' warning:
+> 
+>   arch/arm/mach-bcmring/core.c: linux/amba/bus.h is included more than once.
+> 
+> Signed-off-by: Jaswinder Singh Rajput <jaswinderrajput@gmail.com>
+> ---
+>  arch/arm/mach-bcmring/core.c |    1 -
+>  1 files changed, 0 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-bcmring/core.c b/arch/arm/mach-bcmring/core.c
+> index 492c649..d3bf29b 100644
+> --- a/arch/arm/mach-bcmring/core.c
+> +++ b/arch/arm/mach-bcmring/core.c
+> @@ -31,7 +31,6 @@
+>  #include <linux/clocksource.h>
+>  #include <linux/clockchips.h>
+>  
+> -#include <linux/amba/bus.h>
+>  #include <mach/csp/mm_addr.h>
+>  #include <mach/hardware.h>
+>  #include <asm/clkdev.h>
