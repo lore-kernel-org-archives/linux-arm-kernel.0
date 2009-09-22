@@ -1,59 +1,82 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 22 Sep 2009 11:19:13 +0100
-Subject: Kernel related (?) user space crash at ARM11 MPCore
-In-Reply-To: <20090921213802.GH30821@n2100.arm.linux.org.uk>
-References: <20090919224022.GA738@n2100.arm.linux.org.uk>
-	<1253435940.498.15.camel@pc1117.cambridge.arm.com>
-	<20090920093139.GA1704@n2100.arm.linux.org.uk>
-	<20090920190227.GB5413@n2100.arm.linux.org.uk>
-	<4AB6B0AB.8040307@arm.com> <20090921083109.GC20006@shareable.org>
-	<1253522944.1541.3.camel@pc1117.cambridge.arm.com>
-	<20090921085425.GC27357@n2100.arm.linux.org.uk>
-	<1253526263.1541.32.camel@pc1117.cambridge.arm.com>
-	<20090921100751.GF27357@n2100.arm.linux.org.uk>
-	<20090921213802.GH30821@n2100.arm.linux.org.uk>
-Message-ID: <1253614753.14049.47.camel@pc1117.cambridge.arm.com>
+From: schen@mvista.com (Steve Chen)
+Date: Tue, 22 Sep 2009 05:47:29 -0500
+Subject: [PATCH v5] arm: remove unused code in delay.S
+In-Reply-To: <1253369076.3273.299.camel@linux-1lbu>
+References: <1253292418.3273.257.camel@linux-1lbu>
+	<20090918190920.GB11461@pengutronix.de>
+	<1253305534.3273.283.camel@linux-1lbu>
+	<20090918205349.GM29905@game.jcrosoft.org>
+	<1253364929.3273.298.camel@linux-1lbu>
+	<1253369076.3273.299.camel@linux-1lbu>
+Message-ID: <1253616449.3273.318.camel@linux-1lbu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2009-09-21 at 22:38 +0100, Russell King - ARM Linux wrote:
-> On Mon, Sep 21, 2009 at 11:07:51AM +0100, Russell King - ARM Linux wrote:
-> > On Mon, Sep 21, 2009 at 10:44:23AM +0100, Catalin Marinas wrote:
-> > > I would still call this I-D cache coherency issue since the two caches
-> > > have a different view of the RAM but I agree that the D-cache is the one
-> > > holding the data (with a slight chance for the I-cache not to be in sync
-> > > with main RAM, though we could treat it separately).
-> > > 
-> > > We can sort out the D-cache issue with your approach for cleaning it in
-> > > the copy_user_highpage() function, but, as I said, we affect the
-> > > standard CoW mechanism for data pages quite a lot.
-> > 
-> > Let me restate my approach more clearly:
-> > 
-> > 1. Remember that a VMA has been executable.
-> > 2. Only do the additional handing if the VMA has been executable.
+Document #if 0 code block in delay.S and make it selectable for compile.
 
-> Well, there's a problem with this approach.  Any binary which executes
-> with read-implies-exec (in other words, the majority of those around)
-> results in any region with read permission also getting exec permission.
+Comments by 
+Felipe Contreras <felipe.contreras@gmail.com>
+Jamie Lokier <jamie@shareable.org>
+Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Krzysztof Halasa <khc@pm.waw.pl>
+Marek Vasut <marek.vasut@gmail.com>
+Pavel Machek <pavel@ucw.cz>
+Sergei Shtylyov <sshtylyov@ru.mvista.com>
+Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Some idea (not tested) - we keep XN always set even if the mapping has
-PROT_EXEC. We then handle the prefetch abort and with the IFSR patches
-from Kirill we can detect the permission fault and clear the XN bit
-while also cleaning the D-cache, maybe via update_mmu_cache() or
-directly in __do_page_fault().
+Signed-off-by: Steve Chen <schen@mvista.com>
 
-Most text pages are handled via a prefetch abort anyway, so we don't
-have any performance penalty here. For the read-implies-exec pages or
-the dynamic linker case, we have an additional prefetch abort but that's
-much faster than either flush_cache_range() or copy_to_user_highpage()
-patches.
+---
 
-We may need an additional pte bit or just reuse L_PTE_EXEC.
+ arch/arm/Kconfig     |   23 +++++++++++++++++++++++
+ arch/arm/lib/delay.S |    2 +-
+ 2 files changed, 24 insertions(+), 1 deletions(-)
 
-Yet another idea - add a generic flush_cache_range_for_mprotect()
-function with a specific implementation for ARM (called via
-change_protection).
-
--- 
-Catalin
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index aef63c8..9a5a49a 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -813,6 +813,29 @@ config ARM_ERRATA_460075
+ 	  ACTLR register. Note that setting specific bits in the ACTLR
+register
+ 	  may not be available in non-secure mode.
+ 
++config OLD_CPU_DELAY
++	depends on CPU_32v3 || CPU_32v4 || CPU_32v4T
++	bool "Different delay() code for some older CPUs"
++	help
++	  Enable this if observing longer than expected delays.  This code
++	  improves delay accuracy for some CPUs.  However, it can also cause
++	  delay duration to be too short for others which leads to stability
++	  issues.
++
++	  In other words, do not enable unless you can guarantee that the
++	  processor (or ALL of the processors if building a generic kernel)
++	  delays for at least the time requested after enabling.
++
++	  ARM610 and ARM710 are known to benefit from enabling this option.
++	  It should not be enabled for StrongARMs, because it is known
++	  to produce too short delays on those.
++
++	  CPUs should enable this flag
++		ARM610 (rmk)
++		ARM710 (rmk)
++
++	  CPUs should disable this flag
++		StrongARM (rmk)
+ endmenu
+ 
+ source "arch/arm/common/Kconfig"
+diff --git a/arch/arm/lib/delay.S b/arch/arm/lib/delay.S
+index 8d6a876..67e679b 100644
+--- a/arch/arm/lib/delay.S
++++ b/arch/arm/lib/delay.S
+@@ -42,7 +42,7 @@ ENTRY(__const_udelay)				@ 0 <= r0 <= 0x7fffff06
+ @ Delay routine
+ ENTRY(__delay)
+ 		subs	r0, r0, #1
+-#if 0
++#ifdef CONFIG_OLD_CPU_DELAY
+ 		movls	pc, lr
+ 		subs	r0, r0, #1
+ 		movls	pc, lr
