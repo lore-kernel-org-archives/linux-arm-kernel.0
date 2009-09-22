@@ -1,19 +1,37 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 23 Sep 2009 02:26:09 +0800
-Subject: [PATCH 8/17] pxa: add apmu clock support in mmp
-In-Reply-To: <771cded00909142308n5222831fm84a59c4a9c12f116@mail.gmail.com>
-References: <771cded00909142308n5222831fm84a59c4a9c12f116@mail.gmail.com>
-Message-ID: <f17812d70909221126x15b33abeh4b9561bd22ad0c03@mail.gmail.com>
+From: rmk@arm.linux.org.uk (Russell King)
+Date: Tue, 22 Sep 2009 20:05:55 +0100
+Subject: [patch 175/200] MAINTAINERS: move ARM lists to infradead
+In-Reply-To: <m33a6f7x34.fsf@intrepid.localdomain>
+References: <200909220004.n8M04S5U001324@imap1.linux-foundation.org>
+	<20090922074755.GA696@Chamillionaire.breakpoint.cc>
+	<1253626009.6317.648.camel@macbook.infradead.org>
+	<1253632347.30020.8.camel@Joe-Laptop.home>
+	<m3bpl37y5c.fsf@intrepid.localdomain>
+	<1253636800.30020.24.camel@Joe-Laptop.home>
+	<m33a6f7x34.fsf@intrepid.localdomain>
+Message-ID: <20090922190555.GA24624@flint.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2009 at 2:08 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> From 77edf7eb47b8453b4e9a6b8bf01a8121cda327a5 Mon Sep 17 00:00:00 2001
-> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Thu, 10 Sep 2009 14:01:22 +0800
-> Subject: [PATCH] pxa: add apmu clock support in mmp
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+On Tue, Sep 22, 2009 at 06:39:27PM +0200, Krzysztof Halasa wrote:
+> Joe Perches <joe@perches.com> writes:
+> 
+> > Posting to linux-arm-kernel was and likely still is limited
+> > without prior subscription.
+> 
+> If so then it should be fixed. Otherwise I can see no point in moving
+> from the old list.
 
-Applied.
+The point was to get me out of the loop, so people can stop using me as
+an excuse.  That's what it's about, plain and simple.  It wasn't really
+about the list policies.  It was purely that I was involved in running
+it.
+
+Don't think so?  See Pavel's different attitude towards the moderation
+messages from the new mailing list - it's no longer "linux-arm-kernel
+useless for development".
+
+-- 
+Russell King
+ Linux kernel    2.6 ARM Linux   - http://www.arm.linux.org.uk/
+ maintainer of:
