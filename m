@@ -1,33 +1,37 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 23 Sep 2009 01:24:14 +0800
-Subject: [PATCH 3/17] pxa: merge device struct in pxa910 and pxa168
-In-Reply-To: <771cded00909142302u156bb1ecp6024fa682b2036e4@mail.gmail.com>
-References: <771cded00909142302u156bb1ecp6024fa682b2036e4@mail.gmail.com>
-Message-ID: <f17812d70909221024n4782f5d5i86ad519cffd96c43@mail.gmail.com>
+Date: Wed, 23 Sep 2009 02:02:02 +0800
+Subject: [PATCH 4/17] pxa: enable onenand for ttcdkb board
+In-Reply-To: <771cded00909142303n18a15e93leaa980e13a1a091a@mail.gmail.com>
+References: <771cded00909142303n18a15e93leaa980e13a1a091a@mail.gmail.com>
+Message-ID: <f17812d70909221102p2e10c0ak41399d706b446940@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2009 at 2:02 PM, Haojian Zhuang
+On Tue, Sep 15, 2009 at 2:03 PM, Haojian Zhuang
 <haojian.zhuang@gmail.com> wrote:
-> From 3299ff750a63ff13332e72e13f05a2b79425ca47 Mon Sep 17 00:00:00 2001
+> From da4ebc9254d072b69f17b2fc2980c0b17d9d9aa8 Mon Sep 17 00:00:00 2001
 > From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Tue, 8 Sep 2009 16:16:05 +0800
-> Subject: [PATCH] pxa: merge device struct in pxa910 and pxa168
->
-> device structure are both defined in pxa910 and pxa168. A lot of device are
-> shared between pxa910 and pxa168. Merge them into device.c in order to keep
-> code simple.
+> Date: Wed, 9 Sep 2009 18:22:33 +0800
+> Subject: [PATCH] pxa: enable onenand for ttcdkb board
 >
 > Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> ---
+> ?arch/arm/mach-mmp/devices.c????????????? |??? 1 +
+> ?arch/arm/mach-mmp/include/mach/devices.h |??? 2 +
+> ?arch/arm/mach-mmp/ttc_dkb.c????????????? |?? 77
+> +++++++++++++++++++++++++++++-
+> ?3 files changed, 78 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-mmp/devices.c b/arch/arm/mach-mmp/devices.c
+> index 548ca76..23b3ae1 100644
+> --- a/arch/arm/mach-mmp/devices.c
+> +++ b/arch/arm/mach-mmp/devices.c
+> @@ -79,6 +79,7 @@ PXA168_DEVICE(pwm1, "pxa168-pwm", 0, NONE, 0xd401a000,
+> 0x10);
+> ?PXA168_DEVICE(pwm2, "pxa168-pwm", 1, NONE, 0xd401a400, 0x10);
+> ?PXA168_DEVICE(pwm3, "pxa168-pwm", 2, NONE, 0xd401a800, 0x10);
+> ?PXA168_DEVICE(pwm4, "pxa168-pwm", 3, NONE, 0xd401ac00, 0x10);
+> +PXA168_DEVICE(onenand, "onenand", -1, NONE, 0x80000000, 0x100000);
 
-Mmm....I'd prefer some redundancy so that:
-
-1. you don't have to add a pxa168_device_* in pxa910 code (which is confusing)
-2. you can handle the trivial difference easily between pxa168 and pxa910
-   (e.g. IRQ, DMA channels, I/O memory range)
-3. this is flexible to extend to future SoC
-
-The drawback is a little bit waste of memory since some common definitions
-are not grouped, and that's why I invented 'struct pxa_device_desc', which
-tends to be small, and all those heavy 'struct platform_device's are created
-dynamically.
+Mmm... this isn't really a SoC device, this should be somewhere within
+board code. What about the patch below?
