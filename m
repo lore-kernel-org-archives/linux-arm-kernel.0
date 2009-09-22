@@ -1,46 +1,77 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Tue, 22 Sep 2009 21:45:01 +0200
-Subject: SPI, DMA and an i.MX31
-In-Reply-To: <4AB8F9AE.1070006@billgatliff.com>
-References: <87077C4F48609F4392621D9F99DDE20901202DFF@tesla.star.galaxy.io>
-	<BLU105-W229F8F8F533B107510C600BAE10@phx.gbl>
-	<87077C4F48609F4392621D9F99DDE20901202E00@tesla.star.galaxy.io>
-	<4AB7C020.2070205@gmail.com> <4AB839FF.4000803@windriver.com>
-	<87077C4F48609F4392621D9F99DDE20901202E02@tesla.star.galaxy.io>
-	<59b21cf20909220709w54b9e259ube473b322d661a65@mail.gmail.com>
-	<4AB8F9AE.1070006@billgatliff.com>
-Message-ID: <59b21cf20909221245i355ccea0r44737e9112fd17c0@mail.gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Tue, 22 Sep 2009 21:14:59 +0100
+Subject: [PATCH 4/7] S3C64XX DMA: S3C2410_DMAF_CIRCULAR disable
+In-Reply-To: <1b68c6790909151924u5b1abe5ayaf5377ac57ede69@mail.gmail.com>
+References: <1253008882-7587-1-git-send-email-jassi.brar@samsung.com>
+	<20090916002832.GN13508@trinity.fluff.org>
+	<1b68c6790909151924u5b1abe5ayaf5377ac57ede69@mail.gmail.com>
+Message-ID: <20090922201458.GA31920@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bill
+On Wed, Sep 16, 2009 at 11:24:47AM +0900, jassi brar wrote:
+> On Wed, Sep 16, 2009 at 9:28 AM, Ben Dooks <ben-linux@fluff.org> wrote:
+> > On Tue, Sep 15, 2009 at 07:01:22PM +0900, Jassi wrote:
+> >> S3C2410_DMAF_CIRCULAR requires that we don't free buffer
+> >> resources after TC-IRQ because we will revisit the buffer.
+> >> During simple long term playback/capture, like movie-play,
+> >> this may block those resources(kmem/dma_pool) unncessarily.
+> >> This is especially a problem since we allocate them in IRQ
+> >> context.
+> >> For now, we disable the option and free buff resources after
+> >> it's TC-IRQ. Also, chan->curr will point to the active buffer
+> >> while chan->next is rendered useless.
+> >
+> > This would have been better changing the sound driver and ensuring
+> > it does not allocate as much memory for buffering audio.
+> >
+> > The whole point of the circular buffer is it is allocated once and
+> > then used until the end of playback. If what you are saying is right,
+> > and resources are running out then somewhere either the SoC layer is
+> > losing them or between the DMA and the I2S driver we are losing
+> > buffers. This points to a bug in the resource management of one of
+> > them.
+> Please correct if any of the following is wrong as per the existing code:-
+> In DMA driver:-
+>    1) A 'struct s3c64xx_dma_buff' and a 'struct pl080s_lli' is allocated
+>  during every call to s3c2410_dma_enqueue.
+>     2) These resources are freed only when s3c64xx_dma_ctrl(FLUSH)
+>  is called by the dma client.
+> 
+>  In Dma Client Driver(I2S):-
+>    1) DMA is aquired and setup once before active continuous use
+>        and s3c2410_dma_enqueue is called as many times as the client
+> has some data to transfer, without any other call to dma driver.
+>    2) Unless there is some suspend/resume or pause/play event,
+> s3c64xx_dma_ctrl(FLUSH) may only be called after playback/capture ends.
+> 
+> Now consider the situation when we didn't set the CIRCULAR flag.
+> During this time the buffer resources are simply piling up without being
+> ever reused. Note that the playback maybe of many hours and at
+> some point dma_pool_alloc(and later kzalloc) will start returning NULL.
+> 
+> Besides,
+> a) The dma driver doesn't free those resource even for
+> Non-CIRCULAR flagged requests.
+> b) Only I2S driver makes use of the DMA driver(curently). To make
+> use of the feature(which is available only in 64xx dma driver) the 64xx
+> i2s driver will have to break from 24xx drivers(which we want to unify
+> ultimately?) and ALSA already provides a buffer looping mechanism.
 
-2009/9/22 Bill Gatliff <bgat@billgatliff.com>:
-> Magnus Lilja wrote:
->>
->> That might be a problem. Binary firmware can be handled in Linux, as
->> an example one can load it from user space but that makes it difficult
->> to enable the SDMA before userspace has started. Another example is to
->> let the bootloader load the SDMA scripts but that's not a nice
->> solution. Don't know if this firmware can be accepted as a binary
->> within the kernel.
->>
->
-> It couldn't be a "binary" in the kernel per se, it would be a constant
-> character array that gets compiled into a binary chunk.
+Yes, you are right, having gone back over the original code tree that
+was produced I've found the final patch in the series that never got
+sent which defines the correct use of the DMAF_CIRCUALR and ensures
+that the ASoC driver uses it correctly.
 
-Correct. That's the way Freescale has done it in their BSP, a char[]
-array that eventually gets downloaded into the SDMA engine.
+In this case, the ASoC driver uses the S3C2410_DMAF_CIRCULAR to
+enqueue the buffers once when the stream is initialised and then
+does not call enqueue again.
 
-> ?Sort of like
-> how, for example, Keyspan's drivers are done. ?See
-> linux/firmware/README.AddingFirmware, linux/firmware/keyspan and
-> drivers/usb/serial/keyspan*.
+I will post a patch to the lists with this functionality back in so
+that it can be tested and merged.
 
-The README states that new firmware shall be added to Davids
-linux-firmware tree, but that would mean that the DMA scripts would be
-outside of the Linux source tree. Should one merge Davids
-linux-firmware tree with the standard Linux-tree locally or how is it
-supposed to work?
+-- 
+Ben
 
-Thanks, Magnus
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
