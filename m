@@ -1,45 +1,52 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 22 Sep 2009 10:21:13 +0100
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 22 Sep 2009 15:04:07 +0530
 Subject: Kernel related (?) user space crash at ARM11 MPCore
-In-Reply-To: <20090921223338.GH14700@shareable.org>
-References: <1253435940.498.15.camel@pc1117.cambridge.arm.com>
+In-Reply-To: <1253610085.14049.22.camel@pc1117.cambridge.arm.com>
+References: <4A7AEEB6.5060903@googlemail.com>
+	<1250184014.14019.40.camel@pc1117.cambridge.arm.com>
+	<1250501311.9858.24.camel@pc1117.cambridge.arm.com>
+	<20090817140422.GA10764@n2100.arm.linux.org.uk>
+	<1250529916.11185.80.camel@pc1117.cambridge.arm.com>
+	<20090919224022.GA738@n2100.arm.linux.org.uk>
+	<1253435940.498.15.camel@pc1117.cambridge.arm.com>
 	<20090920093139.GA1704@n2100.arm.linux.org.uk>
-	<20090920190227.GB5413@n2100.arm.linux.org.uk>
-	<4AB6B0AB.8040307@arm.com> <20090921083109.GC20006@shareable.org>
-	<1253522944.1541.3.camel@pc1117.cambridge.arm.com>
-	<20090921085425.GC27357@n2100.arm.linux.org.uk>
-	<1253526263.1541.32.camel@pc1117.cambridge.arm.com>
-	<20090921100751.GF27357@n2100.arm.linux.org.uk>
-	<20090921213802.GH30821@n2100.arm.linux.org.uk>
-	<20090921223338.GH14700@shareable.org>
-Message-ID: <1253611273.14049.30.camel@pc1117.cambridge.arm.com>
+	<4AB6A664.3010704@arm.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02BABA388A@dbde02.ent.ti.com>
+	<1253610085.14049.22.camel@pc1117.cambridge.arm.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02BACC4AF6@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2009-09-21 at 23:33 +0100, Jamie Lokier wrote:
-> Russell King - ARM Linux wrote:
-> > So, mprotect(rw) actually ends up as mprotect(rwx), which means that
-> > effectively _all_ VMAs have been executable.
-> > 
-> > This approach won't work as well as I'd hope, since this means every
-> > COW fault ends up triggering the cache flush.
-> > 
-> > However, the same problem affects Catalin's approach too - with these
-> > binaries, every VMA has VM_EXEC set, which means every VMA gets the
-> > cache flushing treatment whenever flush_cache_range() is called.
-> > 
-> > This is a nasty problem to solve...
+
+> -----Original Message-----
+> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
+> Sent: Tuesday, September 22, 2009 2:31 PM
+> To: Shilimkar, Santosh
+> Cc: Russell King - ARM Linux; Dirk Behme; linux-arm-
+> kernel at lists.infradead.org
+> Subject: RE: Kernel related (?) user space crash at ARM11 MPCore
 > 
-> Would it be so harmful if mprotect(rw) were treated as mprotect(rw),
-> while mprotect(r) is treated as mprotect(rx)?  Sure, someone _could_
-> exec from rw pages, but they _should not_ be doing so if they haven't
-> set PROT_EXEC.
+> On Tue, 2009-09-22 at 11:14 +0530, Shilimkar, Santosh wrote:
+> > Even though this thread is mainly focused on SMP + WA cache, can you
+> > point out some reference which support your argument that " the
+> > non-SMP v6/v7 processors I'm aware of only support read-allocate
+> > caches, even if you try to force write-allocate". Mainly Cortex-a8
+> > (ARMv7). The Cortex-A8 TRM says that it does support WBWA cache.
+> 
+> Please note the "I'm aware of" part. This could be limited to what I
+> have on my desk.
+> 
+> Regarding the Cortex-A8 - the 7.3.3 section in the latest TRM (Level 1
+> Memory System -> Memory attributes -> Normal) has a table which says for
+> the WBWA L1 configuration:
+> 
+>         This is not supported. L1 is always in the no write-allocate
+>         mode.
+> 
+> The L2 (inner cache) supports the write-allocate mode but this is a
+> unified cache and doesn't affect the problem we are seeing here.
 
-For OABI, I think we rely on executable user stack for signal handling
-and the arm_elf_read_implies_exec() always returns 1. There are also
-tools like like this - http://linux.die.net/man/8/execstack - or maybe
-the toolchain setting the PT_GNU_STACK which would also set the
-read_implies_exec for the stack. And the stack must be writable.
+Thanks Catalin for information!!
 
--- 
-Catalin
+Regards,
+Santosh
