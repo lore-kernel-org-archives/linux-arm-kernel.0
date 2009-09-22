@@ -1,395 +1,52 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 22 Sep 2009 15:26:12 +0200
-Subject: [PATCH] Move MMCI header to amba include dir
-Message-ID: <1253625972-19407-1-git-send-email-linus.walleij@stericsson.com>
+From: lilja.magnus@gmail.com (Magnus Lilja)
+Date: Tue, 22 Sep 2009 16:09:16 +0200
+Subject: SPI, DMA and an i.MX31
+In-Reply-To: <87077C4F48609F4392621D9F99DDE20901202E02@tesla.star.galaxy.io>
+References: <87077C4F48609F4392621D9F99DDE20901202DFF@tesla.star.galaxy.io>
+	<BLU105-W229F8F8F533B107510C600BAE10@phx.gbl>
+	<87077C4F48609F4392621D9F99DDE20901202E00@tesla.star.galaxy.io>
+	<4AB7C020.2070205@gmail.com> <4AB839FF.4000803@windriver.com>
+	<87077C4F48609F4392621D9F99DDE20901202E02@tesla.star.galaxy.io>
+Message-ID: <59b21cf20909220709w54b9e259ube473b322d661a65@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This moves the mmci platform data definition struct away from
-arch/arm/include/asm/mach/mmc.h into the more proper place among
-the other primecells in include/linux/amba/mmci.h and at the same
-time renames it to "mmci.h", and also the struct in this file
-confusingly named mmc_platform_data has been renamed
-mmci_platform_data for clarity.
+Hi
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
----
-This patch is against the devel branch in Russells git, and was
-compiled with no errors against realview_defconfig,
-versatile_defconfig, integrator_defconfig and u300_defconfig.
-Some minor tweaks were needed to compile, since devel is not yet
-rebased to master (vic.c #include <linux/device.h> patch and
-the new clocksource code are the culprits).
----
- arch/arm/include/asm/mach/mmc.h          |   18 ------------------
- arch/arm/mach-integrator/integrator_cp.c |    4 ++--
- arch/arm/mach-realview/core.c            |    6 +++---
- arch/arm/mach-realview/core.h            |    4 ++--
- arch/arm/mach-realview/realview_eb.c     |    2 +-
- arch/arm/mach-realview/realview_pb1176.c |    2 +-
- arch/arm/mach-realview/realview_pb11mp.c |    2 +-
- arch/arm/mach-realview/realview_pba8.c   |    2 +-
- arch/arm/mach-realview/realview_pbx.c    |    2 +-
- arch/arm/mach-u300/mmc.c                 |    4 ++--
- arch/arm/mach-versatile/core.c           |    4 ++--
- arch/arm/mach-versatile/versatile_pb.c   |    4 ++--
- drivers/mmc/host/mmci.c                  |    4 ++--
- drivers/mmc/host/mmci.h                  |    2 +-
- include/linux/amba/mmci.h                |   18 ++++++++++++++++++
- 15 files changed, 39 insertions(+), 39 deletions(-)
- delete mode 100644 arch/arm/include/asm/mach/mmc.h
- create mode 100644 include/linux/amba/mmci.h
+2009/9/22 Wolf, Rene, HRO-GP <rene.wolf@mbda-systems.de>:
+> Hi @ all!
+>
+> Wow, there seams to be some interest in this :-)
+>
+>> Freescale has released a BSP for i.MX31 based on kernel 2.6.26. Don't
+>> know how much it differs in the DMA areas but it might be good to
+>> check it out and use that as well as a base for your work on i.MX31-DMA
+>> in 2.6.31. (freescale.com/imx31 => Software & Tools => i.MX31PDK =>
+>> Downloads)
+>
+> Jep. As far as I can remember I did check it and that was a binary only
+> release or I just overlooked the interesting stuff... I will have a
+> second look at it.
 
-diff --git a/arch/arm/include/asm/mach/mmc.h b/arch/arm/include/asm/mach/mmc.h
-deleted file mode 100644
-index 27bec55..0000000
---- a/arch/arm/include/asm/mach/mmc.h
-+++ /dev/null
-@@ -1,18 +0,0 @@
--/*
-- *  arch/arm/include/asm/mach/mmc.h
-- */
--#ifndef ASMARM_MACH_MMC_H
--#define ASMARM_MACH_MMC_H
--
--#include <linux/mmc/host.h>
--
--struct mmc_platform_data {
--	unsigned int ocr_mask;			/* available voltages */
--	u32 (*translate_vdd)(struct device *, unsigned int);
--	unsigned int (*status)(struct device *);
--	int	gpio_wp;
--	int	gpio_cd;
--	unsigned long capabilities;
--};
--
--#endif
-diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index 2a318eb..3f35293 100644
---- a/arch/arm/mach-integrator/integrator_cp.c
-+++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -19,6 +19,7 @@
- #include <linux/amba/bus.h>
- #include <linux/amba/kmi.h>
- #include <linux/amba/clcd.h>
-+#include <linux/amba/mmci.h>
- #include <linux/io.h>
- 
- #include <asm/clkdev.h>
-@@ -35,7 +36,6 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/flash.h>
- #include <asm/mach/irq.h>
--#include <asm/mach/mmc.h>
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
- 
-@@ -400,7 +400,7 @@ static unsigned int mmc_status(struct device *dev)
- 	return status & 8;
- }
- 
--static struct mmc_platform_data mmc_data = {
-+static struct mmci_platform_data mmc_data = {
- 	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
- 	.status		= mmc_status,
- 	.gpio_wp	= -1,
-diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
-index 5a5e1f7..a2083b6 100644
---- a/arch/arm/mach-realview/core.c
-+++ b/arch/arm/mach-realview/core.c
-@@ -30,6 +30,7 @@
- #include <linux/io.h>
- #include <linux/smsc911x.h>
- #include <linux/ata_platform.h>
-+#include <linux/amba/mmci.h>
- 
- #include <asm/clkdev.h>
- #include <asm/system.h>
-@@ -44,7 +45,6 @@
- #include <asm/mach/flash.h>
- #include <asm/mach/irq.h>
- #include <asm/mach/map.h>
--#include <asm/mach/mmc.h>
- 
- #include <asm/hardware/gic.h>
- 
-@@ -237,14 +237,14 @@ static unsigned int realview_mmc_status(struct device *dev)
- 	return readl(REALVIEW_SYSMCI) & mask;
- }
- 
--struct mmc_platform_data realview_mmc0_plat_data = {
-+struct mmci_platform_data realview_mmc0_plat_data = {
- 	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
- 	.status		= realview_mmc_status,
- 	.gpio_wp	= 17,
- 	.gpio_cd	= 16,
- };
- 
--struct mmc_platform_data realview_mmc1_plat_data = {
-+struct mmci_platform_data realview_mmc1_plat_data = {
- 	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
- 	.status		= realview_mmc_status,
- 	.gpio_wp	= 19,
-diff --git a/arch/arm/mach-realview/core.h b/arch/arm/mach-realview/core.h
-index 59a337b..46cd6ac 100644
---- a/arch/arm/mach-realview/core.h
-+++ b/arch/arm/mach-realview/core.h
-@@ -47,8 +47,8 @@ static struct amba_device name##_device = {			\
- extern struct platform_device realview_flash_device;
- extern struct platform_device realview_cf_device;
- extern struct platform_device realview_i2c_device;
--extern struct mmc_platform_data realview_mmc0_plat_data;
--extern struct mmc_platform_data realview_mmc1_plat_data;
-+extern struct mmci_platform_data realview_mmc0_plat_data;
-+extern struct mmci_platform_data realview_mmc1_plat_data;
- extern struct clcd_board clcd_plat_data;
- extern void __iomem *gic_cpu_base_addr;
- extern void __iomem *timer0_va_base;
-diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
-index c0795ea..1d65e64 100644
---- a/arch/arm/mach-realview/realview_eb.c
-+++ b/arch/arm/mach-realview/realview_eb.c
-@@ -24,6 +24,7 @@
- #include <linux/sysdev.h>
- #include <linux/amba/bus.h>
- #include <linux/amba/pl061.h>
-+#include <linux/amba/mmci.h>
- #include <linux/io.h>
- 
- #include <mach/hardware.h>
-@@ -37,7 +38,6 @@
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
--#include <asm/mach/mmc.h>
- #include <asm/mach/time.h>
- 
- #include <mach/board-eb.h>
-diff --git a/arch/arm/mach-realview/realview_pb1176.c b/arch/arm/mach-realview/realview_pb1176.c
-index 395dc18..2817fe0 100644
---- a/arch/arm/mach-realview/realview_pb1176.c
-+++ b/arch/arm/mach-realview/realview_pb1176.c
-@@ -24,6 +24,7 @@
- #include <linux/sysdev.h>
- #include <linux/amba/bus.h>
- #include <linux/amba/pl061.h>
-+#include <linux/amba/mmci.h>
- #include <linux/io.h>
- 
- #include <mach/hardware.h>
-@@ -37,7 +38,6 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/flash.h>
- #include <asm/mach/map.h>
--#include <asm/mach/mmc.h>
- #include <asm/mach/time.h>
- 
- #include <mach/board-pb1176.h>
-diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
-index c0c9e35..94680fc 100644
---- a/arch/arm/mach-realview/realview_pb11mp.c
-+++ b/arch/arm/mach-realview/realview_pb11mp.c
-@@ -24,6 +24,7 @@
- #include <linux/sysdev.h>
- #include <linux/amba/bus.h>
- #include <linux/amba/pl061.h>
-+#include <linux/amba/mmci.h>
- #include <linux/io.h>
- 
- #include <mach/hardware.h>
-@@ -38,7 +39,6 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/flash.h>
- #include <asm/mach/map.h>
--#include <asm/mach/mmc.h>
- #include <asm/mach/time.h>
- 
- #include <mach/board-pb11mp.h>
-diff --git a/arch/arm/mach-realview/realview_pba8.c b/arch/arm/mach-realview/realview_pba8.c
-index 4fc64e1..941beb2 100644
---- a/arch/arm/mach-realview/realview_pba8.c
-+++ b/arch/arm/mach-realview/realview_pba8.c
-@@ -24,6 +24,7 @@
- #include <linux/sysdev.h>
- #include <linux/amba/bus.h>
- #include <linux/amba/pl061.h>
-+#include <linux/amba/mmci.h>
- #include <linux/io.h>
- 
- #include <asm/irq.h>
-@@ -34,7 +35,6 @@
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
--#include <asm/mach/mmc.h>
- #include <asm/mach/time.h>
- 
- #include <mach/hardware.h>
-diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
-index cf68b54..7e4bc6c 100644
---- a/arch/arm/mach-realview/realview_pbx.c
-+++ b/arch/arm/mach-realview/realview_pbx.c
-@@ -23,6 +23,7 @@
- #include <linux/sysdev.h>
- #include <linux/amba/bus.h>
- #include <linux/amba/pl061.h>
-+#include <linux/amba/mmci.h>
- #include <linux/io.h>
- 
- #include <asm/irq.h>
-@@ -34,7 +35,6 @@
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
--#include <asm/mach/mmc.h>
- #include <asm/mach/time.h>
- 
- #include <mach/hardware.h>
-diff --git a/arch/arm/mach-u300/mmc.c b/arch/arm/mach-u300/mmc.c
-index 82af247..7b6b016 100644
---- a/arch/arm/mach-u300/mmc.c
-+++ b/arch/arm/mach-u300/mmc.c
-@@ -19,8 +19,8 @@
- #include <linux/regulator/consumer.h>
- #include <linux/regulator/machine.h>
- #include <linux/gpio.h>
-+#include <linux/amba/mmci.h>
- 
--#include <asm/mach/mmc.h>
- #include "mmc.h"
- #include "padmux.h"
- 
-@@ -28,7 +28,7 @@ struct mmci_card_event {
- 	struct input_dev *mmc_input;
- 	int mmc_inserted;
- 	struct work_struct workq;
--	struct mmc_platform_data mmc0_plat_data;
-+	struct mmci_platform_data mmc0_plat_data;
- };
- 
- static unsigned int mmc_status(struct device *dev)
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index 975eae4..e13be7c 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -27,6 +27,7 @@
- #include <linux/amba/bus.h>
- #include <linux/amba/clcd.h>
- #include <linux/amba/pl061.h>
-+#include <linux/amba/mmci.h>
- #include <linux/clocksource.h>
- #include <linux/clockchips.h>
- #include <linux/cnt32_to_63.h>
-@@ -47,7 +48,6 @@
- #include <asm/mach/irq.h>
- #include <asm/mach/time.h>
- #include <asm/mach/map.h>
--#include <asm/mach/mmc.h>
- 
- #include "core.h"
- #include "clock.h"
-@@ -369,7 +369,7 @@ unsigned int mmc_status(struct device *dev)
- 	return readl(VERSATILE_SYSMCI) & mask;
- }
- 
--static struct mmc_platform_data mmc0_plat_data = {
-+static struct mmci_platform_data mmc0_plat_data = {
- 	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
- 	.status		= mmc_status,
- 	.gpio_wp	= -1,
-diff --git a/arch/arm/mach-versatile/versatile_pb.c b/arch/arm/mach-versatile/versatile_pb.c
-index 9af8d81..239cd30 100644
---- a/arch/arm/mach-versatile/versatile_pb.c
-+++ b/arch/arm/mach-versatile/versatile_pb.c
-@@ -24,6 +24,7 @@
- #include <linux/sysdev.h>
- #include <linux/amba/bus.h>
- #include <linux/amba/pl061.h>
-+#include <linux/amba/mmci.h>
- #include <linux/io.h>
- 
- #include <mach/hardware.h>
-@@ -31,7 +32,6 @@
- #include <asm/mach-types.h>
- 
- #include <asm/mach/arch.h>
--#include <asm/mach/mmc.h>
- 
- #include "core.h"
- 
-@@ -41,7 +41,7 @@
- #define IRQ_MMCI1A	IRQ_SIC_MMCI1A
- #endif
- 
--static struct mmc_platform_data mmc1_plat_data = {
-+static struct mmci_platform_data mmc1_plat_data = {
- 	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
- 	.status		= mmc_status,
- 	.gpio_wp	= -1,
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index bf7c05b..79205e5 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -22,12 +22,12 @@
- #include <linux/clk.h>
- #include <linux/scatterlist.h>
- #include <linux/gpio.h>
-+#include <linux/amba/mmci.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/div64.h>
- #include <asm/io.h>
- #include <asm/sizes.h>
--#include <asm/mach/mmc.h>
- 
- #include "mmci.h"
- 
-@@ -537,7 +537,7 @@ static void mmci_check_status(unsigned long data)
- 
- static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
- {
--	struct mmc_platform_data *plat = dev->dev.platform_data;
-+	struct mmci_platform_data *plat = dev->dev.platform_data;
- 	struct mmci_host *host;
- 	struct mmc_host *mmc;
- 	int ret;
-diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index 839f264..a7f9a51 100644
---- a/drivers/mmc/host/mmci.h
-+++ b/drivers/mmc/host/mmci.h
-@@ -161,7 +161,7 @@ struct mmci_host {
- 	unsigned int		mclk;
- 	unsigned int		cclk;
- 	u32			pwr;
--	struct mmc_platform_data *plat;
-+	struct mmci_platform_data *plat;
- 
- 	u8			hw_designer;
- 	u8			hw_revision:4;
-diff --git a/include/linux/amba/mmci.h b/include/linux/amba/mmci.h
-new file mode 100644
-index 0000000..6b42417
---- /dev/null
-+++ b/include/linux/amba/mmci.h
-@@ -0,0 +1,18 @@
-+/*
-+ *  include/linux/amba/mmci.h
-+ */
-+#ifndef AMBA_MMCI_H
-+#define AMBA_MMCI_H
-+
-+#include <linux/mmc/host.h>
-+
-+struct mmci_platform_data {
-+	unsigned int ocr_mask;			/* available voltages */
-+	u32 (*translate_vdd)(struct device *, unsigned int);
-+	unsigned int (*status)(struct device *);
-+	int	gpio_wp;
-+	int	gpio_cd;
-+	unsigned long capabilities;
-+};
-+
-+#endif
--- 
-1.6.2.1
+Depends on what you mean by "binary only", the source code for
+Freescale's Linux is available in the BSP but no source for the SDMA
+is included.
+
+>
+>> It would be very nice to have i.MX31 DMA support in mainline, that would
+>> perhaps also make it possible to have ALSA sound support for i.MX31.
+>
+> Hmm, would that be ok by the GPL and stuff. Coz the actual 'firmware'
+> is binary only, though it is packed as a 'short' array inside
+> 'sdma_script_code.h' & 'sdma_script_code_pass2.h'?
+
+That might be a problem. Binary firmware can be handled in Linux, as
+an example one can load it from user space but that makes it difficult
+to enable the SDMA before userspace has started. Another example is to
+let the bootloader load the SDMA scripts but that's not a nice
+solution. Don't know if this firmware can be accepted as a binary
+within the kernel.
+
+Perhaps there are other ways.
+
+Regards, Magnus
