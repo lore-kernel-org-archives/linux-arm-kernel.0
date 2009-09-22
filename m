@@ -1,30 +1,38 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Mon, 21 Sep 2009 23:37:59 +0100
-Subject: Kernel related (?) user space crash at ARM11 MPCore
-In-Reply-To: <4AB7FE15.4060804@arm.com>
-References: <20090920093139.GA1704@n2100.arm.linux.org.uk>
-	<20090920190227.GB5413@n2100.arm.linux.org.uk>
-	<4AB6B0AB.8040307@arm.com> <20090921083109.GC20006@shareable.org>
-	<1253522944.1541.3.camel@pc1117.cambridge.arm.com>
-	<20090921085425.GC27357@n2100.arm.linux.org.uk>
-	<1253526263.1541.32.camel@pc1117.cambridge.arm.com>
-	<20090921100751.GF27357@n2100.arm.linux.org.uk>
-	<20090921213802.GH30821@n2100.arm.linux.org.uk>
-	<4AB7FE15.4060804@arm.com>
-Message-ID: <20090921223759.GI14700@shareable.org>
+From: glee-list@swspec.com (Greg Lee)
+Date: Mon, 21 Sep 2009 20:00:51 -0400
+Subject: Follow-up on "WARNING: at arch/arm/mm/consistent.c:368
+	dma_free_coherent"
+Message-ID: <f7cd29ea0909211700l4e79476bi9f09fe058804a17f@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas wrote:
-> Of course, we could improve the generic mm/ code but that's not easy to 
-> merge as it affects other architectures.
+I'm following up on an old thread
+(http://lists.arm.linux.org.uk/lurker/message/20080907.211924.e2bee80b.en.html)
+from September 2008 between Russell King and Mikael Pettersson
+regarding dmabounce.
 
-Then again, I seem to recall a troublesome problem with TLBs and
-multiple threads in here many months ago that I didn't believe was
-fully solved in corner cases, and there's this question I keep
-wondering about whether O_DIRECT (used by SQL databases and QEMU among
-others) is safe on these ARMs due to DMA to user-space coherence...
+Mikael Pettersson writes:
 
-Maybe a bit of generic code just has to be changed.
+>I've now traced the actions in dmabounce.c, and I _think_ I
+>understand what's going on.
 
--- Jamie
+...
+
+>Tracing dmabounce.c:map_single() showed that bouncing never triggered
+>due to the dma_mask, because clearly no page ever resided above it.
+>However, mach-ixp4xx/common-pci.c:dma_needs_bounce() returned true
+>whenever the very last page at 64MB-4096 was accessed. dma_needs_bounce()
+>tests dma_addr + size >= SZ_64M, but that's actually off-by-one.
+>Changing it to dma_addr + size - 1 >= SZ_64M disabled the bounces,
+>but also caused the system hang to reappear.
+
+I then found a recently updated patch from Mikael that appears to
+address this problem here
+(http://user.it.uu.se/~mikpe/linux/patches/2.6/patch-arm-ixp4xx-disable-dmabounce-2.6.31).
+
+This updated patch does not appear to account for the 4K region at the
+end of the 64MB PCI window that I mentioned above.  Does this region
+in fact need to be accounted for?  Or has this now been handled
+differently?
+
+Greg
