@@ -1,88 +1,59 @@
-From: avictor.za@gmail.com (Andrew Victor)
-Date: Tue, 22 Sep 2009 11:47:43 +0200
-Subject: [AT91] Fix AC97 breakage
-Message-ID: <cd73a99e0909220247i71a2084fu9153002a358be1f1@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 22 Sep 2009 11:19:13 +0100
+Subject: Kernel related (?) user space crash at ARM11 MPCore
+In-Reply-To: <20090921213802.GH30821@n2100.arm.linux.org.uk>
+References: <20090919224022.GA738@n2100.arm.linux.org.uk>
+	<1253435940.498.15.camel@pc1117.cambridge.arm.com>
+	<20090920093139.GA1704@n2100.arm.linux.org.uk>
+	<20090920190227.GB5413@n2100.arm.linux.org.uk>
+	<4AB6B0AB.8040307@arm.com> <20090921083109.GC20006@shareable.org>
+	<1253522944.1541.3.camel@pc1117.cambridge.arm.com>
+	<20090921085425.GC27357@n2100.arm.linux.org.uk>
+	<1253526263.1541.32.camel@pc1117.cambridge.arm.com>
+	<20090921100751.GF27357@n2100.arm.linux.org.uk>
+	<20090921213802.GH30821@n2100.arm.linux.org.uk>
+Message-ID: <1253614753.14049.47.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix AC97 build breakage with converting to the shared AT91/AVR32 AC97 driver:
-  struct atmel_ac97_data  -> struct ac97c_platform_data
-  CONFIG_SND_AT91_AC97 -> CONFIG_SND_ATMEL_AC97C
+On Mon, 2009-09-21 at 22:38 +0100, Russell King - ARM Linux wrote:
+> On Mon, Sep 21, 2009 at 11:07:51AM +0100, Russell King - ARM Linux wrote:
+> > On Mon, Sep 21, 2009 at 10:44:23AM +0100, Catalin Marinas wrote:
+> > > I would still call this I-D cache coherency issue since the two caches
+> > > have a different view of the RAM but I agree that the D-cache is the one
+> > > holding the data (with a slight chance for the I-cache not to be in sync
+> > > with main RAM, though we could treat it separately).
+> > > 
+> > > We can sort out the D-cache issue with your approach for cleaning it in
+> > > the copy_user_highpage() function, but, as I said, we affect the
+> > > standard CoW mechanism for data pages quite a lot.
+> > 
+> > Let me restate my approach more clearly:
+> > 
+> > 1. Remember that a VMA has been executable.
+> > 2. Only do the additional handing if the VMA has been executable.
 
-Signed-off-by: Andrew Victor <linux@maxim.org.za>
+> Well, there's a problem with this approach.  Any binary which executes
+> with read-implies-exec (in other words, the majority of those around)
+> results in any region with read permission also getting exec permission.
 
+Some idea (not tested) - we keep XN always set even if the mapping has
+PROT_EXEC. We then handle the prefetch abort and with the IFSR patches
+from Kirill we can detect the permission fault and clear the XN bit
+while also cleaning the D-cache, maybe via update_mmu_cache() or
+directly in __do_page_fault().
 
-diff -urN linux-2.6.31-git.orig/arch/arm/mach-at91/at91cap9_devices.c
-linux-2.6.31-git/arch/arm/mach-at91/at91cap9_devices.c
---- linux-2.6.31-git.orig/arch/arm/mach-at91/at91cap9_devices.c	2009-06-10
-05:05:27.000000000 +0200
-+++ linux-2.6.31-git/arch/arm/mach-at91/at91cap9_devices.c	2009-09-22
-11:26:36.000000000 +0200
-@@ -771,9 +771,9 @@
-  *  AC97
-  * -------------------------------------------------------------------- */
+Most text pages are handled via a prefetch abort anyway, so we don't
+have any performance penalty here. For the read-implies-exec pages or
+the dynamic linker case, we have an additional prefetch abort but that's
+much faster than either flush_cache_range() or copy_to_user_highpage()
+patches.
 
--#if defined(CONFIG_SND_AT91_AC97) || defined(CONFIG_SND_AT91_AC97_MODULE)
-+#if defined(CONFIG_SND_ATMEL_AC97C) || defined(CONFIG_SND_ATMEL_AC97C_MODULE)
- static u64 ac97_dmamask = DMA_BIT_MASK(32);
--static struct atmel_ac97_data ac97_data;
-+static struct ac97c_platform_data ac97_data;
+We may need an additional pte bit or just reuse L_PTE_EXEC.
 
- static struct resource ac97_resources[] = {
- 	[0] = {
-@@ -789,7 +789,7 @@
- };
+Yet another idea - add a generic flush_cache_range_for_mprotect()
+function with a specific implementation for ARM (called via
+change_protection).
 
- static struct platform_device at91cap9_ac97_device = {
--	.name		= "ac97c",
-+	.name		= "atmel_ac97c",
- 	.id		= 1,
- 	.dev		= {
- 				.dma_mask		= &ac97_dmamask,
-@@ -800,7 +800,7 @@
- 	.num_resources	= ARRAY_SIZE(ac97_resources),
- };
-
--void __init at91_add_device_ac97(struct atmel_ac97_data *data)
-+void __init at91_add_device_ac97(struct ac97c_platform_data *data)
- {
- 	if (!data)
- 		return;
-@@ -818,7 +818,7 @@
- 	platform_device_register(&at91cap9_ac97_device);
- }
- #else
--void __init at91_add_device_ac97(struct atmel_ac97_data *data) {}
-+void __init at91_add_device_ac97(struct ac97c_platform_data *data) {}
- #endif
-
-
-diff -urN linux-2.6.31-git.orig/arch/arm/mach-at91/board-cap9adk.c
-linux-2.6.31-git/arch/arm/mach-at91/board-cap9adk.c
---- linux-2.6.31-git.orig/arch/arm/mach-at91/board-cap9adk.c	2009-06-10
-05:05:27.000000000 +0200
-+++ linux-2.6.31-git/arch/arm/mach-at91/board-cap9adk.c	2009-09-22
-11:13:35.000000000 +0200
-@@ -364,7 +364,7 @@
- /*
-  * AC97
-  */
--static struct atmel_ac97_data cap9adk_ac97_data = {
-+static struct ac97c_platform_data cap9adk_ac97_data = {
- //	.reset_pin	= ... not connected
- };
-
-diff -urN linux-2.6.31-git.orig/arch/arm/mach-at91/board-neocore926.c
-linux-2.6.31-git/arch/arm/mach-at91/board-neocore926.c
---- linux-2.6.31-git.orig/arch/arm/mach-at91/board-neocore926.c	2009-06-10
-05:05:27.000000000 +0200
-+++ linux-2.6.31-git/arch/arm/mach-at91/board-neocore926.c	2009-09-22
-11:14:18.000000000 +0200
-@@ -340,7 +340,7 @@
- /*
-  * AC97
-  */
--static struct atmel_ac97_data neocore926_ac97_data = {
-+static struct ac97c_platform_data neocore926_ac97_data = {
- 	.reset_pin	= AT91_PIN_PA13,
- };
+-- 
+Catalin
