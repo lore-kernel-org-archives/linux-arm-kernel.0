@@ -1,27 +1,16 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Tue, 22 Sep 2009 15:45:47 +0200
-Subject: [PATCH 3/3] Move MMCI header to amba include dir
-In-Reply-To: <20090921151107.GC30821@n2100.arm.linux.org.uk>
-References: <1252529727-7957-1-git-send-email-linus.walleij@stericsson.com>
-	<20090921150103.GB30821@n2100.arm.linux.org.uk>
-	<20090921151107.GC30821@n2100.arm.linux.org.uk>
-Message-ID: <63386a3d0909220645t2f995c4ftf9893e23ac5caf0e@mail.gmail.com>
+From: srinidhi.kasagar@stericsson.com (Srinidhi KASAGAR)
+Date: Tue, 22 Sep 2009 16:05:04 +0200
+Subject: u8500 paches are being held ( was My first patch to the mailist,
+	but being held)
+Message-ID: <747C1E83C744F44E9ACFB89FAEEC2C7B11BC3EE46D@EXDCVYMBSTM005.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/9/21 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+David,
 
->> Not sure what's happened, but this patch appears to conflict with
->> another, resulting in:
->
-> It's also meant that 5702/1 has been dropped in addition to 5699/1.
-> In future, please ensure that you run a build check on the machines
-> which you've modified. ?Thanks.
+I have posted a series of patches (u8500 machine support) today and one among them was 48K which was being held by the infradead server. Do you still consider the patches of size > 40 KB are suspects? Should I need to repost the whole patch series by splitting it to match 'your 40K' limit OR is there any possibility that the patch get posted to the list?
 
-My fault for not regression-compiling enough. Learnt a lesson,
-hotted my integration scripts with defaultcompiles for Realview,
-Integrator and versatile and submitted new versions to the patch
-tracker, sorry for the inconvenience.
+git format-patch -M did not help either. 
 
-Yours.
-Linus Walleij
+regards,
+srinidhi
