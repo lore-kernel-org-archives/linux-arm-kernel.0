@@ -1,74 +1,21 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 22 Sep 2009 21:14:59 +0100
-Subject: [PATCH 4/7] S3C64XX DMA: S3C2410_DMAF_CIRCULAR disable
-In-Reply-To: <1b68c6790909151924u5b1abe5ayaf5377ac57ede69@mail.gmail.com>
-References: <1253008882-7587-1-git-send-email-jassi.brar@samsung.com>
-	<20090916002832.GN13508@trinity.fluff.org>
-	<1b68c6790909151924u5b1abe5ayaf5377ac57ede69@mail.gmail.com>
-Message-ID: <20090922201458.GA31920@trinity.fluff.org>
+Date: Tue, 22 Sep 2009 21:24:21 +0100
+Subject: [PATCH] S3C24XX: Define a macro to avoid compilation error
+In-Reply-To: <1253549056-25322-1-git-send-email-ramaxlo@gmail.com>
+References: <1253549056-25322-1-git-send-email-ramaxlo@gmail.com>
+Message-ID: <20090922202421.GB31920@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 16, 2009 at 11:24:47AM +0900, jassi brar wrote:
-> On Wed, Sep 16, 2009 at 9:28 AM, Ben Dooks <ben-linux@fluff.org> wrote:
-> > On Tue, Sep 15, 2009 at 07:01:22PM +0900, Jassi wrote:
-> >> S3C2410_DMAF_CIRCULAR requires that we don't free buffer
-> >> resources after TC-IRQ because we will revisit the buffer.
-> >> During simple long term playback/capture, like movie-play,
-> >> this may block those resources(kmem/dma_pool) unncessarily.
-> >> This is especially a problem since we allocate them in IRQ
-> >> context.
-> >> For now, we disable the option and free buff resources after
-> >> it's TC-IRQ. Also, chan->curr will point to the active buffer
-> >> while chan->next is rendered useless.
-> >
-> > This would have been better changing the sound driver and ensuring
-> > it does not allocate as much memory for buffering audio.
-> >
-> > The whole point of the circular buffer is it is allocated once and
-> > then used until the end of playback. If what you are saying is right,
-> > and resources are running out then somewhere either the SoC layer is
-> > losing them or between the DMA and the I2S driver we are losing
-> > buffers. This points to a bug in the resource management of one of
-> > them.
-> Please correct if any of the following is wrong as per the existing code:-
-> In DMA driver:-
->    1) A 'struct s3c64xx_dma_buff' and a 'struct pl080s_lli' is allocated
->  during every call to s3c2410_dma_enqueue.
->     2) These resources are freed only when s3c64xx_dma_ctrl(FLUSH)
->  is called by the dma client.
+On Tue, Sep 22, 2009 at 12:04:16AM +0800, Ramax Lo wrote:
+> Define a macro to avoid the following error during kernel build process
+> for platforms other than s3c2410:
 > 
->  In Dma Client Driver(I2S):-
->    1) DMA is aquired and setup once before active continuous use
->        and s3c2410_dma_enqueue is called as many times as the client
-> has some data to transfer, without any other call to dma driver.
->    2) Unless there is some suspend/resume or pause/play event,
-> s3c64xx_dma_ctrl(FLUSH) may only be called after playback/capture ends.
+> arch/arm/plat-s3c24xx/cpu.c:84: error: ???s3c2410a_init??? undeclared here (not in a function)
 > 
-> Now consider the situation when we didn't set the CIRCULAR flag.
-> During this time the buffer resources are simply piling up without being
-> ever reused. Note that the playback maybe of many hours and at
-> some point dma_pool_alloc(and later kzalloc) will start returning NULL.
-> 
-> Besides,
-> a) The dma driver doesn't free those resource even for
-> Non-CIRCULAR flagged requests.
-> b) Only I2S driver makes use of the DMA driver(curently). To make
-> use of the feature(which is available only in 64xx dma driver) the 64xx
-> i2s driver will have to break from 24xx drivers(which we want to unify
-> ultimately?) and ALSA already provides a buffer looping mechanism.
+> Signed-off-by: Ramax Lo <ramaxlo@gmail.com>
 
-Yes, you are right, having gone back over the original code tree that
-was produced I've found the final patch in the series that never got
-sent which defines the correct use of the DMAF_CIRCUALR and ensures
-that the ASoC driver uses it correctly.
-
-In this case, the ASoC driver uses the S3C2410_DMAF_CIRCULAR to
-enqueue the buffers once when the stream is initialised and then
-does not call enqueue again.
-
-I will post a patch to the lists with this functionality back in so
-that it can be tested and merged.
+ok, applied to next-s3c24xx-fixes.
 
 -- 
 Ben
