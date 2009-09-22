@@ -1,230 +1,25 @@
-From: broonie@sirena.org.uk (Mark Brown)
-Date: Tue, 22 Sep 2009 15:01:44 -0700
-Subject: [PATCH 2/3] mfd: add U8500 STw4500 SPI device support
-In-Reply-To: <1253572630.21542.46.camel@vinay-desktop>
-References: <1253572630.21542.46.camel@vinay-desktop>
-Message-ID: <20090922220143.GG4736@sirena.org.uk>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 22 Sep 2009 15:08:29 -0700 (PDT)
+Subject: [PATCH 1/3] at91sam9263: add at91_can device to generic device
+	definition
+In-Reply-To: <4AB2362E.3070509@grandegger.com>
+References: <1253180254-11910-1-git-send-email-mkl@pengutronix.de>
+	<1253180254-11910-2-git-send-email-mkl@pengutronix.de>
+	<4AB2362E.3070509@grandegger.com>
+Message-ID: <20090922.150829.150533632.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2009 at 04:07:10AM +0530, srinidhi kasagar wrote:
-> From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-> 
-> This adds core driver support for STw4500 mixed signal
-> multimedia & power management chip. This connects to U8500
+From: Wolfgang Grandegger <wg@grandegger.com>
+Date: Thu, 17 Sep 2009 15:14:22 +0200
 
-MFD patches should be sent to Samuel Ortiz (added to the CCs here).
+> Marc Kleine-Budde wrote:
+>> This patch adds the device definition for the at91_can device to
+>> the generic device definiton file for the at91sam9263.
+>> 
+>> Signed-off-by: Hans J. Koch <hjk@linutronix.de>
+>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+ ...
+> Acked-by: Wolfgang Grandegger <wg@grandegger.com>
 
-> on the SSP (pl022) bus operating in SPI protocol and exports
-> read/write functions for the device to get access to this chip.
-
-I guess this would work with any SPI controller, though obviously it'd
-be rare to find other configurations?
-
-> Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-> ---
->  drivers/mfd/Kconfig   |   10 ++++
->  drivers/mfd/Makefile  |    1 +
->  drivers/mfd/stw4500.c |  137 +++++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 148 insertions(+), 0 deletions(-)
->  create mode 100755 drivers/mfd/stw4500.c
-> 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index 491ac0f..e3aec52 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -256,6 +256,16 @@ config AB3100_CORE
->  	  LEDs, vibrator, system power and temperature, power management
->  	  and ALSA sound.
->  
-> +config U8500_STW4500
-> +	tristate "ST-Ericsson U8500 Mixed Signal Power management chip"
-> +	depends on SPI
-> +	default y if ARCH_U8500
-> +	help
-> +	  Select this option to enable access to STw4500 power management
-> +	  chip. This connects to U8500 on the SSP/SPI bus and exports
-> +	  read/write functions for the devices to get access to this chip.
-> +	  This chip embeds various other multimedia funtionalities as well.
-> +
->  config EZX_PCAP
->  	bool "PCAP Support"
->  	depends on GENERIC_HARDIRQS && SPI_MASTER
-> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> index 6f8a9a1..9b15e52 100644
-> --- a/drivers/mfd/Makefile
-> +++ b/drivers/mfd/Makefile
-> @@ -44,3 +44,4 @@ obj-$(CONFIG_MFD_PCF50633)	+= pcf50633-core.o
->  obj-$(CONFIG_PCF50633_ADC)	+= pcf50633-adc.o
->  obj-$(CONFIG_PCF50633_GPIO)	+= pcf50633-gpio.o
->  obj-$(CONFIG_AB3100_CORE)	+= ab3100-core.o
-> +obj-$(CONFIG_U8500_STW4500)	+= stw4500.o
-> diff --git a/drivers/mfd/stw4500.c b/drivers/mfd/stw4500.c
-> new file mode 100755
-> index 0000000..a8c1d39
-> --- /dev/null
-> +++ b/drivers/mfd/stw4500.c
-> @@ -0,0 +1,137 @@
-> +/*
-> + * Copyright (C) 2009 ST-Ericsson
-> + *
-> + * Author: Srinidhi KASAGAR <srinidhi.kasagar@stericsson.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2, as
-> + * published by the Free Software Foundation.
-> + *
-> + * STw4500 is a companion power management chip used with U8500. On this
-> + * platform, this is interfaced with SSP0 controller which is a ARM
-> + * primecell pl022.
-> + *
-> + * At the moment the module just exports read/write features.
-> + * Interrupt management to be added.
-> + */
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/module.h>
-> +#include <linux/device.h>
-> +#include <linux/spi/spi.h>
-> +
-> +static struct spi_driver stw4500_driver;
-
-Is there any need to forward declare this?
-
-> +
-> +struct stw4500_chip {
-> +	struct spi_device	*spi;
-> +	unsigned long		tx_buf[4];
-> +	unsigned long		rx_buf[4];
-> +};
-> +
-> +struct stw4500_chip *the_stw4500;
-
-This should be static.
-
-> +
-> +/*
-> + * This funtion writes to any STw4500 registers using SPI protocol &
-> + * before it writes it packs the data in the below 24 bit frame format
-> + *
-> + *	 *|------------------------------------|
-> + *	 *| 23|22...18|17.......10|9|8|7......0|
-> + *	 *| r/w  bank       adr          data  |
-> + *	 * ------------------------------------
-> + *
-> + * This function shouldn't be called from interrupt context
-> + */
-> +int stw4500_write(unsigned char block, unsigned long addr,
-> +		unsigned char data)
-> +{
-
-Normally the read and write functions would take the device as an
-argument, though I guess it's probably not the end of the world for this
-hardware.
-
-> +	struct spi_transfer xfer;
-> +	struct spi_message	msg;
-> +	unsigned long spi_data =
-> +		block << 18 | addr << 10 | data;
-> +
-> +	the_stw4500->tx_buf[0] = spi_data;
-> +	the_stw4500->rx_buf[0] = 0;
-> +
-> +	xfer.tx_buf	= the_stw4500->tx_buf;
-> +	xfer.rx_buf 	= NULL;
-> +	xfer.len	= sizeof(unsigned long);
-> +
-> +	spi_message_init(&msg);
-> +	spi_message_add_tail(&xfer, &msg);
-> +
-> +	return spi_sync(the_stw4500->spi, &msg);
-> +}
-> +EXPORT_SYMBOL(stw4500_write);
-> +
-> +int stw4500_read(unsigned char block, unsigned long addr)
-> +{
-> +	struct spi_transfer xfer;
-> +	struct spi_message	msg;
-> +	unsigned long spi_data =
-> +		1 << 23 | block << 18 | addr << 10;
-> +
-> +	the_stw4500->tx_buf[0] = spi_data;
-> +	the_stw4500->rx_buf[0] = 0;
-> +
-> +	xfer.tx_buf	= the_stw4500->tx_buf;
-> +	xfer.rx_buf 	= the_stw4500->rx_buf;
-> +	xfer.len	= sizeof(unsigned long);
-> +
-> +	spi_message_init(&msg);
-> +	spi_message_add_tail(&xfer, &msg);
-> +
-> +	spi_sync(the_stw4500->spi, &msg);
-> +
-> +	return  the_stw4500->rx_buf[0];
-> +}
-> +EXPORT_SYMBOL(stw4500_read);
-> +
-> +static int __init stw4500_probe(struct spi_device *spi)
-> +{
-> +	struct stw4500_chip	*chip;
-> +	unsigned char revision;
-> +
-> +	chip = kzalloc(sizeof *chip, GFP_KERNEL);
-> +	if (!chip)
-> +		return -ENOMEM;
-> +
-> +	chip->spi = spi;
-> +	spi_set_drvdata(spi, chip);
-> +	the_stw4500 = chip;
-> +
-> +	/* read the revision register */
-> +	revision = stw4500_read(0x10, 0x1080);
-> +	printk(KERN_INFO "STw4500 PMU Initialized, revision = %x\n", revision);
-> +
-> +	return 0;
-> +}
-
-I'd expect this function to register child devices for the STW4500
-functionality?
-
-> +
-> +static int __devexit stw4500_remove(struct spi_device *spi)
-> +{
-> +	struct stw4500_chip *chip =
-> +		spi_get_drvdata(spi);
-> +	kfree(chip);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct spi_driver stw4500_driver = {
-> +	.driver = {
-> +		.name = "stw4500",
-> +		.owner = THIS_MODULE,
-> +	},
-> +	.probe = stw4500_probe,
-> +	.remove = __devexit_p(stw4500_remove)
-> +};
-> +
-> +static int __devinit stw4500_init(void)
-> +{
-> +	return spi_register_driver(&stw4500_driver);
-> +}
-> +
-> +static void __exit stw4500_exit(void)
-> +{
-> +	spi_unregister_driver(&stw4500_driver);
-> +}
-> +
-> +subsys_initcall_sync(stw4500_init);
-> -- 
-> 1.6.3.GIT
-> 
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Applied.
