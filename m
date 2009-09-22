@@ -1,17 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Sep 2009 20:33:02 +0100
-Subject: [AT91] Fix AC97 breakage
-In-Reply-To: <cd73a99e0909220247i71a2084fu9153002a358be1f1@mail.gmail.com>
-References: <cd73a99e0909220247i71a2084fu9153002a358be1f1@mail.gmail.com>
-Message-ID: <20090922193302.GA2616@n2100.arm.linux.org.uk>
+From: lilja.magnus@gmail.com (Magnus Lilja)
+Date: Tue, 22 Sep 2009 21:45:01 +0200
+Subject: SPI, DMA and an i.MX31
+In-Reply-To: <4AB8F9AE.1070006@billgatliff.com>
+References: <87077C4F48609F4392621D9F99DDE20901202DFF@tesla.star.galaxy.io>
+	<BLU105-W229F8F8F533B107510C600BAE10@phx.gbl>
+	<87077C4F48609F4392621D9F99DDE20901202E00@tesla.star.galaxy.io>
+	<4AB7C020.2070205@gmail.com> <4AB839FF.4000803@windriver.com>
+	<87077C4F48609F4392621D9F99DDE20901202E02@tesla.star.galaxy.io>
+	<59b21cf20909220709w54b9e259ube473b322d661a65@mail.gmail.com>
+	<4AB8F9AE.1070006@billgatliff.com>
+Message-ID: <59b21cf20909221245i355ccea0r44737e9112fd17c0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2009 at 11:47:43AM +0200, Andrew Victor wrote:
-> Fix AC97 build breakage with converting to the shared AT91/AVR32 AC97 driver:
->   struct atmel_ac97_data  -> struct ac97c_platform_data
->   CONFIG_SND_AT91_AC97 -> CONFIG_SND_ATMEL_AC97C
-> 
-> Signed-off-by: Andrew Victor <linux@maxim.org.za>
+Hi Bill
 
-If this has been build-tested, please submit it to the patch system.
+2009/9/22 Bill Gatliff <bgat@billgatliff.com>:
+> Magnus Lilja wrote:
+>>
+>> That might be a problem. Binary firmware can be handled in Linux, as
+>> an example one can load it from user space but that makes it difficult
+>> to enable the SDMA before userspace has started. Another example is to
+>> let the bootloader load the SDMA scripts but that's not a nice
+>> solution. Don't know if this firmware can be accepted as a binary
+>> within the kernel.
+>>
+>
+> It couldn't be a "binary" in the kernel per se, it would be a constant
+> character array that gets compiled into a binary chunk.
+
+Correct. That's the way Freescale has done it in their BSP, a char[]
+array that eventually gets downloaded into the SDMA engine.
+
+> ?Sort of like
+> how, for example, Keyspan's drivers are done. ?See
+> linux/firmware/README.AddingFirmware, linux/firmware/keyspan and
+> drivers/usb/serial/keyspan*.
+
+The README states that new firmware shall be added to Davids
+linux-firmware tree, but that would mean that the DMA scripts would be
+outside of the Linux source tree. Should one merge Davids
+linux-firmware tree with the standard Linux-tree locally or how is it
+supposed to work?
+
+Thanks, Magnus
