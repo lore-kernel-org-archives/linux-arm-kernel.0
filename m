@@ -1,27 +1,30 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Wed, 23 Sep 2009 22:23:29 +0300
-Subject: Problem with s3c24xx pwm driver
-In-Reply-To: <f17812d70909231203v198aafberd00ce35bd7ba7f6b@mail.gmail.com>
-References: <200909231824.11671.anarsoul@gmail.com>
-	<f17812d70909231203v198aafberd00ce35bd7ba7f6b@mail.gmail.com>
-Message-ID: <200909232223.35835.anarsoul@gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 23 Sep 2009 21:24:34 +0200
+Subject: [PATCH 1/5] s3c2410_udc: 2440 dual packet workaround
+In-Reply-To: <200909231046.36330.anarsoul@gmail.com> (Vasily Khoruzhick's
+	message of "Wed, 23 Sep 2009 10:46:30 +0300")
+References: <200909231046.36330.anarsoul@gmail.com>
+Message-ID: <87vdj9xy4t.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? ????????? ?? 23 ???????? 2009 22:03:17 ????? Eric Miao ???????:
-> Sounds like there are cases where the pwm_enable() and pwm_disable()
-> are not paired? You may want to print out the reference count each time
-> to see if this is true.
+Vasily Khoruzhick <anarsoul@gmail.com> writes:
 
-And, btw, pwm_enable()/pwm_disable for s3c24xx just sets/clears one bit. It 
-doesn't harm to set same bit twice, does it?
+> This needs to be examined further. For now, the patch seems to do the
+> trick.
+>
+> Note that this is not a clean solution by any means, because we
+> might potentially get stuck in that interrupt for quite a while.
 
-Regards
-Vasily
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090923/1c740fa4/attachment.sig>
+Hi Vasily,
+
+That workaround could also freeze the kernel if hardware fails, can't it ?
+
+If there is no better patch found, Wouldn't this patch benefit at least a
+counter to get out of the interrupt handler if the hardware doesn't behave at
+the Nth loop ?
+
+Cheers.
+
+--
+Robert
