@@ -1,88 +1,294 @@
 From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
-Date: Thu, 24 Sep 2009 01:17:22 +0530
-Subject: [PATCH 1/8] [ARM]: enable SMP support for U8500 architecture
-Message-ID: <1253735242.21542.160.camel@vinay-desktop>
+Date: Thu, 24 Sep 2009 01:17:42 +0530
+Subject: [PATCH 2/8] [ARM] U8500: adds secondary cpu support, local timers
+Message-ID: <1253735262.21542.168.camel@vinay-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
 
-This enables SMP, binds to the existing modules like
-Local timers, TWD, SCU and other generic SMP helpers.
-This also enables machine ux500.
+This adds entry point for the secondary CPU and
+setup the infrastructure for the secondary CPU.
+This also enables the local timer for U8500, whereas
+this doesn't participate in the system tick.
 
 Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+Acked-by: Andrea Gallo <andrea.gallo@stericsson.com>
+Reviewed-by: Alessandro Rubini <ru@gnudd.com>
+Reviewed-by: Linus Walleij <linus.walleij@stericsson.com>
 ---
- arch/arm/Kconfig  |   20 ++++++++++++++++----
- arch/arm/Makefile |    1 +
- 2 files changed, 17 insertions(+), 4 deletions(-)
+ arch/arm/mach-ux500/headsmp.S    |   38 ++++++++
+ arch/arm/mach-ux500/localtimer.c |   28 ++++++
+ arch/arm/mach-ux500/platsmp.c    |  181 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 247 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-ux500/headsmp.S
+ create mode 100644 arch/arm/mach-ux500/localtimer.c
+ create mode 100644 arch/arm/mach-ux500/platsmp.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index aef63c8..9331cce 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -637,6 +637,16 @@ config ARCH_OMAP
- 	help
- 	  Support for TI's OMAP platform (OMAP1 and OMAP2).
- 
-+config ARCH_U8500
-+	bool "ST-Ericsson U8500 Series"
-+	select ARM_AMBA
-+	select GENERIC_TIME
-+	select GENERIC_CLOCKEVENTS
-+	select COMMON_CLKDEV
-+	help
-+	  Include support for ST-Ericsson's Cortex-A9 based
-+	  U8500 architecture.
+diff --git a/arch/arm/mach-ux500/headsmp.S b/arch/arm/mach-ux500/headsmp.S
+new file mode 100644
+index 0000000..a6be2cd
+--- /dev/null
++++ b/arch/arm/mach-ux500/headsmp.S
+@@ -0,0 +1,38 @@
++/*
++ *  Copyright (c) 2009 ST-Ericsson
++ *	This file is based  ARM Realview platform
++ *  Copyright (c) 2003 ARM Limited
++ *  All Rights Reserved
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/linkage.h>
++#include <linux/init.h>
 +
- endchoice
- 
- source "arch/arm/mach-clps711x/Kconfig"
-@@ -728,6 +738,8 @@ source "arch/arm/mach-msm/Kconfig"
- 
- source "arch/arm/mach-u300/Kconfig"
- 
-+source "arch/arm/mach-ux500/Kconfig"
++	__INIT
 +
- source "arch/arm/mach-w90x900/Kconfig"
- 
- # Definitions to make life easier
-@@ -881,10 +893,10 @@ source "kernel/time/Kconfig"
- config SMP
- 	bool "Symmetric Multi-Processing (EXPERIMENTAL)"
- 	depends on EXPERIMENTAL && (REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP ||\
--		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4)
-+		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || ARCH_U8500)
- 	depends on GENERIC_CLOCKEVENTS
- 	select USE_GENERIC_SMP_HELPERS
--	select HAVE_ARM_SCU if (ARCH_REALVIEW || ARCH_OMAP4)
-+	select HAVE_ARM_SCU if (ARCH_REALVIEW || ARCH_OMAP4 || ARCH_U8500)
- 	help
- 	  This enables support for systems with more than one CPU. If you have
- 	  a system with only one CPU, like most personal computers, say N. If
-@@ -953,9 +965,9 @@ config HOTPLUG_CPU
- config LOCAL_TIMERS
- 	bool "Use local timer interrupts"
- 	depends on SMP && (REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || \
--		REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4)
-+		REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || ARCH_U8500)
- 	default y
--	select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_OMAP4)
-+	select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_OMAP4 || ARCH_U8500)
- 	help
- 	  Enable support for local timers on SMP platforms, rather then the
- 	  legacy IPI broadcast method.  Local timers allows the system
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index c877d6d..948a8d9 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -155,6 +155,7 @@ machine-$(CONFIG_ARCH_SHARK)		:= shark
- machine-$(CONFIG_ARCH_STMP378X)		:= stmp378x
- machine-$(CONFIG_ARCH_STMP37XX)		:= stmp37xx
- machine-$(CONFIG_ARCH_U300)		:= u300
-+machine-$(CONFIG_ARCH_U8500)		:= ux500
- machine-$(CONFIG_ARCH_VERSATILE)	:= versatile
- machine-$(CONFIG_ARCH_W90X900)		:= w90x900
- machine-$(CONFIG_FOOTBRIDGE)		:= footbridge
++/*
++ * U8500 specific entry point for secondary CPUs.
++ */
++ENTRY(u8500_secondary_startup)
++	mrc	p15, 0, r0, c0, c0, 5
++	and	r0, r0, #15
++	adr	r4, 1f
++	ldmia	r4, {r5, r6}
++	sub	r4, r4, r5
++	add	r6, r6, r4
++	dsb
++pen:	ldr	r7, [r6]
++	cmp	r7, r0
++	bne	pen
++
++	/*
++	 * we've been released from the holding pen: secondary_stack
++	 * should now contain the SVC stack for this core
++	 */
++	b	secondary_startup
++
++1:	.long	.
++	.long	pen_release
+diff --git a/arch/arm/mach-ux500/localtimer.c b/arch/arm/mach-ux500/localtimer.c
+new file mode 100644
+index 0000000..2288f6a
+--- /dev/null
++++ b/arch/arm/mach-ux500/localtimer.c
+@@ -0,0 +1,28 @@
++/*
++ * Copyright (C) 2008-2009 ST-Ericsson
++ * Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
++ *
++ * This file is heavily based on relaview platform, almost a copy.
++ *
++ * Copyright (C) 2002 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/init.h>
++#include <linux/smp.h>
++#include <linux/clockchips.h>
++
++#include <asm/irq.h>
++#include <asm/smp_twd.h>
++#include <asm/localtimer.h>
++
++/*
++ * Setup the local clock events for a CPU.
++ */
++void __cpuinit local_timer_setup(struct clock_event_device *evt)
++{
++	evt->irq = IRQ_LOCALTIMER;
++	twd_timer_setup(evt);
++}
+diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
+new file mode 100644
+index 0000000..88dcb9e
+--- /dev/null
++++ b/arch/arm/mach-ux500/platsmp.c
+@@ -0,0 +1,181 @@
++/*
++ * Copyright (C) 2002 ARM Ltd.
++ * Copyright (C) 2008 STMicroelctronics.
++ * Copyright (C) 2009 ST-Ericsson.
++ *	added support to boot from non volatile memory device
++ *		Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
++ *
++ * This file is based on arm realview platform
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/init.h>
++#include <linux/errno.h>
++#include <linux/delay.h>
++#include <linux/device.h>
++#include <linux/smp.h>
++#include <linux/io.h>
++
++#include <asm/cacheflush.h>
++#include <asm/localtimer.h>
++#include <asm/smp_scu.h>
++#include <mach/hardware.h>
++
++extern void u8500_secondary_startup(void);
++
++/*
++ * control for which core is the next to come out of the secondary
++ * boot "holding pen"
++ */
++volatile int __cpuinitdata pen_release = -1;
++
++static unsigned int __init get_core_count(void)
++{
++	return scu_get_core_count(__io_address(U8500_SCU_BASE));
++}
++
++static DEFINE_SPINLOCK(boot_lock);
++
++void __cpuinit platform_secondary_init(unsigned int cpu)
++{
++	trace_hardirqs_off();
++
++	/*
++	 * if any interrupts are already enabled for the primary
++	 * core (e.g. timer irq), then they will not have been enabled
++	 * for us: do so
++	 */
++	gic_cpu_init(0, __io_address(U8500_GIC_CPU_BASE));
++
++	/*
++	 * let the primary processor know we're out of the
++	 * pen, then head off into the C entry point
++	 */
++	pen_release = -1;
++	smp_wmb();
++
++	/*
++	 * Synchronise with the boot thread.
++	 */
++	spin_lock(&boot_lock);
++	spin_unlock(&boot_lock);
++}
++
++int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
++{
++	unsigned long timeout;
++
++	/*
++	 * set synchronisation state between this boot processor
++	 * and the secondary one
++	 */
++	spin_lock(&boot_lock);
++
++	/*
++	 * The secondary processor is waiting to be released from
++	 * the holding pen - release it, then wait for it to flag
++	 * that it has been released by resetting pen_release.
++	 */
++	pen_release = cpu;
++	flush_cache_all();
++
++	timeout = jiffies + (1 * HZ);
++	while (time_before(jiffies, timeout)) {
++		smp_rmb();
++		if (pen_release == -1)
++			break;
++
++		udelay(10);
++	}
++
++	/*
++	 * now the secondary core is starting up let it run its
++	 * calibrations, then wait for it to finish
++	 */
++	spin_unlock(&boot_lock);
++
++	return pen_release != -1 ? -ENOSYS : 0;
++}
++
++static void __init wakeup_secondary(void)
++{
++	/* nobody is to be released from the pen yet */
++	pen_release = -1;
++
++	/*
++	 * write the address of secondary startup into the backup ram register
++	 * at offset 0x1FF4, then write the magic number 0xA1FEED01 to the
++	 * backup ram register at offset 0x1FF0, which is what boot rom code
++	 * is waiting for. This would wake up the secondary core from WFE
++	 */
++#define U8500_CPU1_JUMPADDR_OFFSET 0x1FF4
++	__raw_writel(virt_to_phys(u8500_secondary_startup),
++			(void __iomem *)U8500_BACKUPRAM0_VA_BASE +
++			U8500_CPU1_JUMPADDR_OFFSET);
++#define U8500_CPU1_WAKEMAGIC_OFFSET 0x1FF0
++	__raw_writel(0xA1FEED01,
++			(void __iomem *)U8500_BACKUPRAM0_VA_BASE +
++			U8500_CPU1_WAKEMAGIC_OFFSET);
++	mb();
++}
++
++/*
++ * Initialise the CPU possible map early - this describes the CPUs
++ * which may be present or become present in the system.
++ */
++void __init smp_init_cpus(void)
++{
++	unsigned int i, ncores = get_core_count();
++
++	for (i = 0; i < ncores; i++)
++		set_cpu_possible(i, true);
++}
++
++void __init smp_prepare_cpus(unsigned int max_cpus)
++{
++	unsigned int ncores = get_core_count();
++	unsigned int cpu = smp_processor_id();
++	int i;
++
++	/* sanity check */
++	if (ncores == 0) {
++		printk(KERN_ERR
++		       "U8500: strange CM count of 0? Default to 1\n");
++		ncores = 1;
++	}
++
++	if (ncores > NR_CPUS) {
++		printk(KERN_WARNING
++		       "U8500: no. of cores (%d) greater than configured "
++		       "maximum of %d - clipping\n",
++		       ncores, NR_CPUS);
++		ncores = NR_CPUS;
++	}
++
++	smp_store_cpu_info(cpu);
++
++	/*
++	 * are we trying to boot more cores than exist?
++	 */
++	if (max_cpus > ncores)
++		max_cpus = ncores;
++
++	/*
++	 * Initialise the present map, which describes the set of CPUs
++	 * actually populated at the present time.
++	 */
++	for (i = 0; i < max_cpus; i++)
++		set_cpu_present(i, true);
++
++	if (max_cpus > 1) {
++		/*
++		 * Enable the local timer or broadcast device for the
++		 * boot CPU, but only if we have more than one CPU.
++		 */
++		percpu_timer_setup();
++		scu_enable(__io_address(U8500_SCU_BASE));
++		wakeup_secondary();
++	}
++}
 -- 
 1.6.3.GIT
