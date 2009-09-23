@@ -1,70 +1,98 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Thu, 24 Sep 2009 11:54:56 +0300
-Subject: Problem with s3c24xx pwm driver
-In-Reply-To: <f17812d70909231525t594704c5u781e2221481676a0@mail.gmail.com>
-References: <200909231824.11671.anarsoul@gmail.com>
-	<200909232223.35835.anarsoul@gmail.com>
-	<f17812d70909231525t594704c5u781e2221481676a0@mail.gmail.com>
-Message-ID: <200909241155.01206.anarsoul@gmail.com>
+From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
+Date: Thu, 24 Sep 2009 02:42:06 +0530
+Subject: [PATCH 0/8] [ARM] ST-Ericsson's U8500 SMP platform, new patch set
+In-Reply-To: <1253735221.21542.159.camel@vinay-desktop>
+References: <1253735221.21542.159.camel@vinay-desktop>
+Message-ID: <1253740326.21542.186.camel@vinay-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? ????????? ?? 24 ???????? 2009 01:25:46 ????? Eric Miao ???????:
+I request you to apply this patch set only on stable 2.6.31 kernel.
+Since there are issues in bring up the secondary core in the 
+mainstream kernel I did not re-base to the mainstream. I am 
+working on it. Apologise for not mentioning before.
 
-> No, it doesn't.
-> 
-> So my suggestion at the moment is that you may:
-> 
-> 1. try dump the registers after pwm_enable() and see if all are setup
-> correctly,
-> 
-> 2. and make sure those registers are write-able at that time (some
-> SoC doesn't allow register writing when the controller is disabled).
-> 
+- srinidhi
 
-Here's a trace with my comments, but I can't see anything wrong in this trace:
-
-/* Configuring backlight level */
-pwm_config:271: TCMPB, wrote: 0000010a, read: 0000010a <- Configure duty
-pwm_config:274: TCNTB, wrote: 0000012a, read: 0000012a <- Configure period
-pwm_config:281: TCON, wrote: 0051990f, read: 0051990f <- Set manual update 
-flag
-pwm_config:286: TCON, wrote: 0051990d, read: 0051990d <- Clear manual update 
-flag
-pwm_enable:149: TCON, wrote: 0051990d, read: 0051990d <- Enable called each 
-time if backlight level != 0
-/* Configuring backlight level */
-pwm_config:271: TCMPB, wrote: 000000a3, read: 000000a3
-pwm_config:274: TCNTB, wrote: 0000012a, read: 0000012a
-pwm_config:281: TCON, wrote: 0051990f, read: 0051990f
-pwm_config:286: TCON, wrote: 0051990d, read: 0051990d
-pwm_enable:149: TCON, wrote: 0051990d, read: 0051990d
-/* Configuring backlight level */
-pwm_config:271: TCMPB, wrote: 00000112, read: 00000112
-pwm_config:274: TCNTB, wrote: 0000012a, read: 0000012a
-pwm_config:281: TCON, wrote: 0051990f, read: 0051990f
-pwm_config:286: TCON, wrote: 0051990d, read: 0051990d
-pwm_enable:149: TCON, wrote: 0051990d, read: 0051990d
-/* Works fine until next sequence */
-/* Disabling backlight */
-pwm_config:271: TCMPB, wrote: 00000129, read: 00000129
-pwm_config:274: TCNTB, wrote: 0000012a, read: 0000012a
-pwm_config:281: TCON, wrote: 0051990f, read: 0051990f
-pwm_config:286: TCON, wrote: 0051990d, read: 0051990d
-pwm_disable:170: TCON, wrote: 0051990c, read: 0051990c <- Clear start flag
-
-/* Enabling backlight back, but it doesn't work :( */
-pwm_config:271: TCMPB, wrote: 00000124, read: 00000124 <- Configure duty
-pwm_config:274: TCNTB, wrote: 0000012a, read: 0000012a <- Configure period
-pwm_config:281: TCON, wrote: 0051990e, read: 0051990e <- Set manual update 
-flag
-pwm_config:286: TCON, wrote: 0051990c, read: 0051990c <- Clear manual update 
-flag
-pwm_enable:149: TCON, wrote: 0051990d, read: 0051990d <- Set start flag
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090924/cd49e4b9/attachment.sig>
+On Thu, 2009-09-24 at 01:17 +0530, srinidhi kasagar wrote:
+> From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+> 
+> This adds a new machine support for ST-Ericsson's U8500 platform. This is
+> an entry level patch which has bindings to existing modules like GIC, SCU,
+> TWD, PL011 UART. This also adds a new SPI device STw4500 which uses ARM pl022
+> bus driver. The patch is based on v2.6.31 kernel and tested on mop500 hardware
+> with SMP enabled.
+> 
+> This time I have split the patches for better readability. Also, for mfd 
+> device support, I have incorporated the review comments.
+> 
+> srinidhi kasagar (8):
+>   [ARM]: enable SMP support for U8500 architecture
+>   [ARM] U8500: adds secondary cpu support, local timers
+>   [ARM] U8500: adds mop500 platform
+>   [ARM] U8500: adds basic SoC support for U8500 CPU
+>   [ARM] U8500: adds basic clock framework
+>   [ARM] U8500: adds stw4500 as pl022 device
+>   mfd: add U8500 STw4500 SPI device support
+>   pl022: fix peripheral id for ST vendor
+> 
+>  arch/arm/Kconfig                                   |   20 ++-
+>  arch/arm/Makefile                                  |    1 +
+>  arch/arm/mach-ux500/Kconfig                        |   15 ++
+>  arch/arm/mach-ux500/Makefile                       |    8 +
+>  .../{mach-footbridge => mach-ux500}/Makefile.boot  |    0
+>  arch/arm/mach-ux500/board-mop500.c                 |  146 +++++++++++
+>  arch/arm/mach-ux500/clock.c                        |   95 +++++++
+>  arch/arm/mach-ux500/cpu-u8500.c                    |   78 ++++++
+>  arch/arm/mach-ux500/headsmp.S                      |   38 +++
+>  .../include/mach/clkdev.h                          |    0
+>  arch/arm/mach-ux500/include/mach/debug-macro.S     |   22 ++
+>  arch/arm/mach-ux500/include/mach/entry-macro.S     |   80 ++++++
+>  arch/arm/mach-ux500/include/mach/hardware.h        |  129 ++++++++++
+>  arch/arm/mach-ux500/include/mach/io.h              |   22 ++
+>  arch/arm/mach-ux500/include/mach/irqs.h            |   71 ++++++
+>  arch/arm/mach-ux500/include/mach/memory.h          |   18 ++
+>  arch/arm/mach-ux500/include/mach/mtu.h             |   53 ++++
+>  arch/arm/mach-ux500/include/mach/setup.h           |   22 ++
+>  arch/arm/mach-ux500/include/mach/smp.h             |   29 +++
+>  arch/arm/mach-ux500/include/mach/system.h          |   25 ++
+>  arch/arm/mach-ux500/include/mach/timex.h           |    6 +
+>  arch/arm/mach-ux500/include/mach/uncompress.h      |   58 +++++
+>  arch/arm/mach-ux500/include/mach/vmalloc.h         |   18 ++
+>  arch/arm/mach-ux500/localtimer.c                   |   28 ++
+>  arch/arm/mach-ux500/platsmp.c                      |  181 ++++++++++++++
+>  arch/arm/mach-ux500/timer.c                        |  163 ++++++++++++
+>  drivers/mfd/Kconfig                                |   10 +
+>  drivers/mfd/Makefile                               |    1 +
+>  drivers/mfd/stw4500.c                              |  207 +++++++++++++++
+>  drivers/spi/amba-pl022.c                           |    2 +-
+>  include/linux/mfd/stw4500.h                        |  262 ++++++++++++++++++++
+>  31 files changed, 1803 insertions(+), 5 deletions(-)
+>  create mode 100644 arch/arm/mach-ux500/Kconfig
+>  create mode 100644 arch/arm/mach-ux500/Makefile
+>  copy arch/arm/{mach-footbridge => mach-ux500}/Makefile.boot (100%)
+>  create mode 100644 arch/arm/mach-ux500/board-mop500.c
+>  create mode 100644 arch/arm/mach-ux500/clock.c
+>  create mode 100644 arch/arm/mach-ux500/cpu-u8500.c
+>  create mode 100644 arch/arm/mach-ux500/headsmp.S
+>  copy arch/arm/{mach-ep93xx => mach-ux500}/include/mach/clkdev.h (100%)
+>  create mode 100644 arch/arm/mach-ux500/include/mach/debug-macro.S
+>  create mode 100644 arch/arm/mach-ux500/include/mach/entry-macro.S
+>  create mode 100644 arch/arm/mach-ux500/include/mach/hardware.h
+>  create mode 100644 arch/arm/mach-ux500/include/mach/io.h
+>  create mode 100644 arch/arm/mach-ux500/include/mach/irqs.h
+>  create mode 100644 arch/arm/mach-ux500/include/mach/memory.h
+>  create mode 100644 arch/arm/mach-ux500/include/mach/mtu.h
+>  create mode 100644 arch/arm/mach-ux500/include/mach/setup.h
+>  create mode 100644 arch/arm/mach-ux500/include/mach/smp.h
+>  create mode 100644 arch/arm/mach-ux500/include/mach/system.h
+>  create mode 100644 arch/arm/mach-ux500/include/mach/timex.h
+>  create mode 100644 arch/arm/mach-ux500/include/mach/uncompress.h
+>  create mode 100644 arch/arm/mach-ux500/include/mach/vmalloc.h
+>  create mode 100644 arch/arm/mach-ux500/localtimer.c
+>  create mode 100644 arch/arm/mach-ux500/platsmp.c
+>  create mode 100644 arch/arm/mach-ux500/timer.c
+>  create mode 100755 drivers/mfd/stw4500.c
+>  create mode 100644 include/linux/mfd/stw4500.h
+> 
+> 
