@@ -1,86 +1,88 @@
 From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
-Date: Thu, 24 Sep 2009 01:17:01 +0530
-Subject: [PATCH 0/8] [ARM] ST-Ericsson's U8500 SMP platform, new patch set
-Message-ID: <1253735221.21542.159.camel@vinay-desktop>
+Date: Thu, 24 Sep 2009 01:17:22 +0530
+Subject: [PATCH 1/8] [ARM]: enable SMP support for U8500 architecture
+Message-ID: <1253735242.21542.160.camel@vinay-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
 
-This adds a new machine support for ST-Ericsson's U8500 platform. This is
-an entry level patch which has bindings to existing modules like GIC, SCU,
-TWD, PL011 UART. This also adds a new SPI device STw4500 which uses ARM pl022
-bus driver. The patch is based on v2.6.31 kernel and tested on mop500 hardware
-with SMP enabled.
+This enables SMP, binds to the existing modules like
+Local timers, TWD, SCU and other generic SMP helpers.
+This also enables machine ux500.
 
-This time I have split the patches for better readability. Also, for mfd 
-device support, I have incorporated the review comments.
+Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+---
+ arch/arm/Kconfig  |   20 ++++++++++++++++----
+ arch/arm/Makefile |    1 +
+ 2 files changed, 17 insertions(+), 4 deletions(-)
 
-srinidhi kasagar (8):
-  [ARM]: enable SMP support for U8500 architecture
-  [ARM] U8500: adds secondary cpu support, local timers
-  [ARM] U8500: adds mop500 platform
-  [ARM] U8500: adds basic SoC support for U8500 CPU
-  [ARM] U8500: adds basic clock framework
-  [ARM] U8500: adds stw4500 as pl022 device
-  mfd: add U8500 STw4500 SPI device support
-  pl022: fix peripheral id for ST vendor
-
- arch/arm/Kconfig                                   |   20 ++-
- arch/arm/Makefile                                  |    1 +
- arch/arm/mach-ux500/Kconfig                        |   15 ++
- arch/arm/mach-ux500/Makefile                       |    8 +
- .../{mach-footbridge => mach-ux500}/Makefile.boot  |    0
- arch/arm/mach-ux500/board-mop500.c                 |  146 +++++++++++
- arch/arm/mach-ux500/clock.c                        |   95 +++++++
- arch/arm/mach-ux500/cpu-u8500.c                    |   78 ++++++
- arch/arm/mach-ux500/headsmp.S                      |   38 +++
- .../include/mach/clkdev.h                          |    0
- arch/arm/mach-ux500/include/mach/debug-macro.S     |   22 ++
- arch/arm/mach-ux500/include/mach/entry-macro.S     |   80 ++++++
- arch/arm/mach-ux500/include/mach/hardware.h        |  129 ++++++++++
- arch/arm/mach-ux500/include/mach/io.h              |   22 ++
- arch/arm/mach-ux500/include/mach/irqs.h            |   71 ++++++
- arch/arm/mach-ux500/include/mach/memory.h          |   18 ++
- arch/arm/mach-ux500/include/mach/mtu.h             |   53 ++++
- arch/arm/mach-ux500/include/mach/setup.h           |   22 ++
- arch/arm/mach-ux500/include/mach/smp.h             |   29 +++
- arch/arm/mach-ux500/include/mach/system.h          |   25 ++
- arch/arm/mach-ux500/include/mach/timex.h           |    6 +
- arch/arm/mach-ux500/include/mach/uncompress.h      |   58 +++++
- arch/arm/mach-ux500/include/mach/vmalloc.h         |   18 ++
- arch/arm/mach-ux500/localtimer.c                   |   28 ++
- arch/arm/mach-ux500/platsmp.c                      |  181 ++++++++++++++
- arch/arm/mach-ux500/timer.c                        |  163 ++++++++++++
- drivers/mfd/Kconfig                                |   10 +
- drivers/mfd/Makefile                               |    1 +
- drivers/mfd/stw4500.c                              |  207 +++++++++++++++
- drivers/spi/amba-pl022.c                           |    2 +-
- include/linux/mfd/stw4500.h                        |  262 ++++++++++++++++++++
- 31 files changed, 1803 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/mach-ux500/Kconfig
- create mode 100644 arch/arm/mach-ux500/Makefile
- copy arch/arm/{mach-footbridge => mach-ux500}/Makefile.boot (100%)
- create mode 100644 arch/arm/mach-ux500/board-mop500.c
- create mode 100644 arch/arm/mach-ux500/clock.c
- create mode 100644 arch/arm/mach-ux500/cpu-u8500.c
- create mode 100644 arch/arm/mach-ux500/headsmp.S
- copy arch/arm/{mach-ep93xx => mach-ux500}/include/mach/clkdev.h (100%)
- create mode 100644 arch/arm/mach-ux500/include/mach/debug-macro.S
- create mode 100644 arch/arm/mach-ux500/include/mach/entry-macro.S
- create mode 100644 arch/arm/mach-ux500/include/mach/hardware.h
- create mode 100644 arch/arm/mach-ux500/include/mach/io.h
- create mode 100644 arch/arm/mach-ux500/include/mach/irqs.h
- create mode 100644 arch/arm/mach-ux500/include/mach/memory.h
- create mode 100644 arch/arm/mach-ux500/include/mach/mtu.h
- create mode 100644 arch/arm/mach-ux500/include/mach/setup.h
- create mode 100644 arch/arm/mach-ux500/include/mach/smp.h
- create mode 100644 arch/arm/mach-ux500/include/mach/system.h
- create mode 100644 arch/arm/mach-ux500/include/mach/timex.h
- create mode 100644 arch/arm/mach-ux500/include/mach/uncompress.h
- create mode 100644 arch/arm/mach-ux500/include/mach/vmalloc.h
- create mode 100644 arch/arm/mach-ux500/localtimer.c
- create mode 100644 arch/arm/mach-ux500/platsmp.c
- create mode 100644 arch/arm/mach-ux500/timer.c
- create mode 100755 drivers/mfd/stw4500.c
- create mode 100644 include/linux/mfd/stw4500.h
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index aef63c8..9331cce 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -637,6 +637,16 @@ config ARCH_OMAP
+ 	help
+ 	  Support for TI's OMAP platform (OMAP1 and OMAP2).
+ 
++config ARCH_U8500
++	bool "ST-Ericsson U8500 Series"
++	select ARM_AMBA
++	select GENERIC_TIME
++	select GENERIC_CLOCKEVENTS
++	select COMMON_CLKDEV
++	help
++	  Include support for ST-Ericsson's Cortex-A9 based
++	  U8500 architecture.
++
+ endchoice
+ 
+ source "arch/arm/mach-clps711x/Kconfig"
+@@ -728,6 +738,8 @@ source "arch/arm/mach-msm/Kconfig"
+ 
+ source "arch/arm/mach-u300/Kconfig"
+ 
++source "arch/arm/mach-ux500/Kconfig"
++
+ source "arch/arm/mach-w90x900/Kconfig"
+ 
+ # Definitions to make life easier
+@@ -881,10 +893,10 @@ source "kernel/time/Kconfig"
+ config SMP
+ 	bool "Symmetric Multi-Processing (EXPERIMENTAL)"
+ 	depends on EXPERIMENTAL && (REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP ||\
+-		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4)
++		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || ARCH_U8500)
+ 	depends on GENERIC_CLOCKEVENTS
+ 	select USE_GENERIC_SMP_HELPERS
+-	select HAVE_ARM_SCU if (ARCH_REALVIEW || ARCH_OMAP4)
++	select HAVE_ARM_SCU if (ARCH_REALVIEW || ARCH_OMAP4 || ARCH_U8500)
+ 	help
+ 	  This enables support for systems with more than one CPU. If you have
+ 	  a system with only one CPU, like most personal computers, say N. If
+@@ -953,9 +965,9 @@ config HOTPLUG_CPU
+ config LOCAL_TIMERS
+ 	bool "Use local timer interrupts"
+ 	depends on SMP && (REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || \
+-		REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4)
++		REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || ARCH_U8500)
+ 	default y
+-	select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_OMAP4)
++	select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_OMAP4 || ARCH_U8500)
+ 	help
+ 	  Enable support for local timers on SMP platforms, rather then the
+ 	  legacy IPI broadcast method.  Local timers allows the system
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index c877d6d..948a8d9 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -155,6 +155,7 @@ machine-$(CONFIG_ARCH_SHARK)		:= shark
+ machine-$(CONFIG_ARCH_STMP378X)		:= stmp378x
+ machine-$(CONFIG_ARCH_STMP37XX)		:= stmp37xx
+ machine-$(CONFIG_ARCH_U300)		:= u300
++machine-$(CONFIG_ARCH_U8500)		:= ux500
+ machine-$(CONFIG_ARCH_VERSATILE)	:= versatile
+ machine-$(CONFIG_ARCH_W90X900)		:= w90x900
+ machine-$(CONFIG_FOOTBRIDGE)		:= footbridge
+-- 
+1.6.3.GIT
