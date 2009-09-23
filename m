@@ -1,45 +1,54 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 23 Sep 2009 13:55:53 +0100
-Subject: Kernel related (?) user space crash at ARM11 MPCore
-In-Reply-To: <1253710306.23370.79.camel@pc1117.cambridge.arm.com>
-References: <20090921085425.GC27357@n2100.arm.linux.org.uk>
-	<1253526263.1541.32.camel@pc1117.cambridge.arm.com>
-	<20090921100751.GF27357@n2100.arm.linux.org.uk>
-	<20090921213802.GH30821@n2100.arm.linux.org.uk>
-	<1253614753.14049.47.camel@pc1117.cambridge.arm.com>
-	<1253639843.14049.95.camel@pc1117.cambridge.arm.com>
-	<4AB9BA3E.20602@googlemail.com>
-	<1253697204.23370.22.camel@pc1117.cambridge.arm.com>
-	<1253702319.23370.47.camel@pc1117.cambridge.arm.com>
-	<19130.4263.228472.651482@pilspetsen.it.uu.se>
-	<20090923124238.GA20495@n2100.arm.linux.org.uk>
-	<1253710306.23370.79.camel@pc1117.cambridge.arm.com>
-Message-ID: <1253710553.23370.83.camel@pc1117.cambridge.arm.com>
+From: buytenh@wantstofly.org (Lennert Buytenhek)
+Date: Wed, 23 Sep 2009 15:07:31 +0200
+Subject: Thecus n2100 uart irq?
+In-Reply-To: <19130.5692.953257.987602@pilspetsen.it.uu.se>
+References: <19130.5692.953257.987602@pilspetsen.it.uu.se>
+Message-ID: <20090923130731.GO1773@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2009-09-23 at 13:51 +0100, Catalin Marinas wrote:
-> On Wed, 2009-09-23 at 13:42 +0100, Russell King - ARM Linux wrote:
-> > On Wed, Sep 23, 2009 at 02:12:23PM +0200, Mikael Pettersson wrote:
-> > > OABI is obsolete legacy, so while it should (perhaps) be
-> > > kept working, it should not be allowed to negatively affect
-> > > the performance of pure EABI systems.
-> > > 
-> > > If option 3 is best for EABI then that's my vote.
-> > 
-> > However, Catalins benchmarks don't include testing my patch with EABI
-> > executables with RIX disabled, so we really don't know how it would
-> > behave.
+On Wed, Sep 23, 2009 at 02:36:12PM +0200, Mikael Pettersson wrote:
+
+> The plat_serial8250_port data in mach-iop32x/n2100.c stores
+> a zero in the .irq field. This causes the 8250 serial driver
+> to run the serial console in irq-less mode with a high-frequency
+> polling timer.
 > 
-> I'll do it shortly, no problem. But since it didn't take VM_EXEC into
-> account, I thought it wouldn't really matter. But I see where you come
-> from - just for comparison with my workaround.
+> According to /proc/timer_stats on my n2100, the 8250 polling
+> timer generates more timeouts than any other timer in my kernel,
+> and about 10 times more timeouts than the second most active
+> timer.
+> 
+> Apart from the constant CPU overhead, this prevents CONFIG_NO_HZ
+> (in my pending plat-iop clocksource/clockevents conversion) from
+> being effective: the frequent timeouts keeps the timer interrupt
+> rate just as high as in the NO_HZ case.
+> 
+> The other mach-iop32x machines use one of the IRQ_IOP32X_XINT[0-3]
+> interrupts for their uarts. I've tried all four values on the n2100,
+> but none of them seemed to work: the console would go silent when
+> the kernel starts init.
 
-Forgot to mention - I don't think lmbench is too relevant to CoW
-performance since the applications are relatively small. But that's the
-problem with any benchmark application which was designed to be, well, a
-benchmark application. We would need real-world applications but I don't
-have time for further investigation here.
+The XINT interrupt sources are interrupt sources for external pins on
+the SoC (GPIO-like).  On the Thecus, the serial port IRQ is not hooked
+up by default (but see below), so that explains why that wouldn't work.
 
--- 
-Catalin
+
+> Does anyone know how run the n2100 uart properly with an irq?
+
+If I recall correctly (it's been a while), then on the n2100, there
+is one XINT line that can either be jumpered to hook up to the serial
+port IRQ or to the interrupt line of one of the USB controllers, and
+the default is to connect to the USB controller interrupt line.
+
+Note that when I last looked, the 8250 driver had the option to work
+in irq-less mode but the USB *HCI drivers didn't, so the only way to
+get serial to run irq-less was to break USB.
+
+I suppose that that's still true, but if the serial and USB controller
+interrupt output are both open drain or so (please check the datasheets
+to see if that's true, as I don't know), you could perhaps just tie the
+three pins together, and have the 8250 and the USB *HCI drivers use the
+same IRQ number.  (If you're not sure whether they are, then you could
+test by tying them together with suitably large resistors, and seeing
+how much current you end up drawing.)
