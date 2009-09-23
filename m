@@ -1,49 +1,47 @@
 From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Wed, 23 Sep 2009 21:43:52 +0200
-Subject: Fwd: [PATCH] em7210: fix memory size
-In-Reply-To: <e9c3a7c20908301645v4cfdec4ehe2ed1e6efaf261ed@mail.gmail.com>
-	(Dan Williams's message of "Sun\, 30 Aug 2009 16\:45\:25 -0700")
-References: <87k51ru2gw.fsf@lechat.rtp-net.org>
-	<e9c3a7c20908301631j50ccb0d6q8ab1ee61a2f4d247@mail.gmail.com>
-	<e9c3a7c20908301645v4cfdec4ehe2ed1e6efaf261ed@mail.gmail.com>
-Message-ID: <87ljk578g7.fsf@lechat.rtp-net.org>
+Date: Wed, 23 Sep 2009 21:48:11 +0200
+Subject: [PATCH] mach-iop32x/ Add nec ns-50 / ApplianceWare sanmina support
+In-Reply-To: <e9c3a7c20908301646w3cc8199dg392b95faad5616de@mail.gmail.com>
+	(Dan Williams's message of "Sun\, 30 Aug 2009 16\:46\:59 -0700")
+References: <87ocr6uyhx.fsf@lechat.rtp-net.org>
+	<e9c3a7c20908301646w3cc8199dg392b95faad5616de@mail.gmail.com>
+Message-ID: <87hbut7890.fsf@lechat.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dan Williams <dan.j.williams@intel.com> writes:
+
 Hi,
 
-> [ replied to wrong mailing list ]
->
->
-> ---------- Forwarded message ----------
-> From: Dan Williams <dan.j.williams@intel.com>
-> Date: Sun, Aug 30, 2009 at 4:31 PM
-> Subject: Re: [PATCH] em7210: fix memory size
-> To: Arnaud Patard <arnaud.patard@rtp-net.org>
-> Cc: linux-arm-kernel at lists.arm.linux.org.uk
->
->
-> On Wed, Jul 29, 2009 at 4:56 AM, Arnaud Patard<arnaud.patard@rtp-net.org> wrote:
+> On Mon, Jul 27, 2009 at 5:00 AM, Arnaud Patard<arnaud.patard@rtp-net.org> wrote:
+>> Hi,
 >>
->> The default memory module size on the ss4000e is 256M but Redboot has
->> been hardcoded to pass 512M to the kernel through ATAG. As getting a new
->> redboot is more than unlikely, it has to be fixed in the kernel
->> (unfortunately). This patch does that.
+>> This patch is adding support for the nec ns-50/ApplianceWare Sanmina
+>> platform. This platforms is a nas based on iop80219 SoC.
+>>
+>> This code has been tested on 2.6.31-rc*
 >>
 >
-> I am on the fence on this one. ?On the one hand it makes sense in that
-> the kernel is usable without a "mem=256M..." command line option on
-> default configured platforms. ?Users that have upgraded the memory can
-> pass a "mem=512M..." to use their extra memory. ?However, it still
-> seems that this will appear as a regression to any current 512M
-> platforms that are not passing a command line option, and a "don't
-> care" to everyone who must be passing "mem=256M..." to get a
-> functional platform.
->
-> Hmm... ?can you say a bit more about this comment "solving this issue will help
-> also people porting the d-i on the device." [1] That might help tip the balance.
+> Looks ok to me except for the bit modifying arch/arm/tools/mach-types.
 
-I've asked more details and I'm going to try to sum up the point. I hope
-I won't make any mistake as I'm not familiar with d-i internals at
-all. Please bear with me.
+oops. Sent the wrong patch :(
+
+New patch attached below.
+
+Arnaud
+
+
+
+This patch is adding support for the nec ns-50/ApplianceWare Sanmina
+platform. This platforms is a nas based on iop80219 SoC.
+
+
+Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+---
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: sanmina.patch
+Type: text/x-diff
+Size: 8050 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090923/41e60f51/attachment-0001.bin>
