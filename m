@@ -1,46 +1,25 @@
-From: linux@bohmer.net (Remy Bohmer)
-Date: Wed, 23 Sep 2009 23:04:09 +0200
-Subject: [PATCH] Don't disable irqs in set_next_event and set_mode
-	callbacks
-In-Reply-To: <1253518763-15087-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1253518763-15087-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <3efb10970909231404me189b28yb90daa6f5f4767b8@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 23 Sep 2009 22:12:15 +0100
+Subject: [PATCH v4, REBASED 1/2] ARM: Pass IFSR register to
+	do_PrefetchAbort()
+In-Reply-To: <00ae0c0830ca659709d80e56e8e87b636c32fcf6.1253616961.git.kirill@shutemov.name>
+References: <00ae0c0830ca659709d80e56e8e87b636c32fcf6.1253616961.git.kirill@shutemov.name>
+Message-ID: <20090923211214.GA25115@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Sep 22, 2009 at 02:00:14PM +0300, Kirill A. Shutemov wrote:
+> diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+> index 379f785..924ec14 100644
+> --- a/arch/arm/mm/fault.c
+> +++ b/arch/arm/mm/fault.c
+> @@ -520,7 +520,7 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+>  }
+>  
+>  asmlinkage void __exception
+> -do_PrefetchAbort(unsigned long addr, struct pt_regs *regs)
+> +do_PrefetchAbort(unsigned long addr, int ifsr, struct pt_regs *regs)
 
-2009/9/21 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> These functions are called with irqs already off.
->
-> at91rm2000 had a WARN_ON_ONCE if irqs were enabled since Nov 2008 with
-> noone reporting having hit it.
+Almost there - this should be 'unsigned int ifsr'.
 
-I guess this is not a processor widely used these days with recent
-kernels, it has been deprecated by Atmel a couple of years ago.
-Besides that, there is also a TC-library clocksource/event
-implementation inside the kernel that runs at a much higher frequency
-compared to the 32kHz the PIT is running on. It is likely that someone
-who cares about accurate timestamps would use the TC-lib
-implementation on this processor. So, it would have surprised me if
-anybody would actually hit this WARN_ON_ONCE...
-
-> It should be safe to remove now.
-
-But anyway, if the problem we encountered back then would still be
-here, many more boards/architectures would suffer from the same
-problem. So, I guess it is safe to remove the irq_disable now.
-But to be completely sure; I will test this patch on 2.6.31-rt11 with
-the sam9261 processor once I have it running stable.(I expect Friday
-and stress it during the weekend. Will inform you about the results on
-Monday)
-
-> should I split the patch?  Would you prefer to add a WARN_ON_ONCE for
-> some time (as at91rm9200 had it)?
-
-I expect this is not needed...
-
-
-Kind Regards,
-
-Remy
+Other than that, patches are fine.
