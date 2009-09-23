@@ -1,25 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 23 Sep 2009 22:12:15 +0100
-Subject: [PATCH v4, REBASED 1/2] ARM: Pass IFSR register to
-	do_PrefetchAbort()
-In-Reply-To: <00ae0c0830ca659709d80e56e8e87b636c32fcf6.1253616961.git.kirill@shutemov.name>
-References: <00ae0c0830ca659709d80e56e8e87b636c32fcf6.1253616961.git.kirill@shutemov.name>
-Message-ID: <20090923211214.GA25115@n2100.arm.linux.org.uk>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 24 Sep 2009 06:25:46 +0800
+Subject: Problem with s3c24xx pwm driver
+In-Reply-To: <200909232223.35835.anarsoul@gmail.com>
+References: <200909231824.11671.anarsoul@gmail.com>
+	<f17812d70909231203v198aafberd00ce35bd7ba7f6b@mail.gmail.com>
+	<200909232223.35835.anarsoul@gmail.com>
+Message-ID: <f17812d70909231525t594704c5u781e2221481676a0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2009 at 02:00:14PM +0300, Kirill A. Shutemov wrote:
-> diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-> index 379f785..924ec14 100644
-> --- a/arch/arm/mm/fault.c
-> +++ b/arch/arm/mm/fault.c
-> @@ -520,7 +520,7 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
->  }
->  
->  asmlinkage void __exception
-> -do_PrefetchAbort(unsigned long addr, struct pt_regs *regs)
-> +do_PrefetchAbort(unsigned long addr, int ifsr, struct pt_regs *regs)
+On Thu, Sep 24, 2009 at 3:23 AM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+> ? ????????? ?? 23 ???????? 2009 22:03:17 ????? Eric Miao ???????:
+>> Sounds like there are cases where the pwm_enable() and pwm_disable()
+>> are not paired? You may want to print out the reference count each time
+>> to see if this is true.
+>
+> And, btw, pwm_enable()/pwm_disable for s3c24xx just sets/clears one bit. It
+> doesn't harm to set same bit twice, does it?
+>
 
-Almost there - this should be 'unsigned int ifsr'.
+No, it doesn't.
 
-Other than that, patches are fine.
+So my suggestion at the moment is that you may:
+
+1. try dump the registers after pwm_enable() and see if all are setup
+correctly,
+
+2. and make sure those registers are write-able at that time (some
+SoC doesn't allow register writing when the controller is disabled).
