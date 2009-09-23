@@ -1,30 +1,48 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 23 Sep 2009 09:17:56 +0200
-Subject: u8500 paches are being held ( was My first patch to the
-	mailist, but being held)
-In-Reply-To: <20090923035845.GF31920@trinity.fluff.org>
-References: <747C1E83C744F44E9ACFB89FAEEC2C7B11BC3EE46D@EXDCVYMBSTM005.EQ1STM.local>
-	<20090923035845.GF31920@trinity.fluff.org>
-Message-ID: <20090923071756.GB8565@elf.ucw.cz>
+From: wim@iguana.be (Wim Van Sebroeck)
+Date: Wed, 23 Sep 2009 09:26:13 +0200
+Subject: [PATCH] watchdog: Add support for the Avionic Design Xanthos
+	watchdog timer.
+In-Reply-To: <20090921145832.GA4211@avionic-design.de>
+References: <20090821073105.GC29382@infomag.iguana.be>
+	<1250860202-28187-1-git-send-email-thierry.reding@avionic-design.de>
+	<20090822081806.GD29382@infomag.iguana.be>
+	<20090824090407.GA24894@avionic-design.de>
+	<20090827202314.GJ29382@infomag.iguana.be>
+	<4A96ED32.7000108@billgatliff.com>
+	<20090827204448.GL29382@infomag.iguana.be>
+	<20090828061108.GA1649@avionic-design.de>
+	<20090831115837.GL29382@infomag.iguana.be>
+	<20090921145832.GA4211@avionic-design.de>
+Message-ID: <20090923072613.GF3929@infomag.iguana.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2009-09-23 04:58:45, Ben Dooks wrote:
-> On Tue, Sep 22, 2009 at 04:05:04PM +0200, Srinidhi KASAGAR wrote:
-> > David,
+Hi Thierry,
+
+> > I'm still puzzled. I have seen a number of watchdog devices that have the option to either reboot the system or generate an interrupt.
+> > They can be set via toggling the correct bits of some configuration register.
 > > 
-> > I have posted a series of patches (u8500 machine support) today and one among them was 48K which was being held by the infradead server. Do you still consider the patches of size > 40 KB are suspects? Should I need to repost the whole patch series by splitting it to match 'your 40K' limit OR is there any possibility that the patch get posted to the list?
-> > 
-> > git format-patch -M did not help either. 
+> > How does this hardware works? Is there a datasheet available somewhere?
 > 
-> I've always felt that patches that big are probably too big to review
-> properly anyway. But that's just my personal view on the matter.
+> It works exactly the same way. The bit defined by ADX_WDT_CONTROL_nRESET
+> controls this behaviour. If set, the watchdog will only generate an
+> interrupt, if cleared (the default) it will reboot the system.
+> 
+> There's currently no real datasheet available. The register definitions at
+> the top of adx_wdt.c are pretty much all of the documentation we currently
+> have, I'm afraid.
 
-Well, not all patches that go to the list are for review/submit. Some
-of them are for info etc...
+I looked at the register definitions and then searched in your code where
+the ADX_WDT_CONTROL_nRESET bit of the watchdog device was initialized.
+I didn't find it.
 
-(Plus, stuff like MSM dsp support is quite hard to split :-()
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+So to get this driver in line with how the other drivers work, we should still
+do the following:
+1) initialize the device at startup so that the ADX_WDT_CONTROL_nRESET is set correctly
+(and the device should also be disabled if it isn't done yet).
+2) we can get rid of the interrupt handling because we will use the reboot behaviour.
+
+Can you adapt your code?
+
+Thanks in advance,
+Wim.
