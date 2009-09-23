@@ -1,26 +1,34 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 23 Sep 2009 16:26:02 -0700
+Date: Wed, 23 Sep 2009 16:28:29 -0700
 Subject: [PATCH/RFC] Runtime PM: ARM: subarch-specific extensions of
 	pdev_archdata
-In-Reply-To: <20090923035411.GD31920@trinity.fluff.org>
-References: <1253670648-28610-1-git-send-email-khilman@deeprootsystems.com>
-	<20090923035411.GD31920@trinity.fluff.org>
-Message-ID: <4ABAAE8A.8050608@deeprootsystems.com>
+In-Reply-To: <19129.63264.653666.70492@pilspetsen.it.uu.se>
+References: <1253670648-28610-1-git-send-email-khilman@deeprootsystems.com>	<f17812d70909222153y4a0e4fc2n496ea2e6caaac847@mail.gmail.com>
+	<19129.63264.653666.70492@pilspetsen.it.uu.se>
+Message-ID: <4ABAAF1D.6090907@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Dooks wrote:
-> How about adding a Kconfig for any architectures interested in defining
-> it to declare that they do not want a generic version, or some form of
-> default include that could be used to support archs where this is not
-> defined?
+Mikael Pettersson wrote:
+> Eric Miao writes:
+>  > On Wed, Sep 23, 2009 at 9:50 AM, Kevin Hilman
+>  > <khilman@deeprootsystems.com> wrote:
+>  > > On ARM platforms, power management can be very platform specific.
+>  > > This patch allows ARM subarches to extend the platform_device
+>  > > pdev_archdata for each subarch by creating a new struct pdev_machdata
+>  > > and allowing each subarch to customize it as needed.
+>  > >
+>  > > As a starting point, each subarch's <mach/device.h> creates an empty
+>  > > struct pdev_machdata.
+>  > >
+>  > 
+>  > Shouldn't that pdev_archdata and pdev_machdata be pointer or something
+>  > so that multiple platform_device can share something in common?
 > 
-> This i san awful lot of nothing header addition.
-> 
+> Forcing it to be a pointer has allocation and lifetime implications.
+> Making it a struct allows the subarch to duplicate or share
+> (via a private pointer) data as it sees fit.
 
-I'm ok with a Kconfig option if that is preferred, but personally I 
-prefer minimizing Kconfig space.
-
-Thanks for the comments,
+Yes, the allocation/lifetime issues were why a struct was chosen.
 
 Kevin
