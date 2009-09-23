@@ -1,49 +1,46 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Thu, 24 Sep 2009 08:57:24 +1200
-Subject: [PATCH] ep93xx/micro9: Update platform code and maintainer
-In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901D42430@mi8nycmail19.Mi8.com>
-References: <75467E8A2C28434DA9302761D4D2B6FDB02DC9@coexs.contec-int.at>
-	<4ABA87EB.5040804@bluewatersys.com>
-	<BD79186B4FD85F4B8E60E381CAEE190901D42430@mi8nycmail19.Mi8.com>
-Message-ID: <4ABA8BB4.6050707@bluewatersys.com>
+From: linux@bohmer.net (Remy Bohmer)
+Date: Wed, 23 Sep 2009 23:04:09 +0200
+Subject: [PATCH] Don't disable irqs in set_next_event and set_mode
+	callbacks
+In-Reply-To: <1253518763-15087-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1253518763-15087-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <3efb10970909231404me189b28yb90daa6f5f4767b8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-H Hartley Sweeten wrote:
-> On Wednesday, September 23, 2009 1:41 PM, Ryan Mallon wrote:
->> Hubert Feurstein wrote:
->>> ARM: Update Contec Micro9 maintainer and add entry in MAINTAINERS
->>>      Update Contec Micro9 platform code and add Micro9-Slim support
->>>
->>> Signed-off-by: Hubert Feurstein <hubert.feurstein@contec.at>
->>> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
->>> Cc: Manfred Gruber <m.gruber@tirol.com>
->>> Cc: Ryan Mallon <ryan@bluewatersys.com>
->> Could we separate this out into two patches, one which updates the
->> MAINTAINERS file, and the maintainer in the comments, and one which
->> makes code changes. The two aren't really related.
-> 
-> Ryan,
-> 
-> I normally would agree but the change to micro9.c is pretty large.
-> There could be some patch reject issues depending on the order the
-> patches are picked up and applied.
+Hi,
 
-They could be posted as a series of 2 so that they are applied in the
-correct order. It shouldn't be a big issue.
+2009/9/21 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> These functions are called with irqs already off.
+>
+> at91rm2000 had a WARN_ON_ONCE if irqs were enabled since Nov 2008 with
+> noone reporting having hit it.
 
-> How about just a split into a MAINTAINERS file patch and a code patch?
+I guess this is not a processor widely used these days with recent
+kernels, it has been deprecated by Atmel a couple of years ago.
+Besides that, there is also a TC-library clocksource/event
+implementation inside the kernel that runs at a much higher frequency
+compared to the 32kHz the PIT is running on. It is likely that someone
+who cares about accurate timestamps would use the TC-lib
+implementation on this processor. So, it would have surprised me if
+anybody would actually hit this WARN_ON_ONCE...
 
-That would be better than a single patch.
+> It should be safe to remove now.
 
-~Ryan
+But anyway, if the problem we encountered back then would still be
+here, many more boards/architectures would suffer from the same
+problem. So, I guess it is safe to remove the irq_disable now.
+But to be completely sure; I will test this patch on 2.6.31-rt11 with
+the sam9261 processor once I have it running stable.(I expect Friday
+and stress it during the weekend. Will inform you about the results on
+Monday)
 
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
+> should I split the patch?  Would you prefer to add a WARN_ON_ONCE for
+> some time (as at91rm9200 had it)?
 
-       Ryan Mallon                              Unit 5, Amuri Park
-       Phone: +64 3 3779127                     404 Barbadoes St
-       Fax:   +64 3 3779135                     PO Box 13 889
-       Email: ryan at bluewatersys.com             Christchurch, 8013
-       Web:   http://www.bluewatersys.com       New Zealand
-       Freecall Australia  1800 148 751         USA 1800 261 2934
+I expect this is not needed...
+
+
+Kind Regards,
+
+Remy
