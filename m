@@ -1,36 +1,27 @@
-From: dave123_aml@yahoo.com (David Anders)
-Date: Wed, 23 Sep 2009 12:20:05 -0700 (PDT)
-Subject: [PATCH 1/5] s3c2410_udc: 2440 dual packet workaround
-In-Reply-To: <200909231046.36330.anarsoul@gmail.com>
-Message-ID: <164376.11955.qm@web54401.mail.yahoo.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Wed, 23 Sep 2009 22:23:29 +0300
+Subject: Problem with s3c24xx pwm driver
+In-Reply-To: <f17812d70909231203v198aafberd00ce35bd7ba7f6b@mail.gmail.com>
+References: <200909231824.11671.anarsoul@gmail.com>
+	<f17812d70909231203v198aafberd00ce35bd7ba7f6b@mail.gmail.com>
+Message-ID: <200909232223.35835.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vasily,
+? ????????? ?? 23 ???????? 2009 22:03:17 ????? Eric Miao ???????:
+> Sounds like there are cases where the pwm_enable() and pwm_disable()
+> are not paired? You may want to print out the reference count each time
+> to see if this is true.
 
-i have tried this patch on a number of S3C2440 based systems and found that this patch is not a completely effective solution. if the purpose is to get a solution even if it is an incomplete one, then i'd be ok with this patch, however, i'm not keen on accepting a patch into the main tree with the knowledge that it isn't 100% effective.
+And, btw, pwm_enable()/pwm_disable for s3c24xx just sets/clears one bit. It 
+doesn't harm to set same bit twice, does it?
 
-Dave Anders
-
-
---- On Wed, 9/23/09, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
-
-> From: Vasily Khoruzhick <anarsoul@gmail.com>
-> Subject: [PATCH 1/5] s3c2410_udc: 2440 dual packet workaround
-> To: "Ben Dooks" <ben-linux@fluff.org>, linux-arm-kernel at lists.infradead.org
-> Date: Wednesday, September 23, 2009, 2:46 AM
-> 
-> 
-> -----Inline Attachment Follows-----
-> 
-> 
-> -----Inline Attachment Follows-----
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
-
-      
+Regards
+Vasily
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090923/1c740fa4/attachment.sig>
