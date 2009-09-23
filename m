@@ -1,31 +1,27 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Wed, 23 Sep 2009 18:24:01 +0300
-Subject: Problem with s3c24xx pwm driver
-Message-ID: <200909231824.11671.anarsoul@gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 23 Sep 2009 12:38:59 -0400
+Subject: [PATCH] ep93xx: add remaining phys offset selections and update
+	micro9
+In-Reply-To: <75467E8A2C28434DA9302761D4D2B6FDB02DC7@coexs.contec-int.at>
+References: <BD79186B4FD85F4B8E60E381CAEE190901D42257@mi8nycmail19.Mi8.com>
+	<75467E8A2C28434DA9302761D4D2B6FDB02DC7@coexs.contec-int.at>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901D423B7@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wednesday, September 23, 2009 7:11 AM, Hubert Feurstein wrote:
+>> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+>> Cc: Ryan Mallon <ryan@bluewatersys.com>
+>> Cc: Hubert Feurstein <hubert.feurstein@contec.at>
+> Acked-by: Hubert Feurstein <hubert.feurstein@contec.at>
+>
+> I had to remove the trailing whitespace at the last #endif, otherwise
+> the patch failed to apply.
 
-I'm encountering very strange problem with s3c24xx pwm driver. I'm using it 
-with pwm-bl driver. When backlight level is 0, pwm-bl calls pwm_config(0, 
-period); pwm_disable(), otherwise it calls pwm_config(duty, period); 
-pwm_enable().
+Hmm.. The file that will be submitted to the patch system does not appear
+to have the trailing whitespace.  Must have happened when I posted the
+patch.
 
-Problem is that after pwm was disabled, it can't be enabled with 
-pwm_config(duty, period); pwm_enable() for some (but not all) _valid_ 
-duty/period combinations.
+Thanks for the Ack.
 
-pwm-bl works fine if pwm_disable() call is commented out.
-
-Does anybody know how to solve this problem? Any suggestions?
-
-Regards
-Vasily
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090923/436b5290/attachment.sig>
+Hartley
