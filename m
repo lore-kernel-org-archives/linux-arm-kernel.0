@@ -1,19 +1,17 @@
-From: ben@trinity.fluff.org (Ben Dooks)
-Date: Wed, 23 Sep 2009 04:54:12 +0100
-Subject: [PATCH/RFC] Runtime PM: ARM: subarch-specific extensions of
-	pdev_archdata
-In-Reply-To: <1253670648-28610-1-git-send-email-khilman@deeprootsystems.com>
-References: <1253670648-28610-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <20090923035411.GD31920@trinity.fluff.org>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Wed, 23 Sep 2009 04:54:53 +0100
+Subject: [PATCH] s3c64xx: Fix S3C64XX_CLKDIV0_ARM_MASK value
+In-Reply-To: <1253677441-14308-1-git-send-email-kgene.kim@samsung.com>
+References: <1253677441-14308-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20090923035453.GE31920@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-How about adding a Kconfig for any architectures interested in defining
-it to declare that they do not want a generic version, or some form of
-default include that could be used to support archs where this is not
-defined?
-
-This i san awful lot of nothing header addition.
+On Wed, Sep 23, 2009 at 12:44:01PM +0900, Kukjin Kim wrote:
+> Fix the values of S3C6400_CLKDIV0_ARM_MASK and S3C6410_CLKDIV0_ARM_MASK.
+> 
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+					^ plese use the @ symbol here.
 
 -- 
 Ben
