@@ -1,27 +1,31 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 23 Sep 2009 04:58:45 +0100
-Subject: u8500 paches are being held ( was My first patch to the mailist,
-	but being held)
-In-Reply-To: <747C1E83C744F44E9ACFB89FAEEC2C7B11BC3EE46D@EXDCVYMBSTM005.EQ1STM.local>
-References: <747C1E83C744F44E9ACFB89FAEEC2C7B11BC3EE46D@EXDCVYMBSTM005.EQ1STM.local>
-Message-ID: <20090923035845.GF31920@trinity.fluff.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 23 Sep 2009 12:59:07 +0900
+Subject: [PATCH] s3c64xx: Fix S3C64XX_CLKDIV0_ARM_MASK value
+Message-ID: <1253678347-16870-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2009 at 04:05:04PM +0200, Srinidhi KASAGAR wrote:
-> David,
-> 
-> I have posted a series of patches (u8500 machine support) today and one among them was 48K which was being held by the infradead server. Do you still consider the patches of size > 40 KB are suspects? Should I need to repost the whole patch series by splitting it to match 'your 40K' limit OR is there any possibility that the patch get posted to the list?
-> 
-> git format-patch -M did not help either. 
+Fix the values of S3C6400_CLKDIV0_ARM_MASK and S3C6410_CLKDIV0_ARM_MASK.
 
-I've always felt that patches that big are probably too big to review
-properly anyway. But that's just my personal view on the matter.
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/plat-s3c64xx/include/plat/regs-clock.h |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-PS, word-wrap your postings to under 77 characters per line.
-
+diff --git a/arch/arm/plat-s3c64xx/include/plat/regs-clock.h b/arch/arm/plat-s3c64xx/include/plat/regs-clock.h
+index a8777a7..ff46e7f 100644
+--- a/arch/arm/plat-s3c64xx/include/plat/regs-clock.h
++++ b/arch/arm/plat-s3c64xx/include/plat/regs-clock.h
+@@ -51,8 +51,8 @@
+ #define S3C6400_CLKDIV0_HCLK_SHIFT	(8)
+ #define S3C6400_CLKDIV0_MPLL_MASK	(0x1 << 4)
+ #define S3C6400_CLKDIV0_MPLL_SHIFT	(4)
+-#define S3C6400_CLKDIV0_ARM_MASK	(0x3 << 0)
+-#define S3C6410_CLKDIV0_ARM_MASK	(0x7 << 0)
++#define S3C6400_CLKDIV0_ARM_MASK	(0x7 << 0)
++#define S3C6410_CLKDIV0_ARM_MASK	(0xf << 0)
+ #define S3C6400_CLKDIV0_ARM_SHIFT	(0)
+ 
+ /* CLKDIV1 */
 -- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+1.5.3.4
