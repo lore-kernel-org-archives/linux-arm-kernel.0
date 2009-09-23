@@ -1,38 +1,86 @@
-From: gerg@snapgear.com (Greg Ungerer)
-Date: Thu, 24 Sep 2009 16:24:04 +1000
-Subject: [PATCH] arm: fix valid_phys_addr_range() range check
-Message-ID: <200909240624.n8O6O4MO002196@localhost.localdomain>
+From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
+Date: Thu, 24 Sep 2009 01:17:01 +0530
+Subject: [PATCH 0/8] [ARM] ST-Ericsson's U8500 SMP platform, new patch set
+Message-ID: <1253735221.21542.159.camel@vinay-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm: fix valid_phys_addr_range() range check
+From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
 
-Commit 1522ac3ec95ff0230e7aa516f86b674fdf72866c
-("Fix virtual to physical translation macro corner cases")
-breaks the end of memory check in valid_phys_addr_range().
-The modified expression results in the apparent /dev/mem size
-being 2 bytes smaller than what it actually is.
+This adds a new machine support for ST-Ericsson's U8500 platform. This is
+an entry level patch which has bindings to existing modules like GIC, SCU,
+TWD, PL011 UART. This also adds a new SPI device STw4500 which uses ARM pl022
+bus driver. The patch is based on v2.6.31 kernel and tested on mop500 hardware
+with SMP enabled.
 
-This patch reworks the expression to correctly check the address,
-while maintaining use of a valid address to __pa().
+This time I have split the patches for better readability. Also, for mfd 
+device support, I have incorporated the review comments.
 
-Signed-off-by: Greg Ungerer <gerg@uclinux.org>
----
- arch/arm/mm/mmap.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+srinidhi kasagar (8):
+  [ARM]: enable SMP support for U8500 architecture
+  [ARM] U8500: adds secondary cpu support, local timers
+  [ARM] U8500: adds mop500 platform
+  [ARM] U8500: adds basic SoC support for U8500 CPU
+  [ARM] U8500: adds basic clock framework
+  [ARM] U8500: adds stw4500 as pl022 device
+  mfd: add U8500 STw4500 SPI device support
+  pl022: fix peripheral id for ST vendor
 
-diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
-index f7457fe..2b79964 100644
---- a/arch/arm/mm/mmap.c
-+++ b/arch/arm/mm/mmap.c
-@@ -124,7 +124,7 @@ int valid_phys_addr_range(unsigned long addr, size_t size)
- {
- 	if (addr < PHYS_OFFSET)
- 		return 0;
--	if (addr + size >= __pa(high_memory - 1))
-+	if (addr + size > __pa(high_memory - 1) + 1)
- 		return 0;
- 
- 	return 1;
--- 
-1.5.5.1
+ arch/arm/Kconfig                                   |   20 ++-
+ arch/arm/Makefile                                  |    1 +
+ arch/arm/mach-ux500/Kconfig                        |   15 ++
+ arch/arm/mach-ux500/Makefile                       |    8 +
+ .../{mach-footbridge => mach-ux500}/Makefile.boot  |    0
+ arch/arm/mach-ux500/board-mop500.c                 |  146 +++++++++++
+ arch/arm/mach-ux500/clock.c                        |   95 +++++++
+ arch/arm/mach-ux500/cpu-u8500.c                    |   78 ++++++
+ arch/arm/mach-ux500/headsmp.S                      |   38 +++
+ .../include/mach/clkdev.h                          |    0
+ arch/arm/mach-ux500/include/mach/debug-macro.S     |   22 ++
+ arch/arm/mach-ux500/include/mach/entry-macro.S     |   80 ++++++
+ arch/arm/mach-ux500/include/mach/hardware.h        |  129 ++++++++++
+ arch/arm/mach-ux500/include/mach/io.h              |   22 ++
+ arch/arm/mach-ux500/include/mach/irqs.h            |   71 ++++++
+ arch/arm/mach-ux500/include/mach/memory.h          |   18 ++
+ arch/arm/mach-ux500/include/mach/mtu.h             |   53 ++++
+ arch/arm/mach-ux500/include/mach/setup.h           |   22 ++
+ arch/arm/mach-ux500/include/mach/smp.h             |   29 +++
+ arch/arm/mach-ux500/include/mach/system.h          |   25 ++
+ arch/arm/mach-ux500/include/mach/timex.h           |    6 +
+ arch/arm/mach-ux500/include/mach/uncompress.h      |   58 +++++
+ arch/arm/mach-ux500/include/mach/vmalloc.h         |   18 ++
+ arch/arm/mach-ux500/localtimer.c                   |   28 ++
+ arch/arm/mach-ux500/platsmp.c                      |  181 ++++++++++++++
+ arch/arm/mach-ux500/timer.c                        |  163 ++++++++++++
+ drivers/mfd/Kconfig                                |   10 +
+ drivers/mfd/Makefile                               |    1 +
+ drivers/mfd/stw4500.c                              |  207 +++++++++++++++
+ drivers/spi/amba-pl022.c                           |    2 +-
+ include/linux/mfd/stw4500.h                        |  262 ++++++++++++++++++++
+ 31 files changed, 1803 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/mach-ux500/Kconfig
+ create mode 100644 arch/arm/mach-ux500/Makefile
+ copy arch/arm/{mach-footbridge => mach-ux500}/Makefile.boot (100%)
+ create mode 100644 arch/arm/mach-ux500/board-mop500.c
+ create mode 100644 arch/arm/mach-ux500/clock.c
+ create mode 100644 arch/arm/mach-ux500/cpu-u8500.c
+ create mode 100644 arch/arm/mach-ux500/headsmp.S
+ copy arch/arm/{mach-ep93xx => mach-ux500}/include/mach/clkdev.h (100%)
+ create mode 100644 arch/arm/mach-ux500/include/mach/debug-macro.S
+ create mode 100644 arch/arm/mach-ux500/include/mach/entry-macro.S
+ create mode 100644 arch/arm/mach-ux500/include/mach/hardware.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/io.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/irqs.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/memory.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/mtu.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/setup.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/smp.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/system.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/timex.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/uncompress.h
+ create mode 100644 arch/arm/mach-ux500/include/mach/vmalloc.h
+ create mode 100644 arch/arm/mach-ux500/localtimer.c
+ create mode 100644 arch/arm/mach-ux500/platsmp.c
+ create mode 100644 arch/arm/mach-ux500/timer.c
+ create mode 100755 drivers/mfd/stw4500.c
+ create mode 100644 include/linux/mfd/stw4500.h
