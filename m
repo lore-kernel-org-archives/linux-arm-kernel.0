@@ -1,96 +1,110 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 23 Sep 2009 10:13:24 +0100
-Subject: Kernel related (?) user space crash at ARM11 MPCore
-In-Reply-To: <4AB9BA3E.20602@googlemail.com>
-References: <20090919224022.GA738@n2100.arm.linux.org.uk>
-	<1253435940.498.15.camel@pc1117.cambridge.arm.com>
-	<20090920093139.GA1704@n2100.arm.linux.org.uk>
-	<20090920190227.GB5413@n2100.arm.linux.org.uk>
-	<4AB6B0AB.8040307@arm.com> <20090921083109.GC20006@shareable.org>
-	<1253522944.1541.3.camel@pc1117.cambridge.arm.com>
-	<20090921085425.GC27357@n2100.arm.linux.org.uk>
-	<1253526263.1541.32.camel@pc1117.cambridge.arm.com>
-	<20090921100751.GF27357@n2100.arm.linux.org.uk>
-	<20090921213802.GH30821@n2100.arm.linux.org.uk>
-	<1253614753.14049.47.camel@pc1117.cambridge.arm.com>
-	<1253639843.14049.95.camel@pc1117.cambridge.arm.com>
-	<4AB9BA3E.20602@googlemail.com>
-Message-ID: <1253697204.23370.22.camel@pc1117.cambridge.arm.com>
+From: matthias@kaehlcke.net (Matthias Kaehlcke)
+Date: Wed, 23 Sep 2009 11:35:43 +0200
+Subject: Problem in USB on the Sheevaplug, 2.6.31
+In-Reply-To: <45219fb00909230143h38db71e7l7c16b4a59ec1b152@mail.gmail.com>
+References: <45219fb00909230143h38db71e7l7c16b4a59ec1b152@mail.gmail.com>
+Message-ID: <20090923093543.GJ2558@darwin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2009-09-23 at 08:03 +0200, Dirk Behme wrote:
-> Catalin Marinas wrote:
-> > On Tue, 2009-09-22 at 11:19 +0100, Catalin Marinas wrote:
-> >> Yet another idea - add a generic flush_cache_range_for_mprotect()
-> >> function with a specific implementation for ARM (called via
-> >> change_protection).
+hi lluis,
+
+El Wed, Sep 23, 2009 at 10:43:56AM +0200 Llu?s Batlle ha dit:
+
+> after using a USB storage device (a Kingston DataTraveler 8GB flash
+> stick) in the sheevaplug for some hours, at one point the device
+> stopped working until I replugged it in.
 > 
-> Catalin and Russell: First many thanks for all the discussion and help 
-> about this!
+> The system kept stable, while all this happened.
 > 
-> > The patch below looks like the best option in my opinion but requires
-> > some generic kernel changes (minimal though). The patch contains the
-> > ARM-specific code as well but can be split in two for pushing upstream.
-> > 
-> > Apart from this patch, I ran some lmbench tests and my workaround
+> Here comes the 'dmesg' part:
 > 
-> If you talk about "workaround", do you mean patch below or patch in
+> EXT3 FS on sda1, internal journal
+> EXT3-fs: mounted filesystem with writeback data mode.
+> #------------ some hours passed ----------
+> usb 1-1: reset high speed USB device using orion-ehci and address 2
+> ------------[ cut here ]------------
+> WARNING: at arch/arm/kernel/process.c:171 cpu_idle+0x74/0xbc()
+> Modules linked in: sg
+> [<c002f85c>] (unwind_backtrace+0x0/0xdc) from [<c003ecb0>]
+> (warn_slowpath_common+0x4c/0x80)
+> [<c003ecb0>] (warn_slowpath_common+0x4c/0x80) from [<c002b974>]
+> (cpu_idle+0x74/0xbc)
+> [<c002b974>] (cpu_idle+0x74/0xbc) from [<c0008b04>] (start_kernel+0x270/0x2d4)
+> [<c0008b04>] (start_kernel+0x270/0x2d4) from [<00008034>] (0x8034)
+> ---[ end trace 81d90711559dbd0e ]---
+> usb 1-1: reset high speed USB device using orion-ehci and address 2
+> usb 1-1: device descriptor read/64, error -110
+> usb 1-1: device descriptor read/64, error -32
+> usb 1-1: reset high speed USB device using orion-ehci and address 2
+> usb 1-1: device descriptor read/64, error -32
+> usb 1-1: device descriptor read/64, error -32
+> usb 1-1: reset high speed USB device using orion-ehci and address 2
+> usb 1-1: device not accepting address 2, error -32
+> usb 1-1: reset high speed USB device using orion-ehci and address 2
+> usb 1-1: device not accepting address 2, error -32
+> sd 0:0:0:0: [sda] Unhandled error code
+> sd 0:0:0:0: [sda] Result: hostbyte=0x07 driverbyte=0x00
+> end_request: I/O error, dev sda, sector 15466566
+> usb 1-1: USB disconnect, address 2
+> EXT3-fs error (device sda1): read_inode_bitmap: Cannot read inode
+> bitmap - block_group = 59, inode_bitmap = 1933313
+> EXT3-fs error (device sda1) in ext3_new_inode: IO failure
+> ------------[ cut here ]------------
+> WARNING: at fs/buffer.c:1152 mark_buffer_dirty+0x34/0xe8()
+> Modules linked in: sg
+> [<c002f85c>] (unwind_backtrace+0x0/0xdc) from [<c003ecb0>]
+> (warn_slowpath_common+0x4c/0x80)
+> [<c003ecb0>] (warn_slowpath_common+0x4c/0x80) from [<c00d67d4>]
+> (mark_buffer_dirty+0x34/0xe8)
+> [<c00d67d4>] (mark_buffer_dirty+0x34/0xe8) from [<c010b3ac>]
+> (ext3_commit_super+0x4c/0x70)
+> [<c010b3ac>] (ext3_commit_super+0x4c/0x70) from [<c010c5a0>]
+> (ext3_handle_error+0x98/0xc4)
+> [<c010c5a0>] (ext3_handle_error+0x98/0xc4) from [<c010c634>]
+> (__ext3_std_error+0x68/0x74)
+> [<c010c634>] (__ext3_std_error+0x68/0x74) from [<c0102e60>]
+> (ext3_new_inode+0x898/0x91c)
+> [<c0102e60>] (ext3_new_inode+0x898/0x91c) from [<c0109898>]
+> (ext3_mkdir+0x8c/0x2cc)
+> [<c0109898>] (ext3_mkdir+0x8c/0x2cc) from [<c00bc5ac>] (vfs_mkdir+0x6c/0xc0)
+> [<c00bc5ac>] (vfs_mkdir+0x6c/0xc0) from [<c00be928>] (sys_mkdirat+0x84/0xd0)
+> [<c00be928>] (sys_mkdirat+0x84/0xd0) from [<c002a9c0>]
+> (ret_fast_syscall+0x0/0x2c)
+> ---[ end trace 81d90711559dbd0f ]---
+> Aborting journal on device sda1.
+> journal commit I/O error
+> ext3_abort called.
+> EXT3-fs error (device sda1): ext3_journal_start_sb: Detected aborted journal
+> Remounting filesystem read-only
 > 
-> http://lists.arm.linux.org.uk/lurker/message/20090817.172516.3100340a.en.html
+> It's a vanilla kernel built with gcc 4.3.4 . If you need more
+> information, I can compile special versions of that kernel to get some
+> additional information.
 
-The patch at the link above. It implements flush_cache_range with a
-check for VM_EXEC but as Russell pointed out, that's set all the time,
-so the mmap performance is affected. Whether this is on a critical path,
-I can't say.
+the USB FAQ suggests it might be a problem of signal quality, try if it
+works when removing ehci-hcd:
+http://www.linux-usb.org/FAQ.html#ts6
 
-> > affects mmap tests quite a lot because of the read-implies-exec forcing
-> > flush_cache_range() in several places. Russell's patch 
-> 
-> Is Russell's patch available publically somewhere? Sorry if I missed it.
+is the file system subject to a lot of write accesses? in this case it
+is likely you will encounter problems of corrupt sectors due to flash
+wear out. be sure not to mount locations like /var (especially
+/var/log) on the flash device. you also should mount the device with
+the options noatime and nodiratime if you aren't doing it yet
 
-It's not but just add a __cpuc_flush_dcache_page() to the
-copy_to_user_highpage() function (I don't think it needs the coherent
-flush since the page was first mapped with RX and update_mmu_cache()
-should have taken care of the I-cache invalidation). Something like
-below:
+<ca>per cert: que tal el sheeva plug? porto temps pensant de
+comprar-ne un</ca>
 
-diff --git a/arch/arm/mm/copypage-v6.c b/arch/arm/mm/copypage-v6.c
-index 4127a7b..f19ed4e 100644
---- a/arch/arm/mm/copypage-v6.c
-+++ b/arch/arm/mm/copypage-v6.c
-@@ -41,6 +41,7 @@ static void v6_copy_user_highpage_nonaliasing(struct page *to,
- 	kfrom = kmap_atomic(from, KM_USER0);
- 	kto = kmap_atomic(to, KM_USER1);
- 	copy_page(kto, kfrom);
-+	__cpuc_flush_dcache_page(kto);
- 	kunmap_atomic(kto, KM_USER1);
- 	kunmap_atomic(kfrom, KM_USER0);
- }
-
-After running some benchmarks, my preference for a fix is:
-
-     1. The patch I just posted which introduces flush_prot_range(). It
-        affects generic code but if people here agree with the idea, I'm
-        happy to try to push for it upstream. It allows mprotect(rx) to
-        flush the caches as some people might expect and doesn't affect
-        the fork or mmap performance
-     2. Russell's (unposted) patch (or the one above) for flushing the
-        D-cache during CoW (no I-cache invalidation necessary). There
-        would be a (probably slight) performance drop for applications
-        using intensive forking (apache?) but it shouldn't be that
-        different from read-allocate caches. The common fork+exec
-        combination shouldn't do much CoW so I don't expect this to be
-        affected
-     3. My initial patch for flush_cache_range but it would be better to
-        disable read-implies-exec
-     4. Handle the prefetch abort for exec permission and only to the
-        flushing there (this patch would be a bit more complicated)
-
-For now, I would say to go with 2 for the -rc releases (and maybe try to
-convince upstream people of 1). If option 1 isn't acceptable upstream,
-we tell people that mprotect(rx) does not flush the caches, so
-sys_cacheflush() should be used instead.
+salutacions
 
 -- 
-Catalin
+Matthias Kaehlcke
+Embedded Linux Engineer
+Barcelona
+
+     Nationalism is an infantile disease. It is the measles of mankind
+                         (Albert Einstein)
+                                                                 .''`.
+    using free software / Debian GNU/Linux | http://debian.org  : :'  :
+                                                                `. `'`
+gpg --keyserver pgp.mit.edu --recv-keys 47D8E5D4                  `-
