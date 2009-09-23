@@ -1,28 +1,20 @@
-From: aaro.koskinen@nokia.com (Aaro Koskinen)
-Date: Wed, 23 Sep 2009 16:13:31 +0300
-Subject: Thecus n2100 uart irq?
-In-Reply-To: <19130.5692.953257.987602@pilspetsen.it.uu.se>
-References: <19130.5692.953257.987602@pilspetsen.it.uu.se>
-Message-ID: <4ABA1EFB.9050509@nokia.com>
+From: Hubert.Feurstein@contec.at (Hubert Feurstein)
+Date: Wed, 23 Sep 2009 16:10:55 +0200
+Subject: AW: [PATCH] ep93xx: add remaining phys offset selections and update
+	micro9
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901D42257@mi8nycmail19.Mi8.com>
+References: <BD79186B4FD85F4B8E60E381CAEE190901D42257@mi8nycmail19.Mi8.com>
+Message-ID: <75467E8A2C28434DA9302761D4D2B6FDB02DC7@coexs.contec-int.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <ryan@bluewatersys.com>
+> Cc: Hubert Feurstein <hubert.feurstein@contec.at>
+Acked-by: Hubert Feurstein <hubert.feurstein@contec.at>
 
-Mikael Pettersson wrote:
-> The other mach-iop32x machines use one of the IRQ_IOP32X_XINT[0-3]
-> interrupts for their uarts. I've tried all four values on the n2100,
-> but none of them seemed to work: the console would go silent when
-> the kernel starts init.
-> 
-> Does anyone know how run the n2100 uart properly with an irq?
+I had to remove the trailing whitespace at the last #endif, otherwise
+the patch failed to apply.
 
-I found the following mention from OpenBSD installation instructions:
-"On the Thecus N2100, it is necessary to move jumper J3 to J4 to properly
-route the serial port interrupt to allow serial to work under OpenBSD."
-And they seem to use XINT3 (not sure if looked at the right place).
-
-Some Debian instructions recommend the opposite jumper position,
-without giving any reasons.
-
-A.
+Regards,
+Hubert
