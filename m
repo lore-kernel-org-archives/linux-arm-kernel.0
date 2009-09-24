@@ -1,31 +1,49 @@
-From: srplsnh@gmail.com (Surinder P Singh)
-Date: Thu, 24 Sep 2009 20:26:56 +0530
-Subject: [PATCH 1/3] [ARM]: U8500 core machine support
-In-Reply-To: <f2235a630909240743t1fddabbct7c8ea0c4f77dbf73@mail.gmail.com>
-References: <1253572622.21542.45.camel@vinay-desktop>
-	<f2235a630909240743t1fddabbct7c8ea0c4f77dbf73@mail.gmail.com>
-Message-ID: <f2235a630909240756w658f84fai668b6d4d9fe3edb6@mail.gmail.com>
+From: wookey@wookware.org (Wookey)
+Date: Thu, 24 Sep 2009 16:10:10 +0100
+Subject: patches for pxafb
+In-Reply-To: <3ea34a000909240715i2742faa8r83f574e7d652d3b9@mail.gmail.com>
+References: <3ea34a000909240715i2742faa8r83f574e7d652d3b9@mail.gmail.com>
+Message-ID: <20090924151010.GS12991@dream.aleph1.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 24, 2009 at 8:13 PM, Surinder P Singh <srplsnh@gmail.com> wrote:
-> Some review comments:
->
->> diff --git a/arch/arm/mach-ux500/include/mach/debug-macro.S b/arch/arm/mach-ux500/include/mach/debug-macro.S
->> +
->> +#include <linux/amba/serial.h>
->> + ? ? ? ? ? ? ? .macro ?addruart,rx
->> + ? ? ? ? ? ? ? mrc ? ? p15, 0, \rx, c1, c0
->> + ? ? ? ? ? ? ? tst ? ? \rx, #1 ? ? ? ? ? ? ? ? @MMU enabled?
->> + ? ? ? ? ? ? ? moveq ? \rx, #0x80007000 ? ? ? ?@MMU off, Physical address
->> + ? ? ? ? ? ? ? movne ? \rx, #0xF0007000 ? ? ? ?@MMU on, Virtual address
->> + ? ? ? ? ? ? ? .endm
->> +
->
-> It looks like the constants used here will break compilation. You
-> could instead use 0x80000000 and 0xf0000000 and add an 'orr \rx, \rx,
-> #0x7000' after the 'movne' to fix this.
->
++++ Christopher Friedt [2009-09-24 16:15 +0200]:
+> Hi folks,
+> 
+> I have a couple of patches for the pxa framebuffer that I would like
+> to submit upstream,
+> but I'm fairly new to it and thought that this would be a good place to start.
+> 
+> [1] add width / height members to struct pxafb_mach_info, and related
+> code in pxafb.c
+> 
+> * useful for providing physical display dimensions to the struct
+> fb_var_screeninfo
+> * some applications (namely Android) will look for these metrics to
+> get an idea of
+>   what the pixels-per-inch ratio is
+> * this is something that can vary on a per-machine basis, which is why
+> I put it in
+>   pxafb_mach_info
 
-You can also remove serial.h from here since this is now included in
-debug-pl01x.S
+When you say per-machine do you mean per type of machine, or per
+device?
+
+So far as I can see the pxa framebuffer stuff assumes that
+every pxa mach type has exactly one display associated with it and
+this is built in to the the kernel. This is very tiresome on balloon3,
+which so far has had 4 different framebuffer-based displays (QVGA, VGA
+LCDs and VGA/SVGA via interface to real monitor) and two
+others (accessed over the samosa IO bus), which correspond to 'no frame
+buffer'. We currently need different kernel configs and different
+kernels to support these which seems deeply crufty, but I'm really not
+sure how to go about having displays run or boot-time configurable. 
+Has anyone thought about how this should be done?
+
+Sorry if this is too far off topic for the simple change mooted, but
+it seems to me to be part of the same discussion. 
+
+Wookey
+-- 
+Principal hats:  iEndian - Balloonboard - Toby Churchill - Emdebian
+http://wookware.org/
