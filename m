@@ -1,175 +1,96 @@
-From: schindele@nentec.de (Juergen Schindele)
-Date: Thu, 24 Sep 2009 10:34:33 +0200
-Subject: Problems with pthread on ARM/PXA270
-In-Reply-To: <200909160926.02036.schindele@nentec.de>
-References: <200909160926.02036.schindele@nentec.de>
-Message-ID: <200909241034.33483.schindele@nentec.de>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Thu, 24 Sep 2009 11:49:20 +0300
+Subject: [PATCH v5 2/2] ARM: Proper prefetch abort handling on ARMv6 and ARMv7
+In-Reply-To: <b833952fedbf24c4a16e0d79fe78019357e9652b.1253781660.git.kirill@shutemov.name>
+References: <b833952fedbf24c4a16e0d79fe78019357e9652b.1253781660.git.kirill@shutemov.name>
+Message-ID: <e9c1f398415c4a7a09d942cd1ef832d9d9dbb5e8.1253781660.git.kirill@shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 16. September 2009 schrieb Juergen Schindele:
-Hey all,
-i've done some tests on different platforms
+Currently, on ARMv6 and ARMv7, if an application tries to execute
+code (or garbage) on non-executable page it hangs. It caused by
+incorrect prefetch abort handling. Now every prefetch abort
+processes as a translation fault.
 
-running OK on x86 openSuse 11.0
-- SCHED_OTHER OK
-- SCHED_RR OK
+To fix this we have to analyze instruction fault status register
+to figure out reason why we've got the abort and process it
+accordingly.
 
+To make IFSR different from DFSR we set bit 31 which is reserved in
+both IFSR and DFSR.
 
-on pxa270 (xscale) platform
-compiler gcc 4.2.0
-with glibc 2.5 (NPTL) from CodeSourcery
-Sourcery G++ Lite 2007q1-10
-on Kernel 2.6.20
-- SCHED_OTHER works fine
-- SCHED_RR does not work at all
+This patch also tries to protect from future hangs on unexpected
+exceptions. An application will be killed if unexpected exception
+type was received.
 
-on the same pxa270 (xscale) platform
-compiler gcc 4.3.3
-and glibc 2.8 (NPTL)  from CodeSourcery
-Sourcery G++ Lite 2009q1-203
-Kernel 2.6.20
-- SCHED_OTHER only one thread is running all the time
-  other threads are blocked.
-- SCHED_RR does not work at all
+Signed-off-by: Kirill A. Shutemov <kirill@shutemov.name>
+---
+ arch/arm/mm/fault.c |   51 ++++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 50 insertions(+), 1 deletions(-)
 
-on ixp425 (xscale) platform
-compiler 3.3.2
-with glibc 2.2.5 (not NPTL)
-from uclinux
-kernel 2.6.16
-- SCHED_OTHER
-First no thread are running. 30 minutes after starting the test all threads
-are started and running. It's unbeleivable !!.
--SCHED_RR does not work at all
-
-Why is SCHED_RR only running on x86 platform ???
-Where is the difference in handling between SCHED_RR ans SCHED_OTHER ?
-Any comments or helps ????
-
-> Hello all,
-> we tried to implement a thread based software on our PXA270 based platform but
-> we had trouble with pthreads. So i modyfied a tiny progam to test. This little progam creates
-> 10 threads and each thread does print something (an index an a pointer to itself). 
-> 
-> On my PC with Suse 11.0 Linux (kernel 2.6.27) this works fine as supposed to.
-> Each thread has his turn and print his own values.
-> 
-> But on our pxa270 platform the thread switch does not (or really rarely) happen
-> and only one thread is printing always the same values. So i suppose thread
-> switching is not working!
-> 
-> Any hints or experiences are welcome !!!
-> 
-> we use codesourcery compiler
-> arm-none-linux-gnueabi-gcc (CodeSourcery Sourcery G++ Lite 2007q1-10) 4.2.0 20070413 (prerelease)
-> Copyright (C) 2007 Free Software Foundation, Inc.
-> This is free software; see the source for copying conditions.  There is NO
-> warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-> 
-> and here the C-code compiled with  "arm-none-linux-gnueabi-gcc -o test test.c -lpthread"
-> 
-> #include <errno.h>
-> #include <error.h>
-> #include <stdio.h>
-> #include <stdlib.h>
-> #include <pthread.h>
-> #include <time.h>
-> 
-> #define NUM_THREADS 10
-> #define NUM_ITERS   50
-> #define TIMEOUT_NS  100000000L
-> 
-> static void *thread (void *);
-> static int argument[NUM_THREADS];
-> static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-> static pthread_attr_t defaultattr;
-> 
-> static void * print_thread (void *arg)
-> {
->     int i;
->     int number = *((int*)arg);
-> 
->     for (;;) {
->         pthread_t self = pthread_self ();
->         printf ("Thread %d is [%d]\n", number, self);
->     }
-> }
-> 
-> int main (void)
-> {
->     pthread_t th;
->     int i, retvalue;
-> 
->     struct sched_param param;
->     pthread_attr_init(&defaultattr);
-> 
->     pthread_attr_setschedpolicy(&defaultattr, SCHED_RR);
-> 
->     param.sched_priority = 10;
->     if ((retvalue = pthread_attr_setschedparam(&defaultattr, &param))!=0) {
->         printf ("ERROR\n");
->         exit (0);
->     }
-> 
->     for (i = 0; i < NUM_THREADS; i++)
->     {
->         argument[i] = i;
->         if (pthread_create (&th, &defaultattr, print_thread, &argument[i]) != 0)
->             error (EXIT_FAILURE, 0, "cannot create thread");
->         printf ("Thread [%d]\n", i);
->     }
-> 
->     while (1) {
->         ;
->     }
-> 
->     /* notreached */
->     return 0;
-> }
-> 
-> --------------------------------------------------------------
-> J?rgen Schindele  
-> Software-Entwicklung
-> 
-> NENTEC Netzwerktechnologie GmbH
-> Greschbachstr. 12
-> 76229 Karlsruhe
-> Deutschland
-> Telefon: +49 721 94249-51
-> Telefax: +49 721 94249-10
-> E-Mail:  schindele at nentec.de
-> WEB:     www.nentec.de
->  
-> Gesch?ftsf?hrung: Klaus Becker, Roland Knapp
-> Sitz der Gesellschaft: Karlsruhe
-> Handelsregister: Amtsgericht Mannheim HRB 107658
-> --------------------------------------------------------------
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
-
-
-
--- 
---------------------------------------------------------------
-J?rgen Schindele  
-Software-Entwicklung
-
-NENTEC Netzwerktechnologie GmbH
-Greschbachstr. 12
-76229 Karlsruhe
-Deutschland
-Telefon: +49 721 94249-51
-Telefax: +49 721 94249-10
-E-Mail:  schindele at nentec.de
-WEB:     www.nentec.de
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index fd2375f..ae0e25f 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -519,9 +519,58 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 	arm_notify_die("", regs, &info, fsr, 0);
+ }
  
-Gesch?ftsf?hrung: Klaus Becker, Roland Knapp
-Sitz der Gesellschaft: Karlsruhe
-Handelsregister: Amtsgericht Mannheim HRB 107658
---------------------------------------------------------------
++
++static struct fsr_info ifsr_info[] = {
++	{ do_bad,		SIGBUS,  0,		"unknown 0"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 1"			   },
++	{ do_bad,		SIGBUS,  0,		"debug event"			   },
++	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"section access flag fault"	   },
++	{ do_bad,		SIGBUS,  0,		"unknown 4"			   },
++	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"section translation fault"	   },
++	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"page access flag fault"	   },
++	{ do_page_fault,	SIGSEGV, SEGV_MAPERR,	"page translation fault"	   },
++	{ do_bad,		SIGBUS,	 0,		"external abort on non-linefetch"  },
++	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"section domain fault"		   },
++	{ do_bad,		SIGBUS,  0,		"unknown 10"			   },
++	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"page domain fault"		   },
++	{ do_bad,		SIGBUS,	 0,		"external abort on translation"	   },
++	{ do_sect_fault,	SIGSEGV, SEGV_ACCERR,	"section permission fault"	   },
++	{ do_bad,		SIGBUS,	 0,		"external abort on translation"	   },
++	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"page permission fault"		   },
++	{ do_bad,		SIGBUS,  0,		"unknown 16"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 17"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 18"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 19"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 20"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 21"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 22"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 23"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 24"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 25"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 26"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 27"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 28"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 29"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 30"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 31"			   },
++};
++
+ asmlinkage void __exception
+ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
+ {
+-	do_translation_fault(addr, FSR_LNX_PF, regs);
++	const struct fsr_info *inf = ifsr_info + fsr_fs(ifsr);
++	struct siginfo info;
++
++	if (!inf->fn(addr, ifsr | FSR_LNX_PF, regs))
++		return;
++
++	printk(KERN_ALERT "Unhandled prefetch abort: %s (0x%03x) at 0x%08lx\n",
++		inf->name, ifsr, addr);
++
++	info.si_signo = inf->sig;
++	info.si_errno = 0;
++	info.si_code  = inf->code;
++	info.si_addr  = (void __user *)addr;
++	arm_notify_die("", regs, &info, ifsr, 0);
+ }
+ 
+-- 
+1.6.4.4
