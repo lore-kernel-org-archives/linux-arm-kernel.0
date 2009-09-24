@@ -1,59 +1,34 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 24 Sep 2009 20:36:42 +0100
-Subject: platform data for the s3c-adc or hardcoded delay?
-In-Reply-To: <2accc2ff0909230336m173f0b0fqc1e1c08be448b648@mail.gmail.com>
-References: <2accc2ff0909230332y6bf565e0kc33a0ef8d8072451@mail.gmail.com>
-	<2accc2ff0909230336m173f0b0fqc1e1c08be448b648@mail.gmail.com>
-Message-ID: <20090924193642.GH31920@trinity.fluff.org>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Thu, 24 Sep 2009 22:38:06 +0300
+Subject: [PATCH 1/5] s3c2410_udc: 2440 dual packet workaround
+In-Reply-To: <200909240711.17683.fg@emlix.com>
+References: <164376.11955.qm@web54401.mail.yahoo.com>
+	<200909232230.03982.anarsoul@gmail.com>
+	<200909240711.17683.fg@emlix.com>
+Message-ID: <200909242238.11627.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 23, 2009 at 05:36:33AM -0500, Nelson Castillo wrote:
-> (Ben, sorry for sending 2 copies. I used the old list address... I'd
-> better go to sleep now.).
-> 
-> 
-> We had this for the touchscreen but it doesn't make sense now that the
-> driver has been converted to use the s3c-adc API.
-> 
-> const static struct s3c_ts_platdata gta02_ts_cfg = {
-> ? ? ? .delay = 10000,
-> ? ? ? .presc = 0xff, /* Slow as we can go. */
-> };
-> 
-> Without this delay the TS doesn't work for us:
-> 
-> Now I see two options:
-> 
-> 1) Hardcode the delay in plat-s3c24xx/adc.c (As it's done in [1]).
-> 2) Submit patches adding s3c_adc_platdata.
+? ????????? ?? 24 ???????? 2009 08:11:17 ????? Fabian Godehardt ???????:
+> On our 2440 machine i found out that adding a receive handling on the
+> interrupt handler makes the driver work, and in ethernet gadget mode the
+>  pings returned much faster.
+> Im not realy familiar with the USB layer / protocoll so i'm not sure if
+>  this breaks something else. You might have a look at this patch (it is
+>  2.6.26 against 2.6.31 so maybe it will not apply successfully and you need
+>  to take a hand on it).
 
-The pre-scaler value is probably something we should be passing to the
-ADC core driver via platform data, I think that the rate that the conversions
-are run at is a property of the board itself and not just the client. This
-is mostly due to (I think) the ADC drawing more power the faster it runs
-and the board may have only been designed to supply a certain amount of
-power to the ADC.
+Your patch works as well with little modification (you used && instead of &). 
+And it seems to be a bit cleaner, it can't stuck in interrupt handler for a 
+while as previous. Would you mind if I submit your patch as part of my 
+patches? I'll add note that you're author of original patch.
 
-The delay value is probably something that the client structure should
-contain and the ADC driver set the delay value when the client is first
-selected to start a conversion. 
- 
-> What do I do?
-> 
-> I also would like to know if we rule out the possibility of
-> delay/presc depending on the current s3c_adc_client.
-> 
-> [1] http://lists.openmoko.org/pipermail/openmoko-kernel/2009-September/010550.html
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Regards
+Vasily
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090924/7518df98/attachment.sig>
