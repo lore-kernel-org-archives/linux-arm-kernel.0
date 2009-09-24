@@ -1,82 +1,46 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 24 Sep 2009 16:35:29 -0700
-Subject: [PATCH 03/12] omap: Fix 44xx compile
+Date: Thu, 24 Sep 2009 16:36:45 -0700
+Subject: [PATCH 04/12] omap: Add missing mux pin for EHCI phy reset line
 In-Reply-To: <20090924233027.6065.95725.stgit@localhost>
 References: <20090924233027.6065.95725.stgit@localhost>
-Message-ID: <20090924233529.6065.34357.stgit@localhost>
+Message-ID: <20090924233645.6065.90549.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks like these patches were not tested that well..
+From: Ajay Kumar Gupta <ajay.gupta@ti.com>
 
+GPIO135 is used as EHCI (port2) phy reset pin on Multi Media Daughter card
+connected to OMAP3EVM.
+
+Signed-off-by: Ajay Kumar Gupta <ajay.gupta@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/cm4xxx.c |   17 ++---------------
- arch/arm/mach-omap2/io.c     |    4 ++--
- arch/arm/mach-omap2/serial.c |    2 +-
- 3 files changed, 5 insertions(+), 18 deletions(-)
+ arch/arm/mach-omap2/mux.c             |    2 ++
+ arch/arm/plat-omap/include/mach/mux.h |    1 +
+ 2 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cm4xxx.c b/arch/arm/mach-omap2/cm4xxx.c
-index e4ebd6d..4af76bb 100644
---- a/arch/arm/mach-omap2/cm4xxx.c
-+++ b/arch/arm/mach-omap2/cm4xxx.c
-@@ -22,7 +22,6 @@
- #include <asm/atomic.h>
- 
- #include "cm.h"
--#include "cm-regbits-4xxx.h"
- 
- /* XXX move this to cm.h */
- /* MAX_MODULE_READY_TIME: max milliseconds for module to leave idle */
-@@ -50,19 +49,7 @@
-  */
- int omap4_cm_wait_idlest_ready(u32 prcm_mod, u8 prcm_dev_offs)
- {
--	int i = 0;
--	u8 cm_id;
--	u16 prcm_mod_offs;
--	u32 mask = OMAP4_PRCM_CM_CLKCTRL_IDLEST_MASK;
--
--	cm_id = prcm_mod >> OMAP4_PRCM_MOD_CM_ID_SHIFT;
--	prcm_mod_offs = prcm_mod & OMAP4_PRCM_MOD_OFFS_MASK;
--
--	while (((omap4_cm_read_mod_reg(cm_id, prcm_mod_offs, prcm_dev_offs,
--				       OMAP4_CM_CLKCTRL_DREG) & mask) != 0) &&
--	       (i++ < MAX_MODULE_READY_TIME))
--		udelay(1);
--
--	return (i < MAX_MODULE_READY_TIME) ? 0 : -EBUSY;
-+	/* FIXME: Add clock manager related code */
-+	return 0;
- }
- 
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 7574b6f..e3a3bad 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -294,10 +294,10 @@ void __init omap2_init_common_hw(struct omap_sdrc_params *sdrc_cs0,
- 	else if (cpu_is_omap34xx())
- 		hwmods = omap34xx_hwmods;
- 
--	omap_hwmod_init(hwmods);
--	omap2_mux_init();
- #ifndef CONFIG_ARCH_OMAP4 /* FIXME: Remove this once the clkdev is ready */
- 	/* The OPP tables have to be registered before a clk init */
-+	omap_hwmod_init(hwmods);
-+	omap2_mux_init();
- 	omap_pm_if_early_init(mpu_opps, dsp_opps, l3_opps);
- 	pwrdm_init(powerdomains_omap);
- 	clkdm_init(clockdomains_omap, clkdm_pwrdm_autodeps);
-diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index faada9f..ae21868 100644
---- a/arch/arm/mach-omap2/serial.c
-+++ b/arch/arm/mach-omap2/serial.c
-@@ -579,7 +579,7 @@ static struct omap_uart_state omap_uart[OMAP_MAX_NR_PORTS] = {
- 	{
- 		.pdev = {
- 			.name			= "serial8250",
--			.id			= 3
-+			.id			= 3,
- 			.dev			= {
- 				.platform_data	= serial_platform_data3,
- 			},
+diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
+index 2daa595..339ba80 100644
+--- a/arch/arm/mach-omap2/mux.c
++++ b/arch/arm/mach-omap2/mux.c
+@@ -472,6 +472,8 @@ MUX_CFG_34XX("G25_34XX_GPIO86_OUT", 0x0fc,
+ 		OMAP34XX_MUX_MODE4 | OMAP34XX_PIN_OUTPUT)
+ MUX_CFG_34XX("AG4_34XX_GPIO134_OUT", 0x160,
+ 		OMAP34XX_MUX_MODE4 | OMAP34XX_PIN_OUTPUT)
++MUX_CFG_34XX("AF4_34XX_GPIO135_OUT", 0x162,
++		OMAP34XX_MUX_MODE4 | OMAP34XX_PIN_OUTPUT)
+ MUX_CFG_34XX("AE4_34XX_GPIO136_OUT", 0x164,
+ 		OMAP34XX_MUX_MODE4 | OMAP34XX_PIN_OUTPUT)
+ MUX_CFG_34XX("AF6_34XX_GPIO140_UP", 0x16c,
+diff --git a/arch/arm/plat-omap/include/mach/mux.h b/arch/arm/plat-omap/include/mach/mux.h
+index 98dfab6..4bcf8a5 100644
+--- a/arch/arm/plat-omap/include/mach/mux.h
++++ b/arch/arm/plat-omap/include/mach/mux.h
+@@ -846,6 +846,7 @@ enum omap34xx_index {
+ 	L8_34XX_GPIO63,
+ 	G25_34XX_GPIO86_OUT,
+ 	AG4_34XX_GPIO134_OUT,
++	AF4_34XX_GPIO135_OUT,
+ 	AE4_34XX_GPIO136_OUT,
+ 	AF6_34XX_GPIO140_UP,
+ 	AE6_34XX_GPIO141,
