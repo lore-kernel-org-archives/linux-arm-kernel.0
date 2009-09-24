@@ -1,50 +1,38 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 24 Sep 2009 01:27:15 +0100
-Subject: [PATCH 1/5] s3c2410_udc: 2440 dual packet workaround
-In-Reply-To: <164376.11955.qm@web54401.mail.yahoo.com>
-References: <200909231046.36330.anarsoul@gmail.com>
-	<164376.11955.qm@web54401.mail.yahoo.com>
-Message-ID: <20090924002715.GH24720@trinity.fluff.org>
+From: gerg@snapgear.com (Greg Ungerer)
+Date: Thu, 24 Sep 2009 16:24:04 +1000
+Subject: [PATCH] arm: fix valid_phys_addr_range() range check
+Message-ID: <200909240624.n8O6O4MO002196@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 23, 2009 at 12:20:05PM -0700, David Anders wrote:
-> Vasily,
-> 
-> i have tried this patch on a number of S3C2440 based systems and found that this patch is not a completely effective solution. if the purpose is to get a solution even if it is an incomplete one, then i'd be ok with this patch, however, i'm not keen on accepting a patch into the main tree with the knowledge that it isn't 100% effective.
-> 
-> Dave Anders
+arm: fix valid_phys_addr_range() range check
 
-I think that if this is afix that makes the code mostly work then
-there really should be some form of note in the code that says that this
-fix is a mostly effective form.
+Commit 1522ac3ec95ff0230e7aa516f86b674fdf72866c
+("Fix virtual to physical translation macro corner cases")
+breaks the end of memory check in valid_phys_addr_range().
+The modified expression results in the apparent /dev/mem size
+being 2 bytes smaller than what it actually is.
+
+This patch reworks the expression to correctly check the address,
+while maintaining use of a valid address to __pa().
+
+Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+---
+ arch/arm/mm/mmap.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
+index f7457fe..2b79964 100644
+--- a/arch/arm/mm/mmap.c
++++ b/arch/arm/mm/mmap.c
+@@ -124,7 +124,7 @@ int valid_phys_addr_range(unsigned long addr, size_t size)
+ {
+ 	if (addr < PHYS_OFFSET)
+ 		return 0;
+-	if (addr + size >= __pa(high_memory - 1))
++	if (addr + size > __pa(high_memory - 1) + 1)
+ 		return 0;
  
-> 
-> --- On Wed, 9/23/09, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
-> 
-> > From: Vasily Khoruzhick <anarsoul@gmail.com>
-> > Subject: [PATCH 1/5] s3c2410_udc: 2440 dual packet workaround
-> > To: "Ben Dooks" <ben-linux@fluff.org>, linux-arm-kernel at lists.infradead.org
-> > Date: Wednesday, September 23, 2009, 2:46 AM
-> > 
-> > 
-> > -----Inline Attachment Follows-----
-> > 
-> > 
-> > -----Inline Attachment Follows-----
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > 
-> 
-> 
->       
-
+ 	return 1;
 -- 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+1.5.5.1
