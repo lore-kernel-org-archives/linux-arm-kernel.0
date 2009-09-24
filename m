@@ -1,23 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Sep 2009 21:34:37 +0100
-Subject: Problem with s3c24xx pwm driver
-In-Reply-To: <200909241733.29167.anarsoul@gmail.com>
-References: <200909231824.11671.anarsoul@gmail.com>
-	<200909232223.35835.anarsoul@gmail.com>
-	<f17812d70909231525t594704c5u781e2221481676a0@mail.gmail.com>
-	<200909241733.29167.anarsoul@gmail.com>
-Message-ID: <20090924203437.GA25389@n2100.arm.linux.org.uk>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Fri, 25 Sep 2009 08:45:47 +1200
+Subject: [PATCH] ep93xx: define EP93XX_*_PHYS_BASE with macros
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901D42577@mi8nycmail19.Mi8.com>
+References: <BD79186B4FD85F4B8E60E381CAEE190901CBF431@mi8nycmail19.Mi8.com><4AB17678.2030905@bluewatersys.com>
+	<BD79186B4FD85F4B8E60E381CAEE190901D42421@mi8nycmail19.Mi8.com>
+	<BD79186B4FD85F4B8E60E381CAEE190901D42577@mi8nycmail19.Mi8.com>
+Message-ID: <4ABBDA7B.5080600@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 24, 2009 at 05:33:24PM +0300, Vasily Khoruzhick wrote:
-> Ok, I've found source of  problem: it seems to be some issue with backlight 
-> LED driver (hardware, not software) with selected PWM clock. It seems that  
-> part of period with "1" is not long enought to charge capacitor, or something 
-> like this. PWM itself works fine.
+H Hartley Sweeten wrote:
+> Ryan,
+> Are you still ok with this patch?
 
-Is it LED or is it CCFL?  If it's CCFL, it needs to be 'struck' and then
-you can reduce the intensity level - by going to max brightness when you
-turn it on and then back the intensity down.
+Yes.
 
-That's fairly normal for CCFL stuff.
+> 
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of H Hartley Sweeten
+> Sent: Wednesday, September 23, 2009 1:20 PM
+> To: linux-arm-kernel
+> Cc: Ryan Mallon
+> Subject: RE: [PATCH] ep93xx: define EP93XX_*_PHYS_BASE with macros
+> 
+> Change the #define's for the EP93XX_*_PHYS_BASE addresses to use
+> macros for easier readability.
+> 
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Acked-by: Ryan Mallon <ryan@bluewatersys.com>
+
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+       Ryan Mallon                              Unit 5, Amuri Park
+       Phone: +64 3 3779127                     404 Barbadoes St
+       Fax:   +64 3 3779135                     PO Box 13 889
+       Email: ryan at bluewatersys.com             Christchurch, 8013
+       Web:   http://www.bluewatersys.com       New Zealand
+       Freecall Australia  1800 148 751         USA 1800 261 2934
