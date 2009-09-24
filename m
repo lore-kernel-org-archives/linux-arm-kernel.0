@@ -1,104 +1,49 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 24 Sep 2009 13:13:35 -0400
-Subject: [PATCH] ep93xx: define EP93XX_*_PHYS_BASE with macros
-In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901D42421@mi8nycmail19.Mi8.com>
-References: <BD79186B4FD85F4B8E60E381CAEE190901CBF431@mi8nycmail19.Mi8.com><4AB17678.2030905@bluewatersys.com>
-	<BD79186B4FD85F4B8E60E381CAEE190901D42421@mi8nycmail19.Mi8.com>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901D42577@mi8nycmail19.Mi8.com>
+From: dave@chronolytics.com (David F. Carlson)
+Date: Thu, 24 Sep 2009 13:42:20 -0400 (EDT)
+Subject: Announcing s3c64xx XWindows fbdrv w/ XAA+XVideo+HWcursor
+Message-ID: <200909241742.n8OHgLHr004520@chronolytics.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ryan,
-Are you still ok with this patch?
 
-Regards,
-Hartley
- 
+S3C6410 based Xwindows fbdev with
+   o  XAA accelerated fills, lines, expands, blits, offscreen pixmaps/stipples
+   o  Alpha-blended HWCursor 
+   o  XVideo Support (using the Samsung Post-Processor colorspace driver)
+   o  Tested with the Maemo Mer kernel 2.6.24.7 because...
 
------Original Message-----
-From: linux-arm-kernel-bounces@lists.infradead.org [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of H Hartley Sweeten
-Sent: Wednesday, September 23, 2009 1:20 PM
-To: linux-arm-kernel
-Cc: Ryan Mallon
-Subject: RE: [PATCH] ep93xx: define EP93XX_*_PHYS_BASE with macros
+This is not as off topic as it might seem...
 
-Change the #define's for the EP93XX_*_PHYS_BASE addresses to use
-macros for easier readability.
+The XWindows subsystem needs help from the kernel in s3cfb "standards" 
+(support MMIO interface) and configuration (how to configure per-screen 
+offscreen memory), some scheme for accessing the Post-Processor and G2D 
+graphics support.  (And of course, gaining driver support for pp and g2d 
+including suspend/resume.)
 
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Acked-by: Ryan Mallon <ryan@bluewatersys.com>
+This driver is pretty much hardcoded for s3c64xx.  If kernel hooks for 
+describing configuration this driver base could be expanded to 
+support many s3c variants (with g2d and pp).
 
---- 
+There is some discussion in the the README.
 
-Rebased to 2.6.31-gitcurr now that the ep93xx branch is stable.
+http://chronolytics.com/mid/README
+http://chronolytics.com/mid/fbdev_xaa_pp_hwcurs.tgz
 
-diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-index 0fbf87b..7c31a44 100644
---- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-+++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-@@ -52,25 +52,27 @@
- #define EP93XX_AHB_VIRT_BASE		0xfef00000
- #define EP93XX_AHB_SIZE			0x00100000
- 
-+#define EP93XX_AHB_PHYS(x)		(EP93XX_AHB_PHYS_BASE + (x))
- #define EP93XX_AHB_IOMEM(x)		IOMEM(EP93XX_AHB_VIRT_BASE + (x))
- 
- #define EP93XX_APB_PHYS_BASE		0x80800000
- #define EP93XX_APB_VIRT_BASE		0xfed00000
- #define EP93XX_APB_SIZE			0x00200000
- 
-+#define EP93XX_APB_PHYS(x)		(EP93XX_APB_PHYS_BASE + (x))
- #define EP93XX_APB_IOMEM(x)		IOMEM(EP93XX_APB_VIRT_BASE + (x))
- 
- 
- /* AHB peripherals */
- #define EP93XX_DMA_BASE			EP93XX_AHB_IOMEM(0x00000000)
- 
--#define EP93XX_ETHERNET_PHYS_BASE	(EP93XX_AHB_PHYS_BASE + 0x00010000)
-+#define EP93XX_ETHERNET_PHYS_BASE	EP93XX_AHB_PHYS(0x00010000)
- #define EP93XX_ETHERNET_BASE		EP93XX_AHB_IOMEM(0x00010000)
- 
--#define EP93XX_USB_PHYS_BASE		(EP93XX_AHB_PHYS_BASE + 0x00020000)
-+#define EP93XX_USB_PHYS_BASE		EP93XX_AHB_PHYS(0x00020000)
- #define EP93XX_USB_BASE			EP93XX_AHB_IOMEM(0x00020000)
- 
--#define EP93XX_RASTER_PHYS_BASE		(EP93XX_AHB_PHYS_BASE + 0x00030000)
-+#define EP93XX_RASTER_PHYS_BASE		EP93XX_AHB_PHYS(0x00030000)
- #define EP93XX_RASTER_BASE		EP93XX_AHB_IOMEM(0x00030000)
- 
- #define EP93XX_GRAPHICS_ACCEL_BASE	EP93XX_AHB_IOMEM(0x00040000)
-@@ -134,13 +136,13 @@
- 
- #define EP93XX_IRDA_BASE		EP93XX_APB_IOMEM(0x000b0000)
- 
--#define EP93XX_UART1_PHYS_BASE		(EP93XX_APB_PHYS_BASE + 0x000c0000)
-+#define EP93XX_UART1_PHYS_BASE		EP93XX_APB_PHYS(0x000c0000)
- #define EP93XX_UART1_BASE		EP93XX_APB_IOMEM(0x000c0000)
- 
--#define EP93XX_UART2_PHYS_BASE		(EP93XX_APB_PHYS_BASE + 0x000d0000)
-+#define EP93XX_UART2_PHYS_BASE		EP93XX_APB_PHYS(0x000d0000)
- #define EP93XX_UART2_BASE		EP93XX_APB_IOMEM(0x000d0000)
- 
--#define EP93XX_UART3_PHYS_BASE		(EP93XX_APB_PHYS_BASE + 0x000e0000)
-+#define EP93XX_UART3_PHYS_BASE		EP93XX_APB_PHYS(0x000e0000)
- #define EP93XX_UART3_BASE		EP93XX_APB_IOMEM(0x000e0000)
- 
- #define EP93XX_KEY_MATRIX_BASE		EP93XX_APB_IOMEM(0x000f0000)
-@@ -148,10 +150,10 @@
- #define EP93XX_ADC_BASE			EP93XX_APB_IOMEM(0x00100000)
- #define EP93XX_TOUCHSCREEN_BASE		EP93XX_APB_IOMEM(0x00100000)
- 
--#define EP93XX_PWM_PHYS_BASE		(EP93XX_APB_PHYS_BASE + 0x00110000)
-+#define EP93XX_PWM_PHYS_BASE		EP93XX_APB_PHYS(0x00110000)
- #define EP93XX_PWM_BASE			EP93XX_APB_IOMEM(0x00110000)
- 
--#define EP93XX_RTC_PHYS_BASE		(EP93XX_APB_PHYS_BASE + 0x00120000)
-+#define EP93XX_RTC_PHYS_BASE		EP93XX_APB_PHYS(0x00120000)
- #define EP93XX_RTC_BASE			EP93XX_APB_IOMEM(0x00120000)
- 
- #define EP93XX_SYSCON_BASE		EP93XX_APB_IOMEM(0x00130000) 
+Acknowledgements:
 
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+The most excellent XAA base code was done by 
+   Matan Ziv-Av <matan@svgalib dot org>
+
+The original XVideo code was done by 
+   Jetta Tang <jetta.tang@hhcn dot com>
+
+The g2d and pp drivers upon which this code is based were provided by
+   Samsung Semiconductor.  Thanks.
+
+Time and Materials and Hosting 
+   Chronolytics Inc.  Real-Time Embedded Software  http://chronolytics.com
+
+David F. Carlson    Chronolytics, Inc.  Rochester, NY
+mailto:dave at chronolytics.com            http://www.chronolytics.com
+
+"The faster I go, the behinder I get." --Lewis Carroll
