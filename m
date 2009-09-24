@@ -1,39 +1,78 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Thu, 24 Sep 2009 17:33:24 +0300
-Subject: Problem with s3c24xx pwm driver
-In-Reply-To: <f17812d70909231525t594704c5u781e2221481676a0@mail.gmail.com>
-References: <200909231824.11671.anarsoul@gmail.com>
-	<200909232223.35835.anarsoul@gmail.com>
-	<f17812d70909231525t594704c5u781e2221481676a0@mail.gmail.com>
-Message-ID: <200909241733.29167.anarsoul@gmail.com>
+From: h.feurstein@gmail.com (h.feurstein)
+Date: Thu, 24 Sep 2009 16:39:28 +0200
+Subject: [PATCH 1/2] ep93xx/micro9: Update maintainer
+Message-ID: <385aa7580909240739v5e80a95p7de0d09d08a671ce@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? ????????? ?? 24 ???????? 2009 01:25:46 ?? ????????:
+ARM: Update Contec Micro9 maintainer and add entry in MAINTAINERS
 
-> No, it doesn't.
-> 
-> So my suggestion at the moment is that you may:
-> 
-> 1. try dump the registers after pwm_enable() and see if all are setup
-> correctly,
-> 
-> 2. and make sure those registers are write-able at that time (some
-> SoC doesn't allow register writing when the controller is disabled).
+Signed-off-by: Hubert Feurstein <hubert.feurstein@contec.at>
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Manfred Gruber <m.gruber@tirol.com>
+Cc: Ryan Mallon <ryan@bluewatersys.com>
+---
+ MAINTAINERS                   |    5 +++++
+ arch/arm/mach-ep93xx/micro9.c |   10 ++++++----
+ 2 files changed, 11 insertions(+), 4 deletions(-)
 
-Ok, I've found source of  problem: it seems to be some issue with backlight 
-LED driver (hardware, not software) with selected PWM clock. It seems that  
-part of period with "1" is not long enought to charge capacitor, or something 
-like this. PWM itself works fine.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 7c1c0b0..1ba98ac 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -576,6 +576,11 @@ M:	Mike Rapoport <mike@compulab.co.il>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
 
-Sorry for buzz.
++ARM/CONTEC MICRO9 MACHINE SUPPORT
++M:	Hubert Feurstein <hubert.feurstein@contec.at>
++S:	Maintained
++F:	arch/arm/mach-ep93xx/micro9.c
++
+ ARM/CORGI MACHINE SUPPORT
+ M:	Richard Purdie <rpurdie@rpsys.net>
+ S:	Maintained
+diff --git a/arch/arm/mach-ep93xx/micro9.c b/arch/arm/mach-ep93xx/micro9.c
+index 0a313e8..72e7a7d 100644
+--- a/arch/arm/mach-ep93xx/micro9.c
++++ b/arch/arm/mach-ep93xx/micro9.c
+@@ -2,7 +2,9 @@
+  *  linux/arch/arm/mach-ep93xx/micro9.c
+  *
+  * Copyright (C) 2006 Contec Steuerungstechnik & Automation GmbH
+- *                   Manfred Gruber <manfred.gruber@contec.at>
++ *                    Manfred Gruber <m.gruber@tirol.com>
++ * Copyright (C) 2009 Contec Steuerungstechnik & Automation GmbH
++ *                    Hubert Feurstein <hubert.feurstein@contec.at>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -66,7 +68,7 @@ static void __init micro9h_init_machine(void)
+ }
 
-Regards
-Vasily
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090924/3da13106/attachment.sig>
+ MACHINE_START(MICRO9, "Contec Hypercontrol Micro9-H")
+-	/* Maintainer: Manfred Gruber <manfred.gruber@contec.at> */
++	/* Maintainer: Hubert Feurstein <hubert.feurstein@contec.at> */
+ 	.phys_io	= EP93XX_APB_PHYS_BASE,
+ 	.io_pg_offst	= ((EP93XX_APB_VIRT_BASE) >> 18) & 0xfffc,
+ 	.boot_params	= EP93XX_SDCE3_PHYS_BASE_SYNC + 0x100,
+@@ -88,7 +90,7 @@ static void __init micro9m_init_machine(void)
+ }
+
+ MACHINE_START(MICRO9M, "Contec Hypercontrol Micro9-M")
+-	/* Maintainer: Manfred Gruber <manfred.gruber@contec.at> */
++	/* Maintainer: Hubert Feurstein <hubert.feurstein@contec.at> */
+ 	.phys_io	= EP93XX_APB_PHYS_BASE,
+ 	.io_pg_offst	= ((EP93XX_APB_VIRT_BASE) >> 18) & 0xfffc,
+ 	.boot_params	= EP93XX_SDCE3_PHYS_BASE_SYNC + 0x100,
+@@ -110,7 +112,7 @@ static void __init micro9l_init_machine(void)
+ }
+
+ MACHINE_START(MICRO9L, "Contec Hypercontrol Micro9-L")
+-	/* Maintainer: Manfred Gruber <manfred.gruber@contec.at> */
++	/* Maintainer: Hubert Feurstein <hubert.feurstein@contec.at> */
+ 	.phys_io	= EP93XX_APB_PHYS_BASE,
+ 	.io_pg_offst	= ((EP93XX_APB_VIRT_BASE) >> 18) & 0xfffc,
+ 	.boot_params	= EP93XX_SDCE3_PHYS_BASE_SYNC + 0x100,
+-- 
+1.6.0.2
