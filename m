@@ -1,34 +1,23 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Thu, 24 Sep 2009 22:38:06 +0300
-Subject: [PATCH 1/5] s3c2410_udc: 2440 dual packet workaround
-In-Reply-To: <200909240711.17683.fg@emlix.com>
-References: <164376.11955.qm@web54401.mail.yahoo.com>
-	<200909232230.03982.anarsoul@gmail.com>
-	<200909240711.17683.fg@emlix.com>
-Message-ID: <200909242238.11627.anarsoul@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Sep 2009 21:34:37 +0100
+Subject: Problem with s3c24xx pwm driver
+In-Reply-To: <200909241733.29167.anarsoul@gmail.com>
+References: <200909231824.11671.anarsoul@gmail.com>
+	<200909232223.35835.anarsoul@gmail.com>
+	<f17812d70909231525t594704c5u781e2221481676a0@mail.gmail.com>
+	<200909241733.29167.anarsoul@gmail.com>
+Message-ID: <20090924203437.GA25389@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? ????????? ?? 24 ???????? 2009 08:11:17 ????? Fabian Godehardt ???????:
-> On our 2440 machine i found out that adding a receive handling on the
-> interrupt handler makes the driver work, and in ethernet gadget mode the
->  pings returned much faster.
-> Im not realy familiar with the USB layer / protocoll so i'm not sure if
->  this breaks something else. You might have a look at this patch (it is
->  2.6.26 against 2.6.31 so maybe it will not apply successfully and you need
->  to take a hand on it).
+On Thu, Sep 24, 2009 at 05:33:24PM +0300, Vasily Khoruzhick wrote:
+> Ok, I've found source of  problem: it seems to be some issue with backlight 
+> LED driver (hardware, not software) with selected PWM clock. It seems that  
+> part of period with "1" is not long enought to charge capacitor, or something 
+> like this. PWM itself works fine.
 
-Your patch works as well with little modification (you used && instead of &). 
-And it seems to be a bit cleaner, it can't stuck in interrupt handler for a 
-while as previous. Would you mind if I submit your patch as part of my 
-patches? I'll add note that you're author of original patch.
+Is it LED or is it CCFL?  If it's CCFL, it needs to be 'struck' and then
+you can reduce the intensity level - by going to max brightness when you
+turn it on and then back the intensity down.
 
-Regards
-Vasily
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090924/7518df98/attachment.sig>
+That's fairly normal for CCFL stuff.
