@@ -1,53 +1,50 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 23 Sep 2009 16:36:19 -0700
-Subject: [PATCH/RFC] Runtime PM: ARM: subarch-specific extensions of
-	pdev_archdata
-In-Reply-To: <f17812d70909231630i20f64328k8d604c3436094b85@mail.gmail.com>
-References: <1253670648-28610-1-git-send-email-khilman@deeprootsystems.com>
-	<f17812d70909222153y4a0e4fc2n496ea2e6caaac847@mail.gmail.com>
-	<19129.63264.653666.70492@pilspetsen.it.uu.se>
-	<4ABAAF1D.6090907@deeprootsystems.com>
-	<f17812d70909231630i20f64328k8d604c3436094b85@mail.gmail.com>
-Message-ID: <4ABAB0F3.2050802@deeprootsystems.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Thu, 24 Sep 2009 01:27:15 +0100
+Subject: [PATCH 1/5] s3c2410_udc: 2440 dual packet workaround
+In-Reply-To: <164376.11955.qm@web54401.mail.yahoo.com>
+References: <200909231046.36330.anarsoul@gmail.com>
+	<164376.11955.qm@web54401.mail.yahoo.com>
+Message-ID: <20090924002715.GH24720@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric Miao wrote:
-> On Thu, Sep 24, 2009 at 7:28 AM, Kevin Hilman
-> <khilman@deeprootsystems.com> wrote:
->> Mikael Pettersson wrote:
->>> Eric Miao writes:
->>>  > On Wed, Sep 23, 2009 at 9:50 AM, Kevin Hilman
->>>  > <khilman@deeprootsystems.com> wrote:
->>>  > > On ARM platforms, power management can be very platform specific.
->>>  > > This patch allows ARM subarches to extend the platform_device
->>>  > > pdev_archdata for each subarch by creating a new struct pdev_machdata
->>>  > > and allowing each subarch to customize it as needed.
->>>  > >
->>>  > > As a starting point, each subarch's <mach/device.h> creates an empty
->>>  > > struct pdev_machdata.
->>>  > >
->>>  >  > Shouldn't that pdev_archdata and pdev_machdata be pointer or
->>> something
->>>  > so that multiple platform_device can share something in common?
->>>
->>> Forcing it to be a pointer has allocation and lifetime implications.
->>> Making it a struct allows the subarch to duplicate or share
->>> (via a private pointer) data as it sees fit.
->> Yes, the allocation/lifetime issues were why a struct was chosen.
->>
+On Wed, Sep 23, 2009 at 12:20:05PM -0700, David Anders wrote:
+> Vasily,
 > 
-> Mmm... this makes sense to me. I'm ok with this patch - just wondering
-> for the moment what to put for the pxa architecture - I'll see what davinci
-> will do first, of course :)
+> i have tried this patch on a number of S3C2440 based systems and found that this patch is not a completely effective solution. if the purpose is to get a solution even if it is an incomplete one, then i'd be ok with this patch, however, i'm not keen on accepting a patch into the main tree with the knowledge that it isn't 100% effective.
+> 
+> Dave Anders
 
-Well, I'll be doing OMAP before davinci, and the pdev_machdata will 
-bascailly contain an OMAP specific struct (omap_device) that keeps track 
-of various OMAP-specific device proerties (powerdomain, clock(s), PM 
-register offsets, etc. etc.)  Basically, nothing that would be shared by 
-other arches.
+I think that if this is afix that makes the code mostly work then
+there really should be some form of note in the code that says that this
+fix is a mostly effective form.
+ 
+> 
+> --- On Wed, 9/23/09, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+> 
+> > From: Vasily Khoruzhick <anarsoul@gmail.com>
+> > Subject: [PATCH 1/5] s3c2410_udc: 2440 dual packet workaround
+> > To: "Ben Dooks" <ben-linux@fluff.org>, linux-arm-kernel at lists.infradead.org
+> > Date: Wednesday, September 23, 2009, 2:46 AM
+> > 
+> > 
+> > -----Inline Attachment Follows-----
+> > 
+> > 
+> > -----Inline Attachment Follows-----
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
+> 
+> 
+>       
 
-If down the road we figure out stuff common to all ARM platforms, we 
-could put it in the pdev_archdata struct.
+-- 
+-- 
+Ben
 
-Kevin
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
