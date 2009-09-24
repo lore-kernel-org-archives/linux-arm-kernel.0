@@ -1,39 +1,57 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 24 Sep 2009 20:00:02 +0100
-Subject: S3C6410 SDHCI driver crash
-In-Reply-To: <4ABB9115.4030609@gmail.com>
-References: <4ABB9115.4030609@gmail.com>
-Message-ID: <20090924190002.GG31920@trinity.fluff.org>
+Date: Thu, 24 Sep 2009 20:36:42 +0100
+Subject: platform data for the s3c-adc or hardcoded delay?
+In-Reply-To: <2accc2ff0909230336m173f0b0fqc1e1c08be448b648@mail.gmail.com>
+References: <2accc2ff0909230332y6bf565e0kc33a0ef8d8072451@mail.gmail.com>
+	<2accc2ff0909230336m173f0b0fqc1e1c08be448b648@mail.gmail.com>
+Message-ID: <20090924193642.GH31920@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 24, 2009 at 05:32:37PM +0200, Maurus Cuelenaere wrote:
-> Hi,
+On Wed, Sep 23, 2009 at 05:36:33AM -0500, Nelson Castillo wrote:
+> (Ben, sorry for sending 2 copies. I used the old list address... I'd
+> better go to sleep now.).
 > 
-> I'm currently experiencing an SDHCI bug in 2.6.31 and linux-next, which 
-> didn't
-> seem to appear in 2.6.31-rc8.
 > 
-> This is on a new S3C6410 platform (SmartQ 7, see [1]) and it seems to be
-> consistently happening right after displaying "Loading hardware drivers" (in
-> user-space; Ubuntu-based).
+> We had this for the touchscreen but it doesn't make sense now that the
+> driver has been converted to use the s3c-adc API.
 > 
-> The relevant kernel log lines are:
+> const static struct s3c_ts_platdata gta02_ts_cfg = {
+> ? ? ? .delay = 10000,
+> ? ? ? .presc = 0xff, /* Slow as we can go. */
+> };
 > 
-> blk: request botched
-> kernel BUG at drivers/mmc/host/sdhci.c:298!
+> Without this delay the TS doesn't work for us:
+> 
+> Now I see two options:
+> 
+> 1) Hardcode the delay in plat-s3c24xx/adc.c (As it's done in [1]).
+> 2) Submit patches adding s3c_adc_platdata.
 
-Having a look at the code in mainline, this is being triggered in 
-sdhci_write_block_pio(), by the following code:
+The pre-scaler value is probably something we should be passing to the
+ADC core driver via platform data, I think that the rate that the conversions
+are run at is a property of the board itself and not just the client. This
+is mostly due to (I think) the ADC drawing more power the faster it runs
+and the board may have only been designed to supply a certain amount of
+power to the ADC.
 
-296     while (blksize) {
-297             if (!sg_miter_next(&host->sg_miter))
-298                     BUG();
+The delay value is probably something that the client structure should
+contain and the ADC driver set the delay value when the client is first
+selected to start a conversion. 
+ 
+> What do I do?
+> 
+> I also would like to know if we rule out the possibility of
+> delay/presc depending on the current s3c_adc_client.
+> 
+> [1] http://lists.openmoko.org/pipermail/openmoko-kernel/2009-September/010550.html
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Which suggests that the size of the transfer was bigger than the sg list
-passed to the transfer, which is worrying as this seems to suggest there
-is a problem with the PIO code writing insufficient data to the card.
-
+-- 
 -- 
 Ben
 
