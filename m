@@ -1,31 +1,42 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Thu, 24 Sep 2009 17:48:44 +0200
-Subject: patches for pxafb
-In-Reply-To: <3ea34a000909240715i2742faa8r83f574e7d652d3b9@mail.gmail.com>
-References: <3ea34a000909240715i2742faa8r83f574e7d652d3b9@mail.gmail.com>
-Message-ID: <20090924154844.GK9361@buzzloop.caiaq.de>
+From: brian@walsh.ws (Brian Walsh)
+Date: Thu, 24 Sep 2009 12:02:25 -0400
+Subject: ixp4xx dmabounce
+In-Reply-To: <m33a6dk9li.fsf@intrepid.localdomain>
+References: <a104b22c0909171402x10c06d41oa5c78065a65836e1@mail.gmail.com>
+	<19129.24807.954274.688709@pilspetsen.it.uu.se>
+	<m33a6dk9li.fsf@intrepid.localdomain>
+Message-ID: <a104b22c0909240902g31da6983w26be4526cbdfc16c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 24, 2009 at 04:15:54PM +0200, Christopher Friedt wrote:
-> I have a couple of patches for the pxa framebuffer that I would like
-> to submit upstream,
-> but I'm fairly new to it and thought that this would be a good place to start.
+On Wed, Sep 23, 2009 at 10:40 AM, Krzysztof Halasa <khc@pm.waw.pl> wrote:
+> Mikael Pettersson <mikpe@it.uu.se> writes:
+>
+>> I strongly suspect that something on the USB or networking side
+>> is allocating I/O buffers without observing the correct DMA APIs.
+>
+> At least the network stack allocates buffers ignoring the DMA masks.
+> The buffers may be allocated by one device (driver) and passed to
+> another device. The only plausible way to fix it is IMHO limiting all
+> skb allocations to the common mask (drivers would be free to either
+> handle or drop skbs outside of their mask).
+>
+> This is relatively easy to implement and I'm going to try it, when time
+> permits.
+>
+>> I think Krzysztof Halasa mentioned running ixp4xx devices with 128MB
+>> RAM and a kernel hacked so kernel-private allocations would always be
+>> served from memory below 64MB. I think he mentioned doing that because
+>> of networking components that would ignore PCI DMA mask constraints.
+>
+> Right. This works fine for network buffers because they aren't that
+> large. The current patch is suboptimal, though.
+> --
+> Krzysztof Halasa
+>
 
-Yes, it is. The first things to read are Documentation/SubmittingPatches
-and Documentation/CodingStyle. Then, use scripts/checkpatch.pl to verify
-your patches.
-
-> Also, I wrote a multi-function driver for the STMPE2401 gpio expander
-> / keypad controller / rotator input / pwm output  chip, and would
-> really appreciate it if someone could review it. I already informed
-> another project (PeekLinux) via IRC, because their device uses the
-> same chip, but had no replies. The code currently only impliments
-> keypad functionality, but I've made lots of room / structure for the
-> rest of the multi-function devices. I'd like to submit that upstream
-> at some point after a couple of reviews. Any volounteers? :-)
-
-The appropriate place to get feedback to such a driver are the linux-i2c
-and linux-input mailing lists.
-
-Daniel
+I tried Krzysztof's patch and it had no noticeable affect.  I am still getting
+about 6.3 Mbps IP data throughput when only using the ohci controller and
+about 3.6 Mbps when the device is attached to the ehci controller.  This
+device works fine when running the same testing attached to an x86
+configured machine and gets about 18 Mbps IP data throughput.
