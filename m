@@ -1,34 +1,31 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Thu, 24 Sep 2009 17:32:37 +0200
-Subject: S3C6410 SDHCI driver crash
-Message-ID: <4ABB9115.4030609@gmail.com>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Thu, 24 Sep 2009 17:48:44 +0200
+Subject: patches for pxafb
+In-Reply-To: <3ea34a000909240715i2742faa8r83f574e7d652d3b9@mail.gmail.com>
+References: <3ea34a000909240715i2742faa8r83f574e7d652d3b9@mail.gmail.com>
+Message-ID: <20090924154844.GK9361@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Sep 24, 2009 at 04:15:54PM +0200, Christopher Friedt wrote:
+> I have a couple of patches for the pxa framebuffer that I would like
+> to submit upstream,
+> but I'm fairly new to it and thought that this would be a good place to start.
 
-I'm currently experiencing an SDHCI bug in 2.6.31 and linux-next, which 
-didn't
-seem to appear in 2.6.31-rc8.
+Yes, it is. The first things to read are Documentation/SubmittingPatches
+and Documentation/CodingStyle. Then, use scripts/checkpatch.pl to verify
+your patches.
 
-This is on a new S3C6410 platform (SmartQ 7, see [1]) and it seems to be
-consistently happening right after displaying "Loading hardware drivers" (in
-user-space; Ubuntu-based).
+> Also, I wrote a multi-function driver for the STMPE2401 gpio expander
+> / keypad controller / rotator input / pwm output  chip, and would
+> really appreciate it if someone could review it. I already informed
+> another project (PeekLinux) via IRC, because their device uses the
+> same chip, but had no replies. The code currently only impliments
+> keypad functionality, but I've made lots of room / structure for the
+> rest of the multi-function devices. I'd like to submit that upstream
+> at some point after a couple of reviews. Any volounteers? :-)
 
-The relevant kernel log lines are:
+The appropriate place to get feedback to such a driver are the linux-i2c
+and linux-input mailing lists.
 
-blk: request botched
-kernel BUG at drivers/mmc/host/sdhci.c:298!
-
-This is on 2.6.31-next-20090923, but I've also had this on regular 
-2.6.31, Ben
-Dooks latest tree and linux-next with the ADMA patches applied.
-
-Any ideas?
-
-[1] 
-http://gitorious.org/mcuelenaere-smartq-kernel/mcuelenaere-smartq-kernel/commits/experimental-2.6.31
-
-Regards,
-
-Maurus Cuelenaere
+Daniel
