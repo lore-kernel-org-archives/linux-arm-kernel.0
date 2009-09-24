@@ -1,49 +1,40 @@
-From: wookey@wookware.org (Wookey)
-Date: Thu, 24 Sep 2009 16:10:10 +0100
-Subject: patches for pxafb
-In-Reply-To: <3ea34a000909240715i2742faa8r83f574e7d652d3b9@mail.gmail.com>
-References: <3ea34a000909240715i2742faa8r83f574e7d652d3b9@mail.gmail.com>
-Message-ID: <20090924151010.GS12991@dream.aleph1.co.uk>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Thu, 24 Sep 2009 17:23:26 +0200
+Subject: S3C64xx backlight PWM misinited GPIO pin
+Message-ID: <4ABB8EEE.7070103@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+++ Christopher Friedt [2009-09-24 16:15 +0200]:
-> Hi folks,
-> 
-> I have a couple of patches for the pxa framebuffer that I would like
-> to submit upstream,
-> but I'm fairly new to it and thought that this would be a good place to start.
-> 
-> [1] add width / height members to struct pxafb_mach_info, and related
-> code in pxafb.c
-> 
-> * useful for providing physical display dimensions to the struct
-> fb_var_screeninfo
-> * some applications (namely Android) will look for these metrics to
-> get an idea of
->   what the pixels-per-inch ratio is
-> * this is something that can vary on a per-machine basis, which is why
-> I put it in
->   pxafb_mach_info
+Hi,
 
-When you say per-machine do you mean per type of machine, or per
-device?
+Are the GPIO pins used as PWM (e.g. GPF15) supposed to be set to special
+function 2 in the bootloader/mach file or is this just a bug in the PWM 
+driver
+in current mainline?
 
-So far as I can see the pxa framebuffer stuff assumes that
-every pxa mach type has exactly one display associated with it and
-this is built in to the the kernel. This is very tiresome on balloon3,
-which so far has had 4 different framebuffer-based displays (QVGA, VGA
-LCDs and VGA/SVGA via interface to real monitor) and two
-others (accessed over the samosa IO bus), which correspond to 'no frame
-buffer'. We currently need different kernel configs and different
-kernels to support these which seems deeply crufty, but I'm really not
-sure how to go about having displays run or boot-time configurable. 
-Has anyone thought about how this should be done?
+Without doing the below, backlight PWM doesn't work for me:
 
-Sorry if this is too far off topic for the simple change mooted, but
-it seems to me to be part of the same discussion. 
 
-Wookey
--- 
-Principal hats:  iEndian - Balloonboard - Toby Churchill - Emdebian
-http://wookware.org/
+static int smartq_bl_init(struct device *dev)
+{
+     s3c_gpio_cfgpin(S3C64XX_GPF(15), S3C_GPIO_SFN(2));
+
+     return 0;
+}
+
+static struct platform_pwm_backlight_data smartq_backlight_data = {
+...
+     .init        = smartq_bl_init,
+...
+};
+
+
+which doesn't look like it's the way to go..
+
+Do I need to set some kind of config option (mach-hmt doesn't seem to 
+need the
+above change) or .. ?
+
+Regards,
+
+Maurus Cuelenaere
