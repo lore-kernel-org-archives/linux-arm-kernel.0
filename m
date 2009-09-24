@@ -1,39 +1,33 @@
 From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Thu, 24 Sep 2009 17:23:26 +0200
-Subject: S3C64xx backlight PWM misinited GPIO pin
-Message-ID: <4ABB8EEE.7070103@gmail.com>
+Date: Thu, 24 Sep 2009 17:32:37 +0200
+Subject: S3C6410 SDHCI driver crash
+Message-ID: <4ABB9115.4030609@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Are the GPIO pins used as PWM (e.g. GPF15) supposed to be set to special
-function 2 in the bootloader/mach file or is this just a bug in the PWM 
-driver
-in current mainline?
+I'm currently experiencing an SDHCI bug in 2.6.31 and linux-next, which 
+didn't
+seem to appear in 2.6.31-rc8.
 
-Without doing the below, backlight PWM doesn't work for me:
+This is on a new S3C6410 platform (SmartQ 7, see [1]) and it seems to be
+consistently happening right after displaying "Loading hardware drivers" (in
+user-space; Ubuntu-based).
 
+The relevant kernel log lines are:
 
-static int smartq_bl_init(struct device *dev)
-{
-     s3c_gpio_cfgpin(S3C64XX_GPF(15), S3C_GPIO_SFN(2));
+blk: request botched
+kernel BUG at drivers/mmc/host/sdhci.c:298!
 
-     return 0;
-}
+This is on 2.6.31-next-20090923, but I've also had this on regular 
+2.6.31, Ben
+Dooks latest tree and linux-next with the ADMA patches applied.
 
-static struct platform_pwm_backlight_data smartq_backlight_data = {
-...
-     .init        = smartq_bl_init,
-...
-};
+Any ideas?
 
-
-which doesn't look like it's the way to go..
-
-Do I need to set some kind of config option (mach-hmt doesn't seem to 
-need the
-above change) or .. ?
+[1] 
+http://gitorious.org/mcuelenaere-smartq-kernel/mcuelenaere-smartq-kernel/commits/experimental-2.6.31
 
 Regards,
 
