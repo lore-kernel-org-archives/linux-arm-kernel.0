@@ -1,78 +1,44 @@
-From: h.feurstein@gmail.com (h.feurstein)
-Date: Thu, 24 Sep 2009 16:39:28 +0200
-Subject: [PATCH 1/2] ep93xx/micro9: Update maintainer
-Message-ID: <385aa7580909240739v5e80a95p7de0d09d08a671ce@mail.gmail.com>
+From: srplsnh@gmail.com (Surinder P Singh)
+Date: Thu, 24 Sep 2009 20:13:14 +0530
+Subject: [PATCH 1/3] [ARM]: U8500 core machine support
+In-Reply-To: <1253572622.21542.45.camel@vinay-desktop>
+References: <1253572622.21542.45.camel@vinay-desktop>
+Message-ID: <f2235a630909240743t1fddabbct7c8ea0c4f77dbf73@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM: Update Contec Micro9 maintainer and add entry in MAINTAINERS
+Some review comments:
 
-Signed-off-by: Hubert Feurstein <hubert.feurstein@contec.at>
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Manfred Gruber <m.gruber@tirol.com>
-Cc: Ryan Mallon <ryan@bluewatersys.com>
----
- MAINTAINERS                   |    5 +++++
- arch/arm/mach-ep93xx/micro9.c |   10 ++++++----
- 2 files changed, 11 insertions(+), 4 deletions(-)
+> diff --git a/arch/arm/mach-ux500/include/mach/debug-macro.S b/arch/arm/mach-ux500/include/mach/debug-macro.S
+> +
+> +#include <linux/amba/serial.h>
+> +               .macro  addruart,rx
+> +               mrc     p15, 0, \rx, c1, c0
+> +               tst     \rx, #1                 @MMU enabled?
+> +               moveq   \rx, #0x80007000        @MMU off, Physical address
+> +               movne   \rx, #0xF0007000        @MMU on, Virtual address
+> +               .endm
+> +
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 7c1c0b0..1ba98ac 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -576,6 +576,11 @@ M:	Mike Rapoport <mike@compulab.co.il>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
+It looks like the constants used here will break compilation. You
+could instead use 0x80000000 and 0xf0000000 and add an 'orr \rx, \rx,
+#0x7000' after the 'movne' to fix this.
 
-+ARM/CONTEC MICRO9 MACHINE SUPPORT
-+M:	Hubert Feurstein <hubert.feurstein@contec.at>
-+S:	Maintained
-+F:	arch/arm/mach-ep93xx/micro9.c
-+
- ARM/CORGI MACHINE SUPPORT
- M:	Richard Purdie <rpurdie@rpsys.net>
- S:	Maintained
-diff --git a/arch/arm/mach-ep93xx/micro9.c b/arch/arm/mach-ep93xx/micro9.c
-index 0a313e8..72e7a7d 100644
---- a/arch/arm/mach-ep93xx/micro9.c
-+++ b/arch/arm/mach-ep93xx/micro9.c
-@@ -2,7 +2,9 @@
-  *  linux/arch/arm/mach-ep93xx/micro9.c
-  *
-  * Copyright (C) 2006 Contec Steuerungstechnik & Automation GmbH
-- *                   Manfred Gruber <manfred.gruber@contec.at>
-+ *                    Manfred Gruber <m.gruber@tirol.com>
-+ * Copyright (C) 2009 Contec Steuerungstechnik & Automation GmbH
-+ *                    Hubert Feurstein <hubert.feurstein@contec.at>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -66,7 +68,7 @@ static void __init micro9h_init_machine(void)
- }
 
- MACHINE_START(MICRO9, "Contec Hypercontrol Micro9-H")
--	/* Maintainer: Manfred Gruber <manfred.gruber@contec.at> */
-+	/* Maintainer: Hubert Feurstein <hubert.feurstein@contec.at> */
- 	.phys_io	= EP93XX_APB_PHYS_BASE,
- 	.io_pg_offst	= ((EP93XX_APB_VIRT_BASE) >> 18) & 0xfffc,
- 	.boot_params	= EP93XX_SDCE3_PHYS_BASE_SYNC + 0x100,
-@@ -88,7 +90,7 @@ static void __init micro9m_init_machine(void)
- }
+> diff --git a/arch/arm/mach-ux500/include/mach/uncompress.h b/arch/arm/mach-ux500/include/mach/uncompress.h
+> +
+> +#include <asm/setup.h>
+> +#include <linux/io.h>
+> +#include <mach/hardware.h>
+> +
+> +#define U8500_UART_DR          0x101FB000
+> +#define U8500_UART_LCRH                0x101FB02c
+> +#define U8500_UART_CR          0x101FB030
+> +#define U8500_UART_FR          0x101FB018
+> +
 
- MACHINE_START(MICRO9M, "Contec Hypercontrol Micro9-M")
--	/* Maintainer: Manfred Gruber <manfred.gruber@contec.at> */
-+	/* Maintainer: Hubert Feurstein <hubert.feurstein@contec.at> */
- 	.phys_io	= EP93XX_APB_PHYS_BASE,
- 	.io_pg_offst	= ((EP93XX_APB_VIRT_BASE) >> 18) & 0xfffc,
- 	.boot_params	= EP93XX_SDCE3_PHYS_BASE_SYNC + 0x100,
-@@ -110,7 +112,7 @@ static void __init micro9l_init_machine(void)
- }
+Just wondering if the UART addresses used here are valid ? since they
+do not seem to correspond to the ones listed in hardware.h.
 
- MACHINE_START(MICRO9L, "Contec Hypercontrol Micro9-L")
--	/* Maintainer: Manfred Gruber <manfred.gruber@contec.at> */
-+	/* Maintainer: Hubert Feurstein <hubert.feurstein@contec.at> */
- 	.phys_io	= EP93XX_APB_PHYS_BASE,
- 	.io_pg_offst	= ((EP93XX_APB_VIRT_BASE) >> 18) & 0xfffc,
- 	.boot_params	= EP93XX_SDCE3_PHYS_BASE_SYNC + 0x100,
--- 
-1.6.0.2
+Cheers,
+surinder
