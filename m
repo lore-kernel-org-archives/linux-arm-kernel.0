@@ -1,98 +1,70 @@
-From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
-Date: Thu, 24 Sep 2009 02:42:06 +0530
-Subject: [PATCH 0/8] [ARM] ST-Ericsson's U8500 SMP platform, new patch set
-In-Reply-To: <1253735221.21542.159.camel@vinay-desktop>
-References: <1253735221.21542.159.camel@vinay-desktop>
-Message-ID: <1253740326.21542.186.camel@vinay-desktop>
+From: rene.wolf@mbda-systems.de (Wolf, Rene, HRO-GP)
+Date: Thu, 24 Sep 2009 12:51:54 +0200
+Subject: SPI, DMA and an i.MX31
+In-Reply-To: <59b21cf20909221245i355ccea0r44737e9112fd17c0@mail.gmail.com>
+References: <4AB8F9AE.1070006@billgatliff.com>
+	<59b21cf20909221245i355ccea0r44737e9112fd17c0@mail.gmail.com>
+Message-ID: <87077C4F48609F4392621D9F99DDE20901202E06@tesla.star.galaxy.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I request you to apply this patch set only on stable 2.6.31 kernel.
-Since there are issues in bring up the secondary core in the 
-mainstream kernel I did not re-base to the mainstream. I am 
-working on it. Apologise for not mentioning before.
+Hi all.
 
-- srinidhi
+Yesterday I was trying to reorganize the newly added sdma stuff. Up till
+then it was just a dirty hack, now it got better structure. As I don't
+know much on the organization of the kernel I cannot say if I did it the
+right way. As a template I tried to match the structure of the dma driver
+for the mx1/mx2 SoCs.
 
-On Thu, 2009-09-24 at 01:17 +0530, srinidhi kasagar wrote:
-> From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-> 
-> This adds a new machine support for ST-Ericsson's U8500 platform. This is
-> an entry level patch which has bindings to existing modules like GIC, SCU,
-> TWD, PL011 UART. This also adds a new SPI device STw4500 which uses ARM pl022
-> bus driver. The patch is based on v2.6.31 kernel and tested on mop500 hardware
-> with SMP enabled.
-> 
-> This time I have split the patches for better readability. Also, for mfd 
-> device support, I have incorporated the review comments.
-> 
-> srinidhi kasagar (8):
->   [ARM]: enable SMP support for U8500 architecture
->   [ARM] U8500: adds secondary cpu support, local timers
->   [ARM] U8500: adds mop500 platform
->   [ARM] U8500: adds basic SoC support for U8500 CPU
->   [ARM] U8500: adds basic clock framework
->   [ARM] U8500: adds stw4500 as pl022 device
->   mfd: add U8500 STw4500 SPI device support
->   pl022: fix peripheral id for ST vendor
-> 
->  arch/arm/Kconfig                                   |   20 ++-
->  arch/arm/Makefile                                  |    1 +
->  arch/arm/mach-ux500/Kconfig                        |   15 ++
->  arch/arm/mach-ux500/Makefile                       |    8 +
->  .../{mach-footbridge => mach-ux500}/Makefile.boot  |    0
->  arch/arm/mach-ux500/board-mop500.c                 |  146 +++++++++++
->  arch/arm/mach-ux500/clock.c                        |   95 +++++++
->  arch/arm/mach-ux500/cpu-u8500.c                    |   78 ++++++
->  arch/arm/mach-ux500/headsmp.S                      |   38 +++
->  .../include/mach/clkdev.h                          |    0
->  arch/arm/mach-ux500/include/mach/debug-macro.S     |   22 ++
->  arch/arm/mach-ux500/include/mach/entry-macro.S     |   80 ++++++
->  arch/arm/mach-ux500/include/mach/hardware.h        |  129 ++++++++++
->  arch/arm/mach-ux500/include/mach/io.h              |   22 ++
->  arch/arm/mach-ux500/include/mach/irqs.h            |   71 ++++++
->  arch/arm/mach-ux500/include/mach/memory.h          |   18 ++
->  arch/arm/mach-ux500/include/mach/mtu.h             |   53 ++++
->  arch/arm/mach-ux500/include/mach/setup.h           |   22 ++
->  arch/arm/mach-ux500/include/mach/smp.h             |   29 +++
->  arch/arm/mach-ux500/include/mach/system.h          |   25 ++
->  arch/arm/mach-ux500/include/mach/timex.h           |    6 +
->  arch/arm/mach-ux500/include/mach/uncompress.h      |   58 +++++
->  arch/arm/mach-ux500/include/mach/vmalloc.h         |   18 ++
->  arch/arm/mach-ux500/localtimer.c                   |   28 ++
->  arch/arm/mach-ux500/platsmp.c                      |  181 ++++++++++++++
->  arch/arm/mach-ux500/timer.c                        |  163 ++++++++++++
->  drivers/mfd/Kconfig                                |   10 +
->  drivers/mfd/Makefile                               |    1 +
->  drivers/mfd/stw4500.c                              |  207 +++++++++++++++
->  drivers/spi/amba-pl022.c                           |    2 +-
->  include/linux/mfd/stw4500.h                        |  262 ++++++++++++++++++++
->  31 files changed, 1803 insertions(+), 5 deletions(-)
->  create mode 100644 arch/arm/mach-ux500/Kconfig
->  create mode 100644 arch/arm/mach-ux500/Makefile
->  copy arch/arm/{mach-footbridge => mach-ux500}/Makefile.boot (100%)
->  create mode 100644 arch/arm/mach-ux500/board-mop500.c
->  create mode 100644 arch/arm/mach-ux500/clock.c
->  create mode 100644 arch/arm/mach-ux500/cpu-u8500.c
->  create mode 100644 arch/arm/mach-ux500/headsmp.S
->  copy arch/arm/{mach-ep93xx => mach-ux500}/include/mach/clkdev.h (100%)
->  create mode 100644 arch/arm/mach-ux500/include/mach/debug-macro.S
->  create mode 100644 arch/arm/mach-ux500/include/mach/entry-macro.S
->  create mode 100644 arch/arm/mach-ux500/include/mach/hardware.h
->  create mode 100644 arch/arm/mach-ux500/include/mach/io.h
->  create mode 100644 arch/arm/mach-ux500/include/mach/irqs.h
->  create mode 100644 arch/arm/mach-ux500/include/mach/memory.h
->  create mode 100644 arch/arm/mach-ux500/include/mach/mtu.h
->  create mode 100644 arch/arm/mach-ux500/include/mach/setup.h
->  create mode 100644 arch/arm/mach-ux500/include/mach/smp.h
->  create mode 100644 arch/arm/mach-ux500/include/mach/system.h
->  create mode 100644 arch/arm/mach-ux500/include/mach/timex.h
->  create mode 100644 arch/arm/mach-ux500/include/mach/uncompress.h
->  create mode 100644 arch/arm/mach-ux500/include/mach/vmalloc.h
->  create mode 100644 arch/arm/mach-ux500/localtimer.c
->  create mode 100644 arch/arm/mach-ux500/platsmp.c
->  create mode 100644 arch/arm/mach-ux500/timer.c
->  create mode 100755 drivers/mfd/stw4500.c
->  create mode 100644 include/linux/mfd/stw4500.h
-> 
-> 
+@Andy
+The drivers/mmc/host/mxcmmc.c from 2.6.31 uses some different dma api: all
+those fkt start with 'imx_', the sdma's from the ltib have a 'mxc' prefix.
+I tried to match them and wrap those 'mxc' in defines, mapping them to the
+'imx' ones. Unfortunately for some fkts I didn't find a matching 'mxc' one.
+The driver compiles, but I guess it's pretty useless the way it is. May be
+I should have looked to the driver version in ltib, instead.
+
+After that I tried to register a SDMA channel with a device. As far as I
+can see that works. The Registered channel shows under
+'/proc/sdma/channels'. Freeing that also works.
+
+Next: Will try to start a SDMA transfer with SPI.
+
+ToDo: One with found knowledge about that should check if the new stuff
+is placed correctly. Then there seams to be effort to define a global
+DMA interface, for more than buffer allocation (at least for the i.MX
+series). So the SDMA stuff should be made complaint with that (I guess
+those 'imx' fkts are ones to go). Further there are structures that are
+passed to some of the SDMA functions to set up a transfer for a device.
+Those structures are incomplete. For my test I added one for CSPI3 TX in
+8Bit mode. For all other cspi in all other modes, they are missing. There
+should be some for 8/16/32 bit for cspi 1/2/3 in rx/tx direction.
+
+@Bill and Magnus
+Would it be ok if there was an assembler for the sdma, and the 'firmware'
+could be in assembler? (I don't know how this would work, just curious :-)
+
+Thanks again! Unfortunately by next Monday I'm out of time. Hopefully I
+will be able to post the stuff I've done so far, on this list. Together
+with an evaluation if the current port 'works' or not.
+
+
+Cheers
+Rene 
+
+
+
+Rene Wolf
+LFK-Lenkflugk?rpersysteme GmbH
+Human Resources Operations & Policy, HRO
+Landshuter Stra?e 26, 85716 Unterschlei?heim, GERMANY
+Phone: +49 89 3179 8337
+Fax: +49 8252 99 8964
+E-Mail: rene.wolf at mbda-systems.de
+
+http://www.mbda.net
+
+Chairman of the Supervisory Board: Antoine Bouvier
+Managing Director: Werner Kaltenegger
+Registered Office: Schrobenhausen
+Commercial Register: Amtsgericht Ingolstadt, HRB 4365
