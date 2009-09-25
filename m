@@ -1,32 +1,23 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Fri, 25 Sep 2009 10:27:14 +0200
-Subject: [PATCH] mach-iop32x/ Add nec ns-50 / ApplianceWare sanmina support
-In-Reply-To: <20090924215915.GA27322@n2100.arm.linux.org.uk> (Russell King's
-	message of "Thu\, 24 Sep 2009 22\:59\:15 +0100")
-References: <87ocr6uyhx.fsf@lechat.rtp-net.org>
-	<e9c3a7c20908301646w3cc8199dg392b95faad5616de@mail.gmail.com>
-	<87hbut7890.fsf@lechat.rtp-net.org>
-	<20090924215915.GA27322@n2100.arm.linux.org.uk>
-Message-ID: <87fxab5t0d.fsf@lechat.rtp-net.org>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Fri, 25 Sep 2009 11:15:12 +0200
+Subject: About ARM TCM patch
+In-Reply-To: <4ABC1D1D.6050506@gmail.com>
+References: <4ABC1D1D.6050506@gmail.com>
+Message-ID: <63386a3d0909250215k50f10a44qae55da31f97f99c0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+2009/9/25 Peter Chen <hzpeterchen@gmail.com>:
 
-Hi,
+> I read the TCM patch from http://lwn.net/Articles/353032/
 
-> On Wed, Sep 23, 2009 at 09:48:11PM +0200, Arnaud Patard wrote:
->> +static struct plat_serial8250_port sanmina_serial_port[] = {
->> +	{
->> +		.mapbase	= IQ31244_UART,
->> +		.membase	= (char *)IQ31244_UART,
+Are you trying to use it too?
+
+> 1. After MMU open, the code running at ITCM can't see physical address for
+> register.
 >
-> This can't be right.
+> 2. After MMU open, the code can't run at physical addressed ITCM.
 
-It is kind of right and it's working fine. You've made the same remark
-when I've submitted the em7210 support :) (fwiw, the sanmina.c file is
-based on my em7210.c code) See
-http://lists.arm.linux.org.uk/lurker/message/20070715.164059.ac9fbe0a.en.html
+Could this be different between ARM9 (which I use) and ARM11?
 
-
-Arnaud
+Linus Walleij
