@@ -1,64 +1,25 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 25 Sep 2009 17:36:15 +0200
-Subject: [at91sam9g45] DMA driver for AC97 and MCI
-In-Reply-To: <4ABCBD32.7080408@visionsystems.de>
-References: <4ABCBD32.7080408@visionsystems.de>
-Message-ID: <4ABCE36F.1000205@atmel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 25 Sep 2009 08:51:22 -0700
+Subject: [PATCH 06/12] omap: mailbox: Flush posted write when acking
+	mailbox irq
+In-Reply-To: <4ABC6D55.3000108@gmail.com>
+References: <20090924233027.6065.95725.stgit@localhost>
+	<20090924233920.6065.16789.stgit@localhost>
+	<4ABC6D55.3000108@gmail.com>
+Message-ID: <20090925155121.GU4919@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Yegor Yefremov :
-
-> I try to get sound and SD card working on at91sam9g45-ekes development
-> board using linux-next tree. As far as I understand AT_HDMAC is the
-> appropriate DMA driver for ARCH_AT91SAM9G45.
-
-Correct.
-
-> I resolved dependencies with this patch, so I could activate it for
-> my platform.
+* Artem Bityutskiy <dedekind1@gmail.com> [090925 00:15]:
+> On 09/25/2009 02:39 AM, Tony Lindgren wrote:
+>> From: Hiroshi DOYU<Hiroshi.DOYU@nokia.com>
+>>
+>> The only way to flush posted write to L4 bus is to do a read back
+>> of the same register right after the write.
 >
-> --- a/drivers/dma/Kconfig
-> +++ b/drivers/dma/Kconfig
-> @@ -48,7 +48,7 @@ config DW_DMAC
-> 
->  config AT_HDMAC
->         tristate "Atmel AHB DMA support"
-> -       depends on ARCH_AT91SAM9RL
-> +       depends on ARCH_AT91SAM9RL || ARCH_AT91SAM9G45
->         select DMA_ENGINE
->         help
->           Support the Atmel AHB DMA controller.  This can be integrated in
+> Just curious, is it really necessary to read back the _same_ register?
+> Would reading back any L4 bus-related register be sufficient?
 
-Well, this patch was waiting for this other to reach mainline:
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=5621/1
+It seems that reading back any register in the same device will do it.
 
-It is true that you will need it.
-
-> Should this driver be also used for sound driver and MCI?
-
-Sure. For sound, maybe we will have to conform to the dma cyclic API
-introduced by dw_dmac driver.
-
-For MCI, here is a patch series that goes before the patch that will do
-the link between atmel_mci, at_hdmac and at91sam9g45.
-
-http://lkml.org/lkml/2009/9/17/224
-
-This last patch is not posted to the mailing list yet, I am waiting for
-the others to reach mainline.
-
-I you are interested in it, you can have a preview here:
-ftp://ftp.linux4sam.org/devel/linux/2630_lnx4sam_patchset-tmp_20090828.tgz
-patch named :
-"at91/atmel-mci: inclusion of sd/mmc driver in at91sam9g45 chip and
-board" aka:
-2630_lnx4sam_patchset-tmp/2.6.30-at91-exp-0033-at91-atmel-mci-inclusion-of-sd-mmc-driver-in-at91sa.patch
-
-Hope this helps,
-
-Best regards,
--- 
-Nicolas Ferre
+Tony
