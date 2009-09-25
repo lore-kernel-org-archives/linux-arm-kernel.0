@@ -1,14 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 25 Sep 2009 21:36:21 +0100
-Subject: [at91sam9g45] DMA driver for AC97 and MCI
-In-Reply-To: <4ABCE36F.1000205@atmel.com>
-References: <4ABCBD32.7080408@visionsystems.de> <4ABCE36F.1000205@atmel.com>
-Message-ID: <20090925203621.GB19662@n2100.arm.linux.org.uk>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 25 Sep 2009 15:50:19 -0400 (EDT)
+Subject: arm: current mainline fails to boot on QNAP TS-109
+In-Reply-To: <200909252039.19789.elendil@planet.nl>
+References: <200909252039.19789.elendil@planet.nl>
+Message-ID: <alpine.LFD.2.00.0909251547450.4997@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 25, 2009 at 05:36:15PM +0200, Nicolas Ferre wrote:
-> Well, this patch was waiting for this other to reach mainline:
-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=5621/1
+On Fri, 25 Sep 2009, Frans Pop wrote:
 
-... which finally got through last night.
+> Current mainline kernel fails to boot on my QNAP TS-109 (orion5x).
+> 
+> It fails immediately after uncompressing the kernel, there are no other 
+> messages on the serial console. The problem was probably introduced in the 
+> last ARM merge:
+> 
+> v2.6.31-8766-gf25f60b is OK
+> v2.6.31-8936-g851b147 fails
+> 
+> If needed I can run a bisect between those commits.
+
+No need -- I found the screw-up.  Will submit a patch right away.
+
+In the mean time just revert commit 200b812d00.
+
+
+Nicolas
