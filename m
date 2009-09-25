@@ -1,25 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 25 Sep 2009 08:51:22 -0700
-Subject: [PATCH 06/12] omap: mailbox: Flush posted write when acking
-	mailbox irq
-In-Reply-To: <4ABC6D55.3000108@gmail.com>
-References: <20090924233027.6065.95725.stgit@localhost>
-	<20090924233920.6065.16789.stgit@localhost>
-	<4ABC6D55.3000108@gmail.com>
-Message-ID: <20090925155121.GU4919@atomide.com>
+From: ek9852@gmail.com (Mok Keith)
+Date: Sat, 26 Sep 2009 01:04:47 +0800
+Subject: [PATCH 1/5] pxa3xx_nand: enable PXA3xx bad block management
+In-Reply-To: <771cded00909250457w19686a53obdc178488368dd43@mail.gmail.com>
+References: <771cded00909250457w19686a53obdc178488368dd43@mail.gmail.com>
+Message-ID: <69f617130909251004y2a17cdetb45f6022a37b4249@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Artem Bityutskiy <dedekind1@gmail.com> [090925 00:15]:
-> On 09/25/2009 02:39 AM, Tony Lindgren wrote:
->> From: Hiroshi DOYU<Hiroshi.DOYU@nokia.com>
->>
->> The only way to flush posted write to L4 bus is to do a read back
->> of the same register right after the write.
->
-> Just curious, is it really necessary to read back the _same_ register?
-> Would reading back any L4 bus-related register be sufficient?
+Hi,
 
-It seems that reading back any register in the same device will do it.
+Any reason to limit the max slot to 40 (PXA_MAX_SLOT). It seems the
+bad block management scheme is not scalable and have a limitation of
+up to 256M bytes flash size only. (256M, 128kB per block = 2048 blocks
+= 40 bad blocks)
 
-Tony
+Also for the calibration of the 2% bad block area, according to most
+NAND specifications (checked Samsung, Hynix, Micron), nand flash
+vendor guarantee no more than 20 bad block per 1024 blocks and this
+rule is apply linearly.
+
+Would it be better to use the following otherwise when nand size is
+greater than 256M the no of bad block entries is not matched to
+specification:
+instead of:
+> +    entries = (entries * 2) / 100;
+
+use:
++    entries = (entries * 10) / 512;
+
+May I know what is the use of PXA_BEGIN_SLOT ?
+
+Keith
