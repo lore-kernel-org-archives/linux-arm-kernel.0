@@ -1,28 +1,56 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 25 Sep 2009 15:50:19 -0400 (EDT)
-Subject: arm: current mainline fails to boot on QNAP TS-109
-In-Reply-To: <200909252039.19789.elendil@planet.nl>
-References: <200909252039.19789.elendil@planet.nl>
-Message-ID: <alpine.LFD.2.00.0909251547450.4997@xanadu.home>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Fri, 25 Sep 2009 22:54:24 +0200
+Subject: [PATCH] Fix booting pre-ARM6 machines
+Message-ID: <1253912064-9444-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 25 Sep 2009, Frans Pop wrote:
+Commit 200b812d0084f800bc52465e273b118ff5f8141f includes the following
+hunk:
 
-> Current mainline kernel fails to boot on my QNAP TS-109 (orion5x).
-> 
-> It fails immediately after uncompressing the kernel, there are no other 
-> messages on the serial console. The problem was probably introduced in the 
-> last ARM merge:
-> 
-> v2.6.31-8766-gf25f60b is OK
-> v2.6.31-8936-g851b147 fails
-> 
-> If needed I can run a bisect between those commits.
+diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+index a4eaf4f..e17e3c3 100644
+--- a/arch/arm/kernel/entry-header.S
++++ b/arch/arm/kernel/entry-header.S
+@@ -76,13 +76,25 @@
+ #ifndef CONFIG_THUMB2_KERNEL
+ 	.macro	svc_exit, rpsr
+ 	msr	spsr_cxsf, \rpsr
++#if defined(CONFIG_CPU_32v6K)
++	clrex					@ clear the exclusive monitor
+ 	ldmia	sp, {r0 - pc}^			@ load r0 - pc, cpsr
++#elif defined (CONFIG_CPU_V6)
++	ldr	r0, [sp]
++	strex	r1, r2, [sp]			@ clear the exclusive monitor
++	ldmib	sp, {r1 - pc}^			@ load r1 - pc, cpsr
++#endif
+ 	.endm
 
-No need -- I found the screw-up.  Will submit a patch right away.
+ 	.macro	restore_user_regs, fast = 0, offset = 0
 
-In the mean time just revert commit 200b812d00.
+Having neither CONFIG_THUMB2_KERNEL nor CONFIG_CPU_32v6K nor
+CONFIG_CPU_V6 this steals the ldmia instruction.  The result is that
+svc_exit doesn't work at all.  So reintroduce it.
 
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Jamie Lokier <jamie@shareable.org>
+---
+ arch/arm/kernel/entry-header.S |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-Nicolas
+diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+index e17e3c3..ac34c0d 100644
+--- a/arch/arm/kernel/entry-header.S
++++ b/arch/arm/kernel/entry-header.S
+@@ -83,6 +83,8 @@
+ 	ldr	r0, [sp]
+ 	strex	r1, r2, [sp]			@ clear the exclusive monitor
+ 	ldmib	sp, {r1 - pc}^			@ load r1 - pc, cpsr
++#else
++	ldmia	sp, {r0 - pc}^			@ load r0 - pc, cpsr
+ #endif
+ 	.endm
+ 
+-- 
+1.6.4.3
