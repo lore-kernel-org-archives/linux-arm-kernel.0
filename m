@@ -1,35 +1,85 @@
-From: andy@warmcat.com (Andy Green)
-Date: Fri, 25 Sep 2009 08:26:12 +0100
-Subject: SPI, DMA and an i.MX31
-In-Reply-To: <87077C4F48609F4392621D9F99DDE20901202E06@tesla.star.galaxy.io>
-References: <4AB8F9AE.1070006@billgatliff.com>	<59b21cf20909221245i355ccea0r44737e9112fd17c0@mail.gmail.com>
-	<87077C4F48609F4392621D9F99DDE20901202E06@tesla.star.galaxy.io>
-Message-ID: <4ABC7094.9000701@warmcat.com>
+From: m.gruber@tirol.com (Manfred Gruber)
+Date: Fri, 25 Sep 2009 09:42:54 +0200
+Subject: [PATCH 1/2] ep93xx/micro9: Update maintainer
+Message-ID: <200909250942.55283.m.gruber@tirol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24/09 11:51, Somebody in the thread at some point said:
+hi !
+here is my Acked-by!
+regards manfred
 
-Hi Rene -
+ARM: Update Contec Micro9 maintainer and add entry in MAINTAINERS
 
-> The drivers/mmc/host/mxcmmc.c from 2.6.31 uses some different dma api: all
-> those fkt start with 'imx_', the sdma's from the ltib have a 'mxc' prefix.
-> I tried to match them and wrap those 'mxc' in defines, mapping them to the
-> 'imx' ones. Unfortunately for some fkts I didn't find a matching 'mxc' one.
-> The driver compiles, but I guess it's pretty useless the way it is. May be
-> I should have looked to the driver version in ltib, instead.
->
-> After that I tried to register a SDMA channel with a device. As far as I
-> can see that works. The Registered channel shows under
-> '/proc/sdma/channels'. Freeing that also works.
->
-> Next: Will try to start a SDMA transfer with SPI.
+Signed-off-by: Hubert Feurstein <hubert.feurstein@contec.at>
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Acked-by: Manfred Gruber <m.gruber@tirol.com>
+Cc: Manfred Gruber <m.gruber@tirol.com>
+Cc: Ryan Mallon <ryan@bluewatersys.com>
+---
+ MAINTAINERS                   |    5 +++++
+ arch/arm/mach-ep93xx/micro9.c |   10 ++++++----
+ 2 files changed, 11 insertions(+), 4 deletions(-)
 
-Thanks a lot for taking a look at it anyway.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 7c1c0b0..1ba98ac 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -576,6 +576,11 @@ M:	Mike Rapoport <mike@compulab.co.il>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
 
-Since this mxcmmc.c imx_ stuff is platform stuff cover mx1 and mx2, I 
-guess there'll be trouble getting any mx3 DMA stuff accepted that 
-doesn't play along with its existing game or change them all to some 
-more standard method.
++ARM/CONTEC MICRO9 MACHINE SUPPORT
++M:	Hubert Feurstein <hubert.feurstein@contec.at>
++S:	Maintained
++F:	arch/arm/mach-ep93xx/micro9.c
++
+ ARM/CORGI MACHINE SUPPORT
+ M:	Richard Purdie <rpurdie@rpsys.net>
+ S:	Maintained
+diff --git a/arch/arm/mach-ep93xx/micro9.c b/arch/arm/mach-ep93xx/micro9.c
+index 0a313e8..72e7a7d 100644
+--- a/arch/arm/mach-ep93xx/micro9.c
++++ b/arch/arm/mach-ep93xx/micro9.c
+@@ -2,7 +2,9 @@
+  *  linux/arch/arm/mach-ep93xx/micro9.c
+  *
+  * Copyright (C) 2006 Contec Steuerungstechnik & Automation GmbH
+- *                   Manfred Gruber <manfred.gruber@contec.at>
++ *                    Manfred Gruber <m.gruber@tirol.com>
++ * Copyright (C) 2009 Contec Steuerungstechnik & Automation GmbH
++ *                    Hubert Feurstein <hubert.feurstein@contec.at>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -66,7 +68,7 @@ static void __init micro9h_init_machine(void)
+ }
 
--Andy
+ MACHINE_START(MICRO9, "Contec Hypercontrol Micro9-H")
+-	/* Maintainer: Manfred Gruber <manfred.gruber@contec.at> */
++	/* Maintainer: Hubert Feurstein <hubert.feurstein@contec.at> */
+ 	.phys_io	= EP93XX_APB_PHYS_BASE,
+ 	.io_pg_offst	= ((EP93XX_APB_VIRT_BASE) >> 18) & 0xfffc,
+ 	.boot_params	= EP93XX_SDCE3_PHYS_BASE_SYNC + 0x100,
+@@ -88,7 +90,7 @@ static void __init micro9m_init_machine(void)
+ }
+
+ MACHINE_START(MICRO9M, "Contec Hypercontrol Micro9-M")
+-	/* Maintainer: Manfred Gruber <manfred.gruber@contec.at> */
++	/* Maintainer: Hubert Feurstein <hubert.feurstein@contec.at> */
+ 	.phys_io	= EP93XX_APB_PHYS_BASE,
+ 	.io_pg_offst	= ((EP93XX_APB_VIRT_BASE) >> 18) & 0xfffc,
+ 	.boot_params	= EP93XX_SDCE3_PHYS_BASE_SYNC + 0x100,
+@@ -110,7 +112,7 @@ static void __init micro9l_init_machine(void)
+ }
+
+ MACHINE_START(MICRO9L, "Contec Hypercontrol Micro9-L")
+-	/* Maintainer: Manfred Gruber <manfred.gruber@contec.at> */
++	/* Maintainer: Hubert Feurstein <hubert.feurstein@contec.at> */
+ 	.phys_io	= EP93XX_APB_PHYS_BASE,
+ 	.io_pg_offst	= ((EP93XX_APB_VIRT_BASE) >> 18) & 0xfffc,
+ 	.boot_params	= EP93XX_SDCE3_PHYS_BASE_SYNC + 0x100,
+-- 
+1.6.0.2
+
+-------------------------------------------------------
