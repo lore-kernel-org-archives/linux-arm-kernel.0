@@ -1,30 +1,31 @@
-From: elendil@planet.nl (Frans Pop)
-Date: Fri, 25 Sep 2009 22:17:44 +0200
-Subject: arm: current mainline fails to boot on QNAP TS-109
-In-Reply-To: <alpine.LFD.2.00.0909251547450.4997@xanadu.home>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 25 Sep 2009 16:28:02 -0400 (EDT)
+Subject: [PATCH] make Linux bootable on ARM again
+In-Reply-To: <200909252039.19789.elendil@planet.nl>
 References: <200909252039.19789.elendil@planet.nl>
-	<alpine.LFD.2.00.0909251547450.4997@xanadu.home>
-Message-ID: <200909252217.46021.elendil@planet.nl>
+Message-ID: <alpine.LFD.2.00.0909251613240.4997@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 25 September 2009, you wrote:
-> On Fri, 25 Sep 2009, Frans Pop wrote:
-> > Current mainline kernel fails to boot on my QNAP TS-109 (orion5x).
-> >
-> > It fails immediately after uncompressing the kernel, there are no
-> > other messages on the serial console. The problem was probably
-> > introduced in the last ARM merge:
-> >
-> > v2.6.31-8766-gf25f60b is OK
-> > v2.6.31-8936-g851b147 fails
-> >
-> > If needed I can run a bisect between those commits.
->
-> No need -- I found the screw-up.  Will submit a patch right away.
+Commit 200b812d00 "Clear the exclusive monitor when returning from an 
+exception" broke the vast majority of ARM systems in the wild which are 
+still pre ARMv6.  The kernel is crashing on the first occurrence of an 
+exception due to the removal of the actual return instruction for them.  
+Let's add it back.
 
-Great. I thought someone might, given that it was a fairly small range.
+Signed-off-by: Nicolas Pitre <nico@marvell.com>
+---
 
-> In the mean time just revert commit 200b812d00.
-
-Thanks!
+diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+index e17e3c3..ac34c0d 100644
+--- a/arch/arm/kernel/entry-header.S
++++ b/arch/arm/kernel/entry-header.S
+@@ -83,6 +83,8 @@
+ 	ldr	r0, [sp]
+ 	strex	r1, r2, [sp]			@ clear the exclusive monitor
+ 	ldmib	sp, {r1 - pc}^			@ load r1 - pc, cpsr
++#else
++	ldmia	sp, {r0 - pc}^			@ load r0 - pc, cpsr
+ #endif
+ 	.endm
+ 
