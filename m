@@ -1,23 +1,35 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Fri, 25 Sep 2009 11:15:12 +0200
-Subject: About ARM TCM patch
-In-Reply-To: <4ABC1D1D.6050506@gmail.com>
-References: <4ABC1D1D.6050506@gmail.com>
-Message-ID: <63386a3d0909250215k50f10a44qae55da31f97f99c0@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 25 Sep 2009 06:23:50 -0400
+Subject: [PATCH 4/17] pxa: enable onenand for ttcdkb board
+In-Reply-To: <f17812d70909221102p2e10c0ak41399d706b446940@mail.gmail.com>
+References: <771cded00909142303n18a15e93leaa980e13a1a091a@mail.gmail.com>
+	<f17812d70909221102p2e10c0ak41399d706b446940@mail.gmail.com>
+Message-ID: <771cded00909250323n3597f429ode4c709c2d4c5aca@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/9/25 Peter Chen <hzpeterchen@gmail.com>:
+On Tue, Sep 22, 2009 at 2:02 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
 
-> I read the TCM patch from http://lwn.net/Articles/353032/
-
-Are you trying to use it too?
-
-> 1. After MMU open, the code running at ITCM can't see physical address for
-> register.
+> On Tue, Sep 15, 2009 at 2:03 PM, Haojian Zhuang
+> <haojian.zhuang@gmail.com> wrote:
 >
-> 2. After MMU open, the code can't run at physical addressed ITCM.
+> Mmm... this isn't really a SoC device, this should be somewhere within
+> board code. What about the patch below?
+>
+>
+Hi Eric,
 
-Could this be different between ARM9 (which I use) and ARM11?
+I updated the patch and attached it now.
 
-Linus Walleij
+Thanks
+Haojian
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090925/9c6970f0/attachment-0001.htm>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0003-pxa-enable-onenand-on-ttcdkb-board.patch
+Type: text/x-patch
+Size: 3246 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090925/9c6970f0/attachment-0001.bin>
