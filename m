@@ -1,48 +1,72 @@
-From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Fri, 25 Sep 2009 15:43:13 -0400
-Subject: [PATCH] pxa: support pxa3xx onenand in saar and ttc dkb
-Message-ID: <mailman.33.1253880186.2253.linux-arm-kernel@lists.infradead.org>
+From: dave@chronolytics.com (David F. Carlson)
+Date: Fri, 25 Sep 2009 08:47:18 -0400 (EDT)
+Subject: Announcing s3c64xx XWindows fbdrv w/ XAA+XVideo+HWcursor
+In-Reply-To: <20090924210958.GI31920@trinity.fluff.org>
+Message-ID: <200909251247.n8PClIil011167@chronolytics.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marvell PXA3xx bad block management is supported in pxa3xx onenand
-device driver. Enable it in saar and ttc dkb platform.
+According to Ben Dooks:
+> 
+> On Thu, Sep 24, 2009 at 01:42:20PM -0400, David F. Carlson wrote:
+> > 
+> > S3C6410 based Xwindows fbdev with
+> >    o  XAA accelerated fills, lines, expands, blits, offscreen pixmaps/stipples
+> >    o  Alpha-blended HWCursor 
+> >    o  XVideo Support (using the Samsung Post-Processor colorspace driver)
+> >    o  Tested with the Maemo Mer kernel 2.6.24.7 because...
+> > 
+> Are the necessary changes for the s3cfb postable to the list to start
+> the review process for them?
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
----
- arch/arm/mach-mmp/ttc_dkb.c |    2 +-
- arch/arm/mach-pxa/saar.c    |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+I have a near-term problem which is that I am still developing on 2.6.24.7
+because my attempts to use next-s3c failed to produce an image that would 
+start XWindows.  (SDHC, pwm, lcd support, etc.)  I am not complaining, just
+explaining.  Patching without testing is not a good place to be.
 
-diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
-index 57d0535..dbd8cfd 100644
---- a/arch/arm/mach-mmp/ttc_dkb.c
-+++ b/arch/arm/mach-mmp/ttc_dkb.c
-@@ -100,7 +100,7 @@ static struct resource ttc_dkb_resource_onenand[] = {
- };
+That being said, you seem to have a preferred direction for what should be
+in the s3c-fb.  Allocation of offscreen memory at config time seems doable
+with static testing.  Is a per-screen Kconfig desirable?  How should DBE and
+offscreen memory play nice?  (Or should they be mutually exclusive?)  With 
+a PP handling color space conversion and onscreen bit, I am not sure 
+DBE buys much.
 
- static struct platform_device ttc_dkb_device_onenand = {
--    .name        = "onenand",
-+    .name        = "pxa3xx-onenand",
-     .id        = -1,
-     .dev        = {
-         .platform_data    = &ttc_dkb_onenand_info,
-diff --git a/arch/arm/mach-pxa/saar.c b/arch/arm/mach-pxa/saar.c
-index 8b7ea09..6892867 100644
---- a/arch/arm/mach-pxa/saar.c
-+++ b/arch/arm/mach-pxa/saar.c
-@@ -556,7 +556,7 @@ static struct resource saar_resource_onenand[] = {
- };
+Adding the MMIO mmap interface is also "trivial".  (If it is desirable.
+I will not waste my time if it is "pre-rejected")
 
- static struct platform_device saar_device_onenand = {
--    .name        = "onenand",
-+    .name        = "pxa3xx-onenand",
-     .id        = -1,
-     .dev        = {
-         .platform_data    = &saar_onenand_info,
--- 
-1.5.6.5
+It also appears that even Samsung latests gits omit the g2d driver.  Is the 
+plan to fold that register space into s3c-fb or "something else"?  I need 
+suspend/resume support in the kernel for the XAA to "work".  But a contig
+vaddr mmap of the display controller and g2d dis-contig physical spaces 
+would suit me fine.  We need an answer to "how do we access the g2d space?"
 
---001517741a14b62254047465bad3
-Content-Type: text/html; charset=ISO-8859-1
-Content-Transfer-Encoding: quoted-printable
+I am not a huge fan of the PP driver API, but it works.  I also think that 
+XVideo is the right way for user space to access the PP.  XWindows will "own"
+the device (ie., baseband not shared).  I would be willing to get you diffs 
+for PP (or Samsung could).
+
+>  
+> > This driver is pretty much hardcoded for s3c64xx.  If kernel hooks for 
+> > describing configuration this driver base could be expanded to 
+> > support many s3c variants (with g2d and pp).
+> 
+> It would be good to get the discussion about these items going before
+> we get too much further down the development process.
+
+I have tried to contact Samsung but I get dead-air.
+
+I know you (Ben) and Harald have had some discussion, but I am out of the 
+loop as to how Samsung/Harald/Ben/others want this thing to look when we 
+are done.
+
+I have placed a marker.  
+
+And I am very willing to "get this right".  But part of my problem is that I 
+have access to 6410 only.  I do not understand the differences amongst the 
+10+ devices in the s3c family.  With very few exceptions (Ben? :-) I am not 
+sure any out of Samsung really understands the whole s3c family.
+
+David F. Carlson    Chronolytics, Inc.  Rochester, NY
+mailto:dave at chronolytics.com            http://www.chronolytics.com
+
+"The faster I go, the behinder I get." --Lewis Carroll
