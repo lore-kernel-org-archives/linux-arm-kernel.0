@@ -1,43 +1,25 @@
-From: dave@chronolytics.com (David F. Carlson)
-Date: Fri, 25 Sep 2009 10:08:11 -0400 (EDT)
-Subject: PATCH add MMIO interface to s3c-fb
-Message-ID: <200909251408.n8PE8BxZ011775@chronolytics.com>
+From: yegor_sub1@visionsystems.de (Yegor Yefremov)
+Date: Fri, 25 Sep 2009 14:53:06 +0200
+Subject: [at91sam9g45] DMA driver for AC97 and MCI
+Message-ID: <4ABCBD32.7080408@visionsystems.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+I try to get sound and SD card working on at91sam9g45-ekes development board using linux-next tree. As far as I understand AT_HDMAC is the appropriate DMA driver for ARCH_AT91SAM9G45. I resolved dependencies with this patch, so I could activate it for my platform.
 
-This patch adds the MMIO interface desired by XWindows fbdevHWMapMMIO() call.
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -48,7 +48,7 @@ config DW_DMAC
 
-David F. Carlson    Chronolytics, Inc.  Rochester, NY
-mailto:dave at chronolytics.com            http://www.chronolytics.com
+ config AT_HDMAC
+        tristate "Atmel AHB DMA support"
+-       depends on ARCH_AT91SAM9RL
++       depends on ARCH_AT91SAM9RL || ARCH_AT91SAM9G45
+        select DMA_ENGINE
+        help
+          Support the Atmel AHB DMA controller.  This can be integrated in
 
-"The faster I go, the behinder I get." --Lewis Carroll
+Should this driver be also used for sound driver and MCI? 
 
-------------------------------------------------------------------------------
-commit 92d6acaa6c50e642592be928c425f27b4bf1f8b0
-Author: Dave Carlson <dave@chronolytics.com>
-Date:   Mon Sep 14 18:45:14 2009 -0400
-
-    Forward port from s3cfb driver from Mer 2.6.24.7.
-    --dfc
-
-diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
-index 5a72083..d8c1952 100644
---- a/drivers/video/s3c-fb.c
-+++ b/drivers/video/s3c-fb.c
-@@ -930,6 +930,15 @@ static int __devinit s3c_fb_probe(struct platform_device *pdev)
- 				s3c_fb_release_win(sfb, sfb->windows[win]);
- 			goto err_ioremap;
- 		}
-+		/* 
-+		** The "correct" Xwindows way is for the fb driver to "own" the 
-+		** fb register space.  If the ioctl FBIOGET_FSCREENINFO contains the 
-+		** mmio physical address and extent, then the Xwindows fbdev call 
-+		** fbdevHWMapMMIO() will allow Xwindows to canonically obtain 
-+		** hw registers all using the defined framebuffer interfaces.
-+		*/
-+		sfb->windows[win].info.fix.mmio_start = res->start;
-+		sfb->windows[win].info.fix.mmio_len = resource_size(res);
- 	}
- 
- 	platform_set_drvdata(pdev, sfb);
+Best regards,
+Yegor
