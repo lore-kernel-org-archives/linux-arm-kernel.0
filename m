@@ -1,29 +1,64 @@
-From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Fri, 25 Sep 2009 19:10:44 -0400
-Subject: [PATCH] [MTD] [NAND] pxa3xx_nand: adjust timing on micron flash
-Message-ID: <mailman.37.1253892295.2253.linux-arm-kernel@lists.infradead.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 25 Sep 2009 17:36:15 +0200
+Subject: [at91sam9g45] DMA driver for AC97 and MCI
+In-Reply-To: <4ABCBD32.7080408@visionsystems.de>
+References: <4ABCBD32.7080408@visionsystems.de>
+Message-ID: <4ABCE36F.1000205@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Slow down the tRp of micron flash timing.
+Hi,
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
----
- drivers/mtd/nand/pxa3xx_nand.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Yegor Yefremov :
 
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index d6c9524..2014f4f 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -264,7 +264,7 @@ static struct pxa3xx_nand_timing micron_timing = {
- 	.tWH	= 15,
- 	.tWP	= 25,
- 	.tRH	= 15,
--	.tRP	= 25,
-+	.tRP	= 30,
- 	.tR	= 25000,
- 	.tWHR	= 60,
- 	.tAR	= 10,
+> I try to get sound and SD card working on at91sam9g45-ekes development
+> board using linux-next tree. As far as I understand AT_HDMAC is the
+> appropriate DMA driver for ARCH_AT91SAM9G45.
+
+Correct.
+
+> I resolved dependencies with this patch, so I could activate it for
+> my platform.
+>
+> --- a/drivers/dma/Kconfig
+> +++ b/drivers/dma/Kconfig
+> @@ -48,7 +48,7 @@ config DW_DMAC
+> 
+>  config AT_HDMAC
+>         tristate "Atmel AHB DMA support"
+> -       depends on ARCH_AT91SAM9RL
+> +       depends on ARCH_AT91SAM9RL || ARCH_AT91SAM9G45
+>         select DMA_ENGINE
+>         help
+>           Support the Atmel AHB DMA controller.  This can be integrated in
+
+Well, this patch was waiting for this other to reach mainline:
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=5621/1
+
+It is true that you will need it.
+
+> Should this driver be also used for sound driver and MCI?
+
+Sure. For sound, maybe we will have to conform to the dma cyclic API
+introduced by dw_dmac driver.
+
+For MCI, here is a patch series that goes before the patch that will do
+the link between atmel_mci, at_hdmac and at91sam9g45.
+
+http://lkml.org/lkml/2009/9/17/224
+
+This last patch is not posted to the mailing list yet, I am waiting for
+the others to reach mainline.
+
+I you are interested in it, you can have a preview here:
+ftp://ftp.linux4sam.org/devel/linux/2630_lnx4sam_patchset-tmp_20090828.tgz
+patch named :
+"at91/atmel-mci: inclusion of sd/mmc driver in at91sam9g45 chip and
+board" aka:
+2630_lnx4sam_patchset-tmp/2.6.30-at91-exp-0033-at91-atmel-mci-inclusion-of-sd-mmc-driver-in-at91sa.patch
+
+Hope this helps,
+
+Best regards,
 -- 
-1.5.6.5
+Nicolas Ferre
