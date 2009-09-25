@@ -1,139 +1,128 @@
-From: david-b@pacbell.net (David Brownell)
-Date: Fri, 25 Sep 2009 10:51:34 -0700
-Subject: [PATCH 4/5] at91/USB: USB drivers modifications for at91sam9g10
-In-Reply-To: <4ABC9A4C.8000702@atmel.com>
-References: <1245341772-1689-1-git-send-email-nicolas.ferre@atmel.com>
-	<4AB0D325.9080407@atmel.com> <4ABC9A4C.8000702@atmel.com>
-Message-ID: <200909251051.34916.david-b@pacbell.net>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 25 Sep 2009 14:17:55 -0400
+Subject: [PATCH] sa1111: CodingStyle cleanups
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901D426F5@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 25 September 2009, Nicolas Ferre wrote:
-> Greg,
-> 
-> Please, can you consider the inclusion of this patch. I have no news
-> about it for a long time...
+EXPORT_* macros should follow immediately after the closing function
+brace line.
 
-ISTR either acking this or suggesting it go with the rest
-of the G10 patches ... regardless, seems OK to me now that
-its precursors have merged.
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 
+---
 
-> Here is a link to its patchwork entry:
-> http://patchwork.kernel.org/patch/31173/
-> 
-> Thanks for your help.
-> 
-> Nicolas Ferre :
-> > Hi,
-> > 
-> > Here is a little "ping" about integration of this patch.
-> > 
-> > Nicolas Ferre :
-> >> From: Hong Xu <hong.xu@atmel.com>
-> >>
-> >> Modify both host and gadget USB drivers for at91sam9g10.
-> >> This add a clock management equivalent to at91sam9261 on usb drivers.
-> >> It also add the way of handling gadget pull-ups (like the at91sam9261).
-> > 
-> > I wonder if we can consider its inclusion as at91sam9g10 is now
-> > integrated in mainline.
-> > Do you want me to split this in several pieces for host/gadget split.
-> > 
-> > Thanks.
-> > 
-> >> Signed-off-by: Hong Xu <hong.xu@atmel.com>
-> >> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> >> ---
-> >>  drivers/usb/gadget/at91_udc.c |    6 +++---
-> >>  drivers/usb/host/ohci-at91.c  |   10 +++++-----
-> >>  2 files changed, 8 insertions(+), 8 deletions(-)
-> >>
-> >> diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
-> >> index 0b2bb8f..bfed3d9 100644
-> >> --- a/drivers/usb/gadget/at91_udc.c
-> >> +++ b/drivers/usb/gadget/at91_udc.c
-> >> @@ -892,7 +892,7 @@ static void pullup(struct at91_udc *udc, int is_on)
-> >>  
-> >>  			txvc |= AT91_UDP_TXVC_PUON;
-> >>  			at91_udp_write(udc, AT91_UDP_TXVC, txvc);
-> >> -		} else if (cpu_is_at91sam9261()) {
-> >> +		} else if (cpu_is_at91sam9261() || cpu_is_at91sam9g10()) {
-> >>  			u32	usbpucr;
-> >>  
-> >>  			usbpucr = at91_sys_read(AT91_MATRIX_USBPUCR);
-> >> @@ -910,7 +910,7 @@ static void pullup(struct at91_udc *udc, int is_on)
-> >>  
-> >>  			txvc &= ~AT91_UDP_TXVC_PUON;
-> >>  			at91_udp_write(udc, AT91_UDP_TXVC, txvc);
-> >> -		} else if (cpu_is_at91sam9261()) {
-> >> +		} else if (cpu_is_at91sam9261() || cpu_is_at91sam9g10()) {
-> >>  			u32	usbpucr;
-> >>  
-> >>  			usbpucr = at91_sys_read(AT91_MATRIX_USBPUCR);
-> >> @@ -1692,7 +1692,7 @@ static int __init at91udc_probe(struct platform_device *pdev)
-> >>  		udc->ep[3].maxpacket = 64;
-> >>  		udc->ep[4].maxpacket = 512;
-> >>  		udc->ep[5].maxpacket = 512;
-> >> -	} else if (cpu_is_at91sam9261()) {
-> >> +	} else if (cpu_is_at91sam9261() || cpu_is_at91sam9g10()) {
-> >>  		udc->ep[3].maxpacket = 64;
-> >>  	} else if (cpu_is_at91sam9263()) {
-> >>  		udc->ep[0].maxpacket = 64;
-> >> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-> >> index b29b0fe..fb64def 100644
-> >> --- a/drivers/usb/host/ohci-at91.c
-> >> +++ b/drivers/usb/host/ohci-at91.c
-> >> @@ -35,7 +35,7 @@ extern int usb_disabled(void);
-> >>  
-> >>  static void at91_start_clock(void)
-> >>  {
-> >> -	if (cpu_is_at91sam9261())
-> >> +	if (cpu_is_at91sam9261() || cpu_is_at91sam9g10())
-> >>  		clk_enable(hclk);
-> >>  	clk_enable(iclk);
-> >>  	clk_enable(fclk);
-> >> @@ -46,7 +46,7 @@ static void at91_stop_clock(void)
-> >>  {
-> >>  	clk_disable(fclk);
-> >>  	clk_disable(iclk);
-> >> -	if (cpu_is_at91sam9261())
-> >> +	if (cpu_is_at91sam9261() || cpu_is_at91sam9g10())
-> >>  		clk_disable(hclk);
-> >>  	clocked = 0;
-> >>  }
-> >> @@ -142,7 +142,7 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
-> >>  
-> >>  	iclk = clk_get(&pdev->dev, "ohci_clk");
-> >>  	fclk = clk_get(&pdev->dev, "uhpck");
-> >> -	if (cpu_is_at91sam9261())
-> >> +	if (cpu_is_at91sam9261() || cpu_is_at91sam9g10())
-> >>  		hclk = clk_get(&pdev->dev, "hck0");
-> >>  
-> >>  	at91_start_hc(pdev);
-> >> @@ -156,7 +156,7 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
-> >>  	/* Error handling */
-> >>  	at91_stop_hc(pdev);
-> >>  
-> >> -	if (cpu_is_at91sam9261())
-> >> +	if (cpu_is_at91sam9261() || cpu_is_at91sam9g10())
-> >>  		clk_put(hclk);
-> >>  	clk_put(fclk);
-> >>  	clk_put(iclk);
-> >> @@ -193,7 +193,7 @@ static void usb_hcd_at91_remove(struct usb_hcd *hcd,
-> >>  	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
-> >>  	usb_put_hcd(hcd);
-> >>  
-> >> -	if (cpu_is_at91sam9261())
-> >> +	if (cpu_is_at91sam9261() || cpu_is_at91sam9g10())
-> >>  		clk_put(hclk);
-> >>  	clk_put(fclk);
-> >>  	clk_put(iclk);
-> > 
-> > 
-> 
-> 
-> -- 
-> Nicolas Ferre
-> 
-> 
+diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
+index ef12794..8ba7044 100644
+--- a/arch/arm/common/sa1111.c
++++ b/arch/arm/common/sa1111.c
+@@ -1032,6 +1032,7 @@ unsigned int sa1111_pll_clock(struct sa1111_dev *sadev)
+ 
+ 	return __sa1111_pll_clock(sachip);
+ }
++EXPORT_SYMBOL(sa1111_pll_clock);
+ 
+ /**
+  *	sa1111_select_audio_mode - select I2S or AC link mode
+@@ -1059,6 +1060,7 @@ void sa1111_select_audio_mode(struct sa1111_dev *sadev, int mode)
+ 
+ 	spin_unlock_irqrestore(&sachip->lock, flags);
+ }
++EXPORT_SYMBOL(sa1111_select_audio_mode);
+ 
+ /**
+  *	sa1111_set_audio_rate - set the audio sample rate
+@@ -1083,6 +1085,7 @@ int sa1111_set_audio_rate(struct sa1111_dev *sadev, int rate)
+ 
+ 	return 0;
+ }
++EXPORT_SYMBOL(sa1111_set_audio_rate);
+ 
+ /**
+  *	sa1111_get_audio_rate - get the audio sample rate
+@@ -1100,6 +1103,7 @@ int sa1111_get_audio_rate(struct sa1111_dev *sadev)
+ 
+ 	return __sa1111_pll_clock(sachip) / (256 * div);
+ }
++EXPORT_SYMBOL(sa1111_get_audio_rate);
+ 
+ void sa1111_set_io_dir(struct sa1111_dev *sadev,
+ 		       unsigned int bits, unsigned int dir,
+@@ -1128,6 +1132,7 @@ void sa1111_set_io_dir(struct sa1111_dev *sadev,
+ 	MODIFY_BITS(gpio + SA1111_GPIO_PCSDR, (bits >> 16) & 255, sleep_dir >> 16);
+ 	spin_unlock_irqrestore(&sachip->lock, flags);
+ }
++EXPORT_SYMBOL(sa1111_set_io_dir);
+ 
+ void sa1111_set_io(struct sa1111_dev *sadev, unsigned int bits, unsigned int v)
+ {
+@@ -1142,6 +1147,7 @@ void sa1111_set_io(struct sa1111_dev *sadev, unsigned int bits, unsigned int v)
+ 	MODIFY_BITS(gpio + SA1111_GPIO_PCDWR, (bits >> 16) & 255, v >> 16);
+ 	spin_unlock_irqrestore(&sachip->lock, flags);
+ }
++EXPORT_SYMBOL(sa1111_set_io);
+ 
+ void sa1111_set_sleep_io(struct sa1111_dev *sadev, unsigned int bits, unsigned int v)
+ {
+@@ -1156,6 +1162,7 @@ void sa1111_set_sleep_io(struct sa1111_dev *sadev, unsigned int bits, unsigned i
+ 	MODIFY_BITS(gpio + SA1111_GPIO_PCSSR, (bits >> 16) & 255, v >> 16);
+ 	spin_unlock_irqrestore(&sachip->lock, flags);
+ }
++EXPORT_SYMBOL(sa1111_set_sleep_io);
+ 
+ /*
+  * Individual device operations.
+@@ -1176,6 +1183,7 @@ void sa1111_enable_device(struct sa1111_dev *sadev)
+ 	sa1111_writel(val | sadev->skpcr_mask, sachip->base + SA1111_SKPCR);
+ 	spin_unlock_irqrestore(&sachip->lock, flags);
+ }
++EXPORT_SYMBOL(sa1111_enable_device);
+ 
+ /**
+  *	sa1111_disable_device - disable an on-chip SA1111 function block
+@@ -1192,6 +1200,7 @@ void sa1111_disable_device(struct sa1111_dev *sadev)
+ 	sa1111_writel(val & ~sadev->skpcr_mask, sachip->base + SA1111_SKPCR);
+ 	spin_unlock_irqrestore(&sachip->lock, flags);
+ }
++EXPORT_SYMBOL(sa1111_disable_device);
+ 
+ /*
+  *	SA1111 "Register Access Bus."
+@@ -1259,17 +1268,20 @@ struct bus_type sa1111_bus_type = {
+ 	.suspend	= sa1111_bus_suspend,
+ 	.resume		= sa1111_bus_resume,
+ };
++EXPORT_SYMBOL(sa1111_bus_type);
+ 
+ int sa1111_driver_register(struct sa1111_driver *driver)
+ {
+ 	driver->drv.bus = &sa1111_bus_type;
+ 	return driver_register(&driver->drv);
+ }
++EXPORT_SYMBOL(sa1111_driver_register);
+ 
+ void sa1111_driver_unregister(struct sa1111_driver *driver)
+ {
+ 	driver_unregister(&driver->drv);
+ }
++EXPORT_SYMBOL(sa1111_driver_unregister);
+ 
+ static int __init sa1111_init(void)
+ {
+@@ -1290,16 +1302,3 @@ module_exit(sa1111_exit);
+ 
+ MODULE_DESCRIPTION("Intel Corporation SA1111 core driver");
+ MODULE_LICENSE("GPL");
+-
+-EXPORT_SYMBOL(sa1111_select_audio_mode);
+-EXPORT_SYMBOL(sa1111_set_audio_rate);
+-EXPORT_SYMBOL(sa1111_get_audio_rate);
+-EXPORT_SYMBOL(sa1111_set_io_dir);
+-EXPORT_SYMBOL(sa1111_set_io);
+-EXPORT_SYMBOL(sa1111_set_sleep_io);
+-EXPORT_SYMBOL(sa1111_enable_device);
+-EXPORT_SYMBOL(sa1111_disable_device);
+-EXPORT_SYMBOL(sa1111_pll_clock);
+-EXPORT_SYMBOL(sa1111_bus_type);
+-EXPORT_SYMBOL(sa1111_driver_register);
+-EXPORT_SYMBOL(sa1111_driver_unregister); 
