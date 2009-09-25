@@ -1,35 +1,29 @@
-From: dhylands@gmail.com (Dave Hylands)
-Date: Thu, 24 Sep 2009 22:04:24 -0700
-Subject: About ARM TCM patch
-In-Reply-To: <4ABC1D1D.6050506@gmail.com>
-References: <4ABC1D1D.6050506@gmail.com>
-Message-ID: <c32efac40909242204x53761880w37af72f9e93b7b0c@mail.gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Fri, 25 Sep 2009 09:07:10 +0300
+Subject: Problem with s3c24xx pwm driver
+In-Reply-To: <20090924203437.GA25389@n2100.arm.linux.org.uk>
+References: <200909231824.11671.anarsoul@gmail.com>
+	<200909241733.29167.anarsoul@gmail.com>
+	<20090924203437.GA25389@n2100.arm.linux.org.uk>
+Message-ID: <200909250907.16868.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+? ????????? ?? 24 ???????? 2009 23:34:37 ????? Russell King - ARM Linux 
+???????:
 
-On Thu, Sep 24, 2009 at 6:30 PM, Peter Chen <hzpeterchen@gmail.com> wrote:
-> Dear ML,
->
-> I read the TCM patch from http://lwn.net/Articles/353032/
->
-> It said:
-> Code executing inside the ITCM does not "see" any MMU mappings
-> and e.g. register accesses must be made to physical addresses.
->
-> I am doubt it is correctly for all systems, at my SoC platform(arm1136JF,
-> v6), the situation is difference.
->
-> 1. After MMU open, the code running at ITCM can't see physical address for
-> register.
->
-> 2. After MMU open, the code can't run at physical addressed ITCM.
+> Is it LED or is it CCFL?  If it's CCFL, it needs to be 'struck' and then
+> you can reduce the intensity level - by going to max brightness when you
+> turn it on and then back the intensity down.
+> 
+> That's fairly normal for CCFL stuff.
 
-That's my understanding as well. Once the MMU is enabled, ALL access
-go through the MMU, whether they originate from the ITCM or not.
-
--- 
-Dave Hylands
-Shuswap, BC, Canada
-http://www.DaveHylands.com/
+I'm not sure, and I don't know how to check it without disassembling PDA. 
+Anyway, thanks for suggestion, let's assume that backlight is CCFL.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090925/0528c02a/attachment.sig>
