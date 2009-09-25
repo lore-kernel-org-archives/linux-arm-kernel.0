@@ -1,23 +1,35 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Fri, 25 Sep 2009 10:12:21 +0300
-Subject: [PATCH 06/12] omap: mailbox: Flush posted write when acking
-	mailbox irq
-In-Reply-To: <20090924233920.6065.16789.stgit@localhost>
-References: <20090924233027.6065.95725.stgit@localhost>
-	<20090924233920.6065.16789.stgit@localhost>
-Message-ID: <4ABC6D55.3000108@gmail.com>
+From: andy@warmcat.com (Andy Green)
+Date: Fri, 25 Sep 2009 08:26:12 +0100
+Subject: SPI, DMA and an i.MX31
+In-Reply-To: <87077C4F48609F4392621D9F99DDE20901202E06@tesla.star.galaxy.io>
+References: <4AB8F9AE.1070006@billgatliff.com>	<59b21cf20909221245i355ccea0r44737e9112fd17c0@mail.gmail.com>
+	<87077C4F48609F4392621D9F99DDE20901202E06@tesla.star.galaxy.io>
+Message-ID: <4ABC7094.9000701@warmcat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/25/2009 02:39 AM, Tony Lindgren wrote:
-> From: Hiroshi DOYU<Hiroshi.DOYU@nokia.com>
+On 09/24/09 11:51, Somebody in the thread at some point said:
+
+Hi Rene -
+
+> The drivers/mmc/host/mxcmmc.c from 2.6.31 uses some different dma api: all
+> those fkt start with 'imx_', the sdma's from the ltib have a 'mxc' prefix.
+> I tried to match them and wrap those 'mxc' in defines, mapping them to the
+> 'imx' ones. Unfortunately for some fkts I didn't find a matching 'mxc' one.
+> The driver compiles, but I guess it's pretty useless the way it is. May be
+> I should have looked to the driver version in ltib, instead.
 >
-> The only way to flush posted write to L4 bus is to do a read back
-> of the same register right after the write.
+> After that I tried to register a SDMA channel with a device. As far as I
+> can see that works. The Registered channel shows under
+> '/proc/sdma/channels'. Freeing that also works.
+>
+> Next: Will try to start a SDMA transfer with SPI.
 
-Just curious, is it really necessary to read back the _same_ register?
-Would reading back any L4 bus-related register be sufficient?
+Thanks a lot for taking a look at it anyway.
 
--- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+Since this mxcmmc.c imx_ stuff is platform stuff cover mx1 and mx2, I 
+guess there'll be trouble getting any mx3 DMA stuff accepted that 
+doesn't play along with its existing game or change them all to some 
+more standard method.
+
+-Andy
