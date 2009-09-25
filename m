@@ -1,38 +1,42 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 25 Sep 2009 06:24:47 -0400
-Subject: [PATCH 5/17] pxa: enable onenand for saar
-In-Reply-To: <f17812d70909221113n5e9c3632y61b440b7df90e7ae@mail.gmail.com>
-References: <771cded00909142306s1f41ffbfv356cae2f2962006b@mail.gmail.com>
-	<f17812d70909221113n5e9c3632y61b440b7df90e7ae@mail.gmail.com>
-Message-ID: <771cded00909250324w2a25e378q31122f385c6d1d4d@mail.gmail.com>
+Date: Fri, 25 Sep 2009 06:29:30 -0400
+Subject: [PATCH 7/17] pxa: move pxa3xx_nand.h into plat directory
+In-Reply-To: <f17812d70909221122m4424b281rad6e1aa6ef42f441@mail.gmail.com>
+References: <771cded00909142307n48c09745g87dfc0a714f80dec@mail.gmail.com>
+	<f17812d70909221122m4424b281rad6e1aa6ef42f441@mail.gmail.com>
+Message-ID: <771cded00909250329n1c03056ck7c0c32688b86e19f@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2009 at 2:13 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+On Tue, Sep 22, 2009 at 2:22 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
 
-> On Tue, Sep 15, 2009 at 2:06 PM, Haojian Zhuang
+> On Tue, Sep 15, 2009 at 2:07 PM, Haojian Zhuang
 > <haojian.zhuang@gmail.com> wrote:
-> > From a01a633e9d3c914c36eb459a91f7cbc8a7f51559 Mon Sep 17 00:00:00 2001
+> > From 39a5943694214654908cb8754a964c772cd4e115 Mon Sep 17 00:00:00 2001
 > > From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> > Date: Wed, 9 Sep 2009 20:42:06 +0800
-> > Subject: [PATCH] pxa: enable onenand for saar
+> > Date: Thu, 10 Sep 2009 13:55:23 +0800
+> > Subject: [PATCH] pxa: move pxa3xx_nand.h into plat directory
+> >
+> > Since the same nand controller is shared between ARCH_PXA and ARCH_MMP.
+> Move
+> > the pxa3xx_nand.h from mach directory to plat directoy.
 > >
 > > Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 >
-> See my previous post on onenand on ttc-dkb.
+> Applied.
 >
 
-Updated and attached the patch.
+Updated the patch.
 
 Thanks
 Haojian
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090925/8499af89/attachment.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090925/a68e2443/attachment-0001.htm>
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: 0004-pxa-enable-onenand-on-saar-platform.patch
+Name: 0006-pxa-move-pxa3xx_nand.h-into-plat-directory.patch
 Type: text/x-patch
-Size: 3537 bytes
+Size: 7932 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090925/8499af89/attachment.bin>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090925/a68e2443/attachment-0001.bin>
