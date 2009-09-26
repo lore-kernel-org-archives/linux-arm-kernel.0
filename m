@@ -1,19 +1,35 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 26 Sep 2009 11:54:47 +0200
-Subject: [PATCH 1/4] [INPUT][KEYBOARD] Samsung keypad driver support
-In-Reply-To: <1252494663-17624-1-git-send-email-jsgood.yang@samsung.com>
-References: <1252494663-17624-1-git-send-email-jsgood.yang@samsung.com>
-Message-ID: <20090926095447.GC1331@ucw.cz>
+Date: Sat, 26 Sep 2009 11:55:55 +0200
+Subject: something wrong in drivers/power
+Message-ID: <20090926095555.GG1331@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2009-09-09 20:11:03, jsgood.yang at samsung.com wrote:
-> From: Jinsung Yang <jsgood.yang@samsung.com>
-> 
-> Add support for Samsung matrix keypad driver
 
-Could generic matrix keyboard driver be used instead?
-							Pavel
+Tosa battery driver seems to be confused about its own identity.
+
+
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
+
+diff -ur power.ofic/tosa_battery.c power/tosa_battery.c
+--- linux/drivers/power.ofic/tosa_battery.c	2009-09-06 08:56:36.000000000 +0200
++++ linux/drivers/power/tosa_battery.c	2009-09-15 15:14:08.000000000 +0200
+@@ -459,7 +459,7 @@
+ }
+ 
+ static struct platform_driver tosa_bat_driver = {
+-	.driver.name	= "wm97xx-battery",
++	.driver.name	= "tosa-battery",
+ 	.driver.owner	= THIS_MODULE,
+ 	.probe		= tosa_bat_probe,
+ 	.remove		= __devexit_p(tosa_bat_remove),
+@@ -483,4 +483,4 @@
+ MODULE_LICENSE("GPL");
+ MODULE_AUTHOR("Dmitry Baryshkov");
+ MODULE_DESCRIPTION("Tosa battery driver");
+-MODULE_ALIAS("platform:wm97xx-battery");
++MODULE_ALIAS("platform:tosa-battery");
+
 
 -- 
 (english) http://www.livejournal.com/~pavelmachek
