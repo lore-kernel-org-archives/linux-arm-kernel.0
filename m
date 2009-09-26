@@ -1,43 +1,34 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 26 Sep 2009 21:14:08 +0200
+From: joe@perches.com (Joe Perches)
+Date: Sat, 26 Sep 2009 12:30:03 -0700
 Subject: [PATCH] MAINTAINERS: ARM/Palm file patterns
-In-Reply-To: <1253990824.7128.25.camel@Joe-Laptop.home>
+In-Reply-To: <200909262114.08994.marek.vasut@gmail.com>
 References: <1253990824.7128.25.camel@Joe-Laptop.home>
-Message-ID: <200909262114.08994.marek.vasut@gmail.com>
+	<200909262114.08994.marek.vasut@gmail.com>
+Message-ID: <1253993403.7128.38.camel@Joe-Laptop.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne So 26. z??? 2009 20:47:04 Joe Perches napsal(a):
-> Hi Marek.
+On Sat, 2009-09-26 at 21:14 +0200, Marek Vasut wrote:
+> Dne So 26. z??? 2009 20:47:04 Joe Perches napsal(a):
+> > For the section you maintain, are these file patterns correct?
+> > +F:	arch/arm/mach-pxa/include/mach/palm*
+> > +F:	arch/arm/mach-pxa/palm*
+> 
+> This might cause trouble, we're working on renaming treo680 (as below) to 
+> palmtreo so palm* wont do ... you'll possibly have to list them or something. 
+> Otherwise ok.
 
-Hi!
-sorry I missed your last mail.
-> 
-> For the section you maintain, are these file patterns correct?
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index c450f3a..f91ac61 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -741,11 +741,12 @@ M:	Dirk Opfer <dirk@opfer-online.de>
->  S:	Maintained
-> 
->  ARM/PALMTX,PALMT5,PALMLD,PALMTE2,PALMTC SUPPORT
-> -P:	Marek Vasut
-> -M:	marek.vasut at gmail.com
-> +M:	Marek Vasut <marek.vasut@gmail.com>
->  L:	linux-arm-kernel at lists.infradead.org
->  W:	http://hackndev.com
->  S:	Maintained
-> +F:	arch/arm/mach-pxa/include/mach/palm*
-> +F:	arch/arm/mach-pxa/palm*
+if/when you do, a specific list could be used
+or maybe exclude patterns could be added
 
-This might cause trouble, we're working on renaming treo680 (as below) to 
-palmtreo so palm* wont do ... you'll possibly have to list them or something. 
-Otherwise ok.
+F:	arch/arm/mach-pxa/palmtx.c
+F:	arch/arm/mach-pxa/palmt5.c
+F:	arch/arm/mach-pxa/palmld.c
+F:	arch/arm/mach-pxa/palmte2.c
+F:	arch/arm/mach-pxa/palmtc.c
 
-Cheers!
-> 
->  ARM/PALM TREO 680 SUPPORT
->  M:	Tomas Cech <sleep_walker@suse.cz>
-> 
+or
+
+F:	arch/arm/mach-pxa/palm*
+X:	arch/arm/mach-pxa/palmtreo*
+X:	arch/arm/mach-pxa/palmz72*
