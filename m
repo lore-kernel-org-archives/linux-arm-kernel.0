@@ -1,55 +1,75 @@
 From: jaswinder@kernel.org (Jaswinder Singh Rajput)
-Date: Sat, 26 Sep 2009 20:51:55 +0530
-Subject: [PATCH] ARM: Remove unused CONFIG reference DEBUG_S3C_PORT
-In-Reply-To: <alpine.LFD.2.00.0909261002400.19973@localhost>
-References: <1253973658.4568.10.camel@ht.satnam>
-	<alpine.LFD.2.00.0909261002400.19973@localhost>
-Message-ID: <1253978515.4568.50.camel@ht.satnam>
+Date: Sat, 26 Sep 2009 20:58:00 +0530
+Subject: [PATCH] ARM: Remove unused CONFIG SA1100_H3XXX
+In-Reply-To: <20090926170311.0a87fac8.kristoffer.ericson@gmail.com>
+References: <1253976606.4568.42.camel@ht.satnam>
+	<20090926170311.0a87fac8.kristoffer.ericson@gmail.com>
+Message-ID: <1253978880.4568.56.camel@ht.satnam>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Robert,
-
-On Sat, 2009-09-26 at 10:03 -0400, Robert P. J. Day wrote:
-> On Sat, 26 Sep 2009, Jaswinder Singh Rajput wrote:
+On Sat, 2009-09-26 at 17:03 +0200, Kristoffer Ericson wrote:
+> On Sat, 26 Sep 2009 20:20:06 +0530
+> Jaswinder Singh Rajput <jaswinder@kernel.org> wrote:
 > 
-> >
-> > Remove unused CONFIG reference DEBUG_S3C_PORT from defconfig
-> >
-> > Reported-by: Robert P. J. Day <rpjday@crashcourse.ca>
-> > Signed-off-by: Jaswinder Singh Rajput <jaswinderrajput@gmail.com>
-> > Cc: Byungho Min <bhmin@samsung.com>
-> > Cc: Ben Dooks <ben-linux@fluff.org>
-> > Cc: Russell King <rmk+lkml@arm.linux.org.uk>
-> > ---
-> >  arch/arm/configs/s5pc100_defconfig |    1 -
-> >  1 files changed, 0 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/arch/arm/configs/s5pc100_defconfig b/arch/arm/configs/s5pc100_defconfig
-> > index b0d7d3d..94edde5 100644
-> > --- a/arch/arm/configs/s5pc100_defconfig
-> > +++ b/arch/arm/configs/s5pc100_defconfig
-> > @@ -859,7 +859,6 @@ CONFIG_DEBUG_ERRORS=y
-> >  # CONFIG_DEBUG_STACK_USAGE is not set
-> >  CONFIG_DEBUG_LL=y
-> >  # CONFIG_DEBUG_ICEDCC is not set
-> > -CONFIG_DEBUG_S3C_PORT=y
-> >  CONFIG_DEBUG_S3C_UART=0
+> > 
+> > Removed unused CONFIG SA1100_H3XXX from Kconfig and defconfig
 > 
->   no, there is no point removing redundant entries from any of the
-> defconfig files -- those files will eventually be rebuilt
-> automatically at some point.
+> Without applying it to check for formatting stuff it looks
+> resonable. Is 3600 in any good shape nowadays?
 > 
 
-Who will build defconfig for old architectures like h3600_defconfig and
-others.
-
-If we are removing unused CONFIG from Kconfig then there is no point of
-leaving those entries in defconfigs after all git grep keep those
-entries and lead to confusions sooner or later. Yeah, for this case
-where we have only entry in defconfig you sounds good but let
-maintainers will decide it :-)
+I worked with many H3600 developers in Year 2000-2003, I was searching
+their names in 'MAINTAINERS' but not able to found any. I have no idea
+what is the status of H3600 now-a-days.
 
 Thanks,
 --
 JSR
+
+> > 
+> > Reported-by: Robert P. J. Day <rpjday@crashcourse.ca>
+> > Signed-off-by: Jaswinder Singh Rajput <jaswinderrajput@gmail.com>
+> > Cc: Dmitry Artamonow <mad_soft@inbox.ru>
+> > Cc: Philipp Zabel <philipp.zabel@gmail.com>
+> > Cc: Kristoffer Ericson <kristoffer.ericson@gmail.com>
+> > Cc: Russell King <rmk+lkml@arm.linux.org.uk>
+> > ---
+> >  arch/arm/configs/h3600_defconfig |    1 -
+> >  arch/arm/mach-sa1100/Kconfig     |    5 -----
+> >  2 files changed, 0 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/arch/arm/configs/h3600_defconfig b/arch/arm/configs/h3600_defconfig
+> > index 1502957..f6aed77 100644
+> > --- a/arch/arm/configs/h3600_defconfig
+> > +++ b/arch/arm/configs/h3600_defconfig
+> > @@ -90,7 +90,6 @@ CONFIG_ARCH_SA1100=y
+> >  # CONFIG_SA1100_COLLIE is not set
+> >  # CONFIG_SA1100_H3100 is not set
+> >  CONFIG_SA1100_H3600=y
+> > -CONFIG_SA1100_H3XXX=y
+> >  # CONFIG_SA1100_BADGE4 is not set
+> >  # CONFIG_SA1100_JORNADA720 is not set
+> >  # CONFIG_SA1100_HACKKIT is not set
+> > diff --git a/arch/arm/mach-sa1100/Kconfig b/arch/arm/mach-sa1100/Kconfig
+> > index 81ffff7..4e5c07f 100644
+> > --- a/arch/arm/mach-sa1100/Kconfig
+> > +++ b/arch/arm/mach-sa1100/Kconfig
+> > @@ -71,11 +71,6 @@ config SA1100_H3600
+> >  	  <http://www.handhelds.org/Compaq/index.html#iPAQ_H3600>
+> >  	  <http://www.compaq.com/products/handhelds/pocketpc/>
+> >  
+> > -config SA1100_H3XXX
+> > -	bool
+> > -	depends on SA1100_H3100 || SA1100_H3600
+> > -	default y
+> > -
+> >  config SA1100_BADGE4
+> >  	bool "HP Labs BadgePAD 4"
+> >  	select SA1111
+> > -- 
+> > 1.6.0.6
+> > 
+> > 
+> 
+> 
