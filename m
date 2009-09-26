@@ -1,38 +1,33 @@
 From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Sat, 26 Sep 2009 21:52:10 +0200
-Subject: [PATCH v2 4/4] iop: implement sched_clock()
-Message-ID: <19134.28906.783581.37290@pilspetsen.it.uu.se>
+Date: Sat, 26 Sep 2009 21:52:45 +0200
+Subject: [PATCH 0/2] n2100: tweaks for tickless operation
+Message-ID: <19134.28941.973482.178035@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a better sched_clock() to the IOP platform,
-implemented using its new clocksource support.
+With the IOP platform converted to use the kernel's generic
+clocksource, clockevent, and time-keeping code, the n2100
+can operate in tickless aka NOHZ mode.
 
-Tested on n2100, compile-tested for all plat-iop machines.
+However, the n2100 has some quirks that cause the clock
+tick rate to remain high in idle mode:
 
-Signed-off-by: Mikael Pettersson <mikpe@it.uu.se>
----
-Changes v1 -> v2:
-* implemented sched_clock()
+1. XINT1 may be connected to the second UHCI controller,
+   forcing the serial driver core to monitor the console
+   UART via a high-frequency timer; this is addressed by
+   patch 1/2 in this series.
+2. The power button is sampled via a 10 Hz timer;
+   this is addressed by patch 2/2 in this series.
+3. The USB UHCI_HCD driver monitors the root hub via
+   interrupts or a medium-frequency (at least 10 Hz
+   it seems) timer. To make it disable the timer and
+   use interrupts, it is required to enable CONFIG_PM.
+   However, CONFIG_PM is disabled in iop32x_defconfig
+   and many other arm defconfigs.
 
- arch/arm/plat-iop/time.c |    8 ++++++++
- 1 file changed, 8 insertions(+)
+Much of this was discovered via /proc/timer_stats.
 
-diff -rupN linux-2.6.31.arm-iop-3-generictime-v2/arch/arm/plat-iop/time.c linux-2.6.31.arm-iop-4-sched_clock/arch/arm/plat-iop/time.c
---- linux-2.6.31.arm-iop-3-generictime-v2/arch/arm/plat-iop/time.c	2009-09-26 17:25:09.000000000 +0200
-+++ linux-2.6.31.arm-iop-4-sched_clock/arch/arm/plat-iop/time.c	2009-09-26 17:24:29.000000000 +0200
-@@ -66,6 +66,14 @@ static void __init iop_clocksource_set_h
- }
- 
- /*
-+ * IOP sched_clock() implementation via its clocksource.
-+ */
-+unsigned long long sched_clock(void)
-+{
-+	return cyc2ns(&iop_clocksource, iop_clocksource_read(NULL));
-+}
-+
-+/*
-  * IOP clockevents (interrupting timer 0).
-  */
- static int iop_set_next_event(unsigned long delta,
+With these tweaks enabled my n2100 averages about 3.1
+timer interrupts per second in idle.
+
+/Mikael
