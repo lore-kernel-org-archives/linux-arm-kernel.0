@@ -1,45 +1,70 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Sat, 26 Sep 2009 13:39:12 +0530
-Subject: OMAP4430 build broken on latest mainline/linux-omap head
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02BADABC8A@dbde02.ent.ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 26 Sep 2009 13:07:39 +0530
+Subject: [PATCH] ARM: OMAP4: Fix build break because of merge conflict
+Message-ID: <mailman.40.1253952573.2253.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
-OMAP4430 board build is breaking on the latest mainline head because of couple of issues.
-1. The serial.c merge conflict issue below wasn't fixed correctly :(
-Related link:
+On the latest mainline head 2.6.31 (commit:6d7f18f6), OMAP4430 board
+build is broken. This was mainly because of merge conflict which wasn't
+resolved correctly.
+
+The related patch and issue was discussed here.
 http://article.gmane.org/gmane.linux.ports.arm.omap/23341
 
-2. Pauls below series breaks build as well. 
-[PATCH 00/13] OMAP PM, clock,	and SDRC updates for the 2.6.32 merge window
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/serial.c |   14 ++------------
+ 1 files changed, 2 insertions(+), 12 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+index 3a529c7..54dfeb5 100644
+--- a/arch/arm/mach-omap2/serial.c
++++ b/arch/arm/mach-omap2/serial.c
+@@ -109,16 +109,6 @@ static struct plat_serial8250_port serial_platform_dat=
+a2[] =3D {
+ 		.regshift	=3D 2,
+ 		.uartclk	=3D OMAP24XX_BASE_BAUD * 16,
+ 	}, {
+-#ifdef CONFIG_ARCH_OMAP4
+-		.membase	=3D IO_ADDRESS(OMAP_UART4_BASE),
+-		.mapbase	=3D OMAP_UART4_BASE,
+-		.irq		=3D 70,
+-		.flags		=3D UPF_BOOT_AUTOCONF,
+-		.iotype		=3D UPIO_MEM,
+-		.regshift	=3D 2,
+-		.uartclk	=3D OMAP24XX_BASE_BAUD * 16,
+-	}, {
+-#endif
+ 		.flags		=3D 0
+ 	}
+ };
+@@ -126,7 +116,7 @@ static struct plat_serial8250_port serial_platform_data=
+2[] =3D {
+ #ifdef CONFIG_ARCH_OMAP4
+ static struct plat_serial8250_port serial_platform_data3[] =3D {
+ 	{
+-		.membase	=3D IO_ADDRESS(OMAP_UART4_BASE),
++		.membase	=3D OMAP2_IO_ADDRESS(OMAP_UART4_BASE),
+ 		.mapbase	=3D OMAP_UART4_BASE,
+ 		.irq		=3D 70,
+ 		.flags		=3D UPF_BOOT_AUTOCONF,
+@@ -579,7 +569,7 @@ static struct omap_uart_state omap_uart[OMAP_MAX_NR_POR=
+TS] =3D {
+ 	{
+ 		.pdev =3D {
+ 			.name			=3D "serial8250",
+-			.id			=3D 3
++			.id			=3D 3,
+ 			.dev			=3D {
+ 				.platform_data	=3D serial_platform_data3,
+ 			},
+--=20
+1.5.4.7
 
-Paul,
-Can you fix the same please? I don't have the correct " cm-regbits-4xxx.h" file to generate the patch. 
+Thanks !!
 
-***************************************************
-CC      arch/arm/mach-omap2/control.o
-  CC      arch/arm/mach-omap2/mux.o
-  CC      arch/arm/mach-omap2/devices.o
-  CC      arch/arm/mach-omap2/serial.o
-  CC      arch/arm/mach-omap2/gpmc.o
-  CC      arch/arm/mach-omap2/timer-gp.o
-  CC      arch/arm/mach-omap2/omap-smp.o
-  AS      arch/arm/mach-omap2/omap-headsmp.o
-  CC      arch/arm/mach-omap2/timer-mpu.o
-  CC      arch/arm/mach-omap2/cm4xxx.o
-arch/arm/mach-omap2/cm4xxx.c:25:29: error: cm-regbits-4xxx.h: No such file or directory
-arch/arm/mach-omap2/cm4xxx.c: In function 'omap4_cm_wait_idlest_ready':
-arch/arm/mach-omap2/cm4xxx.c:61: error: implicit declaration of function 'omap4_cm_read_mod_reg'
-arch/arm/mach-omap2/cm4xxx.c:62: error: 'OMAP4_CM_CLKCTRL_DREG' undeclared (first use in this function)
-arch/arm/mach-omap2/cm4xxx.c:62: error: (Each undeclared identifier is reported only once
-arch/arm/mach-omap2/cm4xxx.c:62: error: for each function it appears in.)
-make[1]: *** [arch/arm/mach-omap2/cm4xxx.o] Error 1
-make: *** [arch/arm/mach-omap2] Error 2
-
-*****************************************************
-
-
-Tony,
-Patch regarding one 1. is below.
+Regards,
+Santosh
