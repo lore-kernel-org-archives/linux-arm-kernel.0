@@ -1,45 +1,64 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 25 Sep 2009 17:09:09 -0400 (EDT)
-Subject: [PATCH] Fix booting pre-ARM6 machines
-In-Reply-To: <1253912064-9444-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1253912064-9444-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <alpine.LFD.2.00.0909251703530.4997@xanadu.home>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Sat, 26 Sep 2009 10:00:29 +0800
+Subject: [PATCH 1/5] pxa3xx_nand: enable PXA3xx bad block management
+In-Reply-To: <69f617130909251004y2a17cdetb45f6022a37b4249@mail.gmail.com>
+References: <771cded00909250457w19686a53obdc178488368dd43@mail.gmail.com>
+	<69f617130909251004y2a17cdetb45f6022a37b4249@mail.gmail.com>
+Message-ID: <771cded00909251900v7ee60bf6uf4c5724075c65826@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 25 Sep 2009, Uwe Kleine-K?nig wrote:
+On Sat, Sep 26, 2009 at 1:04 AM, Mok Keith <ek9852@gmail.com> wrote:
+> Hi,
+>
+> Any reason to limit the max slot to 40 (PXA_MAX_SLOT). It seems the
+> bad block management scheme is not scalable and have a limitation of
+> up to 256M bytes flash size only. (256M, 128kB per block = 2048 blocks
+> = 40 bad blocks)
 
-> Commit 200b812d0084f800bc52465e273b118ff5f8141f includes the following
-> hunk:
-> 
-> diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
-> index a4eaf4f..e17e3c3 100644
-> --- a/arch/arm/kernel/entry-header.S
-> +++ b/arch/arm/kernel/entry-header.S
-> @@ -76,13 +76,25 @@
->  #ifndef CONFIG_THUMB2_KERNEL
->  	.macro	svc_exit, rpsr
->  	msr	spsr_cxsf, \rpsr
-> +#if defined(CONFIG_CPU_32v6K)
-> +	clrex					@ clear the exclusive monitor
->  	ldmia	sp, {r0 - pc}^			@ load r0 - pc, cpsr
-> +#elif defined (CONFIG_CPU_V6)
-> +	ldr	r0, [sp]
-> +	strex	r1, r2, [sp]			@ clear the exclusive monitor
-> +	ldmib	sp, {r1 - pc}^			@ load r1 - pc, cpsr
-> +#endif
->  	.endm
-> 
->  	.macro	restore_user_regs, fast = 0, offset = 0
-> 
+Each slot is one page. It's used to record the relocation information.
+Each relocation
+information is composed by two items. One is the bad block number, the other one
+is relocated block number. Both of these two items cost 16 bits. For
+the large block
+flash, it can save 511 relocation information at most.
 
-I've sent the same patch directly to Linus already in the hope that 
-he'll merge it before -rc1.
+In the head of slot, a 16-bit magic number and 16-bit total number of
+relocation items are
+recorders.
 
-Also you should avoid quoting patch hunks without indenting them or 
-prefixing them with some quotation mark, otherwise the tools used to 
-apply patches from emails will pick on that "diff" above as if it was 
-the actual patch and discard everything that follows it.
+When the slot is used, the next written will be moved to the next
+slot. It's used to protect
+relocation recorders. If one slot is broken, driver could load the previous one.
 
+When all 40 slots are used, driver could erase the whole block and
+write again. This feature
+isn't enabled in the patch.
+>
+> Also for the calibration of the 2% bad block area, according to most
+> NAND specifications (checked Samsung, Hynix, Micron), nand flash
+> vendor guarantee no more than 20 bad block per 1024 blocks and this
+> rule is apply linearly.
+>
+> Would it be better to use the following otherwise when nand size is
+> greater than 256M the no of bad block entries is not matched to
+> specification:
+> instead of:
+>> + ? ?entries = (entries * 2) / 100;
+>
+> use:
+> + ? ?entries = (entries * 10) / 512;
 
-Nicolas
+Yes, this formula is better. I will use this. Maybe I can use this
+formula whatever
+the flash is beyond 256M or not.
+
+>
+> May I know what is the use of PXA_BEGIN_SLOT ?
+I'm sorry that I removed usage of PXA_BEGIN_SLOT. But I didn't clear the macro
+definition.
+>
+> Keith
+>
+
+Now the new patch is in below.
