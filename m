@@ -1,41 +1,47 @@
-From: rpjday@crashcourse.ca (Robert P. J. Day)
-Date: Sat, 26 Sep 2009 21:51:22 -0400 (EDT)
+From: zmc@lurian.net (Zebediah C. McClure)
+Date: Sat, 26 Sep 2009 21:48:00 -0400
 Subject: [PATCH] ARM: OMAP: Remove unused CONFIG MACH_OMAP_HTCWIZARD
-In-Reply-To: <3d374d00909261836g38ceceb0p3fed39ac62103c33@mail.gmail.com>
+In-Reply-To: <1253974303.4568.13.camel@ht.satnam>
 References: <1253974303.4568.13.camel@ht.satnam>
-	<3d374d00909261836g38ceceb0p3fed39ac62103c33@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.0909262148100.6153@localhost>
+Message-ID: <4ABEC450.6080607@lurian.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 27 Sep 2009, Alistair Buxton wrote:
+This is not unused, this is under current development. 
+(linwizard.sourceforge.net) there is another patch series waiting for 
+rc1 to be cut, tony has already replied to the pull request.
 
-> 2009/9/26 Jaswinder Singh Rajput <jaswinder@kernel.org>:
-> >
-> > Remove unused CONFIG MACH_OMAP_HTCWIZARD from Kconfig
+Best regards,
+ZMC
+
+Jaswinder Singh Rajput wrote:
+> Remove unused CONFIG MACH_OMAP_HTCWIZARD from Kconfig
 >
-> Don't do it please! We're working on it.... board file is coming
-> very soon.
-
-  i've noticed that happening fairly often -- feature infrastructure
-is added before the feature itself.  at the risk of sounding all
-preachy and everything, that sort of thing should be avoided in order
-to keep the history cleaner.  and because that's *exactly* the sort of
-thing that, occasionally, produces the kind of historical cruft that
-leaves unused CONFIG variables lying around when a feature is
-abandoned in midstream.
-
-  ok, i'll stop preaching now.
-
-rday
---
-
-
-========================================================================
-Robert P. J. Day                               Waterloo, Ontario, CANADA
-
-        Linux Consulting, Training and Annoying Kernel Pedantry.
-
-Web page:                                          http://crashcourse.ca
-Twitter:                                       http://twitter.com/rpjday
-========================================================================
+> Reported-by: Robert P. J. Day <rpjday@crashcourse.ca>
+> Signed-off-by: Jaswinder Singh Rajput <jaswinderrajput@gmail.com>
+> Cc: Zebediah C. McClure <zmc@lurian.net>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Cc: Russell King <rmk+lkml@arm.linux.org.uk>
+> ---
+>  arch/arm/mach-omap1/Kconfig |    6 ------
+>  1 files changed, 0 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap1/Kconfig b/arch/arm/mach-omap1/Kconfig
+> index 55ecc01..c25038e 100644
+> --- a/arch/arm/mach-omap1/Kconfig
+> +++ b/arch/arm/mach-omap1/Kconfig
+> @@ -50,12 +50,6 @@ config MACH_OMAP_H3
+>  	  TI OMAP 1710 H3 board support. Say Y here if you have such
+>  	  a board.
+>  
+> -config MACH_OMAP_HTCWIZARD
+> -	bool "HTC Wizard"
+> -	depends on ARCH_OMAP850
+> -	help
+> -	  HTC Wizard smartphone support (AKA QTEK 9100, ...)
+> -
+>  config MACH_OMAP_OSK
+>  	bool "TI OSK Support"
+>  	depends on ARCH_OMAP1 && ARCH_OMAP16XX
+>   
