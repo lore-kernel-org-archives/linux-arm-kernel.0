@@ -1,76 +1,63 @@
-From: sleep_walker@suse.cz (=?utf-8?q?Tom=C3=A1=C5=A1_=27Sleep=5FWalker=27?=
-	=?utf-8?q?_=C4=8Cech?=)
-Date: Sun, 27 Sep 2009 02:22:41 +0200
-Subject: [PATCH V2] MAINTAINERS: ARM/Palm file patterns
-In-Reply-To: <1254002818.7128.65.camel@Joe-Laptop.home>
-References: <1253990824.7128.25.camel@Joe-Laptop.home>
-	<200909262230.43385.marek.vasut@gmail.com>
-	<1254002818.7128.65.camel@Joe-Laptop.home>
-Message-ID: <200909270222.42029.sleep_walker@suse.cz>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Sun, 27 Sep 2009 09:29:45 +0800
+Subject: About ARM TCM patch
+In-Reply-To: <63386a3d0909261458kda21ae0q5af3b07bfc0c4e87@mail.gmail.com>
+References: <4ABC1D1D.6050506@gmail.com>
+	<63386a3d0909250215k50f10a44qae55da31f97f99c0@mail.gmail.com>
+	<63386a3d0909261458kda21ae0q5af3b07bfc0c4e87@mail.gmail.com>
+Message-ID: <1254014985.3663.2.camel@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Dne Ne 27. z??? 2009 00:06:58 Joe Perches napsal(a):
-> On Sat, 2009-09-26 at 22:30 +0200, Marek Vasut wrote:
-> > Dne So 26. z??? 2009 21:53:52 Joe Perches napsal(a):
-> > > On Sat, 2009-09-26 at 21:14 +0200, Marek Vasut wrote:
-> > > > This might cause trouble, we're working on renaming treo680 (as below) to
-> > > > palmtreo so palm* wont do ... you'll possibly have to list them or
-> > > > something. Otherwise ok.
-> > palmasoc will hopefully go to hell soon anyway. Otherwise, I'm for the second 
-> > method (listing the files, one per line), it's least confusing.
-
-Acked-by: Tomas Cech <sleep_walker@suse.cz>
-
-> Signed-off-by: Joe Perches <joe@perches.com>
+On Sat, 2009-09-26 at 23:58 +0200, Linus Walleij wrote:
+> 2009/9/25 Linus Walleij <linus.ml.walleij@gmail.com>:
+> > 2009/9/25 Peter Chen <hzpeterchen@gmail.com>:
 > 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index c450f3a..f8f9c4f 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -741,23 +741,36 @@ M:	Dirk Opfer <dirk@opfer-online.de>
->  S:	Maintained
->  
->  ARM/PALMTX,PALMT5,PALMLD,PALMTE2,PALMTC SUPPORT
-> -P:	Marek Vasut
-> -M:	marek.vasut at gmail.com
-> +M:	Marek Vasut <marek.vasut@gmail.com>
->  L:	linux-arm-kernel at lists.infradead.org
->  W:	http://hackndev.com
->  S:	Maintained
-> +F:	arch/arm/mach-pxa/include/mach/palmtx.h
-> +F:	arch/arm/mach-pxa/palmtx.c
-> +F:	arch/arm/mach-pxa/include/mach/palmt5.h
-> +F:	arch/arm/mach-pxa/palmt5.c
-> +F:	arch/arm/mach-pxa/include/mach/palmld.h
-> +F:	arch/arm/mach-pxa/palmld.c
-> +F:	arch/arm/mach-pxa/include/mach/palmte2.h
-> +F:	arch/arm/mach-pxa/palmte2.c
-> +F:	arch/arm/mach-pxa/include/mach/palmtc.h
-> +F:	arch/arm/mach-pxa/palmtc.c
->  
->  ARM/PALM TREO 680 SUPPORT
->  M:	Tomas Cech <sleep_walker@suse.cz>
->  L:	linux-arm-kernel at lists.infradead.org
->  W:	http://hackndev.com
->  S:	Maintained
-> +F:	arch/arm/mach-pxa/include/mach/treo680.h
-> +F:	arch/arm/mach-pxa/treo680.c
->  
->  ARM/PALMZ72 SUPPORT
->  M:	Sergey Lapin <slapin@ossfans.org>
->  L:	linux-arm-kernel at lists.infradead.org
->  W:	http://hackndev.com
->  S:	Maintained
-> +F:	arch/arm/mach-pxa/include/mach/palmz72.h
-> +F:	arch/arm/mach-pxa/palmz72.c
->  
->  ARM/PLEB SUPPORT
->  M:	Peter Chubb <pleb@gelato.unsw.edu.au>
+> >> 1. After MMU open, the code running at ITCM can't see physical address for
+> >> register.
+> >>
+> >> 2. After MMU open, the code can't run at physical addressed ITCM.
+> >
+> > Could this be different between ARM9 (which I use) and ARM11?
 > 
+> Thinking about it this rings a bell. I know it behaves like described on ARM9,
+> so code executing in TCM can only "see" physical memory.
+> 
+> But one difference between the ARM9 and ARM11 families is that the cache
+> is mapped to virtual (MMU:ed) address space in ARM9 and to physical address
+> space in ARM11 is it not? (Is this so already in ARM10 BTW?)
+> 
+> So just thinking intuitively about it, as a TCM memory is very close to what
+> a cache is to the CPU I think it's something like this on ARM9:
+> 
+>      CPU
+>      / \
+> Cache   TCM
+>   |      |
+>  MMU     |
+>   |      |
+> External memory interface
+> 
+> But on ARM11 (ARM10?):
+> 
+>      CPU
+>       |
+>      MMU
+>      / \
+> Cache   TCM
+>   |
+> External memory interface
+> 
+> Is that correct more or less? Catalin would you happen to know this?
+I think you are right. 
 
-Best regards,
+> Anyway the code should still work actually, since we make a 1-1 memory
+> map anyway. But you cannot place the TCM in the memory locations I
+> chose for U300 since these are occupied on ARM11.
+Sorry, I haven't tried your patch at kernel, I just did experiments at u-boot.
 
-Tomas Cech
+
+> Linus Walleij
+-- 
+Best Regards
+Peter Chen
