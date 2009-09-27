@@ -1,36 +1,46 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 27 Sep 2009 17:41:16 +0100
-Subject: Solving section mismatches
-Message-ID: <20090927164115.GB20093@n2100.arm.linux.org.uk>
+Date: Sun, 27 Sep 2009 17:55:31 +0100
+Subject: ixp4xx dmabounce
+In-Reply-To: <a104b22c0909221502l621ec9e9ia02cb524479c4476@mail.gmail.com>
+References: <a104b22c0909171402x10c06d41oa5c78065a65836e1@mail.gmail.com>
+	<20090917215302.GA14939@n2100.arm.linux.org.uk>
+	<a104b22c0909221502l621ec9e9ia02cb524479c4476@mail.gmail.com>
+Message-ID: <20090927165531.GC20093@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sam,
+On Tue, Sep 22, 2009 at 06:02:19PM -0400, Brian Walsh wrote:
+> On Thu, Sep 17, 2009 at 5:53 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> >
+> > On Thu, Sep 17, 2009 at 05:02:59PM -0400, Brian Walsh wrote:
+> > > Any ideas or suggestions?
+> >
+> > It's caused because we don't allow dma_free_coherent() to be called from
+> > IRQ context (which is reasonable because it needs to flush TLBs across
+> > all processors on SMP systems.)
+> 
+> I am not running on an SMP system so would this even be a problem?
 
-Any idea how to solve this:
+Yes - because it's there to ensure that the API is used in a consistent
+way.
 
-WARNING: arch/arm/kernel/built-in.o(.text+0x1ebc): Section mismatch in reference from the function cpu_idle() to the function .cpuexit.text:cpu_die()
-The function cpu_idle() references a function in an exit section.
-Often the function cpu_die() has valid usage outside the exit section
-and the fix is to remove the __cpuexit annotation of cpu_die.
+> > Unfortunately, with the DMA bounce code enabled, this function does get
+> > called from IRQ context, and so tends to spit out these warnings.
+> >
+> > I did have a patch which made dma_free_coherent() lazy, but it was
+> > reported that the suffered disk corruption (though it was never
+> > conclusive whether it was caused by the patch or not.) ?Here's an
+> > updated version of that patch.
+> >
+> 
+> I did not see any data rate improvement using this patch over just commenting
+> out the warning stack dump.? I am still seeing about half the data transfer rate
+> using the high speed ehci USB controller over the full speed ohci USB
+> controller.
 
-WARNING: arch/arm/kernel/built-in.o(.cpuexit.text+0x3c): Section mismatch in reference from the function cpu_die() to the function .cpuinit.text:secondary_start_kernel()
-The function __cpuexit cpu_die() references
-a function __cpuinit secondary_start_kernel().
-This is often seen when error handling in the exit function
-uses functionality in the init path.
-The fix is often to remove the __cpuinit annotation of
-secondary_start_kernel() so it may be used outside an init section.
+I didn't suggest it would improve the data rate - only that it should
+fix the stack dump.
 
-Logically, the annotations are correct - in the first case, cpu_die()
-will only ever be called if hotplug CPU is enabled, since you can't
-offline a CPU without hotplug CPU enabled.  In that case, the __cpuexit.*
-sections are not discarded.
-
-In the second case, this is platform code to restart the CPU, and
-again the anotations are entirely correct - cpuexit code only exists
-if hotplug CPU is enabled, in which case the cpuinit code must also
-be kept around.  Therefore, it is entirely legal for cpuexit code to
-call cpuinit code - unlike __init vs __exit or __devinit vs __devexit.
-
-Therefore, I believe both of these warnings to be incorrect.
+I'd really like to get this patch properly tested and confirmed that it
+does _not_ actually cause corruption, so that I can get it merged.
