@@ -1,65 +1,32 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sun, 27 Sep 2009 10:10:29 +0300
-Subject: [PATCH v2 2/5] Add basic HP iPAQ rx1950 support
-In-Reply-To: <20090927061802.GL31920@trinity.fluff.org>
-References: <4abe82e2.0405560a.5ebe.428d@mx.google.com>
-	<20090927061802.GL31920@trinity.fluff.org>
-Message-ID: <200909271010.43474.anarsoul@gmail.com>
+From: mad_soft@inbox.ru (Dmitry Artamonow)
+Date: Sun, 27 Sep 2009 14:20:17 +0400
+Subject: [PATCH] ARM: Remove unused CONFIG SA1100_H3XXX
+In-Reply-To: <1253976606.4568.42.camel@ht.satnam>
+References: <1253976606.4568.42.camel@ht.satnam>
+Message-ID: <20090927102015.GA6703@rainbow>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? ????????? ?? 27 ???????? 2009 09:18:02 ????? Ben Dooks ???????:
- 
-> > +static int rx1950_backlight_notify(int brightness)
-> > +{
-> > +	static int disabled = 1;
-> > +	if (!brightness) {
-> > +		if (!disabled) {
-> > +			s3c2410_gpio_setpin(S3C2410_GPB(0), 0);
-> > +			s3c2410_gpio_pullup(S3C2410_GPB(0), 0);
-> > +			s3c2410_gpio_cfgpin(S3C2410_GPB(0),
-> > +				S3C2410_GPIO_OUTPUT);
-> > +		}
-> > +		disabled = 1;
-> > +	} else {
-> > +		if (disabled) {
-> > +			/* LED driver need a "push" to power on */
-> > +			s3c2410_gpio_setpin(S3C2410_GPB(0), 1);
-> > +			s3c2410_gpio_pullup(S3C2410_GPB(0), 1);
-> > +			/* Warm up backlight for one period of PWM.
-> > +			 * Without this trick its almost impossible to
-> > +			 * enable backlight
-> > +			 */
-> > +			ndelay(48000);
-> > +			s3c2410_gpio_cfgpin(S3C2410_GPB(0),
-> > +				S3C2410_GPB0_TOUT0);
-> > +		}
-> > +		disabled = 0;
-> > +	}
-> > +	return brightness;
-> > +}
+On 20:20 Sat 26 Sep     , Jaswinder Singh Rajput wrote:
 > 
-> Maybe this is something that should be done in the pwm-bl driver?
-
-Nope, it's device specific. Btw, all this code will be moved into platform 
-driver that controls LCD and backlight power in future.
-
-> > +	/* Configuring udc pullup */
-> > +	s3c2410_gpio_cfgpin(S3C2440_GPJ5, S3C2410_GPIO_OUTPUT);
+> Removed unused CONFIG SA1100_H3XXX from Kconfig and defconfig
 > 
-> please use gpiolib interface, we're moving away from specific gpio set
-> interface.
+> Reported-by: Robert P. J. Day <rpjday@crashcourse.ca>
+> Signed-off-by: Jaswinder Singh Rajput <jaswinderrajput@gmail.com>
+> Cc: Dmitry Artamonow <mad_soft@inbox.ru>
+> Cc: Philipp Zabel <philipp.zabel@gmail.com>
+> Cc: Kristoffer Ericson <kristoffer.ericson@gmail.com>
+> Cc: Russell King <rmk+lkml@arm.linux.org.uk>
+> ---
+>  arch/arm/configs/h3600_defconfig |    1 -
+>  arch/arm/mach-sa1100/Kconfig     |    5 -----
+>  2 files changed, 0 insertions(+), 6 deletions(-)
 
-I'd like to, but gpiolib interface doesn't support GPJ port :(
-  
-Thanks for review!
+Yes, SA1100_H3XXX isn't used anywhere and can be removed safely.
 
-Regards
-Vasily
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090927/b16a0b10/attachment.sig>
+Here's my
+Acked-by: Dmitry Artamonow <mad_soft@inbox.ru>
+
+-- 
+Best regards,
+Dmitry "MAD" Artamonow
