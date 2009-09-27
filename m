@@ -1,51 +1,57 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sun, 27 Sep 2009 20:12:44 +0300
-Subject: s3c24xx gpiolib question
-Message-ID: <200909272012.53753.anarsoul@gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 27 Sep 2009 19:35:16 +0200
+Subject: something wrong in drivers/power
+In-Reply-To: <20090926145536.GA8445@doriath.ww600.siemens.net>
+References: <20090926095555.GG1331@ucw.cz>
+	<20090926145536.GA8445@doriath.ww600.siemens.net>
+Message-ID: <20090927173516.GB6710@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat 2009-09-26 18:55:36, Dmitry Eremin-Solenikov wrote:
+> On Sat, Sep 26, 2009 at 11:55:55AM +0200, Pavel Machek wrote:
+> > 
+> > Tosa battery driver seems to be confused about its own identity.
+> 
+> NAK. Please see the drivers/input/touchscree/wm97xx-core.c
 
-Is following patch sufficient to add GPJ port support to s3c24xx gpiolib?
-And how to switch gpioline to custom function mode (for example TOUT0 on GPB0) 
-via gpiolib?
+Could you elaborate? 
 
-diff --git a/arch/arm/plat-s3c24xx/gpiolib.c b/arch/arm/plat-s3c24xx/gpiolib.c
-index 6d7a961..65d79f9 100644
---- a/arch/arm/plat-s3c24xx/gpiolib.c
-+++ b/arch/arm/plat-s3c24xx/gpiolib.c
-@@ -151,7 +151,8 @@ struct s3c_gpio_chip s3c24xx_gpios[] = {
- 			.ngpio			= 16,
- 			.to_irq			= s3c24xx_gpiolib_bankg_toirq,
- 		},
--	}, {
-+	}, 
-+	[7] = {
- 		.base	= S3C2410_GPHCON,
- 		.pm	= __gpio_pm(&s3c_gpio_pm_2bit),
- 		.chip	= {
-@@ -161,6 +162,16 @@ struct s3c_gpio_chip s3c24xx_gpios[] = {
- 			.ngpio			= 11,
- 		},
- 	},
-+	[8] = {
-+		.base	= S3C2440_GPJCON,
-+		.pm = __gpio_pm(&s3c_gpio_pm_2bit),
-+		.chip	= {
-+			.base			= S3C2440_GPJ0,
-+			.owner			= THIS_MODULE,
-+			.label			= "GPIOJ",
-+			.ngpio			= 16,
-+		},
-+	},
- };
- 
- static __init int s3c24xx_gpiolib_init(void)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090927/2dd0962b/attachment.sig>
+I took a look at touchscreen file, and it does not explain
+anything. Having tosa_battery calling itself wm97xx-battery is at
+least confusing, and there's no explaining comment. Given that we have
+different wm97xx_battery.c driver calling itself "wm97xx-battery"... I
+believe that's a bug.
+
+								Pavel
+
+> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > 
+> > diff -ur power.ofic/tosa_battery.c power/tosa_battery.c
+> > --- linux/drivers/power.ofic/tosa_battery.c	2009-09-06 08:56:36.000000000 +0200
+> > +++ linux/drivers/power/tosa_battery.c	2009-09-15 15:14:08.000000000 +0200
+> > @@ -459,7 +459,7 @@
+> >  }
+> >  
+> >  static struct platform_driver tosa_bat_driver = {
+> > -	.driver.name	= "wm97xx-battery",
+> > +	.driver.name	= "tosa-battery",
+> >  	.driver.owner	= THIS_MODULE,
+> >  	.probe		= tosa_bat_probe,
+> >  	.remove		= __devexit_p(tosa_bat_remove),
+> > @@ -483,4 +483,4 @@
+> >  MODULE_LICENSE("GPL");
+> >  MODULE_AUTHOR("Dmitry Baryshkov");
+> >  MODULE_DESCRIPTION("Tosa battery driver");
+> > -MODULE_ALIAS("platform:wm97xx-battery");
+> > +MODULE_ALIAS("platform:tosa-battery");
+> > 
+> > 
+> > -- 
+> > (english) http://www.livejournal.com/~pavelmachek
+> > (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> 
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
