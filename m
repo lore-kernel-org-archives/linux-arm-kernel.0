@@ -1,40 +1,65 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Sun, 27 Sep 2009 08:08:07 +0100
-Subject: [PATCH v2 4/5] Add suspend/resume support for rx1950
-In-Reply-To: <200909271001.20642.anarsoul@gmail.com>
-References: <4abe82e7.0405560a.5ebe.4296@mx.google.com>
-	<20090927061951.GM31920@trinity.fluff.org>
-	<200909271001.20642.anarsoul@gmail.com>
-Message-ID: <20090927070807.GN31920@trinity.fluff.org>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Sun, 27 Sep 2009 10:10:29 +0300
+Subject: [PATCH v2 2/5] Add basic HP iPAQ rx1950 support
+In-Reply-To: <20090927061802.GL31920@trinity.fluff.org>
+References: <4abe82e2.0405560a.5ebe.428d@mx.google.com>
+	<20090927061802.GL31920@trinity.fluff.org>
+Message-ID: <200909271010.43474.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 27, 2009 at 10:01:08AM +0300, Vasily Khoruzhick wrote:
-> ?? ?????????????????? ???? 27 ???????????????? 2009 09:19:51 ?????????? Ben Dooks ??????????????:
-> > >  		__raw_writel(calc, phys_to_virt(H1940_SUSPEND_CHECKSUM));
-> > > +		if (machine_is_rx1950()) {
-> > > +			/* According to S3C2442 user's manual, page 7-17,
-> > > +			 * when the system is operating in NAND boot mode,
-> > > +			 * the hardware pin configuration - EINT[23:21] ???
-> > > +			 * must be set as input for starting up after
-> > > +			 * wakeup from sleep mode */
-> > 
-> > given this is generic to the s3c2442, why put this here? it also holds
-> > for the s3c2440 too... think about an implementation for the cpu's
-> > sysdev for all nand-booting systems.
+? ????????? ?? 27 ???????? 2009 09:18:02 ????? Ben Dooks ???????:
+ 
+> > +static int rx1950_backlight_notify(int brightness)
+> > +{
+> > +	static int disabled = 1;
+> > +	if (!brightness) {
+> > +		if (!disabled) {
+> > +			s3c2410_gpio_setpin(S3C2410_GPB(0), 0);
+> > +			s3c2410_gpio_pullup(S3C2410_GPB(0), 0);
+> > +			s3c2410_gpio_cfgpin(S3C2410_GPB(0),
+> > +				S3C2410_GPIO_OUTPUT);
+> > +		}
+> > +		disabled = 1;
+> > +	} else {
+> > +		if (disabled) {
+> > +			/* LED driver need a "push" to power on */
+> > +			s3c2410_gpio_setpin(S3C2410_GPB(0), 1);
+> > +			s3c2410_gpio_pullup(S3C2410_GPB(0), 1);
+> > +			/* Warm up backlight for one period of PWM.
+> > +			 * Without this trick its almost impossible to
+> > +			 * enable backlight
+> > +			 */
+> > +			ndelay(48000);
+> > +			s3c2410_gpio_cfgpin(S3C2410_GPB(0),
+> > +				S3C2410_GPB0_TOUT0);
+> > +		}
+> > +		disabled = 0;
+> > +	}
+> > +	return brightness;
+> > +}
 > 
-> Well, actually I thought that suspend for h1940 and rx3000 works without these 
-> tricks... Ok, I'll make it generic for s3c2442 CPU.
+> Maybe this is something that should be done in the pwm-bl driver?
 
-The h1940 is a s3c2410 and all the boot pins on it are specific function
-for boot. No idea if the rx3xxx series use the upper EINT lines for
-anything.
+Nope, it's device specific. Btw, all this code will be moved into platform 
+driver that controls LCD and backlight power in future.
 
-Anyway, please include the s3c2440 in this change as I belive it
-also has the saem note.
+> > +	/* Configuring udc pullup */
+> > +	s3c2410_gpio_cfgpin(S3C2440_GPJ5, S3C2410_GPIO_OUTPUT);
+> 
+> please use gpiolib interface, we're moving away from specific gpio set
+> interface.
 
--- 
-Ben
+I'd like to, but gpiolib interface doesn't support GPJ port :(
+  
+Thanks for review!
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Regards
+Vasily
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090927/b16a0b10/attachment.sig>
