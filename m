@@ -1,51 +1,36 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 27 Sep 2009 16:31:08 +0100
-Subject: [PATCH] Make MMCI driver compile without gpiolib
-In-Reply-To: <1251276988-27882-1-git-send-email-linus.walleij@stericsson.com>
-References: <1251276988-27882-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20090927153108.GA20093@n2100.arm.linux.org.uk>
+Date: Sun, 27 Sep 2009 17:41:16 +0100
+Subject: Solving section mismatches
+Message-ID: <20090927164115.GB20093@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 26, 2009 at 10:56:28AM +0200, Linus Walleij wrote:
-> The recent addition of optional gpiolib support to check if a
-> card was inserted or write protected was really not optional.
-> It needs this ifdef to become optional so that U300 compiles,
-> for example.
+Sam,
 
-Looking back at this, I don't think this ifdef is required.
+Any idea how to solve this:
 
-Why?
+WARNING: arch/arm/kernel/built-in.o(.text+0x1ebc): Section mismatch in reference from the function cpu_idle() to the function .cpuexit.text:cpu_die()
+The function cpu_idle() references a function in an exit section.
+Often the function cpu_die() has valid usage outside the exit section
+and the fix is to remove the __cpuexit annotation of cpu_die.
 
-We're using linux/gpio.h, which provides dummy definitions for the
-GPIO functions of GENERIC_GPIO is not set.  If GENERIC_GPIO is set,
-then GPIOs are available, and can be used.
+WARNING: arch/arm/kernel/built-in.o(.cpuexit.text+0x3c): Section mismatch in reference from the function cpu_die() to the function .cpuinit.text:secondary_start_kernel()
+The function __cpuexit cpu_die() references
+a function __cpuinit secondary_start_kernel().
+This is often seen when error handling in the exit function
+uses functionality in the init path.
+The fix is often to remove the __cpuinit annotation of
+secondary_start_kernel() so it may be used outside an init section.
 
-GPIOLIB is entirely a different matter, and doesn't really indicate
-whether GPIO support is available or not.
+Logically, the annotations are correct - in the first case, cpu_die()
+will only ever be called if hotplug CPU is enabled, since you can't
+offline a CPU without hotplug CPU enabled.  In that case, the __cpuexit.*
+sections are not discarded.
 
-The real problem is that U300 doesn't implement gpio_is_valid() -
-which is part of the GPIO API and not specific to GPIOLIB.
+In the second case, this is platform code to restart the CPU, and
+again the anotations are entirely correct - cpuexit code only exists
+if hotplug CPU is enabled, in which case the cpuinit code must also
+be kept around.  Therefore, it is entirely legal for cpuexit code to
+call cpuinit code - unlike __init vs __exit or __devinit vs __devexit.
 
-Please implement this function, and let's revert this (wrong) patch.
-
-> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> index 5eb86a8..a923ee2 100644
-> --- a/drivers/mmc/host/mmci.c
-> +++ b/drivers/mmc/host/mmci.c
-> @@ -619,6 +619,7 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
->  	writel(0, host->base + MMCIMASK1);
->  	writel(0xfff, host->base + MMCICLEAR);
->  
-> +#ifdef CONFIG_GPIOLIB
->  	if (gpio_is_valid(plat->gpio_cd)) {
->  		ret = gpio_request(plat->gpio_cd, DRIVER_NAME " (cd)");
->  		if (ret == 0)
-> @@ -637,6 +638,7 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
->  		else if (ret != -ENOSYS)
->  			goto err_gpio_wp;
->  	}
-> +#endif
->  
->  	ret = request_irq(dev->irq[0], mmci_irq, IRQF_SHARED, DRIVER_NAME " (cmd)", host);
->  	if (ret)
+Therefore, I believe both of these warnings to be incorrect.
