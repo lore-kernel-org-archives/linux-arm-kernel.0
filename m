@@ -1,157 +1,433 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 28 Sep 2009 17:54:25 +0100
-Subject: arm_syscall cacheflush breakage on VIPT platforms
-In-Reply-To: <20090928095945.GC6715@n2100.arm.linux.org.uk>
-References: <20090928092919.GA30271@localhost>
-	<20090928094140.GA6715@n2100.arm.linux.org.uk>
-	<20090928095429.GB30271@localhost>
-	<20090928095945.GC6715@n2100.arm.linux.org.uk>
-Message-ID: <1254156865.21619.41.camel@pc1117.cambridge.arm.com>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Mon, 28 Sep 2009 10:11:29 -0700
+Subject: [PATCH] Move MMCI header to amba include dir
+In-Reply-To: <1253625972-19407-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <9383297B60843144AC17878B479520F110AEE53835@SJEXCHCCR01.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2009-09-28 at 10:59 +0100, Russell King - ARM Linux wrote:
-> On Mon, Sep 28, 2009 at 12:54:29PM +0300, Imre Deak wrote:
-> > On Mon, Sep 28, 2009 at 11:41:40AM +0200, ext Russell King - ARM Linux wrote:
-> > > On Mon, Sep 28, 2009 at 12:29:19PM +0300, Imre Deak wrote:
-> > > > Hi,
-> > > > 
-> > > > the following test app will cause an unhandled kernel paging request
-> > > > on VIPT platforms. The triggering condition is the mmap_sem held by
-> > > > thread_func while the main thread performs cache flushing.
-> > > > 
-> > > > Since the likelihood of this to trigger is relatively low, a patch will
-> > > > follow that makes similar bugs more visible.
-> > > 
-> > > The problem is that, unlike previous cache architectures, if a page is
-> > > not present we now get a data abort during cache maintainence.  That
-> > > means the cache maintainence instructions used for this call need to
-> > > be marked with user fixups, so that the kernel knows how to handle
-> > > such an abort.
-> > > 
-> > > It is not caused by the holding of mmap_sem.
-> > 
-> > This particular bug is caused by holding of mmap_sem, without any fixup
-> > being defined.
+Hi Linus,
+
+You changes cause the bcmring platform to fail to compile.
+
+Can you go through all the ARM platforms and make the
+necessary adjustments with the change in header files
+for mmc?
+
+Thanks,
+ Scott
+
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org 
+> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On 
+> Behalf Of Linus Walleij
+> Sent: September 22, 2009 6:26 AM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Catalin Marinas; linux-mmc at vger.kernel.org; Linus Walleij
+> Subject: [PATCH] Move MMCI header to amba include dir
 > 
-> No it is not.  The problem has nothing to do with holding of mmap_sem
-> AT ALL.  In fact, do_cache_op needs to hold mmap_sem itself, to prevent
-> the VMA going away beneath it.  That's not going to stop it generating
-> faults, and it's not going to stop it oopsing.
+> This moves the mmci platform data definition struct away from 
+> arch/arm/include/asm/mach/mmc.h into the more proper place 
+> among the other primecells in include/linux/amba/mmci.h and 
+> at the same time renames it to "mmci.h", and also the struct 
+> in this file confusingly named mmc_platform_data has been 
+> renamed mmci_platform_data for clarity.
 > 
-> The problem is that we don't have any fixup in place for this situation.
-
-Something like this should solve the problem (not fully tested but
-implemented as part of the mprotect workaround for the COW issue):
-
-
-Handle possible translation errors in the ARMv6 and ARMv7 coherent user
-
-Handle possible translation errors in the ARMv6 and ARMv7 coherent user
-range functions. This is needed because applications using the
-sys_cacheflush system call can pass a memory range which isn't mapped
-yet even though the corresponding vma is valid.
-
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
-
-diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
-index 8364f6c..7baa6ce 100644
---- a/arch/arm/mm/cache-v6.S
-+++ b/arch/arm/mm/cache-v6.S
-@@ -12,6 +12,7 @@
- #include <linux/linkage.h>
- #include <linux/init.h>
- #include <asm/assembler.h>
-+#include <asm/unwind.h>
- 
- #include "proc-macros.S"
- 
-@@ -129,11 +130,13 @@ ENTRY(v6_coherent_kern_range)
-  *	- the Icache does not read data from the write buffer
-  */
- ENTRY(v6_coherent_user_range)
--
-+ UNWIND(.fnstart		)
- #ifdef HARVARD_CACHE
- 	bic	r0, r0, #CACHE_LINE_SIZE - 1
--1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D line
-+1:
-+ USER(	mcr	p15, 0, r0, c7, c10, 1	)	@ clean D line
- 	add	r0, r0, #CACHE_LINE_SIZE
-+2:
- 	cmp	r0, r1
- 	blo	1b
- #endif
-@@ -151,6 +154,19 @@ ENTRY(v6_coherent_user_range)
- 	mov	pc, lr
- 
- /*
-+ * Fault handling for the cache operation above. If the virtual address in r0
-+ * isn't mapped, just try the next page.
-+ */
-+9001:
-+	mov	r0, r0, lsr #12
-+	mov	r0, r0, lsl #12
-+	add	r0, r0, #4096
-+	b	2b
-+ UNWIND(.fnend		)
-+ENDPROC(v6_coherent_user_range)
-+ENDPROC(v6_coherent_kern_range)
-+
-+/*
-  *	v6_flush_kern_dcache_page(kaddr)
-  *
-  *	Ensure that the data held in the page kaddr is written back
-diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-index 29e6904..4b733d1 100644
---- a/arch/arm/mm/cache-v7.S
-+++ b/arch/arm/mm/cache-v7.S
-@@ -13,6 +13,7 @@
- #include <linux/linkage.h>
- #include <linux/init.h>
- #include <asm/assembler.h>
-+#include <asm/unwind.h>
- 
- #include "proc-macros.S"
- 
-@@ -153,13 +154,16 @@ ENTRY(v7_coherent_kern_range)
-  *	- the Icache does not read data from the write buffer
-  */
- ENTRY(v7_coherent_user_range)
-+ UNWIND(.fnstart		)
- 	dcache_line_size r2, r3
- 	sub	r3, r2, #1
- 	bic	r0, r0, r3
--1:	mcr	p15, 0, r0, c7, c11, 1		@ clean D line to the point of unification
-+1:
-+ USER(	mcr	p15, 0, r0, c7, c11, 1	)	@ clean D line to the point of unification
- 	dsb
--	mcr	p15, 0, r0, c7, c5, 1		@ invalidate I line
-+ USER(	mcr	p15, 0, r0, c7, c5, 1	)	@ invalidate I line
- 	add	r0, r0, r2
-+2:
- 	cmp	r0, r1
- 	blo	1b
- 	mov	r0, #0
-@@ -167,6 +171,17 @@ ENTRY(v7_coherent_user_range)
- 	dsb
- 	isb
- 	mov	pc, lr
-+
-+/*
-+ * Fault handling for the cache operation above. If the virtual address in r0
-+ * isn't mapped, just try the next page.
-+ */
-+9001:
-+	mov	r0, r0, lsr #12
-+	mov	r0, r0, lsl #12
-+	add	r0, r0, #4096
-+	b	2b
-+ UNWIND(.fnend		)
- ENDPROC(v7_coherent_kern_range)
- ENDPROC(v7_coherent_user_range)
- 
-
--- 
-Catalin
+> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+> This patch is against the devel branch in Russells git, and 
+> was compiled with no errors against realview_defconfig, 
+> versatile_defconfig, integrator_defconfig and u300_defconfig.
+> Some minor tweaks were needed to compile, since devel is not 
+> yet rebased to master (vic.c #include <linux/device.h> patch 
+> and the new clocksource code are the culprits).
+> ---
+>  arch/arm/include/asm/mach/mmc.h          |   18 ------------------
+>  arch/arm/mach-integrator/integrator_cp.c |    4 ++--
+>  arch/arm/mach-realview/core.c            |    6 +++---
+>  arch/arm/mach-realview/core.h            |    4 ++--
+>  arch/arm/mach-realview/realview_eb.c     |    2 +-
+>  arch/arm/mach-realview/realview_pb1176.c |    2 +-
+>  arch/arm/mach-realview/realview_pb11mp.c |    2 +-
+>  arch/arm/mach-realview/realview_pba8.c   |    2 +-
+>  arch/arm/mach-realview/realview_pbx.c    |    2 +-
+>  arch/arm/mach-u300/mmc.c                 |    4 ++--
+>  arch/arm/mach-versatile/core.c           |    4 ++--
+>  arch/arm/mach-versatile/versatile_pb.c   |    4 ++--
+>  drivers/mmc/host/mmci.c                  |    4 ++--
+>  drivers/mmc/host/mmci.h                  |    2 +-
+>  include/linux/amba/mmci.h                |   18 ++++++++++++++++++
+>  15 files changed, 39 insertions(+), 39 deletions(-)  delete 
+> mode 100644 arch/arm/include/asm/mach/mmc.h  create mode 
+> 100644 include/linux/amba/mmci.h
+> 
+> diff --git a/arch/arm/include/asm/mach/mmc.h 
+> b/arch/arm/include/asm/mach/mmc.h deleted file mode 100644 
+> index 27bec55..0000000
+> --- a/arch/arm/include/asm/mach/mmc.h
+> +++ /dev/null
+> @@ -1,18 +0,0 @@
+> -/*
+> - *  arch/arm/include/asm/mach/mmc.h
+> - */
+> -#ifndef ASMARM_MACH_MMC_H
+> -#define ASMARM_MACH_MMC_H
+> -
+> -#include <linux/mmc/host.h>
+> -
+> -struct mmc_platform_data {
+> -	unsigned int ocr_mask;			/* available voltages */
+> -	u32 (*translate_vdd)(struct device *, unsigned int);
+> -	unsigned int (*status)(struct device *);
+> -	int	gpio_wp;
+> -	int	gpio_cd;
+> -	unsigned long capabilities;
+> -};
+> -
+> -#endif
+> diff --git a/arch/arm/mach-integrator/integrator_cp.c 
+> b/arch/arm/mach-integrator/integrator_cp.c
+> index 2a318eb..3f35293 100644
+> --- a/arch/arm/mach-integrator/integrator_cp.c
+> +++ b/arch/arm/mach-integrator/integrator_cp.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/amba/bus.h>
+>  #include <linux/amba/kmi.h>
+>  #include <linux/amba/clcd.h>
+> +#include <linux/amba/mmci.h>
+>  #include <linux/io.h>
+>  
+>  #include <asm/clkdev.h>
+> @@ -35,7 +36,6 @@
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/flash.h>
+>  #include <asm/mach/irq.h>
+> -#include <asm/mach/mmc.h>
+>  #include <asm/mach/map.h>
+>  #include <asm/mach/time.h>
+>  
+> @@ -400,7 +400,7 @@ static unsigned int mmc_status(struct device *dev)
+>  	return status & 8;
+>  }
+>  
+> -static struct mmc_platform_data mmc_data = {
+> +static struct mmci_platform_data mmc_data = {
+>  	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
+>  	.status		= mmc_status,
+>  	.gpio_wp	= -1,
+> diff --git a/arch/arm/mach-realview/core.c 
+> b/arch/arm/mach-realview/core.c index 5a5e1f7..a2083b6 100644
+> --- a/arch/arm/mach-realview/core.c
+> +++ b/arch/arm/mach-realview/core.c
+> @@ -30,6 +30,7 @@
+>  #include <linux/io.h>
+>  #include <linux/smsc911x.h>
+>  #include <linux/ata_platform.h>
+> +#include <linux/amba/mmci.h>
+>  
+>  #include <asm/clkdev.h>
+>  #include <asm/system.h>
+> @@ -44,7 +45,6 @@
+>  #include <asm/mach/flash.h>
+>  #include <asm/mach/irq.h>
+>  #include <asm/mach/map.h>
+> -#include <asm/mach/mmc.h>
+>  
+>  #include <asm/hardware/gic.h>
+>  
+> @@ -237,14 +237,14 @@ static unsigned int 
+> realview_mmc_status(struct device *dev)
+>  	return readl(REALVIEW_SYSMCI) & mask;
+>  }
+>  
+> -struct mmc_platform_data realview_mmc0_plat_data = {
+> +struct mmci_platform_data realview_mmc0_plat_data = {
+>  	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
+>  	.status		= realview_mmc_status,
+>  	.gpio_wp	= 17,
+>  	.gpio_cd	= 16,
+>  };
+>  
+> -struct mmc_platform_data realview_mmc1_plat_data = {
+> +struct mmci_platform_data realview_mmc1_plat_data = {
+>  	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
+>  	.status		= realview_mmc_status,
+>  	.gpio_wp	= 19,
+> diff --git a/arch/arm/mach-realview/core.h 
+> b/arch/arm/mach-realview/core.h index 59a337b..46cd6ac 100644
+> --- a/arch/arm/mach-realview/core.h
+> +++ b/arch/arm/mach-realview/core.h
+> @@ -47,8 +47,8 @@ static struct amba_device name##_device = {	
+> 		\
+>  extern struct platform_device realview_flash_device;  extern 
+> struct platform_device realview_cf_device;  extern struct 
+> platform_device realview_i2c_device; -extern struct 
+> mmc_platform_data realview_mmc0_plat_data; -extern struct 
+> mmc_platform_data realview_mmc1_plat_data;
+> +extern struct mmci_platform_data realview_mmc0_plat_data; 
+> extern struct 
+> +mmci_platform_data realview_mmc1_plat_data;
+>  extern struct clcd_board clcd_plat_data;  extern void 
+> __iomem *gic_cpu_base_addr;  extern void __iomem 
+> *timer0_va_base; diff --git 
+> a/arch/arm/mach-realview/realview_eb.c 
+> b/arch/arm/mach-realview/realview_eb.c
+> index c0795ea..1d65e64 100644
+> --- a/arch/arm/mach-realview/realview_eb.c
+> +++ b/arch/arm/mach-realview/realview_eb.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/sysdev.h>
+>  #include <linux/amba/bus.h>
+>  #include <linux/amba/pl061.h>
+> +#include <linux/amba/mmci.h>
+>  #include <linux/io.h>
+>  
+>  #include <mach/hardware.h>
+> @@ -37,7 +38,6 @@
+>  
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/map.h>
+> -#include <asm/mach/mmc.h>
+>  #include <asm/mach/time.h>
+>  
+>  #include <mach/board-eb.h>
+> diff --git a/arch/arm/mach-realview/realview_pb1176.c 
+> b/arch/arm/mach-realview/realview_pb1176.c
+> index 395dc18..2817fe0 100644
+> --- a/arch/arm/mach-realview/realview_pb1176.c
+> +++ b/arch/arm/mach-realview/realview_pb1176.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/sysdev.h>
+>  #include <linux/amba/bus.h>
+>  #include <linux/amba/pl061.h>
+> +#include <linux/amba/mmci.h>
+>  #include <linux/io.h>
+>  
+>  #include <mach/hardware.h>
+> @@ -37,7 +38,6 @@
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/flash.h>
+>  #include <asm/mach/map.h>
+> -#include <asm/mach/mmc.h>
+>  #include <asm/mach/time.h>
+>  
+>  #include <mach/board-pb1176.h>
+> diff --git a/arch/arm/mach-realview/realview_pb11mp.c 
+> b/arch/arm/mach-realview/realview_pb11mp.c
+> index c0c9e35..94680fc 100644
+> --- a/arch/arm/mach-realview/realview_pb11mp.c
+> +++ b/arch/arm/mach-realview/realview_pb11mp.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/sysdev.h>
+>  #include <linux/amba/bus.h>
+>  #include <linux/amba/pl061.h>
+> +#include <linux/amba/mmci.h>
+>  #include <linux/io.h>
+>  
+>  #include <mach/hardware.h>
+> @@ -38,7 +39,6 @@
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/flash.h>
+>  #include <asm/mach/map.h>
+> -#include <asm/mach/mmc.h>
+>  #include <asm/mach/time.h>
+>  
+>  #include <mach/board-pb11mp.h>
+> diff --git a/arch/arm/mach-realview/realview_pba8.c 
+> b/arch/arm/mach-realview/realview_pba8.c
+> index 4fc64e1..941beb2 100644
+> --- a/arch/arm/mach-realview/realview_pba8.c
+> +++ b/arch/arm/mach-realview/realview_pba8.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/sysdev.h>
+>  #include <linux/amba/bus.h>
+>  #include <linux/amba/pl061.h>
+> +#include <linux/amba/mmci.h>
+>  #include <linux/io.h>
+>  
+>  #include <asm/irq.h>
+> @@ -34,7 +35,6 @@
+>  
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/map.h>
+> -#include <asm/mach/mmc.h>
+>  #include <asm/mach/time.h>
+>  
+>  #include <mach/hardware.h>
+> diff --git a/arch/arm/mach-realview/realview_pbx.c 
+> b/arch/arm/mach-realview/realview_pbx.c
+> index cf68b54..7e4bc6c 100644
+> --- a/arch/arm/mach-realview/realview_pbx.c
+> +++ b/arch/arm/mach-realview/realview_pbx.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/sysdev.h>
+>  #include <linux/amba/bus.h>
+>  #include <linux/amba/pl061.h>
+> +#include <linux/amba/mmci.h>
+>  #include <linux/io.h>
+>  
+>  #include <asm/irq.h>
+> @@ -34,7 +35,6 @@
+>  
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/map.h>
+> -#include <asm/mach/mmc.h>
+>  #include <asm/mach/time.h>
+>  
+>  #include <mach/hardware.h>
+> diff --git a/arch/arm/mach-u300/mmc.c 
+> b/arch/arm/mach-u300/mmc.c index 82af247..7b6b016 100644
+> --- a/arch/arm/mach-u300/mmc.c
+> +++ b/arch/arm/mach-u300/mmc.c
+> @@ -19,8 +19,8 @@
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/regulator/machine.h>
+>  #include <linux/gpio.h>
+> +#include <linux/amba/mmci.h>
+>  
+> -#include <asm/mach/mmc.h>
+>  #include "mmc.h"
+>  #include "padmux.h"
+>  
+> @@ -28,7 +28,7 @@ struct mmci_card_event {
+>  	struct input_dev *mmc_input;
+>  	int mmc_inserted;
+>  	struct work_struct workq;
+> -	struct mmc_platform_data mmc0_plat_data;
+> +	struct mmci_platform_data mmc0_plat_data;
+>  };
+>  
+>  static unsigned int mmc_status(struct device *dev) diff 
+> --git a/arch/arm/mach-versatile/core.c 
+> b/arch/arm/mach-versatile/core.c index 975eae4..e13be7c 100644
+> --- a/arch/arm/mach-versatile/core.c
+> +++ b/arch/arm/mach-versatile/core.c
+> @@ -27,6 +27,7 @@
+>  #include <linux/amba/bus.h>
+>  #include <linux/amba/clcd.h>
+>  #include <linux/amba/pl061.h>
+> +#include <linux/amba/mmci.h>
+>  #include <linux/clocksource.h>
+>  #include <linux/clockchips.h>
+>  #include <linux/cnt32_to_63.h>
+> @@ -47,7 +48,6 @@
+>  #include <asm/mach/irq.h>
+>  #include <asm/mach/time.h>
+>  #include <asm/mach/map.h>
+> -#include <asm/mach/mmc.h>
+>  
+>  #include "core.h"
+>  #include "clock.h"
+> @@ -369,7 +369,7 @@ unsigned int mmc_status(struct device *dev)
+>  	return readl(VERSATILE_SYSMCI) & mask;  }
+>  
+> -static struct mmc_platform_data mmc0_plat_data = {
+> +static struct mmci_platform_data mmc0_plat_data = {
+>  	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
+>  	.status		= mmc_status,
+>  	.gpio_wp	= -1,
+> diff --git a/arch/arm/mach-versatile/versatile_pb.c 
+> b/arch/arm/mach-versatile/versatile_pb.c
+> index 9af8d81..239cd30 100644
+> --- a/arch/arm/mach-versatile/versatile_pb.c
+> +++ b/arch/arm/mach-versatile/versatile_pb.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/sysdev.h>
+>  #include <linux/amba/bus.h>
+>  #include <linux/amba/pl061.h>
+> +#include <linux/amba/mmci.h>
+>  #include <linux/io.h>
+>  
+>  #include <mach/hardware.h>
+> @@ -31,7 +32,6 @@
+>  #include <asm/mach-types.h>
+>  
+>  #include <asm/mach/arch.h>
+> -#include <asm/mach/mmc.h>
+>  
+>  #include "core.h"
+>  
+> @@ -41,7 +41,7 @@
+>  #define IRQ_MMCI1A	IRQ_SIC_MMCI1A
+>  #endif
+>  
+> -static struct mmc_platform_data mmc1_plat_data = {
+> +static struct mmci_platform_data mmc1_plat_data = {
+>  	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
+>  	.status		= mmc_status,
+>  	.gpio_wp	= -1,
+> diff --git a/drivers/mmc/host/mmci.c 
+> b/drivers/mmc/host/mmci.c index bf7c05b..79205e5 100644
+> --- a/drivers/mmc/host/mmci.c
+> +++ b/drivers/mmc/host/mmci.c
+> @@ -22,12 +22,12 @@
+>  #include <linux/clk.h>
+>  #include <linux/scatterlist.h>
+>  #include <linux/gpio.h>
+> +#include <linux/amba/mmci.h>
+>  
+>  #include <asm/cacheflush.h>
+>  #include <asm/div64.h>
+>  #include <asm/io.h>
+>  #include <asm/sizes.h>
+> -#include <asm/mach/mmc.h>
+>  
+>  #include "mmci.h"
+>  
+> @@ -537,7 +537,7 @@ static void mmci_check_status(unsigned long data)
+>  
+>  static int __devinit mmci_probe(struct amba_device *dev, 
+> struct amba_id *id)  {
+> -	struct mmc_platform_data *plat = dev->dev.platform_data;
+> +	struct mmci_platform_data *plat = dev->dev.platform_data;
+>  	struct mmci_host *host;
+>  	struct mmc_host *mmc;
+>  	int ret;
+> diff --git a/drivers/mmc/host/mmci.h 
+> b/drivers/mmc/host/mmci.h index 839f264..a7f9a51 100644
+> --- a/drivers/mmc/host/mmci.h
+> +++ b/drivers/mmc/host/mmci.h
+> @@ -161,7 +161,7 @@ struct mmci_host {
+>  	unsigned int		mclk;
+>  	unsigned int		cclk;
+>  	u32			pwr;
+> -	struct mmc_platform_data *plat;
+> +	struct mmci_platform_data *plat;
+>  
+>  	u8			hw_designer;
+>  	u8			hw_revision:4;
+> diff --git a/include/linux/amba/mmci.h 
+> b/include/linux/amba/mmci.h new file mode 100644 index 
+> 0000000..6b42417
+> --- /dev/null
+> +++ b/include/linux/amba/mmci.h
+> @@ -0,0 +1,18 @@
+> +/*
+> + *  include/linux/amba/mmci.h
+> + */
+> +#ifndef AMBA_MMCI_H
+> +#define AMBA_MMCI_H
+> +
+> +#include <linux/mmc/host.h>
+> +
+> +struct mmci_platform_data {
+> +	unsigned int ocr_mask;			/* available voltages */
+> +	u32 (*translate_vdd)(struct device *, unsigned int);
+> +	unsigned int (*status)(struct device *);
+> +	int	gpio_wp;
+> +	int	gpio_cd;
+> +	unsigned long capabilities;
+> +};
+> +
+> +#endif
+> --
+> 1.6.2.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
