@@ -1,40 +1,16 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Mon, 28 Sep 2009 13:26:48 +0200
-Subject: [PATCH 2/2] n2100: reduce power button timer to 1 Hz
-In-Reply-To: <4AC0938A.1040009@nokia.com>
-References: <19134.29011.460366.960746@pilspetsen.it.uu.se>
-	<4AC06E8C.8090908@nokia.com>
-	<19136.36934.791249.535941@pilspetsen.it.uu.se>
-	<4AC0938A.1040009@nokia.com>
-Message-ID: <19136.40312.174341.649031@pilspetsen.it.uu.se>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 Sep 2009 12:27:15 +0100
+Subject: [PATCH] Fix U300 generic GPIO, remove ifdefs from MMCI v2
+In-Reply-To: <1254136780-31679-1-git-send-email-linus.walleij@stericsson.com>
+References: <1254136780-31679-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20090928112715.GB10671@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Aaro Koskinen writes:
- > Hello,
- > 
- > Mikael Pettersson wrote:
- > > Aaro Koskinen writes:
- > >  > Mikael Pettersson wrote:
- > >  > > 10 Hz seems excessive, so this patch adds a compile-time option
- > >  > > to reduce the polling frequency to 1 Hz.
- > >  > > 
- > >  > > (This change could possibly be handled via a kernel boot option,
- > >  > > or even be made unconditional, but I opted for a compile-time
- > >  > > option for now.)
- > >  > 
- > >  > I don't think there is need to have an option for this. With HZ also
- > >  > round_jiffies() could be used, it doesn't need to be exact.
- > > 
- > > I don't quite follow you here. Can you elaborate?
- > 
- > round_jiffies() rounds the time up or down to a full second. It's useful for
- > timers that expire every N seconds. This way timeouts can be grouped, so there
- > is less wakeups.
+On Mon, Sep 28, 2009 at 01:19:40PM +0200, Linus Walleij wrote:
+> This version is hopefully correct for the API. Sorry for the mess
+> again and thanks to Russell and Rabin Vincent for pointing me
+> in the right direction on this one.
 
-Ah, the two sentences were not to be taken as a group:
-1) no need for an option, i.e. reduce to 1 Hz unconditionally, and
-2) with a 1 Hz timer, use round_jiffies() in the hope of grouping
-   with other whole-Hz timers that also use round_jiffies().
-
-I'll look into using round_jiffies().
+I feel the comments in the code are too much.  Maybe a single comment
+about the return value above the function would be sufficient?
