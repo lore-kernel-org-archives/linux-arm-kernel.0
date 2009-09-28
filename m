@@ -1,37 +1,16 @@
-From: leochen@broadcom.com (Leo (Hao) Chen)
-Date: Mon, 28 Sep 2009 13:45:17 -0700
-Subject: [PATCH] ARM: includecheck fix: mach-bcmring, core.c
-In-Reply-To: <1253625100.3784.10.camel@ht.satnam>
-References: <1253623861.3784.4.camel@ht.satnam>
-	<1253625100.3784.10.camel@ht.satnam>
-Message-ID: <20090928204517.GD30661@broadcom.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 Sep 2009 23:34:04 +0100
+Subject: [PATCH] arm: fix compilation of entry-common.S for older CPUs
+In-Reply-To: <20090928194121.GA12304@rainbow>
+References: <1253285745-4198-1-git-send-email-mad_soft@inbox.ru>
+	<20090918162711.GA31263@pengutronix.de>
+	<20090928194121.GA12304@rainbow>
+Message-ID: <20090928223404.GJ10671@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jaswinder,
+On Mon, Sep 28, 2009 at 11:41:22PM +0400, Dmitry Artamonow wrote:
+> Russell, are you ok with this fix? Should I submit patch to your patch
+> tracker?
 
-Huang Weiyi had submitted the same patch last week.
-It's been submitted to Russell already.
-
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=5732/1
-
-Thanks anyway,
-
-On Tue, Sep 22, 2009 at 06:11:40AM -0700, Jaswinder Singh Rajput wrote:
-> Cc to linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-> 
-> On Tue, 2009-09-22 at 18:21 +0530, Jaswinder Singh Rajput wrote:
-> > fix the following 'make includecheck' warning:
-> > 
-> >   arch/arm/mach-bcmring/core.c: linux/amba/bus.h is included more than once.
-> > 
-> > Signed-off-by: Jaswinder Singh Rajput <jaswinderrajput@gmail.com>
-> > ---
- 
-
--- 
-
-Leo Hao Chen
-
-------------------------
-Life is short, run long.
+Yes please.
