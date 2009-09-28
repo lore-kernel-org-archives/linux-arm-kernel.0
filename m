@@ -1,45 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Sep 2009 12:26:24 +0100
-Subject: [PATCH] ARM: add warning for invalid kernel page faults
-In-Reply-To: <20090928110158.GG30271@localhost>
-References: <20090928092919.GA30271@localhost>
-	<1254131304-32057-1-git-send-email-imre.deak@nokia.com>
-	<20090928095516.GB6715@n2100.arm.linux.org.uk>
-	<20090928100048.GC30271@localhost>
-	<20090928100442.GD6715@n2100.arm.linux.org.uk>
-	<20090928101625.GE30271@localhost>
-	<20090928102710.GG6715@n2100.arm.linux.org.uk>
-	<20090928110158.GG30271@localhost>
-Message-ID: <20090928112624.GA10671@n2100.arm.linux.org.uk>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Mon, 28 Sep 2009 13:26:48 +0200
+Subject: [PATCH 2/2] n2100: reduce power button timer to 1 Hz
+In-Reply-To: <4AC0938A.1040009@nokia.com>
+References: <19134.29011.460366.960746@pilspetsen.it.uu.se>
+	<4AC06E8C.8090908@nokia.com>
+	<19136.36934.791249.535941@pilspetsen.it.uu.se>
+	<4AC0938A.1040009@nokia.com>
+Message-ID: <19136.40312.174341.649031@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 28, 2009 at 02:01:58PM +0300, Imre Deak wrote:
-> On Mon, Sep 28, 2009 at 12:27:10PM +0200, ext Russell King - ARM Linux wrote:
-> > [...]
-> >
-> > Now you're talking about different code - the bit I quoted was what was
-> > in your submitted patch, without deletion of intervening lines.  There
-> > was no else clause in your patch.
-> > 
-> > Please, go back and look at your original patch.
-> 
-> Ah, sorry. Missed that line when rebasing. I'll send an updated one.
+Aaro Koskinen writes:
+ > Hello,
+ > 
+ > Mikael Pettersson wrote:
+ > > Aaro Koskinen writes:
+ > >  > Mikael Pettersson wrote:
+ > >  > > 10 Hz seems excessive, so this patch adds a compile-time option
+ > >  > > to reduce the polling frequency to 1 Hz.
+ > >  > > 
+ > >  > > (This change could possibly be handled via a kernel boot option,
+ > >  > > or even be made unconditional, but I opted for a compile-time
+ > >  > > option for now.)
+ > >  > 
+ > >  > I don't think there is need to have an option for this. With HZ also
+ > >  > round_jiffies() could be used, it doesn't need to be exact.
+ > > 
+ > > I don't quite follow you here. Can you elaborate?
+ > 
+ > round_jiffies() rounds the time up or down to a full second. It's useful for
+ > timers that expire every N seconds. This way timeouts can be grouped, so there
+ > is less wakeups.
 
-Now I see what you're getting at.  Yes, we can make this a debugging
-option, but I believe it should exhibit the right behaviour.
+Ah, the two sentences were not to be taken as a group:
+1) no need for an option, i.e. reduce to 1 Hz unconditionally, and
+2) with a 1 Hz timer, use round_jiffies() in the hope of grouping
+   with other whole-Hz timers that also use round_jiffies().
 
-In other words (and as I already covered) it should invoke the standard
-no_context thing if there isn't a fixup handler in place rather than
-continuing blindly on to try to handle the fault.  So, it should be:
-
-	if (!down_read_trylock(&mm->mmap_sem)) {
-		if (!user_mode(regs) && !search_exception_tables(regs->ARM_pc))
-			goto no_context;
-		down_read(&mm->mmap_sem);
-	} else {
-+#ifdef CONFIG_DEBUG_VM
-+		if (!user_mode(regs) && !search_exception_tables(regs->ARM_pc))
-+			goto no_context;
-+#endif
-...
+I'll look into using round_jiffies().
