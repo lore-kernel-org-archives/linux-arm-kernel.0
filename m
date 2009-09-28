@@ -1,41 +1,40 @@
-From: bgat@billgatliff.com (Bill Gatliff)
-Date: Mon, 28 Sep 2009 09:20:47 -0500
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 28 Sep 2009 16:22:28 +0200
 Subject: arm_syscall cacheflush breakage on VIPT platforms
-In-Reply-To: <200909281610.32674.laurent.pinchart@ideasonboard.com>
-References: <20090928092919.GA30271@localhost>	<20090928133109.GM30271@localhost>	<20090928134232.GG10671@n2100.arm.linux.org.uk>
+In-Reply-To: <20090928141510.GG19778@shareable.org>
+References: <20090928092919.GA30271@localhost>
 	<200909281610.32674.laurent.pinchart@ideasonboard.com>
-Message-ID: <4AC0C63F.9090503@billgatliff.com>
+	<20090928141510.GG19778@shareable.org>
+Message-ID: <200909281622.28404.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Laurent Pinchart wrote:
-> Do we really need a cross-architecture solution ? The pressure to implement a 
-> working userspace DMA solution seem to come mostly from embedded system 
-> developers, and embedded systems usually don't mind arch-specific APIs.
->   
+On Monday 28 September 2009 16:15:10 Jamie Lokier wrote:
+> Laurent Pinchart wrote:
+> > > I'd much rather just say "no, userspace DMA is *never* going to ever
+> > > be supported" and call it a day, but I suspect no one's going to like
+> > > that either.
+> >
+> > In that case developers will all create their own incompatible solutions
+> > and the situation will likely get worse. Do you think it would be
+> > possible to create a clean DMA-to-userspace API specific to the ARM
+> > architecture ?
+> 
+> I hate to spell out the obvious, but a fine solution is to _not_ DMA
+> directly to userspace, but to kmalloc() a large buffer in your own
+> driver, DMA into the buffer (it's kernel memory so that's ok), and
+> _then_ mmap() that buffer into userspace after the DMA.  Going the
+> other way, mmap(), write from userspace, munmap(), then do the DMA to
+> the device.
+> 
+> That's trivial to implement, and the developer's we're talking about
+> should have no difficulty writing a simple driver like that.  They
+> have a driver already, it's just a matter of adding the mmap method.
+> 
+> Russell, is there any reason why the above would not work?
 
-So what if the first attempt is ARM-only?  Let the PPC guys have theirs, 
-and so on--- all that experience should give us ideas on how to do the 
-One Size Fits All version.  In the meantime, at least we'll have 
-something we can use.
-
-It's obviously a tricky problem to solve.  Think of the arch-specific 
-version as being "prototype".  We'll be prototyping for a while, I'm 
-sure, and the fact that we don't have such an API yet tells me that we 
-need a few prototypes to identify how--- if it's even possible--- to 
-proceed with a generic implementation.
-
-> In that case developers will all create their own incompatible solutions and 
-> the situation will likely get worse.
-
-... and that creates the additional problem of cleaning up the mess 
-while at the same time finding and implementing a cross-architecture 
-solution.
-
-
-
-b.g.
+Performance reasons mostly. Think about transferring uncompressed 1080p at 
+30fps for instance.
 
 -- 
-Bill Gatliff
-bgat at billgatliff.com
+Laurent Pinchart
