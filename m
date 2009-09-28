@@ -1,26 +1,41 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sun, 27 Sep 2009 21:37:22 -0400 (EDT)
-Subject: Disable highmem with SMP if no h/w TLB broadcasting
-In-Reply-To: <20090927202937.GA26521@n2100.arm.linux.org.uk>
-References: <20090927202937.GA26521@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.0909272029030.4997@xanadu.home>
+From: rabin@rab.in (Rabin Vincent)
+Date: Mon, 28 Sep 2009 07:16:28 +0530
+Subject: [PATCH] Fix U300 generic GPIO, remove ifdefs from MMCI
+In-Reply-To: <1254078501-11745-1-git-send-email-linus.walleij@stericsson.com>
+References: <1254078501-11745-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20090928014628.GA15318@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 27 Sep 2009, Russell King - ARM Linux wrote:
-
-> We suffer an unfortunate combination of "features" which makes highmem
-> support on platforms without hardware TLB maintainence broadcast difficult:
+On Sun, Sep 27, 2009 at 09:08:21PM +0200, Linus Walleij wrote:
+> The #ifdefs in the MMCI driver were erroneous and just masking
+> a bug in the U300 generic GPIO implementation. This removes the
+> ifdefs and fixes the U300 generic GPIO instead.
 > 
-> - we need kmap_high_get() support for DMA cache coherence
-> - this requires kmap_high() to take a spinlock with IRQs disabled
-> - kmap_high() occasionally calls flush_all_zero_pkmaps() to clear
->   out old mappings
+> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> ---
+>  arch/arm/mach-u300/gpio.c              |    8 ++++++++
+>  arch/arm/mach-u300/include/mach/gpio.h |    1 +
+>  drivers/mmc/host/mmci.c                |    2 --
+>  3 files changed, 9 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-u300/gpio.c b/arch/arm/mach-u300/gpio.c
+> index 63c8f27..ce268ef 100644
+> --- a/arch/arm/mach-u300/gpio.c
+> +++ b/arch/arm/mach-u300/gpio.c
+> @@ -281,6 +281,14 @@ int gpio_unregister_callback(unsigned gpio)
+>  }
+>  EXPORT_SYMBOL(gpio_unregister_callback);
+>  
+> +int gpio_is_valid(int number)
+> +{
+> +	if (number < (U300_GPIO_NUM_PORTS * U300_GPIO_PINS_PER_PORT))
+> +		return 0;
+> +	return -EINVAL;
+> +}
 
-Hmmm...  I guess there could be a way to work around this limitation by 
-replacing flush_tlb_kernel_range() with something that would set a per 
-CPU flag on all CPUs to schedule TLB flushing the next time they call 
-kmap_high().
+gpio_is_valid() should return non-zero if the GPIO is valid, and zero
+if it's not.   Also, number may be negative so this function needs to
+check for that.
 
-
-Nicolas
+Rabin
