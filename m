@@ -1,18 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Sep 2009 11:05:35 +0100
-Subject: [PATCH 1/2] n2100: support assigning XINT1 to UART
-In-Reply-To: <20090928095813.GJ1773@mail.wantstofly.org>
-References: <19134.28977.5491.323804@pilspetsen.it.uu.se>
-	<20090928095813.GJ1773@mail.wantstofly.org>
-Message-ID: <20090928100535.GE6715@n2100.arm.linux.org.uk>
+From: imre.deak@nokia.com (Imre Deak)
+Date: Mon, 28 Sep 2009 13:10:44 +0300
+Subject: arm_syscall cacheflush breakage on VIPT platforms
+In-Reply-To: <20090928095945.GC6715@n2100.arm.linux.org.uk>
+References: <20090928092919.GA30271@localhost>
+	<20090928094140.GA6715@n2100.arm.linux.org.uk>
+	<20090928095429.GB30271@localhost>
+	<20090928095945.GC6715@n2100.arm.linux.org.uk>
+Message-ID: <20090928101044.GD30271@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 28, 2009 at 11:58:13AM +0200, Lennert Buytenhek wrote:
-> Can't you detect whether the 8250 IRQ is routed at boot?  E.g. cause
-> the UART to throw an interrupt, check the XINT, clear the interrupt,
-> and check the XINT again, and see if the 8250 interrupt status
-> corresponds to the XINT or not?  (And then printk the result of the
-> detection.)
+On Mon, Sep 28, 2009 at 11:59:45AM +0200, ext Russell King - ARM Linux wrote:
+> On Mon, Sep 28, 2009 at 12:54:29PM +0300, Imre Deak wrote:
+> > On Mon, Sep 28, 2009 at 11:41:40AM +0200, ext Russell King - ARM Linux wrote:
+> > > On Mon, Sep 28, 2009 at 12:29:19PM +0300, Imre Deak wrote:
+> > > > Hi,
+> > > > 
+> > > > the following test app will cause an unhandled kernel paging request
+> > > > on VIPT platforms. The triggering condition is the mmap_sem held by
+> > > > thread_func while the main thread performs cache flushing.
+> > > > 
+> > > > Since the likelihood of this to trigger is relatively low, a patch will
+> > > > follow that makes similar bugs more visible.
+> > > 
+> > > The problem is that, unlike previous cache architectures, if a page is
+> > > not present we now get a data abort during cache maintainence.  That
+> > > means the cache maintainence instructions used for this call need to
+> > > be marked with user fixups, so that the kernel knows how to handle
+> > > such an abort.
+> > > 
+> > > It is not caused by the holding of mmap_sem.
+> > 
+> > This particular bug is caused by holding of mmap_sem, without any fixup
+> > being defined.
+> 
+> No it is not.
 
-8250 already has support for auto-probing its interrupt.
+What I meant is that without holding mmap_sem you'll not trigger the error
+message even if you don't have a fixup routine.
+
+> The problem has nothing to do with holding of mmap_sem
+> AT ALL.  In fact, do_cache_op needs to hold mmap_sem itself, to prevent
+> the VMA going away beneath it.  That's not going to stop it generating
+> faults, and it's not going to stop it oopsing.
+> 
+> The problem is that we don't have any fixup in place for this situation.
+
+Yes, agreed. What I stated is that for _triggerring_ the error message you
+need mmap_sem.
+
+> There is nothing wrong in the page fault handler.
+
+Agreed. Only a warning would be nice to make similar cases more apparent
+even if mmap_sem is not held.
+
+--Imre
