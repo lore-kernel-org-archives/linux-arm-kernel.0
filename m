@@ -1,23 +1,23 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Mon, 28 Sep 2009 13:37:50 +0200
-Subject: [PATCH] Fix U300 generic GPIO, remove ifdefs from MMCI v2
-In-Reply-To: <20090928112715.GB10671@n2100.arm.linux.org.uk>
-References: <1254136780-31679-1-git-send-email-linus.walleij@stericsson.com>
-	<20090928112715.GB10671@n2100.arm.linux.org.uk>
-Message-ID: <63386a3d0909280437y437e0ccbo1e3180c1d5f196c8@mail.gmail.com>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Mon, 28 Sep 2009 13:40:11 +0200
+Subject: [PATCH 1/2] n2100: support assigning XINT1 to UART
+In-Reply-To: <20090928100535.GE6715@n2100.arm.linux.org.uk>
+References: <19134.28977.5491.323804@pilspetsen.it.uu.se>
+	<20090928095813.GJ1773@mail.wantstofly.org>
+	<20090928100535.GE6715@n2100.arm.linux.org.uk>
+Message-ID: <19136.41115.286197.101467@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/9/28 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Mon, Sep 28, 2009 at 01:19:40PM +0200, Linus Walleij wrote:
->> This version is hopefully correct for the API. Sorry for the mess
->> again and thanks to Russell and Rabin Vincent for pointing me
->> in the right direction on this one.
->
-> I feel the comments in the code are too much. ?Maybe a single comment
-> about the return value above the function would be sufficient?
+Russell King - ARM Linux writes:
+ > On Mon, Sep 28, 2009 at 11:58:13AM +0200, Lennert Buytenhek wrote:
+ > > Can't you detect whether the 8250 IRQ is routed at boot?  E.g. cause
+ > > the UART to throw an interrupt, check the XINT, clear the interrupt,
+ > > and check the XINT again, and see if the 8250 interrupt status
+ > > corresponds to the XINT or not?  (And then printk the result of the
+ > > detection.)
+ > 
+ > 8250 already has support for auto-probing its interrupt.
 
-OK there is a v3 redux version in the patch tracker with a single comment.
-Thanks Russell!
-
-Linus Walleij
+The question is how well things work if the 2nd uhci and
+serial share (software) interrupt. I'll have to check.
