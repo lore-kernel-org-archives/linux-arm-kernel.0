@@ -1,39 +1,46 @@
-From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
-Date: Mon, 28 Sep 2009 11:43:46 +0200
-Subject: Problem with mxc_nand driver
-In-Reply-To: <a57e67db0909280241w61f8d8bbm88ff5d749cc946c2@mail.gmail.com>
-References: <a57e67db0909272341k59d4cda6pde85ff7425a75c8f@mail.gmail.com>	
-	<4AC0682D.6000907@eukrea.com>	
-	<a57e67db0909280156x686f0d26u397dc6397fd0b3a@mail.gmail.com>	
-	<4AC07FF9.2040002@eukrea.com>
-	<a57e67db0909280241w61f8d8bbm88ff5d749cc946c2@mail.gmail.com>
-Message-ID: <4AC08552.2070009@eukrea.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 Sep 2009 11:04:42 +0100
+Subject: [PATCH] ARM: add warning for invalid kernel page faults
+In-Reply-To: <20090928100048.GC30271@localhost>
+References: <20090928092919.GA30271@localhost>
+	<1254131304-32057-1-git-send-email-imre.deak@nokia.com>
+	<20090928095516.GB6715@n2100.arm.linux.org.uk>
+	<20090928100048.GC30271@localhost>
+Message-ID: <20090928100442.GD6715@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Sep 28, 2009 at 01:00:48PM +0300, Imre Deak wrote:
+> On Mon, Sep 28, 2009 at 11:55:16AM +0200, ext Russell King - ARM Linux wrote:
+> > On Mon, Sep 28, 2009 at 12:48:24PM +0300, Imre Deak wrote:
+> > > To easier detect code that can trigger the above error, add a check
+> > > also for the case where mmap_sem is acquired. As this has an overhead
+> > > make it a VM debug warning.
+> > 
+> > It _is_ already easy.  I'm not sure why you want even more noise, and
+> > why you want to break the page fault handling.  From the warning you
+> > received in your previous post, it said:
+> 
+> The problem is that it happens very rarely. Only if at the time of the
+> fault the mmap_sem happens to be held. With the change the error would
+> be apparent at the first fault the offending instruction generates.
 
-Jernej Turnsek a ?crit :
-> after writing root fs image into nand partition, running the image and
-> then checking the first empty block I've got following OOB data which
-> is suspicious to me:
-> 
-> OOB:
-> 	ff ff 85 19 03 20 ff ff
-> 	ff 65 02 08 00 00 00 ff
-> 	ff ff ff ff ff ff ff ff
-> 	ff ff 03 ff ff ff ff ff
-> 	ff ff ff ff ff ff ff ff
-> 	ff ff 03 ff ff ff ff ff
-> 	ff ff ff ff ff ff ff ff
-> 	ff ff 03 ff ff ff ff ff
-> 
-> One can see that bytes on offset 2 to 5 are not empty and when using
-> the smallpage_memorybased badblock_pattern byte 6 is not FF like it
-> should be.
-> 
-> Anyone knows what is going on here?
-> 
-which configuration are you using ? SW ECC + without the commit ?
+Actually... I don't agree that your code can have any change what so
+ever.
 
-Eric
+Condition 1:
+                if (!user_mode(regs) && !search_exception_tables(regs->ARM_pc))
+                        goto no_context;
+
+                down_read(&mm->mmap_sem);
++#ifdef CONFIG_DEBUG_VM
+
+Condition 2:
+
++               if (!user_mode(regs) &&
++                   !search_exception_tables(regs->ARM_pc)) {
++                       static unsigned long last_warn_jiffies;
+
+Condition 1 and condition 2 are identical.  They do not change on whether
+the mmap_sem is held or not.  So please explain to me how you actually
+get to printing any of your new warnings.
