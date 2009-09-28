@@ -1,73 +1,78 @@
-From: imre.deak@nokia.com (Imre Deak)
-Date: Mon, 28 Sep 2009 14:05:01 +0300
-Subject: [PATCH v2] ARM: add warning for invalid kernel page faults
-In-Reply-To: <20090928110158.GG30271@localhost>
-References: <20090928110158.GG30271@localhost>
-Message-ID: <1254135901-13016-1-git-send-email-imre.deak@nokia.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 28 Sep 2009 13:19:40 +0200
+Subject: [PATCH] Fix U300 generic GPIO, remove ifdefs from MMCI v2
+Message-ID: <1254136780-31679-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Imre Deak <imre.deak@nokia.com>
+The #ifdefs in the MMCI driver were erroneous and just masking
+a bug in the U300 generic GPIO implementation. This removes the
+ifdefs and fixes the U300 generic GPIO instead.
 
-According to the following in arch/arm/mm/fault.c page faults from
-kernel mode are invalid if mmap_sem is already held and there is
-no exception handler defined for the faulting instruction:
-
-/*
- * As per x86, we may deadlock here.  However, since the kernel only
- * validly references user space from well defined areas of the code,
- * we can bug out early if this is from code which shouldn't.
- */
-if (!down_read_trylock(&mm->mmap_sem)) {
-	if (!user_mode(regs) && !search_exception_tables(regs->ARM_pc))
-		goto no_context;
-
-Since mmap_sem can be held at arbitrary times by another thread this
-also means that any page faults from kernel mode are invalid if no
-exception handler is defined for them, regardless whether mmap_sem is
-held at the time of fault.
-
-To easier detect code that can trigger the above error, add a check
-also for the case where mmap_sem is acquired. As this has an overhead
-make it a VM debug warning.
-
-This will emit a warning at least for arm_syscall cacheflush users
-on VIPT platforms, where the breakage would happen only in a less
-likely situation.
-
-Signed-off-by: Imre Deak <imre.deak@nokia.com>
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 ---
+This version is hopefully correct for the API. Sorry for the mess
+again and thanks to Russell and Rabin Vincent for pointing me
+in the right direction on this one.
+---
+ arch/arm/mach-u300/gpio.c              |   11 +++++++++++
+ arch/arm/mach-u300/include/mach/gpio.h |    1 +
+ drivers/mmc/host/mmci.c                |    2 --
+ 3 files changed, 12 insertions(+), 2 deletions(-)
 
-Added a missing else.
-
- arch/arm/mm/fault.c |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index cc8829d..91a9710 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -278,6 +278,21 @@ do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
- 		if (!user_mode(regs) && !search_exception_tables(regs->ARM_pc))
- 			goto no_context;
- 		down_read(&mm->mmap_sem);
-+	} else {
-+#ifdef CONFIG_DEBUG_VM
-+		if (!user_mode(regs) &&
-+		    !search_exception_tables(regs->ARM_pc)) {
-+			static unsigned long last_warn_jiffies;
-+
-+			if (printk_timed_ratelimit(&last_warn_jiffies, 10000)) {
-+				printk(KERN_WARNING
-+				       "Invalid kernel paging request at virtual address %08lx",
-+				       addr);
-+				show_pte(mm, addr);
-+				WARN_ON(1);
-+			}
-+		}
-+#endif
- 	}
+diff --git a/arch/arm/mach-u300/gpio.c b/arch/arm/mach-u300/gpio.c
+index 63c8f27..0d3bbe2 100644
+--- a/arch/arm/mach-u300/gpio.c
++++ b/arch/arm/mach-u300/gpio.c
+@@ -281,6 +281,17 @@ int gpio_unregister_callback(unsigned gpio)
+ }
+ EXPORT_SYMBOL(gpio_unregister_callback);
  
- 	fault = __do_page_fault(mm, addr, fsr, tsk);
++int gpio_is_valid(int number)
++{
++	if (number >= 0 &&
++	    number < (U300_GPIO_NUM_PORTS * U300_GPIO_PINS_PER_PORT))
++		/* Non-zero means valid */
++		return 1;
++	/* Else it's invalid, zero */
++	return 0;
++}
++EXPORT_SYMBOL(gpio_is_valid);
++
+ int gpio_request(unsigned gpio, const char *label)
+ {
+ 	if (gpio_pin[gpio].users)
+diff --git a/arch/arm/mach-u300/include/mach/gpio.h b/arch/arm/mach-u300/include/mach/gpio.h
+index c817412..7b1fc98 100644
+--- a/arch/arm/mach-u300/include/mach/gpio.h
++++ b/arch/arm/mach-u300/include/mach/gpio.h
+@@ -258,6 +258,7 @@
+ #define PIN_TO_PORT(val) (val >> 3)
+ 
+ /* These can be found in arch/arm/mach-u300/gpio.c */
++extern int gpio_is_valid(int number);
+ extern int gpio_request(unsigned gpio, const char *label);
+ extern void gpio_free(unsigned gpio);
+ extern int gpio_direction_input(unsigned gpio);
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 3d1e532..705a589 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -678,7 +678,6 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
+ 	writel(0, host->base + MMCIMASK1);
+ 	writel(0xfff, host->base + MMCICLEAR);
+ 
+-#ifdef CONFIG_GPIOLIB
+ 	if (gpio_is_valid(plat->gpio_cd)) {
+ 		ret = gpio_request(plat->gpio_cd, DRIVER_NAME " (cd)");
+ 		if (ret == 0)
+@@ -697,7 +696,6 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
+ 		else if (ret != -ENOSYS)
+ 			goto err_gpio_wp;
+ 	}
+-#endif
+ 
+ 	ret = request_irq(dev->irq[0], mmci_irq, IRQF_SHARED, DRIVER_NAME " (cmd)", host);
+ 	if (ret)
 -- 
-1.6.3.3
+1.6.2.1
