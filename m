@@ -1,28 +1,42 @@
-From: imre.deak@nokia.com (Imre Deak)
-Date: Mon, 28 Sep 2009 13:00:48 +0300
-Subject: [PATCH] ARM: add warning for invalid kernel page faults
-In-Reply-To: <20090928095516.GB6715@n2100.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 Sep 2009 10:59:45 +0100
+Subject: arm_syscall cacheflush breakage on VIPT platforms
+In-Reply-To: <20090928095429.GB30271@localhost>
 References: <20090928092919.GA30271@localhost>
-	<1254131304-32057-1-git-send-email-imre.deak@nokia.com>
-	<20090928095516.GB6715@n2100.arm.linux.org.uk>
-Message-ID: <20090928100048.GC30271@localhost>
+	<20090928094140.GA6715@n2100.arm.linux.org.uk>
+	<20090928095429.GB30271@localhost>
+Message-ID: <20090928095945.GC6715@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 28, 2009 at 11:55:16AM +0200, ext Russell King - ARM Linux wrote:
-> On Mon, Sep 28, 2009 at 12:48:24PM +0300, Imre Deak wrote:
-> > To easier detect code that can trigger the above error, add a check
-> > also for the case where mmap_sem is acquired. As this has an overhead
-> > make it a VM debug warning.
+On Mon, Sep 28, 2009 at 12:54:29PM +0300, Imre Deak wrote:
+> On Mon, Sep 28, 2009 at 11:41:40AM +0200, ext Russell King - ARM Linux wrote:
+> > On Mon, Sep 28, 2009 at 12:29:19PM +0300, Imre Deak wrote:
+> > > Hi,
+> > > 
+> > > the following test app will cause an unhandled kernel paging request
+> > > on VIPT platforms. The triggering condition is the mmap_sem held by
+> > > thread_func while the main thread performs cache flushing.
+> > > 
+> > > Since the likelihood of this to trigger is relatively low, a patch will
+> > > follow that makes similar bugs more visible.
+> > 
+> > The problem is that, unlike previous cache architectures, if a page is
+> > not present we now get a data abort during cache maintainence.  That
+> > means the cache maintainence instructions used for this call need to
+> > be marked with user fixups, so that the kernel knows how to handle
+> > such an abort.
+> > 
+> > It is not caused by the holding of mmap_sem.
 > 
-> It _is_ already easy.  I'm not sure why you want even more noise, and
-> why you want to break the page fault handling.  From the warning you
-> received in your previous post, it said:
+> This particular bug is caused by holding of mmap_sem, without any fixup
+> being defined.
 
-The problem is that it happens very rarely. Only if at the time of the
-fault the mmap_sem happens to be held. With the change the error would
-be apparent at the first fault the offending instruction generates.
+No it is not.  The problem has nothing to do with holding of mmap_sem
+AT ALL.  In fact, do_cache_op needs to hold mmap_sem itself, to prevent
+the VMA going away beneath it.  That's not going to stop it generating
+faults, and it's not going to stop it oopsing.
 
-For debugging this is very useful, I think.
+The problem is that we don't have any fixup in place for this situation.
 
---Imre
+There is nothing wrong in the page fault handler.
