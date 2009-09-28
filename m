@@ -1,20 +1,28 @@
-From: aaro.koskinen@nokia.com (Aaro Koskinen)
-Date: Mon, 28 Sep 2009 09:53:44 +0300
-Subject: [PATCH 1/2] n2100: support assigning XINT1 to UART
-In-Reply-To: <19134.28977.5491.323804@pilspetsen.it.uu.se>
-References: <19134.28977.5491.323804@pilspetsen.it.uu.se>
-Message-ID: <4AC05D78.20007@nokia.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 28 Sep 2009 09:21:35 +0200 (CEST)
+Subject: [PATCH needed?] ARM: add missing HAVE_KERNEL_GZIP
+Message-ID: <Pine.LNX.4.64.0909280914220.4212@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Kernel fails to uncompress itself and boot without this patch.
 
-Mikael Pettersson wrote:
-> +config N2100_XINT1_UART
-> +	bool "Support assigning Thecus n2100 XINT1 to UART"
-> +	depends on MACH_N2100 && NO_HZ
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+---
 
-This shouldn't depend on NO_HZ. Some people may want to use it
-just to get (much) faster serial console.
+No idea if this is the correct or even needed fix. I did observe a failure 
+to boot with a post 2.6.31 kernel about two weeks ago without this patch 
+(from u-boot), but it might well have become irrelevant by now.
 
-A.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index aef63c8..fca630e 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -18,6 +18,7 @@ config ARM
+ 	select HAVE_KRETPROBES if (HAVE_KPROBES)
+ 	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
+ 	select HAVE_GENERIC_DMA_COHERENT
++	select HAVE_KERNEL_GZIP
+ 	help
+ 	  The ARM series is a line of low-power-consumption RISC chip designs
+ 	  licensed by ARM Ltd and targeted at embedded applications and
