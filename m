@@ -1,29 +1,49 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 28 Sep 2009 13:22:10 +0100
-Subject: something wrong in drivers/power
-In-Reply-To: <20090928075517.GA6871@doriath.ww600.siemens.net>
-References: <20090926095555.GG1331@ucw.cz>
-	<20090926145536.GA8445@doriath.ww600.siemens.net>
-	<20090927173516.GB6710@elf.ucw.cz>
-	<20090928075517.GA6871@doriath.ww600.siemens.net>
-Message-ID: <20090928122210.GB32420@sirena.org.uk>
+From: ben@trinity.fluff.org (Ben Dooks)
+Date: Mon, 28 Sep 2009 13:23:59 +0100
+Subject: s3c24xx gpiolib question
+In-Reply-To: <200909272012.53753.anarsoul@gmail.com>
+References: <200909272012.53753.anarsoul@gmail.com>
+Message-ID: <20090928122359.GE2698@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 28, 2009 at 11:55:17AM +0400, Dmitry Eremin-Solenikov wrote:
+On Sun, Sep 27, 2009 at 08:12:44PM +0300, Vasily Khoruzhick wrote:
+> Hi,
+> 
+> Is following patch sufficient to add GPJ port support to s3c24xx gpiolib?
+> And how to switch gpioline to custom function mode (for example TOUT0 on GPB0) 
+> via gpiolib?
+> 
+> diff --git a/arch/arm/plat-s3c24xx/gpiolib.c b/arch/arm/plat-s3c24xx/gpiolib.c
+> index 6d7a961..65d79f9 100644
+> --- a/arch/arm/plat-s3c24xx/gpiolib.c
+> +++ b/arch/arm/plat-s3c24xx/gpiolib.c
+> @@ -151,7 +151,8 @@ struct s3c_gpio_chip s3c24xx_gpios[] = {
+>  			.ngpio			= 16,
+>  			.to_irq			= s3c24xx_gpiolib_bankg_toirq,
+>  		},
+> -	}, {
+> +	}, 
+> +	[7] = {
+>  		.base	= S3C2410_GPHCON,
+>  		.pm	= __gpio_pm(&s3c_gpio_pm_2bit),
+>  		.chip	= {
+> @@ -161,6 +162,16 @@ struct s3c_gpio_chip s3c24xx_gpios[] = {
+>  			.ngpio			= 11,
+>  		},
+>  	},
+> +	[8] = {
+> +		.base	= S3C2440_GPJCON,
+> +		.pm = __gpio_pm(&s3c_gpio_pm_2bit),
+> +		.chip	= {
+> +			.base			= S3C2440_GPJ0,
 
-> 1) add a clean possibility to pass platform data via ac97 bus to wm97xx
-> core driver (care to check that it should be passable both via regular
-> ac97 driver and via ASoC).
+I need to get the gpio number space compressed to get this to
+work, it got shuffled out of this round of patches due to urgent
+meetings.
 
-This has already been done by Marek, I think most of the bits made it
-into 2.6.32-rc1 though I haven't checked.  The problem had been getting
-ALSA support for using the platform data but Takashi agreeded to that so
-we're fine.  It needs explict support in the AC97 controller driver to
-actually set the platform data for the CODECs on the bus but that's been
-done for PXA.
+-- 
+Ben
 
-In any case, I'd nack the original patch too - all it will do is break
-the driver since it will no longer load and the attempts to get the
-wm97xx structure from the parent device of a separately registered
-platform device will oops.
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
