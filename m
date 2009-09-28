@@ -1,36 +1,35 @@
-From: andy@warmcat.com (Andy Green)
-Date: Mon, 28 Sep 2009 09:19:14 +0100
-Subject: [PATCH needed?] ARM: add missing HAVE_KERNEL_GZIP
-In-Reply-To: <Pine.LNX.4.64.0909280954490.4212@axis700.grange>
-References: <Pine.LNX.4.64.0909280914220.4212@axis700.grange>	<20090928075313.GA22380@pengutronix.de>
-	<Pine.LNX.4.64.0909280954490.4212@axis700.grange>
-Message-ID: <4AC07182.90901@warmcat.com>
+From: jernej.turnsek@gmail.com (Jernej Turnsek)
+Date: Mon, 28 Sep 2009 10:56:40 +0200
+Subject: Problem with mxc_nand driver
+In-Reply-To: <4AC0682D.6000907@eukrea.com>
+References: <a57e67db0909272341k59d4cda6pde85ff7425a75c8f@mail.gmail.com>
+	<4AC0682D.6000907@eukrea.com>
+Message-ID: <a57e67db0909280156x686f0d26u397dc6397fd0b3a@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/28/2009 08:56 AM, Somebody in the thread at some point said:
-> On Mon, 28 Sep 2009, Uwe Kleine-K?nig wrote:
+Hi,
+
+are you using HW ECC on your chip? I suspect that HW ECC is writting
+something into space provided for the clean markers. I will
+investigate to.
+
+BR,
+Jernej
+
+On Mon, Sep 28, 2009 at 9:39 AM, Eric B?nard <eric@eukrea.com> wrote:
+> Hi Jernej,
 >
->> Hi Guennadi,
+> Jernej Turnsek a ?crit :
 >>
->> On Mon, Sep 28, 2009 at 09:21:35AM +0200, Guennadi Liakhovetski wrote:
->>> Kernel fails to uncompress itself and boot without this patch.
->> I have no problem booting yesterday's linus/master without that change.
+>> I found a bit strange to set badblock_pattern parameter to
+>> smallpage_memorybased although pagesize is 2k. Or am I wrong?
 >>
->> What is the exact problem you see?
+>> When I revert this patch, everything works as it should.
+>>
+> on my iMX27 board, I have the opposite case with a MT29F4G08ABC : it works
+> only with this patch. This code came from the original Freescale BSP. I'm
+> going to investigate more on this problem on my board and let you know.
 >
-> Don't remember the error message exactly - something like "cannot
-> uncompress" or "missing decompressor"... Observed on a i.MX31 system,
-> although, if the problem were real, it probably would be present on all
-> ARMs - none defines any of those decompressors. Will have to double-check
-> then.
-
-Just a comment on this, I run on an iMX device with an uncompressed 
-kernel for a nice decrease in early boot time.  The kernel comes in at 
-3MB uncompressed and the Qi bootloader I used pulls that in around half 
-a second from uSD.
-
-I use gzip for something else as it happens, but in the uncompressed 
-case, boot is not dependent on gzip in the kernel.
-
--Andy
+> Eric
+>
