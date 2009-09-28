@@ -1,25 +1,52 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Mon, 28 Sep 2009 12:30:30 +0200
-Subject: [PATCH 2/2] n2100: reduce power button timer to 1 Hz
-In-Reply-To: <4AC06E8C.8090908@nokia.com>
-References: <19134.29011.460366.960746@pilspetsen.it.uu.se>
-	<4AC06E8C.8090908@nokia.com>
-Message-ID: <19136.36934.791249.535941@pilspetsen.it.uu.se>
+From: jernej.turnsek@gmail.com (Jernej Turnsek)
+Date: Mon, 28 Sep 2009 12:30:46 +0200
+Subject: Problem with mxc_nand driver
+In-Reply-To: <4AC08552.2070009@eukrea.com>
+References: <a57e67db0909272341k59d4cda6pde85ff7425a75c8f@mail.gmail.com>
+	<4AC0682D.6000907@eukrea.com>
+	<a57e67db0909280156x686f0d26u397dc6397fd0b3a@mail.gmail.com>
+	<4AC07FF9.2040002@eukrea.com>
+	<a57e67db0909280241w61f8d8bbm88ff5d749cc946c2@mail.gmail.com>
+	<4AC08552.2070009@eukrea.com>
+Message-ID: <a57e67db0909280330o6e608aa4m332da096d53f4c2c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Aaro Koskinen writes:
- > Hello,
- > 
- > Mikael Pettersson wrote:
- > > 10 Hz seems excessive, so this patch adds a compile-time option
- > > to reduce the polling frequency to 1 Hz.
- > > 
- > > (This change could possibly be handled via a kernel boot option,
- > > or even be made unconditional, but I opted for a compile-time
- > > option for now.)
- > 
- > I don't think there is need to have an option for this. With HZ also
- > round_jiffies() could be used, it doesn't need to be exact.
+static struct mxc_nand_platform_data nand_board_info = {
+	.width = 1,
+	.hw_ecc = 1,
+};
 
-I don't quite follow you here. Can you elaborate?
+Isn't number 85 19 something from jffs2? Magic or something.
+
+Jernej
+
+On Mon, Sep 28, 2009 at 11:43 AM, Eric B?nard <eric@eukrea.com> wrote:
+> Hi,
+>
+> Jernej Turnsek a ?crit :
+>>
+>> after writing root fs image into nand partition, running the image and
+>> then checking the first empty block I've got following OOB data which
+>> is suspicious to me:
+>>
+>> OOB:
+>> ? ? ? ?ff ff 85 19 03 20 ff ff
+>> ? ? ? ?ff 65 02 08 00 00 00 ff
+>> ? ? ? ?ff ff ff ff ff ff ff ff
+>> ? ? ? ?ff ff 03 ff ff ff ff ff
+>> ? ? ? ?ff ff ff ff ff ff ff ff
+>> ? ? ? ?ff ff 03 ff ff ff ff ff
+>> ? ? ? ?ff ff ff ff ff ff ff ff
+>> ? ? ? ?ff ff 03 ff ff ff ff ff
+>>
+>> One can see that bytes on offset 2 to 5 are not empty and when using
+>> the smallpage_memorybased badblock_pattern byte 6 is not FF like it
+>> should be.
+>>
+>> Anyone knows what is going on here?
+>>
+> which configuration are you using ? SW ECC + without the commit ?
+>
+> Eric
+>
