@@ -1,23 +1,33 @@
-From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
-Date: Mon, 28 Sep 2009 09:39:25 +0200
-Subject: Problem with mxc_nand driver
-In-Reply-To: <a57e67db0909272341k59d4cda6pde85ff7425a75c8f@mail.gmail.com>
-References: <a57e67db0909272341k59d4cda6pde85ff7425a75c8f@mail.gmail.com>
-Message-ID: <4AC0682D.6000907@eukrea.com>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Mon, 28 Sep 2009 09:43:57 +0200
+Subject: S3C64xx backlight PWM misinited GPIO pin
+In-Reply-To: <4ABB8EEE.7070103@gmail.com> (Maurus Cuelenaere's message of
+	"Thu\, 24 Sep 2009 17\:23\:26 +0200")
+References: <4ABB8EEE.7070103@gmail.com>
+Message-ID: <87iqf3sede.fsf@macbook.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jernej,
+>>>>> "Maurus" == Maurus Cuelenaere <mcuelenaere@gmail.com> writes:
 
-Jernej Turnsek a ?crit :
-> I found a bit strange to set badblock_pattern parameter to
-> smallpage_memorybased although pagesize is 2k. Or am I wrong?
-> 
-> When I revert this patch, everything works as it should.
-> 
-on my iMX27 board, I have the opposite case with a MT29F4G08ABC : it 
-works only with this patch. This code came from the original Freescale 
-BSP. I'm going to investigate more on this problem on my board and let 
-you know.
+ Maurus> Hi,
 
-Eric
+ Maurus> Are the GPIO pins used as PWM (e.g. GPF15) supposed to be set
+ Maurus> to special function 2 in the bootloader/mach file or is this
+ Maurus> just a bug in the PWM driver in current mainline?
+
+The pin configuration imho doesn't belong in the pwm driver shared
+between 24xx/64xx.
+
+ Maurus> which doesn't look like it's the way to go..
+
+To me it's OK - Ben, what do you say?
+
+ Maurus> Do I need to set some kind of config option (mach-hmt doesn't
+ Maurus> seem to need the above change) or .. ?
+
+It doesn't do it because I setup the pin in the bootloader (E.G. to
+display bootsplash image).
+
+-- 
+Bye, Peter Korsgaard
