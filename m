@@ -1,78 +1,45 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 28 Sep 2009 13:19:40 +0200
-Subject: [PATCH] Fix U300 generic GPIO, remove ifdefs from MMCI v2
-Message-ID: <1254136780-31679-1-git-send-email-linus.walleij@stericsson.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 Sep 2009 12:26:24 +0100
+Subject: [PATCH] ARM: add warning for invalid kernel page faults
+In-Reply-To: <20090928110158.GG30271@localhost>
+References: <20090928092919.GA30271@localhost>
+	<1254131304-32057-1-git-send-email-imre.deak@nokia.com>
+	<20090928095516.GB6715@n2100.arm.linux.org.uk>
+	<20090928100048.GC30271@localhost>
+	<20090928100442.GD6715@n2100.arm.linux.org.uk>
+	<20090928101625.GE30271@localhost>
+	<20090928102710.GG6715@n2100.arm.linux.org.uk>
+	<20090928110158.GG30271@localhost>
+Message-ID: <20090928112624.GA10671@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The #ifdefs in the MMCI driver were erroneous and just masking
-a bug in the U300 generic GPIO implementation. This removes the
-ifdefs and fixes the U300 generic GPIO instead.
+On Mon, Sep 28, 2009 at 02:01:58PM +0300, Imre Deak wrote:
+> On Mon, Sep 28, 2009 at 12:27:10PM +0200, ext Russell King - ARM Linux wrote:
+> > [...]
+> >
+> > Now you're talking about different code - the bit I quoted was what was
+> > in your submitted patch, without deletion of intervening lines.  There
+> > was no else clause in your patch.
+> > 
+> > Please, go back and look at your original patch.
+> 
+> Ah, sorry. Missed that line when rebasing. I'll send an updated one.
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
-This version is hopefully correct for the API. Sorry for the mess
-again and thanks to Russell and Rabin Vincent for pointing me
-in the right direction on this one.
----
- arch/arm/mach-u300/gpio.c              |   11 +++++++++++
- arch/arm/mach-u300/include/mach/gpio.h |    1 +
- drivers/mmc/host/mmci.c                |    2 --
- 3 files changed, 12 insertions(+), 2 deletions(-)
+Now I see what you're getting at.  Yes, we can make this a debugging
+option, but I believe it should exhibit the right behaviour.
 
-diff --git a/arch/arm/mach-u300/gpio.c b/arch/arm/mach-u300/gpio.c
-index 63c8f27..0d3bbe2 100644
---- a/arch/arm/mach-u300/gpio.c
-+++ b/arch/arm/mach-u300/gpio.c
-@@ -281,6 +281,17 @@ int gpio_unregister_callback(unsigned gpio)
- }
- EXPORT_SYMBOL(gpio_unregister_callback);
- 
-+int gpio_is_valid(int number)
-+{
-+	if (number >= 0 &&
-+	    number < (U300_GPIO_NUM_PORTS * U300_GPIO_PINS_PER_PORT))
-+		/* Non-zero means valid */
-+		return 1;
-+	/* Else it's invalid, zero */
-+	return 0;
-+}
-+EXPORT_SYMBOL(gpio_is_valid);
-+
- int gpio_request(unsigned gpio, const char *label)
- {
- 	if (gpio_pin[gpio].users)
-diff --git a/arch/arm/mach-u300/include/mach/gpio.h b/arch/arm/mach-u300/include/mach/gpio.h
-index c817412..7b1fc98 100644
---- a/arch/arm/mach-u300/include/mach/gpio.h
-+++ b/arch/arm/mach-u300/include/mach/gpio.h
-@@ -258,6 +258,7 @@
- #define PIN_TO_PORT(val) (val >> 3)
- 
- /* These can be found in arch/arm/mach-u300/gpio.c */
-+extern int gpio_is_valid(int number);
- extern int gpio_request(unsigned gpio, const char *label);
- extern void gpio_free(unsigned gpio);
- extern int gpio_direction_input(unsigned gpio);
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 3d1e532..705a589 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -678,7 +678,6 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
- 	writel(0, host->base + MMCIMASK1);
- 	writel(0xfff, host->base + MMCICLEAR);
- 
--#ifdef CONFIG_GPIOLIB
- 	if (gpio_is_valid(plat->gpio_cd)) {
- 		ret = gpio_request(plat->gpio_cd, DRIVER_NAME " (cd)");
- 		if (ret == 0)
-@@ -697,7 +696,6 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
- 		else if (ret != -ENOSYS)
- 			goto err_gpio_wp;
- 	}
--#endif
- 
- 	ret = request_irq(dev->irq[0], mmci_irq, IRQF_SHARED, DRIVER_NAME " (cmd)", host);
- 	if (ret)
--- 
-1.6.2.1
+In other words (and as I already covered) it should invoke the standard
+no_context thing if there isn't a fixup handler in place rather than
+continuing blindly on to try to handle the fault.  So, it should be:
+
+	if (!down_read_trylock(&mm->mmap_sem)) {
+		if (!user_mode(regs) && !search_exception_tables(regs->ARM_pc))
+			goto no_context;
+		down_read(&mm->mmap_sem);
+	} else {
++#ifdef CONFIG_DEBUG_VM
++		if (!user_mode(regs) && !search_exception_tables(regs->ARM_pc))
++			goto no_context;
++#endif
+...
