@@ -1,57 +1,28 @@
-From: imre.deak@nokia.com (Imre Deak)
-Date: Mon, 28 Sep 2009 13:10:44 +0300
-Subject: arm_syscall cacheflush breakage on VIPT platforms
-In-Reply-To: <20090928095945.GC6715@n2100.arm.linux.org.uk>
-References: <20090928092919.GA30271@localhost>
-	<20090928094140.GA6715@n2100.arm.linux.org.uk>
-	<20090928095429.GB30271@localhost>
-	<20090928095945.GC6715@n2100.arm.linux.org.uk>
-Message-ID: <20090928101044.GD30271@localhost>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 Sep 2009 11:11:15 +0100
+Subject: Disable highmem with SMP if no h/w TLB broadcasting
+In-Reply-To: <alpine.LFD.2.00.0909272029030.4997@xanadu.home>
+References: <20090927202937.GA26521@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.0909272029030.4997@xanadu.home>
+Message-ID: <20090928101115.GF6715@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 28, 2009 at 11:59:45AM +0200, ext Russell King - ARM Linux wrote:
-> On Mon, Sep 28, 2009 at 12:54:29PM +0300, Imre Deak wrote:
-> > On Mon, Sep 28, 2009 at 11:41:40AM +0200, ext Russell King - ARM Linux wrote:
-> > > On Mon, Sep 28, 2009 at 12:29:19PM +0300, Imre Deak wrote:
-> > > > Hi,
-> > > > 
-> > > > the following test app will cause an unhandled kernel paging request
-> > > > on VIPT platforms. The triggering condition is the mmap_sem held by
-> > > > thread_func while the main thread performs cache flushing.
-> > > > 
-> > > > Since the likelihood of this to trigger is relatively low, a patch will
-> > > > follow that makes similar bugs more visible.
-> > > 
-> > > The problem is that, unlike previous cache architectures, if a page is
-> > > not present we now get a data abort during cache maintainence.  That
-> > > means the cache maintainence instructions used for this call need to
-> > > be marked with user fixups, so that the kernel knows how to handle
-> > > such an abort.
-> > > 
-> > > It is not caused by the holding of mmap_sem.
+On Sun, Sep 27, 2009 at 09:37:22PM -0400, Nicolas Pitre wrote:
+> On Sun, 27 Sep 2009, Russell King - ARM Linux wrote:
+> 
+> > We suffer an unfortunate combination of "features" which makes highmem
+> > support on platforms without hardware TLB maintainence broadcast difficult:
 > > 
-> > This particular bug is caused by holding of mmap_sem, without any fixup
-> > being defined.
+> > - we need kmap_high_get() support for DMA cache coherence
+> > - this requires kmap_high() to take a spinlock with IRQs disabled
+> > - kmap_high() occasionally calls flush_all_zero_pkmaps() to clear
+> >   out old mappings
 > 
-> No it is not.
+> Hmmm...  I guess there could be a way to work around this limitation by 
+> replacing flush_tlb_kernel_range() with something that would set a per 
+> CPU flag on all CPUs to schedule TLB flushing the next time they call 
+> kmap_high().
 
-What I meant is that without holding mmap_sem you'll not trigger the error
-message even if you don't have a fixup routine.
-
-> The problem has nothing to do with holding of mmap_sem
-> AT ALL.  In fact, do_cache_op needs to hold mmap_sem itself, to prevent
-> the VMA going away beneath it.  That's not going to stop it generating
-> faults, and it's not going to stop it oopsing.
-> 
-> The problem is that we don't have any fixup in place for this situation.
-
-Yes, agreed. What I stated is that for _triggerring_ the error message you
-need mmap_sem.
-
-> There is nothing wrong in the page fault handler.
-
-Agreed. Only a warning would be nice to make similar cases more apparent
-even if mmap_sem is not held.
-
---Imre
+Until we have a solution that's acceptable to everyone, I suggest that
+the patch I attached is merged.
