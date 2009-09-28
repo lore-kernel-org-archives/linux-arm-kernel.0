@@ -1,30 +1,33 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 28 Sep 2009 20:39:50 +0200
-Subject: [PATCH] Fix bcmring compile
-Message-ID: <1254163190-2306-1-git-send-email-linus.walleij@stericsson.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Mon, 28 Sep 2009 20:45:38 +0200
+Subject: [PATCH] Move MMCI header to amba include dir
+In-Reply-To: <9383297B60843144AC17878B479520F110AEE53835@SJEXCHCCR01.corp.ad.broadcom.com>
+References: <1253625972-19407-1-git-send-email-linus.walleij@stericsson.com>
+	<9383297B60843144AC17878B479520F110AEE53835@SJEXCHCCR01.corp.ad.broadcom.com>
+Message-ID: <63386a3d0909281145t509f9105x396f5d32b79e9c47@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The movement of the MMCI header file made bcmring break. It turns
-out it was including asm/mmc.h without using it so fixing the
-problem boils down to removing the offending include.
+2009/9/28 Scott Branden <sbranden@broadcom.com>:
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- arch/arm/mach-bcmring/core.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+> You changes cause the bcmring platform to fail to compile.
 
-diff --git a/arch/arm/mach-bcmring/core.c b/arch/arm/mach-bcmring/core.c
-index 492c649..b53b973 100644
---- a/arch/arm/mach-bcmring/core.c
-+++ b/arch/arm/mach-bcmring/core.c
-@@ -45,7 +45,6 @@
- #include <asm/mach/irq.h>
- #include <asm/mach/time.h>
- #include <asm/mach/map.h>
--#include <asm/mach/mmc.h>
- 
- #include <cfg_global.h>
- 
--- 
-1.6.2.1
+The noes! Patch mailed.
+
+> Can you go through all the ARM platforms and make the
+> necessary adjustments with the change in header files
+> for mmc?
+
+I think bcmring was the only one, I missed it because this
+patch was boiling when bcmring got merged... Look:
+
+linux-next-work/arch/arm$ grep -r 'asm/mmc.h' . | wc -l
+0
+
+Whereas:
+linux-next-work/arch/arm$ grep -r 'linux/amba/mmci.h' . | wc -l
+10
+
+So I think I've fixed them now.
+
+Linus Walleij
