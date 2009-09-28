@@ -1,13 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Sep 2009 12:32:12 +0100
-Subject: [PATCH] Fix U300 generic GPIO, remove ifdefs from MMCI v2
-In-Reply-To: <1254136780-31679-1-git-send-email-linus.walleij@stericsson.com>
-References: <1254136780-31679-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20090928113212.GC10671@n2100.arm.linux.org.uk>
+From: imre.deak@nokia.com (Imre Deak)
+Date: Mon, 28 Sep 2009 14:33:27 +0300
+Subject: [PATCH] ARM: add warning for invalid kernel page faults
+In-Reply-To: <20090928112624.GA10671@n2100.arm.linux.org.uk>
+References: <20090928092919.GA30271@localhost>
+	<1254131304-32057-1-git-send-email-imre.deak@nokia.com>
+	<20090928095516.GB6715@n2100.arm.linux.org.uk>
+	<20090928100048.GC30271@localhost>
+	<20090928100442.GD6715@n2100.arm.linux.org.uk>
+	<20090928101625.GE30271@localhost>
+	<20090928102710.GG6715@n2100.arm.linux.org.uk>
+	<20090928110158.GG30271@localhost>
+	<20090928112624.GA10671@n2100.arm.linux.org.uk>
+Message-ID: <20090928113327.GH30271@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-And as a procedural note, can you please avoid immediately throwing
-the patch into the patch system in unison with posting it to the
-mailing list for review?  Please wait a few days for comments on the
-review posting before submitting it to the patch system.
+On Mon, Sep 28, 2009 at 01:26:24PM +0200, ext Russell King - ARM Linux wrote:
+> On Mon, Sep 28, 2009 at 02:01:58PM +0300, Imre Deak wrote:
+> > On Mon, Sep 28, 2009 at 12:27:10PM +0200, ext Russell King - ARM Linux wrote:
+> > > [...]
+> > >
+> > > Now you're talking about different code - the bit I quoted was what was
+> > > in your submitted patch, without deletion of intervening lines.  There
+> > > was no else clause in your patch.
+> > > 
+> > > Please, go back and look at your original patch.
+> > 
+> > Ah, sorry. Missed that line when rebasing. I'll send an updated one.
+> 
+> Now I see what you're getting at.  Yes, we can make this a debugging
+> option, but I believe it should exhibit the right behaviour.
+> 
+> In other words (and as I already covered) it should invoke the standard
+> no_context thing if there isn't a fixup handler in place rather than
+> continuing blindly on to try to handle the fault.  So, it should be:
+> 
+> 	if (!down_read_trylock(&mm->mmap_sem)) {
+> 		if (!user_mode(regs) && !search_exception_tables(regs->ARM_pc))
+> 			goto no_context;
+> 		down_read(&mm->mmap_sem);
+> 	} else {
+> +#ifdef CONFIG_DEBUG_VM
+> +		if (!user_mode(regs) && !search_exception_tables(regs->ARM_pc))
+> +			goto no_context;
+> +#endif
+
+Ok, agreed. Do you need an updated patch?
+
+--Imre
