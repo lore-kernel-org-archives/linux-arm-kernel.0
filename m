@@ -1,29 +1,21 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Mon, 28 Sep 2009 21:00:01 +0200
-Subject: [PATCH] Make MMCI driver compile without gpiolib
-In-Reply-To: <20090927153108.GA20093@n2100.arm.linux.org.uk>
-References: <1251276988-27882-1-git-send-email-linus.walleij@stericsson.com>
-	<20090927153108.GA20093@n2100.arm.linux.org.uk>
-Message-ID: <63386a3d0909281200m1da30d22h4ea4fb72278941de@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 28 Sep 2009 21:03:51 +0200
+Subject: [PATCH] Fix bcmring compile
+In-Reply-To: <9383297B60843144AC17878B479520F110AEE538F9@SJEXCHCCR01.corp.ad.broadcom.com>
+References: <1254163190-2306-1-git-send-email-linus.walleij@stericsson.com>
+	<9383297B60843144AC17878B479520F110AEE538F9@SJEXCHCCR01.corp.ad.broadcom.com>
+Message-ID: <A6D19A13FE030A409EC4362C172E091F0D5C1F43@eseldmw101.eemea.ericsson.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hm thinking back at this:
+[Scott]
 
-2009/9/27 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> The core.c for bcmring was based on mach-versatile.
+> We missed removing this unused include.  
+> An easy fix - Thanks.
 
-> The real problem is that U300 doesn't implement gpio_is_valid() -
-> which is part of the GPIO API and not specific to GPIOLIB.
+That's Acked-by: Scott Branden <sbranden@broadcom.com>
+I presume? (That will make it officially approved by
+the mach maintainer in my eyes you know...)
 
-None of the GPIO drivers in drivers/gpio implement gpio_is_valid()
-though they all select GPIOLIB which in turn selects GENERIC_GPIO.
-
-With one of them being the PL061 this means that the not so
-unlikely combination of PL061+PL180 will fail to compile (even
-though I'm not aware of such a platform for the time being).
-
-Is it worth taking a run over drivers/gpio and try to fix this or
-atleast the PL061 driver? I can have a look at it.
-
-Yours,
 Linus Walleij
