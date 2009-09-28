@@ -1,43 +1,25 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Sep 2009 14:23:28 +0100
+Date: Mon, 28 Sep 2009 14:25:02 +0100
 Subject: arm_syscall cacheflush breakage on VIPT platforms
-In-Reply-To: <20090928131624.GK30271@localhost>
+In-Reply-To: <20090928131926.GB19778@shareable.org>
 References: <20090928092919.GA30271@localhost>
 	<20090928124922.GA19778@shareable.org>
 	<20090928131624.GK30271@localhost>
-Message-ID: <20090928132328.GE10671@n2100.arm.linux.org.uk>
+	<20090928131926.GB19778@shareable.org>
+Message-ID: <20090928132502.GF10671@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 28, 2009 at 04:16:24PM +0300, Imre Deak wrote:
-> On Mon, Sep 28, 2009 at 02:49:22PM +0200, ext Jamie Lokier wrote:
-> > Imre Deak wrote:
-> > > Hi,
-> > > 
-> > > the following test app will cause an unhandled kernel paging request
-> > > on VIPT platforms. The triggering condition is the mmap_sem held by
-> > > thread_func while the main thread performs cache flushing.
-> > > 
-> > > Since the likelihood of this to trigger is relatively low, a patch will
-> > > follow that makes similar bugs more visible.
-> > 
-> > I would expect the likelihood of triggering would be higher for at
-> > least one of Java, Mono, Parrot or any of the modern Javascript
-> > engines.
+On Mon, Sep 28, 2009 at 02:19:26PM +0100, Jamie Lokier wrote:
+> Aieee.  Is sys_cacheflush architecturally the Right Way to do DMA to
+> userspace, or is it just luck that it happens to work?
 > 
-> True, the above statement is only valid for certain use patterns. I was
-> mainly interested in applications that do user range cache flushing as
-> part of their DMA requests and they didn't have threads with frequent
-> syscalls that required mmap_sem, so the problem remained hidden for a
-> long time.
+> Does that include O_DIRECT regular file I/O as used by databases on
+> these ARMs?  (Nobody ever gives a straight answer)
 
-Note that currently this API does not really support that action.  It's
-there to synchronise the I and D caches when you want to write self
-modifying code.
+Most definitely not.  As far as O_DIRECT goes, I've no idea what to do
+about that, or even if it's a problem.  I just don't use it so it's
+not something I care about.
 
-DMA coherency is going to be an extension to it which I'm going to be
-looking at in the coming weeks - but I'm not entirely happy about
-extending the API this way.  It has to be done because too many
-people are demanding a way to do DMA from userspace, so I guess we're
-going to have to forego the "lets do it properly" approach - esp. as
-tha's been illustrated to fail already.
+I wouldn't even know _how_ to use it or even how to provoke any bugs
+in that area.
