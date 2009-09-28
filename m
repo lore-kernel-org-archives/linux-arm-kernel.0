@@ -1,15 +1,15 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Mon, 28 Sep 2009 14:19:26 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 Sep 2009 14:23:28 +0100
 Subject: arm_syscall cacheflush breakage on VIPT platforms
 In-Reply-To: <20090928131624.GK30271@localhost>
 References: <20090928092919.GA30271@localhost>
 	<20090928124922.GA19778@shareable.org>
 	<20090928131624.GK30271@localhost>
-Message-ID: <20090928131926.GB19778@shareable.org>
+Message-ID: <20090928132328.GE10671@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Imre Deak wrote:
+On Mon, Sep 28, 2009 at 04:16:24PM +0300, Imre Deak wrote:
 > On Mon, Sep 28, 2009 at 02:49:22PM +0200, ext Jamie Lokier wrote:
 > > Imre Deak wrote:
 > > > Hi,
@@ -31,10 +31,13 @@ Imre Deak wrote:
 > syscalls that required mmap_sem, so the problem remained hidden for a
 > long time.
 
-Aieee.  Is sys_cacheflush architecturally the Right Way to do DMA to
-userspace, or is it just luck that it happens to work?
+Note that currently this API does not really support that action.  It's
+there to synchronise the I and D caches when you want to write self
+modifying code.
 
-Does that include O_DIRECT regular file I/O as used by databases on
-these ARMs?  (Nobody ever gives a straight answer)
-
--- Jamie
+DMA coherency is going to be an extension to it which I'm going to be
+looking at in the coming weeks - but I'm not entirely happy about
+extending the API this way.  It has to be done because too many
+people are demanding a way to do DMA from userspace, so I guess we're
+going to have to forego the "lets do it properly" approach - esp. as
+tha's been illustrated to fail already.
