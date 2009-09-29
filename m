@@ -1,39 +1,58 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Tue, 29 Sep 2009 23:14:42 +0800
-Subject: [PATCH] i2c: imx: check busy bit when START/STOP
-In-Reply-To: <20090929142440.GF32420@sirena.org.uk>
-References: <4e090d470909290441i7016c4f4g9a929d78838f9b7@mail.gmail.com>
-	<20090929132505.GM27039@pengutronix.de>
-	<4e090d470909290654r6fb36cb4h505662c7cb84b1f8@mail.gmail.com>
-	<20090929142440.GF32420@sirena.org.uk>
-Message-ID: <4e090d470909290814v292487f4l2ff3323bec145def@mail.gmail.com>
+From: brian@walsh.ws (Brian Walsh)
+Date: Tue, 29 Sep 2009 11:16:02 -0400
+Subject: ixp4xx dmabounce
+In-Reply-To: <20090927165531.GC20093@n2100.arm.linux.org.uk>
+References: <a104b22c0909171402x10c06d41oa5c78065a65836e1@mail.gmail.com>
+	<20090917215302.GA14939@n2100.arm.linux.org.uk>
+	<a104b22c0909221502l621ec9e9ia02cb524479c4476@mail.gmail.com>
+	<20090927165531.GC20093@n2100.arm.linux.org.uk>
+Message-ID: <a104b22c0909290816q1ad1ed06hc481f01307c19dd7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 29, 2009 at 10:24 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Tue, Sep 29, 2009 at 09:54:05PM +0800, Richard Zhao wrote:
->> On Tue, Sep 29, 2009 at 9:25 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+On Sun, Sep 27, 2009 at 12:55 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Sep 22, 2009 at 06:02:19PM -0400, Brian Walsh wrote:
+>> On Thu, Sep 17, 2009 at 5:53 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> >
+>> > On Thu, Sep 17, 2009 at 05:02:59PM -0400, Brian Walsh wrote:
+>> > > Any ideas or suggestions?
+>> >
+>> > It's caused because we don't allow dma_free_coherent() to be called from
+>> > IRQ context (which is reasonable because it needs to flush TLBs across
+>> > all processors on SMP systems.)
+>>
+>> I am not running on an SMP system so would this even be a problem?
 >
->> > I think it's generally a good idea to start/stop the clocks when needed
->> > as you do here. It should be an extra patch though.
+> Yes - because it's there to ensure that the API is used in a consistent
+> way.
+
+Right, I was just referring to it being a problem in my specific
+situation not in the
+general case.
+
 >
->> You think I should split the patch to three: IBB, reg_dump, clk dis/en ?
->> The idea is good, more easy to revert. but sometimes, I think it make
->> small things too complex.
+>> > Unfortunately, with the DMA bounce code enabled, this function does get
+>> > called from IRQ context, and so tends to spit out these warnings.
+>> >
+>> > I did have a patch which made dma_free_coherent() lazy, but it was
+>> > reported that the suffered disk corruption (though it was never
+>> > conclusive whether it was caused by the patch or not.) ?Here's an
+>> > updated version of that patch.
+>> >
+>>
+>> I did not see any data rate improvement using this patch over just commenting
+>> out the warning stack dump.? I am still seeing about half the data transfer rate
+>> using the high speed ehci USB controller over the full speed ohci USB
+>> controller.
 >
-> Keeping small things simple is half the reason for doing this - it's not
-> just bisection, it's also the fact that it's much easier to read and
-> understand a small patch that does one thing than it is to do the same
-> with a large patch which makes several unrelated changes. ?When several
-> changes are lumped in together it's harder to see the complete version
-> of any one change in isolation and more effort is required to work out
-> which goals are being accomplished with any given chunk of the patch.
+> I didn't suggest it would improve the data rate - only that it should
+> fix the stack dump.
+>
+> I'd really like to get this patch properly tested and confirmed that it
+> does _not_ actually cause corruption, so that I can get it merged.
 >
 
-Thank you all!
-If you don't have other comments, I will split the patch and send out
-again tomorrow.
-
-Thanks
-Richard
+I will be able to help you test this patch once I get past this issue
+I am dealing with.
