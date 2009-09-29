@@ -1,80 +1,145 @@
-From: imre.deak@nokia.com (Imre Deak)
-Date: Tue, 29 Sep 2009 12:10:01 +0300
-Subject: arm_syscall cacheflush breakage on VIPT platforms
-In-Reply-To: <20090928193528.GA32339@shareable.org>
-References: <20090928092919.GA30271@localhost>
-	<200909281610.32674.laurent.pinchart@ideasonboard.com>
-	<20090928141510.GG19778@shareable.org>
-	<200909281622.28404.laurent.pinchart@ideasonboard.com>
-	<20090928145028.GA23745@shareable.org>
-	<20090928162826.GA21914@localhost>
-	<20090928193528.GA32339@shareable.org>
-Message-ID: <20090929091001.GB9536@localhost>
+From: kristoffer.ericson@gmail.com (Kristoffer Ericson)
+Date: Tue, 29 Sep 2009 11:21:52 +0200
+Subject: [PATCH] sa1111: CodingStyle cleanups
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901D426F5@mi8nycmail19.Mi8.com>
+References: <BD79186B4FD85F4B8E60E381CAEE190901D426F5@mi8nycmail19.Mi8.com>
+Message-ID: <20090929112152.3377df3e.kristoffer.ericson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 28, 2009 at 09:35:29PM +0200, ext Jamie Lokier wrote:
-> Imre Deak wrote:
-> > > > Jamie Lokier wrote:
-> > > > > I hate to spell out the obvious, but a fine solution is to _not_ DMA
-> > > > > directly to userspace, but to kmalloc() a large buffer in your own
-> > > > > driver, DMA into the buffer (it's kernel memory so that's ok), and
-> > > > > _then_ mmap() that buffer into userspace after the DMA.  Going the
-> > > > > other way, mmap(), write from userspace, munmap(), then do the DMA to
-> > > > > the device.
-> > 
-> > One case where I don't see how this would work is when you want to pass
-> > on the read data to another device using DMA as well. For example when
-> > the raw captured data is written to flash storage. Unless you have some
-> > way of letting know the target device that the area is kmalloc'd, but
-> > that seems to be not so standard again.
+
+Acked.
+
+On Fri, 25 Sep 2009 14:17:55 -0400
+"H Hartley Sweeten" <hartleys@visionengravers.com> wrote:
+
+> EXPORT_* macros should follow immediately after the closing function
+> brace line.
 > 
-> An understandable desire.
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 > 
-> But if you want to do that, DMA to userspace and then from userspace is
-> not a particularly efficient way to do it anyway - because both DMAs
-> would have to walk the page tables in get_user_pages.
-> I believe someone posted an architecture/RFC/patches (I forget) for
-> passing memory blocks between devices for camera/video type
-> applications a few months ago.
-
-True, that would be the most ideal, you would even save the cache flush.
-It assumes also that the data can be passed as-is, but perhaps that's a
-fair assumption.
-
-Another example where mmap would be inflexible is when the buffer is
-shared between processes, or you are provided by a framework - like
-gstreamer - with a ready buffer to transfer.
-
-> I was advocating transfering to/from userspace, and the person
-> providing that framework said it was too slow to go via userspace.
+> ---
 > 
-> > > > > That's trivial to implement, and the developer's we're talking about
-> > > > > should have no difficulty writing a simple driver like that.  They
-> > > > > have a driver already, it's just a matter of adding the mmap method.
-> > > > > 
-> > > > > Russell, is there any reason why the above would not work?
-> > 
-> > The need for large physically contiguous allocations at run time.
-> > Preallocation is not so nice if you have a bunch of multimedia
-> > peripherals in your device.
+> diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
+> index ef12794..8ba7044 100644
+> --- a/arch/arm/common/sa1111.c
+> +++ b/arch/arm/common/sa1111.c
+> @@ -1032,6 +1032,7 @@ unsigned int sa1111_pll_clock(struct sa1111_dev *sadev)
+>  
+>  	return __sa1111_pll_clock(sachip);
+>  }
+> +EXPORT_SYMBOL(sa1111_pll_clock);
+>  
+>  /**
+>   *	sa1111_select_audio_mode - select I2S or AC link mode
+> @@ -1059,6 +1060,7 @@ void sa1111_select_audio_mode(struct sa1111_dev *sadev, int mode)
+>  
+>  	spin_unlock_irqrestore(&sachip->lock, flags);
+>  }
+> +EXPORT_SYMBOL(sa1111_select_audio_mode);
+>  
+>  /**
+>   *	sa1111_set_audio_rate - set the audio sample rate
+> @@ -1083,6 +1085,7 @@ int sa1111_set_audio_rate(struct sa1111_dev *sadev, int rate)
+>  
+>  	return 0;
+>  }
+> +EXPORT_SYMBOL(sa1111_set_audio_rate);
+>  
+>  /**
+>   *	sa1111_get_audio_rate - get the audio sample rate
+> @@ -1100,6 +1103,7 @@ int sa1111_get_audio_rate(struct sa1111_dev *sadev)
+>  
+>  	return __sa1111_pll_clock(sachip) / (256 * div);
+>  }
+> +EXPORT_SYMBOL(sa1111_get_audio_rate);
+>  
+>  void sa1111_set_io_dir(struct sa1111_dev *sadev,
+>  		       unsigned int bits, unsigned int dir,
+> @@ -1128,6 +1132,7 @@ void sa1111_set_io_dir(struct sa1111_dev *sadev,
+>  	MODIFY_BITS(gpio + SA1111_GPIO_PCSDR, (bits >> 16) & 255, sleep_dir >> 16);
+>  	spin_unlock_irqrestore(&sachip->lock, flags);
+>  }
+> +EXPORT_SYMBOL(sa1111_set_io_dir);
+>  
+>  void sa1111_set_io(struct sa1111_dev *sadev, unsigned int bits, unsigned int v)
+>  {
+> @@ -1142,6 +1147,7 @@ void sa1111_set_io(struct sa1111_dev *sadev, unsigned int bits, unsigned int v)
+>  	MODIFY_BITS(gpio + SA1111_GPIO_PCDWR, (bits >> 16) & 255, v >> 16);
+>  	spin_unlock_irqrestore(&sachip->lock, flags);
+>  }
+> +EXPORT_SYMBOL(sa1111_set_io);
+>  
+>  void sa1111_set_sleep_io(struct sa1111_dev *sadev, unsigned int bits, unsigned int v)
+>  {
+> @@ -1156,6 +1162,7 @@ void sa1111_set_sleep_io(struct sa1111_dev *sadev, unsigned int bits, unsigned i
+>  	MODIFY_BITS(gpio + SA1111_GPIO_PCSSR, (bits >> 16) & 255, v >> 16);
+>  	spin_unlock_irqrestore(&sachip->lock, flags);
+>  }
+> +EXPORT_SYMBOL(sa1111_set_sleep_io);
+>  
+>  /*
+>   * Individual device operations.
+> @@ -1176,6 +1183,7 @@ void sa1111_enable_device(struct sa1111_dev *sadev)
+>  	sa1111_writel(val | sadev->skpcr_mask, sachip->base + SA1111_SKPCR);
+>  	spin_unlock_irqrestore(&sachip->lock, flags);
+>  }
+> +EXPORT_SYMBOL(sa1111_enable_device);
+>  
+>  /**
+>   *	sa1111_disable_device - disable an on-chip SA1111 function block
+> @@ -1192,6 +1200,7 @@ void sa1111_disable_device(struct sa1111_dev *sadev)
+>  	sa1111_writel(val & ~sadev->skpcr_mask, sachip->base + SA1111_SKPCR);
+>  	spin_unlock_irqrestore(&sachip->lock, flags);
+>  }
+> +EXPORT_SYMBOL(sa1111_disable_device);
+>  
+>  /*
+>   *	SA1111 "Register Access Bus."
+> @@ -1259,17 +1268,20 @@ struct bus_type sa1111_bus_type = {
+>  	.suspend	= sa1111_bus_suspend,
+>  	.resume		= sa1111_bus_resume,
+>  };
+> +EXPORT_SYMBOL(sa1111_bus_type);
+>  
+>  int sa1111_driver_register(struct sa1111_driver *driver)
+>  {
+>  	driver->drv.bus = &sa1111_bus_type;
+>  	return driver_register(&driver->drv);
+>  }
+> +EXPORT_SYMBOL(sa1111_driver_register);
+>  
+>  void sa1111_driver_unregister(struct sa1111_driver *driver)
+>  {
+>  	driver_unregister(&driver->drv);
+>  }
+> +EXPORT_SYMBOL(sa1111_driver_unregister);
+>  
+>  static int __init sa1111_init(void)
+>  {
+> @@ -1290,16 +1302,3 @@ module_exit(sa1111_exit);
+>  
+>  MODULE_DESCRIPTION("Intel Corporation SA1111 core driver");
+>  MODULE_LICENSE("GPL");
+> -
+> -EXPORT_SYMBOL(sa1111_select_audio_mode);
+> -EXPORT_SYMBOL(sa1111_set_audio_rate);
+> -EXPORT_SYMBOL(sa1111_get_audio_rate);
+> -EXPORT_SYMBOL(sa1111_set_io_dir);
+> -EXPORT_SYMBOL(sa1111_set_io);
+> -EXPORT_SYMBOL(sa1111_set_sleep_io);
+> -EXPORT_SYMBOL(sa1111_enable_device);
+> -EXPORT_SYMBOL(sa1111_disable_device);
+> -EXPORT_SYMBOL(sa1111_pll_clock);
+> -EXPORT_SYMBOL(sa1111_bus_type);
+> -EXPORT_SYMBOL(sa1111_driver_register);
+> -EXPORT_SYMBOL(sa1111_driver_unregister); 
 > 
-> The kmalloc+mmap approach does not require any large contiguous
-> allocations, unless that's a property of your hardware, in which case
-> nothing will avoid it.
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-No, I didn't mean the hardware, but was just wondering what the
-benefit would be over get_user_pages. As I see you can either do:
 
-a. kmalloc the whole buffer which will be physically contiguous. If
-   this is mapped to user space so that it won't create aliases with
-   the kernel direct mapping, dma_map_single can be used which will
-   do proper cache sync'ing.
-
-b. kmalloc in chunks (practically pages) and pass it to dma_map_sg,
-   which will only flush cache lines for the kernel direct mapping.
-   Thus in addition for each page you'll have to flush cache lines
-   for the user mapping. For me this doesn't provide much benefit
-   over using get_user_pages.
-
---Imre
+-- 
+Kristoffer Ericson <kristoffer.ericson@gmail.com>
