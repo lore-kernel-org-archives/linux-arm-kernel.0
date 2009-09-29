@@ -1,54 +1,51 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Wed, 30 Sep 2009 15:37:44 +0530
-Subject: Problem with mxc_nand driver
-In-Reply-To: <a57e67db0909280241w61f8d8bbm88ff5d749cc946c2@mail.gmail.com>
-References: <a57e67db0909272341k59d4cda6pde85ff7425a75c8f@mail.gmail.com>
-	<4AC0682D.6000907@eukrea.com>
-	<a57e67db0909280156x686f0d26u397dc6397fd0b3a@mail.gmail.com>
-	<4AC07FF9.2040002@eukrea.com>
-	<a57e67db0909280241w61f8d8bbm88ff5d749cc946c2@mail.gmail.com>
-Message-ID: <20090930100727.GA2365@debian>
+From: aaro.koskinen@nokia.com (Aaro Koskinen)
+Date: Tue, 29 Sep 2009 10:08:21 +0300
+Subject: [PATCH v2 4/4] iop: implement sched_clock()
+In-Reply-To: <19134.28906.783581.37290@pilspetsen.it.uu.se>
+References: <19134.28906.783581.37290@pilspetsen.it.uu.se>
+Message-ID: <4AC1B265.7060902@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 28, 2009 at 11:41:39AM +0200, Jernej Turnsek wrote:
-> after writing root fs image into nand partition, running the image and
-> then checking the first empty block I've got following OOB data which
-> is suspicious to me:
+Hello,
+
+Mikael Pettersson wrote:
+> This adds a better sched_clock() to the IOP platform,
+> implemented using its new clocksource support.
 > 
-> OOB:
-> 	ff ff 85 19 03 20 ff ff
-> 	ff 65 02 08 00 00 00 ff
-> 	ff ff ff ff ff ff ff ff
-> 	ff ff 03 ff ff ff ff ff
-> 	ff ff ff ff ff ff ff ff
-> 	ff ff 03 ff ff ff ff ff
-> 	ff ff ff ff ff ff ff ff
-> 	ff ff 03 ff ff ff ff ff
+> Tested on n2100, compile-tested for all plat-iop machines.
 > 
-> One can see that bytes on offset 2 to 5 are not empty and when using
-> the smallpage_memorybased badblock_pattern byte 6 is not FF like it
-> should be.
+> Signed-off-by: Mikael Pettersson <mikpe@it.uu.se>
+> ---
+> Changes v1 -> v2:
+> * implemented sched_clock()
 > 
-> Anyone knows what is going on here?
+>  arch/arm/plat-iop/time.c |    8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff -rupN linux-2.6.31.arm-iop-3-generictime-v2/arch/arm/plat-iop/time.c linux-2.6.31.arm-iop-4-sched_clock/arch/arm/plat-iop/time.c
+> --- linux-2.6.31.arm-iop-3-generictime-v2/arch/arm/plat-iop/time.c	2009-09-26 17:25:09.000000000 +0200
+> +++ linux-2.6.31.arm-iop-4-sched_clock/arch/arm/plat-iop/time.c	2009-09-26 17:24:29.000000000 +0200
+> @@ -66,6 +66,14 @@ static void __init iop_clocksource_set_h
+>  }
+>  
+>  /*
+> + * IOP sched_clock() implementation via its clocksource.
+> + */
+> +unsigned long long sched_clock(void)
+> +{
+> +	return cyc2ns(&iop_clocksource, iop_clocksource_read(NULL));
+> +}
+> +
+> +/*
 
-85 19 03 20 08 00 00 00 is the JFFS2 cleanmarker; it's written to
-indicate that the block is empty.  This is being stored in the OOB area
-in the positions specified by oobfree in your ecclayout.
+This may not work properly on 2.6.31 because the multiplier may be adjusted. If you want
+to run these patches on top of 2.6.31, check the OMAP sched_clock() which uses mult_orig,
+or maybe drop this patch.
 
-Your ecclayout has this:
+You could also rebase onto current mainline, and use clocksource_cyc2ns().
 
-static struct nand_ecclayout nand_hw_eccoob_64 = {
-	.eccbytes = 20,
-	.eccpos = {6, 7, 8, 9, 10, 22, 23, 24, 25, 26,
-		   38, 39, 40, 41, 42, 54, 55, 56, 57, 58},
-	.oobfree = {{2, 4}, {11, 10}, {27, 10}, {43, 10}, {59, 5}, }
-};
+See commits 80ea3bac3a47bc73efa334d0dd57099d0ff14216 and
+0a54419836254a27baecd9037103171bcbabaf67 for more info.
 
-The {2, 4} element in oobfree says that 4 bytes from position 2 (i.e,
-positions 2, 3, 4, 5) are free to be used to store any OOB data.
-
-If bad block information is supposed to be in position 5, that position
-should not be included in oobfree.
-
-Rabin
+A.
