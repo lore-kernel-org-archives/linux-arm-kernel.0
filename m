@@ -1,341 +1,621 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Wed, 30 Sep 2009 07:21:57 +0800
-Subject: [PATCH] i2c: imx: check busy bit when START/STOP
-In-Reply-To: <20090929140612.GN27039@pengutronix.de>
-References: <4e090d470909290441i7016c4f4g9a929d78838f9b7@mail.gmail.com>
-	<20090929132505.GM27039@pengutronix.de>
-	<4e090d470909290654r6fb36cb4h505662c7cb84b1f8@mail.gmail.com>
-	<20090929140612.GN27039@pengutronix.de>
-Message-ID: <4e090d470909291621y533a12b7s533b7311fc098803@mail.gmail.com>
+From: koteswararao18@gmail.com (nelakurthi koteswararao)
+Date: Wed, 30 Sep 2009 12:51:32 +0530
+Subject: support performance counter for ARM
+In-Reply-To: <bbfde6e10909292304j3c00fbc4w2b03fc045d398c68@mail.gmail.com>
+References: <bbfde6e10909290344t4094bcc2y265089f7c3b8ea78@mail.gmail.com>
+	<bbfde6e10909290345w4661329dn7fc000ddc1db2c64@mail.gmail.com>
+	<20090929144100.GE4975@nowhere>
+	<bbfde6e10909292304j3c00fbc4w2b03fc045d398c68@mail.gmail.com>
+Message-ID: <bbfde6e10909300021n535f11cavcc6fb4333c36d565@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 29, 2009 at 10:06 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Tue, Sep 29, 2009 at 09:54:05PM +0800, Richard Zhao wrote:
->> Thanks, Sacha. See comments inline.
+Dear all,
+
+I will change the naming conventions and symbolic names once perfcounter for
+ARM is supported.
+I want to do intermediate releases for review in mean time
+
+1. I am able to support page faults in ARM with the attached patch along
+with application.( this is for linux-2.6.29 kernel)
+
+-bash-3.2# ./perf  stat ./array
+
+ Performance counter stats for './array':
+
+    2005.297192  task-clock-msecs         #      0.998 CPUs
+              7  context-switches         #      0.000 M/sec
+              0  CPU-migrations           #      0.000 M/sec
+             76  page-faults              #      0.000 M/sec
+  <not counted>  cycles
+  <not counted>  instructions
+  <not counted>  cache-references
+  <not counted>  cache-misses
+
+    2.009101297  seconds time elapsed
+
+
+Please look at it and give your review comments.
+
+Regards,
+Koteswararao.
+
+
+
+
+
+
+On 9/30/09, nelakurthi koteswararao <koteswararao18@gmail.com> wrote:
+>
+> Dear Frederic ,
+>
+> > There have been a big rename recently.
+> > perf counters has become perf events. This renaming has been propagated
+> > everywhere: filenames, symbol names, etc...
+>
+> I will change the names and symbols once i supported successfully
+> perfcounters for ARM.
+>
+> >I guess that for now you should base your patches against latest
+> >linus tree (2.6.32-rc1)
+>
+> Right now , i am trying to support perfcounter for 2.6.29 but not 2.6.32
+>
+> >Doesn't this file already exist?
+> >Oh btw, another stage of the perf arm integration would
+> >be the atomic 64 ARM implementation, to optimize it.
+>
+> That's why i added atomic64.h and atomic64.c files as they are not present
+> in my 2.6.29 version
+>
+> > Once you have fixed this patch, please don't forget to cc
+> > the perf maintainers and LKML. And also Russell King.
+>
+> I will post mails during the implementation of perfcounters for ARM . this
+> mail i am not sending to all mail ids.
+>
+> Regards,
+> koteswararao.
+>
+>
+>
+>
+> On 9/29/09, Frederic Weisbecker <fweisbec@gmail.com> wrote:
 >>
->> On Tue, Sep 29, 2009 at 9:25 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
->> > Hi Richard,
+>> On Tue, Sep 29, 2009 at 04:15:47PM +0530, nelakurthi koteswararao wrote:
+>> > ---
+>> >  arch/arm/Kconfig                    |    2   2 +     0 -     0 !
+>> >  arch/arm/include/asm/atomic.h       |  253   253 +   0 -     0 !
+>> >  arch/arm/include/asm/perf_counter.h |   11   11 +    0 -     0 !
+>>
+>>
+>> There have been a big rename recently.
+>> perf counters has become perf events. This renaming has been propagated
+>> everywhere: filenames, symbol names, etc...
+>>
+>> Could you please update your patch to integrate this change?
+>>
+>> I don't know exactly where your patches should go.
+>> It could be -tip (http://people.redhat.com/mingo/tip.git/README)
+>> where you can find the latest perf event core, tools and x86 changes.
+>> But that could be also the ARM tree.
+>>
+>> I guess that for now you should base your patches against latest
+>> linus tree (2.6.32-rc1)
+>>
+>> (More comments below.)
+>>
+>>
+>> > +static inline void set_perf_counter_pending(void) {
+>> > +     //do {
+>> > +     //} while(0);
+>> > +}
+>> > +
+>>
+>>
+>> Please remove these comments.
+>> You can just do:
+>>
+>>        static inline void set_perf_counter_pending(void) { }
+>>
+>> until you need to implement it in further patches.
+>>
+>> Also the standard way to put comments is to do:
+>>
+>> /* blah */
+>>
+>> You should scripts/checkpatch.pl on your patches, it will warn
+>> you about such static coding standard issues...
+>>
+>> But also look at Documentation/SubmittingPatches
+>>
+>>
+>>
+>> > +#endif /* _ASM_ARM_PERF_COUNTER_H */
+>> > Index: b/arch/arm/include/asm/atomic.h
+>> > ===================================================================
+>> > --- a/arch/arm/include/asm/atomic.h
+>> > +++ b/arch/arm/include/asm/atomic.h
+>> > @@ -225,6 +225,7 @@ static inline int atomic_add_unless(atom
+>> >  #define smp_mb__before_atomic_inc()  barrier()
+>> >  #define smp_mb__after_atomic_inc()   barrier()
 >> >
->> >
->> > On Tue, Sep 29, 2009 at 07:41:44PM +0800, Richard Zhao wrote:
->> >> After START, wait busy bit to be set and
->> >> after STOP, wait busy bit to be clear.
->> >>
->> >> Disable clock when it's possible to save power.
->> >>
->> >> Signed-off-by: Richard Zhao <linuxzsc@gmail.com>
->> >> ---
->> >> ?drivers/i2c/busses/i2c-imx.c | ?116 ++++++++++++++++++++++++++++++++----------
->> >> ?1 files changed, 88 insertions(+), 28 deletions(-)
->> >>
->> >> diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
->> >> index 4afba3e..59cde70 100644
->> >> --- a/drivers/i2c/busses/i2c-imx.c
->> >> +++ b/drivers/i2c/busses/i2c-imx.c
->> >> @@ -120,19 +120,40 @@ struct imx_i2c_struct {
->> >> ? ? ? wait_queue_head_t ? ? ? queue;
->> >> ? ? ? unsigned long ? ? ? ? ? i2csr;
->> >> ? ? ? unsigned int ? ? ? ? ? ?disable_delay;
->> >> + ? ? unsigned int ? ? ? ? ? ?ifdr; /* IMX_I2C_IFDR */
->> >> ?};
->> >>
->> >> ?/** Functions for IMX I2C adapter driver
->> >> ***************************************
->> >> ?*******************************************************************************/
->> >>
->> >> -static int i2c_imx_bus_busy(struct imx_i2c_struct *i2c_imx)
->> >> +#ifdef CONFIG_I2C_DEBUG_BUS
->> >> +#define reg_dump(i2c_imx) \
->> >> +{ \
->> >> + ? ? printk(KERN_DEBUG "fun %s:%d ", __func__, __LINE__); \
->> >> + ? ? printk(KERN_DEBUG "IADR %02x IFDR %02x I2CR %02x I2SR %02x\n", \
->> >> + ? ? ? ? ? ? readb(i2c_imx->base + IMX_I2C_IADR), \
->> >> + ? ? ? ? ? ? readb(i2c_imx->base + IMX_I2C_IFDR), \
->> >> + ? ? ? ? ? ? readb(i2c_imx->base + IMX_I2C_I2CR), \
->> >> + ? ? ? ? ? ? readb(i2c_imx->base + IMX_I2C_I2SR)); \
->> >> +}
->> >> +#else
->> >> +#define reg_dump(i2c_imx)
->> >> +#endif
->> >> +
->> >
->> > Can you please remove this reg_dump? If we really need this it should be
->> > in an extra patch and not clutter this one.
->> I think it's needed. It helps much to debug and don't effect
->> performance by default.
->> >
->> >> +static int i2c_imx_bus_busy(struct imx_i2c_struct *i2c_imx, int for_busy)
->> >> ?{
->> >> ? ? ? unsigned long orig_jiffies = jiffies;
->> >> + ? ? unsigned int temp;
->> >>
->> >> ? ? ? dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
->> >>
->> >> ? ? ? /* wait for bus not busy */
->> >
->> > This comment seems wrong now. This function waits for busy or not busy
->> > depending on for_busy.
->> Right. Thanks
->> >
->> >> - ? ? while (readb(i2c_imx->base + IMX_I2C_I2SR) & I2SR_IBB) {
->> >> + ? ? temp = readb(i2c_imx->base + IMX_I2C_I2SR);
->> >> + ? ? while (1) {
->> >> + ? ? ? ? ? ? if (for_busy && (temp & I2SR_IBB))
->> >> + ? ? ? ? ? ? ? ? ? ? break;
->> >> + ? ? ? ? ? ? if (!for_busy && !(temp & I2SR_IBB))
->> >> + ? ? ? ? ? ? ? ? ? ? break;
->> >> ? ? ? ? ? ? ? if (signal_pending(current)) {
->> >> ? ? ? ? ? ? ? ? ? ? ? dev_dbg(&i2c_imx->adapter.dev,
->> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "<%s> I2C Interrupted\n", __func__);
->> >> @@ -141,9 +162,11 @@ static int i2c_imx_bus_busy(struct imx_i2c_struct *i2c_imx)
->> >> ? ? ? ? ? ? ? if (time_after(jiffies, orig_jiffies + HZ / 1000)) {
->> >> ? ? ? ? ? ? ? ? ? ? ? dev_dbg(&i2c_imx->adapter.dev,
->> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "<%s> I2C bus is busy\n", __func__);
->> >> + ? ? ? ? ? ? ? ? ? ? reg_dump(i2c_imx);
->> >> ? ? ? ? ? ? ? ? ? ? ? return -EIO;
->> >> ? ? ? ? ? ? ? }
->> >> ? ? ? ? ? ? ? schedule();
->> >> + ? ? ? ? ? ? temp = readb(i2c_imx->base + IMX_I2C_I2SR);
->> >> ? ? ? }
->> >>
->> >> ? ? ? return 0;
->> >> @@ -158,9 +181,11 @@ static int i2c_imx_trx_complete(struct
->> >> imx_i2c_struct *i2c_imx)
->> >>
->> >> ? ? ? if (unlikely(result < 0)) {
->> >> ? ? ? ? ? ? ? dev_dbg(&i2c_imx->adapter.dev, "<%s> result < 0\n", __func__);
->> >> + ? ? ? ? ? ? reg_dump(i2c_imx);
->> >> ? ? ? ? ? ? ? return result;
->> >> ? ? ? } else if (unlikely(!(i2c_imx->i2csr & I2SR_IIF))) {
->> >> ? ? ? ? ? ? ? dev_dbg(&i2c_imx->adapter.dev, "<%s> Timeout\n", __func__);
->> >> + ? ? ? ? ? ? reg_dump(i2c_imx);
->> >> ? ? ? ? ? ? ? return -ETIMEDOUT;
->> >> ? ? ? }
->> >> ? ? ? dev_dbg(&i2c_imx->adapter.dev, "<%s> TRX complete\n", __func__);
->> >> @@ -172,6 +197,7 @@ static int i2c_imx_acked(struct imx_i2c_struct *i2c_imx)
->> >> ?{
->> >> ? ? ? if (readb(i2c_imx->base + IMX_I2C_I2SR) & I2SR_RXAK) {
->> >> ? ? ? ? ? ? ? dev_dbg(&i2c_imx->adapter.dev, "<%s> No ACK\n", __func__);
->> >> + ? ? ? ? ? ? reg_dump(i2c_imx);
->> >> ? ? ? ? ? ? ? return -EIO; ?/* No ACK */
->> >> ? ? ? }
->> >>
->> >> @@ -179,20 +205,37 @@ static int i2c_imx_acked(struct imx_i2c_struct *i2c_imx)
->> >> ? ? ? return 0;
->> >> ?}
->> >>
->> >> -static void i2c_imx_start(struct imx_i2c_struct *i2c_imx)
->> >> +static int i2c_imx_start(struct imx_i2c_struct *i2c_imx)
->> >> ?{
->> >> ? ? ? unsigned int temp = 0;
->> >> + ? ? int result;
->> >>
->> >> ? ? ? dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
->> >>
->> >> + ? ? clk_enable(i2c_imx->clk);
->> >> + ? ? writeb(i2c_imx->ifdr, i2c_imx->base + IMX_I2C_IFDR);
->> >> ? ? ? /* Enable I2C controller */
->> >> + ? ? writeb(0, i2c_imx->base + IMX_I2C_I2SR);
->> >> ? ? ? writeb(I2CR_IEN, i2c_imx->base + IMX_I2C_I2CR);
->> >> +
->> >> + ? ? result = i2c_imx_bus_busy(i2c_imx, 0);
->> >> + ? ? if (result) {
->> >> + ? ? ? ? ? ? reg_dump(i2c_imx);
->> >> + ? ? ? ? ? ? return result;
->> >> + ? ? }
->> >> +
->> >> ? ? ? /* Start I2C transaction */
->> >> ? ? ? temp = readb(i2c_imx->base + IMX_I2C_I2CR);
->> >> ? ? ? temp |= I2CR_MSTA;
->> >> ? ? ? writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
->> >> + ? ? result = i2c_imx_bus_busy(i2c_imx, 1);
->> >> + ? ? if (result) {
->> >> + ? ? ? ? ? ? reg_dump(i2c_imx);
->> >> + ? ? ? ? ? ? return result;
->> >> + ? ? }
->> >> ? ? ? temp |= I2CR_IIEN | I2CR_MTX | I2CR_TXAK;
->> >> ? ? ? writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
->> >> + ? ? return result;
->> >> ?}
->> >>
->> >> ?static void i2c_imx_stop(struct imx_i2c_struct *i2c_imx)
->> >> @@ -202,18 +245,21 @@ static void i2c_imx_stop(struct imx_i2c_struct *i2c_imx)
->> >> ? ? ? /* Stop I2C transaction */
->> >> ? ? ? dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
->> >> ? ? ? temp = readb(i2c_imx->base + IMX_I2C_I2CR);
->> >> - ? ? temp &= ~I2CR_MSTA;
->> >> + ? ? temp &= ~(I2CR_MSTA | I2CR_MTX);
->> >
->> > This change seems unrelated. Is it necessary?
->> Yes. It's about STOP. It's better clear MTX. We must generate STOP
->> before read the last byte of Data register. If not, there will be an
->> extra 9bit clock.
->> >
->> >> ? ? ? writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
->> >> - ? ? /* setup chip registers to defaults */
->> >> - ? ? writeb(I2CR_IEN, i2c_imx->base + IMX_I2C_I2CR);
->> >> - ? ? writeb(0, i2c_imx->base + IMX_I2C_I2SR);
->> >> ? ? ? /*
->> >> ? ? ? ?* This delay caused by an i.MXL hardware bug.
->> >> ? ? ? ?* If no (or too short) delay, no "STOP" bit will be generated.
->> >> ? ? ? ?*/
->> >> ? ? ? udelay(i2c_imx->disable_delay);
->> >> +
->> >> +
->> >
->> > double blank line
->> Right.
->> >
->> >> + ? ? if (i2c_imx_bus_busy(i2c_imx, 0))
->> >> + ? ? ? ? ? ? reg_dump(i2c_imx);
->> >> +
->> >> ? ? ? /* Disable I2C controller */
->> >> ? ? ? writeb(0, i2c_imx->base + IMX_I2C_I2CR);
->> >> + ? ? clk_disable(i2c_imx->clk);
->> >> ?}
->> >>
->> >> ?static void __init i2c_imx_set_clk(struct imx_i2c_struct *i2c_imx,
->> >> @@ -233,17 +279,19 @@ static void __init i2c_imx_set_clk(struct
->> >> imx_i2c_struct *i2c_imx,
->> >> ? ? ? else
->> >> ? ? ? ? ? ? ? for (i = 0; i2c_clk_div[i][0] < div; i++);
->> >>
->> >> - ? ? /* Write divider value to register */
->> >> - ? ? writeb(i2c_clk_div[i][1], i2c_imx->base + IMX_I2C_IFDR);
->> >
->> > Why can't we write this value directly anymore...
->> clock will be enable/disable in start/stop
->> >
->> >> -
->> >> - ? ? /*
->> >> - ? ? ?* There dummy delay is calculated.
->> >> - ? ? ?* It should be about one I2C clock period long.
->> >> - ? ? ?* This delay is used in I2C bus disable function
->> >> - ? ? ?* to fix chip hardware bug.
->> >> - ? ? ?*/
->> >> - ? ? i2c_imx->disable_delay = (500000U * i2c_clk_div[i][0]
->> >> - ? ? ? ? ? ? + (i2c_clk_rate / 2) - 1) / (i2c_clk_rate / 2);
->> >> + ? ? /* Store divider value */
->> >> + ? ? i2c_imx->ifdr = i2c_clk_div[i][1];
->> >
->> > ...but have to store it in a variable instead?
->> To save power, because i2c is not aways be accessed, and it's very low
->> speed bus.
->> >
->> >> +
->> >> + ? ? if (cpu_is_mx1()) {
->> >> + ? ? ? ? ? ? /*
->> >> + ? ? ? ? ? ? ?* There dummy delay is calculated.
->> >> + ? ? ? ? ? ? ?* It should be about one I2C clock period long.
->> >> + ? ? ? ? ? ? ?* This delay is used in I2C bus disable function
->> >> + ? ? ? ? ? ? ?* to fix chip hardware bug.
->> >> + ? ? ? ? ? ? ?*/
->> >> + ? ? ? ? ? ? i2c_imx->disable_delay = (500000U * i2c_clk_div[i][0]
->> >> + ? ? ? ? ? ? ? ? ? ? + (i2c_clk_rate / 2) - 1) / (i2c_clk_rate / 2);
->> >> + ? ? }
->> >>
->> >> ? ? ? /* dev_dbg() can't be used, because adapter is not yet registered */
->> >> ?#ifdef CONFIG_I2C_DEBUG_BUS
->> >> @@ -344,7 +392,7 @@ static int i2c_imx_read(struct imx_i2c_struct
->> >> *i2c_imx, struct i2c_msg *msgs)
->> >> ? ? ? ? ? ? ? ? ? ? ? dev_dbg(&i2c_imx->adapter.dev,
->> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "<%s> clear MSTA\n", __func__);
->> >> ? ? ? ? ? ? ? ? ? ? ? temp = readb(i2c_imx->base + IMX_I2C_I2CR);
->> >> - ? ? ? ? ? ? ? ? ? ? temp &= ~I2CR_MSTA;
->> >> + ? ? ? ? ? ? ? ? ? ? temp &= ~(I2CR_MSTA | I2CR_MTX);
->> >> ? ? ? ? ? ? ? ? ? ? ? writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
->> >> ? ? ? ? ? ? ? } else if (i == (msgs->len - 2)) {
->> >> ? ? ? ? ? ? ? ? ? ? ? dev_dbg(&i2c_imx->adapter.dev,
->> >> @@ -369,14 +417,24 @@ static int i2c_imx_xfer(struct i2c_adapter *adapter,
->> >> ? ? ? struct imx_i2c_struct *i2c_imx = i2c_get_adapdata(adapter);
->> >>
->> >> ? ? ? dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
->> >> -
->> >> +#ifdef CONFIG_I2C_DEBUG_BUS
->> >> + ? ? for (i = 0; i < num; i++) {
->> >> + ? ? ? ? ? ? printk(KERN_DEBUG "msg%d addr %02x RD %d cnt %d d:", i,
->> >> + ? ? ? ? ? ? ? ? ? ? msgs[i].addr, msgs[i].flags & I2C_M_RD, msgs[i].len);
->> >> + ? ? ? ? ? ? if (!(msgs[i].flags & I2C_M_RD)) {
->> >> + ? ? ? ? ? ? ? ? ? ? int j;
->> >> + ? ? ? ? ? ? ? ? ? ? for (j = 0; j < msgs[i].len; j++)
->> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? printk("%02x ", msgs[i].buf[j]);
->> >> + ? ? ? ? ? ? }
->> >> + ? ? ? ? ? ? printk("\n");
->> >> + ? ? }
->> >> +#endif
->> >> ? ? ? /* Check if i2c bus is not busy */
->> >> - ? ? result = i2c_imx_bus_busy(i2c_imx);
->> >> - ? ? if (result)
->> >> - ? ? ? ? ? ? goto fail0;
->> >
->> > When removing the code you should also remove the comment.
->> Right
->> >
->> >>
->> >> ? ? ? /* Start I2C transfer */
->> >> - ? ? i2c_imx_start(i2c_imx);
->> >> + ? ? result = i2c_imx_start(i2c_imx);
->> >> + ? ? if (result)
->> >> + ? ? ? ? ? ? goto fail0;
->> >>
->> >> ? ? ? /* read/write data */
->> >> ? ? ? for (i = 0; i < num; i++) {
->> >> @@ -386,6 +444,11 @@ static int i2c_imx_xfer(struct i2c_adapter *adapter,
->> >> ? ? ? ? ? ? ? ? ? ? ? temp = readb(i2c_imx->base + IMX_I2C_I2CR);
->> >> ? ? ? ? ? ? ? ? ? ? ? temp |= I2CR_RSTA;
->> >> ? ? ? ? ? ? ? ? ? ? ? writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
->> >> + ? ? ? ? ? ? ? ? ? ? result = ?i2c_imx_bus_busy(i2c_imx, 1);
->> >> + ? ? ? ? ? ? ? ? ? ? if (result) {
->> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? reg_dump(i2c_imx);
->> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto fail0;
->> >> + ? ? ? ? ? ? ? ? ? ? }
->> >> ? ? ? ? ? ? ? }
->> >> ? ? ? ? ? ? ? dev_dbg(&i2c_imx->adapter.dev,
->> >> ? ? ? ? ? ? ? ? ? ? ? "<%s> transfer message: %d\n", __func__, i);
->> >> @@ -442,7 +505,7 @@ static int __init i2c_imx_probe(struct
->> >> platform_device *pdev)
->> >> ? ? ? int irq;
->> >> ? ? ? int ret;
->> >>
->> >> - ? ? dev_dbg(&pdev->dev, "<%s>\n", __func__);
->> >> + ? ? dev_info(&pdev->dev, "<%s>\n", __func__);
->> >
->> > no
->> Why? I even don't know how many i2c controllers we have, if I didn't
->> get sysfs working. And it only print once.
->> >
->> >>
->> >> ? ? ? res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> >> ? ? ? if (!res) {
->> >> @@ -500,7 +563,6 @@ static int __init i2c_imx_probe(struct
->> >> platform_device *pdev)
->> >> ? ? ? ? ? ? ? dev_err(&pdev->dev, "can't get I2C clock\n");
->> >> ? ? ? ? ? ? ? goto fail3;
->> >> ? ? ? }
->> >> - ? ? clk_enable(i2c_imx->clk);
->> >
->> > I think it's generally a good idea to start/stop the clocks when needed
->> > as you do here. It should be an extra patch though.
->> You think I should split the patch to three: IBB, reg_dump, clk dis/en ?
->> The idea is good, more easy to revert. but sometimes, I think it make
->> small things too complex.
->> Anyway, I'll follow your suggestion.
+>> > +#include <asm-generic/atomic64.h>
+>> >  #include <asm-generic/atomic.h>
+>> >  #endif
+>> >  #endif
+>> > Index: b/include/asm-generic/atomic64.h
+>> > ===================================================================
+>> > --- /dev/null
+>> > +++ b/include/asm-generic/atomic64.h
+>>
+>>
+>> Doesn't this file already exist?
+>>
+>> Oh btw, another stage of the perf arm integration would
+>> be the atomic 64 ARM implementation, to optimize it.
+>>
+>>
+>> > ===================================================================
+>> > --- /dev/null
+>> > +++ b/lib/atomic64.c
+>>
+>>
+>> Same for this one, it already exists, and same for what follows
+>> after.
+>>
+>> Once you have fixed this patch, please don't forget to cc
+>> the perf maintainers and LKML. And also Russell King.
+>>
+>> Thanks!
+>>
+>>
 >
-> In case of regressions everybody will thank you for doing it.
->
-> Sascha
->
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
-> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
->
-Hi Sascha,
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090930/7ac068df/attachment-0001.htm>
+-------------- next part --------------
 
-Do you agree with my other comments?
+Supported performance counter for ARM architecture.
 
-Thanks
-Richard
+ChangeLog:
+    2009/09/24
+    Location: Linux-2.6.29.y-BRANCH_SS
+    refs #6657
+    First changelog verison.
+
+---
+ arch/arm/Kconfig                    |    3 	3 +	0 -	0 !
+ arch/arm/include/asm/atomic.h       |    1 	1 +	0 -	0 !
+ arch/arm/include/asm/perf_counter.h |    8 	8 +	0 -	0 !
+ arch/arm/include/asm/unistd.h       |    3 	2 +	1 -	0 !
+ arch/arm/kernel/calls.S             |    1 	1 +	0 -	0 !
+ arch/arm/mm/fault.c                 |   10 	9 +	1 -	0 !
+ include/asm-generic/atomic64.h      |   42 	42 +	0 -	0 !
+ lib/Kconfig                         |    6 	6 +	0 -	0 !
+ lib/Makefile                        |    2 	2 +	0 -	0 !
+ lib/atomic64.c                      |  175 	175 +	0 -	0 !
+ tools/perf/perf.h                   |    6 	6 +	0 -	0 !
+ 11 files changed, 255 insertions(+), 2 deletions(-)
+
+Index: b/arch/arm/include/asm/unistd.h
+===================================================================
+--- a/arch/arm/include/asm/unistd.h
++++ b/arch/arm/include/asm/unistd.h
+@@ -387,8 +387,9 @@
+ #define __NR_dup3			(__NR_SYSCALL_BASE+358)
+ #define __NR_pipe2			(__NR_SYSCALL_BASE+359)
+ #define __NR_inotify_init1		(__NR_SYSCALL_BASE+360)
++#define __NR_perf_counter_open		(__NR_SYSCALL_BASE+361)
+ 
+-#define __NR_syscall_max 361
++#define __NR_syscall_max 362
+ 
+ /*
+  * The following SWIs are ARM private.
+Index: b/arch/arm/kernel/calls.S
+===================================================================
+--- a/arch/arm/kernel/calls.S
++++ b/arch/arm/kernel/calls.S
+@@ -370,6 +370,7 @@
+ 		CALL(sys_dup3)
+ 		CALL(sys_pipe2)
+ /* 360 */	CALL(sys_inotify_init1)
++		CALL(sys_perf_counter_open)
+ #ifndef syscalls_counted
+ .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
+ #define syscalls_counted
+Index: b/tools/perf/perf.h
+===================================================================
+--- a/tools/perf/perf.h
++++ b/tools/perf/perf.h
+@@ -25,6 +25,12 @@
+ #define cpu_relax()	asm volatile("" ::: "memory");
+ #endif
+ 
++#ifdef __arm__
++#include "../../arch/arm/include/asm/unistd.h"
++#define rmb()           asm volatile("" ::: "memory")
++#define cpu_relax()     asm volatile("" ::: "memory");
++#endif
++
+ #include <time.h>
+ #include <unistd.h>
+ #include <sys/types.h>
+Index: b/arch/arm/Kconfig
+===================================================================
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -20,6 +20,7 @@ config ARM
+ 	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
+ 	select HAVE_FUNCTION_GRAPH_TRACER if (!XIP_KERNEL)
+ 	select HAVE_GENERIC_DMA_COHERENT
++	select GENERIC_ATOMIC64
+ 	help
+ 	  The ARM series is a line of low-power-consumption RISC chip designs
+ 	  licensed by ARM Ltd and targeted at embedded applications and
+@@ -253,6 +254,7 @@ config ARCH_NE1
+ #	select PCI
+ 	select GENERIC_TIME
+ 	select GENERIC_CLOCKEVENTS
++	select HAVE_PERF_COUNTERS
+ 	help
+ 	  This enables support for NEC-EL NaviEngine1-based boards.
+ 
+@@ -463,6 +465,7 @@ config ARCH_MXC
+ 	select ARCH_MTD_XIP
+ 	select GENERIC_GPIO
+ 	select ARCH_REQUIRE_GPIOLIB
++	select HAVE_PERF_COUNTERS
+ 	help
+ 	  Support for Freescale MXC/iMX-based family of processors
+ 
+Index: b/arch/arm/include/asm/perf_counter.h
+===================================================================
+--- /dev/null
++++ b/arch/arm/include/asm/perf_counter.h
+@@ -0,0 +1,8 @@
++#ifndef _ASM_ARM_PERF_COUNTER_H
++#define _ASM_ARM_PERF_COUNTER_H
++
++#define PERF_COUNTER_INDEX_OFFSET	1
++/* ARM only supports software counters through this interface. */
++static inline void set_perf_counter_pending(void) { do { } while(0);
++}
++#endif /* _ASM_ARM_PERF_COUNTER_H */
+Index: b/arch/arm/include/asm/atomic.h
+===================================================================
+--- a/arch/arm/include/asm/atomic.h
++++ b/arch/arm/include/asm/atomic.h
+@@ -225,6 +225,7 @@ static inline int atomic_add_unless(atom
+ #define smp_mb__before_atomic_inc()	barrier()
+ #define smp_mb__after_atomic_inc()	barrier()
+ 
++#include <asm-generic/atomic64.h>
+ #include <asm-generic/atomic.h>
+ #endif
+ #endif
+Index: b/include/asm-generic/atomic64.h
+===================================================================
+--- /dev/null
++++ b/include/asm-generic/atomic64.h
+@@ -0,0 +1,42 @@
++/*
++ * Generic implementation of 64-bit atomics using spinlocks,
++ * useful on processors that don't have 64-bit atomic instructions.
++ *
++ * Copyright ? 2009 Paul Mackerras, IBM Corp. <paulus@au1.ibm.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version
++ * 2 of the License, or (at your option) any later version.
++ */
++#ifndef _ASM_GENERIC_ATOMIC64_H
++#define _ASM_GENERIC_ATOMIC64_H
++
++typedef struct {
++	long long counter;
++} atomic64_t;
++
++#define ATOMIC64_INIT(i)	{ (i) }
++
++extern long long atomic64_read(const atomic64_t *v);
++extern void	 atomic64_set(atomic64_t *v, long long i);
++extern void	 atomic64_add(long long a, atomic64_t *v);
++extern long long atomic64_add_return(long long a, atomic64_t *v);
++extern void	 atomic64_sub(long long a, atomic64_t *v);
++extern long long atomic64_sub_return(long long a, atomic64_t *v);
++extern long long atomic64_dec_if_positive(atomic64_t *v);
++extern long long atomic64_cmpxchg(atomic64_t *v, long long o, long long n);
++extern long long atomic64_xchg(atomic64_t *v, long long new);
++extern int	 atomic64_add_unless(atomic64_t *v, long long a, long long u);
++
++#define atomic64_add_negative(a, v)	(atomic64_add_return((a), (v)) < 0)
++#define atomic64_inc(v)			atomic64_add(1LL, (v))
++#define atomic64_inc_return(v)		atomic64_add_return(1LL, (v))
++#define atomic64_inc_and_test(v) 	(atomic64_inc_return(v) == 0)
++#define atomic64_sub_and_test(a, v)	(atomic64_sub_return((a), (v)) == 0)
++#define atomic64_dec(v)			atomic64_sub(1LL, (v))
++#define atomic64_dec_return(v)		atomic64_sub_return(1LL, (v))
++#define atomic64_dec_and_test(v)	(atomic64_dec_return((v)) == 0)
++#define atomic64_inc_not_zero(v) 	atomic64_add_unless((v), 1LL, 0LL)
++
++#endif  /*  _ASM_GENERIC_ATOMIC64_H  */
+Index: b/lib/atomic64.c
+===================================================================
+--- /dev/null
++++ b/lib/atomic64.c
+@@ -0,0 +1,175 @@
++/*
++ * Generic implementation of 64-bit atomics using spinlocks,
++ * useful on processors that don't have 64-bit atomic instructions.
++ *
++ * Copyright ? 2009 Paul Mackerras, IBM Corp. <paulus@au1.ibm.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version
++ * 2 of the License, or (at your option) any later version.
++ */
++#include <linux/types.h>
++#include <linux/cache.h>
++#include <linux/spinlock.h>
++#include <linux/init.h>
++#include <asm/atomic.h>
++
++/*
++ * We use a hashed array of spinlocks to provide exclusive access
++ * to each atomic64_t variable.  Since this is expected to used on
++ * systems with small numbers of CPUs (<= 4 or so), we use a
++ * relatively small array of 16 spinlocks to avoid wasting too much
++ * memory on the spinlock array.
++ */
++#define NR_LOCKS	16
++
++/*
++ * Ensure each lock is in a separate cacheline.
++ */
++static union {
++	spinlock_t lock;
++	char pad[L1_CACHE_BYTES];
++} atomic64_lock[NR_LOCKS] __cacheline_aligned_in_smp;
++
++static inline spinlock_t *lock_addr(const atomic64_t *v)
++{
++	unsigned long addr = (unsigned long) v;
++
++	addr >>= L1_CACHE_SHIFT;
++	addr ^= (addr >> 8) ^ (addr >> 16);
++	return &atomic64_lock[addr & (NR_LOCKS - 1)].lock;
++}
++
++long long atomic64_read(const atomic64_t *v)
++{
++	unsigned long flags;
++	spinlock_t *lock = lock_addr(v);
++	long long val;
++
++	spin_lock_irqsave(lock, flags);
++	val = v->counter;
++	spin_unlock_irqrestore(lock, flags);
++	return val;
++}
++
++void atomic64_set(atomic64_t *v, long long i)
++{
++	unsigned long flags;
++	spinlock_t *lock = lock_addr(v);
++
++	spin_lock_irqsave(lock, flags);
++	v->counter = i;
++	spin_unlock_irqrestore(lock, flags);
++}
++
++void atomic64_add(long long a, atomic64_t *v)
++{
++	unsigned long flags;
++	spinlock_t *lock = lock_addr(v);
++
++	spin_lock_irqsave(lock, flags);
++	v->counter += a;
++	spin_unlock_irqrestore(lock, flags);
++}
++
++long long atomic64_add_return(long long a, atomic64_t *v)
++{
++	unsigned long flags;
++	spinlock_t *lock = lock_addr(v);
++	long long val;
++
++	spin_lock_irqsave(lock, flags);
++	val = v->counter += a;
++	spin_unlock_irqrestore(lock, flags);
++	return val;
++}
++
++void atomic64_sub(long long a, atomic64_t *v)
++{
++	unsigned long flags;
++	spinlock_t *lock = lock_addr(v);
++
++	spin_lock_irqsave(lock, flags);
++	v->counter -= a;
++	spin_unlock_irqrestore(lock, flags);
++}
++
++long long atomic64_sub_return(long long a, atomic64_t *v)
++{
++	unsigned long flags;
++	spinlock_t *lock = lock_addr(v);
++	long long val;
++
++	spin_lock_irqsave(lock, flags);
++	val = v->counter -= a;
++	spin_unlock_irqrestore(lock, flags);
++	return val;
++}
++
++long long atomic64_dec_if_positive(atomic64_t *v)
++{
++	unsigned long flags;
++	spinlock_t *lock = lock_addr(v);
++	long long val;
++
++	spin_lock_irqsave(lock, flags);
++	val = v->counter - 1;
++	if (val >= 0)
++		v->counter = val;
++	spin_unlock_irqrestore(lock, flags);
++	return val;
++}
++
++long long atomic64_cmpxchg(atomic64_t *v, long long o, long long n)
++{
++	unsigned long flags;
++	spinlock_t *lock = lock_addr(v);
++	long long val;
++
++	spin_lock_irqsave(lock, flags);
++	val = v->counter;
++	if (val == o)
++		v->counter = n;
++	spin_unlock_irqrestore(lock, flags);
++	return val;
++}
++
++long long atomic64_xchg(atomic64_t *v, long long new)
++{
++	unsigned long flags;
++	spinlock_t *lock = lock_addr(v);
++	long long val;
++
++	spin_lock_irqsave(lock, flags);
++	val = v->counter;
++	v->counter = new;
++	spin_unlock_irqrestore(lock, flags);
++	return val;
++}
++
++int atomic64_add_unless(atomic64_t *v, long long a, long long u)
++{
++	unsigned long flags;
++	spinlock_t *lock = lock_addr(v);
++	int ret = 1;
++
++	spin_lock_irqsave(lock, flags);
++	if (v->counter != u) {
++		v->counter += a;
++		ret = 0;
++	}
++	spin_unlock_irqrestore(lock, flags);
++	return ret;
++}
++
++static int init_atomic64_lock(void)
++{
++	int i;
++
++	for (i = 0; i < NR_LOCKS; ++i)
++		spin_lock_init(&atomic64_lock[i].lock);
++	return 0;
++}
++
++pure_initcall(init_atomic64_lock);
+Index: b/lib/Makefile
+===================================================================
+--- a/lib/Makefile
++++ b/lib/Makefile
+@@ -88,6 +88,8 @@ obj-$(CONFIG_HAVE_ARCH_TRACEHOOK) += sys
+ 
+ obj-$(CONFIG_DYNAMIC_PRINTK_DEBUG) += dynamic_printk.o
+ 
++obj-$(CONFIG_GENERIC_ATOMIC64) += atomic64.o
++
+ hostprogs-y	:= gen_crc32table
+ clean-files	:= crc32table.h
+ 
+Index: b/lib/Kconfig
+===================================================================
+--- a/lib/Kconfig
++++ b/lib/Kconfig
+@@ -177,4 +177,10 @@ config DISABLE_OBSOLETE_CPUMASK_FUNCTION
+        bool "Disable obsolete cpumask functions" if DEBUG_PER_CPU_MAPS
+        depends on EXPERIMENTAL && BROKEN
+ 
++#
++# Generic 64-bit atomic support is selected if needed
++#
++config GENERIC_ATOMIC64
++       bool
++
+ endmenu
+Index: b/arch/arm/mm/fault.c
+===================================================================
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -16,6 +16,7 @@
+ #include <linux/kprobes.h>
+ #include <linux/uaccess.h>
+ #include <linux/page-flags.h>
++#include <linux/perf_counter.h>
+ 
+ #include <asm/system.h>
+ #include <asm/pgtable.h>
+@@ -145,7 +146,6 @@ __do_user_fault(struct task_struct *tsk,
+ 		show_regs(regs);
+ 	}
+ #endif
+-
+ 	tsk->thread.address = addr;
+ 	tsk->thread.error_code = fsr;
+ 	tsk->thread.trap_no = 14;
+@@ -254,6 +254,7 @@ do_page_fault(unsigned long addr, unsign
+ 	tsk = current;
+ 	mm  = tsk->mm;
+ 
++	perf_swcounter_event(PERF_COUNT_SW_PAGE_FAULTS, 1, 0, regs, addr);
+ 	/*
+ 	 * If we're in an interrupt or have no user
+ 	 * context, we must not take the fault..
+@@ -281,6 +282,13 @@ do_page_fault(unsigned long addr, unsign
+ 	if (likely(!(fault & (VM_FAULT_ERROR | VM_FAULT_BADMAP | VM_FAULT_BADACCESS))))
+ 		return 0;
+ 
++	if(tsk->maj_flt)
++		perf_swcounter_event(PERF_COUNT_SW_PAGE_FAULTS_MAJ, 1, 0,
++				     regs, addr);
++	if(tsk->min_flt)
++		perf_swcounter_event(PERF_COUNT_SW_PAGE_FAULTS_MIN, 1, 0,
++				     regs, addr);
++
+ 	/*
+ 	 * If we are in kernel mode at this point, we
+ 	 * have no context to handle this fault with.
+-------------- next part --------------
+int fast_multiply(x,  y)
+{
+        return x * y;
+}
+ 
+int slow_multiply(x, y)
+{
+        int i, j, z;
+        for (i = 0, z = 0; i < x; i++)
+                z = z + y;
+        return z;
+}
+ 
+int main()
+{
+        int i,j;
+        int x,y;
+ 
+        for (i = 0; i < 200; i ++) {
+                for (j = 0; j < 3000 ; j++) {
+                        x = fast_multiply(i, j);
+                        y = slow_multiply(i, j);
+                }
+        }
+        return 0;
+}
