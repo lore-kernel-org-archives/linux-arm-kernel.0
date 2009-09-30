@@ -1,30 +1,60 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Wed, 30 Sep 2009 09:56:20 +0200
-Subject: performance counter support for ARM architecture
-In-Reply-To: <bbfde6e10909300026hbccd169s71a5ad1cd45ff944@mail.gmail.com>
-References: <bbfde6e10909300026hbccd169s71a5ad1cd45ff944@mail.gmail.com>
-Message-ID: <20090930075618.GA5784@nowhere>
+From: rpjday@crashcourse.ca (Robert P. J. Day)
+Date: Wed, 30 Sep 2009 04:12:22 -0400 (EDT)
+Subject: apparently, numerous unused header files under arch/arm
+Message-ID: <alpine.LFD.2.00.0909300405080.14643@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2009 at 12:56:18PM +0530, nelakurthi koteswararao wrote:
-> Dear all,
-> 
-> I will change the naming conventions and symbolic names once perfcounter for
-> ARM is supported.
-> I want to do intermediate releases for review in mean time
-> 
-> 1. I am able to support page faults in ARM with the attached patch along
-> with application.( this is for linux-2.6.29 kernel)
 
+  as part of a new tree scan with one of my scripts, i located what
+*appear* to be numerous header files under arch/arm that no one seems
+to be including.  the first few in that list, accompanied by a full
+tree scan of any use of the filename:
 
+===== at91_adc.h =====
+./arch/arm/mach-at91/include/mach/at91_adc.h
+arch/arm/mach-at91/include/mach/at91_adc.h: * arch/arm/mach-at91/include/mach/at91_adc.h
+===== at91_spi.h =====
+./arch/arm/mach-at91/include/mach/at91_spi.h
+arch/arm/mach-at91/include/mach/at91_spi.h: * arch/arm/mach-at91/include/mach/at91_spi.h
+===== at91_ssc.h =====
+./arch/arm/mach-at91/include/mach/at91_ssc.h
+arch/arm/mach-at91/include/mach/at91_ssc.h: * arch/arm/mach-at91/include/mach/at91_ssc.h
+===== aux_reg.h =====
+./arch/arm/mach-l7200/include/mach/aux_reg.h
+arch/arm/mach-l7200/include/mach/aux_reg.h: * arch/arm/mach-l7200/include/mach/aux_reg.h
+===== bast-pmu.h =====
+./arch/arm/mach-s3c2410/include/mach/bast-pmu.h
+arch/arm/mach-s3c2410/include/mach/bast-pmu.h:/* arch/arm/mach-s3c2410/include/mach/bast-pmu.h
+===== board-mx35pdk.h =====
+./arch/arm/plat-mxc/include/mach/board-mx35pdk.h
+===== board-pcm043.h =====
+./arch/arm/plat-mxc/include/mach/board-pcm043.h
+===== board-voiceblue.h =====
+./arch/arm/plat-omap/include/mach/board-voiceblue.h
 
-Perf counters wasn't even in the 2.6.29 kernel so
-I guess you are basing this work on a completely out of date
-perf version.
+... etc etc ...
 
-We can't take patches based on 29. We can't even review
-them, that doesn't make sense given the tons of things that have
-changed since 2.6.29
+  so, for example, nothing seems to include that last listed
+board-voiceblue.h header, not even the source file that's the obvious
+candidate:  arch/arm/mach-omap1/board-voiceblue.c.  and there's lots
+more of those.  (they're listed in alphabetical order, and i was only
+up to the "b"s, but it's almost certain that i'll have some false
+positives in there somewhere, perhaps because of Makefile-based
+includes.)
 
-We need patches against 2.6.32-rc1
+  is there any interest in my posting that arm-specific list somewhere
+and people can peruse it and decide what, if anything, they want to do
+with it?
+
+rday
+--
+
+========================================================================
+Robert P. J. Day                               Waterloo, Ontario, CANADA
+
+        Linux Consulting, Training and Annoying Kernel Pedantry.
+
+Web page:                                          http://crashcourse.ca
+Twitter:                                       http://twitter.com/rpjday
+========================================================================
