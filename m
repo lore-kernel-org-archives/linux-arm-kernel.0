@@ -1,44 +1,66 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 30 Sep 2009 20:10:26 +0800
-Subject: 2.6.32-rc1: spitz boots but suspend/resume is broken
-In-Reply-To: <bc64b4640909300509p6c682fa8rb5ce43c77c79f5@mail.gmail.com>
-References: <20090930120655.GG1412@ucw.cz>
-	<bc64b4640909300509p6c682fa8rb5ce43c77c79f5@mail.gmail.com>
-Message-ID: <f17812d70909300510t106a07b1u3caae9ec4127e26f@mail.gmail.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 30 Sep 2009 14:16:56 +0200 (CEST)
+Subject: arm tree in broken state (was Re: What's inside the pxa tree
+	for this merge window)
+In-Reply-To: <20090930120920.GH1412@ucw.cz>
+References: <f17812d70909100446h17a1903fy74941945dbfc6943@mail.gmail.com>
+	<1253256227.4407.7.camel@pc-matejk>
+	<20090918074551.GA26058@n2100.arm.linux.org.uk>
+	<Pine.LNX.4.64.0909212111490.17328@axis700.grange>
+	<20090921200923.GF30821@n2100.arm.linux.org.uk>
+	<20090930120920.GH1412@ucw.cz>
+Message-ID: <Pine.LNX.4.64.0909301415300.4330@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mmm.... if not due to kernel image size constraints, I'd really like to merge
-all the zaurus configs into one.
+Hi Pavel
 
-On Wed, Sep 30, 2009 at 8:09 PM, Dmitry Eremin-Solenikov
-<dbaryshkov@gmail.com> wrote:
-> On Wed, Sep 30, 2009 at 4:06 PM, Pavel Machek <pavel@ucw.cz> wrote:
->> Hi!
->>
->> matrix keyboard driver needs to be enabled, otherwise it seems ok.
->>
->> Unfortunately, it does not respond to power button in any visible way
->> :-(. Any ideas what might be wrong/how to debug it?
->
-> Enable gpio-keyboard driver, verify (or port power button to it :))
-> and check that
-> enable_wakeup is enabled.
->
-> BTW: on tosa initially i had a problem w/ wakeup. The power button wasn't
-> able to wake the device up. However there was another gpio that was OR of
-> ?power button and AC-in gpios that had to be used for wakeup. Please check
-> if the same design applies to your device.
->
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?Pavel
->> --
->> (english) http://www.livejournal.com/~pavelmachek
->> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
->>
->
->
->
-> --
-> With best wishes
-> Dmitry
->
+On Wed, 30 Sep 2009, Pavel Machek wrote:
+
+> > > > I discarded them _because_ Eric handled them, which is what I said in the
+> > > > comments when I discarded them.
+> > > 
+> > > Ok, I did do my best to get patches in the right order in the mainline, 
+> > > but it all failed. AFAICS, v4l and sh are already in the mainline with a 
+> > > _wrongly_ resolved mefge conflict, which, most likely, breaks the 
+> > > sh_mobile_ceu_camera.c driver, and the three PXA platforms, patches for 
+> > > which should have been applied before both those trees and still haven't 
+> > > been applied are broken until the patches do get in and the later those 
+> > > patches get applied the longer the interval with the broken for them 
+> > > bisection is going to be.
+> > 
+> > Meanwhile I have to consider that we have several bug fixes outstanding,
+> > and since I can't send Linus a pull request every day (max once a week)
+> > I have to be very careful about when I send stuff.
+> > 
+> > So I only get _two_ opportunities during a merge window to send a pull
+> > request.
+> 
+> Well, you should certainly try to keep your tree  unbroken, but when
+> it breaks, fixing it asap should be a priority. I don't know where you
+> got the 'once a week' rule, but it seems stupid.
+> 
+> > I'm going to wait until tomorrow before sending my final pull for this
+> > window, which is the penultimate day before the window closes.
+> > 
+> > Don't blame me for these delays - it's not my choice to impose such
+> > delays.  I'd really like to fix those broken platforms right now.  I
+> > just can't do so without causing additional delays for other issues.
+> > Blame Linus for imposing the "max one pull a week" rule on me.
+> 
+> Do you have maillist reference? Not even Linus should slow down
+> development like that.
+> 
+> If Linus really insists on that, perhaps possible solution would be to
+> make subarch maintainers send pull requests for simple fixes directly
+> to Linus?
+
+Thanks for your concern, but the patches are long in mainline, no reason 
+to worry any more.
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
