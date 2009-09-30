@@ -1,11 +1,13 @@
 From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 30 Sep 2009 17:01:12 -0400
+Date: Wed, 30 Sep 2009 17:24:07 -0400
 Subject: [PATCH] ep93xx: update i2c support
-In-Reply-To: <4AC3BB1F.9050903@bluewatersys.com>
+In-Reply-To: <4AC3C8D2.5060009@bluewatersys.com>
 References: <BD79186B4FD85F4B8E60E381CAEE190901D41F55@mi8nycmail19.Mi8.com>
 	<BD79186B4FD85F4B8E60E381CAEE190901D41F5D@mi8nycmail19.Mi8.com>
 	<4AC3BB1F.9050903@bluewatersys.com>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901D42C6B@mi8nycmail19.Mi8.com>
+	<BD79186B4FD85F4B8E60E381CAEE190901D42C6B@mi8nycmail19.Mi8.com>
+	<4AC3C8D2.5060009@bluewatersys.com>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901D42C7C@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,10 +27,12 @@ Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 
 ---
 
+V4 - add warning message when sda/scl are not EEDAT/EECLK and
+     configured as open drain
 V3 - rebased on comments from Ryan Mallon
 
 diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index f7ebed9..dff9373 100644
+index f7ebed9..3803d4f 100644
 --- a/arch/arm/mach-ep93xx/core.c
 +++ b/arch/arm/mach-ep93xx/core.c
 @@ -550,13 +550,11 @@ void __init ep93xx_register_eth(struct ep93xx_eth_data *data, int copy_addr)
@@ -50,7 +54,7 @@ index f7ebed9..dff9373 100644
  
  static struct platform_device ep93xx_i2c_device = {
  	.name			= "i2c-gpio",
-@@ -564,8 +562,21 @@ static struct platform_device ep93xx_i2c_device = {
+@@ -564,8 +562,26 @@ static struct platform_device ep93xx_i2c_device = {
  	.dev.platform_data	= &ep93xx_i2c_data,
  };
  
@@ -66,6 +70,11 @@ index f7ebed9..dff9373 100644
 +	 * open drain, which will require an external pull-up, or a normal
 +	 * CMOS driver.
 +	 */
++	if (data->sda_is_open_drain && data->sda_pin != EP93XX_GPIO_LINE_EEDAT)
++		printk("ep93xx: sda != EEDAT, open drain has no effect\n");
++	if (data->scl_is_open_drain && data->scl_pin != EP93XX_GPIO_LINE_EECLK)
++		printk("ep93xx: scl != EECLK, open drain has no effect\n");
++	
 +	__raw_writel((ep9xx_i2c_data.sda_is_open_drain << 1) |
 +		     (ep9xx_i2c_data.scl_is_open_drain << 0),
 +		     EP93XX_GPIO_EEDRIVE);
