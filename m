@@ -1,50 +1,71 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Wed, 30 Sep 2009 15:18:55 +0200
-Subject: 2.6.32-rc1/2, arm and usb
-In-Reply-To: <87ocos4njq.fsf@lechat.rtp-net.org>
-References: <87ws3i40id.fsf@lechat.rtp-net.org>
-	<19138.34019.987851.150679@pilspetsen.it.uu.se>
-	<87ocos4njq.fsf@lechat.rtp-net.org>
-Message-ID: <19139.23231.907688.584734@pilspetsen.it.uu.se>
+From: slapin@ossfans.org (Sergey Lapin)
+Date: Wed, 30 Sep 2009 17:21:25 +0400
+Subject: [PATCH V2] MAINTAINERS: ARM/Palm file patterns
+In-Reply-To: <1254002818.7128.65.camel@Joe-Laptop.home>
+References: <1253990824.7128.25.camel@Joe-Laptop.home>
+	<200909262114.08994.marek.vasut@gmail.com>
+	<1253994832.7128.44.camel@Joe-Laptop.home>
+	<200909262230.43385.marek.vasut@gmail.com>
+	<1254002818.7128.65.camel@Joe-Laptop.home>
+Message-ID: <20090930132125.GA20194@build.ossfans.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnaud Patard (Rtp) writes:
- > Mikael Pettersson <mikpe@it.uu.se> writes:
- > 
- > Hi,
- > 
- > > Arnaud Patard (Rtp) writes:
- > >  > I wanted yesterday to check that my iop sanmina support was still fine on
- > >  > latest -rc kernel and found out that it was not booting anymore and last
- > >  > thing printed on the serial console is "done. Booting the kernel". After
- > >  > bisecting, the culprit is commit
- > >  > db8be50c4307dac2b37305fc59c8dc0f978d09ea (in linus tree). Reverting it
- > >  > allows to boot so this confirms the git bisect result.
- > >  > 
- > >  > The commit does this in drivers/usb/host/pci-quirks.c :
- > >  > -DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID, PCI_ANY_ID, quirk_usb_early_handoff);
- > >  > +DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, quirk_usb_early_handoff);
- > >  > 
- > >  > Now, before collecting informations to report the problem to usb folks
- > >  > and trying to debug further, I'm wondering if anyone else got this bug
- > >  > or if I'm just unlucky and has a hardware-specific issue. Also, if
- > >  > someone has an idea of what the problem may be or in which direction I
- > >  > should look at, please share.
- > >
- > > My iop n2100 shows the exact same problem with 2.6.32-rc1,
- > > and reverting the commit mentioned above fixes it.
- > >
- > > None of my other machines (including two non-iop arms, x86,
- > > and ultrasparc) have this problem even though they all have
- > > PCI usb controllers. So the problem looks iop-specific.
- > 
- > fyi, I've taken a look at linux-usb today and found :
- > http://marc.info/?l=linux-usb&m=125426642829044&w=2
- > 
- > So this bug is not iop specific. Even if it doesn't look arch specific,
- > I'm surprised to see that so few machines are affected. I was hoping
- > that all arm machines with usb host on pci were affected but according
- > to your tests it's not the case.
-
-Have you reported the ARM IOP breakage of this commit to the USB list?
+On Sat, Sep 26, 2009 at 03:06:58PM -0700, Joe Perches wrote:
+> On Sat, 2009-09-26 at 22:30 +0200, Marek Vasut wrote:
+> > Dne So 26. z??? 2009 21:53:52 Joe Perches napsal(a):
+> > > On Sat, 2009-09-26 at 21:14 +0200, Marek Vasut wrote:
+> > > > This might cause trouble, we're working on renaming treo680 (as below) to
+> > > > palmtreo so palm* wont do ... you'll possibly have to list them or
+> > > > something. Otherwise ok.
+> > palmasoc will hopefully go to hell soon anyway. Otherwise, I'm for the second 
+> > method (listing the files, one per line), it's least confusing.
+> 
+> Signed-off-by: Joe Perches <joe@perches.com>
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index c450f3a..f8f9c4f 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -741,23 +741,36 @@ M:	Dirk Opfer <dirk@opfer-online.de>
+>  S:	Maintained
+>  
+>  ARM/PALMTX,PALMT5,PALMLD,PALMTE2,PALMTC SUPPORT
+> -P:	Marek Vasut
+> -M:	marek.vasut at gmail.com
+> +M:	Marek Vasut <marek.vasut@gmail.com>
+>  L:	linux-arm-kernel at lists.infradead.org
+>  W:	http://hackndev.com
+>  S:	Maintained
+> +F:	arch/arm/mach-pxa/include/mach/palmtx.h
+> +F:	arch/arm/mach-pxa/palmtx.c
+> +F:	arch/arm/mach-pxa/include/mach/palmt5.h
+> +F:	arch/arm/mach-pxa/palmt5.c
+> +F:	arch/arm/mach-pxa/include/mach/palmld.h
+> +F:	arch/arm/mach-pxa/palmld.c
+> +F:	arch/arm/mach-pxa/include/mach/palmte2.h
+> +F:	arch/arm/mach-pxa/palmte2.c
+> +F:	arch/arm/mach-pxa/include/mach/palmtc.h
+> +F:	arch/arm/mach-pxa/palmtc.c
+>  
+>  ARM/PALM TREO 680 SUPPORT
+>  M:	Tomas Cech <sleep_walker@suse.cz>
+>  L:	linux-arm-kernel at lists.infradead.org
+>  W:	http://hackndev.com
+>  S:	Maintained
+> +F:	arch/arm/mach-pxa/include/mach/treo680.h
+> +F:	arch/arm/mach-pxa/treo680.c
+>  
+>  ARM/PALMZ72 SUPPORT
+>  M:	Sergey Lapin <slapin@ossfans.org>
+>  L:	linux-arm-kernel at lists.infradead.org
+>  W:	http://hackndev.com
+>  S:	Maintained
+> +F:	arch/arm/mach-pxa/include/mach/palmz72.h
+> +F:	arch/arm/mach-pxa/palmz72.c
+Acked-by: Sergey Lapin <slapin@ossfans.org>
+>  
+>  ARM/PLEB SUPPORT
+>  M:	Peter Chubb <pleb@gelato.unsw.edu.au>
+> 
+> 
