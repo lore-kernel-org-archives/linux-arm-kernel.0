@@ -1,76 +1,45 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 30 Sep 2009 11:50:19 +0200
-Subject: [at91sam9g45] touch screen not detected by Angstrom Linux
-In-Reply-To: <4AC31F7F.6090001@visionsystems.de>
-References: <4AC31F7F.6090001@visionsystems.de>
-Message-ID: <4AC329DB.4000004@atmel.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 30 Sep 2009 14:01:39 +0200
+Subject: [patch 175/200] MAINTAINERS: move ARM lists to infradead
+In-Reply-To: <20090922190555.GA24624@flint.arm.linux.org.uk>
+References: <200909220004.n8M04S5U001324@imap1.linux-foundation.org>
+	<20090922074755.GA696@Chamillionaire.breakpoint.cc>
+	<1253626009.6317.648.camel@macbook.infradead.org>
+	<1253632347.30020.8.camel@Joe-Laptop.home>
+	<m3bpl37y5c.fsf@intrepid.localdomain>
+	<1253636800.30020.24.camel@Joe-Laptop.home>
+	<m33a6f7x34.fsf@intrepid.localdomain>
+	<20090922190555.GA24624@flint.arm.linux.org.uk>
+Message-ID: <20090930120139.GA1412@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yegor Yefremov :
-> Hello Nicolas,
-> 
-> I could successfully apply your touch screen drivers to 2.6.32-rc2:
-> 
-> 2.6.30-at91-exp-0045-input-atmel_tsadcc-touchscreen-use-platform-paramet.patch
-> 2.6.30-at91-exp-0046-at91-input-platform-parameters-for-atmel_tsadcc-in.patch
-> 2.6.30-at91-exp-0047-at91-input-touchscreen-support-for-at91sam9g45ekes.patch
-> 
-> Here dmesg output for 2.6.32-rc2:
-> 
-> atmel_tsadcc atmel_tsadcc: Master clock is set at: 133333333 Hz
-> atmel_tsadcc atmel_tsadcc: Prescaler is set at: 221
-> input: atmel touch screen controller as /devices/platform/atmel_tsadcc/input/input1
-> 
-> Here dmesg output for 2.6.27 where touch screen is working under Angstrom Linux:
-> 
-> atmel_tsadcc atmel_tsadcc: Master clock is set at: 133333333 Hz
-> atmel_tsadcc atmel_tsadcc: Prescaler is set at: 221
-> input: atmel touch screen controller as /class/input/input1
-> 
-> The device is working if I read /dev/input/event1, but I'm not able to get it working under Angstrom Linux. Any ideas?
+On Tue 2009-09-22 20:05:55, Russell King wrote:
+> On Tue, Sep 22, 2009 at 06:39:27PM +0200, Krzysztof Halasa wrote:
+> > Joe Perches <joe@perches.com> writes:
+> > 
+> > > Posting to linux-arm-kernel was and likely still is limited
+> > > without prior subscription.
+> > 
+> > If so then it should be fixed. Otherwise I can see no point in moving
+> > from the old list.
 
-Yes: in the driver we do not report the pressure measurement (not 
-available on at91sam9rl). There is a bug in tslib that prevents 
-a pressure-less touchscreen to work correctly.
+Yep, that should be fixed.
 
-1/ solution one: apply the patch I posted on tslib ml:
-https://lists.berlios.de/pipermail/tslib-general/2009-September/000225.html
+> The point was to get me out of the loop, so people can stop using me as
+> an excuse.  That's what it's about, plain and simple.  It wasn't really
+> about the list policies.  It was purely that I was involved in running
+> it.
+> 
+> Don't think so?  See Pavel's different attitude towards the moderation
+> messages from the new mailing list - it's no longer "linux-arm-kernel
+> useless for development".
 
-2/ re-introduce the fake pressure report in your source (atmel_tsadcc driver)
 
-8<-------------------------------------------
-diff --git a/drivers/input/touchscreen/atmel_tsadcc.c b/drivers/input/touchscreen/atmel_tsadcc.c
-index 3c24783..27ac912 100644
---- a/drivers/input/touchscreen/atmel_tsadcc.c
-+++ b/drivers/input/touchscreen/atmel_tsadcc.c
-@@ -134,6 +134,7 @@ static irqreturn_t atmel_tsadcc_interrupt(int irq, void *dev)
- 
- 		input_report_key(input_dev, BTN_TOUCH, 0);
- 		ts_dev->bufferedmeasure = 0;
-+		input_report_abs(input_dev, ABS_PRESSURE, 0);
- 		input_sync(input_dev);
- 
- 	} else if (status & ATMEL_TSADCC_PENCNT) {
-@@ -158,6 +159,7 @@ static irqreturn_t atmel_tsadcc_interrupt(int irq, void *dev)
- 			input_report_abs(input_dev, ABS_X, ts_dev->prev_absx);
- 			input_report_abs(input_dev, ABS_Y, ts_dev->prev_absy);
- 			input_report_key(input_dev, BTN_TOUCH, 1);
-+			input_report_abs(input_dev, ABS_PRESSURE, 7500);
- 			input_sync(input_dev);
- 		} else
- 			ts_dev->bufferedmeasure = 1;
-@@ -256,6 +258,7 @@ static int __devinit atmel_tsadcc_probe(struct platform_device *pdev)
- 	__set_bit(EV_ABS, input_dev->evbit);
- 	input_set_abs_params(input_dev, ABS_X, 0, 0x3FF, 0, 0);
- 	input_set_abs_params(input_dev, ABS_Y, 0, 0x3FF, 0, 0);
-+	input_set_abs_params(input_dev, ABS_PRESSURE, 0, 15000, 0, 0);
- 
- 	input_set_capability(input_dev, EV_KEY, BTN_TOUCH);
- 
-
-8<-------------------------------------------
-
-Best regards,
+The difference is that new list maintainer does not spread 'don't dare
+bothering me' messages around, nor he threatens to censor people when
+they complain. Yes, I'm glad you are out of the loop.
+								Pavel
 -- 
-Nicolas Ferre
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
