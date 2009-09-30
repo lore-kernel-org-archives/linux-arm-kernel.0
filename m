@@ -1,20 +1,24 @@
-From: davidb@quicinc.com (David Brown)
-Date: Wed, 30 Sep 2009 07:46:03 -0700
+From: bgat@billgatliff.com (Bill Gatliff)
+Date: Wed, 30 Sep 2009 09:47:45 -0500
 Subject: apparently, numerous unused header files under arch/arm
 In-Reply-To: <alpine.LFD.2.00.0909300405080.14643@localhost>
 References: <alpine.LFD.2.00.0909300405080.14643@localhost>
-Message-ID: <20090930144603.GC25416@huya.quicinc.com>
+Message-ID: <4AC36F91.3050503@billgatliff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2009 at 01:12:22AM -0700, Robert P. J. Day wrote:
+Robert P. J. Day wrote:
+>   as part of a new tree scan with one of my scripts, i located what
+> *appear* to be numerous header files under arch/arm that no one seems
+> to be including.  the first few in that list, accompanied by a full
+> tree scan of any use of the filename:
+>   
 
-> is there any interest in my posting that arm-specific list somewhere
-> and people can peruse it and decide what, if anything, they want to do
-> with it?
+Would any of those files be of use to user applications?
 
-Any chance the script itself could be made available?  I would
-find this useful as I'm working through large amounts of code to
-get it to a state where it can be sent out as patches.
 
-David
+b.g.
+
+-- 
+Bill Gatliff
+bgat at billgatliff.com
