@@ -1,66 +1,50 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 30 Sep 2009 14:16:56 +0200 (CEST)
-Subject: arm tree in broken state (was Re: What's inside the pxa tree
-	for this merge window)
-In-Reply-To: <20090930120920.GH1412@ucw.cz>
-References: <f17812d70909100446h17a1903fy74941945dbfc6943@mail.gmail.com>
-	<1253256227.4407.7.camel@pc-matejk>
-	<20090918074551.GA26058@n2100.arm.linux.org.uk>
-	<Pine.LNX.4.64.0909212111490.17328@axis700.grange>
-	<20090921200923.GF30821@n2100.arm.linux.org.uk>
-	<20090930120920.GH1412@ucw.cz>
-Message-ID: <Pine.LNX.4.64.0909301415300.4330@axis700.grange>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Wed, 30 Sep 2009 14:36:25 +0200
+Subject: 2.6.32-rc1/2, arm and usb
+In-Reply-To: <19138.34019.987851.150679@pilspetsen.it.uu.se> (Mikael
+	Pettersson's message of "Wed\, 30 Sep 2009 00\:06\:27 +0200")
+References: <87ws3i40id.fsf@lechat.rtp-net.org>
+	<19138.34019.987851.150679@pilspetsen.it.uu.se>
+Message-ID: <87ocos4njq.fsf@lechat.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel
+Mikael Pettersson <mikpe@it.uu.se> writes:
 
-On Wed, 30 Sep 2009, Pavel Machek wrote:
+Hi,
 
-> > > > I discarded them _because_ Eric handled them, which is what I said in the
-> > > > comments when I discarded them.
-> > > 
-> > > Ok, I did do my best to get patches in the right order in the mainline, 
-> > > but it all failed. AFAICS, v4l and sh are already in the mainline with a 
-> > > _wrongly_ resolved mefge conflict, which, most likely, breaks the 
-> > > sh_mobile_ceu_camera.c driver, and the three PXA platforms, patches for 
-> > > which should have been applied before both those trees and still haven't 
-> > > been applied are broken until the patches do get in and the later those 
-> > > patches get applied the longer the interval with the broken for them 
-> > > bisection is going to be.
-> > 
-> > Meanwhile I have to consider that we have several bug fixes outstanding,
-> > and since I can't send Linus a pull request every day (max once a week)
-> > I have to be very careful about when I send stuff.
-> > 
-> > So I only get _two_ opportunities during a merge window to send a pull
-> > request.
-> 
-> Well, you should certainly try to keep your tree  unbroken, but when
-> it breaks, fixing it asap should be a priority. I don't know where you
-> got the 'once a week' rule, but it seems stupid.
-> 
-> > I'm going to wait until tomorrow before sending my final pull for this
-> > window, which is the penultimate day before the window closes.
-> > 
-> > Don't blame me for these delays - it's not my choice to impose such
-> > delays.  I'd really like to fix those broken platforms right now.  I
-> > just can't do so without causing additional delays for other issues.
-> > Blame Linus for imposing the "max one pull a week" rule on me.
-> 
-> Do you have maillist reference? Not even Linus should slow down
-> development like that.
-> 
-> If Linus really insists on that, perhaps possible solution would be to
-> make subarch maintainers send pull requests for simple fixes directly
-> to Linus?
+> Arnaud Patard (Rtp) writes:
+>  > I wanted yesterday to check that my iop sanmina support was still fine on
+>  > latest -rc kernel and found out that it was not booting anymore and last
+>  > thing printed on the serial console is "done. Booting the kernel". After
+>  > bisecting, the culprit is commit
+>  > db8be50c4307dac2b37305fc59c8dc0f978d09ea (in linus tree). Reverting it
+>  > allows to boot so this confirms the git bisect result.
+>  > 
+>  > The commit does this in drivers/usb/host/pci-quirks.c :
+>  > -DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID, PCI_ANY_ID, quirk_usb_early_handoff);
+>  > +DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, quirk_usb_early_handoff);
+>  > 
+>  > Now, before collecting informations to report the problem to usb folks
+>  > and trying to debug further, I'm wondering if anyone else got this bug
+>  > or if I'm just unlucky and has a hardware-specific issue. Also, if
+>  > someone has an idea of what the problem may be or in which direction I
+>  > should look at, please share.
+>
+> My iop n2100 shows the exact same problem with 2.6.32-rc1,
+> and reverting the commit mentioned above fixes it.
+>
+> None of my other machines (including two non-iop arms, x86,
+> and ultrasparc) have this problem even though they all have
+> PCI usb controllers. So the problem looks iop-specific.
 
-Thanks for your concern, but the patches are long in mainline, no reason 
-to worry any more.
+fyi, I've taken a look at linux-usb today and found :
+http://marc.info/?l=linux-usb&m=125426642829044&w=2
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+So this bug is not iop specific. Even if it doesn't look arch specific,
+I'm surprised to see that so few machines are affected. I was hoping
+that all arm machines with usb host on pci were affected but according
+to your tests it's not the case.
+
+
+Arnaud
