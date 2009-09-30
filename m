@@ -1,53 +1,46 @@
-From: sam@ravnborg.org (Sam Ravnborg)
-Date: Wed, 30 Sep 2009 23:39:25 +0200
-Subject: [PATCH 2/2] arm: Clean up linker script using new linker
-	script macros.
-In-Reply-To: <1254345935-15958-3-git-send-email-tabbott@ksplice.com>
-References: <1254345935-15958-1-git-send-email-tabbott@ksplice.com>
-	<1254345935-15958-3-git-send-email-tabbott@ksplice.com>
-Message-ID: <20090930213924.GB15732@merkur.ravnborg.org>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 30 Sep 2009 14:44:31 -0700
+Subject: [PATCH] ARM: allow empty ATAG_CORE
+Message-ID: <1254347072-27932-1-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2009 at 05:25:35PM -0400, Tim Abbott wrote:
-> From: Nelson Elhage <nelhage@ksplice.com>
-> 
-> This patch is mostly a straightforward translation. The primary side
-> effect to the resulting vmlinux should be to increase the alignment on
-> the initramfs to the standard PAGE_SIZE from 32 bytes.
-> 
-> Signed-off-by: Nelson Elhage <nelhage@ksplice.com>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Tim Abbott <tabbott@ksplice.com>
-> ---
->  arch/arm/kernel/vmlinux.lds.S |   75 +++++++++++-----------------------------
->  1 files changed, 21 insertions(+), 54 deletions(-)
-> 
->  
-> -	.bss : {
-> -		__bss_start = .;	/* BSS				*/
-> -		*(.bss)
-> -		*(COMMON)
-> -		__bss_stop = .;
-> -		_end = .;
+From: David Brown <davidb@quicinc.com>
 
-Where is _end in the new layout?
-I think we lost it.
+The ATAG_CORE is allowed to be empty.  Although this is handled
+by parse_tag_core(), __vet_atags during startup rejects this tag
+unless it contains data.  Allow the initial tag to be either the
+full size, or empty.
 
-> -	}
-> -					/* Stabs debugging sections.	*/
-> -	.stab 0 : { *(.stab) }
-> -	.stabstr 0 : { *(.stabstr) }
-> -	.stab.excl 0 : { *(.stab.excl) }
-> -	.stab.exclstr 0 : { *(.stab.exclstr) }
-> -	.stab.index 0 : { *(.stab.index) }
-> -	.stab.indexstr 0 : { *(.stab.indexstr) }
-> +	BSS_SECTION(0, 0, 0)
-> +	STABS_DEBUG
->  	.comment 0 : { *(.comment) }
->  }
+Signed-off-by: David Brown <davidb@quicinc.com>
+---
+Currently, some configurations of the Android bootloader use an empty
+ATAG_CORE.
 
-Other than that.
-Acked-by: Sam Ravnborg <sam@ravnborg.org>
+ arch/arm/kernel/head-common.S |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
-	Sam
+diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
+index 93ad576..1e8f0d6 100644
+--- a/arch/arm/kernel/head-common.S
++++ b/arch/arm/kernel/head-common.S
+@@ -13,6 +13,7 @@
+ 
+ #define ATAG_CORE 0x54410001
+ #define ATAG_CORE_SIZE ((2*4 + 3*4) >> 2)
++#define ATAG_CORE_SIZE_EMPTY ((2*4 + 3*4) >> 2)
+ 
+ 	.align	2
+ 	.type	__switch_data, %object
+@@ -251,7 +252,8 @@ __vet_atags:
+ 	bne	1f
+ 
+ 	ldr	r5, [r2, #0]			@ is first tag ATAG_CORE?
+-	subs	r5, r5, #ATAG_CORE_SIZE
++	cmp	r5, #ATAG_CORE_SIZE
++	cmpne	r5, #ATAG_CORE_SIZE_EMPTY
+ 	bne	1f
+ 	ldr	r5, [r2, #4]
+ 	ldr	r6, =ATAG_CORE
+-- 
+1.6.2.3
