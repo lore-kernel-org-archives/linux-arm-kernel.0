@@ -1,26 +1,59 @@
-From: greg@kroah.com (Greg KH)
-Date: Wed, 30 Sep 2009 16:27:57 -0700
-Subject: [stable] [patch for 2.6.31-stable] zaurus c3000 aka spitz: fix
-	resume
-In-Reply-To: <20090930203251.GA1893@ucw.cz>
-References: <20090930203251.GA1893@ucw.cz>
-Message-ID: <20090930232757.GA17069@kroah.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 30 Sep 2009 14:09:20 +0200
+Subject: arm tree in broken state (was Re: What's inside the pxa tree for
+	this merge window)
+In-Reply-To: <20090921200923.GF30821@n2100.arm.linux.org.uk>
+References: <f17812d70909100446h17a1903fy74941945dbfc6943@mail.gmail.com>
+	<1253256227.4407.7.camel@pc-matejk>
+	<20090918074551.GA26058@n2100.arm.linux.org.uk>
+	<Pine.LNX.4.64.0909212111490.17328@axis700.grange>
+	<20090921200923.GF30821@n2100.arm.linux.org.uk>
+Message-ID: <20090930120920.GH1412@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2009 at 10:32:52PM +0200, Pavel Machek wrote:
+
+> > > I discarded them _because_ Eric handled them, which is what I said in the
+> > > comments when I discarded them.
+> > 
+> > Ok, I did do my best to get patches in the right order in the mainline, 
+> > but it all failed. AFAICS, v4l and sh are already in the mainline with a 
+> > _wrongly_ resolved mefge conflict, which, most likely, breaks the 
+> > sh_mobile_ceu_camera.c driver, and the three PXA platforms, patches for 
+> > which should have been applied before both those trees and still haven't 
+> > been applied are broken until the patches do get in and the later those 
+> > patches get applied the longer the interval with the broken for them 
+> > bisection is going to be.
 > 
+> Meanwhile I have to consider that we have several bug fixes outstanding,
+> and since I can't send Linus a pull request every day (max once a week)
+> I have to be very careful about when I send stuff.
 > 
-> Spitz resume was broken for year or likely two, and it would be very
-> nice to fix it for 2.6.31-stable release. One liner is below...
+> So I only get _two_ opportunities during a merge window to send a pull
+> request.
+
+Well, you should certainly try to keep your tree  unbroken, but when
+it breaks, fixing it asap should be a priority. I don't know where you
+got the 'once a week' rule, but it seems stupid.
+
+> I'm going to wait until tomorrow before sending my final pull for this
+> window, which is the penultimate day before the window closes.
 > 
-> It is in 2.6.32-rc1/2, with some more signoffs...
+> Don't blame me for these delays - it's not my choice to impose such
+> delays.  I'd really like to fix those broken platforms right now.  I
+> just can't do so without causing additional delays for other issues.
+> Blame Linus for imposing the "max one pull a week" rule on me.
 
-Now queued up.
+Do you have maillist reference? Not even Linus should slow down
+development like that.
 
-Next time please let me know what the git commit id is for the patch,
-it's necessary for me to be able to include it in the -stable tree.
+If Linus really insists on that, perhaps possible solution would be to
+make subarch maintainers send pull requests for simple fixes directly
+to Linus?
 
-thanks,
+								Pavel
 
-greg k-h
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
