@@ -1,12 +1,7 @@
 From: koteswararao18@gmail.com (nelakurthi koteswararao)
-Date: Wed, 30 Sep 2009 12:51:32 +0530
-Subject: support performance counter for ARM
-In-Reply-To: <bbfde6e10909292304j3c00fbc4w2b03fc045d398c68@mail.gmail.com>
-References: <bbfde6e10909290344t4094bcc2y265089f7c3b8ea78@mail.gmail.com>
-	<bbfde6e10909290345w4661329dn7fc000ddc1db2c64@mail.gmail.com>
-	<20090929144100.GE4975@nowhere>
-	<bbfde6e10909292304j3c00fbc4w2b03fc045d398c68@mail.gmail.com>
-Message-ID: <bbfde6e10909300021n535f11cavcc6fb4333c36d565@mail.gmail.com>
+Date: Wed, 30 Sep 2009 12:56:18 +0530
+Subject: performance counter support for ARM architecture
+Message-ID: <bbfde6e10909300026hbccd169s71a5ad1cd45ff944@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -39,141 +34,9 @@ Please look at it and give your review comments.
 
 Regards,
 Koteswararao.
-
-
-
-
-
-
-On 9/30/09, nelakurthi koteswararao <koteswararao18@gmail.com> wrote:
->
-> Dear Frederic ,
->
-> > There have been a big rename recently.
-> > perf counters has become perf events. This renaming has been propagated
-> > everywhere: filenames, symbol names, etc...
->
-> I will change the names and symbols once i supported successfully
-> perfcounters for ARM.
->
-> >I guess that for now you should base your patches against latest
-> >linus tree (2.6.32-rc1)
->
-> Right now , i am trying to support perfcounter for 2.6.29 but not 2.6.32
->
-> >Doesn't this file already exist?
-> >Oh btw, another stage of the perf arm integration would
-> >be the atomic 64 ARM implementation, to optimize it.
->
-> That's why i added atomic64.h and atomic64.c files as they are not present
-> in my 2.6.29 version
->
-> > Once you have fixed this patch, please don't forget to cc
-> > the perf maintainers and LKML. And also Russell King.
->
-> I will post mails during the implementation of perfcounters for ARM . this
-> mail i am not sending to all mail ids.
->
-> Regards,
-> koteswararao.
->
->
->
->
-> On 9/29/09, Frederic Weisbecker <fweisbec@gmail.com> wrote:
->>
->> On Tue, Sep 29, 2009 at 04:15:47PM +0530, nelakurthi koteswararao wrote:
->> > ---
->> >  arch/arm/Kconfig                    |    2   2 +     0 -     0 !
->> >  arch/arm/include/asm/atomic.h       |  253   253 +   0 -     0 !
->> >  arch/arm/include/asm/perf_counter.h |   11   11 +    0 -     0 !
->>
->>
->> There have been a big rename recently.
->> perf counters has become perf events. This renaming has been propagated
->> everywhere: filenames, symbol names, etc...
->>
->> Could you please update your patch to integrate this change?
->>
->> I don't know exactly where your patches should go.
->> It could be -tip (http://people.redhat.com/mingo/tip.git/README)
->> where you can find the latest perf event core, tools and x86 changes.
->> But that could be also the ARM tree.
->>
->> I guess that for now you should base your patches against latest
->> linus tree (2.6.32-rc1)
->>
->> (More comments below.)
->>
->>
->> > +static inline void set_perf_counter_pending(void) {
->> > +     //do {
->> > +     //} while(0);
->> > +}
->> > +
->>
->>
->> Please remove these comments.
->> You can just do:
->>
->>        static inline void set_perf_counter_pending(void) { }
->>
->> until you need to implement it in further patches.
->>
->> Also the standard way to put comments is to do:
->>
->> /* blah */
->>
->> You should scripts/checkpatch.pl on your patches, it will warn
->> you about such static coding standard issues...
->>
->> But also look at Documentation/SubmittingPatches
->>
->>
->>
->> > +#endif /* _ASM_ARM_PERF_COUNTER_H */
->> > Index: b/arch/arm/include/asm/atomic.h
->> > ===================================================================
->> > --- a/arch/arm/include/asm/atomic.h
->> > +++ b/arch/arm/include/asm/atomic.h
->> > @@ -225,6 +225,7 @@ static inline int atomic_add_unless(atom
->> >  #define smp_mb__before_atomic_inc()  barrier()
->> >  #define smp_mb__after_atomic_inc()   barrier()
->> >
->> > +#include <asm-generic/atomic64.h>
->> >  #include <asm-generic/atomic.h>
->> >  #endif
->> >  #endif
->> > Index: b/include/asm-generic/atomic64.h
->> > ===================================================================
->> > --- /dev/null
->> > +++ b/include/asm-generic/atomic64.h
->>
->>
->> Doesn't this file already exist?
->>
->> Oh btw, another stage of the perf arm integration would
->> be the atomic 64 ARM implementation, to optimize it.
->>
->>
->> > ===================================================================
->> > --- /dev/null
->> > +++ b/lib/atomic64.c
->>
->>
->> Same for this one, it already exists, and same for what follows
->> after.
->>
->> Once you have fixed this patch, please don't forget to cc
->> the perf maintainers and LKML. And also Russell King.
->>
->> Thanks!
->>
->>
->
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090930/7ac068df/attachment-0001.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090930/7854d777/attachment.htm>
 -------------- next part --------------
 
 Supported performance counter for ARM architecture.
