@@ -1,39 +1,48 @@
-From: rpjday@crashcourse.ca (Robert P. J. Day)
-Date: Wed, 30 Sep 2009 11:15:37 -0400 (EDT)
-Subject: apparently, numerous unused header files under arch/arm
-In-Reply-To: <4AC36F91.3050503@billgatliff.com>
-References: <alpine.LFD.2.00.0909300405080.14643@localhost>
-	<4AC36F91.3050503@billgatliff.com>
-Message-ID: <alpine.LFD.2.00.0909301113420.18061@localhost>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 30 Sep 2009 17:22:53 +0200
+Subject: [RFC] AT91 cpufreq support
+In-Reply-To: <20090826193324.GB7084@pc-ras4041.res.insa>
+References: <20090826193324.GB7084@pc-ras4041.res.insa>
+Message-ID: <4AC377CD.5020809@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Sep 2009, Bill Gatliff wrote:
+Albin Tonnerre :
+> Hi there,
+> 
+> Here is an updated version of the patch that brings cpufreq support on AT91.
+> This one is more generic that the previous one: instead of using fixed values,
+> it gets the current prescaler value and builds the frequency table accordingly.
+> 
+> It fixes a couple mistakes from the previous iteration, making it work more
+> reliably, at least there. I also added a cpufreq notifier to atmel_serial, so
+> that we don't lose the console over a frequency change (I'll move it to a
+> separate patch in a further update, and will add such support for the macb
+> driver too).
+> As there's no cpufreq notifier in the macb driver (yet), using cpufreq with a
+> NFS root filesystem will fail (obviously, other uses of the network will
+> probably fail too, but at least they don't make the system unusable)
+> 
+> On a Calao USB-A9263 board, switching from 180MHz to 11MHz reduces the current
+> consumption by roughly 65mA
+> 
+> Testing/feedback would be very much welcome
 
-> Robert P. J. Day wrote:
-> >   as part of a new tree scan with one of my scripts, i located
-> > what *appear* to be numerous header files under arch/arm that no
-> > one seems to be including.  the first few in that list,
-> > accompanied by a full tree scan of any use of the filename:
->
-> Would any of those files be of use to user applications?
+I am testing your cpufreq patch on at91sam9263ek board.
 
-  don't know -- the script doesn't filter based on any Kbuild files,
-so it's entirely possible that there are false positives.  give me a
-few minutes and i'll post the list.  it contains 58 files, sorted by
-subdirectory so, really, it's not *overwhelmingly* long.
+Indeed it is working quite well. But, I it is true that we will have to
+add notifiers for several drivers: my LCD screen gets messy while
+reducing frequency ;-)
 
-  i can post the script as well, but give me a chance to clean it up a
-bit first.
+Anyway, as I see that there is a notifier for serial driver, I wonder if
+we can keep serial console connexion during frequency switching ? I
+assume that we will have to change the baud rate configuration of the
+terminal emulator but do you have a clue to give us (I tried without
+success) ?
 
-rday
---
+On my test case: at91sam9263ek without LCD backlight I have those
+values: 1,63W @ 199MHz and 1,28W @ 12MHz => 21% gain: good !
 
-========================================================================
-Robert P. J. Day                               Waterloo, Ontario, CANADA
-
-        Linux Consulting, Training and Annoying Kernel Pedantry.
-
-Web page:                                          http://crashcourse.ca
-Twitter:                                       http://twitter.com/rpjday
-========================================================================
+Bye-bye,
+-- 
+Nicolas Ferre
