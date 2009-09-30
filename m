@@ -1,50 +1,48 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Wed, 30 Sep 2009 14:36:25 +0200
-Subject: 2.6.32-rc1/2, arm and usb
-In-Reply-To: <19138.34019.987851.150679@pilspetsen.it.uu.se> (Mikael
-	Pettersson's message of "Wed\, 30 Sep 2009 00\:06\:27 +0200")
-References: <87ws3i40id.fsf@lechat.rtp-net.org>
-	<19138.34019.987851.150679@pilspetsen.it.uu.se>
-Message-ID: <87ocos4njq.fsf@lechat.rtp-net.org>
+From: albin.tonnerre@free-electrons.com (Albin Tonnerre)
+Date: Wed, 30 Sep 2009 14:34:49 +0200
+Subject: [PATCH v2] Add cpuidle support for at91
+In-Reply-To: <4AC2168B.60903@atmel.com>
+References: <1247680190-19674-1-git-send-email-albin.tonnerre@free-electrons.com>
+	<200908111200.58866.marc.pignat@hevs.ch>
+	<20090812165700.GC4051@pc-ras4041.res.insa>
+	<200908130858.47487.marc.pignat@hevs.ch>
+	<20090813193241.GA5985@pc-ras4041.res.insa>
+	<20090909151417.GA4014@pc-ras4041.res.insa>
+	<4AC2168B.60903@atmel.com>
+Message-ID: <20090930123449.GB3238@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mikael Pettersson <mikpe@it.uu.se> writes:
+[Moving the discussion to l-a-k at lists.infradead.org]
 
-Hi,
+Salut Nicolas !
 
-> Arnaud Patard (Rtp) writes:
->  > I wanted yesterday to check that my iop sanmina support was still fine on
->  > latest -rc kernel and found out that it was not booting anymore and last
->  > thing printed on the serial console is "done. Booting the kernel". After
->  > bisecting, the culprit is commit
->  > db8be50c4307dac2b37305fc59c8dc0f978d09ea (in linus tree). Reverting it
->  > allows to boot so this confirms the git bisect result.
->  > 
->  > The commit does this in drivers/usb/host/pci-quirks.c :
->  > -DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID, PCI_ANY_ID, quirk_usb_early_handoff);
->  > +DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, quirk_usb_early_handoff);
->  > 
->  > Now, before collecting informations to report the problem to usb folks
->  > and trying to debug further, I'm wondering if anyone else got this bug
->  > or if I'm just unlucky and has a hardware-specific issue. Also, if
->  > someone has an idea of what the problem may be or in which direction I
->  > should look at, please share.
->
-> My iop n2100 shows the exact same problem with 2.6.32-rc1,
-> and reverting the commit mentioned above fixes it.
->
-> None of my other machines (including two non-iop arms, x86,
-> and ultrasparc) have this problem even though they all have
-> PCI usb controllers. So the problem looks iop-specific.
+Thanks a lot for your answer.
 
-fyi, I've taken a look at linux-usb today and found :
-http://marc.info/?l=linux-usb&m=125426642829044&w=2
+On Tue, 29 Sep 2009 16:15 +0200, Nicolas Ferre wrote :
+> Works very well and allow to save some power. After quick measures, we
+> run at 172mA at 12V instead of 190mA at 12V so ~2.06W and a saving of ~10% :
 
-So this bug is not iop specific. Even if it doesn't look arch specific,
-I'm surprised to see that so few machines are affected. I was hoping
-that all arm machines with usb host on pci were affected but according
-to your tests it's not the case.
+... and you haven't tried cpufreq yet :)
 
+> nice job !
+> This is of course in my test conditions.
 
-Arnaud
+> Just one precision: what is the difference, entering state0 with only
+> the current cpu_do_idle() that is activated by default ?
+
+Sorry, I don't get what you mean. Would you mind elaborating a bit?
+
+Regards,
+-- 
+Albin Tonnerre, Free Electrons
+Kernel, drivers and embedded Linux development,
+consulting, training and support.
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20090930/35313a82/attachment.sig>
