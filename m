@@ -1,90 +1,178 @@
-From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
-Date: Thu,  1 Oct 2009 23:34:20 +0200
-Subject: [PATCH] FCSE: add Makefile and compilation option.
-In-Reply-To: <1254432860-11511-10-git-send-email-gilles.chanteperdrix@xenomai.org>
-References: <1254432860-11511-1-git-send-email-gilles.chanteperdrix@xenomai.org>
-	<1254432860-11511-2-git-send-email-gilles.chanteperdrix@xenomai.org>
-	<1254432860-11511-3-git-send-email-gilles.chanteperdrix@xenomai.org>
-	<1254432860-11511-4-git-send-email-gilles.chanteperdrix@xenomai.org>
-	<1254432860-11511-5-git-send-email-gilles.chanteperdrix@xenomai.org>
-	<1254432860-11511-6-git-send-email-gilles.chanteperdrix@xenomai.org>
-	<1254432860-11511-7-git-send-email-gilles.chanteperdrix@xenomai.org>
-	<1254432860-11511-8-git-send-email-gilles.chanteperdrix@xenomai.org>
-	<1254432860-11511-9-git-send-email-gilles.chanteperdrix@xenomai.org>
-	<1254432860-11511-10-git-send-email-gilles.chanteperdrix@xenomai.org>
-Message-ID: <1254432860-11511-11-git-send-email-gilles.chanteperdrix@xenomai.org>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 1 Oct 2009 17:41:57 -0400
+Subject: [PATCH] ep93xx: update i2c support
+In-Reply-To: <4AC40C11.4060401@bluewatersys.com>
+References: <BD79186B4FD85F4B8E60E381CAEE190901D41F55@mi8nycmail19.Mi8.com>	<BD79186B4FD85F4B8E60E381CAEE190901D41F5D@mi8nycmail19.Mi8.com>	<4AC3BB1F.9050903@bluewatersys.com>	<BD79186B4FD85F4B8E60E381CAEE190901D42C6B@mi8nycmail19.Mi8.com>	<4AC3C8D2.5060009@bluewatersys.com>
+	<BD79186B4FD85F4B8E60E381CAEE190901D42C7C@mi8nycmail19.Mi8.com>
+	<4AC40C11.4060401@bluewatersys.com>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901D42E16@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Gilles Chanteperdrix <gilles.chanteperdrix@xenomai.org>
----
- arch/arm/kernel/Makefile |    1 +
- arch/arm/mm/Kconfig      |   45 +++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 46 insertions(+), 0 deletions(-)
+Update the ep93xx i2c support:
 
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 79087dd..574e77e 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -52,5 +52,6 @@ endif
+  1) The platform init code passes the configuration data for the
+     i2c-gpio driver.  This allows any gpio pin do be used for the
+     sda and scl pins.  It also allows the platform to specify the
+     udelay and timeout.
+  2) Program the gpio configuration register to enable/disable the
+     open drain drivers.  Note that this really only works if the
+     sda and scl pins are set to EP93XX_GPIO_LINE_EEDAT and
+     EP93XX_GPIO_LINE_EECLK.
+  3) Update the edb93xx.c platform init to use the new support.
+
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Acked-by: Ryan Mallon <ryan@bluewatersys.com>
+
+--- 
+
+V5 - use pr_warning for sda/scl messages
+V4 - add warning message when sda/scl are not EEDAT/EECLK and
+     configured as open drain
+V3 - rebased on comments from Ryan Mallon
+
+
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index f7ebed9..e8bae09 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -550,13 +550,11 @@ void __init ep93xx_register_eth(struct ep93xx_eth_data *data, int copy_addr)
+ 	platform_device_register(&ep93xx_eth_device);
+ }
  
- head-y			:= head$(MMUEXT).o
- obj-$(CONFIG_DEBUG_LL)	+= debug.o
-+obj-$(CONFIG_ARM_FCSE)	+= fcse.o
+-static struct i2c_gpio_platform_data ep93xx_i2c_data = {
+-	.sda_pin		= EP93XX_GPIO_LINE_EEDAT,
+-	.sda_is_open_drain	= 0,
+-	.scl_pin		= EP93XX_GPIO_LINE_EECLK,
+-	.scl_is_open_drain	= 0,
+-	.udelay			= 2,
+-};
++
++/*************************************************************************
++ * EP93xx i2c peripheral handling
++ *************************************************************************/
++static struct i2c_gpio_platform_data ep93xx_i2c_data;
  
- extra-y := $(head-y) init_task.o vmlinux.lds
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 8d43e58..fb9a4a5 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -776,3 +776,48 @@ config ARM_L1_CACHE_SHIFT
- 	int
- 	default 6 if ARCH_OMAP3
- 	default 5
+ static struct platform_device ep93xx_i2c_device = {
+ 	.name			= "i2c-gpio",
+@@ -564,8 +562,25 @@ static struct platform_device ep93xx_i2c_device = {
+ 	.dev.platform_data	= &ep93xx_i2c_data,
+ };
+ 
+-void __init ep93xx_register_i2c(struct i2c_board_info *devices, int num)
++void __init ep93xx_register_i2c(struct i2c_gpio_platform_data *data,
++				struct i2c_board_info *devices, int num)
+ {
++	/*
++	 * Set the EEPROM interface pin drive type control.
++	 * Defines the driver type for the EECLK and EEDAT pins as either
++	 * open drain, which will require an external pull-up, or a normal
++	 * CMOS driver.
++	 */
++	if (data->sda_is_open_drain && data->sda_pin != EP93XX_GPIO_LINE_EEDAT)
++		pr_warning("ep93xx: sda != EEDAT, open drain has no effect\n");
++	if (data->scl_is_open_drain && data->scl_pin != EP93XX_GPIO_LINE_EECLK)
++		pr_warning("ep93xx: scl != EECLK, open drain has no effect\n");
++	
++	__raw_writel((data->sda_is_open_drain << 1) |
++		     (data->scl_is_open_drain << 0),
++		     EP93XX_GPIO_EEDRIVE);
 +
-+config ARM_FCSE
-+	bool "Fast Context Switch Extension (EXPERIMENTAL)"
-+	depends on EXPERIMENTAL && !SMP && !CPU_32v6 && !CPU_32v7
-+	default n
-+	help
-+	  The Fast Context Switch Extension (FCSE for short) is an extension of
-+	  some ARM processors which allows to switch contexts between processes
-+	  without flushing cache and saves a few tens of microseconds in the
-+	  worst case.
++	ep93xx_i2c_data = *data;
+ 	i2c_register_board_info(0, devices, num);
+ 	platform_device_register(&ep93xx_i2c_device);
+ }
+diff --git a/arch/arm/mach-ep93xx/edb93xx.c b/arch/arm/mach-ep93xx/edb93xx.c
+index 73145ae..307f435 100644
+--- a/arch/arm/mach-ep93xx/edb93xx.c
++++ b/arch/arm/mach-ep93xx/edb93xx.c
+@@ -28,6 +28,7 @@
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/i2c.h>
++#include <linux/i2c-gpio.h>
+ #include <linux/mtd/physmap.h>
+ 
+ #include <mach/hardware.h>
+@@ -76,13 +77,26 @@ static struct ep93xx_eth_data edb93xx_eth_data = {
+ 	.phy_id		= 1,
+ };
+ 
+-static struct i2c_board_info __initdata edb93xxa_i2c_data[] = {
 +
-+	  Enabling this option makes linux use the FCSE.
++/*************************************************************************
++ * EDB93xx i2c peripheral handling
++ *************************************************************************/
++static struct i2c_gpio_platform_data edb93xx_i2c_gpio_data = {
++	.sda_pin		= EP93XX_GPIO_LINE_EEDAT,
++	.sda_is_open_drain	= 0,
++	.scl_pin		= EP93XX_GPIO_LINE_EECLK,
++	.scl_is_open_drain	= 0,
++	.udelay			= 0,	/* default to 100 kHz */
++	.timeout		= 0,	/* default to 100 ms */
++};
 +
-+	  We propose two modes:
-+	  - the guaranteed mode: we guarantee that there will never be any cache
-+	    flush when switching context, but this means that there can not be
-+	    more than 95 running processes in the system, each with a virtual
-+	    memory space smaller than 32MB, and that the shared memory
-+	    mappings do not use cache;
-+	  - the best effort mode: we allow some cache flushes to happen from
-+	    time to time, but do not limit the number of processes or the
-+	    virtual memory space available for each process, and the shared
-+	    memory mappings use cache.
-+
-+if ARM_FCSE
-+
-+choice
-+	prompt "FCSE mode"
-+	default ARM_FCSE_BEST_EFFORT
-+	help
-+	  This option allow setting which FCSE mode will be used.
-+
-+config ARM_FCSE_GUARANTEED
-+	bool "guaranteed"
-+	help
-+	  Select guaranteed mode.
-+
-+config ARM_FCSE_BEST_EFFORT
-+	bool "best effort"
-+	help
-+	  Select best-effort mode.
-+
-+endchoice
-+
-+endif
--- 
-1.5.6.5
++static struct i2c_board_info __initdata edb93xxa_i2c_board_info[] = {
+ 	{
+ 		I2C_BOARD_INFO("isl1208", 0x6f),
+ 	},
+ };
+ 
+-static struct i2c_board_info __initdata edb93xx_i2c_data[] = {
++static struct i2c_board_info __initdata edb93xx_i2c_board_info[] = {
+ 	{
+ 		I2C_BOARD_INFO("ds1337", 0x68),
+ 	},
+@@ -92,12 +106,14 @@ static void __init edb93xx_register_i2c(void)
+ {
+ 	if (machine_is_edb9302a() || machine_is_edb9307a() ||
+ 	    machine_is_edb9315a()) {
+-		ep93xx_register_i2c(edb93xxa_i2c_data,
+-				ARRAY_SIZE(edb93xxa_i2c_data));
++		ep93xx_register_i2c(&edb93xx_i2c_gpio_data,
++				    edb93xxa_i2c_board_info,
++				    ARRAY_SIZE(edb93xxa_i2c_board_info));
+ 	} else if (machine_is_edb9307() || machine_is_edb9312() ||
+ 		   machine_is_edb9315()) {
+-		ep93xx_register_i2c(edb93xx_i2c_data,
+-				ARRAY_SIZE(edb93xx_i2c_data));
++		ep93xx_register_i2c(&edb93xx_i2c_gpio_data
++				    edb93xx_i2c_board_info,
++				    ARRAY_SIZE(edb93xx_i2c_board_info));
+ 	}
+ }
+ 
+diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+index 0fbf87b..2b3be3c 100644
+--- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
++++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+@@ -127,6 +127,7 @@
+ #define EP93XX_GPIO_B_INT_ACK		EP93XX_GPIO_REG(0xb4)
+ #define EP93XX_GPIO_B_INT_ENABLE	EP93XX_GPIO_REG(0xb8)
+ #define EP93XX_GPIO_B_INT_STATUS	EP93XX_GPIO_REG(0xbc)
++#define EP93XX_GPIO_EEDRIVE		EP93XX_GPIO_REG(0xc8)
+ 
+ #define EP93XX_AAC_BASE			EP93XX_APB_IOMEM(0x00080000)
+ 
+diff --git a/arch/arm/mach-ep93xx/include/mach/platform.h b/arch/arm/mach-ep93xx/include/mach/platform.h
+index 01a0f08..a3ec33f 100644
+--- a/arch/arm/mach-ep93xx/include/mach/platform.h
++++ b/arch/arm/mach-ep93xx/include/mach/platform.h
+@@ -4,6 +4,7 @@
+ 
+ #ifndef __ASSEMBLY__
+ 
++struct i2c_gpio_platform_data;
+ struct i2c_board_info;
+ struct platform_device;
+ struct ep93xxfb_mach_info;
+@@ -33,7 +34,8 @@ static inline void ep93xx_devcfg_clear_bits(unsigned int bits)
+ }
+ 
+ void ep93xx_register_eth(struct ep93xx_eth_data *data, int copy_addr);
+-void ep93xx_register_i2c(struct i2c_board_info *devices, int num);
++void ep93xx_register_i2c(struct i2c_gpio_platform_data *data,
++			 struct i2c_board_info *devices, int num);
+ void ep93xx_register_fb(struct ep93xxfb_mach_info *data);
+ void ep93xx_register_pwm(int pwm0, int pwm1);
+ int ep93xx_pwm_acquire_gpio(struct platform_device *pdev); 
