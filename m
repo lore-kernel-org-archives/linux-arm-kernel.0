@@ -1,82 +1,140 @@
 From: linuxzsc@gmail.com (Richard Zhao)
-Date: Thu,  1 Oct 2009 09:13:33 +0800
-Subject: [PATCH 4/4] i2c: imx: disable clock when it's possible to save power.
-In-Reply-To: <1254359613-21210-3-git-send-email-linuxzsc@gmail.com>
-References: <1254359613-21210-1-git-send-email-linuxzsc@gmail.com>
-	<1254359613-21210-2-git-send-email-linuxzsc@gmail.com>
-	<1254359613-21210-3-git-send-email-linuxzsc@gmail.com>
-Message-ID: <1254359613-21210-4-git-send-email-linuxzsc@gmail.com>
+Date: Thu,  1 Oct 2009 09:13:30 +0800
+Subject: [PATCH 1/4] i2c: imx: check busy bit when START/STOP
+Message-ID: <1254359613-21210-1-git-send-email-linuxzsc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable clock before START, disable it after STOP.
+After START/RESTART, wait for busy bit to be set and
+after STOP, wait for busy bit to be clear.
 
 Signed-off-by: Richard Zhao <linuxzsc@gmail.com>
 
 diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
-index 87faea4..72ddea3 100644
+index 4afba3e..156cc95 100644
 --- a/drivers/i2c/busses/i2c-imx.c
 +++ b/drivers/i2c/busses/i2c-imx.c
-@@ -120,6 +120,7 @@ struct imx_i2c_struct {
- 	wait_queue_head_t	queue;
- 	unsigned long		i2csr;
- 	unsigned int 		disable_delay;
-+	unsigned int		ifdr; /* IMX_I2C_IFDR */
- };
- 
+@@ -125,14 +125,19 @@ struct imx_i2c_struct {
  /** Functions for IMX I2C adapter driver ***************************************
-@@ -210,6 +211,8 @@ static int i2c_imx_start(struct imx_i2c_struct *i2c_imx)
+ *******************************************************************************/
+ 
+-static int i2c_imx_bus_busy(struct imx_i2c_struct *i2c_imx)
++static int i2c_imx_bus_busy(struct imx_i2c_struct *i2c_imx, int for_busy)
+ {
+ 	unsigned long orig_jiffies = jiffies;
++	unsigned int temp;
  
  	dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
  
-+	clk_enable(i2c_imx->clk);
-+	writeb(i2c_imx->ifdr, i2c_imx->base + IMX_I2C_IFDR);
- 	/* Enable I2C controller */
- 	writeb(0, i2c_imx->base + IMX_I2C_I2SR);
- 	writeb(I2CR_IEN, i2c_imx->base + IMX_I2C_I2CR);
-@@ -254,6 +257,7 @@ static void i2c_imx_stop(struct imx_i2c_struct *i2c_imx)
+-	/* wait for bus not busy */
+-	while (readb(i2c_imx->base + IMX_I2C_I2SR) & I2SR_IBB) {
++	temp = readb(i2c_imx->base + IMX_I2C_I2SR);
++	while (1) {
++		if (for_busy && (temp & I2SR_IBB))
++			break;
++		if (!for_busy && !(temp & I2SR_IBB))
++			break;
+ 		if (signal_pending(current)) {
+ 			dev_dbg(&i2c_imx->adapter.dev,
+ 				"<%s> I2C Interrupted\n", __func__);
+@@ -144,6 +149,7 @@ static int i2c_imx_bus_busy(struct imx_i2c_struct *i2c_imx)
+ 			return -EIO;
+ 		}
+ 		schedule();
++		temp = readb(i2c_imx->base + IMX_I2C_I2SR);
+ 	}
  
- 	/* Disable I2C controller */
- 	writeb(0, i2c_imx->base + IMX_I2C_I2CR);
-+	clk_disable(i2c_imx->clk);
+ 	return 0;
+@@ -179,20 +185,32 @@ static int i2c_imx_acked(struct imx_i2c_struct *i2c_imx)
+ 	return 0;
  }
  
- static void __init i2c_imx_set_clk(struct imx_i2c_struct *i2c_imx,
-@@ -273,8 +277,8 @@ static void __init i2c_imx_set_clk(struct imx_i2c_struct *i2c_imx,
- 	else
- 		for (i = 0; i2c_clk_div[i][0] < div; i++);
+-static void i2c_imx_start(struct imx_i2c_struct *i2c_imx)
++static int i2c_imx_start(struct imx_i2c_struct *i2c_imx)
+ {
+ 	unsigned int temp = 0;
++	int result;
  
--	/* Write divider value to register */
--	writeb(i2c_clk_div[i][1], i2c_imx->base + IMX_I2C_IFDR);
-+	/* Store divider value */
-+	i2c_imx->ifdr = i2c_clk_div[i][1];
+ 	dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
  
- 	if (cpu_is_mx1()) {
- 		/*
-@@ -555,7 +559,6 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "can't get I2C clock\n");
- 		goto fail3;
- 	}
--	clk_enable(i2c_imx->clk);
+ 	/* Enable I2C controller */
++	writeb(0, i2c_imx->base + IMX_I2C_I2SR);
+ 	writeb(I2CR_IEN, i2c_imx->base + IMX_I2C_I2CR);
++
++	result = i2c_imx_bus_busy(i2c_imx, 0);
++	if (result)
++		return result;
++
+ 	/* Start I2C transaction */
+ 	temp = readb(i2c_imx->base + IMX_I2C_I2CR);
+ 	temp |= I2CR_MSTA;
+ 	writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
++	result = i2c_imx_bus_busy(i2c_imx, 1);
++	if (result)
++		return result;
++
+ 	temp |= I2CR_IIEN | I2CR_MTX | I2CR_TXAK;
+ 	writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
++	return result;
+ }
  
- 	/* Request IRQ */
- 	ret = request_irq(i2c_imx->irq, i2c_imx_isr, 0, pdev->name, i2c_imx);
-@@ -604,7 +607,6 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
- fail5:
- 	free_irq(i2c_imx->irq, i2c_imx);
- fail4:
--	clk_disable(i2c_imx->clk);
- 	clk_put(i2c_imx->clk);
- fail3:
- 	release_mem_region(i2c_imx->res->start, resource_size(res));
-@@ -641,8 +643,6 @@ static int __exit i2c_imx_remove(struct platform_device *pdev)
- 	if (pdata && pdata->exit)
- 		pdata->exit(&pdev->dev);
+ static void i2c_imx_stop(struct imx_i2c_struct *i2c_imx)
+@@ -202,16 +220,16 @@ static void i2c_imx_stop(struct imx_i2c_struct *i2c_imx)
+ 	/* Stop I2C transaction */
+ 	dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
+ 	temp = readb(i2c_imx->base + IMX_I2C_I2CR);
+-	temp &= ~I2CR_MSTA;
++	temp &= ~(I2CR_MSTA | I2CR_MTX);
+ 	writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
+-	/* setup chip registers to defaults */
+-	writeb(I2CR_IEN, i2c_imx->base + IMX_I2C_I2CR);
+-	writeb(0, i2c_imx->base + IMX_I2C_I2SR);
+ 	/*
+ 	 * This delay caused by an i.MXL hardware bug.
+ 	 * If no (or too short) delay, no "STOP" bit will be generated.
+ 	 */
+ 	udelay(i2c_imx->disable_delay);
++
++	i2c_imx_bus_busy(i2c_imx, 0);
++
+ 	/* Disable I2C controller */
+ 	writeb(0, i2c_imx->base + IMX_I2C_I2CR);
+ }
+@@ -344,7 +362,7 @@ static int i2c_imx_read(struct imx_i2c_struct *i2c_imx, struct i2c_msg *msgs)
+ 			dev_dbg(&i2c_imx->adapter.dev,
+ 				"<%s> clear MSTA\n", __func__);
+ 			temp = readb(i2c_imx->base + IMX_I2C_I2CR);
+-			temp &= ~I2CR_MSTA;
++			temp &= ~(I2CR_MSTA | I2CR_MTX);
+ 			writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
+ 		} else if (i == (msgs->len - 2)) {
+ 			dev_dbg(&i2c_imx->adapter.dev,
+@@ -370,14 +388,11 @@ static int i2c_imx_xfer(struct i2c_adapter *adapter,
  
--	/* Disable I2C clock */
--	clk_disable(i2c_imx->clk);
- 	clk_put(i2c_imx->clk);
+ 	dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
  
- 	release_mem_region(i2c_imx->res->start, resource_size(i2c_imx->res));
+-	/* Check if i2c bus is not busy */
+-	result = i2c_imx_bus_busy(i2c_imx);
++	/* Start I2C transfer */
++	result = i2c_imx_start(i2c_imx);
+ 	if (result)
+ 		goto fail0;
+ 
+-	/* Start I2C transfer */
+-	i2c_imx_start(i2c_imx);
+-
+ 	/* read/write data */
+ 	for (i = 0; i < num; i++) {
+ 		if (i) {
+@@ -386,6 +401,9 @@ static int i2c_imx_xfer(struct i2c_adapter *adapter,
+ 			temp = readb(i2c_imx->base + IMX_I2C_I2CR);
+ 			temp |= I2CR_RSTA;
+ 			writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
++			result =  i2c_imx_bus_busy(i2c_imx, 1);
++			if (result)
++				goto fail0;
+ 		}
+ 		dev_dbg(&i2c_imx->adapter.dev,
+ 			"<%s> transfer message: %d\n", __func__, i);
 -- 
 1.6.0.4
