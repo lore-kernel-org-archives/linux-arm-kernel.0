@@ -1,19 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 1 Oct 2009 16:30:22 +0100
-Subject: [PATCH] ARM: allow empty ATAG_CORE
-In-Reply-To: <1254351180-29199-1-git-send-email-davidb@codeaurora.org>
-References: <1254347072-27932-1-git-send-email-davidb@codeaurora.org>
-	<1254351180-29199-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <20091001153022.GA30326@n2100.arm.linux.org.uk>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 01 Oct 2009 12:15:30 -0400 (EDT)
+Subject: kirkwood openrd: random kernel crashes with git kernel
+In-Reply-To: <20091001090444.560b2e0a@marrow.netinsight.se>
+References: <200910010904.18923.dk-arm-linux@gmx.de>
+	<20091001090444.560b2e0a@marrow.netinsight.se>
+Message-ID: <alpine.LFD.2.00.0910011214000.4997@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2009 at 03:53:00PM -0700, David Brown wrote:
-> From: David Brown <davidb@quicinc.com>
-> 
-> The ATAG_CORE is allowed to be empty.  Although this is handled
-> by parse_tag_core(), __vet_atags during startup rejects this tag
-> unless it contains data.  Allow the initial tag to be either the
-> full size, or empty.
+On Thu, 1 Oct 2009, Simon Kagstrom wrote:
 
-Please send to the patch system, thanks.
+> On Thu, 1 Oct 2009 09:04:18 +0200
+> Dieter Kiermaier <dk-arm-linux@gmx.de> wrote:
+> 
+> > hm - it seems to be suspect but I've got random kernel crashes with latest openrd git kernel from:
+> > 
+> > http://repo.or.cz/w/linux-2.6/linux-2.6-openrd.git
+> > (BTW: are there any news on bringing the openrd kernel to mainline?)
+> > 
+> > It looks like there is something wrong in cpu_idle()???
+> 
+> Try starting with openocd disconnected (i.e., the openocd program
+> suspended or terminated). I also get random crashes when that is on,
+> presumably caused by it stopping and resuming the kernel randomly (you
+> can see that in the openocd terminal window).
+
+Also note that openocd cannot work reliably with Linux running on the 
+target if you don't use the nohlt kernel cmdline argument.
+
+
+Nicolas
