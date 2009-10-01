@@ -1,25 +1,26 @@
-From: simon.kagstrom@netinsight.net (Simon Kagstrom)
-Date: Thu, 1 Oct 2009 09:04:44 +0200
-Subject: kirkwood openrd: random kernel crashes with git kernel
-In-Reply-To: <200910010904.18923.dk-arm-linux@gmx.de>
-References: <200910010904.18923.dk-arm-linux@gmx.de>
-Message-ID: <20091001090444.560b2e0a@marrow.netinsight.se>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Thu, 1 Oct 2009 10:15:38 +0300
+Subject: [PATCH v5 1/2] ARM: Pass IFSR register to do_PrefetchAbort()
+In-Reply-To: <b833952fedbf24c4a16e0d79fe78019357e9652b.1253781660.git.kirill@shutemov.name>
+References: <b833952fedbf24c4a16e0d79fe78019357e9652b.1253781660.git.kirill@shutemov.name>
+Message-ID: <cc557aab0910010015i2e471c13mb4529409b3e68e45@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 1 Oct 2009 09:04:18 +0200
-Dieter Kiermaier <dk-arm-linux@gmx.de> wrote:
+On Thu, Sep 24, 2009 at 11:49 AM, Kirill A. Shutemov
+<kirill@shutemov.name> wrote:
+> Instruction fault status register, IFSR, was introduced on ARMv6 to
+> provide status information about the last insturction fault. It
+> needed for proper prefetch abort handling.
+>
+> Now we have three prefetch abort model:
+>
+> ?* legacy - for CPUs before ARMv6. They doesn't provide neither
+> ? ?IFSR nor IFAR. We simulate IFSR with section translation fault
+> ? ?status for them to generalize code;
+> ?* ARMv6 - provides IFSR, but not IFAR;
+> ?* ARMv7 - provides both IFSR and IFAR.
+>
+> Signed-off-by: Kirill A. Shutemov <kirill@shutemov.name>
 
-> hm - it seems to be suspect but I've got random kernel crashes with latest openrd git kernel from:
-> 
-> http://repo.or.cz/w/linux-2.6/linux-2.6-openrd.git
-> (BTW: are there any news on bringing the openrd kernel to mainline?)
-> 
-> It looks like there is something wrong in cpu_idle()???
-
-Try starting with openocd disconnected (i.e., the openocd program
-suspended or terminated). I also get random crashes when that is on,
-presumably caused by it stopping and resuming the kernel randomly (you
-can see that in the openocd terminal window).
-
-// Simon
+Any chances to get it into 2.6.32?
