@@ -1,42 +1,22 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 1 Oct 2009 15:59:39 +0100
-Subject: [PATCH] ep93xx: introduce clk parent
-In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901D42C80@mi8nycmail19.Mi8.com>
-References: <BD79186B4FD85F4B8E60E381CAEE190901CBF45C@mi8nycmail19.Mi8.com>
-	<BD79186B4FD85F4B8E60E381CAEE190901D42467@mi8nycmail19.Mi8.com>
-	<4AC3B748.5060904@bluewatersys.com>
-	<BD79186B4FD85F4B8E60E381CAEE190901D42C80@mi8nycmail19.Mi8.com>
-Message-ID: <20091001145939.GA28044@n2100.arm.linux.org.uk>
+Date: Thu, 1 Oct 2009 16:04:24 +0100
+Subject: [PATCH] arm: fix valid_phys_addr_range() range check
+In-Reply-To: <200909240624.n8O6O4MO002196@localhost.localdomain>
+References: <200909240624.n8O6O4MO002196@localhost.localdomain>
+Message-ID: <20091001150424.GB28044@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2009 at 05:30:28PM -0400, H Hartley Sweeten wrote:
-> On Wednesday, September 30, 2009 12:54 PM, Ryan Mallon wrote:
-> > H Hartley Sweeten wrote:
-> >> The clock generation system in the ep93xx uses two external oscillator's
-> >> and two internal PLLs to derive all the internal clocks.  Many of these
-> >> internal clocks can be stopped to save power.
-> >> 
-> >> This introduces a "parent" hierarchy for the clocks so that the users
-> >> count can be correctly tracked for power management.
-> >> 
-> >> The "parent" for the video clock can either be one of the PLL outputs
-> >> or the external oscillator.  In order to correctly track the "parent"
-> >> for the video clock calc_clk_div() needed to be modified.  It now
-> >> returns an error code if the desired rate cannot be generated.
-> >> 
-> >> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> >> Cc: Ryan Mallon <ryan@bluewatersys.com>
-> >> 
-> >> ---
-> >> 
-> >
-> > Acked-by: Ryan Mallon <ryan@bluewatersys.com>
+On Thu, Sep 24, 2009 at 04:24:04PM +1000, Greg Ungerer wrote:
+> arm: fix valid_phys_addr_range() range check
 > 
-> Russell,
+> Commit 1522ac3ec95ff0230e7aa516f86b674fdf72866c
+> ("Fix virtual to physical translation macro corner cases")
+> breaks the end of memory check in valid_phys_addr_range().
+> The modified expression results in the apparent /dev/mem size
+> being 2 bytes smaller than what it actually is.
 > 
-> As the clkdev maintainer, do you see any problems with this?
+> This patch reworks the expression to correctly check the address,
+> while maintaining use of a valid address to __pa().
 
-Only comment is that you should really consider some locking in
-clk_enable and clk_disable to prevent the use count being corrupted
-by simultaneous calls.
+Looks good, can you please send it to the patch system?
