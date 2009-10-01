@@ -1,22 +1,16 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 1 Oct 2009 16:04:24 +0100
-Subject: [PATCH] arm: fix valid_phys_addr_range() range check
-In-Reply-To: <200909240624.n8O6O4MO002196@localhost.localdomain>
-References: <200909240624.n8O6O4MO002196@localhost.localdomain>
-Message-ID: <20091001150424.GB28044@n2100.arm.linux.org.uk>
+Date: Thu, 1 Oct 2009 16:07:18 +0100
+Subject: [PATCH RESEND 8/8] pl022: fix peripheral id for ST vendor
+In-Reply-To: <1253735412.21542.180.camel@vinay-desktop>
+References: <1253735412.21542.180.camel@vinay-desktop>
+Message-ID: <20091001150718.GC28044@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 24, 2009 at 04:24:04PM +1000, Greg Ungerer wrote:
-> arm: fix valid_phys_addr_range() range check
+On Thu, Sep 24, 2009 at 01:20:12AM +0530, srinidhi kasagar wrote:
+> From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
 > 
-> Commit 1522ac3ec95ff0230e7aa516f86b674fdf72866c
-> ("Fix virtual to physical translation macro corner cases")
-> breaks the end of memory check in valid_phys_addr_range().
-> The modified expression results in the apparent /dev/mem size
-> being 2 bytes smaller than what it actually is.
-> 
-> This patch reworks the expression to correctly check the address,
-> while maintaining use of a valid address to __pa().
+> This fixes ths wrong peripheral id being used
+> in pl022 driver for ST derivative
 
-Looks good, can you please send it to the patch system?
+Please submit to the patch system, thanks.
