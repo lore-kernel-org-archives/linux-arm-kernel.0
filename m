@@ -1,41 +1,43 @@
-From: andreas.fenkart@streamunlimited.com (Andreas Fenkart)
-Date: Thu,  1 Oct 2009 12:49:01 +0200
-Subject: [PATCH 6/6] Add PKMAP area description to memory.txt.
-In-Reply-To: <1254394141-26673-6-git-send-email-andreas.fenkart@streamunlimited.com>
-References: <20090810213905.GA4046@n2100.arm.linux.org.uk>
-	<1254394141-26673-1-git-send-email-andreas.fenkart@streamunlimited.com>
-	<1254394141-26673-2-git-send-email-andreas.fenkart@streamunlimited.com>
-	<1254394141-26673-3-git-send-email-andreas.fenkart@streamunlimited.com>
-	<1254394141-26673-4-git-send-email-andreas.fenkart@streamunlimited.com>
-	<1254394141-26673-5-git-send-email-andreas.fenkart@streamunlimited.com>
-	<1254394141-26673-6-git-send-email-andreas.fenkart@streamunlimited.com>
-Message-ID: <1254394141-26673-7-git-send-email-andreas.fenkart@streamunlimited.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 1 Oct 2009 13:56:57 +0100
+Subject: [PATCH 2/2] arm: Clean up linker script using new linker
+	script macros.
+In-Reply-To: <20090930213924.GB15732@merkur.ravnborg.org>
+References: <1254345935-15958-1-git-send-email-tabbott@ksplice.com>
+	<1254345935-15958-3-git-send-email-tabbott@ksplice.com>
+	<20090930213924.GB15732@merkur.ravnborg.org>
+Message-ID: <20091001125657.GA26910@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also adapts delimiters of neighbouring modules area.
+On Wed, Sep 30, 2009 at 11:39:25PM +0200, Sam Ravnborg wrote:
+> On Wed, Sep 30, 2009 at 05:25:35PM -0400, Tim Abbott wrote:
+> > From: Nelson Elhage <nelhage@ksplice.com>
+> > 
+> > This patch is mostly a straightforward translation. The primary side
+> > effect to the resulting vmlinux should be to increase the alignment on
+> > the initramfs to the standard PAGE_SIZE from 32 bytes.
+> > 
+> > Signed-off-by: Nelson Elhage <nelhage@ksplice.com>
+> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> > Signed-off-by: Tim Abbott <tabbott@ksplice.com>
+> > ---
+> >  arch/arm/kernel/vmlinux.lds.S |   75 +++++++++++-----------------------------
+> >  1 files changed, 21 insertions(+), 54 deletions(-)
+> > 
+> >  
+> > -	.bss : {
+> > -		__bss_start = .;	/* BSS				*/
+> > -		*(.bss)
+> > -		*(COMMON)
+> > -		__bss_stop = .;
+> > -		_end = .;
+> 
+> Where is _end in the new layout?
+> I think we lost it.
 
-Signed-off-by: Andreas Fenkart <andreas.fenkart@streamunlimited.com>
----
- Documentation/arm/memory.txt |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
+You're right - this will cause a build failure since _end is used in
+several core ARM files.  Tim?
 
-diff --git a/Documentation/arm/memory.txt b/Documentation/arm/memory.txt
-index 9d58c7c..eb0fae1 100644
---- a/Documentation/arm/memory.txt
-+++ b/Documentation/arm/memory.txt
-@@ -59,7 +59,11 @@ PAGE_OFFSET	high_memory-1	Kernel direct-mapped RAM region.
- 				This maps the platforms RAM, and typically
- 				maps all platform RAM in a 1:1 relationship.
- 
--TASK_SIZE	PAGE_OFFSET-1	Kernel module space
-+PKMAP_BASE	PAGE_OFFSET-1	Permanent kernel mappings
-+				One way of mapping HIGHMEM pages into kernel
-+				space.
-+
-+MODULES_VADDR	MODULES_END-1	Kernel module space
- 				Kernel modules inserted via insmod are
- 				placed here using dynamic mappings.
- 
--- 
-1.6.4.3
+PS, please ensure that all patches are at the very least build tested,
+or say when they aren't.
