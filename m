@@ -1,7 +1,7 @@
 From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
-Date: Thu,  1 Oct 2009 23:34:18 +0200
-Subject: [PATCH] "Best-effort" FCSE: Handle shared mappings.
-In-Reply-To: <1254432860-11511-8-git-send-email-gilles.chanteperdrix@xenomai.org>
+Date: Thu,  1 Oct 2009 23:34:19 +0200
+Subject: [PATCH] "Best-effort" FCSE: Handle mappings above 32 MB
+In-Reply-To: <1254432860-11511-9-git-send-email-gilles.chanteperdrix@xenomai.org>
 References: <1254432860-11511-1-git-send-email-gilles.chanteperdrix@xenomai.org>
 	<1254432860-11511-2-git-send-email-gilles.chanteperdrix@xenomai.org>
 	<1254432860-11511-3-git-send-email-gilles.chanteperdrix@xenomai.org>
@@ -10,223 +10,196 @@ References: <1254432860-11511-1-git-send-email-gilles.chanteperdrix@xenomai.org>
 	<1254432860-11511-6-git-send-email-gilles.chanteperdrix@xenomai.org>
 	<1254432860-11511-7-git-send-email-gilles.chanteperdrix@xenomai.org>
 	<1254432860-11511-8-git-send-email-gilles.chanteperdrix@xenomai.org>
-Message-ID: <1254432860-11511-9-git-send-email-gilles.chanteperdrix@xenomai.org>
+	<1254432860-11511-9-git-send-email-gilles.chanteperdrix@xenomai.org>
+Message-ID: <1254432860-11511-10-git-send-email-gilles.chanteperdrix@xenomai.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Account for writable shared mappings, so as to be able to flush cache
-when switching out a process with such a mapping.
+In case an address larger than 32 MB is returned by
+arch_get_unmapped_area(), relocate the calling process to the null
+pid. When such a process forks, also give the child process a null
+pid. Account for pages above 32 MB, and when a process with such pages
+is switched in or out, flush the cache.
 
-This accounting is done by adding the L_PTE_SHARED flag to page
-belonging to such mappings in make_coherent(), then, set_pte_at() is
-intercepted to account for both addition and removal of pages with
-this flag set.
-
-Note that using the L_PTE_SHARED flag makes the FCSE patch
-incompatible with ARMv6+ and Xscale3, but the FCSE feature is
-deprecated in ARMv6 anyway.
+As in handling shared mappings, we use set_pte_at() to do the pages
+accounting.
 
 Signed-off-by: Gilles Chanteperdrix <gilles.chanteperdrix@xenomai.org>
 ---
- arch/arm/include/asm/mmu.h         |    3 ++
- arch/arm/include/asm/mmu_context.h |    6 ++++
- arch/arm/include/asm/pgtable.h     |   42 ++++++++++++++++++++++++--
- arch/arm/kernel/fcse.c             |    3 +-
- arch/arm/mm/fault-armv.c           |   55 +++++++++++++++++++++++++++++++++++-
- 5 files changed, 103 insertions(+), 6 deletions(-)
+ arch/arm/include/asm/fcse.h        |    2 +
+ arch/arm/include/asm/mmu.h         |    2 +
+ arch/arm/include/asm/mmu_context.h |   17 +++++++++++++-
+ arch/arm/include/asm/pgtable.h     |    7 ++++++
+ arch/arm/kernel/fcse.c             |   41 +++++++++++++++++++++++++++++++++++-
+ arch/arm/mm/mmap.c                 |    7 ++++++
+ 6 files changed, 73 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/include/asm/fcse.h b/arch/arm/include/asm/fcse.h
+index c8680c6..66fa9de 100644
+--- a/arch/arm/include/asm/fcse.h
++++ b/arch/arm/include/asm/fcse.h
+@@ -69,6 +69,8 @@ void fcse_pid_free(unsigned pid);
+ #ifdef CONFIG_ARM_FCSE_BEST_EFFORT
+ int fcse_needs_flush(struct mm_struct *prev, struct mm_struct *next);
+ void fcse_notify_flush_all(void);
++void fcse_pid_reference(unsigned pid);
++void fcse_relocate_mm_to_null_pid(struct mm_struct *mm);
+ #else /* CONFIG_ARM_FCSE_GUARANTEED */
+ #define fcse_needs_flush(prev, next) (0)
+ #define fcse_notify_flush_all() do { } while (0)
 diff --git a/arch/arm/include/asm/mmu.h b/arch/arm/include/asm/mmu.h
-index 7472598..9a2fb51 100644
+index 9a2fb51..13c844f 100644
 --- a/arch/arm/include/asm/mmu.h
 +++ b/arch/arm/include/asm/mmu.h
-@@ -10,6 +10,9 @@ typedef struct {
- #ifdef CONFIG_ARM_FCSE
- 	unsigned long pid;
+@@ -12,6 +12,8 @@ typedef struct {
  	cpumask_t cpu_tlb_mask;
-+#ifdef CONFIG_ARM_FCSE_BEST_EFFORT
-+	unsigned shared_dirty_pages;
-+#endif /* CONFIG_ARM_FCSE_BEST_EFFORT */
+ #ifdef CONFIG_ARM_FCSE_BEST_EFFORT
+ 	unsigned shared_dirty_pages;
++	unsigned big;
++	unsigned high_pages;
+ #endif /* CONFIG_ARM_FCSE_BEST_EFFORT */
  #endif /* CONFIG_ARM_FCSE */
  	unsigned int kvm_seq;
- } mm_context_t;
 diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
-index ad1bbb4..035a9f2 100644
+index 035a9f2..85eac0a 100644
 --- a/arch/arm/include/asm/mmu_context.h
 +++ b/arch/arm/include/asm/mmu_context.h
-@@ -76,6 +76,9 @@ init_new_context(struct task_struct *tsk, struct mm_struct *mm)
- 	int pid;
+@@ -77,13 +77,25 @@ init_new_context(struct task_struct *tsk, struct mm_struct *mm)
  
  	cpus_clear(mm->context.cpu_tlb_mask);
-+#ifdef CONFIG_ARM_FCSE_BEST_EFFORT
-+	mm->context.shared_dirty_pages = 0;
-+#endif /* CONFIG_ARM_FCSE_BEST_EFFORT */
- 
+ #ifdef CONFIG_ARM_FCSE_BEST_EFFORT
++	if (!mm->context.big) {
++		pid = fcse_pid_alloc();
++		mm->context.pid = pid << FCSE_PID_SHIFT;
++	} else {
++		/* We are normally forking a process vith a virtual address
++		   space larger than 32 MB, so its pid should be 0. */
++		BUG_ON(mm->context.pid);
++		fcse_pid_reference(0);
++	}
++	/* If we are forking, set_pte_at will restore the correct high pages
++	   count, and shared writable pages are write-protected again. */
+ 	mm->context.shared_dirty_pages = 0;
+-#endif /* CONFIG_ARM_FCSE_BEST_EFFORT */
+-
++	mm->context.high_pages = 0;
++#else /* CONFIG_ARM_FCSE_GUARANTEED */
  	pid = fcse_pid_alloc();
  	if (pid < 0)
-@@ -91,6 +94,9 @@ init_new_context(struct task_struct *tsk, struct mm_struct *mm)
- static inline void destroy_context(struct mm_struct *mm)
- {
+ 		return pid;
+ 	mm->context.pid = pid << FCSE_PID_SHIFT;
++#endif /* CONFIG_ARM_FCSE_GUARANTEED */
+ #endif /* CONFIG_ARM_FCSE */
+ 
+ 	return 0;
+@@ -96,6 +108,7 @@ static inline void destroy_context(struct mm_struct *mm)
  #ifdef CONFIG_ARM_FCSE
-+#ifdef CONFIG_ARM_FCSE_BEST_EFFORT
-+	BUG_ON(mm->context.shared_dirty_pages);
-+#endif /* CONFIG_ARM_FCSE_BEST_EFFORT */
+ #ifdef CONFIG_ARM_FCSE_BEST_EFFORT
+ 	BUG_ON(mm->context.shared_dirty_pages);
++	BUG_ON(mm->context.high_pages);
+ #endif /* CONFIG_ARM_FCSE_BEST_EFFORT */
  	fcse_pid_free(mm->context.pid >> FCSE_PID_SHIFT);
  #endif /* CONFIG_ARM_FCSE */
- }
 diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 197c596..7775c1b 100644
+index 7775c1b..6c79d71 100644
 --- a/arch/arm/include/asm/pgtable.h
 +++ b/arch/arm/include/asm/pgtable.h
-@@ -250,6 +250,33 @@ extern pgprot_t		pgprot_kernel;
- #define __S111  __PAGE_SHARED_EXEC
+@@ -257,6 +257,10 @@ extern pgprot_t		pgprot_kernel;
+ 	unsigned long _val = (val);				\
+ 	if (pte_present(_val) && ((_val) & L_PTE_SHARED))	\
+ 		--_mm->context.shared_dirty_pages;		\
++	if (pte_present(_val) && _addr < TASK_SIZE) {		\
++		if (_addr >= FCSE_TASK_SIZE)			\
++			--_mm->context.high_pages;		\
++	}							\
+ } while (0)
  
- #ifndef __ASSEMBLY__
-+#ifdef CONFIG_ARM_FCSE_BEST_EFFORT
-+#define fcse_account_page_removal(mm, addr, val) do {		\
-+	struct mm_struct *_mm = (mm);				\
-+	unsigned long _addr = (addr);				\
-+	unsigned long _val = (val);				\
-+	if (pte_present(_val) && ((_val) & L_PTE_SHARED))	\
-+		--_mm->context.shared_dirty_pages;		\
-+} while (0)
-+
-+#define fcse_account_page_addition(mm, addr, val) ({			\
-+	struct mm_struct *_mm = (mm);					\
-+	unsigned long _addr = (addr);					\
-+	unsigned long _val = (val);					\
-+	if (pte_present(_val) && (_val & L_PTE_SHARED)) {		\
-+		if ((_val & (PTE_CACHEABLE | L_PTE_WRITE | L_PTE_DIRTY)) \
-+		    != (PTE_CACHEABLE | L_PTE_WRITE | L_PTE_DIRTY))	\
-+			_val &= ~L_PTE_SHARED;				\
-+		else							\
-+			++_mm->context.shared_dirty_pages;		\
-+	}								\
-+	_val;								\
-+})
-+#else /* CONFIG_ARM_FCSE_GUARANTEED || !CONFIG_ARM_FCSE */
-+#define fcse_account_page_removal(mm, addr, val) do { } while (0)
-+#define fcse_account_page_addition(mm, addr, val) (val)
-+#endif /* CONFIG_ARM_FCSE_GUARANTEED || !CONFIG_ARM_FCSE */
-+
- /*
-  * ZERO_PAGE is a global shared page that is always zero: used
-  * for zero-mapped memory areas etc..
-@@ -261,7 +288,10 @@ extern struct page *empty_zero_page;
- #define pfn_pte(pfn,prot)	(__pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot)))
- 
- #define pte_none(pte)		(!pte_val(pte))
--#define pte_clear(mm,addr,ptep)	set_pte_ext(ptep, __pte(0), 0)
-+#define pte_clear(mm,addr,ptep)	do {				\
-+	fcse_account_page_removal(mm, addr, pte_val(*ptep));	\
-+	set_pte_ext(ptep, __pte(0), 0);				\
-+} while (0)
- #define pte_page(pte)		(pfn_to_page(pte_pfn(pte)))
- #define pte_offset_kernel(dir,addr)	(pmd_page_vaddr(*(dir)) + __pte_index(addr))
- 
-@@ -280,9 +310,13 @@ extern struct page *empty_zero_page;
- 
- #define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,pte,ext)
- 
--#define set_pte_at(mm,addr,ptep,pteval) do { \
--	set_pte_ext(ptep, pteval, (addr) >= TASK_SIZE ? 0 : PTE_EXT_NG); \
-- } while (0)
-+#define set_pte_at(mm,addr,ptep,pteval) do {				\
-+	unsigned long _pteval = (pteval);				\
-+	fcse_account_page_removal(mm, addr, pte_val(*ptep));		\
-+	pte_val(_pteval) =						\
-+		fcse_account_page_addition(mm, addr, pte_val(_pteval)); \
-+	set_pte_ext(ptep, _pteval, (addr) >= TASK_SIZE ? 0 : PTE_EXT_NG); \
-+} while (0)
- 
- /*
-  * The following only work if pte_present() is true.
+ #define fcse_account_page_addition(mm, addr, val) ({			\
+@@ -270,6 +274,9 @@ extern pgprot_t		pgprot_kernel;
+ 		else							\
+ 			++_mm->context.shared_dirty_pages;		\
+ 	}								\
++	if (pte_present(_val)						\
++	    && _addr < TASK_SIZE && _addr >= FCSE_TASK_SIZE)		\
++		++_mm->context.high_pages;				\
+ 	_val;								\
+ })
+ #else /* CONFIG_ARM_FCSE_GUARANTEED || !CONFIG_ARM_FCSE */
 diff --git a/arch/arm/kernel/fcse.c b/arch/arm/kernel/fcse.c
-index 774717c..5b257c9 100644
+index 5b257c9..d15ac30 100644
 --- a/arch/arm/kernel/fcse.c
 +++ b/arch/arm/kernel/fcse.c
-@@ -118,7 +118,8 @@ int fcse_needs_flush(struct mm_struct *prev, struct mm_struct *next)
- 	__set_bit(pid, fcse_pids_cache_dirty);
+@@ -119,7 +119,9 @@ int fcse_needs_flush(struct mm_struct *prev, struct mm_struct *next)
  	spin_unlock_irqrestore(&fcse_lock, flags);
  
--	res = reused_pid;
-+	res = reused_pid
-+		|| prev->context.shared_dirty_pages;
+ 	res = reused_pid
+-		|| prev->context.shared_dirty_pages;
++		|| prev->context.shared_dirty_pages
++		|| prev->context.high_pages
++		|| next->context.high_pages;
  
  	if (res) {
  		cpu_clear(smp_processor_id(), prev->cpu_vm_mask);
-diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
-index 40bccb9..3135a6b 100644
---- a/arch/arm/mm/fault-armv.c
-+++ b/arch/arm/mm/fault-armv.c
-@@ -25,6 +25,57 @@
- 
- static unsigned long shared_pte_mask = L_PTE_MT_BUFFERABLE;
- 
-+#ifdef CONFIG_ARM_FCSE_BEST_EFFORT
-+static void fcse_set_pte_shared(struct vm_area_struct *vma,
-+				unsigned long address)
+@@ -133,4 +135,41 @@ void fcse_notify_flush_all(void)
+ {
+ 	fcse_notify_flush_all_inner(current->mm);
+ }
++
++void fcse_pid_reference(unsigned pid)
 +{
-+	pgd_t *pgd;
-+	pmd_t *pmd;
-+	pte_t *pte, entry;
++	unsigned long flags;
 +
-+	if (!(vma->vm_flags & VM_MAYSHARE) || address >= TASK_SIZE)
-+		return;
-+
-+	pgd = pgd_offset(vma->vm_mm, address);
-+	if (pgd_none(*pgd))
-+		goto no_pgd;
-+	if (pgd_bad(*pgd))
-+		goto bad_pgd;
-+
-+	pmd = pmd_offset(pgd, address);
-+	if (pmd_none(*pmd))
-+		goto no_pmd;
-+	if (pmd_bad(*pmd))
-+		goto bad_pmd;
-+
-+	pte = pte_offset_map(pmd, address);
-+	entry = *pte;
-+
-+	if ((pte_val(entry)
-+	     & (L_PTE_PRESENT | PTE_CACHEABLE | L_PTE_WRITE | L_PTE_DIRTY))
-+	    == (L_PTE_PRESENT | PTE_CACHEABLE | L_PTE_WRITE | L_PTE_DIRTY)) {
-+		pte_val(entry) |= L_PTE_SHARED;
-+		set_pte_at(vma->vm_mm, address, pte, entry);
-+	}
-+	pte_unmap(pte);
-+	return;
-+
-+bad_pgd:
-+	pgd_ERROR(*pgd);
-+	pgd_clear(pgd);
-+no_pgd:
-+	return;
-+
-+bad_pmd:
-+	pmd_ERROR(*pmd);
-+	pmd_clear(pmd);
-+no_pmd:
-+	return;
++	spin_lock_irqsave(&fcse_lock, flags);
++	fcse_pid_reference_inner(pid);
++	spin_unlock_irqrestore(&fcse_lock, flags);
 +}
-+#else /* !CONFIG_ARM_FCSE_BEST_EFFORT */
-+#define fcse_set_pte_shared(vma, addr) do { } while (0)
-+#endif /* !CONFIG_ARM_FCSE_BEST_EFFORT */
 +
- /*
-  * We take the easy way out of this problem - we make the
-  * PTE uncacheable.  However, we leave the write buffer on.
-@@ -126,8 +177,10 @@ make_coherent(struct address_space *mapping, struct vm_area_struct *vma, unsigne
- 	flush_dcache_mmap_unlock(mapping);
- 	if (aliases)
- 		adjust_pte(vma, addr);
--	else
-+	else {
-+		fcse_set_pte_shared(vma, addr);
- 		flush_cache_page(vma, addr, pfn);
-+	}
- #else /* CONFIG_ARM_FCSE_GUARANTEED */
- 	if (vma->vm_flags & VM_MAYSHARE)
- 		adjust_pte(vma, addr);
++/* Called with mm->mmap_sem write-locked. */
++void fcse_relocate_mm_to_null_pid(struct mm_struct *mm)
++{
++	pgd_t *to = mm->pgd + pgd_index(0);
++	pgd_t *from = pgd_offset(mm, 0);
++	unsigned len = pgd_index(FCSE_TASK_SIZE) * sizeof(*from);
++	unsigned long flags;
++
++	preempt_disable();
++
++	memcpy(to, from, len);
++	spin_lock_irqsave(&fcse_lock, flags);
++	fcse_pid_dereference(mm->context.pid >> FCSE_PID_SHIFT);
++	fcse_pid_reference_inner(0);
++	per_pid[0].last_mm = mm;
++	spin_unlock_irqrestore(&fcse_lock, flags);
++
++	mm->context.pid = 0;
++	fcse_pid_set(0);
++	memset(from, '\0', len);
++	mb();
++	flush_cache_mm(mm);
++	flush_tlb_mm(mm);
++
++	preempt_enable();
++}
++
+ #endif /* CONFIG_ARM_FCSE_BEST_EFFORT */
+diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
+index e608bda..ac81369 100644
+--- a/arch/arm/mm/mmap.c
++++ b/arch/arm/mm/mmap.c
+@@ -125,7 +125,14 @@ found_addr:
+ 			mm->cached_hole_size = 0;
+ 			goto full_search;
+ 		}
++#ifdef CONFIG_ARM_FCSE_BEST_EFFORT
++		if (mm->context.pid) {
++			mm->context.big = 1;
++			fcse_relocate_mm_to_null_pid(mm);
++		}
++#else /* CONFIG_ARM_FCSE_GUARANTEED */
+ 		return -ENOMEM;
++#endif /* CONFIG_ARM_FCSE_GUARANTEED */
+ 	}
+ #endif /* CONFIG_ARM_FCSE */
+ 	return addr;
 -- 
 1.5.6.5
