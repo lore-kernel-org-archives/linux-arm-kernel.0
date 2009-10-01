@@ -1,43 +1,60 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 1 Oct 2009 13:56:57 +0100
-Subject: [PATCH 2/2] arm: Clean up linker script using new linker
-	script macros.
-In-Reply-To: <20090930213924.GB15732@merkur.ravnborg.org>
-References: <1254345935-15958-1-git-send-email-tabbott@ksplice.com>
-	<1254345935-15958-3-git-send-email-tabbott@ksplice.com>
-	<20090930213924.GB15732@merkur.ravnborg.org>
-Message-ID: <20091001125657.GA26910@n2100.arm.linux.org.uk>
+Date: Thu, 1 Oct 2009 14:03:38 +0100
+Subject: [PATCH 1/4] Made VMALLOC_END of type unsigned long.
+In-Reply-To: <20091001104715.GA25067@CCCP>
+References: <1245155890204-git-send-email-andreas.fenkart@streamunlimited.com>
+	<20090619094640.GD22234@n2100.arm.linux.org.uk>
+	<20091001104715.GA25067@CCCP>
+Message-ID: <20091001130338.GB26910@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2009 at 11:39:25PM +0200, Sam Ravnborg wrote:
-> On Wed, Sep 30, 2009 at 05:25:35PM -0400, Tim Abbott wrote:
-> > From: Nelson Elhage <nelhage@ksplice.com>
-> > 
-> > This patch is mostly a straightforward translation. The primary side
-> > effect to the resulting vmlinux should be to increase the alignment on
-> > the initramfs to the standard PAGE_SIZE from 32 bytes.
-> > 
-> > Signed-off-by: Nelson Elhage <nelhage@ksplice.com>
-> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Signed-off-by: Tim Abbott <tabbott@ksplice.com>
-> > ---
-> >  arch/arm/kernel/vmlinux.lds.S |   75 +++++++++++-----------------------------
-> >  1 files changed, 21 insertions(+), 54 deletions(-)
-> > 
-> >  
-> > -	.bss : {
-> > -		__bss_start = .;	/* BSS				*/
-> > -		*(.bss)
-> > -		*(COMMON)
-> > -		__bss_stop = .;
-> > -		_end = .;
+On Thu, Oct 01, 2009 at 12:47:15PM +0200, Andreas Fenkart wrote:
+> Davinci defines VMALLOC_END this way:
 > 
-> Where is _end in the new layout?
-> I think we lost it.
+> #define VMALLOC_END   (IO_VIRT - (2<<20))   
+> 
+> The simple solution would be to prefix the VMALLOC_END with UL,
+> the alternative to make IO_VIRT unsinged long.
 
-You're right - this will cause a build failure since _end is used in
-several core ARM files.  Tim?
+Is:
 
-PS, please ensure that all patches are at the very least build tested,
-or say when they aren't.
+	(IO_VIRT - (2<<20))UL
+
+valid C?  I don't think it is, and neither does my compiler.
+
+> IO_PHYS should not be changed though, since it is assigned to
+> unsigned int fields.
+
+I'd actually argue that it's more correct for physical addresses to be
+unsigned long rather than unsigned int.
+
+> So I changed the patch, and made only IO_VIRT unsigned long:
+> 
+>  #define IO_PHYS        0x01c00000
+>  #define IO_OFFSET      0xfd000000 /* Virtual IO = 0xfec00000 */
+>  #define IO_SIZE        0x00400000
+> -#define IO_VIRT        (IO_PHYS + IO_OFFSET)
+> +#define IO_VIRT        UL(IO_PHYS + IO_OFFSET)
+
+This doesn't work, for the same reason I point out above.  An expression
+suffixed with 'UL' is not valid.  However, a pure number may be suffixed
+with 'UL' to make it an unsigned long constant.
+
+> IO_PHYS:
+> -assigned to struct machine_desc / unsigned int phys_io;
+> -assigned to struct machine_desc / unsigned int io_pg_offst;
+
+These both can become unsigned long without any harm.
+
+> -shifted and assigned to struct map_desc / unsigned long pfn;
+> -used defines for UART base address, which are:
+> --via plat_serial8250_port / resource_size_t mapbase
+> ---assigned to type phys_addr_t
+> -used defines for TIMER base address, which recursively are:
+> --assigned to struct davinci_timer_instance / void __iomem *base;
+> -used defines for WDOG base address, which are:
+> --via struct resource / resource_size_t start
+> ---assigned to type phys_addr_t
+
+The rest are fine.
