@@ -1,31 +1,40 @@
-From: simon.kagstrom@netinsight.net (Simon Kagstrom)
-Date: Thu, 1 Oct 2009 10:08:09 +0200
+From: sascha-ml-devel-openrd-google@silbe.org (Sascha Silbe)
+Date: Thu, 1 Oct 2009 10:12:16 +0200
 Subject: kirkwood openrd: random kernel crashes with git kernel
-In-Reply-To: <200910011007.17429.dk-arm-linux@gmx.de>
+In-Reply-To: <200910010904.18923.dk-arm-linux@gmx.de>
 References: <200910010904.18923.dk-arm-linux@gmx.de>
-	<20091001090444.560b2e0a@marrow.netinsight.se>
-	<200910011007.17429.dk-arm-linux@gmx.de>
-Message-ID: <20091001100809.72ae92d3@marrow.netinsight.se>
+Message-ID: <20091001081216.GA4941@twin.sascha.silbe.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 1 Oct 2009 10:07:17 +0200
-Dieter Kiermaier <dk-arm-linux@gmx.de> wrote:
+On Thu, Oct 01, 2009 at 09:04:18AM +0200, Dieter Kiermaier wrote:
 
-> > Try starting with openocd disconnected (i.e., the openocd program
-> > suspended or terminated). I also get random crashes when that is on,
-> > presumably caused by it stopping and resuming the kernel randomly (you
-> > can see that in the openocd terminal window).
->
-> It looks like this was the real reason!
-> I've spent hours of sorting out what causes the crashes but now it's clear why it is almost random
-> and not depending on my kernel configuration!
+> WARNING: at arch/arm/kernel/process.c:171 cpu_idle+0x74/0xbc()
+> Modules linked in:
+> [<c002a748>] (unwind_backtrace+0x0/0xd8) from [<c003931c>] 
+> (warn_slowpath_common+0x4c/0x68)
+> [<c003931c>] (warn_slowpath_common+0x4c/0x68) from [<c0026844>] 
+> (cpu_idle+0x74/0xbc)
+> [<c0026844>] (cpu_idle+0x74/0xbc) from [<c0008b2c>] 
+> (start_kernel+0x22c/0x27c)
+> [<c0008b2c>] (start_kernel+0x22c/0x27c) from [<00008034>] (0x8034)
+Try the patch from [1], it works for me (uptime 5 days now without the 
+message above).
+Disclaimer: I know next to nothing about Linux internals, so can't judge 
+the quality of the patch. Use at your own risk.
 
-I guess this is something that should be asked to the openocd people. I
-haven't got around to look at it more yet though. It might even be a
-known issue I suppose.
 
-Or perhaps the timing difference is triggering some real kernel bug.
-Anyway, without OpenOCD, I don't see random kernel crashes anymore.
+[1] http://patchwork.kernel.org/patch/40871/
 
-// Simon
+CU Sascha
+
+-- 
+http://sascha.silbe.org/
+http://www.infra-silbe.de/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 489 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091001/e932760f/attachment-0001.sig>
