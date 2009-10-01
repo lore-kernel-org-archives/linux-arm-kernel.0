@@ -1,175 +1,152 @@
 From: linuxzsc@gmail.com (Richard Zhao)
-Date: Thu, 1 Oct 2009 16:01:50 +0800
-Subject: [PATCH 3/4] i2c: imx: add macros and printk to make debug easy
-In-Reply-To: <20091001072934.GX27039@pengutronix.de>
+Date: Thu, 1 Oct 2009 16:03:20 +0800
+Subject: [PATCH 1/4] i2c: imx: check busy bit when START/STOP
+In-Reply-To: <1254359613-21210-1-git-send-email-linuxzsc@gmail.com>
 References: <1254359613-21210-1-git-send-email-linuxzsc@gmail.com>
-	<1254359613-21210-2-git-send-email-linuxzsc@gmail.com>
-	<1254359613-21210-3-git-send-email-linuxzsc@gmail.com>
-	<20091001072934.GX27039@pengutronix.de>
-Message-ID: <4e090d470910010101r6839cc9ax4fe84f04a1afbb00@mail.gmail.com>
+Message-ID: <4e090d470910010103o611d9fb2t3acf93632216fc88@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 1, 2009 at 3:29 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Thu, Oct 01, 2009 at 09:13:32AM +0800, Richard Zhao wrote:
->> When CONFIG_I2C_DEBUG_BUS is enabled, it helps dump registers at operation
->> fail condition, and print i2c_msg to xfer.
->>
->> Signed-off-by: Richard Zhao <linuxzsc@gmail.com>
+On Thu, Oct 1, 2009 at 9:13 AM, Richard Zhao <linuxzsc@gmail.com> wrote:
+> After START/RESTART, wait for busy bit to be set and
+> after STOP, wait for busy bit to be clear.
 >
-> Honestly I don't think we need this. It makes the driver too verbose for
-> my taste.
+> Signed-off-by: Richard Zhao <linuxzsc@gmail.com>
 >
-> Sascha
+> diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
+> index 4afba3e..156cc95 100644
+> --- a/drivers/i2c/busses/i2c-imx.c
+> +++ b/drivers/i2c/busses/i2c-imx.c
+> @@ -125,14 +125,19 @@ struct imx_i2c_struct {
+> ?/** Functions for IMX I2C adapter driver ***************************************
+> ?*******************************************************************************/
 >
+> -static int i2c_imx_bus_busy(struct imx_i2c_struct *i2c_imx)
+> +static int i2c_imx_bus_busy(struct imx_i2c_struct *i2c_imx, int for_busy)
+> ?{
+> ? ? ? ?unsigned long orig_jiffies = jiffies;
+> + ? ? ? unsigned int temp;
 >
->>
->> diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
->> index c1e541c..87faea4 100644
->> --- a/drivers/i2c/busses/i2c-imx.c
->> +++ b/drivers/i2c/busses/i2c-imx.c
->> @@ -125,6 +125,20 @@ struct imx_i2c_struct {
->> ?/** Functions for IMX I2C adapter driver ***************************************
->> ?*******************************************************************************/
->>
->> +#ifdef CONFIG_I2C_DEBUG_BUS
->> +#define reg_dump(i2c_imx) \
->> +{ \
->> + ? ? printk(KERN_DEBUG "fun %s:%d ", __func__, __LINE__); \
->> + ? ? printk(KERN_DEBUG "IADR %02x IFDR %02x I2CR %02x I2SR %02x\n", \
->> + ? ? ? ? ? ? readb(i2c_imx->base + IMX_I2C_IADR), \
->> + ? ? ? ? ? ? readb(i2c_imx->base + IMX_I2C_IFDR), \
->> + ? ? ? ? ? ? readb(i2c_imx->base + IMX_I2C_I2CR), \
->> + ? ? ? ? ? ? readb(i2c_imx->base + IMX_I2C_I2SR)); \
->> +}
->> +#else
->> +#define reg_dump(i2c_imx)
->> +#endif
->> +
->> ?static int i2c_imx_bus_busy(struct imx_i2c_struct *i2c_imx, int for_busy)
->> ?{
->> ? ? ? unsigned long orig_jiffies = jiffies;
->> @@ -146,6 +160,7 @@ static int i2c_imx_bus_busy(struct imx_i2c_struct *i2c_imx, int for_busy)
->> ? ? ? ? ? ? ? if (time_after(jiffies, orig_jiffies + HZ / 1000)) {
->> ? ? ? ? ? ? ? ? ? ? ? dev_dbg(&i2c_imx->adapter.dev,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "<%s> I2C bus is busy\n", __func__);
->> + ? ? ? ? ? ? ? ? ? ? reg_dump(i2c_imx);
->> ? ? ? ? ? ? ? ? ? ? ? return -EIO;
->> ? ? ? ? ? ? ? }
->> ? ? ? ? ? ? ? schedule();
->> @@ -164,9 +179,11 @@ static int i2c_imx_trx_complete(struct imx_i2c_struct *i2c_imx)
->>
->> ? ? ? if (unlikely(result < 0)) {
->> ? ? ? ? ? ? ? dev_dbg(&i2c_imx->adapter.dev, "<%s> result < 0\n", __func__);
->> + ? ? ? ? ? ? reg_dump(i2c_imx);
->> ? ? ? ? ? ? ? return result;
->> ? ? ? } else if (unlikely(!(i2c_imx->i2csr & I2SR_IIF))) {
->> ? ? ? ? ? ? ? dev_dbg(&i2c_imx->adapter.dev, "<%s> Timeout\n", __func__);
->> + ? ? ? ? ? ? reg_dump(i2c_imx);
->> ? ? ? ? ? ? ? return -ETIMEDOUT;
->> ? ? ? }
->> ? ? ? dev_dbg(&i2c_imx->adapter.dev, "<%s> TRX complete\n", __func__);
->> @@ -178,6 +195,7 @@ static int i2c_imx_acked(struct imx_i2c_struct *i2c_imx)
->> ?{
->> ? ? ? if (readb(i2c_imx->base + IMX_I2C_I2SR) & I2SR_RXAK) {
->> ? ? ? ? ? ? ? dev_dbg(&i2c_imx->adapter.dev, "<%s> No ACK\n", __func__);
->> + ? ? ? ? ? ? reg_dump(i2c_imx);
->> ? ? ? ? ? ? ? return -EIO; ?/* No ACK */
->> ? ? ? }
->>
->> @@ -197,17 +215,20 @@ static int i2c_imx_start(struct imx_i2c_struct *i2c_imx)
->> ? ? ? writeb(I2CR_IEN, i2c_imx->base + IMX_I2C_I2CR);
->>
->> ? ? ? result = i2c_imx_bus_busy(i2c_imx, 0);
->> - ? ? if (result)
->> + ? ? if (result) {
->> + ? ? ? ? ? ? reg_dump(i2c_imx);
->> ? ? ? ? ? ? ? return result;
->> + ? ? }
->>
->> ? ? ? /* Start I2C transaction */
->> ? ? ? temp = readb(i2c_imx->base + IMX_I2C_I2CR);
->> ? ? ? temp |= I2CR_MSTA;
->> ? ? ? writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
->> ? ? ? result = i2c_imx_bus_busy(i2c_imx, 1);
->> - ? ? if (result)
->> + ? ? if (result) {
->> + ? ? ? ? ? ? reg_dump(i2c_imx);
->> ? ? ? ? ? ? ? return result;
->> -
->> + ? ? }
->> ? ? ? temp |= I2CR_IIEN | I2CR_MTX | I2CR_TXAK;
->> ? ? ? writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
->> ? ? ? return result;
->> @@ -228,7 +249,8 @@ static void i2c_imx_stop(struct imx_i2c_struct *i2c_imx)
->> ? ? ? ?*/
->> ? ? ? udelay(i2c_imx->disable_delay);
->>
->> - ? ? i2c_imx_bus_busy(i2c_imx, 0);
->> + ? ? if (i2c_imx_bus_busy(i2c_imx, 0))
->> + ? ? ? ? ? ? reg_dump(i2c_imx);
->>
->> ? ? ? /* Disable I2C controller */
->> ? ? ? writeb(0, i2c_imx->base + IMX_I2C_I2CR);
->> @@ -389,7 +411,18 @@ static int i2c_imx_xfer(struct i2c_adapter *adapter,
->> ? ? ? struct imx_i2c_struct *i2c_imx = i2c_get_adapdata(adapter);
->>
->> ? ? ? dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
->> -
->> +#ifdef CONFIG_I2C_DEBUG_BUS
->> + ? ? for (i = 0; i < num; i++) {
->> + ? ? ? ? ? ? printk(KERN_DEBUG "msg%d addr %02x RD %d cnt %d d:", i,
->> + ? ? ? ? ? ? ? ? ? ? msgs[i].addr, msgs[i].flags & I2C_M_RD, msgs[i].len);
->> + ? ? ? ? ? ? if (!(msgs[i].flags & I2C_M_RD)) {
->> + ? ? ? ? ? ? ? ? ? ? int j;
->> + ? ? ? ? ? ? ? ? ? ? for (j = 0; j < msgs[i].len; j++)
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? printk("%02x ", msgs[i].buf[j]);
->> + ? ? ? ? ? ? }
->> + ? ? ? ? ? ? printk("\n");
->> + ? ? }
->> +#endif
->> ? ? ? /* Start I2C transfer */
->> ? ? ? result = i2c_imx_start(i2c_imx);
->> ? ? ? if (result)
->> @@ -404,8 +437,10 @@ static int i2c_imx_xfer(struct i2c_adapter *adapter,
->> ? ? ? ? ? ? ? ? ? ? ? temp |= I2CR_RSTA;
->> ? ? ? ? ? ? ? ? ? ? ? writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
->> ? ? ? ? ? ? ? ? ? ? ? result = ?i2c_imx_bus_busy(i2c_imx, 1);
->> - ? ? ? ? ? ? ? ? ? ? if (result)
->> + ? ? ? ? ? ? ? ? ? ? if (result) {
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? reg_dump(i2c_imx);
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto fail0;
->> + ? ? ? ? ? ? ? ? ? ? }
->> ? ? ? ? ? ? ? }
->> ? ? ? ? ? ? ? dev_dbg(&i2c_imx->adapter.dev,
->> ? ? ? ? ? ? ? ? ? ? ? "<%s> transfer message: %d\n", __func__, i);
->> @@ -562,7 +597,7 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
->> ? ? ? ? ? ? ? res_size, i2c_imx->res->start);
->> ? ? ? dev_dbg(&i2c_imx->adapter.dev, "adapter name: \"%s\"\n",
->> ? ? ? ? ? ? ? i2c_imx->adapter.name);
->> - ? ? dev_dbg(&i2c_imx->adapter.dev, "IMX I2C adapter registered\n");
->> + ? ? dev_info(&i2c_imx->adapter.dev, "IMX I2C adapter registered\n");
->>
->> ? ? ? return 0; ? /* Return OK */
->>
->> --
->> 1.6.0.4
->>
->>
+> ? ? ? ?dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
 >
+> - ? ? ? /* wait for bus not busy */
+> - ? ? ? while (readb(i2c_imx->base + IMX_I2C_I2SR) & I2SR_IBB) {
+> + ? ? ? temp = readb(i2c_imx->base + IMX_I2C_I2SR);
+> + ? ? ? while (1) {
+> + ? ? ? ? ? ? ? if (for_busy && (temp & I2SR_IBB))
+> + ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? ? ? ? ? if (!for_busy && !(temp & I2SR_IBB))
+> + ? ? ? ? ? ? ? ? ? ? ? break;
+> ? ? ? ? ? ? ? ?if (signal_pending(current)) {
+> ? ? ? ? ? ? ? ? ? ? ? ?dev_dbg(&i2c_imx->adapter.dev,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"<%s> I2C Interrupted\n", __func__);
+> @@ -144,6 +149,7 @@ static int i2c_imx_bus_busy(struct imx_i2c_struct *i2c_imx)
+> ? ? ? ? ? ? ? ? ? ? ? ?return -EIO;
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ? ? ? ? ?schedule();
+> + ? ? ? ? ? ? ? temp = readb(i2c_imx->base + IMX_I2C_I2SR);
+> ? ? ? ?}
+>
+> ? ? ? ?return 0;
+> @@ -179,20 +185,32 @@ static int i2c_imx_acked(struct imx_i2c_struct *i2c_imx)
+> ? ? ? ?return 0;
+> ?}
+>
+> -static void i2c_imx_start(struct imx_i2c_struct *i2c_imx)
+> +static int i2c_imx_start(struct imx_i2c_struct *i2c_imx)
+> ?{
+> ? ? ? ?unsigned int temp = 0;
+> + ? ? ? int result;
+>
+> ? ? ? ?dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
+>
+> ? ? ? ?/* Enable I2C controller */
+> + ? ? ? writeb(0, i2c_imx->base + IMX_I2C_I2SR);
+> ? ? ? ?writeb(I2CR_IEN, i2c_imx->base + IMX_I2C_I2CR);
+> +
+> + ? ? ? result = i2c_imx_bus_busy(i2c_imx, 0);
+> + ? ? ? if (result)
+> + ? ? ? ? ? ? ? return result;
+> +
+> ? ? ? ?/* Start I2C transaction */
+> ? ? ? ?temp = readb(i2c_imx->base + IMX_I2C_I2CR);
+> ? ? ? ?temp |= I2CR_MSTA;
+> ? ? ? ?writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
+> + ? ? ? result = i2c_imx_bus_busy(i2c_imx, 1);
+> + ? ? ? if (result)
+> + ? ? ? ? ? ? ? return result;
+> +
+> ? ? ? ?temp |= I2CR_IIEN | I2CR_MTX | I2CR_TXAK;
+> ? ? ? ?writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
+> + ? ? ? return result;
+> ?}
+>
+> ?static void i2c_imx_stop(struct imx_i2c_struct *i2c_imx)
+> @@ -202,16 +220,16 @@ static void i2c_imx_stop(struct imx_i2c_struct *i2c_imx)
+> ? ? ? ?/* Stop I2C transaction */
+> ? ? ? ?dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
+> ? ? ? ?temp = readb(i2c_imx->base + IMX_I2C_I2CR);
+> - ? ? ? temp &= ~I2CR_MSTA;
+> + ? ? ? temp &= ~(I2CR_MSTA | I2CR_MTX);
+> ? ? ? ?writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
+> - ? ? ? /* setup chip registers to defaults */
+> - ? ? ? writeb(I2CR_IEN, i2c_imx->base + IMX_I2C_I2CR);
+> - ? ? ? writeb(0, i2c_imx->base + IMX_I2C_I2SR);
+> ? ? ? ?/*
+> ? ? ? ? * This delay caused by an i.MXL hardware bug.
+> ? ? ? ? * If no (or too short) delay, no "STOP" bit will be generated.
+> ? ? ? ? */
+> ? ? ? ?udelay(i2c_imx->disable_delay);
+> +
+> + ? ? ? i2c_imx_bus_busy(i2c_imx, 0);
+> +
+> ? ? ? ?/* Disable I2C controller */
+> ? ? ? ?writeb(0, i2c_imx->base + IMX_I2C_I2CR);
+> ?}
+> @@ -344,7 +362,7 @@ static int i2c_imx_read(struct imx_i2c_struct *i2c_imx, struct i2c_msg *msgs)
+> ? ? ? ? ? ? ? ? ? ? ? ?dev_dbg(&i2c_imx->adapter.dev,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"<%s> clear MSTA\n", __func__);
+> ? ? ? ? ? ? ? ? ? ? ? ?temp = readb(i2c_imx->base + IMX_I2C_I2CR);
+> - ? ? ? ? ? ? ? ? ? ? ? temp &= ~I2CR_MSTA;
+> + ? ? ? ? ? ? ? ? ? ? ? temp &= ~(I2CR_MSTA | I2CR_MTX);
+> ? ? ? ? ? ? ? ? ? ? ? ?writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
+> ? ? ? ? ? ? ? ?} else if (i == (msgs->len - 2)) {
+> ? ? ? ? ? ? ? ? ? ? ? ?dev_dbg(&i2c_imx->adapter.dev,
+> @@ -370,14 +388,11 @@ static int i2c_imx_xfer(struct i2c_adapter *adapter,
+>
+> ? ? ? ?dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
+>
+> - ? ? ? /* Check if i2c bus is not busy */
+> - ? ? ? result = i2c_imx_bus_busy(i2c_imx);
+> + ? ? ? /* Start I2C transfer */
+> + ? ? ? result = i2c_imx_start(i2c_imx);
+> ? ? ? ?if (result)
+> ? ? ? ? ? ? ? ?goto fail0;
+>
+> - ? ? ? /* Start I2C transfer */
+> - ? ? ? i2c_imx_start(i2c_imx);
+> -
+> ? ? ? ?/* read/write data */
+> ? ? ? ?for (i = 0; i < num; i++) {
+> ? ? ? ? ? ? ? ?if (i) {
+> @@ -386,6 +401,9 @@ static int i2c_imx_xfer(struct i2c_adapter *adapter,
+> ? ? ? ? ? ? ? ? ? ? ? ?temp = readb(i2c_imx->base + IMX_I2C_I2CR);
+> ? ? ? ? ? ? ? ? ? ? ? ?temp |= I2CR_RSTA;
+> ? ? ? ? ? ? ? ? ? ? ? ?writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
+> + ? ? ? ? ? ? ? ? ? ? ? result = ?i2c_imx_bus_busy(i2c_imx, 1);
+> + ? ? ? ? ? ? ? ? ? ? ? if (result)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto fail0;
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ? ? ? ? ?dev_dbg(&i2c_imx->adapter.dev,
+> ? ? ? ? ? ? ? ? ? ? ? ?"<%s> transfer message: %d\n", __func__, i);
 > --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
-> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
+> 1.6.0.4
+>
 >
 
-1. i2c is more important bus in embedded system than PC. Many PMICs
-are connected to cpu via i2c. Before system boot up, we depend much on
-printk message.
-2. When we add a new i2c device, it's easy to have problems. Maybe
-it's hw issue, one device fails, all ones in the same bus fails. In
-such condition, debug message is very helpfull.
+Hi Sascha,
+
+So I assume you have no comments about this patch ?
 
 Thanks
 Richard
