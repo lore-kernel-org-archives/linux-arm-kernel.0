@@ -1,11 +1,10 @@
 From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 1 Oct 2009 17:41:57 -0400
+Date: Thu, 1 Oct 2009 18:18:44 -0400
 Subject: [PATCH] ep93xx: update i2c support
-In-Reply-To: <4AC40C11.4060401@bluewatersys.com>
-References: <BD79186B4FD85F4B8E60E381CAEE190901D41F55@mi8nycmail19.Mi8.com>	<BD79186B4FD85F4B8E60E381CAEE190901D41F5D@mi8nycmail19.Mi8.com>	<4AC3BB1F.9050903@bluewatersys.com>	<BD79186B4FD85F4B8E60E381CAEE190901D42C6B@mi8nycmail19.Mi8.com>	<4AC3C8D2.5060009@bluewatersys.com>
-	<BD79186B4FD85F4B8E60E381CAEE190901D42C7C@mi8nycmail19.Mi8.com>
-	<4AC40C11.4060401@bluewatersys.com>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901D42E16@mi8nycmail19.Mi8.com>
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901D42E16@mi8nycmail19.Mi8.com>
+References: <BD79186B4FD85F4B8E60E381CAEE190901D41F55@mi8nycmail19.Mi8.com>	<BD79186B4FD85F4B8E60E381CAEE190901D41F5D@mi8nycmail19.Mi8.com>	<4AC3BB1F.9050903@bluewatersys.com>	<BD79186B4FD85F4B8E60E381CAEE190901D42C6B@mi8nycmail19.Mi8.com>	<4AC3C8D2.5060009@bluewatersys.com><BD79186B4FD85F4B8E60E381CAEE190901D42C7C@mi8nycmail19.Mi8.com><4AC40C11.4060401@bluewatersys.com>
+	<BD79186B4FD85F4B8E60E381CAEE190901D42E16@mi8nycmail19.Mi8.com>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901D42E1C@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,6 +25,7 @@ Acked-by: Ryan Mallon <ryan@bluewatersys.com>
 
 --- 
 
+V6 - add missing #include <linux/gpio.h> to edb93xx.c
 V5 - use pr_warning for sda/scl messages
 V4 - add warning message when sda/scl are not EEDAT/EECLK and
      configured as open drain
@@ -83,18 +83,22 @@ index f7ebed9..e8bae09 100644
  	platform_device_register(&ep93xx_i2c_device);
  }
 diff --git a/arch/arm/mach-ep93xx/edb93xx.c b/arch/arm/mach-ep93xx/edb93xx.c
-index 73145ae..307f435 100644
+index 73145ae..ca71cf1 100644
 --- a/arch/arm/mach-ep93xx/edb93xx.c
 +++ b/arch/arm/mach-ep93xx/edb93xx.c
-@@ -28,6 +28,7 @@
+@@ -27,8 +27,10 @@
+ #include <linux/kernel.h>
  #include <linux/init.h>
  #include <linux/platform_device.h>
- #include <linux/i2c.h>
-+#include <linux/i2c-gpio.h>
+-#include <linux/i2c.h>
  #include <linux/mtd/physmap.h>
++#include <linux/gpio.h>
++#include <linux/i2c.h>
++#include <linux/i2c-gpio.h>
  
  #include <mach/hardware.h>
-@@ -76,13 +77,26 @@ static struct ep93xx_eth_data edb93xx_eth_data = {
+ 
+@@ -76,13 +78,26 @@ static struct ep93xx_eth_data edb93xx_eth_data = {
  	.phy_id		= 1,
  };
  
@@ -123,7 +127,7 @@ index 73145ae..307f435 100644
  	{
  		I2C_BOARD_INFO("ds1337", 0x68),
  	},
-@@ -92,12 +106,14 @@ static void __init edb93xx_register_i2c(void)
+@@ -92,12 +107,14 @@ static void __init edb93xx_register_i2c(void)
  {
  	if (machine_is_edb9302a() || machine_is_edb9307a() ||
  	    machine_is_edb9315a()) {
