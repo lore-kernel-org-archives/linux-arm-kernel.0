@@ -1,34 +1,43 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 2 Oct 2009 16:53:15 +0200
-Subject: your mail
-In-Reply-To: <1250258343-14203-1-git-send-email-thierry.reding@avionic-design.de>
-References: <1250258343-14203-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <20091002145315.GB25736@avionic-design.de>
+From: bgat@billgatliff.com (Bill Gatliff)
+Date: Fri, 02 Oct 2009 10:31:59 -0500
+Subject: Generic GPIO I2C bitbang kernel question
+In-Reply-To: <3d1967ab0909301917g1acc4fd4ga49eb1906a8fccf5@mail.gmail.com>
+References: <3d1967ab0909301917g1acc4fd4ga49eb1906a8fccf5@mail.gmail.com>
+Message-ID: <4AC61CEF.2020003@billgatliff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Thierry Reding wrote:
-> So it's been quite a while since I last posted this series and there have been
-> a number of changes.
-> 
-> Support for T-Pid analog variants is dropped and will be handled in user-space
-> instead. There hardware does not differ from the standard T-Pid. This gets rid 
-> of some ugly platform-specific #ifdefs.
-> 
-> Front-panel controls are now handled in a separate driver, adx-keypad. That
-> way backlight control can be moved to userspace.
-> 
-> This series also adds a watchdog driver that can be used on all Avionic Design
-> Xanthos-based boards.
+Brian Hutchinson wrote:
+> Hi,
+>
+> I'm trying to get i2c-core gpio bitbang I2C adapter working on a picoChip
+> PC205 (ARM926EJS core)
+>
+> I have soft i2c bit banging working in u-boot and am now trying to get it
+> working in Linux.
+>   
 
-Russell,
+What is the response time of the slave?  I have at times had troubles
+over-running my slave's address checking code, which would result in
+false NAK reporting.  The quick fix was to slow down the i2c clock to
+give the slave more time to respond.
 
-with the watchdog and backlight drivers out of the way, would you like me to
-get any of the other drivers (fb, keypad) in via seperate trees or can they go
-in through the ARM tree?
+Presumably, if your hardware is working in u-boot then your pullup
+resistors and other hardware must be right.  But at higher speeds, is it
+_really_ right?  If your pullup resistors have low resistance, the slave
+might not be able to sink them fast enough for the master to see the ACK.
 
-Do the remaining patches need additional work or can I go ahead and submit
-them to the patch system? Or do you prefer some other way to get them into
-your tree?
+Just a couple of things that have bitten me in the bit-bang code.  But
+when the above aren't issues, I have found the current implementation to
+be solid.  I haven't checked the .31+ kernels, but I did thoroughly test
+the .30 and previous ones.
 
-Thierry
+
+HTH,
+
+
+b.g.
+
+-- 
+Bill Gatliff
+bgat at billgatliff.com
