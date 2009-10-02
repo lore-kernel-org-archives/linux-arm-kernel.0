@@ -1,34 +1,47 @@
-From: Peiyu.Li@csr.com (Peiyu Li)
-Date: Thu, 1 Oct 2009 18:27:56 -0700
-Subject: how to keep some basic relocation information in executable binary
-Message-ID: <ED2979D1CA1B3E4BB166ED9990088522366040@SJOAMSEXB01.AMERICAS.ROOT.PRI>
+From: simon.kagstrom@netinsight.net (Simon Kagstrom)
+Date: Fri, 2 Oct 2009 08:40:00 +0200
+Subject: kirkwood openrd: random kernel crashes with git kernel
+In-Reply-To: <alpine.LFD.2.00.0910011218410.4997@xanadu.home>
+References: <200910010904.18923.dk-arm-linux@gmx.de>
+	<20091001081216.GA4941@twin.sascha.silbe.org>
+	<20091001101925.50a592fd@marrow.netinsight.se>
+	<alpine.LFD.2.00.0910011218410.4997@xanadu.home>
+Message-ID: <20091002084000.7c93d634@marrow.netinsight.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, 
+On Thu, 01 Oct 2009 12:19:21 -0400 (EDT)
+Nicolas Pitre <nico@fluxnic.net> wrote:
 
-I am trying to find a way to build out one ARM-instruction binary that
-can run at any address in the bare metal environment. The GOT can
-relocate most of the symbols. But for those pointers which have been
-static initialized in struct, I have not found a good way to fix them at
-run-time. As you know, there may be pointers or non-pointers data in the
-struct. To only fix the pointer data, I must know the detail relocation
-information at run-time. 
-It seems that -emit-relocs option is designed for runtime relocation,
-and it can keep the relocation information in the final elf format
-executable file. After convert this elf format to the binary format by
-using "objcopy" tool, the relocation information is lost. I still can
-not know which data need to be relocated in the static initialized
-struct.
+> > I should add that I've seen this error even without openocd connected,
+> > so this seems to be a real error. Anyway, I guess this will sooner or
+> > later be applied (in some form) upstream, so openrd should benefit
+> > "automatically" from it.
+> > 
+> > However, with OpenOCD there are other type of crashes which look very
+> > random, so I believe those will stay even with this.
+> 
+> Please send me information about those when you can.
 
-How can I know the relocation information for these static initialized
-struct? Besides that pointers in GOT and the static initialized struct ,
-is there any other data should be run-time relocated in the binary
-executable file?
-Any help would be greatly appreciated.
-Thanks in advance.
-Peiyu 1
+The nohlt argument seems to fix them, thanks! Without it I get random
+memory corruption errors such as this:
 
+   Mount local file[    5.160903] BUG: spinlock wrong owner on CPU#0, rc.sysinit/452
+   [    5.166878]  lock: df464af8, .magic: dead4ead, .owner: <none>/-1, .owner_cpu: 0
+   [    5.174229] [<c003130c>] (unwind_backtrace+0x0/0xdc) from [<c02c7b10>] (dump_stack+0x18/0x1c)
+   [    5.182842] [<c02c7b10>] (dump_stack+0x18/0x1c) from [<c017bc08>] (spin_bug+0x90/0xa4)
+   [    5.190837] [<c017bc08>] (spin_bug+0x90/0xa4) from [<c017bc84>] (_raw_spin_unlock+0x68/0xac)
+   [    5.199356] [<c017bc84>] (_raw_spin_unlock+0x68/0xac) from [<c02ca8a0>] (_spin_unlock_irq+0x10/0x20)
+   [    5.208573] [<c02ca8a0>] (_spin_unlock_irq+0x10/0x20) from [<c00475dc>] (dup_mm+0x278/0x450)
+   [    5.217093] [<c00475dc>] (dup_mm+0x278/0x450) from [<c0048004>] (copy_process+0x794/0xddc)
+   [    5.225437] [<c0048004>] (copy_process+0x794/0xddc) from [<c00487ac>] (do_fork+0x160/0x314)
+   [    5.233870] [<c00487ac>] (do_fork+0x160/0x314) from [<c002e218>] (sys_clone+0x34/0x3c)
+   [    5.241867] [<c002e218>] (sys_clone+0x34/0x3c) from [<c002ae80>] (ret_fast_syscall+0x0/0x28)
+   systems.
+   Segmentation fault
+   [    5.264718] Slab corruption: names_cache start=df9f9000, len=4096
 
+although the typical case is that it just hangs without printing out
+much.
 
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+// Simon
