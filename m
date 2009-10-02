@@ -1,61 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 02 Oct 2009 15:46:53 -0700
-Subject: [PATCH 8/8] omapfb: Blizzard: constify register address tables
-In-Reply-To: <20091002223510.11962.21751.stgit@localhost>
-References: <20091002223510.11962.21751.stgit@localhost>
-Message-ID: <20091002224653.11962.4623.stgit@localhost>
+From: davidb@quicinc.com (David Brown)
+Date: Fri, 2 Oct 2009 16:50:05 -0700
+Subject: 3rd party patches?
+Message-ID: <20091002235005.GA31813@huya.quicinc.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tommi Rantala <tt.rantala@gmail.com>
+Russell, is there a way to submit patches to your patch system
+that will set the author field to a third party?  I submitted
+with the initial From: line that git format-patch generated, but
+that didn't seem to work.  There's probably going to be a handful
+of patches we're pushing where the author will be someone other
+than the one sending the email.
 
-Constify register address tables
+Thanks,
+David Brown
 
-Cc: Tomi Valkeinen <tomi.valkeinen@nokia.com>
-Cc: Imre Deak <imre.deak@nokia.com>
-Signed-off-by: Tommi Rantala <tt.rantala@gmail.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- drivers/video/omap/blizzard.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+commit 31abdb744179159f8b605f56da5b197b188e1689
+Author: David Brown <davidb@codeaurora.org>
+Date:   Thu Oct 1 17:43:29 2009 +0100
 
-diff --git a/drivers/video/omap/blizzard.c b/drivers/video/omap/blizzard.c
-index ce28be6..70dadf9 100644
---- a/drivers/video/omap/blizzard.c
-+++ b/drivers/video/omap/blizzard.c
-@@ -93,7 +93,7 @@ struct blizzard_reg_list {
- };
- 
- /* These need to be saved / restored separately from the rest. */
--static struct blizzard_reg_list blizzard_pll_regs[] = {
-+static const struct blizzard_reg_list blizzard_pll_regs[] = {
- 	{
- 		.start	= 0x04,		/* Don't save PLL ctrl (0x0C) */
- 		.end	= 0x0a,
-@@ -104,7 +104,7 @@ static struct blizzard_reg_list blizzard_pll_regs[] = {
- 	},
- };
- 
--static struct blizzard_reg_list blizzard_gen_regs[] = {
-+static const struct blizzard_reg_list blizzard_gen_regs[] = {
- 	{
- 		.start	= 0x18,		/* SDRAM control */
- 		.end	= 0x20,
-@@ -1372,7 +1372,7 @@ static void blizzard_get_caps(int plane, struct omapfb_caps *caps)
- 			   (1 << OMAPFB_COLOR_YUV420);
- }
- 
--static void _save_regs(struct blizzard_reg_list *list, int cnt)
-+static void _save_regs(const struct blizzard_reg_list *list, int cnt)
- {
- 	int i;
- 
-@@ -1383,7 +1383,7 @@ static void _save_regs(struct blizzard_reg_list *list, int cnt)
- 	}
- }
- 
--static void _restore_regs(struct blizzard_reg_list *list, int cnt)
-+static void _restore_regs(const struct blizzard_reg_list *list, int cnt)
- {
- 	int i;
- 
+    ARM: 5739/1: ARM: allow empty ATAG_CORE
+    
+    From: David Brown <davidb@quicinc.com>
+    
+    The ATAG_CORE is allowed to be empty.  Although this is handled
+    by parse_tag_core(), __vet_atags during startup rejects this tag
+    unless it contains data.  Allow the initial tag to be either the
+    full size, or empty.
+    
+    Signed-off-by: David Brown <davidb@quicinc.com>
+    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
