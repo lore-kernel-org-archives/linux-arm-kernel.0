@@ -1,39 +1,144 @@
 From: tabbott@ksplice.com (Tim Abbott)
-Date: Fri, 2 Oct 2009 16:32:41 -0400 (EDT)
-Subject: [PATCH 2/2] arm: Clean up linker script using new linker	script
+Date: Fri,  2 Oct 2009 16:32:47 -0400
+Subject: [PATCH v4 2/2] arm: Clean up linker script using new linker script
 	macros.
-In-Reply-To: <20091001125657.GA26910@n2100.arm.linux.org.uk>
-References: <1254345935-15958-1-git-send-email-tabbott@ksplice.com>
-	<1254345935-15958-3-git-send-email-tabbott@ksplice.com>
-	<20090930213924.GB15732@merkur.ravnborg.org>
-	<20091001125657.GA26910@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.1.10.0910021536510.19358@dr-wily.mit.edu>
+In-Reply-To: <alpine.DEB.1.10.0910021536510.19358@dr-wily.mit.edu>
+References: <alpine.DEB.1.10.0910021536510.19358@dr-wily.mit.edu>
+Message-ID: <1254515567-27110-2-git-send-email-tabbott@ksplice.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 1 Oct 2009, Russell King - ARM Linux wrote:
+From: Nelson Elhage <nelhage@ksplice.com>
 
-> On Wed, Sep 30, 2009 at 11:39:25PM +0200, Sam Ravnborg wrote:
-> > 
-> > Where is _end in the new layout?
-> > I think we lost it.
-> 
-> You're right - this will cause a build failure since _end is used in
-> several core ARM files.  Tim?
+This patch is mostly a straightforward translation. The primary side
+effect to the resulting vmlinux should be to increase the alignment on
+the initramfs to the standard PAGE_SIZE from 32 bytes.
 
-It's supposed to be after BSS_SECTION.  I'll send you a new pair of 
-patches with this fixed and Sam's acks added shortly.
+Signed-off-by: Nelson Elhage <nelhage@ksplice.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Tim Abbott <tabbott@ksplice.com>
+Acked-by: Sam Ravnborg <sam@ravnborg.org>
+---
+ arch/arm/kernel/vmlinux.lds.S |   77 ++++++++++++----------------------------
+ 1 files changed, 23 insertions(+), 54 deletions(-)
 
-> PS, please ensure that all patches are at the very least build tested,
-> or say when they aren't.
-
-These were build-tested originally; it seems I introduced this bug when 
-rebasing the patch past the recent DISCARD changes, and failed to retest.  
-Sorry about that (I think you are right that it was more generally a 
-mistake to not clearly tag these patches as build-but-not-run tested in 
-the first place.  I'll do that in the future).
-
-My cross-compile environment is unavailable at present, so the new version 
-will be completely untested as well.
-
-	-Tim Abbott
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index 0902f80..71151bd 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -40,43 +40,31 @@ SECTIONS
+ 		__tagtable_begin = .;
+ 			*(.taglist.init)
+ 		__tagtable_end = .;
+-		. = ALIGN(16);
+-		__setup_start = .;
+-			*(.init.setup)
+-		__setup_end = .;
++
++		INIT_SETUP(16)
++
+ 		__early_begin = .;
+ 			*(.early_param.init)
+ 		__early_end = .;
+-		__initcall_start = .;
+-			INITCALLS
+-		__initcall_end = .;
+-		__con_initcall_start = .;
+-			*(.con_initcall.init)
+-		__con_initcall_end = .;
+-		__security_initcall_start = .;
+-			*(.security_initcall.init)
+-		__security_initcall_end = .;
+-#ifdef CONFIG_BLK_DEV_INITRD
+-		. = ALIGN(32);
+-		__initramfs_start = .;
+-			usr/built-in.o(.init.ramfs)
+-		__initramfs_end = .;
+-#endif
+-		. = ALIGN(PAGE_SIZE);
+-		__per_cpu_load = .;
+-		__per_cpu_start = .;
+-			*(.data.percpu.page_aligned)
+-			*(.data.percpu)
+-			*(.data.percpu.shared_aligned)
+-		__per_cpu_end = .;
++
++		INIT_CALLS
++		CON_INITCALL
++		SECURITY_INITCALL
++		INIT_RAM_FS
++
+ #ifndef CONFIG_XIP_KERNEL
+ 		__init_begin = _stext;
+ 		INIT_DATA
+-		. = ALIGN(PAGE_SIZE);
+-		__init_end = .;
+ #endif
+ 	}
+ 
++	PERCPU(PAGE_SIZE)
++
++#ifndef CONFIG_XIP_KERNEL
++	. = ALIGN(PAGE_SIZE);
++	__init_end = .;
++#endif
++
+ 	/DISCARD/ : {			/* Exit code and data		*/
+ 		EXIT_TEXT
+ 		EXIT_DATA
+@@ -155,7 +143,7 @@ SECTIONS
+ 		 * first, the init task union, aligned
+ 		 * to an 8192 byte boundary.
+ 		 */
+-		*(.data.init_task)
++		INIT_TASK_DATA(THREAD_SIZE)
+ 
+ #ifdef CONFIG_XIP_KERNEL
+ 		. = ALIGN(PAGE_SIZE);
+@@ -165,17 +153,8 @@ SECTIONS
+ 		__init_end = .;
+ #endif
+ 
+-		. = ALIGN(PAGE_SIZE);
+-		__nosave_begin = .;
+-		*(.data.nosave)
+-		. = ALIGN(PAGE_SIZE);
+-		__nosave_end = .;
+-
+-		/*
+-		 * then the cacheline aligned data
+-		 */
+-		. = ALIGN(32);
+-		*(.data.cacheline_aligned)
++		NOSAVE_DATA
++		CACHELINE_ALIGNED_DATA(32)
+ 
+ 		/*
+ 		 * The exception fixup table (might need resorting at runtime)
+@@ -254,20 +233,10 @@ SECTIONS
+ 	}
+ #endif
+ 
+-	.bss : {
+-		__bss_start = .;	/* BSS				*/
+-		*(.bss)
+-		*(COMMON)
+-		__bss_stop = .;
+-		_end = .;
+-	}
+-					/* Stabs debugging sections.	*/
+-	.stab 0 : { *(.stab) }
+-	.stabstr 0 : { *(.stabstr) }
+-	.stab.excl 0 : { *(.stab.excl) }
+-	.stab.exclstr 0 : { *(.stab.exclstr) }
+-	.stab.index 0 : { *(.stab.index) }
+-	.stab.indexstr 0 : { *(.stab.indexstr) }
++	BSS_SECTION(0, 0, 0)
++	_end = .;
++
++	STABS_DEBUG
+ 	.comment 0 : { *(.comment) }
+ }
+ 
+-- 
+1.6.4.3
