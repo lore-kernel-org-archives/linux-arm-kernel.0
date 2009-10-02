@@ -1,76 +1,33 @@
-From: walsimou@walsimou.com (Gaye Abdoulaye Walsimou)
-Date: Fri, 02 Oct 2009 23:52:30 +0200
-Subject: [PATCH] s3c2440: mini2440 buildfix
-In-Reply-To: <20091001133431.GH28928@trinity.fluff.org>
-References: <1254403894-9404-1-git-send-email-gadiyar@ti.com>
-	<20091001133431.GH28928@trinity.fluff.org>
-Message-ID: <4AC6761E.8040708@walsimou.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 2 Oct 2009 23:37:06 +0100
+Subject: [git pull] iop3xx fixes for 2.6.31-rc7
+In-Reply-To: <EFCC3EA6-5150-4A12-BBF2-9C8147B83820@iki.fi>
+References: <1250633811.25922.10.camel@dwillia2-linux.ch.intel.com>
+	<EFCC3EA6-5150-4A12-BBF2-9C8147B83820@iki.fi>
+Message-ID: <20091002223706.GA31132@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Dooks wrote:
-> On Thu, Oct 01, 2009 at 07:01:34PM +0530, Anand Gadiyar wrote:
->   
->> s3c2440: mini2440 buildfix
->>
->> Fix the following two build errors seen with mini2440_defconfig:
->>
->>   CC      arch/arm/plat-s3c24xx/cpu.o
->> arch/arm/plat-s3c24xx/cpu.c:84: error: 's3c2410a_init' undeclared here (not in a function)
->> make[1]: *** [arch/arm/plat-s3c24xx/cpu.o] Error 1
->> make: *** [arch/arm/plat-s3c24xx] Error 2
->>
->>   LD      .tmp_vmlinux1
->> arch/arm/mach-s3c2440/built-in.o:(.init.data+0x724): undefined reference to `s3c_device_usb'
->> make: *** [.tmp_vmlinux1] Error 1
->>
->> Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
->> CC: Gaye Abdoulaye Walsimou <walsimou@walsimou.com>
->> CC: Ben Dooks <ben-linux@fluff.org>
->> ---
->> The latter error was reported by Gaye Abdoulaye Walsimou.
->> I hit the former error while attempting to fix it.
->>
->> I don't have this board, so I do not know if this is correct.
->> Build-tested only.
->>
->> - Anand
->>
->> diff --git a/arch/arm/mach-s3c2440/Kconfig b/arch/arm/mach-s3c2440/Kconfig
->> index d7bba91..64f9e6d 100644
->> --- a/arch/arm/mach-s3c2440/Kconfig
->> +++ b/arch/arm/mach-s3c2440/Kconfig
->> @@ -102,6 +102,7 @@ config MACH_MINI2440
->>  	select EEPROM_AT24
->>  	select LEDS_TRIGGER_BACKLIGHT
->>  	select SND_S3C24XX_SOC_S3C24XX_UDA134X
->> +	select S3C_DEV_USB_HOST
->>  	select S3C_DEV_NAND
->>  	help
->>  	  Say Y here to select support for the MINI2440. Is a 10cm x 10cm board
->>     
+On Fri, Oct 02, 2009 at 10:45:51AM +0300, Aaro Koskinen wrote:
+> Hi,
 >
-> Yes, this is the fix for this one.
+> On 19.8.2009, at 1.16, Dan Williams wrote:
+>> Hi Russell, please pull from:
+>>
+>> 	git://git.kernel.org/pub/scm/linux/kernel/git/djbw/xscaleiop.git  
+>> fixes
+>>
+>> ...to receive:
+>>
+>> Aaro Koskinen (1):
+>>       iop3xx: ATU and PCI memory configuration corrected
+>>
+>> Dan Williams (1):
+>>       iop33x: update defconfig (default atu to on)
+>>
+>> Julia Lawall (1):
+>>       arch/arm/plat-iop: Use DIV_ROUND_CLOSEST
 >
->   
->> diff --git a/arch/arm/plat-s3c24xx/include/plat/s3c2410.h b/arch/arm/plat-s3c24xx/include/plat/s3c2410.h
->> index b6deeef..82ab4aa 100644
->> --- a/arch/arm/plat-s3c24xx/include/plat/s3c2410.h
->> +++ b/arch/arm/plat-s3c24xx/include/plat/s3c2410.h
->> @@ -27,6 +27,7 @@ extern void s3c2410_init_clocks(int xtal);
->>  #define s3c2410_init_uarts NULL
->>  #define s3c2410_map_io NULL
->>  #define s3c2410_init NULL
->> +#define s3c2410a_init NULL
->>  #endif
->>     
->
-> this one we've already got a fix queued, awaiting feedback on the 
-> s3c64xx fixes before pushing upstream.
->
->   
-Thanks for these fix!
-I didn't notice the second one,  but I've already submitted similar
-patch for the first!
+> Any chance to get these into .32-rc series?
 
-Regards,
+Now pulled and pushed back out for Linus to pick up.
