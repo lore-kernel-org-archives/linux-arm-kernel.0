@@ -1,58 +1,73 @@
-From: sedji.gaouaou@atmel.com (Sedji Gaouaou)
-Date: Fri, 02 Oct 2009 16:08:34 +0200
-Subject: [PATCH] at91: enable ssc reception on at91sam9g20ek
-In-Reply-To: <1254387002-22105-1-git-send-email-sedji.gaouaou@atmel.com>
-References: <1254387002-22105-1-git-send-email-sedji.gaouaou@atmel.com>
-Message-ID: <4AC60962.3090608@atmel.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 2 Oct 2009 16:11:06 +0200
+Subject: [PATCH 1/4] i2c: imx: check busy bit when START/STOP
+In-Reply-To: <4e090d470910020117w620fda4cta7b26b912d01bc24@mail.gmail.com>
+References: <1254359613-21210-1-git-send-email-linuxzsc@gmail.com>
+	<4e090d470910010103o611d9fb2t3acf93632216fc88@mail.gmail.com>
+	<20091001083831.GD27039@pengutronix.de>
+	<4e090d470910010211k4ce78763i1a5163ec6ea57fe8@mail.gmail.com>
+	<20091001095239.GE27039@pengutronix.de>
+	<4e090d470910010754r1ebc4455u6220ccfd803491b0@mail.gmail.com>
+	<20091001163753.GA20103@pengutronix.de>
+	<4e090d470910011757g261c693ehdca40ce43ebee2ec@mail.gmail.com>
+	<20091002072643.GH27039@pengutronix.de>
+	<4e090d470910020117w620fda4cta7b26b912d01bc24@mail.gmail.com>
+Message-ID: <20091002141106.GG3179@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Oct 02, 2009 at 04:17:09PM +0800, Richard Zhao wrote:
+> On Fri, Oct 2, 2009 at 3:26 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > On Fri, Oct 02, 2009 at 08:57:04AM +0800, Richard Zhao wrote:
+> >> On Fri, Oct 2, 2009 at 12:37 AM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+> >> >> > Ah, so 'make the driver work on i.MX51' is a good statement which should
+> >> >> > be part of the commit message.
+> >> >> Well, maybe I can mention it.
+> >> >> But I think the good point is to present what you modified, not the side effect.
+> >> >
+> >> > It is not the side effect but the intention :) As no code is changed without a
+> >> > need, the reason really should be in the patch description.
+> >> No, it's not intention. I'm just trying to make the controller work in
+> >> a right way. Without this patch, maybe some other fast cpus have
+> >> problem too. I just tested mx31 and mx51. I will add "Without this
+> >> patch, i2c on some fast SoCs (for example imx51) will not work". Is it
+> >> ok for you?
+> >
+> > Please remember that we do not have i.MX51 support in mainline, so this
+> > is irrelevant atm.
+> So I don't need to meantion mx51? "Without this patch, i2c on some
+> fast SoCs will not work" is all right?
 
-This patch was actually more a tips and tricks than a proper patch.
-Indeed there is currently no Mic entry on the at91sam9g20ek board, but 
-it could be quite easy to add one.
-For instance
+Sounds good to me!
 
+> > At the moment we have a driver which is not multi master capable.
+> > Looking at the datasheet the change you do seems not enough to change
+> > this. So we should take a patch which changes something from which you
+> > think it might be needed? And you don't even have the details at hand?
+> >
+> > No.
+> Ok, It seems I have no reason to keep the busy wait before START.
+> Wolfram, do you agree to remove the busy wait?
 
-More informations could be found here: 
-http://www.linux4sam.org/twiki/bin/view/Linux4SAM/AudioRecordOnAt91sam9g20ek
+If somebody really needs multi-master and is able to test it, then it can be
+reimplemented (but as said, this needs a lot more changes). Have to have a
+closer look though, if it may detect a stalled bus.
 
+> I saw you submmited the original driver.
+
+I helped in getting it accepted, but the commit is mainly from Darius.
 
 Regards,
-Sedji
 
-Sedji Gaouaou a ?crit :
-> This patch enables reception in the ssc driver and therefore adds recording capabilities for the ATMEL AT91SAM9G20EK board.
-> (patch based on: http://www.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git).
-> ---
->  arch/arm/mach-at91/board-sam9g20ek.c |    2 +-
->  sound/soc/atmel/atmel_ssc_dai.c      |    2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
-> index a55398e..f74cefc 100644
-> --- a/arch/arm/mach-at91/board-sam9g20ek.c
-> +++ b/arch/arm/mach-at91/board-sam9g20ek.c
-> @@ -302,7 +302,7 @@ static void __init ek_board_init(void)
->  	/* PCK0 provides MCLK to the WM8731 */
->  	at91_set_B_periph(AT91_PIN_PC1, 0);
->  	/* SSC (for WM8731) */
-> -	at91_add_device_ssc(AT91SAM9260_ID_SSC, ATMEL_SSC_TX);
-> +	at91_add_device_ssc(AT91SAM9260_ID_SSC, ATMEL_SSC_TX | ATMEL_SSC_RX);
->  }
->  
->  MACHINE_START(AT91SAM9G20EK, "Atmel AT91SAM9G20-EK")
-> diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
-> index e588e63..7e78e02 100644
-> --- a/sound/soc/atmel/atmel_ssc_dai.c
-> +++ b/sound/soc/atmel/atmel_ssc_dai.c
-> @@ -427,7 +427,7 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
->  			| SSC_BF(RCMR_STTDLY, START_DELAY)
->  			| SSC_BF(RCMR_START, SSC_START_FALLING_RF)
->  			| SSC_BF(RCMR_CKI, SSC_CKI_RISING)
-> -			| SSC_BF(RCMR_CKO, SSC_CKO_NONE)
-> +			| SSC_BF(RCMR_CKO, SSC_CKO_CONTINUOUS)
->  			| SSC_BF(RCMR_CKS, SSC_CKS_DIV);
->  
->  		rfmr =	  SSC_BF(RFMR_FSEDGE, SSC_FSEDGE_POSITIVE)
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091002/81cecc6c/attachment.sig>
