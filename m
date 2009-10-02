@@ -1,75 +1,54 @@
-From: tabbott@ksplice.com (Tim Abbott)
-Date: Fri,  2 Oct 2009 16:32:46 -0400
-Subject: [PATCH v4 1/2] arm: convert to use __HEAD and HEAD_TEXT macros.
-In-Reply-To: <alpine.DEB.1.10.0910021536510.19358@dr-wily.mit.edu>
-References: <alpine.DEB.1.10.0910021536510.19358@dr-wily.mit.edu>
-Message-ID: <1254515567-27110-1-git-send-email-tabbott@ksplice.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 2 Oct 2009 23:03:41 +0200
+Subject: 2.6.32-rc1: spitz boots but suspend/resume is broken
+In-Reply-To: <20091002073205.GA23986@pengutronix.de>
+References: <20090930120655.GG1412@ucw.cz>
+	<bc64b4640909300509p6c682fa8rb5ce43c77c79f5@mail.gmail.com>
+	<20091002041015.GB1409@ucw.cz>
+	<20091002073205.GA23986@pengutronix.de>
+Message-ID: <20091002210341.GD29734@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This has the consequence of changing the section name used for head
-code from ".text.head" to ".head.text".  Since this commit changes all
-users in the architecture, this change should be harmless.
+On Fri 2009-10-02 09:32:05, Sascha Hauer wrote:
+> Hi,
+> 
+> On Fri, Oct 02, 2009 at 06:10:15AM +0200, Pavel Machek wrote:
+> > On Wed 2009-09-30 16:09:25, Dmitry Eremin-Solenikov wrote:
+> > > On Wed, Sep 30, 2009 at 4:06 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> > > > Hi!
+> > > >
+> > > > matrix keyboard driver needs to be enabled, otherwise it seems ok.
+> > > >
+> > > > Unfortunately, it does not respond to power button in any visible way
+> > > > :-(. Any ideas what might be wrong/how to debug it?
+> > > 
+> > > Enable gpio-keyboard driver, verify (or port power button to it :))
+> > > and check that
+> > > enable_wakeup is enabled.
+> > 
+> > It seems neccessary tables for gpio-keyboard just are not there :-(.
+> > 
+> > In the meantime, this allows easy switch to known-good driver. (Can we
+> > get it upstream until problem is fixed properly?)
+> > 
+> > Unfortunately, that still does not fix suspend/resume. (Does it work
+> > for you?)
+> 
+> Are you using the serial console on spitz? If yes, this might be
+> interesting for you:
 
-The .text.head output section is eliminated and the head text code is
-included at the start of the .init output section.
+I don't have serial cable :(.
 
-Signed-off-by: Tim Abbott <tabbott@ksplice.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Linus Torvalds <torvalds@linux-foundation.org>
-Acked-by: Sam Ravnborg <sam@ravnborg.org>
----
- arch/arm/kernel/head-nommu.S  |    2 +-
- arch/arm/kernel/head.S        |    2 +-
- arch/arm/kernel/vmlinux.lds.S |    8 +++-----
- 3 files changed, 5 insertions(+), 7 deletions(-)
+> http://bugzilla.kernel.org/show_bug.cgi?id=14297
+> 
+> I ended up with a console with 9600 baud after resume. My system resumed
+> correctly, but I did not see anything.
 
-diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-index e5dfc28..573b803 100644
---- a/arch/arm/kernel/head-nommu.S
-+++ b/arch/arm/kernel/head-nommu.S
-@@ -32,7 +32,7 @@
-  * numbers for r1.
-  *
-  */
--	.section ".text.head", "ax"
-+	__HEAD
- ENTRY(stext)
- 	setmode	PSR_F_BIT | PSR_I_BIT | SVC_MODE, r9 @ ensure svc mode
- 						@ and irqs disabled
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 38ccbe1..eb62bf9 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -74,7 +74,7 @@
-  * crap here - that's what the boot loader (or in extreme, well justified
-  * circumstances, zImage) is for.
-  */
--	.section ".text.head", "ax"
-+	__HEAD
- ENTRY(stext)
- 	setmode	PSR_F_BIT | PSR_I_BIT | SVC_MODE, r9 @ ensure svc mode
- 						@ and irqs disabled
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index aecf87d..0902f80 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -24,13 +24,11 @@ SECTIONS
- #else
- 	. = PAGE_OFFSET + TEXT_OFFSET;
- #endif
--	.text.head : {
--		_stext = .;
--		_sinittext = .;
--		*(.text.head)
--	}
- 
- 	.init : {			/* Init code and data		*/
-+		_stext = .;
-+		_sinittext = .;
-+			HEAD_TEXT
- 			INIT_TEXT
- 		_einittext = .;
- 		__proc_info_begin = .;
+...but someone with serial cable capturing 2.6.32-rc2 resume would
+certainly be welcome :).
+								Pavel
+
 -- 
-1.6.4.3
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
