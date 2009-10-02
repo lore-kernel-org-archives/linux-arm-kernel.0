@@ -1,36 +1,30 @@
-From: ospite@studenti.unina.it (Antonio Ospite)
-Date: Fri,  2 Oct 2009 16:24:02 +0200
-Subject: [PATCH] pxamci: fix printing gpio numbers in pxamci_probe
-Message-ID: <1254493442-32312-1-git-send-email-ospite@studenti.unina.it>
+From: valentin.longchamp@epfl.ch (Valentin Longchamp)
+Date: Fri,  2 Oct 2009 16:30:41 +0200
+Subject: [PATCH 1/1] mx3: fix small typo preventing mx3-based configurations
+	to compile
+Message-ID: <1254493841-14974-1-git-send-email-valentin.longchamp@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
----
- drivers/mmc/host/pxamci.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+This should be included an rc fix please.
 
-diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
-index 5e0b152..b00d673 100644
---- a/drivers/mmc/host/pxamci.c
-+++ b/drivers/mmc/host/pxamci.c
-@@ -693,7 +693,7 @@ static int pxamci_probe(struct platform_device *pdev)
- 	if (gpio_is_valid(gpio_ro)) {
- 		ret = gpio_request(gpio_ro, "mmc card read only");
- 		if (ret) {
--			dev_err(&pdev->dev, "Failed requesting gpio_ro %d\n", gpio_power);
-+			dev_err(&pdev->dev, "Failed requesting gpio_ro %d\n", gpio_ro);
- 			goto err_gpio_ro;
- 		}
- 		gpio_direction_input(gpio_ro);
-@@ -701,7 +701,7 @@ static int pxamci_probe(struct platform_device *pdev)
- 	if (gpio_is_valid(gpio_cd)) {
- 		ret = gpio_request(gpio_cd, "mmc card detect");
- 		if (ret) {
--			dev_err(&pdev->dev, "Failed requesting gpio_cd %d\n", gpio_power);
-+			dev_err(&pdev->dev, "Failed requesting gpio_cd %d\n", gpio_cd);
- 			goto err_gpio_cd;
- 		}
- 		gpio_direction_input(gpio_cd);
+Signed-off-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
+---
+ arch/arm/mach-mx3/pcm037_eet.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-mx3/pcm037_eet.c b/arch/arm/mach-mx3/pcm037_eet.c
+index 8d38600..dc6baf3 100644
+--- a/arch/arm/mach-mx3/pcm037_eet.c
++++ b/arch/arm/mach-mx3/pcm037_eet.c
+@@ -184,7 +184,7 @@ static int eet_init_devices(void)
+ 	/* SPI */
+ 	spi_register_board_info(pcm037_spi_dev, ARRAY_SIZE(pcm037_spi_dev));
+ #if defined(CONFIG_SPI_IMX) || defined(CONFIG_SPI_IMX_MODULE)
+-	mxc_register_device(&mxc_spi_device0, &pcm037_spi1_master);
++	mxc_register_device(&imx_spi_device0, &pcm037_spi1_master);
+ #endif
+ 
+ 	platform_device_register(&pcm037_gpio_keys_device);
 -- 
-1.6.4.3
+1.6.0.4
