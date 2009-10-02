@@ -1,34 +1,39 @@
-From: cgagneraud@techworks.ie (Christian Gagneraud)
-Date: Fri, 02 Oct 2009 21:21:34 +0100
-Subject: git an patches: Some questions
-Message-ID: <4AC660CE.600@techworks.ie>
+From: tabbott@ksplice.com (Tim Abbott)
+Date: Fri, 2 Oct 2009 16:32:41 -0400 (EDT)
+Subject: [PATCH 2/2] arm: Clean up linker script using new linker	script
+	macros.
+In-Reply-To: <20091001125657.GA26910@n2100.arm.linux.org.uk>
+References: <1254345935-15958-1-git-send-email-tabbott@ksplice.com>
+	<1254345935-15958-3-git-send-email-tabbott@ksplice.com>
+	<20090930213924.GB15732@merkur.ravnborg.org>
+	<20091001125657.GA26910@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.1.10.0910021536510.19358@dr-wily.mit.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Thu, 1 Oct 2009, Russell King - ARM Linux wrote:
 
-I would like to have some advice on how to manage my git tree, patches 
-that I pick on this list (EP93XX related) and patches that I would 
-like to submit (TS-72XX related).
+> On Wed, Sep 30, 2009 at 11:39:25PM +0200, Sam Ravnborg wrote:
+> > 
+> > Where is _end in the new layout?
+> > I think we lost it.
+> 
+> You're right - this will cause a build failure since _end is used in
+> several core ARM files.  Tim?
 
-First of all I would like to know what tools people are using, I've 
-read about stg [1][2] and it looks to me that it fits well my needs.
+It's supposed to be after BSS_SECTION.  I'll send you a new pair of 
+patches with this fixed and Sam's acks added shortly.
 
-Next, I'm would like to know the best strategy to track the latest 
-patches from linux-arm and at the same time work on my own patches.
-Should I create a branch, say ep93xx, that track linux tree and on 
-which i apply the EP93xx patches, and set up another branch, say 
-ts72xx, that track the ep93xx branch? Or should i use only one branch 
-and use "stg import" for patches I'm not the author and "stg new" for 
-my own work.
+> PS, please ensure that all patches are at the very least build tested,
+> or say when they aren't.
 
-Using stg import/new looks interesting, but then if I want to submit 
-my patches by email, stg will send all the patch part of the series 
-including the one that I've imported but that's not what I'm looking for.
+These were build-tested originally; it seems I introduced this bug when 
+rebasing the patch past the recent DISCARD changes, and failed to retest.  
+Sorry about that (I think you are right that it was more generally a 
+mistake to not clearly tag these patches as build-but-not-run tested in 
+the first place.  I'll do that in the future).
 
-Any help, advice or point-out appreciated.
-Thanks,
-Chris
+My cross-compile environment is unavailable at present, so the new version 
+will be completely untested as well.
 
-[1] http://wiki.openmoko.org/wiki/Hints_on_using_GIT_and_stgit
-[2] http://www.procode.org/stgit/doc/tutorial.html
+	-Tim Abbott
