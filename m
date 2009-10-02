@@ -1,67 +1,63 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 2 Oct 2009 06:10:15 +0200
-Subject: 2.6.32-rc1: spitz boots but suspend/resume is broken
-In-Reply-To: <bc64b4640909300509p6c682fa8rb5ce43c77c79f5@mail.gmail.com>
-References: <20090930120655.GG1412@ucw.cz>
-	<bc64b4640909300509p6c682fa8rb5ce43c77c79f5@mail.gmail.com>
-Message-ID: <20091002041015.GB1409@ucw.cz>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 2 Oct 2009 09:26:43 +0200
+Subject: [PATCH 1/4] i2c: imx: check busy bit when START/STOP
+In-Reply-To: <4e090d470910011757g261c693ehdca40ce43ebee2ec@mail.gmail.com>
+References: <1254359613-21210-1-git-send-email-linuxzsc@gmail.com>
+	<4e090d470910010103o611d9fb2t3acf93632216fc88@mail.gmail.com>
+	<20091001083831.GD27039@pengutronix.de>
+	<4e090d470910010211k4ce78763i1a5163ec6ea57fe8@mail.gmail.com>
+	<20091001095239.GE27039@pengutronix.de>
+	<4e090d470910010754r1ebc4455u6220ccfd803491b0@mail.gmail.com>
+	<20091001163753.GA20103@pengutronix.de>
+	<4e090d470910011757g261c693ehdca40ce43ebee2ec@mail.gmail.com>
+Message-ID: <20091002072643.GH27039@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2009-09-30 16:09:25, Dmitry Eremin-Solenikov wrote:
-> On Wed, Sep 30, 2009 at 4:06 PM, Pavel Machek <pavel@ucw.cz> wrote:
-> > Hi!
+On Fri, Oct 02, 2009 at 08:57:04AM +0800, Richard Zhao wrote:
+> On Fri, Oct 2, 2009 at 12:37 AM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+> >> > Ah, so 'make the driver work on i.MX51' is a good statement which should
+> >> > be part of the commit message.
+> >> Well, maybe I can mention it.
+> >> But I think the good point is to present what you modified, not the side effect.
 > >
-> > matrix keyboard driver needs to be enabled, otherwise it seems ok.
+> > It is not the side effect but the intention :) As no code is changed without a
+> > need, the reason really should be in the patch description.
+> No, it's not intention. I'm just trying to make the controller work in
+> a right way. Without this patch, maybe some other fast cpus have
+> problem too. I just tested mx31 and mx51. I will add "Without this
+> patch, i2c on some fast SoCs (for example imx51) will not work". Is it
+> ok for you?
+
+Please remember that we do not have i.MX51 support in mainline, so this
+is irrelevant atm.
+
 > >
-> > Unfortunately, it does not respond to power button in any visible way
-> > :-(. Any ideas what might be wrong/how to debug it?
-> 
-> Enable gpio-keyboard driver, verify (or port power button to it :))
-> and check that
-> enable_wakeup is enabled.
+> >> Yes. But I don't have multi-master system. So I can't say that.
+> >> The code is just taken from Freescale latest code. Without it, It
+> >> could also cause a device error. I forget the details. ?Anyway, it
+> >> doesn't make anything wrong.
+> >
+> > Do you know where the details are explained?
+> No, I don't. I don't have device in hand now. If you have, could you
+> please help do a simple test?
+> Use hw to simulate multi-master system. Before execute xfer, you first
+> pull down SDA, then pull down SDC. It simulates a START. and execute
+> xfer to see whether IBB is set?
 
-It seems neccessary tables for gpio-keyboard just are not there :-(.
+No, we won't do any tests on hardware.
 
-In the meantime, this allows easy switch to known-good driver. (Can we
-get it upstream until problem is fixed properly?)
+At the moment we have a driver which is not multi master capable.
+Looking at the datasheet the change you do seems not enough to change
+this. So we should take a patch which changes something from which you
+think it might be needed? And you don't even have the details at hand?
 
-Unfortunately, that still does not fix suspend/resume. (Does it work
-for you?)
+No.
 
-> BTW: on tosa initially i had a problem w/ wakeup. The power button wasn't
-> able to wake the device up. However there was another gpio that was OR of
->  power button and AC-in gpios that had to be used for wakeup. Please check
-> if the same design applies to your device.
-
-Well, it all worked in 2.6.31. How do I check it?
-
-								Pavel
----
-
-Switch back to known-good keyboard driver. The new one does not
-support power key, making suspend unusable.
-
-This actually fixes regression from 2.6.31 (power key now works) but
-not suspend/resume regression (will have to hunt more).
-
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
-
-diff -ur linux-rc/arch/arm.ofic/mach-pxa/spitz.c linux-rc/arch/arm/mach-pxa/spitz.c
---- linux-rc/arch/arm.ofic/mach-pxa/spitz.c	2009-09-28 12:09:26.000000000 +0200
-+++ linux-rc/arch/arm/mach-pxa/spitz.c	2009-09-30 22:27:43.000000000 +0200
-@@ -367,7 +367,8 @@
- };
- 
- static struct platform_device spitzkbd_device = {
--	.name		= "matrix-keypad",
-+  //	.name		= "matrix-keypad",
-+	.name		= "spitz-keyboard",
- 	.id		= -1,
- 	.dev		= {
- 		.platform_data = &spitzkbd_pdata,
-
+Sascha
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
