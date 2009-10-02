@@ -1,50 +1,41 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 02 Oct 2009 15:41:33 -0700
-Subject: [PATCH 4/8] omap: iovmm: Fix incorrect spelling
+Date: Fri, 02 Oct 2009 15:42:50 -0700
+Subject: [PATCH 5/8] omap: iovmm: Add missing mutex_unlock
 In-Reply-To: <20091002223510.11962.21751.stgit@localhost>
 References: <20091002223510.11962.21751.stgit@localhost>
-Message-ID: <20091002224133.11962.84509.stgit@localhost>
+Message-ID: <20091002224250.11962.58393.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+From: Daniel Walker <dwalker@fifo99.com>
 
-Fix incorrect spelling
+I was using Coccinelle with the mutex_unlock semantic patch, and it
+unconvered this problem. It appears to be a valid missing unlock issue.
+This change should correct it by moving the unlock below the label.
 
-Signed-off-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+This patch is against the mainline kernel.
+
+Cc: Julia Lawall <julia@diku.dk>
+Cc: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+Signed-off-by: Daniel Walker <dwalker@fifo99.com>
+Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/plat-omap/iovmm.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/plat-omap/iovmm.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/plat-omap/iovmm.c b/arch/arm/plat-omap/iovmm.c
-index 57f7122..0e5573d 100644
+index 0e5573d..dc3fac3 100644
 --- a/arch/arm/plat-omap/iovmm.c
 +++ b/arch/arm/plat-omap/iovmm.c
-@@ -47,7 +47,7 @@
-  *	'va':	mpu virtual address
-  *
-  *	'c':	contiguous memory area
-- *	'd':	dicontiguous memory area
-+ *	'd':	discontiguous memory area
-  *	'a':	anonymous memory allocation
-  *	'()':	optional feature
-  *
-@@ -398,7 +398,7 @@ static inline void sgtable_drain_vmalloc(struct sg_table *sgt)
- {
- 	/*
- 	 * Actually this is not necessary at all, just exists for
--	 * consistency of the code readibility.
-+	 * consistency of the code readability.
- 	 */
- 	BUG_ON(!sgt);
+@@ -363,8 +363,9 @@ void *da_to_va(struct iommu *obj, u32 da)
+ 		goto out;
+ 	}
+ 	va = area->va;
+-	mutex_unlock(&obj->mmap_lock);
+ out:
++	mutex_unlock(&obj->mmap_lock);
++
+ 	return va;
  }
-@@ -434,7 +434,7 @@ static inline void sgtable_drain_kmalloc(struct sg_table *sgt)
- {
- 	/*
- 	 * Actually this is not necessary at all, just exists for
--	 * consistency of the code readibility
-+	 * consistency of the code readability
- 	 */
- 	BUG_ON(!sgt);
- }
+ EXPORT_SYMBOL_GPL(da_to_va);
