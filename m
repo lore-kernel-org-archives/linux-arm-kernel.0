@@ -1,30 +1,34 @@
-From: valentin.longchamp@epfl.ch (Valentin Longchamp)
-Date: Fri,  2 Oct 2009 16:30:41 +0200
-Subject: [PATCH 1/1] mx3: fix small typo preventing mx3-based configurations
-	to compile
-Message-ID: <1254493841-14974-1-git-send-email-valentin.longchamp@epfl.ch>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 2 Oct 2009 16:53:15 +0200
+Subject: your mail
+In-Reply-To: <1250258343-14203-1-git-send-email-thierry.reding@avionic-design.de>
+References: <1250258343-14203-1-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <20091002145315.GB25736@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This should be included an rc fix please.
+* Thierry Reding wrote:
+> So it's been quite a while since I last posted this series and there have been
+> a number of changes.
+> 
+> Support for T-Pid analog variants is dropped and will be handled in user-space
+> instead. There hardware does not differ from the standard T-Pid. This gets rid 
+> of some ugly platform-specific #ifdefs.
+> 
+> Front-panel controls are now handled in a separate driver, adx-keypad. That
+> way backlight control can be moved to userspace.
+> 
+> This series also adds a watchdog driver that can be used on all Avionic Design
+> Xanthos-based boards.
 
-Signed-off-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
----
- arch/arm/mach-mx3/pcm037_eet.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Russell,
 
-diff --git a/arch/arm/mach-mx3/pcm037_eet.c b/arch/arm/mach-mx3/pcm037_eet.c
-index 8d38600..dc6baf3 100644
---- a/arch/arm/mach-mx3/pcm037_eet.c
-+++ b/arch/arm/mach-mx3/pcm037_eet.c
-@@ -184,7 +184,7 @@ static int eet_init_devices(void)
- 	/* SPI */
- 	spi_register_board_info(pcm037_spi_dev, ARRAY_SIZE(pcm037_spi_dev));
- #if defined(CONFIG_SPI_IMX) || defined(CONFIG_SPI_IMX_MODULE)
--	mxc_register_device(&mxc_spi_device0, &pcm037_spi1_master);
-+	mxc_register_device(&imx_spi_device0, &pcm037_spi1_master);
- #endif
- 
- 	platform_device_register(&pcm037_gpio_keys_device);
--- 
-1.6.0.4
+with the watchdog and backlight drivers out of the way, would you like me to
+get any of the other drivers (fb, keypad) in via seperate trees or can they go
+in through the ARM tree?
+
+Do the remaining patches need additional work or can I go ahead and submit
+them to the patch system? Or do you prefer some other way to get them into
+your tree?
+
+Thierry
