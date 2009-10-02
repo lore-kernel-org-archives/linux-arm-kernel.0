@@ -1,33 +1,103 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 2 Oct 2009 23:37:06 +0100
-Subject: [git pull] iop3xx fixes for 2.6.31-rc7
-In-Reply-To: <EFCC3EA6-5150-4A12-BBF2-9C8147B83820@iki.fi>
-References: <1250633811.25922.10.camel@dwillia2-linux.ch.intel.com>
-	<EFCC3EA6-5150-4A12-BBF2-9C8147B83820@iki.fi>
-Message-ID: <20091002223706.GA31132@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 02 Oct 2009 15:37:41 -0700
+Subject: [PATCH 1/8] omap: Fix incorrect 730 vs 850 detection
+In-Reply-To: <20091002223510.11962.21751.stgit@localhost>
+References: <20091002223510.11962.21751.stgit@localhost>
+Message-ID: <20091002223740.11962.89469.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 02, 2009 at 10:45:51AM +0300, Aaro Koskinen wrote:
-> Hi,
->
-> On 19.8.2009, at 1.16, Dan Williams wrote:
->> Hi Russell, please pull from:
->>
->> 	git://git.kernel.org/pub/scm/linux/kernel/git/djbw/xscaleiop.git  
->> fixes
->>
->> ...to receive:
->>
->> Aaro Koskinen (1):
->>       iop3xx: ATU and PCI memory configuration corrected
->>
->> Dan Williams (1):
->>       iop33x: update defconfig (default atu to on)
->>
->> Julia Lawall (1):
->>       arch/arm/plat-iop: Use DIV_ROUND_CLOSEST
->
-> Any chance to get these into .32-rc series?
+Commit cd92204924fafbd5c7241dfd12ca3176d542e0c5 added
+support for omap850. However, the patch accidentally
+removed the wrong ifdef:
 
-Now pulled and pushed back out for Linus to pick up.
+ #  define cpu_is_omap730()		1
+ # endif
+ #endif
++#else
++# if defined(CONFIG_ARCH_OMAP850)
++#  undef  cpu_is_omap850
++#  define cpu_is_omap850()		1
++# endif
++#endif
+
+...
+
+ void omap2_check_revision(void);
+
+ #endif    /* defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3) */
+-
+-#endif
+
+Instead of removing removing the #endif at the end of the file,
+the #endif before #else should have been removed.
+
+But we cannot have multiple #else statements as pointed out by
+Alistair Buxton <a.j.buxton@gmail.com>. So the fix is to:
+
+- remove the non-multi-omap special handling, as we need to
+  detect between omap730 and omap850 anyways.
+
+- add the missing #endif back to the end of the file
+
+Reported-by: Sanjeev Premi <premi@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/plat-omap/include/mach/cpu.h |   37 ++++++++++++---------------------
+ 1 files changed, 14 insertions(+), 23 deletions(-)
+
+diff --git a/arch/arm/plat-omap/include/mach/cpu.h b/arch/arm/plat-omap/include/mach/cpu.h
+index 11e73d9..f129efb 100644
+--- a/arch/arm/plat-omap/include/mach/cpu.h
++++ b/arch/arm/plat-omap/include/mach/cpu.h
+@@ -303,32 +303,21 @@ IS_OMAP_TYPE(3430, 0x3430)
+ #define cpu_is_omap2430()		0
+ #define cpu_is_omap3430()		0
+ 
+-#if defined(MULTI_OMAP1)
+-# if defined(CONFIG_ARCH_OMAP730)
+-#  undef  cpu_is_omap730
+-#  define cpu_is_omap730()		is_omap730()
+-# endif
+-# if defined(CONFIG_ARCH_OMAP850)
+-#  undef  cpu_is_omap850
+-#  define cpu_is_omap850()		is_omap850()
+-# endif
+-#else
+-# if defined(CONFIG_ARCH_OMAP730)
+-#  undef  cpu_is_omap730
+-#  define cpu_is_omap730()		1
+-# endif
+-#endif
+-#else
+-# if defined(CONFIG_ARCH_OMAP850)
+-#  undef  cpu_is_omap850
+-#  define cpu_is_omap850()		1
+-# endif
+-#endif
+-
+ /*
+  * Whether we have MULTI_OMAP1 or not, we still need to distinguish
+- * between 330 vs. 1510 and 1611B/5912 vs. 1710.
++ * between 730 vs 850, 330 vs. 1510 and 1611B/5912 vs. 1710.
+  */
++
++#if defined(CONFIG_ARCH_OMAP730)
++# undef  cpu_is_omap730
++# define cpu_is_omap730()		is_omap730()
++#endif
++
++#if defined(CONFIG_ARCH_OMAP850)
++# undef  cpu_is_omap850
++# define cpu_is_omap850()		is_omap850()
++#endif
++
+ #if defined(CONFIG_ARCH_OMAP15XX)
+ # undef  cpu_is_omap310
+ # undef  cpu_is_omap1510
+@@ -433,3 +422,5 @@ IS_OMAP_TYPE(3430, 0x3430)
+ 
+ int omap_chip_is(struct omap_chip_id oci);
+ void omap2_check_revision(void);
++
++#endif
