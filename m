@@ -1,43 +1,58 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 2 Oct 2009 10:46:03 +0200
-Subject: [PATCH v2] Add cpuidle support for at91
-In-Reply-To: <4AC35582.8000404@atmel.com>
-References: <1247680190-19674-1-git-send-email-albin.tonnerre@free-electrons.com>
-	<200908111200.58866.marc.pignat@hevs.ch>
-	<20090812165700.GC4051@pc-ras4041.res.insa>
-	<200908130858.47487.marc.pignat@hevs.ch>
-	<20090813193241.GA5985@pc-ras4041.res.insa>
-	<20090909151417.GA4014@pc-ras4041.res.insa>
-	<4AC2168B.60903@atmel.com> <20090930123449.GB3238@laptop>
-	<4AC35582.8000404@atmel.com>
-Message-ID: <20091002084603.GA3179@pengutronix.de>
+From: sedji.gaouaou@atmel.com (Sedji Gaouaou)
+Date: Fri, 02 Oct 2009 16:08:34 +0200
+Subject: [PATCH] at91: enable ssc reception on at91sam9g20ek
+In-Reply-To: <1254387002-22105-1-git-send-email-sedji.gaouaou@atmel.com>
+References: <1254387002-22105-1-git-send-email-sedji.gaouaou@atmel.com>
+Message-ID: <4AC60962.3090608@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-> In other words, only state "wait-for-interrupt *and* RAM self refresh"
-> brings some more power saving. Indeed, cpu_do_idle() that correspond to
-> the "WFI" state was already the way of dealing with idle cpu, even
-> without your patch. Am I correct ?
+This patch was actually more a tips and tricks than a proper patch.
+Indeed there is currently no Mic entry on the at91sam9g20ek board, but 
+it could be quite easy to add one.
+For instance
 
-Yes, but it has a higher exit latency. Those data is provided to the cpuidle
-framework, so it can decide which state to use.
 
-I wonder if other people can confirm a similar amount of power savings? I am
-trying to implement the RAM self refresh for i.MX and don't see much
-improvment. I guess I still do something wrong...
+More informations could be found here: 
+http://www.linux4sam.org/twiki/bin/view/Linux4SAM/AudioRecordOnAt91sam9g20ek
+
 
 Regards,
+Sedji
 
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091002/4f2c5efa/attachment.sig>
+Sedji Gaouaou a ?crit :
+> This patch enables reception in the ssc driver and therefore adds recording capabilities for the ATMEL AT91SAM9G20EK board.
+> (patch based on: http://www.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git).
+> ---
+>  arch/arm/mach-at91/board-sam9g20ek.c |    2 +-
+>  sound/soc/atmel/atmel_ssc_dai.c      |    2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
+> index a55398e..f74cefc 100644
+> --- a/arch/arm/mach-at91/board-sam9g20ek.c
+> +++ b/arch/arm/mach-at91/board-sam9g20ek.c
+> @@ -302,7 +302,7 @@ static void __init ek_board_init(void)
+>  	/* PCK0 provides MCLK to the WM8731 */
+>  	at91_set_B_periph(AT91_PIN_PC1, 0);
+>  	/* SSC (for WM8731) */
+> -	at91_add_device_ssc(AT91SAM9260_ID_SSC, ATMEL_SSC_TX);
+> +	at91_add_device_ssc(AT91SAM9260_ID_SSC, ATMEL_SSC_TX | ATMEL_SSC_RX);
+>  }
+>  
+>  MACHINE_START(AT91SAM9G20EK, "Atmel AT91SAM9G20-EK")
+> diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
+> index e588e63..7e78e02 100644
+> --- a/sound/soc/atmel/atmel_ssc_dai.c
+> +++ b/sound/soc/atmel/atmel_ssc_dai.c
+> @@ -427,7 +427,7 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+>  			| SSC_BF(RCMR_STTDLY, START_DELAY)
+>  			| SSC_BF(RCMR_START, SSC_START_FALLING_RF)
+>  			| SSC_BF(RCMR_CKI, SSC_CKI_RISING)
+> -			| SSC_BF(RCMR_CKO, SSC_CKO_NONE)
+> +			| SSC_BF(RCMR_CKO, SSC_CKO_CONTINUOUS)
+>  			| SSC_BF(RCMR_CKS, SSC_CKS_DIV);
+>  
+>  		rfmr =	  SSC_BF(RFMR_FSEDGE, SSC_FSEDGE_POSITIVE)
