@@ -1,34 +1,176 @@
 From: krzysztof.h1@poczta.fm (Krzysztof Helt)
-Date: Sat, 3 Oct 2009 07:42:49 +0200
-Subject: [PATCH 7/7] [ARM] s3c-fb: Added color key blending.
-In-Reply-To: <E4D3F24EA6C9E54F817833EAE0D912AC0771185D5E@bssrvexch01.BS.local>
-References: <E4D3F24EA6C9E54F817833EAE0D912AC0771185D5E@bssrvexch01.BS.local>
-Message-ID: <20091003074249.2a8ae03d.krzysztof.h1@poczta.fm>
+Date: Sat, 3 Oct 2009 07:18:20 +0200
+Subject: [Linux-fbdev-devel] [PATCH 1/7] [ARM] s3c-fb: Added colorkey
+	support
+In-Reply-To: <E4D3F24EA6C9E54F817833EAE0D912AC0771185D58@bssrvexch01.BS.local>
+References: <E4D3F24EA6C9E54F817833EAE0D912AC0771185D58@bssrvexch01.BS.local>
+Message-ID: <20091003071820.6d209b92.krzysztof.h1@poczta.fm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Sep 2009 20:05:04 +0200
+On Fri, 11 Sep 2009 20:04:48 +0200
 Pawel Osciak <p.osciak@samsung.com> wrote:
 
-> This feature allows blending based on color key value.
-> Pixels with key value get blended with alpha1, while the rest
-> gets blended with alpha0.
-> 
 > Reviewed-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > Reviewed-by: Kyungmin Park <kyungmin.park@samsung.com>
 > Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
 > 
-> ---
->  arch/arm/plat-s3c/include/plat/s3c-fb.h |    2 ++
->  drivers/video/s3c-fb.c                  |   27 ++++++++++++++++++++++++++-
->  2 files changed, 28 insertions(+), 1 deletions(-)
 > 
+> ---
+>  arch/arm/plat-s3c/include/plat/regs-fb.h |    3 +
+>  arch/arm/plat-s3c/include/plat/s3c-fb.h  |   45 ++++++++
+>  drivers/video/s3c-fb.c                   |  164 ++++++++++++++++++++++++++++++
+>  3 files changed, 212 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/plat-s3c/include/plat/s3c-fb.h
+> 
+> diff --git a/arch/arm/plat-s3c/include/plat/regs-fb.h b/arch/arm/plat-s3c/include/plat/regs-fb.h
+> index 8048cae..8d3071d 100644
+> --- a/arch/arm/plat-s3c/include/plat/regs-fb.h
+> +++ b/arch/arm/plat-s3c/include/plat/regs-fb.h
+> @@ -323,6 +323,7 @@
+>  
+>  /* Window colour-key control registers */
+>  
+> +#define WxKEYCON0(_x)				(0x140 + ((_x-1) * 8))
+>  #define WxKEYCON0_KEYBL_EN			(1 << 26)
+>  #define WxKEYCON0_KEYEN_F			(1 << 25)
+>  #define WxKEYCON0_DIRCON			(1 << 24)
+> @@ -330,6 +331,8 @@
+>  #define WxKEYCON0_COMPKEY_SHIFT			(0)
+>  #define WxKEYCON0_COMPKEY_LIMIT			(0xffffff)
+>  #define WxKEYCON0_COMPKEY(_x)			((_x) << 0)
+> +
+> +#define WxKEYCON1(_x)				(0x144 + ((_x-1) * 8))
+>  #define WxKEYCON1_COLVAL_MASK			(0xffffff << 0)
+>  #define WxKEYCON1_COLVAL_SHIFT			(0)
+>  #define WxKEYCON1_COLVAL_LIMIT			(0xffffff)
+> diff --git a/arch/arm/plat-s3c/include/plat/s3c-fb.h b/arch/arm/plat-s3c/include/plat/s3c-fb.h
+> new file mode 100644
+> index 0000000..0aebc40
+> --- /dev/null
+> +++ b/arch/arm/plat-s3c/include/plat/s3c-fb.h
+> @@ -0,0 +1,45 @@
+> +/*
+> + * include/linux/s3c/s3c-fb.h
+> + *
+> + * Copyright 2009 Samsung Electronics Co., Ltd.
+> + * Author:  Pawel Osciak <p.osciak@samsung.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __LINUX_S3C_FB_H__
+> +#define __LINUX_S3C_FB_H__
+> +
+> +#include <linux/types.h>
+> +
+> +struct s3c_fb_color {
+> +	__u32 a : 8;
+> +	__u32 r : 8;
+> +	__u32 g : 8;
+> +	__u32 b : 8;
+> +} __attribute__((__packed__));
+> +
+> +typedef enum s3c_fb_color_key_mode {
+> +	S3CFB_COLORKEY_MODE_BG = 0,
+> +	S3CFB_COLORKEY_MODE_FG = 1
+> +} s3c_fb_color_key_mode_t;
+> +
+> +#ifndef FBIO_WAITFORVSYNC
+> +#define FBIO_WAITFORVSYNC _IOW('F', 0x20, __u32)
+> +#endif
+> +
+> +#define S3CFB_IOCTL_MAGIC 'k'
+> +
+> +#define S3CFB_IOCTL_SET_COLOR_KEY	_IOW(S3CFB_IOCTL_MAGIC, 0,\
+> +					struct s3c_fb_color)
+> +#define S3CFB_IOCTL_SET_COLOR_KEY_MASK	_IOW(S3CFB_IOCTL_MAGIC, 1,\
+> +					struct s3c_fb_color)
+> +/* param: s3c_fb_color_key_mode */
+> +#define S3CFB_IOCTL_SET_COLOR_KEY_MODE	_IO(S3CFB_IOCTL_MAGIC, 2)
+> +/* param: 1 - on, 0 - off */
+> +#define S3CFB_IOCTL_COLOR_KEY_ENABLE	_IO(S3CFB_IOCTL_MAGIC, 3)
+> +
+> +#endif /* __LINUX_S3C_FB_H__ */
+> +
+> diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
+> index 001a1a1..2de3151 100644
+> --- a/drivers/video/s3c-fb.c
+> +++ b/drivers/video/s3c-fb.c
+> @@ -24,6 +24,8 @@
+>  #include <linux/uaccess.h>
+>  #include <linux/interrupt.h>
+>  
+> +#include <plat/s3c-fb.h>
+> +
+>  #include <mach/map.h>
+>  #include <mach/regs-fb.h>
+>  #include <plat/fb.h>
+> @@ -43,6 +45,7 @@
+>   * is being built for.
+>  */
+>  
+> +/*#define CONFIG_FB_S3C_DEBUG_REGWRITE*/
+>  #ifdef CONFIG_FB_S3C_DEBUG_REGWRITE
+>  #undef writel
+>  #define writel(v, r) do { \
+> @@ -821,11 +824,148 @@ static int s3c_fb_pan_display(struct fb_var_screeninfo *var,
+>  	return 0;
+>  }
+>  
+> +static inline int s3c_fb_color_to_rgb565(struct s3c_fb_color *color)
+> +{
+> +	return (((color->r & 0x1f) << 19) | 0x70000)
+> +	     | (((color->g & 0x3f) << 10) | 0x300)
+> +	     | (((color->b & 0x1f) <<  3) | 0x7);
+> +}
 
-Acked-by: Krzysztof Helt <krzysztof.h1@wp.pl>
+Does it work for color key values which are 0? If the color key is black (#000000)
+the key value is 0x70307. I don't know the datasheet of the controller so it is just
+a something to check.
 
+> +
+> +static inline int s3c_fb_color_to_rgb888(struct s3c_fb_color *color)
+> +{
+> +	return (color->r << 16) | (color->g << 8) | color->b;
+> +}
+> +
+> +static inline int has_colorkey(int win_no)
+> +{
+> +	if (win_no == 0)
+> +		return 0;
+> +	else
+> +		return 1;
+> +}
+> +
+> +static int s3c_fb_set_color_key(struct s3c_fb_win *win,
+> +			        struct s3c_fb_color *color_key)
+> +{
+> +	struct s3c_fb *sfb = win->parent;
+> +	void __iomem *regs = sfb->regs;
+> +	int color = 0;
+> +
+> +	if (! has_colorkey(win->index)) {
+> +		dev_err(sfb->dev, "Window %d does not support color keying\n",
+> +			win->index);
+> +		return -EINVAL;
+> +	}
+> +
+> +	dev_info(sfb->dev, "Window %d, BPP: %d\n", win->index,
+> +		 win->fbinfo->var.bits_per_pixel);
+> +
+> +	if (win->fbinfo->var.bits_per_pixel == 16) {
+> +		color = s3c_fb_color_to_rgb565(color_key);
+> +	} else if (win->fbinfo->var.bits_per_pixel >= 24) {
+> +		  /*|| win->fbinfo->var.bits_per_pixel == 28) {*/
 
+Please remove this commented line.
 
+Best regards,
+Krzysztof
 
-----------------------------------------------------------------------
-Zobacz najwiekszy samolot na swiecie!  
-Kliknij >>> http://link.interia.pl/f238f
+---------------------------------------------------------------
+Zapytaj wr??k?!
+Kliknij >>> http://link.interia.pl/f238d 
