@@ -1,12 +1,18 @@
 From: cgagneraud@techworks.ie (Christian Gagneraud)
-Date: Sat, 03 Oct 2009 20:49:01 +0100
+Date: Sat, 03 Oct 2009 20:55:06 +0100
 Subject: Sparsemem  on EP93XX
 In-Reply-To: <20091003194155.GA21857@n2100.arm.linux.org.uk>
 References: <4AC7A3D4.3080408@techworks.ie>
 	<20091003194155.GA21857@n2100.arm.linux.org.uk>
-Message-ID: <4AC7AAAD.4000301@techworks.ie>
+Message-ID: <4AC7AC1A.7000202@techworks.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Sorry if you get this message twice, but time to time, my emails are 
+rejected by caramon.arm.linux.org.uk because of reverse DNS stuff. 
+Second time lucky?
+
+Chris
 
 Russell King - ARM Linux wrote:
 > On Sat, Oct 03, 2009 at 08:19:48PM +0100, Christian Gagneraud wrote:
