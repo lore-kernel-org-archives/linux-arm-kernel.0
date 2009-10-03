@@ -1,45 +1,137 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 02 Oct 2009 22:50:39 -0400 (EDT)
-Subject: kirkwood openrd: random kernel crashes with git kernel
-In-Reply-To: <20091002084000.7c93d634@marrow.netinsight.se>
-References: <200910010904.18923.dk-arm-linux@gmx.de>
-	<20091001081216.GA4941@twin.sascha.silbe.org>
-	<20091001101925.50a592fd@marrow.netinsight.se>
-	<alpine.LFD.2.00.0910011218410.4997@xanadu.home>
-	<20091002084000.7c93d634@marrow.netinsight.se>
-Message-ID: <alpine.LFD.2.00.0910022241340.4997@xanadu.home>
+From: krzysztof.h1@poczta.fm (Krzysztof Helt)
+Date: Sat, 3 Oct 2009 07:23:33 +0200
+Subject: [PATCH 2/7] [ARM] s3c-fb: Added window source selection.
+In-Reply-To: <E4D3F24EA6C9E54F817833EAE0D912AC0771185D59@bssrvexch01.BS.local>
+References: <E4D3F24EA6C9E54F817833EAE0D912AC0771185D59@bssrvexch01.BS.local>
+Message-ID: <20091003072333.661123b5.krzysztof.h1@poczta.fm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2 Oct 2009, Simon Kagstrom wrote:
+On Fri, 11 Sep 2009 20:04:52 +0200
+Pawel Osciak <p.osciak@samsung.com> wrote:
 
-> On Thu, 01 Oct 2009 12:19:21 -0400 (EDT)
-> Nicolas Pitre <nico@fluxnic.net> wrote:
+> It is now possible to switch between local bus and DMA as the source
+> for a window. Local source mode can handle RGB and YCbCr formats.
 > 
-> > > I should add that I've seen this error even without openocd connected,
-> > > so this seems to be a real error. Anyway, I guess this will sooner or
-> > > later be applied (in some form) upstream, so openrd should benefit
-> > > "automatically" from it.
-> > > 
-> > > However, with OpenOCD there are other type of crashes which look very
-> > > random, so I believe those will stay even with this.
-> > 
-> > Please send me information about those when you can.
+> Reviewed-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Reviewed-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
 > 
-> The nohlt argument seems to fix them, thanks! Without it I get random
-> memory corruption errors such as this:
-[...]
+> ---
+>  arch/arm/plat-s3c/include/plat/regs-fb.h |    1 +
+>  arch/arm/plat-s3c/include/plat/s3c-fb.h  |    9 ++++++
+>  drivers/video/s3c-fb.c                   |   40 ++++++++++++++++++++++++++++++
+>  3 files changed, 50 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-s3c/include/plat/regs-fb.h b/arch/arm/plat-s3c/include/plat/regs-fb.h
+> index 8d3071d..4c024ca 100644
+> --- a/arch/arm/plat-s3c/include/plat/regs-fb.h
+> +++ b/arch/arm/plat-s3c/include/plat/regs-fb.h
+> @@ -170,6 +170,7 @@
+>  /* WINCONx */
+>  
+>  
+> +#define WINCONx(_x)				(0x20 + ((_x) * 4))
+>  #define WINCONx_BITSWP				(1 << 18)
+>  #define WINCONx_BYTSWP				(1 << 17)
+>  #define WINCONx_HAWSWP				(1 << 16)
+> diff --git a/arch/arm/plat-s3c/include/plat/s3c-fb.h b/arch/arm/plat-s3c/include/plat/s3c-fb.h
+> index 0aebc40..b08f9ad 100644
+> --- a/arch/arm/plat-s3c/include/plat/s3c-fb.h
+> +++ b/arch/arm/plat-s3c/include/plat/s3c-fb.h
+> @@ -26,6 +26,12 @@ typedef enum s3c_fb_color_key_mode {
+>  	S3CFB_COLORKEY_MODE_FG = 1
+>  } s3c_fb_color_key_mode_t;
+>  
+> +typedef enum s3c_fb_source {
+> +	S3CFB_SOURCE_DMA = 0,
+> +	S3CFB_SOURCE_LOCAL_RGB = 1,
+> +	S3CFB_SOURCE_LOCAL_YCbCr = 2
+> +} s3c_fb_source_t;
+> +
 
-Good.  Just so that you know the reason: the nohlt argument tells the 
-kernel not to use the wait-for-interrupt instruction when idle.  This 
-basically turns the idle loop into a busy loop.
+There is no need to use typedef here (see Documentation/CodingStyle). It is used in one place only, anyway.
 
-The WFI instruction is normally used because it turns the CPU clock off 
-to save power. Unfortunately, the clock to the JTAG unit is also turned 
-off in that case and JTAG communication goes down the drain when that 
-occurs.  Depending on exactly when the WFI mode is entered, if that 
-happens in the middle of a JTAG communication then strange things may 
-happen.  With nohlt the CPU clock is never stopped.
+>  #ifndef FBIO_WAITFORVSYNC
+>  #define FBIO_WAITFORVSYNC _IOW('F', 0x20, __u32)
+>  #endif
+> @@ -41,5 +47,8 @@ typedef enum s3c_fb_color_key_mode {
+>  /* param: 1 - on, 0 - off */
+>  #define S3CFB_IOCTL_COLOR_KEY_ENABLE	_IO(S3CFB_IOCTL_MAGIC, 3)
+>  
+> +
+> +/* Param: s3c_fb_source */
+> +#define S3CFB_IOCTL_SET_SOURCE		_IO(S3CFB_IOCTL_MAGIC, 5)
+>  #endif /* __LINUX_S3C_FB_H__ */
+>  
+> diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
+> index 2de3151..28622c0 100644
+> --- a/drivers/video/s3c-fb.c
+> +++ b/drivers/video/s3c-fb.c
+> @@ -960,6 +960,43 @@ static int s3c_fb_set_color_key_mode(struct s3c_fb_win *win,
+>  	return 0;
+>  }
+>  
+> +static int s3c_fb_set_source(struct s3c_fb_win *win, s3c_fb_source_t source)
+> +{
+> +	struct s3c_fb *sfb = win->parent;
+> +	int wincon_reg, new_val;
+> +
+> +	if (win->index > 2) {
+> +		dev_err(sfb->dev, "Source change not supported for window %d\n",
+> +			win->index);
+> +		return -EINVAL;
+> +	}
+> +
+> +	wincon_reg = readl(sfb->regs + WINCONx(win->index));
+> +	new_val = wincon_reg;
+> +
+> +	switch (source) {
+> +	case S3CFB_SOURCE_DMA:
+> +		new_val &= ~(WINCONx_ENLOCAL | WINCONx_YCbCr);
+> +		break;
+> +	case S3CFB_SOURCE_LOCAL_RGB:
+> +		new_val &= ~WINCONx_YCbCr;
+> +		new_val |= WINCONx_ENLOCAL;
+> +		break;
+> +	case S3CFB_SOURCE_LOCAL_YCbCr:
+> +		new_val |= WINCONx_YCbCr | WINCONx_ENLOCAL;
+> +		break;
+> +	default:
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* The window has to be disabled during source switch */
+> +	writel(wincon_reg & ~WINCONx_ENWIN, sfb->regs + WINCONx(win->index));
+> +	new_val |= WINCONx_ENWIN;
+> +	writel(new_val, sfb->regs + WINCONx(win->index));
+> +
+> +	return 0;
+> +}
+> +
+>  static int s3c_fb_ioctl(struct fb_info *info, unsigned int cmd,
+>  			unsigned long arg)
+>  {
+> @@ -999,6 +1036,9 @@ static int s3c_fb_ioctl(struct fb_info *info, unsigned int cmd,
+>  	case S3CFB_IOCTL_COLOR_KEY_ENABLE:
+>  		return s3c_fb_color_key_enable(win, arg);
+>  
+> +
+> +	case S3CFB_IOCTL_SET_SOURCE:
+> +		return s3c_fb_set_source(win, arg);
+>  	default:
+>  		return -ENOTTY;
+>  	}
+> -- 
+> 1.6.4.2.253.g0b1fac
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 
-Nicolas
+----------------------------------------------------------------------
+Nie boisz sie wampirow!
+A wi?c Graj >>> http://link.interia.pl/f2390
