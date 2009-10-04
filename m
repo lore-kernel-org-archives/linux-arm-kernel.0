@@ -1,127 +1,145 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Sun, 4 Oct 2009 20:30:01 +0800
-Subject: [PATCH 4/4] i2c: imx: disable clock when it's possible to save
-	power.
-In-Reply-To: <20091001080053.GA27039@pengutronix.de>
-References: <1254359613-21210-1-git-send-email-linuxzsc@gmail.com>
-	<1254359613-21210-2-git-send-email-linuxzsc@gmail.com>
-	<1254359613-21210-3-git-send-email-linuxzsc@gmail.com>
-	<1254359613-21210-4-git-send-email-linuxzsc@gmail.com>
-	<20091001073434.GY27039@pengutronix.de>
-	<4e090d470910010056n56bff9f4l1fec703c2dde9edf@mail.gmail.com>
-	<20091001080053.GA27039@pengutronix.de>
-Message-ID: <4e090d470910040530t49998b9fi69eae9455d57fac2@mail.gmail.com>
+From: rmk@arm.linux.org.uk (Russell King)
+Date: Sun, 04 Oct 2009 16:08:59 +0100
+Subject: [RFC PATCH 01/10] PCMCIA: soc_common: convert to a stand alone module
+Message-ID: <6cc18319511869ba8c46bf1d1b20553baa170904.1253722954.git.rmk+kernel@arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 1, 2009 at 4:00 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Thu, Oct 01, 2009 at 03:56:29PM +0800, Richard Zhao wrote:
->> On Thu, Oct 1, 2009 at 3:34 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
->> > On Thu, Oct 01, 2009 at 09:13:33AM +0800, Richard Zhao wrote:
->> >> Enable clock before START, disable it after STOP.
->> >
->> > The clk_diable/enable calls in suspend/resume should be removed also.
->> >
->> > Sascha
->> >
->> >>
->> >> Signed-off-by: Richard Zhao <linuxzsc@gmail.com>
->> >>
->> >> diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
->> >> index 87faea4..72ddea3 100644
->> >> --- a/drivers/i2c/busses/i2c-imx.c
->> >> +++ b/drivers/i2c/busses/i2c-imx.c
->> >> @@ -120,6 +120,7 @@ struct imx_i2c_struct {
->> >> ? ? ? wait_queue_head_t ? ? ? queue;
->> >> ? ? ? unsigned long ? ? ? ? ? i2csr;
->> >> ? ? ? unsigned int ? ? ? ? ? ?disable_delay;
->> >> + ? ? unsigned int ? ? ? ? ? ?ifdr; /* IMX_I2C_IFDR */
->> >> ?};
->> >>
->> >> ?/** Functions for IMX I2C adapter driver ***************************************
->> >> @@ -210,6 +211,8 @@ static int i2c_imx_start(struct imx_i2c_struct *i2c_imx)
->> >>
->> >> ? ? ? dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
->> >>
->> >> + ? ? clk_enable(i2c_imx->clk);
->> >> + ? ? writeb(i2c_imx->ifdr, i2c_imx->base + IMX_I2C_IFDR);
->> >> ? ? ? /* Enable I2C controller */
->> >> ? ? ? writeb(0, i2c_imx->base + IMX_I2C_I2SR);
->> >> ? ? ? writeb(I2CR_IEN, i2c_imx->base + IMX_I2C_I2CR);
->> >> @@ -254,6 +257,7 @@ static void i2c_imx_stop(struct imx_i2c_struct *i2c_imx)
->> >>
->> >> ? ? ? /* Disable I2C controller */
->> >> ? ? ? writeb(0, i2c_imx->base + IMX_I2C_I2CR);
->> >> + ? ? clk_disable(i2c_imx->clk);
->> >> ?}
->> >>
->> >> ?static void __init i2c_imx_set_clk(struct imx_i2c_struct *i2c_imx,
->> >> @@ -273,8 +277,8 @@ static void __init i2c_imx_set_clk(struct imx_i2c_struct *i2c_imx,
->> >> ? ? ? else
->> >> ? ? ? ? ? ? ? for (i = 0; i2c_clk_div[i][0] < div; i++);
->> >>
->> >> - ? ? /* Write divider value to register */
->> >> - ? ? writeb(i2c_clk_div[i][1], i2c_imx->base + IMX_I2C_IFDR);
->> >> + ? ? /* Store divider value */
->> >> + ? ? i2c_imx->ifdr = i2c_clk_div[i][1];
->> >>
->> >> ? ? ? if (cpu_is_mx1()) {
->> >> ? ? ? ? ? ? ? /*
->> >> @@ -555,7 +559,6 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
->> >> ? ? ? ? ? ? ? dev_err(&pdev->dev, "can't get I2C clock\n");
->> >> ? ? ? ? ? ? ? goto fail3;
->> >> ? ? ? }
->> >> - ? ? clk_enable(i2c_imx->clk);
->> >>
->> >> ? ? ? /* Request IRQ */
->> >> ? ? ? ret = request_irq(i2c_imx->irq, i2c_imx_isr, 0, pdev->name, i2c_imx);
->> >> @@ -604,7 +607,6 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
->> >> ?fail5:
->> >> ? ? ? free_irq(i2c_imx->irq, i2c_imx);
->> >> ?fail4:
->> >> - ? ? clk_disable(i2c_imx->clk);
->> >> ? ? ? clk_put(i2c_imx->clk);
->> >> ?fail3:
->> >> ? ? ? release_mem_region(i2c_imx->res->start, resource_size(res));
->> >> @@ -641,8 +643,6 @@ static int __exit i2c_imx_remove(struct platform_device *pdev)
->> >> ? ? ? if (pdata && pdata->exit)
->> >> ? ? ? ? ? ? ? pdata->exit(&pdev->dev);
->> >>
->> >> - ? ? /* Disable I2C clock */
->> >> - ? ? clk_disable(i2c_imx->clk);
->> >> ? ? ? clk_put(i2c_imx->clk);
->> >>
->> >> ? ? ? release_mem_region(i2c_imx->res->start, resource_size(i2c_imx->res));
->> >> --
->> >> 1.6.0.4
->> >>
->> >>
->> >
->> > --
->> > Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
->> > Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
->> > Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
->> > Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
->> >
->>
->> I don't think we have any suspend/resume routine. And we won't need it any more.
->
-> Ups, my bad. I have it in my local tree and didn't realize it isn't
-> upstream.
->
-> Sascha
->
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
-> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
->
+Convert soc_common.c to be a stand alone module, rather than wrapping
+it up into the individual SoC specific base modules.  In doing this,
+we need to add init/exit functions for soc_common to register/remove
+the cpufreq notifier.
 
-Hi Sascha,
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/pcmcia/Kconfig      |    6 ++++++
+ drivers/pcmcia/Makefile     |   10 ++++------
+ drivers/pcmcia/soc_common.c |   16 +++++++---------
+ 3 files changed, 17 insertions(+), 15 deletions(-)
 
-Do I need re-send this patch when I re-send out other patches?
-
-Thanks
-Richard
+diff --git a/drivers/pcmcia/Kconfig b/drivers/pcmcia/Kconfig
+index fbf965b..092866f 100644
+--- a/drivers/pcmcia/Kconfig
++++ b/drivers/pcmcia/Kconfig
+@@ -192,9 +192,13 @@ config PCMCIA_AU1X00
+ 	tristate "Au1x00 pcmcia support"
+ 	depends on SOC_AU1X00 && PCMCIA
+ 
++config PCMCIA_SOC_COMMON
++	bool
++
+ config PCMCIA_SA1100
+ 	tristate "SA1100 support"
+ 	depends on ARM && ARCH_SA1100 && PCMCIA
++	select PCMCIA_SOC_COMMON
+ 	help
+ 	  Say Y here to include support for SA11x0-based PCMCIA or CF
+ 	  sockets, found on HP iPAQs, Yopy, and other StrongARM(R)/
+@@ -205,6 +209,7 @@ config PCMCIA_SA1100
+ config PCMCIA_SA1111
+ 	tristate "SA1111 support"
+ 	depends on ARM && ARCH_SA1100 && SA1111 && PCMCIA
++	select PCMCIA_SOC_COMMON
+ 	help
+ 	  Say Y  here to include support for SA1111-based PCMCIA or CF
+ 	  sockets, found on the Jornada 720, Graphicsmaster and other
+@@ -218,6 +223,7 @@ config PCMCIA_PXA2XX
+ 	depends on (ARCH_LUBBOCK || MACH_MAINSTONE || PXA_SHARPSL \
+ 		    || MACH_ARMCORE || ARCH_PXA_PALM || TRIZEPS_PCMCIA \
+ 		    || ARCH_VIPER || ARCH_PXA_ESERIES || MACH_STARGATE2)
++	select PCMCIA_SOC_COMMON
+ 	help
+ 	  Say Y here to include support for the PXA2xx PCMCIA controller
+ 
+diff --git a/drivers/pcmcia/Makefile b/drivers/pcmcia/Makefile
+index 047394d..3895869 100644
+--- a/drivers/pcmcia/Makefile
++++ b/drivers/pcmcia/Makefile
+@@ -22,8 +22,9 @@ obj-$(CONFIG_I82365)				+= i82365.o
+ obj-$(CONFIG_I82092)				+= i82092.o
+ obj-$(CONFIG_TCIC)				+= tcic.o
+ obj-$(CONFIG_PCMCIA_M8XX)			+= m8xx_pcmcia.o
+-obj-$(CONFIG_PCMCIA_SA1100)			+= sa11xx_core.o sa1100_cs.o
+-obj-$(CONFIG_PCMCIA_SA1111)			+= sa11xx_core.o sa1111_cs.o
++obj-$(CONFIG_PCMCIA_SOC_COMMON)			+= soc_common.o
++obj-$(CONFIG_PCMCIA_SA1100)			+= sa11xx_base.o sa1100_cs.o
++obj-$(CONFIG_PCMCIA_SA1111)			+= sa11xx_base.o sa1111_cs.o
+ obj-$(CONFIG_M32R_PCC)				+= m32r_pcc.o
+ obj-$(CONFIG_M32R_CFC)				+= m32r_cfc.o
+ obj-$(CONFIG_PCMCIA_AU1X00)			+= au1x00_ss.o
+@@ -34,9 +35,6 @@ obj-$(CONFIG_BFIN_CFPCMCIA)			+= bfin_cf_pcmcia.o
+ obj-$(CONFIG_AT91_CF)				+= at91_cf.o
+ obj-$(CONFIG_ELECTRA_CF)			+= electra_cf.o
+ 
+-sa11xx_core-y					+= soc_common.o sa11xx_base.o
+-pxa2xx_core-y					+= soc_common.o pxa2xx_base.o
+-
+ au1x00_ss-y					+= au1000_generic.o
+ au1x00_ss-$(CONFIG_MIPS_PB1000)			+= au1000_pb1x00.o
+ au1x00_ss-$(CONFIG_MIPS_PB1100)			+= au1000_pb1x00.o
+@@ -75,4 +73,4 @@ pxa2xx-obj-$(CONFIG_MACH_PALMLD)		+= pxa2xx_palmld.o
+ pxa2xx-obj-$(CONFIG_MACH_E740)			+= pxa2xx_e740.o
+ pxa2xx-obj-$(CONFIG_MACH_STARGATE2)		+= pxa2xx_stargate2.o
+ 
+-obj-$(CONFIG_PCMCIA_PXA2XX)			+= pxa2xx_core.o $(pxa2xx-obj-y)
++obj-$(CONFIG_PCMCIA_PXA2XX)			+= pxa2xx_base.o $(pxa2xx-obj-y)
+diff --git a/drivers/pcmcia/soc_common.c b/drivers/pcmcia/soc_common.c
+index 163cf98..38c5484 100644
+--- a/drivers/pcmcia/soc_common.c
++++ b/drivers/pcmcia/soc_common.c
+@@ -608,15 +608,14 @@ static int soc_pcmcia_cpufreq_register(void)
+ 				"notifier for PCMCIA (%d)\n", ret);
+ 	return ret;
+ }
++fs_initcall(soc_pcmcia_cpufreq_register);
+ 
+ static void soc_pcmcia_cpufreq_unregister(void)
+ {
+ 	cpufreq_unregister_notifier(&soc_pcmcia_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
+ }
++module_exit(soc_pcmcia_cpufreq_unregister);
+ 
+-#else
+-static int soc_pcmcia_cpufreq_register(void) { return 0; }
+-static void soc_pcmcia_cpufreq_unregister(void) {}
+ #endif
+ 
+ int soc_common_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops,
+@@ -667,9 +666,6 @@ int soc_common_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops
+ 			goto out_err_5;
+ 		}
+ 
+-		if (list_empty(&soc_pcmcia_sockets))
+-			soc_pcmcia_cpufreq_register();
+-
+ 		list_add(&skt->node, &soc_pcmcia_sockets);
+ 
+ 		/*
+@@ -742,6 +738,7 @@ int soc_common_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops
+ 	mutex_unlock(&soc_pcmcia_sockets_lock);
+ 	return ret;
+ }
++EXPORT_SYMBOL(soc_common_drv_pcmcia_probe);
+ 
+ int soc_common_drv_pcmcia_remove(struct device *dev)
+ {
+@@ -772,9 +769,6 @@ int soc_common_drv_pcmcia_remove(struct device *dev)
+ 		release_resource(&skt->res_io);
+ 		release_resource(&skt->res_skt);
+ 	}
+-	if (list_empty(&soc_pcmcia_sockets))
+-		soc_pcmcia_cpufreq_unregister();
+-
+ 	mutex_unlock(&soc_pcmcia_sockets_lock);
+ 
+ 	kfree(sinfo);
+@@ -782,3 +776,7 @@ int soc_common_drv_pcmcia_remove(struct device *dev)
+ 	return 0;
+ }
+ EXPORT_SYMBOL(soc_common_drv_pcmcia_remove);
++
++MODULE_AUTHOR("John Dorsey <john+@cs.cmu.edu>");
++MODULE_DESCRIPTION("Linux PCMCIA Card Services: Common SoC support");
++MODULE_LICENSE("Dual MPL/GPL");
+-- 
+1.6.2.5
