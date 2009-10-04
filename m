@@ -1,50 +1,29 @@
 From: cgagneraud@techworks.ie (Christian Gagneraud)
-Date: Sat, 03 Oct 2009 21:07:01 +0100
-Subject: Sparsemem  on EP93XX
-In-Reply-To: <20091003195426.GB21857@n2100.arm.linux.org.uk>
-References: <4AC7A3D4.3080408@techworks.ie>	<20091003194155.GA21857@n2100.arm.linux.org.uk>	<4AC7AAAD.4000301@techworks.ie>
-	<20091003195426.GB21857@n2100.arm.linux.org.uk>
-Message-ID: <4AC7AEE5.5070707@techworks.ie>
+Date: Sun, 04 Oct 2009 02:14:13 +0100
+Subject: [RFC][PATCH  v1.0] Update and enhance TS-7XXX support
+Message-ID: <20091004011413.12578.89897.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Sat, Oct 03, 2009 at 08:49:01PM +0100, Christian Gagneraud wrote:
->> # CONFIG_EXPERIMENTAL is not set
-> ...
->> CONFIG_ARCH_HAS_HOLES_MEMORYMODEL=y
->> CONFIG_ARCH_SPARSEMEM_ENABLE=y
->> CONFIG_ARCH_SPARSEMEM_DEFAULT=y
->> # CONFIG_ARCH_SELECT_MEMORY_MODEL is not set
->> CONFIG_FLATMEM=y
->> CONFIG_FLAT_NODE_MEM_MAP=y
-> 
-> So yes, flatmem is still enabled... because there's a condition missing
-> in mm/Kconfig.  Try this patch:
-> 
-> diff --git a/mm/Kconfig b/mm/Kconfig
-> index 2477607..95b2965 100644
-> --- a/mm/Kconfig
-> +++ b/mm/Kconfig
-> @@ -67,7 +67,7 @@ config DISCONTIGMEM
->  
->  config SPARSEMEM
->  	def_bool y
-> -	depends on SPARSEMEM_MANUAL
-> +	depends on (!SELECT_MEMORY_MODEL && ARCH_SPARSEMEM_ENABLE) || SPARSEMEM_MANUAL
->  
->  config FLATMEM
->  	def_bool y
+This is the very first patch needed to uptdate and enhance support for the 
+TS-72XX boards (See http://www.embeddedarm.com).
 
-Yeah!!! It works now! :)
+These few patches are the ones that affect all EP93XX platforms. As I'm sure 
+they are not yet quite right for now, any comments are very welcome.
 
-Thank you very much!
+These patch have been collected and maintained mainly by Matthieu Crapet 
+(http://mcrapet.free.fr/). Tests and contributions are made by the community 
+on yahoo groups (http://tech.groups.yahoo.com/group/ts-7000).
 
-Chris.
+Thanks to Russel King for spoting the bug that made the sparsemem patch useless.
+Now we can enjoy a recent kernel with 64MB of RAM! :)
 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Patch set statistics:
+ arch/arm/Kconfig                                |    1 +
+ arch/arm/include/asm/memory.h                   |    2 ++
+ arch/arm/kernel/head.S                          |    3 ++
+ arch/arm/mach-ep93xx/Kconfig                    |   16 ++++++++++++
+ arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |   15 ++++++++++++
+ arch/arm/mach-ep93xx/include/mach/memory.h      |   30 +++++++++++++++++++++++
+ arch/arm/mm/proc-arm920.S                       |    3 ++
+ 7 files changed, 70 insertions(+), 0 deletions(-)
