@@ -1,61 +1,56 @@
-From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
-Date: Sun, 04 Oct 2009 21:25:16 +0200
-Subject: [PATCH] FCSE: pid life cycle.
-In-Reply-To: <20091004190223.GH1378@ucw.cz>
-References: <1254432860-11511-1-git-send-email-gilles.chanteperdrix@xenomai.org>
-	<1254432860-11511-2-git-send-email-gilles.chanteperdrix@xenomai.org>
-	<20091004190223.GH1378@ucw.cz>
-Message-ID: <4AC8F69C.8030205@xenomai.org>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Mon, 05 Oct 2009 08:33:26 +1300
+Subject: [PATCH v1.0 3/4] EP93XX: Add more register definition
+In-Reply-To: <20091004011429.12578.27177.stgit@localhost.localdomain>
+References: <20091004011413.12578.89897.stgit@localhost.localdomain>
+	<20091004011429.12578.27177.stgit@localhost.localdomain>
+Message-ID: <4AC8F886.2050806@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pavel Machek wrote:
-> On Thu 2009-10-01 23:34:11, Gilles Chanteperdrix wrote:
->> Add a pid member to the mm_context_t structure, allocate this pid in
->> the init_new_context, free it in the destroy_context, switch it in
->> switch_mm.
->>
->> A bitfield is maintained to know what pids are currently in use.
->>
->> Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
->> Signed-off-by: Gilles Chanteperdrix <gilles.chanteperdrix@xenomai.org>
-> ...
->> --- /dev/null
->> +++ b/arch/arm/include/asm/fcse.h
->> @@ -0,0 +1,44 @@
->> +/*
->> + * Filename:    arch/arm/include/asm/fcse.h
->> + * Description: ARM Process ID (PID) includes for Fast Address Space Switching
->> + *              (FASS) in ARM Linux.
->> + * Created:     14/10/2001
->> + * Changes:     19/02/2002 - Macros added.
->> + *              03/08/2007 - Adapted to kernel 2.6.21 (ssm)
->> + *              Feb 2008   - Simplified a bit (rco)
+Christian Gagneraud wrote:
+> Add register definition for GPIO A,B,C and D data and data direction,
+> Security, Chip ID, ...
 > 
-> We normally avoid changelogs in sources.
-
-Ok. Will remove that, it was inherited.
-
+> Signed-off-by: Matthieu Crapet <mcrapet@gmail.com>
+> Signed-off-by: Christian Gagneraud <cgagneraud@techworks.ie>
+> ---
 > 
->> +/* Sets the CPU's PID Register */
->> +static inline void fcse_pid_set(unsigned long pid)
->> +{
->> +	__asm__ __volatile__ ("mcr p15, 0, %0, c13, c0, 0"
->> +			      : /* */: "r" (pid) : "memory");
->> +}
+>  arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |   15 +++++++++++++++
+>  1 files changed, 15 insertions(+), 0 deletions(-)
 > 
-> Calling this 'pid' is extremely confusing. PID already means process
-> id...
+> diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+> index c5216fc..a5f721e 100644
+> --- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+> +++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+> @@ -111,28 +111,42 @@
+>  #define EP93XX_I2S_BASE			EP93XX_APB_IOMEM(0x00020000)
+>  
+>  #define EP93XX_SECURITY_BASE		EP93XX_APB_IOMEM(0x00030000)
+> +#define EP93XX_SECURITY_REG(x)		(EP93XX_SECURITY_BASE + (x))
+> +#define EP93XX_SECURITY_UNIQID		EP93XX_SECURITY_REG(0x2440)
+>  
+>  #define EP93XX_GPIO_BASE		EP93XX_APB_IOMEM(0x00040000)
+>  #define EP93XX_GPIO_REG(x)		(EP93XX_GPIO_BASE + (x))
+> +#define EP93XX_GPIO_A_DATA		EP93XX_GPIO_REG(0x00)
+> +#define EP93XX_GPIO_B_DATA		EP93XX_GPIO_REG(0x04)
+> +#define EP93XX_GPIO_C_DATA		EP93XX_GPIO_REG(0x08)
+> +#define EP93XX_GPIO_D_DATA		EP93XX_GPIO_REG(0x0C)
+> +#define EP93XX_GPIO_A_DIR		EP93XX_GPIO_REG(0x10)
+> +#define EP93XX_GPIO_B_DIR		EP93XX_GPIO_REG(0x14)
+> +#define EP93XX_GPIO_C_DIR		EP93XX_GPIO_REG(0x18)
+> +#define EP93XX_GPIO_D_DIR		EP93XX_GPIO_REG(0x1C)
 
-Guess what, it also means "process id" in the FCSE case, and it is the
-name it has in the documentation, I always find a good idea to name the
-hardware registers as per documentation. I guess the original intent was
-to put the real process id into the hardware register, but that is not
-really possible with Linux. So, I guess we can call it fcse_pid.
+Are these being used for something? EP93xx already has full gpiolib
+support, so there should be no need to define these registers.
 
-In any case, I will keep all modifications for a second post once I had
-sufficient review (namely, I am expecting Russell's review, since he is
-the one who will accept or reject the patch in the end).
+~Ryan
 
 -- 
-					    Gilles.
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
