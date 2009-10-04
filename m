@@ -1,37 +1,30 @@
-From: Larry.Finger@lwfinger.net (Larry Finger)
-Date: Sun, 04 Oct 2009 18:01:40 -0500
-Subject: [RFC PATCH 05/10] PCMCIA: sa1111: wrap soc_pcmcia_socket to
-	contain sa1111 specific data
-In-Reply-To: <485cc33b078bb619d4544cf31388401dd1708029.1253722954.git.rmk+kernel@arm.linux.org.uk>
-References: <6cc18319511869ba8c46bf1d1b20553baa170904.1253722954.git.rmk+kernel@arm.linux.org.uk>
-	<485cc33b078bb619d4544cf31388401dd1708029.1253722954.git.rmk+kernel@arm.linux.org.uk>
-Message-ID: <4AC92954.1010104@lwfinger.net>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Sun, 4 Oct 2009 19:03:14 -0400
+Subject: [PATCH v1.0 2/4] TS72XX: Allow to override machine ID
+In-Reply-To: <20091004011424.12578.79467.stgit@localhost.localdomain>
+References: <20091004011413.12578.89897.stgit@localhost.localdomain>
+	<20091004011424.12578.79467.stgit@localhost.localdomain>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901DB75AB@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King wrote:
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  drivers/pcmcia/pxa2xx_base.c       |   19 +++++++----
->  drivers/pcmcia/pxa2xx_base.h       |    3 ++
->  drivers/pcmcia/pxa2xx_lubbock.c    |   10 ++++--
->  drivers/pcmcia/sa1100_badge4.c     |    7 ++++-
->  drivers/pcmcia/sa1100_jornada720.c |   20 ++++++++----
->  drivers/pcmcia/sa1100_neponset.c   |    9 ++++-
->  drivers/pcmcia/sa1111_generic.c    |   58 ++++++++++++++++++++++++++++--------
->  drivers/pcmcia/sa1111_generic.h    |   14 ++++++++
->  drivers/pcmcia/sa11xx_base.c       |   21 ++++++++----
->  drivers/pcmcia/sa11xx_base.h       |    2 +
->  10 files changed, 123 insertions(+), 40 deletions(-)
+On Saturday, October 03, 2009 6:14 PM, Christian Gagneraud wrote:
+> From: Matthieu Crapet <mcrapet@gmail.com>
+> 
+> In early days Technologic Systems fixed the 0x163 value in redboot
+> instead of 0x2a1, this patch allow to overwrite it.
+> 
+> Signed-off-by: Matthieu Crapet <mcrapet@gmail.com>
+> Signed-off-by: Christian Gagneraud <cgagneraud@techworks.ie>
 
-What tree is this patch for? I get the following errors when applying
-to taday's pull of Linus's tree (git describe is
-v2.6.32-rc1-384-ga99bbaf):
+As others have already pointed out, this is a pure hack and not
+suitable for mainline.
 
-patching file drivers/pcmcia/sa1100_jornada720.c
-Hunk #1 FAILED at 24.
-Hunk #2 FAILED at 40.
-Hunk #3 FAILED at 85.
-Hunk #4 FAILED at 101.
-4 out of 4 hunks FAILED -- rejects in file
-drivers/pcmcia/sa1100_jornada720.c
+The bootloader for systems that needs this really should be updated.
+Machine ID 0x163 (355) is ARCH_CX861XX which isn't an ep93xx based
+system and doesn't even have a platform init in mainline.
+
+NAK.
+
+Regards,
+Hartley
