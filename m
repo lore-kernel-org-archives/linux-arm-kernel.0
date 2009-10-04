@@ -1,94 +1,74 @@
 From: cgagneraud@techworks.ie (Christian Gagneraud)
-Date: Sun, 04 Oct 2009 02:14:34 +0100
-Subject: [PATCH v1.0 4/4] MM: Switch TS72XX to use sparemem
+Date: Sun, 04 Oct 2009 02:14:29 +0100
+Subject: [PATCH v1.0 3/4] EP93XX: Add more register definition
 In-Reply-To: <20091004011413.12578.89897.stgit@localhost.localdomain>
 References: <20091004011413.12578.89897.stgit@localhost.localdomain>
-Message-ID: <20091004011434.12578.76922.stgit@localhost.localdomain>
+Message-ID: <20091004011429.12578.27177.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested on TS7260 with 64MB SDRAM (8*8MB). (Other boards will be tested
-soon-ish). Special thanks to Matthieu Crappet, Charlie M.
-
-I'm not sure what's the impact for other machine based on EP93XX, it's likely
-that SECTION_SIZE_BITS and MAX_PHYSMEM_BITS needs to be define with default
-values that suits everyone
-
-PS: Has to be apply on top of this patch:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2009-October/001706.html
+Add register definition for GPIO A,B,C and D data and data direction,
+Security, Chip ID, ...
 
 Signed-off-by: Matthieu Crapet <mcrapet@gmail.com>
 Signed-off-by: Christian Gagneraud <cgagneraud@techworks.ie>
 ---
 
- arch/arm/Kconfig                           |    1 +
- arch/arm/include/asm/memory.h              |    2 ++
- arch/arm/mach-ep93xx/include/mach/memory.h |   30 ++++++++++++++++++++++++++++
- 3 files changed, 33 insertions(+), 0 deletions(-)
+ arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 1c4119c..0f1d52f 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -288,6 +288,7 @@ config ARCH_EP93XX
- 	select CPU_ARM920T
- 	select ARM_AMBA
- 	select ARM_VIC
-+	select ARCH_SPARSEMEM_ENABLE
- 	select GENERIC_GPIO
- 	select HAVE_CLK
- 	select COMMON_CLKDEV
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index cefedf0..6be9d9b 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -125,8 +125,10 @@
-  * private definitions which should NOT be used outside memory.h
-  * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
-  */
-+#ifndef __phys_to_virt
- #define __virt_to_phys(x)	((x) - PAGE_OFFSET + PHYS_OFFSET)
- #define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
-+#endif
+diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+index c5216fc..a5f721e 100644
+--- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
++++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+@@ -111,28 +111,42 @@
+ #define EP93XX_I2S_BASE			EP93XX_APB_IOMEM(0x00020000)
  
- /*
-  * Convert a physical address to a Page Frame Number and back
-diff --git a/arch/arm/mach-ep93xx/include/mach/memory.h b/arch/arm/mach-ep93xx/include/mach/memory.h
-index 554064e..4cb3329 100644
---- a/arch/arm/mach-ep93xx/include/mach/memory.h
-+++ b/arch/arm/mach-ep93xx/include/mach/memory.h
-@@ -19,4 +19,34 @@
- #error "Kconfig bug: No EP93xx PHYS_OFFSET set"
- #endif
+ #define EP93XX_SECURITY_BASE		EP93XX_APB_IOMEM(0x00030000)
++#define EP93XX_SECURITY_REG(x)		(EP93XX_SECURITY_BASE + (x))
++#define EP93XX_SECURITY_UNIQID		EP93XX_SECURITY_REG(0x2440)
  
-+#ifdef CONFIG_MACH_TS72XX
-+/*
-+ * Non-linear mapping like so:
-+ * phys       => virt
-+ * 0x00000000 => 0xc0000000
-+ * 0x01000000 => 0xc1000000
-+ * 0x04000000 => 0xc4000000
-+ * 0x05000000 => 0xc5000000
-+ * 0xe0000000 => 0xc8000000
-+ * 0xe1000000 => 0xc9000000
-+ * 0xe4000000 => 0xcc000000
-+ * 0xe5000000 => 0xcd000000
-+ *
-+ * As suggested here: http://marc.info/?l=linux-arm&m=122754446724900&w=2
-+ *
-+ * Note that static inline functions won't work here because
-+ * arch/arm/include/asm/memory.h uses "#ifndef __virt_to_phys" to check whether to
-+ * use generic functions or not.
-+ */
-+#define __phys_to_virt(p)   \
-+            (((p) & 0x07ffffff) | (((p) & 0xe0000000) ? 0x08000000 : 0) | PAGE_OFFSET)
-+
-+#define __virt_to_phys(v)   \
-+            (((v) & 0x07ffffff) | (((v) & 0x08000000) ? 0xe0000000 : 0 ))
-+
-+#define SECTION_SIZE_BITS 24
-+#define MAX_PHYSMEM_BITS 32
-+
-+#endif /* CONFIG_ARCH_TS72XX */
-+
- #endif
+ #define EP93XX_GPIO_BASE		EP93XX_APB_IOMEM(0x00040000)
+ #define EP93XX_GPIO_REG(x)		(EP93XX_GPIO_BASE + (x))
++#define EP93XX_GPIO_A_DATA		EP93XX_GPIO_REG(0x00)
++#define EP93XX_GPIO_B_DATA		EP93XX_GPIO_REG(0x04)
++#define EP93XX_GPIO_C_DATA		EP93XX_GPIO_REG(0x08)
++#define EP93XX_GPIO_D_DATA		EP93XX_GPIO_REG(0x0C)
++#define EP93XX_GPIO_A_DIR		EP93XX_GPIO_REG(0x10)
++#define EP93XX_GPIO_B_DIR		EP93XX_GPIO_REG(0x14)
++#define EP93XX_GPIO_C_DIR		EP93XX_GPIO_REG(0x18)
++#define EP93XX_GPIO_D_DIR		EP93XX_GPIO_REG(0x1C)
+ #define EP93XX_GPIO_F_INT_TYPE1		EP93XX_GPIO_REG(0x4c)
+ #define EP93XX_GPIO_F_INT_TYPE2		EP93XX_GPIO_REG(0x50)
+ #define EP93XX_GPIO_F_INT_ACK		EP93XX_GPIO_REG(0x54)
+ #define EP93XX_GPIO_F_INT_ENABLE	EP93XX_GPIO_REG(0x58)
+ #define EP93XX_GPIO_F_INT_STATUS	EP93XX_GPIO_REG(0x5c)
++#define EP93XX_GPIO_F_INT_DEBOUNCE	EP93XX_GPIO_REG(0x64)
+ #define EP93XX_GPIO_A_INT_TYPE1		EP93XX_GPIO_REG(0x90)
+ #define EP93XX_GPIO_A_INT_TYPE2		EP93XX_GPIO_REG(0x94)
+ #define EP93XX_GPIO_A_INT_ACK		EP93XX_GPIO_REG(0x98)
+ #define EP93XX_GPIO_A_INT_ENABLE	EP93XX_GPIO_REG(0x9c)
++#define EP93XX_GPIO_A_INT_DEBOUNCE	EP93XX_GPIO_REG(0xa8)
+ #define EP93XX_GPIO_A_INT_STATUS	EP93XX_GPIO_REG(0xa0)
+ #define EP93XX_GPIO_B_INT_TYPE1		EP93XX_GPIO_REG(0xac)
+ #define EP93XX_GPIO_B_INT_TYPE2		EP93XX_GPIO_REG(0xb0)
+ #define EP93XX_GPIO_B_INT_ACK		EP93XX_GPIO_REG(0xb4)
+ #define EP93XX_GPIO_B_INT_ENABLE	EP93XX_GPIO_REG(0xb8)
+ #define EP93XX_GPIO_B_INT_STATUS	EP93XX_GPIO_REG(0xbc)
++#define EP93XX_GPIO_B_INT_DEBOUNCE	EP93XX_GPIO_REG(0xc4)
+ #define EP93XX_GPIO_EEDRIVE		EP93XX_GPIO_REG(0xc8)
+ 
+ #define EP93XX_AAC_BASE			EP93XX_APB_IOMEM(0x00080000)
+ 
++#define EP93XX_SPI_PHYS_BASE		EP93XX_APB_PHYS(0x000a0000)
+ #define EP93XX_SPI_BASE			EP93XX_APB_IOMEM(0x000a0000)
+ 
+ #define EP93XX_IRDA_BASE		EP93XX_APB_IOMEM(0x000b0000)
+@@ -221,6 +235,7 @@
+ #define EP93XX_SYSCON_KEYTCHCLKDIV_ADIV	(1<<16)
+ #define EP93XX_SYSCON_KEYTCHCLKDIV_KEN	(1<<15)
+ #define EP93XX_SYSCON_KEYTCHCLKDIV_KDIV	(1<<0)
++#define EP93XX_SYSCON_CHIPID		EP93XX_SYSCON_REG(0x94)
+ #define EP93XX_SYSCON_SWLOCK		EP93XX_SYSCON_REG(0xc0)
+ 
+ #define EP93XX_WATCHDOG_BASE		EP93XX_APB_IOMEM(0x00140000)
