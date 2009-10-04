@@ -1,32 +1,37 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 4 Oct 2009 23:17:05 +0200
-Subject: Strange rejection messages -- was Your message to
-	linux-arm-kernel awaits moderator approval (fwd)
-In-Reply-To: <1254690469.3277.2467.camel@macbook.infradead.org>
-References: <20091004190036.GE1378@ucw.cz>
-	<1254690469.3277.2467.camel@macbook.infradead.org>
-Message-ID: <20091004211704.GF1447@elf.ucw.cz>
+From: Larry.Finger@lwfinger.net (Larry Finger)
+Date: Sun, 04 Oct 2009 18:01:40 -0500
+Subject: [RFC PATCH 05/10] PCMCIA: sa1111: wrap soc_pcmcia_socket to
+	contain sa1111 specific data
+In-Reply-To: <485cc33b078bb619d4544cf31388401dd1708029.1253722954.git.rmk+kernel@arm.linux.org.uk>
+References: <6cc18319511869ba8c46bf1d1b20553baa170904.1253722954.git.rmk+kernel@arm.linux.org.uk>
+	<485cc33b078bb619d4544cf31388401dd1708029.1253722954.git.rmk+kernel@arm.linux.org.uk>
+Message-ID: <4AC92954.1010104@lwfinger.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun 2009-10-04 22:07:49, David Woodhouse wrote:
-> On Sun, 2009-10-04 at 21:00 +0200, Pavel Machek wrote:
-> > Hi!
-> > 
-> > I'm still getting strange bounces about 'suspicious header'. I don't
-> > think I'm doing anything strange -- is the 'in-reply-to' trap still
-> > there? Can it get fixed?
-> 
-> My logs show no bounces, and no rejections of your mail. Can you give me
-> details of the message which didn't make it through to the list? I can't
-> see anything of yours which didn't.
+Russell King wrote:
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  drivers/pcmcia/pxa2xx_base.c       |   19 +++++++----
+>  drivers/pcmcia/pxa2xx_base.h       |    3 ++
+>  drivers/pcmcia/pxa2xx_lubbock.c    |   10 ++++--
+>  drivers/pcmcia/sa1100_badge4.c     |    7 ++++-
+>  drivers/pcmcia/sa1100_jornada720.c |   20 ++++++++----
+>  drivers/pcmcia/sa1100_neponset.c   |    9 ++++-
+>  drivers/pcmcia/sa1111_generic.c    |   58 ++++++++++++++++++++++++++++--------
+>  drivers/pcmcia/sa1111_generic.h    |   14 ++++++++
+>  drivers/pcmcia/sa11xx_base.c       |   21 ++++++++----
+>  drivers/pcmcia/sa11xx_base.h       |    2 +
+>  10 files changed, 123 insertions(+), 40 deletions(-)
 
-Thats the thing... I just got "suspicious header" message in mail inbox,
-and I forwarded that. I tried googling for message subject, and yes it
-hit lkml, but google will not tell me if it was delivered to linux-arm...
+What tree is this patch for? I get the following errors when applying
+to taday's pull of Linus's tree (git describe is
+v2.6.32-rc1-384-ga99bbaf):
 
-									Pavel
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+patching file drivers/pcmcia/sa1100_jornada720.c
+Hunk #1 FAILED at 24.
+Hunk #2 FAILED at 40.
+Hunk #3 FAILED at 85.
+Hunk #4 FAILED at 101.
+4 out of 4 hunks FAILED -- rejects in file
+drivers/pcmcia/sa1100_jornada720.c
