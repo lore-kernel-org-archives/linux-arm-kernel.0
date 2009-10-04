@@ -1,54 +1,94 @@
 From: cgagneraud@techworks.ie (Christian Gagneraud)
-Date: Sun, 04 Oct 2009 02:14:19 +0100
-Subject: [PATCH v1.0 1/4] EP93XX: Allow to force nF bit in control reg
+Date: Sun, 04 Oct 2009 02:14:34 +0100
+Subject: [PATCH v1.0 4/4] MM: Switch TS72XX to use sparemem
 In-Reply-To: <20091004011413.12578.89897.stgit@localhost.localdomain>
 References: <20091004011413.12578.89897.stgit@localhost.localdomain>
-Message-ID: <20091004011418.12578.67140.stgit@localhost.localdomain>
+Message-ID: <20091004011434.12578.76922.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Usually this is set by the bootrom.  If it is not set, then the CPU
-core will run from HCLK instead of FCLK, and performance will suffer.
+Tested on TS7260 with 64MB SDRAM (8*8MB). (Other boards will be tested
+soon-ish). Special thanks to Matthieu Crappet, Charlie M.
+
+I'm not sure what's the impact for other machine based on EP93XX, it's likely
+that SECTION_SIZE_BITS and MAX_PHYSMEM_BITS needs to be define with default
+values that suits everyone
+
+PS: Has to be apply on top of this patch:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2009-October/001706.html
 
 Signed-off-by: Matthieu Crapet <mcrapet@gmail.com>
 Signed-off-by: Christian Gagneraud <cgagneraud@techworks.ie>
 ---
 
- arch/arm/mach-ep93xx/Kconfig |    9 +++++++++
- arch/arm/mm/proc-arm920.S    |    3 +++
- 2 files changed, 12 insertions(+), 0 deletions(-)
+ arch/arm/Kconfig                           |    1 +
+ arch/arm/include/asm/memory.h              |    2 ++
+ arch/arm/mach-ep93xx/include/mach/memory.h |   30 ++++++++++++++++++++++++++++
+ 3 files changed, 33 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-ep93xx/Kconfig b/arch/arm/mach-ep93xx/Kconfig
-index 9167c3d..303c4f8 100644
---- a/arch/arm/mach-ep93xx/Kconfig
-+++ b/arch/arm/mach-ep93xx/Kconfig
-@@ -7,6 +7,15 @@ config CRUNCH
- 	help
- 	  Enable kernel support for MaverickCrunch.
- 
-+config CR1_NFBIT
-+       bool "Turn on nF bit in ControlRegister 1"
-+       help
-+         Say 'Y' here to force the nF bit on.  Usually this is set
-+         by the bootrom.  If it is not set, then the CPU core will
-+         run from HCLK instead of FCLK, and performance will suffer.
-+         If you see BogoMIPS of about 1/4 of your CPU clock, try
-+         turning this on; your performance should double.
-+
- comment "EP93xx Platforms"
- 
- choice
-diff --git a/arch/arm/mm/proc-arm920.S b/arch/arm/mm/proc-arm920.S
-index 914d688..9f030ee 100644
---- a/arch/arm/mm/proc-arm920.S
-+++ b/arch/arm/mm/proc-arm920.S
-@@ -373,6 +373,9 @@ __arm920_setup:
- 	mrc	p15, 0, r0, c1, c0		@ get control register v4
- 	bic	r0, r0, r5
- 	orr	r0, r0, r6
-+#ifdef CONFIG_CR1_NFBIT
-+	orr     r0, r0, #0x40000000             @ set nF
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1c4119c..0f1d52f 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -288,6 +288,7 @@ config ARCH_EP93XX
+ 	select CPU_ARM920T
+ 	select ARM_AMBA
+ 	select ARM_VIC
++	select ARCH_SPARSEMEM_ENABLE
+ 	select GENERIC_GPIO
+ 	select HAVE_CLK
+ 	select COMMON_CLKDEV
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index cefedf0..6be9d9b 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -125,8 +125,10 @@
+  * private definitions which should NOT be used outside memory.h
+  * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
+  */
++#ifndef __phys_to_virt
+ #define __virt_to_phys(x)	((x) - PAGE_OFFSET + PHYS_OFFSET)
+ #define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
 +#endif
- 	mov	pc, lr
- 	.size	__arm920_setup, . - __arm920_setup
  
+ /*
+  * Convert a physical address to a Page Frame Number and back
+diff --git a/arch/arm/mach-ep93xx/include/mach/memory.h b/arch/arm/mach-ep93xx/include/mach/memory.h
+index 554064e..4cb3329 100644
+--- a/arch/arm/mach-ep93xx/include/mach/memory.h
++++ b/arch/arm/mach-ep93xx/include/mach/memory.h
+@@ -19,4 +19,34 @@
+ #error "Kconfig bug: No EP93xx PHYS_OFFSET set"
+ #endif
+ 
++#ifdef CONFIG_MACH_TS72XX
++/*
++ * Non-linear mapping like so:
++ * phys       => virt
++ * 0x00000000 => 0xc0000000
++ * 0x01000000 => 0xc1000000
++ * 0x04000000 => 0xc4000000
++ * 0x05000000 => 0xc5000000
++ * 0xe0000000 => 0xc8000000
++ * 0xe1000000 => 0xc9000000
++ * 0xe4000000 => 0xcc000000
++ * 0xe5000000 => 0xcd000000
++ *
++ * As suggested here: http://marc.info/?l=linux-arm&m=122754446724900&w=2
++ *
++ * Note that static inline functions won't work here because
++ * arch/arm/include/asm/memory.h uses "#ifndef __virt_to_phys" to check whether to
++ * use generic functions or not.
++ */
++#define __phys_to_virt(p)   \
++            (((p) & 0x07ffffff) | (((p) & 0xe0000000) ? 0x08000000 : 0) | PAGE_OFFSET)
++
++#define __virt_to_phys(v)   \
++            (((v) & 0x07ffffff) | (((v) & 0x08000000) ? 0xe0000000 : 0 ))
++
++#define SECTION_SIZE_BITS 24
++#define MAX_PHYSMEM_BITS 32
++
++#endif /* CONFIG_ARCH_TS72XX */
++
+ #endif
