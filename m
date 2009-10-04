@@ -1,29 +1,54 @@
 From: cgagneraud@techworks.ie (Christian Gagneraud)
-Date: Sun, 04 Oct 2009 02:14:13 +0100
-Subject: [RFC][PATCH  v1.0] Update and enhance TS-7XXX support
-Message-ID: <20091004011413.12578.89897.stgit@localhost.localdomain>
+Date: Sun, 04 Oct 2009 02:14:24 +0100
+Subject: [PATCH v1.0 2/4] TS72XX: Allow to override machine ID
+In-Reply-To: <20091004011413.12578.89897.stgit@localhost.localdomain>
+References: <20091004011413.12578.89897.stgit@localhost.localdomain>
+Message-ID: <20091004011424.12578.79467.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the very first patch needed to uptdate and enhance support for the 
-TS-72XX boards (See http://www.embeddedarm.com).
+From: Matthieu Crapet <mcrapet@gmail.com>
 
-These few patches are the ones that affect all EP93XX platforms. As I'm sure 
-they are not yet quite right for now, any comments are very welcome.
+In early days Technologic Systems fixed the 0x163 value in redboot
+instead of 0x2a1, this patch allow to overwrite it.
 
-These patch have been collected and maintained mainly by Matthieu Crapet 
-(http://mcrapet.free.fr/). Tests and contributions are made by the community 
-on yahoo groups (http://tech.groups.yahoo.com/group/ts-7000).
+Signed-off-by: Matthieu Crapet <mcrapet@gmail.com>
+Signed-off-by: Christian Gagneraud <cgagneraud@techworks.ie>
+---
 
-Thanks to Russel King for spoting the bug that made the sparsemem patch useless.
-Now we can enjoy a recent kernel with 64MB of RAM! :)
+ arch/arm/kernel/head.S       |    3 +++
+ arch/arm/mach-ep93xx/Kconfig |    7 +++++++
+ 2 files changed, 10 insertions(+), 0 deletions(-)
 
-Patch set statistics:
- arch/arm/Kconfig                                |    1 +
- arch/arm/include/asm/memory.h                   |    2 ++
- arch/arm/kernel/head.S                          |    3 ++
- arch/arm/mach-ep93xx/Kconfig                    |   16 ++++++++++++
- arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |   15 ++++++++++++
- arch/arm/mach-ep93xx/include/mach/memory.h      |   30 +++++++++++++++++++++++
- arch/arm/mm/proc-arm920.S                       |    3 ++
- 7 files changed, 70 insertions(+), 0 deletions(-)
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 38ccbe1..c2e4514 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -82,6 +82,9 @@ ENTRY(stext)
+ 	bl	__lookup_processor_type		@ r5=procinfo r9=cpuid
+ 	movs	r10, r5				@ invalid processor (r5=0)?
+ 	beq	__error_p			@ yes, error 'p'
++#ifdef CONFIG_MACH_TS72XX_FORCE_MACHINEID
++	ldr r1, =0x2a1
++#endif
+ 	bl	__lookup_machine_type		@ r5=machinfo
+ 	movs	r8, r5				@ invalid machine (r5=0)?
+ 	beq	__error_a			@ yes, error 'a'
+diff --git a/arch/arm/mach-ep93xx/Kconfig b/arch/arm/mach-ep93xx/Kconfig
+index 303c4f8..a909303 100644
+--- a/arch/arm/mach-ep93xx/Kconfig
++++ b/arch/arm/mach-ep93xx/Kconfig
+@@ -191,6 +191,13 @@ config EP93XX_EARLY_UART3
+ 
+ endchoice
+ 
++config MACH_TS72XX_FORCE_MACHINEID
++	bool "Force Machine ID"
++	depends on MACH_TS72XX
++	help
++	  Say 'Y' here to force Machine ID to 0x2A1 (MACH_TYPE_TS72XX legacy value)
++	  In early days Technologic Systems fixed the 0x163 value in redboot.
++
+ endmenu
+ 
+ endif
