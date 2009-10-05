@@ -1,59 +1,88 @@
-From: cgagneraud@techworks.ie (Christian Gagneraud)
-Date: Mon, 05 Oct 2009 19:34:30 +0100
-Subject: [PATCH v1.0 2/4] TS72XX: Allow to override machine ID
-In-Reply-To: <200910051801.22974.marek.vasut@gmail.com>
-References: <20091004011413.12578.89897.stgit@localhost.localdomain>
-	<4AC9E3CE.2030307@techworks.ie>
-	<19146.3499.156615.1713@pilspetsen.it.uu.se>
-	<200910051801.22974.marek.vasut@gmail.com>
-Message-ID: <4ACA3C36.30706@techworks.ie>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 5 Oct 2009 14:52:39 -0400
+Subject: [PATCH v1.0 4/4] MM: Switch TS72XX to use sparemem
+In-Reply-To: <4ACA3807.9050908@techworks.ie>
+References: <20091004011413.12578.89897.stgit@localhost.localdomain><20091004011434.12578.76922.stgit@localhost.localdomain>
+	<4AC9E4B8.1040208@techworks.ie>
+	<BD79186B4FD85F4B8E60E381CAEE190901DB7687@mi8nycmail19.Mi8.com>
+	<4ACA3807.9050908@techworks.ie>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901DB76E6@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Vasut wrote:
-> Dne Po 5. ??jna 2009 17:15:55 Mikael Pettersson napsal(a):
->> Christian Gagneraud writes:
->>  > H Hartley Sweeten wrote:
->>  > > On Saturday, October 03, 2009 6:14 PM, Christian Gagneraud wrote:
->>  > >> From: Matthieu Crapet <mcrapet@gmail.com>
->>  > >>
->>  > >> In early days Technologic Systems fixed the 0x163 value in redboot
->>  > >> instead of 0x2a1, this patch allow to overwrite it.
->>  > >>
->>  > >> Signed-off-by: Matthieu Crapet <mcrapet@gmail.com>
->>  > >> Signed-off-by: Christian Gagneraud <cgagneraud@techworks.ie>
->>  > >
->>  > > As others have already pointed out, this is a pure hack and not
->>  > > suitable for mainline.
->>  > >
->>  > > The bootloader for systems that needs this really should be updated.
->>  > > Machine ID 0x163 (355) is ARCH_CX861XX which isn't an ep93xx based
->>  > > system and doesn't even have a platform init in mainline.
->>  >
->>  > I see your point, but what if the bootloader can't be updated? Does
->>  > that mean that people using these boards will have to bother with
->>  > applying patches on mainline kernel for ever?
->>  > Can't we find a way to address this issue, I'm pretty sure this is not
->>  > the only board that need this kind of asm hack.
->>
->> All you need to do is to wrap the kernel binary image with
->> a small shim that corrects the Machine ID in r1. devio can
->> do that, as can (I think) printf(1).
->>
->> No need to replace the bootloader or hack the kernel.
-> 
-> devio 'wl 0xe59f1000,4' 'wl 0xe28ff004,4' 'wl $MACH,4' >> id.bin
-> cat id.bin zImage > zImage.crippled
+On Monday, October 05, 2009 11:17 AM, Christian Gagneraud wrote:
+> H Hartley Sweeten wrote:
+>> On Monday, October 05, 2009 5:21 AM, Christian Gagneraud wrote:
+>>> Hi,
+>>>
+>>> What people think about enabling sparsemem on EP93XX? I know this 
+>>> patch as it is will break all but this board.
+>>>
+>>> Can we define defaults SECTION_SIZE_BITS and MAX_PHYSMEM_BITS that 
+>>> will suit all the supported boards?
+>> 
+>> With sparsemem enabled what is your memory detected during boot?  For
+>> instance on my ep9307 based system with flatmem I get:
+>> 
+>> Memory: 32MB 32MB = 64MB total
+>> Memory: 44552KB available (3452K code, 254K data, 124K init, 0K highmem)
+>           ^^^^^
+> Are you missing 16MB?
 
-Thank you for the tip, i will have a look at this.
+No.  My rootfs is in /dev/ram and uses the remaining space.
+
+> Here is what i get with sparsemem:
+> 
+> Memory: 8MB 8MB 8MB 8MB 8MB 8MB 8MB 8MB = 64MB total 
+> 
+> Memory: 63264KB available (1252K code, 231K data, 64K init, 0K highmem)
+>
+> 00000000-007fffff : System RAM 
+>   00020000-00276fff : Kernel text 
+>   00278000-002c1923 : Kernel data 
+> 01000000-017fffff : System RAM 
+> 04000000-047fffff : System RAM 
+> 05000000-057fffff : System RAM
+> e0000000-e07fffff : System RAM 
+> e1000000-e17fffff : System RAM 
+> e4000000-e47fffff : System RAM 
+> e5000000-e57fffff : System RAM
+>
+> For boards shipped with 32MB, there's one 32MB chip on SD_CS3 that 
+> shows at 0x00000000, for boards shipped with 64MB there's another 32MB 
+> chip on SD_CS2 which pop up at 0xe0000000
+
+OK.  That makes sense.  I was under the impression that the 64MB board
+was using a single chip select.
+ 
+> That's for the models that offer 32 or 64MB, but TS have other models 
+> that offer 64 or 128MB, these boards are designed the same way: 1 64MB 
+> chip on SD_CS3 and optional a second 64MB chip on SD_CS2.
+> I was told that in that case 16 banks needed to be define (and btw it 
+> couldn't be handled , I didn't check it yet.
+
+The single chip 64MB board would work fine but it would use 8 banks.  The
+128MB board would be a problem with flatmem because of the 16 banks.  In
+order to support this NR_BANKS would have to be increased in
+arch/arm/include/asm/setup.h.
+
+> Before sparsemem, we had to use discontigmem (and patch it),now with 
+> parsemem there's no needs for such a thing anymore, the only needed 
+> bits are 4 #define.
+
+Sparsemem is probably a good solution for the multiple chip selects.  But
+we need to make sure that any solution used works for all ep93xx variants.
+
+The ep93xx has 4 sdram chip-selects but, because of the ASDO (sync/async)
+boot, there are 5 possible base addresses for them.  Then, depending on
+the bus width and the density of memory used, the node mapping for each
+bank can vary greatly.  Even worse, node mapping changes depending on the
+SROMLL bit.  The document referenced below has all the information needed
+but at this point I don't know of a good solution.
+
+> http://arm.cirrus.com/files/HOWTO/EP93xx%20SDRAM%20Address%20Ranges.pdf
+
+Maybe Russell can help (Cced).
 
 Regards,
-Chris
-
-> 
-> Like this (I used this on Toradex board where those morons fixed machine id too).
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
+Hartley
