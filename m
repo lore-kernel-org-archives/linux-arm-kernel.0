@@ -1,119 +1,37 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 5 Oct 2009 16:49:12 +0200 (CEST)
-Subject: [PATCH v2] fix pcm037_eet compilation with the new SPI driver
-In-Reply-To: <4AC9FC2D.6000200@epfl.ch>
-References: <Pine.LNX.4.64.0910051001500.4337@axis700.grange>
-	<20091005121936.GD23986@pengutronix.de> <4AC9FC2D.6000200@epfl.ch>
-Message-ID: <Pine.LNX.4.64.0910051644010.4337@axis700.grange>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 5 Oct 2009 16:48:50 +0200
+Subject: Strange rejection messages -- was Your message to
+	linux-arm-kernel awaits moderator approval (fwd)
+In-Reply-To: <1254745468.13096.331.camel@macbook.infradead.org>
+References: <20091004190036.GE1378@ucw.cz>
+	<1254690469.3277.2467.camel@macbook.infradead.org>
+	<20091004211704.GF1447@elf.ucw.cz>
+	<1254724599.3277.3066.camel@macbook.infradead.org>
+	<20091005115159.GD11044@shareable.org>
+	<20091005120802.GB13694@elf.ucw.cz>
+	<1254745468.13096.331.camel@macbook.infradead.org>
+Message-ID: <20091005144850.GA16110@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix pcm037_eet compilation with the new imx SPI driver by unifying 
-platform device names.
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
----
-On Mon, 5 Oct 2009, Valentin Longchamp wrote:
-
-> Hi Sascha,
+> > > > This happens on lkml too, but the only difference is that you don't get
+> > > > _told_ about it.
+> > > 
+> > > I guess Pavel wants to know what's suspicious about it, so he can
+> > > avoid being stuck in the moderation queue in future.
 > 
-> Sascha Hauer wrote:
-> > 
-> > On Mon, Oct 05, 2009 at 10:04:51AM +0200, Guennadi Liakhovetski wrote:
-> > > At some point the SPI device name in arch/arm/mach-mx3/devices.c has
-> > > changed, which then broke compilation of pcm037_eet with the new SPI
-> > > driver. Use the correct name.
-> > 
-> > It didn't change, it was merged with imx_spi_device0. Can we change the
-> > name in devices.[ch] instead? All other devices start with mxc_. Sorry,
-> > my bad.
+> I believe that particular message was flagged by the "Message has
+> References: or In-Reply-To: header, but Subject doesn't start with 'Re:'
+> rule -- which is there to catch the people who hijack existing threads
+> when they should be starting new ones.
 > 
-> I don't really where it is changed ... mxc seems better so devices.[ch] is
-> more logical.
-> 
-> But I have sent the exact same patch on Friday and received no comment ... I
-> hope mine or Guennadi's (I don't really care) can get its way to -rc4.
+> I've now made that accept 'Re:' _anywhere_ in the subject line, rather
+> than only at the beginning, so I don't think that particular mail would
+> be trapped in future.
 
-Sorry, I missed it. Here's a version with changed devices.[hc].
-
-diff --git a/arch/arm/mach-mx3/devices.c b/arch/arm/mach-mx3/devices.c
-index 8a577f3..e6abe18 100644
---- a/arch/arm/mach-mx3/devices.c
-+++ b/arch/arm/mach-mx3/devices.c
-@@ -459,7 +459,7 @@ struct platform_device mxc_usbh2 = {
-  * SPI master controller
-  * 3 channels
-  */
--static struct resource imx_spi_0_resources[] = {
-+static struct resource mxc_spi_0_resources[] = {
- 	{
- 	       .start = CSPI1_BASE_ADDR,
- 	       .end = CSPI1_BASE_ADDR + SZ_4K - 1,
-@@ -471,7 +471,7 @@ static struct resource imx_spi_0_resources[] = {
- 	},
- };
- 
--static struct resource imx_spi_1_resources[] = {
-+static struct resource mxc_spi_1_resources[] = {
- 	{
- 		.start = CSPI2_BASE_ADDR,
- 		.end = CSPI2_BASE_ADDR + SZ_4K - 1,
-@@ -483,7 +483,7 @@ static struct resource imx_spi_1_resources[] = {
- 	},
- };
- 
--static struct resource imx_spi_2_resources[] = {
-+static struct resource mxc_spi_2_resources[] = {
- 	{
- 		.start = CSPI3_BASE_ADDR,
- 		.end = CSPI3_BASE_ADDR + SZ_4K - 1,
-@@ -495,25 +495,25 @@ static struct resource imx_spi_2_resources[] = {
- 	},
- };
- 
--struct platform_device imx_spi_device0 = {
-+struct platform_device mxc_spi_device0 = {
- 	.name = "spi_imx",
- 	.id = 0,
--	.num_resources = ARRAY_SIZE(imx_spi_0_resources),
--	.resource = imx_spi_0_resources,
-+	.num_resources = ARRAY_SIZE(mxc_spi_0_resources),
-+	.resource = mxc_spi_0_resources,
- };
- 
--struct platform_device imx_spi_device1 = {
-+struct platform_device mxc_spi_device1 = {
- 	.name = "spi_imx",
- 	.id = 1,
--	.num_resources = ARRAY_SIZE(imx_spi_1_resources),
--	.resource = imx_spi_1_resources,
-+	.num_resources = ARRAY_SIZE(mxc_spi_1_resources),
-+	.resource = mxc_spi_1_resources,
- };
- 
--struct platform_device imx_spi_device2 = {
-+struct platform_device mxc_spi_device2 = {
- 	.name = "spi_imx",
- 	.id = 2,
--	.num_resources = ARRAY_SIZE(imx_spi_2_resources),
--	.resource = imx_spi_2_resources,
-+	.num_resources = ARRAY_SIZE(mxc_spi_2_resources),
-+	.resource = mxc_spi_2_resources,
- };
- 
- #ifdef CONFIG_ARCH_MX35
-diff --git a/arch/arm/mach-mx3/devices.h b/arch/arm/mach-mx3/devices.h
-index 79f2be4..ab87419 100644
---- a/arch/arm/mach-mx3/devices.h
-+++ b/arch/arm/mach-mx3/devices.h
-@@ -20,7 +20,7 @@ extern struct platform_device mxc_otg_host;
- extern struct platform_device mxc_usbh1;
- extern struct platform_device mxc_usbh2;
- extern struct platform_device mxc_rnga_device;
--extern struct platform_device imx_spi_device0;
--extern struct platform_device imx_spi_device1;
--extern struct platform_device imx_spi_device2;
-+extern struct platform_device mxc_spi_device0;
-+extern struct platform_device mxc_spi_device1;
-+extern struct platform_device mxc_spi_device2;
- 
+Thanks!
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
