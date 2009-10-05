@@ -1,46 +1,119 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 5 Oct 2009 15:46:23 +0100
-Subject: cache aliasing in dup_mmap
-In-Reply-To: <20090929191108.GA13568@n2100.arm.linux.org.uk>
-References: <e06498070903061426o5875ad13hc6328aa0d3f08ed7@mail.gmail.com>
-	<20090306225525.GB3212@n2100.arm.linux.org.uk>
-	<e06498070903062020s22222594h7be318fb9f3fdaee@mail.gmail.com>
-	<ca992f110903080105ye955070t260e6a4334186986@mail.gmail.com>
-	<20090308121029.GA21277@n2100.arm.linux.org.uk>
-	<20090308143607.GA27349@n2100.arm.linux.org.uk>
-	<e06498070909290925q55777041q6f3ecfaf9847babb@mail.gmail.com>
-	<e06498070909290930w7745e1e3x2e224ad75ff62dbd@mail.gmail.com>
-	<20090929191108.GA13568@n2100.arm.linux.org.uk>
-Message-ID: <20091005144623.GA20633@n2100.arm.linux.org.uk>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 5 Oct 2009 16:49:12 +0200 (CEST)
+Subject: [PATCH v2] fix pcm037_eet compilation with the new SPI driver
+In-Reply-To: <4AC9FC2D.6000200@epfl.ch>
+References: <Pine.LNX.4.64.0910051001500.4337@axis700.grange>
+	<20091005121936.GD23986@pengutronix.de> <4AC9FC2D.6000200@epfl.ch>
+Message-ID: <Pine.LNX.4.64.0910051644010.4337@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 29, 2009 at 08:11:08PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Sep 29, 2009 at 12:30:27PM -0400, Steven Walter wrote:
-> > On Sun, Mar 8, 2009 at 10:36 AM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> > > On Sun, Mar 08, 2009 at 12:10:29PM +0000, Russell King - ARM Linux wrote:
-> > >> I don't think moving flush_cache_mm solves anything - the problem remains,
-> > >> but with a different timing.
-> > >
-> > > On the other hand, this should solve the problem. ?I'm not 100% happy
-> > > with this because we end up using the cache flush ops on the same memory
-> > > several times.
-> > 
-> > Russell
-> > 
-> > It appears that this patch is neither in Linus' tree nor the ARM
-> > master branch. ?Was a different fix committed to address the original
-> > memory corruption issue?
+Fix pcm037_eet compilation with the new imx SPI driver by unifying 
+platform device names.
+
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+---
+On Mon, 5 Oct 2009, Valentin Longchamp wrote:
+
+> Hi Sascha,
 > 
-> >From what I can see, there was no positive response to the actual patch
-> (and no testing of the actual patch), so it doesn't get merged.
+> Sascha Hauer wrote:
+> > 
+> > On Mon, Oct 05, 2009 at 10:04:51AM +0200, Guennadi Liakhovetski wrote:
+> > > At some point the SPI device name in arch/arm/mach-mx3/devices.c has
+> > > changed, which then broke compilation of pcm037_eet with the new SPI
+> > > driver. Use the correct name.
+> > 
+> > It didn't change, it was merged with imx_spi_device0. Can we change the
+> > name in devices.[ch] instead? All other devices start with mxc_. Sorry,
+> > my bad.
 > 
-> Changes don't get merged until they themselves have been tested.
+> I don't really where it is changed ... mxc seems better so devices.[ch] is
+> more logical.
+> 
+> But I have sent the exact same patch on Friday and received no comment ... I
+> hope mine or Guennadi's (I don't really care) can get its way to -rc4.
 
-I've not heard anything further.  I've thrown the patches into the git
-tree under a separate branch now (top two):
+Sorry, I missed it. Here's a version with changed devices.[hc].
 
-http://ftp.arm.linux.org.uk/git/gitweb.cgi?p=linux-2.6-arm.git;a=shortlog;h=refs/heads/cup
-
-I do feel that more work needs to be done to the 2nd patch though.
+diff --git a/arch/arm/mach-mx3/devices.c b/arch/arm/mach-mx3/devices.c
+index 8a577f3..e6abe18 100644
+--- a/arch/arm/mach-mx3/devices.c
++++ b/arch/arm/mach-mx3/devices.c
+@@ -459,7 +459,7 @@ struct platform_device mxc_usbh2 = {
+  * SPI master controller
+  * 3 channels
+  */
+-static struct resource imx_spi_0_resources[] = {
++static struct resource mxc_spi_0_resources[] = {
+ 	{
+ 	       .start = CSPI1_BASE_ADDR,
+ 	       .end = CSPI1_BASE_ADDR + SZ_4K - 1,
+@@ -471,7 +471,7 @@ static struct resource imx_spi_0_resources[] = {
+ 	},
+ };
+ 
+-static struct resource imx_spi_1_resources[] = {
++static struct resource mxc_spi_1_resources[] = {
+ 	{
+ 		.start = CSPI2_BASE_ADDR,
+ 		.end = CSPI2_BASE_ADDR + SZ_4K - 1,
+@@ -483,7 +483,7 @@ static struct resource imx_spi_1_resources[] = {
+ 	},
+ };
+ 
+-static struct resource imx_spi_2_resources[] = {
++static struct resource mxc_spi_2_resources[] = {
+ 	{
+ 		.start = CSPI3_BASE_ADDR,
+ 		.end = CSPI3_BASE_ADDR + SZ_4K - 1,
+@@ -495,25 +495,25 @@ static struct resource imx_spi_2_resources[] = {
+ 	},
+ };
+ 
+-struct platform_device imx_spi_device0 = {
++struct platform_device mxc_spi_device0 = {
+ 	.name = "spi_imx",
+ 	.id = 0,
+-	.num_resources = ARRAY_SIZE(imx_spi_0_resources),
+-	.resource = imx_spi_0_resources,
++	.num_resources = ARRAY_SIZE(mxc_spi_0_resources),
++	.resource = mxc_spi_0_resources,
+ };
+ 
+-struct platform_device imx_spi_device1 = {
++struct platform_device mxc_spi_device1 = {
+ 	.name = "spi_imx",
+ 	.id = 1,
+-	.num_resources = ARRAY_SIZE(imx_spi_1_resources),
+-	.resource = imx_spi_1_resources,
++	.num_resources = ARRAY_SIZE(mxc_spi_1_resources),
++	.resource = mxc_spi_1_resources,
+ };
+ 
+-struct platform_device imx_spi_device2 = {
++struct platform_device mxc_spi_device2 = {
+ 	.name = "spi_imx",
+ 	.id = 2,
+-	.num_resources = ARRAY_SIZE(imx_spi_2_resources),
+-	.resource = imx_spi_2_resources,
++	.num_resources = ARRAY_SIZE(mxc_spi_2_resources),
++	.resource = mxc_spi_2_resources,
+ };
+ 
+ #ifdef CONFIG_ARCH_MX35
+diff --git a/arch/arm/mach-mx3/devices.h b/arch/arm/mach-mx3/devices.h
+index 79f2be4..ab87419 100644
+--- a/arch/arm/mach-mx3/devices.h
++++ b/arch/arm/mach-mx3/devices.h
+@@ -20,7 +20,7 @@ extern struct platform_device mxc_otg_host;
+ extern struct platform_device mxc_usbh1;
+ extern struct platform_device mxc_usbh2;
+ extern struct platform_device mxc_rnga_device;
+-extern struct platform_device imx_spi_device0;
+-extern struct platform_device imx_spi_device1;
+-extern struct platform_device imx_spi_device2;
++extern struct platform_device mxc_spi_device0;
++extern struct platform_device mxc_spi_device1;
++extern struct platform_device mxc_spi_device2;
+ 
