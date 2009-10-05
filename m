@@ -1,52 +1,46 @@
-From: valentin.longchamp@epfl.ch (Valentin Longchamp)
-Date: Mon, 05 Oct 2009 16:01:17 +0200
-Subject: [PATCH] fix pcm037_eet compilation with the new SPI driver
-In-Reply-To: <20091005121936.GD23986@pengutronix.de>
-References: <Pine.LNX.4.64.0910051001500.4337@axis700.grange>
-	<20091005121936.GD23986@pengutronix.de>
-Message-ID: <4AC9FC2D.6000200@epfl.ch>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 5 Oct 2009 15:46:23 +0100
+Subject: cache aliasing in dup_mmap
+In-Reply-To: <20090929191108.GA13568@n2100.arm.linux.org.uk>
+References: <e06498070903061426o5875ad13hc6328aa0d3f08ed7@mail.gmail.com>
+	<20090306225525.GB3212@n2100.arm.linux.org.uk>
+	<e06498070903062020s22222594h7be318fb9f3fdaee@mail.gmail.com>
+	<ca992f110903080105ye955070t260e6a4334186986@mail.gmail.com>
+	<20090308121029.GA21277@n2100.arm.linux.org.uk>
+	<20090308143607.GA27349@n2100.arm.linux.org.uk>
+	<e06498070909290925q55777041q6f3ecfaf9847babb@mail.gmail.com>
+	<e06498070909290930w7745e1e3x2e224ad75ff62dbd@mail.gmail.com>
+	<20090929191108.GA13568@n2100.arm.linux.org.uk>
+Message-ID: <20091005144623.GA20633@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Tue, Sep 29, 2009 at 08:11:08PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Sep 29, 2009 at 12:30:27PM -0400, Steven Walter wrote:
+> > On Sun, Mar 8, 2009 at 10:36 AM, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> > > On Sun, Mar 08, 2009 at 12:10:29PM +0000, Russell King - ARM Linux wrote:
+> > >> I don't think moving flush_cache_mm solves anything - the problem remains,
+> > >> but with a different timing.
+> > >
+> > > On the other hand, this should solve the problem. ?I'm not 100% happy
+> > > with this because we end up using the cache flush ops on the same memory
+> > > several times.
+> > 
+> > Russell
+> > 
+> > It appears that this patch is neither in Linus' tree nor the ARM
+> > master branch. ?Was a different fix committed to address the original
+> > memory corruption issue?
+> 
+> >From what I can see, there was no positive response to the actual patch
+> (and no testing of the actual patch), so it doesn't get merged.
+> 
+> Changes don't get merged until they themselves have been tested.
 
-Sascha Hauer wrote:
-> 
-> On Mon, Oct 05, 2009 at 10:04:51AM +0200, Guennadi Liakhovetski wrote:
->> At some point the SPI device name in arch/arm/mach-mx3/devices.c has 
->> changed, which then broke compilation of pcm037_eet with the new SPI 
->> driver. Use the correct name.
-> 
-> It didn't change, it was merged with imx_spi_device0. Can we change the
-> name in devices.[ch] instead? All other devices start with mxc_. Sorry,
-> my bad.
+I've not heard anything further.  I've thrown the patches into the git
+tree under a separate branch now (top two):
 
-I don't really where it is changed ... mxc seems better so devices.[ch] 
-is more logical.
+http://ftp.arm.linux.org.uk/git/gitweb.cgi?p=linux-2.6-arm.git;a=shortlog;h=refs/heads/cup
 
-But I have sent the exact same patch on Friday and received no comment 
-... I hope mine or Guennadi's (I don't really care) can get its way to -rc4.
-
-Val
-
-> 
-> Sascha
-> 
-> 
->> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
->> ---
->> diff --git a/arch/arm/mach-mx3/pcm037_eet.c b/arch/arm/mach-mx3/pcm037_eet.c
->> index 8d38600..dc6baf3 100644
->> --- a/arch/arm/mach-mx3/pcm037_eet.c
->> +++ b/arch/arm/mach-mx3/pcm037_eet.c
->> @@ -184,7 +184,7 @@ static int eet_init_devices(void)
->>  	/* SPI */
->>  	spi_register_board_info(pcm037_spi_dev, ARRAY_SIZE(pcm037_spi_dev));
->>  #if defined(CONFIG_SPI_IMX) || defined(CONFIG_SPI_IMX_MODULE)
->> -	mxc_register_device(&mxc_spi_device0, &pcm037_spi1_master);
->> +	mxc_register_device(&imx_spi_device0, &pcm037_spi1_master);
->>  #endif
->>  
->>  	platform_device_register(&pcm037_gpio_keys_device);
->>
-> 
+I do feel that more work needs to be done to the 2nd patch though.
