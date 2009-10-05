@@ -1,26 +1,61 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 5 Oct 2009 10:04:51 +0200 (CEST)
-Subject: [PATCH] fix pcm037_eet compilation with the new SPI driver
-Message-ID: <Pine.LNX.4.64.0910051001500.4337@axis700.grange>
+From: kristoffer.ericson@gmail.com (Kristoffer Ericson)
+Date: Mon, 5 Oct 2009 11:21:13 +0200
+Subject: [RFC PATCH 05/10] PCMCIA: sa1111: wrap soc_pcmcia_socket to
+	contain sa1111 specific data
+In-Reply-To: <20091004231402.GA31087@n2100.arm.linux.org.uk>
+References: <6cc18319511869ba8c46bf1d1b20553baa170904.1253722954.git.rmk+kernel@arm.linux.org.uk>
+	<485cc33b078bb619d4544cf31388401dd1708029.1253722954.git.rmk+kernel@arm.linux.org.uk>
+	<4AC92954.1010104@lwfinger.net>
+	<20091004231402.GA31087@n2100.arm.linux.org.uk>
+Message-ID: <20091005112113.7d431aa6.kristoffer.ericson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At some point the SPI device name in arch/arm/mach-mx3/devices.c has 
-changed, which then broke compilation of pcm037_eet with the new SPI 
-driver. Use the correct name.
+On Mon, 5 Oct 2009 00:14:02 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
----
-diff --git a/arch/arm/mach-mx3/pcm037_eet.c b/arch/arm/mach-mx3/pcm037_eet.c
-index 8d38600..dc6baf3 100644
---- a/arch/arm/mach-mx3/pcm037_eet.c
-+++ b/arch/arm/mach-mx3/pcm037_eet.c
-@@ -184,7 +184,7 @@ static int eet_init_devices(void)
- 	/* SPI */
- 	spi_register_board_info(pcm037_spi_dev, ARRAY_SIZE(pcm037_spi_dev));
- #if defined(CONFIG_SPI_IMX) || defined(CONFIG_SPI_IMX_MODULE)
--	mxc_register_device(&mxc_spi_device0, &pcm037_spi1_master);
-+	mxc_register_device(&imx_spi_device0, &pcm037_spi1_master);
- #endif
- 
- 	platform_device_register(&pcm037_gpio_keys_device);
+> On Sun, Oct 04, 2009 at 06:01:40PM -0500, Larry Finger wrote:
+> > Russell King wrote:
+> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > > ---
+> > >  drivers/pcmcia/pxa2xx_base.c       |   19 +++++++----
+> > >  drivers/pcmcia/pxa2xx_base.h       |    3 ++
+> > >  drivers/pcmcia/pxa2xx_lubbock.c    |   10 ++++--
+> > >  drivers/pcmcia/sa1100_badge4.c     |    7 ++++-
+> > >  drivers/pcmcia/sa1100_jornada720.c |   20 ++++++++----
+> > >  drivers/pcmcia/sa1100_neponset.c   |    9 ++++-
+> > >  drivers/pcmcia/sa1111_generic.c    |   58 ++++++++++++++++++++++++++++--------
+> > >  drivers/pcmcia/sa1111_generic.h    |   14 ++++++++
+> > >  drivers/pcmcia/sa11xx_base.c       |   21 ++++++++----
+> > >  drivers/pcmcia/sa11xx_base.h       |    2 +
+> > >  10 files changed, 123 insertions(+), 40 deletions(-)
+> > 
+> > What tree is this patch for? I get the following errors when applying
+> > to taday's pull of Linus's tree (git describe is
+> > v2.6.32-rc1-384-ga99bbaf):
+> > 
+> > patching file drivers/pcmcia/sa1100_jornada720.c
+> > Hunk #1 FAILED at 24.
+> > Hunk #2 FAILED at 40.
+> > Hunk #3 FAILED at 85.
+> > Hunk #4 FAILED at 101.
+> > 4 out of 4 hunks FAILED -- rejects in file
+> > drivers/pcmcia/sa1100_jornada720.c
+> 
+> Guess that's because 5690/1 was been applied behind my back.  I'll see
+> about rebasing the patch and discarding 5690 from the patch system.
+
+My bad, it sent an updated version to linux-pcmcia while
+forgetting to CC arm. Also totally forgot that I still had it
+pending inside linux-arm patch tracker.
+
+Sorry
+
+> 
+> _______________________________________________
+> Linux PCMCIA reimplementation list
+> http://lists.infradead.org/mailman/listinfo/linux-pcmcia
+
+
+-- 
+Kristoffer Ericson <kristoffer.ericson@gmail.com>
