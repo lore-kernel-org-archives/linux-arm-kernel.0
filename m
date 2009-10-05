@@ -1,59 +1,52 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 5 Oct 2009 14:20:41 +0200
-Subject: [PATCH] fix compilation of i.MX31 platforms
-In-Reply-To: <Pine.LNX.4.64.0910050945480.4337@axis700.grange>
-References: <Pine.LNX.4.64.0910050945480.4337@axis700.grange>
-Message-ID: <20091005122041.GE23986@pengutronix.de>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Mon, 05 Oct 2009 13:24:28 +0100
+Subject: Strange rejection messages -- was Your message to
+	linux-arm-kernel awaits moderator approval (fwd)
+In-Reply-To: <20091005120802.GB13694@elf.ucw.cz>
+References: <20091004190036.GE1378@ucw.cz>
+	<1254690469.3277.2467.camel@macbook.infradead.org>
+	<20091004211704.GF1447@elf.ucw.cz>
+	<1254724599.3277.3066.camel@macbook.infradead.org>
+	<20091005115159.GD11044@shareable.org>
+	<20091005120802.GB13694@elf.ucw.cz>
+Message-ID: <1254745468.13096.331.camel@macbook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 05, 2009 at 10:00:58AM +0200, Guennadi Liakhovetski wrote:
-> mxc_iomux_v3_init() is defined in arch/arm/plat-mxc/iomux-v3.c, which is 
-> not linked for i.MX31 and produces an undefined reference error. Fix this 
-> by building the offending code only for i.MX35.
-
-Ok for -rc.
-
+On Mon, 2009-10-05 at 14:08 +0200, Pavel Machek wrote:
 > 
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> ---
-> 
-> 2.6.32-rc1 (and, AFAICS, all current trees) don't build for i.MX31.
+> Well, I get notified that it was trapped, but that's about it. I do
+> not get notified when it is forwarded, I do not get notified _why_ it
+> was trapped, and I'm not even told which exact message was that.
 
-At least not when i.MX35 is disabled.
+You do get the Subject line, although you don't get the Message-Id.
 
-Sascha
+> Maybe the "trapped for moderation" message simply should not be sent,
+> or only be sent after mail is in queue for 24 hours or something?
 
-> Disliking #ifdef's as much as you do, this is not the best fix. A nicer 
-> one would be defining a dummy mxc_iomux_v3_init() inline in 
-> arch/arm/plat-mxc/include/mach/iomux-v3.h, but this would waste a couple 
-> of bytes in arch/arm/mach-mx3/mm.o for the unneeded mx35_map_io(). Either 
-> way is fine with me, shoose whichever you prefer.
-> 
-> diff --git a/arch/arm/mach-mx3/mm.c b/arch/arm/mach-mx3/mm.c
-> index ad5a112..bedf5b8 100644
-> --- a/arch/arm/mach-mx3/mm.c
-> +++ b/arch/arm/mach-mx3/mm.c
-> @@ -81,6 +81,7 @@ void __init mx31_map_io(void)
->  	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
->  }
->  
-> +#ifdef CONFIG_ARCH_MX35
->  void __init mx35_map_io(void)
->  {
->  	mxc_set_cpu_type(MXC_CPU_MX35);
-> @@ -89,6 +90,7 @@ void __init mx35_map_io(void)
->  
->  	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
->  }
-> +#endif
->  
->  void __init mx31_init_irq(void)
->  {
-> 
+Maybe. At some point I want to turn it into an SMTP-time rejection (even
+though the message is actually accepted, and the 'rejection' message
+will say that. The mailman behaviour will be sending 'notification' to
+people whose email address was _faked_ as the sender of the trapped
+mail.
+
+> > > This happens on lkml too, but the only difference is that you don't get
+> > > _told_ about it.
+> > 
+> > I guess Pavel wants to know what's suspicious about it, so he can
+> > avoid being stuck in the moderation queue in future.
+
+I believe that particular message was flagged by the "Message has
+References: or In-Reply-To: header, but Subject doesn't start with 'Re:'
+rule -- which is there to catch the people who hijack existing threads
+when they should be starting new ones.
+
+I've now made that accept 'Re:' _anywhere_ in the subject line, rather
+than only at the beginning, so I don't think that particular mail would
+be trapped in future.
+
+But the moderators are usually quite fast -- there's no real _harm_ in
+being trapped for moderation. You're making a fuss over nothing.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+dwmw2
