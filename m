@@ -1,47 +1,119 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Mon, 5 Oct 2009 12:51:59 +0100
-Subject: Strange rejection messages -- was Your message to
-	linux-arm-kernel awaits moderator approval (fwd)
-In-Reply-To: <1254724599.3277.3066.camel@macbook.infradead.org>
-References: <20091004190036.GE1378@ucw.cz>
-	<1254690469.3277.2467.camel@macbook.infradead.org>
-	<20091004211704.GF1447@elf.ucw.cz>
-	<1254724599.3277.3066.camel@macbook.infradead.org>
-Message-ID: <20091005115159.GD11044@shareable.org>
+From: cgagneraud@techworks.ie (Christian Gagneraud)
+Date: Mon, 05 Oct 2009 13:06:16 +0100
+Subject: [PATCH v1.0 3/4] EP93XX: Add more register definition
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901DB75AC@mi8nycmail19.Mi8.com>
+References: <20091004011413.12578.89897.stgit@localhost.localdomain>	<20091004011429.12578.27177.stgit@localhost.localdomain>
+	<BD79186B4FD85F4B8E60E381CAEE190901DB75AC@mi8nycmail19.Mi8.com>
+Message-ID: <4AC9E138.1040309@techworks.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David Woodhouse wrote:
-> On Sun, 2009-10-04 at 23:17 +0200, Pavel Machek wrote:
-> > On Sun 2009-10-04 22:07:49, David Woodhouse wrote:
-> > > On Sun, 2009-10-04 at 21:00 +0200, Pavel Machek wrote:
-> > > > Hi!
-> > > > 
-> > > > I'm still getting strange bounces about 'suspicious header'. I don't
-> > > > think I'm doing anything strange -- is the 'in-reply-to' trap still
-> > > > there? Can it get fixed?
-> > > 
-> > > My logs show no bounces, and no rejections of your mail. Can you give me
-> > > details of the message which didn't make it through to the list? I can't
-> > > see anything of yours which didn't.
-> > 
-> > Thats the thing... I just got "suspicious header" message in mail inbox,
-> > and I forwarded that. I tried googling for message subject, and yes it
-> > hit lkml, but google will not tell me if it was delivered to linux-arm...
+H Hartley Sweeten wrote:
+> On Saturday, October 03, 2009 6:14 PM, Christian Gagneraud wrote:
+>> Add register definition for GPIO A,B,C and D data and data direction,
+>> Security, Chip ID, ...
+>>
+>> Signed-off-by: Matthieu Crapet <mcrapet@gmail.com>
+>> Signed-off-by: Christian Gagneraud <cgagneraud@techworks.ie>
+>> ---
+>>
+>>  arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |   15 +++++++++++++++
+>>  1 files changed, 15 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+>> index c5216fc..a5f721e 100644
+>> --- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+>> +++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+>> @@ -111,28 +111,42 @@
+>>  #define EP93XX_I2S_BASE			EP93XX_APB_IOMEM(0x00020000)
+>>  
+>>  #define EP93XX_SECURITY_BASE		EP93XX_APB_IOMEM(0x00030000)
+>> +#define EP93XX_SECURITY_REG(x)		(EP93XX_SECURITY_BASE + (x))
+>> +#define EP93XX_SECURITY_UNIQID		EP93XX_SECURITY_REG(0x2440)
+>>  
+>>  #define EP93XX_GPIO_BASE		EP93XX_APB_IOMEM(0x00040000)
+>>  #define EP93XX_GPIO_REG(x)		(EP93XX_GPIO_BASE + (x))
+>> +#define EP93XX_GPIO_A_DATA		EP93XX_GPIO_REG(0x00)
+>> +#define EP93XX_GPIO_B_DATA		EP93XX_GPIO_REG(0x04)
+>> +#define EP93XX_GPIO_C_DATA		EP93XX_GPIO_REG(0x08)
+>> +#define EP93XX_GPIO_D_DATA		EP93XX_GPIO_REG(0x0C)
+>> +#define EP93XX_GPIO_A_DIR		EP93XX_GPIO_REG(0x10)
+>> +#define EP93XX_GPIO_B_DIR		EP93XX_GPIO_REG(0x14)
+>> +#define EP93XX_GPIO_C_DIR		EP93XX_GPIO_REG(0x18)
+>> +#define EP93XX_GPIO_D_DIR		EP93XX_GPIO_REG(0x1C)
+>>  #define EP93XX_GPIO_F_INT_TYPE1		EP93XX_GPIO_REG(0x4c)
+>>  #define EP93XX_GPIO_F_INT_TYPE2		EP93XX_GPIO_REG(0x50)
+>>  #define EP93XX_GPIO_F_INT_ACK		EP93XX_GPIO_REG(0x54)
+>>  #define EP93XX_GPIO_F_INT_ENABLE	EP93XX_GPIO_REG(0x58)
+>>  #define EP93XX_GPIO_F_INT_STATUS	EP93XX_GPIO_REG(0x5c)
+>> +#define EP93XX_GPIO_F_INT_DEBOUNCE	EP93XX_GPIO_REG(0x64)
+>>  #define EP93XX_GPIO_A_INT_TYPE1		EP93XX_GPIO_REG(0x90)
+>>  #define EP93XX_GPIO_A_INT_TYPE2		EP93XX_GPIO_REG(0x94)
+>>  #define EP93XX_GPIO_A_INT_ACK		EP93XX_GPIO_REG(0x98)
+>>  #define EP93XX_GPIO_A_INT_ENABLE	EP93XX_GPIO_REG(0x9c)
+>> +#define EP93XX_GPIO_A_INT_DEBOUNCE	EP93XX_GPIO_REG(0xa8)
+>>  #define EP93XX_GPIO_A_INT_STATUS	EP93XX_GPIO_REG(0xa0)
+>>  #define EP93XX_GPIO_B_INT_TYPE1		EP93XX_GPIO_REG(0xac)
+>>  #define EP93XX_GPIO_B_INT_TYPE2		EP93XX_GPIO_REG(0xb0)
+>>  #define EP93XX_GPIO_B_INT_ACK		EP93XX_GPIO_REG(0xb4)
+>>  #define EP93XX_GPIO_B_INT_ENABLE	EP93XX_GPIO_REG(0xb8)
+>>  #define EP93XX_GPIO_B_INT_STATUS	EP93XX_GPIO_REG(0xbc)
+>> +#define EP93XX_GPIO_B_INT_DEBOUNCE	EP93XX_GPIO_REG(0xc4)
+>>  #define EP93XX_GPIO_EEDRIVE		EP93XX_GPIO_REG(0xc8)
 > 
-> Of course it was delivered.
+> The ep93xx has been converted to full gpiolib support.  There
+> is no need for the GPIO register defines.  Also, it's a bad
+> idea to have them since anything using these will be "breaking"
+> the gpiolib API.
 > 
-> Pavel, what is so hard for you to understand? In order to keep spam and
-> other noise on the list down, some mails are trapped for _MODERATION_.
-> 
-> When this happens, you get notified. It is not a _bounce_; it is not a
-> _rejection_. I will not even bother _looking_ if you make stupid claims
-> like that again.
-> 
-> This happens on lkml too, but the only difference is that you don't get
-> _told_ about it.
+> If you need to use the gpio debounce the ep93xx core already has
+> support for this.  Please see ep93xx_gpio_int_debounce() in
+> arch/arm/mach-ep93xx/core.c.
 
-I guess Pavel wants to know what's suspicious about it, so he can
-avoid being stuck in the moderation queue in future.
+This was needed for a GPIO based keypad. I will have a look on how to 
+convert it to use GPIO lib.
 
--- Jamie
+> 
+> On a side note.  What tree did you base this patch on?  The
+> EP93XX_GPIO_EEDRIVE is not currently in mainline.
+
+Linus tree + a couple of pending patches from this ML.
+
+> 
+>>  #define EP93XX_AAC_BASE			EP93XX_APB_IOMEM(0x00080000)
+>>  
+>> +#define EP93XX_SPI_PHYS_BASE		EP93XX_APB_PHYS(0x000a0000)
+>>  #define EP93XX_SPI_BASE			EP93XX_APB_IOMEM(0x000a0000)
+>>  
+>>  #define EP93XX_IRDA_BASE		EP93XX_APB_IOMEM(0x000b0000)
+>> @@ -221,6 +235,7 @@
+>>  #define EP93XX_SYSCON_KEYTCHCLKDIV_ADIV	(1<<16)
+>>  #define EP93XX_SYSCON_KEYTCHCLKDIV_KEN	(1<<15)
+>>  #define EP93XX_SYSCON_KEYTCHCLKDIV_KDIV	(1<<0)
+>> +#define EP93XX_SYSCON_CHIPID		EP93XX_SYSCON_REG(0x94)
+>>  #define EP93XX_SYSCON_SWLOCK		EP93XX_SYSCON_REG(0xc0)
+>>  
+>>  #define EP93XX_WATCHDOG_BASE		EP93XX_APB_IOMEM(0x00140000)
+> 
+> NAK.
+
+OK for GPIO and SPI, but what about the SECURITY and SYSCON_CHIPID 
+stuff? The idea behind that is to extend in some way board/cpu 
+specific information.
+For example the TS-7XXX boards comes with some options, there is 
+currently a patch that add a /proc entry to display cpu and board 
+information (CPU version, CPLD/FPGA firmware version, state of 
+configuration jumpers, HW options installed, ...)
+
+
+Regards,
+Chris
+
+> 
+> Regards,
+> Hartley
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
