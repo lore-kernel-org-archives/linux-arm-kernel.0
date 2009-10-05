@@ -1,66 +1,47 @@
-From: ospite@studenti.unina.it (Antonio Ospite)
-Date: Mon, 5 Oct 2009 12:45:58 +0200
-Subject: [PATCH] pxamci: fix printing gpio numbers in pxamci_probe
-In-Reply-To: <1254493442-32312-1-git-send-email-ospite@studenti.unina.it>
-References: <1254493442-32312-1-git-send-email-ospite@studenti.unina.it>
-Message-ID: <20091005124558.04dd13cd.ospite@studenti.unina.it>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Mon, 5 Oct 2009 12:51:59 +0100
+Subject: Strange rejection messages -- was Your message to
+	linux-arm-kernel awaits moderator approval (fwd)
+In-Reply-To: <1254724599.3277.3066.camel@macbook.infradead.org>
+References: <20091004190036.GE1378@ucw.cz>
+	<1254690469.3277.2467.camel@macbook.infradead.org>
+	<20091004211704.GF1447@elf.ucw.cz>
+	<1254724599.3277.3066.camel@macbook.infradead.org>
+Message-ID: <20091005115159.GD11044@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  2 Oct 2009 16:24:02 +0200
-Antonio Ospite <ospite@studenti.unina.it> wrote:
-
-> Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
-> ---
->  drivers/mmc/host/pxamci.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+David Woodhouse wrote:
+> On Sun, 2009-10-04 at 23:17 +0200, Pavel Machek wrote:
+> > On Sun 2009-10-04 22:07:49, David Woodhouse wrote:
+> > > On Sun, 2009-10-04 at 21:00 +0200, Pavel Machek wrote:
+> > > > Hi!
+> > > > 
+> > > > I'm still getting strange bounces about 'suspicious header'. I don't
+> > > > think I'm doing anything strange -- is the 'in-reply-to' trap still
+> > > > there? Can it get fixed?
+> > > 
+> > > My logs show no bounces, and no rejections of your mail. Can you give me
+> > > details of the message which didn't make it through to the list? I can't
+> > > see anything of yours which didn't.
+> > 
+> > Thats the thing... I just got "suspicious header" message in mail inbox,
+> > and I forwarded that. I tried googling for message subject, and yes it
+> > hit lkml, but google will not tell me if it was delivered to linux-arm...
 > 
-> diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
-> index 5e0b152..b00d673 100644
-> --- a/drivers/mmc/host/pxamci.c
-> +++ b/drivers/mmc/host/pxamci.c
-> @@ -693,7 +693,7 @@ static int pxamci_probe(struct platform_device *pdev)
->  	if (gpio_is_valid(gpio_ro)) {
->  		ret = gpio_request(gpio_ro, "mmc card read only");
->  		if (ret) {
-> -			dev_err(&pdev->dev, "Failed requesting gpio_ro %d\n", gpio_power);
-> +			dev_err(&pdev->dev, "Failed requesting gpio_ro %d\n", gpio_ro);
->  			goto err_gpio_ro;
->  		}
->  		gpio_direction_input(gpio_ro);
-> @@ -701,7 +701,7 @@ static int pxamci_probe(struct platform_device *pdev)
->  	if (gpio_is_valid(gpio_cd)) {
->  		ret = gpio_request(gpio_cd, "mmc card detect");
->  		if (ret) {
-> -			dev_err(&pdev->dev, "Failed requesting gpio_cd %d\n", gpio_power);
-> +			dev_err(&pdev->dev, "Failed requesting gpio_cd %d\n", gpio_cd);
->  			goto err_gpio_cd;
->  		}
->  		gpio_direction_input(gpio_cd);
-> -- 
-> 1.6.4.3
+> Of course it was delivered.
 > 
+> Pavel, what is so hard for you to understand? In order to keep spam and
+> other noise on the list down, some mails are trapped for _MODERATION_.
+> 
+> When this happens, you get notified. It is not a _bounce_; it is not a
+> _rejection_. I will not even bother _looking_ if you make stupid claims
+> like that again.
+> 
+> This happens on lkml too, but the only difference is that you don't get
+> _told_ about it.
 
-Ping.
+I guess Pavel wants to know what's suspicious about it, so he can
+avoid being stuck in the moderation queue in future.
 
-Thanks,
-   Antonio
-
--- 
-Antonio Ospite
-http://ao2.it
-
-PGP public key ID: 0x4553B001
-
-A: Because it messes up the order in which people normally read text.
-   See http://en.wikipedia.org/wiki/Posting_style
-Q: Why is top-posting such a bad thing?
-A: Top-posting.
-Q: What is the most annoying thing in e-mail?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091005/cadc7a03/attachment.sig>
+-- Jamie
