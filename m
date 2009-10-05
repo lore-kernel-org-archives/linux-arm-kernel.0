@@ -1,42 +1,94 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 5 Oct 2009 00:14:02 +0100
-Subject: [RFC PATCH 05/10] PCMCIA: sa1111: wrap soc_pcmcia_socket to
-	contain sa1111 specific data
-In-Reply-To: <4AC92954.1010104@lwfinger.net>
-References: <6cc18319511869ba8c46bf1d1b20553baa170904.1253722954.git.rmk+kernel@arm.linux.org.uk>
-	<485cc33b078bb619d4544cf31388401dd1708029.1253722954.git.rmk+kernel@arm.linux.org.uk>
-	<4AC92954.1010104@lwfinger.net>
-Message-ID: <20091004231402.GA31087@n2100.arm.linux.org.uk>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Sun, 4 Oct 2009 20:52:45 -0400
+Subject: [PATCH] ep93xx: add remaining phys offset selections and
+	updatemicro9
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901D423B7@mi8nycmail19.Mi8.com>
+References: <BD79186B4FD85F4B8E60E381CAEE190901D42257@mi8nycmail19.Mi8.com><75467E8A2C28434DA9302761D4D2B6FDB02DC7@coexs.contec-int.at>
+	<BD79186B4FD85F4B8E60E381CAEE190901D423B7@mi8nycmail19.Mi8.com>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901DB75B0@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 04, 2009 at 06:01:40PM -0500, Larry Finger wrote:
-> Russell King wrote:
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> >  drivers/pcmcia/pxa2xx_base.c       |   19 +++++++----
-> >  drivers/pcmcia/pxa2xx_base.h       |    3 ++
-> >  drivers/pcmcia/pxa2xx_lubbock.c    |   10 ++++--
-> >  drivers/pcmcia/sa1100_badge4.c     |    7 ++++-
-> >  drivers/pcmcia/sa1100_jornada720.c |   20 ++++++++----
-> >  drivers/pcmcia/sa1100_neponset.c   |    9 ++++-
-> >  drivers/pcmcia/sa1111_generic.c    |   58 ++++++++++++++++++++++++++++--------
-> >  drivers/pcmcia/sa1111_generic.h    |   14 ++++++++
-> >  drivers/pcmcia/sa11xx_base.c       |   21 ++++++++----
-> >  drivers/pcmcia/sa11xx_base.h       |    2 +
-> >  10 files changed, 123 insertions(+), 40 deletions(-)
-> 
-> What tree is this patch for? I get the following errors when applying
-> to taday's pull of Linus's tree (git describe is
-> v2.6.32-rc1-384-ga99bbaf):
-> 
-> patching file drivers/pcmcia/sa1100_jornada720.c
-> Hunk #1 FAILED at 24.
-> Hunk #2 FAILED at 40.
-> Hunk #3 FAILED at 85.
-> Hunk #4 FAILED at 101.
-> 4 out of 4 hunks FAILED -- rejects in file
-> drivers/pcmcia/sa1100_jornada720.c
+This adds the missing Kconfig options for the first SDRAM bank address
+on ep93xx boards.
 
-Guess that's because 5690/1 was been applied behind my back.  I'll see
-about rebasing the patch and discarding 5690 from the patch system.
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <ryan@bluewatersys.com>
+Cc: Hubert Feurstein <hubert.feurstein@contec.at>
+
+---
+
+V2 - removed micro9 Kconfig changes, this will be a separate patch
+
+diff --git a/arch/arm/mach-ep93xx/Kconfig b/arch/arm/mach-ep93xx/Kconfig
+index d7291c6..6675c05 100644
+--- a/arch/arm/mach-ep93xx/Kconfig
++++ b/arch/arm/mach-ep93xx/Kconfig
+@@ -17,13 +17,31 @@ config EP93XX_SDCE3_SYNC_PHYS_OFFSET
+ 	bool "0x00000000 - SDCE3/SyncBoot"
+ 	help
+ 	  Select this option if you want support for EP93xx boards with the
+-	  first SDRAM bank at 0x00000000
++	  first SDRAM bank at 0x00000000.
+ 
+ config EP93XX_SDCE0_PHYS_OFFSET
+ 	bool "0xc0000000 - SDCEO"
+ 	help
+ 	  Select this option if you want support for EP93xx boards with the
+-	  first SDRAM bank at 0xc0000000
++	  first SDRAM bank at 0xc0000000.
++
++config EP93XX_SDCE1_PHYS_OFFSET
++	bool "0xd0000000 - SDCE1"
++	help
++	  Select this option if you want support for EP93xx boards with the
++	  first SDRAM bank at 0xd0000000.
++
++config EP93XX_SDCE2_PHYS_OFFSET
++	bool "0xe0000000 - SDCE2"
++	help
++	  Select this option if you want support for EP93xx boards with the
++	  first SDRAM bank at 0xe0000000.
++
++config EP93XX_SDCE3_ASYNC_PHYS_OFFSET
++	bool "0xf0000000 - SDCE3/AsyncBoot"
++	help
++	  Select this option if you want support for EP93xx boards with the
++	  first SDRAM bank at 0xf0000000.
+ 
+ endchoice
+ 
+diff --git a/arch/arm/mach-ep93xx/Makefile.boot b/arch/arm/mach-ep93xx/Makefile.boot
+index 27a085a..0ad33f1 100644
+--- a/arch/arm/mach-ep93xx/Makefile.boot
++++ b/arch/arm/mach-ep93xx/Makefile.boot
+@@ -3,3 +3,12 @@ params_phys-$(CONFIG_EP93XX_SDCE3_SYNC_PHYS_OFFSET)	:= 0x00000100
+ 
+    zreladdr-$(CONFIG_EP93XX_SDCE0_PHYS_OFFSET)		:= 0xc0008000
+ params_phys-$(CONFIG_EP93XX_SDCE0_PHYS_OFFSET)		:= 0xc0000100
++
++   zreladdr-$(CONFIG_EP93XX_SDCE1_PHYS_OFFSET)		:= 0xd0008000
++params_phys-$(CONFIG_EP93XX_SDCE1_PHYS_OFFSET)		:= 0xd0000100
++
++   zreladdr-$(CONFIG_EP93XX_SDCE2_PHYS_OFFSET)		:= 0xe0008000
++params_phys-$(CONFIG_EP93XX_SDCE2_PHYS_OFFSET)		:= 0xe0000100
++
++   zreladdr-$(CONFIG_EP93XX_SDCE3_ASYNC_PHYS_OFFSET)	:= 0xf0008000
++params_phys-$(CONFIG_EP93XX_SDCE3_ASYNC_PHYS_OFFSET)	:= 0xf0000100
+diff --git a/arch/arm/mach-ep93xx/include/mach/memory.h b/arch/arm/mach-ep93xx/include/mach/memory.h
+index 925b12e..554064e 100644
+--- a/arch/arm/mach-ep93xx/include/mach/memory.h
++++ b/arch/arm/mach-ep93xx/include/mach/memory.h
+@@ -9,6 +9,12 @@
+ #define PHYS_OFFSET		UL(0x00000000)
+ #elif defined(CONFIG_EP93XX_SDCE0_PHYS_OFFSET)
+ #define PHYS_OFFSET		UL(0xc0000000)
++#elif defined(CONFIG_EP93XX_SDCE1_PHYS_OFFSET)
++#define PHYS_OFFSET		UL(0xd0000000)
++#elif defined(CONFIG_EP93XX_SDCE2_PHYS_OFFSET)
++#define PHYS_OFFSET		UL(0xe0000000)
++#elif defined(CONFIG_EP93XX_SDCE3_ASYNC_PHYS_OFFSET)
++#define PHYS_OFFSET		UL(0xf0000000)
+ #else
+ #error "Kconfig bug: No EP93xx PHYS_OFFSET set"
+ #endif 
