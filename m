@@ -1,116 +1,49 @@
-From: thommycheck@gmx.de (Thomas Kunze)
-Date: Mon,  5 Oct 2009 23:35:33 +0200
-Subject: [PATCH 9/9] collie: support pda_power driver
-In-Reply-To: <1254778533-3529-9-git-send-email-thommycheck@gmx.de>
-References: <1254778533-3529-1-git-send-email-thommycheck@gmx.de>
-	<1254778533-3529-2-git-send-email-thommycheck@gmx.de>
-	<1254778533-3529-3-git-send-email-thommycheck@gmx.de>
-	<1254778533-3529-4-git-send-email-thommycheck@gmx.de>
-	<1254778533-3529-5-git-send-email-thommycheck@gmx.de>
-	<1254778533-3529-6-git-send-email-thommycheck@gmx.de>
-	<1254778533-3529-7-git-send-email-thommycheck@gmx.de>
-	<1254778533-3529-8-git-send-email-thommycheck@gmx.de>
-	<1254778533-3529-9-git-send-email-thommycheck@gmx.de>
-Message-ID: <1254778533-3529-10-git-send-email-thommycheck@gmx.de>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 5 Oct 2009 18:03:27 -0400
+Subject: [PATCH] Change ep93xx gpio_irq static inlines to macros
+In-Reply-To: <49EBDE05.1050406@bluewatersys.com>
+References: <49EBDE05.1050406@bluewatersys.com>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901DB7762@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This add the pda-power platform device to collie.
+From: Ryan Mallon <ryan@bluewatersys.com>
 
-Signed-off-by: Thomas Kunze <thommycheck@gmx.de>
+Change the gpio_to_irq and irq_to_gpio static inline functions to macros
+so that they can be used in variable initialisers.
+
+Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+
 ---
- arch/arm/mach-sa1100/collie.c |   65 +++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 65 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
-index 395cf09..fdab9d9 100644
---- a/arch/arm/mach-sa1100/collie.c
-+++ b/arch/arm/mach-sa1100/collie.c
-@@ -26,6 +26,7 @@
- #include <linux/mtd/partitions.h>
- #include <linux/timer.h>
- #include <linux/gpio.h>
-+#include <linux/pda_power.h>
+This patch seems to have been lost, originally posted 4/19/2009.
+Updated so that the macro parameters are wrapped with ().
+
+
+diff --git a/arch/arm/mach-ep93xx/include/mach/gpio.h b/arch/arm/mach-ep93xx/include/mach/gpio.h
+index 0a1498a..c991b14 100644
+--- a/arch/arm/mach-ep93xx/include/mach/gpio.h
++++ b/arch/arm/mach-ep93xx/include/mach/gpio.h
+@@ -114,17 +114,9 @@ extern void ep93xx_gpio_int_debounce(unsigned int irq, int enable);
+  *          B0..B7  (7..15) to irq 72..79, and
+  *          F0..F7 (16..24) to irq 80..87.
+  */
+-static inline int gpio_to_irq(unsigned gpio)
+-{
+-	if (gpio <= EP93XX_GPIO_LINE_MAX_IRQ)
+-		return 64 + gpio;
+-
+-	return -EINVAL;
+-}
+-
+-static inline int irq_to_gpio(unsigned irq)
+-{
+-	return irq - gpio_to_irq(0);
+-}
++#define gpio_to_irq(gpio)	\
++	(((gpio) <= EP93XX_GPIO_LINE_MAX_IRQ) ? (64 + (gpio)) : -EINVAL)
++
++#define irq_to_gpio(irq)	((irq) - gpio_to_irq(0))
  
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
-@@ -89,6 +90,69 @@ static struct mcp_plat_data collie_mcp_data = {
- 	.gpio_base	= COLLIE_TC35143_GPIO_BASE,
- };
- 
-+/*
-+ * Collie AC IN
-+ */
-+static int collie_power_init(struct device *dev)
-+{
-+	int ret = gpio_request(COLLIE_GPIO_AC_IN, "ac in");
-+	if (ret)
-+		goto err_gpio_req;
-+
-+	ret = gpio_direction_input(COLLIE_GPIO_AC_IN);
-+	if (ret)
-+		goto err_gpio_in;
-+
-+	return 0;
-+
-+err_gpio_in:
-+	gpio_free(COLLIE_GPIO_AC_IN);
-+err_gpio_req:
-+	return ret;
-+}
-+
-+static void collie_power_exit(struct device *dev)
-+{
-+	gpio_free(COLLIE_GPIO_AC_IN);
-+}
-+
-+static int collie_power_ac_online(void)
-+{
-+	return gpio_get_value(COLLIE_GPIO_AC_IN) == 2;
-+}
-+
-+static char *collie_ac_supplied_to[] = {
-+	"main-battery",
-+	"backup-battery",
-+};
-+
-+static struct pda_power_pdata collie_power_data = {
-+	.init			= collie_power_init,
-+	.is_ac_online		= collie_power_ac_online,
-+	.exit			= collie_power_exit,
-+	.supplied_to		= collie_ac_supplied_to,
-+	.num_supplicants	= ARRAY_SIZE(collie_ac_supplied_to),
-+};
-+
-+static struct resource collie_power_resource[] = {
-+	{
-+		.name		= "ac",
-+		.start		= gpio_to_irq(COLLIE_GPIO_AC_IN),
-+		.end		= gpio_to_irq(COLLIE_GPIO_AC_IN),
-+		.flags		= IORESOURCE_IRQ |
-+				  IORESOURCE_IRQ_HIGHEDGE |
-+				  IORESOURCE_IRQ_LOWEDGE,
-+	},
-+};
-+
-+static struct platform_device collie_power_device = {
-+	.name			= "pda-power",
-+	.id			= -1,
-+	.dev.platform_data	= &collie_power_data,
-+	.resource		= collie_power_resource,
-+	.num_resources		= ARRAY_SIZE(collie_power_resource),
-+};
-+
- #ifdef CONFIG_SHARP_LOCOMO
- /*
-  * low-level UART features.
-@@ -180,6 +244,7 @@ struct platform_device collie_locomo_device = {
- static struct platform_device *devices[] __initdata = {
- 	&collie_locomo_device,
- 	&colliescoop_device,
-+	&collie_power_device,
- };
- 
- static struct mtd_partition collie_partitions[] = {
--- 
-1.6.0.4
+ #endif 
