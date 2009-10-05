@@ -1,29 +1,110 @@
 From: thommycheck@gmx.de (Thomas Kunze)
-Date: Mon,  5 Oct 2009 23:35:25 +0200
-Subject: [PATCH 1/9] collie: fix scoop convesion to new api
-In-Reply-To: <1254778533-3529-1-git-send-email-thommycheck@gmx.de>
+Date: Mon,  5 Oct 2009 23:35:26 +0200
+Subject: [PATCH 2/9] collie: prepare for gpiolib use
+In-Reply-To: <1254778533-3529-2-git-send-email-thommycheck@gmx.de>
 References: <1254778533-3529-1-git-send-email-thommycheck@gmx.de>
-Message-ID: <1254778533-3529-2-git-send-email-thommycheck@gmx.de>
+	<1254778533-3529-2-git-send-email-thommycheck@gmx.de>
+Message-ID: <1254778533-3529-3-git-send-email-thommycheck@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+prefix gpio definitions for direct register access with '_' so we
+can use the other names for gpio_request & co
 
 Signed-off-by: Thomas Kunze <thommycheck@gmx.de>
 ---
- arch/arm/mach-sa1100/collie.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/mach-sa1100/collie.c              |   12 ++++---
+ arch/arm/mach-sa1100/include/mach/collie.h |   42 +++++++++++++++++----------
+ 2 files changed, 33 insertions(+), 21 deletions(-)
 
 diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
-index bbf2ebc..b629cba 100644
+index b629cba..9f5029c 100644
 --- a/arch/arm/mach-sa1100/collie.c
 +++ b/arch/arm/mach-sa1100/collie.c
-@@ -56,6 +56,7 @@ static struct resource collie_scoop_resources[] = {
- static struct scoop_config collie_scoop_setup = {
- 	.io_dir 	= COLLIE_SCOOP_IO_DIR,
- 	.io_out		= COLLIE_SCOOP_IO_OUT,
-+	.gpio_base	= COLLIE_SCOOP_GPIO_BASE,
- };
+@@ -249,22 +249,24 @@ static void __init collie_init(void)
+ 	GPDR = GPIO_LDD8 | GPIO_LDD9 | GPIO_LDD10 | GPIO_LDD11 | GPIO_LDD12 |
+ 		GPIO_LDD13 | GPIO_LDD14 | GPIO_LDD15 | GPIO_SSP_TXD |
+ 		GPIO_SSP_SCLK | GPIO_SSP_SFRM | GPIO_SDLC_SCLK |
+-		COLLIE_GPIO_UCB1x00_RESET | COLLIE_GPIO_nMIC_ON |
+-		COLLIE_GPIO_nREMOCON_ON | GPIO_32_768kHz;
++		_COLLIE_GPIO_UCB1x00_RESET | _COLLIE_GPIO_nMIC_ON |
++		_COLLIE_GPIO_nREMOCON_ON | GPIO_32_768kHz;
  
- struct platform_device colliescoop_device = {
+ 	PPDR = PPC_LDD0 | PPC_LDD1 | PPC_LDD2 | PPC_LDD3 | PPC_LDD4 | PPC_LDD5 |
+ 		PPC_LDD6 | PPC_LDD7 | PPC_L_PCLK | PPC_L_LCLK | PPC_L_FCLK | PPC_L_BIAS |
+ 		PPC_TXD1 | PPC_TXD2 | PPC_TXD3 | PPC_TXD4 | PPC_SCLK | PPC_SFRM;
+ 
+-	PWER = COLLIE_GPIO_AC_IN | COLLIE_GPIO_CO | COLLIE_GPIO_ON_KEY |
+-		COLLIE_GPIO_WAKEUP | COLLIE_GPIO_nREMOCON_INT | PWER_RTC;
++	PWER = _COLLIE_GPIO_AC_IN | _COLLIE_GPIO_CO | _COLLIE_GPIO_ON_KEY |
++		_COLLIE_GPIO_WAKEUP | _COLLIE_GPIO_nREMOCON_INT | PWER_RTC;
+ 
+-	PGSR = COLLIE_GPIO_nREMOCON_ON;
++	PGSR = _COLLIE_GPIO_nREMOCON_ON;
+ 
+ 	PSDR = PPC_RXD1 | PPC_RXD2 | PPC_RXD3 | PPC_RXD4;
+ 
+ 	PCFR = PCFR_OPDE;
+ 
++	GPSR |= _COLLIE_GPIO_UCB1x00_RESET;
++
+ 
+ 	platform_scoop_config = &collie_pcmcia_config;
+ 
+diff --git a/arch/arm/mach-sa1100/include/mach/collie.h b/arch/arm/mach-sa1100/include/mach/collie.h
+index 9efb569..8c8fe46 100644
+--- a/arch/arm/mach-sa1100/include/mach/collie.h
++++ b/arch/arm/mach-sa1100/include/mach/collie.h
+@@ -30,24 +30,34 @@
+ 				COLLIE_SCP_LB_VOL_CHG )
+ #define COLLIE_SCOOP_IO_OUT	( COLLIE_SCP_MUTE_L | COLLIE_SCP_MUTE_R )
+ 
+-/* GPIOs for which the generic definition doesn't say much */
++/* GPIOs for gpiolib  */
+ 
+-#define COLLIE_GPIO_ON_KEY		GPIO_GPIO (0)
+-#define COLLIE_GPIO_AC_IN		GPIO_GPIO (1)
+-#define COLLIE_GPIO_SDIO_INT		GPIO_GPIO (11)
+-#define COLLIE_GPIO_CF_IRQ		GPIO_GPIO (14)
+-#define COLLIE_GPIO_nREMOCON_INT	GPIO_GPIO (15)
+-#define COLLIE_GPIO_UCB1x00_RESET	GPIO_GPIO (16)
+-#define COLLIE_GPIO_nMIC_ON		GPIO_GPIO (17)
+-#define COLLIE_GPIO_nREMOCON_ON		GPIO_GPIO (18)
+-#define COLLIE_GPIO_CO			GPIO_GPIO (20)
+-#define COLLIE_GPIO_MCP_CLK		GPIO_GPIO (21)
+-#define COLLIE_GPIO_CF_CD		GPIO_GPIO (22)
+-#define COLLIE_GPIO_UCB1x00_IRQ		GPIO_GPIO (23)
+-#define COLLIE_GPIO_WAKEUP		GPIO_GPIO (24)
+-#define COLLIE_GPIO_GA_INT		GPIO_GPIO (25)
+-#define COLLIE_GPIO_MAIN_BAT_LOW	GPIO_GPIO (26)
++#define COLLIE_GPIO_ON_KEY		(0)
++#define COLLIE_GPIO_AC_IN		(1)
++#define COLLIE_GPIO_SDIO_INT		(11)
++#define COLLIE_GPIO_CF_IRQ		(14)
++#define COLLIE_GPIO_nREMOCON_INT	(15)
++#define COLLIE_GPIO_UCB1x00_RESET	(16)
++#define COLLIE_GPIO_nMIC_ON		(17)
++#define COLLIE_GPIO_nREMOCON_ON		(18)
++#define COLLIE_GPIO_CO			(20)
++#define COLLIE_GPIO_MCP_CLK		(21)
++#define COLLIE_GPIO_CF_CD		(22)
++#define COLLIE_GPIO_UCB1x00_IRQ		(23)
++#define COLLIE_GPIO_WAKEUP		(24)
++#define COLLIE_GPIO_GA_INT		(25)
++#define COLLIE_GPIO_MAIN_BAT_LOW	(26)
+ 
++/* GPIO definitions for direct register access */
++
++#define _COLLIE_GPIO_ON_KEY		GPIO_GPIO(0)
++#define _COLLIE_GPIO_AC_IN		GPIO_GPIO(1)
++#define _COLLIE_GPIO_nREMOCON_INT	GPIO_GPIO(15)
++#define _COLLIE_GPIO_UCB1x00_RESET	GPIO_GPIO(16)
++#define _COLLIE_GPIO_nMIC_ON		GPIO_GPIO(17)
++#define _COLLIE_GPIO_nREMOCON_ON	GPIO_GPIO(18)
++#define _COLLIE_GPIO_CO			GPIO_GPIO(20)
++#define _COLLIE_GPIO_WAKEUP		GPIO_GPIO(24)
+ /* Interrupts */
+ 
+ #define COLLIE_IRQ_GPIO_ON_KEY		IRQ_GPIO0
 -- 
 1.6.0.4
