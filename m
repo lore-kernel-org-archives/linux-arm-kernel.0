@@ -1,73 +1,60 @@
 From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Mon, 5 Oct 2009 12:51:21 -0400
-Subject: [PATCH v1.0 3/4] EP93XX: Add more register definition
-In-Reply-To: <4AC9E138.1040309@techworks.ie>
-References: <20091004011413.12578.89897.stgit@localhost.localdomain>	<20091004011429.12578.27177.stgit@localhost.localdomain>
-	<BD79186B4FD85F4B8E60E381CAEE190901DB75AC@mi8nycmail19.Mi8.com>
-	<4AC9E138.1040309@techworks.ie>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901DB767F@mi8nycmail19.Mi8.com>
+Date: Mon, 5 Oct 2009 13:06:44 -0400
+Subject: [PATCH v1.0 4/4] MM: Switch TS72XX to use sparemem
+In-Reply-To: <4AC9E4B8.1040208@techworks.ie>
+References: <20091004011413.12578.89897.stgit@localhost.localdomain><20091004011434.12578.76922.stgit@localhost.localdomain>
+	<4AC9E4B8.1040208@techworks.ie>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901DB7687@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, October 05, 2009 5:06 AM, Christian Gagneraud wrote:
->> The ep93xx has been converted to full gpiolib support.  There
->> is no need for the GPIO register defines.  Also, it's a bad
->> idea to have them since anything using these will be "breaking"
->> the gpiolib API.
->> 
->> If you need to use the gpio debounce the ep93xx core already has
->> support for this.  Please see ep93xx_gpio_int_debounce() in
->> arch/arm/mach-ep93xx/core.c.
->
-> This was needed for a GPIO based keypad. I will have a look on how to 
-> convert it to use GPIO lib.
+On Monday, October 05, 2009 5:21 AM, Christian Gagneraud wrote:
+> Hi,
+> 
+> What people think about enabling sparsemem on EP93XX? I know this 
+> patch as it is will break all but this board.
+> 
+> Can we define defaults SECTION_SIZE_BITS and MAX_PHYSMEM_BITS that 
+> will suit all the supported boards?
 
-If you are referring to Matthieu Crapet's 0017-ts72xx_dio_keypad.patch,
-that patch appears to have already been converted over to use gpiolib.
+With sparsemem enabled what is your memory detected during boot?  For
+instance on my ep9307 based system with flatmem I get:
 
-Regardless, the in tree matrix_keypad.c driver will probably work
-instead of introducing another GPIO based keypad driver.
+Memory: 32MB 32MB = 64MB total
+Memory: 44552KB available (3452K code, 254K data, 124K init, 0K highmem)
 
->> On a side note.  What tree did you base this patch on?  The
->> EP93XX_GPIO_EEDRIVE is not currently in mainline.
->
-> Linus tree + a couple of pending patches from this ML.
+And cat /proc/iomem shows:
 
-Bad form.  Pending patches could always be dropped at some point.  You
-should only base your patches on published trees'.
+c0000000-c1ffffff : System RAM
+  c0027000-c0385fff : Kernel text
+  c03a0000-c03df88f : Kernel data
+c4000000-c5ffffff : System RAM
 
->>>  #define EP93XX_AAC_BASE			EP93XX_APB_IOMEM(0x00080000)
->>>  
->>> +#define EP93XX_SPI_PHYS_BASE		EP93XX_APB_PHYS(0x000a0000)
->>>  #define EP93XX_SPI_BASE			EP93XX_APB_IOMEM(0x000a0000)
->>>  
->>>  #define EP93XX_IRDA_BASE		EP93XX_APB_IOMEM(0x000b0000)
->>> @@ -221,6 +235,7 @@
->>>  #define EP93XX_SYSCON_KEYTCHCLKDIV_ADIV	(1<<16)
->>>  #define EP93XX_SYSCON_KEYTCHCLKDIV_KEN	(1<<15)
->>>  #define EP93XX_SYSCON_KEYTCHCLKDIV_KDIV	(1<<0)
->>> +#define EP93XX_SYSCON_CHIPID		EP93XX_SYSCON_REG(0x94)
->>>  #define EP93XX_SYSCON_SWLOCK		EP93XX_SYSCON_REG(0xc0)
->>>  
->>>  #define EP93XX_WATCHDOG_BASE		EP93XX_APB_IOMEM(0x00140000)
->> 
->> NAK.
->
-> OK for GPIO and SPI, but what about the SECURITY and SYSCON_CHIPID 
-> stuff? The idea behind that is to extend in some way board/cpu 
-> specific information.
-> For example the TS-7XXX boards comes with some options, there is 
-> currently a patch that add a /proc entry to display cpu and board 
-> information (CPU version, CPLD/FPGA firmware version, state of 
-> configuration jumpers, HW options installed, ...)
+So the kernel finds two 32MB chunks which is what the bootloader passed
+in the ATAGS.  And the addresses match what was passed.
 
-I think you are referring to Matthieu's 0006-ep93xx_cpuinfo.patch.
-This is IMHO a hack.  I have another approach for this that I proposed
-to Russell a while ago.  He had some concern's about breaking userspace
-tools at that time.  I am planning on resubmitting my patch shortly
-in order to get more opinions.
+What is your intended result by switching to sparsemem?
 
-Please hold off on this for a bit.
+I have also messed with sparsemem and I get the same results as above
+with it enabled.  I don't see any real reason to switch to sparsemem.
+
+The _only_ reason I can see is if a system has more than 8 banks of
+memory.  I think that is the current limit for flatmem support in the
+kernel.  There are only two configuration I know of that can cause this
+on the ep93xx when only on chip select is used:
+
+512 Mbit (16-bit wide device) = 64 MBytes with SROMLL = 0 -> 16 banks
+512 Mbit (2 x 16-bit wide device) = 128 Mbytes with SROMLL = 0 -> 16 banks
+
+Both of these configuration can be "fixed" by having the bootloader set
+the SROMLL bit = 1. 
+
+512 Mbit (16-bit wide device) = 64 MBytes with SROMLL = 1 -> 8 banks
+512 Mbit (2 x 16-bit wide device) = 128 Mbytes with SROMLL = 1 -> 1 bank
+
+Please refer to the following document for more information:
+
+http://arm.cirrus.com/files/HOWTO/EP93xx%20SDRAM%20Address%20Ranges.pdf
 
 Regards,
 Hartley
