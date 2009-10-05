@@ -1,28 +1,32 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 05 Oct 2009 19:56:10 +0200
-Subject: [PATCH] pxamci: fix printing gpio numbers in pxamci_probe
-In-Reply-To: <20091005124558.04dd13cd.ospite@studenti.unina.it> (Antonio
-	Ospite's message of "Mon\, 5 Oct 2009 12\:45\:58 +0200")
-References: <1254493442-32312-1-git-send-email-ospite@studenti.unina.it>
-	<20091005124558.04dd13cd.ospite@studenti.unina.it>
-Message-ID: <87tyydafnp.fsf@free.fr>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 05 Oct 2009 10:57:10 -0700
+Subject: [PATCH 0/5] OMAP PM fixes for 2.6.32
+In-Reply-To: <1254507295-11381-1-git-send-email-khilman@deeprootsystems.com>
+	(Kevin Hilman's message of "Fri\, 2 Oct 2009 11\:14\:50 -0700")
+References: <1254507295-11381-1-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <877hv9yb9l.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Antonio Ospite <ospite@studenti.unina.it> writes:
+Kevin Hilman <khilman@deeprootsystems.com> writes:
 
-> On Fri,  2 Oct 2009 16:24:02 +0200
-> Antonio Ospite <ospite@studenti.unina.it> wrote:
+> These fixes are primarily for PRCM interrupt handler bugs
+> and GPIO wakeup support.
 >
->> Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
+> Jon Hunter (1):
+>   OMAP3: PM: Prevent hang in prcm_interrupt_handler
+>
+> Kevin Hilman (1):
+>   OMAP3: PM: Enable GPIO module-level wakeups
+>
+> Paul Walmsley (2):
+>   OMAP3: PM: PRCM interrupt: check MPUGRPSEL register
+>   OMAP3: PM: PRCM interrupt: only handle selected PRCM interrupts
+>
+> Vikram Pandita (1):
+>   OMAP3: PM: USBHOST: clear wakeup events on both hosts
+>
 
-As this fixes code I wrote poorly, feel free to have my :
-Reviewed-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Here's one more for the PM fixes queue from Atrem.
 
-Eric, I think this can be scheduled without any problem into your linux-next
-branch.
-
-Cheers
-
---
-Robert
+Kevin
