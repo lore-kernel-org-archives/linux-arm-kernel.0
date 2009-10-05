@@ -1,43 +1,41 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Mon, 05 Oct 2009 07:36:39 +0100
-Subject: Strange rejection messages -- was Your message to
-	linux-arm-kernel awaits moderator approval (fwd)
-In-Reply-To: <20091004211704.GF1447@elf.ucw.cz>
-References: <20091004190036.GE1378@ucw.cz>
-	<1254690469.3277.2467.camel@macbook.infradead.org>
-	<20091004211704.GF1447@elf.ucw.cz>
-Message-ID: <1254724599.3277.3066.camel@macbook.infradead.org>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 5 Oct 2009 10:00:58 +0200 (CEST)
+Subject: [PATCH] fix compilation of i.MX31 platforms
+Message-ID: <Pine.LNX.4.64.0910050945480.4337@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2009-10-04 at 23:17 +0200, Pavel Machek wrote:
-> On Sun 2009-10-04 22:07:49, David Woodhouse wrote:
-> > On Sun, 2009-10-04 at 21:00 +0200, Pavel Machek wrote:
-> > > Hi!
-> > > 
-> > > I'm still getting strange bounces about 'suspicious header'. I don't
-> > > think I'm doing anything strange -- is the 'in-reply-to' trap still
-> > > there? Can it get fixed?
-> > 
-> > My logs show no bounces, and no rejections of your mail. Can you give me
-> > details of the message which didn't make it through to the list? I can't
-> > see anything of yours which didn't.
-> 
-> Thats the thing... I just got "suspicious header" message in mail inbox,
-> and I forwarded that. I tried googling for message subject, and yes it
-> hit lkml, but google will not tell me if it was delivered to linux-arm...
+mxc_iomux_v3_init() is defined in arch/arm/plat-mxc/iomux-v3.c, which is 
+not linked for i.MX31 and produces an undefined reference error. Fix this 
+by building the offending code only for i.MX35.
 
-Of course it was delivered.
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+---
 
-Pavel, what is so hard for you to understand? In order to keep spam and
-other noise on the list down, some mails are trapped for _MODERATION_.
+2.6.32-rc1 (and, AFAICS, all current trees) don't build for i.MX31. 
+Disliking #ifdef's as much as you do, this is not the best fix. A nicer 
+one would be defining a dummy mxc_iomux_v3_init() inline in 
+arch/arm/plat-mxc/include/mach/iomux-v3.h, but this would waste a couple 
+of bytes in arch/arm/mach-mx3/mm.o for the unneeded mx35_map_io(). Either 
+way is fine with me, shoose whichever you prefer.
 
-When this happens, you get notified. It is not a _bounce_; it is not a
-_rejection_. I will not even bother _looking_ if you make stupid claims
-like that again.
-
-This happens on lkml too, but the only difference is that you don't get
-_told_ about it.
-
--- 
-dwmw2
+diff --git a/arch/arm/mach-mx3/mm.c b/arch/arm/mach-mx3/mm.c
+index ad5a112..bedf5b8 100644
+--- a/arch/arm/mach-mx3/mm.c
++++ b/arch/arm/mach-mx3/mm.c
+@@ -81,6 +81,7 @@ void __init mx31_map_io(void)
+ 	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
+ }
+ 
++#ifdef CONFIG_ARCH_MX35
+ void __init mx35_map_io(void)
+ {
+ 	mxc_set_cpu_type(MXC_CPU_MX35);
+@@ -89,6 +90,7 @@ void __init mx35_map_io(void)
+ 
+ 	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
+ }
++#endif
+ 
+ void __init mx31_init_irq(void)
+ {
