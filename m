@@ -1,42 +1,55 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 5 Oct 2009 14:19:36 +0200
-Subject: [PATCH] fix pcm037_eet compilation with the new SPI driver
-In-Reply-To: <Pine.LNX.4.64.0910051001500.4337@axis700.grange>
-References: <Pine.LNX.4.64.0910051001500.4337@axis700.grange>
-Message-ID: <20091005121936.GD23986@pengutronix.de>
+Date: Mon, 5 Oct 2009 14:20:41 +0200
+Subject: [PATCH] fix compilation of i.MX31 platforms
+In-Reply-To: <Pine.LNX.4.64.0910050945480.4337@axis700.grange>
+References: <Pine.LNX.4.64.0910050945480.4337@axis700.grange>
+Message-ID: <20091005122041.GE23986@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
+On Mon, Oct 05, 2009 at 10:00:58AM +0200, Guennadi Liakhovetski wrote:
+> mxc_iomux_v3_init() is defined in arch/arm/plat-mxc/iomux-v3.c, which is 
+> not linked for i.MX31 and produces an undefined reference error. Fix this 
+> by building the offending code only for i.MX35.
 
-On Mon, Oct 05, 2009 at 10:04:51AM +0200, Guennadi Liakhovetski wrote:
-> At some point the SPI device name in arch/arm/mach-mx3/devices.c has 
-> changed, which then broke compilation of pcm037_eet with the new SPI 
-> driver. Use the correct name.
-
-It didn't change, it was merged with imx_spi_device0. Can we change the
-name in devices.[ch] instead? All other devices start with mxc_. Sorry,
-my bad.
-
-Sascha
-
+Ok for -rc.
 
 > 
 > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 > ---
-> diff --git a/arch/arm/mach-mx3/pcm037_eet.c b/arch/arm/mach-mx3/pcm037_eet.c
-> index 8d38600..dc6baf3 100644
-> --- a/arch/arm/mach-mx3/pcm037_eet.c
-> +++ b/arch/arm/mach-mx3/pcm037_eet.c
-> @@ -184,7 +184,7 @@ static int eet_init_devices(void)
->  	/* SPI */
->  	spi_register_board_info(pcm037_spi_dev, ARRAY_SIZE(pcm037_spi_dev));
->  #if defined(CONFIG_SPI_IMX) || defined(CONFIG_SPI_IMX_MODULE)
-> -	mxc_register_device(&mxc_spi_device0, &pcm037_spi1_master);
-> +	mxc_register_device(&imx_spi_device0, &pcm037_spi1_master);
->  #endif
+> 
+> 2.6.32-rc1 (and, AFAICS, all current trees) don't build for i.MX31.
+
+At least not when i.MX35 is disabled.
+
+Sascha
+
+> Disliking #ifdef's as much as you do, this is not the best fix. A nicer 
+> one would be defining a dummy mxc_iomux_v3_init() inline in 
+> arch/arm/plat-mxc/include/mach/iomux-v3.h, but this would waste a couple 
+> of bytes in arch/arm/mach-mx3/mm.o for the unneeded mx35_map_io(). Either 
+> way is fine with me, shoose whichever you prefer.
+> 
+> diff --git a/arch/arm/mach-mx3/mm.c b/arch/arm/mach-mx3/mm.c
+> index ad5a112..bedf5b8 100644
+> --- a/arch/arm/mach-mx3/mm.c
+> +++ b/arch/arm/mach-mx3/mm.c
+> @@ -81,6 +81,7 @@ void __init mx31_map_io(void)
+>  	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
+>  }
 >  
->  	platform_device_register(&pcm037_gpio_keys_device);
+> +#ifdef CONFIG_ARCH_MX35
+>  void __init mx35_map_io(void)
+>  {
+>  	mxc_set_cpu_type(MXC_CPU_MX35);
+> @@ -89,6 +90,7 @@ void __init mx35_map_io(void)
+>  
+>  	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
+>  }
+> +#endif
+>  
+>  void __init mx31_init_irq(void)
+>  {
 > 
 
 -- 
