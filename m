@@ -1,252 +1,91 @@
 From: thommycheck@gmx.de (Thomas Kunze)
-Date: Mon,  5 Oct 2009 23:35:30 +0200
-Subject: [PATCH 6/9] add gpiolib support to ucb1x00
-In-Reply-To: <1254778533-3529-6-git-send-email-thommycheck@gmx.de>
+Date: Mon,  5 Oct 2009 23:35:31 +0200
+Subject: [PATCH 7/9] collie: convert to gpiolib for ucb1x00
+In-Reply-To: <1254778533-3529-7-git-send-email-thommycheck@gmx.de>
 References: <1254778533-3529-1-git-send-email-thommycheck@gmx.de>
 	<1254778533-3529-2-git-send-email-thommycheck@gmx.de>
 	<1254778533-3529-3-git-send-email-thommycheck@gmx.de>
 	<1254778533-3529-4-git-send-email-thommycheck@gmx.de>
 	<1254778533-3529-5-git-send-email-thommycheck@gmx.de>
 	<1254778533-3529-6-git-send-email-thommycheck@gmx.de>
-Message-ID: <1254778533-3529-7-git-send-email-thommycheck@gmx.de>
+	<1254778533-3529-7-git-send-email-thommycheck@gmx.de>
+Message-ID: <1254778533-3529-8-git-send-email-thommycheck@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The old access methods to the gpios will be removed when
-all users has been converted. (mainly ucb1x00-ts)
+Only the parts used for collie_battery are converted.
+The rest will be cleaned up later.
 
 Signed-off-by: Thomas Kunze <thommycheck@gmx.de>
 ---
- arch/arm/mach-sa1100/include/mach/mcp.h |    1 +
- drivers/mfd/mcp-sa11x0.c                |    1 +
- drivers/mfd/ucb1x00-core.c              |   87 ++++++++++++++++++++++++++++++-
- include/linux/mfd/mcp.h                 |    1 +
- include/linux/mfd/ucb1x00.h             |    3 +
- 5 files changed, 91 insertions(+), 2 deletions(-)
+ arch/arm/mach-sa1100/collie.c              |    1 +
+ arch/arm/mach-sa1100/include/mach/collie.h |   35 ++++++++++++++-------------
+ 2 files changed, 19 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/include/mach/mcp.h b/arch/arm/mach-sa1100/include/mach/mcp.h
-index fb8b09a..ed1a331 100644
---- a/arch/arm/mach-sa1100/include/mach/mcp.h
-+++ b/arch/arm/mach-sa1100/include/mach/mcp.h
-@@ -16,6 +16,7 @@ struct mcp_plat_data {
- 	u32 mccr0;
- 	u32 mccr1;
- 	unsigned int sclk_rate;
-+	int gpio_base;
+diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
+index 9f5029c..395cf09 100644
+--- a/arch/arm/mach-sa1100/collie.c
++++ b/arch/arm/mach-sa1100/collie.c
+@@ -86,6 +86,7 @@ static struct scoop_pcmcia_config collie_pcmcia_config = {
+ static struct mcp_plat_data collie_mcp_data = {
+ 	.mccr0		= MCCR0_ADM | MCCR0_ExtClk,
+ 	.sclk_rate	= 9216000,
++	.gpio_base	= COLLIE_TC35143_GPIO_BASE,
  };
+ 
+ #ifdef CONFIG_SHARP_LOCOMO
+diff --git a/arch/arm/mach-sa1100/include/mach/collie.h b/arch/arm/mach-sa1100/include/mach/collie.h
+index 8c8fe46..71a0b3f 100644
+--- a/arch/arm/mach-sa1100/include/mach/collie.h
++++ b/arch/arm/mach-sa1100/include/mach/collie.h
+@@ -25,10 +25,10 @@
+ #define COLLIE_GPIO_VPEN	(COLLIE_SCOOP_GPIO_BASE + 7)
+ #define COLLIE_SCP_LB_VOL_CHG	SCOOP_GPCR_PA19
+ 
+-#define COLLIE_SCOOP_IO_DIR	( COLLIE_SCP_MUTE_L | COLLIE_SCP_MUTE_R | \
++#define COLLIE_SCOOP_IO_DIR	(COLLIE_SCP_MUTE_L | COLLIE_SCP_MUTE_R | \
+ 				COLLIE_SCP_5VON | COLLIE_SCP_AMP_ON | \
+-				COLLIE_SCP_LB_VOL_CHG )
+-#define COLLIE_SCOOP_IO_OUT	( COLLIE_SCP_MUTE_L | COLLIE_SCP_MUTE_R )
++				COLLIE_SCP_LB_VOL_CHG)
++#define COLLIE_SCOOP_IO_OUT	(COLLIE_SCP_MUTE_L | COLLIE_SCP_MUTE_R)
+ 
+ /* GPIOs for gpiolib  */
+ 
+@@ -80,19 +80,20 @@
+ #define COLLIE_LCM_IRQ_GPIO_nSD_WP	IRQ_LOCOMO_GPIO14
+ 
+ /* GPIO's on the TC35143AF (Toshiba Analog Frontend) */
+-#define COLLIE_TC35143_GPIO_VERSION0    UCB_IO_0	/* GPIO0=Version                 */
+-#define COLLIE_TC35143_GPIO_TBL_CHK     UCB_IO_1	/* GPIO1=TBL_CHK                 */
+-#define COLLIE_TC35143_GPIO_VPEN_ON     UCB_IO_2	/* GPIO2=VPNE_ON                 */
+-#define COLLIE_TC35143_GPIO_IR_ON       UCB_IO_3	/* GPIO3=IR_ON                   */
+-#define COLLIE_TC35143_GPIO_AMP_ON      UCB_IO_4	/* GPIO4=AMP_ON                  */
+-#define COLLIE_TC35143_GPIO_VERSION1    UCB_IO_5	/* GPIO5=Version                 */
+-#define COLLIE_TC35143_GPIO_FS8KLPF     UCB_IO_5	/* GPIO5=fs 8k LPF               */
+-#define COLLIE_TC35143_GPIO_BUZZER_BIAS UCB_IO_6	/* GPIO6=BUZZER BIAS             */
+-#define COLLIE_TC35143_GPIO_MBAT_ON     UCB_IO_7	/* GPIO7=MBAT_ON                 */
+-#define COLLIE_TC35143_GPIO_BBAT_ON     UCB_IO_8	/* GPIO8=BBAT_ON                 */
+-#define COLLIE_TC35143_GPIO_TMP_ON      UCB_IO_9	/* GPIO9=TMP_ON                  */
+-#define COLLIE_TC35143_GPIO_IN		( UCB_IO_0 | UCB_IO_2 | UCB_IO_5 )
+-#define COLLIE_TC35143_GPIO_OUT		( UCB_IO_1 | UCB_IO_3 | UCB_IO_4 | UCB_IO_6 | \
+-					UCB_IO_7 | UCB_IO_8 | UCB_IO_9 )
++#define COLLIE_TC35143_GPIO_BASE	(GPIO_MAX + 13)
++#define COLLIE_TC35143_GPIO_VERSION0    UCB_IO_0
++#define COLLIE_TC35143_GPIO_TBL_CHK     UCB_IO_1
++#define COLLIE_TC35143_GPIO_VPEN_ON     UCB_IO_2
++#define COLLIE_TC35143_GPIO_IR_ON       UCB_IO_3
++#define COLLIE_TC35143_GPIO_AMP_ON      UCB_IO_4
++#define COLLIE_TC35143_GPIO_VERSION1    UCB_IO_5
++#define COLLIE_TC35143_GPIO_FS8KLPF     UCB_IO_5
++#define COLLIE_TC35143_GPIO_BUZZER_BIAS UCB_IO_6
++#define COLLIE_GPIO_MBAT_ON     	(COLLIE_TC35143_GPIO_BASE + 7)
++#define COLLIE_GPIO_BBAT_ON     	(COLLIE_TC35143_GPIO_BASE + 8)
++#define COLLIE_GPIO_TMP_ON      	(COLLIE_TC35143_GPIO_BASE + 9)
++#define COLLIE_TC35143_GPIO_IN		(UCB_IO_0 | UCB_IO_2 | UCB_IO_5)
++#define COLLIE_TC35143_GPIO_OUT		(UCB_IO_1 | UCB_IO_3 | UCB_IO_4 \
++						| UCB_IO_6)
  
  #endif
-diff --git a/drivers/mfd/mcp-sa11x0.c b/drivers/mfd/mcp-sa11x0.c
-index 2121898..2584272 100644
---- a/drivers/mfd/mcp-sa11x0.c
-+++ b/drivers/mfd/mcp-sa11x0.c
-@@ -163,6 +163,7 @@ static int mcp_sa11x0_probe(struct platform_device *pdev)
- 	mcp->dma_audio_wr	= DMA_Ser4MCP0Wr;
- 	mcp->dma_telco_rd	= DMA_Ser4MCP1Rd;
- 	mcp->dma_telco_wr	= DMA_Ser4MCP1Wr;
-+	mcp->gpio_base		= data->gpio_base;
- 
- 	platform_set_drvdata(pdev, mcp);
- 
-diff --git a/drivers/mfd/ucb1x00-core.c b/drivers/mfd/ucb1x00-core.c
-index 61f3933..e0d7700 100644
---- a/drivers/mfd/ucb1x00-core.c
-+++ b/drivers/mfd/ucb1x00-core.c
-@@ -25,11 +25,11 @@
- #include <linux/device.h>
- #include <linux/mutex.h>
- #include <linux/mfd/ucb1x00.h>
-+#include <linux/gpio.h>
- 
- #include <mach/dma.h>
- #include <mach/hardware.h>
- 
--
- static DEFINE_MUTEX(ucb1x00_mutex);
- static LIST_HEAD(ucb1x00_drivers);
- static LIST_HEAD(ucb1x00_devices);
-@@ -107,6 +107,60 @@ unsigned int ucb1x00_io_read(struct ucb1x00 *ucb)
- 	return ucb1x00_reg_read(ucb, UCB_IO_DATA);
- }
- 
-+static void ucb1x00_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
-+{
-+	struct ucb1x00 *ucb = container_of(chip, struct ucb1x00, gpio);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&ucb->io_lock, flags);
-+	if (value)
-+		ucb->io_out |= 1 << offset;
-+	else
-+		ucb->io_out &= ~(1 << offset);
-+
-+	ucb1x00_reg_write(ucb, UCB_IO_DATA, ucb->io_out);
-+	spin_unlock_irqrestore(&ucb->io_lock, flags);
-+}
-+
-+static int ucb1x00_gpio_get(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct ucb1x00 *ucb = container_of(chip, struct ucb1x00, gpio);
-+	return ucb1x00_reg_read(ucb, UCB_IO_DATA) & (1 << offset);
-+}
-+
-+static int ucb1x00_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct ucb1x00 *ucb = container_of(chip, struct ucb1x00, gpio);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&ucb->io_lock, flags);
-+	ucb->io_dir &= ~(1 << offset);
-+	ucb1x00_reg_write(ucb, UCB_IO_DIR, ucb->io_dir);
-+	spin_unlock_irqrestore(&ucb->io_lock, flags);
-+
-+	return 0;
-+}
-+
-+static int ucb1x00_gpio_direction_output(struct gpio_chip *chip, unsigned offset
-+		, int value)
-+{
-+	struct ucb1x00 *ucb = container_of(chip, struct ucb1x00, gpio);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&ucb->io_lock, flags);
-+	ucb->io_dir |= (1 << offset);
-+	ucb1x00_reg_write(ucb, UCB_IO_DIR, ucb->io_dir);
-+
-+	if (value)
-+		ucb->io_out |= 1 << offset;
-+	else
-+		ucb->io_out &= ~(1 << offset);
-+	ucb1x00_reg_write(ucb, UCB_IO_DATA, ucb->io_out);
-+	spin_unlock_irqrestore(&ucb->io_lock, flags);
-+
-+	return 0;
-+}
-+
- /*
-  * UCB1300 data sheet says we must:
-  *  1. enable ADC	=> 5us (including reference startup time)
-@@ -475,6 +529,7 @@ static int ucb1x00_probe(struct mcp *mcp)
- 	struct ucb1x00_driver *drv;
- 	unsigned int id;
- 	int ret = -ENODEV;
-+	int temp;
- 
- 	mcp_enable(mcp);
- 	id = mcp_reg_read(mcp, UCB_ID);
-@@ -507,12 +562,27 @@ static int ucb1x00_probe(struct mcp *mcp)
- 		goto err_free;
- 	}
- 
-+	ucb->gpio.base = -1;
-+	if (mcp->gpio_base != 0) {
-+		ucb->gpio.label = dev_name(&ucb->dev);
-+		ucb->gpio.base = mcp->gpio_base;
-+		ucb->gpio.ngpio = 10;
-+		ucb->gpio.set = ucb1x00_gpio_set;
-+		ucb->gpio.get = ucb1x00_gpio_get;
-+		ucb->gpio.direction_input = ucb1x00_gpio_direction_input;
-+		ucb->gpio.direction_output = ucb1x00_gpio_direction_output;
-+		ret = gpiochip_add(&ucb->gpio);
-+		if (ret)
-+			goto err_free;
-+	} else
-+		dev_info(&ucb->dev, "gpio_base not set so no gpiolib support");
-+
- 	ret = request_irq(ucb->irq, ucb1x00_irq, IRQF_TRIGGER_RISING,
- 			  "UCB1x00", ucb);
- 	if (ret) {
- 		printk(KERN_ERR "ucb1x00: unable to grab irq%d: %d\n",
- 			ucb->irq, ret);
--		goto err_free;
-+		goto err_gpio;
- 	}
- 
- 	mcp_set_drvdata(mcp, ucb);
-@@ -521,6 +591,7 @@ static int ucb1x00_probe(struct mcp *mcp)
- 	if (ret)
- 		goto err_irq;
- 
-+
- 	INIT_LIST_HEAD(&ucb->devs);
- 	mutex_lock(&ucb1x00_mutex);
- 	list_add(&ucb->node, &ucb1x00_devices);
-@@ -528,10 +599,14 @@ static int ucb1x00_probe(struct mcp *mcp)
- 		ucb1x00_add_dev(ucb, drv);
- 	}
- 	mutex_unlock(&ucb1x00_mutex);
-+
- 	goto out;
- 
-  err_irq:
- 	free_irq(ucb->irq, ucb);
-+ err_gpio:
-+	if (ucb->gpio.base != -1)
-+		temp = gpiochip_remove(&ucb->gpio);
-  err_free:
- 	kfree(ucb);
-  err_disable:
-@@ -544,6 +619,7 @@ static void ucb1x00_remove(struct mcp *mcp)
- {
- 	struct ucb1x00 *ucb = mcp_get_drvdata(mcp);
- 	struct list_head *l, *n;
-+	int ret;
- 
- 	mutex_lock(&ucb1x00_mutex);
- 	list_del(&ucb->node);
-@@ -553,6 +629,12 @@ static void ucb1x00_remove(struct mcp *mcp)
- 	}
- 	mutex_unlock(&ucb1x00_mutex);
- 
-+	if (ucb->gpio.base != -1) {
-+		ret = gpiochip_remove(&ucb->gpio);
-+		if (ret)
-+			dev_err(&ucb->dev, "Can't remove gpio chip: %d\n", ret);
-+	}
-+
- 	free_irq(ucb->irq, ucb);
- 	device_unregister(&ucb->dev);
- }
-@@ -603,6 +685,7 @@ static int ucb1x00_resume(struct mcp *mcp)
- 	struct ucb1x00 *ucb = mcp_get_drvdata(mcp);
- 	struct ucb1x00_dev *dev;
- 
-+	ucb1x00_reg_write(ucb, UCB_IO_DIR, ucb->io_dir);
- 	mutex_lock(&ucb1x00_mutex);
- 	list_for_each_entry(dev, &ucb->devs, dev_node) {
- 		if (dev->drv->resume)
-diff --git a/include/linux/mfd/mcp.h b/include/linux/mfd/mcp.h
-index be95e09..ee49670 100644
---- a/include/linux/mfd/mcp.h
-+++ b/include/linux/mfd/mcp.h
-@@ -26,6 +26,7 @@ struct mcp {
- 	dma_device_t	dma_telco_rd;
- 	dma_device_t	dma_telco_wr;
- 	struct device	attached_device;
-+	int		gpio_base;
- };
- 
- struct mcp_ops {
-diff --git a/include/linux/mfd/ucb1x00.h b/include/linux/mfd/ucb1x00.h
-index eac3463..aa9c378 100644
---- a/include/linux/mfd/ucb1x00.h
-+++ b/include/linux/mfd/ucb1x00.h
-@@ -11,6 +11,8 @@
- #define UCB1200_H
- 
- #include <linux/mfd/mcp.h>
-+#include <linux/gpio.h>
-+
- #define UCB_IO_DATA	0x00
- #define UCB_IO_DIR	0x01
- 
-@@ -123,6 +125,7 @@ struct ucb1x00 {
- 	struct device		dev;
- 	struct list_head	node;
- 	struct list_head	devs;
-+	struct gpio_chip 	gpio;
- };
- 
- struct ucb1x00_driver;
 -- 
 1.6.0.4
