@@ -1,42 +1,31 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Tue, 06 Oct 2009 11:13:39 +1300
-Subject: [PATCH] Change ep93xx gpio_irq static inlines to macros
-In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901DB7762@mi8nycmail19.Mi8.com>
-References: <49EBDE05.1050406@bluewatersys.com>
-	<BD79186B4FD85F4B8E60E381CAEE190901DB7762@mi8nycmail19.Mi8.com>
-Message-ID: <4ACA6F93.1090204@bluewatersys.com>
+From: greg@kroah.com (Greg KH)
+Date: Mon, 5 Oct 2009 15:52:22 -0700
+Subject: Kernel update to 2.6.31.1 on pxa270: udev and usb storage
+	cause kernel Oops
+In-Reply-To: <20091003124832.GA15525@n2100.arm.linux.org.uk>
+References: <1254213562.5586.13.camel@wks02-lin.nanotronic.local>
+	<20091003124832.GA15525@n2100.arm.linux.org.uk>
+Message-ID: <20091005225222.GB792@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-H Hartley Sweeten wrote:
-> From: Ryan Mallon <ryan@bluewatersys.com>
+On Sat, Oct 03, 2009 at 01:48:32PM +0100, Russell King - ARM Linux wrote:
+> I think you need to report this to the USB/udev people.
 > 
-> Change the gpio_to_irq and irq_to_gpio static inline functions to macros
-> so that they can be used in variable initialisers.
-> 
-> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
-> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> 
-> ---
-> 
-> This patch seems to have been lost, originally posted 4/19/2009.
-> Updated so that the macro parameters are wrapped with ().
->  
+> On Tue, Sep 29, 2009 at 10:39:22AM +0200, hoefle marco wrote:
+> > Hello,
+> > we use Kernel 2.6.30.4 on a PXA270 platform (from Phytec). It works good
+> > with all peripherals on the Phytec board. 
+> > For an old Sandisk device (diskonchip) we have a driver ported to 2.6.3x
+> > as the block device driver API has changed. We thought it will be a wise
+> > decision to do the porting already to 2.6.3x. 
+> > However, when using the latest Kernel (and the previous one 2.6.30) with
+> > all the drivers we used in 2.6.30.4 udev and usb storage seem not to
+> > work any more.
+> > Does anybody have an idea why?
 
-Thanks Hartley. I think this patch should still be okay, I don't think
-anything relies on these being functions.
+No, I don't. Do you have a pointer to your code anywhere?
 
-Can you please submit to the patch system since you have the patch ready
-to go.
+thanks,
 
-Thanks,
-~Ryan
-
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+greg k-h
