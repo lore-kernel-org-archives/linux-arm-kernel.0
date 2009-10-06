@@ -1,62 +1,104 @@
-From: thommycheck@gmx.de (Thomas Kunze)
-Date: Tue, 06 Oct 2009 18:36:45 +0200
-Subject: collie and SA1100 patches
-In-Reply-To: <20091006125702.45d761ae.kristoffer.ericson@gmail.com>
-References: <1254778533-3529-1-git-send-email-thommycheck@gmx.de>
-	<20091006125702.45d761ae.kristoffer.ericson@gmail.com>
-Message-ID: <4ACB721D.8040906@gmx.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 06 Oct 2009 17:58:51 +0100
+Subject: [PATCH] Thumb-2: Correct "mov.w pc,
+	lr" instruction which is unpredictable
+Message-ID: <20091006165850.6368.17770.stgit@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kristoffer Ericson wrote:
-> On Mon,  5 Oct 2009 23:35:24 +0200
-> Thomas Kunze <thommycheck@gmx.de> wrote:
->
->   
->> Hi all!
->>    
->> This patchset implements prober power management for collie. To archieve this
->> some bugs were fixed and gpiolib-support was added to the ucb1x00 driver.
->> Please tell me if I should CC some other people or lists.
->>     
->
-> Without looking at the patches, how does this affect other sa11xx based
-> platforms?
->   
-They can use gpiolib for ucb1x00 now (patch 3 and 6) and can use 
-"gpio_to_irq" and "irq_to_gpio"
-in static initialisation. Otherwise they aren't affected.
->   
->> Regards,
->> Thomas
->>
->> Statistics:
->>  arch/arm/mach-sa1100/collie.c              |   79 +++++-
->>  arch/arm/mach-sa1100/include/mach/collie.h |   77 +++---
->>  arch/arm/mach-sa1100/include/mach/gpio.h   |   19 +-
->>  arch/arm/mach-sa1100/include/mach/mcp.h    |    1 +
->>  drivers/leds/leds-locomo.c                 |    2 +-
->>  drivers/mfd/mcp-core.c                     |    2 +-
->>  drivers/mfd/mcp-sa11x0.c                   |    3 +-
->>  drivers/mfd/ucb1x00-assabet.c              |    2 +-
->>  drivers/mfd/ucb1x00-core.c                 |   89 ++++++-
->>  drivers/mfd/ucb1x00-ts.c                   |    2 +-
->>  drivers/power/Kconfig                      |    7 +
->>  drivers/power/Makefile                     |    1 +
->>  drivers/power/collie_battery.c             |  418 ++++++++++++++++++++++++++++
->>  {drivers => include/linux}/mfd/mcp.h       |    3 +
->>  {drivers => include/linux}/mfd/ucb1x00.h   |    7 +-
->>  15 files changed, 649 insertions(+), 63 deletions(-)
->>  create mode 100644 drivers/power/collie_battery.c
->>  rename {drivers => include/linux}/mfd/mcp.h (97%)
->>  rename {drivers => include/linux}/mfd/ucb1x00.h (98%)
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>     
->
->
->   
+The 32-bit wide variant of "mov pc, reg" in Thumb-2 is unpredictable
+causing improper handling of the undefined instructions not caught by
+the kernel. This patch adds a movw_pc macro for such situations
+(currently only used in call_fpe).
+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/kernel/entry-armv.S   |   28 ++++++++++++++--------------
+ arch/arm/kernel/entry-header.S |   15 +++++++++++++++
+ 2 files changed, 29 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 322410b..0022b4d 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -608,33 +608,33 @@ call_fpe:
+  THUMB(	add	pc, r8			)
+ 	nop
+ 
+-	W(mov)	pc, lr				@ CP#0
++	movw_pc	lr				@ CP#0
+ 	W(b)	do_fpe				@ CP#1 (FPE)
+ 	W(b)	do_fpe				@ CP#2 (FPE)
+-	W(mov)	pc, lr				@ CP#3
++	movw_pc	lr				@ CP#3
+ #ifdef CONFIG_CRUNCH
+ 	b	crunch_task_enable		@ CP#4 (MaverickCrunch)
+ 	b	crunch_task_enable		@ CP#5 (MaverickCrunch)
+ 	b	crunch_task_enable		@ CP#6 (MaverickCrunch)
+ #else
+-	W(mov)	pc, lr				@ CP#4
+-	W(mov)	pc, lr				@ CP#5
+-	W(mov)	pc, lr				@ CP#6
++	movw_pc	lr				@ CP#4
++	movw_pc	lr				@ CP#5
++	movw_pc	lr				@ CP#6
+ #endif
+-	W(mov)	pc, lr				@ CP#7
+-	W(mov)	pc, lr				@ CP#8
+-	W(mov)	pc, lr				@ CP#9
++	movw_pc	lr				@ CP#7
++	movw_pc	lr				@ CP#8
++	movw_pc	lr				@ CP#9
+ #ifdef CONFIG_VFP
+ 	W(b)	do_vfp				@ CP#10 (VFP)
+ 	W(b)	do_vfp				@ CP#11 (VFP)
+ #else
+-	W(mov)	pc, lr				@ CP#10 (VFP)
+-	W(mov)	pc, lr				@ CP#11 (VFP)
++	movw_pc	lr				@ CP#10 (VFP)
++	movw_pc	lr				@ CP#11 (VFP)
+ #endif
+-	W(mov)	pc, lr				@ CP#12
+-	W(mov)	pc, lr				@ CP#13
+-	W(mov)	pc, lr				@ CP#14 (Debug)
+-	W(mov)	pc, lr				@ CP#15 (Control)
++	movw_pc	lr				@ CP#12
++	movw_pc	lr				@ CP#13
++	movw_pc	lr				@ CP#14 (Debug)
++	movw_pc	lr				@ CP#15 (Control)
+ 
+ #ifdef CONFIG_NEON
+ 	.align	6
+diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+index ac34c0d..7e9ed1e 100644
+--- a/arch/arm/kernel/entry-header.S
++++ b/arch/arm/kernel/entry-header.S
+@@ -110,6 +110,13 @@
+ 	mov	\rd, sp, lsr #13
+ 	mov	\rd, \rd, lsl #13
+ 	.endm
++
++	@
++	@ 32-bit wide "mov pc, reg"
++	@
++	.macro	movw_pc, reg
++	mov	pc, \reg
++	.endm
+ #else	/* CONFIG_THUMB2_KERNEL */
+ 	.macro	svc_exit, rpsr
+ 	clrex					@ clear the exclusive monitor
+@@ -146,6 +153,14 @@
+ 	lsr	\rd, \rd, #13
+ 	mov	\rd, \rd, lsl #13
+ 	.endm
++
++	@
++	@ 32-bit wide "mov pc, reg"
++	@
++	.macro	movw_pc, reg
++	mov	pc, \reg
++	nop
++	.endm
+ #endif	/* !CONFIG_THUMB2_KERNEL */
+ 
+ /*
