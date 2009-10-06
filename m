@@ -1,419 +1,175 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 6 Oct 2009 09:58:17 +0200
-Subject: 32-rc1 aka 32-rc2: warning at manage.c:361 (set_irq_wake),
-	matrix-keypad related?
-In-Reply-To: <20091006050649.GH27881@core.coreip.homeip.net>
-References: <20090930200746.GA1384@ucw.cz>
-	<20091006050649.GH27881@core.coreip.homeip.net>
-Message-ID: <20091006075816.GA1362@ucw.cz>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 06 Oct 2009 10:10:45 +0200
+Subject: Global Video Buffers Pool - PMM and UPBuffer reference drivers
+	[RFC]
+In-Reply-To: <200910021603.n92G3elB032227@chronolytics.com>
+References: <E4D3F24EA6C9E54F817833EAE0D912AC077151C44B@bssrvexch01.BS.local>
+	<200910021603.n92G3elB032227@chronolytics.com>
+Message-ID: <002301ca465c$841cdca0$8c5695e0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hello,
 
-On Mon 2009-10-05 22:06:50, Dmitry Torokhov wrote:
-> On Wed, Sep 30, 2009 at 10:07:46PM +0200, Pavel Machek wrote:
-> > 
-> > It complains about unbalanced irq 113 wake disable. That one belongs
-> > to matrix-keypad...
+On Friday, October 02, 2009 6:04 PM David F. Carlson wrote:
+
+> I am not a fan of the large and static driver based bootmem allocations in the
+> samsung-ap-2.6 git.  This work at least addresses that issue.  Thanks.
 > 
-> I guess some of enable_irq_wake()s fail on your box. Do you see it if
-> you apply the patch below?
+> Below are some comments.  Perhaps I am not "getting it".
+> 
+> According to Marek Szyprowski:
+> >
+> > algorithm itself would typically be changed to fit a usage pattern.
+> >
+> > In our solution all memory buffers are all allocated by user-space
+> > applications, because only user applications have enough information
+> > which devices will be used in the video processing pipeline. For
+> > example:
+> >
+> > MFC video decoder -> Post Processor (scaler and color space converter)
+> >  -> Frame Buffer memory.
+> >
+> > If such a translation succeeds the
+> > physical memory region will be properly locked and is guaranteed to be
+> > in the memory till the end of transaction. Each transaction must be
+> > closed by the multimedia device driver explicitly.
+> 
+> Since this is a *physical* memory manager, I would never expect the memory
+> to not be in memory...
 
-I'll do short test. But... if you are right, your patch will just make
-your machine refuse to suspend... right?
+The memory cannot be swapped to disk, but notice that PMM is also an allocator.
+It must track which regions has been allocated and free them when are no
+longer in use.
 
-Ungood.
+> > 2. Allocating a buffer from userspace
+> >
+> > PMM provides a /dev/pmm special device. Each time the application wants
+> > to allocate a buffer it opens the /dev/pmm special file, calls
+> > IOCTL_PMM_ALLOC ioctl and the mmaps it into its virtual memory. The
+> > struct pmm_area_info parameter for IOCTL_PMM_ALLOC ioctl describes the
+> > memory requirements for the buffer (please refer to
+> > include/linux/s3c/pmm.h) - like buffer size, memory alignment, memory
+> > type (PMM supports different memory types, although currently only one
+> > is used) and cpu cache coherency rules (memory can be mapped as
+> > cacheable or non-cacheable). The buffer is freed when the file
+> > descriptor reference count reaches zero (so the file is closed, is
+> > unmmaped from applications memory and released from multimedia devices).
+> 
+> I prefer using mmap semantics with a driver than messes with *my* address
+> space.  Ioctls that mess with my address space gives me hives.
+> 
+> mmap is the call a user makes to map a memory/file object into its space.
+> ioctl is for things that don't fit read/write/mmap.  :-)
 
-Actually, it seems to break suspend (returns  -EINVAL while refusing
-to suspend), warnings are still there, and keyboard is dead after
-failed suspend... double plus ungood.
+Well, maybe I didn't write it clear enough. You allocate a buffer with
+custom ioctl and then map it with mmap() call. So the sequence of the calls
+is as follows:
 
-Aha, so warning is solved: the one in the log is from gpio_buttons.
+struct pmm_mem_info info = {
+	.magic = PMM_MAGIC,
+	.size = BUFFER_SIZE,
+	.type = PMM_MEM_GENERAL,
+	.flags = PMM_NO_CACHE,
+	.alignment = 0x1000,
+};
 
-(I wonder if the 'unbalanced irq_wake' warning is useful... who added it?)
+fd = open(/dev/pmm);
+ioctl(fd, IOCTL_PMM_ALLOC, &info);
+mmap(0, BUFFER_SIZE, 0777, MAP_SHARED, fd, 0);
+close(fd);
+
+> 1.  memory alignment will be page size 4k (no?).  Or are you suggesting
+> larger alignment requirements?  Are any of the target devices 24 bit dma
+> clients?  (Crossing a 16MB boundary would then not work...)
+
+You can set the alignment in pmm_mem_info structure.
+
+> 2. Since these buffers will be dma sources/targets, cache will be off (no?)
+
+You can control weather to use cache or not on the buffer region with special
+flags provided to alloc ioctl. In case o cacheable mapping, the upbuffer
+translation layer would do proper cache synchronization (flush/clean/invalidate)
+basing on the type of operation that the driver wants to perform (please refer
+to include/linux/s3c/upbuffer.h)
+
+> Many CPUs ldr/stm memcpy do burst access to DDR so non-cached is still pretty
+> zipping for non-bit banging apps.  Forcing non-cached makes much of the "sync"
+> semantic you have "go away".
+> 
+> Is there a use-case for cached graphics controller memory that I am missing?
+
+Yes, you may want to perform some of the gfx transformations by the cpu (in
+case they are for example not available in the hardware). If the buffer is
+mapped as non-cacheable then all cpu read opeations will be really slow.
+
+> > 3. Buffer locking
+> >
+> > If user application performed a mmap call on some special device and a
+> > driver mapped some physical memory into user address space (usually with
+> > remap_pfn_range function), this will create a vm_area structure with
+> > VM_PFNMAP flag set in user address space map. UPBuffer layer can easily
+> > perform a reverse mapping (virtual address to physical memory address)
+> > by simply reading the PTE values and checking if it is contiguous in
+> > physical memory. The only problem is how to guarantee the security of
+> > this solution. VM_PFNMAP-type areas do not have associated page
+> > structures so that memory pages cannot be locked directly in page cache.
+> > However such memory area would not be freed until the special file that
+> > is behind it is still in use. We found that is can be correctly locked
+> > by increasing reference counter of that special file (vm_area->vm_file).
+> > This would lock the mapping from being freed if user would accidently do
+> > something really nasty like unmapping that area.
+> 
+> I am still missing it.  Your /dev/pmm is allocating *physical memory* -- which
+> it (the pmm) owns for all time (bootmem).  If the user unmaps it, it is still
+> pmm's physical memory.
+> 
+> Now, returning the allocated memory to the pmm freelist
+> requires both the source and target to relinquish.  That implies both drivers
+> "know" to relinquish on last-close.  Otherwise, you leak like a sieve.
+>
+> Returning the pmm memory to the freelist when the user unmaps means that
+> dma registers in HW still reference that memory.  Only the driver knows
+> when it is "done".
+
+Exactly this is addressed by the UPBuffer translation layer. If application
+unmaps the buffer from its address space the region is not freed unless the
+multimedia driver explicitly unlocks it after the transaction. That is that
+I called the buffer locking. Multimedia driver must lock the buffer before
+performing any DMA transactions on it.
  
-									Pavel
+> Re: configuration
+> There are quite a few CONFIG variables.  Forcing s3c-mm drivers to use PMM
+> would knock quite a few of them out.
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-info for No Bus:vcs
-PM: Adding info for No Bus:vcsa
-PM: Adding info for No Bus:vcs1
-PM: Adding info for No Bus:vcsa1
-PM: Adding info for No Bus:tty1
-PM: Adding info for No Bus:tty2
-PM: Adding info for No Bus:tty3
-PM: Adding info for No Bus:tty4
-PM: Adding info for No Bus:tty5
-PM: Adding info for No Bus:tty6
-PM: Adding info for No Bus:tty7
-PM: Adding info for No Bus:tty8
-PM: Adding info for No Bus:tty9
-PM: Adding info for No Bus:tty10
-PM: Adding info for No Bus:tty11
-PM: Adding info for No Bus:tty12
-PM: Adding info for No Bus:tty13
-PM: Adding info for No Bus:tty14
-PM: Adding info for No Bus:tty15
-PM: Adding info for No Bus:tty16
-PM: Adding info for No Bus:tty17
-PM: Adding info for No Bus:tty18
-PM: Adding info for No Bus:tty19
-PM: Adding info for No Bus:tty20
-PM: Adding info for No Bus:tty21
-PM: Adding info for No Bus:tty22
-PM: Adding info for No Bus:tty23
-PM: Adding info for No Bus:tty24
-PM: Adding info for No Bus:tty25
-PM: Adding info for No Bus:tty26
-PM: Adding info for No Bus:tty27
-PM: Adding info for No Bus:tty28
-PM: Adding info for No Bus:tty29
-PM: Adding info for No Bus:tty30
-PM: Adding info for No Bus:tty31
-PM: Adding info for No Bus:tty32
-PM: Adding info for No Bus:tty33
-PM: Adding info for No Bus:tty34
-PM: Adding info for No Bus:tty35
-PM: Adding info for No Bus:tty36
-PM: Adding info for No Bus:tty37
-PM: Adding info for No Bus:tty38
-PM: Adding info for No Bus:tty39
-PM: Adding info for No Bus:tty40
-PM: Adding info for No Bus:tty41
-PM: Adding info for No Bus:tty42
-PM: Adding info for No Bus:tty43
-PM: Adding info for No Bus:tty44
-PM: Adding info for No Bus:tty45
-PM: Adding info for No Bus:tty46
-PM: Adding info for No Bus:tty47
-PM: Adding info for No Bus:tty48
-PM: Adding info for No Bus:tty49
-PM: Adding info for No Bus:tty50
-PM: Adding info for No Bus:tty51
-PM: Adding info for No Bus:tty52
-PM: Adding info for No Bus:tty53
-PM: Adding info for No Bus:tty54
-PM: Adding info for No Bus:tty55
-PM: Adding info for No Bus:tty56
-PM: Adding info for No Bus:tty57
-PM: Adding info for No Bus:tty58
-PM: Adding info for No Bus:tty59
-PM: Adding info for No Bus:tty60
-PM: Adding info for No Bus:tty61
-PM: Adding info for No Bus:tty62
-PM: Adding info for No Bus:tty63
-PM: Adding info for No Bus:ptmx
-PM: Adding info for No Bus:apm_bios
-Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
-PM: Adding info for platform:serial8250
-platform serial8250: __pm_runtime_idle()!
-platform serial8250: __pm_runtime_idle() returns -11!
-PM: Adding info for No Bus:ttyS0
-PM: Adding info for No Bus:ttyS1
-PM: Adding info for No Bus:ttyS2
-PM: Adding info for No Bus:ttyS3
-serial8250 serial8250: __pm_runtime_idle()!
-serial8250 serial8250: __pm_runtime_idle() returns -11!
-Uniform Multi-Platform E-IDE driver
-ide-gd driver 1.18
-NAND device: Manufacturer ID: 0xec, Chip ID: 0x73 (Samsung NAND 16MiB 3,3V 8-bit)
-Scanning device for bad blocks
-Creating 3 MTD partitions on "sharpsl-nand":
-0x000000000000-0x000000700000 : "System Area"
-PM: Adding info for No Bus:mtd0
-PM: Adding info for No Bus:mtd0ro
-PM: Adding info for No Bus:mtdblock0
-PM: Adding info for No Bus:31:0
-0x000000700000-0x000000c00000 : "Root Filesystem"
-PM: Adding info for No Bus:mtd1
-PM: Adding info for No Bus:mtd1ro
-PM: Adding info for No Bus:mtdblock1
-0x000000c00000-0x000001000000 : "Home Filesystem"
-PM: Adding info for No Bus:mtd2
-PM: Adding info for No Bus:mtd2ro
-PM: Adding info for No Bus:mtdblock2
-sharpsl-nand sharpsl-nand: __pm_runtime_idle()!
-sharpsl-nand sharpsl-nand: __pm_runtime_idle() returns -11!
-PPP generic driver version 2.4.2
-PM: Adding info for No Bus:ppp
-orinoco 0.15 (David Gibson <hermes@gibson.dropbear.id.au>, Pavel Roskin <proski@gnu.org>, et al)
-orinoco_cs 0.15 (David Gibson <hermes@gibson.dropbear.id.au>, Pavel Roskin <proski@gnu.org>, et al)
-PM: Adding info for No Bus:mice
-mice: PS/2 mouse device common for all mice
-PM: Adding info for No Bus:input0
-input: gpio-keys as /class/input/input0
-PM: Adding info for No Bus:event0
-gpio-keys gpio-keys: __pm_runtime_idle()!
-gpio-keys gpio-keys: __pm_runtime_idle() returns -11!
-PM: Adding info for No Bus:input1
-input: matrix-keypad as /class/input/input1
-PM: Adding info for No Bus:event1
-matrix-keypad matrix-keypad: __pm_runtime_idle()!
-matrix-keypad matrix-keypad: __pm_runtime_idle() returns -11!
-PM: Adding info for No Bus:hwmon0
-ads7846 spi2.0: touchscreen, irq 107
-PM: Adding info for No Bus:input2
-input: ADS7846 Touchscreen as /class/input/input2
-PM: Adding info for No Bus:mouse0
-PM: Adding info for No Bus:event2
-ads7846 spi2.0: __pm_runtime_idle()!
-ads7846 spi2.0: __pm_runtime_idle() returns -11!
-APM Battery Driver
-PM: Adding info for No Bus:hwmon1
-max1111 spi2.2: __pm_runtime_idle()!
-max1111 spi2.2: __pm_runtime_idle() returns -11!
-Bluetooth: HCI UART driver ver 2.2
-Bluetooth: HCI H4 protocol initialized
-Bluetooth: HCI BCSP protocol initialized
-cpuidle: using governor ladder
-PM: Adding info for No Bus:mmc0
-pxa2xx-mci pxa2xx-mci.0: __pm_runtime_idle()!
-pxa2xx-mci pxa2xx-mci.0: __pm_runtime_idle() returns -11!
-PM: Adding info for No Bus:spitz:amber:charge
-Registered led device: spitz:amber:charge
-PM: Adding info for No Bus:spitz:green:hddactivity
-Registered led device: spitz:green:hddactivity
-leds-gpio leds-gpio: __pm_runtime_idle()!
-leds-gpio leds-gpio: __pm_runtime_idle() returns -11!
-wacom driver registered
-TCP cubic registered
-NET: Registered protocol family 17
-Bluetooth: L2CAP ver 2.14
-Bluetooth: L2CAP socket layer initialized
-Bluetooth: RFCOMM TTY layer initialized
-Bluetooth: RFCOMM socket layer initialized
-Bluetooth: RFCOMM ver 1.11
-Bluetooth: BNEP (Ethernet Emulation) ver 1.3
-Bluetooth: BNEP filters: protocol multicast
-Bluetooth: HIDP (Human Interface Emulation) ver 1.2
-lib80211: common routines for IEEE802.11 drivers
-lib80211_crypt: registered algorithm 'NULL'
-XScale iWMMXt coprocessor detected.
-sharpsl-pm sharpsl-pm: __pm_runtime_idle()!
-sharpsl-pm sharpsl-pm: __pm_runtime_idle() returns -11!
-PM: Adding info for No Bus:cpu_dma_latency
-PM: Adding info for No Bus:network_latency
-PM: Adding info for No Bus:network_throughput
-Waiting 3sec before mounting root device...
-pcmcia_socket pcmcia_socket1: pccard: PCMCIA card inserted into slot 1
-pcmcia 1.0: pcmcia: registering new device pcmcia1.0
-PM: Adding info for pcmcia:1.0
-Probing IDE interface ide0...
-hda: HMS360404D5CF00, CFA DISK drive
-PM: Adding info for No Bus:ide0
-PM: Adding info for No Bus:ide0
-ide0 at 0xc4840000-0xc4840007,0xc484000e on irq 202
-PM: Adding info for ide:0.0
-PM: Adding info for No Bus:0.0
-hda: max request size: 128KiB
-hda: 7999488 sectors (4095 MB) w/128KiB Cache, CHS=7936/16/63
-hda: cache flushes supported
-PM: Adding info for No Bus:hda
- hda: hda1 hda2 hda3
-PM: Adding info for No Bus:hda1
-PM: Adding info for No Bus:hda2
-PM: Adding info for No Bus:hda3
-PM: Adding info for No Bus:3:0
-ide-gd 0.0: __pm_runtime_idle()!
-ide-gd 0.0: __pm_runtime_idle() returns -11!
-ide-cs: hda: Vpp = 0.0
-ide-cs 1.0: __pm_runtime_idle()!
-ide-cs 1.0: __pm_runtime_idle() returns -11!
-EXT3-fs: INFO: recovery required on readonly filesystem.
-EXT3-fs: write access will be enabled during recovery.
-kjournald starting.  Commit interval 5 seconds
-EXT3-fs: recovery complete.
-EXT3-fs: mounted filesystem with ordered data mode.
-VFS: Mounted root (ext3 filesystem) readonly on device 3:3.
-Freeing init memory: 92K
-EXT3-fs warning: maximal mount count reached, running e2fsck is recommended
-EXT3 FS on hda3, internal journal
-kjournald starting.  Commit interval 5 seconds
-EXT3-fs warning: maximal mount count reached, running e2fsck is recommended
-EXT3 FS on hda2, internal journal
-EXT3-fs: recovery complete.
-EXT3-fs: mounted filesystem with ordered data mode.
-Adding 55160k swap on /SWAP.  Priority:-1 extents:15 across:55220k 
-PM: Adding info for No Bus:vcs2
-PM: Adding info for No Bus:vcsa2
-PM: Adding info for No Bus:vcs3
-PM: Adding info for No Bus:vcsa3
-PM: Adding info for No Bus:vcs4
-PM: Adding info for No Bus:vcsa4
-PM: Adding info for No Bus:vcs6
-PM: Adding info for No Bus:vcsa6
-PM: Adding info for No Bus:vcs5
-PM: Adding info for No Bus:vcsa5
-PM: Syncing filesystems ... done.
-PM: Preparing system for mem sleep
-PM: Adding info for No Bus:vcs63
-PM: Adding info for No Bus:vcsa63
-Freezing user space processes ... (elapsed 0.00 seconds) done.
-Freezing remaining freezable tasks ... (elapsed 0.00 seconds) done.
-PM: Entering mem sleep
-platform pxa27x-udc: preparing suspend
-platform pxa2xx-uart.0: preparing suspend
-platform pxa2xx-uart.1: preparing suspend
-platform pxa2xx-uart.2: preparing suspend
-platform pxa2xx-i2s: preparing suspend
-platform sa1100-rtc: preparing suspend
-platform pxa-rtc: preparing suspend
-pxa27x-ssp pxa27x-ssp.0: preparing suspend
-pxa27x-ssp pxa27x-ssp.1: preparing suspend
-pxa27x-ssp pxa27x-ssp.2: preparing suspend
-platform pxa27x-pwm.0: preparing suspend
-platform pxa27x-pwm.1: preparing suspend
-pxa2xx-spi pxa2xx-spi.2: preparing suspend
-sharp-scoop sharp-scoop.0: preparing suspend
-matrix-keypad matrix-keypad: preparing suspend, may wakeup
-gpio-keys gpio-keys: preparing suspend, may wakeup
-leds-gpio leds-gpio: preparing suspend
-sharpsl-nand sharpsl-nand: preparing suspend
-platform physmap-flash: preparing suspend
-pxa2xx-mci pxa2xx-mci.0: preparing suspend
-platform pxa27x-ohci: preparing suspend
-platform pxa2xx-ir: preparing suspend
-pxa2xx-fb pxa2xx-fb: preparing suspend
-pxa2xx-i2c pxa2xx-i2c.0: preparing suspend
-sharp-scoop sharp-scoop.1: preparing suspend
-platform regulatory.0: preparing suspend
-pxa2xx-pcmcia pxa2xx-pcmcia: preparing suspend
-sharpsl-pm sharpsl-pm: preparing suspend
-serial8250 serial8250: preparing suspend
-ide-gd 0.0: legacy suspend
-ide-cs 1.0: legacy suspend
-leds spitz:green:hddactivity: legacy class suspend
-leds spitz:amber:charge: legacy class suspend
-input input2: type suspend
-input input1: type suspend
-input input0: type suspend
-mtd mtd2ro: legacy class suspend
-mtd mtd2: legacy class suspend
-mtd mtd1ro: legacy class suspend
-mtd mtd1: legacy class suspend
-mtd mtd0ro: legacy class suspend
-mtd mtd0: legacy class suspend
-serial8250 serial8250: suspend
-backlight corgi_bl: legacy class suspend
-sharpsl-pm sharpsl-pm: suspend
-pxa2xx-pcmcia pxa2xx-pcmcia: suspend
-platform regulatory.0: suspend
-i2c i2c-0: legacy suspend
-max1111 spi2.2: legacy suspend
-corgi-lcd spi2.1: legacy suspend
-ads7846 spi2.0: legacy suspend
-sharp-scoop sharp-scoop.1: suspend
-pxa2xx-i2c pxa2xx-i2c.0: suspend
-pxa2xx-fb pxa2xx-fb: suspend
-platform pxa2xx-ir: suspend
-platform pxa27x-ohci: suspend
-pxa2xx-mci pxa2xx-mci.0: suspend
-platform physmap-flash: suspend
-sharpsl-nand sharpsl-nand: suspend
-leds-gpio leds-gpio: suspend
-gpio-keys gpio-keys: suspend, may wakeup
-matrix-keypad matrix-keypad: suspend, may wakeup
-matrix-keypad matrix-keypad: Failed to setup GPIO 17 as wakeup source, err: -22
-pm_op(): platform_pm_suspend+0x0/0x5c returns -22
-PM: Device matrix-keypad failed to suspend: error -22
-PM: Some devices failed to suspend
-gpio-keys gpio-keys: resume
-------------[ cut here ]------------
-WARNING: at kernel/irq/manage.c:361 set_irq_wake+0x7c/0x138()
-Unbalanced IRQ 191 wake disable
-Modules linked in:
-[<c00248f8>] (unwind_backtrace+0x0/0xe4) from [<c003520c>] (warn_slowpath_common+0x4c/0x80)
-[<c003520c>] (warn_slowpath_common+0x4c/0x80) from [<c003527c>] (warn_slowpath_fmt+0x28/0x38)
-[<c003527c>] (warn_slowpath_fmt+0x28/0x38) from [<c0060b88>] (set_irq_wake+0x7c/0x138)
-[<c0060b88>] (set_irq_wake+0x7c/0x138) from [<c01d0274>] (gpio_keys_resume+0x64/0x80)
-[<c01d0274>] (gpio_keys_resume+0x64/0x80) from [<c0190d3c>] (platform_pm_resume+0x30/0x54)
-[<c0190d3c>] (platform_pm_resume+0x30/0x54) from [<c019302c>] (pm_op+0x6c/0x8c)
-[<c019302c>] (pm_op+0x6c/0x8c) from [<c0193af4>] (dpm_resume_end+0xf0/0x47c)
-[<c0193af4>] (dpm_resume_end+0xf0/0x47c) from [<c005d980>] (suspend_devices_and_enter+0x8c/0x1dc)
-[<c005d980>] (suspend_devices_and_enter+0x8c/0x1dc) from [<c005dbb8>] (enter_state+0xe8/0x120)
-[<c005dbb8>] (enter_state+0xe8/0x120) from [<c005d2bc>] (state_store+0x90/0xc4)
-[<c005d2bc>] (state_store+0x90/0xc4) from [<c01459bc>] (kobj_attr_store+0x1c/0x24)
-[<c01459bc>] (kobj_attr_store+0x1c/0x24) from [<c00d80d8>] (sysfs_write_file+0x104/0x18c)
-[<c00d80d8>] (sysfs_write_file+0x104/0x18c) from [<c008ffe8>] (vfs_write+0xb0/0x164)
-[<c008ffe8>] (vfs_write+0xb0/0x164) from [<c009016c>] (sys_write+0x40/0x70)
-[<c009016c>] (sys_write+0x40/0x70) from [<c001fec0>] (ret_fast_syscall+0x0/0x28)
----[ end trace 974713f34f14652d ]---
-leds-gpio leds-gpio: resume
-sharpsl-nand sharpsl-nand: resume
-platform physmap-flash: resume
-pxa2xx-mci pxa2xx-mci.0: resume
-platform pxa27x-ohci: resume
-platform pxa2xx-ir: resume
-pxa2xx-fb pxa2xx-fb: resume
-pxa2xx-i2c pxa2xx-i2c.0: resume
-sharp-scoop sharp-scoop.1: resume
-ads7846 spi2.0: legacy resume
-corgi-lcd spi2.1: legacy resume
-max1111 spi2.2: legacy resume
-i2c i2c-0: legacy resume
-platform regulatory.0: resume
-pxa2xx-pcmcia pxa2xx-pcmcia: resume
-sharpsl-pm sharpsl-pm: resume
-backlight corgi_bl: legacy class resume
-serial8250 serial8250: resume
-mtd mtd0: legacy class resume
-mtd mtd0ro: legacy class resume
-mtd mtd1: legacy class resume
-mtd mtd1ro: legacy class resume
-mtd mtd2: legacy class resume
-mtd mtd2ro: legacy class resume
-input input0: type resume
-input input1: type resume
-input input2: type resume
-leds spitz:amber:charge: legacy class resume
-leds spitz:green:hddactivity: legacy class resume
-ide-cs 1.0: legacy resume
-ide-gd 0.0: legacy resume
-serial8250 serial8250: completing resume
-sharpsl-pm sharpsl-pm: completing resume
-pxa2xx-pcmcia pxa2xx-pcmcia: completing resume
-platform regulatory.0: completing resume
-sharp-scoop sharp-scoop.1: completing resume
-pxa2xx-i2c pxa2xx-i2c.0: completing resume
-pxa2xx-fb pxa2xx-fb: completing resume
-platform pxa2xx-ir: completing resume
-platform pxa27x-ohci: completing resume
-pxa2xx-mci pxa2xx-mci.0: completing resume
-platform physmap-flash: completing resume
-sharpsl-nand sharpsl-nand: completing resume
-leds-gpio leds-gpio: completing resume
-gpio-keys gpio-keys: completing resume
-matrix-keypad matrix-keypad: completing resume
-sharp-scoop sharp-scoop.0: completing resume
-pxa2xx-spi pxa2xx-spi.2: completing resume
-platform pxa27x-pwm.1: completing resume
-platform pxa27x-pwm.0: completing resume
-pxa27x-ssp pxa27x-ssp.2: completing resume
-pxa27x-ssp pxa27x-ssp.1: completing resume
-pxa27x-ssp pxa27x-ssp.0: completing resume
-platform pxa-rtc: completing resume
-platform sa1100-rtc: completing resume
-platform pxa2xx-i2s: completing resume
-platform pxa2xx-uart.2: completing resume
-platform pxa2xx-uart.1: completing resume
-platform pxa2xx-uart.0: completing resume
-platform pxa27x-udc: completing resume
-PM: Finishing wakeup.
-Restarting tasks ... done.
-hda: task_pio_intr: status=0x59 { DriveReady SeekComplete DataRequest Error }
-hda: task_pio_intr: error=0x04 { DriveStatusError }
-hda: possibly failed opcode: 0xc4
-hda: task_pio_intr: status=0x59 { DriveReady SeekComplete DataRequest Error }
-hda: task_pio_intr: error=0x04 { DriveStatusError }
-hda: possibly failed opcode: 0xc4
-hda: task_pio_intr: status=0x59 { DriveReady SeekComplete DataRequest Error }
-hda: task_pio_intr: error=0x04 { DriveStatusError }
-hda: possibly failed opcode: 0xc4
-hda: task_pio_intr: status=0x59 { DriveReady SeekComplete DataRequest Error }
-hda: task_pio_intr: error=0x04 { DriveStatusError }
-hda: possibly failed opcode: 0xc4
-ide0: reset: success
+This was presented only as a reference. Don't take it too strictly.
+
+> You have presented a very flexible, general purpose bootmem allocator/mapper.
+> (cache/uncached, bounce/pmm, etc.)
+> 
+> The problem you were trying to solve is a means to generalize multiple
+> compile-time fixed bootmem allocations at runtime.
+> 
+> Perhaps this could be simplified to fix that problem by assuming that
+> all users (including the s3c-fb driver) would use a simple non-cached
+> pmm allocator so that all allocations would be pooled.
+
+I don't get this, could you elaborate?
+
+> I would advocate "hiding" pmm allocations within the s3c-mm drivers.
+> Each driver could test user buffers for "isPMM()" trivially since the
+> bootmem is physically contig.
+> 
+> What is the advantage in exporting the pmm API to user-space?
+
+Only user applications know what buffers will be required for the
+processing they are performing and which of them they want to reuse
+with other drivers. We decided to remove all buffers from the drivers
+and allocate them separately in user space. This way no memory is wasted
+to fixed buffers. Please note that the ability of SHARING the same buffer
+between different devices is the key feature of this solution.
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
