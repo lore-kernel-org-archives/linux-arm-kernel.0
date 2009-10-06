@@ -1,47 +1,48 @@
 From: kristoffer.ericson@gmail.com (Kristoffer Ericson)
-Date: Tue, 6 Oct 2009 12:53:18 +0200
-Subject: [PATCH] SA1100: fix building of h3100
-In-Reply-To: <1254765034-29849-1-git-send-email-mad_soft@inbox.ru>
-References: <1254765034-29849-1-git-send-email-mad_soft@inbox.ru>
-Message-ID: <20091006125318.d430a642.kristoffer.ericson@gmail.com>
+Date: Tue, 6 Oct 2009 12:57:02 +0200
+Subject: collie and SA1100 patches
+In-Reply-To: <1254778533-3529-1-git-send-email-thommycheck@gmx.de>
+References: <1254778533-3529-1-git-send-email-thommycheck@gmx.de>
+Message-ID: <20091006125702.45d761ae.kristoffer.ericson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon,  5 Oct 2009 21:50:34 +0400
-Dmitry Artamonow <mad_soft@inbox.ru> wrote:
+On Mon,  5 Oct 2009 23:35:24 +0200
+Thomas Kunze <thommycheck@gmx.de> wrote:
 
-> Both iPaqs h3100 and h3600 currently share the same source
-> file - h3600.c  But Makefile builds it only if CONFIG_SA1100_H3600
-> selected, so selecting just CONFIG_SA1100_H3100 results in
-> "no machine record defined" message and aborted compilation.
-> 
-> Fix it.
+> Hi all!
+>    
+> This patchset implements prober power management for collie. To archieve this
+> some bugs were fixed and gpiolib-support was added to the ucb1x00 driver.
+> Please tell me if I should CC some other people or lists.
 
-Acked
+Without looking at the patches, how does this affect other sa11xx based
+platforms?
 
 > 
-> Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
-> ---
-> Well, it left unnoticed by me for a while, just because I always build
-> kernels with _both_ machines compiled in.
+> Regards,
+> Thomas
 > 
->  arch/arm/mach-sa1100/Makefile |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-sa1100/Makefile b/arch/arm/mach-sa1100/Makefile
-> index 8a5546e..bb7b819 100644
-> --- a/arch/arm/mach-sa1100/Makefile
-> +++ b/arch/arm/mach-sa1100/Makefile
-> @@ -25,6 +25,7 @@ led-$(CONFIG_SA1100_CERF)		+= leds-cerf.o
->  
->  obj-$(CONFIG_SA1100_COLLIE)		+= collie.o
->  
-> +obj-$(CONFIG_SA1100_H3100)		+= h3600.o
->  obj-$(CONFIG_SA1100_H3600)		+= h3600.o
->  
->  obj-$(CONFIG_SA1100_HACKKIT)		+= hackkit.o
-> -- 
-> 1.6.3.4
+> Statistics:
+>  arch/arm/mach-sa1100/collie.c              |   79 +++++-
+>  arch/arm/mach-sa1100/include/mach/collie.h |   77 +++---
+>  arch/arm/mach-sa1100/include/mach/gpio.h   |   19 +-
+>  arch/arm/mach-sa1100/include/mach/mcp.h    |    1 +
+>  drivers/leds/leds-locomo.c                 |    2 +-
+>  drivers/mfd/mcp-core.c                     |    2 +-
+>  drivers/mfd/mcp-sa11x0.c                   |    3 +-
+>  drivers/mfd/ucb1x00-assabet.c              |    2 +-
+>  drivers/mfd/ucb1x00-core.c                 |   89 ++++++-
+>  drivers/mfd/ucb1x00-ts.c                   |    2 +-
+>  drivers/power/Kconfig                      |    7 +
+>  drivers/power/Makefile                     |    1 +
+>  drivers/power/collie_battery.c             |  418 ++++++++++++++++++++++++++++
+>  {drivers => include/linux}/mfd/mcp.h       |    3 +
+>  {drivers => include/linux}/mfd/ucb1x00.h   |    7 +-
+>  15 files changed, 649 insertions(+), 63 deletions(-)
+>  create mode 100644 drivers/power/collie_battery.c
+>  rename {drivers => include/linux}/mfd/mcp.h (97%)
+>  rename {drivers => include/linux}/mfd/ucb1x00.h (98%)
 > 
 > 
 > _______________________________________________
