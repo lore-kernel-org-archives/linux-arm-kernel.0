@@ -1,40 +1,97 @@
-From: rene.wolf@mbda-systems.de (Wolf, Rene, HRO-GP)
-Date: Tue, 6 Oct 2009 09:22:23 +0200
-Subject: imx SDMA
-In-Reply-To: <200910060857.52469.null@rez.ru>
-References: <200910060857.52469.null@rez.ru>
-Message-ID: <87077C4F48609F4392621D9F99DDE20901202E0D@tesla.star.galaxy.io>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 6 Oct 2009 09:46:36 +0200
+Subject: spitz: add gpio button support
+Message-ID: <20091006074635.GA2775@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexei.
 
-If you're intereseted in drivers using the SDMA there are two, for
-the i.MX platform. Both use some dma api, one of em the SDMA api, afaik.
-/u/s/l/drivers/mmc/host/mxc_mmc.c 
-/u/s/l/drivers/mmc/host/imxmmc.c
-The point is, those two differ in the recent kernel versions. The one
-I refer to is the 2.6.22 from the LTIB (http://ltib.org/) for i.MX31.
+This is call for testing/comments. It adds support for power button,
+SWA and SWB.. I'm not sure what AK_INT is, nor what event it should
+generate. Unfortunately, this does _not_ fix suspend/resume, and
+neither does switch back to old spitz-keyboard help.
 
-What would that torrent contain?
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
+								Pavel
 
+--- linux-rc/arch/arm.ofic/mach-pxa/spitz.c	2009-09-28 12:09:26.000000000 +0200
++++ linux-rc/arch/arm/mach-pxa/spitz.c	2009-10-04 20:58:32.000000000 +0200
+@@ -15,6 +15,7 @@
+ #include <linux/kernel.h>
+ #include <linux/platform_device.h>
+ #include <linux/delay.h>
++#include <linux/gpio_keys.h>
+ #include <linux/gpio.h>
+ #include <linux/leds.h>
+ #include <linux/mtd/physmap.h>
+@@ -367,7 +368,8 @@
+ };
+ 
+ static struct platform_device spitzkbd_device = {
+-	.name		= "matrix-keypad",
++  	.name		= "matrix-keypad",
++	//	.name		= "spitz-keyboard",
+ 	.id		= -1,
+ 	.dev		= {
+ 		.platform_data = &spitzkbd_pdata,
+@@ -375,6 +377,48 @@
+ };
+ 
+ 
++static struct gpio_keys_button spitz_gpio_keys[] = {
++	{
++		.type	= EV_KEY,
++		.code	= KEY_SUSPEND,
++		.gpio	= SPITZ_GPIO_ON_KEY,
++		.desc	= "Poweron",
++		.wakeup	= 1,
++	},
++	{
++		.type	= EV_SW,
++		.code	= 0,
++		.gpio	= SPITZ_GPIO_SWA,
++		.desc	= "SWA",
++	},
++	{
++		.type	= EV_SW,
++		.code	= 1,
++		.gpio	= SPITZ_GPIO_SWB,
++		.desc	= "SWB",
++	},
++	{
++		.type	= EV_KEY,
++		.code	= KEY_F13,
++		.gpio	= SPITZ_GPIO_AK_INT,
++		.desc	= "HP",
++	},
++};
++
++static struct gpio_keys_platform_data spitz_gpio_keys_platform_data = {
++	.buttons	= spitz_gpio_keys,
++	.nbuttons	= ARRAY_SIZE(spitz_gpio_keys),
++};
++
++static struct platform_device spitz_gpio_keys_device = {
++	.name	= "gpio-keys",
++	.id	= -1,
++	.dev	= {
++		.platform_data	= &spitz_gpio_keys_platform_data,
++	},
++};
++
++
+ /*
+  * Spitz LEDs
+  */
+@@ -689,6 +733,7 @@
+ static struct platform_device *devices[] __initdata = {
+ 	&spitzscoop_device,
+ 	&spitzkbd_device,
++	&spitz_gpio_keys_device,
+ 	&spitzled_device,
+ 	&sharpsl_nand_device,
+ 	&sharpsl_rom_device,
 
-Thanks and
-Cheers
-Rene
-
-
-Rene Wolf
-LFK-Lenkflugk?rpersysteme GmbH
-Human Resources Operations & Policy, HRO
-Landshuter Stra?e 26, 85716 Unterschlei?heim, GERMANY
-Phone: +49 89 3179 8337
-Fax: +49 8252 99 8964
-E-Mail: rene.wolf at mbda-systems.de
-
-http://www.mbda.net
-
-Chairman of the Supervisory Board: Antoine Bouvier
-Managing Director: Werner Kaltenegger
-Registered Office: Schrobenhausen
-Commercial Register: Amtsgericht Ingolstadt, HRB 4365
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
