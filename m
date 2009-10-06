@@ -1,49 +1,40 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 6 Oct 2009 08:48:52 +0200
-Subject: [PATCH v2] fix pcm037_eet compilation with the new SPI driver
-In-Reply-To: <Pine.LNX.4.64.0910051644010.4337@axis700.grange>
-References: <Pine.LNX.4.64.0910051001500.4337@axis700.grange>
-	<20091005121936.GD23986@pengutronix.de> <4AC9FC2D.6000200@epfl.ch>
-	<Pine.LNX.4.64.0910051644010.4337@axis700.grange>
-Message-ID: <20091006064852.GH23986@pengutronix.de>
+From: rene.wolf@mbda-systems.de (Wolf, Rene, HRO-GP)
+Date: Tue, 6 Oct 2009 09:22:23 +0200
+Subject: imx SDMA
+In-Reply-To: <200910060857.52469.null@rez.ru>
+References: <200910060857.52469.null@rez.ru>
+Message-ID: <87077C4F48609F4392621D9F99DDE20901202E0D@tesla.star.galaxy.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 05, 2009 at 04:49:12PM +0200, Guennadi Liakhovetski wrote:
-> Fix pcm037_eet compilation with the new imx SPI driver by unifying 
-> platform device names.
-> 
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> ---
-> On Mon, 5 Oct 2009, Valentin Longchamp wrote:
-> 
-> > Hi Sascha,
-> > 
-> > Sascha Hauer wrote:
-> > > 
-> > > On Mon, Oct 05, 2009 at 10:04:51AM +0200, Guennadi Liakhovetski wrote:
-> > > > At some point the SPI device name in arch/arm/mach-mx3/devices.c has
-> > > > changed, which then broke compilation of pcm037_eet with the new SPI
-> > > > driver. Use the correct name.
-> > > 
-> > > It didn't change, it was merged with imx_spi_device0. Can we change the
-> > > name in devices.[ch] instead? All other devices start with mxc_. Sorry,
-> > > my bad.
-> > 
-> > I don't really where it is changed ... mxc seems better so devices.[ch] is
-> > more logical.
-> > 
-> > But I have sent the exact same patch on Friday and received no comment ... I
-> > hope mine or Guennadi's (I don't really care) can get its way to -rc4.
-> 
-> Sorry, I missed it. Here's a version with changed devices.[hc].
+Hi Alexei.
 
-Ok, thanks.
+If you're intereseted in drivers using the SDMA there are two, for
+the i.MX platform. Both use some dma api, one of em the SDMA api, afaik.
+/u/s/l/drivers/mmc/host/mxc_mmc.c 
+/u/s/l/drivers/mmc/host/imxmmc.c
+The point is, those two differ in the recent kernel versions. The one
+I refer to is the 2.6.22 from the LTIB (http://ltib.org/) for i.MX31.
 
-Sascha
+What would that torrent contain?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+
+Thanks and
+Cheers
+Rene
+
+
+Rene Wolf
+LFK-Lenkflugk?rpersysteme GmbH
+Human Resources Operations & Policy, HRO
+Landshuter Stra?e 26, 85716 Unterschlei?heim, GERMANY
+Phone: +49 89 3179 8337
+Fax: +49 8252 99 8964
+E-Mail: rene.wolf at mbda-systems.de
+
+http://www.mbda.net
+
+Chairman of the Supervisory Board: Antoine Bouvier
+Managing Director: Werner Kaltenegger
+Registered Office: Schrobenhausen
+Commercial Register: Amtsgericht Ingolstadt, HRB 4365
