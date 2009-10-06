@@ -1,29 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Oct 2009 12:28:31 +0100
-Subject: [PATCH] SA1100: fix building of h3100
-In-Reply-To: <20091006125318.d430a642.kristoffer.ericson@gmail.com>
-References: <1254765034-29849-1-git-send-email-mad_soft@inbox.ru>
-	<20091006125318.d430a642.kristoffer.ericson@gmail.com>
-Message-ID: <20091006112831.GA15695@n2100.arm.linux.org.uk>
+From: utx@penguin.cz (Stanislav Brabec)
+Date: Tue, 06 Oct 2009 13:48:52 +0200
+Subject: spitz: add gpio button support (AK_INT and remote control
+	description)
+In-Reply-To: <20091006074635.GA2775@ucw.cz>
+References: <20091006074635.GA2775@ucw.cz>
+Message-ID: <1254829732.3546.35.camel@utx.utx.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 06, 2009 at 12:53:18PM +0200, Kristoffer Ericson wrote:
-> On Mon,  5 Oct 2009 21:50:34 +0400
-> Dmitry Artamonow <mad_soft@inbox.ru> wrote:
-> 
-> > Both iPaqs h3100 and h3600 currently share the same source
-> > file - h3600.c  But Makefile builds it only if CONFIG_SA1100_H3600
-> > selected, so selecting just CONFIG_SA1100_H3100 results in
-> > "no machine record defined" message and aborted compilation.
-> > 
-> > Fix it.
-> 
-> Acked
+Pavel Machek wrote:
+> I'm not sure what AK_INT is, nor what event it should
+> generate.
 
-If there are people seriously looking at H3[16]00 stuff, it would be
-a good idea to move it over to use the proper GPIO support rather
-than continue to rely upon its own version.
+AK_INT: remote control detect
 
-Also maybe splitting it into h3100.c and h3600.c, with (if any) common
-bits in h3xxx.c might be an idea?
+How it should work on spitz:
+
+The default state of ?the remote pin of audio barrel connector is a weak
+pull-up.
+
+Button is pressed. => Voltage ?on remote pin decreases. => Hardware
+defined threshold voltage is reached. => AK_INT is triggered. => Driver
+sets SPITZ_SCP2_AKIN_PULLUP (it connects stronger and more power hungry
+pull-up), ignores AK_INT change, sets MAX1111 to channel 0, reads value
+from A/D converter.
+
+After some debouncing:
+
+The value is below threshold. => Decode the value and generate input
+event.
+
+The value is over threshold. => Switch SPITZ_SCP2_AKIN_PULLUP back,
+activate AK_INT interrupt and wait for next edge.
+
+The value is near zero. => ?A standard 3-ring earphone connector seems
+to be inserted. AK_INT will be "active" all the time. To save stronger
+pull-up power, behave like the value over threshold and ignore AK_INT
+until possible next change (remove earphone, insert remote).
+
+Some of these actions should probably cause wake-up. It would be nice to
+wake-up sleeping Zaurus by pressing Play button and start to play.
+
+The driver is available e. g. in 2.6.26-RP kernel as
+sharpsl-rc-r1.patch. I plan to rewrite it to a generic "resistor matrix
+keyboard" and then sent to vanilla.
+
+
+________________________________________________________________________
+Stanislav Brabec
+http://www.penguin.cz/~utx
