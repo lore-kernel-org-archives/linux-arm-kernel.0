@@ -1,81 +1,46 @@
-From: bgat@billgatliff.com (Bill Gatliff)
-Date: Wed, 07 Oct 2009 07:45:39 -0500
-Subject: i.MX31 kernel panic and irq
-In-Reply-To: <87077C4F48609F4392621D9F99DDE20901202E10@tesla.star.galaxy.io>
-References: <87077C4F48609F4392621D9F99DDE20901202E0E@tesla.star.galaxy.io>
-	<4ACB659E.3000206@billgatliff.com>
-	<87077C4F48609F4392621D9F99DDE20901202E10@tesla.star.galaxy.io>
-Message-ID: <4ACC8D73.2080109@billgatliff.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 7 Oct 2009 14:10:03 +0100
+Subject: [PATCH 2/9] collie: prepare for gpiolib use
+In-Reply-To: <20091007124251.GB7656@rainbow>
+References: <1254778533-3529-1-git-send-email-thommycheck@gmx.de>
+	<1254778533-3529-2-git-send-email-thommycheck@gmx.de>
+	<1254778533-3529-3-git-send-email-thommycheck@gmx.de>
+	<20091007110805.GA7656@rainbow>
+	<20091007112552.GC6246@n2100.arm.linux.org.uk>
+	<20091007124251.GB7656@rainbow>
+Message-ID: <20091007131003.GA11371@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wolf, Rene, HRO-GP wrote:
-> Hi Bill.
->
-> Thanks for your fast reply!
->
->   
->> low-level throttling of incoming interrupts 
->>     
->
-> Hmm, I did test it with the option 'IRQF_DISABLED'. That should disable
-> IRQs while in the ISR, so all IRQs during the ISR should be ignored.
-> If they are ignored this should not lead to stack overflows, right?
-> Or is the stack jumble happening during the time the kernel needs to
-> disable the IRQs?
->   
+On Wed, Oct 07, 2009 at 04:42:52PM +0400, Dmitry Artamonow wrote:
+> Perhaps I wasn't exactly clear in explaining my thoughts. Sorry.
+> I meant following - currently in mach/h3600_gpio.h we have gpios declared
+> like that:
+> #define GPIO_H3100_IR_ON                GPIO_GPIO (8)
+> which effectively means:
+> #define GPIO_H3100_IR_ON                (1 << 8)
+> i.e. bit-shifted value. 
+> 
+> But gpiolibs needs numeric gpio definitions, something like that:
+> #define NGPIO_H3100_IR_ON		8
+> 
+> That's all well, but not all direct operations with GPIO registers on
+> SA1100 can be converted to gpiolib.
 
-I'd have to look in detail at the code for the IRQ handler, but IIRC it 
-re-enables IRQs at some point before even the first IRQF_DISABLED 
-handler would get called.  So your explanation could be accurate.
+I tinkered around with this yesterday before your message came through,
+and I defined a new set of definitions, eg:
 
-> I did test the setup with 10kHz and it went haywire, too:
-> 1st test: crash after  700k irqs
-> 2nd test: crash after 4200k irqs
-> 3rd test: crash after  200k irqs
->
-> So it seams quite random to me. Also tried with no irq events: system
-> was running for 20 min. without crash.
->   
+#define H3100_GPIO_IR_ON	8
 
-Well, "random" when you have limited information.  :)  If it is a stack 
-overflow, it would be quite predictable--- at the moment the stack 
-overflows!  But you don't know how to reliably set up a condition where 
-the stack will overflow, because it will be dependent on whatever else 
-the system is busy doing.
+so avoiding the problem.  See my 'sa1100' branch published in the usual
+places.
 
-I wonder how it fares at 1kHz?
+> Operations with GAFR (GPIO alternate function register), for example
+> (PXA have MFD API for that, but StrongArm doesn't)
 
-> About the application: the IRQs will come with a freq. of around 200kHz.
-> in bursts of several dozens. So I'm not quite sure if that is going
-> to work, will have to try :-)
->   
+Maybe long-term replicating something like the MFP API would be a good
+idea, rather than sticking with direct manipulation of the GAFR (which
+is racy if done from two different contexts).
 
-Boy, I sure hope you don't also need a predictable interrupt latency.  
-It sounds like the system will definitely fall behind during those bursts.
-
-If your function generator has an amplitude modulation capability, you 
-could use that along with a very low-duty-cycle pulse to create 
-controlled bursts of any duration and count.  You might need two 
-function generators to do it, or perhaps just a couple of 555 timers and 
-a soldering iron.
-
-In your previous posts you said that the system could process a few 
-200kHz interrupts before it died.  If that number is always greater than 
-"several dozens", then you might be still be ok.  Otherwise, you might 
-need to bring some additional hardware into the design or switch to a 
-different CPU (PPC machines tend to have pretty decent performance at 
-such high loads).
-
-Another alternative would be to disable the interrupt source at the 
-moment the first interrupt is detected, and then use a polled mode until 
-the burst is over.  In fact, if you were to implement that as part of 
-your testing and find that your system no longer dies, that's another 
-indication that stack overflow might be the root cause.
-
-
-b.g.
-
--- 
-Bill Gatliff
-bgat at billgatliff.com
+Currently, it's hard to audit that all GAFR manipulations are done in
+a safe way.
