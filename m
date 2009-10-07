@@ -1,34 +1,36 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 7 Oct 2009 22:23:42 +0800
-Subject: Kernel update to 2.6.31.1 on pxa270: udev and usb storage cause
-	kernel Oops
-In-Reply-To: <1254915955.26123.7.camel@wks02-lin.nanotronic.local>
-References: <1254213562.5586.13.camel@wks02-lin.nanotronic.local>
-	<20091003124832.GA15525@n2100.arm.linux.org.uk>
-	<20091005225222.GB792@kroah.com>
-	<1254915955.26123.7.camel@wks02-lin.nanotronic.local>
-Message-ID: <f17812d70910070723u687e1244u7d8b9d4da816c68e@mail.gmail.com>
+Date: Wed, 7 Oct 2009 22:27:52 +0800
+Subject: spitz: add gpio button support (AK_INT and remote control
+	description)
+In-Reply-To: <20091007120643.GA17069@rakim.wolfsonmicro.main>
+References: <20091006074635.GA2775@ucw.cz>
+	<1254829732.3546.35.camel@utx.utx.cz>
+	<20091007085806.GB28807@elf.ucw.cz>
+	<1254914991.4213.80.camel@hammer.suse.cz>
+	<20091007120643.GA17069@rakim.wolfsonmicro.main>
+Message-ID: <f17812d70910070727x47b2a22h8e9f9304740d5abf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 7, 2009 at 7:45 PM, hoefle marco <marco.hoefle@nanotronic.ch> wrote:
-> On Mon, 2009-10-05 at 15:52 -0700, Greg KH wrote:
->> On Sat, Oct 03, 2009 at 01:48:32PM +0100, Russell King - ARM Linux wrote:
->> > I think you need to report this to the USB/udev people.
->> >
->> > On Tue, Sep 29, 2009 at 10:39:22AM +0200, hoefle marco wrote:
->> > > Hello,
->> > > we use Kernel 2.6.30.4 on a PXA270 platform (from Phytec). It works good
->> > > with all peripherals on the Phytec board.
->> > > For an old Sandisk device (diskonchip) we have a driver ported to 2.6.3x
->> > > as the block device driver API has changed. We thought it will be a wise
->> > > decision to do the porting already to 2.6.3x.
->> > > However, when using the latest Kernel (and the previous one 2.6.30) with
->> > > all the drivers we used in 2.6.30.4 udev and usb storage seem not to
->> > > work any more.
->> > > Does anybody have an idea why?
+So what's the conclusion of the patch? Any ACK/NAK or patch needs updating?
+
+On Wed, Oct 7, 2009 at 8:06 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Wed, Oct 07, 2009 at 01:29:51PM +0200, Stanislav Brabec wrote:
 >
-> It looks that more things which worked with 2.6.30.4 do not work with
-> the latest stable 2.6.31.2 kernel. I get also a Kernel oops when
-> rebooting the system.
+>> SW_REMOTE_INSERT should be recognized by the Jack abstraction layer
+>> (sound/core/jack.c).
+>
+> It's the other way around - the jack layer reports jacks for ALSA cards.
+> Also, for spitz you'd probably want to be using the ASoC wrapper layer.
+>
+>> Well, I am thinking about defining extra values for resistors, that can
+>> make stuff even more useful at cost of need of non-standard wiring on
+>> fourth ring of the audio jack. It can generate SW_MICROPHONE_INSERT,
+>> SW_LINEOUT_INSERT, and not yet defined SW_HEADESET_INSERT and
+>> SW_LINEIN_INSERT (which would require hardware mod inside Zaurus for
+>> stereo line-in).
+>
+> Headset should be represented by reporting headphone plus microphone on
+> one jack simultaneously.
 >
