@@ -1,29 +1,27 @@
-From: jackylam.gsl@gmail.com (Jacky Lam)
-Date: Wed, 7 Oct 2009 10:01:37 +0800
-Subject: Some light on FastFPE
-Message-ID: <39811fe10910061901v314b091ct6c817027da59fd69@mail.gmail.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Wed, 7 Oct 2009 08:34:38 +0200
+Subject: Patches for Freescale MXC SoCs and direct ULPI communication [v3]
+In-Reply-To: <20090907102006.GB31592@pengutronix.de>
+References: <1251924478-30651-1-git-send-email-daniel@caiaq.de>
+	<4A9FE3C6.3050609@epfl.ch> <20090907102006.GB31592@pengutronix.de>
+Message-ID: <eedb5540910062334h282315edi750bf10b48448163@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Pitre ??:
-> On Wed, 7 Oct 2009, Jacky Lam wrote:
->
->> Dear All,
->>
->> 	Could anyone point me some light on how to get the current source code
->> of FastFPE?
->
-> Why?  You would get much faster results by using user space based
-> soft-float.
->
->
-> Nicolas
->
->
-Yes, I have read the FAQ. But for historical reason, I still need the
-support of hard float. Please point me to the source if it is still
-being maintained.
+What is the status regarding to mainline about these patches?
+
+Have they been applied somewhere?
 
 Thanks.
 
-Jacky
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091007/d74e2226/attachment.htm>
