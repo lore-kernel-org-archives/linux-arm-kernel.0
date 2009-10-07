@@ -1,16 +1,21 @@
-From: jackylam.gsl@gmail.com (Jacky Lam)
-Date: Wed, 7 Oct 2009 09:22:28 +0800
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 06 Oct 2009 21:50:08 -0400 (EDT)
 Subject: Some light on FastFPE
-Message-ID: <39811fe10910061822v1bd2082fw65aedf461b6468aa@mail.gmail.com>
+In-Reply-To: <39811fe10910061822v1bd2082fw65aedf461b6468aa@mail.gmail.com>
+References: <39811fe10910061822v1bd2082fw65aedf461b6468aa@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.0910062149110.32051@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear All,
+On Wed, 7 Oct 2009, Jacky Lam wrote:
 
-	Could anyone point me some light on how to get the current source code
-of FastFPE?
+> Dear All,
+> 
+> 	Could anyone point me some light on how to get the current source code
+> of FastFPE?
 
-	Thanks very much.
+Why?  You would get much faster results by using user space based 
+soft-float.
 
-BR,
-Jacky
+
+Nicolas
