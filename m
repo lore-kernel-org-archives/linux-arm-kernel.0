@@ -1,48 +1,30 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Wed, 7 Oct 2009 13:48:00 +0200
-Subject: [PATCH 2/9] collie: prepare for gpiolib use
-In-Reply-To: <20091007112552.GC6246@n2100.arm.linux.org.uk>
-References: <1254778533-3529-1-git-send-email-thommycheck@gmx.de>
-	<1254778533-3529-2-git-send-email-thommycheck@gmx.de>
-	<1254778533-3529-3-git-send-email-thommycheck@gmx.de>
-	<20091007110805.GA7656@rainbow>
-	<20091007112552.GC6246@n2100.arm.linux.org.uk>
-Message-ID: <19148.32752.740077.475080@ipc1.ka-ro>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 7 Oct 2009 13:06:44 +0100
+Subject: spitz: add gpio button support (AK_INT and remote control
+	description)
+In-Reply-To: <1254914991.4213.80.camel@hammer.suse.cz>
+References: <20091006074635.GA2775@ucw.cz>
+	<1254829732.3546.35.camel@utx.utx.cz>
+	<20091007085806.GB28807@elf.ucw.cz>
+	<1254914991.4213.80.camel@hammer.suse.cz>
+Message-ID: <20091007120643.GA17069@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux writes:
-> On Wed, Oct 07, 2009 at 03:08:05PM +0400, Dmitry Artamonow wrote:
-> > On 23:35 Mon 05 Oct     , Thomas Kunze wrote:
-> > > prefix gpio definitions for direct register access with '_' so we
-> > > can use the other names for gpio_request & co
-> > 
-> > Familiar problem - numeric vs bit-shifted gpio defines.
-> > I'm facing it here too while converting h3[16]00 to gpiolib,
-> > and I'm thinking about dropping bit-shifted defines completely
-> > and using GPIO_GPIO(SOME_NUMERIC_GPIO) instead.
-> 
-> What we did with PXA was to decide not to use definitions for the built-in
-> GPIOs - what's the point of:
-> 
-> #define GPIO0	0
-> #define GPIO1	1
-> #define GPIO2	2
-> ...
-> 
-A point could be that 'grep GPIO0 ...' would find any usage of that
-GPIO in the kernel source while 'grep 0 ...' would be quite
-pointless.
+On Wed, Oct 07, 2009 at 01:29:51PM +0200, Stanislav Brabec wrote:
 
+> SW_REMOTE_INSERT should be recognized by the Jack abstraction layer
+> (sound/core/jack.c).
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+It's the other way around - the jack layer reports jacks for ALSA cards.
+Also, for spitz you'd probably want to be using the ASoC wrapper layer.
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+> Well, I am thinking about defining extra values for resistors, that can
+> make stuff even more useful at cost of need of non-standard wiring on
+> fourth ring of the audio jack. It can generate SW_MICROPHONE_INSERT,
+> SW_LINEOUT_INSERT, and not yet defined SW_HEADESET_INSERT and
+> SW_LINEIN_INSERT (which would require hardware mod inside Zaurus for
+> stereo line-in).
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Headset should be represented by reporting headphone plus microphone on
+one jack simultaneously.
