@@ -1,45 +1,22 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 6 Oct 2009 21:36:04 -0700
-Subject: 32-rc1 aka 32-rc2: warning at manage.c:361 (set_irq_wake),
-	matrix-keypad related?
-In-Reply-To: <20091006075816.GA1362@ucw.cz>
-References: <20090930200746.GA1384@ucw.cz>
-	<20091006050649.GH27881@core.coreip.homeip.net>
-	<20091006075816.GA1362@ucw.cz>
-Message-ID: <20091007043603.GC10204@core.coreip.homeip.net>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Wed, 7 Oct 2009 08:48:23 +0200
+Subject: Patches for Freescale MXC SoCs and direct ULPI communication [v3]
+In-Reply-To: <eedb5540910062334h282315edi750bf10b48448163@mail.gmail.com>
+References: <1251924478-30651-1-git-send-email-daniel@caiaq.de>
+	<4A9FE3C6.3050609@epfl.ch> <20090907102006.GB31592@pengutronix.de>
+	<eedb5540910062334h282315edi750bf10b48448163@mail.gmail.com>
+Message-ID: <20091007064823.GV9361@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 06, 2009 at 09:58:17AM +0200, Pavel Machek wrote:
-> Hi!
+On Wed, Oct 07, 2009 at 08:34:38AM +0200, javier Martin wrote:
+> What is the status regarding to mainline about these patches?
 > 
-> On Mon 2009-10-05 22:06:50, Dmitry Torokhov wrote:
-> > On Wed, Sep 30, 2009 at 10:07:46PM +0200, Pavel Machek wrote:
-> > > 
-> > > It complains about unbalanced irq 113 wake disable. That one belongs
-> > > to matrix-keypad...
-> > 
-> > I guess some of enable_irq_wake()s fail on your box. Do you see it if
-> > you apply the patch below?
-> 
-> I'll do short test. But... if you are right, your patch will just make
-> your machine refuse to suspend... right?
-> 
-> Ungood.
+> Have they been applied somewhere?
 
-It was just a debug patch.
+Not yet. There are some API change requests pending which I will do as
+soon as I can. I'm currently abroad without access to the hardware, so I
+can't work on this issue. Please be patient.
 
-> 
-> Actually, it seems to break suspend (returns  -EINVAL while refusing
-> to suspend), warnings are still there, and keyboard is dead after
-> failed suspend... double plus ungood.
-> 
-> Aha, so warning is solved: the one in the log is from gpio_buttons.
-> 
-
-OK, so it looks like your box refuses to set up one of the GPIOs as a
-wakeup source... Hmm, either your box is wrong ;) or matrix_keypad
-driver needs to maintain a separate list of wakeup GPIOs.
-
--- 
-Dmitry
+Thanks,
+Daniel
