@@ -1,71 +1,61 @@
-From: greg@kroah.com (Greg KH)
-Date: Wed, 7 Oct 2009 08:25:52 -0700
-Subject: Kernel update to 2.6.31.1 on pxa270: udev and usb storage
-	cause kernel Oops
-In-Reply-To: <20091007145000.GC26894@kroah.com>
-References: <1254213562.5586.13.camel@wks02-lin.nanotronic.local>
-	<20091003124832.GA15525@n2100.arm.linux.org.uk>
-	<20091005225222.GB792@kroah.com>
-	<1254915955.26123.7.camel@wks02-lin.nanotronic.local>
-	<20091007145000.GC26894@kroah.com>
-Message-ID: <20091007152552.GB27394@kroah.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 7 Oct 2009 09:33:28 -0700
+Subject: 32-rc1 aka 32-rc2: warning at manage.c:361 (set_irq_wake),
+	matrix-keypad related?
+In-Reply-To: <f17812d70910070742y5e27f9c3u38e3299b94f33613@mail.gmail.com>
+References: <20090930200746.GA1384@ucw.cz>
+	<20091006050649.GH27881@core.coreip.homeip.net>
+	<20091006075816.GA1362@ucw.cz>
+	<20091007043603.GC10204@core.coreip.homeip.net>
+	<f17812d70910070742y5e27f9c3u38e3299b94f33613@mail.gmail.com>
+Message-ID: <20091007163327.GA12053@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 07, 2009 at 07:50:00AM -0700, Greg KH wrote:
-> On Wed, Oct 07, 2009 at 01:45:55PM +0200, hoefle marco wrote:
-> > On Mon, 2009-10-05 at 15:52 -0700, Greg KH wrote:
-> > > On Sat, Oct 03, 2009 at 01:48:32PM +0100, Russell King - ARM Linux wrote:
-> > > > I think you need to report this to the USB/udev people.
-> > > > 
-> > > > On Tue, Sep 29, 2009 at 10:39:22AM +0200, hoefle marco wrote:
-> > > > > Hello,
-> > > > > we use Kernel 2.6.30.4 on a PXA270 platform (from Phytec). It works good
-> > > > > with all peripherals on the Phytec board. 
-> > > > > For an old Sandisk device (diskonchip) we have a driver ported to 2.6.3x
-> > > > > as the block device driver API has changed. We thought it will be a wise
-> > > > > decision to do the porting already to 2.6.3x. 
-> > > > > However, when using the latest Kernel (and the previous one 2.6.30) with
-> > > > > all the drivers we used in 2.6.30.4 udev and usb storage seem not to
-> > > > > work any more.
-> > > > > Does anybody have an idea why?
-> > 
-> > It looks that more things which worked with 2.6.30.4 do not work with
-> > the latest stable 2.6.31.2 kernel. I get also a Kernel oops when
-> > rebooting the system.
-> > 
-> > What I did to get there:
-> > I disabled udevd and made the important device nodes static. This
-> > allowed to boot into the system. I also disabled unnecessary things like
-> > USB support and the tffs disk-on-chip driver.
-> > Starting udevd manually does cause the same kernel oops as described at
-> > the beginning of this thread.
-> > 
-> > In addition I get that oops when rebooting the system:
-> > 
-> > / # reboot
-> > The system is going down NOW!
-> > Sending SIGTERM to all processes
-> > Sending SIGKILL to all processes
-> > Requesting system reboot
-> > Unable to handle kernel paging request at virtual address 20726590
-> > pgd = c39a0000
-> > [20726590] *pgd=00000000
-> > Internal error: Oops: f5 [#2]
-> > Modules linked in:
-> > CPU: 0    Tainted: G      D     (2.6.31.2 #3)
-> > PC is at device_shutdown+0x34/0xbc
+On Wed, Oct 07, 2009 at 10:42:08PM +0800, Eric Miao wrote:
+> On Wed, Oct 7, 2009 at 12:36 PM, Dmitry Torokhov
+> <dmitry.torokhov@gmail.com> wrote:
+> > On Tue, Oct 06, 2009 at 09:58:17AM +0200, Pavel Machek wrote:
+> >> Hi!
+> >>
+> >> On Mon 2009-10-05 22:06:50, Dmitry Torokhov wrote:
+> >> > On Wed, Sep 30, 2009 at 10:07:46PM +0200, Pavel Machek wrote:
+> >> > >
+> >> > > It complains about unbalanced irq 113 wake disable. That one belongs
+> >> > > to matrix-keypad...
+> >> >
+> >> > I guess some of enable_irq_wake()s fail on your box. Do you see it if
+> >> > you apply the patch below?
+> >>
+> >> I'll do short test. But... if you are right, your patch will just make
+> >> your machine refuse to suspend... right?
+> >>
+> >> Ungood.
+> >
+> > It was just a debug patch.
+> >
+> >>
+> >> Actually, it seems to break suspend (returns ?-EINVAL while refusing
+> >> to suspend), warnings are still there, and keyboard is dead after
+> >> failed suspend... double plus ungood.
+> >>
+> >> Aha, so warning is solved: the one in the log is from gpio_buttons.
+> >>
+> >
+> > OK, so it looks like your box refuses to set up one of the GPIOs as a
+> > wakeup source... Hmm, either your box is wrong ;) or matrix_keypad
+> > driver needs to maintain a separate list of wakeup GPIOs.
+> >
 > 
-> I think something else is going on here that is a problem.
-> 
-> Can you turn on debugging for the driver core (CONFIG_DEBUG_DRIVER) and
-> let us see the kernel log?  I'm guessing that you have a driver that
-> doesn't like some of the driver core changes that went into 2.6.31.
+> This is due to the nature of PXA processor, where not every GPIO can
+> be configured as a wakeup source. Mmm.... we can either return a
+> pseudo value indicating setting wakeup on that GPIO is OK (which
+> doesn't sound like a good idea), or we can just ignore the failure of
+> enable_irq_wake() in matrix_keypad?
 
-See my response to you on the linux-hotplug list for a number of bugs I
-just found in the driver code you posted.  In short, it's your code, not
-the kernel :)
+We ignore the failure right now in the mainline but that causes stack
+traces on resume as we trying to disable not enabled wakeup GPIOs. That
+was original Pavel's complaint.
 
-thanks,
-
-greg k-h
+-- 
+Dmitry
