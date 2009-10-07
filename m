@@ -1,43 +1,76 @@
-From: Larry.Finger@lwfinger.net (Larry Finger)
-Date: Wed, 07 Oct 2009 13:45:08 -0500
-Subject: [RFC PATCH 05/10] PCMCIA: sa1111: wrap soc_pcmcia_socket
-	to	contain sa1111 specific data
-In-Reply-To: <20091007182632.GD11371@n2100.arm.linux.org.uk>
-References: <6cc18319511869ba8c46bf1d1b20553baa170904.1253722954.git.rmk+kernel@arm.linux.org.uk>
-	<485cc33b078bb619d4544cf31388401dd1708029.1253722954.git.rmk+kernel@arm.linux.org.uk>
-	<4AC92954.1010104@lwfinger.net>
-	<20091004231402.GA31087@n2100.arm.linux.org.uk>
-	<20091005112113.7d431aa6.kristoffer.ericson@gmail.com>
-	<20091006104518.GA14717@n2100.arm.linux.org.uk>
-	<4ACCC66F.3060800@lwfinger.net>
-	<20091007182632.GD11371@n2100.arm.linux.org.uk>
-Message-ID: <4ACCE1B4.5020103@lwfinger.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 7 Oct 2009 11:51:12 -0700
+Subject: [GIT PULL] omap fixes for v2.6.32-rc3
+Message-ID: <20091007185112.GJ7899@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/2009 01:26 PM, Russell King - ARM Linux wrote:
-> On Wed, Oct 07, 2009 at 11:48:47AM -0500, Larry Finger wrote:
->> Russell King - ARM Linux wrote:
->>> This series has been rebased in my git tree - branch pcmcia.  I'll
->>> avoid re-posting the patches since it appears to cause dwmw2's mail
->>> server quite a bit of grief (it took well over an hour to deal with
->>> the 10 patches last time I posted.)
->>>
->>> Ignore the top commit of:
->>>
->>> http://ftp.arm.linux.org.uk/git/gitweb.cgi?p=linux-2.6-arm.git;a=shortlog;h=refs/heads/pcmcia
->>>
->>> As usual, it's also available in overall patch and mbox forms:
->>>
->>> http://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/
->>
->> I "tested" the patches. The reason it is in quotes is that the change
->> to Makefile, Kconfig and rsrc_nonstatic.c are the only parts that
->> affected my system.
->
-> In what way?
+Linus,
 
-Bad choice of words. Those were the only parts I could test, and the 
-system worked without any problems.
+Please pull omap fixes from:
 
-Larry
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+
+Regards,
+
+Tony
+
+
+The following changes since commit 374576a8b6f865022c0fd1ca62396889b23d66dd:
+  Linus Torvalds (1):
+        Linux 2.6.32-rc3
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+
+Artem Bityutskiy (1):
+      OMAP3: PM: introduce a new powerdomain walk helper
+
+Daniel Walker (1):
+      omap: iovmm: Add missing mutex_unlock
+
+Hiroshi DOYU (1):
+      omap: iovmm: Fix incorrect spelling
+
+Jon Hunter (1):
+      OMAP3: PM: Prevent hang in prcm_interrupt_handler
+
+Kevin Hilman (1):
+      OMAP3: PM: Enable GPIO module-level wakeups
+
+Paul Walmsley (2):
+      OMAP3: PM: PRCM interrupt: check MPUGRPSEL register
+      OMAP3: PM: PRCM interrupt: only handle selected PRCM interrupts
+
+Rajendra Nayak (1):
+      omap: Lock DPLL5 at boot
+
+Sergio Aguirre (1):
+      omapfb: Condition mutex acquisition
+
+Tommi Rantala (2):
+      omapfb: Blizzard: fix pointer to be const
+      omapfb: Blizzard: constify register address tables
+
+Tony Lindgren (2):
+      omap: Fix incorrect 730 vs 850 detection
+      Merge branch 'pm-fixes-32' of git://git.kernel.org/.../khilman/linux-omap-pm into omap-fixes-for-linus
+
+Vikram Pandita (1):
+      OMAP3: PM: USBHOST: clear wakeup events on both hosts
+
+ye janboe (1):
+      omap: SRAM: flush the right address after memcpy in omap_sram_push
+
+ arch/arm/mach-omap2/clock34xx.c               |   35 +++++
+ arch/arm/mach-omap2/pm-debug.c                |    4 +-
+ arch/arm/mach-omap2/pm34xx.c                  |  187 ++++++++++++++-----------
+ arch/arm/mach-omap2/powerdomain.c             |   39 ++++--
+ arch/arm/plat-omap/include/mach/cpu.h         |   37 ++---
+ arch/arm/plat-omap/include/mach/powerdomain.h |    2 +
+ arch/arm/plat-omap/iovmm.c                    |    9 +-
+ arch/arm/plat-omap/sram.c                     |    3 +-
+ drivers/video/omap/blizzard.c                 |   10 +-
+ drivers/video/omap/omapfb_main.c              |   22 ++-
+ 10 files changed, 212 insertions(+), 136 deletions(-)
