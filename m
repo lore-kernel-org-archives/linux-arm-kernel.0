@@ -1,65 +1,29 @@
-From: greg@kroah.com (Greg KH)
-Date: Wed, 7 Oct 2009 07:50:00 -0700
-Subject: Kernel update to 2.6.31.1 on pxa270: udev and usb storage
-	cause kernel Oops
-In-Reply-To: <1254915955.26123.7.camel@wks02-lin.nanotronic.local>
-References: <1254213562.5586.13.camel@wks02-lin.nanotronic.local>
-	<20091003124832.GA15525@n2100.arm.linux.org.uk>
-	<20091005225222.GB792@kroah.com>
-	<1254915955.26123.7.camel@wks02-lin.nanotronic.local>
-Message-ID: <20091007145000.GC26894@kroah.com>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Wed, 7 Oct 2009 16:55:37 +0200
+Subject: [lm-sensors] [PATCH 2.6.32] hwmon: Disable s3c-hwmon build  for
+	S3C64xx
+In-Reply-To: <20091007143006.GB4162@sirena.org.uk>
+References: <mailman.3211.1254922769.2256.linux-arm-kernel@lists.infradead.org>
+	<4ACCA42A.5060508@gmail.com> <20091007143006.GB4162@sirena.org.uk>
+Message-ID: <20091007165537.220346a7@hyperion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 07, 2009 at 01:45:55PM +0200, hoefle marco wrote:
-> On Mon, 2009-10-05 at 15:52 -0700, Greg KH wrote:
-> > On Sat, Oct 03, 2009 at 01:48:32PM +0100, Russell King - ARM Linux wrote:
-> > > I think you need to report this to the USB/udev people.
-> > > 
-> > > On Tue, Sep 29, 2009 at 10:39:22AM +0200, hoefle marco wrote:
-> > > > Hello,
-> > > > we use Kernel 2.6.30.4 on a PXA270 platform (from Phytec). It works good
-> > > > with all peripherals on the Phytec board. 
-> > > > For an old Sandisk device (diskonchip) we have a driver ported to 2.6.3x
-> > > > as the block device driver API has changed. We thought it will be a wise
-> > > > decision to do the porting already to 2.6.3x. 
-> > > > However, when using the latest Kernel (and the previous one 2.6.30) with
-> > > > all the drivers we used in 2.6.30.4 udev and usb storage seem not to
-> > > > work any more.
-> > > > Does anybody have an idea why?
-> 
-> It looks that more things which worked with 2.6.30.4 do not work with
-> the latest stable 2.6.31.2 kernel. I get also a Kernel oops when
-> rebooting the system.
-> 
-> What I did to get there:
-> I disabled udevd and made the important device nodes static. This
-> allowed to boot into the system. I also disabled unnecessary things like
-> USB support and the tffs disk-on-chip driver.
-> Starting udevd manually does cause the same kernel oops as described at
-> the beginning of this thread.
-> 
-> In addition I get that oops when rebooting the system:
-> 
-> / # reboot
-> The system is going down NOW!
-> Sending SIGTERM to all processes
-> Sending SIGKILL to all processes
-> Requesting system reboot
-> Unable to handle kernel paging request at virtual address 20726590
-> pgd = c39a0000
-> [20726590] *pgd=00000000
-> Internal error: Oops: f5 [#2]
-> Modules linked in:
-> CPU: 0    Tainted: G      D     (2.6.31.2 #3)
-> PC is at device_shutdown+0x34/0xbc
+Hi Mark,
 
-I think something else is going on here that is a problem.
+On Wed, 7 Oct 2009 15:30:07 +0100, Mark Brown wrote:
+> On Wed, Oct 07, 2009 at 04:22:34PM +0200, Maurus Cuelenaere wrote:
+> 
+> > Have you seen this?
+> 
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2009-October/001787.html
+> 
+> Yes, but it doesn't look like 2.6.32 material at this point (and the fix
+> patch was originally posted in August).
 
-Can you turn on debugging for the driver core (CONFIG_DEBUG_DRIVER) and
-let us see the kernel log?  I'm guessing that you have a driver that
-doesn't like some of the driver core changes that went into 2.6.31.
+I thought it'd be merged into the patch adding the driver, that's why I
+didn't pick it back then. But it did not happen, so I've applied your
+patch now and will send it to Linus soon.
 
-thanks,
-
-greg k-h
+-- 
+Jean Delvare
