@@ -1,15 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 7 Oct 2009 08:35:50 +0100
-Subject: Some light on FastFPE
-In-Reply-To: <39811fe10910061822v1bd2082fw65aedf461b6468aa@mail.gmail.com>
-References: <39811fe10910061822v1bd2082fw65aedf461b6468aa@mail.gmail.com>
-Message-ID: <20091007073550.GA5439@n2100.arm.linux.org.uk>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed, 7 Oct 2009 09:56:42 +0200
+Subject: ucb1x00 patches
+In-Reply-To: <19148.16274.293527.828860@ipc1.ka-ro>
+References: <4ACB7123.8000609@gmx.de> <19148.16274.293527.828860@ipc1.ka-ro>
+Message-ID: <200910070956.42651.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 07, 2009 at 09:22:28AM +0800, Jacky Lam wrote:
-> 	Could anyone point me some light on how to get the current source code
-> of FastFPE?
+Dne St 7. ??jna 2009 09:13:22 Lothar Wa?mann napsal(a):
+> Hi,
+> 
+> Thomas Kunze writes:
+> > Hi,
+> >
+> > I posted these patches at linux-arm-kernel as part of the patchset
+> > "collie and SA1100 patches".
+> > Could you please comment on them? I'd also like to know you opinion on
+> > moving ucb1x00-ts.c to
+> > input/drivers/touchscreen.
+> 
+> What about the ucb1400_ts.c which is already there?
+> 
 
-You'll have to extract it from the old 2.4 patches - you can find it
-in patch-2.4.27-vrs1.bz2.
+I'd be for unifying all the ucb drivers into a single one, but Russell was 
+against it iirc.
+> 
+> Lothar Wa?mann
+> 
