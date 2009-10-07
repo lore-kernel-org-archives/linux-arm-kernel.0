@@ -1,76 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 Oct 2009 11:51:12 -0700
-Subject: [GIT PULL] omap fixes for v2.6.32-rc3
-Message-ID: <20091007185112.GJ7899@atomide.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 7 Oct 2009 16:21:24 -0400
+Subject: [PATCH] ep93xx: remove old EP93XX_GPIO_* defines
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901DB7AFF@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+Most of the EP93XX_GPIO_*_INT_* register defines in ep93xx-regs.h
+not required due to how the ep93xx core and gpiolib support handle
+gpio interrupts.  Remove the defines to prevent future confusion.
 
-Please pull omap fixes from:
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <ryan@bluewatersys.com>
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+---
 
-Regards,
-
-Tony
-
-
-The following changes since commit 374576a8b6f865022c0fd1ca62396889b23d66dd:
-  Linus Torvalds (1):
-        Linux 2.6.32-rc3
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-
-Artem Bityutskiy (1):
-      OMAP3: PM: introduce a new powerdomain walk helper
-
-Daniel Walker (1):
-      omap: iovmm: Add missing mutex_unlock
-
-Hiroshi DOYU (1):
-      omap: iovmm: Fix incorrect spelling
-
-Jon Hunter (1):
-      OMAP3: PM: Prevent hang in prcm_interrupt_handler
-
-Kevin Hilman (1):
-      OMAP3: PM: Enable GPIO module-level wakeups
-
-Paul Walmsley (2):
-      OMAP3: PM: PRCM interrupt: check MPUGRPSEL register
-      OMAP3: PM: PRCM interrupt: only handle selected PRCM interrupts
-
-Rajendra Nayak (1):
-      omap: Lock DPLL5 at boot
-
-Sergio Aguirre (1):
-      omapfb: Condition mutex acquisition
-
-Tommi Rantala (2):
-      omapfb: Blizzard: fix pointer to be const
-      omapfb: Blizzard: constify register address tables
-
-Tony Lindgren (2):
-      omap: Fix incorrect 730 vs 850 detection
-      Merge branch 'pm-fixes-32' of git://git.kernel.org/.../khilman/linux-omap-pm into omap-fixes-for-linus
-
-Vikram Pandita (1):
-      OMAP3: PM: USBHOST: clear wakeup events on both hosts
-
-ye janboe (1):
-      omap: SRAM: flush the right address after memcpy in omap_sram_push
-
- arch/arm/mach-omap2/clock34xx.c               |   35 +++++
- arch/arm/mach-omap2/pm-debug.c                |    4 +-
- arch/arm/mach-omap2/pm34xx.c                  |  187 ++++++++++++++-----------
- arch/arm/mach-omap2/powerdomain.c             |   39 ++++--
- arch/arm/plat-omap/include/mach/cpu.h         |   37 ++---
- arch/arm/plat-omap/include/mach/powerdomain.h |    2 +
- arch/arm/plat-omap/iovmm.c                    |    9 +-
- arch/arm/plat-omap/sram.c                     |    3 +-
- drivers/video/omap/blizzard.c                 |   10 +-
- drivers/video/omap/omapfb_main.c              |   22 ++-
- 10 files changed, 212 insertions(+), 136 deletions(-)
+diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+index b07338c..aae72b8 100644
+--- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
++++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+@@ -114,20 +114,8 @@
+ 
+ #define EP93XX_GPIO_BASE		EP93XX_APB_IOMEM(0x00040000)
+ #define EP93XX_GPIO_REG(x)		(EP93XX_GPIO_BASE + (x))
+-#define EP93XX_GPIO_F_INT_TYPE1		EP93XX_GPIO_REG(0x4c)
+-#define EP93XX_GPIO_F_INT_TYPE2		EP93XX_GPIO_REG(0x50)
+-#define EP93XX_GPIO_F_INT_ACK		EP93XX_GPIO_REG(0x54)
+-#define EP93XX_GPIO_F_INT_ENABLE	EP93XX_GPIO_REG(0x58)
+ #define EP93XX_GPIO_F_INT_STATUS	EP93XX_GPIO_REG(0x5c)
+-#define EP93XX_GPIO_A_INT_TYPE1		EP93XX_GPIO_REG(0x90)
+-#define EP93XX_GPIO_A_INT_TYPE2		EP93XX_GPIO_REG(0x94)
+-#define EP93XX_GPIO_A_INT_ACK		EP93XX_GPIO_REG(0x98)
+-#define EP93XX_GPIO_A_INT_ENABLE	EP93XX_GPIO_REG(0x9c)
+ #define EP93XX_GPIO_A_INT_STATUS	EP93XX_GPIO_REG(0xa0)
+-#define EP93XX_GPIO_B_INT_TYPE1		EP93XX_GPIO_REG(0xac)
+-#define EP93XX_GPIO_B_INT_TYPE2		EP93XX_GPIO_REG(0xb0)
+-#define EP93XX_GPIO_B_INT_ACK		EP93XX_GPIO_REG(0xb4)
+-#define EP93XX_GPIO_B_INT_ENABLE	EP93XX_GPIO_REG(0xb8)
+ #define EP93XX_GPIO_B_INT_STATUS	EP93XX_GPIO_REG(0xbc)
+ 
+ #define EP93XX_AAC_BASE			EP93XX_APB_IOMEM(0x00080000) 
