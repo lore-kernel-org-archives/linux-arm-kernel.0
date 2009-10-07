@@ -1,41 +1,34 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Wed, 07 Oct 2009 16:22:34 +0200
-Subject: [PATCH 2.6.32] hwmon: Disable s3c-hwmon build for S3C64xx
-In-Reply-To: <mailman.3211.1254922769.2256.linux-arm-kernel@lists.infradead.org>
-References: <mailman.3211.1254922769.2256.linux-arm-kernel@lists.infradead.org>
-Message-ID: <4ACCA42A.5060508@gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 7 Oct 2009 22:23:42 +0800
+Subject: Kernel update to 2.6.31.1 on pxa270: udev and usb storage cause
+	kernel Oops
+In-Reply-To: <1254915955.26123.7.camel@wks02-lin.nanotronic.local>
+References: <1254213562.5586.13.camel@wks02-lin.nanotronic.local>
+	<20091003124832.GA15525@n2100.arm.linux.org.uk>
+	<20091005225222.GB792@kroah.com>
+	<1254915955.26123.7.camel@wks02-lin.nanotronic.local>
+Message-ID: <f17812d70910070723u687e1244u7d8b9d4da816c68e@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Op 07-10-09 15:39, linux-arm-kernel-request at lists.infradead.org schreef:
-> The s3c-hwmon driver depends on the arch/arm implementation of the core
-> ADC support for the chip.  Since the S3C64xx version has not yet been
-> merged disable building of the driver on S3C64xx for now.
+On Wed, Oct 7, 2009 at 7:45 PM, hoefle marco <marco.hoefle@nanotronic.ch> wrote:
+> On Mon, 2009-10-05 at 15:52 -0700, Greg KH wrote:
+>> On Sat, Oct 03, 2009 at 01:48:32PM +0100, Russell King - ARM Linux wrote:
+>> > I think you need to report this to the USB/udev people.
+>> >
+>> > On Tue, Sep 29, 2009 at 10:39:22AM +0200, hoefle marco wrote:
+>> > > Hello,
+>> > > we use Kernel 2.6.30.4 on a PXA270 platform (from Phytec). It works good
+>> > > with all peripherals on the Phytec board.
+>> > > For an old Sandisk device (diskonchip) we have a driver ported to 2.6.3x
+>> > > as the block device driver API has changed. We thought it will be a wise
+>> > > decision to do the porting already to 2.6.3x.
+>> > > However, when using the latest Kernel (and the previous one 2.6.30) with
+>> > > all the drivers we used in 2.6.30.4 udev and usb storage seem not to
+>> > > work any more.
+>> > > Does anybody have an idea why?
 >
-> Signed-off-by: Mark Brown<broonie@opensource.wolfsonmicro.com>
-> ---
->   drivers/hwmon/Kconfig |    2 +-
->   1 files changed, 1 insertions(+), 1 deletions(-)
+> It looks that more things which worked with 2.6.30.4 do not work with
+> the latest stable 2.6.31.2 kernel. I get also a Kernel oops when
+> rebooting the system.
 >
-> diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
-> index 4d0d0cd..87184b5 100644
-> --- a/drivers/hwmon/Kconfig
-> +++ b/drivers/hwmon/Kconfig
-> @@ -684,7 +684,7 @@ config SENSORS_SHT15
->
->   config SENSORS_S3C
->   	tristate "S3C24XX/S3C64XX Inbuilt ADC"
-> -	depends on ARCH_S3C2410 || ARCH_S3C64XX
-> +	depends on ARCH_S3C2410
->   	help
->   	  If you say yes here you get support for the on-board ADCs of
->   	  the Samsung S3C24XX or S3C64XX series of SoC
-> -- 1.6.4.3
-
-Have you seen this?
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2009-October/001787.html
-
-Regards,
-
-Maurus Cuelenaere
