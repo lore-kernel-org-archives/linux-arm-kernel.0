@@ -1,41 +1,65 @@
-From: bgat@billgatliff.com (Bill Gatliff)
-Date: Wed, 07 Oct 2009 09:44:27 -0500
-Subject: i.MX31 kernel panic and irq
-In-Reply-To: <20091007132051.GB11371@n2100.arm.linux.org.uk>
-References: <87077C4F48609F4392621D9F99DDE20901202E0E@tesla.star.galaxy.io>
-	<4ACB659E.3000206@billgatliff.com>
-	<20091007132051.GB11371@n2100.arm.linux.org.uk>
-Message-ID: <4ACCA94B.60708@billgatliff.com>
+From: greg@kroah.com (Greg KH)
+Date: Wed, 7 Oct 2009 07:50:00 -0700
+Subject: Kernel update to 2.6.31.1 on pxa270: udev and usb storage
+	cause kernel Oops
+In-Reply-To: <1254915955.26123.7.camel@wks02-lin.nanotronic.local>
+References: <1254213562.5586.13.camel@wks02-lin.nanotronic.local>
+	<20091003124832.GA15525@n2100.arm.linux.org.uk>
+	<20091005225222.GB792@kroah.com>
+	<1254915955.26123.7.camel@wks02-lin.nanotronic.local>
+Message-ID: <20091007145000.GC26894@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Tue, Oct 06, 2009 at 10:43:26AM -0500, Bill Gatliff wrote:
->   
->> The OOPS messages suggest that the machine has run off into stuff that  
->> isn't code, which would be consistent with the stack pointer getting  
->> blown out of the stack memory.
->>     
->
-> I don't follow your line of reasoning.
+On Wed, Oct 07, 2009 at 01:45:55PM +0200, hoefle marco wrote:
+> On Mon, 2009-10-05 at 15:52 -0700, Greg KH wrote:
+> > On Sat, Oct 03, 2009 at 01:48:32PM +0100, Russell King - ARM Linux wrote:
+> > > I think you need to report this to the USB/udev people.
+> > > 
+> > > On Tue, Sep 29, 2009 at 10:39:22AM +0200, hoefle marco wrote:
+> > > > Hello,
+> > > > we use Kernel 2.6.30.4 on a PXA270 platform (from Phytec). It works good
+> > > > with all peripherals on the Phytec board. 
+> > > > For an old Sandisk device (diskonchip) we have a driver ported to 2.6.3x
+> > > > as the block device driver API has changed. We thought it will be a wise
+> > > > decision to do the porting already to 2.6.3x. 
+> > > > However, when using the latest Kernel (and the previous one 2.6.30) with
+> > > > all the drivers we used in 2.6.30.4 udev and usb storage seem not to
+> > > > work any more.
+> > > > Does anybody have an idea why?
+> 
+> It looks that more things which worked with 2.6.30.4 do not work with
+> the latest stable 2.6.31.2 kernel. I get also a Kernel oops when
+> rebooting the system.
+> 
+> What I did to get there:
+> I disabled udevd and made the important device nodes static. This
+> allowed to boot into the system. I also disabled unnecessary things like
+> USB support and the tffs disk-on-chip driver.
+> Starting udevd manually does cause the same kernel oops as described at
+> the beginning of this thread.
+> 
+> In addition I get that oops when rebooting the system:
+> 
+> / # reboot
+> The system is going down NOW!
+> Sending SIGTERM to all processes
+> Sending SIGKILL to all processes
+> Requesting system reboot
+> Unable to handle kernel paging request at virtual address 20726590
+> pgd = c39a0000
+> [20726590] *pgd=00000000
+> Internal error: Oops: f5 [#2]
+> Modules linked in:
+> CPU: 0    Tainted: G      D     (2.6.31.2 #3)
+> PC is at device_shutdown+0x34/0xbc
 
-I protected myself by saying I was "speculating".  :)
+I think something else is going on here that is a problem.
 
-I think some of the other dumps I saw from him were less clear as to the 
-problem, which combined with his descriptions of how he was triggering 
-the event made me think about stack corruption as a meta-problem.
+Can you turn on debugging for the driver core (CONFIG_DEBUG_DRIVER) and
+let us see the kernel log?  I'm guessing that you have a driver that
+doesn't like some of the driver core changes that went into 2.6.31.
 
-Stack corruption could result in register value corruption, for sure.  
-And the fact that his board doesn't fail in the same way each time makes 
-me look more at the pattern of OOPS dumps rather than the individual ones.
+thanks,
 
-But you've definitely looked at this dump in more detail than I did.  So 
-I could be speculating in the wrong direction altogether.  I was just 
-trying to distract him until you solved the problem.  :)
-
-
-b.g.
-
--- 
-Bill Gatliff
-bgat at billgatliff.com
+greg k-h
