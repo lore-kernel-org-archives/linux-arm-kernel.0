@@ -1,62 +1,259 @@
 From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 7 Oct 2009 13:09:10 -0400
+Date: Wed, 7 Oct 2009 13:31:24 -0400
 Subject: [PATCH 1/2] Update ts72xx to use generic platform nand driver
-In-Reply-To: <jbvtp6-i58.ln1@chipmunk.wormnet.eu>
-References: <BD79186B4FD85F4B8E60E381CAEE190901DB7967@mi8nycmail19.Mi8.com>
-	<jbvtp6-i58.ln1@chipmunk.wormnet.eu>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901DB7A8D@mi8nycmail19.Mi8.com>
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901DB7A8D@mi8nycmail19.Mi8.com>
+References: <BD79186B4FD85F4B8E60E381CAEE190901DB7967@mi8nycmail19.Mi8.com><jbvtp6-i58.ln1@chipmunk.wormnet.eu>
+	<BD79186B4FD85F4B8E60E381CAEE190901DB7A8D@mi8nycmail19.Mi8.com>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901DB7A9E@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, October 07, 2009 1:16 AM, Alexander Clouter wrote:
-> Hi,
+Update the ts72xx platform's nand driver support.
 
-[snip]
+This changes the ts72xx platform from using a custom nand driver
+(ts7250.c) to the generic platform nand driver (plat_nand.c).
 
-> These struct's are almost identical so could you not...
+Tested on TS-7250 with 32MB NAND.
 
-[snip]
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Tested-by: Matthieu Crapet <mcrapet@gmail.com>
+Cc: David Woodhouse <dwmw2@infradead.org>
+Cc: Alexander Clouter <alex@digriz.org.uk>
+Cc: <linux-arm-kernel@lists.infradead.org>
+Cc: <linux-mtd@lists.infradead.org>
 
-> -----------
-> static struct mtd_partition ts72xx_part_info[] = {
-> 	{
-> 		/* gut feeling for *Joe Public* is to go MTD_WRITABLE */
-> 		.name		= "TS-BOOTROM",
-> 		.offset		= 0,
-> 		.size		= TS72XX_BOOTROM_PART_SIZE,
-> 	}, {
-> 		.name		= "Linux",
-> 		.offset		= MTDPART_OFS_APPEND,
-> 		/* to be filled in later */
-> 		.size		= 0,
-> 	}, {
-> 		/* mask MTD_WRITABLE here too? */
-> 		.name		= "Redboot",
-> 		.offset		= MTDPART_OFS_APPEND,
-> 		.size		= MTDPART_SIZ_FULL,
-> 	}
-> };
-> 
-> static void ts72xx_nand_set_parts(....)
-> {
-> 	....
-> 
-> 	/* or I guess you could just bailout... */
-> 	if (size != SZ_32M && size != SZ_128M)
-> 		pr_warning("ts72xx: Unknown nand disk size:%lluMB\n", size >> 20);
-> 
-> 	chip->partitions = ts72xx_part_info;
-> 	chip->nr_partitions = ARRAY_SIZE(ts72xx_part_info);
-> 
-> 	ts72xx_part_info[1].size = size - TS72XX_REDBOOT_PART_SIZE;
-> }
+---
 
-Thanks for pointing that out.  I like your change and will modify the patch.
+V2 - mark the TS-BOOTROM and RedBoot partitions read-only (Alexander Clouter)
+     combined the nand mtd_partition structs (Alexander Clouter)
+     combined the nand resource structs similarly
 
-I didn't think about making the "TS-BOOTROM" and "RedBoot" partitions read-only.
-Probably a good idea, I'll add that also.
-
-Updated patch coming soon.
-
-Regards,
-Hartley
+diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
+index 259f782..95805cc 100644
+--- a/arch/arm/mach-ep93xx/ts72xx.c
++++ b/arch/arm/mach-ep93xx/ts72xx.c
+@@ -16,6 +16,8 @@
+ #include <linux/io.h>
+ #include <linux/m48t86.h>
+ #include <linux/mtd/physmap.h>
++#include <linux/mtd/nand.h>
++#include <linux/mtd/partitions.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/ts72xx.h>
+@@ -54,92 +56,163 @@ static struct map_desc ts72xx_io_desc[] __initdata = {
+ 	}
+ };
+ 
+-static struct map_desc ts72xx_nand_io_desc[] __initdata = {
+-	{
+-		.virtual	= TS72XX_NAND_DATA_VIRT_BASE,
+-		.pfn		= __phys_to_pfn(TS72XX_NAND1_DATA_PHYS_BASE),
+-		.length		= TS72XX_NAND_DATA_SIZE,
+-		.type		= MT_DEVICE,
+-	}, {
+-		.virtual	= TS72XX_NAND_CONTROL_VIRT_BASE,
+-		.pfn		= __phys_to_pfn(TS72XX_NAND1_CONTROL_PHYS_BASE),
+-		.length		= TS72XX_NAND_CONTROL_SIZE,
+-		.type		= MT_DEVICE,
+-	}, {
+-		.virtual	= TS72XX_NAND_BUSY_VIRT_BASE,
+-		.pfn		= __phys_to_pfn(TS72XX_NAND1_BUSY_PHYS_BASE),
+-		.length		= TS72XX_NAND_BUSY_SIZE,
+-		.type		= MT_DEVICE,
++static void __init ts72xx_map_io(void)
++{
++	ep93xx_map_io();
++	iotable_init(ts72xx_io_desc, ARRAY_SIZE(ts72xx_io_desc));
++}
++
++
++/*************************************************************************
++ * NAND flash
++ *************************************************************************/
++#define TS72XX_NAND_CONTROL_ADDR_LINE	22	/* 0xN0400000 */
++#define TS72XX_NAND_BUSY_ADDR_LINE	23	/* 0xN0800000 */
++
++static void ts72xx_nand_hwcontrol(struct mtd_info *mtd,
++				  int cmd, unsigned int ctrl)
++{
++	struct nand_chip *chip = mtd->priv;
++
++	if (ctrl & NAND_CTRL_CHANGE) {
++		void __iomem *addr = chip->IO_ADDR_R;
++		unsigned char bits;
++
++		addr += (1 << TS72XX_NAND_CONTROL_ADDR_LINE);
++
++		bits = (ctrl & NAND_NCE) << 2;	/* bit 0 -> bit 2 */
++		bits |= ctrl & NAND_CLE;	/* bit 1 -> bit 1 */
++		bits |= (ctrl & NAND_ALE) >> 2;	/* bit 2 -> bit 0 */
++
++		__raw_writeb((__raw_readb(addr) & ~0x7) | bits, addr);
+ 	}
+-};
+ 
+-static struct map_desc ts72xx_alternate_nand_io_desc[] __initdata = {
++	if (cmd != NAND_CMD_NONE)
++		__raw_writeb(cmd, chip->IO_ADDR_W);
++}
++
++static int ts72xx_nand_device_ready(struct mtd_info *mtd)
++{
++	struct nand_chip *chip = mtd->priv;
++	void __iomem *addr = chip->IO_ADDR_R;
++
++	addr += (1 << TS72XX_NAND_BUSY_ADDR_LINE);
++
++	return __raw_readb(addr) & 0x20;
++}
++
++static const char *ts72xx_nand_part_probes[] = { "cmdlinepart", NULL };
++
++#define TS72XX_BOOTROM_PART_SIZE	(SZ_16K)
++#define TS72XX_REDBOOT_PART_SIZE	(SZ_2M + SZ_1M)
++
++static struct mtd_partition ts72xx_nand_parts[] = {
+ 	{
+-		.virtual	= TS72XX_NAND_DATA_VIRT_BASE,
+-		.pfn		= __phys_to_pfn(TS72XX_NAND2_DATA_PHYS_BASE),
+-		.length		= TS72XX_NAND_DATA_SIZE,
+-		.type		= MT_DEVICE,
++		.name		= "TS-BOOTROM",
++		.offset		= 0,
++		.size		= TS72XX_BOOTROM_PART_SIZE,
++		.mask_flags	= MTD_WRITEABLE,	/* force read-only */
+ 	}, {
+-		.virtual	= TS72XX_NAND_CONTROL_VIRT_BASE,
+-		.pfn		= __phys_to_pfn(TS72XX_NAND2_CONTROL_PHYS_BASE),
+-		.length		= TS72XX_NAND_CONTROL_SIZE,
+-		.type		= MT_DEVICE,
++		.name		= "Linux",
++		.offset		= MTDPART_OFS_APPEND,
++		.size		= 0,			/* filled in later */
+ 	}, {
+-		.virtual	= TS72XX_NAND_BUSY_VIRT_BASE,
+-		.pfn		= __phys_to_pfn(TS72XX_NAND2_BUSY_PHYS_BASE),
+-		.length		= TS72XX_NAND_BUSY_SIZE,
+-		.type		= MT_DEVICE,
+-	}
++		.name		= "RedBoot",
++		.offset		= MTDPART_OFS_APPEND,
++		.size		= MTDPART_SIZ_FULL,
++		.mask_flags	= MTD_WRITEABLE,	/* force read-only */
++	},
+ };
+ 
+-static void __init ts72xx_map_io(void)
++static void ts72xx_nand_set_parts(uint64_t size,
++				  struct platform_nand_chip *chip)
+ {
+-	ep93xx_map_io();
+-	iotable_init(ts72xx_io_desc, ARRAY_SIZE(ts72xx_io_desc));
++	/* Factory TS-72xx board only come with 32MB or 128MB NAND options */
++	if (size == SZ_32M || size == SZ_128M) {
++		/* Set the "Linux" partition size */
++		ts72xx_nand_parts[1].size = size - TS72XX_REDBOOT_PART_SIZE;
+ 
+-	/*
+-	 * The TS-7200 has NOR flash, the other models have NAND flash.
+-	 */
+-	if (!board_is_ts7200()) {
+-		if (is_ts9420_installed()) {
+-			iotable_init(ts72xx_alternate_nand_io_desc,
+-				ARRAY_SIZE(ts72xx_alternate_nand_io_desc));
+-		} else {
+-			iotable_init(ts72xx_nand_io_desc,
+-				ARRAY_SIZE(ts72xx_nand_io_desc));
+-		}
++		chip->partitions = ts72xx_nand_parts;
++		chip->nr_partitions = ARRAY_SIZE(ts72xx_nand_parts);
++	} else {
++		pr_warning("ts72xx: Unknown nand disk size:%lluMB\n", size >> 20);
+ 	}
+ }
+ 
++static struct platform_nand_data ts72xx_nand_data = {
++	.chip = {
++		.nr_chips	= 1,
++		.chip_offset	= 0,
++		.chip_delay	= 15,
++		.part_probe_types = ts72xx_nand_part_probes,
++		.set_parts	= ts72xx_nand_set_parts,
++	},
++	.ctrl = {
++		.cmd_ctrl	= ts72xx_nand_hwcontrol,
++		.dev_ready	= ts72xx_nand_device_ready,
++	},
++};
++
++static struct resource ts72xx_nand_resource[] = {
++	{
++		.start		= 0,			/* filled in later */
++		.end		= 0,			/* filled in later */
++		.flags		= IORESOURCE_MEM,
++	},
++};
++
++static struct platform_device ts72xx_nand_flash = {
++	.name			= "gen_nand",
++	.id			= -1,
++	.dev.platform_data	= &ts72xx_nand_data,
++	.resource		= ts72xx_nand_resource,
++	.num_resources		= ARRAY_SIZE(ts72xx_nand_resource),
++};
++
++
+ /*************************************************************************
+  * NOR flash (TS-7200 only)
+  *************************************************************************/
+-static struct physmap_flash_data ts72xx_flash_data = {
++static struct physmap_flash_data ts72xx_nor_data = {
+ 	.width		= 2,
+ };
+ 
+-static struct resource ts72xx_flash_resource = {
++static struct resource ts72xx_nor_resource = {
+ 	.start		= EP93XX_CS6_PHYS_BASE,
+ 	.end		= EP93XX_CS6_PHYS_BASE + SZ_16M - 1,
+ 	.flags		= IORESOURCE_MEM,
+ };
+ 
+-static struct platform_device ts72xx_flash = {
++static struct platform_device ts72xx_nor_flash = {
+ 	.name		= "physmap-flash",
+ 	.id		= 0,
+ 	.dev		= {
+-		.platform_data	= &ts72xx_flash_data,
++		.platform_data	= &ts72xx_nor_data,
+ 	},
+ 	.num_resources	= 1,
+-	.resource	= &ts72xx_flash_resource,
++	.resource	= &ts72xx_nor_resource,
+ };
+ 
+ static void __init ts72xx_register_flash(void)
+ {
+-	if (board_is_ts7200())
+-		platform_device_register(&ts72xx_flash);
++	if (board_is_ts7200()) {
++		platform_device_register(&ts72xx_nor_flash);
++	} else {
++		resource_size_t start;
++
++		if (is_ts9420_installed())
++			start = EP93XX_CS7_PHYS_BASE;
++		else
++			start = EP93XX_CS6_PHYS_BASE;
++
++		ts72xx_nand_resource[0].start = start;
++		ts72xx_nand_resource[0].end = start + SZ_16M - 1;
++
++		platform_device_register(&ts72xx_nand_flash);
++	}
+ }
+ 
++
+ static unsigned char ts72xx_rtc_readbyte(unsigned long addr)
+ {
+ 	__raw_writeb(addr, TS72XX_RTC_INDEX_VIRT_BASE); 
