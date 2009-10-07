@@ -1,22 +1,34 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 7 Oct 2009 08:48:23 +0200
-Subject: Patches for Freescale MXC SoCs and direct ULPI communication [v3]
-In-Reply-To: <eedb5540910062334h282315edi750bf10b48448163@mail.gmail.com>
-References: <1251924478-30651-1-git-send-email-daniel@caiaq.de>
-	<4A9FE3C6.3050609@epfl.ch> <20090907102006.GB31592@pengutronix.de>
-	<eedb5540910062334h282315edi750bf10b48448163@mail.gmail.com>
-Message-ID: <20091007064823.GV9361@buzzloop.caiaq.de>
+From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
+Date: Wed, 7 Oct 2009 09:13:22 +0200
+Subject: ucb1x00 patches
+In-Reply-To: <4ACB7123.8000609@gmx.de>
+References: <4ACB7123.8000609@gmx.de>
+Message-ID: <19148.16274.293527.828860@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 07, 2009 at 08:34:38AM +0200, javier Martin wrote:
-> What is the status regarding to mainline about these patches?
+Hi,
+
+Thomas Kunze writes:
+> Hi,
 > 
-> Have they been applied somewhere?
+> I posted these patches at linux-arm-kernel as part of the patchset 
+> "collie and SA1100 patches".
+> Could you please comment on them? I'd also like to know you opinion on 
+> moving ucb1x00-ts.c to
+> input/drivers/touchscreen.
+> 
+What about the ucb1400_ts.c which is already there?
 
-Not yet. There are some API change requests pending which I will do as
-soon as I can. I'm currently abroad without access to the hardware, so I
-can't work on this issue. Please be patient.
 
-Thanks,
-Daniel
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
