@@ -1,35 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 7 Oct 2009 17:41:23 +0100
-Subject: RMK's sa1100 branch (was Re: [PATCH 2/9] collie: prepare for
-	gpiolib use)
-In-Reply-To: <20091007143351.GA10769@rainbow>
-References: <1254778533-3529-1-git-send-email-thommycheck@gmx.de>
-	<1254778533-3529-2-git-send-email-thommycheck@gmx.de>
-	<1254778533-3529-3-git-send-email-thommycheck@gmx.de>
-	<20091007110805.GA7656@rainbow>
-	<20091007112552.GC6246@n2100.arm.linux.org.uk>
-	<20091007124251.GB7656@rainbow>
-	<20091007131003.GA11371@n2100.arm.linux.org.uk>
-	<20091007143351.GA10769@rainbow>
-Message-ID: <20091007164123.GC11371@n2100.arm.linux.org.uk>
+From: Larry.Finger@lwfinger.net (Larry Finger)
+Date: Wed, 07 Oct 2009 11:48:47 -0500
+Subject: [RFC PATCH 05/10] PCMCIA: sa1111: wrap soc_pcmcia_socket
+	to	contain sa1111 specific data
+In-Reply-To: <20091006104518.GA14717@n2100.arm.linux.org.uk>
+References: <6cc18319511869ba8c46bf1d1b20553baa170904.1253722954.git.rmk+kernel@arm.linux.org.uk>
+	<485cc33b078bb619d4544cf31388401dd1708029.1253722954.git.rmk+kernel@arm.linux.org.uk>
+	<4AC92954.1010104@lwfinger.net>
+	<20091004231402.GA31087@n2100.arm.linux.org.uk>
+	<20091005112113.7d431aa6.kristoffer.ericson@gmail.com>
+	<20091006104518.GA14717@n2100.arm.linux.org.uk>
+Message-ID: <4ACCC66F.3060800@lwfinger.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 07, 2009 at 06:33:51PM +0400, Dmitry Artamonow wrote:
-> On 14:10 Wed 07 Oct     , Russell King - ARM Linux wrote:
-> > On Wed, Oct 07, 2009 at 04:42:52PM +0400, Dmitry Artamonow wrote:
-> > I tinkered around with this yesterday before your message came through,
-> > and I defined a new set of definitions, eg:
-> > 
-> > #define H3100_GPIO_IR_ON	8
-> > 
-> > so avoiding the problem.  See my 'sa1100' branch published in the usual
-> > places.
+Russell King - ARM Linux wrote:
+> This series has been rebased in my git tree - branch pcmcia.  I'll
+> avoid re-posting the patches since it appears to cause dwmw2's mail
+> server quite a bit of grief (it took well over an hour to deal with
+> the 10 patches last time I posted.)
 > 
-> Whoa! Seems that you did a lot of work. What do you plan to do with it?
-> Should I rebase my work on top of IPAQ patches in this branch?
+> Ignore the top commit of:
+> 
+> http://ftp.arm.linux.org.uk/git/gitweb.cgi?p=linux-2.6-arm.git;a=shortlog;h=refs/heads/pcmcia
+> 
+> As usual, it's also available in overall patch and mbox forms:
+> 
+> http://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/
 
-That's up to you really - while I do have a H3600 which had Linux on,
-I don't know what state it's in with regard to being usable, so I
-don't count myself as being able to properly test changes in this
-area.
+I "tested" the patches. The reason it is in quotes is that the change
+to Makefile, Kconfig and rsrc_nonstatic.c are the only parts that
+affected my system.
+
+Larry
