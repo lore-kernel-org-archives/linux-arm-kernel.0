@@ -1,67 +1,154 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 8 Oct 2009 16:26:03 -0700
-Subject: [GIT PULL] omap fixes for v2.6.32-rc3
-In-Reply-To: <94a0d4530910081520t66ce7567xe142979a35b1245@mail.gmail.com>
-References: <20091007185112.GJ7899@atomide.com>
-	<94a0d4530910081429m7ad88b43q38245109f3252078@mail.gmail.com>
-	<20091008214140.GJ7417@atomide.com>
-	<94a0d4530910081513w1a919dc2s50eca41966a2261d@mail.gmail.com>
-	<94a0d4530910081520t66ce7567xe142979a35b1245@mail.gmail.com>
-Message-ID: <20091008232603.GB25892@atomide.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 8 Oct 2009 19:39:31 -0400
+Subject: [PATCH] ep93xx: add keypad core support
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901DB7CE7@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Contreras <felipe.contreras@gmail.com> [091008 15:20]:
-> On Fri, Oct 9, 2009 at 1:13 AM, Felipe Contreras
-> <felipe.contreras@gmail.com> wrote:
-> > On Fri, Oct 9, 2009 at 12:41 AM, Tony Lindgren <tony@atomide.com> wrote:
-> >> * Felipe Contreras <felipe.contreras@gmail.com> [091008 14:29]:
-> >>> On Wed, Oct 7, 2009 at 9:51 PM, Tony Lindgren <tony@atomide.com> wrote:
-> >>>
+Add the core support needed by the ep93xx matrix keypad driver.
 
-<snip snip>
+The keypad driver unfortunately was merged early and the core
+support is missing.  The clkdev support has been resolved and
+is now merged.  This adds the platform device to the ep93xx
+core and supplies the functions needed to acquire/free the gpio
+pins and actually enable/disable the controller peripheral.
 
-> >>> The beagleboard is still not booting for me with this branch, I need
-> >>> to add these two patches:
-> >>>
-> >>> * http://patchwork.kernel.org/patch/50721/
-> >>>
-> >>
-> >> This should go to the mainline kernel via Samuel as it's
-> >> drivers/mfd related.
-> >>
-> >>> This one is needed because the defconfig has:
-> >>> CONFIG_TWL4030_USB=y
-> >>>
-> >>> * http://patchwork.kernel.org/patch/50970/
-> >>>
-> >>> This is needed because most people boot from an MMC.
-> >>
-> >> And this should go in via the mmc list.
-> >
-> > Should it?
-> >
-> > Here you can see Uwe Kleine-K?nig sending the original patch without
-> > even CC'ing the mmc list:
-> > http://marc.info/?l=linux-kernel&m=124820861213849&w=2
-> >
-> > And it was unintentionally broken by this one:
-> > http://marc.info/?l=linux-mmc&m=125249763422227&w=2
-> 
-> Er, actually that one was ok, the problem was introduced only in the
-> final version:
-> http://marc.info/?l=linux-mmc&m=125366315417006&w=2
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <ryan@bluewatersys.com>
 
-Right, looks like Roger forgot to Cc linux-mmc.
+---
+
+Note: this patch will need to be rebased once a few patches in
+the ARM patch tracker are applied.  Please consider this patch
+for review.
+
+
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index f7ebed9..0481587 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -31,6 +31,7 @@
  
-> > I don't see what we are waiting for, the code is clearly broken, even
-> > the compiler warns that nobody is using omap_hsmmc_probe().
-
-I've sent Roger's patch to Andrew & linux-mmc so hopefully it will get
-merged soon:
-
-http://www.mail-archive.com/linux-mmc at vger.kernel.org/msg00539.html
-
-Regards,
-
-Tony
+ #include <mach/hardware.h>
+ #include <mach/fb.h>
++#include <mach/ep93xx_keypad.h>
+ 
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+@@ -714,6 +715,82 @@ void __init ep93xx_register_fb(struct ep93xxfb_mach_info *data)
+ 	platform_device_register(&ep93xx_fb_device);
+ }
+ 
++
++/*************************************************************************
++ * EP93xx matrix keypad peripheral handling
++ *************************************************************************/
++static struct resource ep93xx_keypad_resource[] = {
++	{
++		.start	= EP93XX_KEY_MATRIX_PHYS_BASE,
++		.end	= EP93XX_KEY_MATRIX_PHYS_BASE + 0x0c - 1,
++		.flags	= IORESOURCE_MEM,
++	}, {
++		.start	= IRQ_EP93XX_KEY,
++		.end	= IRQ_EP93XX_KEY,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device ep93xx_keypad_device = {
++	.name			= "ep93xx-keypad",
++	.id			= -1,
++	.num_resources		= ARRAY_SIZE(ep93xx_keypad_resource),
++	.resource		= ep93xx_keypad_resource,
++};
++
++void __init ep93xx_register_keypad(struct ep93xx_keypad_platform_data *data)
++{
++	ep93xx_keypad_device.dev.platform_data = data;
++	platform_device_register(&ep93xx_keypad_device);
++}
++
++int ep93xx_keypad_acquire_gpio(struct platform_device *pdev)
++{
++	int err;
++	int i;
++
++	for (i = 0; i < 8; i++) {
++		err = gpio_request(EP93XX_GPIO_LINE_C(i), dev_name(&pdev->dev));
++		if (err)
++			goto fail_gpio_c;
++		err = gpio_request(EP93XX_GPIO_LINE_D(i), dev_name(&pdev->dev));
++		if (err)
++			goto fail_gpio_d;
++	}
++
++	/* Enable the keypad controller; ports C and D used for keypad */
++	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_KEYS |
++				EP93XX_SYSCON_DEVCFG_GONK);
++
++	return 0;
++
++fail_gpio_d:
++	gpio_free(EP93XX_GPIO_LINE_C(i));
++fail_gpio_c:
++	for ( ; i >= 0; --i) {
++		gpio_free(EP93XX_GPIO_LINE_C(i));
++		gpio_free(EP93XX_GPIO_LINE_D(i));
++	}
++	return err;
++}
++EXPORT_SYMBOL(ep93xx_keypad_acquire_gpio);
++
++void ep93xx_keypad_release_gpio(struct platform_device *pdev)
++{
++	int i;
++
++	for (i = 0; i < 8; i++) {
++		gpio_free(EP93XX_GPIO_LINE_C(i));
++		gpio_free(EP93XX_GPIO_LINE_D(i));
++	}
++
++	/* Disable the keypad controller; ports C and D used for GPIO */
++	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_KEYS |
++				EP93XX_SYSCON_DEVCFG_GONK);
++}
++EXPORT_SYMBOL(ep93xx_keypad_release_gpio);
++
++
+ extern void ep93xx_gpio_init(void);
+ 
+ void __init ep93xx_init_devices(void)
+diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+index 0fbf87b..4526bf0 100644
+--- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
++++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+@@ -143,6 +143,7 @@
+ #define EP93XX_UART3_PHYS_BASE		(EP93XX_APB_PHYS_BASE + 0x000e0000)
+ #define EP93XX_UART3_BASE		EP93XX_APB_IOMEM(0x000e0000)
+ 
++#define EP93XX_KEY_MATRIX_PHYS_BASE		EP93XX_APB_PHYS(0x000f0000)
+ #define EP93XX_KEY_MATRIX_BASE		EP93XX_APB_IOMEM(0x000f0000)
+ 
+ #define EP93XX_ADC_BASE			EP93XX_APB_IOMEM(0x00100000)
+diff --git a/arch/arm/mach-ep93xx/include/mach/platform.h b/arch/arm/mach-ep93xx/include/mach/platform.h
+index 01a0f08..442e03b 100644
+--- a/arch/arm/mach-ep93xx/include/mach/platform.h
++++ b/arch/arm/mach-ep93xx/include/mach/platform.h
+@@ -7,6 +7,7 @@
+ struct i2c_board_info;
+ struct platform_device;
+ struct ep93xxfb_mach_info;
++struct ep93xx_keypad_platform_data;
+ 
+ struct ep93xx_eth_data
+ {
+@@ -38,6 +39,9 @@ void ep93xx_register_fb(struct ep93xxfb_mach_info *data);
+ void ep93xx_register_pwm(int pwm0, int pwm1);
+ int ep93xx_pwm_acquire_gpio(struct platform_device *pdev);
+ void ep93xx_pwm_release_gpio(struct platform_device *pdev);
++void ep93xx_register_keypad(struct ep93xx_keypad_platform_data *data);
++int ep93xx_keypad_acquire_gpio(struct platform_device *pdev);
++void ep93xx_keypad_release_gpio(struct platform_device *pdev);
+ 
+ void ep93xx_init_devices(void);
+ extern struct sys_timer ep93xx_timer; 
