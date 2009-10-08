@@ -1,25 +1,101 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 8 Oct 2009 22:34:25 +0100
-Subject: [PATCH] ep93xx: introduce clk parent
-In-Reply-To: <4ACE598E.1090908@techworks.ie>
-References: <BD79186B4FD85F4B8E60E381CAEE190901CBF45C@mi8nycmail19.Mi8.com>
-	<BD79186B4FD85F4B8E60E381CAEE190901D42467@mi8nycmail19.Mi8.com>
-	<4AC3B748.5060904@bluewatersys.com>
-	<BD79186B4FD85F4B8E60E381CAEE190901D42C80@mi8nycmail19.Mi8.com>
-	<20091001145939.GA28044@n2100.arm.linux.org.uk>
-	<BD79186B4FD85F4B8E60E381CAEE190901D42D95@mi8nycmail19.Mi8.com>
-	<4ACE598E.1090908@techworks.ie>
-Message-ID: <20091008213425.GA16880@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 8 Oct 2009 14:41:41 -0700
+Subject: [GIT PULL] omap fixes for v2.6.32-rc3
+In-Reply-To: <94a0d4530910081429m7ad88b43q38245109f3252078@mail.gmail.com>
+References: <20091007185112.GJ7899@atomide.com>
+	<94a0d4530910081429m7ad88b43q38245109f3252078@mail.gmail.com>
+Message-ID: <20091008214140.GJ7417@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 08, 2009 at 10:28:46PM +0100, Christian Gagneraud wrote:
-> I'm currently working on adding ADC support (no touchscreen for now) and 
-> the problem is that touchscreen (ADC) and keypad use the same clock. With 
-> this patch applied it would be possible to define the shared 
-> ep93xx-keytch clock and add ep93xx-keypad and ep93xx-touchscreen as 
-> children.
+* Felipe Contreras <felipe.contreras@gmail.com> [091008 14:29]:
+> On Wed, Oct 7, 2009 at 9:51 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > Linus,
+> >
+> > Please pull omap fixes from:
+> >
+> > git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+> >
+> > Regards,
+> >
+> > Tony
+> >
+> >
+> > The following changes since commit 374576a8b6f865022c0fd1ca62396889b23d66dd:
+> > ?Linus Torvalds (1):
+> > ? ? ? ?Linux 2.6.32-rc3
+> >
+> > are available in the git repository at:
+> >
+> > ?git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+> >
+> > Artem Bityutskiy (1):
+> > ? ? ?OMAP3: PM: introduce a new powerdomain walk helper
+> >
+> > Daniel Walker (1):
+> > ? ? ?omap: iovmm: Add missing mutex_unlock
+> >
+> > Hiroshi DOYU (1):
+> > ? ? ?omap: iovmm: Fix incorrect spelling
+> >
+> > Jon Hunter (1):
+> > ? ? ?OMAP3: PM: Prevent hang in prcm_interrupt_handler
+> >
+> > Kevin Hilman (1):
+> > ? ? ?OMAP3: PM: Enable GPIO module-level wakeups
+> >
+> > Paul Walmsley (2):
+> > ? ? ?OMAP3: PM: PRCM interrupt: check MPUGRPSEL register
+> > ? ? ?OMAP3: PM: PRCM interrupt: only handle selected PRCM interrupts
+> >
+> > Rajendra Nayak (1):
+> > ? ? ?omap: Lock DPLL5 at boot
+> >
+> > Sergio Aguirre (1):
+> > ? ? ?omapfb: Condition mutex acquisition
+> >
+> > Tommi Rantala (2):
+> > ? ? ?omapfb: Blizzard: fix pointer to be const
+> > ? ? ?omapfb: Blizzard: constify register address tables
+> >
+> > Tony Lindgren (2):
+> > ? ? ?omap: Fix incorrect 730 vs 850 detection
+> > ? ? ?Merge branch 'pm-fixes-32' of git://git.kernel.org/.../khilman/linux-omap-pm into omap-fixes-for-linus
+> >
+> > Vikram Pandita (1):
+> > ? ? ?OMAP3: PM: USBHOST: clear wakeup events on both hosts
+> >
+> > ye janboe (1):
+> > ? ? ?omap: SRAM: flush the right address after memcpy in omap_sram_push
+> 
+> The beagleboard is still not booting for me with this branch, I need
+> to add these two patches:
+> 
+> * http://patchwork.kernel.org/patch/50721/
+> 
 
-If it's a shared clock with common control, there's nothing to stop you
-returning the same clock for both of them - that's how the clk API is
-supposed to work.
+This should go to the mainline kernel via Samuel as it's
+drivers/mfd related.
+
+> This one is needed because the defconfig has:
+> CONFIG_TWL4030_USB=y
+> 
+> * http://patchwork.kernel.org/patch/50970/
+> 
+> This is needed because most people boot from an MMC.
+
+And this should go in via the mmc list.
+
+So little more patience is still needed :)
+
+Cheers,
+
+Tony
+
+> 
+> You can add my 'tested-by' line if you want.
+> 
+> Cheers.
+> 
+> -- 
+> Felipe Contreras
