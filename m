@@ -1,49 +1,25 @@
-From: leochen@broadcom.com (Leo (Hao) Chen)
-Date: Thu, 8 Oct 2009 14:33:13 -0700
-Subject: [PATCH] bcmring: add oprofile pmu support
-Message-ID: <20091008213313.GQ4708@broadcom.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 8 Oct 2009 22:34:25 +0100
+Subject: [PATCH] ep93xx: introduce clk parent
+In-Reply-To: <4ACE598E.1090908@techworks.ie>
+References: <BD79186B4FD85F4B8E60E381CAEE190901CBF45C@mi8nycmail19.Mi8.com>
+	<BD79186B4FD85F4B8E60E381CAEE190901D42467@mi8nycmail19.Mi8.com>
+	<4AC3B748.5060904@bluewatersys.com>
+	<BD79186B4FD85F4B8E60E381CAEE190901D42C80@mi8nycmail19.Mi8.com>
+	<20091001145939.GA28044@n2100.arm.linux.org.uk>
+	<BD79186B4FD85F4B8E60E381CAEE190901D42D95@mi8nycmail19.Mi8.com>
+	<4ACE598E.1090908@techworks.ie>
+Message-ID: <20091008213425.GA16880@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Oct 08, 2009 at 10:28:46PM +0100, Christian Gagneraud wrote:
+> I'm currently working on adding ADC support (no touchscreen for now) and 
+> the problem is that touchscreen (ADC) and keypad use the same clock. With 
+> this patch applied it would be possible to define the shared 
+> ep93xx-keytch clock and add ep93xx-keypad and ep93xx-touchscreen as 
+> children.
 
-The patch is to add oprofile pmu support for bcmring arch.
-
-Thanks,
-
-Leo
-
-From: Leo Chen <leochen@broadcom.com>
-Date: Thu, 8 Oct 2009 14:28:35 -0700
-Subject: [PATCH] bcmring: add oprofile pmu support
-
-oprofile pmu support for bcmring arch.
-
-Signed-off-by: Leo Hao Chen <leochen@broadcom.com>
----
- arch/arm/oprofile/op_model_v6.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/oprofile/op_model_v6.c b/arch/arm/oprofile/op_model_v6.c
-index fe58138..f7d2ec5 100644
---- a/arch/arm/oprofile/op_model_v6.c
-+++ b/arch/arm/oprofile/op_model_v6.c
-@@ -33,6 +33,9 @@ static int irqs[] = {
- #ifdef CONFIG_ARCH_OMAP2
- 	3,
- #endif
-+#ifdef CONFIG_ARCH_BCMRING
-+	IRQ_PMUIRQ, /* for BCMRING, ARM PMU interrupt is 43 */
-+#endif
- };
- 
- static void armv6_pmu_stop(void)
--- 
-1.6.0.6
-
--- 
-
-Leo Hao Chen
-
-------------------------
-Life is short, run long.
+If it's a shared clock with common control, there's nothing to stop you
+returning the same clock for both of them - that's how the clk API is
+supposed to work.
