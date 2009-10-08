@@ -1,56 +1,67 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 8 Oct 2009 19:25:21 -0400
-Subject: [PATCH] ep93xx: introduce clk parent
-In-Reply-To: <4ACE7261.1030302@techworks.ie>
-References: <BD79186B4FD85F4B8E60E381CAEE190901CBF45C@mi8nycmail19.Mi8.com>	<BD79186B4FD85F4B8E60E381CAEE190901D42467@mi8nycmail19.Mi8.com>	<4AC3B748.5060904@bluewatersys.com>	<BD79186B4FD85F4B8E60E381CAEE190901D42C80@mi8nycmail19.Mi8.com>	<20091001145939.GA28044@n2100.arm.linux.org.uk><BD79186B4FD85F4B8E60E381CAEE190901D42D95@mi8nycmail19.Mi8.com>
-	<4ACE598E.1090908@techworks.ie>
-	<BD79186B4FD85F4B8E60E381CAEE190901DB7CDE@mi8nycmail19.Mi8.com>
-	<4ACE7261.1030302@techworks.ie>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901DB7CE4@mi8nycmail19.Mi8.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 8 Oct 2009 16:26:03 -0700
+Subject: [GIT PULL] omap fixes for v2.6.32-rc3
+In-Reply-To: <94a0d4530910081520t66ce7567xe142979a35b1245@mail.gmail.com>
+References: <20091007185112.GJ7899@atomide.com>
+	<94a0d4530910081429m7ad88b43q38245109f3252078@mail.gmail.com>
+	<20091008214140.GJ7417@atomide.com>
+	<94a0d4530910081513w1a919dc2s50eca41966a2261d@mail.gmail.com>
+	<94a0d4530910081520t66ce7567xe142979a35b1245@mail.gmail.com>
+Message-ID: <20091008232603.GB25892@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, October 08, 2009 4:15 PM, Christian Gagneraud wrote:
-> Hartley,
->
-> The keypad clock is already in as is the et_keytchclk_rate too.
+* Felipe Contreras <felipe.contreras@gmail.com> [091008 15:20]:
+> On Fri, Oct 9, 2009 at 1:13 AM, Felipe Contreras
+> <felipe.contreras@gmail.com> wrote:
+> > On Fri, Oct 9, 2009 at 12:41 AM, Tony Lindgren <tony@atomide.com> wrote:
+> >> * Felipe Contreras <felipe.contreras@gmail.com> [091008 14:29]:
+> >>> On Wed, Oct 7, 2009 at 9:51 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >>>
 
-Saw that.  Already responded to you about it.
+<snip snip>
 
-> Can you explain me by the way why the keypad declares the clock with 
-> dev_id="ep93xx-keypad" and no con_id, but the pwm declares the clock 
-> with no dev_id and with con_id="clk_pwm"
-> Which of dev and con is the consumer and which one is the producer?
-> I'm a bit confuse between the platform_driver.name, the clock.dev_id 
-> and the clock.con_id
->
-> As well I've noticed that the EP93XX keypad input driver does a 
-> clock_get("clk_key"), but this clock doesn't exist. or did I miss 
-> something.
+> >>> The beagleboard is still not booting for me with this branch, I need
+> >>> to add these two patches:
+> >>>
+> >>> * http://patchwork.kernel.org/patch/50721/
+> >>>
+> >>
+> >> This should go to the mainline kernel via Samuel as it's
+> >> drivers/mfd related.
+> >>
+> >>> This one is needed because the defconfig has:
+> >>> CONFIG_TWL4030_USB=y
+> >>>
+> >>> * http://patchwork.kernel.org/patch/50970/
+> >>>
+> >>> This is needed because most people boot from an MMC.
+> >>
+> >> And this should go in via the mmc list.
+> >
+> > Should it?
+> >
+> > Here you can see Uwe Kleine-K?nig sending the original patch without
+> > even CC'ing the mmc list:
+> > http://marc.info/?l=linux-kernel&m=124820861213849&w=2
+> >
+> > And it was unintentionally broken by this one:
+> > http://marc.info/?l=linux-mmc&m=125249763422227&w=2
+> 
+> Er, actually that one was ok, the problem was introduced only in the
+> final version:
+> http://marc.info/?l=linux-mmc&m=125366315417006&w=2
 
-No, I did...
+Right, looks like Roger forgot to Cc linux-mmc.
+ 
+> > I don't see what we are waiting for, the code is clearly broken, even
+> > the compiler warns that nobody is using omap_hsmmc_probe().
 
-When the input group picked up the keypad driver I didn't get the core
-support files reviewed/merged.  So basically the keypad driver is
-currently broken.
+I've sent Roger's patch to Andrew & linux-mmc so hopefully it will get
+merged soon:
 
-Patch 5578/1 was the first patch needed to fix this.  During the review
-for it, the original use intended for by the driver changed.  So I'm in
-the process of fixing the keypad driver.  Hopefully I'll get this all
-resolved soon.
-
-As far as the dev/con id's.
-
-I could have created two clocks for the pwms.  One for dev_id="pwm.0" and
-one for dev_id="pwm.1" which is how the two pwm ports get identified when
-used.  But, since the pwm clock cannot be disabled it seemed cleaner to
-just add one clock, con_id="clk_pwm", since the clock is common for both
-pwm controllers.  Look at drivers/misc/ep93xx_pwm.c and you will see that
-the clk_get() call passes the dev_id and the con_id.  Since there is not
-a matching dev_id in the ep93xx clocks[], the match occurs based on the
-con_id.
-
-Make sense?
+http://www.mail-archive.com/linux-mmc at vger.kernel.org/msg00539.html
 
 Regards,
-Hartley
+
+Tony
