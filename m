@@ -1,86 +1,49 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Fri, 9 Oct 2009 00:29:52 +0300
-Subject: [GIT PULL] omap fixes for v2.6.32-rc3
-In-Reply-To: <20091007185112.GJ7899@atomide.com>
-References: <20091007185112.GJ7899@atomide.com>
-Message-ID: <94a0d4530910081429m7ad88b43q38245109f3252078@mail.gmail.com>
+From: leochen@broadcom.com (Leo (Hao) Chen)
+Date: Thu, 8 Oct 2009 14:33:13 -0700
+Subject: [PATCH] bcmring: add oprofile pmu support
+Message-ID: <20091008213313.GQ4708@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 7, 2009 at 9:51 PM, Tony Lindgren <tony@atomide.com> wrote:
-> Linus,
->
-> Please pull omap fixes from:
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
->
-> Regards,
->
-> Tony
->
->
-> The following changes since commit 374576a8b6f865022c0fd1ca62396889b23d66dd:
-> ?Linus Torvalds (1):
-> ? ? ? ?Linux 2.6.32-rc3
->
-> are available in the git repository at:
->
-> ?git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
->
-> Artem Bityutskiy (1):
-> ? ? ?OMAP3: PM: introduce a new powerdomain walk helper
->
-> Daniel Walker (1):
-> ? ? ?omap: iovmm: Add missing mutex_unlock
->
-> Hiroshi DOYU (1):
-> ? ? ?omap: iovmm: Fix incorrect spelling
->
-> Jon Hunter (1):
-> ? ? ?OMAP3: PM: Prevent hang in prcm_interrupt_handler
->
-> Kevin Hilman (1):
-> ? ? ?OMAP3: PM: Enable GPIO module-level wakeups
->
-> Paul Walmsley (2):
-> ? ? ?OMAP3: PM: PRCM interrupt: check MPUGRPSEL register
-> ? ? ?OMAP3: PM: PRCM interrupt: only handle selected PRCM interrupts
->
-> Rajendra Nayak (1):
-> ? ? ?omap: Lock DPLL5 at boot
->
-> Sergio Aguirre (1):
-> ? ? ?omapfb: Condition mutex acquisition
->
-> Tommi Rantala (2):
-> ? ? ?omapfb: Blizzard: fix pointer to be const
-> ? ? ?omapfb: Blizzard: constify register address tables
->
-> Tony Lindgren (2):
-> ? ? ?omap: Fix incorrect 730 vs 850 detection
-> ? ? ?Merge branch 'pm-fixes-32' of git://git.kernel.org/.../khilman/linux-omap-pm into omap-fixes-for-linus
->
-> Vikram Pandita (1):
-> ? ? ?OMAP3: PM: USBHOST: clear wakeup events on both hosts
->
-> ye janboe (1):
-> ? ? ?omap: SRAM: flush the right address after memcpy in omap_sram_push
+Hi,
 
-The beagleboard is still not booting for me with this branch, I need
-to add these two patches:
+The patch is to add oprofile pmu support for bcmring arch.
 
-* http://patchwork.kernel.org/patch/50721/
+Thanks,
 
-This one is needed because the defconfig has:
-CONFIG_TWL4030_USB=y
+Leo
 
-* http://patchwork.kernel.org/patch/50970/
+From: Leo Chen <leochen@broadcom.com>
+Date: Thu, 8 Oct 2009 14:28:35 -0700
+Subject: [PATCH] bcmring: add oprofile pmu support
 
-This is needed because most people boot from an MMC.
+oprofile pmu support for bcmring arch.
 
-You can add my 'tested-by' line if you want.
+Signed-off-by: Leo Hao Chen <leochen@broadcom.com>
+---
+ arch/arm/oprofile/op_model_v6.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-Cheers.
+diff --git a/arch/arm/oprofile/op_model_v6.c b/arch/arm/oprofile/op_model_v6.c
+index fe58138..f7d2ec5 100644
+--- a/arch/arm/oprofile/op_model_v6.c
++++ b/arch/arm/oprofile/op_model_v6.c
+@@ -33,6 +33,9 @@ static int irqs[] = {
+ #ifdef CONFIG_ARCH_OMAP2
+ 	3,
+ #endif
++#ifdef CONFIG_ARCH_BCMRING
++	IRQ_PMUIRQ, /* for BCMRING, ARM PMU interrupt is 43 */
++#endif
+ };
+ 
+ static void armv6_pmu_stop(void)
+-- 
+1.6.0.6
 
 -- 
-Felipe Contreras
+
+Leo Hao Chen
+
+------------------------
+Life is short, run long.
