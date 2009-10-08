@@ -1,72 +1,151 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  8 Oct 2009 09:47:20 +0200
-Subject: [PATCH 4/6] mx25: Add missing copyright / license header
-In-Reply-To: <1254988042-16737-4-git-send-email-s.hauer@pengutronix.de>
+Date: Thu,  8 Oct 2009 09:47:21 +0200
+Subject: [PATCH 5/6] pcm038: Add SPI/MC13783 support
+In-Reply-To: <1254988042-16737-5-git-send-email-s.hauer@pengutronix.de>
 References: <1254988042-16737-1-git-send-email-s.hauer@pengutronix.de>
 	<1254988042-16737-2-git-send-email-s.hauer@pengutronix.de>
 	<1254988042-16737-3-git-send-email-s.hauer@pengutronix.de>
 	<1254988042-16737-4-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1254988042-16737-5-git-send-email-s.hauer@pengutronix.de>
+	<1254988042-16737-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1254988042-16737-6-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-mx25/devices.c |   18 ++++++++++++++++++
- arch/arm/mach-mx25/mx25pdk.c |   18 ++++++++++++++++++
- 2 files changed, 36 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx2/pcm038.c |   92 +++++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 90 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-mx25/devices.c b/arch/arm/mach-mx25/devices.c
-index 25c3296..63511de 100644
---- a/arch/arm/mach-mx25/devices.c
-+++ b/arch/arm/mach-mx25/devices.c
-@@ -1,3 +1,21 @@
-+/*
-+ * Copyright 2009 Sascha Hauer, <kernel@pengutronix.de>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor,
-+ * Boston, MA  02110-1301, USA.
-+ */
-+
+diff --git a/arch/arm/mach-mx2/pcm038.c b/arch/arm/mach-mx2/pcm038.c
+index ee65dda..2262e18 100644
+--- a/arch/arm/mach-mx2/pcm038.c
++++ b/arch/arm/mach-mx2/pcm038.c
+@@ -23,6 +23,10 @@
+ #include <linux/mtd/plat-ram.h>
+ #include <linux/mtd/physmap.h>
  #include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
- #include <linux/gpio.h>
-diff --git a/arch/arm/mach-mx25/mx25pdk.c b/arch/arm/mach-mx25/mx25pdk.c
-index e99d7bb..d23ae57 100644
---- a/arch/arm/mach-mx25/mx25pdk.c
-+++ b/arch/arm/mach-mx25/mx25pdk.c
-@@ -1,3 +1,21 @@
-+/*
-+ * Copyright 2009 Sascha Hauer, <kernel@pengutronix.de>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor,
-+ * Boston, MA  02110-1301, USA.
-+ */
++#include <linux/regulator/machine.h>
++#include <linux/mfd/mc13783.h>
++#include <linux/spi/spi.h>
++#include <linux/irq.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -35,6 +39,7 @@
+ #include <mach/iomux.h>
+ #include <mach/imx-uart.h>
+ #include <mach/mxc_nand.h>
++#include <mach/spi.h>
+ 
+ #include "devices.h"
+ 
+@@ -78,8 +83,6 @@ static int pcm038_pins[] = {
+ 	PC6_PF_I2C2_SCL,
+ 	/* SPI1 */
+ 	PD25_PF_CSPI1_RDY,
+-	PD27_PF_CSPI1_SS1,
+-	PD28_PF_CSPI1_SS0,
+ 	PD29_PF_CSPI1_SCLK,
+ 	PD30_PF_CSPI1_MISO,
+ 	PD31_PF_CSPI1_MOSI,
+@@ -196,6 +199,86 @@ static struct i2c_board_info pcm038_i2c_devices[] = {
+ 	}
+ };
+ 
++static int pcm038_spi_cs[] = {GPIO_PORTD + 28};
 +
- #include <linux/types.h>
- #include <linux/init.h>
- #include <linux/clk.h>
++static struct spi_imx_master pcm038_spi_0_data = {
++	.chipselect = pcm038_spi_cs,
++	.num_chipselect = ARRAY_SIZE(pcm038_spi_cs),
++};
++
++static struct regulator_consumer_supply sdhc1_consumers[] = {
++	{
++		.dev	= &mxc_sdhc_device1.dev,
++		.supply	= "sdhc_vcc",
++	},
++};
++
++static struct regulator_init_data sdhc1_data = {
++	.constraints = {
++		.min_uV = 3000000,
++		.max_uV = 3400000,
++		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
++			REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
++		.valid_modes_mask = REGULATOR_MODE_NORMAL |
++			REGULATOR_MODE_FAST,
++		.always_on = 0,
++		.boot_on = 0,
++	},
++	.num_consumer_supplies = ARRAY_SIZE(sdhc1_consumers),
++	.consumer_supplies = sdhc1_consumers,
++};
++
++static struct regulator_consumer_supply cam_consumers[] = {
++	{
++		.dev	= NULL,
++		.supply	= "imx_cam_vcc",
++	},
++};
++
++static struct regulator_init_data cam_data = {
++	.constraints = {
++		.min_uV = 3000000,
++		.max_uV = 3400000,
++		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
++			REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
++		.valid_modes_mask = REGULATOR_MODE_NORMAL |
++			REGULATOR_MODE_FAST,
++		.always_on = 0,
++		.boot_on = 0,
++	},
++	.num_consumer_supplies = ARRAY_SIZE(cam_consumers),
++	.consumer_supplies = cam_consumers,
++};
++
++struct mc13783_regulator_init_data pcm038_regulators[] = {
++	{
++		.id = MC13783_REGU_VCAM,
++		.init_data = &cam_data,
++	}, {
++		.id = MC13783_REGU_VMMC1,
++		.init_data = &sdhc1_data,
++	},
++};
++
++static struct mc13783_platform_data pcm038_pmic = {
++	.regulators = pcm038_regulators,
++	.num_regulators = ARRAY_SIZE(pcm038_regulators),
++	.flags = MC13783_USE_ADC | MC13783_USE_REGULATOR |
++		 MC13783_USE_TOUCHSCREEN,
++};
++
++static struct spi_board_info pcm038_spi_board_info[] __initdata = {
++	{
++		.modalias = "mc13783",
++		.irq = IRQ_GPIOB(23),
++		.max_speed_hz = 300000,
++		.bus_num = 0,
++		.chip_select = 0,
++		.platform_data = &pcm038_pmic,
++		.mode = SPI_CS_HIGH,
++	}
++};
++
+ static void __init pcm038_init(void)
+ {
+ 	mxc_gpio_setup_multiple_pins(pcm038_pins, ARRAY_SIZE(pcm038_pins),
+@@ -219,6 +302,11 @@ static void __init pcm038_init(void)
+ 	/* PE18 for user-LED D40 */
+ 	mxc_gpio_mode(GPIO_PORTE | 18 | GPIO_GPIO | GPIO_OUT);
+ 
++	mxc_gpio_mode(GPIO_PORTD | 28 | GPIO_GPIO | GPIO_OUT);
++	mxc_register_device(&mxc_spi_device0, &pcm038_spi_0_data);
++	spi_register_board_info(pcm038_spi_board_info,
++				ARRAY_SIZE(pcm038_spi_board_info));
++
+ 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
+ 
+ #ifdef CONFIG_MACH_PCM970_BASEBOARD
 -- 
 1.6.4.3
