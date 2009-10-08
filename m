@@ -1,111 +1,40 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Fri, 9 Oct 2009 01:20:50 +0300
-Subject: [GIT PULL] omap fixes for v2.6.32-rc3
-In-Reply-To: <94a0d4530910081513w1a919dc2s50eca41966a2261d@mail.gmail.com>
-References: <20091007185112.GJ7899@atomide.com>
-	<94a0d4530910081429m7ad88b43q38245109f3252078@mail.gmail.com>
-	<20091008214140.GJ7417@atomide.com>
-	<94a0d4530910081513w1a919dc2s50eca41966a2261d@mail.gmail.com>
-Message-ID: <94a0d4530910081520t66ce7567xe142979a35b1245@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 8 Oct 2009 18:32:49 -0400
+Subject: [PATCH] ep93xx: introduce clk parent
+In-Reply-To: <20091008213425.GA16880@n2100.arm.linux.org.uk>
+References: <BD79186B4FD85F4B8E60E381CAEE190901CBF45C@mi8nycmail19.Mi8.com><BD79186B4FD85F4B8E60E381CAEE190901D42467@mi8nycmail19.Mi8.com><4AC3B748.5060904@bluewatersys.com><BD79186B4FD85F4B8E60E381CAEE190901D42C80@mi8nycmail19.Mi8.com><20091001145939.GA28044@n2100.arm.linux.org.uk><BD79186B4FD85F4B8E60E381CAEE190901D42D95@mi8nycmail19.Mi8.com><4ACE598E.1090908@techworks.ie>
+	<20091008213425.GA16880@n2100.arm.linux.org.uk>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901DB7CDB@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 9, 2009 at 1:13 AM, Felipe Contreras
-<felipe.contreras@gmail.com> wrote:
-> On Fri, Oct 9, 2009 at 12:41 AM, Tony Lindgren <tony@atomide.com> wrote:
->> * Felipe Contreras <felipe.contreras@gmail.com> [091008 14:29]:
->>> On Wed, Oct 7, 2009 at 9:51 PM, Tony Lindgren <tony@atomide.com> wrote:
->>> > Linus,
->>> >
->>> > Please pull omap fixes from:
->>> >
->>> > git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
->>> >
->>> > Regards,
->>> >
->>> > Tony
->>> >
->>> >
->>> > The following changes since commit 374576a8b6f865022c0fd1ca62396889b23d66dd:
->>> > ?Linus Torvalds (1):
->>> > ? ? ? ?Linux 2.6.32-rc3
->>> >
->>> > are available in the git repository at:
->>> >
->>> > ?git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
->>> >
->>> > Artem Bityutskiy (1):
->>> > ? ? ?OMAP3: PM: introduce a new powerdomain walk helper
->>> >
->>> > Daniel Walker (1):
->>> > ? ? ?omap: iovmm: Add missing mutex_unlock
->>> >
->>> > Hiroshi DOYU (1):
->>> > ? ? ?omap: iovmm: Fix incorrect spelling
->>> >
->>> > Jon Hunter (1):
->>> > ? ? ?OMAP3: PM: Prevent hang in prcm_interrupt_handler
->>> >
->>> > Kevin Hilman (1):
->>> > ? ? ?OMAP3: PM: Enable GPIO module-level wakeups
->>> >
->>> > Paul Walmsley (2):
->>> > ? ? ?OMAP3: PM: PRCM interrupt: check MPUGRPSEL register
->>> > ? ? ?OMAP3: PM: PRCM interrupt: only handle selected PRCM interrupts
->>> >
->>> > Rajendra Nayak (1):
->>> > ? ? ?omap: Lock DPLL5 at boot
->>> >
->>> > Sergio Aguirre (1):
->>> > ? ? ?omapfb: Condition mutex acquisition
->>> >
->>> > Tommi Rantala (2):
->>> > ? ? ?omapfb: Blizzard: fix pointer to be const
->>> > ? ? ?omapfb: Blizzard: constify register address tables
->>> >
->>> > Tony Lindgren (2):
->>> > ? ? ?omap: Fix incorrect 730 vs 850 detection
->>> > ? ? ?Merge branch 'pm-fixes-32' of git://git.kernel.org/.../khilman/linux-omap-pm into omap-fixes-for-linus
->>> >
->>> > Vikram Pandita (1):
->>> > ? ? ?OMAP3: PM: USBHOST: clear wakeup events on both hosts
->>> >
->>> > ye janboe (1):
->>> > ? ? ?omap: SRAM: flush the right address after memcpy in omap_sram_push
->>>
->>> The beagleboard is still not booting for me with this branch, I need
->>> to add these two patches:
->>>
->>> * http://patchwork.kernel.org/patch/50721/
->>>
->>
->> This should go to the mainline kernel via Samuel as it's
->> drivers/mfd related.
->>
->>> This one is needed because the defconfig has:
->>> CONFIG_TWL4030_USB=y
->>>
->>> * http://patchwork.kernel.org/patch/50970/
->>>
->>> This is needed because most people boot from an MMC.
->>
->> And this should go in via the mmc list.
->
-> Should it?
->
-> Here you can see Uwe Kleine-K?nig sending the original patch without
-> even CC'ing the mmc list:
-> http://marc.info/?l=linux-kernel&m=124820861213849&w=2
->
-> And it was unintentionally broken by this one:
-> http://marc.info/?l=linux-mmc&m=125249763422227&w=2
+Russell,
 
-Er, actually that one was ok, the problem was introduced only in the
-final version:
-http://marc.info/?l=linux-mmc&m=125366315417006&w=2
+Did you see the locking I added for clk_enable / clk_disable?  Will that
+cover the concern you had earlier? 
 
-> I don't see what we are waiting for, the code is clearly broken, even
-> the compiler warns that nobody is using omap_hsmmc_probe().
+Regards,
+Hartley
 
--- 
-Felipe Contreras
+-----Original Message-----
+From: linux-arm-kernel-bounces@lists.infradead.org [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Russell King - ARM Linux
+Sent: Thursday, October 08, 2009 2:34 PM
+To: Christian Gagneraud
+Cc: linux-arm-kernel
+Subject: Re: [PATCH] ep93xx: introduce clk parent
+
+On Thu, Oct 08, 2009 at 10:28:46PM +0100, Christian Gagneraud wrote:
+> I'm currently working on adding ADC support (no touchscreen for now) and 
+> the problem is that touchscreen (ADC) and keypad use the same clock. With 
+> this patch applied it would be possible to define the shared 
+> ep93xx-keytch clock and add ep93xx-keypad and ep93xx-touchscreen as 
+> children.
+
+If it's a shared clock with common control, there's nothing to stop you
+returning the same clock for both of them - that's how the clk API is
+supposed to work.
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
