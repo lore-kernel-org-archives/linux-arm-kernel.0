@@ -1,35 +1,33 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  8 Oct 2009 09:47:16 +0200
-Subject: Some mxc patches for -rc
-Message-ID: <1254988042-16737-1-git-send-email-s.hauer@pengutronix.de>
+Date: Thu,  8 Oct 2009 09:47:17 +0200
+Subject: [PATCH 1/6] i.MX27 clock: rename spi clocks to match device
+In-Reply-To: <1254988042-16737-1-git-send-email-s.hauer@pengutronix.de>
+References: <1254988042-16737-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1254988042-16737-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-mx2/clock_imx27.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-Here are some more mxc related patches for -rc.
-
-Sascha
-
-The following changes since commit 374576a8b6f865022c0fd1ca62396889b23d66dd:
-  Linus Torvalds (1):
-        Linux 2.6.32-rc3
-
-are available in the git repository at:
-
-  none ..BRANCH.NOT.VERIFIED..
-
-Sascha Hauer (6):
-      i.MX27 clock: rename spi clocks to match device
-      mx25 devices: Add missing include
-      mx25pdk: remove nand support as it is not present in current tree
-      mx25: Add missing copyright / license header
-      pcm038: Add SPI/MC13783 support
-      pcm970 mmc: Fix ro switch
-
- arch/arm/mach-mx2/clock_imx27.c      |    6 +-
- arch/arm/mach-mx2/pcm038.c           |   92 +++++++++++++++++++++++++++++++++-
- arch/arm/mach-mx2/pcm970-baseboard.c |    2 +-
- arch/arm/mach-mx25/devices.c         |   19 +++++++
- arch/arm/mach-mx25/mx25pdk.c         |   25 +++++++---
- 5 files changed, 131 insertions(+), 13 deletions(-)
+diff --git a/arch/arm/mach-mx2/clock_imx27.c b/arch/arm/mach-mx2/clock_imx27.c
+index 4089951..174fa3e 100644
+--- a/arch/arm/mach-mx2/clock_imx27.c
++++ b/arch/arm/mach-mx2/clock_imx27.c
+@@ -638,9 +638,9 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("mxc-mmc.0", NULL, sdhc1_clk)
+ 	_REGISTER_CLOCK("mxc-mmc.1", NULL, sdhc2_clk)
+ 	_REGISTER_CLOCK("mxc-mmc.2", NULL, sdhc3_clk)
+-	_REGISTER_CLOCK(NULL, "cspi1", cspi1_clk)
+-	_REGISTER_CLOCK(NULL, "cspi2", cspi2_clk)
+-	_REGISTER_CLOCK(NULL, "cspi3", cspi3_clk)
++	_REGISTER_CLOCK("spi_imx.0", NULL, cspi1_clk)
++	_REGISTER_CLOCK("spi_imx.1", NULL, cspi2_clk)
++	_REGISTER_CLOCK("spi_imx.2", NULL, cspi3_clk)
+ 	_REGISTER_CLOCK("imx-fb.0", NULL, lcdc_clk)
+ 	_REGISTER_CLOCK(NULL, "csi", csi_clk)
+ 	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usb_clk)
+-- 
+1.6.4.3
