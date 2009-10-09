@@ -1,17 +1,17 @@
 From: dhaval.vasa@einfochips.com (Dhaval Vasa)
-Date: Fri, 09 Oct 2009 19:33:25 +0530
+Date: Fri, 09 Oct 2009 19:33:51 +0530
 Subject: [PATCH] [ARM] kirkwood: combine support for openrd base/client
 	support
 In-Reply-To: <200910091600.45161.dk-arm-linux@gmx.de>
 References: <20091009123956.GA6085@chipmunk>
 	<200910091600.45161.dk-arm-linux@gmx.de>
-Message-ID: <4ACF42AD.6010103@einfochips.com>
+Message-ID: <4ACF42C7.3090306@einfochips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Alexander, Dieter,
 
-I will test it on saturday.
+I will test it on Saturday. And take care of i2c, pcie inits.
 
 - Dhaval
 
