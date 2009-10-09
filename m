@@ -1,31 +1,35 @@
 From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Sat, 10 Oct 2009 00:12:24 +0400
-Subject: [PATCH] irda/sa1100_ir: check return value of startup hook
-In-Reply-To: <4ACF293C.7070803@ru.mvista.com>
-References: <1255073153-24962-1-git-send-email-mad_soft@inbox.ru>
-	<4ACF293C.7070803@ru.mvista.com>
-Message-ID: <20091009201224.GA6208@rainbow>
+Date: Fri, 9 Oct 2009 21:56:21 +0400
+Subject: [PATCH v2] irda/sa1100_ir: check return value of startup hook
+Message-ID: <mailman.60.1255119157.2253.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:14 Fri 09 Oct     , Sergei Shtylyov wrote:
+Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
+---
+ drivers/net/irda/sa1100_ir.c |    7 +++++--
+ 1 files changed, 5 insertions(+), 2 deletions(-)
 
-[...]
-> > -	if (si->pdata->startup)
-> > -		si->pdata->startup(si->dev);
-> > +	if (si->pdata->startup)	{
-> > +		ret = si->pdata->startup(si->dev);
-> > +		if (ret)
-> > +			return ret;
-> > +		}
-> 
->     Overindented brace.
-> 
-
-Nice catch, thanks!
-
-Updated patch in attachment.
-
+diff --git a/drivers/net/irda/sa1100_ir.c b/drivers/net/irda/sa1100_ir.c
+index 38bf7cf..c412e80 100644
+--- a/drivers/net/irda/sa1100_ir.c
++++ b/drivers/net/irda/sa1100_ir.c
+@@ -232,8 +232,11 @@ static int sa1100_irda_startup(struct sa1100_irda *si)
+ 	/*
+ 	 * Ensure that the ports for this device are setup correctly.
+ 	 */
+-	if (si->pdata->startup)
+-		si->pdata->startup(si->dev);
++	if (si->pdata->startup)	{
++		ret = si->pdata->startup(si->dev);
++		if (ret)
++			return ret;
++	}
+ 
+ 	/*
+ 	 * Configure PPC for IRDA - we want to drive TXD2 low.
 -- 
-Best regards,
-Dmitry "MAD" Artamonow
+1.6.3.4
+
+
+--opJtzjQTFsWo+cga--
