@@ -1,80 +1,58 @@
-From: leochen@broadcom.com (Leo Chen)
-Date: Wed, 7 Oct 2009 11:44:35 -0700
-Subject: [PATCH] bcmring: modify bcmring_defconfig with gpio support
-Message-ID: <mailman.68.1255122832.2253.linux-arm-kernel@lists.infradead.org>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 9 Oct 2009 17:22:02 -0400
+Subject: [PATCH 2/8] bcmring: add gpio support in Kconfig and Makefile
+In-Reply-To: <20091009211224.GA24851@broadcom.com>
+References: <20091009211224.GA24851@broadcom.com>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901DB7E08@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Friday, October 09, 2009 2:12 PM, Leo (Hao) Chen wrote:
+> From 4aff48c9134bc44306540bf7220c3546a8a889d2 Mon Sep 17 00:00:00 2001
+> From: Leo Chen <leochen@broadcom.com>
+> Date: Wed, 7 Oct 2009 11:43:05 -0700
+> Subject: [PATCH] bcmring: gpio addition to Kconfig and Makefile
+> 
+> 
+> Signed-off-by: Leo Hao Chen <leochen@broadcom.com>
+> ---
+>  arch/arm/Kconfig                   |    3 ++-
+>  arch/arm/mach-bcmring/Makefile     |    3 ++-
+>  arch/arm/mach-bcmring/csp/Makefile |    2 ++
+>  3 files changed, 6 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 1c4119c..d22af37 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -695,10 +695,11 @@ config ARCH_BCMRING
+>  	depends on MMU
+>  	select CPU_V6
+>  	select ARM_AMBA
+> +	select GENERIC_GPIO
+>  	select COMMON_CLKDEV
+>  	select GENERIC_TIME
+>  	select GENERIC_CLOCKEVENTS
+> -	select ARCH_WANT_OPTIONAL_GPIOLIB
+> +	select ARCH_REQUIRE_GPIOLIB
+>  	help
+>  	  Support for Broadcom's BCMRing platform.
+>  
+> diff --git a/arch/arm/mach-bcmring/Makefile b/arch/arm/mach-bcmring/Makefile
+> index f8d9fce..b629869 100644
+> --- a/arch/arm/mach-bcmring/Makefile
+> +++ b/arch/arm/mach-bcmring/Makefile
+> @@ -4,5 +4,6 @@
+>  
+>  # Object file lists.
+>  
+> -obj-y := arch.o mm.o irq.o clock.o core.o timer.o dma.o
+> +obj-y := arch.o mm.o irq.o clock.o core.o timer.o dma.o gpio_irq.o
+>  obj-y += csp/
+> +obj-$(CONFIG_ARCH_REQUIRE_GPIOLIB)	+= gpio.o
 
-Signed-off-by: Leo Hao Chen <leochen@broadcom.com>
----
- arch/arm/configs/bcmring_defconfig |   29 +++++++++++++++++++++++++++--
- 1 files changed, 27 insertions(+), 2 deletions(-)
+If ARCH_BCMRING always has CONFIG_ARCH_REQUIRE_GPIOLIB why not just add
+gpio.o to the obj-y list?
 
-diff --git a/arch/arm/configs/bcmring_defconfig b/arch/arm/configs/bcmring_defconfig
-index bcc0bac..b3d6fdd 100644
---- a/arch/arm/configs/bcmring_defconfig
-+++ b/arch/arm/configs/bcmring_defconfig
-@@ -413,6 +413,7 @@ CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_VERIFY_WRITE=y
- # CONFIG_MTD_NAND_ECC_SMC is not set
- # CONFIG_MTD_NAND_MUSEUM_IDS is not set
-+# CONFIG_MTD_NAND_GPIO is not set
- CONFIG_MTD_NAND_IDS=y
- CONFIG_MTD_NAND_BCM_UMI=y
- CONFIG_MTD_NAND_BCM_UMI_HWCS=y
-@@ -438,6 +439,7 @@ CONFIG_BLK_DEV=y
- # CONFIG_BLK_DEV_RAM is not set
- # CONFIG_CDROM_PKTCDVD is not set
- # CONFIG_ATA_OVER_ETH is not set
-+# CONFIG_MG_DISK is not set
- # CONFIG_MISC_DEVICES is not set
- CONFIG_HAVE_IDE=y
- # CONFIG_IDE is not set
-@@ -520,8 +522,28 @@ CONFIG_LEGACY_PTY_COUNT=64
- # CONFIG_TCG_TPM is not set
- # CONFIG_I2C is not set
- # CONFIG_SPI is not set
--CONFIG_ARCH_WANT_OPTIONAL_GPIOLIB=y
--# CONFIG_GPIOLIB is not set
-+CONFIG_ARCH_REQUIRE_GPIOLIB=y
-+CONFIG_GPIOLIB=y
-+#
-+# Memory mapped GPIO expanders:
-+#
-+# CONFIG_GPIO_PL061 is not set
-+
-+#
-+# I2C GPIO expanders:
-+#
-+
-+#
-+# PCI GPIO expanders:
-+#
-+
-+#
-+# SPI GPIO expanders:
-+#
-+
-+#
-+# AC97 GPIO expanders:
-+#
- # CONFIG_W1 is not set
- # CONFIG_POWER_SUPPLY is not set
- # CONFIG_HWMON is not set
-@@ -540,8 +562,11 @@ CONFIG_SSB_POSSIBLE=y
- #
- # CONFIG_MFD_CORE is not set
- # CONFIG_MFD_SM501 is not set
-+# CONFIG_MFD_ASIC3 is not set
-+# CONFIG_HTC_EGPIO is not set
- # CONFIG_HTC_PASIC3 is not set
- # CONFIG_MFD_TMIO is not set
-+# CONFIG_MFD_TC6393XB is not set
- # CONFIG_MEDIA_SUPPORT is not set
- 
- #
--- 
-1.6.0.6
-
-Leo Chen
+Regards,
+Hartley
