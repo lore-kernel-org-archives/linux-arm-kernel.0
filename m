@@ -1,35 +1,54 @@
-From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Fri, 9 Oct 2009 21:56:21 +0400
-Subject: [PATCH v2] irda/sa1100_ir: check return value of startup hook
-Message-ID: <mailman.60.1255119157.2253.linux-arm-kernel@lists.infradead.org>
+From: leochen@broadcom.com (Leo (Hao) Chen)
+Date: Fri, 9 Oct 2009 14:06:01 -0700
+Subject: [PATCH 0/8] bcmring: add gpio support
+Message-ID: <20091009210601.GA24641@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
----
- drivers/net/irda/sa1100_ir.c |    7 +++++--
- 1 files changed, 5 insertions(+), 2 deletions(-)
+Hi,
 
-diff --git a/drivers/net/irda/sa1100_ir.c b/drivers/net/irda/sa1100_ir.c
-index 38bf7cf..c412e80 100644
---- a/drivers/net/irda/sa1100_ir.c
-+++ b/drivers/net/irda/sa1100_ir.c
-@@ -232,8 +232,11 @@ static int sa1100_irda_startup(struct sa1100_irda *si)
- 	/*
- 	 * Ensure that the ports for this device are setup correctly.
- 	 */
--	if (si->pdata->startup)
--		si->pdata->startup(si->dev);
-+	if (si->pdata->startup)	{
-+		ret = si->pdata->startup(si->dev);
-+		if (ret)
-+			return ret;
-+	}
- 
- 	/*
- 	 * Configure PPC for IRDA - we want to drive TXD2 low.
+This patch set is to add gpio/gpiomux support for bcmring machine.
+Your comments are welcome.
+
+The summary of this patch set.
+
+[PATCH 1/8] add reg32_clear_bits and reg32_set_bits accessor functions
+[PATCH 2/8] add gpio support in Kconfig and Makefile for bcmring
+[PATCH 3/8] add gpio_to_irq and irq_to_gpio definitions
+[PATCH 4/8] add gpio.c and gpio_irq.c
+[PATCH 5/8] add gpio headers in include/mach
+[PATCH 6/8] add gpio headers in include/mach/csp directory.
+[PATCH 7/8] add gpio csp code and header
+[PATCH 8/8] modify bcmring_defconfig with gpio support
+
+
+ arch/arm/Kconfig                                   |    3 +-
+ arch/arm/configs/bcmring_defconfig                 |   29 +-
+ arch/arm/mach-bcmring/Makefile                     |    3 +-
+ arch/arm/mach-bcmring/csp/Makefile                 |    2 +
+ arch/arm/mach-bcmring/csp/gpio/Makefile            |    1 +
+ arch/arm/mach-bcmring/csp/gpio/gpioHw_pl061.c      |  192 ++++++
+ arch/arm/mach-bcmring/csp/gpiomux/Makefile         |    1 +
+ arch/arm/mach-bcmring/csp/gpiomux/gpiomux.c        |  669 ++++++++++++++++++++
+ arch/arm/mach-bcmring/gpio.c                       |  291 +++++++++
+ arch/arm/mach-bcmring/gpio_irq.c                   |  381 +++++++++++
+ arch/arm/mach-bcmring/include/csp/gpioHw.h         |  383 +++++++++++
+ arch/arm/mach-bcmring/include/csp/reg.h            |   14 +
+ .../mach-bcmring/include/mach/csp/gpioHw_inline.h  |  345 ++++++++++
+ .../arm/mach-bcmring/include/mach/csp/gpioHw_reg.h |  381 +++++++++++
+ arch/arm/mach-bcmring/include/mach/csp/gpiomux.h   |  221 +++++++
+ arch/arm/mach-bcmring/include/mach/gpio.h          |   22 +
+ arch/arm/mach-bcmring/include/mach/gpio_defs.h     |  102 +++
+ arch/arm/mach-bcmring/include/mach/gpio_irq.h      |   61 ++
+ arch/arm/mach-bcmring/include/mach/gpio_types.h    |   52 ++
+ arch/arm/mach-bcmring/include/mach/irqs.h          |    3 +
+ arch/arm/mach-bcmring/include/mach/reg_gpio.h      |  131 ++++
+ 21 files changed, 3283 insertions(+), 4 deletions(-)
+
+
 -- 
-1.6.3.4
 
+Leo Hao Chen
 
---opJtzjQTFsWo+cga--
+------------------------
+Life is short, run long.
