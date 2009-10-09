@@ -1,77 +1,112 @@
-From: dk-arm-linux@gmx.de (Dieter Kiermaier)
-Date: Fri, 9 Oct 2009 08:51:44 +0200
-Subject: [PATCH v2] OpenRD base: Initialize PCI express and i2c
-In-Reply-To: <20091009082645.7e37573d@marrow.netinsight.se>
-References: <200910081333.43065.dk-arm-linux@gmx.de>
-	<alpine.LFD.2.00.0910081337260.18779@xanadu.home>
-	<20091009082645.7e37573d@marrow.netinsight.se>
-Message-ID: <200910090851.44868.dk-arm-linux@gmx.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 9 Oct 2009 10:02:01 +0200
+Subject: [GIT PULL] omap fixes for v2.6.32-rc3
+In-Reply-To: <94a0d4530910081513w1a919dc2s50eca41966a2261d@mail.gmail.com>
+References: <20091007185112.GJ7899@atomide.com>
+	<94a0d4530910081429m7ad88b43q38245109f3252078@mail.gmail.com>
+	<20091008214140.GJ7417@atomide.com>
+	<94a0d4530910081513w1a919dc2s50eca41966a2261d@mail.gmail.com>
+Message-ID: <20091009080201.GB28096@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hello,
 
-I've tested you patch against 2.6.32-rc3 from Linus' tree and it works fine and applies without any issues.
-
-Without patch:
-h-3.2# uname -a
-Linux DB88FXX81 2.6.32-rc3-00256-g36a0790 #1 PREEMPT Fri Oct 9 08:44:33 CEST 2009 armv5tel GNU/Linux
-sh-3.2#
-sh-3.2#
-sh-3.2# lspci
-sh-3.2#
-
-with applied patch:
-
-sh-3.2# uname -a
-Linux DB88FXX81 2.6.32-rc3-00256-g36a0790-dirty #2 PREEMPT Fri Oct 9 08:47:02 CEST 2009 armv5tel GNU/Linux
-sh-3.2# lspci
-00:00.0 Class 0580: Device 11ab:6281 (rev 02)
-00:01.0 Class 0200: Device 10ec:8168 (rev 01)
-sh-3.2#
-
-Sorry for the silly question, but what have I do to ack it?
-
-Greetings,
-Dieter
-
-> Signed-off-by: Simon Kagstrom <simon.kagstrom@netinsight.net>
-> ---
-> Right now I don't have a PCI card to test with, so Dieter: could you
-> test the patch and ack it?
+On Fri, Oct 09, 2009 at 01:13:01AM +0300, Felipe Contreras wrote:
+> On Fri, Oct 9, 2009 at 12:41 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Felipe Contreras <felipe.contreras@gmail.com> [091008 14:29]:
+> >> On Wed, Oct 7, 2009 at 9:51 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >> > Linus,
+> >> >
+> >> > Please pull omap fixes from:
+> >> >
+> >> > git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+> >> >
+> >> > Regards,
+> >> >
+> >> > Tony
+> >> >
+> >> >
+> >> > The following changes since commit 374576a8b6f865022c0fd1ca62396889b23d66dd:
+> >> > ?Linus Torvalds (1):
+> >> > ? ? ? ?Linux 2.6.32-rc3
+> >> >
+> >> > are available in the git repository at:
+> >> >
+> >> > ?git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+> >> >
+> >> > Artem Bityutskiy (1):
+> >> > ? ? ?OMAP3: PM: introduce a new powerdomain walk helper
+> >> >
+> >> > Daniel Walker (1):
+> >> > ? ? ?omap: iovmm: Add missing mutex_unlock
+> >> >
+> >> > Hiroshi DOYU (1):
+> >> > ? ? ?omap: iovmm: Fix incorrect spelling
+> >> >
+> >> > Jon Hunter (1):
+> >> > ? ? ?OMAP3: PM: Prevent hang in prcm_interrupt_handler
+> >> >
+> >> > Kevin Hilman (1):
+> >> > ? ? ?OMAP3: PM: Enable GPIO module-level wakeups
+> >> >
+> >> > Paul Walmsley (2):
+> >> > ? ? ?OMAP3: PM: PRCM interrupt: check MPUGRPSEL register
+> >> > ? ? ?OMAP3: PM: PRCM interrupt: only handle selected PRCM interrupts
+> >> >
+> >> > Rajendra Nayak (1):
+> >> > ? ? ?omap: Lock DPLL5 at boot
+> >> >
+> >> > Sergio Aguirre (1):
+> >> > ? ? ?omapfb: Condition mutex acquisition
+> >> >
+> >> > Tommi Rantala (2):
+> >> > ? ? ?omapfb: Blizzard: fix pointer to be const
+> >> > ? ? ?omapfb: Blizzard: constify register address tables
+> >> >
+> >> > Tony Lindgren (2):
+> >> > ? ? ?omap: Fix incorrect 730 vs 850 detection
+> >> > ? ? ?Merge branch 'pm-fixes-32' of git://git.kernel.org/.../khilman/linux-omap-pm into omap-fixes-for-linus
+> >> >
+> >> > Vikram Pandita (1):
+> >> > ? ? ?OMAP3: PM: USBHOST: clear wakeup events on both hosts
+> >> >
+> >> > ye janboe (1):
+> >> > ? ? ?omap: SRAM: flush the right address after memcpy in omap_sram_push
+> >>
+> >> The beagleboard is still not booting for me with this branch, I need
+> >> to add these two patches:
+> >>
+> >> * http://patchwork.kernel.org/patch/50721/
+> >>
+> >
+> > This should go to the mainline kernel via Samuel as it's
+> > drivers/mfd related.
+> >
+> >> This one is needed because the defconfig has:
+> >> CONFIG_TWL4030_USB=y
+> >>
+> >> * http://patchwork.kernel.org/patch/50970/
+> >>
+> >> This is needed because most people boot from an MMC.
+> >
+> > And this should go in via the mmc list.
 > 
-> ChangeLog:
+> Should it?
 > 
-> v2:
->   * Rebase against 2.6.32
->   * Remove UART1 initialization (UART1 is not always present - either
->     the SD card or UART1 is selected)
-> 
->  arch/arm/mach-kirkwood/openrd_base-setup.c |   12 ++++++++++++
->  1 files changed, 12 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-kirkwood/openrd_base-setup.c b/arch/arm/mach-kirkwood/openrd_base-setup.c
-> index 947dfb8..77617c7 100644
-> --- a/arch/arm/mach-kirkwood/openrd_base-setup.c
-> +++ b/arch/arm/mach-kirkwood/openrd_base-setup.c
-> @@ -70,8 +70,20 @@ static void __init openrd_base_init(void)
->  	kirkwood_ge00_init(&openrd_base_ge00_data);
->  	kirkwood_sata_init(&openrd_base_sata_data);
->  	kirkwood_sdio_init(&openrd_base_mvsdio_data);
-> +
-> +	kirkwood_i2c_init();
->  }
->  
-> +static int __init openrd_base_pci_init(void)
-> +{
-> +	if (machine_is_openrd_base())
-> +		kirkwood_pcie_init();
-> +
-> +	return 0;
-> + }
-> +subsys_initcall(openrd_base_pci_init);
-> +
-> +
->  MACHINE_START(OPENRD_BASE, "Marvell OpenRD Base Board")
->  	/* Maintainer: Dhaval Vasa <dhaval.vasa@einfochips.com> */
->  	.phys_io	= KIRKWOOD_REGS_PHYS_BASE,
+> Here you can see Uwe Kleine-K?nig sending the original patch without
+> even CC'ing the mmc list:
+> http://marc.info/?l=linux-kernel&m=124820861213849&w=2
+Note these are different patches.  Mine fixes a section problem as the
+probe function used to live in .init.text but was still used with
+platform_driver_register.
+
+Other than that you can add my Acked-by: for "omap_hsmmc: Add missing
+probe handler hook to platform driver data".
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
