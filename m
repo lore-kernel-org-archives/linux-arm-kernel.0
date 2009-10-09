@@ -1,56 +1,63 @@
-From: alan-jenkins@tuffmail.co.uk (Alan Jenkins)
-Date: Fri,  9 Oct 2009 15:02:22 +0100
-Subject: [PATCH 6/6] ARM: newfpe can no longer be compiled as a module -
-	cleanup (part 2 of 2)
-In-Reply-To: <1255096942-10451-1-git-send-email-alan-jenkins@tuffmail.co.uk>
-References: <1255096942-10451-1-git-send-email-alan-jenkins@tuffmail.co.uk>
-Message-ID: <1255096942-10451-6-git-send-email-alan-jenkins@tuffmail.co.uk>
+From: alex@digriz.org.uk (Alexander Clouter)
+Date: Fri, 9 Oct 2009 15:05:08 +0100
+Subject: [PATCH] [ARM] kirkwood: combine support for openrd base/client
+	support
+In-Reply-To: <200910091600.45161.dk-arm-linux@gmx.de>
+References: <20091009123956.GA6085@chipmunk>
+	<200910091600.45161.dk-arm-linux@gmx.de>
+Message-ID: <20091009140508.GD6085@chipmunk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since fpmodule can no longer be removed, it doesn't need to save the old
-value of fp_enter.
+Hi,
 
-Also change module_init() to late_initcall() for consistency with
-vfp/vfpmodule.c.  That will move it one step later, after the device
-initcalls, but it will still run before /sbin/init.
+* Dieter Kiermaier <dk-arm-linux@gmx.de> [2009-10-09 16:00:44+0200]:
+>
+> [snipped]
+>
+> > +static void __init openrd_init(void)
+> > +{
+> > +	/*
+> > +	 * Basic setup. Needs to be called early.
+> > +	 */
+> > +	kirkwood_init();
+> > +	kirkwood_mpp_conf(openrd_mpp_config);
+> > +
+> > +	kirkwood_uart0_init();
+> > +	kirkwood_nand_init(ARRAY_AND_SIZE(openrd_nand_parts), 25);
+> > +
+> > +	kirkwood_ehci_init();
+> > +
+> > +	kirkwood_ge00_init(&openrd_ge00_data);
+> > +#ifdef CONFIG_MACH_OPENRD_CLIENT
+> > +	if (machine_is_openrd_client())
+> > +		kirkwood_ge01_init(&openrd_ge01_data);
+> > +#endif
+> 
+> shouldn't it be enough to have the if(machine_is.... statement?
+> I didn't see why you test #ifdef, too?
+>
+the struct 'openrd_ge01_data' is wrapped in 
+#ifdef CONFIG_MACH_OPENRD_CLIENT too and only exists if you want the 
+board support for it.  So although machine_is_openrd_client() will 
+exist, the compiler will barf that openrd_ge01_data does not exist; the 
+alternative is to have it grumble (when you do not want the Client 
+support) that there is an un-used struct floating about.
 
-Build tested only.
+I was under the impression the latter is considered worse than the 
+former, I personally am not bothered either way.
+ 
+> Additionally it would be nice, if you could integrate the i2c / pcie 
+> init in your patch? Please see Simons patch at:
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2009-October/001950.html
+> 
+I knew someone was going to say that :)  Will do though, so 'watch this 
+space'.
 
-Signed-off-by: Alan Jenkins <alan-jenkins@tuffmail.co.uk>
----
- arch/arm/nwfpe/fpmodule.c |    8 ++------
- 1 files changed, 2 insertions(+), 6 deletions(-)
+Cheers
 
-diff --git a/arch/arm/nwfpe/fpmodule.c b/arch/arm/nwfpe/fpmodule.c
-index 9a21f35..296a5b5 100644
---- a/arch/arm/nwfpe/fpmodule.c
-+++ b/arch/arm/nwfpe/fpmodule.c
-@@ -65,9 +65,6 @@ static struct notifier_block nwfpe_notifier_block = {
- /* external declarations for saved kernel symbols */
- extern void (*fp_enter)(void);
- 
--/* Original value of fp_enter from kernel before patched by fpe_init. */
--static void (*orig_fp_enter)(void);
--
- /* forward declarations */
- extern void nwfpe_enter(void);
- 
-@@ -91,8 +88,7 @@ static int __init fpe_init(void)
- 
- 	thread_register_notifier(&nwfpe_notifier_block);
- 
--	/* Save pointer to the old FP handler and then patch ourselves in */
--	orig_fp_enter = fp_enter;
-+	/* Patch ourselves in as the FP handler. */
- 	fp_enter = nwfpe_enter;
- 
- 	return 0;
-@@ -155,4 +151,4 @@ void float_raise(signed char flags)
- 		send_sig(SIGFPE, current, 1);
- }
- 
--module_init(fpe_init);
-+late_initcall(fpe_init);
 -- 
-1.6.3.2
+Alexander Clouter
+.sigmonster says: Vini, vidi, Linux!
+                  		-- Unknown source
