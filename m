@@ -1,112 +1,29 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 9 Oct 2009 10:02:01 +0200
-Subject: [GIT PULL] omap fixes for v2.6.32-rc3
-In-Reply-To: <94a0d4530910081513w1a919dc2s50eca41966a2261d@mail.gmail.com>
-References: <20091007185112.GJ7899@atomide.com>
-	<94a0d4530910081429m7ad88b43q38245109f3252078@mail.gmail.com>
-	<20091008214140.GJ7417@atomide.com>
-	<94a0d4530910081513w1a919dc2s50eca41966a2261d@mail.gmail.com>
-Message-ID: <20091009080201.GB28096@pengutronix.de>
+From: mail@roese.nl (Stefan Roese)
+Date: Fri, 9 Oct 2009 10:25:20 +0200
+Subject: New Samsung ARM git tree branches / moving forward
+In-Reply-To: <20090828082451.GG9822@prithivi.gnumonks.org>
+References: <20090828082451.GG9822@prithivi.gnumonks.org>
+Message-ID: <200910091025.20411.mail@roese.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, Oct 09, 2009 at 01:13:01AM +0300, Felipe Contreras wrote:
-> On Fri, Oct 9, 2009 at 12:41 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Felipe Contreras <felipe.contreras@gmail.com> [091008 14:29]:
-> >> On Wed, Oct 7, 2009 at 9:51 PM, Tony Lindgren <tony@atomide.com> wrote:
-> >> > Linus,
-> >> >
-> >> > Please pull omap fixes from:
-> >> >
-> >> > git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-> >> >
-> >> > Regards,
-> >> >
-> >> > Tony
-> >> >
-> >> >
-> >> > The following changes since commit 374576a8b6f865022c0fd1ca62396889b23d66dd:
-> >> > ?Linus Torvalds (1):
-> >> > ? ? ? ?Linux 2.6.32-rc3
-> >> >
-> >> > are available in the git repository at:
-> >> >
-> >> > ?git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-> >> >
-> >> > Artem Bityutskiy (1):
-> >> > ? ? ?OMAP3: PM: introduce a new powerdomain walk helper
-> >> >
-> >> > Daniel Walker (1):
-> >> > ? ? ?omap: iovmm: Add missing mutex_unlock
-> >> >
-> >> > Hiroshi DOYU (1):
-> >> > ? ? ?omap: iovmm: Fix incorrect spelling
-> >> >
-> >> > Jon Hunter (1):
-> >> > ? ? ?OMAP3: PM: Prevent hang in prcm_interrupt_handler
-> >> >
-> >> > Kevin Hilman (1):
-> >> > ? ? ?OMAP3: PM: Enable GPIO module-level wakeups
-> >> >
-> >> > Paul Walmsley (2):
-> >> > ? ? ?OMAP3: PM: PRCM interrupt: check MPUGRPSEL register
-> >> > ? ? ?OMAP3: PM: PRCM interrupt: only handle selected PRCM interrupts
-> >> >
-> >> > Rajendra Nayak (1):
-> >> > ? ? ?omap: Lock DPLL5 at boot
-> >> >
-> >> > Sergio Aguirre (1):
-> >> > ? ? ?omapfb: Condition mutex acquisition
-> >> >
-> >> > Tommi Rantala (2):
-> >> > ? ? ?omapfb: Blizzard: fix pointer to be const
-> >> > ? ? ?omapfb: Blizzard: constify register address tables
-> >> >
-> >> > Tony Lindgren (2):
-> >> > ? ? ?omap: Fix incorrect 730 vs 850 detection
-> >> > ? ? ?Merge branch 'pm-fixes-32' of git://git.kernel.org/.../khilman/linux-omap-pm into omap-fixes-for-linus
-> >> >
-> >> > Vikram Pandita (1):
-> >> > ? ? ?OMAP3: PM: USBHOST: clear wakeup events on both hosts
-> >> >
-> >> > ye janboe (1):
-> >> > ? ? ?omap: SRAM: flush the right address after memcpy in omap_sram_push
-> >>
-> >> The beagleboard is still not booting for me with this branch, I need
-> >> to add these two patches:
-> >>
-> >> * http://patchwork.kernel.org/patch/50721/
-> >>
-> >
-> > This should go to the mainline kernel via Samuel as it's
-> > drivers/mfd related.
-> >
-> >> This one is needed because the defconfig has:
-> >> CONFIG_TWL4030_USB=y
-> >>
-> >> * http://patchwork.kernel.org/patch/50970/
-> >>
-> >> This is needed because most people boot from an MMC.
-> >
-> > And this should go in via the mmc list.
+On Friday 28 August 2009 10:24:51 Harald Welte wrote:
+> On Fri, Aug 28, 2009 at 12:19:49PM +0900, Harald Welte wrote:
+> > I hope later today we can push that tree to git.kernel.org.
+> > Anyone who's
+> > interested can then look at it and see that it is far from being
+> > optimal.
 > 
-> Should it?
-> 
-> Here you can see Uwe Kleine-K?nig sending the original patch without
-> even CC'ing the mmc list:
-> http://marc.info/?l=linux-kernel&m=124820861213849&w=2
-Note these are different patches.  Mine fixes a section problem as the
-probe function used to live in .init.text but was still used with
-platform_driver_register.
+> This has been done now.  The public git tree at
+> git://git.kernel.org/pub/scm/linux/kernel/git/kki_ap/linux-2.6-samsung.git
+> contains the latest sources from the Samsung LSI Linux kernel team.  The
+>  tree will be updated once per day to reflect the development inside the
+>  Samsung team.
 
-Other than that you can add my Acked-by: for "omap_hsmmc: Add missing
-probe handler hook to platform driver data".
+Unfortunately this git repository doesn't exist any more. I'm wondering why 
+it was removed? Is there a replacement somewhere? What's the plan here?
 
-Best regards
-Uwe
+Thanks.
 
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Cheers,
+Stefan
