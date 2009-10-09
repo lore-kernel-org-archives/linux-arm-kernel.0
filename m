@@ -1,30 +1,21 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 9 Oct 2009 14:35:14 -0400
-Subject: [PATCH] CPU_ARM920T: remove dead Maverick EP9312 URL
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901DB7DBA@mi8nycmail19.Mi8.com>
+From: peter@peter-teichmann.de (Peter Teichmann)
+Date: Fri, 9 Oct 2009 21:31:17 +0200
+Subject: Some light on FastFPE
+In-Reply-To: <39811fe10910061822v1bd2082fw65aedf461b6468aa@mail.gmail.com>
+References: <39811fe10910061822v1bd2082fw65aedf461b6468aa@mail.gmail.com>
+Message-ID: <200910092131.17770.peter@peter-teichmann.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the URL listed for Maverick EP9312 since it is not available
-and modify the help text appropriately.
+Am Wednesday 07 October 2009 03:22:28 schrieb Jacky Lam:
+> Dear All,
+>
+> 	Could anyone point me some light on how to get the current source code
+> of FastFPE?
 
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+I do not have access to the most recent version presently, but version 0.95 
+is available at:
 
----
+http://www.peter-teichmann.de/download/fastfpe_0.95.tar.bz2
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index e993140..9264d81 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -122,10 +122,7 @@ config CPU_ARM920T
- 	select CPU_TLB_V4WBI if MMU
- 	help
- 	  The ARM920T is licensed to be produced by numerous vendors,
--	  and is used in the Maverick EP9312 and the Samsung S3C2410.
--
--	  More information on the Maverick EP9312 at
--	  <http://linuxdevices.com/products/PD2382866068.html>.
-+	  and is used in the Cirrus EP93xx and the Samsung S3C2410.
- 
- 	  Say Y if you want support for the ARM920T processor.
- 	  Otherwise, say N. 
+Peter
