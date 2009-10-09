@@ -1,32 +1,38 @@
 From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Fri,  9 Oct 2009 11:25:53 +0400
-Subject: [PATCH] irda/sa1100_ir: check return value of startup hook
-Message-ID: <1255073153-24962-1-git-send-email-mad_soft@inbox.ru>
+Date: Fri,  9 Oct 2009 12:18:49 +0400
+Subject: [PATCH] mtd: maps/sa1100: fix section mismatch
+Message-ID: <1255076329-15065-1-git-send-email-mad_soft@inbox.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Commit f0b1e589 changed sa1100_mtd_probe from __init to __devinit,
+but missed to correct sa1100_setup_mtd definition accordingly, which
+causes following warning:
+
+WARNING: vmlinux.o(.devinit.text+0xf4): Section mismatch in reference from
+ the function sa1100_mtd_probe() to the function .init.text:sa1100_setup_mtd()
+The function __devinit sa1100_mtd_probe() references
+a function __init sa1100_setup_mtd().
+If sa1100_setup_mtd is only used by sa1100_mtd_probe then
+annotate sa1100_setup_mtd with a matching annotation.
+
 Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
 ---
- drivers/net/irda/sa1100_ir.c |    7 +++++--
- 1 files changed, 5 insertions(+), 2 deletions(-)
+ drivers/mtd/maps/sa1100-flash.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/net/irda/sa1100_ir.c b/drivers/net/irda/sa1100_ir.c
-index 38bf7cf..df5db2d 100644
---- a/drivers/net/irda/sa1100_ir.c
-+++ b/drivers/net/irda/sa1100_ir.c
-@@ -232,8 +232,11 @@ static int sa1100_irda_startup(struct sa1100_irda *si)
- 	/*
- 	 * Ensure that the ports for this device are setup correctly.
- 	 */
--	if (si->pdata->startup)
--		si->pdata->startup(si->dev);
-+	if (si->pdata->startup)	{
-+		ret = si->pdata->startup(si->dev);
-+		if (ret)
-+			return ret;
-+		}
+diff --git a/drivers/mtd/maps/sa1100-flash.c b/drivers/mtd/maps/sa1100-flash.c
+index fdb97f3..b1cf17b 100644
+--- a/drivers/mtd/maps/sa1100-flash.c
++++ b/drivers/mtd/maps/sa1100-flash.c
+@@ -248,7 +248,7 @@ static void sa1100_destroy(struct sa_info *info, struct flash_platform_data *pla
+ 		plat->exit();
+ }
  
- 	/*
- 	 * Configure PPC for IRDA - we want to drive TXD2 low.
+-static struct sa_info *__init
++static struct sa_info *__devinit
+ sa1100_setup_mtd(struct platform_device *pdev, struct flash_platform_data *plat)
+ {
+ 	struct sa_info *info;
 -- 
 1.6.3.4
