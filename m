@@ -1,34 +1,32 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri,  9 Oct 2009 12:20:21 +0200
-Subject: [PATCH TRIVIAL] atmel_lcdfb.c: Fix sinfo->irqbase from %lu to %d in
-	dev_info().
-Message-ID: <1255083621-25147-1-git-send-email-nicolas.ferre@atmel.com>
+From: mad_soft@inbox.ru (Dmitry Artamonow)
+Date: Fri,  9 Oct 2009 11:25:53 +0400
+Subject: [PATCH] irda/sa1100_ir: check return value of startup hook
+Message-ID: <1255073153-24962-1-git-send-email-mad_soft@inbox.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Claudio Scordino <claudio@evidence.eu.com>
-
-This patch fixes a type mismatch when calling dev_info() in the
-atmel_lcdfb.c driver.
-
-Signed-off-by: Claudio Scordino <claudio@evidence.eu.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
 ---
- drivers/video/atmel_lcdfb.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/net/irda/sa1100_ir.c |    7 +++++--
+ 1 files changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
-index 2830ffd..317afab 100644
---- a/drivers/video/atmel_lcdfb.c
-+++ b/drivers/video/atmel_lcdfb.c
-@@ -959,7 +959,7 @@ static int __init atmel_lcdfb_probe(struct platform_device *pdev)
- 	if (sinfo->atmel_lcdfb_power_control)
- 		sinfo->atmel_lcdfb_power_control(1);
+diff --git a/drivers/net/irda/sa1100_ir.c b/drivers/net/irda/sa1100_ir.c
+index 38bf7cf..df5db2d 100644
+--- a/drivers/net/irda/sa1100_ir.c
++++ b/drivers/net/irda/sa1100_ir.c
+@@ -232,8 +232,11 @@ static int sa1100_irda_startup(struct sa1100_irda *si)
+ 	/*
+ 	 * Ensure that the ports for this device are setup correctly.
+ 	 */
+-	if (si->pdata->startup)
+-		si->pdata->startup(si->dev);
++	if (si->pdata->startup)	{
++		ret = si->pdata->startup(si->dev);
++		if (ret)
++			return ret;
++		}
  
--	dev_info(dev, "fb%d: Atmel LCDC at 0x%08lx (mapped at %p), irq %lu\n",
-+	dev_info(dev, "fb%d: Atmel LCDC at 0x%08lx (mapped at %p), irq %d\n",
- 		       info->node, info->fix.mmio_start, sinfo->mmio, sinfo->irq_base);
- 
- 	return 0;
+ 	/*
+ 	 * Configure PPC for IRDA - we want to drive TXD2 low.
 -- 
-1.5.6.5
+1.6.3.4
