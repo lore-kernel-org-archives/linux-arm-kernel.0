@@ -1,32 +1,36 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 9 Oct 2009 10:54:43 +0200
-Subject: One MXC patch for -rc
-In-Reply-To: <1255018344-17197-1-git-send-email-valentin.longchamp@epfl.ch>
-References: <1255018344-17197-1-git-send-email-valentin.longchamp@epfl.ch>
-Message-ID: <20091009085443.GF30719@pengutronix.de>
+From: laforge@gnumonks.org (Harald Welte)
+Date: Fri, 9 Oct 2009 10:51:08 +0200
+Subject: New Samsung ARM git tree branches / moving forward
+In-Reply-To: <200910091025.20411.mail@roese.nl>
+References: <20090828082451.GG9822@prithivi.gnumonks.org>
+	<200910091025.20411.mail@roese.nl>
+Message-ID: <20091009085108.GO7910@prithivi.gnumonks.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Valentin,
-
-On Thu, Oct 08, 2009 at 06:12:23PM +0200, Valentin Longchamp wrote:
-> I had sent this patch in August and since it is quite trivial, very
-> useful and was already reviewed, it would be nice to include it for -rc4.
-
-Yes, will do. I was about to prepare a patch myself, so thank you :)
-
+On Fri, Oct 09, 2009 at 10:25:20AM +0200, Stefan Roese wrote:
+> On Friday 28 August 2009 10:24:51 Harald Welte wrote:
+> > On Fri, Aug 28, 2009 at 12:19:49PM +0900, Harald Welte wrote:
+> > > I hope later today we can push that tree to git.kernel.org.
+> > > Anyone who's
+> > > interested can then look at it and see that it is far from being
+> > > optimal.
+> > 
+> > This has been done now.  The public git tree at
+> > git://git.kernel.org/pub/scm/linux/kernel/git/kki_ap/linux-2.6-samsung.git
+> > contains the latest sources from the Samsung LSI Linux kernel team.  The
+> >  tree will be updated once per day to reflect the development inside the
+> >  Samsung team.
 > 
-> Btw Sascha, you have not updated your mxc git tree in a while. Do you
-> still want to do it or the prefered reference branch for MXC that now
-> most of things are in place is Linus's master branch (as for ARM) ?
+> Unfortunately this git repository doesn't exist any more. I'm wondering why 
+> it was removed? Is there a replacement somewhere? What's the plan here?
 
-The tree is de facto empty. I haven't updated it, but all patches are in
-mainline now.
+There was an accident, please stay tuned, Samsung and myself are working on
+restoring it.
 
-Sascha
-
+Regards,
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+- Harald Welte <laforge@gnumonks.org>           http://laforge.gnumonks.org/
+============================================================================
+"Privacy in residential applications is a desirable marketing option."
+                                                  (ETSI EN 300 175-7 Ch. A6)
