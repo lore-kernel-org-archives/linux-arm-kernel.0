@@ -1,38 +1,49 @@
-From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Fri,  9 Oct 2009 12:18:49 +0400
-Subject: [PATCH] mtd: maps/sa1100: fix section mismatch
-Message-ID: <1255076329-15065-1-git-send-email-mad_soft@inbox.ru>
+From: albin.tonnerre@free-electrons.com (Albin Tonnerre)
+Date: Fri, 9 Oct 2009 12:53:30 +0200
+Subject: [PATCH v2] Add cpuidle support for at91
+In-Reply-To: <4AC35582.8000404@atmel.com>
+References: <1247680190-19674-1-git-send-email-albin.tonnerre@free-electrons.com>
+	<200908111200.58866.marc.pignat@hevs.ch>
+	<20090812165700.GC4051@pc-ras4041.res.insa>
+	<200908130858.47487.marc.pignat@hevs.ch>
+	<20090813193241.GA5985@pc-ras4041.res.insa>
+	<20090909151417.GA4014@pc-ras4041.res.insa>
+	<4AC2168B.60903@atmel.com> <20090930123449.GB3238@laptop>
+	<4AC35582.8000404@atmel.com>
+Message-ID: <20091009105330.GA2191@pc-ran3241.res.insa>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit f0b1e589 changed sa1100_mtd_probe from __init to __devinit,
-but missed to correct sa1100_setup_mtd definition accordingly, which
-causes following warning:
+On Wed, 30 Sep 2009 14:56 +0200, Nicolas Ferre wrote :
+> Albin Tonnerre :
+>  >> Just one precision: what is the difference, entering state0 with only
+> >> the current cpu_do_idle() that is activated by default ?
+> > 
+> > Sorry, I don't get what you mean. Would you mind elaborating a bit?
+> 
+> I guess that during idle time, even without the cpuidle infrastructure,
+> the SOC enters arch_idle() that calls cpu_do_idle().
+> 
+> So, now that I have your patch applied, I wonder what is the difference
+> between the old situation and the first state of the cpuidle table.
+> 
+> In other words, only state "wait-for-interrupt *and* RAM self refresh"
+> brings some more power saving. Indeed, cpu_do_idle() that correspond to
+> the "WFI" state was already the way of dealing with idle cpu, even
+> without your patch. Am I correct ?
 
-WARNING: vmlinux.o(.devinit.text+0xf4): Section mismatch in reference from
- the function sa1100_mtd_probe() to the function .init.text:sa1100_setup_mtd()
-The function __devinit sa1100_mtd_probe() references
-a function __init sa1100_setup_mtd().
-If sa1100_setup_mtd is only used by sa1100_mtd_probe then
-annotate sa1100_setup_mtd with a matching annotation.
+Indeed, only the second mode brings us some gain.
 
-Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
----
- drivers/mtd/maps/sa1100-flash.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/mtd/maps/sa1100-flash.c b/drivers/mtd/maps/sa1100-flash.c
-index fdb97f3..b1cf17b 100644
---- a/drivers/mtd/maps/sa1100-flash.c
-+++ b/drivers/mtd/maps/sa1100-flash.c
-@@ -248,7 +248,7 @@ static void sa1100_destroy(struct sa_info *info, struct flash_platform_data *pla
- 		plat->exit();
- }
- 
--static struct sa_info *__init
-+static struct sa_info *__devinit
- sa1100_setup_mtd(struct platform_device *pdev, struct flash_platform_data *plat)
- {
- 	struct sa_info *info;
+Regards,
 -- 
-1.6.3.4
+Albin Tonnerre, Free Electrons
+Kernel, drivers and embedded Linux development,
+consulting, training and support.
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 835 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091009/20844aa2/attachment.sig>
