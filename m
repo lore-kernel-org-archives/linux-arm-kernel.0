@@ -1,20 +1,26 @@
-From: tbm@cyrius.com (Martin Michlmayr)
-Date: Fri, 9 Oct 2009 13:32:28 +0100
-Subject: DNS-323 rev B1 support not complete yet
-Message-ID: <20091009123228.GF4292@deprecation.cyrius.com>
+From: alan-jenkins@tuffmail.co.uk (Alan Jenkins)
+Date: Fri, 09 Oct 2009 14:48:00 +0100
+Subject: [PATCH] ARM: unexport symbols used to implement floating point
+	emulation
+Message-ID: <4ACF3F10.9040907@tuffmail.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Erik,
+Hi again,
 
-You posted some patches to improve support for the DNS-323 rev B1 a
-while ago.  Did you have time to work on those patches in the
-meantime?
+Same deal as before - I'd like to have your Acked-by on this patch so I
+can submit it as part of a series to Rusty.   It should be the last
+ARM-specific issue, although I haven't finished the series yet so I
+could be wrong.
 
-If I'm not mistaken, there are still two issues left at the moment:
- - The power LED will blink all the time
- - The machine doesn't power off correctly.
+This time I removed the the offending feature, since it appears unused. 
+I'm hoping you can confirm this :-).
 
--- 
-Martin Michlmayr
-http://www.cyrius.com/
+While I was looking, I found a few other cleanup opportunities.  They're
+independent from my needs, so I'll submit them separately for inclusion
+in the ARM tree.
+
+Thanks
+Alan
+
+-------------------------------->
