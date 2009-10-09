@@ -1,38 +1,26 @@
-From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Fri, 09 Oct 2009 16:14:52 +0400
-Subject: [PATCH] irda/sa1100_ir: check return value of startup hook
-In-Reply-To: <1255073153-24962-1-git-send-email-mad_soft@inbox.ru>
-References: <1255073153-24962-1-git-send-email-mad_soft@inbox.ru>
-Message-ID: <4ACF293C.7070803@ru.mvista.com>
+From: alex@digriz.org.uk (Alexander Clouter)
+Date: Fri, 9 Oct 2009 13:41:44 +0100
+Subject: [PATCH] [ARM] kirkwood: combine support for openrd base/client
+	support
+In-Reply-To: <20091009123956.GA6085@chipmunk>
+References: <20091009123956.GA6085@chipmunk>
+Message-ID: <20091009124144.GB6085@chipmunk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi,
 
-Dmitry Artamonow wrote:
+* Alexander Clouter <alex@digriz.org.uk> [2009-10-09 13:39:56+0100]:
+>
+> Based on the work done by Dhaval Vasa to add OpenRD Base support (and 
+> the unmerged Client) support, this patch adds support for the 
+> Kirkwood OpenRD Client board.
+> 
+I should say this patch has only been testing on the OpenRD Client as I 
+do not have the Base board available to tinker with.
 
-> Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
-[...]
-> diff --git a/drivers/net/irda/sa1100_ir.c b/drivers/net/irda/sa1100_ir.c
-> index 38bf7cf..df5db2d 100644
-> --- a/drivers/net/irda/sa1100_ir.c
-> +++ b/drivers/net/irda/sa1100_ir.c
-> @@ -232,8 +232,11 @@ static int sa1100_irda_startup(struct sa1100_irda *si)
->  	/*
->  	 * Ensure that the ports for this device are setup correctly.
->  	 */
-> -	if (si->pdata->startup)
-> -		si->pdata->startup(si->dev);
-> +	if (si->pdata->startup)	{
-> +		ret = si->pdata->startup(si->dev);
-> +		if (ret)
-> +			return ret;
-> +		}
+Cheers
 
-    Overindented brace.
-
->  
->  	/*
->  	 * Configure PPC for IRDA - we want to drive TXD2 low.
-
-WBR, Sergei
+-- 
+Alexander Clouter
+.sigmonster says: Money is better than poverty, if only for financial reasons.
