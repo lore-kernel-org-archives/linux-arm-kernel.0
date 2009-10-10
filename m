@@ -1,59 +1,41 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 9 Oct 2009 20:38:46 -0400
-Subject: 2.6.32-rc3/sparsemem: kernel BUG at mm/bootmem.c:243
-In-Reply-To: <4ACFC458.7080307@techworks.ie>
-References: <4ACFC458.7080307@techworks.ie>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901DB7E33@mi8nycmail19.Mi8.com>
+From: alan-jenkins@tuffmail.co.uk (Alan Jenkins)
+Date: Sat, 10 Oct 2009 09:41:08 +0100
+Subject: [PATCH 4/6] ARM: remove references to non-existent fastfpe
+In-Reply-To: <20091009165513.GA5902@n2100.arm.linux.org.uk>
+References: <1255096942-10451-1-git-send-email-alan-jenkins@tuffmail.co.uk>
+	<1255096942-10451-4-git-send-email-alan-jenkins@tuffmail.co.uk>
+	<20091009165513.GA5902@n2100.arm.linux.org.uk>
+Message-ID: <4AD048A4.1070805@tuffmail.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, October 09, 2009 4:17 PM, Christian Gagneraud wrote:
-> Hi,
-> 
-> I've rebased my tree to 2.6.32-rc3, and apply the patch for sparsemem
-> support (ts72xx) + the fix in mm/Kconfig, and now the kernel refuse to
-> boot. Any hint is greatly appreciated
+Russell King - ARM Linux wrote:
+> On Fri, Oct 09, 2009 at 03:02:20PM +0100, Alan Jenkins wrote:
+>   
+>> 	# Do we have FASTFPE?
+>> 	FASTFPE		:=arch/arm/fastfpe
+>> 	ifeq ($(FASTFPE),$(wildcard $(FASTFPE)))
+>> 	FASTFPE_OBJ	:=$(FASTFPE)/
+>> 	endif
+>> 	fastfpe
+>>
+>> We don't have FASTFPE.  If this code still exists out of tree, it can
+>> surely maintain its own Makefile and Kconfig entries.  Let's not confuse
+>> users by allowing them to select FASTFPE, and then silently not building
+>> it.
+>>     
+>
+> The code is not maintained anymore, but can just be slotted in (as per
+> the recent request on the mailing list.)  I'd rather not have the
+> hastle of maintaining fastfpe patches thank you.
+>   
 
-I'm not the best one to interpret the log but you are hitting a BUG()
-in __free() (mm/bootmem.c).
+Urk. The fine balancing act of limbo. Another possibility would be to 
+provide a stub
 
-To start with are the ATAGS describing your memory being propery passed
-by the bootloader?
+#error "fastfpe not included; disable it or download it"
 
-Try applying this patch to see what the kernel thinks your memory
-actually is.  On my ep9307 system I get:
+But if you want to just leave it, that's obviously your decision to make.
 
-CPU: ARM920T [41129200] revision 0 (ARMv4T), cr=c0007177
-CPU: VIVT data cache, VIVT instruction cache
-Machine: Vision Engraving Systems EP9307 SoM
-arm_add_memory: start:0xc0000000 size:0x2000000 node:0
-arm_add_memory: start:0xc4000000 size:0x2000000 node:0
-Memory policy: ECC disabled, Data cache writeback
-Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 16192
-Kernel command line: root=/dev/ram console=ttyAM2 video=ep93xx-fb:640x480-16 at 60
-PID hash table entries: 256 (order: 8, 1024 bytes)
-Dentry cache hash table entries: 8192 (order: 3, 32768 bytes)
-Inode-cache hash table entries: 4096 (order: 2, 16384 bytes)
-Memory: 32MB 32MB = 64MB total
-
-This is with flatmem not sparsemem.  I have 64MB total with 32MB at 0xc0000000
-and 32MB at 0xc4000000.
-
-Regards,
-Hartley
-
----
-
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index c6c57b6..1c3d665 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -410,6 +410,8 @@ static int __init arm_add_memory(unsigned long start, unsigned long size)
- 		return -EINVAL;
- 
- 	meminfo.nr_banks++;
-+	printk("%s: start:%#lx size:%#lx node:%d\n",
-+		__func__, bank->start, bank->size, bank->node);
- 	return 0;
- }
-  
+Regards
+Alan
