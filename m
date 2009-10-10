@@ -1,57 +1,42 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Sat, 10 Oct 2009 18:28:41 +0200
-Subject: [PATCH] s3c64xx: Add gpio_to_irq() support for EINTx
-Message-ID: <b2e8f9f70910100928j6622b2d3ia1beb16d2378e2fa@mail.gmail.com>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Sat, 10 Oct 2009 09:56:43 -0700
+Subject: [PATCH 7/8] bcmring: add gpio csp code and header
+In-Reply-To: <20091010092841.GA23492@n2100.arm.linux.org.uk>
+References: <20091009211317.GF24851@broadcom.com>,
+	<20091010092841.GA23492@n2100.arm.linux.org.uk>
+Message-ID: <9383297B60843144AC17878B479520F110AE9A6EE6@SJEXCHCCR01.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add gpio_to_irq() support for all individual external interrupts to s3c64xx
+Hi Russell,
 
-Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
----
- arch/arm/plat-s3c64xx/gpiolib.c |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+If existing code exists for blocks we certainly do not want add the same code into the kernel.  That just means more code we need to support rather than leveraging existing code.
 
-diff --git a/arch/arm/plat-s3c64xx/gpiolib.c b/arch/arm/plat-s3c64xx/gpiolib.c
-index 9285929..7785604 100644
---- a/arch/arm/plat-s3c64xx/gpiolib.c
-+++ b/arch/arm/plat-s3c64xx/gpiolib.c
-@@ -213,6 +213,11 @@ static struct s3c_gpio_cfg gpio_4bit_cfg_eint0011 = {
- 	.get_pull	= s3c_gpio_getpull_updown,
- };
+The only variances we have in our GPIO code vs. standard kernel code are:
+1)  We have GPIO's in the PL061 as well as on co-processor(s).  These are all supported through the gpiolib infrastructure transparently.  How it all fits together in our GPIO driver I'll have to look at.
+2)  We have pin mux'ing of the GPIO's as well as a reservation mechanism so that a pin already requested for a certain purpose can not be rededicated for other purposes until it is released.  This has proved quite useful in catching driver conflicts and use case scenarios.
 
-+int s3c64xx_gpio2int_gpm(struct gpio_chip *chip, unsigned pin)
-+{
-+	return pin < 5 ? IRQ_EINT(23) + pin : -ENXIO;
-+}
-+
- static struct s3c_gpio_chip gpio_4bit[] = {
- 	{
- 		.base	= S3C64XX_GPA_BASE,
-@@ -269,10 +274,16 @@ static struct s3c_gpio_chip gpio_4bit[] = {
- 			.base	= S3C64XX_GPM(0),
- 			.ngpio	= S3C64XX_GPIO_M_NR,
- 			.label	= "GPM",
-+			.to_irq = s3c64xx_gpio2int_gpm,
- 		},
- 	},
- };
+We'll investigate the PL061 driver and see how this all fits together.  Hopefully it does.  I do see a lot of pin mux'ing code in various arch directories, but I do not see a common mechanism in the kernel to handle this.  It's probably something useful to handle in the future.  The problem right now is there are multiple models implemented for this with varying requirements.
 
-+int s3c64xx_gpio2int_gpl(struct gpio_chip *chip, unsigned pin)
-+{
-+	return pin >= 8 ? IRQ_EINT(16) + pin - 8 : -ENXIO;
-+}
-+
- static struct s3c_gpio_chip gpio_4bit2[] = {
- 	{
- 		.base	= S3C64XX_GPH_BASE + 0x4,
-@@ -297,6 +308,7 @@ static struct s3c_gpio_chip gpio_4bit2[] = {
- 			.base	= S3C64XX_GPL(0),
- 			.ngpio	= S3C64XX_GPIO_L_NR,
- 			.label	= "GPL",
-+			.to_irq = s3c64xx_gpio2int_gpl,
- 		},
- 	},
- };
--- 
-1.6.3.3
+Any other suggestions are appreciated.
+
+Thanks.
+ Scott
+
+________________________________________
+From: linux-arm-kernel-bounces@lists.infradead.org [linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Russell King - ARM Linux [linux at arm.linux.org.uk]
+Sent: October 10, 2009 2:28 AM
+To: Leo (Hao) Chen
+Cc: linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH 7/8] bcmring: add gpio csp code and header
+
+Why do you require this driver?  We already have a PL061 GPIO driver
+in the kernel tree using the kernel's gpiolib infrastructure.
+
+I hope this CSP stuff doesn't mean that you're going to have to duplicate
+almost every kernel driver...
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
