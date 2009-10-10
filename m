@@ -1,24 +1,18 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 10 Oct 2009 19:03:19 +0100
-Subject: [PATCH 7/8] bcmring: add gpio csp code and header
-In-Reply-To: <9383297B60843144AC17878B479520F110AE9A6EE6@SJEXCHCCR01.corp.ad.broadcom.com>
-References: <20091010092841.GA23492@n2100.arm.linux.org.uk>
-	<9383297B60843144AC17878B479520F110AE9A6EE6@SJEXCHCCR01.corp.ad.broadcom.com>
-Message-ID: <20091010180319.GA28716@n2100.arm.linux.org.uk>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Sat, 10 Oct 2009 23:05:50 +0200
+Subject: memory hotplug and hotremove on ARM
+In-Reply-To: <20091009230236.GS10587@labbmf-linux.quicinc.com>
+References: <20091009230236.GS10587@labbmf-linux.quicinc.com>
+Message-ID: <63386a3d0910101405w727481bdga8e2704e7892d7d7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 10, 2009 at 09:56:43AM -0700, Scott Branden wrote:
-> I do see a lot of pin mux'ing code in various arch
-> directories, but I do not see a common mechanism in the kernel to handle
-> this.
+2009/10/10 Larry Bassel <lbassel@quicinc.com>:
 
-Pin muxing seems to be very SoC specific, and so it is not covered by
-a common implementation (yet).
+> I'd like any feedback people have on how I'm approaching this and
+> if there are any alternate approaches I should consider.
 
-Also, experience shows us that drivers should not be doing any pin
-muxing operations themselves - the best place for that appears to be
-the board support code itself, which knows how the board is wired up.
-In addition, there are SoCs where putting pin muxing code in the driver
-would make things really complicated, involving platforms having to
-pass this information into drivers.
+The feedback I have is that this is very important work and I'd like
+to see the patches ASAP, keep it up! :-)
+
+Linus Walleij
