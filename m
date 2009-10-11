@@ -1,30 +1,44 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Sun, 11 Oct 2009 16:41:46 +0300
-Subject: [PATCH] mtd: maps/sa1100: fix section mismatch
-In-Reply-To: <1255076329-15065-1-git-send-email-mad_soft@inbox.ru>
-References: <1255076329-15065-1-git-send-email-mad_soft@inbox.ru>
-Message-ID: <1255268506.16942.77.camel@localhost>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun, 11 Oct 2009 17:59:45 +0200
+Subject: zaurus suspend saga: 2.6.32-rc3
+In-Reply-To: <20091011090423.GB1414@ucw.cz> (Pavel Machek's message of "Sun\,
+	11 Oct 2009 11\:04\:23 +0200")
+References: <20091011090423.GB1414@ucw.cz>
+Message-ID: <87skdpvs3y.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2009-10-09 at 12:18 +0400, Dmitry Artamonow wrote:
-> Commit f0b1e589 changed sa1100_mtd_probe from __init to __devinit,
-> but missed to correct sa1100_setup_mtd definition accordingly, which
-> causes following warning:
-> 
-> WARNING: vmlinux.o(.devinit.text+0xf4): Section mismatch in reference from
->  the function sa1100_mtd_probe() to the function .init.text:sa1100_setup_mtd()
-> The function __devinit sa1100_mtd_probe() references
-> a function __init sa1100_setup_mtd().
-> If sa1100_setup_mtd is only used by sa1100_mtd_probe then
-> annotate sa1100_setup_mtd with a matching annotation.
-> 
-> Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
+Pavel Machek <pavel@ucw.cz> writes:
 
-Added to my l2-mtd-2.6.git tree:
+> Hi!
+>
+> I'm using patch similar to this for debugging:
+>
+> ...and good news is that it blinks after pressing of power button.
+>
+> ...core > pm_test also works.
+>
+> I also verified that end of pxa_pm_enter() is reached (with similar
+> blinking patch). End of corgi_pxa_pm_enter() seems to be reached, too.
+>
+> Any ideas what to try next?
+> 								Pavel
 
-http://git.infradead.org/users/dedekind/l2-mtd-2.6.git/commit/232216ec8d423a222ae113bd15691d66a1e6d957
+For the Mitac MIO A701 board, with a similar problem, I had :
+ - removed almost all drivers (except screen and USB for control)
+ - realized that the culprit was amongst drivers (which resumed in a loop in
+ that time, should be the same now)
+ - added some way to find which one failed (in my case, I chose morse code
+ through the buzzer to "speak" the device's name)
+ - found out the driver faulty code
+ - fixed it
+ - retried, cheered.
 
--- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+As soon as you reach a resumed screen, it becomes easier :)
+
+That's a very tedious and long fight, good luck.
+
+Cheers
+
+--
+Robert
