@@ -1,38 +1,49 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Mon, 12 Oct 2009 00:10:43 +0200
-Subject: [PATCH v1 2/2] OMAP3: add platform devices for ETM and ETB
-In-Reply-To: <1255279286-8904-2-git-send-email-virtuoso@slind.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 11 Oct 2009 23:29:38 +0100
+Subject: [PATCH v1 1/2] arm: a driver for on-chip ETM and ETB
+In-Reply-To: <63386a3d0910111507r681e69c4ka843cac9ad0e8b40@mail.gmail.com>
 References: <1255279286-8904-1-git-send-email-virtuoso@slind.org>
-	<1255279286-8904-2-git-send-email-virtuoso@slind.org>
-Message-ID: <63386a3d0910111510q2e17fec7ofe3db29a4d1f7822@mail.gmail.com>
+	<63386a3d0910111507r681e69c4ka843cac9ad0e8b40@mail.gmail.com>
+Message-ID: <20091011222938.GA13244@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/10/11 Alexander Shishkin <virtuoso@slind.org>:
+On Mon, Oct 12, 2009 at 12:07:57AM +0200, Linus Walleij wrote:
+> First, these are registered as platform devices, should they not be AMBA
+> devices (i.e. PrimeCells?) I think that's what they are, and they probably
+> have device ID:s to be matched in the last words of their 4K pages
+> do they not?
 
-> This enables debug components found in omap3xxx.
-> (...)
-> +static struct resource rx51_etb_resource = {
-> + ? ? ? .start = ETB_BASE,
-> + ? ? ? .end ? = ETB_BASE + SZ_4K,
+It does look like it's Primecell-like, so it should be using the
+primecell support so that others can make use of this.  As such, it
+should not be OMAP specific.
 
-.end = ETB_BASE + SZ_4K - 1
+> > + ? ? ? clk = clk_get(&pdev->dev, "emu_core_alwon_ck");
+> > + ? ? ? clk_enable(clk);
+> > +
+> > + ? ? ? clk = clk_get(&pdev->dev, "emu_per_alwon_ck");
+> > + ? ? ? clk_enable(clk);
+> > +
+> > + ? ? ? clk = clk_get(&pdev->dev, "emu_mpu_alwon_ck");
+> > + ? ? ? clk_enable(clk);
+> > +
+> > + ? ? ? clk = clk_get(&pdev->dev, "emu_src_ck");
+> > + ? ? ? clk_enable(clk);
+> 
+> Are these clocks really generic? It looks a lot like OMAP-specific
+> stuff. Is it possible to hide these behind a single clock inside the
+> platform? like "etbclock" or so that increase refcount of the others
+> by 1?
 
-This will play with the resource paradigm and resource_size() will
-work correctly in the driver after this.
+First obvious problem is that there's no error checking there.
 
-> + ? ? ? .flags = IORESOURCE_MEM,
-> +};
-> +
->(...)
-> +
-> +static struct resource rx51_etm_resource = {
-> + ? ? ? .start = ETM_BASE,
-> + ? ? ? .end ? = ETM_BASE + SZ_4K,
+Second problem is that this could very well be a generic driver, and
+OMAP specifics should not be in here.  Looking at the Coresight ETM11
+documentation, there's:
 
-Ditto.
+ATCLK - ATB interface clock
+CLK - main clock
+PCLKDBG - Debug APB clock or PCLK - APB clock
 
-> + ? ? ? .flags = IORESOURCE_MEM,
-> +};
-
-Linus Walleij
+I'm not sure why OMAP seems to have four clocks when the ETM has only
+three clocks itself.
