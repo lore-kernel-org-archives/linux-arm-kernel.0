@@ -1,50 +1,53 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 11 Oct 2009 14:14:58 +0200
-Subject: ucb1x00 patches
-In-Reply-To: <20091007081235.GA6246@n2100.arm.linux.org.uk>
-References: <4ACB7123.8000609@gmx.de> <19148.16274.293527.828860@ipc1.ka-ro>
-	<200910070956.42651.marek.vasut@gmail.com>
-	<20091007081235.GA6246@n2100.arm.linux.org.uk>
-Message-ID: <20091011121458.GA1356@ucw.cz>
+Date: Sun, 11 Oct 2009 14:15:13 +0200
+Subject: [PATCH 5/9] SA1100: make gpio_to_irq and reverse a macro
+In-Reply-To: <1254778533-3529-6-git-send-email-thommycheck@gmx.de>
+References: <1254778533-3529-1-git-send-email-thommycheck@gmx.de>
+	<1254778533-3529-2-git-send-email-thommycheck@gmx.de>
+	<1254778533-3529-3-git-send-email-thommycheck@gmx.de>
+	<1254778533-3529-4-git-send-email-thommycheck@gmx.de>
+	<1254778533-3529-5-git-send-email-thommycheck@gmx.de>
+	<1254778533-3529-6-git-send-email-thommycheck@gmx.de>
+Message-ID: <20091011121512.GB1356@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2009-10-07 09:12:35, Russell King - ARM Linux wrote:
-> On Wed, Oct 07, 2009 at 09:56:42AM +0200, Marek Vasut wrote:
-> > Dne St 7. ????jna 2009 09:13:22 Lothar Wa??mann napsal(a):
-> > > Hi,
-> > > 
-> > > Thomas Kunze writes:
-> > > > Hi,
-> > > >
-> > > > I posted these patches at linux-arm-kernel as part of the patchset
-> > > > "collie and SA1100 patches".
-> > > > Could you please comment on them? I'd also like to know you opinion on
-> > > > moving ucb1x00-ts.c to
-> > > > input/drivers/touchscreen.
-> > > 
-> > > What about the ucb1400_ts.c which is already there?
-> > > 
-> > 
-> > I'd be for unifying all the ucb drivers into a single one, but Russell was 
-> > against it iirc.
+Hi!
+
+> The function can't be used for static initialisations so
+> convert them to macros.
 > 
-> They're different beasts, and I really don't think they should be unified.
-> They have different register layouts, and different access arrangements,
-> which need different handling.
-> 
-> The result is that the UCB1200/UCB1300 support gets unnecessarily penalised
-> when UCB1400 is integrated - instead of merely taking a spinlock and
-> accessing the register, you have to ensure everything you do is in thread
-> context, including interrupt handlers.
+> Signed-off-by: Thomas Kunze <thommycheck@gmx.de>
 
-Is it that bad?
+Do you actually use them in initializers?
 
-If sharing makes sense on source-code level, that kind of penalty
-should be acceptable. If it makes more eyes on the sources, it will
-still be a win.
-									Pavel
+If not, I guess the function version is nicer...
 
+> @@ -49,20 +49,9 @@ static inline void gpio_set_value(unsigned gpio, int value)
+>  
+>  #define gpio_cansleep	__gpio_cansleep
+>  
+> -static inline unsigned gpio_to_irq(unsigned gpio)
+> -{
+> -	if (gpio < 11)
+> -		return IRQ_GPIO0 + gpio;
+> -	else
+> -		return IRQ_GPIO11 - 11 + gpio;
+> -}
+> -
+> -static inline unsigned irq_to_gpio(unsigned irq)
+> -{
+> -	if (irq < IRQ_GPIO11_27)
+> -		return irq - IRQ_GPIO0;
+> -	else
+> -		return irq - IRQ_GPIO11 + 11;
+> -}
+> +#define gpio_to_irq(gpio)	((gpio < 11) ? (IRQ_GPIO0 + gpio) : \
+> +					(IRQ_GPIO11 - 11 + gpio))
+> +#define irq_to_gpio(irq)	((irq < IRQ_GPIO11_27) ? (irq - IRQ_GPIO0) : \
+> +					(irq - IRQ_GPIO11 + 11))
+>  
+>  #endif
 
 -- 
 (english) http://www.livejournal.com/~pavelmachek
