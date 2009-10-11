@@ -1,309 +1,663 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Sun, 11 Oct 2009 17:19:51 -0400
-Subject: [PATCH 2/2] Remove now-defunct ts7250 nand driver
-In-Reply-To: <1255260678.16942.39.camel@localhost>
-References: <BD79186B4FD85F4B8E60E381CAEE190901DB7969@mi8nycmail19.Mi8.com>
-	<1255260678.16942.39.camel@localhost>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901DB7E5A@mi8nycmail19.Mi8.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Mon, 12 Oct 2009 00:07:57 +0200
+Subject: [PATCH v1 1/2] arm: a driver for on-chip ETM and ETB
+In-Reply-To: <1255279286-8904-1-git-send-email-virtuoso@slind.org>
+References: <1255279286-8904-1-git-send-email-virtuoso@slind.org>
+Message-ID: <63386a3d0910111507r681e69c4ka843cac9ad0e8b40@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ts72xx platform has been updated to use the generic platform nand
-driver (plat_nand.c).  This removes the now-defunct ts7250.c nand driver.
- 
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Matthieu Crapet <mcrapet@gmail.com>
-Cc: David Woodhouse <dwmw2@infradead.org>
-Cc: Artem Bityutskiy <dedekind1@gmail.com>
-Cc: <linux-arm-kernel@lists.infradead.org>
-Cc: <linux-mtd@lists.infradead.org>
+2009/10/11 Alexander Shishkin <virtuoso@slind.org>:
 
----
+> This driver implements support for on-chip Embedded Tracing Macrocell and
+> Embedded Trace Buffer. It allows to trigger tracing of kernel execution flow
+> and exporting trace output to userspace via character device and a sysrq
+> combo.
 
-V2 - rebased to current mtd tree (Artem Bityutskiy)
+Cool, can it at all be interfaced to kernel tracing mechanisms like
+ftrace, LTTng...? Or is this entirely orthogonal?
 
- arch/arm/mach-ep93xx/include/mach/ts72xx.h |   19 ---
- drivers/mtd/nand/Kconfig                   |    6 -
- drivers/mtd/nand/Makefile                  |    1 -
- drivers/mtd/nand/ts7250.c                  |  207 ----------------------------
- 4 files changed, 0 insertions(+), 233 deletions(-)
+First, these are registered as platform devices, should they not be AMBA
+devices (i.e. PrimeCells?) I think that's what they are, and they probably
+have device ID:s to be matched in the last words of their 4K pages
+do they not?
 
-diff --git a/arch/arm/mach-ep93xx/include/mach/ts72xx.h b/arch/arm/mach-ep93xx/include/mach/ts72xx.h
-index 3bd934e..61c0e13 100644
---- a/arch/arm/mach-ep93xx/include/mach/ts72xx.h
-+++ b/arch/arm/mach-ep93xx/include/mach/ts72xx.h
-@@ -9,9 +9,6 @@
-  * febff000	22000000	4K	model number register
-  * febfe000	22400000	4K	options register
-  * febfd000	22800000	4K	options register #2
-- * febfc000	[67]0000000	4K	NAND data register
-- * febfb000	[67]0400000	4K	NAND control register
-- * febfa000	[67]0800000	4K	NAND busy register
-  * febf9000	10800000	4K	TS-5620 RTC index register
-  * febf8000	11700000	4K	TS-5620 RTC data register
-  */
-@@ -41,22 +38,6 @@
- #define TS72XX_OPTIONS2_TS9420_BOOT	0x02
- 
- 
--#define TS72XX_NAND1_DATA_PHYS_BASE	0x60000000
--#define TS72XX_NAND2_DATA_PHYS_BASE	0x70000000
--#define TS72XX_NAND_DATA_VIRT_BASE	0xfebfc000
--#define TS72XX_NAND_DATA_SIZE		0x00001000
--
--#define TS72XX_NAND1_CONTROL_PHYS_BASE	0x60400000
--#define TS72XX_NAND2_CONTROL_PHYS_BASE	0x70400000
--#define TS72XX_NAND_CONTROL_VIRT_BASE	0xfebfb000
--#define TS72XX_NAND_CONTROL_SIZE	0x00001000
--
--#define TS72XX_NAND1_BUSY_PHYS_BASE	0x60800000
--#define TS72XX_NAND2_BUSY_PHYS_BASE	0x70800000
--#define TS72XX_NAND_BUSY_VIRT_BASE	0xfebfa000
--#define TS72XX_NAND_BUSY_SIZE		0x00001000
--
--
- #define TS72XX_RTC_INDEX_VIRT_BASE	0xfebf9000
- #define TS72XX_RTC_INDEX_PHYS_BASE	0x10800000
- #define TS72XX_RTC_INDEX_SIZE		0x00001000
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index 2fda0b6..fdee525 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -97,12 +97,6 @@ config MTD_NAND_OMAP_PREFETCH_DMA
- 	 or in DMA interrupt mode.
- 	 Say y for DMA mode or MPU mode will be used
- 
--config MTD_NAND_TS7250
--	tristate "NAND Flash device on TS-7250 board"
--	depends on MACH_TS72XX
--	help
--	  Support for NAND flash on Technologic Systems TS-7250 platform.
--
- config MTD_NAND_IDS
- 	tristate
- 
-diff --git a/drivers/mtd/nand/Makefile b/drivers/mtd/nand/Makefile
-index 6950d3d..ecc404c 100644
---- a/drivers/mtd/nand/Makefile
-+++ b/drivers/mtd/nand/Makefile
-@@ -19,7 +19,6 @@ obj-$(CONFIG_MTD_NAND_DISKONCHIP)	+= diskonchip.o
- obj-$(CONFIG_MTD_NAND_H1900)		+= h1910.o
- obj-$(CONFIG_MTD_NAND_RTC_FROM4)	+= rtc_from4.o
- obj-$(CONFIG_MTD_NAND_SHARPSL)		+= sharpsl.o
--obj-$(CONFIG_MTD_NAND_TS7250)		+= ts7250.o
- obj-$(CONFIG_MTD_NAND_NANDSIM)		+= nandsim.o
- obj-$(CONFIG_MTD_NAND_CS553X)		+= cs553x_nand.o
- obj-$(CONFIG_MTD_NAND_NDFC)		+= ndfc.o
-diff --git a/drivers/mtd/nand/ts7250.c b/drivers/mtd/nand/ts7250.c
-deleted file mode 100644
-index 0f5562a..0000000
---- a/drivers/mtd/nand/ts7250.c
-+++ /dev/null
-@@ -1,207 +0,0 @@
--/*
-- * drivers/mtd/nand/ts7250.c
-- *
-- * Copyright (C) 2004 Technologic Systems (support at embeddedARM.com)
-- *
-- * Derived from drivers/mtd/nand/edb7312.c
-- *   Copyright (C) 2004 Marius Gr??ger (mag at sysgo.de)
-- *
-- * Derived from drivers/mtd/nand/autcpu12.c
-- *   Copyright (c) 2001 Thomas Gleixner (gleixner at autronix.de)
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * Overview:
-- *   This is a device driver for the NAND flash device found on the
-- *   TS-7250 board which utilizes a Samsung 32 Mbyte part.
-- */
--
--#include <linux/slab.h>
--#include <linux/module.h>
--#include <linux/init.h>
--#include <linux/mtd/mtd.h>
--#include <linux/mtd/nand.h>
--#include <linux/mtd/partitions.h>
--#include <linux/io.h>
--
--#include <mach/hardware.h>
--#include <mach/ts72xx.h>
--
--#include <asm/sizes.h>
--#include <asm/mach-types.h>
--
--/*
-- * MTD structure for TS7250 board
-- */
--static struct mtd_info *ts7250_mtd = NULL;
--
--#ifdef CONFIG_MTD_PARTITIONS
--static const char *part_probes[] = { "cmdlinepart", NULL };
--
--#define NUM_PARTITIONS 3
--
--/*
-- * Define static partitions for flash device
-- */
--static struct mtd_partition partition_info32[] = {
--	{
--		.name		= "TS-BOOTROM",
--		.offset		= 0x00000000,
--		.size		= 0x00004000,
--	}, {
--		.name		= "Linux",
--		.offset		= 0x00004000,
--		.size		= 0x01d00000,
--	}, {
--		.name		= "RedBoot",
--		.offset		= 0x01d04000,
--		.size		= 0x002fc000,
--	},
--};
--
--/*
-- * Define static partitions for flash device
-- */
--static struct mtd_partition partition_info128[] = {
--	{
--		.name		= "TS-BOOTROM",
--		.offset		= 0x00000000,
--		.size		= 0x00004000,
--	}, {
--		.name		= "Linux",
--		.offset		= 0x00004000,
--		.size		= 0x07d00000,
--	}, {
--		.name		= "RedBoot",
--		.offset		= 0x07d04000,
--		.size		= 0x002fc000,
--	},
--};
--#endif
--
--
--/*
-- *	hardware specific access to control-lines
-- *
-- *	ctrl:
-- *	NAND_NCE: bit 0 -> bit 2
-- *	NAND_CLE: bit 1 -> bit 1
-- *	NAND_ALE: bit 2 -> bit 0
-- */
--static void ts7250_hwcontrol(struct mtd_info *mtd, int cmd, unsigned int ctrl)
--{
--	struct nand_chip *chip = mtd->priv;
--
--	if (ctrl & NAND_CTRL_CHANGE) {
--		unsigned long addr = TS72XX_NAND_CONTROL_VIRT_BASE;
--		unsigned char bits;
--
--		bits = (ctrl & NAND_NCE) << 2;
--		bits |= ctrl & NAND_CLE;
--		bits |= (ctrl & NAND_ALE) >> 2;
--
--		__raw_writeb((__raw_readb(addr) & ~0x7) | bits, addr);
--	}
--
--	if (cmd != NAND_CMD_NONE)
--		writeb(cmd, chip->IO_ADDR_W);
--}
--
--/*
-- *	read device ready pin
-- */
--static int ts7250_device_ready(struct mtd_info *mtd)
--{
--	return __raw_readb(TS72XX_NAND_BUSY_VIRT_BASE) & 0x20;
--}
--
--/*
-- * Main initialization routine
-- */
--static int __init ts7250_init(void)
--{
--	struct nand_chip *this;
--	const char *part_type = 0;
--	int mtd_parts_nb = 0;
--	struct mtd_partition *mtd_parts = 0;
--
--	if (!machine_is_ts72xx() || board_is_ts7200())
--		return -ENXIO;
--
--	/* Allocate memory for MTD device structure and private data */
--	ts7250_mtd = kmalloc(sizeof(struct mtd_info) + sizeof(struct nand_chip), GFP_KERNEL);
--	if (!ts7250_mtd) {
--		printk("Unable to allocate TS7250 NAND MTD device structure.\n");
--		return -ENOMEM;
--	}
--
--	/* Get pointer to private data */
--	this = (struct nand_chip *)(&ts7250_mtd[1]);
--
--	/* Initialize structures */
--	memset(ts7250_mtd, 0, sizeof(struct mtd_info));
--	memset(this, 0, sizeof(struct nand_chip));
--
--	/* Link the private data with the MTD structure */
--	ts7250_mtd->priv = this;
--	ts7250_mtd->owner = THIS_MODULE;
--
--	/* insert callbacks */
--	this->IO_ADDR_R = (void *)TS72XX_NAND_DATA_VIRT_BASE;
--	this->IO_ADDR_W = (void *)TS72XX_NAND_DATA_VIRT_BASE;
--	this->cmd_ctrl = ts7250_hwcontrol;
--	this->dev_ready = ts7250_device_ready;
--	this->chip_delay = 15;
--	this->ecc.mode = NAND_ECC_SOFT;
--
--	printk("Searching for NAND flash...\n");
--	/* Scan to find existence of the device */
--	if (nand_scan(ts7250_mtd, 1)) {
--		kfree(ts7250_mtd);
--		return -ENXIO;
--	}
--#ifdef CONFIG_MTD_PARTITIONS
--	ts7250_mtd->name = "ts7250-nand";
--	mtd_parts_nb = parse_mtd_partitions(ts7250_mtd, part_probes, &mtd_parts, 0);
--	if (mtd_parts_nb > 0)
--		part_type = "command line";
--	else
--		mtd_parts_nb = 0;
--#endif
--	if (mtd_parts_nb == 0) {
--		mtd_parts = partition_info32;
--		if (ts7250_mtd->size >= (128 * 0x100000))
--			mtd_parts = partition_info128;
--		mtd_parts_nb = NUM_PARTITIONS;
--		part_type = "static";
--	}
--
--	/* Register the partitions */
--	printk(KERN_NOTICE "Using %s partition definition\n", part_type);
--	add_mtd_partitions(ts7250_mtd, mtd_parts, mtd_parts_nb);
--
--	/* Return happy */
--	return 0;
--}
--
--module_init(ts7250_init);
--
--/*
-- * Clean up routine
-- */
--static void __exit ts7250_cleanup(void)
--{
--	/* Unregister the device */
--	del_mtd_device(ts7250_mtd);
--
--	/* Free the MTD device structure */
--	kfree(ts7250_mtd);
--}
--
--module_exit(ts7250_cleanup);
--
--MODULE_LICENSE("GPL");
--MODULE_AUTHOR("Jesse Off <joff@embeddedARM.com>");
--MODULE_DESCRIPTION("MTD map driver for Technologic Systems TS-7250 board"); 
+> (...)
+> diff --git a/arch/arm/kernel/etm.c b/arch/arm/kernel/etm.c
+> new file mode 100644
+> index 0000000..3e7b431
+> --- /dev/null
+> +++ b/arch/arm/kernel/etm.c
+> @@ -0,0 +1,588 @@
+> +/*
+> + * linux/arch/arm/kernel/etm.c
+> + *
+> + * Driver for ARM's Embedded Trace Macrocell and Embedded Trace Buffer.
+> + *
+> + * Copyright (C) 2009 Nokia Corporation.
+> + * Alexander Shishkin
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/types.h>
+> +#include <linux/io.h>
+> +#include <linux/clk.h>
+> +#include <linux/sysrq.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/fs.h>
+> +#include <linux/uaccess.h>
+> +#include <linux/miscdevice.h>
+> +#include <linux/vmalloc.h>
+> +#include <linux/mutex.h>
+> +#include <asm/hardware/coresight.h>
+> +#include <asm/sections.h>
+> +
+> +MODULE_LICENSE("GPL");
+> +MODULE_AUTHOR("Alexander Shishkin");
+> +
+> +static struct tracectx tracer;
+> +
+> +static inline bool trace_isrunning(struct tracectx *t)
+> +{
+> + ? ? ? return !!(t->flags & TRACER_RUNNING);
+> +}
+> +
+> +static int etm_setup_address_range(struct tracectx *t, int n,
+> + ? ? ? ? ? ? ? unsigned long start, unsigned long end, int exclude, int data)
+> +{
+> + ? ? ? u32 flags = ETMAAT_ARM | ETMAAT_IGNCONTEXTID | ETMAAT_NSONLY | \
+> + ? ? ? ? ? ? ? ? ? ETMAAT_NOVALCMP;
+> +
+> + ? ? ? if (n < 1 || n > t->ncmppairs)
+> + ? ? ? ? ? ? ? return -EINVAL;
+> +
+> + ? ? ? /* comparators and ranges are numbered starting with 1 as opposed
+> + ? ? ? ?* to bits in a word */
+> + ? ? ? n--;
+> +
+> + ? ? ? if (data)
+> + ? ? ? ? ? ? ? flags |= ETMAAT_DLOADSTORE;
+> + ? ? ? else
+> + ? ? ? ? ? ? ? flags |= ETMAAT_IEXEC;
+> +
+> + ? ? ? /* first comparator for the range */
+> + ? ? ? etm_writel(t, flags, ETMR_COMP_ACC_TYPE(n * 2));
+> + ? ? ? etm_writel(t, start, ETMR_COMP_VAL(n * 2));
+> +
+> + ? ? ? /* second comparator is right next to it */
+> + ? ? ? etm_writel(t, flags, ETMR_COMP_ACC_TYPE(n * 2 + 1));
+> + ? ? ? etm_writel(t, end, ETMR_COMP_VAL(n * 2 + 1));
+> +
+> + ? ? ? flags = exclude ? ETMTE_INCLEXCL : 0;
+> + ? ? ? etm_writel(t, flags | (1 << n), ETMR_TRACEENCTRL);
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +static int trace_start(struct tracectx *t)
+> +{
+> + ? ? ? u32 v;
+> + ? ? ? unsigned long timeout = TRACER_TIMEOUT;
+> +
+> + ? ? ? etb_unlock(t);
+> +
+> + ? ? ? etb_writel(t, 0, ETBR_FORMATTERCTRL);
+> + ? ? ? etb_writel(t, 1, ETBR_CTRL);
+> +
+> + ? ? ? etb_lock(t);
+> +
+> + ? ? ? /* configure etm */
+> + ? ? ? v = ETMCTRL_OPTS | ETMCTRL_PROGRAM | ETMCTRL_PORTSIZE(t->etm_portsz);
+> +
+> + ? ? ? if (t->flags & TRACER_CYCLE_ACC)
+> + ? ? ? ? ? ? ? v |= ETMCTRL_CYCLEACCURATE;
+> +
+> + ? ? ? etm_unlock(t);
+> +
+> + ? ? ? etm_writel(t, v, ETMR_CTRL);
+> +
+> + ? ? ? while (!(etm_readl(t, ETMR_CTRL) & ETMCTRL_PROGRAM) && --timeout)
+> + ? ? ? ? ? ? ? ;
+> + ? ? ? if (!timeout) {
+> + ? ? ? ? ? ? ? dev_dbg(t->dev, "Waiting for progbit to assert timed out\n");
+> + ? ? ? ? ? ? ? etm_lock(t);
+> + ? ? ? ? ? ? ? return -EFAULT;
+> + ? ? ? }
+> +
+> + ? ? ? etm_setup_address_range(t, 1, (unsigned long)_stext,
+> + ? ? ? ? ? ? ? ? ? ? ? (unsigned long)_etext, 0, 0);
+> + ? ? ? etm_writel(t, 0, ETMR_TRACEENCTRL2);
+> + ? ? ? etm_writel(t, 0, ETMR_TRACESSCTRL);
+> + ? ? ? etm_writel(t, 0x6f, ETMR_TRACEENEVT);
+> +
+> + ? ? ? v &= ~ETMCTRL_PROGRAM;
+> + ? ? ? v |= ETMCTRL_PORTSEL;
+> +
+> + ? ? ? etm_writel(t, v, ETMR_CTRL);
+> +
+> + ? ? ? timeout = TRACER_TIMEOUT;
+> + ? ? ? while (etm_readl(t, ETMR_CTRL) & ETMCTRL_PROGRAM && --timeout)
+> + ? ? ? ? ? ? ? ;
+> + ? ? ? if (!timeout) {
+> + ? ? ? ? ? ? ? dev_dbg(t->dev, "Waiting for progbit to deassert timed out\n");
+> + ? ? ? ? ? ? ? etm_lock(t);
+> + ? ? ? ? ? ? ? return -EFAULT;
+> + ? ? ? }
+> +
+> + ? ? ? etm_lock(t);
+> +
+> + ? ? ? t->flags |= TRACER_RUNNING;
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +static int trace_stop(struct tracectx *t)
+> +{
+> + ? ? ? unsigned long timeout = TRACER_TIMEOUT;
+> +
+> + ? ? ? etm_unlock(t);
+> +
+> + ? ? ? etm_writel(t, 0x440, ETMR_CTRL);
+> + ? ? ? while (!(etm_readl(t, ETMR_CTRL) & ETMCTRL_PROGRAM) && --timeout)
+> + ? ? ? ? ? ? ? ;
+> + ? ? ? if (!timeout) {
+> + ? ? ? ? ? ? ? dev_dbg(t->dev, "Waiting for progbit to assert timed out\n");
+> + ? ? ? ? ? ? ? etm_lock(t);
+> + ? ? ? ? ? ? ? return -EFAULT;
+> + ? ? ? }
+> +
+> + ? ? ? etm_lock(t);
+> +
+> + ? ? ? etb_unlock(t);
+> + ? ? ? etb_writel(t, ETBFF_MANUAL_FLUSH, ETBR_FORMATTERCTRL);
+> +
+> + ? ? ? timeout = TRACER_TIMEOUT;
+> + ? ? ? while (etb_readl(t, ETBR_FORMATTERCTRL) &
+> + ? ? ? ? ? ? ? ? ? ? ? ETBFF_MANUAL_FLUSH && --timeout)
+> + ? ? ? ? ? ? ? ;
+> + ? ? ? if (!timeout) {
+> + ? ? ? ? ? ? ? dev_dbg(t->dev, "Waiting for formatter flush to commence "
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "timed out\n");
+> + ? ? ? ? ? ? ? etb_lock(t);
+> + ? ? ? ? ? ? ? return -EFAULT;
+> + ? ? ? }
+> +
+> + ? ? ? etb_writel(t, 0, ETBR_CTRL);
+> +
+> + ? ? ? etb_lock(t);
+> +
+> + ? ? ? t->flags &= ~TRACER_RUNNING;
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +static int etb_getdatalen(struct tracectx *t)
+> +{
+> + ? ? ? u32 v;
+> + ? ? ? int rp, wp;
+> +
+> + ? ? ? v = etb_readl(t, ETBR_STATUS);
+> +
+> + ? ? ? if (v & 1)
+> + ? ? ? ? ? ? ? return t->etb_bufsz;
+> +
+> + ? ? ? rp = etb_readl(t, ETBR_READADDR);
+> + ? ? ? wp = etb_readl(t, ETBR_WRITEADDR);
+> +
+> + ? ? ? if (rp > wp) {
+> + ? ? ? ? ? ? ? etb_writel(t, 0, ETBR_READADDR);
+> + ? ? ? ? ? ? ? etb_writel(t, 0, ETBR_WRITEADDR);
+> +
+> + ? ? ? ? ? ? ? return 0;
+> + ? ? ? }
+> +
+> + ? ? ? return wp - rp;
+> +}
+> +
+> +/* sysrq+v will always stop the running trace and leave it at that */
+> +static void etm_dump(void)
+> +{
+> + ? ? ? struct tracectx *t = &tracer;
+> + ? ? ? u32 first = 0;
+> + ? ? ? int length;
+> +
+> + ? ? ? if (!t->etb_regs) {
+> + ? ? ? ? ? ? ? printk(KERN_INFO "No tracing hardware found\n");
+> + ? ? ? ? ? ? ? return;
+> + ? ? ? }
+> +
+> + ? ? ? if (!mutex_trylock(&t->mutex))
+> + ? ? ? ? ? ? ? return;
+> +
+> + ? ? ? if (trace_isrunning(t))
+> + ? ? ? ? ? ? ? trace_stop(t);
+> +
+> + ? ? ? etb_unlock(t);
+> +
+> + ? ? ? length = etb_getdatalen(t);
+> +
+> + ? ? ? if (length == t->etb_bufsz)
+> + ? ? ? ? ? ? ? first = etb_readl(t, ETBR_WRITEADDR);
+> +
+> + ? ? ? etb_writel(t, first, ETBR_READADDR);
+> +
+> + ? ? ? printk(KERN_INFO "Trace buffer contents length: %d\n", length);
+> + ? ? ? printk(KERN_INFO "--- ETB buffer begin ---\n");
+> + ? ? ? for (; length; length--)
+> + ? ? ? ? ? ? ? printk("%08x", cpu_to_be32(etb_readl(t, ETBR_READMEM)));
+> + ? ? ? printk(KERN_INFO "\n--- ETB buffer end ---\n");
+> +
+> + ? ? ? etb_writel(t, 0, ETBR_TRIGGERCOUNT);
+> + ? ? ? etb_writel(t, 0, ETBR_READADDR);
+> + ? ? ? etb_writel(t, 0, ETBR_WRITEADDR);
+> +
+> + ? ? ? etb_lock(t);
+> +
+> + ? ? ? mutex_unlock(&t->mutex);
+> +}
+> +
+> +static void sysrq_etm_dump(int key, struct tty_struct *tty)
+> +{
+> + ? ? ? dev_dbg(tracer.dev, "Dumping ETB buffer\n");
+> + ? ? ? etm_dump();
+> +}
+> +
+> +static struct sysrq_key_op sysrq_etm_op = {
+> + ? ? ? .handler = sysrq_etm_dump,
+> + ? ? ? .help_msg = "ETM buffer dump",
+> + ? ? ? .action_msg = "etm",
+> +};
+> +
+> +static int etb_open(struct inode *inode, struct file *file)
+> +{
+> + ? ? ? if (!tracer.etb_regs)
+> + ? ? ? ? ? ? ? return -ENODEV;
+> +
+> + ? ? ? file->private_data = &tracer;
+> +
+> + ? ? ? return nonseekable_open(inode, file);
+> +}
+> +
+> +static ssize_t etb_read(struct file *file, char __user *data,
+> + ? ? ? ? ? ? ? size_t len, loff_t *ppos)
+> +{
+> + ? ? ? int total, i;
+> + ? ? ? long length;
+> + ? ? ? struct tracectx *t = file->private_data;
+> + ? ? ? u32 first = 0;
+> + ? ? ? u32 *buf;
+> +
+> + ? ? ? mutex_lock(&t->mutex);
+> +
+> + ? ? ? if (trace_isrunning(t)) {
+> + ? ? ? ? ? ? ? length = 0;
+> + ? ? ? ? ? ? ? goto out;
+> + ? ? ? }
+> +
+> + ? ? ? etb_unlock(t);
+> +
+> + ? ? ? total = etb_getdatalen(t);
+> + ? ? ? if (total == t->etb_bufsz)
+> + ? ? ? ? ? ? ? first = etb_readl(t, ETBR_WRITEADDR);
+> +
+> + ? ? ? etb_writel(t, first, ETBR_READADDR);
+> +
+> + ? ? ? length = min(total * 4, (int)len);
+> + ? ? ? buf = vmalloc(length);
+> +
+> + ? ? ? dev_dbg(t->dev, "ETB buffer length: %d\n", total);
+> + ? ? ? dev_dbg(t->dev, "ETB status reg: %x\n", etb_readl(t, ETBR_STATUS));
+> + ? ? ? for (i = 0; i < length / 4; i++)
+> + ? ? ? ? ? ? ? buf[i] = etb_readl(t, ETBR_READMEM);
+> +
+> + ? ? ? /* the only way to deassert overflow bit in ETB status is this */
+> + ? ? ? etb_writel(t, 1, ETBR_CTRL);
+> + ? ? ? etb_writel(t, 0, ETBR_CTRL);
+> +
+> + ? ? ? etb_writel(t, 0, ETBR_WRITEADDR);
+> + ? ? ? etb_writel(t, 0, ETBR_READADDR);
+> + ? ? ? etb_writel(t, 0, ETBR_TRIGGERCOUNT);
+> +
+> + ? ? ? etb_lock(t);
+> +
+> + ? ? ? length = copy_to_user(data, buf, length);
+> + ? ? ? vfree(buf);
+> +
+> +out:
+> + ? ? ? mutex_unlock(&t->mutex);
+> +
+> + ? ? ? return length;
+> +}
+> +
+> +static int etb_release(struct inode *inode, struct file *file)
+> +{
+> + ? ? ? /* there's nothing to do here, actually */
+> + ? ? ? return 0;
+> +}
+> +
+> +static struct file_operations etb_fops = {
+> + ? ? ? .owner = THIS_MODULE,
+> + ? ? ? .read = etb_read,
+> + ? ? ? .open = etb_open,
+> + ? ? ? .release = etb_release,
+> +};
+> +
+> +static struct miscdevice etb_miscdev = {
+> + ? ? ? .name = "tracebuf",
+> + ? ? ? .minor = 0,
+> + ? ? ? .fops = &etb_fops,
+> +};
+> +
+> +static int __devinit etb_drv_probe(struct platform_device *pdev)
+> +{
+> + ? ? ? struct tracectx *t = platform_get_drvdata(pdev);
+> + ? ? ? struct resource *res;
+> + ? ? ? struct clk *clk;
+> + ? ? ? int ret = 0;
+> +
+> + ? ? ? if (t && t->etb_regs) {
+> + ? ? ? ? ? ? ? dev_dbg(&pdev->dev, "ETB already initialized\n");
+> + ? ? ? ? ? ? ? ret = -EBUSY;
+> + ? ? ? ? ? ? ? goto out;
+> + ? ? ? }
+> +
+> + ? ? ? res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> + ? ? ? if (!res) {
+> + ? ? ? ? ? ? ? ret = -ENODEV;
+> + ? ? ? ? ? ? ? goto out;
+> + ? ? ? }
+> +
+> + ? ? ? if (!request_mem_region(res->start, SZ_4K, "etb")) {
+
+request_mem_region(res->start, resource_size(res), "etb")
+And I think it is perfectly legal with larger buffers so should
+really be like that.
+
+> + ? ? ? ? ? ? ? ret = -EBUSY;
+> + ? ? ? ? ? ? ? goto out;
+> + ? ? ? }
+> +
+> + ? ? ? if (!t) {
+> + ? ? ? ? ? ? ? t = &tracer;
+> + ? ? ? ? ? ? ? platform_set_drvdata(pdev, t);
+> + ? ? ? }
+> +
+> + ? ? ? t->etb_regs = ioremap_nocache(res->start, SZ_4K);
+
+ioremap_nocache(res->start, resource_size(res))
+
+> + ? ? ? if (!t->etb_regs) {
+> + ? ? ? ? ? ? ? ret = -ENOMEM;
+> + ? ? ? ? ? ? ? platform_set_drvdata(pdev, NULL);
+> + ? ? ? ? ? ? ? release_mem_region(res->start, SZ_4K);
+
+release_mem_region(res->start. resource_size(res))
+
+> + ? ? ? ? ? ? ? goto out;
+> + ? ? ? }
+> +
+> + ? ? ? etb_miscdev.parent = &pdev->dev;
+> +
+> + ? ? ? ret = misc_register(&etb_miscdev);
+> + ? ? ? if (ret) {
+> + ? ? ? ? ? ? ? platform_set_drvdata(pdev, NULL);
+> + ? ? ? ? ? ? ? iounmap(t->etb_regs);
+> + ? ? ? ? ? ? ? release_mem_region(res->start, SZ_4K);
+
+release_mem_region(res->start, resource_size(res))
+
+Note: you're starting to duplicate code here, perhaps you
+can move it into the error path below out_foo: labels?
+
+> + ? ? ? ? ? ? ? goto out;
+> + ? ? ? }
+> +
+> + ? ? ? clk = clk_get(&pdev->dev, "emu_core_alwon_ck");
+> + ? ? ? clk_enable(clk);
+> +
+> + ? ? ? clk = clk_get(&pdev->dev, "emu_per_alwon_ck");
+> + ? ? ? clk_enable(clk);
+> +
+> + ? ? ? clk = clk_get(&pdev->dev, "emu_mpu_alwon_ck");
+> + ? ? ? clk_enable(clk);
+> +
+> + ? ? ? clk = clk_get(&pdev->dev, "emu_src_ck");
+> + ? ? ? clk_enable(clk);
+
+Are these clocks really generic? It looks a lot like OMAP-specific
+stuff. Is it possible to hide these behind a single clock inside the
+platform? like "etbclock" or so that increase refcount of the others
+by 1?
+
+> +
+> + ? ? ? etb_unlock(t);
+> + ? ? ? t->etb_bufsz = etb_readl(t, ETBR_DEPTH);
+> + ? ? ? dev_dbg(&pdev->dev, "Size: %x\n", t->etb_bufsz);
+> +
+> + ? ? ? /* make sure trace capture is disabled */
+> + ? ? ? etb_writel(t, 0, ETBR_CTRL);
+> + ? ? ? etb_writel(t, 0x1000, ETBR_FORMATTERCTRL);
+> + ? ? ? etb_lock(t);
+> +
+> + ? ? ? dev_dbg(&pdev->dev, "ETB platform driver initialized.\n");
+> +
+> + ? ? ? ret = 0;
+> +out:
+> + ? ? ? return ret;
+> +}
+> +
+> +static struct platform_driver etb_driver = {
+> + ? ? ? .probe ? ? ? ? ? = etb_drv_probe,
+> + ? ? ? .driver ?= {
+> + ? ? ? ? ? ? ? .name ? ?= "etb",
+> + ? ? ? ? ? ? ? .owner ?= THIS_MODULE,
+> + ? ? ? },
+> +};
+> +
+> +/* use a sysfs file "trace_running" to start/stop tracing */
+> +static ssize_t trace_running_show(struct kobject *kobj,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct kobj_attribute *attr,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? char *buf)
+> +{
+> + ? ? ? return sprintf(buf, "%x\n", trace_isrunning(&tracer));
+> +}
+> +
+> +static ssize_t trace_running_store(struct kobject *kobj,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct kobj_attribute *attr,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?const char *buf, size_t n)
+> +{
+> + ? ? ? unsigned int value;
+> + ? ? ? int ret;
+> +
+> + ? ? ? if (sscanf(buf, "%u", &value) != 1)
+> + ? ? ? ? ? ? ? return -EINVAL;
+> +
+> + ? ? ? mutex_lock(&tracer.mutex);
+> + ? ? ? ret = value ? trace_start(&tracer) : trace_stop(&tracer);
+> + ? ? ? mutex_unlock(&tracer.mutex);
+> +
+> + ? ? ? return ret ? : n;
+> +}
+> +
+> +static struct kobj_attribute trace_running_attr =
+> + ? ? ? __ATTR(trace_running, 0644, trace_running_show, trace_running_store);
+> +
+> +static ssize_t trace_info_show(struct kobject *kobj,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct kobj_attribute *attr,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? char *buf)
+> +{
+> + ? ? ? u32 etb_wa, etb_ra, etb_st, etb_fc, etm_ctrl, etm_st;
+> + ? ? ? int datalen;
+> +
+> + ? ? ? etb_unlock(&tracer);
+> + ? ? ? datalen = etb_getdatalen(&tracer);
+> + ? ? ? etb_wa = etb_readl(&tracer, ETBR_WRITEADDR);
+> + ? ? ? etb_ra = etb_readl(&tracer, ETBR_READADDR);
+> + ? ? ? etb_st = etb_readl(&tracer, ETBR_STATUS);
+> + ? ? ? etb_fc = etb_readl(&tracer, ETBR_FORMATTERCTRL);
+> + ? ? ? etb_lock(&tracer);
+> +
+> + ? ? ? etm_unlock(&tracer);
+> + ? ? ? etm_ctrl = etm_readl(&tracer, ETMR_CTRL);
+> + ? ? ? etm_st = etm_readl(&tracer, ETMR_STATUS);
+> + ? ? ? etm_lock(&tracer);
+> +
+> + ? ? ? return sprintf(buf, "Trace buffer len: %d\nComparator pairs: %d\n"
+> + ? ? ? ? ? ? ? ? ? ? ? "ETBR_WRITEADDR:\t%08x\n"
+> + ? ? ? ? ? ? ? ? ? ? ? "ETBR_READADDR:\t%08x\n"
+> + ? ? ? ? ? ? ? ? ? ? ? "ETBR_STATUS:\t%08x\n"
+> + ? ? ? ? ? ? ? ? ? ? ? "ETBR_FORMATTERCTRL:\t%08x\n"
+> + ? ? ? ? ? ? ? ? ? ? ? "ETMR_CTRL:\t%08x\n"
+> + ? ? ? ? ? ? ? ? ? ? ? "ETMR_STATUS:\t%08x\n",
+> + ? ? ? ? ? ? ? ? ? ? ? datalen,
+> + ? ? ? ? ? ? ? ? ? ? ? tracer.ncmppairs,
+> + ? ? ? ? ? ? ? ? ? ? ? etb_wa,
+> + ? ? ? ? ? ? ? ? ? ? ? etb_ra,
+> + ? ? ? ? ? ? ? ? ? ? ? etb_st,
+> + ? ? ? ? ? ? ? ? ? ? ? etb_fc,
+> + ? ? ? ? ? ? ? ? ? ? ? etm_ctrl,
+> + ? ? ? ? ? ? ? ? ? ? ? etm_st
+> + ? ? ? ? ? ? ? ? ? ? ? );
+> +}
+> +
+> +static struct kobj_attribute trace_info_attr =
+> + ? ? ? __ATTR(trace_info, 0444, trace_info_show, NULL);
+> +
+> +static ssize_t trace_mode_show(struct kobject *kobj,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct kobj_attribute *attr,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? char *buf)
+> +{
+> + ? ? ? return sprintf(buf, "%d %d\n",
+> + ? ? ? ? ? ? ? ? ? ? ? !!(tracer.flags & TRACER_CYCLE_ACC),
+> + ? ? ? ? ? ? ? ? ? ? ? tracer.etm_portsz);
+> +}
+> +
+> +static ssize_t trace_mode_store(struct kobject *kobj,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct kobj_attribute *attr,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?const char *buf, size_t n)
+> +{
+> + ? ? ? unsigned int cycacc, portsz;
+> +
+> + ? ? ? if (sscanf(buf, "%u %u", &cycacc, &portsz) != 2)
+> + ? ? ? ? ? ? ? return -EINVAL;
+> +
+> + ? ? ? mutex_lock(&tracer.mutex);
+> + ? ? ? if (cycacc)
+> + ? ? ? ? ? ? ? tracer.flags |= TRACER_CYCLE_ACC;
+> + ? ? ? else
+> + ? ? ? ? ? ? ? tracer.flags &= ~TRACER_CYCLE_ACC;
+> +
+> + ? ? ? tracer.etm_portsz = portsz & 0x0f;
+> + ? ? ? mutex_unlock(&tracer.mutex);
+> +
+> + ? ? ? return n;
+> +}
+> +
+> +static struct kobj_attribute trace_mode_attr =
+> + ? ? ? __ATTR(trace_mode, 0644, trace_mode_show, trace_mode_store);
+> +
+> +static int __devinit etm_drv_probe(struct platform_device *pdev)
+> +{
+> + ? ? ? struct tracectx *t = platform_get_drvdata(pdev);
+> + ? ? ? struct resource *res;
+> + ? ? ? int ret = 0;
+> +
+> + ? ? ? if (t && t->etm_regs) {
+> + ? ? ? ? ? ? ? dev_dbg(&pdev->dev, "ETM already initialized\n");
+> + ? ? ? ? ? ? ? ret = -EBUSY;
+> + ? ? ? ? ? ? ? goto out;
+> + ? ? ? }
+> +
+> + ? ? ? res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> + ? ? ? if (!res) {
+> + ? ? ? ? ? ? ? ret = -ENODEV;
+> + ? ? ? ? ? ? ? goto out;
+> + ? ? ? }
+> +
+> + ? ? ? if (!request_mem_region(res->start, SZ_4K, "etm")) {
+
+request_mem_region(res->start, resource_size(res), "etm")
+
+> + ? ? ? ? ? ? ? ret = -EBUSY;
+> + ? ? ? ? ? ? ? goto out;
+> + ? ? ? }
+> +
+> + ? ? ? if (!t) {
+> + ? ? ? ? ? ? ? t = &tracer;
+> + ? ? ? ? ? ? ? platform_set_drvdata(pdev, t);
+> + ? ? ? }
+> +
+> + ? ? ? t->etm_regs = ioremap_nocache(res->start, SZ_4K);
+
+resource_size(res)
+
+> + ? ? ? if (!t->etm_regs) {
+> + ? ? ? ? ? ? ? ret = -ENOMEM;
+> + ? ? ? ? ? ? ? release_mem_region(res->start, SZ_4K);
+
+resource_size(res)
+
+> + ? ? ? ? ? ? ? platform_set_drvdata(pdev, NULL);
+> + ? ? ? ? ? ? ? goto out;
+> + ? ? ? }
+> +
+> + ? ? ? mutex_init(&t->mutex);
+> + ? ? ? t->dev = &pdev->dev;
+> + ? ? ? t->flags = TRACER_CYCLE_ACC;
+> + ? ? ? t->etm_portsz = 1;
+> +
+> + ? ? ? etm_unlock(t);
+> + ? ? ? ret = etm_readl(t, CSCR_PRSR);
+> +
+> + ? ? ? t->ncmppairs = etm_readl(t, ETMR_CONFCODE) & 0xf;
+> + ? ? ? etm_writel(t, 0x440, ETMR_CTRL);
+> + ? ? ? etm_lock(t);
+> +
+> + ? ? ? ret = sysfs_create_file(&pdev->dev.kobj,
+> + ? ? ? ? ? ? ? ? ? ? ? &trace_running_attr.attr);
+> + ? ? ? ret = sysfs_create_file(&pdev->dev.kobj,
+> + ? ? ? ? ? ? ? ? ? ? ? &trace_info_attr.attr);
+> + ? ? ? ret = sysfs_create_file(&pdev->dev.kobj,
+> + ? ? ? ? ? ? ? ? ? ? ? &trace_mode_attr.attr);
+> + ? ? ? dev_dbg(t->dev, "ETM platform driver initialized.\n");
+> +
+> +out:
+> + ? ? ? return ret;
+> +}
+> +
+> +static struct platform_driver etm_driver = {
+> + ? ? ? .probe ? ? ? ? ? = etm_drv_probe,
+> + ? ? ? .driver ?= {
+> + ? ? ? ? ? ? ? .name ? ?= "etm",
+> + ? ? ? ? ? ? ? .owner ? = THIS_MODULE,
+> + ? ? ? },
+> +};
+> +
+> +static int __init etm_init(void)
+> +{
+> + ? ? ? platform_driver_register(&etb_driver);
+> + ? ? ? platform_driver_register(&etm_driver);
+
+You're not checking the return values.
+
+I think this calls for using platform_driver_probe(&etm_driver, etm_drv_probe);
+and removing the .probe part of the driver and tag the probe functions
+as __init as well.
+
+> + ? ? ? register_sysrq_key('v', &sysrq_etm_op);
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +module_init(etm_init);
+> +
+> --
+> 1.6.3.3
+
+Yours,
+Linus Walleij
