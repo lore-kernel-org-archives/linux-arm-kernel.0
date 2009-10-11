@@ -1,63 +1,29 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 11 Oct 2009 11:04:23 +0200
-Subject: zaurus suspend saga: 2.6.32-rc3
-Message-ID: <20091011090423.GB1414@ucw.cz>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Sun, 11 Oct 2009 14:30:21 +0300
+Subject: [PATCH 1/2] Update ts72xx to use generic platform nand driver
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901DB7967@mi8nycmail19.Mi8.com>
+References: <BD79186B4FD85F4B8E60E381CAEE190901DB7967@mi8nycmail19.Mi8.com>
+Message-ID: <1255260621.16942.38.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Tue, 2009-10-06 at 18:19 -0400, H Hartley Sweeten wrote:
+> Update the ts72xx platform's nand driver support.
+> 
+> This changes the ts72xx platform from using a custom nand driver
+> (ts7250.c) to the generic platform nand driver (plat_nand.c).
+> 
+> Tested on TS-7250 with 32MB NAND.
+> 
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Tested-by: Matthieu Crapet <mcrapet@gmail.com>
+> Cc: David Woodhouse <dwmw2@infradead.org>
+> Cc: <linux-arm-kernel@lists.infradead.org>
+> Cc: <linux-mtd@lists.infradead.org>
 
-I'm using patch similar to this for debugging:
-
-...and good news is that it blinks after pressing of power button.
-
-...core > pm_test also works.
-
-I also verified that end of pxa_pm_enter() is reached (with similar
-blinking patch). End of corgi_pxa_pm_enter() seems to be reached, too.
-
-Any ideas what to try next?
-								Pavel
-
---- arm.ofic//mach-pxa/pm.c	2009-09-10 00:13:59.000000000 +0200
-+++ arm/mach-pxa/pm.c	2009-10-07 14:21:21.000000000 +0200
-@@ -14,7 +14,10 @@
- #include <linux/module.h>
- #include <linux/suspend.h>
- #include <linux/errno.h>
-+#include <linux/gpio.h>
-+#include <linux/delay.h>
- 
-+#include <mach/spitz.h>
- #include <mach/pm.h>
- 
- struct pxa_cpu_pm_fns *pxa_cpu_pm_fns;
-@@ -41,6 +44,24 @@
- 
- 	/* *** go zzz *** */
- 	pxa_cpu_pm_fns->enter(state);
-+
-+	gpio_set_value(SPITZ_GPIO_LED_GREEN, 0);
-+	mdelay(100);
-+	gpio_set_value(SPITZ_GPIO_LED_GREEN, 1);
-+	mdelay(100);
-+	gpio_set_value(SPITZ_GPIO_LED_GREEN, 0);
-+	mdelay(100);
-+	gpio_set_value(SPITZ_GPIO_LED_GREEN, 1);
-+	mdelay(100);
-+	gpio_set_value(SPITZ_GPIO_LED_GREEN, 0);
-+	mdelay(100);
-+	gpio_set_value(SPITZ_GPIO_LED_GREEN, 1);
-+	mdelay(100);
-+	gpio_set_value(SPITZ_GPIO_LED_GREEN, 0);
-+	mdelay(100);
-+	gpio_set_value(SPITZ_GPIO_LED_GREEN, 1);
-+	mdelay(100);
-+
- 	cpu_init();
- 
- 	if (state != PM_SUSPEND_STANDBY) {
+Patches do not apply cleanly to current mtd tree. Please, refresh
+and resend.
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Best Regards,
+Artem Bityutskiy (????? ????????)
