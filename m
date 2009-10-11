@@ -1,58 +1,51 @@
-From: dk-arm-linux@gmx.de (Dieter Kiermaier)
-Date: Mon, 12 Oct 2009 14:39:22 +0200
-Subject: mdev (hotplug/udev???) umount problem with latest kernel for openrd
-Message-ID: <200910121439.22862.dk-arm-linux@gmx.de>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 11 Oct 2009 14:14:58 +0200
+Subject: ucb1x00 patches
+In-Reply-To: <20091007081235.GA6246@n2100.arm.linux.org.uk>
+References: <4ACB7123.8000609@gmx.de> <19148.16274.293527.828860@ipc1.ka-ro>
+	<200910070956.42651.marek.vasut@gmail.com>
+	<20091007081235.GA6246@n2100.arm.linux.org.uk>
+Message-ID: <20091011121458.GA1356@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everybody,
+On Wed 2009-10-07 09:12:35, Russell King - ARM Linux wrote:
+> On Wed, Oct 07, 2009 at 09:56:42AM +0200, Marek Vasut wrote:
+> > Dne St 7. ????jna 2009 09:13:22 Lothar Wa??mann napsal(a):
+> > > Hi,
+> > > 
+> > > Thomas Kunze writes:
+> > > > Hi,
+> > > >
+> > > > I posted these patches at linux-arm-kernel as part of the patchset
+> > > > "collie and SA1100 patches".
+> > > > Could you please comment on them? I'd also like to know you opinion on
+> > > > moving ucb1x00-ts.c to
+> > > > input/drivers/touchscreen.
+> > > 
+> > > What about the ucb1400_ts.c which is already there?
+> > > 
+> > 
+> > I'd be for unifying all the ucb drivers into a single one, but Russell was 
+> > against it iirc.
+> 
+> They're different beasts, and I really don't think they should be unified.
+> They have different register layouts, and different access arrangements,
+> which need different handling.
+> 
+> The result is that the UCB1200/UCB1300 support gets unnecessarily penalised
+> when UCB1400 is integrated - instead of merely taking a spinlock and
+> accessing the register, you have to ensure everything you do is in thread
+> context, including interrupt handlers.
 
-I observe a problem with unmounting usb pendrives by using mdev (busybox mini udev).
+Is it that bad?
 
-Today morning I've updated Dhaval Vasas tree ( http://repo.or.cz/w/linux-2.6/linux-2.6-openrd.git )
-and since then I couldn't run umount -f /dev/sda1 if I unplug my usb pendrive before that.
-
-My kernel version is now:
-
-sh-3.2# uname -a
-Linux DB88FXX81 2.6.32-rc3-ga45e255 #1 PREEMPT Mon Oct 12 09:04:59 CEST 2009 armv5tel GNU/Linux
-
-
-But that's exactly what happens when I unplug the stick and mdev runs my helper scprit to run umount -f /dev/sda1.
-
-The process umount hangs (but in the background) and also the mdev process hangs and never comes back.
-
-strace on mdev shows:
-sh-3.2# strace -p 522
-Process 522 attached - interrupt to quit
-wait4(526,
-
-strace on umount shows:
-sh-3.2# strace -p 533
-Process 533 attached - interrupt to quit
-
-and never comes back (couldn't interrupt with CTRL-C for example)
-
-After some time (I think about 120sec...) the following is displayed on my console:
-INFO: task umount:533 blocked for more than 120 seconds.
-"echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
-umount        D c03575c0     0   533    526 0x00000001
-[<c03575c0>] (schedule+0x360/0x3f0) from [<c00d08dc>] (bdi_sched_wait+0xc/0x18)
-[<c00d08dc>] (bdi_sched_wait+0xc/0x18) from [<c03580e4>] (__wait_on_bit+0x60/0xac)
-[<c03580e4>] (__wait_on_bit+0x60/0xac) from [<c03581a4>] (out_of_line_wait_on_bit+0x74/0x80)
-[<c03581a4>] (out_of_line_wait_on_bit+0x74/0x80) from [<c00d0970>] (sync_inodes_sb+0x88/0x17c)
-[<c00d0970>] (sync_inodes_sb+0x88/0x17c) from [<c00d4c24>] (__sync_filesystem+0x30/0x6c)
-[<c00d4c24>] (__sync_filesystem+0x30/0x6c) from [<c00b5234>] (generic_shutdown_super+0x2c/0x130)
-[<c00b5234>] (generic_shutdown_super+0x2c/0x130) from [<c00b5354>] (kill_block_super+0x1c/0x38)
-[<c00b5354>] (kill_block_super+0x1c/0x38) from [<c00b56ac>] (deactivate_super+0x68/0x8c)
-[<c00b56ac>] (deactivate_super+0x68/0x8c) from [<c00cc720>] (sys_umount+0x2c8/0x2fc)
-[<c00cc720>] (sys_umount+0x2c8/0x2fc) from [<c00259c0>] (ret_fast_syscall+0x0/0x28)
+If sharing makes sense on source-code level, that kind of penalty
+should be acceptable. If it makes more eyes on the sources, it will
+still be a win.
+									Pavel
 
 
-Does anybody has an idea how I can track this down?
-
-With the former version from http://repo.or.cz/w/linux-2.6/linux-2.6-openrd.git everything works fine :(
-
-Any tips are very appreciated.
-
-Dieter
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
