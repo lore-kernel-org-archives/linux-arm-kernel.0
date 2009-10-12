@@ -1,68 +1,26 @@
-From: ngupta@vflare.org (Nitin Gupta)
-Date: Mon, 12 Oct 2009 14:20:23 +0530
-Subject: [PATCH] [ARM] force dcache flush if dcache_dirty bit set
-Message-ID: <1255337423-3158-1-git-send-email-ngupta@vflare.org>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Mon, 12 Oct 2009 11:02:16 +0200
+Subject: [PATCH] arch/arm/common/vic.c: code reorganization
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901DB7D84@mi8nycmail19.Mi8.com>
+References: <BD79186B4FD85F4B8E60E381CAEE190901CBF46D@mi8nycmail19.Mi8.com>
+	<63386a3d0909180155s3032d6e7jc18b36e1b62a288f@mail.gmail.com>
+	<BD79186B4FD85F4B8E60E381CAEE190901D41EF4@mi8nycmail19.Mi8.com>
+	<20090918163111.GA2284@n2100.arm.linux.org.uk>
+	<BD79186B4FD85F4B8E60E381CAEE190901D42615@mi8nycmail19.Mi8.com>
+	<BD79186B4FD85F4B8E60E381CAEE190901DB7709@mi8nycmail19.Mi8.com>
+	<BD79186B4FD85F4B8E60E381CAEE190901DB7D84@mi8nycmail19.Mi8.com>
+Message-ID: <63386a3d0910120202u5144bc7ep6b2008a71089369e@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARM, update_mmu_cache() does dcache flush for a page only if
-it has a kernel mapping (page_mapping(page) != NULL). The correct
-behavior would be to force the flush based on dcache_dirty bit only.
+2009/10/9 H Hartley Sweeten <hartleys@visionengravers.com>:
 
-One of the cases where present logic would be a problem is when
-a RAM based block device[1] is used as a swap disk. In this case,
-we would have in-memory data corruption as shown in steps below:
+> This reorganizes the vic.c code in anticipation of a future patch
+> to use struct vic_device as the data stored in set_irq_chip_data().
 
-do_swap_page()
-{
-    - Allocate a new page (if not already in swap cache)
-    - Issue read from swap disk
-        - Block driver issues flush_dcache_page()
-        - flush_dcache_page() simply sets PG_dcache_dirty bit and does not
-          actually issue a flush since this page has no user space mapping yet.
-    - Now, if swap disk is almost full, this newly read page is removed
-      from swap cache and corrsponding swap slot is freed.
-    - Map this page anonymously in user space.
-    - update_mmu_cache()
-        - Since this page does not have kernel mapping (its not in page/swap
-          cache and is mapped anonymously), it does not issue dcache flush
-          even if dcache_dirty bit is set by flush_dcache_page() above.
+I've tried to test this but I've got some real mangling problems when I
+bring up the raw mail, =20 =3D and =<newline> all over the place,
+I don't know if this is all my own fault, so that gmail mangles it.
+Can you send me a copy as an attachment that I can test?
 
-    <user now gets stale data since dcache was never flushed>
-}
-
-Same problem exists on mips too.
-
-[1] example:
- - brd (RAM based block device)
- - ramzswap (RAM based compressed swap device)
-
-Signed-off-by: Nitin Gupta <ngupta@vflare.org>
----
- arch/arm/mm/fault-armv.c |    9 +++------
- 1 files changed, 3 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
-index bc0099d..d0d17b6 100644
---- a/arch/arm/mm/fault-armv.c
-+++ b/arch/arm/mm/fault-armv.c
-@@ -153,14 +153,11 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr, pte_t pte)
- 
- 	page = pfn_to_page(pfn);
- 	mapping = page_mapping(page);
--	if (mapping) {
- #ifndef CONFIG_SMP
--		int dirty = test_and_clear_bit(PG_dcache_dirty, &page->flags);
--
--		if (dirty)
--			__flush_dcache_page(mapping, page);
-+	if (test_and_clear_bit(PG_dcache_dirty, &page->flags))
-+		__flush_dcache_page(mapping, page);
- #endif
--
-+	if (mapping) {
- 		if (cache_is_vivt())
- 			make_coherent(mapping, vma, addr, pfn);
- 		else if (vma->vm_flags & VM_EXEC)
--- 
-1.6.2.5
+Linus Walleij
