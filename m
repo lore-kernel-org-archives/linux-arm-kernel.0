@@ -1,154 +1,80 @@
-From: tabbott@ksplice.com (Tim Abbott)
-Date: Mon, 12 Oct 2009 10:41:10 -0400 (EDT)
-Subject: [PATCH v4 2/2] arm: Clean up linker script using new linker
-	script macros.
-In-Reply-To: <1254515567-27110-2-git-send-email-tabbott@ksplice.com>
-References: <alpine.DEB.1.10.0910021536510.19358@dr-wily.mit.edu>
-	<1254515567-27110-2-git-send-email-tabbott@ksplice.com>
-Message-ID: <alpine.DEB.1.10.0910121036130.6253@dr-wily.mit.edu>
+From: joel@jms.id.au (Joel Stanley)
+Date: Tue, 13 Oct 2009 01:16:46 +1030
+Subject: [PATCH] [ARM] kirkwood: combine support for openrd base/client
+	support
+In-Reply-To: <200910120946.01628.dk-arm-linux@gmx.de>
+References: <20091009123956.GA6085@chipmunk>
+	<200910120836.03584.dk-arm-linux@gmx.de>
+	<20091012073122.GH6085@chipmunk>
+	<200910120946.01628.dk-arm-linux@gmx.de>
+Message-ID: <ad9478410910120746g2ce82af1t71a84ea02e9eecb7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Can someone with an arm machine test this patch?  I'd really appreciate 
-it.
+Hello,
 
-	-Tim Abbott
+On Mon, Oct 12, 2009 at 18:16, Dieter Kiermaier <dk-arm-linux@gmx.de> wrote:
+>> If you can point out where I should be looking, I will have a look and
+>> if I can find it I will enable it.
+>
+> I'm sorry, but I haven't an openrd-client board :(
+> Maybe someone else can help us?
 
-On Fri, 2 Oct 2009, Tim Abbott wrote:
+I have tested Alexander's patch on my openrd-client board, applied to
+Linus' tree.  It boots and networking works fine.
 
-> From: Nelson Elhage <nelhage@ksplice.com>
-> 
-> This patch is mostly a straightforward translation. The primary side
-> effect to the resulting vmlinux should be to increase the alignment on
-> the initramfs to the standard PAGE_SIZE from 32 bytes.
-> 
-> Signed-off-by: Nelson Elhage <nelhage@ksplice.com>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Tim Abbott <tabbott@ksplice.com>
-> Acked-by: Sam Ravnborg <sam@ravnborg.org>
-> ---
->  arch/arm/kernel/vmlinux.lds.S |   77 ++++++++++++----------------------------
->  1 files changed, 23 insertions(+), 54 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> index 0902f80..71151bd 100644
-> --- a/arch/arm/kernel/vmlinux.lds.S
-> +++ b/arch/arm/kernel/vmlinux.lds.S
-> @@ -40,43 +40,31 @@ SECTIONS
->  		__tagtable_begin = .;
->  			*(.taglist.init)
->  		__tagtable_end = .;
-> -		. = ALIGN(16);
-> -		__setup_start = .;
-> -			*(.init.setup)
-> -		__setup_end = .;
-> +
-> +		INIT_SETUP(16)
-> +
->  		__early_begin = .;
->  			*(.early_param.init)
->  		__early_end = .;
-> -		__initcall_start = .;
-> -			INITCALLS
-> -		__initcall_end = .;
-> -		__con_initcall_start = .;
-> -			*(.con_initcall.init)
-> -		__con_initcall_end = .;
-> -		__security_initcall_start = .;
-> -			*(.security_initcall.init)
-> -		__security_initcall_end = .;
-> -#ifdef CONFIG_BLK_DEV_INITRD
-> -		. = ALIGN(32);
-> -		__initramfs_start = .;
-> -			usr/built-in.o(.init.ramfs)
-> -		__initramfs_end = .;
-> -#endif
-> -		. = ALIGN(PAGE_SIZE);
-> -		__per_cpu_load = .;
-> -		__per_cpu_start = .;
-> -			*(.data.percpu.page_aligned)
-> -			*(.data.percpu)
-> -			*(.data.percpu.shared_aligned)
-> -		__per_cpu_end = .;
-> +
-> +		INIT_CALLS
-> +		CON_INITCALL
-> +		SECURITY_INITCALL
-> +		INIT_RAM_FS
-> +
->  #ifndef CONFIG_XIP_KERNEL
->  		__init_begin = _stext;
->  		INIT_DATA
-> -		. = ALIGN(PAGE_SIZE);
-> -		__init_end = .;
->  #endif
->  	}
->  
-> +	PERCPU(PAGE_SIZE)
-> +
-> +#ifndef CONFIG_XIP_KERNEL
-> +	. = ALIGN(PAGE_SIZE);
-> +	__init_end = .;
-> +#endif
-> +
->  	/DISCARD/ : {			/* Exit code and data		*/
->  		EXIT_TEXT
->  		EXIT_DATA
-> @@ -155,7 +143,7 @@ SECTIONS
->  		 * first, the init task union, aligned
->  		 * to an 8192 byte boundary.
->  		 */
-> -		*(.data.init_task)
-> +		INIT_TASK_DATA(THREAD_SIZE)
->  
->  #ifdef CONFIG_XIP_KERNEL
->  		. = ALIGN(PAGE_SIZE);
-> @@ -165,17 +153,8 @@ SECTIONS
->  		__init_end = .;
->  #endif
->  
-> -		. = ALIGN(PAGE_SIZE);
-> -		__nosave_begin = .;
-> -		*(.data.nosave)
-> -		. = ALIGN(PAGE_SIZE);
-> -		__nosave_end = .;
-> -
-> -		/*
-> -		 * then the cacheline aligned data
-> -		 */
-> -		. = ALIGN(32);
-> -		*(.data.cacheline_aligned)
-> +		NOSAVE_DATA
-> +		CACHELINE_ALIGNED_DATA(32)
->  
->  		/*
->  		 * The exception fixup table (might need resorting at runtime)
-> @@ -254,20 +233,10 @@ SECTIONS
->  	}
->  #endif
->  
-> -	.bss : {
-> -		__bss_start = .;	/* BSS				*/
-> -		*(.bss)
-> -		*(COMMON)
-> -		__bss_stop = .;
-> -		_end = .;
-> -	}
-> -					/* Stabs debugging sections.	*/
-> -	.stab 0 : { *(.stab) }
-> -	.stabstr 0 : { *(.stabstr) }
-> -	.stab.excl 0 : { *(.stab.excl) }
-> -	.stab.exclstr 0 : { *(.stab.exclstr) }
-> -	.stab.index 0 : { *(.stab.index) }
-> -	.stab.indexstr 0 : { *(.stab.indexstr) }
-> +	BSS_SECTION(0, 0, 0)
-> +	_end = .;
-> +
-> +	STABS_DEBUG
->  	.comment 0 : { *(.comment) }
->  }
->  
-> -- 
-> 1.6.4.3
-> 
-> 
+I also added calls to initialise i2c and pcie based on the patch by
+Simon Kagstrom, and both devices appear to work.  The diff I added is
+attached.
+
+# i2cdetect -l
+i2c-0	i2c       	mv64xxx_i2c adapter             	I2C adapter
+
+# lspci -v
+00:00.0 Memory controller: Marvell Technology Group Ltd. Device 6281 (rev 02)
+	Subsystem: Marvell Technology Group Ltd. Device 11ab
+	Flags: bus master, fast devsel, latency 0, IRQ 9
+	Memory at <ignored> (64-bit, prefetchable)
+	Capabilities: [40] Power Management version 3
+	Capabilities: [50] MSI: Enable- Count=1/1 Maskable- 64bit+
+	Capabilities: [60] Express Root Port (Slot-), MSI 00
+	Capabilities: [100] Advanced Error Reporting
+
+00:01.0 VGA compatible controller: XGI Technology Inc. (eXtreme
+Graphics Innovation) Z11/Z11M (prog-if 00 [VGA controller])
+	Flags: bus master, fast devsel, latency 0
+	BIST result: 00
+	Memory at e0000000 (32-bit, prefetchable) [size=64M]
+	Memory at e4000000 (32-bit, non-prefetchable) [size=256K]
+	I/O ports at f2000000 [size=128]
+	[virtual] Expansion ROM at e4040000 [disabled] [size=64K]
+	Capabilities: [40] Power Management version 2
+	Capabilities: [a0] Express Endpoint, MSI 01
+	Capabilities: [c0] MSI: Enable- Count=1/1 Maskable- 64bit-
+	Capabilities: [100] Advanced Error Reporting
+
+Joel
+
+--
+
+Author: Joel Stanley <joel@jms.id.au>
+Date:   Tue Oct 13 00:02:04 2009 +1030
+
+    Add pcie and i2c initalisation
+
+diff --git a/arch/arm/mach-kirkwood/openrd-setup.c
+b/arch/arm/mach-kirkwood/openrd-setup.c
+index 6bdeeab..d5504e2 100644
+--- a/arch/arm/mach-kirkwood/openrd-setup.c
++++ b/arch/arm/mach-kirkwood/openrd-setup.c
+@@ -80,6 +80,10 @@ static void __init openrd_init(void)
+ #endif
+        kirkwood_sata_init(&openrd_sata_data);
+        kirkwood_sdio_init(&openrd_mvsdio_data);
++
++       kirkwood_i2c_init();
++
++       kirkwood_pcie_init();
+ }
+
+ #ifdef CONFIG_MACH_OPENRD_BASE
