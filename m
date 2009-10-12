@@ -1,46 +1,23 @@
-From: ngupta@vflare.org (Nitin Gupta)
-Date: Mon, 12 Oct 2009 22:42:22 +0530
-Subject: [PATCH] [ARM] force dcache flush if dcache_dirty bit set
-In-Reply-To: <20091012170312.GB9453@flint.arm.linux.org.uk>
-References: <1255337423-3158-1-git-send-email-ngupta@vflare.org>
-	<20091012090710.GA29310@n2100.arm.linux.org.uk>
-	<20091012.023744.157085851.davem@davemloft.net>
-	<20091012100023.GC29310@n2100.arm.linux.org.uk>
-	<Pine.LNX.4.64.0910121634170.7327@sister.anvils>
-	<20091012170312.GB9453@flint.arm.linux.org.uk>
-Message-ID: <4AD36376.60007@vflare.org>
+From: thommycheck@gmx.de (Thomas Kunze)
+Date: Mon, 12 Oct 2009 19:31:52 +0200
+Subject: [PATCH 5/9] SA1100: make gpio_to_irq and reverse a macro
+In-Reply-To: <20091011121512.GB1356@ucw.cz>
+References: <1254778533-3529-1-git-send-email-thommycheck@gmx.de>	<1254778533-3529-2-git-send-email-thommycheck@gmx.de>	<1254778533-3529-3-git-send-email-thommycheck@gmx.de>	<1254778533-3529-4-git-send-email-thommycheck@gmx.de>	<1254778533-3529-5-git-send-email-thommycheck@gmx.de>	<1254778533-3529-6-git-send-email-thommycheck@gmx.de>
+	<20091011121512.GB1356@ucw.cz>
+Message-ID: <4AD36808.5030506@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/2009 10:33 PM, Russell King wrote:
-> On Mon, Oct 12, 2009 at 05:09:53PM +0100, Hugh Dickins wrote:
->> Sorry to muddy the waters on this, if you and Dave are sure that
->> you have the right fix, down in your architectures, and that fix
->> isn't going to hurt your performance significantly.
-> 
-> If I look at the issue from this point of view:
-> 
-> - we are using PG_arch_1 to delay cache handling for the page
-> 
-> - if PG_arch_1 is set on a page, we set it explicitly because we
->   didn't do some flushing between the allocation of the page and
->   mapping it into userspace
-> 
-> - if a page with PG_arch_1 set ever gets to userspace, this can
->   only be because we did the lazy flushing thing
+Pavel Machek wrote:
+> Hi!
 >
-
- 
-> I don't see that there should have been any bearing on whether a page
-> has a mapping or not when we get to update_mmu_cache.  The issue here
-> is that > if PG_arch_1 is set on a page, then we didn't flush it at
-> the time when we believed it was appropriate to do so. <
-> 
-
-
-Presented so clearly by Russell and this is exactly what I meant, though
-the example just focused on some particular swap case which I happen to
-stumble upon while working on something similar.
-
-Thanks,
-Nitin
+>   
+>> The function can't be used for static initialisations so
+>> convert them to macros.
+>>
+>> Signed-off-by: Thomas Kunze <thommycheck@gmx.de>
+>>     
+>
+> Do you actually use them in initializers?
+>   
+Yes the last patch of the series does.
