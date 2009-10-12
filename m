@@ -1,49 +1,20 @@
-From: hugh.dickins@tiscali.co.uk (Hugh Dickins)
-Date: Mon, 12 Oct 2009 19:06:04 +0100 (BST)
-Subject: [PATCH] [ARM] force dcache flush if dcache_dirty bit set
-In-Reply-To: <20091012170312.GB9453@flint.arm.linux.org.uk>
-References: <1255337423-3158-1-git-send-email-ngupta@vflare.org>
-	<20091012090710.GA29310@n2100.arm.linux.org.uk>
-	<20091012.023744.157085851.davem@davemloft.net>
-	<20091012100023.GC29310@n2100.arm.linux.org.uk>
-	<Pine.LNX.4.64.0910121634170.7327@sister.anvils>
-	<20091012170312.GB9453@flint.arm.linux.org.uk>
-Message-ID: <Pine.LNX.4.64.0910121855070.21347@sister.anvils>
+From: sleep_walker@suse.cz (=?utf-8?q?Tom=C3=A1=C5=A1_=27Sleep=5FWalker=27?=
+	=?utf-8?q?_=C4=8Cech?=)
+Date: Mon, 12 Oct 2009 20:45:44 +0200
+Subject: [PATCH 1/2] PalmTreo: generalisation of Treo680 code
+In-Reply-To: <f17812d70910100706r6bb37749ud15fd496fcd2fc28@mail.gmail.com>
+References: <1252670222-25233-1-git-send-email-sleep_walker@suse.cz>
+	<200909131127.05790.marek.vasut@gmail.com>
+	<f17812d70910100706r6bb37749ud15fd496fcd2fc28@mail.gmail.com>
+Message-ID: <200910122045.44945.sleep_walker@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Oct 2009, Russell King wrote:
-> On Mon, Oct 12, 2009 at 05:09:53PM +0100, Hugh Dickins wrote:
-> > Sorry to muddy the waters on this, if you and Dave are sure that
-> > you have the right fix, down in your architectures, and that fix
-> > isn't going to hurt your performance significantly.
-> 
-> If I look at the issue from this point of view:
-> 
-> - we are using PG_arch_1 to delay cache handling for the page
-> 
-> - if PG_arch_1 is set on a page, we set it explicitly because we
->   didn't do some flushing between the allocation of the page and
->   mapping it into userspace
-> 
-> - if a page with PG_arch_1 set ever gets to userspace, this can
->   only be because we did the lazy flushing thing
-> 
-> I don't see that there should have been any bearing on whether a page
-> has a mapping or not when we get to update_mmu_cache.  The issue here
-> is that > if PG_arch_1 is set on a page, then we didn't flush it at
-> the time when we believed it was appropriate to do so. <
-> 
-> Tell me I'm wrong (having only just sent it to Linus...)
+Dne So 10. ??jna 2009 16:06:59 Eric Miao napsal(a):
+> Sorry for late response. Applied to 'devel'.
 
-I wouldn't dare!  Put that way, it seems very clear that it was always
-at best a redundant test, which Nitin now shows can go wrong.  Okay,
-thanks, let's forget about whether file invalidation can or cannot
-also put a page into this state, and proceed with your fix.
+Thanks.
 
-The architectures which appear to need fixing in the same way are
-arm, mips, parisc, sh and sparc64 (xtensa looks right already, and
-score just looks confused - a whole function __update_cache() which
-checks for PG_arch_1, yet nothing sets it?).
+Best regards,
 
-Hugh
+Tomas Cech
