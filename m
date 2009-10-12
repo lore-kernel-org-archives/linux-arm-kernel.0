@@ -1,20 +1,218 @@
-From: sleep_walker@suse.cz (=?utf-8?q?Tom=C3=A1=C5=A1_=27Sleep=5FWalker=27?=
-	=?utf-8?q?_=C4=8Cech?=)
-Date: Mon, 12 Oct 2009 20:45:44 +0200
-Subject: [PATCH 1/2] PalmTreo: generalisation of Treo680 code
-In-Reply-To: <f17812d70910100706r6bb37749ud15fd496fcd2fc28@mail.gmail.com>
-References: <1252670222-25233-1-git-send-email-sleep_walker@suse.cz>
-	<200909131127.05790.marek.vasut@gmail.com>
-	<f17812d70910100706r6bb37749ud15fd496fcd2fc28@mail.gmail.com>
-Message-ID: <200910122045.44945.sleep_walker@suse.cz>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon, 12 Oct 2009 22:11:34 +0200
+Subject: [PATCH] at91: support for eco920
+Message-ID: <1255378294-10913-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne So 10. ??jna 2009 16:06:59 Eric Miao napsal(a):
-> Sorry for late response. Applied to 'devel'.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+---
+Hello,
 
-Thanks.
+I didn't find a suitable defconfig to add this machine to.  It seems
+each machine has its own defconfig?!
 
-Best regards,
+Best regards
+Uwe
 
-Tomas Cech
+ arch/arm/mach-at91/Kconfig        |    5 +
+ arch/arm/mach-at91/Makefile       |    1 +
+ arch/arm/mach-at91/board-eco920.c |  158 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 164 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-at91/board-eco920.c
+
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index e35d54d..7878e33 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -163,6 +163,11 @@ config MACH_CPUAT91
+ 	  Select this if you are using the Eukrea Electromatique's
+ 	  CPUAT91 board <http://www.eukrea.com/>.
+ 
++config MACH_ECO920
++	bool "eco920"
++	help
++	  Select this if you are using the eco920 board
++
+ endif
+ 
+ # ----------------------------------------------------------
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index ada440a..9ad357f 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -35,6 +35,7 @@ obj-$(CONFIG_MACH_PICOTUX2XX)	+= board-picotux200.o
+ obj-$(CONFIG_MACH_ECBAT91)	+= board-ecbat91.o
+ obj-$(CONFIG_MACH_YL9200)	+= board-yl-9200.o
+ obj-$(CONFIG_MACH_CPUAT91)	+= board-cpuat91.o
++obj-$(CONFIG_MACH_ECO920)	+= board-eco920.o
+ 
+ # AT91SAM9260 board-specific support
+ obj-$(CONFIG_MACH_AT91SAM9260EK) += board-sam9260ek.o
+diff --git a/arch/arm/mach-at91/board-eco920.c b/arch/arm/mach-at91/board-eco920.c
+new file mode 100644
+index 0000000..974f175
+--- /dev/null
++++ b/arch/arm/mach-at91/board-eco920.c
+@@ -0,0 +1,158 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++ */
++
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/mtd/physmap.h>
++
++#include <asm/mach-types.h>
++
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++
++#include <mach/board.h>
++#include <mach/gpio.h>
++#include <mach/at91rm9200_mc.h>
++#include "generic.h"
++
++static void __init eco920_map_io(void)
++{
++	at91rm9200_initialize(18432000, AT91RM9200_PQFP);
++
++	/* Setup the LEDs */
++	at91_init_leds(AT91_PIN_PB0, AT91_PIN_PB1);
++
++	/* DBGU on ttyS0. (Rx & Tx only */
++	at91_register_uart(0, 0, 0);
++
++	/* set serial console to ttyS0 (ie, DBGU) */
++	at91_set_serial_console(0);
++}
++
++static void __init eco920_init_irq(void)
++{
++	at91rm9200_init_interrupts(NULL);
++}
++
++static struct at91_eth_data __initdata eco920_eth_data = {
++	.phy_irq_pin	= AT91_PIN_PC2,
++	.is_rmii	= 1,
++};
++
++static struct at91_usbh_data __initdata eco920_usbh_data = {
++	.ports		= 1,
++};
++
++static struct at91_udc_data __initdata eco920_udc_data = {
++	.vbus_pin	= AT91_PIN_PB12,
++	.pullup_pin	= AT91_PIN_PB13,
++};
++
++static struct at91_mmc_data __initdata eco920_mmc_data = {
++	.slot_b		= 0,
++	.wire4		= 0,
++};
++
++static struct physmap_flash_data eco920_flash_data = {
++	.width  = 2,
++};
++
++static struct resource eco920_flash_resource = {
++	.start          = 0x11000000,
++	.end            = 0x11ffffff,
++	.flags          = IORESOURCE_MEM,
++};
++
++static struct platform_device eco920_flash = {
++	.name           = "physmap-flash",
++	.id             = 0,
++	.dev            = {
++		.platform_data  = &eco920_flash_data,
++	},
++	.resource       = &eco920_flash_resource,
++	.num_resources  = 1,
++};
++
++static struct resource at91_beeper_resources[] = {
++	[0] = {
++		.start          = AT91RM9200_BASE_TC3,
++		.end            = AT91RM9200_BASE_TC3 + 0x39,
++		.flags          = IORESOURCE_MEM,
++	},
++};
++
++static struct platform_device at91_beeper = {
++	.name           = "at91_beeper",
++	.id             = 0,
++	.resource       = at91_beeper_resources,
++	.num_resources  = ARRAY_SIZE(at91_beeper_resources),
++};
++
++static struct spi_board_info eco920_spi_devices[] = {
++	{	/* CAN controller */
++		.modalias	= "tlv5638",
++		.chip_select	= 3,
++		.max_speed_hz	= 20 * 1000 * 1000,
++		.mode		= SPI_CPHA,
++	},
++};
++
++static void __init eco920_board_init(void)
++{
++	at91_add_device_serial();
++	at91_add_device_eth(&eco920_eth_data);
++	at91_add_device_usbh(&eco920_usbh_data);
++	at91_add_device_udc(&eco920_udc_data);
++
++	at91_add_device_mmc(0, &eco920_mmc_data);
++	platform_device_register(&eco920_flash);
++
++	at91_sys_write(AT91_SMC_CSR(7),	AT91_SMC_RWHOLD_(1)
++				| AT91_SMC_RWSETUP_(1)
++				| AT91_SMC_DBW_8
++				| AT91_SMC_WSEN
++				| AT91_SMC_NWS_(15));
++
++	at91_set_A_periph(AT91_PIN_PC6, 1);
++
++	at91_set_gpio_input(AT91_PIN_PA23, 0);
++	at91_set_deglitch(AT91_PIN_PA23, 1);
++
++/* Initialization of the Static Memory Controller for Chip Select 3 */
++	at91_sys_write(AT91_SMC_CSR(3),
++		AT91_SMC_DBW_16  |	/* 16 bit */
++		AT91_SMC_WSEN    |
++		AT91_SMC_NWS_(5) |	/* wait states */
++		AT91_SMC_TDF_(1)	/* float time */
++	);
++
++	at91_clock_associate("tc3_clk", &at91_beeper.dev, "at91_beeper");
++	at91_set_B_periph(AT91_PIN_PB6, 0);
++	platform_device_register(&at91_beeper);
++
++	at91_add_device_spi(eco920_spi_devices, ARRAY_SIZE(eco920_spi_devices));
++}
++
++MACHINE_START(ECO920, "eco920")
++	/* Maintainer: Sascha Hauer */
++	.phys_io	= AT91_BASE_SYS,
++	.io_pg_offst	= (AT91_VA_BASE_SYS >> 18) & 0xfffc,
++	.boot_params	= AT91_SDRAM_BASE + 0x100,
++	.timer		= &at91rm9200_timer,
++	.map_io		= eco920_map_io,
++	.init_irq	= eco920_init_irq,
++	.init_machine	= eco920_board_init,
++MACHINE_END
+-- 
+1.6.4.3
