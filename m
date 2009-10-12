@@ -1,13 +1,13 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Tue, 13 Oct 2009 09:33:51 +1300
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 12 Oct 2009 17:51:54 -0400
 Subject: [RFC PATCH v1] EP93XX: Add ADC support
 In-Reply-To: <20091012142413.30881.62391.stgit@archeopterix.techworks.local>
 References: <20091012142413.30881.62391.stgit@archeopterix.techworks.local>
-Message-ID: <4AD392AF.8050806@bluewatersys.com>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901DB7F6F@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Christian Gagneraud wrote:
+On Monday, October 12, 2009 7:24 AM, Christian Gagneraud wrote:
 > This patch add support for the ADC found in the EP93XX.
 > 
 > This work is based on S3C platform ADC, apart from hardware related
@@ -27,13 +27,17 @@ Christian Gagneraud wrote:
 > 
 > 
 > This is a first draft. Comments and criticism welcome.
-
-Hi Christian, some comments below.
-
 > 
 > Signed-off-by: Christian Gagneraud <cgagneraud@techworks.ie>
 > ---
-> 
+
+Hello Christian,
+
+I see Ryan already sent you some comments so I'll just add mine.
+
+Run this thru checkpatch.pl please.  There are a number of whitespace
+issues in this patch.
+
 >  arch/arm/mach-ep93xx/Makefile                   |    2 
 >  arch/arm/mach-ep93xx/adc.c                      |  415 +++++++++++++++++++++++
 >  arch/arm/mach-ep93xx/clock.c                    |    7 
@@ -97,6 +101,13 @@ Hi Christian, some comments below.
 > + * |TS_SETUP_ENABLE (*)     |  0  |  0  |  1  | 0/1 |
 > + * +------------------------+-----+-----+-----+-----+
 > + * (*) 
+
+Are you missing a comment about (*)?
+
+Is it the intention that this i/o wrapper will allow BOTH the adc
+and the touchscreen to work at the same time?  I don't think that
+is possible.
+
 > + */
 > +
 > +#include <linux/module.h>
@@ -112,6 +123,11 @@ Hi Christian, some comments below.
 > +
 > +#include <mach/hardware.h>
 > +
+
+Please remove the register definitions from ep93xx-regs.h and just put the
+defines locally in this file.  They are not used anywhere else and belong
+here.  See drivers/misc/ep93xx_pwm.c as an example.
+
 > +static inline void ep93xx_adc_set_reg(void __iomem *reg,
 > +                                      unsigned long val)
 > +{	
@@ -134,6 +150,10 @@ Hi Christian, some comments below.
 > +	val |= bits;
 > +	ep93xx_adc_set_reg(reg,val);
 > +}
+
+These I/O access functions should be using the __iomem address that you
+ioremap'ed in the probe.  Again, see drivers/misc/ep93xx_pwm.c.
+
 > +
 > +struct ep93xx_adc_client {
 > +	struct platform_device *pdev;
@@ -142,16 +162,6 @@ Hi Christian, some comments below.
 > +	unsigned int nr_samples;
 > +	int result;
 > +	unsigned int channel;
-
-Tab delimiting can make these easier to read, ie:
-
-struct ep93xx_adc_client {
-	struct platform_device	*pdev;
-	struct list_head	pend;
-	wait_queue_head_t	*wait;
-	...
-};
-
 > +};
 > +
 > +struct adc_device {
@@ -170,10 +180,6 @@ struct ep93xx_adc_client {
 > +static LIST_HEAD(adc_pending);
 > +
 > +#define adc_dbg(_adc, msg...) dev_dbg(&(_adc)->pdev->dev, msg)
-
-Bit of a nitpick, but can you move the structure definitions and
-variable declarations above the first functions in this file.
-
 > +
 > +static inline void ep93xx_adc_convert(struct adc_device *adc)
 > +{
@@ -191,9 +197,6 @@ variable declarations above the first functions in this file.
 > +		 * caller can even be the irq handler. Should we
 > +		 * better fire a timer? */
 > +		mdelay(2);
-
-Perhaps make the mdelay value a platform data in the meantime then?
-
 > +	}
 > +
 > +	/* Fire ADC engine with Sync Data Ready IRQ enabled */
@@ -209,9 +212,6 @@ Perhaps make the mdelay value a platform data in the meantime then?
 > +		next = list_first_entry(&adc_pending,
 > +					struct ep93xx_adc_client, pend);
 > +		list_del(&next->pend);
-
-Are all of the callers of ep93xx_adc_try safely locked?
-
 > +		adc_dbg(adc, "new client is %p\n", next);
 > +		adc->cur = next;
 > +		ep93xx_adc_convert(adc);
@@ -226,10 +226,6 @@ Are all of the callers of ep93xx_adc_try safely locked?
 > +
 > +	if (!adc) {
 > +		printk(KERN_ERR "%s: failed to find adc\n", __func__);
-
-Change to:
-	pr_error("ep93xx_adc: %s: Failed to find adc\n", __func__);
-
 > +		return -EINVAL;
 > +	}
 > +
@@ -279,26 +275,14 @@ Change to:
 > +}
 > +
 > +EXPORT_SYMBOL_GPL(ep93xx_adc_convert);
-
-The function ep93xx_adc_convert is static inline, so this doesn't make
-sense (unless I'm missing something). The s3c code also looks broken is
-this regard (s3c_adc_convert isn't used anywhere but the driver). I
-think this should be exporting ep93xx_adc_read?
-
 > +
 > +struct ep93xx_adc_client *ep93xx_adc_register(struct platform_device *pdev)
 > +{
 > +	struct ep93xx_adc_client *client;
 > +
 > +	printk("adc_register: %s\n", pdev->name);
-
-Do we need to print this? Maybe use pr_debug or dev_dbg?
-
 > +
 > +	WARN_ON(!pdev);
-
-You dereference pdev above this line so you will have already bugged :-).
-
 > +
 > +	if (!pdev)
 > +		return ERR_PTR(-EINVAL);
@@ -354,14 +338,8 @@ You dereference pdev above this line so you will have already bugged :-).
 > +	/* Read and convert data */
 > +	data = __raw_readl(EP93XX_TS_XYRESULT);
 > +	data &= 0x0000FFFF;
-
-data &= 0xffff; is fine.
-
 > +	if (data < 0x7000)
 > +		data += 0x10000;
-
-Nitpick: data |= 0x10000 is a bit more clear.
-
 > +	data -= adc->refm;
 > +
 > +	client->nr_samples--;
@@ -370,10 +348,6 @@ Nitpick: data |= 0x10000 is a bit more clear.
 > +
 > +	/* If all samples are done, disable IRQ, and kick start the next
 > +	 * one if any. */
-
-This comment doesn't make sense. If all samples are done, kick start the
-next one? Am I missing something?
-
 > +	if (client->nr_samples == 0) {
 > +		local_irq_save(flags);
 > +		adc->cur = NULL;
@@ -394,9 +368,6 @@ next one? Am I missing something?
 > +	int ret;
 > +
 > +	printk("adc_probe: %s\n", pdev->name);
-
-pr_debug.
-
 > +
 > +	adc = kzalloc(sizeof(struct adc_device), GFP_KERNEL);
 > +	if (adc == NULL) {
@@ -421,6 +392,10 @@ pr_debug.
 > +	}
 > +
 > +	adc->clk = clk_get(dev, "ep93xx-analog");
+
+Did you try:
+	adc->clk = clk_get(dev, NULL);
+
 > +	if (IS_ERR(adc->clk)) {
 > +		dev_err(dev, "failed to get ADC clock\n");
 > +		ret = PTR_ERR(adc->clk);
@@ -433,6 +408,9 @@ pr_debug.
 > +		ret = -ENXIO;
 > +		goto err_clk;
 > +	}
+
+request_mem_region() before ioremap().
+
 > +
 > +	adc->regs = ioremap(regs->start, resource_size(regs));
 > +	if (!adc->regs) {
@@ -444,9 +422,6 @@ pr_debug.
 > +	clk_enable(adc->clk);
 > +
 > +	// Enable ADC, inactivate TS controller
-
-/* */ comments please.
-
 > +	ep93xx_devcfg_set_clear(EP93XX_SYSCON_DEVCFG_TIN,
 > +				EP93XX_SYSCON_DEVCFG_ADCPD);
 > +	// Disable TS engine
@@ -455,27 +430,21 @@ pr_debug.
 > +	ep93xx_adc_clr_reg_bits(EP93XX_TS_SETUP2, EP93XX_TS_SETUP2_NSIGND);
 > +
 > +	dev_info(dev, "attached adc driver\n");
-
-Don't really need to pollute the dmesg output.
-
 > +
 > +	platform_set_drvdata(pdev, adc);
 > +
 > +	/* Defaults from datasheet (approximated values) */
 > +	adc->refm = 0xFFFF - 25000;
-
-Erk, why two different bases? Can we just #define these values somewhere.
-
 > +	adc->refp = 25000;
 > +	adc_dev = adc;
 > +
 > +	return 0;
 > +
 > +      err_clk:
+
+Please remove whitespace before the goto labels.
+
 > +	clk_put(adc->clk);
-
-clk_disable?
-
 > +
 > +      err_irq:
 > +	free_irq(adc->irq, adc);
@@ -525,9 +494,6 @@ clk_disable?
 > +static struct platform_driver ep93xx_adc_driver = {
 > +	.driver = {
 > +		   .name = "ep93xx-analog",
-
-Why not ep93xx-adc?
-
 > +		   .owner = THIS_MODULE,
 > +		   },
 > +	.probe = ep93xx_adc_probe,
@@ -544,9 +510,6 @@ Why not ep93xx-adc?
 > +	if (ret)
 > +		printk(KERN_ERR "%s: failed to add adc driver\n",
 > +		       __func__);
-
-pr_error.
-
 > +
 > +	return ret;
 > +}
@@ -561,6 +524,9 @@ pr_error.
 >  	.set_rate	= set_keytchclk_rate,
 >  };
 > +static struct clk clk_analog = {
+
+	.parent	= &clk_xtali,
+
 > +	.sw_locked	= 1,
 > +	.enable_reg	= EP93XX_SYSCON_KEYTCHCLKDIV,
 > +	.enable_mask	= EP93XX_SYSCON_KEYTCHCLKDIV_TSEN,
@@ -600,6 +566,9 @@ pr_error.
 > +		.flags	= IORESOURCE_IRQ,
 > +	},
 > +};
+
+The [0] = and [1] = are not needed.
+
 > +
 > +struct platform_device ep93xx_analog_device = {
 > +	.name		= "ep93xx-analog",
@@ -614,6 +583,10 @@ pr_error.
 > +	.id		= -1,
 > +	.dev.parent	= &ep93xx_analog_device.dev,
 > +};
+
+Please make both of these struct's static and just add the necessary
+ep93xx_register_*() functions for the platform init to call.
+
 > +
 > +/*************************************************************************
 >   * EP93xx video peripheral handling
@@ -659,15 +632,9 @@ pr_error.
 > +#define ADC_SW_SYM_REFM         (1<<27)
 > +#define ADC_SW_DAC_IN		(1<<29)
 > +#define ADC_SW_IN_LOAD		(1<<30)
-
-Nitpick, spaces around <<
-
 > +
 > +/* AGND as VREF-, AVDD as VREF+ */
 > +#define ADC_SW_APWR_REF         (ADC_SW_AVDD_REFP|ADC_SW_AGND_REFM)
-
-Spaces around |
-
 > +
 > +struct ep93xx_adc_client;
 > +
@@ -700,7 +667,15 @@ Spaces around |
 > + * no touchscreen, the EP9307, EP9312 and EP9315 processors each
 > + * support up to an 8-wire touch screen or a general 12-bit ADC
 > + */
+
+Please remove this comment and put it in the driver file.
+
 > +#define EP93XX_TS_PHYS_BASE		(EP93XX_APB_PHYS_BASE + 0x00100000)
+
+Should be:
+
+#define EP93XX_TS_PHYS_BASE			EP93XX_APB_PHYS(0x00100000)
+
 > +#define EP93XX_TS_BASE			EP93XX_APB_IOMEM(0x00100000)
 > +#define EP93XX_TS_REG(x)		(EP93XX_TS_BASE + (x))
 > +#define EP93XX_TS_SETUP			EP93XX_TS_REG(0x00)
@@ -713,8 +688,14 @@ Spaces around |
 > +#define EP93XX_TS_SETUP2		EP93XX_TS_REG(0x24)
 > +#define EP93XX_TS_SETUP2_RINTEN		(1<<11)
 > +#define EP93XX_TS_SETUP2_NSIGND		(1<<9)
+
+None of these registers should be defined here.  Just put the offsets 
+in the adc driver.
+
 > +
->  
+
+Remove this extra blank line.
+
 >  #define EP93XX_PWM_PHYS_BASE		(EP93XX_APB_PHYS_BASE + 0x00110000)
 >  #define EP93XX_PWM_BASE			EP93XX_APB_IOMEM(0x00110000)
 > diff --git a/arch/arm/mach-ep93xx/include/mach/hwmon.h b/arch/arm/mach-ep93xx/include/mach/hwmon.h
@@ -738,9 +719,6 @@ Spaces around |
 > +
 > +#ifndef __ASM_ARCH_HWMON_H
 > +#define __ASM_ARCH_HWMON_H __FILE__
-
-Stray __FILE__?
-
 > +
 > +extern struct platform_device ep93xx_hwmon_device;
 > +
@@ -768,6 +746,9 @@ Stray __FILE__?
 > +	struct ep93xx_hwmon_chcfg *in[7];
 > +};
 > +
+
+The extra ep93xx_hwmon_data struct probably isn't needed.  See below.
+
 > +#endif				/* __ASM_ARCH_HWMON_H */
 > diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
 > index 259f782..2bbf05b 100644
@@ -779,6 +760,9 @@ Stray __FILE__?
 >  #include <mach/hardware.h>
 > +#include <mach/adc.h>
 > +#include <mach/hwmon.h>
+
+Please put these two after the tx72xx.h header.
+
 >  #include <mach/ts72xx.h>
 >  
 >  #include <asm/mach-types.h>
@@ -798,6 +782,9 @@ Stray __FILE__?
 > +        
 > +	ep93xx_hwmon_device.dev.platform_data = &ts72xx_hwmon_info;
 >  }
+
+Ugly... You shouldn't be setting up any type of device data in (*map_io).
+
 >  
 >  /*************************************************************************
 > @@ -170,6 +176,74 @@ static struct ep93xx_eth_data ts72xx_eth_data = {
@@ -819,23 +806,13 @@ Stray __FILE__?
 > +
 > +// 0V gives 0, 3.3V gives c. 50000
 > +// TODO: self calibrate by using VBAT and Load resistor switches
-
-/* */ comments please.
-
 > +static struct ep93xx_hwmon_data ts72xx_hwmon_info = {
 > +	/* POWER_IN*10K/150K (4.5-20V) */
 > +	.in[0] = &(struct ep93xx_hwmon_chcfg) {
-
-That cast looks really ugly, is there a better way?
-
 > +		.name		= "ts72xx-vin",
 > +                .channel        = TS72XX_ADC0,
 > +		.mult		= 33*(15+1),
 > +		.div		= 500*1,
-
-Spaces around operators please. Also why the explict multiplies
-(especially by 1)?
-
 > +	},
 > +	/* PC104_5V*10K/54.9K (5V) */
 > +	.in[1] = &(struct ep93xx_hwmon_chcfg) {
@@ -880,6 +857,49 @@ Spaces around operators please. Also why the explict multiplies
 > +		.div		= 500*1,
 > +	},
 > +};
+
+Can you just use struct ep93xx_hwmon_chcfg directly without using the
+struct ep93xx_hwmon_data as a container?  Something like:
+
+static struct ep93xx_hwmon_chcfg ts72xx_hwmon_info[] = {
+	{	/* POWER_IN*10K/150K (4.5-20V) */
+		.name		= "ts72xx-vin",
+		.channel	= TS72XX_ADC0,
+		.mult		= 33*(15+1),
+		.div		= 500*1,
+	}, {	/* PC104_5V*10K/54.9K (5V) */
+		.name		= "ts72xx-v5",
+		.channel	= TS72XX_ADC4,
+		.mult		= 33*(549+100),
+		.div		= 500*100,
+	}, {	/* Vcore (1.8V)  */
+		.name		= "ts72xx-vcore",
+		.channel	= TS72XX_ADC2,
+		.mult		= 33*1,
+		.div		= 500*1,
+	}, {	/* User ADC on DIO2.8  (0-3.3V) */
+		.name		= "ts72xx-dio2.8",
+		.channel	= TS72XX_ADC3,
+		.mult		= 33*1,
+		.div		= 500*1,
+	}, {	/* User ADC on DIO2.10 (0-3.3V) */
+		.name		= "ts72xx-dio2.10",
+		.channel	= TS72XX_ADC1,
+		.mult		= 33*1,
+		.div		= 500*1,
+	}, {	/* EP93XX.VBAT (1.8V)  */
+		.name		= "ep93xx-vbat",
+		.channel	= ADC_SW_VBAT_IN|ADC_SW_APWR_REF,
+		.mult		= 33*1,
+		.div		= 500*1,
+	}, {	/* EP93XX.DAC (?)  */
+		.name		= "ep93xx-vdac",
+		.channel	= ADC_SW_DAC_IN|ADC_SW_APWR_REF,
+		.mult		= 33*1,
+		.div		= 500*1,
+	},
+};
+
 > +
 > +
 >  static void __init ts72xx_init_machine(void)
@@ -892,6 +912,11 @@ Spaces around operators please. Also why the explict multiplies
 > +        
 > +	platform_device_register(&ep93xx_analog_device);
 > +        
+
+Just put the device data setup here:
+
+	ep93xx_hwmon_device.dev.platform_data = &ts72xx_hwmon_info;
+
 > +	platform_device_register(&ep93xx_hwmon_device);
 >  }
 >  
@@ -994,6 +1019,11 @@ Spaces around operators please. Also why the explict multiplies
 > + * @hwmon_dev: The hwmon device we created.
 > + * @attr: The holders for the channel attributes.
 > +*/
+
+A lot of the comments in this file are just noise.  Also, they really
+shouldn't be in kerneldoc format since they are private to this file
+and not exported in any way.
+
 > +struct ep93xx_hwmon {
 > +	struct semaphore lock;
 > +	struct ep93xx_adc_client *client;
@@ -1359,18 +1389,6 @@ Spaces around operators please. Also why the explict multiplies
 > +MODULE_LICENSE("GPL v2");
 > +MODULE_ALIAS("platform:ep93xx-hwmon");
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+Regards,
+Hartley
