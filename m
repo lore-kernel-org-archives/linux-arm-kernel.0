@@ -1,42 +1,48 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Tue, 13 Oct 2009 11:07:52 +0900
-Subject: [PATCH] [ARM] force dcache flush if dcache_dirty bit set
-In-Reply-To: <20091012170312.GB9453@flint.arm.linux.org.uk>
-References: <1255337423-3158-1-git-send-email-ngupta@vflare.org>
-	<20091012090710.GA29310@n2100.arm.linux.org.uk>
-	<20091012.023744.157085851.davem@davemloft.net>
-	<20091012100023.GC29310@n2100.arm.linux.org.uk>
-	<Pine.LNX.4.64.0910121634170.7327@sister.anvils>
-	<20091012170312.GB9453@flint.arm.linux.org.uk>
-Message-ID: <20091013020752.GB5736@linux-sh.org>
+From: shinya.kuribayashi@necel.com (Shinya Kuribayashi)
+Date: Tue, 13 Oct 2009 11:44:04 +0900
+Subject: [RFC] i2c-designware patches
+Message-ID: <4AD3E974.8080200@necel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 12, 2009 at 06:03:12PM +0100, Russell King wrote:
-> On Mon, Oct 12, 2009 at 05:09:53PM +0100, Hugh Dickins wrote:
-> > Sorry to muddy the waters on this, if you and Dave are sure that
-> > you have the right fix, down in your architectures, and that fix
-> > isn't going to hurt your performance significantly.
-> 
-> If I look at the issue from this point of view:
-> 
-> - we are using PG_arch_1 to delay cache handling for the page
-> 
-> - if PG_arch_1 is set on a page, we set it explicitly because we
->   didn't do some flushing between the allocation of the page and
->   mapping it into userspace
-> 
-> - if a page with PG_arch_1 set ever gets to userspace, this can
->   only be because we did the lazy flushing thing
-> 
-> I don't see that there should have been any bearing on whether a page
-> has a mapping or not when we get to update_mmu_cache.  The issue here
-> is that > if PG_arch_1 is set on a page, then we didn't flush it at
-> the time when we believed it was appropriate to do so. <
-> 
-> Tell me I'm wrong (having only just sent it to Linus...)
-> 
-Having looked at the ARM fix, in the !mapping case do you not need the
-I-cache flush on vma->vm_flags & VM_EXEC? Or is the presumption that
-flush_icache_page()-type action doesn't need to be undertaken by
-flush_dcache_page()/update_mmu_cache() when there is no page_mapping()?
+Hi Baruch and lists,
+
+Here're various improvements / bug-fixing patches for DW I2C driver.
+I'm working with v2.6.27-based kernel, but they must work fine with the
+latest mainline kernel.
+
+It's stil in RFC, and I'm working with it for some time.  Any comments
+or suggestions are highly appreciated.  Then I'll respin and give it a
+test, thanks.
+
+Baruch, I'd say the base driver is in good shape enogh, so I'm having
+a fun with modifing the driver.  Thanks for the initial work.
+
+P.S. ARM and MIPS lists are Cc:ed as I believe there must be potential
+users of this driver.
+
+
+Shinya Kuribayashi (16):
+      i2c-designware: Consolidate to use 32-bit word accesses
+      i2c-designware: Don't use the IC_CLR_INTR register to clear interrupts
+      i2c-designware: Use platform_get_irq helper
+      i2c-designware: i2c_dw_read: Take "struct dw_i2c_dev" pointer
+      i2c-designware: i2c_dw_xfer_msg: Take "struct dw_i2c_dev" pointer
+      i2c-designware: Remove an useless local variable "num"
+      i2c-designware: Set a clock name to DesignWare I2C clock source
+      i2c-designware: Improve _HCNT/_LCNT calculation
+      i2c-designware: i2c_dw_xfer_msg: Fix an i2c_msg search bug
+      i2c-designware: Do dw_i2c_pump_msg's jobs in the interrutp handler
+      i2c-designware: Set Tx/Rx FIFO threshold levels
+      i2c-designware: Divide i2c_dw_xfer_msg into two functions
+      i2c-designware: i2c_dw_xfer_msg: Introduce a local "buf" pointer
+      i2c-designware: Deferred FIFO-data-counting variables initialization
+      i2c-designware: i2c_dw_xfer_msg: Mark as completed on an error
+      i2c-designware: Add I2C_FUNC_SMBUS_* bits
+
+ drivers/i2c/busses/i2c-designware.c |  367 +++++++++++++++++++++++++----------
+ 1 files changed, 264 insertions(+), 103 deletions(-)
+
+-- 
+Shinya Kuribayashi
+NEC Electronics
