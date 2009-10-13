@@ -1,46 +1,50 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 13 Oct 2009 09:08:00 +0200
-Subject: [PATCH] serial/atmel_serial: Fix another fallout of the change to
-	BUILD_BUG_ON
-Message-ID: <1255417680-25609-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Tue, 13 Oct 2009 09:19:48 +0200
+Subject: [PATCH] mmc: at91_mci: Don't include asm/mach/mmc.h
+In-Reply-To: <1254996762-19115-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1254996762-19115-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1255418388-27866-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 8c87df457cb5 fixed BUILD_BUG_ON with the result that some
-expressions (e.g. "not really constant" ones) result in a build failure.
+This fixes a compile error introduced in
 
-Some of these were fixed in 8c87df457cb5, but not serial/atmel_serial.
+	6ef297f (ARM: 5720/1: Move MMCI header to amba include dir)
+
+That commit moved arch/arm/include/asm/mach/mmc.h to
+include/linux/amba/mmci.h.  Just removing the include was enough.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: Jan Beulich <jbeulich@novell.com>
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Bill Gatliff <bgat@billgatliff.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Pierre Ossman <drzeus@drzeus.cx>
+Cc: linux-arm-kernel at lists.infradead.org
 Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Haavard Skinnemoen <hskinnemoen@atmel.com>
-Cc: Alan Cox <alan@linux.intel.com>
 ---
 Hello,
 
-currently 27 arm defconfigs fail because of that error, see
-
-	http://armlinux.simtec.co.uk/kautobuild/2.6.32-rc4-git1/errors.html
+what is the right path to Linus for this patch?
 
 Best regards
 Uwe
 
- drivers/serial/atmel_serial.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/mmc/host/at91_mci.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/serial/atmel_serial.c b/drivers/serial/atmel_serial.c
-index 3551c5c..b37d75f 100644
---- a/drivers/serial/atmel_serial.c
-+++ b/drivers/serial/atmel_serial.c
-@@ -1531,7 +1531,7 @@ static int __devinit atmel_serial_probe(struct platform_device *pdev)
- 	void *data;
- 	int ret;
+diff --git a/drivers/mmc/host/at91_mci.c b/drivers/mmc/host/at91_mci.c
+index e556d42..63924e0 100644
+--- a/drivers/mmc/host/at91_mci.c
++++ b/drivers/mmc/host/at91_mci.c
+@@ -72,7 +72,6 @@
+ #include <asm/irq.h>
+ #include <asm/gpio.h>
  
--	BUILD_BUG_ON(!is_power_of_2(ATMEL_SERIAL_RINGSIZE));
-+	MAYBE_BUILD_BUG_ON(!is_power_of_2(ATMEL_SERIAL_RINGSIZE));
- 
- 	port = &atmel_ports[pdev->id];
- 	port->backup_imr = 0;
+-#include <asm/mach/mmc.h>
+ #include <mach/board.h>
+ #include <mach/cpu.h>
+ #include <mach/at91_mci.h>
 -- 
 1.6.4.3
