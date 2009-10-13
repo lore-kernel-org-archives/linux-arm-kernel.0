@@ -1,39 +1,74 @@
-From: pjohn@in.mvista.com (Philby John)
-Date: Tue, 13 Oct 2009 19:03:48 +0530
-Subject: [PATCH] aaci: ARM1176 aaci-pl041 AC97 register read timeout
-Message-ID: <1255440829.25065.54.camel@localhost.localdomain>
+From: alex@digriz.org.uk (Alexander Clouter)
+Date: Tue, 13 Oct 2009 15:41:01 +0100
+Subject: [PATCH] [ARM] kirkwood: combine support for openrd base/client
+	?support
+References: <20091009123956.GA6085@chipmunk>
+	<200910120836.03584.dk-arm-linux@gmx.de>
+	<20091012073122.GH6085@chipmunk>
+	<200910120946.01628.dk-arm-linux@gmx.de>
+	<ad9478410910120746g2ce82af1t71a84ea02e9eecb7@mail.gmail.com>
+Message-ID: <t4geq6-pm4.ln1@chipmunk.wormnet.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philby John <pjohn@in.mvista.com>
-Date: Tue, 13 Oct 2009 16:20:22 +0530
-Subject: [PATCH] ARM1176 aaci-pl041 AC97 register read timeout
+Joel Stanley <joel@jms.id.au> wrote:
+>
+> On Mon, Oct 12, 2009 at 18:16, Dieter Kiermaier <dk-arm-linux@gmx.de> wrote:
+>>> If you can point out where I should be looking, I will have a look and
+>>> if I can find it I will enable it.
+>>
+>> I'm sorry, but I haven't an openrd-client board :(
+>> Maybe someone else can help us?
+> 
+> I have tested Alexander's patch on my openrd-client board, applied to
+> Linus' tree.  It boots and networking works fine.
+> 
+> I also added calls to initialise i2c and pcie based on the patch by
+> Simon Kagstrom, and both devices appear to work.  The diff I added is
+> attached.
+> 
+Hmmm, seems to now be working for me too, I have updated from 32-rc2 to 
+rc4 so that probably fixed something along the way I suppose.
 
-After a reboot on an ARM1176 which amounts to a softreset, it has been
-noted that the ALSA driver does not get registered and the probe fails
-with the error "aaci-pl041 fpga:04: ac97 read back fail". In the process
-of reading from a register the SL1TxBusy bit is set indicating that the
-transceiver is busy and remains so until the default timeout occurs.
-Set the Power down register 0x26 to an arbitrary value as specified in the
-PL041 manual (page: 3-18) so that AACISL1TX/AACISL2TX registers take
-their default state.
+> Author: Joel Stanley <joel@jms.id.au>
+> Date:   Tue Oct 13 00:02:04 2009 +1030
+> 
+>    Add pcie and i2c initalisation
+> 
+> diff --git a/arch/arm/mach-kirkwood/openrd-setup.c
+> b/arch/arm/mach-kirkwood/openrd-setup.c
+> index 6bdeeab..d5504e2 100644
+> --- a/arch/arm/mach-kirkwood/openrd-setup.c
+> +++ b/arch/arm/mach-kirkwood/openrd-setup.c
+> @@ -80,6 +80,10 @@ static void __init openrd_init(void)
+> #endif
+>        kirkwood_sata_init(&openrd_sata_data);
+>        kirkwood_sdio_init(&openrd_mvsdio_data);
+> +
+> +       kirkwood_i2c_init();
+> +
+> +       kirkwood_pcie_init();
+> }
+> 
+> #ifdef CONFIG_MACH_OPENRD_BASE
+>
+I think to match the coding style of the other kirkwood boards this 
+should go in a seperate pci_init function:
+----
+static int __init openrd_base_pci_init(void)
+{
+        kirkwood_pcie_init();
 
-Signed-off-by: Philby John <pjohn@in.mvista.com>
----
- sound/arm/aaci.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+        return 0;
+}
+subsys_initcall(openrd_base_pci_init);
+----
 
-diff --git a/sound/arm/aaci.c b/sound/arm/aaci.c
-index dc78272..1f0f821 100644
---- a/sound/arm/aaci.c
-+++ b/sound/arm/aaci.c
-@@ -937,6 +937,7 @@ static int __devinit aaci_probe_ac97(struct aaci *aaci)
- 	struct snd_ac97 *ac97;
- 	int ret;
- 
-+	writel(0, aaci->base + AC97_POWERDOWN);
- 	/*
- 	 * Assert AACIRESET for 2us
- 	 */
+Well, included is my 'new' version with Nico's recommendation to remove 
+the unnecessary ifdef's.
+
+Cheers
+
 -- 
-1.6.3.3.MVISTA
+Alexander Clouter
+.sigmonster says: Pie are not square.  Pie are round.  Cornbread are square.
