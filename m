@@ -1,30 +1,38 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Tue, 13 Oct 2009 10:56:37 +0300
-Subject: [PATCH] ARM: ELF: Add register information of threads to coredump
-In-Reply-To: <20091012133854.GA2480@n2100.arm.linux.org.uk>
-References: <1255242411-16025-1-git-send-email-dedekind1@gmail.com>
-	<20091012133854.GA2480@n2100.arm.linux.org.uk>
-Message-ID: <1255420597.32489.5.camel@localhost>
+From: shinya.kuribayashi@necel.com (Shinya Kuribayashi)
+Date: Tue, 13 Oct 2009 17:01:28 +0900
+Subject: [RFC] i2c-designware patches
+In-Reply-To: <20091013070412.GA9739@jasper.tkos.co.il>
+References: <4AD3E974.8080200@necel.com>
+	<20091013070412.GA9739@jasper.tkos.co.il>
+Message-ID: <4AD433D8.8090900@necel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2009-10-12 at 14:38 +0100, Russell King - ARM Linux wrote:
-> On Sun, Oct 11, 2009 at 09:26:51AM +0300, Artem Bityutskiy wrote:
-> > From: Mika Westerberg <mika.westerberg@iki.fi>
-> > 
-> > Defines ELF_CORE_COPY_TASK_REGS so that CPU register information
-> > of every thread is included in coredump. Without this, only the faulting
-> > thread is coredumped.
-> > 
-> > Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
-> > Signed-off-by: Artem Bityutskiy <Artem.Bityutskiy@nokia.com>
-> > Cc: Roger Quadros <ext-roger.quadros@nokia.com>
-> > Cc: linux-arm-kernel at lists.infradead.org
+Baruch Siach wrote:
+> On Tue, Oct 13, 2009 at 11:44:04AM +0900, Shinya Kuribayashi wrote:
+>> Here're various improvements / bug-fixing patches for DW I2C driver.
+>> I'm working with v2.6.27-based kernel, but they must work fine with the
+>> latest mainline kernel.
+>>
+>> It's stil in RFC, and I'm working with it for some time.  Any comments
+>> or suggestions are highly appreciated.  Then I'll respin and give it a
+>> test, thanks.
+>>
+>> Baruch, I'd say the base driver is in good shape enogh, so I'm having
+>> a fun with modifing the driver.  Thanks for the initial work.
 > 
-> Please send to the patch system.
+> Thanks. It is good to see that my work is actually useful for someone. I'll go 
+> over this series in the coming days. Unfortunately I don't have the hardware 
+> for testing anymore, but I'll try at least to compile test these patches.
 
-OK, done.
+No problem, I could do real tests on real hardwares, so just give me a
+feedback.  Grammar corrections or rewording is also appriciated.
+
+> By the way, what is the chip you work with?
+
+I'd like to avoid specific comment on this.  I'm working with our big-
+endian MIPS SoCs which are not in mainline.
 
 -- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+Shinya Kuribayashi
+NEC Electronics
