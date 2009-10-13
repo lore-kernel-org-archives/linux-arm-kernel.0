@@ -1,40 +1,46 @@
-From: shinya.kuribayashi@necel.com (Shinya Kuribayashi)
-Date: Tue, 13 Oct 2009 11:54:21 +0900
-Subject: [PATCH 16/16] i2c-designware: Add I2C_FUNC_SMBUS_* bits
-In-Reply-To: <4AD3E974.8080200@necel.com>
-References: <4AD3E974.8080200@necel.com>
-Message-ID: <4AD3EBDD.50105@necel.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 12 Oct 2009 23:29:23 -0400 (EDT)
+Subject: [PATCH v2] OpenRD base: Initialize PCI express and i2c
+In-Reply-To: <200910090851.44868.dk-arm-linux@gmx.de>
+References: <200910081333.43065.dk-arm-linux@gmx.de>
+	<alpine.LFD.2.00.0910081337260.18779@xanadu.home>
+	<20091009082645.7e37573d@marrow.netinsight.se>
+	<200910090851.44868.dk-arm-linux@gmx.de>
+Message-ID: <alpine.LFD.2.00.0910122327280.20122@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will ease our testing a bit with i2c-tools.  Note that DW I2C core
-doesn't support I2C_FUNC_SMBUS_QUICK, as it's not capable of slave-
-addressing-only I2C transactions.
+On Fri, 9 Oct 2009, Dieter Kiermaier wrote:
 
-Signed-off-by: Shinya Kuribayashi <shinya.kuribayashi@necel.com>
----
- drivers/i2c/busses/i2c-designware.c |    9 ++++++++-
- 1 files changed, 8 insertions(+), 1 deletions(-)
+> Hi Simon,
+> 
+> I've tested you patch against 2.6.32-rc3 from Linus' tree and it works fine and applies without any issues.
+> 
+> Without patch:
+> h-3.2# uname -a
+> Linux DB88FXX81 2.6.32-rc3-00256-g36a0790 #1 PREEMPT Fri Oct 9 08:44:33 CEST 2009 armv5tel GNU/Linux
+> sh-3.2#
+> sh-3.2#
+> sh-3.2# lspci
+> sh-3.2#
+> 
+> with applied patch:
+> 
+> sh-3.2# uname -a
+> Linux DB88FXX81 2.6.32-rc3-00256-g36a0790-dirty #2 PREEMPT Fri Oct 9 08:47:02 CEST 2009 armv5tel GNU/Linux
+> sh-3.2# lspci
+> 00:00.0 Class 0580: Device 11ab:6281 (rev 02)
+> 00:01.0 Class 0200: Device 10ec:8168 (rev 01)
+> sh-3.2#
 
-diff --git a/drivers/i2c/busses/i2c-designware.c b/drivers/i2c/busses/i2c-designware.c
-index 6f85e28..80c8b8a 100644
---- a/drivers/i2c/busses/i2c-designware.c
-+++ b/drivers/i2c/busses/i2c-designware.c
-@@ -529,7 +529,14 @@ done:
- 
- static u32 i2c_dw_func(struct i2c_adapter *adap)
- {
--	return I2C_FUNC_I2C | I2C_FUNC_10BIT_ADDR;
-+	return	I2C_FUNC_I2C |
-+		I2C_FUNC_10BIT_ADDR |
-+		I2C_FUNC_SMBUS_BYTE |
-+		I2C_FUNC_SMBUS_BYTE_DATA |
-+		I2C_FUNC_SMBUS_WORD_DATA |
-+		I2C_FUNC_SMBUS_BLOCK_DATA |
-+		I2C_FUNC_SMBUS_I2C_BLOCK |
-+		I2C_FUNC_SMBUS_I2C_BLOCK_2;
- }
- 
- static u32 i2c_dw_read_clear_intrbits(struct dw_i2c_dev *dev)
--- 
-1.6.5
+I've applied it to the orion repo.
+
+> Sorry for the silly question, but what have I do to ack it?
+
+You basically say so like you did above.  Some maintainers also prefer 
+you provide a ready to cop and paste line such as:
+
+Acked-by: Dieter Kiermaier <dk-arm-linux@gmx.de>
+
+
+Nicolas
