@@ -1,74 +1,28 @@
-From: alex@digriz.org.uk (Alexander Clouter)
-Date: Tue, 13 Oct 2009 15:28:12 +0100
-Subject: [PATCH] [ARM] kirkwood: combine support for openrd
-	base/client?support
-References: <20091009123956.GA6085@chipmunk>
-	<200910091600.45161.dk-arm-linux@gmx.de>
-	<20091009140508.GD6085@chipmunk>
-	<alpine.LFD.2.00.0910122313090.20122@xanadu.home>
-Message-ID: <scfeq6-pm4.ln1@chipmunk.wormnet.eu>
+From: tabbott@ksplice.com (Tim Abbott)
+Date: Tue, 13 Oct 2009 12:47:45 -0400 (EDT)
+Subject: [PATCH v4 2/2] arm: Clean up linker script using new linker
+	script macros.
+In-Reply-To: <20091013085003.GB3194@pengutronix.de>
+References: <alpine.DEB.1.10.0910021536510.19358@dr-wily.mit.edu>
+	<1254515567-27110-2-git-send-email-tabbott@ksplice.com>
+	<alpine.DEB.1.10.0910121036130.6253@dr-wily.mit.edu>
+	<20091013085003.GB3194@pengutronix.de>
+Message-ID: <alpine.DEB.1.10.0910131147090.2868@dr-wily.mit.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 13 Oct 2009, Uwe Kleine-K?nig wrote:
 
-Nicolas Pitre <nico@fluxnic.net> wrote:
->
-> On Fri, 9 Oct 2009, Alexander Clouter wrote:
-> 
->> the struct 'openrd_ge01_data' is wrapped in 
->> #ifdef CONFIG_MACH_OPENRD_CLIENT too and only exists if you want the 
->> board support for it.  So although machine_is_openrd_client() will 
->> exist, the compiler will barf that openrd_ge01_data does not exist;
-> 
-> Don't put a #ifdef on it either then.
-> 
-Okay...
+> On Mon, Oct 12, 2009 at 10:41:10AM -0400, Tim Abbott wrote:
+> > Can someone with an arm machine test this patch?  I'd really appreciate 
+> > it.
+> Compiles and is running fine on eco920.
 
->> the alternative is to have it grumble (when you do not want the Client 
->> support) that there is an un-used struct floating about.
-> 
-> That shouldn't happen.  It will still be referenced by the
-> 
->        if (machine_is_openrd_client())
->                kirkwood_ge01_init(&openrd_ge01_data);
-> 
-> and when the Client support is not configured in, then the 
-> machine_is_openrd_client() is turned into a 0 which makes gcc nicely 
-> optimize the unused code and static data structures away.
-> 
-I pondered if the compiler did that but thought as the Linux kernel is 
-littered with ifdef's anyway, a few more cannot hurt :)
+Thanks!
 
->> I was under the impression the latter is considered worse than the 
->> former, I personally am not bothered either way.
-> 
-> Did you try the later?
-> 
-Nope, but I just have now and you are quite right.  All ifdef's nuked 
-from orbit.
+Russell, are you willing to take this patch series for 2.6.32?  It would 
+make life a lot easier for my work on building the kernel with 
+-ffunction-sections -fdata-sections targeted at 2.6.33 if these linker 
+script cleanups for the last couple architectures made it into 2.6.32.
 
->> > Additionally it would be nice, if you could integrate the i2c / pcie 
->> > init in your patch? Please see Simons patch at:
->> >
->> > http://lists.infradead.org/pipermail/linux-arm-kernel/2009-October/001950.html
->> > 
->> I knew someone was going to say that :)  Will do though, so 'watch this 
->> space'.
-> 
-> Being a separate issue, this probably should remain a separate patch.  
-> My position is that the missing PCI init call could go upstream now 
-> whereas the consolidation patch would need to wait for the next merge 
-> window.
-> 
-That's fine with me, I was just throwing the patch out there to see how 
-people felt about the consolidation and also as since August[1] the 
-OpenRD Client had not been mentioned on the mailing list.
-
-Cheers
-
-[1] http://lkml.org/lkml/2009/8/19/115
-
--- 
-Alexander Clouter
-.sigmonster says: Memory fault -- brain fried
+	-Tim Abbott
