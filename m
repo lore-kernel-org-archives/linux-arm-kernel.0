@@ -1,74 +1,289 @@
 From: alex@digriz.org.uk (Alexander Clouter)
-Date: Tue, 13 Oct 2009 15:41:01 +0100
-Subject: [PATCH] [ARM] kirkwood: combine support for openrd base/client
-	?support
-References: <20091009123956.GA6085@chipmunk>
-	<200910120836.03584.dk-arm-linux@gmx.de>
-	<20091012073122.GH6085@chipmunk>
-	<200910120946.01628.dk-arm-linux@gmx.de>
-	<ad9478410910120746g2ce82af1t71a84ea02e9eecb7@mail.gmail.com>
-Message-ID: <t4geq6-pm4.ln1@chipmunk.wormnet.eu>
+Date: Tue, 13 Oct 2009 15:38:47 +0100
+Subject: [PATCHv2] [ARM] kirkwood: combine support for openrd base/client support
+Message-ID: <mailman.72.1255446560.2253.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joel Stanley <joel@jms.id.au> wrote:
->
-> On Mon, Oct 12, 2009 at 18:16, Dieter Kiermaier <dk-arm-linux@gmx.de> wrote:
->>> If you can point out where I should be looking, I will have a look and
->>> if I can find it I will enable it.
->>
->> I'm sorry, but I haven't an openrd-client board :(
->> Maybe someone else can help us?
-> 
-> I have tested Alexander's patch on my openrd-client board, applied to
-> Linus' tree.  It boots and networking works fine.
-> 
-> I also added calls to initialise i2c and pcie based on the patch by
-> Simon Kagstrom, and both devices appear to work.  The diff I added is
-> attached.
-> 
-Hmmm, seems to now be working for me too, I have updated from 32-rc2 to 
-rc4 so that probably fixed something along the way I suppose.
+Inspired by the mach-ep93xx flattening work, there is really not
+much difference between the OpenRD base and client board support
+so they should be merged together.
 
-> Author: Joel Stanley <joel@jms.id.au>
-> Date:   Tue Oct 13 00:02:04 2009 +1030
-> 
->    Add pcie and i2c initalisation
-> 
-> diff --git a/arch/arm/mach-kirkwood/openrd-setup.c
-> b/arch/arm/mach-kirkwood/openrd-setup.c
-> index 6bdeeab..d5504e2 100644
-> --- a/arch/arm/mach-kirkwood/openrd-setup.c
-> +++ b/arch/arm/mach-kirkwood/openrd-setup.c
-> @@ -80,6 +80,10 @@ static void __init openrd_init(void)
-> #endif
->        kirkwood_sata_init(&openrd_sata_data);
->        kirkwood_sdio_init(&openrd_mvsdio_data);
-> +
-> +       kirkwood_i2c_init();
-> +
-> +       kirkwood_pcie_init();
-> }
-> 
-> #ifdef CONFIG_MACH_OPENRD_BASE
->
-I think to match the coding style of the other kirkwood boards this 
-should go in a seperate pci_init function:
-----
-static int __init openrd_base_pci_init(void)
-{
-        kirkwood_pcie_init();
+The only difference between v1 and v2 is that the un-necessary
+ifdef's have been remove as recommended by Nico.
 
-        return 0;
-}
-subsys_initcall(openrd_base_pci_init);
-----
+Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
+---
+ arch/arm/mach-kirkwood/Kconfig             |   11 +++
+ arch/arm/mach-kirkwood/Makefile            |    2 +-
+ arch/arm/mach-kirkwood/openrd-setup.c      |  115 ++++++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/openrd_base-setup.c |   96 -----------------------
+ 4 files changed, 127 insertions(+), 97 deletions(-)
+ create mode 100644 arch/arm/mach-kirkwood/openrd-setup.c
+ delete mode 100644 arch/arm/mach-kirkwood/openrd_base-setup.c
 
-Well, included is my 'new' version with Nico's recommendation to remove 
-the unnecessary ifdef's.
-
-Cheers
-
+diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+index 0aca451..8e9ac7d 100644
+--- a/arch/arm/mach-kirkwood/Kconfig
++++ b/arch/arm/mach-kirkwood/Kconfig
+@@ -38,12 +38,23 @@ config MACH_TS219
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  QNAP TS-119 and TS-219 Turbo NAS devices.
+ 
++config MACH_OPENRD
++        bool
++
+ config MACH_OPENRD_BASE
+ 	bool "Marvell OpenRD Base Board"
++	select MACH_OPENRD
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell OpenRD Base Board.
+ 
++config MACH_OPENRD_CLIENT
++	bool "Marvell OpenRD Client Board"
++	select MACH_OPENRD
++	help
++	  Say 'Y' here if you want your kernel to support the
++	  Marvell OpenRD Client Board.
++
+ endmenu
+ 
+ endif
+diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
+index 80ab0ec..5ad19dd 100644
+--- a/arch/arm/mach-kirkwood/Makefile
++++ b/arch/arm/mach-kirkwood/Makefile
+@@ -6,6 +6,6 @@ obj-$(CONFIG_MACH_RD88F6281)		+= rd88f6281-setup.o
+ obj-$(CONFIG_MACH_MV88F6281GTW_GE)	+= mv88f6281gtw_ge-setup.o
+ obj-$(CONFIG_MACH_SHEEVAPLUG)		+= sheevaplug-setup.o
+ obj-$(CONFIG_MACH_TS219)		+= ts219-setup.o
+-obj-$(CONFIG_MACH_OPENRD_BASE)		+= openrd_base-setup.o
++obj-$(CONFIG_MACH_OPENRD)		+= openrd-setup.o
+ 
+ obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
+diff --git a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
+new file mode 100644
+index 0000000..7f3e5f0
+--- /dev/null
++++ b/arch/arm/mach-kirkwood/openrd-setup.c
+@@ -0,0 +1,115 @@
++/*
++ * arch/arm/mach-kirkwood/openrd-setup.c
++ *
++ * Marvell OpenRD (Base|Client) Board Setup
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/mtd/partitions.h>
++#include <linux/ata_platform.h>
++#include <linux/mv643xx_eth.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <mach/kirkwood.h>
++#include <plat/mvsdio.h>
++#include "common.h"
++#include "mpp.h"
++
++static struct mtd_partition openrd_nand_parts[] = {
++	{
++		.name = "u-boot",
++		.offset = 0,
++		.size = SZ_1M
++	}, {
++		.name = "uImage",
++		.offset = MTDPART_OFS_NXTBLK,
++		.size = SZ_4M
++	}, {
++		.name = "root",
++		.offset = MTDPART_OFS_NXTBLK,
++		.size = MTDPART_SIZ_FULL
++	},
++};
++
++static struct mv643xx_eth_platform_data openrd_ge00_data = {
++	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
++};
++
++static struct mv643xx_eth_platform_data openrd_ge01_data = {
++	.phy_addr	= MV643XX_ETH_PHY_ADDR(18),
++};
++
++static struct mv_sata_platform_data openrd_sata_data = {
++	.n_ports	= 2,
++};
++
++static struct mvsdio_platform_data openrd_mvsdio_data = {
++	.gpio_card_detect = 29,	/* MPP29 used as SD card detect */
++};
++
++static unsigned int openrd_mpp_config[] __initdata = {
++	MPP29_GPIO,
++	0
++};
++
++static void __init openrd_init(void)
++{
++	/*
++	 * Basic setup. Needs to be called early.
++	 */
++	kirkwood_init();
++	kirkwood_mpp_conf(openrd_mpp_config);
++
++	kirkwood_uart0_init();
++	kirkwood_nand_init(ARRAY_AND_SIZE(openrd_nand_parts), 25);
++
++	kirkwood_ehci_init();
++
++	kirkwood_ge00_init(&openrd_ge00_data);
++	if (machine_is_openrd_client())
++		kirkwood_ge01_init(&openrd_ge01_data);
++	kirkwood_sata_init(&openrd_sata_data);
++	kirkwood_sdio_init(&openrd_mvsdio_data);
++
++	kirkwood_i2c_init();
++}
++
++static int __init openrd_base_pci_init(void)
++{
++	kirkwood_pcie_init();
++
++	return 0;
++}
++subsys_initcall(openrd_base_pci_init);
++
++#ifdef CONFIG_MACH_OPENRD_BASE
++MACHINE_START(OPENRD_BASE, "Marvell OpenRD Base Board")
++	/* Maintainer: Dhaval Vasa <dhaval.vasa@einfochips.com> */
++	.phys_io	= KIRKWOOD_REGS_PHYS_BASE,
++	.io_pg_offst	= ((KIRKWOOD_REGS_VIRT_BASE) >> 18) & 0xfffc,
++	.boot_params	= 0x00000100,
++	.init_machine	= openrd_init,
++	.map_io		= kirkwood_map_io,
++	.init_irq	= kirkwood_init_irq,
++	.timer		= &kirkwood_timer,
++MACHINE_END
++#endif
++
++#ifdef CONFIG_MACH_OPENRD_CLIENT
++MACHINE_START(OPENRD_CLIENT, "Marvell OpenRD Client Board")
++	/* Maintainer: Dhaval Vasa <dhaval.vasa@einfochips.com> */
++	.phys_io	= KIRKWOOD_REGS_PHYS_BASE,
++	.io_pg_offst	= ((KIRKWOOD_REGS_VIRT_BASE) >> 18) & 0xfffc,
++	.boot_params	= 0x00000100,
++	.init_machine	= openrd_init,
++	.map_io		= kirkwood_map_io,
++	.init_irq	= kirkwood_init_irq,
++	.timer		= &kirkwood_timer,
++MACHINE_END
++#endif
+diff --git a/arch/arm/mach-kirkwood/openrd_base-setup.c b/arch/arm/mach-kirkwood/openrd_base-setup.c
+deleted file mode 100644
+index 77617c7..0000000
+--- a/arch/arm/mach-kirkwood/openrd_base-setup.c
++++ /dev/null
+@@ -1,96 +0,0 @@
+-/*
+- * arch/arm/mach-kirkwood/openrd_base-setup.c
+- *
+- * Marvell OpenRD Base Board Setup
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/mtd/partitions.h>
+-#include <linux/ata_platform.h>
+-#include <linux/mv643xx_eth.h>
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <mach/kirkwood.h>
+-#include <plat/mvsdio.h>
+-#include "common.h"
+-#include "mpp.h"
+-
+-static struct mtd_partition openrd_base_nand_parts[] = {
+-	{
+-		.name = "u-boot",
+-		.offset = 0,
+-		.size = SZ_1M
+-	}, {
+-		.name = "uImage",
+-		.offset = MTDPART_OFS_NXTBLK,
+-		.size = SZ_4M
+-	}, {
+-		.name = "root",
+-		.offset = MTDPART_OFS_NXTBLK,
+-		.size = MTDPART_SIZ_FULL
+-	},
+-};
+-
+-static struct mv643xx_eth_platform_data openrd_base_ge00_data = {
+-	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
+-};
+-
+-static struct mv_sata_platform_data openrd_base_sata_data = {
+-	.n_ports	= 2,
+-};
+-
+-static struct mvsdio_platform_data openrd_base_mvsdio_data = {
+-	.gpio_card_detect = 29,	/* MPP29 used as SD card detect */
+-};
+-
+-static unsigned int openrd_base_mpp_config[] __initdata = {
+-	MPP29_GPIO,
+-	0
+-};
+-
+-static void __init openrd_base_init(void)
+-{
+-	/*
+-	 * Basic setup. Needs to be called early.
+-	 */
+-	kirkwood_init();
+-	kirkwood_mpp_conf(openrd_base_mpp_config);
+-
+-	kirkwood_uart0_init();
+-	kirkwood_nand_init(ARRAY_AND_SIZE(openrd_base_nand_parts), 25);
+-
+-	kirkwood_ehci_init();
+-
+-	kirkwood_ge00_init(&openrd_base_ge00_data);
+-	kirkwood_sata_init(&openrd_base_sata_data);
+-	kirkwood_sdio_init(&openrd_base_mvsdio_data);
+-
+-	kirkwood_i2c_init();
+-}
+-
+-static int __init openrd_base_pci_init(void)
+-{
+-	if (machine_is_openrd_base())
+-		kirkwood_pcie_init();
+-
+-	return 0;
+- }
+-subsys_initcall(openrd_base_pci_init);
+-
+-
+-MACHINE_START(OPENRD_BASE, "Marvell OpenRD Base Board")
+-	/* Maintainer: Dhaval Vasa <dhaval.vasa@einfochips.com> */
+-	.phys_io	= KIRKWOOD_REGS_PHYS_BASE,
+-	.io_pg_offst	= ((KIRKWOOD_REGS_VIRT_BASE) >> 18) & 0xfffc,
+-	.boot_params	= 0x00000100,
+-	.init_machine	= openrd_base_init,
+-	.map_io		= kirkwood_map_io,
+-	.init_irq	= kirkwood_init_irq,
+-	.timer		= &kirkwood_timer,
+-MACHINE_END
 -- 
-Alexander Clouter
-.sigmonster says: Pie are not square.  Pie are round.  Cornbread are square.
+1.6.4.3
