@@ -1,10 +1,10 @@
 From: cgagneraud@techworks.ie (Christian Gagneraud)
-Date: Tue, 13 Oct 2009 13:46:54 +0100
+Date: Tue, 13 Oct 2009 13:48:54 +0100
 Subject: [RFC PATCH v1] EP93XX: Add ADC support
-In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901DB7F7D@mi8nycmail19.Mi8.com>
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901DB7F74@mi8nycmail19.Mi8.com>
 References: <20091012142413.30881.62391.stgit@archeopterix.techworks.local>
-	<BD79186B4FD85F4B8E60E381CAEE190901DB7F7D@mi8nycmail19.Mi8.com>
-Message-ID: <4AD476BE.60602@techworks.ie>
+	<BD79186B4FD85F4B8E60E381CAEE190901DB7F74@mi8nycmail19.Mi8.com>
+Message-ID: <4AD47736.6020503@techworks.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -35,45 +35,28 @@ H Hartley Sweeten wrote:
 > 
 > [snip]
 > 
->> diff --git a/arch/arm/mach-ep93xx/adc.c b/arch/arm/mach-ep93xx/adc.c
->> new file mode 100644
->> index 0000000..78dc074
->> --- /dev/null
->> +++ b/arch/arm/mach-ep93xx/adc.c
+>> diff --git a/arch/arm/mach-ep93xx/Makefile b/arch/arm/mach-ep93xx/Makefile
+>> index eae6199..e3c62fe 100644
+>> --- a/arch/arm/mach-ep93xx/Makefile
+>> +++ b/arch/arm/mach-ep93xx/Makefile
+>> @@ -6,6 +6,8 @@ obj-m			:=
+>>  obj-n			:=
+>>  obj-			:=
+>>  
+>> +obj-$(CONFIG_EP93XX_ADC)	+= adc.o
 > 
-> [snip]
-> 
->> +	adc->irq = platform_get_irq(pdev, 0);
->> +	if (adc->irq <= 0) {
->> +		dev_err(dev, "failed to get adc irq\n");
->> +		ret = -ENOENT;
->> +		goto err_alloc;
->> +	}
->> +
->> +	ret = request_irq(adc->irq, ep93xx_adc_irq, IRQF_DISABLED,
->> +			  dev_name(dev), adc);
->> +	if (ret < 0) {
->> +		dev_err(dev, "failed to attach adc irq\n");
->> +		goto err_alloc;
->> +	}
-> 
-> The interrupt should be the last thing you request.  If an interrupt
-> occurs before the device is completely ready will crash the kernel.
+> This Kconfig option is not defined in the patch.
 
-OK, will do. Actually now that you pointed me this out, there's even 
-more things to do to ensure everything is initialized correctly, same 
-  for ep93xx_adc_remove()
+Oops, it has vanished into a black hole! ;)
 
-> 
-> Most of these dev_err messages are not needed.  The upper layers will
-> print the error code.  You can keep them around for early debugging
-> but they should be removed before the driver is finally merged.
-
-OK, will do.
+Thanks
+Chris
 
 > 
 > Regards,
 > Hartley
-
-Thanks,
-Chris
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
