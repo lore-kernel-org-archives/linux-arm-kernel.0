@@ -1,35 +1,37 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Wed, 14 Oct 2009 09:25:20 +1300
-Subject: [PATCH] s3c: Fix adc function exports
-In-Reply-To: <20091013201945.GK28849@trinity.fluff.org>
-References: <4AD4E096.2060409@bluewatersys.com>
-	<20091013201945.GK28849@trinity.fluff.org>
-Message-ID: <4AD4E230.7080800@bluewatersys.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 13 Oct 2009 17:55:35 -0400
+Subject: [PATCH] ep93xx: remove dead code in ep93xx_gpio_ab_irq_handler()
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901DB8071@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Dooks wrote:
-> On Wed, Oct 14, 2009 at 09:18:30AM +1300, Ryan Mallon wrote:
->> A couple of mistakes were picked up in the s3c adc driver during the
->> review of Christian Gagneraud's ep93xx adc patches.
->  
->> ---
->> Make s3c_adc_start static since it is not used by any other driver, and
->> fix the export of s3c_adc_read.
-> 
-> s3c_adc_start is used by ts driver which is under review, so please don't
-> remove it. The other part is correct, I'll chop and apply.
+Remove unnecessary code in ep93xx_gpio_ab_irq_handler().
 
-Okay, thanks. I take it you are applying to your tree, I don't need to
-fix and submit to the patch system?
+The desc calculation for gpio port B was left in when the following
+commit was merged.
 
-~Ryan
+commit d8aa0251f12546e9bd1e9ee1d9782d6492819a04
+Author: Dmitry Baryshkov <dbaryshkov@gmail.com>
+Date:   Thu Oct 9 13:36:24 2008 +0100
 
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
+    [ARM] 5298/1: Drop desc_handle_irq()
 
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+It's not needed so remove it.
+
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <ryan@bluewatersys.com>
+
+---
+
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index f95dc16..b4357c3 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -206,7 +206,6 @@ static void ep93xx_gpio_ab_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	for (i = 0; i < 8; i++) {
+ 		if (status & (1 << i)) {
+ 			int gpio_irq = gpio_to_irq(EP93XX_GPIO_LINE_B(0)) + i;
+-			desc = irq_desc + gpio_irq;
+ 			generic_handle_irq(gpio_irq);
+ 		}
+ 	} 
