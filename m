@@ -1,46 +1,81 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 12 Oct 2009 23:29:23 -0400 (EDT)
-Subject: [PATCH v2] OpenRD base: Initialize PCI express and i2c
-In-Reply-To: <200910090851.44868.dk-arm-linux@gmx.de>
-References: <200910081333.43065.dk-arm-linux@gmx.de>
-	<alpine.LFD.2.00.0910081337260.18779@xanadu.home>
-	<20091009082645.7e37573d@marrow.netinsight.se>
-	<200910090851.44868.dk-arm-linux@gmx.de>
-Message-ID: <alpine.LFD.2.00.0910122327280.20122@xanadu.home>
+Date: Mon, 12 Oct 2009 23:20:31 -0400 (EDT)
+Subject: [PATCH] [ARM] kirkwood: combine support for openrd base/client
+	support
+In-Reply-To: <20091009140508.GD6085@chipmunk>
+References: <20091009123956.GA6085@chipmunk>
+	<200910091600.45161.dk-arm-linux@gmx.de>
+	<20091009140508.GD6085@chipmunk>
+Message-ID: <alpine.LFD.2.00.0910122313090.20122@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Oct 2009, Dieter Kiermaier wrote:
+On Fri, 9 Oct 2009, Alexander Clouter wrote:
 
-> Hi Simon,
+> Hi,
 > 
-> I've tested you patch against 2.6.32-rc3 from Linus' tree and it works fine and applies without any issues.
-> 
-> Without patch:
-> h-3.2# uname -a
-> Linux DB88FXX81 2.6.32-rc3-00256-g36a0790 #1 PREEMPT Fri Oct 9 08:44:33 CEST 2009 armv5tel GNU/Linux
-> sh-3.2#
-> sh-3.2#
-> sh-3.2# lspci
-> sh-3.2#
-> 
-> with applied patch:
-> 
-> sh-3.2# uname -a
-> Linux DB88FXX81 2.6.32-rc3-00256-g36a0790-dirty #2 PREEMPT Fri Oct 9 08:47:02 CEST 2009 armv5tel GNU/Linux
-> sh-3.2# lspci
-> 00:00.0 Class 0580: Device 11ab:6281 (rev 02)
-> 00:01.0 Class 0200: Device 10ec:8168 (rev 01)
-> sh-3.2#
+> * Dieter Kiermaier <dk-arm-linux@gmx.de> [2009-10-09 16:00:44+0200]:
+> >
+> > [snipped]
+> >
+> > > +static void __init openrd_init(void)
+> > > +{
+> > > +	/*
+> > > +	 * Basic setup. Needs to be called early.
+> > > +	 */
+> > > +	kirkwood_init();
+> > > +	kirkwood_mpp_conf(openrd_mpp_config);
+> > > +
+> > > +	kirkwood_uart0_init();
+> > > +	kirkwood_nand_init(ARRAY_AND_SIZE(openrd_nand_parts), 25);
+> > > +
+> > > +	kirkwood_ehci_init();
+> > > +
+> > > +	kirkwood_ge00_init(&openrd_ge00_data);
+> > > +#ifdef CONFIG_MACH_OPENRD_CLIENT
+> > > +	if (machine_is_openrd_client())
+> > > +		kirkwood_ge01_init(&openrd_ge01_data);
+> > > +#endif
+> > 
+> > shouldn't it be enough to have the if(machine_is.... statement?
+> > I didn't see why you test #ifdef, too?
+> >
+> the struct 'openrd_ge01_data' is wrapped in 
+> #ifdef CONFIG_MACH_OPENRD_CLIENT too and only exists if you want the 
+> board support for it.  So although machine_is_openrd_client() will 
+> exist, the compiler will barf that openrd_ge01_data does not exist;
 
-I've applied it to the orion repo.
+Don't put a #ifdef on it either then.
 
-> Sorry for the silly question, but what have I do to ack it?
+> the alternative is to have it grumble (when you do not want the Client 
+> support) that there is an un-used struct floating about.
 
-You basically say so like you did above.  Some maintainers also prefer 
-you provide a ready to cop and paste line such as:
+That shouldn't happen.  It will still be referenced by the
 
-Acked-by: Dieter Kiermaier <dk-arm-linux@gmx.de>
+	if (machine_is_openrd_client())
+		kirkwood_ge01_init(&openrd_ge01_data);
+
+and when the Client support is not configured in, then the 
+machine_is_openrd_client() is turned into a 0 which makes gcc nicely 
+optimize the unused code and static data structures away.
+
+> I was under the impression the latter is considered worse than the 
+> former, I personally am not bothered either way.
+
+Did you try the later?
+
+> > Additionally it would be nice, if you could integrate the i2c / pcie 
+> > init in your patch? Please see Simons patch at:
+> >
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2009-October/001950.html
+> > 
+> I knew someone was going to say that :)  Will do though, so 'watch this 
+> space'.
+
+Being a separate issue, this probably should remain a separate patch.  
+My position is that the missing PCI init call could go upstream now 
+whereas the consolidation patch would need to wait for the next merge 
+window.
 
 
 Nicolas
