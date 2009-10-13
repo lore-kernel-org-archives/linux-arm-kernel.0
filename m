@@ -1,78 +1,111 @@
 From: shinya.kuribayashi@necel.com (Shinya Kuribayashi)
-Date: Tue, 13 Oct 2009 11:52:24 +0900
-Subject: [PATCH 11/16] i2c-designware: Set Tx/Rx FIFO threshold levels
+Date: Tue, 13 Oct 2009 11:52:49 +0900
+Subject: [PATCH 12/16] i2c-designware: Divide i2c_dw_xfer_msg into two
+	functions
 In-Reply-To: <4AD3E974.8080200@necel.com>
 References: <4AD3E974.8080200@necel.com>
-Message-ID: <4AD3EB68.7090806@necel.com>
+Message-ID: <4AD3EB81.9060803@necel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As a hardware feature, DesignWare I2C core emits a STOP condition
-whenever Tx FIFO becomes empty (strictly speaking, whenever the last
-byte in the Tx FIFO has been sent out), even if we have more bytes to
-be written.
+We have some steps at the top of i2c_dw_xfer_msg() to set up the slave
+address and enable the DW I2C core.  It's executed only when we don't
+have STATUS_WRITE_IN_PROGRESS.
 
-In other words, we must never make "Tx FIFO underrun" happen during
-a transaction, except for the last byte.  For the safety's sake, we'd
-make TX_EMPTY interrupt get triggered every time one byte is processed.
+Then we need to make sure that STATUS_WRITE_IN_PROGRESS only indicates
+that we have a pending i2c_msg to process.  In other words, even if
+STATUS_WRITE_IN_PROGRESS is not set, that doesn't mean we're at initial
+state in the I2C transaction.
 
-Rx FIFO threshold needs to be set as well according to such tx policy.
-In addition, this patch also modifies the interrupt settings properly
-(enable RX_FULL mask, and hook it in the handler)
+Since i2c_dw_xfer_msg() will be invoked again and again during the
+transaction, those init steps have a possibility to be re-processed
+needlessly.  For example, this issue easily takes place when processing
+a combined transaction with a certain condition (the number of tx bytes
+in the first i2c_msg == Tx FIFO depth).
+
+Consequently we should not use STATUS_WRITE_IN_PROGRESS to determine
+where we're at in the I2C transaction, then let's separate those
+initialization steps from i2c_dw_xfer_msg().
 
 Signed-off-by: Shinya Kuribayashi <shinya.kuribayashi@necel.com>
 ---
- drivers/i2c/busses/i2c-designware.c |   15 +++++++++++----
- 1 files changed, 11 insertions(+), 4 deletions(-)
+ drivers/i2c/busses/i2c-designware.c |   45 +++++++++++++++++++---------------
+ 1 files changed, 25 insertions(+), 20 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-designware.c b/drivers/i2c/busses/i2c-designware.c
-index 52a69a2..d9b5790 100644
+index d9b5790..de006f0 100644
 --- a/drivers/i2c/busses/i2c-designware.c
 +++ b/drivers/i2c/busses/i2c-designware.c
-@@ -50,6 +50,8 @@
- #define DW_IC_INTR_STAT		0x2c
- #define DW_IC_INTR_MASK		0x30
- #define DW_IC_RAW_INTR_STAT	0x34
-+#define DW_IC_RX_TL		0x38
-+#define DW_IC_TX_TL		0x3c
- #define DW_IC_CLR_INTR		0x40
- #define DW_IC_CLR_RX_UNDER	0x44
- #define DW_IC_CLR_RX_OVER	0x48
-@@ -294,6 +296,10 @@ static void i2c_dw_init(struct dw_i2c_dev *dev)
- 	writel(lcnt, dev->base + DW_IC_FS_SCL_LCNT);
- 	dev_dbg(dev->dev, "Fast-mode HCNT:LCNT = %d:%d\n", hcnt, lcnt);
+@@ -325,6 +325,29 @@ static int i2c_dw_wait_bus_not_busy(struct dw_i2c_dev *dev)
+ 	return 0;
+ }
  
-+	/* Configure Tx/Rx FIFO threshold levels */
-+	writel(dev->tx_fifo_depth - 1, dev->base + DW_IC_TX_TL);
-+	writel(0, dev->base + DW_IC_RX_TL);
++static void i2c_dw_xfer_init(struct dw_i2c_dev *dev)
++{
++	struct i2c_msg *msgs = dev->msgs;
++	u32 ic_con;
 +
- 	/* configure the i2c master */
- 	ic_con = DW_IC_CON_MASTER | DW_IC_CON_SLAVE_DISABLE |
- 		DW_IC_CON_RESTART_EN | DW_IC_CON_SPEED_FAST;
-@@ -396,7 +402,7 @@ i2c_dw_xfer_msg(struct dw_i2c_dev *dev)
- 		}
- 	}
- 
--	intr_mask = DW_IC_INTR_STOP_DET | DW_IC_INTR_TX_ABRT;
-+	intr_mask = DW_IC_INTR_STOP_DET | DW_IC_INTR_TX_ABRT | DW_IC_INTR_RX_FULL;
- 	if (buf_len > 0)
- 		intr_mask |= DW_IC_INTR_TX_EMPTY;
- 	writel(intr_mask, dev->base + DW_IC_INTR_MASK);
-@@ -582,11 +588,12 @@ static irqreturn_t i2c_dw_isr(int this_irq, void *dev_id)
- 		dev->status = STATUS_IDLE;
- 	}
- 
--	if (stat & DW_IC_INTR_TX_EMPTY) {
--		/* Allocate room for data reception prior to xfer_msg() */
-+	/* Allocate room for data reception prior to i2c_dw_xfer_msg(). */
-+	if (stat & DW_IC_INTR_RX_FULL)
- 		i2c_dw_read(dev);
++	/* Disable the adapter */
++	writel(0, dev->base + DW_IC_ENABLE);
 +
-+	if (stat & DW_IC_INTR_TX_EMPTY)
- 		i2c_dw_xfer_msg(dev);
++	/* set the slave (target) address */
++	writel(msgs[dev->msg_write_idx].addr, dev->base + DW_IC_TAR);
++
++	/* if the slave address is ten bit address, enable 10BITADDR */
++	ic_con = readl(dev->base + DW_IC_CON);
++	if (msgs[dev->msg_write_idx].flags & I2C_M_TEN)
++		ic_con |= DW_IC_CON_10BITADDR_MASTER;
++	else
++		ic_con &= ~DW_IC_CON_10BITADDR_MASTER;
++	writel(ic_con, dev->base + DW_IC_CON);
++
++	/* Enable the adapter */
++	writel(1, dev->base + DW_IC_ENABLE);
++}
++
+ /*
+  * Initiate low level master read/write transaction.
+  * This function is called from i2c_dw_xfer when starting a transfer.
+@@ -335,31 +358,12 @@ static void
+ i2c_dw_xfer_msg(struct dw_i2c_dev *dev)
+ {
+ 	struct i2c_msg *msgs = dev->msgs;
+-	u32 ic_con, intr_mask;
++	u32 intr_mask;
+ 	int tx_limit = dev->tx_fifo_depth - readl(dev->base + DW_IC_TXFLR);
+ 	int rx_limit = dev->rx_fifo_depth - readl(dev->base + DW_IC_RXFLR);
+ 	u32 addr = msgs[dev->msg_write_idx].addr;
+ 	u32 buf_len = dev->tx_buf_len;
+ 
+-	if (!(dev->status & STATUS_WRITE_IN_PROGRESS)) {
+-		/* Disable the adapter */
+-		writel(0, dev->base + DW_IC_ENABLE);
+-
+-		/* set the slave (target) address */
+-		writel(msgs[dev->msg_write_idx].addr, dev->base + DW_IC_TAR);
+-
+-		/* if the slave address is ten bit address, enable 10BITADDR */
+-		ic_con = readl(dev->base + DW_IC_CON);
+-		if (msgs[dev->msg_write_idx].flags & I2C_M_TEN)
+-			ic_con |= DW_IC_CON_10BITADDR_MASTER;
+-		else
+-			ic_con &= ~DW_IC_CON_10BITADDR_MASTER;
+-		writel(ic_con, dev->base + DW_IC_CON);
+-
+-		/* Enable the adapter */
+-		writel(1, dev->base + DW_IC_ENABLE);
 -	}
+-
+ 	for (; dev->msg_write_idx < dev->msgs_num; dev->msg_write_idx++) {
+ 		/* if target address has changed, we need to
+ 		 * reprogram the target address in the i2c
+@@ -474,6 +478,7 @@ i2c_dw_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ 		goto done;
  
- 	/*
- 	 * No need to modify or disable the interrupt mask here, as
+ 	/* start the transfers */
++	i2c_dw_xfer_init(dev);
+ 	i2c_dw_xfer_msg(dev);
+ 
+ 	/* wait for tx to complete */
 -- 
 1.6.5
