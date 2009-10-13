@@ -1,35 +1,30 @@
-From: JBeulich@novell.com (Jan Beulich)
-Date: Tue, 13 Oct 2009 08:40:01 +0100
-Subject: [PATCH] serial/atmel_serial: Fix another fallout of the
-	change to BUILD_BUG_ON
-In-Reply-To: <20091013092644.72c78334@hskinnemoen-d830>
-References: <1255417680-25609-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20091013092644.72c78334@hskinnemoen-d830>
-Message-ID: <4AD44AF10200007800019801@vpn.id2.novell.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Tue, 13 Oct 2009 10:56:37 +0300
+Subject: [PATCH] ARM: ELF: Add register information of threads to coredump
+In-Reply-To: <20091012133854.GA2480@n2100.arm.linux.org.uk>
+References: <1255242411-16025-1-git-send-email-dedekind1@gmail.com>
+	<20091012133854.GA2480@n2100.arm.linux.org.uk>
+Message-ID: <1255420597.32489.5.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> Haavard Skinnemoen <haavard.skinnemoen@atmel.com> 13.10.09 09:26 >>>
->Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
->> Commit 8c87df457cb5 fixed BUILD_BUG_ON with the result that some
->> expressions (e.g. "not really constant" ones) result in a build failure.
->> 
->> Some of these were fixed in 8c87df457cb5, but not serial/atmel_serial.
->
->This patch fixes the same issue:
->
->http://lkml.org/lkml/2009/10/6/305 
->
->> -	BUILD_BUG_ON(!is_power_of_2(ATMEL_SERIAL_RINGSIZE));
->> +	MAYBE_BUILD_BUG_ON(!is_power_of_2(ATMEL_SERIAL_RINGSIZE));
->
->What's the difference between BUILD_BUG_ON() and MAYBE_BUILD_BUG_ON()?
+On Mon, 2009-10-12 at 14:38 +0100, Russell King - ARM Linux wrote:
+> On Sun, Oct 11, 2009 at 09:26:51AM +0300, Artem Bityutskiy wrote:
+> > From: Mika Westerberg <mika.westerberg@iki.fi>
+> > 
+> > Defines ELF_CORE_COPY_TASK_REGS so that CPU register information
+> > of every thread is included in coredump. Without this, only the faulting
+> > thread is coredumped.
+> > 
+> > Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
+> > Signed-off-by: Artem Bityutskiy <Artem.Bityutskiy@nokia.com>
+> > Cc: Roger Quadros <ext-roger.quadros@nokia.com>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> 
+> Please send to the patch system.
 
-The latter (at present) generally only serves as an annotation. It should
-probably be renamed and converted to the (linking time) detecting
-mechanism Rusty suggested (though I'm not sure that model would
-allow all non-constant [at parsing time] uses to be detected - clearly
-there would remain potential for build issues if the compiler isn't able
-to reduce the expression to a constant during optimization).
+OK, done.
 
-Jan
+-- 
+Best Regards,
+Artem Bityutskiy (????? ????????)
