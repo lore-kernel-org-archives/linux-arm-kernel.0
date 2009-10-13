@@ -1,21 +1,51 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 13 Oct 2009 03:17:56 -0700 (PDT)
-Subject: [PATCH] irda/sa1100_ir: check return value of startup hook
-In-Reply-To: <20091009201224.GA6208@rainbow>
-References: <1255073153-24962-1-git-send-email-mad_soft@inbox.ru>
-	<4ACF293C.7070803@ru.mvista.com> <20091009201224.GA6208@rainbow>
-Message-ID: <20091013.031756.208832886.davem@davemloft.net>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 13 Oct 2009 17:33:19 +0530
+Subject: ARM: SMP: BUG with PREEMPT enabled
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02BB254F8D@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dmitry Artamonow <mad_soft@inbox.ru>
-Date: Sat, 10 Oct 2009 00:12:24 +0400
+Russell,
 
->>From ba1fe701950634aae46aa59431633e99f8bd18cc Mon Sep 17 00:00:00 2001
-> From: Dmitry Artamonow <mad_soft@inbox.ru>
-> Date: Fri, 9 Oct 2009 21:56:21 +0400
-> Subject: [PATCH v2] irda/sa1100_ir: check return value of startup hook
-> 
-> Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
+On the latest ARM kernel(v2.6.32-rc4),I have observed a BUG() dump when PREEMPT is enabled.
+Attached is the detailed log for your reference.
 
-Applied, thanks.
+<snip>
+**********************************************************
+BUG: using smp_processor_id() in preemptible [00000000] code: init/1
+caller is flush_tlb_mm+0x44/0x70
+Backtrace: 
+[<c00225c4>] (dump_backtrace+0x0/0x110) from [<c01713a0>] (dump_stack+0x18/0x1c)
+ r7:00000000 r6:c00234f0 r5:00000001 r4:c7828000
+[<c0171388>] (dump_stack+0x0/0x1c) from [<c0135364>] (debug_smp_processor_id+0xc0/0xf0)
+[<c01352a4>] (debug_smp_processor_id+0x0/0xf0) from [<c00234f0>] (flush_tlb_mm+0x44/0x70)
+ r7:00000000 r6:c60b41a0 r5:c60b4154 r4:00000001
+[<c00234ac>] (flush_tlb_mm+0x0/0x70) from [<c0039568>] (dup_mm+0x304/0x38c)
+ r5:c1f09058 r4:00000000
+[<c0039264>] (dup_mm+0x0/0x38c) from [<c0039de4>] (copy_process+0x7b8/0xeb0)
+[<c003962c>] (copy_process+0x0/0xeb0) from [<c003a638>] (do_fork+0x15c/0x29c)
+[<c003a4dc>] (do_fork+0x0/0x29c) from [<c0021df0>] (sys_clone+0x34/0x3c)
+[<c0021dbc>] (sys_clone+0x0/0x3c) from [<c001efa0>] (ret_fast_syscall+0x0/0x2c)
+**************************************************************
+
+As evident from the log " smp_processor_id " is used in preemptible code. This gets triggered from 
+flush_tlb_mm() -->
+	local_flush_tlb_mm()
+	{
+		if (cpu_isset(smp_processor_id(), vma->vm_mm->cpu_vm_mask)) ^^
+	}
+
+This can be guuarded using "get_cpu/put_cpu" pair which can make it preemption safe but I am not sure whether that is the right fix.
+
+Let me know your remarks !!
+
+Regards,
+Santosh
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: preempt.log
+Type: application/octet-stream
+Size: 9633 bytes
+Desc: preempt.log
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091013/cb570ae4/attachment.obj>
