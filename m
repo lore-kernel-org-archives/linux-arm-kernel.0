@@ -1,155 +1,24 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Oct 2009 14:49:20 -0700
-Subject: [PATCH 3/6] omap: headers: Split entry-macro.S for mach-omap1 and
-	mach-omap2
+Date: Wed, 14 Oct 2009 14:49:36 -0700
+Subject: [PATCH 4/6] omap: headers: Move mtd-xip.h to be mach-omap1 specific
 In-Reply-To: <20091014213748.30227.71513.stgit@kaulin.muru.com>
 References: <20091014213748.30227.71513.stgit@kaulin.muru.com>
-Message-ID: <20091014214920.30227.10280.stgit@kaulin.muru.com>
+Message-ID: <20091014214936.30227.98582.stgit@kaulin.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split entry-macro.S for mach-omap1 and mach-omap2
+These registers are omap1 specific.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
 
- arch/arm/mach-omap1/include/mach/entry-macro.S |   58 ++++++++
- arch/arm/mach-omap2/include/mach/entry-macro.S |  122 +++++++++++++++++
- arch/arm/plat-omap/include/mach/entry-macro.S  |  172 ------------------------
- 3 files changed, 180 insertions(+), 172 deletions(-)
- create mode 100644 arch/arm/mach-omap1/include/mach/entry-macro.S
- create mode 100644 arch/arm/mach-omap2/include/mach/entry-macro.S
- delete mode 100644 arch/arm/plat-omap/include/mach/entry-macro.S
+ arch/arm/mach-omap1/include/mach/mtd-xip.h |   61 ++++++++++++++++++++++++++++
+ arch/arm/plat-omap/include/mach/mtd-xip.h  |   61 ----------------------------
+ 2 files changed, 61 insertions(+), 61 deletions(-)
+ create mode 100644 arch/arm/mach-omap1/include/mach/mtd-xip.h
+ delete mode 100644 arch/arm/plat-omap/include/mach/mtd-xip.h
 
-diff --git a/arch/arm/mach-omap1/include/mach/entry-macro.S b/arch/arm/mach-omap1/include/mach/entry-macro.S
-new file mode 100644
-index 0000000..2e98f86
---- /dev/null
-+++ b/arch/arm/mach-omap1/include/mach/entry-macro.S
-@@ -0,0 +1,58 @@
-+/*
-+ * arch/arm/mach-omap1/include/mach/entry-macro.S
-+ *
-+ * Low-level IRQ helper macros for OMAP-based platforms
-+ *
-+ * Copyright (C) 2009 Texas Instruments
-+ *
-+ * This file is licensed under  the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+#include <mach/hardware.h>
-+#include <mach/io.h>
-+#include <mach/irqs.h>
-+#include <asm/hardware/gic.h>
-+
-+#if (defined(CONFIG_ARCH_OMAP730)||defined(CONFIG_ARCH_OMAP850)) && \
-+	(defined(CONFIG_ARCH_OMAP15XX) || defined(CONFIG_ARCH_OMAP16XX))
-+#error "FIXME: OMAP730 doesn't support multiple-OMAP"
-+#elif defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
-+#define INT_IH2_IRQ		INT_730_IH2_IRQ
-+#elif defined(CONFIG_ARCH_OMAP15XX)
-+#define INT_IH2_IRQ		INT_1510_IH2_IRQ
-+#elif defined(CONFIG_ARCH_OMAP16XX)
-+#define INT_IH2_IRQ		INT_1610_IH2_IRQ
-+#else
-+#warning "IH2 IRQ defaulted"
-+#define INT_IH2_IRQ		INT_1510_IH2_IRQ
-+#endif
-+
-+ 		.macro	disable_fiq
-+		.endm
-+
-+		.macro  get_irqnr_preamble, base, tmp
-+		.endm
-+
-+		.macro  arch_ret_to_user, tmp1, tmp2
-+		.endm
-+
-+		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
-+		ldr	\base, =OMAP1_IO_ADDRESS(OMAP_IH1_BASE)
-+		ldr	\irqnr, [\base, #IRQ_ITR_REG_OFFSET]
-+		ldr	\tmp, [\base, #IRQ_MIR_REG_OFFSET]
-+		mov	\irqstat, #0xffffffff
-+		bic	\tmp, \irqstat, \tmp
-+		tst	\irqnr, \tmp
-+		beq	1510f
-+
-+		ldr	\irqnr, [\base, #IRQ_SIR_FIQ_REG_OFFSET]
-+		cmp	\irqnr, #0
-+		ldreq	\irqnr, [\base, #IRQ_SIR_IRQ_REG_OFFSET]
-+		cmpeq	\irqnr, #INT_IH2_IRQ
-+		ldreq	\base, =OMAP1_IO_ADDRESS(OMAP_IH2_BASE)
-+		ldreq	\irqnr, [\base, #IRQ_SIR_IRQ_REG_OFFSET]
-+		addeqs	\irqnr, \irqnr, #32
-+1510:
-+		.endm
-+
-diff --git a/arch/arm/plat-omap/include/mach/entry-macro.S b/arch/arm/mach-omap2/include/mach/entry-macro.S
-similarity index 73%
-rename from arch/arm/plat-omap/include/mach/entry-macro.S
-rename to arch/arm/mach-omap2/include/mach/entry-macro.S
-index a559299..aafa0f6 100644
---- a/arch/arm/plat-omap/include/mach/entry-macro.S
-+++ b/arch/arm/mach-omap2/include/mach/entry-macro.S
-@@ -15,54 +15,6 @@
- #include <mach/irqs.h>
- #include <asm/hardware/gic.h>
- 
--#if defined(CONFIG_ARCH_OMAP1)
--
--#if defined(CONFIG_ARCH_OMAP730) && \
--	(defined(CONFIG_ARCH_OMAP15XX) || defined(CONFIG_ARCH_OMAP16XX))
--#error "FIXME: OMAP730 doesn't support multiple-OMAP"
--#elif defined(CONFIG_ARCH_OMAP730)
--#define INT_IH2_IRQ		INT_730_IH2_IRQ
--#elif defined(CONFIG_ARCH_OMAP15XX)
--#define INT_IH2_IRQ		INT_1510_IH2_IRQ
--#elif defined(CONFIG_ARCH_OMAP16XX)
--#define INT_IH2_IRQ		INT_1610_IH2_IRQ
--#else
--#warning "IH2 IRQ defaulted"
--#define INT_IH2_IRQ		INT_1510_IH2_IRQ
--#endif
--
-- 		.macro	disable_fiq
--		.endm
--
--		.macro  get_irqnr_preamble, base, tmp
--		.endm
--
--		.macro  arch_ret_to_user, tmp1, tmp2
--		.endm
--
--		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
--		ldr	\base, =OMAP1_IO_ADDRESS(OMAP_IH1_BASE)
--		ldr	\irqnr, [\base, #IRQ_ITR_REG_OFFSET]
--		ldr	\tmp, [\base, #IRQ_MIR_REG_OFFSET]
--		mov	\irqstat, #0xffffffff
--		bic	\tmp, \irqstat, \tmp
--		tst	\irqnr, \tmp
--		beq	1510f
--
--		ldr	\irqnr, [\base, #IRQ_SIR_FIQ_REG_OFFSET]
--		cmp	\irqnr, #0
--		ldreq	\irqnr, [\base, #IRQ_SIR_IRQ_REG_OFFSET]
--		cmpeq	\irqnr, #INT_IH2_IRQ
--		ldreq	\base, =OMAP1_IO_ADDRESS(OMAP_IH2_BASE)
--		ldreq	\irqnr, [\base, #IRQ_SIR_IRQ_REG_OFFSET]
--		addeqs	\irqnr, \irqnr, #32
--1510:
--		.endm
--
--#endif
--#if defined(CONFIG_ARCH_OMAP24XX) || defined(CONFIG_ARCH_OMAP34XX) || \
--			defined(CONFIG_ARCH_OMAP4)
--
- #include <mach/omap24xx.h>
- #include <mach/omap34xx.h>
- 
-@@ -168,5 +120,3 @@
- 
- 		.macro	irq_prio_table
- 		.endm
--
--#endif
+diff --git a/arch/arm/plat-omap/include/mach/mtd-xip.h b/arch/arm/mach-omap1/include/mach/mtd-xip.h
+similarity index 100%
+rename from arch/arm/plat-omap/include/mach/mtd-xip.h
+rename to arch/arm/mach-omap1/include/mach/mtd-xip.h
