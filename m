@@ -1,79 +1,90 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Oct 2009 10:06:41 +0100
-Subject: [at91sam9g45] Network crash
-In-Reply-To: <4AD58FFB.50204@visionsystems.de>
-References: <4AD58FFB.50204@visionsystems.de>
-Message-ID: <20091014090641.GA18013@n2100.arm.linux.org.uk>
+From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
+Date: Wed, 14 Oct 2009 11:37:39 +0200
+Subject: Global Video Buffers Pool - PMM and UPBuffer reference drivers
+	[RFC]
+In-Reply-To: <000401ca4ca0$d668ef40$833acdc0$%szyprowski@samsung.com>
+References: <000401ca4ca0$d668ef40$833acdc0$%szyprowski@samsung.com>
+Message-ID: <op.u1sac1ji7p4s8u@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 14, 2009 at 10:46:51AM +0200, Yegor Yefremov wrote:
-> # nuttcp -t -T5m 192.168.1.90
-> nuttcp-t: Info: attempting to switch to deprecated "classic" mode
-> nuttcp-t: Info: will use less reliable transmitter side statistics
-> Unable to handle kernel NULL pointer dereference at virtual address 0000001a
-> pgd = c0004000
-> [0000001a] *pgd=00000000
-> Internal error: Oops: 80000000 [#1]
-> Modules linked in:
-> CPU: 0    Not tainted  (2.6.32-rc2 #25)
-> PC is at 0x1a
-> LR is at tcp_transmit_skb+0x1d8/0x6c4
-> pc : [<0000001a>]    lr : [<c0231798>]    psr: 20000033
-> sp : c0325d30  ip : c3b06480  fp : c3b064e8
-> r10: 00000020  r9 : 00025d80  r8 : c3bf3c68
-> r7 : 00000020  r6 : c3bf3c48  r5 : c3b06480  r4 : c0325d38
-> r3 : 0000001b  r2 : 00000000  r1 : 00000000  r0 : 0000000c
-> Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA Thumb  Segment kernel
-> Control: 0005317f  Table: 73894000  DAC: 00000017
-> Process swapper (pid: 0, stack limit = 0xc0324270)
-> Stack: (0xc0325d30 to 0xc0326000)
-> 5d20:                                     00000119 00000040 00000002 00000000
-> 5d40: ffffb2b3 0007e2b0 0000001b 00000000 00000406 c3b06480 c3b06480 000005a8
-> 5d60: c3bf3ba0 c3bf3bc0 00025d80 5c1ab86a c3b064e8 c0234254 00000000 00000000
-> 5d80: 00000000 00000000 000005a8 00000000 00000003 0000001d 00000002 ffffb2b3
-> 5da0: c3b064e8 00000402 00000000 c3b06480 00000020 c3845900 c3b06480 00000020
-> 5dc0: c3845920 00000002 c39702f0 c02343fc 00000020 c3b06480 c3b06480 c022f3f4
-> 5de0: c021b7e4 c02198a0 80000013 c3bfc844 00000001 c3b06480 c3845900 c3bfc844
-> 5e00: c3b06480 0000924d c3bfc830 00000002 c39702f0 c0236984 c3845900 c0359f60
-> 5e20: 00000000 00000000 c3845900 c3bfc844 00000000 c3b06480 c3845900 c3bfc844
-> 5e40: 7c01a8c0 c0236f1c 7c01a8c0 0000924d 00000002 00000006 00000006 c3845900
-> 5e60: c0359f60 00000000 00000008 00000080 c0359b70 c021bb78 c3bfc830 c3845900
-> 5e80: c3970000 c021baa0 c3970000 c0029a54 c3bfc822 00000042 c3845900 c0359b50
-> 5ea0: c3970000 00000000 00000008 c02033dc 00000109 c0359b60 c3845900 00000109
-> 5ec0: c3845900 00000042 c39702c0 00000109 ffffffc2 c01bd3d0 c0325f78 00000040
-> 5ee0: 00000001 0000003f 0000004c c39702f0 00000040 0000000c 0000012c c033d224
-> 5f00: c0359b60 ffffb2b5 c033d234 c0203af0 41069265 00000100 c0324000 0000000c
-> 5f20: 00000001 00000003 c03462f8 0000000a 00000000 c0046230 00000001 c032ce18
-> 5f40: 00000019 00000019 00000000 00000019 c0327b20 70023a70 41069265 70023a3c
-> 5f60: 00000000 c002907c c0325fc4 ffffffff fefff000 c0029a54 00000000 0005317f
-> 5f80: 0005217f 60000013 c0324000 c0327b2c c0341590 c0327b20 70023a70 41069265
-> 5fa0: 70023a3c 00000000 600000d3 c0325fc0 c002ae54 c002ae60 60000013 ffffffff
-> 5fc0: c002b368 c002b334 c034ad3c c0341550 c0025e10 c0008ae4 c00085fc 00000000
-> 5fe0: 00000000 c0025e10 00053175 c03415b8 c0026214 70008034 00000000 00000000
-> Code: bad PC value.
-> Kernel panic - not syncing: Fatal exception in interrupt
-> [<c002f6ec>] (unwind_backtrace+0x0/0xdc) from [<c0269648>] (panic+0x34/0x120)
-> [<c0269648>] (panic+0x34/0x120) from [<c002d9d4>] (die+0x130/0x15c)
-> [<c002d9d4>] (die+0x130/0x15c) from [<c0030898>] (__do_kernel_fault+0x68/0x80)
-> [<c0030898>] (__do_kernel_fault+0x68/0x80) from [<c0030a68>] (do_page_fault+0x1b8/0x1d0)
-> [<c0030a68>] (do_page_fault+0x1b8/0x1d0) from [<c0029b2c>] (__pabt_svc+0x4c/0x80)
-> [<c0029b2c>] (__pabt_svc+0x4c/0x80) from [<0000001a>] (0x1a)
+Hello,
 
-This doesn't make sense - the backtrace values do not appear in the stack
-dump, plus the backtrace is missing from the oops (its generated from the
-panic() itself.
+[Code modified a bit to shorten it; removed some error reporting;
+  irrelevant parts of the code removed.]
+>> diff --git a/drivers/s3cmm/pmm-init.c b/drivers/s3cmm/pmm-init.c
+>> new file mode 100644
+>> index 0000000..f1e31a5
+>> --- /dev/null
+>> +++ b/drivers/s3cmm/pmm-init.c
+>> @@ -0,0 +1,75 @@
+>> +static unsigned long pmm_memory_start, pmm_memory_size;
+>> +
+>> +static int __init pmm_early_param(char *param)
+>> +{
+>> +       unsigned long long size = memparse(param, 0);
+>> +       void *ptr;
+>> +
+>> +       if (size <= 0 || size > (1ull << 30))
+>> +               return -EINVAL;
+>> +
+>> +       pmm_memory_size = PAGE_ALIGN((unsigned long)size);
+>> +       ptr = alloc_bootmem_pages_nopanic(pmm_memory_size);
 
-What's more is that the backtrace itself is wrong (Catalin?) because it's
-duplicating the information - the first function reference per line is
-supposed to be where we entered the function, but I guess EABI can't
-give that to us.
+From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> How does this work?  When early params are parsed, the memory subsystem
+> hasn't been initialized - not even bootmem.  So this will always fail.
 
-Moreover, it seems to be a thumb based kernel, which I guess means that
-you can't enable frame pointers to get a better backtrace, especially one
-which reveals the path to the faulting instruction itself.
+ From my investigation into Linux kernel source code it seems as if
+bootmem were initialised prior to parsing early params.  Lets look at
+start_kernel():
 
-No idea how to debug this I'm afraid.  The only suggestion I can come
-up with is to use some kind of hardware tracing tool to monitor the
-processor instruction fetches and produce a log from that.  Maybe
-Catalin can provide other hints on how to debug T2 code.
+#v+
+init/main.c:
+584        setup_arch(&command_line);
+[...]
+595        parse_early_param();
+[...]
+607        mm_init();
+#v-
+
+On ARM with MMU setup_arch() calls paging_init()
+(arch/arm/kernel/setup.c:730) which calls bootmem_init()
+(arch/arm/mm/mmu.c:989) which is the function that initialises
+bootmem.
+
+Early params are obviously handled by parse_early_param() function
+which is invoked after the call to setup_arch().
+
+What is also worth mentioning is that mm_init() initialises standard
+allocators so after this function is called bootmem no longer works.
+
+
+I've also tried to use various *_initcall()s (the ones defined in
+include/linux/init.h) but neither of them seemed to work.
+
+
+>> +       if (ptr)
+>> +               pmm_memory_start = virt_to_phys(ptr);
+>> +
+>> +       return 0;
+>> +}
+>> +early_param("pmm", pmm_early_param);
+>> +
+>> +
+>> +
+>> +/** Called from pmm_module_init() when module is initialised. */
+>> +void pmm_module_platform_init(pmm_add_region_func add_region)
+>> +{
+>> +       if (pmm_memory_start && pmm_memory_size)
+>> +               add_region(pmm_memory_start, pmm_memory_size,
+>> +                          PMM_MEM_GENERAL, 0);
+>> +}
+>> +EXPORT_SYMBOL(pmm_module_platform_init);
+
+
+-- 
+Best regards,                                           _     _
+   .o. | Liege of Serenely Enlightened Majesty of       o' \,=./ `o
+   ..o | Computer Science,  Micha? "mina86" Nazarewicz     (o o)
+   ooo +---<mina86@mina86.com>---<mina86@jabber.org>---ooO--(_)--Ooo--
