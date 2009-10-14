@@ -1,46 +1,26 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 13 Oct 2009 17:13:28 -0700
-Subject: [PATCH 0/6] omap fixes for v2.6.32-rc4
-Message-ID: <20091014001233.6116.84749.stgit@localhost>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Wed, 14 Oct 2009 09:20:17 +0200
+Subject: [PATCH 00/10] [ARM] cm-x300 updates for 2.6.33
+Message-ID: <cover.1255504387.git.mike@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+The following patch serie updates CM-X300 board support 
 
-Here are few omap fixes for review.
+Igor Grinberg (10):
+  [ARM] pxa/cm-x300: add revision difference handling
+  [ARM] pxa/cm-x300: add TDO35S lcd support
+  [ARM] pxa/cm-x300: add ac97 controller registration
+  [ARM] pxa/cm-x300: add Wi2Wi chip (Bluetooth and WiFi) initialization
+  [ARM] pxa/cm-x300: add support for PXA310 cpu
+  [ARM] pxa/cm-x300: enable USB port 2 for PXA300
+  [ARM] pxa/cm-x300: add da9030 support
+  [ARM] pxa/cm-x300: update authors and copyright
+  ASoC: finally enable support for eXeda and CM-X300
+  [ARM] pxa/cm-x300: update defconfig
 
-Regards,
-
-Tony
-
----
-
-Aaro Koskinen (1):
-      omap: RX-51: Drop I2C-1 speed to 2200
-
-Anuj Aggarwal (1):
-      omap: SDMA: Fixing bug in omap_dma_set_global_params()
-
-Jarkko Nikula (1):
-      omap: McBSP: Fix incorrect receiver stop in omap_mcbsp_stop
-
-Roel Kluin (1):
-      omap: Fix Unlikely(x) < y
-
-Sanjeev Premi (1):
-      omap: CONFIG_ISP1301_OMAP redefined in Beagle defconfig
-
-Teerth Reddy (1):
-      omap: Initialization of SDRC params on Zoom2
-
-
- arch/arm/configs/omap3_beagle_defconfig      |    1 -
- arch/arm/mach-omap2/board-rx51-peripherals.c |    2 +-
- arch/arm/mach-omap2/board-zoom2.c            |    4 +++-
- arch/arm/plat-omap/dma.c                     |   15 +++++++++------
- arch/arm/plat-omap/gpio.c                    |    2 +-
- arch/arm/plat-omap/mcbsp.c                   |    2 +-
- 6 files changed, 15 insertions(+), 11 deletions(-)
-
--- 
-Signature
+ arch/arm/configs/cm_x300_defconfig |  351 ++++++++++++++++++++++++------------
+ arch/arm/mach-pxa/Kconfig          |    1 +
+ arch/arm/mach-pxa/cm-x300.c        |  223 ++++++++++++++++++++++-
+ sound/soc/pxa/Kconfig              |    3 +-
+ 4 files changed, 456 insertions(+), 122 deletions(-)
