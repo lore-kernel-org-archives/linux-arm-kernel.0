@@ -1,40 +1,28 @@
 From: a.j.buxton@gmail.com (Alistair Buxton)
-Date: Wed, 14 Oct 2009 20:51:47 +0100
-Subject: [PATCH 15/17] OMAP7XX: Clocks: Add ck_ref and armxor
-Message-ID: <3d374d00910141251p61d83d0fjbecd18bf16f05510@mail.gmail.com>
+Date: Wed, 14 Oct 2009 20:51:52 +0100
+Subject: [PATCH 16/17] OMAP850: PM: Add an ARCH_OMAP850 check
+Message-ID: <3d374d00910141251j64a44d54xacf9adfd492abca9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These clocks are required for booting.
+This just makes the same warning be printed on omap850 and omap730.
 
-Signed-off-by: Angelo Arrifano <miknix@gmail.com>
 Signed-off-by: Alistair Buxton <a.j.buxton@gmail.com>
-Reviewed-by: Zebediah C. McClure <zmc@lurian.net>
 ---
- arch/arm/mach-omap1/clock.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap1/pm.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/clock.c b/arch/arm/mach-omap1/clock.c
-index d2b00a5..5f77b83 100644
---- a/arch/arm/mach-omap1/clock.c
-+++ b/arch/arm/mach-omap1/clock.c
-@@ -75,7 +75,7 @@ struct omap_clk {
+diff --git a/arch/arm/mach-omap1/pm.h b/arch/arm/mach-omap1/pm.h
+index 0f20aed..56a6479 100644
+--- a/arch/arm/mach-omap1/pm.h
++++ b/arch/arm/mach-omap1/pm.h
+@@ -105,6 +105,7 @@
+ #define OMAP7XX_IDLE_LOOP_REQUEST	0x0C00
 
- static struct omap_clk omap_clks[] = {
- 	/* non-ULPD clocks */
--	CLK(NULL,	"ck_ref",	&ck_ref,	CK_16XX | CK_1510 | CK_310),
-+	CLK(NULL,	"ck_ref",	&ck_ref,	CK_16XX | CK_1510 | CK_310 | CK_7XX),
- 	CLK(NULL,	"ck_dpll1",	&ck_dpll1,	CK_16XX | CK_1510 | CK_310),
- 	/* CK_GEN1 clocks */
- 	CLK(NULL,	"ck_dpll1out",	&ck_dpll1out.clk, CK_16XX),
-@@ -83,7 +83,7 @@ static struct omap_clk omap_clks[] = {
- 	CLK(NULL,	"arm_ck",	&arm_ck,	CK_16XX | CK_1510 | CK_310),
- 	CLK(NULL,	"armper_ck",	&armper_ck.clk,	CK_16XX | CK_1510 | CK_310),
- 	CLK(NULL,	"arm_gpio_ck",	&arm_gpio_ck,	CK_1510 | CK_310),
--	CLK(NULL,	"armxor_ck",	&armxor_ck.clk,	CK_16XX | CK_1510 | CK_310),
-+	CLK(NULL,	"armxor_ck",	&armxor_ck.clk,	CK_16XX | CK_1510 | CK_310 | CK_7XX),
- 	CLK(NULL,	"armtim_ck",	&armtim_ck.clk,	CK_16XX | CK_1510 | CK_310),
- 	CLK("omap_wdt",	"fck",		&armwdt_ck.clk,	CK_16XX | CK_1510 | CK_310),
- 	CLK("omap_wdt",	"ick",		&armper_ck.clk,	CK_16XX),
+ #if     !defined(CONFIG_ARCH_OMAP730) && \
++	!defined(CONFIG_ARCH_OMAP850) && \
+ 	!defined(CONFIG_ARCH_OMAP15XX) && \
+ 	!defined(CONFIG_ARCH_OMAP16XX)
+ #warning "Power management for this processor not implemented yet"
 -- 
 1.6.5
