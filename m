@@ -1,56 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 14 Oct 2009 18:10:29 +0100
-Subject: [PATCH] [ARM] force dcache flush if dcache_dirty bit set
-In-Reply-To: <20091013020752.GB5736@linux-sh.org>
-References: <1255337423-3158-1-git-send-email-ngupta@vflare.org>
-	<20091012090710.GA29310@n2100.arm.linux.org.uk>
-	<20091012.023744.157085851.davem@davemloft.net>
-	<20091012100023.GC29310@n2100.arm.linux.org.uk>
-	<Pine.LNX.4.64.0910121634170.7327@sister.anvils>
-	<20091012170312.GB9453@flint.arm.linux.org.uk>
-	<20091013020752.GB5736@linux-sh.org>
-Message-ID: <1255540229.15103.50.camel@pc1117.cambridge.arm.com>
+From: peter@peter-teichmann.de (Peter Teichmann)
+Date: Wed, 14 Oct 2009 20:21:58 +0200
+Subject: [PATCH 4/6] ARM: remove references to non-existent fastfpe
+In-Reply-To: <4AD048A4.1070805@tuffmail.co.uk>
+References: <1255096942-10451-1-git-send-email-alan-jenkins@tuffmail.co.uk>
+	<20091009165513.GA5902@n2100.arm.linux.org.uk>
+	<4AD048A4.1070805@tuffmail.co.uk>
+Message-ID: <200910142021.59118.peter@peter-teichmann.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2009-10-13 at 11:07 +0900, Paul Mundt wrote:
-> On Mon, Oct 12, 2009 at 06:03:12PM +0100, Russell King wrote:
-> > On Mon, Oct 12, 2009 at 05:09:53PM +0100, Hugh Dickins wrote:
-> > > Sorry to muddy the waters on this, if you and Dave are sure that
-> > > you have the right fix, down in your architectures, and that fix
-> > > isn't going to hurt your performance significantly.
-> > 
-> > If I look at the issue from this point of view:
-> > 
-> > - we are using PG_arch_1 to delay cache handling for the page
-> > 
-> > - if PG_arch_1 is set on a page, we set it explicitly because we
-> >   didn't do some flushing between the allocation of the page and
-> >   mapping it into userspace
-> > 
-> > - if a page with PG_arch_1 set ever gets to userspace, this can
-> >   only be because we did the lazy flushing thing
-> > 
-> > I don't see that there should have been any bearing on whether a page
-> > has a mapping or not when we get to update_mmu_cache.  The issue here
-> > is that > if PG_arch_1 is set on a page, then we didn't flush it at
-> > the time when we believed it was appropriate to do so. <
-> > 
-> > Tell me I'm wrong (having only just sent it to Linus...)
-> 
-> Having looked at the ARM fix, in the !mapping case do you not need the
-> I-cache flush on vma->vm_flags & VM_EXEC? Or is the presumption that
-> flush_icache_page()-type action doesn't need to be undertaken by
-> flush_dcache_page()/update_mmu_cache() when there is no page_mapping()?
+Am Saturday 10 October 2009 10:41:08 schrieb Alan Jenkins:
+> Russell King - ARM Linux wrote:
+> > On Fri, Oct 09, 2009 at 03:02:20PM +0100, Alan Jenkins wrote:
+> >> 	# Do we have FASTFPE?
+> >> 	FASTFPE		:=arch/arm/fastfpe
+> >> 	ifeq ($(FASTFPE),$(wildcard $(FASTFPE)))
+> >> 	FASTFPE_OBJ	:=$(FASTFPE)/
+> >> 	endif
+> >> 	fastfpe
+> >>
+> >> We don't have FASTFPE.  If this code still exists out of tree, it can
+> >> surely maintain its own Makefile and Kconfig entries.  Let's not
+> >> confuse users by allowing them to select FASTFPE, and then silently not
+> >> building it.
+> >
+> > The code is not maintained anymore, but can just be slotted in (as per
+> > the recent request on the mailing list.)  I'd rather not have the
+> > hastle of maintaining fastfpe patches thank you.
+>
+> Urk. The fine balancing act of limbo. Another possibility would be to
+> provide a stub
+>
+> #error "fastfpe not included; disable it or download it"
+>
+> But if you want to just leave it, that's obviously your decision to make.
 
-If I understand Nitin's scenario correctly, I think it should also
-invalidate the I-cache.
+I agree to Alan. It seems reasonable at least to include a stub as he 
+suggests. However, since FastFPE was not updated for some years now, maybe 
+the burden of maintaining patches is not so heavy in anymore? Maybe we can 
+as well just include the latest version now? It becomes more and more 
+difficult to find the source for someone who is interested in it.
 
-For executable anonymous pages containing, it's the user app writing the
-code (JIT etc.) and it calls an ARM-specific syscall for I and D cache
-maintenance. If such page is read back from swap, following Nitin's
-scenario, the I-cache would need to be invalidated as well otherwise it
-can have stale entries.
+What do you think?
 
--- 
-Catalin
+Peter
