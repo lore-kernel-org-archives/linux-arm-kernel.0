@@ -1,45 +1,34 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Wed, 14 Oct 2009 13:02:35 +1300
-Subject: ts72xx: rc4 doesn't boot anymore
-In-Reply-To: <4AD5121D.4070309@techworks.ie>
-References: <4AD5121D.4070309@techworks.ie>
-Message-ID: <4AD5151B.30300@bluewatersys.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 13 Oct 2009 17:13:52 -0700
+Subject: [PATCH 2/6] omap: CONFIG_ISP1301_OMAP redefined in Beagle defconfig
+In-Reply-To: <20091014001233.6116.84749.stgit@localhost>
+References: <20091014001233.6116.84749.stgit@localhost>
+Message-ID: <20091014001352.6116.3939.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Christian Gagneraud wrote:
-> Hi all,
-> 
-> I really don't understand what's happenning, nothing has changed on my
-> side (same board, same bootloader), rc2 was booting OK, rc3 didn't boot
-> unless I pass on the command line the config for half of my memory
-> (mem=8M at 0x0 mem=8M at 16M mem=8M at 64M mem=8M at 80M). Now with rc4 it's even
-> worth, the kernel complains about bad configuration page, detects 16MB
-> of memory and ignore any mem= command line params (this board has 8
-> nodes of 8MB each).
-> 
-> Below is the trace of the crash, I've added some debug printk,
-> especially concerning the atags (attached is my hack of
-> arch/arm/kernel/setup.c and another patch i need to get the board
-> booting (I know it's bad))
-> 
-> Unless I'm missing something, the rc2 was booting OK, I'm sure.
-> 
-> Any help greatly appreciate.
-> 
+From: Sanjeev Premi <premi@ti.com>
 
-Can you do a bisect between rc4 and rc2 (or rc3 with the command line
-arguments you gave) to see if you can track down a specific commit which
-is breaking your setup.
+The symbol CONFIG_ISP1301_OMAP was defined twice in the
+defconfig. This was causing the warning:
+arch/arm/configs/omap3_beagle_defconfig:972:warning:
+ override: reassigning to symbol ISP1301_OMAP
 
-Thanks,
-~Ryan
+Signed-off-by: Sanjeev Premi <premi@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/configs/omap3_beagle_defconfig |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+diff --git a/arch/arm/configs/omap3_beagle_defconfig b/arch/arm/configs/omap3_beagle_defconfig
+index 357d402..b3c8cce 100644
+--- a/arch/arm/configs/omap3_beagle_defconfig
++++ b/arch/arm/configs/omap3_beagle_defconfig
+@@ -969,7 +969,6 @@ CONFIG_USB_ETH_RNDIS=y
+ #
+ CONFIG_USB_OTG_UTILS=y
+ # CONFIG_USB_GPIO_VBUS is not set
+-# CONFIG_ISP1301_OMAP is not set
+ CONFIG_TWL4030_USB=y
+ # CONFIG_NOP_USB_XCEIV is not set
+ CONFIG_MMC=y
