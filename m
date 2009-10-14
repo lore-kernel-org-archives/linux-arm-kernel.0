@@ -1,56 +1,35 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 13 Oct 2009 17:14:18 -0700
-Subject: [PATCH 3/6] omap: SDMA: Fixing bug in omap_dma_set_global_params()
+Date: Tue, 13 Oct 2009 17:14:30 -0700
+Subject: [PATCH 4/6] omap: RX-51: Drop I2C-1 speed to 2200
 In-Reply-To: <20091014001233.6116.84749.stgit@localhost>
 References: <20091014001233.6116.84749.stgit@localhost>
-Message-ID: <20091014001418.6116.82370.stgit@localhost>
+Message-ID: <20091014001430.6116.52257.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Anuj Aggarwal <anuj.aggarwal@ti.com>
+From: Aaro Koskinen <Aaro.Koskinen@nokia.com>
 
-Argument tparams was not being used to program
-global register GCR.HI_THREAD_RESERVED. This patch fixes the same.
+The I2C-1 bus frequency on RX-51 should be 2.2 MHz. The speed is limited
+by TWL5030/GAIA; a higher speed could lead to errors on the interface. The
+maximum speed depends on the system clock for GAIA: 2.2 MHz (if 19.2 MHz),
+2.4 MHz (26 MHz) or 2.9 MHz (38.4 MHz).
 
-Signed-off-by: Anuj Aggarwal <anuj.aggarwal@ti.com>
+Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/plat-omap/dma.c |   15 +++++++++------
- 1 files changed, 9 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/board-rx51-peripherals.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
-index fd3154a..0eb676d 100644
---- a/arch/arm/plat-omap/dma.c
-+++ b/arch/arm/plat-omap/dma.c
-@@ -829,10 +829,10 @@ EXPORT_SYMBOL(omap_free_dma);
-  *
-  * @param arb_rate
-  * @param max_fifo_depth
-- * @param tparams - Number of thereads to reserve : DMA_THREAD_RESERVE_NORM
-- * 						    DMA_THREAD_RESERVE_ONET
-- * 						    DMA_THREAD_RESERVE_TWOT
-- * 						    DMA_THREAD_RESERVE_THREET
-+ * @param tparams - Number of threads to reserve : DMA_THREAD_RESERVE_NORM
-+ * 						   DMA_THREAD_RESERVE_ONET
-+ * 						   DMA_THREAD_RESERVE_TWOT
-+ * 						   DMA_THREAD_RESERVE_THREET
-  */
- void
- omap_dma_set_global_params(int arb_rate, int max_fifo_depth, int tparams)
-@@ -844,11 +844,14 @@ omap_dma_set_global_params(int arb_rate, int max_fifo_depth, int tparams)
- 		return;
+diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
+index c1af532..2b0eb1b 100644
+--- a/arch/arm/mach-omap2/board-rx51-peripherals.c
++++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
+@@ -444,7 +444,7 @@ static int __init rx51_i2c_init(void)
+ 		rx51_twldata.vaux3 = &rx51_vaux3_cam;
+ 		rx51_twldata.vmmc2 = &rx51_vmmc2;
  	}
- 
-+	if (max_fifo_depth == 0)
-+		max_fifo_depth = 1;
- 	if (arb_rate == 0)
- 		arb_rate = 1;
- 
--	reg = (arb_rate & 0xff) << 16;
--	reg |= (0xff & max_fifo_depth);
-+	reg = 0xff & max_fifo_depth;
-+	reg |= (0x3 & tparams) << 12;
-+	reg |= (arb_rate & 0xff) << 16;
- 
- 	dma_write(reg, GCR);
- }
+-	omap_register_i2c_bus(1, 2600, rx51_peripherals_i2c_board_info_1,
++	omap_register_i2c_bus(1, 2200, rx51_peripherals_i2c_board_info_1,
+ 			ARRAY_SIZE(rx51_peripherals_i2c_board_info_1));
+ 	omap_register_i2c_bus(2, 100, NULL, 0);
+ 	omap_register_i2c_bus(3, 400, NULL, 0);
