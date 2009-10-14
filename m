@@ -1,64 +1,22 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 14 Oct 2009 21:02:48 +0200
-Subject: [RFC] i2c-designware patches
-In-Reply-To: <4AD3E974.8080200@necel.com>
-References: <4AD3E974.8080200@necel.com>
-Message-ID: <20091014190248.GE11789@tarshish>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 14 Oct 2009 20:03:33 +0100
+Subject: [PATCH 4/6] ARM: remove references to non-existent fastfpe
+In-Reply-To: <200910142021.59118.peter@peter-teichmann.de>
+References: <1255096942-10451-1-git-send-email-alan-jenkins@tuffmail.co.uk>
+	<20091009165513.GA5902@n2100.arm.linux.org.uk>
+	<4AD048A4.1070805@tuffmail.co.uk>
+	<200910142021.59118.peter@peter-teichmann.de>
+Message-ID: <20091014190333.GA28948@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shinya,
+On Wed, Oct 14, 2009 at 08:21:58PM +0200, Peter Teichmann wrote:
+> I agree to Alan. It seems reasonable at least to include a stub as he 
+> suggests. However, since FastFPE was not updated for some years now, maybe 
+> the burden of maintaining patches is not so heavy in anymore? Maybe we can 
+> as well just include the latest version now? It becomes more and more 
+> difficult to find the source for someone who is interested in it.
 
-On Tue, Oct 13, 2009 at 11:44:04AM +0900, Shinya Kuribayashi wrote:
-> Here're various improvements / bug-fixing patches for DW I2C driver.
-> I'm working with v2.6.27-based kernel, but they must work fine with the
-> latest mainline kernel.
-> 
-> It's stil in RFC, and I'm working with it for some time.  Any comments
-> or suggestions are highly appreciated.  Then I'll respin and give it a
-> test, thanks.
-> 
-> Baruch, I'd say the base driver is in good shape enogh, so I'm having
-> a fun with modifing the driver.  Thanks for the initial work.
-> 
-> P.S. ARM and MIPS lists are Cc:ed as I believe there must be potential
-> users of this driver.
-> 
-> 
-> Shinya Kuribayashi (16):
->      i2c-designware: Consolidate to use 32-bit word accesses
->      i2c-designware: Don't use the IC_CLR_INTR register to clear interrupts
->      i2c-designware: Use platform_get_irq helper
->      i2c-designware: i2c_dw_read: Take "struct dw_i2c_dev" pointer
->      i2c-designware: i2c_dw_xfer_msg: Take "struct dw_i2c_dev" pointer
->      i2c-designware: Remove an useless local variable "num"
->      i2c-designware: Set a clock name to DesignWare I2C clock source
->      i2c-designware: Improve _HCNT/_LCNT calculation
->      i2c-designware: i2c_dw_xfer_msg: Fix an i2c_msg search bug
->      i2c-designware: Do dw_i2c_pump_msg's jobs in the interrutp handler
->      i2c-designware: Set Tx/Rx FIFO threshold levels
->      i2c-designware: Divide i2c_dw_xfer_msg into two functions
->      i2c-designware: i2c_dw_xfer_msg: Introduce a local "buf" pointer
->      i2c-designware: Deferred FIFO-data-counting variables initialization
->      i2c-designware: i2c_dw_xfer_msg: Mark as completed on an error
->      i2c-designware: Add I2C_FUNC_SMBUS_* bits
-
-Great job.
-
-Your contribution to the implementation of transactions that are longer than 
-the hardware buffers is very important. I wrote this code as a theoretical 
-exercise, as I never had access to an i2c slave which requires long 
-transactions. So I'm not surprised to find out that this code was broken.
-
-For all these patches except no. 7 (Set a clock name to DesignWare I2C clock 
-source) and no. 16 (Add I2C_FUNC_SMBUS_* bits) you have my
-
-Acked-by: Baruch Siach <baruch@tkos.co.il>
-
-Thanks,
-baruch
-
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+The easiest and least risky approach would be to leave it as is - we
+know it's not causing any problems with it there, and it's not causing
+any run-time bloat.
