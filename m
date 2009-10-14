@@ -1,7 +1,7 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 14 Oct 2009 14:58:03 -0700
-Subject: [PATCH 20/27] OMAP: PM: Clear DMA channel state after a wakeup
-In-Reply-To: <1255557490-16787-20-git-send-email-khilman@deeprootsystems.com>
+Date: Wed, 14 Oct 2009 14:58:04 -0700
+Subject: [PATCH 21/27] OMAP: Store reboot mode in scratchpad on OMAP34xx
+In-Reply-To: <1255557490-16787-21-git-send-email-khilman@deeprootsystems.com>
 References: <1255557490-16787-1-git-send-email-khilman@deeprootsystems.com>
 	<1255557490-16787-2-git-send-email-khilman@deeprootsystems.com>
 	<1255557490-16787-3-git-send-email-khilman@deeprootsystems.com>
@@ -22,43 +22,50 @@ References: <1255557490-16787-1-git-send-email-khilman@deeprootsystems.com>
 	<1255557490-16787-18-git-send-email-khilman@deeprootsystems.com>
 	<1255557490-16787-19-git-send-email-khilman@deeprootsystems.com>
 	<1255557490-16787-20-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1255557490-16787-21-git-send-email-khilman@deeprootsystems.com>
+	<1255557490-16787-21-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1255557490-16787-22-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Aaro Koskinen <aaro.koskinen@nokia.com>
+From: Juha Yrjola <juha.yrjola@solidboot.com>
 
-Clear DMA channel states so that users can assume a known initial state.
+The reboot mode can be communicated to a bootloader (or the
+kernel itself) with a scratchpad register. This functionality
+is especially useful, if userspace is allowed to change
+the reboot mode.
 
-Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+Signed-off-by: Juha Yrjola <juha.yrjola@solidboot.com>
+Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/plat-omap/dma.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/prcm.c |   13 +++++++++++--
+ 1 files changed, 11 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
-index f911bfd..ee9c02a 100644
---- a/arch/arm/plat-omap/dma.c
-+++ b/arch/arm/plat-omap/dma.c
-@@ -2358,6 +2358,8 @@ EXPORT_SYMBOL(omap_dma_global_context_save);
+diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
+index 99ff439..ce17eb1 100644
+--- a/arch/arm/mach-omap2/prcm.c
++++ b/arch/arm/mach-omap2/prcm.c
+@@ -134,9 +134,18 @@ void omap_prcm_arch_reset(char mode)
  
- void omap_dma_global_context_restore(void)
- {
-+	int ch;
+ 	if (cpu_is_omap24xx())
+ 		prcm_offs = WKUP_MOD;
+-	else if (cpu_is_omap34xx())
++	else if (cpu_is_omap34xx()) {
++		u32 l;
 +
- 	dma_write(omap_dma_global_context.dma_gcr, GCR);
- 	dma_write(omap_dma_global_context.dma_ocp_sysconfig,
- 		OCP_SYSCONFIG);
-@@ -2372,6 +2374,10 @@ void omap_dma_global_context_restore(void)
- 	 */
- 	if (cpu_is_omap34xx() && (omap_type() != OMAP2_DEVICE_TYPE_GP))
- 		dma_write(0x3 , IRQSTATUS_L0);
-+
-+	for (ch = 0; ch < dma_chan_count; ch++)
-+		if (dma_chan[ch].dev_id != -1)
-+			omap_clear_dma(ch);
- }
- EXPORT_SYMBOL(omap_dma_global_context_restore);
+ 		prcm_offs = OMAP3430_GR_MOD;
+-	else
++		l = ('B' << 24) | ('M' << 16) | mode;
++		/* Reserve the first word in scratchpad for communicating
++		 * with the boot ROM. A pointer to a data structure
++		 * describing the boot process can be stored there,
++		 * cf. OMAP34xx TRM, Initialization / Software Booting
++		 * Configuration. */
++		omap_writel(l, OMAP343X_SCRATCHPAD + 4);
++	} else
+ 		WARN_ON(1);
  
+ 	prm_set_mod_reg_bits(OMAP_RST_DPLL3, prcm_offs, RM_RSTCTRL);
 -- 
 1.6.4.3
