@@ -1,20 +1,44 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 14 Oct 2009 16:46:22 +0100
-Subject: [PATCH 09/10] [PATCH 04/10] ASoC: finally enable support for
-	eXeda and CM-X300
-In-Reply-To: <b013b3ef99e26e493af0a8d8becf3f98502b362a.1255504387.git.mike@compulab.co.il>
-References: <cover.1255504387.git.mike@compulab.co.il>
-	<b013b3ef99e26e493af0a8d8becf3f98502b362a.1255504387.git.mike@compulab.co.il>
-Message-ID: <20091014154622.GA31536@rakim.wolfsonmicro.main>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 Oct 2009 09:55:35 -0700
+Subject: [PATCH 1/6] omap: Fix Unlikely(x) < y
+In-Reply-To: <20091014001341.6116.47622.stgit@localhost>
+References: <20091014001233.6116.84749.stgit@localhost>
+	<20091014001341.6116.47622.stgit@localhost>
+Message-ID: <20091014165535.GG12700@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 14, 2009 at 09:20:26AM +0200, Mike Rapoport wrote:
-> From: Igor Grinberg <grinberg@compulab.co.il>
+* Tony Lindgren <tony@atomide.com> [091013 17:21]:
+> From: Roel Kluin <roel.kluin@gmail.com>
+> 
+> The closing parenthesis was not on the right location.
 
-> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
-> CC: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> CC: alsa-devel at alsa-project.org
+Looks like this one is in the -mm now, so dropping from
+mine.
 
-Applied, thanks.
+Tony
+ 
+> Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/plat-omap/gpio.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
+> index 71ebd7f..7c345b7 100644
+> --- a/arch/arm/plat-omap/gpio.c
+> +++ b/arch/arm/plat-omap/gpio.c
+> @@ -373,7 +373,7 @@ static inline int gpio_valid(int gpio)
+>  
+>  static int check_gpio(int gpio)
+>  {
+> -	if (unlikely(gpio_valid(gpio)) < 0) {
+> +	if (unlikely(gpio_valid(gpio) < 0)) {
+>  		printk(KERN_ERR "omap-gpio: invalid GPIO %d\n", gpio);
+>  		dump_stack();
+>  		return -1;
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
