@@ -1,149 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Oct 2009 15:18:53 -0700
-Subject: [PATCH 08/27] OMAP3: PM: handle PER/NEON/CORE in idle
-In-Reply-To: <1255557490-16787-9-git-send-email-khilman@deeprootsystems.com>
-References: <1255557490-16787-1-git-send-email-khilman@deeprootsystems.com>
-	<1255557490-16787-2-git-send-email-khilman@deeprootsystems.com>
-	<1255557490-16787-3-git-send-email-khilman@deeprootsystems.com>
-	<1255557490-16787-4-git-send-email-khilman@deeprootsystems.com>
-	<1255557490-16787-5-git-send-email-khilman@deeprootsystems.com>
-	<1255557490-16787-6-git-send-email-khilman@deeprootsystems.com>
-	<1255557490-16787-7-git-send-email-khilman@deeprootsystems.com>
-	<1255557490-16787-8-git-send-email-khilman@deeprootsystems.com>
-	<1255557490-16787-9-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <20091014221852.GP12700@atomide.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 14 Oct 2009 16:31:35 -0600
+Subject: [PATCH 0/2] OMAP clock and clockdomain fixes for 2.6.29-rc5
+Message-ID: <20091014222609.5545.7736.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@deeprootsystems.com> [091014 15:15]:
-> From: Rajendra Nayak <rnayak@ti.com>
+(resending due to old l-a-k host address)
 
-Might be worth checking the descriptions in the whole series :)
- 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
-> ---
->  arch/arm/mach-omap2/pm34xx.c |   64 +++++++++++++++++++++++++++++++++++------
->  1 files changed, 54 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> index 9dbb5a0..7eab539 100644
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -49,7 +49,10 @@ static LIST_HEAD(pwrst_list);
->  
->  static void (*_omap_sram_idle)(u32 *addr, int save_state);
->  
-> -static struct powerdomain *mpu_pwrdm;
-> +static struct powerdomain *mpu_pwrdm, *neon_pwrdm;
-> +static struct powerdomain *core_pwrdm, *per_pwrdm;
-> +
-> +static int set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
->  
->  /*
->   * PRCM Interrupt Handler Helper Function
-> @@ -169,13 +172,22 @@ static void omap_sram_idle(void)
->  	/* save_state = 1 => Only L1 and logic lost */
->  	/* save_state = 2 => Only L2 lost */
->  	/* save_state = 3 => L1, L2 and logic lost */
-> -	int save_state = 0, mpu_next_state;
-> +	int save_state = 0;
-> +	int mpu_next_state = PWRDM_POWER_ON;
-> +	int per_next_state = PWRDM_POWER_ON;
-> +	int core_next_state = PWRDM_POWER_ON;
->  
->  	if (!_omap_sram_idle)
->  		return;
->  
-> +	pwrdm_clear_all_prev_pwrst(mpu_pwrdm);
-> +	pwrdm_clear_all_prev_pwrst(neon_pwrdm);
-> +	pwrdm_clear_all_prev_pwrst(core_pwrdm);
-> +	pwrdm_clear_all_prev_pwrst(per_pwrdm);
-> +
->  	mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
->  	switch (mpu_next_state) {
-> +	case PWRDM_POWER_ON:
->  	case PWRDM_POWER_RET:
->  		/* No need to save context */
->  		save_state = 0;
-> @@ -187,18 +199,37 @@ static void omap_sram_idle(void)
->  	}
->  	pwrdm_pre_transition();
->  
-> -	omap2_gpio_prepare_for_retention();
-> -	omap_uart_prepare_idle(0);
-> -	omap_uart_prepare_idle(1);
-> -	omap_uart_prepare_idle(2);
-> +	/* NEON control */
-> +	if (pwrdm_read_pwrst(neon_pwrdm) == PWRDM_POWER_ON)
-> +		set_pwrdm_state(neon_pwrdm, mpu_next_state);
-> +
-> +	/* CORE & PER */
-> +	core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
-> +	if (core_next_state < PWRDM_POWER_ON) {
-> +		omap2_gpio_prepare_for_retention();
-> +		omap_uart_prepare_idle(0);
-> +		omap_uart_prepare_idle(1);
-> +		/* PER changes only with core */
-> +		per_next_state = pwrdm_read_next_pwrst(per_pwrdm);
-> +		if (per_next_state < PWRDM_POWER_ON)
-> +			omap_uart_prepare_idle(2);
-> +		/* Enable IO-PAD wakeup */
-> +		prm_set_mod_reg_bits(OMAP3430_EN_IO, WKUP_MOD, PM_WKEN);
-> +	}
->  
->  	_omap_sram_idle(NULL, save_state);
->  	cpu_init();
->  
-> -	omap_uart_resume_idle(2);
-> -	omap_uart_resume_idle(1);
-> -	omap_uart_resume_idle(0);
-> -	omap2_gpio_resume_after_retention();
-> +	if (core_next_state < PWRDM_POWER_ON) {
-> +		if (per_next_state < PWRDM_POWER_ON)
-> +			omap_uart_resume_idle(2);
-> +		omap_uart_resume_idle(1);
-> +		omap_uart_resume_idle(0);
-> +
-> +		/* Disable IO-PAD wakeup */
-> +		prm_clear_mod_reg_bits(OMAP3430_EN_IO, WKUP_MOD, PM_WKEN);
-> +		omap2_gpio_resume_after_retention();
-> +	}
->  
->  	pwrdm_post_transition();
->  
-> @@ -791,6 +822,10 @@ static int __init omap3_pm_init(void)
->  		goto err2;
->  	}
->  
-> +	neon_pwrdm = pwrdm_lookup("neon_pwrdm");
-> +	per_pwrdm = pwrdm_lookup("per_pwrdm");
-> +	core_pwrdm = pwrdm_lookup("core_pwrdm");
-> +
->  	omap_push_sram_idle();
->  #ifdef CONFIG_SUSPEND
->  	suspend_set_ops(&omap_pm_ops);
-> @@ -798,6 +833,15 @@ static int __init omap3_pm_init(void)
->  
->  	pm_idle = omap3_pm_idle;
->  
-> +	pwrdm_add_wkdep(neon_pwrdm, mpu_pwrdm);
-> +	/*
-> +	 * REVISIT: This wkdep is only necessary when GPIO2-6 are enabled for
-> +	 * IO-pad wakeup.  Otherwise it will unnecessarily waste power
-> +	 * waking up PER with every CORE wakeup - see
-> +	 * http://marc.info/?l=linux-omap&m=121852150710062&w=2
-> +	*/
-> +	pwrdm_add_wkdep(per_pwrdm, core_pwrdm);
-> +
->  err1:
->  	return ret;
->  err2:
-> -- 
-> 1.6.4.3
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Hello,
+
+This series contains:
+
+- one OMAP2 clock fix that allows N800 to boot further (there are unrelated
+  problems with both the current linux-omap head and omap-fixes branch that
+  cause booting to fail due to other reasons), and
+
+- one OMAP2/3 clockdomain fix that can cause clockdomain transitions to be
+  missed by the clockdomain code -- this mostly affects OMAP3 OFF mode.
+
+These patches are also available as a git branch (based on Linus'
+v2.6.32-rc4 tag) from
+
+  git://git.pwsan.com/linux-2.6 2_6_32rc4_fixes
+
+
+- Paul
+
+---
+
+Kalle Jokiniemi (1):
+      OMAP: Fix race condition with autodeps
+
+Paul Walmsley (1):
+      OMAP2xxx clock: set up clockdomain pointer in struct clk
+
+
+ arch/arm/mach-omap2/clock24xx.c   |    1 +
+ arch/arm/mach-omap2/clockdomain.c |   74 ++++++++++++++++++++++---------------
+ 2 files changed, 45 insertions(+), 30 deletions(-)
+
+size:
+   text	   data	    bss	    dec	    hex	filename
+3588474	 198624	 105152	3892250	 3b641a	vmlinux.omap3beagle.orig
+3588562	 198624	 105152	3892338	 3b6472	vmlinux.omap3beagle.patched
