@@ -1,133 +1,238 @@
 From: a.j.buxton@gmail.com (Alistair Buxton)
-Date: Wed, 14 Oct 2009 20:51:20 +0100
-Subject: [PATCH 10/17] OMAP7XX: Create omap7xx.h
-Message-ID: <3d374d00910141251n31d80b91odbad69833bce5bd7@mail.gmail.com>
+Date: Wed, 14 Oct 2009 20:51:26 +0100
+Subject: [PATCH 11/17] OMAP7XX: Update core omap1 files to use omap7xx.h
+Message-ID: <3d374d00910141251i26517cb7ve4256847710b7e9d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This patch is part of a series which removes references to omap730 in code
 which is shared with omap850, replacing them with references to omap7xx.
 
-This include file is intended to replace omap730.h and omap850.h
-All values defined herein are identical to those in both the old files.
-
 Signed-off-by: Alistair Buxton <a.j.buxton@gmail.com>
 Reviewed-by: Zebediah C. McClure <zmc@lurian.net>
 ---
- arch/arm/plat-omap/include/mach/omap7xx.h |  104 +++++++++++++++++++++++++++++
- 1 files changed, 104 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-omap/include/mach/omap7xx.h
+ arch/arm/mach-omap1/board-fsample.c        |   12 ++++++------
+ arch/arm/mach-omap1/board-perseus2.c       |   12 ++++++------
+ arch/arm/mach-omap1/clock.c                |    2 +-
+ arch/arm/mach-omap1/io.c                   |   12 ++++++------
+ arch/arm/plat-omap/include/mach/hardware.h |    2 +-
+ arch/arm/plat-omap/include/mach/mux.h      |   14 +++++++-------
+ arch/arm/plat-omap/io.c                    |   12 ++++++------
+ 7 files changed, 33 insertions(+), 33 deletions(-)
 
-diff --git a/arch/arm/plat-omap/include/mach/omap7xx.h
-b/arch/arm/plat-omap/include/mach/omap7xx.h
-new file mode 100644
-index 0000000..53f5241
---- /dev/null
-+++ b/arch/arm/plat-omap/include/mach/omap7xx.h
-@@ -0,0 +1,104 @@
-+/* arch/arm/plat-omap/include/mach/omap7xx.h
-+ *
-+ * Hardware definitions for TI OMAP7XX processor.
-+ *
-+ * Cleanup for Linux-2.6 by Dirk Behme <dirk.behme@de.bosch.com>
-+ * Adapted for omap850 by Zebediah C. McClure <zmc@lurian.net>
-+ * Adapted for omap7xx by Alistair Buxton <a.j.buxton@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License as published by the
-+ * Free Software Foundation; either version 2 of the License, or (at your
-+ * option) any later version.
-+ *
-+ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED
-+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
-+ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
-+ * NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
-+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
-+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
-+ * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-+ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
-+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ *
-+ * You should have received a copy of the  GNU General Public License along
-+ * with this program; if not, write  to the Free Software Foundation, Inc.,
-+ * 675 Mass Ave, Cambridge, MA 02139, USA.
-+ */
-+
-+#ifndef __ASM_ARCH_OMAP7XX_H
-+#define __ASM_ARCH_OMAP7XX_H
-+
-+/*
-+ * ----------------------------------------------------------------------------
-+ * Base addresses
-+ * ----------------------------------------------------------------------------
-+ */
-+
-+/* Syntax: XX_BASE = Virtual base address, XX_START = Physical base address */
-+
-+#define OMAP7XX_DSP_BASE	0xE0000000
-+#define OMAP7XX_DSP_SIZE	0x50000
-+#define OMAP7XX_DSP_START	0xE0000000
-+
-+#define OMAP7XX_DSPREG_BASE	0xE1000000
-+#define OMAP7XX_DSPREG_SIZE	SZ_128K
-+#define OMAP7XX_DSPREG_START	0xE1000000
-+
-+/*
-+ * ----------------------------------------------------------------------------
-+ * OMAP7XX specific configuration registers
-+ * ----------------------------------------------------------------------------
-+ */
-+#define OMAP7XX_CONFIG_BASE	0xfffe1000
-+#define OMAP7XX_IO_CONF_0	0xfffe1070
-+#define OMAP7XX_IO_CONF_1	0xfffe1074
-+#define OMAP7XX_IO_CONF_2	0xfffe1078
-+#define OMAP7XX_IO_CONF_3	0xfffe107c
-+#define OMAP7XX_IO_CONF_4	0xfffe1080
-+#define OMAP7XX_IO_CONF_5	0xfffe1084
-+#define OMAP7XX_IO_CONF_6	0xfffe1088
-+#define OMAP7XX_IO_CONF_7	0xfffe108c
-+#define OMAP7XX_IO_CONF_8	0xfffe1090
-+#define OMAP7XX_IO_CONF_9	0xfffe1094
-+#define OMAP7XX_IO_CONF_10	0xfffe1098
-+#define OMAP7XX_IO_CONF_11	0xfffe109c
-+#define OMAP7XX_IO_CONF_12	0xfffe10a0
-+#define OMAP7XX_IO_CONF_13	0xfffe10a4
-+
-+#define OMAP7XX_MODE_1		0xfffe1010
-+#define OMAP7XX_MODE_2		0xfffe1014
-+
-+/* CSMI specials: in terms of base + offset */
-+#define OMAP7XX_MODE2_OFFSET	0x14
-+
-+/*
-+ * ----------------------------------------------------------------------------
-+ * OMAP7XX traffic controller configuration registers
-+ * ----------------------------------------------------------------------------
-+ */
-+#define OMAP7XX_FLASH_CFG_0	0xfffecc10
-+#define OMAP7XX_FLASH_ACFG_0	0xfffecc50
-+#define OMAP7XX_FLASH_CFG_1	0xfffecc14
-+#define OMAP7XX_FLASH_ACFG_1	0xfffecc54
-+
-+/*
-+ * ----------------------------------------------------------------------------
-+ * OMAP7XX DSP control registers
-+ * ----------------------------------------------------------------------------
-+ */
-+#define OMAP7XX_ICR_BASE	0xfffbb800
-+#define OMAP7XX_DSP_M_CTL	0xfffbb804
-+#define OMAP7XX_DSP_MMU_BASE	0xfffed200
-+
-+/*
-+ * ----------------------------------------------------------------------------
-+ * OMAP7XX PCC_UPLD configuration registers
-+ * ----------------------------------------------------------------------------
-+ */
-+#define OMAP7XX_PCC_UPLD_CTRL_BASE	(0xfffe0900)
-+#define OMAP7XX_PCC_UPLD_CTRL		(OMAP7XX_PCC_UPLD_CTRL_BASE + 0x00)
-+
-+#endif /*  __ASM_ARCH_OMAP7XX_H */
-+
+diff --git a/arch/arm/mach-omap1/board-fsample.c
+b/arch/arm/mach-omap1/board-fsample.c
+index a7ead1b..e53f774 100644
+--- a/arch/arm/mach-omap1/board-fsample.c
++++ b/arch/arm/mach-omap1/board-fsample.c
+@@ -309,7 +309,7 @@ static void __init omap_fsample_map_io(void)
+ 	/*
+ 	 * Hold GSM Reset until needed
+ 	 */
+-	omap_writew(omap_readw(OMAP730_DSP_M_CTL) & ~1, OMAP730_DSP_M_CTL);
++	omap_writew(omap_readw(OMAP7XX_DSP_M_CTL) & ~1, OMAP7XX_DSP_M_CTL);
+
+ 	/*
+ 	 * UARTs -> done automagically by 8250 driver
+@@ -320,21 +320,21 @@ static void __init omap_fsample_map_io(void)
+ 	 */
+
+ 	/* Flash: CS0 timings setup */
+-	omap_writel(0x0000fff3, OMAP730_FLASH_CFG_0);
+-	omap_writel(0x00000088, OMAP730_FLASH_ACFG_0);
++	omap_writel(0x0000fff3, OMAP7XX_FLASH_CFG_0);
++	omap_writel(0x00000088, OMAP7XX_FLASH_ACFG_0);
+
+ 	/*
+ 	 * Ethernet support through the debug board
+ 	 * CS1 timings setup
+ 	 */
+-	omap_writel(0x0000fff3, OMAP730_FLASH_CFG_1);
+-	omap_writel(0x00000000, OMAP730_FLASH_ACFG_1);
++	omap_writel(0x0000fff3, OMAP7XX_FLASH_CFG_1);
++	omap_writel(0x00000000, OMAP7XX_FLASH_ACFG_1);
+
+ 	/*
+ 	 * Configure MPU_EXT_NIRQ IO in IO_CONF9 register,
+ 	 * It is used as the Ethernet controller interrupt
+ 	 */
+-	omap_writel(omap_readl(OMAP730_IO_CONF_9) & 0x1FFFFFFF, OMAP730_IO_CONF_9);
++	omap_writel(omap_readl(OMAP7XX_IO_CONF_9) & 0x1FFFFFFF, OMAP7XX_IO_CONF_9);
+ }
+
+ MACHINE_START(OMAP_FSAMPLE, "OMAP730 F-Sample")
+diff --git a/arch/arm/mach-omap1/board-perseus2.c
+b/arch/arm/mach-omap1/board-perseus2.c
+index 8340669..ec22838 100644
+--- a/arch/arm/mach-omap1/board-perseus2.c
++++ b/arch/arm/mach-omap1/board-perseus2.c
+@@ -270,7 +270,7 @@ static void __init omap_perseus2_map_io(void)
+ 	/*
+ 	 * Hold GSM Reset until needed
+ 	 */
+-	omap_writew(omap_readw(OMAP730_DSP_M_CTL) & ~1, OMAP730_DSP_M_CTL);
++	omap_writew(omap_readw(OMAP7XX_DSP_M_CTL) & ~1, OMAP7XX_DSP_M_CTL);
+
+ 	/*
+ 	 * UARTs -> done automagically by 8250 driver
+@@ -281,21 +281,21 @@ static void __init omap_perseus2_map_io(void)
+ 	 */
+
+ 	/* Flash: CS0 timings setup */
+-	omap_writel(0x0000fff3, OMAP730_FLASH_CFG_0);
+-	omap_writel(0x00000088, OMAP730_FLASH_ACFG_0);
++	omap_writel(0x0000fff3, OMAP7XX_FLASH_CFG_0);
++	omap_writel(0x00000088, OMAP7XX_FLASH_ACFG_0);
+
+ 	/*
+ 	 * Ethernet support through the debug board
+ 	 * CS1 timings setup
+ 	 */
+-	omap_writel(0x0000fff3, OMAP730_FLASH_CFG_1);
+-	omap_writel(0x00000000, OMAP730_FLASH_ACFG_1);
++	omap_writel(0x0000fff3, OMAP7XX_FLASH_CFG_1);
++	omap_writel(0x00000000, OMAP7XX_FLASH_ACFG_1);
+
+ 	/*
+ 	 * Configure MPU_EXT_NIRQ IO in IO_CONF9 register,
+ 	 * It is used as the Ethernet controller interrupt
+ 	 */
+-	omap_writel(omap_readl(OMAP730_IO_CONF_9) & 0x1FFFFFFF, OMAP730_IO_CONF_9);
++	omap_writel(omap_readl(OMAP7XX_IO_CONF_9) & 0x1FFFFFFF, OMAP7XX_IO_CONF_9);
+ }
+
+ MACHINE_START(OMAP_PERSEUS2, "OMAP730 Perseus2")
+diff --git a/arch/arm/mach-omap1/clock.c b/arch/arm/mach-omap1/clock.c
+index fcbea61..c24cc28 100644
+--- a/arch/arm/mach-omap1/clock.c
++++ b/arch/arm/mach-omap1/clock.c
+@@ -862,7 +862,7 @@ int __init omap1_clk_init(void)
+
+ #if defined(CONFIG_MACH_OMAP_PERSEUS2) || defined(CONFIG_MACH_OMAP_FSAMPLE)
+ 	/* Select slicer output as OMAP input clock */
+-	omap_writew(omap_readw(OMAP730_PCC_UPLD_CTRL) & ~0x1, OMAP730_PCC_UPLD_CTRL);
++	omap_writew(omap_readw(OMAP7XX_PCC_UPLD_CTRL) & ~0x1, OMAP7XX_PCC_UPLD_CTRL);
+ #endif
+
+ 	/* Amstrad Delta wants BCLK high when inactive */
+diff --git a/arch/arm/mach-omap1/io.c b/arch/arm/mach-omap1/io.c
+index 19de57f..157d508 100644
+--- a/arch/arm/mach-omap1/io.c
++++ b/arch/arm/mach-omap1/io.c
+@@ -39,14 +39,14 @@ static struct map_desc omap_io_desc[] __initdata = {
+ #if defined (CONFIG_ARCH_OMAP730) || defined (CONFIG_ARCH_OMAP850)
+ static struct map_desc omap730_io_desc[] __initdata = {
+ 	{
+-		.virtual	= OMAP730_DSP_BASE,
+-		.pfn		= __phys_to_pfn(OMAP730_DSP_START),
+-		.length		= OMAP730_DSP_SIZE,
++		.virtual	= OMAP7XX_DSP_BASE,
++		.pfn		= __phys_to_pfn(OMAP7XX_DSP_START),
++		.length		= OMAP7XX_DSP_SIZE,
+ 		.type		= MT_DEVICE
+ 	}, {
+-		.virtual	= OMAP730_DSPREG_BASE,
+-		.pfn		= __phys_to_pfn(OMAP730_DSPREG_START),
+-		.length		= OMAP730_DSPREG_SIZE,
++		.virtual	= OMAP7XX_DSPREG_BASE,
++		.pfn		= __phys_to_pfn(OMAP7XX_DSPREG_START),
++		.length		= OMAP7XX_DSPREG_SIZE,
+ 		.type		= MT_DEVICE
+ 	}
+ };
+diff --git a/arch/arm/plat-omap/include/mach/hardware.h
+b/arch/arm/plat-omap/include/mach/hardware.h
+index 26c1fbf..99c4241 100644
+--- a/arch/arm/plat-omap/include/mach/hardware.h
++++ b/arch/arm/plat-omap/include/mach/hardware.h
+@@ -280,7 +280,7 @@
+  * ---------------------------------------------------------------------------
+  */
+
+-#include "omap730.h"
++#include "omap7xx.h"
+ #include "omap1510.h"
+ #include "omap16xx.h"
+ #include "omap24xx.h"
+diff --git a/arch/arm/plat-omap/include/mach/mux.h
+b/arch/arm/plat-omap/include/mach/mux.h
+index 587fb63..66ae302 100644
+--- a/arch/arm/plat-omap/include/mach/mux.h
++++ b/arch/arm/plat-omap/include/mach/mux.h
+@@ -51,13 +51,13 @@
+ 					.pu_pd_reg = PU_PD_SEL_##reg, \
+ 					.pu_pd_val = status,
+
+-#define MUX_REG_730(reg, mode_offset, mode) .mux_reg_name =
+"OMAP730_IO_CONF_"#reg, \
+-					.mux_reg = OMAP730_IO_CONF_##reg, \
++#define MUX_REG_730(reg, mode_offset, mode) .mux_reg_name =
+"OMAP7XX_IO_CONF_"#reg, \
++					.mux_reg = OMAP7XX_IO_CONF_##reg, \
+ 					.mask_offset = mode_offset, \
+ 					.mask = mode,
+
+-#define PULL_REG_730(reg, bit, status)	.pull_name = "OMAP730_IO_CONF_"#reg, \
+-					.pull_reg = OMAP730_IO_CONF_##reg, \
++#define PULL_REG_730(reg, bit, status)	.pull_name = "OMAP7XX_IO_CONF_"#reg, \
++					.pull_reg = OMAP7XX_IO_CONF_##reg, \
+ 					.pull_bit = bit, \
+ 					.pull_val = status,
+
+@@ -75,11 +75,11 @@
+ 					.pu_pd_val = status,
+
+ #define MUX_REG_730(reg, mode_offset, mode) \
+-					.mux_reg = OMAP730_IO_CONF_##reg, \
++					.mux_reg = OMAP7XX_IO_CONF_##reg, \
+ 					.mask_offset = mode_offset, \
+ 					.mask = mode,
+
+-#define PULL_REG_730(reg, bit, status)	.pull_reg = OMAP730_IO_CONF_##reg, \
++#define PULL_REG_730(reg, bit, status)	.pull_reg = OMAP7XX_IO_CONF_##reg, \
+ 					.pull_bit = bit, \
+ 					.pull_val = status,
+
+@@ -99,7 +99,7 @@
+
+ /*
+  * OMAP730/850 has a slightly different config for the pin mux.
+- * - config regs are the OMAP730_IO_CONF_x regs (see omap730.h) regs and
++ * - config regs are the OMAP7XX_IO_CONF_x regs (see omap730.h) regs and
+  *   not the FUNC_MUX_CTRL_x regs from hardware.h
+  * - for pull-up/down, only has one enable bit which is is in the same register
+  *   as mux config
+diff --git a/arch/arm/plat-omap/io.c b/arch/arm/plat-omap/io.c
+index 388fd94..23a205f 100644
+--- a/arch/arm/plat-omap/io.c
++++ b/arch/arm/plat-omap/io.c
+@@ -13,7 +13,7 @@
+ #include <linux/io.h>
+ #include <linux/mm.h>
+
+-#include <mach/omap730.h>
++#include <mach/omap7xx.h>
+ #include <mach/omap1510.h>
+ #include <mach/omap16xx.h>
+ #include <mach/omap24xx.h>
+@@ -34,12 +34,12 @@ void __iomem *omap_ioremap(unsigned long p, size_t
+size, unsigned int type)
+ 			return XLATE(p, OMAP1_IO_PHYS, OMAP1_IO_VIRT);
+ 	}
+ 	if (cpu_is_omap7xx()) {
+-		if (BETWEEN(p, OMAP730_DSP_BASE, OMAP730_DSP_SIZE))
+-			return XLATE(p, OMAP730_DSP_BASE, OMAP730_DSP_START);
++		if (BETWEEN(p, OMAP7XX_DSP_BASE, OMAP7XX_DSP_SIZE))
++			return XLATE(p, OMAP7XX_DSP_BASE, OMAP7XX_DSP_START);
+
+-		if (BETWEEN(p, OMAP730_DSPREG_BASE, OMAP730_DSPREG_SIZE))
+-			return XLATE(p, OMAP730_DSPREG_BASE,
+-					OMAP730_DSPREG_START);
++		if (BETWEEN(p, OMAP7XX_DSPREG_BASE, OMAP7XX_DSPREG_SIZE))
++			return XLATE(p, OMAP7XX_DSPREG_BASE,
++					OMAP7XX_DSPREG_START);
+ 	}
+ 	if (cpu_is_omap15xx()) {
+ 		if (BETWEEN(p, OMAP1510_DSP_BASE, OMAP1510_DSP_SIZE))
 -- 
 1.6.5
