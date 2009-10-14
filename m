@@ -1,27 +1,20 @@
-From: yegor_sub1@visionsystems.de (Yegor Yefremov)
-Date: Wed, 14 Oct 2009 17:02:33 +0200
-Subject: Fix watchdog enabling for AT91SAM9G45
-Message-ID: <4AD5E809.6090505@visionsystems.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 14 Oct 2009 16:46:22 +0100
+Subject: [PATCH 09/10] [PATCH 04/10] ASoC: finally enable support for
+	eXeda and CM-X300
+In-Reply-To: <b013b3ef99e26e493af0a8d8becf3f98502b362a.1255504387.git.mike@compulab.co.il>
+References: <cover.1255504387.git.mike@compulab.co.il>
+	<b013b3ef99e26e493af0a8d8becf3f98502b362a.1255504387.git.mike@compulab.co.il>
+Message-ID: <20091014154622.GA31536@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix watchdog enabling for AT91SAM9G45
+On Wed, Oct 14, 2009 at 09:20:26AM +0200, Mike Rapoport wrote:
+> From: Igor Grinberg <grinberg@compulab.co.il>
 
-The macro for the watchdog has been changed from CONFIG_AT91SAM9_WATCHDOG
-to CONFIG_AT91SAM9X_WATCHDOG due to AT91CAP9 chips support
+> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+> CC: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> CC: alsa-devel at alsa-project.org
 
-Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
-
-Index: linus2/arch/arm/mach-at91/at91sam9g45_devices.c
-===================================================================
---- linus2.orig/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ linus2/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -838,7 +838,7 @@ static void __init at91_add_device_rtt(v
-  *  Watchdog
-  * -------------------------------------------------------------------- */
- 
--#if defined(CONFIG_AT91SAM9_WATCHDOG) || defined(CONFIG_AT91SAM9_WATCHDOG_MODULE)
-+#if defined(CONFIG_AT91SAM9X_WATCHDOG) || defined(CONFIG_AT91SAM9X_WATCHDOG_MODULE)
- static struct platform_device at91sam9g45_wdt_device = {
- 	.name		= "at91_wdt",
- 	.id		= -1,
+Applied, thanks.
