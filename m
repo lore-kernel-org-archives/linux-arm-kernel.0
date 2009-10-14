@@ -1,7 +1,7 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 14 Oct 2009 14:58:06 -0700
-Subject: [PATCH 23/27] OMAP3: PM: Fix INTC context save/restore
-In-Reply-To: <1255557490-16787-23-git-send-email-khilman@deeprootsystems.com>
+Date: Wed, 14 Oct 2009 14:58:07 -0700
+Subject: [PATCH 24/27] PM: Disable usb host HW save and restore
+In-Reply-To: <1255557490-16787-24-git-send-email-khilman@deeprootsystems.com>
 References: <1255557490-16787-1-git-send-email-khilman@deeprootsystems.com>
 	<1255557490-16787-2-git-send-email-khilman@deeprootsystems.com>
 	<1255557490-16787-3-git-send-email-khilman@deeprootsystems.com>
@@ -25,41 +25,42 @@ References: <1255557490-16787-1-git-send-email-khilman@deeprootsystems.com>
 	<1255557490-16787-21-git-send-email-khilman@deeprootsystems.com>
 	<1255557490-16787-22-git-send-email-khilman@deeprootsystems.com>
 	<1255557490-16787-23-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1255557490-16787-24-git-send-email-khilman@deeprootsystems.com>
+	<1255557490-16787-24-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1255557490-16787-25-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Aaro Koskinen <Aaro.Koskinen@nokia.com>
+From: Kalle Jokiniemi <kalle.jokiniemi@digia.com>
 
-Wrong index was used for ILR.
+The hardware SAVEANDRESTORE mechanism seems to leave
+USB HOST power domain permanently into active state
+after one transition from off to active state.
+Disabling for now.
 
-Signed-off-by: Aaro Koskinen <Aaro.Koskinen@nokia.com>
+Signed-off-by: Kalle Jokiniemi <ext-kalle.jokiniemi@nokia.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/irq.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/powerdomains34xx.h |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-index fa2524d..aceedd8 100644
---- a/arch/arm/mach-omap2/irq.c
-+++ b/arch/arm/mach-omap2/irq.c
-@@ -233,7 +233,7 @@ void omap3_intc_save_context(void)
- 			intc_bank_read_reg(bank, INTC_THRESHOLD);
- 		for (i = 0; i < INTCPS_NR_IRQS; i++)
- 			intc_context[ind].ilr[i] =
--				intc_bank_read_reg(bank, (0x100 + 0x4*ind));
-+				intc_bank_read_reg(bank, (0x100 + 0x4*i));
- 		for (i = 0; i < INTCPS_NR_MIR_REGS; i++)
- 			intc_context[ind].mir[i] =
- 				intc_bank_read_reg(&irq_banks[0], INTC_MIR0 +
-@@ -259,7 +259,7 @@ void omap3_intc_restore_context(void)
- 					bank, INTC_THRESHOLD);
- 		for (i = 0; i < INTCPS_NR_IRQS; i++)
- 			intc_bank_write_reg(intc_context[ind].ilr[i],
--				bank, (0x100 + 0x4*ind));
-+				bank, (0x100 + 0x4*i));
- 		for (i = 0; i < INTCPS_NR_MIR_REGS; i++)
- 			intc_bank_write_reg(intc_context[ind].mir[i],
- 				 &irq_banks[0], INTC_MIR0 + (0x20 * i));
+diff --git a/arch/arm/mach-omap2/powerdomains34xx.h b/arch/arm/mach-omap2/powerdomains34xx.h
+index 4dcf94b..aa557b2 100644
+--- a/arch/arm/mach-omap2/powerdomains34xx.h
++++ b/arch/arm/mach-omap2/powerdomains34xx.h
+@@ -338,7 +338,13 @@ static struct powerdomain usbhost_pwrdm = {
+ 	.sleepdep_srcs	  = dss_per_usbhost_sleepdeps,
+ 	.pwrsts		  = PWRSTS_OFF_RET_ON,
+ 	.pwrsts_logic_ret = PWRDM_POWER_RET,
+-	.flags		  = PWRDM_HAS_HDWR_SAR, /* for USBHOST ctrlr only */
++	/*
++	 * REVISIT: Enabling usb host save and restore mechanism seems to
++	 * leave the usb host domain permanently in ACTIVE mode after
++	 * changing the usb host power domain state from OFF to active once.
++	 * Disabling for now.
++	 */
++	/*.flags	  = PWRDM_HAS_HDWR_SAR,*/ /* for USBHOST ctrlr only */
+ 	.banks		  = 1,
+ 	.pwrsts_mem_ret	  = {
+ 		[0] = PWRDM_POWER_RET, /* MEMRETSTATE */
 -- 
 1.6.4.3
