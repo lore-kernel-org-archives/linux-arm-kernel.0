@@ -1,90 +1,49 @@
-From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
-Date: Wed, 14 Oct 2009 11:37:39 +0200
-Subject: Global Video Buffers Pool - PMM and UPBuffer reference drivers
-	[RFC]
-In-Reply-To: <000401ca4ca0$d668ef40$833acdc0$%szyprowski@samsung.com>
-References: <000401ca4ca0$d668ef40$833acdc0$%szyprowski@samsung.com>
-Message-ID: <op.u1sac1ji7p4s8u@localhost>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 14 Oct 2009 11:09:15 +0100
+Subject: [PATCH 07/16] i2c-designware: Set a clock name to DesignWare
+	I2C clock source
+In-Reply-To: <4AD5514B.4090504@necel.com>
+References: <4AD3E974.8080200@necel.com> <4AD3EB09.8050304@necel.com>
+	<20091013224123.GB13398@fluff.org.uk> <4AD5514B.4090504@necel.com>
+Message-ID: <20091014100915.GA24540@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Oct 14, 2009 at 01:19:23PM +0900, Shinya Kuribayashi wrote:
 
-[Code modified a bit to shorten it; removed some error reporting;
-  irrelevant parts of the code removed.]
->> diff --git a/drivers/s3cmm/pmm-init.c b/drivers/s3cmm/pmm-init.c
->> new file mode 100644
->> index 0000000..f1e31a5
->> --- /dev/null
->> +++ b/drivers/s3cmm/pmm-init.c
->> @@ -0,0 +1,75 @@
->> +static unsigned long pmm_memory_start, pmm_memory_size;
->> +
->> +static int __init pmm_early_param(char *param)
->> +{
->> +       unsigned long long size = memparse(param, 0);
->> +       void *ptr;
->> +
->> +       if (size <= 0 || size > (1ull << 30))
->> +               return -EINVAL;
->> +
->> +       pmm_memory_size = PAGE_ALIGN((unsigned long)size);
->> +       ptr = alloc_bootmem_pages_nopanic(pmm_memory_size);
+> * And clk_get() is expected to pick up a clock source with:
 
-From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> How does this work?  When early params are parsed, the memory subsystem
-> hasn't been initialized - not even bootmem.  So this will always fail.
+> 1) dev_id + clk_id ... strict matching condition (default)
+> 2) dev_id only ... fuzzy extension1 (clk_id can be regarded as wildcard)
+> 3) clk_id only ... fuzzy extension2 (dev_id can be regarded as wildcard)
 
- From my investigation into Linux kernel source code it seems as if
-bootmem were initialised prior to parsing early params.  Lets look at
-start_kernel():
+>  2) and 3) might be sort of ARM's clkdev extensions
+>  (I think it's useful), but that's not my point.
+>  I'll leave that alone for now.
 
-#v+
-init/main.c:
-584        setup_arch(&command_line);
-[...]
-595        parse_early_param();
-[...]
-607        mm_init();
-#v-
+Part of the reason I was querying this is that you were using the clock
+name "dw_i2c_clk" which looks like a globally namespaced name which
+would be used with option 3 above.  Several clock frameworks just
+completely ignore dev_id which creates a lot of problems down the line.
+If it had just been i2c_clk I'd have been less likely to follow up.
 
-On ARM with MMU setup_arch() calls paging_init()
-(arch/arm/kernel/setup.c:730) which calls bootmem_init()
-(arch/arm/mm/mmu.c:989) which is the function that initialises
-bootmem.
+Option 3 has never been the intended use of the clock API and is
+basically a bug in any clock implementation that requires it for most
+drivers but it does need to be used in a few limited cases where the
+relevant kernel subsystem doesn't provide a struct device (cpufreq is
+the major offender here).
 
-Early params are obviously handled by parse_early_param() function
-which is invoked after the call to setup_arch().
+> * From the point of drivers, we're never interested in clk_get()
+>  implementation, and which matching pattern 1) - 3) is taken.
 
-What is also worth mentioning is that mm_init() initialises standard
-allocators so after this function is called bootmem no longer works.
+>  Supplying only "dev_id" could be regarded as misuse of clk_get(),
 
+As far as I can tell from what rmk is saying it seems that the use of a
+NULL string is actually an intended usage for devices where the clocks
+aren't otherwise named.  I had the concerns when I first saw this usage
+but it does seem to be an expected and intended use.
 
-I've also tried to use various *_initcall()s (the ones defined in
-include/linux/init.h) but neither of them seemed to work.
+> and will increase dependence on clk framework implementation.
 
-
->> +       if (ptr)
->> +               pmm_memory_start = virt_to_phys(ptr);
->> +
->> +       return 0;
->> +}
->> +early_param("pmm", pmm_early_param);
->> +
->> +
->> +
->> +/** Called from pmm_module_init() when module is initialised. */
->> +void pmm_module_platform_init(pmm_add_region_func add_region)
->> +{
->> +       if (pmm_memory_start && pmm_memory_size)
->> +               add_region(pmm_memory_start, pmm_memory_size,
->> +                          PMM_MEM_GENERAL, 0);
->> +}
->> +EXPORT_SYMBOL(pmm_module_platform_init);
-
-
--- 
-Best regards,                                           _     _
-   .o. | Liege of Serenely Enlightened Majesty of       o' \,=./ `o
-   ..o | Computer Science,  Micha? "mina86" Nazarewicz     (o o)
-   ooo +---<mina86@mina86.com>---<mina86@jabber.org>---ooO--(_)--Ooo--
+To a certain extent this is good in that it applies pressure to improve
+the clock API implementations concerned.
