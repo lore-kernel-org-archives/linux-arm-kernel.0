@@ -1,39 +1,112 @@
-From: alan-jenkins@tuffmail.co.uk (Alan Jenkins)
-Date: Wed, 14 Oct 2009 21:33:33 +0100
-Subject: [PATCH 4/6] ARM: remove references to non-existent fastfpe
-In-Reply-To: <20091014190333.GA28948@n2100.arm.linux.org.uk>
-References: <1255096942-10451-1-git-send-email-alan-jenkins@tuffmail.co.uk>
-	<20091009165513.GA5902@n2100.arm.linux.org.uk>
-	<4AD048A4.1070805@tuffmail.co.uk>
-	<200910142021.59118.peter@peter-teichmann.de>
-	<20091014190333.GA28948@n2100.arm.linux.org.uk>
-Message-ID: <4AD6359D.7010303@tuffmail.co.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 Oct 2009 14:12:07 -0700
+Subject: [PATCH 00/17] Massive OMAP730/OMAP850 cleanup
+In-Reply-To: <3d374d00910141250h22e18bccpa6792d2a323b61f8@mail.gmail.com>
+References: <3d374d00910141250h22e18bccpa6792d2a323b61f8@mail.gmail.com>
+Message-ID: <20091014211206.GL12700@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Wed, Oct 14, 2009 at 08:21:58PM +0200, Peter Teichmann wrote:
->   
->> I agree to Alan. It seems reasonable at least to include a stub as he 
->> suggests. However, since FastFPE was not updated for some years now, maybe 
->> the burden of maintaining patches is not so heavy in anymore? Maybe we can 
->> as well just include the latest version now? It becomes more and more 
->> difficult to find the source for someone who is interested in it.
->>     
->
-> The easiest and least risky approach would be to leave it as is - we
-> know it's not causing any problems with it there, and it's not causing
-> any run-time bloat.
->   
+* Alistair Buxton <a.j.buxton@gmail.com> [091014 13:03]:
+> Reposting the full series for review. Assuming this is all OK would it
+> be a good idea to merge the config variables into a single
+> CONFIG_ARCH_OMAP7XX? There doesn't seem to be any reason to have both.
+> Original description follows.
 
-Sure, if you don't like it, don't take it. All the patches in the 
-"series" should stand on their own, with the exception of the last one 
-(clearly labelled as "part 2" of the penultimate patch).
+Yeah, those should be merged too. Let's do that as a separate patch.
 
-Hopefully, it should be trivial to establish the correctness of the 
-patches 1 and 2 :-). But they are only cleanup attempts. The patch I 
-really care about is the one I sent independently, "ARM: unexport 
-symbols used to implement floating point emulation".
+Regards,
 
-Regards
-Alan
+Tony
+
+> 
+> 
+> Hello from the Linwizard project,
+> 
+> We have been working on supporting omap850 smartphones from HTC such
+> as Wizard, Herald etc. We have found that omap730 and omap850 are
+> almost exactly the same. As far as what is supported in linux-omap so
+> far, they are identical. Currently there are seperate code paths for
+> 730 and 850, and this is causing us a lot of problems when one is
+> changed and the other isn't. I also noticed that OMAP F-Sample board
+> uses ARCH_OMAP730 even though it has a OMAP850 SoC.
+> 
+> In order to try to clean this up I have produced a patch series which
+> removes all cpu_is_omap730/850 and replaces them with unified
+> cpu_is_omap7xx() blocks, and similarly merges CONFIG checks. Here is a
+> random example:
+> 
+> -#ifdef CONFIG_ARCH_OMAP730
+> - if (cpu_is_omap730()) {
+> +#if defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
+> + if (cpu_is_omap7xx()) {
+> irq_banks = omap730_irq_banks;
+> irq_bank_count = ARRAY_SIZE(omap730_irq_banks);
+> }
+> #endif
+> -#ifdef CONFIG_ARCH_OMAP850
+> - if (cpu_is_omap850()) {
+> - irq_banks = omap850_irq_banks;
+> - irq_bank_count = ARRAY_SIZE(omap850_irq_banks);
+> - }
+> -#endif
+> 
+> Drilling down through the variables shows they are always equivalent
+> for 730 and 850, except where there is a bug.
+> 
+> This makes several bugs go away for us on omap850, including the
+> MPUIO_VBASE bug, and the lack of working IRQs - since these bugs arn't
+> in the 730 paths. It would hopefully prevent similar bugs from showing
+> up in the future too.
+> 
+> Alistair Buxton (16):
+>   OMAP7XX: Serial: Remove duplicate omap850 code
+>   OMAP7XX: GPIO: Remove duplicate omap850 code
+>   OMAP7XX: IO: Remove duplicate omap850 code
+>   OMAP7XX: Mux: Remove duplicate omap850 code
+>   OMAP7XX: USB: Remove duplicate omap850 code
+>   OMAP7XX: IRQ: Remove duplicate omap850 code
+>   OMAP7XX: PM: Add omap850 support
+>   OMAP7XX: Clocks: Add omap850 support
+>   OMAP7XX: McBSP: Add omap850 support
+>   OMAP7XX: Create omap7xx.h
+>   OMAP7XX: Update core omap1 files to use omap7xx.h
+>   OMAP7XX: Replace omap730 references in irqs.h and all users
+>   OMAP7XX: Rename all the rest of the omap730 references in omap1 core
+>   OMAP7XX: omap_uwire.c: Convert to omap7xx.h
+>   OMAP850: PM: Add an ARCH_OMAP850 check
+>   OMAP850: Fix zImage booting
+> 
+> Angelo Arrifano (1):
+>   OMAP7XX: Clocks: Add ck_ref and armxor
+> 
+>  arch/arm/mach-omap1/board-fsample.c           |   18 +-
+>  arch/arm/mach-omap1/board-perseus2.c          |   18 +-
+>  arch/arm/mach-omap1/clock.c                   |   24 ++--
+>  arch/arm/mach-omap1/io.c                      |   45 ++----
+>  arch/arm/mach-omap1/irq.c                     |   32 +---
+>  arch/arm/mach-omap1/mcbsp.c                   |   32 ++--
+>  arch/arm/mach-omap1/mux.c                     |   70 +++-----
+>  arch/arm/mach-omap1/pm.c                      |  100 ++++++------
+>  arch/arm/mach-omap1/pm.h                      |   53 +++---
+>  arch/arm/mach-omap1/serial.c                  |   13 +-
+>  arch/arm/mach-omap1/sleep.S                   |   22 ++--
+>  arch/arm/plat-omap/devices.c                  |   22 ++--
+>  arch/arm/plat-omap/gpio.c                     |  227 +++++++------------------
+>  arch/arm/plat-omap/include/mach/entry-macro.S |    8 +-
+>  arch/arm/plat-omap/include/mach/hardware.h    |    2 +-
+>  arch/arm/plat-omap/include/mach/irqs.h        |  229 ++++++++-----------------
+>  arch/arm/plat-omap/include/mach/mcbsp.h       |    6 +-
+>  arch/arm/plat-omap/include/mach/mux.h         |  100 +++--------
+>  arch/arm/plat-omap/include/mach/omap7xx.h     |  104 +++++++++++
+>  arch/arm/plat-omap/include/mach/uncompress.h  |    3 +-
+>  arch/arm/plat-omap/io.c                       |   14 +-
+>  arch/arm/plat-omap/usb.c                      |   10 +-
+>  drivers/spi/omap_uwire.c                      |    8 +-
+>  23 files changed, 480 insertions(+), 680 deletions(-)
+>  create mode 100644 arch/arm/plat-omap/include/mach/omap7xx.h
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
