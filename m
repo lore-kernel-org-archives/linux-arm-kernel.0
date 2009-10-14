@@ -1,36 +1,162 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Wed, 14 Oct 2009 09:20:26 +0200
-Subject: [PATCH 09/10] [PATCH 04/10] ASoC: finally enable support for eXeda
-	and CM-X300
-In-Reply-To: <cover.1255504387.git.mike@compulab.co.il>
-References: <cover.1255504387.git.mike@compulab.co.il>
-Message-ID: <b013b3ef99e26e493af0a8d8becf3f98502b362a.1255504387.git.mike@compulab.co.il>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 14 Oct 2009 09:34:07 +0200
+Subject: Global Video Buffers Pool - PMM and UPBuffer reference drivers
+	[RFC]
+In-Reply-To: <20091012160015.GC2480@n2100.arm.linux.org.uk>
+References: <E4D3F24EA6C9E54F817833EAE0D912AC077151C44B@bssrvexch01.BS.local>
+	<20091012160015.GC2480@n2100.arm.linux.org.uk>
+Message-ID: <000001ca4ca0$b906cf30$2b146d90$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Igor Grinberg <grinberg@compulab.co.il>
+Hello,
 
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-Signed-off-by: Mike Rapoport <mike@compulab.co.il>
-CC: Mark Brown <broonie@opensource.wolfsonmicro.com>
-CC: alsa-devel at alsa-project.org
----
- sound/soc/pxa/Kconfig |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+On Monday, October 12, 2009 6:00 PM Russell King wrote:
 
-diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
-index dcb3181..d4f4031 100644
---- a/sound/soc/pxa/Kconfig
-+++ b/sound/soc/pxa/Kconfig
-@@ -90,7 +90,8 @@ config SND_PXA2XX_SOC_E800
- 
- config SND_PXA2XX_SOC_EM_X270
- 	tristate "SoC Audio support for CompuLab EM-x270, eXeda and CM-X300"
--	depends on SND_PXA2XX_SOC && MACH_EM_X270
-+	depends on SND_PXA2XX_SOC && (MACH_EM_X270 || MACH_EXEDA || \
-+			MACH_CM_X300)
- 	select SND_PXA2XX_SOC_AC97
- 	select SND_SOC_WM9712
- 	help
--- 
-1.6.0.6
+> Below are some brief comments from having looked through the code.  I
+> don't intend to suggest that they're anywhere near complete though,
+> but are observations I've spotted today.
+
+Thank you for your review!
+
+> On Thu, Oct 01, 2009 at 12:39:29PM +0200, Marek Szyprowski wrote:
+> >  arch/arm/mach-s3c6410/Kconfig                 |    1 +
+> >  arch/arm/mach-s3c6410/include/mach/pmm-plat.h |   40 +
+> >  drivers/Kconfig                               |    3 +
+> >  drivers/Makefile                              |    1 +
+> >  drivers/s3cmm/Kconfig                         |  142 +++
+> >  drivers/s3cmm/Makefile                        |    9 +
+> >  drivers/s3cmm/pmm-init.c                      |   75 ++
+> >  drivers/s3cmm/pmm.c                           | 1400 +++++++++++++++++++++++++
+> >  drivers/s3cmm/upbuffer.c                      |  608 +++++++++++
+> >  include/linux/s3c/pmm.h                       |  141 +++
+> >  include/linux/s3c/upbuffer.h                  |  131 +++
+> >  ipc/shm.c                                     |   24 +-
+> >  mm/shmem.c                                    |   55 +-
+> 
+> Does this have to be s3c specific, or can this be turned into something
+> generic?
+
+In our opinion our approach can be generic, at least for UMA systems with
+a lot of devices that can work only with memory buffers that are contiguous
+in physical memory. We have however no idea where it should be placed in
+drivers directory tree, that's why we left it in our custom s3c directories.
+
+[snip]
+> > +static int direct_pfn_prepare(struct upbuf *b, struct vm_area_struct *vma)
+> > +{
+> > +       struct upbuf_private *priv = b->priv;
+> > +       unsigned long start, base;
+> > +       int page_count, i, res;
+> > +       pte_t pte;
+> > +
+> > +       debug("direct_pfn_prepare\n");
+> > +
+> > +       if (!(vma->vm_flags & VM_PFNMAP) || !vma->vm_file) {
+> > +               return -EINVAL;
+> > +       }
+> > +
+> > +       page_count = priv->page_count;
+> > +       BUG_ON(!page_count);
+> > +
+> > +       debug("Direct PFN mapping found, "
+> > +             "using special file reference counter.\n");
+> > +
+> > +       /* increment vma file use count before hacking with pte map */
+> > +       get_file(vma->vm_file);
+> 
+> I do hope you're not under the impression that getting the file in some
+> way protects the pte map?  My understanding is the only thing which
+> protects page tables (and VMAs) is vma->vm_mm->mmap_sem.
+> 
+> If you want to protect against VMAs going away, read-lock it.  If you
+> want to modify VMAs, write-lock it.  Also, only a write lock will also
+> protect against the page fault handler changing the page tables (since
+> it will want to gain a read-lock.)
+
+Good point. In our approach memory buffers can be locked for a long time
+and we don't want to lock the whole applications memory management and
+address space (vm_mm) for such a long time. That's why we were looking
+for alternative way.
+
+We decided to protect the physical memory of the buffer not the vma area
+itself. If we can ensure that the physical memory would not be reused by
+other application until the driver finishes the multimedia transaction,
+everything would be fine. If user application unmap the vma area before
+the multimedia transaction finishes, it is its own fault. We don't care
+about that, unless it causes security issues with other applications.
+
+This is of course for virtual mappings. What we cannot accept though is
+the physical memory (from our PMM allocator) being freed before the
+transaction is finished.
+
+In our approach we rely on the fact that PMM uses free-after-release
+semantic, which means that the allocated physical memory is freed only
+after releasing the file that was used to mmap the particular buffer.
+In this case locking the buffer can be simplified to increasing the
+reference count of the vm_file. We thought that this is a correct way
+of locking underlying memory buffers for that vm area. Now we
+understand that this worked only for our custom allocator.
+
+Do you know if there is any other way to lock the particular vm area
+without locking the whole memory management of the process (vm_mm)?
+In other words, we would like to protect the underlying physical
+memory from being freed prematurely (without our consent).
+
+[snip] 
+> > +       b->paddr            = priv->page_pa_first + priv->page_offset;
+> > +       priv->data.file     = vma->vm_file;
+> > +       priv->sync          = direct_pfn_sync;
+> > +       priv->release       = direct_pfn_release;
+> > +       debug("vma = %p, vma->vm_file = %p\n", (void*)vma, (void*)vma->vm_file);
+> > +
+> > +       if ((pte & PTE_CACHEABLE) == 0) {
+> 
+> The big hint here is that there's no L_ prefix.  This is buggy.  There is
+> no cacheable bit in a 'pte' anymore - there are memory types, which you
+> need to mask out and compare instead.
+> 
+> Even if you did have access to the hardware page table entry, the contents
+> of it is CPU specific, and that's most certainly true of the old 'cacheable'
+> bit.
+> 
+> Moreover, shared file mappings on VIVT processors can have their cache
+> status down-graded to uncacheable if the thread maps more than one copy
+> of the shared file and faults in the same page multiple times.  That
+> shouldn't be a problem here, but it could be if this is the situation
+> you first notice how the page is mapped - especially if later on it
+> becomes mapped with the cache enabled.
+
+Is there any preferred way to get information on the type of the mapping?
+If it is cacheable or not? I just found that accessing these bits directly
+was the fastest way. Works on S3CXXXX (ARM11 core) and S5PCXXX (Coretex8
+core) just fine.
+
+[snip]
+> > +int upbuf_prepare(struct upbuf *buf, unsigned long vaddr, unsigned long size,
+> > +                  enum upbuf_flags flags)
+> > +{
+> > +       struct vm_area_struct *vma;
+> > +       struct upbuf_private *priv;
+> > +       unsigned int page_va_last;
+> > +       void *kernel_vaddr;
+> > +       int res;
+> > +
+> > +       BUG_ON(buf == NULL || current == NULL);git
+> > +
+> > +       debug("upbuf_prepare: vaddr 0x%08lx, size 0x%ld, flags %d\n",
+> > +             vaddr, size, flags);
+> > +
+> > +
+> > +       /* Get the VMA */
+> > +       vma = find_extend_vma(current->mm, vaddr);
+> 
+> Locking?  This modifies a vma, and so needs _write_ locking on the mm's
+> mmap_lock.
+
+Okay 
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
