@@ -1,238 +1,409 @@
 From: a.j.buxton@gmail.com (Alistair Buxton)
-Date: Wed, 14 Oct 2009 20:51:26 +0100
-Subject: [PATCH 11/17] OMAP7XX: Update core omap1 files to use omap7xx.h
-Message-ID: <3d374d00910141251i26517cb7ve4256847710b7e9d@mail.gmail.com>
+Date: Wed, 14 Oct 2009 20:51:31 +0100
+Subject: [PATCH 12/17] OMAP7XX: Replace omap730 references in irqs.h and all
+	users
+Message-ID: <3d374d00910141251g16d59117j4b3ac2df563635c1@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This patch is part of a series which removes references to omap730 in code
 which is shared with omap850, replacing them with references to omap7xx.
 
+Turns INT_730_* to INT_7XX_* for definitions in irqs.h and all users.
+
 Signed-off-by: Alistair Buxton <a.j.buxton@gmail.com>
 Reviewed-by: Zebediah C. McClure <zmc@lurian.net>
 ---
- arch/arm/mach-omap1/board-fsample.c        |   12 ++++++------
- arch/arm/mach-omap1/board-perseus2.c       |   12 ++++++------
- arch/arm/mach-omap1/clock.c                |    2 +-
- arch/arm/mach-omap1/io.c                   |   12 ++++++------
- arch/arm/plat-omap/include/mach/hardware.h |    2 +-
- arch/arm/plat-omap/include/mach/mux.h      |   14 +++++++-------
- arch/arm/plat-omap/io.c                    |   12 ++++++------
- 7 files changed, 33 insertions(+), 33 deletions(-)
+ arch/arm/mach-omap1/board-fsample.c           |    6 +-
+ arch/arm/mach-omap1/board-perseus2.c          |    6 +-
+ arch/arm/mach-omap1/irq.c                     |    2 +-
+ arch/arm/mach-omap1/mcbsp.c                   |    8 +-
+ arch/arm/mach-omap1/pm.c                      |   10 +-
+ arch/arm/mach-omap1/serial.c                  |    4 +-
+ arch/arm/plat-omap/gpio.c                     |   14 +-
+ arch/arm/plat-omap/include/mach/entry-macro.S |    2 +-
+ arch/arm/plat-omap/include/mach/irqs.h        |  148 ++++++++++++------------
+ arch/arm/plat-omap/usb.c                      |    4 +-
+ 10 files changed, 102 insertions(+), 102 deletions(-)
 
 diff --git a/arch/arm/mach-omap1/board-fsample.c
 b/arch/arm/mach-omap1/board-fsample.c
-index a7ead1b..e53f774 100644
+index e53f774..74720e6 100644
 --- a/arch/arm/mach-omap1/board-fsample.c
 +++ b/arch/arm/mach-omap1/board-fsample.c
-@@ -309,7 +309,7 @@ static void __init omap_fsample_map_io(void)
- 	/*
- 	 * Hold GSM Reset until needed
- 	 */
--	omap_writew(omap_readw(OMAP730_DSP_M_CTL) & ~1, OMAP730_DSP_M_CTL);
-+	omap_writew(omap_readw(OMAP7XX_DSP_M_CTL) & ~1, OMAP7XX_DSP_M_CTL);
+@@ -107,7 +107,7 @@ static struct resource smc91x_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+-		.start	= INT_730_MPU_EXT_NIRQ,
++		.start	= INT_7XX_MPU_EXT_NIRQ,
+ 		.end	= 0,
+ 		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE,
+ 	},
+@@ -196,8 +196,8 @@ static struct platform_device smc91x_device = {
 
- 	/*
- 	 * UARTs -> done automagically by 8250 driver
-@@ -320,21 +320,21 @@ static void __init omap_fsample_map_io(void)
- 	 */
-
- 	/* Flash: CS0 timings setup */
--	omap_writel(0x0000fff3, OMAP730_FLASH_CFG_0);
--	omap_writel(0x00000088, OMAP730_FLASH_ACFG_0);
-+	omap_writel(0x0000fff3, OMAP7XX_FLASH_CFG_0);
-+	omap_writel(0x00000088, OMAP7XX_FLASH_ACFG_0);
-
- 	/*
- 	 * Ethernet support through the debug board
- 	 * CS1 timings setup
- 	 */
--	omap_writel(0x0000fff3, OMAP730_FLASH_CFG_1);
--	omap_writel(0x00000000, OMAP730_FLASH_ACFG_1);
-+	omap_writel(0x0000fff3, OMAP7XX_FLASH_CFG_1);
-+	omap_writel(0x00000000, OMAP7XX_FLASH_ACFG_1);
-
- 	/*
- 	 * Configure MPU_EXT_NIRQ IO in IO_CONF9 register,
- 	 * It is used as the Ethernet controller interrupt
- 	 */
--	omap_writel(omap_readl(OMAP730_IO_CONF_9) & 0x1FFFFFFF, OMAP730_IO_CONF_9);
-+	omap_writel(omap_readl(OMAP7XX_IO_CONF_9) & 0x1FFFFFFF, OMAP7XX_IO_CONF_9);
- }
-
- MACHINE_START(OMAP_FSAMPLE, "OMAP730 F-Sample")
+ static struct resource kp_resources[] = {
+ 	[0] = {
+-		.start	= INT_730_MPUIO_KEYPAD,
+-		.end	= INT_730_MPUIO_KEYPAD,
++		.start	= INT_7XX_MPUIO_KEYPAD,
++		.end	= INT_7XX_MPUIO_KEYPAD,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
 diff --git a/arch/arm/mach-omap1/board-perseus2.c
 b/arch/arm/mach-omap1/board-perseus2.c
-index 8340669..ec22838 100644
+index ec22838..2f897cf 100644
 --- a/arch/arm/mach-omap1/board-perseus2.c
 +++ b/arch/arm/mach-omap1/board-perseus2.c
-@@ -270,7 +270,7 @@ static void __init omap_perseus2_map_io(void)
- 	/*
- 	 * Hold GSM Reset until needed
+@@ -74,7 +74,7 @@ static struct resource smc91x_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+-		.start	= INT_730_MPU_EXT_NIRQ,
++		.start	= INT_7XX_MPU_EXT_NIRQ,
+ 		.end	= 0,
+ 		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE,
+ 	},
+@@ -163,8 +163,8 @@ static struct platform_device smc91x_device = {
+
+ static struct resource kp_resources[] = {
+ 	[0] = {
+-		.start	= INT_730_MPUIO_KEYPAD,
+-		.end	= INT_730_MPUIO_KEYPAD,
++		.start	= INT_7XX_MPUIO_KEYPAD,
++		.end	= INT_7XX_MPUIO_KEYPAD,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+diff --git a/arch/arm/mach-omap1/irq.c b/arch/arm/mach-omap1/irq.c
+index c05999c..704a80c 100644
+--- a/arch/arm/mach-omap1/irq.c
++++ b/arch/arm/mach-omap1/irq.c
+@@ -234,7 +234,7 @@ void __init omap_init_irq(void)
+ 	/* Unmask level 2 handler */
+
+ 	if (cpu_is_omap7xx())
+-		omap_unmask_irq(INT_730_IH2_IRQ);
++		omap_unmask_irq(INT_7XX_IH2_IRQ);
+ 	else if (cpu_is_omap15xx())
+ 		omap_unmask_irq(INT_1510_IH2_IRQ);
+ 	else if (cpu_is_omap16xx())
+diff --git a/arch/arm/mach-omap1/mcbsp.c b/arch/arm/mach-omap1/mcbsp.c
+index 06f380b..7ccca00 100644
+--- a/arch/arm/mach-omap1/mcbsp.c
++++ b/arch/arm/mach-omap1/mcbsp.c
+@@ -85,16 +85,16 @@ static struct omap_mcbsp_platform_data
+omap730_mcbsp_pdata[] = {
+ 		.phys_base	= OMAP730_MCBSP1_BASE,
+ 		.dma_rx_sync	= OMAP_DMA_MCBSP1_RX,
+ 		.dma_tx_sync	= OMAP_DMA_MCBSP1_TX,
+-		.rx_irq		= INT_730_McBSP1RX,
+-		.tx_irq		= INT_730_McBSP1TX,
++		.rx_irq		= INT_7XX_McBSP1RX,
++		.tx_irq		= INT_7XX_McBSP1TX,
+ 		.ops		= &omap1_mcbsp_ops,
+ 	},
+ 	{
+ 		.phys_base	= OMAP730_MCBSP2_BASE,
+ 		.dma_rx_sync	= OMAP_DMA_MCBSP3_RX,
+ 		.dma_tx_sync	= OMAP_DMA_MCBSP3_TX,
+-		.rx_irq		= INT_730_McBSP2RX,
+-		.tx_irq		= INT_730_McBSP2TX,
++		.rx_irq		= INT_7XX_McBSP2RX,
++		.tx_irq		= INT_7XX_McBSP2TX,
+ 		.ops		= &omap1_mcbsp_ops,
+ 	},
+ };
+diff --git a/arch/arm/mach-omap1/pm.c b/arch/arm/mach-omap1/pm.c
+index 12f246e..58479c7 100644
+--- a/arch/arm/mach-omap1/pm.c
++++ b/arch/arm/mach-omap1/pm.c
+@@ -184,8 +184,8 @@ static void omap_pm_wakeup_setup(void)
+ 	 * wake up to a GPIO interrupt.
  	 */
--	omap_writew(omap_readw(OMAP730_DSP_M_CTL) & ~1, OMAP730_DSP_M_CTL);
-+	omap_writew(omap_readw(OMAP7XX_DSP_M_CTL) & ~1, OMAP7XX_DSP_M_CTL);
+ 	if (cpu_is_omap7xx())
+-		level1_wake = OMAP_IRQ_BIT(INT_730_GPIO_BANK1) |
+-			OMAP_IRQ_BIT(INT_730_IH2_IRQ);
++		level1_wake = OMAP_IRQ_BIT(INT_7XX_GPIO_BANK1) |
++			OMAP_IRQ_BIT(INT_7XX_IH2_IRQ);
+ 	else if (cpu_is_omap15xx())
+ 		level1_wake = OMAP_IRQ_BIT(INT_GPIO_BANK1) |
+ 			OMAP_IRQ_BIT(INT_1510_IH2_IRQ);
+@@ -197,8 +197,8 @@ static void omap_pm_wakeup_setup(void)
 
- 	/*
- 	 * UARTs -> done automagically by 8250 driver
-@@ -281,21 +281,21 @@ static void __init omap_perseus2_map_io(void)
- 	 */
+ 	if (cpu_is_omap7xx()) {
+ 		omap_writel(~level2_wake, OMAP_IH2_0_MIR);
+-		omap_writel(~(OMAP_IRQ_BIT(INT_730_WAKE_UP_REQ) |
+-				OMAP_IRQ_BIT(INT_730_MPUIO_KEYPAD)),
++		omap_writel(~(OMAP_IRQ_BIT(INT_7XX_WAKE_UP_REQ) |
++				OMAP_IRQ_BIT(INT_7XX_MPUIO_KEYPAD)),
+ 				OMAP_IH2_1_MIR);
+ 	} else if (cpu_is_omap15xx()) {
+ 		level2_wake |= OMAP_IRQ_BIT(INT_KEYBOARD);
+@@ -687,7 +687,7 @@ static int __init omap_pm_init(void)
+ 	pm_idle = omap1_pm_idle;
 
- 	/* Flash: CS0 timings setup */
--	omap_writel(0x0000fff3, OMAP730_FLASH_CFG_0);
--	omap_writel(0x00000088, OMAP730_FLASH_ACFG_0);
-+	omap_writel(0x0000fff3, OMAP7XX_FLASH_CFG_0);
-+	omap_writel(0x00000088, OMAP7XX_FLASH_ACFG_0);
+ 	if (cpu_is_omap7xx())
+-		setup_irq(INT_730_WAKE_UP_REQ, &omap_wakeup_irq);
++		setup_irq(INT_7XX_WAKE_UP_REQ, &omap_wakeup_irq);
+ 	else if (cpu_is_omap16xx())
+ 		setup_irq(INT_1610_WAKE_UP_REQ, &omap_wakeup_irq);
 
- 	/*
- 	 * Ethernet support through the debug board
- 	 * CS1 timings setup
- 	 */
--	omap_writel(0x0000fff3, OMAP730_FLASH_CFG_1);
--	omap_writel(0x00000000, OMAP730_FLASH_ACFG_1);
-+	omap_writel(0x0000fff3, OMAP7XX_FLASH_CFG_1);
-+	omap_writel(0x00000000, OMAP7XX_FLASH_ACFG_1);
+diff --git a/arch/arm/mach-omap1/serial.c b/arch/arm/mach-omap1/serial.c
+index 49381e2..ed07af1 100644
+--- a/arch/arm/mach-omap1/serial.c
++++ b/arch/arm/mach-omap1/serial.c
+@@ -113,8 +113,8 @@ void __init omap_serial_init(void)
+ 	if (cpu_is_omap7xx()) {
+ 		serial_platform_data[0].regshift = 0;
+ 		serial_platform_data[1].regshift = 0;
+-		serial_platform_data[0].irq = INT_730_UART_MODEM_1;
+-		serial_platform_data[1].irq = INT_730_UART_MODEM_IRDA_2;
++		serial_platform_data[0].irq = INT_7XX_UART_MODEM_1;
++		serial_platform_data[1].irq = INT_7XX_UART_MODEM_IRDA_2;
+ 	}
 
- 	/*
- 	 * Configure MPU_EXT_NIRQ IO in IO_CONF9 register,
- 	 * It is used as the Ethernet controller interrupt
- 	 */
--	omap_writel(omap_readl(OMAP730_IO_CONF_9) & 0x1FFFFFFF, OMAP730_IO_CONF_9);
-+	omap_writel(omap_readl(OMAP7XX_IO_CONF_9) & 0x1FFFFFFF, OMAP7XX_IO_CONF_9);
- }
+ 	if (cpu_is_omap15xx()) {
+diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
+index 665ca05..22f6e68 100644
+--- a/arch/arm/plat-omap/gpio.c
++++ b/arch/arm/plat-omap/gpio.c
+@@ -221,13 +221,13 @@ static struct gpio_bank gpio_bank_1510[2] = {
 
- MACHINE_START(OMAP_PERSEUS2, "OMAP730 Perseus2")
-diff --git a/arch/arm/mach-omap1/clock.c b/arch/arm/mach-omap1/clock.c
-index fcbea61..c24cc28 100644
---- a/arch/arm/mach-omap1/clock.c
-+++ b/arch/arm/mach-omap1/clock.c
-@@ -862,7 +862,7 @@ int __init omap1_clk_init(void)
-
- #if defined(CONFIG_MACH_OMAP_PERSEUS2) || defined(CONFIG_MACH_OMAP_FSAMPLE)
- 	/* Select slicer output as OMAP input clock */
--	omap_writew(omap_readw(OMAP730_PCC_UPLD_CTRL) & ~0x1, OMAP730_PCC_UPLD_CTRL);
-+	omap_writew(omap_readw(OMAP7XX_PCC_UPLD_CTRL) & ~0x1, OMAP7XX_PCC_UPLD_CTRL);
+ #if defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
+ static struct gpio_bank gpio_bank_730[7] = {
+-	{ OMAP1_MPUIO_VBASE,    INT_730_MPUIO,	    IH_MPUIO_BASE,	METHOD_MPUIO },
+-	{ OMAP730_GPIO1_BASE,  INT_730_GPIO_BANK1,  IH_GPIO_BASE,	METHOD_GPIO_730 },
+-	{ OMAP730_GPIO2_BASE,  INT_730_GPIO_BANK2,  IH_GPIO_BASE +
+32,	METHOD_GPIO_730 },
+-	{ OMAP730_GPIO3_BASE,  INT_730_GPIO_BANK3,  IH_GPIO_BASE +
+64,	METHOD_GPIO_730 },
+-	{ OMAP730_GPIO4_BASE,  INT_730_GPIO_BANK4,  IH_GPIO_BASE +
+96,	METHOD_GPIO_730 },
+-	{ OMAP730_GPIO5_BASE,  INT_730_GPIO_BANK5,  IH_GPIO_BASE + 128,
+METHOD_GPIO_730 },
+-	{ OMAP730_GPIO6_BASE,  INT_730_GPIO_BANK6,  IH_GPIO_BASE + 160,
+METHOD_GPIO_730 },
++	{ OMAP1_MPUIO_VBASE,    INT_7XX_MPUIO,	    IH_MPUIO_BASE,	METHOD_MPUIO },
++	{ OMAP730_GPIO1_BASE,  INT_7XX_GPIO_BANK1,  IH_GPIO_BASE,	METHOD_GPIO_730 },
++	{ OMAP730_GPIO2_BASE,  INT_7XX_GPIO_BANK2,  IH_GPIO_BASE +
+32,	METHOD_GPIO_730 },
++	{ OMAP730_GPIO3_BASE,  INT_7XX_GPIO_BANK3,  IH_GPIO_BASE +
+64,	METHOD_GPIO_730 },
++	{ OMAP730_GPIO4_BASE,  INT_7XX_GPIO_BANK4,  IH_GPIO_BASE +
+96,	METHOD_GPIO_730 },
++	{ OMAP730_GPIO5_BASE,  INT_7XX_GPIO_BANK5,  IH_GPIO_BASE + 128,
+METHOD_GPIO_730 },
++	{ OMAP730_GPIO6_BASE,  INT_7XX_GPIO_BANK6,  IH_GPIO_BASE + 160,
+METHOD_GPIO_730 },
+ };
  #endif
 
- 	/* Amstrad Delta wants BCLK high when inactive */
-diff --git a/arch/arm/mach-omap1/io.c b/arch/arm/mach-omap1/io.c
-index 19de57f..157d508 100644
---- a/arch/arm/mach-omap1/io.c
-+++ b/arch/arm/mach-omap1/io.c
-@@ -39,14 +39,14 @@ static struct map_desc omap_io_desc[] __initdata = {
- #if defined (CONFIG_ARCH_OMAP730) || defined (CONFIG_ARCH_OMAP850)
- static struct map_desc omap730_io_desc[] __initdata = {
- 	{
--		.virtual	= OMAP730_DSP_BASE,
--		.pfn		= __phys_to_pfn(OMAP730_DSP_START),
--		.length		= OMAP730_DSP_SIZE,
-+		.virtual	= OMAP7XX_DSP_BASE,
-+		.pfn		= __phys_to_pfn(OMAP7XX_DSP_START),
-+		.length		= OMAP7XX_DSP_SIZE,
- 		.type		= MT_DEVICE
- 	}, {
--		.virtual	= OMAP730_DSPREG_BASE,
--		.pfn		= __phys_to_pfn(OMAP730_DSPREG_START),
--		.length		= OMAP730_DSPREG_SIZE,
-+		.virtual	= OMAP7XX_DSPREG_BASE,
-+		.pfn		= __phys_to_pfn(OMAP7XX_DSPREG_START),
-+		.length		= OMAP7XX_DSPREG_SIZE,
- 		.type		= MT_DEVICE
- 	}
- };
-diff --git a/arch/arm/plat-omap/include/mach/hardware.h
-b/arch/arm/plat-omap/include/mach/hardware.h
-index 26c1fbf..99c4241 100644
---- a/arch/arm/plat-omap/include/mach/hardware.h
-+++ b/arch/arm/plat-omap/include/mach/hardware.h
-@@ -280,7 +280,7 @@
-  * ---------------------------------------------------------------------------
-  */
-
--#include "omap730.h"
-+#include "omap7xx.h"
- #include "omap1510.h"
- #include "omap16xx.h"
- #include "omap24xx.h"
-diff --git a/arch/arm/plat-omap/include/mach/mux.h
-b/arch/arm/plat-omap/include/mach/mux.h
-index 587fb63..66ae302 100644
---- a/arch/arm/plat-omap/include/mach/mux.h
-+++ b/arch/arm/plat-omap/include/mach/mux.h
-@@ -51,13 +51,13 @@
- 					.pu_pd_reg = PU_PD_SEL_##reg, \
- 					.pu_pd_val = status,
-
--#define MUX_REG_730(reg, mode_offset, mode) .mux_reg_name =
-"OMAP730_IO_CONF_"#reg, \
--					.mux_reg = OMAP730_IO_CONF_##reg, \
-+#define MUX_REG_730(reg, mode_offset, mode) .mux_reg_name =
-"OMAP7XX_IO_CONF_"#reg, \
-+					.mux_reg = OMAP7XX_IO_CONF_##reg, \
- 					.mask_offset = mode_offset, \
- 					.mask = mode,
-
--#define PULL_REG_730(reg, bit, status)	.pull_name = "OMAP730_IO_CONF_"#reg, \
--					.pull_reg = OMAP730_IO_CONF_##reg, \
-+#define PULL_REG_730(reg, bit, status)	.pull_name = "OMAP7XX_IO_CONF_"#reg, \
-+					.pull_reg = OMAP7XX_IO_CONF_##reg, \
- 					.pull_bit = bit, \
- 					.pull_val = status,
-
-@@ -75,11 +75,11 @@
- 					.pu_pd_val = status,
-
- #define MUX_REG_730(reg, mode_offset, mode) \
--					.mux_reg = OMAP730_IO_CONF_##reg, \
-+					.mux_reg = OMAP7XX_IO_CONF_##reg, \
- 					.mask_offset = mode_offset, \
- 					.mask = mode,
-
--#define PULL_REG_730(reg, bit, status)	.pull_reg = OMAP730_IO_CONF_##reg, \
-+#define PULL_REG_730(reg, bit, status)	.pull_reg = OMAP7XX_IO_CONF_##reg, \
- 					.pull_bit = bit, \
- 					.pull_val = status,
-
-@@ -99,7 +99,7 @@
+diff --git a/arch/arm/plat-omap/include/mach/entry-macro.S
+b/arch/arm/plat-omap/include/mach/entry-macro.S
+index bcf7158..abe0864 100644
+--- a/arch/arm/plat-omap/include/mach/entry-macro.S
++++ b/arch/arm/plat-omap/include/mach/entry-macro.S
+@@ -21,7 +21,7 @@
+ 	(defined(CONFIG_ARCH_OMAP15XX) || defined(CONFIG_ARCH_OMAP16XX))
+ #error "FIXME: OMAP7XX doesn't support multiple-OMAP"
+ #elif defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
+-#define INT_IH2_IRQ		INT_730_IH2_IRQ
++#define INT_IH2_IRQ		INT_7XX_IH2_IRQ
+ #elif defined(CONFIG_ARCH_OMAP15XX)
+ #define INT_IH2_IRQ		INT_1510_IH2_IRQ
+ #elif defined(CONFIG_ARCH_OMAP16XX)
+diff --git a/arch/arm/plat-omap/include/mach/irqs.h
+b/arch/arm/plat-omap/include/mach/irqs.h
+index 7f338f0..6a6d028 100644
+--- a/arch/arm/plat-omap/include/mach/irqs.h
++++ b/arch/arm/plat-omap/include/mach/irqs.h
+@@ -86,26 +86,26 @@
+ #define INT_1610_SSR_FIFO_0	29
 
  /*
-  * OMAP730/850 has a slightly different config for the pin mux.
-- * - config regs are the OMAP730_IO_CONF_x regs (see omap730.h) regs and
-+ * - config regs are the OMAP7XX_IO_CONF_x regs (see omap730.h) regs and
-  *   not the FUNC_MUX_CTRL_x regs from hardware.h
-  * - for pull-up/down, only has one enable bit which is is in the same register
-  *   as mux config
-diff --git a/arch/arm/plat-omap/io.c b/arch/arm/plat-omap/io.c
-index 388fd94..23a205f 100644
---- a/arch/arm/plat-omap/io.c
-+++ b/arch/arm/plat-omap/io.c
-@@ -13,7 +13,7 @@
- #include <linux/io.h>
- #include <linux/mm.h>
+- * OMAP-730 specific IRQ numbers for interrupt handler 1
++ * OMAP-7xx specific IRQ numbers for interrupt handler 1
+  */
+-#define INT_730_IH2_FIQ		0
+-#define INT_730_IH2_IRQ		1
+-#define INT_730_USB_NON_ISO	2
+-#define INT_730_USB_ISO		3
+-#define INT_730_ICR		4
+-#define INT_730_EAC		5
+-#define INT_730_GPIO_BANK1	6
+-#define INT_730_GPIO_BANK2	7
+-#define INT_730_GPIO_BANK3	8
+-#define INT_730_McBSP2TX	10
+-#define INT_730_McBSP2RX	11
+-#define INT_730_McBSP2RX_OVF	12
+-#define INT_730_LCD_LINE	14
+-#define INT_730_GSM_PROTECT	15
+-#define INT_730_TIMER3		16
+-#define INT_730_GPIO_BANK5	17
+-#define INT_730_GPIO_BANK6	18
+-#define INT_730_SPGIO_WR	29
++#define INT_7XX_IH2_FIQ		0
++#define INT_7XX_IH2_IRQ		1
++#define INT_7XX_USB_NON_ISO	2
++#define INT_7XX_USB_ISO		3
++#define INT_7XX_ICR		4
++#define INT_7XX_EAC		5
++#define INT_7XX_GPIO_BANK1	6
++#define INT_7XX_GPIO_BANK2	7
++#define INT_7XX_GPIO_BANK3	8
++#define INT_7XX_McBSP2TX	10
++#define INT_7XX_McBSP2RX	11
++#define INT_7XX_McBSP2RX_OVF	12
++#define INT_7XX_LCD_LINE	14
++#define INT_7XX_GSM_PROTECT	15
++#define INT_7XX_TIMER3		16
++#define INT_7XX_GPIO_BANK5	17
++#define INT_7XX_GPIO_BANK6	18
++#define INT_7XX_SPGIO_WR	29
 
--#include <mach/omap730.h>
-+#include <mach/omap7xx.h>
- #include <mach/omap1510.h>
- #include <mach/omap16xx.h>
- #include <mach/omap24xx.h>
-@@ -34,12 +34,12 @@ void __iomem *omap_ioremap(unsigned long p, size_t
-size, unsigned int type)
- 			return XLATE(p, OMAP1_IO_PHYS, OMAP1_IO_VIRT);
- 	}
- 	if (cpu_is_omap7xx()) {
--		if (BETWEEN(p, OMAP730_DSP_BASE, OMAP730_DSP_SIZE))
--			return XLATE(p, OMAP730_DSP_BASE, OMAP730_DSP_START);
-+		if (BETWEEN(p, OMAP7XX_DSP_BASE, OMAP7XX_DSP_SIZE))
-+			return XLATE(p, OMAP7XX_DSP_BASE, OMAP7XX_DSP_START);
+ /*
+  * IRQ numbers for interrupt handler 2
+@@ -183,62 +183,62 @@
+ #define INT_1610_SHA1MD5	(91 + IH2_BASE)
 
--		if (BETWEEN(p, OMAP730_DSPREG_BASE, OMAP730_DSPREG_SIZE))
--			return XLATE(p, OMAP730_DSPREG_BASE,
--					OMAP730_DSPREG_START);
-+		if (BETWEEN(p, OMAP7XX_DSPREG_BASE, OMAP7XX_DSPREG_SIZE))
-+			return XLATE(p, OMAP7XX_DSPREG_BASE,
-+					OMAP7XX_DSPREG_START);
- 	}
- 	if (cpu_is_omap15xx()) {
- 		if (BETWEEN(p, OMAP1510_DSP_BASE, OMAP1510_DSP_SIZE))
+ /*
+- * OMAP-730 specific IRQ numbers for interrupt handler 2
++ * OMAP-7xx specific IRQ numbers for interrupt handler 2
+  */
+-#define INT_730_HW_ERRORS	(0 + IH2_BASE)
+-#define INT_730_NFIQ_PWR_FAIL	(1 + IH2_BASE)
+-#define INT_730_CFCD		(2 + IH2_BASE)
+-#define INT_730_CFIREQ		(3 + IH2_BASE)
+-#define INT_730_I2C		(4 + IH2_BASE)
+-#define INT_730_PCC		(5 + IH2_BASE)
+-#define INT_730_MPU_EXT_NIRQ	(6 + IH2_BASE)
+-#define INT_730_SPI_100K_1	(7 + IH2_BASE)
+-#define INT_730_SYREN_SPI	(8 + IH2_BASE)
+-#define INT_730_VLYNQ		(9 + IH2_BASE)
+-#define INT_730_GPIO_BANK4	(10 + IH2_BASE)
+-#define INT_730_McBSP1TX	(11 + IH2_BASE)
+-#define INT_730_McBSP1RX	(12 + IH2_BASE)
+-#define INT_730_McBSP1RX_OF	(13 + IH2_BASE)
+-#define INT_730_UART_MODEM_IRDA_2 (14 + IH2_BASE)
+-#define INT_730_UART_MODEM_1	(15 + IH2_BASE)
+-#define INT_730_MCSI		(16 + IH2_BASE)
+-#define INT_730_uWireTX		(17 + IH2_BASE)
+-#define INT_730_uWireRX		(18 + IH2_BASE)
+-#define INT_730_SMC_CD		(19 + IH2_BASE)
+-#define INT_730_SMC_IREQ	(20 + IH2_BASE)
+-#define INT_730_HDQ_1WIRE	(21 + IH2_BASE)
+-#define INT_730_TIMER32K	(22 + IH2_BASE)
+-#define INT_730_MMC_SDIO	(23 + IH2_BASE)
+-#define INT_730_UPLD		(24 + IH2_BASE)
+-#define INT_730_USB_HHC_1	(27 + IH2_BASE)
+-#define INT_730_USB_HHC_2	(28 + IH2_BASE)
+-#define INT_730_USB_GENI	(29 + IH2_BASE)
+-#define INT_730_USB_OTG		(30 + IH2_BASE)
+-#define INT_730_CAMERA_IF	(31 + IH2_BASE)
+-#define INT_730_RNG		(32 + IH2_BASE)
+-#define INT_730_DUAL_MODE_TIMER (33 + IH2_BASE)
+-#define INT_730_DBB_RF_EN	(34 + IH2_BASE)
+-#define INT_730_MPUIO_KEYPAD	(35 + IH2_BASE)
+-#define INT_730_SHA1_MD5	(36 + IH2_BASE)
+-#define INT_730_SPI_100K_2	(37 + IH2_BASE)
+-#define INT_730_RNG_IDLE	(38 + IH2_BASE)
+-#define INT_730_MPUIO		(39 + IH2_BASE)
+-#define INT_730_LLPC_LCD_CTRL_CAN_BE_OFF	(40 + IH2_BASE)
+-#define INT_730_LLPC_OE_FALLING (41 + IH2_BASE)
+-#define INT_730_LLPC_OE_RISING	(42 + IH2_BASE)
+-#define INT_730_LLPC_VSYNC	(43 + IH2_BASE)
+-#define INT_730_WAKE_UP_REQ	(46 + IH2_BASE)
+-#define INT_730_DMA_CH6		(53 + IH2_BASE)
+-#define INT_730_DMA_CH7		(54 + IH2_BASE)
+-#define INT_730_DMA_CH8		(55 + IH2_BASE)
+-#define INT_730_DMA_CH9		(56 + IH2_BASE)
+-#define INT_730_DMA_CH10	(57 + IH2_BASE)
+-#define INT_730_DMA_CH11	(58 + IH2_BASE)
+-#define INT_730_DMA_CH12	(59 + IH2_BASE)
+-#define INT_730_DMA_CH13	(60 + IH2_BASE)
+-#define INT_730_DMA_CH14	(61 + IH2_BASE)
+-#define INT_730_DMA_CH15	(62 + IH2_BASE)
+-#define INT_730_NAND		(63 + IH2_BASE)
++#define INT_7XX_HW_ERRORS	(0 + IH2_BASE)
++#define INT_7XX_NFIQ_PWR_FAIL	(1 + IH2_BASE)
++#define INT_7XX_CFCD		(2 + IH2_BASE)
++#define INT_7XX_CFIREQ		(3 + IH2_BASE)
++#define INT_7XX_I2C		(4 + IH2_BASE)
++#define INT_7XX_PCC		(5 + IH2_BASE)
++#define INT_7XX_MPU_EXT_NIRQ	(6 + IH2_BASE)
++#define INT_7XX_SPI_100K_1	(7 + IH2_BASE)
++#define INT_7XX_SYREN_SPI	(8 + IH2_BASE)
++#define INT_7XX_VLYNQ		(9 + IH2_BASE)
++#define INT_7XX_GPIO_BANK4	(10 + IH2_BASE)
++#define INT_7XX_McBSP1TX	(11 + IH2_BASE)
++#define INT_7XX_McBSP1RX	(12 + IH2_BASE)
++#define INT_7XX_McBSP1RX_OF	(13 + IH2_BASE)
++#define INT_7XX_UART_MODEM_IRDA_2 (14 + IH2_BASE)
++#define INT_7XX_UART_MODEM_1	(15 + IH2_BASE)
++#define INT_7XX_MCSI		(16 + IH2_BASE)
++#define INT_7XX_uWireTX		(17 + IH2_BASE)
++#define INT_7XX_uWireRX		(18 + IH2_BASE)
++#define INT_7XX_SMC_CD		(19 + IH2_BASE)
++#define INT_7XX_SMC_IREQ	(20 + IH2_BASE)
++#define INT_7XX_HDQ_1WIRE	(21 + IH2_BASE)
++#define INT_7XX_TIMER32K	(22 + IH2_BASE)
++#define INT_7XX_MMC_SDIO	(23 + IH2_BASE)
++#define INT_7XX_UPLD		(24 + IH2_BASE)
++#define INT_7XX_USB_HHC_1	(27 + IH2_BASE)
++#define INT_7XX_USB_HHC_2	(28 + IH2_BASE)
++#define INT_7XX_USB_GENI	(29 + IH2_BASE)
++#define INT_7XX_USB_OTG		(30 + IH2_BASE)
++#define INT_7XX_CAMERA_IF	(31 + IH2_BASE)
++#define INT_7XX_RNG		(32 + IH2_BASE)
++#define INT_7XX_DUAL_MODE_TIMER (33 + IH2_BASE)
++#define INT_7XX_DBB_RF_EN	(34 + IH2_BASE)
++#define INT_7XX_MPUIO_KEYPAD	(35 + IH2_BASE)
++#define INT_7XX_SHA1_MD5	(36 + IH2_BASE)
++#define INT_7XX_SPI_100K_2	(37 + IH2_BASE)
++#define INT_7XX_RNG_IDLE	(38 + IH2_BASE)
++#define INT_7XX_MPUIO		(39 + IH2_BASE)
++#define INT_7XX_LLPC_LCD_CTRL_CAN_BE_OFF	(40 + IH2_BASE)
++#define INT_7XX_LLPC_OE_FALLING (41 + IH2_BASE)
++#define INT_7XX_LLPC_OE_RISING	(42 + IH2_BASE)
++#define INT_7XX_LLPC_VSYNC	(43 + IH2_BASE)
++#define INT_7XX_WAKE_UP_REQ	(46 + IH2_BASE)
++#define INT_7XX_DMA_CH6		(53 + IH2_BASE)
++#define INT_7XX_DMA_CH7		(54 + IH2_BASE)
++#define INT_7XX_DMA_CH8		(55 + IH2_BASE)
++#define INT_7XX_DMA_CH9		(56 + IH2_BASE)
++#define INT_7XX_DMA_CH10	(57 + IH2_BASE)
++#define INT_7XX_DMA_CH11	(58 + IH2_BASE)
++#define INT_7XX_DMA_CH12	(59 + IH2_BASE)
++#define INT_7XX_DMA_CH13	(60 + IH2_BASE)
++#define INT_7XX_DMA_CH14	(61 + IH2_BASE)
++#define INT_7XX_DMA_CH15	(62 + IH2_BASE)
++#define INT_7XX_NAND		(63 + IH2_BASE)
+
+ #define INT_24XX_SYS_NIRQ	7
+ #define INT_24XX_SDMA_IRQ0	12
+diff --git a/arch/arm/plat-omap/usb.c b/arch/arm/plat-omap/usb.c
+index 980d2eb..3c40b85 100644
+--- a/arch/arm/plat-omap/usb.c
++++ b/arch/arm/plat-omap/usb.c
+@@ -615,7 +615,7 @@ omap_otg_init(struct omap_usb_config *config)
+ 		syscon &= ~HST_IDLE_EN;
+ 		ohci_device.dev.platform_data = config;
+ 		if (cpu_is_omap7xx())
+-			ohci_resources[1].start = INT_730_USB_HHC_1;
++			ohci_resources[1].start = INT_7XX_USB_HHC_1;
+ 		status = platform_device_register(&ohci_device);
+ 		if (status)
+ 			pr_debug("can't register OHCI device, %d\n", status);
+@@ -627,7 +627,7 @@ omap_otg_init(struct omap_usb_config *config)
+ 		syscon &= ~OTG_IDLE_EN;
+ 		otg_device.dev.platform_data = config;
+ 		if (cpu_is_omap7xx())
+-			otg_resources[1].start = INT_730_USB_OTG;
++			otg_resources[1].start = INT_7XX_USB_OTG;
+ 		status = platform_device_register(&otg_device);
+ 		if (status)
+ 			pr_debug("can't register OTG device, %d\n", status);
 -- 
 1.6.5
