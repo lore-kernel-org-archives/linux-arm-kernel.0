@@ -1,161 +1,45 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 14 Oct 2009 16:31:40 -0600
-Subject: [PATCH 1/2] OMAP: Fix race condition with autodeps
-In-Reply-To: <20091014222609.5545.7736.stgit@localhost.localdomain>
-References: <20091014222609.5545.7736.stgit@localhost.localdomain>
-Message-ID: <20091014223135.5545.27509.stgit@localhost.localdomain>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 Oct 2009 15:54:56 -0700
+Subject: [PATCH 1/6] omap: headers: Add mach patch to include files
+In-Reply-To: <20091014214845.30227.51419.stgit@kaulin.muru.com>
+References: <20091014213748.30227.71513.stgit@kaulin.muru.com>
+	<20091014214845.30227.51419.stgit@kaulin.muru.com>
+Message-ID: <20091014225455.GA14531@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kalle Jokiniemi <kalle.jokiniemi@digia.com>
+* Tony Lindgren <tony@atomide.com> [091014 14:55]:
+> This is to prepare for moving hardware.h to live under plat
+> instead of mach.
 
-There is a possible race condition in clockdomain
-code handling hw supported idle transitions.
-
-When multiple autodeps dependencies are being added
-or removed, a transition of still remaining dependent
-powerdomain can result in false readings of the
-state counter. This is especially fatal for off mode
-state counter, as it could result in a driver not
-noticing a context loss.
-
-Fixed by disabling hw supported state transitions
-when autodeps are being changed.
-
-Signed-off-by: Kalle Jokiniemi <kalle.jokiniemi@digia.com>
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/clockdomain.c |   74 ++++++++++++++++++++++---------------
- 1 files changed, 44 insertions(+), 30 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
-index 4ef7b4f..58aff84 100644
---- a/arch/arm/mach-omap2/clockdomain.c
-+++ b/arch/arm/mach-omap2/clockdomain.c
-@@ -137,6 +137,36 @@ static void _clkdm_del_autodeps(struct clockdomain *clkdm)
- 	}
- }
+The subject should say "add mach path" instead of "add mach patch"..
  
-+/*
-+ * _omap2_clkdm_set_hwsup - set the hwsup idle transition bit
-+ * @clkdm: struct clockdomain *
-+ * @enable: int 0 to disable, 1 to enable
-+ *
-+ * Internal helper for actually switching the bit that controls hwsup
-+ * idle transitions for clkdm.
-+ */
-+static void _omap2_clkdm_set_hwsup(struct clockdomain *clkdm, int enable)
-+{
-+	u32 v;
-+
-+	if (cpu_is_omap24xx()) {
-+		if (enable)
-+			v = OMAP24XX_CLKSTCTRL_ENABLE_AUTO;
-+		else
-+			v = OMAP24XX_CLKSTCTRL_DISABLE_AUTO;
-+	} else if (cpu_is_omap34xx()) {
-+		if (enable)
-+			v = OMAP34XX_CLKSTCTRL_ENABLE_AUTO;
-+		else
-+			v = OMAP34XX_CLKSTCTRL_DISABLE_AUTO;
-+	} else {
-+		BUG();
-+	}
-+
-+	cm_rmw_mod_reg_bits(clkdm->clktrctrl_mask,
-+			    v << __ffs(clkdm->clktrctrl_mask),
-+			    clkdm->pwrdm.ptr->prcm_offs, CM_CLKSTCTRL);
-+}
- 
- static struct clockdomain *_clkdm_lookup(const char *name)
- {
-@@ -456,8 +486,6 @@ int omap2_clkdm_wakeup(struct clockdomain *clkdm)
-  */
- void omap2_clkdm_allow_idle(struct clockdomain *clkdm)
- {
--	u32 v;
--
- 	if (!clkdm)
- 		return;
- 
-@@ -473,18 +501,7 @@ void omap2_clkdm_allow_idle(struct clockdomain *clkdm)
- 	if (atomic_read(&clkdm->usecount) > 0)
- 		_clkdm_add_autodeps(clkdm);
- 
--	if (cpu_is_omap24xx())
--		v = OMAP24XX_CLKSTCTRL_ENABLE_AUTO;
--	else if (cpu_is_omap34xx())
--		v = OMAP34XX_CLKSTCTRL_ENABLE_AUTO;
--	else
--		BUG();
--
--
--	cm_rmw_mod_reg_bits(clkdm->clktrctrl_mask,
--			    v << __ffs(clkdm->clktrctrl_mask),
--			    clkdm->pwrdm.ptr->prcm_offs,
--			    CM_CLKSTCTRL);
-+	_omap2_clkdm_set_hwsup(clkdm, 1);
- 
- 	pwrdm_clkdm_state_switch(clkdm);
- }
-@@ -500,8 +517,6 @@ void omap2_clkdm_allow_idle(struct clockdomain *clkdm)
-  */
- void omap2_clkdm_deny_idle(struct clockdomain *clkdm)
- {
--	u32 v;
--
- 	if (!clkdm)
- 		return;
- 
-@@ -514,16 +529,7 @@ void omap2_clkdm_deny_idle(struct clockdomain *clkdm)
- 	pr_debug("clockdomain: disabling automatic idle transitions for %s\n",
- 		 clkdm->name);
- 
--	if (cpu_is_omap24xx())
--		v = OMAP24XX_CLKSTCTRL_DISABLE_AUTO;
--	else if (cpu_is_omap34xx())
--		v = OMAP34XX_CLKSTCTRL_DISABLE_AUTO;
--	else
--		BUG();
--
--	cm_rmw_mod_reg_bits(clkdm->clktrctrl_mask,
--			    v << __ffs(clkdm->clktrctrl_mask),
--			    clkdm->pwrdm.ptr->prcm_offs, CM_CLKSTCTRL);
-+	_omap2_clkdm_set_hwsup(clkdm, 0);
- 
- 	if (atomic_read(&clkdm->usecount) > 0)
- 		_clkdm_del_autodeps(clkdm);
-@@ -569,10 +575,14 @@ int omap2_clkdm_clk_enable(struct clockdomain *clkdm, struct clk *clk)
- 	v = omap2_clkdm_clktrctrl_read(clkdm);
- 
- 	if ((cpu_is_omap34xx() && v == OMAP34XX_CLKSTCTRL_ENABLE_AUTO) ||
--	    (cpu_is_omap24xx() && v == OMAP24XX_CLKSTCTRL_ENABLE_AUTO))
-+	    (cpu_is_omap24xx() && v == OMAP24XX_CLKSTCTRL_ENABLE_AUTO)) {
-+		/* Disable HW transitions when we are changing deps */
-+		_omap2_clkdm_set_hwsup(clkdm, 0);
- 		_clkdm_add_autodeps(clkdm);
--	else
-+		_omap2_clkdm_set_hwsup(clkdm, 1);
-+	} else {
- 		omap2_clkdm_wakeup(clkdm);
-+	}
- 
- 	pwrdm_wait_transition(clkdm->pwrdm.ptr);
- 	pwrdm_clkdm_state_switch(clkdm);
-@@ -623,10 +633,14 @@ int omap2_clkdm_clk_disable(struct clockdomain *clkdm, struct clk *clk)
- 	v = omap2_clkdm_clktrctrl_read(clkdm);
- 
- 	if ((cpu_is_omap34xx() && v == OMAP34XX_CLKSTCTRL_ENABLE_AUTO) ||
--	    (cpu_is_omap24xx() && v == OMAP24XX_CLKSTCTRL_ENABLE_AUTO))
-+	    (cpu_is_omap24xx() && v == OMAP24XX_CLKSTCTRL_ENABLE_AUTO)) {
-+		/* Disable HW transitions when we are changing deps */
-+		_omap2_clkdm_set_hwsup(clkdm, 0);
- 		_clkdm_del_autodeps(clkdm);
--	else
-+		_omap2_clkdm_set_hwsup(clkdm, 1);
-+	} else {
- 		omap2_clkdm_sleep(clkdm);
-+	}
- 
- 	pwrdm_clkdm_state_switch(clkdm);
- 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+> 
+>  arch/arm/plat-omap/include/mach/hardware.h |   12 ++++++------
+>  1 files changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/plat-omap/include/mach/hardware.h b/arch/arm/plat-omap/include/mach/hardware.h
+> index 26c1fbf..f746c9d 100644
+> --- a/arch/arm/plat-omap/include/mach/hardware.h
+> +++ b/arch/arm/plat-omap/include/mach/hardware.h
+> @@ -280,11 +280,11 @@
+>   * ---------------------------------------------------------------------------
+>   */
+>  
+> -#include "omap730.h"
+> -#include "omap1510.h"
+> -#include "omap16xx.h"
+> -#include "omap24xx.h"
+> -#include "omap34xx.h"
+> -#include "omap44xx.h"
+> +#include <mach/omap730.h>
+> +#include <mach/omap1510.h>
+> +#include <mach/omap16xx.h>
+> +#include <mach/omap24xx.h>
+> +#include <mach/omap34xx.h>
+> +#include <mach/omap44xx.h>
+>  
+>  #endif	/* __ASM_ARCH_OMAP_HARDWARE_H */
+> 
