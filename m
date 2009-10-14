@@ -1,50 +1,40 @@
 From: a.j.buxton@gmail.com (Alistair Buxton)
-Date: Wed, 14 Oct 2009 20:51:42 +0100
-Subject: [PATCH 14/17] OMAP7XX: omap_uwire.c: Convert to omap7xx.h
-Message-ID: <3d374d00910141251j1a80c39au55c19378c4e3665d@mail.gmail.com>
+Date: Wed, 14 Oct 2009 20:51:47 +0100
+Subject: [PATCH 15/17] OMAP7XX: Clocks: Add ck_ref and armxor
+Message-ID: <3d374d00910141251p61d83d0fjbecd18bf16f05510@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This also replaces CPU checks with cpu_is_omap7xx()
+These clocks are required for booting.
 
+Signed-off-by: Angelo Arrifano <miknix@gmail.com>
 Signed-off-by: Alistair Buxton <a.j.buxton@gmail.com>
 Reviewed-by: Zebediah C. McClure <zmc@lurian.net>
 ---
- drivers/spi/omap_uwire.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap1/clock.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/spi/omap_uwire.c b/drivers/spi/omap_uwire.c
-index e75ba9b..7bcf409 100644
---- a/drivers/spi/omap_uwire.c
-+++ b/drivers/spi/omap_uwire.c
-@@ -52,7 +52,7 @@
- #include <asm/mach-types.h>
+diff --git a/arch/arm/mach-omap1/clock.c b/arch/arm/mach-omap1/clock.c
+index d2b00a5..5f77b83 100644
+--- a/arch/arm/mach-omap1/clock.c
++++ b/arch/arm/mach-omap1/clock.c
+@@ -75,7 +75,7 @@ struct omap_clk {
 
- #include <mach/mux.h>
--#include <mach/omap730.h>	/* OMAP730_IO_CONF registers */
-+#include <mach/omap7xx.h>	/* OMAP7XX_IO_CONF registers */
-
-
- /* FIXME address is now a platform device resource,
-@@ -504,7 +504,7 @@ static int __init uwire_probe(struct platform_device *pdev)
- 	}
- 	clk_enable(uwire->ck);
-
--	if (cpu_is_omap730())
-+	if (cpu_is_omap7xx())
- 		uwire_idx_shift = 1;
- 	else
- 		uwire_idx_shift = 2;
-@@ -573,8 +573,8 @@ static int __init omap_uwire_init(void)
- 	}
- 	if (machine_is_omap_perseus2()) {
- 		/* configure pins: MPU_UW_nSCS1, MPU_UW_SDO, MPU_UW_SCLK */
--		int val = omap_readl(OMAP730_IO_CONF_9) & ~0x00EEE000;
--		omap_writel(val | 0x00AAA000, OMAP730_IO_CONF_9);
-+		int val = omap_readl(OMAP7XX_IO_CONF_9) & ~0x00EEE000;
-+		omap_writel(val | 0x00AAA000, OMAP7XX_IO_CONF_9);
- 	}
-
- 	return platform_driver_probe(&uwire_driver, uwire_probe);
+ static struct omap_clk omap_clks[] = {
+ 	/* non-ULPD clocks */
+-	CLK(NULL,	"ck_ref",	&ck_ref,	CK_16XX | CK_1510 | CK_310),
++	CLK(NULL,	"ck_ref",	&ck_ref,	CK_16XX | CK_1510 | CK_310 | CK_7XX),
+ 	CLK(NULL,	"ck_dpll1",	&ck_dpll1,	CK_16XX | CK_1510 | CK_310),
+ 	/* CK_GEN1 clocks */
+ 	CLK(NULL,	"ck_dpll1out",	&ck_dpll1out.clk, CK_16XX),
+@@ -83,7 +83,7 @@ static struct omap_clk omap_clks[] = {
+ 	CLK(NULL,	"arm_ck",	&arm_ck,	CK_16XX | CK_1510 | CK_310),
+ 	CLK(NULL,	"armper_ck",	&armper_ck.clk,	CK_16XX | CK_1510 | CK_310),
+ 	CLK(NULL,	"arm_gpio_ck",	&arm_gpio_ck,	CK_1510 | CK_310),
+-	CLK(NULL,	"armxor_ck",	&armxor_ck.clk,	CK_16XX | CK_1510 | CK_310),
++	CLK(NULL,	"armxor_ck",	&armxor_ck.clk,	CK_16XX | CK_1510 | CK_310 | CK_7XX),
+ 	CLK(NULL,	"armtim_ck",	&armtim_ck.clk,	CK_16XX | CK_1510 | CK_310),
+ 	CLK("omap_wdt",	"fck",		&armwdt_ck.clk,	CK_16XX | CK_1510 | CK_310),
+ 	CLK("omap_wdt",	"ick",		&armper_ck.clk,	CK_16XX),
 -- 
 1.6.5
