@@ -1,36 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 13 Oct 2009 17:14:53 -0700
-Subject: [PATCH 6/6] omap: McBSP: Fix incorrect receiver stop in
-	omap_mcbsp_stop
-In-Reply-To: <20091014001233.6116.84749.stgit@localhost>
-References: <20091014001233.6116.84749.stgit@localhost>
-Message-ID: <20091014001453.6116.76836.stgit@localhost>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Wed, 14 Oct 2009 13:41:20 +1300
+Subject: [PATCH] ep93xx: fix build error in edb93xx.c
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901DB807D@mi8nycmail19.Mi8.com>
+References: <BD79186B4FD85F4B8E60E381CAEE190901DB807D@mi8nycmail19.Mi8.com>
+Message-ID: <4AD51E30.4000804@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jarkko Nikula <jhnikula@gmail.com>
+H Hartley Sweeten wrote:
+> Fix a build error due to a typo (missing comma) in:
+> 
+> 	ARM: 5754/1: ep93xx: update i2c support
+> 
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <ryan@bluewatersys.com>
+> 
+> ---
+> 
+> diff --git a/arch/arm/mach-ep93xx/edb93xx.c b/arch/arm/mach-ep93xx/edb93xx.c
+> index ca71cf1..a4a7be3 100644
+> --- a/arch/arm/mach-ep93xx/edb93xx.c
+> +++ b/arch/arm/mach-ep93xx/edb93xx.c
+> @@ -112,7 +112,7 @@ static void __init edb93xx_register_i2c(void)
+>  				    ARRAY_SIZE(edb93xxa_i2c_board_info));
+>  	} else if (machine_is_edb9307() || machine_is_edb9312() ||
+>  		   machine_is_edb9315()) {
+> -		ep93xx_register_i2c(&edb93xx_i2c_gpio_data
+> +		ep93xx_register_i2c(&edb93xx_i2c_gpio_data,
+>  				    edb93xx_i2c_board_info,
+>  				    ARRAY_SIZE(edb93xx_i2c_board_info));
+>  	} 
+> 
 
-This small typo written by author causes that McBSP receiver is disabled on
-OMAP2430 and OMAP3430 even if only transmitter is stopped. This was noted
-with ALSA SoC where simultaneous recording halted if playback was stopped
-first.
+Acked-by: Ryan Mallon <ryan@bluewatersys.com>
 
-Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/plat-omap/mcbsp.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+How did it slip through?
 
-diff --git a/arch/arm/plat-omap/mcbsp.c b/arch/arm/plat-omap/mcbsp.c
-index 88ac976..e664b91 100644
---- a/arch/arm/plat-omap/mcbsp.c
-+++ b/arch/arm/plat-omap/mcbsp.c
-@@ -595,7 +595,7 @@ void omap_mcbsp_stop(unsigned int id, int tx, int rx)
- 	rx &= 1;
- 	if (cpu_is_omap2430() || cpu_is_omap34xx()) {
- 		w = OMAP_MCBSP_READ(io_base, RCCR);
--		w |= (tx ? RDISABLE : 0);
-+		w |= (rx ? RDISABLE : 0);
- 		OMAP_MCBSP_WRITE(io_base, RCCR, w);
- 	}
- 	w = OMAP_MCBSP_READ(io_base, SPCR1);
+~Ryan
+
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
