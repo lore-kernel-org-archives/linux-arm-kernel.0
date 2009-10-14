@@ -1,7 +1,7 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 14 Oct 2009 14:57:58 -0700
-Subject: [PATCH 15/27] OMAP3: PM: Enable SDRAM auto-refresh during sleep
-In-Reply-To: <1255557490-16787-15-git-send-email-khilman@deeprootsystems.com>
+Date: Wed, 14 Oct 2009 14:57:59 -0700
+Subject: [PATCH 16/27] OMAP3: PM: Save and restore also CM_CLKSEL1_PLL_IVA2
+In-Reply-To: <1255557490-16787-16-git-send-email-khilman@deeprootsystems.com>
 References: <1255557490-16787-1-git-send-email-khilman@deeprootsystems.com>
 	<1255557490-16787-2-git-send-email-khilman@deeprootsystems.com>
 	<1255557490-16787-3-git-send-email-khilman@deeprootsystems.com>
@@ -17,81 +17,51 @@ References: <1255557490-16787-1-git-send-email-khilman@deeprootsystems.com>
 	<1255557490-16787-13-git-send-email-khilman@deeprootsystems.com>
 	<1255557490-16787-14-git-send-email-khilman@deeprootsystems.com>
 	<1255557490-16787-15-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1255557490-16787-16-git-send-email-khilman@deeprootsystems.com>
+	<1255557490-16787-16-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1255557490-16787-17-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tero Kristo <tero.kristo@nokia.com>
+From: Jouni Hogander <jouni.hogander@nokia.com>
 
-Fix for ES3.0 bug: SDRC not sending auto-refresh when OMAP wakes-up from OFF
-mode (warning for HS devices.)
+CM_CLKSEL1_PLL_IVA2 is not saved/restored currently. This patch is
+adding save and restore for it.
 
-Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
+Signed-off-by: Jouni Hogander <jouni.hogander@nokia.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/pm34xx.c |   29 +++++++++++++++++++++++++++++
- 1 files changed, 29 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/prcm.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index ab8f66a..9247639 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -45,6 +45,13 @@
+diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
+index 9322447..99ff439 100644
+--- a/arch/arm/mach-omap2/prcm.c
++++ b/arch/arm/mach-omap2/prcm.c
+@@ -39,6 +39,7 @@ static void __iomem *cm_base;
  
- #include "prm.h"
- #include "pm.h"
-+#include "sdrc.h"
-+
-+#define SDRC_POWER_AUTOCOUNT_SHIFT 8
-+#define SDRC_POWER_AUTOCOUNT_MASK (0xffff << SDRC_POWER_AUTOCOUNT_SHIFT)
-+#define SDRC_POWER_CLKCTRL_SHIFT 4
-+#define SDRC_POWER_CLKCTRL_MASK (0x3 << SDRC_POWER_CLKCTRL_SHIFT)
-+#define SDRC_SELF_REFRESH_ON_AUTOCOUNT (0x2 << SDRC_POWER_CLKCTRL_SHIFT)
- 
- /* Scratchpad offsets */
- #define OMAP343X_TABLE_ADDRESS_OFFSET	   0x31
-@@ -298,6 +305,7 @@ static void omap_sram_idle(void)
- 	int per_next_state = PWRDM_POWER_ON;
- 	int core_next_state = PWRDM_POWER_ON;
- 	int core_prev_state, per_prev_state;
-+	u32 sdrc_pwr = 0;
- 
- 	if (!_omap_sram_idle)
- 		return;
-@@ -350,6 +358,21 @@ static void omap_sram_idle(void)
- 	}
- 
- 	/*
-+	 * Force SDRAM controller to self-refresh mode after timeout on
-+	 * autocount. This is needed on ES3.0 to avoid SDRAM controller
-+	 * hang-ups.
-+	 */
-+	if (system_rev >= OMAP3430_REV_ES3_0 &&
-+	    omap_type() != OMAP2_DEVICE_TYPE_GP &&
-+	    core_next_state == PWRDM_POWER_OFF) {
-+		sdrc_pwr = sdrc_read_reg(SDRC_POWER);
-+		sdrc_write_reg((sdrc_pwr &
-+			~(SDRC_POWER_AUTOCOUNT_MASK|SDRC_POWER_CLKCTRL_MASK)) |
-+			(1 << SDRC_POWER_AUTOCOUNT_SHIFT) |
-+			SDRC_SELF_REFRESH_ON_AUTOCOUNT, SDRC_POWER);
-+	}
-+
-+	/*
- 	 * omap3_arm_context is the location where ARM registers
- 	 * get saved. The restore path then reads from this
- 	 * location and restores them back.
-@@ -357,6 +380,12 @@ static void omap_sram_idle(void)
- 	_omap_sram_idle(omap3_arm_context, save_state);
- 	cpu_init();
- 
-+	/* Restore normal SDRAM settings */
-+	if (system_rev >= OMAP3430_REV_ES3_0 &&
-+	    omap_type() != OMAP2_DEVICE_TYPE_GP &&
-+	    core_next_state == PWRDM_POWER_OFF)
-+		sdrc_write_reg(sdrc_pwr, SDRC_POWER);
-+
- 	/* Restore table entry modified during MMU restoration */
- 	if (pwrdm_read_prev_pwrst(mpu_pwrdm) == PWRDM_POWER_OFF)
- 		restore_table_entry();
+ struct omap3_prcm_regs {
+ 	u32 control_padconf_sys_nirq;
++	u32 iva2_cm_clksel1;
+ 	u32 iva2_cm_clksel2;
+ 	u32 cm_sysconfig;
+ 	u32 sgx_cm_clksel;
+@@ -261,6 +262,8 @@ void omap3_prcm_save_context(void)
+ {
+ 	prcm_context.control_padconf_sys_nirq =
+ 			 omap_ctrl_readl(OMAP343X_CONTROL_PADCONF_SYSNIRQ);
++	prcm_context.iva2_cm_clksel1 =
++			 cm_read_mod_reg(OMAP3430_IVA2_MOD, CM_CLKSEL1);
+ 	prcm_context.iva2_cm_clksel2 =
+ 			 cm_read_mod_reg(OMAP3430_IVA2_MOD, CM_CLKSEL2);
+ 	prcm_context.cm_sysconfig = __raw_readl(OMAP3430_CM_SYSCONFIG);
+@@ -414,6 +417,8 @@ void omap3_prcm_restore_context(void)
+ {
+ 	omap_ctrl_writel(prcm_context.control_padconf_sys_nirq,
+ 					 OMAP343X_CONTROL_PADCONF_SYSNIRQ);
++	cm_write_mod_reg(prcm_context.iva2_cm_clksel1, OMAP3430_IVA2_MOD,
++					 CM_CLKSEL1);
+ 	cm_write_mod_reg(prcm_context.iva2_cm_clksel2, OMAP3430_IVA2_MOD,
+ 					 CM_CLKSEL2);
+ 	__raw_writel(prcm_context.cm_sysconfig, OMAP3430_CM_SYSCONFIG);
 -- 
 1.6.4.3
