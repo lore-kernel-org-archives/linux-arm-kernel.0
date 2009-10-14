@@ -1,105 +1,56 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 14 Oct 2009 13:05:05 -0400
-Subject: [PATCH 1/2] Update ts72xx to use generic platform nand driver
-In-Reply-To: <1255509739.32489.123.camel@localhost>
-References: <BD79186B4FD85F4B8E60E381CAEE190901DB7967@mi8nycmail19.Mi8.com>
-	<1255260621.16942.38.camel@localhost>
-	<BD79186B4FD85F4B8E60E381CAEE190901DB7E59@mi8nycmail19.Mi8.com>
-	<1255509739.32489.123.camel@localhost>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901DB8132@mi8nycmail19.Mi8.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 14 Oct 2009 18:10:29 +0100
+Subject: [PATCH] [ARM] force dcache flush if dcache_dirty bit set
+In-Reply-To: <20091013020752.GB5736@linux-sh.org>
+References: <1255337423-3158-1-git-send-email-ngupta@vflare.org>
+	<20091012090710.GA29310@n2100.arm.linux.org.uk>
+	<20091012.023744.157085851.davem@davemloft.net>
+	<20091012100023.GC29310@n2100.arm.linux.org.uk>
+	<Pine.LNX.4.64.0910121634170.7327@sister.anvils>
+	<20091012170312.GB9453@flint.arm.linux.org.uk>
+	<20091013020752.GB5736@linux-sh.org>
+Message-ID: <1255540229.15103.50.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, October 14, 2009 1:42 AM, Artem Bityutskiy wrote:
-> On Sun, 2009-10-11 at 17:19 -0400, H Hartley Sweeten wrote:
->> Update the ts72xx platform's nand driver support.
->>  
->> This changes the ts72xx platform from using a custom nand driver
->> (ts7250.c) to the generic platform nand driver (plat_nand.c).
->>  
->> Tested on TS-7250 with 32MB NAND.
->>  
->> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
->> Tested-by: Matthieu Crapet <mcrapet@gmail.com>
->> Cc: David Woodhouse <dwmw2@infradead.org>
->> Cc: Artem Bityutskiy <dedekind1@gmail.com>
->> Cc: <linux-arm-kernel@lists.infradead.org>
->> Cc: <linux-mtd@lists.infradead.org>
->> 
->> ---
->> 
->> V2 - rebased to current mtd tree (Artem Bityutskiy)
->> 
->>  arch/arm/mach-ep93xx/ts72xx.c |  177 +++++++++++++++++++++++++++++------------
->>  1 files changed, 125 insertions(+), 52 deletions(-)
->
-> Ok, I've tried this patch on both mtd-2.6 and linux-2.6 git trees, and
-> it does not apply cleanly.
+On Tue, 2009-10-13 at 11:07 +0900, Paul Mundt wrote:
+> On Mon, Oct 12, 2009 at 06:03:12PM +0100, Russell King wrote:
+> > On Mon, Oct 12, 2009 at 05:09:53PM +0100, Hugh Dickins wrote:
+> > > Sorry to muddy the waters on this, if you and Dave are sure that
+> > > you have the right fix, down in your architectures, and that fix
+> > > isn't going to hurt your performance significantly.
+> > 
+> > If I look at the issue from this point of view:
+> > 
+> > - we are using PG_arch_1 to delay cache handling for the page
+> > 
+> > - if PG_arch_1 is set on a page, we set it explicitly because we
+> >   didn't do some flushing between the allocation of the page and
+> >   mapping it into userspace
+> > 
+> > - if a page with PG_arch_1 set ever gets to userspace, this can
+> >   only be because we did the lazy flushing thing
+> > 
+> > I don't see that there should have been any bearing on whether a page
+> > has a mapping or not when we get to update_mmu_cache.  The issue here
+> > is that > if PG_arch_1 is set on a page, then we didn't flush it at
+> > the time when we believed it was appropriate to do so. <
+> > 
+> > Tell me I'm wrong (having only just sent it to Linus...)
+> 
+> Having looked at the ARM fix, in the !mapping case do you not need the
+> I-cache flush on vma->vm_flags & VM_EXEC? Or is the presumption that
+> flush_icache_page()-type action doesn't need to be undertaken by
+> flush_dcache_page()/update_mmu_cache() when there is no page_mapping()?
 
-[snip]
+If I understand Nitin's scenario correctly, I think it should also
+invalidate the I-cache.
 
-I'm really confused why this does not apply.
+For executable anonymous pages containing, it's the user app writing the
+code (JIT etc.) and it calls an ARM-specific syscall for I and D cache
+maintenance. If such page is read back from swap, following Nitin's
+scenario, the I-cache would need to be invalidated as well otherwise it
+can have stale entries.
 
-My mtd-2.6.git tree is at the same place as yours.
-
-bigguiness at etch:~/src/git/mtd-2.6$ git show
-commit 8032747e7680a31cdde293421af62d2e1904c528
-Author: David Woodhouse <David.Woodhouse@intel.com>
-Date:   Mon Oct 5 08:30:04 2009 +0100
-
-    mtd: make onenand_base.c compile again
-    
-    Signed-off-by: David Woodhouse <David.Woodhouse@intel.com>
-
-diff --git a/drivers/mtd/onenand/onenand_base.c b/drivers/mtd/onenand/onenand_base.c
-index 8935e63..6e250f3 100644
---- a/drivers/mtd/onenand/onenand_base.c
-+++ b/drivers/mtd/onenand/onenand_base.c
-@@ -1051,7 +1051,7 @@ static int onenand_mlc_read_ops_nolock(struct mtd_info *mtd, loff_t from,
-        int writesize = this->writesize;
- 
-        DEBUG(MTD_DEBUG_LEVEL3, "%s: from = 0x%08x, len = %i\n",
--               (unsigned int) from, (int) len);
-+             __func__, (unsigned int) from, (int) len);
- 
-        if (ops->mode == MTD_OOB_AUTO)
-                oobsize = this->ecclayout->oobavail;
-@@ -2022,8 +2022,8 @@ static int onenand_write_oob_nolock(struct mtd_info *mtd, loff_t to,
-        if (unlikely(to >= mtd->size ||
-                     column + len > ((mtd->size >> this->page_shift) -
-                                     (to >> this->page_shift)) * oobsize)) {
--               printk(KERN_ERR "%s: Attempted to write past end of device\n"
--                       __func__);
-+               printk(KERN_ERR "%s: Attempted to write past end of device\n",
-+                      __func__);
-                return -EINVAL;
-        }
-
-If I apply the two patches I get.
-
-bigguiness at etch:~/src/git/mtd-2.6$ patch -p1 < /mnt/hgfs/share/ts72xx_plat_nand_v2.patch 
-patching file arch/arm/mach-ep93xx/ts72xx.c
-bigguiness@etch:~/src/git/mtd-2.6$ patch -p1 < /mnt/hgfs/share/ts7250_remove_v2.patch 
-patching file arch/arm/mach-ep93xx/include/mach/ts72xx.h
-patching file drivers/mtd/nand/Kconfig
-patching file drivers/mtd/nand/Makefile
-patching file drivers/mtd/nand/ts7250.c
-
-I have attached the two patches just in case it's an email issue.
-
-Regards,
-Hartley
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: ts7250_remove_v2.patch
-Type: application/octet-stream
-Size: 7973 bytes
-Desc: ts7250_remove_v2.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091014/5bf168b2/attachment-0002.obj>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: ts72xx_plat_nand_v2.patch
-Type: application/octet-stream
-Size: 6733 bytes
-Desc: ts72xx_plat_nand_v2.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091014/5bf168b2/attachment-0003.obj>
+-- 
+Catalin
