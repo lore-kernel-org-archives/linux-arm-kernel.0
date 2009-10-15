@@ -1,61 +1,77 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Thu, 15 Oct 2009 21:15:01 +0400
-Subject: [PATCH] gta02: set pcf50633 chg_ref_current_ma
-In-Reply-To: <1255471148-29047-3-git-send-email-fercerpav@gmail.com>
-References: <1255471148-29047-1-git-send-email-fercerpav@gmail.com>
-	<1255471148-29047-2-git-send-email-fercerpav@gmail.com>
-	<1255471148-29047-3-git-send-email-fercerpav@gmail.com>
-Message-ID: <20091015171501.GA25775@oksana.dev.rtsoft.ru>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Thu, 15 Oct 2009 19:24:51 +0200
+Subject: [PATCH 1/4] [MXC] Armadillo500 Add support for onboard GPIO Buttons.
+In-Reply-To: <20091015191325.74ba24fb@Marramao-laptop>
+References: <20091015191325.74ba24fb@Marramao-laptop>
+Message-ID: <20091015192451.50ee35c5@Marramao-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 14, 2009 at 01:59:05AM +0400, Paul Fertser wrote:
-> From: Lars-Peter Clausen <lars@metafoo.de>
-> 
-> This value is board-specific and is needed for calculations to set charging
-> current limit properly.
-> 
-> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
-> Acked-by: Nelson Castillo <arhuaco@freaks-unidos.net>
-> Signed-off-by: Paul Fertser <fercerpav@gmail.com>
-> ---
-> 
-> Since this patch compile-depends on previous probably it should go through
-> the same tree as others. Nelson (gta02 maintainer) agrees with whatever you
-> think is best.
+There are two low active Buttons on boards.
+This patch connect those to the Input Subsystem over gpio-keys driver.
 
-I would happy to apply this patch via battery tree, along
-with other your patches.
+Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
+---
+ arch/arm/mach-mx3/armadillo5x0.c |   33 +++++++++++++++++++++++++++++++++
+ 1 files changed, 33 insertions(+), 0 deletions(-)
 
-Just to make things clear: we no longer need RMK's Ack for
-mach-specific patches that don't touch core code? Or maybe
-Ben's Ack is still required?
-
-Want to be on a safe side before applying.
-
-Thanks!
-
->  arch/arm/mach-s3c2442/mach-gta02.c |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c2442/mach-gta02.c b/arch/arm/mach-s3c2442/mach-gta02.c
-> index 0fb385b..b0a3d74 100644
-> --- a/arch/arm/mach-s3c2442/mach-gta02.c
-> +++ b/arch/arm/mach-s3c2442/mach-gta02.c
-> @@ -268,6 +268,9 @@ struct pcf50633_platform_data gta02_pcf_pdata = {
->  
->  	.batteries = gta02_batteries,
->  	.num_batteries = ARRAY_SIZE(gta02_batteries),
-> +
-> +	.chg_ref_current_ma = 1000,
-> +
->  	.reg_init_data = {
->  		[PCF50633_REGULATOR_AUTO] = {
->  			.constraints = {
-> -- 
-> 1.6.0.6
-
+diff --git a/arch/arm/mach-mx3/armadillo5x0.c b/arch/arm/mach-mx3/armadillo5x0.c
+index 776c0ee..309fa7a 100644
+--- a/arch/arm/mach-mx3/armadillo5x0.c
++++ b/arch/arm/mach-mx3/armadillo5x0.c
+@@ -33,6 +33,8 @@
+ #include <linux/irq.h>
+ #include <linux/mtd/physmap.h>
+ #include <linux/io.h>
++#include <linux/input.h>
++#include <linux/gpio_keys.h>
+ 
+ #include <mach/hardware.h>
+ #include <asm/mach-types.h>
+@@ -98,6 +100,36 @@ static int armadillo5x0_pins[] = {
+ 	MX31_PIN_DRDY0__DRDY0,
+ 	IOMUX_MODE(MX31_PIN_LCS1, IOMUX_CONFIG_GPIO), /*ADV7125_PSAVE*/
+ };
++/* GPIO BUTTONS */
++static struct gpio_keys_button armadillo5x0_buttons[] = {
++	{
++		.code		= KEY_ENTER, /*28*/
++		.gpio		= IOMUX_TO_GPIO(MX31_PIN_SCLK0),
++		.active_low	= 1,
++		.desc		= "menu",
++		.wakeup		= 1,
++	}, {
++		.code		= KEY_BACK, /*158*/
++		.gpio		= IOMUX_TO_GPIO(MX31_PIN_SRST0),
++		.active_low	= 1,
++		.desc		= "back",
++		.wakeup		= 1,
++	}
++};
++
++static struct gpio_keys_platform_data armadillo5x0_button_data = {
++	.buttons	= armadillo5x0_buttons,
++	.nbuttons	= ARRAY_SIZE(armadillo5x0_buttons),
++};
++
++static struct platform_device armadillo5x0_button_device = {
++	.name		= "gpio-keys",
++	.id		= -1,
++	.num_resources	= 0,
++	.dev		= {
++		.platform_data	= &armadillo5x0_button_data,
++	}
++};
+ 
+ /*
+  * NAND Flash
+@@ -300,6 +332,7 @@ static struct imxuart_platform_data uart_pdata = {
+ 
+ static struct platform_device *devices[] __initdata = {
+ 	&armadillo5x0_smc911x_device,
++	&armadillo5x0_button_device,
+ };
+ 
+ /*
 -- 
-Anton Vorontsov
-email: cbouatmailru at gmail.com
-irc://irc.freenode.net/bd2
+1.5.4.3
