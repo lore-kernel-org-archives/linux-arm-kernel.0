@@ -1,58 +1,66 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Oct 2009 17:33:42 -0700
-Subject: [GIT PULL] omap fixes for v2.6.32-rc4
-Message-ID: <20091015003341.GG14531@atomide.com>
+From: shinya.kuribayashi@necel.com (Shinya Kuribayashi)
+Date: Thu, 15 Oct 2009 12:22:23 +0900
+Subject: [PATCH 16/16] i2c-designware: Add I2C_FUNC_SMBUS_* bits
+In-Reply-To: <20091014185327.GD11789@tarshish>
+References: <4AD3E974.8080200@necel.com> <4AD3EBDD.50105@necel.com>
+	<20091014185327.GD11789@tarshish>
+Message-ID: <4AD6956F.4050605@necel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+Hi Baruch,
 
-Please pull omap fixes from:
+Baruch Siach wrote:
+> On Tue, Oct 13, 2009 at 11:54:21AM +0900, Shinya Kuribayashi wrote:
+>> This will ease our testing a bit with i2c-tools.  Note that DW I2C core
+>> doesn't support I2C_FUNC_SMBUS_QUICK, as it's not capable of slave-
+>> addressing-only I2C transactions.
+> 
+> Is this supposed to be applied to mainline?
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+Yes, I hope so.  But I have to admit I blindly added several flags for
+my testing, and should have audited them before submitting patches.
 
-Regards,
+>> @@ -529,7 +529,14 @@ done:
+>>
+>> static u32 i2c_dw_func(struct i2c_adapter *adap)
+>> {
+>> -	return I2C_FUNC_I2C | I2C_FUNC_10BIT_ADDR;
+>> +	return	I2C_FUNC_I2C |
+>> +		I2C_FUNC_10BIT_ADDR |
+>> +		I2C_FUNC_SMBUS_BYTE |
+>> +		I2C_FUNC_SMBUS_BYTE_DATA |
+>> +		I2C_FUNC_SMBUS_WORD_DATA |
+>> +		I2C_FUNC_SMBUS_BLOCK_DATA |
+>> +		I2C_FUNC_SMBUS_I2C_BLOCK |
+>> +		I2C_FUNC_SMBUS_I2C_BLOCK_2;
+>> }
 
-Tony
+As far as I confirmed the requirements for having I2C_FUNC_SMBUS_*
+from drivers/i2c/,
 
+>> +		I2C_FUNC_SMBUS_BLOCK_DATA |
 
-The following changes since commit 161291396e76e0832c08f617eb9bd364d1648148:
-  Linus Torvalds (1):
-        Linux 2.6.32-rc4
+>> +		I2C_FUNC_SMBUS_I2C_BLOCK_2;
 
-are available in the git repository at:
+should be removed.  About the former, we have not implemented proper
+I2C_M_RECV_LEN handling yet [ I'm not sure what it's for ... ], and
+the latter doesn't seem to be used anywhere in the kernel.
+As for the rest, BYTE/WORD/I2C_BLOCK transaction works for me.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+So the resulting func() would be,
 
-Aaro Koskinen (1):
-      omap: RX-51: Drop I2C-1 speed to 2200
+static u32 i2c_dw_func(struct i2c_adapter *adap)
+{
+	return	I2C_FUNC_I2C |
+		I2C_FUNC_10BIT_ADDR |
+		I2C_FUNC_SMBUS_BYTE |
+		I2C_FUNC_SMBUS_BYTE_DATA |
+		I2C_FUNC_SMBUS_WORD_DATA |
+		I2C_FUNC_SMBUS_I2C_BLOCK;
+}
 
-Anuj Aggarwal (1):
-      omap: SDMA: Fixing bug in omap_dma_set_global_params()
-
-Jarkko Nikula (1):
-      omap: McBSP: Fix incorrect receiver stop in omap_mcbsp_stop
-
-Kalle Jokiniemi (1):
-      OMAP: Fix race condition with autodeps
-
-Paul Walmsley (1):
-      OMAP2xxx clock: set up clockdomain pointer in struct clk
-
-Sanjeev Premi (1):
-      omap: CONFIG_ISP1301_OMAP redefined in Beagle defconfig
-
-Teerth Reddy (1):
-      omap: Initialization of SDRC params on Zoom2
-
-Tony Lindgren (1):
-      Merge branch '2_6_32rc4_fixes' of git://git.pwsan.com/linux-2.6 into omap-fixes-for-linus
-
- arch/arm/configs/omap3_beagle_defconfig      |    1 -
- arch/arm/mach-omap2/board-rx51-peripherals.c |    2 +-
- arch/arm/mach-omap2/board-zoom2.c            |    4 +-
- arch/arm/mach-omap2/clock24xx.c              |    1 +
- arch/arm/mach-omap2/clockdomain.c            |   74 +++++++++++++++----------
- arch/arm/plat-omap/dma.c                     |   15 +++--
- arch/arm/plat-omap/mcbsp.c                   |    2 +-
- 7 files changed, 59 insertions(+), 40 deletions(-)
+and will be fixed up in the next patchset.
+-- 
+Shinya Kuribayashi
+NEC Electronics
