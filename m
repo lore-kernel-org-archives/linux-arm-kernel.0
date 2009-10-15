@@ -1,29 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Oct 2009 12:40:32 +0100
-Subject: SMP: BUG with PREEMPT enabled
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02BB2555BF@dbde02.ent.ti.com>
-References: <EAF47CD23C76F840A9E7FCE10091EFAB02BB254F8D@dbde02.ent.ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02BB2555BF@dbde02.ent.ti.com>
-Message-ID: <20091015114032.GB14817@n2100.arm.linux.org.uk>
+From: dk-arm-linux@gmx.de (Dieter Kiermaier)
+Date: Thu, 15 Oct 2009 13:52:41 +0200
+Subject: arm / kirkwood (openrd): cpu_idle
+Message-ID: <200910151352.41991.dk-arm-linux@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 14, 2009 at 04:56:18PM +0530, Shilimkar, Santosh wrote:
-> > On the latest ARM kernel(v2.6.32-rc4),I have observed a BUG() dump when
+Hi all,
 
-Umm...
+we've discussed some days ago the cpu_idle issue on marvell kirkwood devices.
+I got following output sometimes. I don't know if this is really a problem?
 
-> @@ -350,7 +350,7 @@ static inline void local_flush_tlb_mm(struct mm_struct *mm)
->  	if (tlb_flag(TLB_WB))
->  		dsb();
->  
-> -	if (cpu_isset(smp_processor_id(), mm->cpu_vm_mask)) {
-> +	if (cpu_isset(get_cpu(), mm->cpu_vm_mask)) {
+------------[ cut here ]------------
+WARNING: at arch/arm/kernel/process.c:171 cpu_idle+0x74/0xbc()
+Modules linked in:
+[<c002b8bc>] (unwind_backtrace+0x0/0xd8) from [<c003af1c>] (warn_slowpath_common+0x4c/0x68)
+[<c003af1c>] (warn_slowpath_common+0x4c/0x68) from [<c00278c4>] (cpu_idle+0x74/0xbc)
+[<c00278c4>] (cpu_idle+0x74/0xbc) from [<c0008b2c>] (start_kernel+0x22c/0x27c)
+[<c0008b2c>] (start_kernel+0x22c/0x27c) from [<00008034>] (0x8034)
+---[ end trace 134046cd7af57c60 ]---
 
-This isn't 2.6.32-rc4 code - which actually is:
+I've tried to apply the patch Simon mentioned at
+http://lists.infradead.org/pipermail/linux-arm-kernel/2009-October/001624.html
+http://patchwork.kernel.org/patch/40871/
 
-        if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(mm))) {
+But it looks like that in rc4 something has changed so the patch didn't apply without errors.
+And I don't know enough about this stuff to know what I'm doing :(
 
-so what kernel version are you working with?
-
-The result is this patch won't apply to 2.6.32-rc4.
+Any help would be appreciated!
+Thanks in advance,
+Dieter
