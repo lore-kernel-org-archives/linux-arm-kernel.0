@@ -1,58 +1,33 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 15 Oct 2009 12:59:13 +0100
-Subject: [PATCH] [ARM] force dcache flush if dcache_dirty bit set
-In-Reply-To: <1255540229.15103.50.camel@pc1117.cambridge.arm.com>
-References: <1255337423-3158-1-git-send-email-ngupta@vflare.org>
-	<20091012090710.GA29310@n2100.arm.linux.org.uk>
-	<20091012.023744.157085851.davem@davemloft.net>
-	<20091012100023.GC29310@n2100.arm.linux.org.uk>
-	<Pine.LNX.4.64.0910121634170.7327@sister.anvils>
-	<20091012170312.GB9453@flint.arm.linux.org.uk>
-	<20091013020752.GB5736@linux-sh.org>
-	<1255540229.15103.50.camel@pc1117.cambridge.arm.com>
-Message-ID: <1255607953.10164.63.camel@pc1117.cambridge.arm.com>
+From: sascha-ml-devel-openrd-google@silbe.org (Sascha Silbe)
+Date: Thu, 15 Oct 2009 14:10:22 +0200
+Subject: arm / kirkwood (openrd): cpu_idle
+In-Reply-To: <200910151352.41991.dk-arm-linux@gmx.de>
+References: <200910151352.41991.dk-arm-linux@gmx.de>
+Message-ID: <20091015121022.GC26774@twin.sascha.silbe.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2009-10-14 at 18:10 +0100, Catalin Marinas wrote:
-> On Tue, 2009-10-13 at 11:07 +0900, Paul Mundt wrote:
-> > On Mon, Oct 12, 2009 at 06:03:12PM +0100, Russell King wrote:
-> > > I don't see that there should have been any bearing on whether a page
-> > > has a mapping or not when we get to update_mmu_cache.  The issue here
-> > > is that > if PG_arch_1 is set on a page, then we didn't flush it at
-> > > the time when we believed it was appropriate to do so. <
-> > > 
-> > > Tell me I'm wrong (having only just sent it to Linus...)
-> > 
-> > Having looked at the ARM fix, in the !mapping case do you not need the
-> > I-cache flush on vma->vm_flags & VM_EXEC? Or is the presumption that
-> > flush_icache_page()-type action doesn't need to be undertaken by
-> > flush_dcache_page()/update_mmu_cache() when there is no page_mapping()?
-> 
-> If I understand Nitin's scenario correctly, I think it should also
-> invalidate the I-cache.
-> 
-> For executable anonymous pages containing, it's the user app writing the
-> code (JIT etc.) and it calls an ARM-specific syscall for I and D cache
-> maintenance. If such page is read back from swap, following Nitin's
-> scenario, the I-cache would need to be invalidated as well otherwise it
-> can have stale entries.
+On Thu, Oct 15, 2009 at 01:52:41PM +0200, Dieter Kiermaier wrote:
 
-We can have a scenario where I-cache invalidation would not help on ARM.
-Some apps may temporarily change protection from RX to RW to write some
-data (not instructions) to a page containing code. If Nitin's scenario
-happens when the page is RW, the VM_EXEC wouldn't be set, hence no
-I-cache invalidation.
+> But it looks like that in rc4 something has changed so the patch 
+> didn't apply without errors.
+It was quite easy to resolve (even though I don't understand any of the 
+touched code), see [1] for a rebased patch.
+I'm wondering why it wasn't merged upstream yet, though.
 
-The app would later do mprotect(RX) but on some ARM processors
-flush_cache_range() is a no-op and therefore no cache flushing. What
-other architectures with Harvard caches do for mprotect(RX)? Is this
-assumed to invalidate the I-cache?
 
-(we have another I-D cache coherency problem on ARM with COW text pages
-following a RX -> RW -> write data -> RX scenario and there are a few
-solutions for this, though none of them optimal with the current cache
-flushing API, especially with the read-implies-exec ELF personality)
+[1] 
+http://sascha.silbe.org/openrd/0001-apply-cpu_idle-IRQ-fix-from-http-patchwork.kernel.patch
+
+CU Sascha
 
 -- 
-Catalin
+http://sascha.silbe.org/
+http://www.infra-silbe.de/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 489 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091015/233666d6/attachment.sig>
