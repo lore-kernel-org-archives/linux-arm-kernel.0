@@ -1,34 +1,34 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 15 Oct 2009 13:22:04 +0100
-Subject: [PATCH 3/4] Revert 75f4aa1 (unconditionally define __virt_to_phys and
-	__phys_to_virt)
-In-Reply-To: <20091015121927.739.32071.stgit@pc1117.cambridge.arm.com>
-References: <20091015121927.739.32071.stgit@pc1117.cambridge.arm.com>
-Message-ID: <20091015122204.739.25384.stgit@pc1117.cambridge.arm.com>
+From: dk-arm-linux@gmx.de (Dieter Kiermaier)
+Date: Thu, 15 Oct 2009 14:28:27 +0200
+Subject: arm / kirkwood (openrd): cpu_idle
+In-Reply-To: <20091015121022.GC26774@twin.sascha.silbe.org>
+References: <200910151352.41991.dk-arm-linux@gmx.de>
+	<20091015121022.GC26774@twin.sascha.silbe.org>
+Message-ID: <200910151428.27691.dk-arm-linux@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SPARSEMEM support for RealView PBX requires non-linear physical to
-virtual address translation.
+Am Donnerstag 15 Oktober 2009 14:10:22 schrieb Sascha Silbe:
+> On Thu, Oct 15, 2009 at 01:52:41PM +0200, Dieter Kiermaier wrote:
+> 
+> > But it looks like that in rc4 something has changed so the patch 
+> > didn't apply without errors.
+> It was quite easy to resolve (even though I don't understand any of the 
+> touched code), see [1] for a rebased patch.
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Nicolas Pitre <nico@cam.org>
----
- arch/arm/include/asm/memory.h |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Many thanks, I was to yellow :)
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index cefedf0..bc2ff8b 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -125,8 +125,10 @@
-  * private definitions which should NOT be used outside memory.h
-  * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
-  */
-+#ifndef __virt_to_phys
- #define __virt_to_phys(x)	((x) - PAGE_OFFSET + PHYS_OFFSET)
- #define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
-+#endif
- 
- /*
-  * Convert a physical address to a Page Frame Number and back
+
+> I'm wondering why it wasn't merged upstream yet, though.
+
+I'm wondering, too.
+Dieter
+
+
+> 
+> 
+> [1] 
+> http://sascha.silbe.org/openrd/0001-apply-cpu_idle-IRQ-fix-from-http-patchwork.kernel.patch
+> 
+> CU Sascha
+> 
