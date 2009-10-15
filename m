@@ -1,31 +1,48 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 15 Oct 2009 23:26:09 +1030
-Subject: arm / kirkwood (openrd): cpu_idle
-In-Reply-To: <200910151428.27691.dk-arm-linux@gmx.de>
-References: <200910151352.41991.dk-arm-linux@gmx.de>
-	<20091015121022.GC26774@twin.sascha.silbe.org>
-	<200910151428.27691.dk-arm-linux@gmx.de>
-Message-ID: <ad9478410910150556h346c1042l48589843087e6fba@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 15 Oct 2009 18:55:13 +0530
+Subject: SMP: BUG with PREEMPT enabled
+In-Reply-To: <20091015114032.GB14817@n2100.arm.linux.org.uk>
+References: <EAF47CD23C76F840A9E7FCE10091EFAB02BB254F8D@dbde02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02BB2555BF@dbde02.ent.ti.com>
+	<20091015114032.GB14817@n2100.arm.linux.org.uk>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02BB37D10B@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2009 at 22:58, Dieter Kiermaier <dk-arm-linux@gmx.de> wrote:
->
-> Am Donnerstag 15 Oktober 2009 14:10:22 schrieb Sascha Silbe:
->> On Thu, Oct 15, 2009 at 01:52:41PM +0200, Dieter Kiermaier wrote:
->>
->> > But it looks like that in rc4 something has changed so the patch
->> > didn't apply without errors.
->> It was quite easy to resolve (even though I don't understand any of the
->> touched code), see [1] for a rebased patch.
+The patch submitted to patch-system I based it on 2.6.32-rc4
 
-I can confirm that the patch fixes the issue; I have been testing for
-48 hours on an openrd-client without seeing the WARNING.
+Have you tried that patch ?
 
->> I'm wondering why it wasn't merged upstream yet, though.
->
-> I'm wondering, too.
+The one attached was in email was based on 2.6.31
 
-Agreed.  What can we do to help it on it's way?
+Regards,
+Santosh
 
-Joel
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Thursday, October 15, 2009 5:11 PM
+> To: Shilimkar, Santosh
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: SMP: BUG with PREEMPT enabled
+> 
+> On Wed, Oct 14, 2009 at 04:56:18PM +0530, Shilimkar, Santosh wrote:
+> > > On the latest ARM kernel(v2.6.32-rc4),I have observed a BUG() dump
+> when
+> 
+> Umm...
+> 
+> > @@ -350,7 +350,7 @@ static inline void local_flush_tlb_mm(struct
+> mm_struct *mm)
+> >  	if (tlb_flag(TLB_WB))
+> >  		dsb();
+> >
+> > -	if (cpu_isset(smp_processor_id(), mm->cpu_vm_mask)) {
+> > +	if (cpu_isset(get_cpu(), mm->cpu_vm_mask)) {
+> 
+> This isn't 2.6.32-rc4 code - which actually is:
+> 
+>         if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(mm))) {
+> 
+> so what kernel version are you working with?
+> 
+> The result is this patch won't apply to 2.6.32-rc4.
