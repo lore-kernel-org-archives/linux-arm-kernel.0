@@ -1,12 +1,15 @@
 From: mike@compulab.co.il (Mike Rapoport)
-Date: Thu, 15 Oct 2009 10:06:36 +0200
-Subject: >From d91f4e6f60747fd0c04bce6274326618217540b4 Mon Sep 17 00:00:00
-	2001
-Message-ID: <1255593996-5545-1-git-send-email-mike@compulab.co.il>
+Date: Thu, 15 Oct 2009 10:11:09 +0200
+Subject: [PATCH] [ARM] pxa/cm-x300: fix mmc numbering (was >From d91f4e6f60747)
+In-Reply-To: <1255593996-5545-1-git-send-email-mike@compulab.co.il>
+References: <1255593996-5545-1-git-send-email-mike@compulab.co.il>
+Message-ID: <4AD6D91D.2050703@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Eric,
+Please discard the previous e-mail. Sorry for the noise...
+
 It would be really nice if it can go to 2.6.32
 
 ---
@@ -24,22 +27,22 @@ index 52f6ad7..e6fbb0a 100644
 --- a/arch/arm/mach-pxa/cm-x300.c
 +++ b/arch/arm/mach-pxa/cm-x300.c
 @@ -53,10 +53,10 @@
- 
+
  #define CM_X300_ETH_PHYS	0x08000010
- 
+
 -#define GPIO82_MMC2_IRQ		(82)
 -#define GPIO85_MMC2_WP		(85)
 +#define GPIO82_MMC_IRQ		(82)
 +#define GPIO85_MMC_WP		(85)
- 
+
 -#define	CM_X300_MMC2_IRQ	IRQ_GPIO(GPIO82_MMC2_IRQ)
 +#define	CM_X300_MMC_IRQ		IRQ_GPIO(GPIO82_MMC_IRQ)
- 
+
  #define GPIO95_RTC_CS		(95)
  #define GPIO96_RTC_WR		(96)
 @@ -430,37 +430,37 @@ static inline void cm_x300_init_nand(void) {}
  #endif
- 
+
  #if defined(CONFIG_MMC) || defined(CONFIG_MMC_MODULE)
 -/* The first MMC slot of CM-X300 is hardwired to Libertas card and has
 +static struct pxamci_platform_data cm_x300_mci_platform_data = {
@@ -61,12 +64,12 @@ index 52f6ad7..e6fbb0a 100644
  {
  	return 0;
  }
- 
+
 -static void cm_x300_mci_exit(struct device *dev, void *data)
 +static void cm_x300_mci2_exit(struct device *dev, void *data)
  {
  }
- 
+
 -static struct pxamci_platform_data cm_x300_mci_platform_data = {
 +static struct pxamci_platform_data cm_x300_mci2_platform_data = {
  	.detect_delay		= 20,
@@ -79,7 +82,7 @@ index 52f6ad7..e6fbb0a 100644
  	.gpio_card_ro		= -1,
  	.gpio_power		= -1,
  };
- 
+
 -static struct pxamci_platform_data cm_x300_mci2_platform_data = {
 -	.detect_delay		= 20,
 -	.ocr_mask		= MMC_VDD_32_33|MMC_VDD_33_34,
@@ -93,3 +96,7 @@ index 52f6ad7..e6fbb0a 100644
  	pxa_set_mci_info(&cm_x300_mci_platform_data);
 -- 
 1.6.0.6
+
+-- 
+Sincerely yours,
+Mike.
