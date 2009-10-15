@@ -1,44 +1,27 @@
 From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Thu, 15 Oct 2009 20:51:17 +0400
-Subject: [RFC] Re-order of PXA-based platforms in Kconfig and Makefile
-In-Reply-To: <f17812d70910100901m57999415mecc637a05921e78a@mail.gmail.com>
-References: <f17812d70910100901m57999415mecc637a05921e78a@mail.gmail.com>
-Message-ID: <20091015165117.GA23632@oksana.dev.rtsoft.ru>
+Date: Thu, 15 Oct 2009 20:53:20 +0400
+Subject: [RESEND][PATCH] mtd: maps: remove obsolete ipaq-flash driver
+In-Reply-To: <1255433694-26471-1-git-send-email-mad_soft@inbox.ru>
+References: <1255433694-26471-1-git-send-email-mad_soft@inbox.ru>
+Message-ID: <20091015165320.GA24086@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 11, 2009 at 12:01:19AM +0800, Eric Miao wrote:
-> All,
+On Tue, Oct 13, 2009 at 03:34:54PM +0400, Dmitry Artamonow wrote:
+> This driver seems to be obsolete and broken for a long time.
+> It depends on CONFIG_IPAQ_HANDHELD that simply doesn't exists
+> anywhere in kernel. Also, it seems that none of machines it
+> claims to support have any use of it:
+>  SA11xx-based iPAQs (h3100/h3600) use sa1100-flash
+>  iPAQ h5000 uses physmap-flash
+>  Jornada 720 uses sa1100-flash
+>  Jornada 560 and iPAQ h1910 are not in mainline
 > 
-> I've listed almost all the PXA based platforms currently existing in mainline
-> kernel as below. Due to the naming mess in Kconfig and Makefile, I'd like to
-> get them sorted in the following order:
-> 
->   1. By category:
->      Intel/Marvell Dev Platforms, followed by 3rd party platforms, followed
->      by end-user products (this is to ensure the commonly referenced platforms
->      will appear first)
-> 
->   2. By vendor name in alphabetic within each category
->      (this is to ensure code reuse and similar platforms can be grouped as
->       much as possible)
-> 
-> Patch is attached, and any problems, please let me know.
-> 
-> - eric
-> 
-> Vendor		Board Name	Processor	Maintaneance Status
-[...]
-> HP		HX4700		PXA27x		Philipp Zabel <philipp.zabel@gmail.com>
-> HP		H5000		PXA27x		Unknown (initial submission by:
-> 							Anton Vorontsov <cbouatmailru@gmail.com>
-> 							Milan Plzik <milan.plzik@gmail.com>)
+> Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
 
-I still have the H5000 (as well as HX4700) machine, and I'm still
-interested in it. The active development/mainlining suspended a
-bit, but I hope to get to it soon (heh).
+Acked-by: Anton Vorontsov <cbouatmailru@gmail.com>
 
-The latest version of the patch looks good, thanks!
+Thanks!
 
 -- 
 Anton Vorontsov
