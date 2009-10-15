@@ -1,30 +1,41 @@
-From: kyle@mcmartin.ca (Kyle McMartin)
-Date: Thu, 15 Oct 2009 17:48:05 -0400
-Subject: [PATCH] [ARM] force dcache flush if dcache_dirty bit set
-In-Reply-To: <Pine.LNX.4.64.0910121855070.21347@sister.anvils>
-References: <1255337423-3158-1-git-send-email-ngupta@vflare.org>
-	<20091012090710.GA29310@n2100.arm.linux.org.uk>
-	<20091012.023744.157085851.davem@davemloft.net>
-	<20091012100023.GC29310@n2100.arm.linux.org.uk>
-	<Pine.LNX.4.64.0910121634170.7327@sister.anvils>
-	<20091012170312.GB9453@flint.arm.linux.org.uk>
-	<Pine.LNX.4.64.0910121855070.21347@sister.anvils>
-Message-ID: <20091015214805.GP11702@bombadil.infradead.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 15 Oct 2009 23:52:15 +0200
+Subject: spitz: add gpio button support (fixes regression)
+In-Reply-To: <1255643252.3985.63.camel@utx.utx.cz>
+References: <20091006074635.GA2775@ucw.cz>
+	<1254829732.3546.35.camel@utx.utx.cz>
+	<20091007085806.GB28807@elf.ucw.cz>
+	<1254914991.4213.80.camel@hammer.suse.cz>
+	<20091007120643.GA17069@rakim.wolfsonmicro.main>
+	<f17812d70910070727x47b2a22h8e9f9304740d5abf@mail.gmail.com>
+	<20091006200933.GA1606@ucw.cz>
+	<1255641385.3985.55.camel@utx.utx.cz>
+	<20091015212024.GC15898@elf.ucw.cz>
+	<1255643252.3985.63.camel@utx.utx.cz>
+Message-ID: <20091015215215.GG15898@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 12, 2009 at 07:06:04PM +0100, Hugh Dickins wrote:
-> The architectures which appear to need fixing in the same way are
-> arm, mips, parisc, sh and sparc64 (xtensa looks right already, and
-> score just looks confused - a whole function __update_cache() which
-> checks for PG_arch_1, yet nothing sets it?).
+On Thu 2009-10-15 23:47:32, Stanislav Brabec wrote:
+> Pavel Machek wrote:
+> >Well, resume is hit by second regression.
+> >
+> >Suspend key.... I restored it to the level of functionality in
+> >2.6.31 :-).
 > 
+> > > +		.type	= EV_KEY,
+> > > +		.code	= KEY_SUSPEND,
+> 
+> I guess it should be EV_PWR. Then it will at least go to suspend.
 
-parisc looks affected as well, though I don't recall the semantics of
-dcache flushing without a mapping. James, can you send a patch?
+Does it actually go to suspend with that change?
 
-WRT score, which seems to have been mostly cobbled together as a modern
-copy of mips, it can likely be eliminated entirely, as it looks to have
-been cargoculted from mips without thought.
+(Actually, I wonder how it could have ever worked: userspace should
+certainly be in a loop there; kernel should not suspend machine on its
+own. In -rp kernels, kernel _does_ suspend on its own, but... I'm not
+sure if that's suitable for mainline).
+								Pavel
 
-regards, Kyle
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
