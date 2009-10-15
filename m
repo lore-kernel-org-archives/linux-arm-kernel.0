@@ -1,129 +1,29 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 15 Oct 2009 19:01:15 +0800
-Subject: [PATCH] pxa: extend gpio pins from 128 to 256
-In-Reply-To: <771cded00909250339g1b894557v6cabf978fa11e470@mail.gmail.com>
-References: <771cded00909250339g1b894557v6cabf978fa11e470@mail.gmail.com>
-Message-ID: <f17812d70910150401q425b47e2hb4da64bb203dc770@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 15 Oct 2009 12:40:32 +0100
+Subject: SMP: BUG with PREEMPT enabled
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02BB2555BF@dbde02.ent.ti.com>
+References: <EAF47CD23C76F840A9E7FCE10091EFAB02BB254F8D@dbde02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02BB2555BF@dbde02.ent.ti.com>
+Message-ID: <20091015114032.GB14817@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Haojian,
+On Wed, Oct 14, 2009 at 04:56:18PM +0530, Shilimkar, Santosh wrote:
+> > On the latest ARM kernel(v2.6.32-rc4),I have observed a BUG() dump when
 
-Sorry for late reply. See my comments below:
+Umm...
 
-On Fri, Sep 25, 2009 at 6:39 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> From 341628d9c44d120284cd45e8fa5ac9bd4acfe464 Mon Sep 17 00:00:00 2001
-> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Fri, 25 Sep 2009 14:28:11 -0400
-> Subject: [PATCH] pxa: extend gpio pins from 128 to 256
->
-> GPIO pins exceeds 128 pins. So extend the maximum GPIO pins to 256.
-> And extend MFP pins also.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> ---
-> ?arch/arm/mach-pxa/include/mach/gpio.h |??? 2 +-
-> ?arch/arm/mach-pxa/include/mach/irqs.h |??? 2 +-
-> ?arch/arm/mach-pxa/mfp-pxa2xx.c??????? |??? 6 +++---
-> ?arch/arm/mach-pxa/pxa3xx.c??????????? |??? 2 +-
-> ?arch/arm/plat-pxa/include/plat/mfp.h? |??? 2 +-
-> ?5 files changed, 7 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/include/mach/gpio.h
-> b/arch/arm/mach-pxa/include/mach/gpio.h
-> index b024a8b..0cd683c 100644
-> --- a/arch/arm/mach-pxa/include/mach/gpio.h
-> +++ b/arch/arm/mach-pxa/include/mach/gpio.h
-> @@ -99,7 +99,7 @@
-> ?#define GAFR(x)??? ??? GPIO_REG(0x54 + (((x) & 0x70) >> 2))
->
->
-> -#define NR_BUILTIN_GPIO 128
-> +#define NR_BUILTIN_GPIO 256
->
-> ?#define gpio_to_bank(gpio)??? ((gpio) >> 5)
-> ?#define gpio_to_irq(gpio)??? IRQ_GPIO(gpio)
-> diff --git a/arch/arm/mach-pxa/include/mach/irqs.h
-> b/arch/arm/mach-pxa/include/mach/irqs.h
-> index 3677a9a..9565b0f 100644
-> --- a/arch/arm/mach-pxa/include/mach/irqs.h
-> +++ b/arch/arm/mach-pxa/include/mach/irqs.h
-> @@ -106,7 +106,7 @@
-> ?#endif
->
-> ?#define PXA_GPIO_IRQ_BASE??? PXA_IRQ(96)
-> -#define PXA_GPIO_IRQ_NUM??? (192)
-> +#define PXA_GPIO_IRQ_NUM??? (256)
->
-> ?#define GPIO_2_x_TO_IRQ(x)??? (PXA_GPIO_IRQ_BASE + (x))
-> ?#define IRQ_GPIO(x)??? (((x) < 2) ? (IRQ_GPIO0 + (x)) : GPIO_2_x_TO_IRQ(x))
-> diff --git a/arch/arm/mach-pxa/mfp-pxa2xx.c b/arch/arm/mach-pxa/mfp-pxa2xx.c
-> index cf6b720..767db92 100644
-> --- a/arch/arm/mach-pxa/mfp-pxa2xx.c
-> +++ b/arch/arm/mach-pxa/mfp-pxa2xx.c
-> @@ -41,7 +41,7 @@ struct gpio_desc {
-> ???? unsigned long??? config;
-> ?};
->
-> -static struct gpio_desc gpio_desc[MFP_PIN_GPIO127 + 1];
-> +static struct gpio_desc gpio_desc[MFP_PIN_GPIO255 + 1];
->
+> @@ -350,7 +350,7 @@ static inline void local_flush_tlb_mm(struct mm_struct *mm)
+>  	if (tlb_flag(TLB_WB))
+>  		dsb();
+>  
+> -	if (cpu_isset(smp_processor_id(), mm->cpu_vm_mask)) {
+> +	if (cpu_isset(get_cpu(), mm->cpu_vm_mask)) {
 
-I'm not sure if this is really necessary since mfp-pxa2xx.c is pxa2xx specific,
-and extending the array by double means wasting of space?
+This isn't 2.6.32-rc4 code - which actually is:
 
-> ?static unsigned long gpdr_lpm[4];
->
-> @@ -117,7 +117,7 @@ static inline int __mfp_validate(int mfp)
-> ?{
-> ???? int gpio = mfp_to_gpio(mfp);
->
-> -??? if ((mfp > MFP_PIN_GPIO127) || !gpio_desc[gpio].valid) {
-> +??? if ((mfp > MFP_PIN_GPIO255) || !gpio_desc[gpio].valid) {
-> ???? ??? pr_warning("%s: GPIO%d is invalid pin\n", __func__, gpio);
-> ???? ??? return -1;
-> ???? }
+        if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(mm))) {
 
-Same here, pxa2xx specific.
+so what kernel version are you working with?
 
-> @@ -169,7 +169,7 @@ int gpio_set_wake(unsigned int gpio, unsigned int on)
-> ???? struct gpio_desc *d;
-> ???? unsigned long c, mux_taken;
->
-> -??? if (gpio > mfp_to_gpio(MFP_PIN_GPIO127))
-> +??? if (gpio > mfp_to_gpio(MFP_PIN_GPIO255))
-> ???? ??? return -EINVAL;
->
-> ???? d = &gpio_desc[gpio];
-> diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
-> index 09b7b1a..7783ac9 100644
-> --- a/arch/arm/mach-pxa/pxa3xx.c
-> +++ b/arch/arm/mach-pxa/pxa3xx.c
-> @@ -539,7 +539,7 @@ void __init pxa3xx_init_irq(void)
-> ???? __asm__ __volatile__("mcr p15, 0, %0, c15, c1, 0\n": :"r"(value));
->
-> ???? pxa_init_irq(56, pxa3xx_set_wake);
-> -??? pxa_init_gpio(IRQ_GPIO_2_x, 2, 127, NULL);
-> +??? pxa_init_gpio(IRQ_GPIO_2_x, 2, 255, NULL);
-> ?}
->
-> ?/*
-> diff --git a/arch/arm/plat-pxa/include/plat/mfp.h
-> b/arch/arm/plat-pxa/include/plat/mfp.h
-> index 22086e6..857a683 100644
-> --- a/arch/arm/plat-pxa/include/plat/mfp.h
-> +++ b/arch/arm/plat-pxa/include/plat/mfp.h
-> @@ -16,7 +16,7 @@
-> ?#ifndef __ASM_PLAT_MFP_H
-> ?#define __ASM_PLAT_MFP_H
->
-> -#define mfp_to_gpio(m)??? ((m) % 128)
-> +#define mfp_to_gpio(m)??? ((m) % 256)
->
-> ?/* list of all the configurable MFP pins */
-> ?enum {
-> --
-> 1.5.6.5
->
->
+The result is this patch won't apply to 2.6.32-rc4.
