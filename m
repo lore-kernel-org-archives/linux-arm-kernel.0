@@ -1,102 +1,42 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Thu, 15 Oct 2009 10:11:09 +0200
-Subject: [PATCH] [ARM] pxa/cm-x300: fix mmc numbering (was >From d91f4e6f60747)
-In-Reply-To: <1255593996-5545-1-git-send-email-mike@compulab.co.il>
-References: <1255593996-5545-1-git-send-email-mike@compulab.co.il>
-Message-ID: <4AD6D91D.2050703@compulab.co.il>
+From: valentin.longchamp@epfl.ch (Valentin Longchamp)
+Date: Thu, 15 Oct 2009 11:42:55 +0200
+Subject: [PATCH 1/6] mx31: various pins used for mx31moboard
+In-Reply-To: <1255599780-12948-1-git-send-email-valentin.longchamp@epfl.ch>
+References: <1255599780-12948-1-git-send-email-valentin.longchamp@epfl.ch>
+Message-ID: <1255599780-12948-2-git-send-email-valentin.longchamp@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric,
-Please discard the previous e-mail. Sorry for the noise...
-
-It would be really nice if it can go to 2.6.32
-
+Signed-off-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
 ---
-CM-X300 has libertas on mmc2 and  SD card slot on mmc1.
-This patch fixes wrong MMC ports assignment.
+ arch/arm/plat-mxc/include/mach/iomux-mx3.h |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
 
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-Signed-off-by: Mike Rapoport <mike@compulab.co.il>
----
- arch/arm/mach-pxa/cm-x300.c |   38 +++++++++++++++++++-------------------
- 1 files changed, 19 insertions(+), 19 deletions(-)
-
-diff --git a/arch/arm/mach-pxa/cm-x300.c b/arch/arm/mach-pxa/cm-x300.c
-index 52f6ad7..e6fbb0a 100644
---- a/arch/arm/mach-pxa/cm-x300.c
-+++ b/arch/arm/mach-pxa/cm-x300.c
-@@ -53,10 +53,10 @@
-
- #define CM_X300_ETH_PHYS	0x08000010
-
--#define GPIO82_MMC2_IRQ		(82)
--#define GPIO85_MMC2_WP		(85)
-+#define GPIO82_MMC_IRQ		(82)
-+#define GPIO85_MMC_WP		(85)
-
--#define	CM_X300_MMC2_IRQ	IRQ_GPIO(GPIO82_MMC2_IRQ)
-+#define	CM_X300_MMC_IRQ		IRQ_GPIO(GPIO82_MMC_IRQ)
-
- #define GPIO95_RTC_CS		(95)
- #define GPIO96_RTC_WR		(96)
-@@ -430,37 +430,37 @@ static inline void cm_x300_init_nand(void) {}
- #endif
-
- #if defined(CONFIG_MMC) || defined(CONFIG_MMC_MODULE)
--/* The first MMC slot of CM-X300 is hardwired to Libertas card and has
-+static struct pxamci_platform_data cm_x300_mci_platform_data = {
-+	.detect_delay		= 20,
-+	.ocr_mask		= MMC_VDD_32_33|MMC_VDD_33_34,
-+	.gpio_card_detect	= GPIO82_MMC_IRQ,
-+	.gpio_card_ro		= GPIO85_MMC_WP,
-+	.gpio_power		= -1,
-+};
-+
-+/* The second MMC slot of CM-X300 is hardwired to Libertas card and has
-    no detection/ro pins */
--static int cm_x300_mci_init(struct device *dev,
--			    irq_handler_t cm_x300_detect_int,
--			    void *data)
-+static int cm_x300_mci2_init(struct device *dev,
-+			     irq_handler_t cm_x300_detect_int,
-+	void *data)
- {
- 	return 0;
- }
-
--static void cm_x300_mci_exit(struct device *dev, void *data)
-+static void cm_x300_mci2_exit(struct device *dev, void *data)
- {
- }
-
--static struct pxamci_platform_data cm_x300_mci_platform_data = {
-+static struct pxamci_platform_data cm_x300_mci2_platform_data = {
- 	.detect_delay		= 20,
- 	.ocr_mask		= MMC_VDD_32_33|MMC_VDD_33_34,
--	.init 			= cm_x300_mci_init,
--	.exit			= cm_x300_mci_exit,
-+	.init 			= cm_x300_mci2_init,
-+	.exit			= cm_x300_mci2_exit,
- 	.gpio_card_detect	= -1,
- 	.gpio_card_ro		= -1,
- 	.gpio_power		= -1,
- };
-
--static struct pxamci_platform_data cm_x300_mci2_platform_data = {
--	.detect_delay		= 20,
--	.ocr_mask		= MMC_VDD_32_33|MMC_VDD_33_34,
--	.gpio_card_detect	= GPIO82_MMC2_IRQ,
--	.gpio_card_ro		= GPIO85_MMC2_WP,
--	.gpio_power		= -1,
--};
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx3.h b/arch/arm/plat-mxc/include/mach/iomux-mx3.h
+index 446f867..0dcfb77 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-mx3.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-mx3.h
+@@ -623,6 +623,8 @@ enum iomux_pins {
+ #define MX31_PIN_GPIO3_0__GPIO3_0	IOMUX_MODE(MX31_PIN_GPIO3_0, IOMUX_CONFIG_GPIO)
+ #define MX31_PIN_GPIO3_1__GPIO3_1	IOMUX_MODE(MX31_PIN_GPIO3_1, IOMUX_CONFIG_GPIO)
+ #define MX31_PIN_TXD2__GPIO1_28		IOMUX_MODE(MX31_PIN_TXD2, IOMUX_CONFIG_GPIO)
++#define MX31_PIN_CSI_D4__GPIO3_4	IOMUX_MODE(MX31_PIN_CSI_D4, IOMUX_CONFIG_GPIO)
++#define MX31_PIN_CSI_D5__GPIO3_5	IOMUX_MODE(MX31_PIN_CSI_D5, IOMUX_CONFIG_GPIO)
+ #define MX31_PIN_USBOTG_DATA0__USBOTG_DATA0    IOMUX_MODE(MX31_PIN_USBOTG_DATA0, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_USBOTG_DATA1__USBOTG_DATA1    IOMUX_MODE(MX31_PIN_USBOTG_DATA1, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_USBOTG_DATA2__USBOTG_DATA2    IOMUX_MODE(MX31_PIN_USBOTG_DATA2, IOMUX_CONFIG_FUNC)
+@@ -693,7 +695,11 @@ enum iomux_pins {
+ #define MX31_PIN_DCD_DCE1__GPIO2_11	IOMUX_MODE(MX31_PIN_DCD_DCE1, IOMUX_CONFIG_GPIO)
+ #define MX31_PIN_STXD5__GPIO1_21       IOMUX_MODE(MX31_PIN_STXD5, IOMUX_CONFIG_GPIO)
+ #define MX31_PIN_SRXD5__GPIO1_22       IOMUX_MODE(MX31_PIN_SRXD5, IOMUX_CONFIG_GPIO)
 -
- static void __init cm_x300_init_mmc(void)
- {
- 	pxa_set_mci_info(&cm_x300_mci_platform_data);
++#define MX31_PIN_GPIO1_3__GPIO1_3	IOMUX_MODE(MX31_PIN_GPIO1_3, IOMUX_CONFIG_GPIO)
++#define MX31_PIN_CSPI2_SS1__CSPI3_SS1	IOMUX_MODE(MX31_PIN_CSPI2_SS1, IOMUX_CONFIG_ALT1)
++#define MX31_PIN_RTS1__GPIO2_6		IOMUX_MODE(MX31_PIN_RTS1, IOMUX_CONFIG_GPIO)
++#define MX31_PIN_CTS1__GPIO2_7		IOMUX_MODE(MX31_PIN_CTS1, IOMUX_CONFIG_GPIO)
++#define MX31_PIN_LCS0__GPIO3_23		IOMUX_MODE(MX31_PIN_LCS0, IOMUX_CONFIG_GPIO)
+ 
+ /*XXX: The SS0, SS1, SS2, SS3 lines of spi3 are multiplexed by cspi2_ss0, cspi2_ss1, cspi1_ss0
+  * cspi1_ss1*/
 -- 
-1.6.0.6
-
--- 
-Sincerely yours,
-Mike.
+1.6.0.4
