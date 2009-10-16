@@ -1,44 +1,40 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 16 Oct 2009 00:14:04 +0200
-Subject: [RFC] mx31moboard: patches for next merge window
-In-Reply-To: <1255599780-12948-1-git-send-email-valentin.longchamp@epfl.ch>
-References: <1255599780-12948-1-git-send-email-valentin.longchamp@epfl.ch>
-Message-ID: <20091015221404.GC8818@pengutronix.de>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 16 Oct 2009 11:01:31 +0800
+Subject: spitz: add gpio button support (fixes regression)
+In-Reply-To: <20091015215215.GG15898@elf.ucw.cz>
+References: <20091006074635.GA2775@ucw.cz> <20091007085806.GB28807@elf.ucw.cz>
+	<1254914991.4213.80.camel@hammer.suse.cz>
+	<20091007120643.GA17069@rakim.wolfsonmicro.main>
+	<f17812d70910070727x47b2a22h8e9f9304740d5abf@mail.gmail.com>
+	<20091006200933.GA1606@ucw.cz> <1255641385.3985.55.camel@utx.utx.cz>
+	<20091015212024.GC15898@elf.ucw.cz>
+	<1255643252.3985.63.camel@utx.utx.cz>
+	<20091015215215.GG15898@elf.ucw.cz>
+Message-ID: <f17812d70910152001r7b5b0326s5f0e880cca3b3b68@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Valentin,
+On Fri, Oct 16, 2009 at 5:52 AM, Pavel Machek <pavel@ucw.cz> wrote:
+> On Thu 2009-10-15 23:47:32, Stanislav Brabec wrote:
+>> Pavel Machek wrote:
+>> >Well, resume is hit by second regression.
+>> >
+>> >Suspend key.... I restored it to the level of functionality in
+>> >2.6.31 :-).
+>>
+>> > > + ? ? ? ? .type ? = EV_KEY,
+>> > > + ? ? ? ? .code ? = KEY_SUSPEND,
+>>
+>> I guess it should be EV_PWR. Then it will at least go to suspend.
+>
+> Does it actually go to suspend with that change?
+>
+> (Actually, I wonder how it could have ever worked: userspace should
+> certainly be in a loop there; kernel should not suspend machine on its
+> own. In -rp kernels, kernel _does_ suspend on its own, but... I'm not
+> sure if that's suitable for mainline).
 
-On Thu, Oct 15, 2009 at 11:42:54AM +0200, Valentin Longchamp wrote:
-> Here are the patches I would like to push during the next merge window for
-> the mx31moboard platform.
-> 
-> It consists of a fix for a small hardware design issue for the main serial
-> port, a few GPIOs used on the robots that are declared, camera support and
-> finally MC13783 support as it is now getting ready.
-> 
-> For MC13783, we would need RTC as well, but I did not add it yet since it
-> is not in mainline yet.
-
-I think you did, but it's fine.
-
-> 
-> The camera part still is initial: it works well with a single camera but I
-> still have to figure out what is the best way to handle the two mt9t031 we
-> have on the marxbot.
-> 
-> The main peripheral that we are using and that still is missing is the USB
-> host, but since the driver still needs a few improvements, I keep it aside
-> for now.
-> 
-> Please review and comment.
-
-Looks ok to me. I'll have a closer look on monday.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+EV_PWR is what's in the original spitzkbd.c, so I assume that's
+something we should keep. And the reason that EV_PWR makes
+it actually suspend might related the APM emulation things,
+which I'm not very sure about.
