@@ -1,45 +1,42 @@
 From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Sat, 17 Oct 2009 00:00:51 +0200
-Subject: [PATCH v3 4/4] iop: implement sched_clock()
-Message-ID: <19160.60691.72229.932486@pilspetsen.it.uu.se>
+Date: Sat, 17 Oct 2009 00:01:30 +0200
+Subject: [PATCH v3 0/2] n2100: tweaks for tickless operation
+Message-ID: <19160.60730.618133.828578@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a better sched_clock() to the IOP platform,
-implemented using its new clocksource support.
+With the IOP platform converted to use the kernel's generic
+clocksource, clockevent, and time-keeping code, the n2100
+can operate in tickless aka NOHZ mode.
 
-Tested on n2100, compile-tested for all plat-iop machines.
+However, the n2100 has some quirks that cause the clock
+tick rate to remain high in idle mode:
 
-Signed-off-by: Mikael Pettersson <mikpe@it.uu.se>
----
-Changes v2 -> v3:
-* bug fix: open-code cyc2ns() and use cs->mult_orig not cs->mult
-* rebased on 2.6.32-rc5, use new clocksource_cyc2ns()
+1. The power button is sampled via a 10 Hz timer;
+   this is addressed by patch 1/2 in this series.
+2. XINT1 may be connected to the second UHCI controller,
+   forcing the serial driver core to monitor the console
+   UART via a high-frequency timer; this is addressed by
+   a work-in-progress patch 2/2 in this series.
+3. The USB UHCI_HCD driver monitors the root hub via
+   interrupts or a medium-frequency (at least 10 Hz
+   it seems) timer. To make it disable the timer and
+   use interrupts, it is required to enable CONFIG_PM.
+   However, CONFIG_PM is disabled in iop32x_defconfig
+   and many other arm defconfigs.
 
-Changes v1 -> v2:
-* implemented sched_clock()
+Much of this was discovered via /proc/timer_stats.
 
- arch/arm/plat-iop/time.c |   11 +++++++++++
- 1 file changed, 11 insertions(+)
+With these tweaks enabled my n2100 now averages about 2.5
+timer interrupts per second in idle.
 
-diff -rupN linux-2.6.32-rc5.arm-iop-3-generictime-v3/arch/arm/plat-iop/time.c linux-2.6.32-rc5.arm-iop-4-sched_clock-v3/arch/arm/plat-iop/time.c
---- linux-2.6.32-rc5.arm-iop-3-generictime-v3/arch/arm/plat-iop/time.c	2009-10-16 21:36:55.000000000 +0200
-+++ linux-2.6.32-rc5.arm-iop-4-sched_clock-v3/arch/arm/plat-iop/time.c	2009-10-16 21:39:16.000000000 +0200
-@@ -66,6 +66,17 @@ static void __init iop_clocksource_set_h
- }
- 
- /*
-+ * IOP sched_clock() implementation via its clocksource.
-+ */
-+unsigned long long sched_clock(void)
-+{
-+	cycle_t cyc = iop_clocksource_read(NULL);
-+	struct clocksource *cs = &iop_clocksource;
-+
-+	return clocksource_cyc2ns(cyc, cs->mult, cs->shift);
-+}
-+
-+/*
-  * IOP clockevents (interrupting timer 0).
-  */
- static int iop_set_next_event(unsigned long delta,
+Patch 1/2 should be ready for the 2.6.33 merge window,
+can I get an ACK or NAK for that one?
+
+Overall changes v1 -> v3:
+* dropped some config dependencies
+* the XINT1 UART changes are still preliminary, reordered
+  patch series to put those last
+* rebased on 2.6.32-rc5
+
+/Mikael
