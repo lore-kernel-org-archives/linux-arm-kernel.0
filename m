@@ -1,71 +1,113 @@
 From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Sat, 17 Oct 2009 00:02:01 +0200
-Subject: [PATCH v3 1/2] n2100: reduce power button timer to 1 Hz
-Message-ID: <19160.60761.315446.356742@pilspetsen.it.uu.se>
+Date: Sat, 17 Oct 2009 00:02:41 +0200
+Subject: [PATCH v3 2/2] n2100: support assigning XINT1 to UART
+Message-ID: <19160.60801.732471.358213@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The power button on the n2100 apparently does not generate
-an interrupt when pressed, so the board support code sets
-up a periodic timer to sample it.
+The Thecus n2100 has a jumper which determines if the XINT1
+interrupt line is connected to the second UHCI controller
+(position J3) or the serial console UART (position J4).
 
-This timer operates at 10 Hz, which makes it the third worst
-cause of timeouts in my kernel when idle.
+In position J3 (default) the second UHCI controller is fully
+operational, allowing low-speed USB devices to be connected
+to any of the three USB ports. However, the UART has to be
+polled by a high-frequency timer, causing CPU overheads.
 
-10 Hz seems excessive, so this patch reduces the polling
-frequency to 1 Hz. round_jiffies() is used to allow this
-timer to group with any other whole-Hz timer, avoiding
-unecessary timer wakeups.
+In position J4 the second UHCI controller is not operational,
+causing low-speed USB devices to only work when connected to
+the front USB port. On the other hand, the UART polling timer
+is eliminated, resulting in reduced CPU overheads, fewer wakeups
+in tickless mode, and a faster serial console.
+
+This patch adds a compile-time option allowing the kernel to
+be configured appropriately for the J3 or J4 cases.
 
 Signed-off-by: Mikael Pettersson <mikpe@it.uu.se>
 ---
+This patch is preliminary and optional. There should be a
+boot-time probe to detect how XINT1 is wired. I have not had
+time to implemented that yet, so I'm posting this patch as a
+very preliminary solution to the problem.
+
 Changes v1 -> v3:
-* dropped config option, made the change unconditional
-* use round_jiffies() to make the timer group with any
-  other active whole-Hz timer; this change reduced my
-  idle tick rate from 3.1 Hz to about 2.5 Hz
-* moved duplicated power button timer update code to a
-  new subroutine
-* reorder patch series so this patch applies before the
-  XINT1 UART patch
+* this change is useful also for non-tickless kernels,
+  so dropped "&& NO_HZ" dependency from config option and
+  updated config option help text accordingly
+* reordered patch series so this patch applies after the
+  1 Hz power button patch
 * rebased on 2.6.32-rc5
 
- arch/arm/mach-iop32x/n2100.c |   12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+ arch/arm/mach-iop32x/Kconfig |   22 ++++++++++++++++++++++
+ arch/arm/mach-iop32x/n2100.c |   15 +++++++++++++--
+ 2 files changed, 35 insertions(+), 2 deletions(-)
 
-diff -rupN linux-2.6.32-rc5/arch/arm/mach-iop32x/n2100.c linux-2.6.32-rc5.arm-n2100-1-pbpt-hz1-v3/arch/arm/mach-iop32x/n2100.c
---- linux-2.6.32-rc5/arch/arm/mach-iop32x/n2100.c	2008-12-25 15:54:13.000000000 +0100
-+++ linux-2.6.32-rc5.arm-n2100-1-pbpt-hz1-v3/arch/arm/mach-iop32x/n2100.c	2009-10-16 22:00:53.000000000 +0200
-@@ -296,6 +296,12 @@ static void n2100_power_off(void)
+diff -rupN linux-2.6.32-rc5.arm-n2100-1-pbpt-hz1-v3/arch/arm/mach-iop32x/Kconfig linux-2.6.32-rc5.arm-n2100-2-xint1-uart-v3/arch/arm/mach-iop32x/Kconfig
+--- linux-2.6.32-rc5.arm-n2100-1-pbpt-hz1-v3/arch/arm/mach-iop32x/Kconfig	2008-07-14 10:22:36.000000000 +0200
++++ linux-2.6.32-rc5.arm-n2100-2-xint1-uart-v3/arch/arm/mach-iop32x/Kconfig	2009-10-16 22:02:42.000000000 +0200
+@@ -43,4 +43,26 @@ config MACH_EM7210
  
- static struct timer_list power_button_poll_timer;
+ endmenu
  
-+static void power_button_poll_timer_rearm(void)
-+{
-+	power_button_poll_timer.expires = round_jiffies(jiffies + HZ);
-+	add_timer(&power_button_poll_timer);
-+}
++config N2100_XINT1_UART
++	bool "Support assigning Thecus n2100 XINT1 to UART"
++	depends on MACH_N2100
++	help
++	  The Thecus n2100 has a jumper which determines if the XINT1
++	  interrupt line is connected to the second UHCI controller
++	  (position J3) or the serial console UART (position J4).
 +
- static void power_button_poll(unsigned long dummy)
- {
- 	if (gpio_line_get(N2100_POWER_BUTTON) == 0) {
-@@ -303,8 +309,7 @@ static void power_button_poll(unsigned l
- 		return;
- 	}
++	  In position J3 (default) the second UHCI controller is fully
++	  operational, allowing low-speed USB devices to be connected
++	  to any of the three USB ports. However, the UART has to be
++	  polled by a high-frequency timer, causing CPU overheads.
++
++	  In position J4 the second UHCI controller is not operational,
++	  causing low-speed USB devices to only work when connected to
++	  the front USB port. On the other hand, the UART polling timer
++	  is eliminated, resulting in reduced CPU overheads, fewer wakeups
++	  in tickless mode, and a faster serial console.
++
++	  Say Y if tickless operation or a fast serial console is important
++	  for you.
++
+ endif
+diff -rupN linux-2.6.32-rc5.arm-n2100-1-pbpt-hz1-v3/arch/arm/mach-iop32x/n2100.c linux-2.6.32-rc5.arm-n2100-2-xint1-uart-v3/arch/arm/mach-iop32x/n2100.c
+--- linux-2.6.32-rc5.arm-n2100-1-pbpt-hz1-v3/arch/arm/mach-iop32x/n2100.c	2009-10-16 22:00:53.000000000 +0200
++++ linux-2.6.32-rc5.arm-n2100-2-xint1-uart-v3/arch/arm/mach-iop32x/n2100.c	2009-10-16 22:02:42.000000000 +0200
+@@ -43,6 +43,17 @@
+ #include <mach/time.h>
  
--	power_button_poll_timer.expires = jiffies + (HZ / 10);
--	add_timer(&power_button_poll_timer);
-+	power_button_poll_timer_rearm();
- }
- 
- 
-@@ -323,8 +328,7 @@ static void __init n2100_init_machine(vo
- 
- 	init_timer(&power_button_poll_timer);
- 	power_button_poll_timer.function = power_button_poll;
--	power_button_poll_timer.expires = jiffies + (HZ / 10);
--	add_timer(&power_button_poll_timer);
-+	power_button_poll_timer_rearm();
- }
- 
- MACHINE_START(N2100, "Thecus N2100")
+ /*
++ * N2100 IRQ assignments depend on XINT1 jumper.
++ */
++#ifdef CONFIG_N2100_XINT1_UART
++#define N2100_UART_IRQ		IRQ_IOP32X_XINT1
++#define N2100_VT6212_INTA_IRQ	-1	/* disabled */
++#else
++#define N2100_UART_IRQ		0	/* uses polling timer */
++#define N2100_VT6212_INTA_IRQ	IRQ_IOP32X_XINT1
++#endif
++
++/*
+  * N2100 timer tick configuration.
+  */
+ static void __init n2100_timer_init(void)
+@@ -95,7 +106,7 @@ n2100_pci_map_irq(struct pci_dev *dev, u
+ 		irq = IRQ_IOP32X_XINT2;
+ 	} else if (PCI_SLOT(dev->devfn) == 4 && pin == 1) {
+ 		/* VT6212 INTA */
+-		irq = IRQ_IOP32X_XINT1;
++		irq = N2100_VT6212_INTA_IRQ;
+ 	} else if (PCI_SLOT(dev->devfn) == 4 && pin == 2) {
+ 		/* VT6212 INTB */
+ 		irq = IRQ_IOP32X_XINT0;
+@@ -177,7 +188,7 @@ static struct plat_serial8250_port n2100
+ 	{
+ 		.mapbase	= N2100_UART,
+ 		.membase	= (char *)N2100_UART,
+-		.irq		= 0,
++		.irq		= N2100_UART_IRQ,
+ 		.flags		= UPF_SKIP_TEST,
+ 		.iotype		= UPIO_MEM,
+ 		.regshift	= 0,
