@@ -1,8 +1,8 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 16 Oct 2009 12:09:21 -0700
-Subject: [PATCH 17/46] davinci: Add support for Sharp LCD035Q3DG01 graphical
-	LCD
-In-Reply-To: <1255720190-7452-18-git-send-email-khilman@deeprootsystems.com>
+Date: Fri, 16 Oct 2009 12:09:22 -0700
+Subject: [PATCH 18/46] davinci: Add LCD Graphics support for DA830/OMAP-L137
+	EVM
+In-Reply-To: <1255720190-7452-19-git-send-email-khilman@deeprootsystems.com>
 References: <1255720190-7452-1-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-2-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-3-git-send-email-khilman@deeprootsystems.com>
@@ -21,123 +21,156 @@ References: <1255720190-7452-1-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-16-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-17-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-18-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1255720190-7452-19-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-19-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1255720190-7452-20-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark A. Greer <mgreer@mvista.com>
+From: Steve Chen <schen@mvista.com>
 
-Add support for the Sharp LCD035Q3DG01 graphical LCD.  This
-requires a minor interface change to da8xx_register_lcdc()
-so that the board code can pass in the platform_data which
-describes the lcd controller that's to be used.
+Add graphics support for the Sharp LCD035Q3DG01 graphical
+LCD that's on the User Interface (UI) daughter card of the
+DA830/OMAP-L137 EVM.
 
+The LCD shares EMIFA lines with the NAND and NOR devices that
+are also on the UI card so those lines are shared via a couple
+of muxes.  The muxes are controlled by the 'MUX_MODE' line on
+the UI card.  The 'MUX_MODE' line is controlled by pin P6 of
+a pcf8574 i2c expander that's at i2c address 0x3f on UI card.
+The i2c expander is controlled using the gpio infrastructure
+from the board code using the 'setup()' and 'teardown()'
+routines.
+
+Signed-off-by: Steve Chen <schen@mvista.com>
 Signed-off-by: Mark A. Greer <mgreer@mvista.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-davinci/board-da850-evm.c    |    2 +-
- arch/arm/mach-davinci/devices-da8xx.c      |   25 ++++++++++++++-----------
- arch/arm/mach-davinci/include/mach/da8xx.h |    6 +++++-
- 3 files changed, 20 insertions(+), 13 deletions(-)
+ arch/arm/mach-davinci/Kconfig           |   21 ++++++++++++++
+ arch/arm/mach-davinci/board-da830-evm.c |   44 ++++++++++++++++++++++++++++++-
+ arch/arm/mach-davinci/da830.c           |    2 +-
+ 3 files changed, 65 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index fbc7aae..da1a6fb 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -377,7 +377,7 @@ static __init void da850_evm_init(void)
- 		pr_warning("da850_evm_init: lcd initialization failed: %d\n",
- 				ret);
+diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
+index 40866c6..7b6dddf 100644
+--- a/arch/arm/mach-davinci/Kconfig
++++ b/arch/arm/mach-davinci/Kconfig
+@@ -101,6 +101,27 @@ config MACH_DAVINCI_DA830_EVM
+ 	help
+ 	  Say Y here to select the TI DA830/OMAP-L137 Evaluation Module.
  
--	ret = da8xx_register_lcdc();
-+	ret = da8xx_register_lcdc(&sharp_lk043t1dg01_pdata);
- 	if (ret)
- 		pr_warning("da850_evm_init: lcdc registration failed: %d\n",
- 				ret);
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index 0102e0a..5595613 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -21,7 +21,6 @@
- #include <mach/common.h>
- #include <mach/time.h>
- #include <mach/da8xx.h>
--#include <video/da8xx-fb.h>
++config DA830_UI
++	bool "DA830/OMAP-L137 UI (User Interface) board support"
++	depends on MACH_DAVINCI_DA830_EVM
++	help
++	  Say Y here if you have the DA830/OMAP-L137 UI
++	  (User Interface) board installed and you want to
++	  enable the peripherals located on User Interface
++	  board.
++
++choice
++	prompt "Select DA830/OMAP-L137 UI board peripheral"
++	depends on DA830_UI
++
++config DA830_UI_LCD
++	bool "LCD"
++	help
++	  Say Y here to use the LCD as a framebuffer or simple character
++	  display.
++
++endchoice
++
+ config MACH_DAVINCI_DA850_EVM
+ 	bool "TI DA850/OMAP-L138 Reference Platform"
+ 	default ARCH_DAVINCI_DA850
+diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+index 69a791a..dfc4897 100644
+--- a/arch/arm/mach-davinci/board-da830-evm.c
++++ b/arch/arm/mach-davinci/board-da830-evm.c
+@@ -13,7 +13,9 @@
+ #include <linux/module.h>
+ #include <linux/init.h>
+ #include <linux/console.h>
++#include <linux/gpio.h>
+ #include <linux/i2c.h>
++#include <linux/i2c/pcf857x.h>
+ #include <linux/i2c/at24.h>
  
- #include "clock.h"
- 
-@@ -381,10 +380,16 @@ static struct lcd_ctrl_config lcd_cfg = {
- 	.raster_order		= 0,
+ #include <asm/mach-types.h>
+@@ -38,6 +40,31 @@ static struct at24_platform_data da830_evm_i2c_eeprom_info = {
+ 	.context	= (void *)0x7f00,
  };
  
--static struct da8xx_lcdc_platform_data da850_evm_lcdc_pdata = {
--	.manu_name = "sharp",
--	.controller_data = &lcd_cfg,
--	.type = "Sharp_LK043T1DG01",
-+struct da8xx_lcdc_platform_data sharp_lcd035q3dg01_pdata = {
-+	.manu_name		= "sharp",
-+	.controller_data	= &lcd_cfg,
-+	.type			= "Sharp_LCD035Q3DG01",
++static int da830_evm_ui_expander_setup(struct i2c_client *client, int gpio,
++		unsigned ngpio, void *context)
++{
++	gpio_request(gpio + 6, "MUX_MODE");
++#ifdef CONFIG_DA830_UI_LCD
++	gpio_direction_output(gpio + 6, 0);
++#else /* Must be NAND or NOR */
++	gpio_direction_output(gpio + 6, 1);
++#endif
++	return 0;
++}
++
++static int da830_evm_ui_expander_teardown(struct i2c_client *client, int gpio,
++		unsigned ngpio, void *context)
++{
++	gpio_free(gpio + 6);
++	return 0;
++}
++
++static struct pcf857x_platform_data da830_evm_ui_expander_info = {
++	.gpio_base	= DAVINCI_N_GPIO,
++	.setup		= da830_evm_ui_expander_setup,
++	.teardown	= da830_evm_ui_expander_teardown,
 +};
 +
-+struct da8xx_lcdc_platform_data sharp_lk043t1dg01_pdata = {
-+	.manu_name		= "sharp",
-+	.controller_data	= &lcd_cfg,
-+	.type			= "Sharp_LK043T1DG01",
- };
- 
- static struct resource da8xx_lcdc_resources[] = {
-@@ -400,19 +405,17 @@ static struct resource da8xx_lcdc_resources[] = {
+ static struct i2c_board_info __initdata da830_evm_i2c_devices[] = {
+ 	{
+ 		I2C_BOARD_INFO("24c256", 0x50),
+@@ -45,7 +72,11 @@ static struct i2c_board_info __initdata da830_evm_i2c_devices[] = {
  	},
- };
- 
--static struct platform_device da850_lcdc_device = {
-+static struct platform_device da8xx_lcdc_device = {
- 	.name		= "da8xx_lcdc",
- 	.id		= 0,
- 	.num_resources	= ARRAY_SIZE(da8xx_lcdc_resources),
- 	.resource	= da8xx_lcdc_resources,
--	.dev = {
--		.platform_data = &da850_evm_lcdc_pdata,
+ 	{
+ 		I2C_BOARD_INFO("tlv320aic3x", 0x18),
 -	}
++	},
++	{
++		I2C_BOARD_INFO("pcf8574", 0x3f),
++		.platform_data	= &da830_evm_ui_expander_info,
++	},
  };
  
--int __init da8xx_register_lcdc(void)
-+int __init da8xx_register_lcdc(struct da8xx_lcdc_platform_data *pdata)
- {
--	return platform_device_register(&da850_lcdc_device);
-+	da8xx_lcdc_device.dev.platform_data = pdata;
-+	return platform_device_register(&da8xx_lcdc_device);
+ static struct davinci_i2c_platform_data da830_evm_i2c_0_pdata = {
+@@ -175,6 +206,17 @@ static __init void da830_evm_init(void)
+ 	if (ret)
+ 		pr_warning("da830_evm_init: mmc/sd registration failed: %d\n",
+ 				ret);
++
++#ifdef CONFIG_DA830_UI_LCD
++	ret = da8xx_pinmux_setup(da830_lcdcntl_pins);
++	if (ret)
++		pr_warning("da830_evm_init: lcdcntl mux setup failed: %d\n",
++				ret);
++
++	ret = da8xx_register_lcdc(&sharp_lcd035q3dg01_pdata);
++	if (ret)
++		pr_warning("da830_evm_init: lcd setup failed: %d\n", ret);
++#endif
  }
  
- static struct resource da8xx_mmcsd0_resources[] = {
-diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-index ec2821b..375a3f7 100644
---- a/arch/arm/mach-davinci/include/mach/da8xx.h
-+++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-@@ -11,6 +11,8 @@
- #ifndef __ASM_ARCH_DAVINCI_DA8XX_H
- #define __ASM_ARCH_DAVINCI_DA8XX_H
- 
-+#include <video/da8xx-fb.h>
-+
- #include <mach/serial.h>
- #include <mach/edma.h>
- #include <mach/i2c.h>
-@@ -76,12 +78,14 @@ int da8xx_register_edma(void);
- int da8xx_register_i2c(int instance, struct davinci_i2c_platform_data *pdata);
- int da8xx_register_watchdog(void);
- int da8xx_register_emac(void);
--int da8xx_register_lcdc(void);
-+int da8xx_register_lcdc(struct da8xx_lcdc_platform_data *pdata);
- int da8xx_register_mmcsd0(struct davinci_mmc_config *config);
- void __init da8xx_register_mcasp(int id, struct snd_platform_data *pdata);
- 
- extern struct platform_device da8xx_serial_device;
- extern struct emac_platform_data da8xx_emac_pdata;
-+extern struct da8xx_lcdc_platform_data sharp_lcd035q3dg01_pdata;
-+extern struct da8xx_lcdc_platform_data sharp_lk043t1dg01_pdata;
- 
- extern const short da830_emif25_pins[];
- extern const short da830_spi0_pins[];
+ #ifdef CONFIG_SERIAL_8250_CONSOLE
+diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
+index f52174a..f0b2f96 100644
+--- a/arch/arm/mach-davinci/da830.c
++++ b/arch/arm/mach-davinci/da830.c
+@@ -411,7 +411,7 @@ static struct davinci_clk da830_clks[] = {
+ 	CLK(NULL,		"pwm2",		&pwm2_clk),
+ 	CLK("eqep.0",		NULL,		&eqep0_clk),
+ 	CLK("eqep.1",		NULL,		&eqep1_clk),
+-	CLK("da830_lcdc",	NULL,		&lcdc_clk),
++	CLK("da8xx_lcdc.0",	NULL,		&lcdc_clk),
+ 	CLK("davinci-mcasp.0",	NULL,		&mcasp0_clk),
+ 	CLK("davinci-mcasp.1",	NULL,		&mcasp1_clk),
+ 	CLK("davinci-mcasp.2",	NULL,		&mcasp2_clk),
 -- 
 1.6.4.3
