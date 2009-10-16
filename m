@@ -1,7 +1,7 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 16 Oct 2009 12:09:26 -0700
-Subject: [PATCH 22/46] DaVinci: EDMA: Fix Bug in edma_alloc_cont_slots API
-In-Reply-To: <1255720190-7452-23-git-send-email-khilman@deeprootsystems.com>
+Date: Fri, 16 Oct 2009 12:09:27 -0700
+Subject: [PATCH 23/46] davinci: DM355: Update NAND driver platform data
+In-Reply-To: <1255720190-7452-24-git-send-email-khilman@deeprootsystems.com>
 References: <1255720190-7452-1-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-2-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-3-git-send-email-khilman@deeprootsystems.com>
@@ -25,45 +25,36 @@ References: <1255720190-7452-1-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-21-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-22-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-23-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1255720190-7452-24-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-24-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1255720190-7452-25-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sandeep Paulraj <s-paulraj@ti.com>
+From: Sneha Narnakaje <nsnehaprabha@ti.com>
 
-The edma_alloc_cont_slots API is used for obtaining a set of
-contiguous slots. When we use the "_ANY" option with this
-API, by definition of this option it is suppossed to start
-looking for a set of contiguous slots starting from slot 64 for
-DaVinci SOC's and 32 for DA8xx SOC's. This has been explained in
-the API description in the driver itself. So when we use the
-"_ANY" option with this API, the slot number passed as
-an argument should be a "don't care".
-This patch takes care of this condition mentioned above.
-When checking to see if the starting slot is a valid number,
-it checks to make sure that the "_ANY" option is not used.
+This patch updates the NAND driver platform data to use 4-bit ECC and the
+ECC_HW/ECC_HW_OOB_FIRST modes.
 
-Signed-off-by: Sandeep Paulraj <s-paulraj@ti.com>
+Signed-off-by: Sneha Narnakaje <nsnehaprabha@ti.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-davinci/dma.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/mach-davinci/board-dm355-evm.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
-index 89ce3e1..8eda4c3 100644
---- a/arch/arm/mach-davinci/dma.c
-+++ b/arch/arm/mach-davinci/dma.c
-@@ -771,8 +771,9 @@ int edma_alloc_cont_slots(unsigned ctlr, unsigned int id, int slot, int count)
- 	 * the number of channels and lesser than the total number
- 	 * of slots
- 	 */
--	if (slot < edma_info[ctlr]->num_channels ||
--		slot >= edma_info[ctlr]->num_slots)
-+	if ((id != EDMA_CONT_PARAMS_ANY) &&
-+		(slot < edma_info[ctlr]->num_channels ||
-+		slot >= edma_info[ctlr]->num_slots))
- 		return -EINVAL;
+diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
+index 77e8067..f87ef58 100644
+--- a/arch/arm/mach-davinci/board-dm355-evm.c
++++ b/arch/arm/mach-davinci/board-dm355-evm.c
+@@ -86,8 +86,9 @@ static struct davinci_nand_pdata davinci_nand_data = {
+ 	.mask_chipsel		= BIT(14),
+ 	.parts			= davinci_nand_partitions,
+ 	.nr_parts		= ARRAY_SIZE(davinci_nand_partitions),
+-	.ecc_mode		= NAND_ECC_HW_SYNDROME,
++	.ecc_mode		= NAND_ECC_HW,
+ 	.options		= NAND_USE_FLASH_BBT,
++	.ecc_bits		= 4,
+ };
  
- 	/*
+ static struct resource davinci_nand_resources[] = {
 -- 
 1.6.4.3
