@@ -1,113 +1,117 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Sat, 17 Oct 2009 00:02:41 +0200
-Subject: [PATCH v3 2/2] n2100: support assigning XINT1 to UART
-Message-ID: <19160.60801.732471.358213@pilspetsen.it.uu.se>
+From: utx@penguin.cz (Stanislav Brabec)
+Date: Sat, 17 Oct 2009 00:22:17 +0200
+Subject: [PATCH] Re: spitz: add gpio button support (fixes regression)
+In-Reply-To: <20091016190521.GB17849@n2100.arm.linux.org.uk>
+References: <20091007120643.GA17069@rakim.wolfsonmicro.main>
+	<f17812d70910070727x47b2a22h8e9f9304740d5abf@mail.gmail.com>
+	<20091006200933.GA1606@ucw.cz> <1255641385.3985.55.camel@utx.utx.cz>
+	<20091015212024.GC15898@elf.ucw.cz>
+	<1255643252.3985.63.camel@utx.utx.cz>
+	<20091015215215.GG15898@elf.ucw.cz>
+	<1255685315.5470.3.camel@hammer.suse.cz>
+	<20091016093950.GI15898@elf.ucw.cz>
+	<1255719006.9583.31.camel@utx.utx.cz>
+	<20091016190521.GB17849@n2100.arm.linux.org.uk>
+Message-ID: <1255731737.12593.4.camel@utx.utx.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Thecus n2100 has a jumper which determines if the XINT1
-interrupt line is connected to the second UHCI controller
-(position J3) or the serial console UART (position J4).
+Russell King - ARM Linux wrote: 
+> I'm not sure we want to apply this patch - it has UTF <U+FEFF>
+> sequences embedded randomly in it.
 
-In position J3 (default) the second UHCI controller is fully
-operational, allowing low-speed USB devices to be connected
-to any of the three USB ports. However, the UART has to be
-polled by a high-frequency timer, causing CPU overheads.
+These character were added by Evolution. I don't know why. I just wanted
+to inline a mail and edit few characters.
 
-In position J4 the second UHCI controller is not operational,
-causing low-speed USB devices to only work when connected to
-the front USB port. On the other hand, the UART polling timer
-is eliminated, resulting in reduced CPU overheads, fewer wakeups
-in tickless mode, and a faster serial console.
+Define Spitz buttons as GPIO keys in a way compatible with the old driver:
 
-This patch adds a compile-time option allowing the kernel to
-be configured appropriately for the J3 or J4 cases.
+On/Off: As Suspend EV_PWR key
 
-Signed-off-by: Mikael Pettersson <mikpe@it.uu.se>
----
-This patch is preliminary and optional. There should be a
-boot-time probe to detect how XINT1 is wired. I have not had
-time to implemented that yet, so I'm posting this patch as a
-very preliminary solution to the problem.
+Raw values of lid sensors SWA and SWB: As EV_SW switches
+SWA: Display Down
+SWB: Lid Closed
+Recommended user space decoding:
+SWA==0 & SWB==0: lid opened (landscape mode)
+SWA==1 & SWB==0: invalid (or mechanic race condition)
+SWA==0 & SWB==1: lid closed with display up (portrait mode or mechanic
+                 race condition while closing to display-less mode)
+SWA==1 & SWB==1: lid closed with display down (display-less mode)
 
-Changes v1 -> v3:
-* this change is useful also for non-tickless kernels,
-  so dropped "&& NO_HZ" dependency from config option and
-  updated config option help text accordingly
-* reordered patch series so this patch applies after the
-  1 Hz power button patch
-* rebased on 2.6.32-rc5
+AK_INT remote trigger is not mapped as input event. Without complete
+remote driver and remote pull-up control it has no useful
+interpretation.
 
- arch/arm/mach-iop32x/Kconfig |   22 ++++++++++++++++++++++
- arch/arm/mach-iop32x/n2100.c |   15 +++++++++++++--
- 2 files changed, 35 insertions(+), 2 deletions(-)
+Signed-off-by: Stanislav Brabec <utx@penguin.cz>
+Acked-by: Pavel Machek <pavel@ucw.cz>
 
-diff -rupN linux-2.6.32-rc5.arm-n2100-1-pbpt-hz1-v3/arch/arm/mach-iop32x/Kconfig linux-2.6.32-rc5.arm-n2100-2-xint1-uart-v3/arch/arm/mach-iop32x/Kconfig
---- linux-2.6.32-rc5.arm-n2100-1-pbpt-hz1-v3/arch/arm/mach-iop32x/Kconfig	2008-07-14 10:22:36.000000000 +0200
-+++ linux-2.6.32-rc5.arm-n2100-2-xint1-uart-v3/arch/arm/mach-iop32x/Kconfig	2009-10-16 22:02:42.000000000 +0200
-@@ -43,4 +43,26 @@ config MACH_EM7210
+diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+index ee8d603..c690522 100644
+--- a/arch/arm/mach-pxa/spitz.c
++++ b/arch/arm/mach-pxa/spitz.c
+@@ -15,6 +15,7 @@
+ #include <linux/kernel.h>
+ #include <linux/platform_device.h>
+ #include <linux/delay.h>
++#include <linux/gpio_keys.h>
+ #include <linux/gpio.h>
+ #include <linux/leds.h>
+ #include <linux/mtd/physmap.h>
+@@ -375,6 +376,43 @@ static struct platform_device spitzkbd_device = {
+ };
  
- endmenu
- 
-+config N2100_XINT1_UART
-+	bool "Support assigning Thecus n2100 XINT1 to UART"
-+	depends on MACH_N2100
-+	help
-+	  The Thecus n2100 has a jumper which determines if the XINT1
-+	  interrupt line is connected to the second UHCI controller
-+	  (position J3) or the serial console UART (position J4).
+
++static struct gpio_keys_button spitz_gpio_keys[] = {
++	{
++		.type	= EV_PWR,
++		.code	= KEY_SUSPEND,
++		.gpio	= SPITZ_GPIO_ON_KEY,
++		.desc	= "On/Off",
++		.wakeup	= 1,
++	},
++	/* Two buttons detecting the lid state */
++	{
++		.type	= EV_SW,
++		.code	= 0,
++		.gpio	= SPITZ_GPIO_SWA,
++		.desc	= "Display Down",
++	},
++	{
++		.type	= EV_SW,
++		.code	= 1,
++		.gpio	= SPITZ_GPIO_SWB,
++		.desc	= "Lid Closed",
++	},
++};
 +
-+	  In position J3 (default) the second UHCI controller is fully
-+	  operational, allowing low-speed USB devices to be connected
-+	  to any of the three USB ports. However, the UART has to be
-+	  polled by a high-frequency timer, causing CPU overheads.
++static struct gpio_keys_platform_data spitz_gpio_keys_platform_data = {
++	.buttons	= spitz_gpio_keys,
++	.nbuttons	= ARRAY_SIZE(spitz_gpio_keys),
++};
 +
-+	  In position J4 the second UHCI controller is not operational,
-+	  causing low-speed USB devices to only work when connected to
-+	  the front USB port. On the other hand, the UART polling timer
-+	  is eliminated, resulting in reduced CPU overheads, fewer wakeups
-+	  in tickless mode, and a faster serial console.
++static struct platform_device spitz_gpio_keys_device = {
++	.name	= "gpio-keys",
++	.id	= -1,
++	.dev	= {
++		.platform_data	= &spitz_gpio_keys_platform_data,
++	},
++};
 +
-+	  Say Y if tickless operation or a fast serial console is important
-+	  for you.
 +
- endif
-diff -rupN linux-2.6.32-rc5.arm-n2100-1-pbpt-hz1-v3/arch/arm/mach-iop32x/n2100.c linux-2.6.32-rc5.arm-n2100-2-xint1-uart-v3/arch/arm/mach-iop32x/n2100.c
---- linux-2.6.32-rc5.arm-n2100-1-pbpt-hz1-v3/arch/arm/mach-iop32x/n2100.c	2009-10-16 22:00:53.000000000 +0200
-+++ linux-2.6.32-rc5.arm-n2100-2-xint1-uart-v3/arch/arm/mach-iop32x/n2100.c	2009-10-16 22:02:42.000000000 +0200
-@@ -43,6 +43,17 @@
- #include <mach/time.h>
- 
  /*
-+ * N2100 IRQ assignments depend on XINT1 jumper.
-+ */
-+#ifdef CONFIG_N2100_XINT1_UART
-+#define N2100_UART_IRQ		IRQ_IOP32X_XINT1
-+#define N2100_VT6212_INTA_IRQ	-1	/* disabled */
-+#else
-+#define N2100_UART_IRQ		0	/* uses polling timer */
-+#define N2100_VT6212_INTA_IRQ	IRQ_IOP32X_XINT1
-+#endif
-+
-+/*
-  * N2100 timer tick configuration.
+  * Spitz LEDs
   */
- static void __init n2100_timer_init(void)
-@@ -95,7 +106,7 @@ n2100_pci_map_irq(struct pci_dev *dev, u
- 		irq = IRQ_IOP32X_XINT2;
- 	} else if (PCI_SLOT(dev->devfn) == 4 && pin == 1) {
- 		/* VT6212 INTA */
--		irq = IRQ_IOP32X_XINT1;
-+		irq = N2100_VT6212_INTA_IRQ;
- 	} else if (PCI_SLOT(dev->devfn) == 4 && pin == 2) {
- 		/* VT6212 INTB */
- 		irq = IRQ_IOP32X_XINT0;
-@@ -177,7 +188,7 @@ static struct plat_serial8250_port n2100
- 	{
- 		.mapbase	= N2100_UART,
- 		.membase	= (char *)N2100_UART,
--		.irq		= 0,
-+		.irq		= N2100_UART_IRQ,
- 		.flags		= UPF_SKIP_TEST,
- 		.iotype		= UPIO_MEM,
- 		.regshift	= 0,
+@@ -689,6 +727,7 @@ static struct platform_device sharpsl_rom_device = {
+ static struct platform_device *devices[] __initdata = {
+ 	&spitzscoop_device,
+ 	&spitzkbd_device,
++	&spitz_gpio_keys_device,
+ 	&spitzled_device,
+ 	&sharpsl_nand_device,
+ 	&sharpsl_rom_device,
+
+
+
+________________________________________________________________________
+
+Stanislav Brabec
+http://www.penguin.cz/~utx
