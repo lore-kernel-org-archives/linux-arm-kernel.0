@@ -1,89 +1,35 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Fri, 16 Oct 2009 09:38:43 +0300
-Subject: [PATCH 1/2] Update ts72xx to use generic platform nand driver
-In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901DB8132@mi8nycmail19.Mi8.com>
-References: <BD79186B4FD85F4B8E60E381CAEE190901DB7967@mi8nycmail19.Mi8.com>
-	<1255260621.16942.38.camel@localhost>
-	<BD79186B4FD85F4B8E60E381CAEE190901DB7E59@mi8nycmail19.Mi8.com>
-	<1255509739.32489.123.camel@localhost>
-	<BD79186B4FD85F4B8E60E381CAEE190901DB8132@mi8nycmail19.Mi8.com>
-Message-ID: <1255675123.32489.310.camel@localhost>
+From: jbe@pengutronix.de (Juergen Beisert)
+Date: Fri, 16 Oct 2009 09:41:38 +0200
+Subject: S3C2440: SD-Card access fails
+In-Reply-To: <20091016054856.GB2261@trinity.fluff.org>
+References: <200910152014.50677.jbe@pengutronix.de>
+	<20091016054856.GB2261@trinity.fluff.org>
+Message-ID: <200910160941.39181.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2009-10-14 at 13:05 -0400, H Hartley Sweeten wrote:
-> On Wednesday, October 14, 2009 1:42 AM, Artem Bityutskiy wrote:
-> > On Sun, 2009-10-11 at 17:19 -0400, H Hartley Sweeten wrote:
-> >> Update the ts72xx platform's nand driver support.
-> >>  
-> >> This changes the ts72xx platform from using a custom nand driver
-> >> (ts7250.c) to the generic platform nand driver (plat_nand.c).
-> >>  
-> >> Tested on TS-7250 with 32MB NAND.
-> >>  
-> >> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> >> Tested-by: Matthieu Crapet <mcrapet@gmail.com>
-> >> Cc: David Woodhouse <dwmw2@infradead.org>
-> >> Cc: Artem Bityutskiy <dedekind1@gmail.com>
-> >> Cc: <linux-arm-kernel@lists.infradead.org>
-> >> Cc: <linux-mtd@lists.infradead.org>
-> >> 
-> >> ---
-> >> 
-> >> V2 - rebased to current mtd tree (Artem Bityutskiy)
-> >> 
-> >>  arch/arm/mach-ep93xx/ts72xx.c |  177 +++++++++++++++++++++++++++++------------
-> >>  1 files changed, 125 insertions(+), 52 deletions(-)
-> >
-> > Ok, I've tried this patch on both mtd-2.6 and linux-2.6 git trees, and
-> > it does not apply cleanly.
-> 
-> [snip]
-> 
-> I'm really confused why this does not apply.
-> 
-> My mtd-2.6.git tree is at the same place as yours.
-> 
-> bigguiness at etch:~/src/git/mtd-2.6$ git show
-> commit 8032747e7680a31cdde293421af62d2e1904c528
-> Author: David Woodhouse <David.Woodhouse@intel.com>
-> Date:   Mon Oct 5 08:30:04 2009 +0100
-> 
->     mtd: make onenand_base.c compile again
->     
->     Signed-off-by: David Woodhouse <David.Woodhouse@intel.com>
-> 
-> diff --git a/drivers/mtd/onenand/onenand_base.c b/drivers/mtd/onenand/onenand_base.c
-> index 8935e63..6e250f3 100644
-> --- a/drivers/mtd/onenand/onenand_base.c
-> +++ b/drivers/mtd/onenand/onenand_base.c
-> @@ -1051,7 +1051,7 @@ static int onenand_mlc_read_ops_nolock(struct mtd_info *mtd, loff_t from,
->         int writesize = this->writesize;
->  
->         DEBUG(MTD_DEBUG_LEVEL3, "%s: from = 0x%08x, len = %i\n",
-> -               (unsigned int) from, (int) len);
-> +             __func__, (unsigned int) from, (int) len);
->  
->         if (ops->mode == MTD_OOB_AUTO)
->                 oobsize = this->ecclayout->oobavail;
-> @@ -2022,8 +2022,8 @@ static int onenand_write_oob_nolock(struct mtd_info *mtd, loff_t to,
->         if (unlikely(to >= mtd->size ||
->                      column + len > ((mtd->size >> this->page_shift) -
->                                      (to >> this->page_shift)) * oobsize)) {
-> -               printk(KERN_ERR "%s: Attempted to write past end of device\n"
-> -                       __func__);
-> +               printk(KERN_ERR "%s: Attempted to write past end of device\n",
-> +                      __func__);
->                 return -EINVAL;
->         }
+Hi Ben,
 
-My git head was actually different, take a look at my previous answer.
+On Freitag, 16. Oktober 2009, Ben Dooks wrote:
+> On Thu, Oct 15, 2009 at 08:14:50PM +0200, Juergen Beisert wrote:
+> > I'm using an S3C2440 based custom made board with a 2.6.31.3 kernel (with
+> > a few modifications to add the boards specific file). When I do some
+> > traffic on the SD card (1GiB SD type), for example untaring an archive I
+> > get a failure like this one:
+>
+> Is your platform data marked __initdata?
 
-> If I apply the two patches I get.
+Thanks for your answer. Yes, my local s3c24xx_mci_pdata structure was marked 
+with __initdata, like the one in mach-s3c2440/mach-mini2440.c (seems I used 
+the wrong example to create my own sources...).
+I removed this __initdata marker in my sources and now SD card access seems to 
+work (tests are still running).
 
-Could you please try to save your own e-mails, and then apply them using
-"git am"?
+Regards,
+Juergen
 
 -- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+Pengutronix e.K.                              | Juergen Beisert             |
+Linux Solutions for Science and Industry      | Phone: +49-8766-939 228     |
+Vertretung Sued/Muenchen, Germany             | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686              | http://www.pengutronix.de/  |
