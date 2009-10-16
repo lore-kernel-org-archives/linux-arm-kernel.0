@@ -1,7 +1,7 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 16 Oct 2009 12:09:23 -0700
-Subject: [PATCH 19/46] davinci: Add RTC support for DA8xx/OMAP-L13x SoC's
-In-Reply-To: <1255720190-7452-20-git-send-email-khilman@deeprootsystems.com>
+Date: Fri, 16 Oct 2009 12:09:24 -0700
+Subject: [PATCH 20/46] davinci: Correct the GPIO number for LCD panel power
+In-Reply-To: <1255720190-7452-21-git-send-email-khilman@deeprootsystems.com>
 References: <1255720190-7452-1-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-2-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-3-git-send-email-khilman@deeprootsystems.com>
@@ -22,115 +22,120 @@ References: <1255720190-7452-1-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-18-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-19-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-20-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1255720190-7452-21-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-21-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1255720190-7452-22-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark A. Greer <mgreer@mvista.com>
+From: Sudhakar Rajashekhara <sudhakar.raj@ti.com>
 
-Add RTC support for the da830/omap-l137 and da850/omap-l138
-SoC's by leveraging existing the rtc-omap driver.
+On the latest DA850/OMAP-L138 EVM (Beta) the GPIO pin
+number of LCD panel power has changed. This patch takes
+care of this change. Software will support only Beta
+versions of DA850/OMAP-L138 EVM.
 
-Signed-off-by: Mark A. Greer <mgreer@mvista.com>
+In the process, add the missing entry for data pin 0
+and remove the GPIO specific pins from da850_lcdcntl_pins
+structure. EVM specific muxing for LCD is being done in the
+board file now.
+
+Signed-off-by: Sudhakar Rajashekhara <sudhakar.raj@ti.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-davinci/board-da830-evm.c    |    4 +++
- arch/arm/mach-davinci/board-da850-evm.c    |    4 +++
- arch/arm/mach-davinci/devices-da8xx.c      |   35 ++++++++++++++++++++++++++++
- arch/arm/mach-davinci/include/mach/da8xx.h |    1 +
- 4 files changed, 44 insertions(+), 0 deletions(-)
+ arch/arm/mach-davinci/board-da850-evm.c  |   14 +++++++++++++-
+ arch/arm/mach-davinci/da850.c            |   13 ++++++-------
+ arch/arm/mach-davinci/include/mach/mux.h |    2 +-
+ 3 files changed, 20 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index dfc4897..fb76721 100644
---- a/arch/arm/mach-davinci/board-da830-evm.c
-+++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -217,6 +217,10 @@ static __init void da830_evm_init(void)
- 	if (ret)
- 		pr_warning("da830_evm_init: lcd setup failed: %d\n", ret);
- #endif
-+
-+	ret = da8xx_register_rtc();
-+	if (ret)
-+		pr_warning("da830_evm_init: rtc setup failed: %d\n", ret);
- }
- 
- #ifdef CONFIG_SERIAL_8250_CONSOLE
 diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index da1a6fb..47619a9 100644
+index 47619a9..25ae007 100644
 --- a/arch/arm/mach-davinci/board-da850-evm.c
 +++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -381,6 +381,10 @@ static __init void da850_evm_init(void)
- 	if (ret)
- 		pr_warning("da850_evm_init: lcdc registration failed: %d\n",
+@@ -32,12 +32,13 @@
+ #include <mach/cp_intc.h>
+ #include <mach/da8xx.h>
+ #include <mach/nand.h>
++#include <mach/mux.h>
+ 
+ #define DA850_EVM_PHY_MASK		0x1
+ #define DA850_EVM_MDIO_FREQUENCY	2200000 /* PHY bus frequency */
+ 
++#define DA850_LCD_PWR_PIN		GPIO_TO_PIN(2, 8)
+ #define DA850_LCD_BL_PIN		GPIO_TO_PIN(2, 15)
+-#define DA850_LCD_PWR_PIN		GPIO_TO_PIN(8, 10)
+ 
+ #define DA850_MMCSD_CD_PIN		GPIO_TO_PIN(4, 0)
+ #define DA850_MMCSD_WP_PIN		GPIO_TO_PIN(4, 1)
+@@ -264,6 +265,11 @@ static void __init da850_evm_init_nor(void)
+ #define HAS_MMC 0
+ #endif
+ 
++static const short da850_evm_lcdc_pins[] = {
++	DA850_GPIO2_8, DA850_GPIO2_15,
++	-1
++};
++
+ static __init void da850_evm_init(void)
+ {
+ 	struct davinci_soc_info *soc_info = &davinci_soc_info;
+@@ -372,6 +378,12 @@ static __init void da850_evm_init(void)
+ 		pr_warning("da850_evm_init: lcdcntl mux setup failed: %d\n",
  				ret);
-+
-+	ret = da8xx_register_rtc();
+ 
++	/* Handle board specific muxing for LCD here */
++	ret = da8xx_pinmux_setup(da850_evm_lcdc_pins);
 +	if (ret)
-+		pr_warning("da850_evm_init: rtc setup failed: %d\n", ret);
- }
++		pr_warning("da850_evm_init: evm specific lcd mux setup "
++				"failed: %d\n",	ret);
++
+ 	ret = da850_lcd_hw_init();
+ 	if (ret)
+ 		pr_warning("da850_evm_init: lcd initialization failed: %d\n",
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index 575e9cc..a62863c 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -513,8 +513,8 @@ static const struct mux_config da850_pins[] = {
+ 	MUX_CFG(DA850, EMA_WAIT_1,	6,	24,	15,	1,	false)
+ 	MUX_CFG(DA850, NEMA_CS_2,	7,	0,	15,	1,	false)
+ 	/* GPIO function */
++	MUX_CFG(DA850, GPIO2_8,		5,	28,	15,	8,	false)
+ 	MUX_CFG(DA850, GPIO2_15,	5,	0,	15,	8,	false)
+-	MUX_CFG(DA850, GPIO8_10,	18,	28,	15,	8,	false)
+ 	MUX_CFG(DA850, GPIO4_0,		10,	28,	15,	8,	false)
+ 	MUX_CFG(DA850, GPIO4_1,		10,	24,	15,	8,	false)
+ #endif
+@@ -562,12 +562,11 @@ const short da850_mcasp_pins[] __initdata = {
+ };
  
- #ifdef CONFIG_SERIAL_8250_CONSOLE
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index 5595613..dd0ea08 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -29,6 +29,7 @@
- #define DA8XX_TPTC1_BASE		0x01c08400
- #define DA8XX_WDOG_BASE			0x01c21000 /* DA8XX_TIMER64P1_BASE */
- #define DA8XX_I2C0_BASE			0x01c22000
-+#define DA8XX_RTC_BASE			0x01C23000
- #define DA8XX_EMAC_CPPI_PORT_BASE	0x01e20000
- #define DA8XX_EMAC_CPGMACSS_BASE	0x01e22000
- #define DA8XX_EMAC_CPGMAC_BASE		0x01e23000
-@@ -453,3 +454,37 @@ int __init da8xx_register_mmcsd0(struct davinci_mmc_config *config)
- 	da8xx_mmcsd0_device.dev.platform_data = config;
- 	return platform_device_register(&da8xx_mmcsd0_device);
- }
-+
-+static struct resource da8xx_rtc_resources[] = {
-+	{
-+		.start		= DA8XX_RTC_BASE,
-+		.end		= DA8XX_RTC_BASE + SZ_4K - 1,
-+		.flags		= IORESOURCE_MEM,
-+	},
-+	{ /* timer irq */
-+		.start		= IRQ_DA8XX_RTC,
-+		.end		= IRQ_DA8XX_RTC,
-+		.flags		= IORESOURCE_IRQ,
-+	},
-+	{ /* alarm irq */
-+		.start		= IRQ_DA8XX_RTC,
-+		.end		= IRQ_DA8XX_RTC,
-+		.flags		= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device da8xx_rtc_device = {
-+	.name           = "omap_rtc",
-+	.id             = -1,
-+	.num_resources	= ARRAY_SIZE(da8xx_rtc_resources),
-+	.resource	= da8xx_rtc_resources,
-+};
-+
-+int da8xx_register_rtc(void)
-+{
-+	/* Unlock the rtc's registers */
-+	__raw_writel(0x83e70b13, IO_ADDRESS(DA8XX_RTC_BASE + 0x6c));
-+	__raw_writel(0x95a4f1e0, IO_ADDRESS(DA8XX_RTC_BASE + 0x70));
-+
-+	return platform_device_register(&da8xx_rtc_device);
-+}
-diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-index 375a3f7..a152261 100644
---- a/arch/arm/mach-davinci/include/mach/da8xx.h
-+++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-@@ -81,6 +81,7 @@ int da8xx_register_emac(void);
- int da8xx_register_lcdc(struct da8xx_lcdc_platform_data *pdata);
- int da8xx_register_mmcsd0(struct davinci_mmc_config *config);
- void __init da8xx_register_mcasp(int id, struct snd_platform_data *pdata);
-+int da8xx_register_rtc(void);
+ const short da850_lcdcntl_pins[] __initdata = {
+-	DA850_LCD_D_1, DA850_LCD_D_2, DA850_LCD_D_3, DA850_LCD_D_4,
+-	DA850_LCD_D_5, DA850_LCD_D_6, DA850_LCD_D_7, DA850_LCD_D_8,
+-	DA850_LCD_D_9, DA850_LCD_D_10, DA850_LCD_D_11, DA850_LCD_D_12,
+-	DA850_LCD_D_13, DA850_LCD_D_14, DA850_LCD_D_15, DA850_LCD_PCLK,
+-	DA850_LCD_HSYNC, DA850_LCD_VSYNC, DA850_NLCD_AC_ENB_CS, DA850_GPIO2_15,
+-	DA850_GPIO8_10,
++	DA850_LCD_D_0, DA850_LCD_D_1, DA850_LCD_D_2, DA850_LCD_D_3,
++	DA850_LCD_D_4, DA850_LCD_D_5, DA850_LCD_D_6, DA850_LCD_D_7,
++	DA850_LCD_D_8, DA850_LCD_D_9, DA850_LCD_D_10, DA850_LCD_D_11,
++	DA850_LCD_D_12, DA850_LCD_D_13, DA850_LCD_D_14, DA850_LCD_D_15,
++	DA850_LCD_PCLK, DA850_LCD_HSYNC, DA850_LCD_VSYNC, DA850_NLCD_AC_ENB_CS,
+ 	-1
+ };
  
- extern struct platform_device da8xx_serial_device;
- extern struct emac_platform_data da8xx_emac_pdata;
+diff --git a/arch/arm/mach-davinci/include/mach/mux.h b/arch/arm/mach-davinci/include/mach/mux.h
+index bb84893..b2c1ad0 100644
+--- a/arch/arm/mach-davinci/include/mach/mux.h
++++ b/arch/arm/mach-davinci/include/mach/mux.h
+@@ -881,8 +881,8 @@ enum davinci_da850_index {
+ 	DA850_NEMA_CS_2,
+ 
+ 	/* GPIO function */
++	DA850_GPIO2_8,
+ 	DA850_GPIO2_15,
+-	DA850_GPIO8_10,
+ 	DA850_GPIO4_0,
+ 	DA850_GPIO4_1,
+ };
 -- 
 1.6.4.3
