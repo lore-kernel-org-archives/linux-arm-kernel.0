@@ -1,12 +1,14 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 16 Oct 2009 12:09:03 -0700
+Date: Fri, 16 Oct 2009 12:09:04 -0700
 Subject: [PATCH 00/46] davinci updates for 2.6.33
-Message-ID: <1255720190-7452-1-git-send-email-khilman@deeprootsystems.com>
+In-Reply-To: <1255720190-7452-1-git-send-email-khilman@deeprootsystems.com>
+References: <1255720190-7452-1-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1255720190-7452-2-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series includes various DaVinci platform updates which are
-targeted for the next merge window (2.6.33.)
+This series includes various platform updates to the DaVinci
+family SoCs which are targeted for the next merge window (2.6.33.)
 
 This series based on v2.6.32-rc5 and is available as the
 'davinci-next' branch of DaVinci git[1].  This branch is also
@@ -15,6 +17,7 @@ automatically included in linux-next.
 Kevin
 
 [1] http://git.kernel.org/?p=linux/kernel/git/khilman/linux-davinci.git;a=summary
+
 
 
 Chaithrika U S (3):
