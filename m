@@ -1,34 +1,56 @@
-From: jbe@pengutronix.de (Juergen Beisert)
-Date: Fri, 16 Oct 2009 11:24:50 +0200
-Subject: [PATCH] S3C2440: SD-Card usage fails with attribute __initdata for
-	the platformdata
-In-Reply-To: <20091016054856.GB2261@trinity.fluff.org>
-References: <200910152014.50677.jbe@pengutronix.de>
-	<20091016054856.GB2261@trinity.fluff.org>
-Message-ID: <200910161124.51537.jbe@pengutronix.de>
+From: utx@penguin.cz (Stanislav Brabec)
+Date: Fri, 16 Oct 2009 11:28:35 +0200
+Subject: spitz: add gpio button support (fixes regression)
+In-Reply-To: <20091015215215.GG15898@elf.ucw.cz>
+References: <20091006074635.GA2775@ucw.cz>
+	<1254829732.3546.35.camel@utx.utx.cz>
+	<20091007085806.GB28807@elf.ucw.cz>
+	<1254914991.4213.80.camel@hammer.suse.cz>
+	<20091007120643.GA17069@rakim.wolfsonmicro.main>
+	<f17812d70910070727x47b2a22h8e9f9304740d5abf@mail.gmail.com>
+	<20091006200933.GA1606@ucw.cz> <1255641385.3985.55.camel@utx.utx.cz>
+	<20091015212024.GC15898@elf.ucw.cz>
+	<1255643252.3985.63.camel@utx.utx.cz>
+	<20091015215215.GG15898@elf.ucw.cz>
+Message-ID: <1255685315.5470.3.camel@hammer.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Author: Juergen Beisert <j.beisert@pengutronix.de>
-Subject: Do not use __initdata for MMC's platform data
+Pavel Machek wrote:
+> On Thu 2009-10-15 23:47:32, Stanislav Brabec wrote:
+> > Pavel Machek wrote:
+> > >Well, resume is hit by second regression.
+> > >
+> > >Suspend key.... I restored it to the level of functionality in
+> > >2.6.31 :-).
+> > 
+> > > > +		.type	= EV_KEY,
+> > > > +		.code	= KEY_SUSPEND,
+> > 
+> > I guess it should be EV_PWR. Then it will at least go to suspend.
+> 
+> Does it actually go to suspend with that change?
 
-With __initdata for MMC's platform data the kernel fails at various locations
-when using the MMC/SD cards
+Yes.
 
-Signed-off-by: Juergen Beisert <j.beisert@pengutronix.de>
+> (Actually, I wonder how it could have ever worked: userspace should
+> certainly be in a loop there; kernel should not suspend machine on its
+> own. In -rp kernels, kernel _does_ suspend on its own, but... I'm not
+> sure if that's suitable for mainline).
 
----
+At least userspace apmd should be able to enter into suspend process
+(tested in 2.6.26-RP, not yet verified in 2.6.32-rc*).
 
-diff --git a/arch/arm/mach-s3c2440/mach-mini2440.c b/arch/arm/mach-s3c2440/mach-mini2440.c
-index ec71a69..f307666 100644
---- a/arch/arm/mach-s3c2440/mach-mini2440.c
-+++ b/arch/arm/mach-s3c2440/mach-mini2440.c
-@@ -233,7 +233,7 @@ struct s3c2410fb_mach_info mini2440_fb_info __initdata = {
- 
- /* MMC/SD  */
- 
--static struct s3c24xx_mci_pdata mini2440_mmc_cfg __initdata = {
-+static struct s3c24xx_mci_pdata mini2440_mmc_cfg = {
-    .gpio_detect   = S3C2410_GPG(8),
-    .gpio_wprotect = S3C2410_GPH(8),
-    .set_power     = NULL,
+I don't know, what is the preferred way in recent days, but Tosa does
+the same.
+
+-- 
+Best Regards / S pozdravem,
+
+Stanislav Brabec
+software developer
+---------------------------------------------------------------------
+SUSE LINUX, s. r. o.                          e-mail: sbrabec at suse.cz
+Lihovarsk? 1060/12           tel: +420 284 028 966, +49 911 740538747
+190 00 Praha 9                                  fax: +420 284 028 951
+Czech Republic                                    http://www.suse.cz/
