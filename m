@@ -1,26 +1,24 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Fri, 16 Oct 2009 18:36:08 +0100
-Subject: [PATCH 1/2] Update ts72xx to use generic platform nand driver
-In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901E244F4@mi8nycmail19.Mi8.com>
-References: <BD79186B4FD85F4B8E60E381CAEE190901DB7967@mi8nycmail19.Mi8.com>
-	<1255260621.16942.38.camel@localhost>
-	<BD79186B4FD85F4B8E60E381CAEE190901DB7E59@mi8nycmail19.Mi8.com>
-	<1255509739.32489.123.camel@localhost>
-	<BD79186B4FD85F4B8E60E381CAEE190901DB8132@mi8nycmail19.Mi8.com>
-	<1255675123.32489.310.camel@localhost>
-	<BD79186B4FD85F4B8E60E381CAEE190901E244EA@mi8nycmail19.Mi8.com>
-	<1255713631.18879.675.camel@macbook.infradead.org>
-	<BD79186B4FD85F4B8E60E381CAEE190901E244F4@mi8nycmail19.Mi8.com>
-Message-ID: <1255714568.18879.677.camel@macbook.infradead.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 16 Oct 2009 19:35:42 +0100
+Subject: [PATCH 5/6] mx31moboard: camera support
+In-Reply-To: <1255599780-12948-6-git-send-email-valentin.longchamp@epfl.ch>
+References: <1255599780-12948-1-git-send-email-valentin.longchamp@epfl.ch>
+	<1255599780-12948-2-git-send-email-valentin.longchamp@epfl.ch>
+	<1255599780-12948-3-git-send-email-valentin.longchamp@epfl.ch>
+	<1255599780-12948-4-git-send-email-valentin.longchamp@epfl.ch>
+	<1255599780-12948-5-git-send-email-valentin.longchamp@epfl.ch>
+	<1255599780-12948-6-git-send-email-valentin.longchamp@epfl.ch>
+Message-ID: <20091016183542.GA17849@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2009-10-16 at 13:32 -0400, H Hartley Sweeten wrote:
-> Stupid question... What does the 'i' stand for?  I see in lib/string_helpers.c that
-> all the units_10[] values don't have the 'i' and units_2[] do but I would like to
-> know what it actually means. 
+On Thu, Oct 15, 2009 at 11:42:59AM +0200, Valentin Longchamp wrote:
+> +	buf = dma_alloc_coherent(NULL, buf_size, &dma_handle, GFP_KERNEL);
+> +	if (!buf) {
+> +		pr_err("%s: cannot allocate camera buffer-memory\n", __func__);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	memset(buf, 0, buf_size);
 
-http://physics.nist.gov/cuu/Units/binary.html
-
--- 
-dwmw2
+No need to memset memory returned from dma_alloc_coherent.
