@@ -1,7 +1,7 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 16 Oct 2009 12:09:35 -0700
-Subject: [PATCH 31/46] davinci: da830: add support for new silicon revisions
-In-Reply-To: <1255720190-7452-32-git-send-email-khilman@deeprootsystems.com>
+Date: Fri, 16 Oct 2009 12:09:36 -0700
+Subject: [PATCH 32/46] davinci: da830 EVM: remove #include <mach/gpio.h>
+In-Reply-To: <1255720190-7452-33-git-send-email-khilman@deeprootsystems.com>
 References: <1255720190-7452-1-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-2-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-3-git-send-email-khilman@deeprootsystems.com>
@@ -34,13 +34,29 @@ References: <1255720190-7452-1-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-30-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-31-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-32-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1255720190-7452-33-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-33-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1255720190-7452-34-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Newer revs of da830 silicon have different 'variant' field of the JTAG
-id register.  Current code only supports rev 1.0 silicon.
+All that is needed is the existing #include <linux/gpio.h>
 
-This patch adds support for rev1.1 and rev2.0 silicon and updates
-the 'name' strings to add a '-' between 'omap' & 'l137' to have
-consistent naming with da850/omap-l138.
+Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+---
+ arch/arm/mach-davinci/board-da830-evm.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+index 13f4c57..fb706db 100644
+--- a/arch/arm/mach-davinci/board-da830-evm.c
++++ b/arch/arm/mach-davinci/board-da830-evm.c
+@@ -26,7 +26,6 @@
+ #include <mach/irqs.h>
+ #include <mach/cp_intc.h>
+ #include <mach/mux.h>
+-#include <mach/gpio.h>
+ #include <mach/da8xx.h>
+ #include <mach/asp.h>
+ #include <mach/usb.h>
+-- 
+1.6.4.3
