@@ -1,35 +1,43 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 16 Oct 2009 11:39:51 +0200
-Subject: spitz: add gpio button support (fixes regression)
-In-Reply-To: <1255685315.5470.3.camel@hammer.suse.cz>
-References: <20091007085806.GB28807@elf.ucw.cz>
-	<1254914991.4213.80.camel@hammer.suse.cz>
-	<20091007120643.GA17069@rakim.wolfsonmicro.main>
-	<f17812d70910070727x47b2a22h8e9f9304740d5abf@mail.gmail.com>
-	<20091006200933.GA1606@ucw.cz>
-	<1255641385.3985.55.camel@utx.utx.cz>
-	<20091015212024.GC15898@elf.ucw.cz>
-	<1255643252.3985.63.camel@utx.utx.cz>
-	<20091015215215.GG15898@elf.ucw.cz>
-	<1255685315.5470.3.camel@hammer.suse.cz>
-Message-ID: <20091016093950.GI15898@elf.ucw.cz>
+From: alex@digriz.org.uk (Alexander Clouter)
+Date: Fri, 16 Oct 2009 12:50:57 +0100
+Subject: arm / kirkwood (openrd): cpu_idle
+References: <200910151352.41991.dk-arm-linux@gmx.de>
+	<20091015121022.GC26774@twin.sascha.silbe.org>
+	<200910151428.27691.dk-arm-linux@gmx.de>
+	<ad9478410910150556h346c1042l48589843087e6fba@mail.gmail.com>
+Message-ID: <1a3mq6-ga5.ln1@chipmunk.wormnet.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > (Actually, I wonder how it could have ever worked: userspace should
-> > certainly be in a loop there; kernel should not suspend machine on its
-> > own. In -rp kernels, kernel _does_ suspend on its own, but... I'm not
-> > sure if that's suitable for mainline).
+Joel Stanley <joel@jms.id.au> wrote:
+>
+> On Thu, Oct 15, 2009 at 22:58, Dieter Kiermaier <dk-arm-linux@gmx.de> wrote:
+>>
+>> Am Donnerstag 15 Oktober 2009 14:10:22 schrieb Sascha Silbe:
+>
+>>> On Thu, Oct 15, 2009 at 01:52:41PM +0200, Dieter Kiermaier wrote:
+>>>
+>>> > But it looks like that in rc4 something has changed so the patch
+>>> > didn't apply without errors.
+>>> It was quite easy to resolve (even though I don't understand any of the
+>>> touched code), see [1] for a rebased patch.
 > 
-> At least userspace apmd should be able to enter into suspend process
-> (tested in 2.6.26-RP, not yet verified in 2.6.32-rc*).
+> I can confirm that the patch fixes the issue; I have been testing for
+> 48 hours on an openrd-client without seeing the WARNING.
 > 
-> I don't know, what is the preferred way in recent days, but Tosa does
-> the same.
+>>> I'm wondering why it wasn't merged upstream yet, though.
+>>
+>> I'm wondering, too.
+> 
+> Agreed.  What can we do to help it on it's way?
+> 
+I guess someone could add a bunch of Tested-By's to the LKML posting.
 
-Ok, lets do it that way, then. I guess you need to post patch with
-your signed-off-by, and you can add my acked-by.
-									Pavel
+http://patchwork.kernel.org/patch/50728/
+
+Cheers
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Alexander Clouter
+.sigmonster says: "We live, in a very kooky time."
+                  		-- Herb Blashtfalt
