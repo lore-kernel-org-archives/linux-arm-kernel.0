@@ -1,128 +1,142 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 16 Oct 2009 20:05:21 +0100
-Subject: [PATCH] Re: spitz: add gpio button support (fixes regression)
-In-Reply-To: <1255719006.9583.31.camel@utx.utx.cz>
-References: <20091007120643.GA17069@rakim.wolfsonmicro.main>
-	<f17812d70910070727x47b2a22h8e9f9304740d5abf@mail.gmail.com>
-	<20091006200933.GA1606@ucw.cz>
-	<1255641385.3985.55.camel@utx.utx.cz>
-	<20091015212024.GC15898@elf.ucw.cz>
-	<1255643252.3985.63.camel@utx.utx.cz>
-	<20091015215215.GG15898@elf.ucw.cz>
-	<1255685315.5470.3.camel@hammer.suse.cz>
-	<20091016093950.GI15898@elf.ucw.cz>
-	<1255719006.9583.31.camel@utx.utx.cz>
-Message-ID: <20091016190521.GB17849@n2100.arm.linux.org.uk>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Fri, 16 Oct 2009 12:09:03 -0700
+Subject: [PATCH 00/46] davinci updates for 2.6.33
+Message-ID: <1255720190-7452-1-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm not sure we want to apply this patch - it has UTF <U+FEFF>
-sequences embedded randomly in it.  I notice these because they
-completely screw up the ability to read this email in mutt running
-under a Linux VT (resulting in bits of the screen scrolling which
-mutt didn't intend.)
+This series includes various DaVinci platform updates which are
+targeted for the next merge window (2.6.33.)
 
-I suggest you try re-sending it as an attachment.
+This series based on v2.6.32-rc5 and is available as the
+'davinci-next' branch of DaVinci git[1].  This branch is also
+automatically included in linux-next.
 
-On Fri, Oct 16, 2009 at 08:50:05PM +0200, Stanislav Brabec wrote:
-> Pavel Machek wrote:
-> >Ok, lets do it that way, then.
-> 
-> Updating desc for lid keys and resending patch with proper comments:
-> ?
-> Define Spitz buttons as GPIO keys in a way compatible with the old driver:
-> 
-> On/Off: As Suspend EV_PWR key
-> 
-> ?Raw values of? lid sensors ?SWA and SWB: As EV_SW switches
-> SWA: Display Down
-> SWB: Lid Closed
-> Recommended user space decoding:
-> ?SWA==0 & SWB==0: lid opened (landscape mode)
-> ??SWA==1 & SWB==0: ?invalid (or mechanic race condition)
-> SWA==0 & SWB==1: ?lid closed with display up (portrait mode or ?mechanic
->                  race condition while closing to ?display-less mode)
-> SWA==1 & SWB==1: lid closed with display down (display-less mode)
-> 
-> ?AK_INT remote trigger is not mapped as input event. Without complete
-> remote driver and remote pull-up control it has no useful
-> interpretation.
-> 
-> Signed-off-by: Stanislav Brabec <utx@penguin.cz>
-> Acked-by: Pavel Machek <pavel@ucw.cz>
-> 
-> diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
-> index ee8d603..c690522 100644
-> --- a/arch/arm/mach-pxa/spitz.c
-> +++ b/arch/arm/mach-pxa/spitz.c
-> @@ -15,6 +15,7 @@
->  #include <linux/kernel.h>
->  #include <linux/platform_device.h>
->  #include <linux/delay.h>
-> +#include <linux/gpio_keys.h>
->  #include <linux/gpio.h>
->  #include <linux/leds.h>
->  #include <linux/mtd/physmap.h>
-> @@ -375,6 +376,43 @@ static struct platform_device spitzkbd_device = {
->  };
->  
->  
-> +static struct gpio_keys_button spitz_gpio_keys[] = {
-> +	{
-> +		.type	= EV_PWR,
-> +		.code	= KEY_SUSPEND,
-> +		.gpio	= SPITZ_GPIO_ON_KEY,
-> +		.desc	= "On/Off",
-> +		.wakeup	= 1,
-> +	},
-> +	/* Two buttons detecting the lid state */
-> +	{
-> +		.type	= EV_SW,
-> +		.code	= 0,
-> +		.gpio	= SPITZ_GPIO_SWA,
-> +		.desc	= "?Display Down",
-> +	},
-> +	{
-> +		.type	= EV_SW,
-> +		.code	= 1,
-> +		.gpio	= SPITZ_GPIO_SWB,
-> +		.desc	= "?Lid Closed",
-> +	},
-> +};
-> +
-> +static struct gpio_keys_platform_data spitz_gpio_keys_platform_data = {
-> +	.buttons	= spitz_gpio_keys,
-> +	.nbuttons	= ARRAY_SIZE(spitz_gpio_keys),
-> +};
-> +
-> +static struct platform_device spitz_gpio_keys_device = {
-> +	.name	= "gpio-keys",
-> +	.id	= -1,
-> +	.dev	= {
-> +		.platform_data	= &spitz_gpio_keys_platform_data,
-> +	},
-> +};
-> +
-> +
->  /*
->   * Spitz LEDs
->   */
-> @@ -689,6 +727,7 @@ static struct platform_device sharpsl_rom_device = {
->  static struct platform_device *devices[] __initdata = {
->  	&spitzscoop_device,
->  	&spitzkbd_device,
-> +	&spitz_gpio_keys_device,
->  	&spitzled_device,
->  	&sharpsl_nand_device,
->  	&sharpsl_rom_device,
-> 
-> 
-> ________________________________________________________________________
-> Stanislav Brabec
-> http://www.penguin.cz/~utx
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Kevin
+
+[1] http://git.kernel.org/?p=linux/kernel/git/khilman/linux-davinci.git;a=summary
+
+
+Chaithrika U S (3):
+  davinci: DA850/OMAP-L138 EVM expander setup and UI card detection
+  davinci: RMII support for DA850/OMAP-L138 EVM
+  davinci: DA850/OMAP-L138: Set ASYNC3 domain flag for McASP
+
+David A. Griego (1):
+  davinci: Add MMC/SD support for DA830/OMAP-L137 EVM
+
+Hemant Pedanekar (2):
+  davinci: dm646x: Add support for 3.x silicon revision
+  davinci: dm646x-evm: Add platform data for NAND
+
+Kevin Hilman (4):
+  davinci: da830 EVM: make machine name string consistent with da850
+  davinci: da830: add support for new silicon revisions
+  davinci: da830 EVM: remove #include <mach/gpio.h>
+  davinci: DMx and da8xx defconfig updates
+
+Mark A. Greer (5):
+  davinci: Move DA8xx/OMAP-L13x emac register routine
+  davinci: Change DA8xx/OMAP-L13x McASP registration routine name
+  davinci: Add DA830/OMAP-L137 EVM specific pinmux setting for McASP1
+  davinci: Add support for Sharp LCD035Q3DG01 graphical LCD
+  davinci: Add RTC support for DA8xx/OMAP-L13x SoC's
+
+Miguel Aguilar (1):
+  Davinci: DM365: Add platform device for McBSP
+
+Phaneendra Kumar (1):
+  DaVinci: DM365: SDIO interrupt resource correction
+
+Sandeep Paulraj (5):
+  DaVinci: DM365: Correct USB parent clock
+  DaVinci: EDMA: Fix bug in edma_free_cont_slots API
+  DaVinci: EDMA: Fix Bug in edma_alloc_cont_slots API
+  DaVinci: EDMA: Fix Bug while obtaining contiguous params
+  DaVinci: EDMA: Updating terminlogy in EDMA driver
+
+Sekhar Nori (15):
+  davinci: DA8XX/OMAP-L1XX: It's SYSCFG not BOOT_CFG
+  davinci: DA8XX/OMAP-L1XX: Avoid use of IO_ADDRESS for SYSCFG module
+  davinci: DA8XX/OMAP-L1XX: JTAG ID register should offset from SYSCFG
+    base
+  davinci: enable easy top down traversal of clock tree
+  davinci: make clock rate re-calculation easy
+  davinci: support changing the clock rate in clock framework
+  davinci: support re-parenting a clock in the clock framework
+  davinci: DA850/OMAP-L138: allow async3 source to be changed
+  davinci: add generic CPUFreq driver for DaVinci
+  davinci: DA850/OMAP-L138: add frequency scaling support
+  davinci: DA850/OMAP-L138: add voltage regulation support
+  davinci: DA850/OMAP-L138 EVM: register for CPUFreq support
+  davinci: DA850/OMAP-L138 EVM: add support for TPS65070 PMIC
+  davinci: fix compilation error when using mach/system.h
+  davinci: make it easier to identify SoC init failures
+
+Sergei Shtylyov (5):
+  davinci: DA8xx: CFGCHIP2 register definitions
+  davinci: DA8xx: OHCI platform device
+  davinci: DA830 EVM: OHCI platform code
+  davinci: DA8xx: rename 'psc_ctlr' field into 'gpsc'
+  DaVinci: remove unneeded #include's
+
+Sneha Narnakaje (2):
+  davinci: DM355: Update NAND driver platform data
+  davinci: DM365: Update NAND driver platform data
+
+Steve Chen (1):
+  davinci: Add LCD Graphics support for DA830/OMAP-L137 EVM
+
+Sudhakar Rajashekhara (1):
+  davinci: Correct the GPIO number for LCD panel power
+
+ arch/arm/configs/da830_omapl137_defconfig    | 1254 ------------------------
+ arch/arm/configs/da850_omapl138_defconfig    | 1229 ------------------------
+ arch/arm/configs/da8xx_omapl_defconfig       | 1322 ++++++++++++++++++++++++++
+ arch/arm/configs/davinci_all_defconfig       |  125 ++-
+ arch/arm/mach-davinci/Kconfig                |   54 ++
+ arch/arm/mach-davinci/Makefile               |    3 +
+ arch/arm/mach-davinci/board-da830-evm.c      |  234 +++++-
+ arch/arm/mach-davinci/board-da850-evm.c      |  366 +++++++-
+ arch/arm/mach-davinci/board-dm355-evm.c      |   12 +-
+ arch/arm/mach-davinci/board-dm355-leopard.c  |    9 +-
+ arch/arm/mach-davinci/board-dm365-evm.c      |   18 +-
+ arch/arm/mach-davinci/board-dm644x-evm.c     |   12 -
+ arch/arm/mach-davinci/board-dm646x-evm.c     |   84 ++-
+ arch/arm/mach-davinci/board-sffsdr.c         |   12 -
+ arch/arm/mach-davinci/clock.c                |  227 ++++-
+ arch/arm/mach-davinci/clock.h                |   17 +-
+ arch/arm/mach-davinci/common.c               |    4 +-
+ arch/arm/mach-davinci/cp_intc.c              |    3 -
+ arch/arm/mach-davinci/cpufreq.c              |  219 +++++
+ arch/arm/mach-davinci/da830.c                |   75 +-
+ arch/arm/mach-davinci/da850.c                |  302 ++++++-
+ arch/arm/mach-davinci/devices-da8xx.c        |   76 ++-
+ arch/arm/mach-davinci/devices.c              |    6 +-
+ arch/arm/mach-davinci/dm355.c                |    2 -
+ arch/arm/mach-davinci/dm365.c                |   49 +-
+ arch/arm/mach-davinci/dm644x.c               |    2 -
+ arch/arm/mach-davinci/dm646x.c               |   11 +-
+ arch/arm/mach-davinci/dma.c                  |  105 ++-
+ arch/arm/mach-davinci/gpio.c                 |    9 -
+ arch/arm/mach-davinci/include/mach/asp.h     |    3 +
+ arch/arm/mach-davinci/include/mach/cpufreq.h |   25 +
+ arch/arm/mach-davinci/include/mach/da8xx.h   |   23 +-
+ arch/arm/mach-davinci/include/mach/dm365.h   |    2 +
+ arch/arm/mach-davinci/include/mach/dm644x.h  |    1 -
+ arch/arm/mach-davinci/include/mach/mux.h     |   11 +-
+ arch/arm/mach-davinci/include/mach/system.h  |    3 +-
+ arch/arm/mach-davinci/include/mach/usb.h     |   57 ++
+ arch/arm/mach-davinci/mux.c                  |    1 -
+ arch/arm/mach-davinci/psc.c                  |    3 -
+ arch/arm/mach-davinci/serial.c               |    6 -
+ arch/arm/mach-davinci/sram.c                 |    3 -
+ arch/arm/mach-davinci/time.c                 |    6 -
+ arch/arm/mach-davinci/usb.c                  |   41 +-
+ 43 files changed, 3186 insertions(+), 2840 deletions(-)
+ delete mode 100644 arch/arm/configs/da830_omapl137_defconfig
+ delete mode 100644 arch/arm/configs/da850_omapl138_defconfig
+ create mode 100644 arch/arm/configs/da8xx_omapl_defconfig
+ create mode 100644 arch/arm/mach-davinci/cpufreq.c
+ create mode 100644 arch/arm/mach-davinci/include/mach/cpufreq.h
+ create mode 100644 arch/arm/mach-davinci/include/mach/usb.h
