@@ -1,8 +1,7 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 16 Oct 2009 12:09:13 -0700
-Subject: [PATCH 09/46] davinci: DA8XX/OMAP-L1XX: JTAG ID register should
-	offset from SYSCFG base
-In-Reply-To: <1255720190-7452-10-git-send-email-khilman@deeprootsystems.com>
+Date: Fri, 16 Oct 2009 12:09:14 -0700
+Subject: [PATCH 10/46] davinci: enable easy top down traversal of clock tree
+In-Reply-To: <1255720190-7452-11-git-send-email-khilman@deeprootsystems.com>
 References: <1255720190-7452-1-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-2-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-3-git-send-email-khilman@deeprootsystems.com>
@@ -13,80 +12,75 @@ References: <1255720190-7452-1-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-8-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-9-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-10-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1255720190-7452-11-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-11-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1255720190-7452-12-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sekhar Nori <nsekhar@ti.com>
 
-This makes it clear that JTAG ID register is part of the
-SYSCFG module
+Achieve easy top down traversal of clock tree by keeping
+track of each clock's list of children.
+
+This is useful in supporting DVFS where clock rates of
+all children need to be updated in an efficient manner.
 
 Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-davinci/da830.c              |    3 ++-
- arch/arm/mach-davinci/da850.c              |    3 ++-
- arch/arm/mach-davinci/include/mach/da8xx.h |    2 +-
- 3 files changed, 5 insertions(+), 3 deletions(-)
+ arch/arm/mach-davinci/clock.c |   10 +++++++---
+ arch/arm/mach-davinci/clock.h |    2 ++
+ 2 files changed, 9 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
-index 3d70eae..f52174a 100644
---- a/arch/arm/mach-davinci/da830.c
-+++ b/arch/arm/mach-davinci/da830.c
-@@ -1178,7 +1178,6 @@ static struct davinci_timer_info da830_timer_info = {
- static struct davinci_soc_info davinci_soc_info_da830 = {
- 	.io_desc		= da830_io_desc,
- 	.io_desc_num		= ARRAY_SIZE(da830_io_desc),
--	.jtag_id_base		= IO_ADDRESS(DA8XX_JTAG_ID_REG),
- 	.ids			= da830_ids,
- 	.ids_num		= ARRAY_SIZE(da830_ids),
- 	.cpu_clks		= da830_clks,
-@@ -1204,6 +1203,8 @@ void __init da830_init(void)
- 	if (WARN(!da8xx_syscfg_base, "Unable to map syscfg module"))
- 		return;
+diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
+index 83d54d5..f8c4ef0 100644
+--- a/arch/arm/mach-davinci/clock.c
++++ b/arch/arm/mach-davinci/clock.c
+@@ -123,8 +123,12 @@ int clk_register(struct clk *clk)
+ 			clk->name, clk->parent->name))
+ 		return -EINVAL;
  
-+	davinci_soc_info_da830.jtag_id_base =
-+					DA8XX_SYSCFG_VIRT(DA8XX_JTAG_ID_REG);
- 	davinci_soc_info_da830.pinmux_base = DA8XX_SYSCFG_VIRT(0x120);
++	INIT_LIST_HEAD(&clk->children);
++
+ 	mutex_lock(&clocks_mutex);
+ 	list_add_tail(&clk->node, &clocks);
++	if (clk->parent)
++		list_add_tail(&clk->childnode, &clk->parent->children);
+ 	mutex_unlock(&clocks_mutex);
  
- 	davinci_common_init(&davinci_soc_info_da830);
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 54d1836..f5c3a6a 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -793,7 +793,6 @@ static struct davinci_timer_info da850_timer_info = {
- static struct davinci_soc_info davinci_soc_info_da850 = {
- 	.io_desc		= da850_io_desc,
- 	.io_desc_num		= ARRAY_SIZE(da850_io_desc),
--	.jtag_id_base		= IO_ADDRESS(DA8XX_JTAG_ID_REG),
- 	.ids			= da850_ids,
- 	.ids_num		= ARRAY_SIZE(da850_ids),
- 	.cpu_clks		= da850_clks,
-@@ -819,6 +818,8 @@ void __init da850_init(void)
- 	if (WARN(!da8xx_syscfg_base, "Unable to map syscfg module"))
- 		return;
+ 	/* If rate is already set, use it */
+@@ -146,6 +150,7 @@ void clk_unregister(struct clk *clk)
  
-+	davinci_soc_info_da850.jtag_id_base =
-+					DA8XX_SYSCFG_VIRT(DA8XX_JTAG_ID_REG);
- 	davinci_soc_info_da850.pinmux_base = DA8XX_SYSCFG_VIRT(0x120);
+ 	mutex_lock(&clocks_mutex);
+ 	list_del(&clk->node);
++	list_del(&clk->childnode);
+ 	mutex_unlock(&clocks_mutex);
+ }
+ EXPORT_SYMBOL(clk_unregister);
+@@ -352,9 +357,8 @@ dump_clock(struct seq_file *s, unsigned nest, struct clk *parent)
+ 	/* REVISIT show device associations too */
  
- 	davinci_common_init(&davinci_soc_info_da850);
-diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-index 11d2079..6f03650 100644
---- a/arch/arm/mach-davinci/include/mach/da8xx.h
-+++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-@@ -33,10 +33,10 @@ extern void __iomem *da8xx_syscfg_base;
+ 	/* cost is now small, but not linear... */
+-	list_for_each_entry(clk, &clocks, node) {
+-		if (clk->parent == parent)
+-			dump_clock(s, nest + NEST_DELTA, clk);
++	list_for_each_entry(clk, &parent->children, childnode) {
++		dump_clock(s, nest + NEST_DELTA, clk);
+ 	}
+ }
  
- #define DA8XX_SYSCFG_BASE	(IO_PHYS + 0x14000)
- #define DA8XX_SYSCFG_VIRT(x)	(da8xx_syscfg_base + (x))
-+#define DA8XX_JTAG_ID_REG	0x18
- 
- #define DA8XX_PSC0_BASE		0x01c10000
- #define DA8XX_PLL0_BASE		0x01c11000
--#define DA8XX_JTAG_ID_REG	0x01c14018
- #define DA8XX_TIMER64P0_BASE	0x01c20000
- #define DA8XX_TIMER64P1_BASE	0x01c21000
- #define DA8XX_GPIO_BASE		0x01e26000
+diff --git a/arch/arm/mach-davinci/clock.h b/arch/arm/mach-davinci/clock.h
+index 27233cb..f88794d 100644
+--- a/arch/arm/mach-davinci/clock.h
++++ b/arch/arm/mach-davinci/clock.h
+@@ -69,6 +69,8 @@ struct clk {
+ 	u8			lpsc;
+ 	u8			psc_ctlr;
+ 	struct clk              *parent;
++	struct list_head	children; 	/* list of children */
++	struct list_head	childnode;	/* parent's child list node */
+ 	struct pll_data         *pll_data;
+ 	u32                     div_reg;
+ };
 -- 
 1.6.4.3
