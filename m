@@ -1,7 +1,8 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 16 Oct 2009 12:09:37 -0700
-Subject: [PATCH 33/46] davinci: add generic CPUFreq driver for DaVinci
-In-Reply-To: <1255720190-7452-34-git-send-email-khilman@deeprootsystems.com>
+Date: Fri, 16 Oct 2009 12:09:44 -0700
+Subject: [PATCH 40/46] davinci: DA850/OMAP-L138 EVM expander setup and UI card
+	detection
+In-Reply-To: <1255720190-7452-41-git-send-email-khilman@deeprootsystems.com>
 References: <1255720190-7452-1-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-2-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-3-git-send-email-khilman@deeprootsystems.com>
@@ -36,306 +37,206 @@ References: <1255720190-7452-1-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-32-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-33-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-34-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1255720190-7452-35-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-35-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-36-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-37-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-38-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-39-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-40-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-41-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1255720190-7452-42-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sekhar Nori <nsekhar@ti.com>
+From: Chaithrika U S <chaithrika@ti.com>
 
-Adds a basic CPUFreq driver for DaVinci devices registering with the
-kernel CPUFreq infrastructure.
+DA850/OMAP-L138 EVM can be connected to an UI card which has various
+peripherals on it.The UI card has TCA6416 expander which can be probed
+to check whether the UI card is connected or not. If the UI card is
+connected, setup NOR and NAND devices. This is done via the expander
+setup callback.
 
-Support is added for both frequency and voltage regulation.
-
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: Chaithrika U S <chaithrika@ti.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-davinci/Kconfig                |    1 +
- arch/arm/mach-davinci/Makefile               |    3 +
- arch/arm/mach-davinci/cpufreq.c              |  219 ++++++++++++++++++++++++++
- arch/arm/mach-davinci/include/mach/cpufreq.h |   25 +++
- 4 files changed, 248 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-davinci/cpufreq.c
- create mode 100644 arch/arm/mach-davinci/include/mach/cpufreq.h
+ arch/arm/mach-davinci/board-da850-evm.c |  127 ++++++++++++++++++++++++-------
+ 1 files changed, 99 insertions(+), 28 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
-index 7b6dddf..6c81b6c 100644
---- a/arch/arm/mach-davinci/Kconfig
-+++ b/arch/arm/mach-davinci/Kconfig
-@@ -32,6 +32,7 @@ config ARCH_DAVINCI_DA830
-         bool "DA830/OMAP-L137 based system"
- 	select CP_INTC
- 	select ARCH_DAVINCI_DA8XX
-+	select ARCH_HAS_CPUFREQ
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index a34df64..05b2d87 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -17,6 +17,7 @@
+ #include <linux/console.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c/at24.h>
++#include <linux/i2c/pca953x.h>
+ #include <linux/gpio.h>
+ #include <linux/platform_device.h>
+ #include <linux/mtd/mtd.h>
+@@ -145,10 +146,85 @@ static struct platform_device da850_evm_nandflash_device = {
+ 	.resource	= da850_evm_nandflash_resource,
+ };
  
- config ARCH_DAVINCI_DA850
- 	bool "DA850/OMAP-L138 based system"
-diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
-index 2e11e84..be629c5 100644
---- a/arch/arm/mach-davinci/Makefile
-+++ b/arch/arm/mach-davinci/Makefile
-@@ -29,3 +29,6 @@ obj-$(CONFIG_MACH_DAVINCI_DM6467_EVM)	+= board-dm646x-evm.o
- obj-$(CONFIG_MACH_DAVINCI_DM365_EVM)	+= board-dm365-evm.o
- obj-$(CONFIG_MACH_DAVINCI_DA830_EVM)	+= board-da830-evm.o
- obj-$(CONFIG_MACH_DAVINCI_DA850_EVM)	+= board-da850-evm.o
++static u32 ui_card_detected;
++static void da850_evm_setup_nor_nand(void);
 +
-+# Power Management
-+obj-$(CONFIG_CPU_FREQ)			+= cpufreq.o
-diff --git a/arch/arm/mach-davinci/cpufreq.c b/arch/arm/mach-davinci/cpufreq.c
-new file mode 100644
-index 0000000..8c8c07b
---- /dev/null
-+++ b/arch/arm/mach-davinci/cpufreq.c
-@@ -0,0 +1,219 @@
-+/*
-+ * CPU frequency scaling for DaVinci
-+ *
-+ * Copyright (C) 2009 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * Based on linux/arch/arm/plat-omap/cpu-omap.c. Original Copyright follows:
-+ *
-+ *  Copyright (C) 2005 Nokia Corporation
-+ *  Written by Tony Lindgren <tony@atomide.com>
-+ *
-+ *  Based on cpu-sa1110.c, Copyright (C) 2001 Russell King
-+ *
-+ * Copyright (C) 2007-2008 Texas Instruments, Inc.
-+ * Updated to support OMAP3
-+ * Rajendra Nayak <rnayak@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/types.h>
-+#include <linux/cpufreq.h>
-+#include <linux/init.h>
-+#include <linux/err.h>
-+#include <linux/clk.h>
-+#include <linux/platform_device.h>
-+
-+#include <mach/hardware.h>
-+#include <mach/cpufreq.h>
-+#include <mach/common.h>
-+
-+#include "clock.h"
-+
-+struct davinci_cpufreq {
-+	struct device *dev;
-+	struct clk *armclk;
-+};
-+static struct davinci_cpufreq cpufreq;
-+
-+static int davinci_verify_speed(struct cpufreq_policy *policy)
++static int da850_evm_ui_expander_setup(struct i2c_client *client, unsigned gpio,
++						unsigned ngpio, void *c)
 +{
-+	struct davinci_cpufreq_config *pdata = cpufreq.dev->platform_data;
-+	struct cpufreq_frequency_table *freq_table = pdata->freq_table;
-+	struct clk *armclk = cpufreq.armclk;
++	int sel_a, sel_b, sel_c, ret;
 +
-+	if (freq_table)
-+		return cpufreq_frequency_table_verify(policy, freq_table);
++	sel_a = gpio + 7;
++	sel_b = gpio + 6;
++	sel_c = gpio + 5;
 +
-+	if (policy->cpu)
-+		return -EINVAL;
++	ret = gpio_request(sel_a, "sel_a");
++	if (ret) {
++		pr_warning("Cannot open UI expander pin %d\n", sel_a);
++		goto exp_setup_sela_fail;
++	}
 +
-+	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
-+				     policy->cpuinfo.max_freq);
++	ret = gpio_request(sel_b, "sel_b");
++	if (ret) {
++		pr_warning("Cannot open UI expander pin %d\n", sel_b);
++		goto exp_setup_selb_fail;
++	}
 +
-+	policy->min = clk_round_rate(armclk, policy->min * 1000) / 1000;
-+	policy->max = clk_round_rate(armclk, policy->max * 1000) / 1000;
-+	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
-+						policy->cpuinfo.max_freq);
++	ret = gpio_request(sel_c, "sel_c");
++	if (ret) {
++		pr_warning("Cannot open UI expander pin %d\n", sel_c);
++		goto exp_setup_selc_fail;
++	}
++
++	/* deselect all functionalities */
++	gpio_direction_output(sel_a, 1);
++	gpio_direction_output(sel_b, 1);
++	gpio_direction_output(sel_c, 1);
++
++	ui_card_detected = 1;
++	pr_info("DA850/OMAP-L138 EVM UI card detected\n");
++
++	da850_evm_setup_nor_nand();
++
 +	return 0;
-+}
 +
-+static unsigned int davinci_getspeed(unsigned int cpu)
-+{
-+	if (cpu)
-+		return 0;
-+
-+	return clk_get_rate(cpufreq.armclk) / 1000;
-+}
-+
-+static int davinci_target(struct cpufreq_policy *policy,
-+				unsigned int target_freq, unsigned int relation)
-+{
-+	int ret = 0;
-+	unsigned int idx;
-+	struct cpufreq_freqs freqs;
-+	struct davinci_cpufreq_config *pdata = cpufreq.dev->platform_data;
-+	struct clk *armclk = cpufreq.armclk;
-+
-+	/*
-+	 * Ensure desired rate is within allowed range.  Some govenors
-+	 * (ondemand) will just pass target_freq=0 to get the minimum.
-+	 */
-+	if (target_freq < policy->cpuinfo.min_freq)
-+		target_freq = policy->cpuinfo.min_freq;
-+	if (target_freq > policy->cpuinfo.max_freq)
-+		target_freq = policy->cpuinfo.max_freq;
-+
-+	freqs.old = davinci_getspeed(0);
-+	freqs.new = clk_round_rate(armclk, target_freq * 1000) / 1000;
-+	freqs.cpu = 0;
-+
-+	if (freqs.old == freqs.new)
-+		return ret;
-+
-+	cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER,
-+			dev_driver_string(cpufreq.dev),
-+			"transition: %u --> %u\n", freqs.old, freqs.new);
-+
-+	ret = cpufreq_frequency_table_target(policy, pdata->freq_table,
-+						freqs.new, relation, &idx);
-+	if (ret)
-+		return -EINVAL;
-+
-+	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-+
-+	/* if moving to higher frequency, up the voltage beforehand */
-+	if (pdata->set_voltage && freqs.new > freqs.old)
-+		pdata->set_voltage(idx);
-+
-+	ret = clk_set_rate(armclk, idx);
-+
-+	/* if moving to lower freq, lower the voltage after lowering freq */
-+	if (pdata->set_voltage && freqs.new < freqs.old)
-+		pdata->set_voltage(idx);
-+
-+	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-+
++exp_setup_selc_fail:
++	gpio_free(sel_b);
++exp_setup_selb_fail:
++	gpio_free(sel_a);
++exp_setup_sela_fail:
 +	return ret;
 +}
 +
-+static int __init davinci_cpu_init(struct cpufreq_policy *policy)
++static int da850_evm_ui_expander_teardown(struct i2c_client *client,
++					unsigned gpio, unsigned ngpio, void *c)
 +{
-+	int result = 0;
-+	struct davinci_cpufreq_config *pdata = cpufreq.dev->platform_data;
-+	struct cpufreq_frequency_table *freq_table = pdata->freq_table;
++	/* deselect all functionalities */
++	gpio_set_value(gpio + 5, 1);
++	gpio_set_value(gpio + 6, 1);
++	gpio_set_value(gpio + 7, 1);
 +
-+	if (policy->cpu != 0)
-+		return -EINVAL;
++	gpio_free(gpio + 5);
++	gpio_free(gpio + 6);
++	gpio_free(gpio + 7);
 +
-+	policy->cur = policy->min = policy->max = davinci_getspeed(0);
-+
-+	if (freq_table) {
-+		result = cpufreq_frequency_table_cpuinfo(policy, freq_table);
-+		if (!result)
-+			cpufreq_frequency_table_get_attr(freq_table,
-+							policy->cpu);
-+	} else {
-+		policy->cpuinfo.min_freq = policy->min;
-+		policy->cpuinfo.max_freq = policy->max;
-+	}
-+
-+	policy->min = policy->cpuinfo.min_freq;
-+	policy->max = policy->cpuinfo.max_freq;
-+	policy->cur = davinci_getspeed(0);
-+
-+	/*
-+	 * Time measurement across the target() function yields ~1500-1800us
-+	 * time taken with no drivers on notification list.
-+	 * Setting the latency to 2000 us to accomodate addition of drivers
-+	 * to pre/post change notification list.
-+	 */
-+	policy->cpuinfo.transition_latency = 2000 * 1000;
 +	return 0;
 +}
 +
-+static int davinci_cpu_exit(struct cpufreq_policy *policy)
-+{
-+	cpufreq_frequency_table_put_attr(policy->cpu);
-+	return 0;
-+}
-+
-+static struct freq_attr *davinci_cpufreq_attr[] = {
-+	&cpufreq_freq_attr_scaling_available_freqs,
-+	NULL,
++static struct pca953x_platform_data da850_evm_ui_expander_info = {
++	.gpio_base	= DAVINCI_N_GPIO,
++	.setup		= da850_evm_ui_expander_setup,
++	.teardown	= da850_evm_ui_expander_teardown,
 +};
 +
-+static struct cpufreq_driver davinci_driver = {
-+	.flags		= CPUFREQ_STICKY,
-+	.verify		= davinci_verify_speed,
-+	.target		= davinci_target,
-+	.get		= davinci_getspeed,
-+	.init		= davinci_cpu_init,
-+	.exit		= davinci_cpu_exit,
-+	.name		= "davinci",
-+	.attr		= davinci_cpufreq_attr,
-+};
-+
-+static int __init davinci_cpufreq_probe(struct platform_device *pdev)
-+{
-+	struct davinci_cpufreq_config *pdata = pdev->dev.platform_data;
-+
-+	if (!pdata)
-+		return -EINVAL;
-+	if (!pdata->freq_table)
-+		return -EINVAL;
-+
-+	cpufreq.dev = &pdev->dev;
-+
-+	cpufreq.armclk = clk_get(NULL, "arm");
-+	if (IS_ERR(cpufreq.armclk)) {
-+		dev_err(cpufreq.dev, "Unable to get ARM clock\n");
-+		return PTR_ERR(cpufreq.armclk);
-+	}
-+
-+	return cpufreq_register_driver(&davinci_driver);
-+}
-+
-+static int __exit davinci_cpufreq_remove(struct platform_device *pdev)
-+{
-+	clk_put(cpufreq.armclk);
-+
-+	return cpufreq_unregister_driver(&davinci_driver);
-+}
-+
-+static struct platform_driver davinci_cpufreq_driver = {
-+	.driver = {
-+		.name	 = "cpufreq-davinci",
-+		.owner	 = THIS_MODULE,
+ static struct i2c_board_info __initdata da850_evm_i2c_devices[] = {
+ 	{
+ 		I2C_BOARD_INFO("tlv320aic3x", 0x18),
+-	}
 +	},
-+	.remove = __exit_p(davinci_cpufreq_remove),
-+};
-+
-+static int __init davinci_cpufreq_init(void)
++	{
++		I2C_BOARD_INFO("tca6416", 0x20),
++		.platform_data = &da850_evm_ui_expander_info,
++	},
+ };
+ 
+ static struct davinci_i2c_platform_data da850_evm_i2c_0_pdata = {
+@@ -399,13 +475,6 @@ static int __init pmic_tps65070_init(void)
+ 					ARRAY_SIZE(da850evm_tps65070_info));
+ }
+ 
+-#if defined(CONFIG_MTD_PHYSMAP) || \
+-    defined(CONFIG_MTD_PHYSMAP_MODULE)
+-#define HAS_NOR 1
+-#else
+-#define HAS_NOR 0
+-#endif
+-
+ #if defined(CONFIG_MMC_DAVINCI) || \
+     defined(CONFIG_MMC_DAVINCI_MODULE)
+ #define HAS_MMC 1
+@@ -413,6 +482,28 @@ static int __init pmic_tps65070_init(void)
+ #define HAS_MMC 0
+ #endif
+ 
++static void da850_evm_setup_nor_nand(void)
 +{
-+	return platform_driver_probe(&davinci_cpufreq_driver,
-+							davinci_cpufreq_probe);
++	int ret = 0;
++
++	if (ui_card_detected & !HAS_MMC) {
++		ret = da8xx_pinmux_setup(da850_nand_pins);
++		if (ret)
++			pr_warning("da850_evm_init: nand mux setup failed: "
++					"%d\n",	ret);
++
++		ret = da8xx_pinmux_setup(da850_nor_pins);
++		if (ret)
++			pr_warning("da850_evm_init: nor mux setup failed: %d\n",
++				ret);
++
++		da850_evm_init_nor();
++
++		platform_add_devices(da850_evm_devices,
++					ARRAY_SIZE(da850_evm_devices));
++	}
 +}
-+late_initcall(davinci_cpufreq_init);
 +
-diff --git a/arch/arm/mach-davinci/include/mach/cpufreq.h b/arch/arm/mach-davinci/include/mach/cpufreq.h
-new file mode 100644
-index 0000000..442bdea
---- /dev/null
-+++ b/arch/arm/mach-davinci/include/mach/cpufreq.h
-@@ -0,0 +1,25 @@
-+/*
-+ * TI DaVinci CPUFreq platform support.
-+ *
-+ * Copyright (C) 2009 Texas Instruments, Inc. http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#ifndef _MACH_DAVINCI_CPUFREQ_H
-+#define _MACH_DAVINCI_CPUFREQ_H
-+
-+#include <linux/cpufreq.h>
-+
-+struct davinci_cpufreq_config {
-+	struct cpufreq_frequency_table *freq_table;
-+	int (*set_voltage) (unsigned int index);
-+};
-+
-+#endif
+ static const short da850_evm_lcdc_pins[] = {
+ 	DA850_GPIO2_8, DA850_GPIO2_15,
+ 	-1
+@@ -428,21 +519,6 @@ static __init void da850_evm_init(void)
+ 		pr_warning("da850_evm_init: TPS65070 PMIC init failed: %d\n",
+ 				ret);
+ 
+-	ret = da8xx_pinmux_setup(da850_nand_pins);
+-	if (ret)
+-		pr_warning("da850_evm_init: nand mux setup failed: %d\n",
+-				ret);
+-
+-	ret = da8xx_pinmux_setup(da850_nor_pins);
+-	if (ret)
+-		pr_warning("da850_evm_init: nor mux setup failed: %d\n",
+-				ret);
+-
+-	da850_evm_init_nor();
+-
+-	platform_add_devices(da850_evm_devices,
+-				ARRAY_SIZE(da850_evm_devices));
+-
+ 	ret = da8xx_register_edma();
+ 	if (ret)
+ 		pr_warning("da850_evm_init: edma registration failed: %d\n",
+@@ -478,11 +554,6 @@ static __init void da850_evm_init(void)
+ 				ret);
+ 
+ 	if (HAS_MMC) {
+-		if (HAS_NOR)
+-			pr_warning("WARNING: both NOR Flash and MMC/SD are "
+-				"enabled, but they share AEMIF pins.\n"
+-				"\tDisable one of them.\n");
+-
+ 		ret = da8xx_pinmux_setup(da850_mmcsd0_pins);
+ 		if (ret)
+ 			pr_warning("da850_evm_init: mmcsd0 mux setup failed:"
 -- 
 1.6.4.3
