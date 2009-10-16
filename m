@@ -1,7 +1,7 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 16 Oct 2009 12:09:25 -0700
-Subject: [PATCH 21/46] DaVinci: EDMA: Fix bug in edma_free_cont_slots API
-In-Reply-To: <1255720190-7452-22-git-send-email-khilman@deeprootsystems.com>
+Date: Fri, 16 Oct 2009 12:09:26 -0700
+Subject: [PATCH 22/46] DaVinci: EDMA: Fix Bug in edma_alloc_cont_slots API
+In-Reply-To: <1255720190-7452-23-git-send-email-khilman@deeprootsystems.com>
 References: <1255720190-7452-1-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-2-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-3-git-send-email-khilman@deeprootsystems.com>
@@ -24,49 +24,46 @@ References: <1255720190-7452-1-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-20-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-21-git-send-email-khilman@deeprootsystems.com>
 	<1255720190-7452-22-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1255720190-7452-23-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-23-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1255720190-7452-24-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sandeep Paulraj <s-paulraj@ti.com>
 
-In the edma_free_cont_slots API, the variable slot was being modified
-and then used in the for loop.
-This results in incorrect behaviour when the API is used.
+The edma_alloc_cont_slots API is used for obtaining a set of
+contiguous slots. When we use the "_ANY" option with this
+API, by definition of this option it is suppossed to start
+looking for a set of contiguous slots starting from slot 64 for
+DaVinci SOC's and 32 for DA8xx SOC's. This has been explained in
+the API description in the driver itself. So when we use the
+"_ANY" option with this API, the slot number passed as
+an argument should be a "don't care".
+This patch takes care of this condition mentioned above.
+When checking to see if the starting slot is a valid number,
+it checks to make sure that the "_ANY" option is not used.
 
 Signed-off-by: Sandeep Paulraj <s-paulraj@ti.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-davinci/dma.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-davinci/dma.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
-index f2e57d2..89ce3e1 100644
+index 89ce3e1..8eda4c3 100644
 --- a/arch/arm/mach-davinci/dma.c
 +++ b/arch/arm/mach-davinci/dma.c
-@@ -813,7 +813,7 @@ EXPORT_SYMBOL(edma_alloc_cont_slots);
-  */
- int edma_free_cont_slots(unsigned slot, int count)
- {
--	unsigned ctlr;
-+	unsigned ctlr, slot_to_free;
- 	int i;
+@@ -771,8 +771,9 @@ int edma_alloc_cont_slots(unsigned ctlr, unsigned int id, int slot, int count)
+ 	 * the number of channels and lesser than the total number
+ 	 * of slots
+ 	 */
+-	if (slot < edma_info[ctlr]->num_channels ||
+-		slot >= edma_info[ctlr]->num_slots)
++	if ((id != EDMA_CONT_PARAMS_ANY) &&
++		(slot < edma_info[ctlr]->num_channels ||
++		slot >= edma_info[ctlr]->num_slots))
+ 		return -EINVAL;
  
- 	ctlr = EDMA_CTLR(slot);
-@@ -826,11 +826,11 @@ int edma_free_cont_slots(unsigned slot, int count)
- 
- 	for (i = slot; i < slot + count; ++i) {
- 		ctlr = EDMA_CTLR(i);
--		slot = EDMA_CHAN_SLOT(i);
-+		slot_to_free = EDMA_CHAN_SLOT(i);
- 
--		memcpy_toio(edmacc_regs_base[ctlr] + PARM_OFFSET(slot),
-+		memcpy_toio(edmacc_regs_base[ctlr] + PARM_OFFSET(slot_to_free),
- 			&dummy_paramset, PARM_SIZE);
--		clear_bit(slot, edma_info[ctlr]->edma_inuse);
-+		clear_bit(slot_to_free, edma_info[ctlr]->edma_inuse);
- 	}
- 
- 	return 0;
+ 	/*
 -- 
 1.6.4.3
