@@ -1,117 +1,94 @@
-From: utx@penguin.cz (Stanislav Brabec)
-Date: Sat, 17 Oct 2009 00:22:17 +0200
-Subject: [PATCH] Re: spitz: add gpio button support (fixes regression)
-In-Reply-To: <20091016190521.GB17849@n2100.arm.linux.org.uk>
-References: <20091007120643.GA17069@rakim.wolfsonmicro.main>
-	<f17812d70910070727x47b2a22h8e9f9304740d5abf@mail.gmail.com>
-	<20091006200933.GA1606@ucw.cz> <1255641385.3985.55.camel@utx.utx.cz>
-	<20091015212024.GC15898@elf.ucw.cz>
-	<1255643252.3985.63.camel@utx.utx.cz>
-	<20091015215215.GG15898@elf.ucw.cz>
-	<1255685315.5470.3.camel@hammer.suse.cz>
-	<20091016093950.GI15898@elf.ucw.cz>
-	<1255719006.9583.31.camel@utx.utx.cz>
-	<20091016190521.GB17849@n2100.arm.linux.org.uk>
-Message-ID: <1255731737.12593.4.camel@utx.utx.cz>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 16 Oct 2009 16:40:04 -0700
+Subject: [PATCH 00/14] Use ioremap for omap,
+	split OMAP2_IO_ADDRESS for more space
+Message-ID: <20091016233624.2463.26653.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote: 
-> I'm not sure we want to apply this patch - it has UTF <U+FEFF>
-> sequences embedded randomly in it.
+Hi all,
 
-These character were added by Evolution. I don't know why. I just wanted
-to inline a mail and edit few characters.
+This series intended for the merge window after 2.6.32 removes
+OMAP2_IO_ADDRESS to reclaim more address space.
 
-Define Spitz buttons as GPIO keys in a way compatible with the old driver:
+OMAP2_IO_ADDRESS is replaced with ioremap where possible, and
+the remaining usage is split into OMAP2_L3_IO_ADDRESS and
+OMAP2_L4_IO_ADDRESS.
 
-On/Off: As Suspend EV_PWR key
+Some usage still remains in *.S files and headers. Eventually we should
+be able to remove the usage and only define it locally.
 
-Raw values of lid sensors SWA and SWB: As EV_SW switches
-SWA: Display Down
-SWB: Lid Closed
-Recommended user space decoding:
-SWA==0 & SWB==0: lid opened (landscape mode)
-SWA==1 & SWB==0: invalid (or mechanic race condition)
-SWA==0 & SWB==1: lid closed with display up (portrait mode or mechanic
-                 race condition while closing to display-less mode)
-SWA==1 & SWB==1: lid closed with display down (display-less mode)
+Note that after this series omap4 no longer uses these macros.
+Other omaps will need more work still.
 
-AK_INT remote trigger is not mapped as input event. Without complete
-remote driver and remote pull-up control it has no useful
-interpretation.
+Regards,
 
-Signed-off-by: Stanislav Brabec <utx@penguin.cz>
-Acked-by: Pavel Machek <pavel@ucw.cz>
+Tony
 
-diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
-index ee8d603..c690522 100644
---- a/arch/arm/mach-pxa/spitz.c
-+++ b/arch/arm/mach-pxa/spitz.c
-@@ -15,6 +15,7 @@
- #include <linux/kernel.h>
- #include <linux/platform_device.h>
- #include <linux/delay.h>
-+#include <linux/gpio_keys.h>
- #include <linux/gpio.h>
- #include <linux/leds.h>
- #include <linux/mtd/physmap.h>
-@@ -375,6 +376,43 @@ static struct platform_device spitzkbd_device = {
- };
- 
+---
 
-+static struct gpio_keys_button spitz_gpio_keys[] = {
-+	{
-+		.type	= EV_PWR,
-+		.code	= KEY_SUSPEND,
-+		.gpio	= SPITZ_GPIO_ON_KEY,
-+		.desc	= "On/Off",
-+		.wakeup	= 1,
-+	},
-+	/* Two buttons detecting the lid state */
-+	{
-+		.type	= EV_SW,
-+		.code	= 0,
-+		.gpio	= SPITZ_GPIO_SWA,
-+		.desc	= "Display Down",
-+	},
-+	{
-+		.type	= EV_SW,
-+		.code	= 1,
-+		.gpio	= SPITZ_GPIO_SWB,
-+		.desc	= "Lid Closed",
-+	},
-+};
-+
-+static struct gpio_keys_platform_data spitz_gpio_keys_platform_data = {
-+	.buttons	= spitz_gpio_keys,
-+	.nbuttons	= ARRAY_SIZE(spitz_gpio_keys),
-+};
-+
-+static struct platform_device spitz_gpio_keys_device = {
-+	.name	= "gpio-keys",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &spitz_gpio_keys_platform_data,
-+	},
-+};
-+
-+
- /*
-  * Spitz LEDs
-  */
-@@ -689,6 +727,7 @@ static struct platform_device sharpsl_rom_device = {
- static struct platform_device *devices[] __initdata = {
- 	&spitzscoop_device,
- 	&spitzkbd_device,
-+	&spitz_gpio_keys_device,
- 	&spitzled_device,
- 	&sharpsl_nand_device,
- 	&sharpsl_rom_device,
+Santosh Shilimkar (5):
+      omap: Add OMAP4 L3 and L4 peripherals.
+      omap: Fix DEBUG_LL UART io address
+      omap: Move SRAM map to claim more io space
+      omap: Remap L3, L4 to get more kernel io address space
+      omap: Split OMAP2_IO_ADDRESS to L3 and L4
+
+Tony Lindgren (9):
+      omap: Use ioremap in dispc.c
+      omap: Use ioremap for omap4 L4 code
+      omap: Use getnstimeofday for omap_device
+      omap: Use ioremap in omap_hwmod.c
+      omap: Use ioremap in gpio.c
+      omap: Use ioremap in dmtimer.c
+      omap: Use ioremap in dma.c
+      omap: Use ioremap in irq.c
+      omap: Change low-level serial init to use ioremap
 
 
+ arch/arm/mach-omap1/serial.c                  |   11 +
+ arch/arm/mach-omap2/board-2430sdp.c           |    2 
+ arch/arm/mach-omap2/board-3430sdp.c           |    2 
+ arch/arm/mach-omap2/board-4430sdp.c           |   15 +-
+ arch/arm/mach-omap2/board-apollon.c           |    2 
+ arch/arm/mach-omap2/board-generic.c           |    2 
+ arch/arm/mach-omap2/board-h4.c                |    2 
+ arch/arm/mach-omap2/board-ldp.c               |    2 
+ arch/arm/mach-omap2/board-n8x0.c              |    6 -
+ arch/arm/mach-omap2/board-omap3beagle.c       |    2 
+ arch/arm/mach-omap2/board-omap3evm.c          |    2 
+ arch/arm/mach-omap2/board-omap3pandora.c      |    2 
+ arch/arm/mach-omap2/board-overo.c             |    2 
+ arch/arm/mach-omap2/board-rx51.c              |    2 
+ arch/arm/mach-omap2/board-zoom2.c             |    2 
+ arch/arm/mach-omap2/cm.h                      |    6 -
+ arch/arm/mach-omap2/io.c                      |   18 ++
+ arch/arm/mach-omap2/irq.c                     |   12 +
+ arch/arm/mach-omap2/omap-smp.c                |   28 ++-
+ arch/arm/mach-omap2/omap_hwmod.c              |   18 +-
+ arch/arm/mach-omap2/pm-debug.c                |    3 
+ arch/arm/mach-omap2/prm.h                     |    6 -
+ arch/arm/mach-omap2/sdrc.h                    |    9 +
+ arch/arm/mach-omap2/serial.c                  |   15 +-
+ arch/arm/mach-omap2/sram242x.S                |    4 
+ arch/arm/mach-omap2/sram243x.S                |    4 
+ arch/arm/mach-omap2/timer-gp.c                |    3 
+ arch/arm/plat-omap/common.c                   |   44 ++---
+ arch/arm/plat-omap/dma.c                      |   34 +++-
+ arch/arm/plat-omap/dmtimer.c                  |   16 +-
+ arch/arm/plat-omap/gpio.c                     |  222 ++++++++++++++-----------
+ arch/arm/plat-omap/include/mach/control.h     |   15 +-
+ arch/arm/plat-omap/include/mach/debug-macro.S |    4 
+ arch/arm/plat-omap/include/mach/entry-macro.S |    6 -
+ arch/arm/plat-omap/include/mach/io.h          |  124 ++++++++++----
+ arch/arm/plat-omap/include/mach/omap44xx.h    |    8 -
+ arch/arm/plat-omap/include/mach/sdrc.h        |    6 -
+ arch/arm/plat-omap/include/mach/vmalloc.h     |    2 
+ arch/arm/plat-omap/io.c                       |   20 ++
+ arch/arm/plat-omap/omap_device.c              |   50 ++----
+ arch/arm/plat-omap/sram.c                     |   24 +--
+ drivers/video/omap/dispc.c                    |   20 ++
+ 42 files changed, 479 insertions(+), 298 deletions(-)
 
-________________________________________________________________________
-
-Stanislav Brabec
-http://www.penguin.cz/~utx
+-- 
+Signature
