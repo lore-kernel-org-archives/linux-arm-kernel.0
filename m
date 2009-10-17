@@ -1,27 +1,53 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 17 Oct 2009 12:42:39 +0800
-Subject: [PATCH] Re: spitz: add gpio button support (fixes regression)
-In-Reply-To: <1255731737.12593.4.camel@utx.utx.cz>
-References: <20091007120643.GA17069@rakim.wolfsonmicro.main>
-	<1255641385.3985.55.camel@utx.utx.cz>
-	<20091015212024.GC15898@elf.ucw.cz>
-	<1255643252.3985.63.camel@utx.utx.cz>
-	<20091015215215.GG15898@elf.ucw.cz>
-	<1255685315.5470.3.camel@hammer.suse.cz>
-	<20091016093950.GI15898@elf.ucw.cz>
-	<1255719006.9583.31.camel@utx.utx.cz>
-	<20091016190521.GB17849@n2100.arm.linux.org.uk>
-	<1255731737.12593.4.camel@utx.utx.cz>
-Message-ID: <f17812d70910162142r72d58f08gffafedb4cd008655@mail.gmail.com>
+From: julia@diku.dk (Julia Lawall)
+Date: Sat, 17 Oct 2009 08:40:02 +0200 (CEST)
+Subject: [PATCH 7/14] drivers/mmc: Move dereference after NULL test
+Message-ID: <Pine.LNX.4.64.0910170839430.9213@ask.diku.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 17, 2009 at 6:22 AM, Stanislav Brabec <utx@penguin.cz> wrote:
-> Russell King - ARM Linux wrote:
->> I'm not sure we want to apply this patch - it has UTF <U+FEFF>
->> sequences embedded randomly in it.
+From: Julia Lawall <julia@diku.dk>
 
-That's ZWNBSP - Zero-Width No-Break Space (unicode character FEFF).
-I think Stanislav needs to train his evolution a little bit for this.
+If the NULL test on mrq is needed, then the derefernce should be after the
+NULL test.
 
-Anyway, applied to 'fix' with the above special character removed.
+A simplified version of the semantic match that detects this problem is as
+follows (http://coccinelle.lip6.fr/):
+
+// <smpl>
+@match exists@
+expression x, E;
+identifier fld;
+@@
+
+* x->fld
+  ... when != \(x = E\|&x\)
+* x == NULL
+// </smpl>
+
+Signed-off-by: Julia Lawall <julia@diku.dk>
+
+---
+ drivers/mmc/host/s3cmci.c           |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
+index 99b74a3..5be6962 100644
+--- a/drivers/mmc/host/s3cmci.c
++++ b/drivers/mmc/host/s3cmci.c
+@@ -820,7 +820,7 @@ fail_request:
+ static void finalize_request(struct s3cmci_host *host)
+ {
+ 	struct mmc_request *mrq = host->mrq;
+-	struct mmc_command *cmd = host->cmd_is_stop ? mrq->stop : mrq->cmd;
++	struct mmc_command *cmd;
+ 	int debug_as_failure = 0;
+ 
+ 	if (host->complete_what != COMPLETION_FINALIZE)
+@@ -828,6 +828,7 @@ static void finalize_request(struct s3cmci_host *host)
+ 
+ 	if (!mrq)
+ 		return;
++	cmd = host->cmd_is_stop ? mrq->stop : mrq->cmd;
+ 
+ 	if (cmd->data && (cmd->error == 0) &&
+ 	    (cmd->data->error == 0)) {
