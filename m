@@ -1,374 +1,394 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 17 Oct 2009 09:19:47 -0700
-Subject: [PATCH 08/14] omap: Use ioremap for omap4 L4 code
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02BB37D7AA@dbde02.ent.ti.com>
-References: <20091016233624.2463.26653.stgit@localhost>
-	<20091016234138.2463.38350.stgit@localhost>
-	<20091016234622.GH12576@atomide.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02BB37D7AA@dbde02.ent.ti.com>
-Message-ID: <20091017161947.GK12576@atomide.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Sat, 17 Oct 2009 23:40:57 +0200
+Subject: [PATCH] Updated U300 defconfig
+Message-ID: <1255815657-18862-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shilimkar, Santosh <santosh.shilimkar@ti.com> [091017 03:49]:
-> Thanks Tony for this ioremap series!!
-> 
-> > -----Original Message-----
-> > From: Tony Lindgren [mailto:tony at atomide.com]
-> > Sent: Saturday, October 17, 2009 5:16 AM
-> > To: linux-arm-kernel at lists.infradead.org
-> > Cc: linux-omap at vger.kernel.org; Shilimkar, Santosh
-> > Subject: Re: [PATCH 08/14] omap: Use ioremap for omap4 L4 code
-> > 
-> > * Tony Lindgren <tony@atomide.com> [091016 16:42]:
-> > > Use ioremap for omap4 L4 code
-> > 
-> > Santosh, can you please check and ack this patch?
-> > 
-> > Especially some of the ioremap sizes may be wrong. Also, this one
-> > I cannot boot test, so it's just compile tested.
-> 
-> I have checked the patch and it looks all right except few typo. Also the scu_base is needed bit earlier. 
+This updates the U300 to use all the drivers merged in during the
+2.6.32 merge window.
 
-OK
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ arch/arm/configs/u300_defconfig |   94 +++++++++++++++++++++++++++------------
+ 1 files changed, 66 insertions(+), 28 deletions(-)
 
-> > 
-> > > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > > ---
-> > >  arch/arm/mach-omap2/board-4430sdp.c           |   13 ++++++++++--
-> > >  arch/arm/mach-omap2/omap-smp.c                |   28
-> > ++++++++++++++++++++-----
-> > >  arch/arm/mach-omap2/timer-gp.c                |    3 ++-
-> > >  arch/arm/plat-omap/include/mach/entry-macro.S |    2 ++
-> > >  arch/arm/plat-omap/include/mach/omap44xx.h    |    5 ----
-> > >  5 files changed, 37 insertions(+), 14 deletions(-)
-> > >
-> > > diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-
-> > omap2/board-4430sdp.c
-> > > index eb37c40..2a7b901 100644
-> > > --- a/arch/arm/mach-omap2/board-4430sdp.c
-> > > +++ b/arch/arm/mach-omap2/board-4430sdp.c
-> > > @@ -52,8 +52,17 @@ static struct omap_board_config_kernel
-> > sdp4430_config[] __initdata = {
-> > >
-> > >  static void __init gic_init_irq(void)
-> > >  {
-> > > -	gic_dist_init(0, OMAP2_IO_ADDRESS(OMAP44XX_GIC_DIST_BASE), 29);
-> > > -	gic_cpu_init(0, OMAP2_IO_ADDRESS(OMAP44XX_GIC_CPU_BASE));
-> > > +	void __iomem *base;
-> > > +
-> > > +	/* Static mapping, never released */
-> > > +	base = ioremap(OMAP44XX_GIC_DIST_BASE, SZ_4K);
-> > > +	BUG_ON(!base);
-> > > +	gic_dist_init(0, base, 29);
-> > > +
-> > > +	/* Static mapping, never released */
-> > > +	base = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_256);
-> Should be "SZ_512"
-
-OK
-
-> > > +	BUG_ON(!base);
-> > > +	gic_cpu_init(0, OMAP44XX_GIC_CPU_BASE);
-> This should be gic_cpu_init(0, base);
-
-Oops :)
-
-> > >  }
-> > >
-> > >  static void __init omap_4430sdp_init_irq(void)
-> > > diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-
-> > smp.c
-> > > index 48ee295..a1b618c 100644
-> > > --- a/arch/arm/mach-omap2/omap-smp.c
-> > > +++ b/arch/arm/mach-omap2/omap-smp.c
-> > > @@ -26,11 +26,11 @@
-> > >  #include <mach/hardware.h>
-> > >
-> > >  /* Registers used for communicating startup information */
-> > > -#define OMAP4_AUXCOREBOOT_REG0		(OMAP44XX_VA_WKUPGEN_BASE +
-> > 0x800)
-> > > -#define OMAP4_AUXCOREBOOT_REG1		(OMAP44XX_VA_WKUPGEN_BASE +
-> > 0x804)
-> > > +static void __iomem *omap4_auxcoreboot_reg0;
-> > > +static void __iomem *omap4_auxcoreboot_reg1;
-> > >
-> > >  /* SCU base address */
-> > > -static void __iomem *scu_base = OMAP44XX_VA_SCU_BASE;
-> > > +static void __iomem *scu_base;
-> > >
-> > >  /*
-> > >   * Use SCU config register to count number of cores
-> > > @@ -46,6 +46,8 @@ static DEFINE_SPINLOCK(boot_lock);
-> > >
-> > >  void __cpuinit platform_secondary_init(unsigned int cpu)
-> > >  {
-> > > +	void __iomem *gic_cpu_base;
-> > > +
-> > >  	trace_hardirqs_off();
-> > >
-> > >  	/*
-> > > @@ -54,7 +56,10 @@ void __cpuinit platform_secondary_init(unsigned int
-> > cpu)
-> > >  	 * for us: do so
-> > >  	 */
-> > >
-> > > -	gic_cpu_init(0, OMAP2_IO_ADDRESS(OMAP44XX_GIC_CPU_BASE));
-> > > +	/* Static mapping, never released */
-> > > +	gic_cpu_base = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_256);
-> Although underneath static mapping will take care of not doing dual mapping, we can map this ones in gic_init_irq() and use the same variable here. 
-
-Yeah, good.
-
-> > > +	BUG_ON(!gic_cpu_base);
-> > > +	gic_cpu_init(0, gic_cpu_base);
-> > >
-> > >  	/*
-> > >  	 * Synchronise with the boot thread.
-> > > @@ -79,7 +84,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct
-> > task_struct *idle)
-> > >  	 * the AuxCoreBoot1 register is updated with cpu state
-> > >  	 * A barrier is added to ensure that write buffer is drained
-> > >  	 */
-> > > -	__raw_writel(cpu, OMAP4_AUXCOREBOOT_REG1);
-> > > +	__raw_writel(cpu, omap4_auxcoreboot_reg1);
-> > >  	smp_wmb();
-> > >
-> > >  	timeout = jiffies + (1 * HZ);
-> > > @@ -104,7 +109,7 @@ static void __init wakeup_secondary(void)
-> > >  	 * A barrier is added to ensure that write buffer is drained
-> > >  	 */
-> > >  	__raw_writel(virt_to_phys(omap_secondary_startup),	   \
-> > > -					OMAP4_AUXCOREBOOT_REG0);
-> > > +					omap4_auxcoreboot_reg0);
-> > >  	smp_wmb();
-> > >
-> > >  	/*
-> > > @@ -130,6 +135,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
-> > >  {
-> > >  	unsigned int ncores = get_core_count();
-> This call will not give correct count. Also there is one more call earlier and hence scu_base ioremaps needs to be done earlier.
-
-OK
-
-> > >  	unsigned int cpu = smp_processor_id();
-> > > +	void __iomem *omap4_wkupgen_base;
-> > >  	int i;
-> > >
-> > >  	/* sanity check */
-> > > @@ -161,6 +167,16 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
-> > >  	for (i = 0; i < max_cpus; i++)
-> > >  		set_cpu_present(i, true);
-> > >
-> > > +	/* Never released */
-> > > +	omap4_wkupgen_base = ioremap(OMAP44XX_WKUPGEN_BASE, SZ_4K);
-> > > +	BUG_ON(!omap4_wkupgen_base);
-> > > +	omap4_auxcoreboot_reg0 = omap4_wkupgen_base + 0x800;
-> > > +	omap4_auxcoreboot_reg0 = omap4_wkupgen_base + 0x804;
-> Should be "omap4_auxcoreboot_reg1 = omap4_wkupgen_base + 0x804;"
-
-Oops!
-
-> > > +
-> > > +	/* Never released */
-> > > +	scu_base = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_256);
-> > > +	BUG_ON(!scu_base);
-> > > +
-> > >  	if (max_cpus > 1) {
-> > >  		/*
-> > >  		 * Enable the local timer or broadcast device for the
-> > > diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-omap2/timer-
-> > gp.c
-> > > index e2338c0..cd72970 100644
-> > > --- a/arch/arm/mach-omap2/timer-gp.c
-> > > +++ b/arch/arm/mach-omap2/timer-gp.c
-> > > @@ -231,7 +231,8 @@ static void __init omap2_gp_clocksource_init(void)
-> > >  static void __init omap2_gp_timer_init(void)
-> > >  {
-> > >  #ifdef CONFIG_LOCAL_TIMERS
-> > > -	twd_base = OMAP2_IO_ADDRESS(OMAP44XX_LOCAL_TWD_BASE);
-> > > +	twd_base = ioremap(OMAP44XX_LOCAL_TWD_BASE, SZ_256);
-> > > +	BUG_ON(!twd_base);
-> > >  #endif
-> > >  	omap_dm_timer_init();
-> > >
-> > > diff --git a/arch/arm/plat-omap/include/mach/entry-macro.S
-> > b/arch/arm/plat-omap/include/mach/entry-macro.S
-> > > index abe0864..3bad928 100644
-> > > --- a/arch/arm/plat-omap/include/mach/entry-macro.S
-> > > +++ b/arch/arm/plat-omap/include/mach/entry-macro.S
-> > > @@ -104,6 +104,8 @@
-> > >
-> > >  		.endm
-> > >  #else
-> > > +#define OMAP44XX_VA_GIC_CPU_BASE
-> > 	OMAP2_IO_ADDRESS(OMAP44XX_GIC_CPU_BASE)
-> > > +
-> > >  		/*
-> > >  		 * The interrupt numbering scheme is defined in the
-> > >  		 * interrupt controller spec.  To wit:
-> > > diff --git a/arch/arm/plat-omap/include/mach/omap44xx.h b/arch/arm/plat-
-> > omap/include/mach/omap44xx.h
-> > > index b3ba5ac..8b4a578 100644
-> > > --- a/arch/arm/plat-omap/include/mach/omap44xx.h
-> > > +++ b/arch/arm/plat-omap/include/mach/omap44xx.h
-> > > @@ -33,14 +33,9 @@
-> > >  #define IRQ_SIR_IRQ			0x0040
-> > >  #define OMAP44XX_GIC_DIST_BASE		0x48241000
-> > >  #define OMAP44XX_GIC_CPU_BASE		0x48240100
-> > > -#define OMAP44XX_VA_GIC_CPU_BASE
-> > 	OMAP2_IO_ADDRESS(OMAP44XX_GIC_CPU_BASE)
-> > >  #define OMAP44XX_SCU_BASE		0x48240000
-> > > -#define OMAP44XX_VA_SCU_BASE
-> > 	OMAP2_IO_ADDRESS(OMAP44XX_SCU_BASE)
-> > >  #define OMAP44XX_LOCAL_TWD_BASE		0x48240600
-> > > -#define OMAP44XX_VA_LOCAL_TWD_BASE
-> > 	OMAP2_IO_ADDRESS(OMAP44XX_LOCAL_TWD_BASE)
-> > > -#define OMAP44XX_LOCAL_TWD_SIZE		0x00000100
-> > >  #define OMAP44XX_WKUPGEN_BASE		0x48281000
-> > > -#define OMAP44XX_VA_WKUPGEN_BASE
-> > 	OMAP2_IO_ADDRESS(OMAP44XX_WKUPGEN_BASE)
-> > >
-> > >  #endif /* __ASM_ARCH_OMAP44XX_H */
-> 
-> Here is the patch on top of ioremap series which should fix above mentioned things. With below patch + two serial related patches the kernel boots on OMAP4430.
-
-Great, will update. Thanks for taking the time to fix it!
-
-Regards,
-
-Tony
-
+diff --git a/arch/arm/configs/u300_defconfig b/arch/arm/configs/u300_defconfig
+index 7d61ae6..953ba02 100644
+--- a/arch/arm/configs/u300_defconfig
++++ b/arch/arm/configs/u300_defconfig
+@@ -1,14 +1,14 @@
+ #
+ # Automatically generated make config: don't edit
+-# Linux kernel version: 2.6.31-rc3
+-# Thu Jul 16 23:36:10 2009
++# Linux kernel version: 2.6.32-rc5
++# Sat Oct 17 23:32:24 2009
+ #
+ CONFIG_ARM=y
+ CONFIG_SYS_SUPPORTS_APM_EMULATION=y
+ CONFIG_GENERIC_GPIO=y
+ CONFIG_GENERIC_TIME=y
+ CONFIG_GENERIC_CLOCKEVENTS=y
+-CONFIG_MMU=y
++CONFIG_HAVE_TCM=y
+ CONFIG_GENERIC_HARDIRQS=y
+ CONFIG_STACKTRACE_SUPPORT=y
+ CONFIG_HAVE_LATENCYTOP_SUPPORT=y
+@@ -44,11 +44,12 @@ CONFIG_SYSVIPC_SYSCTL=y
+ #
+ # RCU Subsystem
+ #
+-CONFIG_CLASSIC_RCU=y
+-# CONFIG_TREE_RCU is not set
+-# CONFIG_PREEMPT_RCU is not set
++CONFIG_TREE_RCU=y
++# CONFIG_TREE_PREEMPT_RCU is not set
++# CONFIG_RCU_TRACE is not set
++CONFIG_RCU_FANOUT=32
++# CONFIG_RCU_FANOUT_EXACT is not set
+ # CONFIG_TREE_RCU_TRACE is not set
+-# CONFIG_PREEMPT_RCU_TRACE is not set
+ # CONFIG_IKCONFIG is not set
+ CONFIG_LOG_BUF_SHIFT=14
+ # CONFIG_GROUP_SCHED is not set
+@@ -80,17 +81,15 @@ CONFIG_SHMEM=y
+ # CONFIG_AIO is not set
  
-> From c7db626e320b73c02ce7578e81b8b8c65c41c955 Mon Sep 17 00:00:00 2001
-> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Date: Sat, 17 Oct 2009 15:25:00 +0530
-> Subject: [PATCH] omap: ioremap fixes for omap4
-> 
-> This patch fixes the below ioremap for omap4 patch.
-> 
-> http://patchwork.kernel.org/patch/54457/
-> 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/mach-omap2/board-4430sdp.c      |    4 ++--
->  arch/arm/mach-omap2/omap-smp.c           |   23 ++++++++++-------------
->  arch/arm/plat-omap/common.c              |    3 +++
->  arch/arm/plat-omap/include/mach/common.h |    3 +++
->  4 files changed, 18 insertions(+), 15 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-> index 50a62f2..4b644a9 100644
-> --- a/arch/arm/mach-omap2/board-4430sdp.c
-> +++ b/arch/arm/mach-omap2/board-4430sdp.c
-> @@ -60,9 +60,9 @@ static void __init gic_init_irq(void)
->  	gic_dist_init(0, base, 29);
->  
->  	/* Static mapping, never released */
-> -	base = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_256);
-> +	gic_cpu_base_addr = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_512);
->  	BUG_ON(!base);
-> -	gic_cpu_init(0, OMAP44XX_GIC_CPU_BASE);
-> +	gic_cpu_init(0, gic_cpu_base_addr);
->  }
->  
->  static void __init omap_4430sdp_init_irq(void)
-> diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-> index a1b618c..8813ac2 100644
-> --- a/arch/arm/mach-omap2/omap-smp.c
-> +++ b/arch/arm/mach-omap2/omap-smp.c
-> @@ -24,6 +24,7 @@
->  #include <asm/localtimer.h>
->  #include <asm/smp_scu.h>
->  #include <mach/hardware.h>
-> +#include <mach/common.h>
->  
->  /* Registers used for communicating startup information */
->  static void __iomem *omap4_auxcoreboot_reg0;
-> @@ -46,8 +47,6 @@ static DEFINE_SPINLOCK(boot_lock);
->  
->  void __cpuinit platform_secondary_init(unsigned int cpu)
->  {
-> -	void __iomem *gic_cpu_base;
-> -
->  	trace_hardirqs_off();
->  
->  	/*
-> @@ -55,11 +54,7 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
->  	 * core (e.g. timer irq), then they will not have been enabled
->  	 * for us: do so
->  	 */
-> -
-> -	/* Static mapping, never released */
-> -	gic_cpu_base = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_256);
-> -	BUG_ON(!gic_cpu_base);
-> -	gic_cpu_init(0, gic_cpu_base);
-> +	gic_cpu_init(0, gic_cpu_base_addr);
->  
->  	/*
->  	 * Synchronise with the boot thread.
-> @@ -125,7 +120,13 @@ static void __init wakeup_secondary(void)
->   */
->  void __init smp_init_cpus(void)
->  {
-> -	unsigned int i, ncores = get_core_count();
-> +	unsigned int i, ncores;
-> +
-> +	/* Never released */
-> +	scu_base = ioremap(OMAP44XX_SCU_BASE, SZ_256);
-> +	BUG_ON(!scu_base);
-> +
-> +	ncores = get_core_count();
->  
->  	for (i = 0; i < ncores; i++)
->  		set_cpu_possible(i, true);
-> @@ -171,11 +172,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
->  	omap4_wkupgen_base = ioremap(OMAP44XX_WKUPGEN_BASE, SZ_4K);
->  	BUG_ON(!omap4_wkupgen_base);
->  	omap4_auxcoreboot_reg0 = omap4_wkupgen_base + 0x800;
-> -	omap4_auxcoreboot_reg0 = omap4_wkupgen_base + 0x804;
-> -
-> -	/* Never released */
-> -	scu_base = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_256);
-> -	BUG_ON(!scu_base);
-> +	omap4_auxcoreboot_reg1 = omap4_wkupgen_base + 0x804;
->  
->  	if (max_cpus > 1) {
->  		/*
-> diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
-> index 1aa58d2..8b3ef17 100644
-> --- a/arch/arm/plat-omap/common.c
-> +++ b/arch/arm/plat-omap/common.c
-> @@ -49,6 +49,9 @@ int omap_bootloader_tag_len;
->  struct omap_board_config_kernel *omap_board_config;
->  int omap_board_config_size;
->  
-> +/* used by omap-smp.c and board-4430sdp.c */
-> +void __iomem *gic_cpu_base_addr;
-> +
->  static const void *get_config(u16 tag, size_t len, int skip, size_t *len_out)
->  {
->  	struct omap_board_config_kernel *kinfo = NULL;
-> diff --git a/arch/arm/plat-omap/include/mach/common.h b/arch/arm/plat-omap/include/mach/common.h
-> index fdeab42..064f173 100644
-> --- a/arch/arm/plat-omap/include/mach/common.h
-> +++ b/arch/arm/plat-omap/include/mach/common.h
-> @@ -31,6 +31,9 @@
->  
->  struct sys_timer;
->  
-> +/* used by omap-smp.c and board-4430sdp.c */
-> +extern void __iomem *gic_cpu_base_addr;
-> +
->  extern void omap_map_common_io(void);
->  extern struct sys_timer omap_timer;
->  #if defined(CONFIG_I2C_OMAP) || defined(CONFIG_I2C_OMAP_MODULE)
-> -- 
-> 1.5.4.7
-> 
-> 
-> 
-> Regards,
-> Santosh
+ #
+-# Performance Counters
++# Kernel Performance Events And Counters
+ #
+ # CONFIG_VM_EVENT_COUNTERS is not set
+ CONFIG_SLUB_DEBUG=y
+-# CONFIG_STRIP_ASM_SYMS is not set
+ CONFIG_COMPAT_BRK=y
+ # CONFIG_SLAB is not set
+ CONFIG_SLUB=y
+ # CONFIG_SLOB is not set
+ # CONFIG_PROFILING is not set
+-# CONFIG_MARKERS is not set
+ CONFIG_HAVE_OPROFILE=y
+ # CONFIG_KPROBES is not set
+ CONFIG_HAVE_KPROBES=y
+@@ -133,6 +132,7 @@ CONFIG_DEFAULT_IOSCHED="deadline"
+ #
+ # System Type
+ #
++CONFIG_MMU=y
+ # CONFIG_ARCH_AAEC2000 is not set
+ # CONFIG_ARCH_INTEGRATOR is not set
+ # CONFIG_ARCH_REALVIEW is not set
+@@ -147,6 +147,7 @@ CONFIG_DEFAULT_IOSCHED="deadline"
+ # CONFIG_ARCH_STMP3XXX is not set
+ # CONFIG_ARCH_NETX is not set
+ # CONFIG_ARCH_H720X is not set
++# CONFIG_ARCH_NOMADIK is not set
+ # CONFIG_ARCH_IOP13XX is not set
+ # CONFIG_ARCH_IOP32X is not set
+ # CONFIG_ARCH_IOP33X is not set
+@@ -169,11 +170,13 @@ CONFIG_DEFAULT_IOSCHED="deadline"
+ # CONFIG_ARCH_SA1100 is not set
+ # CONFIG_ARCH_S3C2410 is not set
+ # CONFIG_ARCH_S3C64XX is not set
++# CONFIG_ARCH_S5PC1XX is not set
+ # CONFIG_ARCH_SHARK is not set
+ # CONFIG_ARCH_LH7A40X is not set
+ CONFIG_ARCH_U300=y
+ # CONFIG_ARCH_DAVINCI is not set
+ # CONFIG_ARCH_OMAP is not set
++# CONFIG_ARCH_BCMRING is not set
+ 
+ #
+ # ST-Ericsson AB U300/U330/U335/U365 Platform
+@@ -195,6 +198,7 @@ CONFIG_MACH_U300_BS335=y
+ CONFIG_MACH_U300_DUAL_RAM=y
+ CONFIG_U300_DEBUG=y
+ # CONFIG_MACH_U300_SEMI_IS_SHARED is not set
++CONFIG_MACH_U300_SPIDUMMY=y
+ 
+ #
+ # All the settings below must match the bootloader's settings
+@@ -207,7 +211,7 @@ CONFIG_CPU_32=y
+ CONFIG_CPU_ARM926T=y
+ CONFIG_CPU_32v5=y
+ CONFIG_CPU_ABRT_EV5TJ=y
+-CONFIG_CPU_PABRT_NOIFAR=y
++CONFIG_CPU_PABRT_LEGACY=y
+ CONFIG_CPU_CACHE_VIVT=y
+ CONFIG_CPU_COPY_V4WB=y
+ CONFIG_CPU_TLB_V4WBI=y
+@@ -222,6 +226,7 @@ CONFIG_ARM_THUMB=y
+ # CONFIG_CPU_DCACHE_DISABLE is not set
+ # CONFIG_CPU_DCACHE_WRITETHROUGH is not set
+ # CONFIG_CPU_CACHE_ROUND_ROBIN is not set
++CONFIG_ARM_L1_CACHE_SHIFT=5
+ CONFIG_ARM_VIC=y
+ CONFIG_ARM_VIC_NR=2
+ CONFIG_COMMON_CLKDEV=y
+@@ -245,6 +250,8 @@ CONFIG_VMSPLIT_3G=y
+ # CONFIG_VMSPLIT_2G is not set
+ # CONFIG_VMSPLIT_1G is not set
+ CONFIG_PAGE_OFFSET=0xC0000000
++# CONFIG_PREEMPT_NONE is not set
++# CONFIG_PREEMPT_VOLUNTARY is not set
+ CONFIG_PREEMPT=y
+ CONFIG_HZ=100
+ CONFIG_AEABI=y
+@@ -265,6 +272,7 @@ CONFIG_ZONE_DMA_FLAG=0
+ CONFIG_VIRT_TO_BUS=y
+ CONFIG_HAVE_MLOCK=y
+ CONFIG_HAVE_MLOCKED_PAGE_BIT=y
++# CONFIG_KSM is not set
+ CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
+ CONFIG_ALIGNMENT_TRAP=y
+ # CONFIG_UACCESS_WITH_MEMCPY is not set
+@@ -313,6 +321,7 @@ CONFIG_PM=y
+ # CONFIG_PM_DEBUG is not set
+ # CONFIG_SUSPEND is not set
+ # CONFIG_APM_EMULATION is not set
++# CONFIG_PM_RUNTIME is not set
+ CONFIG_ARCH_SUSPEND_POSSIBLE=y
+ CONFIG_NET=y
+ 
+@@ -351,6 +360,7 @@ CONFIG_DEFAULT_TCP_CONG="cubic"
+ # CONFIG_NETFILTER is not set
+ # CONFIG_IP_DCCP is not set
+ # CONFIG_IP_SCTP is not set
++# CONFIG_RDS is not set
+ # CONFIG_TIPC is not set
+ # CONFIG_ATM is not set
+ # CONFIG_BRIDGE is not set
+@@ -391,6 +401,7 @@ CONFIG_DEFAULT_TCP_CONG="cubic"
+ # Generic Driver Options
+ #
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++# CONFIG_DEVTMPFS is not set
+ CONFIG_STANDALONE=y
+ # CONFIG_PREVENT_FIRMWARE_BUILD is not set
+ CONFIG_FW_LOADER=y
+@@ -402,9 +413,9 @@ CONFIG_EXTRA_FIRMWARE=""
+ # CONFIG_CONNECTOR is not set
+ CONFIG_MTD=y
+ # CONFIG_MTD_DEBUG is not set
++# CONFIG_MTD_TESTS is not set
+ # CONFIG_MTD_CONCAT is not set
+ CONFIG_MTD_PARTITIONS=y
+-# CONFIG_MTD_TESTS is not set
+ # CONFIG_MTD_REDBOOT_PARTS is not set
+ CONFIG_MTD_CMDLINE_PARTS=y
+ # CONFIG_MTD_AFS_PARTS is not set
+@@ -453,6 +464,7 @@ CONFIG_MTD_CFI_I2=y
+ #
+ # CONFIG_MTD_DATAFLASH is not set
+ # CONFIG_MTD_M25P80 is not set
++# CONFIG_MTD_SST25L is not set
+ # CONFIG_MTD_SLRAM is not set
+ # CONFIG_MTD_PHRAM is not set
+ # CONFIG_MTD_MTDRAM is not set
+@@ -520,6 +532,7 @@ CONFIG_HAVE_IDE=y
+ # CONFIG_MD is not set
+ # CONFIG_NETDEVICES is not set
+ # CONFIG_ISDN is not set
++# CONFIG_PHONE is not set
+ 
+ #
+ # Input device support
+@@ -540,12 +553,16 @@ CONFIG_INPUT_EVDEV=y
+ # Input Device Drivers
+ #
+ CONFIG_INPUT_KEYBOARD=y
++# CONFIG_KEYBOARD_ADP5588 is not set
+ # CONFIG_KEYBOARD_ATKBD is not set
++# CONFIG_QT2160 is not set
+ # CONFIG_KEYBOARD_LKKBD is not set
+ # CONFIG_KEYBOARD_GPIO is not set
+ # CONFIG_KEYBOARD_MATRIX is not set
+ # CONFIG_KEYBOARD_LM8323 is not set
++# CONFIG_KEYBOARD_MAX7359 is not set
+ # CONFIG_KEYBOARD_NEWTON is not set
++# CONFIG_KEYBOARD_OPENCORES is not set
+ # CONFIG_KEYBOARD_STOWAWAY is not set
+ # CONFIG_KEYBOARD_SUNKBD is not set
+ # CONFIG_KEYBOARD_XTKBD is not set
+@@ -597,6 +614,7 @@ CONFIG_LEGACY_PTY_COUNT=16
+ # CONFIG_TCG_TPM is not set
+ CONFIG_I2C=y
+ CONFIG_I2C_BOARDINFO=y
++CONFIG_I2C_COMPAT=y
+ # CONFIG_I2C_CHARDEV is not set
+ CONFIG_I2C_HELPER_AUTO=y
+ 
+@@ -629,9 +647,6 @@ CONFIG_I2C_STU300=y
+ # Miscellaneous I2C Chip support
+ #
+ # CONFIG_DS1682 is not set
+-# CONFIG_SENSORS_PCF8574 is not set
+-# CONFIG_PCF8575 is not set
+-# CONFIG_SENSORS_PCA9539 is not set
+ # CONFIG_SENSORS_TSL2550 is not set
+ # CONFIG_I2C_DEBUG_CORE is not set
+ # CONFIG_I2C_DEBUG_ALGO is not set
+@@ -653,16 +668,21 @@ CONFIG_SPI_PL022=y
+ #
+ # CONFIG_SPI_SPIDEV is not set
+ # CONFIG_SPI_TLE62X0 is not set
++
++#
++# PPS support
++#
++# CONFIG_PPS is not set
+ # CONFIG_W1 is not set
+ CONFIG_POWER_SUPPLY=y
+ # CONFIG_POWER_SUPPLY_DEBUG is not set
+ # CONFIG_PDA_POWER is not set
+ # CONFIG_BATTERY_DS2760 is not set
++# CONFIG_BATTERY_DS2782 is not set
+ # CONFIG_BATTERY_BQ27x00 is not set
+ # CONFIG_BATTERY_MAX17040 is not set
+ # CONFIG_HWMON is not set
+ # CONFIG_THERMAL is not set
+-# CONFIG_THERMAL_HWMON is not set
+ CONFIG_WATCHDOG=y
+ # CONFIG_WATCHDOG_NOWAYOUT is not set
+ 
+@@ -690,10 +710,24 @@ CONFIG_SSB_POSSIBLE=y
+ # CONFIG_MFD_TC6387XB is not set
+ # CONFIG_PMIC_DA903X is not set
+ # CONFIG_MFD_WM8400 is not set
++# CONFIG_MFD_WM831X is not set
+ # CONFIG_MFD_WM8350_I2C is not set
+ # CONFIG_MFD_PCF50633 is not set
++# CONFIG_MFD_MC13783 is not set
+ CONFIG_AB3100_CORE=y
++CONFIG_AB3100_OTP=y
+ # CONFIG_EZX_PCAP is not set
++CONFIG_REGULATOR=y
++# CONFIG_REGULATOR_DEBUG is not set
++# CONFIG_REGULATOR_FIXED_VOLTAGE is not set
++# CONFIG_REGULATOR_VIRTUAL_CONSUMER is not set
++# CONFIG_REGULATOR_USERSPACE_CONSUMER is not set
++# CONFIG_REGULATOR_BQ24022 is not set
++# CONFIG_REGULATOR_MAX1586 is not set
++# CONFIG_REGULATOR_LP3971 is not set
++CONFIG_REGULATOR_AB3100=y
++# CONFIG_REGULATOR_TPS65023 is not set
++# CONFIG_REGULATOR_TPS6507X is not set
+ # CONFIG_MEDIA_SUPPORT is not set
+ 
+ #
+@@ -792,9 +826,10 @@ CONFIG_MMC_BLOCK_BOUNCE=y
+ #
+ CONFIG_MMC_ARMMMCI=y
+ # CONFIG_MMC_SDHCI is not set
++# CONFIG_MMC_AT91 is not set
++# CONFIG_MMC_ATMELMCI is not set
+ # CONFIG_MMC_SPI is not set
+ # CONFIG_MEMSTICK is not set
+-# CONFIG_ACCESSIBILITY is not set
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ 
+@@ -820,10 +855,10 @@ CONFIG_LEDS_TRIGGER_BACKLIGHT=y
+ #
+ # iptables trigger is under Netfilter config (LED target)
+ #
++# CONFIG_ACCESSIBILITY is not set
+ CONFIG_RTC_LIB=y
+ CONFIG_RTC_CLASS=y
+-CONFIG_RTC_HCTOSYS=y
+-CONFIG_RTC_HCTOSYS_DEVICE="rtc0"
++# CONFIG_RTC_HCTOSYS is not set
+ # CONFIG_RTC_DEBUG is not set
+ 
+ #
+@@ -863,6 +898,7 @@ CONFIG_RTC_INTF_DEV=y
+ # CONFIG_RTC_DRV_R9701 is not set
+ # CONFIG_RTC_DRV_RS5C348 is not set
+ # CONFIG_RTC_DRV_DS3234 is not set
++# CONFIG_RTC_DRV_PCF2123 is not set
+ 
+ #
+ # Platform RTC drivers
+@@ -878,27 +914,25 @@ CONFIG_RTC_INTF_DEV=y
+ # CONFIG_RTC_DRV_M48T59 is not set
+ # CONFIG_RTC_DRV_BQ4802 is not set
+ # CONFIG_RTC_DRV_V3020 is not set
++CONFIG_RTC_DRV_AB3100=y
+ 
+ #
+ # on-CPU RTC drivers
+ #
+ # CONFIG_RTC_DRV_PL030 is not set
+ # CONFIG_RTC_DRV_PL031 is not set
++CONFIG_RTC_DRV_COH901331=y
+ CONFIG_DMADEVICES=y
+ 
+ #
+ # DMA Devices
+ #
+ # CONFIG_AUXDISPLAY is not set
+-CONFIG_REGULATOR=y
+-# CONFIG_REGULATOR_DEBUG is not set
+-# CONFIG_REGULATOR_FIXED_VOLTAGE is not set
+-# CONFIG_REGULATOR_VIRTUAL_CONSUMER is not set
+-# CONFIG_REGULATOR_USERSPACE_CONSUMER is not set
+-# CONFIG_REGULATOR_BQ24022 is not set
+-# CONFIG_REGULATOR_MAX1586 is not set
+-# CONFIG_REGULATOR_LP3971 is not set
+ # CONFIG_UIO is not set
++
++#
++# TI VLYNQ
++#
+ # CONFIG_STAGING is not set
+ 
+ #
+@@ -913,6 +947,7 @@ CONFIG_REGULATOR=y
+ # CONFIG_XFS_FS is not set
+ # CONFIG_OCFS2_FS is not set
+ # CONFIG_BTRFS_FS is not set
++# CONFIG_NILFS2_FS is not set
+ CONFIG_FILE_LOCKING=y
+ CONFIG_FSNOTIFY=y
+ # CONFIG_DNOTIFY is not set
+@@ -975,7 +1010,6 @@ CONFIG_MISC_FILESYSTEMS=y
+ # CONFIG_ROMFS_FS is not set
+ # CONFIG_SYSV_FS is not set
+ # CONFIG_UFS_FS is not set
+-# CONFIG_NILFS2_FS is not set
+ # CONFIG_NETWORK_FILESYSTEMS is not set
+ 
+ #
+@@ -1033,6 +1067,7 @@ CONFIG_ENABLE_WARN_DEPRECATED=y
+ CONFIG_ENABLE_MUST_CHECK=y
+ CONFIG_FRAME_WARN=1024
+ # CONFIG_MAGIC_SYSRQ is not set
++# CONFIG_STRIP_ASM_SYMS is not set
+ # CONFIG_UNUSED_SYMBOLS is not set
+ # CONFIG_DEBUG_FS is not set
+ # CONFIG_HEADERS_CHECK is not set
+@@ -1066,11 +1101,13 @@ CONFIG_DEBUG_INFO=y
+ # CONFIG_DEBUG_LIST is not set
+ # CONFIG_DEBUG_SG is not set
+ # CONFIG_DEBUG_NOTIFIERS is not set
++# CONFIG_DEBUG_CREDENTIALS is not set
+ # CONFIG_BOOT_PRINTK_DELAY is not set
+ # CONFIG_RCU_TORTURE_TEST is not set
+ # CONFIG_RCU_CPU_STALL_DETECTOR is not set
+ # CONFIG_BACKTRACE_SELF_TEST is not set
+ # CONFIG_DEBUG_BLOCK_EXT_DEVT is not set
++# CONFIG_DEBUG_FORCE_WEAK_PER_CPU is not set
+ # CONFIG_FAULT_INJECTION is not set
+ # CONFIG_LATENCYTOP is not set
+ # CONFIG_SYSCTL_SYSCALL_CHECK is not set
+@@ -1121,6 +1158,7 @@ CONFIG_GENERIC_FIND_LAST_BIT=y
+ # CONFIG_CRC32 is not set
+ # CONFIG_CRC7 is not set
+ # CONFIG_LIBCRC32C is not set
++CONFIG_GENERIC_ALLOCATOR=y
+ CONFIG_HAS_IOMEM=y
+ CONFIG_HAS_IOPORT=y
+ CONFIG_HAS_DMA=y
+-- 
+1.6.2.5
