@@ -1,14 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 17 Oct 2009 09:10:04 +0100
-Subject: [PATCH 05/14] omap: Use ioremap in gpio.c
-In-Reply-To: <20091016234104.2463.54276.stgit@localhost>
-References: <20091016233624.2463.26653.stgit@localhost>
-	<20091016234104.2463.54276.stgit@localhost>
-Message-ID: <20091017081004.GA648@n2100.arm.linux.org.uk>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Sat, 17 Oct 2009 17:46:23 +0800
+Subject: [PATCH V1 2/3] i2c: imx: only imx1 needs disable delay
+In-Reply-To: <1255772784-11387-1-git-send-email-linuxzsc@gmail.com>
+References: <1255772784-11387-1-git-send-email-linuxzsc@gmail.com>
+Message-ID: <1255772784-11387-2-git-send-email-linuxzsc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 16, 2009 at 04:41:04PM -0700, Tony Lindgren wrote:
-> +	{ OMAP1_MPUIO_VBASE, 0, INT_MPUIO, IH_MPUIO_BASE,
+check cpu_is_mx1() when disable delay.
 
-That 0 should be NULL - it's a pointer.
+Signed-off-by: Richard Zhao <linuxzsc@gmail.com>
+
+diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
+index 6055e92..671d37c 100644
+--- a/drivers/i2c/busses/i2c-imx.c
++++ b/drivers/i2c/busses/i2c-imx.c
+@@ -225,11 +225,13 @@ static void i2c_imx_stop(struct imx_i2c_struct *i2c_imx)
+ 		writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
+ 		i2c_imx->stopped = 1;
+ 	}
+-	/*
+-	 * This delay caused by an i.MXL hardware bug.
+-	 * If no (or too short) delay, no "STOP" bit will be generated.
+-	 */
+-	udelay(i2c_imx->disable_delay);
++	if (cpu_is_mx1()) {
++		/*
++		 * This delay caused by an i.MXL hardware bug.
++		 * If no (or too short) delay, no "STOP" bit will be generated.
++		 */
++		udelay(i2c_imx->disable_delay);
++	}
+ 
+ 	if (!i2c_imx->stopped)
+ 		i2c_imx_bus_busy(i2c_imx, 0);
+-- 
+1.6.0.4
