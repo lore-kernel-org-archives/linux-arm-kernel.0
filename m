@@ -1,394 +1,169 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Sat, 17 Oct 2009 23:40:57 +0200
-Subject: [PATCH] Updated U300 defconfig
-Message-ID: <1255815657-18862-1-git-send-email-linus.walleij@stericsson.com>
+Date: Sun, 18 Oct 2009 00:48:35 +0200
+Subject: [PATCH] Make MIPS dynamic clocksource/clockevent clock code generic
+Message-ID: <1255819715-19763-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This updates the U300 to use all the drivers merged in during the
-2.6.32 merge window.
+This moves the clocksource_set_clock() and clockevent_set_clock()
+from the MIPS timer code into clockchips and clocksource where
+it belongs. The patch was triggered by code posted by Mikael
+Pettersson duplicating this code for the IOP ARM system. The
+function signatures where altered slightly to fit into their
+destination header files, unsigned int changed to u32 and inlined.
 
 Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Mikael Pettersson <mikpe@it.uu.se>
+Cc: Ralf Baechle <ralf@linux-mips.org>
 ---
- arch/arm/configs/u300_defconfig |   94 +++++++++++++++++++++++++++------------
- 1 files changed, 66 insertions(+), 28 deletions(-)
+Ralf has stated in earlier conversation that this should be moved,
+now we risk duplicating code so let's move it.
 
-diff --git a/arch/arm/configs/u300_defconfig b/arch/arm/configs/u300_defconfig
-index 7d61ae6..953ba02 100644
---- a/arch/arm/configs/u300_defconfig
-+++ b/arch/arm/configs/u300_defconfig
-@@ -1,14 +1,14 @@
- #
- # Automatically generated make config: don't edit
--# Linux kernel version: 2.6.31-rc3
--# Thu Jul 16 23:36:10 2009
-+# Linux kernel version: 2.6.32-rc5
-+# Sat Oct 17 23:32:24 2009
- #
- CONFIG_ARM=y
- CONFIG_SYS_SUPPORTS_APM_EMULATION=y
- CONFIG_GENERIC_GPIO=y
- CONFIG_GENERIC_TIME=y
- CONFIG_GENERIC_CLOCKEVENTS=y
--CONFIG_MMU=y
-+CONFIG_HAVE_TCM=y
- CONFIG_GENERIC_HARDIRQS=y
- CONFIG_STACKTRACE_SUPPORT=y
- CONFIG_HAVE_LATENCYTOP_SUPPORT=y
-@@ -44,11 +44,12 @@ CONFIG_SYSVIPC_SYSCTL=y
- #
- # RCU Subsystem
- #
--CONFIG_CLASSIC_RCU=y
--# CONFIG_TREE_RCU is not set
--# CONFIG_PREEMPT_RCU is not set
-+CONFIG_TREE_RCU=y
-+# CONFIG_TREE_PREEMPT_RCU is not set
-+# CONFIG_RCU_TRACE is not set
-+CONFIG_RCU_FANOUT=32
-+# CONFIG_RCU_FANOUT_EXACT is not set
- # CONFIG_TREE_RCU_TRACE is not set
--# CONFIG_PREEMPT_RCU_TRACE is not set
- # CONFIG_IKCONFIG is not set
- CONFIG_LOG_BUF_SHIFT=14
- # CONFIG_GROUP_SCHED is not set
-@@ -80,17 +81,15 @@ CONFIG_SHMEM=y
- # CONFIG_AIO is not set
+I don't have access to a MIPS cross-compiler so please can the
+MIPS people test this?
+
+Can you test it on the IOP too, Mikael?
+---
+ arch/mips/include/asm/time.h |    4 ----
+ arch/mips/kernel/time.c      |   33 ---------------------------------
+ include/linux/clockchips.h   |   24 ++++++++++++++++++++++++
+ include/linux/clocksource.h  |   24 +++++++++++++++++++++++-
+ 4 files changed, 47 insertions(+), 38 deletions(-)
+
+diff --git a/arch/mips/include/asm/time.h b/arch/mips/include/asm/time.h
+index df6a430..e9b3f92 100644
+--- a/arch/mips/include/asm/time.h
++++ b/arch/mips/include/asm/time.h
+@@ -84,8 +84,4 @@ static inline int init_mips_clocksource(void)
+ #endif
+ }
  
- #
--# Performance Counters
-+# Kernel Performance Events And Counters
- #
- # CONFIG_VM_EVENT_COUNTERS is not set
- CONFIG_SLUB_DEBUG=y
--# CONFIG_STRIP_ASM_SYMS is not set
- CONFIG_COMPAT_BRK=y
- # CONFIG_SLAB is not set
- CONFIG_SLUB=y
- # CONFIG_SLOB is not set
- # CONFIG_PROFILING is not set
--# CONFIG_MARKERS is not set
- CONFIG_HAVE_OPROFILE=y
- # CONFIG_KPROBES is not set
- CONFIG_HAVE_KPROBES=y
-@@ -133,6 +132,7 @@ CONFIG_DEFAULT_IOSCHED="deadline"
- #
- # System Type
- #
-+CONFIG_MMU=y
- # CONFIG_ARCH_AAEC2000 is not set
- # CONFIG_ARCH_INTEGRATOR is not set
- # CONFIG_ARCH_REALVIEW is not set
-@@ -147,6 +147,7 @@ CONFIG_DEFAULT_IOSCHED="deadline"
- # CONFIG_ARCH_STMP3XXX is not set
- # CONFIG_ARCH_NETX is not set
- # CONFIG_ARCH_H720X is not set
-+# CONFIG_ARCH_NOMADIK is not set
- # CONFIG_ARCH_IOP13XX is not set
- # CONFIG_ARCH_IOP32X is not set
- # CONFIG_ARCH_IOP33X is not set
-@@ -169,11 +170,13 @@ CONFIG_DEFAULT_IOSCHED="deadline"
- # CONFIG_ARCH_SA1100 is not set
- # CONFIG_ARCH_S3C2410 is not set
- # CONFIG_ARCH_S3C64XX is not set
-+# CONFIG_ARCH_S5PC1XX is not set
- # CONFIG_ARCH_SHARK is not set
- # CONFIG_ARCH_LH7A40X is not set
- CONFIG_ARCH_U300=y
- # CONFIG_ARCH_DAVINCI is not set
- # CONFIG_ARCH_OMAP is not set
-+# CONFIG_ARCH_BCMRING is not set
+-extern void clocksource_set_clock(struct clocksource *cs, unsigned int clock);
+-extern void clockevent_set_clock(struct clock_event_device *cd,
+-		unsigned int clock);
+-
+ #endif /* _ASM_TIME_H */
+diff --git a/arch/mips/kernel/time.c b/arch/mips/kernel/time.c
+index 1f467d5..fb74974 100644
+--- a/arch/mips/kernel/time.c
++++ b/arch/mips/kernel/time.c
+@@ -71,39 +71,6 @@ EXPORT_SYMBOL(perf_irq);
  
- #
- # ST-Ericsson AB U300/U330/U335/U365 Platform
-@@ -195,6 +198,7 @@ CONFIG_MACH_U300_BS335=y
- CONFIG_MACH_U300_DUAL_RAM=y
- CONFIG_U300_DEBUG=y
- # CONFIG_MACH_U300_SEMI_IS_SHARED is not set
-+CONFIG_MACH_U300_SPIDUMMY=y
+ unsigned int mips_hpt_frequency;
  
- #
- # All the settings below must match the bootloader's settings
-@@ -207,7 +211,7 @@ CONFIG_CPU_32=y
- CONFIG_CPU_ARM926T=y
- CONFIG_CPU_32v5=y
- CONFIG_CPU_ABRT_EV5TJ=y
--CONFIG_CPU_PABRT_NOIFAR=y
-+CONFIG_CPU_PABRT_LEGACY=y
- CONFIG_CPU_CACHE_VIVT=y
- CONFIG_CPU_COPY_V4WB=y
- CONFIG_CPU_TLB_V4WBI=y
-@@ -222,6 +226,7 @@ CONFIG_ARM_THUMB=y
- # CONFIG_CPU_DCACHE_DISABLE is not set
- # CONFIG_CPU_DCACHE_WRITETHROUGH is not set
- # CONFIG_CPU_CACHE_ROUND_ROBIN is not set
-+CONFIG_ARM_L1_CACHE_SHIFT=5
- CONFIG_ARM_VIC=y
- CONFIG_ARM_VIC_NR=2
- CONFIG_COMMON_CLKDEV=y
-@@ -245,6 +250,8 @@ CONFIG_VMSPLIT_3G=y
- # CONFIG_VMSPLIT_2G is not set
- # CONFIG_VMSPLIT_1G is not set
- CONFIG_PAGE_OFFSET=0xC0000000
-+# CONFIG_PREEMPT_NONE is not set
-+# CONFIG_PREEMPT_VOLUNTARY is not set
- CONFIG_PREEMPT=y
- CONFIG_HZ=100
- CONFIG_AEABI=y
-@@ -265,6 +272,7 @@ CONFIG_ZONE_DMA_FLAG=0
- CONFIG_VIRT_TO_BUS=y
- CONFIG_HAVE_MLOCK=y
- CONFIG_HAVE_MLOCKED_PAGE_BIT=y
-+# CONFIG_KSM is not set
- CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
- CONFIG_ALIGNMENT_TRAP=y
- # CONFIG_UACCESS_WITH_MEMCPY is not set
-@@ -313,6 +321,7 @@ CONFIG_PM=y
- # CONFIG_PM_DEBUG is not set
- # CONFIG_SUSPEND is not set
- # CONFIG_APM_EMULATION is not set
-+# CONFIG_PM_RUNTIME is not set
- CONFIG_ARCH_SUSPEND_POSSIBLE=y
- CONFIG_NET=y
+-void __init clocksource_set_clock(struct clocksource *cs, unsigned int clock)
+-{
+-	u64 temp;
+-	u32 shift;
+-
+-	/* Find a shift value */
+-	for (shift = 32; shift > 0; shift--) {
+-		temp = (u64) NSEC_PER_SEC << shift;
+-		do_div(temp, clock);
+-		if ((temp >> 32) == 0)
+-			break;
+-	}
+-	cs->shift = shift;
+-	cs->mult = (u32) temp;
+-}
+-
+-void __cpuinit clockevent_set_clock(struct clock_event_device *cd,
+-	unsigned int clock)
+-{
+-	u64 temp;
+-	u32 shift;
+-
+-	/* Find a shift value */
+-	for (shift = 32; shift > 0; shift--) {
+-		temp = (u64) clock << shift;
+-		do_div(temp, NSEC_PER_SEC);
+-		if ((temp >> 32) == 0)
+-			break;
+-	}
+-	cd->shift = shift;
+-	cd->mult = (u32) temp;
+-}
+-
+ /*
+  * This function exists in order to cause an error due to a duplicate
+  * definition if platform code should have its own implementation.  The hook
+diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
+index 3a1dbba..41aa95e 100644
+--- a/include/linux/clockchips.h
++++ b/include/linux/clockchips.h
+@@ -115,6 +115,30 @@ static inline unsigned long div_sc(unsigned long ticks, unsigned long nsec,
+ 	return (unsigned long) tmp;
+ }
  
-@@ -351,6 +360,7 @@ CONFIG_DEFAULT_TCP_CONG="cubic"
- # CONFIG_NETFILTER is not set
- # CONFIG_IP_DCCP is not set
- # CONFIG_IP_SCTP is not set
-+# CONFIG_RDS is not set
- # CONFIG_TIPC is not set
- # CONFIG_ATM is not set
- # CONFIG_BRIDGE is not set
-@@ -391,6 +401,7 @@ CONFIG_DEFAULT_TCP_CONG="cubic"
- # Generic Driver Options
- #
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+# CONFIG_DEVTMPFS is not set
- CONFIG_STANDALONE=y
- # CONFIG_PREVENT_FIRMWARE_BUILD is not set
- CONFIG_FW_LOADER=y
-@@ -402,9 +413,9 @@ CONFIG_EXTRA_FIRMWARE=""
- # CONFIG_CONNECTOR is not set
- CONFIG_MTD=y
- # CONFIG_MTD_DEBUG is not set
-+# CONFIG_MTD_TESTS is not set
- # CONFIG_MTD_CONCAT is not set
- CONFIG_MTD_PARTITIONS=y
--# CONFIG_MTD_TESTS is not set
- # CONFIG_MTD_REDBOOT_PARTS is not set
- CONFIG_MTD_CMDLINE_PARTS=y
- # CONFIG_MTD_AFS_PARTS is not set
-@@ -453,6 +464,7 @@ CONFIG_MTD_CFI_I2=y
- #
- # CONFIG_MTD_DATAFLASH is not set
- # CONFIG_MTD_M25P80 is not set
-+# CONFIG_MTD_SST25L is not set
- # CONFIG_MTD_SLRAM is not set
- # CONFIG_MTD_PHRAM is not set
- # CONFIG_MTD_MTDRAM is not set
-@@ -520,6 +532,7 @@ CONFIG_HAVE_IDE=y
- # CONFIG_MD is not set
- # CONFIG_NETDEVICES is not set
- # CONFIG_ISDN is not set
-+# CONFIG_PHONE is not set
- 
- #
- # Input device support
-@@ -540,12 +553,16 @@ CONFIG_INPUT_EVDEV=y
- # Input Device Drivers
- #
- CONFIG_INPUT_KEYBOARD=y
-+# CONFIG_KEYBOARD_ADP5588 is not set
- # CONFIG_KEYBOARD_ATKBD is not set
-+# CONFIG_QT2160 is not set
- # CONFIG_KEYBOARD_LKKBD is not set
- # CONFIG_KEYBOARD_GPIO is not set
- # CONFIG_KEYBOARD_MATRIX is not set
- # CONFIG_KEYBOARD_LM8323 is not set
-+# CONFIG_KEYBOARD_MAX7359 is not set
- # CONFIG_KEYBOARD_NEWTON is not set
-+# CONFIG_KEYBOARD_OPENCORES is not set
- # CONFIG_KEYBOARD_STOWAWAY is not set
- # CONFIG_KEYBOARD_SUNKBD is not set
- # CONFIG_KEYBOARD_XTKBD is not set
-@@ -597,6 +614,7 @@ CONFIG_LEGACY_PTY_COUNT=16
- # CONFIG_TCG_TPM is not set
- CONFIG_I2C=y
- CONFIG_I2C_BOARDINFO=y
-+CONFIG_I2C_COMPAT=y
- # CONFIG_I2C_CHARDEV is not set
- CONFIG_I2C_HELPER_AUTO=y
- 
-@@ -629,9 +647,6 @@ CONFIG_I2C_STU300=y
- # Miscellaneous I2C Chip support
- #
- # CONFIG_DS1682 is not set
--# CONFIG_SENSORS_PCF8574 is not set
--# CONFIG_PCF8575 is not set
--# CONFIG_SENSORS_PCA9539 is not set
- # CONFIG_SENSORS_TSL2550 is not set
- # CONFIG_I2C_DEBUG_CORE is not set
- # CONFIG_I2C_DEBUG_ALGO is not set
-@@ -653,16 +668,21 @@ CONFIG_SPI_PL022=y
- #
- # CONFIG_SPI_SPIDEV is not set
- # CONFIG_SPI_TLE62X0 is not set
++/**
++ * clockevent_set_clock - dynamically calculates an appropriate shift
++ *			  and mult value for a clocksource given a
++ *			  known clock frequency
++ * @dev:	Clockevent device to initialize
++ * @hz:		Clockevent clock frequency in Hz
++ */
++static inline void clockevent_set_clock(struct clock_event_device *dev, u32 hz)
++{
++	u64 temp;
++	u32 shift;
 +
-+#
-+# PPS support
-+#
-+# CONFIG_PPS is not set
- # CONFIG_W1 is not set
- CONFIG_POWER_SUPPLY=y
- # CONFIG_POWER_SUPPLY_DEBUG is not set
- # CONFIG_PDA_POWER is not set
- # CONFIG_BATTERY_DS2760 is not set
-+# CONFIG_BATTERY_DS2782 is not set
- # CONFIG_BATTERY_BQ27x00 is not set
- # CONFIG_BATTERY_MAX17040 is not set
- # CONFIG_HWMON is not set
- # CONFIG_THERMAL is not set
--# CONFIG_THERMAL_HWMON is not set
- CONFIG_WATCHDOG=y
- # CONFIG_WATCHDOG_NOWAYOUT is not set
- 
-@@ -690,10 +710,24 @@ CONFIG_SSB_POSSIBLE=y
- # CONFIG_MFD_TC6387XB is not set
- # CONFIG_PMIC_DA903X is not set
- # CONFIG_MFD_WM8400 is not set
-+# CONFIG_MFD_WM831X is not set
- # CONFIG_MFD_WM8350_I2C is not set
- # CONFIG_MFD_PCF50633 is not set
-+# CONFIG_MFD_MC13783 is not set
- CONFIG_AB3100_CORE=y
-+CONFIG_AB3100_OTP=y
- # CONFIG_EZX_PCAP is not set
-+CONFIG_REGULATOR=y
-+# CONFIG_REGULATOR_DEBUG is not set
-+# CONFIG_REGULATOR_FIXED_VOLTAGE is not set
-+# CONFIG_REGULATOR_VIRTUAL_CONSUMER is not set
-+# CONFIG_REGULATOR_USERSPACE_CONSUMER is not set
-+# CONFIG_REGULATOR_BQ24022 is not set
-+# CONFIG_REGULATOR_MAX1586 is not set
-+# CONFIG_REGULATOR_LP3971 is not set
-+CONFIG_REGULATOR_AB3100=y
-+# CONFIG_REGULATOR_TPS65023 is not set
-+# CONFIG_REGULATOR_TPS6507X is not set
- # CONFIG_MEDIA_SUPPORT is not set
- 
- #
-@@ -792,9 +826,10 @@ CONFIG_MMC_BLOCK_BOUNCE=y
- #
- CONFIG_MMC_ARMMMCI=y
- # CONFIG_MMC_SDHCI is not set
-+# CONFIG_MMC_AT91 is not set
-+# CONFIG_MMC_ATMELMCI is not set
- # CONFIG_MMC_SPI is not set
- # CONFIG_MEMSTICK is not set
--# CONFIG_ACCESSIBILITY is not set
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- 
-@@ -820,10 +855,10 @@ CONFIG_LEDS_TRIGGER_BACKLIGHT=y
- #
- # iptables trigger is under Netfilter config (LED target)
- #
-+# CONFIG_ACCESSIBILITY is not set
- CONFIG_RTC_LIB=y
- CONFIG_RTC_CLASS=y
--CONFIG_RTC_HCTOSYS=y
--CONFIG_RTC_HCTOSYS_DEVICE="rtc0"
-+# CONFIG_RTC_HCTOSYS is not set
- # CONFIG_RTC_DEBUG is not set
- 
- #
-@@ -863,6 +898,7 @@ CONFIG_RTC_INTF_DEV=y
- # CONFIG_RTC_DRV_R9701 is not set
- # CONFIG_RTC_DRV_RS5C348 is not set
- # CONFIG_RTC_DRV_DS3234 is not set
-+# CONFIG_RTC_DRV_PCF2123 is not set
- 
- #
- # Platform RTC drivers
-@@ -878,27 +914,25 @@ CONFIG_RTC_INTF_DEV=y
- # CONFIG_RTC_DRV_M48T59 is not set
- # CONFIG_RTC_DRV_BQ4802 is not set
- # CONFIG_RTC_DRV_V3020 is not set
-+CONFIG_RTC_DRV_AB3100=y
- 
- #
- # on-CPU RTC drivers
- #
- # CONFIG_RTC_DRV_PL030 is not set
- # CONFIG_RTC_DRV_PL031 is not set
-+CONFIG_RTC_DRV_COH901331=y
- CONFIG_DMADEVICES=y
- 
- #
- # DMA Devices
- #
- # CONFIG_AUXDISPLAY is not set
--CONFIG_REGULATOR=y
--# CONFIG_REGULATOR_DEBUG is not set
--# CONFIG_REGULATOR_FIXED_VOLTAGE is not set
--# CONFIG_REGULATOR_VIRTUAL_CONSUMER is not set
--# CONFIG_REGULATOR_USERSPACE_CONSUMER is not set
--# CONFIG_REGULATOR_BQ24022 is not set
--# CONFIG_REGULATOR_MAX1586 is not set
--# CONFIG_REGULATOR_LP3971 is not set
- # CONFIG_UIO is not set
++	/* Find a shift value */
++	for (shift = 32; shift > 0; shift--) {
++		temp = (u64) hz << shift;
++		do_div(temp, NSEC_PER_SEC);
++		if ((temp >> 32) == 0)
++			break;
++	}
++	dev->shift = shift;
++	dev->mult = (u32) temp;
++}
 +
-+#
-+# TI VLYNQ
-+#
- # CONFIG_STAGING is not set
++
+ /* Clock event layer functions */
+ extern unsigned long clockevent_delta2ns(unsigned long latch,
+ 					 struct clock_event_device *evt);
+diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
+index 9ea40ff..807fb37 100644
+--- a/include/linux/clocksource.h
++++ b/include/linux/clocksource.h
+@@ -257,6 +257,29 @@ static inline u32 clocksource_hz2mult(u32 hz, u32 shift_constant)
+ }
  
- #
-@@ -913,6 +947,7 @@ CONFIG_REGULATOR=y
- # CONFIG_XFS_FS is not set
- # CONFIG_OCFS2_FS is not set
- # CONFIG_BTRFS_FS is not set
-+# CONFIG_NILFS2_FS is not set
- CONFIG_FILE_LOCKING=y
- CONFIG_FSNOTIFY=y
- # CONFIG_DNOTIFY is not set
-@@ -975,7 +1010,6 @@ CONFIG_MISC_FILESYSTEMS=y
- # CONFIG_ROMFS_FS is not set
- # CONFIG_SYSV_FS is not set
- # CONFIG_UFS_FS is not set
--# CONFIG_NILFS2_FS is not set
- # CONFIG_NETWORK_FILESYSTEMS is not set
+ /**
++ * clocksource_set_clock - dynamically calculates an appropriate shift
++ *			   and mult value for a clocksource given a
++ *			   known clock frequency
++ * @cs:		Clocksource to initialize
++ * @hz:		Clocksource frequency in Hz
++ */
++static inline void clocksource_set_clock(struct clocksource *cs, u32 hz)
++{
++	u64 temp;
++	u32 shift;
++
++	/* Find a shift value */
++	for (shift = 32; shift > 0; shift--) {
++		temp = (u64) NSEC_PER_SEC << shift;
++		do_div(temp, hz);
++		if ((temp >> 32) == 0)
++			break;
++	}
++	cs->shift = shift;
++	cs->mult = (u32) temp;
++}
++
++/**
+  * clocksource_cyc2ns - converts clocksource cycles to nanoseconds
+  *
+  * Converts cycles to nanoseconds, using the given mult and shift.
+@@ -268,7 +291,6 @@ static inline s64 clocksource_cyc2ns(cycle_t cycles, u32 mult, u32 shift)
+ 	return ((u64) cycles * mult) >> shift;
+ }
  
- #
-@@ -1033,6 +1067,7 @@ CONFIG_ENABLE_WARN_DEPRECATED=y
- CONFIG_ENABLE_MUST_CHECK=y
- CONFIG_FRAME_WARN=1024
- # CONFIG_MAGIC_SYSRQ is not set
-+# CONFIG_STRIP_ASM_SYMS is not set
- # CONFIG_UNUSED_SYMBOLS is not set
- # CONFIG_DEBUG_FS is not set
- # CONFIG_HEADERS_CHECK is not set
-@@ -1066,11 +1101,13 @@ CONFIG_DEBUG_INFO=y
- # CONFIG_DEBUG_LIST is not set
- # CONFIG_DEBUG_SG is not set
- # CONFIG_DEBUG_NOTIFIERS is not set
-+# CONFIG_DEBUG_CREDENTIALS is not set
- # CONFIG_BOOT_PRINTK_DELAY is not set
- # CONFIG_RCU_TORTURE_TEST is not set
- # CONFIG_RCU_CPU_STALL_DETECTOR is not set
- # CONFIG_BACKTRACE_SELF_TEST is not set
- # CONFIG_DEBUG_BLOCK_EXT_DEVT is not set
-+# CONFIG_DEBUG_FORCE_WEAK_PER_CPU is not set
- # CONFIG_FAULT_INJECTION is not set
- # CONFIG_LATENCYTOP is not set
- # CONFIG_SYSCTL_SYSCALL_CHECK is not set
-@@ -1121,6 +1158,7 @@ CONFIG_GENERIC_FIND_LAST_BIT=y
- # CONFIG_CRC32 is not set
- # CONFIG_CRC7 is not set
- # CONFIG_LIBCRC32C is not set
-+CONFIG_GENERIC_ALLOCATOR=y
- CONFIG_HAS_IOMEM=y
- CONFIG_HAS_IOPORT=y
- CONFIG_HAS_DMA=y
+-
+ /* used to install a new clocksource */
+ extern int clocksource_register(struct clocksource*);
+ extern void clocksource_unregister(struct clocksource*);
 -- 
 1.6.2.5
