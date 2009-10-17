@@ -1,14 +1,15 @@
 From: julia@diku.dk (Julia Lawall)
-Date: Sat, 17 Oct 2009 08:40:02 +0200 (CEST)
-Subject: [PATCH 7/14] drivers/mmc: Move dereference after NULL test
-Message-ID: <Pine.LNX.4.64.0910170839430.9213@ask.diku.dk>
+Date: Sat, 17 Oct 2009 08:42:30 +0200 (CEST)
+Subject: [PATCH 12/14] arch/arm/plat-omap: Drop an unnecessary NULL test
+Message-ID: <Pine.LNX.4.64.0910170842120.9213@ask.diku.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Julia Lawall <julia@diku.dk>
 
-If the NULL test on mrq is needed, then the derefernce should be after the
-NULL test.
+map_iovm_area is only called from a context where its second argument is
+known not to be NULL, so drop the unnecessary test.  If new could be NULL,
+the initialization of da should be moved below the test.
 
 A simplified version of the semantic match that detects this problem is as
 follows (http://coccinelle.lip6.fr/):
@@ -27,27 +28,19 @@ identifier fld;
 Signed-off-by: Julia Lawall <julia@diku.dk>
 
 ---
- drivers/mmc/host/s3cmci.c           |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ arch/arm/plat-omap/iovmm.c          |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
-index 99b74a3..5be6962 100644
---- a/drivers/mmc/host/s3cmci.c
-+++ b/drivers/mmc/host/s3cmci.c
-@@ -820,7 +820,7 @@ fail_request:
- static void finalize_request(struct s3cmci_host *host)
- {
- 	struct mmc_request *mrq = host->mrq;
--	struct mmc_command *cmd = host->cmd_is_stop ? mrq->stop : mrq->cmd;
-+	struct mmc_command *cmd;
- 	int debug_as_failure = 0;
+diff --git a/arch/arm/plat-omap/iovmm.c b/arch/arm/plat-omap/iovmm.c
+index dc3fac3..21c73d4 100644
+--- a/arch/arm/plat-omap/iovmm.c
++++ b/arch/arm/plat-omap/iovmm.c
+@@ -449,7 +449,7 @@ static int map_iovm_area(struct iommu *obj, struct iovm_struct *new,
+ 	struct scatterlist *sg;
+ 	u32 da = new->da_start;
  
- 	if (host->complete_what != COMPLETION_FINALIZE)
-@@ -828,6 +828,7 @@ static void finalize_request(struct s3cmci_host *host)
+-	if (!obj || !new || !sgt)
++	if (!obj || !sgt)
+ 		return -EINVAL;
  
- 	if (!mrq)
- 		return;
-+	cmd = host->cmd_is_stop ? mrq->stop : mrq->cmd;
- 
- 	if (cmd->data && (cmd->error == 0) &&
- 	    (cmd->data->error == 0)) {
+ 	BUG_ON(!sgtable_ok(sgt));
