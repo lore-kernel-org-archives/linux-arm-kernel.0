@@ -1,54 +1,14 @@
-From: julia@diku.dk (Julia Lawall)
-Date: Sat, 17 Oct 2009 08:42:49 +0200 (CEST)
-Subject: [PATCH 13/14] arch/arm/plat-s3c24xx: Move dereference after NULL test
-Message-ID: <Pine.LNX.4.64.0910170842310.9213@ask.diku.dk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 17 Oct 2009 09:10:04 +0100
+Subject: [PATCH 05/14] omap: Use ioremap in gpio.c
+In-Reply-To: <20091016234104.2463.54276.stgit@localhost>
+References: <20091016233624.2463.26653.stgit@localhost>
+	<20091016234104.2463.54276.stgit@localhost>
+Message-ID: <20091017081004.GA648@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <julia@diku.dk>
+On Fri, Oct 16, 2009 at 04:41:04PM -0700, Tony Lindgren wrote:
+> +	{ OMAP1_MPUIO_VBASE, 0, INT_MPUIO, IH_MPUIO_BASE,
 
-If the NULL test on buf is needed, then the dereference should be after the
-NULL test.
-
-A simplified version of the semantic match that detects this problem is as
-follows (http://coccinelle.lip6.fr/):
-
-// <smpl>
-@match exists@
-expression x, E;
-identifier fld;
-@@
-
-* x->fld
-  ... when != \(x = E\|&x\)
-* x == NULL
-// </smpl>
-
-Signed-off-by: Julia Lawall <julia@diku.dk>
-
----
- arch/arm/plat-s3c24xx/dma.c         |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
-index 196b191..f046f8c 100644
---- a/arch/arm/plat-s3c24xx/dma.c
-+++ b/arch/arm/plat-s3c24xx/dma.c
-@@ -208,14 +208,14 @@ s3c2410_dma_loadbuffer(struct s3c2410_dma_chan *chan,
- {
- 	unsigned long reload;
- 
--	pr_debug("s3c2410_chan_loadbuffer: loading buff %p (0x%08lx,0x%06x)\n",
--		 buf, (unsigned long)buf->data, buf->size);
--
- 	if (buf == NULL) {
- 		dmawarn("buffer is NULL\n");
- 		return -EINVAL;
- 	}
- 
-+	pr_debug("s3c2410_chan_loadbuffer: loading buff %p (0x%08lx,0x%06x)\n",
-+		 buf, (unsigned long)buf->data, buf->size);
-+
- 	/* check the state of the channel before we do anything */
- 
- 	if (chan->load_state == S3C2410_DMALOAD_1LOADED) {
+That 0 should be NULL - it's a pointer.
