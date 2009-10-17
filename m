@@ -1,82 +1,215 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Sat, 17 Oct 2009 17:46:24 +0800
-Subject: [PATCH V1 3/3] i2c: imx: disable clock when it's possible to save
-	power.
-In-Reply-To: <1255772784-11387-2-git-send-email-linuxzsc@gmail.com>
-References: <1255772784-11387-1-git-send-email-linuxzsc@gmail.com>
-	<1255772784-11387-2-git-send-email-linuxzsc@gmail.com>
-Message-ID: <1255772784-11387-3-git-send-email-linuxzsc@gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Sat, 17 Oct 2009 16:18:55 +0530
+Subject: [PATCH 08/14] omap: Use ioremap for omap4 L4 code
+In-Reply-To: <20091016234622.GH12576@atomide.com>
+References: <20091016233624.2463.26653.stgit@localhost>
+	<20091016234138.2463.38350.stgit@localhost>
+	<20091016234622.GH12576@atomide.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02BB37D7AA@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable clock before START, disable it after STOP.
+Thanks Tony for this ioremap series!!
 
-Signed-off-by: Richard Zhao <linuxzsc@gmail.com>
+> -----Original Message-----
+> From: Tony Lindgren [mailto:tony at atomide.com]
+> Sent: Saturday, October 17, 2009 5:16 AM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: linux-omap at vger.kernel.org; Shilimkar, Santosh
+> Subject: Re: [PATCH 08/14] omap: Use ioremap for omap4 L4 code
+> 
+> * Tony Lindgren <tony@atomide.com> [091016 16:42]:
+> > Use ioremap for omap4 L4 code
+> 
+> Santosh, can you please check and ack this patch?
+> 
+> Especially some of the ioremap sizes may be wrong. Also, this one
+> I cannot boot test, so it's just compile tested.
 
-diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
-index 671d37c..e3654d6 100644
---- a/drivers/i2c/busses/i2c-imx.c
-+++ b/drivers/i2c/busses/i2c-imx.c
-@@ -121,6 +121,7 @@ struct imx_i2c_struct {
- 	unsigned long		i2csr;
- 	unsigned int 		disable_delay;
- 	int			stopped;
-+	unsigned int		ifdr; /* IMX_I2C_IFDR */
- };
- 
- /** Functions for IMX I2C adapter driver ***************************************
-@@ -192,6 +193,8 @@ static int i2c_imx_start(struct imx_i2c_struct *i2c_imx)
- 
- 	dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
- 
-+	clk_enable(i2c_imx->clk);
-+	writeb(i2c_imx->ifdr, i2c_imx->base + IMX_I2C_IFDR);
- 	/* Enable I2C controller */
- 	writeb(0, i2c_imx->base + IMX_I2C_I2SR);
- 	writeb(I2CR_IEN, i2c_imx->base + IMX_I2C_I2CR);
-@@ -238,6 +241,7 @@ static void i2c_imx_stop(struct imx_i2c_struct *i2c_imx)
- 
- 	/* Disable I2C controller */
- 	writeb(0, i2c_imx->base + IMX_I2C_I2CR);
-+	clk_disable(i2c_imx->clk);
- }
- 
- static void __init i2c_imx_set_clk(struct imx_i2c_struct *i2c_imx,
-@@ -257,8 +261,8 @@ static void __init i2c_imx_set_clk(struct imx_i2c_struct *i2c_imx,
- 	else
- 		for (i = 0; i2c_clk_div[i][0] < div; i++);
- 
--	/* Write divider value to register */
--	writeb(i2c_clk_div[i][1], i2c_imx->base + IMX_I2C_IFDR);
-+	/* Store divider value */
-+	i2c_imx->ifdr = i2c_clk_div[i][1];
- 
- 	/*
- 	 * There dummy delay is calculated.
-@@ -528,7 +532,6 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "can't get I2C clock\n");
- 		goto fail3;
- 	}
--	clk_enable(i2c_imx->clk);
- 
- 	/* Request IRQ */
- 	ret = request_irq(i2c_imx->irq, i2c_imx_isr, 0, pdev->name, i2c_imx);
-@@ -577,7 +580,6 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
- fail5:
- 	free_irq(i2c_imx->irq, i2c_imx);
- fail4:
--	clk_disable(i2c_imx->clk);
- 	clk_put(i2c_imx->clk);
- fail3:
- 	release_mem_region(i2c_imx->res->start, resource_size(res));
-@@ -614,8 +616,6 @@ static int __exit i2c_imx_remove(struct platform_device *pdev)
- 	if (pdata && pdata->exit)
- 		pdata->exit(&pdev->dev);
- 
--	/* Disable I2C clock */
--	clk_disable(i2c_imx->clk);
- 	clk_put(i2c_imx->clk);
- 
- 	release_mem_region(i2c_imx->res->start, resource_size(i2c_imx->res));
--- 
-1.6.0.4
+I have checked the patch and it looks all right except few typo. Also the scu_base is needed bit earlier. 
+> 
+> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > ---
+> >  arch/arm/mach-omap2/board-4430sdp.c           |   13 ++++++++++--
+> >  arch/arm/mach-omap2/omap-smp.c                |   28
+> ++++++++++++++++++++-----
+> >  arch/arm/mach-omap2/timer-gp.c                |    3 ++-
+> >  arch/arm/plat-omap/include/mach/entry-macro.S |    2 ++
+> >  arch/arm/plat-omap/include/mach/omap44xx.h    |    5 ----
+> >  5 files changed, 37 insertions(+), 14 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-
+> omap2/board-4430sdp.c
+> > index eb37c40..2a7b901 100644
+> > --- a/arch/arm/mach-omap2/board-4430sdp.c
+> > +++ b/arch/arm/mach-omap2/board-4430sdp.c
+> > @@ -52,8 +52,17 @@ static struct omap_board_config_kernel
+> sdp4430_config[] __initdata = {
+> >
+> >  static void __init gic_init_irq(void)
+> >  {
+> > -	gic_dist_init(0, OMAP2_IO_ADDRESS(OMAP44XX_GIC_DIST_BASE), 29);
+> > -	gic_cpu_init(0, OMAP2_IO_ADDRESS(OMAP44XX_GIC_CPU_BASE));
+> > +	void __iomem *base;
+> > +
+> > +	/* Static mapping, never released */
+> > +	base = ioremap(OMAP44XX_GIC_DIST_BASE, SZ_4K);
+> > +	BUG_ON(!base);
+> > +	gic_dist_init(0, base, 29);
+> > +
+> > +	/* Static mapping, never released */
+> > +	base = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_256);
+Should be "SZ_512"
+> > +	BUG_ON(!base);
+> > +	gic_cpu_init(0, OMAP44XX_GIC_CPU_BASE);
+This should be gic_cpu_init(0, base);
+> >  }
+> >
+> >  static void __init omap_4430sdp_init_irq(void)
+> > diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-
+> smp.c
+> > index 48ee295..a1b618c 100644
+> > --- a/arch/arm/mach-omap2/omap-smp.c
+> > +++ b/arch/arm/mach-omap2/omap-smp.c
+> > @@ -26,11 +26,11 @@
+> >  #include <mach/hardware.h>
+> >
+> >  /* Registers used for communicating startup information */
+> > -#define OMAP4_AUXCOREBOOT_REG0		(OMAP44XX_VA_WKUPGEN_BASE +
+> 0x800)
+> > -#define OMAP4_AUXCOREBOOT_REG1		(OMAP44XX_VA_WKUPGEN_BASE +
+> 0x804)
+> > +static void __iomem *omap4_auxcoreboot_reg0;
+> > +static void __iomem *omap4_auxcoreboot_reg1;
+> >
+> >  /* SCU base address */
+> > -static void __iomem *scu_base = OMAP44XX_VA_SCU_BASE;
+> > +static void __iomem *scu_base;
+> >
+> >  /*
+> >   * Use SCU config register to count number of cores
+> > @@ -46,6 +46,8 @@ static DEFINE_SPINLOCK(boot_lock);
+> >
+> >  void __cpuinit platform_secondary_init(unsigned int cpu)
+> >  {
+> > +	void __iomem *gic_cpu_base;
+> > +
+> >  	trace_hardirqs_off();
+> >
+> >  	/*
+> > @@ -54,7 +56,10 @@ void __cpuinit platform_secondary_init(unsigned int
+> cpu)
+> >  	 * for us: do so
+> >  	 */
+> >
+> > -	gic_cpu_init(0, OMAP2_IO_ADDRESS(OMAP44XX_GIC_CPU_BASE));
+> > +	/* Static mapping, never released */
+> > +	gic_cpu_base = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_256);
+Although underneath static mapping will take care of not doing dual mapping, we can map this ones in gic_init_irq() and use the same variable here. 
+> > +	BUG_ON(!gic_cpu_base);
+> > +	gic_cpu_init(0, gic_cpu_base);
+> >
+> >  	/*
+> >  	 * Synchronise with the boot thread.
+> > @@ -79,7 +84,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct
+> task_struct *idle)
+> >  	 * the AuxCoreBoot1 register is updated with cpu state
+> >  	 * A barrier is added to ensure that write buffer is drained
+> >  	 */
+> > -	__raw_writel(cpu, OMAP4_AUXCOREBOOT_REG1);
+> > +	__raw_writel(cpu, omap4_auxcoreboot_reg1);
+> >  	smp_wmb();
+> >
+> >  	timeout = jiffies + (1 * HZ);
+> > @@ -104,7 +109,7 @@ static void __init wakeup_secondary(void)
+> >  	 * A barrier is added to ensure that write buffer is drained
+> >  	 */
+> >  	__raw_writel(virt_to_phys(omap_secondary_startup),	   \
+> > -					OMAP4_AUXCOREBOOT_REG0);
+> > +					omap4_auxcoreboot_reg0);
+> >  	smp_wmb();
+> >
+> >  	/*
+> > @@ -130,6 +135,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+> >  {
+> >  	unsigned int ncores = get_core_count();
+This call will not give correct count. Also there is one more call earlier and hence scu_base ioremaps needs to be done earlier.
+> >  	unsigned int cpu = smp_processor_id();
+> > +	void __iomem *omap4_wkupgen_base;
+> >  	int i;
+> >
+> >  	/* sanity check */
+> > @@ -161,6 +167,16 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+> >  	for (i = 0; i < max_cpus; i++)
+> >  		set_cpu_present(i, true);
+> >
+> > +	/* Never released */
+> > +	omap4_wkupgen_base = ioremap(OMAP44XX_WKUPGEN_BASE, SZ_4K);
+> > +	BUG_ON(!omap4_wkupgen_base);
+> > +	omap4_auxcoreboot_reg0 = omap4_wkupgen_base + 0x800;
+> > +	omap4_auxcoreboot_reg0 = omap4_wkupgen_base + 0x804;
+Should be "omap4_auxcoreboot_reg1 = omap4_wkupgen_base + 0x804;"
+> > +
+> > +	/* Never released */
+> > +	scu_base = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_256);
+> > +	BUG_ON(!scu_base);
+> > +
+> >  	if (max_cpus > 1) {
+> >  		/*
+> >  		 * Enable the local timer or broadcast device for the
+> > diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-omap2/timer-
+> gp.c
+> > index e2338c0..cd72970 100644
+> > --- a/arch/arm/mach-omap2/timer-gp.c
+> > +++ b/arch/arm/mach-omap2/timer-gp.c
+> > @@ -231,7 +231,8 @@ static void __init omap2_gp_clocksource_init(void)
+> >  static void __init omap2_gp_timer_init(void)
+> >  {
+> >  #ifdef CONFIG_LOCAL_TIMERS
+> > -	twd_base = OMAP2_IO_ADDRESS(OMAP44XX_LOCAL_TWD_BASE);
+> > +	twd_base = ioremap(OMAP44XX_LOCAL_TWD_BASE, SZ_256);
+> > +	BUG_ON(!twd_base);
+> >  #endif
+> >  	omap_dm_timer_init();
+> >
+> > diff --git a/arch/arm/plat-omap/include/mach/entry-macro.S
+> b/arch/arm/plat-omap/include/mach/entry-macro.S
+> > index abe0864..3bad928 100644
+> > --- a/arch/arm/plat-omap/include/mach/entry-macro.S
+> > +++ b/arch/arm/plat-omap/include/mach/entry-macro.S
+> > @@ -104,6 +104,8 @@
+> >
+> >  		.endm
+> >  #else
+> > +#define OMAP44XX_VA_GIC_CPU_BASE
+> 	OMAP2_IO_ADDRESS(OMAP44XX_GIC_CPU_BASE)
+> > +
+> >  		/*
+> >  		 * The interrupt numbering scheme is defined in the
+> >  		 * interrupt controller spec.  To wit:
+> > diff --git a/arch/arm/plat-omap/include/mach/omap44xx.h b/arch/arm/plat-
+> omap/include/mach/omap44xx.h
+> > index b3ba5ac..8b4a578 100644
+> > --- a/arch/arm/plat-omap/include/mach/omap44xx.h
+> > +++ b/arch/arm/plat-omap/include/mach/omap44xx.h
+> > @@ -33,14 +33,9 @@
+> >  #define IRQ_SIR_IRQ			0x0040
+> >  #define OMAP44XX_GIC_DIST_BASE		0x48241000
+> >  #define OMAP44XX_GIC_CPU_BASE		0x48240100
+> > -#define OMAP44XX_VA_GIC_CPU_BASE
+> 	OMAP2_IO_ADDRESS(OMAP44XX_GIC_CPU_BASE)
+> >  #define OMAP44XX_SCU_BASE		0x48240000
+> > -#define OMAP44XX_VA_SCU_BASE
+> 	OMAP2_IO_ADDRESS(OMAP44XX_SCU_BASE)
+> >  #define OMAP44XX_LOCAL_TWD_BASE		0x48240600
+> > -#define OMAP44XX_VA_LOCAL_TWD_BASE
+> 	OMAP2_IO_ADDRESS(OMAP44XX_LOCAL_TWD_BASE)
+> > -#define OMAP44XX_LOCAL_TWD_SIZE		0x00000100
+> >  #define OMAP44XX_WKUPGEN_BASE		0x48281000
+> > -#define OMAP44XX_VA_WKUPGEN_BASE
+> 	OMAP2_IO_ADDRESS(OMAP44XX_WKUPGEN_BASE)
+> >
+> >  #endif /* __ASM_ARCH_OMAP44XX_H */
+
+Here is the patch on top of ioremap series which should fix above mentioned things. With below patch + two serial related patches the kernel boots on OMAP4430.
