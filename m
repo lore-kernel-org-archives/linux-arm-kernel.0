@@ -1,26 +1,20 @@
-From: tbm@cyrius.com (Martin Michlmayr)
-Date: Sat, 17 Oct 2009 16:49:25 +0100
-Subject: arm / kirkwood (openrd): cpu_idle
-In-Reply-To: <1a3mq6-ga5.ln1@chipmunk.wormnet.eu>
-References: <200910151352.41991.dk-arm-linux@gmx.de>
-	<20091015121022.GC26774@twin.sascha.silbe.org>
-	<200910151428.27691.dk-arm-linux@gmx.de>
-	<ad9478410910150556h346c1042l48589843087e6fba@mail.gmail.com>
-	<1a3mq6-ga5.ln1@chipmunk.wormnet.eu>
-Message-ID: <20091017154925.GA11553@deprecation.cyrius.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 17 Oct 2009 09:13:48 -0700
+Subject: [PATCH 05/14] omap: Use ioremap in gpio.c
+In-Reply-To: <20091017081004.GA648@n2100.arm.linux.org.uk>
+References: <20091016233624.2463.26653.stgit@localhost>
+	<20091016234104.2463.54276.stgit@localhost>
+	<20091017081004.GA648@n2100.arm.linux.org.uk>
+Message-ID: <20091017161347.GJ12576@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Alexander Clouter <alex@digriz.org.uk> [2009-10-16 12:50]:
-> >>> I'm wondering why it wasn't merged upstream yet, though.
-> >>
-> >> I'm wondering, too.
-> > 
-> > Agreed.  What can we do to help it on it's way?
-> > 
-> I guess someone could add a bunch of Tested-By's to the LKML posting.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [091017 01:10]:
+> On Fri, Oct 16, 2009 at 04:41:04PM -0700, Tony Lindgren wrote:
+> > +	{ OMAP1_MPUIO_VBASE, 0, INT_MPUIO, IH_MPUIO_BASE,
+> 
+> That 0 should be NULL - it's a pointer.
 
-I did and Andrew Morton said he'll make sure it ends up in 2.6.32.
--- 
-Martin Michlmayr
-http://www.cyrius.com/
+Right, thanks, will update.
+
+Tony
