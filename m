@@ -1,28 +1,51 @@
-From: dean_go@eledsn.com (dean_go Zhang)
-Date: Fri, 30 Oct 2009 20:28:44 +0800
-Subject: Soc camera:Is there anyone dealing with ov9650chip?Let's talk about
-	soc camera driver.
-Message-ID: <65c69abb0910300528j2bffc2b8i8eb07254725f8de7@mail.gmail.com>
+From: haojian.zhuang@marvell.com (Haojian Zhuang)
+Date: Sun, 18 Oct 2009 06:09:32 -0400
+Subject: [PATCH] [ARM] pxa: rename macro from pxa9xx to pxa93x
+Message-ID: <mailman.107.1257389905.2253.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm reading to documentation in linux-2.6.30,and ov7670 driver ,and I'm
-trying to make a driver for ov9650.
+Because original macro can only judge whether current CPU is pxa93x, rename
+the macro to correct name.
 
-> struct soc_camera_ops provides .probe and .remove methods, which are called
-> by
-> the soc-camera core, when a camera is matched against or removed from a
-> camera
-> host bus, .init, .release, .suspend, and .resume are called from the camera
-> host
-> driver as discussed above. Other members of this struct provide respective
-> V4L2
-> functionality.
->
+Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+---
+ arch/arm/mach-pxa/include/mach/hardware.h |    7 ++++---
+ 1 files changed, 4 insertions(+), 3 deletions(-)
 
-This is from the documentation,but I didn't find any thing about
-soc_camera_host_device in ov7670's driver code.
-Does anyone know how to make a v4l2 soc camera driver?
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091030/9d20025c/attachment.htm>
+diff --git a/arch/arm/mach-pxa/include/mach/hardware.h
+b/arch/arm/mach-pxa/include/mach/hardware.h
+index aa3d9f7..50f1297 100644
+--- a/arch/arm/mach-pxa/include/mach/hardware.h
++++ b/arch/arm/mach-pxa/include/mach/hardware.h
+@@ -105,6 +105,7 @@
+  *
+  *  PXA935	A0	0x56056931	0x1E653013
+  *  PXA935	B0	0x56056936	0x6E653013
++ *  PXA935	B1	0x56056938	0x8E653013
+  */
+ #ifdef CONFIG_PXA25x
+ #define __cpu_is_pxa210(id)				\
+@@ -283,7 +284,7 @@
+ 		_id == 0x3;				\
+ 	 })
+
+-#define __cpu_is_pxa9xx(id)				\
++#define __cpu_is_pxa93x(id)				\
+ 	({						\
+ 		unsigned int _id = (id) >> 4 & 0xfff;	\
+ 		_id == 0x683 || _id == 0x693;		\
+@@ -299,9 +300,9 @@
+ 		__cpu_is_pxa3xx(read_cpuid_id());	\
+ 	 })
+
+-#define cpu_is_pxa9xx()					\
++#define cpu_is_pxa93x()					\
+ 	({						\
+-		__cpu_is_pxa9xx(read_cpuid_id());	\
++		__cpu_is_pxa93x(read_cpuid_id());	\
+ 	 })
+ /*
+  * return current memory and LCD clock frequency in units of 10kHz
+-- 
+1.5.6.5
