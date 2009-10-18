@@ -1,37 +1,43 @@
-From: virtuoso@slind.org (Alexander Shishkin)
-Date: Mon, 19 Oct 2009 15:57:41 +0300
-Subject: [PATCH v2 1/2] arm: a driver for on-chip ETM and ETB
-In-Reply-To: <20091013174413.GA1134@n2100.arm.linux.org.uk>
-References: <1255453611-16119-1-git-send-email-virtuoso@slind.org>
-	<20091013174413.GA1134@n2100.arm.linux.org.uk>
-Message-ID: <71a0d6ff0910190557q25cb1da2o1bcd6bdd5348c881@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sun, 18 Oct 2009 15:28:40 +0800
+Subject: [PATCH] pxa: extend gpio pins from 128 to 256
+In-Reply-To: <771cded00910172343s525e527flc4e06582b9951e47@mail.gmail.com>
+References: <771cded00909250339g1b894557v6cabf978fa11e470@mail.gmail.com>
+	<f17812d70910150401q425b47e2hb4da64bb203dc770@mail.gmail.com>
+	<771cded00910172201k6cf7c8c7ue7485c4c876e8123@mail.gmail.com>
+	<f17812d70910172303l6cf6693bxabb2fed121cd33f4@mail.gmail.com>
+	<771cded00910172343s525e527flc4e06582b9951e47@mail.gmail.com>
+Message-ID: <f17812d70910180028y12ba79a9vd576cd832b5ae190@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/10/13 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Tue, Oct 13, 2009 at 08:06:50PM +0300, Alexander Shishkin wrote:
->> Changes:
->> v2 -- major update:
->> ? ? ? * fixes according to comments from Linus Walleij and Anand Gadiyar
->> ? ? ? * omap3 clock-related stuff moved to platform device
->
-> And so what about my comments?
-Ah, sorry about that. It was just that the same comments were given by
-Linus, so my reply regarding those was to him.
+Mmm... as long as the platforms call pxa2xx_mfp_config(), I was thinking the
+pxa2xx part can remain intact, saving some bits.
 
-Generally, my concern was that to make not all of the ETM versions
-even have a memory-mapped registers (earlier versions use cp14
-instead; I don't support those at the moment, but it might be a nice
-thing to do that in future) and some of the registers which the AMBA
-framework seems to rely (peripheral id and component id) on are only
-available since ETMv3.2. And the most recent version mentioned in "ETM
-architecture" document is 3.4.
+Soon will be on the flight, will reply two days later. Thanks.
 
-That said, I'm personally not overly concerned about the support for
-earlier versions of those macrocells and if you maintain that those
-are better off implemented as AMBA drivers, I've not problem doing
-that.
+On Oct 18, 2009 2:43 PM, "Haojian Zhuang" <haojian.zhuang@gmail.com> wrote:
 
-Regards,
---
-Alex
+On Sun, Oct 18, 2009 at 2:03 AM, Eric Miao <eric.y.miao@gmail.com> wrote: >
+On Sun, Oct 18, 2009 at ...
+I think that mfp_to_gpio() macro is also a part of mfp driver. This
+macro is used widely
+in platform driver in order to allocate platform irq resource.
+NR_BUILTIN_GPIO is similar
+to this macro.
+
+Because they're used in structure initialization, we can't use
+detecting CPU method to
+distinguish how much mfp/gpio pins can be applied on current CPU.
+Since we couldn't
+import variable or function into structure intialization code. Current
+patch is the easiest
+modification.
+
+If there's a better solution, I'm glad to adopt it. :)
+
+Thanks
+Haojian
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091018/a1d31678/attachment-0001.htm>
