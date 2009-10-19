@@ -1,23 +1,32 @@
-From: JBeulich@novell.com (Jan Beulich)
-Date: Mon, 19 Oct 2009 09:19:40 +0100
-Subject: [PATCH] serial/atmel_serial: Fix another fallout of the
-	change to BUILD_BUG_ON
-In-Reply-To: <200910191638.41299.rusty@rustcorp.com.au>
-References: <1255417680-25609-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20091013092644.72c78334@hskinnemoen-d830>
-	<4AD44AF10200007800019801@vpn.id2.novell.com>
-	<200910191638.41299.rusty@rustcorp.com.au>
-Message-ID: <4ADC3D3C020000780001AA10@vpn.id2.novell.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 19 Oct 2009 10:20:27 +0200
+Subject: Patches for SPI support on Lilly1131 modules
+In-Reply-To: <20091017140351.GF29442@buzzloop.caiaq.de>
+References: <1255785180-18501-1-git-send-email-daniel@caiaq.de>
+	<20091017140351.GF29442@buzzloop.caiaq.de>
+Message-ID: <20091019082027.GE8818@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> Rusty Russell <rusty@rustcorp.com.au> 19.10.09 08:08 >>>
->How's this?  It's not quite valid C, but it "works":
+On Sat, Oct 17, 2009 at 04:03:51PM +0200, Daniel Mack wrote:
+> On Sat, Oct 17, 2009 at 03:12:56PM +0200, Daniel Mack wrote:
+> > Here come four patches to support SPI on Lilly1131 modules in general and
+> > the mc13783 in particular.
+> > 
+> > They apply to -rc5.
+> 
+> Ah, sorry. I didn't see that my tree has the MXC USB bits which haven't
+> been merged yet, so these patches won't apply on your side before that
+> happens. Which is hopefully soon. There will be another development
+> round though, hopefully next week.
 
-But that's not what you proposed initially, i.e. generating a link time
-error if a compile time error can't be generated (and only if even a link
-time error isn't possible, a run time one should be forced).
+Ok, so I'll wait for you to ping me.
 
-And btw., why do you think this isn't valid C?
+Sascha
 
-Jan
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
