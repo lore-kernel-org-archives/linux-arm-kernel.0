@@ -1,32 +1,49 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Tue, 20 Oct 2009 01:02:29 +1030
-Subject: [PATCH] serial/atmel_serial: Fix another fallout of the change to
-	BUILD_BUG_ON
-In-Reply-To: <4ADC3D3C020000780001AA10@vpn.id2.novell.com>
-References: <1255417680-25609-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<200910191638.41299.rusty@rustcorp.com.au>
-	<4ADC3D3C020000780001AA10@vpn.id2.novell.com>
-Message-ID: <200910200102.30478.rusty@rustcorp.com.au>
+From: jbe@pengutronix.de (Juergen Beisert)
+Date: Mon, 19 Oct 2009 16:34:10 +0200
+Subject: [PATCH] input/touchscreen: add S3C24XX SoC touchscreen input
+	driver
+In-Reply-To: <4ADC4D4D.5020508@gmail.com>
+References: <mailman.4020.1255949705.2256.linux-arm-kernel@lists.infradead.org>
+	<4ADC4D4D.5020508@gmail.com>
+Message-ID: <200910191634.11341.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 19 Oct 2009 06:49:40 pm Jan Beulich wrote:
-> >>> Rusty Russell <rusty@rustcorp.com.au> 19.10.09 08:08 >>>
-> >How's this?  It's not quite valid C, but it "works":
-> 
-> But that's not what you proposed initially, i.e. generating a link time
-> error if a compile time error can't be generated (and only if even a link
-> time error isn't possible, a run time one should be forced).
+On Montag, 19. Oktober 2009, Maurus Cuelenaere wrote:
+> Op 19-10-09 12:55, linux-arm-kernel-request at lists.infradead.org schreef:
+> > This touchscreen driver is for touchscreen controller on Samsung
+> > S3C2410/S3C2440 SoC chip. S3C2410/S3C2440 has the on chip touchscreen
+> > controller based on it's analog to digital converter(8-channel analog
+> > inputs, touchscreen uses 4 of them). This driver uses the exsiting S3C
+> > ADC driver to make the touchscreen controller of S3C2410/S3C2440 work
+> > well together with other ADC devices connected to the S3C24XX SoC chip.
+> >
+> > The patch is created against kernel 2.6.32-rc4 and tested with S3C2440
+> > SoC and Samsung LTE430WQ-F0C touchscreen.
+> >
+> >
+> > Signed-off-by: Shine Liu<liuxian@redflag-linux.com>
+> > Signed-off-by: Shine Liu<shinel@foxmail.com>
+>
+> Do you know that there's another patch (at Openmoko) created by Nelson
+> Castillo that does the same, but also has support for kernel-space
+> touchscreen filters? (I think [1] is his latest version)
+> I don't know how your patch performs, but according to [2] the filters
+> should help a lot avoiding jitter etc.
+>
+> I'm not sure whether Nelson has submitted his patches for mainline
+> review yet and what the status is on the kernel filters, but IMHO doing
+> some filtering in kernel space (see the "Why are we doing filtering in
+> kernel space?" part of [2]) which results in a "cleaner" output is
+> preferred over reporting possible "jittery" data.
 
-Yeah, this was cleverer.  A compile time is nicer than link time.  And this
-is *actually* what I want: a compile fail if the compiler knows enough, runtime
-otherwise.
+Filtering can be done perfectly in userland (like all the other ts do). IMHO I 
+can't see any need to do it in kernel space.
 
-> And btw., why do you think this isn't valid C?
+jbe
 
->From my glance at ISO C, non-positive sized variable length arrays are
-invalid.  gcc here seems to give the expected results (eg. sizeof gives
-a negative result).
-
-Cheers,
-Rusty.
+-- 
+Pengutronix e.K.                              | Juergen Beisert             |
+Linux Solutions for Science and Industry      | Phone: +49-8766-939 228     |
+Vertretung Sued/Muenchen, Germany             | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686              | http://www.pengutronix.de/  |
