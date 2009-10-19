@@ -1,37 +1,25 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 19 Oct 2009 22:19:28 +0200
-Subject: [PATCH] imx/gpio: Use handle_level_irq
-Message-ID: <1255983568-20958-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Mon, 19 Oct 2009 22:32:47 +0200
+Subject: [PATCH v2 1/2] arm: a driver for on-chip ETM and ETB
+In-Reply-To: <71a0d6ff0910190557q25cb1da2o1bcd6bdd5348c881@mail.gmail.com>
+References: <1255453611-16119-1-git-send-email-virtuoso@slind.org>
+	<20091013174413.GA1134@n2100.arm.linux.org.uk>
+	<71a0d6ff0910190557q25cb1da2o1bcd6bdd5348c881@mail.gmail.com>
+Message-ID: <63386a3d0910191332y7162d4c4vec625bcda24a8dcb@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to Russell King handle_edge_irq is only useful for "edge-based
-inputs where the controller does not remember transitions with the input
-masked."
+2009/10/19 Alexander Shishkin <virtuoso@slind.org>:
 
-So using handle_edge_irq unconditionally for both edge and level irqs is
-wrong.  Testing showed that the controller does remember transitions
-while the interrupt is masked.  So use handle_level_irq unconditionally.
+> That said, I'm personally not overly concerned about the support for
+> earlier versions of those macrocells and if you maintain that those
+> are better off implemented as AMBA drivers, I've not problem doing
+> that.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: Russell King <rmk@arm.linux.org.uk>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/plat-mxc/gpio.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+If people are using older versions, they can hardcode the peripheral
+ID when they define the AMBA device in their board setup. This
+effectively deactivates the probe for device ID:s.
 
-diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
-index cfc4a8b..d65ebe3 100644
---- a/arch/arm/plat-mxc/gpio.c
-+++ b/arch/arm/plat-mxc/gpio.c
-@@ -282,7 +282,7 @@ int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
- 		for (j = port[i].virtual_irq_start;
- 			j < port[i].virtual_irq_start + 32; j++) {
- 			set_irq_chip(j, &gpio_irq_chip);
--			set_irq_handler(j, handle_edge_irq);
-+			set_irq_handler(j, handle_level_irq);
- 			set_irq_flags(j, IRQF_VALID);
- 		}
- 
--- 
-1.6.5
+So it's safe to use the AMBA PrimeCell abstraction anyway.
+
+Linus Walleij
