@@ -1,38 +1,85 @@
-From: skuribay@pobox.com (Shinya Kuribayashi)
-Date: Mon, 19 Oct 2009 10:23:42 +0900
-Subject: [RFC] i2c-designware patches
-In-Reply-To: <20091014190248.GE11789@tarshish>
-References: <4AD3E974.8080200@necel.com> <20091014190248.GE11789@tarshish>
-Message-ID: <4ADBBF9E.1070801@pobox.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Mon, 19 Oct 2009 13:38:35 +0800
+Subject: Ext3 is supported not well at 2.6.28 for external SD card removal
+Message-ID: <4ADBFB5B.9030200@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
+Dear all,
 
-Baruch Siach wrote:
-> Your contribution to the implementation of transactions that are longer than 
-> the hardware buffers is very important. I wrote this code as a theoretical 
-> exercise, as I never had access to an i2c slave which requires long 
-> transactions. So I'm not surprised to find out that this code was broken.
+I find the kernel 2.6.28 is supported ext3 for SD card not well.
+The external SD card is formatted with ext3, and when removal from
+sd slot, it prints below ext3_abort msg. Such message isn't occurred at
+Linux 2.6.23 and 2.6.27.
 
-Aa far as looking through the source code, I know that it's broken
-without giving it a try with real DW I2C hardware ;-), but that'
-not a big problem.
+mmc1: card d555 removed
+mmcblk2: error -110 sending read/write command
+mmcblk2: error -110 requesting status
+end_request: I/O error, dev mmcblk2, sector 1576855
+Buffer I/O error on device mmcblk2p1, logical block 197099
+lost page write due to I/O error on mmcblk2p1
+mmcblk2: error -110 sending read/write command
+mmcblk2: error -110 requesting status
+end_request: I/O error, dev mmcblk2, sector 1576863
+Buffer I/O error on device mmcblk2p1, logical block 197100
+lost page write due to I/O error on mmcblk2p1
+Aborting journal on device mmcblk2p1.
+------------[ cut here ]------------
+WARNING: at 
+/home/nchen/work/L28EVB/Dev/sirfa5cb_l28_alpha/kernel/fs/buffer.c:1195 
+mark_buffer_dirty+0x9c/0xb8()
+Modules linked in: sirfsoc_wdt sirfsoc_uspserial g_ether g_usbdrv 
+ehci_hcd usbcore snd_soc_cb_modac_ts snd_soc_modac snd_soc_sirfsoc_i2s snd_s
+oc_ts_stream_mode snd_soc_sirfsoc snd_soc_core snd_pcm snd_timer snd 
+soundcore snd_page_alloc sirfsoc_bl sirfsoc_fb cfbcopyarea cfbimgblt cfbf
+illrect
+[<c008a8d8>] (dump_stack+0x0/0x14) from [<c009edfc>] 
+(warn_on_slowpath+0x4c/0x68)
+[<c009edb0>] (warn_on_slowpath+0x0/0x68) from [<c011c1b0>] 
+(mark_buffer_dirty+0x9c/0xb8)
+  r6:c0ad1000 r5:c0340970 r4:c349b7f0
+[<c011c114>] (mark_buffer_dirty+0x0/0xb8) from [<c015b84c>] 
+(journal_update_superblock+0xcc/0x14c)
+  r5:c3a319c0 r4:c38da000
+[<c015b780>] (journal_update_superblock+0x0/0x14c) from [<c015ba84>] 
+(__journal_abort_soft+0xc8/0xd8)
+  r7:c38da000 r6:fffffffb r5:c3a319c0 r4:c38da000
+[<c015b9bc>] (__journal_abort_soft+0x0/0xd8) from [<c015baa4>] 
+(journal_abort+0x10/0x14)
+  r6:c3493860 r5:fffffffb r4:c349b748
+[<c015ba94>] (journal_abort+0x0/0x14) from [<c0158324>] 
+(journal_commit_transaction+0xa64/0x14a0)
+[<c01578c0>] (journal_commit_transaction+0x0/0x14a0) from [<c015c6d8>] 
+(kjournald+0xc4/0x29c)
+[<c015c614>] (kjournald+0x0/0x29c) from [<c00b5818>] (kthread+0x54/0x80)
+[<c00b57c4>] (kthread+0x0/0x80) from [<c00a1ec8>] (do_exit+0x0/0x818)
+  r5:00000000 r4:00000000
+---[ end trace 494b15a74f793f7d ]---
+mmcblk2: error -110 sending read/write command
+mmcblk2: error -110 requesting status
+end_request: I/O error, dev mmcblk2, sector 1576855
+Buffer I/O error on device mmcblk2p1, logical block 197099
+lost page write due to I/O error on mmcblk2p1
+journal commit I/O error
+ext3_abort called.
+EXT3-fs error (device mmcblk2p1): ext3_put_super: Couldn't clean up the 
+journal
+Remounting filesystem read-only
 
-As said in the covermail, your initial work, namely i2c_dw_xfer(),
-i2c_dw_xfer_msg(), and i2c_dw_read() is well-designed, this _is_
-very important.  That makes further enhancements of DW I2C
-transactions much easier, and makes me decide to post the patches.
+Besides, I find when system goes to suspend, when we remove sd card 
+after the system has already suspended. Then, press wakeup button, the 
+system can't wakeup. It sounds happens
+deadlock at __fsync_super, which call stack likes below:
+mmc_remove_card-->device_del-->mmc_blk_remove-->del_gendisk
 
-> For all these patches except no. 7 (Set a clock name to DesignWare I2C clock 
-> source) and no. 16 (Add I2C_FUNC_SMBUS_* bits) you have my
-> 
-> Acked-by: Baruch Siach <baruch@tkos.co.il>
+Such action is ok at Linux 2.6.23 and 2.6.27. And sd card with vfat at 
+2.6.28 is ok.
 
-Thanks, will do.
+Does anyone know what happening for ext3 at 2.6.28 ( or from 2.6.28)?
+Any solutions for such issue?
 
-I added more 4-5 patches fixing transmit abort handling, and misc
-updates all over the patchset (typos, comments, better logics).
-They will come up, hopefully, next week.
+Thank you!
 
-  Shinya
+-- 
+Best regards,
+Peter Chen
