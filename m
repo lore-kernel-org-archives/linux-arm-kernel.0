@@ -1,34 +1,23 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 19 Oct 2009 10:01:28 +0200
-Subject: Ext3 is supported not well at 2.6.28 for external SD card removal
-In-Reply-To: <4ADC1943.1090306@gmail.com>
-References: <4ADBFB5B.9030200@gmail.com>
-	<200910190759.11591.marek.vasut@gmail.com>
-	<4ADC1943.1090306@gmail.com>
-Message-ID: <20091019080128.GC11449@pengutronix.de>
+From: JBeulich@novell.com (Jan Beulich)
+Date: Mon, 19 Oct 2009 09:19:40 +0100
+Subject: [PATCH] serial/atmel_serial: Fix another fallout of the
+	change to BUILD_BUG_ON
+In-Reply-To: <200910191638.41299.rusty@rustcorp.com.au>
+References: <1255417680-25609-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20091013092644.72c78334@hskinnemoen-d830>
+	<4AD44AF10200007800019801@vpn.id2.novell.com>
+	<200910191638.41299.rusty@rustcorp.com.au>
+Message-ID: <4ADC3D3C020000780001AA10@vpn.id2.novell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+>>> Rusty Russell <rusty@rustcorp.com.au> 19.10.09 08:08 >>>
+>How's this?  It's not quite valid C, but it "works":
 
-On Mon, Oct 19, 2009 at 03:46:11PM +0800, Peter Chen wrote:
-> Marek Vasut wrote:
->> Dne Po 19. ??jna 2009 07:38:35 Peter Chen napsal(a):
->> You popped the card out without unmounting the filesystem I guess ?
-> We don't execute umount at 2.6.27/23 either, and it has little error:
-> [   32.541208] Buffer I/O error on device mmcblk1p1, logical block 0
-> [   32.544784] lost page write due to I/O error on mmcblk1p1
->
-> Besides, the remove card is ok after suspend at 2.6.27 and 2.6.23.
->
-> Usually, the remove card(ext3) without umount is forbiddon or not?
-You shouldn't remove the card without unmounting first.  And you should
-unmount with .23 and .27, too.  Just because these kernels don't wail it
-doesn't mean you cannot loose data.
+But that's not what you proposed initially, i.e. generating a link time
+error if a compile time error can't be generated (and only if even a link
+time error isn't possible, a run time one should be forced).
 
-Best regards
-Uwe
+And btw., why do you think this isn't valid C?
 
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Jan
