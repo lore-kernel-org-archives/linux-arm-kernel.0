@@ -1,25 +1,32 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Mon, 19 Oct 2009 22:32:47 +0200
-Subject: [PATCH v2 1/2] arm: a driver for on-chip ETM and ETB
-In-Reply-To: <71a0d6ff0910190557q25cb1da2o1bcd6bdd5348c881@mail.gmail.com>
-References: <1255453611-16119-1-git-send-email-virtuoso@slind.org>
-	<20091013174413.GA1134@n2100.arm.linux.org.uk>
-	<71a0d6ff0910190557q25cb1da2o1bcd6bdd5348c881@mail.gmail.com>
-Message-ID: <63386a3d0910191332y7162d4c4vec625bcda24a8dcb@mail.gmail.com>
+From: avictor.za@gmail.com (Andrew Victor)
+Date: Mon, 19 Oct 2009 23:13:40 +0200
+Subject: [PATCH] at91: support for eco920
+In-Reply-To: <20091019074729.GA11449@pengutronix.de>
+References: <1255378294-10913-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<cd73a99e0910181325i65632137w5250868755fbeb98@mail.gmail.com>
+	<20091019074729.GA11449@pengutronix.de>
+Message-ID: <cd73a99e0910191413u2fdaf269tcef50a38839e1f6f@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/10/19 Alexander Shishkin <virtuoso@slind.org>:
+hi,
 
-> That said, I'm personally not overly concerned about the support for
-> earlier versions of those macrocells and if you maintain that those
-> are better off implemented as AMBA drivers, I've not problem doing
-> that.
+>> Yes, each AT91-based board usually has its own defconfig.
+> Should I add one for that board? ?I'd like to have it enabled in a
+> defconfig, but I'd prefer to simply enable it in an already existing one
+> and so don't increase the number of defconfigs.
+>
+> Thoughts?
 
-If people are using older versions, they can hardcode the peripheral
-ID when they define the AMBA device in their board setup. This
-effectively deactivates the probe for device ID:s.
+Well, the config file says what external peripherals are available on
+the board (and therefore what drivers to enable).  So it is kind of
+unique to the board.
 
-So it's safe to use the AMBA PrimeCell abstraction anyway.
+But if you really don't want to add another defconfig (but want it
+included in a defconfig), you can probably add it to the AT91RM9200-DK
+one.  (I don't think many people are still using that board, but I
+still always compile-test that one).
 
-Linus Walleij
+
+Regards,
+  Andrew Victor
