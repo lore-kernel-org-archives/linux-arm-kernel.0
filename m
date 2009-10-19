@@ -1,235 +1,70 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 19 Oct 2009 17:03:08 +0100
-Subject: [PATCH 4/4] RealView: Add sparsemem support for the RealView
-	PBX platform
-In-Reply-To: <20091019154601.GG13614@n2100.arm.linux.org.uk>
-References: <20091015121927.739.32071.stgit@pc1117.cambridge.arm.com>
-	<20091015122209.739.42849.stgit@pc1117.cambridge.arm.com>
-	<20091019154601.GG13614@n2100.arm.linux.org.uk>
-Message-ID: <1255968188.31096.44.camel@pc1117.cambridge.arm.com>
+From: mgreer@mvista.com (Mark A. Greer)
+Date: Mon, 19 Oct 2009 09:39:37 -0700
+Subject: [PATCH 16/46] davinci: Add MMC/SD support for DA830/OMAP-L137 EVM
+In-Reply-To: <20091019140752.GC13614@n2100.arm.linux.org.uk>
+References: <1255720190-7452-10-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-11-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-12-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-13-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-14-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-15-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-16-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-17-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-18-git-send-email-khilman@deeprootsystems.com>
+	<20091019140752.GC13614@n2100.arm.linux.org.uk>
+Message-ID: <20091019163937.GA2869@mag.az.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2009-10-19 at 16:46 +0100, Russell King - ARM Linux wrote:
-> On Thu, Oct 15, 2009 at 01:22:09PM +0100, Catalin Marinas wrote:
-> > +#ifdef CONFIG_ZONE_DMA
-> > +/*
-> > + * Adjust the zones if there are restrictions for DMA access.
-> > + */
-> > +void __init realview_adjust_zones(int node, unsigned long *size,
-> > +				  unsigned long *hole)
+On Mon, Oct 19, 2009 at 03:07:52PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Oct 16, 2009 at 12:09:20PM -0700, Kevin Hilman wrote:
+> > From: David A. Griego <dgriego@mvista.com>
+> > 
+> > Add pinmux settings, etc. to enable the MMC/SC hardware.
+> > 
+> > Signed-off-by: David A. Griego <dgriego@mvista.com>
+> > Signed-off-by: Mark A. Greer <mgreer@mvista.com>
+> > Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+> > ---
+> >  arch/arm/mach-davinci/board-da830-evm.c |   43 +++++++++++++++++++++++++++++++
+> >  1 files changed, 43 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+> > index 39711c1..69a791a 100644
+> > --- a/arch/arm/mach-davinci/board-da830-evm.c
+> > +++ b/arch/arm/mach-davinci/board-da830-evm.c
+> > @@ -23,6 +23,7 @@
+> >  #include <mach/irqs.h>
+> >  #include <mach/cp_intc.h>
+> >  #include <mach/mux.h>
+> > +#include <mach/gpio.h>
+> 
+> linux/gpio.h
+
+Oops.
+
+> > +static int da830_evm_mmc_get_ro(int index)
 > > +{
-> > +	unsigned long dma_size = SZ_256M >> PAGE_SHIFT;
+> > +	int val, status, gpio_num = 33;
 > > +
-> > +	if (!machine_is_realview_pbx() || node || (size[0] <= dma_size))
-> > +		return;
-> > +
-> > +	size[ZONE_NORMAL] = size[0] - dma_size;
-> > +	size[ZONE_DMA] = dma_size;
-> > +	hole[ZONE_NORMAL] = hole[0];
-> > +	hole[ZONE_DMA] = 0;
-> > +}
+> > +	status = gpio_request(gpio_num, "MMC WP\n");
+> > +	if (status < 0) {
+> > +		pr_warning("%s can not open GPIO %d\n", __func__, gpio_num);
+> > +		return 0;
+> > +	}
+> > +	gpio_direction_input(gpio_num);
+> > +	val = gpio_get_value(gpio_num);
+> > +	gpio_free(gpio_num);
 > 
-> You also need to set ISA_DMA_THRESHOLD and MAX_DMA_ADDRESS:
-> 
-> #define ISA_DMA_THRESHOLD       (PHYS_OFFSET + SZ_256M - 1)
-> #define MAX_DMA_ADDRESS         (PAGE_OFFSET + SZ_256M)
-> 
-> so that other bits of code know what to expect from a GFP_DMA-type
-> allocation.
+> Should this really be requesting the gpio every time it wants to be
+> read?  This approach sounds wrong.  Why not just request the GPIO in
+> the platform initialisation code, setting its direction, and merely
+> reading it in this function?
 
-Thanks. Here's the updated patch:
+This routine doesn't get called on every read.  AFAICT, its only called
+by mmc_sd_init_card() which is called during init and resume.  That seems
+like the logical time to check if the card is set to read-only since cards
+can be inserted and removed while the system is running.
 
-
-RealView: Add sparsemem support for the RealView PBX platform
-
-From: Catalin Marinas <catalin.marinas@arm.com>
-
-The RealView PBX board has two 512MB blocks of memory - one at
-0x70000000 (with 256MB mirror at 0) and another at 0x20000000. Only the
-block at 0x70000000 (or the mirror at 0) may be used for DMA (e.g.
-framebuffer). This patch adds the sparsemem definitions to allow the use
-of all the memory split as follows:
-
-  256MB @ 0x00000000 (ZONE_DMA)
-  512MB @ 0x20000000 (ZONE_NORMAL)
-  256MB @ 0x80000000 (ZONE_NORMAL)
-
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/mach-realview/Kconfig               |    8 ++++
- arch/arm/mach-realview/core.c                |   21 +++++++++++
- arch/arm/mach-realview/include/mach/memory.h |   49 ++++++++++++++++++++++++++
- arch/arm/mach-realview/realview_pbx.c        |   22 +++++++++++-
- 4 files changed, 97 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
-index dfc9b0b..ba548ab 100644
---- a/arch/arm/mach-realview/Kconfig
-+++ b/arch/arm/mach-realview/Kconfig
-@@ -70,12 +70,14 @@ config MACH_REALVIEW_PBX
- 	bool "Support RealView/PBX platform"
- 	select ARM_GIC
- 	select HAVE_PATA_PLATFORM
-+	select ARCH_SPARSEMEM_ENABLE if CPU_V7
-+	select ZONE_DMA if SPARSEMEM
- 	help
- 	  Include support for the ARM(R) RealView PBX platform.
- 
- config REALVIEW_HIGH_PHYS_OFFSET
- 	bool "High physical base address for the RealView platform"
--	depends on MMU && !MACH_REALVIEW_PB1176
-+	depends on MMU && !MACH_REALVIEW_PB1176 && !SPARSEMEM
- 	default y
- 	help
- 	  RealView boards other than PB1176 have the RAM available at
-@@ -84,4 +86,8 @@ config REALVIEW_HIGH_PHYS_OFFSET
- 	  memory to be accessed contiguously at the high physical
- 	  offset.
- 
-+config ARCH_FLATMEM_ENABLE
-+	bool
-+	default y if ARCH_SPARSEMEM_ENABLE
-+
- endmenu
-diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
-index c21b0fd..9f29343 100644
---- a/arch/arm/mach-realview/core.c
-+++ b/arch/arm/mach-realview/core.c
-@@ -59,6 +59,25 @@
- /* used by entry-macro.S and platsmp.c */
- void __iomem *gic_cpu_base_addr;
- 
-+#ifdef CONFIG_ZONE_DMA
-+/*
-+ * Adjust the zones if there are restrictions for DMA access.
-+ */
-+void __init realview_adjust_zones(int node, unsigned long *size,
-+				  unsigned long *hole)
-+{
-+	unsigned long dma_size = SZ_256M >> PAGE_SHIFT;
-+
-+	if (!machine_is_realview_pbx() || node || (size[0] <= dma_size))
-+		return;
-+
-+	size[ZONE_NORMAL] = size[0] - dma_size;
-+	size[ZONE_DMA] = dma_size;
-+	hole[ZONE_NORMAL] = hole[0];
-+	hole[ZONE_DMA] = 0;
-+}
-+#endif
-+
- /*
-  * This is the RealView sched_clock implementation.  This has
-  * a resolution of 41.7ns, and a maximum value of about 179s.
-@@ -543,7 +562,7 @@ static int realview_clcd_setup(struct clcd_fb *fb)
- 	fb->panel		= realview_clcd_panel();
- 
- 	fb->fb.screen_base = dma_alloc_writecombine(&fb->dev->dev, framesize,
--						    &dma, GFP_KERNEL);
-+						    &dma, GFP_KERNEL | GFP_DMA);
- 	if (!fb->fb.screen_base) {
- 		printk(KERN_ERR "CLCD: unable to map framebuffer\n");
- 		return -ENOMEM;
-diff --git a/arch/arm/mach-realview/include/mach/memory.h b/arch/arm/mach-realview/include/mach/memory.h
-index 293c300..2417bbc 100644
---- a/arch/arm/mach-realview/include/mach/memory.h
-+++ b/arch/arm/mach-realview/include/mach/memory.h
-@@ -29,4 +29,53 @@
- #define PHYS_OFFSET		UL(0x00000000)
- #endif
- 
-+#if !defined(__ASSEMBLY__) && defined(CONFIG_ZONE_DMA)
-+extern void realview_adjust_zones(int node, unsigned long *size,
-+				  unsigned long *hole);
-+#define arch_adjust_zones(node, size, hole) \
-+	realview_adjust_zones(node, size, hole)
-+
-+#define ISA_DMA_THRESHOLD	(PHYS_OFFSET + SZ_256M - 1)
-+#define MAX_DMA_ADDRESS		(PAGE_OFFSET + SZ_256M)
-+#endif
-+
-+#ifdef CONFIG_SPARSEMEM
-+
-+/*
-+ * Sparsemem definitions for RealView PBX.
-+ *
-+ * The RealView PBX board has another block of 512MB of RAM at 0x20000000,
-+ * however only the block at 0x70000000 (or the 256MB mirror at 0x00000000)
-+ * may be used for DMA.
-+ *
-+ * The macros below define a section size of 256MB and a non-linear virtual to
-+ * physical mapping:
-+ *
-+ * 256MB @ 0x00000000 -> PAGE_OFFSET
-+ * 512MB @ 0x20000000 -> PAGE_OFFSET + 0x10000000
-+ * 256MB @ 0x80000000 -> PAGE_OFFSET + 0x30000000
-+ */
-+#ifdef CONFIG_REALVIEW_HIGH_PHYS_OFFSET
-+#error "SPARSEMEM not available with REALVIEW_HIGH_PHYS_OFFSET"
-+#endif
-+
-+#define MAX_PHYSMEM_BITS	32
-+#define SECTION_SIZE_BITS	28
-+
-+/* bank page offsets */
-+#define PAGE_OFFSET1	(PAGE_OFFSET + 0x10000000)
-+#define PAGE_OFFSET2	(PAGE_OFFSET + 0x30000000)
-+
-+#define __phys_to_virt(phys)						\
-+	((phys) >= 0x80000000 ?	(phys) - 0x80000000 + PAGE_OFFSET2 :	\
-+	 (phys) >= 0x20000000 ?	(phys) - 0x20000000 + PAGE_OFFSET1 :	\
-+	 (phys) + PAGE_OFFSET)
-+
-+#define __virt_to_phys(virt)						\
-+	 ((virt) >= PAGE_OFFSET2 ? (virt) - PAGE_OFFSET2 + 0x80000000 :	\
-+	  (virt) >= PAGE_OFFSET1 ? (virt) - PAGE_OFFSET1 + 0x20000000 :	\
-+	  (virt) - PAGE_OFFSET)
-+
-+#endif	/* CONFIG_SPARSEMEM */
-+
- #endif
-diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
-index 5d09d8b..ec39488 100644
---- a/arch/arm/mach-realview/realview_pbx.c
-+++ b/arch/arm/mach-realview/realview_pbx.c
-@@ -304,6 +304,26 @@ static struct sys_timer realview_pbx_timer = {
- 	.init		= realview_pbx_timer_init,
- };
- 
-+static void realview_pbx_fixup(struct machine_desc *mdesc, struct tag *tags,
-+			       char **from, struct meminfo *meminfo)
-+{
-+#ifdef CONFIG_SPARSEMEM
-+	/*
-+	 * Memory configuration with SPARSEMEM enabled on RealView PBX (see
-+	 * asm/mach/memory.h for more information).
-+	 */
-+	meminfo->bank[0].start = 0;
-+	meminfo->bank[0].size = SZ_256M;
-+	meminfo->bank[1].start = 0x20000000;
-+	meminfo->bank[1].size = SZ_512M;
-+	meminfo->bank[2].start = 0x80000000;
-+	meminfo->bank[2].size = SZ_256M;
-+	meminfo->nr_banks = 3;
-+#else
-+	realview_fixup(mdesc, tags, from, meminfo);
-+#endif
-+}
-+
- static void __init realview_pbx_init(void)
- {
- 	int i;
-@@ -345,7 +365,7 @@ MACHINE_START(REALVIEW_PBX, "ARM-RealView PBX")
- 	.phys_io	= REALVIEW_PBX_UART0_BASE,
- 	.io_pg_offst	= (IO_ADDRESS(REALVIEW_PBX_UART0_BASE) >> 18) & 0xfffc,
- 	.boot_params	= PHYS_OFFSET + 0x00000100,
--	.fixup		= realview_fixup,
-+	.fixup		= realview_pbx_fixup,
- 	.map_io		= realview_pbx_map_io,
- 	.init_irq	= gic_init_irq,
- 	.timer		= &realview_pbx_timer,
-
-
--- 
-Catalin
+Mark
+--
