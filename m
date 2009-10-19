@@ -1,128 +1,103 @@
-From: saaguirre@ti.com (Aguirre Rodriguez, Sergio Alberto)
-Date: Mon, 19 Oct 2009 13:07:59 -0500
-Subject: [PATCH 08/14] omap: Use ioremap for omap4 L4 code
-In-Reply-To: <20091019173831.GS12576@atomide.com>
-References: <20091016233624.2463.26653.stgit@localhost>
-	<20091016234138.2463.38350.stgit@localhost>
-	<20091016234622.GH12576@atomide.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02BB37D7AA@dbde02.ent.ti.com>
-	<20091017161947.GK12576@atomide.com>
-	<20091019002416.GM12576@atomide.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02BB37D82D@dbde02.ent.ti.com>
-	<20091019171204.GP12576@atomide.com>
-	<A24693684029E5489D1D202277BE89444CFD9382@dlee02.ent.ti.com>
-	<20091019173831.GS12576@atomide.com>
-Message-ID: <A24693684029E5489D1D202277BE89444CFD9450@dlee02.ent.ti.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 19 Oct 2009 11:19:00 -0700
+Subject: [PATCH 13/46] davinci: support re-parenting a clock in the clock
+	framework
+In-Reply-To: <20091019140540.GB13614@n2100.arm.linux.org.uk> (Russell King's
+	message of "Mon\, 19 Oct 2009 15\:05\:40 +0100")
+References: <1255720190-7452-6-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-7-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-8-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-9-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-10-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-11-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-12-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-13-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-14-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-15-git-send-email-khilman@deeprootsystems.com>
+	<20091019140540.GB13614@n2100.arm.linux.org.uk>
+Message-ID: <87ws2rs0vf.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-> -----Original Message-----
-> From: Tony Lindgren [mailto:tony at atomide.com] 
-> Sent: Monday, October 19, 2009 12:39 PM
-> To: Aguirre Rodriguez, Sergio Alberto
-> Cc: Shilimkar, Santosh; linux-arm-kernel at lists.infradead.org; 
-> linux-omap at vger.kernel.org
-> Subject: Re: [PATCH 08/14] omap: Use ioremap for omap4 L4 code
-> 
-> * Aguirre Rodriguez, Sergio Alberto <saaguirre@ti.com> [091019 10:21]:
-> > Tony, 
-> > 
-> > > -----Original Message-----
-> > > From: linux-omap-owner at vger.kernel.org 
-> > > [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of 
-> Tony Lindgren
-> > > Sent: Monday, October 19, 2009 12:12 PM
-> > > To: Shilimkar, Santosh
-> > > Cc: linux-arm-kernel at lists.infradead.org; 
-> linux-omap at vger.kernel.org
-> > > Subject: Re: [PATCH 08/14] omap: Use ioremap for omap4 L4 code
-> > > 
-> > > * Shilimkar, Santosh <santosh.shilimkar@ti.com> [091019 00:27]:
-> > > > Tony,
-> > > > > -----Original Message-----
-> > > > > From: Tony Lindgren [mailto:tony at atomide.com]
-> > > > > Sent: Monday, October 19, 2009 5:54 AM
-> > > > > To: Shilimkar, Santosh
-> > > > > Cc: linux-arm-kernel at lists.infradead.org; 
-> > > linux-omap at vger.kernel.org
-> > > > > Subject: Re: [PATCH 08/14] omap: Use ioremap for omap4 L4 code
-> > > > > 
-> > > > > * Tony Lindgren <tony@atomide.com> [091017 09:19]:
-> > > > > > * Shilimkar, Santosh <santosh.shilimkar@ti.com> 
-> [091017 03:49]:
-> > > > > > > Thanks Tony for this ioremap series!!
-> > > > > > >
-> > > > > > > > -----Original Message-----
-> > > > > > > > From: Tony Lindgren [mailto:tony at atomide.com]
-> > > > > > > > Sent: Saturday, October 17, 2009 5:16 AM
-> > > > > > > > To: linux-arm-kernel at lists.infradead.org
-> > > > > > > > Cc: linux-omap at vger.kernel.org; Shilimkar, Santosh
-> > > > > > > > Subject: Re: [PATCH 08/14] omap: Use ioremap for 
-> > > omap4 L4 code
-> > > > > > > >
-> > > > > > > > * Tony Lindgren <tony@atomide.com> [091016 16:42]:
-> > > > > > > > > Use ioremap for omap4 L4 code
-> > > > > > > >
-> > > > > > > > Santosh, can you please check and ack this patch?
-> > > > > > > >
-> > > > > > > > Especially some of the ioremap sizes may be wrong. 
-> > > Also, this one
-> > > > > > > > I cannot boot test, so it's just compile tested.
-> > > > > > >
-> > > > > > > I have checked the patch and it looks all right 
-> > > except few typo. Also
-> > > > > the scu_base is needed bit earlier.
-> > > > > 
-> > > > > <snip>
-> > > > > 
-> > > > > > > Here is the patch on top of ioremap series which 
-> > > should fix above
-> > > > > mentioned things. With below patch + two serial related 
-> > > patches the kernel
-> > > > > boots on OMAP4430.
-> > > > > >
-> > > > > > Great, will update. Thanks for taking the time to fix it!
-> > > > > 
-> > > > > Here's this one updated with Santosh's fix merged in.
-> > > > V2 has one typo which I think I also missed in my patch.
-> > > > >+	/* Static mapping, never released */
-> > > > >+	gic_cpu_base_addr = 
-> ioremap(OMAP44XX_GIC_CPU_BASE, SZ_512);
-> > > > >+	BUG_ON(!base);
-> > > > Should be BUG_ON(!gic_cpu_base_addr);
-> > > 
-> > > OK, here's V3 of the patch.
-> > 
-> > Tony,
-> > 
-> > > diff --git 
-> a/arch/arm/plat-omap/include/mach/entry-macro.S 
-> b/arch/arm/plat-omap/include/mach/entry-macro.S
-> > > index abe0864..3bad928 100644
-> > > --- a/arch/arm/plat-omap/include/mach/entry-macro.S
-> > > +++ b/arch/arm/plat-omap/include/mach/entry-macro.S
-> > > @@ -104,6 +104,8 @@
-> > >  
-> > >  		.endm
-> > >  #else
-> > > +#define OMAP44XX_VA_GIC_CPU_BASE	
-> OMAP2_IO_ADDRESS(OMAP44XX_GIC_CPU_BASE)
-> > > +
-> > 
-> > Shouldn't this define go with the ioremap aproach?
-> 
-> That's still needed for the get_irqnr_and_base assembly macro.
-> But at least it's now defined locally for the macro.
+> On Fri, Oct 16, 2009 at 12:09:17PM -0700, Kevin Hilman wrote:
+>> From: Sekhar Nori <nsekhar@ti.com>
+>> 
+>> The clk_set_parent() API is implemented to enable re-parenting
+>> clocks in the clock tree.
+>> 
+>> This is useful in DVFS and helps by shifting clocks to an asynchronous
+>> domain where supported by hardware
+>> 
+>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+>> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+>> ---
+>>  arch/arm/mach-davinci/clock.c |   23 +++++++++++++++++++++++
+>>  1 files changed, 23 insertions(+), 0 deletions(-)
+>> 
+>> diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
+>> index 09e0e1c..12ceeea 100644
+>> --- a/arch/arm/mach-davinci/clock.c
+>> +++ b/arch/arm/mach-davinci/clock.c
+>> @@ -141,6 +141,29 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
+>>  }
+>>  EXPORT_SYMBOL(clk_set_rate);
+>>  
+>> +int clk_set_parent(struct clk *clk, struct clk *parent)
+>> +{
+>> +	unsigned long flags;
+>> +
+>> +	if (clk == NULL || IS_ERR(clk))
+>> +		return -EINVAL;
+>> +
+>> +	mutex_lock(&clocks_mutex);
+>> +	clk->parent = parent;
+>> +	list_del_init(&clk->childnode);
+>> +	list_add(&clk->childnode, &clk->parent->children);
+>> +	mutex_unlock(&clocks_mutex);
+>
+> This is bad, and is suffering from precisely the same problem which
+> OMAP suffered from:
+>
+> 1. it takes no notice of whether the clk is in use.
+> 2. it takes no notice of whether the parent clocks are being used.
+>
+> The result is that using clk_set_parent() on a clk_enable()'d clock,
+> you totally destroy the usecounting of the parent clocks, leading to
+> the clock tree usecount becoming totally buggered up.
+>
+> Either refuse to change the parent of an already clk_enable()'d clock,
+> or do proper usecount fixups when changing the parent.
 
-Oh ok, I didn't catch that one.
+On davinci, we only reparent during early init, so refusing to change
+the parent of an enabled will suffice.
 
-Thanks for clarifying.
+I've added a check (and warning) if the clock is already enabled as
+well as a refusal to re-parent:
 
-Regards,
-Sergio
-> 
-> Tony
-> 
-> 
+int clk_set_parent(struct clk *clk, struct clk *parent)
+{
+	unsigned long flags;
+
+	if (clk == NULL || IS_ERR(clk))
+		return -EINVAL;
+
+	/* Cannot change parent on enabled clock */
+	if (WARN_ON(clk->usecount))
+		return -EINVAL;
+
+	mutex_lock(&clocks_mutex);
+	clk->parent = parent;
+	list_del_init(&clk->childnode);
+	list_add(&clk->childnode, &clk->parent->children);
+	mutex_unlock(&clocks_mutex);
+
+	spin_lock_irqsave(&clockfw_lock, flags);
+	if (clk->recalc)
+		clk->rate = clk->recalc(clk);
+	propagate_rate(clk);
+	spin_unlock_irqrestore(&clockfw_lock, flags);
+
+	return 0;
+}
