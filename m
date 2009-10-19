@@ -1,56 +1,34 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 21 Oct 2009 09:46:59 +0200
-Subject: [PATCH RESEND#2] mmc: at91_mci: Don't include asm/mach/mmc.h
-In-Reply-To: <4ADDF2E7.4010200@billgatliff.com>
-References: <4ADDF2E7.4010200@billgatliff.com>
-Message-ID: <1256111219-25266-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 19 Oct 2009 23:37:52 +0200
+Subject: spitz backlight: fix brightness limiting
+Message-ID: <20091019213751.GC1482@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes a compile bug introduced in
 
-	6ef297f (ARM: 5720/1: Move MMCI header to amba include dir)
+On spitz (& similar) machines, if battery is running low, backlight
+needs to be limited to lower step. Unfortunately, current code uses &=
+for limiting, turning backlight off completely for some backlight
+settings. Fix that.
 
-That commit moved arch/arm/include/asm/mach/mmc.h to
-include/linux/amba/mmci.h.  Just removing the include was enough.
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Bill Gatliff <bgat@billgatliff.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Pierre Ossman <drzeus@drzeus.cx>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Linus Torvalds <torvalds@linux-foundation.org>
----
-Hello,
-
-this patch is a build fix that seems to bite quite some people, but
-nobody has picked it up until now.
-
-Linus Walleij suggested to send it to Russell's patch tracker, but I
-don't think this is the right way for that patch.  It should either go
-via Pierre or (IMO preferably) via Andrew.
-
-Best regards
-Uwe
-
- drivers/mmc/host/at91_mci.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/mmc/host/at91_mci.c b/drivers/mmc/host/at91_mci.c
-index e556d42..63924e0 100644
---- a/drivers/mmc/host/at91_mci.c
-+++ b/drivers/mmc/host/at91_mci.c
-@@ -72,7 +72,6 @@
- #include <asm/irq.h>
- #include <asm/gpio.h>
+--- linux-rc/drivers/video/backlight/corgi_lcd.c	2009-10-18 18:11:36.000000000 +0200
++++ linux-rc/drivers/video/backlight/corgi_lcd.c	2009-10-16 02:10:13.000000000 +0200
+@@ -433,8 +434,9 @@
  
--#include <asm/mach/mmc.h>
- #include <mach/board.h>
- #include <mach/cpu.h>
- #include <mach/at91_mci.h>
+ 	if (corgibl_flags & CORGIBL_SUSPENDED)
+ 		intensity = 0;
+-	if (corgibl_flags & CORGIBL_BATTLOW)
+-		intensity &= lcd->limit_mask;
++
++	if ((corgibl_flags & CORGIBL_BATTLOW) && intensity > lcd->limit_mask)
++		intensity = lcd->limit_mask;
+ 
+ 	return corgi_bl_set_intensity(lcd, intensity);
+ }
+
+
 -- 
-1.6.5
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
