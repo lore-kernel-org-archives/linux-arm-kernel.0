@@ -1,33 +1,37 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 19 Oct 2009 09:47:29 +0200
-Subject: [PATCH] at91: support for eco920
-In-Reply-To: <cd73a99e0910181325i65632137w5250868755fbeb98@mail.gmail.com>
-References: <1255378294-10913-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<cd73a99e0910181325i65632137w5250868755fbeb98@mail.gmail.com>
-Message-ID: <20091019074729.GA11449@pengutronix.de>
+Date: Mon, 19 Oct 2009 09:56:04 +0200
+Subject: [PATCH 7/14] drivers/mmc: Move dereference after NULL test
+In-Reply-To: <Pine.LNX.4.64.0910170839430.9213@ask.diku.dk>
+References: <Pine.LNX.4.64.0910170839430.9213@ask.diku.dk>
+Message-ID: <20091019075604.GB11449@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Sun, Oct 18, 2009 at 10:25:06PM +0200, Andrew Victor wrote:
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+On Sat, Oct 17, 2009 at 08:40:02AM +0200, Julia Lawall wrote:
+> From: Julia Lawall <julia@diku.dk>
 > 
-> Acked-by: Andrew Victor <linux@maxim.org.za>
-Fine, thanks.
+> If the NULL test on mrq is needed, then the derefernce should be after the
+> NULL test.
+s/derefernce/dereference/
  
-> > I didn't find a suitable defconfig to add this machine to. ?It seems
-> > each machine has its own defconfig?!
+> A simplified version of the semantic match that detects this problem is as
+> follows (http://coccinelle.lip6.fr/):
 > 
-> Yes, each AT91-based board usually has its own defconfig.
-Should I add one for that board?  I'd like to have it enabled in a
-defconfig, but I'd prefer to simply enable it in an already existing one
-and so don't increase the number of defconfigs.
+> // <smpl>
+> @match exists@
+> expression x, E;
+> identifier fld;
+> @@
+> 
+> * x->fld
+>   ... when != \(x = E\|&x\)
+> * x == NULL
+> // </smpl>
+> 
+> Signed-off-by: Julia Lawall <julia@diku.dk>
+Other than that
 
-Thoughts?
-
-Uwe
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
 -- 
 Pengutronix e.K.                              | Uwe Kleine-K?nig            |
