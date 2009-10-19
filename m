@@ -1,30 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Oct 2009 15:13:46 +0100
-Subject: [PATCH 38/46] davinci: fix compilation error when using
-	mach/system.h
-In-Reply-To: <1255720190-7452-40-git-send-email-khilman@deeprootsystems.com>
-References: <1255720190-7452-31-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-32-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-33-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-34-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-35-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-36-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-37-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-38-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-39-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-40-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <20091019141346.GD13614@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 19 Oct 2009 16:27:57 +0200
+Subject: [PATCH 2/4] [MXC] Armadillo500 Correct bus length for SMSC9118
+	on board chip.
+In-Reply-To: <20091015192905.2fa228f9@Marramao-laptop>
+References: <20091015191325.74ba24fb@Marramao-laptop>
+	<20091015192451.50ee35c5@Marramao-laptop>
+	<20091015192905.2fa228f9@Marramao-laptop>
+Message-ID: <20091019142757.GL8818@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 16, 2009 at 12:09:42PM -0700, Kevin Hilman wrote:
-> From: Sekhar Nori <nsekhar@ti.com>
-> 
-> include/mach/system.h uses the cpu_do_idle() function which is
-> defined in asm/proc-fns.h. Without this patch including system.h
-> leads to error of the sort:
-> 
-> error: implicit declaration of function 'cpu_do_idle'
+Hi Alberto,
 
-The right answer might actually be to ensure that arch/arm/kernel/process.c
-includes this file, so that all mach/system.h files don't have to.
+On Thu, Oct 15, 2009 at 07:29:05PM +0200, Alberto Panizzo wrote:
+> Armadillo500 Correct bus length for SMSC9118 on board chip.
+> 
+> The SMSC9118 network chip is connected to the data bus with a 16 bit
+> interface, not 32 as early suggested.
+
+This one looks like it should go into 2.6.32, right?
+
+The other patches are ok. Please let me know what I should do with this
+one.
+
+Sascha
+
+> 
+> Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
+> ---
+>  arch/arm/mach-mx3/armadillo5x0.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx3/armadillo5x0.c b/arch/arm/mach-mx3/armadillo5x0.c
+> index 309fa7a..bd4a0f9 100644
+> --- a/arch/arm/mach-mx3/armadillo5x0.c
+> +++ b/arch/arm/mach-mx3/armadillo5x0.c
+> @@ -310,7 +310,7 @@ static struct resource armadillo5x0_smc911x_resources[] = {
+>  };
+>  
+>  static struct smsc911x_platform_config smsc911x_info = {
+> -	.flags		= SMSC911X_USE_32BIT,
+> +	.flags		= SMSC911X_USE_16BIT,
+>  	.irq_polarity   = SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
+>  	.irq_type       = SMSC911X_IRQ_TYPE_PUSH_PULL,
+>  };
+> -- 
+> 1.5.4.3
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
