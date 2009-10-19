@@ -1,71 +1,45 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 19 Oct 2009 12:25:51 +0100
-Subject: [PATCH 13/14] arch/arm/plat-s3c24xx: Move dereference after
-	NULL test
-In-Reply-To: <Pine.LNX.4.64.0910170842310.9213@ask.diku.dk>
-References: <Pine.LNX.4.64.0910170842310.9213@ask.diku.dk>
-Message-ID: <20091019112551.GA13389@fluff.org.uk>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Mon, 19 Oct 2009 13:28:13 +0200
+Subject: [PATCH] input/touchscreen: add S3C24XX SoC touchscreen input
+	driver
+In-Reply-To: <mailman.4020.1255949705.2256.linux-arm-kernel@lists.infradead.org>
+References: <mailman.4020.1255949705.2256.linux-arm-kernel@lists.infradead.org>
+Message-ID: <4ADC4D4D.5020508@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 17, 2009 at 08:42:49AM +0200, Julia Lawall wrote:
-> From: Julia Lawall <julia@diku.dk>
-> 
-> If the NULL test on buf is needed, then the dereference should be after the
-> NULL test.
-> 
-> A simplified version of the semantic match that detects this problem is as
-> follows (http://coccinelle.lip6.fr/):
-> 
-> // <smpl>
-> @match exists@
-> expression x, E;
-> identifier fld;
-> @@
-> 
-> * x->fld
->   ... when != \(x = E\|&x\)
-> * x == NULL
-> // </smpl>
-> 
-> Signed-off-by: Julia Lawall <julia@diku.dk>
+Op 19-10-09 12:55, linux-arm-kernel-request at lists.infradead.org schreef:
+> This touchscreen driver is for touchscreen controller on Samsung
+> S3C2410/S3C2440 SoC chip. S3C2410/S3C2440 has the on chip touchscreen
+> controller based on it's analog to digital converter(8-channel analog
+> inputs, touchscreen uses 4 of them). This driver uses the exsiting S3C
+> ADC driver to make the touchscreen controller of S3C2410/S3C2440 work
+> well together with other ADC devices connected to the S3C24XX SoC chip.
+>
+> The patch is created against kernel 2.6.32-rc4 and tested with S3C2440
+> SoC and Samsung LTE430WQ-F0C touchscreen.
+>
+>
+> Signed-off-by: Shine Liu<liuxian@redflag-linux.com>
+> Signed-off-by: Shine Liu<shinel@foxmail.com>
+>    
 
-I'll apply it to next-s3c24xx-fixes unless someone else wants to
-pick it up for inclusion.
- 
-> ---
->  arch/arm/plat-s3c24xx/dma.c         |    6 +++---
->  1 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
-> index 196b191..f046f8c 100644
-> --- a/arch/arm/plat-s3c24xx/dma.c
-> +++ b/arch/arm/plat-s3c24xx/dma.c
-> @@ -208,14 +208,14 @@ s3c2410_dma_loadbuffer(struct s3c2410_dma_chan *chan,
->  {
->  	unsigned long reload;
->  
-> -	pr_debug("s3c2410_chan_loadbuffer: loading buff %p (0x%08lx,0x%06x)\n",
-> -		 buf, (unsigned long)buf->data, buf->size);
-> -
->  	if (buf == NULL) {
->  		dmawarn("buffer is NULL\n");
->  		return -EINVAL;
->  	}
->  
-> +	pr_debug("s3c2410_chan_loadbuffer: loading buff %p (0x%08lx,0x%06x)\n",
-> +		 buf, (unsigned long)buf->data, buf->size);
-> +
->  	/* check the state of the channel before we do anything */
->  
->  	if (chan->load_state == S3C2410_DMALOAD_1LOADED) {
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Do you know that there's another patch (at Openmoko) created by Nelson 
+Castillo that does the same, but also has support for kernel-space 
+touchscreen filters? (I think [1] is his latest version)
+I don't know how your patch performs, but according to [2] the filters 
+should help a lot avoiding jitter etc.
 
--- 
-Ben (ben at fluff.org, http://www.fluff.org/)
+I'm not sure whether Nelson has submitted his patches for mainline 
+review yet and what the status is on the kernel filters, but IMHO doing 
+some filtering in kernel space (see the "Why are we doing filtering in 
+kernel space?" part of [2]) which results in a "cleaner" output is 
+preferred over reporting possible "jittery" data.
 
-  'a smiley only costs 4 bytes'
+Regards,
+Maurus Cuelenaere
+
+
+[1] 
+http://nelson-patches.googlecode.com/svn/trunk/openmoko/kernel/ts-with-s3c-adc/
+[2] http://wiki.openmoko.org/wiki/Touchscreen_Filters
