@@ -1,101 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 Oct 2009 10:38:32 -0700
-Subject: [PATCH 08/14] omap: Use ioremap for omap4 L4 code
-In-Reply-To: <A24693684029E5489D1D202277BE89444CFD9382@dlee02.ent.ti.com>
-References: <20091016233624.2463.26653.stgit@localhost>
-	<20091016234138.2463.38350.stgit@localhost>
-	<20091016234622.GH12576@atomide.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02BB37D7AA@dbde02.ent.ti.com>
-	<20091017161947.GK12576@atomide.com>
-	<20091019002416.GM12576@atomide.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02BB37D82D@dbde02.ent.ti.com>
-	<20091019171204.GP12576@atomide.com>
-	<A24693684029E5489D1D202277BE89444CFD9382@dlee02.ent.ti.com>
-Message-ID: <20091019173831.GS12576@atomide.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 19 Oct 2009 11:03:30 -0700
+Subject: [PATCH 01/46] DaVinci: DM365: SDIO interrupt resource correction
+In-Reply-To: <20091019135842.GA13614@n2100.arm.linux.org.uk> (Russell King's
+	message of "Mon\, 19 Oct 2009 14\:58\:42 +0100")
+References: <1255720190-7452-1-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-2-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-3-git-send-email-khilman@deeprootsystems.com>
+	<20091019135842.GA13614@n2100.arm.linux.org.uk>
+Message-ID: <8763abtg5p.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Aguirre Rodriguez, Sergio Alberto <saaguirre@ti.com> [091019 10:21]:
-> Tony, 
-> 
-> > -----Original Message-----
-> > From: linux-omap-owner at vger.kernel.org 
-> > [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Tony Lindgren
-> > Sent: Monday, October 19, 2009 12:12 PM
-> > To: Shilimkar, Santosh
-> > Cc: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
-> > Subject: Re: [PATCH 08/14] omap: Use ioremap for omap4 L4 code
-> > 
-> > * Shilimkar, Santosh <santosh.shilimkar@ti.com> [091019 00:27]:
-> > > Tony,
-> > > > -----Original Message-----
-> > > > From: Tony Lindgren [mailto:tony at atomide.com]
-> > > > Sent: Monday, October 19, 2009 5:54 AM
-> > > > To: Shilimkar, Santosh
-> > > > Cc: linux-arm-kernel at lists.infradead.org; 
-> > linux-omap at vger.kernel.org
-> > > > Subject: Re: [PATCH 08/14] omap: Use ioremap for omap4 L4 code
-> > > > 
-> > > > * Tony Lindgren <tony@atomide.com> [091017 09:19]:
-> > > > > * Shilimkar, Santosh <santosh.shilimkar@ti.com> [091017 03:49]:
-> > > > > > Thanks Tony for this ioremap series!!
-> > > > > >
-> > > > > > > -----Original Message-----
-> > > > > > > From: Tony Lindgren [mailto:tony at atomide.com]
-> > > > > > > Sent: Saturday, October 17, 2009 5:16 AM
-> > > > > > > To: linux-arm-kernel at lists.infradead.org
-> > > > > > > Cc: linux-omap at vger.kernel.org; Shilimkar, Santosh
-> > > > > > > Subject: Re: [PATCH 08/14] omap: Use ioremap for 
-> > omap4 L4 code
-> > > > > > >
-> > > > > > > * Tony Lindgren <tony@atomide.com> [091016 16:42]:
-> > > > > > > > Use ioremap for omap4 L4 code
-> > > > > > >
-> > > > > > > Santosh, can you please check and ack this patch?
-> > > > > > >
-> > > > > > > Especially some of the ioremap sizes may be wrong. 
-> > Also, this one
-> > > > > > > I cannot boot test, so it's just compile tested.
-> > > > > >
-> > > > > > I have checked the patch and it looks all right 
-> > except few typo. Also
-> > > > the scu_base is needed bit earlier.
-> > > > 
-> > > > <snip>
-> > > > 
-> > > > > > Here is the patch on top of ioremap series which 
-> > should fix above
-> > > > mentioned things. With below patch + two serial related 
-> > patches the kernel
-> > > > boots on OMAP4430.
-> > > > >
-> > > > > Great, will update. Thanks for taking the time to fix it!
-> > > > 
-> > > > Here's this one updated with Santosh's fix merged in.
-> > > V2 has one typo which I think I also missed in my patch.
-> > > >+	/* Static mapping, never released */
-> > > >+	gic_cpu_base_addr = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_512);
-> > > >+	BUG_ON(!base);
-> > > Should be BUG_ON(!gic_cpu_base_addr);
-> > 
-> > OK, here's V3 of the patch.
-> 
-> Tony,
-> 
-> > diff --git a/arch/arm/plat-omap/include/mach/entry-macro.S b/arch/arm/plat-omap/include/mach/entry-macro.S
-> > index abe0864..3bad928 100644
-> > --- a/arch/arm/plat-omap/include/mach/entry-macro.S
-> > +++ b/arch/arm/plat-omap/include/mach/entry-macro.S
-> > @@ -104,6 +104,8 @@
-> >  
-> >  		.endm
-> >  #else
-> > +#define OMAP44XX_VA_GIC_CPU_BASE	OMAP2_IO_ADDRESS(OMAP44XX_GIC_CPU_BASE)
-> > +
-> 
-> Shouldn't this define go with the ioremap aproach?
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-That's still needed for the get_irqnr_and_base assembly macro.
-But at least it's now defined locally for the macro.
+> Shouldn't this be targetted for -rc?
+>
+> If it's a bug fix, it should go for rc and stable releases, not the
+> next kernel.
 
-Tony
+Yes, it's a bug fix and there are two in this series, but since
+mainline is not the (yet) the primary tree for davinci, I decided not
+to bother with more fixes late in in this round and send them for the
+next window instead.
+
+Kevin
+
+
+> On Fri, Oct 16, 2009 at 12:09:05PM -0700, Kevin Hilman wrote:
+>> From: Phaneendra Kumar <phani@embwise.com>
+>> 
+>> This patch fixes a typo/bug in the DM365 SDIO interrupt assignment
+>> 
+>> Signed-off-by: Sandeep Paulraj <s-paulraj@ti.com>
+>> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+>> ---
+>>  arch/arm/mach-davinci/devices.c |    2 +-
+>>  1 files changed, 1 insertions(+), 1 deletions(-)
+>> 
+>> diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
+>> index a55b650..34dc0e9 100644
+>> --- a/arch/arm/mach-davinci/devices.c
+>> +++ b/arch/arm/mach-davinci/devices.c
+>> @@ -177,7 +177,7 @@ void __init davinci_setup_mmc(int module, struct davinci_mmc_config *config)
+>>  			mmcsd1_resources[0].start = DM365_MMCSD1_BASE;
+>>  			mmcsd1_resources[0].end = DM365_MMCSD1_BASE +
+>>  							SZ_4K - 1;
+>> -			mmcsd0_resources[2].start = IRQ_DM365_SDIOINT1;
+>> +			mmcsd1_resources[2].start = IRQ_DM365_SDIOINT1;
+>>  		} else
+>>  			break;
+>>  
+>> -- 
+>> 1.6.4.3
+>> 
+>> 
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
