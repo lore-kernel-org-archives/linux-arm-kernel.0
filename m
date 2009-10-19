@@ -1,32 +1,78 @@
-From: avictor.za@gmail.com (Andrew Victor)
-Date: Mon, 19 Oct 2009 23:13:40 +0200
-Subject: [PATCH] at91: support for eco920
-In-Reply-To: <20091019074729.GA11449@pengutronix.de>
-References: <1255378294-10913-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<cd73a99e0910181325i65632137w5250868755fbeb98@mail.gmail.com>
-	<20091019074729.GA11449@pengutronix.de>
-Message-ID: <cd73a99e0910191413u2fdaf269tcef50a38839e1f6f@mail.gmail.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 19 Oct 2009 16:26:33 -0700
+Subject: [PATCH 13/46] davinci: support re-parenting a clock in the clock
+	framework
+In-Reply-To: <20091019140540.GB13614@n2100.arm.linux.org.uk> (Russell King's
+	message of "Mon\, 19 Oct 2009 15\:05\:40 +0100")
+References: <1255720190-7452-6-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-7-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-8-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-9-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-10-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-11-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-12-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-13-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-14-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-15-git-send-email-khilman@deeprootsystems.com>
+	<20091019140540.GB13614@n2100.arm.linux.org.uk>
+Message-ID: <87pr8jq82e.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
->> Yes, each AT91-based board usually has its own defconfig.
-> Should I add one for that board? ?I'd like to have it enabled in a
-> defconfig, but I'd prefer to simply enable it in an already existing one
-> and so don't increase the number of defconfigs.
+> On Fri, Oct 16, 2009 at 12:09:17PM -0700, Kevin Hilman wrote:
+>> From: Sekhar Nori <nsekhar@ti.com>
+>> 
+>> The clk_set_parent() API is implemented to enable re-parenting
+>> clocks in the clock tree.
+>> 
+>> This is useful in DVFS and helps by shifting clocks to an asynchronous
+>> domain where supported by hardware
+>> 
+>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+>> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+>> ---
+>>  arch/arm/mach-davinci/clock.c |   23 +++++++++++++++++++++++
+>>  1 files changed, 23 insertions(+), 0 deletions(-)
+>> 
+>> diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
+>> index 09e0e1c..12ceeea 100644
+>> --- a/arch/arm/mach-davinci/clock.c
+>> +++ b/arch/arm/mach-davinci/clock.c
+>> @@ -141,6 +141,29 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
+>>  }
+>>  EXPORT_SYMBOL(clk_set_rate);
+>>  
+>> +int clk_set_parent(struct clk *clk, struct clk *parent)
+>> +{
+>> +	unsigned long flags;
+>> +
+>> +	if (clk == NULL || IS_ERR(clk))
+>> +		return -EINVAL;
+>> +
+>> +	mutex_lock(&clocks_mutex);
+>> +	clk->parent = parent;
+>> +	list_del_init(&clk->childnode);
+>> +	list_add(&clk->childnode, &clk->parent->children);
+>> +	mutex_unlock(&clocks_mutex);
 >
-> Thoughts?
+> This is bad, and is suffering from precisely the same problem which
+> OMAP suffered from:
+>
+> 1. it takes no notice of whether the clk is in use.
+> 2. it takes no notice of whether the parent clocks are being used.
+>
+> The result is that using clk_set_parent() on a clk_enable()'d clock,
+> you totally destroy the usecounting of the parent clocks, leading to
+> the clock tree usecount becoming totally buggered up.
+>
+> Either refuse to change the parent of an already clk_enable()'d clock,
+> or do proper usecount fixups when changing the parent.
 
-Well, the config file says what external peripherals are available on
-the board (and therefore what drivers to enable).  So it is kind of
-unique to the board.
+Russell, thanks for the review.
 
-But if you really don't want to add another defconfig (but want it
-included in a defconfig), you can probably add it to the AT91RM9200-DK
-one.  (I don't think many people are still using that board, but I
-still always compile-test that one).
+Here's an updated version which refuses to reparent on an enabled
+clock.  This updated one is now part of davinci-next.
 
-
-Regards,
-  Andrew Victor
+Kevin
