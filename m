@@ -1,46 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Oct 2009 17:56:07 +0100
-Subject: [PATCH 16/46] davinci: Add MMC/SD support for DA830/OMAP-L137 EVM
-In-Reply-To: <20091019163937.GA2869@mag.az.mvista.com>
-References: <1255720190-7452-11-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-12-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-13-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-14-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-15-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-16-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-17-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-18-git-send-email-khilman@deeprootsystems.com>
-	<20091019140752.GC13614@n2100.arm.linux.org.uk>
-	<20091019163937.GA2869@mag.az.mvista.com>
-Message-ID: <20091019165607.GI13614@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 19 Oct 2009 10:12:04 -0700
+Subject: [PATCH 08/14] omap: Use ioremap for omap4 L4 code
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02BB37D82D@dbde02.ent.ti.com>
+References: <20091016233624.2463.26653.stgit@localhost>
+	<20091016234138.2463.38350.stgit@localhost>
+	<20091016234622.GH12576@atomide.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02BB37D7AA@dbde02.ent.ti.com>
+	<20091017161947.GK12576@atomide.com>
+	<20091019002416.GM12576@atomide.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02BB37D82D@dbde02.ent.ti.com>
+Message-ID: <20091019171204.GP12576@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 19, 2009 at 09:39:37AM -0700, Mark A. Greer wrote:
-> On Mon, Oct 19, 2009 at 03:07:52PM +0100, Russell King - ARM Linux wrote:
-> > On Fri, Oct 16, 2009 at 12:09:20PM -0700, Kevin Hilman wrote:
-> > > +static int da830_evm_mmc_get_ro(int index)
-> > > +{
-> > > +	int val, status, gpio_num = 33;
-> > > +
-> > > +	status = gpio_request(gpio_num, "MMC WP\n");
-> > > +	if (status < 0) {
-> > > +		pr_warning("%s can not open GPIO %d\n", __func__, gpio_num);
-> > > +		return 0;
-> > > +	}
-> > > +	gpio_direction_input(gpio_num);
-> > > +	val = gpio_get_value(gpio_num);
-> > > +	gpio_free(gpio_num);
+* Shilimkar, Santosh <santosh.shilimkar@ti.com> [091019 00:27]:
+> Tony,
+> > -----Original Message-----
+> > From: Tony Lindgren [mailto:tony at atomide.com]
+> > Sent: Monday, October 19, 2009 5:54 AM
+> > To: Shilimkar, Santosh
+> > Cc: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
+> > Subject: Re: [PATCH 08/14] omap: Use ioremap for omap4 L4 code
 > > 
-> > Should this really be requesting the gpio every time it wants to be
-> > read?  This approach sounds wrong.  Why not just request the GPIO in
-> > the platform initialisation code, setting its direction, and merely
-> > reading it in this function?
-> 
-> This routine doesn't get called on every read.  AFAICT, its only called
-> by mmc_sd_init_card() which is called during init and resume.  That seems
-> like the logical time to check if the card is set to read-only since cards
-> can be inserted and removed while the system is running.
+> > * Tony Lindgren <tony@atomide.com> [091017 09:19]:
+> > > * Shilimkar, Santosh <santosh.shilimkar@ti.com> [091017 03:49]:
+> > > > Thanks Tony for this ioremap series!!
+> > > >
+> > > > > -----Original Message-----
+> > > > > From: Tony Lindgren [mailto:tony at atomide.com]
+> > > > > Sent: Saturday, October 17, 2009 5:16 AM
+> > > > > To: linux-arm-kernel at lists.infradead.org
+> > > > > Cc: linux-omap at vger.kernel.org; Shilimkar, Santosh
+> > > > > Subject: Re: [PATCH 08/14] omap: Use ioremap for omap4 L4 code
+> > > > >
+> > > > > * Tony Lindgren <tony@atomide.com> [091016 16:42]:
+> > > > > > Use ioremap for omap4 L4 code
+> > > > >
+> > > > > Santosh, can you please check and ack this patch?
+> > > > >
+> > > > > Especially some of the ioremap sizes may be wrong. Also, this one
+> > > > > I cannot boot test, so it's just compile tested.
+> > > >
+> > > > I have checked the patch and it looks all right except few typo. Also
+> > the scu_base is needed bit earlier.
+> > 
+> > <snip>
+> > 
+> > > > Here is the patch on top of ioremap series which should fix above
+> > mentioned things. With below patch + two serial related patches the kernel
+> > boots on OMAP4430.
+> > >
+> > > Great, will update. Thanks for taking the time to fix it!
+> > 
+> > Here's this one updated with Santosh's fix merged in.
+> V2 has one typo which I think I also missed in my patch.
+> >+	/* Static mapping, never released */
+> >+	gic_cpu_base_addr = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_512);
+> >+	BUG_ON(!base);
+> Should be BUG_ON(!gic_cpu_base_addr);
 
-My complaint is not about when this function is called, it's about what
-is being done inside this function.
+OK, here's V3 of the patch.
+
+Tony
