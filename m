@@ -1,105 +1,50 @@
-From: saaguirre@ti.com (Aguirre Rodriguez, Sergio Alberto)
-Date: Tue, 20 Oct 2009 12:15:41 -0500
-Subject: [PATCH 3b/6] omap: Split vmalloc.h for mach-omap1 and mach-omap2
-In-Reply-To: <20091020165714.GC12576@atomide.com>
-References: <20091014213748.30227.71513.stgit@kaulin.muru.com>
-	<20091014214920.30227.10280.stgit@kaulin.muru.com>
-	<20091020165714.GC12576@atomide.com>
-Message-ID: <A24693684029E5489D1D202277BE89444CFD9E9C@dlee02.ent.ti.com>
+From: bgat@billgatliff.com (Bill Gatliff)
+Date: Tue, 20 Oct 2009 12:27:03 -0500
+Subject: [PATCH] mmc: at91_mci: Don't include asm/mach/mmc.h
+In-Reply-To: <4AD42E10.7010801@atmel.com>
+References: <1254996762-19115-1-git-send-email-u.kleine-koenig@pengutronix.de>	<1255418388-27866-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<4AD42E10.7010801@atmel.com>
+Message-ID: <4ADDF2E7.4010200@billgatliff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony, 
+Nicolas Ferre wrote:
+> Uwe Kleine-K?nig :
+>   
+>> This fixes a compile error introduced in
+>>
+>> 	6ef297f (ARM: 5720/1: Move MMCI header to amba include dir)
+>>
+>> That commit moved arch/arm/include/asm/mach/mmc.h to
+>> include/linux/amba/mmci.h.  Just removing the include was enough.
+>>
+>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>> Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Acked-by: Bill Gatliff <bgat@billgatliff.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+>> Cc: Pierre Ossman <drzeus@drzeus.cx>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: Andrew Morton <akpm@linux-foundation.org>
+>> ---
+>> Hello,
+>>
+>> what is the right path to Linus for this patch?
+>>     
+>
+> Uwe,
+>
+> I gess that Andrew Morton will have to handle it.
+>
+> Let's help him not forget it ;-)
+>   
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org 
-> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Tony Lindgren
-> Sent: Tuesday, October 20, 2009 11:57 AM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: linux-omap at vger.kernel.org
-> Subject: [PATCH 3b/6] omap: Split vmalloc.h for mach-omap1 
-> and mach-omap2
-> 
-> I've added a patch to split vmalloc.h into this series to allow
-> different VMALLOC_END on omap1 and omap2.
-> 
-> Regards,
-> 
-> Tony
-> 
-> From 72464dbae2749dd57bc2b3cd57d4fc6ba7abca37 Mon Sep 17 00:00:00 2001
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Mon, 19 Oct 2009 17:26:29 -0700
-> Subject: [PATCH] omap: Split vmalloc.h for mach-omap1 and mach-omap2
-> 
-> Earlier patch "omap: Remap L3, L4 to get more kernel io address space"
-> changed the VMALLOC_END.
-> 
-> However, this change causes problems on mach-omap1:
-> 
-> BUG: mapping for 0xe0000000 at 0xe0000000 overlaps vmalloc space
-> BUG: mapping for 0xe1000000 at 0xe1000000 overlaps vmalloc space
-> 
-> Fix this by creating separate vmalloc.h files for mach-omap1
-> and mach-omap2.
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> diff --git a/arch/arm/plat-omap/include/mach/vmalloc.h 
-> b/arch/arm/mach-omap1/include/mach/vmalloc.h
-> similarity index 86%
-> copy from arch/arm/plat-omap/include/mach/vmalloc.h
-> copy to arch/arm/mach-omap1/include/mach/vmalloc.h
-> index fc338a5..1b2af14 100644
-> --- a/arch/arm/plat-omap/include/mach/vmalloc.h
-> +++ b/arch/arm/mach-omap1/include/mach/vmalloc.h
-> @@ -1,5 +1,5 @@
->  /*
-> - *  arch/arm/plat-omap/include/mach/vmalloc.h
-> + *  arch/arm/mach-omap1/include/mach/vmalloc.h
+Indeed!  This one _really_ annoys me.
 
-I thought that keeping file paths was discouraged...
 
-Why not getting rid of it to avoid changing it every time?
+b.g.
 
-Regards,
-Sergio
->   *
->   *  Copyright (C) 2000 Russell King.
->   *
-> @@ -17,8 +17,4 @@
->   * along with this program; if not, write to the Free Software
->   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 
-> 02111-1307 USA
->   */
-> -#ifdef CONFIG_ARCH_OMAP1
->  #define VMALLOC_END	(PAGE_OFFSET + 0x18000000)
-> -#else
-> -#define VMALLOC_END	(PAGE_OFFSET + 0x38000000)
-> -#endif
-> diff --git a/arch/arm/plat-omap/include/mach/vmalloc.h 
-> b/arch/arm/mach-omap2/include/mach/vmalloc.h
-> similarity index 85%
-> rename from arch/arm/plat-omap/include/mach/vmalloc.h
-> rename to arch/arm/mach-omap2/include/mach/vmalloc.h
-> index fc338a5..9ce9b6e 100644
-> --- a/arch/arm/plat-omap/include/mach/vmalloc.h
-> +++ b/arch/arm/mach-omap2/include/mach/vmalloc.h
-> @@ -17,8 +17,4 @@
->   * along with this program; if not, write to the Free Software
->   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 
-> 02111-1307 USA
->   */
-> -#ifdef CONFIG_ARCH_OMAP1
-> -#define VMALLOC_END	(PAGE_OFFSET + 0x18000000)
-> -#else
-> -#define VMALLOC_END	(PAGE_OFFSET + 0x38000000)
-> -#endif
-> +#define VMALLOC_END	  (PAGE_OFFSET + 0x38000000)
-> --
-> To unsubscribe from this list: send the line "unsubscribe 
-> linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
+-- 
+Bill Gatliff
+bgat at billgatliff.com
