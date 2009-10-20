@@ -1,59 +1,34 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 13 Oct 2009 09:36:48 +0200
-Subject: [PATCH] mmc: at91_mci: Don't include asm/mach/mmc.h
-In-Reply-To: <1255418388-27866-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1254996762-19115-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1255418388-27866-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <4AD42E10.7010801@atmel.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 20 Oct 2009 10:41:32 +0100
+Subject: [PATCH] input/touchscreen: add S3C24XX SoC touchscreen input
+	driver
+In-Reply-To: <2accc2ff0910200121g4f2c0839l96c7d99e4f4de47a@mail.gmail.com>
+References: <mailman.4020.1255949705.2256.linux-arm-kernel@lists.infradead.org>
+	<4ADC4D4D.5020508@gmail.com>
+	<20091019120744.GB7412@n2100.arm.linux.org.uk>
+	<2accc2ff0910192121t27387b90t9cfd5a5252aa00cc@mail.gmail.com>
+	<20091020073946.GB723@n2100.arm.linux.org.uk>
+	<2accc2ff0910200121g4f2c0839l96c7d99e4f4de47a@mail.gmail.com>
+Message-ID: <20091020094132.GA17240@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe Kleine-K?nig :
-> This fixes a compile error introduced in
-> 
-> 	6ef297f (ARM: 5720/1: Move MMCI header to amba include dir)
-> 
-> That commit moved arch/arm/include/asm/mach/mmc.h to
-> include/linux/amba/mmci.h.  Just removing the include was enough.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Acked-by: Linus Walleij <linus.walleij@stericsson.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Acked-by: Bill Gatliff <bgat@billgatliff.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Pierre Ossman <drzeus@drzeus.cx>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> ---
-> Hello,
-> 
-> what is the right path to Linus for this patch?
+On Tue, Oct 20, 2009 at 03:21:17AM -0500, Nelson Castillo wrote:
 
-Uwe,
+> Can the s3c driver send the events at full speed? (Maximum possible ADC rate?).
 
-I gess that Andrew Morton will have to handle it.
+> Even if it's possible I think we would monopolize the adc driver
+> needlessly because we don't need all that conversions when there is
+> not much noise. Please read on.
 
-Let's help him not forget it ;-)
-
-Bye,
-
->  drivers/mmc/host/at91_mci.c |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/at91_mci.c b/drivers/mmc/host/at91_mci.c
-> index e556d42..63924e0 100644
-> --- a/drivers/mmc/host/at91_mci.c
-> +++ b/drivers/mmc/host/at91_mci.c
-> @@ -72,7 +72,6 @@
->  #include <asm/irq.h>
->  #include <asm/gpio.h>
->  
-> -#include <asm/mach/mmc.h>
->  #include <mach/board.h>
->  #include <mach/cpu.h>
->  #include <mach/at91_mci.h>
-
-
--- 
-Nicolas Ferre
+There's currently no facility to push sample rate requests down into the
+kernel from userspace.  However, this is a good idea in general - there
+was some recent (brief) discussion of doing this on the linux-input list.
+Since different use cases have different sample rate requirements (such
+as the difference between handwriting recognition which can need 200
+samples/second and a simple finger operated menu which may be happy with
+10) there's value in being able to vary the sample rate at run time.  I
+was intending to look at this shortly as part of some touchscreen driver
+development I need to do soon or perhaps someone else will pick up the
+idea, if it does get implemented then obviously tslib would also be able
+to use it here.
