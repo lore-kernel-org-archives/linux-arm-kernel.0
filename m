@@ -1,75 +1,57 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 21 Oct 2009 03:43:44 +0800
-Subject: collie and SA1100 patches
-In-Reply-To: <4ADDFADB.8090808@gmx.de>
-References: <1254778533-3529-1-git-send-email-thommycheck@gmx.de>
-	<4ADDFADB.8090808@gmx.de>
-Message-ID: <f17812d70910201243k6b9d1856g26becc89ff551994@mail.gmail.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Tue, 20 Oct 2009 21:51:35 +0200
+Subject: [PATCH] Use CONFIG_VECTORS_BASE instead of hardcoded 0xffff0000.
+In-Reply-To: <1256054856-20404-1-git-send-email-benoit.fouet@free.fr>
+References: <1256054856-20404-1-git-send-email-benoit.fouet@free.fr>
+Message-ID: <63386a3d0910201251n4e6fec18le5a2d2cd0941be78@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 21, 2009 at 2:00 AM, Thomas Kunze <thommycheck@gmx.de> wrote:
-> Hi,
->
-> what is the status of this patchset?
-> The patchset is available via git at:
-> http://git.linuxtogo.org/?p=thesing/collie.git;a=shortlog;h=refs/heads/for-lak
->
-> The branch is based on 2.6.32-rc5. Please tell me if I should rebase on sth.
-> else.
+2009/10/20 Benoit Fouet <benoit.fouet@free.fr>:
 
-This patchset looks OK to me. I'm willing to see such changes being
-made to pxa2xx-based zaurus as well.
+> The configuration option exists but is not used everywhere,
+> this patch tries to make it the default instead of the
+> hardcoded value.
 
-Russell,
+Previously IIRC these could only be placed at 0x00000000 or
+0xffff0000, and I haven't heard of it being changed, and the
+code surrounding this surely does not take into account that
+it could be anything that 0 or 0xffff0000.
 
-Are you interested to merge this?
+With a recursive
+cd arch/arm/ && grep -r CONFIG_VECTORS_BASE .
+you see that everybody and his dog is using 0xffff0000
+(high vectors).
 
->
-> Regards,
-> Thomas
->>
->> Hi all!
->> ? This patchset implements prober power management for collie. To archieve
->> this
->> some bugs were fixed and gpiolib-support was added to the ucb1x00 driver.
->> Please tell me if I should CC some other people or lists.
->>
->> Regards,
->> Thomas
->>
->> Statistics:
->> ?arch/arm/mach-sa1100/collie.c ? ? ? ? ? ? ?| ? 79 +++++-
->> ?arch/arm/mach-sa1100/include/mach/collie.h | ? 77 +++---
->> ?arch/arm/mach-sa1100/include/mach/gpio.h ? | ? 19 +-
->> ?arch/arm/mach-sa1100/include/mach/mcp.h ? ?| ? ?1 +
->> ?drivers/leds/leds-locomo.c ? ? ? ? ? ? ? ? | ? ?2 +-
->> ?drivers/mfd/mcp-core.c ? ? ? ? ? ? ? ? ? ? | ? ?2 +-
->> ?drivers/mfd/mcp-sa11x0.c ? ? ? ? ? ? ? ? ? | ? ?3 +-
->> ?drivers/mfd/ucb1x00-assabet.c ? ? ? ? ? ? ?| ? ?2 +-
->> ?drivers/mfd/ucb1x00-core.c ? ? ? ? ? ? ? ? | ? 89 ++++++-
->> ?drivers/mfd/ucb1x00-ts.c ? ? ? ? ? ? ? ? ? | ? ?2 +-
->> ?drivers/power/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? ?7 +
->> ?drivers/power/Makefile ? ? ? ? ? ? ? ? ? ? | ? ?1 +
->> ?drivers/power/collie_battery.c ? ? ? ? ? ? | ?418
->> ++++++++++++++++++++++++++++
->> ?{drivers => include/linux}/mfd/mcp.h ? ? ? | ? ?3 +
->> ?{drivers => include/linux}/mfd/ucb1x00.h ? | ? ?7 +-
->> ?15 files changed, 649 insertions(+), 63 deletions(-)
->> ?create mode 100644 drivers/power/collie_battery.c
->> ?rename {drivers => include/linux}/mfd/mcp.h (97%)
->> ?rename {drivers => include/linux}/mfd/ucb1x00.h (98%)
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+I think we'd rather get rid of CONFIG_VECTORS_BASE
+with that hex value, this config value could for example
+be CONFIG_VECTORS_LOW | CONFIG_VECTORS_HIGH, mutually
+exclusive instead, and then _LOW will basically never be used
+and things become simpler, I think having a hex value for
+CONFIG_VECTORS_BASE is actually confusing since that
+may give people the (false) idea that this can be set to anything.
+
+> (...)
+> ? ? ? ?/*
+> ? ? ? ? * Create a mapping for the machine vectors at the high-vectors
+> - ? ? ? ?* location (0xffff0000). ?If we aren't using high-vectors, also
+> + ? ? ? ?* location (CONFIG_VECTORS_BASE). ?If we aren't using high-vectors, also
+> ? ? ? ? * create a mapping at the low-vectors virtual address.
+> ? ? ? ? */
+> ? ? ? ?map.pfn = __phys_to_pfn(virt_to_phys(vectors));
+> - ? ? ? map.virtual = 0xffff0000;
+> + ? ? ? map.virtual = CONFIG_VECTORS_BASE;
+> ? ? ? ?map.length = PAGE_SIZE;
+> ? ? ? ?map.type = MT_HIGH_VECTORS;
+> ? ? ? ?create_mapping(&map);
+
+Speaking of this: for machines with TCM (like the U300) we'd probably
+like to move our ITCM to 0xffff0000 (CONFIG_VECTORS_BASE) and alter
+the code so that iff CONFIG_VECTORS_BASE == __sitcm_text the
+vectors page will not be allocated and mapped, and vectors go into
+ITCM instead. The idea is that since TCM fast as cache, it's a pretty
+good idea to lock them in there. (Seen on other ARM OS:es...)
+
+I'll try to make a patch for that someday.
+
+Linus Walleij
