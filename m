@@ -1,155 +1,64 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 20 Oct 2009 16:32:53 +0200
-Subject: [PATCH] at91: at91sam9g20ek modify dual slot evaluation kit
-Message-ID: <1256049173-17373-1-git-send-email-nicolas.ferre@atmel.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 20 Oct 2009 07:12:43 -0700
+Subject: [PATCH 38/46] davinci: fix compilation error when using
+	mach/system.h
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59301DDF23F9F@dbde02.ent.ti.com>
+	(Sekhar Nori's message of "Tue\, 20 Oct 2009 18\:29\:58 +0530")
+References: <1255720190-7452-31-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-32-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-33-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-34-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-35-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-36-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-37-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-38-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-39-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-40-git-send-email-khilman@deeprootsystems.com>
+	<20091019141346.GD13614@n2100.arm.linux.org.uk>
+	<87my3ns07s.fsf@deeprootsystems.com>
+	<B85A65D85D7EB246BE421B3FB0FBB59301DDF23F9F@dbde02.ent.ti.com>
+Message-ID: <871vkyqhlw.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-at91sam9g20ek rev. C and onwards embed two SD/MMC slots. This patch modify the
-previous dual slot board definition to match the official rev. C board. It also
-allows the use of at91_mci SD/MMC driver in addition to the atmel-mci one.
+"Nori, Sekhar" <nsekhar@ti.com> writes:
 
-Some pins have been re-affected from leds or Ethernet phy IRQ to the SD/MMC
-slot A. This lead to a modification of those definitions.
+> On Tue, Oct 20, 2009 at 00:03:11, Kevin Hilman wrote:
+>> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+>>
+>> > On Fri, Oct 16, 2009 at 12:09:42PM -0700, Kevin Hilman wrote:
+>> >> From: Sekhar Nori <nsekhar@ti.com>
+>> >>
+>> >> include/mach/system.h uses the cpu_do_idle() function which is
+>> >> defined in asm/proc-fns.h. Without this patch including system.h
+>> >> leads to error of the sort:
+>> >>
+>> >> error: implicit declaration of function 'cpu_do_idle'
+>> >
+>> > The right answer might actually be to ensure that arch/arm/kernel/process.c
+>> > includes this file, so that all mach/system.h files don't have to.
+>>
+>> Maybe it should be more explicit, but at least on 2.6.32, process.c
+>> already triggers an include of <asm/proc-fns.h> (linux/mm.h ->
+>> asm/pgtable.h -> asm/proc-fns.h.
+>>
+>> IIRC, the problem was not with arch/arm/kernel/process.c other
+>> mach-davinci files using <mach/system.h> for some reason.
+>>
+>> After Sergei's major #include cleanup for mach-davinci/*, I don't
+>> think this is actually necessary anymore.
+>>
+>> Sekhar, I'll drop this patch from davinci-next unless you think this
+>> is still necessary for some reason.
+>
+> Kevin, I made this patch because I started using arch_idle() for entering
+> WFI mode in the da850 cpuidle driver.
+>
+> The Marvell Kirkwood cpuidle driver uses a call to cpu_do_idle() directly,
+> but calling arch_idle sounded more appropriate to me in case the arch
+> needs to do something special for entering idle (though not actually the
+> case with da850).
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-This is a modification of the changes introduced by the patch:
-"AT91: atmel-mci: Platform configuration to the the atmel-mci driver" that went
-into mainline through the MMC path (thanks to Andrew Morton).
+For now, I think we should stick to calling cpu_do_idle() directly.
 
-Also move slightly the 2MMC board Kconfig entry.
-
- arch/arm/mach-at91/Kconfig                     |   20 +++++++++++---------
- arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c |   23 +++++++++++++++--------
- 2 files changed, 26 insertions(+), 17 deletions(-)
-
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index e35d54d..2fd8843 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -289,13 +289,6 @@ config MACH_NEOCORE926
- 	help
- 	  Select this if you are using the Adeneo Neocore 926 board.
- 
--config MACH_AT91SAM9G20EK_2MMC
--	bool "Atmel AT91SAM9G20-EK Evaluation Kit modified for 2 MMC Slots"
--	depends on ARCH_AT91SAM9G20
--	help
--	  Select this if you are using an Atmel AT91SAM9G20-EK Evaluation Kit
--	  Rev A or B modified for 2 MMC Slots.
--
- endif
- 
- # ----------------------------------------------------------
-@@ -322,7 +315,16 @@ config MACH_AT91SAM9G20EK
- 	bool "Atmel AT91SAM9G20-EK Evaluation Kit"
- 	depends on ARCH_AT91SAM9G20
- 	help
--	  Select this if you are using Atmel's AT91SAM9G20-EK Evaluation Kit.
-+	  Select this if you are using Atmel's AT91SAM9G20-EK Evaluation Kit
-+	  that embeds only one SD/MMC slot.
-+
-+config MACH_AT91SAM9G20EK_2MMC
-+	bool "Atmel AT91SAM9G20-EK Evaluation Kit with 2 SD/MMC Slots"
-+	depends on ARCH_AT91SAM9G20
-+	help
-+	  Select this if you are using an Atmel AT91SAM9G20-EK Evaluation Kit
-+	  with 2 SD/MMC Slots. This is the case for AT91SAM9G20-EK rev. C and
-+	  onwards.
- 
- config MACH_CPU9G20
- 	bool "Eukrea CPU9G20 board"
-@@ -392,7 +394,7 @@ config MTD_AT91_DATAFLASH_CARD
- 
- config MTD_NAND_ATMEL_BUSWIDTH_16
- 	bool "Enable 16-bit data bus interface to NAND flash"
--	depends on (MACH_AT91SAM9260EK || MACH_AT91SAM9261EK || MACH_AT91SAM9G10EK || MACH_AT91SAM9263EK || MACH_AT91SAM9G20EK || MACH_AT91SAM9G45EKES || MACH_AT91CAP9ADK)
-+	depends on (MACH_AT91SAM9260EK || MACH_AT91SAM9261EK || MACH_AT91SAM9G10EK || MACH_AT91SAM9263EK || MACH_AT91SAM9G20EK || MACH_AT91SAM9G20EK_2MMC || MACH_AT91SAM9G45EKES || MACH_AT91CAP9ADK)
- 	help
- 	  On AT91SAM926x boards both types of NAND flash can be present
- 	  (8 and 16 bit data bus width).
-diff --git a/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c b/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c
-index a28e53f..a4102d7 100644
---- a/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c
-+++ b/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c
-@@ -90,7 +90,7 @@ static struct at91_udc_data __initdata ek_udc_data = {
-  * SPI devices.
-  */
- static struct spi_board_info ek_spi_devices[] = {
--#if !defined(CONFIG_MMC_ATMELMCI)
-+#if !(defined(CONFIG_MMC_ATMELMCI) || defined(CONFIG_MMC_AT91))
- 	{	/* DataFlash chip */
- 		.modalias	= "mtd_dataflash",
- 		.chip_select	= 1,
-@@ -113,7 +113,7 @@ static struct spi_board_info ek_spi_devices[] = {
-  * MACB Ethernet device
-  */
- static struct at91_eth_data __initdata ek_macb_data = {
--	.phy_irq_pin	= AT91_PIN_PC12,
-+	.phy_irq_pin	= AT91_PIN_PB0,
- 	.is_rmii	= 1,
- };
- 
-@@ -194,24 +194,27 @@ static void __init ek_add_device_nand(void)
- 
- /*
-  * MCI (SD/MMC)
-- * det_pin and wp_pin are not connected
-+ * wp_pin is not connected
-  */
- #if defined(CONFIG_MMC_ATMELMCI) || defined(CONFIG_MMC_ATMELMCI_MODULE)
- static struct mci_platform_data __initdata ek_mmc_data = {
- 	.slot[0] = {
- 		.bus_width	= 4,
--		.detect_pin	= -ENODEV,
-+		.detect_pin	= AT91_PIN_PC2,
- 		.wp_pin		= -ENODEV,
- 	},
- 	.slot[1] = {
- 		.bus_width	= 4,
--		.detect_pin	= -ENODEV,
-+		.detect_pin	= AT91_PIN_PC9,
- 		.wp_pin		= -ENODEV,
- 	},
- 
- };
- #else
--static struct amci_platform_data __initdata ek_mmc_data = {
-+static struct at91_mmc_data __initdata ek_mmc_data = {
-+	.slot_b		= 1,	/* Only one slot so use slot B */
-+	.wire4		= 1,
-+	.det_pin	= AT91_PIN_PC9,
- };
- #endif
- 
-@@ -221,13 +224,13 @@ static struct amci_platform_data __initdata ek_mmc_data = {
- static struct gpio_led ek_leds[] = {
- 	{	/* "bottom" led, green, userled1 to be defined */
- 		.name			= "ds5",
--		.gpio			= AT91_PIN_PB12,
-+		.gpio			= AT91_PIN_PB8,
- 		.active_low		= 1,
- 		.default_trigger	= "none",
- 	},
- 	{	/* "power" led, yellow */
- 		.name			= "ds1",
--		.gpio			= AT91_PIN_PB13,
-+		.gpio			= AT91_PIN_PB9,
- 		.default_trigger	= "heartbeat",
- 	}
- };
-@@ -254,7 +257,11 @@ static void __init ek_board_init(void)
- 	/* Ethernet */
- 	at91_add_device_eth(&ek_macb_data);
- 	/* MMC */
-+#if defined(CONFIG_MMC_ATMELMCI) || defined(CONFIG_MMC_ATMELMCI_MODULE)
- 	at91_add_device_mci(0, &ek_mmc_data);
-+#else
-+	at91_add_device_mmc(0, &ek_mmc_data);
-+#endif
- 	/* I2C */
- 	at91_add_device_i2c(ek_i2c_devices, ARRAY_SIZE(ek_i2c_devices));
- 	/* LEDs */
--- 
-1.5.6.5
+Kevin
