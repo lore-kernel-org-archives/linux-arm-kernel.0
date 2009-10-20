@@ -1,59 +1,34 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Tue, 20 Oct 2009 18:29:58 +0530
-Subject: [PATCH 38/46] davinci: fix compilation error when using
-	mach/system.h
-In-Reply-To: <87my3ns07s.fsf@deeprootsystems.com>
-References: <1255720190-7452-31-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-32-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-33-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-34-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-35-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-36-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-37-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-38-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-39-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-40-git-send-email-khilman@deeprootsystems.com>
-	<20091019141346.GD13614@n2100.arm.linux.org.uk>
-	<87my3ns07s.fsf@deeprootsystems.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB59301DDF23F9F@dbde02.ent.ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 20 Oct 2009 15:01:06 +0200
+Subject: [PATCH 4/5] at91/USB: USB drivers modifications for at91sam9g10
+In-Reply-To: <20090929174017.GC7209@kroah.com>
+References: <1245341772-1689-1-git-send-email-nicolas.ferre@atmel.com>
+	<4AB0D325.9080407@atmel.com> <4ABC9A4C.8000702@atmel.com>
+	<200909251051.34916.david-b@pacbell.net>
+	<4AC1BE68.2080504@atmel.com> <20090929174017.GC7209@kroah.com>
+Message-ID: <4ADDB492.40405@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2009 at 00:03:11, Kevin Hilman wrote:
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
->
-> > On Fri, Oct 16, 2009 at 12:09:42PM -0700, Kevin Hilman wrote:
-> >> From: Sekhar Nori <nsekhar@ti.com>
-> >>
-> >> include/mach/system.h uses the cpu_do_idle() function which is
-> >> defined in asm/proc-fns.h. Without this patch including system.h
-> >> leads to error of the sort:
-> >>
-> >> error: implicit declaration of function 'cpu_do_idle'
-> >
-> > The right answer might actually be to ensure that arch/arm/kernel/process.c
-> > includes this file, so that all mach/system.h files don't have to.
->
-> Maybe it should be more explicit, but at least on 2.6.32, process.c
-> already triggers an include of <asm/proc-fns.h> (linux/mm.h ->
-> asm/pgtable.h -> asm/proc-fns.h.
->
-> IIRC, the problem was not with arch/arm/kernel/process.c other
-> mach-davinci files using <mach/system.h> for some reason.
->
-> After Sergei's major #include cleanup for mach-davinci/*, I don't
-> think this is actually necessary anymore.
->
-> Sekhar, I'll drop this patch from davinci-next unless you think this
-> is still necessary for some reason.
+Greg KH :
+> On Tue, Sep 29, 2009 at 09:59:36AM +0200, Nicolas Ferre wrote:
+>> David Brownell :
+>>> On Friday 25 September 2009, Nicolas Ferre wrote:
+>>>> Greg,
+>>>>
+>>>> Please, can you consider the inclusion of this patch. I have no news
+>>>> about it for a long time...
+>>> ISTR either acking this or suggesting it go with the rest
+>>> of the G10 patches ... regardless, seems OK to me now that
+>>> its precursors have merged.
+>> Good.
+>>
+>> Greg, can you handle this for inclusion in mainline soon ?
+> 
+> I'll dig it out and work on this after the x.org conference this week...
 
-Kevin, I made this patch because I started using arch_idle() for entering
-WFI mode in the da850 cpuidle driver.
+Ping ?
 
-The Marvell Kirkwood cpuidle driver uses a call to cpu_do_idle() directly,
-but calling arch_idle sounded more appropriate to me in case the arch
-needs to do something special for entering idle (though not actually the
-case with da850).
-
-Thanks,
-Sekhar
+Thanks, Bye,
+-- 
+Nicolas Ferre
