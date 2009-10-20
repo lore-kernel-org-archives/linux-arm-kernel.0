@@ -1,62 +1,30 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Tue, 20 Oct 2009 10:19:12 +0200
-Subject: [PATCH] Make MIPS dynamic clocksource/clockevent clock code
-	generic
-In-Reply-To: <alpine.LFD.2.00.0910200454300.2863@localhost.localdomain>
-References: <1255819715-19763-1-git-send-email-linus.walleij@stericsson.com>
-	<alpine.LFD.2.00.0910200454300.2863@localhost.localdomain>
-Message-ID: <19165.29312.300540.500942@pilspetsen.it.uu.se>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 20 Oct 2009 10:21:08 +0200
+Subject: usb support for imx35 ?
+In-Reply-To: <200910201155.54578.a.babich@rez.ru>
+References: <200910201155.54578.a.babich@rez.ru>
+Message-ID: <20091020082108.GP8818@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Gleixner writes:
- > > +static inline void clockevent_set_clock(struct clock_event_device *dev, u32 hz)
- > > +{
- > > +	u64 temp;
- > > +	u32 shift;
- > > +
- > > +	/* Find a shift value */
- > > +	for (shift = 32; shift > 0; shift--) {
- > > +		temp = (u64) hz << shift;
- > > +		do_div(temp, NSEC_PER_SEC);
- > > +		if ((temp >> 32) == 0)
- > > +			break;
- > > +	}
- > > +	dev->shift = shift;
- > > +	dev->mult = (u32) temp;
- > > +}
- > > +
- > > +
- > > +static inline void clocksource_set_clock(struct clocksource *cs, u32 hz)
- > > +{
- > > +	u64 temp;
- > > +	u32 shift;
- > > +
- > > +	/* Find a shift value */
- > > +	for (shift = 32; shift > 0; shift--) {
- > > +		temp = (u64) NSEC_PER_SEC << shift;
- > > +		do_div(temp, hz);
- > > +		if ((temp >> 32) == 0)
- > > +			break;
- > > +	}
- > > +	cs->shift = shift;
- > > +	cs->mult = (u32) temp;
- > > +}
- > > +
- > 
- > So that's the same function twice, right ?
+On Tue, Oct 20, 2009 at 11:55:54AM +0600, Alexei Babich wrote:
+> Hello all.
+> 
+> Tell me please, what is the status of support for USB-HOST in the microcontroller Freescale imx35?
+> Thank you.
 
-They are similar but not identical:
+Basically the same status as for i.MX27/31/25. There have been patches
+to add USB host support from Daniel Mack. Hopefully they go in in the
+next merge window.
+All mentioned i.MXs have the same otg core with some minor differences.
+Daniels patches aim for i.MX31, but once these are mainline, the rest is
+easy.
 
- > > +		temp = (u64) hz << shift;
- > > +		do_div(temp, NSEC_PER_SEC);
+Sascha
 
-vs
 
- > > +		temp = (u64) NSEC_PER_SEC << shift;
- > > +		do_div(temp, hz);
-
-I suppose both functions could be implemented by a suitably
-parametric third function, but IMO that would just obscure things.
-
-Making them non-inline I fully agree with.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
