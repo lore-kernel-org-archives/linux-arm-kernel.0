@@ -1,53 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 20 Oct 2009 21:10:09 +0100
-Subject: [PATCH] Use CONFIG_VECTORS_BASE instead of hardcoded 0xffff0000.
-In-Reply-To: <63386a3d0910201251n4e6fec18le5a2d2cd0941be78@mail.gmail.com>
-References: <1256054856-20404-1-git-send-email-benoit.fouet@free.fr>
-	<63386a3d0910201251n4e6fec18le5a2d2cd0941be78@mail.gmail.com>
-Message-ID: <20091020201009.GA14305@n2100.arm.linux.org.uk>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Tue, 20 Oct 2009 23:27:55 +0200
+Subject: [PATCH] Make MIPS dynamic clocksource/clockevent clock code
+	generic
+In-Reply-To: <alpine.LFD.2.00.0910200454300.2863@localhost.localdomain>
+References: <1255819715-19763-1-git-send-email-linus.walleij@stericsson.com>
+	<alpine.LFD.2.00.0910200454300.2863@localhost.localdomain>
+Message-ID: <63386a3d0910201427i1dd8c789i1c9bceeea250d98c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2009 at 09:51:35PM +0200, Linus Walleij wrote:
-> I think we'd rather get rid of CONFIG_VECTORS_BASE
-> with that hex value, this config value could for example
-> be CONFIG_VECTORS_LOW | CONFIG_VECTORS_HIGH, mutually
-> exclusive instead, and then _LOW will basically never be used
-> and things become simpler, I think having a hex value for
-> CONFIG_VECTORS_BASE is actually confusing since that
-> may give people the (false) idea that this can be set to anything.
+2009/10/20 Thomas Gleixner <tglx@linutronix.de>:
 
-In the MMU case, there are only two possible addresses for the vectors -
-0x00000000 or 0xffff0000.  Which is in play is entirely dependent on the
-state of the V bit in the control register.
+> On Sun, 18 Oct 2009, Linus Walleij wrote:
+>> This moves the clocksource_set_clock() and clockevent_set_clock()
+>> from the MIPS timer code into clockchips and clocksource where
+>> it belongs.
+> (...)
+> Please do not make that functions inline. They are too large and there
+> is no benefit of inlining them.
 
-Since there are only two possibilities, this is hard-coded into the code,
-and VECTORS_BASE is not used - it's pointless and its actually got nothing
-to do with what VECTORS_BASE is set to.
+I think there is, because these functions in MIPS if I'm not misreading it, are
+used once each in one and one spot only in the clocksource/clockevent
+set-up at boot time for each platform in which they are currently used.
 
-In the noMMU case, the base for the vectors is configurable.  Consider
-that on noMMU, you need the reset vector to be populated by code before
-any RAM is available.  One way to do this is to ensure that ROM or flash
-is mapped there.  It could be that the hardware CPU vectors are always
-directed to ROM.
+Further these spots tend to be __init or even __cpuinit code segments,
+so they will be discarded and if we inline the code it will be discarded
+after boot as well.
 
-So, what noMMU implementations do is they load the ROM image up with
-a set of instructions to soft-redirect the CPU vectors (except for
-reset) into system RAM, which can be at any address.
+If you foresee that the code will be used in other ways under other
+circumstances, I will make them non-inlined of course, but I have a
+hard time seeing that.
 
-This is what VECTORS_BASE is doing - it's allowing noMMU systems to
-inform the kernel where the redirected vectors are stored in the system
-memory map.
+OK?
 
-VECTORS_BASE really has no meaning for MMU-based systems.
-
-> Speaking of this: for machines with TCM (like the U300) we'd probably
-> like to move our ITCM to 0xffff0000 (CONFIG_VECTORS_BASE) and alter
-> the code so that iff CONFIG_VECTORS_BASE == __sitcm_text the
-> vectors page will not be allocated and mapped, and vectors go into
-> ITCM instead. The idea is that since TCM fast as cache, it's a pretty
-> good idea to lock them in there. (Seen on other ARM OS:es...)
-
-No can do - the top of the vector page is used for other purposes,
-including storing the current TLS value in that page.  It's not used
-solely for the vectors.
+Linus Walleij
