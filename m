@@ -1,34 +1,26 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 19 Oct 2009 23:37:52 +0200
-Subject: spitz backlight: fix brightness limiting
-Message-ID: <20091019213751.GC1482@ucw.cz>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 21 Oct 2009 09:53:47 +0200
+Subject: [PATCH RESEND#2] mmc: at91_mci: Don't include asm/mach/mmc.h
+In-Reply-To: <1256111219-25266-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <4ADDF2E7.4010200@billgatliff.com>
+	<1256111219-25266-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <4ADEBE0B.3060007@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Uwe Kleine-K?nig :
+> This fixes a compile bug introduced in
+> 
+> 	6ef297f (ARM: 5720/1: Move MMCI header to amba include dir)
+> 
+> That commit moved arch/arm/include/asm/mach/mmc.h to
+> include/linux/amba/mmci.h.  Just removing the include was enough.
 
-On spitz (& similar) machines, if battery is running low, backlight
-needs to be limited to lower step. Unfortunately, current code uses &=
-for limiting, turning backlight off completely for some backlight
-settings. Fix that.
+FYI it is already in -mm patchsed as:
+mmc-at91_mci-dont-include-asm-mach-mmch.patch
 
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
+We now just have to track its way to mainline.
 
---- linux-rc/drivers/video/backlight/corgi_lcd.c	2009-10-18 18:11:36.000000000 +0200
-+++ linux-rc/drivers/video/backlight/corgi_lcd.c	2009-10-16 02:10:13.000000000 +0200
-@@ -433,8 +434,9 @@
- 
- 	if (corgibl_flags & CORGIBL_SUSPENDED)
- 		intensity = 0;
--	if (corgibl_flags & CORGIBL_BATTLOW)
--		intensity &= lcd->limit_mask;
-+
-+	if ((corgibl_flags & CORGIBL_BATTLOW) && intensity > lcd->limit_mask)
-+		intensity = lcd->limit_mask;
- 
- 	return corgi_bl_set_intensity(lcd, intensity);
- }
-
-
+Bye,
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Nicolas Ferre
