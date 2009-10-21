@@ -1,34 +1,66 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 21 Oct 2009 18:05:30 +0100
-Subject: [PATCH 2.6.32 1/2] SMDK6410: Configure GPIO pull up for WM835x IRQ
-	line
-Message-ID: <1256144731-27221-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: valentin.longchamp@epfl.ch (Valentin Longchamp)
+Date: Wed, 21 Oct 2009 19:11:24 +0200
+Subject: [PATCH 5/6] mx31moboard: camera support
+In-Reply-To: <20091020080941.GN8818@pengutronix.de>
+References: <1255599780-12948-1-git-send-email-valentin.longchamp@epfl.ch>
+	<1255599780-12948-2-git-send-email-valentin.longchamp@epfl.ch>
+	<1255599780-12948-3-git-send-email-valentin.longchamp@epfl.ch>
+	<1255599780-12948-4-git-send-email-valentin.longchamp@epfl.ch>
+	<1255599780-12948-5-git-send-email-valentin.longchamp@epfl.ch>
+	<1255599780-12948-6-git-send-email-valentin.longchamp@epfl.ch>
+	<Pine.LNX.4.64.0910162307160.26130@axis700.grange>
+	<4ADC96A9.3090403@epfl.ch> <20091020080941.GN8818@pengutronix.de>
+Message-ID: <4ADF40BC.4090801@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When used with the WM1190-EV1 board we can use the internal pull up
-resistor of the CPU to provide the required pull for the IRQ line.
-Without this interrupts from the WM835x don't work in the default
-WM1190-EV1 hardwaer configuration.
+Sascha Hauer wrote:
+> On Mon, Oct 19, 2009 at 06:41:13PM +0200, Valentin Longchamp wrote:
+>> Hi Guennadi,
+>>
+>> Guennadi Liakhovetski wrote:
+>>> Hi
+>>>
+>>> On Thu, 15 Oct 2009, Valentin Longchamp wrote:
+>>>
+>>>> We have two mt9t031 cameras that have a muxed bus on the robot.
+>>>> We can control which one we are using with gpio outputs. This
+>>>> currently is not optimal
+>>> So, what prevents you from registering two platform devices for your 
+>>> two cameras? Is there a problem with that?
+>> The lack of time until now to do it properly. I sent those patches as  
+>> initial RFC (and by the way thanks for your comment).
+>>
+>> I would like to have one video interface only and that I can switch  
+>> between the two physical camera using a quite simple system call. Would  
+>> that be compatible with registering the two platform devices ?
+> 
+> Wouldn't it be better to have /dev/video[01] for two cameras? How do
+> keep the registers synchron between both cameras otherwise?
+> 
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c6410/mach-smdk6410.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+Well, from my experimentations, most initializations are done when you 
+open the device. So if you close the device, switch camera and open it 
+again, the registers are initialized with the need values. Of course 
+there is a problem is you switch camera while the device is open.
 
-diff --git a/arch/arm/mach-s3c6410/mach-smdk6410.c b/arch/arm/mach-s3c6410/mach-smdk6410.c
-index 72776ff..480d297 100644
---- a/arch/arm/mach-s3c6410/mach-smdk6410.c
-+++ b/arch/arm/mach-s3c6410/mach-smdk6410.c
-@@ -372,6 +372,9 @@ static int __init smdk6410_wm8350_init(struct wm8350 *wm8350)
- {
- 	int i;
- 
-+	/* Configure the IRQ line */
-+	s3c_gpio_setpull(S3C64XX_GPN(12), S3C_GPIO_PULL_UP);
-+
- 	/* Instantiate the regulators */
- 	for (i = 0; i < ARRAY_SIZE(wm1190_regulators); i++)
- 		wm8350_register_regulator(wm8350,
+It could be ok with /dev/video[01], but I would need something that 
+would prevent one device to be opened when the other already is open (a 
+mutex, but where ?).
+
+Besides, I have read a slide from Dongsoo Kim 
+(http://www.celinuxforum.org/CelfPubWiki/ELC2009Presentations?action=AttachFile&do=get&target=Framework_for_digital_camera_in_linux-in_detail.ppt 
+slides 41-47) and the cleanest solution would be to have the two chips 
+enumerated with VIDIOC_ENUMINPUT as proposed. What would then be the 
+v4l2 call to switch from one device to each other ? How to "link" it 
+with the kernel code that make the real hardware switching ?
+
+Thanks for your inputs.
+
+Val
+
 -- 
-1.6.5
+Valentin Longchamp, PhD Student, EPFL-STI-LSRO1
+valentin.longchamp at epfl.ch, Phone: +41216937827
+http://people.epfl.ch/valentin.longchamp
+MEA3485, Station 9, CH-1015 Lausanne
