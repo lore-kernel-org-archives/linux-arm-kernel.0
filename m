@@ -1,72 +1,42 @@
-From: dcbw@redhat.com (Dan Williams)
-Date: Wed, 21 Oct 2009 13:15:19 -0700
-Subject: MXC MMC driver and SDIO peripherals
-In-Reply-To: <20091021192038.GK14091@buzzloop.caiaq.de>
-References: <20091021192038.GK14091@buzzloop.caiaq.de>
-Message-ID: <1256156119.8469.40.camel@localhost.localdomain>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 22 Oct 2009 04:20:34 +0800
+Subject: spitz backlight: fix brightness limiting
+In-Reply-To: <20091019213751.GC1482@ucw.cz>
+References: <20091019213751.GC1482@ucw.cz>
+Message-ID: <f17812d70910211320s29d3aaa5tad3206df1e99e03b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2009-10-21 at 21:20 +0200, Daniel Mack wrote:
-> Hi,
-> 
-> we're having trouble getting SDIO connected harware to fly on MX31 based
-> designs. In particular, a SD8686 chip supported by the libertas_sdio
-> driver will hang forever when built without CONFIG_MMC_DEBUG=y. With
-> that option selected, however, the behaviour is a little different, and
-> I can at least see the following messages on a recent 2.6.32-rc5 based
-> MX31 tree.
-> 
-> Is there any common pitfall for such setups? I did more or less the same
-> thing on PXAs (same WLAN chip, same kind of interface, same firmware),
-> and haven't seen any such effects, so I suspect the MXC specific parts
-> to be the reason for that. Any ideas?
+It's a little bit weird it's called 'limit_mask' when I first converted it
+to a spi driver. There must be some reasons, Richard, you've got
+any ideas?
 
-Any idea what quirks your SDHC is using if any?  Does it require PIO or
-can it do DMA?  Does it have any transfer restrictions on block size or
-bit-width?  What is the debug output of the MMC stack when loading the
-module for your SDHC?
-
-Dan
-
-> Thanks,
-> Daniel
-> 
-> 
-> [    1.450000] mmc0: new SDIO card at address 0001
-> ...
-> # modprobe libertas_sdio
-> [   15.180000] libertas_sdio: Libertas SDIO driver
-> [   15.180000] libertas_sdio: Copyright Pierre Ossman
-> [   15.190000] libertas_sdio mmc0:0001:1: firmware: requesting sd8686_helper.bin
-> [   15.320000] libertas_sdio mmc0:0001:1: firmware: requesting sd8686.bin
-> [   15.840000] libertas: 00:19:88:03:13:5a, fw 8.73.7p3, cap 0x00000393
-> [   16.870000] libertas: problem fetching packet from firmware
-> [   18.840000] libertas: command 0x001e timed out
-> [   18.840000] libertas: requeueing command 0x001e due to timeout (#1)
-> [   18.870000] libertas: Received result 0 to command 1e after 1 retries
-> [   18.910000] libertas: wlan0: Marvell WLAN 802.11 adapter
-> 
-> # ifconfig wlan0 up
-> [  216.760000] ADDRCONF(NETDEV_UP): wlan0: link is not ready
-> [  217.800000] libertas: problem fetching packet from firmware
-> [  219.770000] libertas: command 0x0010 timed out
-> [  219.770000] libertas: requeueing command 0x0010 due to timeout (#1)
-> [  219.800000] libertas: Received result 0 to command 10 after 1 retries
-> 
-> # iwlist wlan0 scan
-> [  244.260000] libertas: problem fetching packet from firmware
-> [  247.800000] libertas: command 0x0006 timed out
-> [  247.800000] libertas: requeueing command 0x0006 due to timeout (#1)
-> [  248.260000] libertas: Received result 0 to command 6 after 1 retries
-> [  249.920000] libertas: problem fetching packet from firmware
-> [  253.560000] libertas: command 0x0006 timed out
-> [  253.560000] libertas: requeueing command 0x0006 due to timeout (#1)
-> [  254.920000] libertas: problem fetching packet from firmware
-> wlan0     Failed to read scan data : Resource temporarily unavailable
-> 
-> 
-> _______________________________________________
-> libertas-dev mailing list
-> libertas-dev at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/libertas-dev
+On Tue, Oct 20, 2009 at 5:37 AM, Pavel Machek <pavel@ucw.cz> wrote:
+>
+> On spitz (& similar) machines, if battery is running low, backlight
+> needs to be limited to lower step. Unfortunately, current code uses &=
+> for limiting, turning backlight off completely for some backlight
+> settings. Fix that.
+>
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+>
+> --- linux-rc/drivers/video/backlight/corgi_lcd.c ? ? ? ?2009-10-18 18:11:36.000000000 +0200
+> +++ linux-rc/drivers/video/backlight/corgi_lcd.c ? ? ? ?2009-10-16 02:10:13.000000000 +0200
+> @@ -433,8 +434,9 @@
+>
+> ? ? ? ?if (corgibl_flags & CORGIBL_SUSPENDED)
+> ? ? ? ? ? ? ? ?intensity = 0;
+> - ? ? ? if (corgibl_flags & CORGIBL_BATTLOW)
+> - ? ? ? ? ? ? ? intensity &= lcd->limit_mask;
+> +
+> + ? ? ? if ((corgibl_flags & CORGIBL_BATTLOW) && intensity > lcd->limit_mask)
+> + ? ? ? ? ? ? ? intensity = lcd->limit_mask;
+>
+> ? ? ? ?return corgi_bl_set_intensity(lcd, intensity);
+> ?}
+>
+>
+> --
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+>
