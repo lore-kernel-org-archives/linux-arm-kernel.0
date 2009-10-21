@@ -1,56 +1,19 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 21 Oct 2009 21:20:38 +0200
-Subject: MXC MMC driver and SDIO peripherals
-Message-ID: <20091021192038.GK14091@buzzloop.caiaq.de>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 21 Oct 2009 21:20:47 +0200
+Subject: Dream patches for 2.6.31/32-pre?
+Message-ID: <20091021192046.GA19321@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi!
 
-we're having trouble getting SDIO connected harware to fly on MX31 based
-designs. In particular, a SD8686 chip supported by the libertas_sdio
-driver will hang forever when built without CONFIG_MMC_DEBUG=y. With
-that option selected, however, the behaviour is a little different, and
-I can at least see the following messages on a recent 2.6.32-rc5 based
-MX31 tree.
+Did forward porting HTC Dream patches progress somehow? I'd like to
+boot 2.6.32-rc, or at least 2.6.31 on the device.
 
-Is there any common pitfall for such setups? I did more or less the same
-thing on PXAs (same WLAN chip, same kind of interface, same firmware),
-and haven't seen any such effects, so I suspect the MXC specific parts
-to be the reason for that. Any ideas?
+(And yes, I should fix the includes in staging tree. I'll look at
+that.)
 
-Thanks,
-Daniel
-
-
-[    1.450000] mmc0: new SDIO card at address 0001
-...
-# modprobe libertas_sdio
-[   15.180000] libertas_sdio: Libertas SDIO driver
-[   15.180000] libertas_sdio: Copyright Pierre Ossman
-[   15.190000] libertas_sdio mmc0:0001:1: firmware: requesting sd8686_helper.bin
-[   15.320000] libertas_sdio mmc0:0001:1: firmware: requesting sd8686.bin
-[   15.840000] libertas: 00:19:88:03:13:5a, fw 8.73.7p3, cap 0x00000393
-[   16.870000] libertas: problem fetching packet from firmware
-[   18.840000] libertas: command 0x001e timed out
-[   18.840000] libertas: requeueing command 0x001e due to timeout (#1)
-[   18.870000] libertas: Received result 0 to command 1e after 1 retries
-[   18.910000] libertas: wlan0: Marvell WLAN 802.11 adapter
-
-# ifconfig wlan0 up
-[  216.760000] ADDRCONF(NETDEV_UP): wlan0: link is not ready
-[  217.800000] libertas: problem fetching packet from firmware
-[  219.770000] libertas: command 0x0010 timed out
-[  219.770000] libertas: requeueing command 0x0010 due to timeout (#1)
-[  219.800000] libertas: Received result 0 to command 10 after 1 retries
-
-# iwlist wlan0 scan
-[  244.260000] libertas: problem fetching packet from firmware
-[  247.800000] libertas: command 0x0006 timed out
-[  247.800000] libertas: requeueing command 0x0006 due to timeout (#1)
-[  248.260000] libertas: Received result 0 to command 6 after 1 retries
-[  249.920000] libertas: problem fetching packet from firmware
-[  253.560000] libertas: command 0x0006 timed out
-[  253.560000] libertas: requeueing command 0x0006 due to timeout (#1)
-[  254.920000] libertas: problem fetching packet from firmware
-wlan0     Failed to read scan data : Resource temporarily unavailable
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
