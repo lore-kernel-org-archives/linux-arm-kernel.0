@@ -1,53 +1,17 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 21 Oct 2009 20:29:43 +0200
-Subject: [PATCH] ARM: NX3: do not reference mxc_iomux_v3_init() for
-	!CONFIG_ARCH_MX35
-Message-ID: <1256149783-16789-1-git-send-email-daniel@caiaq.de>
+From: jdk@ti.com (Kridner, Jason)
+Date: Wed, 21 Oct 2009 13:34:12 -0500
+Subject: Sitara ARM processor family announcement (v3)
+Message-ID: <8F7AF80515AF0D4D93307E594F3CB40E4028F8AD@dlee03.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent kernels for mx31 fail to link due to an undefined reference to
-mxc_iomux_v3_init().
+I believe many of you have likely seen the new Sitara ARM product family announcement[1] as part of broadening our ARM product portfolio[2].  This family draws processing cores from the DaVinci family of DSP/multimedia devices and OMAP family of low-power devices and focuses on markets like industrial automation, point-of-sale, medical instrumentation, digital signage, portable data terminals, test & measurement, and single board computers.
 
-Signed-off-by: Daniel Mack <daniel@caiaq.de>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-mx3/mm.c |   12 +++++++-----
- 1 files changed, 7 insertions(+), 5 deletions(-)
+The important thing is where will the community collaborate on the Linux kernel for these new devices!  To help decode the broad number of part numbers and brands, I'm creating a wiki table that shows where TI will be submitting our patches to handle the new devices and as a place holder for frequently asked questions[3].
 
-diff --git a/arch/arm/mach-mx3/mm.c b/arch/arm/mach-mx3/mm.c
-index ad5a112..c8acd60 100644
---- a/arch/arm/mach-mx3/mm.c
-+++ b/arch/arm/mach-mx3/mm.c
-@@ -81,6 +81,12 @@ void __init mx31_map_io(void)
- 	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
- }
- 
-+void __init mx31_init_irq(void)
-+{
-+	mxc_init_irq(IO_ADDRESS(AVIC_BASE_ADDR));
-+}
-+
-+#ifdef CONFIG_ARCH_MX35
- void __init mx35_map_io(void)
- {
- 	mxc_set_cpu_type(MXC_CPU_MX35);
-@@ -90,15 +96,11 @@ void __init mx35_map_io(void)
- 	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
- }
- 
--void __init mx31_init_irq(void)
--{
--	mxc_init_irq(IO_ADDRESS(AVIC_BASE_ADDR));
--}
--
- void __init mx35_init_irq(void)
- {
- 	mx31_init_irq();
- }
-+#endif
- 
- #ifdef CONFIG_CACHE_L2X0
- static int mxc_init_l2x0(void)
--- 
-1.6.5
+Regards,
+Jason Kridner
+
+[1] http://www.ti.com/sitara 
+[2] http://www.ti.com/arm 
+[3] http://tiexpressdsp.com/index.php?title=Applications_Processors_Crossreference 
