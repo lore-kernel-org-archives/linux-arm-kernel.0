@@ -1,42 +1,37 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 21 Oct 2009 17:26:53 +0200
-Subject: [PATCH] at91: at91sam9g20ek modify dual slot evaluation kit
-In-Reply-To: <1256049173-17373-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1256049173-17373-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20091021152653.GF19714@game.jcrosoft.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 21 Oct 2009 18:05:31 +0100
+Subject: [PATCH 2.6.32 2/2] S3C64XX: Fix S3C64XX_CLKDIV0_ARM_MASK value
+In-Reply-To: <1256144731-27221-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1256144731-27221-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1256144731-27221-2-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +	  that embeds only one SD/MMC slot.
-> +
-> +config MACH_AT91SAM9G20EK_2MMC
-> +	bool "Atmel AT91SAM9G20-EK Evaluation Kit with 2 SD/MMC Slots"
-> +	depends on ARCH_AT91SAM9G20
-> +	help
-> +	  Select this if you are using an Atmel AT91SAM9G20-EK Evaluation Kit
-> +	  with 2 SD/MMC Slots. This is the case for AT91SAM9G20-EK rev. C and
-> +	  onwards.
->  
->  config MACH_CPU9G20
->  	bool "Eukrea CPU9G20 board"
-> @@ -392,7 +394,7 @@ config MTD_AT91_DATAFLASH_CARD
->  
->  config MTD_NAND_ATMEL_BUSWIDTH_16
->  	bool "Enable 16-bit data bus interface to NAND flash"
-> -	depends on (MACH_AT91SAM9260EK || MACH_AT91SAM9261EK || MACH_AT91SAM9G10EK || MACH_AT91SAM9263EK || MACH_AT91SAM9G20EK || MACH_AT91SAM9G45EKES || MACH_AT91CAP9ADK)
-> +	depends on (MACH_AT91SAM9260EK || MACH_AT91SAM9261EK || MACH_AT91SAM9G10EK || MACH_AT91SAM9263EK || MACH_AT91SAM9G20EK || MACH_AT91SAM9G20EK_2MMC || MACH_AT91SAM9G45EKES || MACH_AT91CAP9ADK)
-it's time to replace this by select it at machine config state
+From: Kukjin Kim <kgene.kim@samsung.com>
 
-> @@ -254,7 +257,11 @@ static void __init ek_board_init(void)
->  	/* Ethernet */
->  	at91_add_device_eth(&ek_macb_data);
->  	/* MMC */
-> +#if defined(CONFIG_MMC_ATMELMCI) || defined(CONFIG_MMC_ATMELMCI_MODULE)
->  	at91_add_device_mci(0, &ek_mmc_data);
-> +#else
-> +	at91_add_device_mmc(0, &ek_mmc_data);
-> +#endif
-do we really need to do this choice at board level?
+The value of S3C64XX_CLKDIV0_ARM_MASK is wrong. This patch fixes
+this values, S3C6400_CLKDIV0_ARM_MASK and S3C6410_CLKDIV0_ARM_MASK.
 
-Best Regards,
-J.
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/plat-s3c64xx/include/plat/regs-clock.h |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/plat-s3c64xx/include/plat/regs-clock.h b/arch/arm/plat-s3c64xx/include/plat/regs-clock.h
+index a8777a7..ff46e7f 100644
+--- a/arch/arm/plat-s3c64xx/include/plat/regs-clock.h
++++ b/arch/arm/plat-s3c64xx/include/plat/regs-clock.h
+@@ -51,8 +51,8 @@
+ #define S3C6400_CLKDIV0_HCLK_SHIFT	(8)
+ #define S3C6400_CLKDIV0_MPLL_MASK	(0x1 << 4)
+ #define S3C6400_CLKDIV0_MPLL_SHIFT	(4)
+-#define S3C6400_CLKDIV0_ARM_MASK	(0x3 << 0)
+-#define S3C6410_CLKDIV0_ARM_MASK	(0x7 << 0)
++#define S3C6400_CLKDIV0_ARM_MASK	(0x7 << 0)
++#define S3C6410_CLKDIV0_ARM_MASK	(0xf << 0)
+ #define S3C6400_CLKDIV0_ARM_SHIFT	(0)
+ 
+ /* CLKDIV1 */
+-- 
+1.6.5
