@@ -1,52 +1,54 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 22 Oct 2009 02:05:53 +0530
-Subject: coherent memory should be ARMv6's Device Memory?
-In-Reply-To: <ede8cc2f231dda80cc85839cb94ec565.squirrel@www.codeaurora.org>
-References: <ede8cc2f231dda80cc85839cb94ec565.squirrel@www.codeaurora.org>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02BB47FD79@dbde02.ent.ti.com>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Wed, 21 Oct 2009 22:51:56 +0200
+Subject: MXC MMC driver and SDIO peripherals
+In-Reply-To: <1256156119.8469.40.camel@localhost.localdomain>
+References: <20091021192038.GK14091@buzzloop.caiaq.de>
+	<1256156119.8469.40.camel@localhost.localdomain>
+Message-ID: <20091021205156.GO14091@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Dan,
 
-
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
-> arm-kernel-bounces at lists.infradead.org] On Behalf Of
-> adharmap at codeaurora.org
-> Sent: Thursday, October 22, 2009 1:20 AM
-> To: linux-arm-kernel at lists.infradead.org
-> Subject: coherent memory should be ARMv6's Device Memory?
+On Wed, Oct 21, 2009 at 01:15:19PM -0700, Dan Williams wrote:
+> On Wed, 2009-10-21 at 21:20 +0200, Daniel Mack wrote:
+> > Hi,
+> > 
+> > we're having trouble getting SDIO connected harware to fly on MX31 based
+> > designs. In particular, a SD8686 chip supported by the libertas_sdio
+> > driver will hang forever when built without CONFIG_MMC_DEBUG=y. With
+> > that option selected, however, the behaviour is a little different, and
+> > I can at least see the following messages on a recent 2.6.32-rc5 based
+> > MX31 tree.
+> > 
+> > Is there any common pitfall for such setups? I did more or less the same
+> > thing on PXAs (same WLAN chip, same kind of interface, same firmware),
+> > and haven't seen any such effects, so I suspect the MXC specific parts
+> > to be the reason for that. Any ideas?
 > 
-> The current implementation of __dma_alloc  on ARMv7 based cpu
-> returns
-> Strongly Ordered Memory. On my uniprocessor  hardware the strongly
-> ordered
-> memory causes the reads after a DMA_FROM_DEVICE transfer to be slow.
-> I
-> think __dma_alloc returns StronglyOrdered memory on all v6 and v7
-> variants
-> where arch_is_coherent is false.
-> 
-> In my opinion, coherent memory should be changed from Strongly
-> Ordered
-> Memory to device memory for the following reasons
-> 1. Device and Strongly Ordered are both non-cacheable and hence
-> shareable
-> and coherent.
-> 2. There are no speculative fetches from Device and StronglyOrdered
-> 3. The Program order is guaranteed for access to Device and Strongly
-> Order
-> memory
-> 4. Device accesses don't insert a "dmb" after each accesses and
-> hence are
-> faster
-> 
-> I am thinking of changing the pgprot_uncached to pgprot_device  in
-> dma_alloc_coherent in dma-mapping.c.
+> Any idea what quirks your SDHC is using if any?  Does it require PIO or
+> can it do DMA? 
 
-Just think about the DMA usage where DMA don't see the same copy in the memory because some data is still there in the Write buffer. This means which such a memory you always need to have DWB / DSB to ensure that your DMA sees correct copy. Effectively you are taking away the buffering advantage because DMA needs it that way.
+In mainline kernels, DMA is limited to the MX2 SoC family. The MX3 that
+I'm using is excluded from that feature, but I'mm not aware of the
+reason for that.
 
-In case your CPU is also operating this memory which might be slower then you can use DMA streaming API's.
+> Does it have any transfer restrictions on block size or
+> bit-width? 
 
-Regards,
-Santosh
+I didn't really debug it yet, but from what I see in the sources, the
+maximum block size is 2048. The hardware is connected via the 4-wire
+interface (+clk, +cmd). The system I tried that on has a MMC slot where
+I can plug in either the WLAN eval kit or a memory card, and the latter
+works just fine, which tells me that at least the pin config and the
+hardware can't be entirely wrong.
+
+> What is the debug output of the MMC stack when loading the
+> module for your SDHC?
+
+Exactly one line ;)
+
+[    1.340000] i.MX SDHC driver
+
+
+Daniel
