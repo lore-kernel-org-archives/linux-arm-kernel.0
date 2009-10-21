@@ -1,59 +1,24 @@
-From: yuan-bo.ye@motorola.com (Janboe Ye)
-Date: Wed, 21 Oct 2009 19:07:57 +0800
-Subject: [PATCH] check put_user fail in do_signal when enable OABI_COMPACT
-Message-ID: <1256123277.3851.36.camel@debian-nb>
+From: roel.kluin@gmail.com (Roel Kluin)
+Date: Wed, 21 Oct 2009 13:25:50 +0200
+Subject: [PATCH] pxa: Add missing underscores in define
+Message-ID: <4ADEEFBE.2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using OABI, do_signal need to copy restart_syscall to user stack.
-It is possible that put_user fail. This triggers flush_icache page
-fault and crash kernel.
+Underscores were missing.
 
-Signed-off-by: janboe <janboe.ye@gmail.com>
+Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
 ---
- arch/arm/kernel/signal.c |   21 +++++++++++++--------
- 1 files changed, 13 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-index f6bc5d4..2122d43 100644
---- a/arch/arm/kernel/signal.c
-+++ b/arch/arm/kernel/signal.c
-@@ -626,6 +626,7 @@ static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
- 	struct k_sigaction ka;
- 	siginfo_t info;
- 	int signr;
-+	int ret = 0;
+diff --git a/arch/arm/mach-mmp/include/mach/mfp-pxa910.h b/arch/arm/mach-mmp/include/mach/mfp-pxa910.h
+index bf1189f..7e8a80f 100644
+--- a/arch/arm/mach-mmp/include/mach/mfp-pxa910.h
++++ b/arch/arm/mach-mmp/include/mach/mfp-pxa910.h
+@@ -160,7 +160,7 @@
+ #define MMC1_WP_MMC1_WP		MFP_CFG_DRV(MMC1_WP, AF0, MEDIUM)
  
- 	/*
- 	 * We want the common case to go fast, which
-@@ -679,16 +680,20 @@ static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
- 				 */
- 				swival = swival - __NR_SYSCALL_BASE + __NR_OABI_SYSCALL_BASE;
- 
--				put_user(regs->ARM_pc, &usp[0]);
-+				ret |= put_user(regs->ARM_pc, &usp[0]);
- 				/* swi __NR_restart_syscall */
--				put_user(0xef000000 | swival, &usp[1]);
-+				ret |= put_user(0xef000000 | swival, &usp[1]);
- 				/* ldr	pc, [sp], #12 */
--				put_user(0xe49df00c, &usp[2]);
--
--				flush_icache_range((unsigned long)usp,
--						   (unsigned long)(usp + 3));
--
--				regs->ARM_pc = regs->ARM_sp + 4;
-+				ret |= put_user(0xe49df00c, &usp[2]);
-+				if (!ret) {
-+					flush_icache_range((unsigned long)usp,
-+						(unsigned long)(usp + 3));
-+
-+					regs->ARM_pc = regs->ARM_sp + 4;
-+				} else {
-+					regs->ARM_sp += 12;
-+					force_sigsegv(0, current);
-+				}
- #endif
- 			}
- 		}
--- 
-1.6.3.3
+ /* PWM */
+-#define GPIO27 PWM3 AF2		MFP_CFG(GPIO27, AF2)
++#define GPIO27_PWM3_AF2		MFP_CFG(GPIO27, AF2)
+ #define GPIO51_PWM2_OUT		MFP_CFG(GPIO51, AF2)
+ #define GPIO117_PWM1_OUT	MFP_CFG(GPIO117, AF2)
+ #define GPIO118_PWM2_OUT	MFP_CFG(GPIO118, AF2)
