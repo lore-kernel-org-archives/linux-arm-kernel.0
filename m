@@ -1,38 +1,56 @@
-From: benoit.fouet@free.fr (Benoit Fouet)
-Date: Wed, 21 Oct 2009 09:04:38 +0200
-Subject: [PATCH] Use CONFIG_VECTORS_BASE instead of hardcoded 0xffff0000.
-In-Reply-To: <20091020201009.GA14305@n2100.arm.linux.org.uk>
-References: <1256054856-20404-1-git-send-email-benoit.fouet@free.fr>
-	<63386a3d0910201251n4e6fec18le5a2d2cd0941be78@mail.gmail.com>
-	<20091020201009.GA14305@n2100.arm.linux.org.uk>
-Message-ID: <20091021090438.0ec458dd.benoit.fouet@free.fr>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed, 21 Oct 2009 09:46:59 +0200
+Subject: [PATCH RESEND#2] mmc: at91_mci: Don't include asm/mach/mmc.h
+In-Reply-To: <4ADDF2E7.4010200@billgatliff.com>
+References: <4ADDF2E7.4010200@billgatliff.com>
+Message-ID: <1256111219-25266-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+This fixes a compile bug introduced in
 
-On Tue, 20 Oct 2009 21:10:09 +0100 Russell King - ARM Linux wrote:
-> On Tue, Oct 20, 2009 at 09:51:35PM +0200, Linus Walleij wrote:
-> > I think we'd rather get rid of CONFIG_VECTORS_BASE
-> > with that hex value, this config value could for example
-> > be CONFIG_VECTORS_LOW | CONFIG_VECTORS_HIGH, mutually
-> > exclusive instead, and then _LOW will basically never be used
-> > and things become simpler, I think having a hex value for
-> > CONFIG_VECTORS_BASE is actually confusing since that
-> > may give people the (false) idea that this can be set to anything.
-> 
-> In the MMU case, there are only two possible addresses for the vectors -
-> 0x00000000 or 0xffff0000.  Which is in play is entirely dependent on the
-> state of the V bit in the control register.
-> 
+	6ef297f (ARM: 5720/1: Move MMCI header to amba include dir)
 
-Reading the DDI0344D (Cortex A8 r2p1 trm), it seemed to me that this
-was configurable with the security extension:
-http://infocentre.arm.com/help/topic/com.arm.doc.ddi0344d/Babfbcae.html
+That commit moved arch/arm/include/asm/mach/mmc.h to
+include/linux/amba/mmci.h.  Just removing the include was enough.
 
-although my patch was very likely the wrong approach (changing
-VECTORS_BASE does not really make sense, as this is the one that can
-not be remapped), there are still processors in the wild in which you
-can configure the base address of the exception vectors.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Bill Gatliff <bgat@billgatliff.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Pierre Ossman <drzeus@drzeus.cx>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Linus Torvalds <torvalds@linux-foundation.org>
+---
+Hello,
 
-Ben
+this patch is a build fix that seems to bite quite some people, but
+nobody has picked it up until now.
+
+Linus Walleij suggested to send it to Russell's patch tracker, but I
+don't think this is the right way for that patch.  It should either go
+via Pierre or (IMO preferably) via Andrew.
+
+Best regards
+Uwe
+
+ drivers/mmc/host/at91_mci.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/mmc/host/at91_mci.c b/drivers/mmc/host/at91_mci.c
+index e556d42..63924e0 100644
+--- a/drivers/mmc/host/at91_mci.c
++++ b/drivers/mmc/host/at91_mci.c
+@@ -72,7 +72,6 @@
+ #include <asm/irq.h>
+ #include <asm/gpio.h>
+ 
+-#include <asm/mach/mmc.h>
+ #include <mach/board.h>
+ #include <mach/cpu.h>
+ #include <mach/at91_mci.h>
+-- 
+1.6.5
