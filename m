@@ -1,33 +1,59 @@
-From: yegor_sub1@visionsystems.de (Yegor Yefremov)
-Date: Wed, 21 Oct 2009 12:43:58 +0200
-Subject: [at91sam9g45] fail to start second kernel via kexec if watchdog is
-	enabled
-Message-ID: <4ADEE5EE.8020205@visionsystems.de>
+From: yuan-bo.ye@motorola.com (Janboe Ye)
+Date: Wed, 21 Oct 2009 19:07:57 +0800
+Subject: [PATCH] check put_user fail in do_signal when enable OABI_COMPACT
+Message-ID: <1256123277.3851.36.camel@debian-nb>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Using OABI, do_signal need to copy restart_syscall to user stack.
+It is possible that put_user fail. This triggers flush_icache page
+fault and crash kernel.
 
-I have problem booting the second kernel after enabling the watchdog following these steps: http://www.at91.com/index.php?option=com_jfusion&Itemid=57&jfile=viewtopic.php&f=12&t=5551&p=29283&hilit=watchdog+bootstrap#p29283
-Bootstrap: don't touch watchdog
-U-Boot: configure watchdog and set the timer counter value to 16 seconds
-Linux: keep pinging the watchdog
+Signed-off-by: janboe <janboe.ye@gmail.com>
+---
+ arch/arm/kernel/signal.c |   21 +++++++++++++--------
+ 1 files changed, 13 insertions(+), 8 deletions(-)
 
-The first kernel (booted from u-boot) is working as expected, but if I start the new one using kexec it gets only till frame buffer init:
-
-....
-NetWinder Floating Point Emulator V0.97 (double precision)
-Slow work thread pool: Starting up
-Slow work thread pool: Ready
-JFFS2 version 2.2. (NAND) -? 2001-2006 Red Hat, Inc.
-msgmni has been set to 245
-io scheduler noop registered
-io scheduler anticipatory registered (default)
-atmel_lcdfb atmel_lcdfb.0: backlight control is not available
-atmel_lcdfb atmel_lcdfb.0: 510KiB frame buffer at 77980000 (mapped at ffa00000)
-Start AT91Bootstrap...
-
-Without watchdog there is no problem. Both kernels (2.6.32-rc5) are the same. Any idea?
-
-Best regards,
-Yegor
+diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+index f6bc5d4..2122d43 100644
+--- a/arch/arm/kernel/signal.c
++++ b/arch/arm/kernel/signal.c
+@@ -626,6 +626,7 @@ static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
+ 	struct k_sigaction ka;
+ 	siginfo_t info;
+ 	int signr;
++	int ret = 0;
+ 
+ 	/*
+ 	 * We want the common case to go fast, which
+@@ -679,16 +680,20 @@ static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
+ 				 */
+ 				swival = swival - __NR_SYSCALL_BASE + __NR_OABI_SYSCALL_BASE;
+ 
+-				put_user(regs->ARM_pc, &usp[0]);
++				ret |= put_user(regs->ARM_pc, &usp[0]);
+ 				/* swi __NR_restart_syscall */
+-				put_user(0xef000000 | swival, &usp[1]);
++				ret |= put_user(0xef000000 | swival, &usp[1]);
+ 				/* ldr	pc, [sp], #12 */
+-				put_user(0xe49df00c, &usp[2]);
+-
+-				flush_icache_range((unsigned long)usp,
+-						   (unsigned long)(usp + 3));
+-
+-				regs->ARM_pc = regs->ARM_sp + 4;
++				ret |= put_user(0xe49df00c, &usp[2]);
++				if (!ret) {
++					flush_icache_range((unsigned long)usp,
++						(unsigned long)(usp + 3));
++
++					regs->ARM_pc = regs->ARM_sp + 4;
++				} else {
++					regs->ARM_sp += 12;
++					force_sigsegv(0, current);
++				}
+ #endif
+ 			}
+ 		}
+-- 
+1.6.3.3
