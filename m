@@ -1,27 +1,72 @@
-From: adharmap@codeaurora.org (adharmap at codeaurora.org)
-Date: Wed, 21 Oct 2009 12:50:08 -0700 (PDT)
-Subject: coherent memory should be ARMv6's Device Memory?
-Message-ID: <ede8cc2f231dda80cc85839cb94ec565.squirrel@www.codeaurora.org>
+From: dcbw@redhat.com (Dan Williams)
+Date: Wed, 21 Oct 2009 13:15:19 -0700
+Subject: MXC MMC driver and SDIO peripherals
+In-Reply-To: <20091021192038.GK14091@buzzloop.caiaq.de>
+References: <20091021192038.GK14091@buzzloop.caiaq.de>
+Message-ID: <1256156119.8469.40.camel@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current implementation of __dma_alloc  on ARMv7 based cpu returns
-Strongly Ordered Memory. On my uniprocessor  hardware the strongly ordered
-memory causes the reads after a DMA_FROM_DEVICE transfer to be slow. I
-think __dma_alloc returns StronglyOrdered memory on all v6 and v7 variants
-where arch_is_coherent is false.
+On Wed, 2009-10-21 at 21:20 +0200, Daniel Mack wrote:
+> Hi,
+> 
+> we're having trouble getting SDIO connected harware to fly on MX31 based
+> designs. In particular, a SD8686 chip supported by the libertas_sdio
+> driver will hang forever when built without CONFIG_MMC_DEBUG=y. With
+> that option selected, however, the behaviour is a little different, and
+> I can at least see the following messages on a recent 2.6.32-rc5 based
+> MX31 tree.
+> 
+> Is there any common pitfall for such setups? I did more or less the same
+> thing on PXAs (same WLAN chip, same kind of interface, same firmware),
+> and haven't seen any such effects, so I suspect the MXC specific parts
+> to be the reason for that. Any ideas?
 
-In my opinion, coherent memory should be changed from Strongly Ordered
-Memory to device memory for the following reasons
-1. Device and Strongly Ordered are both non-cacheable and hence shareable
-and coherent.
-2. There are no speculative fetches from Device and StronglyOrdered
-3. The Program order is guaranteed for access to Device and Strongly Order
-memory
-4. Device accesses don?t insert a "dmb" after each accesses and hence are
-faster
+Any idea what quirks your SDHC is using if any?  Does it require PIO or
+can it do DMA?  Does it have any transfer restrictions on block size or
+bit-width?  What is the debug output of the MMC stack when loading the
+module for your SDHC?
 
-I am thinking of changing the pgprot_uncached to pgprot_device  in
-dma_alloc_coherent in dma-mapping.c.
+Dan
 
-Abhijeet
+> Thanks,
+> Daniel
+> 
+> 
+> [    1.450000] mmc0: new SDIO card at address 0001
+> ...
+> # modprobe libertas_sdio
+> [   15.180000] libertas_sdio: Libertas SDIO driver
+> [   15.180000] libertas_sdio: Copyright Pierre Ossman
+> [   15.190000] libertas_sdio mmc0:0001:1: firmware: requesting sd8686_helper.bin
+> [   15.320000] libertas_sdio mmc0:0001:1: firmware: requesting sd8686.bin
+> [   15.840000] libertas: 00:19:88:03:13:5a, fw 8.73.7p3, cap 0x00000393
+> [   16.870000] libertas: problem fetching packet from firmware
+> [   18.840000] libertas: command 0x001e timed out
+> [   18.840000] libertas: requeueing command 0x001e due to timeout (#1)
+> [   18.870000] libertas: Received result 0 to command 1e after 1 retries
+> [   18.910000] libertas: wlan0: Marvell WLAN 802.11 adapter
+> 
+> # ifconfig wlan0 up
+> [  216.760000] ADDRCONF(NETDEV_UP): wlan0: link is not ready
+> [  217.800000] libertas: problem fetching packet from firmware
+> [  219.770000] libertas: command 0x0010 timed out
+> [  219.770000] libertas: requeueing command 0x0010 due to timeout (#1)
+> [  219.800000] libertas: Received result 0 to command 10 after 1 retries
+> 
+> # iwlist wlan0 scan
+> [  244.260000] libertas: problem fetching packet from firmware
+> [  247.800000] libertas: command 0x0006 timed out
+> [  247.800000] libertas: requeueing command 0x0006 due to timeout (#1)
+> [  248.260000] libertas: Received result 0 to command 6 after 1 retries
+> [  249.920000] libertas: problem fetching packet from firmware
+> [  253.560000] libertas: command 0x0006 timed out
+> [  253.560000] libertas: requeueing command 0x0006 due to timeout (#1)
+> [  254.920000] libertas: problem fetching packet from firmware
+> wlan0     Failed to read scan data : Resource temporarily unavailable
+> 
+> 
+> _______________________________________________
+> libertas-dev mailing list
+> libertas-dev at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/libertas-dev
