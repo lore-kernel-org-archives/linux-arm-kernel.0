@@ -1,53 +1,36 @@
 From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Wed, 21 Oct 2009 13:55:47 +1300
-Subject: [PATCH] ep93xx: add errata info about pwm outputs
-In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901DB8080@mi8nycmail19.Mi8.com>
-References: <BD79186B4FD85F4B8E60E381CAEE190901DB8080@mi8nycmail19.Mi8.com>
-Message-ID: <4ADE5C13.6000502@bluewatersys.com>
+Date: Wed, 21 Oct 2009 13:58:45 +1300
+Subject: [PATCH] ep93xx: remove ep93xx_init_time() prototype
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901DB8075@mi8nycmail19.Mi8.com>
+References: <BD79186B4FD85F4B8E60E381CAEE190901DB8075@mi8nycmail19.Mi8.com>
+Message-ID: <4ADE5CC5.3070807@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 H Hartley Sweeten wrote:
-> The EP93xx User's guide has an error about the number of pwm
-> channels available in the various chips.  Add comments about
-> this in the driver since the guide will probably never get
-> updated.
-> 
->   EP9301/02 only have pwm.1, pin PMWOUT is not on the chip
->   EP9307 only has pwm.0, pin PWMOUT1 (EGPIO14) is not on the chip
->   EP9312/15 have both pwm0 and pwm.1
+> Remove unused prototype for ep93xx_init_time().  This function
+> is not defined in the kernel.
 > 
 > Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 > Cc: Ryan Mallon <ryan@bluewatersys.com>
 > 
 > ---
 > 
-> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-> index f95dc16..f30be28 100644
-> --- a/arch/arm/mach-ep93xx/core.c
-> +++ b/arch/arm/mach-ep93xx/core.c
-> @@ -648,6 +648,7 @@ static struct platform_device ep93xx_pwm1_device = {
+> diff --git a/arch/arm/mach-ep93xx/include/mach/platform.h b/arch/arm/mach-ep93xx/include/mach/platform.h
+> index a3ec33f..469fd96 100644
+> --- a/arch/arm/mach-ep93xx/include/mach/platform.h
+> +++ b/arch/arm/mach-ep93xx/include/mach/platform.h
+> @@ -17,7 +17,6 @@ struct ep93xx_eth_data
 >  
->  void __init ep93xx_register_pwm(int pwm0, int pwm1)
->  {
-> +	/* NOTE: EP9301/02 do not have PWMOUT */
->  	if (pwm0)
->  		platform_device_register(&ep93xx_pwm0_device);
+>  void ep93xx_map_io(void);
+>  void ep93xx_init_irq(void);
+> -void ep93xx_init_time(unsigned long);
 >  
-> diff --git a/drivers/misc/ep93xx_pwm.c b/drivers/misc/ep93xx_pwm.c
-> index ba46941..de9f405 100644
-> --- a/drivers/misc/ep93xx_pwm.c
-> +++ b/drivers/misc/ep93xx_pwm.c
-> @@ -9,12 +9,18 @@
->   *	as published by the Free Software Foundation; either version
->   *	2 of the License, or (at your option) any later version.
->   *
-> - *  EP9307 has only one channel:
-> - *    - PWMOUT
-> + * The EP93xx User's Guide has an error about the number of pwm channels
-> + * available in the various chips.
+>  /* EP93xx System Controller software locked register write */
+>  void ep93xx_syscon_swlocked_write(unsigned int val, void __iomem *reg); 
+> 
 
-Is there an official errata for this that we can link to?
+Acked-by: Ryan Mallon <ryan@bluewatersys.com>
 
 ~Ryan
 
