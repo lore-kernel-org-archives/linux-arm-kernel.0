@@ -1,47 +1,168 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 21 Oct 2009 15:56:53 +0200
-Subject: [PATCH] serial/atmel_serial: Fix another fallout of the change
-	to BUILD_BUG_ON
-In-Reply-To: <20091021122709.GA332@n2100.arm.linux.org.uk>
-References: <1255417680-25609-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20091013092644.72c78334@hskinnemoen-d830>
-	<20091013082447.GA3194@pengutronix.de>
-	<20091021122709.GA332@n2100.arm.linux.org.uk>
-Message-ID: <20091021135653.GA2064@pengutronix.de>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Wed, 21 Oct 2009 22:11:31 +0800
+Subject: [PATCH V1 1/3] i2c: imx: check busy bit when START/STOP
+In-Reply-To: <1255772784-11387-1-git-send-email-linuxzsc@gmail.com>
+References: <1255772784-11387-1-git-send-email-linuxzsc@gmail.com>
+Message-ID: <4e090d470910210711m685fb17dt2b3346950eced99d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Sat, Oct 17, 2009 at 5:46 PM, Richard Zhao <linuxzsc@gmail.com> wrote:
+> The controller can't do anything else before it actually generates START/STOP.
+> So we check busy bit to make sure START/STOP is successfully finished.
+>
+> If we don't check busy bit, START/STOP may fail on some fast CPUs.
+>
+> Signed-off-by: Richard Zhao <linuxzsc@gmail.com>
+>
+> diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
+> index 4afba3e..6055e92 100644
+> --- a/drivers/i2c/busses/i2c-imx.c
+> +++ b/drivers/i2c/busses/i2c-imx.c
+> @@ -120,19 +120,25 @@ struct imx_i2c_struct {
+> ? ? ? ?wait_queue_head_t ? ? ? queue;
+> ? ? ? ?unsigned long ? ? ? ? ? i2csr;
+> ? ? ? ?unsigned int ? ? ? ? ? ?disable_delay;
+> + ? ? ? int ? ? ? ? ? ? ? ? ? ? stopped;
+> ?};
+>
+> ?/** Functions for IMX I2C adapter driver ***************************************
+> ?*******************************************************************************/
+>
+> -static int i2c_imx_bus_busy(struct imx_i2c_struct *i2c_imx)
+> +static int i2c_imx_bus_busy(struct imx_i2c_struct *i2c_imx, int for_busy)
+> ?{
+> ? ? ? ?unsigned long orig_jiffies = jiffies;
+> + ? ? ? unsigned int temp;
+>
+> ? ? ? ?dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
+>
+> - ? ? ? /* wait for bus not busy */
+> - ? ? ? while (readb(i2c_imx->base + IMX_I2C_I2SR) & I2SR_IBB) {
+> + ? ? ? while (1) {
+> + ? ? ? ? ? ? ? temp = readb(i2c_imx->base + IMX_I2C_I2SR);
+> + ? ? ? ? ? ? ? if (for_busy && (temp & I2SR_IBB))
+> + ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? ? ? ? ? if (!for_busy && !(temp & I2SR_IBB))
+> + ? ? ? ? ? ? ? ? ? ? ? break;
+> ? ? ? ? ? ? ? ?if (signal_pending(current)) {
+> ? ? ? ? ? ? ? ? ? ? ? ?dev_dbg(&i2c_imx->adapter.dev,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"<%s> I2C Interrupted\n", __func__);
+> @@ -179,39 +185,55 @@ static int i2c_imx_acked(struct imx_i2c_struct *i2c_imx)
+> ? ? ? ?return 0;
+> ?}
+>
+> -static void i2c_imx_start(struct imx_i2c_struct *i2c_imx)
+> +static int i2c_imx_start(struct imx_i2c_struct *i2c_imx)
+> ?{
+> ? ? ? ?unsigned int temp = 0;
+> + ? ? ? int result;
+>
+> ? ? ? ?dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
+>
+> ? ? ? ?/* Enable I2C controller */
+> + ? ? ? writeb(0, i2c_imx->base + IMX_I2C_I2SR);
+> ? ? ? ?writeb(I2CR_IEN, i2c_imx->base + IMX_I2C_I2CR);
+> +
+> + ? ? ? /* Wait controller to be stable */
+> + ? ? ? udelay(50);
+> +
+> ? ? ? ?/* Start I2C transaction */
+> ? ? ? ?temp = readb(i2c_imx->base + IMX_I2C_I2CR);
+> ? ? ? ?temp |= I2CR_MSTA;
+> ? ? ? ?writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
+> + ? ? ? result = i2c_imx_bus_busy(i2c_imx, 1);
+> + ? ? ? if (result)
+> + ? ? ? ? ? ? ? return result;
+> + ? ? ? i2c_imx->stopped = 0;
+> +
+> ? ? ? ?temp |= I2CR_IIEN | I2CR_MTX | I2CR_TXAK;
+> ? ? ? ?writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
+> + ? ? ? return result;
+> ?}
+>
+> ?static void i2c_imx_stop(struct imx_i2c_struct *i2c_imx)
+> ?{
+> ? ? ? ?unsigned int temp = 0;
+>
+> - ? ? ? /* Stop I2C transaction */
+> - ? ? ? dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
+> - ? ? ? temp = readb(i2c_imx->base + IMX_I2C_I2CR);
+> - ? ? ? temp &= ~I2CR_MSTA;
+> - ? ? ? writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
+> - ? ? ? /* setup chip registers to defaults */
+> - ? ? ? writeb(I2CR_IEN, i2c_imx->base + IMX_I2C_I2CR);
+> - ? ? ? writeb(0, i2c_imx->base + IMX_I2C_I2SR);
+> + ? ? ? if (!i2c_imx->stopped) {
+> + ? ? ? ? ? ? ? /* Stop I2C transaction */
+> + ? ? ? ? ? ? ? dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
+> + ? ? ? ? ? ? ? temp = readb(i2c_imx->base + IMX_I2C_I2CR);
+> + ? ? ? ? ? ? ? temp &= ~(I2CR_MSTA | I2CR_MTX);
+> + ? ? ? ? ? ? ? writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
+> + ? ? ? ? ? ? ? i2c_imx->stopped = 1;
+> + ? ? ? }
+> ? ? ? ?/*
+> ? ? ? ? * This delay caused by an i.MXL hardware bug.
+> ? ? ? ? * If no (or too short) delay, no "STOP" bit will be generated.
+> ? ? ? ? */
+> ? ? ? ?udelay(i2c_imx->disable_delay);
+> +
+> + ? ? ? if (!i2c_imx->stopped)
+> + ? ? ? ? ? ? ? i2c_imx_bus_busy(i2c_imx, 0);
+> +
+> ? ? ? ?/* Disable I2C controller */
+> ? ? ? ?writeb(0, i2c_imx->base + IMX_I2C_I2CR);
+> ?}
+> @@ -341,11 +363,15 @@ static int i2c_imx_read(struct imx_i2c_struct *i2c_imx, struct i2c_msg *msgs)
+> ? ? ? ? ? ? ? ?if (result)
+> ? ? ? ? ? ? ? ? ? ? ? ?return result;
+> ? ? ? ? ? ? ? ?if (i == (msgs->len - 1)) {
+> + ? ? ? ? ? ? ? ? ? ? ? /* It must generate STOP before read I2DR to prevent
+> + ? ? ? ? ? ? ? ? ? ? ? ? ?controller from generating another clock cycle */
+> ? ? ? ? ? ? ? ? ? ? ? ?dev_dbg(&i2c_imx->adapter.dev,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"<%s> clear MSTA\n", __func__);
+> ? ? ? ? ? ? ? ? ? ? ? ?temp = readb(i2c_imx->base + IMX_I2C_I2CR);
+> - ? ? ? ? ? ? ? ? ? ? ? temp &= ~I2CR_MSTA;
+> + ? ? ? ? ? ? ? ? ? ? ? temp &= ~(I2CR_MSTA | I2CR_MTX);
+> ? ? ? ? ? ? ? ? ? ? ? ?writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
+> + ? ? ? ? ? ? ? ? ? ? ? i2c_imx_bus_busy(i2c_imx, 0);
+> + ? ? ? ? ? ? ? ? ? ? ? i2c_imx->stopped = 1;
+> ? ? ? ? ? ? ? ?} else if (i == (msgs->len - 2)) {
+> ? ? ? ? ? ? ? ? ? ? ? ?dev_dbg(&i2c_imx->adapter.dev,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"<%s> set TXAK\n", __func__);
+> @@ -370,14 +396,11 @@ static int i2c_imx_xfer(struct i2c_adapter *adapter,
+>
+> ? ? ? ?dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
+>
+> - ? ? ? /* Check if i2c bus is not busy */
+> - ? ? ? result = i2c_imx_bus_busy(i2c_imx);
+> + ? ? ? /* Start I2C transfer */
+> + ? ? ? result = i2c_imx_start(i2c_imx);
+> ? ? ? ?if (result)
+> ? ? ? ? ? ? ? ?goto fail0;
+>
+> - ? ? ? /* Start I2C transfer */
+> - ? ? ? i2c_imx_start(i2c_imx);
+> -
+> ? ? ? ?/* read/write data */
+> ? ? ? ?for (i = 0; i < num; i++) {
+> ? ? ? ? ? ? ? ?if (i) {
+> @@ -386,6 +409,9 @@ static int i2c_imx_xfer(struct i2c_adapter *adapter,
+> ? ? ? ? ? ? ? ? ? ? ? ?temp = readb(i2c_imx->base + IMX_I2C_I2CR);
+> ? ? ? ? ? ? ? ? ? ? ? ?temp |= I2CR_RSTA;
+> ? ? ? ? ? ? ? ? ? ? ? ?writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
+> + ? ? ? ? ? ? ? ? ? ? ? result = ?i2c_imx_bus_busy(i2c_imx, 1);
+> + ? ? ? ? ? ? ? ? ? ? ? if (result)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto fail0;
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ? ? ? ? ?dev_dbg(&i2c_imx->adapter.dev,
+> ? ? ? ? ? ? ? ? ? ? ? ?"<%s> transfer message: %d\n", __func__, i);
+> --
+> 1.6.0.4
+>
+>
 
-On Wed, Oct 21, 2009 at 01:27:09PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Oct 13, 2009 at 10:24:47AM +0200, Uwe Kleine-K?nig wrote:
-> > Hello Andrew,
-> > 
-> > On Tue, Oct 13, 2009 at 09:26:44AM +0200, Haavard Skinnemoen wrote:
-> > > Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
-> > > > Commit 8c87df457cb5 fixed BUILD_BUG_ON with the result that some
-> > > > expressions (e.g. "not really constant" ones) result in a build failure.
-> > > > 
-> > > > Some of these were fixed in 8c87df457cb5, but not serial/atmel_serial.
-> > > 
-> > > This patch fixes the same issue:
-> > > 
-> > > http://lkml.org/lkml/2009/10/6/305
-> > Can you please take this and add my Ack?
-> > 
-> > If you cannot find it anymore in your inbox, you can get it from
-> > http://article.gmane.org/gmane.linux.kernel/898575/raw
-> 
-> So what's happening with this?
-The patch by Haavard Skinnemoen is in -mm as
+Adding Ben ...
 
-	atmel_serial-fix-bad-build_bug_on-usage.patch
-
-.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Thanks
+Richard
