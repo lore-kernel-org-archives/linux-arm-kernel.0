@@ -1,43 +1,36 @@
 From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Wed, 21 Oct 2009 14:00:41 +1300
-Subject: [PATCH] ep93xx: remove dead code in ep93xx_gpio_ab_irq_handler()
-In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901DB8071@mi8nycmail19.Mi8.com>
-References: <BD79186B4FD85F4B8E60E381CAEE190901DB8071@mi8nycmail19.Mi8.com>
-Message-ID: <4ADE5D39.3080005@bluewatersys.com>
+Date: Wed, 21 Oct 2009 14:01:54 +1300
+Subject: [PATCH] CPU_ARM920T: remove dead Maverick EP9312 URL
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901DB7DBA@mi8nycmail19.Mi8.com>
+References: <BD79186B4FD85F4B8E60E381CAEE190901DB7DBA@mi8nycmail19.Mi8.com>
+Message-ID: <4ADE5D82.9000604@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 H Hartley Sweeten wrote:
-> Remove unnecessary code in ep93xx_gpio_ab_irq_handler().
-> 
-> The desc calculation for gpio port B was left in when the following
-> commit was merged.
-> 
-> commit d8aa0251f12546e9bd1e9ee1d9782d6492819a04
-> Author: Dmitry Baryshkov <dbaryshkov@gmail.com>
-> Date:   Thu Oct 9 13:36:24 2008 +0100
-> 
->     [ARM] 5298/1: Drop desc_handle_irq()
-> 
-> It's not needed so remove it.
+> Remove the URL listed for Maverick EP9312 since it is not available
+> and modify the help text appropriately.
 > 
 > Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <ryan@bluewatersys.com>
 > 
 > ---
 > 
-> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-> index f95dc16..b4357c3 100644
-> --- a/arch/arm/mach-ep93xx/core.c
-> +++ b/arch/arm/mach-ep93xx/core.c
-> @@ -206,7 +206,6 @@ static void ep93xx_gpio_ab_irq_handler(unsigned int irq, struct irq_desc *desc)
->  	for (i = 0; i < 8; i++) {
->  		if (status & (1 << i)) {
->  			int gpio_irq = gpio_to_irq(EP93XX_GPIO_LINE_B(0)) + i;
-> -			desc = irq_desc + gpio_irq;
->  			generic_handle_irq(gpio_irq);
->  		}
->  	} 
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index e993140..9264d81 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -122,10 +122,7 @@ config CPU_ARM920T
+>  	select CPU_TLB_V4WBI if MMU
+>  	help
+>  	  The ARM920T is licensed to be produced by numerous vendors,
+> -	  and is used in the Maverick EP9312 and the Samsung S3C2410.
+> -
+> -	  More information on the Maverick EP9312 at
+> -	  <http://linuxdevices.com/products/PD2382866068.html>.
+> +	  and is used in the Cirrus EP93xx and the Samsung S3C2410.
+>  
+>  	  Say Y if you want support for the ARM920T processor.
+>  	  Otherwise, say N. 
 > 
 
 Acked-by: Ryan Mallon <ryan@bluewatersys.com>
