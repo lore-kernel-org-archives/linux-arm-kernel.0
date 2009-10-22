@@ -1,53 +1,60 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 22 Oct 2009 14:19:47 -0400 (EDT)
-Subject: [PATCHv3] [ARM] kirkwood: combine support for openrd base/client
-	support
-In-Reply-To: <20091022110436.GF6085@chipmunk>
-References: <pbh5r6-os7.ln1@chipmunk.wormnet.eu>
-	<20091022124756.56e89d7a@marrow.netinsight.se>
-	<20091022110436.GF6085@chipmunk>
-Message-ID: <alpine.LFD.2.00.0910221412360.21460@xanadu.home>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 23 Oct 2009 05:05:29 +0800
+Subject: [PATCH] Zaurus: Fix PROM partition table for spitz
+In-Reply-To: <1256245103.9561.11.camel@utx.utx.cz>
+References: <1256245103.9561.11.camel@utx.utx.cz>
+Message-ID: <f17812d70910221405v753eadbdu67c0d532ac77e222@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Oct 2009, Alexander Clouter wrote:
+I'm a bit upset that some things else may depend on the original
+layout (though that's incorrect), and this possibly breaks the
+sequence numbering of /dev/mtd?.
 
-> Hi,
-> 
-> * Simon Kagstrom <simon.kagstrom@netinsight.net> [2009-10-22 12:47:56+0200]:
-> >
-> > On Thu, 22 Oct 2009 09:22:49 +0100 Alexander Clouter <alex@digriz.org.uk> wrote:
-> > 
-> > > +static int __init openrd_pci_init(void)
-> > > +{
-> > > +	kirkwood_pcie_init();
-> > 
-> > I think you should do
-> > 
-> > 	if (machine_is_openrd_base() || machine_is_openrd_client())
-> > 		kirkwood_pcie_init();
-> > 
-> > here instead since there might be other boards configured as well where
-> > this shouldn't be done (e.g., a build with both sheevaplug and the
-> > OpenRDs).
-> > 
-> It's called 'openrd-setup.c' not 'sheevaplug-setup.c' :)
-
-So?
-
-> The SheevaPlug's do not use this at all ('MACHINE_START(SHEEVAPLUG, 
-> ...)' is not to be seen in there), they already have their own file.
-
-The openrd_pci_init() is still called with a subsys_initcall() 
-registration.  That would be invoked on a SheevaPlug as well if you have 
-a kernel that supports them both.
-
-> If someone 
-> wants to merge the SheevaPlug's into here too they can cross that bridge 
-> themselves.
-
-No way.  I'll bomb the bridge beforehand.  There should be a balance 
-between consolidation and abstraction.
-
-
-Nicolas
+On Fri, Oct 23, 2009 at 4:58 AM, Stanislav Brabec <utx@penguin.cz> wrote:
+> Attached patch fixes partition table of the Zaurus PROM. It works on
+> terrier, but I guess it is common for all Zaurus models.
+>
+> The partition marked ??"Boot PROM Filesystem" is a fact a database file
+> for EN-JP dictionary. Designers decided to put the English-Japanese
+> translation dictionary to the remaining part of the PROM.
+>
+> Changes:
+>
+> Newly mapped the bootloader system as "Boot PROM System".
+>
+> Already mapped EN-JP dictionary changes its name from ?"Boot PROM
+> Filesystem" to "EN-JP Data File".
+>
+> How to verify the layout on other models:
+> ?root at zaurus:~# modprobe physmap
+> root at zaurus:~# file -s /dev/mtd4
+> /dev/mtd4: DBase 3 data file (1031668283 records)
+>
+> Signed-off-by: Stanislav Brabec <utx@penguin.cz>
+>
+> diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+> index ee8d603..c382d14 100644
+> --- a/arch/arm/mach-pxa/spitz.c
+> +++ b/arch/arm/mach-pxa/spitz.c
+> @@ -658,7 +696,11 @@ static struct platform_device sharpsl_nand_device = {
+>
+> ?static struct mtd_partition sharpsl_rom_parts[] = {
+> ? ? ? ?{
+> - ? ? ? ? ? ? ? .name ? ="Boot PROM Filesystem",
+> + ? ? ? ? ? ? ? .name ? ="Boot PROM System",
+> + ? ? ? ? ? ? ? .offset = 0x00100000,
+> + ? ? ? },
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ="EN-JP Data File",
+> ? ? ? ? ? ? ? ?.offset = 0x00140000,
+> ? ? ? ? ? ? ? ?.size ? = MTDPART_SIZ_FULL,
+> ? ? ? ?},
+>
+>
+>
+> ________________________________________________________________________
+> Stanislav Brabec
+> http://www.penguin.cz/~utx/zaurus
+>
+>
