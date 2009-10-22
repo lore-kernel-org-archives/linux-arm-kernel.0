@@ -1,88 +1,53 @@
-From: utx@penguin.cz (Stanislav Brabec)
-Date: Thu, 22 Oct 2009 23:05:03 +0200
-Subject: [PATCH] Zaurus: Fix NAND Flash OOB layout for Borzoi
-Message-ID: <1256245503.9561.18.camel@utx.utx.cz>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 22 Oct 2009 14:19:47 -0400 (EDT)
+Subject: [PATCHv3] [ARM] kirkwood: combine support for openrd base/client
+	support
+In-Reply-To: <20091022110436.GF6085@chipmunk>
+References: <pbh5r6-os7.ln1@chipmunk.wormnet.eu>
+	<20091022124756.56e89d7a@marrow.netinsight.se>
+	<20091022110436.GF6085@chipmunk>
+Message-ID: <alpine.LFD.2.00.0910221412360.21460@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Borzoi, Terrier and Akita use the same NAND Flash OOB layout, which
-seems to be different from Spitz for some reason. Here is a fix.
+On Thu, 22 Oct 2009, Alexander Clouter wrote:
 
-When the code was ported to the platform data, the map was applied just
-for Akita.
+> Hi,
+> 
+> * Simon Kagstrom <simon.kagstrom@netinsight.net> [2009-10-22 12:47:56+0200]:
+> >
+> > On Thu, 22 Oct 2009 09:22:49 +0100 Alexander Clouter <alex@digriz.org.uk> wrote:
+> > 
+> > > +static int __init openrd_pci_init(void)
+> > > +{
+> > > +	kirkwood_pcie_init();
+> > 
+> > I think you should do
+> > 
+> > 	if (machine_is_openrd_base() || machine_is_openrd_client())
+> > 		kirkwood_pcie_init();
+> > 
+> > here instead since there might be other boards configured as well where
+> > this shouldn't be done (e.g., a build with both sheevaplug and the
+> > OpenRDs).
+> > 
+> It's called 'openrd-setup.c' not 'sheevaplug-setup.c' :)
 
-After this patch, Flash works again on Borzoi. Terrier still has a
-problem with partition table? different from Borzoi (unfixable without
-reading of the system configuration in flash) and JFFS2 partitions can
-be mounted (with some "Empty flash at ... ends at ..." in the syslog).
+So?
 
-Signed-off-by: Stanislav Brabec <utx@penguin.cz>
+> The SheevaPlug's do not use this at all ('MACHINE_START(SHEEVAPLUG, 
+> ...)' is not to be seen in there), they already have their own file.
 
-diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
-index ee8d603..c382d14 100644
---- a/arch/arm/mach-pxa/spitz.c
-+++ b/arch/arm/mach-pxa/spitz.c
-@@ -740,11 +783,34 @@ static void __init common_init(void)
- 	pxa_set_i2c_info(NULL);
- }
- 
-+#if defined(CONFIG_MACH_AKITA) || defined(CONFIG_MACH_BORZOI)
-+static struct nand_bbt_descr sharpsl_akita_bbt = {
-+	.options = 0,
-+	.offs = 4,
-+	.len = 1,
-+	.pattern = scan_ff_pattern
-+};
-+
-+static struct nand_ecclayout akita_oobinfo = {
-+	.eccbytes = 24,
-+	.eccpos = {
-+		   0x5, 0x1, 0x2, 0x3, 0x6, 0x7, 0x15, 0x11,
-+		   0x12, 0x13, 0x16, 0x17, 0x25, 0x21, 0x22, 0x23,
-+		   0x26, 0x27, 0x35, 0x31, 0x32, 0x33, 0x36, 0x37},
-+	.oobfree = {{0x08, 0x09}}
-+};
-+#endif
-+
- #if defined(CONFIG_MACH_SPITZ) || defined(CONFIG_MACH_BORZOI)
- static void __init spitz_init(void)
- {
- 	spitz_ficp_platform_data.gpio_pwdown = SPITZ_GPIO_IR_ON;
- 
-+	if (machine_is_borzoi()) {
-+		sharpsl_nand_platform_data.badblock_pattern = &sharpsl_akita_bbt;
-+		sharpsl_nand_platform_data.ecc_layout = &akita_oobinfo;
-+	}
-+
- 	platform_scoop_config = &spitz_pcmcia_config;
- 
- 	common_init();
-@@ -769,22 +835,6 @@ static struct i2c_board_info akita_i2c_board_info[] = {
- 	},
- };
- 
--static struct nand_bbt_descr sharpsl_akita_bbt = {
--	.options = 0,
--	.offs = 4,
--	.len = 1,
--	.pattern = scan_ff_pattern
--};
--
--static struct nand_ecclayout akita_oobinfo = {
--	.eccbytes = 24,
--	.eccpos = {
--		   0x5, 0x1, 0x2, 0x3, 0x6, 0x7, 0x15, 0x11,
--		   0x12, 0x13, 0x16, 0x17, 0x25, 0x21, 0x22, 0x23,
--		   0x26, 0x27, 0x35, 0x31, 0x32, 0x33, 0x36, 0x37},
--	.oobfree = {{0x08, 0x09}}
--};
--
- static void __init akita_init(void)
- {
- 	spitz_ficp_platform_data.gpio_pwdown = AKITA_GPIO_IR_ON;
+The openrd_pci_init() is still called with a subsys_initcall() 
+registration.  That would be invoked on a SheevaPlug as well if you have 
+a kernel that supports them both.
+
+> If someone 
+> wants to merge the SheevaPlug's into here too they can cross that bridge 
+> themselves.
+
+No way.  I'll bomb the bridge beforehand.  There should be a balance 
+between consolidation and abstraction.
 
 
-
-________________________________________________________________________
-Stanislav Brabec
-http://www.penguin.cz/~utx/zaurus
+Nicolas
