@@ -1,71 +1,162 @@
-From: mfuzzey@gmail.com (Martin Fuzzey)
-Date: Thu, 22 Oct 2009 19:33:49 +0200
-Subject: soc_common and irq handling
-Message-ID: <ba4215e10910221033u2874e955v23e6df5462c21743@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 22 Oct 2009 19:48:16 +0200
+Subject: zaurus: cleanup sharpsl_pm.c
+In-Reply-To: <f17812d70910220705o9f4a0ddwa22157b59a519350@mail.gmail.com>
+References: <20091006200339.GA1538@ucw.cz> <20091017163627.GB1423@ucw.cz>
+	<f17812d70910200859v6d18e81bs2760d8af1d8da5bf@mail.gmail.com>
+	<f17812d70910220705o9f4a0ddwa22157b59a519350@mail.gmail.com>
+Message-ID: <20091022174816.GC5325@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-am currently working on pcmcia/cf support for freescale mxc.
+Hi!
 
-I started from the Freescale MX31 code (although my hardware is MX21 -
-its quite similar and I hope to make a generic driver).
+> >>> This fixes checkpatch/style problems in sharpsl_pm.c, allowing me to
+> >>> submit real fixes next. Move spitz-specific voltage table to
+> >>> spitz-specific file.
+> >>>
+> >>> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> >>
+> >> Eric, any news on this one? I have real development going on top of
+> >> this one, so it is quite important for me...
+> >
+> > Sorry late on this. Applied.
+> 
+> Pavel,
+> 
+> Here's the problem, please help look into this:
+> 
+>   CC      arch/arm/mach-pxa/corgi_pm.o
+> In file included from
+> /home/ycmiao/kernel/linux-2.6/arch/arm/mach-pxa/corgi_pm.c:28:
+> /home/ycmiao/kernel/linux-2.6/arch/arm/mach-pxa/include/mach/pxa2xx-gpio.h:4:2:
+> warning: #warning Please use mfp-pxa2[57]x.h instead of pxa2xx-gpio.h
+> /home/ycmiao/kernel/linux-2.6/arch/arm/mach-pxa/corgi_pm.c:217: error:
+> 'spitz_battery_levels_noac' undeclared here (not in a function)
+> /home/ycmiao/kernel/linux-2.6/arch/arm/mach-pxa/corgi_pm.c:218: error:
+> 'spitz_battery_levels_acin' undeclared here (not in a function)
+> make[2]: *** [arch/arm/mach-pxa/corgi_pm.o] Error 1
+> make[1]: *** [arch/arm/mach-pxa] Error 2
+> make[1]: *** Waiting for unfinished jobs....
 
-The Freescale code basically includes a (slightly modified) private
-copy of soc_common. I am attempting to clean this up...
+Sorry about that.
 
-The current in tree users of soc_common (sa11xx and pxa2xx) use
-seperate irqs for card status events and card interrupts, they request
-the card status interrupts with soc_pcmcia_request_irqs() and just
-define the irq for the card interrupt (via skt->irq) and let the
-client driver request the interrupt later.
+---
 
-However the mxc SoCs only have a single interrupt for all this so if I
-use soc_pcmcia_request_irqs() it is requested in non shared mode and
-the client driver gets  EBUSY when it tries to request the same
-interrupt.
+Introduce separate set of battery limits for corgi. This fixes
+compilation, and the values probably should be subtly different, too.
 
-My current solution to this is:
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-diff --git a/drivers/pcmcia/soc_common.c b/drivers/pcmcia/soc_common.c
-index de25eb8..8ba3167 100644
---- a/drivers/pcmcia/soc_common.c
-+++ b/drivers/pcmcia/soc_common.c
+diff -ur linux-rc/arch/arm.ofic/mach-pxa/corgi_pm.c linux-rc/arch/arm/mach-pxa/corgi_pm.c
+--- linux-rc/arch/arm.ofic/mach-pxa/corgi_pm.c	2009-09-10 00:13:59.000000000 +0200
++++ linux-rc/arch/arm/mach-pxa/corgi_pm.c	2009-10-22 19:19:02.000000000 +0200
+@@ -35,6 +35,92 @@
+ #define SHARPSL_FATAL_ACIN_VOLT        182   /* 3.45V */
+ #define SHARPSL_FATAL_NOACIN_VOLT      170   /* 3.40V */
+ 
++static const struct battery_thresh corgi_battery_levels_acin[] = {
++	{ 213, 100},
++	{ 212,  98},
++	{ 211,  95},
++	{ 210,  93},
++	{ 209,  90},
++	{ 208,  88},
++	{ 207,  85},
++	{ 206,  83},
++	{ 205,  80},
++	{ 204,  78},
++	{ 203,  75},
++	{ 202,  73},
++	{ 201,  70},
++	{ 200,  68},
++	{ 199,  65},
++	{ 198,  63},
++	{ 197,  60},
++	{ 196,  58},
++	{ 195,  55},
++	{ 194,  53},
++	{ 193,  50},
++	{ 192,  48},
++	{ 192,  45},
++	{ 191,  43},
++	{ 191,  40},
++	{ 190,  38},
++	{ 190,  35},
++	{ 189,  33},
++	{ 188,  30},
++	{ 187,  28},
++	{ 186,  25},
++	{ 185,  23},
++	{ 184,  20},
++	{ 183,  18},
++	{ 182,  15},
++	{ 181,  13},
++	{ 180,  10},
++	{ 179,   8},
++	{ 178,   5},
++	{   0,   0},
++};
++
++static const struct battery_thresh  corgi_battery_levels_noac[] = {
++	{ 213, 100},
++	{ 212,  98},
++	{ 211,  95},
++	{ 210,  93},
++	{ 209,  90},
++	{ 208,  88},
++	{ 207,  85},
++	{ 206,  83},
++	{ 205,  80},
++	{ 204,  78},
++	{ 203,  75},
++	{ 202,  73},
++	{ 201,  70},
++	{ 200,  68},
++	{ 199,  65},
++	{ 198,  63},
++	{ 197,  60},
++	{ 196,  58},
++	{ 195,  55},
++	{ 194,  53},
++	{ 193,  50},
++	{ 192,  48},
++	{ 191,  45},
++	{ 190,  43},
++	{ 189,  40},
++	{ 188,  38},
++	{ 187,  35},
++	{ 186,  33},
++	{ 185,  30},
++	{ 184,  28},
++	{ 183,  25},
++	{ 182,  23},
++	{ 181,  20},
++	{ 180,  18},
++	{ 179,  15},
++	{ 178,  13},
++	{ 177,  10},
++	{ 176,   8},
++	{ 175,   5},
++	{   0,   0},
++};
++
+ static void corgi_charger_init(void)
+ {
+ 	pxa_gpio_mode(CORGI_GPIO_ADC_TEMP_ON | GPIO_OUT);
+@@ -214,8 +300,8 @@
+ 	.fatal_acin_volt  = SHARPSL_FATAL_ACIN_VOLT,
+ 	.fatal_noacin_volt= SHARPSL_FATAL_NOACIN_VOLT,
+ 	.bat_levels       = 40,
+-	.bat_levels_noac  = spitz_battery_levels_noac,
+-	.bat_levels_acin  = spitz_battery_levels_acin,
++	.bat_levels_noac  = corgi_battery_levels_noac,
++	.bat_levels_acin  = corgi_battery_levels_acin,
+ 	.status_high_acin = 188,
+ 	.status_low_acin  = 178,
+ 	.status_high_noac = 185,
 
-@@ -528,7 +528,8 @@ int soc_pcmcia_request_irqs(struct soc_pcmcia_socket *skt,
-               if (irqs[i].sock != skt->nr)
-                       continue;
-               res = request_irq(irqs[i].irq, soc_common_pcmcia_interrupt,
--                                 IRQF_DISABLED, irqs[i].str, skt);
-+                                 IRQF_DISABLED | irqs[i].flags,
-+                                 irqs[i].str, skt);
-               if (res)
-                       break;
-               set_irq_type(irqs[i].irq, IRQ_TYPE_NONE);
 
-diff --git a/drivers/pcmcia/soc_common.h b/drivers/pcmcia/soc_common.h
-index e2d837b..9076003 100644
---- a/drivers/pcmcia/soc_common.h
-+++ b/drivers/pcmcia/soc_common.h
-@@ -126,6 +126,7 @@ struct pcmcia_irqs {
-       int sock;
-       int irq;
-       const char *str;
-+       unsigned long flags;
- };
-
-
-
-Ie add a flags field and let the driver request IRQF_SHARED.
-
-Is this reasonable / acceptable?
-
-Unfortunately this gives the the runtime warning (from kernel/irq/manage.c)
- IRQ 28/pcmcia0: IRQF_DISABLED is not guaranteed on shared IRQs
-
-Is there a better solution for this case? - I can't think of one
-seeing as the client driver will be doing a request_irq() and the host
-controller needs the same irq.
-
-Cheers,
-
-Martin
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
