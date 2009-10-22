@@ -1,72 +1,40 @@
-From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Thu, 22 Oct 2009 18:02:12 +0400
-Subject: [PATCH 43/46] DaVinci: remove unneeded #include's
-In-Reply-To: <1255720190-7452-45-git-send-email-khilman@deeprootsystems.com>
-References: <1255720190-7452-1-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-32-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-33-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-34-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-35-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-36-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-37-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-38-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-39-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-40-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-41-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-42-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-43-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-44-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-45-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <4AE065E4.70506@ru.mvista.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 22 Oct 2009 22:05:49 +0800
+Subject: zaurus: cleanup sharpsl_pm.c
+In-Reply-To: <f17812d70910200859v6d18e81bs2760d8af1d8da5bf@mail.gmail.com>
+References: <20091006200339.GA1538@ucw.cz> <20091017163627.GB1423@ucw.cz>
+	<f17812d70910200859v6d18e81bs2760d8af1d8da5bf@mail.gmail.com>
+Message-ID: <f17812d70910220705o9f4a0ddwa22157b59a519350@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Oct 20, 2009 at 11:59 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> On Sun, Oct 18, 2009 at 12:36 AM, Pavel Machek <pavel@ucw.cz> wrote:
+>> On Tue 2009-10-06 22:03:39, Pavel Machek wrote:
+>>> This fixes checkpatch/style problems in sharpsl_pm.c, allowing me to
+>>> submit real fixes next. Move spitz-specific voltage table to
+>>> spitz-specific file.
+>>>
+>>> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+>>
+>> Eric, any news on this one? I have real development going on top of
+>> this one, so it is quite important for me...
+>
+> Sorry late on this. Applied.
 
-Kevin Hilman wrote:
+Pavel,
 
-> From: Sergei Shtylyov <sshtylyov@ru.mvista.com>
+Here's the problem, please help look into this:
 
-> There have accumulated quite a lot of them after the code reorganizations...
-
-> In several cases I had to replace #include <linux/dma-mapping.h> which wasn't
-> needed directly but happened to #include <linux/err.h> which was needed.
-
-> Signed-off-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
-> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
-
-[...]
-
-> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-> index b804d57..120ede0 100644
-> --- a/arch/arm/mach-davinci/da850.c
-> +++ b/arch/arm/mach-davinci/da850.c
-> @@ -11,24 +11,21 @@
->   * is licensed "as is" without any warranty of any kind, whether express
->   * or implied.
->   */
-> -#include <linux/kernel.h>
->  #include <linux/init.h>
->  #include <linux/clk.h>
-> -#include <linux/platform_device.h>
->  #include <linux/cpufreq.h>
->  #include <linux/regulator/consumer.h>
->  
->  #include <asm/mach/map.h>
->  
-> -#include <mach/clock.h>
->  #include <mach/psc.h>
-> -#include <mach/mux.h>
->  #include <mach/irqs.h>
->  #include <mach/cputype.h>
->  #include <mach/common.h>
->  #include <mach/time.h>
->  #include <mach/da8xx.h>
->  #include <mach/cpufreq.h>
-> +#include <linux/platform_device.h>
-
-    As has been pointed out, this is not in its proper group. Perhaps the 
-patch can be changed before pushing upstream, and removal and addition of 
-this line just nullified?
-
-WBR, Sergei
+  CC      arch/arm/mach-pxa/corgi_pm.o
+In file included from
+/home/ycmiao/kernel/linux-2.6/arch/arm/mach-pxa/corgi_pm.c:28:
+/home/ycmiao/kernel/linux-2.6/arch/arm/mach-pxa/include/mach/pxa2xx-gpio.h:4:2:
+warning: #warning Please use mfp-pxa2[57]x.h instead of pxa2xx-gpio.h
+/home/ycmiao/kernel/linux-2.6/arch/arm/mach-pxa/corgi_pm.c:217: error:
+'spitz_battery_levels_noac' undeclared here (not in a function)
+/home/ycmiao/kernel/linux-2.6/arch/arm/mach-pxa/corgi_pm.c:218: error:
+'spitz_battery_levels_acin' undeclared here (not in a function)
+make[2]: *** [arch/arm/mach-pxa/corgi_pm.o] Error 1
+make[1]: *** [arch/arm/mach-pxa] Error 2
+make[1]: *** Waiting for unfinished jobs....
