@@ -1,44 +1,67 @@
-From: utx@penguin.cz (Stanislav Brabec)
-Date: Fri, 23 Oct 2009 00:09:48 +0200
-Subject: [PATCH] Zaurus: Fix PROM partition table for spitz
-In-Reply-To: <20091022214511.GB9364@elf.ucw.cz> (from pavel@ucw.cz on Thu
-	Oct 22 23:45:11 2009)
-Message-ID: <1256249388.1986.0@zaurus>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 22 Oct 2009 15:11:06 -0700
+Subject: [PATCH 00/10] omap fixes for v2.6.32-rc5
+Message-ID: <20091022221013.27408.443.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2009-10-29 23:45:11 Pavel Machek wrote:
-> On Fri 2009-10-23 05:33:27, Eric Miao wrote:
-> > (I won't refuse some comments to make this more clear in the code
-> > though).
-> 
-> I don't know. If the table is wrong, we should fix it. Yes, it may
-> break someone, but it probably will not.
+Hi all,
 
-This change is not worse than change in .config, as there is no
-guarantee of order of loading NAND and PROM maps.
+Here are some omap fixes for review.
 
-I just looked at original 2.4 kernel. There were:
-PROM EN-JP as "Filesystem", bootloader not mapped
-NAND partitions as "smf", "root", "home"
+Regards,
 
-This is an output of cat /proc/mtd on vendor's 2.4.20.
+Tony
 
-dev:    size   erasesize  name
-mtd0: 006b0000 00020000 "Filesystem"
-mtd1: 00700000 00020000 "smf"
-mtd2: 02b00000 00020000 "root"
-mtd3: 04e00000 00020000 "home"
+---
 
-We never were compatible:
+Hiroshi DOYU (1):
+      omap: iommu: fix wrong condition check for SUPERSECTION
 
-Guessing from "file" output, EN-JP partition is just a file, not a
-filesystem. I am OK with keeping of name "Boot PROM Filesystem" and
-calling the new partition as "PROM Bootloader", but EN-JP in the name
-cleanly describes the surprising contents. Adding bootloader data
-partition has probably a single use case: Being easily able to grab
-the PROM contents for the emulator.
+Janusz Krzysztofik (3):
+      omap1: Fix DSP public peripherals support for ams-delta
+      omap1: Fix redundant UARTs pin muxing that can break other hardware support
+      omap: Fix omap-keypad by restoring old keypad.h without breaking omap2 boards that use matrix_keypad
+
+Kevin Hilman (1):
+      omap3: PM: enable UART3 module wakeups
+
+Santosh Shilimkar (3):
+      omap4: Fix UART4 platform data on omap4
+      omap4: Allow omap_serial_early_init() for OMAP4430 board
+      omap: SDMA: Fix omap_stop_dma() API for channel linking
+
+Tony Lindgren (2):
+      omap2: Fix console serial port number for n8x0
+      omap: Fix detection of n8x0
+
+
+ arch/arm/configs/n8x0_defconfig              |    2 +-
+ arch/arm/mach-omap1/board-ams-delta.c        |    6 ++++++
+ arch/arm/mach-omap1/board-generic.c          |    8 ++++++++
+ arch/arm/mach-omap1/board-innovator.c        |   20 ++++++++++++++++++++
+ arch/arm/mach-omap1/board-palmte.c           |    8 ++++++++
+ arch/arm/mach-omap1/board-palmtt.c           |    8 ++++++++
+ arch/arm/mach-omap1/board-palmz71.c          |    8 ++++++++
+ arch/arm/mach-omap1/board-sx1.c              |    8 ++++++++
+ arch/arm/mach-omap1/board-voiceblue.c        |    8 ++++++++
+ arch/arm/mach-omap1/serial.c                 |   26 --------------------------
+ arch/arm/mach-omap2/Kconfig                  |   12 ++++++++++++
+ arch/arm/mach-omap2/board-3430sdp.c          |    2 +-
+ arch/arm/mach-omap2/board-4430sdp.c          |    4 ++--
+ arch/arm/mach-omap2/board-ldp.c              |    2 +-
+ arch/arm/mach-omap2/board-omap3evm.c         |    2 +-
+ arch/arm/mach-omap2/board-omap3pandora.c     |    2 +-
+ arch/arm/mach-omap2/board-rx51-peripherals.c |    2 +-
+ arch/arm/mach-omap2/board-rx51.c             |    1 -
+ arch/arm/mach-omap2/board-zoom2.c            |    2 +-
+ arch/arm/mach-omap2/io.c                     |    2 ++
+ arch/arm/mach-omap2/pm34xx.c                 |    7 ++++---
+ arch/arm/mach-omap2/serial.c                 |   10 ----------
+ arch/arm/plat-omap/dma.c                     |   18 ++++++++----------
+ arch/arm/plat-omap/include/mach/keypad.h     |    5 ++++-
+ arch/arm/plat-omap/iommu.c                   |    2 +-
+ 25 files changed, 114 insertions(+), 61 deletions(-)
 
 -- 
-Stanislav Brabec
-http://www.penguin.cz/~utx/zaurus
+Signature
