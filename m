@@ -1,78 +1,106 @@
-From: hongjiujing@gmail.com (tommy tommy)
-Date: Thu, 22 Oct 2009 19:05:50 +0800
-Subject: MXC MMC driver and SDIO peripherals
-In-Reply-To: <20091022081933.GC8818@pengutronix.de>
-References: <20091021192038.GK14091@buzzloop.caiaq.de>
-	<1256156119.8469.40.camel@localhost.localdomain>
-	<20091021205156.GO14091@buzzloop.caiaq.de>
-	<20091022081933.GC8818@pengutronix.de>
-Message-ID: <48cbf6bf0910220405k1fa5837ay20e135bc321b24e@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 22 Oct 2009 22:17:18 +0200
+Subject: zaurus: cleanup sharpsl_pm.c (fwd)
+Message-ID: <20091022201718.GF6611@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,sir!
+(I sent this to Eric, here it is for public record, too.)
 
-1:your memory card test is fine,it can indicate sdhc data communicate ok
-with sdio dma!
-2:just use scope to test and know its clock,wifi clock is very strict,if
-clock is lower ,will
-get some issue.if sdio clock bigger than 25M or very slower,will get some
-issue!
-3:no relation with your MCU DMA,just SDIO DMA!
+Hi!
 
-2009/10/22 Sascha Hauer <s.hauer@pengutronix.de>
 
-> On Wed, Oct 21, 2009 at 10:51:56PM +0200, Daniel Mack wrote:
-> > Hi Dan,
+> >> > Well, I'd say that the sharing leads to some very ugly code. ... so
+> >> > I'd preer it unshared.
+> >> >
+> >>
+> >> I suggest to re-name it to "sharpsl_" something instead of "spitz_",
+> >> to be less confusing at this moment.
 > >
-> > On Wed, Oct 21, 2009 at 01:15:19PM -0700, Dan Williams wrote:
-> > > On Wed, 2009-10-21 at 21:20 +0200, Daniel Mack wrote:
-> > > > Hi,
-> > > >
-> > > > we're having trouble getting SDIO connected harware to fly on MX31
-> based
-> > > > designs. In particular, a SD8686 chip supported by the libertas_sdio
-> > > > driver will hang forever when built without CONFIG_MMC_DEBUG=y. With
-> > > > that option selected, however, the behaviour is a little different,
-> and
-> > > > I can at least see the following messages on a recent 2.6.32-rc5
-> based
-> > > > MX31 tree.
-> > > >
-> > > > Is there any common pitfall for such setups? I did more or less the
-> same
-> > > > thing on PXAs (same WLAN chip, same kind of interface, same
-> firmware),
-> > > > and haven't seen any such effects, so I suspect the MXC specific
-> parts
-> > > > to be the reason for that. Any ideas?
-> > >
-> > > Any idea what quirks your SDHC is using if any?  Does it require PIO or
-> > > can it do DMA?
-> >
-> > In mainline kernels, DMA is limited to the MX2 SoC family. The MX3 that
-> > I'm using is excluded from that feature, but I'mm not aware of the
-> > reason for that.
->
-> The reason is that the i.MX31/35/25 have a so called Smart DMA engine
-> (SDMA). So far nobody has been smart enough to clean the Freescale code
-> up for mainline. The original DMA engine this driver works with is
-> equipped with the i.MX1/21/27 processors.
->
-> Sascha
->
->
-> --
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091022/b1da27d9/attachment.htm>
+> > Yep, but lets do that as next patch, ok?
+
+---
+
+Battery power levels are shared between spitz and corgi, rename
+variable to reflect it.
+
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
+
+diff --git a/arch/arm/mach-pxa/corgi_pm.c b/arch/arm/mach-pxa/corgi_pm.c
+index a093282..d4a0733 100644
+--- a/arch/arm/mach-pxa/corgi_pm.c
++++ b/arch/arm/mach-pxa/corgi_pm.c
+@@ -214,8 +214,8 @@ static struct sharpsl_charger_machinfo corgi_pm_machinfo = {
+ 	.fatal_acin_volt  = SHARPSL_FATAL_ACIN_VOLT,
+ 	.fatal_noacin_volt= SHARPSL_FATAL_NOACIN_VOLT,
+ 	.bat_levels       = 40,
+-	.bat_levels_noac  = spitz_battery_levels_noac,
+-	.bat_levels_acin  = spitz_battery_levels_acin,
++	.bat_levels_noac  = sharpsl_battery_levels_noac,
++	.bat_levels_acin  = sharpsl_battery_levels_acin,
+ 	.status_high_acin = 188,
+ 	.status_low_acin  = 178,
+ 	.status_high_noac = 185,
+diff --git a/arch/arm/mach-pxa/sharpsl.h b/arch/arm/mach-pxa/sharpsl.h
+index 55259f4..1439785 100644
+--- a/arch/arm/mach-pxa/sharpsl.h
++++ b/arch/arm/mach-pxa/sharpsl.h
+@@ -42,8 +42,8 @@ void corgi_lcdtg_hw_init(int mode);
+ #define MAX1111_BATT_TEMP   2u
+ #define MAX1111_ACIN_VOLT   6u
+ 
+-extern struct battery_thresh spitz_battery_levels_acin[];
+-extern struct battery_thresh spitz_battery_levels_noac[];
++extern struct battery_thresh sharpsl_battery_levels_acin[];
++extern struct battery_thresh sharpsl_battery_levels_noac[];
+ int sharpsl_pm_pxa_read_max1111(int channel);
+ 
+ 
+diff --git a/arch/arm/mach-pxa/sharpsl_pm.c b/arch/arm/mach-pxa/sharpsl_pm.c
+index dc3907f..67229a1 100644
+--- a/arch/arm/mach-pxa/sharpsl_pm.c
++++ b/arch/arm/mach-pxa/sharpsl_pm.c
+@@ -78,7 +78,7 @@ DEFINE_LED_TRIGGER(sharpsl_charge_led_trigger);
+ 
+ 
+ 
+-struct battery_thresh spitz_battery_levels_acin[] = {
++struct battery_thresh sharpsl_battery_levels_acin[] = {
+ 	{ 213, 100},
+ 	{ 212,  98},
+ 	{ 211,  95},
+@@ -121,7 +121,7 @@ struct battery_thresh spitz_battery_levels_acin[] = {
+ 	{   0,   0},
+ };
+ 
+-struct battery_thresh  spitz_battery_levels_noac[] = {
++struct battery_thresh sharpsl_battery_levels_noac[] = {
+ 	{ 213, 100},
+ 	{ 212,  98},
+ 	{ 211,  95},
+diff --git a/arch/arm/mach-pxa/spitz_pm.c b/arch/arm/mach-pxa/spitz_pm.c
+index 60bfaff..fc5a70c 100644
+--- a/arch/arm/mach-pxa/spitz_pm.c
++++ b/arch/arm/mach-pxa/spitz_pm.c
+@@ -208,8 +208,8 @@ struct sharpsl_charger_machinfo spitz_pm_machinfo = {
+ 	.fatal_acin_volt  = SHARPSL_FATAL_ACIN_VOLT,
+ 	.fatal_noacin_volt= SHARPSL_FATAL_NOACIN_VOLT,
+ 	.bat_levels       = 40,
+-	.bat_levels_noac  = spitz_battery_levels_noac,
+-	.bat_levels_acin  = spitz_battery_levels_acin,
++	.bat_levels_noac  = sharpsl_battery_levels_noac,
++	.bat_levels_acin  = sharpsl_battery_levels_acin,
+ 	.status_high_acin = 188,
+ 	.status_low_acin  = 178,
+ 	.status_high_noac = 185,
+
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+
+----- End forwarded message -----
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
