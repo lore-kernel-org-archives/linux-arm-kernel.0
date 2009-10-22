@@ -1,44 +1,27 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 22 Oct 2009 23:45:11 +0200
-Subject: [PATCH] Zaurus: Fix PROM partition table for spitz
-In-Reply-To: <f17812d70910221433x27998c6do4617d2b259d6ef90@mail.gmail.com>
-References: <1256245103.9561.11.camel@utx.utx.cz>
-	<f17812d70910221405v753eadbdu67c0d532ac77e222@mail.gmail.com>
-	<1256246014.9561.24.camel@utx.utx.cz>
-	<f17812d70910221433x27998c6do4617d2b259d6ef90@mail.gmail.com>
-Message-ID: <20091022214511.GB9364@elf.ucw.cz>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Thu, 22 Oct 2009 14:49:57 -0700
+Subject: [PATCH v3 4/4] iop: implement sched_clock()
+In-Reply-To: <19160.60691.72229.932486@pilspetsen.it.uu.se>
+References: <19160.60691.72229.932486@pilspetsen.it.uu.se>
+Message-ID: <e9c3a7c20910221449i6a9f8bc6y6b3af1f2f7fe1c44@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2009-10-23 05:33:27, Eric Miao wrote:
-> On Fri, Oct 23, 2009 at 5:13 AM, Stanislav Brabec <utx@penguin.cz> wrote:
-> > Eric Miao wrote:
-> >> I'm a bit upset that some things else may depend on the original
-> >> layout (though that's incorrect), and this possibly breaks the
-> >> sequence numbering of /dev/mtd?.
-> >
-> > It can break in many ways, e. g. by compiling one as module and another
-> > into kernel, and depends on order of modules load.
-> >
-> > That is why software should search partitions by name.
-> >
-> 
-> But there might be software that doesn't. I'd be a little bit
-> conservative about this.
-> 
-> > AFAIK, nothing uses the EN-JP or initial bootloader data in the 2.6.x
-> > distros, so it should be just safe housekeeping.
-> >
-> 
-> This, on the other hand, says it's also safe not to inserting
-> some additional partition in between :-)
-> 
-> (I won't refuse some comments to make this more clear in the code
-> though).
+Hi Mikael,
 
-I don't know. If the table is wrong, we should fix it. Yes, it may
-break someone, but it probably will not.
+On Fri, Oct 16, 2009 at 3:00 PM, Mikael Pettersson <mikpe@it.uu.se> wrote:
+> This adds a better sched_clock() to the IOP platform,
+> implemented using its new clocksource support.
+>
+> Tested on n2100, compile-tested for all plat-iop machines.
+>
+> Signed-off-by: Mikael Pettersson <mikpe@it.uu.se>
+> ---
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+I applied this series and my iop13xx does not get past "Uncompressing
+Linux".  Bisecting points to this patch i.e. the other three are ok
+(at least for booting).  Any ideas?  I won't have time to debug this
+for a while.
+
+Regards,
+Dan
