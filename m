@@ -1,96 +1,56 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 23 Oct 2009 06:18:53 +0800
-Subject: [PATCH] Zaurus: Fix NAND Flash OOB layout for Borzoi
-In-Reply-To: <1256245503.9561.18.camel@utx.utx.cz>
-References: <1256245503.9561.18.camel@utx.utx.cz>
-Message-ID: <f17812d70910221518n13a79e9t5bcc99027a900b46@mail.gmail.com>
+From: ospite@studenti.unina.it (Antonio Ospite)
+Date: Fri, 23 Oct 2009 00:36:31 +0200
+Subject: [WARNING] pxamci: 'pxa2xx-mci.0' does not have a release() function.
+Message-ID: <20091023003631.1331a60a.ospite@studenti.unina.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2009 at 5:05 AM, Stanislav Brabec <utx@penguin.cz> wrote:
-> Borzoi, Terrier and Akita use the same NAND Flash OOB layout, which
-> seems to be different from Spitz for some reason. Here is a fix.
->
-> When the code was ported to the platform data, the map was applied just
-> for Akita.
->
-> After this patch, Flash works again on Borzoi. Terrier still has a
-> problem with partition table? different from Borzoi (unfixable without
-> reading of the system configuration in flash) and JFFS2 partitions can
-> be mounted (with some "Empty flash at ... ends at ..." in the syslog).
->
-> Signed-off-by: Stanislav Brabec <utx@penguin.cz>
+Hi,
 
-OK, applied to 'fix'.
+I get this warning on shutdown. How to fix it properly?
 
->
-> diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
-> index ee8d603..c382d14 100644
-> --- a/arch/arm/mach-pxa/spitz.c
-> +++ b/arch/arm/mach-pxa/spitz.c
-> @@ -740,11 +783,34 @@ static void __init common_init(void)
-> ? ? ? ?pxa_set_i2c_info(NULL);
-> ?}
->
-> +#if defined(CONFIG_MACH_AKITA) || defined(CONFIG_MACH_BORZOI)
-> +static struct nand_bbt_descr sharpsl_akita_bbt = {
-> + ? ? ? .options = 0,
-> + ? ? ? .offs = 4,
-> + ? ? ? .len = 1,
-> + ? ? ? .pattern = scan_ff_pattern
-> +};
-> +
-> +static struct nand_ecclayout akita_oobinfo = {
-> + ? ? ? .eccbytes = 24,
-> + ? ? ? .eccpos = {
-> + ? ? ? ? ? ? ? ? ?0x5, 0x1, 0x2, 0x3, 0x6, 0x7, 0x15, 0x11,
-> + ? ? ? ? ? ? ? ? ?0x12, 0x13, 0x16, 0x17, 0x25, 0x21, 0x22, 0x23,
-> + ? ? ? ? ? ? ? ? ?0x26, 0x27, 0x35, 0x31, 0x32, 0x33, 0x36, 0x37},
-> + ? ? ? .oobfree = {{0x08, 0x09}}
-> +};
-> +#endif
-> +
-> ?#if defined(CONFIG_MACH_SPITZ) || defined(CONFIG_MACH_BORZOI)
-> ?static void __init spitz_init(void)
-> ?{
-> ? ? ? ?spitz_ficp_platform_data.gpio_pwdown = SPITZ_GPIO_IR_ON;
->
-> + ? ? ? if (machine_is_borzoi()) {
-> + ? ? ? ? ? ? ? sharpsl_nand_platform_data.badblock_pattern = &sharpsl_akita_bbt;
-> + ? ? ? ? ? ? ? sharpsl_nand_platform_data.ecc_layout = &akita_oobinfo;
-> + ? ? ? }
-> +
-> ? ? ? ?platform_scoop_config = &spitz_pcmcia_config;
->
-> ? ? ? ?common_init();
-> @@ -769,22 +835,6 @@ static struct i2c_board_info akita_i2c_board_info[] = {
-> ? ? ? ?},
-> ?};
->
-> -static struct nand_bbt_descr sharpsl_akita_bbt = {
-> - ? ? ? .options = 0,
-> - ? ? ? .offs = 4,
-> - ? ? ? .len = 1,
-> - ? ? ? .pattern = scan_ff_pattern
-> -};
-> -
-> -static struct nand_ecclayout akita_oobinfo = {
-> - ? ? ? .eccbytes = 24,
-> - ? ? ? .eccpos = {
-> - ? ? ? ? ? ? ? ? ?0x5, 0x1, 0x2, 0x3, 0x6, 0x7, 0x15, 0x11,
-> - ? ? ? ? ? ? ? ? ?0x12, 0x13, 0x16, 0x17, 0x25, 0x21, 0x22, 0x23,
-> - ? ? ? ? ? ? ? ? ?0x26, 0x27, 0x35, 0x31, 0x32, 0x33, 0x36, 0x37},
-> - ? ? ? .oobfree = {{0x08, 0x09}}
-> -};
-> -
-> ?static void __init akita_init(void)
-> ?{
-> ? ? ? ?spitz_ficp_platform_data.gpio_pwdown = AKITA_GPIO_IR_ON;
->
->
->
-> ________________________________________________________________________
-> Stanislav Brabec
-> http://www.penguin.cz/~utx/zaurus
->
->
+FYI, in my setup pxa2xx_spi is the parent for pxamci, set using
+this patch:
+http://git.openezx.org/openezx.git?a=commitdiff;h=0ffd85ad8faea3456d4ecf5f63ae65aca26fff21
+
+WARNING: at drivers/base/core.c:124 device_release+0x68/0x7c()
+Device 'pxa2xx-mci.0' does not have a release() function, it is broken and must be fixed.
+Modules linked in: bridge stp llc ipv6
+[<c002fd44>] (unwind_backtrace+0x0/0xe0) from [<c004399c>] (warn_slowpath_common+0x4c/0x68)
+[<c004399c>] (warn_slowpath_common+0x4c/0x68) from [<c00439f4>] (warn_slowpath_fmt+0x28/0x38)
+[<c00439f4>] (warn_slowpath_fmt+0x28/0x38) from [<c01717c4>] (device_release+0x68/0x7c)
+[<c01717c4>] (device_release+0x68/0x7c) from [<c0134a38>] (kobject_release+0x5c/0x74)
+[<c0134a38>] (kobject_release+0x5c/0x74) from [<c0135778>] (kref_put+0x68/0x7c)
+[<c0135778>] (kref_put+0x68/0x7c) from [<c029b47c>] (klist_next+0xa8/0xb4)
+[<c029b47c>] (klist_next+0xa8/0xb4) from [<c0170674>] (next_device+0xc/0x1c)
+[<c0170674>] (next_device+0xc/0x1c) from [<c01706c8>] (device_for_each_child+0x44/0x6c)
+[<c01706c8>] (device_for_each_child+0x44/0x6c) from [<c0183308>] (spi_unregister_master+0x18/0x28)
+[<c0183308>] (spi_unregister_master+0x18/0x28) from [<c0183f48>] (pxa2xx_spi_remove+0xd4/0xf0)
+[<c0183f48>] (pxa2xx_spi_remove+0xd4/0xf0) from [<c01845ac>] (pxa2xx_spi_shutdown+0x10/0x48)
+[<c01845ac>] (pxa2xx_spi_shutdown+0x10/0x48) from [<c01749b4>] (platform_drv_shutdown+0x1c/0x24)
+[<c01749b4>] (platform_drv_shutdown+0x1c/0x24) from [<c0170410>] (device_shutdown+0x5c/0xbc)
+[<c0170410>] (device_shutdown+0x5c/0xbc) from [<c00525cc>] (kernel_power_off+0x10/0x44)
+[<c00525cc>] (kernel_power_off+0x10/0x44) from [<c0053844>] (sys_reboot+0x118/0x1d8)
+[<c0053844>] (sys_reboot+0x118/0x1d8) from [<c0029f20>] (ret_fast_syscall+0x0/0x34)
+
+Thanks,
+   Antonio
+
+-- 
+Antonio Ospite
+http://ao2.it
+
+PGP public key ID: 0x4553B001
+
+A: Because it messes up the order in which people normally read text.
+   See http://en.wikipedia.org/wiki/Posting_style
+Q: Why is top-posting such a bad thing?
+A: Top-posting.
+Q: What is the most annoying thing in e-mail?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091023/67e4583e/attachment.sig>
