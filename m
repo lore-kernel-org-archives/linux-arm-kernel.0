@@ -1,66 +1,78 @@
-From: 914059751@qq.com (rocky)
-Date: Tue, 20 Oct 2009 18:18:59 +0800
-Subject: =?gb2312?B?tPC4tDogQVJNMTE3NiBnb2VzIHdpbGQgd2hlbiBNTVUgb24gbGluZQ==?=
-In-Reply-To: <761ea48b0910200259i7b98aa41i25af3beb58b56cda@mail.gmail.com>
-References: <tencent_238CF8B63259E7C90B7B75AF@qq.com>
-	<761ea48b0910200259i7b98aa41i25af3beb58b56cda@mail.gmail.com>
-Message-ID: <0EDD94343D3747C4B7953C144F2E8800@dufan>
+From: hongjiujing@gmail.com (tommy tommy)
+Date: Thu, 22 Oct 2009 19:05:50 +0800
+Subject: MXC MMC driver and SDIO peripherals
+In-Reply-To: <20091022081933.GC8818@pengutronix.de>
+References: <20091021192038.GK14091@buzzloop.caiaq.de>
+	<1256156119.8469.40.camel@localhost.localdomain>
+	<20091021205156.GO14091@buzzloop.caiaq.de>
+	<20091022081933.GC8818@pengutronix.de>
+Message-ID: <48cbf6bf0910220405k1fa5837ay20e135bc321b24e@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM1176 is definitely an ARMv7 VMSA! Its CPUID is:0x410FB764, check the
-following code to see how does kernel code decide which architecture
-operation procedure to use.
+hi,sir!
 
-BTW: S3C6410 is also based on ARM1176 core, it uses ARMv7 cache calls as
-well.
+1:your memory card test is fine,it can indicate sdhc data communicate ok
+with sdio dma!
+2:just use scope to test and know its clock,wifi clock is very strict,if
+clock is lower ,will
+get some issue.if sdio clock bigger than 25M or very slower,will get some
+issue!
+3:no relation with your MCU DMA,just SDIO DMA!
 
---------------- Arch/arm/boot/compressed/head.S -------------------
-/*
- * Here follow the relocatable cache support functions for the
- * various processors.  This is a generic hook for locating an
- * entry and jumping to an instruction at the specified offset
- * from the start of the block.  Please note this is all position
- * independent code.
- *
- *  r1  = corrupted
- *  r2  = corrupted
- *  r3  = block offset
- *  r6  = corrupted
- *  r12 = corrupted
- */
+2009/10/22 Sascha Hauer <s.hauer@pengutronix.de>
 
-call_cache_fn:	adr	r12, proc_types
-#ifdef CONFIG_CPU_CP15
-		mrc	p15, 0, r6, c0, c0	@ get processor ID
-#else
-		ldr	r6, =CONFIG_PROCESSOR_ID
-#endif
-1:		ldr	r1, [r12, #0]		@ get value
-		ldr	r2, [r12, #4]		@ get mask
-		eor	r1, r1, r6		@ (real ^ match)
-		tst	r1, r2			@       & mask
-		addeq	pc, r12, r3		@ call cache function
-		add	r12, r12, #4*5
-		b	1b
-proc_types
-		.word	0x000f0000		@ new CPU Id
-		.word	0x000f0000
-		b	__armv7_mmu_cache_on
-		b	__armv7_mmu_cache_off
-		b	__armv7_mmu_cache_flush
-
------????-----
-???: Laurent Desnogues [mailto:laurent.desnogues at gmail.com] 
-????: 2009?10?20? 18:00
-???: ???
-??: linux-arm-kernel
-??: Re: ARM1176 goes wild when MMU on line
-
-2009/10/20 ??? <914059751@qq.com>:
-> ARM1176 has ARMv7 VMSA. ?Am I?missing something obvious?
-
-Is that a typo? ARM1176 is an ARMv6 chip, not an ARMv7 one.
-
-
-Laurent
+> On Wed, Oct 21, 2009 at 10:51:56PM +0200, Daniel Mack wrote:
+> > Hi Dan,
+> >
+> > On Wed, Oct 21, 2009 at 01:15:19PM -0700, Dan Williams wrote:
+> > > On Wed, 2009-10-21 at 21:20 +0200, Daniel Mack wrote:
+> > > > Hi,
+> > > >
+> > > > we're having trouble getting SDIO connected harware to fly on MX31
+> based
+> > > > designs. In particular, a SD8686 chip supported by the libertas_sdio
+> > > > driver will hang forever when built without CONFIG_MMC_DEBUG=y. With
+> > > > that option selected, however, the behaviour is a little different,
+> and
+> > > > I can at least see the following messages on a recent 2.6.32-rc5
+> based
+> > > > MX31 tree.
+> > > >
+> > > > Is there any common pitfall for such setups? I did more or less the
+> same
+> > > > thing on PXAs (same WLAN chip, same kind of interface, same
+> firmware),
+> > > > and haven't seen any such effects, so I suspect the MXC specific
+> parts
+> > > > to be the reason for that. Any ideas?
+> > >
+> > > Any idea what quirks your SDHC is using if any?  Does it require PIO or
+> > > can it do DMA?
+> >
+> > In mainline kernels, DMA is limited to the MX2 SoC family. The MX3 that
+> > I'm using is excluded from that feature, but I'mm not aware of the
+> > reason for that.
+>
+> The reason is that the i.MX31/35/25 have a so called Smart DMA engine
+> (SDMA). So far nobody has been smart enough to clean the Freescale code
+> up for mainline. The original DMA engine this driver works with is
+> equipped with the i.MX1/21/27 processors.
+>
+> Sascha
+>
+>
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091022/b1da27d9/attachment.htm>
