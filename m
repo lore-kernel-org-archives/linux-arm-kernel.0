@@ -1,20 +1,25 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 23 Oct 2009 06:48:38 +0800
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Oct 2009 23:57:58 +0100
 Subject: [WARNING] pxamci: 'pxa2xx-mci.0' does not have a release()
 	function.
 In-Reply-To: <20091023003631.1331a60a.ospite@studenti.unina.it>
 References: <20091023003631.1331a60a.ospite@studenti.unina.it>
-Message-ID: <f17812d70910221548l31b09e94tf41d7987628450f4@mail.gmail.com>
+Message-ID: <20091022225758.GA9106@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2009 at 6:36 AM, Antonio Ospite
-<ospite@studenti.unina.it> wrote:
+On Fri, Oct 23, 2009 at 12:36:31AM +0200, Antonio Ospite wrote:
 > Hi,
->
+> 
 > I get this warning on shutdown. How to fix it properly?
->
+> 
+> FYI, in my setup pxa2xx_spi is the parent for pxamci, set using
+> this patch:
+> http://git.openezx.org/openezx.git?a=commitdiff;h=0ffd85ad8faea3456d4ecf5f63ae65aca26fff21
 
-This is weird, as if pxa2xx_set_spi_info() is used, the pxa2xx-spi device
-is actually created by platform_device_alloc(), which has a default
-release function of "platform_device_release()".
+This sounds like it's the cause of the problem - from the backtrace, it
+looks like SPI expects the children of the SPI device to be its own
+responsibility to maintain.
+
+Hence, because you've made pxamci a child of SPI, SPI is trying to
+unregister and release the pxamci device.
