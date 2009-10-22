@@ -1,36 +1,37 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 23 Oct 2009 03:49:04 +0800
-Subject: zaurus: cleanup sharpsl_pm.c
-In-Reply-To: <20091022193532.GC6611@elf.ucw.cz>
-References: <20091006200339.GA1538@ucw.cz> <20091017163627.GB1423@ucw.cz>
-	<f17812d70910200859v6d18e81bs2760d8af1d8da5bf@mail.gmail.com>
-	<f17812d70910220705o9f4a0ddwa22157b59a519350@mail.gmail.com>
-	<20091022174816.GC5325@elf.ucw.cz>
-	<f17812d70910221126k50c4ea7em9d58f6e85db884ae@mail.gmail.com>
-	<20091022191954.GB6611@elf.ucw.cz>
-	<f17812d70910221228y6613ff5eg813129b37ccfe0a1@mail.gmail.com>
-	<20091022193532.GC6611@elf.ucw.cz>
-Message-ID: <f17812d70910221249p98d9cc3n30b27cd9a86254b0@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 22 Oct 2009 21:49:02 +0200
+Subject: [at91sam9g45] fail to start second kernel via kexec if
+	watchdog is enabled
+In-Reply-To: <4ADEE5EE.8020205@visionsystems.de>
+References: <4ADEE5EE.8020205@visionsystems.de>
+Message-ID: <20091022194902.GM19714@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2009 at 3:35 AM, Pavel Machek <pavel@ucw.cz> wrote:
-> Hi!
->
->> > Well, I'd say that the sharing leads to some very ugly code. ... so
->> > I'd preer it unshared.
->> >
->>
->> I suggest to re-name it to "sharpsl_" something instead of "spitz_",
->> to be less confusing at this moment.
->
-> Yep, but lets do that as next patch, ok?
->
->> > But if you would prefer, I can prepare patch without the table
->> > moving...?
->>
->> That would be appreciated.
->
-> Here it is.
+On 12:43 Wed 21 Oct     , Yegor Yefremov wrote:
+> Hello,
+> 
+> I have problem booting the second kernel after enabling the watchdog following these steps: http://www.at91.com/index.php?option=com_jfusion&Itemid=57&jfile=viewtopic.php&f=12&t=5551&p=29283&hilit=watchdog+bootstrap#p29283
+> Bootstrap: don't touch watchdog
+> U-Boot: configure watchdog and set the timer counter value to 16 seconds
+> Linux: keep pinging the watchdog
+> 
+> The first kernel (booted from u-boot) is working as expected, but if I start the new one using kexec it gets only till frame buffer init:
+> 
+> ....
+> NetWinder Floating Point Emulator V0.97 (double precision)
+> Slow work thread pool: Starting up
+> Slow work thread pool: Ready
+> JFFS2 version 2.2. (NAND) -? 2001-2006 Red Hat, Inc.
+> msgmni has been set to 245
+> io scheduler noop registered
+> io scheduler anticipatory registered (default)
+> atmel_lcdfb atmel_lcdfb.0: backlight control is not available
+> atmel_lcdfb atmel_lcdfb.0: 510KiB frame buffer at 77980000 (mapped at ffa00000)
+> Start AT91Bootstrap...
+> 
+> Without watchdog there is no problem. Both kernels (2.6.32-rc5) are the same. Any idea?
+do you enable the watchdog in the send kernel?
 
-Applied.
+Best Regards,
+J.
