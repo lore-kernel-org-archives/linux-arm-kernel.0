@@ -1,7 +1,7 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 22 Oct 2009 16:09:46 -0700
-Subject: [PATCH v2 25/32] OMAP3: PM: Wait for SDRC ready iso a blind delay
-In-Reply-To: <1256252993-24328-25-git-send-email-khilman@deeprootsystems.com>
+Date: Thu, 22 Oct 2009 16:09:47 -0700
+Subject: [PATCH v2 26/32] OMAP3: PM debug: allow runtime toggle of PM features
+In-Reply-To: <1256252993-24328-26-git-send-email-khilman@deeprootsystems.com>
 References: <1256252993-24328-1-git-send-email-khilman@deeprootsystems.com>
 	<1256252993-24328-2-git-send-email-khilman@deeprootsystems.com>
 	<1256252993-24328-3-git-send-email-khilman@deeprootsystems.com>
@@ -27,111 +27,163 @@ References: <1256252993-24328-1-git-send-email-khilman@deeprootsystems.com>
 	<1256252993-24328-23-git-send-email-khilman@deeprootsystems.com>
 	<1256252993-24328-24-git-send-email-khilman@deeprootsystems.com>
 	<1256252993-24328-25-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1256252993-24328-26-git-send-email-khilman@deeprootsystems.com>
+	<1256252993-24328-26-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1256252993-24328-27-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Peter 'p2' De Schrijver <peter.de-schrijver@nokia.com>
+Allow enable/disable of low-power states during idle.  To
+enable low-power idle:
 
-This patch improves the wakeup SRAM code polling the SDRC to become ready
-instead of just waiting for a fixed amount of time.
+   echo 1 > /debug/pm_debug/sleep_while_idle
 
-Signed-off-by: Peter 'p2' De Schrijver <peter.de-schrijver@nokia.com>
+ to disable:
+
+   echo 0 > /debug/pm_debug/sleep_while_idle
+
+Also allow enable/disable of OFF-mode.  To enable:
+
+   echo 1 > /debug/pm_debug/enable_off_mode
+
+ to disable:
+
+   echo 0 > /debug/pm_debug/enable_off_mode
+
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/sleep34xx.S |   48 +++++++++++++++++++++++++++++---------
- 1 files changed, 36 insertions(+), 12 deletions(-)
+ arch/arm/mach-omap2/pm-debug.c |   27 +++++++++++++++++++++++++++
+ arch/arm/mach-omap2/pm.h       |    4 ++++
+ arch/arm/mach-omap2/pm34xx.c   |   22 ++++++++++++++++++++++
+ arch/arm/mach-omap2/serial.c   |    2 --
+ 4 files changed, 53 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
-index dedfa0e..15268f8 100644
---- a/arch/arm/mach-omap2/sleep34xx.S
-+++ b/arch/arm/mach-omap2/sleep34xx.S
-@@ -29,6 +29,7 @@
- #include <mach/io.h>
- #include <plat/control.h>
+diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
+index 7eb2c12..1725da3 100644
+--- a/arch/arm/mach-omap2/pm-debug.c
++++ b/arch/arm/mach-omap2/pm-debug.c
+@@ -527,6 +527,29 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *dir)
+ 	return 0;
+ }
  
-+#include "cm.h"
- #include "prm.h"
- #include "sdrc.h"
++static int option_get(void *data, u64 *val)
++{
++	u32 *option = data;
++
++	*val = *option;
++
++	return 0;
++}
++
++static int option_set(void *data, u64 val)
++{
++	u32 *option = data;
++
++	*option = val;
++
++	if (option == &enable_off_mode)
++		omap3_pm_off_mode_enable(val);
++
++	return 0;
++}
++
++DEFINE_SIMPLE_ATTRIBUTE(pm_dbg_option_fops, option_get, option_set, "%llu\n");
++
+ static int __init pm_dbg_init(void)
+ {
+ 	int i;
+@@ -569,6 +592,10 @@ static int __init pm_dbg_init(void)
  
-@@ -38,6 +39,7 @@
- #define PM_PREPWSTST_MPU_V	OMAP34XX_PRM_REGADDR(MPU_MOD, \
- 				OMAP3430_PM_PREPWSTST)
- #define PM_PWSTCTRL_MPU_P	OMAP3430_PRM_BASE + MPU_MOD + PM_PWSTCTRL
-+#define CM_IDLEST1_CORE_V	OMAP34XX_CM_REGADDR(CORE_MOD, CM_IDLEST1)
- #define SRAM_BASE_P		0x40200000
- #define CONTROL_STAT		0x480022F0
- #define SCRATCHPAD_MEM_OFFS	0x310 /* Move this as correct place is
-@@ -52,6 +54,8 @@
- #define SDRC_MR_1_P		(OMAP343X_SDRC_BASE + SDRC_MR_1)
- #define SDRC_EMR2_1_P		(OMAP343X_SDRC_BASE + SDRC_EMR2_1)
- #define SDRC_MANUAL_1_P		(OMAP343X_SDRC_BASE + SDRC_MANUAL_1)
-+#define SDRC_DLLA_STATUS_V	OMAP34XX_SDRC_REGADDR(SDRC_DLLA_STATUS)
-+#define SDRC_DLLA_CTRL_V	OMAP34XX_SDRC_REGADDR(SDRC_DLLA_CTRL)
+ 		}
  
- 	.text
- /* Function call to get the restore pointer for resume from OFF */
-@@ -187,7 +191,7 @@ loop:
- 	nop
- 	nop
- 	nop
--	bl i_dll_wait
-+	bl wait_sdrc_ok
++	(void) debugfs_create_file("enable_off_mode", S_IRUGO | S_IWUGO, d,
++				   &enable_off_mode, &pm_dbg_option_fops);
++	(void) debugfs_create_file("sleep_while_idle", S_IRUGO | S_IWUGO, d,
++				   &sleep_while_idle, &pm_dbg_option_fops);
+ 	pm_dbg_init_done = 1;
  
- 	ldmfd	sp!, {r0-r12, pc}		@ restore regs and return
- restore_es3:
-@@ -539,21 +543,41 @@ skip_l2_inval:
- 	nop
- 	nop
- 	nop
--	bl i_dll_wait
-+	bl wait_sdrc_ok
- 	/* restore regs and return */
- 	ldmfd   sp!, {r0-r12, pc}
+ 	return 0;
+diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+index 45cafac..9582793 100644
+--- a/arch/arm/mach-omap2/pm.h
++++ b/arch/arm/mach-omap2/pm.h
+@@ -13,7 +13,11 @@
  
--i_dll_wait:
--	ldr     r4, clk_stabilize_delay
-+/* Make sure SDRC accesses are ok */
-+wait_sdrc_ok:
-+        ldr     r4, cm_idlest1_core
-+        ldr     r5, [r4]
-+        and     r5, r5, #0x2
-+        cmp     r5, #0
-+        bne     wait_sdrc_ok
-+        ldr     r4, sdrc_power
-+        ldr     r5, [r4]
-+        bic     r5, r5, #0x40
-+        str     r5, [r4]
-+wait_dll_lock:
-+        /* Is dll in lock mode? */
-+        ldr     r4, sdrc_dlla_ctrl
-+        ldr     r5, [r4]
-+        tst     r5, #0x4
-+        bxne    lr
-+        /* wait till dll locks */
-+        ldr     r4, sdrc_dlla_status
-+        ldr     r5, [r4]
-+        and     r5, r5, #0x4
-+        cmp     r5, #0x4
-+        bne     wait_dll_lock
-+        bx      lr
+ #include <plat/powerdomain.h>
  
--i_dll_delay:
--	subs    r4, r4, #0x1
--	bne     i_dll_delay
--	ldr     r4, sdrc_power
--	ldr     r5, [r4]
--	bic     r5, r5, #0x40
--	str     r5, [r4]
--	bx	lr
-+cm_idlest1_core:
-+	.word	CM_IDLEST1_CORE_V
-+sdrc_dlla_status:
-+	.word	SDRC_DLLA_STATUS_V
-+sdrc_dlla_ctrl:
-+	.word	SDRC_DLLA_CTRL_V
- pm_prepwstst_core:
- 	.word	PM_PREPWSTST_CORE_V
- pm_prepwstst_core_p:
++extern u32 enable_off_mode;
++extern u32 sleep_while_idle;
++
+ extern void *omap3_secure_ram_storage;
++extern void omap3_pm_off_mode_enable(int);
+ 
+ extern int omap3_pm_get_suspend_state(struct powerdomain *pwrdm);
+ extern int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state);
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 90d1dc5..ade2e4a 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -25,6 +25,7 @@
+ #include <linux/list.h>
+ #include <linux/err.h>
+ #include <linux/gpio.h>
++#include <linux/clk.h>
+ 
+ #include <plat/sram.h>
+ #include <plat/clockdomain.h>
+@@ -57,6 +58,9 @@
+ #define OMAP343X_TABLE_VALUE_OFFSET	   0x30
+ #define OMAP343X_CONTROL_REG_VALUE_OFFSET  0x32
+ 
++u32 enable_off_mode;
++u32 sleep_while_idle;
++
+ struct power_state {
+ 	struct powerdomain *pwrdm;
+ 	u32 next_state;
+@@ -456,6 +460,8 @@ static int omap3_fclks_active(void)
+ 
+ static int omap3_can_sleep(void)
+ {
++	if (!sleep_while_idle)
++		return 0;
+ 	if (!omap_uart_can_sleep())
+ 		return 0;
+ 	if (omap3_fclks_active())
+@@ -900,6 +906,22 @@ static void __init prcm_setup_regs(void)
+ 	omap3_d2d_idle();
+ }
+ 
++void omap3_pm_off_mode_enable(int enable)
++{
++	struct power_state *pwrst;
++	u32 state;
++
++	if (enable)
++		state = PWRDM_POWER_OFF;
++	else
++		state = PWRDM_POWER_RET;
++
++	list_for_each_entry(pwrst, &pwrst_list, node) {
++		pwrst->next_state = state;
++		set_pwrdm_state(pwrst->pwrdm, state);
++	}
++}
++
+ int omap3_pm_get_suspend_state(struct powerdomain *pwrdm)
+ {
+ 	struct power_state *pwrst;
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+index dabc089..2e17b57 100644
+--- a/arch/arm/mach-omap2/serial.c
++++ b/arch/arm/mach-omap2/serial.c
+@@ -155,8 +155,6 @@ static inline void __init omap_uart_reset(struct omap_uart_state *uart)
+ 
+ #if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3)
+ 
+-static int enable_off_mode; /* to be removed by full off-mode patches */
+-
+ static void omap_uart_save_context(struct omap_uart_state *uart)
+ {
+ 	u16 lcr = 0;
 -- 
 1.6.4.3
