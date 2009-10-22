@@ -1,58 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 22 Oct 2009 22:18:33 +0100
-Subject: coherent memory should be ARMv6's Device Memory?
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02BB47FD79@dbde02.ent.ti.com>
-References: <ede8cc2f231dda80cc85839cb94ec565.squirrel@www.codeaurora.org>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02BB47FD79@dbde02.ent.ti.com>
-Message-ID: <1256246313.5076.12.camel@pc1117.cambridge.arm.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 23 Oct 2009 05:33:27 +0800
+Subject: [PATCH] Zaurus: Fix PROM partition table for spitz
+In-Reply-To: <1256246014.9561.24.camel@utx.utx.cz>
+References: <1256245103.9561.11.camel@utx.utx.cz>
+	<f17812d70910221405v753eadbdu67c0d532ac77e222@mail.gmail.com>
+	<1256246014.9561.24.camel@utx.utx.cz>
+Message-ID: <f17812d70910221433x27998c6do4617d2b259d6ef90@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2009-10-22 at 02:05 +0530, Shilimkar, Santosh wrote:
-> > -----Original Message-----
-> > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
-> > arm-kernel-bounces at lists.infradead.org] On Behalf Of
-> > adharmap at codeaurora.org
-> > Sent: Thursday, October 22, 2009 1:20 AM
-> > To: linux-arm-kernel at lists.infradead.org
-> > Subject: coherent memory should be ARMv6's Device Memory?
-> > 
-> > The current implementation of __dma_alloc  on ARMv7 based cpu
-> > returns
-> > Strongly Ordered Memory. On my uniprocessor  hardware the strongly
-> > ordered
-> > memory causes the reads after a DMA_FROM_DEVICE transfer to be slow.
-> > I
-> > think __dma_alloc returns StronglyOrdered memory on all v6 and v7
-> > variants
-> > where arch_is_coherent is false.
-> > 
-> > In my opinion, coherent memory should be changed from Strongly
-> > Ordered
-> > Memory to device memory for the following reasons
-> > 1. Device and Strongly Ordered are both non-cacheable and hence
-> > shareable
-> > and coherent.
-> > 2. There are no speculative fetches from Device and StronglyOrdered
-> > 3. The Program order is guaranteed for access to Device and Strongly
-> > Order
-> > memory
-> > 4. Device accesses don't insert a "dmb" after each accesses and
-> > hence are
-> > faster
-> > 
-> > I am thinking of changing the pgprot_uncached to pgprot_device  in
-> > dma_alloc_coherent in dma-mapping.c.
-> 
-> Just think about the DMA usage where DMA don't see the same copy in
-> the memory because some data is still there in the Write buffer. This
-> means which such a memory you always need to have DWB / DSB to ensure
-> that your DMA sees correct copy. Effectively you are taking away the
-> buffering advantage because DMA needs it that way.
+On Fri, Oct 23, 2009 at 5:13 AM, Stanislav Brabec <utx@penguin.cz> wrote:
+> Eric Miao wrote:
+>> I'm a bit upset that some things else may depend on the original
+>> layout (though that's incorrect), and this possibly breaks the
+>> sequence numbering of /dev/mtd?.
+>
+> It can break in many ways, e. g. by compiling one as module and another
+> into kernel, and depends on order of modules load.
+>
+> That is why software should search partitions by name.
+>
 
-It depends on the amount of data you write, the CPU may optimise
-accesses to device or normal uncached memory much better than SO memory
-(which looks pretty much like having a DSB after every access).
+But there might be software that doesn't. I'd be a little bit
+conservative about this.
 
--- 
-Catalin
+> AFAIK, nothing uses the EN-JP or initial bootloader data in the 2.6.x
+> distros, so it should be just safe housekeeping.
+>
+
+This, on the other hand, says it's also safe not to inserting
+some additional partition in between :-)
+
+(I won't refuse some comments to make this more clear in the code
+though).
