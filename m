@@ -1,60 +1,33 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 23 Oct 2009 05:05:29 +0800
-Subject: [PATCH] Zaurus: Fix PROM partition table for spitz
-In-Reply-To: <1256245103.9561.11.camel@utx.utx.cz>
-References: <1256245103.9561.11.camel@utx.utx.cz>
-Message-ID: <f17812d70910221405v753eadbdu67c0d532ac77e222@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 22 Oct 2009 22:12:49 +0100
+Subject: coherent memory should be ARMv6's Device Memory?
+In-Reply-To: <ede8cc2f231dda80cc85839cb94ec565.squirrel@www.codeaurora.org>
+References: <ede8cc2f231dda80cc85839cb94ec565.squirrel@www.codeaurora.org>
+Message-ID: <1256245969.5076.9.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm a bit upset that some things else may depend on the original
-layout (though that's incorrect), and this possibly breaks the
-sequence numbering of /dev/mtd?.
+On Wed, 2009-10-21 at 12:50 -0700, adharmap at codeaurora.org wrote:
+> The current implementation of __dma_alloc  on ARMv7 based cpu returns
+> Strongly Ordered Memory. On my uniprocessor  hardware the strongly ordered
+> memory causes the reads after a DMA_FROM_DEVICE transfer to be slow. I
+> think __dma_alloc returns StronglyOrdered memory on all v6 and v7 variants
+> where arch_is_coherent is false.
+> 
+> In my opinion, coherent memory should be changed from Strongly Ordered
+> Memory to device memory for the following reasons
+[...]
+> I am thinking of changing the pgprot_uncached to pgprot_device  in
+> dma_alloc_coherent in dma-mapping.c.
 
-On Fri, Oct 23, 2009 at 4:58 AM, Stanislav Brabec <utx@penguin.cz> wrote:
-> Attached patch fixes partition table of the Zaurus PROM. It works on
-> terrier, but I guess it is common for all Zaurus models.
->
-> The partition marked ??"Boot PROM Filesystem" is a fact a database file
-> for EN-JP dictionary. Designers decided to put the English-Japanese
-> translation dictionary to the remaining part of the PROM.
->
-> Changes:
->
-> Newly mapped the bootloader system as "Boot PROM System".
->
-> Already mapped EN-JP dictionary changes its name from ?"Boot PROM
-> Filesystem" to "EN-JP Data File".
->
-> How to verify the layout on other models:
-> ?root at zaurus:~# modprobe physmap
-> root at zaurus:~# file -s /dev/mtd4
-> /dev/mtd4: DBase 3 data file (1031668283 records)
->
-> Signed-off-by: Stanislav Brabec <utx@penguin.cz>
->
-> diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
-> index ee8d603..c382d14 100644
-> --- a/arch/arm/mach-pxa/spitz.c
-> +++ b/arch/arm/mach-pxa/spitz.c
-> @@ -658,7 +696,11 @@ static struct platform_device sharpsl_nand_device = {
->
-> ?static struct mtd_partition sharpsl_rom_parts[] = {
-> ? ? ? ?{
-> - ? ? ? ? ? ? ? .name ? ="Boot PROM Filesystem",
-> + ? ? ? ? ? ? ? .name ? ="Boot PROM System",
-> + ? ? ? ? ? ? ? .offset = 0x00100000,
-> + ? ? ? },
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .name ? ="EN-JP Data File",
-> ? ? ? ? ? ? ? ?.offset = 0x00140000,
-> ? ? ? ? ? ? ? ?.size ? = MTDPART_SIZ_FULL,
-> ? ? ? ?},
->
->
->
-> ________________________________________________________________________
-> Stanislav Brabec
-> http://www.penguin.cz/~utx/zaurus
->
->
+If we want to be safe on ARMv7, we should actually change it to
+pgprot_writecombine() which creates Norman uncached memory. According to
+the ARM ARM (and hardware that we may see in the future), it is
+Unpredictable to have two aliases to the same physical location using
+different memory types (i.e. Normal vs SO or Device). With some
+restriction, the hardware can cope with multiple Normal memory mappings
+with different cacheability attributes (cached vs uncached). Drivers
+would also need to use a barrier.
+
+-- 
+Catalin
