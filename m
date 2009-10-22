@@ -1,35 +1,23 @@
-From: simon.kagstrom@netinsight.net (Simon Kagstrom)
-Date: Thu, 22 Oct 2009 12:47:56 +0200
-Subject: [PATCHv3] [ARM] kirkwood: combine support for openrd
-	base/client support
-In-Reply-To: <pbh5r6-os7.ln1@chipmunk.wormnet.eu>
-References: <pbh5r6-os7.ln1@chipmunk.wormnet.eu>
-Message-ID: <20091022124756.56e89d7a@marrow.netinsight.se>
+From: broonie@sirena.org.uk (Mark Brown)
+Date: Thu, 22 Oct 2009 11:59:43 +0100
+Subject: about ARM11 WM9715 no sound when resume
+In-Reply-To: <1256208322.23498.1.camel@tommy-desktop>
+References: <1256180289.11383.0.camel@tommy-desktop>
+	<20091022103927.GB3776@sirena.org.uk>
+	<1256208322.23498.1.camel@tommy-desktop>
+Message-ID: <20091022105943.GC3776@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Oct 2009 09:22:49 +0100
-Alexander Clouter <alex@digriz.org.uk> wrote:
+On Thu, Oct 22, 2009 at 06:45:22PM +0800, tommy wrote:
 
-> +static int __init openrd_pci_init(void)
-> +{
-> +	kirkwood_pcie_init();
+Please don't top post, it breaks the flow of discussion.
 
-I think you should do
+> hi,brown!
+> It can playback mp3 from start to end,also can't indicate its clock is
+> ok ?
 
-	if (machine_is_openrd_base() || machine_is_openrd_client())
-		kirkwood_pcie_init();
+To check the clock you should use an oscilloscope to make sure that the
+clock is present and running at the expected rate.
 
-here instead since there might be other boards configured as well where
-this shouldn't be done (e.g., a build with both sheevaplug and the
-OpenRDs).
-
-> diff --git a/arch/arm/mach-kirkwood/openrd_base-setup.c b/arch/arm/mach-kirkwood/openrd_base-setup.c
-
-Perhaps it's a good idea to rebase this one against Nicolas orion.git tree at
-
-  http://git.marvell.com/?p=orion.git;a=summary
-
-?
-
-// Simon
+I'm not sure what you mean about MP3 playback?
