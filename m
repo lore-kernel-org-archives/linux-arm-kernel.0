@@ -1,23 +1,47 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 22 Oct 2009 09:05:27 +0200
-Subject: spitz backlight: fix brightness limiting
-In-Reply-To: <f17812d70910211320s29d3aaa5tad3206df1e99e03b@mail.gmail.com>
-References: <20091019213751.GC1482@ucw.cz>
-	<f17812d70910211320s29d3aaa5tad3206df1e99e03b@mail.gmail.com>
-Message-ID: <20091022070527.GE2211@elf.ucw.cz>
+Date: Thu, 22 Oct 2009 09:21:19 +0200
+Subject: msm_sdcc.c: add missing include
+Message-ID: <20091022072119.GA3285@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2009-10-22 04:20:34, Eric Miao wrote:
-> It's a little bit weird it's called 'limit_mask' when I first converted it
-> to a spi driver. There must be some reasons, Richard, you've got
-> any ideas?
 
-Yes, the code was "interesting"...
+Add missing include for	msm_sdcc compilation.
 
-I can certainly do the rename, but maybe we can fix the issue now and
-do futher cleanups later?
-								Pavel
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
+
+diff --git a/arch/arm/include/asm/mach/mmc.h b/arch/arm/include/asm/mach/mmc.h
+new file mode 100644
+index 0000000..8948dec
+--- /dev/null
++++ b/arch/arm/include/asm/mach/mmc.h
+@@ -0,0 +1,26 @@
++/*
++ *  arch/arm/include/asm/mach/mmc.h
++ */
++#ifndef ASMARM_MACH_MMC_H
++#define ASMARM_MACH_MMC_H
++
++#include <linux/mmc/host.h>
++#include <linux/mmc/card.h>
++#include <linux/mmc/sdio_func.h>
++
++struct embedded_sdio_data {
++        struct sdio_cis cis;
++        struct sdio_cccr cccr;
++        struct sdio_embedded_func *funcs;
++        int num_funcs;
++};
++
++struct mmc_platform_data {
++	unsigned int ocr_mask;			/* available voltages */
++	u32 (*translate_vdd)(struct device *, unsigned int);
++	unsigned int (*status)(struct device *);
++	struct embedded_sdio_data *embedded_sdio;
++	int (*register_status_notify)(void (*callback)(int card_present, void *dev_id), void *dev_id);
++};
++
++#endif
 
 -- 
 (english) http://www.livejournal.com/~pavelmachek
