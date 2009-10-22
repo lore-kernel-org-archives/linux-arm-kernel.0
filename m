@@ -1,78 +1,37 @@
-From: janboe.ye@gmail.com (ye janboe)
-Date: Thu, 22 Oct 2009 11:35:22 +0800
-Subject: [PATCH] check put_user fail in do_signal when enable OABI_COMPACT
-In-Reply-To: <1256123277.3851.36.camel@debian-nb>
-References: <1256123277.3851.36.camel@debian-nb>
-Message-ID: <af3ea28a0910212035w5f44f108r594ced6062bb35f3@mail.gmail.com>
+From: khasim@ti.com (Syed Mohammed, Khasim)
+Date: Thu, 22 Oct 2009 09:37:37 +0530
+Subject: FW: Sitara ARM processor family announcement (v3)
+Message-ID: <0680EC522D0CC943BC586913CF3768C0037D21A6E0@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
-No one think that it is possible that put_user could fail in some
-situation even if currently kernel subtract 12 from ARM_sp and cross
-page bound?
+FYI,
 
-Thanks
+I didn't see this mail on linux-arm mailing lists, just forwarding.
 
-Janboe
+Regards,
+Khasim
 
-2009/10/21 Janboe Ye <yuan-bo.ye@motorola.com>:
-> Using OABI, do_signal need to copy restart_syscall to user stack.
-> It is possible that put_user fail. This triggers flush_icache page
-> fault and crash kernel.
->
-> Signed-off-by: janboe <janboe.ye@gmail.com>
-> ---
-> ?arch/arm/kernel/signal.c | ? 21 +++++++++++++--------
-> ?1 files changed, 13 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-> index f6bc5d4..2122d43 100644
-> --- a/arch/arm/kernel/signal.c
-> +++ b/arch/arm/kernel/signal.c
-> @@ -626,6 +626,7 @@ static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
-> ? ? ? ?struct k_sigaction ka;
-> ? ? ? ?siginfo_t info;
-> ? ? ? ?int signr;
-> + ? ? ? int ret = 0;
->
-> ? ? ? ?/*
-> ? ? ? ? * We want the common case to go fast, which
-> @@ -679,16 +680,20 @@ static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? */
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?swival = swival - __NR_SYSCALL_BASE + __NR_OABI_SYSCALL_BASE;
->
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? put_user(regs->ARM_pc, &usp[0]);
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ret |= put_user(regs->ARM_pc, &usp[0]);
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?/* swi __NR_restart_syscall */
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? put_user(0xef000000 | swival, &usp[1]);
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ret |= put_user(0xef000000 | swival, &usp[1]);
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?/* ldr ?pc, [sp], #12 */
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? put_user(0xe49df00c, &usp[2]);
-> -
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? flush_icache_range((unsigned long)usp,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(unsigned long)(usp + 3));
-> -
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? regs->ARM_pc = regs->ARM_sp + 4;
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ret |= put_user(0xe49df00c, &usp[2]);
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? if (!ret) {
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? flush_icache_range((unsigned long)usp,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (unsigned long)(usp + 3));
-> +
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? regs->ARM_pc = regs->ARM_sp + 4;
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? } else {
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? regs->ARM_sp += 12;
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? force_sigsegv(0, current);
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? }
-> ?#endif
-> ? ? ? ? ? ? ? ? ? ? ? ?}
-> ? ? ? ? ? ? ? ?}
-> --
-> 1.6.3.3
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+-----Original Message-----
+From: davinci-linux-open-source-bounces@linux.davincidsp.com [mailto:davinci-linux-open-source-bounces at linux.davincidsp.com] On Behalf Of Kridner, Jason
+Sent: Thursday, October 22, 2009 12:04 AM
+To: linux-omap at vger.kernel.org; beagleboard at googlegroups.com; davinci-linux-open-source at linux.davincidsp.com; leopardboard at googlegroups.com; omapzoom at googlegroups.com; linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org; linux-arm at vger.kernel.org
+Subject: Sitara ARM processor family announcement (v3)
+
+I believe many of you have likely seen the new Sitara ARM product family announcement[1] as part of broadening our ARM product portfolio[2].  This family draws processing cores from the DaVinci family of DSP/multimedia devices and OMAP family of low-power devices and focuses on markets like industrial automation, point-of-sale, medical instrumentation, digital signage, portable data terminals, test & measurement, and single board computers.
+
+The important thing is where will the community collaborate on the Linux kernel for these new devices!  To help decode the broad number of part numbers and brands, I'm creating a wiki table that shows where TI will be submitting our patches to handle the new devices and as a place holder for frequently asked questions[3].
+
+Regards,
+Jason Kridner
+
+[1] http://www.ti.com/sitara 
+[2] http://www.ti.com/arm 
+[3] http://tiexpressdsp.com/index.php?title=Applications_Processors_Crossreference 
+
+
+
+_______________________________________________
+Davinci-linux-open-source mailing list
+Davinci-linux-open-source at linux.davincidsp.com
+http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
