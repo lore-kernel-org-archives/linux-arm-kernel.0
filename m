@@ -1,7 +1,7 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 22 Oct 2009 16:09:40 -0700
-Subject: [PATCH v2 19/32] OMAP3: PM: Fix PLL_MOD CLKEN offset in scratchpad
-In-Reply-To: <1256252993-24328-19-git-send-email-khilman@deeprootsystems.com>
+Date: Thu, 22 Oct 2009 16:09:41 -0700
+Subject: [PATCH v2 20/32] OMAP: PM: Clear DMA channel state after a wakeup
+In-Reply-To: <1256252993-24328-20-git-send-email-khilman@deeprootsystems.com>
 References: <1256252993-24328-1-git-send-email-khilman@deeprootsystems.com>
 	<1256252993-24328-2-git-send-email-khilman@deeprootsystems.com>
 	<1256252993-24328-3-git-send-email-khilman@deeprootsystems.com>
@@ -21,43 +21,45 @@ References: <1256252993-24328-1-git-send-email-khilman@deeprootsystems.com>
 	<1256252993-24328-17-git-send-email-khilman@deeprootsystems.com>
 	<1256252993-24328-18-git-send-email-khilman@deeprootsystems.com>
 	<1256252993-24328-19-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1256252993-24328-20-git-send-email-khilman@deeprootsystems.com>
+	<1256252993-24328-20-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1256252993-24328-21-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kalle Jokiniemi <kalle.jokiniemi@digia.com>
+From: Aaro Koskinen <aaro.koskinen@nokia.com>
 
-The CM_CLKEN_PLL register saved in scratchpad memory
-was wrongly using offset of 0x0004 instead of 0x0000.
+Clear DMA channel states so that users can assume a known initial
+state.
 
-The effect of this was that boot ROM code would
-restore the wrong value when waking up from off mode.
-This wrong value, however, will be overwritten by
-prcm context restore. Still, a short period of wrong
-clock settings in CM_CLKEN_PLL remained between ROM
-code and prcm context restore. This is fixed by the
-patch.
-
-Problem reported by: Jouni Hogander <jouni.hogander@nokia.com>
-
-Signed-off-by: Kalle Jokiniemi <kalle.jokiniemi@digia.com>
+Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/control.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/plat-omap/dma.c |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
-index b84cff7..c41565e 100644
---- a/arch/arm/mach-omap2/control.c
-+++ b/arch/arm/mach-omap2/control.c
-@@ -230,7 +230,7 @@ void omap3_save_scratchpad_contents(void)
- 	prcm_block_contents.cm_clksel_wkup =
- 			cm_read_mod_reg(WKUP_MOD, CM_CLKSEL);
- 	prcm_block_contents.cm_clken_pll =
--			cm_read_mod_reg(PLL_MOD, OMAP3430_CM_CLKEN_PLL);
-+			cm_read_mod_reg(PLL_MOD, CM_CLKEN);
- 	prcm_block_contents.cm_autoidle_pll =
- 			cm_read_mod_reg(PLL_MOD, OMAP3430_CM_AUTOIDLE_PLL);
- 	prcm_block_contents.cm_clksel1_pll =
+diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+index 3b91fd3..f716234 100644
+--- a/arch/arm/plat-omap/dma.c
++++ b/arch/arm/plat-omap/dma.c
+@@ -2359,6 +2359,8 @@ EXPORT_SYMBOL(omap_dma_global_context_save);
+ 
+ void omap_dma_global_context_restore(void)
+ {
++	int ch;
++
+ 	dma_write(omap_dma_global_context.dma_gcr, GCR);
+ 	dma_write(omap_dma_global_context.dma_ocp_sysconfig,
+ 		OCP_SYSCONFIG);
+@@ -2373,6 +2375,10 @@ void omap_dma_global_context_restore(void)
+ 	 */
+ 	if (cpu_is_omap34xx() && (omap_type() != OMAP2_DEVICE_TYPE_GP))
+ 		dma_write(0x3 , IRQSTATUS_L0);
++
++	for (ch = 0; ch < dma_chan_count; ch++)
++		if (dma_chan[ch].dev_id != -1)
++			omap_clear_dma(ch);
+ }
+ EXPORT_SYMBOL(omap_dma_global_context_restore);
+ 
 -- 
 1.6.4.3
