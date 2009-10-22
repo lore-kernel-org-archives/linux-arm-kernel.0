@@ -1,45 +1,96 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Fri, 23 Oct 2009 00:17:29 +0200
-Subject: [PATCH v3 4/4] iop: implement sched_clock()
-In-Reply-To: <e9c3a7c20910221449i6a9f8bc6y6b3af1f2f7fe1c44@mail.gmail.com>
-References: <19160.60691.72229.932486@pilspetsen.it.uu.se>
-	<e9c3a7c20910221449i6a9f8bc6y6b3af1f2f7fe1c44@mail.gmail.com>
-Message-ID: <19168.55801.851167.570526@pilspetsen.it.uu.se>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 23 Oct 2009 06:18:53 +0800
+Subject: [PATCH] Zaurus: Fix NAND Flash OOB layout for Borzoi
+In-Reply-To: <1256245503.9561.18.camel@utx.utx.cz>
+References: <1256245503.9561.18.camel@utx.utx.cz>
+Message-ID: <f17812d70910221518n13a79e9t5bcc99027a900b46@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dan Williams writes:
- > Hi Mikael,
- > 
- > On Fri, Oct 16, 2009 at 3:00 PM, Mikael Pettersson <mikpe@it.uu.se> wrote:
- > > This adds a better sched_clock() to the IOP platform,
- > > implemented using its new clocksource support.
- > >
- > > Tested on n2100, compile-tested for all plat-iop machines.
- > >
- > > Signed-off-by: Mikael Pettersson <mikpe@it.uu.se>
- > > ---
- > 
- > I applied this series and my iop13xx does not get past "Uncompressing
- > Linux".  Bisecting points to this patch i.e. the other three are ok
- > (at least for booting).  Any ideas?  I won't have time to debug this
- > for a while.
+On Fri, Oct 23, 2009 at 5:05 AM, Stanislav Brabec <utx@penguin.cz> wrote:
+> Borzoi, Terrier and Akita use the same NAND Flash OOB layout, which
+> seems to be different from Spitz for some reason. Here is a fix.
+>
+> When the code was ported to the platform data, the map was applied just
+> for Akita.
+>
+> After this patch, Flash works again on Borzoi. Terrier still has a
+> problem with partition table? different from Borzoi (unfixable without
+> reading of the system configuration in flash) and JFFS2 partitions can
+> be mounted (with some "Empty flash at ... ends at ..." in the syslog).
+>
+> Signed-off-by: Stanislav Brabec <utx@penguin.cz>
 
-Thanks for testing and for doing the bisection.
+OK, applied to 'fix'.
 
-Actually I do have an idea what it might be. sched_clock() is
-"registered" (if you can call it that) at link-time simply by
-virtue of being defined, while the other machinery it needs
-(clocksource) is enabled at boot-time at some semi-unknown point.
-So there's an early boot-time window where calls to sched_clock()
-may occur but won't work.
-
-I've seen vague references to this issue in other platforms'
-code, but nothing really concrete. Obviously I never saw that
-issue on my n2100 and frankly forgot about it until now.
-
-I'll have to grep around for the appropriate fix; in the mean
-time, just dropping this one patch is the right solution, as
-nothing else in this series depends on it.
-
-/Mikael
+>
+> diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+> index ee8d603..c382d14 100644
+> --- a/arch/arm/mach-pxa/spitz.c
+> +++ b/arch/arm/mach-pxa/spitz.c
+> @@ -740,11 +783,34 @@ static void __init common_init(void)
+> ? ? ? ?pxa_set_i2c_info(NULL);
+> ?}
+>
+> +#if defined(CONFIG_MACH_AKITA) || defined(CONFIG_MACH_BORZOI)
+> +static struct nand_bbt_descr sharpsl_akita_bbt = {
+> + ? ? ? .options = 0,
+> + ? ? ? .offs = 4,
+> + ? ? ? .len = 1,
+> + ? ? ? .pattern = scan_ff_pattern
+> +};
+> +
+> +static struct nand_ecclayout akita_oobinfo = {
+> + ? ? ? .eccbytes = 24,
+> + ? ? ? .eccpos = {
+> + ? ? ? ? ? ? ? ? ?0x5, 0x1, 0x2, 0x3, 0x6, 0x7, 0x15, 0x11,
+> + ? ? ? ? ? ? ? ? ?0x12, 0x13, 0x16, 0x17, 0x25, 0x21, 0x22, 0x23,
+> + ? ? ? ? ? ? ? ? ?0x26, 0x27, 0x35, 0x31, 0x32, 0x33, 0x36, 0x37},
+> + ? ? ? .oobfree = {{0x08, 0x09}}
+> +};
+> +#endif
+> +
+> ?#if defined(CONFIG_MACH_SPITZ) || defined(CONFIG_MACH_BORZOI)
+> ?static void __init spitz_init(void)
+> ?{
+> ? ? ? ?spitz_ficp_platform_data.gpio_pwdown = SPITZ_GPIO_IR_ON;
+>
+> + ? ? ? if (machine_is_borzoi()) {
+> + ? ? ? ? ? ? ? sharpsl_nand_platform_data.badblock_pattern = &sharpsl_akita_bbt;
+> + ? ? ? ? ? ? ? sharpsl_nand_platform_data.ecc_layout = &akita_oobinfo;
+> + ? ? ? }
+> +
+> ? ? ? ?platform_scoop_config = &spitz_pcmcia_config;
+>
+> ? ? ? ?common_init();
+> @@ -769,22 +835,6 @@ static struct i2c_board_info akita_i2c_board_info[] = {
+> ? ? ? ?},
+> ?};
+>
+> -static struct nand_bbt_descr sharpsl_akita_bbt = {
+> - ? ? ? .options = 0,
+> - ? ? ? .offs = 4,
+> - ? ? ? .len = 1,
+> - ? ? ? .pattern = scan_ff_pattern
+> -};
+> -
+> -static struct nand_ecclayout akita_oobinfo = {
+> - ? ? ? .eccbytes = 24,
+> - ? ? ? .eccpos = {
+> - ? ? ? ? ? ? ? ? ?0x5, 0x1, 0x2, 0x3, 0x6, 0x7, 0x15, 0x11,
+> - ? ? ? ? ? ? ? ? ?0x12, 0x13, 0x16, 0x17, 0x25, 0x21, 0x22, 0x23,
+> - ? ? ? ? ? ? ? ? ?0x26, 0x27, 0x35, 0x31, 0x32, 0x33, 0x36, 0x37},
+> - ? ? ? .oobfree = {{0x08, 0x09}}
+> -};
+> -
+> ?static void __init akita_init(void)
+> ?{
+> ? ? ? ?spitz_ficp_platform_data.gpio_pwdown = AKITA_GPIO_IR_ON;
+>
+>
+>
+> ________________________________________________________________________
+> Stanislav Brabec
+> http://www.penguin.cz/~utx/zaurus
+>
+>
