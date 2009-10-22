@@ -1,179 +1,71 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 22 Oct 2009 10:01:38 -0700
-Subject: [PATCH v3 2/2] OMAP3: add AMBA devices for ETM and ETB
-In-Reply-To: <1256230315-22340-2-git-send-email-virtuoso@slind.org>
-References: <1256230315-22340-1-git-send-email-virtuoso@slind.org>
-	<1256230315-22340-2-git-send-email-virtuoso@slind.org>
-Message-ID: <20091022170138.GN16230@atomide.com>
+From: mfuzzey@gmail.com (Martin Fuzzey)
+Date: Thu, 22 Oct 2009 19:33:49 +0200
+Subject: soc_common and irq handling
+Message-ID: <ba4215e10910221033u2874e955v23e6df5462c21743@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Alexander Shishkin <virtuoso@slind.org> [091022 09:52]:
-> This enables on-chip tracing components found in omap3xxx.
-> 
-> Signed-off-by: Alexander Shishkin <virtuoso@slind.org>
+am currently working on pcmcia/cf support for freescale mxc.
 
-This should not cause any merge issues with the pending
-omap header changes, so let's merge this via Russell's
-queue along with the other ETM patches.
+I started from the Freescale MX31 code (although my hardware is MX21 -
+its quite similar and I hope to make a generic driver).
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+The Freescale code basically includes a (slightly modified) private
+copy of soc_common. I am attempting to clean this up...
+
+The current in tree users of soc_common (sa11xx and pxa2xx) use
+seperate irqs for card status events and card interrupts, they request
+the card status interrupts with soc_pcmcia_request_irqs() and just
+define the irq for the card interrupt (via skt->irq) and let the
+client driver request the interrupt later.
+
+However the mxc SoCs only have a single interrupt for all this so if I
+use soc_pcmcia_request_irqs() it is requested in non shared mode and
+the client driver gets  EBUSY when it tries to request the same
+interrupt.
+
+My current solution to this is:
+
+diff --git a/drivers/pcmcia/soc_common.c b/drivers/pcmcia/soc_common.c
+index de25eb8..8ba3167 100644
+--- a/drivers/pcmcia/soc_common.c
++++ b/drivers/pcmcia/soc_common.c
+
+@@ -528,7 +528,8 @@ int soc_pcmcia_request_irqs(struct soc_pcmcia_socket *skt,
+               if (irqs[i].sock != skt->nr)
+                       continue;
+               res = request_irq(irqs[i].irq, soc_common_pcmcia_interrupt,
+-                                 IRQF_DISABLED, irqs[i].str, skt);
++                                 IRQF_DISABLED | irqs[i].flags,
++                                 irqs[i].str, skt);
+               if (res)
+                       break;
+               set_irq_type(irqs[i].irq, IRQ_TYPE_NONE);
+
+diff --git a/drivers/pcmcia/soc_common.h b/drivers/pcmcia/soc_common.h
+index e2d837b..9076003 100644
+--- a/drivers/pcmcia/soc_common.h
++++ b/drivers/pcmcia/soc_common.h
+@@ -126,6 +126,7 @@ struct pcmcia_irqs {
+       int sock;
+       int irq;
+       const char *str;
++       unsigned long flags;
+ };
 
 
-> ---
->  arch/arm/mach-omap2/Kconfig     |    8 +++++
->  arch/arm/mach-omap2/Makefile    |    3 ++
->  arch/arm/mach-omap2/clock34xx.c |    8 ++--
->  arch/arm/mach-omap2/emu.c       |   66 +++++++++++++++++++++++++++++++++++++++
->  4 files changed, 81 insertions(+), 4 deletions(-)
->  create mode 100644 arch/arm/mach-omap2/emu.c
-> 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 15cb529..f50d5bc 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -96,3 +96,11 @@ config MACH_OMAP_ZOOM2
->  config MACH_OMAP_4430SDP
->  	bool "OMAP 4430 SDP board"
->  	depends on ARCH_OMAP4
-> +
-> +config OMAP3_EMU
-> +	bool "OMAP3 tracing peripherals"
-> +	depends on ARCH_OMAP3
-> +	select OC_ETM
-> +	help
-> +	  Say Y here to enable tracing hardware of omap3
-> +
-> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-> index 954693c..c0ceb8c 100644
-> --- a/arch/arm/mach-omap2/Makefile
-> +++ b/arch/arm/mach-omap2/Makefile
-> @@ -46,6 +46,9 @@ obj-$(CONFIG_ARCH_OMAP2)		+= clock24xx.o
->  obj-$(CONFIG_ARCH_OMAP3)		+= clock34xx.o
->  obj-$(CONFIG_OMAP_PM_SRF)		+=  resource34xx.o
->  
-> +# EMU peripherals
-> +obj-$(CONFIG_OMAP3_EMU)		+= emu.o
-> +
->  iommu-y					+= iommu2.o
->  iommu-$(CONFIG_ARCH_OMAP3)		+= omap3-iommu.o
->  
-> diff --git a/arch/arm/mach-omap2/clock34xx.c b/arch/arm/mach-omap2/clock34xx.c
-> index da5bc1f..59d4320 100644
-> --- a/arch/arm/mach-omap2/clock34xx.c
-> +++ b/arch/arm/mach-omap2/clock34xx.c
-> @@ -123,7 +123,7 @@ static struct omap_clk omap34xx_clks[] = {
->  	CLK(NULL,	"dpll3_m2x2_ck", &dpll3_m2x2_ck, CK_343X),
->  	CLK(NULL,	"dpll3_m3_ck",	&dpll3_m3_ck,	CK_343X),
->  	CLK(NULL,	"dpll3_m3x2_ck", &dpll3_m3x2_ck, CK_343X),
-> -	CLK(NULL,	"emu_core_alwon_ck", &emu_core_alwon_ck, CK_343X),
-> +	CLK("etb",	"emu_core_alwon_ck", &emu_core_alwon_ck, CK_343X),
->  	CLK(NULL,	"dpll4_ck",	&dpll4_ck,	CK_343X),
->  	CLK(NULL,	"dpll4_x2_ck",	&dpll4_x2_ck,	CK_343X),
->  	CLK(NULL,	"omap_96m_alwon_fck", &omap_96m_alwon_fck, CK_343X),
-> @@ -142,7 +142,7 @@ static struct omap_clk omap34xx_clks[] = {
->  	CLK(NULL,	"dpll4_m5x2_ck", &dpll4_m5x2_ck, CK_343X),
->  	CLK(NULL,	"dpll4_m6_ck",	&dpll4_m6_ck,	CK_343X),
->  	CLK(NULL,	"dpll4_m6x2_ck", &dpll4_m6x2_ck, CK_343X),
-> -	CLK(NULL,	"emu_per_alwon_ck", &emu_per_alwon_ck, CK_343X),
-> +	CLK("etb",	"emu_per_alwon_ck", &emu_per_alwon_ck, CK_343X),
->  	CLK(NULL,	"dpll5_ck",	&dpll5_ck,	CK_3430ES2),
->  	CLK(NULL,	"dpll5_m2_ck",	&dpll5_m2_ck,	CK_3430ES2),
->  	CLK(NULL,	"clkout2_src_ck", &clkout2_src_ck, CK_343X),
-> @@ -151,7 +151,7 @@ static struct omap_clk omap34xx_clks[] = {
->  	CLK(NULL,	"dpll1_fck",	&dpll1_fck,	CK_343X),
->  	CLK(NULL,	"mpu_ck",	&mpu_ck,	CK_343X),
->  	CLK(NULL,	"arm_fck",	&arm_fck,	CK_343X),
-> -	CLK(NULL,	"emu_mpu_alwon_ck", &emu_mpu_alwon_ck, CK_343X),
-> +	CLK("etb",	"emu_mpu_alwon_ck", &emu_mpu_alwon_ck, CK_343X),
->  	CLK(NULL,	"dpll2_fck",	&dpll2_fck,	CK_343X),
->  	CLK(NULL,	"iva2_ck",	&iva2_ck,	CK_343X),
->  	CLK(NULL,	"l3_ick",	&l3_ick,	CK_343X),
-> @@ -306,7 +306,7 @@ static struct omap_clk omap34xx_clks[] = {
->  	CLK("omap-mcbsp.2", "fck",	&mcbsp2_fck,	CK_343X),
->  	CLK("omap-mcbsp.3", "fck",	&mcbsp3_fck,	CK_343X),
->  	CLK("omap-mcbsp.4", "fck",	&mcbsp4_fck,	CK_343X),
-> -	CLK(NULL,	"emu_src_ck",	&emu_src_ck,	CK_343X),
-> +	CLK("etb",	"emu_src_ck",	&emu_src_ck,	CK_343X),
->  	CLK(NULL,	"pclk_fck",	&pclk_fck,	CK_343X),
->  	CLK(NULL,	"pclkx2_fck",	&pclkx2_fck,	CK_343X),
->  	CLK(NULL,	"atclk_fck",	&atclk_fck,	CK_343X),
-> diff --git a/arch/arm/mach-omap2/emu.c b/arch/arm/mach-omap2/emu.c
-> new file mode 100644
-> index 0000000..ec0d984
-> --- /dev/null
-> +++ b/arch/arm/mach-omap2/emu.c
-> @@ -0,0 +1,66 @@
-> +/*
-> + * emu.c
-> + *
-> + * ETM and ETB CoreSight components' resources as found in OMAP3xxx.
-> + *
-> + * Copyright (C) 2009 Nokia Corporation.
-> + * Alexander Shishkin
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/types.h>
-> +#include <linux/module.h>
-> +#include <linux/device.h>
-> +#include <linux/amba/bus.h>
-> +#include <linux/io.h>
-> +#include <linux/clk.h>
-> +#include <linux/err.h>
-> +
-> +MODULE_LICENSE("GPL");
-> +MODULE_AUTHOR("Alexander Shishkin");
-> +
-> +/* Cortex CoreSight components within omap3xxx EMU */
-> +#define ETM_BASE	(L4_EMU_34XX_PHYS + 0x10000)
-> +#define DBG_BASE	(L4_EMU_34XX_PHYS + 0x11000)
-> +#define ETB_BASE	(L4_EMU_34XX_PHYS + 0x1b000)
-> +#define DAPCTL		(L4_EMU_34XX_PHYS + 0x1d000)
-> +
-> +static struct amba_device omap3_etb_device = {
-> +	.dev		= {
-> +		.init_name = "etb",
-> +	},
-> +	.res		= {
-> +		.start	= ETB_BASE,
-> +		.end	= ETB_BASE + SZ_4K - 1,
-> +		.flags	= IORESOURCE_MEM,
-> +	},
-> +	.periphid	= 0x000bb907,
-> +};
-> +
-> +static struct amba_device omap3_etm_device = {
-> +	.dev		= {
-> +		.init_name = "etm",
-> +	},
-> +	.res		= {
-> +		.start	= ETM_BASE,
-> +		.end	= ETM_BASE + SZ_4K - 1,
-> +		.flags	= IORESOURCE_MEM,
-> +	},
-> +	.periphid	= 0x102bb921,
-> +};
-> +
-> +static int __init emu_init(void)
-> +{
-> +	amba_device_register(&omap3_etb_device, &iomem_resource);
-> +	amba_device_register(&omap3_etm_device, &iomem_resource);
-> +
-> +	return 0;
-> +}
-> +
-> +subsys_initcall(emu_init);
-> +
-> -- 
-> 1.6.3.3
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Ie add a flags field and let the driver request IRQF_SHARED.
+
+Is this reasonable / acceptable?
+
+Unfortunately this gives the the runtime warning (from kernel/irq/manage.c)
+ IRQ 28/pcmcia0: IRQF_DISABLED is not guaranteed on shared IRQs
+
+Is there a better solution for this case? - I can't think of one
+seeing as the client driver will be doing a request_irq() and the host
+controller needs the same irq.
+
+Cheers,
+
+Martin
