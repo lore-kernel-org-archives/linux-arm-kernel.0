@@ -1,8 +1,7 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 22 Oct 2009 16:09:51 -0700
-Subject: [PATCH v2 30/32] OMAP3: PM: MPU and CORE should stay awake if there
-	is CAM domain ACTIVE
-In-Reply-To: <1256252993-24328-30-git-send-email-khilman@deeprootsystems.com>
+Date: Thu, 22 Oct 2009 16:09:52 -0700
+Subject: [PATCH v2 31/32] OMAP3: PM: Enable IO-CHAIN wakeup
+In-Reply-To: <1256252993-24328-31-git-send-email-khilman@deeprootsystems.com>
 References: <1256252993-24328-1-git-send-email-khilman@deeprootsystems.com>
 	<1256252993-24328-2-git-send-email-khilman@deeprootsystems.com>
 	<1256252993-24328-3-git-send-email-khilman@deeprootsystems.com>
@@ -33,61 +32,109 @@ References: <1256252993-24328-1-git-send-email-khilman@deeprootsystems.com>
 	<1256252993-24328-28-git-send-email-khilman@deeprootsystems.com>
 	<1256252993-24328-29-git-send-email-khilman@deeprootsystems.com>
 	<1256252993-24328-30-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1256252993-24328-31-git-send-email-khilman@deeprootsystems.com>
+	<1256252993-24328-31-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1256252993-24328-32-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tero Kristo <tero.kristo@nokia.com>
+From: Kalle Jokiniemi <kalle.jokiniemi@digia.com>
 
-MPU and CORE should stay awake if there is CAM domain ACTIVE. This is
-because that module doesn't have wake-up capability.
+OMAP 3430 ES3.1 chips have a separate bit for IO daisy-chain
+wake up enabling. It needs to be enabled when entering
+retention or off state, otherwise waking up might not work
+in all situations.
 
-This should replace the patch that is currently in the PM branch.
-
-Signed-off-by: Jouni Hogander <jouni.hogander@nokia.com>
-Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
+Signed-off-by: Kalle Jokiniemi <kalle.jokiniemi@digia.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/pm34xx.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/pm34xx.c           |   38 +++++++++++++++++++++++++++++--
+ arch/arm/mach-omap2/prm-regbits-34xx.h |    2 +
+ 2 files changed, 37 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 55567bf..7623eda 100644
+index 7623eda..511a57d 100644
 --- a/arch/arm/mach-omap2/pm34xx.c
 +++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -80,6 +80,7 @@ static int (*_omap_save_secure_sram)(u32 *addr);
+@@ -94,6 +94,35 @@ static inline void omap3_per_restore_context(void)
+ 	omap_gpio_restore_context();
+ }
  
- static struct powerdomain *mpu_pwrdm, *neon_pwrdm;
- static struct powerdomain *core_pwrdm, *per_pwrdm;
-+static struct powerdomain *cam_pwrdm;
- 
- static int set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
- 
-@@ -355,6 +356,9 @@ static void omap_sram_idle(void)
++static void omap3_enable_io_chain(void)
++{
++	int timeout = 0;
++
++	if (omap_rev() >= OMAP3430_REV_ES3_1) {
++		prm_set_mod_reg_bits(OMAP3430_EN_IO_CHAIN, WKUP_MOD, PM_WKEN);
++		/* Do a readback to assure write has been done */
++		prm_read_mod_reg(WKUP_MOD, PM_WKEN);
++
++		while (!(prm_read_mod_reg(WKUP_MOD, PM_WKST) &
++			 OMAP3430_ST_IO_CHAIN)) {
++			timeout++;
++			if (timeout > 1000) {
++				printk(KERN_ERR "Wake up daisy chain "
++				       "activation failed.\n");
++				return;
++			}
++			prm_set_mod_reg_bits(OMAP3430_ST_IO_CHAIN,
++					     WKUP_MOD, PM_WKST);
++		}
++	}
++}
++
++static void omap3_disable_io_chain(void)
++{
++	if (omap_rev() >= OMAP3430_REV_ES3_1)
++		prm_clear_mod_reg_bits(OMAP3430_EN_IO_CHAIN, WKUP_MOD, PM_WKEN);
++}
++
+ static void omap3_core_save_context(void)
+ {
+ 	u32 control_padconf_off;
+@@ -367,8 +396,9 @@ static void omap_sram_idle(void)
+ 			omap3_core_save_context();
+ 			omap3_prcm_save_context();
  		}
+-		/* Enable IO-PAD wakeup */
++		/* Enable IO-PAD and IO-CHAIN wakeups */
+ 		prm_set_mod_reg_bits(OMAP3430_EN_IO, WKUP_MOD, PM_WKEN);
++		omap3_enable_io_chain();
  	}
  
-+	if (pwrdm_read_pwrst(cam_pwrdm) == PWRDM_POWER_ON)
-+		omap2_clkdm_deny_idle(mpu_pwrdm->pwrdm_clkdms[0]);
-+
- 	/* CORE */
- 	if (core_next_state < PWRDM_POWER_ON) {
- 		omap_uart_prepare_idle(0);
-@@ -434,6 +438,7 @@ static void omap_sram_idle(void)
+ 	/*
+@@ -432,9 +462,11 @@ static void omap_sram_idle(void)
+ 			pwrdm_set_next_pwrst(per_pwrdm, PWRDM_POWER_OFF);
+ 	}
+ 
+-	/* Disable IO-PAD wakeup */
+-	if (core_next_state < PWRDM_POWER_ON)
++	/* Disable IO-PAD and IO-CHAIN wakeup */
++	if (core_next_state < PWRDM_POWER_ON) {
+ 		prm_clear_mod_reg_bits(OMAP3430_EN_IO, WKUP_MOD, PM_WKEN);
++		omap3_disable_io_chain();
++	}
  
  	pwrdm_post_transition();
  
-+	omap2_clkdm_allow_idle(mpu_pwrdm->pwrdm_clkdms[0]);
- }
+diff --git a/arch/arm/mach-omap2/prm-regbits-34xx.h b/arch/arm/mach-omap2/prm-regbits-34xx.h
+index 9fd03a2..8f21bae 100644
+--- a/arch/arm/mach-omap2/prm-regbits-34xx.h
++++ b/arch/arm/mach-omap2/prm-regbits-34xx.h
+@@ -365,6 +365,7 @@
+ /* PM_PREPWSTST_GFX specific bits */
  
- /*
-@@ -1067,6 +1072,7 @@ static int __init omap3_pm_init(void)
- 	neon_pwrdm = pwrdm_lookup("neon_pwrdm");
- 	per_pwrdm = pwrdm_lookup("per_pwrdm");
- 	core_pwrdm = pwrdm_lookup("core_pwrdm");
-+	cam_pwrdm = pwrdm_lookup("cam_pwrdm");
+ /* PM_WKEN_WKUP specific bits */
++#define OMAP3430_EN_IO_CHAIN				(1 << 16)
+ #define OMAP3430_EN_IO					(1 << 8)
+ #define OMAP3430_EN_GPIO1				(1 << 3)
  
- 	omap_push_sram_idle();
- #ifdef CONFIG_SUSPEND
+@@ -373,6 +374,7 @@
+ /* PM_IVA2GRPSEL_WKUP specific bits */
+ 
+ /* PM_WKST_WKUP specific bits */
++#define OMAP3430_ST_IO_CHAIN				(1 << 16)
+ #define OMAP3430_ST_IO					(1 << 8)
+ 
+ /* PRM_CLKSEL */
 -- 
 1.6.4.3
