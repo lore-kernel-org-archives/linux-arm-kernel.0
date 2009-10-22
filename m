@@ -1,37 +1,30 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 22 Oct 2009 21:49:02 +0200
-Subject: [at91sam9g45] fail to start second kernel via kexec if
-	watchdog is enabled
-In-Reply-To: <4ADEE5EE.8020205@visionsystems.de>
-References: <4ADEE5EE.8020205@visionsystems.de>
-Message-ID: <20091022194902.GM19714@game.jcrosoft.org>
+Date: Thu, 22 Oct 2009 22:01:25 +0200
+Subject: [PATCH 1/2] arm: remove redund depend on of config LOCAL_TIMERS
+Message-ID: <1256241686-28647-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:43 Wed 21 Oct     , Yegor Yefremov wrote:
-> Hello,
-> 
-> I have problem booting the second kernel after enabling the watchdog following these steps: http://www.at91.com/index.php?option=com_jfusion&Itemid=57&jfile=viewtopic.php&f=12&t=5551&p=29283&hilit=watchdog+bootstrap#p29283
-> Bootstrap: don't touch watchdog
-> U-Boot: configure watchdog and set the timer counter value to 16 seconds
-> Linux: keep pinging the watchdog
-> 
-> The first kernel (booted from u-boot) is working as expected, but if I start the new one using kexec it gets only till frame buffer init:
-> 
-> ....
-> NetWinder Floating Point Emulator V0.97 (double precision)
-> Slow work thread pool: Starting up
-> Slow work thread pool: Ready
-> JFFS2 version 2.2. (NAND) -? 2001-2006 Red Hat, Inc.
-> msgmni has been set to 245
-> io scheduler noop registered
-> io scheduler anticipatory registered (default)
-> atmel_lcdfb atmel_lcdfb.0: backlight control is not available
-> atmel_lcdfb atmel_lcdfb.0: 510KiB frame buffer at 77980000 (mapped at ffa00000)
-> Start AT91Bootstrap...
-> 
-> Without watchdog there is no problem. Both kernels (2.6.32-rc5) are the same. Any idea?
-do you enable the watchdog in the send kernel?
+the machines and arch depned list is already predent at SMP config
 
-Best Regards,
-J.
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ arch/arm/Kconfig |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1c4119c..beb1340 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1026,8 +1026,7 @@ config HOTPLUG_CPU
+ 
+ config LOCAL_TIMERS
+ 	bool "Use local timer interrupts"
+-	depends on SMP && (REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || \
+-		REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4)
++	depends on SMP
+ 	default y
+ 	select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_OMAP4)
+ 	help
+-- 
+1.6.3.1
