@@ -1,24 +1,20 @@
-From: rpurdie@rpsys.net (Richard Purdie)
-Date: Thu, 22 Oct 2009 23:43:19 +0100
-Subject: spitz backlight: fix brightness limiting
-In-Reply-To: <f17812d70910211320s29d3aaa5tad3206df1e99e03b@mail.gmail.com>
-References: <20091019213751.GC1482@ucw.cz>
-	<f17812d70910211320s29d3aaa5tad3206df1e99e03b@mail.gmail.com>
-Message-ID: <1256251399.23211.164.camel@dax.rpnet.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 23 Oct 2009 06:48:38 +0800
+Subject: [WARNING] pxamci: 'pxa2xx-mci.0' does not have a release()
+	function.
+In-Reply-To: <20091023003631.1331a60a.ospite@studenti.unina.it>
+References: <20091023003631.1331a60a.ospite@studenti.unina.it>
+Message-ID: <f17812d70910221548l31b09e94tf41d7987628450f4@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2009-10-22 at 04:20 +0800, Eric Miao wrote:
-> It's a little bit weird it's called 'limit_mask' when I first converted it
-> to a spi driver. There must be some reasons, Richard, you've got
-> any ideas?
+On Fri, Oct 23, 2009 at 6:36 AM, Antonio Ospite
+<ospite@studenti.unina.it> wrote:
+> Hi,
+>
+> I get this warning on shutdown. How to fix it properly?
+>
 
-Its a historical artifact that once worked through some bitfield magic
-but probably stopped working when we increased the range of values the
-backlight could accept and we didn't notice the limiting problem.
-
-I'll happily take a patch to fix that.
-
-Cheers,
-
-Richard
+This is weird, as if pxa2xx_set_spi_info() is used, the pxa2xx-spi device
+is actually created by platform_device_alloc(), which has a default
+release function of "platform_device_release()".
