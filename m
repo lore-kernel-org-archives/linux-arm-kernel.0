@@ -1,27 +1,44 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Thu, 22 Oct 2009 14:49:57 -0700
-Subject: [PATCH v3 4/4] iop: implement sched_clock()
-In-Reply-To: <19160.60691.72229.932486@pilspetsen.it.uu.se>
-References: <19160.60691.72229.932486@pilspetsen.it.uu.se>
-Message-ID: <e9c3a7c20910221449i6a9f8bc6y6b3af1f2f7fe1c44@mail.gmail.com>
+From: utx@penguin.cz (Stanislav Brabec)
+Date: Fri, 23 Oct 2009 00:09:48 +0200
+Subject: [PATCH] Zaurus: Fix PROM partition table for spitz
+In-Reply-To: <20091022214511.GB9364@elf.ucw.cz> (from pavel@ucw.cz on Thu
+	Oct 22 23:45:11 2009)
+Message-ID: <1256249388.1986.0@zaurus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mikael,
+On 2009-10-29 23:45:11 Pavel Machek wrote:
+> On Fri 2009-10-23 05:33:27, Eric Miao wrote:
+> > (I won't refuse some comments to make this more clear in the code
+> > though).
+> 
+> I don't know. If the table is wrong, we should fix it. Yes, it may
+> break someone, but it probably will not.
 
-On Fri, Oct 16, 2009 at 3:00 PM, Mikael Pettersson <mikpe@it.uu.se> wrote:
-> This adds a better sched_clock() to the IOP platform,
-> implemented using its new clocksource support.
->
-> Tested on n2100, compile-tested for all plat-iop machines.
->
-> Signed-off-by: Mikael Pettersson <mikpe@it.uu.se>
-> ---
+This change is not worse than change in .config, as there is no
+guarantee of order of loading NAND and PROM maps.
 
-I applied this series and my iop13xx does not get past "Uncompressing
-Linux".  Bisecting points to this patch i.e. the other three are ok
-(at least for booting).  Any ideas?  I won't have time to debug this
-for a while.
+I just looked at original 2.4 kernel. There were:
+PROM EN-JP as "Filesystem", bootloader not mapped
+NAND partitions as "smf", "root", "home"
 
-Regards,
-Dan
+This is an output of cat /proc/mtd on vendor's 2.4.20.
+
+dev:    size   erasesize  name
+mtd0: 006b0000 00020000 "Filesystem"
+mtd1: 00700000 00020000 "smf"
+mtd2: 02b00000 00020000 "root"
+mtd3: 04e00000 00020000 "home"
+
+We never were compatible:
+
+Guessing from "file" output, EN-JP partition is just a file, not a
+filesystem. I am OK with keeping of name "Boot PROM Filesystem" and
+calling the new partition as "PROM Bootloader", but EN-JP in the name
+cleanly describes the surprising contents. Adding bootloader data
+partition has probably a single use case: Being easily able to grab
+the PROM contents for the emulator.
+
+-- 
+Stanislav Brabec
+http://www.penguin.cz/~utx/zaurus
