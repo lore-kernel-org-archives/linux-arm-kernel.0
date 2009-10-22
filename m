@@ -1,450 +1,273 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 22 Oct 2009 11:03:54 +0200
-Subject: dream in staging: remove wakelock support
-Message-ID: <20091022090354.GA30695@elf.ucw.cz>
+From: alex@digriz.org.uk (Alexander Clouter)
+Date: Thu, 22 Oct 2009 09:22:49 +0100
+Subject: [PATCHv3] [ARM] kirkwood: combine support for openrd base/client
+	support
+Message-ID: <pbh5r6-os7.ln1@chipmunk.wormnet.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Inspired by the mach-ep93xx flattening work, there is really not
+much difference between the OpenRD base and client board support
+so they should be merged together.
 
-Includes changed so that <linux/sched.h> is now needed for
-TASK_INTERRUPTIBLE and friends, so include it.
+ v0 - initial release
+ v1 - added I2C/PCIe support
+ v2 - removed un-necessary ifdef's as recommended by Nico
+	and marked u-boot MTD_WRITEABLE
+ v3 - fixup GbE1 to work (PHY address incorrect, hex 18 *not* dec 18)
 
-Remove hooks for features not in mainline, such as earlysuspend and
-wakelocks.
-
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
-
-diff --git a/drivers/staging/dream/camera/msm_camera.c b/drivers/staging/dream/camera/msm_camera.c
-index 8816599..7d93877 100644
---- a/drivers/staging/dream/camera/msm_camera.c
-+++ b/drivers/staging/dream/camera/msm_camera.c
-@@ -13,6 +13,7 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/init.h>
-+#include <linux/sched.h>
- #include <mach/board.h>
+Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
+---
+diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+index 0aca451..8e9ac7d 100644
+--- a/arch/arm/mach-kirkwood/Kconfig
++++ b/arch/arm/mach-kirkwood/Kconfig
+@@ -38,12 +38,23 @@ config MACH_TS219
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  QNAP TS-119 and TS-219 Turbo NAS devices.
  
- #include <linux/fs.h>
-@@ -1597,7 +1598,6 @@ static int __msm_release(struct msm_sync *sync)
- 		MSM_DRAIN_QUEUE(sync, pict_frame_q);
- 
- 		sync->sctrl.s_release();
--		wake_unlock(&sync->wake_lock);
- 
- 		sync->apps_id = NULL;
- 		CDBG("msm_release completed!\n");
-@@ -1806,7 +1806,6 @@ static int __msm_open(struct msm_sync *sync, const char *const apps_id)
- 	sync->apps_id = apps_id;
- 
- 	if (!sync->opencnt) {
--		wake_lock(&sync->wake_lock);
- 
- 		msm_camvfe_fn_init(&sync->vfefn, sync);
- 		if (sync->vfefn.vfe_init) {
-@@ -2044,8 +2043,6 @@ static int msm_sync_init(struct msm_sync *sync,
- 	INIT_LIST_HEAD(&sync->pict_frame_q);
- 	init_waitqueue_head(&sync->pict_frame_wait);
- 
--	wake_lock_init(&sync->wake_lock, WAKE_LOCK_IDLE, "msm_camera");
--
- 	rc = msm_camio_probe_on(pdev);
- 	if (rc < 0)
- 		return rc;
-@@ -2058,7 +2055,6 @@ static int msm_sync_init(struct msm_sync *sync,
- 	if (rc < 0) {
- 		pr_err("msm_camera: failed to initialize %s\n",
- 			sync->sdata->sensor_name);
--		wake_lock_destroy(&sync->wake_lock);
- 		return rc;
- 	}
- 
-@@ -2070,7 +2066,6 @@ static int msm_sync_init(struct msm_sync *sync,
- 
- static int msm_sync_destroy(struct msm_sync *sync)
- {
--	wake_lock_destroy(&sync->wake_lock);
- 	return 0;
- }
- 
-diff --git a/drivers/staging/dream/camera/msm_vfe7x.c b/drivers/staging/dream/camera/msm_vfe7x.c
-index 5de96c5..33ab3ac 100644
---- a/drivers/staging/dream/camera/msm_vfe7x.c
-+++ b/drivers/staging/dream/camera/msm_vfe7x.c
-@@ -5,6 +5,7 @@
- #include <linux/msm_adsp.h>
- #include <linux/uaccess.h>
- #include <linux/fs.h>
-+#include <linux/sched.h>
- #include <linux/android_pmem.h>
- #include <mach/msm_adsp.h>
- #include <linux/delay.h>
-diff --git a/drivers/staging/dream/gpio_event.c b/drivers/staging/dream/gpio_event.c
-index 8b64c1e..e60e2c0 100644
---- a/drivers/staging/dream/gpio_event.c
-+++ b/drivers/staging/dream/gpio_event.c
-@@ -13,7 +13,7 @@
-  *
-  */
- 
--#include <linux/earlysuspend.h>
++config MACH_OPENRD
++        bool
 +
- #include <linux/module.h>
- #include <linux/input.h>
- #include <linux/gpio_event.h>
-@@ -23,7 +23,6 @@
- struct gpio_event {
- 	struct input_dev *input_dev;
- 	const struct gpio_event_platform_data *info;
--	struct early_suspend early_suspend;
- 	void *state[0];
- };
+ config MACH_OPENRD_BASE
+ 	bool "Marvell OpenRD Base Board"
++	select MACH_OPENRD
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell OpenRD Base Board.
  
-diff --git a/drivers/staging/dream/gpio_input.c b/drivers/staging/dream/gpio_input.c
-index 7e307f2..0638ec4 100644
---- a/drivers/staging/dream/gpio_input.c
-+++ b/drivers/staging/dream/gpio_input.c
-@@ -19,7 +19,6 @@
- #include <linux/hrtimer.h>
- #include <linux/input.h>
- #include <linux/interrupt.h>
--#include <linux/wakelock.h>
++config MACH_OPENRD_CLIENT
++	bool "Marvell OpenRD Client Board"
++	select MACH_OPENRD
++	help
++	  Say 'Y' here if you want your kernel to support the
++	  Marvell OpenRD Client Board.
++
+ endmenu
  
- enum {
- 	DEBOUNCE_UNSTABLE     = BIT(0),	/* Got irq, while debouncing */
-@@ -44,7 +43,6 @@ struct gpio_input_state {
- 	int use_irq;
- 	int debounce_count;
- 	spinlock_t irq_lock;
--	struct wake_lock wake_lock;
- 	struct gpio_key_state key_state[0];
- };
+ endif
+diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
+index 80ab0ec..5ad19dd 100644
+--- a/arch/arm/mach-kirkwood/Makefile
++++ b/arch/arm/mach-kirkwood/Makefile
+@@ -6,6 +6,6 @@ obj-$(CONFIG_MACH_RD88F6281)		+= rd88f6281-setup.o
+ obj-$(CONFIG_MACH_MV88F6281GTW_GE)	+= mv88f6281gtw_ge-setup.o
+ obj-$(CONFIG_MACH_SHEEVAPLUG)		+= sheevaplug-setup.o
+ obj-$(CONFIG_MACH_TS219)		+= ts219-setup.o
+-obj-$(CONFIG_MACH_OPENRD_BASE)		+= openrd_base-setup.o
++obj-$(CONFIG_MACH_OPENRD)		+= openrd-setup.o
  
-@@ -143,8 +141,6 @@ static enum hrtimer_restart gpio_event_input_timer_func(struct hrtimer *timer)
- 		hrtimer_start(timer, ds->info->debounce_time, HRTIMER_MODE_REL);
- 	else if (!ds->use_irq)
- 		hrtimer_start(timer, ds->info->poll_time, HRTIMER_MODE_REL);
--	else
--		wake_unlock(&ds->wake_lock);
- 
- 	spin_unlock_irqrestore(&ds->irq_lock, irqflags);
- 
-@@ -170,7 +166,6 @@ static irqreturn_t gpio_event_input_irq_handler(int irq, void *dev_id)
- 		if (ks->debounce & DEBOUNCE_WAIT_IRQ) {
- 			ks->debounce = DEBOUNCE_UNKNOWN;
- 			if (ds->debounce_count++ == 0) {
--				wake_lock(&ds->wake_lock);
- 				hrtimer_start(
- 					&ds->timer, ds->info->debounce_time,
- 					HRTIMER_MODE_REL);
-@@ -277,7 +272,6 @@ int gpio_event_input_func(struct input_dev *input_dev,
- 		ds->debounce_count = di->keymap_size;
- 		ds->input_dev = input_dev;
- 		ds->info = di;
--		wake_lock_init(&ds->wake_lock, WAKE_LOCK_SUSPEND, "gpio_input");
- 		spin_lock_init(&ds->irq_lock);
- 
- 		for (i = 0; i < di->keymap_size; i++) {
-@@ -336,7 +330,6 @@ err_gpio_configure_failed:
- err_gpio_request_failed:
- 		;
- 	}
--	wake_lock_destroy(&ds->wake_lock);
- 	kfree(ds);
- err_ds_alloc_failed:
- 	return ret;
-diff --git a/drivers/staging/dream/gpio_matrix.c b/drivers/staging/dream/gpio_matrix.c
-index c1f4765..796de4f 100644
---- a/drivers/staging/dream/gpio_matrix.c
-+++ b/drivers/staging/dream/gpio_matrix.c
-@@ -18,13 +18,11 @@
- #include <linux/gpio_event.h>
- #include <linux/hrtimer.h>
- #include <linux/interrupt.h>
--#include <linux/wakelock.h>
- 
- struct gpio_kp {
- 	struct input_dev *input_dev;
- 	struct gpio_event_matrix_info *keypad_info;
- 	struct hrtimer timer;
--	struct wake_lock wake_lock;
- 	int current_output;
- 	unsigned int use_irq:1;
- 	unsigned int key_state_changed:1;
-@@ -199,7 +197,6 @@ static enum hrtimer_restart gpio_keypad_timer_func(struct hrtimer *timer)
- 	}
- 	for (in = 0; in < mi->ninputs; in++)
- 		enable_irq(gpio_to_irq(mi->input_gpios[in]));
--	wake_unlock(&kp->wake_lock);
- 	return HRTIMER_NORESTART;
- }
- 
-@@ -222,7 +219,6 @@ static irqreturn_t gpio_keypad_irq_handler(int irq_in, void *dev_id)
- 		else
- 			gpio_direction_input(mi->output_gpios[i]);
- 	}
--	wake_lock(&kp->wake_lock);
- 	hrtimer_start(&kp->timer, ktime_set(0, 0), HRTIMER_MODE_REL);
- 	return IRQ_HANDLED;
- }
-@@ -363,7 +359,6 @@ int gpio_event_matrix_func(struct input_dev *input_dev,
- 
- 		hrtimer_init(&kp->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
- 		kp->timer.function = gpio_keypad_timer_func;
--		wake_lock_init(&kp->wake_lock, WAKE_LOCK_SUSPEND, "gpio_kp");
- 		err = gpio_keypad_request_irqs(kp);
- 		kp->use_irq = err == 0;
- 
-@@ -371,8 +366,6 @@ int gpio_event_matrix_func(struct input_dev *input_dev,
- 			"in %s mode\n", input_dev->name,
- 			kp->use_irq ? "interrupt" : "polling");
- 
--		if (kp->use_irq)
--			wake_lock(&kp->wake_lock);
- 		hrtimer_start(&kp->timer, ktime_set(0, 0), HRTIMER_MODE_REL);
- 
- 		return 0;
-@@ -386,7 +379,6 @@ int gpio_event_matrix_func(struct input_dev *input_dev,
- 			free_irq(gpio_to_irq(mi->input_gpios[i]), kp);
- 
- 	hrtimer_cancel(&kp->timer);
--	wake_lock_destroy(&kp->wake_lock);
- 	for (i = mi->noutputs - 1; i >= 0; i--) {
- err_gpio_direction_input_failed:
- 		gpio_free(mi->input_gpios[i]);
-diff --git a/drivers/staging/dream/qdsp5/adsp.c b/drivers/staging/dream/qdsp5/adsp.c
-index d096456..9069535 100644
---- a/drivers/staging/dream/qdsp5/adsp.c
-+++ b/drivers/staging/dream/qdsp5/adsp.c
-@@ -32,16 +32,12 @@
- #include <linux/module.h>
- #include <linux/uaccess.h>
- #include <linux/wait.h>
--#include <linux/wakelock.h>
- 
--static struct wake_lock adsp_wake_lock;
- static inline void prevent_suspend(void)
- {
--	wake_lock(&adsp_wake_lock);
- }
- static inline void allow_suspend(void)
- {
--	wake_unlock(&adsp_wake_lock);
- }
- 
- #include <linux/io.h>
-@@ -1046,7 +1042,6 @@ static int msm_adsp_probe(struct platform_device *pdev)
- 
- 	pr_info("adsp: probe\n");
- 
--	wake_lock_init(&adsp_wake_lock, WAKE_LOCK_SUSPEND, "adsp");
- #if CONFIG_MSM_AMSS_VERSION >= 6350
- 	adsp_info.init_info_ptr = kzalloc(
- 		(sizeof(struct adsp_rtos_mp_mtoa_init_info_type)), GFP_KERNEL);
-diff --git a/drivers/staging/dream/qdsp5/audio_out.c b/drivers/staging/dream/qdsp5/audio_out.c
-index d1adcf6..df87ca3 100644
---- a/drivers/staging/dream/qdsp5/audio_out.c
-+++ b/drivers/staging/dream/qdsp5/audio_out.c
-@@ -38,8 +38,6 @@
- #include <mach/qdsp5/qdsp5audppcmdi.h>
- #include <mach/qdsp5/qdsp5audppmsg.h>
- 
--#include <mach/htc_pwrsink.h>
+ obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
+diff --git a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
+new file mode 100644
+index 0000000..a91e800
+--- /dev/null
++++ b/arch/arm/mach-kirkwood/openrd-setup.c
+@@ -0,0 +1,117 @@
++/*
++ * arch/arm/mach-kirkwood/openrd-setup.c
++ *
++ * Marvell OpenRD (Base|Client) Board Setup
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/mtd/nand.h>
++#include <linux/mtd/partitions.h>
++#include <linux/ata_platform.h>
++#include <linux/mv643xx_eth.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <mach/kirkwood.h>
++#include <plat/mvsdio.h>
++#include "common.h"
++#include "mpp.h"
++
++static struct mtd_partition openrd_nand_parts[] = {
++	{
++		.name		= "u-boot",
++		.offset		= 0,
++		.size		= SZ_1M,
++		.mask_flags	= MTD_WRITEABLE
++	}, {
++		.name		= "uImage",
++		.offset		= MTDPART_OFS_NXTBLK,
++		.size		= SZ_4M
++	}, {
++		.name		= "root",
++		.offset		= MTDPART_OFS_NXTBLK,
++		.size		= MTDPART_SIZ_FULL
++	},
++};
++
++static struct mv643xx_eth_platform_data openrd_ge00_data = {
++	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
++};
++
++static struct mv643xx_eth_platform_data openrd_ge01_data = {
++	.phy_addr	= MV643XX_ETH_PHY_ADDR(24),
++};
++
++static struct mv_sata_platform_data openrd_sata_data = {
++	.n_ports	= 2,
++};
++
++static struct mvsdio_platform_data openrd_mvsdio_data = {
++	.gpio_card_detect = 29,	/* MPP29 used as SD card detect */
++};
++
++static unsigned int openrd_mpp_config[] __initdata = {
++	MPP29_GPIO,
++	0
++};
++
++static void __init openrd_init(void)
++{
++	/*
++	 * Basic setup. Needs to be called early.
++	 */
++	kirkwood_init();
++	kirkwood_mpp_conf(openrd_mpp_config);
++
++	kirkwood_uart0_init();
++	kirkwood_nand_init(ARRAY_AND_SIZE(openrd_nand_parts), 25);
++
++	kirkwood_ehci_init();
++
++	kirkwood_ge00_init(&openrd_ge00_data);
++	if (machine_is_openrd_client())
++		kirkwood_ge01_init(&openrd_ge01_data);
++	kirkwood_sata_init(&openrd_sata_data);
++	kirkwood_sdio_init(&openrd_mvsdio_data);
++
++	kirkwood_i2c_init();
++}
++
++static int __init openrd_pci_init(void)
++{
++	kirkwood_pcie_init();
++
++	return 0;
++}
++subsys_initcall(openrd_pci_init);
++
++#ifdef CONFIG_MACH_OPENRD_BASE
++MACHINE_START(OPENRD_BASE, "Marvell OpenRD Base Board")
++	/* Maintainer: Dhaval Vasa <dhaval.vasa@einfochips.com> */
++	.phys_io	= KIRKWOOD_REGS_PHYS_BASE,
++	.io_pg_offst	= ((KIRKWOOD_REGS_VIRT_BASE) >> 18) & 0xfffc,
++	.boot_params	= 0x00000100,
++	.init_machine	= openrd_init,
++	.map_io		= kirkwood_map_io,
++	.init_irq	= kirkwood_init_irq,
++	.timer		= &kirkwood_timer,
++MACHINE_END
++#endif
++
++#ifdef CONFIG_MACH_OPENRD_CLIENT
++MACHINE_START(OPENRD_CLIENT, "Marvell OpenRD Client Board")
++	/* Maintainer: Dhaval Vasa <dhaval.vasa@einfochips.com> */
++	.phys_io	= KIRKWOOD_REGS_PHYS_BASE,
++	.io_pg_offst	= ((KIRKWOOD_REGS_VIRT_BASE) >> 18) & 0xfffc,
++	.boot_params	= 0x00000100,
++	.init_machine	= openrd_init,
++	.map_io		= kirkwood_map_io,
++	.init_irq	= kirkwood_init_irq,
++	.timer		= &kirkwood_timer,
++MACHINE_END
++#endif
+diff --git a/arch/arm/mach-kirkwood/openrd_base-setup.c b/arch/arm/mach-kirkwood/openrd_base-setup.c
+deleted file mode 100644
+index 947dfb8..0000000
+--- a/arch/arm/mach-kirkwood/openrd_base-setup.c
++++ /dev/null
+@@ -1,84 +0,0 @@
+-/*
+- * arch/arm/mach-kirkwood/openrd_base-setup.c
+- *
+- * Marvell OpenRD Base Board Setup
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
 -
- #include "evlog.h"
- 
- #define LOG_AUDIO_EVENTS 1
-@@ -260,7 +258,6 @@ static int audio_enable(struct audio *audio)
- 	}
- 
- 	audio->enabled = 1;
--	htc_pwrsink_set(PWRSINK_AUDIO, 100);
- 	return 0;
- }
- 
-@@ -695,7 +692,6 @@ static int audio_release(struct inode *inode, struct file *file)
- 	audio_flush(audio);
- 	audio->opened = 0;
- 	mutex_unlock(&audio->lock);
--	htc_pwrsink_set(PWRSINK_AUDIO, 0);
- 	return 0;
- }
- 
-diff --git a/drivers/staging/dream/smd/smd_qmi.c b/drivers/staging/dream/smd/smd_qmi.c
-index d4e7d88..687db14 100644
---- a/drivers/staging/dream/smd/smd_qmi.c
-+++ b/drivers/staging/dream/smd/smd_qmi.c
-@@ -24,7 +24,6 @@
- #include <linux/wait.h>
- #include <linux/miscdevice.h>
- #include <linux/workqueue.h>
--#include <linux/wakelock.h>
- 
- #include <asm/uaccess.h>
- #include <mach/msm_smd.h>
-@@ -74,7 +73,6 @@ struct qmi_ctxt {
- 
- 	smd_channel_t *ch;
- 	const char *ch_name;
--	struct wake_lock wake_lock;
- 
- 	struct work_struct open_work;
- 	struct work_struct read_work;
-@@ -90,7 +88,6 @@ void qmi_ctxt_init(struct qmi_ctxt *ctxt, unsigned n)
- 	mutex_init(&ctxt->lock);
- 	INIT_WORK(&ctxt->read_work, qmi_read_work);
- 	INIT_WORK(&ctxt->open_work, qmi_open_work);
--	wake_lock_init(&ctxt->wake_lock, WAKE_LOCK_SUSPEND, ctxt->misc.name);
- 	ctxt->ctl_txn_id = 1;
- 	ctxt->wds_txn_id = 1;
- 	ctxt->wds_busy = 1;
-@@ -454,7 +451,6 @@ static void qmi_process_qmux(struct qmi_ctxt *ctxt,
- 		break;
- 	}
- 	mutex_unlock(&ctxt->lock);
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/mtd/partitions.h>
+-#include <linux/ata_platform.h>
+-#include <linux/mv643xx_eth.h>
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <mach/kirkwood.h>
+-#include <plat/mvsdio.h>
+-#include "common.h"
+-#include "mpp.h"
 -
- 	wake_up(&qmi_wait_queue);
- }
- 
-@@ -509,7 +505,6 @@ static void qmi_notify(void *priv, unsigned event)
- 		int sz;
- 		sz = smd_cur_packet_size(ctxt->ch);
- 		if ((sz > 0) && (sz <= smd_read_avail(ctxt->ch))) {
--			wake_lock_timeout(&ctxt->wake_lock, HZ / 2);
- 			queue_work(qmi_wq, &ctxt->read_work);
- 		}
- 		break;
-diff --git a/drivers/staging/dream/smd/smd_rpcrouter.c b/drivers/staging/dream/smd/smd_rpcrouter.c
-index d4a4a88..5ac2cd4 100644
---- a/drivers/staging/dream/smd/smd_rpcrouter.c
-+++ b/drivers/staging/dream/smd/smd_rpcrouter.c
-@@ -33,7 +33,6 @@
- #include <linux/err.h>
- #include <linux/sched.h>
- #include <linux/poll.h>
--#include <linux/wakelock.h>
- #include <asm/uaccess.h>
- #include <asm/byteorder.h>
- #include <linux/platform_device.h>
-@@ -96,7 +95,6 @@ static DEFINE_SPINLOCK(server_list_lock);
- static DEFINE_SPINLOCK(smd_lock);
- 
- static struct workqueue_struct *rpcrouter_workqueue;
--static struct wake_lock rpcrouter_wake_lock;
- static int rpcrouter_need_len;
- 
- static atomic_t next_xid = ATOMIC_INIT(1);
-@@ -290,7 +288,6 @@ struct msm_rpc_endpoint *msm_rpcrouter_create_local_endpoint(dev_t dev)
- 	init_waitqueue_head(&ept->wait_q);
- 	INIT_LIST_HEAD(&ept->read_q);
- 	spin_lock_init(&ept->read_q_lock);
--	wake_lock_init(&ept->read_q_wake_lock, WAKE_LOCK_SUSPEND, "rpc_read");
- 	INIT_LIST_HEAD(&ept->incomplete);
- 
- 	spin_lock_irqsave(&local_endpoints_lock, flags);
-@@ -313,7 +310,6 @@ int msm_rpcrouter_destroy_local_endpoint(struct msm_rpc_endpoint *ept)
- 	if (rc < 0)
- 		return rc;
- 
--	wake_lock_destroy(&ept->read_q_wake_lock);
- 	list_del(&ept->list);
- 	kfree(ept);
- 	return 0;
-@@ -540,8 +536,6 @@ static void rpcrouter_smdnotify(void *_dev, unsigned event)
- 	if (event != SMD_EVENT_DATA)
- 		return;
- 
--	if (smd_read_avail(smd_channel) >= rpcrouter_need_len)
--		wake_lock(&rpcrouter_wake_lock);
- 	wake_up(&smd_wait);
- }
- 
-@@ -576,7 +570,6 @@ static int rr_read(void *data, int len)
- 				return -EIO;
- 		}
- 		rpcrouter_need_len = len;
--		wake_unlock(&rpcrouter_wake_lock);
- 		spin_unlock_irqrestore(&smd_lock, flags);
- 
- //		printk("rr_read: waiting (%d)\n", len);
-@@ -676,7 +669,6 @@ static void do_read_data(struct work_struct *work)
- 
- packet_complete:
- 	spin_lock_irqsave(&ept->read_q_lock, flags);
--	wake_lock(&ept->read_q_wake_lock);
- 	list_add_tail(&pkt->list, &ept->read_q);
- 	wake_up(&ept->wait_q);
- 	spin_unlock_irqrestore(&ept->read_q_lock, flags);
-@@ -699,7 +691,6 @@ done:
- fail_io:
- fail_data:
- 	printk(KERN_ERR "rpc_router has died\n");
--	wake_unlock(&rpcrouter_wake_lock);
- }
- 
- void msm_rpc_setup_req(struct rpc_request_hdr *hdr, uint32_t prog,
-@@ -1061,8 +1052,6 @@ int __msm_rpc_read(struct msm_rpc_endpoint *ept,
- 		return -ETOOSMALL;
- 	}
- 	list_del(&pkt->list);
--	if (list_empty(&ept->read_q))
--		wake_unlock(&ept->read_q_wake_lock);
- 	spin_unlock_irqrestore(&ept->read_q_lock, flags);
- 
- 	rc = pkt->length;
-@@ -1229,7 +1218,6 @@ static int msm_rpcrouter_probe(struct platform_device *pdev)
- 
- 	init_waitqueue_head(&newserver_wait);
- 	init_waitqueue_head(&smd_wait);
--	wake_lock_init(&rpcrouter_wake_lock, WAKE_LOCK_SUSPEND, "SMD_RPCCALL");
- 
- 	rpcrouter_workqueue = create_singlethread_workqueue("rpcrouter");
- 	if (!rpcrouter_workqueue)
-diff --git a/drivers/staging/dream/smd/smd_tty.c b/drivers/staging/dream/smd/smd_tty.c
-index 2edd9d1..f409449 100644
---- a/drivers/staging/dream/smd/smd_tty.c
-+++ b/drivers/staging/dream/smd/smd_tty.c
-@@ -19,7 +19,6 @@
- #include <linux/cdev.h>
- #include <linux/device.h>
- #include <linux/wait.h>
--#include <linux/wakelock.h>
- 
- #include <linux/tty.h>
- #include <linux/tty_driver.h>
-@@ -34,7 +33,6 @@ static DEFINE_MUTEX(smd_tty_lock);
- struct smd_tty_info {
- 	smd_channel_t *ch;
- 	struct tty_struct *tty;
--	struct wake_lock wake_lock;
- 	int open_count;
- };
- 
-@@ -69,7 +67,6 @@ static void smd_tty_notify(void *priv, unsigned event)
- 			printk(KERN_ERR "OOPS - smd_tty_buffer mismatch?!");
- 		}
- 
--		wake_lock_timeout(&info->wake_lock, HZ / 2);
- 		tty_flip_buffer_push(tty);
- 	}
- 
-@@ -95,7 +92,6 @@ static int smd_tty_open(struct tty_struct *tty, struct file *f)
- 	info = smd_tty + n;
- 
- 	mutex_lock(&smd_tty_lock);
--	wake_lock_init(&info->wake_lock, WAKE_LOCK_SUSPEND, name);
- 	tty->driver_data = info;
- 
- 	if (info->open_count++ == 0) {
-@@ -122,7 +118,6 @@ static void smd_tty_close(struct tty_struct *tty, struct file *f)
- 	if (--info->open_count == 0) {
- 		info->tty = 0;
- 		tty->driver_data = 0;
--		wake_lock_destroy(&info->wake_lock);
- 		if (info->ch) {
- 			smd_close(info->ch);
- 			info->ch = 0;
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-static struct mtd_partition openrd_base_nand_parts[] = {
+-	{
+-		.name = "u-boot",
+-		.offset = 0,
+-		.size = SZ_1M
+-	}, {
+-		.name = "uImage",
+-		.offset = MTDPART_OFS_NXTBLK,
+-		.size = SZ_4M
+-	}, {
+-		.name = "root",
+-		.offset = MTDPART_OFS_NXTBLK,
+-		.size = MTDPART_SIZ_FULL
+-	},
+-};
+-
+-static struct mv643xx_eth_platform_data openrd_base_ge00_data = {
+-	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
+-};
+-
+-static struct mv_sata_platform_data openrd_base_sata_data = {
+-	.n_ports	= 2,
+-};
+-
+-static struct mvsdio_platform_data openrd_base_mvsdio_data = {
+-	.gpio_card_detect = 29,	/* MPP29 used as SD card detect */
+-};
+-
+-static unsigned int openrd_base_mpp_config[] __initdata = {
+-	MPP29_GPIO,
+-	0
+-};
+-
+-static void __init openrd_base_init(void)
+-{
+-	/*
+-	 * Basic setup. Needs to be called early.
+-	 */
+-	kirkwood_init();
+-	kirkwood_mpp_conf(openrd_base_mpp_config);
+-
+-	kirkwood_uart0_init();
+-	kirkwood_nand_init(ARRAY_AND_SIZE(openrd_base_nand_parts), 25);
+-
+-	kirkwood_ehci_init();
+-
+-	kirkwood_ge00_init(&openrd_base_ge00_data);
+-	kirkwood_sata_init(&openrd_base_sata_data);
+-	kirkwood_sdio_init(&openrd_base_mvsdio_data);
+-}
+-
+-MACHINE_START(OPENRD_BASE, "Marvell OpenRD Base Board")
+-	/* Maintainer: Dhaval Vasa <dhaval.vasa@einfochips.com> */
+-	.phys_io	= KIRKWOOD_REGS_PHYS_BASE,
+-	.io_pg_offst	= ((KIRKWOOD_REGS_VIRT_BASE) >> 18) & 0xfffc,
+-	.boot_params	= 0x00000100,
+-	.init_machine	= openrd_base_init,
+-	.map_io		= kirkwood_map_io,
+-	.init_irq	= kirkwood_init_irq,
+-	.timer		= &kirkwood_timer,
+-MACHINE_END
