@@ -1,39 +1,55 @@
-From: albin.tonnerre@free-electrons.com (Albin Tonnerre)
-Date: Thu, 22 Oct 2009 17:47:54 +0200
-Subject: [PATCH v2] Add cpuidle support for at91
-In-Reply-To: <4AC2168B.60903@atmel.com>
-References: <1247680190-19674-1-git-send-email-albin.tonnerre@free-electrons.com>
-	<200908111200.58866.marc.pignat@hevs.ch>
-	<20090812165700.GC4051@pc-ras4041.res.insa>
-	<200908130858.47487.marc.pignat@hevs.ch>
-	<20090813193241.GA5985@pc-ras4041.res.insa>
-	<20090909151417.GA4014@pc-ras4041.res.insa>
-	<4AC2168B.60903@atmel.com>
-Message-ID: <20091022154754.GB9854@pc-ran3241.res.insa>
+From: matt@0xlab.org (Matt Hsu)
+Date: Fri, 23 Oct 2009 00:41:01 +0800
+Subject: MXC MMC driver and SDIO peripherals
+In-Reply-To: <20091021205156.GO14091@buzzloop.caiaq.de>
+References: <20091021192038.GK14091@buzzloop.caiaq.de>	<1256156119.8469.40.camel@localhost.localdomain>
+	<20091021205156.GO14091@buzzloop.caiaq.de>
+Message-ID: <4AE08B1D.7010307@0xlab.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Sending it to the right list this time, sorry for the noise]
 
-On Tue, 29 Sep 2009 16:15 +0200, Nicolas Ferre wrote :
-> > On Thu, 13 Aug 2009 21:32 +0200, Albin Tonnerre wrote :
-> >> This patch adds the support for cpuidle on AT91 SoCs, taken from the
-> >> cpuidle support in mach-kirkwood.
-> >> cpuidle needs sdram_selfrefresh_enable and _disable, so move their
-> >> definition to a separate header file instead of duplicating the code
-> >> already used in pm.c.
-> >>
-> >> Signed-off-by: Albin Tonnerre <albin.tonnerre@free-electrons.com>
-> 
-> [nicolas.ferre at atmel.com: tested on at91sam9263ek]
-> Tested-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>
+> I didn't really debug it yet, but from what I see in the sources, the
+> maximum block size is 2048. The hardware is connected via the 4-wire
+>   
+Hi Daniel,
 
-Andrew: what's your opinion on this? If it's OK, I'd really like to see it
-pushed forward.
+Did you try to run the driver with 1-Bit mode?
 
-Regards,
--- 
-Albin Tonnerre, Free Electrons
-Kernel, drivers and embedded Linux development,
-consulting, training and support.
-http://free-electrons.com
+Maybe you can try to have debug routine to report the IRQ status for 
+this sdhc controller.
+Then you could know what's wrong with firmware downloading or command 
+issuing.
+Since the card detection looks fine according to your message.
+
+If it tells you the DATA CRC error, then you can try to operate the SDIO 
+in 1-Bit mode.
+If it tells you the CMD CRC error, probably the strength of SDIO_CLK is 
+not enough, you
+need to have either internal pull-up or external resistor.
+
+Cheers,
+Matt
+> interface (+clk, +cmd). The system I tried that on has a MMC slot where
+> I can plug in either the WLAN eval kit or a memory card, and the latter
+> works just fine, which tells me that at least the pin config and the
+> hardware can't be entirely wrong.
+>
+>   
+>> What is the debug output of the MMC stack when loading the
+>> module for your SDHC?
+>>     
+>
+> Exactly one line ;)
+>
+> [    1.340000] i.MX SDHC driver
+>
+>
+> Daniel
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>   
