@@ -1,33 +1,35 @@
-From: jiujin.hong@mid-fun.com (tommy)
-Date: Thu, 22 Oct 2009 18:45:22 +0800
-Subject: about ARM11 WM9715 no sound when resume
-In-Reply-To: <20091022103927.GB3776@sirena.org.uk>
-References: <1256180289.11383.0.camel@tommy-desktop>
-	<20091022103927.GB3776@sirena.org.uk>
-Message-ID: <1256208322.23498.1.camel@tommy-desktop>
+From: simon.kagstrom@netinsight.net (Simon Kagstrom)
+Date: Thu, 22 Oct 2009 12:47:56 +0200
+Subject: [PATCHv3] [ARM] kirkwood: combine support for openrd
+	base/client support
+In-Reply-To: <pbh5r6-os7.ln1@chipmunk.wormnet.eu>
+References: <pbh5r6-os7.ln1@chipmunk.wormnet.eu>
+Message-ID: <20091022124756.56e89d7a@marrow.netinsight.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,brown!
-It can playback mp3 from start to end,also can't indicate its clock is
-ok ?
+On Thu, 22 Oct 2009 09:22:49 +0100
+Alexander Clouter <alex@digriz.org.uk> wrote:
 
-On ?, 2009-10-22 at 11:39 +0100, Mark Brown wrote:
-> On Thu, Oct 22, 2009 at 10:58:09AM +0800, tommy wrote:
-> > Platform:Linux 2.6.24.2
-> 
-> This is a very old kernel, I would strongly recommend upgrading to
-> something more current, it will make it much easier for you to seek
-> upstream support.
-> 
-> >               When MCU resume from suspend,no sound but can also
-> > playback from start to end!
-> >                It has sound only by modifing sound setting applicantion
-> > program!
-> 
-> The wm971x ASoC drivers have suspend and resume support which is fairly
-> widely used on a number of platforms.  However, there may be problems
-> with the CPU drivers.  As a first step I would suggest checking to make
-> sure that the master clock to the CODEC is restarted after resume and
-> that the AC97 link is succesfully restarted.
-> 
+> +static int __init openrd_pci_init(void)
+> +{
+> +	kirkwood_pcie_init();
+
+I think you should do
+
+	if (machine_is_openrd_base() || machine_is_openrd_client())
+		kirkwood_pcie_init();
+
+here instead since there might be other boards configured as well where
+this shouldn't be done (e.g., a build with both sheevaplug and the
+OpenRDs).
+
+> diff --git a/arch/arm/mach-kirkwood/openrd_base-setup.c b/arch/arm/mach-kirkwood/openrd_base-setup.c
+
+Perhaps it's a good idea to rebase this one against Nicolas orion.git tree at
+
+  http://git.marvell.com/?p=orion.git;a=summary
+
+?
+
+// Simon
