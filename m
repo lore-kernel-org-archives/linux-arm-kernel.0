@@ -1,32 +1,24 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 23 Oct 2009 06:45:50 +0800
-Subject: [PATCH] Zaurus: Fix NAND Flash OOB layout for Borzoi
-In-Reply-To: <1256251085.23211.155.camel@dax.rpnet.com>
-References: <1256245503.9561.18.camel@utx.utx.cz>
-	<1256251085.23211.155.camel@dax.rpnet.com>
-Message-ID: <f17812d70910221545i11f51c1bu8f57ae8cf5991b7d@mail.gmail.com>
+From: rpurdie@rpsys.net (Richard Purdie)
+Date: Thu, 22 Oct 2009 23:43:19 +0100
+Subject: spitz backlight: fix brightness limiting
+In-Reply-To: <f17812d70910211320s29d3aaa5tad3206df1e99e03b@mail.gmail.com>
+References: <20091019213751.GC1482@ucw.cz>
+	<f17812d70910211320s29d3aaa5tad3206df1e99e03b@mail.gmail.com>
+Message-ID: <1256251399.23211.164.camel@dax.rpnet.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2009 at 6:38 AM, Richard Purdie <rpurdie@rpsys.net> wrote:
-> On Thu, 2009-10-22 at 23:05 +0200, Stanislav Brabec wrote:
->> Borzoi, Terrier and Akita use the same NAND Flash OOB layout, which
->> seems to be different from Spitz for some reason. Here is a fix.
->>
->> When the code was ported to the platform data, the map was applied just
->> for Akita.
->>
->> After this patch, Flash works again on Borzoi. Terrier still has a
->> problem with partition table? different from Borzoi (unfixable without
->> reading of the system configuration in flash) and JFFS2 partitions can
->> be mounted (with some "Empty flash at ... ends at ..." in the syslog).
->>
->> Signed-off-by: Stanislav Brabec <utx@penguin.cz>
->
-> Akita and Borzoi/Terrier share the same kind of flash so this match
-> almost certainly makes sense.
->
-> Acked-by: Richard Purdie <rpurdie@rpsys.net>
->
+On Thu, 2009-10-22 at 04:20 +0800, Eric Miao wrote:
+> It's a little bit weird it's called 'limit_mask' when I first converted it
+> to a spi driver. There must be some reasons, Richard, you've got
+> any ideas?
 
-Updated.
+Its a historical artifact that once worked through some bitfield magic
+but probably stopped working when we increased the range of values the
+backlight could accept and we didn't notice the limiting problem.
+
+I'll happily take a patch to fix that.
+
+Cheers,
+
+Richard
