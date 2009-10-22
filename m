@@ -1,42 +1,51 @@
-From: alex@digriz.org.uk (Alexander Clouter)
-Date: Thu, 22 Oct 2009 21:38:03 +0100
-Subject: [PATCHv3] [ARM] kirkwood: combine support for openrd
-	base/client support
-In-Reply-To: <alpine.LFD.2.00.0910221412360.21460@xanadu.home>
-References: <pbh5r6-os7.ln1@chipmunk.wormnet.eu>
-	<20091022124756.56e89d7a@marrow.netinsight.se>
-	<20091022110436.GF6085@chipmunk>
-	<alpine.LFD.2.00.0910221412360.21460@xanadu.home>
-Message-ID: <20091022203803.GU6085@chipmunk>
+From: utx@penguin.cz (Stanislav Brabec)
+Date: Thu, 22 Oct 2009 22:58:23 +0200
+Subject: [PATCH] Zaurus: Fix PROM partition table for spitz
+Message-ID: <1256245103.9561.11.camel@utx.utx.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Attached patch fixes partition table of the Zaurus PROM. It works on
+terrier, but I guess it is common for all Zaurus models.
 
-* Nicolas Pitre <nico@fluxnic.net> [2009-10-22 14:19:47-0400]:
->
-> On Thu, 22 Oct 2009, Alexander Clouter wrote:
-> 
-> > The SheevaPlug's do not use this at all ('MACHINE_START(SHEEVAPLUG, 
-> > ...)' is not to be seen in there), they already have their own file.
-> 
-> The openrd_pci_init() is still called with a subsys_initcall() 
-> registration.  That would be invoked on a SheevaPlug as well if you have 
-> a kernel that supports them both.
->
-Right, now I understand, that makes perfect sense.  I'll amend things to 
-behave for version 4.
+The partition marked ??"Boot PROM Filesystem" is a fact a database file
+for EN-JP dictionary. Designers decided to put the English-Japanese
+translation dictionary to the remaining part of the PROM.
 
-> > If someone wants to merge the SheevaPlug's into here too they can 
-> > cross that bridge themselves.
-> 
-> No way.  I'll bomb the bridge beforehand.  There should be a balance 
-> between consolidation and abstraction.
-> 
-I did not say it was a Good Idea(tm) :)
+Changes:
 
-Cheers
+Newly mapped the bootloader system as "Boot PROM System".
 
--- 
-Alexander Clouter
-.sigmonster says: It was Penguin lust... at its ugliest.
+Already mapped EN-JP dictionary changes its name from ?"Boot PROM
+Filesystem" to "EN-JP Data File".
+
+How to verify the layout on other models:
+?root at zaurus:~# modprobe physmap
+root at zaurus:~# file -s /dev/mtd4
+/dev/mtd4: DBase 3 data file (1031668283 records)
+
+Signed-off-by: Stanislav Brabec <utx@penguin.cz>
+
+diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+index ee8d603..c382d14 100644
+--- a/arch/arm/mach-pxa/spitz.c
++++ b/arch/arm/mach-pxa/spitz.c
+@@ -658,7 +696,11 @@ static struct platform_device sharpsl_nand_device = {
+ 
+ static struct mtd_partition sharpsl_rom_parts[] = {
+ 	{
+-		.name	="Boot PROM Filesystem",
++		.name	="Boot PROM System",
++		.offset	= 0x00100000,
++	},
++	{
++		.name	="EN-JP Data File",
+ 		.offset	= 0x00140000,
+ 		.size	= MTDPART_SIZ_FULL,
+ 	},
+
+
+
+________________________________________________________________________
+Stanislav Brabec
+http://www.penguin.cz/~utx/zaurus
