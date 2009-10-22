@@ -1,24 +1,28 @@
-From: fabioestevam@yahoo.com (Fabio Estevam)
-Date: Wed, 21 Oct 2009 15:40:15 -0700 (PDT)
-Subject: [PATCH] ARM: NX3: do not reference mxc_iomux_v3_init() for
-	!CONFIG_ARCH_MX35
-In-Reply-To: <1256149783-16789-1-git-send-email-daniel@caiaq.de>
-Message-ID: <316243.78392.qm@web51008.mail.re2.yahoo.com>
+From: jiujin.hong@mid-fun.com (tommy)
+Date: Thu, 22 Oct 2009 10:58:09 +0800
+Subject: about ARM11 WM9715 no sound when resume
+Message-ID: <1256180289.11383.0.camel@tommy-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,all!
 
+Platform:Linux 2.6.24.2
+MCU:Samsung ARM11
+Codec:WM9715 AC97
 
---- On Wed, 10/21/09, Daniel Mack <daniel@caiaq.de> wrote:
+Problem:
+              When MCU resume from suspend,no sound but can also
+playback from start to end!
+               It has sound only by modifing sound setting applicantion
+program!
+               I see ubuntu alsa resume,it is use alsa-force(reloading
+alsa driver to fix that problem),is that only way to fix that issue in
+ARM too?
+               My driver is built-in!
+               I try to write volume reg to codec when resume,also the
+same problem!
+               
+Thanks first!
 
-> From: Daniel Mack <daniel@caiaq.de>
-> Subject: [PATCH] ARM: NX3: do not reference mxc_iomux_v3_init() for !\
-
-There is a typo on the Subject: NX3 should be MX3.
-
-Regards,
-
-Fabio Estevam
-
-
-      
+Tommy at China
