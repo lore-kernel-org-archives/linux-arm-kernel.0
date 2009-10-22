@@ -1,33 +1,27 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 22 Oct 2009 22:12:49 +0100
-Subject: coherent memory should be ARMv6's Device Memory?
-In-Reply-To: <ede8cc2f231dda80cc85839cb94ec565.squirrel@www.codeaurora.org>
-References: <ede8cc2f231dda80cc85839cb94ec565.squirrel@www.codeaurora.org>
-Message-ID: <1256245969.5076.9.camel@pc1117.cambridge.arm.com>
+From: utx@penguin.cz (Stanislav Brabec)
+Date: Thu, 22 Oct 2009 23:13:34 +0200
+Subject: [PATCH] Zaurus: Fix PROM partition table for spitz
+In-Reply-To: <f17812d70910221405v753eadbdu67c0d532ac77e222@mail.gmail.com>
+References: <1256245103.9561.11.camel@utx.utx.cz>
+	<f17812d70910221405v753eadbdu67c0d532ac77e222@mail.gmail.com>
+Message-ID: <1256246014.9561.24.camel@utx.utx.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2009-10-21 at 12:50 -0700, adharmap at codeaurora.org wrote:
-> The current implementation of __dma_alloc  on ARMv7 based cpu returns
-> Strongly Ordered Memory. On my uniprocessor  hardware the strongly ordered
-> memory causes the reads after a DMA_FROM_DEVICE transfer to be slow. I
-> think __dma_alloc returns StronglyOrdered memory on all v6 and v7 variants
-> where arch_is_coherent is false.
-> 
-> In my opinion, coherent memory should be changed from Strongly Ordered
-> Memory to device memory for the following reasons
-[...]
-> I am thinking of changing the pgprot_uncached to pgprot_device  in
-> dma_alloc_coherent in dma-mapping.c.
+Eric Miao wrote:
+> I'm a bit upset that some things else may depend on the original
+> layout (though that's incorrect), and this possibly breaks the
+> sequence numbering of /dev/mtd?.
 
-If we want to be safe on ARMv7, we should actually change it to
-pgprot_writecombine() which creates Norman uncached memory. According to
-the ARM ARM (and hardware that we may see in the future), it is
-Unpredictable to have two aliases to the same physical location using
-different memory types (i.e. Normal vs SO or Device). With some
-restriction, the hardware can cope with multiple Normal memory mappings
-with different cacheability attributes (cached vs uncached). Drivers
-would also need to use a barrier.
+It can break in many ways, e. g. by compiling one as module and another
+into kernel, and depends on order of modules load.
 
--- 
-Catalin
+That is why software should search partitions by name.
+
+AFAIK, nothing uses the EN-JP or initial bootloader data in the 2.6.x
+distros, so it should be just safe housekeeping.
+
+
+________________________________________________________________________
+Stanislav Brabec
+http://www.penguin.cz/~utx
