@@ -1,251 +1,268 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 23 Oct 2009 18:34:12 +0200
-Subject: [PATCH 1/3 v2] atmel-mci: change use of dma slave interface
+Date: Fri, 23 Oct 2009 18:34:14 +0200
+Subject: [PATCH 3/3 v2] at91/atmel-mci: inclusion of sd/mmc driver in
+	at91sam9g45 chip and board
 In-Reply-To: <20090930155557.7dae503b@hskinnemoen-d830>
 References: <20090930155557.7dae503b@hskinnemoen-d830>
-Message-ID: <acfa557032a93e2d3186981b16f7048a5a31028a.1256314995.git.nicolas.ferre@atmel.com>
+Message-ID: <a3b1332815576dc4d496937b8a5ab69d36818d00.1256314995.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow the use of another DMA controller driver in atmel-mci sd/mmc driver.
-This adds a generic dma_slave pointer to the mci platform structure where
-we can store DMA controller information.  In atmel-mci we use information
-provided by this structure to initialize the driver (with new helper
-functions that are architecture dependant).
-
-This also adds at32/avr32 chip modifications to cope with this new access
-method.
+This adds the support of atmel-mci sd/mmc driver in at91sam9g45 devices and
+board files. This also configures the DMA controller slave interface for
+at_hdmac dmaengine driver.
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-at91/include/mach/atmel-mci.h     |   24 ++++++++++
- arch/avr32/mach-at32ap/at32ap700x.c             |   18 +++++--
- arch/avr32/mach-at32ap/include/mach/atmel-mci.h |   24 ++++++++++
- drivers/mmc/host/atmel-mci.c                    |   56 +++++++++++++++--------
- include/linux/atmel-mci.h                       |    4 +-
- 5 files changed, 98 insertions(+), 28 deletions(-)
- create mode 100644 arch/arm/mach-at91/include/mach/atmel-mci.h
- create mode 100644 arch/avr32/mach-at32ap/include/mach/atmel-mci.h
+ arch/arm/mach-at91/at91sam9g45_devices.c |  164 ++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/board-sam9m10g45ek.c  |   24 +++++
+ drivers/mmc/host/Kconfig                 |    2 +-
+ 3 files changed, 189 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-at91/include/mach/atmel-mci.h b/arch/arm/mach-at91/include/mach/atmel-mci.h
-new file mode 100644
-index 0000000..998cb0c
---- /dev/null
-+++ b/arch/arm/mach-at91/include/mach/atmel-mci.h
-@@ -0,0 +1,24 @@
-+#ifndef __MACH_ATMEL_MCI_H
-+#define __MACH_ATMEL_MCI_H
+diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+index d581cff..f341b7e 100644
+--- a/arch/arm/mach-at91/at91sam9g45_devices.c
++++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+@@ -24,7 +24,10 @@
+ #include <mach/at91sam9g45.h>
+ #include <mach/at91sam9g45_matrix.h>
+ #include <mach/at91sam9_smc.h>
 +
-+#include <mach/at_hdmac.h>
+ #include <mach/at_hdmac.h>
++#include <mach/atmel-mci.h>
++#include <linux/atmel-mci.h>
+ 
+ #include "generic.h"
+ 
+@@ -294,6 +297,167 @@ void __init at91_add_device_eth(struct at91_eth_data *data) {}
+ 
+ 
+ /* --------------------------------------------------------------------
++ *  MMC / SD
++ * -------------------------------------------------------------------- */
 +
-+/**
-+ * struct mci_dma_data - DMA data for MCI interface
-+ */
-+struct mci_dma_data {
-+	struct at_dma_slave	sdata;
++#if defined(CONFIG_MMC_ATMELMCI) || defined(CONFIG_MMC_ATMELMCI_MODULE)
++static u64 mmc_dmamask = DMA_BIT_MASK(32);
++static struct mci_platform_data mmc0_data, mmc1_data;
++
++static struct resource mmc0_resources[] = {
++	[0] = {
++		.start	= AT91SAM9G45_BASE_MCI0,
++		.end	= AT91SAM9G45_BASE_MCI0 + SZ_16K - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= AT91SAM9G45_ID_MCI0,
++		.end	= AT91SAM9G45_ID_MCI0,
++		.flags	= IORESOURCE_IRQ,
++	},
 +};
 +
-+/* accessor macros */
-+#define	slave_data_ptr(s)	(&(s)->sdata)
-+#define find_slave_dev(s)	((s)->sdata.dma_dev)
-+
-+#define	setup_dma_addr(s, t, r)	do {		\
-+	if (s) {				\
-+		(s)->sdata.tx_reg = (t);	\
-+		(s)->sdata.rx_reg = (r);	\
-+	}					\
-+} while (0)
-+
-+#endif /* __MACH_ATMEL_MCI_H */
-diff --git a/arch/avr32/mach-at32ap/at32ap700x.c b/arch/avr32/mach-at32ap/at32ap700x.c
-index eb9d4dc..b40ff39 100644
---- a/arch/avr32/mach-at32ap/at32ap700x.c
-+++ b/arch/avr32/mach-at32ap/at32ap700x.c
-@@ -15,6 +15,8 @@
- #include <linux/gpio.h>
- #include <linux/spi/spi.h>
- #include <linux/usb/atmel_usba_udc.h>
-+
-+#include <mach/atmel-mci.h>
- #include <linux/atmel-mci.h>
- 
- #include <asm/io.h>
-@@ -1320,7 +1322,7 @@ struct platform_device *__init
- at32_add_device_mci(unsigned int id, struct mci_platform_data *data)
- {
- 	struct platform_device		*pdev;
--	struct dw_dma_slave		*dws = &data->dma_slave;
-+	struct mci_dma_slave		*slave;
- 	u32				pioa_mask;
- 	u32				piob_mask;
- 
-@@ -1339,13 +1341,17 @@ at32_add_device_mci(unsigned int id, struct mci_platform_data *data)
- 				ARRAY_SIZE(atmel_mci0_resource)))
- 		goto fail;
- 
--	dws->dma_dev = &dw_dmac0_device.dev;
--	dws->reg_width = DW_DMA_SLAVE_WIDTH_32BIT;
--	dws->cfg_hi = (DWC_CFGH_SRC_PER(0)
-+	slave = kzalloc(sizeof(struct mci_dma_slave), GFP_KERNEL);
-+
-+	slave->sdata.dma_dev = &dw_dmac0_device.dev;
-+	slave->sdata.reg_width = DW_DMA_SLAVE_WIDTH_32BIT;
-+	slave->sdata.cfg_hi = (DWC_CFGH_SRC_PER(0)
- 				| DWC_CFGH_DST_PER(1));
--	dws->cfg_lo &= ~(DWC_CFGL_HS_DST_POL
-+	slave->sdata.cfg_lo &= ~(DWC_CFGL_HS_DST_POL
- 				| DWC_CFGL_HS_SRC_POL);
- 
-+	data->dma_slave = slave;
-+
- 	if (platform_device_add_data(pdev, data,
- 				sizeof(struct mci_platform_data)))
- 		goto fail;
-@@ -1411,6 +1417,8 @@ at32_add_device_mci(unsigned int id, struct mci_platform_data *data)
- 	return pdev;
- 
- fail:
-+	data->dma_slave = NULL;
-+	kfree(slave);
- 	platform_device_put(pdev);
- 	return NULL;
- }
-diff --git a/arch/avr32/mach-at32ap/include/mach/atmel-mci.h b/arch/avr32/mach-at32ap/include/mach/atmel-mci.h
-new file mode 100644
-index 0000000..a9b3896
---- /dev/null
-+++ b/arch/avr32/mach-at32ap/include/mach/atmel-mci.h
-@@ -0,0 +1,24 @@
-+#ifndef __MACH_ATMEL_MCI_H
-+#define __MACH_ATMEL_MCI_H
-+
-+#include <linux/dw_dmac.h>
-+
-+/**
-+ * struct mci_dma_data - DMA data for MCI interface
-+ */
-+struct mci_dma_data {
-+	struct dw_dma_slave	sdata;
++static struct platform_device at91sam9g45_mmc0_device = {
++	.name		= "atmel_mci",
++	.id		= 0,
++	.dev		= {
++				.dma_mask		= &mmc_dmamask,
++				.coherent_dma_mask	= DMA_BIT_MASK(32),
++				.platform_data		= &mmc0_data,
++	},
++	.resource	= mmc0_resources,
++	.num_resources	= ARRAY_SIZE(mmc0_resources),
 +};
 +
-+/* accessor macros */
-+#define	slave_data_ptr(s)	(&(s)->sdata)
-+#define find_slave_dev(s)	((s)->sdata.dma_dev)
++static struct resource mmc1_resources[] = {
++	[0] = {
++		.start	= AT91SAM9G45_BASE_MCI1,
++		.end	= AT91SAM9G45_BASE_MCI1 + SZ_16K - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= AT91SAM9G45_ID_MCI1,
++		.end	= AT91SAM9G45_ID_MCI1,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
 +
-+#define	setup_dma_addr(s, t, r)	do {		\
-+	if (s) {				\
-+		(s)->sdata.tx_reg = (t);	\
-+		(s)->sdata.rx_reg = (r);	\
-+	}					\
-+} while (0)
++static struct platform_device at91sam9g45_mmc1_device = {
++	.name		= "atmel_mci",
++	.id		= 1,
++	.dev		= {
++				.dma_mask		= &mmc_dmamask,
++				.coherent_dma_mask	= DMA_BIT_MASK(32),
++				.platform_data		= &mmc1_data,
++	},
++	.resource	= mmc1_resources,
++	.num_resources	= ARRAY_SIZE(mmc1_resources),
++};
 +
-+#endif /* __MACH_ATMEL_MCI_H */
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index fc25586..ba8b219 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -25,6 +25,8 @@
- #include <linux/stat.h>
- 
- #include <linux/mmc/host.h>
-+
-+#include <mach/atmel-mci.h>
- #include <linux/atmel-mci.h>
- 
- #include <asm/io.h>
-@@ -1584,14 +1586,43 @@ static void __exit atmci_cleanup_slot(struct atmel_mci_slot *slot,
- #ifdef CONFIG_MMC_ATMELMCI_DMA
- static bool filter(struct dma_chan *chan, void *slave)
- {
--	struct dw_dma_slave *dws = slave;
-+	struct mci_dma_data	*sl = slave;
- 
--	if (dws->dma_dev == chan->device->dev) {
--		chan->private = dws;
-+	if (sl && find_slave_dev(sl) == chan->device->dev) {
-+		chan->private = slave_data_ptr(sl);
- 		return true;
--	} else
-+	} else {
- 		return false;
-+	}
- }
-+
-+static void atmci_configure_dma(struct atmel_mci *host)
++/* Consider only one slot : slot 0 */
++void __init at91_add_device_mci(short mmc_id, struct mci_platform_data *data)
 +{
-+	struct mci_platform_data	*pdata;
 +
-+	if (host == NULL)
++	if (!data)
 +		return;
 +
-+	pdata = host->pdev->dev.platform_data;
++	/* Must have at least one usable slot */
++	if (!data->slot[0].bus_width)
++		return;
 +
-+	if (pdata && find_slave_dev(pdata->dma_slave)) {
-+		dma_cap_mask_t mask;
++#if defined(CONFIG_MMC_ATMELMCI_DMA)
++	{
++	struct mci_dma_data	*slave;
 +
-+		setup_dma_addr(pdata->dma_slave,
-+			       host->mapbase + MCI_TDR,
-+			       host->mapbase + MCI_RDR);
++	slave = kzalloc(sizeof(struct mci_dma_data), GFP_KERNEL);
 +
-+		/* Try to grab a DMA channel */
-+		dma_cap_zero(mask);
-+		dma_cap_set(DMA_SLAVE, mask);
-+		host->dma.chan =
-+			dma_request_channel(mask, filter, pdata->dma_slave);
++	/* DMA slave channel configuration */
++	slave->sdata.dma_dev = &at_hdmac_device.dev;
++	slave->sdata.reg_width = DW_DMA_SLAVE_WIDTH_32BIT;
++	slave->sdata.cfg = ATC_FIFOCFG_HALFFIFO
++			 | ATC_SRC_H2SEL_HW | ATC_DST_H2SEL_HW;
++	slave->sdata.ctrla = ATC_SCSIZE_16 | ATC_DCSIZE_16;
++	if (mmc_id == 0)	/* MCI0 */
++		slave->sdata.cfg |= ATC_SRC_PER(AT_DMA_ID_MCI0)
++				 | ATC_DST_PER(AT_DMA_ID_MCI0);
++
++	else			/* MCI1 */
++		slave->sdata.cfg |= ATC_SRC_PER(AT_DMA_ID_MCI1)
++				 | ATC_DST_PER(AT_DMA_ID_MCI1);
++
++	data->dma_slave = slave;
 +	}
-+	if (!host->dma.chan)
-+		dev_notice(&host->pdev->dev, "DMA not available, using PIO\n");
++#endif
++
++
++	/* input/irq */
++	if (data->slot[0].detect_pin) {
++		at91_set_gpio_input(data->slot[0].detect_pin, 1);
++		at91_set_deglitch(data->slot[0].detect_pin, 1);
++	}
++	if (data->slot[0].wp_pin)
++		at91_set_gpio_input(data->slot[0].wp_pin, 1);
++
++	if (mmc_id == 0) {		/* MCI0 */
++
++		/* CLK */
++		at91_set_A_periph(AT91_PIN_PA0, 0);
++
++		/* CMD */
++		at91_set_A_periph(AT91_PIN_PA1, 1);
++
++		/* DAT0, maybe DAT1..DAT3 and maybe DAT4..DAT7 */
++		at91_set_A_periph(AT91_PIN_PA2, 1);
++		if (data->slot[0].bus_width == 4) {
++			at91_set_A_periph(AT91_PIN_PA3, 1);
++			at91_set_A_periph(AT91_PIN_PA4, 1);
++			at91_set_A_periph(AT91_PIN_PA5, 1);
++			if (data->slot[0].bus_width == 8) {
++				at91_set_A_periph(AT91_PIN_PA6, 1);
++				at91_set_A_periph(AT91_PIN_PA7, 1);
++				at91_set_A_periph(AT91_PIN_PA8, 1);
++				at91_set_A_periph(AT91_PIN_PA9, 1);
++			}
++		}
++
++		mmc0_data = *data;
++		at91_clock_associate("mci0_clk", &at91sam9g45_mmc0_device.dev, "mci_clk");
++		platform_device_register(&at91sam9g45_mmc0_device);
++
++	} else {			/* MCI1 */
++
++		/* CLK */
++		at91_set_A_periph(AT91_PIN_PA31, 0);
++
++		/* CMD */
++		at91_set_A_periph(AT91_PIN_PA22, 1);
++
++		/* DAT0, maybe DAT1..DAT3 and maybe DAT4..DAT7 */
++		at91_set_A_periph(AT91_PIN_PA23, 1);
++		if (data->slot[0].bus_width == 4) {
++			at91_set_A_periph(AT91_PIN_PA24, 1);
++			at91_set_A_periph(AT91_PIN_PA25, 1);
++			at91_set_A_periph(AT91_PIN_PA26, 1);
++			if (data->slot[0].bus_width == 8) {
++				at91_set_A_periph(AT91_PIN_PA27, 1);
++				at91_set_A_periph(AT91_PIN_PA28, 1);
++				at91_set_A_periph(AT91_PIN_PA29, 1);
++				at91_set_A_periph(AT91_PIN_PA30, 1);
++			}
++		}
++
++		mmc1_data = *data;
++		at91_clock_associate("mci1_clk", &at91sam9g45_mmc1_device.dev, "mci_clk");
++		platform_device_register(&at91sam9g45_mmc1_device);
++
++	}
 +}
 +#else
-+static void atmci_configure_dma(struct atmel_mci *host) {}
- #endif
++void __init at91_add_device_mci(short mmc_id, struct mci_platform_data *data) {}
++#endif
++
++
++/* --------------------------------------------------------------------
+  *  NAND / SmartMedia
+  * -------------------------------------------------------------------- */
  
- static int __init atmci_probe(struct platform_device *pdev)
-@@ -1645,22 +1676,7 @@ static int __init atmci_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err_request_irq;
+diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
+index 64c3843..1cce010 100644
+--- a/arch/arm/mach-at91/board-sam9m10g45ek.c
++++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
+@@ -24,6 +24,7 @@
+ #include <linux/input.h>
+ #include <linux/leds.h>
+ #include <linux/clk.h>
++#include <linux/atmel-mci.h>
  
--#ifdef CONFIG_MMC_ATMELMCI_DMA
--	if (pdata->dma_slave.dma_dev) {
--		struct dw_dma_slave *dws = &pdata->dma_slave;
--		dma_cap_mask_t mask;
--
--		dws->tx_reg = regs->start + MCI_TDR;
--		dws->rx_reg = regs->start + MCI_RDR;
--
--		/* Try to grab a DMA channel */
--		dma_cap_zero(mask);
--		dma_cap_set(DMA_SLAVE, mask);
--		host->dma.chan = dma_request_channel(mask, filter, dws);
--	}
--	if (!host->dma.chan)
--		dev_notice(&pdev->dev, "DMA not available, using PIO\n");
--#endif /* CONFIG_MMC_ATMELMCI_DMA */
-+	atmci_configure_dma(host);
+ #include <mach/hardware.h>
+ #include <video/atmel_lcdc.h>
+@@ -99,6 +100,26 @@ static struct spi_board_info ek_spi_devices[] = {
  
- 	platform_set_drvdata(pdev, host);
  
-diff --git a/include/linux/atmel-mci.h b/include/linux/atmel-mci.h
-index 57b1846..3e09b34 100644
---- a/include/linux/atmel-mci.h
-+++ b/include/linux/atmel-mci.h
-@@ -3,8 +3,6 @@
- 
- #define ATMEL_MCI_MAX_NR_SLOTS	2
- 
--#include <linux/dw_dmac.h>
--
- /**
-  * struct mci_slot_pdata - board-specific per-slot configuration
-  * @bus_width: Number of data lines wired up the slot
-@@ -34,7 +32,7 @@ struct mci_slot_pdata {
-  * @slot: Per-slot configuration data.
+ /*
++ * MCI (SD/MMC)
++ */
++static struct mci_platform_data __initdata mci0_data = {
++	.slot[0] = {
++		.bus_width	= 4,
++		.detect_pin	= AT91_PIN_PD10,
++		.wp_pin		= -1,
++	},
++};
++
++static struct mci_platform_data __initdata mci1_data = {
++	.slot[0] = {
++		.bus_width	= 4,
++		.detect_pin	= AT91_PIN_PD11,
++		.wp_pin		= AT91_PIN_PD29,
++	},
++};
++
++
++/*
+  * MACB Ethernet device
   */
- struct mci_platform_data {
--	struct dw_dma_slave	dma_slave;
-+	struct mci_dma_data	*dma_slave;
- 	struct mci_slot_pdata	slot[ATMEL_MCI_MAX_NR_SLOTS];
- };
+ static struct at91_eth_data __initdata ek_macb_data = {
+@@ -370,6 +391,9 @@ static void __init ek_board_init(void)
+ 	at91_add_device_usba(&ek_usba_udc_data);
+ 	/* SPI */
+ 	at91_add_device_spi(ek_spi_devices, ARRAY_SIZE(ek_spi_devices));
++	/* MMC */
++	at91_add_device_mci(0, &mci0_data);
++	at91_add_device_mci(1, &mci1_data);
+ 	/* Ethernet */
+ 	at91_add_device_eth(&ek_macb_data);
+ 	/* NAND */
+diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+index 432ae83..b4aeb9d 100644
+--- a/drivers/mmc/host/Kconfig
++++ b/drivers/mmc/host/Kconfig
+@@ -188,7 +188,7 @@ endchoice
  
+ config MMC_ATMELMCI_DMA
+ 	bool "Atmel MCI DMA support (EXPERIMENTAL)"
+-	depends on MMC_ATMELMCI && AVR32 && DMA_ENGINE && EXPERIMENTAL
++	depends on MMC_ATMELMCI && (AVR32 || ARCH_AT91SAM9G45) && DMA_ENGINE && EXPERIMENTAL
+ 	help
+ 	  Say Y here to have the Atmel MCI driver use a DMA engine to
+ 	  do data transfers and thus increase the throughput and
 -- 
 1.5.6.5
