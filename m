@@ -1,37 +1,41 @@
-From: yegor_sub1@visionsystems.de (Yegor Yefremov)
-Date: Fri, 23 Oct 2009 08:47:47 +0200
-Subject: [at91sam9g45] fail to start second kernel via kexec if watchdog
-	is enabled
-In-Reply-To: <20091022194902.GM19714@game.jcrosoft.org>
-References: <4ADEE5EE.8020205@visionsystems.de>
-	<20091022194902.GM19714@game.jcrosoft.org>
-Message-ID: <4AE15193.3000006@visionsystems.de>
+From: simon.kagstrom@netinsight.net (Simon Kagstrom)
+Date: Fri, 23 Oct 2009 09:31:53 +0200
+Subject: [PATCHv3] [ARM] kirkwood: combine support for openrd
+	base/client support
+In-Reply-To: <20091022110436.GF6085@chipmunk>
+References: <pbh5r6-os7.ln1@chipmunk.wormnet.eu>
+	<20091022124756.56e89d7a@marrow.netinsight.se>
+	<20091022110436.GF6085@chipmunk>
+Message-ID: <20091023093153.363e2984@marrow.netinsight.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> I have problem booting the second kernel after enabling the watchdog following these steps: http://www.at91.com/index.php?option=com_jfusion&Itemid=57&jfile=viewtopic.php&f=12&t=5551&p=29283&hilit=watchdog+bootstrap#p29283
->> Bootstrap: don't touch watchdog
->> U-Boot: configure watchdog and set the timer counter value to 16 seconds
->> Linux: keep pinging the watchdog
->>
->> The first kernel (booted from u-boot) is working as expected, but if I start the new one using kexec it gets only till frame buffer init:
->>
->> ....
->> NetWinder Floating Point Emulator V0.97 (double precision)
->> Slow work thread pool: Starting up
->> Slow work thread pool: Ready
->> JFFS2 version 2.2. (NAND) -? 2001-2006 Red Hat, Inc.
->> msgmni has been set to 245
->> io scheduler noop registered
->> io scheduler anticipatory registered (default)
->> atmel_lcdfb atmel_lcdfb.0: backlight control is not available
->> atmel_lcdfb atmel_lcdfb.0: 510KiB frame buffer at 77980000 (mapped at ffa00000)
->> Start AT91Bootstrap...
->>
->> Without watchdog there is no problem. Both kernels (2.6.32-rc5) are the same. Any idea?
-> do you enable the watchdog in the send kernel?
+Sorry for being unclear in my comments! (And thanks to Nicolas for
+explaining the PCI init issue I raised).
 
-Yes. But as you can see from the bootlog, the system reboots before watchdog driver will be initialized. I'll try to tap watchdog in the board init part. Maybe it will help.
+On Thu, 22 Oct 2009 12:04:36 +0100
+Alexander Clouter <alex@digriz.org.uk> wrote:
 
-Regards,
-Yegor
+> > > diff --git a/arch/arm/mach-kirkwood/openrd_base-setup.c b/arch/arm/mach-kirkwood/openrd_base-setup.c
+> > 
+> > Perhaps it's a good idea to rebase this one against Nicolas orion.git tree at
+> > 
+> >   http://git.marvell.com/?p=orion.git;a=summary
+> > 
+> ...erm..I have not rebased but it should apply cleanly though as I just 
+> run from a clone'd vanilla 2.6 (Linus's tree) and pull in orion.git 
+> anyway.
+
+Well, your patch will/should go through Nicolas tree, and I just
+noticed that it didn't contain the last patches on orion.git (namely
+the PCI init you also added to the combined file).
+
+I haven't tested, but would guess that git won't accept removing a file
+which has changes in it - the openrd-base.c you _remove_ don't have the
+PCI init.
+
+
+Anyway, I believe it makes very much sense to merge the two OpenRDs, so
+other than these things I'm happy with the patch.
+
+// Simon
