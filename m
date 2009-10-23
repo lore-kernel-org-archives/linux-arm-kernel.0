@@ -1,50 +1,78 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 23 Oct 2009 12:19:40 -0700
-Subject: [PATCH 05/10] omap1: Fix DSP public peripherals support for
-	ams-delta
-In-Reply-To: <4AE0E938.7080305@ti.com>
-References: <20091022221013.27408.443.stgit@localhost>
-	<20091022221216.27408.39863.stgit@localhost>
-	<4AE0E938.7080305@ti.com>
-Message-ID: <20091023191939.GJ16230@atomide.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Fri, 23 Oct 2009 13:49:02 -0700
+Subject: [PATCH 43/46] DaVinci: remove unneeded #include's
+In-Reply-To: <4AE065E4.70506@ru.mvista.com> (Sergei Shtylyov's message of
+	"Thu\, 22 Oct 2009 18\:02\:12 +0400")
+References: <1255720190-7452-1-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-32-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-33-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-34-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-35-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-36-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-37-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-38-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-39-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-40-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-41-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-42-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-43-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-44-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-45-git-send-email-khilman@deeprootsystems.com>
+	<4AE065E4.70506@ru.mvista.com>
+Message-ID: <87y6n1eszl.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [091022 16:22]:
+Sergei Shtylyov <sshtylyov@ru.mvista.com> writes:
+
+> Hello.
 >
-> Tony Lindgren wrote:
->> From: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
->>
->> DSP public peripherals used to work on OMAP1510 based (or all OMAP1 class?)
->> machines as long as old dspgateway code were present in the l-o tree. For
->> several months it is no longer included, breaking support for McBSP1 based
->> audio on Amstrad Delta, for example.
->>
->> This patch, derived from the old dspgateway code, corrects the problem for the
->> board by simply taking the DSP out of reset state, I guess. That way, things
->> should not break when a new dsp code is added to the tree, and the change can
->> be reverted then.
+> Kevin Hilman wrote:
 >
-> A minor comment/correction here. Although this bit is called "DSP_RST"  
-> this does not actually release the DSP from reset. This bit actually  
-> releases the reset for the "priority registers (TIPB module), EMIF  
-> configuration registers, and the MPUI control logic (partially) in the  
-> DSP", thus allowing you to access the DSP peripherals via the MPUI. Bit  
-> 1 of the same register, called "DSP_EN", actually releases the DSP reset.
-
-Thanks for clarifying that.
-
->> If there are any reports on McBSP1 or other DSP public peripherals not working
->> for other OMAP1 machines (I've not heard of any for now), I can prepare a more
->> general patch providing an extra include file with a helper function defined.
+>> From: Sergei Shtylyov <sshtylyov@ru.mvista.com>
 >
-> This would be necessary for all OMAP15xx based devices that use McBSP1  
-> (or McBSP3 for that matter). However, I am not sure if it is common for  
-> other boards to use McBSP1 for audio.
+>> There have accumulated quite a lot of them after the code reorganizations...
+>
+>> In several cases I had to replace #include <linux/dma-mapping.h> which wasn't
+>> needed directly but happened to #include <linux/err.h> which was needed.
+>
+>> Signed-off-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
+>> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+>
+> [...]
+>
+>> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+>> index b804d57..120ede0 100644
+>> --- a/arch/arm/mach-davinci/da850.c
+>> +++ b/arch/arm/mach-davinci/da850.c
+>> @@ -11,24 +11,21 @@
+>>   * is licensed "as is" without any warranty of any kind, whether express
+>>   * or implied.
+>>   */
+>> -#include <linux/kernel.h>
+>>  #include <linux/init.h>
+>>  #include <linux/clk.h>
+>> -#include <linux/platform_device.h>
+>>  #include <linux/cpufreq.h>
+>>  #include <linux/regulator/consumer.h>
+>>   #include <asm/mach/map.h>
+>>  -#include <mach/clock.h>
+>>  #include <mach/psc.h>
+>> -#include <mach/mux.h>
+>>  #include <mach/irqs.h>
+>>  #include <mach/cputype.h>
+>>  #include <mach/common.h>
+>>  #include <mach/time.h>
+>>  #include <mach/da8xx.h>
+>>  #include <mach/cpufreq.h>
+>> +#include <linux/platform_device.h>
+>
+>    As has been pointed out, this is not in its proper group. Perhaps
+> the patch can be changed before pushing upstream, and removal and
+> addition of this line just nullified?
 
-Yeah, I guess currently only board-ams-delta.c needs this for audio.
-But that could of course change once there are more 15xx boards using ASoC.
+Indeed, I'll clean this up in the davinci-next branch.
 
-Regards,
+Thanks,
 
-Tony
+Kevin
