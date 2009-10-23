@@ -1,63 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 23 Oct 2009 11:18:06 +0100
-Subject: [WARNING] pxamci: 'pxa2xx-mci.0' does not have a release()
-	function.
-In-Reply-To: <20091023115028.59ed7f74.ospite@studenti.unina.it>
-References: <20091023003631.1331a60a.ospite@studenti.unina.it>
-	<20091022225758.GA9106@n2100.arm.linux.org.uk>
-	<20091023115028.59ed7f74.ospite@studenti.unina.it>
-Message-ID: <20091023101806.GB19437@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 23 Oct 2009 11:22:54 +0100
+Subject: [PATCH] Use Normal uncached memory rather than Strongly
+	Ordered on ARMv6+
+In-Reply-To: <20091023100639.GA19437@n2100.arm.linux.org.uk>
+References: <20091023094121.21605.39568.stgit@pc1117.cambridge.arm.com>
+	<20091023100639.GA19437@n2100.arm.linux.org.uk>
+Message-ID: <1256293374.6564.27.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2009 at 11:50:28AM +0200, Antonio Ospite wrote:
-> On Thu, 22 Oct 2009 23:57:58 +0100
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
-> > On Fri, Oct 23, 2009 at 12:36:31AM +0200, Antonio Ospite wrote:
-> > > Hi,
-> > > 
-> > > I get this warning on shutdown. How to fix it properly?
-> > > 
-> > > FYI, in my setup pxa2xx_spi is the parent for pxamci, set using
-> > > this patch:
-> > > http://git.openezx.org/openezx.git?a=commitdiff;h=0ffd85ad8faea3456d4ecf5f63ae65aca26fff21
+On Fri, 2009-10-23 at 11:06 +0100, Russell King - ARM Linux wrote:
+> On Fri, Oct 23, 2009 at 10:41:21AM +0100, Catalin Marinas wrote:
+> > ARMv6 onwards requires that there are no aliases to the same physical
+> > location using different memory types (i.e. Normal vs Strongly Ordered).
+> > Access to SO mappings when the unaligned accesses are handled in
+> > hardware is also Unpredictable (pgprot_noncached() mappings in user
+> > space).
 > > 
-> > This sounds like it's the cause of the problem - from the backtrace, it
-> > looks like SPI expects the children of the SPI device to be its own
-> > responsibility to maintain.
-> > 
-> > Hence, because you've made pxamci a child of SPI, SPI is trying to
-> > unregister and release the pxamci device.
+> > The patch modifies the pgprot_noncached() for ARMv6+ architecture
+> > versions to generate Normal uncached memory attributes rather than
+> > Strongly Ordered. The patch also modifies the mandatory barriers to use
+> > dmb() rather than being simple compiler barriers.
 > 
-> A little more background: we need pxamci to be a child of SPI because
-> our PMIC is connected via SPI, and a PMIC regulator is used for mmc
-> powering; enforcing this hierarchy is needed to make pxamci suspend and
-> resume properly.
+> It's not this simple - pgprot_noncached() is used for /dev/mem O_SYNC
+> mappings, which are used for device mappings.  This means you still
+> end up with the unpredictable issue.
 
-I don't think this is the right solution - and I don't know what the
-right solution would be given that the interfaces I suspect you need
-aren't public.
+If it is used for accessing device memory, why not create a
+pgprot_device() and use this instead (maybe after checking for pfn_valid
+to make sure we don't map the RAM as device memory)? Of course, it needs
+some modifications to the mem.c driver which may be ARM specific, though
+some other architecture might benefit as well.
 
-I don't think you can reverse the order of SPI and MMC initialization
-because that'd mean MMC could try to use SPI before it exists.
+>From drivers/char/mem.c:
 
-Maybe the right answer is for SPI to stop thinking it owns all child
-devices, and only unregister devices which it owns (iow, are of some
-SPI bus-type.)
+	/*
+	 * On ia64, we ignore O_SYNC because we cannot tolerate memory attribute aliases.
+	 */
 
-Adding Greg for comment.
+So ARM it's not the only architecture with this issue (I know you don't
+like this argument :-)).
 
-> The board init does:
-> 	spi_pd = platform_device_alloc("pxa2xx-spi", 1);
-> 	spi_pd->dev.platform_data = &ezx_spi_masterinfo;
-> 	platform_device_add(spi_pd);
-> 	spi_register_board_info(ARRAY_AND_SIZE(a780_spi_boardinfo));
-> 
-> 	pxa_set_mci_parent(&spi_pd->dev);
-> 	pxa_set_mci_info(&ezx_mci_platform_data);
-> 
-> Now, do you suggest to adapt pxamci so it supports the case when
-> another driver wants to release it? I am not sure how to do that, tho.
+I can see MIPS has its own #ifdef in the mem.c driver as well.
 
-Definitely not.
+-- 
+Catalin
