@@ -1,38 +1,38 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 23 Oct 2009 20:20:23 +0200
-Subject: [PATCH] at91: support for eco920
-In-Reply-To: <20091023175629.GB29430@game.jcrosoft.org>
-References: <20091021084826.GA29667@n2100.arm.linux.org.uk>
-	<1256115527-20635-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20091021151917.GE19714@game.jcrosoft.org>
-	<20091023121152.GB1821@pengutronix.de>
-	<20091023175629.GB29430@game.jcrosoft.org>
-Message-ID: <20091023182023.GB3440@pengutronix.de>
+From: r-woodruff2@ti.com (Woodruff, Richard)
+Date: Fri, 23 Oct 2009 13:35:40 -0500
+Subject: [PATCH] Use Normal uncached memory rather than Strongly	Ordered
+	on ARMv6+
+In-Reply-To: <20091023171227.GA29639@n2100.arm.linux.org.uk>
+References: <20091023094121.21605.39568.stgit@pc1117.cambridge.arm.com>
+	<20091023100639.GA19437@n2100.arm.linux.org.uk>
+	<1256293374.6564.27.camel@pc1117.cambridge.arm.com>
+	<20091023103420.GC19437@n2100.arm.linux.org.uk>
+	<1256295591.6564.42.camel@pc1117.cambridge.arm.com>
+	<20091023113001.GA22853@n2100.arm.linux.org.uk>
+	<1256299512.6564.74.camel@pc1117.cambridge.arm.com>
+	<20091023123600.GB22853@n2100.arm.linux.org.uk>
+	<1256316861.6564.154.camel@pc1117.cambridge.arm.com>
+	<20091023171227.GA29639@n2100.arm.linux.org.uk>
+Message-ID: <13B9B4C6EF24D648824FF11BE8967162039B4E0379@dlee02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2009 at 07:56:29PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 14:11 Fri 23 Oct     , Uwe Kleine-K?nig wrote:
-> > On Wed, Oct 21, 2009 at 05:19:17PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > On 10:58 Wed 21 Oct     , Uwe Kleine-K?nig wrote:
-> > > > CONFIG_MACH_ECO920 is enabled in at91rm9200dk_defconfig.  The name is
-> > > > wrong, but this is better than adding another defconfig or don't get
-> > > > compile coverage at all./
-> > > in this case it will be better to have a generic rm9200 defconfig
-> > right, but imho this shouldn't stop my patch.
-> rename at91rm9200dk_defconfig to at91rm9200_defconfig will make the patch
-> better and will avoid this comment about wrong name defconfig
-Hm, this is only slightly better:
 
-	linux-2.6$ grep CONFIG_ARCH_AT91RM9200=y arch/arm/configs/* | wc -l
-	12
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Friday, October 23, 2009 12:12 PM
 
-Andrew, thoughts?  Are you interested at all in reducing the number of
-defconfigs for at91?
+> As far as I'm concerned, we've spent far too long discussing this issue -
+> there's nothing really to discuss.  We need dma_alloc_coherent() to use
+> its own page protection modifier, which causes it to behave the same as
+> dma_alloc_writecombine() on ARMv7, and with the existing behaviour (for
+> the time being) on ARMv6 and below.  We should leave pgprot_noncached()
+> well alone until we know that its other places need to be changed.
 
-Best regards
-Uwe
+We do have a few ARMv7 versions in the pipeline at various stages. ARM has projected speculative access is going to be an issue and we do believe them.  Any tools which will help here and finding the problems will be useful.  Some of these probably will be internal hack patches.  However, once hardware is fully out there having some conditionals out there would help everyone out.
 
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+This week there was some odd coherency issue yet to be explained.  That eventual debug will look at this as one of the angles.
+
+On CortexA8-OMAP3430 in the field, if L2-Speculative access is enabled using AuxCR, defiantly we did run into some issues.  In instance I know about the L2 speculative fetch had some collision with secure protection.  This happened across a SMI to monitor mode.  Perhaps it could have as easily been elsewhere like what will be up coming.
+
+Regards,
+Richard W.
