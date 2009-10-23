@@ -1,78 +1,31 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 23 Oct 2009 13:49:02 -0700
-Subject: [PATCH 43/46] DaVinci: remove unneeded #include's
-In-Reply-To: <4AE065E4.70506@ru.mvista.com> (Sergei Shtylyov's message of
-	"Thu\, 22 Oct 2009 18\:02\:12 +0400")
-References: <1255720190-7452-1-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-32-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-33-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-34-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-35-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-36-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-37-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-38-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-39-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-40-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-41-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-42-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-43-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-44-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-45-git-send-email-khilman@deeprootsystems.com>
-	<4AE065E4.70506@ru.mvista.com>
-Message-ID: <87y6n1eszl.fsf@deeprootsystems.com>
+From: davidb@quicinc.com (David Brown)
+Date: Fri, 23 Oct 2009 14:30:31 -0700
+Subject: [PATCH] Use Normal uncached memory rather than Strongly
+	Ordered on ARMv6+
+In-Reply-To: <20091023123600.GB22853@n2100.arm.linux.org.uk>
+References: <20091023094121.21605.39568.stgit@pc1117.cambridge.arm.com>
+	<20091023100639.GA19437@n2100.arm.linux.org.uk>
+	<1256293374.6564.27.camel@pc1117.cambridge.arm.com>
+	<20091023103420.GC19437@n2100.arm.linux.org.uk>
+	<1256295591.6564.42.camel@pc1117.cambridge.arm.com>
+	<20091023113001.GA22853@n2100.arm.linux.org.uk>
+	<1256299512.6564.74.camel@pc1117.cambridge.arm.com>
+	<20091023123600.GB22853@n2100.arm.linux.org.uk>
+Message-ID: <20091023213031.GA17468@huya.quicinc.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sergei Shtylyov <sshtylyov@ru.mvista.com> writes:
+On Fri, Oct 23, 2009 at 05:36:00AM -0700, Russell King - ARM Linux wrote:
 
-> Hello.
->
-> Kevin Hilman wrote:
->
->> From: Sergei Shtylyov <sshtylyov@ru.mvista.com>
->
->> There have accumulated quite a lot of them after the code reorganizations...
->
->> In several cases I had to replace #include <linux/dma-mapping.h> which wasn't
->> needed directly but happened to #include <linux/err.h> which was needed.
->
->> Signed-off-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
->> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
->
-> [...]
->
->> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
->> index b804d57..120ede0 100644
->> --- a/arch/arm/mach-davinci/da850.c
->> +++ b/arch/arm/mach-davinci/da850.c
->> @@ -11,24 +11,21 @@
->>   * is licensed "as is" without any warranty of any kind, whether express
->>   * or implied.
->>   */
->> -#include <linux/kernel.h>
->>  #include <linux/init.h>
->>  #include <linux/clk.h>
->> -#include <linux/platform_device.h>
->>  #include <linux/cpufreq.h>
->>  #include <linux/regulator/consumer.h>
->>   #include <asm/mach/map.h>
->>  -#include <mach/clock.h>
->>  #include <mach/psc.h>
->> -#include <mach/mux.h>
->>  #include <mach/irqs.h>
->>  #include <mach/cputype.h>
->>  #include <mach/common.h>
->>  #include <mach/time.h>
->>  #include <mach/da8xx.h>
->>  #include <mach/cpufreq.h>
->> +#include <linux/platform_device.h>
->
->    As has been pointed out, this is not in its proper group. Perhaps
-> the patch can be changed before pushing upstream, and removal and
-> addition of this line just nullified?
+> > Alternatively, we can place a DMB in readl/writel but I'm not sure about
+> > the performance impact.
+> 
+> If you do that, you might as well use strongly ordered memory for device
+> mappings - since you'll be causing the CPU to stall after each access.
 
-Indeed, I'll clean this up in the davinci-next branch.
+Actually, the DMB is stronger than strongly ordered.  Strongly
+ordered only guarantees ordering within somewhat arbitrarily
+defined (and not completely settled) 1KB boundaries, for memory
+mapped peripherals.
 
-Thanks,
-
-Kevin
+David
