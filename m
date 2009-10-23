@@ -1,62 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 23 Oct 2009 18:12:27 +0100
-Subject: [PATCH] Use Normal uncached memory rather than Strongly
-	Ordered on ARMv6+
-In-Reply-To: <1256316861.6564.154.camel@pc1117.cambridge.arm.com>
-References: <20091023094121.21605.39568.stgit@pc1117.cambridge.arm.com>
-	<20091023100639.GA19437@n2100.arm.linux.org.uk>
-	<1256293374.6564.27.camel@pc1117.cambridge.arm.com>
-	<20091023103420.GC19437@n2100.arm.linux.org.uk>
-	<1256295591.6564.42.camel@pc1117.cambridge.arm.com>
-	<20091023113001.GA22853@n2100.arm.linux.org.uk>
-	<1256299512.6564.74.camel@pc1117.cambridge.arm.com>
-	<20091023123600.GB22853@n2100.arm.linux.org.uk>
-	<1256316861.6564.154.camel@pc1117.cambridge.arm.com>
-Message-ID: <20091023171227.GA29639@n2100.arm.linux.org.uk>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 23 Oct 2009 18:47:00 +0200
+Subject: [PATCH] Enable TCM on the Nomadik
+Message-ID: <1256316420-29515-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2009 at 05:54:21PM +0100, Catalin Marinas wrote:
-> On Fri, 2009-10-23 at 13:36 +0100, Russell King - ARM Linux wrote:
-> > If you have a shared ownership ring buffer, you need the writes for
-> > updating the DMA pointers to hit it before the write to change the
-> > ownership of the descriptor to device.  Reverse those two writes and
-> > you end up transmitting junk.
-> 
-> But if we have arch_is_coherent() enabled (possibly with hardware
-> support like ARM's ACP), we need the drivers to have barriers anyway
-> since we would use normal cached memory (and ordering isn't guaranteed).
-> Of course, one has to go through the drivers used with a platform and
-> check them but we already have a precedent.
+This enables the 8KiB ITCM + 8KiB DTCM found on the Nomadik board
+and its derivates.
 
-Actually, we do not.  arch_is_coherent() is for one ARM platform
-(Intel IXP) which has their own DMA coherent support for PCI devices -
-devices which quite possibly already have the necessary barriers.
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.se>
+Cc: Alessandro Rubini <rubini-list@gnudd.com>
+---
+I don't have a Nomadik board so I cannot test this really, but I
+hope Alessandro can spare some time for it. The example code in
+Documentation/arm/tcm.txt can be used to see if the compile macros
+and allocation pool are working.
+---
+ arch/arm/Kconfig                            |    1 +
+ arch/arm/mach-nomadik/include/mach/memory.h |    8 ++++++++
+ 2 files changed, 9 insertions(+), 0 deletions(-)
 
-> BTW, there are two other architectures (x86 and PowerPC) with a similar
-> restriction. Do they do anything about this in Linux?
-
-PPC doesn't appear to - they seem to live with multiple mappings for
-the same space with different attributes.
-
-x86 is fully cache coherent, and so doesn't have the DMA issue to
-worry about - there's no need for dma_alloc_coherent() to be anything
-but a call to get_free_pages().
-
-ARM is more complex because we don't have any coherency hardware,
-and the only way to safely get the required semantics for this memory
-is by returning "strongly ordered" on ARMv5 and below.
-
-In summary, the concern is:
-1. The ARM support is currently setup to return strongly ordered memory.
-2. Drivers are _currently_ written with this expectation in mind no
-   matter what CPU architecture is in use.
-3. Relaxing the returned memory type will destabilise systems,
-   especially on ARMv6 and above.
-
-As far as I'm concerned, we've spent far too long discussing this issue -
-there's nothing really to discuss.  We need dma_alloc_coherent() to use
-its own page protection modifier, which causes it to behave the same as
-dma_alloc_writecombine() on ARMv7, and with the existing behaviour (for
-the time being) on ARMv6 and below.  We should leave pgprot_noncached()
-well alone until we know that its other places need to be changed.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1c4119c..39cf2ba 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -349,6 +349,7 @@ config ARCH_NOMADIK
+ 	select ARM_AMBA
+ 	select ARM_VIC
+ 	select CPU_ARM926T
++	select HAVE_TCM
+ 	select HAVE_CLK
+ 	select COMMON_CLKDEV
+ 	select GENERIC_TIME
+diff --git a/arch/arm/mach-nomadik/include/mach/memory.h b/arch/arm/mach-nomadik/include/mach/memory.h
+index 1e5689d..d2375de 100644
+--- a/arch/arm/mach-nomadik/include/mach/memory.h
++++ b/arch/arm/mach-nomadik/include/mach/memory.h
+@@ -25,4 +25,12 @@
+  */
+ #define PHYS_OFFSET	UL(0x00000000)
+ 
++/*
++ * TCM memory whereabouts
++ */
++#define ITCM_OFFSET	0xffff2000
++#define ITCM_END	0xffff3fff
++#define DTCM_OFFSET	0xffff4000
++#define DTCM_END	0xffff5fff
++
+ #endif
+-- 
+1.6.2.5
