@@ -1,60 +1,80 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 23 Oct 2009 11:04:08 +0200
-Subject: [at91sam9g45] fail to start second kernel via kexec if
-	watchdog is enabled
-In-Reply-To: <4AE163EF.5030608@visionsystems.de>
-References: <4ADEE5EE.8020205@visionsystems.de>
-	<20091022194902.GM19714@game.jcrosoft.org>
-	<4AE15193.3000006@visionsystems.de>
-	<4AE163EF.5030608@visionsystems.de>
-Message-ID: <20091023090408.GA28885@game.jcrosoft.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 23 Oct 2009 10:41:21 +0100
+Subject: [PATCH] Use Normal uncached memory rather than Strongly Ordered on
+	ARMv6+
+Message-ID: <20091023094121.21605.39568.stgit@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:06 Fri 23 Oct     , Yegor Yefremov wrote:
-> >>> I have problem booting the second kernel after enabling the watchdog following these steps: http://www.at91.com/index.php?option=com_jfusion&Itemid=57&jfile=viewtopic.php&f=12&t=5551&p=29283&hilit=watchdog+bootstrap#p29283
-> >>> Bootstrap: don't touch watchdog
-> >>> U-Boot: configure watchdog and set the timer counter value to 16 seconds
-> >>> Linux: keep pinging the watchdog
-> >>>
-> >>> The first kernel (booted from u-boot) is working as expected, but if I start the new one using kexec it gets only till frame buffer init:
-> >>>
-> >>> ....
-> >>> NetWinder Floating Point Emulator V0.97 (double precision)
-> >>> Slow work thread pool: Starting up
-> >>> Slow work thread pool: Ready
-> >>> JFFS2 version 2.2. (NAND) -? 2001-2006 Red Hat, Inc.
-> >>> msgmni has been set to 245
-> >>> io scheduler noop registered
-> >>> io scheduler anticipatory registered (default)
-> >>> atmel_lcdfb atmel_lcdfb.0: backlight control is not available
-> >>> atmel_lcdfb atmel_lcdfb.0: 510KiB frame buffer at 77980000 (mapped at ffa00000)
-> >>> Start AT91Bootstrap...
-> >>>
-> >>> Without watchdog there is no problem. Both kernels (2.6.32-rc5) are the same. Any idea?
-> >> do you enable the watchdog in the send kernel?
-> > 
-> > Yes. But as you can see from the bootlog, the system reboots before watchdog driver will be initialized. I'll try to tap watchdog in the board init part. Maybe it will help.
-> 
-> 
-> It works! I just inserted watchdog reset statement into arch/arm/mach-at91/board-sam9m10g45ek.c->ek_board_init() routine:
-> 
-> static void __init ek_board_init(void)
-> {
-> 	/* Serial */
-> 	at91_add_device_serial();
-> .....
-> 	/* LEDs */
-> 	at91_gpio_leds(ek_leds, ARRAY_SIZE(ek_leds));
-> 	at91_pwm_leds(ek_pwm_led, ARRAY_SIZE(ek_pwm_led));
-> 	at91_sys_write(AT91_WDT_CR, AT91_WDT_KEY | AT91_WDT_WDRSTT);
-> }
-> 
-> It is actually a workaround, but till the real reason is figures out, it keeps the system working.
-I would sugest to mesure how many time to you need to go to the driver init
+ARMv6 onwards requires that there are no aliases to the same physical
+location using different memory types (i.e. Normal vs Strongly Ordered).
+Access to SO mappings when the unaligned accesses are handled in
+hardware is also Unpredictable (pgprot_noncached() mappings in user
+space).
 
-if it's less than the watchdog I'd supposed that just before the jump to the second
-kernel the watchdog was not reset
+The patch modifies the pgprot_noncached() for ARMv6+ architecture
+versions to generate Normal uncached memory attributes rather than
+Strongly Ordered. The patch also modifies the mandatory barriers to use
+dmb() rather than being simple compiler barriers.
 
-Best Regards,
-J.
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Cc: Abhijeet <adharmap@codeaurora.org>
+Cc: Richard Woodruff <r-woodruff2@ti.com>
+---
+ arch/arm/include/asm/pgtable.h |   12 ++++++++++++
+ arch/arm/include/asm/system.h  |   10 ++++++++++
+ 2 files changed, 22 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 8429868..c3cd7d4 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -372,11 +372,23 @@ PTE_BIT_FUNC(mkyoung,   |= L_PTE_YOUNG);
+ 
+ static inline pte_t pte_mkspecial(pte_t pte) { return pte; }
+ 
++#if __LINUX_ARM_ARCH__ < 6
+ /*
+  * Mark the prot value as uncacheable and unbufferable.
+  */
+ #define pgprot_noncached(prot) \
+ 	__pgprot((pgprot_val(prot) & ~L_PTE_MT_MASK) | L_PTE_MT_UNCACHED)
++#else
++/*
++ * Mark the prot value as uncacheable, bufferable (Normal uncached memory).
++ * ARMv6 onwards requires that there are no aliases to the same physical
++ * location using different memory types (i.e. Normal vs Strongly Ordered).
++ * Access to SO mappings when the unaligned accesses are handled in hardware
++ * is also Unpredictable (pgprot_noncached() mappings in user space).
++ */
++#define pgprot_noncached(prot) \
++	__pgprot((pgprot_val(prot) & ~L_PTE_MT_MASK) | L_PTE_MT_BUFFERABLE)
++#endif
+ #define pgprot_writecombine(prot) \
+ 	__pgprot((pgprot_val(prot) & ~L_PTE_MT_MASK) | L_PTE_MT_BUFFERABLE)
+ 
+diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+index d65b2f5..cc89848 100644
+--- a/arch/arm/include/asm/system.h
++++ b/arch/arm/include/asm/system.h
+@@ -139,9 +139,19 @@ extern unsigned int user_debug;
+ #endif
+ 
+ #ifndef CONFIG_SMP
++#if __LINUX_ARM_ARCH__ < 6
+ #define mb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
+ #define rmb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
+ #define wmb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
++#else
++/*
++ * pgprot_noncached() creates Normal uncached mappings, therefore mandatory
++ * barriers are needed.
++ */
++#define mb()		dmb()
++#define rmb()		dmb()
++#define wmb()		dmb()
++#endif
+ #define smp_mb()	barrier()
+ #define smp_rmb()	barrier()
+ #define smp_wmb()	barrier()
