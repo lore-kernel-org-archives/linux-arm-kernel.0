@@ -1,42 +1,51 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 23 Oct 2009 17:54:21 +0100
-Subject: [PATCH] Use Normal uncached memory rather than Strongly
-	Ordered on ARMv6+
-In-Reply-To: <20091023123600.GB22853@n2100.arm.linux.org.uk>
-References: <20091023094121.21605.39568.stgit@pc1117.cambridge.arm.com>
-	<20091023100639.GA19437@n2100.arm.linux.org.uk>
-	<1256293374.6564.27.camel@pc1117.cambridge.arm.com>
-	<20091023103420.GC19437@n2100.arm.linux.org.uk>
-	<1256295591.6564.42.camel@pc1117.cambridge.arm.com>
-	<20091023113001.GA22853@n2100.arm.linux.org.uk>
-	<1256299512.6564.74.camel@pc1117.cambridge.arm.com>
-	<20091023123600.GB22853@n2100.arm.linux.org.uk>
-Message-ID: <1256316861.6564.154.camel@pc1117.cambridge.arm.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Fri, 23 Oct 2009 09:58:58 -0700
+Subject: [PATCH 00/10] OMAP3: PM: add CPUidle support
+Message-ID: <1256317148-25506-1-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2009-10-23 at 13:36 +0100, Russell King - ARM Linux wrote:
-> If you have a shared ownership ring buffer, you need the writes for
-> updating the DMA pointers to hit it before the write to change the
-> ownership of the descriptor to device.  Reverse those two writes and
-> you end up transmitting junk.
+This series adds CPUidle support for OMAP3.  This includes power
+states for full-chip retention and full-chip OFF during idle.
 
-But if we have arch_is_coherent() enabled (possibly with hardware
-support like ARM's ACP), we need the drivers to have barriers anyway
-since we would use normal cached memory (and ordering isn't guaranteed).
-Of course, one has to go through the drivers used with a platform and
-check them but we already have a precedent.
+This series is based on top of Tony's for-next branch plus
+the recently posted off-mode series.
 
-BTW, there are two other architectures (x86 and PowerPC) with a similar
-restriction. Do they do anything about this in Linux?
+  [PATCH v2 00/32] OMAP3: PM: base off-mode support
 
-PowerPC, 4.8.1 (page 36):
+This series is also available in my linux-omap-pm repo[1]
+as a branch named pm-upstream/pm-cpuidle.
 
-http://pcsostres.ac.upc.edu/cellsim/lib/exe/fetch.php/book_iii.powerpc_operating_environment_architecture.version_2.01.es-archpub3.pdf?id=additional_cell_documents&cache=cache
+Kevin
 
-x86, 10.12.4 (page 10-44):
+Jouni Hogander (1):
+  OMAP3: PM: Use pwrdm_set_next_pwrst instead of set_pwrdm_state in
+    idle loop
 
-ftp://download.intel.com/support/processors/celeron/sb/25366820.pdf
+Kalle Jokiniemi (1):
+  OMAP3: PM: CPUidle: fix init sequencing
 
--- 
-Catalin
+Kevin Hilman (2):
+  OMAP3: PM: CPUidle: obey enable_off_mode flag
+  OMAP3: PM: CPUidle: check activity for C2, C3, correct accounting
+
+Peter 'p2' De Schrijver (2):
+  OMAP3: PM: CPUidle: Add new lower-latency C1 state
+  OMAP3: PM: idle: Remove fclk check for idle loop
+
+Rajendra Nayak (2):
+  OMAP3: PM: CPUidle: base driver and support for C1-C2
+  OMAP3: PM: CPUidle: support retention and off-mode C-states
+
+Sanjeev Premi (1):
+  OMAP3: PM: CPUidle: Start C-state definitions from base 0
+
+Tero Kristo (1):
+  OMAP3: PM: Added resched check into idle calls
+
+ arch/arm/mach-omap2/Makefile      |    2 +-
+ arch/arm/mach-omap2/cpuidle34xx.c |  318 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/pm.h          |    4 +
+ arch/arm/mach-omap2/pm34xx.c      |   55 +------
+ 4 files changed, 329 insertions(+), 50 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/cpuidle34xx.c
