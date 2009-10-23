@@ -1,64 +1,25 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 23 Oct 2009 10:57:16 -0700
-Subject: [PATCH v2 12/32] OMAP: PM: DMA context save/restore for off-mode
-	support
-In-Reply-To: <618f0c910910230654l3a7e241esd3f838878424310b@mail.gmail.com>
-	(Venkatraman S.'s message of "Fri\, 23 Oct 2009 19\:24\:47 +0530")
-References: <1256252993-24328-1-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-5-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-6-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-7-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-8-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-9-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-10-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-11-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-12-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-13-git-send-email-khilman@deeprootsystems.com>
-	<618f0c910910230654l3a7e241esd3f838878424310b@mail.gmail.com>
-Message-ID: <87ljj2f0xv.fsf@deeprootsystems.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 23 Oct 2009 19:56:29 +0200
+Subject: [PATCH] at91: support for eco920
+In-Reply-To: <20091023121152.GB1821@pengutronix.de>
+References: <20091021084826.GA29667@n2100.arm.linux.org.uk>
+	<1256115527-20635-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20091021151917.GE19714@game.jcrosoft.org>
+	<20091023121152.GB1821@pengutronix.de>
+Message-ID: <20091023175629.GB29430@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Venkatraman S <svenkatr@ti.com> writes:
+On 14:11 Fri 23 Oct     , Uwe Kleine-K?nig wrote:
+> On Wed, Oct 21, 2009 at 05:19:17PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 10:58 Wed 21 Oct     , Uwe Kleine-K?nig wrote:
+> > > CONFIG_MACH_ECO920 is enabled in at91rm9200dk_defconfig.  The name is
+> > > wrong, but this is better than adding another defconfig or don't get
+> > > compile coverage at all./
+> > in this case it will be better to have a generic rm9200 defconfig
+> right, but imho this shouldn't stop my patch.
+rename at91rm9200dk_defconfig to at91rm9200_defconfig will make the patch
+better and will avoid this comment about wrong name defconfig
 
-> On Fri, Oct 23, 2009 at 4:39 AM, Kevin Hilman
-> <khilman@deeprootsystems.com> wrote:
->> From: Tero Kristo <tero.kristo@nokia.com>
->>
->> For HS/EMU devices, these additional features are also used:
->>
->> - DMA interrupt disable routine added
->> - Added DMA controller reset to DMA context restore
->>
->> Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
->> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
-
-[...]
-
->> +void omap_dma_disable_irq(int lch)
->> +{
->> + ? ? ? u32 val;
->> +
->> + ? ? ? if (cpu_class_is_omap2()) {
->> + ? ? ? ? ? ? ? /* Disable interrupts */
->> + ? ? ? ? ? ? ? val = dma_read(IRQENABLE_L0);
->> + ? ? ? ? ? ? ? val &= ~(1 << lch);
->> + ? ? ? ? ? ? ? dma_write(val, IRQENABLE_L0);
->> + ? ? ? }
->> +}
->> +
-> Just curious - Doesn't it need EXPORT_SYMBOL() ?
-
-No, was not meant to be used by modules.  In fact, when I update this
-patch for the chmod problem, I'm going to drop the EXPORT_SYMBOL() for
-the context save/restore as well since that is only meant to be called
-from the PM core.
-
-> Is this used somewhere ? If yes,
-> would be nice to have omap_dma_enable_irq as well
-
-Looking closer, it looks like the user of this was removed in 
-"[PATCH v2 17/32] OMAP3: PM: Fix secure SRAM context save/restore", so I'll
-remove this function in that patch as well.
-
-Kevin
+Best Regards,
+J.
