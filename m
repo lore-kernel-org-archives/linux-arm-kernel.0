@@ -1,32 +1,37 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri, 23 Oct 2009 09:01:23 +0300
-Subject: [PATCH] s3c24xx-adc: resume convertions interrupted by going to
-	suspend
-In-Reply-To: <20091022185954.GA8096@trinity.fluff.org>
-References: <200910201719.41102.anarsoul@gmail.com>
-	<200910221410.28632.anarsoul@gmail.com>
-	<20091022185954.GA8096@trinity.fluff.org>
-Message-ID: <200910230901.30966.anarsoul@gmail.com>
+From: yegor_sub1@visionsystems.de (Yegor Yefremov)
+Date: Fri, 23 Oct 2009 08:47:47 +0200
+Subject: [at91sam9g45] fail to start second kernel via kexec if watchdog
+	is enabled
+In-Reply-To: <20091022194902.GM19714@game.jcrosoft.org>
+References: <4ADEE5EE.8020205@visionsystems.de>
+	<20091022194902.GM19714@game.jcrosoft.org>
+Message-ID: <4AE15193.3000006@visionsystems.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? ????????? ?? 22 ??????? 2009 21:59:54 ?? ????????:
-> On Thu, Oct 22, 2009 at 02:10:23PM +0300, Vasily Khoruzhick wrote:
-> > Does anyone on maillist interested in this bugfix? I got no response for
-> > 2 days...
-> 
-> I've been in and out of bed feeling ill, I can't sit on this list
-> 24x7 looking at bugfixes.
+>> I have problem booting the second kernel after enabling the watchdog following these steps: http://www.at91.com/index.php?option=com_jfusion&Itemid=57&jfile=viewtopic.php&f=12&t=5551&p=29283&hilit=watchdog+bootstrap#p29283
+>> Bootstrap: don't touch watchdog
+>> U-Boot: configure watchdog and set the timer counter value to 16 seconds
+>> Linux: keep pinging the watchdog
+>>
+>> The first kernel (booted from u-boot) is working as expected, but if I start the new one using kexec it gets only till frame buffer init:
+>>
+>> ....
+>> NetWinder Floating Point Emulator V0.97 (double precision)
+>> Slow work thread pool: Starting up
+>> Slow work thread pool: Ready
+>> JFFS2 version 2.2. (NAND) -? 2001-2006 Red Hat, Inc.
+>> msgmni has been set to 245
+>> io scheduler noop registered
+>> io scheduler anticipatory registered (default)
+>> atmel_lcdfb atmel_lcdfb.0: backlight control is not available
+>> atmel_lcdfb atmel_lcdfb.0: 510KiB frame buffer at 77980000 (mapped at ffa00000)
+>> Start AT91Bootstrap...
+>>
+>> Without watchdog there is no problem. Both kernels (2.6.32-rc5) are the same. Any idea?
+> do you enable the watchdog in the send kernel?
 
-Sorry for impatience, I just want to make sure that my patch wasn't ignored or 
-lost.
+Yes. But as you can see from the bootlog, the system reboots before watchdog driver will be initialized. I'll try to tap watchdog in the board init part. Maybe it will help.
 
-Regards
-Vasily
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091023/4f1f13de/attachment.sig>
+Regards,
+Yegor
