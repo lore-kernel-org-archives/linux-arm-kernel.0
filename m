@@ -1,80 +1,68 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 23 Oct 2009 10:41:21 +0100
-Subject: [PATCH] Use Normal uncached memory rather than Strongly Ordered on
-	ARMv6+
-Message-ID: <20091023094121.21605.39568.stgit@pc1117.cambridge.arm.com>
+From: ospite@studenti.unina.it (Antonio Ospite)
+Date: Fri, 23 Oct 2009 11:50:28 +0200
+Subject: [WARNING] pxamci: 'pxa2xx-mci.0' does not have a release()
+	function.
+In-Reply-To: <20091022225758.GA9106@n2100.arm.linux.org.uk>
+References: <20091023003631.1331a60a.ospite@studenti.unina.it>
+	<20091022225758.GA9106@n2100.arm.linux.org.uk>
+Message-ID: <20091023115028.59ed7f74.ospite@studenti.unina.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv6 onwards requires that there are no aliases to the same physical
-location using different memory types (i.e. Normal vs Strongly Ordered).
-Access to SO mappings when the unaligned accesses are handled in
-hardware is also Unpredictable (pgprot_noncached() mappings in user
-space).
+On Thu, 22 Oct 2009 23:57:58 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-The patch modifies the pgprot_noncached() for ARMv6+ architecture
-versions to generate Normal uncached memory attributes rather than
-Strongly Ordered. The patch also modifies the mandatory barriers to use
-dmb() rather than being simple compiler barriers.
+> On Fri, Oct 23, 2009 at 12:36:31AM +0200, Antonio Ospite wrote:
+> > Hi,
+> > 
+> > I get this warning on shutdown. How to fix it properly?
+> > 
+> > FYI, in my setup pxa2xx_spi is the parent for pxamci, set using
+> > this patch:
+> > http://git.openezx.org/openezx.git?a=commitdiff;h=0ffd85ad8faea3456d4ecf5f63ae65aca26fff21
+> 
+> This sounds like it's the cause of the problem - from the backtrace, it
+> looks like SPI expects the children of the SPI device to be its own
+> responsibility to maintain.
+> 
+> Hence, because you've made pxamci a child of SPI, SPI is trying to
+> unregister and release the pxamci device.
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Cc: Abhijeet <adharmap@codeaurora.org>
-Cc: Richard Woodruff <r-woodruff2@ti.com>
----
- arch/arm/include/asm/pgtable.h |   12 ++++++++++++
- arch/arm/include/asm/system.h  |   10 ++++++++++
- 2 files changed, 22 insertions(+), 0 deletions(-)
+A little more background: we need pxamci to be a child of SPI because
+our PMIC is connected via SPI, and a PMIC regulator is used for mmc
+powering; enforcing this hierarchy is needed to make pxamci suspend and
+resume properly.
 
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 8429868..c3cd7d4 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -372,11 +372,23 @@ PTE_BIT_FUNC(mkyoung,   |= L_PTE_YOUNG);
- 
- static inline pte_t pte_mkspecial(pte_t pte) { return pte; }
- 
-+#if __LINUX_ARM_ARCH__ < 6
- /*
-  * Mark the prot value as uncacheable and unbufferable.
-  */
- #define pgprot_noncached(prot) \
- 	__pgprot((pgprot_val(prot) & ~L_PTE_MT_MASK) | L_PTE_MT_UNCACHED)
-+#else
-+/*
-+ * Mark the prot value as uncacheable, bufferable (Normal uncached memory).
-+ * ARMv6 onwards requires that there are no aliases to the same physical
-+ * location using different memory types (i.e. Normal vs Strongly Ordered).
-+ * Access to SO mappings when the unaligned accesses are handled in hardware
-+ * is also Unpredictable (pgprot_noncached() mappings in user space).
-+ */
-+#define pgprot_noncached(prot) \
-+	__pgprot((pgprot_val(prot) & ~L_PTE_MT_MASK) | L_PTE_MT_BUFFERABLE)
-+#endif
- #define pgprot_writecombine(prot) \
- 	__pgprot((pgprot_val(prot) & ~L_PTE_MT_MASK) | L_PTE_MT_BUFFERABLE)
- 
-diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-index d65b2f5..cc89848 100644
---- a/arch/arm/include/asm/system.h
-+++ b/arch/arm/include/asm/system.h
-@@ -139,9 +139,19 @@ extern unsigned int user_debug;
- #endif
- 
- #ifndef CONFIG_SMP
-+#if __LINUX_ARM_ARCH__ < 6
- #define mb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
- #define rmb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
- #define wmb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
-+#else
-+/*
-+ * pgprot_noncached() creates Normal uncached mappings, therefore mandatory
-+ * barriers are needed.
-+ */
-+#define mb()		dmb()
-+#define rmb()		dmb()
-+#define wmb()		dmb()
-+#endif
- #define smp_mb()	barrier()
- #define smp_rmb()	barrier()
- #define smp_wmb()	barrier()
+The board init does:
+	spi_pd = platform_device_alloc("pxa2xx-spi", 1);
+	spi_pd->dev.platform_data = &ezx_spi_masterinfo;
+	platform_device_add(spi_pd);
+	spi_register_board_info(ARRAY_AND_SIZE(a780_spi_boardinfo));
+
+	pxa_set_mci_parent(&spi_pd->dev);
+	pxa_set_mci_info(&ezx_mci_platform_data);
+
+Now, do you suggest to adapt pxamci so it supports the case when
+another driver wants to release it? I am not sure how to do that, tho.
+
+Thanks,
+   Antonio
+
+-- 
+Antonio Ospite
+http://ao2.it
+
+PGP public key ID: 0x4553B001
+
+A: Because it messes up the order in which people normally read text.
+   See http://en.wikipedia.org/wiki/Posting_style
+Q: Why is top-posting such a bad thing?
+A: Top-posting.
+Q: What is the most annoying thing in e-mail?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091023/6e44a83b/attachment-0001.sig>
