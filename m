@@ -1,49 +1,63 @@
-From: arhuaco@freaks-unidos.net (Nelson Castillo)
-Date: Fri, 23 Oct 2009 00:38:26 -0500
-Subject: [PATCH] input/touchscreen: add S3C24XX SoC touchscreen input
-	driver
-In-Reply-To: <20091020094132.GA17240@sirena.org.uk>
-References: <mailman.4020.1255949705.2256.linux-arm-kernel@lists.infradead.org>
-	<4ADC4D4D.5020508@gmail.com>
-	<20091019120744.GB7412@n2100.arm.linux.org.uk>
-	<2accc2ff0910192121t27387b90t9cfd5a5252aa00cc@mail.gmail.com>
-	<20091020073946.GB723@n2100.arm.linux.org.uk>
-	<2accc2ff0910200121g4f2c0839l96c7d99e4f4de47a@mail.gmail.com>
-	<20091020094132.GA17240@sirena.org.uk>
-Message-ID: <2accc2ff0910222238g31161deoe704a889df3c4b3a@mail.gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Fri, 23 Oct 2009 08:57:26 +0300
+Subject: [PATCH] s3c24xx-adc: resume convertions interrupted by going to
+	suspend
+In-Reply-To: <20091022190524.GB8096@trinity.fluff.org>
+References: <200910201719.41102.anarsoul@gmail.com>
+	<20091022190524.GB8096@trinity.fluff.org>
+Message-ID: <200910230857.35780.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2009 at 4:41 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Tue, Oct 20, 2009 at 03:21:17AM -0500, Nelson Castillo wrote:
->
->> Can the s3c driver send the events at full speed? (Maximum possible ADC rate?).
+? ????????? ?? 22 ??????? 2009 22:05:24 ????? Ben Dooks ???????:
 
-Yes, but in packets I think (The way I would know how to implement it).
-We could try sending 2000 events per second to user-space and see what
-happens :-) :-)
+> > -	client->select_cb(client, 1);
+> > +	if (!client->selected) {
+> > +		client->selected = 1;
+> > +		client->select_cb(client, 1);
+> > +	}
+> 
+> You seem to have added something other than just a bugfix to this patch,
+> you've changed the behaviour of the select callback. Is this really
+> necessary for the function of the fix or something that dropped in by
+> accident?
 
->> Even if it's possible I think we would monopolize the adc driver
->> needlessly because we don't need all that conversions when there is
->> not much noise. Please read on.
->
-> There's currently no facility to push sample rate requests down into the
-> kernel from userspace. ?However, this is a good idea in general - there
-> was some recent (brief) discussion of doing this on the linux-input list.
+No, select callback behaviour is not changed, this check is necessary to avoid 
+calling select callback when client was already selected (for example, after 
+resuming from suspend)
+ 
+> >  	writel(adc->prescale | S3C2410_ADCCON_PRSCEN,
+> >  	       adc->regs + S3C2410_ADCCON);
+> > +	/* Schedule task if there are clients pending. */
+> > +	if (!list_empty(&adc_pending) || adc_dev->ts_pend) {
+> > +		INIT_WORK(&resume_work, adc_resume_work);
+> > +		if (!schedule_work(&resume_work))
+> > +			dev_err(&pdev->dev,
+> > +				"Failed to schedule adc_resume work!\n");
+> > +	}
+> 
+> Is the work being used here to avoid trying to do things that may
+> sleep? IIRC, none of the calls should need to sleep.
 
-I see. It makes sense.
+It's used to prevent calling callbacks (that may sleep) in atomic context 
+(AFAIK resume handler is in atomic context)
+ 
+> I was just wondering whether it would be better to abort any calls in
+> progress before sleep and get the clients themselves to restart once
+> they themselves have been resumed. We may end up with the case where the
+> callbacks are being triggered before the client has been resumed.
 
-ATM one big difference with the kernel approach is that in the kernel
-you can request the adc conversions on demand.
+Maybe, but sometimes it's tricky to abort waiting for callback in client 
+driver. Anyway, resume_work will be called only after all drivers has been 
+resumed, so situation when callbacks are being triggered before the client has 
+been resumed is impossible.
 
-> Since different use cases have different sample rate requirements (such
-> as the difference between handwriting recognition which can need 200
-> samples/second and a simple finger operated menu which may be happy with
-> 10) there's value in being able to vary the sample rate at run time. ?I
-> was intending to look at this shortly as part of some touchscreen driver
-> development I need to do soon or perhaps someone else will pick up the
-> idea, if it does get implemented then obviously tslib would also be able
-> to use it here.
-
-With a lot more points you can indeed do better filtering in users-pace.
+Regards,
+Vasily
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091023/d2de15d2/attachment.sig>
