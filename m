@@ -1,30 +1,49 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 23 Oct 2009 07:20:52 +0200
-Subject: spitz backlight: fix brightness limiting
-In-Reply-To: <1256251399.23211.164.camel@dax.rpnet.com>
-References: <20091019213751.GC1482@ucw.cz>
-	<f17812d70910211320s29d3aaa5tad3206df1e99e03b@mail.gmail.com>
-	<1256251399.23211.164.camel@dax.rpnet.com>
-Message-ID: <20091023052052.GA15499@elf.ucw.cz>
+From: arhuaco@freaks-unidos.net (Nelson Castillo)
+Date: Fri, 23 Oct 2009 00:38:26 -0500
+Subject: [PATCH] input/touchscreen: add S3C24XX SoC touchscreen input
+	driver
+In-Reply-To: <20091020094132.GA17240@sirena.org.uk>
+References: <mailman.4020.1255949705.2256.linux-arm-kernel@lists.infradead.org>
+	<4ADC4D4D.5020508@gmail.com>
+	<20091019120744.GB7412@n2100.arm.linux.org.uk>
+	<2accc2ff0910192121t27387b90t9cfd5a5252aa00cc@mail.gmail.com>
+	<20091020073946.GB723@n2100.arm.linux.org.uk>
+	<2accc2ff0910200121g4f2c0839l96c7d99e4f4de47a@mail.gmail.com>
+	<20091020094132.GA17240@sirena.org.uk>
+Message-ID: <2accc2ff0910222238g31161deoe704a889df3c4b3a@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2009-10-22 23:43:19, Richard Purdie wrote:
-> On Thu, 2009-10-22 at 04:20 +0800, Eric Miao wrote:
-> > It's a little bit weird it's called 'limit_mask' when I first converted it
-> > to a spi driver. There must be some reasons, Richard, you've got
-> > any ideas?
-> 
-> Its a historical artifact that once worked through some bitfield magic
-> but probably stopped working when we increased the range of values the
-> backlight could accept and we didn't notice the limiting problem.
-> 
-> I'll happily take a patch to fix that.
+On Tue, Oct 20, 2009 at 4:41 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Tue, Oct 20, 2009 at 03:21:17AM -0500, Nelson Castillo wrote:
+>
+>> Can the s3c driver send the events at full speed? (Maximum possible ADC rate?).
 
-Patch is available in the parent post. For now, I just fix it so that
-it does not turn backlight off when it should not. I'll submit
-limit_mask -> limit as separate patch, ok?
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Yes, but in packets I think (The way I would know how to implement it).
+We could try sending 2000 events per second to user-space and see what
+happens :-) :-)
+
+>> Even if it's possible I think we would monopolize the adc driver
+>> needlessly because we don't need all that conversions when there is
+>> not much noise. Please read on.
+>
+> There's currently no facility to push sample rate requests down into the
+> kernel from userspace. ?However, this is a good idea in general - there
+> was some recent (brief) discussion of doing this on the linux-input list.
+
+I see. It makes sense.
+
+ATM one big difference with the kernel approach is that in the kernel
+you can request the adc conversions on demand.
+
+> Since different use cases have different sample rate requirements (such
+> as the difference between handwriting recognition which can need 200
+> samples/second and a simple finger operated menu which may be happy with
+> 10) there's value in being able to vary the sample rate at run time. ?I
+> was intending to look at this shortly as part of some touchscreen driver
+> development I need to do soon or perhaps someone else will pick up the
+> idea, if it does get implemented then obviously tslib would also be able
+> to use it here.
+
+With a lot more points you can indeed do better filtering in users-pace.
