@@ -1,41 +1,30 @@
-From: simon.kagstrom@netinsight.net (Simon Kagstrom)
-Date: Fri, 23 Oct 2009 09:31:53 +0200
-Subject: [PATCHv3] [ARM] kirkwood: combine support for openrd
-	base/client support
-In-Reply-To: <20091022110436.GF6085@chipmunk>
-References: <pbh5r6-os7.ln1@chipmunk.wormnet.eu>
-	<20091022124756.56e89d7a@marrow.netinsight.se>
-	<20091022110436.GF6085@chipmunk>
-Message-ID: <20091023093153.363e2984@marrow.netinsight.se>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 23 Oct 2009 15:56:59 +0800
+Subject: spitz backlight: fix brightness limiting
+In-Reply-To: <20091023052052.GA15499@elf.ucw.cz>
+References: <20091019213751.GC1482@ucw.cz>
+	<f17812d70910211320s29d3aaa5tad3206df1e99e03b@mail.gmail.com>
+	<1256251399.23211.164.camel@dax.rpnet.com>
+	<20091023052052.GA15499@elf.ucw.cz>
+Message-ID: <f17812d70910230056y3d1fca0enc821f9ef46f07145@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for being unclear in my comments! (And thanks to Nicolas for
-explaining the PCI init issue I raised).
+On Fri, Oct 23, 2009 at 1:20 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> On Thu 2009-10-22 23:43:19, Richard Purdie wrote:
+>> On Thu, 2009-10-22 at 04:20 +0800, Eric Miao wrote:
+>> > It's a little bit weird it's called 'limit_mask' when I first converted it
+>> > to a spi driver. There must be some reasons, Richard, you've got
+>> > any ideas?
+>>
+>> Its a historical artifact that once worked through some bitfield magic
+>> but probably stopped working when we increased the range of values the
+>> backlight could accept and we didn't notice the limiting problem.
+>>
+>> I'll happily take a patch to fix that.
+>
+> Patch is available in the parent post. For now, I just fix it so that
+> it does not turn backlight off when it should not. I'll submit
+> limit_mask -> limit as separate patch, ok?
 
-On Thu, 22 Oct 2009 12:04:36 +0100
-Alexander Clouter <alex@digriz.org.uk> wrote:
-
-> > > diff --git a/arch/arm/mach-kirkwood/openrd_base-setup.c b/arch/arm/mach-kirkwood/openrd_base-setup.c
-> > 
-> > Perhaps it's a good idea to rebase this one against Nicolas orion.git tree at
-> > 
-> >   http://git.marvell.com/?p=orion.git;a=summary
-> > 
-> ...erm..I have not rebased but it should apply cleanly though as I just 
-> run from a clone'd vanilla 2.6 (Linus's tree) and pull in orion.git 
-> anyway.
-
-Well, your patch will/should go through Nicolas tree, and I just
-noticed that it didn't contain the last patches on orion.git (namely
-the PCI init you also added to the combined file).
-
-I haven't tested, but would guess that git won't accept removing a file
-which has changes in it - the openrd-base.c you _remove_ don't have the
-PCI init.
-
-
-Anyway, I believe it makes very much sense to merge the two OpenRDs, so
-other than these things I'm happy with the patch.
-
-// Simon
+I'm fine with that. Feel free to.
