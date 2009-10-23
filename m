@@ -1,30 +1,53 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 23 Oct 2009 15:56:59 +0800
-Subject: spitz backlight: fix brightness limiting
-In-Reply-To: <20091023052052.GA15499@elf.ucw.cz>
-References: <20091019213751.GC1482@ucw.cz>
-	<f17812d70910211320s29d3aaa5tad3206df1e99e03b@mail.gmail.com>
-	<1256251399.23211.164.camel@dax.rpnet.com>
-	<20091023052052.GA15499@elf.ucw.cz>
-Message-ID: <f17812d70910230056y3d1fca0enc821f9ef46f07145@mail.gmail.com>
+From: yegor_sub1@visionsystems.de (Yegor Yefremov)
+Date: Fri, 23 Oct 2009 10:06:07 +0200
+Subject: [at91sam9g45] fail to start second kernel via kexec if watchdog
+	is enabled
+In-Reply-To: <4AE15193.3000006@visionsystems.de>
+References: <4ADEE5EE.8020205@visionsystems.de>	<20091022194902.GM19714@game.jcrosoft.org>
+	<4AE15193.3000006@visionsystems.de>
+Message-ID: <4AE163EF.5030608@visionsystems.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2009 at 1:20 PM, Pavel Machek <pavel@ucw.cz> wrote:
-> On Thu 2009-10-22 23:43:19, Richard Purdie wrote:
->> On Thu, 2009-10-22 at 04:20 +0800, Eric Miao wrote:
->> > It's a little bit weird it's called 'limit_mask' when I first converted it
->> > to a spi driver. There must be some reasons, Richard, you've got
->> > any ideas?
->>
->> Its a historical artifact that once worked through some bitfield magic
->> but probably stopped working when we increased the range of values the
->> backlight could accept and we didn't notice the limiting problem.
->>
->> I'll happily take a patch to fix that.
->
-> Patch is available in the parent post. For now, I just fix it so that
-> it does not turn backlight off when it should not. I'll submit
-> limit_mask -> limit as separate patch, ok?
+>>> I have problem booting the second kernel after enabling the watchdog following these steps: http://www.at91.com/index.php?option=com_jfusion&Itemid=57&jfile=viewtopic.php&f=12&t=5551&p=29283&hilit=watchdog+bootstrap#p29283
+>>> Bootstrap: don't touch watchdog
+>>> U-Boot: configure watchdog and set the timer counter value to 16 seconds
+>>> Linux: keep pinging the watchdog
+>>>
+>>> The first kernel (booted from u-boot) is working as expected, but if I start the new one using kexec it gets only till frame buffer init:
+>>>
+>>> ....
+>>> NetWinder Floating Point Emulator V0.97 (double precision)
+>>> Slow work thread pool: Starting up
+>>> Slow work thread pool: Ready
+>>> JFFS2 version 2.2. (NAND) -? 2001-2006 Red Hat, Inc.
+>>> msgmni has been set to 245
+>>> io scheduler noop registered
+>>> io scheduler anticipatory registered (default)
+>>> atmel_lcdfb atmel_lcdfb.0: backlight control is not available
+>>> atmel_lcdfb atmel_lcdfb.0: 510KiB frame buffer at 77980000 (mapped at ffa00000)
+>>> Start AT91Bootstrap...
+>>>
+>>> Without watchdog there is no problem. Both kernels (2.6.32-rc5) are the same. Any idea?
+>> do you enable the watchdog in the send kernel?
+> 
+> Yes. But as you can see from the bootlog, the system reboots before watchdog driver will be initialized. I'll try to tap watchdog in the board init part. Maybe it will help.
 
-I'm fine with that. Feel free to.
+
+It works! I just inserted watchdog reset statement into arch/arm/mach-at91/board-sam9m10g45ek.c->ek_board_init() routine:
+
+static void __init ek_board_init(void)
+{
+	/* Serial */
+	at91_add_device_serial();
+.....
+	/* LEDs */
+	at91_gpio_leds(ek_leds, ARRAY_SIZE(ek_leds));
+	at91_pwm_leds(ek_pwm_led, ARRAY_SIZE(ek_pwm_led));
+	at91_sys_write(AT91_WDT_CR, AT91_WDT_KEY | AT91_WDT_WDRSTT);
+}
+
+It is actually a workaround, but till the real reason is figures out, it keeps the system working.
+
+Regards,
+Yegor
