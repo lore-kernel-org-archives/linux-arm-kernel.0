@@ -1,130 +1,69 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 24 Oct 2009 22:36:36 +0100
-Subject: [RFC 02/11] ARM: Fix errata 411920 workarounds
+Date: Sat, 24 Oct 2009 22:58:40 +0100
+Subject: [RFC 03/11] ARM: move __flush_icache_all() out of flush_pfn_alias()
 In-Reply-To: <cover.1256683230.git.rmk+kernel@arm.linux.org.uk>
 References: <cover.1256683230.git.rmk+kernel@arm.linux.org.uk>
-Message-ID: <6af8ea18ac64a74700e374489751a63e643ac394.1256683230.git.rmk+kernel@arm.linux.org.uk>
+Message-ID: <8ca70e1506b186ae7e711713ad7d4edd5ebb5c49.1256683230.git.rmk+kernel@arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Errata 411920 indicates that any "invalidate entire instruction cache"
-operation can fail if the right conditions are present.  This is not
-limited just to those operations in flush.c, but elsewhere.  Place the
-workaround in the already existing __flush_icache_all() function
-instead.
-
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/include/asm/cacheflush.h |    5 +++++
- arch/arm/mm/context.c             |    4 ++--
- arch/arm/mm/flush.c               |   31 ++++++-------------------------
- 3 files changed, 13 insertions(+), 27 deletions(-)
+ arch/arm/mm/flush.c |   11 ++++++++---
+ 1 files changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index 3147f75..af0624c 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -412,9 +412,14 @@ extern void flush_dcache_page(struct page *);
- 
- static inline void __flush_icache_all(void)
- {
-+#ifdef CONFIG_ARM_ERRATA_411920
-+	extern void v6_icache_inval_all(void);
-+	v6_icache_inval_all();
-+#else
- 	asm("mcr	p15, 0, %0, c7, c5, 0	@ invalidate I-cache\n"
- 	    :
- 	    : "r" (0));
-+#endif
- }
- 
- #define ARCH_HAS_FLUSH_ANON_PAGE
-diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
-index 6bda76a..d4f8275 100644
---- a/arch/arm/mm/context.c
-+++ b/arch/arm/mm/context.c
-@@ -50,8 +50,8 @@ void __new_context(struct mm_struct *mm)
- 		isb();
- 		flush_tlb_all();
- 		if (icache_is_vivt_asid_tagged()) {
--			asm("mcr	p15, 0, %0, c7, c5, 0	@ invalidate I-cache\n"
--			    "mcr	p15, 0, %0, c7, c5, 6	@ flush BTAC/BTB\n"
-+			__flush_icache_all();
-+			asm("mcr	p15, 0, %0, c7, c5, 6	@ flush BTAC/BTB"
- 			    :
- 			    : "r" (0));
- 			dsb();
 diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index b279429..7f294f3 100644
+index 7f294f3..4e2a4e7 100644
 --- a/arch/arm/mm/flush.c
 +++ b/arch/arm/mm/flush.c
-@@ -18,10 +18,6 @@
- 
- #include "mm.h"
- 
--#ifdef CONFIG_ARM_ERRATA_411920
--extern void v6_icache_inval_all(void);
--#endif
--
- #ifdef CONFIG_CPU_CACHE_VIPT
- 
- #define ALIAS_FLUSH_START	0xffff4000
-@@ -35,16 +31,11 @@ static void flush_pfn_alias(unsigned long pfn, unsigned long vaddr)
- 	flush_tlb_kernel_page(to);
- 
- 	asm(	"mcrr	p15, 0, %1, %0, c14\n"
--	"	mcr	p15, 0, %2, c7, c10, 4\n"
--#ifndef CONFIG_ARM_ERRATA_411920
--	"	mcr	p15, 0, %2, c7, c5, 0\n"
--#endif
-+	"	mcr	p15, 0, %2, c7, c10, 4"
+@@ -35,7 +35,6 @@ static void flush_pfn_alias(unsigned long pfn, unsigned long vaddr)
  	    :
  	    : "r" (to), "r" (to + PAGE_SIZE - L1_CACHE_BYTES), "r" (zero)
  	    : "cc");
--#ifdef CONFIG_ARM_ERRATA_411920
--	v6_icache_inval_all();
--#endif
-+	__flush_icache_all();
+-	__flush_icache_all();
  }
  
  void flush_cache_mm(struct mm_struct *mm)
-@@ -57,16 +48,11 @@ void flush_cache_mm(struct mm_struct *mm)
- 
- 	if (cache_is_vipt_aliasing()) {
- 		asm(	"mcr	p15, 0, %0, c7, c14, 0\n"
--		"	mcr	p15, 0, %0, c7, c10, 4\n"
--#ifndef CONFIG_ARM_ERRATA_411920
--		"	mcr	p15, 0, %0, c7, c5, 0\n"
--#endif
-+		"	mcr	p15, 0, %0, c7, c10, 4"
- 		    :
- 		    : "r" (0)
- 		    : "cc");
--#ifdef CONFIG_ARM_ERRATA_411920
--		v6_icache_inval_all();
--#endif
-+		__flush_icache_all();
+@@ -85,8 +84,10 @@ void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr, unsig
+ 		return;
  	}
+ 
+-	if (cache_is_vipt_aliasing())
++	if (cache_is_vipt_aliasing()) {
+ 		flush_pfn_alias(pfn, user_addr);
++		__flush_icache_all();
++	}
  }
  
-@@ -81,16 +67,11 @@ void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned
+ void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
+@@ -103,6 +104,7 @@ void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
  
  	if (cache_is_vipt_aliasing()) {
- 		asm(	"mcr	p15, 0, %0, c7, c14, 0\n"
--		"	mcr	p15, 0, %0, c7, c10, 4\n"
--#ifndef CONFIG_ARM_ERRATA_411920
--		"	mcr	p15, 0, %0, c7, c5, 0\n"
--#endif
-+		"	mcr	p15, 0, %0, c7, c10, 4"
- 		    :
- 		    : "r" (0)
- 		    : "cc");
--#ifdef CONFIG_ARM_ERRATA_411920
--		v6_icache_inval_all();
--#endif
+ 		flush_pfn_alias(page_to_pfn(page), uaddr);
 +		__flush_icache_all();
+ 		return;
  	}
+ 
+@@ -139,9 +141,11 @@ void __flush_dcache_page(struct address_space *mapping, struct page *page)
+ 	 * we only need to do one flush - which would be at the relevant
+ 	 * userspace colour, which is congruent with page->index.
+ 	 */
+-	if (mapping && cache_is_vipt_aliasing())
++	if (mapping && cache_is_vipt_aliasing()) {
+ 		flush_pfn_alias(page_to_pfn(page),
+ 				page->index << PAGE_CACHE_SHIFT);
++		__flush_icache_all();
++	}
  }
  
+ static void __flush_dcache_aliases(struct address_space *mapping, struct page *page)
+@@ -242,6 +246,7 @@ void __flush_anon_page(struct vm_area_struct *vma, struct page *page, unsigned l
+ 		 * userspace address only.
+ 		 */
+ 		flush_pfn_alias(pfn, vmaddr);
++		__flush_icache_all();
+ 	}
+ 
+ 	/*
 -- 
 1.6.2.5
