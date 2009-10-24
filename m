@@ -1,84 +1,130 @@
 From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Sun, 25 Oct 2009 00:16:14 +0400
-Subject: [PATCH 12/20] SA1100: h3100/h3600: configure all unused gpios as
-	inputs
-In-Reply-To: <1256415251-22735-2-git-send-email-mad_soft@inbox.ru>
-References: <1256415251-22735-2-git-send-email-mad_soft@inbox.ru>
-Message-ID: <1256415376-22778-1-git-send-email-mad_soft@inbox.ru>
+Date: Sun, 25 Oct 2009 00:20:39 +0400
+Subject: [PATCH 14/20] SA1100: h3100/h3600: merge h3600.h and h3600_gpio.h
+	into h3xxx.h
+In-Reply-To: <1256415643-22853-1-git-send-email-mad_soft@inbox.ru>
+References: <1256415376-22778-1-git-send-email-mad_soft@inbox.ru>
+	<1256415643-22853-1-git-send-email-mad_soft@inbox.ru>
+Message-ID: <1256415643-22853-2-git-send-email-mad_soft@inbox.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After conversion to gpiolib there's still some GPIOs left, that get
-configured in *_mach_init() as outputs (using direct operations
-on GPCR/GPDR registers), but otherwise unused. These GPIOs are mainly
-sound related and should be configured by corresponding driver once
-it is written.
-
-Drop this initialisation and configure all GPIOs as input.
+Combine both headers into one, rename to h3xxx.h and change all
+users accordingly.
 
 Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
 ---
- arch/arm/mach-sa1100/h3600.c |   26 +++-----------------------
- 1 files changed, 3 insertions(+), 23 deletions(-)
+ arch/arm/mach-sa1100/h3600.c                       |    3 +-
+ arch/arm/mach-sa1100/include/mach/h3600.h          |   36 --------------------
+ .../include/mach/{h3600_gpio.h => h3xxx.h}         |   16 +++++++--
+ drivers/pcmcia/sa1100_h3600.c                      |    3 +-
+ 4 files changed, 15 insertions(+), 43 deletions(-)
+ delete mode 100644 arch/arm/mach-sa1100/include/mach/h3600.h
+ rename arch/arm/mach-sa1100/include/mach/{h3600_gpio.h => h3xxx.h} (86%)
 
 diff --git a/arch/arm/mach-sa1100/h3600.c b/arch/arm/mach-sa1100/h3600.c
-index 6792dd1..3d52190 100644
+index 3d52190..dd39f90 100644
 --- a/arch/arm/mach-sa1100/h3600.c
 +++ b/arch/arm/mach-sa1100/h3600.c
-@@ -297,20 +297,14 @@ static void __init h3xxx_map_io(void)
- 	PCFR = PCFR_OPDE;
- 	PSDR = 0;
+@@ -44,8 +44,7 @@
+ #include <asm/mach/map.h>
+ #include <asm/mach/serial_sa1100.h>
  
-+	GPCR = 0x0fffffff;	/* All outputs are set low by default */
-+	GPDR = 0;		/* Configure all GPIOs as input */
- }
+-#include <mach/h3600.h>
+-#include <mach/h3600_gpio.h>
++#include <mach/h3xxx.h>
  
- /************************* H3100 *************************/
+ #include "generic.h"
  
- #ifdef CONFIG_SA1100_H3100
- 
--#define H3100_DIRECT_EGPIO (GPIO_H3100_BT_ON	  \
--			  | GPIO_H3100_GPIO3	  \
--			  | GPIO_H3100_QMUTE	  \
--			  | GPIO_H3100_LCD_3V_ON  \
--			  | GPIO_H3100_AUD_ON	  \
--			  | GPIO_H3100_AUD_PWR_ON \
--			  | GPIO_H3100_IR_ON	  \
--			  | GPIO_H3100_IR_FSEL)
- /*
-  * helper for sa1100fb
+diff --git a/arch/arm/mach-sa1100/include/mach/h3600.h b/arch/arm/mach-sa1100/include/mach/h3600.h
+deleted file mode 100644
+index e420422..0000000
+--- a/arch/arm/mach-sa1100/include/mach/h3600.h
++++ /dev/null
+@@ -1,36 +0,0 @@
+-/*
+- *
+- * Definitions for H3600 Handheld Computer
+- *
+- * Copyright 2000 Compaq Computer Corporation.
+- *
+- * Use consistent with the GNU GPL is permitted,
+- * provided that this copyright notice is
+- * preserved in its entirety in all copies and derived works.
+- *
+- * COMPAQ COMPUTER CORPORATION MAKES NO WARRANTIES, EXPRESSED OR IMPLIED,
+- * AS TO THE USEFULNESS OR CORRECTNESS OF THIS CODE OR ITS
+- * FITNESS FOR ANY PARTICULAR PURPOSE.
+- *
+- * Author: Jamey Hicks.
+- *
+- * History:
+- *
+- * 2001-10-??	Andrew Christian   Added support for iPAQ H3800
+- *
+- */
+-
+-#ifndef _INCLUDE_H3600_H_
+-#define _INCLUDE_H3600_H_
+-
+-/* Physical memory regions corresponding to chip selects */
+-#define H3600_EGPIO_PHYS	(SA1100_CS5_PHYS + 0x01000000)
+-#define H3600_BANK_2_PHYS	SA1100_CS2_PHYS
+-#define H3600_BANK_4_PHYS	SA1100_CS4_PHYS
+-
+-/* Virtual memory regions corresponding to chip selects 2 & 4 (used on sleeves) */
+-#define H3600_EGPIO_VIRT	0xf0000000
+-#define H3600_BANK_2_VIRT	0xf1000000
+-#define H3600_BANK_4_VIRT	0xf3800000
+-
+-#endif /* _INCLUDE_H3600_H_ */
+diff --git a/arch/arm/mach-sa1100/include/mach/h3600_gpio.h b/arch/arm/mach-sa1100/include/mach/h3xxx.h
+similarity index 86%
+rename from arch/arm/mach-sa1100/include/mach/h3600_gpio.h
+rename to arch/arm/mach-sa1100/include/mach/h3xxx.h
+index 2537f35..7f1e130 100644
+--- a/arch/arm/mach-sa1100/include/mach/h3600_gpio.h
++++ b/arch/arm/mach-sa1100/include/mach/h3xxx.h
+@@ -20,8 +20,18 @@
+  *
   */
-@@ -330,16 +324,9 @@ static void __init h3100_map_io(void)
  
- 	sa1100fb_lcd_power = h3100_lcd_power;
- 
--	/* Initialize h3100-specific values here */
--	GPCR = 0x0fffffff;	 /* All outputs are set low by default */
--	GPDR = GPIO_H3600_L3_CLOCK |
--	       GPIO_H3600_L3_MODE  | GPIO_H3600_L3_DATA  |
--	       GPIO_H3600_CLK_SET1 | GPIO_H3600_CLK_SET0 |
--	       H3100_DIRECT_EGPIO;
--
- 	/* Older bootldrs put GPIO2-9 in alternate mode on the
- 	   assumption that they are used for video */
--	GAFR &= ~H3100_DIRECT_EGPIO;
-+	GAFR &= ~0x000001fb;
- }
- 
- /*
-@@ -424,13 +411,6 @@ static void __init h3600_map_io(void)
- 	h3xxx_map_io();
- 
- 	sa1100fb_lcd_power = h3600_lcd_power;
--
--	/* Initialize h3600-specific values here */
--
--	GPCR = 0x0fffffff;	 /* All outputs are set low by default */
--	GPDR = GPIO_H3600_L3_CLOCK |
--	       GPIO_H3600_L3_MODE  | GPIO_H3600_L3_DATA  |
--	       GPIO_H3600_CLK_SET1 | GPIO_H3600_CLK_SET0;
- }
+-#ifndef _INCLUDE_H3600_GPIO_H_
+-#define _INCLUDE_H3600_GPIO_H_
++#ifndef _INCLUDE_H3XXX_H_
++#define _INCLUDE_H3XXX_H_
++
++/* Physical memory regions corresponding to chip selects */
++#define H3600_EGPIO_PHYS	(SA1100_CS5_PHYS + 0x01000000)
++#define H3600_BANK_2_PHYS	SA1100_CS2_PHYS
++#define H3600_BANK_4_PHYS	SA1100_CS4_PHYS
++
++/* Virtual memory regions corresponding to chip selects 2 & 4 (used on sleeves) */
++#define H3600_EGPIO_VIRT	0xf0000000
++#define H3600_BANK_2_VIRT	0xf1000000
++#define H3600_BANK_4_VIRT	0xf3800000
  
  /*
+  * gpiolib numbers for all iPAQs
+@@ -77,4 +87,4 @@
+ #define H3600_EGPIO_LCD_5V_ON		(H3XXX_EGPIO_BASE + 14) /* enable 5V to LCD. active high. */
+ #define H3600_EGPIO_LVDD_ON		(H3XXX_EGPIO_BASE + 15) /* enable 9V and -6.5V to LCD. */
+ 
+-#endif /* _INCLUDE_H3600_GPIO_H_ */
++#endif /* _INCLUDE_H3XXX_H_ */
+diff --git a/drivers/pcmcia/sa1100_h3600.c b/drivers/pcmcia/sa1100_h3600.c
+index 4afd348..4717aca 100644
+--- a/drivers/pcmcia/sa1100_h3600.c
++++ b/drivers/pcmcia/sa1100_h3600.c
+@@ -15,8 +15,7 @@
+ #include <mach/hardware.h>
+ #include <asm/irq.h>
+ #include <asm/mach-types.h>
+-#include <mach/h3600.h>
+-#include <mach/h3600_gpio.h>
++#include <mach/h3xxx.h>
+ 
+ #include "sa1100_generic.h"
+ 
 -- 
 1.6.5.1.63.ga9d7.dirty
