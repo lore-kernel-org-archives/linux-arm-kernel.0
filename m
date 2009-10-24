@@ -1,41 +1,37 @@
 From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Sun, 25 Oct 2009 00:04:02 +0400
-Subject: [PATCH 04/20] SA1100: h3600: remove unused cruft from h3600.h
-In-Reply-To: <1256414658-22611-4-git-send-email-mad_soft@inbox.ru>
+Date: Sun, 25 Oct 2009 00:04:03 +0400
+Subject: [PATCH 05/20] SA1100: h3600: stop setting direction for LCD pins
+In-Reply-To: <1256414658-22611-5-git-send-email-mad_soft@inbox.ru>
 References: <1256414658-22611-1-git-send-email-mad_soft@inbox.ru>
 	<1256414658-22611-2-git-send-email-mad_soft@inbox.ru>
 	<1256414658-22611-3-git-send-email-mad_soft@inbox.ru>
 	<1256414658-22611-4-git-send-email-mad_soft@inbox.ru>
-Message-ID: <1256414658-22611-5-git-send-email-mad_soft@inbox.ru>
+	<1256414658-22611-5-git-send-email-mad_soft@inbox.ru>
+Message-ID: <1256414658-22611-6-git-send-email-mad_soft@inbox.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PM_SUSPEND, PM_RESUME and machine_is_h3xxx() are not used anywhere in
-kernel (checked with git grep), so it's safe to remove them.
+sa1100_fb driver handles this
 
 Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
 ---
- arch/arm/mach-sa1100/include/mach/h3600.h |    8 --------
- 1 files changed, 0 insertions(+), 8 deletions(-)
+ arch/arm/mach-sa1100/h3600.c |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/include/mach/h3600.h b/arch/arm/mach-sa1100/include/mach/h3600.h
-index 2827faa..69f138c 100644
---- a/arch/arm/mach-sa1100/include/mach/h3600.h
-+++ b/arch/arm/mach-sa1100/include/mach/h3600.h
-@@ -23,14 +23,6 @@
- #ifndef _INCLUDE_H3600_H_
- #define _INCLUDE_H3600_H_
+diff --git a/arch/arm/mach-sa1100/h3600.c b/arch/arm/mach-sa1100/h3600.c
+index 5033c03..021cecb 100644
+--- a/arch/arm/mach-sa1100/h3600.c
++++ b/arch/arm/mach-sa1100/h3600.c
+@@ -464,9 +464,7 @@ static void __init h3600_map_io(void)
+ 	GPCR = 0x0fffffff;	 /* All outputs are set low by default */
+ 	GPDR = GPIO_H3600_L3_CLOCK |
+ 	       GPIO_H3600_L3_MODE  | GPIO_H3600_L3_DATA  |
+-	       GPIO_H3600_CLK_SET1 | GPIO_H3600_CLK_SET0 |
+-	       GPIO_LDD15 | GPIO_LDD14 | GPIO_LDD13 | GPIO_LDD12 |
+-	       GPIO_LDD11 | GPIO_LDD10 | GPIO_LDD9  | GPIO_LDD8;
++	       GPIO_H3600_CLK_SET1 | GPIO_H3600_CLK_SET0;
  
--typedef int __bitwise pm_request_t;
--
--#define PM_SUSPEND	((__force pm_request_t) 1)	/* enter D1-D3 */
--#define PM_RESUME	((__force pm_request_t) 2)	/* enter D0 */
--
--/* generalized support for H3xxx series Compaq Pocket PC's */
--#define machine_is_h3xxx() (machine_is_h3100() || machine_is_h3600())
--
- /* Physical memory regions corresponding to chip selects */
- #define H3600_EGPIO_PHYS	(SA1100_CS5_PHYS + 0x01000000)
- #define H3600_BANK_2_PHYS	SA1100_CS2_PHYS
+ 	H3600_EGPIO = h3600_egpio;	   /* Maintains across sleep? */
+ 	assign_h3600_egpio = h3600_control_egpio;
 -- 
 1.6.5.1.63.ga9d7.dirty
