@@ -1,130 +1,112 @@
 From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Sun, 25 Oct 2009 00:20:39 +0400
-Subject: [PATCH 14/20] SA1100: h3100/h3600: merge h3600.h and h3600_gpio.h
-	into h3xxx.h
-In-Reply-To: <1256415643-22853-1-git-send-email-mad_soft@inbox.ru>
+Date: Sun, 25 Oct 2009 00:20:38 +0400
+Subject: [PATCH 13/20] SA1100: h3100/h3600: drop old GPIO definitions
+In-Reply-To: <1256415376-22778-1-git-send-email-mad_soft@inbox.ru>
 References: <1256415376-22778-1-git-send-email-mad_soft@inbox.ru>
-	<1256415643-22853-1-git-send-email-mad_soft@inbox.ru>
-Message-ID: <1256415643-22853-2-git-send-email-mad_soft@inbox.ru>
+Message-ID: <1256415643-22853-1-git-send-email-mad_soft@inbox.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Combine both headers into one, rename to h3xxx.h and change all
-users accordingly.
+As all existing code was converted to gpiolib, drop no more
+used pre-gpiolib (bit-shifted) GPIO definintions.
+Supply new gpiolib-friendly definitions for GPIOs which
+don't have them yet.
 
 Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
 ---
- arch/arm/mach-sa1100/h3600.c                       |    3 +-
- arch/arm/mach-sa1100/include/mach/h3600.h          |   36 --------------------
- .../include/mach/{h3600_gpio.h => h3xxx.h}         |   16 +++++++--
- drivers/pcmcia/sa1100_h3600.c                      |    3 +-
- 4 files changed, 15 insertions(+), 43 deletions(-)
- delete mode 100644 arch/arm/mach-sa1100/include/mach/h3600.h
- rename arch/arm/mach-sa1100/include/mach/{h3600_gpio.h => h3xxx.h} (86%)
+ arch/arm/mach-sa1100/include/mach/h3600.h      |   24 ------------------
+ arch/arm/mach-sa1100/include/mach/h3600_gpio.h |   31 +++++------------------
+ 2 files changed, 7 insertions(+), 48 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/h3600.c b/arch/arm/mach-sa1100/h3600.c
-index 3d52190..dd39f90 100644
---- a/arch/arm/mach-sa1100/h3600.c
-+++ b/arch/arm/mach-sa1100/h3600.c
-@@ -44,8 +44,7 @@
- #include <asm/mach/map.h>
- #include <asm/mach/serial_sa1100.h>
- 
--#include <mach/h3600.h>
--#include <mach/h3600_gpio.h>
-+#include <mach/h3xxx.h>
- 
- #include "generic.h"
- 
 diff --git a/arch/arm/mach-sa1100/include/mach/h3600.h b/arch/arm/mach-sa1100/include/mach/h3600.h
-deleted file mode 100644
-index e420422..0000000
+index f4911db..e420422 100644
 --- a/arch/arm/mach-sa1100/include/mach/h3600.h
-+++ /dev/null
-@@ -1,36 +0,0 @@
++++ b/arch/arm/mach-sa1100/include/mach/h3600.h
+@@ -33,28 +33,4 @@
+ #define H3600_BANK_2_VIRT	0xf1000000
+ #define H3600_BANK_4_VIRT	0xf3800000
+ 
 -/*
-- *
-- * Definitions for H3600 Handheld Computer
-- *
-- * Copyright 2000 Compaq Computer Corporation.
-- *
-- * Use consistent with the GNU GPL is permitted,
-- * provided that this copyright notice is
-- * preserved in its entirety in all copies and derived works.
-- *
-- * COMPAQ COMPUTER CORPORATION MAKES NO WARRANTIES, EXPRESSED OR IMPLIED,
-- * AS TO THE USEFULNESS OR CORRECTNESS OF THIS CODE OR ITS
-- * FITNESS FOR ANY PARTICULAR PURPOSE.
-- *
-- * Author: Jamey Hicks.
-- *
-- * History:
-- *
-- * 2001-10-??	Andrew Christian   Added support for iPAQ H3800
-- *
-- */
+-   Machine-independent GPIO definitions
+-   --- these are common across all current iPAQ platforms
+-*/
 -
--#ifndef _INCLUDE_H3600_H_
--#define _INCLUDE_H3600_H_
+-#define GPIO_H3600_NPOWER_BUTTON	GPIO_GPIO (0)	/* Also known as the "off button"  */
 -
--/* Physical memory regions corresponding to chip selects */
--#define H3600_EGPIO_PHYS	(SA1100_CS5_PHYS + 0x01000000)
--#define H3600_BANK_2_PHYS	SA1100_CS2_PHYS
--#define H3600_BANK_4_PHYS	SA1100_CS4_PHYS
+-#define GPIO_H3600_PCMCIA_CD1		GPIO_GPIO (10)
+-#define GPIO_H3600_PCMCIA_IRQ1		GPIO_GPIO (11)
 -
--/* Virtual memory regions corresponding to chip selects 2 & 4 (used on sleeves) */
--#define H3600_EGPIO_VIRT	0xf0000000
--#define H3600_BANK_2_VIRT	0xf1000000
--#define H3600_BANK_4_VIRT	0xf3800000
+-/* UDA1341 L3 Interface */
+-#define GPIO_H3600_L3_DATA		GPIO_GPIO (14)
+-#define GPIO_H3600_L3_MODE		GPIO_GPIO (15)
+-#define GPIO_H3600_L3_CLOCK		GPIO_GPIO (16)
 -
--#endif /* _INCLUDE_H3600_H_ */
-diff --git a/arch/arm/mach-sa1100/include/mach/h3600_gpio.h b/arch/arm/mach-sa1100/include/mach/h3xxx.h
-similarity index 86%
-rename from arch/arm/mach-sa1100/include/mach/h3600_gpio.h
-rename to arch/arm/mach-sa1100/include/mach/h3xxx.h
-index 2537f35..7f1e130 100644
+-#define GPIO_H3600_PCMCIA_CD0		GPIO_GPIO (17)
+-#define GPIO_H3600_SYS_CLK		GPIO_GPIO (19)
+-#define GPIO_H3600_PCMCIA_IRQ0		GPIO_GPIO (21)
+-
+-#define GPIO_H3600_COM_DCD		GPIO_GPIO (23)
+-#define GPIO_H3600_OPT_IRQ		GPIO_GPIO (24)
+-#define GPIO_H3600_COM_CTS		GPIO_GPIO (25)
+-#define GPIO_H3600_COM_RTS		GPIO_GPIO (26)
+-
+ #endif /* _INCLUDE_H3600_H_ */
+diff --git a/arch/arm/mach-sa1100/include/mach/h3600_gpio.h b/arch/arm/mach-sa1100/include/mach/h3600_gpio.h
+index 0c0bfa5..2537f35 100644
 --- a/arch/arm/mach-sa1100/include/mach/h3600_gpio.h
-+++ b/arch/arm/mach-sa1100/include/mach/h3xxx.h
-@@ -20,8 +20,18 @@
-  *
-  */
++++ b/arch/arm/mach-sa1100/include/mach/h3600_gpio.h
+@@ -30,6 +30,7 @@
+ #define H3XXX_GPIO_PCMCIA_CD1		10
+ #define H3XXX_GPIO_PCMCIA_IRQ1		11
+ #define H3XXX_GPIO_PCMCIA_CD0		17
++#define H3XXX_GPIO_ACTION_BUTTON	18
+ #define H3XXX_GPIO_SYS_CLK		19
+ #define H3XXX_GPIO_PCMCIA_IRQ0		21
+ #define H3XXX_GPIO_COM_DCD		23
+@@ -37,23 +38,8 @@
+ #define H3XXX_GPIO_COM_CTS		25
+ #define H3XXX_GPIO_COM_RTS		26
  
--#ifndef _INCLUDE_H3600_GPIO_H_
--#define _INCLUDE_H3600_GPIO_H_
-+#ifndef _INCLUDE_H3XXX_H_
-+#define _INCLUDE_H3XXX_H_
-+
-+/* Physical memory regions corresponding to chip selects */
-+#define H3600_EGPIO_PHYS	(SA1100_CS5_PHYS + 0x01000000)
-+#define H3600_BANK_2_PHYS	SA1100_CS2_PHYS
-+#define H3600_BANK_4_PHYS	SA1100_CS4_PHYS
-+
-+/* Virtual memory regions corresponding to chip selects 2 & 4 (used on sleeves) */
-+#define H3600_EGPIO_VIRT	0xf0000000
-+#define H3600_BANK_2_VIRT	0xf1000000
-+#define H3600_BANK_4_VIRT	0xf3800000
+-/*
+- * GPIO lines that are common across ALL iPAQ models are in "h3600.h"
+- * This file contains machine-specific definitions
+- */
++/* machine-specific gpios */
  
- /*
-  * gpiolib numbers for all iPAQs
-@@ -77,4 +87,4 @@
- #define H3600_EGPIO_LCD_5V_ON		(H3XXX_EGPIO_BASE + 14) /* enable 5V to LCD. active high. */
- #define H3600_EGPIO_LVDD_ON		(H3XXX_EGPIO_BASE + 15) /* enable 9V and -6.5V to LCD. */
+-#define GPIO_H3600_SUSPEND              GPIO_GPIO (0)
+-/* GPIO[2:9] used by LCD on H3600/3800, used as GPIO on H3100 */
+-#define GPIO_H3100_BT_ON		GPIO_GPIO (2)
+-#define GPIO_H3100_GPIO3		GPIO_GPIO (3)
+-#define GPIO_H3100_QMUTE		GPIO_GPIO (4)
+-#define GPIO_H3100_LCD_3V_ON		GPIO_GPIO (5)
+-#define GPIO_H3100_AUD_ON		GPIO_GPIO (6)
+-#define GPIO_H3100_AUD_PWR_ON		GPIO_GPIO (7)
+-#define GPIO_H3100_IR_ON		GPIO_GPIO (8)
+-#define GPIO_H3100_IR_FSEL		GPIO_GPIO (9)
+-
+-/* gpiolib versions of the above */
+ #define H3100_GPIO_BT_ON		2
+ #define H3100_GPIO_QMUTE		4
+ #define H3100_GPIO_LCD_3V_ON		5
+@@ -62,14 +48,11 @@
+ #define H3100_GPIO_IR_ON		8
+ #define H3100_GPIO_IR_FSEL		9
  
--#endif /* _INCLUDE_H3600_GPIO_H_ */
-+#endif /* _INCLUDE_H3XXX_H_ */
-diff --git a/drivers/pcmcia/sa1100_h3600.c b/drivers/pcmcia/sa1100_h3600.c
-index 4afd348..4717aca 100644
---- a/drivers/pcmcia/sa1100_h3600.c
-+++ b/drivers/pcmcia/sa1100_h3600.c
-@@ -15,8 +15,7 @@
- #include <mach/hardware.h>
- #include <asm/irq.h>
- #include <asm/mach-types.h>
--#include <mach/h3600.h>
--#include <mach/h3600_gpio.h>
-+#include <mach/h3xxx.h>
+-/* for H3600, audio sample rate clock generator */
+-#define GPIO_H3600_CLK_SET0		GPIO_GPIO (12)
+-#define GPIO_H3600_CLK_SET1		GPIO_GPIO (13)
+-
+-#define GPIO_H3600_ACTION_BUTTON	GPIO_GPIO (18)
+-#define GPIO_H3600_SOFT_RESET           GPIO_GPIO (20)   /* Also known as BATT_FAULT */
+-#define GPIO_H3600_OPT_LOCK		GPIO_GPIO (22)
+-#define GPIO_H3600_OPT_DET		GPIO_GPIO (27)
++#define H3600_GPIO_CLK_SET0		12	/* audio sample rate clock generator */
++#define H3600_GPIO_CLK_SET1		13
++#define H3600_GPIO_SOFT_RESET		20	/* also known as BATT_FAULT */
++#define H3600_GPIO_OPT_LOCK		22
++#define H3600_GPIO_OPT_DET		27
  
- #include "sa1100_generic.h"
  
+ /* H3100 / 3600 EGPIO pins */
 -- 
 1.6.5.1.63.ga9d7.dirty
