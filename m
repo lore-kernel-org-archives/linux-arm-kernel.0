@@ -1,19 +1,28 @@
-From: muni.anda@gmail.com (muni anda)
-Date: Fri, 23 Oct 2009 21:03:16 -0700
-Subject: cpu_vm_mask checks in ARM flush functions
-Message-ID: <f20fa6c60910232103h5a3046fbmda23a093f94fa230@mail.gmail.com>
+From: arhuaco@freaks-unidos.net (Nelson Castillo)
+Date: Sat, 24 Oct 2009 01:59:25 -0500
+Subject: [PATCH] s3c24xx-adc: resume convertions interrupted by going to
+	suspend
+In-Reply-To: <200910221410.28632.anarsoul@gmail.com>
+References: <200910201719.41102.anarsoul@gmail.com>
+	<200910221410.28632.anarsoul@gmail.com>
+Message-ID: <2accc2ff0910232359t1bc7515avb7b208ffbd112807@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I was going though the cache flush functions in arch/arm/mm/flush.c
-and found that cpu_isset() is used at a lot of places. I couldn't
-understand the reason why there is a need for cpu_vm_mask checks? My
-understanding was that those functions will be executed on the CPU for
-which the cpu_mask is already set (in switch_mm call). Is there a
-different calling sequence that I am missing?
+On Thu, Oct 22, 2009 at 6:10 AM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+> ? ????????? ?? 20 ??????? 2009 17:19:30 ????? Vasily Khoruzhick ???????:
+>> Fix for a bug that shows when the s3c2410 TS driver requests
+>> a conversion from the s3c-adc driver and the machine goes into suspend.
+>> In this case the touchscreen stops working.
 
-Can someone please the need for those checks (For example
-flush_ptrace_access() function running on vipt_non_aliasing caches).
+>@@ -224,6 +225,7 @@ struct s3c_adc_client *s3c_adc_register(struct platform_device *pdev,
 
-Thanks,
--Muni
+> 	client->is_ts = is_ts;
+
+> 	client->select_cb = select;
+
+> 	client->convert_cb = conv;
+
+>+	client->selected = 0;
+
+You don't need to clear client->selected. kzalloc takes care of this.
