@@ -1,22 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 28 Oct 2009 17:41:07 +0000
-Subject: [RFC 00/11] Cache handling updates
-In-Reply-To: <200910281717.26240.laurent.pinchart@ideasonboard.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Sat, 24 Oct 2009 14:11:59 +0100
+Subject: [RFC 01/11] ARM: Reduce __flush_dcache_page() visibility
+In-Reply-To: <cover.1256683230.git.rmk+kernel@arm.linux.org.uk>
 References: <cover.1256683230.git.rmk+kernel@arm.linux.org.uk>
-	<200910281717.26240.laurent.pinchart@ideasonboard.com>
-Message-ID: <20091028174107.GD20040@n2100.arm.linux.org.uk>
+Message-ID: <6ec348a08a49454de6a8b801795c373f93ba6c76.1256683230.git.rmk+kernel@arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2009 at 05:17:26PM +0100, Laurent Pinchart wrote:
-> Hi Russel,
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/include/asm/cacheflush.h |    2 --
+ arch/arm/mm/fault-armv.c          |    2 ++
+ arch/arm/mm/mm.h                  |    2 ++
+ 3 files changed, 4 insertions(+), 2 deletions(-)
 
-Grr.
-
-> for some reason the patches seem not to have made it to the list. I haven't 
-> received them in my mailbox, and I can't find them in the archive.
-
-I've no idea either; they got stuck in the moderation queue last night
-and I assume are still pending.
-
-I'm sure the list admins will eventually get around to it.
+diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+index fd03fb6..3147f75 100644
+--- a/arch/arm/include/asm/cacheflush.h
++++ b/arch/arm/include/asm/cacheflush.h
+@@ -410,8 +410,6 @@ extern void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
+  */
+ extern void flush_dcache_page(struct page *);
+ 
+-extern void __flush_dcache_page(struct address_space *mapping, struct page *page);
+-
+ static inline void __flush_icache_all(void)
+ {
+ 	asm("mcr	p15, 0, %0, c7, c5, 0	@ invalidate I-cache\n"
+diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
+index d0d17b6..830cf17 100644
+--- a/arch/arm/mm/fault-armv.c
++++ b/arch/arm/mm/fault-armv.c
+@@ -23,6 +23,8 @@
+ #include <asm/pgtable.h>
+ #include <asm/tlbflush.h>
+ 
++#include "mm.h"
++
+ static unsigned long shared_pte_mask = L_PTE_MT_BUFFERABLE;
+ 
+ /*
+diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
+index c4f6f05..a888363 100644
+--- a/arch/arm/mm/mm.h
++++ b/arch/arm/mm/mm.h
+@@ -24,6 +24,8 @@ struct mem_type {
+ 
+ const struct mem_type *get_mem_type(unsigned int type);
+ 
++extern void __flush_dcache_page(struct address_space *mapping, struct page *page);
++
+ #endif
+ 
+ struct map_desc;
+-- 
+1.6.2.5
