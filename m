@@ -1,38 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 24 Oct 2009 22:10:26 +0100
-Subject: [PATCH 00/20] iPAQ h3100/h3600 work for 2.6.33
-In-Reply-To: <1256414658-22611-1-git-send-email-mad_soft@inbox.ru>
-References: <1256414658-22611-1-git-send-email-mad_soft@inbox.ru>
-Message-ID: <20091024211026.GE16451@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 24 Oct 2009 14:36:55 -0700
+Subject: [GIT PULL] omap-fixes for v2.6.32-rc5
+Message-ID: <20091024213655.GM16230@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 25, 2009 at 12:03:58AM +0400, Dmitry Artamonow wrote:
-> Compile and run tested on iPAQs h3150 and h3635 with CF jacket.
-> Patches are mostly checkpatch clean - there's some comments
-> exceeding 80-line limit, but otherwise all code should be ok.
+Linus,
 
-I don't really care about the 80 character line limit in two circumstances:
-1. if a printk format string needs to go over the limit, so be it.
-2. comments against #defines when it's reasonable for them to be there
-   provided its not excessive.
+Please pull omap fixes from:
 
-Looking at these patches, it seems sane.
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
 
-> Also, please note, that patches are generated with "-C" flag
-> of git-format-patch for easier review. If there's problems with
-> applying, use patches from URL above - they're generated without "-C".
+Regards,
 
-That's fine, and the patches to me at least look fine as well.  The only
-thing which gives me slight concern is the:
+Tony
 
-	if (!gpio_request()) {
-		gpio_direction_output();
-		gpio_free();
-	}
 
-stuff, but I guess you can't get around that easily, especially if those
-GPIOs only become available at some time later.  It is something that
-eventually needs to be addressed though - consider that this can lead
-to unexpected (and silent) failures if the GPIOs aren't available when
-another driver initializes, and can't (eg) turn on the IrDA tranceiver.
+The following changes since commit 012abeea669ea49636cf952d13298bb68654146a:
+  Linus Torvalds (1):
+        Linux 2.6.32-rc5
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+
+Hiroshi DOYU (1):
+      omap: iommu: fix wrong condition check for SUPERSECTION
+
+Janusz Krzysztofik (3):
+      omap: Fix omap-keypad by restoring old keypad.h without breaking omap2 boards that use matrix_keypad
+      omap1: Fix redundant UARTs pin muxing that can break other hardware support
+      omap1: Fix DSP public peripherals support for ams-delta
+
+Kevin Hilman (1):
+      omap3: PM: enable UART3 module wakeups
+
+Santosh Shilimkar (3):
+      omap: SDMA: Fix omap_stop_dma() API for channel linking
+      omap4: Allow omap_serial_early_init() for OMAP4430 board
+      omap4: Fix UART4 platform data on omap4
+
+Tony Lindgren (2):
+      omap2: Fix detection of n8x0
+      omap2: Fix console serial port number for n8x0
+
+ arch/arm/configs/n8x0_defconfig              |    2 +-
+ arch/arm/mach-omap1/board-ams-delta.c        |    6 ++++++
+ arch/arm/mach-omap1/board-generic.c          |    8 ++++++++
+ arch/arm/mach-omap1/board-innovator.c        |   20 ++++++++++++++++++++
+ arch/arm/mach-omap1/board-palmte.c           |    8 ++++++++
+ arch/arm/mach-omap1/board-palmtt.c           |    8 ++++++++
+ arch/arm/mach-omap1/board-palmz71.c          |    8 ++++++++
+ arch/arm/mach-omap1/board-sx1.c              |    8 ++++++++
+ arch/arm/mach-omap1/board-voiceblue.c        |    8 ++++++++
+ arch/arm/mach-omap1/serial.c                 |   26 --------------------------
+ arch/arm/mach-omap2/Kconfig                  |   12 ++++++++++++
+ arch/arm/mach-omap2/board-3430sdp.c          |    2 +-
+ arch/arm/mach-omap2/board-4430sdp.c          |    4 ++--
+ arch/arm/mach-omap2/board-ldp.c              |    2 +-
+ arch/arm/mach-omap2/board-omap3evm.c         |    2 +-
+ arch/arm/mach-omap2/board-omap3pandora.c     |    2 +-
+ arch/arm/mach-omap2/board-rx51-peripherals.c |    2 +-
+ arch/arm/mach-omap2/board-rx51.c             |    1 -
+ arch/arm/mach-omap2/board-zoom2.c            |    2 +-
+ arch/arm/mach-omap2/io.c                     |    2 ++
+ arch/arm/mach-omap2/pm34xx.c                 |    7 ++++---
+ arch/arm/mach-omap2/serial.c                 |   10 ----------
+ arch/arm/plat-omap/dma.c                     |   18 ++++++++----------
+ arch/arm/plat-omap/include/mach/keypad.h     |    5 ++++-
+ arch/arm/plat-omap/iommu.c                   |    2 +-
+ 25 files changed, 114 insertions(+), 61 deletions(-)
