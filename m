@@ -1,48 +1,38 @@
 From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Sun, 25 Oct 2009 00:03:59 +0400
-Subject: [PATCH 01/20] SA1100: h3100/h3600: mark *_mach_init functions as
-	__init
-In-Reply-To: <1256414658-22611-1-git-send-email-mad_soft@inbox.ru>
+Date: Sun, 25 Oct 2009 00:04:00 +0400
+Subject: [PATCH 02/20] SA1100: h3100/h3600: remove dead links from Kconfig
+	help text
+In-Reply-To: <1256414658-22611-2-git-send-email-mad_soft@inbox.ru>
 References: <1256414658-22611-1-git-send-email-mad_soft@inbox.ru>
-Message-ID: <1256414658-22611-2-git-send-email-mad_soft@inbox.ru>
+	<1256414658-22611-2-git-send-email-mad_soft@inbox.ru>
+Message-ID: <1256414658-22611-3-git-send-email-mad_soft@inbox.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
 ---
- arch/arm/mach-sa1100/h3600.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-sa1100/Kconfig |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/h3600.c b/arch/arm/mach-sa1100/h3600.c
-index 2f6ea17..ebb3b8d 100644
---- a/arch/arm/mach-sa1100/h3600.c
-+++ b/arch/arm/mach-sa1100/h3600.c
-@@ -188,7 +188,7 @@ static struct sa1100_port_fns h3xxx_port_fns __initdata = {
- };
+diff --git a/arch/arm/mach-sa1100/Kconfig b/arch/arm/mach-sa1100/Kconfig
+index 4e5c07f..854768f 100644
+--- a/arch/arm/mach-sa1100/Kconfig
++++ b/arch/arm/mach-sa1100/Kconfig
+@@ -59,7 +59,6 @@ config SA1100_H3100
+ 	  Linux port to this machine can be found at:
  
+ 	  <http://www.handhelds.org/Compaq/index.html#iPAQ_H3100>
+-	  <http://www.compaq.com/products/handhelds/pocketpc/>
  
--static void h3xxx_mach_init(void)
-+static void __init h3xxx_mach_init(void)
- {
- 	sa1100_register_uart_fns(&h3xxx_port_fns);
- 	sa11x0_register_mtd(&h3xxx_flash_data, &h3xxx_flash_resource, 1);
-@@ -371,7 +371,7 @@ static struct gpio_default_state h3100_default_gpio[] = {
- 	{ H3XXX_GPIO_COM_RTS,	GPIO_MODE_OUT0,	"COM RTS" },
- };
+ config SA1100_H3600
+ 	bool "Compaq iPAQ H3600/H3700"
+@@ -69,7 +68,6 @@ config SA1100_H3600
+ 	  Linux port to this machine can be found at:
  
--static void h3100_mach_init(void)
-+static void __init h3100_mach_init(void)
- {
- 	h3xxx_init_gpio(h3100_default_gpio, ARRAY_SIZE(h3100_default_gpio));
- 	h3xxx_mach_init();
-@@ -500,7 +500,7 @@ static struct gpio_default_state h3600_default_gpio[] = {
- 	{ H3XXX_GPIO_COM_RTS,	GPIO_MODE_OUT0,	"COM RTS" },
- };
+ 	  <http://www.handhelds.org/Compaq/index.html#iPAQ_H3600>
+-	  <http://www.compaq.com/products/handhelds/pocketpc/>
  
--static void h3600_mach_init(void)
-+static void __init h3600_mach_init(void)
- {
- 	h3xxx_init_gpio(h3600_default_gpio, ARRAY_SIZE(h3600_default_gpio));
- 	h3xxx_mach_init();
+ config SA1100_BADGE4
+ 	bool "HP Labs BadgePAD 4"
 -- 
 1.6.5.1.63.ga9d7.dirty
