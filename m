@@ -1,38 +1,38 @@
 From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Sun, 25 Oct 2009 00:04:00 +0400
-Subject: [PATCH 02/20] SA1100: h3100/h3600: remove dead links from Kconfig
-	help text
-In-Reply-To: <1256414658-22611-2-git-send-email-mad_soft@inbox.ru>
+Date: Sun, 25 Oct 2009 00:04:01 +0400
+Subject: [PATCH 03/20] SA1100: h3600: remove IRDA bits from serial PM callback
+In-Reply-To: <1256414658-22611-3-git-send-email-mad_soft@inbox.ru>
 References: <1256414658-22611-1-git-send-email-mad_soft@inbox.ru>
 	<1256414658-22611-2-git-send-email-mad_soft@inbox.ru>
-Message-ID: <1256414658-22611-3-git-send-email-mad_soft@inbox.ru>
+	<1256414658-22611-3-git-send-email-mad_soft@inbox.ru>
+Message-ID: <1256414658-22611-4-git-send-email-mad_soft@inbox.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+IRDA is handled by separate sa1100-ir driver and has
+nothing to do with sa1100_serial
+
 Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
 ---
- arch/arm/mach-sa1100/Kconfig |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
+ arch/arm/mach-sa1100/h3600.c |    5 +----
+ 1 files changed, 1 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/Kconfig b/arch/arm/mach-sa1100/Kconfig
-index 4e5c07f..854768f 100644
---- a/arch/arm/mach-sa1100/Kconfig
-+++ b/arch/arm/mach-sa1100/Kconfig
-@@ -59,7 +59,6 @@ config SA1100_H3100
- 	  Linux port to this machine can be found at:
+diff --git a/arch/arm/mach-sa1100/h3600.c b/arch/arm/mach-sa1100/h3600.c
+index ebb3b8d..5033c03 100644
+--- a/arch/arm/mach-sa1100/h3600.c
++++ b/arch/arm/mach-sa1100/h3600.c
+@@ -155,11 +155,8 @@ static u_int h3xxx_uart_get_mctrl(struct uart_port *port)
  
- 	  <http://www.handhelds.org/Compaq/index.html#iPAQ_H3100>
--	  <http://www.compaq.com/products/handhelds/pocketpc/>
+ static void h3xxx_uart_pm(struct uart_port *port, u_int state, u_int oldstate)
+ {
+-	if (port->mapbase == _Ser2UTCR0) { /* TODO: REMOVE THIS */
+-		assign_h3600_egpio(IPAQ_EGPIO_IR_ON, !state);
+-	} else if (port->mapbase == _Ser3UTCR0) {
++	if (port->mapbase == _Ser3UTCR0)
+ 		assign_h3600_egpio(IPAQ_EGPIO_RS232_ON, !state);
+-	}
+ }
  
- config SA1100_H3600
- 	bool "Compaq iPAQ H3600/H3700"
-@@ -69,7 +68,6 @@ config SA1100_H3600
- 	  Linux port to this machine can be found at:
- 
- 	  <http://www.handhelds.org/Compaq/index.html#iPAQ_H3600>
--	  <http://www.compaq.com/products/handhelds/pocketpc/>
- 
- config SA1100_BADGE4
- 	bool "HP Labs BadgePAD 4"
+ /*
 -- 
 1.6.5.1.63.ga9d7.dirty
