@@ -1,72 +1,129 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 24 Oct 2009 14:36:55 -0700
-Subject: [GIT PULL] omap-fixes for v2.6.32-rc5
-Message-ID: <20091024213655.GM16230@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 24 Oct 2009 22:53:13 +0100
+Subject: Fix errata 411920
+Message-ID: <20091024215313.GF16451@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+Catalin,
 
-Please pull omap fixes from:
+According to my reading of this errata, any "invalidate entire instruction
+cache" operation can fail.  I'm not sure why the work-around is just
+implemented for some of these operations, and not others.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+Here's a patch which addresses the remaining operations.  Note that
+the arch/arm/mm/context.c one is weird - it's flushing the BTB
+twice - once using "c7, c5, 0" and again with "c7, c5, 6".  Is there
+a a reason for this?
 
-Regards,
+ arch/arm/include/asm/cacheflush.h |    5 +++++
+ arch/arm/mm/context.c             |    4 ++--
+ arch/arm/mm/flush.c               |   31 ++++++-------------------------
+ 3 files changed, 13 insertions(+), 27 deletions(-)
 
-Tony
-
-
-The following changes since commit 012abeea669ea49636cf952d13298bb68654146a:
-  Linus Torvalds (1):
-        Linux 2.6.32-rc5
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-
-Hiroshi DOYU (1):
-      omap: iommu: fix wrong condition check for SUPERSECTION
-
-Janusz Krzysztofik (3):
-      omap: Fix omap-keypad by restoring old keypad.h without breaking omap2 boards that use matrix_keypad
-      omap1: Fix redundant UARTs pin muxing that can break other hardware support
-      omap1: Fix DSP public peripherals support for ams-delta
-
-Kevin Hilman (1):
-      omap3: PM: enable UART3 module wakeups
-
-Santosh Shilimkar (3):
-      omap: SDMA: Fix omap_stop_dma() API for channel linking
-      omap4: Allow omap_serial_early_init() for OMAP4430 board
-      omap4: Fix UART4 platform data on omap4
-
-Tony Lindgren (2):
-      omap2: Fix detection of n8x0
-      omap2: Fix console serial port number for n8x0
-
- arch/arm/configs/n8x0_defconfig              |    2 +-
- arch/arm/mach-omap1/board-ams-delta.c        |    6 ++++++
- arch/arm/mach-omap1/board-generic.c          |    8 ++++++++
- arch/arm/mach-omap1/board-innovator.c        |   20 ++++++++++++++++++++
- arch/arm/mach-omap1/board-palmte.c           |    8 ++++++++
- arch/arm/mach-omap1/board-palmtt.c           |    8 ++++++++
- arch/arm/mach-omap1/board-palmz71.c          |    8 ++++++++
- arch/arm/mach-omap1/board-sx1.c              |    8 ++++++++
- arch/arm/mach-omap1/board-voiceblue.c        |    8 ++++++++
- arch/arm/mach-omap1/serial.c                 |   26 --------------------------
- arch/arm/mach-omap2/Kconfig                  |   12 ++++++++++++
- arch/arm/mach-omap2/board-3430sdp.c          |    2 +-
- arch/arm/mach-omap2/board-4430sdp.c          |    4 ++--
- arch/arm/mach-omap2/board-ldp.c              |    2 +-
- arch/arm/mach-omap2/board-omap3evm.c         |    2 +-
- arch/arm/mach-omap2/board-omap3pandora.c     |    2 +-
- arch/arm/mach-omap2/board-rx51-peripherals.c |    2 +-
- arch/arm/mach-omap2/board-rx51.c             |    1 -
- arch/arm/mach-omap2/board-zoom2.c            |    2 +-
- arch/arm/mach-omap2/io.c                     |    2 ++
- arch/arm/mach-omap2/pm34xx.c                 |    7 ++++---
- arch/arm/mach-omap2/serial.c                 |   10 ----------
- arch/arm/plat-omap/dma.c                     |   18 ++++++++----------
- arch/arm/plat-omap/include/mach/keypad.h     |    5 ++++-
- arch/arm/plat-omap/iommu.c                   |    2 +-
- 25 files changed, 114 insertions(+), 61 deletions(-)
+diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+index 3147f75..af0624c 100644
+--- a/arch/arm/include/asm/cacheflush.h
++++ b/arch/arm/include/asm/cacheflush.h
+@@ -412,9 +412,14 @@ extern void flush_dcache_page(struct page *);
+ 
+ static inline void __flush_icache_all(void)
+ {
++#ifdef CONFIG_ARM_ERRATA_411920
++	extern void v6_icache_inval_all(void);
++	v6_icache_inval_all();
++#else
+ 	asm("mcr	p15, 0, %0, c7, c5, 0	@ invalidate I-cache\n"
+ 	    :
+ 	    : "r" (0));
++#endif
+ }
+ 
+ #define ARCH_HAS_FLUSH_ANON_PAGE
+diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
+index 6bda76a..d4f8275 100644
+--- a/arch/arm/mm/context.c
++++ b/arch/arm/mm/context.c
+@@ -50,8 +50,8 @@ void __new_context(struct mm_struct *mm)
+ 		isb();
+ 		flush_tlb_all();
+ 		if (icache_is_vivt_asid_tagged()) {
+-			asm("mcr	p15, 0, %0, c7, c5, 0	@ invalidate I-cache\n"
+-			    "mcr	p15, 0, %0, c7, c5, 6	@ flush BTAC/BTB\n"
++			__flush_icache_all();
++			asm("mcr	p15, 0, %0, c7, c5, 6	@ flush BTAC/BTB"
+ 			    :
+ 			    : "r" (0));
+ 			dsb();
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index b279429..7f294f3 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -18,10 +18,6 @@
+ 
+ #include "mm.h"
+ 
+-#ifdef CONFIG_ARM_ERRATA_411920
+-extern void v6_icache_inval_all(void);
+-#endif
+-
+ #ifdef CONFIG_CPU_CACHE_VIPT
+ 
+ #define ALIAS_FLUSH_START	0xffff4000
+@@ -35,16 +31,11 @@ static void flush_pfn_alias(unsigned long pfn, unsigned long vaddr)
+ 	flush_tlb_kernel_page(to);
+ 
+ 	asm(	"mcrr	p15, 0, %1, %0, c14\n"
+-	"	mcr	p15, 0, %2, c7, c10, 4\n"
+-#ifndef CONFIG_ARM_ERRATA_411920
+-	"	mcr	p15, 0, %2, c7, c5, 0\n"
+-#endif
++	"	mcr	p15, 0, %2, c7, c10, 4"
+ 	    :
+ 	    : "r" (to), "r" (to + PAGE_SIZE - L1_CACHE_BYTES), "r" (zero)
+ 	    : "cc");
+-#ifdef CONFIG_ARM_ERRATA_411920
+-	v6_icache_inval_all();
+-#endif
++	__flush_icache_all();
+ }
+ 
+ void flush_cache_mm(struct mm_struct *mm)
+@@ -57,16 +48,11 @@ void flush_cache_mm(struct mm_struct *mm)
+ 
+ 	if (cache_is_vipt_aliasing()) {
+ 		asm(	"mcr	p15, 0, %0, c7, c14, 0\n"
+-		"	mcr	p15, 0, %0, c7, c10, 4\n"
+-#ifndef CONFIG_ARM_ERRATA_411920
+-		"	mcr	p15, 0, %0, c7, c5, 0\n"
+-#endif
++		"	mcr	p15, 0, %0, c7, c10, 4"
+ 		    :
+ 		    : "r" (0)
+ 		    : "cc");
+-#ifdef CONFIG_ARM_ERRATA_411920
+-		v6_icache_inval_all();
+-#endif
++		__flush_icache_all();
+ 	}
+ }
+ 
+@@ -81,16 +67,11 @@ void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned
+ 
+ 	if (cache_is_vipt_aliasing()) {
+ 		asm(	"mcr	p15, 0, %0, c7, c14, 0\n"
+-		"	mcr	p15, 0, %0, c7, c10, 4\n"
+-#ifndef CONFIG_ARM_ERRATA_411920
+-		"	mcr	p15, 0, %0, c7, c5, 0\n"
+-#endif
++		"	mcr	p15, 0, %0, c7, c10, 4"
+ 		    :
+ 		    : "r" (0)
+ 		    : "cc");
+-#ifdef CONFIG_ARM_ERRATA_411920
+-		v6_icache_inval_all();
+-#endif
++		__flush_icache_all();
+ 	}
+ }
+ 
