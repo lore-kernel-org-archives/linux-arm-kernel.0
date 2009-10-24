@@ -1,39 +1,66 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 24 Oct 2009 12:10:36 +0100
-Subject: cpu_vm_mask checks in ARM flush functions
-In-Reply-To: <f20fa6c60910232103h5a3046fbmda23a093f94fa230@mail.gmail.com>
-References: <f20fa6c60910232103h5a3046fbmda23a093f94fa230@mail.gmail.com>
-Message-ID: <20091024111036.GC16451@n2100.arm.linux.org.uk>
+Date: Sat, 24 Oct 2009 12:13:57 +0100
+Subject: [PATCH] Use REV and REV16 for byte swapping on ARMv6+
+In-Reply-To: <1256374782-5803-1-git-send-email-rabin@rab.in>
+References: <1256374782-5803-1-git-send-email-rabin@rab.in>
+Message-ID: <20091024111357.GD16451@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2009 at 09:03:16PM -0700, muni anda wrote:
-> I was going though the cache flush functions in arch/arm/mm/flush.c
-> and found that cpu_isset() is used at a lot of places. I couldn't
-> understand the reason why there is a need for cpu_vm_mask checks? My
-> understanding was that those functions will be executed on the CPU for
-> which the cpu_mask is already set (in switch_mm call). Is there a
-> different calling sequence that I am missing?
+On Sat, Oct 24, 2009 at 02:29:42PM +0530, Rabin Vincent wrote:
+> ARMv6 introduced the REV and REV16 instructions that reverse bytes in
+> words and halfwords.  Use them for the arch-specific implementation of
+> the byte swapping helpers on ARMv6+.
 
-There are cases where (eg) pages are unmapped in a different process
-to the one which is running.
+Please submit to the patch system.  Note that you can now use this format,
+and just put the "KernelVersion:" header somewhere in before the 'diff'
+line.
 
-> Can someone please the need for those checks (For example
-> flush_ptrace_access() function running on vipt_non_aliasing caches).
-
-ptrace accesses are done by a different process from the one being
-operated on, so it is not likely that their address space is directly
-accessible - but it can be.
-
-For VIVT caches, this means that if the address space is visible, we
-need to flush the page.  If it is not visible, we must not do any
-cache maintainence (which will be done when the kernel switches
-address spaces anyway.)
-
-For VIPT aliasing caches, we do not flush the caches on every context
-switch, and so we must always deal with cache aliases caused by
-accessing the kernel's view of memory.
-
-For VIPT non-aliasing caches, there may be a bug there; it requires
-more time than I currently have to think about to say for certain
-though.
+> 
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> ---
+>  arch/arm/include/asm/swab.h |   19 +++++++++++++++++++
+>  1 files changed, 19 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/swab.h b/arch/arm/include/asm/swab.h
+> index ca2bf2f..9997ad2 100644
+> --- a/arch/arm/include/asm/swab.h
+> +++ b/arch/arm/include/asm/swab.h
+> @@ -22,6 +22,24 @@
+>  #  define __SWAB_64_THRU_32__
+>  #endif
+>  
+> +#if defined(__KERNEL__) && __LINUX_ARM_ARCH__ >= 6
+> +
+> +static inline __attribute_const__ __u16 __arch_swab16(__u16 x)
+> +{
+> +	__asm__ ("rev16 %0, %1" : "=r" (x) : "r" (x));
+> +	return x;
+> +}
+> +#define __arch_swab16 __arch_swab16
+> +
+> +static inline __attribute_const__ __u32 __arch_swab32(__u32 x)
+> +{
+> +	__asm__ ("rev %0, %1" : "=r" (x) : "r" (x));
+> +	return x;
+> +}
+> +#define __arch_swab32 __arch_swab32
+> +
+> +#else
+> +
+>  static inline __attribute_const__ __u32 __arch_swab32(__u32 x)
+>  {
+>  	__u32 t;
+> @@ -48,3 +66,4 @@ static inline __attribute_const__ __u32 __arch_swab32(__u32 x)
+>  
+>  #endif
+>  
+> +#endif
+> -- 
+> 1.6.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
