@@ -1,41 +1,25 @@
-From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Sun, 25 Oct 2009 15:53:26 +0300
-Subject: [PATCH] SA1100: h3100/h3600: always build htc-egpio driver
-Message-ID: <mailman.91.1256484975.2253.linux-arm-kernel@lists.infradead.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 25 Oct 2009 15:44:16 +0000
+Subject: [PATCH] check put_user fail in do_signal when enable OABI_COMPACT
+In-Reply-To: <af3ea28a0910242323n55e14391x7519ecfb9de44856@mail.gmail.com>
+References: <1256123277.3851.36.camel@debian-nb>
+	<af3ea28a0910212035w5f44f108r594ced6062bb35f3@mail.gmail.com>
+	<20091024104916.GB16451@n2100.arm.linux.org.uk>
+	<af3ea28a0910242323n55e14391x7519ecfb9de44856@mail.gmail.com>
+Message-ID: <20091025154416.GB1774@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many features of h3100/h3600 (LCD, PCMCIA, Flash write, etc.)
-depend on correct functioning of GPIO expander handled by htc-egpio
-driver, so force its building in Kconfig.
+On Sun, Oct 25, 2009 at 02:23:09PM +0800, ye janboe wrote:
+> hi, Russell
+> 
+> Your patch looks good for real fixing this issue.
 
-Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
----
- arch/arm/mach-sa1100/Kconfig |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+My patch doesn't address your issue, it only addresses a previous
+problem.  We're still decrementing the stack pointer and writing to
+a possible new page - which could fault.
 
-diff --git a/arch/arm/mach-sa1100/Kconfig b/arch/arm/mach-sa1100/Kconfig
-index 854768f..03a7f38 100644
---- a/arch/arm/mach-sa1100/Kconfig
-+++ b/arch/arm/mach-sa1100/Kconfig
-@@ -53,6 +53,7 @@ config SA1100_COLLIE
- 
- config SA1100_H3100
- 	bool "Compaq iPAQ H3100"
-+	select HTC_EGPIO
- 	help
- 	  Say Y here if you intend to run this kernel on the Compaq iPAQ
- 	  H3100 handheld computer.  Information about this machine and the
-@@ -62,6 +63,7 @@ config SA1100_H3100
- 
- config SA1100_H3600
- 	bool "Compaq iPAQ H3600/H3700"
-+	select HTC_EGPIO
- 	help
- 	  Say Y here if you intend to run this kernel on the Compaq iPAQ
- 	  H3600 handheld computer.  Information about this machine and the
--- 
-1.6.3.4
+Therefore, your patch is still required, but it needs to be modified
+to apply on top of my patch.
 
-
---YiEDa0DAkWCtVeE4--
+A replacement patch would be welcome.
