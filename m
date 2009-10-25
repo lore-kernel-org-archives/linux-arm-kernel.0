@@ -1,129 +1,68 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sun, 25 Oct 2009 10:40:02 +0000
-Subject: [RFC 06/11] ARM: Avoid duplicated implementation for VIVT cache
-	flushing
+Date: Sun, 25 Oct 2009 10:59:08 +0000
+Subject: [RFC 07/11] ARM: Allocate ZERO_PAGE from highmem
 In-Reply-To: <cover.1256683230.git.rmk+kernel@arm.linux.org.uk>
 References: <cover.1256683230.git.rmk+kernel@arm.linux.org.uk>
-Message-ID: <2ba31e0dd84d4ed65105fd274fc74ba68016f121.1256683230.git.rmk+kernel@arm.linux.org.uk>
+Message-ID: <551619d0fd5153ca4a5e1821aea8d867d9581c9a.1256683230.git.rmk+kernel@arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We had two copies of the wrapper code for VIVT cache flushing - one in
-asm/cacheflush.h and one in arch/arm/mm/flush.c.  Reduce this down to
-one common copy.
+The zero page does not need to be in low memory, so allocate it from
+high memory.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/include/asm/cacheflush.h |   20 +++++++++++++++-----
- arch/arm/mm/flush.c               |   17 ++++-------------
- 2 files changed, 19 insertions(+), 18 deletions(-)
+ arch/arm/mm/init.c |    9 +++++++++
+ arch/arm/mm/mmu.c  |   10 ----------
+ 2 files changed, 9 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index af0624c..9fd6d3a 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -331,15 +331,15 @@ static inline void outer_flush_range(unsigned long start, unsigned long end)
-  * Convert calls to our calling convention.
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 40940d7..101e100 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -609,6 +609,15 @@ void __init mem_init(void)
+ 		 */
+ 		sysctl_overcommit_memory = OVERCOMMIT_ALWAYS;
+ 	}
++
++	/*
++	 * Allocate the zero page, trying to get it from highmem if
++	 * available.  Note that this must always succeed and returns
++	 * a zeroed page.
++	 */
++	empty_zero_page = alloc_pages(GFP_KERNEL | __GFP_HIGHMEM | __GFP_ZERO, 0);
++	BUG_ON(!empty_zero_page);
++	__flush_dcache_page(NULL, empty_zero_page);
+ }
+ 
+ void free_initmem(void)
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 2a7cc61..2bff0c2 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1012,8 +1012,6 @@ static void __init kmap_init(void)
   */
- #define flush_cache_all()		__cpuc_flush_kern_all()
--#ifndef CONFIG_CPU_CACHE_VIPT
--static inline void flush_cache_mm(struct mm_struct *mm)
-+
-+static inline void vivt_flush_cache_mm(struct mm_struct *mm)
+ void __init paging_init(struct machine_desc *mdesc)
  {
- 	if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(mm)))
- 		__cpuc_flush_user_all();
+-	void *zero_page;
+-
+ 	build_mem_type_table();
+ 	sanity_check_meminfo();
+ 	prepare_page_table();
+@@ -1022,14 +1020,6 @@ void __init paging_init(struct machine_desc *mdesc)
+ 	kmap_init();
+ 
+ 	top_pmd = pmd_off_k(0xffff0000);
+-
+-	/*
+-	 * allocate the zero page.  Note that this always succeeds and
+-	 * returns a zeroed result.
+-	 */
+-	zero_page = alloc_bootmem_low_pages(PAGE_SIZE);
+-	empty_zero_page = virt_to_page(zero_page);
+-	__flush_dcache_page(NULL, empty_zero_page);
  }
  
- static inline void
--flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end)
-+vivt_flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end)
- {
- 	if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(vma->vm_mm)))
- 		__cpuc_flush_user_range(start & PAGE_MASK, PAGE_ALIGN(end),
-@@ -347,7 +347,7 @@ flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long
- }
- 
- static inline void
--flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr, unsigned long pfn)
-+vivt_flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr, unsigned long pfn)
- {
- 	if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(vma->vm_mm))) {
- 		unsigned long addr = user_addr & PAGE_MASK;
-@@ -356,7 +356,7 @@ flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr, unsigned l
- }
- 
- static inline void
--flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
-+vivt_flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
- 			 unsigned long uaddr, void *kaddr,
- 			 unsigned long len, int write)
- {
-@@ -365,6 +365,16 @@ flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
- 		__cpuc_coherent_kern_range(addr, addr + len);
- 	}
- }
-+
-+#ifndef CONFIG_CPU_CACHE_VIPT
-+#define flush_cache_mm(mm) \
-+		vivt_flush_cache_mm(mm)
-+#define flush_cache_range(vma,start,end) \
-+		vivt_flush_cache_range(vma,start,end)
-+#define flush_cache_page(vma,addr,pfn) \
-+		vivt_flush_cache_page(vma,addr,pfn)
-+#define flush_ptrace_access(vma,page,ua,ka,len,write) \
-+		vivt_flush_ptrace_access(vma,page,ua,ka,len,write)
- #else
- extern void flush_cache_mm(struct mm_struct *mm);
- extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index 82dd2c5..4fa3d4d 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -40,8 +40,7 @@ static void flush_pfn_alias(unsigned long pfn, unsigned long vaddr)
- void flush_cache_mm(struct mm_struct *mm)
- {
- 	if (cache_is_vivt()) {
--		if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(mm)))
--			__cpuc_flush_user_all();
-+		vivt_flush_cache_mm(mm);
- 		return;
- 	}
- 
-@@ -58,9 +57,7 @@ void flush_cache_mm(struct mm_struct *mm)
- void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end)
- {
- 	if (cache_is_vivt()) {
--		if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(vma->vm_mm)))
--			__cpuc_flush_user_range(start & PAGE_MASK, PAGE_ALIGN(end),
--						vma->vm_flags);
-+		vivt_flush_cache_range(vma, start, end);
- 		return;
- 	}
- 
-@@ -77,10 +74,7 @@ void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned
- void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr, unsigned long pfn)
- {
- 	if (cache_is_vivt()) {
--		if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(vma->vm_mm))) {
--			unsigned long addr = user_addr & PAGE_MASK;
--			__cpuc_flush_user_range(addr, addr + PAGE_SIZE, vma->vm_flags);
--		}
-+		vivt_flush_cache_page(vma, user_addr, pfn);
- 		return;
- 	}
- 
-@@ -95,10 +89,7 @@ void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
- 			 unsigned long len, int write)
- {
- 	if (cache_is_vivt()) {
--		if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(vma->vm_mm))) {
--			unsigned long addr = (unsigned long)kaddr;
--			__cpuc_coherent_kern_range(addr, addr + len);
--		}
-+		vivt_flush_ptrace_access(vma, page, uaddr, kaddr, len, write);
- 		return;
- 	}
- 
+ /*
 -- 
 1.6.2.5
