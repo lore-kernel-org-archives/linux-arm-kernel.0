@@ -1,31 +1,11 @@
-From: janboe.ye@gmail.com (ye janboe)
-Date: Tue, 27 Oct 2009 22:41:46 +0800
-Subject: [PATCH] check put_user fail in do_signal when enable OABI_COMPACT
-In-Reply-To: <20091027142858.GA22412@n2100.arm.linux.org.uk>
-References: <1256123277.3851.36.camel@debian-nb>
-	<20091025154416.GB1774@n2100.arm.linux.org.uk>
-	<af3ea28a0910251959id60ad5kf95dd1f908fa55c9@mail.gmail.com>
-	<200910271514.54506.jpihet@mvista.com>
-	<20091027142858.GA22412@n2100.arm.linux.org.uk>
-Message-ID: <af3ea28a0910270741t5aee5365tca3e12b382698c7b@mail.gmail.com>
+From: zyxsjl@126.com (zyxsjl)
+Date: Sun, 25 Oct 2009 14:49:48 +0800 (CST)
+Subject: abt kernel 2.6 compressed/head.s
+Message-ID: <7866344.98541256453388015.JavaMail.coremail@bj126app34.126.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-looks fine too. Thanks
-
-2009/10/27 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Tue, Oct 27, 2009 at 03:14:53PM +0100, Jean Pihet wrote:
->> Russell, Janboe,
->>
->> On Monday 26 October 2009 03:59:23 ye janboe wrote:
->> > Sure. Russell
->> >
->> > After you restart_syscall patch are merged, I will send out another patch.
->> Here is what I ended up with after merging.
->> It has been tested on OMAP3 boards although I could not trigger the failing
->> put_user test case.
->>
->> What do you think?
->
-> Looks fine, thanks.
->
+hi anyone, I have not understood some code in this file below: #ifndef CONFIG_ZBOOT_ROM /* * If we're running fully PIC === CONFIG_ZBOOT_ROM = n, * we need to fix up pointers into the BSS region. * r2 - BSS start * r3 - BSS end * sp - stack pointer */ add r2, r2, r0 add r3, r3, r0 add sp, sp, r0 /* * Relocate all entries in the GOT table. */ 1: ldr r1, [r6, #0] @ relocate entries in the GOT add r1, r1, r0 @ table. This fixes up the str r1, [r6], #4 @ C references. cmp r6, ip blo 1b #else /* * Relocate entries in the GOT table. We only relocate * the entries that are outside the (relocated) BSS region. */ 1: ldr r1, [r6, #0] @ relocate entries in the GOT cmp r1, r2 @ entry 
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091025/b0453206/attachment-0001.htm>
