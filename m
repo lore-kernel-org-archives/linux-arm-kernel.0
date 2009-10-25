@@ -1,46 +1,93 @@
 From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Sun, 25 Oct 2009 18:36:03 +0300
-Subject: [PATCH 00/20] iPAQ h3100/h3600 work for 2.6.33
-In-Reply-To: <20091024211026.GE16451@n2100.arm.linux.org.uk>
-References: <1256414658-22611-1-git-send-email-mad_soft@inbox.ru>
-	<20091024211026.GE16451@n2100.arm.linux.org.uk>
-Message-ID: <20091025153603.GA24490@rainbow>
+Date: Sun, 25 Oct 2009 16:49:37 +0300
+Subject: [PATCH] SA1100: h3100/h3600: emit messages on failed gpio_request
+Message-ID: <mailman.90.1256484975.2253.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22:10 Sat 24 Oct     , Russell King - ARM Linux wrote:
-> 
-> That's fine, and the patches to me at least look fine as well.  The only
-> thing which gives me slight concern is the:
-> 
-> 	if (!gpio_request()) {
-> 		gpio_direction_output();
-> 		gpio_free();
-> 	}
-> 
-> stuff, but I guess you can't get around that easily, especially if those
-> GPIOs only become available at some time later.  It is something that
-> eventually needs to be addressed though - consider that this can lead
-> to unexpected (and silent) failures if the GPIOs aren't available when
-> another driver initializes, and can't (eg) turn on the IrDA tranceiver.
+Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
+---
+ arch/arm/mach-sa1100/h3100.c |    3 ++-
+ arch/arm/mach-sa1100/h3600.c |   16 ++++++++++++----
+ arch/arm/mach-sa1100/h3xxx.c |    8 ++++++--
+ 3 files changed, 20 insertions(+), 7 deletions(-)
 
-Yes, you right here about silent failures. I think they could be made less
-silent by inserting some pr_err()-s , though it would bloat code a
-bit (I'd like to see request_gpio() itself emitting error message,
-but currectly it does that only when CONFIG_DEBUG_GPIO is set).
-Ok, here's incremental patch adding pr_err-s in attachment - if you're
-OK with it I will roll it into [09/20] and rebase all following patches.
-
-Also perhaps it's a good idea to always built-in htc-egpio driver
-(by adding "select HTC_EGPIO" to h3100/h3600 Kconfig options) - that should
-decrease probability of gpio_request failures a lot. Patch also
-attached.
-
-Anyway these gpio_requests in callbacks is temporary solution.
-In a long term I'd really like to see proper init/exit hooks in
-corresponding drivers, but it's hard to say how much work it will
-require.
-
+diff --git a/arch/arm/mach-sa1100/h3100.c b/arch/arm/mach-sa1100/h3100.c
+index 793e68c..3571411 100644
+--- a/arch/arm/mach-sa1100/h3100.c
++++ b/arch/arm/mach-sa1100/h3100.c
+@@ -31,7 +31,8 @@ static void h3100_lcd_power(int enable)
+ 		gpio_set_value(H3100_GPIO_LCD_3V_ON, enable);
+ 		gpio_direction_output(H3XXX_EGPIO_LCD_ON, enable);
+ 		gpio_free(H3XXX_EGPIO_LCD_ON);
+-	}
++	} else
++		pr_err("%s: can't request H3XXX_EGPIO_LCD_ON\n", __func__);
+ }
+ 
+ 
+diff --git a/arch/arm/mach-sa1100/h3600.c b/arch/arm/mach-sa1100/h3600.c
+index 47587cc..af3b714 100644
+--- a/arch/arm/mach-sa1100/h3600.c
++++ b/arch/arm/mach-sa1100/h3600.c
+@@ -27,14 +27,22 @@
+  */
+ static void h3600_lcd_power(int enable)
+ {
+-	if (gpio_request(H3XXX_EGPIO_LCD_ON, "LCD power"))
++	if (gpio_request(H3XXX_EGPIO_LCD_ON, "LCD power")) {
++		pr_err("%s: can't request H3XXX_EGPIO_LCD_ON\n", __func__);
+ 		goto err1;
+-	if (gpio_request(H3600_EGPIO_LCD_PCI, "LCD control"))
++	}
++	if (gpio_request(H3600_EGPIO_LCD_PCI, "LCD control")) {
++		pr_err("%s: can't request H3XXX_EGPIO_LCD_PCI\n", __func__);
+ 		goto err2;
+-	if (gpio_request(H3600_EGPIO_LCD_5V_ON, "LCD 5v"))
++	}
++	if (gpio_request(H3600_EGPIO_LCD_5V_ON, "LCD 5v")) {
++		pr_err("%s: can't request H3XXX_EGPIO_LCD_5V_ON\n", __func__);
+ 		goto err3;
+-	if (gpio_request(H3600_EGPIO_LVDD_ON, "LCD 9v/-6.5v"))
++	}
++	if (gpio_request(H3600_EGPIO_LVDD_ON, "LCD 9v/-6.5v")) {
++		pr_err("%s: can't request H3600_EGPIO_LVDD_ON\n", __func__);
+ 		goto err4;
++	}
+ 
+ 	gpio_direction_output(H3XXX_EGPIO_LCD_ON, enable);
+ 	gpio_direction_output(H3600_EGPIO_LCD_PCI, enable);
+diff --git a/arch/arm/mach-sa1100/h3xxx.c b/arch/arm/mach-sa1100/h3xxx.c
+index ec9d9db..432ce93 100644
+--- a/arch/arm/mach-sa1100/h3xxx.c
++++ b/arch/arm/mach-sa1100/h3xxx.c
+@@ -83,8 +83,10 @@ static void h3xxx_set_vpp(int vpp)
+ static int h3xxx_flash_init(void)
+ {
+ 	int err = gpio_request(H3XXX_EGPIO_VPP_ON, "Flash Vpp");
+-	if (err)
++	if (err) {
++		pr_err("%s: can't request H3XXX_EGPIO_VPP_ON\n", __func__);
+ 		return err;
++	}
+ 
+ 	err = gpio_direction_output(H3XXX_EGPIO_VPP_ON, 0);
+ 	if (err)
+@@ -147,7 +149,9 @@ static void h3xxx_uart_pm(struct uart_port *port, u_int state, u_int oldstate)
+ 		if (!gpio_request(H3XXX_EGPIO_RS232_ON, "RS232 transceiver")) {
+ 			gpio_direction_output(H3XXX_EGPIO_RS232_ON, !state);
+ 			gpio_free(H3XXX_EGPIO_RS232_ON);
+-		}
++		} else
++			pr_err("%s: can't request H3XXX_EGPIO_RS232_ON\n",
++				__func__);
+ }
+ 
+ /*
 -- 
-Best regards,
-Dmitry "MAD" Artamonow
+1.6.3.4
+
+
+--YiEDa0DAkWCtVeE4
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: attachment; filename="0001-SA1100-h3100-h3600-always-build-htc-egpio-driver.patch"
