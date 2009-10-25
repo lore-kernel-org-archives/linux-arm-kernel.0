@@ -1,48 +1,41 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sun, 25 Oct 2009 14:12:27 +0000
-Subject: [RFC 10/11] ARM: arrange for flush_cache_range() to always flush the
-	I-cache
+Date: Sun, 25 Oct 2009 14:31:40 +0000
+Subject: [RFC 11/11] ARM: avoid flushing I-cache in flush_cache_mm()
 In-Reply-To: <cover.1256683230.git.rmk+kernel@arm.linux.org.uk>
 References: <cover.1256683230.git.rmk+kernel@arm.linux.org.uk>
-Message-ID: <12475bd20f82c3a5e78d5b8e9d3cb266914c4727.1256683230.git.rmk+kernel@arm.linux.org.uk>
+Message-ID: <f4e898a97589fdee3c689780212fe225e6732a6b.1256683230.git.rmk+kernel@arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dirk Behme reported instability on ARM11 SMP (VIPT non-aliasing cache)
-caused by the dynamic linker changing protection on text pages to write
-GOT entries.  The problem is due to an interaction between the write
-faulting code providing new anonymous pages (which haven't had their
-I-cache cleaned due to no VM_EXEC) and change_protection() not doing
-any kind of I-cache maintainence.
+flush_cache_mm() is called in two cases:
+1. when a process exits, just before the page tables are torn down.
+   We can allow the stale lines to evict themselves over time without
+   causing any harm.
 
-Work around this by flushing the I-cache in flush_cache_range() for
-VM_EXEC VMAs (which is what we have when the region is being made
-executable again.)  This ensures that the I-cache will be up to date
-with the new COW'd pages.
+2. when a process forks, and we've allocated a new ASID.
+   The instruction cache issues are dealt with as pages are brought
+   into the new process address space.  Flushing the I-cache here is
+   therefore unnecessary.
 
-Note: if users are writing instructions, then they still need to use
-the ARM sys_cacheflush API to ensure that the caches are correctly
-synchronized.
+However, we must keep the VIPT aliasing D-cache flush to ensure that
+any dirty cache lines are not written back after the pages have been
+reallocated for some other use - which would result in corruption.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mm/flush.c |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
+ arch/arm/mm/flush.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index 9770e27..ee7ce68 100644
+index ee7ce68..329594e 100644
 --- a/arch/arm/mm/flush.c
 +++ b/arch/arm/mm/flush.c
-@@ -67,10 +67,9 @@ void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned
+@@ -50,7 +50,6 @@ void flush_cache_mm(struct mm_struct *mm)
  		    :
  		    : "r" (0)
  		    : "cc");
 -		__flush_icache_all();
  	}
- 
--	if (vma->vm_flags & VM_EXEC && icache_is_vivt_asid_tagged())
-+	if (vma->vm_flags & VM_EXEC)
- 		__flush_icache_all();
  }
  
 -- 
