@@ -1,24 +1,30 @@
-From: pjohn@in.mvista.com (Philby John)
-Date: Mon, 26 Oct 2009 15:48:57 +0530
-Subject: [PATCH 1/1] reboot: Fix Realview ARM1176PB board reboot
-In-Reply-To: <1256230510.8608.50.camel@pc1117.cambridge.arm.com>
-References: <1256216280.6515.13.camel@localhost.localdomain>
-	<1256230510.8608.50.camel@pc1117.cambridge.arm.com>
-Message-ID: <1256552337.14462.2.camel@localhost.localdomain>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 26 Oct 2009 10:22:26 +0000
+Subject: cpu_vm_mask checks in ARM flush functions
+In-Reply-To: <20091024111036.GC16451@n2100.arm.linux.org.uk>
+References: <f20fa6c60910232103h5a3046fbmda23a093f94fa230@mail.gmail.com>
+	<20091024111036.GC16451@n2100.arm.linux.org.uk>
+Message-ID: <1256552546.5282.2.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2009-10-22 at 17:55 +0100, Catalin Marinas wrote:
-> On Thu, 2009-10-22 at 18:28 +0530, Philby John wrote:
-> > Ping on this one! Is there anything else that I must do here other
-> > than the void* type cast that Russell asked me to correct?
-> 
-> It seems to be ok but I haven't had time to try it on hardware. Assuming
-> that you did the testing:
-> 
-Yes, I did test it multiple times and so did Montavista QA.
+On Sat, 2009-10-24 at 12:10 +0100, Russell King - ARM Linux wrote:
+> On Fri, Oct 23, 2009 at 09:03:16PM -0700, muni anda wrote:
+> > I was going though the cache flush functions in arch/arm/mm/flush.c
+> > and found that cpu_isset() is used at a lot of places. I couldn't
+> > understand the reason why there is a need for cpu_vm_mask checks? My
+> > understanding was that those functions will be executed on the CPU for
+> > which the cpu_mask is already set (in switch_mm call). Is there a
+> > different calling sequence that I am missing?
+[...]
+> For VIPT non-aliasing caches, there may be a bug there; it requires
+> more time than I currently have to think about to say for certain
+> though.
 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Thanks
+Someone in ARM mentioned that setting breakpoints on ARM11MPCore doesn't
+always work. I gave them a patch with cpu_vm_mask check removed but they
+said it still doesn't work. I cannot guarantee that the fix doesn't work
+until I try it but I haven't had time for it yet.
 
--Philby
+-- 
+Catalin
