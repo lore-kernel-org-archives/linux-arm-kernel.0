@@ -1,41 +1,27 @@
-From: roel.kluin@gmail.com (Roel Kluin)
-Date: Mon, 26 Oct 2009 22:46:35 +0100
-Subject: [PATCH] icst525: Add missing increment
-In-Reply-To: <4AE61590.2030603@gmail.com>
-References: <4AE61590.2030603@gmail.com>
-Message-ID: <4AE618BB.4060601@gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 26 Oct 2009 22:14:52 +0100
+Subject: [PATCH 2.6.32] drivers/serial/atmel_serial.c: Fix BUILD_BUG_ON
+	build
+In-Reply-To: <1256569964-14416-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1256569964-14416-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <20091026211452.GB2561@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without this increment the loop can only break if it does in the
-first iteration.
+On 15:12 Mon 26 Oct     , Mark Brown wrote:
+> Since 'BUILD_BUG_ON(): fix it and a couple of bogus uses of it'
+> (commit 8c87df45) the BUILD_BUG_ON() for the ring buffer size has
+> failed to build due to use of is_power_of_2(). Fix this in the
+> same way as the SPARC vio.h was fixed in that commit by converting
+> to MAYBE_BUILD_BUG_ON().
+> 
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+a similatr patch done by Haavard
+atmel_serial-fix-bad-build_bug_on-usage.patch 
+is already in the -mm
 
-Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
----
- arch/arm/common/icst525.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+btw when it will be merged?
 
-Same issue, different file.
-
-diff --git a/arch/arm/common/icst525.c b/arch/arm/common/icst525.c
-index 3d377c5..0aef96a 100644
---- a/arch/arm/common/icst525.c
-+++ b/arch/arm/common/icst525.c
-@@ -53,7 +53,7 @@ icst525_khz_to_vco(const struct icst525_params *p, unsigned long freq)
- 		 */
- 		if (f > 10000 && f <= p->vco_max)
- 			break;
--	} while (i < ARRAY_SIZE(idx2s));
-+	} while (++i < ARRAY_SIZE(idx2s));
- 
- 	if (i >= ARRAY_SIZE(idx2s))
- 		return vco;
-@@ -116,7 +116,7 @@ icst525_ps_to_vco(const struct icst525_params *p, unsigned long period)
- 		 */
- 		if (f >= ps && f < 100000)
- 			break;
--	} while (i < ARRAY_SIZE(idx2s));
-+	} while (++i < ARRAY_SIZE(idx2s));
- 
- 	if (i >= ARRAY_SIZE(idx2s))
- 		return vco;
+Best Regards,
+J.
