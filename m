@@ -1,25 +1,34 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Sun, 25 Oct 2009 23:18:12 +0100
-Subject: [PATCH] Make MIPS dynamic clocksource/clockevent clock code
-	generic v2
-In-Reply-To: <1256078002-27919-1-git-send-email-linus.walleij@stericsson.com>
-References: <1256078002-27919-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <63386a3d0910251518i42149642g183f2d3f6c43384f@mail.gmail.com>
+From: janboe.ye@gmail.com (ye janboe)
+Date: Mon, 26 Oct 2009 10:59:23 +0800
+Subject: [PATCH] check put_user fail in do_signal when enable OABI_COMPACT
+In-Reply-To: <20091025154416.GB1774@n2100.arm.linux.org.uk>
+References: <1256123277.3851.36.camel@debian-nb>
+	<af3ea28a0910212035w5f44f108r594ced6062bb35f3@mail.gmail.com>
+	<20091024104916.GB16451@n2100.arm.linux.org.uk>
+	<af3ea28a0910242323n55e14391x7519ecfb9de44856@mail.gmail.com>
+	<20091025154416.GB1774@n2100.arm.linux.org.uk>
+Message-ID: <af3ea28a0910251959id60ad5kf95dd1f908fa55c9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/10/21 Linus Walleij <linus.walleij@stericsson.com>:
+Sure. Russell
 
-> Changes v1->v2:
-> - Fixed Mikaels comments: spelling, terminology.
-> - Kept the functions inline: all uses and foreseen uses
-> ?are once per kernel and all are in __init or __cpuinit sections.
-> - Unable to break out common code - the code is not common and
-> ?implementing two execution paths will be more awkward.
-> - Hoping the tglx likes it anyway.
+After you restart_syscall patch are merged, I will send out another patch.
 
-Ping on tglx on this, I will uninline the functions if you think
-it's better in the long run, just tell me, else can you pick this
-patch?
+Thanks
 
-Linus Walleij
+2009/10/25 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Sun, Oct 25, 2009 at 02:23:09PM +0800, ye janboe wrote:
+>> hi, Russell
+>>
+>> Your patch looks good for real fixing this issue.
+>
+> My patch doesn't address your issue, it only addresses a previous
+> problem. ?We're still decrementing the stack pointer and writing to
+> a possible new page - which could fault.
+>
+> Therefore, your patch is still required, but it needs to be modified
+> to apply on top of my patch.
+>
+> A replacement patch would be welcome.
+>
