@@ -1,34 +1,82 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 26 Oct 2009 10:51:48 +0000
-Subject: cpu_vm_mask checks in ARM flush functions
-In-Reply-To: <1256552546.5282.2.camel@pc1117.cambridge.arm.com>
-References: <f20fa6c60910232103h5a3046fbmda23a093f94fa230@mail.gmail.com>
-	<20091024111036.GC16451@n2100.arm.linux.org.uk>
-	<1256552546.5282.2.camel@pc1117.cambridge.arm.com>
-Message-ID: <20091026105148.GA22097@n2100.arm.linux.org.uk>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Mon, 26 Oct 2009 11:55:56 +0100
+Subject: [PATCH 2/5] ARM: MX3: add SPI functions for lilly1131-db
+In-Reply-To: <1256554559-17828-2-git-send-email-daniel@caiaq.de>
+References: <1256554559-17828-1-git-send-email-daniel@caiaq.de>
+	<1256554559-17828-2-git-send-email-daniel@caiaq.de>
+Message-ID: <1256554559-17828-3-git-send-email-daniel@caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 26, 2009 at 10:22:26AM +0000, Catalin Marinas wrote:
-> On Sat, 2009-10-24 at 12:10 +0100, Russell King - ARM Linux wrote:
-> > On Fri, Oct 23, 2009 at 09:03:16PM -0700, muni anda wrote:
-> > > I was going though the cache flush functions in arch/arm/mm/flush.c
-> > > and found that cpu_isset() is used at a lot of places. I couldn't
-> > > understand the reason why there is a need for cpu_vm_mask checks? My
-> > > understanding was that those functions will be executed on the CPU for
-> > > which the cpu_mask is already set (in switch_mm call). Is there a
-> > > different calling sequence that I am missing?
-> [...]
-> > For VIPT non-aliasing caches, there may be a bug there; it requires
-> > more time than I currently have to think about to say for certain
-> > though.
-> 
-> Someone in ARM mentioned that setting breakpoints on ARM11MPCore doesn't
-> always work. I gave them a patch with cpu_vm_mask check removed but they
-> said it still doesn't work. I cannot guarantee that the fix doesn't work
-> until I try it but I haven't had time for it yet.
+This adds support for the two SPI busses found on the lilly1131 module.
 
-Since I don't have an EABI gdb, I can't test it either.
+Signed-off-by: Daniel Mack <daniel@caiaq.de>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-mx3/mx31lilly.c |   37 +++++++++++++++++++++++++++++++++++++
+ 1 files changed, 37 insertions(+), 0 deletions(-)
 
-Was the ARM11MPCore system being tested one which broadcasts the cache ops
-in hardware?
+diff --git a/arch/arm/mach-mx3/mx31lilly.c b/arch/arm/mach-mx3/mx31lilly.c
+index de5cf01..59b3526 100644
+--- a/arch/arm/mach-mx3/mx31lilly.c
++++ b/arch/arm/mach-mx3/mx31lilly.c
+@@ -41,6 +41,7 @@
+ #include <mach/common.h>
+ #include <mach/iomux-mx3.h>
+ #include <mach/board-mx31lilly.h>
++#include <mach/spi.h>
+ 
+ #include "devices.h"
+ 
+@@ -110,6 +111,22 @@ static struct platform_device *devices[] __initdata = {
+ 	&physmap_flash_device,
+ };
+ 
++static int spi_internal_chipselect[] = {
++	MXC_SPI_CS(0),
++	MXC_SPI_CS(1),
++	MXC_SPI_CS(2),
++};
++
++static struct spi_imx_master spi0_pdata = {
++	.chipselect = spi_internal_chipselect,
++	.num_chipselect = ARRAY_SIZE(spi_internal_chipselect),
++};
++
++static struct spi_imx_master spi1_pdata = {
++	.chipselect = spi_internal_chipselect,
++	.num_chipselect = ARRAY_SIZE(spi_internal_chipselect),
++};
++
+ static int mx31lilly_baseboard;
+ core_param(mx31lilly_baseboard, mx31lilly_baseboard, int, 0444);
+ 
+@@ -128,6 +145,26 @@ static void __init mx31lilly_board_init(void)
+ 
+ 	mxc_iomux_alloc_pin(MX31_PIN_CS4__CS4, "Ethernet CS");
+ 
++	/* SPI */
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_SCLK__SCLK, "SPI1_CLK");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_MOSI__MOSI, "SPI1_TX");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_MISO__MISO, "SPI1_RX");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_SPI_RDY__SPI_RDY, "SPI1_RDY");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_SS0__SS0, "SPI1_SS0");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_SS1__SS1, "SPI1_SS1");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_SS2__SS2, "SPI1_SS2");
++
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_SCLK__SCLK, "SPI2_CLK");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_MOSI__MOSI, "SPI2_TX");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_MISO__MISO, "SPI2_RX");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_SPI_RDY__SPI_RDY, "SPI2_RDY");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_SS0__SS0, "SPI2_SS0");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_SS1__SS1, "SPI2_SS1");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_SS2__SS2, "SPI2_SS2");
++
++	mxc_register_device(&imx_spi_device0, &spi0_pdata);
++	mxc_register_device(&imx_spi_device1, &spi1_pdata);
++
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
+ }
+ 
+-- 
+1.6.5
