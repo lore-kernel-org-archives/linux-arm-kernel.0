@@ -1,61 +1,46 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 26 Oct 2009 19:13:27 +0000
-Subject: cpu_vm_mask checks in ARM flush functions
-In-Reply-To: <1256580065.5282.124.camel@pc1117.cambridge.arm.com>
-References: <f20fa6c60910232103h5a3046fbmda23a093f94fa230@mail.gmail.com>
-	<20091024111036.GC16451@n2100.arm.linux.org.uk>
-	<1256552546.5282.2.camel@pc1117.cambridge.arm.com>
-	<20091026105148.GA22097@n2100.arm.linux.org.uk>
-	<1256555719.5282.26.camel@pc1117.cambridge.arm.com>
-	<20091026111933.GC22097@n2100.arm.linux.org.uk>
-	<1256558381.5282.47.camel@pc1117.cambridge.arm.com>
-	<20091026121544.GD22097@n2100.arm.linux.org.uk>
-	<1256580065.5282.124.camel@pc1117.cambridge.arm.com>
-Message-ID: <20091026191327.GA27708@n2100.arm.linux.org.uk>
+Date: Mon, 26 Oct 2009 19:17:15 +0000
+Subject: Kernel related (?) user space crash at ARM11 MPCore
+In-Reply-To: <1256582736.5282.161.camel@pc1117.cambridge.arm.com>
+References: <20090921085425.GC27357@n2100.arm.linux.org.uk>
+	<1253526263.1541.32.camel@pc1117.cambridge.arm.com>
+	<20090921100751.GF27357@n2100.arm.linux.org.uk>
+	<20091015145753.GC14817@n2100.arm.linux.org.uk>
+	<1255620022.10164.74.camel@pc1117.cambridge.arm.com>
+	<20091015152852.GD14817@n2100.arm.linux.org.uk>
+	<1255622179.10164.92.camel@pc1117.cambridge.arm.com>
+	<1256038748.32578.14.camel@pc1117.cambridge.arm.com>
+	<20091025144805.GA1774@n2100.arm.linux.org.uk>
+	<1256582736.5282.161.camel@pc1117.cambridge.arm.com>
+Message-ID: <20091026191715.GB27708@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 26, 2009 at 06:01:05PM +0000, Catalin Marinas wrote:
-> On Mon, 2009-10-26 at 12:15 +0000, Russell King - ARM Linux wrote:
-> > On Mon, Oct 26, 2009 at 11:59:41AM +0000, Catalin Marinas wrote:
-> > > On Mon, 2009-10-26 at 11:19 +0000, Russell King - ARM Linux wrote:
-> > > > On Mon, Oct 26, 2009 at 11:15:19AM +0000, Catalin Marinas wrote:
-> > > > > On Mon, 2009-10-26 at 10:51 +0000, Russell King - ARM Linux wrote:
-> > > > > > Was the ARM11MPCore system being tested one which broadcasts the cache ops
-> > > > > > in hardware?
-> > > > > 
-> > > > > There's no ARM11MPCore with in-hardware cache ops broadcasting (only
-> > > > > Cortex-A9). I think there was also a case of not setting the PG_arch_1
-> > > > > bit on SMP at all.
-> > > > 
-> > > > That'll be why it removing that check doesn't resolve the problem then.
-> > > > The coherent flushes aren't broadcasted.
-> > > 
-> > > You get to flush the D-cache with the breakpoint if removing the check
-> > > but still not invalidating the I-cache on a different CPU. The
-> > > particular case the guys here were testing was setting a breakpoint on a
-> > > page which wasn't executed/mapped yet in the debugged application.
-> [...]
-> > The write to the kernel mapping of the page is done, and with the
-> > additional VM mask test removed, a local D-cache and I-cache flush
-> > is done (however, if you're running with full preemption enabled,
-> > this could occur on a different CPU to that which dirtied its cache.)
+On Mon, Oct 26, 2009 at 06:45:36PM +0000, Catalin Marinas wrote:
+> On Sun, 2009-10-25 at 14:48 +0000, Russell King - ARM Linux wrote:
+> > On Tue, Oct 20, 2009 at 12:39:08PM +0100, Catalin Marinas wrote:
+> > > diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
+> > > index d0d17b6..4e37ab6 100644
+> > > --- a/arch/arm/mm/fault-armv.c
+> > > +++ b/arch/arm/mm/fault-armv.c
+> > > @@ -160,8 +160,7 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr, pte_t pte)
+> > >  	if (mapping) {
+> > >  		if (cache_is_vivt())
+> > >  			make_coherent(mapping, vma, addr, pfn);
+> > > -		else if (vma->vm_flags & VM_EXEC)
+> > > -			__flush_icache_all();
+> > > +		__flush_icache_all();
 > > 
-> > Was preempt enabled?
+> > BTW, why are you penalising VIVT cached systems as well with this
+> > change?  Surely you meant to leave the 'else' still there.
 > 
-> No.
-
-In which case, until there is definitive evidence otherwise, I'm tempted
-to discount this report - logically, I can't see a problem with that
-additional test gone for the described scenario.
-
-> > However, with a page which has been mapped in and executed from, we do
-> > need to do an I-cache flush on the other processors which have run this
-> > executable.  The whole flush_ptrace_access() is definitely weak in this
-> > area.
+> I removed the else for the case where v6_copy_user_highpage() only does
+> flush_dcache_page() and the page was mprotect(RW) temporarily.
 > 
-> Can we use smp_call_function()? Are interrupt enabled in
-> flush_ptrace_access()?
+> There was another situation in the recent swap/anonymous pages case
+> where I replied that there could be a situation where I-cache needs
+> unconditional invalidation.
 
-Yes, I'm working on a patch which does this (which'll be part of a series
-of patches in this area.)
+The question still stands.  We've not had I-cache flushing here for VIVT
+caches.  We don't have a problem with them here.  Why is it necessary
+for them to also flush the I-cache?
