@@ -1,41 +1,58 @@
-From: ben@trinity.fluff.org (Ben Dooks)
-Date: Mon, 26 Oct 2009 15:31:40 +0000
-Subject: S3C6400 SMDK6400 HSMMC problem
-In-Reply-To: <20091022172716.2c20c1a8@linpcd55>
-References: <20091022172716.2c20c1a8@linpcd55>
-Message-ID: <20091026153139.GC8096@trinity.fluff.org>
+From: greg@kroah.com (Greg KH)
+Date: Mon, 26 Oct 2009 09:58:52 -0700
+Subject: [WARNING] pxamci: 'pxa2xx-mci.0' does not have a release()
+	function.
+In-Reply-To: <20091023101806.GB19437@n2100.arm.linux.org.uk>
+References: <20091023003631.1331a60a.ospite@studenti.unina.it>
+	<20091022225758.GA9106@n2100.arm.linux.org.uk>
+	<20091023115028.59ed7f74.ospite@studenti.unina.it>
+	<20091023101806.GB19437@n2100.arm.linux.org.uk>
+Message-ID: <20091026165852.GC18218@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 22, 2009 at 05:27:16PM +0200, Markus Schwarzenberg wrote:
-> Hello,
+On Fri, Oct 23, 2009 at 11:18:06AM +0100, Russell King - ARM Linux wrote:
+> On Fri, Oct 23, 2009 at 11:50:28AM +0200, Antonio Ospite wrote:
+> > On Thu, 22 Oct 2009 23:57:58 +0100
+> > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > 
+> > > On Fri, Oct 23, 2009 at 12:36:31AM +0200, Antonio Ospite wrote:
+> > > > Hi,
+> > > > 
+> > > > I get this warning on shutdown. How to fix it properly?
+> > > > 
+> > > > FYI, in my setup pxa2xx_spi is the parent for pxamci, set using
+> > > > this patch:
+> > > > http://git.openezx.org/openezx.git?a=commitdiff;h=0ffd85ad8faea3456d4ecf5f63ae65aca26fff21
+> > > 
+> > > This sounds like it's the cause of the problem - from the backtrace, it
+> > > looks like SPI expects the children of the SPI device to be its own
+> > > responsibility to maintain.
+> > > 
+> > > Hence, because you've made pxamci a child of SPI, SPI is trying to
+> > > unregister and release the pxamci device.
+> > 
+> > A little more background: we need pxamci to be a child of SPI because
+> > our PMIC is connected via SPI, and a PMIC regulator is used for mmc
+> > powering; enforcing this hierarchy is needed to make pxamci suspend and
+> > resume properly.
 > 
-> First: i'm new to this list. The new listinfo page tells nothing
-> about attachments (are they allowed, size?) or where to put them 
-> now - so for now i don't attach two files i actually wanted to 
-> provide (my adaptions for u-boot-hsmmc, kernel .config).
+> I don't think this is the right solution - and I don't know what the
+> right solution would be given that the interfaces I suspect you need
+> aren't public.
 > 
-> Now the problem: 
+> I don't think you can reverse the order of SPI and MMC initialization
+> because that'd mean MMC could try to use SPI before it exists.
 > 
-> i'm trying to get linux-2.6.32-rc5 working on a Samsung/Meritech 
-> SMDK6400, (Processor S3C6400.) 
+> Maybe the right answer is for SPI to stop thinking it owns all child
+> devices, and only unregister devices which it owns (iow, are of some
+> SPI bus-type.)
 > 
-> The kernel is load sucessfully using u-boot-2009.08-rc3 from the 
-> DOS-Partition of a SD Card via the S3C6400 HSMMC 0. 
->   Note1: to get this working I adapted src/cpu/s3c6410/hs_mmc.c 
->          from OpenMoko / qi for u-boot. 
-> 
-> However the kernel's sdhci driver has problems (I/O errors) using the same
-> S3C6400 HSMMC 0 (see below) when trying to mount the root partition from
-> the SD Card.
+> Adding Greg for comment.
 
-It is possible there is a problem with the setup data being passed for
-the system, since the controller has some feedback controls that are
-in an extended part of the SDHCI controller space.
+Um, why not ask the SPI maintainer?  I don't know what the SPI code is
+doing, sorry.
 
+thanks,
 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+greg k-h
