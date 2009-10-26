@@ -1,21 +1,40 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Mon, 26 Oct 2009 11:55:54 +0100
-Subject: MX3: SPI/MMC/I2C fixes for lilly-1131 modules
-Message-ID: <1256554559-17828-1-git-send-email-daniel@caiaq.de>
+Date: Mon, 26 Oct 2009 11:55:55 +0100
+Subject: [PATCH 1/5] ARM: MX3: remove I2C defintions from mx31lilly.c
+In-Reply-To: <1256554559-17828-1-git-send-email-daniel@caiaq.de>
+References: <1256554559-17828-1-git-send-email-daniel@caiaq.de>
+Message-ID: <1256554559-17828-2-git-send-email-daniel@caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the EHCI/ULPI bits for MXC seem to take a little longer, I rebased the
-patches I sent earlier to apply without the USB code.
+The module does not use these pins for I2C but for SPI.
 
-The following five patches address the mx31lilly modules and add support
-for SPI, proper fast slope pin config for MMC and a missing define in the
-uncompression code.
+Signed-off-by: Daniel Mack <daniel@caiaq.de>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-mx3/mx31lilly.c |    3 ---
+ 1 files changed, 0 insertions(+), 3 deletions(-)
 
-Daniel
-
-[PATCH 1/5] ARM: MX3: remove I2C defintions from mx31lilly.c
-[PATCH 2/5] ARM: MX3: add SPI functions for lilly1131-db
-[PATCH 3/5] ARM: MX3: add support for mc13783 on lilly-db
-[PATCH 4/5] ARM: MX3: Add pad config for MMC pins on lilly-db
-[PATCH 5/5] ARM: MX3: add MX3X_UART1_BASE_ADDR for uncompression on lilly1131
+diff --git a/arch/arm/mach-mx3/mx31lilly.c b/arch/arm/mach-mx3/mx31lilly.c
+index 4230251..de5cf01 100644
+--- a/arch/arm/mach-mx3/mx31lilly.c
++++ b/arch/arm/mach-mx3/mx31lilly.c
+@@ -108,7 +108,6 @@ static struct platform_device physmap_flash_device = {
+ static struct platform_device *devices[] __initdata = {
+ 	&smsc91x_device,
+ 	&physmap_flash_device,
+-	&mxc_i2c_device1,
+ };
+ 
+ static int mx31lilly_baseboard;
+@@ -128,8 +127,6 @@ static void __init mx31lilly_board_init(void)
+ 	}
+ 
+ 	mxc_iomux_alloc_pin(MX31_PIN_CS4__CS4, "Ethernet CS");
+-	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_MOSI__SCL, "I2C SCL");
+-	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_MISO__SDA, "I2C SDA");
+ 
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
+ }
+-- 
+1.6.5
