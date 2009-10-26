@@ -1,11 +1,105 @@
-From: zyxsjl@126.com (zyxsjl)
-Date: Sun, 25 Oct 2009 14:49:48 +0800 (CST)
-Subject: abt kernel 2.6 compressed/head.s
-Message-ID: <7866344.98541256453388015.JavaMail.coremail@bj126app34.126.com>
+From: 914059751@qq.com (rocky)
+Date: Mon, 26 Oct 2009 16:43:45 +0800
+Subject: =?gb2312?B?tPC4tDogQVJNMTE3NiBnb2VzIHdpbGQgd2hlbiBNTVUgb24gbGluZQ==?=
+In-Reply-To: <000001ca5616$3add4790$1b46010a@Emea.Arm.com>
+References: <tencent_238CF8B63259E7C90B7B75AF@qq.com><761ea48b0910200259i7b98aa41i25af3beb58b56cda@mail.gmail.com>
+	<0EDD94343D3747C4B7953C144F2E8800@dufan>
+	<000001ca5616$3add4790$1b46010a@Emea.Arm.com>
+Message-ID: <AE7A62887BAF42598E7BBEF76D59A4B1@dufan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi anyone, I have not understood some code in this file below: #ifndef CONFIG_ZBOOT_ROM /* * If we're running fully PIC === CONFIG_ZBOOT_ROM = n, * we need to fix up pointers into the BSS region. * r2 - BSS start * r3 - BSS end * sp - stack pointer */ add r2, r2, r0 add r3, r3, r0 add sp, sp, r0 /* * Relocate all entries in the GOT table. */ 1: ldr r1, [r6, #0] @ relocate entries in the GOT add r1, r1, r0 @ table. This fixes up the str r1, [r6], #4 @ C references. cmp r6, ip blo 1b #else /* * Relocate entries in the GOT table. We only relocate * the entries that are outside the (relocated) BSS region. */ 1: ldr r1, [r6, #0] @ relocate entries in the GOT cmp r1, r2 @ entry 
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091025/b0453206/attachment-0001.htm>
+Hi,Peter:)
+	Thanks for you tips! 
+	It appears that ARM1176 implementing an revised ARMv7 CPU ID, though
+it's based on an ARMv6 core. I changed ARMv6 cpu mask of cache function in
+arch/arm/boot/compressed/head.S, kernel still pops in decompress_kernel. I
+really don't know how to debug this, any advise would be really appreciated.
+
+
+--rocky
+
+
+
+
+-----????-----
+???: Peter Pearse [mailto:peter.pearse at arm.com] 
+????: 2009?10?26? 16:28
+???: 'rocky'
+??: RE: ARM1176 goes wild when MMU on line
+
+http://www.arm.com/products/CPUs/ARM1176.html 
+
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org 
+> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On 
+> Behalf Of rocky
+> Sent: 20 October 2009 11:19
+> To: 'Laurent Desnogues'
+> Cc: 'linux-arm-kernel'
+> Subject: ??: ARM1176 goes wild when MMU on line
+> 
+> ARM1176 is definitely an ARMv7 VMSA! Its CPUID is:0x410FB764, 
+> check the following code to see how does kernel code decide 
+> which architecture operation procedure to use.
+> 
+> BTW: S3C6410 is also based on ARM1176 core, it uses ARMv7 
+> cache calls as well.
+> 
+> --------------- Arch/arm/boot/compressed/head.S -------------------
+> /*
+>  * Here follow the relocatable cache support functions for the
+>  * various processors.  This is a generic hook for locating an
+>  * entry and jumping to an instruction at the specified offset
+>  * from the start of the block.  Please note this is all position
+>  * independent code.
+>  *
+>  *  r1  = corrupted
+>  *  r2  = corrupted
+>  *  r3  = block offset
+>  *  r6  = corrupted
+>  *  r12 = corrupted
+>  */
+> 
+> call_cache_fn:	adr	r12, proc_types
+> #ifdef CONFIG_CPU_CP15
+> 		mrc	p15, 0, r6, c0, c0	@ get processor ID
+> #else
+> 		ldr	r6, =CONFIG_PROCESSOR_ID
+> #endif
+> 1:		ldr	r1, [r12, #0]		@ get value
+> 		ldr	r2, [r12, #4]		@ get mask
+> 		eor	r1, r1, r6		@ (real ^ match)
+> 		tst	r1, r2			@       & mask
+> 		addeq	pc, r12, r3		@ call cache function
+> 		add	r12, r12, #4*5
+> 		b	1b
+> proc_types
+> 		.word	0x000f0000		@ new CPU Id
+> 		.word	0x000f0000
+> 		b	__armv7_mmu_cache_on
+> 		b	__armv7_mmu_cache_off
+> 		b	__armv7_mmu_cache_flush
+> 
+> -----????-----
+> ???: Laurent Desnogues [mailto:laurent.desnogues at gmail.com]
+> ????: 2009?10?20? 18:00
+> ???: ???
+> ??: linux-arm-kernel
+> ??: Re: ARM1176 goes wild when MMU on line
+> 
+> 2009/10/20 ??? <914059751@qq.com>:
+> > ARM1176 has ARMv7 VMSA. ?Am I?missing something obvious?
+> 
+> Is that a typo? ARM1176 is an ARMv6 chip, not an ARMv7 one.
+> 
+> 
+> Laurent
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
