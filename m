@@ -1,456 +1,190 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 27 Oct 2009 23:12:31 -0000
-Subject: [RFC PATCH 05/10] PCMCIA: sa1111: wrap soc_pcmcia_socket to contain
-	sa1111 specific data
+Date: Tue, 27 Oct 2009 23:12:46 -0000
+Subject: [RFC PATCH 06/10] PCMCIA: sa1111: remove duplicated initializers
 In-Reply-To: <925a8da0d92cdf1f37aaef988fcc63bf9744576e.1256684685.git.rmk+kernel@arm.linux.org.uk>
 References: <925a8da0d92cdf1f37aaef988fcc63bf9744576e.1256684685.git.rmk+kernel@arm.linux.org.uk>
-Message-ID: <292d42293fdab0075f2f6b7cc5f152590bedfee0.1256684685.git.rmk+kernel@arm.linux.org.uk>
+Message-ID: <3e5da29dfd19f558a6f86f80de0240b459154d51.1256684685.git.rmk+kernel@arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/pcmcia/pxa2xx_base.c       |   19 +++++++----
- drivers/pcmcia/pxa2xx_base.h       |    3 ++
- drivers/pcmcia/pxa2xx_lubbock.c    |   10 ++++--
- drivers/pcmcia/sa1100_badge4.c     |    7 ++++-
- drivers/pcmcia/sa1100_jornada720.c |   20 ++++++++----
- drivers/pcmcia/sa1100_neponset.c   |    9 ++++-
- drivers/pcmcia/sa1111_generic.c    |   58 ++++++++++++++++++++++++++++--------
- drivers/pcmcia/sa1111_generic.h    |   14 ++++++++
- drivers/pcmcia/sa11xx_base.c       |   21 ++++++++----
- drivers/pcmcia/sa11xx_base.h       |    2 +
- 10 files changed, 123 insertions(+), 40 deletions(-)
+ drivers/pcmcia/pxa2xx_lubbock.c    |    4 ----
+ drivers/pcmcia/sa1100_badge4.c     |    6 ------
+ drivers/pcmcia/sa1100_jornada720.c |   32 +++++++++-----------------------
+ drivers/pcmcia/sa1100_neponset.c   |    4 ----
+ drivers/pcmcia/sa1111_generic.c    |   11 ++++++++---
+ drivers/pcmcia/sa1111_generic.h    |    3 ---
+ 6 files changed, 17 insertions(+), 43 deletions(-)
 
-diff --git a/drivers/pcmcia/pxa2xx_base.c b/drivers/pcmcia/pxa2xx_base.c
-index 3cb4fd2..c9c104b 100644
---- a/drivers/pcmcia/pxa2xx_base.c
-+++ b/drivers/pcmcia/pxa2xx_base.c
-@@ -228,7 +228,7 @@ static const char *skt_names[] = {
- #define SKT_DEV_INFO_SIZE(n) \
- 	(sizeof(struct skt_dev_info) + (n)*sizeof(struct soc_pcmcia_socket))
- 
--static int pxa2xx_drv_pcmcia_add_one(struct soc_pcmcia_socket *skt)
-+int pxa2xx_drv_pcmcia_add_one(struct soc_pcmcia_socket *skt)
- {
- 	skt->res_skt.start = _PCMCIA(skt->nr);
- 	skt->res_skt.end = _PCMCIA(skt->nr) + PCMCIASp - 1;
-@@ -253,9 +253,18 @@ static int pxa2xx_drv_pcmcia_add_one(struct soc_pcmcia_socket *skt)
- 	return soc_pcmcia_add_one(skt);
- }
- 
-+void pxa2xx_drv_pcmcia_ops(struct pcmcia_low_level *ops)
-+{
-+	/* Provide our PXA2xx specific timing routines. */
-+	ops->set_timing  = pxa2xx_pcmcia_set_timing;
-+#ifdef CONFIG_CPU_FREQ
-+	ops->frequency_change = pxa2xx_pcmcia_frequency_change;
-+#endif
-+}
-+
- int __pxa2xx_drv_pcmcia_probe(struct device *dev)
- {
--	int i, ret;
-+	int i, ret = 0;
- 	struct pcmcia_low_level *ops;
- 	struct skt_dev_info *sinfo;
- 	struct soc_pcmcia_socket *skt;
-@@ -265,11 +274,7 @@ int __pxa2xx_drv_pcmcia_probe(struct device *dev)
- 
- 	ops = (struct pcmcia_low_level *)dev->platform_data;
- 
--	/* Provide our PXA2xx specific timing routines. */
--	ops->set_timing  = pxa2xx_pcmcia_set_timing;
--#ifdef CONFIG_CPU_FREQ
--	ops->frequency_change = pxa2xx_pcmcia_frequency_change;
--#endif
-+	pxa2xx_drv_pcmcia_ops(ops);
- 
- 	sinfo = kzalloc(SKT_DEV_INFO_SIZE(ops->nr), GFP_KERNEL);
- 	if (!sinfo)
-diff --git a/drivers/pcmcia/pxa2xx_base.h b/drivers/pcmcia/pxa2xx_base.h
-index 235d681..cb5efae 100644
---- a/drivers/pcmcia/pxa2xx_base.h
-+++ b/drivers/pcmcia/pxa2xx_base.h
-@@ -1,3 +1,6 @@
- /* temporary measure */
- extern int __pxa2xx_drv_pcmcia_probe(struct device *);
- 
-+int pxa2xx_drv_pcmcia_add_one(struct soc_pcmcia_socket *skt);
-+void pxa2xx_drv_pcmcia_ops(struct pcmcia_low_level *ops);
-+
 diff --git a/drivers/pcmcia/pxa2xx_lubbock.c b/drivers/pcmcia/pxa2xx_lubbock.c
-index 6cbb1b1..35d5280 100644
+index 35d5280..b9f8c8f 100644
 --- a/drivers/pcmcia/pxa2xx_lubbock.c
 +++ b/drivers/pcmcia/pxa2xx_lubbock.c
-@@ -32,6 +32,7 @@ static int
- lubbock_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
- 				const socket_state_t *state)
- {
-+	struct sa1111_pcmcia_socket *s = to_skt(skt);
- 	unsigned int pa_dwr_mask, pa_dwr_set, misc_mask, misc_set;
- 	int ret = 0;
+@@ -201,12 +201,8 @@ lubbock_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
  
-@@ -149,7 +150,7 @@ lubbock_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
- 
- 	if (ret == 0) {
- 		lubbock_set_misc_wr(misc_mask, misc_set);
--		sa1111_set_io(SA1111_DEV(skt->dev), pa_dwr_mask, pa_dwr_set);
-+		sa1111_set_io(s->dev, pa_dwr_mask, pa_dwr_set);
- 	}
- 
- #if 1
-@@ -175,7 +176,7 @@ lubbock_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
- 			 * Switch to 5V,  Configure socket with 5V voltage
- 			 */
- 			lubbock_set_misc_wr(misc_mask, 0);
--			sa1111_set_io(SA1111_DEV(skt->dev), pa_dwr_mask, 0);
-+			sa1111_set_io(s->dev, pa_dwr_mask, 0);
- 
- 			/*
- 			 * It takes about 100ms to turn off Vcc.
-@@ -228,8 +229,9 @@ int pcmcia_lubbock_init(struct sa1111_dev *sadev)
- 		/* Set CF Socket 1 power to standby mode. */
- 		lubbock_set_misc_wr((1 << 15) | (1 << 14), 0);
- 
--		sadev->dev.platform_data = &lubbock_pcmcia_ops;
--		ret = __pxa2xx_drv_pcmcia_probe(&sadev->dev);
-+		pxa2xx_drv_pcmcia_ops(&lubbock_pcmcia_ops);
-+		ret = sa1111_pcmcia_add(sadev, &lubbock_pcmcia_ops,
-+				pxa2xx_drv_pcmcia_add_one);
- 	}
- 
- 	return ret;
+ static struct pcmcia_low_level lubbock_pcmcia_ops = {
+ 	.owner			= THIS_MODULE,
+-	.hw_init		= sa1111_pcmcia_hw_init,
+-	.hw_shutdown		= sa1111_pcmcia_hw_shutdown,
+-	.socket_state		= sa1111_pcmcia_socket_state,
+ 	.configure_socket	= lubbock_pcmcia_configure_socket,
+ 	.socket_init		= sa1111_pcmcia_socket_init,
+-	.socket_suspend		= sa1111_pcmcia_socket_suspend,
+ 	.first			= 0,
+ 	.nr			= 2,
+ };
 diff --git a/drivers/pcmcia/sa1100_badge4.c b/drivers/pcmcia/sa1100_badge4.c
-index 1ca9737..6399314 100644
+index 6399314..1ce53f4 100644
 --- a/drivers/pcmcia/sa1100_badge4.c
 +++ b/drivers/pcmcia/sa1100_badge4.c
-@@ -134,6 +134,9 @@ static struct pcmcia_low_level badge4_pcmcia_ops = {
+@@ -127,14 +127,8 @@ badge4_pcmcia_configure_socket(struct soc_pcmcia_socket *skt, const socket_state
  
+ static struct pcmcia_low_level badge4_pcmcia_ops = {
+ 	.owner			= THIS_MODULE,
+-	.hw_init		= sa1111_pcmcia_hw_init,
+-	.hw_shutdown		= sa1111_pcmcia_hw_shutdown,
+-	.socket_state		= sa1111_pcmcia_socket_state,
+ 	.configure_socket	= badge4_pcmcia_configure_socket,
+-
  	.socket_init		= sa1111_pcmcia_socket_init,
- 	.socket_suspend		= sa1111_pcmcia_socket_suspend,
-+
-+	.first			= 0,
-+	.nr			= 2,
+-	.socket_suspend		= sa1111_pcmcia_socket_suspend,
+-
+ 	.first			= 0,
+ 	.nr			= 2,
  };
- 
- int pcmcia_badge4_init(struct device *dev)
-@@ -146,7 +149,9 @@ int pcmcia_badge4_init(struct device *dev)
- 		       __func__,
- 		       badge4_pcmvcc, badge4_pcmvpp, badge4_cfvcc);
- 
--		ret = sa11xx_drv_pcmcia_probe(dev, &badge4_pcmcia_ops, 0, 2);
-+		sa11xx_drv_pcmcia_ops(&badge4_pcmcia_ops);
-+		ret = sa1111_pcmcia_add(dev, &badge4_pcmcia_ops,
-+				sa11xx_drv_pcmcia_add_one);
- 	}
- 
- 	return ret;
 diff --git a/drivers/pcmcia/sa1100_jornada720.c b/drivers/pcmcia/sa1100_jornada720.c
-index 7eedb42..4a32f4f 100644
+index 4a32f4f..6bcabee 100644
 --- a/drivers/pcmcia/sa1100_jornada720.c
 +++ b/drivers/pcmcia/sa1100_jornada720.c
-@@ -24,6 +24,7 @@
+@@ -22,23 +22,6 @@
+ #define SOCKET1_POWER	(GPIO_GPIO1 | GPIO_GPIO3)
+ #define SOCKET1_3V	GPIO_GPIO3
  
- static int jornada720_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
- {
-+	struct sa1111_pcmcia_socket *s = to_skt(skt);
- 	unsigned int pin = GPIO_A0 | GPIO_A1 | GPIO_A2 | GPIO_A3;
- 
- 	/*
-@@ -31,9 +32,9 @@ static int jornada720_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
- 	*/
- 	GRER |= 0x00000002;
- 	/* Set GPIO_A<3:1> to be outputs for PCMCIA/CF power controller: */
--	sa1111_set_io_dir(SA1111_DEV(skt->dev), pin, 0, 0);
--	sa1111_set_io(SA1111_DEV(skt->dev), pin, 0);
--	sa1111_set_sleep_io(SA1111_DEV(skt->dev), pin, 0);
-+	sa1111_set_io_dir(s->dev, pin, 0, 0);
-+	sa1111_set_io(s->dev, pin, 0);
-+	sa1111_set_sleep_io(s->dev, pin, 0);
- 
- 	return sa1111_pcmcia_hw_init(skt);
- }
-@@ -41,6 +42,7 @@ static int jornada720_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
+-static int jornada720_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
+-{
+-	struct sa1111_pcmcia_socket *s = to_skt(skt);
+-	unsigned int pin = GPIO_A0 | GPIO_A1 | GPIO_A2 | GPIO_A3;
+-
+-	/*
+-	* What is all this crap for?
+-	*/
+-	GRER |= 0x00000002;
+-	/* Set GPIO_A<3:1> to be outputs for PCMCIA/CF power controller: */
+-	sa1111_set_io_dir(s->dev, pin, 0, 0);
+-	sa1111_set_io(s->dev, pin, 0);
+-	sa1111_set_sleep_io(s->dev, pin, 0);
+-
+-	return sa1111_pcmcia_hw_init(skt);
+-}
+-
  static int
  jornada720_pcmcia_configure_socket(struct soc_pcmcia_socket *skt, const socket_state_t *state)
  {
-+	struct sa1111_pcmcia_socket *s = to_skt(skt);
- 	unsigned int pa_dwr_mask, pa_dwr_set;
- 	int ret;
+@@ -108,14 +91,8 @@ jornada720_pcmcia_configure_socket(struct soc_pcmcia_socket *skt, const socket_s
  
-@@ -97,7 +99,7 @@ jornada720_pcmcia_configure_socket(struct soc_pcmcia_socket *skt, const socket_s
- 		unsigned long flags;
- 
- 		local_irq_save(flags);
--		sa1111_set_io(SA1111_DEV(skt->dev), pa_dwr_mask, pa_dwr_set);
-+		sa1111_set_io(s->dev, pa_dwr_mask, pa_dwr_set);
- 		local_irq_restore(flags);
- 	}
- 
-@@ -113,14 +115,20 @@ static struct pcmcia_low_level jornada720_pcmcia_ops = {
- 
+ static struct pcmcia_low_level jornada720_pcmcia_ops = {
+ 	.owner			= THIS_MODULE,
+-	.hw_init		= jornada720_pcmcia_hw_init,
+-	.hw_shutdown		= sa1111_pcmcia_hw_shutdown,
+-	.socket_state		= sa1111_pcmcia_socket_state,
+ 	.configure_socket	= jornada720_pcmcia_configure_socket,
+-
  	.socket_init		= sa1111_pcmcia_socket_init,
- 	.socket_suspend		= sa1111_pcmcia_socket_suspend,
-+
-+	.first			= 0,
-+	.nr			= 2,
+-	.socket_suspend		= sa1111_pcmcia_socket_suspend,
+-
+ 	.first			= 0,
+ 	.nr			= 2,
  };
- 
- int __devinit pcmcia_jornada720_init(struct device *dev)
- {
+@@ -125,6 +102,15 @@ int __devinit pcmcia_jornada720_init(struct device *dev)
  	int ret = -ENODEV;
  
--	if (machine_is_jornada720())
--		ret = sa11xx_drv_pcmcia_probe(dev, &jornada720_pcmcia_ops, 0, 2);
-+	if (machine_is_jornada720()) {
-+		sa11xx_drv_pcmcia_ops(&jornada720_pcmcia_ops);
-+		ret = sa1111_pcmcia_add(dev, &jornada720_pcmcia_ops,
-+				sa11xx_drv_pcmcia_add_one);
-+	}
- 
- 	return ret;
- }
+ 	if (machine_is_jornada720()) {
++		unsigned int pin = GPIO_A0 | GPIO_A1 | GPIO_A2 | GPIO_A3;
++
++		GRER |= 0x00000002;
++
++		/* Set GPIO_A<3:1> to be outputs for PCMCIA/CF power controller: */
++		sa1111_set_io_dir(dev, pin, 0, 0);
++		sa1111_set_io(dev, pin, 0);
++		sa1111_set_sleep_io(dev, pin, 0);
++
+ 		sa11xx_drv_pcmcia_ops(&jornada720_pcmcia_ops);
+ 		ret = sa1111_pcmcia_add(dev, &jornada720_pcmcia_ops,
+ 				sa11xx_drv_pcmcia_add_one);
 diff --git a/drivers/pcmcia/sa1100_neponset.c b/drivers/pcmcia/sa1100_neponset.c
-index 0c76d33..e39c65a 100644
+index e39c65a..c95639b 100644
 --- a/drivers/pcmcia/sa1100_neponset.c
 +++ b/drivers/pcmcia/sa1100_neponset.c
-@@ -43,6 +43,7 @@
- static int
- neponset_pcmcia_configure_socket(struct soc_pcmcia_socket *skt, const socket_state_t *state)
- {
-+	struct sa1111_pcmcia_socket *s = to_skt(skt);
- 	unsigned int ncr_mask, ncr_set, pa_dwr_mask, pa_dwr_set;
- 	int ret;
+@@ -116,12 +116,8 @@ static void neponset_pcmcia_socket_init(struct soc_pcmcia_socket *skt)
  
-@@ -99,7 +100,7 @@ neponset_pcmcia_configure_socket(struct soc_pcmcia_socket *skt, const socket_sta
- 		NCR_0 = (NCR_0 & ~ncr_mask) | ncr_set;
- 
- 		local_irq_restore(flags);
--		sa1111_set_io(SA1111_DEV(skt->dev), pa_dwr_mask, pa_dwr_set);
-+		sa1111_set_io(s->dev, pa_dwr_mask, pa_dwr_set);
- 	}
- 
- 	return 0;
-@@ -121,6 +122,8 @@ static struct pcmcia_low_level neponset_pcmcia_ops = {
+ static struct pcmcia_low_level neponset_pcmcia_ops = {
+ 	.owner			= THIS_MODULE,
+-	.hw_init		= sa1111_pcmcia_hw_init,
+-	.hw_shutdown		= sa1111_pcmcia_hw_shutdown,
+-	.socket_state		= sa1111_pcmcia_socket_state,
  	.configure_socket	= neponset_pcmcia_configure_socket,
  	.socket_init		= neponset_pcmcia_socket_init,
- 	.socket_suspend 	= sa1111_pcmcia_socket_suspend,
-+	.first			= 0,
-+	.nr			= 2,
+-	.socket_suspend 	= sa1111_pcmcia_socket_suspend,
+ 	.first			= 0,
+ 	.nr			= 2,
  };
- 
- int pcmcia_neponset_init(struct sa1111_dev *sadev)
-@@ -135,7 +138,9 @@ int pcmcia_neponset_init(struct sa1111_dev *sadev)
- 		sa1111_set_io_dir(sadev, GPIO_A0|GPIO_A1|GPIO_A2|GPIO_A3, 0, 0);
- 		sa1111_set_io(sadev, GPIO_A0|GPIO_A1|GPIO_A2|GPIO_A3, 0);
- 		sa1111_set_sleep_io(sadev, GPIO_A0|GPIO_A1|GPIO_A2|GPIO_A3, 0);
--		ret = sa11xx_drv_pcmcia_probe(&sadev->dev, &neponset_pcmcia_ops, 0, 2);
-+		sa11xx_drv_pcmcia_ops(&neponset_pcmcia_ops);
-+		ret = sa1111_pcmcia_add(sadev, &neponset_pcmcia_ops,
-+				sa11xx_drv_pcmcia_add_one);
- 	}
- 
- 	return ret;
 diff --git a/drivers/pcmcia/sa1111_generic.c b/drivers/pcmcia/sa1111_generic.c
-index a6793e3..98c7915 100644
+index 98c7915..219860a 100644
 --- a/drivers/pcmcia/sa1111_generic.c
 +++ b/drivers/pcmcia/sa1111_generic.c
-@@ -30,9 +30,6 @@ static struct pcmcia_irqs irqs[] = {
+@@ -28,12 +28,12 @@ static struct pcmcia_irqs irqs[] = {
+ 	{ 1, IRQ_S1_BVD1_STSCHG, "SA1111 CF BVD1"            },
+ };
  
- int sa1111_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
+-int sa1111_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
++static int sa1111_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
  {
--	if (skt->irq == NO_IRQ)
--		skt->irq = skt->nr ? IRQ_S1_READY_NINT : IRQ_S0_READY_NINT;
--
  	return soc_pcmcia_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
  }
  
-@@ -43,8 +40,8 @@ void sa1111_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
- 
- void sa1111_pcmcia_socket_state(struct soc_pcmcia_socket *skt, struct pcmcia_state *state)
+-void sa1111_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
++static void sa1111_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
  {
--	struct sa1111_dev *sadev = SA1111_DEV(skt->dev);
--	unsigned long status = sa1111_readl(sadev->mapbase + SA1111_PCSR);
-+	struct sa1111_pcmcia_socket *s = to_skt(skt);
-+	unsigned long status = sa1111_readl(s->dev->mapbase + SA1111_PCSR);
+ 	soc_pcmcia_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
+ }
+@@ -111,7 +111,7 @@ void sa1111_pcmcia_socket_init(struct soc_pcmcia_socket *skt)
+ 	soc_pcmcia_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
+ }
  
- 	switch (skt->nr) {
- 	case 0:
-@@ -71,7 +68,7 @@ void sa1111_pcmcia_socket_state(struct soc_pcmcia_socket *skt, struct pcmcia_sta
- 
- int sa1111_pcmcia_configure_socket(struct soc_pcmcia_socket *skt, const socket_state_t *state)
+-void sa1111_pcmcia_socket_suspend(struct soc_pcmcia_socket *skt)
++static void sa1111_pcmcia_socket_suspend(struct soc_pcmcia_socket *skt)
  {
--	struct sa1111_dev *sadev = SA1111_DEV(skt->dev);
-+	struct sa1111_pcmcia_socket *s = to_skt(skt);
- 	unsigned int pccr_skt_mask, pccr_set_mask, val;
- 	unsigned long flags;
- 
-@@ -100,10 +97,10 @@ int sa1111_pcmcia_configure_socket(struct soc_pcmcia_socket *skt, const socket_s
- 		pccr_set_mask |= PCCR_S0_FLT|PCCR_S1_FLT;
- 
- 	local_irq_save(flags);
--	val = sa1111_readl(sadev->mapbase + SA1111_PCCR);
-+	val = sa1111_readl(s->dev->mapbase + SA1111_PCCR);
- 	val &= ~pccr_skt_mask;
- 	val |= pccr_set_mask & pccr_skt_mask;
--	sa1111_writel(val, sadev->mapbase + SA1111_PCCR);
-+	sa1111_writel(val, s->dev->mapbase + SA1111_PCCR);
- 	local_irq_restore(flags);
- 
- 	return 0;
-@@ -119,10 +116,45 @@ void sa1111_pcmcia_socket_suspend(struct soc_pcmcia_socket *skt)
  	soc_pcmcia_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
  }
+@@ -122,6 +122,11 @@ int sa1111_pcmcia_add(struct sa1111_dev *dev, struct pcmcia_low_level *ops,
+ 	struct sa1111_pcmcia_socket *s;
+ 	int i, ret = 0;
  
-+int sa1111_pcmcia_add(struct sa1111_dev *dev, struct pcmcia_low_level *ops,
-+	int (*add)(struct soc_pcmcia_socket *))
-+{
-+	struct sa1111_pcmcia_socket *s;
-+	int i, ret = 0;
++	ops->hw_init = sa1111_pcmcia_hw_init;
++	ops->hw_shutdown = sa1111_pcmcia_hw_shutdown;
++	ops->socket_state = sa1111_pcmcia_socket_state;
++	ops->socket_suspend = sa1111_pcmcia_socket_suspend;
 +
-+	s = kzalloc(sizeof(*s) * ops->nr, GFP_KERNEL);
-+	if (!s)
-+		return -ENODEV;
-+
-+	for (i = 0; i < ops->nr; i++) {
-+		s = kzalloc(sizeof(*s), GFP_KERNEL);
-+		if (!s)
-+			return -ENOMEM;
-+
-+		s->soc.nr = ops->first + i;
-+		s->soc.irq = s->soc.nr ? IRQ_S1_READY_NINT : IRQ_S0_READY_NINT;
-+		s->soc.ops = ops;
-+		s->soc.socket.owner = ops->owner;
-+		s->soc.socket.dev.parent = &dev->dev;
-+		s->dev = dev;
-+
-+		ret = add(&s->soc);
-+		if (ret == 0) {
-+			s->next = dev_get_drvdata(&dev->dev);
-+			dev_set_drvdata(&dev->dev, s);
-+		} else
-+			kfree(s);
-+	}
-+
-+	return ret;
-+}
-+
- static int pcmcia_probe(struct sa1111_dev *dev)
- {
- 	void __iomem *base;
- 
-+	dev_set_drvdata(&dev->dev, NULL);
-+
- 	if (!request_mem_region(dev->res.start, 512,
- 				SA1111_DRIVER_NAME(dev)))
- 		return -EBUSY;
-@@ -152,15 +184,15 @@ static int pcmcia_probe(struct sa1111_dev *dev)
- 
- static int __devexit pcmcia_remove(struct sa1111_dev *dev)
- {
--	struct skt_dev_info *sinfo = dev_get_drvdata(&dev->dev);
--	int i;
-+	struct sa1111_pcmcia_socket *next, *s = dev_get_drvdata(&dev->dev);
- 
- 	dev_set_drvdata(&dev->dev, NULL);
- 
--	for (i = 0; i < sinfo->nskt; i++)
--		soc_pcmcia_remove_one(&sinfo->skt[i]);
-+	for (; next = s->next, s; s = next) {
-+		soc_pcmcia_remove_one(&s->soc);
-+		kfree(s);
-+	}
- 
--	kfree(sinfo);
- 	release_mem_region(dev->res.start, 512);
- 	return 0;
- }
+ 	s = kzalloc(sizeof(*s) * ops->nr, GFP_KERNEL);
+ 	if (!s)
+ 		return -ENODEV;
 diff --git a/drivers/pcmcia/sa1111_generic.h b/drivers/pcmcia/sa1111_generic.h
-index 10ced4a..536fe15 100644
+index 536fe15..02dc857 100644
 --- a/drivers/pcmcia/sa1111_generic.h
 +++ b/drivers/pcmcia/sa1111_generic.h
-@@ -1,6 +1,20 @@
- #include "soc_common.h"
- #include "sa11xx_base.h"
+@@ -15,12 +15,9 @@ static inline struct sa1111_pcmcia_socket *to_skt(struct soc_pcmcia_socket *s)
+ int sa1111_pcmcia_add(struct sa1111_dev *dev, struct pcmcia_low_level *ops,
+ 	int (*add)(struct soc_pcmcia_socket *));
  
-+struct sa1111_pcmcia_socket {
-+	struct soc_pcmcia_socket soc;
-+	struct sa1111_dev *dev;
-+	struct sa1111_pcmcia_socket *next;
-+};
-+
-+static inline struct sa1111_pcmcia_socket *to_skt(struct soc_pcmcia_socket *s)
-+{
-+	return container_of(s, struct sa1111_pcmcia_socket, soc);
-+}
-+
-+int sa1111_pcmcia_add(struct sa1111_dev *dev, struct pcmcia_low_level *ops,
-+	int (*add)(struct soc_pcmcia_socket *));
-+
- extern int sa1111_pcmcia_hw_init(struct soc_pcmcia_socket *);
- extern void sa1111_pcmcia_hw_shutdown(struct soc_pcmcia_socket *);
+-extern int sa1111_pcmcia_hw_init(struct soc_pcmcia_socket *);
+-extern void sa1111_pcmcia_hw_shutdown(struct soc_pcmcia_socket *);
  extern void sa1111_pcmcia_socket_state(struct soc_pcmcia_socket *, struct pcmcia_state *);
-diff --git a/drivers/pcmcia/sa11xx_base.c b/drivers/pcmcia/sa11xx_base.c
-index 92a4348..4db8149 100644
---- a/drivers/pcmcia/sa11xx_base.c
-+++ b/drivers/pcmcia/sa11xx_base.c
-@@ -171,7 +171,7 @@ static const char *skt_names[] = {
- #define SKT_DEV_INFO_SIZE(n) \
- 	(sizeof(struct skt_dev_info) + (n)*sizeof(struct soc_pcmcia_socket))
+ extern int sa1111_pcmcia_configure_socket(struct soc_pcmcia_socket *, const socket_state_t *);
+ extern void sa1111_pcmcia_socket_init(struct soc_pcmcia_socket *);
+-extern void sa1111_pcmcia_socket_suspend(struct soc_pcmcia_socket *);
  
--static int sa11xx_drv_pcmcia_add_one(struct soc_pcmcia_socket *skt)
-+int sa11xx_drv_pcmcia_add_one(struct soc_pcmcia_socket *skt)
- {
- 	skt->res_skt.start = _PCMCIA(skt->nr);
- 	skt->res_skt.end = _PCMCIA(skt->nr) + PCMCIASp - 1;
-@@ -195,14 +195,10 @@ static int sa11xx_drv_pcmcia_add_one(struct soc_pcmcia_socket *skt)
- 
- 	return soc_pcmcia_add_one(skt);
- }
-+EXPORT_SYMBOL(sa11xx_drv_pcmcia_add_one);
- 
--int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops,
--			    int first, int nr)
-+void sa11xx_drv_pcmcia_ops(struct pcmcia_low_level *ops)
- {
--	struct skt_dev_info *sinfo;
--	struct soc_pcmcia_socket *skt;
--	int i;
--
- 	/*
- 	 * set default MECR calculation if the board specific
- 	 * code did not specify one...
-@@ -216,6 +212,17 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops,
- #ifdef CONFIG_CPU_FREQ
- 	ops->frequency_change = sa1100_pcmcia_frequency_change;
- #endif
-+}
-+EXPORT_SYMBOL(sa11xx_drv_pcmcia_ops);
-+
-+int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops,
-+			    int first, int nr)
-+{
-+	struct skt_dev_info *sinfo;
-+	struct soc_pcmcia_socket *skt;
-+	int i, ret = 0;
-+
-+	sa11xx_drv_pcmcia_ops(ops);
- 
- 	sinfo = kzalloc(SKT_DEV_INFO_SIZE(nr), GFP_KERNEL);
- 	if (!sinfo)
-diff --git a/drivers/pcmcia/sa11xx_base.h b/drivers/pcmcia/sa11xx_base.h
-index 7bc2082..3d76d72 100644
---- a/drivers/pcmcia/sa11xx_base.h
-+++ b/drivers/pcmcia/sa11xx_base.h
-@@ -118,6 +118,8 @@ static inline unsigned int sa1100_pcmcia_cmd_time(unsigned int cpu_clock_khz,
- }
- 
- 
-+int sa11xx_drv_pcmcia_add_one(struct soc_pcmcia_socket *skt);
-+void sa11xx_drv_pcmcia_ops(struct pcmcia_low_level *ops);
- extern int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, int first, int nr);
- 
- #endif  /* !defined(_PCMCIA_SA1100_H) */
+ extern int pcmcia_badge4_init(struct device *);
+ extern int pcmcia_jornada720_init(struct device *);
 -- 
 1.6.2.5
