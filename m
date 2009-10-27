@@ -1,119 +1,851 @@
 From: mfuzzey@gmail.com (Martin Fuzzey)
-Date: Tue, 27 Oct 2009 18:26:57 +0100
-Subject: [RFC PATCH 1/2] PCMCIA: Add soc_common support for banked SoC drivers.
+Date: Tue, 27 Oct 2009 18:27:02 +0100
+Subject: [RFC PATCH 2/2] MXC: add pcmcia support
 In-Reply-To: <20091027172652.7671.85583.stgit@srv002.fuzzey.net>
 References: <20091027172652.7671.85583.stgit@srv002.fuzzey.net>
-Message-ID: <20091027172657.7671.95785.stgit@srv002.fuzzey.net>
+Message-ID: <20091027172702.7671.50161.stgit@srv002.fuzzey.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some SoCs (like freescale MXC) require configuring a device register
-to set the bank mapped into the memory window.
 
-Also allow interrupt flags to be configured (to support shared interrupts).
 
 Signed-off-by: Martin Fuzzey <mfuzzey@gmail.com>
 
 ---
 
- drivers/pcmcia/soc_common.c |   21 +++++++++++++++------
- drivers/pcmcia/soc_common.h |    7 +++++++
- 2 files changed, 22 insertions(+), 6 deletions(-)
+ arch/arm/mach-mx2/clock_imx21.c |    1 
+ arch/arm/mach-mx2/clock_imx27.c |    1 
+ arch/arm/mach-mx2/devices.c     |   21 +
+ arch/arm/mach-mx2/devices.h     |    1 
+ arch/arm/mach-mx3/clock.c       |    1 
+ drivers/pcmcia/Kconfig          |    6 
+ drivers/pcmcia/Makefile         |    3 
+ drivers/pcmcia/mxc_generic.c    |  711 +++++++++++++++++++++++++++++++++++++++
+ 8 files changed, 745 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/pcmcia/mxc_generic.c
 
-diff --git a/drivers/pcmcia/soc_common.c b/drivers/pcmcia/soc_common.c
-index 163cf98..c06440c 100644
---- a/drivers/pcmcia/soc_common.c
-+++ b/drivers/pcmcia/soc_common.c
-@@ -257,7 +257,8 @@ static irqreturn_t soc_common_pcmcia_interrupt(int irq, void *dev)
- 	struct soc_pcmcia_socket *skt = dev;
+diff --git a/arch/arm/mach-mx2/clock_imx21.c b/arch/arm/mach-mx2/clock_imx21.c
+index 801e9d2..e131312 100644
+--- a/arch/arm/mach-mx2/clock_imx21.c
++++ b/arch/arm/mach-mx2/clock_imx21.c
+@@ -960,6 +960,7 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("mxc-keypad", NULL, kpp_clk)
+ 	_REGISTER_CLOCK(NULL, "owire", owire_clk)
+ 	_REGISTER_CLOCK(NULL, "rtc", rtc_clk)
++	_REGISTER_CLOCK("mxc-pcmcia", NULL, hclk_clk)
+ };
  
- 	debug(skt, 3, "servicing IRQ %d\n", irq);
--
-+	if (skt->ops->ack_interrupt)
-+		skt->ops->ack_interrupt(skt);
- 	soc_common_check_status(skt);
+ /*
+diff --git a/arch/arm/mach-mx2/clock_imx27.c b/arch/arm/mach-mx2/clock_imx27.c
+index a3a76cf..ed2fb96 100644
+--- a/arch/arm/mach-mx2/clock_imx27.c
++++ b/arch/arm/mach-mx2/clock_imx27.c
+@@ -674,6 +674,7 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("mxc_w1.0", NULL, owire_clk)
+ 	_REGISTER_CLOCK(NULL, "rtc", rtc_clk)
+ 	_REGISTER_CLOCK(NULL, "scc", scc_clk)
++	_REGISTER_CLOCK("mxc-pcmcia", NULL, ahb_clk)
+ };
  
- 	return IRQ_HANDLED;
-@@ -335,6 +336,7 @@ soc_common_pcmcia_set_io_map(struct pcmcia_socket *sock, struct pccard_io_map *m
+ /* Adjust the clock path for TO2 and later */
+diff --git a/arch/arm/mach-mx2/devices.c b/arch/arm/mach-mx2/devices.c
+index 50199af..906ccb2 100644
+--- a/arch/arm/mach-mx2/devices.c
++++ b/arch/arm/mach-mx2/devices.c
+@@ -564,3 +564,24 @@ int __init mxc_register_gpios(void)
  {
- 	struct soc_pcmcia_socket *skt = to_soc_pcmcia_socket(sock);
- 	unsigned short speed = map->speed;
-+	int ret = 0;
- 
- 	debug(skt, 2, "map %u  speed %u start 0x%08x stop 0x%08x\n",
- 		map->map, map->speed, map->start, map->stop);
-@@ -367,11 +369,14 @@ soc_common_pcmcia_set_io_map(struct pcmcia_socket *sock, struct pccard_io_map *m
- 	if (map->stop == 1)
- 		map->stop = PAGE_SIZE-1;
- 
-+	if (skt->ops->set_io_map)
-+		ret = skt->ops->set_io_map(skt, map);
-+
- 	map->stop -= map->start;
- 	map->stop += skt->socket.io_offset;
- 	map->start = skt->socket.io_offset;
- 
--	return 0;
-+	return ret;
+ 	return mxc_gpio_init(imx_gpio_ports, ARRAY_SIZE(imx_gpio_ports));
  }
++
++static struct resource mxc_resource_pcmcia[] = {
++	[0] = {
++		.start  = PCMCIA_CTL_BASE_ADDR,
++		.end    = PCMCIA_CTL_BASE_ADDR + 0x67,
++		.flags  = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start  = MXC_INT_PCMCIA,
++		.end    = MXC_INT_PCMCIA,
++		.flags  = IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device mxc_device_pcmcia = {
++	.name           = "mxc-pcmcia",
++	.id             = -1,
++	.resource       = mxc_resource_pcmcia,
++	.num_resources  = ARRAY_SIZE(mxc_resource_pcmcia),
++};
++
+diff --git a/arch/arm/mach-mx2/devices.h b/arch/arm/mach-mx2/devices.h
+index d315406..9eff953 100644
+--- a/arch/arm/mach-mx2/devices.h
++++ b/arch/arm/mach-mx2/devices.h
+@@ -26,4 +26,5 @@ extern struct platform_device mxc_usbh2;
+ extern struct platform_device mxc_spi_device0;
+ extern struct platform_device mxc_spi_device1;
+ extern struct platform_device mxc_spi_device2;
++extern struct platform_device mxc_device_pcmcia;
  
+diff --git a/arch/arm/mach-mx3/clock.c b/arch/arm/mach-mx3/clock.c
+index da4a59f..7663010 100644
+--- a/arch/arm/mach-mx3/clock.c
++++ b/arch/arm/mach-mx3/clock.c
+@@ -573,6 +573,7 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK(NULL, "mpeg4", mpeg4_clk)
+ 	_REGISTER_CLOCK(NULL, "mbx", mbx_clk)
+ 	_REGISTER_CLOCK("mxc_rtc", NULL, ckil_clk)
++	_REGISTER_CLOCK("mxc-pcmcia", NULL, ahb_clk)
+ };
  
-@@ -389,6 +394,7 @@ soc_common_pcmcia_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map
- 	struct soc_pcmcia_socket *skt = to_soc_pcmcia_socket(sock);
- 	struct resource *res;
- 	unsigned short speed = map->speed;
-+	int ret = 0;
+ int __init mx31_clocks_init(unsigned long fref)
+diff --git a/drivers/pcmcia/Kconfig b/drivers/pcmcia/Kconfig
+index 17f38a7..9bddf2f 100644
+--- a/drivers/pcmcia/Kconfig
++++ b/drivers/pcmcia/Kconfig
+@@ -292,4 +292,10 @@ config PCCARD_NONSTATIC
+ config PCCARD_IODYN
+ 	bool
  
- 	debug(skt, 2, "map %u speed %u card_start %08x\n",
- 		map->map, map->speed, map->card_start);
-@@ -423,10 +429,12 @@ soc_common_pcmcia_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map
- 	}
++config PCMCIA_MXC
++	tristate "Freescale MXC PCMCIA Driver"
++	depends on PCMCIA && ARCH_MXC
++	help
++	  Say Y here to support the integrated PCMCIA in the freescale MXC SoCs.
++
+ endif	# PCCARD
+diff --git a/drivers/pcmcia/Makefile b/drivers/pcmcia/Makefile
+index a03a38a..024fb9c 100644
+--- a/drivers/pcmcia/Makefile
++++ b/drivers/pcmcia/Makefile
+@@ -34,6 +34,8 @@ obj-$(CONFIG_OMAP_CF)				+= omap_cf.o
+ obj-$(CONFIG_BFIN_CFPCMCIA)			+= bfin_cf_pcmcia.o
+ obj-$(CONFIG_AT91_CF)				+= at91_cf.o
+ obj-$(CONFIG_ELECTRA_CF)			+= electra_cf.o
++obj-$(CONFIG_PCMCIA_MXC)		+=  mxc_pcmcia.o
++mxc_pcmcia-objs						+= soc_common.o mxc_generic.o
  
- 	skt->ops->set_timing(skt);
-+	if (skt->ops->set_mem_map)
-+		ret = skt->ops->set_mem_map(skt, map);
+ sa11xx_core-y					+= soc_common.o sa11xx_base.o
+ pxa2xx_core-y					+= soc_common.o pxa2xx_base.o
+@@ -78,3 +80,4 @@ pxa2xx-obj-$(CONFIG_MACH_E740)			+= pxa2xx_e740.o
+ pxa2xx-obj-$(CONFIG_MACH_STARGATE2)		+= pxa2xx_stargate2.o
+ 
+ obj-$(CONFIG_PCMCIA_PXA2XX)			+= pxa2xx_core.o $(pxa2xx-obj-y)
++
+diff --git a/drivers/pcmcia/mxc_generic.c b/drivers/pcmcia/mxc_generic.c
+new file mode 100644
+index 0000000..4151ae4
+--- /dev/null
++++ b/drivers/pcmcia/mxc_generic.c
+@@ -0,0 +1,711 @@
++/*
++ * drivers/pcmcia/mxc_pcmica.c
++ *
++ * Driver for the PCMCIA control functionality of i.MX SoC family
++ *
++ * Copyright (C) 1999 John G. Dorsey.  All Rights Reserved.
++ * Copyright (C) 2005-2007 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright (C) 2009 Martin Fuzzey <mfuzzey@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/kernel.h>
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/err.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++
++#include <mach/hardware.h>
++#include "soc_common.h"
++
++
++#define PCMCIA_WINDOWS  5 /* # windows supported by hardware */
++#define ATTRIBUTE_MEMORY_WINDOW	0
++#define COMMON_MEMORY_WINDOW	1
++#define IO_WINDOW		2
++
++/* Registers */
++#define PCMCIA_PIPR	0x00	/* Input pins register */
++#define PIPR_POWERON	(1 <<  8)	/* card indicates "power on" */
++#define PIPR_RDY	(1 <<  7)	/* card is ready */
++#define PIPR_BVD2	(1 <<  6)	/* battery voltage 2/SPKR in */
++#define PIPR_BVD1	(1 <<  5)	/* battery voltage 1/STSCHG */
++#define PIPR_CD		(3 <<  3)	/* card detect 1 and 2 */
++#define PIPR_WP		(1 <<  2)	/* write protect switch enabled */
++#define PIPR_VS		(3 <<  0)	/* voltage sense bits */
++#define PIPR_VS_5V	(1 <<  0)	/* 5v */
++
++#define PCMCIA_PSCR	0x04	/* Status Changed Register */
++#define PSCR_POWC	(1 << 11)	/* power on changed */
++#define PSCR_RDYR	(1 << 10)	/* ready rising changed */
++#define PSCR_RDYF	(1 <<  9)	/* ready falling changed */
++#define PSCR_RDYH	(1 <<  8)	/* ready state */
++#define PSCR_RDYL	(1 <<  7)	/* inverted ready state */
++#define PSCR_BVDC2	(1 <<  6)	/* battery voltage 2 changed */
++#define PSCR_BVDC1	(1 <<  5)	/* battery voltage 1 changed */
++#define PSCR_CDC2 	(1 <<  4)	/* card detect 2 changed */
++#define PSCR_CDC1 	(1 <<  3)	/* card detect 1 changed */
++#define PSCR_WPC	(1 <<  2)	/* write protect changed */
++#define PSCR_VSC2	(1 <<  1)	/* voltage sense 2 changed */
++#define PSCR_VSC1	(1 <<  0)	/* voltage sense 1 changed */
++
++#define PCMCIA_PER	0x08	/* Interrupt Enable Register */
++#define PER_ERRINTEN	(1 << 12)	/* error interrupt enable */
++#define PER_POWERONEN	(1 << 11)	/* power on interrupt enable */
++#define PER_RDYRE	(1 << 10)	/* RDY/nIREQ pin rising edge */
++#define PER_RDYFE	(1 <<  9)	/* RDY/nIREQ pin falling edge */
++#define PER_RDYHE	(1 <<  8)	/* RDY/nIREQ pin high */
++#define PER_RDYLE	(1 <<  7)	/* RDY/nIREQ pin low */
++#define PER_BVDE2	(1 <<  6)	/* battery voltage 2/SPKR in */
++#define PER_BVDE1	(1 <<  5)	/* battery voltage 1/STSCHG */
++#define PER_CDE2	(1 <<  4)	/* card detect 2  */
++#define PER_CDE1	(1 <<  3)	/* card detect 1 */
++#define PER_WPE		(1 <<  2)	/* write protect */
++#define PER_VSE2	(1 <<  1)	/* voltage sense 2 */
++#define PER_VSE1	(1 <<  0)	/* voltage sense 1 */
++
++/* win: 0-4 */
++#define PCMCIA_PBR(win)	(0x0C + 4 * (win))	/* Base Register x */
++
++#define PCMCIA_POR(win)	(0x28 + 4 * (win))	/* Option Register x */
++#define POR_PV		(1 << 29)	/* set iff bank is valid */
++#define POR_WPEN	(1 << 28)	/* write protect input enable */
++#define POR_WP		(1 << 27)	/* write protected */
++
++#define POR_PRS_SHIFT	(25)
++#define POR_PRS(x)		(((x) & 0x3) << POR_PRS_SHIFT)
++#define POR_PRS_MASK		POR_PRS(3)	/* PCMCIA region select */
++#define POR_PRS_COMMON		(0)	/* values of POR_PRS field */
++#define POR_PRS_TRUE_IDE	(1)
++#define POR_PRS_ATTRIBUTE	(2)
++#define POR_PRS_IO		(3)
++
++#define POR_PPS_8	(1 << 24)	/* PCMCIA Port size =  8bits */
++#define POR_PPS_16	(0 << 24)	/* PCMCIA Port size = 16bits */
++
++#define POR_PSL_SHIFT	(17)	/* strobe length */
++#define POR_PSL(x)	(((x) & 0x7F) << POR_PSL_SHIFT)
++#define POR_PSL_MASK		POR_PSL(0x7f)
++
++#define POR_PSST_SHIFT	(11)	/* strobe setup time */
++#define POR_PSST(x)		(((x) & 0x3F) << POR_PSST_SHIFT)
++#define POR_PSST_MASK		POR_PSST(0x3f)
++
++#define POR_PSHT_SHIFT	(5)	/* strobe hold time  */
++#define POR_PSHT(x)		(((x) & 0x3F) << POR_PSHT_SHIFT)
++#define POR_PSHT_MASK		POR_PSHT(0x3f)
++
++#define POR_BSIZE_SHIFT	(0)	/* bank size */
++#define POR_BSIZE(x)		(((x) & 0x1F) << POR_BSIZE_SHIFT)
++#define POR_BSIZE_MASK		POR_BSIZE(0x1F)
++
++#define PCMCIA_POFR(win)	(0x44 + 4 * (win))	/* Offset Register x */
++
++#define PCMCIA_PGCR	0x60	/* General Control Register */
++#define PGCR_LPMEN	(1 <<  3)	/* Low power Mode Enable */
++#define PGCR_SPKREN	(1 <<  2)	/* SPKROUT routing enable */
++#define PGCR_POE	(1 <<  1)	/* Controller out enable */
++#define PGCR_RESET	(1 <<  0)	/* Card reset */
++
++#define PCMCIA_PGSR	0x64	/* General Status Register */
++#define PGSR_NWINE	(1 <<  4)	/* No Window error */
++#define PGSR_LPE	(1 <<  3)	/* Low Power error */
++#define PGSR_SE		(1 <<  2)	/* Size error */
++#define PGSR_CDE	(1 <<  1)	/* Card Detect error */
++#define PGSR_WPE	(1 <<  0)	/* Write Protect error */
++
++
++static const char skt_name[] = "pcmcia0";
++
++struct mxc_pcmcia_window {
++	unsigned size;
++	unsigned bsize; /* BSZIE value - see datasheet */
++};
++
++struct mxc_pcmcia_soc {
++	unsigned long base;	/* physical base address of card memory */
++	unsigned long addr_size; /* addressable range by pcmcia */
++	struct mxc_pcmcia_window windows[PCMCIA_WINDOWS];
++};
++
++struct mxc_pcmcia {
++	void __iomem *regs;
++	struct pcmcia_irqs irqs;
++	struct clk *clk;
++	struct mxc_pcmcia_soc *soc;
++};
++
++/* Hardcoded base address rather than PCMCIA_MEM_BASE_ADDR below
++to allow driver to work on multiple SoC types which I understand is a
++longterm objective for MXC */
++static struct mxc_pcmcia_soc mx21_soc = {
++	.base = 0xD4000000,
++	.addr_size = SZ_32K,
++	.windows = {
++		{.size = SZ_8K, .bsize = 0x0D},
++		{.size = SZ_8K, .bsize = 0x0D},
++		{.size = SZ_2K, .bsize = 0x04},
++	},
++};
++
++static struct mxc_pcmcia_soc mx27_soc = {
++	.base = 0xDC000000,
++	.addr_size = SZ_64M,
++	.windows = {
++		{.size = SZ_16M, .bsize = 0x14},
++		{.size = SZ_16M, .bsize = 0x14},
++		{.size = SZ_64K, .bsize = 0x05},
++	},
++};
++
++static struct mxc_pcmcia_soc mx3x_soc = {
++	.base = 0xBC000000,
++	.addr_size = SZ_64M,
++	.windows = {
++		{.size = SZ_16M, .bsize = 0x14},
++		{.size = SZ_16M, .bsize = 0x14},
++		{.size = SZ_64K, .bsize = 0x05},
++	},
++};
++
++static inline struct mxc_pcmcia *driver_data(struct soc_pcmcia_socket *skt)
++{
++	return skt->socket.driver_data;
++}
++
++static inline void set_register_bits(struct mxc_pcmcia *mxc_pcmcia,
++	u32 offset, u32 mask)
++{
++	void __iomem *reg = mxc_pcmcia->regs + offset;
++	writel(readl(reg) | mask, reg);
++}
++
++static inline void clear_register_bits(struct mxc_pcmcia *mxc_pcmcia,
++	u32 offset, u32 mask)
++{
++	void __iomem *reg = mxc_pcmcia->regs + offset;
++	writel(readl(reg) & ~mask, reg);
++}
++
++
++/*
++ * Set address and profile to window registers POR, POFR
++ */
++static int mxc_pcmcia_set_window(struct soc_pcmcia_socket *skt,
++	u_int card_addr, u_int window, u_int active, u32 *offset)
++{
++	u32 reg;
++	struct mxc_pcmcia *mxc_pcmcia = driver_data(skt);
++	u32 offset_mask = mxc_pcmcia->soc->windows[window].size - 1;
++	u32 bank_mask = ~offset_mask;
++
++	/* Disable the window */
++	clear_register_bits(mxc_pcmcia, PCMCIA_POR(window), POR_PV);
++
++	if ((card_addr & bank_mask) >= mxc_pcmcia->soc->addr_size) {
++		dev_err(skt->dev, "card address not supported %08X\n",
++			card_addr);
++		return -EINVAL;
++	}
++
++	/* Set POR */
++	reg = readl(mxc_pcmcia->regs + PCMCIA_POR(window));
++	reg &= ~(POR_PRS_MASK | POR_WPEN | POR_WP | POR_PPS_8);
++	reg |= POR_PPS_16;
++
++	switch (window) {
++	case IO_WINDOW:
++		reg |= POR_PRS(POR_PRS_IO);
++		break;
++
++	case ATTRIBUTE_MEMORY_WINDOW:
++		reg |= POR_PRS(POR_PRS_ATTRIBUTE);
++		break;
++
++	case COMMON_MEMORY_WINDOW:
++		reg |= POR_PRS(POR_PRS_COMMON);
++		break;
++
++	default:
++		return -EINVAL;
++
++	}
++	writel(reg, mxc_pcmcia->regs + PCMCIA_POR(window));
++
++	writel(card_addr & bank_mask, mxc_pcmcia->regs + PCMCIA_POFR(window));
++
++	/* Enable the window */
++	if (active)
++		set_register_bits(mxc_pcmcia, PCMCIA_POR(window), POR_PV);
++
++	if (offset)
++		*offset = card_addr & offset_mask;
++
++	return 0;
++}
++
++
++static int mxc_set_io_map(struct soc_pcmcia_socket *skt,
++	struct pccard_io_map *map)
++{
++	return mxc_pcmcia_set_window(
++		skt,
++		0, IO_WINDOW,
++		map->flags & MAP_ACTIVE, NULL);
++}
++
++
++static int mxc_set_mem_map(struct soc_pcmcia_socket *skt,
++	struct pccard_mem_map *map)
++{
++	int window;
++	int ret;
++	struct resource *res;
++	u32 offset;
++
++	if (map->flags & MAP_ATTRIB) {
++		window = ATTRIBUTE_MEMORY_WINDOW;
++		res = &skt->res_attr;
++	} else {
++		window = COMMON_MEMORY_WINDOW;
++		res = &skt->res_mem;
++	}
++
++	ret = mxc_pcmcia_set_window(
++		skt,
++		map->card_start,
++		window,
++		map->flags & MAP_ACTIVE,
++		&offset);
++
++	if (!ret)
++		map->static_start = res->start + offset;
++
++	return ret;
++}
++
++
++static int mxc_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
++{
++	struct mxc_pcmcia *mxc_pcmcia = driver_data(skt);
++	int ret;
++	int i;
++	u32 base, bsize, offset = 0;
++
++	ret = soc_pcmcia_request_irqs(skt, &mxc_pcmcia->irqs, 1);
++	if (ret)
++		return ret;
++
++	/* configure but don't enable windows */
++	for (i = 0; i < PCMCIA_WINDOWS; i++) {
++		if (mxc_pcmcia->soc->windows[i].size) {
++			base = offset;
++			bsize = mxc_pcmcia->soc->windows[i].bsize;
++		} else {
++			base = 0;
++			bsize = 0;
++		}
++		writel(base, mxc_pcmcia->regs + PCMCIA_PBR(i));
++		writel(bsize, mxc_pcmcia->regs + PCMCIA_POR(i));
++		writel(0, mxc_pcmcia->regs + PCMCIA_POFR(i));
++		offset += mxc_pcmcia->soc->windows[i].size;
++	}
++
++	return 0;
++}
++
++
++static void mxc_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
++{
++	struct mxc_pcmcia *mxc_pcmcia = driver_data(skt);
++	int i;
++
++	soc_pcmcia_free_irqs(skt, &mxc_pcmcia->irqs, 1);
++
++	for (i = 0; i < PCMCIA_WINDOWS; i++) {
++		writel(0, mxc_pcmcia->regs + PCMCIA_PBR(i));
++		writel(0, mxc_pcmcia->regs + PCMCIA_POR(i));
++		writel(0, mxc_pcmcia->regs + PCMCIA_POFR(i));
++	}
++}
++
++static void
++mxc_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
++				struct pcmcia_state *state)
++{
++	unsigned long pins;
++
++	pins = readl(driver_data(skt)->regs + PCMCIA_PIPR);
++	dev_dbg(skt->dev, "PIPR = 0x%08lx\n", pins);
++
++	state->ready = (pins & PIPR_RDY) ? 1 : 0;
++	state->bvd2 = (pins & PIPR_BVD2) ? 1 : 0;
++	state->bvd1 = (pins & PIPR_BVD1) ? 1 : 0;
++
++	if ((pins & PIPR_CD) == PIPR_CD)
++		skt->cs_state.csc_mask |= SS_INSERTION;
++	state->detect = (pins & PIPR_CD) ? 0 : 1;
++	state->wrprot = (pins & PIPR_WP) ? 1 : 0;
++	state->vs_3v = (pins & PIPR_VS_5V) ? 0 : 1;
++	state->vs_Xv = 0;
++}
++
++
++static void mxc_pcmcia_soft_reset(struct soc_pcmcia_socket *skt)
++{
++	struct mxc_pcmcia *mxc_pcmcia = driver_data(skt);
++
++	set_register_bits(mxc_pcmcia, PCMCIA_PGCR, PGCR_RESET);
++	msleep(2);
++
++	clear_register_bits(mxc_pcmcia, PCMCIA_PGCR, PGCR_RESET | PGCR_LPMEN);
++	set_register_bits(mxc_pcmcia, PCMCIA_PGCR, PGCR_POE);
++	msleep(2);
++	dev_dbg(skt->dev, "soft_reset:PGCR = %08x\n",
++		readl(mxc_pcmcia->regs + PCMCIA_PGCR));
++}
++
++static int
++mxc_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
++				const socket_state_t *state)
++{
++	struct mxc_pcmcia *mxc_pcmcia = driver_data(skt);
++
++	if (state->Vcc != 0 && state->Vcc != 33 && state->Vcc != 50) {
++		dev_err(skt->dev, "unrecognized Vcc %d\n", state->Vcc);
++		return -EINVAL;
++	}
++
++	dev_dbg(skt->dev, "PIPR = %x, desired Vcc = %d.%dV\n",
++		 readl(mxc_pcmcia->regs + PCMCIA_PIPR),
++		 state->Vcc / 10, state->Vcc % 10);
++
++	if (state->flags & SS_RESET) {
++		mxc_pcmcia_soft_reset(skt);
++
++		/* clean out previous tenant's trash */
++		writel(
++			PGSR_NWINE | PGSR_LPE | PGSR_SE | PGSR_CDE | PGSR_WPE,
++			mxc_pcmcia->regs + PCMCIA_PGSR);
++	}
++	/* enable interrupts if requested, else turn 'em off */
++	if (skt->irq)
++		writel(PER_RDYLE | PER_CDE1 | PER_CDE2,
++			mxc_pcmcia->regs + PCMCIA_PER);
 +	else
-+		map->static_start = res->start + map->card_start;
- 
--	map->static_start = res->start + map->card_start;
--
--	return 0;
++		writel(0, mxc_pcmcia->regs + PCMCIA_PER);
++
++	return 0;
++}
++
++
++/*
++ * Enable card status IRQs on (re-)initialisation.  This can
++ * be called at initialisation, power management event, or
++ * pcmcia event.
++ */
++static void mxc_pcmcia_socket_init(struct soc_pcmcia_socket *skt)
++{
++	struct mxc_pcmcia *mxc_pcmcia = driver_data(skt);
++
++	mxc_pcmcia_soft_reset(skt);
++	soc_pcmcia_enable_irqs(skt, &mxc_pcmcia->irqs, 1);
++}
++
++/*
++ * Disable card status IRQ on suspend.
++ */
++static void mxc_pcmcia_socket_suspend(struct soc_pcmcia_socket *skt)
++{
++	struct mxc_pcmcia *mxc_pcmcia = driver_data(skt);
++
++	soc_pcmcia_disable_irqs(skt, &mxc_pcmcia->irqs, 1);
++	set_register_bits(mxc_pcmcia, PCMCIA_PGCR, PGCR_LPMEN);
++}
++
++static void mxc_pcmcia_set_window_timing(struct soc_pcmcia_socket *skt,
++	u_int speed_ns, u_int window, u_int clk_ns)
++{
++	struct mxc_pcmcia *mxc_pcmcia = driver_data(skt);
++	u_int cycles = speed_ns / clk_ns;
++	u_int code = POR_PSHT(cycles) | POR_PSST(cycles) | POR_PSL(cycles + 2);
++
++	/* Disable the window */
++	clear_register_bits(mxc_pcmcia, PCMCIA_POR(window), POR_PV);
++
++	/* Clear the register first */
++	clear_register_bits(mxc_pcmcia, PCMCIA_POR(window),
++		POR_PSST_MASK | POR_PSL_MASK | POR_PSHT_MASK);
++
++	/* And then set the register */
++	set_register_bits(mxc_pcmcia, PCMCIA_POR(window), code);
++
++	/* Enable the window */
++	set_register_bits(mxc_pcmcia, PCMCIA_POR(window), POR_PV);
++}
++
++
++static int mxc_pcmcia_set_timing(struct soc_pcmcia_socket *skt)
++{
++	u_int clk_ns;
++	struct soc_pcmcia_timing timing;
++	struct mxc_pcmcia *mxc_pcmcia = driver_data(skt);
++
++	clk_ns = (1000 * 1000 * 1000) / clk_get_rate(mxc_pcmcia->clk);
++
++	soc_common_pcmcia_get_timing(skt, &timing);
++	dev_dbg(skt->dev, "timing: io %d, mem %d, attr %d clk_ns=%d\n",
++		timing.io, timing.mem, timing.attr, clk_ns);
++
++	mxc_pcmcia_set_window_timing(skt, timing.io,
++					IO_WINDOW, clk_ns);
++	mxc_pcmcia_set_window_timing(skt, timing.mem,
++					COMMON_MEMORY_WINDOW, clk_ns);
++	mxc_pcmcia_set_window_timing(skt, timing.attr,
++					ATTRIBUTE_MEMORY_WINDOW, clk_ns);
++
++	return 0;
++}
++
++
++static void mxc_pcmcia_ack_interrupt(struct soc_pcmcia_socket *skt)
++{
++	struct mxc_pcmcia *mxc_pcmcia = driver_data(skt);
++
++	writel(readl(mxc_pcmcia->regs + PCMCIA_PSCR),
++		mxc_pcmcia->regs + PCMCIA_PSCR);
++	writel(readl(mxc_pcmcia->regs + PCMCIA_PGSR),
++		mxc_pcmcia->regs + PCMCIA_PGSR);
++}
++
++static struct pcmcia_low_level mxc_pcmcia_ops = {
++	.owner = THIS_MODULE,
++	.hw_init = mxc_pcmcia_hw_init,
++	.hw_shutdown = mxc_pcmcia_hw_shutdown,
++	.socket_state = mxc_pcmcia_socket_state,
++	.configure_socket = mxc_pcmcia_configure_socket,
++
++	.socket_init = mxc_pcmcia_socket_init,
++	.socket_suspend = mxc_pcmcia_socket_suspend,
++
++	.set_timing = mxc_pcmcia_set_timing,
++	.set_io_map = mxc_set_io_map,
++	.set_mem_map = mxc_set_mem_map,
++	.ack_interrupt = mxc_pcmcia_ack_interrupt,
++};
++
++
++static void mxc_pcmcia_setup_resources(struct soc_pcmcia_socket *skt,
++	struct mxc_pcmcia_soc *soc)
++{
++	skt->res_skt.start = soc->base;
++	skt->res_skt.flags = IORESOURCE_MEM;
++
++	skt->res_attr.start = soc->base;
++	skt->res_attr.end = skt->res_attr.start +
++		soc->windows[ATTRIBUTE_MEMORY_WINDOW].size - 1;
++	skt->res_attr.name = "attribute";
++	skt->res_attr.flags = IORESOURCE_MEM;
++
++	skt->res_mem.start = skt->res_attr.end + 1;
++	skt->res_mem.end = skt->res_mem.start +
++		soc->windows[COMMON_MEMORY_WINDOW].size - 1;
++	skt->res_mem.name = "memory";
++	skt->res_mem.flags = IORESOURCE_MEM;
++
++	skt->res_io.start = skt->res_mem.end + 1;
++	skt->res_io.end = skt->res_io.start +
++		soc->windows[IO_WINDOW].size - 1;
++	skt->res_io.name = "io";
++	skt->res_io.flags = IORESOURCE_MEM | IORESOURCE_BUSY;
++
++	skt->res_skt.end = skt->res_io.end;
++
++	driver_data(skt)->soc = soc;
++}
++
++static struct mxc_pcmcia_soc *mxc_pcmcia_find_soc(void)
++{
++	if (cpu_is_mx3())
++		return &mx3x_soc;
++	if (cpu_is_mx27())
++		return &mx27_soc;
++	if (cpu_is_mx21())
++		return &mx21_soc;
++	return NULL;
++}
++
++static int __devinit mxc_drv_pcmcia_probe(struct platform_device *pdev)
++{
++	struct skt_dev_info *sinfo;
++	struct soc_pcmcia_socket *skt;
++	struct mxc_pcmcia *driver_data;
++	struct mxc_pcmcia_soc *soc;
++	struct resource *res;
++	struct pccard_io_map map;
++	int ret;
++
++	printk(KERN_INFO "mxc pcmcia driver\n");
++
++	soc = mxc_pcmcia_find_soc();
++	if (!soc) {
++		dev_err(&pdev->dev, "unsupported SoC\n");
++		return -ENODEV;
++	}
++
++	sinfo = kzalloc(sizeof(struct skt_dev_info)
++			+ sizeof(struct soc_pcmcia_socket), GFP_KERNEL);
++	if (!sinfo)
++		return -ENOMEM;
++
++	driver_data = kzalloc(sizeof(*driver_data), GFP_KERNEL);
++	if (!driver_data) {
++		ret = -ENOMEM;
++		goto failed_alloc;
++	}
++
++	sinfo->nskt = 1;
++	skt = &sinfo->skt[0];
++	skt->nr = 0;
++	skt->socket.driver_data = driver_data;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		ret = -ENXIO;
++		goto failed_regs_resource;
++	}
++
++	res = request_mem_region(res->start, resource_size(res), pdev->name);
++	if (!res) {
++		ret = -EBUSY;
++		goto failed_request_regs_mem;
++	}
++
++	driver_data->regs = ioremap(res->start, resource_size(res));
++	if (!driver_data->regs) {
++		ret = -ENOMEM;
++		goto failed_map_regs;
++	}
++
++	skt->irq = platform_get_irq(pdev, 0);
++	if (skt->irq < 0) {
++		ret = skt->irq;
++		goto failed_irq;
++	}
++	driver_data->irqs.irq = skt->irq;
++	driver_data->irqs.flags = IRQF_SHARED;
++	driver_data->irqs.str = skt_name;
++
++	driver_data->clk = clk_get(&pdev->dev, NULL);
++	if (IS_ERR(driver_data->clk)) {
++		ret = PTR_ERR(driver_data->clk);
++		goto failed_clock;
++	}
++
++	skt->res_skt.name = skt_name;
++	mxc_pcmcia_setup_resources(skt, soc);
++
++	ret = soc_common_drv_pcmcia_probe(&pdev->dev, &mxc_pcmcia_ops, sinfo);
++	if (ret)
++		goto failed_common;
++
++	platform_set_drvdata(pdev, sinfo);
++
++	/* Core does not setup maps for io when in static mode */
++	map.map = 0;
++	map.start = 0;
++	map.stop = driver_data->soc->windows[IO_WINDOW].size - 1;
++	map.flags = MAP_ACTIVE | MAP_16BIT;
++	map.speed = 0;
++	skt->socket.ops->set_io_map(&skt->socket, &map);
++
++	return 0;
++
++failed_common:
++	clk_put(driver_data->clk);
++failed_clock:
++failed_irq:
++	iounmap(driver_data->regs);
++failed_map_regs:
++	release_mem_region(res->start, resource_size(res));
++failed_request_regs_mem:
++failed_regs_resource:
++	kfree(driver_data);
++failed_alloc:
++	kfree(sinfo);
++
 +	return ret;
- }
- 
- struct bittbl {
-@@ -519,7 +527,8 @@ int soc_pcmcia_request_irqs(struct soc_pcmcia_socket *skt,
- 		if (irqs[i].sock != skt->nr)
- 			continue;
- 		res = request_irq(irqs[i].irq, soc_common_pcmcia_interrupt,
--				  IRQF_DISABLED, irqs[i].str, skt);
-+				  IRQF_DISABLED | irqs[i].flags,
-+				  irqs[i].str, skt);
- 		if (res)
- 			break;
- 		set_irq_type(irqs[i].irq, IRQ_TYPE_NONE);
-diff --git a/drivers/pcmcia/soc_common.h b/drivers/pcmcia/soc_common.h
-index 290e143..9076003 100644
---- a/drivers/pcmcia/soc_common.h
-+++ b/drivers/pcmcia/soc_common.h
-@@ -113,6 +113,12 @@ struct pcmcia_low_level {
- 	 */
- 	int (*frequency_change)(struct soc_pcmcia_socket *, unsigned long, struct cpufreq_freqs *);
- #endif
-+	void (*ack_interrupt)(struct soc_pcmcia_socket *);
++}
 +
-+	/* Hardware specific mapping */
-+	int (*set_mem_map)(struct soc_pcmcia_socket *, struct pccard_mem_map *);
-+	int (*set_io_map)(struct soc_pcmcia_socket *, struct pccard_io_map *map);
 +
- };
- 
- 
-@@ -120,6 +126,7 @@ struct pcmcia_irqs {
- 	int sock;
- 	int irq;
- 	const char *str;
-+	unsigned long flags;
- };
- 
- struct soc_pcmcia_timing {
++static int __devexit mxc_drv_pcmcia_remove(struct platform_device *pdev)
++{
++	struct skt_dev_info *sinfo = platform_get_drvdata(pdev);
++
++	soc_common_drv_pcmcia_remove(&pdev->dev);
++
++	if (sinfo) {
++		struct soc_pcmcia_socket *skt = &sinfo->skt[0];
++		struct mxc_pcmcia *driver_data = skt->socket.driver_data;
++		struct resource *res;
++
++		iounmap(driver_data->regs);
++		clk_put(driver_data->clk);
++
++		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++		if (res)
++			release_mem_region(res->start, resource_size(res));
++		kfree(driver_data);
++	}
++
++	kfree(sinfo);
++	return 0;
++}
++
++
++static int mxc_drv_pcmcia_suspend(struct platform_device *pdev,
++				      pm_message_t state)
++{
++	return pcmcia_socket_dev_suspend(&pdev->dev);
++}
++
++static int mxc_drv_pcmcia_resume(struct platform_device *pdev)
++{
++	return pcmcia_socket_dev_resume(&pdev->dev);
++}
++
++static struct platform_driver mxc_pcmcia_driver = {
++	.driver = {
++		.name = "mxc-pcmcia",
++		.owner	= THIS_MODULE,
++	},
++	.probe = mxc_drv_pcmcia_probe,
++	.remove = mxc_drv_pcmcia_remove,
++	.suspend = mxc_drv_pcmcia_suspend,
++	.resume = mxc_drv_pcmcia_resume,
++};
++
++static int __init mxc_pcmcia_init(void)
++{
++	return platform_driver_register(&mxc_pcmcia_driver);
++}
++
++static void __exit mxc_pcmcia_exit(void)
++{
++	platform_driver_unregister(&mxc_pcmcia_driver);
++}
++
++fs_initcall(mxc_pcmcia_init);
++module_exit(mxc_pcmcia_exit);
++
++MODULE_AUTHOR("Martin Fuzzey");
++MODULE_DESCRIPTION("MXC PCMCIA Socket Controller");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:mxc-pcmcia");
++
