@@ -1,31 +1,33 @@
-From: mensch0815@googlemail.com (matthias)
-Date: Tue, 27 Oct 2009 10:44:01 +0100
-Subject: spi doubt on AP7000
-Message-ID: <3e4778d50910270244x3e9a1275mab7c4fe7812b5d10@mail.gmail.com>
+From: derkling@gmail.com (derkling at gmail.com)
+Date: Tue, 27 Oct 2009 11:06:39 +0100
+Subject: [PATCH] ARM: STMP3xxx: bugfixed propagate_rate definition
+Message-ID: <1256637999-21937-1-git-send-email-derkling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+From: Patrick Bellasi <derkling@gmail.com>
 
+This patch remove the "__init" modifier from the definition of the
+propagate_rate routine. Indeed this routine is used by the exported API
+(e.g. clk_set_rate) and thus is needed at run-time.
 
-I develop on a custom board which makes heavy use of spi transfers on
-both spi modules (spi0 and spi1) to read sensor data. Kernel version
-is 2.6.25.10.
-I observe some weird spi controller errors: if I communicate with more
-spi slaves on spi bus 1, I get an error on spi bus 0.
-In drivers/spi/atmel_spi.c:
-dev_warn(master->dev.parent, "fifo overrun (%u/%u remaining)\n",
-spi_readl(as, TCR), spi_readl(as, RCR));
+Signed-off-by: Patrick Bellasi <derkling@gmail.com>
+---
+ arch/arm/plat-stmp3xxx/clock.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-This happens due to doubled writing of RDR memory of the peripheral
-dma controller (pdc), although both spi controllers have different pdc
-memory regiones assigned (see at32ap700x.c for details).
-Does anyone can explain me why transfer amount of spi 1 influences spi 0?
-Any suggestions how I can get rid of this error apart from minimizing
-max_speed_hz of the attached spi_device(s)?
-Regards,
-Matthias
-
-
+diff --git a/arch/arm/plat-stmp3xxx/clock.c b/arch/arm/plat-stmp3xxx/clock.c
+index 5d2f19a..5e64b55 100644
+--- a/arch/arm/plat-stmp3xxx/clock.c
++++ b/arch/arm/plat-stmp3xxx/clock.c
+@@ -925,7 +925,7 @@ static struct clk_lookup onchip_clks[] = {
+ 	},
+ };
+ 
+-static int __init propagate_rate(struct clk *clk)
++static int propagate_rate(struct clk *clk)
+ {
+ 	struct clk_lookup *cl;
+ 
 -- 
-motzblog.wordpress.com
+1.5.6.3
