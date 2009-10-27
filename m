@@ -1,36 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 27 Oct 2009 18:06:33 +0000
-Subject: abt kernel 2.6 compressed/head.s
-In-Reply-To: <18250270.157661256615664391.JavaMail.coremail@bj126app51.126.com>
-References: <18250270.157661256615664391.JavaMail.coremail@bj126app51.126.com>
-Message-ID: <20091027180633.GA26281@n2100.arm.linux.org.uk>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 27 Oct 2009 14:08:07 -0400 (EDT)
+Subject: [PATCH] check put_user fail in do_signal when enable OABI_COMPACT
+In-Reply-To: <200910271857.35371.jpihet@mvista.com>
+References: <1256123277.3851.36.camel@debian-nb>
+	<200910271514.54506.jpihet@mvista.com>
+	<19175.5363.259051.477820@pilspetsen.it.uu.se>
+	<200910271857.35371.jpihet@mvista.com>
+Message-ID: <alpine.LFD.2.00.0910271407020.10545@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 27, 2009 at 11:54:24AM +0800, zyxsjl wrote:
+On Tue, 27 Oct 2009, Jean Pihet wrote:
+
+> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+> index f330974..4366cc0 100644
+> --- a/arch/arm/kernel/signal.c
+> +++ b/arch/arm/kernel/signal.c
+> @@ -676,8 +676,14 @@ static int do_signal(sigset_t *oldset, struct pt_regs 
+> *regs, int syscall)
+>  				regs->ARM_sp -= 4;
+>  				usp = (u32 __user *)regs->ARM_sp;
 >  
->  hi anyone, 
-> I have not understood some code in this file below: 
-...
-> my question is:what is the different between the both CONFIG_ZBOOT_ROM=y
-> or n, and so led to the different tackles from the above code on relocation?
+> -				put_user(regs->ARM_pc, usp);
+> -				regs->ARM_pc = KERN_RESTART_CODE;
+> +				if (put_user(regs->ARM_pc, usp) == 0) {
+> +					flush_icache_range((unsigned long)usp,
+> +						(unsigned long)(usp + 1));
 
-The first thing to note is that there is no initialized data section -
-we only have text, constant data, and BSS.
-
-
-When ZBOOT_ROM=n, we relocate all entries.  This means that the entire
-image can be relocated as a whole anywhere in RAM, and the BSS segment
-moves with the image.  Such an image can not be programmed into ROM or
-flash.
+Why are you flushing the icache?  There is no code on the stack anymore.
 
 
-When ZBOOT_ROM=y, we exclude BSS entries from being relocated.  This
-means that the image can still be relocated _provided_ it is located
-in RAM, but the BSS remains at the compile-time fixed address.
-
-If the image is located in ROM or flash, it can not be relocated and
-_must_ be built for the precise address it will be executed from.
-This restriction is because the GOT table will be in ROM and therefore
-can not be written to (the code explicitly avoids any writes to the GOT
-in this case.)
+Nicolas
