@@ -1,32 +1,36 @@
 From: avictor.za@gmail.com (Andrew Victor)
-Date: Tue, 27 Oct 2009 22:03:00 +0200
-Subject: Question: support multiple boards of bcmring SoC?
-In-Reply-To: <20091023185900.GI28382@broadcom.com>
-References: <20091023185900.GI28382@broadcom.com>
-Message-ID: <cd73a99e0910271303l25c6c64bmbff613471871f224@mail.gmail.com>
+Date: Tue, 27 Oct 2009 22:13:34 +0200
+Subject: [PATCH] at91: support for eco920
+In-Reply-To: <20091023182023.GB3440@pengutronix.de>
+References: <20091021084826.GA29667@n2100.arm.linux.org.uk>
+	<1256115527-20635-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20091021151917.GE19714@game.jcrosoft.org>
+	<20091023121152.GB1821@pengutronix.de>
+	<20091023175629.GB29430@game.jcrosoft.org>
+	<20091023182023.GB3440@pengutronix.de>
+Message-ID: <cd73a99e0910271313k60fd7f47lbff0a3bb3596f04b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Leo,
+hi,
 
-> We have multiple boards using the bcmring SoC, like evm board, sp board,
-> and we'd like to submit the support code to the community as well.
-> For the code we submitted to arch/arm/mach-bcmring, it supports only one
-> board for now.
+> Hm, this is only slightly better:
 >
-> My question is: what's the standard/best way to support multiple boards for
-> one SoC support?
+> ? ? ? ?linux-2.6$ grep CONFIG_ARCH_AT91RM9200=y arch/arm/configs/* | wc -l
+> ? ? ? ?12
+>
+> Andrew, thoughts? ?Are you interested at all in reducing the number of
+> defconfigs for at91?
 
-You can possibly have a look at the AT91 processor support
-(arch/arm/mach-at91/) for an example.
+Not really.
+A specific board usually has a specific set of peripherals, so
+requires its own configuration file to enable those peripherals.
+I'm not sure how useful a "generic" defconfig would be.....
 
-We have the SoC processor support files (eg, at91rm9200.c and
-at91rm9200_devices.c), and a separate file for the various different
-boards (eg, board-dk.c, board-eb9200.c, board-kb9202.c).
+[I see from the Makefile there are 13 AT91RM9200-based boards
+currently supported in mainline, so there is already 1 which doesn't
+have a defconfig]
 
-[The support for the other SoC's in the AT91 family is also in that
-directory, so that's why there are other at91*.c and at91*_devices.c
-files]
 
 Regards,
   Andrew Victor
