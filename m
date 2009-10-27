@@ -1,43 +1,145 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 27 Oct 2009 22:40:30 +0000
-Subject: [RFC 00/11] Cache handling updates
-Message-ID: <cover.1256683230.git.rmk+kernel@arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 27 Oct 2009 23:11:32 -0000
+Subject: [RFC PATCH 01/10] PCMCIA: soc_common: convert to a stand alone module
+Message-ID: <925a8da0d92cdf1f37aaef988fcc63bf9744576e.1256684685.git.rmk+kernel@arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For RFC, this series of patches cleans up and updates various aspects
-of the kernel's cache handling.  The 'fix errata 411920' patch is one
-which I'm intending pushing to mainline once the current set has been
-pulled.
+Convert soc_common.c to be a stand alone module, rather than wrapping
+it up into the individual SoC specific base modules.  In doing this,
+we need to add init/exit functions for soc_common to register/remove
+the cpufreq notifier.
 
-A few things of note from this:
-1. flush flush_dcache_page, on VIPT aliasing caches, we ended up
-   flushing the I-cache multiple times.  This has been fixed.
-2. we now avoid flush_dcache_page operating on the ZERO_PAGE (for bss)
-3. ZERO_PAGE can now be allocated from highmem
-4. reinforced I-cache handling for VIVT ASID-tagged caches (to be more
-   like VIVT caches were)
-5. fix the RX->RW->RX issue by flushing the I-cache in flush_cache_range()
-6. it seems pointless flushing the I-cache of VIPT caches in flush_cache_mm
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/pcmcia/Kconfig      |    6 ++++++
+ drivers/pcmcia/Makefile     |   10 ++++------
+ drivers/pcmcia/soc_common.c |   16 +++++++---------
+ 3 files changed, 17 insertions(+), 15 deletions(-)
 
-Russell King (11):
-  ARM: Reduce __flush_dcache_page() visibility
-  ARM: Fix errata 411920 workarounds
-  ARM: move __flush_icache_all() out of flush_pfn_alias()
-  ARM: Remove __flush_icache_all() from __flush_dcache_page()
-  ARM: Avoid flush_dcache_page() for zero page
-  ARM: Avoid duplicated implementation for VIVT cache flushing
-  ARM: Allocate ZERO_PAGE from highmem
-  ARM: Avoid evaluating page_address() multiple times
-  ARM: Add I-cache invalidation for VIVT ASID tagged caches
-  ARM: arrange for flush_cache_range() to always flush the I-cache
-  ARM: avoid flushing I-cache in flush_cache_mm()
-
- arch/arm/include/asm/cacheflush.h |   27 ++++++++++---
- arch/arm/mm/context.c             |    4 +-
- arch/arm/mm/fault-armv.c          |    9 ++++
- arch/arm/mm/flush.c               |   74 ++++++++++++++++---------------------
- arch/arm/mm/init.c                |    9 ++++
- arch/arm/mm/mm.h                  |    2 +
- arch/arm/mm/mmu.c                 |   10 -----
- 7 files changed, 74 insertions(+), 61 deletions(-)
+diff --git a/drivers/pcmcia/Kconfig b/drivers/pcmcia/Kconfig
+index 17f38a7..0b82493 100644
+--- a/drivers/pcmcia/Kconfig
++++ b/drivers/pcmcia/Kconfig
+@@ -196,9 +196,13 @@ config PCMCIA_BCM63XX
+ 	tristate "bcm63xx pcmcia support"
+ 	depends on BCM63XX && PCMCIA
+ 
++config PCMCIA_SOC_COMMON
++	bool
++
+ config PCMCIA_SA1100
+ 	tristate "SA1100 support"
+ 	depends on ARM && ARCH_SA1100 && PCMCIA
++	select PCMCIA_SOC_COMMON
+ 	help
+ 	  Say Y here to include support for SA11x0-based PCMCIA or CF
+ 	  sockets, found on HP iPAQs, Yopy, and other StrongARM(R)/
+@@ -209,6 +213,7 @@ config PCMCIA_SA1100
+ config PCMCIA_SA1111
+ 	tristate "SA1111 support"
+ 	depends on ARM && ARCH_SA1100 && SA1111 && PCMCIA
++	select PCMCIA_SOC_COMMON
+ 	help
+ 	  Say Y  here to include support for SA1111-based PCMCIA or CF
+ 	  sockets, found on the Jornada 720, Graphicsmaster and other
+@@ -222,6 +227,7 @@ config PCMCIA_PXA2XX
+ 	depends on (ARCH_LUBBOCK || MACH_MAINSTONE || PXA_SHARPSL \
+ 		    || MACH_ARMCORE || ARCH_PXA_PALM || TRIZEPS_PCMCIA \
+ 		    || ARCH_VIPER || ARCH_PXA_ESERIES || MACH_STARGATE2)
++	select PCMCIA_SOC_COMMON
+ 	help
+ 	  Say Y here to include support for the PXA2xx PCMCIA controller
+ 
+diff --git a/drivers/pcmcia/Makefile b/drivers/pcmcia/Makefile
+index a03a38a..3829383 100644
+--- a/drivers/pcmcia/Makefile
++++ b/drivers/pcmcia/Makefile
+@@ -22,8 +22,9 @@ obj-$(CONFIG_I82365)				+= i82365.o
+ obj-$(CONFIG_I82092)				+= i82092.o
+ obj-$(CONFIG_TCIC)				+= tcic.o
+ obj-$(CONFIG_PCMCIA_M8XX)			+= m8xx_pcmcia.o
+-obj-$(CONFIG_PCMCIA_SA1100)			+= sa11xx_core.o sa1100_cs.o
+-obj-$(CONFIG_PCMCIA_SA1111)			+= sa11xx_core.o sa1111_cs.o
++obj-$(CONFIG_PCMCIA_SOC_COMMON)			+= soc_common.o
++obj-$(CONFIG_PCMCIA_SA1100)			+= sa11xx_base.o sa1100_cs.o
++obj-$(CONFIG_PCMCIA_SA1111)			+= sa11xx_base.o sa1111_cs.o
+ obj-$(CONFIG_M32R_PCC)				+= m32r_pcc.o
+ obj-$(CONFIG_M32R_CFC)				+= m32r_cfc.o
+ obj-$(CONFIG_PCMCIA_AU1X00)			+= au1x00_ss.o
+@@ -35,9 +36,6 @@ obj-$(CONFIG_BFIN_CFPCMCIA)			+= bfin_cf_pcmcia.o
+ obj-$(CONFIG_AT91_CF)				+= at91_cf.o
+ obj-$(CONFIG_ELECTRA_CF)			+= electra_cf.o
+ 
+-sa11xx_core-y					+= soc_common.o sa11xx_base.o
+-pxa2xx_core-y					+= soc_common.o pxa2xx_base.o
+-
+ au1x00_ss-y					+= au1000_generic.o
+ au1x00_ss-$(CONFIG_MIPS_PB1000)			+= au1000_pb1x00.o
+ au1x00_ss-$(CONFIG_MIPS_PB1100)			+= au1000_pb1x00.o
+@@ -77,4 +75,4 @@ pxa2xx-obj-$(CONFIG_MACH_PALMLD)		+= pxa2xx_palmld.o
+ pxa2xx-obj-$(CONFIG_MACH_E740)			+= pxa2xx_e740.o
+ pxa2xx-obj-$(CONFIG_MACH_STARGATE2)		+= pxa2xx_stargate2.o
+ 
+-obj-$(CONFIG_PCMCIA_PXA2XX)			+= pxa2xx_core.o $(pxa2xx-obj-y)
++obj-$(CONFIG_PCMCIA_PXA2XX)			+= pxa2xx_base.o $(pxa2xx-obj-y)
+diff --git a/drivers/pcmcia/soc_common.c b/drivers/pcmcia/soc_common.c
+index 163cf98..38c5484 100644
+--- a/drivers/pcmcia/soc_common.c
++++ b/drivers/pcmcia/soc_common.c
+@@ -608,15 +608,14 @@ static int soc_pcmcia_cpufreq_register(void)
+ 				"notifier for PCMCIA (%d)\n", ret);
+ 	return ret;
+ }
++fs_initcall(soc_pcmcia_cpufreq_register);
+ 
+ static void soc_pcmcia_cpufreq_unregister(void)
+ {
+ 	cpufreq_unregister_notifier(&soc_pcmcia_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
+ }
++module_exit(soc_pcmcia_cpufreq_unregister);
+ 
+-#else
+-static int soc_pcmcia_cpufreq_register(void) { return 0; }
+-static void soc_pcmcia_cpufreq_unregister(void) {}
+ #endif
+ 
+ int soc_common_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops,
+@@ -667,9 +666,6 @@ int soc_common_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops
+ 			goto out_err_5;
+ 		}
+ 
+-		if (list_empty(&soc_pcmcia_sockets))
+-			soc_pcmcia_cpufreq_register();
+-
+ 		list_add(&skt->node, &soc_pcmcia_sockets);
+ 
+ 		/*
+@@ -742,6 +738,7 @@ int soc_common_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops
+ 	mutex_unlock(&soc_pcmcia_sockets_lock);
+ 	return ret;
+ }
++EXPORT_SYMBOL(soc_common_drv_pcmcia_probe);
+ 
+ int soc_common_drv_pcmcia_remove(struct device *dev)
+ {
+@@ -772,9 +769,6 @@ int soc_common_drv_pcmcia_remove(struct device *dev)
+ 		release_resource(&skt->res_io);
+ 		release_resource(&skt->res_skt);
+ 	}
+-	if (list_empty(&soc_pcmcia_sockets))
+-		soc_pcmcia_cpufreq_unregister();
+-
+ 	mutex_unlock(&soc_pcmcia_sockets_lock);
+ 
+ 	kfree(sinfo);
+@@ -782,3 +776,7 @@ int soc_common_drv_pcmcia_remove(struct device *dev)
+ 	return 0;
+ }
+ EXPORT_SYMBOL(soc_common_drv_pcmcia_remove);
++
++MODULE_AUTHOR("John Dorsey <john+@cs.cmu.edu>");
++MODULE_DESCRIPTION("Linux PCMCIA Card Services: Common SoC support");
++MODULE_LICENSE("Dual MPL/GPL");
+-- 
+1.6.2.5
