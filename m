@@ -1,56 +1,66 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Tue, 27 Oct 2009 16:42:43 +0100
-Subject: [PATCH] check put_user fail in do_signal when enable OABI_COMPACT
-In-Reply-To: <200910271514.54506.jpihet@mvista.com>
-References: <1256123277.3851.36.camel@debian-nb>
-	<20091025154416.GB1774@n2100.arm.linux.org.uk>
-	<af3ea28a0910251959id60ad5kf95dd1f908fa55c9@mail.gmail.com>
-	<200910271514.54506.jpihet@mvista.com>
-Message-ID: <19175.5363.259051.477820@pilspetsen.it.uu.se>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 27 Oct 2009 09:57:50 -0700
+Subject: staging/dream: add gpio and pmem support
+In-Reply-To: <20091027081921.GG5019@elf.ucw.cz>
+References: <20091022091333.GA31023@elf.ucw.cz>
+	<20091026234332.GB26583@kroah.com>
+	<20091027001702.GA5019@elf.ucw.cz>
+	<20091027030039.GA6195@kroah.com>
+	<20091027081921.GG5019@elf.ucw.cz>
+Message-ID: <20091027165750.GA24477@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jean Pihet writes:
- > --- a/arch/arm/kernel/signal.c
- > +++ b/arch/arm/kernel/signal.c
- > @@ -643,6 +643,7 @@ static int do_signal(sigset_t *oldset, struct pt_regs 
- > *regs, int syscall)
- >  	struct k_sigaction ka;
- >  	siginfo_t info;
- >  	int signr;
- > +	int ret = 0;
- >  
- >  	/*
- >  	 * We want the common case to go fast, which
- > @@ -685,8 +686,15 @@ static int do_signal(sigset_t *oldset, struct pt_regs 
- > *regs, int syscall)
- >  				regs->ARM_sp -= 4;
- >  				usp = (u32 __user *)regs->ARM_sp;
- >  
- > -				put_user(regs->ARM_pc, usp);
- > -				regs->ARM_pc = KERN_RESTART_CODE;
- > +				ret |= put_user(regs->ARM_pc, usp);
- > +				if (!ret) {
- > +					flush_icache_range((unsigned long)usp,
- > +						(unsigned long)(usp + 1));
- > +					regs->ARM_pc = KERN_RESTART_CODE;
- > +				} else {
- > +					regs->ARM_sp += 4;
- > +					force_sigsegv(0, current);
- > +				}
- >  #endif
+On Tue, Oct 27, 2009 at 09:19:21AM +0100, Pavel Machek wrote:
+> On Mon 2009-10-26 20:00:39, Greg KH wrote:
+> > On Tue, Oct 27, 2009 at 01:17:03AM +0100, Pavel Machek wrote:
+> > > Hi!
+> > > 
+> > > > > This adds generic_gpio and pmem support, both are needed for other
+> > > > > dream drivers.
+> > > > > 
+> > > > > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > > > 
+> > > > I'd prefer to get the existing code building, before adding new stuff :(
+> > > 
+> > > Well, unfortunately other pieces depend on these.
+> > 
+> > The pieces already in the tree? 
+> 
+> Yes :-(.
+> 
+> > Why are you sending me patches that do
+> > not build?
+> 
+> I did not realize how much was those drivers depenend on arch-specific part.
+> 
+> > > I have it building with this patch (but note that it uses -I magic; I
+> > > started to write script rewriting files so that -I is not neccessary,
+> > > but I did not have time to finish it yet).
+> > 
+> > Ok, should I just delete the whole drivers/staging/dream/ directory as
+> > there seems no goal to get this to build properly?  I've just marked the
+> > code as BROKEN, any chance to get it building again soon?
+> 
+> Could we perhaps use -I to let it build before I find time to do
+> search&replace of 100 #includes? Yes, I'm working on that, but no, it
+> obviously does not progress as fast as I expected...
+> 
+> 								Pavel
+> 
+> Add missing files/includes neccessary for Dream compilation.
+>     
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-I don't like this 'ret' variable:
-- it's only for OABI, but declared at the top and initialised also for EABI
-- you update it with |=, but clearly there's no useful previous value
+Ick, no.  I'm not going to take the wakelock and other header files that
+are "generic" to android into the dream subdir.  That's not ok.
 
-I'd drop 'ret' and just do:
+If this code requires this mess to build, I think we should just delete
+the whole thing and start over with patches that add code that can
+actually build properly.
 
-				if (put_user(regs->ARM_pc, usp) == 0) {
-					flush...
-				} else {
-					... force_sigsegv
-				}
+Any objection to that?
 
-(Note: == 0 not !, since ! is often read as "failed" whereas for
-put_user() 0 means Ok and non-zero means -errno.)
+thanks,
+
+greg k-h
