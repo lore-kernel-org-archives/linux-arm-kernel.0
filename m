@@ -1,145 +1,331 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 27 Oct 2009 23:11:32 -0000
-Subject: [RFC PATCH 01/10] PCMCIA: soc_common: convert to a stand alone module
-Message-ID: <925a8da0d92cdf1f37aaef988fcc63bf9744576e.1256684685.git.rmk+kernel@arm.linux.org.uk>
+Date: Tue, 27 Oct 2009 23:11:45 -0000
+Subject: [RFC PATCH 02/10] PCMCIA: soc_common: provide single socket
+	add/remove functionality
+In-Reply-To: <925a8da0d92cdf1f37aaef988fcc63bf9744576e.1256684685.git.rmk+kernel@arm.linux.org.uk>
+References: <925a8da0d92cdf1f37aaef988fcc63bf9744576e.1256684685.git.rmk+kernel@arm.linux.org.uk>
+Message-ID: <786e249ed8f9e77d28f16ae8693fdc08565140ba.1256684685.git.rmk+kernel@arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert soc_common.c to be a stand alone module, rather than wrapping
-it up into the individual SoC specific base modules.  In doing this,
-we need to add init/exit functions for soc_common to register/remove
-the cpufreq notifier.
+Factor out the functionality for adding and removing a single
+socket, thereby allowing SoCs to individually register each
+socket.  The advantage of this approach is that SoCs can then
+extend soc_pcmcia_socket as they wish.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/pcmcia/Kconfig      |    6 ++++++
- drivers/pcmcia/Makefile     |   10 ++++------
- drivers/pcmcia/soc_common.c |   16 +++++++---------
- 3 files changed, 17 insertions(+), 15 deletions(-)
+ drivers/pcmcia/soc_common.c |  230 +++++++++++++++++++++++--------------------
+ drivers/pcmcia/soc_common.h |    3 +-
+ 2 files changed, 125 insertions(+), 108 deletions(-)
 
-diff --git a/drivers/pcmcia/Kconfig b/drivers/pcmcia/Kconfig
-index 17f38a7..0b82493 100644
---- a/drivers/pcmcia/Kconfig
-+++ b/drivers/pcmcia/Kconfig
-@@ -196,9 +196,13 @@ config PCMCIA_BCM63XX
- 	tristate "bcm63xx pcmcia support"
- 	depends on BCM63XX && PCMCIA
- 
-+config PCMCIA_SOC_COMMON
-+	bool
-+
- config PCMCIA_SA1100
- 	tristate "SA1100 support"
- 	depends on ARM && ARCH_SA1100 && PCMCIA
-+	select PCMCIA_SOC_COMMON
- 	help
- 	  Say Y here to include support for SA11x0-based PCMCIA or CF
- 	  sockets, found on HP iPAQs, Yopy, and other StrongARM(R)/
-@@ -209,6 +213,7 @@ config PCMCIA_SA1100
- config PCMCIA_SA1111
- 	tristate "SA1111 support"
- 	depends on ARM && ARCH_SA1100 && SA1111 && PCMCIA
-+	select PCMCIA_SOC_COMMON
- 	help
- 	  Say Y  here to include support for SA1111-based PCMCIA or CF
- 	  sockets, found on the Jornada 720, Graphicsmaster and other
-@@ -222,6 +227,7 @@ config PCMCIA_PXA2XX
- 	depends on (ARCH_LUBBOCK || MACH_MAINSTONE || PXA_SHARPSL \
- 		    || MACH_ARMCORE || ARCH_PXA_PALM || TRIZEPS_PCMCIA \
- 		    || ARCH_VIPER || ARCH_PXA_ESERIES || MACH_STARGATE2)
-+	select PCMCIA_SOC_COMMON
- 	help
- 	  Say Y here to include support for the PXA2xx PCMCIA controller
- 
-diff --git a/drivers/pcmcia/Makefile b/drivers/pcmcia/Makefile
-index a03a38a..3829383 100644
---- a/drivers/pcmcia/Makefile
-+++ b/drivers/pcmcia/Makefile
-@@ -22,8 +22,9 @@ obj-$(CONFIG_I82365)				+= i82365.o
- obj-$(CONFIG_I82092)				+= i82092.o
- obj-$(CONFIG_TCIC)				+= tcic.o
- obj-$(CONFIG_PCMCIA_M8XX)			+= m8xx_pcmcia.o
--obj-$(CONFIG_PCMCIA_SA1100)			+= sa11xx_core.o sa1100_cs.o
--obj-$(CONFIG_PCMCIA_SA1111)			+= sa11xx_core.o sa1111_cs.o
-+obj-$(CONFIG_PCMCIA_SOC_COMMON)			+= soc_common.o
-+obj-$(CONFIG_PCMCIA_SA1100)			+= sa11xx_base.o sa1100_cs.o
-+obj-$(CONFIG_PCMCIA_SA1111)			+= sa11xx_base.o sa1111_cs.o
- obj-$(CONFIG_M32R_PCC)				+= m32r_pcc.o
- obj-$(CONFIG_M32R_CFC)				+= m32r_cfc.o
- obj-$(CONFIG_PCMCIA_AU1X00)			+= au1x00_ss.o
-@@ -35,9 +36,6 @@ obj-$(CONFIG_BFIN_CFPCMCIA)			+= bfin_cf_pcmcia.o
- obj-$(CONFIG_AT91_CF)				+= at91_cf.o
- obj-$(CONFIG_ELECTRA_CF)			+= electra_cf.o
- 
--sa11xx_core-y					+= soc_common.o sa11xx_base.o
--pxa2xx_core-y					+= soc_common.o pxa2xx_base.o
--
- au1x00_ss-y					+= au1000_generic.o
- au1x00_ss-$(CONFIG_MIPS_PB1000)			+= au1000_pb1x00.o
- au1x00_ss-$(CONFIG_MIPS_PB1100)			+= au1000_pb1x00.o
-@@ -77,4 +75,4 @@ pxa2xx-obj-$(CONFIG_MACH_PALMLD)		+= pxa2xx_palmld.o
- pxa2xx-obj-$(CONFIG_MACH_E740)			+= pxa2xx_e740.o
- pxa2xx-obj-$(CONFIG_MACH_STARGATE2)		+= pxa2xx_stargate2.o
- 
--obj-$(CONFIG_PCMCIA_PXA2XX)			+= pxa2xx_core.o $(pxa2xx-obj-y)
-+obj-$(CONFIG_PCMCIA_PXA2XX)			+= pxa2xx_base.o $(pxa2xx-obj-y)
 diff --git a/drivers/pcmcia/soc_common.c b/drivers/pcmcia/soc_common.c
-index 163cf98..38c5484 100644
+index 38c5484..8938608 100644
 --- a/drivers/pcmcia/soc_common.c
 +++ b/drivers/pcmcia/soc_common.c
-@@ -608,15 +608,14 @@ static int soc_pcmcia_cpufreq_register(void)
- 				"notifier for PCMCIA (%d)\n", ret);
- 	return ret;
- }
-+fs_initcall(soc_pcmcia_cpufreq_register);
+@@ -573,7 +573,7 @@ void soc_pcmcia_enable_irqs(struct soc_pcmcia_socket *skt,
+ EXPORT_SYMBOL(soc_pcmcia_enable_irqs);
  
- static void soc_pcmcia_cpufreq_unregister(void)
- {
- 	cpufreq_unregister_notifier(&soc_pcmcia_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
- }
-+module_exit(soc_pcmcia_cpufreq_unregister);
  
--#else
--static int soc_pcmcia_cpufreq_register(void) { return 0; }
--static void soc_pcmcia_cpufreq_unregister(void) {}
+-LIST_HEAD(soc_pcmcia_sockets);
++static LIST_HEAD(soc_pcmcia_sockets);
+ static DEFINE_MUTEX(soc_pcmcia_sockets_lock);
+ 
+ #ifdef CONFIG_CPU_FREQ
+@@ -618,158 +618,174 @@ module_exit(soc_pcmcia_cpufreq_unregister);
+ 
  #endif
  
- int soc_common_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops,
-@@ -667,9 +666,6 @@ int soc_common_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops
- 			goto out_err_5;
- 		}
- 
--		if (list_empty(&soc_pcmcia_sockets))
--			soc_pcmcia_cpufreq_register();
+-int soc_common_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops,
+-				struct skt_dev_info *sinfo)
++void soc_pcmcia_remove_one(struct soc_pcmcia_socket *skt)
+ {
+-	struct soc_pcmcia_socket *skt;
+-	int ret, i;
 -
- 		list_add(&skt->node, &soc_pcmcia_sockets);
+ 	mutex_lock(&soc_pcmcia_sockets_lock);
++	del_timer_sync(&skt->poll_timer);
  
- 		/*
-@@ -742,6 +738,7 @@ int soc_common_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops
- 	mutex_unlock(&soc_pcmcia_sockets_lock);
+-	/*
+-	 * Initialise the per-socket structure.
+-	 */
+-	for (i = 0; i < sinfo->nskt; i++) {
+-		skt = &sinfo->skt[i];
++	pcmcia_unregister_socket(&skt->socket);
+ 
+-		skt->socket.ops = &soc_common_pcmcia_operations;
+-		skt->socket.owner = ops->owner;
+-		skt->socket.dev.parent = dev;
++	flush_scheduled_work();
+ 
+-		init_timer(&skt->poll_timer);
+-		skt->poll_timer.function = soc_common_pcmcia_poll_event;
+-		skt->poll_timer.data = (unsigned long)skt;
+-		skt->poll_timer.expires = jiffies + SOC_PCMCIA_POLL_PERIOD;
++	skt->ops->hw_shutdown(skt);
+ 
+-		skt->dev	= dev;
+-		skt->ops	= ops;
++	soc_common_pcmcia_config_skt(skt, &dead_socket);
+ 
+-		ret = request_resource(&iomem_resource, &skt->res_skt);
+-		if (ret)
+-			goto out_err_1;
++	list_del(&skt->node);
++	mutex_unlock(&soc_pcmcia_sockets_lock);
+ 
+-		ret = request_resource(&skt->res_skt, &skt->res_io);
+-		if (ret)
+-			goto out_err_2;
++	iounmap(skt->virt_io);
++	skt->virt_io = NULL;
++	release_resource(&skt->res_attr);
++	release_resource(&skt->res_mem);
++	release_resource(&skt->res_io);
++	release_resource(&skt->res_skt);
++}
++EXPORT_SYMBOL(soc_pcmcia_remove_one);
+ 
+-		ret = request_resource(&skt->res_skt, &skt->res_mem);
+-		if (ret)
+-			goto out_err_3;
++int soc_pcmcia_add_one(struct soc_pcmcia_socket *skt)
++{
++	int ret;
+ 
+-		ret = request_resource(&skt->res_skt, &skt->res_attr);
+-		if (ret)
+-			goto out_err_4;
++	init_timer(&skt->poll_timer);
++	skt->poll_timer.function = soc_common_pcmcia_poll_event;
++	skt->poll_timer.data = (unsigned long)skt;
++	skt->poll_timer.expires = jiffies + SOC_PCMCIA_POLL_PERIOD;
+ 
+-		skt->virt_io = ioremap(skt->res_io.start, 0x10000);
+-		if (skt->virt_io == NULL) {
+-			ret = -ENOMEM;
+-			goto out_err_5;
+-		}
++	ret = request_resource(&iomem_resource, &skt->res_skt);
++	if (ret)
++		goto out_err_1;
+ 
+-		list_add(&skt->node, &soc_pcmcia_sockets);
++	ret = request_resource(&skt->res_skt, &skt->res_io);
++	if (ret)
++		goto out_err_2;
+ 
+-		/*
+-		 * We initialize default socket timing here, because
+-		 * we are not guaranteed to see a SetIOMap operation at
+-		 * runtime.
+-		 */
+-		ops->set_timing(skt);
++	ret = request_resource(&skt->res_skt, &skt->res_mem);
++	if (ret)
++		goto out_err_3;
+ 
+-		ret = ops->hw_init(skt);
+-		if (ret)
+-			goto out_err_6;
++	ret = request_resource(&skt->res_skt, &skt->res_attr);
++	if (ret)
++		goto out_err_4;
+ 
+-		skt->socket.features = SS_CAP_STATIC_MAP|SS_CAP_PCCARD;
+-		skt->socket.resource_ops = &pccard_static_ops;
+-		skt->socket.irq_mask = 0;
+-		skt->socket.map_size = PAGE_SIZE;
+-		skt->socket.pci_irq = skt->irq;
+-		skt->socket.io_offset = (unsigned long)skt->virt_io;
++	skt->virt_io = ioremap(skt->res_io.start, 0x10000);
++	if (skt->virt_io == NULL) {
++		ret = -ENOMEM;
++		goto out_err_5;
++	}
+ 
+-		skt->status = soc_common_pcmcia_skt_state(skt);
++	mutex_lock(&soc_pcmcia_sockets_lock);
+ 
+-		ret = pcmcia_register_socket(&skt->socket);
+-		if (ret)
+-			goto out_err_7;
++	list_add(&skt->node, &soc_pcmcia_sockets);
+ 
+-		WARN_ON(skt->socket.sock != i);
++	/*
++	 * We initialize default socket timing here, because
++	 * we are not guaranteed to see a SetIOMap operation at
++	 * runtime.
++	 */
++	skt->ops->set_timing(skt);
+ 
+-		add_timer(&skt->poll_timer);
++	ret = skt->ops->hw_init(skt);
++	if (ret)
++		goto out_err_6;
+ 
+-		ret = device_create_file(&skt->socket.dev, &dev_attr_status);
+-		if (ret)
+-			goto out_err_8;
+-	}
++	skt->socket.ops = &soc_common_pcmcia_operations;
++	skt->socket.features = SS_CAP_STATIC_MAP|SS_CAP_PCCARD;
++	skt->socket.resource_ops = &pccard_static_ops;
++	skt->socket.irq_mask = 0;
++	skt->socket.map_size = PAGE_SIZE;
++	skt->socket.pci_irq = skt->irq;
++	skt->socket.io_offset = (unsigned long)skt->virt_io;
+ 
+-	dev_set_drvdata(dev, sinfo);
+-	ret = 0;
+-	goto out;
++	skt->status = soc_common_pcmcia_skt_state(skt);
+ 
+-	do {
+-		skt = &sinfo->skt[i];
++	ret = pcmcia_register_socket(&skt->socket);
++	if (ret)
++		goto out_err_7;
++
++	add_timer(&skt->poll_timer);
++
++	mutex_unlock(&soc_pcmcia_sockets_lock);
++
++	ret = device_create_file(&skt->socket.dev, &dev_attr_status);
++	if (ret)
++		goto out_err_8;
++
++	return ret;
+ 
+-		device_remove_file(&skt->socket.dev, &dev_attr_status);
+  out_err_8:
+-		del_timer_sync(&skt->poll_timer);
+-		pcmcia_unregister_socket(&skt->socket);
++	mutex_lock(&soc_pcmcia_sockets_lock);
++	del_timer_sync(&skt->poll_timer);
++	pcmcia_unregister_socket(&skt->socket);
+ 
+  out_err_7:
+-		flush_scheduled_work();
++	flush_scheduled_work();
+ 
+-		ops->hw_shutdown(skt);
++	skt->ops->hw_shutdown(skt);
+  out_err_6:
+- 		list_del(&skt->node);
+-		iounmap(skt->virt_io);
++	list_del(&skt->node);
++	mutex_unlock(&soc_pcmcia_sockets_lock);
++	iounmap(skt->virt_io);
+  out_err_5:
+-		release_resource(&skt->res_attr);
++	release_resource(&skt->res_attr);
+  out_err_4:
+-		release_resource(&skt->res_mem);
++	release_resource(&skt->res_mem);
+  out_err_3:
+-		release_resource(&skt->res_io);
++	release_resource(&skt->res_io);
+  out_err_2:
+-		release_resource(&skt->res_skt);
++	release_resource(&skt->res_skt);
+  out_err_1:
+-		i--;
+-	} while (i > 0);
+ 
+-	kfree(sinfo);
+-
+- out:
+-	mutex_unlock(&soc_pcmcia_sockets_lock);
  	return ret;
  }
+-EXPORT_SYMBOL(soc_common_drv_pcmcia_probe);
++EXPORT_SYMBOL(soc_pcmcia_add_one);
+ 
+-int soc_common_drv_pcmcia_remove(struct device *dev)
++int soc_common_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops,
++				struct skt_dev_info *sinfo)
+ {
+-	struct skt_dev_info *sinfo = dev_get_drvdata(dev);
+-	int i;
++	struct soc_pcmcia_socket *skt;
++	int ret, i;
+ 
+-	dev_set_drvdata(dev, NULL);
++	/*
++	 * Initialise the per-socket structure.
++	 */
++	for (i = ret = 0; i < sinfo->nskt; i++) {
++		skt = &sinfo->skt[i];
+ 
+-	mutex_lock(&soc_pcmcia_sockets_lock);
+-	for (i = 0; i < sinfo->nskt; i++) {
+-		struct soc_pcmcia_socket *skt = &sinfo->skt[i];
++		skt->socket.owner = ops->owner;
++		skt->socket.dev.parent = dev;
+ 
+-		del_timer_sync(&skt->poll_timer);
++		skt->dev	= dev;
++		skt->ops	= ops;
+ 
+-		pcmcia_unregister_socket(&skt->socket);
++		ret = soc_pcmcia_add_one(skt);
++		if (ret)
++			break;
+ 
+-		flush_scheduled_work();
++		WARN_ON(skt->socket.sock != i);
++	}
+ 
+-		skt->ops->hw_shutdown(skt);
++	if (ret) {
++		while (--i >= 0)
++			soc_pcmcia_remove_one(&sinfo->skt[i]);
++		kfree(sinfo);
++	} else {
++		dev_set_drvdata(dev, sinfo);
++	}
+ 
+-		soc_common_pcmcia_config_skt(skt, &dead_socket);
++	return ret;
++}
 +EXPORT_SYMBOL(soc_common_drv_pcmcia_probe);
  
- int soc_common_drv_pcmcia_remove(struct device *dev)
- {
-@@ -772,9 +769,6 @@ int soc_common_drv_pcmcia_remove(struct device *dev)
- 		release_resource(&skt->res_io);
- 		release_resource(&skt->res_skt);
- 	}
--	if (list_empty(&soc_pcmcia_sockets))
--		soc_pcmcia_cpufreq_unregister();
--
- 	mutex_unlock(&soc_pcmcia_sockets_lock);
+-		list_del(&skt->node);
+-		iounmap(skt->virt_io);
+-		skt->virt_io = NULL;
+-		release_resource(&skt->res_attr);
+-		release_resource(&skt->res_mem);
+-		release_resource(&skt->res_io);
+-		release_resource(&skt->res_skt);
+-	}
+-	mutex_unlock(&soc_pcmcia_sockets_lock);
++int soc_common_drv_pcmcia_remove(struct device *dev)
++{
++	struct skt_dev_info *sinfo = dev_get_drvdata(dev);
++	int i;
++
++	dev_set_drvdata(dev, NULL);
++
++	for (i = 0; i < sinfo->nskt; i++)
++		soc_pcmcia_remove_one(&sinfo->skt[i]);
  
  	kfree(sinfo);
-@@ -782,3 +776,7 @@ int soc_common_drv_pcmcia_remove(struct device *dev)
- 	return 0;
- }
- EXPORT_SYMBOL(soc_common_drv_pcmcia_remove);
-+
-+MODULE_AUTHOR("John Dorsey <john+@cs.cmu.edu>");
-+MODULE_DESCRIPTION("Linux PCMCIA Card Services: Common SoC support");
-+MODULE_LICENSE("Dual MPL/GPL");
+ 
+diff --git a/drivers/pcmcia/soc_common.h b/drivers/pcmcia/soc_common.h
+index 290e143..51c72ba 100644
+--- a/drivers/pcmcia/soc_common.h
++++ b/drivers/pcmcia/soc_common.h
+@@ -135,7 +135,8 @@ extern void soc_pcmcia_enable_irqs(struct soc_pcmcia_socket *skt, struct pcmcia_
+ extern void soc_common_pcmcia_get_timing(struct soc_pcmcia_socket *, struct soc_pcmcia_timing *);
+ 
+ 
+-extern struct list_head soc_pcmcia_sockets;
++void soc_pcmcia_remove_one(struct soc_pcmcia_socket *skt);
++int soc_pcmcia_add_one(struct soc_pcmcia_socket *skt);
+ 
+ extern int soc_common_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, struct skt_dev_info *sinfo);
+ extern int soc_common_drv_pcmcia_remove(struct device *dev);
 -- 
 1.6.2.5
