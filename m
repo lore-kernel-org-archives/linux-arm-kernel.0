@@ -1,85 +1,79 @@
-From: jpihet@mvista.com (Jean Pihet)
-Date: Tue, 27 Oct 2009 20:12:52 +0100
-Subject: [PATCH] check put_user fail in do_signal when enable OABI_COMPACT
-In-Reply-To: <alpine.LFD.2.00.0910271454110.10545@xanadu.home>
-References: <1256123277.3851.36.camel@debian-nb>
-	<200910271937.57146.jpihet@mvista.com>
-	<alpine.LFD.2.00.0910271454110.10545@xanadu.home>
-Message-ID: <200910272012.53488.jpihet@mvista.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 27 Oct 2009 20:33:30 +0100
+Subject: staging/dream: add gpio and pmem support
+In-Reply-To: <20091027165750.GA24477@kroah.com>
+References: <20091022091333.GA31023@elf.ucw.cz>
+	<20091026234332.GB26583@kroah.com>
+	<20091027001702.GA5019@elf.ucw.cz>
+	<20091027030039.GA6195@kroah.com>
+	<20091027081921.GG5019@elf.ucw.cz>
+	<20091027165750.GA24477@kroah.com>
+Message-ID: <20091027193330.GB19379@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas,
+Hi!
 
-On Tuesday 27 October 2009 19:59:36 Nicolas Pitre wrote:
-...
-> > Side question: does the put_user requires a flush of some sort? If not,
-> > why?
->
-> No because it stores data into the d-cache directly at the virtual
-> address to be used by user space.  Previously the d-cache needed to
-> be cleaned for data to hit main memory and the i-cache invalidated for
-> the newly stored _code_ to be seen by the instruction path.  Since there
-> is no code involved anymore the cache flushes are useless.
->
-> > Is it OK to re-send a patch with the call to flush_icache_range removed?
->
-> Yes.
-Ok here is the updated patch. Let's hope it is the good one that time ;-)
+> > Could we perhaps use -I to let it build before I find time to do
+> > search&replace of 100 #includes? Yes, I'm working on that, but no, it
+> > obviously does not progress as fast as I expected...
+> > 
+> > Add missing files/includes neccessary for Dream compilation.
+> >     
+> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> 
+> Ick, no.  I'm not going to take the wakelock and other header files that
+> are "generic" to android into the dream subdir.  That's not ok.
 
-Can it be merged? It applies cleanly on top of Russell's latest patch 
-(http://marc.info/?l=linux-arm-kernel&m=125638133624452&w=2).
->
->
-> Nicolas
+What is so wrong with wakelocks? They are just nops in this case.
 
-Regards,
-Jean
+> If this code requires this mess to build, I think we should just delete
+> the whole thing and start over with patches that add code that can
+> actually build properly.
 
----
->From d862e03679f7ea44fca1bf1ea256bbade3fbe76a Mon Sep 17 00:00:00 2001
-From: Jean Pihet <jpihet@mvista.com>
-Date: Tue, 27 Oct 2009 10:09:22 +0100
-Subject: ARM: Check put_user fail in do_signal when enable OABI_COMPAT
+Well, crap is easier to clean up when it compiles (and is in tree --
+that's point of staging -- right?), and it is not particulary bad crap
+in this case.
 
-Using OABI, do_signal need to copy restart_syscall to user stack.
-It is possible that put_user fail. This triggers flush_icache page
-fault and crash kernel.
+> Any objection to that?
 
-Signed-off-by: janboe <janboe.ye@gmail.com>
+Yes; dropping the code now will not help anything. Merging it to this
+point was not easy, and forcing me to redo it will just delay me from
+cleaning it up.
 
-Merged from
-http://lists.infradead.org/pipermail/linux-arm-kernel/2009-October/002621.html
-on top of
-http://marc.info/?l=linux-arm-kernel&m=125638133624452&w=2
+Merging crappy Windows driver to staging is easy:
 
-Tested with multiple sleeping apps/threads (using the nanosleep syscall) and
-suspend/resume.
+1) you verify it is GPL
 
-Signed-off-by: Jean Pihet <jpihet@mvista.com>
----
- arch/arm/kernel/signal.c |    8 ++++++--
- 1 files changed, 6 insertions(+), 2 deletions(-)
+2) you submit it
 
-diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-index f330974..ea9722a 100644
---- a/arch/arm/kernel/signal.c
-+++ b/arch/arm/kernel/signal.c
-@@ -676,8 +676,12 @@ static int do_signal(sigset_t *oldset, struct pt_regs 
-*regs, int syscall)
- 				regs->ARM_sp -= 4;
- 				usp = (u32 __user *)regs->ARM_sp;
- 
--				put_user(regs->ARM_pc, usp);
--				regs->ARM_pc = KERN_RESTART_CODE;
-+				if (put_user(regs->ARM_pc, usp) == 0) {
-+					regs->ARM_pc = KERN_RESTART_CODE;
-+				} else {
-+					regs->ARM_sp += 4;
-+					force_sigsegv(0, current);
-+				}
- #endif
- 			}
- 		}
+[and then, clean it in tree].
+
+I tried same process with dream support:
+
+1) driver was GPLed
+
+2) I tried submitting
+
+3) I was told to split it according to authors. In Windows driver
+world, that would be show-stopper. Thanks to Google support, I figured
+authors.
+
+4) I'm told that -I is not acceptable, not even inside
+staging. Windows drivers regulary have way worse build system
+abuses. (Of course, those need to be fixed before merging into kernel
+proper; fortunately they are easy to do incrementally).
+
+Now, I see that wakelocks are show-stopper for merging into kernel
+proper, but what is the problem for staging? We merged drivers with
+OS_MEMORY_ALLOCATE(); wakelocks are just nops in this case.
+
+Could we please clean this driver in-tree? (Wakelocks are already nops
+due to #ifdef magic, cleaning them incrementally is easy.)
+
+(Plus, of course I'd like some help, but google people seem very
+silent :-( ).
+									Pavel
 -- 
-1.6.2.5.168.g3823
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
