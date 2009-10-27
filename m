@@ -1,86 +1,36 @@
-From: jpihet@mvista.com (Jean Pihet)
-Date: Tue, 27 Oct 2009 18:57:34 +0100
-Subject: [PATCH] check put_user fail in do_signal when enable OABI_COMPACT
-In-Reply-To: <19175.5363.259051.477820@pilspetsen.it.uu.se>
-References: <1256123277.3851.36.camel@debian-nb>
-	<200910271514.54506.jpihet@mvista.com>
-	<19175.5363.259051.477820@pilspetsen.it.uu.se>
-Message-ID: <200910271857.35371.jpihet@mvista.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 27 Oct 2009 18:06:33 +0000
+Subject: abt kernel 2.6 compressed/head.s
+In-Reply-To: <18250270.157661256615664391.JavaMail.coremail@bj126app51.126.com>
+References: <18250270.157661256615664391.JavaMail.coremail@bj126app51.126.com>
+Message-ID: <20091027180633.GA26281@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tuesday 27 October 2009 16:42:43 Mikael Pettersson wrote:
+On Tue, Oct 27, 2009 at 11:54:24AM +0800, zyxsjl wrote:
+>  
+>  hi anyone, 
+> I have not understood some code in this file below: 
 ...
->
-> I don't like this 'ret' variable:
-> - it's only for OABI, but declared at the top and initialised also for EABI
-> - you update it with |=, but clearly there's no useful previous value
->
-> I'd drop 'ret' and just do:
->
-> 				if (put_user(regs->ARM_pc, usp) == 0) {
-> 					flush...
-> 				} else {
-> 					... force_sigsegv
-> 				}
->
-> (Note: == 0 not !, since ! is often read as "failed" whereas for
-> put_user() 0 means Ok and non-zero means -errno.)
-Yes that improves the code readability. Thanks for the suggestion.
+> my question is:what is the different between the both CONFIG_ZBOOT_ROM=y
+> or n, and so led to the different tackles from the above code on relocation?
 
-Here is an updated patch.
-
-Regards,
-Jean
+The first thing to note is that there is no initialized data section -
+we only have text, constant data, and BSS.
 
 
->From 885a5952dd38bc0c023e52f731ea2681d43132ba Mon Sep 17 00:00:00 2001
-From: Jean Pihet <jpihet@mvista.com>
-Date: Tue, 27 Oct 2009 10:09:22 +0100
-Subject: ARM: Check put_user fail in do_signal when enable OABI_COMPAT
+When ZBOOT_ROM=n, we relocate all entries.  This means that the entire
+image can be relocated as a whole anywhere in RAM, and the BSS segment
+moves with the image.  Such an image can not be programmed into ROM or
+flash.
 
-Using OABI, do_signal need to copy restart_syscall to user stack.
-It is possible that put_user fail. This triggers flush_icache page
-fault and crash kernel.
 
-Signed-off-by: janboe <janboe.ye@gmail.com>
+When ZBOOT_ROM=y, we exclude BSS entries from being relocated.  This
+means that the image can still be relocated _provided_ it is located
+in RAM, but the BSS remains at the compile-time fixed address.
 
-Merged from
-http://lists.infradead.org/pipermail/linux-arm-kernel/2009-October/002621.html
-on top of
-http://marc.info/?l=linux-arm-kernel&m=125638133624452&w=2
-
-Tested with multiple sleeping apps/threads (using the nanosleep syscall) and
-suspend/resume.
-
-Signed-off-by: Jean Pihet <jpihet@mvista.com>
----
- arch/arm/kernel/signal.c |   10 ++++++++--
- 1 files changed, 8 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-index f330974..4366cc0 100644
---- a/arch/arm/kernel/signal.c
-+++ b/arch/arm/kernel/signal.c
-@@ -676,8 +676,14 @@ static int do_signal(sigset_t *oldset, struct pt_regs 
-*regs, int syscall)
- 				regs->ARM_sp -= 4;
- 				usp = (u32 __user *)regs->ARM_sp;
- 
--				put_user(regs->ARM_pc, usp);
--				regs->ARM_pc = KERN_RESTART_CODE;
-+				if (put_user(regs->ARM_pc, usp) == 0) {
-+					flush_icache_range((unsigned long)usp,
-+						(unsigned long)(usp + 1));
-+					regs->ARM_pc = KERN_RESTART_CODE;
-+				} else {
-+					regs->ARM_sp += 4;
-+					force_sigsegv(0, current);
-+				}
- #endif
- 			}
- 		}
--- 
-1.6.2.5.168.g3823
+If the image is located in ROM or flash, it can not be relocated and
+_must_ be built for the precise address it will be executed from.
+This restriction is because the GOT table will be in ROM and therefore
+can not be written to (the code explicitly avoids any writes to the GOT
+in this case.)
