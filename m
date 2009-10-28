@@ -1,48 +1,30 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 28 Oct 2009 15:49:01 +0000
-Subject: [RFC 09/11] ARM: Add I-cache invalidation for VIVT ASID tagged
-	caches
-In-Reply-To: <5dee6c2014c4724c1ff6923326e93084f337581a.1256683230.git.rmk+kernel@arm.linux.org.uk>
-References: <cover.1256683230.git.rmk+kernel@arm.linux.org.uk>
-	<5dee6c2014c4724c1ff6923326e93084f337581a.1256683230.git.rmk+kernel@arm.linux.org.uk>
-Message-ID: <1256744941.27121.45.camel@pc1117.cambridge.arm.com>
+From: schwarzb@ipms.fraunhofer.de (Markus Schwarzenberg)
+Date: Wed, 28 Oct 2009 16:49:17 +0100
+Subject: smdk6400/S3C6400 failure on execution of init process
+In-Reply-To: <20091028153010.GE8096@trinity.fluff.org>
+References: <20091028162037.22f2cb22@linpcd55>
+	<20091028153010.GE8096@trinity.fluff.org>
+Message-ID: <20091028164917.1bbaef4f@linpcd55>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2009-10-25 at 13:35 +0000, Russell King wrote:
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/mm/flush.c |    6 ++++++
->  1 files changed, 6 insertions(+), 0 deletions(-)
+On Wed, 28 Oct 2009 15:30:17 +0000 Ben Dooks <ben-linux@fluff.org> wrote:
+
+> On Wed, Oct 28, 2009 at 04:20:37PM +0100, Markus Schwarzenberg wrote:
+> > 
+> > booting linux-2.6.32-rc5 on our smdk6400 (S3C6400) fails somewhere in/after 
+> > the asm call in arch/arm/kernel/sys_arm.c:kernel_execve, when the init 
+> > process is to be run.
 > 
-> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-> index dc66f86..9770e27 100644
-> --- a/arch/arm/mm/flush.c
-> +++ b/arch/arm/mm/flush.c
-> @@ -69,6 +69,9 @@ void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned
->  		    : "cc");
->  		__flush_icache_all();
->  	}
-> +
-> +	if (vma->vm_flags & VM_EXEC && icache_is_vivt_asid_tagged())
-> +		__flush_icache_all();
->  }
->  
->  void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr, unsigned long pfn)
-> @@ -82,6 +85,9 @@ void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr, unsig
->  		flush_pfn_alias(pfn, user_addr);
->  		__flush_icache_all();
->  	}
-> +
-> +	if (vma->vm_flags & VM_EXEC && icache_is_vivt_asid_tagged())
-> +		__flush_icache_all();
->  }
->  
->  void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
+> Which is the last kernel version that ran this ok?
 
-You may be right but why is this needed? Between mm's, we have the ASID.
-Within the same mm, do we expect to change the corresponding physical
-address of a virtual address without calling update_mmu_cache?
+None. 2.6.32-rc5 is basically the first we try. (after no success with 
+2.6.31-rc6)
 
--- 
-Catalin
+ 
+> Does the kernel have vfp support compiled in?
+
+No.
+
+--
+Markus Schwarzenberg
