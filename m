@@ -1,26 +1,28 @@
-From: broonie@sirena.org.uk (Mark Brown)
-Date: Wed, 28 Oct 2009 13:15:27 +0000
-Subject: [PATCH 08/12] ARM: S3C: Add info for supporting circular DMA
-	buffers
-In-Reply-To: <20091028124749.GD31509@trinity.fluff.org>
-References: <1256732153-22027-1-git-send-email-ben-linux@fluff.org>
-	<1256732153-22027-8-git-send-email-ben-linux@fluff.org>
-	<20091028123944.GB23925@sirena.org.uk>
-	<20091028124749.GD31509@trinity.fluff.org>
-Message-ID: <20091028131527.GC23925@sirena.org.uk>
+From: schwarzb@ipms.fraunhofer.de (Markus Schwarzenberg)
+Date: Wed, 28 Oct 2009 14:47:48 +0100
+Subject: S3C6400 SMDK6400 HSMMC problem
+In-Reply-To: <20091026153139.GC8096@trinity.fluff.org>
+References: <20091022172716.2c20c1a8@linpcd55>
+	<20091026153139.GC8096@trinity.fluff.org>
+Message-ID: <20091028144748.3a01adfa@linpcd55>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2009 at 12:47:51PM +0000, Ben Dooks wrote:
+On Mon, 26 Oct 2009 15:31:40 +0000 Ben Dooks <ben@trinity.fluff.org> wrote:
 
-> I was pushing this up via my tree, it touches both the core and ASoC code
-> so decided to merge myself and copy-you.
+> > However the kernel's sdhci driver has problems (I/O errors) using the same
+> > S3C6400 HSMMC 0 (see below) when trying to mount the root partition from
+> > the SD Card.
+> 
+> It is possible there is a problem with the setup data being passed for
+> the system, since the controller has some feedback controls that are
+> in an extended part of the SDHCI controller space.
 
-Like I say, if you could put it on a branch I could pull in if need be
-in the case of merge conflicts that'd be ideal.
+thanks. now it turned out that with unrecommended feedback control 
+settings (FCSEL[2]=0 for for Normal Speed mode) the I/O errors are gone.
 
-> On the whole Samsung merging, there is still work in progress there so
-> we will see what is going to happen.
+in the original setup arch/arm/mach-s3c6400/setup-sdhci.c it's done 
+as recommended by Samsung and the same way it's done in OpenMoko/qi.
 
-The general trend appears to be moving away from upstream as far as I
-can see; public activity has certainly been dying down.
+--
+Markus
