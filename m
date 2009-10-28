@@ -1,56 +1,84 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 28 Oct 2009 18:21:47 +0100
-Subject: MXC MMC driver and SDIO peripherals
-In-Reply-To: <1256749864.3850.44.camel@localhost.localdomain>
-References: <20091021192038.GK14091@buzzloop.caiaq.de>
-	<1256156119.8469.40.camel@localhost.localdomain>
-	<20091028164752.GN29442@buzzloop.caiaq.de>
-	<1256749864.3850.44.camel@localhost.localdomain>
-Message-ID: <20091028172147.GM14091@buzzloop.caiaq.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 28 Oct 2009 13:24:13 -0400 (EDT)
+Subject: [PATCH] check put_user fail in do_signal when enable OABI_COMPACT
+In-Reply-To: <200910281800.47681.jpihet@mvista.com>
+References: <1256123277.3851.36.camel@debian-nb>
+	<alpine.LFD.2.00.0910281209240.10545@xanadu.home>
+	<200910281723.01684.jpihet@mvista.com>
+	<200910281800.47681.jpihet@mvista.com>
+Message-ID: <alpine.LFD.2.00.0910281323320.10545@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2009 at 10:11:04AM -0700, Dan Williams wrote:
-> On Wed, 2009-10-28 at 17:47 +0100, Daniel Mack wrote:
-> > I did some more research on this and it turns out that the problem is
-> > related to multi block transfers. At least, this is when it first
-> > occurs.
-> > 
-> > The libertas SDIO driver downloads two firmwares to the device, one
-> > 'helper' and one 'real' firmware The first one only uses chunks of 64
-> > bytes each and that seems to work fine. The real firmware, however,
-> > loads in 512 bytes chunks which the SDIO core breaks up into 16 blocks
-> > of 32 bytes. And this is where the MXC host controller bails out with a
-> > CRC error. Unfortunately, it does not give any more detailed information
-> > about what exactly went wrong.
-> > 
-> > The effect might be related to an errata entry[1], which is what I'm
-> > currently investigating. To do so, I would like to limit the the
-> > communication to singe-block transfers, just to exclude all other
-> > possible (electrical, clock speed, ...) issues. I did that by setting
-> > mmc->max_blk_count to 1 in the the host controller, but then again,
-> > the libertas driver and/or the firmware doesn't like that and dies in
-> > if_sdio_pro_real() with
-> > 
-> >   firmware wants 17 bytes
-> >   firmware helper signalled error
-> > 
-> > Any idea how to get that working with only single block small transfers?
-> 
-> Just a note; single-block transfers will probably kill your wifi
-> performance, especially if the errata are true.  When the libertas
-> driver sends network data packets it sends them with
-> 
-> 		ret = sdio_writesb(card->func, card->ioport,
-> 				packet->buffer, packet->nb);
-> 
-> so if your packet is normal ethernet 1500 bytes, breaking that up in to
-> 47 single block transfers of 32-bytes each is going to be slow...
+On Wed, 28 Oct 2009, Jean Pihet wrote:
 
-Yep, I know. Thats's a disaster, especially without DMA enabled (which
-is currently the case).
+> On Wednesday 28 October 2009 17:23:01 Jean Pihet wrote:
+> ...
+> > > Still wrong.  Why flush_icache?
+> >
+> > Indeed that is wrong (again!). I had put it in the problem description but
+> > that does not apply anymore.
+> >
+> > Thanks, will send an update.
+> Here is the updated patch. Is it OK?
 
-But I'd like to see it working somehow first and then see whether that's
-really the issue :)
+ACK.
 
-Daniel
+> ---
+> From 28336b68b2e2507ba0922c55147e5e72ec1a88dc Mon Sep 17 00:00:00 2001
+> From: Jean Pihet <jpihet@mvista.com>
+> Date: Tue, 27 Oct 2009 10:09:22 +0100
+> Subject: ARM: Check put_user fail in do_signal when enable OABI_COMPAT
+> 
+> Source: Janboe Ye <janboe.ye@gmail.com>
+> MR: 36048
+> Type: Defect Fix
+> Disposition: Submitted to linux-arm-kernel ML
+> ChangeID: 689ddf707d2232e9cf01387ac1264bc8812b9ffd
+> Description:
+> 
+> Using OABI, the call to put_user in do_signal can fail causing the calling
+> app to hang.
+> 
+> The solution is to check if put_user fails and force the app to
+> seg fault in that case.
+> 
+> Signed-off-by: janboe <janboe.ye@gmail.com>
+> 
+> Merged from
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2009-October/002621.html
+> on top of
+> http://marc.info/?l=linux-arm-kernel&m=125638133624452&w=2
+> 
+> Tested with multiple sleeping apps/threads (using the nanosleep syscall) and
+> suspend/resume.
+> 
+> Signed-off-by: Jean Pihet <jpihet@mvista.com>
+> ---
+>  arch/arm/kernel/signal.c |    8 ++++++--
+>  1 files changed, 6 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+> index f330974..ea9722a 100644
+> --- a/arch/arm/kernel/signal.c
+> +++ b/arch/arm/kernel/signal.c
+> @@ -676,8 +676,12 @@ static int do_signal(sigset_t *oldset, struct pt_regs 
+> *regs, int syscall)
+>  				regs->ARM_sp -= 4;
+>  				usp = (u32 __user *)regs->ARM_sp;
+>  
+> -				put_user(regs->ARM_pc, usp);
+> -				regs->ARM_pc = KERN_RESTART_CODE;
+> +				if (put_user(regs->ARM_pc, usp) == 0) {
+> +					regs->ARM_pc = KERN_RESTART_CODE;
+> +				} else {
+> +					regs->ARM_sp += 4;
+> +					force_sigsegv(0, current);
+> +				}
+>  #endif
+>  			}
+>  		}
+> -- 
+> 1.6.2.5.168.g3823
+> 
+> 
