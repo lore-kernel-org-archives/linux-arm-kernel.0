@@ -1,42 +1,24 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sun, 25 Oct 2009 14:31:40 +0000
-Subject: [RFC 11/11] ARM: avoid flushing I-cache in flush_cache_mm()
-In-Reply-To: <cover.1256683230.git.rmk+kernel@arm.linux.org.uk>
-References: <cover.1256683230.git.rmk+kernel@arm.linux.org.uk>
-Message-ID: <f4e898a97589fdee3c689780212fe225e6732a6b.1256683230.git.rmk+kernel@arm.linux.org.uk>
+From: Virupax.SS@Lntemsys.com (Virupax.SS at Lntemsys.com)
+Date: Wed, 28 Oct 2009 20:30:59 +0530
+Subject: smsc911x driver fails on ifconfig down and up
+Message-ID: <OFA313B4AC.C7E2966E-ON6525765D.005208E0-6525765D.005263B5@lntemsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-flush_cache_mm() is called in two cases:
-1. when a process exits, just before the page tables are torn down.
-   We can allow the stale lines to evict themselves over time without
-   causing any harm.
+I am using linux 2.6.27 on at91sam9g20 board.When i ping the smsc 9115 
+ethernet as below on boot up it works
 
-2. when a process forks, and we've allocated a new ASID.
-   The instruction cache issues are dealt with as pages are brought
-   into the new process address space.  Flushing the I-cache here is
-   therefore unnecessary.
+ping -s 65000 192.168.1.1
 
-However, we must keep the VIPT aliasing D-cache flush to ensure that
-any dirty cache lines are not written back after the pages have been
-reallocated for some other use - which would result in corruption.
+but if i do ifconfig down and ifconfig up for the smsc ethernet and then 
+the ping to the ethernet as above down not work.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mm/flush.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+Can you please tell what problem may be there with the driver.
 
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index ee7ce68..329594e 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -50,7 +50,6 @@ void flush_cache_mm(struct mm_struct *mm)
- 		    :
- 		    : "r" (0)
- 		    : "cc");
--		__flush_icache_all();
- 	}
- }
- 
--- 
-1.6.2.5
+Thanks
+
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091028/ceb6de87/attachment.htm>
