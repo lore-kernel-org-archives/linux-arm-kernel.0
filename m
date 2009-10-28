@@ -1,42 +1,37 @@
-From: bn@niasdigital.com (Ben Nizette)
-Date: Thu, 29 Oct 2009 07:50:57 +1100
-Subject: [PATCH 3/3 v2] at91/atmel-mci: inclusion of sd/mmc driver in
-	at91sam9g45 chip and board
-In-Reply-To: <cd73a99e0910281253x1bb72b74p47cb5110efb0871f@mail.gmail.com>
-References: <acfa557032a93e2d3186981b16f7048a5a31028a.1256314995.git.nicolas.ferre@atmel.com>
-	<20090930155557.7dae503b@hskinnemoen-d830>
-	<a3b1332815576dc4d496937b8a5ab69d36818d00.1256314995.git.nicolas.ferre@atmel.com>
-	<cd73a99e0910271243x744c956bl598fef9fd4144840@mail.gmail.com>
-	<20091028083548.38f1d80c@hskinnemoen-d830>
-	<d6cda7730910271753o54acfa04t1225de460083325f@mail.gmail.com>
-	<cd73a99e0910281253x1bb72b74p47cb5110efb0871f@mail.gmail.com>
-Message-ID: <1256763057.4362.36.camel@ben-desktop>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 28 Oct 2009 22:22:06 +0100
+Subject: staging/dream: add gpio and pmem support
+In-Reply-To: <a55d774e0910271503u40184a37ub493cfb3ed37adba@mail.gmail.com>
+References: <20091022091333.GA31023@elf.ucw.cz>
+	<20091026234332.GB26583@kroah.com>
+	<20091027001702.GA5019@elf.ucw.cz>
+	<20091027030039.GA6195@kroah.com>
+	<20091027081921.GG5019@elf.ucw.cz>
+	<20091027165750.GA24477@kroah.com>
+	<20091027193330.GB19379@elf.ucw.cz>
+	<a55d774e0910271503u40184a37ub493cfb3ed37adba@mail.gmail.com>
+Message-ID: <20091028212206.GE4159@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2009-10-28 at 21:53 +0200, Andrew Victor wrote:
-> hi,
+On Tue 2009-10-27 15:03:08, Brian Swetland wrote:
+> On Tue, Oct 27, 2009 at 12:33 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> >
+> > (Plus, of course I'd like some help, but google people seem very
+> > silent :-( ).
 > 
-> > Then I think it would be best to use GPIO_PIN_NONE. Makes it clear
-> > what is expected and avoids confusion on what should be the proper
-> > value.
-> > I hope I'm not saying non-sense, but even if I am, I guess you can see
-> > that I'm advocating against the magic numbers :)
+> Hi Pavel,
 > 
-> What magic numbers ?
+> The Android kernel team is completely buried in issues related to fall
+> 09 devices -- we're just not going to have cycles for sorting out
 
-I think Thiago was referring to the "-1" in the original patch as the
-magic number.
+Given how Android is spreading between phones -- like a wildfire --
+I'm not surprised. But it is very unfortunate -- exactly because
+Android is extremely important mobile platform :-(.
 
-Leaving the field blank to be initialised to 0 is certainly the
-cleanest, I agree, but it doesn't actually /work/.  On many archs 0 is a
-valid gpio number; the gpio_is_valid check used throughout the kernel
-(including atmel-mci.c) looks like
-
-static inline int gpio_is_valid(int number)
-{
-	/* only some non-negative numbers are valid */
-	return ((unsigned)number) < ARCH_NR_GPIOS;
-}
-
-	--Ben.
+I can still hope that Google opens developer centre in Prague and
+starts hiring :-).
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
