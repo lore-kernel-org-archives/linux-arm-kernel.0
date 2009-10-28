@@ -1,30 +1,30 @@
-From: schwarzb@ipms.fraunhofer.de (Markus Schwarzenberg)
-Date: Wed, 28 Oct 2009 16:49:17 +0100
-Subject: smdk6400/S3C6400 failure on execution of init process
-In-Reply-To: <20091028153010.GE8096@trinity.fluff.org>
-References: <20091028162037.22f2cb22@linpcd55>
-	<20091028153010.GE8096@trinity.fluff.org>
-Message-ID: <20091028164917.1bbaef4f@linpcd55>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 28 Oct 2009 15:51:38 +0000
+Subject: [RFC 10/11] ARM: arrange for flush_cache_range() to always
+	flush the I-cache
+In-Reply-To: <12475bd20f82c3a5e78d5b8e9d3cb266914c4727.1256683230.git.rmk+kernel@arm.linux.org.uk>
+References: <cover.1256683230.git.rmk+kernel@arm.linux.org.uk>
+	<12475bd20f82c3a5e78d5b8e9d3cb266914c4727.1256683230.git.rmk+kernel@arm.linux.org.uk>
+Message-ID: <1256745098.27121.48.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Oct 2009 15:30:17 +0000 Ben Dooks <ben-linux@fluff.org> wrote:
-
-> On Wed, Oct 28, 2009 at 04:20:37PM +0100, Markus Schwarzenberg wrote:
-> > 
-> > booting linux-2.6.32-rc5 on our smdk6400 (S3C6400) fails somewhere in/after 
-> > the asm call in arch/arm/kernel/sys_arm.c:kernel_execve, when the init 
-> > process is to be run.
+On Sun, 2009-10-25 at 14:12 +0000, Russell King wrote:
+> Dirk Behme reported instability on ARM11 SMP (VIPT non-aliasing cache)
+> caused by the dynamic linker changing protection on text pages to write
+> GOT entries.  The problem is due to an interaction between the write
+> faulting code providing new anonymous pages (which haven't had their
+> I-cache cleaned due to no VM_EXEC) and change_protection() not doing
+> any kind of I-cache maintainence.
 > 
-> Which is the last kernel version that ran this ok?
+> Work around this by flushing the I-cache in flush_cache_range() for
+> VM_EXEC VMAs (which is what we have when the region is being made
+> executable again.)  This ensures that the I-cache will be up to date
+> with the new COW'd pages.
 
-None. 2.6.32-rc5 is basically the first we try. (after no success with 
-2.6.31-rc6)
+Are you sure this fixes the problem? IIRC this is mainly caused by the
+write-allocate D-cache and that copy_to_user_highpage() doesn't flush
+the D-cache. Just an I-cache invalidation wouldn't help much.
 
- 
-> Does the kernel have vfp support compiled in?
-
-No.
-
---
-Markus Schwarzenberg
+-- 
+Catalin
