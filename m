@@ -1,52 +1,44 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 28 Oct 2009 12:15:43 +0000
-Subject: [PATCH 02/12] ARM: S3C24XX: Introduce S3C2442B CPU
+Date: Wed, 28 Oct 2009 12:15:52 +0000
+Subject: [PATCH 11/12] ARM: S3C2440: mini2440: Fix spare warnings
 In-Reply-To: <1256732153-22027-1-git-send-email-ben-linux@fluff.org>
 References: <1256732153-22027-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1256732153-22027-2-git-send-email-ben-linux@fluff.org>
+Message-ID: <1256732153-22027-11-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Harald Welte <laforge@gnumonks.org>
+Fix the following sparse warnings in arch/arm/mach-s3c2440/mach-mini2440.c
+due to missing 'static'.
 
-Add the S3C2442B CPU ID to aid support the Openmoko GTA02 / Freerunner.
+warning: symbol 'mini2440_lcd_cfg' was not declared. Should it be static?
+warning: symbol 'mini2440_fb_info' was not declared. Should it be static?
 
-Signed-off-by: Harald Welte <laforge@gnumonks.org>
-Signed-off-by: Andy Green <andy@warmcat.com>
-Signed-off-by: Nelson Castillo <arhuaco@freaks-unidos.net>
-[ben-linux at fluff.org: edit description for clarity and S3C2442B as uppercase]
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/plat-s3c24xx/cpu.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ arch/arm/mach-s3c2440/mach-mini2440.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/plat-s3c24xx/cpu.c b/arch/arm/plat-s3c24xx/cpu.c
-index 5447e60..4af9dd9 100644
---- a/arch/arm/plat-s3c24xx/cpu.c
-+++ b/arch/arm/plat-s3c24xx/cpu.c
-@@ -61,6 +61,7 @@ static const char name_s3c2410[]  = "S3C2410";
- static const char name_s3c2412[]  = "S3C2412";
- static const char name_s3c2440[]  = "S3C2440";
- static const char name_s3c2442[]  = "S3C2442";
-+static const char name_s3c2442b[]  = "S3C2442B";
- static const char name_s3c2443[]  = "S3C2443";
- static const char name_s3c2410a[] = "S3C2410A";
- static const char name_s3c2440a[] = "S3C2440A";
-@@ -112,6 +113,15 @@ static struct cpu_table cpu_ids[] __initdata = {
- 		.name		= name_s3c2442
- 	},
- 	{
-+		.idcode		= 0x32440aab,
-+		.idmask		= 0xffffffff,
-+		.map_io		= s3c244x_map_io,
-+		.init_clocks	= s3c244x_init_clocks,
-+		.init_uarts	= s3c244x_init_uarts,
-+		.init		= s3c2442_init,
-+		.name		= name_s3c2442b
-+	},
-+	{
- 		.idcode		= 0x32412001,
- 		.idmask		= 0xffffffff,
- 		.map_io		= s3c2412_map_io,
+diff --git a/arch/arm/mach-s3c2440/mach-mini2440.c b/arch/arm/mach-s3c2440/mach-mini2440.c
+index ec71a69..1c3382f 100644
+--- a/arch/arm/mach-s3c2440/mach-mini2440.c
++++ b/arch/arm/mach-s3c2440/mach-mini2440.c
+@@ -144,7 +144,7 @@ static struct s3c2410_udc_mach_info mini2440_udc_cfg __initdata = {
+ 	.type		= (S3C2410_LCDCON1_TFT16BPP |\
+ 			   S3C2410_LCDCON1_TFT)
+ 
+-struct s3c2410fb_display mini2440_lcd_cfg[] __initdata = {
++static struct s3c2410fb_display mini2440_lcd_cfg[] __initdata = {
+ 	[0] = {	/* mini2440 + 3.5" TFT + touchscreen */
+ 		_LCD_DECLARE(
+ 			7,			/* The 3.5 is quite fast */
+@@ -191,7 +191,7 @@ struct s3c2410fb_display mini2440_lcd_cfg[] __initdata = {
+ #define S3C2410_GPCCON_MASK(x)	(3 << ((x) * 2))
+ #define S3C2410_GPDCON_MASK(x)	(3 << ((x) * 2))
+ 
+-struct s3c2410fb_mach_info mini2440_fb_info __initdata = {
++static struct s3c2410fb_mach_info mini2440_fb_info __initdata = {
+ 	.displays	 = &mini2440_lcd_cfg[0], /* not constant! see init */
+ 	.num_displays	 = 1,
+ 	.default_display = 0,
 -- 
 1.6.3.3
