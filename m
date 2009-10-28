@@ -1,34 +1,30 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 28 Oct 2009 20:25:04 +0100
-Subject: [RFC 00/11] Cache handling updates
-In-Reply-To: <20091028174107.GD20040@n2100.arm.linux.org.uk>
-References: <cover.1256683230.git.rmk+kernel@arm.linux.org.uk>
-	<200910281717.26240.laurent.pinchart@ideasonboard.com>
-	<20091028174107.GD20040@n2100.arm.linux.org.uk>
-Message-ID: <200910282025.04873.laurent.pinchart@ideasonboard.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Wed, 28 Oct 2009 19:32:34 +0000
+Subject: [PATCH] check put_user fail in do_signal when enable OABI_COMPACT
+In-Reply-To: <200910281800.47681.jpihet@mvista.com>
+References: <1256123277.3851.36.camel@debian-nb>
+	<alpine.LFD.2.00.0910281209240.10545@xanadu.home>
+	<200910281723.01684.jpihet@mvista.com>
+	<200910281800.47681.jpihet@mvista.com>
+Message-ID: <20091028193234.GB17475@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 October 2009 18:41:07 Russell King - ARM Linux wrote:
-> On Wed, Oct 28, 2009 at 05:17:26PM +0100, Laurent Pinchart wrote:
-> > Hi Russel,
-> 
-> Grr.
+Jean Pihet wrote:
+>  				usp = (u32 __user *)regs->ARM_sp;
+>  
+> -				put_user(regs->ARM_pc, usp);
+> -				regs->ARM_pc = KERN_RESTART_CODE;
+> +				if (put_user(regs->ARM_pc, usp) == 0) {
+> +					regs->ARM_pc = KERN_RESTART_CODE;
+> +				} else {
+> +					regs->ARM_sp += 4;
+> +					force_sigsegv(0, current);
+> +				}
+>  #endif
+>  			}
+>  		}
 
-Sorry, I'll be more careful next time.
- 
-> > for some reason the patches seem not to have made it to the list. I
-> > haven't received them in my mailbox, and I can't find them in the
-> > archive.
-> 
-> I've no idea either; they got stuck in the moderation queue last night
-> and I assume are still pending.
-> 
-> I'm sure the list admins will eventually get around to it.
+This one looks good to me.
 
-Thanks.
-
--- 
-Regards,
-
-Laurent Pinchart
+-- Jamie
