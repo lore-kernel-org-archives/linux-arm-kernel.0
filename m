@@ -1,59 +1,34 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 28 Oct 2009 12:15:46 +0000
-Subject: [PATCH 05/12] ARM: S3C24XX: arch/arm/plat-s3c24xx: Move dereference
-	after NULL test
+Date: Wed, 28 Oct 2009 12:15:53 +0000
+Subject: [PATCH 12/12] ARM: S3C2410: Fix sparse warnings in
+	arch/arm/mach-s3c2410/gpio.c
 In-Reply-To: <1256732153-22027-1-git-send-email-ben-linux@fluff.org>
 References: <1256732153-22027-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1256732153-22027-5-git-send-email-ben-linux@fluff.org>
+Message-ID: <1256732153-22027-12-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <julia@diku.dk>
+Fix sparse warning in arch/arm/mach-s3c2410/gpio.c due to missing
+include of <mach/gpio-fns.h>. Fixes the following warning:
 
-If the NULL test on buf is needed, then the dereference should be after the
-NULL test.
+warning: symbol 's3c2410_gpio_irqfilter' was not declared. Should it be static?
 
-A simplified version of the semantic match that detects this problem is as
-follows (http://coccinelle.lip6.fr/):
-
-// <smpl>
-@match exists@
-expression x, E;
-identifier fld;
-@@
-
-* x->fld
-  ... when != \(x = E\|&x\)
-* x == NULL
-// </smpl>
-
-Signed-off-by: Julia Lawall <julia@diku.dk>
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/plat-s3c24xx/dma.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-s3c2410/gpio.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
-index 196b191..f046f8c 100644
---- a/arch/arm/plat-s3c24xx/dma.c
-+++ b/arch/arm/plat-s3c24xx/dma.c
-@@ -208,14 +208,14 @@ s3c2410_dma_loadbuffer(struct s3c2410_dma_chan *chan,
- {
- 	unsigned long reload;
+diff --git a/arch/arm/mach-s3c2410/gpio.c b/arch/arm/mach-s3c2410/gpio.c
+index 7974afc..9664e01 100644
+--- a/arch/arm/mach-s3c2410/gpio.c
++++ b/arch/arm/mach-s3c2410/gpio.c
+@@ -28,6 +28,7 @@
+ #include <linux/io.h>
  
--	pr_debug("s3c2410_chan_loadbuffer: loading buff %p (0x%08lx,0x%06x)\n",
--		 buf, (unsigned long)buf->data, buf->size);
--
- 	if (buf == NULL) {
- 		dmawarn("buffer is NULL\n");
- 		return -EINVAL;
- 	}
+ #include <mach/hardware.h>
++#include <mach/gpio-fns.h>
+ #include <asm/irq.h>
  
-+	pr_debug("s3c2410_chan_loadbuffer: loading buff %p (0x%08lx,0x%06x)\n",
-+		 buf, (unsigned long)buf->data, buf->size);
-+
- 	/* check the state of the channel before we do anything */
- 
- 	if (chan->load_state == S3C2410_DMALOAD_1LOADED) {
+ #include <mach/regs-gpio.h>
 -- 
 1.6.3.3
