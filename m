@@ -1,24 +1,19 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 28 Oct 2009 00:55:08 +0100
-Subject: [PATCH] video: add driver for PXA3xx 2D graphics accelerator [v3]
-Message-ID: <20091027235508.GZ14091@buzzloop.caiaq.de>
+Date: Wed, 28 Oct 2009 01:14:59 +0100
+Subject: [PATCH] USB: Add EHCI support for MX27 and MX31 based boards
+Message-ID: <20091028001459.GB14091@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric et al,
+As the generic ULPI OTG bits have been picked now, the last thing for
+USB on MX2/MX3 SoCs that needs to go thru the USB people's channel is
+the EHCI driver itself. There is still the MXC spcific ULPI
+implementation which I will submit seperately.
 
-Dennis Oliver Kropp manged to find a long standing race in our PXA3xx
-DirectFB accelerator driver which makes the system stable now in all our
-tests. The necessary user space patch went upstream already [1].
-Below is a patch that adds the corresponding kernel space driver.
-
-We're using that driver for quite some time now and believe that it is a
-huge benefit for any user of PXA3xx SoCs with graphical applications, so
-we would love to see it merged upstream soon. Could this go thru the pxa
-tree for .33?
+I rebased this patch to apply to the current mainline git. Is there
+anything I can do to speed up things a little? IIRC, there was still no
+Ack from David Brownell, which was the reason why it wasn't considered
+for merging yet.
 
 Thanks,
 Daniel
-
-
-[1] http://git.directfb.org/?p=core/DirectFB.git;a=commit;h=01b6e0fa56aa3ceadbde8344c3f35cb4a1feab15
