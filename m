@@ -1,50 +1,15 @@
-From: avictor.za@gmail.com (Andrew Victor)
-Date: Wed, 28 Oct 2009 21:53:03 +0200
-Subject: [PATCH 3/3 v2] at91/atmel-mci: inclusion of sd/mmc driver in
-	at91sam9g45 chip and board
-In-Reply-To: <d6cda7730910271753o54acfa04t1225de460083325f@mail.gmail.com>
-References: <acfa557032a93e2d3186981b16f7048a5a31028a.1256314995.git.nicolas.ferre@atmel.com>
-	<20090930155557.7dae503b@hskinnemoen-d830>
-	<a3b1332815576dc4d496937b8a5ab69d36818d00.1256314995.git.nicolas.ferre@atmel.com>
-	<cd73a99e0910271243x744c956bl598fef9fd4144840@mail.gmail.com>
-	<20091028083548.38f1d80c@hskinnemoen-d830>
-	<d6cda7730910271753o54acfa04t1225de460083325f@mail.gmail.com>
-Message-ID: <cd73a99e0910281253x1bb72b74p47cb5110efb0871f@mail.gmail.com>
+From: john.ogness@linutronix.de (John Ogness)
+Date: Wed, 28 Oct 2009 20:57:22 +0100
+Subject: i.MX35 NANDFC implementation?
+Message-ID: <80ocnrfg0t.fsf@merkur.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
+Hi,
 
-> Then I think it would be best to use GPIO_PIN_NONE. Makes it clear
-> what is expected and avoids confusion on what should be the proper
-> value.
-> I hope I'm not saying non-sense, but even if I am, I guess you can see
-> that I'm advocating against the magic numbers :)
+I am implementing the NAND Flash Controller for for the i.MX35 on a PDK
+board from Freescale. I couldn't find any existing implementation
+anywhere, but maybe one of you is also working on it? If so, please let
+me know so we can work together on it.
 
-What magic numbers ?
-
-If you have a "wp_pin" on the board, you declare the struct as:
-    static struct mci_platform_data __initdata mci0_data = {
-          .slot[0] = {
-                 .bus_width      = 4,
-                 .detect_pin     = AT91_PIN_PD10,
-        }
-    }
-
-and if you do have a "wp_pin" on your board, you declare the struct as:
-    static struct mci_platform_data __initdata mci0_data = {
-          .slot[0] = {
-                 .bus_width      = 4,
-                 .detect_pin     = AT91_PIN_PD10,
-                 .wp_pin          = AT91_PIN_PD11,
-        }
-    }
-
-And it's more future-proof.  If the next version of the
-driver/peripheral has a "toggle_pin" GPIO option, you don't need to go
-update all board files with a ".toggle_pin  = GPIO_PIN_NONE"   or
-".toggle_pin = -ENODEV".
-
-
-Regards,
-  Andrew Victor
+John Ogness
