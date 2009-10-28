@@ -1,82 +1,59 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 28 Oct 2009 17:32:34 +0000
-Subject: [RFC 02/11] ARM: Fix errata 411920 workarounds
-In-Reply-To: <1256743895.27121.39.camel@pc1117.cambridge.arm.com>
+Date: Wed, 28 Oct 2009 17:35:35 +0000
+Subject: [RFC 09/11] ARM: Add I-cache invalidation for VIVT ASID tagged
+	caches
+In-Reply-To: <1256744941.27121.45.camel@pc1117.cambridge.arm.com>
 References: <cover.1256683230.git.rmk+kernel@arm.linux.org.uk>
-	<6af8ea18ac64a74700e374489751a63e643ac394.1256683230.git.rmk+kernel@arm.linux.org.uk>
-	<1256743895.27121.39.camel@pc1117.cambridge.arm.com>
-Message-ID: <20091028173234.GA20040@n2100.arm.linux.org.uk>
+	<5dee6c2014c4724c1ff6923326e93084f337581a.1256683230.git.rmk+kernel@arm.linux.org.uk>
+	<1256744941.27121.45.camel@pc1117.cambridge.arm.com>
+Message-ID: <20091028173535.GB20040@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2009 at 03:31:35PM +0000, Catalin Marinas wrote:
-> On Sat, 2009-10-24 at 22:36 +0100, Russell King wrote:
-> > Errata 411920 indicates that any "invalidate entire instruction cache"
-> > operation can fail if the right conditions are present.  This is not
-> > limited just to those operations in flush.c, but elsewhere.  Place the
-> > workaround in the already existing __flush_icache_all() function
-> > instead.
-> > 
+On Wed, Oct 28, 2009 at 03:49:01PM +0000, Catalin Marinas wrote:
+> On Sun, 2009-10-25 at 13:35 +0000, Russell King wrote:
 > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > > ---
-> >  arch/arm/include/asm/cacheflush.h |    5 +++++
-> >  arch/arm/mm/context.c             |    4 ++--
-> >  arch/arm/mm/flush.c               |   31 ++++++-------------------------
-> >  3 files changed, 13 insertions(+), 27 deletions(-)
+> >  arch/arm/mm/flush.c |    6 ++++++
+> >  1 files changed, 6 insertions(+), 0 deletions(-)
 > > 
-> > diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-> > index 3147f75..af0624c 100644
-> > --- a/arch/arm/include/asm/cacheflush.h
-> > +++ b/arch/arm/include/asm/cacheflush.h
-> > @@ -412,9 +412,14 @@ extern void flush_dcache_page(struct page *);
-> >  
-> >  static inline void __flush_icache_all(void)
-> >  {
-> > +#ifdef CONFIG_ARM_ERRATA_411920
-> > +	extern void v6_icache_inval_all(void);
-> > +	v6_icache_inval_all();
-> > +#else
-> 
-> I think some compiler complain of "extern" declarations inside a
-> function, not entirely sure.
-
-It does not, it's an entirely valid scoping mechanism.
-
-> >         asm("mcr        p15, 0, %0, c7, c5, 0   @ invalidate I-cache\n"
-> >             :
-> >             : "r" (0));
-> > +#endif
+> > diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+> > index dc66f86..9770e27 100644
+> > --- a/arch/arm/mm/flush.c
+> > +++ b/arch/arm/mm/flush.c
+> > @@ -69,6 +69,9 @@ void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned
+> >  		    : "cc");
+> >  		__flush_icache_all();
+> >  	}
+> > +
+> > +	if (vma->vm_flags & VM_EXEC && icache_is_vivt_asid_tagged())
+> > +		__flush_icache_all();
 > >  }
+> >  
+> >  void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr, unsigned long pfn)
+> > @@ -82,6 +85,9 @@ void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr, unsig
+> >  		flush_pfn_alias(pfn, user_addr);
+> >  		__flush_icache_all();
+> >  	}
+> > +
+> > +	if (vma->vm_flags & VM_EXEC && icache_is_vivt_asid_tagged())
+> > +		__flush_icache_all();
+> >  }
+> >  
+> >  void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
 > 
-> For correctness, can we add a dsb() at the end of this function so that
-> the I-cache operation is guaranteed to complete?
+> You may be right but why is this needed? Between mm's, we have the ASID.
+> Within the same mm, do we expect to change the corresponding physical
+> address of a virtual address without calling update_mmu_cache?
 
-Two reasons why not to in this patch:
+Stop thinking that update_mmu_cache() has something to do with cache
+handling.  That is not its purpose.  update_mmu_cache() is there for
+systems with software-TLBs to efficiently update the software-TLB for
+the page fault which has happened.
 
-1. it changes the produced code, and therefore is another functional change.
-2. it means we end up with a sequence like:
+flush_cache_page() on the other hand is called whenever we change a
+page mapping - but it's not called when mm's change.
 
-	data cache maintainence
-	dsb();
-	instruction cache maintainence
-	dsb();
-
-The dsb() between the two operations probably isn't required.
-
-> > diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
-> > index 6bda76a..d4f8275 100644
-> > --- a/arch/arm/mm/context.c
-> > +++ b/arch/arm/mm/context.c
-> > @@ -50,8 +50,8 @@ void __new_context(struct mm_struct *mm)
-> >  		isb();
-> >  		flush_tlb_all();
-> >  		if (icache_is_vivt_asid_tagged()) {
-> > -			asm("mcr	p15, 0, %0, c7, c5, 0	@ invalidate I-cache\n"
-> > -			    "mcr	p15, 0, %0, c7, c5, 6	@ flush BTAC/BTB\n"
-> > +			__flush_icache_all();
-> > +			asm("mcr	p15, 0, %0, c7, c5, 6	@ flush BTAC/BTB"
-> 
-> IIUC, we don't need to flush the BTAC after a full I-cache invalidation
-> (not sure why I added it).
-
-Okay, I'll fix the patch for that.
+The ARM ARM specifies that when we change the page tables, and we
+have a VIVT I-cache, it needs to be flushed.  The above is merely
+complying with that statement.
