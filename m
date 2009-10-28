@@ -1,62 +1,69 @@
-From: greg@kroah.com (Greg KH)
-Date: Wed, 28 Oct 2009 08:51:16 -0700
-Subject: staging/dream: add gpio and pmem support
-In-Reply-To: <20091027232521.GA16782@elf.ucw.cz>
-References: <20091022091333.GA31023@elf.ucw.cz>
-	<20091026234332.GB26583@kroah.com>
-	<20091027001702.GA5019@elf.ucw.cz>
-	<20091027030039.GA6195@kroah.com>
-	<20091027081921.GG5019@elf.ucw.cz>
-	<20091027165750.GA24477@kroah.com>
-	<20091027193330.GB19379@elf.ucw.cz>
-	<20091027204445.GA28878@kroah.com>
-	<20091027232521.GA16782@elf.ucw.cz>
-Message-ID: <20091028155116.GA1434@kroah.com>
+From: schwarzb@ipms.fraunhofer.de (Markus Schwarzenberg)
+Date: Wed, 28 Oct 2009 16:59:49 +0100
+Subject: smdk6400/S3C6400 failure on execution of init process
+In-Reply-To: <20091028153916.GB2244@debian>
+References: <20091028162037.22f2cb22@linpcd55> <20091028153916.GB2244@debian>
+Message-ID: <20091028165949.593b4d04@linpcd55>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2009 at 12:25:22AM +0100, Pavel Machek wrote:
-> Hi!
-> 
-> > > What is so wrong with wakelocks? They are just nops in this case.
+On Wed, 28 Oct 2009 21:09:16 +0530 Rabin Vincent <rabin@rab.in> wrote:
+
+> On Wed, Oct 28, 2009 at 04:20:37PM +0100, Markus Schwarzenberg wrote:
 > > 
-> > Are they really?  Then why is the whole large file needed?
-> 
-> It is probably not, I went to "submit vendor code, then clean it up"
-> mode. CONFIG_HAS_WAKELOCK should be disabled, so it basically stubs
-> itself out.
-> 
-> > > 2) you submit it
+> > booting linux-2.6.32-rc5 on our smdk6400 (S3C6400) fails somewhere in/after 
+> > the asm call in arch/arm/kernel/sys_arm.c:kernel_execve, when the init 
+> > process is to be run.
 > > 
-> > Wait, it has to BUILD!  This code has never been able to be built.  Only
-> > after I disabled it from the CONFIG_ANDROID have I noticed this, which
-> > is my fault.  But it needs to get fixed, and taking a bunch of code in
-> > addition to the mess we have now, seems like the wrong way to do it.
-> 
-> It seems to be the only reasonable way. gpio is used from all the
-> other stuff, and removing it is not really an option.
-> 
-> > > Now, I see that wakelocks are show-stopper for merging into kernel
-> > > proper, but what is the problem for staging? We merged drivers with
-> > > OS_MEMORY_ALLOCATE(); wakelocks are just nops in this case.
-> > > 
-> > > Could we please clean this driver in-tree? (Wakelocks are already nops
-> > > due to #ifdef magic, cleaning them incrementally is easy.)
+> > The preceding do_execve returned OK, which suggests that the /init file is 
+> > found, executable etc. in rootfs. 
 > > 
-> > With this patch, will it build properly?
+> > The failure happens for both booting from  sd-card as well as from initramfs.
+> > I've tried several /init applications, from busybox to a simple wait(1); loop
+> > all with the same behavior.
+> > 
+> > What's the best way to debug this?
 > 
-> Its certainly way closer to building... it builds for me, with
-> something like below; platform devices really are initialized from
-> board-* files and get passed parameters.
+> As a first step, enable CONFIG_DEBUG_USER in your kernel and pass
+> "user_debug=31" on the kernel command line.  You'll get more info about
+> why init's being killed.
 
-Ick.  This isn't ok, we can't take patches for staging stuff in files
-outside of drivers/staging/
+thanks, did this, the additional messages are (context see [*]):
 
-So for now, I've deleted the drivers/staging/dream/ directory from my
-tree, which will get pushed for 2.6.33.  Please clean the code up and
-get it into buildable shape and I will be glad to add the drivers back
-into the staging directory at that time.
+  [1] endless-loop-no: obsolete system call 00000000.
+  Code: e08f1001 e1a0c000 e3a0702d ef000000 (e3700a01) 
 
-thanks,
+Still have to investigate how to interpret this...
 
-greg k-h
+--
+Markus Schwarzenberg
+
+[*]
+
+
+mmc0:     (CMD12): 0: 00000b00 00000000 00000000 00000000
+do_execve (/endless-loop-nonstatic-arm) succeeded
+kernel_execve calling asm
+mmc0: starting CMD18 arg 30868800 flags 000000b5
+mmc0:     blksz 512 blocks 72 flags 00000200 tsac 100 ms nsac 0
+mmc0:     CMD12 arg 00000000 flags 0000049d
+sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00000001
+sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00000002
+sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00000001
+mmc0: req done (CMD18): 0: 00000900 00000000 00000000 00000000
+mmc0:     36864 bytes transferred: 0
+mmc0:     (CMD12): 0: 00000b00 00000000 00000000 00000000
+[1] endless-loop-no: obsolete system call 00000000.
+Code: e08f1001 e1a0c000 e3a0702d ef000000 (e3700a01) 
+Kernel panic - not syncing: Attempted to kill init!
+Backtrace: 
+[<c002a9f0>] (dump_backtrace+0x0/0x114) from [<c0275358>] (dump_stack+0x18/0x1c)
+ r7:c781ff64 r6:c781d900 r5:c781d900 r4:c034201c
+[<c0275340>] (dump_stack+0x0/0x1c) from [<c02753a8>] (panic+0x4c/0x11c)
+[<c027535c>] (panic+0x0/0x11c) from [<c0048990>] (do_exit+0x74/0x5b4)
+ r3:c032a428 r2:c781d900 r1:c781fc28 r0:c02df366
+[<c004891c>] (do_exit+0x0/0x5b4) from [<c0048f54>] (do_group_exit+0x84/0xb8)
+[<c0048ed0>] (do_group_exit+0x0/0xb8) from [<c0052cc8>] (get_signal_to_deliver+0x2b8/0x2e8)
+ r4:00000004
+[<c0052a10>] (get_signal_to_deliver+0x0/0x2e8) from [<c00291c0>] (do_notify_resume+0x64/0x5b8)
+[<c002915c>] (do_notify_resume+0x0/0x5b8) from [<c0026f2c>] (work_pending+0x1c/0x20)
