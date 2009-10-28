@@ -1,84 +1,103 @@
-From: jpihet@mvista.com (Jean Pihet)
-Date: Wed, 28 Oct 2009 18:00:47 +0100
-Subject: [PATCH] check put_user fail in do_signal when enable OABI_COMPACT
-In-Reply-To: <200910281723.01684.jpihet@mvista.com>
-References: <1256123277.3851.36.camel@debian-nb>
-	<alpine.LFD.2.00.0910281209240.10545@xanadu.home>
-	<200910281723.01684.jpihet@mvista.com>
-Message-ID: <200910281800.47681.jpihet@mvista.com>
+From: dcbw@redhat.com (Dan Williams)
+Date: Wed, 28 Oct 2009 10:06:02 -0700
+Subject: MXC MMC driver and SDIO peripherals
+In-Reply-To: <20091028164752.GN29442@buzzloop.caiaq.de>
+References: <20091021192038.GK14091@buzzloop.caiaq.de>
+	<1256156119.8469.40.camel@localhost.localdomain>
+	<20091028164752.GN29442@buzzloop.caiaq.de>
+Message-ID: <1256749562.3850.41.camel@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 October 2009 17:23:01 Jean Pihet wrote:
-...
-> > Still wrong.  Why flush_icache?
->
-> Indeed that is wrong (again!). I had put it in the problem description but
-> that does not apply anymore.
->
-> Thanks, will send an update.
-Here is the updated patch. Is it OK?
+On Wed, 2009-10-28 at 17:47 +0100, Daniel Mack wrote:
+> On Wed, Oct 21, 2009 at 01:15:19PM -0700, Dan Williams wrote:
+> > On Wed, 2009-10-21 at 21:20 +0200, Daniel Mack wrote:
+> > > Hi,
+> > > 
+> > > we're having trouble getting SDIO connected harware to fly on MX31 based
+> > > designs. In particular, a SD8686 chip supported by the libertas_sdio
+> > > driver will hang forever when built without CONFIG_MMC_DEBUG=y. With
+> > > that option selected, however, the behaviour is a little different, and
+> > > I can at least see the following messages on a recent 2.6.32-rc5 based
+> > > MX31 tree.
+> > > 
+> > > Is there any common pitfall for such setups? I did more or less the same
+> > > thing on PXAs (same WLAN chip, same kind of interface, same firmware),
+> > > and haven't seen any such effects, so I suspect the MXC specific parts
+> > > to be the reason for that. Any ideas?
+> > 
+> > Any idea what quirks your SDHC is using if any?  Does it require PIO or
+> > can it do DMA?  Does it have any transfer restrictions on block size or
+> > bit-width?  What is the debug output of the MMC stack when loading the
+> > module for your SDHC?
+> 
+> I did some more research on this and it turns out that the problem is
+> related to multi block transfers. At least, this is when it first
+> occurs.
+> 
+> The libertas SDIO driver downloads two firmwares to the device, one
+> 'helper' and one 'real' firmware The first one only uses chunks of 64
+> bytes each and that seems to work fine. The real firmware, however,
+> loads in 512 bytes chunks which the SDIO core breaks up into 16 blocks
+> of 32 bytes. And this is where the MXC host controller bails out with a
+> CRC error. Unfortunately, it does not give any more detailed information
+> about what exactly went wrong.
+> 
+> The effect might be related to an errata entry[1], which is what I'm
+> currently investigating. To do so, I would like to limit the the
+> communication to singe-block transfers, just to exclude all other
+> possible (electrical, clock speed, ...) issues. I did that by setting
+> mmc->max_blk_count to 1 in the the host controller, but then again,
+> the libertas driver and/or the firmware doesn't like that and dies in
+> if_sdio_pro_real() with
+> 
+>   firmware wants 17 bytes
+>   firmware helper signalled error
+> 
+> Any idea how to get that working with only single block small transfers?
 
-Jean
->
-> > Nicolas
->
-> Jean
->
+All the Marvell documentation (v5 at least) refers to 512-byte transfers
+of the second-stage firmware in 32-byte blocks:
 
----
->From 28336b68b2e2507ba0922c55147e5e72ec1a88dc Mon Sep 17 00:00:00 2001
-From: Jean Pihet <jpihet@mvista.com>
-Date: Tue, 27 Oct 2009 10:09:22 +0100
-Subject: ARM: Check put_user fail in do_signal when enable OABI_COMPAT
+Section 2.2.1.1 of the v5 spec states:
 
-Source: Janboe Ye <janboe.ye@gmail.com>
-MR: 36048
-Type: Defect Fix
-Disposition: Submitted to linux-arm-kernel ML
-ChangeID: 689ddf707d2232e9cf01387ac1264bc8812b9ffd
-Description:
+"
+2) If the length requested by helper is larger than 512 bytes, it is cut
+into multiple pieces for CMD53 write. The current download length is set
+to 512 bytes (16 blocks x 32 bytes per block) in each iteration of CMD53
+write.
+3) Host starts the download of 16 blocks of firmware (512 bytes)
+4) Host copies the payload to the buffer.
+5) Host writes 16 blocks of the firmware image data using CMD 53.
+6) Repeat Steps 3 through 5 until the firmware image data specified by
+the helper (Step 2) for this iteration is downloaded completely.
+"
 
-Using OABI, the call to put_user in do_signal can fail causing the calling
-app to hang.
+The helper firmware may well expect all 16 blocks.  But try adjusting
+"chunk_size" in if_sdio.c::if_sdio_prog_real() down to one block (ie, 32
+not 512) and see if the helper pukes.  The code looks like it can handle
+chunk_size changes just fine.
 
-The solution is to check if put_user fails and force the app to
-seg fault in that case.
+If it does, and we after we further test that with other v8 and v9
+firmware, then maybe we can print out a big fat warning about SDHC
+suckage before trying a single-block fallback.
 
-Signed-off-by: janboe <janboe.ye@gmail.com>
+Dan
 
-Merged from
-http://lists.infradead.org/pipermail/linux-arm-kernel/2009-October/002621.html
-on top of
-http://marc.info/?l=linux-arm-kernel&m=125638133624452&w=2
-
-Tested with multiple sleeping apps/threads (using the nanosleep syscall) and
-suspend/resume.
-
-Signed-off-by: Jean Pihet <jpihet@mvista.com>
----
- arch/arm/kernel/signal.c |    8 ++++++--
- 1 files changed, 6 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-index f330974..ea9722a 100644
---- a/arch/arm/kernel/signal.c
-+++ b/arch/arm/kernel/signal.c
-@@ -676,8 +676,12 @@ static int do_signal(sigset_t *oldset, struct pt_regs 
-*regs, int syscall)
- 				regs->ARM_sp -= 4;
- 				usp = (u32 __user *)regs->ARM_sp;
- 
--				put_user(regs->ARM_pc, usp);
--				regs->ARM_pc = KERN_RESTART_CODE;
-+				if (put_user(regs->ARM_pc, usp) == 0) {
-+					regs->ARM_pc = KERN_RESTART_CODE;
-+				} else {
-+					regs->ARM_sp += 4;
-+					force_sigsegv(0, current);
-+				}
- #endif
- 			}
- 		}
--- 
-1.6.2.5.168.g3823
+> Btw - there's a number of things missing for SDIO in the MXC MMC driver
+> which I implemented/fixed. I'll send patches as soon as I have more
+> confidence about the whole setup.
+> 
+> 
+> Thanks,
+> Daniel
+> 
+> 
+> [1] Errata IDs TLSbo91748 and TLSbo78667 from
+>     http://www.freescale.com/files/32bit/doc/errata/MCIMX31CE.pdf?fpsp=1
+> 
+> 
+> _______________________________________________
+> libertas-dev mailing list
+> libertas-dev at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/libertas-dev
