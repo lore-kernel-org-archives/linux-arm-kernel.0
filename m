@@ -1,50 +1,36 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 28 Oct 2009 23:41:59 +0100
-Subject: staging/dream: add gpio and pmem support
-In-Reply-To: <20091028221155.GA25429@kroah.com>
-References: <20091027001702.GA5019@elf.ucw.cz>
-	<20091027030039.GA6195@kroah.com>
-	<20091027081921.GG5019@elf.ucw.cz>
-	<20091027165750.GA24477@kroah.com>
-	<20091027193330.GB19379@elf.ucw.cz>
-	<20091027204445.GA28878@kroah.com>
-	<20091027232521.GA16782@elf.ucw.cz>
-	<20091028155116.GA1434@kroah.com>
-	<20091028215612.GB8053@elf.ucw.cz>
-	<20091028221155.GA25429@kroah.com>
-Message-ID: <20091028224158.GC9304@elf.ucw.cz>
+Date: Wed, 28 Oct 2009 23:48:18 +0100
+Subject: staging/dream: add TODO file
+Message-ID: <20091028224817.GA13987@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2009-10-28 15:11:55, Greg KH wrote:
-> On Wed, Oct 28, 2009 at 10:56:12PM +0100, Pavel Machek wrote:
-> > 
-> > > > > With this patch, will it build properly?
-> > > > 
-> > > > Its certainly way closer to building... it builds for me, with
-> > > > something like below; platform devices really are initialized from
-> > > > board-* files and get passed parameters.
-> > > 
-> > > Ick.  This isn't ok, we can't take patches for staging stuff in files
-> > > outside of drivers/staging/
-> > 
-> > I know, I was trying to show that ammount of required changes is very small.
-> > 
-> > > So for now, I've deleted the drivers/staging/dream/ directory from my
-> > > tree, which will get pushed for 2.6.33.  Please clean the code up and
-> > > get it into buildable shape and I will be glad to add the drivers back
-> > > into the staging directory at that time.
-> > 
-> > Ok, I got something that builds; verifying it on device is hard, as
-> > last kernel that boots there is 2.6.29...
-> > 
-> > Should I turn it into series and submit?
-> 
-> Yes please.
+This adds TODO list. It is probably incomplete, as many parts were not
+reviewed by the upstream maintainers, yet.
 
-Ok, here you go. These are against your tree before your "rm -r"
-patch. I hope I did not make mistake somewhere.
-								Pavel
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
+
+
+diff --git a/drivers/staging/dream/TODO b/drivers/staging/dream/TODO
+new file mode 100644
+index 0000000..38fd221
+--- /dev/null
++++ b/drivers/staging/dream/TODO
+@@ -0,0 +1,14 @@
++* remove support for wakelocks since those are not in mainline
++
++* camera driver uses old V4L API
++
++* coding style in some places is lacking
++
++* gpio_input.c has some features matrix_keypad lacks. They should be
++merged to gpio_input, with gpio_input.c removed
++
++* pmem provides interface for userspace. Needs to be reviewed at least.
++
++* it is probably possible to simplify touchscreen driver using threaded_irq's.
++
++* touchscreen driver should be switched to oficial multitouch API
 
 -- 
 (english) http://www.livejournal.com/~pavelmachek
