@@ -1,58 +1,34 @@
-From: matthias@kaehlcke.net (Matthias Kaehlcke)
-Date: Wed, 28 Oct 2009 12:25:50 +0100
-Subject: ep93xx Ethernet hangs!
-In-Reply-To: <8e7afda70910280402r41e198cet6fc92817cd1c847f@mail.gmail.com>
-References: <8e7afda70910280402r41e198cet6fc92817cd1c847f@mail.gmail.com>
-Message-ID: <20091028112550.GH4179@darwin>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Wed, 28 Oct 2009 12:15:50 +0000
+Subject: [PATCH 09/12] ARM: S3C2440: mini2440: Fix missing
+	CONFIG_S3C_DEV_USB_HOST
+In-Reply-To: <1256732153-22027-1-git-send-email-ben-linux@fluff.org>
+References: <1256732153-22027-1-git-send-email-ben-linux@fluff.org>
+Message-ID: <1256732153-22027-9-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
+Fix missing select of S3C_DEV_USB_HOST when building for mini2440
+only. Fixes the following error:
 
-El Wed, Oct 28, 2009 at 12:02:02PM +0100 Markus Kreidl ha dit:
+built-in.o: undefined reference to `s3c_device_usb`
 
-> I am using a 2.6.30.4 kernel for my ep93xx ts-7260 board.
-> 
-> 
-> Test scenario:
-> 
-> I wrote a udp server/client application to test the ethernet
-> interface. The server is implemented in the ep93xx board.
-> 
-> a) the client connects to the ep93xx board and starts to send data
-> (length 100bytes) to the ep93xx board and waits for same data to be
-> retransmitted.
-> 
-> b) ep93xx board receives the data and sends it back to the client.
-> 
-> c) After the client receives the same data retransmitted data, the
-> client retransmits one byte longe data to the  ep93xx board.
-> 
-> This game will be repeated till a data length of 65000 bytes is reached.
-> 
-> Problem:
-> Sometimes this test can be done two times without any problems, but
-> when a problem occur the client application is waiting for the
-> retranmission of sent data package. Also the ep93xx board is not
-> pingable from a third computer.
+Signed-off-by: Ben Dooks <ben-linux@fluff.org>
+---
+ arch/arm/mach-s3c2440/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-I also have problems with ethernet hangs on an edb9301 like
-board. I still haven't been able to identify a consistent pattern of
-when the hang occurs, in my case it usually takes several days. Taking
-down the interface and bringing it up again 'resolves' the problem.
-
-I havn't spent much time investigating the issue, as my current
-project doesn't rely on the ethernet interface and it takes days to
-'reproduce' it.
-
+diff --git a/arch/arm/mach-s3c2440/Kconfig b/arch/arm/mach-s3c2440/Kconfig
+index d7bba91..a8b69d7 100644
+--- a/arch/arm/mach-s3c2440/Kconfig
++++ b/arch/arm/mach-s3c2440/Kconfig
+@@ -103,6 +103,7 @@ config MACH_MINI2440
+ 	select LEDS_TRIGGER_BACKLIGHT
+ 	select SND_S3C24XX_SOC_S3C24XX_UDA134X
+ 	select S3C_DEV_NAND
++	select S3C_DEV_USB_HOST
+ 	help
+ 	  Say Y here to select support for the MINI2440. Is a 10cm x 10cm board
+ 	  available via various sources. It can come with a 3.5" or 7" touch LCD.
 -- 
-Matthias Kaehlcke
-Embedded Linux Engineer
-Barcelona
-
-      The assumption that what currently exists must necessarily
-        exist is the acid that corrodes all visionary thinking
-                                                                 .''`.
-    using free software / Debian GNU/Linux | http://debian.org  : :'  :
-                                                                `. `'`
-gpg --keyserver pgp.mit.edu --recv-keys 47D8E5D4                  `-
+1.6.3.3
