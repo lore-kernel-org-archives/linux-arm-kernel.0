@@ -1,40 +1,59 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 28 Oct 2009 12:15:51 +0000
-Subject: [PATCH 10/12] ARM: S3C24XX: Fix warnings in
-	arch/arm/plat-s3c24xx/gpio.c
+Date: Wed, 28 Oct 2009 12:15:46 +0000
+Subject: [PATCH 05/12] ARM: S3C24XX: arch/arm/plat-s3c24xx: Move dereference
+	after NULL test
 In-Reply-To: <1256732153-22027-1-git-send-email-ben-linux@fluff.org>
 References: <1256732153-22027-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1256732153-22027-10-git-send-email-ben-linux@fluff.org>
+Message-ID: <1256732153-22027-5-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following warnings from sparse in arch/arm/plat-s3c24xx/gpio.
-due to the missing include of <mach/gpio-fns.h>
+From: Julia Lawall <julia@diku.dk>
 
-gpio.c:36:6: warning: symbol 's3c2410_gpio_cfgpin' was not declared. Should it be static?
-gpio.c:84:14: warning: symbol 's3c2410_gpio_getcfg' was not declared. Should it be static?
-gpio.c:103:6: warning: symbol 's3c2410_gpio_pullup' was not declared. Should it be static?
-gpio.c:125:5: warning: symbol 's3c2410_gpio_getpull' was not declared. Should it be static?
-gpio.c:138:6: warning: symbol 's3c2410_gpio_setpin' was not declared. Should it be static?
-gpio.c:157:14: warning: symbol 's3c2410_gpio_getpin' was not declared. Should it be static?
-gpio.c:184:5: warning: symbol 's3c2410_gpio_getirq' was not declared. Should it be static?
+If the NULL test on buf is needed, then the dereference should be after the
+NULL test.
 
+A simplified version of the semantic match that detects this problem is as
+follows (http://coccinelle.lip6.fr/):
+
+// <smpl>
+@match exists@
+expression x, E;
+identifier fld;
+@@
+
+* x->fld
+  ... when != \(x = E\|&x\)
+* x == NULL
+// </smpl>
+
+Signed-off-by: Julia Lawall <julia@diku.dk>
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/plat-s3c24xx/gpio.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/plat-s3c24xx/dma.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/plat-s3c24xx/gpio.c b/arch/arm/plat-s3c24xx/gpio.c
-index 95df059..5467470 100644
---- a/arch/arm/plat-s3c24xx/gpio.c
-+++ b/arch/arm/plat-s3c24xx/gpio.c
-@@ -29,6 +29,7 @@
- #include <linux/io.h>
+diff --git a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
+index 196b191..f046f8c 100644
+--- a/arch/arm/plat-s3c24xx/dma.c
++++ b/arch/arm/plat-s3c24xx/dma.c
+@@ -208,14 +208,14 @@ s3c2410_dma_loadbuffer(struct s3c2410_dma_chan *chan,
+ {
+ 	unsigned long reload;
  
- #include <mach/hardware.h>
-+#include <mach/gpio-fns.h>
- #include <asm/irq.h>
+-	pr_debug("s3c2410_chan_loadbuffer: loading buff %p (0x%08lx,0x%06x)\n",
+-		 buf, (unsigned long)buf->data, buf->size);
+-
+ 	if (buf == NULL) {
+ 		dmawarn("buffer is NULL\n");
+ 		return -EINVAL;
+ 	}
  
- #include <mach/regs-gpio.h>
++	pr_debug("s3c2410_chan_loadbuffer: loading buff %p (0x%08lx,0x%06x)\n",
++		 buf, (unsigned long)buf->data, buf->size);
++
+ 	/* check the state of the channel before we do anything */
+ 
+ 	if (chan->load_state == S3C2410_DMALOAD_1LOADED) {
 -- 
 1.6.3.3
