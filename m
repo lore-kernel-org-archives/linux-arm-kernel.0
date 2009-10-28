@@ -1,100 +1,62 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 28 Oct 2009 14:58:22 +0000
-Subject: [PATCH][RE-SUBMIT] Default setting of the ARM_UNWIND option
-In-Reply-To: <4AE82D17.6040900@evidence.eu.com>
-References: <4AD73DA4.4050006@evidence.eu.com>
-	<1255620333.10164.77.camel@pc1117.cambridge.arm.com>
-	<4AE55D83.7080608@evidence.eu.com>
-	<1256555452.5282.21.camel@pc1117.cambridge.arm.com>
-	<4AE82D17.6040900@evidence.eu.com>
-Message-ID: <1256741902.27121.29.camel@pc1117.cambridge.arm.com>
+From: ajay.gupta@ti.com (Gupta, Ajay Kumar)
+Date: Wed, 28 Oct 2009 20:48:11 +0530
+Subject: [PATCH RFC 1/2] MUSB: CPPI 4.1 DMA driver (take 4)
+In-Reply-To: <4AE85B02.1080207@ru.mvista.com>
+References: <200908142241.00528.sshtylyov@ru.mvista.com>
+	<4A8A202E.2040505@windriver.com> <4A8A7047.9080405@ru.mvista.com>
+	<4A8CF552.3080801@windriver.com>
+	<19F8576C6E063C45BE387C64729E73940436EEAE36@dbde02.ent.ti.com>
+	<4AE85B02.1080207@ru.mvista.com>
+Message-ID: <19F8576C6E063C45BE387C64729E73940436EEAE60@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2009-10-28 at 12:37 +0100, Claudio Scordino wrote:
-> Catalin Marinas ha scritto:
-> > On Mon, 2009-10-26 at 09:27 +0100, Claudio Scordino wrote:
-> >   
-> >> My ARM board hanged at the initial "Calibrating delay loop" message.
-> >>
-> >> After some inspection, I found out the problem to be with commit
-> >> adf8b37bafc1495393201a2ae4235846371870d0. This commit introduces stack
-> >> unwinding for ARM, and set it enabled by default. However, it seems to
-> >> not work with buggy or not-EABI compilers.
-> >>
-> >> My suggestion is to keep the feature (which is fine) but change the
-> >> default setting of the option (see the attached patch).
-> >
-> > The option still depends on EXPERIMENTAL, so you get ARM_UNWIND on when
-> > enabling that.
-> >
-> > I'm more in favour of a #warning on #error in the unwind.c file based on
-> > the compiler version rather than not having it on by default. The reason
-> > is that people reported performance improvements when compiling the
-> > kernel without frame pointers.
+> -----Original Message-----
+> From: Sergei Shtylyov [mailto:sshtylyov at ru.mvista.com]
+> Sent: Wednesday, October 28, 2009 8:24 PM
+> To: Gupta, Ajay Kumar
+> Cc: linux-usb at vger.kernel.org; davinci-linux-open-
+> source at linux.davincidsp.com; stanley.miao; Hilman, Kevin; david-
+> b at pacbell.net; Subbrathnam, Swaminathan; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH RFC 1/2] MUSB: CPPI 4.1 DMA driver (take 4)
 > 
-> [Sorry, I sent the wrong patch... This is the new one.]
-
-and the wrong ARM kernel list (I changed the Cc line).
-
-> This solution is fine too (even if I still think that changing the
-> default setting is better).
+> Hello.
 > 
-> Please, consider the patch in attachment: is it like you would have it ?
-
-You can just send it to Russell's patch system once there are no more
-comments on it.
-
-See below for my comments.
-
-> BTW, do we have any list of buggy or not-EABI versions of the gcc
-> compiler ?
-
-No, but for non-EABI compilers I think the __ARM_EABI__ check is enough.
-
-> From: Claudio Scordino <claudio@evidence.eu.com>
-> Date: Mon, 26 Oct 2009 17:13:18 +0100
-> Subject: [PATCH 1/1] Some warnings when compiling ARM unwind support with a buggy or not-EABI compiler.
+> Gupta, Ajay Kumar wrote:
 > 
-> ARM unwind support is known to build only with EABI and not-buggy compilers.
-> Now we check the compiler and raise a #warning in case of wrong compiler.
-
-Maybe you can clarify a bit that the problem is not unwinding
-information but the -fno-frame-pointer option added as a result of 
-!CONFIG_FRAME_POINTER.
-
-> Signed-off-by: Claudio Scordino <claudio@evidence.eu.com>
-> ---
->  arch/arm/kernel/unwind.c |    9 +++++++++
->  1 files changed, 9 insertions(+), 0 deletions(-)
+> > Sergei,
 > 
-> diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
-> index 39baf11..47345c1 100644
-> --- a/arch/arm/kernel/unwind.c
-> +++ b/arch/arm/kernel/unwind.c
-> @@ -26,6 +26,15 @@
->   * http://infocenter.arm.com/help/topic/com.arm.doc.subset.swdev.abi/index.html
->   */
->  
-> +#if !defined (__ARM_EABI__)
-> +#warning Your compiler does not have EABI support.
-> +#warning    ARM unwind support it is known to compile only on EABI compilers.
+> > Is there any other update to this patch ?
+> 
+>     The last was take 5 from August 21th:
+> 
+> http://marc.info/?l=linux-usb&m=125087318308323
 
-Maybe "ARM unwind is known ... only with ..." (though English is not my
-first language).
+Thanks, I will check this one.
 
-> +#warning    Change compiler or disable ARM_UNWIND option.
-> +#elif (__GNUC__ == 4 && __GNUC_MINOR__ == 2)
+> 
+>  > We have some patches on top of your base version.
+> 
+>     Interesting...
+> 
+> > Kevin and David,
+> > There is another TI platform AM3517 which also has same CPPI41 DMA. So
+> even this platform has to use same CPPI41 files but there is an issue on
+> using cppi4.1 core engine (cppi41.c file at arch/arm/mach-XXX).
+> 
+>     Are you going to push the AM3517 support upstream?
 
-Could we assume this for (__GNUC_MINOR__ <= 2)?
+Currently AM3517 base port patches are being submitted. Once they are done, and cppi4.1 core dependency is cleared then I plan to submit patches on top of your latest version (take 5).
 
-> +#warning Your compiler is too buggy; it is known to not compile ARM unwind support.
-> +#warning    Change compiler or disable ARM_UNWIND option.
-> +#endif
-> +
->  #include <linux/kernel.h>
->  #include <linux/init.h>
->  #include <linux/module.h>
-
--- 
-Catalin
+-Ajay
+ 
+> 
+> > Can we move this cppi41 core part to some arch/arm/common place so that
+> both da8xx and Am3517 can use it ? Or is there any other option ?
+> 
+>     Adding linux-arm-kernel list to the loop as well...
+> 
+> > -Ajay
+> 
+> WBR, Sergei
