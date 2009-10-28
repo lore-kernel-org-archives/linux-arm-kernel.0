@@ -1,30 +1,20 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 28 Oct 2009 17:35:43 +0100
-Subject: [PATCH] Make it possible for U300 LDO D to shut down
-Message-ID: <1256747743-18811-1-git-send-email-linus.walleij@stericsson.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 28 Oct 2009 16:35:53 +0000
+Subject: Fix errata 411920
+In-Reply-To: <20091024215313.GF16451@n2100.arm.linux.org.uk>
+References: <20091024215313.GF16451@n2100.arm.linux.org.uk>
+Message-ID: <1256747753.27121.60.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This changes the regulator platform config for U300 so that the
-LDO D regulator can change status and shut down the system and
-the pm_shutdown() hook in regulator.c starts working.
+On Sat, 2009-10-24 at 21:53 +0000, Russell King - ARM Linux wrote:
+> Here's a patch which addresses the remaining operations.  Note that
+> the arch/arm/mm/context.c one is weird - it's flushing the BTB
+> twice - once using "c7, c5, 0" and again with "c7, c5, 6".  Is there
+> a a reason for this?
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- arch/arm/mach-u300/i2c.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+I replied to the patch series as well. I don't think we need the BTB
+flushing here.
 
-diff --git a/arch/arm/mach-u300/i2c.c b/arch/arm/mach-u300/i2c.c
-index 7bc2503..c73ed06 100644
---- a/arch/arm/mach-u300/i2c.c
-+++ b/arch/arm/mach-u300/i2c.c
-@@ -130,6 +130,7 @@ static struct ab3100_platform_data ab3100_plf_data = {
- 				.min_uV = LDO_D_VOLTAGE,
- 				.max_uV = LDO_D_VOLTAGE,
- 				.valid_modes_mask = REGULATOR_MODE_NORMAL,
-+				.valid_ops_mask = REGULATOR_CHANGE_STATUS,
- 				/*
- 				 * Actually this is boot_on but we need
- 				 * to reference count it externally to
 -- 
-1.6.3.3
+Catalin
