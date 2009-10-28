@@ -1,29 +1,48 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Wed, 28 Oct 2009 21:09:16 +0530
-Subject: smdk6400/S3C6400 failure on execution of init process
-In-Reply-To: <20091028162037.22f2cb22@linpcd55>
-References: <20091028162037.22f2cb22@linpcd55>
-Message-ID: <20091028153916.GB2244@debian>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 28 Oct 2009 15:49:01 +0000
+Subject: [RFC 09/11] ARM: Add I-cache invalidation for VIVT ASID tagged
+	caches
+In-Reply-To: <5dee6c2014c4724c1ff6923326e93084f337581a.1256683230.git.rmk+kernel@arm.linux.org.uk>
+References: <cover.1256683230.git.rmk+kernel@arm.linux.org.uk>
+	<5dee6c2014c4724c1ff6923326e93084f337581a.1256683230.git.rmk+kernel@arm.linux.org.uk>
+Message-ID: <1256744941.27121.45.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2009 at 04:20:37PM +0100, Markus Schwarzenberg wrote:
+On Sun, 2009-10-25 at 13:35 +0000, Russell King wrote:
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/mm/flush.c |    6 ++++++
+>  1 files changed, 6 insertions(+), 0 deletions(-)
 > 
-> booting linux-2.6.32-rc5 on our smdk6400 (S3C6400) fails somewhere in/after 
-> the asm call in arch/arm/kernel/sys_arm.c:kernel_execve, when the init 
-> process is to be run.
-> 
-> The preceding do_execve returned OK, which suggests that the /init file is 
-> found, executable etc. in rootfs. 
-> 
-> The failure happens for both booting from  sd-card as well as from initramfs.
-> I've tried several /init applications, from busybox to a simple wait(1); loop
-> all with the same behavior.
-> 
-> What's the best way to debug this?
+> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+> index dc66f86..9770e27 100644
+> --- a/arch/arm/mm/flush.c
+> +++ b/arch/arm/mm/flush.c
+> @@ -69,6 +69,9 @@ void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned
+>  		    : "cc");
+>  		__flush_icache_all();
+>  	}
+> +
+> +	if (vma->vm_flags & VM_EXEC && icache_is_vivt_asid_tagged())
+> +		__flush_icache_all();
+>  }
+>  
+>  void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr, unsigned long pfn)
+> @@ -82,6 +85,9 @@ void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr, unsig
+>  		flush_pfn_alias(pfn, user_addr);
+>  		__flush_icache_all();
+>  	}
+> +
+> +	if (vma->vm_flags & VM_EXEC && icache_is_vivt_asid_tagged())
+> +		__flush_icache_all();
+>  }
+>  
+>  void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
 
-As a first step, enable CONFIG_DEBUG_USER in your kernel and pass
-"user_debug=31" on the kernel command line.  You'll get more info about
-why init's being killed.
+You may be right but why is this needed? Between mm's, we have the ASID.
+Within the same mm, do we expect to change the corresponding physical
+address of a virtual address without calling update_mmu_cache?
 
-Rabin
+-- 
+Catalin
