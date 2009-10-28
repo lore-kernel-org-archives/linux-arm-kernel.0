@@ -1,131 +1,67 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 28 Oct 2009 15:30:17 +0000
-Subject: smdk6400/S3C6400 failure on execution of init process
-In-Reply-To: <20091028162037.22f2cb22@linpcd55>
-References: <20091028162037.22f2cb22@linpcd55>
-Message-ID: <20091028153010.GE8096@trinity.fluff.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 28 Oct 2009 15:31:35 +0000
+Subject: [RFC 02/11] ARM: Fix errata 411920 workarounds
+In-Reply-To: <6af8ea18ac64a74700e374489751a63e643ac394.1256683230.git.rmk+kernel@arm.linux.org.uk>
+References: <cover.1256683230.git.rmk+kernel@arm.linux.org.uk>
+	<6af8ea18ac64a74700e374489751a63e643ac394.1256683230.git.rmk+kernel@arm.linux.org.uk>
+Message-ID: <1256743895.27121.39.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2009 at 04:20:37PM +0100, Markus Schwarzenberg wrote:
+On Sat, 2009-10-24 at 22:36 +0100, Russell King wrote:
+> Errata 411920 indicates that any "invalidate entire instruction cache"
+> operation can fail if the right conditions are present.  This is not
+> limited just to those operations in flush.c, but elsewhere.  Place the
+> workaround in the already existing __flush_icache_all() function
+> instead.
 > 
-> booting linux-2.6.32-rc5 on our smdk6400 (S3C6400) fails somewhere in/after 
-> the asm call in arch/arm/kernel/sys_arm.c:kernel_execve, when the init 
-> process is to be run.
-
-Which is the last kernel version that ran this ok?
- 
-> The preceding do_execve returned OK, which suggests that the /init file is 
-> found, executable etc. in rootfs. 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/include/asm/cacheflush.h |    5 +++++
+>  arch/arm/mm/context.c             |    4 ++--
+>  arch/arm/mm/flush.c               |   31 ++++++-------------------------
+>  3 files changed, 13 insertions(+), 27 deletions(-)
 > 
-> The failure happens for both booting from  sd-card as well as from initramfs.
-> I've tried several /init applications, from busybox to a simple wait(1); loop
-> all with the same behavior.
-> 
-> What's the best way to debug this?
-> 
-> Messages (first two lines from additional diagnostics in 
->           do_execve [**] / kernel_execve [*] ):
-
-Does the kernel have vfp support compiled in?
- 
->   do_execve (/endless-loop-nonstatic-arm) succeeded
->   kernel_execve calling asm
->   mmc0: starting CMD18 arg 30868800 flags 000000b5
->   mmc0:     blksz 512 blocks 72 flags 00000200 tsac 100 ms nsac 0
->   mmc0:     CMD12 arg 00000000 flags 0000049d
->   sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00000001
->   sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00000002
->   sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00000001
->   mmc0: req done (CMD18): 0: 00000900 00000000 00000000 00000000
->   mmc0:     36864 bytes transferred: 0
->   mmc0:     (CMD12): 0: 00000b00 00000000 00000000 00000000
-
-The SD card read seems to have gone ok.
-
->   Kernel panic - not syncing: Attempted to kill init!
->   Backtrace: 
->   [<c002a9f0>] (dump_backtrace+0x0/0x114) from [<c0275358>]
->   (dump_stack+0x18/0x1c)
->    r7:c781ff64 r6:c781d900 r5:c781d900 r4:c034201c
->   [<c0275340>] (dump_stack+0x0/0x1c) from [<c02753a8>] (panic+0x4c/0x11c)
->   [<c027535c>] (panic+0x0/0x11c) from [<c0048990>] (do_exit+0x74/0x5b4)
->    r3:c032a428 r2:c781d900 r1:c781fc28 r0:c02df366
->   [<c004891c>] (do_exit+0x0/0x5b4) from [<c0048f54>]
->   (do_group_exit+0x84/0xb8)
->   [<c0048ed0>] (do_group_exit+0x0/0xb8) from [<c0052cc8>]
->   (get_signal_to_deliver+0x2b8/0x2e8)
->    r4:00000004
->   [<c0052a10>] (get_signal_to_deliver+0x0/0x2e8) from [<c00291c0>]
->   (do_notify_resume+0x64/0x5b8)
->   [<c002915c>] (do_notify_resume+0x0/0x5b8) from [<c0026f2c>]
->   (work_pending+0x1c/0x20)
-> 
-> 
-> Regards,
-> 
-> Markus Schwarzenberg
-> 
-> [*] additional messages generated in kernel_execve
-> 
-> --- linux-2.6.32-rc5.orig/arch/arm/kernel/sys_arm.c     2009-10-16 02:41:50.000000000 +0200
-> +++ linux-2.6.32-rc5/arch/arm/kernel/sys_arm.c  2009-10-28 16:11:25.000000000 +0100
-> @@ -265,6 +265,7 @@
->         struct pt_regs regs;
->         int ret;
+> diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+> index 3147f75..af0624c 100644
+> --- a/arch/arm/include/asm/cacheflush.h
+> +++ b/arch/arm/include/asm/cacheflush.h
+> @@ -412,9 +412,14 @@ extern void flush_dcache_page(struct page *);
 >  
-> +       printk("kernel_execve %s\n", filename);
->         memset(&regs, 0, sizeof(struct pt_regs));
->         ret = do_execve((char *)filename, (char __user * __user *)argv,
->                         (char __user * __user *)envp, &regs);
-> @@ -275,6 +276,7 @@
->          * Save argc to the register structure for userspace.
->          */
->         regs.ARM_r0 = ret;
-> +       printk("kernel_execve calling asm\n");
->  
->         /*
->          * We were successful.  We won't be returning to our caller, but
-> @@ -296,6 +298,7 @@
->                 : "r0", "r1", "r2", "r3", "ip", "lr", "memory");
->  
->   out:
-> +       printk("kernel_execve return\n");
->         return ret;
+>  static inline void __flush_icache_all(void)
+>  {
+> +#ifdef CONFIG_ARM_ERRATA_411920
+> +	extern void v6_icache_inval_all(void);
+> +	v6_icache_inval_all();
+> +#else
+
+I think some compiler complain of "extern" declarations inside a
+function, not entirely sure.
+
+>         asm("mcr        p15, 0, %0, c7, c5, 0   @ invalidate I-cache\n"
+>             :
+>             : "r" (0));
+> +#endif
 >  }
->  EXPORT_SYMBOL(kernel_execve);
-> 
-> [**] additional messages generated in do_execve
-> 
-> --- linux-2.6.32-rc5.orig/fs/exec.c  2009-10-16 02:41:50.000000000 +0200
-> +++ linux-2.6.32-rc5/fs/exec.c  2009-10-28 10:20:46.000000000 +0100
-> @@ -1362,6 +1362,7 @@
->         current->stack_start = current->mm->start_stack;
->  
->         /* execve succeeded */
-> +       printk("do_execve (%s) succeeded\n", filename);
->         current->fs->in_exec = 0;
->         current->in_execve = 0;
->         acct_update_integrals(current);
-> @@ -1392,6 +1393,7 @@
->         if (displaced)
->                 reset_files_struct(displaced);
->  out_ret:
-> +       printk("do_execve (%s) had errors\n", filename);
->         return retval;
->  }
-> 
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
--- 
--- 
-Ben
+For correctness, can we add a dsb() at the end of this function so that
+the I-cache operation is guaranteed to complete?
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+> diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
+> index 6bda76a..d4f8275 100644
+> --- a/arch/arm/mm/context.c
+> +++ b/arch/arm/mm/context.c
+> @@ -50,8 +50,8 @@ void __new_context(struct mm_struct *mm)
+>  		isb();
+>  		flush_tlb_all();
+>  		if (icache_is_vivt_asid_tagged()) {
+> -			asm("mcr	p15, 0, %0, c7, c5, 0	@ invalidate I-cache\n"
+> -			    "mcr	p15, 0, %0, c7, c5, 6	@ flush BTAC/BTB\n"
+> +			__flush_icache_all();
+> +			asm("mcr	p15, 0, %0, c7, c5, 6	@ flush BTAC/BTB"
+
+IIUC, we don't need to flush the BTAC after a full I-cache invalidation
+(not sure why I added it).
+ 
+-- 
+Catalin
