@@ -1,107 +1,127 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Oct 2009 19:12:21 +0000
-Subject: [PATCH] iop13xx: workaround errata that causes uart interrupts
-	to be missed
-In-Reply-To: <1256843340.28922.14.camel@dwillia2-linux.ch.intel.com>
-References: <1256843340.28922.14.camel@dwillia2-linux.ch.intel.com>
-Message-ID: <20091029191221.GD11460@n2100.arm.linux.org.uk>
+From: syrjala@sci.fi (Ville =?iso-8859-1?Q?Syrj=E4l=E4?=)
+Date: Thu, 29 Oct 2009 21:51:56 +0200
+Subject: [PATCH] ARM: pxafb: Use the passed fb_var_screeninfo struct in
+	pxafb_pan_display()
+In-Reply-To: <f17812d70910271913l15950170we45290bb1892761a@mail.gmail.com>
+References: <20091022063434.GQ14091@buzzloop.caiaq.de>
+	<20091028001805.GC14091@buzzloop.caiaq.de>
+	<f17812d70910271913l15950170we45290bb1892761a@mail.gmail.com>
+Message-ID: <20091029195156.GI22046@sci.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-You need to cc Alan Cox and lkml on this.
+On Wed, Oct 28, 2009 at 10:13:17AM +0800, Eric Miao wrote:
+> I see no problem with this patch, applied to 'devel'.
 
-On Thu, Oct 29, 2009 at 12:09:00PM -0700, Dan Williams wrote:
-> Reading the uart iir register sometimes results in the interrupt being
-> cleared without being reported.  Use the the system interrupt pending
-> register as a fallback.
+This patch looks broken to me. The only fields of of the fb_var_screeninfo
+passed to pan_display that should be used are xoffset, yoffset and 
+vmode & FB_VMODE_YWRAP. The rest are not checked by the common code at
+all and depending on the hardware the pan operation may involve looking
+at any number of fields from fb_var_screeninfo so if other fields are
+taken from the passed fb_var_screeninfo the pan operation may end up doing
+a lot more than panning (eg. it could change the video mode). Even worse
+things could happen since the values are not checked at all.
+
+To prevent driver authors' from shooting themselves in the foot it might
+make sense to change the common code to make a copy of info->var and
+merge those three fields from the passed fb_var_screeninfo into the copy,
+which would then be passed to the driver.
+
 > 
-> This converts locations in the code that only care about the interrupt
-> pending bit to use the iir_int_status() macro.
+> On Wed, Oct 28, 2009 at 8:18 AM, Daniel Mack <daniel@caiaq.de> wrote:
+> > Any idea what to do with this one?
+> >
+> > Daniel
+> >
+> >
+> > On Thu, Oct 22, 2009 at 08:34:34AM +0200, Daniel Mack wrote:
+> >> Hi Eric,
+> >>
+> >> this one has been living in our kernel tree for quite some time now but
+> >> it seems it hasn't been merged yet. It's needed to make the pxafb driver
+> >> work with DirectFB applications properly.
+> >>
+> >> Thanks,
+> >> Daniel
+> >>
+> >>
+> >> From 42e8a4226777b6cc82988061c80167813f403ec8 Mon Sep 17 00:00:00 2001
+> >> From: Sven Neumann <s.neumann@raumfeld.com>
+> >> Date: Wed, 6 May 2009 16:22:50 +0200
+> >> Subject: [PATCH] ARM: pxafb: Use the passed fb_var_screeninfo struct in pxafb_pan_display()
+> >>
+> >> pxafb_pan_display() used to ignore the fb_var_screeninfo parameter. Now
+> >> pass it to setup_base_frame() instead of pulling default values out of
+> >> fb_info.
+> >>
+> >> Signed-off-by: Sven Neumann <s.neumann@raumfeld.com>
+> >> Signed-off-by: Daniel Mack <daniel@caiaq.de>
+> >> Cc: Eric Miao <eric.y.miao@gmail.com>
+> >> ---
+> >> ?drivers/video/pxafb.c | ? 12 +++++++-----
+> >> ?1 files changed, 7 insertions(+), 5 deletions(-)
+> >>
+> >> diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
+> >> index 1820c4a..a20a7d4 100644
+> >> --- a/drivers/video/pxafb.c
+> >> +++ b/drivers/video/pxafb.c
+> >> @@ -80,7 +80,8 @@
+> >> ?static int pxafb_activate_var(struct fb_var_screeninfo *var,
+> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct pxafb_info *);
+> >> ?static void set_ctrlr_state(struct pxafb_info *fbi, u_int state);
+> >> -static void setup_base_frame(struct pxafb_info *fbi, int branch);
+> >> +static void setup_base_frame(struct pxafb_info *fbi,
+> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct fb_var_screeninfo *var, int branch);
+> >> ?static int setup_frame_dma(struct pxafb_info *fbi, int dma, int pal,
+> >> ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long offset, size_t size);
+> >>
+> >> @@ -536,7 +537,7 @@ static int pxafb_pan_display(struct fb_var_screeninfo *var,
+> >> ? ? ? if (fbi->state != C_ENABLE)
+> >> ? ? ? ? ? ? ? return 0;
+> >>
+> >> - ? ? setup_base_frame(fbi, 1);
+> >> + ? ? setup_base_frame(fbi, var, 1);
+> >>
+> >> ? ? ? if (fbi->lccr0 & LCCR0_SDS)
+> >> ? ? ? ? ? ? ? lcd_writel(fbi, FBR1, fbi->fdadr[dma + 1] | 0x1);
+> >> @@ -1052,9 +1053,10 @@ static int setup_frame_dma(struct pxafb_info *fbi, int dma, int pal,
+> >> ? ? ? return 0;
+> >> ?}
+> >>
+> >> -static void setup_base_frame(struct pxafb_info *fbi, int branch)
+> >> +static void setup_base_frame(struct pxafb_info *fbi,
+> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct fb_var_screeninfo *var,
+> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? int branch)
+> >> ?{
+> >> - ? ? struct fb_var_screeninfo *var = &fbi->fb.var;
+> >> ? ? ? struct fb_fix_screeninfo *fix = &fbi->fb.fix;
+> >> ? ? ? int nbytes, dma, pal, bpp = var->bits_per_pixel;
+> >> ? ? ? unsigned long offset;
+> >> @@ -1332,7 +1334,7 @@ static int pxafb_activate_var(struct fb_var_screeninfo *var,
+> >> ?#endif
+> >> ? ? ? ? ? ? ? setup_parallel_timing(fbi, var);
+> >>
+> >> - ? ? setup_base_frame(fbi, 0);
+> >> + ? ? setup_base_frame(fbi, var, 0);
+> >>
+> >> ? ? ? fbi->reg_lccr0 = fbi->lccr0 |
+> >> ? ? ? ? ? ? ? (LCCR0_LDM | LCCR0_SFM | LCCR0_IUM | LCCR0_EFM |
+> >> --
+> >> 1.6.5
+> >>
+> >>
+> >> _______________________________________________
+> >> linux-arm-kernel mailing list
+> >> linux-arm-kernel at lists.infradead.org
+> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
 > 
-> Signed-off-by: Dan Williams <dan.j.williams@intel.com>
-> ---
-> This patch has been sitting in the 'misc' branch of the xscaleiop tree
-> in an un-mergeable form for quite a while [1].  I finally got fed up
-> with forward porting it and would like to try to get this workaround
-> upstream.  There appears to be no maintainer for 8250.c, so not sure who
-> should merge this.  I can append it to the end of my next pull request
-> for the iop queue...?
-> 
-> Thanks,
-> Dan
-> 
-> [1]: http://git.kernel.org/?p=linux/kernel/git/djbw/xscaleiop.git;a=commitdiff;h=a7d124f5
-> 
->  drivers/serial/8250.c |   36 +++++++++++++++++++++++++++++++++---
->  1 files changed, 33 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/serial/8250.c b/drivers/serial/8250.c
-> index b1ae774..c905860 100644
-> --- a/drivers/serial/8250.c
-> +++ b/drivers/serial/8250.c
-> @@ -547,6 +547,36 @@ serial_out_sync(struct uart_8250_port *up, int offset, int value)
->  	(up->port.serial_in(&(up)->port, (offset)))
->  #define serial_out(up, offset, value)	\
->  	(up->port.serial_out(&(up)->port, (offset), (value)))
-> +
-> +#ifndef CONFIG_ARCH_IOP13XX
-> +#define iir_int_status(up) serial_in((up), UART_IIR)
-> +#else
-> +/* A silicon issue on IOP13XX causes IIR reads to return UART_IIR_NO_INT
-> + * even if an interrupt is pending. Use the system interrupt pending
-> + * register to check for servicing as a workaround.
-> + */
-> +#include <mach/irqs.h>
-> +static unsigned int iir_int_status(struct uart_8250_port *up)
-> +{
-> +	unsigned long membase = (unsigned long) up->port.membase;
-> +	unsigned long ipnd, iir;
-> +
-> +	ipnd = read_intpnd_1();
-> +	iir = UART_IIR_NO_INT;
-> +	if (membase == IOP13XX_UART0_VIRT) {
-> +		if (ipnd & (1 << (IRQ_IOP13XX_UART0 - 32)))
-> +			iir &= ~UART_IIR_NO_INT;
-> +	} else if (membase == IOP13XX_UART1_VIRT) {
-> +		if (ipnd & (1 << (IRQ_IOP13XX_UART1 - 32)))
-> +			iir &= ~UART_IIR_NO_INT;
-> +	} else
-> +		BUG();
-> +	/* clear the interupt via the LSR */
-> +	mem_serial_in(&up->port, UART_LSR);
-> +	return iir;
-> +}
-> +#endif
-> +
->  /*
->   * We used to support using pause I/O for certain machines.  We
->   * haven't supported this for a while, but just in case it's badly
-> @@ -1572,7 +1602,7 @@ static irqreturn_t serial8250_interrupt(int irq, void *dev_id)
->  
->  		up = list_entry(l, struct uart_8250_port, list);
->  
-> -		iir = serial_in(up, UART_IIR);
-> +		iir = iir_int_status(up);
->  		if (!(iir & UART_IIR_NO_INT)) {
->  			serial8250_handle_port(up);
->  
-> @@ -1732,7 +1762,7 @@ static void serial8250_timeout(unsigned long data)
->  	struct uart_8250_port *up = (struct uart_8250_port *)data;
->  	unsigned int iir;
->  
-> -	iir = serial_in(up, UART_IIR);
-> +	iir = iir_int_status(up);
->  	if (!(iir & UART_IIR_NO_INT))
->  		serial8250_handle_port(up);
->  	mod_timer(&up->timer, jiffies + poll_timeout(up->port.timeout));
-> @@ -1753,7 +1783,7 @@ static void serial8250_backup_timeout(unsigned long data)
->  		serial_out(up, UART_IER, 0);
->  	}
->  
-> -	iir = serial_in(up, UART_IIR);
-> +	iir = iir_int_status(up);
->  
->  	/*
->  	 * This should be a safe test for anyone who doesn't trust the
-> 
-> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Ville Syrj?l?
+syrjala at sci.fi
+http://www.sci.fi/~syrjala/
