@@ -1,60 +1,51 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Thu, 29 Oct 2009 16:05:27 +0100
-Subject: [01/02] pxa: add 2d graphics driver
-In-Reply-To: <f17812d70910290750r30066c57ta533cf17e37efbc8@mail.gmail.com>
-References: <771cded00910280747j2de4984bv43d1ed658c581ce8@mail.gmail.com>
-	<20091028145646.GH14091@buzzloop.caiaq.de>
-	<f17812d70910290750r30066c57ta533cf17e37efbc8@mail.gmail.com>
-Message-ID: <20091029150527.GR14091@buzzloop.caiaq.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 29 Oct 2009 15:16:06 +0000
+Subject: marvell kirkwood / openrd-base kernel freeze on bootup with
+	PICe->PCI bridge
+In-Reply-To: <200910291611.02766.dk-arm-linux@gmx.de>
+References: <200910290936.40397.dk-arm-linux@gmx.de>
+	<200910291157.45910.dk-arm-linux@gmx.de>
+	<309002C0DA137042828828FC53D7A9347E13F1EA87@IL-MB01.marvell.com>
+	<200910291611.02766.dk-arm-linux@gmx.de>
+Message-ID: <20091029151606.GA11460@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 29, 2009 at 10:50:54PM +0800, Eric Miao wrote:
-> > Uh. What's that!? Another one? How is that driver supposed to be used?
-> > Is there any userspace reference? And did you see the DirectFB supported
-> > version of such a driver I submitted several times already?
-> >
-> > Sigh. We sould really avoid to have two drivers for the same purpose.
-> > Any idea how to solve this?
-> >
+On Thu, Oct 29, 2009 at 05:11:02PM +0200, Dieter Kiermaier wrote:
+> Am Donnerstag 29 Oktober 2009 12:33:03 schrieb Ronen Shitrit:
+> > Sorry I don't have experience with the OpenOCD.
+> > Any way by using the printk hack, u can simply read the register and print it...
 > 
-> I think this is the original version we had in our internal release
-> years ago, and released after solving some legal issues now.
-
-Ah, I see.
-
-> From my POV, this isn't really a bad news, at least we have another
-> solution which may can be referenced and benefit the final result.
+> I fear I need any further help:
 > 
-> The problem with this driver I guess is that how other Marvell apps
-> depends on this, and it's currently unknown since the API and user-
-> space stuffs are not public at the moment. And apparently, the one
-> you posted has already included a link to the directfb usage.
+> I've tried to read the register you told me but now I get an oops:
+> <1>Unable to handle kernel paging request at virtual address 40020100
+> <1>pgd = c0004000
+> <1>[40020100] *pgd=00000000
+> <0>Internal error: Oops: 5 [#1] PREEMP
 > 
-> Technically, these drivers are based on samilar ideas, I don't have
-> any preference. The real issue is that Marvell should have a look
-> into the directfb version, and evaluate if something is missing and
-> the effort of porting existing apps over to that driver because
-> eventually I'd like to see only one driver there. And vice versa
-> from the directfb POV.
+> My code to read the register is:
+> #include <asm/io.h>
+> printk("register 0x20100: %x\n", readl(virt_to_phys(0x20100)))
 > 
-> Note I'm neutral on this, and this could be the chance both parties
-> look into the solution of the other one, and improve the final
-> result. (what I care only is good code ;-)
+> also a 
+> printk("register 0x20100: %x\n", readl(0x20100));
+> fail with an Ooops :(
+> 
+> What am I doing wrong here?
 
-Hmm, we're actually happy with what we currently got, so unless someone
-speaks up and points out bugs or missing features, I don't see why we
-will touch the code again in near future.
+1. virt_to_phys() is only valid for the kernel memory region in the
+   virtual address space.  0x20100 is not within such a region.
 
-The reason why we would like to see the DirectFB version mainline is
-simply that it's a lot easier for users to use it then and we won't have
-to maintain a per-kernel-release patchset to add this functionality.
+2. readl() takes an offsettable cookie representing the location you
+   want to access.  (you get this cookie via ioremap of a bus address
+   or via a platform defined constant.)  Practially (for most existing
+   implementations but not all) it is a virtual address.
 
-And, frankly spoken, without a free (at least freely available) library
-to actually use the GCU features from applications, the driver itself is
-actually pointless.
+Assuming 0x20100 is the physical address of the register, you should be
+able to read it like this:
 
-Maybe the community helps deciding by starting to use our driver and by
-giving some feedback :)
-
-Daniel
+	void __iomem *base = ioremap(0x20100, 4);
+	if (base)
+		printk("register 0x20100: %x\n", readl(base));
+	iounmap(base);
