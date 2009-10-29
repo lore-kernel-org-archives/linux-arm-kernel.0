@@ -1,51 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Oct 2009 15:16:06 +0000
-Subject: marvell kirkwood / openrd-base kernel freeze on bootup with
-	PICe->PCI bridge
-In-Reply-To: <200910291611.02766.dk-arm-linux@gmx.de>
-References: <200910290936.40397.dk-arm-linux@gmx.de>
-	<200910291157.45910.dk-arm-linux@gmx.de>
-	<309002C0DA137042828828FC53D7A9347E13F1EA87@IL-MB01.marvell.com>
-	<200910291611.02766.dk-arm-linux@gmx.de>
-Message-ID: <20091029151606.GA11460@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 29 Oct 2009 17:23:53 +0000
+Subject: [RFC 09/11] ARM: Add I-cache invalidation for VIVT ASID tagged
+	caches
+In-Reply-To: <20091028173535.GB20040@n2100.arm.linux.org.uk>
+References: <cover.1256683230.git.rmk+kernel@arm.linux.org.uk>
+	<5dee6c2014c4724c1ff6923326e93084f337581a.1256683230.git.rmk+kernel@arm.linux.org.uk>
+	<1256744941.27121.45.camel@pc1117.cambridge.arm.com>
+	<20091028173535.GB20040@n2100.arm.linux.org.uk>
+Message-ID: <1256837033.6874.45.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 29, 2009 at 05:11:02PM +0200, Dieter Kiermaier wrote:
-> Am Donnerstag 29 Oktober 2009 12:33:03 schrieb Ronen Shitrit:
-> > Sorry I don't have experience with the OpenOCD.
-> > Any way by using the printk hack, u can simply read the register and print it...
+On Wed, 2009-10-28 at 17:35 +0000, Russell King - ARM Linux wrote:
+> On Wed, Oct 28, 2009 at 03:49:01PM +0000, Catalin Marinas wrote:
+> > On Sun, 2009-10-25 at 13:35 +0000, Russell King wrote:
+> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > > ---
+> > >  arch/arm/mm/flush.c |    6 ++++++
+> > >  1 files changed, 6 insertions(+), 0 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+> > > index dc66f86..9770e27 100644
+> > > --- a/arch/arm/mm/flush.c
+> > > +++ b/arch/arm/mm/flush.c
+> > > @@ -69,6 +69,9 @@ void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned
+> > >  		    : "cc");
+> > >  		__flush_icache_all();
+> > >  	}
+> > > +
+> > > +	if (vma->vm_flags & VM_EXEC && icache_is_vivt_asid_tagged())
+> > > +		__flush_icache_all();
+> > >  }
+> > >  
+> > >  void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr, unsigned long pfn)
+> > > @@ -82,6 +85,9 @@ void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr, unsig
+> > >  		flush_pfn_alias(pfn, user_addr);
+> > >  		__flush_icache_all();
+> > >  	}
+> > > +
+> > > +	if (vma->vm_flags & VM_EXEC && icache_is_vivt_asid_tagged())
+> > > +		__flush_icache_all();
+> > >  }
+> > >  
+> > >  void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
+> > 
+> > You may be right but why is this needed? Between mm's, we have the ASID.
+> > Within the same mm, do we expect to change the corresponding physical
+> > address of a virtual address without calling update_mmu_cache?
 > 
-> I fear I need any further help:
+> Stop thinking that update_mmu_cache() has something to do with cache
+> handling.  That is not its purpose.  update_mmu_cache() is there for
+> systems with software-TLBs to efficiently update the software-TLB for
+> the page fault which has happened.
 > 
-> I've tried to read the register you told me but now I get an oops:
-> <1>Unable to handle kernel paging request at virtual address 40020100
-> <1>pgd = c0004000
-> <1>[40020100] *pgd=00000000
-> <0>Internal error: Oops: 5 [#1] PREEMP
+> flush_cache_page() on the other hand is called whenever we change a
+> page mapping - but it's not called when mm's change.
 > 
-> My code to read the register is:
-> #include <asm/io.h>
-> printk("register 0x20100: %x\n", readl(virt_to_phys(0x20100)))
-> 
-> also a 
-> printk("register 0x20100: %x\n", readl(0x20100));
-> fail with an Ooops :(
-> 
-> What am I doing wrong here?
+> The ARM ARM specifies that when we change the page tables, and we
+> have a VIVT I-cache, it needs to be flushed.  The above is merely
+> complying with that statement.
 
-1. virt_to_phys() is only valid for the kernel memory region in the
-   virtual address space.  0x20100 is not within such a region.
+In this case I'm OK with the patch (I think it's pretty much the same
+behaviour with pre-ARMv6 VIVT caches).
 
-2. readl() takes an offsettable cookie representing the location you
-   want to access.  (you get this cookie via ioremap of a bus address
-   or via a platform defined constant.)  Practially (for most existing
-   implementations but not all) it is a virtual address.
-
-Assuming 0x20100 is the physical address of the register, you should be
-able to read it like this:
-
-	void __iomem *base = ioremap(0x20100, 4);
-	if (base)
-		printk("register 0x20100: %x\n", readl(base));
-	iounmap(base);
+-- 
+Catalin
