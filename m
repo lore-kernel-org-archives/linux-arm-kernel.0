@@ -1,21 +1,34 @@
-From: dk-arm-linux@gmx.de (Dieter Kiermaier)
-Date: Thu, 29 Oct 2009 12:57:45 +0200
+From: rshitrit@marvell.com (Ronen Shitrit)
+Date: Thu, 29 Oct 2009 13:33:03 +0200
 Subject: marvell kirkwood / openrd-base kernel freeze on bootup with
 	PICe->PCI bridge
-In-Reply-To: <309002C0DA137042828828FC53D7A9347E13F1EA41@IL-MB01.marvell.com>
+In-Reply-To: <200910291157.45910.dk-arm-linux@gmx.de>
 References: <200910290936.40397.dk-arm-linux@gmx.de>
 	<200910291036.51048.dk-arm-linux@gmx.de>
 	<309002C0DA137042828828FC53D7A9347E13F1EA41@IL-MB01.marvell.com>
-Message-ID: <200910291157.45910.dk-arm-linux@gmx.de>
+	<200910291157.45910.dk-arm-linux@gmx.de>
+Message-ID: <309002C0DA137042828828FC53D7A9347E13F1EA87@IL-MB01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Sorry I don't have experience with the OpenOCD.
+Any way by using the printk hack, u can simply read the register and print it...
+
+Regards
+
+-----Original Message-----
+From: linux-arm-kernel-bounces@lists.infradead.org [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Dieter Kiermaier
+Sent: Thursday, October 29, 2009 12:58 PM
+To: linux-arm-kernel at lists.infradead.org
+Cc: Nicolas Pitre; openrd at googlegroups.com; Daniel Mack; Nicolas Pitre
+Subject: Re: marvell kirkwood / openrd-base kernel freeze on bootup with PICe->PCI bridge
 
 Am Donnerstag 29 Oktober 2009 11:33:41 schrieb Ronen Shitrit:
 > Can u pls place a breakpoint before scanning the pcie and read register 0x20100.
 > If bit 2 is set, try to unset it and continue.
-> 
+>
 > When u scan the PCI u probably get master abort error on a device which isnt found, according to bit 2 above this "Error indications" is propagated to the Mbus-L and will cause external abort.
-> 
+>
 
 Hi Ronen,
 
@@ -26,21 +39,21 @@ How do I place a breakpoint?
 Can I run the kernel directly from the openocd debugger, without running it from u-boot?
 
 > Regards
-> 
+>
 > -----Original Message-----
 > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Dieter Kiermaier
 > Sent: Thursday, October 29, 2009 11:37 AM
 > To: linux-arm-kernel at lists.infradead.org
 > Cc: Nicolas Pitre; openrd at googlegroups.com; Daniel Mack; Nicolas Pitre
 > Subject: Re: marvell kirkwood / openrd-base kernel freeze on bootup with PICe->PCI bridge
-> 
-> 
+>
+>
 > Maybe helpful additional information:
 > It makes no difference if I connect a PCI device behind my bridge or not.
 > The trace is exactly the same.
-> 
+>
 > Dieter
-> 
+>
 > > Am Donnerstag 29 Oktober 2009 09:52:36 schrieb Daniel Mack:
 > > Hi Daniel,
 > >
@@ -205,16 +218,23 @@ Can I run the kernel directly from the openocd debugger, without running it from
 > > linux-arm-kernel at lists.infradead.org
 > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > >
-> 
-> 
-> 
+>
+>
+>
 > _______________________________________________
 > linux-arm-kernel mailing list
 > linux-arm-kernel at lists.infradead.org
 > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+>
 > _______________________________________________
 > linux-arm-kernel mailing list
 > linux-arm-kernel at lists.infradead.org
 > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+>
+
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
