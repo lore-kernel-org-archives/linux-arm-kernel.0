@@ -1,96 +1,20 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Thu, 29 Oct 2009 13:39:27 +0100
-Subject: [PATCH 2/2] Add COH 901 318 DMA driver platform config for U300
-	v3
-In-Reply-To: <e9c3a7c20910281208w54ddc859wb650f6527dae2d08@mail.gmail.com>
-References: <1256743153-17252-1-git-send-email-linus.walleij@stericsson.com>
-	<e9c3a7c20910281208w54ddc859wb650f6527dae2d08@mail.gmail.com>
-Message-ID: <63386a3d0910290539y1fb39cefj92bee7b37fe062a1@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 29 Oct 2009 22:50:54 +0800
+Subject: [01/02] pxa: add 2d graphics driver
+In-Reply-To: <20091028145646.GH14091@buzzloop.caiaq.de>
+References: <771cded00910280747j2de4984bv43d1ed658c581ce8@mail.gmail.com>
+	<20091028145646.GH14091@buzzloop.caiaq.de>
+Message-ID: <f17812d70910290750r30066c57ta533cf17e37efbc8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/10/28 Dan Williams <dan.j.williams@intel.com>:
-
-> On Wed, Oct 28, 2009 at 8:19 AM, Linus Walleij
-> <linus.walleij@stericsson.com> wrote:
-> [..]
->> +#define flags_memcpy_config (COH901318_CX_CFG_CH_DISABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CFG_RM_MEMORY_TO_MEMORY | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CFG_LCR_DISABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CFG_TC_IRQ_ENABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CFG_BE_IRQ_ENABLE)
->> +#define flags_memcpy_lli_chained (COH901318_CX_CTRL_TC_ENABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_BURST_COUNT_32_BYTES | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_SRC_BUS_SIZE_32_BITS | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_SRC_ADDR_INC_ENABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_DST_BUS_SIZE_32_BITS | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_DST_ADDR_INC_ENABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_MASTER_MODE_M1RW | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_TCP_DISABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_TC_IRQ_DISABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_HSP_DISABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_HSS_DISABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_DDMA_LEGACY | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_PRDD_SOURCE)
->> +#define flags_memcpy_lli (COH901318_CX_CTRL_TC_ENABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_BURST_COUNT_32_BYTES | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_SRC_BUS_SIZE_32_BITS | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_SRC_ADDR_INC_ENABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_DST_BUS_SIZE_32_BITS | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_DST_ADDR_INC_ENABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_MASTER_MODE_M1RW | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_TCP_DISABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_TC_IRQ_DISABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_HSP_DISABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_HSS_DISABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_DDMA_LEGACY | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_PRDD_SOURCE)
->> +#define flags_memcpy_lli_last (COH901318_CX_CTRL_TC_ENABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_BURST_COUNT_32_BYTES | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_SRC_BUS_SIZE_32_BITS | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_SRC_ADDR_INC_ENABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_DST_BUS_SIZE_32_BITS | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_DST_ADDR_INC_ENABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_MASTER_MODE_M1RW | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_TCP_DISABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_TC_IRQ_ENABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_HSP_DISABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_HSS_DISABLE | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_DDMA_LEGACY | \
->> + ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CTRL_PRDD_SOURCE)
+> Uh. What's that!? Another one? How is that driver supposed to be used?
+> Is there any userspace reference? And did you see the DirectFB supported
+> version of such a driver I submitted several times already?
 >
-> You go through the hassle of defining these flag combination sets...
+> Sigh. We sould really avoid to have two drivers for the same purpose.
+> Any idea how to solve this?
 >
->> + ? ? ? ? ? ? ? .param.config = COH901318_CX_CFG_CH_DISABLE |
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CFG_RM_MEMORY_TO_PRIMARY |
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CFG_LCR_DISABLE |
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CFG_TC_IRQ_ENABLE |
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? COH901318_CX_CFG_BE_IRQ_ENABLE,
->
-> ...but then don't use them to cut down on the line count in the
-> definition of these parameters?
 
-We do, look further below:
-
-+       {
-+               .number = U300_DMA_GENERAL_PURPOSE_0,
-+               .name = "GENERAL 00",
-+               .priority_high = 0,
-+
-+               .param.config = flags_memcpy_config,
-+               .param.ctrl_lli_chained = flags_memcpy_lli_chained,
-+               .param.ctrl_lli = flags_memcpy_lli,
-+               .param.ctrl_lli_last = flags_memcpy_lli_last,
-+       },
-
-Only the general purpose channels support memcpy and these are all set
-up the same way (for accelerating memcpy() operations).
-
-The rest of the channels are, mem -> io, io -> mem, io -> io and the io
-(device DMA) configurations are individual and varies greatly with
-hardware. For some currently unused hardware we haven't even defined
-the proper flags yet, and e.g. changing the burst size of an individual
-channel without affecting the rest is something a developer is very
-likely to do.
-
-Linus Walleij
+I think this is the original version we had in our internal release
+years ago, and released after solving some legal issues now.
