@@ -1,25 +1,51 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 29 Oct 2009 16:01:49 +0800
-Subject: Query : head.S assembler options
-In-Reply-To: <d06872620910290011u6d724437s991a3de94a660e60@mail.gmail.com>
-References: <d06872620910290011u6d724437s991a3de94a660e60@mail.gmail.com>
-Message-ID: <f17812d70910290101s392fa8dby16a0b7d33b6814e3@mail.gmail.com>
+From: markus.kreidl@gmail.com (Markus Kreidl)
+Date: Thu, 29 Oct 2009 09:25:07 +0100
+Subject: ep93xx Ethernet hangs!
+In-Reply-To: <8e7afda70910280402r41e198cet6fc92817cd1c847f@mail.gmail.com>
+References: <8e7afda70910280402r41e198cet6fc92817cd1c847f@mail.gmail.com>
+Message-ID: <8e7afda70910290125x2c4a7308k53f07a8cfba62792@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-That really depends on the kbuild Makefiles, where I guess -D__ASSEMBLY__
-is there in KBUILD_AFLAGS, please check it out.
+Correction test result: The ep93xx board is still pingable.
 
-BTW: your name in Indic is really cool, rarely see.
+I tried the test without a hub or switch, I just used a
+cross over cable between my PC and the ep93xx board to
+avoid loosing packages.
 
-2009/10/29 ????? ????? ????? <sureshkrshukla@gmail.com>:
-> I want to see the assembler options for : arch/arm/kernel/head.S.
-> I want to confirm if it has __ASSEMBLY__ being passed to it.
+
+2009/10/28 Markus Kreidl <markus.kreidl@gmail.com>:
+> Hi,
 >
-> Any ideas ?
+> I am using a 2.6.30.4 kernel for my ep93xx ts-7260 board.
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+> Test scenario:
+>
+> I wrote a udp server/client application to test the ethernet
+> interface. The server is implemented in the ep93xx board.
+>
+> a) the client connects to the ep93xx board and starts to send data
+> (length 100bytes) to the ep93xx board and waits for same data to be
+> retransmitted.
+>
+> b) ep93xx board receives the data and sends it back to the client.
+>
+> c) After the client receives the same data retransmitted data, the
+> client retransmits one byte longe data to the ?ep93xx board.
+>
+> This game will be repeated till a data length of 65000 bytes is reached.
+>
+> Problem:
+> Sometimes this test can be done two times without any problems, but
+> when a problem occur the client application is waiting for the
+> retranmission of sent data package. Also the ep93xx board is not
+> pingable from a third computer.
+>
+>
+> The same effect on kernel 2.6.27.10
+>
+> Hints are welcome.
+>
+> Markus K.
 >
