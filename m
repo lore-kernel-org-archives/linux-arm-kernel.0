@@ -1,61 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 29 Oct 2009 18:32:33 +0000
-Subject: [RFC 02/11] ARM: Fix errata 411920 workarounds
-In-Reply-To: <20091028173234.GA20040@n2100.arm.linux.org.uk>
-References: <cover.1256683230.git.rmk+kernel@arm.linux.org.uk>
-	<6af8ea18ac64a74700e374489751a63e643ac394.1256683230.git.rmk+kernel@arm.linux.org.uk>
-	<1256743895.27121.39.camel@pc1117.cambridge.arm.com>
-	<20091028173234.GA20040@n2100.arm.linux.org.uk>
-Message-ID: <1256841153.6874.85.camel@pc1117.cambridge.arm.com>
+From: stephan.lachowsky@maxim-ic.com (Stephan Lachowsky)
+Date: Thu, 29 Oct 2009 11:51:18 -0700
+Subject: [PATCH] [ARM] fix csum_partial_copy_from_user() fault handler
+Message-ID: <1256842278.20770.78.camel@qu101.quarc.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2009-10-28 at 17:32 +0000, Russell King - ARM Linux wrote:
-> On Wed, Oct 28, 2009 at 03:31:35PM +0000, Catalin Marinas wrote:
-> > On Sat, 2009-10-24 at 22:36 +0100, Russell King wrote:
-> > > diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-> > > index 3147f75..af0624c 100644
-> > > --- a/arch/arm/include/asm/cacheflush.h
-> > > +++ b/arch/arm/include/asm/cacheflush.h
-> > > @@ -412,9 +412,14 @@ extern void flush_dcache_page(struct page *);
-> > >  
-> > >  static inline void __flush_icache_all(void)
-> > >  {
-> > > +#ifdef CONFIG_ARM_ERRATA_411920
-> > > +	extern void v6_icache_inval_all(void);
-> > > +	v6_icache_inval_all();
-> > > +#else
-> > >         asm("mcr        p15, 0, %0, c7, c5, 0   @ invalidate I-cache\n"
-> > >             :
-> > >             : "r" (0));
-> > > +#endif
-> > >  }
-> > 
-> > For correctness, can we add a dsb() at the end of this function so that
-> > the I-cache operation is guaranteed to complete?
-> 
-> Two reasons why not to in this patch:
-> 
-> 1. it changes the produced code, and therefore is another functional change.
-> 2. it means we end up with a sequence like:
-> 
-> 	data cache maintainence
-> 	dsb();
-> 	instruction cache maintainence
-> 	dsb();
-> 
-> The dsb() between the two operations probably isn't required.
+The framepointer setup for csum_partial_copy_from_user() was removed in
+22acc4e65043d436bc286e6059960fa533e37356.  The fault handler needs to use
+an offset from the stack pointer instead.
 
-That's described in B2.2.7 in the ARM ARM (make sure you use the latest
-errata markup - 4.0).
+Signed-off-by: Stephan Lachowsky <stephan.lachowsky@maxim-ic.com>
+---
+ arch/arm/lib/csumpartialcopyuser.S |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-The first DSB is needed to ensure the the D-cache op completed before
-the I-cache op (in case we get speculative prefetches into the I-cache
-before the D-cache op completed).
-
-The second DSB would be needed to ensure the completion of the I-cache
-maintenance operation. An ISB may be needed as well but the return from
-exception has the same effect, so user code isn't affected.
-
+diff --git a/arch/arm/lib/csumpartialcopyuser.S b/arch/arm/lib/csumpartialcopyuser.S
+index 14677fb..afbf3cc 100644
+--- a/arch/arm/lib/csumpartialcopyuser.S
++++ b/arch/arm/lib/csumpartialcopyuser.S
+@@ -93,7 +93,7 @@
+ 		.section .fixup,"ax"
+ 		.align	4
+ 9001:		mov	r4, #-EFAULT
+-		ldr	r5, [fp, #4]		@ *err_ptr
++		ldr	r5, [sp, #32]		@ *err_ptr
+ 		str	r4, [r5]
+ 		ldmia	sp, {r1, r2}		@ retrieve dst, len
+ 		add	r2, r2, r1
 -- 
-Catalin
+1.6.2.5
