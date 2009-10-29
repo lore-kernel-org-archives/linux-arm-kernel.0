@@ -1,32 +1,41 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 29 Oct 2009 08:32:56 +0100
-Subject: i.MX35 NANDFC implementation?
-In-Reply-To: <80tyxjfg7e.fsf@merkur.tec.linutronix.de>
-References: <80tyxjfg7e.fsf@merkur.tec.linutronix.de>
-Message-ID: <20091029073256.GJ15296@pengutronix.de>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Thu, 29 Oct 2009 09:49:20 +0200
+Subject: [PATCH] s3c24xx-adc: resume convertions interrupted by going to
+	suspend
+In-Reply-To: <2accc2ff0910232359t1bc7515avb7b208ffbd112807@mail.gmail.com>
+References: <200910201719.41102.anarsoul@gmail.com>
+	<200910221410.28632.anarsoul@gmail.com>
+	<2accc2ff0910232359t1bc7515avb7b208ffbd112807@mail.gmail.com>
+Message-ID: <200910290949.28010.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2009 at 08:53:25PM +0100, John Ogness wrote:
-> Hi,
+? ????????? ?? 24 ??????? 2009 09:59:25 ????? Nelson Castillo ???????:
+> >@@ -224,6 +225,7 @@ struct s3c_adc_client *s3c_adc_register(struct
+> > platform_device *pdev,
+> >
+> > 	client->is_ts = is_ts;
+> >
+> > 	client->select_cb = select;
+> >
+> > 	client->convert_cb = conv;
+> >
+> >+	client->selected = 0;
 > 
-> I am implementing the NAND Flash Controller for for the i.MX35 on a PDK
-> board from Freescale. I couldn't find any existing implementation
-> anywhere, but maybe one of you is also working on it? If so, please let
-> me know so we can work together on it.
+> You don't need to clear client->selected. kzalloc takes care of this.
 
-First please note that the mailing list address has changed. Find the
-correct address in cc.
-
-I recently created patches for i.MX35 Nand support. I posted them to the
-mtd list and you can find them here via git:
-
-git://git.pengutronix.de/git/imx/linux-2.6.git mxc-nand
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Ok, here's a fixed version.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-s3c24xx-adc-resume-convertions-interrupted-by-going-.patch
+Type: text/x-patch
+Size: 3397 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091029/d4ae5fc6/attachment.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091029/d4ae5fc6/attachment.sig>
