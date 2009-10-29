@@ -1,51 +1,51 @@
-From: markus.kreidl@gmail.com (Markus Kreidl)
-Date: Thu, 29 Oct 2009 09:25:07 +0100
-Subject: ep93xx Ethernet hangs!
-In-Reply-To: <8e7afda70910280402r41e198cet6fc92817cd1c847f@mail.gmail.com>
-References: <8e7afda70910280402r41e198cet6fc92817cd1c847f@mail.gmail.com>
-Message-ID: <8e7afda70910290125x2c4a7308k53f07a8cfba62792@mail.gmail.com>
+From: dk-arm-linux@gmx.de (Dieter Kiermaier)
+Date: Thu, 29 Oct 2009 10:36:40 +0200
+Subject: marvell kirkwood / openrd-base kernel freeze on bootup with PICe->PCI
+	bridge
+Message-ID: <200910290936.40397.dk-arm-linux@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Correction test result: The ep93xx board is still pingable.
+Hi all,
 
-I tried the test without a hub or switch, I just used a
-cross over cable between my PC and the ep93xx board to
-avoid loosing packages.
+I've got a strange problem with latest git kernel. If I connect a PCIe->PCI bridge (without any connected PCI device!)
+to my openrd-base board the kernel freezes during bootup if PCI is enabled:
+Filename 'uImage_openrd'.
+Load address: 0x800000
+Loading: #################################################################
+         #################################################################
+         #################################################################
+         #################################################################
+         #################################################################
+         #################################################################
+         #################################################################
+         ############
+done
+Bytes transferred = 2390120 (247868 hex)
+## Booting kernel from Legacy Image at 00800000 ...
+   Image Name:   Linux-2.6.32-rc5-00081-g964fe08-
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    2390056 Bytes =  2.3 MB
+   Load Address: 00008000
+   Entry Point:  00008000
+   Verifying Checksum ... OK
+   Loading Kernel Image ... OK
+OK
+
+Starting kernel ...
+
+Uncompressing Linux............................................................................................................................................................ done.
+
+The PCIe->PCI bridge is a Marvell 88SB2211 evaluation board and I expect it works well - at least it does in all other environments I've tested so far.
+
+If I insert eg a PCIe Network card everything works fine.
+With former marvell 2.6.22 stock kernel / u-boot kernel boots up and I can access PCI card connected after my bridge.
+
+Please can someone help me to track this down?
+Some tips how to debug such a problem using openocd are very welcome, too!
+I'm completely lost in space :(
 
 
-2009/10/28 Markus Kreidl <markus.kreidl@gmail.com>:
-> Hi,
->
-> I am using a 2.6.30.4 kernel for my ep93xx ts-7260 board.
->
->
-> Test scenario:
->
-> I wrote a udp server/client application to test the ethernet
-> interface. The server is implemented in the ep93xx board.
->
-> a) the client connects to the ep93xx board and starts to send data
-> (length 100bytes) to the ep93xx board and waits for same data to be
-> retransmitted.
->
-> b) ep93xx board receives the data and sends it back to the client.
->
-> c) After the client receives the same data retransmitted data, the
-> client retransmits one byte longe data to the ?ep93xx board.
->
-> This game will be repeated till a data length of 65000 bytes is reached.
->
-> Problem:
-> Sometimes this test can be done two times without any problems, but
-> when a problem occur the client application is waiting for the
-> retranmission of sent data package. Also the ep93xx board is not
-> pingable from a third computer.
->
->
-> The same effect on kernel 2.6.27.10
->
-> Hints are welcome.
->
-> Markus K.
->
+
+Many thanks,
+Dieter
