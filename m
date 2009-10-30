@@ -1,60 +1,104 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 30 Oct 2009 00:36:01 +0000
-Subject: S3C6410 board (SmartQ 7) USB host issues
-In-Reply-To: <4AEA3240.10105@gmail.com>
-References: <4AEA3240.10105@gmail.com>
-Message-ID: <20091030003601.GF8096@trinity.fluff.org>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Fri, 30 Oct 2009 01:38:22 +0100
+Subject: [PATCH 2/5] ARM: MX3: add SPI functions for lilly1131-db
+In-Reply-To: <1256554559-17828-3-git-send-email-daniel@caiaq.de>
+References: <1256554559-17828-1-git-send-email-daniel@caiaq.de>
+	<1256554559-17828-2-git-send-email-daniel@caiaq.de>
+	<1256554559-17828-3-git-send-email-daniel@caiaq.de>
+Message-ID: <20091030003822.GV14091@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 30, 2009 at 01:24:32AM +0100, Maurus Cuelenaere wrote:
-> Hi,
+Hi Sascha,
+
+did you pull this series already? I'm asking because after a recent
+rebase (Linus pulled the ARM bits just now), this one patch below breaks
+the build as the SPI device names appear to have changed. The other
+patches in these series are not affected.
+
+I can either send a new version or a fixup patch, whatever makes more
+sense. 
+
+Thanks,
+Daniel
+
+
+On Mon, Oct 26, 2009 at 11:55:56AM +0100, Daniel Mack wrote:
+> This adds support for the two SPI busses found on the lilly1131 module.
 > 
-> I'm working on getting mainline Linux working on the SmartQ 7, a Samsung 
-> S3C6410 board.
+> Signed-off-by: Daniel Mack <daniel@caiaq.de>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  arch/arm/mach-mx3/mx31lilly.c |   37 +++++++++++++++++++++++++++++++++++++
+>  1 files changed, 37 insertions(+), 0 deletions(-)
 > 
-> I'm having issues getting USB host to work, when I try to attach a 
-> device (Logitech mouse in this case) to it I get "device descriptor 
-> read/64, error -62" errors. Then it gets a new address assigned and gets 
-> back to the same error (this loops around 4 times, then Linux seems to 
-> give up).
-
-That could be due to a number of things, such as:
-
-1) Unstable clock (need to verify the clock below is happening)
-2) Interface problems - does the board have the correct pull ups
-3) Does the interface have power control that needs to be set?
- 
-> This board doesn't have a separate 48M clock source, so I'm currently 
-> changing the USB host clock source to EPLL in my board config like this:
-
-What is the current EPLL rate?
- 
-> struct clk * usb_clock, * mout_epll;
+> diff --git a/arch/arm/mach-mx3/mx31lilly.c b/arch/arm/mach-mx3/mx31lilly.c
+> index de5cf01..59b3526 100644
+> --- a/arch/arm/mach-mx3/mx31lilly.c
+> +++ b/arch/arm/mach-mx3/mx31lilly.c
+> @@ -41,6 +41,7 @@
+>  #include <mach/common.h>
+>  #include <mach/iomux-mx3.h>
+>  #include <mach/board-mx31lilly.h>
+> +#include <mach/spi.h>
+>  
+>  #include "devices.h"
+>  
+> @@ -110,6 +111,22 @@ static struct platform_device *devices[] __initdata = {
+>  	&physmap_flash_device,
+>  };
+>  
+> +static int spi_internal_chipselect[] = {
+> +	MXC_SPI_CS(0),
+> +	MXC_SPI_CS(1),
+> +	MXC_SPI_CS(2),
+> +};
+> +
+> +static struct spi_imx_master spi0_pdata = {
+> +	.chipselect = spi_internal_chipselect,
+> +	.num_chipselect = ARRAY_SIZE(spi_internal_chipselect),
+> +};
+> +
+> +static struct spi_imx_master spi1_pdata = {
+> +	.chipselect = spi_internal_chipselect,
+> +	.num_chipselect = ARRAY_SIZE(spi_internal_chipselect),
+> +};
+> +
+>  static int mx31lilly_baseboard;
+>  core_param(mx31lilly_baseboard, mx31lilly_baseboard, int, 0444);
+>  
+> @@ -128,6 +145,26 @@ static void __init mx31lilly_board_init(void)
+>  
+>  	mxc_iomux_alloc_pin(MX31_PIN_CS4__CS4, "Ethernet CS");
+>  
+> +	/* SPI */
+> +	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_SCLK__SCLK, "SPI1_CLK");
+> +	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_MOSI__MOSI, "SPI1_TX");
+> +	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_MISO__MISO, "SPI1_RX");
+> +	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_SPI_RDY__SPI_RDY, "SPI1_RDY");
+> +	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_SS0__SS0, "SPI1_SS0");
+> +	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_SS1__SS1, "SPI1_SS1");
+> +	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_SS2__SS2, "SPI1_SS2");
+> +
+> +	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_SCLK__SCLK, "SPI2_CLK");
+> +	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_MOSI__MOSI, "SPI2_TX");
+> +	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_MISO__MISO, "SPI2_RX");
+> +	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_SPI_RDY__SPI_RDY, "SPI2_RDY");
+> +	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_SS0__SS0, "SPI2_SS0");
+> +	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_SS1__SS1, "SPI2_SS1");
+> +	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_SS2__SS2, "SPI2_SS2");
+> +
+> +	mxc_register_device(&imx_spi_device0, &spi0_pdata);
+> +	mxc_register_device(&imx_spi_device1, &spi1_pdata);
+> +
+>  	platform_add_devices(devices, ARRAY_SIZE(devices));
+>  }
+>  
+> -- 
+> 1.6.5
 > 
-> usb_clock = clk_get(NULL, "usb-bus-host");
-> if(usb_clock == NULL) {
->     pr_err("%s: failed to get usb-bus-host clock\n", __func__);
->     return -ENXIO;
-> }
-> mout_epll = clk_get(NULL, "mout_epll");
-> if(mout_epll == NULL) {
->     pr_err("%s: failed to get mout_epll clock\n", __func__);
->     clk_put(usb_clock);
->     return -ENXIO;
-> }
 > 
-> /* setup clock */
-> clk_set_parent(usb_clock, mout_epll);
-> clk_set_rate(usb_clock, 48000000);
-
-does clk_get_rate() here show 48MHz, or something 'close' ?
-
-currently we do not have support for setting the EPLL, so you
-may be getting a best-effort value from the divider chain.
-
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
