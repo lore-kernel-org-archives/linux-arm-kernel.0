@@ -1,59 +1,28 @@
-From: niam.niam@gmail.com (Ni@m)
-Date: Fri, 30 Oct 2009 07:44:42 +0200
-Subject: what's zero_pages for in paging_int
-In-Reply-To: <tencent_6A57DBDE2957BDF72E459404@qq.com>
-References: <tencent_6A57DBDE2957BDF72E459404@qq.com>
-Message-ID: <a9e22dff0910292244i293eeae0xf604bb0bf0cf71a2@mail.gmail.com>
+From: dean_go@eledsn.com (dean_go Zhang)
+Date: Fri, 30 Oct 2009 20:28:44 +0800
+Subject: Soc camera:Is there anyone dealing with ov9650chip?Let's talk about
+	soc camera driver.
+Message-ID: <65c69abb0910300528j2bffc2b8i8eb07254725f8de7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, rocky.
-Mostly zeropage is needed to catch NULL-dereferencing.
+I'm reading to documentation in linux-2.6.30,and ov7670 driver ,and I'm
+trying to make a driver for ov9650.
 
-Regards.
--- Dima
+> struct soc_camera_ops provides .probe and .remove methods, which are called
+> by
+> the soc-camera core, when a camera is matched against or removed from a
+> camera
+> host bus, .init, .release, .suspend, and .resume are called from the camera
+> host
+> driver as discussed above. Other members of this struct provide respective
+> V4L2
+> functionality.
+>
 
-2009/10/30 ??? <914059751@qq.com>
-
-> Hi, guys
->
->     In paging_int, after setting up bootmem allocator, why zero page is
-> needed? i cannot see any things usefull resides on that page, something i
-> missing obviously?
->
->    thanks
-> ----rocky
->
->  ---------------------Linux-2.6.30/arch/arm/mm/mmu.c-----------------------
->
-> void __init paging_init(struct machine_desc *mdesc)
-> {
->         void *zero_page;
->
->         build_mem_type_table();
->         sanity_check_meminfo();
->         prepare_page_table();
->         bootmem_init();
->         devicemaps_init(mdesc);
->         kmap_init();/*DF: most embedded system do NOT have any HIGH MEM */
->         top_pmd = pmd_off_k(0xffff0000);
->
->
->         /*
->          * allocate the zero page.  Note that this always succeeds and
->          * returns a zeroed result.
->          */
->         zero_page = alloc_bootmem_low_pages(PAGE_SIZE);   /* DF: what?s
-> this for? */
->         empty_zero_page = virt_to_page(zero_page);
->         flush_dcache_page(empty_zero_page);
->
-> }
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+This is from the documentation,but I didn't find any thing about
+soc_camera_host_device in ov7670's driver code.
+Does anyone know how to make a v4l2 soc camera driver?
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091030/9e0c3573/attachment.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091030/9d20025c/attachment.htm>
