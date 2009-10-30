@@ -1,35 +1,41 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 30 Oct 2009 18:07:54 +0100
-Subject: At91SAM9G20 AT91_MCI patches
-In-Reply-To: <5547BA931CA43849A16B2B02F2528D3938F80DD6@DEFTHW99E25MSX.ww902.siemens.net>
-References: <5547BA931CA43849A16B2B02F2528D3938F80DD6@DEFTHW99E25MSX.ww902.siemens.net>
-Message-ID: <4AEB1D6A.9030606@atmel.com>
+From: dev.c0debabe@gmail.com (Stefan Schoenleitner)
+Date: Fri, 30 Oct 2009 18:25:03 +0100
+Subject: at91sam9260 on linux 2.6.31 with at91 patchset: UART looses bytes
+	when receiving packets
+Message-ID: <4AEB216F.7080006@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Retallack, Mark :
-> Good morning, I hope this is the correct list. 
-> 
-> I am using the AT91SAM9G20-EK dev board. It does not look like the vanilla kernel (2.6.27+) contains the patch for support in the drivers/mmc/host/at91_mci.c file. Patch 5130/3 contains the correct information, however the final patch 5130/4 has the at91_mci section removed. Was there a reason for this? 
-> 
-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=5130/3
-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=5130/4
+Hi,
 
-I advice you to go with Linux4sam.org experimental patches for 2.6.27.
-for 2.6.30 you have a preview here:
-ftp://ftp.linux4sam.org/devel/linux/
-(pick the 3 ones that are at91_mci related)
+I have a at91sam9260 based development board with a Rev.B controller
+sitting on it.
+On this board I use UART0 in raw mode with no flow control to connect to
+a DSP board and exchange data packets.
+While the UART generally seems to be working it seems to loose bytes
+from time to time when receiving.
 
-> Also it would be useful to know what the preferred MCI (MMC) driver for the AT91SAM9G20 is; the at91_mci or atmel_mci. The revision A and B AT91SAM9G20-EK dev board (board-sam9g20ek.c) uses the at91_mci driver, but the revision C AT91SAM9G20-EK dev board (board-sam9g20ek-2slot-mmc.c) uses atmel_mci driver.
+Interestingly is is *always the same byte* on the same position in the
+stream that is lost.
+I verified that the stream really contains all the bytes by sniffing the
+TX pin on the DSP board at the same time.
+While on the PC that is used for sniffing all bytes are received, the
+sam9260 board misses the mentioned byte.
 
-Dual slot 9g20 has a patch to enable at91_mci use:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2009-October/002577.html
+I looked into the errata section of the sam9260 datasheet as well.
+For Rev.A chips there were some related UART problems but for my Rev.B
+chip these errors seem to have been fixed.
 
-- atmel_mci allow the use of 2 slots but does not handle PDC (DMA data
-transfers)
-- at91_mci is using PDC (recommended with experimental patches mentioned
-above)
+Did anyone on this list had similar problems ?
+Do you have suggestions how I can find out what's wrong and fix the
+problem ?
 
-Best regards,
--- 
-Nicolas Ferre
+One possibility to debug the problem that comes to my mind right now is
+to add some debug code to the kernel so that I can see which bytes are
+actually received from the uart controller itself.
+If the data coming from the controller is the same as the data I receive
+in my userspace application it has to be a hardware or hardware
+configuration problem, right ?
+
+cheers,
+stefan
