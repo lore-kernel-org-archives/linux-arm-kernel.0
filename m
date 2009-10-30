@@ -1,38 +1,52 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Fri, 30 Oct 2009 12:19:20 +0100
-Subject: [PATCH] ARM: pxafb: Use the passed fb_var_screeninfo struct in
-	pxafb_pan_display()
-In-Reply-To: <20091029195156.GI22046@sci.fi>
-References: <20091022063434.GQ14091@buzzloop.caiaq.de>
-	<20091028001805.GC14091@buzzloop.caiaq.de>
-	<f17812d70910271913l15950170we45290bb1892761a@mail.gmail.com>
-	<20091029195156.GI22046@sci.fi>
-Message-ID: <20091030111920.GC14091@buzzloop.caiaq.de>
+Date: Fri, 30 Oct 2009 12:06:16 +0100
+Subject: [PATCH] [ARM] pxafb: only take some fields of var in pxafb_pan_display()
+Message-ID: <mailman.97.1256901572.2253.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 29, 2009 at 09:51:56PM +0200, Ville Syrj?l? wrote:
-> On Wed, Oct 28, 2009 at 10:13:17AM +0800, Eric Miao wrote:
-> > I see no problem with this patch, applied to 'devel'.
-> 
-> This patch looks broken to me. The only fields of of the fb_var_screeninfo
-> passed to pan_display that should be used are xoffset, yoffset and 
-> vmode & FB_VMODE_YWRAP. The rest are not checked by the common code at
-> all and depending on the hardware the pan operation may involve looking
-> at any number of fields from fb_var_screeninfo so if other fields are
-> taken from the passed fb_var_screeninfo the pan operation may end up doing
-> a lot more than panning (eg. it could change the video mode). Even worse
-> things could happen since the values are not checked at all.
-> 
-> To prevent driver authors' from shooting themselves in the foot it might
-> make sense to change the common code to make a copy of info->var and
-> merge those three fields from the passed fb_var_screeninfo into the copy,
-> which would then be passed to the driver.
+Commit 3a8552e made pxafb pay attention to paramters passed to
+pxafb_pan_display(). As Ville Syrj?l? pointed out, this is potentially
+dangerous as user could pass in any other screeninfo parameters as well,
+and not only such that are relevant for display panning.
 
-Agreed. See the fixup patch below. I did that locally now for pxafb to
-fix the potential regression. Eventually code like this could go to some
-more generic place.
+This patch fixed that by limiting the arguments actually used to
+.xoffset, .yoffset and .vmode & FB_VMODE_YWRAP.
 
-Thanks for pointing this out!
+Signed-off-by: Daniel Mack <daniel@caiaq.de>
+Cc: Ville Syrj?l? <syrjala@sci.fi>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Sven Neumann <s.neumann@raumfeld.com>
+---
+ drivers/video/pxafb.c |   11 ++++++++++-
+ 1 files changed, 10 insertions(+), 1 deletions(-)
 
-Daniel
+diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
+index a20a7d4..e5ceda5 100644
+--- a/drivers/video/pxafb.c
++++ b/drivers/video/pxafb.c
+@@ -532,12 +532,21 @@ static int pxafb_pan_display(struct fb_var_screeninfo *var,
+ 			     struct fb_info *info)
+ {
+ 	struct pxafb_info *fbi = (struct pxafb_info *)info;
++	struct fb_var_screeninfo newvar;
+ 	int dma = DMA_MAX + DMA_BASE;
+ 
+ 	if (fbi->state != C_ENABLE)
+ 		return 0;
+ 
+-	setup_base_frame(fbi, var, 1);
++	/* Only take .xoffset, .yoffset and .vmode & FB_VMODE_YWRAP from what
++	 * was passed in and copy the rest from the old screeninfo. */
++	memcpy(&newvar, &fbi->fb.var, sizeof(newvar));
++	newvar.xoffset = var->xoffset;
++	newvar.yoffset = var->yoffset;
++	newvar.vmode &= ~FB_VMODE_YWRAP;
++	newvar.vmode |= var->vmode & FB_VMODE_YWRAP;
++
++	setup_base_frame(fbi, &newvar, 1);
+ 
+ 	if (fbi->lccr0 & LCCR0_SDS)
+ 		lcd_writel(fbi, FBR1, fbi->fdadr[dma + 1] | 0x1);
+-- 
+1.6.5
