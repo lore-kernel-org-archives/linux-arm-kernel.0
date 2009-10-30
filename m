@@ -1,34 +1,19 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Fri, 30 Oct 2009 14:18:36 +0800
-Subject: [PATCH] net: Fix checks on unsigned in w90p910_ether_probe()
-In-Reply-To: <20091029.230624.125832796.davem@davemloft.net>
-References: <4ADDFE0C.3020400@gmail.com>
-	<20091029.230624.125832796.davem@davemloft.net>
-Message-ID: <e68bb3470910292318j7a4d3e9fpcc9fe714a0561ef7@mail.gmail.com>
+From: mark.retallack@siemens.com (Retallack, Mark)
+Date: Fri, 30 Oct 2009 09:47:06 +0100
+Subject: At91SAM9G20 AT91_MCI patches
+Message-ID: <5547BA931CA43849A16B2B02F2528D3938F80DD6@DEFTHW99E25MSX.ww902.siemens.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear sirs,
+Good morning, I hope this is the correct list. 
 
-Okay, it is right, thanks all for your help.
-I will re-fix it later.
+I am using the AT91SAM9G20-EK dev board. It does not look like the vanilla kernel (2.6.27+) contains the patch for support in the drivers/mmc/host/at91_mci.c file. Patch 5130/3 contains the correct information, however the final patch 5130/4 has the at91_mci section removed. Was there a reason for this? 
 
-2009/10/30, David Miller <davem@davemloft.net>:
-> From: Roel Kluin <roel.kluin@gmail.com>
-> Date: Tue, 20 Oct 2009 20:14:36 +0200
->
-> > ether->txirq and ->rxirq are unsigned
-> >
-> > Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
->
-> platform_get_irq() returns a signed int so the intention
-> is more likely that catching negative value returns
-> was intended.
->
-> Probably the correct fix is to mark txirq and rxirq as
-> plain 'int'.
->
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=5130/3
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=5130/4
 
+Also it would be useful to know what the preferred MCI (MMC) driver for the AT91SAM9G20 is; the at91_mci or atmel_mci. The revision A and B AT91SAM9G20-EK dev board (board-sam9g20ek.c) uses the at91_mci driver, but the revision C AT91SAM9G20-EK dev board (board-sam9g20ek-2slot-mmc.c) uses atmel_mci driver.
 
--- 
-Wan z.s
+Thanks in advance 
+
+Mark Retallack.
