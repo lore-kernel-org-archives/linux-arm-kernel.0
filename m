@@ -1,23 +1,23 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Sat, 31 Oct 2009 02:34:27 +0100
-Subject: Possible suspend/resume regression in .32-rc?
-Message-ID: <20091031013427.GL14091@buzzloop.caiaq.de>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Sat, 31 Oct 2009 10:47:58 +0800
+Subject: [PATCH V1 1/3] i2c: imx: check busy bit when START/STOP
+In-Reply-To: <20091030004025.GG13398@fluff.org.uk>
+References: <1255772784-11387-1-git-send-email-linuxzsc@gmail.com>
+	<20091030004025.GG13398@fluff.org.uk>
+Message-ID: <4e090d470910301947y2cd4e95x88f500c6c008d97d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Is anyone using suspend/resume with a recent git mainline kernel on PXA
-or other ARM embedded boards? My platform used to suspend and resume
-just fine on 2.6.31 but now as I rebased it, it fails the resume part.
+On Fri, Oct 30, 2009 at 8:40 AM, Ben Dooks <ben-linux@fluff.org> wrote:
+> Does anyone have any comments on these, or shall I look at merging
+> them as fixes?
+>
+> --
+> Ben (ben at fluff.org, http://www.fluff.org/)
+>
+> ?'a smiley only costs 4 bytes'
+>
 
-Unfortunately, I can't bisect it as the platform is not mainline yet and
-so I always have mandatory patches (without my platform won't do
-anything) on top of the git repository. Which breaks the bisect logic.
+Thanks, Ben! I've test these patch on imx31 pdk and imx51 pdk.
 
-What puzzles me is that I see the current raising at wakeup time, so at
-least the processor seems to resume, but I can't see any serial console
-output, just like if the kernel crashed very early after wakeup.
-'no_console_suspend' didn't help either.
-
-Does anyone use that successfully? Any idea for possible regressions?
-
-Daniel
+  Richard
