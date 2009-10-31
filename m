@@ -1,23 +1,37 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Sat, 31 Oct 2009 10:47:58 +0800
-Subject: [PATCH V1 1/3] i2c: imx: check busy bit when START/STOP
-In-Reply-To: <20091030004025.GG13398@fluff.org.uk>
-References: <1255772784-11387-1-git-send-email-linuxzsc@gmail.com>
-	<20091030004025.GG13398@fluff.org.uk>
-Message-ID: <4e090d470910301947y2cd4e95x88f500c6c008d97d@mail.gmail.com>
+From: rpjday@crashcourse.ca (Robert P. J. Day)
+Date: Sat, 31 Oct 2009 04:00:51 -0400 (EDT)
+Subject: [PATCH] ARM/S3C2440:  Add spaces around case range operands.
+Message-ID: <alpine.LFD.2.00.0910310359260.24643@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 30, 2009 at 8:40 AM, Ben Dooks <ben-linux@fluff.org> wrote:
-> Does anyone have any comments on these, or shall I look at merging
-> them as fixes?
->
-> --
-> Ben (ben at fluff.org, http://www.fluff.org/)
->
-> ?'a smiley only costs 4 bytes'
->
 
-Thanks, Ben! I've test these patch on imx31 pdk and imx51 pdk.
+For safety, add spaces around the case range operator "..." since it
+might be parsed incorrectly when used with integer values.
 
-  Richard
+Signed-off-by: Robert P. J. Day <rpjday@crashcourse.ca>
+
+---
+
+diff --git a/arch/arm/mach-s3c2440/mach-mini2440.c b/arch/arm/mach-s3c2440/mach-mini2440.c
+index ec71a69..f6ee17c 100644
+--- a/arch/arm/mach-s3c2440/mach-mini2440.c
++++ b/arch/arm/mach-s3c2440/mach-mini2440.c
+@@ -582,7 +582,7 @@ static void mini2440_parse_features(
+ 		char f = *fp++;
+
+ 		switch (f) {
+-		case '0'...'9':	/* tft screen */
++		case '0' ... '9':	/* tft screen */
+ 			if (features->done & FEATURE_SCREEN) {
+ 				printk(KERN_INFO "MINI2440: '%c' ignored, "
+ 					"screen type already set\n", f);
+
+========================================================================
+Robert P. J. Day                               Waterloo, Ontario, CANADA
+
+            Linux Consulting, Training and Kernel Pedantry.
+
+Web page:                                          http://crashcourse.ca
+Twitter:                                       http://twitter.com/rpjday
+========================================================================
