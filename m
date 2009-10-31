@@ -1,53 +1,63 @@
-From: rkiyerpersonal@gmail.com (Rajanikanth H.V)
-Date: Sat, 31 Oct 2009 18:43:19 +0530
-Subject: DMA Cache coherency issue on A9 SMP System
-Message-ID: <d82162470910310613mff28897k68d8794b6fb5b469@mail.gmail.com>
+From: dev.c0debabe@gmail.com (Stefan Schoenleitner)
+Date: Sat, 31 Oct 2009 15:00:54 +0100
+Subject: at91sam9260 on linux 2.6.31 with at91 patchset: UART looses bytes
+	when receiving packets
+In-Reply-To: <4AEC1D8D.7020209@gmail.com>
+References: <594305.67002.qm@web84306.mail.re1.yahoo.com>
+	<4AEC1D8D.7020209@gmail.com>
+Message-ID: <4AEC4316.3050008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Catalin,
+Hi,
 
-I comeacross to see DMA cache coherency problem which is similar to
-what you have stated in one of your previous mails,
-"esp., dma cache coherency issue in the case of DMA_FROM_DEVICE.
+I added some debug code to the atmel_serial.c kernel driver now.
+The result is that the kernel *correctly receives* all bytes from the "bad" packet:
 
-my Current Setup:
-	- A9 SMP
-	- Kernel version 2.6.29
-	- EHCI Host with DMA
-	- Application use case:
-		[USB Disk is connected to A9 Target Board]
-		> Read a 200M File and apply md5sum
-			OR
-		> Copy a 200M+ file to a new file.
-
-Problem:
-	> MD5sum fails
-	> The copied file will have corrupt data 		
-
-Debugging further i have the following observation:
-1. Pages pointed in each entry of Scatter-Gather list will be
-Cache 'CLEAN+Invalidate'ed   before EHCI-DMA Happens for
-DMA_FROM_DEVICE (BULK IN Request) .
-Ref: dma_map_page()-> map_page();
-
-Note:
-	arm_arm / cortex-a9 document suggests to 'CLEAN+INVALIDATE'
-	which is happening on the DMA'able page.
-
-2. After the DMA i do not see the expected pattern,  instead,
-	> One Cacheline length or 32 Bytes will have stale data
-		on some pages
-Note: I have created a 200M File having predefined pattern
-
-3. As a Workaround, I applied 'dma_sync_single_for_device' on the
-	DMA'ed pages after the DMA, this seems to have solved the
-	issue, since i do not see any stale entry.
-
-what could be the root cause?.
+kernel: hexdump(): 30 bytes
+kernel: 0000    61 00 1a 01 01 c0 3c 22 cd 3c 36 4b 13 ae 56 99 .a.....<".<6K..V
+kernel: 0010    00 21 e4 29 84 0d c3 6a 95 17 6f 4d 9f c7       .!.)...j..oM..
 
 
-thanks in advance,
-regards,
+But in the application the 0x13 byte is never received:
 
-Rajanikanth
+
+hexdump(): 4 bytes
+0000	61 00 1a 01                                     a...
+read chunk of 25 bytes
+hexdump(): 25 bytes
+0000	01 c0 3c 22 cd 3c 36 4b ae 56 99 00 21 e4 29 84 ...<".<6K.V..!.)
+0010	0a c3 6a 95 17 6f 4d 9f c7                      ..j..oM..
+
+
+
+Is it possible that the byte 0x13 is somehow filtered out ?
+If so, why does the same code work then on the PC but not on the ARM board ?
+
+I suspect that my raw terminal setup is missing something ?
+--------------------------------------------------------------------------
+     // set format 8N1
+    newtio.c_cflag &= ~CSIZE;   // Mask the character size bits
+    newtio.c_cflag &= ~PARENB;
+    newtio.c_cflag &= ~CSTOPB;
+    newtio.c_cflag &= ~CSIZE;
+    newtio.c_cflag |= CS8;      // Select 8 data bits
+
+    // use hardware flow control (RTC/CTS)
+    newtio.c_cflag |= CRTSCTS;
+
+    // raw input
+    newtio.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+
+    // raw ouput
+    newtio.c_oflag &= ~OPOST;
+
+    // enable receiver and local mode
+    newtio.c_cflag |= (CLOCAL | CREAD);
+
+    newtio.c_cc[VTIME]=0;
+    newtio.c_cc[VMIN]=1;
+--------------------------------------------------------------------------
+
+cheers,
+stefan
