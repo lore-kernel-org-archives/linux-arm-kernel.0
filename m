@@ -1,58 +1,52 @@
-From: jic23@cam.ac.uk (Jonathan Cameron)
-Date: Sun, 01 Nov 2009 17:44:42 +0000
-Subject: Soc camera:Is there anyone dealing with ov9650chip?Let's talk
-	about 	soc camera driver.
-In-Reply-To: <65c69abb0910300528j2bffc2b8i8eb07254725f8de7@mail.gmail.com>
-References: <65c69abb0910300528j2bffc2b8i8eb07254725f8de7@mail.gmail.com>
-Message-ID: <4AEDC90A.7050005@cam.ac.uk>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Mon, 02 Nov 2009 08:54:27 +1300
+Subject: Possible suspend/resume regression in .32-rc?
+In-Reply-To: <20091031013427.GL14091@buzzloop.caiaq.de>
+References: <20091031013427.GL14091@buzzloop.caiaq.de>
+Message-ID: <4AEDE773.4080800@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dean_go Zhang wrote:
-> I'm reading to documentation in linux-2.6.30,and ov7670 driver ,and I'm
-> trying to make a driver for ov9650.
-> 
->     struct soc_camera_ops provides .probe and .remove methods, which are
->     called by
->     the soc-camera core, when a camera is matched against or removed
->     from a camera
->     host bus, .init, .release, .suspend, and .resume are called from the
->     camera host
->     driver as discussed above. Other members of this struct provide
->     respective V4L2
->     functionality.
-> 
->  
-> This is from the documentation,but I didn't find any thing about
-> soc_camera_host_device in ov7670's driver code.
-> Does anyone know how to make a v4l2 soc camera driver? 
-This isn't really an arm related question.  Should really be asked on
-linux-media. (now cc'd along with Guennadi)
+Daniel Mack wrote:
+> Is anyone using suspend/resume with a recent git mainline kernel on PXA
+> or other ARM embedded boards? My platform used to suspend and resume
+> just fine on 2.6.31 but now as I rebased it, it fails the resume part.
 
-Having said that...
+Are you using the same .config? I have had drivers with dodgy
+suspend/resume code before. You could try removing unneeded drivers and
+see if the problem still exists.
 
-The reason you aren't finding soc camera related stuff in the ov7670 driver
-is that it isn't currently a soc camera driver.  There is ongoing work to
-move the soc-camera framework fully over to using v4l2-subdevs thus allowing
-drivers like this one to work both with soc-camera interfaces and others.
+> Unfortunately, I can't bisect it as the platform is not mainline yet and
+> so I always have mandatory patches (without my platform won't do
+> anything) on top of the git repository. Which breaks the bisect logic.
 
-There are still a few elements being cleaned up (primarily to do with
-negotiation of image formats) that make it tricky for a single driver to
-directly support use through soc camera and without it. 
+You can do the bisect by creating a patch (or series of patches) between
+mainline and your code. Do the bisect on the clean mainline and then
+apply the patch on top of the bisect point at each stage.
 
-I would suggest looking in the linux-media archive for
-Guennanadi Liakhovetski's latest imagebus patches for what still needs doing.
+> What puzzles me is that I see the current raising at wakeup time, so at
+> least the processor seems to resume, but I can't see any serial console
+> output, just like if the kernel crashed very early after wakeup.
+> 'no_console_suspend' didn't help either.
 
-In meantime, the following patch against 2.6.32-rc5 adds soc camera support to the
-ov7670 driver.  I've been posting updates tracking Guennadi's changes to soc camera
-to linux-media (though I haven't had a chance to do the recent imagebus changes yet).
+You could try enabling CONFIG_DEBUG_LL and adding the following to
+kernel/printk.c just above the call to vscnprintf:
 
-Unfortunately omnivision aren't exactly free with datasheets (I can get the ov9650 from
-google but not the ov9640), so I can't check, but based purely on numbering how does
-this chip compare to the ov9640 which as a driver in kernel (probably in a queue
-for next merge window? - it's certainly in the tree Guennadi is using and has been
-posted to linux-media)
+	{
+		extern void printascii(const char *);
+		printascii(printk_buf);
+	}
 
-Google did however give me this hit, which mentions an ov9650 driver
-http://marex-hnd.blogspot.com/2009/08/omnivision-ov9640-hacking-part-iv.html
-Perhaps Guennadi has more info on this?
+The alternative is to connect to the unit with a JTAG debugger and get a
+stack trace and print the contents of __log_buf (the printk buffer).
+
+~Ryan
+
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
