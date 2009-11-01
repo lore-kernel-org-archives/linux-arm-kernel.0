@@ -1,33 +1,55 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Sun, 1 Nov 2009 21:54:49 +0100
-Subject: Possible suspend/resume regression in .32-rc?
-In-Reply-To: <20091031013427.GL14091@buzzloop.caiaq.de>
-References: <20091031013427.GL14091@buzzloop.caiaq.de>
-Message-ID: <20091101205449.GT14091@buzzloop.caiaq.de>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 1 Nov 2009 22:12:34 +0100
+Subject: [PATCH 02/12] ARM: S3C24XX: Introduce S3C2442B CPU
+In-Reply-To: <1256732153-22027-2-git-send-email-ben-linux@fluff.org>
+References: <1256732153-22027-1-git-send-email-ben-linux@fluff.org>
+	<1256732153-22027-2-git-send-email-ben-linux@fluff.org>
+Message-ID: <20091101211234.GA2085@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 31, 2009 at 02:34:27AM +0100, Daniel Mack wrote:
-> Is anyone using suspend/resume with a recent git mainline kernel on PXA
-> or other ARM embedded boards? My platform used to suspend and resume
-> just fine on 2.6.31 but now as I rebased it, it fails the resume part.
+On Wed 2009-10-28 12:15:43, Ben Dooks wrote:
+> From: Harald Welte <laforge@gnumonks.org>
 > 
-> Unfortunately, I can't bisect it as the platform is not mainline yet and
-> so I always have mandatory patches (without my platform won't do
-> anything) on top of the git repository. Which breaks the bisect logic.
+> Add the S3C2442B CPU ID to aid support the Openmoko GTA02 / Freerunner.
 > 
-> What puzzles me is that I see the current raising at wakeup time, so at
-> least the processor seems to resume, but I can't see any serial console
-> output, just like if the kernel crashed very early after wakeup.
-> 'no_console_suspend' didn't help either.
+> Signed-off-by: Harald Welte <laforge@gnumonks.org>
+> Signed-off-by: Andy Green <andy@warmcat.com>
+> Signed-off-by: Nelson Castillo <arhuaco@freaks-unidos.net>
+> [ben-linux at fluff.org: edit description for clarity and S3C2442B as uppercase]
+> Signed-off-by: Ben Dooks <ben-linux@fluff.org>
+> ---
+>  arch/arm/plat-s3c24xx/cpu.c |   10 ++++++++++
+>  1 files changed, 10 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-s3c24xx/cpu.c b/arch/arm/plat-s3c24xx/cpu.c
+> index 5447e60..4af9dd9 100644
+> --- a/arch/arm/plat-s3c24xx/cpu.c
+> +++ b/arch/arm/plat-s3c24xx/cpu.c
+> @@ -61,6 +61,7 @@ static const char name_s3c2410[]  = "S3C2410";
+>  static const char name_s3c2412[]  = "S3C2412";
+>  static const char name_s3c2440[]  = "S3C2440";
+>  static const char name_s3c2442[]  = "S3C2442";
+> +static const char name_s3c2442b[]  = "S3C2442B";
+>  static const char name_s3c2443[]  = "S3C2443";
+>  static const char name_s3c2410a[] = "S3C2410A";
+>  static const char name_s3c2440a[] = "S3C2440A";
+> @@ -112,6 +113,15 @@ static struct cpu_table cpu_ids[] __initdata = {
+>  		.name		= name_s3c2442
+>  	},
+>  	{
+> +		.idcode		= 0x32440aab,
+> +		.idmask		= 0xffffffff,
+> +		.map_io		= s3c244x_map_io,
+> +		.init_clocks	= s3c244x_init_clocks,
+> +		.init_uarts	= s3c244x_init_uarts,
+> +		.init		= s3c2442_init,
+> +		.name		= name_s3c2442b
 
-Ok, got it. The culprit is commit d2c37068 ("[ARM] pxa: initialize
-default interrupt priority and use ICHP for IRQ handling"). Reverting it
-make suspend/resume work again on my board.
-
-Haojian, Eric, could you have a look at this?
-
-Many thanks for all input, everyone :)
-
-Thanks,
-Daniel
+Could we simply put the string here? This is unneccessary
+obfuscation... and it is used just once so it does not save
+anything...
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
