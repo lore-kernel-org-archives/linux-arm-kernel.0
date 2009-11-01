@@ -1,45 +1,28 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 1 Nov 2009 21:34:43 +0100
-Subject: [PATCH] [RTC] Add Freescale MC13783 RTC driver
-In-Reply-To: <1256373342-5294-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1256330323-13300-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1256373342-5294-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20091101203443.GB18116@pengutronix.de>
+Date: Sun, 1 Nov 2009 21:39:59 +0100
+Subject: [PATCH] imx/gpio: Use handle_level_irq
+In-Reply-To: <20091020081303.GO8818@pengutronix.de>
+References: <1255983568-20958-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20091020081303.GO8818@pengutronix.de>
+Message-ID: <20091101203959.GC18116@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Sat, Oct 24, 2009 at 10:35:42AM +0200, Uwe Kleine-K?nig wrote:
-> This driver provides support for the RTC part integrated into the
-> Freescale MC13783 PMIC and bases on patch created earlier by Sascha
-> Hauer.
+On Tue, Oct 20, 2009 at 10:13:03AM +0200, Sascha Hauer wrote:
+> On Mon, Oct 19, 2009 at 10:19:28PM +0200, Uwe Kleine-K?nig wrote:
+> > According to Russell King handle_edge_irq is only useful for "edge-based
+> > inputs where the controller does not remember transitions with the input
+> > masked."
+> > 
+> > So using handle_edge_irq unconditionally for both edge and level irqs is
+> > wrong.  Testing showed that the controller does remember transitions
+> > while the interrupt is masked.  So use handle_level_irq unconditionally.
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-k?nig@pengutronix.de>
-> Cc: Valentin Longchamp <valentin.longchamp@epfl.ch>
-> Cc: Paul Gortmaker <p_gortmaker@yahoo.com>
-> Cc: Alessandro Zummo <a.zummo@towertech.it>
-> Cc: rtc-linux at googlegroups.com
-> ---
-> Hello,
-> 
-> this patch depends on
-> 
-> 	mfd/mc13783: near complete rewrite
-> 
-> sent earlier on lkml[1].  Compared to the earlier version of rtc support
-> on mc13783 as sent by Sascha, this driver got reset detection and
-> therefore depends on the patch above.
-> 
-> A tree runnable on Phytec's PCM038 is available in my git tree
-> 
-> 	git://git.pengutronix.de/git/ukl/linux-2.6.git mc13783
-> 
-> .  (Maybe I will rewrite these commits, so please expect it might change
-> in a non-fast-forward manner.)
-
-Valentin, could you already test this?  Any comments by the others?
+> As this fixes only rt kernels and we have no reports that something is
+> not working on non rt kernels I suggest putting this into the next merge
+> window.
+I didn't find my patch in your imx tree.  Assuming I don't have
+overlooked it, what is stopping you?
 
 Best regards
 Uwe
