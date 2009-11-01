@@ -1,32 +1,33 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 1 Nov 2009 21:39:59 +0100
-Subject: [PATCH] imx/gpio: Use handle_level_irq
-In-Reply-To: <20091020081303.GO8818@pengutronix.de>
-References: <1255983568-20958-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20091020081303.GO8818@pengutronix.de>
-Message-ID: <20091101203959.GC18116@pengutronix.de>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Sun, 1 Nov 2009 21:54:49 +0100
+Subject: Possible suspend/resume regression in .32-rc?
+In-Reply-To: <20091031013427.GL14091@buzzloop.caiaq.de>
+References: <20091031013427.GL14091@buzzloop.caiaq.de>
+Message-ID: <20091101205449.GT14091@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2009 at 10:13:03AM +0200, Sascha Hauer wrote:
-> On Mon, Oct 19, 2009 at 10:19:28PM +0200, Uwe Kleine-K?nig wrote:
-> > According to Russell King handle_edge_irq is only useful for "edge-based
-> > inputs where the controller does not remember transitions with the input
-> > masked."
-> > 
-> > So using handle_edge_irq unconditionally for both edge and level irqs is
-> > wrong.  Testing showed that the controller does remember transitions
-> > while the interrupt is masked.  So use handle_level_irq unconditionally.
+On Sat, Oct 31, 2009 at 02:34:27AM +0100, Daniel Mack wrote:
+> Is anyone using suspend/resume with a recent git mainline kernel on PXA
+> or other ARM embedded boards? My platform used to suspend and resume
+> just fine on 2.6.31 but now as I rebased it, it fails the resume part.
 > 
-> As this fixes only rt kernels and we have no reports that something is
-> not working on non rt kernels I suggest putting this into the next merge
-> window.
-I didn't find my patch in your imx tree.  Assuming I don't have
-overlooked it, what is stopping you?
+> Unfortunately, I can't bisect it as the platform is not mainline yet and
+> so I always have mandatory patches (without my platform won't do
+> anything) on top of the git repository. Which breaks the bisect logic.
+> 
+> What puzzles me is that I see the current raising at wakeup time, so at
+> least the processor seems to resume, but I can't see any serial console
+> output, just like if the kernel crashed very early after wakeup.
+> 'no_console_suspend' didn't help either.
 
-Best regards
-Uwe
+Ok, got it. The culprit is commit d2c37068 ("[ARM] pxa: initialize
+default interrupt priority and use ICHP for IRQ handling"). Reverting it
+make suspend/resume work again on my board.
 
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Haojian, Eric, could you have a look at this?
+
+Many thanks for all input, everyone :)
+
+Thanks,
+Daniel
