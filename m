@@ -1,91 +1,41 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 1 Nov 2009 23:27:34 +0100
-Subject: [PATCH 3/3] staging/dream: Add final missing bits
-Message-ID: <20091101222733.GC20740@elf.ucw.cz>
+From: swetland@google.com (Brian Swetland)
+Date: Sun, 1 Nov 2009 15:01:19 -0800
+Subject: [3/3,ARM] msm: add minimal board file for HTC Dream device
+In-Reply-To: <20091101221345.GA16926@elf.ucw.cz>
+References: <20091101221345.GA16926@elf.ucw.cz>
+Message-ID: <a55d774e0911011501x6abdb6a2p117f7038a4fa80cf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Nov 1, 2009 at 2:13 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> Hi!
+>
+> On Thu 2009-06-18 00:31:15, Brian Swetland wrote:
+>> This is just enough to get the device booting and serial console
+>> working. ?Sufficient for debugging further MSM7k/Dream Support.
+>> This will support HTC Dream / T-Mobile G1 / Android ADP1 (which
+>> are all the same hardware, known as "trout" to the ARM machine
+>> database).
+>>
+>> Signed-off-by: Brian Swetland <swetland@google.com>
+>> Acked-by: Pavel Machek <pavel@ucw.cz>
+>> Reviewed-by: GeunSik Lim <geunsik.lim@samsung.com>
+>
+> I'm trying to get this series to work -- i.e. get dream boot up-to
+> serial console.
+>
+> I tried applying series on 2.6.29, and it failed compilation.
+>
+> On 2.6.30 and 2.6.32-rc, I get "Uncompressing linux..." feedback on
+> serial, but that's it. Do you still remember what kernel version these
+> should be applied to? .config would be helpful, too...
 
-This adds final missing bits that allow drivers/staging to compile.
+Pretty sure it's something later than .29
 
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
+Does enabling DEBUG_LL help?  If something's dying before the serial
+port is registered, you might never see any console chatter.
 
-diff --git a/drivers/staging/dream/include/mach/camera.h b/drivers/staging/dream/include/mach/camera.h
-index c20f042..6ccc521 100644
---- a/drivers/staging/dream/include/mach/camera.h
-+++ b/drivers/staging/dream/include/mach/camera.h
-@@ -277,3 +277,39 @@ void msm_camio_disable(struct platform_device *);
- int msm_camio_probe_on(struct platform_device *);
- int msm_camio_probe_off(struct platform_device *);
- #endif
-+
-+struct msm_camera_io_ext {
-+	uint32_t mdcphy;
-+	uint32_t mdcsz;
-+	uint32_t appphy;
-+	uint32_t appsz;
-+};
-+
-+struct msm_camera_device_platform_data {
-+	void (*camera_gpio_on) (void);
-+	void (*camera_gpio_off)(void);
-+	struct msm_camera_io_ext ioext;
-+};
-+
-+#ifdef CONFIG_SENSORS_MT9T013
-+struct msm_camera_legacy_device_platform_data {
-+	int sensor_reset;
-+	int sensor_pwd;
-+	int vcm_pwd;
-+	void (*config_gpio_on) (void);
-+	void (*config_gpio_off)(void);
-+};
-+#endif
-+
-+#define MSM_CAMERA_FLASH_NONE 0
-+#define MSM_CAMERA_FLASH_LED  1
-+
-+struct msm_camera_sensor_info {
-+	const char *sensor_name;
-+	int sensor_reset;
-+	int sensor_pwd;
-+	int vcm_pwd;
-+	int mclk;
-+	int flash_type;
-+	struct msm_camera_device_platform_data *pdata;
-+};
-diff --git a/drivers/staging/dream/include/mach/msm_rpcrouter.h b/drivers/staging/dream/include/mach/msm_rpcrouter.h
-index 9724ece..2ad21de 100644
---- a/drivers/staging/dream/include/mach/msm_rpcrouter.h
-+++ b/drivers/staging/dream/include/mach/msm_rpcrouter.h
-@@ -176,4 +176,14 @@ struct msm_rpc_server
- 
- int msm_rpc_create_server(struct msm_rpc_server *server);
- 
-+struct snd_endpoint {
-+	int id;
-+	const char *name;
-+};
-+
-+struct msm_snd_endpoints {
-+	struct snd_endpoint *endpoints;
-+	unsigned num;
-+};
-+
- #endif
-diff --git a/drivers/staging/dream/qdsp5/adsp.c b/drivers/staging/dream/qdsp5/adsp.c
-index 9069535..1fab9ce 100644
---- a/drivers/staging/dream/qdsp5/adsp.c
-+++ b/drivers/staging/dream/qdsp5/adsp.c
-@@ -45,6 +45,7 @@ static inline void allow_suspend(void)
- #include "adsp.h"
- 
- #define INT_ADSP INT_ADSP_A9_A11
-+#define MSM_AD5_BASE          IOMEM(0xE0300000)
- 
- static struct adsp_info adsp_info;
- static struct msm_rpc_endpoint *rpc_cb_server_client;
+Also, I believe you'll want to pass console=ttyMSM2,115200n8 on the
+kernel commandline  (-c parameter to fastboot or mkbootimg).
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Brian
