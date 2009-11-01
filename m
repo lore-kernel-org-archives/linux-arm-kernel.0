@@ -1,81 +1,58 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Sun, 1 Nov 2009 13:07:08 +0000
-Subject: [PATCH 6/7] S3C6410: Add platform data for S3C IDE controller
-	driver
-In-Reply-To: <1257051536-8170-1-git-send-email-thomas.ab@samsung.com>
-References: <1257051536-8170-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <20091101130707.GJ8096@trinity.fluff.org>
+From: jic23@cam.ac.uk (Jonathan Cameron)
+Date: Sun, 01 Nov 2009 17:44:42 +0000
+Subject: Soc camera:Is there anyone dealing with ov9650chip?Let's talk
+	about 	soc camera driver.
+In-Reply-To: <65c69abb0910300528j2bffc2b8i8eb07254725f8de7@mail.gmail.com>
+References: <65c69abb0910300528j2bffc2b8i8eb07254725f8de7@mail.gmail.com>
+Message-ID: <4AEDC90A.7050005@cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 01, 2009 at 01:58:56PM +0900, Thomas Abraham wrote:
-> This patch adds platform data for S3C IDE controller driver in
-> S3C6410 platform.
+dean_go Zhang wrote:
+> I'm reading to documentation in linux-2.6.30,and ov7670 driver ,and I'm
+> trying to make a driver for ov9650.
 > 
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> ---
->  arch/arm/mach-s3c6410/mach-smdk6410.c |    8 +++++++-
->  1 files changed, 7 insertions(+), 1 deletions(-)
+>     struct soc_camera_ops provides .probe and .remove methods, which are
+>     called by
+>     the soc-camera core, when a camera is matched against or removed
+>     from a camera
+>     host bus, .init, .release, .suspend, and .resume are called from the
+>     camera host
+>     driver as discussed above. Other members of this struct provide
+>     respective V4L2
+>     functionality.
 > 
-> diff --git a/arch/arm/mach-s3c6410/mach-smdk6410.c b/arch/arm/mach-s3c6410/mach-smdk6410.c
-> index ea51dbe..81b435e 100644
-> --- a/arch/arm/mach-s3c6410/mach-smdk6410.c
-> +++ b/arch/arm/mach-s3c6410/mach-smdk6410.c
-> @@ -50,6 +50,7 @@
->  #include <plat/regs-sys.h>
->  #include <plat/iic.h>
->  #include <plat/fb.h>
-> +#include <plat/ide.h>
->  #include <plat/gpio-cfg.h>
 >  
->  #include <plat/s3c6410.h>
-> @@ -153,6 +154,12 @@ static struct s3c_fb_platdata smdk6410_lcd_pdata __initdata = {
->  	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
->  };
->  
-> +#ifdef CONFIG_BLK_DEV_IDE_S3C
-> +static struct s3c_ide_platdata smdk6410_ide_pdata __initdata = {
-> +	.setup_gpio	= s3c64xx_ide_setup_gpio,
-> +};
-> +#endif
-> +
->  static struct resource smdk6410_smsc911x_resources[] = {
->  	[0] = {
->  		.start = 0x18000000,
-> @@ -199,7 +204,9 @@ static struct platform_device *smdk6410_devices[] __initdata = {
->  	&s3c_device_usb,
->  	&s3c_device_usb_hsotg,
->  	&smdk6410_lcd_powerdev,
-> -
-> +#ifdef CONFIG_BLK_DEV_IDE_S3C
-> +	&s3c_device_cfcon,
-> +#endif
->  	&smdk6410_smsc911x,
->  };
+> This is from the documentation,but I didn't find any thing about
+> soc_camera_host_device in ov7670's driver code.
+> Does anyone know how to make a v4l2 soc camera driver? 
+This isn't really an arm related question.  Should really be asked on
+linux-media. (now cc'd along with Guennadi)
 
-Firstly, doing stuff if the driver is enabled or not is not a good idea,
-as it means re-installing the kernel if you then go and build the driver
-as a module at a later date.
+Having said that...
 
-Two, since I guess that the IDE gpio setup should be the same across all
-s3c6410 based systems, then you should look at supplying a standard
-platform data that the board can use instead of having to duplicate this
-across all the boards.
+The reason you aren't finding soc camera related stuff in the ov7670 driver
+is that it isn't currently a soc camera driver.  There is ongoing work to
+move the soc-camera framework fully over to using v4l2-subdevs thus allowing
+drivers like this one to work both with soc-camera interfaces and others.
 
-> @@ -377,6 +382,9 @@ static void __init smdk6410_machine_init(void)
->  	s3c_i2c0_set_platdata(NULL);
->  	s3c_i2c1_set_platdata(NULL);
->  	s3c_fb_set_platdata(&smdk6410_lcd_pdata);
-> +#ifdef CONFIG_BLK_DEV_IDE_S3C
-> +	s3c_ide_set_platdata(&smdk6410_ide_pdata);
-> +#endif
->  
->  	gpio_request(S3C64XX_GPN(5), "LCD power");
->  	gpio_request(S3C64XX_GPF(13), "LCD power");
+There are still a few elements being cleaned up (primarily to do with
+negotiation of image formats) that make it tricky for a single driver to
+directly support use through soc camera and without it. 
 
--- 
-Ben
+I would suggest looking in the linux-media archive for
+Guennanadi Liakhovetski's latest imagebus patches for what still needs doing.
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+In meantime, the following patch against 2.6.32-rc5 adds soc camera support to the
+ov7670 driver.  I've been posting updates tracking Guennadi's changes to soc camera
+to linux-media (though I haven't had a chance to do the recent imagebus changes yet).
+
+Unfortunately omnivision aren't exactly free with datasheets (I can get the ov9650 from
+google but not the ov9640), so I can't check, but based purely on numbering how does
+this chip compare to the ov9640 which as a driver in kernel (probably in a queue
+for next merge window? - it's certainly in the tree Guennadi is using and has been
+posted to linux-media)
+
+Google did however give me this hit, which mentions an ov9650 driver
+http://marex-hnd.blogspot.com/2009/08/omnivision-ov9640-hacking-part-iv.html
+Perhaps Guennadi has more info on this?
