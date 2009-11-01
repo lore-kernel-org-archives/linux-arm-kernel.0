@@ -1,30 +1,30 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 1 Nov 2009 21:22:10 +0100
-Subject: Possible suspend/resume regression in .32-rc?
-In-Reply-To: <20091031013427.GL14091@buzzloop.caiaq.de>
-References: <20091031013427.GL14091@buzzloop.caiaq.de>
-Message-ID: <20091101202209.GB13467@pengutronix.de>
+Date: Sun, 1 Nov 2009 21:32:40 +0100
+Subject: [PATCH] at91: support for eco920
+In-Reply-To: <1256115527-20635-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20091021084826.GA29667@n2100.arm.linux.org.uk>
+	<1256115527-20635-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20091101203240.GA18116@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hallo Daniel, 
+Hello,
 
-On Sat, Oct 31, 2009 at 02:34:27AM +0100, Daniel Mack wrote:
-> Is anyone using suspend/resume with a recent git mainline kernel on PXA
-> or other ARM embedded boards? My platform used to suspend and resume
-> just fine on 2.6.31 but now as I rebased it, it fails the resume part.
+On Wed, Oct 21, 2009 at 10:58:47AM +0200, Uwe Kleine-K?nig wrote:
+> CONFIG_MACH_ECO920 is enabled in at91rm9200dk_defconfig.  The name is
+> wrong, but this is better than adding another defconfig or don't get
+> compile coverage at all.
 > 
-> Unfortunately, I can't bisect it as the platform is not mainline yet and
-> so I always have mandatory patches (without my platform won't do
-> anything) on top of the git repository. Which breaks the bisect logic.
-What you can do is call 2.6.31 good and to test a vanilla state, do
-something like
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+> Hello,
+> 
+> as pointed by Russell I included linux/gpio.h instead of mach/gpio.h.
+Is this patch OK now, should I sent to the patch system even if
+Jean-Christophe PLAGNIOL-VILLARD pointed out the defconfig stuff isn't
+optimal?
 
-	git merge my_support_branch_based_on_2.6.31
-	... test ...
-	git reset --hard HEAD^
-	git bisect --good_or_bad_as_found_by_test_above
- 
 Best regards
 Uwe
 
