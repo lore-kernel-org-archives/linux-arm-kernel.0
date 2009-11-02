@@ -1,46 +1,66 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Mon, 2 Nov 2009 17:34:05 +0530
-Subject: [PATCH 33/46] davinci: add generic CPUFreq driver for DaVinci
-In-Reply-To: <1255720190-7452-35-git-send-email-khilman@deeprootsystems.com>
-References: <1255720190-7452-34-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-35-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB59301DE1EBCEC@dbde02.ent.ti.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 2 Nov 2009 13:22:58 +0100
+Subject: Possible suspend/resume regression in .32-rc?
+In-Reply-To: <771cded00911020318u3939a06dq75cd3504d6c0eb50@mail.gmail.com>
+References: <20091031013427.GL14091@buzzloop.caiaq.de>
+	<20091101205449.GT14091@buzzloop.caiaq.de>
+	<20091101213343.GA31345@elf.ucw.cz>
+	<20091101220341.GA16698@elf.ucw.cz>
+	<771cded00911020122o3bb5cc96q957c8be1ce7cae46@mail.gmail.com>
+	<20091102093840.GA11426@elf.ucw.cz>
+	<771cded00911020248s2b2b6577o5ec2f3772a09e7b9@mail.gmail.com>
+	<20091102105141.GB11426@elf.ucw.cz>
+	<771cded00911020318u3939a06dq75cd3504d6c0eb50@mail.gmail.com>
+Message-ID: <20091102122258.GA22624@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 17, 2009 at 00:39:37, Kevin Hilman wrote:
-> From: Sekhar Nori <nsekhar@ti.com>
->
-> Adds a basic CPUFreq driver for DaVinci devices registering with the
-> kernel CPUFreq infrastructure.
->
-> Support is added for both frequency and voltage regulation.
->
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
-> ---
->  arch/arm/mach-davinci/Kconfig                |    1 +
->  arch/arm/mach-davinci/Makefile               |    3 +
->  arch/arm/mach-davinci/cpufreq.c              |  219 ++++++++++++++++++++++++++
->  arch/arm/mach-davinci/include/mach/cpufreq.h |   25 +++
->  4 files changed, 248 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-davinci/cpufreq.c
->  create mode 100644 arch/arm/mach-davinci/include/mach/cpufreq.h
->
-> diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
-> index 7b6dddf..6c81b6c 100644
-> --- a/arch/arm/mach-davinci/Kconfig
-> +++ b/arch/arm/mach-davinci/Kconfig
-> @@ -32,6 +32,7 @@ config ARCH_DAVINCI_DA830
->          bool "DA830/OMAP-L137 based system"
->       select CP_INTC
->       select ARCH_DAVINCI_DA8XX
-> +     select ARCH_HAS_CPUFREQ
 
-Kevin,
+> >> > Given that it hangs very early, in arch_suspend_enable_irqs() (see my
+> >> > other mail), I don't trust your analysis.
+> >> >
+> >> > I'm not using serial console on spitz, and I have never had successful
+> >> > resume with the patch applied.
+...
+> I see. You can chech my patch in below. I need to save IPRs in suspend
+> resume routine.
+...
+> >From 1764e836424d42a0654b8b73c402a2dddb118dc4 Mon Sep 17 00:00:00 2001
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date: Mon, 2 Nov 2009 14:02:21 -0500
+> Subject: [PATCH] pxa: fix system resume issue on pxa27x and pxa3xx
+> 
+> Since interrupt handler is changed to use interrupt priority, we also need to
+> save and restore these interrupt controller registers in suspend/resume
+> routine.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 
-This config option has mistakenly been selected for DA830
-instead of DA850.
+Acked-by: Pavel Machek <pavel@ucw.cz>
+Tested-by: Pavel Machek <pavel@ucw.cz>
 
-Thanks,
-Sekhar
+> @@ -150,6 +150,7 @@ void __init pxa_init_irq(int irq_nr, set_wake_t fn)
+> 
+>  #ifdef CONFIG_PM
+>  static unsigned long saved_icmr[2];
+> +static unsigned long saved_ipr[128];
+> 
+>  static int pxa_irq_suspend(struct sys_device *dev, pm_message_t state)
+>  {
+> @@ -159,6 +160,10 @@ static int pxa_irq_suspend(struct sys_device
+> *dev, pm_message_t state)
+
+Note: Your mail client is word-wrapping.
+
+>  		saved_icmr[i] = _ICMR(irq);
+>  		_ICMR(irq) = 0;
+>  	}
+> +	if (pxa_internal_irq_nr > 128)
+> +		BUG();
+
+BUG_ON()? WARN_ON() then irq_nr = 128? User is very unlikely to read
+the BUG() message at this point...
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
