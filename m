@@ -1,167 +1,97 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 1 Nov 2009 23:13:46 +0100
-Subject: [3/3,ARM] msm: add minimal board file for HTC Dream device
-Message-ID: <20091101221345.GA16926@elf.ucw.cz>
+Date: Mon, 2 Nov 2009 12:12:39 +0100
+Subject: msm_sdcc.c: add missing include, fix compilation
+In-Reply-To: <20091022185126.GA4401@n2100.arm.linux.org.uk>
+References: <20091022072119.GA3285@elf.ucw.cz>
+	<20091022185126.GA4401@n2100.arm.linux.org.uk>
+Message-ID: <20091102111239.GB26989@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi!
 
-On Thu 2009-06-18 00:31:15, Brian Swetland wrote:
-> This is just enough to get the device booting and serial console
-> working.  Sufficient for debugging further MSM7k/Dream Support.
-> This will support HTC Dream / T-Mobile G1 / Android ADP1 (which
-> are all the same hardware, known as "trout" to the ARM machine
-> database).
+> > Add missing include for	msm_sdcc compilation.
+> > 
+> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
 > 
-> Signed-off-by: Brian Swetland <swetland@google.com>
-> Acked-by: Pavel Machek <pavel@ucw.cz>
-> Reviewed-by: GeunSik Lim <geunsik.lim@samsung.com>
-
-I'm trying to get this series to work -- i.e. get dream boot up-to
-serial console. 
-
-I tried applying series on 2.6.29, and it failed compilation.
-
-On 2.6.30 and 2.6.32-rc, I get "Uncompressing linux..." feedback on
-serial, but that's it. Do you still remember what kernel version these
-should be applied to? .config would be helpful, too...
-								Pavel
-
-> ---
-> arch/arm/mach-msm/Kconfig       |    6 +++
->  arch/arm/mach-msm/Makefile      |    1 +
->  arch/arm/mach-msm/board-dream.c |   84 +++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-msm/board-dream.h |    5 ++
->  4 files changed, 96 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-msm/board-dream.c
->  create mode 100644 arch/arm/mach-msm/board-dream.h
+> I don't think this is the right solution - why should MSM have a
+> platform specific include in the ARM generic include files?
 > 
-> diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-> index 35f2a90..f780086 100644
-> --- a/arch/arm/mach-msm/Kconfig
-> +++ b/arch/arm/mach-msm/Kconfig
-> @@ -34,4 +34,10 @@ config MACH_HALIBUT
->  	help
->  	  Support for the Qualcomm SURF7201A eval board.
->  
-> +config MACH_TROUT
-> +	default y
-> +	bool "HTC Dream (aka trout)"
-> +	help
-> +	  Support for the HTC Dream, T-Mobile G1, Android ADP1 devices.
-> +
->  endif
-> diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-> index 1aa4700..91e6f5c 100644
-> --- a/arch/arm/mach-msm/Makefile
-> +++ b/arch/arm/mach-msm/Makefile
-> @@ -6,3 +6,4 @@ obj-y += clock.o clock-7x01a.o
->  
->  obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o
->  
-> +obj-$(CONFIG_MACH_TROUT) += board-dream.o
-> diff --git a/arch/arm/mach-msm/board-dream.c b/arch/arm/mach-msm/board-dream.c
-> new file mode 100644
-> index 0000000..6eae7e3
-> --- /dev/null
-> +++ b/arch/arm/mach-msm/board-dream.c
-> @@ -0,0 +1,84 @@
-> +/* linux/arch/arm/mach-msm/board-dream.c
-> + *
-> + * Copyright (C) 2009 Google, Inc.
-> + * Author: Brian Swetland <swetland@google.com>
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/platform_device.h>
-> +
-> +#include <asm/mach-types.h>
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/map.h>
-> +
-> +#include <mach/board.h>
-> +#include <mach/hardware.h>
-> +#include <mach/msm_iomap.h>
-> +
-> +#include "devices.h"
-> +#include "board-dream.h"
-> +
-> +static struct platform_device *devices[] __initdata = {
-> +	&msm_device_uart3,
-> +	&msm_device_smd,
-> +	&msm_device_nand,
-> +	&msm_device_hsusb,
-> +	&msm_device_i2c,
-> +};
-> +
-> +extern struct sys_timer msm_timer;
-> +
-> +static void __init trout_init_irq(void)
-> +{
-> +	msm_init_irq();
-> +}
-> +
-> +static void __init trout_init(void)
-> +{
-> +	platform_add_devices(devices, ARRAY_SIZE(devices));
-> +}
-> +
-> +static struct map_desc trout_io_desc[] __initdata = {
-> +	{
-> +		.virtual = TROUT_CPLD_BASE,
-> +		.pfn     = __phys_to_pfn(TROUT_CPLD_START),
-> +		.length  = TROUT_CPLD_SIZE,
-> +		.type    = MT_DEVICE_NONSHARED
-> +	}
-> +};
-> +
-> +static void __init trout_map_io(void)
-> +{
-> +	msm_map_common_io();
-> +	iotable_init(trout_io_desc, ARRAY_SIZE(trout_io_desc));
-> +
-> +#ifdef CONFIG_MSM_DEBUG_UART3
-> +	/* route UART3 to the "H2W" extended usb connector */
-> +	writeb(0x80, TROUT_CPLD_BASE + 0x00);
-> +#endif
-> +
-> +	msm_clock_init();
-> +}
-> +
-> +MACHINE_START(TROUT, "HTC Dream")
-> +#ifdef CONFIG_MSM_DEBUG_UART
-> +	.phys_io	= MSM_DEBUG_UART_PHYS,
-> +	.io_pg_offst	= ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
-> +#endif
-> +	.boot_params	= 0x10000100,
-> +	.map_io		= trout_map_io,
-> +	.init_irq	= trout_init_irq,
-> +	.init_machine	= trout_init,
-> +	.timer		= &msm_timer,
-> +MACHINE_END
-> diff --git a/arch/arm/mach-msm/board-dream.h b/arch/arm/mach-msm/board-dream.h
-> new file mode 100644
-> index 0000000..4f345a5
-> --- /dev/null
-> +++ b/arch/arm/mach-msm/board-dream.h
-> @@ -0,0 +1,5 @@
-> +
-> +#define TROUT_CPLD_BASE   0xE8100000
-> +#define TROUT_CPLD_START  0x98000000
-> +#define TROUT_CPLD_SIZE   SZ_4K
-> +
+> (If anything, we should be getting rid of any non-shared platform
+> specific includes in the arch/arm/include/asm/mach directory.)
+
+Ok.
+
+---
+
+Add missing include for msm_sdcc compilation, and remove pwrsink
+support that is not mainline, yet.
+
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
+
+diff --git a/arch/arm/mach-msm/include/mach/mmc.h b/arch/arm/mach-msm/include/mach/mmc.h
+new file mode 100644
+index 0000000..8948dec
+--- /dev/null
++++ b/arch/arm/mach-msm/include/mach/mmc.h
+@@ -0,0 +1,26 @@
++/*
++ *  arch/arm/include/asm/mach/mmc.h
++ */
++#ifndef ASMARM_MACH_MMC_H
++#define ASMARM_MACH_MMC_H
++
++#include <linux/mmc/host.h>
++#include <linux/mmc/card.h>
++#include <linux/mmc/sdio_func.h>
++
++struct embedded_sdio_data {
++        struct sdio_cis cis;
++        struct sdio_cccr cccr;
++        struct sdio_embedded_func *funcs;
++        int num_funcs;
++};
++
++struct mmc_platform_data {
++	unsigned int ocr_mask;			/* available voltages */
++	u32 (*translate_vdd)(struct device *, unsigned int);
++	unsigned int (*status)(struct device *);
++	struct embedded_sdio_data *embedded_sdio;
++	int (*register_status_notify)(void (*callback)(int card_present, void *dev_id), void *dev_id);
++};
++
++#endif
+diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
+index dba4600..b31946e 100644
+--- a/drivers/mmc/host/msm_sdcc.c
++++ b/drivers/mmc/host/msm_sdcc.c
+@@ -38,10 +38,9 @@
+ #include <asm/div64.h>
+ #include <asm/sizes.h>
+ 
+-#include <asm/mach/mmc.h>
++#include <mach/mmc.h>
+ #include <mach/msm_iomap.h>
+ #include <mach/dma.h>
+-#include <mach/htc_pwrsink.h>
+ 
+ #include "msm_sdcc.h"
+ 
+@@ -775,13 +774,11 @@ msmsdcc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 
+ 	switch (ios->power_mode) {
+ 	case MMC_POWER_OFF:
+-		htc_pwrsink_set(PWRSINK_SDCARD, 0);
+ 		break;
+ 	case MMC_POWER_UP:
+ 		pwr |= MCI_PWR_UP;
+ 		break;
+ 	case MMC_POWER_ON:
+-		htc_pwrsink_set(PWRSINK_SDCARD, 100);
+ 		pwr |= MCI_PWR_ON;
+ 		break;
+ 	}
+
 
 -- 
 (english) http://www.livejournal.com/~pavelmachek
