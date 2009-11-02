@@ -1,20 +1,53 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 02 Nov 2009 16:37:43 +0000
-Subject: [PATCH] [ARM] fix csum_partial_copy_from_user() fault handler
-In-Reply-To: <1256842278.20770.78.camel@qu101.quarc.com>
-References: <1256842278.20770.78.camel@qu101.quarc.com>
-Message-ID: <1257179863.19092.61.camel@pc1117.cambridge.arm.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Mon, 2 Nov 2009 16:47:44 +0000
+Subject: Using statically allocated memory for platform_data.
+In-Reply-To: <20091102163701.GD5785@n2100.arm.linux.org.uk>
+References: <20091102112316.16163f6a.ospite@studenti.unina.it>
+	<20091102150011.GB20341@fluff.org.uk>
+	<20091102150525.GB5785@n2100.arm.linux.org.uk>
+	<20091102152500.GD23772@trinity.fluff.org>
+	<20091102155231.GC20341@fluff.org.uk>
+	<20091102155625.GC5785@n2100.arm.linux.org.uk>
+	<20091102162839.GD20341@fluff.org.uk>
+	<20091102163701.GD5785@n2100.arm.linux.org.uk>
+Message-ID: <20091102164743.GE23772@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2009-10-29 at 11:51 -0700, Stephan Lachowsky wrote:
-> The framepointer setup for csum_partial_copy_from_user() was removed in
-> 22acc4e65043d436bc286e6059960fa533e37356.  The fault handler needs to use
-> an offset from the stack pointer instead.
+On Mon, Nov 02, 2009 at 04:37:01PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Nov 02, 2009 at 04:28:39PM +0000, Ben Dooks wrote:
+> > On Mon, Nov 02, 2009 at 03:56:25PM +0000, Russell King - ARM Linux wrote:
+> > > The reason we have platform_device_add_data() is that people think that
+> > > the device data needs to persist for the lifetime of the device.  I
+> > > personally disagree with that - once you unregister the device, it's
+> > > guaranteed that device drivers will have been unregistered, so who's
+> > > going to use the platform data?
+> > 
+> > That doesn't make any sense, in the current case of using the
+> > platform_device_alloc() and those calls the data is only living
+> > for the lifetime of the device, as the release call is tidying up
+> > the result.
 > 
-> Signed-off-by: Stephan Lachowsky <stephan.lachowsky@maxim-ic.com>
+> What I'm saying is that the lifetime of the data finishes once
+> the _unregister() call has returned.  So:
+> 
+> 	data = pdev->dev.platform_data;
+> 	platform_device_unregister(pdev);
+> 	kfree(data);
+> 
+> is an entirely valid way of handling the "I allocated my platform
+> data" problem - it doesn't need to exist to the point where the
+> device itself is freed.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Unforutnately pretty much everyone now assumes that the act of
+unregistering the device will get rid of the data that the allocated
+by the add functions.
+
+This would mean going around fixing a number of current drivers which
+all make that assumption.
 
 -- 
-Catalin
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
