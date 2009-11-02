@@ -1,57 +1,46 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 2 Nov 2009 12:23:21 +0100
-Subject: [3/3,ARM] msm: add minimal board file for HTC Dream device
-In-Reply-To: <a55d774e0911011533xf9b1285k7dc92745f2fb4edf@mail.gmail.com>
-References: <20091101221345.GA16926@elf.ucw.cz>
-	<a55d774e0911011501x6abdb6a2p117f7038a4fa80cf@mail.gmail.com>
-	<20091101231950.GF20740@elf.ucw.cz>
-	<a55d774e0911011533xf9b1285k7dc92745f2fb4edf@mail.gmail.com>
-Message-ID: <20091102112321.GC26989@elf.ucw.cz>
+From: ajay.gupta@ti.com (Gupta, Ajay Kumar)
+Date: Mon, 2 Nov 2009 16:54:00 +0530
+Subject: [PATCH RFC 1/2] MUSB: CPPI 4.1 DMA driver (take 4)
+In-Reply-To: <20091102110216.GF9446@nokia.com>
+References: <200908142241.00528.sshtylyov@ru.mvista.com>
+	<4A8A202E.2040505@windriver.com> <4A8A7047.9080405@ru.mvista.com>
+	<4A8CF552.3080801@windriver.com>
+	<19F8576C6E063C45BE387C64729E73940436EEAE36@dbde02.ent.ti.com>
+	<4AE85B02.1080207@ru.mvista.com>
+	<19F8576C6E063C45BE387C64729E73940436EEAE60@dbde02.ent.ti.com>
+	<19F8576C6E063C45BE387C64729E73940436EEB489@dbde02.ent.ti.com>
+	<20091102103706.GB1133@n2100.arm.linux.org.uk>
+	<19F8576C6E063C45BE387C64729E73940436EEB5EF@dbde02.ent.ti.com>
+	<20091102110216.GF9446@nokia.com>
+Message-ID: <19F8576C6E063C45BE387C64729E73940436EEB601@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun 2009-11-01 15:33:39, Brian Swetland wrote:
-> On Sun, Nov 1, 2009 at 3:19 PM, Pavel Machek <pavel@ucw.cz> wrote:
-> >>
-> >> Pretty sure it's something later than .29
 > >
-> > I guess I should try 2.6.31.
+> > > If it's a USB DMA device (from the patches I can find, that seems to
+> be
+> > > the case) then why can't it live in drivers/usb or drivers/dma ?
 > >
-> >> Does enabling DEBUG_LL help? ?If something's dying before the serial
-> >> port is registered, you might never see any console chatter.
+> > CPPI4.1 DMA engine can be used either by USB or by Ethernet interface
+> though
+> > currently only USB is using it but in future even Ethernet devices may
+> use it.
 > >
-> > DEBUG_LL does not help. Is that early_printk() equivalent?
-> > With DEBUG_ICEDC I don't even get "uncompressing linux" message.
+> > Infact, there is a TI platform (not in mainline), where both USB and
+> Ethernet interface is using CPPI4.1 DMA.
 > 
-> ICEDCC will try to send messages to JTAG DCC.
-> 
-> Sticking a call to printascii(printk_buf) after the vscnprintf() in
-> vprintk() in kernel/printk.c is sometimes useful alongside DEBUG_LL
-> (so that printks will go to the serial port immediately).
+> you might want to provide support for it via drivers/dma and for the
+> musb stuff, you just add the wrappers musb uses. See how tusb6010_omap.c
+> uses OMAP's system dma which is also used by any other driver which
+> requests a dma channel.
 
-Thanks, that did the trick. I'm now at:
+Sounds good. 
 
-Uncompressing
-Linux...................................................................
- done, booting the kernel.
-<5>Linux version 2.6.32-rc5-00486-g5b11a58-dirty (pavel at amd) (gcc
-version 4.3.2 (Debi9
-CPU: ARMv6-compatible processor [4117b362] revision 2 (ARMv6TEJ),
-cr=00c5387f
-CPU: VIPT aliasing data cache, VIPT aliasing instruction cache
-Machine: HTC Dream
-<4>Ignoring unrecognised tag 0x4d534d70
-<4>Ignoring unrecognised tag 0x57494649
-<4>Ignoring unrecognised tag 0x89768976
-Memory policy: ECC disabled, Data cache writeback
-<3>INITRD: 0x11000000+0x00024aa8 extends beyond physical memory -
-disabling initrd
-<7>On node 0 totalpages: 0
-<1>bootmem alloc of 32768 bytes failed!
-<0>Kernel panic - not syncing: Out of memory
+So if we want to move CPPI4.1 DMA core to drivers/dma then it has to follow
+standard set of DMA APIs (right?), which I afraid, may not be done in current implementation.
 
-...and I managed to fix that by introducing dream_fixup(). Thanks!
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Regards,
+Ajay
+  
+> --
+> balbi
