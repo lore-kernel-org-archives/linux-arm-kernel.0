@@ -1,50 +1,36 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 2 Nov 2009 11:39:40 +0100
-Subject: Using statically allocated memory for platform_data.
-In-Reply-To: <20091102112316.16163f6a.ospite@studenti.unina.it>
-References: <20091102112316.16163f6a.ospite@studenti.unina.it>
-Message-ID: <20091102103940.GA25282@pengutronix.de>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Mon, 02 Nov 2009 18:43:31 +0800
+Subject: Why flush_cache_all() not including flushing L2 cache if the
+	system has L2 cache?
+In-Reply-To: <f17812d70911011942vbf43be3wb32455ae54fe1ef3@mail.gmail.com>
+References: <4AEE44AD.4010604@gmail.com>
+	<f17812d70911011942vbf43be3wb32455ae54fe1ef3@mail.gmail.com>
+Message-ID: <4AEEB7D3.1030801@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Eric Miao wrote:
+> On Mon, Nov 2, 2009 at 10:32 AM, Peter Chen <hzpeterchen@gmail.com> wrote:
+>> Dear list,
+>>
+>> I met a problem if the address is first used by cachable, then uncachable.
+>> After that, the address will be filled with cachable value
+>> after that L2 cache line is evicted.
+>>
+> 
+> L2 cache is usually physically tagged, and from the CPU POV, it's
+> consistent once the L1 is flushed.
+My SoC platform is arm11, and L2 is PIPT. what do you mean " from the 
+CPU POV, it's consistent once the L1 is flushed"?
+> 
+> If you have problems with L2 not being flushed, it's most likely a
+> device issue, which means you probably need the dma_ API.
+> 
+I know it can be fixed by using dma_ API for alloc uncachable address.
+But If someone uses uncachable memory address before flush it, it is 
+problem. Since L1 should be flushed at code, why L2 not?
 
-On Mon, Nov 02, 2009 at 11:23:16AM +0100, Antonio Ospite wrote:
-> Hi,
-> 
-> I noted that in some mfd drivers (drivers/mfd/ezx-pcap.c and
-> drivers/mfd/da903x.c) there is code like this:
-> 
-> static int __devinit pcap_add_subdev(struct pcap_chip *pcap,
->                                      struct pcap_subdev *subdev)
-> {
->         struct platform_device *pdev;
-> 
->         pdev = platform_device_alloc(subdev->name, subdev->id);
->         pdev->dev.parent = &pcap->spi->dev;
->         pdev->dev.platform_data = subdev->platform_data;
-> 
->         return platform_device_add(pdev);
-> }
-> 
-> Note the _direct_assignment_ of platform data; then in board init code
-> there are often global struct pointers passed as subdev platform data,
-> see arch/arm/mach-pxa/em-x270.c::em_x270_da9030_subdevs for instance.
-> 
-> In these cases, whenever the subdev platform device is unregistered,
-> the call to platform_device_release() tries to kfree the platform data,
-> and being it statically allocated memory this triggers a bug from SLAB:
-> 	kernel BUG at mm/slab.c:521!
-> In my case this prevented proper device poweroff.
-> 
-> The question: should these mfd drivers use platform_device_add_data()
-> which allocates dynamic memory for *a copy* of platform data? Is this
-> simple solution acceptable even if there will be more memory used?
-If you move the original data lives in .init there is no duplication.
-
-Best regards
-Uwe
-
+Thank you!
 -- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Best regards,
+Peter Chen
