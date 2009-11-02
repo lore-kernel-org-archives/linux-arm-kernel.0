@@ -1,45 +1,74 @@
-From: thomas.ab@samsung.com (Thomas Abraham)
-Date: Mon, 2 Nov 2009 15:18:00 +0900
-Subject: [PATCH 6/7] S3C6410: Add platform data for S3C IDE controller
-	driver
-In-Reply-To: <20091101130707.GJ8096@trinity.fluff.org>
-References: <1257051536-8170-1-git-send-email-thomas.ab@samsung.com>
-	<20091101130707.GJ8096@trinity.fluff.org>
-Message-ID: <84c135f50911012218o7142ff23y571517d8e96a6734@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 2 Nov 2009 05:22:30 -0400
+Subject: Possible suspend/resume regression in .32-rc?
+In-Reply-To: <20091101220341.GA16698@elf.ucw.cz>
+References: <20091031013427.GL14091@buzzloop.caiaq.de>
+	<20091101205449.GT14091@buzzloop.caiaq.de>
+	<20091101213343.GA31345@elf.ucw.cz>
+	<20091101220341.GA16698@elf.ucw.cz>
+Message-ID: <771cded00911020122o3bb5cc96q957c8be1ce7cae46@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 1, 2009 at 10:07 PM, Ben Dooks <ben-linux@fluff.org> wrote:
-> On Sun, Nov 01, 2009 at 01:58:56PM +0900, Thomas Abraham wrote:
->> This patch adds platform data for S3C IDE controller driver in
->> S3C6410 platform.
+On Sun, Nov 1, 2009 at 6:03 PM, Pavel Machek <pavel@ucw.cz> wrote:
+>> Hi!
 >>
->> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
->> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->> ---
->> ?arch/arm/mach-s3c6410/mach-smdk6410.c | ? ?8 +++++++-
->> ?1 files changed, 7 insertions(+), 1 deletions(-)
->> -
->> +#ifdef CONFIG_BLK_DEV_IDE_S3C
->> + ? ? &s3c_device_cfcon,
->> +#endif
->> ? ? ? &smdk6410_smsc911x,
->> ?};
+>> > > Is anyone using suspend/resume with a recent git mainline kernel on PXA
+>> > > or other ARM embedded boards? My platform used to suspend and resume
+>> > > just fine on 2.6.31 but now as I rebased it, it fails the resume part.
+>> > >
+>> > > Unfortunately, I can't bisect it as the platform is not mainline yet and
+>> > > so I always have mandatory patches (without my platform won't do
+>> > > anything) on top of the git repository. Which breaks the bisect logic.
+>> > >
+>> > > What puzzles me is that I see the current raising at wakeup time, so at
+>> > > least the processor seems to resume, but I can't see any serial console
+>> > > output, just like if the kernel crashed very early after wakeup.
+>> > > 'no_console_suspend' didn't help either.
+>> >
+>> > Ok, got it. The culprit is commit d2c37068 ("[ARM] pxa: initialize
+>> > default interrupt priority and use ICHP for IRQ handling"). Reverting it
+>> > make suspend/resume work again on my board.
+>> >
+>> > Haojian, Eric, could you have a look at this?
+>>
+>> Okay, patch is this one: I'll test reverting it shortly.
+>>
+>> commit d2c37068429b29d6549cf3486fc84b836689e122
+>> Author: Haojian Zhuang <haojian.zhuang@marvell.com>
+>> Date: ? Wed Aug 19 19:49:31 2009 +0800
+>>
+>> ? ? [ARM] pxa: initialize default interrupt priority and use ICHP for IRQ handling
+>>
+>> ? ? Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+>> ? ? Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
 >
-> Firstly, doing stuff if the driver is enabled or not is not a good idea,
-> as it means re-installing the kernel if you then go and build the driver
-> as a module at a later date.
+> And yes, reverting it _does_ fix suspend on spitz.
 >
-> Two, since I guess that the IDE gpio setup should be the same across all
-> s3c6410 based systems, then you should look at supplying a standard
-> platform data that the board can use instead of having to duplicate this
-> across all the boards.
->
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?Pavel
 
-Ok. I will remove the conditional compilation and move the platform
-data from SMDK board file. Since the IDE driver is not accepted, these
-patches will be updated and resent again with the libata based driver.
+Em, it's not caused by the IRQ patch.
 
-Thanks Ben for reviewing the patches.
+The kernel is blocked in resume path. When console is resumed, IRQ is
+already disabled and system is blocked. Actually, IRQ shouldn't be
+disabled at here. Up to now, I only find which patch will cause this
+issue. But I can't find the best solution on it. The patch with issue
+is pasted in below.
 
-Thomas.
+So this issue is only occused when console suspend is enabled. If you
+enable no_console_suspend in command, you won't meet this issue. It
+seems that it's caused by removing termios setting in
+uart_resume_port() in the below patch. If I add these code back, the
+issue doesn't occur any more.
+
+Deepak,
+Could you help to investigate this issue also?
+
+By the way, the suggested quick test command is in below. If we tried
+these commands for 20 times, the issue would occur. I only test it in
+PXA silicon. I don't know the symptom on other silicons.
+$ echo devices > /sys/power/pm_test
+$ echo mem > /sys/power/state
+
+Thanks
+Haojian
