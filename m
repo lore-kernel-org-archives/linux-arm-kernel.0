@@ -1,50 +1,54 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 2 Nov 2009 11:55:12 +0100
-Subject: [PATCH 3/3] msm: Add memory map for HTC Dream
-Message-ID: <20091102105512.GA23559@elf.ucw.cz>
+From: ajay.gupta@ti.com (Gupta, Ajay Kumar)
+Date: Mon, 2 Nov 2009 16:27:59 +0530
+Subject: [PATCH RFC 1/2] MUSB: CPPI 4.1 DMA driver (take 4)
+In-Reply-To: <20091102103706.GB1133@n2100.arm.linux.org.uk>
+References: <200908142241.00528.sshtylyov@ru.mvista.com>
+	<4A8A202E.2040505@windriver.com> <4A8A7047.9080405@ru.mvista.com>
+	<4A8CF552.3080801@windriver.com>
+	<19F8576C6E063C45BE387C64729E73940436EEAE36@dbde02.ent.ti.com>
+	<4AE85B02.1080207@ru.mvista.com>
+	<19F8576C6E063C45BE387C64729E73940436EEAE60@dbde02.ent.ti.com>
+	<19F8576C6E063C45BE387C64729E73940436EEB489@dbde02.ent.ti.com>
+	<20091102103706.GB1133@n2100.arm.linux.org.uk>
+Message-ID: <19F8576C6E063C45BE387C64729E73940436EEB5EF@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> On Mon, Nov 02, 2009 at 09:51:13AM +0530, Gupta, Ajay Kumar wrote:
+> > Is there any updated patch on cppi4.1 core also?
+> 
+> Is there _any_ cppi4.1 core patch anywhere?  Not according to google.
 
-Add memory map to HTC Dream, so that boot can proceed further.
+Russell,
 
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
+Here is the latest version of cppi4.1 core.
+http://patchwork.kernel.org/patch/46698/
 
---- linux-good//arch/arm/mach-msm/board-dream.c	2009-11-02 11:54:12.000000000 +0100
-+++ linux-dream-mainline/arch/arm/mach-msm/board-dream.c	2009-11-02 11:11:47.000000000 +0100
-@@ -21,6 +21,7 @@
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-+#include <asm/setup.h>
  
- #include <mach/board.h>
- #include <mach/hardware.h>
-@@ -44,6 +45,15 @@
- 	msm_init_irq();
- }
- 
-+static void __init trout_fixup(struct machine_desc *desc, struct tag *tags,
-+				char **cmdline, struct meminfo *mi)
-+{
-+	mi->nr_banks = 1;
-+	mi->bank[0].start = PHYS_OFFSET;
-+	mi->bank[0].node = PHYS_TO_NID(PHYS_OFFSET);
-+	mi->bank[0].size = (101*1024*1024);
-+}
-+
- static void __init trout_init(void)
- {
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
-@@ -77,6 +87,7 @@
- 	.io_pg_offst	= ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
- #endif
- 	.boot_params	= 0x10000100,
-+	.fixup		= trout_fixup,
- 	.map_io		= trout_map_io,
- 	.init_irq	= trout_init_irq,
- 	.init_machine	= trout_init,
+> > Another option is to create arch/arm/ti-common to place all TI
+> platform's
+> > common software, such as CPPI4.1 used both in DA8xx and AM3517.
+> 
+> No thanks.  I really don't see why we should allow TI to have yet more
+> directories scattered throughout the tree that are out of place with
+> existing conventions.
+> 
+> And what is this CPPI thing anyway?
+> 
+> http://acronyms.thefreedictionary.com/CPPI
+> 
+> "Communications Port Programming Interface" seems to be about the best
+> applicable one from that list!
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Yes, this is the correct one.
+
+> If it's a USB DMA device (from the patches I can find, that seems to be
+> the case) then why can't it live in drivers/usb or drivers/dma ?
+
+CPPI4.1 DMA engine can be used either by USB or by Ethernet interface though
+currently only USB is using it but in future even Ethernet devices may use it.
+
+Infact, there is a TI platform (not in mainline), where both USB and Ethernet interface is using CPPI4.1 DMA.
+
+Regards,
+Ajay
