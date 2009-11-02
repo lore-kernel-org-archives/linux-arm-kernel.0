@@ -1,71 +1,36 @@
-From: ospite@studenti.unina.it (Antonio Ospite)
-Date: Mon, 2 Nov 2009 11:23:16 +0100
-Subject: Using statically allocated memory for platform_data.
-Message-ID: <20091102112316.16163f6a.ospite@studenti.unina.it>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 Nov 2009 10:37:06 +0000
+Subject: [PATCH RFC 1/2] MUSB: CPPI 4.1 DMA driver (take 4)
+In-Reply-To: <19F8576C6E063C45BE387C64729E73940436EEB489@dbde02.ent.ti.com>
+References: <200908142241.00528.sshtylyov@ru.mvista.com>
+	<4A8A202E.2040505@windriver.com> <4A8A7047.9080405@ru.mvista.com>
+	<4A8CF552.3080801@windriver.com>
+	<19F8576C6E063C45BE387C64729E73940436EEAE36@dbde02.ent.ti.com>
+	<4AE85B02.1080207@ru.mvista.com>
+	<19F8576C6E063C45BE387C64729E73940436EEAE60@dbde02.ent.ti.com>
+	<19F8576C6E063C45BE387C64729E73940436EEB489@dbde02.ent.ti.com>
+Message-ID: <20091102103706.GB1133@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Nov 02, 2009 at 09:51:13AM +0530, Gupta, Ajay Kumar wrote:
+> Is there any updated patch on cppi4.1 core also?
 
-I noted that in some mfd drivers (drivers/mfd/ezx-pcap.c and
-drivers/mfd/da903x.c) there is code like this:
+Is there _any_ cppi4.1 core patch anywhere?  Not according to google.
 
-static int __devinit pcap_add_subdev(struct pcap_chip *pcap,
-                                     struct pcap_subdev *subdev)
-{
-        struct platform_device *pdev;
+> Another option is to create arch/arm/ti-common to place all TI platform's
+> common software, such as CPPI4.1 used both in DA8xx and AM3517.
 
-        pdev = platform_device_alloc(subdev->name, subdev->id);
-        pdev->dev.parent = &pcap->spi->dev;
-        pdev->dev.platform_data = subdev->platform_data;
+No thanks.  I really don't see why we should allow TI to have yet more
+directories scattered throughout the tree that are out of place with
+existing conventions.
 
-        return platform_device_add(pdev);
-}
+And what is this CPPI thing anyway?
 
-Note the _direct_assignment_ of platform data; then in board init code
-there are often global struct pointers passed as subdev platform data,
-see arch/arm/mach-pxa/em-x270.c::em_x270_da9030_subdevs for instance.
+http://acronyms.thefreedictionary.com/CPPI
 
-In these cases, whenever the subdev platform device is unregistered,
-the call to platform_device_release() tries to kfree the platform data,
-and being it statically allocated memory this triggers a bug from SLAB:
-	kernel BUG at mm/slab.c:521!
-In my case this prevented proper device poweroff.
+"Communications Port Programming Interface" seems to be about the best
+applicable one from that list!
 
-The question: should these mfd drivers use platform_device_add_data()
-which allocates dynamic memory for *a copy* of platform data? Is this
-simple solution acceptable even if there will be more memory used?
-Or should we setup platform_data in dynamic memory from the beginning
-in board init code? (which would be way less pretty IMHO).
-
-As a side note, I've found that SLOB is more permissive in these cases
-when statically allocated memory is being freed, it reports the bug but
-the kernel does not hang, and in my case poweroff is still possible.
-
-If you need more info to come up with an opinion about that, just let me
-know.
-
-Thanks,
-   Antonio
-
-P.S. I am sending this also to LKML, but I am not subscribed to it, if
-you get the message from there, please CC me on reply.
-
--- 
-Antonio Ospite
-http://ao2.it
-
-PGP public key ID: 0x4553B001
-
-A: Because it messes up the order in which people normally read text.
-   See http://en.wikipedia.org/wiki/Posting_style
-Q: Why is top-posting such a bad thing?
-A: Top-posting.
-Q: What is the most annoying thing in e-mail?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091102/7ef9c33a/attachment-0001.sig>
+If it's a USB DMA device (from the patches I can find, that seems to be
+the case) then why can't it live in drivers/usb or drivers/dma ?
