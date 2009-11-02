@@ -1,54 +1,31 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 02 Nov 2009 09:20:51 -0800
-Subject: [PATCH 33/46] davinci: add generic CPUFreq driver for DaVinci
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59301DE1EBCEC@dbde02.ent.ti.com>
-	(Sekhar Nori's message of "Mon\, 2 Nov 2009 17\:34\:05 +0530")
-References: <1255720190-7452-34-git-send-email-khilman@deeprootsystems.com>
-	<1255720190-7452-35-git-send-email-khilman@deeprootsystems.com>
-	<B85A65D85D7EB246BE421B3FB0FBB59301DE1EBCEC@dbde02.ent.ti.com>
-Message-ID: <87639slu6k.fsf@deeprootsystems.com>
+From: linux@dominikbrodowski.net (Dominik Brodowski)
+Date: Mon, 2 Nov 2009 18:21:48 +0100
+Subject: [RFC PATCH 00/10] PCMCIA soc_common re-factorization
+In-Reply-To: <20091029172552.GB11460@n2100.arm.linux.org.uk>
+References: <925a8da0d92cdf1f37aaef988fcc63bf9744576e.1256684685.git.rmk+kernel@arm.linux.org.uk>
+	<20091027231849.GE22412@n2100.arm.linux.org.uk>
+	<20091028212534.GA31361@comet.dominikbrodowski.net>
+	<20091029172552.GB11460@n2100.arm.linux.org.uk>
+Message-ID: <20091102172148.GA11782@isilmar.linta.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Nori, Sekhar" <nsekhar@ti.com> writes:
+On Thu, Oct 29, 2009 at 05:25:52PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Oct 28, 2009 at 10:25:34PM +0100, Dominik Brodowski wrote:
+> > Do you have a git tree to pull from, or shall I apply each patch locally?
+> > Alternatively, you're free to push it upstream yourself; as the PCMCIA core
+> > is only touched in one (albeit _very_ useful) line.
+> 
+> Thanks.  Here's a URL you can pull them from:
+> 
+> ssh://master.kernel.org/home/rmk/linux-2.6-arm.git pcmcia
 
-> On Sat, Oct 17, 2009 at 00:39:37, Kevin Hilman wrote:
->> From: Sekhar Nori <nsekhar@ti.com>
->>
->> Adds a basic CPUFreq driver for DaVinci devices registering with the
->> kernel CPUFreq infrastructure.
->>
->> Support is added for both frequency and voltage regulation.
->>
->> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
->> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
->> ---
->>  arch/arm/mach-davinci/Kconfig                |    1 +
->>  arch/arm/mach-davinci/Makefile               |    3 +
->>  arch/arm/mach-davinci/cpufreq.c              |  219 ++++++++++++++++++++++++++
->>  arch/arm/mach-davinci/include/mach/cpufreq.h |   25 +++
->>  4 files changed, 248 insertions(+), 0 deletions(-)
->>  create mode 100644 arch/arm/mach-davinci/cpufreq.c
->>  create mode 100644 arch/arm/mach-davinci/include/mach/cpufreq.h
->>
->> diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
->> index 7b6dddf..6c81b6c 100644
->> --- a/arch/arm/mach-davinci/Kconfig
->> +++ b/arch/arm/mach-davinci/Kconfig
->> @@ -32,6 +32,7 @@ config ARCH_DAVINCI_DA830
->>          bool "DA830/OMAP-L137 based system"
->>       select CP_INTC
->>       select ARCH_DAVINCI_DA8XX
->> +     select ARCH_HAS_CPUFREQ
->
-> Kevin,
->
-> This config option has mistakenly been selected for DA830
-> instead of DA850.
->
+Thanks! I've applied the patches you sent me by mail, though, as your tree
+was based on something more recent from Linus than my tree, and I wanted to
+avoid a merge of Linus' tree into my tree.
 
-Thanks Sekhar,
+http://git.kernel.org/?p=linux/kernel/git/brodo/pcmcia-2.6.git;a=summary
+should have your patches momentarily.
 
-I'll fix in davinci-next.
-
-Kevin
+Best,
+	Dominik
