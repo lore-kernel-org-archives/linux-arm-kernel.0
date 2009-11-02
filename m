@@ -1,75 +1,46 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Nov 2009 11:54:58 +0000
-Subject: [PATCH RFC 1/2] MUSB: CPPI 4.1 DMA driver (take 4)
-In-Reply-To: <19F8576C6E063C45BE387C64729E73940436EEB5EF@dbde02.ent.ti.com>
-References: <200908142241.00528.sshtylyov@ru.mvista.com>
-	<4A8A202E.2040505@windriver.com> <4A8A7047.9080405@ru.mvista.com>
-	<4A8CF552.3080801@windriver.com>
-	<19F8576C6E063C45BE387C64729E73940436EEAE36@dbde02.ent.ti.com>
-	<4AE85B02.1080207@ru.mvista.com>
-	<19F8576C6E063C45BE387C64729E73940436EEAE60@dbde02.ent.ti.com>
-	<19F8576C6E063C45BE387C64729E73940436EEB489@dbde02.ent.ti.com>
-	<20091102103706.GB1133@n2100.arm.linux.org.uk>
-	<19F8576C6E063C45BE387C64729E73940436EEB5EF@dbde02.ent.ti.com>
-Message-ID: <20091102115458.GA3348@n2100.arm.linux.org.uk>
+Date: Mon, 2 Nov 2009 12:00:27 +0000
+Subject: [PATCH] pxa: fix system resume issue on pxa27x and pxa3xx
+In-Reply-To: <771cded00911020342j5266b3c4ga4e94324c2369630@mail.gmail.com>
+References: <771cded00911020342j5266b3c4ga4e94324c2369630@mail.gmail.com>
+Message-ID: <20091102120027.GB3348@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 02, 2009 at 04:27:59PM +0530, Gupta, Ajay Kumar wrote:
-> > On Mon, Nov 02, 2009 at 09:51:13AM +0530, Gupta, Ajay Kumar wrote:
-> > > Is there any updated patch on cppi4.1 core also?
-> > 
-> > Is there _any_ cppi4.1 core patch anywhere?  Not according to google.
+On Mon, Nov 02, 2009 at 07:42:14AM -0400, Haojian Zhuang wrote:
+> >From 1764e836424d42a0654b8b73c402a2dddb118dc4 Mon Sep 17 00:00:00 2001
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date: Mon, 2 Nov 2009 14:02:21 -0500
+> Subject: [PATCH] pxa: fix system resume issue on pxa27x and pxa3xx
 > 
-> Russell,
-> 
-> Here is the latest version of cppi4.1 core.
-> http://patchwork.kernel.org/patch/46698/
+> Since interrupt handler is changed to use interrupt priority, we also need to
+> save and restore these interrupt controller registers in suspend/resume
+> routine.
 
-A few points come up about this.
+Since we've just been struggling with discovering why something doesn't
+suspend/resume, is this:
 
-1. alloc_queue() - this is a find_next_zero_bit loop coupled with a
-   check for the excluded bitmap.
+> @@ -159,6 +160,10 @@ static int pxa_irq_suspend(struct sys_device
+> *dev, pm_message_t state)
+>  		saved_icmr[i] = _ICMR(irq);
+>  		_ICMR(irq) = 0;
+>  	}
+> +	if (pxa_internal_irq_nr > 128)
+> +		BUG();
 
-	end = start + count;
-	do {
-		bit = find_next_zero_bit(allocated, end, start);
-		if (bit >= end)
-			return -ENOSPC;
-		start = bit + 1;
-	} while (test_bit(bit, excluded));
+really appropriate.  If we have more than 128 interrupts, do we really
+want to cause the kernel to OOPS at this point?
 
-	__set_bit(bit, allocated);
+What about:
 
-	return bit;
+	if (WARN_ON(pxa_internal_irq_nr > 128))
+		return -EINVAL;
 
-   Note that 'allocated' and 'excluded' both need to be arrays of
-   unsigned long.
+so that we refuse to sleep _and_ log the reason why?
 
-2. alloc_queue() again - it looks to me like the existing implementation
-   is racy - who ensures that we don't have two people searching and
-   allocating the same bit?  A solution to that without adding locking
-   would be:
+This way, the platform will still be alive, and if you didn't see it via
+the console, at least it'll be available via dmesg - which is a lot better
+than trying to work out why the machine gets stuck during suspend.
 
-	end = start + count;
-	do {
-		bit = find_next_zero_bit(allocated, end, start);
-		if (bit >= end)
-			return -ENOSPC;
-		start = bit + 1;
-	} while (test_bit(bit, excluded) || test_and_set_bit(bit, allocated));
-	return bit;
-
-3. linking_ram - cppi41_queue_mgr_init() seems to be the only user.  I
-   don't see why linking_ram would be necessary.
-
-4. debugging printks via pr_debug() please (and define DEBUG at the top of
-   the file to enable debugging.)
-
-> > If it's a USB DMA device (from the patches I can find, that seems to be
-> > the case) then why can't it live in drivers/usb or drivers/dma ?
-> 
-> CPPI4.1 DMA engine can be used either by USB or by Ethernet interface though
-> currently only USB is using it but in future even Ethernet devices may use it.
-
-drivers/dma does seem to be the right place for this.
+Such a check should also be a little higher up - since we're already
+looping over the number of irqs for ICMR.
