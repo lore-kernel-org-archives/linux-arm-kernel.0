@@ -1,17 +1,19 @@
-From: yuasa@linux-mips.org (Yoichi Yuasa)
-Date: Mon, 2 Nov 2009 10:52:19 +0900
-Subject: [PATCH] Add KZM-ARM11-01 support
-In-Reply-To: <20091030112208.GA1185@n2100.arm.linux.org.uk>
-References: <20091030135343.b907e5de.yuasa@linux-mips.org>
-	<20091030110841.GF11014@pengutronix.de>
-	<20091030112208.GA1185@n2100.arm.linux.org.uk>
-Message-ID: <20091102105219.643679b8.yuasa@linux-mips.org>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Mon, 02 Nov 2009 10:32:13 +0800
+Subject: Why flush_cache_all() not including flushing L2 cache if the system
+	has L2 cache?
+Message-ID: <4AEE44AD.4010604@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear list,
 
-Thank you for your comments.
-I'll update the patch.
+I met a problem if the address is first used by cachable, then 
+uncachable. After that, the address will be filled with cachable value
+after that L2 cache line is evicted.
 
-Yoichi
+Thank you!
+
+-- 
+Best regards,
+Peter Chen
