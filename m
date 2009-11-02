@@ -1,54 +1,34 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 02 Nov 2009 18:11:19 +0100
-Subject: [PATCH 3/3 v2] at91/atmel-mci: inclusion of sd/mmc driver in
-	at91sam9g45 chip and board
-In-Reply-To: <1256763057.4362.36.camel@ben-desktop>
-References: <acfa557032a93e2d3186981b16f7048a5a31028a.1256314995.git.nicolas.ferre@atmel.com>	
-	<20090930155557.7dae503b@hskinnemoen-d830>	
-	<a3b1332815576dc4d496937b8a5ab69d36818d00.1256314995.git.nicolas.ferre@atmel.com>	
-	<cd73a99e0910271243x744c956bl598fef9fd4144840@mail.gmail.com>	
-	<20091028083548.38f1d80c@hskinnemoen-d830>	
-	<d6cda7730910271753o54acfa04t1225de460083325f@mail.gmail.com>	
-	<cd73a99e0910281253x1bb72b74p47cb5110efb0871f@mail.gmail.com>
-	<1256763057.4362.36.camel@ben-desktop>
-Message-ID: <4AEF12B7.3040704@atmel.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 02 Nov 2009 18:14:13 +0100
+Subject: [PATCH] pxa: fix system resume issue on pxa27x and pxa3xx
+In-Reply-To: <771cded00911020342j5266b3c4ga4e94324c2369630@mail.gmail.com>
+	(Haojian Zhuang's message of "Mon\, 2 Nov 2009 07\:42\:14 -0400")
+References: <771cded00911020342j5266b3c4ga4e94324c2369630@mail.gmail.com>
+Message-ID: <87ws28aly2.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Nizette :
-> On Wed, 2009-10-28 at 21:53 +0200, Andrew Victor wrote:
->> hi,
->>
->>> Then I think it would be best to use GPIO_PIN_NONE. Makes it clear
->>> what is expected and avoids confusion on what should be the proper
->>> value.
->>> I hope I'm not saying non-sense, but even if I am, I guess you can see
->>> that I'm advocating against the magic numbers :)
->> What magic numbers ?
-> 
-> I think Thiago was referring to the "-1" in the original patch as the
-> magic number.
-> 
-> Leaving the field blank to be initialised to 0 is certainly the
-> cleanest, I agree, but it doesn't actually /work/.  On many archs 0 is a
-> valid gpio number; the gpio_is_valid check used throughout the kernel
-> (including atmel-mci.c) looks like
-> 
-> static inline int gpio_is_valid(int number)
-> {
-> 	/* only some non-negative numbers are valid */
-> 	return ((unsigned)number) < ARCH_NR_GPIOS;
-> }
+Haojian Zhuang <haojian.zhuang@gmail.com> writes:
 
-I understand that the better way to solve this issue is to:
-- keep the AT91 way of specifying not connected pins (= 0)
-- code the gpio_is_valid() function for at91 that tests this way of
-handling not connected gpio
+> From 1764e836424d42a0654b8b73c402a2dddb118dc4 Mon Sep 17 00:00:00 2001
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date: Mon, 2 Nov 2009 14:02:21 -0500
+> Subject: [PATCH] pxa: fix system resume issue on pxa27x and pxa3xx
+>
+> Since interrupt handler is changed to use interrupt priority, we also need to
+> save and restore these interrupt controller registers in suspend/resume
+> routine.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Tested-by: Daniel Mack <daniel@caiaq.de>
 
-I see that in arch/arm/mach-at91/include/mach/gpio.h
-we include the asm-generic/gpio.h file... must I implement the full set
-of gpiolib ?
+Yes, the fix does work for my platform too, well done.
+Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-Best regards,
--- 
-Nicolas Ferre
+As a side note, the "128" magic number may have deserved a little define
+somewhere.
+
+Cheers.
+
+--
+Robert
