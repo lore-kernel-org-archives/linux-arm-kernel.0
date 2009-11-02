@@ -1,51 +1,57 @@
-From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Mon, 2 Nov 2009 14:02:21 -0500
-Subject: [PATCH] pxa: fix system resume issue on pxa27x and pxa3xx
-Message-ID: <mailman.101.1257160692.2253.linux-arm-kernel@lists.infradead.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 2 Nov 2009 12:23:21 +0100
+Subject: [3/3,ARM] msm: add minimal board file for HTC Dream device
+In-Reply-To: <a55d774e0911011533xf9b1285k7dc92745f2fb4edf@mail.gmail.com>
+References: <20091101221345.GA16926@elf.ucw.cz>
+	<a55d774e0911011501x6abdb6a2p117f7038a4fa80cf@mail.gmail.com>
+	<20091101231950.GF20740@elf.ucw.cz>
+	<a55d774e0911011533xf9b1285k7dc92745f2fb4edf@mail.gmail.com>
+Message-ID: <20091102112321.GC26989@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since interrupt handler is changed to use interrupt priority, we also need to
-save and restore these interrupt controller registers in suspend/resume
-routine.
+On Sun 2009-11-01 15:33:39, Brian Swetland wrote:
+> On Sun, Nov 1, 2009 at 3:19 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> >>
+> >> Pretty sure it's something later than .29
+> >
+> > I guess I should try 2.6.31.
+> >
+> >> Does enabling DEBUG_LL help? ?If something's dying before the serial
+> >> port is registered, you might never see any console chatter.
+> >
+> > DEBUG_LL does not help. Is that early_printk() equivalent?
+> > With DEBUG_ICEDC I don't even get "uncompressing linux" message.
+> 
+> ICEDCC will try to send messages to JTAG DCC.
+> 
+> Sticking a call to printascii(printk_buf) after the vscnprintf() in
+> vprintk() in kernel/printk.c is sometimes useful alongside DEBUG_LL
+> (so that printks will go to the serial port immediately).
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
----
- arch/arm/mach-pxa/irq.c |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+Thanks, that did the trick. I'm now at:
 
-diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
-index d694ce2..cdc272b 100644
---- a/arch/arm/mach-pxa/irq.c
-+++ b/arch/arm/mach-pxa/irq.c
-@@ -150,6 +150,7 @@ void __init pxa_init_irq(int irq_nr, set_wake_t fn)
+Uncompressing
+Linux...................................................................
+ done, booting the kernel.
+<5>Linux version 2.6.32-rc5-00486-g5b11a58-dirty (pavel at amd) (gcc
+version 4.3.2 (Debi9
+CPU: ARMv6-compatible processor [4117b362] revision 2 (ARMv6TEJ),
+cr=00c5387f
+CPU: VIPT aliasing data cache, VIPT aliasing instruction cache
+Machine: HTC Dream
+<4>Ignoring unrecognised tag 0x4d534d70
+<4>Ignoring unrecognised tag 0x57494649
+<4>Ignoring unrecognised tag 0x89768976
+Memory policy: ECC disabled, Data cache writeback
+<3>INITRD: 0x11000000+0x00024aa8 extends beyond physical memory -
+disabling initrd
+<7>On node 0 totalpages: 0
+<1>bootmem alloc of 32768 bytes failed!
+<0>Kernel panic - not syncing: Out of memory
 
- #ifdef CONFIG_PM
- static unsigned long saved_icmr[2];
-+static unsigned long saved_ipr[128];
-
- static int pxa_irq_suspend(struct sys_device *dev, pm_message_t state)
- {
-@@ -159,6 +160,10 @@ static int pxa_irq_suspend(struct sys_device
-*dev, pm_message_t state)
- 		saved_icmr[i] = _ICMR(irq);
- 		_ICMR(irq) = 0;
- 	}
-+	if (pxa_internal_irq_nr > 128)
-+		BUG();
-+	for (i = 0; i < pxa_internal_irq_nr; i++)
-+		saved_ipr[i] = IPR(i);
-
- 	return 0;
- }
-@@ -171,6 +176,8 @@ static int pxa_irq_resume(struct sys_device *dev)
- 		_ICMR(irq) = saved_icmr[i];
- 		_ICLR(irq) = 0;
- 	}
-+	for (i = 0; i < pxa_internal_irq_nr; i++)
-+		IPR(i) = saved_ipr[i];
-
- 	ICCR = 1;
- 	return 0;
+...and I managed to fix that by introducing dream_fixup(). Thanks!
+									Pavel
 -- 
-1.5.6.5
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
