@@ -1,46 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Nov 2009 12:00:27 +0000
-Subject: [PATCH] pxa: fix system resume issue on pxa27x and pxa3xx
-In-Reply-To: <771cded00911020342j5266b3c4ga4e94324c2369630@mail.gmail.com>
-References: <771cded00911020342j5266b3c4ga4e94324c2369630@mail.gmail.com>
-Message-ID: <20091102120027.GB3348@n2100.arm.linux.org.uk>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Mon, 2 Nov 2009 17:34:05 +0530
+Subject: [PATCH 33/46] davinci: add generic CPUFreq driver for DaVinci
+In-Reply-To: <1255720190-7452-35-git-send-email-khilman@deeprootsystems.com>
+References: <1255720190-7452-34-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-35-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB59301DE1EBCEC@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 02, 2009 at 07:42:14AM -0400, Haojian Zhuang wrote:
-> >From 1764e836424d42a0654b8b73c402a2dddb118dc4 Mon Sep 17 00:00:00 2001
-> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Mon, 2 Nov 2009 14:02:21 -0500
-> Subject: [PATCH] pxa: fix system resume issue on pxa27x and pxa3xx
-> 
-> Since interrupt handler is changed to use interrupt priority, we also need to
-> save and restore these interrupt controller registers in suspend/resume
-> routine.
+On Sat, Oct 17, 2009 at 00:39:37, Kevin Hilman wrote:
+> From: Sekhar Nori <nsekhar@ti.com>
+>
+> Adds a basic CPUFreq driver for DaVinci devices registering with the
+> kernel CPUFreq infrastructure.
+>
+> Support is added for both frequency and voltage regulation.
+>
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+> ---
+>  arch/arm/mach-davinci/Kconfig                |    1 +
+>  arch/arm/mach-davinci/Makefile               |    3 +
+>  arch/arm/mach-davinci/cpufreq.c              |  219 ++++++++++++++++++++++++++
+>  arch/arm/mach-davinci/include/mach/cpufreq.h |   25 +++
+>  4 files changed, 248 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-davinci/cpufreq.c
+>  create mode 100644 arch/arm/mach-davinci/include/mach/cpufreq.h
+>
+> diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
+> index 7b6dddf..6c81b6c 100644
+> --- a/arch/arm/mach-davinci/Kconfig
+> +++ b/arch/arm/mach-davinci/Kconfig
+> @@ -32,6 +32,7 @@ config ARCH_DAVINCI_DA830
+>          bool "DA830/OMAP-L137 based system"
+>       select CP_INTC
+>       select ARCH_DAVINCI_DA8XX
+> +     select ARCH_HAS_CPUFREQ
 
-Since we've just been struggling with discovering why something doesn't
-suspend/resume, is this:
+Kevin,
 
-> @@ -159,6 +160,10 @@ static int pxa_irq_suspend(struct sys_device
-> *dev, pm_message_t state)
->  		saved_icmr[i] = _ICMR(irq);
->  		_ICMR(irq) = 0;
->  	}
-> +	if (pxa_internal_irq_nr > 128)
-> +		BUG();
+This config option has mistakenly been selected for DA830
+instead of DA850.
 
-really appropriate.  If we have more than 128 interrupts, do we really
-want to cause the kernel to OOPS at this point?
-
-What about:
-
-	if (WARN_ON(pxa_internal_irq_nr > 128))
-		return -EINVAL;
-
-so that we refuse to sleep _and_ log the reason why?
-
-This way, the platform will still be alive, and if you didn't see it via
-the console, at least it'll be available via dmesg - which is a lot better
-than trying to work out why the machine gets stuck during suspend.
-
-Such a check should also be a little higher up - since we're already
-looping over the number of irqs for ICMR.
+Thanks,
+Sekhar
