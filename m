@@ -1,52 +1,53 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 2 Nov 2009 22:33:15 +0800
-Subject: [PATCH] pxa: fix system resume issue on pxa27x and pxa3xx
-In-Reply-To: <20091102120027.GB3348@n2100.arm.linux.org.uk>
-References: <771cded00911020342j5266b3c4ga4e94324c2369630@mail.gmail.com>
-	<20091102120027.GB3348@n2100.arm.linux.org.uk>
-Message-ID: <f17812d70911020633v46662961jae3cdd19cd5f9020@mail.gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Mon, 2 Nov 2009 14:51:39 +0000
+Subject: Using statically allocated memory for platform_data.
+In-Reply-To: <20091102103940.GA25282@pengutronix.de>
+References: <20091102112316.16163f6a.ospite@studenti.unina.it>
+	<20091102103940.GA25282@pengutronix.de>
+Message-ID: <20091102145139.GA20341@fluff.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 2, 2009 at 8:00 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Nov 02, 2009 at 07:42:14AM -0400, Haojian Zhuang wrote:
->> >From 1764e836424d42a0654b8b73c402a2dddb118dc4 Mon Sep 17 00:00:00 2001
->> From: Haojian Zhuang <haojian.zhuang@marvell.com>
->> Date: Mon, 2 Nov 2009 14:02:21 -0500
->> Subject: [PATCH] pxa: fix system resume issue on pxa27x and pxa3xx
->>
->> Since interrupt handler is changed to use interrupt priority, we also need to
->> save and restore these interrupt controller registers in suspend/resume
->> routine.
->
-> Since we've just been struggling with discovering why something doesn't
-> suspend/resume, is this:
->
->> @@ -159,6 +160,10 @@ static int pxa_irq_suspend(struct sys_device
->> *dev, pm_message_t state)
->> ? ? ? ? ? ? ? saved_icmr[i] = _ICMR(irq);
->> ? ? ? ? ? ? ? _ICMR(irq) = 0;
->> ? ? ? }
->> + ? ? if (pxa_internal_irq_nr > 128)
->> + ? ? ? ? ? ? BUG();
->
-> really appropriate. ?If we have more than 128 interrupts, do we really
-> want to cause the kernel to OOPS at this point?
->
-> What about:
->
-> ? ? ? ?if (WARN_ON(pxa_internal_irq_nr > 128))
-> ? ? ? ? ? ? ? ?return -EINVAL;
->
-> so that we refuse to sleep _and_ log the reason why?
->
-> This way, the platform will still be alive, and if you didn't see it via
-> the console, at least it'll be available via dmesg - which is a lot better
-> than trying to work out why the machine gets stuck during suspend.
->
-> Such a check should also be a little higher up - since we're already
-> looping over the number of irqs for ICMR.
->
+On Mon, Nov 02, 2009 at 11:39:40AM +0100, Uwe Kleine-K?nig wrote:
+> Hello,
+> 
+> On Mon, Nov 02, 2009 at 11:23:16AM +0100, Antonio Ospite wrote:
+> > Hi,
+> > 
+> > I noted that in some mfd drivers (drivers/mfd/ezx-pcap.c and
+> > drivers/mfd/da903x.c) there is code like this:
+> > 
+> > static int __devinit pcap_add_subdev(struct pcap_chip *pcap,
+> >                                      struct pcap_subdev *subdev)
+> > {
+> >         struct platform_device *pdev;
+> > 
+> >         pdev = platform_device_alloc(subdev->name, subdev->id);
+> >         pdev->dev.parent = &pcap->spi->dev;
+> >         pdev->dev.platform_data = subdev->platform_data;
+> > 
+> >         return platform_device_add(pdev);
+> > }
+> > 
+> > Note the _direct_assignment_ of platform data; then in board init code
+> > there are often global struct pointers passed as subdev platform data,
+> > see arch/arm/mach-pxa/em-x270.c::em_x270_da9030_subdevs for instance.
+> > 
+> > In these cases, whenever the subdev platform device is unregistered,
+> > the call to platform_device_release() tries to kfree the platform data,
+> > and being it statically allocated memory this triggers a bug from SLAB:
+> > 	kernel BUG at mm/slab.c:521!
+> > In my case this prevented proper device poweroff.
+> > 
+> > The question: should these mfd drivers use platform_device_add_data()
+> > which allocates dynamic memory for *a copy* of platform data? Is this
+> > simple solution acceptable even if there will be more memory used?
+> If you move the original data lives in .init there is no duplication.
 
-Yes, I'd prefer such a check could be done earlier in pxa_init_irq() instead.
+they you can't modprobe devices after loading the kernel, so udev
+autoload and the like become impossible.
+
+-- 
+Ben (ben at fluff.org, http://www.fluff.org/)
+
+  'a smiley only costs 4 bytes'
