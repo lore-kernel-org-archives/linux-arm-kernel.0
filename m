@@ -1,36 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Nov 2009 10:37:06 +0000
-Subject: [PATCH RFC 1/2] MUSB: CPPI 4.1 DMA driver (take 4)
-In-Reply-To: <19F8576C6E063C45BE387C64729E73940436EEB489@dbde02.ent.ti.com>
-References: <200908142241.00528.sshtylyov@ru.mvista.com>
-	<4A8A202E.2040505@windriver.com> <4A8A7047.9080405@ru.mvista.com>
-	<4A8CF552.3080801@windriver.com>
-	<19F8576C6E063C45BE387C64729E73940436EEAE36@dbde02.ent.ti.com>
-	<4AE85B02.1080207@ru.mvista.com>
-	<19F8576C6E063C45BE387C64729E73940436EEAE60@dbde02.ent.ti.com>
-	<19F8576C6E063C45BE387C64729E73940436EEB489@dbde02.ent.ti.com>
-Message-ID: <20091102103706.GB1133@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 2 Nov 2009 11:39:40 +0100
+Subject: Using statically allocated memory for platform_data.
+In-Reply-To: <20091102112316.16163f6a.ospite@studenti.unina.it>
+References: <20091102112316.16163f6a.ospite@studenti.unina.it>
+Message-ID: <20091102103940.GA25282@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 02, 2009 at 09:51:13AM +0530, Gupta, Ajay Kumar wrote:
-> Is there any updated patch on cppi4.1 core also?
+Hello,
 
-Is there _any_ cppi4.1 core patch anywhere?  Not according to google.
+On Mon, Nov 02, 2009 at 11:23:16AM +0100, Antonio Ospite wrote:
+> Hi,
+> 
+> I noted that in some mfd drivers (drivers/mfd/ezx-pcap.c and
+> drivers/mfd/da903x.c) there is code like this:
+> 
+> static int __devinit pcap_add_subdev(struct pcap_chip *pcap,
+>                                      struct pcap_subdev *subdev)
+> {
+>         struct platform_device *pdev;
+> 
+>         pdev = platform_device_alloc(subdev->name, subdev->id);
+>         pdev->dev.parent = &pcap->spi->dev;
+>         pdev->dev.platform_data = subdev->platform_data;
+> 
+>         return platform_device_add(pdev);
+> }
+> 
+> Note the _direct_assignment_ of platform data; then in board init code
+> there are often global struct pointers passed as subdev platform data,
+> see arch/arm/mach-pxa/em-x270.c::em_x270_da9030_subdevs for instance.
+> 
+> In these cases, whenever the subdev platform device is unregistered,
+> the call to platform_device_release() tries to kfree the platform data,
+> and being it statically allocated memory this triggers a bug from SLAB:
+> 	kernel BUG at mm/slab.c:521!
+> In my case this prevented proper device poweroff.
+> 
+> The question: should these mfd drivers use platform_device_add_data()
+> which allocates dynamic memory for *a copy* of platform data? Is this
+> simple solution acceptable even if there will be more memory used?
+If you move the original data lives in .init there is no duplication.
 
-> Another option is to create arch/arm/ti-common to place all TI platform's
-> common software, such as CPPI4.1 used both in DA8xx and AM3517.
+Best regards
+Uwe
 
-No thanks.  I really don't see why we should allow TI to have yet more
-directories scattered throughout the tree that are out of place with
-existing conventions.
-
-And what is this CPPI thing anyway?
-
-http://acronyms.thefreedictionary.com/CPPI
-
-"Communications Port Programming Interface" seems to be about the best
-applicable one from that list!
-
-If it's a USB DMA device (from the patches I can find, that seems to be
-the case) then why can't it live in drivers/usb or drivers/dma ?
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
