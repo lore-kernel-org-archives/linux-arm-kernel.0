@@ -1,29 +1,54 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 02 Nov 2009 18:18:30 +0100
-Subject: [PATCH 2/3 v2] mmc: atmel-mci: New MCI2 module support in
-	atmel-mci driver
-In-Reply-To: <af570068c8bd25f207dd3a43b8acd7cf645b21af.1256314995.git.nicolas.ferre@atmel.com>
-References: <20090930155557.7dae503b@hskinnemoen-d830>
-	<af570068c8bd25f207dd3a43b8acd7cf645b21af.1256314995.git.nicolas.ferre@atmel.com>
-Message-ID: <4AEF1466.8090203@atmel.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 02 Nov 2009 09:20:51 -0800
+Subject: [PATCH 33/46] davinci: add generic CPUFreq driver for DaVinci
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59301DE1EBCEC@dbde02.ent.ti.com>
+	(Sekhar Nori's message of "Mon\, 2 Nov 2009 17\:34\:05 +0530")
+References: <1255720190-7452-34-git-send-email-khilman@deeprootsystems.com>
+	<1255720190-7452-35-git-send-email-khilman@deeprootsystems.com>
+	<B85A65D85D7EB246BE421B3FB0FBB59301DE1EBCEC@dbde02.ent.ti.com>
+Message-ID: <87639slu6k.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+"Nori, Sekhar" <nsekhar@ti.com> writes:
 
-What do you think about the rework of this atmel-mci DMA interface ?
-patches:
-[PATCH 1/3 v2] atmel-mci: change use of dma slave interface
-[PATCH 2/3 v2] mmc: atmel-mci: New MCI2 module support in atmel-mci driver
+> On Sat, Oct 17, 2009 at 00:39:37, Kevin Hilman wrote:
+>> From: Sekhar Nori <nsekhar@ti.com>
+>>
+>> Adds a basic CPUFreq driver for DaVinci devices registering with the
+>> kernel CPUFreq infrastructure.
+>>
+>> Support is added for both frequency and voltage regulation.
+>>
+>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+>> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+>> ---
+>>  arch/arm/mach-davinci/Kconfig                |    1 +
+>>  arch/arm/mach-davinci/Makefile               |    3 +
+>>  arch/arm/mach-davinci/cpufreq.c              |  219 ++++++++++++++++++++++++++
+>>  arch/arm/mach-davinci/include/mach/cpufreq.h |   25 +++
+>>  4 files changed, 248 insertions(+), 0 deletions(-)
+>>  create mode 100644 arch/arm/mach-davinci/cpufreq.c
+>>  create mode 100644 arch/arm/mach-davinci/include/mach/cpufreq.h
+>>
+>> diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
+>> index 7b6dddf..6c81b6c 100644
+>> --- a/arch/arm/mach-davinci/Kconfig
+>> +++ b/arch/arm/mach-davinci/Kconfig
+>> @@ -32,6 +32,7 @@ config ARCH_DAVINCI_DA830
+>>          bool "DA830/OMAP-L137 based system"
+>>       select CP_INTC
+>>       select ARCH_DAVINCI_DA8XX
+>> +     select ARCH_HAS_CPUFREQ
+>
+> Kevin,
+>
+> This config option has mistakenly been selected for DA830
+> instead of DA850.
+>
 
-We may consider them in replacement of the previous ones and dissociate 
-this series from the third one which will be reworked and may goes through 
-using another path.
-(for the record: [PATCH 3/3 v2] at91/atmel-mci: inclusion of sd/mmc 
-driver in at91sam9g45 chip and board).
+Thanks Sekhar,
 
-Thanks,
+I'll fix in davinci-next.
 
-Bye,
--- 
-Nicolas Ferre
+Kevin
