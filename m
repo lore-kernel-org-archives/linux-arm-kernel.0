@@ -1,23 +1,22 @@
 From: avictor.za@gmail.com (Andrew Victor)
-Date: Mon, 2 Nov 2009 21:42:59 +0200
-Subject: [PATCH] KS8695: Fix macro definition bug in regs-switch.c
-In-Reply-To: <4aee57dd.161bf30a.29cd.ffffd72f@mx.google.com>
-References: <4aee57dd.161bf30a.29cd.ffffd72f@mx.google.com>
-Message-ID: <cd73a99e0911021142o36d3db8djbb007f1916ee02b3@mail.gmail.com>
+Date: Mon, 2 Nov 2009 21:46:02 +0200
+Subject: [PATCH] at91: support for eco920
+In-Reply-To: <20091101203240.GA18116@pengutronix.de>
+References: <20091021084826.GA29667@n2100.arm.linux.org.uk>
+	<1256115527-20635-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20091101203240.GA18116@pengutronix.de>
+Message-ID: <cd73a99e0911021146t5f0224b6r476adc231ea7ebf4@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
+hi Uwe Kleine-K?nig,
 
-> 1. Macro style is so strange.
-> 2. The value 0xc0 is not match with KS8695 manual. It should be 0x0c.
->
-> Signed-off-by: zeal <zealcook@gmail.com>
+> Is this patch OK now, should I sent to the patch system even if
+> Jean-Christophe PLAGNIOL-VILLARD pointed out the defconfig stuff isn't
+> optimal?
 
+Fine with me.
 Acked-by: Andrew Victor <linux@maxim.org.za>
-
-Please submit the patch to Russell King's patch-tracking system.
-   <http://www.arm.linux.org.uk/developer/patches/>
 
 
 Regards,
