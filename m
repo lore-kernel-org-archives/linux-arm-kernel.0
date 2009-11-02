@@ -1,26 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Nov 2009 20:21:01 +0000
-Subject: [PATCH] at91: support for eco920
-In-Reply-To: <20091102201626.GA25272@pengutronix.de>
-References: <20091021084826.GA29667@n2100.arm.linux.org.uk>
-	<1256115527-20635-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20091101203240.GA18116@pengutronix.de>
-	<cd73a99e0911021146t5f0224b6r476adc231ea7ebf4@mail.gmail.com>
-	<20091102201626.GA25272@pengutronix.de>
-Message-ID: <20091102202101.GF5785@n2100.arm.linux.org.uk>
+From: hlovdal@gmail.com (=?UTF-8?B?SMOla29uIEzDuHZkYWw=?=)
+Date: Mon, 2 Nov 2009 22:13:40 +0100
+Subject: [PATCH 5/7] S3C64XX: Add platform data and driver resources for
+	IDE controller driver.
+In-Reply-To: <20091101130502.GI8096@trinity.fluff.org>
+References: <1257051403-8146-1-git-send-email-thomas.ab@samsung.com>
+	<20091101130502.GI8096@trinity.fluff.org>
+Message-ID: <a01a16b50911021313h681bac38pdeea996a3e3cfb81@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 02, 2009 at 09:16:26PM +0100, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Mon, Nov 02, 2009 at 09:46:02PM +0200, Andrew Victor wrote:
-> > > Is this patch OK now, should I sent to the patch system even if
-> > > Jean-Christophe PLAGNIOL-VILLARD pointed out the defconfig stuff isn't
-> > > optimal?
-> > 
-> > Fine with me.
-> > Acked-by: Andrew Victor <linux@maxim.org.za>
-> Russell, is this enough to send it to the patch system?
+2009/11/1 Ben Dooks <ben-linux@fluff.org>:
+> On Sun, Nov 01, 2009 at 01:56:43PM +0900, Thomas Abraham wrote:
+>> + ? ? if (!pd) {
+>> + ? ? ? ? ? ? printk(KERN_ERR "%s: no memory for platform data\n", __func__);
+>> + ? ? ? ? ? ? return;
+>> + ? ? }
+>> + ? ? s3c_device_cfcon.dev.platform_data = pd;
+>
+> doing:
+>
+> ? ? ? ?if (!pd)
+> ? ? ? ? ? ? ? ?printk(KERN_ERR "%s: no memory for platform data\n", __func__);
+> ? ? ? ?else
+> ? ? ? ? ? ? ? ?s3c_device_cfcon.dev.platform_data = pd;
+>
+> would be better.
 
-If everyone else agrees, yes.
+I do not quite understand why this would be better. In the former case
+the normal operation (e.g. s3c_dev... = pd;) is written directly without
+any extra indentation and is not buried (deep) down in some error handling.
+
+Writing code in that style makes it very easy to read with a mental filter like
+
+     if (test) {
+             ERROR HANDLING, ERROR HANDLING, ERROR HANDLING, ERROR HANDLING;
+             return;
+     }
+     NORMAL CASE, NORMAL CASE, NORMAL CASE, ;
+
+See also http://stackoverflow.com/questions/114342/what-are-code-smells-what-is-the-best-way-to-correct-them/223881#223881.
+
+BR H?kon L?vdal
