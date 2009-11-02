@@ -1,5 +1,5 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Mon, 2 Nov 2009 10:29:09 +0100
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 2 Nov 2009 10:38:40 +0100
 Subject: Possible suspend/resume regression in .32-rc?
 In-Reply-To: <771cded00911020122o3bb5cc96q957c8be1ce7cae46@mail.gmail.com>
 References: <20091031013427.GL14091@buzzloop.caiaq.de>
@@ -7,11 +7,27 @@ References: <20091031013427.GL14091@buzzloop.caiaq.de>
 	<20091101213343.GA31345@elf.ucw.cz>
 	<20091101220341.GA16698@elf.ucw.cz>
 	<771cded00911020122o3bb5cc96q957c8be1ce7cae46@mail.gmail.com>
-Message-ID: <20091102092909.GW14091@buzzloop.caiaq.de>
+Message-ID: <20091102093840.GA11426@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 02, 2009 at 05:22:30AM -0400, Haojian Zhuang wrote:
+On Mon 2009-11-02 05:22:30, Haojian Zhuang wrote:
+> On Sun, Nov 1, 2009 at 6:03 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> >> Hi!
+> >>
+> >> > > Is anyone using suspend/resume with a recent git mainline kernel on PXA
+> >> > > or other ARM embedded boards? My platform used to suspend and resume
+> >> > > just fine on 2.6.31 but now as I rebased it, it fails the resume part.
+> >> > >
+> >> > > Unfortunately, I can't bisect it as the platform is not mainline yet and
+> >> > > so I always have mandatory patches (without my platform won't do
+> >> > > anything) on top of the git repository. Which breaks the bisect logic.
+> >> > >
+> >> > > What puzzles me is that I see the current raising at wakeup time, so at
+> >> > > least the processor seems to resume, but I can't see any serial console
+> >> > > output, just like if the kernel crashed very early after wakeup.
+> >> > > 'no_console_suspend' didn't help either.
+> >> >
 > >> > Ok, got it. The culprit is commit d2c37068 ("[ARM] pxa: initialize
 > >> > default interrupt priority and use ICHP for IRQ handling"). Reverting it
 > >> > make suspend/resume work again on my board.
@@ -30,8 +46,6 @@ On Mon, Nov 02, 2009 at 05:22:30AM -0400, Haojian Zhuang wrote:
 > >> ? ? Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
 > >
 > > And yes, reverting it _does_ fix suspend on spitz.
-> >
-> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?Pavel
 > 
 > Em, it's not caused by the IRQ patch.
 > 
@@ -47,7 +61,25 @@ On Mon, Nov 02, 2009 at 05:22:30AM -0400, Haojian Zhuang wrote:
 > uart_resume_port() in the below patch. If I add these code back, the
 > issue doesn't occur any more.
 
-Well no, not confirmed. I tested with no_console_suspend, and it still
-hit me. And without too, btw.
+Given that it hangs very early, in arch_suspend_enable_irqs() (see my
+other mail), I don't trust your analysis.
 
-Daniel
+> Deepak,
+> Could you help to investigate this issue also?
+> 
+> By the way, the suggested quick test command is in below. If we tried
+> these commands for 20 times, the issue would occur. I only test it in
+> PXA silicon. I don't know the symptom on other silicons.
+> $ echo devices > /sys/power/pm_test
+> $ echo mem > /sys/power/state
+
+I'm not using serial console on spitz, and I have never had successful
+resume with the patch applied.
+
+The original patch is also poorly changelogged. What is the advantage
+of ICHP and why do we want default priorities?
+
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
