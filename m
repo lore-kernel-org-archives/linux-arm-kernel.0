@@ -1,43 +1,29 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 02 Nov 2009 18:14:20 +0100
-Subject: [PATCH 3/3 v2] at91/atmel-mci: inclusion of sd/mmc driver in
-	at91sam9g45 chip and board
-In-Reply-To: <4AE55A93.1080106@visionsystems.de>
+Date: Mon, 02 Nov 2009 18:18:30 +0100
+Subject: [PATCH 2/3 v2] mmc: atmel-mci: New MCI2 module support in
+	atmel-mci driver
+In-Reply-To: <af570068c8bd25f207dd3a43b8acd7cf645b21af.1256314995.git.nicolas.ferre@atmel.com>
 References: <20090930155557.7dae503b@hskinnemoen-d830>
-	<a3b1332815576dc4d496937b8a5ab69d36818d00.1256314995.git.nicolas.ferre@atmel.com>
-	<4AE55A93.1080106@visionsystems.de>
-Message-ID: <4AEF136C.8020005@atmel.com>
+	<af570068c8bd25f207dd3a43b8acd7cf645b21af.1256314995.git.nicolas.ferre@atmel.com>
+Message-ID: <4AEF1466.8090203@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yegor Yefremov :
-> Nicolas Ferre wrote:
->> This adds the support of atmel-mci sd/mmc driver in at91sam9g45 devices and
->> board files. This also configures the DMA controller slave interface for
->> at_hdmac dmaengine driver.
->>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Hi,
 
-[..]
+What do you think about the rework of this atmel-mci DMA interface ?
+patches:
+[PATCH 1/3 v2] atmel-mci: change use of dma slave interface
+[PATCH 2/3 v2] mmc: atmel-mci: New MCI2 module support in atmel-mci driver
 
->> +	/* DMA slave channel configuration */
->> +	slave->sdata.dma_dev = &at_hdmac_device.dev;
->> +	slave->sdata.reg_width = DW_DMA_SLAVE_WIDTH_32BIT;
-> 
-> slave->sdata.reg_width = AT_DMA_SLAVE_WIDTH_32BIT;
-> 
->> +	slave->sdata.cfg = ATC_FIFOCFG_HALFFIFO
->> +			 | ATC_SRC_H2SEL_HW | ATC_DST_H2SEL_HW;
+We may consider them in replacement of the previous ones and dissociate 
+this series from the third one which will be reworked and may goes through 
+using another path.
+(for the record: [PATCH 3/3 v2] at91/atmel-mci: inclusion of sd/mmc 
+driver in at91sam9g45 chip and board).
 
-Queued for v3 of this patch (I will dissociate if from the patch series).
+Thanks,
 
-
-> Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
-
-Ok, I will add.
-
-Thanks a lot.
-
-Best regards,
+Bye,
 -- 
 Nicolas Ferre
