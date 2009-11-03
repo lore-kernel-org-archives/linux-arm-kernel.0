@@ -1,50 +1,29 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 03 Nov 2009 13:04:35 +0100
-Subject: [PATCH] at91: at91sam9g20ek modify dual slot evaluation kit
-In-Reply-To: <20091021152653.GF19714@game.jcrosoft.org>
-References: <1256049173-17373-1-git-send-email-nicolas.ferre@atmel.com>
-	<20091021152653.GF19714@game.jcrosoft.org>
-Message-ID: <4AF01C53.3070301@atmel.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Tue, 3 Nov 2009 14:51:41 +0100
+Subject: [PATCH] Make MIPS dynamic clocksource/clockevent clock code
+	generic v2
+In-Reply-To: <63386a3d0910251518i42149642g183f2d3f6c43384f@mail.gmail.com>
+References: <1256078002-27919-1-git-send-email-linus.walleij@stericsson.com>
+	<63386a3d0910251518i42149642g183f2d3f6c43384f@mail.gmail.com>
+Message-ID: <63386a3d0911030551j1accd6fby7038895df544385b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jean-Christophe PLAGNIOL-VILLARD :
->> +	  that embeds only one SD/MMC slot.
->> +
->> +config MACH_AT91SAM9G20EK_2MMC
->> +	bool "Atmel AT91SAM9G20-EK Evaluation Kit with 2 SD/MMC Slots"
->> +	depends on ARCH_AT91SAM9G20
->> +	help
->> +	  Select this if you are using an Atmel AT91SAM9G20-EK Evaluation Kit
->> +	  with 2 SD/MMC Slots. This is the case for AT91SAM9G20-EK rev. C and
->> +	  onwards.
->>  
->>  config MACH_CPU9G20
->>  	bool "Eukrea CPU9G20 board"
->> @@ -392,7 +394,7 @@ config MTD_AT91_DATAFLASH_CARD
->>  
->>  config MTD_NAND_ATMEL_BUSWIDTH_16
->>  	bool "Enable 16-bit data bus interface to NAND flash"
->> -	depends on (MACH_AT91SAM9260EK || MACH_AT91SAM9261EK || MACH_AT91SAM9G10EK || MACH_AT91SAM9263EK || MACH_AT91SAM9G20EK || MACH_AT91SAM9G45EKES || MACH_AT91CAP9ADK)
->> +	depends on (MACH_AT91SAM9260EK || MACH_AT91SAM9261EK || MACH_AT91SAM9G10EK || MACH_AT91SAM9263EK || MACH_AT91SAM9G20EK || MACH_AT91SAM9G20EK_2MMC || MACH_AT91SAM9G45EKES || MACH_AT91CAP9ADK)
-> it's time to replace this by select it at machine config state
+2009/10/25 Linus Walleij <linus.ml.walleij@gmail.com>:
+> 2009/10/21 Linus Walleij <linus.walleij@stericsson.com>:
+>
+>> Changes v1->v2:
+>> - Fixed Mikaels comments: spelling, terminology.
+>> - Kept the functions inline: all uses and foreseen uses
+>> ?are once per kernel and all are in __init or __cpuinit sections.
+>> - Unable to break out common code - the code is not common and
+>> ?implementing two execution paths will be more awkward.
+>> - Hoping the tglx likes it anyway.
+>
+> Ping on tglx on this, I will uninline the functions if you think
+> it's better in the long run, just tell me, else can you pick this
+> patch?
 
-Ok patches are comming now on top of this one.
+Ping again...
 
->> @@ -254,7 +257,11 @@ static void __init ek_board_init(void)
->>  	/* Ethernet */
->>  	at91_add_device_eth(&ek_macb_data);
->>  	/* MMC */
->> +#if defined(CONFIG_MMC_ATMELMCI) || defined(CONFIG_MMC_ATMELMCI_MODULE)
->>  	at91_add_device_mci(0, &ek_mmc_data);
->> +#else
->> +	at91_add_device_mmc(0, &ek_mmc_data);
->> +#endif
-> do we really need to do this choice at board level?
-
-Yes, you will choose on your board which driver will drive your sd/mmc
-interface. The device file will give access to both of them.
-
-Best regards,
--- 
-Nicolas Ferre
+Linus Walleij
