@@ -1,78 +1,36 @@
-From: ospite@studenti.unina.it (Antonio Ospite)
-Date: Tue, 3 Nov 2009 18:31:54 +0100
-Subject: Using statically allocated memory for platform_data.
-In-Reply-To: <20091102164743.GE23772@trinity.fluff.org>
-References: <20091102112316.16163f6a.ospite@studenti.unina.it>
-	<20091102150011.GB20341@fluff.org.uk>
-	<20091102150525.GB5785@n2100.arm.linux.org.uk>
-	<20091102152500.GD23772@trinity.fluff.org>
-	<20091102155231.GC20341@fluff.org.uk>
-	<20091102155625.GC5785@n2100.arm.linux.org.uk>
-	<20091102162839.GD20341@fluff.org.uk>
-	<20091102163701.GD5785@n2100.arm.linux.org.uk>
-	<20091102164743.GE23772@trinity.fluff.org>
-Message-ID: <20091103183154.ee6b5676.ospite@studenti.unina.it>
+From: stefan@datenfreihafen.org (Stefan Schmidt)
+Date: Tue, 3 Nov 2009 18:44:30 +0100
+Subject: [PATCH 0/3] ezx: A780/A910 camera, A910 leds, ezx_defconfig update
+In-Reply-To: <1257266734-28673-1-git-send-email-ospite@studenti.unina.it>
+References: <1257266734-28673-1-git-send-email-ospite@studenti.unina.it>
+Message-ID: <20091103174430.GA20822@excalibur.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2 Nov 2009 16:47:44 +0000
-Ben Dooks <ben-linux@fluff.org> wrote:
+Hello.
 
-> On Mon, Nov 02, 2009 at 04:37:01PM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Nov 02, 2009 at 04:28:39PM +0000, Ben Dooks wrote:
-> > > On Mon, Nov 02, 2009 at 03:56:25PM +0000, Russell King - ARM Linux wrote:
-> > > > The reason we have platform_device_add_data() is that people think that
-> > > > the device data needs to persist for the lifetime of the device.  I
-> > > > personally disagree with that - once you unregister the device, it's
-> > > > guaranteed that device drivers will have been unregistered, so who's
-> > > > going to use the platform data?
-> > > 
-> > > That doesn't make any sense, in the current case of using the
-> > > platform_device_alloc() and those calls the data is only living
-> > > for the lifetime of the device, as the release call is tidying up
-> > > the result.
-> > 
-> > What I'm saying is that the lifetime of the data finishes once
-> > the _unregister() call has returned.  So:
-> > 
-> > 	data = pdev->dev.platform_data;
-> > 	platform_device_unregister(pdev);
-> > 	kfree(data);
-> > 
-> > is an entirely valid way of handling the "I allocated my platform
-> > data" problem - it doesn't need to exist to the point where the
-> > device itself is freed.
+[Put Eric in CC]
+
+On Tue, 2009-11-03 at 17:45, Antonio Ospite wrote:
 > 
-> Unforutnately pretty much everyone now assumes that the act of
-> unregistering the device will get rid of the data that the allocated
-> by the add functions.
+> some updates for the EZX platform:
+
+Thanks for driving this forward.
+
+> [PATCH 1/3] ezx: Add camera support for A780 and A910 EZX phones
+> [PATCH 2/3] ezx: Add leds-lp3944 support for A910 EZX phone
+> [PATCH 3/3] ezx: Update ezx_defconfig now that ezx-pcap is in
 > 
-> This would mean going around fixing a number of current drivers which
-> all make that assumption.
-> 
+> Are we still in time for 2.6.32?
 
-So those drivers (ezx-pcap.c, da903x.c) aren't doing anything manifestly
-wrong by not calling platform_device_add_data(), and the issue will be
-solved in ./drivers/base/platform.c someway eventually, right?
+Given that we are near -rc6 and this is clearly no fix I would say no. But Eric
+should be happy to apply it to his devel branch which will hit Linus tree during
+the next merge window.
 
-Thanks,
-   Antonio
+Eric, Antonio is doing a good deal of the current work at OpenEZX. If you need
+an ACK anyway you can put mine into it.
 
--- 
-Antonio Ospite
-http://ao2.it
+Acked-by: Stefan Schmidt <stefan@datenfreihafen.org>
 
-PGP public key ID: 0x4553B001
-
-A: Because it messes up the order in which people normally read text.
-   See http://en.wikipedia.org/wiki/Posting_style
-Q: Why is top-posting such a bad thing?
-A: Top-posting.
-Q: What is the most annoying thing in e-mail?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091103/014c463b/attachment.sig>
+regards
+Stefan Schmidt
