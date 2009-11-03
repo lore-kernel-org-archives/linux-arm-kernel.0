@@ -1,39 +1,85 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Tue, 03 Nov 2009 22:23:07 +0100
+From: roel.kluin@gmail.com (Roel Kluin)
+Date: Tue, 03 Nov 2009 23:05:32 +0100
 Subject: [PATCH] IXP4xx: Ensure index is positive
-In-Reply-To: <4AF0922B.3030701@hiramoto.org> (Karl Hiramoto's message of "Tue,
-	03 Nov 2009 21:27:23 +0100")
+In-Reply-To: <m3eiofl2v8.fsf@intrepid.localdomain>
 References: <4AF08014.4000704@gmail.com> <4AF0922B.3030701@hiramoto.org>
-Message-ID: <m3eiofl2v8.fsf@intrepid.localdomain>
+	<m3eiofl2v8.fsf@intrepid.localdomain>
+Message-ID: <4AF0A92C.6050400@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Karl Hiramoto <karl@hiramoto.org> writes:
+The indexes were signed, so negatives were possible.
 
->> +++ b/arch/arm/mach-ixp4xx/common.c
->> @@ -119,7 +119,7 @@ EXPORT_SYMBOL(gpio_to_irq);
->>   int irq_to_gpio(int irq)
->>  {
->> -	int gpio = (irq < 32) ? irq2gpio[irq] : -EINVAL;
->> +	int gpio = (irq < 32 && irq >= 0) ? irq2gpio[irq] : -EINVAL;
->>   	if (gpio == -1)
->>  		return -EINVAL;
+Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
+---
+Op 03-11-09 22:23, Krzysztof Halasa schreef:
+> Karl Hiramoto <karl@hiramoto.org> writes:
 
->> +++ b/arch/arm/mach-ixp4xx/ixp4xx_npe.c
->> @@ -667,7 +667,7 @@ err:
->>   struct npe *npe_request(int id)
->>  {
->> -	if (id < NPE_COUNT)
->> +	if (id >= 0 && id < NPE_COUNT)
+>> changing npe_request() to unsigned would probably be better
 
-> changing npe_request() to unsigned would probably be better and  not
-> add to bloat.   If your calling these functions with negative
-> arguments, your code is buggy then.
+> Right. Both files in fact.
+> 
+> Even the id < NPE_COUNT test is probably not needed but I can imagine
+> someone lowering NPE_COUNT. Negative values are unreasonable (though
+> unsigned type make this unrelevant, of course).
 
-Right. Both files in fact.
+ arch/arm/mach-ixp4xx/common.c            |    2 +-
+ arch/arm/mach-ixp4xx/include/mach/gpio.h |    2 +-
+ arch/arm/mach-ixp4xx/include/mach/npe.h  |    2 +-
+ arch/arm/mach-ixp4xx/ixp4xx_npe.c        |    2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
 
-Even the id < NPE_COUNT test is probably not needed but I can imagine
-someone lowering NPE_COUNT. Negative values are unreasonable (though
-unsigned type make this unrelevant, of course).
--- 
-Krzysztof Halasa
+Is this ok?
+
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index cfd52fb..3bbf40f 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -117,7 +117,7 @@ int gpio_to_irq(int gpio)
+ }
+ EXPORT_SYMBOL(gpio_to_irq);
+ 
+-int irq_to_gpio(int irq)
++int irq_to_gpio(unsigned int irq)
+ {
+ 	int gpio = (irq < 32) ? irq2gpio[irq] : -EINVAL;
+ 
+diff --git a/arch/arm/mach-ixp4xx/include/mach/gpio.h b/arch/arm/mach-ixp4xx/include/mach/gpio.h
+index cd5aec2..a5f87de 100644
+--- a/arch/arm/mach-ixp4xx/include/mach/gpio.h
++++ b/arch/arm/mach-ixp4xx/include/mach/gpio.h
+@@ -70,7 +70,7 @@ static inline void gpio_set_value(unsigned gpio, int value)
+ #include <asm-generic/gpio.h>			/* cansleep wrappers */
+ 
+ extern int gpio_to_irq(int gpio);
+-extern int irq_to_gpio(int gpio);
++extern int irq_to_gpio(unsigned int irq);
+ 
+ #endif
+ 
+diff --git a/arch/arm/mach-ixp4xx/include/mach/npe.h b/arch/arm/mach-ixp4xx/include/mach/npe.h
+index 37d0511..e320db2 100644
+--- a/arch/arm/mach-ixp4xx/include/mach/npe.h
++++ b/arch/arm/mach-ixp4xx/include/mach/npe.h
+@@ -33,7 +33,7 @@ int npe_send_message(struct npe *npe, const void *msg, const char *what);
+ int npe_recv_message(struct npe *npe, void *msg, const char *what);
+ int npe_send_recv_message(struct npe *npe, void *msg, const char *what);
+ int npe_load_firmware(struct npe *npe, const char *name, struct device *dev);
+-struct npe *npe_request(int id);
++struct npe *npe_request(unsigned id);
+ void npe_release(struct npe *npe);
+ 
+ #endif /* __IXP4XX_NPE_H */
+diff --git a/arch/arm/mach-ixp4xx/ixp4xx_npe.c b/arch/arm/mach-ixp4xx/ixp4xx_npe.c
+index 47ac69c..e8bb257 100644
+--- a/arch/arm/mach-ixp4xx/ixp4xx_npe.c
++++ b/arch/arm/mach-ixp4xx/ixp4xx_npe.c
+@@ -665,7 +665,7 @@ err:
+ }
+ 
+ 
+-struct npe *npe_request(int id)
++struct npe *npe_request(unsigned id)
+ {
+ 	if (id < NPE_COUNT)
+ 		if (npe_tab[id].valid)
