@@ -1,51 +1,64 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 3 Nov 2009 20:54:44 +0100
-Subject: patch system doesn't parse From: pseudo header (Was: [PATCH]
-	Use REV and REV16 for byte swapping on ARMv6+)
-In-Reply-To: <20091026110524.GB22097@n2100.arm.linux.org.uk>
-References: <1256374782-5803-1-git-send-email-rabin@rab.in>
-	<20091024111357.GD16451@n2100.arm.linux.org.uk>
-	<1256554966.5282.15.camel@pc1117.cambridge.arm.com>
-	<20091026110524.GB22097@n2100.arm.linux.org.uk>
-Message-ID: <20091103195444.GB20260@pengutronix.de>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Tue, 3 Nov 2009 20:24:38 +0100
+Subject: [RFC] [PATCH v2] OMAP: DMA: Fix omapfb/lcdc on Amstrad Delta broken
+	when PM set
+Message-ID: <200911032024.47741.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+With CONFIG_PM=y, the omapfb/lcdc device on Amstrad Delta, after initially
+starting correctly, breaks with the following error messages:
 
-On Mon, Oct 26, 2009 at 11:05:24AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Oct 26, 2009 at 11:02:46AM +0000, Catalin Marinas wrote:
-> > On Sat, 2009-10-24 at 12:13 +0100, Russell King - ARM Linux wrote:
-> > > On Sat, Oct 24, 2009 at 02:29:42PM +0530, Rabin Vincent wrote:
-> > > > ARMv6 introduced the REV and REV16 instructions that reverse bytes in
-> > > > words and halfwords.  Use them for the arch-specific implementation of
-> > > > the byte swapping helpers on ARMv6+.
-> > > 
-> > > Please submit to the patch system.  Note that you can now use this format,
-> > > and just put the "KernelVersion:" header somewhere in before the 'diff'
-> > > line.
-> > 
-> > (OT) Does it also now parse a "From:" line (if the author differs from
-> > the sender)?
-> 
-> No.  Reasons explained previously.
-Hmm, it's hard to search for From: in the archives, so the best hit I
-found is:
+omapfb omapfb: resetting (status 0xffffff96,reset count 1)
+...
+omapfb omapfb: resetting (status 0xffffff96,reset count 100)
+omapfb omapfb: too many reset attempts, giving up.
 
-	http://thread.gmane.org/gmane.linux.ports.arm.kernel/32274/focus=32651
+Looking closer at this I have found that it had been broken almost 2 years ago
+with commit 2418996e3b100114edb2ae110d5d4acb928909d2, PM fixes for OMAP1.
 
-Is it that you mean?
+The definite reason for broken omapfb/lcdc behavoiur in PM mode
+appeared to be ARM_IDLECT1:IDLIF_ARM (bit 6) put into idle regardless of LCD
+DMA possibly running. The bit were set based on return value of the
+omap_dma_running() function that did not check for dedicated LCD DMA
+channel status. The patch below fixes this.
 
-I would make use of such a pseudo header, too.  From time to time I
-mainline patches created by colleagues.  So in the end it's me who adds
-the patch even though I'm not the author.
+Created and tested against linux-2.6.32-rc5
 
-I don't know how your patch system works but if you point me to its
-source I might have a look how to implement it.
+Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
 
-Best regards
-Uwe
+---
+Hi,
+If there are still no comments, especially on the bug possible impact on other 
+OMAP1510 boards (or even OMAP1610 with internal LCD controller), then Tony, 
+please apply it as is. Until it is accepted, I am stuck with new 
+ams_delta_defconfig.
 
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Thanks,
+Janusz
+
+--- linux-2.6.32-rc5/arch/arm/plat-omap/dma.c.orig	2009-10-16 02:41:50.000000000 +0200
++++ linux-2.6.32-rc5/arch/arm/plat-omap/dma.c	2009-11-03 20:15:35.000000000 +0100
+@@ -30,6 +30,7 @@
+ #include <linux/irq.h>
+ #include <linux/io.h>
+ 
++#include <asm/mach-types.h>
+ #include <asm/system.h>
+ #include <mach/hardware.h>
+ #include <mach/dma.h>
+@@ -1110,6 +1111,14 @@ int omap_dma_running(void)
+ {
+ 	int lch;
+ 
++	/*
++	 * On Amstrad Delta, the OMAP internal LCD controller will start the
++	 * transfer when it gets enabled, so assume DMA running if LCD enabled.
++	 */
++	if (machine_is_ams_delta())
++		if (omap_readw(0xfffec000 + 0x00) & (1 << 0))
++			return 1;
++
+ 	/* Check if LCD DMA is running */
+ 	if (cpu_is_omap16xx())
+ 		if (omap_readw(OMAP1610_DMA_LCD_CCR) & OMAP_DMA_CCR_EN)
