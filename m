@@ -1,66 +1,50 @@
-From: valentin.longchamp@epfl.ch (Valentin Longchamp)
-Date: Tue, 03 Nov 2009 12:31:01 +0100
-Subject: [PATCH 5/6] mx31moboard: camera support
-In-Reply-To: <4AE855E4.1040705@epfl.ch>
-References: <1255599780-12948-1-git-send-email-valentin.longchamp@epfl.ch>
-	<1255599780-12948-2-git-send-email-valentin.longchamp@epfl.ch>
-	<1255599780-12948-3-git-send-email-valentin.longchamp@epfl.ch>
-	<1255599780-12948-4-git-send-email-valentin.longchamp@epfl.ch>
-	<1255599780-12948-5-git-send-email-valentin.longchamp@epfl.ch>
-	<1255599780-12948-6-git-send-email-valentin.longchamp@epfl.ch>
-	<Pine.LNX.4.64.0910162307160.26130@axis700.grange>
-	<4ADC96A9.3090403@epfl.ch> <20091020080941.GN8818@pengutronix.de>
-	<4ADF40BC.4090801@epfl.ch>
-	<Pine.LNX.4.64.0910240059150.8342@axis700.grange>
-	<4AE855E4.1040705@epfl.ch>
-Message-ID: <4AF01475.1010704@epfl.ch>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 03 Nov 2009 13:04:35 +0100
+Subject: [PATCH] at91: at91sam9g20ek modify dual slot evaluation kit
+In-Reply-To: <20091021152653.GF19714@game.jcrosoft.org>
+References: <1256049173-17373-1-git-send-email-nicolas.ferre@atmel.com>
+	<20091021152653.GF19714@game.jcrosoft.org>
+Message-ID: <4AF01C53.3070301@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
+Jean-Christophe PLAGNIOL-VILLARD :
+>> +	  that embeds only one SD/MMC slot.
+>> +
+>> +config MACH_AT91SAM9G20EK_2MMC
+>> +	bool "Atmel AT91SAM9G20-EK Evaluation Kit with 2 SD/MMC Slots"
+>> +	depends on ARCH_AT91SAM9G20
+>> +	help
+>> +	  Select this if you are using an Atmel AT91SAM9G20-EK Evaluation Kit
+>> +	  with 2 SD/MMC Slots. This is the case for AT91SAM9G20-EK rev. C and
+>> +	  onwards.
+>>  
+>>  config MACH_CPU9G20
+>>  	bool "Eukrea CPU9G20 board"
+>> @@ -392,7 +394,7 @@ config MTD_AT91_DATAFLASH_CARD
+>>  
+>>  config MTD_NAND_ATMEL_BUSWIDTH_16
+>>  	bool "Enable 16-bit data bus interface to NAND flash"
+>> -	depends on (MACH_AT91SAM9260EK || MACH_AT91SAM9261EK || MACH_AT91SAM9G10EK || MACH_AT91SAM9263EK || MACH_AT91SAM9G20EK || MACH_AT91SAM9G45EKES || MACH_AT91CAP9ADK)
+>> +	depends on (MACH_AT91SAM9260EK || MACH_AT91SAM9261EK || MACH_AT91SAM9G10EK || MACH_AT91SAM9263EK || MACH_AT91SAM9G20EK || MACH_AT91SAM9G20EK_2MMC || MACH_AT91SAM9G45EKES || MACH_AT91CAP9ADK)
+> it's time to replace this by select it at machine config state
 
-Valentin Longchamp wrote:
-> Guennadi Liakhovetski wrote:
-> 
->> 3. to support switching inputs, significant modifications to soc_camera.c 
->> would be required. I read Nate's argument before, that as long as clients 
->> can only be accessed one at a time, this should be presented by multiple 
->> inputs rather than multiple device nodes. Somebody else from the V4L folk 
->> has also confirmed this opinion. In principle I don't feel strongly either 
->> way. But currently soc-camera uses a one i2c client to one device node 
->> model, and I'm somewhat reluctant to change this before we're done with 
->> the v4l2-subdev conversion.
->>
-> 
-> Sure, one step at a time. So for now the switching is not possible with 
-> soc_camera.
-> 
-> My problem is that both cameras have the same I2C address since they are 
-> the same.
-> 
-> Would I need to declare 2 i2c_device with the same address (I'm not sure 
-> it would even work ...) used by two _client_ platform_devices or would I 
-> have to have the two platform devices pointing to the same i2c_device ?
-> 
+Ok patches are comming now on top of this one.
 
-I've finally had time to test all this. My current problem with 
-registering the two cameras is that they both have the same i2c address, 
-and soc_camera calls v4l2_i2c_new_subdev_board where in my case the same 
-address on the same i2c tries to be registered and of course fails.
+>> @@ -254,7 +257,11 @@ static void __init ek_board_init(void)
+>>  	/* Ethernet */
+>>  	at91_add_device_eth(&ek_macb_data);
+>>  	/* MMC */
+>> +#if defined(CONFIG_MMC_ATMELMCI) || defined(CONFIG_MMC_ATMELMCI_MODULE)
+>>  	at91_add_device_mci(0, &ek_mmc_data);
+>> +#else
+>> +	at91_add_device_mmc(0, &ek_mmc_data);
+>> +#endif
+> do we really need to do this choice at board level?
 
-We would need a way in soc_camera not to register a new i2c client for 
-device but use an existing one (but that's what you don't want to change 
-for now as you state it in your above last sentence). I just want to 
-point this out once more so that you know there is interest about this 
-for the next soc_camera works.
+Yes, you will choose on your board which driver will drive your sd/mmc
+interface. The device file will give access to both of them.
 
-So my current solution for mainline inclusion is to register only one 
-camera device node without taking care of the cam mux for now.
-
-Val
-
+Best regards,
 -- 
-Valentin Longchamp, PhD Student, EPFL-STI-LSRO1
-valentin.longchamp at epfl.ch, Phone: +41216937827
-http://people.epfl.ch/valentin.longchamp
-MEA3485, Station 9, CH-1015 Lausanne
+Nicolas Ferre
