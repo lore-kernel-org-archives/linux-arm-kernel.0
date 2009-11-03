@@ -1,20 +1,21 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 3 Nov 2009 17:36:20 +0000
-Subject: [PATCH 2/9] S3C64XX: Fix S3C64XX_CLKDIV0_ARM_MASK value
-In-Reply-To: <1257259332-7867-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Tue, 3 Nov 2009 17:37:01 +0000
+Subject: [PATCH 5/9] S3C64XX: Set rate of crystal mux
+In-Reply-To: <1257259332-7867-5-git-send-email-broonie@opensource.wolfsonmicro.com>
 References: <1257259332-7867-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 	<1257259332-7867-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <20091103173619.GI23772@trinity.fluff.org>
+	<1257259332-7867-3-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<1257259332-7867-4-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<1257259332-7867-5-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <20091103173701.GJ23772@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 03, 2009 at 02:42:05PM +0000, Mark Brown wrote:
-> From: Kukjin Kim <kgene.kim@samsung.com>
-> 
-> The value of S3C64XX_CLKDIV0_ARM_MASK is wrong. This patch fixes
-> this values, S3C6400_CLKDIV0_ARM_MASK and S3C6410_CLKDIV0_ARM_MASK.
+On Tue, Nov 03, 2009 at 02:42:08PM +0000, Mark Brown wrote:
+> The current code assumes that the external clock mux will be set to
+> the crystal. Set this up explicitly within the clock API.
 
-this should be merged now.
+should be merged now.
 
 -- 
 Ben
