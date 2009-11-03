@@ -1,24 +1,42 @@
-From: mpalmer@hezmatt.org (Matthew Palmer)
-Date: Wed, 4 Nov 2009 05:56:35 +1100
-Subject: [GIT PULL] AT91/AVR32 some common macros
-In-Reply-To: <alpine.LFD.2.01.0911031014340.31845@localhost.localdomain>
-References: <4AF07242.3070803@atmel.com>
-	<alpine.LFD.2.01.0911031014340.31845@localhost.localdomain>
-Message-ID: <20091103185635.GE8322@hezmatt.org>
+From: roel.kluin@gmail.com (Roel Kluin)
+Date: Tue, 03 Nov 2009 20:10:12 +0100
+Subject: [PATCH] IXP4xx: Ensure index is positive
+Message-ID: <4AF08014.4000704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 03, 2009 at 10:15:38AM -0800, Linus Torvalds wrote:
-> On Tue, 3 Nov 2009, Nicolas Ferre wrote:
-> > 
-> > If it not bother you too much to pull such a tiny and 
-> > trivial piece of code, can you please pull:
-> > 
-> >   git://github.com/at91linux/linux-2.6-at91.git for-linus
-> 
-> 	"fatal: The remote end hung up unexpectedly"
+The indexes are signed, make sure they are not negative
+when we read the array elements.
 
-Something was hinky with the repository; I don't know why, but it was
-missind the git-daemon-export-ok flag file.  It's working now.
+Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
+---
+ arch/arm/mach-ixp4xx/common.c     |    2 +-
+ arch/arm/mach-ixp4xx/ixp4xx_npe.c |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-- Matt
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index cfd52fb..2df77bc 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -119,7 +119,7 @@ EXPORT_SYMBOL(gpio_to_irq);
+ 
+ int irq_to_gpio(int irq)
+ {
+-	int gpio = (irq < 32) ? irq2gpio[irq] : -EINVAL;
++	int gpio = (irq < 32 && irq >= 0) ? irq2gpio[irq] : -EINVAL;
+ 
+ 	if (gpio == -1)
+ 		return -EINVAL;
+diff --git a/arch/arm/mach-ixp4xx/ixp4xx_npe.c b/arch/arm/mach-ixp4xx/ixp4xx_npe.c
+index 47ac69c..30e1456 100644
+--- a/arch/arm/mach-ixp4xx/ixp4xx_npe.c
++++ b/arch/arm/mach-ixp4xx/ixp4xx_npe.c
+@@ -667,7 +667,7 @@ err:
+ 
+ struct npe *npe_request(int id)
+ {
+-	if (id < NPE_COUNT)
++	if (id >= 0 && id < NPE_COUNT)
+ 		if (npe_tab[id].valid)
+ 			if (try_module_get(THIS_MODULE))
+ 				return &npe_tab[id];
