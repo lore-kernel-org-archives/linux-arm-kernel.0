@@ -1,154 +1,67 @@
-From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Mon, 2 Nov 2009 14:02:21 -0500
-Subject: [PATCH] pxa: fix system resume issue on pxa27x and pxa3xx
-Message-ID: <mailman.103.1257214808.2253.linux-arm-kernel@lists.infradead.org>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Tue, 03 Nov 2009 15:30:56 +1300
+Subject: [PATCH 3/3 v2] at91/atmel-mci: inclusion of sd/mmc driver in
+	at91sam9g45 chip and board
+In-Reply-To: <4AEF12B7.3040704@atmel.com>
+References: <acfa557032a93e2d3186981b16f7048a5a31028a.1256314995.git.nicolas.ferre@atmel.com>		<20090930155557.7dae503b@hskinnemoen-d830>		<a3b1332815576dc4d496937b8a5ab69d36818d00.1256314995.git.nicolas.ferre@atmel.com>		<cd73a99e0910271243x744c956bl598fef9fd4144840@mail.gmail.com>		<20091028083548.38f1d80c@hskinnemoen-d830>		<d6cda7730910271753o54acfa04t1225de460083325f@mail.gmail.com>		<cd73a99e0910281253x1bb72b74p47cb5110efb0871f@mail.gmail.com>	<1256763057.4362.36.camel@ben-desktop>
+	<4AEF12B7.3040704@atmel.com>
+Message-ID: <4AEF95E0.7040602@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since interrupt handler is changed to use interrupt priority, we also need to
-save and restore these interrupt controller registers in suspend/resume
-routine.
+Nicolas Ferre wrote:
+> Ben Nizette :
+>   
+>> On Wed, 2009-10-28 at 21:53 +0200, Andrew Victor wrote:
+>>     
+>>> hi,
+>>>
+>>>       
+>>>> Then I think it would be best to use GPIO_PIN_NONE. Makes it clear
+>>>> what is expected and avoids confusion on what should be the proper
+>>>> value.
+>>>> I hope I'm not saying non-sense, but even if I am, I guess you can see
+>>>> that I'm advocating against the magic numbers :)
+>>>>         
+>>> What magic numbers ?
+>>>       
+>> I think Thiago was referring to the "-1" in the original patch as the
+>> magic number.
+>>
+>> Leaving the field blank to be initialised to 0 is certainly the
+>> cleanest, I agree, but it doesn't actually /work/.  On many archs 0 is a
+>> valid gpio number; the gpio_is_valid check used throughout the kernel
+>> (including atmel-mci.c) looks like
+>>
+>> static inline int gpio_is_valid(int number)
+>> {
+>> 	/* only some non-negative numbers are valid */
+>> 	return ((unsigned)number) < ARCH_NR_GPIOS;
+>> }
+>>     
+>
+> I understand that the better way to solve this issue is to:
+> - keep the AT91 way of specifying not connected pins (= 0)
+> - code the gpio_is_valid() function for at91 that tests this way of
+> handling not connected gpio
+>   
+It doesn't appear that the gpio_is_valid function can be overridden by a
+platform specific version. However, as you point out, on AT91 it appears
+broken since anything less than AT91_PIN_PA0 (32) is not a valid gpio.
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-Tested-by: Daniel Mack <daniel@caiaq.de>
-Acked-by: Pavel Machek <pavel@ucw.cz>
-Tested-by: Pavel Machek <pavel@ucw.cz>
-Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- arch/arm/mach-pxa/irq.c |   18 ++++++++++++++----
- 1 files changed, 14 insertions(+), 4 deletions(-)
+IIRC, we can't mark static inline functions as weak, and we don't want
+to turn gpio_is_valid into an actual function call. We could do some
+preprocessor magic, but that gets a bit messy.
 
-diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
-index d694ce2..7f6f26c 100644
---- a/arch/arm/mach-pxa/irq.c
-+++ b/arch/arm/mach-pxa/irq.c
-@@ -28,6 +28,7 @@
- #define IRQ_BIT(n)	(((n) - PXA_IRQ(0)) & 0x1f)
- #define _ICMR(n)	(*((((n) - PXA_IRQ(0)) & ~0x1f) ? &ICMR2 : &ICMR))
- #define _ICLR(n)	(*((((n) - PXA_IRQ(0)) & ~0x1f) ? &ICLR2 : &ICLR))
-+#define MAX_INTERNAL_IRQS	128
+CC'ed David Brownell, who does most of the gpiolib stuff. Any ideas?
 
- /*
-  * This is for peripheral IRQs internal to the PXA chip.
-@@ -122,23 +123,27 @@ void __init pxa_init_irq(int irq_nr, set_wake_t fn)
- {
- 	int irq, i;
+~Ryan
 
--	pxa_internal_irq_nr = irq_nr;
--
- 	for (irq = PXA_IRQ(0); irq < PXA_IRQ(irq_nr); irq += 32) {
- 		_ICMR(irq) = 0;	/* disable all IRQs */
- 		_ICLR(irq) = 0;	/* all IRQs are IRQ, not FIQ */
- 	}
-
-+	/* irq_nr shouldn't exceed MAX_INTERNAL_IRQS */
-+	if (irq_nr > MAX_INTERNAL_IRQS)
-+		pxa_internal_irq_nr = MAX_INTERNAL_IRQS;
-+	else
-+		pxa_internal_irq_nr = irq_nr;
-+
- 	/* initialize interrupt priority */
- 	if (cpu_is_pxa27x() || cpu_is_pxa3xx()) {
--		for (i = 0; i < irq_nr; i++)
-+		for (i = 0; i < pxa_internal_irq_nr; i++)
- 			IPR(i) = i | (1 << 31);
- 	}
-
- 	/* only unmasked interrupts kick us out of idle */
- 	ICCR = 1;
-
--	for (irq = PXA_IRQ(0); irq < PXA_IRQ(irq_nr); irq++) {
-+	for (irq = PXA_IRQ(0); irq < PXA_IRQ(pxa_internal_irq_nr); irq++) {
- 		set_irq_chip(irq, &pxa_internal_irq_chip);
- 		set_irq_handler(irq, handle_level_irq);
- 		set_irq_flags(irq, IRQF_VALID);
-@@ -150,6 +155,7 @@ void __init pxa_init_irq(int irq_nr, set_wake_t fn)
-
- #ifdef CONFIG_PM
- static unsigned long saved_icmr[2];
-+static unsigned long saved_ipr[MAX_INTERNAL_IRQS];
-
- static int pxa_irq_suspend(struct sys_device *dev, pm_message_t state)
- {
-@@ -159,6 +165,8 @@ static int pxa_irq_suspend(struct sys_device *dev,
-pm_message_t state)
- 		saved_icmr[i] = _ICMR(irq);
- 		_ICMR(irq) = 0;
- 	}
-+	for (i = 0; i < pxa_internal_irq_nr; i++)
-+		saved_ipr[i] = IPR(i);
-
- 	return 0;
- }
-@@ -171,6 +179,8 @@ static int pxa_irq_resume(struct sys_device *dev)
- 		_ICMR(irq) = saved_icmr[i];
- 		_ICLR(irq) = 0;
- 	}
-+	for (i = 0; i < pxa_internal_irq_nr; i++)
-+		IPR(i) = saved_ipr[i];
-
- 	ICCR = 1;
- 	return 0;
 -- 
-1.5.6.5
+Bluewater Systems Ltd - ARM Technology Solution Centre
 
---00151774051c77fae704776e216f
-Content-Type: text/x-patch; charset=US-ASCII; 
-	name="0001-pxa-fix-system-resume-issue-on-pxa27x-and-pxa3xx.patch"
-Content-Disposition: attachment; 
-	filename="0001-pxa-fix-system-resume-issue-on-pxa27x-and-pxa3xx.patch"
-Content-Transfer-Encoding: base64
-X-Attachment-Id: f_g1ki04450
-
-RnJvbSBjOWRkNTQ0YzE5MjMyNmE3ZTc1NjY5MjNlMTkwNTdiOGM2YzNkNWUwIE1vbiBTZXAgMTcg
-MDA6MDA6MDAgMjAwMQpGcm9tOiBIYW9qaWFuIFpodWFuZyA8aGFvamlhbi56aHVhbmdAbWFydmVs
-bC5jb20+CkRhdGU6IE1vbiwgMiBOb3YgMjAwOSAxNDowMjoyMSAtMDUwMApTdWJqZWN0OiBbUEFU
-Q0hdIHB4YTogZml4IHN5c3RlbSByZXN1bWUgaXNzdWUgb24gcHhhMjd4IGFuZCBweGEzeHgKClNp
-bmNlIGludGVycnVwdCBoYW5kbGVyIGlzIGNoYW5nZWQgdG8gdXNlIGludGVycnVwdCBwcmlvcml0
-eSwgd2UgYWxzbyBuZWVkIHRvCnNhdmUgYW5kIHJlc3RvcmUgdGhlc2UgaW50ZXJydXB0IGNvbnRy
-b2xsZXIgcmVnaXN0ZXJzIGluIHN1c3BlbmQvcmVzdW1lCnJvdXRpbmUuCgpTaWduZWQtb2ZmLWJ5
-OiBIYW9qaWFuIFpodWFuZyA8aGFvamlhbi56aHVhbmdAbWFydmVsbC5jb20+ClRlc3RlZC1ieTog
-RGFuaWVsIE1hY2sgPGRhbmllbEBjYWlhcS5kZT4KQWNrZWQtYnk6IFBhdmVsIE1hY2hlayA8cGF2
-ZWxAdWN3LmN6PgpUZXN0ZWQtYnk6IFBhdmVsIE1hY2hlayA8cGF2ZWxAdWN3LmN6PgpUZXN0ZWQt
-Ynk6IFJvYmVydCBKYXJ6bWlrIDxyb2JlcnQuamFyem1pa0BmcmVlLmZyPgotLS0KIGFyY2gvYXJt
-L21hY2gtcHhhL2lycS5jIHwgICAxOCArKysrKysrKysrKysrKy0tLS0KIDEgZmlsZXMgY2hhbmdl
-ZCwgMTQgaW5zZXJ0aW9ucygrKSwgNCBkZWxldGlvbnMoLSkKCmRpZmYgLS1naXQgYS9hcmNoL2Fy
-bS9tYWNoLXB4YS9pcnEuYyBiL2FyY2gvYXJtL21hY2gtcHhhL2lycS5jCmluZGV4IGQ2OTRjZTIu
-LjdmNmYyNmMgMTAwNjQ0Ci0tLSBhL2FyY2gvYXJtL21hY2gtcHhhL2lycS5jCisrKyBiL2FyY2gv
-YXJtL21hY2gtcHhhL2lycS5jCkBAIC0yOCw2ICsyOCw3IEBACiAjZGVmaW5lIElSUV9CSVQobikJ
-KCgobikgLSBQWEFfSVJRKDApKSAmIDB4MWYpCiAjZGVmaW5lIF9JQ01SKG4pCSgqKCgoKG4pIC0g
-UFhBX0lSUSgwKSkgJiB+MHgxZikgPyAmSUNNUjIgOiAmSUNNUikpCiAjZGVmaW5lIF9JQ0xSKG4p
-CSgqKCgoKG4pIC0gUFhBX0lSUSgwKSkgJiB+MHgxZikgPyAmSUNMUjIgOiAmSUNMUikpCisjZGVm
-aW5lIE1BWF9JTlRFUk5BTF9JUlFTCTEyOAogCiAvKgogICogVGhpcyBpcyBmb3IgcGVyaXBoZXJh
-bCBJUlFzIGludGVybmFsIHRvIHRoZSBQWEEgY2hpcC4KQEAgLTEyMiwyMyArMTIzLDI3IEBAIHZv
-aWQgX19pbml0IHB4YV9pbml0X2lycShpbnQgaXJxX25yLCBzZXRfd2FrZV90IGZuKQogewogCWlu
-dCBpcnEsIGk7CiAKLQlweGFfaW50ZXJuYWxfaXJxX25yID0gaXJxX25yOwotCiAJZm9yIChpcnEg
-PSBQWEFfSVJRKDApOyBpcnEgPCBQWEFfSVJRKGlycV9ucik7IGlycSArPSAzMikgewogCQlfSUNN
-UihpcnEpID0gMDsJLyogZGlzYWJsZSBhbGwgSVJRcyAqLwogCQlfSUNMUihpcnEpID0gMDsJLyog
-YWxsIElSUXMgYXJlIElSUSwgbm90IEZJUSAqLwogCX0KIAorCS8qIGlycV9uciBzaG91bGRuJ3Qg
-ZXhjZWVkIE1BWF9JTlRFUk5BTF9JUlFTICovCisJaWYgKGlycV9uciA+IE1BWF9JTlRFUk5BTF9J
-UlFTKQorCQlweGFfaW50ZXJuYWxfaXJxX25yID0gTUFYX0lOVEVSTkFMX0lSUVM7CisJZWxzZQor
-CQlweGFfaW50ZXJuYWxfaXJxX25yID0gaXJxX25yOworCiAJLyogaW5pdGlhbGl6ZSBpbnRlcnJ1
-cHQgcHJpb3JpdHkgKi8KIAlpZiAoY3B1X2lzX3B4YTI3eCgpIHx8IGNwdV9pc19weGEzeHgoKSkg
-ewotCQlmb3IgKGkgPSAwOyBpIDwgaXJxX25yOyBpKyspCisJCWZvciAoaSA9IDA7IGkgPCBweGFf
-aW50ZXJuYWxfaXJxX25yOyBpKyspCiAJCQlJUFIoaSkgPSBpIHwgKDEgPDwgMzEpOwogCX0KIAog
-CS8qIG9ubHkgdW5tYXNrZWQgaW50ZXJydXB0cyBraWNrIHVzIG91dCBvZiBpZGxlICovCiAJSUND
-UiA9IDE7CiAKLQlmb3IgKGlycSA9IFBYQV9JUlEoMCk7IGlycSA8IFBYQV9JUlEoaXJxX25yKTsg
-aXJxKyspIHsKKwlmb3IgKGlycSA9IFBYQV9JUlEoMCk7IGlycSA8IFBYQV9JUlEocHhhX2ludGVy
-bmFsX2lycV9ucik7IGlycSsrKSB7CiAJCXNldF9pcnFfY2hpcChpcnEsICZweGFfaW50ZXJuYWxf
-aXJxX2NoaXApOwogCQlzZXRfaXJxX2hhbmRsZXIoaXJxLCBoYW5kbGVfbGV2ZWxfaXJxKTsKIAkJ
-c2V0X2lycV9mbGFncyhpcnEsIElSUUZfVkFMSUQpOwpAQCAtMTUwLDYgKzE1NSw3IEBAIHZvaWQg
-X19pbml0IHB4YV9pbml0X2lycShpbnQgaXJxX25yLCBzZXRfd2FrZV90IGZuKQogCiAjaWZkZWYg
-Q09ORklHX1BNCiBzdGF0aWMgdW5zaWduZWQgbG9uZyBzYXZlZF9pY21yWzJdOworc3RhdGljIHVu
-c2lnbmVkIGxvbmcgc2F2ZWRfaXByW01BWF9JTlRFUk5BTF9JUlFTXTsKIAogc3RhdGljIGludCBw
-eGFfaXJxX3N1c3BlbmQoc3RydWN0IHN5c19kZXZpY2UgKmRldiwgcG1fbWVzc2FnZV90IHN0YXRl
-KQogewpAQCAtMTU5LDYgKzE2NSw4IEBAIHN0YXRpYyBpbnQgcHhhX2lycV9zdXNwZW5kKHN0cnVj
-dCBzeXNfZGV2aWNlICpkZXYsIHBtX21lc3NhZ2VfdCBzdGF0ZSkKIAkJc2F2ZWRfaWNtcltpXSA9
-IF9JQ01SKGlycSk7CiAJCV9JQ01SKGlycSkgPSAwOwogCX0KKwlmb3IgKGkgPSAwOyBpIDwgcHhh
-X2ludGVybmFsX2lycV9ucjsgaSsrKQorCQlzYXZlZF9pcHJbaV0gPSBJUFIoaSk7CiAKIAlyZXR1
-cm4gMDsKIH0KQEAgLTE3MSw2ICsxNzksOCBAQCBzdGF0aWMgaW50IHB4YV9pcnFfcmVzdW1lKHN0
-cnVjdCBzeXNfZGV2aWNlICpkZXYpCiAJCV9JQ01SKGlycSkgPSBzYXZlZF9pY21yW2ldOwogCQlf
-SUNMUihpcnEpID0gMDsKIAl9CisJZm9yIChpID0gMDsgaSA8IHB4YV9pbnRlcm5hbF9pcnFfbnI7
-IGkrKykKKwkJSVBSKGkpID0gc2F2ZWRfaXByW2ldOwogCiAJSUNDUiA9IDE7CiAJcmV0dXJuIDA7
-Ci0tIAoxLjUuNi41Cgo=
---00151774051c77fae704776e216f--
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751 
+Fax:   +64 3 3779135			  USA 1800 261 2934
