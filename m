@@ -1,49 +1,72 @@
-From: utx@penguin.cz (Stanislav Brabec)
-Date: Tue, 03 Nov 2009 10:50:21 +0100
-Subject: Possible suspend/resume regression in .32-rc?
-In-Reply-To: <771cded00911021931x41cfa51bh2959d3748db5ac0@mail.gmail.com>
-References: <20091031013427.GL14091@buzzloop.caiaq.de>
-	<20091101205449.GT14091@buzzloop.caiaq.de>
-	<20091101213343.GA31345@elf.ucw.cz> <20091101220341.GA16698@elf.ucw.cz>
-	<771cded00911020122o3bb5cc96q957c8be1ce7cae46@mail.gmail.com>
-	<1257155873.5642.14.camel@utx.utx.cz>
-	<771cded00911021931x41cfa51bh2959d3748db5ac0@mail.gmail.com>
-Message-ID: <1257241821.4269.5.camel@utx.utx.cz>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue,  3 Nov 2009 11:47:15 +0100
+Subject: [PATCH] [ARM] serial/pxa: work around Errata #75
+Message-ID: <1257245235-14783-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Haojian Zhuang wrote:
-> On Mon, Nov 2, 2009 at 5:57 AM, Stanislav Brabec <utx@penguin.cz> wrote:
-> > Haojian Zhuang wrote:
-> >
-> >> Commit b5b82df6, from May 2007, breaks no_console_suspend on the OLPC
-> >> XO laptop. Basically what happens is that upon returning from resume,
-> >> serial8250_resume_port() will reconfigure the port for high speed
-> >> mode and all console output will be garbled, making debug of the
-> >> resume path painful. This patch modifies uart_resume_port() to
-> >> reset the port to the state it was in before we suspended.
-> >
-> > See my patch waiting for approval in LKML thread
-> > "serial-core: resume serial hardware with no_console_suspend".
-> >
-> > It attempts to fix it, but I was not yet able to test it due to spitz
-> > resume breakage.
-> >
-> 
-> Hi Stanislav,
-> 
-> At first, your patch can't be applied into my latest codebase. I have
-> to update the patch. But the console resume is still blocked after
-> applied your patch. It works only after I merge some old code back. My
-> modified patch is in below.
+Intel(R) PXA27x Processor Family Specification Update (Nov 2005)
+says:
 
-Yes, code changed there a bit. I sent rebased patch later in the thread.
-Did you try this one? (Well I did not test it yet - in time of sending
-resume did not work at all on my Zaurus.)
+  E75. UART: Baud rate may not be programmed correctly on
+       back-to-back writes.
 
-Your patch is a bit different. I'll test both as soon as possible.
+  Problem:
+  When programming the Divisor Latch registers, Low and High (DLL and
+  DLH), with back-to-back writes, the second register write may not
+  take effect. The result is an incorrect baud rate.
 
+  Workaround:
+  After programming the first Divisor Latch register, read and verify
+  it before programming the second Divisor Latch register.
 
-________________________________________________________________________
-Stanislav Brabec
-http://www.penguin.cz/~utx
+This was hit when changing the baud rate from 115200 to 9600 while
+receiving characters at 9600 Bd.
+
+And fixed indention of some comments nearby.
+
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Alan Cox <alan@linux.intel.com>
+Cc: Mike Rapoport <mike@compulab.co.il>
+---
+ drivers/serial/pxa.c |   13 +++++++++++--
+ 1 files changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/serial/pxa.c b/drivers/serial/pxa.c
+index b8629d7..4a82104 100644
+--- a/drivers/serial/pxa.c
++++ b/drivers/serial/pxa.c
+@@ -438,6 +438,7 @@ serial_pxa_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	unsigned char cval, fcr = 0;
+ 	unsigned long flags;
+ 	unsigned int baud, quot;
++	unsigned int dll;
+ 
+ 	switch (termios->c_cflag & CSIZE) {
+ 	case CS5:
+@@ -534,10 +535,18 @@ serial_pxa_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	else
+ 		up->mcr &= ~UART_MCR_AFE;
+ 
+-	serial_out(up, UART_LCR, cval | UART_LCR_DLAB);/* set DLAB */
++	serial_out(up, UART_LCR, cval | UART_LCR_DLAB);	/* set DLAB */
+ 	serial_out(up, UART_DLL, quot & 0xff);		/* LS of divisor */
++
++	/*
++	 * work around Errata #75 according to Intel(R) PXA27x Processor Family
++	 * Specification Update (Nov 2005)
++	 */
++	dll = serial_in(up, UART_DLL);
++	WARN_ON(dll != (quot & 0xff));
++
+ 	serial_out(up, UART_DLM, quot >> 8);		/* MS of divisor */
+-	serial_out(up, UART_LCR, cval);		/* reset DLAB */
++	serial_out(up, UART_LCR, cval);			/* reset DLAB */
+ 	up->lcr = cval;					/* Save LCR */
+ 	serial_pxa_set_mctrl(&up->port, up->port.mctrl);
+ 	serial_out(up, UART_FCR, fcr);
+-- 
+1.6.5.2
