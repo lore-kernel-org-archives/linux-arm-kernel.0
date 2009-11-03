@@ -1,26 +1,25 @@
-From: rmk@arm.linux.org.uk (Russell King)
-Date: Tue, 3 Nov 2009 21:01:15 +0000
-Subject: [PATCH 1/2] [ARM] i2c/pxa: remove unused macro
-In-Reply-To: <1257275000-18866-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1257275000-18866-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20091103210115.GA24955@flint.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Nov 2009 21:09:15 +0000
+Subject: patch system doesn't parse From: pseudo header (Was: [PATCH]
+	Use REV and REV16 for byte swapping on ARMv6+)
+In-Reply-To: <20091103195444.GB20260@pengutronix.de>
+References: <1256374782-5803-1-git-send-email-rabin@rab.in>
+	<20091024111357.GD16451@n2100.arm.linux.org.uk>
+	<1256554966.5282.15.camel@pc1117.cambridge.arm.com>
+	<20091026110524.GB22097@n2100.arm.linux.org.uk>
+	<20091103195444.GB20260@pengutronix.de>
+Message-ID: <20091103210915.GB8719@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 03, 2009 at 08:03:19PM +0100, Uwe Kleine-K?nig wrote:
-> Commit
+On Tue, Nov 03, 2009 at 08:54:44PM +0100, Uwe Kleine-K?nig wrote:
+> Hmm, it's hard to search for From: in the archives, so the best hit I
+> found is:
 > 
-> 	beea494 ([ARM] Remove EEPROM slave emulation from i2c-pxa driver.)
+> 	http://thread.gmane.org/gmane.linux.ports.arm.kernel/32274/focus=32651
+> 
+> Is it that you mean?
 
-Oh great.  Some people may remember the LX code that I submitted to
-the mailing list a while back.  Removing the slave emulation buggers
-that platform up.  I do intend to submit that once the issue of where
-the PCON support should be located is resolved - which is still
-pending.
-
-Please revert this change, thanks.
-
--- 
-Russell King
- Linux kernel    2.6 ARM Linux   - http://www.arm.linux.org.uk/
- maintainer of:
+Sorry, no idea which you mean, elinks doesn't display any text other
+than the thread listing for gmane stuff, so no idea which message
+you're suggesting I look at.
