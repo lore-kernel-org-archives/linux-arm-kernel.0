@@ -1,64 +1,24 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Tue, 3 Nov 2009 20:24:38 +0100
-Subject: [RFC] [PATCH v2] OMAP: DMA: Fix omapfb/lcdc on Amstrad Delta broken
-	when PM set
-Message-ID: <200911032024.47741.jkrzyszt@tis.icnet.pl>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 3 Nov 2009 21:00:14 +0100
+Subject: [PATCH 1/2] [ARM] i2c/pxa: remove unused macro
+In-Reply-To: <1257275000-18866-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1257275000-18866-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20091103200014.GC20260@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With CONFIG_PM=y, the omapfb/lcdc device on Amstrad Delta, after initially
-starting correctly, breaks with the following error messages:
+Hello,
 
-omapfb omapfb: resetting (status 0xffffff96,reset count 1)
-...
-omapfb omapfb: resetting (status 0xffffff96,reset count 100)
-omapfb omapfb: too many reset attempts, giving up.
+> Cc: Eric Miao <eric.miao@marvell.com>
+postmaster at marvell.com claims the address ymiao3 at marvell.com isn't
+valid.  So I think Eric got a new one.
 
-Looking closer at this I have found that it had been broken almost 2 years ago
-with commit 2418996e3b100114edb2ae110d5d4acb928909d2, PM fixes for OMAP1.
+If you answer to that thread please take care to use
+eric.y.miao at gmail.com which hopefully works.
 
-The definite reason for broken omapfb/lcdc behavoiur in PM mode
-appeared to be ARM_IDLECT1:IDLIF_ARM (bit 6) put into idle regardless of LCD
-DMA possibly running. The bit were set based on return value of the
-omap_dma_running() function that did not check for dedicated LCD DMA
-channel status. The patch below fixes this.
+Best regards
+Uwe
 
-Created and tested against linux-2.6.32-rc5
-
-Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
-
----
-Hi,
-If there are still no comments, especially on the bug possible impact on other 
-OMAP1510 boards (or even OMAP1610 with internal LCD controller), then Tony, 
-please apply it as is. Until it is accepted, I am stuck with new 
-ams_delta_defconfig.
-
-Thanks,
-Janusz
-
---- linux-2.6.32-rc5/arch/arm/plat-omap/dma.c.orig	2009-10-16 02:41:50.000000000 +0200
-+++ linux-2.6.32-rc5/arch/arm/plat-omap/dma.c	2009-11-03 20:15:35.000000000 +0100
-@@ -30,6 +30,7 @@
- #include <linux/irq.h>
- #include <linux/io.h>
- 
-+#include <asm/mach-types.h>
- #include <asm/system.h>
- #include <mach/hardware.h>
- #include <mach/dma.h>
-@@ -1110,6 +1111,14 @@ int omap_dma_running(void)
- {
- 	int lch;
- 
-+	/*
-+	 * On Amstrad Delta, the OMAP internal LCD controller will start the
-+	 * transfer when it gets enabled, so assume DMA running if LCD enabled.
-+	 */
-+	if (machine_is_ams_delta())
-+		if (omap_readw(0xfffec000 + 0x00) & (1 << 0))
-+			return 1;
-+
- 	/* Check if LCD DMA is running */
- 	if (cpu_is_omap16xx())
- 		if (omap_readw(OMAP1610_DMA_LCD_CCR) & OMAP_DMA_CCR_EN)
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
