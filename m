@@ -1,59 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 3 Nov 2009 12:10:48 -0800
-Subject: [RFC] [PATCH v2] OMAP: DMA: Fix omapfb/lcdc on Amstrad Delta
-	broken when PM set
-In-Reply-To: <200911032104.33049.jkrzyszt@tis.icnet.pl>
-References: <200911032024.47741.jkrzyszt@tis.icnet.pl>
-	<200911032104.33049.jkrzyszt@tis.icnet.pl>
-Message-ID: <20091103201048.GP8981@atomide.com>
+From: karl@hiramoto.org (Karl Hiramoto)
+Date: Tue, 03 Nov 2009 21:27:23 +0100
+Subject: [PATCH] IXP4xx: Ensure index is positive
+In-Reply-To: <4AF08014.4000704@gmail.com>
+References: <4AF08014.4000704@gmail.com>
+Message-ID: <4AF0922B.3030701@hiramoto.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [091103 12:05]:
-> Tuesday 03 November 2009 20:24:38 Janusz Krzysztofik napisa?(a):
-> > If there are still no comments, especially on the bug possible impact on
-> > other OMAP1510 boards (or even OMAP1610 with internal LCD controller), then
-> > Tony, please apply it as is. Until it is accepted, I am stuck with new
-> > ams_delta_defconfig.
-> 
-> Tony,
-> Sorry, I've not checked for new mail before posting this one and missed your 
-> acceptance for my idea of fixing all omap1510, not only ams_delta. If there 
-> are no more comments, I'll submit v3 with cpu_is_omap1510() replacing 
-> machine_is_ams_delta().
-
-Sounds good to me.
-
-Tony
- 
-> Thanks,
-> Janusz
-> 
-> > --- linux-2.6.32-rc5/arch/arm/plat-omap/dma.c.orig	2009-10-16
-> > 02:41:50.000000000 +0200 +++
-> > linux-2.6.32-rc5/arch/arm/plat-omap/dma.c	2009-11-03 20:15:35.000000000
-> > +0100 @@ -30,6 +30,7 @@
-> >  #include <linux/irq.h>
-> >  #include <linux/io.h>
-> >
-> > +#include <asm/mach-types.h>
-> >  #include <asm/system.h>
-> >  #include <mach/hardware.h>
-> >  #include <mach/dma.h>
-> > @@ -1110,6 +1111,14 @@ int omap_dma_running(void)
-> >  {
-> >  	int lch;
-> >
-> > +	/*
-> > +	 * On Amstrad Delta, the OMAP internal LCD controller will start the
-> > +	 * transfer when it gets enabled, so assume DMA running if LCD enabled.
-> > +	 */
-> > +	if (machine_is_ams_delta())
-> > +		if (omap_readw(0xfffec000 + 0x00) & (1 << 0))
-> > +			return 1;
-> > +
-> >  	/* Check if LCD DMA is running */
-> >  	if (cpu_is_omap16xx())
-> >  		if (omap_readw(OMAP1610_DMA_LCD_CCR) & OMAP_DMA_CCR_EN)
-> 
-> 
+Roel Kluin wrote:
+> The indexes are signed, make sure they are not negative
+> when we read the array elements.
+>
+> Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
+> ---
+>  arch/arm/mach-ixp4xx/common.c     |    2 +-
+>  arch/arm/mach-ixp4xx/ixp4xx_npe.c |    2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+> index cfd52fb..2df77bc 100644
+> --- a/arch/arm/mach-ixp4xx/common.c
+> +++ b/arch/arm/mach-ixp4xx/common.c
+> @@ -119,7 +119,7 @@ EXPORT_SYMBOL(gpio_to_irq);
+>  
+>  int irq_to_gpio(int irq)
+>  {
+> -	int gpio = (irq < 32) ? irq2gpio[irq] : -EINVAL;
+> +	int gpio = (irq < 32 && irq >= 0) ? irq2gpio[irq] : -EINVAL;
+>  
+>  	if (gpio == -1)
+>  		return -EINVAL;
+> diff --git a/arch/arm/mach-ixp4xx/ixp4xx_npe.c b/arch/arm/mach-ixp4xx/ixp4xx_npe.c
+> index 47ac69c..30e1456 100644
+> --- a/arch/arm/mach-ixp4xx/ixp4xx_npe.c
+> +++ b/arch/arm/mach-ixp4xx/ixp4xx_npe.c
+> @@ -667,7 +667,7 @@ err:
+>  
+>  struct npe *npe_request(int id)
+>  {
+> -	if (id < NPE_COUNT)
+> +	if (id >= 0 && id < NPE_COUNT)
+>  		if (npe_tab[id].valid)
+>  			if (try_module_get(THIS_MODULE))
+>  				return &npe_tab[id];
+>
+>   
+changing npe_request() to unsigned would probably be better and  not add 
+to bloat.   If your calling these functions with negative arguments, 
+your code is buggy then.
