@@ -1,33 +1,36 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue,  3 Nov 2009 14:42:04 +0000
-Subject: [PATCH 1/9] SMDK6410: Configure GPIO pull up for WM835x IRQ line
-Message-ID: <1257259332-7867-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Tue,  3 Nov 2009 14:42:08 +0000
+Subject: [PATCH 5/9] S3C64XX: Set rate of crystal mux
+In-Reply-To: <1257259332-7867-4-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1257259332-7867-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<1257259332-7867-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<1257259332-7867-3-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<1257259332-7867-4-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1257259332-7867-5-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When used with the WM1190-EV1 board we can use the internal pull up
-resistor of the CPU to provide the required pull for the IRQ line.
-Without this interrupts from the WM835x don't work in the default
-WM1190-EV1 hardwaer configuration.
+The current code assumes that the external clock mux will be set to
+the crystal. Set this up explicitly within the clock API.
 
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/mach-s3c6410/mach-smdk6410.c |    3 +++
+ arch/arm/plat-s3c64xx/s3c6400-clock.c |    3 +++
  1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s3c6410/mach-smdk6410.c b/arch/arm/mach-s3c6410/mach-smdk6410.c
-index ea51dbe..9f1a214 100644
---- a/arch/arm/mach-s3c6410/mach-smdk6410.c
-+++ b/arch/arm/mach-s3c6410/mach-smdk6410.c
-@@ -320,6 +320,9 @@ static int __init smdk6410_wm8350_init(struct wm8350 *wm8350)
- {
- 	int i;
+diff --git a/arch/arm/plat-s3c64xx/s3c6400-clock.c b/arch/arm/plat-s3c64xx/s3c6400-clock.c
+index 9745852..6ffa21e 100644
+--- a/arch/arm/plat-s3c64xx/s3c6400-clock.c
++++ b/arch/arm/plat-s3c64xx/s3c6400-clock.c
+@@ -677,6 +677,9 @@ void __init_or_cpufreq s3c6400_setup_clocks(void)
  
-+	/* Configure the IRQ line */
-+	s3c_gpio_setpull(S3C64XX_GPN(12), S3C_GPIO_PULL_UP);
+ 	printk(KERN_DEBUG "%s: xtal is %ld\n", __func__, xtal);
+ 
++	/* For now assume the mux always selects the crystal */
++	clk_ext_xtal_mux.parent = xtal_clk;
 +
- 	/* Instantiate the regulators */
- 	for (i = 0; i < ARRAY_SIZE(wm1190_regulators); i++)
- 		wm8350_register_regulator(wm8350,
+ 	epll = s3c6400_get_epll(xtal);
+ 	mpll = s3c6400_get_pll(xtal, __raw_readl(S3C_MPLL_CON));
+ 	apll = s3c6400_get_pll(xtal, __raw_readl(S3C_APLL_CON));
 -- 
 1.6.5.2
