@@ -1,70 +1,65 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue,  3 Nov 2009 14:42:12 +0000
-Subject: [PATCH 9/9] S3C64XX: Redo voltage ranges for cpufreq
-In-Reply-To: <1257259332-7867-8-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1257259332-7867-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1257259332-7867-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1257259332-7867-3-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1257259332-7867-4-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1257259332-7867-5-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1257259332-7867-6-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1257259332-7867-7-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1257259332-7867-8-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <1257259332-7867-9-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 03 Nov 2009 15:42:16 +0100
+Subject: [RFC PATCH] atmel_lcdfb Kconfig: remove long dependency line
+In-Reply-To: <20090625084631.GA7985@n2100.arm.linux.org.uk>
+References: <4A40D695.5000302@atmel.com>
+	<1245767456-6434-1-git-send-email-nicolas.ferre@atmel.com>
+	<20090623153556.0e574899@hskinnemoen-d830>
+	<4A40E2E6.9060904@atmel.com>
+	<20090625084631.GA7985@n2100.arm.linux.org.uk>
+Message-ID: <4AF04148.8070103@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The documentation for the S3C6410 CPU voltage scaling is rather
-unclear, with omitted values for several speed settings. Originally
-the code was using only quoted values, resulting in some fairly odd
-settings. The S3C6410 is also unusual in that the both the maximum
-and minimum voltages quoted scale as the frequency rises, rather
-than just the minimum voltage.
+I come back on this patch as I have a Kconfig cleanup patch series coming.
 
-Clean this up a bit by always using the specified typical settings
-as the minimum voltage (ignoring any specified minimum voltage) in
-order to avoid running near the edge of the processor capabilities.
-Also use the next quoted maximum voltages rather than the typical
-voltages where no maximum voltage is quoted, allowing operation on
-a greater range of systems.
+Russell King - ARM Linux :
+> On Tue, Jun 23, 2009 at 04:12:54PM +0200, Nicolas Ferre wrote:
+>> Haavard Skinnemoen :
+>>> Nicolas Ferre wrote:
+>>>> +config ARCH_ATMEL_HAS_FB
+>>>> +	bool
+>>>> +	depends on FB
+>>>> +	default n
+>>> What happens when we unconditionally select something which depends on
+>>> something else?
+>> :-P
+>>
+>> Experience shows that this configuration is selected.
+>>
+>> The dependency allows to have a good hierarchy in the configuration tree...
+>> Better proposition welcome.
+> 
+> 1st - no need for 'default n' - you're specifying something that's already
+> the default.
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/plat-s3c64xx/cpufreq.c |   15 +++++++--------
- 1 files changed, 7 insertions(+), 8 deletions(-)
+Ok.
 
-diff --git a/arch/arm/plat-s3c64xx/cpufreq.c b/arch/arm/plat-s3c64xx/cpufreq.c
-index 61276bf..74c0e83 100644
---- a/arch/arm/plat-s3c64xx/cpufreq.c
-+++ b/arch/arm/plat-s3c64xx/cpufreq.c
-@@ -28,11 +28,10 @@ struct s3c64xx_dvfs {
- };
- 
- static struct s3c64xx_dvfs s3c64xx_dvfs_table[] = {
--	[0] = { 1000000, 1000000 },
--	[1] = { 1000000, 1050000 },
--	[2] = { 1050000, 1100000 },
--	[3] = { 1050000, 1150000 },
--	[4] = { 1250000, 1350000 },
-+	[0] = { 1000000, 1150000 },
-+	[1] = { 1050000, 1150000 },
-+	[2] = { 1100000, 1150000 },
-+	[3] = { 1200000, 1350000 },
- };
- 
- static struct cpufreq_frequency_table s3c64xx_freq_table[] = {
-@@ -42,9 +41,9 @@ static struct cpufreq_frequency_table s3c64xx_freq_table[] = {
- 	{ 1, 266000 },
- 	{ 2, 333000 },
- 	{ 2, 400000 },
--	{ 3, 532000 },
--	{ 3, 533000 },
--	{ 4, 667000 },
-+	{ 2, 532000 },
-+	{ 2, 533000 },
-+	{ 3, 667000 },
- 	{ 0, CPUFREQ_TABLE_END },
- };
- #endif
+> 2nd - don't make this symbol depend on anything, and don't use the symbol
+> for anything except providing a dependency for FB_ATMEL.  Instead, let
+> FB_ATMEL deal with the dependency on FB and ARCH_ATMEL_HAS_FB.
+
+The problem is that if I do not setup the dependency here the menu entry
+will not be available at the proper level. In fact I will see the Atmel
+LCD entry here:
+"Graphics support"
+ <*> Support for frame buffer devices  --->
+ <*> AT91/AT32 LCD Controller support
+
+instead of here:
+"Graphics support"
+ ---> "Support for frame buffer devices"
+      [..]
+      <*> "AT91/AT32 LCD Controller support"
+      [..]
+
+So I keep the depend.
+
+> 3rd - ISTR we have a convention for these - 'HAVE_foo' for a configuration
+> option named 'foo'.  So it should probably be HAVE_FB_ATMEL.
+
+Ok, changed to HAVE_FB_ATMEL indeed.
+
+Thanks. Best regards,
 -- 
-1.6.5.2
+Nicolas Ferre
