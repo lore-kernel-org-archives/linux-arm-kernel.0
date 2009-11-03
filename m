@@ -1,85 +1,37 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 3 Nov 2009 09:11:34 -0800
-Subject: [PATCH] OMAP1: PM: Fix omapfb/lcd on Amstrad Delta broken when
-	PM set
-In-Reply-To: <200911010218.29347.jkrzyszt@tis.icnet.pl>
-References: <200910292339.48610.jkrzyszt@tis.icnet.pl>
-	<200910301542.27206.jkrzyszt@tis.icnet.pl>
-	<20091030173317.GX7180@atomide.com>
-	<200911010218.29347.jkrzyszt@tis.icnet.pl>
-Message-ID: <20091103171133.GJ8981@atomide.com>
+Date: Tue, 3 Nov 2009 09:24:00 -0800
+Subject: Please advise on modifying defconfig for Amstrad Delta
+In-Reply-To: <200910250340.34046.jkrzyszt@tis.icnet.pl>
+References: <200910250340.34046.jkrzyszt@tis.icnet.pl>
+Message-ID: <20091103172400.GM8981@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [091031 18:20]:
-> Friday 30 October 2009 18:33:18 Tony Lindgren napisa?(a):
-> > * Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [091030 07:43]:
-> > > Thursday 29 October 2009 23:39:44 Janusz Krzysztofik napisa?(a):
-> > > > With CONFIG_PM=y, the omapfb/lcd device on Amstrad Delta, after
-> > > > initially starting correctly, breaks with the following error messages:
-> > > >
-> > > > omapfb omapfb: resetting (status 0xffffff96,reset count 1)
-> > > > ...
-> > > > omapfb omapfb: resetting (status 0xffffff96,reset count 100)
-> > > > omapfb omapfb: too many reset attempts, giving up.
-> > > >
-> > > > Looking closer at this I have found that it had been broken almost 2
-> > > > years ago with commit 2418996e3b100114edb2ae110d5d4acb928909d2, PM
-> > > > fixes for OMAP1.
-> > > >
-> > > > The definite reason for broken omapfb/lcd_ams_delta in PM mode appeared
-> > > > to be ARM_IDLECT1:IDLIF_ARM (bit 6) put into idle. The patch below
-> > > > fixes it.
-> > > >
-> > > > Since PM area is quite new to me, I am not sure if there may be a
-> > > > better solution. AFAICS, the standard way to prevent an ARM_CLKCT1 bit
-> > > > being switched to idle is to enable a clock that uses it (tipb_ck,
-> > > > dma_ck, or tc_ck or one of its children in this case, right?).
-> > > >
-> > > > I assume there is no bug in omapfb nor lcdc, as that would be already
-> > > > detected. Maybe it would be better to fix
-> > > > drivers/video/omap/lcd_ams_delta.c (or
-> > > > arch/arm/mach-omap1/board-ams-delta), but I don't know what clock
-> > > > should I enable, if any.
-> > >
-> > > More looking at it, I found that might be omap_dma_running() from
-> > > arch/arm/plat-omap/dma.c that needs correction. It already checks for LCD
-> > > dma running for OMAP1610, but does nothing similiar for 1510. I have
-> > > revisited http://focus.ti.com/lit/ug/spru674/spru674.pdf, but found no
-> > > hint how to do that in a 1610 similiar way.
-> >
-> > Hmm to me it looks like the OMAP_DMA_CCR_EN should be set in one of the
-> > channels if enabled. Maybe you need add a similar check somewhere in
-> > the *_lcd_dma_* functions too in dma.c?
+* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [091024 19:41]:
+> Hi,
 > 
-> Tony,
-> It sounds reasonable, but the problem is that in the OMAP5910 documentation I 
-> can find no DMA_CCR equivalent in the LCD dedicated DMA channel register set, 
-> nor EN equivalent in the DMA_LCD_CTRL register.
+> I'm just working on a new, updated version of ams_delta_defconfig. Starting from the current version, created over 2 years ago for 2.6.22, I turned on a few device drivers that was added recently, turned on thumb instructions support, turned on EABI, kept old ABI compatibility and NWFPE, and got a resulting kernel that is ~170kB too large to be successfully booted using tools available at http://the.earth.li/pub/e3/.
 > 
-> I have had a look at *_lcd_dma_*, as you suggested, and found this:
+> Of course, I am able to trim that down, even adding a few more drivers for add-on hardware that I am using, and get a kernel that works perfectly for me, but since I have never prepared a default config, I'd like to get your advice on what I can remove and what should rather be kept untouched.
 > 
->         /*
->          * Set the Enable bit only if an external controller is
->          * connected. Otherwise the OMAP internal controller will
->          * start the transfer when it gets enabled.
->          */
->         if (enable_1510_mode || !lcd_dma.ext_ctrl)
->                 return;
+> Instead of pasting sixteen hundred lines here, I'd rather ask about the simplest change I can see:
 > 
-> That may suggest checking for LCD controller, not DMA channel, enable bit 
-> could give an answer if LCD DMA is likely to be running or not. So maybe 
-> adding a function to drivers/video/omap/lcdc.c that would check for 
-> OMAP_LCDC_CONTROL:OMAP_LCDC_CTRL_LCD_EN, then invoke that function from 
-> omap_dma_running() in case of omap1510 could be a proper solution.
+> -# CONFIG_EMBEDDED is not set
+> -CONFIG_KALLSYMS=y
+> +CONFIG_EMBEDDED=y
+> +# CONFIG_KALLSYMS is not set
 > 
-> However, that would affect not only Amstrad Delta, but all 1510 based 
-> machines. Since there were no reports about broken LCD DMA on 1510, I'd 
-> rather get a confirmation from omap guys, more experienced than me, that the 
-> solution proposed is correct and should work not only for my Amstrad Delta 
-> before I get that way.
+> That would give me a kernel that is small enough, but since only a few of arm defconfigs have CONFIG_KALLSYMS not set, I am not sure if it is generally acceptable.
 
-That sounds like a reasonable way to fix it to me.
+Send that as a fix to this list with the minimal changes,
+we should still be able to get it in as a fix during the -rc
+series.
+
+If you want to update the whole defconfig, we need to wait
+for the merge window.
+
+Just do the diff -u, then edit the patch to leave out all
+the other hunks except the one above.
 
 Regards,
 
