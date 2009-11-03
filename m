@@ -1,50 +1,74 @@
-From: karl@hiramoto.org (Karl Hiramoto)
-Date: Tue, 03 Nov 2009 21:27:23 +0100
-Subject: [PATCH] IXP4xx: Ensure index is positive
-In-Reply-To: <4AF08014.4000704@gmail.com>
-References: <4AF08014.4000704@gmail.com>
-Message-ID: <4AF0922B.3030701@hiramoto.org>
+From: ospite@studenti.unina.it (Antonio Ospite)
+Date: Tue, 3 Nov 2009 21:40:20 +0100
+Subject: [PATCH 0/3] ezx: A780/A910 camera, A910 leds, ezx_defconfig update
+In-Reply-To: <20091103174430.GA20822@excalibur.local>
+References: <1257266734-28673-1-git-send-email-ospite@studenti.unina.it>
+	<20091103174430.GA20822@excalibur.local>
+Message-ID: <20091103214020.a5f6bac9.ospite@studenti.unina.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Roel Kluin wrote:
-> The indexes are signed, make sure they are not negative
-> when we read the array elements.
+On Tue, 3 Nov 2009 18:44:30 +0100
+Stefan Schmidt <stefan@datenfreihafen.org> wrote:
+
+> Hello.
+> 
+> [Put Eric in CC]
 >
-> Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
-> ---
->  arch/arm/mach-ixp4xx/common.c     |    2 +-
->  arch/arm/mach-ixp4xx/ixp4xx_npe.c |    2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+
+<OT>
+Thanks, I've realized that the best practice to write the summary
+message is via 'git format-patch --cover-letter' to add the needed
+recipients, rather than using 'git send-email --compose' which doesn't
+process CCs, BCCs and SOBs for the introduction message.
+</OT>
+
+> On Tue, 2009-11-03 at 17:45, Antonio Ospite wrote:
+> > 
+> > some updates for the EZX platform:
+> 
+> Thanks for driving this forward.
+> 
+> > [PATCH 1/3] ezx: Add camera support for A780 and A910 EZX phones
+> > [PATCH 2/3] ezx: Add leds-lp3944 support for A910 EZX phone
+> > [PATCH 3/3] ezx: Update ezx_defconfig now that ezx-pcap is in
+> > 
+> > Are we still in time for 2.6.32?
+> 
+> Given that we are near -rc6 and this is clearly no fix I would say no. But Eric
+> should be happy to apply it to his devel branch which will hit Linus tree during
+> the next merge window.
 >
-> diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-> index cfd52fb..2df77bc 100644
-> --- a/arch/arm/mach-ixp4xx/common.c
-> +++ b/arch/arm/mach-ixp4xx/common.c
-> @@ -119,7 +119,7 @@ EXPORT_SYMBOL(gpio_to_irq);
->  
->  int irq_to_gpio(int irq)
->  {
-> -	int gpio = (irq < 32) ? irq2gpio[irq] : -EINVAL;
-> +	int gpio = (irq < 32 && irq >= 0) ? irq2gpio[irq] : -EINVAL;
->  
->  	if (gpio == -1)
->  		return -EINVAL;
-> diff --git a/arch/arm/mach-ixp4xx/ixp4xx_npe.c b/arch/arm/mach-ixp4xx/ixp4xx_npe.c
-> index 47ac69c..30e1456 100644
-> --- a/arch/arm/mach-ixp4xx/ixp4xx_npe.c
-> +++ b/arch/arm/mach-ixp4xx/ixp4xx_npe.c
-> @@ -667,7 +667,7 @@ err:
->  
->  struct npe *npe_request(int id)
->  {
-> -	if (id < NPE_COUNT)
-> +	if (id >= 0 && id < NPE_COUNT)
->  		if (npe_tab[id].valid)
->  			if (try_module_get(THIS_MODULE))
->  				return &npe_tab[id];
+
+That's fine, of course.
+
+> Eric, Antonio is doing a good deal of the current work at OpenEZX. If you need
+> an ACK anyway you can put mine into it.
+> 
+> Acked-by: Stefan Schmidt <stefan@datenfreihafen.org>
+> 
+> regards
+> Stefan Schmidt
 >
->   
-changing npe_request() to unsigned would probably be better and  not add 
-to bloat.   If your calling these functions with negative arguments, 
-your code is buggy then.
+
+Ciao,
+  Antonio
+
+-- 
+Antonio Ospite
+http://ao2.it
+
+PGP public key ID: 0x4553B001
+
+A: Because it messes up the order in which people normally read text.
+   See http://en.wikipedia.org/wiki/Posting_style
+Q: Why is top-posting such a bad thing?
+A: Top-posting.
+Q: What is the most annoying thing in e-mail?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091103/63619ce5/attachment.sig>
