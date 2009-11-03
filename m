@@ -1,58 +1,49 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 3 Nov 2009 17:32:26 +0800
-Subject: [PATCH 2/6] pxa: frame buffer support both pxa168 and pxa910
-In-Reply-To: <7c34ac520911022245o4c8fd276vcaf0d8d106b77da3@mail.gmail.com>
-References: <7c34ac520911022245o4c8fd276vcaf0d8d106b77da3@mail.gmail.com>
-Message-ID: <f17812d70911030132o1a3d5022o9b166898b29285c@mail.gmail.com>
+From: utx@penguin.cz (Stanislav Brabec)
+Date: Tue, 03 Nov 2009 10:50:21 +0100
+Subject: Possible suspend/resume regression in .32-rc?
+In-Reply-To: <771cded00911021931x41cfa51bh2959d3748db5ac0@mail.gmail.com>
+References: <20091031013427.GL14091@buzzloop.caiaq.de>
+	<20091101205449.GT14091@buzzloop.caiaq.de>
+	<20091101213343.GA31345@elf.ucw.cz> <20091101220341.GA16698@elf.ucw.cz>
+	<771cded00911020122o3bb5cc96q957c8be1ce7cae46@mail.gmail.com>
+	<1257155873.5642.14.camel@utx.utx.cz>
+	<771cded00911021931x41cfa51bh2959d3748db5ac0@mail.gmail.com>
+Message-ID: <1257241821.4269.5.camel@utx.utx.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 3, 2009 at 2:45 PM, Jun Nie <niej0001@gmail.com> wrote:
-> pxa: frame buffer support both pxa168 and pxa910
->
-> Signed-off-by: Jun Nie <njun@marvell.com>
-> ---
-> ?drivers/video/pxa168fb.c | ? ?6 ++++++
-> ?1 files changed, 6 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
-> index 27bdf2b..2ba1444 100644
-> --- a/drivers/video/pxa168fb.c
-> +++ b/drivers/video/pxa168fb.c
-> @@ -875,12 +875,18 @@ failed:
-> ? ? ? ?return ret;
-> ?}
->
-> + static const struct platform_device_id mmpfb_id_table[] = {
-> + ? ? ? ?{"pxa168-fb", 0},
-> + ? ? ? ?{"pxa910-fb", 1},
-> + };
-> +
+Haojian Zhuang wrote:
+> On Mon, Nov 2, 2009 at 5:57 AM, Stanislav Brabec <utx@penguin.cz> wrote:
+> > Haojian Zhuang wrote:
+> >
+> >> Commit b5b82df6, from May 2007, breaks no_console_suspend on the OLPC
+> >> XO laptop. Basically what happens is that upon returning from resume,
+> >> serial8250_resume_port() will reconfigure the port for high speed
+> >> mode and all console output will be garbled, making debug of the
+> >> resume path painful. This patch modifies uart_resume_port() to
+> >> reset the port to the state it was in before we suspended.
+> >
+> > See my patch waiting for approval in LKML thread
+> > "serial-core: resume serial hardware with no_console_suspend".
+> >
+> > It attempts to fix it, but I was not yet able to test it due to spitz
+> > resume breakage.
+> >
+> 
+> Hi Stanislav,
+> 
+> At first, your patch can't be applied into my latest codebase. I have
+> to update the patch. But the console resume is still blocked after
+> applied your patch. It works only after I merge some old code back. My
+> modified patch is in below.
 
-Not sure '0' and '1' means anything here? Otherwise can just be '0'.
-Intended usage could be some flags difference between processors,
-let's say pxa910-fb supports YUV, one can have something like:
+Yes, code changed there a bit. I sent rebased patch later in the thread.
+Did you try this one? (Well I did not test it yet - in time of sending
+resume did not work at all on my Zaurus.)
 
-{ "pxa168-fb", FB_SUPPORT_RGB },
-{ "pxa910-fb", FB_SUPPORT_RGB | FB_SUPPORT_YUV },
+Your patch is a bit different. I'll test both as soon as possible.
 
-Just examples.
 
-> ?static struct platform_driver pxa168fb_driver = {
-> ? ? ? ?.driver ? ? ? ? = {
-> ? ? ? ? ? ? ? ?.name ? = "pxa168-fb",
-> ? ? ? ? ? ? ? ?.owner ?= THIS_MODULE,
-> ? ? ? ?},
-> ? ? ? ?.probe ? ? ? ? ?= pxa168fb_probe,
-> + ? ? ? .id_table ? ? ? = mmpfb_id_table,
-> ?};
->
-> ?static int __devinit pxa168fb_init(void)
-> --
-> 1.5.4.3
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+________________________________________________________________________
+Stanislav Brabec
+http://www.penguin.cz/~utx
