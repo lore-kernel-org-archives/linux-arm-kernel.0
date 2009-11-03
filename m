@@ -1,23 +1,31 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 3 Nov 2009 16:29:41 +0100 (CET)
-Subject: [PATCH] Make MIPS dynamic clocksource/clockevent clock code
-	generic v2
-In-Reply-To: <63386a3d0911030551j1accd6fby7038895df544385b@mail.gmail.com>
-References: <1256078002-27919-1-git-send-email-linus.walleij@stericsson.com>
-	<63386a3d0910251518i42149642g183f2d3f6c43384f@mail.gmail.com>
-	<63386a3d0911030551j1accd6fby7038895df544385b@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.0911031628480.12138@localhost.localdomain>
+From: ospite@studenti.unina.it (Antonio Ospite)
+Date: Tue,  3 Nov 2009 17:45:31 +0100
+Subject: [PATCH 0/3] ezx: A780/A910 camera, A910 leds, ezx_defconfig update
+Message-ID: <1257266734-28673-1-git-send-email-ospite@studenti.unina.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 3 Nov 2009, Linus Walleij wrote:
-> > Ping on tglx on this, I will uninline the functions if you think
-> > it's better in the long run, just tell me, else can you pick this
-> > patch?
-> 
-> Ping again...
+Hi,
 
-Still catching up with mail backlog. Will come to this in the next
-days.
+some updates for the EZX platform:
 
-      tglx
+[PATCH 1/3] ezx: Add camera support for A780 and A910 EZX phones
+[PATCH 2/3] ezx: Add leds-lp3944 support for A910 EZX phone
+[PATCH 3/3] ezx: Update ezx_defconfig now that ezx-pcap is in
+
+Are we still in time for 2.6.32?
+
+Ciao ciao,
+   Antonio
+
+--
+Antonio Ospite
+http://ao2.it
+
+PGP public key ID: 0x4553B001
+
+A: Because it messes up the order in which people normally read text.
+   See http://en.wikipedia.org/wiki/Posting_style
+Q: Why is top-posting such a bad thing?
+A: Top-posting.
+Q: What is the most annoying thing in e-mail?
