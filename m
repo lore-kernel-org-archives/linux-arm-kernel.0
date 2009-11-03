@@ -1,74 +1,66 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 3 Nov 2009 10:57:37 +0000
-Subject: dream: glue for mmc controller
-In-Reply-To: <20091103105319.GA2492@elf.ucw.cz>
-References: <20091103105319.GA2492@elf.ucw.cz>
-Message-ID: <20091103105737.GE20341@fluff.org.uk>
+From: valentin.longchamp@epfl.ch (Valentin Longchamp)
+Date: Tue, 03 Nov 2009 12:31:01 +0100
+Subject: [PATCH 5/6] mx31moboard: camera support
+In-Reply-To: <4AE855E4.1040705@epfl.ch>
+References: <1255599780-12948-1-git-send-email-valentin.longchamp@epfl.ch>
+	<1255599780-12948-2-git-send-email-valentin.longchamp@epfl.ch>
+	<1255599780-12948-3-git-send-email-valentin.longchamp@epfl.ch>
+	<1255599780-12948-4-git-send-email-valentin.longchamp@epfl.ch>
+	<1255599780-12948-5-git-send-email-valentin.longchamp@epfl.ch>
+	<1255599780-12948-6-git-send-email-valentin.longchamp@epfl.ch>
+	<Pine.LNX.4.64.0910162307160.26130@axis700.grange>
+	<4ADC96A9.3090403@epfl.ch> <20091020080941.GN8818@pengutronix.de>
+	<4ADF40BC.4090801@epfl.ch>
+	<Pine.LNX.4.64.0910240059150.8342@axis700.grange>
+	<4AE855E4.1040705@epfl.ch>
+Message-ID: <4AF01475.1010704@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 03, 2009 at 11:53:20AM +0100, Pavel Machek wrote:
-> 
-> This is what I came up with (relative to the previous
-> patches). Unfortunately, it does not quite work: mmc controller is
-> detected, but it hangs trying to access the card.
-> 
-> Good news is that GPIO support seems to work, and I am able to flash
-> the keyboard backlight.
-> 
-> Does anyone have an idea what is wrong? Do I need some more
-> infrastructure to set up (DMA transfers or something?)?
-> 
-> I'm only setting up one mmc channel; I believe the other one is for
-> wifi, and it should work like this...?
-> 								Pavel
-> 
-> diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-> index 91e6f5c..16c0faa 100644
-> --- a/arch/arm/mach-msm/Makefile
-> +++ b/arch/arm/mach-msm/Makefile
-> @@ -6,4 +6,4 @@ obj-y += clock.o clock-7x01a.o
->  
->  obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o
->  
-> -obj-$(CONFIG_MACH_TROUT) += board-dream.o
-> +obj-$(CONFIG_MACH_TROUT) += board-dream.o board-dream-mmc.o board-dream-gpio.o generic_gpio.o
-> diff --git a/arch/arm/mach-msm/board-dream-gpio.c b/arch/arm/mach-msm/board-dream-gpio.c
-> new file mode 100644
-> index 0000000..7e86a99
-> --- /dev/null
-> +++ b/arch/arm/mach-msm/board-dream-gpio.c
-> @@ -0,0 +1,301 @@
-> +/* arch/arm/mach-msm/board-dream-gpio.c
-> + *
-> + * Copyright (C) 2008 Google, Inc.
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/errno.h>
-> +#include <linux/irq.h>
-> +#include <linux/pm.h>
-> +#include <linux/sysdev.h>
-> +
-> +#include <asm/io.h>
-> +#include <asm/gpio.h>
-linux/gpio.h
-linux/io.h
+Hi Guennadi,
 
+Valentin Longchamp wrote:
+> Guennadi Liakhovetski wrote:
+> 
+>> 3. to support switching inputs, significant modifications to soc_camera.c 
+>> would be required. I read Nate's argument before, that as long as clients 
+>> can only be accessed one at a time, this should be presented by multiple 
+>> inputs rather than multiple device nodes. Somebody else from the V4L folk 
+>> has also confirmed this opinion. In principle I don't feel strongly either 
+>> way. But currently soc-camera uses a one i2c client to one device node 
+>> model, and I'm somewhat reluctant to change this before we're done with 
+>> the v4l2-subdev conversion.
+>>
+> 
+> Sure, one step at a time. So for now the switching is not possible with 
+> soc_camera.
+> 
+> My problem is that both cameras have the same I2C address since they are 
+> the same.
+> 
+> Would I need to declare 2 i2c_device with the same address (I'm not sure 
+> it would even work ...) used by two _client_ platform_devices or would I 
+> have to have the two platform devices pointing to the same i2c_device ?
+> 
 
-and why can't use you use gpiolib?
+I've finally had time to test all this. My current problem with 
+registering the two cameras is that they both have the same i2c address, 
+and soc_camera calls v4l2_i2c_new_subdev_board where in my case the same 
+address on the same i2c tries to be registered and of course fails.
+
+We would need a way in soc_camera not to register a new i2c client for 
+device but use an existing one (but that's what you don't want to change 
+for now as you state it in your above last sentence). I just want to 
+point this out once more so that you know there is interest about this 
+for the next soc_camera works.
+
+So my current solution for mainline inclusion is to register only one 
+camera device node without taking care of the cam mux for now.
+
+Val
 
 -- 
-Ben (ben at fluff.org, http://www.fluff.org/)
-
-  'a smiley only costs 4 bytes'
+Valentin Longchamp, PhD Student, EPFL-STI-LSRO1
+valentin.longchamp at epfl.ch, Phone: +41216937827
+http://people.epfl.ch/valentin.longchamp
+MEA3485, Station 9, CH-1015 Lausanne
