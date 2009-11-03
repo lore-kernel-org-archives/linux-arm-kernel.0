@@ -1,377 +1,287 @@
-From: niej0001@gmail.com (Jun Nie)
-Date: Tue, 3 Nov 2009 15:31:24 +0800
-Subject: [PATCH 6/6] pxa: add frame buffer support on pxa168 aspenite
-	platform
-In-Reply-To: <7c34ac520911022245n3dda1a12nc09694d80dc93a75@mail.gmail.com>
-References: <7c34ac520911022245n3dda1a12nc09694d80dc93a75@mail.gmail.com>
-Message-ID: <7c34ac520911022331s5bd9233enf3f54356bdd7baaa@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 3 Nov 2009 16:32:30 +0800
+Subject: [PATCH 1/6] pxa: support pxa168 LCD controller SPI operation
+In-Reply-To: <7c34ac520911022245x2845e5dex1311bd74a08606db@mail.gmail.com>
+References: <7c34ac520911022245x2845e5dex1311bd74a08606db@mail.gmail.com>
+Message-ID: <f17812d70911030032u1fc5f7afwce0d36da906867d8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/11/3 Jun Nie <niej0001@gmail.com>:
-> pxa: add frame buffer support on pxa168 aspenite platform
+On Tue, Nov 3, 2009 at 2:45 PM, Jun Nie <niej0001@gmail.com> wrote:
+> pxa: support pxa168 LCD controller SPI operation
 >
 > Signed-off-by: Jun Nie <njun@marvell.com>
 > ---
-> ?arch/arm/configs/pxa168_defconfig ? ? ? | ? 86 ++++++++++++++++++++-
-> ?arch/arm/mach-mmp/aspenite.c ? ? ? ? ? ?| ?132 +++++++++++++++++++++++++++++++
-> ?arch/arm/mach-mmp/include/mach/pxa168.h | ? ?8 ++
-> ?arch/arm/mach-mmp/pxa168.c ? ? ? ? ? ? ?| ? ?3 +
-> ?4 files changed, 227 insertions(+), 2 deletions(-)
+> ?arch/arm/mach-mmp/include/mach/pxa168fb.h | ? 29 +++++++++
+> ?drivers/video/pxa168fb.c ? ? ? ? ? ? ? ? ?| ? 92 +++++++++++++++++++++++++++++
+> ?drivers/video/pxa168fb.h ? ? ? ? ? ? ? ? ?| ? 24 +-------
+> ?include/video/pxa168fb.h ? ? ? ? ? ? ? ? ?| ? 18 ++++++
+> ?4 files changed, 140 insertions(+), 23 deletions(-)
+> ?create mode 100644 arch/arm/mach-mmp/include/mach/pxa168fb.h
 >
-> diff --git a/arch/arm/configs/pxa168_defconfig
-> b/arch/arm/configs/pxa168_defconfig
-> index db5faea..b736517 100644
-> --- a/arch/arm/configs/pxa168_defconfig
-> +++ b/arch/arm/configs/pxa168_defconfig
-> @@ -509,7 +509,49 @@ CONFIG_UNIX98_PTYS=y
-> ?# CONFIG_R3964 is not set
-> ?# CONFIG_RAW_DRIVER is not set
-> ?# CONFIG_TCG_TPM is not set
-> -# CONFIG_I2C is not set
-> +CONFIG_I2C=y
-> +CONFIG_I2C_BOARDINFO=y
-> +# CONFIG_I2C_CHARDEV is not set
-> +CONFIG_I2C_HELPER_AUTO=y
-> +CONFIG_I2C_ALGOBIT=y
+> diff --git a/arch/arm/mach-mmp/include/mach/pxa168fb.h
+> b/arch/arm/mach-mmp/include/mach/pxa168fb.h
+> new file mode 100644
+> index 0000000..897cc3e
+> --- /dev/null
+> +++ b/arch/arm/mach-mmp/include/mach/pxa168fb.h
+> @@ -0,0 +1,29 @@
+> +#ifndef __PXA168FBSPI_H__
+> +#define __PXA168FBSPI_H__
 > +
-> +#
-> +# I2C Hardware Bus support
-> +#
+> +/* SPI Control Register. */
+> +#define LCD_SPU_SPI_CTRL ? ? ? ? ? ? ? ? ? ? ? 0x0180
+> +#define ? ? CFG_SCLKCNT(div) ? ? ? ? ? ? ? ? ? ((div) << 24) ?/* 0xFF~0x2 */
+> +#define ? ? CFG_SCLKCNT_MASK ? ? ? ? ? ? ? ? ? 0xFF000000
+> +#define ? ? CFG_RXBITS(rx) ? ? ? ? ? ? ? ? ? ? ((rx - 1) << 16) ? /* 0x1F~0x1, 0x1:
+> 2bits ... 0x1F: 32bits */
+> +#define ? ? CFG_RXBITS_MASK ? ? ? ? ? ? ? ? ? ?0x00FF0000
+> +#define ? ? CFG_TXBITS(tx) ? ? ? ? ? ? ? ? ? ? ?((tx - 1) << 8) ? ?/*
+> 0x1F~0x1, 0x1: 2bits ... 0x1F: 32bits */
+> +#define ? ? CFG_TXBITS_MASK ? ? ? ? ? ? ? ? ? ?0x0000FF00
+> +#define ? ? CFG_CLKINV(clk) ? ? ? ? ? ? ? ? ? ?((clk) << 7)
+> +#define ? ? CFG_CLKINV_MASK ? ? ? ? ? ? ? ? ? ?0x00000080
+> +#define ? ? CFG_KEEPXFER(transfer) ? ? ? ? ? ? ((transfer) << 6)
+> +#define ? ? CFG_KEEPXFER_MASK ? ? ? ? ? ? ? ? ?0x00000040
+> +#define ? ? CFG_RXBITSTO0(rx) ? ? ? ? ? ? ? ? ?((rx) << 5)
+> +#define ? ? CFG_RXBITSTO0_MASK ? ? ? ? ? ? ? ? 0x00000020
+> +#define ? ? CFG_TXBITSTO0(tx) ? ? ? ? ? ? ? ? ?((tx) << 4)
+> +#define ? ? CFG_TXBITSTO0_MASK ? ? ? ? ? ? ? ? 0x00000010
+> +#define ? ? CFG_SPI_ENA(spi) ? ? ? ? ? ? ? ? ? ((spi) << 3)
+> +#define ? ? CFG_SPI_ENA_MASK ? ? ? ? ? ? ? ? ? 0x00000008
+> +#define ? ? CFG_SPI_SEL(spi) ? ? ? ? ? ? ? ? ? ((spi) << 2) ? ?/* 1: port1; 0: port0 */
+> +#define ? ? CFG_SPI_SEL_MASK ? ? ? ? ? ? ? ? ? 0x00000004
+> +#define ? ? CFG_SPI_3W4WB(wire) ? ? ? ? ? ? ? ? ((wire)<<1) ?/* 1:
+> 3-wire; 0: 4-wire */
+> +#define ? ? CFG_SPI_3W4WB_MASK ? ? ? ? ? ? ? ? 0x00000002
+> +#define ? ? CFG_SPI_START(start) ? ? ? ? ? ? ? (start)
+> +#define ? ? CFG_SPI_START_MASK ? ? ? ? ? ? ? ? 0x00000001
 > +
-> +#
-> +# I2C system bus drivers (mostly embedded / system-on-chip)
-> +#
-> +# CONFIG_I2C_DESIGNWARE is not set
-> +CONFIG_I2C_GPIO=y
-> +# CONFIG_I2C_OCORES is not set
-> +CONFIG_I2C_PXA=y
-> +# CONFIG_I2C_PXA_SLAVE is not set
-> +# CONFIG_I2C_SIMTEC is not set
-> +
-> +#
-> +# External I2C/SMBus adapter drivers
-> +#
-> +# CONFIG_I2C_PARPORT_LIGHT is not set
-> +# CONFIG_I2C_TAOS_EVM is not set
-> +
-> +#
-> +# Other I2C/SMBus bus drivers
-> +#
-> +# CONFIG_I2C_PCA_PLATFORM is not set
-> +# CONFIG_I2C_STUB is not set
-> +
-> +#
-> +# Miscellaneous I2C Chip support
-> +#
-> +# CONFIG_DS1682 is not set
-> +# CONFIG_SENSORS_PCF8574 is not set
-> +# CONFIG_PCF8575 is not set
-> +# CONFIG_SENSORS_TSL2550 is not set
-> +# CONFIG_I2C_DEBUG_CORE is not set
-> +# CONFIG_I2C_DEBUG_ALGO is not set
-> +# CONFIG_I2C_DEBUG_BUS is not set
-> +# CONFIG_I2C_DEBUG_CHIP is not set
-> ?# CONFIG_SPI is not set
-> ?CONFIG_ARCH_REQUIRE_GPIOLIB=y
-> ?CONFIG_GPIOLIB=y
-> @@ -523,6 +565,9 @@ CONFIG_GPIOLIB=y
-> ?#
-> ?# I2C GPIO expanders:
-> ?#
-> +# CONFIG_GPIO_MAX732X is not set
-> +CONFIG_GPIO_PCA953X=y
-> +# CONFIG_GPIO_PCF857X is not set
->
-> ?#
-> ?# PCI GPIO expanders:
-> @@ -578,7 +623,34 @@ CONFIG_SSB_POSSIBLE=y
-> ?#
-> ?# CONFIG_VGASTATE is not set
-> ?# CONFIG_VIDEO_OUTPUT_CONTROL is not set
-> -# CONFIG_FB is not set
-> +CONFIG_FB=y
-> +# CONFIG_FIRMWARE_EDID is not set
-> +# CONFIG_FB_DDC is not set
-> +# CONFIG_FB_BOOT_VESA_SUPPORT is not set
-> +# CONFIG_FB_CFB_FILLRECT is not set
-> +# CONFIG_FB_CFB_COPYAREA is not set
-> +# CONFIG_FB_CFB_IMAGEBLIT is not set
-> +# CONFIG_FB_CFB_REV_PIXELS_IN_BYTE is not set
-> +# CONFIG_FB_SYS_FILLRECT is not set
-> +# CONFIG_FB_SYS_COPYAREA is not set
-> +# CONFIG_FB_SYS_IMAGEBLIT is not set
-> +# CONFIG_FB_FOREIGN_ENDIAN is not set
-> +# CONFIG_FB_SYS_FOPS is not set
-> +# CONFIG_FB_SVGALIB is not set
-> +# CONFIG_FB_MACMODES is not set
-> +# CONFIG_FB_BACKLIGHT is not set
-> +# CONFIG_FB_MODE_HELPERS is not set
-> +# CONFIG_FB_TILEBLITTING is not set
-> +
-> +#
-> +# Frame buffer hardware drivers
-> +#
-> +# CONFIG_FB_S1D13XXX is not set
-> +CONFIG_FB_PXA168=y
-> +# CONFIG_FB_VIRTUAL is not set
-> +# CONFIG_FB_METRONOME is not set
-> +# CONFIG_FB_MB862XX is not set
-> +# CONFIG_FB_BROADSHEET is not set
-> ?# CONFIG_BACKLIGHT_LCD_SUPPORT is not set
->
-> ?#
-> @@ -591,6 +663,16 @@ CONFIG_SSB_POSSIBLE=y
-> ?#
-> ?# CONFIG_VGA_CONSOLE is not set
-> ?CONFIG_DUMMY_CONSOLE=y
-> +CONFIG_FRAMEBUFFER_CONSOLE=y
-> +CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
-> +# CONFIG_FRAMEBUFFER_CONSOLE_ROTATION is not set
-> +# CONFIG_FONTS is not set
-> +CONFIG_FONT_8x8=y
-> +CONFIG_FONT_8x16=y
-> +CONFIG_LOGO=y
-> +# CONFIG_LOGO_LINUX_MONO is not set
-> +CONFIG_LOGO_LINUX_VGA16=y
-> +CONFIG_LOGO_LINUX_CLUT224=y
-> ?# CONFIG_SOUND is not set
-> ?# CONFIG_HID_SUPPORT is not set
-> ?# CONFIG_USB_SUPPORT is not set
-> diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
-> index b422bb5..76a57dc 100644
-> --- a/arch/arm/mach-mmp/aspenite.c
-> +++ b/arch/arm/mach-mmp/aspenite.c
-> @@ -17,12 +17,14 @@
-> ?#include <linux/mtd/partitions.h>
-> ?#include <linux/mtd/nand.h>
-> ?#include <linux/i2c/pca953x.h>
-> +#include <linux/delay.h>
->
-> ?#include <asm/mach-types.h>
-> ?#include <asm/mach/arch.h>
-> ?#include <mach/addr-map.h>
-> ?#include <mach/mfp-pxa168.h>
-> ?#include <mach/pxa168.h>
-> +#include <mach/pxa168fb.h>
-> ?#include <mach/gpio.h>
-> ?#include <plat/pxa3xx_nand.h>
+> +#endif /* __PXA168FBSPI_H__ */
+
+Shouldn't these be defined in drivers/video/pxa168fb.h? Or if
+some of the definitions are to be used by platform code, move
+them to include/video/pxa168fb.h.
+
+> diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
+> index 84d8327..27bdf2b 100644
+> --- a/drivers/video/pxa168fb.c
+> +++ b/drivers/video/pxa168fb.c
+> @@ -29,10 +29,91 @@
+> ?#include <linux/uaccess.h>
 > ?#include <video/pxa168fb.h>
-> @@ -66,6 +68,39 @@ static unsigned long common_pin_config[] __initdata = {
-> ? ? ? ?/* UART1 */
-> ? ? ? ?GPIO107_UART1_RXD,
-> ? ? ? ?GPIO108_UART1_TXD,
-> +
-> +#ifdef CONFIG_FB_PXA168
-> + ? ? ? /* LCD */
-> + ? ? ? GPIO56_LCD_FCLK_RD,
-> + ? ? ? GPIO57_LCD_LCLK_A0,
-> + ? ? ? GPIO58_LCD_PCLK_WR,
-> + ? ? ? GPIO59_LCD_DENA_BIAS,
-> + ? ? ? GPIO60_LCD_DD0,
-> + ? ? ? GPIO61_LCD_DD1,
-> + ? ? ? GPIO62_LCD_DD2,
-> + ? ? ? GPIO63_LCD_DD3,
-> + ? ? ? GPIO64_LCD_DD4,
-> + ? ? ? GPIO65_LCD_DD5,
-> + ? ? ? GPIO66_LCD_DD6,
-> + ? ? ? GPIO67_LCD_DD7,
-> + ? ? ? GPIO68_LCD_DD8,
-> + ? ? ? GPIO69_LCD_DD9,
-> + ? ? ? GPIO70_LCD_DD10,
-> + ? ? ? GPIO71_LCD_DD11,
-> + ? ? ? GPIO72_LCD_DD12,
-> + ? ? ? GPIO73_LCD_DD13,
-> + ? ? ? GPIO74_LCD_DD14,
-> + ? ? ? GPIO75_LCD_DD15,
-> +
-> + ? ? ? GPIO76_LCD_DD16,
-> + ? ? ? GPIO77_LCD_DD17,
-> + ? ? ? GPIO78_LCD_DD18,
-> + ? ? ? GPIO79_LCD_DD19,
-> + ? ? ? GPIO80_LCD_DD20,
-> + ? ? ? GPIO81_LCD_DD21,
-> + ? ? ? GPIO82_LCD_DD22,
-> + ? ? ? GPIO83_LCD_DD23,
-> +#endif
-> ?};
 >
-> ?static struct smc91x_platdata smc91x_info = {
-> @@ -95,6 +130,100 @@ static struct platform_device smc91x_device = {
-> ? ? ? ?.resource ? ? ? = smc91x_resources,
-> ?};
+> +#include <mach/pxa168fb.h>
+> +#include <mach/gpio.h>
+> ?#include "pxa168fb.h"
 >
-> +#ifdef CONFIG_FB_PXA168
-> +static u16 tpo_spi_cmdon[] = {
-> + ? ? ? 0x080F,
-> + ? ? ? 0x0C5F,
-> + ? ? ? 0x1017,
-> + ? ? ? 0x1420,
-> + ? ? ? 0x1808,
-> + ? ? ? 0x1c20,
-> + ? ? ? 0x2020,
-> + ? ? ? 0x2420,
-> + ? ? ? 0x2820,
-> + ? ? ? 0x2c20,
-> + ? ? ? 0x3020,
-> + ? ? ? 0x3420,
-> + ? ? ? 0x3810,
-> + ? ? ? 0x3c10,
-> + ? ? ? 0x4010,
-> + ? ? ? 0x4415,
-> + ? ? ? 0x48aa,
-> + ? ? ? 0x4cff,
-> + ? ? ? 0x5086,
-> + ? ? ? 0x548d,
-> + ? ? ? 0x58d4,
-> + ? ? ? 0x5cfb,
-> + ? ? ? 0x602e,
-> + ? ? ? 0x645a,
-> + ? ? ? 0x6889,
-> + ? ? ? 0x6cfe,
-> + ? ? ? 0x705a,
-> + ? ? ? 0x749b,
-> + ? ? ? 0x78c5,
-> + ? ? ? 0x7cff,
-> + ? ? ? 0x80f0,
-> + ? ? ? 0x84f0,
-> + ? ? ? 0x8808,
-> +};
-> +
-> +static u16 tpo_spi_cmdoff[] = {
-> + ? ? ? 0x0c5e, ? ? ? ? //standby
-> +};
-> +
-> +static int tpo_lcd_power(struct pxa168fb_info *fbi, unsigned int
-> spi_gpio_cs, unsigned int spi_gpio_reset, int on)
+> ?#define DEFAULT_REFRESH ? ? ? ? ? ? ? ?60 ? ? ?/* Hz */
+>
+> +static inline void spi_gpio_assert_set(int spi_gpio_cs, int val)
 > +{
-> + ? ? ? int err = 0;
-> + ? ? ? if (on) {
-> + ? ? ? ? ? ? ? if (spi_gpio_reset != -1) {
-> + ? ? ? ? ? ? ? ? ? ? ? err = gpio_request(spi_gpio_reset, "TPO_LCD_SPI_RESET");
-> + ? ? ? ? ? ? ? ? ? ? ? if (err) {
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? printk("failed to request GPIO for TPO LCD RESET\n");
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? return err;
-> + ? ? ? ? ? ? ? ? ? ? ? }
-> + ? ? ? ? ? ? ? ? ? ? ? gpio_direction_output(spi_gpio_reset, 0);
-> + ? ? ? ? ? ? ? ? ? ? ? msleep(100);
-> + ? ? ? ? ? ? ? ? ? ? ? gpio_set_value(spi_gpio_reset, 1);
-> + ? ? ? ? ? ? ? ? ? ? ? msleep(100);
-> + ? ? ? ? ? ? ? ? ? ? ? gpio_free(spi_gpio_reset);
+> + ? ? ? ? ? ? ?if (gpio_is_valid(spi_gpio_cs))
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? gpio_set_value(spi_gpio_cs, val);
+> +}
+
+Mmm.... two points:
+
+1. spi_gpio_assert() sounds enough to me, no "_set" suffix necessary
+2. is it possible that in some cases that this GPIO CS signal is inverted?
+
+> +int pxa168fb_spi_send(struct pxa168fb_info *fbi, void *value, int count,
+> + ? ? ? ? ? ? ? unsigned int spi_gpio_cs, unsigned int interval_us)
+> +{
+> + ? ? ? u32 x, spi_byte_len;
+> + ? ? ? u8 *cmd = (u8 *)value;
+> + ? ? ? int i, err, isr, iopad, ret = 0;
+> +
+> + ? ? ? if (gpio_is_valid(spi_gpio_cs)) {
+> + ? ? ? ? ? ? ? err = gpio_request(spi_gpio_cs, "LCD_SPI_CS");
+> + ? ? ? ? ? ? ? if (err) {
+> + ? ? ? ? ? ? ? ? ? ? ? dev_err(fbi->dev, "failed to request GPIO for LCD CS\n");
+> + ? ? ? ? ? ? ? ? ? ? ? return -1;
 > + ? ? ? ? ? ? ? }
-> + ? ? ? ? ? ? ? return pxa168fb_spi_send(fbi, tpo_spi_cmdon,
-> ARRAY_SIZE(tpo_spi_cmdon), spi_gpio_cs, 1);
-> + ? ? ? } else
-> + ? ? ? ? ? ? ? return pxa168fb_spi_send(fbi, tpo_spi_cmdoff,
-> ARRAY_SIZE(tpo_spi_cmdoff), spi_gpio_cs, 1);
+> + ? ? ? ? ? ? ? gpio_direction_output(spi_gpio_cs, 1);
+> + ? ? ? }
+
+Is this possible this been done at some initialization stage and do only once?
+
+> + ? ? ? spi_byte_len = readl(fbi->reg_base + LCD_SPU_SPI_CTRL);
+> + ? ? ? spi_byte_len = (spi_byte_len >> 8) & 0xff;
+> + ? ? ? /* Alignment should be (spi_byte_len + 7) >> 3, but
+> + ? ? ? ?* spi controller request set one less than bit length */
+> + ? ? ? spi_byte_len = (spi_byte_len + 8) >> 3;
+> + ? ? ? /* spi command provided by platform should be 1, 2, or 4 byte aligned */
+> + ? ? ? if(3 == spi_byte_len)
+> + ? ? ? ? ? ? ? spi_byte_len = 4;
+> +
+> + ? ? ? iopad = readl(fbi->reg_base + SPU_IOPAD_CONTROL);
+> + ? ? ? if ((iopad & CFG_IOPADMODE_MASK) != PIN_MODE_DUMB_18_SPI)
+> + ? ? ? ? ? ? ? writel(PIN_MODE_DUMB_18_SPI, fbi->reg_base + SPU_IOPAD_CONTROL);
+> + ? ? ? isr = readl(fbi->reg_base + SPU_IRQ_ISR);
+> + ? ? ? writel((isr & ~SPI_IRQ_ENA_MASK), fbi->reg_base + SPU_IRQ_ISR);
+> + ? ? ? for (i = 0; i < count; i++) {
+> + ? ? ? ? ? ? ? spi_gpio_assert_set(spi_gpio_cs, 0);
+> + ? ? ? ? ? ? ? udelay(interval_us);
+> + ? ? ? ? ? ? ? switch (spi_byte_len){
+> + ? ? ? ? ? ? ? case 1:
+> + ? ? ? ? ? ? ? ? ? ? ? writel(*cmd, fbi->reg_base + LCD_SPU_SPI_TXDATA);
+> + ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? ? ? ? ? case 2:
+> + ? ? ? ? ? ? ? ? ? ? ? writel(*(u16*)cmd, fbi->reg_base + LCD_SPU_SPI_TXDATA);
+> + ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? ? ? ? ? case 4:
+> + ? ? ? ? ? ? ? ? ? ? ? writel(*(u32*)cmd, fbi->reg_base + LCD_SPU_SPI_TXDATA);
+> + ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? ? ? ? ? default:
+> + ? ? ? ? ? ? ? ? ? ? ? dev_err(fbi->dev, "Wrong spi bit length\n");
+> + ? ? ? ? ? ? ? ? ? ? ? spi_gpio_assert_set(spi_gpio_cs, 1);
+> + ? ? ? ? ? ? ? ? ? ? ? ret = -1;
+> + ? ? ? ? ? ? ? ? ? ? ? goto spi_exit;
+> + ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? cmd += spi_byte_len;
+> + ? ? ? ? ? ? ? x = readl(fbi->reg_base + LCD_SPU_SPI_CTRL);
+> + ? ? ? ? ? ? ? x |= 0x1;
+> + ? ? ? ? ? ? ? writel(x, fbi->reg_base + LCD_SPU_SPI_CTRL);
+> + ? ? ? ? ? ? ? isr = readl(fbi->reg_base + SPU_IRQ_ISR);
+> + ? ? ? ? ? ? ? while(!(isr & SPI_IRQ_ENA_MASK)) {
+> + ? ? ? ? ? ? ? ? ? ? ? udelay(1);
+> + ? ? ? ? ? ? ? ? ? ? ? isr = readl(fbi->reg_base + SPU_IRQ_ISR);
+> + ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? x = readl(fbi->reg_base + LCD_SPU_SPI_CTRL);
+> + ? ? ? ? ? ? ? x &= ~0x1;
+> + ? ? ? ? ? ? ? writel(x, fbi->reg_base + LCD_SPU_SPI_CTRL);
+> + ? ? ? ? ? ? ? spi_gpio_assert_set(spi_gpio_cs, 1);
+> + ? ? ? }
+
+So after this loop, the 'spi_gpio_cs' is left asserted, which isn't good.
+
+> +
+> +spi_exit:
+> + ? ? ? if (gpio_is_valid(spi_gpio_cs))
+> + ? ? ? ? ? ? ? gpio_free(spi_gpio_cs);
+> + ? ? ? if ((iopad & CFG_IOPADMODE_MASK) != PIN_MODE_DUMB_18_SPI)
+> + ? ? ? ? ? ? ? writel(iopad, fbi->reg_base + SPU_IOPAD_CONTROL);
+> +
+> + ? ? ? return ret;
 > +}
+> +EXPORT_SYMBOL(pxa168fb_spi_send);
 > +
-> +static struct fb_videomode video_modes_aspen[] = {
-> + ? ? ? [0] = {
-> + ? ? ? ? ? ? ? .pixclock ? ? ? = 30120,
-> + ? ? ? ? ? ? ? .refresh ? ? ? ?= 60,
-> + ? ? ? ? ? ? ? .xres ? ? ? ? ? = 800,
-> + ? ? ? ? ? ? ? .yres ? ? ? ? ? = 480,
-> + ? ? ? ? ? ? ? .hsync_len ? ? ?= 1,
-> + ? ? ? ? ? ? ? .left_margin ? ?= 215,
-> + ? ? ? ? ? ? ? .right_margin ? = 40,
-> + ? ? ? ? ? ? ? .vsync_len ? ? ?= 1,
-> + ? ? ? ? ? ? ? .upper_margin ? = 34,
-> + ? ? ? ? ? ? ? .lower_margin ? = 10,
-> + ? ? ? ? ? ? ? .sync ? ? ? ? ? = 0,
-> + ? ? ? },
-> +};
-> +
-> +struct pxa168fb_mach_info aspenite_lcd_info __initdata = {
-> + ? ? ? .id ? ? ? ? ? ? ? ? ? ? = "Base-aspen",
-> + ? ? ? .modes ? ? ? ? ? ? ? ? ?= video_modes_aspen,
-> + ? ? ? .num_modes ? ? ? ? ? ? ?= ARRAY_SIZE(video_modes_aspen),
-> + ? ? ? .pix_fmt ? ? ? ? ? ? ? ?= PIX_FMT_RGB565,
-> + ? ? ? .io_pin_allocation_mode = PIN_MODE_DUMB_24,
-> + ? ? ? .dumb_mode ? ? ? ? ? ? ?= DUMB_MODE_RGB888,
-> + ? ? ? .active ? ? ? ? ? ? ? ? = 1,
-> + ? ? ? .spi_ctrl ? ? ? ? ? ? ? = CFG_SCLKCNT(2) | CFG_TXBITS(16) | CFG_SPI_SEL(1) |
-> CFG_SPI_3W4WB(1) | CFG_SPI_ENA(1),
-> + ? ? ? .spi_gpio_cs ? ? ? ? ? ?= GPIO_EXT1(14),
-> + ? ? ? .spi_gpio_reset ? ? ? ? = -1,
-> + ? ? ? .pxa168fb_lcd_power ? ? = tpo_lcd_power,
-> +};
-> +
-> +#endif
-> +
-> ?#if defined(CONFIG_MTD_NAND) || defined(CONFIG_MTD_NAND_MODULE)
-> ?static struct mtd_partition apn_nand_partitions[] = {
-> ? ? ? ?{
-> @@ -184,6 +313,9 @@ static void __init common_init(void)
->
-> ? ? ? ?/* on-chip devices */
-> ? ? ? ?pxa168_add_uart(1);
-> +#ifdef CONFIG_FB_PXA168
-> + ? ? ? pxa168_add_fb(&aspenite_lcd_info);
-> +#endif
->
-> ? ? ? ?apn_init_nand();
-> ? ? ? ?pxa168_add_twsi(0, &pwri2c_info, ARRAY_AND_SIZE(aspenite_i2c_board_info));
-> diff --git a/arch/arm/mach-mmp/include/mach/pxa168.h
-> b/arch/arm/mach-mmp/include/mach/pxa168.h
-> index d117ceb..d43fb13 100644
-> --- a/arch/arm/mach-mmp/include/mach/pxa168.h
-> +++ b/arch/arm/mach-mmp/include/mach/pxa168.h
-> @@ -4,6 +4,7 @@
-> ?#include <linux/i2c.h>
-> ?#include <mach/devices.h>
-> ?#include <plat/i2c.h>
-> +#include <video/pxa168fb.h>
->
-> ?extern struct pxa_device_desc pxa168_device_uart1;
-> ?extern struct pxa_device_desc pxa168_device_uart2;
-> @@ -14,6 +15,7 @@ extern struct pxa_device_desc pxa168_device_pwm2;
-> ?extern struct pxa_device_desc pxa168_device_pwm3;
-> ?extern struct pxa_device_desc pxa168_device_pwm4;
-> ?extern struct pxa_device_desc pxa168_device_nand;
-> +extern struct pxa_device_desc pxa168_device_fb;
->
-> ?static inline int pxa168_add_uart(int id)
+> ?static int determine_best_pix_fmt(struct fb_var_screeninfo *var)
 > ?{
-> @@ -65,4 +67,10 @@ static inline int pxa168_add_pwm(int id)
+> ? ? ? ?/*
+> @@ -687,6 +768,7 @@ static int __init pxa168fb_probe(struct
+> platform_device *pdev)
+> ? ? ? ?}
 >
-> ? ? ? ?return pxa_register_device(d, NULL, 0);
-> ?}
+> ? ? ? ?info->fix.smem_start = (unsigned long)fbi->fb_start_dma;
+> + ? ? ? set_graphics_start(info, 0, 0);
+
+This need a separate patch.
+
+>
+> ? ? ? ?/*
+> ? ? ? ? * Set video mode according to platform data.
+> @@ -728,6 +810,9 @@ static int __init pxa168fb_probe(struct
+> platform_device *pdev)
+> ? ? ? ?writel(0, fbi->reg_base + LCD_SPU_SRAM_PARA0);
+> ? ? ? ?writel(CFG_CSB_256x32(0x1)|CFG_CSB_256x24(0x1)|CFG_CSB_256x8(0x1),
+> ? ? ? ? ? ? ? ?fbi->reg_base + LCD_SPU_SRAM_PARA1);
+> + ? ? ? if ((mi->spi_ctrl != -1) && (mi->spi_ctrl & CFG_SPI_ENA_MASK))
+> + ? ? ? ? ? ? ? writel(mi->spi_ctrl, fbi->reg_base + LCD_SPU_SPI_CTRL);
 > +
-> +static inline int pxa168_add_fb(struct pxa168fb_mach_info *mi)
-> +{
-> + ? ? ? return pxa_register_device(&pxa168_device_fb, mi, sizeof(*mi));
-> +}
-> +
-> ?#endif /* __ASM_MACH_PXA168_H */
-> diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
-> index 59b393e..8be1e46 100644
-> --- a/arch/arm/mach-mmp/pxa168.c
-> +++ b/arch/arm/mach-mmp/pxa168.c
-> @@ -74,6 +74,7 @@ static APBC_CLK(pwm3, PXA168_PWM3, 1, 13000000);
-> ?static APBC_CLK(pwm4, PXA168_PWM4, 1, 13000000);
 >
-> ?static APMU_CLK(nand, NAND, 0x1db, 208000000);
-> +static APMU_CLK(lcd, LCD, 0x003f, 312000000);
+> ? ? ? ?/*
+> ? ? ? ? * Allocate color map.
+> @@ -764,6 +849,13 @@ static int __init pxa168fb_probe(struct
+> platform_device *pdev)
+> ? ? ? ?}
 >
-> ?/* device and clock bindings */
-> ?static struct clk_lookup pxa168_clkregs[] = {
-> @@ -86,6 +87,7 @@ static struct clk_lookup pxa168_clkregs[] = {
-> ? ? ? ?INIT_CLKREG(&clk_pwm2, "pxa168-pwm.1", NULL),
-> ? ? ? ?INIT_CLKREG(&clk_pwm3, "pxa168-pwm.2", NULL),
-> ? ? ? ?INIT_CLKREG(&clk_pwm4, "pxa168-pwm.3", NULL),
-> + ? ? ? INIT_CLKREG(&clk_lcd, "pxa168-fb", "LCDCLK"),
+> ? ? ? ?platform_set_drvdata(pdev, fbi);
+> + ? ? ? if (mi->pxa168fb_lcd_power){
+> + ? ? ? ? ? ? ? if(mi->pxa168fb_lcd_power(fbi, mi->spi_gpio_cs, mi->spi_gpio_reset, 1)){
+> + ? ? ? ? ? ? ? ? ? ? ? dev_err(&pdev->dev, "Failed to power up pxa168-fb\n");
+> + ? ? ? ? ? ? ? ? ? ? ? goto failed_free_irq;
+> + ? ? ? ? ? ? ? }
+> + ? ? ? }
+> + ? ? ? dev_info(fbi->dev, "frame buffer detected\n");
+
+Need another patch for this as well?
+
+> ? ? ? ?return 0;
+>
+> ?failed_free_irq:
+> diff --git a/drivers/video/pxa168fb.h b/drivers/video/pxa168fb.h
+> index eee0927..1e4859e 100644
+> --- a/drivers/video/pxa168fb.h
+> +++ b/drivers/video/pxa168fb.h
+> @@ -170,29 +170,7 @@
+> ?#define ? ? DMA_FRAME_CNT_MASK ? ? ? ? ? ? ? ? 0x00000003 ?/* Video */
+>
+> ?/* SPI Control Register. */
+> -#define LCD_SPU_SPI_CTRL ? ? ? ? ? ? ? ? ? ? ? 0x0180
+> -#define ? ? CFG_SCLKCNT(div) ? ? ? ? ? ? ? ? ? ((div) << 24) ?/* 0xFF~0x2 */
+> -#define ? ? CFG_SCLKCNT_MASK ? ? ? ? ? ? ? ? ? 0xFF000000
+> -#define ? ? CFG_RXBITS(rx) ? ? ? ? ? ? ? ? ? ? ((rx) << 16) ? /* 0x1F~0x1 */
+> -#define ? ? CFG_RXBITS_MASK ? ? ? ? ? ? ? ? ? ?0x00FF0000
+> -#define ? ? CFG_TXBITS(tx) ? ? ? ? ? ? ? ? ? ? ((tx) << 8) ? ?/* 0x1F~0x1 */
+> -#define ? ? CFG_TXBITS_MASK ? ? ? ? ? ? ? ? ? ?0x0000FF00
+> -#define ? ? CFG_CLKINV(clk) ? ? ? ? ? ? ? ? ? ?((clk) << 7)
+> -#define ? ? CFG_CLKINV_MASK ? ? ? ? ? ? ? ? ? ?0x00000080
+> -#define ? ? CFG_KEEPXFER(transfer) ? ? ? ? ? ? ((transfer) << 6)
+> -#define ? ? CFG_KEEPXFER_MASK ? ? ? ? ? ? ? ? ?0x00000040
+> -#define ? ? CFG_RXBITSTO0(rx) ? ? ? ? ? ? ? ? ?((rx) << 5)
+> -#define ? ? CFG_RXBITSTO0_MASK ? ? ? ? ? ? ? ? 0x00000020
+> -#define ? ? CFG_TXBITSTO0(tx) ? ? ? ? ? ? ? ? ?((tx) << 4)
+> -#define ? ? CFG_TXBITSTO0_MASK ? ? ? ? ? ? ? ? 0x00000010
+> -#define ? ? CFG_SPI_ENA(spi) ? ? ? ? ? ? ? ? ? ((spi) << 3)
+> -#define ? ? CFG_SPI_ENA_MASK ? ? ? ? ? ? ? ? ? 0x00000008
+> -#define ? ? CFG_SPI_SEL(spi) ? ? ? ? ? ? ? ? ? ((spi) << 2)
+> -#define ? ? CFG_SPI_SEL_MASK ? ? ? ? ? ? ? ? ? 0x00000004
+> -#define ? ? CFG_SPI_3W4WB(wire) ? ? ? ? ? ? ? ? ? ? ? ?((wire) << 1)
+> -#define ? ? CFG_SPI_3W4WB_MASK ? ? ? ? ? ? ? ? 0x00000002
+> -#define ? ? CFG_SPI_START(start) ? ? ? ? ? ? ? (start)
+> -#define ? ? CFG_SPI_START_MASK ? ? ? ? ? ? ? ? 0x00000001
+> +/* For SPI register, please refer to
+> arch/arm/mach-mmp/include/mach/pxa168fb.h */
+>
+> ?/* SPI Tx Data Register */
+> ?#define LCD_SPU_SPI_TXDATA ? ? ? ? ? ? ? ? ? ? 0x0184
+> diff --git a/include/video/pxa168fb.h b/include/video/pxa168fb.h
+> index b5cc72f..f0497ae 100644
+> --- a/include/video/pxa168fb.h
+> +++ b/include/video/pxa168fb.h
+> @@ -122,6 +122,24 @@ struct pxa168fb_mach_info {
+> ? ? ? ?unsigned ? ? ? ?panel_rbswap:1;
+> ? ? ? ?unsigned ? ? ? ?active:1;
+> ? ? ? ?unsigned ? ? ? ?enable_lcd:1;
+> + ? ? ? /*
+> + ? ? ? ?* SPI control
+> + ? ? ? ?*/
+> + ? ? ? unsigned int ? ?spi_ctrl;
+> + ? ? ? unsigned int ? ?spi_gpio_cs;
+> + ? ? ? unsigned int ? ?spi_gpio_reset;
+> + ? ? ? /*
+> + ? ? ? ?* power on/off function.
+> + ? ? ? ?*/
+> + ? ? ? int (*pxa168fb_lcd_power)(struct pxa168fb_info *, unsigned int,
+> unsigned int, int);
 > ?};
 >
-> ?static int __init pxa168_init(void)
-> @@ -132,3 +134,4 @@ PXA168_DEVICE(pwm2, "pxa168-pwm", 1, NONE,
-> 0xd401a400, 0x10);
-> ?PXA168_DEVICE(pwm3, "pxa168-pwm", 2, NONE, 0xd401a800, 0x10);
-> ?PXA168_DEVICE(pwm4, "pxa168-pwm", 3, NONE, 0xd401ac00, 0x10);
-> ?PXA168_DEVICE(nand, "pxa3xx-nand", -1, NAND, 0xd4283000, 0x200, 97, 99);
-> +PXA168_DEVICE(fb, "pxa168-fb", -1, LCD, 0xd420b000, 0x1c8);
+> +/* SPI utility for configure panel SPI command.
+> + * value: command array, element should be 1, 2 or 4 byte aligned.
+> + * count: command array length
+> + * spi_gpio_cs: gpio number for spi chip select
+> + * interval_us: time interval between two commands, us as unit */
+> +int pxa168fb_spi_send(struct pxa168fb_info *fbi, void *value, int count,
+> + ? ? ? ? ? ? ? unsigned int spi_gpio_cs, unsigned int interval_us);
+> +
+> ?#endif /* __ASM_MACH_PXA168FB_H */
 > --
 > 1.5.4.3
 >
-
-add linux-fbdev at vger.kernel.org
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
