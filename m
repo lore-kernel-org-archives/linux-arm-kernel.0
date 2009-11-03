@@ -1,65 +1,103 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 03 Nov 2009 15:42:16 +0100
-Subject: [RFC PATCH] atmel_lcdfb Kconfig: remove long dependency line
-In-Reply-To: <20090625084631.GA7985@n2100.arm.linux.org.uk>
-References: <4A40D695.5000302@atmel.com>
-	<1245767456-6434-1-git-send-email-nicolas.ferre@atmel.com>
-	<20090623153556.0e574899@hskinnemoen-d830>
-	<4A40E2E6.9060904@atmel.com>
-	<20090625084631.GA7985@n2100.arm.linux.org.uk>
-Message-ID: <4AF04148.8070103@atmel.com>
+Date: Tue,  3 Nov 2009 17:30:56 +0100
+Subject: [PATCH 3/3] atmel_lcdfb Kconfig: remove long dependency line
+In-Reply-To: <1256049173-17373-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1256049173-17373-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <29424085870c8c8cc3fe9d6e1f382a24f8a9ca2b.1257263893.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I come back on this patch as I have a Kconfig cleanup patch series coming.
+Many Atmel SOC are embedding a LCD controller. This patch removes the long
+dependency line for this Atmel LCD framebuffer driver configuration entry.
+The HAVE_FB_ATMEL configuration option is located in the video Kconfig file
+as it may be setup by ARM/AT91 and AVR32 chips.
 
-Russell King - ARM Linux :
-> On Tue, Jun 23, 2009 at 04:12:54PM +0200, Nicolas Ferre wrote:
->> Haavard Skinnemoen :
->>> Nicolas Ferre wrote:
->>>> +config ARCH_ATMEL_HAS_FB
->>>> +	bool
->>>> +	depends on FB
->>>> +	default n
->>> What happens when we unconditionally select something which depends on
->>> something else?
->> :-P
->>
->> Experience shows that this configuration is selected.
->>
->> The dependency allows to have a good hierarchy in the configuration tree...
->> Better proposition welcome.
-> 
-> 1st - no need for 'default n' - you're specifying something that's already
-> the default.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/Kconfig |    6 ++++++
+ arch/avr32/Kconfig         |    1 +
+ drivers/video/Kconfig      |    6 +++++-
+ 3 files changed, 12 insertions(+), 1 deletions(-)
 
-Ok.
-
-> 2nd - don't make this symbol depend on anything, and don't use the symbol
-> for anything except providing a dependency for FB_ATMEL.  Instead, let
-> FB_ATMEL deal with the dependency on FB and ARCH_ATMEL_HAS_FB.
-
-The problem is that if I do not setup the dependency here the menu entry
-will not be available at the proper level. In fact I will see the Atmel
-LCD entry here:
-"Graphics support"
- <*> Support for frame buffer devices  --->
- <*> AT91/AT32 LCD Controller support
-
-instead of here:
-"Graphics support"
- ---> "Support for frame buffer devices"
-      [..]
-      <*> "AT91/AT32 LCD Controller support"
-      [..]
-
-So I keep the depend.
-
-> 3rd - ISTR we have a convention for these - 'HAVE_foo' for a configuration
-> option named 'foo'.  So it should probably be HAVE_FB_ATMEL.
-
-Ok, changed to HAVE_FB_ATMEL indeed.
-
-Thanks. Best regards,
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index bb4cd27..3df124e 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -41,18 +41,21 @@ config ARCH_AT91SAM9261
+ 	select CPU_ARM926T
+ 	select GENERIC_TIME
+ 	select GENERIC_CLOCKEVENTS
++	select HAVE_FB_ATMEL
+ 
+ config ARCH_AT91SAM9G10
+ 	bool "AT91SAM9G10"
+ 	select CPU_ARM926T
+ 	select GENERIC_TIME
+ 	select GENERIC_CLOCKEVENTS
++	select HAVE_FB_ATMEL
+ 
+ config ARCH_AT91SAM9263
+ 	bool "AT91SAM9263"
+ 	select CPU_ARM926T
+ 	select GENERIC_TIME
+ 	select GENERIC_CLOCKEVENTS
++	select HAVE_FB_ATMEL
+ 
+ config ARCH_AT91SAM9RL
+ 	bool "AT91SAM9RL"
+@@ -60,6 +63,7 @@ config ARCH_AT91SAM9RL
+ 	select GENERIC_TIME
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_AT91_USART3
++	select HAVE_FB_ATMEL
+ 
+ config ARCH_AT91SAM9G20
+ 	bool "AT91SAM9G20"
+@@ -76,12 +80,14 @@ config ARCH_AT91SAM9G45
+ 	select GENERIC_TIME
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_AT91_USART3
++	select HAVE_FB_ATMEL
+ 
+ config ARCH_AT91CAP9
+ 	bool "AT91CAP9"
+ 	select CPU_ARM926T
+ 	select GENERIC_TIME
+ 	select GENERIC_CLOCKEVENTS
++	select HAVE_FB_ATMEL
+ 
+ config ARCH_AT91X40
+ 	bool "AT91x40"
+diff --git a/arch/avr32/Kconfig b/arch/avr32/Kconfig
+index 35e3bd9..d856354 100644
+--- a/arch/avr32/Kconfig
++++ b/arch/avr32/Kconfig
+@@ -92,6 +92,7 @@ config PLATFORM_AT32AP
+ 	select PERFORMANCE_COUNTERS
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select GENERIC_ALLOCATOR
++	select HAVE_FB_ATMEL
+ 
+ #
+ # CPU types
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index 9bbb285..253083a 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -935,9 +935,13 @@ config FB_S1D13XXX
+ 	  working with S1D13806). Product specs at
+ 	  <http://www.erd.epson.com/vdc/html/legacy_13xxx.htm>
+ 
++config HAVE_FB_ATMEL
++	depends on FB
++	bool
++
+ config FB_ATMEL
+ 	tristate "AT91/AT32 LCD Controller support"
+-	depends on FB && (ARCH_AT91SAM9261 || ARCH_AT91SAM9G10 || ARCH_AT91SAM9263 || ARCH_AT91SAM9RL || ARCH_AT91SAM9G45 || ARCH_AT91CAP9 || AVR32)
++	depends on FB && HAVE_FB_ATMEL
+ 	select FB_CFB_FILLRECT
+ 	select FB_CFB_COPYAREA
+ 	select FB_CFB_IMAGEBLIT
 -- 
-Nicolas Ferre
+1.5.6.5
