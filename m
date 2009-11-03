@@ -1,24 +1,32 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 3 Nov 2009 17:37:01 +0000
-Subject: [PATCH 5/9] S3C64XX: Set rate of crystal mux
-In-Reply-To: <1257259332-7867-5-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1257259332-7867-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1257259332-7867-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1257259332-7867-3-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1257259332-7867-4-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1257259332-7867-5-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <20091103173701.GJ23772@trinity.fluff.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 03 Nov 2009 19:11:14 +0100
+Subject: [GIT PULL] AT91/AVR32 some common macros
+Message-ID: <4AF07242.3070803@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 03, 2009 at 02:42:08PM +0000, Mark Brown wrote:
-> The current code assumes that the external clock mux will be set to
-> the crystal. Set this up explicitly within the clock API.
+Hi Linus,
 
-should be merged now.
+If it not bother you too much to pull such a tiny and 
+trivial piece of code, can you please pull:
+
+  git://github.com/at91linux/linux-2.6-at91.git for-linus
+
+I directly sent this to you as it require two arch subsystems to 
+synchronize. As I have some .32 fixes that are waiting for those 
+lines to be merged to go upstream, I thought it was worth a try.
+
+You can receive the following changes:
+
+Nicolas Ferre (2):
+      avr32: add two new at91 to cpu.h definition
+      at91: at91sam9g45 family: identify several chip versions
+
+ arch/arm/mach-at91/include/mach/cpu.h     |    9 +++++++++
+ arch/avr32/mach-at32ap/include/mach/cpu.h |    3 +++
+ 2 files changed, 12 insertions(+), 0 deletions(-)
+
+
 
 -- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Nicolas Ferre
