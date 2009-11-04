@@ -1,72 +1,97 @@
-From: valentin.longchamp@epfl.ch (Valentin Longchamp)
-Date: Wed, 04 Nov 2009 19:12:51 +0100
-Subject: [PATCH] [RTC] Add Freescale MC13783 RTC driver
-In-Reply-To: <20091101203443.GB18116@pengutronix.de>
-References: <1256330323-13300-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1256373342-5294-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20091101203443.GB18116@pengutronix.de>
-Message-ID: <4AF1C423.3010407@epfl.ch>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 4 Nov 2009 19:22:58 +0100 (CET)
+Subject: [PATCH 5/6] mx31moboard: camera support
+In-Reply-To: <4AF01475.1010704@epfl.ch>
+References: <1255599780-12948-1-git-send-email-valentin.longchamp@epfl.ch>
+	<1255599780-12948-2-git-send-email-valentin.longchamp@epfl.ch>
+	<1255599780-12948-3-git-send-email-valentin.longchamp@epfl.ch>
+	<1255599780-12948-4-git-send-email-valentin.longchamp@epfl.ch>
+	<1255599780-12948-5-git-send-email-valentin.longchamp@epfl.ch>
+	<1255599780-12948-6-git-send-email-valentin.longchamp@epfl.ch>
+	<Pine.LNX.4.64.0910162307160.26130@axis700.grange>
+	<4ADC96A9.3090403@epfl.ch>
+	<20091020080941.GN8818@pengutronix.de> <4ADF40BC.4090801@epfl.ch>
+	<Pine.LNX.4.64.0910240059150.8342@axis700.grange>
+	<4AE855E4.1040705@epfl.ch> <4AF01475.1010704@epfl.ch>
+Message-ID: <Pine.LNX.4.64.0911031455190.5059@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Tue, 3 Nov 2009, Valentin Longchamp wrote:
 
-Uwe Kleine-K?nig wrote:
-> Hello,
+> Hi Guennadi,
 > 
-> On Sat, Oct 24, 2009 at 10:35:42AM +0200, Uwe Kleine-K?nig wrote:
->> This driver provides support for the RTC part integrated into the
->> Freescale MC13783 PMIC and bases on patch created earlier by Sascha
->> Hauer.
->>
->> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
->> Signed-off-by: Uwe Kleine-K?nig <u.kleine-k?nig@pengutronix.de>
->> Cc: Valentin Longchamp <valentin.longchamp@epfl.ch>
->> Cc: Paul Gortmaker <p_gortmaker@yahoo.com>
->> Cc: Alessandro Zummo <a.zummo@towertech.it>
->> Cc: rtc-linux at googlegroups.com
->> ---
->> Hello,
->>
->> this patch depends on
->>
->> 	mfd/mc13783: near complete rewrite
->>
->> sent earlier on lkml[1].  Compared to the earlier version of rtc support
->> on mc13783 as sent by Sascha, this driver got reset detection and
->> therefore depends on the patch above.
->>
->> A tree runnable on Phytec's PCM038 is available in my git tree
->>
->> 	git://git.pengutronix.de/git/ukl/linux-2.6.git mc13783
->>
->> .  (Maybe I will rewrite these commits, so please expect it might change
->> in a non-fast-forward manner.)
+> Valentin Longchamp wrote:
+> > Guennadi Liakhovetski wrote:
+> > 
+> > > 3. to support switching inputs, significant modifications to soc_camera.c
+> > > would be required. I read Nate's argument before, that as long as clients
+> > > can only be accessed one at a time, this should be presented by multiple
+> > > inputs rather than multiple device nodes. Somebody else from the V4L folk
+> > > has also confirmed this opinion. In principle I don't feel strongly either
+> > > way. But currently soc-camera uses a one i2c client to one device node
+> > > model, and I'm somewhat reluctant to change this before we're done with
+> > > the v4l2-subdev conversion.
+> > > 
+> > 
+> > Sure, one step at a time. So for now the switching is not possible with
+> > soc_camera.
+> > 
+> > My problem is that both cameras have the same I2C address since they are the
+> > same.
+> > 
+> > Would I need to declare 2 i2c_device with the same address (I'm not sure it
+> > would even work ...) used by two _client_ platform_devices or would I have
+> > to have the two platform devices pointing to the same i2c_device ?
+> > 
 > 
-> Valentin, could you already test this?  Any comments by the others?
+> I've finally had time to test all this. My current problem with registering
+> the two cameras is that they both have the same i2c address, and soc_camera
+> calls v4l2_i2c_new_subdev_board where in my case the same address on the same
+> i2c tries to be registered and of course fails.
 > 
+> We would need a way in soc_camera not to register a new i2c client for device
+> but use an existing one (but that's what you don't want to change for now as
+> you state it in your above last sentence). I just want to point this out once
+> more so that you know there is interest about this for the next soc_camera
+> works.
 
-I have tested your patches (taken your mc13783 branch today, and merged 
-it into my patches rebased on 2.6.32-rc6).
+These are two separate issues: inability to work with two devices with the 
+same i2c address, and arguably suboptimal choice of the way to switch 
+between multiple mutually-exclusive clients (sensors) on a single 
+interface.
 
-Your mfd/mc13783 rewrite seems to work for me (but since there is no 
-real usage for now, I don't use ADC yet and regulator don't do a lot). 
-But it runs fine on my hardware.
+For multiple chips with the same adderess, in principle you could register 
+one or more video devices yet before registering respective i2c devices. 
+And then on the selected switching operation (either opening of one of the 
+/dev/video* nodes, or selecting an input) you register the i2c device, 
+probe it, etc. This would work, but looks seriously overengineered to me. 
+And it would indeed require pretty fundamental changes to the soc-camera 
+core.
 
-However, I get the hctosys: unable to read the hardware clock error 
-message at boot (from drivers/rtc/hctosys.c:62). Is it normal ?
+Otherwise we could push this switching down into the driver / platform. We 
+could just export only one camera from the platform code, implement a 
+S_INPUT method in soc-camera, that would be delivered to the sensor 
+driver, it would save context of the current sensor, call the platform 
+hook to switch to another camera, and restore its configuration. In this 
+case the soc-camera core and the host driver would not see two sensors, 
+but just one, all the switching would be done internally in the sensor 
+driver / platform callback.
 
-Furthermore, the date and time are saved during system off, but the time 
-is not updated: if I shut down the system during 10 minutes, my time 
-will get a 10 minute delay. Is this a normal behavior with you current 
-implementation or is there something we have wrong in our design/code 
-(we have battery for the mc13783) ? I will have a further look at this 
-later, didn't have time now.
+If we also decide to use S_INPUT to switch between different sensors on an 
+interface, we would have to make a distinction between two cases in the 
+core - whether the input we're switching to belongs to the "same" sensor 
+or to another one.
 
-Val
+> So my current solution for mainline inclusion is to register only one camera
+> device node without taking care of the cam mux for now.
 
--- 
-Valentin Longchamp, PhD Student, EPFL-STI-LSRO1
-valentin.longchamp at epfl.ch, Phone: +41216937827
-http://people.epfl.ch/valentin.longchamp
-MEA3485, Station 9, CH-1015 Lausanne
+Yes, please, send me an updated version of the patch. I think, you haven't 
+done that yet, right?
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
