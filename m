@@ -1,91 +1,36 @@
-From: ospite@studenti.unina.it (Antonio Ospite)
-Date: Wed, 4 Nov 2009 12:35:36 +0100
-Subject: [PATCH 1/3] ezx: Add camera support for A780 and A910 EZX phones
-In-Reply-To: <Pine.LNX.4.64.0911040907400.4837@axis700.grange>
-References: <1257266734-28673-1-git-send-email-ospite@studenti.unina.it>
-	<1257266734-28673-2-git-send-email-ospite@studenti.unina.it>
-	<f17812d70911032238i3ae6fa19g24720662b9079f24@mail.gmail.com>
-	<Pine.LNX.4.64.0911040907400.4837@axis700.grange>
-Message-ID: <20091104123536.9b95d161.ospite@studenti.unina.it>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Wed,  4 Nov 2009 14:14:39 +0200
+Subject: [PATCH] [ARM] pxa/pxa3xx.c: register U2D clock
+Message-ID: <1257336880-16011-1-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 Nov 2009 09:13:16 +0100 (CET)
-Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
 
-> On Wed, 4 Nov 2009, Eric Miao wrote:
-> 
-> > Hi Antonio,
-> > 
-> > Patch looks generally OK except for the MFP/GPIO usage, check my
-> > comments below, thanks.
-> > 
-> > > +/* camera */
-> > > +static int a780_pxacamera_init(struct device *dev)
-> > > +{
-> > > + ? ? ? int err;
-> > > +
-> > > + ? ? ? /*
-> > > + ? ? ? ?* GPIO50_GPIO is CAM_EN: active low
-> > > + ? ? ? ?* GPIO19_GPIO is CAM_RST: active high
-> > > + ? ? ? ?*/
-> > > + ? ? ? err = gpio_request(MFP_PIN_GPIO50, "nCAM_EN");
-> > 
-> > Mmm... MFP != GPIO, so this probably should be written simply as:
-> > 
-> > #define GPIO_nCAM_EN	(50)
-> 
-> ...but without parenthesis, please:
-> 
-> #define GPIO_nCAM_EN	50
-> 
-> same everywhere below
->
+Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+---
+ arch/arm/mach-pxa/pxa3xx.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-OK.
-
-BTW, Guennadi, shouldn't the pxa_camera platform_data expose also an
-exit() method for symmetry with the init() one, where we can free the
-requested resources?
-
-If you want I think I can add it.
-
-[...]
-> > > +
-> > > +static int a780_pxacamera_power(struct device *dev, int on)
-> > > +{
-> > > + ? ? ? gpio_set_value(MFP_PIN_GPIO50, on ? 0 : 1);
-> > 
-> > 	gpio_set_value(GPIO_nCAM_EN, on ? 0 : 1);
-> 
-> IMHO better yet
-> 
-> 	gpio_set_value(GPIO_nCAM_EN, !on);
-> 
-> Also throughout the patch below.
-> 
-> I'm still to look at it miself and maybe provide a couple more comments, 
-> if any.
-> 
-
-Ok, thanks,
-   Antonio
-
+diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+index 09b7b1a..ca536f2 100644
+--- a/arch/arm/mach-pxa/pxa3xx.c
++++ b/arch/arm/mach-pxa/pxa3xx.c
+@@ -237,6 +237,7 @@ static DEFINE_PXA3_CKEN(pxa3xx_stuart, STUART, 14857000, 1);
+ static DEFINE_PXA3_CKEN(pxa3xx_i2c, I2C, 32842000, 0);
+ static DEFINE_PXA3_CKEN(pxa3xx_udc, UDC, 48000000, 5);
+ static DEFINE_PXA3_CKEN(pxa3xx_usbh, USBH, 48000000, 0);
++static DEFINE_PXA3_CKEN(pxa3xx_u2d, USB2, 48000000, 0);
+ static DEFINE_PXA3_CKEN(pxa3xx_keypad, KEYPAD, 32768, 0);
+ static DEFINE_PXA3_CKEN(pxa3xx_ssp1, SSP1, 13000000, 0);
+ static DEFINE_PXA3_CKEN(pxa3xx_ssp2, SSP2, 13000000, 0);
+@@ -261,6 +262,7 @@ static struct clk_lookup pxa3xx_clkregs[] = {
+ 	INIT_CLKREG(&clk_pxa3xx_i2c, "pxa2xx-i2c.0", NULL),
+ 	INIT_CLKREG(&clk_pxa3xx_udc, "pxa27x-udc", NULL),
+ 	INIT_CLKREG(&clk_pxa3xx_usbh, "pxa27x-ohci", NULL),
++	INIT_CLKREG(&clk_pxa3xx_u2d, NULL, "U2DCLK"),
+ 	INIT_CLKREG(&clk_pxa3xx_keypad, "pxa27x-keypad", NULL),
+ 	INIT_CLKREG(&clk_pxa3xx_ssp1, "pxa27x-ssp.0", NULL),
+ 	INIT_CLKREG(&clk_pxa3xx_ssp2, "pxa27x-ssp.1", NULL),
 -- 
-Antonio Ospite
-http://ao2.it
-
-PGP public key ID: 0x4553B001
-
-A: Because it messes up the order in which people normally read text.
-   See http://en.wikipedia.org/wiki/Posting_style
-Q: Why is top-posting such a bad thing?
-A: Top-posting.
-Q: What is the most annoying thing in e-mail?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091104/a4c5d482/attachment-0001.sig>
+1.6.0.6
