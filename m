@@ -1,47 +1,92 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 4 Nov 2009 14:15:01 +0100
-Subject: imx27 - hanging at freeing init memory -- getting some junk
-	characters here after on console ..
-In-Reply-To: <OF15AFD08D.F28F9544-ON65257664.002A1275-65257664.002A127F@tcs.com>
-References: <OF15AFD08D.F28F9544-ON65257664.002A1275-65257664.002A127F@tcs.com>
-Message-ID: <20091104131500.GZ14091@buzzloop.caiaq.de>
+From: jpihet@mvista.com (Jean Pihet)
+Date: Wed, 4 Nov 2009 14:33:31 +0100
+Subject: [PATCH] check put_user fail in do_signal when enable OABI_COMPACT
+In-Reply-To: <200910281800.47681.jpihet@mvista.com>
+References: <1256123277.3851.36.camel@debian-nb>
+	<200910281723.01684.jpihet@mvista.com>
+	<200910281800.47681.jpihet@mvista.com>
+Message-ID: <200911041433.32010.jpihet@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 04, 2009 at 01:09:32PM +0530, Vadivelan M wrote:
->      I am porting Linux-2.6.28 Kernel on IMX27based board.
->      Filesystem is mounted and after that we are getting message Freeing init
->      memory and some junk characters are coming. Keyboards are responding.
->      Can anybody help us in this regard.
-> 
->      Thanks,
-> 
->      Please see the following logs ..
-> 
->      Launch LinuxUncompressing
->      Linux......................................................................
->      done, booting the kernel.
->      Linux version 2.6.28-arm2 (root at localhost.localdomain) (gcc version
->      4.1.1) #75 Wed Oct 28 13:12:53 IST 2009
->      CPU: ARM926EJ-S [41069264] revision 4 (ARMv5TEJ), cr=00053177
->      CPU: VIVT data cache, VIVT instruction cache
->      Machine: Freescale i.MX27ADS
->      Kernel command line: root=/dev/ram rw mem=64M console=ttymxc0,115200
+Russell,
 
-Your kernel uses 115200 baud to output these messages ...
+Is this one OK? Can it be merged now that your fix for signal restart has been 
+merged into mainline?
 
-[...]
+Regards,
+Jean
 
->      EXT2-fs warning: mounting unchecked fs, running e2fsck is recommended
->      VFS: Mounted root (ext2 filesystem).
->      Freeing init memory: 92K
-> 
->      After this some junk characters are coming like ....
-> 
->      &#65533;&#65533;&#1421;&#65533;&#531488;0^&#1949;&#65533;&#65533;r&#65533;'&#65533;&#65533;&#65533;j&#65533;&#65533;r:&#65533;&#65533;&#65533;&#65533;&#65533;&#65533;&#65533;:&#65533;&#65533;M&#65533;.&#65533;&#65533;D&#65533;d&#65533;z.?&#65533;&#65533;.T&#65533;&#65533;8V&#65533;`&#65533;T&#65533;&#65533;&#65533;V&#51082;]nn]^&#65400;&#65533;m8m&#65533;&#65533;^&#65533;.&#65533;m&#65533;.E&#65533;&#65533;N&#65533;&#65533;8&#65533;&#65533;6&#65533;&#65533;&#65533;:]&#65533;&#65533;&#65533;
-
-... and in your inittab, there seems to be a getty registered which
-operates at a different speed. Change either of the two and you should
-be fine.
-
-Daniel
+On Wednesday 28 October 2009 18:00:47 Jean Pihet wrote:
+> On Wednesday 28 October 2009 17:23:01 Jean Pihet wrote:
+> ...
+>
+> > > Still wrong.  Why flush_icache?
+> >
+> > Indeed that is wrong (again!). I had put it in the problem description
+> > but that does not apply anymore.
+> >
+> > Thanks, will send an update.
+>
+> Here is the updated patch. Is it OK?
+>
+> Jean
+>
+> > > Nicolas
+> >
+> > Jean
+>
+> ---
+> From 28336b68b2e2507ba0922c55147e5e72ec1a88dc Mon Sep 17 00:00:00 2001
+> From: Jean Pihet <jpihet@mvista.com>
+> Date: Tue, 27 Oct 2009 10:09:22 +0100
+> Subject: ARM: Check put_user fail in do_signal when enable OABI_COMPAT
+>
+> Source: Janboe Ye <janboe.ye@gmail.com>
+> MR: 36048
+> Type: Defect Fix
+> Disposition: Submitted to linux-arm-kernel ML
+> ChangeID: 689ddf707d2232e9cf01387ac1264bc8812b9ffd
+> Description:
+>
+> Using OABI, the call to put_user in do_signal can fail causing the calling
+> app to hang.
+>
+> The solution is to check if put_user fails and force the app to
+> seg fault in that case.
+>
+> Signed-off-by: janboe <janboe.ye@gmail.com>
+>
+> Merged from
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2009-October/002621.h
+>tml on top of
+> http://marc.info/?l=linux-arm-kernel&m=125638133624452&w=2
+>
+> Tested with multiple sleeping apps/threads (using the nanosleep syscall)
+> and suspend/resume.
+>
+> Signed-off-by: Jean Pihet <jpihet@mvista.com>
+> ---
+>  arch/arm/kernel/signal.c |    8 ++++++--
+>  1 files changed, 6 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+> index f330974..ea9722a 100644
+> --- a/arch/arm/kernel/signal.c
+> +++ b/arch/arm/kernel/signal.c
+> @@ -676,8 +676,12 @@ static int do_signal(sigset_t *oldset, struct pt_regs
+> *regs, int syscall)
+>  				regs->ARM_sp -= 4;
+>  				usp = (u32 __user *)regs->ARM_sp;
+>
+> -				put_user(regs->ARM_pc, usp);
+> -				regs->ARM_pc = KERN_RESTART_CODE;
+> +				if (put_user(regs->ARM_pc, usp) == 0) {
+> +					regs->ARM_pc = KERN_RESTART_CODE;
+> +				} else {
+> +					regs->ARM_sp += 4;
+> +					force_sigsegv(0, current);
+> +				}
+>  #endif
+>  			}
+>  		}
