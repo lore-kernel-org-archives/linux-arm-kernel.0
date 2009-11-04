@@ -1,32 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 Nov 2009 21:03:00 +0000
-Subject: GCC built-in atomic operations and memory barriers
-In-Reply-To: <4AF1E01A.2010209@45mercystreet.com>
-References: <4AF1C361.8090405@45mercystreet.com>
-	<20091104190544.GA518@n2100.arm.linux.org.uk>
-	<4AF1E01A.2010209@45mercystreet.com>
-Message-ID: <20091104210300.GD518@n2100.arm.linux.org.uk>
+From: fercerpav@gmail.com (Paul Fertser)
+Date: Thu,  5 Nov 2009 00:24:56 +0300
+Subject: [PATCH 3/6] gta02: set pcf50633 charger_reference_current_ma
+In-Reply-To: <1257369899-325-2-git-send-email-fercerpav@gmail.com>
+References: <1257369899-325-1-git-send-email-fercerpav@gmail.com>
+	<1257369899-325-2-git-send-email-fercerpav@gmail.com>
+Message-ID: <1257369899-325-3-git-send-email-fercerpav@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 04, 2009 at 09:12:10PM +0100, Toby Douglass wrote:
->  382                do {
->  383                        asm volatile("@ __cmpxchg4\n"
->  384                        "       ldrex   %1, [%2]\n"
->  385                        "       mov     %0, #0\n"
->  386                        "       teq     %1, %3\n"
->  387                        "       strexeq %0, %4, [%2]\n"
->  388                                : "=&r" (res), "=&r" (oldval)
->  389                                : "r" (ptr), "Ir" (old), "r" (new)
->  390                                : "memory", "cc");
->  391                } while (res);
->
-> The "mov %0, #0" - why is this inbetween the ldrex and strexeq?  it
-> seems to me it could just as well happen before the ldrex, and doing so
-> would reduce the time between the ldrex and strexeq and so reduce the
-> chance of someone else modifying our target.
+From: Lars-Peter Clausen <lars@metafoo.de>
 
-Because it probably doesn't.  Loads normally have a 'result delay' which
-cause a pipeline stall when the result is used in the next instruction.
-It makes sense to fill those stall cycles with useful work, rather than
-stalling the execution pipeline.
+This value is board-specific and is needed for calculations to set charging
+current limit properly.
+
+Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
+Acked-by: Nelson Castillo <arhuaco@freaks-unidos.net>
+Signed-off-by: Paul Fertser <fercerpav@gmail.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+
+Since this patch compile-depends on previous probably it should go through
+the same tree as others. Nelson (gta02 maintainer) agrees with whatever you
+think is best.
+
+Anton Vorontsov is ok with merging it through his tree but needs an explicit
+ack.
+
+ arch/arm/mach-s3c2442/mach-gta02.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-s3c2442/mach-gta02.c b/arch/arm/mach-s3c2442/mach-gta02.c
+index 0fb385b..b0a3d74 100644
+--- a/arch/arm/mach-s3c2442/mach-gta02.c
++++ b/arch/arm/mach-s3c2442/mach-gta02.c
+@@ -268,6 +268,9 @@ struct pcf50633_platform_data gta02_pcf_pdata = {
+ 
+ 	.batteries = gta02_batteries,
+ 	.num_batteries = ARRAY_SIZE(gta02_batteries),
++
++	.charger_reference_current_ma = 1000,
++
+ 	.reg_init_data = {
+ 		[PCF50633_REGULATOR_AUTO] = {
+ 			.constraints = {
+-- 
+1.6.4.4
