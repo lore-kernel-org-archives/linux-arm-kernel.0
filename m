@@ -1,59 +1,39 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 4 Nov 2009 14:42:09 +0800
-Subject: [PATCH 0/3] ezx: A780/A910 camera, A910 leds, ezx_defconfig
-	update
-In-Reply-To: <20091103214020.a5f6bac9.ospite@studenti.unina.it>
-References: <1257266734-28673-1-git-send-email-ospite@studenti.unina.it>
-	<20091103174430.GA20822@excalibur.local>
-	<20091103214020.a5f6bac9.ospite@studenti.unina.it>
-Message-ID: <f17812d70911032242l343008c5y48b35666f6d214d7@mail.gmail.com>
+Date: Wed, 4 Nov 2009 15:20:28 +0800
+Subject: [PATCH 3/6] pxa: fix pxa168 lcd controller vsync/hsync timing
+	error
+In-Reply-To: <7c34ac520911022245x7f002a7at846a835dfded550c@mail.gmail.com>
+References: <7c34ac520911022245x7f002a7at846a835dfded550c@mail.gmail.com>
+Message-ID: <f17812d70911032320k379dc7laab1979a3b452969@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 4, 2009 at 4:40 AM, Antonio Ospite <ospite@studenti.unina.it> wrote:
-> On Tue, 3 Nov 2009 18:44:30 +0100
-> Stefan Schmidt <stefan@datenfreihafen.org> wrote:
+On Tue, Nov 3, 2009 at 2:45 PM, Jun Nie <niej0001@gmail.com> wrote:
+> pxa: fix pxa168 lcd controller vsync/hsync timing error
 >
->> Hello.
->>
->> [Put Eric in CC]
->>
+> Signed-off-by: Jun Nie <njun@marvell.com>
+> ---
+> ?drivers/video/pxa168fb.c | ? ?4 ++--
+> ?include/video/pxa168fb.h | ? ?2 --
+> ?2 files changed, 2 insertions(+), 4 deletions(-)
 >
-> <OT>
-> Thanks, I've realized that the best practice to write the summary
-> message is via 'git format-patch --cover-letter' to add the needed
-> recipients, rather than using 'git send-email --compose' which doesn't
-> process CCs, BCCs and SOBs for the introduction message.
-> </OT>
->
->> On Tue, 2009-11-03 at 17:45, Antonio Ospite wrote:
->> >
->> > some updates for the EZX platform:
->>
->> Thanks for driving this forward.
->>
->> > [PATCH 1/3] ezx: Add camera support for A780 and A910 EZX phones
->> > [PATCH 2/3] ezx: Add leds-lp3944 support for A910 EZX phone
->> > [PATCH 3/3] ezx: Update ezx_defconfig now that ezx-pcap is in
->> >
->> > Are we still in time for 2.6.32?
->>
->> Given that we are near -rc6 and this is clearly no fix I would say no. But Eric
->> should be happy to apply it to his devel branch which will hit Linus tree during
->> the next merge window.
->>
->
-> That's fine, of course.
->
->> Eric, Antonio is doing a good deal of the current work at OpenEZX. If you need
->> an ACK anyway you can put mine into it.
->>
->> Acked-by: Stefan Schmidt <stefan@datenfreihafen.org>
->>
+> diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
+> index 2ba1444..bdd524c 100644
+> --- a/drivers/video/pxa168fb.c
+> +++ b/drivers/video/pxa168fb.c
+> @@ -459,8 +459,8 @@ static void set_dumb_panel_control(struct fb_info *info)
+> ? ? ? ?x |= mi->invert_composite_blank ? 0x00000040 : 0;
+> ? ? ? ?x |= (info->var.sync & FB_SYNC_COMP_HIGH_ACT) ? 0x00000020 : 0;
+> ? ? ? ?x |= mi->invert_pix_val_ena ? 0x00000010 : 0;
+> - ? ? ? x |= (info->var.sync & FB_SYNC_VERT_HIGH_ACT) ? 0 : 0x00000008;
+> - ? ? ? x |= (info->var.sync & FB_SYNC_HOR_HIGH_ACT) ? 0 : 0x00000004;
+> + ? ? ? x |= (info->var.sync & FB_SYNC_VERT_HIGH_ACT) ? 0x00000008 : 0;
+> + ? ? ? x |= (info->var.sync & FB_SYNC_HOR_HIGH_ACT) ? 0x00000004 : 0;
 
-Thanks Stefan and Antonio,
+Hi Jun,
 
-We are still in -rc phase so will not likely miss the next merge window
-once you get the MFP/GPIO issue solved.
+Could you please help double check this? My understanding is
+FB_SYNC_VERT_HIGH_ACT means it's a positive pulse covering all the
+valid HSYNCs, and a rising edge of VSYNC means a start of the frame.
 
-BTW: I didn't see [PATCH 3/3], or maybe I overlooked?
+However, CFG_INV_VSYNC is '1' means the opposite.
