@@ -1,17 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 Nov 2009 19:32:44 +0000
-Subject: [PATCH] check put_user fail in do_signal when enable OABI_COMPACT
-In-Reply-To: <200911041433.32010.jpihet@mvista.com>
-References: <1256123277.3851.36.camel@debian-nb>
-	<200910281723.01684.jpihet@mvista.com>
-	<200910281800.47681.jpihet@mvista.com>
-	<200911041433.32010.jpihet@mvista.com>
-Message-ID: <20091104193244.GC518@n2100.arm.linux.org.uk>
+From: trd@45mercystreet.com (Toby Douglass)
+Date: Wed, 04 Nov 2009 21:12:10 +0100
+Subject: GCC built-in atomic operations and memory barriers
+In-Reply-To: <20091104190544.GA518@n2100.arm.linux.org.uk>
+References: <4AF1C361.8090405@45mercystreet.com>
+	<20091104190544.GA518@n2100.arm.linux.org.uk>
+Message-ID: <4AF1E01A.2010209@45mercystreet.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 04, 2009 at 02:33:31PM +0100, Jean Pihet wrote:
-> Is this one OK? Can it be merged now that your fix for signal restart
-> has been merged into mainline?
+Russell King - ARM Linux wrote:
+> On Wed, Nov 04, 2009 at 07:09:37PM +0100, Toby Douglass wrote:
+>> This leads me to want to use smp_mb().  However, from what I can see,
+>> this macro is only available via the linux kernel headers; it's not
+>> available in user-mode.  Is this correct?
+> 
+> Correct.
 
-Yes.
+Thanks.  It's often hard on the net to track down a negative answer.
+
+[snip]
+
+While we're talking about the GCC atomics...
+
+This appears to be the current code for CAS;
+
+  349        static inline unsigned long __cmpxchg(volatile void *ptr,
+unsigned long old, unsigned long new, int size)
+
+  352        unsigned long oldval, res;
+
+[snip]
+
+  382                do {
+  383                        asm volatile("@ __cmpxchg4\n"
+  384                        "       ldrex   %1, [%2]\n"
+  385                        "       mov     %0, #0\n"
+  386                        "       teq     %1, %3\n"
+  387                        "       strexeq %0, %4, [%2]\n"
+  388                                : "=&r" (res), "=&r" (oldval)
+  389                                : "r" (ptr), "Ir" (old), "r" (new)
+  390                                : "memory", "cc");
+  391                } while (res);
+
+The "mov %0, #0" - why is this inbetween the ldrex and strexeq?  it
+seems to me it could just as well happen before the ldrex, and doing so
+would reduce the time between the ldrex and strexeq and so reduce the
+chance of someone else modifying our target.
