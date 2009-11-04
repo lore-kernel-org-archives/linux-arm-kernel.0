@@ -1,24 +1,30 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 4 Nov 2009 22:35:33 +0800
-Subject: [PATCH] [ARM] pxa: add U2D registers and bits definitions
-In-Reply-To: <1257336880-16011-2-git-send-email-grinberg@compulab.co.il>
-References: <1257336880-16011-1-git-send-email-grinberg@compulab.co.il>
-	<1257336880-16011-2-git-send-email-grinberg@compulab.co.il>
-Message-ID: <f17812d70911040635o1ab53e64s255d031db0de6091@mail.gmail.com>
+Date: Wed, 4 Nov 2009 22:44:38 +0800
+Subject: [PATCH] ARM: pxafb: Use the passed fb_var_screeninfo struct in
+	pxafb_pan_display()
+In-Reply-To: <20091030111920.GC14091@buzzloop.caiaq.de>
+References: <20091022063434.GQ14091@buzzloop.caiaq.de>
+	<20091028001805.GC14091@buzzloop.caiaq.de>
+	<f17812d70910271913l15950170we45290bb1892761a@mail.gmail.com>
+	<20091029195156.GI22046@sci.fi>
+	<20091030111920.GC14091@buzzloop.caiaq.de>
+Message-ID: <f17812d70911040644l2cb76f0en222ae5bb63a57e43@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 4, 2009 at 8:14 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+> Commit 3a8552e made pxafb pay attention to paramters passed to
+> pxafb_pan_display(). As Ville Syrj?l? pointed out, this is potentially
+> dangerous as user could pass in any other screeninfo parameters as well,
+> and not only such that are relevant for display panning.
 >
-> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
-> ---
-> ?arch/arm/mach-pxa/include/mach/regs-u2d.h | ?199 +++++++++++++++++++++++++++++
-> ?1 files changed, 199 insertions(+), 0 deletions(-)
-> ?create mode 100644 arch/arm/mach-pxa/include/mach/regs-u2d.h
+> This patch fixed that by limiting the arguments actually used to
+> .xoffset, .yoffset and .vmode & FB_VMODE_YWRAP.
 >
-> diff --git a/arch/arm/mach-pxa/include/mach/regs-u2d.h b/arch/arm/mach-pxa/include/mach/regs-u2d.h
+> Signed-off-by: Daniel Mack <daniel@caiaq.de>
+> Cc: Ville Syrj?l? <syrjala@sci.fi>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Sven Neumann <s.neumann@raumfeld.com>
 
-Unless there are registers shared between drivers and platform code,
-I'd rather this been kept closer to the driver, include/mach/* is already
-pretty crowded :)
+OK, merged with the previous commit with additional comments of
+the issue found, and with Ville Syrj?l? <syrjala@sci.fi> in the Cc
+list. Thanks.
