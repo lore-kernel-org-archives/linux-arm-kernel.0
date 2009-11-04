@@ -1,109 +1,71 @@
-From: jiujin.hong@mid-fun.com (tommy)
-Date: Fri, 06 Nov 2009 16:00:57 +0800
-Subject: about s3c64xx-ac97 irq and mmc interrupt trigger
-Message-ID: <1257494457.22587.0.camel@tommy-desktop>
+From: mike.rapoport@gmail.com (Mike Rapoport)
+Date: Thu, 5 Nov 2009 00:02:16 +0200
+Subject: [PATCH] [ARM] pxa/pxa3xx.c: register U2D clock
+In-Reply-To: <f17812d70911040647l35739ed3hf749112d43b79354@mail.gmail.com>
+References: <1257336880-16011-1-git-send-email-grinberg@compulab.co.il>
+	<f17812d70911040647l35739ed3hf749112d43b79354@mail.gmail.com>
+Message-ID: <f870da180911041402o14d9f2ccwd3c16c66d0346b75@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,all!
+On Wed, Nov 4, 2009 at 4:47 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
 
-Several days ago ,i have a post ,as following!
-
-"HI,all!
-I have met a big error in s3c6410 linux2.6.24.2 BSP ,the same as the
-following
-
-"
-Kernel MMC/SD developers,
-
-
-I've been encountering some problems when I abruptly remove SD card
-during data transfer (song playback ... more so when the amount of
-transfer is huge)
-The kernel gets stuck in mmc_request function in the loops below
-if (!mq) {
-printk(KERN_ERR "MMC: killing requests for dead queue ");
-while ((req = elv_next_request(q)) != NULL) {
-do {
-ret = end_that_request_chunk(req, 0,
-req->current_nr_sectors << 9);
-} while (ret);
-}
-return;
-}
-elv_next_requests returns the current request which is then ended with
-end_that_request_chunk, however the request is never dequeued. As a
-result, every
-iteration of the while returns the same request and this "while"
-becomes an infinite loop with the same req being returned each time
-
-I added a call to blkdev_dequeue_request(req); after the do_while but
-within the while and with this change the while loop always ends but I
-observed that the kernel MMC stack sometimes(infrequent though) does
-not respond to mmc_detect_change upon the next card insertion.
-
-I'm running an ARM9 port of 2.6.24.7 kernel on a custom board with a
-custom SD host controller and always use 4 bit transfer mode
-
-Any help/info or similar experiences would be of real help.
-"
-
-Later i use __blk_end_request to replace end_that_request_chunk,can make
-this issue better!
-Now i reconsider this question,maybe a driver or hardware issue in BSP ?
-Because i read  2.6.24.7-kernel pxa2xx-ac97.c code, i found the
-following code :
-
-static irqreturn_t pxa2xx_ac97_irq(int irq, void *dev_id)
-{
-        long status;
-
-        status = GSR;
-        if (status) {
-                GSR = status;
-                gsr_bits |= status;
-                wake_up(&gsr_wq);
-
-#ifdef CONFIG_PXA27x
-                /* Although we don't use those we still need to clear
-them
-                   since they tend to spuriously trigger when MMC is
-used
-                   (hardware bug? go figure)... */
-                MISR = MISR_EOC;
-                PISR = PISR_EOC;
-                MCSR = MCSR_EOC;
-#endif
-
-                return IRQ_HANDLED;
-        }
-
-        return IRQ_NONE;
-}
-
-does samsung-s3c64xx BSP kernel (just for 2.6.24.2) s3c64xx-ac97.c also
-need similiar as 
-
-#ifdef CONFIG_S3C64XX
-                /* Although we don't use those we still need to clear
-them
-                   since they tend to spuriously trigger when MMC is
-used
-                   (hardware bug? go figure)... */
-                MISR = MISR_EOC;/* DMA End-of-Chain (exclusive clear)===
-Modem In
-Status Register */
-                PISR = PISR_EOC;/* DMA End-of-Chain (exclusive clear)
-=== /* PCM In
-Status Register */
-*/
-                MCSR = MCSR_EOC; /* DMA End-of-Chain (exclusive clear)
-==Mic In Status
-Register*/
-#endif
+> On Wed, Nov 4, 2009 at 8:14 PM, Igor Grinberg <grinberg@compulab.co.il>
+> wrote:
+> >
+> > Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+> > Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+>
+> ISTR U2D is present on pxa310 _only_, if that's the case, might
+> better put the clock into pxa300.c. Please help double check.
+>
+>
+On pxa310 the U2D differs in capabilities from pxa300/320. But they all use
+the same clock :)
 
 
-to avoid mmc interrupt trigger ?
+
+> > ---
+> >  arch/arm/mach-pxa/pxa3xx.c |    2 ++
+> >  1 files changed, 2 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+> > index 09b7b1a..ca536f2 100644
+> > --- a/arch/arm/mach-pxa/pxa3xx.c
+> > +++ b/arch/arm/mach-pxa/pxa3xx.c
+> > @@ -237,6 +237,7 @@ static DEFINE_PXA3_CKEN(pxa3xx_stuart, STUART,
+> 14857000, 1);
+> >  static DEFINE_PXA3_CKEN(pxa3xx_i2c, I2C, 32842000, 0);
+> >  static DEFINE_PXA3_CKEN(pxa3xx_udc, UDC, 48000000, 5);
+> >  static DEFINE_PXA3_CKEN(pxa3xx_usbh, USBH, 48000000, 0);
+> > +static DEFINE_PXA3_CKEN(pxa3xx_u2d, USB2, 48000000, 0);
+> >  static DEFINE_PXA3_CKEN(pxa3xx_keypad, KEYPAD, 32768, 0);
+> >  static DEFINE_PXA3_CKEN(pxa3xx_ssp1, SSP1, 13000000, 0);
+> >  static DEFINE_PXA3_CKEN(pxa3xx_ssp2, SSP2, 13000000, 0);
+> > @@ -261,6 +262,7 @@ static struct clk_lookup pxa3xx_clkregs[] = {
+> >        INIT_CLKREG(&clk_pxa3xx_i2c, "pxa2xx-i2c.0", NULL),
+> >        INIT_CLKREG(&clk_pxa3xx_udc, "pxa27x-udc", NULL),
+> >        INIT_CLKREG(&clk_pxa3xx_usbh, "pxa27x-ohci", NULL),
+> > +       INIT_CLKREG(&clk_pxa3xx_u2d, NULL, "U2DCLK"),
+> >        INIT_CLKREG(&clk_pxa3xx_keypad, "pxa27x-keypad", NULL),
+> >        INIT_CLKREG(&clk_pxa3xx_ssp1, "pxa27x-ssp.0", NULL),
+> >        INIT_CLKREG(&clk_pxa3xx_ssp2, "pxa27x-ssp.1", NULL),
+> > --
+> > 1.6.0.6
+> >
+> >
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
 
 
-Tommy@China
+
+-- 
+Sincerely Yours,
+Mike.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091105/7087ddab/attachment-0001.htm>
