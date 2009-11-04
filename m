@@ -1,40 +1,42 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Wed, 4 Nov 2009 20:27:29 +0200
-Subject: [PATCH] s3c24xx-adc: resume convertions interrupted by going to
-	suspend
-In-Reply-To: <200910290949.28010.anarsoul@gmail.com>
-References: <200910201719.41102.anarsoul@gmail.com>
-	<2accc2ff0910232359t1bc7515avb7b208ffbd112807@mail.gmail.com>
-	<200910290949.28010.anarsoul@gmail.com>
-Message-ID: <200911042027.34278.anarsoul@gmail.com>
+From: trd@45mercystreet.com (Toby Douglass)
+Date: Wed, 04 Nov 2009 19:09:37 +0100
+Subject: GCC built-in atomic operations and memory barriers
+Message-ID: <4AF1C361.8090405@45mercystreet.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? ????????? ?? 29 ??????? 2009 09:49:20 ????? Vasily Khoruzhick ???????:
-> ? ????????? ?? 24 ??????? 2009 09:59:25 ????? Nelson Castillo ???????:
-> > >@@ -224,6 +225,7 @@ struct s3c_adc_client *s3c_adc_register(struct
-> > > platform_device *pdev,
-> > >
-> > > 	client->is_ts = is_ts;
-> > >
-> > > 	client->select_cb = select;
-> > >
-> > > 	client->convert_cb = conv;
-> > >
-> > >+	client->selected = 0;
-> >
-> > You don't need to clear client->selected. kzalloc takes care of this.
-> 
-> Ok, here's a fixed version.
+Hi -
 
-Any chance to get review/comments on this patch?
+My first post.
 
-Regards
-Vasily
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091104/077489aa/attachment.sig>
+I have written a (currently small) library of lock-free data structures
+(www.liblfds.org).
+
+I am porting to ARM.
+
+The port is complete except for CAS.
+
+I initially tried to use the GCC built-in CAS; in my test set, the third
+test fails with a double free, because the head element of the freelist
+being tested has come to point to itself.
+
+So I figured I'd need to write my own CAS.  I learned enough ARM
+assembly and did enough Googling to put something together.  I've done
+the same already for x86 (I needed cmpxchg16b, so I couldn't use the GCC
+built-ins) so I have a tiny bit of experience in it; and my attempt
+fails in exactly the same way as the GCC built-in.
+
+So I go to bed.  Next day I think, ah, memory barriers!  you don't need
+to specify them on x86 for atomics, but I bet you do on ARM; and indeed,
+you do.
+
+I then discover in this mailing list an interesting thread, dated May
+2009, which states that the GCC built-ins for ARM do not have memory
+barriers.  The kernel I'm using is 2.6.28, which was released Christmas
+Day 2008.
+
+So I think the lack of memory barriers may well be why the code is failing.
+
+This leads me to want to use smp_mb().  However, from what I can see,
+this macro is only available via the linux kernel headers; it's not
+available in user-mode.  Is this correct?
