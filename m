@@ -1,39 +1,57 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 4 Nov 2009 15:20:28 +0800
-Subject: [PATCH 3/6] pxa: fix pxa168 lcd controller vsync/hsync timing
-	error
-In-Reply-To: <7c34ac520911022245x7f002a7at846a835dfded550c@mail.gmail.com>
-References: <7c34ac520911022245x7f002a7at846a835dfded550c@mail.gmail.com>
-Message-ID: <f17812d70911032320k379dc7laab1979a3b452969@mail.gmail.com>
+From: ospite@studenti.unina.it (Antonio Ospite)
+Date: Wed, 4 Nov 2009 08:42:59 +0100
+Subject: [PATCH 0/3] ezx: A780/A910 camera, A910 leds, ezx_defconfig
+	update
+In-Reply-To: <f17812d70911032242l343008c5y48b35666f6d214d7@mail.gmail.com>
+References: <1257266734-28673-1-git-send-email-ospite@studenti.unina.it>
+	<20091103174430.GA20822@excalibur.local>
+	<20091103214020.a5f6bac9.ospite@studenti.unina.it>
+	<f17812d70911032242l343008c5y48b35666f6d214d7@mail.gmail.com>
+Message-ID: <20091104084259.5c604f1a.ospite@studenti.unina.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 3, 2009 at 2:45 PM, Jun Nie <niej0001@gmail.com> wrote:
-> pxa: fix pxa168 lcd controller vsync/hsync timing error
+On Wed, 4 Nov 2009 14:42:09 +0800
+Eric Miao <eric.y.miao@gmail.com> wrote:
+
+> On Wed, Nov 4, 2009 at 4:40 AM, Antonio Ospite <ospite@studenti.unina.it> wrote:
+> > On Tue, 3 Nov 2009 18:44:30 +0100
+> > Stefan Schmidt <stefan@datenfreihafen.org> wrote:
 >
-> Signed-off-by: Jun Nie <njun@marvell.com>
-> ---
-> ?drivers/video/pxa168fb.c | ? ?4 ++--
-> ?include/video/pxa168fb.h | ? ?2 --
-> ?2 files changed, 2 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
-> index 2ba1444..bdd524c 100644
-> --- a/drivers/video/pxa168fb.c
-> +++ b/drivers/video/pxa168fb.c
-> @@ -459,8 +459,8 @@ static void set_dumb_panel_control(struct fb_info *info)
-> ? ? ? ?x |= mi->invert_composite_blank ? 0x00000040 : 0;
-> ? ? ? ?x |= (info->var.sync & FB_SYNC_COMP_HIGH_ACT) ? 0x00000020 : 0;
-> ? ? ? ?x |= mi->invert_pix_val_ena ? 0x00000010 : 0;
-> - ? ? ? x |= (info->var.sync & FB_SYNC_VERT_HIGH_ACT) ? 0 : 0x00000008;
-> - ? ? ? x |= (info->var.sync & FB_SYNC_HOR_HIGH_ACT) ? 0 : 0x00000004;
-> + ? ? ? x |= (info->var.sync & FB_SYNC_VERT_HIGH_ACT) ? 0x00000008 : 0;
-> + ? ? ? x |= (info->var.sync & FB_SYNC_HOR_HIGH_ACT) ? 0x00000004 : 0;
+> >> Eric, Antonio is doing a good deal of the current work at OpenEZX. If you need
+> >> an ACK anyway you can put mine into it.
+> >>
+> >> Acked-by: Stefan Schmidt <stefan@datenfreihafen.org>
+> >>
+> 
+> Thanks Stefan and Antonio,
+> 
+> We are still in -rc phase so will not likely miss the next merge window
+> once you get the MFP/GPIO issue solved.
+> 
+> BTW: I didn't see [PATCH 3/3], or maybe I overlooked?
 
-Hi Jun,
+I'll send it again, it must have been eaten by some MTA for some
+reason.
 
-Could you please help double check this? My understanding is
-FB_SYNC_VERT_HIGH_ACT means it's a positive pulse covering all the
-valid HSYNCs, and a rising edge of VSYNC means a start of the frame.
+Regards,
+   Antonio
 
-However, CFG_INV_VSYNC is '1' means the opposite.
+-- 
+Antonio Ospite
+http://ao2.it
+
+PGP public key ID: 0x4553B001
+
+A: Because it messes up the order in which people normally read text.
+   See http://en.wikipedia.org/wiki/Posting_style
+Q: Why is top-posting such a bad thing?
+A: Top-posting.
+Q: What is the most annoying thing in e-mail?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091104/b9262f38/attachment.sig>
