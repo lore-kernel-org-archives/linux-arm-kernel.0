@@ -1,45 +1,30 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 4 Nov 2009 22:47:09 +0800
-Subject: [PATCH] [ARM] pxa/pxa3xx.c: register U2D clock
-In-Reply-To: <1257336880-16011-1-git-send-email-grinberg@compulab.co.il>
-References: <1257336880-16011-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <f17812d70911040647l35739ed3hf749112d43b79354@mail.gmail.com>
+Date: Wed, 4 Nov 2009 23:30:04 +0800
+Subject: [GIT PULL] pxa: fixes for 2.6.32-rc5
+Message-ID: <f17812d70911040730y38fb769dr1dae9038974c941b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 4, 2009 at 8:14 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
->
-> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+Russell,
 
-ISTR U2D is present on pxa310 _only_, if that's the case, might
-better put the clock into pxa300.c. Please help double check.
+The following changes since commit b6727b12dd2ffb4a890eb5b13a298230c29ba45d:
+  Linus Torvalds (1):
+        Merge git://git.kernel.org/.../gregkh/staging-2.6
 
-> ---
-> ?arch/arm/mach-pxa/pxa3xx.c | ? ?2 ++
-> ?1 files changed, 2 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
-> index 09b7b1a..ca536f2 100644
-> --- a/arch/arm/mach-pxa/pxa3xx.c
-> +++ b/arch/arm/mach-pxa/pxa3xx.c
-> @@ -237,6 +237,7 @@ static DEFINE_PXA3_CKEN(pxa3xx_stuart, STUART, 14857000, 1);
-> ?static DEFINE_PXA3_CKEN(pxa3xx_i2c, I2C, 32842000, 0);
-> ?static DEFINE_PXA3_CKEN(pxa3xx_udc, UDC, 48000000, 5);
-> ?static DEFINE_PXA3_CKEN(pxa3xx_usbh, USBH, 48000000, 0);
-> +static DEFINE_PXA3_CKEN(pxa3xx_u2d, USB2, 48000000, 0);
-> ?static DEFINE_PXA3_CKEN(pxa3xx_keypad, KEYPAD, 32768, 0);
-> ?static DEFINE_PXA3_CKEN(pxa3xx_ssp1, SSP1, 13000000, 0);
-> ?static DEFINE_PXA3_CKEN(pxa3xx_ssp2, SSP2, 13000000, 0);
-> @@ -261,6 +262,7 @@ static struct clk_lookup pxa3xx_clkregs[] = {
-> ? ? ? ?INIT_CLKREG(&clk_pxa3xx_i2c, "pxa2xx-i2c.0", NULL),
-> ? ? ? ?INIT_CLKREG(&clk_pxa3xx_udc, "pxa27x-udc", NULL),
-> ? ? ? ?INIT_CLKREG(&clk_pxa3xx_usbh, "pxa27x-ohci", NULL),
-> + ? ? ? INIT_CLKREG(&clk_pxa3xx_u2d, NULL, "U2DCLK"),
-> ? ? ? ?INIT_CLKREG(&clk_pxa3xx_keypad, "pxa27x-keypad", NULL),
-> ? ? ? ?INIT_CLKREG(&clk_pxa3xx_ssp1, "pxa27x-ssp.0", NULL),
-> ? ? ? ?INIT_CLKREG(&clk_pxa3xx_ssp2, "pxa27x-ssp.1", NULL),
-> --
-> 1.6.0.6
->
->
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
+
+Haojian Zhuang (1):
+      [ARM] pxa: fix resume failure by saving/restoring IPRx registers
+
+Ondrej Zajicek (1):
+      [ARM] pxa/palm: fix incorrect initialization of Palm Tungsten C keyboard
+
+Stanislav Brabec (1):
+      [ARM] pxa/zaurus: fix NAND flash OOB layout for Borzoi
+
+ arch/arm/mach-pxa/irq.c    |   11 ++++++++++-
+ arch/arm/mach-pxa/palmtc.c |    8 ++++----
+ arch/arm/mach-pxa/spitz.c  |   39 +++++++++++++++++++++++----------------
+ 3 files changed, 37 insertions(+), 21 deletions(-)
