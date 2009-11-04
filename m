@@ -1,285 +1,41 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 4 Nov 2009 09:13:16 +0100 (CET)
-Subject: [PATCH 1/3] ezx: Add camera support for A780 and A910 EZX phones
-In-Reply-To: <f17812d70911032238i3ae6fa19g24720662b9079f24@mail.gmail.com>
-References: <1257266734-28673-1-git-send-email-ospite@studenti.unina.it>
-	<1257266734-28673-2-git-send-email-ospite@studenti.unina.it>
-	<f17812d70911032238i3ae6fa19g24720662b9079f24@mail.gmail.com>
-Message-ID: <Pine.LNX.4.64.0911040907400.4837@axis700.grange>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 4 Nov 2009 10:00:59 +0100
+Subject: [PATCH 1/2] [ARM] i2c/pxa: remove unused macro
+In-Reply-To: <20091103210115.GA24955@flint.arm.linux.org.uk>
+References: <1257275000-18866-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20091103210115.GA24955@flint.arm.linux.org.uk>
+Message-ID: <20091104090059.GB23889@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 Nov 2009, Eric Miao wrote:
+Hello,
 
-> Hi Antonio,
+On Tue, Nov 03, 2009 at 09:01:15PM +0000, Russell King wrote:
+> On Tue, Nov 03, 2009 at 08:03:19PM +0100, Uwe Kleine-K?nig wrote:
+> > Commit
+> > 
+> > 	beea494 ([ARM] Remove EEPROM slave emulation from i2c-pxa driver.)
 > 
-> Patch looks generally OK except for the MFP/GPIO usage, check my
-> comments below, thanks.
+> Oh great.  Some people may remember the LX code that I submitted to
+> the mailing list a while back.  Removing the slave emulation buggers
+> that platform up.  I do intend to submit that once the issue of where
+> the PCON support should be located is resolved - which is still
+> pending.
 > 
-> > +/* camera */
-> > +static int a780_pxacamera_init(struct device *dev)
-> > +{
-> > + ? ? ? int err;
-> > +
-> > + ? ? ? /*
-> > + ? ? ? ?* GPIO50_GPIO is CAM_EN: active low
-> > + ? ? ? ?* GPIO19_GPIO is CAM_RST: active high
-> > + ? ? ? ?*/
-> > + ? ? ? err = gpio_request(MFP_PIN_GPIO50, "nCAM_EN");
-> 
-> Mmm... MFP != GPIO, so this probably should be written simply as:
-> 
-> #define GPIO_nCAM_EN	(50)
+> Please revert this change, thanks.
+"this" means beea494 or my patch?  I'm unsure because you (Russell) are
+the author of beea494.
 
-...but without parenthesis, please:
+The main reason for this series was the 2nd patch.  While creating it I
+noticed that eedbg was unused.
 
-#define GPIO_nCAM_EN	50
-
-same everywhere below
-
-> or (which tends to be more accurate but not necessary)
-> 
-> #define GPIO_nCAM_EN	mfp_to_gpio(MFP_PIN_GPIO50)
-> 
-> If platform matters, I suggest something like:
-> 
-> #define GPIO_A780_nCAM_EN	(50)
-> #define GPIO_A910_nCAM_EN	(<something else>)
-> 
-> ...
-> 
-> 	err = gpio_request(GPIO_nCAM_EN, "nCAM_EN");
-> 
-> > + ? ? ? if (err) {
-> > + ? ? ? ? ? ? ? pr_err("%s: Failed to request nCAM_EN\n", __func__);
-> > + ? ? ? ? ? ? ? goto fail;
-> > + ? ? ? }
-> > +
-> > + ? ? ? err = gpio_request(MFP_PIN_GPIO19, "CAM_RST");
-> 
-> ditto
-> 
-> > + ? ? ? if (err) {
-> > + ? ? ? ? ? ? ? pr_err("%s: Failed to request CAM_RST\n", __func__);
-> > + ? ? ? ? ? ? ? goto fail_gpio_cam_rst;
-> > + ? ? ? }
-> > +
-> > + ? ? ? gpio_direction_output(MFP_PIN_GPIO50, 0);
-> > + ? ? ? gpio_direction_output(MFP_PIN_GPIO19, 1);
-> > +
-> > + ? ? ? return 0;
-> > +
-> > +fail_gpio_cam_rst:
-> > + ? ? ? gpio_free(MFP_PIN_GPIO50);
-> > +fail:
-> > + ? ? ? return err;
-> > +}
-> > +
-> > +static int a780_pxacamera_power(struct device *dev, int on)
-> > +{
-> > + ? ? ? gpio_set_value(MFP_PIN_GPIO50, on ? 0 : 1);
-> 
-> 	gpio_set_value(GPIO_nCAM_EN, on ? 0 : 1);
-
-IMHO better yet
-
-	gpio_set_value(GPIO_nCAM_EN, !on);
-
-Also throughout the patch below.
-
-I'm still to look at it miself and maybe provide a couple more comments, 
-if any.
+For this second patch (only defining i2c_pxa_scream_blue_murder if DEBUG
+is #defined) should I rebase it to beea494^ or should I revert beea494
+and put it on top of the reverted beea494?
 
 Thanks
-Guennadi
+Uwe
 
-> 
-> > +
-> > +#if 0
-> > + ? ? ? /*
-> > + ? ? ? ?* This is reported to resolve the "vertical line in view finder"
-> > + ? ? ? ?* issue (LIBff11930), in the original source code released by
-> > + ? ? ? ?* Motorola, but we never experienced the problem, so we don't use
-> > + ? ? ? ?* this for now.
-> > + ? ? ? ?*
-> > + ? ? ? ?* AP Kernel camera driver: set TC_MM_EN to low when camera is running
-> > + ? ? ? ?* and TC_MM_EN to high when camera stops.
-> > + ? ? ? ?*
-> > + ? ? ? ?* BP Software: if TC_MM_EN is low, BP do not shut off 26M clock, but
-> > + ? ? ? ?* BP can sleep itself.
-> > + ? ? ? ?*/
-> > + ? ? ? gpio_set_value(MFP_PIN_GPIO99, on ? 0 : 1);
-> > +#endif
-> 
-> This is a little bit confusing - can we remove this for this stage?
-> 
-> > +
-> > + ? ? ? return 0;
-> > +}
-> > +
-> > +static int a780_pxacamera_reset(struct device *dev)
-> > +{
-> > + ? ? ? gpio_set_value(MFP_PIN_GPIO19, 0);
-> > + ? ? ? msleep(10);
-> > + ? ? ? gpio_set_value(MFP_PIN_GPIO19, 1);
-> 
-> better to define something like above:
-> 
-> #define GPIO_CAM_RESET	(19)
-> 
-> ...
-> 
-> 	gpio_set_value(GPIO_CAM_RESET, ...);
-> 
-> > +
-> > + ? ? ? return 0;
-> > +}
-> > +
-> > +struct pxacamera_platform_data a780_pxacamera_platform_data = {
-> > + ? ? ? .init ? = a780_pxacamera_init,
-> > + ? ? ? .flags ?= PXA_CAMERA_MASTER | PXA_CAMERA_DATAWIDTH_8 |
-> > + ? ? ? ? ? ? ? PXA_CAMERA_PCLK_EN | PXA_CAMERA_MCLK_EN,
-> > + ? ? ? .mclk_10khz = 5000,
-> > +};
-> > +
-> > +static struct i2c_board_info a780_camera_i2c_board_info = {
-> > + ? ? ? I2C_BOARD_INFO("mt9m111", 0x5d),
-> > +};
-> > +
-> > +static struct soc_camera_link a780_iclink = {
-> > + ? ? ? .bus_id ? ? ? ? = 0,
-> > + ? ? ? .flags ? ? ? ? ?= SOCAM_SENSOR_INVERT_PCLK,
-> > + ? ? ? .i2c_adapter_id = 0,
-> > + ? ? ? .board_info ? ? = &a780_camera_i2c_board_info,
-> > + ? ? ? .module_name ? ?= "mt9m111",
-> > + ? ? ? .power ? ? ? ? ?= a780_pxacamera_power,
-> > + ? ? ? .reset ? ? ? ? ?= a780_pxacamera_reset,
-> > +};
-> > +
-> > +static struct platform_device a780_camera = {
-> > + ? ? ? .name ? = "soc-camera-pdrv",
-> > + ? ? ? .id ? ? = 0,
-> > + ? ? ? .dev ? ?= {
-> > + ? ? ? ? ? ? ? .platform_data = &a780_iclink,
-> > + ? ? ? },
-> > +};
-> > +
-> > ?static struct platform_device *a780_devices[] __initdata = {
-> > ? ? ? ?&a780_gpio_keys,
-> > + ? ? ? &a780_camera,
-> > ?};
-> >
-> > ?static void __init a780_init(void)
-> > @@ -699,6 +797,8 @@ static void __init a780_init(void)
-> >
-> > ? ? ? ?pxa_set_keypad_info(&a780_keypad_platform_data);
-> >
-> > + ? ? ? pxa_set_camera_info(&a780_pxacamera_platform_data);
-> > +
-> > ? ? ? ?platform_add_devices(ARRAY_AND_SIZE(ezx_devices));
-> > ? ? ? ?platform_add_devices(ARRAY_AND_SIZE(a780_devices));
-> > ?}
-> > @@ -864,8 +964,84 @@ static struct platform_device a910_gpio_keys = {
-> > ? ? ? ?},
-> > ?};
-> >
-> > +/* camera */
-> > +static int a910_pxacamera_init(struct device *dev)
-> > +{
-> > + ? ? ? int err;
-> > +
-> > + ? ? ? /*
-> > + ? ? ? ?* GPIO50_GPIO is CAM_EN: active low
-> > + ? ? ? ?* GPIO28_GPIO is CAM_RST: active high
-> > + ? ? ? ?*/
-> > + ? ? ? err = gpio_request(MFP_PIN_GPIO50, "nCAM_EN");
-> > + ? ? ? if (err) {
-> > + ? ? ? ? ? ? ? pr_err("%s: Failed to request nCAM_EN\n", __func__);
-> > + ? ? ? ? ? ? ? goto fail;
-> > + ? ? ? }
-> > +
-> > + ? ? ? err = gpio_request(MFP_PIN_GPIO28, "CAM_RST");
-> > + ? ? ? if (err) {
-> > + ? ? ? ? ? ? ? pr_err("%s: Failed to request CAM_RST\n", __func__);
-> > + ? ? ? ? ? ? ? goto fail_gpio_cam_rst;
-> > + ? ? ? }
-> > +
-> > + ? ? ? gpio_direction_output(MFP_PIN_GPIO50, 0);
-> > + ? ? ? gpio_direction_output(MFP_PIN_GPIO28, 1);
-> > +
-> > + ? ? ? return 0;
-> > +
-> > +fail_gpio_cam_rst:
-> > + ? ? ? gpio_free(MFP_PIN_GPIO50);
-> > +fail:
-> > + ? ? ? return err;
-> > +}
-> > +
-> > +static int a910_pxacamera_power(struct device *dev, int on)
-> > +{
-> > + ? ? ? gpio_set_value(MFP_PIN_GPIO50, on ? 0 : 1);
-> > + ? ? ? return 0;
-> > +}
-> > +
-> > +static int a910_pxacamera_reset(struct device *dev)
-> > +{
-> > + ? ? ? gpio_set_value(MFP_PIN_GPIO28, 0);
-> > + ? ? ? msleep(10);
-> > + ? ? ? gpio_set_value(MFP_PIN_GPIO28, 1);
-> > +
-> > + ? ? ? return 0;
-> > +}
-> > +
-> > +struct pxacamera_platform_data a910_pxacamera_platform_data = {
-> > + ? ? ? .init ? = a910_pxacamera_init,
-> > + ? ? ? .flags ?= PXA_CAMERA_MASTER | PXA_CAMERA_DATAWIDTH_8 |
-> > + ? ? ? ? ? ? ? PXA_CAMERA_PCLK_EN | PXA_CAMERA_MCLK_EN,
-> > + ? ? ? .mclk_10khz = 5000,
-> > +};
-> > +
-> > +static struct i2c_board_info a910_camera_i2c_board_info = {
-> > + ? ? ? I2C_BOARD_INFO("mt9m111", 0x5d),
-> > +};
-> > +
-> > +static struct soc_camera_link a910_iclink = {
-> > + ? ? ? .bus_id ? ? ? ? = 0,
-> > + ? ? ? .i2c_adapter_id = 0,
-> > + ? ? ? .board_info ? ? = &a910_camera_i2c_board_info,
-> > + ? ? ? .module_name ? ?= "mt9m111",
-> > + ? ? ? .power ? ? ? ? ?= a910_pxacamera_power,
-> > + ? ? ? .reset ? ? ? ? ?= a910_pxacamera_reset,
-> > +};
-> > +
-> > +static struct platform_device a910_camera = {
-> > + ? ? ? .name ? = "soc-camera-pdrv",
-> > + ? ? ? .id ? ? = 0,
-> > + ? ? ? .dev ? ?= {
-> > + ? ? ? ? ? ? ? .platform_data = &a910_iclink,
-> > + ? ? ? },
-> > +};
-> > +
-> > ?static struct platform_device *a910_devices[] __initdata = {
-> > ? ? ? ?&a910_gpio_keys,
-> > + ? ? ? &a910_camera,
-> > ?};
-> >
-> > ?static void __init a910_init(void)
-> > @@ -880,6 +1056,8 @@ static void __init a910_init(void)
-> >
-> > ? ? ? ?pxa_set_keypad_info(&a910_keypad_platform_data);
-> >
-> > + ? ? ? pxa_set_camera_info(&a910_pxacamera_platform_data);
-> > +
-> > ? ? ? ?platform_add_devices(ARRAY_AND_SIZE(ezx_devices));
-> > ? ? ? ?platform_add_devices(ARRAY_AND_SIZE(a910_devices));
-> > ?}
-> > --
-> > 1.6.5.2
-> >
-> >
-> 
-
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
