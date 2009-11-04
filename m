@@ -1,30 +1,54 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 4 Nov 2009 23:30:04 +0800
-Subject: [GIT PULL] pxa: fixes for 2.6.32-rc5
-Message-ID: <f17812d70911040730y38fb769dr1dae9038974c941b@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 04 Nov 2009 16:25:38 +0000
+Subject: [GIT PULL] RealView and ARMv7 patches for 2.6.33
+Message-ID: <1257351938.26524.117.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Hi Russell,
 
-The following changes since commit b6727b12dd2ffb4a890eb5b13a298230c29ba45d:
+Could you please pull the branch below for the upcoming merging window?
+
+There are two patches for checking whether the SCU and the SMP/nAMP
+modes are already initialised (if running in non-secure mode) which were
+posted on the list but haven't got any comments (they are trivial
+anyway).
+
+Thanks.
+
+
+The following changes since commit b419148e567728f6af0c3b01965c1cc141e3e13a:
   Linus Torvalds (1):
-        Merge git://git.kernel.org/.../gregkh/staging-2.6
+        Linux 2.6.32-rc6
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
+  git://linux-arm.org/linux-2.6.git for-rmk
 
-Haojian Zhuang (1):
-      [ARM] pxa: fix resume failure by saving/restoring IPRx registers
+Catalin Marinas (3):
+      Check whether the SCU was already initialised
+      RealView: Add default memory configuration
+      RealView: Add sparsemem support for the RealView PBX platform
 
-Ondrej Zajicek (1):
-      [ARM] pxa/palm: fix incorrect initialization of Palm Tungsten C keyboard
+Colin Tuckley (1):
+      RealView: Remove duplicated #define REALVIEW_SYS_FLAGS* statements
 
-Stanislav Brabec (1):
-      [ARM] pxa/zaurus: fix NAND flash OOB layout for Borzoi
+Tony Thompson (1):
+      ARMv7: Check whether the SMP/nAMP mode was already enabled
 
- arch/arm/mach-pxa/irq.c    |   11 ++++++++++-
- arch/arm/mach-pxa/palmtc.c |    8 ++++----
- arch/arm/mach-pxa/spitz.c  |   39 +++++++++++++++++++++++----------------
- 3 files changed, 37 insertions(+), 21 deletions(-)
+ arch/arm/kernel/smp_scu.c                    |    4 ++
+ arch/arm/mach-realview/Kconfig               |    8 ++++-
+ arch/arm/mach-realview/core.c                |   42 +++++++++++++++++++++-
+ arch/arm/mach-realview/core.h                |    6 +++
+ arch/arm/mach-realview/include/mach/memory.h |   49 ++++++++++++++++++++++++++
+ arch/arm/mach-realview/platsmp.c             |    5 +--
+ arch/arm/mach-realview/realview_eb.c         |    1 +
+ arch/arm/mach-realview/realview_pb1176.c     |   13 +++++++
+ arch/arm/mach-realview/realview_pb11mp.c     |    1 +
+ arch/arm/mach-realview/realview_pba8.c       |    1 +
+ arch/arm/mach-realview/realview_pbx.c        |   21 +++++++++++
+ arch/arm/mm/proc-v7.S                        |    7 ++--
+ 12 files changed, 149 insertions(+), 9 deletions(-)
+
+-- 
+Catalin
