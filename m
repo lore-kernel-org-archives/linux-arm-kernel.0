@@ -1,102 +1,59 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 4 Nov 2009 14:40:10 +0800
-Subject: [PATCH 2/3] ezx: Add leds-lp3944 support for A910 EZX phone
-In-Reply-To: <1257266734-28673-3-git-send-email-ospite@studenti.unina.it>
+Date: Wed, 4 Nov 2009 14:42:09 +0800
+Subject: [PATCH 0/3] ezx: A780/A910 camera, A910 leds, ezx_defconfig
+	update
+In-Reply-To: <20091103214020.a5f6bac9.ospite@studenti.unina.it>
 References: <1257266734-28673-1-git-send-email-ospite@studenti.unina.it>
-	<1257266734-28673-2-git-send-email-ospite@studenti.unina.it>
-	<1257266734-28673-3-git-send-email-ospite@studenti.unina.it>
-Message-ID: <f17812d70911032240x39ee949fye2eb8475c78a7079@mail.gmail.com>
+	<20091103174430.GA20822@excalibur.local>
+	<20091103214020.a5f6bac9.ospite@studenti.unina.it>
+Message-ID: <f17812d70911032242l343008c5y48b35666f6d214d7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch looks good, will apply later.
+On Wed, Nov 4, 2009 at 4:40 AM, Antonio Ospite <ospite@studenti.unina.it> wrote:
+> On Tue, 3 Nov 2009 18:44:30 +0100
+> Stefan Schmidt <stefan@datenfreihafen.org> wrote:
+>
+>> Hello.
+>>
+>> [Put Eric in CC]
+>>
+>
+> <OT>
+> Thanks, I've realized that the best practice to write the summary
+> message is via 'git format-patch --cover-letter' to add the needed
+> recipients, rather than using 'git send-email --compose' which doesn't
+> process CCs, BCCs and SOBs for the introduction message.
+> </OT>
+>
+>> On Tue, 2009-11-03 at 17:45, Antonio Ospite wrote:
+>> >
+>> > some updates for the EZX platform:
+>>
+>> Thanks for driving this forward.
+>>
+>> > [PATCH 1/3] ezx: Add camera support for A780 and A910 EZX phones
+>> > [PATCH 2/3] ezx: Add leds-lp3944 support for A910 EZX phone
+>> > [PATCH 3/3] ezx: Update ezx_defconfig now that ezx-pcap is in
+>> >
+>> > Are we still in time for 2.6.32?
+>>
+>> Given that we are near -rc6 and this is clearly no fix I would say no. But Eric
+>> should be happy to apply it to his devel branch which will hit Linus tree during
+>> the next merge window.
+>>
+>
+> That's fine, of course.
+>
+>> Eric, Antonio is doing a good deal of the current work at OpenEZX. If you need
+>> an ACK anyway you can put mine into it.
+>>
+>> Acked-by: Stefan Schmidt <stefan@datenfreihafen.org>
+>>
 
-On Wed, Nov 4, 2009 at 12:45 AM, Antonio Ospite
-<ospite@studenti.unina.it> wrote:
-> Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
-> ---
-> ?arch/arm/mach-pxa/ezx.c | ? 53 +++++++++++++++++++++++++++++++++++++++++++++++
-> ?1 files changed, 53 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/ezx.c b/arch/arm/mach-pxa/ezx.c
-> index 9faa6e5..ac58083 100644
-> --- a/arch/arm/mach-pxa/ezx.c
-> +++ b/arch/arm/mach-pxa/ezx.c
-> @@ -19,6 +19,7 @@
-> ?#include <linux/input.h>
-> ?#include <linux/gpio.h>
-> ?#include <linux/gpio_keys.h>
-> +#include <linux/leds-lp3944.h>
->
-> ?#include <media/soc_camera.h>
->
-> @@ -1039,6 +1040,57 @@ static struct platform_device a910_camera = {
-> ? ? ? ?},
-> ?};
->
-> +/* leds-lp3944 */
-> +static struct lp3944_platform_data a910_lp3944_leds = {
-> + ? ? ? .leds_size = LP3944_LEDS_MAX,
-> + ? ? ? .leds = {
-> + ? ? ? ? ? ? ? [0] = {
-> + ? ? ? ? ? ? ? ? ? ? ? .name = "a910:red:",
-> + ? ? ? ? ? ? ? ? ? ? ? .status = LP3944_LED_STATUS_OFF,
-> + ? ? ? ? ? ? ? ? ? ? ? .type = LP3944_LED_TYPE_LED,
-> + ? ? ? ? ? ? ? },
-> + ? ? ? ? ? ? ? [1] = {
-> + ? ? ? ? ? ? ? ? ? ? ? .name = "a910:green:",
-> + ? ? ? ? ? ? ? ? ? ? ? .status = LP3944_LED_STATUS_OFF,
-> + ? ? ? ? ? ? ? ? ? ? ? .type = LP3944_LED_TYPE_LED,
-> + ? ? ? ? ? ? ? },
-> + ? ? ? ? ? ? ? [2] {
-> + ? ? ? ? ? ? ? ? ? ? ? .name = "a910:blue:",
-> + ? ? ? ? ? ? ? ? ? ? ? .status = LP3944_LED_STATUS_OFF,
-> + ? ? ? ? ? ? ? ? ? ? ? .type = LP3944_LED_TYPE_LED,
-> + ? ? ? ? ? ? ? },
-> + ? ? ? ? ? ? ? /* Leds 3 and 4 are used as display power switches */
-> + ? ? ? ? ? ? ? [3] = {
-> + ? ? ? ? ? ? ? ? ? ? ? .name = "a910::cli_display",
-> + ? ? ? ? ? ? ? ? ? ? ? .status = LP3944_LED_STATUS_OFF,
-> + ? ? ? ? ? ? ? ? ? ? ? .type = LP3944_LED_TYPE_LED_INVERTED
-> + ? ? ? ? ? ? ? },
-> + ? ? ? ? ? ? ? [4] = {
-> + ? ? ? ? ? ? ? ? ? ? ? .name = "a910::main_display",
-> + ? ? ? ? ? ? ? ? ? ? ? .status = LP3944_LED_STATUS_ON,
-> + ? ? ? ? ? ? ? ? ? ? ? .type = LP3944_LED_TYPE_LED_INVERTED
-> + ? ? ? ? ? ? ? },
-> + ? ? ? ? ? ? ? [5] = { .type = LP3944_LED_TYPE_NONE },
-> + ? ? ? ? ? ? ? [6] = {
-> + ? ? ? ? ? ? ? ? ? ? ? .name = "a910::torch",
-> + ? ? ? ? ? ? ? ? ? ? ? .status = LP3944_LED_STATUS_OFF,
-> + ? ? ? ? ? ? ? ? ? ? ? .type = LP3944_LED_TYPE_LED,
-> + ? ? ? ? ? ? ? },
-> + ? ? ? ? ? ? ? [7] = {
-> + ? ? ? ? ? ? ? ? ? ? ? .name = "a910::flash",
-> + ? ? ? ? ? ? ? ? ? ? ? .status = LP3944_LED_STATUS_OFF,
-> + ? ? ? ? ? ? ? ? ? ? ? .type = LP3944_LED_TYPE_LED_INVERTED,
-> + ? ? ? ? ? ? ? },
-> + ? ? ? },
-> +};
-> +
-> +static struct i2c_board_info __initdata a910_i2c_board_info[] = {
-> + ? ? ? {
-> + ? ? ? ? ? ? ? I2C_BOARD_INFO("lp3944", 0x60),
-> + ? ? ? ? ? ? ? .platform_data = &a910_lp3944_leds,
-> + ? ? ? },
-> +};
-> +
-> ?static struct platform_device *a910_devices[] __initdata = {
-> ? ? ? ?&a910_gpio_keys,
-> ? ? ? ?&a910_camera,
-> @@ -1051,6 +1103,7 @@ static void __init a910_init(void)
-> ? ? ? ?pxa2xx_mfp_config(ARRAY_AND_SIZE(a910_pin_config));
->
-> ? ? ? ?pxa_set_i2c_info(NULL);
-> + ? ? ? i2c_register_board_info(0, ARRAY_AND_SIZE(a910_i2c_board_info));
->
-> ? ? ? ?set_pxa_fb_info(&ezx_fb_info_2);
->
-> --
-> 1.6.5.2
->
->
+Thanks Stefan and Antonio,
+
+We are still in -rc phase so will not likely miss the next merge window
+once you get the MFP/GPIO issue solved.
+
+BTW: I didn't see [PATCH 3/3], or maybe I overlooked?
