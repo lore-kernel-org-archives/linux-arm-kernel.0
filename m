@@ -1,32 +1,52 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 04 Nov 2009 11:00:27 +0100
-Subject: [GIT PULL] AT91/AVR32 some common macros
-In-Reply-To: <20091103185635.GE8322@hezmatt.org>
-References: <4AF07242.3070803@atmel.com>
-	<alpine.LFD.2.01.0911031014340.31845@localhost.localdomain>
-	<20091103185635.GE8322@hezmatt.org>
-Message-ID: <4AF150BB.3020309@atmel.com>
+From: pieterg@gmx.com (pieterg)
+Date: Wed, 4 Nov 2009 11:05:34 +0100
+Subject: pxafb: RGBT555 support
+In-Reply-To: <f17812d70911040134r205f81a0v59cec86d355f2b55@mail.gmail.com>
+References: <200910291235.55826.pieterg@gmx.com>
+	<200911041028.28859.pieterg@gmx.com>
+	<f17812d70911040134r205f81a0v59cec86d355f2b55@mail.gmail.com>
+Message-ID: <200911041105.34359.pieterg@gmx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Matthew Palmer :
-> On Tue, Nov 03, 2009 at 10:15:38AM -0800, Linus Torvalds wrote:
->> On Tue, 3 Nov 2009, Nicolas Ferre wrote:
->>> If it not bother you too much to pull such a tiny and 
->>> trivial piece of code, can you please pull:
->>>
->>>   git://github.com/at91linux/linux-2.6-at91.git for-linus
->> 	"fatal: The remote end hung up unexpectedly"
-> 
-> Something was hinky with the repository; I don't know why, but it was
-> missind the git-daemon-export-ok flag file.  It's working now.
+On Wednesday 04 November 2009 10:34:25 Eric Miao wrote:
+> On Wed, Nov 4, 2009 at 5:28 PM, pieterg <pieterg@gmx.com> wrote:
+> > On Thursday 29 October 2009 12:35:55 pieterg wrote:
+> >> Great to see the 'recent' work on overlay support and color format
+> >> fixes in pxafb.c.
+> >> Looks like I no longer need my local patches.
+> >>
+> >> However, there is one thing that I cannot seem to accomplish just yet.
+> >> We have an LCD which is connected in an RGBT555 configuration.
+> >> That means somehow var->transp.length should be set to 1.
+> >> After that, it looks like pxafb_set_pxifmt should do its job just
+> >> fine.
+> >>
+> >> Would it make sense to add transparency info to pxafb_mode_info?
+> >> After all it is a hardware property, with our LCD and the way it is
+> >> connected we won't be able to do RGB565, so our var->transp.length
+> >> should be fixed at 1.
+> >> If pxafb_setmode could do that, based on the pxafb_mode_info, that
+> >> would probably solve my problem.
+> >> Maybe something could be done by comparing 'depth' and 'bpp', if one
+> >> is 16 and the other 15, one could make the assumption the remaining
+> >> bit is used for transparency.
+> >>
+> >> Or am I overlooking something here, and is there a better way to force
+> >> pxafb to RGBT555 for my LCD?
+> >
+> > Sorry to ask again, but is there an official/preferred way to select
+> > RGBT555 mode in pxafb, or should I just continue hacking it in for now?
+>
+> Unfortunately, transparency is part of depth and it's really not easy to
+> distinguish between RGB565 and RGBT555 by depth and bits_per_pixel
+> only without introducing something else.
 
-Linus, I have seen the merge. Thank you.
-
-Matthew, thanks for handling the repository error.
-
-Sorry for the false start...
-
-Best regards,
--- 
-Nicolas Ferre
+So perhaps something like this (untested)?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-pxafb-added-transparency-field-to-pxafb_mode_info-st.patch
+Type: text/x-diff
+Size: 1364 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091104/f63783f4/attachment.bin>
