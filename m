@@ -1,98 +1,47 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 2 Nov 2009 12:12:39 +0100
-Subject: msm_sdcc.c: add missing include, fix compilation
-In-Reply-To: <20091022185126.GA4401@n2100.arm.linux.org.uk>
-References: <20091022072119.GA3285@elf.ucw.cz>
-	<20091022185126.GA4401@n2100.arm.linux.org.uk>
-Message-ID: <20091102111239.GB26989@elf.ucw.cz>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Wed, 4 Nov 2009 14:15:01 +0100
+Subject: imx27 - hanging at freeing init memory -- getting some junk
+	characters here after on console ..
+In-Reply-To: <OF15AFD08D.F28F9544-ON65257664.002A1275-65257664.002A127F@tcs.com>
+References: <OF15AFD08D.F28F9544-ON65257664.002A1275-65257664.002A127F@tcs.com>
+Message-ID: <20091104131500.GZ14091@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > Add missing include for	msm_sdcc compilation.
-> > 
-> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+On Wed, Nov 04, 2009 at 01:09:32PM +0530, Vadivelan M wrote:
+>      I am porting Linux-2.6.28 Kernel on IMX27based board.
+>      Filesystem is mounted and after that we are getting message Freeing init
+>      memory and some junk characters are coming. Keyboards are responding.
+>      Can anybody help us in this regard.
 > 
-> I don't think this is the right solution - why should MSM have a
-> platform specific include in the ARM generic include files?
+>      Thanks,
 > 
-> (If anything, we should be getting rid of any non-shared platform
-> specific includes in the arch/arm/include/asm/mach directory.)
+>      Please see the following logs ..
+> 
+>      Launch LinuxUncompressing
+>      Linux......................................................................
+>      done, booting the kernel.
+>      Linux version 2.6.28-arm2 (root at localhost.localdomain) (gcc version
+>      4.1.1) #75 Wed Oct 28 13:12:53 IST 2009
+>      CPU: ARM926EJ-S [41069264] revision 4 (ARMv5TEJ), cr=00053177
+>      CPU: VIVT data cache, VIVT instruction cache
+>      Machine: Freescale i.MX27ADS
+>      Kernel command line: root=/dev/ram rw mem=64M console=ttymxc0,115200
 
-Ok.
+Your kernel uses 115200 baud to output these messages ...
 
----
+[...]
 
-Add missing include for msm_sdcc compilation, and remove pwrsink
-support that is not mainline, yet.
+>      EXT2-fs warning: mounting unchecked fs, running e2fsck is recommended
+>      VFS: Mounted root (ext2 filesystem).
+>      Freeing init memory: 92K
+> 
+>      After this some junk characters are coming like ....
+> 
+>      &#65533;&#65533;&#1421;&#65533;&#531488;0^&#1949;&#65533;&#65533;r&#65533;'&#65533;&#65533;&#65533;j&#65533;&#65533;r:&#65533;&#65533;&#65533;&#65533;&#65533;&#65533;&#65533;:&#65533;&#65533;M&#65533;.&#65533;&#65533;D&#65533;d&#65533;z.?&#65533;&#65533;.T&#65533;&#65533;8V&#65533;`&#65533;T&#65533;&#65533;&#65533;V&#51082;]nn]^&#65400;&#65533;m8m&#65533;&#65533;^&#65533;.&#65533;m&#65533;.E&#65533;&#65533;N&#65533;&#65533;8&#65533;&#65533;6&#65533;&#65533;&#65533;:]&#65533;&#65533;&#65533;
 
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
+... and in your inittab, there seems to be a getty registered which
+operates at a different speed. Change either of the two and you should
+be fine.
 
-diff --git a/arch/arm/mach-msm/include/mach/mmc.h b/arch/arm/mach-msm/include/mach/mmc.h
-new file mode 100644
-index 0000000..8948dec
---- /dev/null
-+++ b/arch/arm/mach-msm/include/mach/mmc.h
-@@ -0,0 +1,26 @@
-+/*
-+ *  arch/arm/include/asm/mach/mmc.h
-+ */
-+#ifndef ASMARM_MACH_MMC_H
-+#define ASMARM_MACH_MMC_H
-+
-+#include <linux/mmc/host.h>
-+#include <linux/mmc/card.h>
-+#include <linux/mmc/sdio_func.h>
-+
-+struct embedded_sdio_data {
-+        struct sdio_cis cis;
-+        struct sdio_cccr cccr;
-+        struct sdio_embedded_func *funcs;
-+        int num_funcs;
-+};
-+
-+struct mmc_platform_data {
-+	unsigned int ocr_mask;			/* available voltages */
-+	u32 (*translate_vdd)(struct device *, unsigned int);
-+	unsigned int (*status)(struct device *);
-+	struct embedded_sdio_data *embedded_sdio;
-+	int (*register_status_notify)(void (*callback)(int card_present, void *dev_id), void *dev_id);
-+};
-+
-+#endif
-diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
-index dba4600..b31946e 100644
---- a/drivers/mmc/host/msm_sdcc.c
-+++ b/drivers/mmc/host/msm_sdcc.c
-@@ -38,10 +38,9 @@
- #include <asm/div64.h>
- #include <asm/sizes.h>
- 
--#include <asm/mach/mmc.h>
-+#include <mach/mmc.h>
- #include <mach/msm_iomap.h>
- #include <mach/dma.h>
--#include <mach/htc_pwrsink.h>
- 
- #include "msm_sdcc.h"
- 
-@@ -775,13 +774,11 @@ msmsdcc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 
- 	switch (ios->power_mode) {
- 	case MMC_POWER_OFF:
--		htc_pwrsink_set(PWRSINK_SDCARD, 0);
- 		break;
- 	case MMC_POWER_UP:
- 		pwr |= MCI_PWR_UP;
- 		break;
- 	case MMC_POWER_ON:
--		htc_pwrsink_set(PWRSINK_SDCARD, 100);
- 		pwr |= MCI_PWR_ON;
- 		break;
- 	}
-
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Daniel
