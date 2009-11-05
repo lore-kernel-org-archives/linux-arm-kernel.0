@@ -1,136 +1,91 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Thu,  5 Nov 2009 18:13:36 +0100
-Subject: [PATCH 3/3] ARM: MXC: mxcmmc: Teach the driver SDIO operations
-In-Reply-To: <1257441216-19604-3-git-send-email-daniel@caiaq.de>
-References: <1257441216-19604-1-git-send-email-daniel@caiaq.de>
-	<1257441216-19604-2-git-send-email-daniel@caiaq.de>
-	<1257441216-19604-3-git-send-email-daniel@caiaq.de>
-Message-ID: <1257441216-19604-4-git-send-email-daniel@caiaq.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 5 Nov 2009 17:29:54 +0000
+Subject: kernel BUG at kernel/posix-cpu-timers.c:1389!
+In-Reply-To: <3972542e0911050907y37f7112frdcb6354313d40c2@mail.gmail.com>
+References: <3972542e0910300953s725bebd0ua5a0d1db557d408a@mail.gmail.com>
+	<f17812d70910310732o5568a183i2504d2d926a95df1@mail.gmail.com>
+	<4AEF0D3D.4070708@atmel.com>
+	<20091102165441.GE5785@n2100.arm.linux.org.uk>
+	<3972542e0911050907y37f7112frdcb6354313d40c2@mail.gmail.com>
+Message-ID: <20091105172953.GE21681@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Successfully tested on MX31 hardware using libertas SDIO peripherals.
+On Thu, Nov 05, 2009 at 11:07:41AM -0600, E Robertson wrote:
+> On Mon, Nov 2, 2009 at 10:54 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Mon, Nov 02, 2009 at 05:47:57PM +0100, Nicolas Ferre wrote:
+> >> in arch/arm/mach-at91/at91sam926x_time.c +125
+> >> ?.flags = IRQF_SHARED | IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+> >>
+> >> IRQF_DISABLED is positionned. But on the other hand, I saw in the kernel
+> >> booting messages that:
+> >> "IRQ 1/rtc0: IRQF_DISABLED is not guaranteed on shared IRQs"
+> >>
+> >> What does this mean ? what is the difference with former way of managing
+> >> shared interrupts ?
+> >
+> > If the first IRQ action which is run was registered without IRQF_DISABLED
+> > the entire set will be run without interrupts disabled.
+> >
+> >> And above all, what is the proper way to set an IRQ on a shared
+> >> interrupt line ?
+> >
+> > The only real solution is to ensure that all requesters use IRQF_DISABLED.
+> >
+> 
+> I don't see where this could be the cause of this problem. The bug
+> happens after the system is running and I attempt to use the select
+> method for polling (serial port & uevents).  Without this the bug [
+> BUG_ON(!irqs_disabled()); ]  did not occur.  I added the flag to the
+> requesters but that did not help, maybe I overlooked something.
 
-Signed-off-by: Daniel Mack <daniel@caiaq.de>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Dan Williams <dan.j.williams@intel.com>
----
- drivers/mmc/host/mxcmmc.c |   48 ++++++++++++++++++++++++++++++++++++--------
- 1 files changed, 39 insertions(+), 9 deletions(-)
+Well, run_posix_cpu_timers() must be called with interrupts disabled.
+This bug indicates that this has been violated.
 
-diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
-index 8aa6de0..01324c5 100644
---- a/drivers/mmc/host/mxcmmc.c
-+++ b/drivers/mmc/host/mxcmmc.c
-@@ -119,6 +119,7 @@ struct mxcmci_host {
- 	int			detect_irq;
- 	int			dma;
- 	int			do_dma;
-+	int			use_sdio;
- 	unsigned int		power_mode;
- 	struct imxmmc_platform_data *pdata;
- 
-@@ -138,6 +139,7 @@ struct mxcmci_host {
- 	int			clock;
- 
- 	struct work_struct	datawork;
-+	spinlock_t		lock;
- };
- 
- static void mxcmci_set_clk_rate(struct mxcmci_host *host, unsigned int clk_ios);
-@@ -226,6 +228,8 @@ static int mxcmci_setup_data(struct mxcmci_host *host, struct mmc_data *data)
- static int mxcmci_start_cmd(struct mxcmci_host *host, struct mmc_command *cmd,
- 		unsigned int cmdat)
- {
-+	u32 int_cntr;
-+
- 	WARN_ON(host->cmd != NULL);
- 	host->cmd = cmd;
- 
-@@ -249,13 +253,15 @@ static int mxcmci_start_cmd(struct mxcmci_host *host, struct mmc_command *cmd,
- 		return -EINVAL;
- 	}
- 
-+	int_cntr = INT_END_CMD_RES_EN;
-+
- 	if (mxcmci_use_dma(host))
--		writel(INT_READ_OP_EN | INT_WRITE_OP_DONE_EN |
--				INT_END_CMD_RES_EN,
--				host->base + MMC_REG_INT_CNTR);
--	else
--		writel(INT_END_CMD_RES_EN, host->base + MMC_REG_INT_CNTR);
-+		int_cntr |= INT_READ_OP_EN | INT_WRITE_OP_DONE_EN;
-+
-+	if (host->use_sdio)
-+		int_cntr |= INT_SDIO_IRQ_EN;
- 
-+	writel(int_cntr, host->base + MMC_REG_INT_CNTR);
- 	writew(cmd->opcode, host->base + MMC_REG_CMD);
- 	writel(cmd->arg, host->base + MMC_REG_ARG);
- 	writew(cmdat, host->base + MMC_REG_CMD_DAT_CONT);
-@@ -536,8 +542,12 @@ static irqreturn_t mxcmci_irq(int irq, void *devid)
- 
- 	dev_dbg(mmc_dev(host->mmc), "%s: 0x%08x\n", __func__, stat);
- 
-+	if ((stat & STATUS_SDIO_INT_ACTIVE) && host->use_sdio)
-+		mmc_signal_sdio_irq(host->mmc);
-+
- 	if (stat & STATUS_END_CMD_RESP)
- 		mxcmci_cmd_done(host, stat);
-+
- #ifdef HAS_DMA
- 	if (mxcmci_use_dma(host) &&
- 		  (stat & (STATUS_DATA_TRANS_DONE | STATUS_WRITE_OP_DONE)))
-@@ -674,11 +684,30 @@ static int mxcmci_get_ro(struct mmc_host *mmc)
- 	return -ENOSYS;
- }
- 
-+static void mxcmci_enable_sdio_irq(struct mmc_host *mmc, int enable)
-+{
-+	struct mxcmci_host *host = mmc_priv(mmc);
-+	unsigned long flags;
-+	u32 int_cntr;
-+
-+	spin_lock_irqsave(&host->lock, flags);
-+	host->use_sdio = enable;
-+	int_cntr = readl(host->base + MMC_REG_INT_CNTR);
-+
-+	if (enable)
-+		int_cntr |= INT_SDIO_IRQ_EN;
-+	else
-+		int_cntr &= ~INT_SDIO_IRQ_EN;
-+
-+	writel(int_cntr, host->base + MMC_REG_INT_CNTR);
-+	spin_unlock_irqrestore(&host->lock, flags);
-+}
- 
- static const struct mmc_host_ops mxcmci_ops = {
--	.request	= mxcmci_request,
--	.set_ios	= mxcmci_set_ios,
--	.get_ro		= mxcmci_get_ro,
-+	.request		= mxcmci_request,
-+	.set_ios		= mxcmci_set_ios,
-+	.get_ro			= mxcmci_get_ro,
-+	.enable_sdio_irq	= mxcmci_enable_sdio_irq,
- };
- 
- static int mxcmci_probe(struct platform_device *pdev)
-@@ -706,7 +735,7 @@ static int mxcmci_probe(struct platform_device *pdev)
- 	}
- 
- 	mmc->ops = &mxcmci_ops;
--	mmc->caps = MMC_CAP_4_BIT_DATA;
-+	mmc->caps = MMC_CAP_4_BIT_DATA | MMC_CAP_SDIO_IRQ;
- 
- 	/* MMC core transfer sizes tunable parameters */
- 	mmc->max_hw_segs = 64;
-@@ -725,6 +754,7 @@ static int mxcmci_probe(struct platform_device *pdev)
- 
- 	host->mmc = mmc;
- 	host->pdata = pdev->dev.platform_data;
-+	spin_lock_init(&host->lock);
- 
- 	if (host->pdata && host->pdata->ocr_avail)
- 		mmc->ocr_avail = host->pdata->ocr_avail;
--- 
-1.6.5.2
+Since we know that the timer stuff works on virtually every other
+platform which makes use of the generic time infrastructure, I doubt
+you've found a bug in it - so that tends to eliminate tick_handle_periodic()
+and below in the call chain.  (Oh how I absolutely detest how genirq is
+completely undocumented with respect to details like this, and people
+are left to guess.)
+
+So, the only thing that leaves is that tick_handle_periodic() was called
+with IRQs enabled.
+
+You could try putting a BUG_ON(!irqs_disabled()) in parent functions to
+trace where interrupts are being re-enabled, but I think you'll find that
+at91sam926x_pit_interrupt() was called with IRQs enabled.
+
+Now, for any shared interrupt, where some handlers are registered with
+IRQF_DISABLED and non-IRQF_DISABLED can lead to IRQF_DISABLED handlers
+being called with IRQs enabled (hence the "IRQF_SHARED is not guaranteed
+on shared IRQs" warning).  So... the solution is as I said above.
+
+> [<c00da3a8>] (__bug+0x0/0x2c) from [<c0105444>] (run_posix_cpu_timers+0x34/0x88
+> 4)
+> [<c0105410>] (run_posix_cpu_timers+0x0/0x884) from [<c00f8a24>] (update_process
+> _times+0x5c/0x60)
+> [<c00f89c8>] (update_process_times+0x0/0x60) from [<c010dafc>] (tick_periodic+0
+> xb8/0xdc)
+>  r6:00000001 r5:c0345790 r4:00000000
+> [<c010da44>] (tick_periodic+0x0/0xdc) from [<c010db40>] (tick_handle_periodic+0
+> x20/0xd0)
+>  r5:c032a954 r4:00000001
+> [<c010db20>] (tick_handle_periodic+0x0/0xd0) from [<c00dfaf0>] (at91sam926x_pit
+> _interrupt+0x60/0x90)
+> [<c00dfa90>] (at91sam926x_pit_interrupt+0x0/0x90) from [<c0113ba8>] (handle_IRQ
+> _event+0x44/0x10c)
+>  r5:00000001 r4:c032a99c
+> [<c0113b64>] (handle_IRQ_event+0x0/0x10c) from [<c011582c>] (handle_level_irq+0
+> xc4/0x13c)
+>  r8:00000000 r7:c032a99c r6:00000000 r5:00000001 r4:c032e034
+> [<c0115768>] (handle_level_irq+0x0/0x13c) from [<c00d606c>] (asm_do_IRQ+0x6c/0x
+> 9c)
+>  r7:00000001 r6:00000000 r5:c0333e58 r4:00000001
+> [<c00d6000>] (asm_do_IRQ+0x0/0x9c) from [<c00d6a5c>] (__irq_svc+0x3c/0x80)
+> Exception stack(0xc1ce5f60 to 0xc1ce5fa8)
+> 5f60: 00000006 beebaaa8 00000000 00000000 beebaaa0 beebaaa8 00000005 0000008e
+> 5f80: c00d6fe4 c1ce4000 4004e108 00000000 00000000 c1ce5fa8 c00d6e40 c014bc68
+> 5fa0: 80000013 ffffffff
+>  r6:00000001 r5:fefff000 r4:ffffffff
