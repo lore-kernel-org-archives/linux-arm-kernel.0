@@ -1,49 +1,54 @@
-From: niej0001@gmail.com (Jun Nie)
-Date: Thu, 5 Nov 2009 10:15:32 +0800
-Subject: [PATCH 3/6] pxa: fix pxa168 lcd controller vsync/hsync timing
-	error
-In-Reply-To: <f17812d70911032320k379dc7laab1979a3b452969@mail.gmail.com>
-References: <7c34ac520911022245x7f002a7at846a835dfded550c@mail.gmail.com>
-	<f17812d70911032320k379dc7laab1979a3b452969@mail.gmail.com>
-Message-ID: <7c34ac520911041815k6555e209r4039ae9f97c9ebca@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 5 Nov 2009 10:48:17 +0800
+Subject: [PATCH 1/3 v2] ezx: Add camera support for A780 and A910 EZX
+	phones
+In-Reply-To: <Pine.LNX.4.64.0911050040160.4837@axis700.grange>
+References: <f17812d70911040119g6eb1f254pa78dd8519afef61d@mail.gmail.com>
+	<1257367650-15056-1-git-send-email-ospite@studenti.unina.it>
+	<Pine.LNX.4.64.0911050040160.4837@axis700.grange>
+Message-ID: <f17812d70911041848r5a8e961u1a461c00af809ffc@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/11/4 Eric Miao <eric.y.miao@gmail.com>:
-> On Tue, Nov 3, 2009 at 2:45 PM, Jun Nie <niej0001@gmail.com> wrote:
->> pxa: fix pxa168 lcd controller vsync/hsync timing error
->>
->> Signed-off-by: Jun Nie <njun@marvell.com>
->> ---
->> ?drivers/video/pxa168fb.c | ? ?4 ++--
->> ?include/video/pxa168fb.h | ? ?2 --
->> ?2 files changed, 2 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
->> index 2ba1444..bdd524c 100644
->> --- a/drivers/video/pxa168fb.c
->> +++ b/drivers/video/pxa168fb.c
->> @@ -459,8 +459,8 @@ static void set_dumb_panel_control(struct fb_info *info)
->> ? ? ? ?x |= mi->invert_composite_blank ? 0x00000040 : 0;
->> ? ? ? ?x |= (info->var.sync & FB_SYNC_COMP_HIGH_ACT) ? 0x00000020 : 0;
->> ? ? ? ?x |= mi->invert_pix_val_ena ? 0x00000010 : 0;
->> - ? ? ? x |= (info->var.sync & FB_SYNC_VERT_HIGH_ACT) ? 0 : 0x00000008;
->> - ? ? ? x |= (info->var.sync & FB_SYNC_HOR_HIGH_ACT) ? 0 : 0x00000004;
->> + ? ? ? x |= (info->var.sync & FB_SYNC_VERT_HIGH_ACT) ? 0x00000008 : 0;
->> + ? ? ? x |= (info->var.sync & FB_SYNC_HOR_HIGH_ACT) ? 0x00000004 : 0;
+On Thu, Nov 5, 2009 at 7:53 AM, Guennadi Liakhovetski
+<g.liakhovetski@gmx.de> wrote:
+> On Wed, 4 Nov 2009, Antonio Ospite wrote:
 >
-> Hi Jun,
+>> Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
+>> Signed-off-by: Bart Visscher <bartv@thisnet.nl>
 >
-> Could you please help double check this? My understanding is
-> FB_SYNC_VERT_HIGH_ACT means it's a positive pulse covering all the
-> valid HSYNCs, and a rising edge of VSYNC means a start of the frame.
+> Is this patch going via Bart? Or should this be an Acked-by?
+
+Sometimes there are multiple people working on the same patch,
+and I don't see anyway for the SOB process to address this correctly
+since the author could be _only_ one and the SOB list respresents
+a patch passing route. So basically I don't care too much about
+SOB by multiple people yet not strictly conform to the patch forwarding
+route.
+
 >
-> However, CFG_INV_VSYNC is '1' means the opposite.
+...
+>
+> A general question for the ezx.c: wouldn't it be better to convert that
+> full-of-ifdef's file to a mach-pxa/ezx/ directory?
 >
 
-My understanding is that high active means high level trigger new
-frame/line. Below page support my point if it is not wrong.
+I'm only concerned that mach-pxa/* is already very crowded, I'm
+even thinkin of merging all those eseries things in a single file.
 
-http://www.arcadecollecting.com/info/Sync_fixing.txt
+The real difficulty with ezx is that they share many things, and the
+sharing sometimes is not just common, it can be shared by some
+of the platforms but not all - even if one eventually separates them
+into different files, there still needs to be a lot #ifdef .. #endif.
 
-Jun
+Since these #ifdef .. #endif are actually inclusive, and can even
+be removed if no one cares about the size compiling all the
+platforms together, I don't see them as big problems.
+
+> Thanks
+> Guennadi
+> ---
+> Guennadi Liakhovetski, Ph.D.
+> Freelance Open-Source Software Developer
+> http://www.open-technology.de/
+>
