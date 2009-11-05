@@ -1,48 +1,51 @@
-From: tbm@cyrius.com (Martin Michlmayr)
-Date: Thu, 5 Nov 2009 18:15:31 +0000
-Subject: [PATCH] Kirkwood: Add QNAP TS-110/TS-210 to Kconfig help text
-Message-ID: <20091105181531.GA10076@deprecation.cyrius.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 5 Nov 2009 19:17:18 +0100
+Subject: [RFC PATCH] Add an earlyprintk debug console
+In-Reply-To: <FCCFB4CDC6E5564B9182F639FC35608702FA4B5901@dbde02.ent.ti.com>
+References: <20091105123448.27637.97119.stgit@pc1117.cambridge.arm.com>
+	<FCCFB4CDC6E5564B9182F639FC35608702FA4B5901@dbde02.ent.ti.com>
+Message-ID: <20091105181718.GB7221@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add two new models from QNAP to the help text.  They are compatible
-with the TS-119/TS-219 and therefore supported by the current code.
-The only difference is that they have less RAM (256 MB instead of
-512 MB), a slower CPU (800 MHz vs 1.2 GHz) and a plastic case.
+Hello,
 
-Signed-off-by: Martin Michlmayr <tbm@cyrius.com>
+On Thu, Nov 05, 2009 at 07:25:45PM +0530, Pandita, Vikram wrote:
+> 
+> >-----Original Message-----
+> >From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
+> >bounces at lists.infradead.org] On Behalf Of Catalin Marinas
+> >Sent: Thursday, November 05, 2009 4:35 AM
+> >To: linux-arm-kernel at lists.infradead.org
+> >Cc: Sascha Hauer; Uwe Kleine-K?nig
+> >Subject: [RFC PATCH] Add an earlyprintk debug console
+> >
+> >This patch allows an earlyprintk console if CONFIG_DEBUG_LL is enabled,
+> >using the printch asm function.
+> >
+> >The patch is based on the original work by Sascha Hauer.
+> 
+> Nice work...
+> Linux-omap has been using for couple of years this hackery, which finally has a solution now:
+> 
+> diff --git a/kernel/printk.c b/kernel/printk.c
+> index f38b07f..1def076 100644
+> --- a/kernel/printk.c
+> +++ b/kernel/printk.c
+> @@ -36,6 +36,10 @@
+> 
+> +#ifdef CONFIG_DEBUG_LL
+> +       printascii(printk_buf);
+> +#endif
+> 
+>         p = printk_buf;
+I guess this won't be accepted, as kernel/printk.c is generic code,
+CONFIG_DEBUG_LL is ARM specific.  (And IIRC you need to declare
+printascii first.)
 
-diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-index d58e8b0..8bf09ae 100644
---- a/arch/arm/mach-kirkwood/Kconfig
-+++ b/arch/arm/mach-kirkwood/Kconfig
-@@ -33,10 +33,11 @@ config MACH_SHEEVAPLUG
- 	  Marvell SheevaPlug Reference Board.
- 
- config MACH_TS219
--	bool "QNAP TS-119 and TS-219 Turbo NAS"
-+	bool "QNAP TS-110, TS-119, TS-210, TS-219 and TS-219P Turbo NAS"
- 	help
- 	  Say 'Y' here if you want your kernel to support the
--	  QNAP TS-119 and TS-219 Turbo NAS devices.
-+	  QNAP TS-110, TS-119, TS-210, TS-219 and TS-219P Turbo NAS
-+	  devices.
- 
- config MACH_TS41X
- 	bool "QNAP TS-410, TS-410U, TS-419P and TS-419U Turbo NAS"
-diff --git a/arch/arm/mach-kirkwood/ts219-setup.c b/arch/arm/mach-kirkwood/ts219-setup.c
-index cb0f56d..a7c209d 100644
---- a/arch/arm/mach-kirkwood/ts219-setup.c
-+++ b/arch/arm/mach-kirkwood/ts219-setup.c
-@@ -1,6 +1,6 @@
- /*
-  *
-- * QNAP TS-119/TS-219 Turbo NAS Board Setup
-+ * QNAP TS-11x/TS-21x Turbo NAS Board Setup
-  *
-  * Copyright (C) 2009  Martin Michlmayr <tbm@cyrius.com>
-  * Copyright (C) 2008  Byron Bradley <byron.bbradley@gmail.com>
+Best regards
+Uwe
 
 -- 
-Martin Michlmayr
-http://www.cyrius.com/
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
