@@ -1,29 +1,40 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 5 Nov 2009 11:04:32 +0000
-Subject: S3C64XX DMA driver fixes
-In-Reply-To: <1257396253-32108-1-git-send-email-jassi.brar@samsung.com>
-References: <1257396253-32108-1-git-send-email-jassi.brar@samsung.com>
-Message-ID: <20091105110432.GC4808@trinity.fluff.org>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Thu, 5 Nov 2009 12:07:40 +0100
+Subject: imx27 - hanging at freeing init memory -- getting some junk
+	characters here after on console ..
+In-Reply-To: <OFEF3C8131.8C4BB129-ON65257665.003C2B08-65257665.003C2B0A@tcs.com>
+References: <20091104131500.GZ14091@buzzloop.caiaq.de>
+	<OF15AFD08D.F28F9544-ON65257664.002A1275-65257664.002A127F@tcs.com>
+	<OFEF3C8131.8C4BB129-ON65257665.003C2B08-65257665.003C2B0A@tcs.com>
+Message-ID: <20091105110740.GO14091@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 05, 2009 at 01:44:13PM +0900, Jassi Brar wrote:
-> Hello,
->   Following are a few patches against 
->  http://www.fluff.org/git/bjdooks/linux.git fixes-s3c64xx-dma
->  commit 7ec6b719e4f75f9e73b610b7a71255d639cd566b
-> 
->  Among other things, the patches enable the PL-080 driver to
->  work with non-circular buffer queues as well. The implementation
->  was tested with I2S driver by making s3c_dma_has_circular() return
->  false. My not-yet-submitting SPI driver works fine too after these
->  patches.
+(Please do not remove anyone from Cc and do not post on top when
+replying)
 
-Thanks, i'll have a look at this and see if they can be sent before the
-next merge window or not.
+On Thu, Nov 05, 2009 at 04:27:11PM +0530, Prabha J wrote:
+>    But in inittab ,we are not using any getty.
 
--- 
-Ben
+What you see is certainly not a crash - something obviously just changes
+the baudrate. If you're not using getty, it's something else. Try
+adding 'init=/bin/sh' to your kernel command line. That should dump you
+directly to a shell without any further startup script processing. If
+that works, your problem is not related to the kernel.
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+>    One more thing,
+>    We have Linux-2.6.19.2 which is working on this board and we are using the
+>    same root filesystem and the toolchain used also same.
+>    We checked the clock and baudrate ,and it is correct.
+
+Maybe the baud rate configured in the older kernel is different?
+I don't know.
+
+>    What else may be the problem.
+>    Are we missing any configuration?
+>    Between linux-2.6.19.2 and linux-2.6.28 there is lot of changes. Do we
+>    have to change anything in the driver.
+
+Which driver do you mean?
+
+Daniel
