@@ -1,67 +1,60 @@
-From: ospite@studenti.unina.it (Antonio Ospite)
-Date: Thu, 5 Nov 2009 16:14:32 +0100
-Subject: [PATCH] Allow platforms to control which PXA uarts are registered
-In-Reply-To: <20091105141337.GB21681@n2100.arm.linux.org.uk>
-References: <20091105141337.GB21681@n2100.arm.linux.org.uk>
-Message-ID: <20091105161432.cf278409.ospite@studenti.unina.it>
+From: eltshanli@gmail.com (Li Jie)
+Date: Thu, 5 Nov 2009 23:29:54 +0800
+Subject: [PATCH] kirkwood: fix section mismatch
+Message-ID: <8fb2581d0911050729o1631bbf8rdab225eaee593187@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 5 Nov 2009 14:13:38 +0000
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+kirkwood_timer_init() and kirkwood_pcie_setup() lack of __init which
+causes following warnings:
 
-> For some platforms, it is inappropriate to register all PXA UARTs.
-> In some cases, the UARTs may not be used, and in others we may want
-> to avoid registering the UARTs to allow other drivers (eg, FICP) to
-> make use of the UART.
-> 
-> In addition, a while back there was a request to be able to pass
-> platform data to the UART driver.
-> 
-> This patch enables all of this by providing functions platforms can
-> call to register each individual UART.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+WARNING: vmlinux.o(.text+0x9568): Section mismatch in reference from
+the function kirkwood_timer_init() to the function
+.init.text:kirkwood_find_tclk()
+The function kirkwood_timer_init() references
+the function __init kirkwood_find_tclk().
+This is often because kirkwood_timer_init lacks a __init
+annotation or the annotation of kirkwood_find_tclk is wrong.
 
-in ezx.c you only put the *uart_info() calls in e2_init() (the last one,
-I guess it was because of some automation?), but in this file there are
-several machines defined.
+WARNING: vmlinux.o(.text+0x979c): Section mismatch in reference from
+the function kirkwood_pcie_setup() to the function
+.init.text:orion_pcie_setup()
+The function kirkwood_pcie_setup() references
+the function __init orion_pcie_setup().
+This is often because kirkwood_pcie_setup lacks a __init
+annotation or the annotation of orion_pcie_setup is wrong.
 
->  arch/arm/mach-pxa/ezx.c            |    3 +++
+Signed-off-by: lijie <eltshanli@gmail.com>
+---
+ arch/arm/mach-kirkwood/common.c |    2 +-
+ arch/arm/mach-kirkwood/pcie.c   |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-> diff --git a/arch/arm/mach-pxa/ezx.c b/arch/arm/mach-pxa/ezx.c
-> index 588b265..0dca63e 100644
-> --- a/arch/arm/mach-pxa/ezx.c
-> +++ b/arch/arm/mach-pxa/ezx.c
-> @@ -971,6 +971,9 @@ static void __init e2_init(void)
->  	pxa2xx_mfp_config(ARRAY_AND_SIZE(gen2_pin_config));
->  	pxa2xx_mfp_config(ARRAY_AND_SIZE(e2_pin_config));
->  
-> +	pxa_set_ffuart_info(NULL);
-> +	pxa_set_btuart_info(NULL);
-> +	pxa_set_stuart_info(NULL);
->  	pxa_set_i2c_info(NULL);
->  	i2c_register_board_info(0, ARRAY_AND_SIZE(e2_i2c_board_info));
->  
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index 0acb61f..7177c4a 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -845,7 +845,7 @@ int __init kirkwood_find_tclk(void)
+ 	return 166666667;
+ }
 
-Regards,
-   Antonio
+-static void kirkwood_timer_init(void)
++static void __init kirkwood_timer_init(void)
+ {
+ 	kirkwood_tclk = kirkwood_find_tclk();
+ 	orion_time_init(IRQ_KIRKWOOD_BRIDGE, kirkwood_tclk);
+diff --git a/arch/arm/mach-kirkwood/pcie.c b/arch/arm/mach-kirkwood/pcie.c
+index d90b9aa..5538820 100644
+--- a/arch/arm/mach-kirkwood/pcie.c
++++ b/arch/arm/mach-kirkwood/pcie.c
+@@ -93,7 +93,7 @@ static struct pci_ops pcie_ops = {
+ };
 
+
+-static int kirkwood_pcie_setup(int nr, struct pci_sys_data *sys)
++static int __init kirkwood_pcie_setup(int nr, struct pci_sys_data *sys)
+ {
+ 	struct resource *res;
+ 	extern unsigned int kirkwood_clk_ctrl;
 -- 
-Antonio Ospite
-http://ao2.it
-
-PGP public key ID: 0x4553B001
-
-A: Because it messes up the order in which people normally read text.
-   See http://en.wikipedia.org/wiki/Posting_style
-Q: Why is top-posting such a bad thing?
-A: Top-posting.
-Q: What is the most annoying thing in e-mail?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091105/f440d4b8/attachment.sig>
+1.6.5.2
