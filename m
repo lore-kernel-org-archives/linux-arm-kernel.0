@@ -1,51 +1,65 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 5 Nov 2009 00:06:13 -0500
-Subject: Possible suspend/resume regression in .32-rc?
-In-Reply-To: <1257241821.4269.5.camel@utx.utx.cz>
-References: <20091031013427.GL14091@buzzloop.caiaq.de>
-	<20091101205449.GT14091@buzzloop.caiaq.de>
-	<20091101213343.GA31345@elf.ucw.cz>
-	<20091101220341.GA16698@elf.ucw.cz>
-	<771cded00911020122o3bb5cc96q957c8be1ce7cae46@mail.gmail.com>
-	<1257155873.5642.14.camel@utx.utx.cz>
-	<771cded00911021931x41cfa51bh2959d3748db5ac0@mail.gmail.com>
-	<1257241821.4269.5.camel@utx.utx.cz>
-Message-ID: <771cded00911042106u39fd3655mae50a89bd419411b@mail.gmail.com>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Thu, 5 Nov 2009 08:10:10 +0100
+Subject: [PATCH] Fix PXA-27x/3xx interrupts when CONFIG_PXA_HAVE_ISA_IRQS=y
+In-Reply-To: <f17812d70911041914u534cbd50s4fb57f0b77fcca9c@mail.gmail.com>
+References: <20091103210439.2a6c1f20@taxman.wild-wind.fr.eu.org>
+	<771cded00911031827m34f36dc7r1bc7e1096bb98690@mail.gmail.com>
+	<f17812d70911031920t706d9909w3750a2eb9b1d958@mail.gmail.com>
+	<771cded00911041911qded36d3sf9ce4384e1ad80b6@mail.gmail.com>
+	<f17812d70911041914u534cbd50s4fb57f0b77fcca9c@mail.gmail.com>
+Message-ID: <20091105081010.53bb9284@taxman.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 3, 2009 at 4:50 AM, Stanislav Brabec <utx@penguin.cz> wrote:
-> Haojian Zhuang wrote:
->> On Mon, Nov 2, 2009 at 5:57 AM, Stanislav Brabec <utx@penguin.cz> wrote:
->> > Haojian Zhuang wrote:
->> >
->> >> Commit b5b82df6, from May 2007, breaks no_console_suspend on the OLPC
->> >> XO laptop. Basically what happens is that upon returning from resume,
->> >> serial8250_resume_port() will reconfigure the port for high speed
->> >> mode and all console output will be garbled, making debug of the
->> >> resume path painful. This patch modifies uart_resume_port() to
->> >> reset the port to the state it was in before we suspended.
->> >
->> > See my patch waiting for approval in LKML thread
->> > "serial-core: resume serial hardware with no_console_suspend".
->> >
->> > It attempts to fix it, but I was not yet able to test it due to spitz
->> > resume breakage.
->> >
->>
->> Hi Stanislav,
->>
->> At first, your patch can't be applied into my latest codebase. I have
->> to update the patch. But the console resume is still blocked after
->> applied your patch. It works only after I merge some old code back. My
->> modified patch is in below.
->
-> Yes, code changed there a bit. I sent rebased patch later in the thread.
-> Did you try this one? (Well I did not test it yet - in time of sending
-> resume did not work at all on my Zaurus.)
->
-> Your patch is a bit different. I'll test both as soon as possible.
->
->
+On Thu, 5 Nov 2009 11:14:33 +0800
+Eric Miao <eric.y.miao@gmail.com> wrote:
 
-Your latest patch works well in my platform. Thanks a lot.
+Eric,
+
+> Could you please check without that #ifdef .. #endif it still works
+> fine since my assmption is PXA_IRQ() has taken that into account.
+
+Indeed, PXA_IRQ() knows about PXA_HAVE_ISA_IRQ, and we can
+unconditionally have this fix.
+
+Please find below the updated patch.
+
+	M.
+
+>From 50390cb82a10921b91a25f5908fdcacdf624017c Mon Sep 17 00:00:00 2001
+From: Marc Zyngier <maz@taxman.wild-wind.fr.eu.org>
+Date: Tue, 3 Nov 2009 20:35:19 +0100
+Subject: [PATCH] Fix pxa27x/3xx interrupts when CONFIG_PXA_HAVE_ISA_IRQS=y
+
+Commit d2c37068429b29d6549cf3486fc84b836689e122 ([ARM] pxa:
+initialize default interrupt priority and use ICHP for IRQ handling)
+broke ISA interrupt support on pxa27x/3xx.
+
+In such a case, PXA_IRQ(0) != 0, and the IRQ number computed from
+ICHP must be offset by PXA_IRQ(0).
+
+Tested on an Arcom Zeus (pxa270), with both CONFIG_PXA_HAVE_ISA_IRQS
+enabled and disabled.
+
+Signed-off-by: Marc Zyngier <maz@misterjones.org>
+---
+ arch/arm/mach-pxa/include/mach/entry-macro.S |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/include/mach/entry-macro.S b/arch/arm/mach-pxa/include/mach/entry-macro.S
+index 2418806..a73bc86 100644
+--- a/arch/arm/mach-pxa/include/mach/entry-macro.S
++++ b/arch/arm/mach-pxa/include/mach/entry-macro.S
+@@ -46,5 +46,6 @@
+ 		beq	1001f
+ 		bic	\irqstat, \irqstat, #0x80000000
+ 		mov	\irqnr, \irqstat, lsr #16
++		add	\irqnr, \irqnr, #(PXA_IRQ(0))
+ 1001:
+ 		.endm
+-- 
+1.6.0.4
+
+
+-- 
+I'm the slime oozin' out from your TV set...
