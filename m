@@ -1,78 +1,67 @@
-From: valentin.longchamp@epfl.ch (Valentin Longchamp)
-Date: Thu, 05 Nov 2009 16:06:15 +0100
-Subject: [PATCH] [RTC] Add Freescale MC13783 RTC driver
-In-Reply-To: <4AF1C423.3010407@epfl.ch>
-References: <1256330323-13300-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1256373342-5294-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20091101203443.GB18116@pengutronix.de> <4AF1C423.3010407@epfl.ch>
-Message-ID: <4AF2E9E7.9050807@epfl.ch>
+From: ospite@studenti.unina.it (Antonio Ospite)
+Date: Thu, 5 Nov 2009 16:14:32 +0100
+Subject: [PATCH] Allow platforms to control which PXA uarts are registered
+In-Reply-To: <20091105141337.GB21681@n2100.arm.linux.org.uk>
+References: <20091105141337.GB21681@n2100.arm.linux.org.uk>
+Message-ID: <20091105161432.cf278409.ospite@studenti.unina.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Valentin Longchamp wrote:
-> Hi Uwe,
-> 
-> Uwe Kleine-K?nig wrote:
->> Hello,
->>
->> On Sat, Oct 24, 2009 at 10:35:42AM +0200, Uwe Kleine-K?nig wrote:
->>> This driver provides support for the RTC part integrated into the
->>> Freescale MC13783 PMIC and bases on patch created earlier by Sascha
->>> Hauer.
->>>
->>> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
->>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-k?nig@pengutronix.de>
->>> Cc: Valentin Longchamp <valentin.longchamp@epfl.ch>
->>> Cc: Paul Gortmaker <p_gortmaker@yahoo.com>
->>> Cc: Alessandro Zummo <a.zummo@towertech.it>
->>> Cc: rtc-linux at googlegroups.com
->>> ---
->>> Hello,
->>>
->>> this patch depends on
->>>
->>> 	mfd/mc13783: near complete rewrite
->>>
->>> sent earlier on lkml[1].  Compared to the earlier version of rtc support
->>> on mc13783 as sent by Sascha, this driver got reset detection and
->>> therefore depends on the patch above.
->>>
->>> A tree runnable on Phytec's PCM038 is available in my git tree
->>>
->>> 	git://git.pengutronix.de/git/ukl/linux-2.6.git mc13783
->>>
->>> .  (Maybe I will rewrite these commits, so please expect it might change
->>> in a non-fast-forward manner.)
->> Valentin, could you already test this?  Any comments by the others?
->>
-> 
-> I have tested your patches (taken your mc13783 branch today, and merged 
-> it into my patches rebased on 2.6.32-rc6).
-> 
-> Your mfd/mc13783 rewrite seems to work for me (but since there is no 
-> real usage for now, I don't use ADC yet and regulator don't do a lot). 
-> But it runs fine on my hardware.
-> 
-> However, I get the hctosys: unable to read the hardware clock error 
-> message at boot (from drivers/rtc/hctosys.c:62). Is it normal ?
-> 
-> Furthermore, the date and time are saved during system off, but the time 
-> is not updated: if I shut down the system during 10 minutes, my time 
-> will get a 10 minute delay. Is this a normal behavior with you current 
-> implementation or is there something we have wrong in our design/code 
-> (we have battery for the mc13783) ? I will have a further look at this 
-> later, didn't have time now.
-> 
+On Thu, 5 Nov 2009 14:13:38 +0000
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-This was due to a small hardware problem on our platform. Your RTC 
-driver now works well on mx31moboard. Please consider my ackey-by:
+> For some platforms, it is inappropriate to register all PXA UARTs.
+> In some cases, the UARTs may not be used, and in others we may want
+> to avoid registering the UARTs to allow other drivers (eg, FICP) to
+> make use of the UART.
+> 
+> In addition, a while back there was a request to be able to pass
+> platform data to the UART driver.
+> 
+> This patch enables all of this by providing functions platforms can
+> call to register each individual UART.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Ackey-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
+in ezx.c you only put the *uart_info() calls in e2_init() (the last one,
+I guess it was because of some automation?), but in this file there are
+several machines defined.
 
-Val
+>  arch/arm/mach-pxa/ezx.c            |    3 +++
+
+> diff --git a/arch/arm/mach-pxa/ezx.c b/arch/arm/mach-pxa/ezx.c
+> index 588b265..0dca63e 100644
+> --- a/arch/arm/mach-pxa/ezx.c
+> +++ b/arch/arm/mach-pxa/ezx.c
+> @@ -971,6 +971,9 @@ static void __init e2_init(void)
+>  	pxa2xx_mfp_config(ARRAY_AND_SIZE(gen2_pin_config));
+>  	pxa2xx_mfp_config(ARRAY_AND_SIZE(e2_pin_config));
+>  
+> +	pxa_set_ffuart_info(NULL);
+> +	pxa_set_btuart_info(NULL);
+> +	pxa_set_stuart_info(NULL);
+>  	pxa_set_i2c_info(NULL);
+>  	i2c_register_board_info(0, ARRAY_AND_SIZE(e2_i2c_board_info));
+>  
+
+Regards,
+   Antonio
 
 -- 
-Valentin Longchamp, PhD Student, EPFL-STI-LSRO1
-valentin.longchamp at epfl.ch, Phone: +41216937827
-http://people.epfl.ch/valentin.longchamp
-MEA3485, Station 9, CH-1015 Lausanne
+Antonio Ospite
+http://ao2.it
+
+PGP public key ID: 0x4553B001
+
+A: Because it messes up the order in which people normally read text.
+   See http://en.wikipedia.org/wiki/Posting_style
+Q: Why is top-posting such a bad thing?
+A: Top-posting.
+Q: What is the most annoying thing in e-mail?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091105/f440d4b8/attachment.sig>
