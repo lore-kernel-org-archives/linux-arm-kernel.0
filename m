@@ -1,34 +1,51 @@
-From: jassi.brar@samsung.com (Jassi Brar)
-Date: Thu,  5 Nov 2009 13:44:39 +0900
-Subject: [PATCH 4/5] S3C64XX DMA: Free node for non-circular queues
-Message-ID: <1257396279-32231-1-git-send-email-jassi.brar@samsung.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Thu, 5 Nov 2009 00:06:13 -0500
+Subject: Possible suspend/resume regression in .32-rc?
+In-Reply-To: <1257241821.4269.5.camel@utx.utx.cz>
+References: <20091031013427.GL14091@buzzloop.caiaq.de>
+	<20091101205449.GT14091@buzzloop.caiaq.de>
+	<20091101213343.GA31345@elf.ucw.cz>
+	<20091101220341.GA16698@elf.ucw.cz>
+	<771cded00911020122o3bb5cc96q957c8be1ce7cae46@mail.gmail.com>
+	<1257155873.5642.14.camel@utx.utx.cz>
+	<771cded00911021931x41cfa51bh2959d3748db5ac0@mail.gmail.com>
+	<1257241821.4269.5.camel@utx.utx.cz>
+Message-ID: <771cded00911042106u39fd3655mae50a89bd419411b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to free the buff and lli nodes if the buffer queue is 
-not CIRCULAR.
+On Tue, Nov 3, 2009 at 4:50 AM, Stanislav Brabec <utx@penguin.cz> wrote:
+> Haojian Zhuang wrote:
+>> On Mon, Nov 2, 2009 at 5:57 AM, Stanislav Brabec <utx@penguin.cz> wrote:
+>> > Haojian Zhuang wrote:
+>> >
+>> >> Commit b5b82df6, from May 2007, breaks no_console_suspend on the OLPC
+>> >> XO laptop. Basically what happens is that upon returning from resume,
+>> >> serial8250_resume_port() will reconfigure the port for high speed
+>> >> mode and all console output will be garbled, making debug of the
+>> >> resume path painful. This patch modifies uart_resume_port() to
+>> >> reset the port to the state it was in before we suspended.
+>> >
+>> > See my patch waiting for approval in LKML thread
+>> > "serial-core: resume serial hardware with no_console_suspend".
+>> >
+>> > It attempts to fix it, but I was not yet able to test it due to spitz
+>> > resume breakage.
+>> >
+>>
+>> Hi Stanislav,
+>>
+>> At first, your patch can't be applied into my latest codebase. I have
+>> to update the patch. But the console resume is still blocked after
+>> applied your patch. It works only after I merge some old code back. My
+>> modified patch is in below.
+>
+> Yes, code changed there a bit. I sent rebased patch later in the thread.
+> Did you try this one? (Well I did not test it yet - in time of sending
+> resume did not work at all on my Zaurus.)
+>
+> Your patch is a bit different. I'll test both as soon as possible.
+>
+>
 
-Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
----
- arch/arm/plat-s3c64xx/dma.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/plat-s3c64xx/dma.c b/arch/arm/plat-s3c64xx/dma.c
-index 20b0747..0971d06 100644
---- a/arch/arm/plat-s3c64xx/dma.c
-+++ b/arch/arm/plat-s3c64xx/dma.c
-@@ -612,6 +612,12 @@ static irqreturn_t s3c64xx_dma_irq(int irq, void *pw)
- 
- 		s3c64xx_dma_bufffdone(chan, buff, res);
- 
-+		/* Free the node and update curr, if non-circular queue */
-+		if (!(chan->flags & S3C2410_DMAF_CIRCULAR)) {
-+			chan->curr = buff->next;
-+			s3c64xx_dma_freebuff(buff);
-+		}
-+
- 		/* Update 'next' */
- 		buff = chan->next;
- 		if (chan->next == chan->end) {
--- 
-1.6.2.5
+Your latest patch works well in my platform. Thanks a lot.
