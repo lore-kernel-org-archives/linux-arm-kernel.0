@@ -1,25 +1,31 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 5 Nov 2009 11:14:33 +0800
-Subject: [PATCH] Fix PXA-27x/3xx interrupts when CONFIG_PXA_HAVE_ISA_IRQS=y
-In-Reply-To: <771cded00911041911qded36d3sf9ce4384e1ad80b6@mail.gmail.com>
-References: <20091103210439.2a6c1f20@taxman.wild-wind.fr.eu.org>
-	<771cded00911031827m34f36dc7r1bc7e1096bb98690@mail.gmail.com>
-	<f17812d70911031920t706d9909w3750a2eb9b1d958@mail.gmail.com>
-	<771cded00911041911qded36d3sf9ce4384e1ad80b6@mail.gmail.com>
-Message-ID: <f17812d70911041914u534cbd50s4fb57f0b77fcca9c@mail.gmail.com>
+Date: Thu, 5 Nov 2009 11:46:58 +0800
+Subject: [PATCH] [ARM] pxa/pxa3xx.c: register U2D clock
+In-Reply-To: <f870da180911041402o14d9f2ccwd3c16c66d0346b75@mail.gmail.com>
+References: <1257336880-16011-1-git-send-email-grinberg@compulab.co.il>
+	<f17812d70911040647l35739ed3hf749112d43b79354@mail.gmail.com>
+	<f870da180911041402o14d9f2ccwd3c16c66d0346b75@mail.gmail.com>
+Message-ID: <f17812d70911041946q85aeb9bi414d3fa42243c0c0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> CONFIG_PXA_HAVE_ISA_IRQS is used on some platforms which emulates
->> ISA expansion slots so some legacy ISA cards can still be used on pxa
->> platforms, not necessarily related to pxa25x, could be pxa27x and pxa3xx.
->> We need to take a look into the patch indeed.
+On Thu, Nov 5, 2009 at 6:02 AM, Mike Rapoport <mike.rapoport@gmail.com> wrote:
+>
+>
+> On Wed, Nov 4, 2009 at 4:47 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+>>
+>> On Wed, Nov 4, 2009 at 8:14 PM, Igor Grinberg <grinberg@compulab.co.il>
+>> wrote:
+>> >
+>> > Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+>> > Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+>>
+>> ISTR U2D is present on pxa310 _only_, if that's the case, might
+>> better put the clock into pxa300.c. Please help double check.
 >>
 >
-> I'm OK on this patch. It works well on my platform.
+> On pxa310 the U2D differs in capabilities from pxa300/320. But they all use
+> the same clock :)
 >
 
-So Marc,
-
-Could you please check without that #ifdef .. #endif it still works fine
-since my assmption is PXA_IRQ() has taken that into account.
+True. Applied in 'devel', thanks.
