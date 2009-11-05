@@ -1,50 +1,36 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 5 Nov 2009 19:17:18 +0100
-Subject: [RFC PATCH] Add an earlyprintk debug console
-In-Reply-To: <FCCFB4CDC6E5564B9182F639FC35608702FA4B5901@dbde02.ent.ti.com>
-References: <20091105123448.27637.97119.stgit@pc1117.cambridge.arm.com>
-	<FCCFB4CDC6E5564B9182F639FC35608702FA4B5901@dbde02.ent.ti.com>
-Message-ID: <20091105181718.GB7221@pengutronix.de>
+Date: Thu, 5 Nov 2009 19:28:18 +0100
+Subject: [PATCH] Fix the machine description printing in __error_a
+In-Reply-To: <20091105124149.27866.81631.stgit@pc1117.cambridge.arm.com>
+References: <20091105124149.27866.81631.stgit@pc1117.cambridge.arm.com>
+Message-ID: <20091105182817.GC7221@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thu, Nov 05, 2009 at 07:25:45PM +0530, Pandita, Vikram wrote:
+On Thu, Nov 05, 2009 at 12:41:49PM +0000, Catalin Marinas wrote:
+> Commit b86040a59f changed label 3 in head-common.S but only modified
+> __lookup_machine_type. This patch corrects the __error_a function as
+> well.
 > 
-> >-----Original Message-----
-> >From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
-> >bounces at lists.infradead.org] On Behalf Of Catalin Marinas
-> >Sent: Thursday, November 05, 2009 4:35 AM
-> >To: linux-arm-kernel at lists.infradead.org
-> >Cc: Sascha Hauer; Uwe Kleine-K?nig
-> >Subject: [RFC PATCH] Add an earlyprintk debug console
-> >
-> >This patch allows an earlyprintk console if CONFIG_DEBUG_LL is enabled,
-> >using the printch asm function.
-> >
-> >The patch is based on the original work by Sascha Hauer.
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>  arch/arm/kernel/head-common.S |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> Nice work...
-> Linux-omap has been using for couple of years this hackery, which finally has a solution now:
-> 
-> diff --git a/kernel/printk.c b/kernel/printk.c
-> index f38b07f..1def076 100644
-> --- a/kernel/printk.c
-> +++ b/kernel/printk.c
-> @@ -36,6 +36,10 @@
-> 
-> +#ifdef CONFIG_DEBUG_LL
-> +       printascii(printk_buf);
-> +#endif
-> 
->         p = printk_buf;
-I guess this won't be accepted, as kernel/printk.c is generic code,
-CONFIG_DEBUG_LL is ARM specific.  (And IIRC you need to declare
-printascii first.)
-
-Best regards
-Uwe
+> diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
+> index 885a721..b9505aa 100644
+> --- a/arch/arm/kernel/head-common.S
+> +++ b/arch/arm/kernel/head-common.S
+> @@ -97,7 +97,7 @@ __error_a:
+>  	bl	printhex8
+>  	adr	r0, str_a2
+>  	bl	printascii
+> -	adr	r3, 3f
+> +	adr	r3, 4f
+>  	ldmia	r3, {r4, r5, r6}		@ get machine desc list
+>  	sub	r4, r3, r4			@ get offset between virt&phys
+>  	add	r5, r5, r4			@ convert virt addresses to
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
 -- 
 Pengutronix e.K.                              | Uwe Kleine-K?nig            |
