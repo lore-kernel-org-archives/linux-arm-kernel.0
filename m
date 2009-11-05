@@ -1,62 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Nov 2009 13:00:48 +0000
-Subject: [RFC PATCH] ARMv7: Use lazy cache flushing if hardware
-	broadcasts cache operations
-In-Reply-To: <20091105125059.2762.57284.stgit@pc1117.cambridge.arm.com>
-References: <20091105125059.2762.57284.stgit@pc1117.cambridge.arm.com>
-Message-ID: <20091105130048.GA21681@n2100.arm.linux.org.uk>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Thu, 05 Nov 2009 14:04:59 +0100
+Subject: [PATCH] IXP4xx: Ensure index is positive
+In-Reply-To: <4AF0A92C.6050400@gmail.com> (Roel Kluin's message of "Tue, 03
+	Nov 2009 23:05:32 +0100")
+References: <4AF08014.4000704@gmail.com> <4AF0922B.3030701@hiramoto.org>
+	<m3eiofl2v8.fsf@intrepid.localdomain> <4AF0A92C.6050400@gmail.com>
+Message-ID: <m33a4t5dhg.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 05, 2009 at 12:50:59PM +0000, Catalin Marinas wrote:
-> diff --git a/arch/arm/include/asm/cachetype.h b/arch/arm/include/asm/cachetype.h
-> index d3a4c2c..3d5d1c9 100644
-> --- a/arch/arm/include/asm/cachetype.h
-> +++ b/arch/arm/include/asm/cachetype.h
-> @@ -1,6 +1,8 @@
->  #ifndef __ASM_ARM_CACHETYPE_H
->  #define __ASM_ARM_CACHETYPE_H
+Roel Kluin <roel.kluin@gmail.com> writes:
+
+> +++ b/arch/arm/mach-ixp4xx/common.c
+> @@ -117,7 +117,7 @@ int gpio_to_irq(int gpio)
+>  }
+>  EXPORT_SYMBOL(gpio_to_irq);
 >  
-> +#include <asm/cputype.h>
-> +
->  #define CACHEID_VIVT			(1 << 0)
->  #define CACHEID_VIPT_NONALIASING	(1 << 1)
->  #define CACHEID_VIPT_ALIASING		(1 << 2)
-> @@ -49,4 +51,18 @@ static inline unsigned int __attribute__((pure)) cacheid_is(unsigned int mask)
->  	       (~__CACHEID_NEVER & __CACHEID_ARCH_MIN & mask & cacheid);
+> -int irq_to_gpio(int irq)
+> +int irq_to_gpio(unsigned int irq)
+>  {
+>  	int gpio = (irq < 32) ? irq2gpio[irq] : -EINVAL;
+>  
+> diff --git a/arch/arm/mach-ixp4xx/include/mach/gpio.h b/arch/arm/mach-ixp4xx/include/mach/gpio.h
+> index cd5aec2..a5f87de 100644
+> --- a/arch/arm/mach-ixp4xx/include/mach/gpio.h
+> +++ b/arch/arm/mach-ixp4xx/include/mach/gpio.h
+> @@ -70,7 +70,7 @@ static inline void gpio_set_value(unsigned gpio, int value)
+>  #include <asm-generic/gpio.h>			/* cansleep wrappers */
+>  
+>  extern int gpio_to_irq(int gpio);
+> -extern int irq_to_gpio(int gpio);
+> +extern int irq_to_gpio(unsigned int irq);
+>  
+>  #endif
+>  
+> diff --git a/arch/arm/mach-ixp4xx/include/mach/npe.h b/arch/arm/mach-ixp4xx/include/mach/npe.h
+> index 37d0511..e320db2 100644
+> --- a/arch/arm/mach-ixp4xx/include/mach/npe.h
+> +++ b/arch/arm/mach-ixp4xx/include/mach/npe.h
+> @@ -33,7 +33,7 @@ int npe_send_message(struct npe *npe, const void *msg, const char *what);
+>  int npe_recv_message(struct npe *npe, void *msg, const char *what);
+>  int npe_send_recv_message(struct npe *npe, void *msg, const char *what);
+>  int npe_load_firmware(struct npe *npe, const char *name, struct device *dev);
+> -struct npe *npe_request(int id);
+> +struct npe *npe_request(unsigned id);
+>  void npe_release(struct npe *npe);
+>  
+>  #endif /* __IXP4XX_NPE_H */
+> diff --git a/arch/arm/mach-ixp4xx/ixp4xx_npe.c b/arch/arm/mach-ixp4xx/ixp4xx_npe.c
+> index 47ac69c..e8bb257 100644
+> --- a/arch/arm/mach-ixp4xx/ixp4xx_npe.c
+> +++ b/arch/arm/mach-ixp4xx/ixp4xx_npe.c
+> @@ -665,7 +665,7 @@ err:
 >  }
 >  
-> +/*
-> + * Cache maintenance operations hardware broadcasting.
-> + */
-> +#ifndef CONFIG_SMP
-> +#define cache_ops_hw_broadcast()	1
-> +#elif __LINUX_ARM_ARCH__ <= 6
-> +#define cache_ops_hw_broadcast()	0
-> +#else
-> +static inline int cache_ops_hw_broadcast(void)
-> +{
-> +	return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) >= 1;
-> +}
-> +#endif
-> +
+>  
+> -struct npe *npe_request(int id)
+> +struct npe *npe_request(unsigned id)
 
-Please place this in asm/smp_plat.h, and let's have it in the same sense
-as the TLB ops version as well for consistency (so we don't have to
-individually remember how each of these functions work and their sense.)
-IOW (this is cut'n'pasted, so is tab broken):
-
-diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
-index 59303e2..e621530 100644
---- a/arch/arm/include/asm/smp_plat.h
-+++ b/arch/arm/include/asm/smp_plat.h
-@@ -13,4 +13,9 @@ static inline int tlb_ops_need_broadcast(void)
-        return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 2;
- }
- 
-+static inline int cache_ops_need_broadcast(void)
-+{
-+       return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 1;
-+}
-+
- #endif
+It looks good, thanks a lot.
+-- 
+Krzysztof Halasa
