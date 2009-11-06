@@ -1,29 +1,32 @@
 From: trd@45mercystreet.com (Toby Douglass)
-Date: Fri, 06 Nov 2009 20:10:13 +0100
+Date: Fri, 06 Nov 2009 20:17:47 +0100
 Subject: GCC built-in atomic operations and memory barriers
-In-Reply-To: <20091104210300.GD518@n2100.arm.linux.org.uk>
+In-Reply-To: <4AF1FBA4.4070307@xenomai.org>
 References: <4AF1C361.8090405@45mercystreet.com>
 	<20091104190544.GA518@n2100.arm.linux.org.uk>
-	<4AF1E01A.2010209@45mercystreet.com>
-	<20091104210300.GD518@n2100.arm.linux.org.uk>
-Message-ID: <4AF47495.4040109@45mercystreet.com>
+	<4AF1FBA4.4070307@xenomai.org>
+Message-ID: <4AF4765B.5080303@45mercystreet.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Wed, Nov 04, 2009 at 09:12:10PM +0100, Toby Douglass wrote:
-
-[snip]
-
->> The "mov %0, #0" - why is this inbetween the ldrex and strexeq?  it
->> seems to me it could just as well happen before the ldrex, and doing so
->> would reduce the time between the ldrex and strexeq and so reduce the
->> chance of someone else modifying our target.
+Gilles Chanteperdrix wrote:
+> Russell King - ARM Linux wrote:
+>> The kernel API is the syscall interface and associated data structures.
+>> It does not include everything you can find in kernel headers.
 > 
-> Because it probably doesn't.  Loads normally have a 'result delay' which
-> cause a pipeline stall when the result is used in the next instruction.
-> It makes sense to fill those stall cycles with useful work, rather than
-> stalling the execution pipeline.
+> Are the functions found in the vectors page part of the kernel API?
+> Because if that is so, then they provide a way to implement cmpxchg and
+> barriers in user-space.
 
-Thanks, Russell.  I was concerned there was something functionally 
-important I'd missed with regard to the atomic op.
+GCC (I had overlooked this) has a function, __sync_synchronize(), which 
+provides a full memory barrier.  I do not know how it is implemented on 
+ARM, but the CAS I wrote certainly would not work (and did not work) 
+without a memory barrier and with this function inserted, does work.
+
+The GCC atomic CAS for ARM appears to call the OS's compare-exchange 
+function, which certainly is broken, by lacking memory barriers, on the 
+Linux I am developing on.
+
+Either way, I now have my own platform independent ARM __asm__ for LL/CS 
+CAS, with memory barriers, so I'm happy.  Also, I got my OpenGL wrapper 
+DLL working last night :-)
