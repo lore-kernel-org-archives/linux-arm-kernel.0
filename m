@@ -1,35 +1,40 @@
-From: jiujin.hong@mid-fun.com (tommy)
-Date: Fri, 06 Nov 2009 15:51:36 +0800
-Subject: Suggestion:S3C64XX and next-S3C MFC need IOCTL_MFC_RESET ?
-Message-ID: <1257493896.21338.1.camel@tommy-desktop>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 06 Nov 2009 16:58:39 +0900
+Subject: About allocate the memory with non-secure attribute
+Message-ID: <000b01ca5eb6$f3e01c10$dba05430$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,emailist!
-  
-  I think S3C64XX and next-s3c MFC driver need IOCTL_MFC_RESET,because
-if APP unlegal exit mfc operation or MFC met some uncorrect
-h264/mpeg4/vc1/wmv9 media stream,can cause MFC inter unit become
-uncorrect state,it need RESET to recover to work for next!When under
-that uncorrect condition,APP must use ioctl_MFC_RESET to recover!
+Hi everyone,
 
- i have test it ,also OK even met uncorrect stream and unlegal app file
-descriptor exit !
+In default case, the ARM CPU is in the secure state until secure state
+attribute is changed.
 
+We are developing the system MMU device driver which makes multimedia device
+can use virtual address instead of physical address.
 
+Our system MMU operates as follows;
 
-patch may be similiar as following:
+1. The device driver requests the virtually continuous memory to the OS.
+2. When OS returns the page table as a result, the system MMU receives the
+pointer of page table.
+3. When HW Device generates the virtual addressing transaction, system MMU
+translate it into the physical address by referring page table.
+4. If the secure attribute of device's transaction is not matched with the
+attribute of its page table, system MMU generate the fault interrupt, and
+returns bus decode error to the HW Device.
 
-               /*For MFC RESET,when met uncorrect stram or unlegal file
-descriptor exit ,for APP engineer*/
-                case IOCTL_MFC_RESET:
-                        MFC_Mutex_Lock();
-          
-                        MFC_HW_Init(); /*RESET MFC,download
-firmware ,reset mfc busy flag*/
+The problem is "the HW device generates the non-secure transaction, while
+page table has secure attribute."
 
-                        MFC_Mutex_Release();
-                        break;
+And, we don't want to make HW device generates the secure transaction.
 
+Is there any solution to allocate the memory with non-secure attribute?
 
-Tommy at China
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+System LSI Division, SAMSUNG ELECTRONICS CO., LTD.
