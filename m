@@ -1,77 +1,29 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 3 Nov 2009 11:02:37 +0100
-Subject: [PATCH 1/3] [ARM] serial/pxa: work around Errata #75
-Message-ID: <mailman.0.1257540056.2170.linux-arm-kernel@lists.infradead.org>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Fri, 6 Nov 2009 22:25:06 +0000
+Subject: [PATCH v2] i2c-designware updates
+In-Reply-To: <4AF419B6.1000802@necel.com>
+References: <4AF419B6.1000802@necel.com>
+Message-ID: <20091106222506.GP23772@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Intel(R) PXA27x Processor Family Specification Update (Nov 2005)
-says:
+On Fri, Nov 06, 2009 at 09:42:30PM +0900, Shinya Kuribayashi wrote:
+> Hi Baruch and Ben,
+>
+> here's v2 patchset of DesignWare I2C driver (i2c-designware.c).
+> I did all test I can do for now (including arbitration tests), and
+> fixed more issues left in the v1 patchset.  I think now the driver is
+> in reasonable shape for the mainline, and hope gets merged.
+>
+> The patches which already have Baruch's Acked-by: line are logically
+> same as the previous v1 patches.  For the rest are revised version of
+> v1 patches, or newly added in v2.
 
-  E75. UART: Baud rate may not be programmed correctly on
-       back-to-back writes.
-
-  Problem:
-  When programming the Divisor Latch registers, Low and High (DLL and
-  DLH), with back-to-back writes, the second register write may not
-  take effect. The result is an incorrect baud rate.
-
-  Workaround:
-  After programming the first Divisor Latch register, read and verify
-  it before programming the second Divisor Latch register.
-
-This was hit when changing the baud rate from 115200 to 9600 while
-receiving characters at 9600 Bd.
-
-And fixed indention of some comments nearby.
-
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
-Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: Alan Cox <alan@linux.intel.com>
-Cc: Mike Rapoport <mike@compulab.co.il>
----
- drivers/serial/pxa.c |   13 +++++++++++--
- 1 files changed, 11 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/serial/pxa.c b/drivers/serial/pxa.c
-index b8629d7..4a82104 100644
---- a/drivers/serial/pxa.c
-+++ b/drivers/serial/pxa.c
-@@ -438,6 +438,7 @@ serial_pxa_set_termios(struct uart_port *port, struct ktermios *termios,
- 	unsigned char cval, fcr = 0;
- 	unsigned long flags;
- 	unsigned int baud, quot;
-+	unsigned int dll;
- 
- 	switch (termios->c_cflag & CSIZE) {
- 	case CS5:
-@@ -534,10 +535,18 @@ serial_pxa_set_termios(struct uart_port *port, struct ktermios *termios,
- 	else
- 		up->mcr &= ~UART_MCR_AFE;
- 
--	serial_out(up, UART_LCR, cval | UART_LCR_DLAB);/* set DLAB */
-+	serial_out(up, UART_LCR, cval | UART_LCR_DLAB);	/* set DLAB */
- 	serial_out(up, UART_DLL, quot & 0xff);		/* LS of divisor */
-+
-+	/*
-+	 * work around Errata #75 according to Intel(R) PXA27x Processor Family
-+	 * Specification Update (Nov 2005)
-+	 */
-+	dll = serial_in(up, UART_DLL);
-+	WARN_ON(dll != (quot & 0xff));
-+
- 	serial_out(up, UART_DLM, quot >> 8);		/* MS of divisor */
--	serial_out(up, UART_LCR, cval);		/* reset DLAB */
-+	serial_out(up, UART_LCR, cval);			/* reset DLAB */
- 	up->lcr = cval;					/* Save LCR */
- 	serial_pxa_set_mctrl(&up->port, up->port.mctrl);
- 	serial_out(up, UART_FCR, fcr);
--- 
-1.6.5.2
-
+thanks, the first pass seems ok, will give a thorough review by next
+week and get a branch with them on for -next submission.
 
 -- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
