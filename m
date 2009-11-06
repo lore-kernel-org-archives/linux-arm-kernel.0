@@ -1,32 +1,45 @@
-From: trd@45mercystreet.com (Toby Douglass)
-Date: Fri, 06 Nov 2009 20:17:47 +0100
-Subject: GCC built-in atomic operations and memory barriers
-In-Reply-To: <4AF1FBA4.4070307@xenomai.org>
-References: <4AF1C361.8090405@45mercystreet.com>
-	<20091104190544.GA518@n2100.arm.linux.org.uk>
-	<4AF1FBA4.4070307@xenomai.org>
-Message-ID: <4AF4765B.5080303@45mercystreet.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 6 Nov 2009 21:40:46 +0100
+Subject: [PATCH] [ARM] serial/pxa: work around Errata #75
+In-Reply-To: <1257245235-14783-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1257245235-14783-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20091106204046.GA8952@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gilles Chanteperdrix wrote:
-> Russell King - ARM Linux wrote:
->> The kernel API is the syscall interface and associated data structures.
->> It does not include everything you can find in kernel headers.
+Hello,
+
+[Added Greg to Cc:]
+
+On Tue, Nov 03, 2009 at 11:47:15AM +0100, Uwe Kleine-K?nig wrote:
+> Intel(R) PXA27x Processor Family Specification Update (Nov 2005)
+> says:
 > 
-> Are the functions found in the vectors page part of the kernel API?
-> Because if that is so, then they provide a way to implement cmpxchg and
-> barriers in user-space.
+>   E75. UART: Baud rate may not be programmed correctly on
+>        back-to-back writes.
+> 
+>   Problem:
+>   When programming the Divisor Latch registers, Low and High (DLL and
+>   DLH), with back-to-back writes, the second register write may not
+>   take effect. The result is an incorrect baud rate.
+> 
+>   Workaround:
+>   After programming the first Divisor Latch register, read and verify
+>   it before programming the second Divisor Latch register.
+> 
+> This was hit when changing the baud rate from 115200 to 9600 while
+> receiving characters at 9600 Bd.
+> 
+> And fixed indention of some comments nearby.
+I havn't received any feed-back for this up to now.
 
-GCC (I had overlooked this) has a function, __sync_synchronize(), which 
-provides a full memory barrier.  I do not know how it is implemented on 
-ARM, but the CAS I wrote certainly would not work (and did not work) 
-without a memory barrier and with this function inserted, does work.
+Did I address the right people?  Are you just burried in work?
+Assuming the patch is OK, which is the right path into mainline?
+Some patches touching drivers/serial/pxa.c went in via Russell's tree,
+bdc04e3 (serial: move delta_msr_wait into the tty_port) went in via
+gregkh/tty-2.6.
 
-The GCC atomic CAS for ARM appears to call the OS's compare-exchange 
-function, which certainly is broken, by lacking memory barriers, on the 
-Linux I am developing on.
+Greg: as you didn't get the original patch you can find it below.
 
-Either way, I now have my own platform independent ARM __asm__ for LL/CS 
-CAS, with memory barriers, so I'm happy.  Also, I got my OpenGL wrapper 
-DLL working last night :-)
+Best regards
+Uwe
