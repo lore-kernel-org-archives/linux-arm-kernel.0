@@ -1,20 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Nov 2009 18:36:06 +0000
-Subject: [PATCH] Allow platforms to control which PXA uarts are registered
-In-Reply-To: <200911061742.06476.schindele@nentec.de>
-References: <20091105141337.GB21681@n2100.arm.linux.org.uk>
-	<200911061742.06476.schindele@nentec.de>
-Message-ID: <20091106183606.GA14557@n2100.arm.linux.org.uk>
+From: trd@45mercystreet.com (Toby Douglass)
+Date: Fri, 06 Nov 2009 20:10:13 +0100
+Subject: GCC built-in atomic operations and memory barriers
+In-Reply-To: <20091104210300.GD518@n2100.arm.linux.org.uk>
+References: <4AF1C361.8090405@45mercystreet.com>
+	<20091104190544.GA518@n2100.arm.linux.org.uk>
+	<4AF1E01A.2010209@45mercystreet.com>
+	<20091104210300.GD518@n2100.arm.linux.org.uk>
+Message-ID: <4AF47495.4040109@45mercystreet.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 06, 2009 at 06:42:06PM +0200, Juergen Schindele wrote:
-> Dear Russell,
-> this is a good idea because not all PXA based designs use all
-> of the available uarts. 
-> I think it would be even better if you could give the order of the
-> UARTS at the same time in the platform initialisation.
+Russell King - ARM Linux wrote:
+> On Wed, Nov 04, 2009 at 09:12:10PM +0100, Toby Douglass wrote:
 
-No.  We did that with SA11x0 CPUs and it turned into a mess - it
-became very difficult to sort out "my ttySA1 doesn't work" problems
-because no one knew what port ttySA1 actually corresponded with.
+[snip]
+
+>> The "mov %0, #0" - why is this inbetween the ldrex and strexeq?  it
+>> seems to me it could just as well happen before the ldrex, and doing so
+>> would reduce the time between the ldrex and strexeq and so reduce the
+>> chance of someone else modifying our target.
+> 
+> Because it probably doesn't.  Loads normally have a 'result delay' which
+> cause a pipeline stall when the result is used in the next instruction.
+> It makes sense to fill those stall cycles with useful work, rather than
+> stalling the execution pipeline.
+
+Thanks, Russell.  I was concerned there was something functionally 
+important I'd missed with regard to the atomic op.
