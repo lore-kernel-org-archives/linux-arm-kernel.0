@@ -1,62 +1,61 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 6 Nov 2009 17:40:14 +0100 (CET)
-Subject: [PATCH 1/3] ezx: Add camera support for A780 and A910 EZX phones
-In-Reply-To: <20091104123536.9b95d161.ospite@studenti.unina.it>
-References: <1257266734-28673-1-git-send-email-ospite@studenti.unina.it>
-	<1257266734-28673-2-git-send-email-ospite@studenti.unina.it>
-	<f17812d70911032238i3ae6fa19g24720662b9079f24@mail.gmail.com>
-	<Pine.LNX.4.64.0911040907400.4837@axis700.grange>
-	<20091104123536.9b95d161.ospite@studenti.unina.it>
-Message-ID: <Pine.LNX.4.64.0911061720570.4389@axis700.grange>
+From: schindele@nentec.de (Juergen Schindele)
+Date: Fri, 6 Nov 2009 18:42:06 +0200
+Subject: [PATCH] Allow platforms to control which PXA uarts are registered
+In-Reply-To: <20091105141337.GB21681@n2100.arm.linux.org.uk>
+References: <20091105141337.GB21681@n2100.arm.linux.org.uk>
+Message-ID: <200911061742.06476.schindele@nentec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(added Robert to CC)
+Dear Russell,
+this is a good idea because not all PXA based designs use all
+of the available uarts. 
+I think it would be even better if you could give the order of the
+UARTS at the same time in the platform initialisation.
 
-On Wed, 4 Nov 2009, Antonio Ospite wrote:
+Just like this:
++       pxa_set_btuart_info(0);
++???????pxa_set_ffuart_info(1);
++???????pxa_set_stuart_info(2);
+...
++void __init pxa_set_ffuart_info(int id)
++{  
++	pxa_device_ffuart.id = id;
++       pxa_register_device(&pxa_device_ffuart, info);
++}
 
-> On Wed, 4 Nov 2009 09:13:16 +0100 (CET)
-> Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> 
-> > > > +/* camera */
-> > > > +static int a780_pxacamera_init(struct device *dev)
-> > > > +{
-> > > > + ? ? ? int err;
-> > > > +
-> > > > + ? ? ? /*
-> > > > + ? ? ? ?* GPIO50_GPIO is CAM_EN: active low
-> > > > + ? ? ? ?* GPIO19_GPIO is CAM_RST: active high
-> > > > + ? ? ? ?*/
-> > > > + ? ? ? err = gpio_request(MFP_PIN_GPIO50, "nCAM_EN");
-> > > 
-> > > Mmm... MFP != GPIO, so this probably should be written simply as:
-> > > 
-> > > #define GPIO_nCAM_EN	(50)
-> > 
-> > ...but without parenthesis, please:
-> > 
-> > #define GPIO_nCAM_EN	50
-> > 
-> > same everywhere below
-> >
-> 
-> OK.
-> 
-> BTW, Guennadi, shouldn't the pxa_camera platform_data expose also an
-> exit() method for symmetry with the init() one, where we can free the
-> requested resources?
+Which means that the PXA BTUART will be connected to ttyS0,
+the PXA FFUART on ttyS1 and so on (in this example of corse).
 
-Good that you mentioned this. In fact, I think, that .init should go. So 
-far it is used in pcm990-baseboard.c to initialise pins. You're doing 
-essentially the same - requesting and configuring GPIOs. And it has been 
-agreed, that there is so far no real case, where a static 
-GPIO-configuration wouldn't work. So, I would suggest you remove .init, 
-configure GPIOs statically. And then submit a patch to remove .init 
-completely from struct pxacamera_platform_data. Robert, do you agree?
+This would behave the same way as the patch from Bill Gatliff
+which was very useful for me some time ago.
+http://www.spinics.net/linux/lists/arm-kernel/msg28215.html
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Bye
+> For some platforms, it is inappropriate to register all PXA UARTs.
+> In some cases, the UARTs may not be used, and in others we may want
+> to avoid registering the UARTs to allow other drivers (eg, FICP) to
+> make use of the UART.
+>
+> In addition, a while back there was a request to be able to pass
+> platform data to the UART driver.
+
+> This patch enables all of this by providing functions platforms can
+> call to register each individual UART.
+--------------------------------------------------------------
+J?rgen Schindele  
+Software-Entwicklung
+
+NENTEC Netzwerktechnologie GmbH
+Greschbachstr. 12
+76229 Karlsruhe
+Deutschland
+Telefon: +49 721 94249-51
+Telefax: +49 721 94249-10
+E-Mail:  schindele at nentec.de
+WEB:     www.nentec.de
+ 
+Gesch?ftsf?hrung: Klaus Becker, Roland Knapp
+Sitz der Gesellschaft: Karlsruhe
+Handelsregister: Amtsgericht Mannheim HRB 107658
+--------------------------------------------------------------
