@@ -1,192 +1,247 @@
-From: dk-arm-linux@gmx.de (Dieter Kiermaier)
-Date: Fri, 6 Nov 2009 15:59:47 +0100
-Subject: kirkwood / openrd: umount problem using mdev (busybox)
-Message-ID: <200911061559.47922.dk-arm-linux@gmx.de>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 6 Nov 2009 15:53:10 +0100 (CET)
+Subject: [PATCH 6/6] mx31moboard: camera support
+In-Reply-To: <1257268191-19075-7-git-send-email-valentin.longchamp@epfl.ch>
+References: <1257268191-19075-1-git-send-email-valentin.longchamp@epfl.ch>
+	<1257268191-19075-2-git-send-email-valentin.longchamp@epfl.ch>
+	<1257268191-19075-3-git-send-email-valentin.longchamp@epfl.ch>
+	<1257268191-19075-4-git-send-email-valentin.longchamp@epfl.ch>
+	<1257268191-19075-5-git-send-email-valentin.longchamp@epfl.ch>
+	<1257268191-19075-6-git-send-email-valentin.longchamp@epfl.ch>
+	<1257268191-19075-7-git-send-email-valentin.longchamp@epfl.ch>
+Message-ID: <Pine.LNX.4.64.0911061551400.4389@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Tue, 3 Nov 2009, Valentin Longchamp wrote:
 
-I've encountered a new problem with regards to busybox mdev while umounting a usb pendrive:
-I'm using kernel
-sh-3.2# uname -a
-Linux DB88FXX81 2.6.32-rc4 #2 PREEMPT Thu Nov 5 13:41:41 CET 2009 armv5tel GNU/Linux
-sh-3.2#
+> We have two mt9t031 cameras that have a muxed bus on the robot.
+> Only one is currently initialized because of limitations in
+> soc_camera that should be removed later.
+> 
+> Signed-off-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
 
+As mentioned in my reply to another patch (4/6) in this series, now this 
+patch is missing the header include. But if Sascha is ready to get them 
+with this small inaccuracy
 
-Mounting and umounting manually works like a charm without any problems. But if I disconnected a
-mounted pendrive and wants mdev to umount it on a remove event the umount call hangs until I get a
-message from my kernel (see below).
+Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
+Thanks
+Guennadi
 
+> ---
+>  arch/arm/mach-mx3/mx31moboard-marxbot.c |   86 ++++++++++++++++++++++++++++++-
+>  arch/arm/mach-mx3/mx31moboard.c         |   36 +++++++++++++
+>  2 files changed, 121 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx3/mx31moboard-marxbot.c b/arch/arm/mach-mx3/mx31moboard-marxbot.c
+> index 6b06faf..e4e344e 100644
+> --- a/arch/arm/mach-mx3/mx31moboard-marxbot.c
+> +++ b/arch/arm/mach-mx3/mx31moboard-marxbot.c
+> @@ -16,9 +16,11 @@
+>   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+>   */
+>  
+> +#include <linux/delay.h>
+>  #include <linux/gpio.h>
+>  #include <linux/init.h>
+>  #include <linux/interrupt.h>
+> +#include <linux/i2c.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/types.h>
+>  
+> @@ -28,6 +30,8 @@
+>  #include <mach/iomux-mx3.h>
+>  #include <mach/mmc.h>
+>  
+> +#include <media/soc_camera.h>
+> +
+>  #include "devices.h"
+>  
+>  static unsigned int marxbot_pins[] = {
+> @@ -37,7 +41,6 @@ static unsigned int marxbot_pins[] = {
+>  	MX31_PIN_PC_CD2_B__SD2_CLK, MX31_PIN_PC_CD1_B__SD2_CMD,
+>  	MX31_PIN_ATA_DIOR__GPIO3_28, MX31_PIN_ATA_DIOW__GPIO3_29,
+>  	/* CSI */
+> -	MX31_PIN_CSI_D4__CSI_D4, MX31_PIN_CSI_D5__CSI_D5,
+>  	MX31_PIN_CSI_D6__CSI_D6, MX31_PIN_CSI_D7__CSI_D7,
+>  	MX31_PIN_CSI_D8__CSI_D8, MX31_PIN_CSI_D9__CSI_D9,
+>  	MX31_PIN_CSI_D10__CSI_D10, MX31_PIN_CSI_D11__CSI_D11,
+> @@ -45,6 +48,7 @@ static unsigned int marxbot_pins[] = {
+>  	MX31_PIN_CSI_D14__CSI_D14, MX31_PIN_CSI_D15__CSI_D15,
+>  	MX31_PIN_CSI_HSYNC__CSI_HSYNC, MX31_PIN_CSI_MCLK__CSI_MCLK,
+>  	MX31_PIN_CSI_PIXCLK__CSI_PIXCLK, MX31_PIN_CSI_VSYNC__CSI_VSYNC,
+> +	MX31_PIN_CSI_D4__GPIO3_4, MX31_PIN_CSI_D5__GPIO3_5,
+>  	MX31_PIN_GPIO3_0__GPIO3_0, MX31_PIN_GPIO3_1__GPIO3_1,
+>  	MX31_PIN_TXD2__GPIO1_28,
+>  	/* dsPIC resets */
+> @@ -122,6 +126,83 @@ static void dspics_resets_init(void)
+>  	}
+>  }
+>  
+> +#define TURRETCAM_POWER	IOMUX_TO_GPIO(MX31_PIN_GPIO3_1)
+> +#define BASECAM_POWER	IOMUX_TO_GPIO(MX31_PIN_CSI_D5)
+> +#define TURRETCAM_RST_B	IOMUX_TO_GPIO(MX31_PIN_GPIO3_0)
+> +#define BASECAM_RST_B	IOMUX_TO_GPIO(MX31_PIN_CSI_D4)
+> +#define CAM_CHOICE	IOMUX_TO_GPIO(MX31_PIN_TXD2)
+> +
+> +static int marxbot_basecam_power(struct device *dev, int on)
+> +{
+> +	gpio_set_value(BASECAM_POWER, !on);
+> +	return 0;
+> +}
+> +
+> +static int marxbot_basecam_reset(struct device *dev)
+> +{
+> +	gpio_set_value(BASECAM_RST_B, 0);
+> +	udelay(100);
+> +	gpio_set_value(BASECAM_RST_B, 1);
+> +	return 0;
+> +}
+> +
+> +static struct i2c_board_info marxbot_i2c_devices[] = {
+> +	{
+> +		I2C_BOARD_INFO("mt9t031", 0x5d),
+> +	},
+> +};
+> +
+> +static struct soc_camera_link base_iclink = {
+> +	.bus_id		= 0,		/* Must match with the camera ID */
+> +	.power		= marxbot_basecam_power,
+> +	.reset		= marxbot_basecam_reset,
+> +	.board_info	= &marxbot_i2c_devices[0],
+> +	.i2c_adapter_id	= 0,
+> +	.module_name	= "mt9t031",
+> +};
+> +
+> +static struct platform_device marxbot_camera[] = {
+> +	{
+> +		.name	= "soc-camera-pdrv",
+> +		.id	= 0,
+> +		.dev	= {
+> +			.platform_data = &base_iclink,
+> +		},
+> +	},
+> +};
+> +
+> +static struct platform_device *marxbot_cameras[] __initdata = {
+> +	&marxbot_camera[0],
+> +};
+> +
+> +static int __init marxbot_cam_init(void)
+> +{
+> +	int ret = gpio_request(CAM_CHOICE, "cam-choice");
+> +	if (ret)
+> +		return ret;
+> +	gpio_direction_output(CAM_CHOICE, 1);
+> +
+> +	ret = gpio_request(BASECAM_RST_B, "basecam-reset");
+> +	if (ret)
+> +		return ret;
+> +	gpio_direction_output(BASECAM_RST_B, 1);
+> +	ret = gpio_request(BASECAM_POWER, "basecam-standby");
+> +	if (ret)
+> +		return ret;
+> +	gpio_direction_output(BASECAM_POWER, 0);
+> +
+> +	ret = gpio_request(TURRETCAM_RST_B, "turretcam-reset");
+> +	if (ret)
+> +		return ret;
+> +	gpio_direction_output(TURRETCAM_RST_B, 1);
+> +	ret = gpio_request(TURRETCAM_POWER, "turretcam-standby");
+> +	if (ret)
+> +		return ret;
+> +	gpio_direction_output(TURRETCAM_POWER, 0);
+> +
+> +	return 0;
+> +}
+> +
+>  /*
+>   * system init for baseboard usage. Will be called by mx31moboard init.
+>   */
+> @@ -136,6 +217,9 @@ void __init mx31moboard_marxbot_init(void)
+>  
+>  	mxc_register_device(&mxcsdhc_device1, &sdhc2_pdata);
+>  
+> +	marxbot_cam_init();
+> +	platform_add_devices(marxbot_cameras, ARRAY_SIZE(marxbot_cameras));
+> +
+>  	/* battery present pin */
+>  	gpio_request(IOMUX_TO_GPIO(MX31_PIN_LCS0), "bat-present");
+>  	gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_LCS0));
+> diff --git a/arch/arm/mach-mx3/mx31moboard.c b/arch/arm/mach-mx3/mx31moboard.c
+> index 2f95dcd..b167f13 100644
+> --- a/arch/arm/mach-mx3/mx31moboard.c
+> +++ b/arch/arm/mach-mx3/mx31moboard.c
+> @@ -17,6 +17,7 @@
+>   */
+>  
+>  #include <linux/delay.h>
+> +#include <linux/dma-mapping.h>
+>  #include <linux/fsl_devices.h>
+>  #include <linux/gpio.h>
+>  #include <linux/init.h>
+> @@ -403,6 +404,39 @@ static struct platform_device *devices[] __initdata = {
+>  	&mx31moboard_leds_device,
+>  };
+>  
+> +static struct mx3_camera_pdata camera_pdata = {
+> +	.dma_dev	= &mx3_ipu.dev,
+> +	.flags		= MX3_CAMERA_DATAWIDTH_8 | MX3_CAMERA_DATAWIDTH_10,
+> +	.mclk_10khz	= 4800,
+> +};
+> +
+> +#define CAMERA_BUF_SIZE	(4*1024*1024)
+> +
+> +static int __init mx31moboard_cam_alloc_dma(const size_t buf_size)
+> +{
+> +	dma_addr_t dma_handle;
+> +	void *buf;
+> +	int dma;
+> +
+> +	if (buf_size < 2 * 1024 * 1024)
+> +		return -EINVAL;
+> +
+> +	buf = dma_alloc_coherent(NULL, buf_size, &dma_handle, GFP_KERNEL);
+> +	if (!buf) {
+> +		pr_err("%s: cannot allocate camera buffer-memory\n", __func__);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	memset(buf, 0, buf_size);
+> +
+> +	dma = dma_declare_coherent_memory(&mx3_camera.dev,
+> +					dma_handle, dma_handle, buf_size,
+> +					DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
+> +
+> +	/* The way we call dma_declare_coherent_memory only a malloc can fail */
+> +	return dma & DMA_MEMORY_MAP ? 0 : -ENOMEM;
+> +}
+> +
+>  static int mx31moboard_baseboard;
+>  core_param(mx31moboard_baseboard, mx31moboard_baseboard, int, 0444);
+>  
+> @@ -436,6 +470,8 @@ static void __init mxc_board_init(void)
+>  	mxc_register_device(&mxcsdhc_device0, &sdhc1_pdata);
+>  
+>  	mxc_register_device(&mx3_ipu, &mx3_ipu_data);
+> +	if (!mx31moboard_cam_alloc_dma(CAMERA_BUF_SIZE))
+> +		mxc_register_device(&mx3_camera, &camera_pdata);
+>  
+>  	usb_xcvr_reset();
+>  
+> -- 
+> 1.6.3.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
-A strace of the umount call gives:
-execve("/bin/umount", ["umount", "-f", "-l", "/dev/sda1"], [/* 14 vars */]) = 0
-brk(0)                                  = 0xf5000
-uname({sys="Linux", node="DB88FXX81", ...}) = 0
-mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x4001d000
-access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)
-open("/etc/ld.so.cache", O_RDONLY)      = -1 ENOENT (No such file or directory)
-open("/lib/tls/v5l/fast-mult/half/libm.so.6", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/lib/tls/v5l/fast-mult/half", 0xbed722f8) = -1 ENOENT (No such file or directory)
-open("/lib/tls/v5l/fast-mult/libm.so.6", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/lib/tls/v5l/fast-mult", 0xbed722f8) = -1 ENOENT (No such file or directory)
-open("/lib/tls/v5l/half/libm.so.6", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/lib/tls/v5l/half", 0xbed722f8) = -1 ENOENT (No such file or directory)
-open("/lib/tls/v5l/libm.so.6", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/lib/tls/v5l", 0xbed722f8)      = -1 ENOENT (No such file or directory)
-open("/lib/tls/fast-mult/half/libm.so.6", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/lib/tls/fast-mult/half", 0xbed722f8) = -1 ENOENT (No such file or directory)
-open("/lib/tls/fast-mult/libm.so.6", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/lib/tls/fast-mult", 0xbed722f8) = -1 ENOENT (No such file or directory)
-open("/lib/tls/half/libm.so.6", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/lib/tls/half", 0xbed722f8)     = -1 ENOENT (No such file or directory)
-open("/lib/tls/libm.so.6", O_RDONLY)    = -1 ENOENT (No such file or directory)
-stat64("/lib/tls", 0xbed722f8)          = -1 ENOENT (No such file or directory)
-open("/lib/v5l/fast-mult/half/libm.so.6", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/lib/v5l/fast-mult/half", 0xbed722f8) = -1 ENOENT (No such file or directory)
-open("/lib/v5l/fast-mult/libm.so.6", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/lib/v5l/fast-mult", 0xbed722f8) = -1 ENOENT (No such file or directory)
-open("/lib/v5l/half/libm.so.6", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/lib/v5l/half", 0xbed722f8)     = -1 ENOENT (No such file or directory)
-open("/lib/v5l/libm.so.6", O_RDONLY)    = -1 ENOENT (No such file or directory)
-stat64("/lib/v5l", 0xbed722f8)          = -1 ENOENT (No such file or directory)
-open("/lib/fast-mult/half/libm.so.6", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/lib/fast-mult/half", 0xbed722f8) = -1 ENOENT (No such file or directory)
-open("/lib/fast-mult/libm.so.6", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/lib/fast-mult", 0xbed722f8)    = -1 ENOENT (No such file or directory)
-open("/lib/half/libm.so.6", O_RDONLY)   = -1 ENOENT (No such file or directory)
-stat64("/lib/half", 0xbed722f8)         = -1 ENOENT (No such file or directory)
-open("/lib/libm.so.6", O_RDONLY)        = 4
-read(4, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0(\0\1\0\0\0\0342\0\0004\0\0\0"..., 512) = 512
-fstat64(4, {st_mode=S_IFREG|0755, st_size=693352, ...}) = 0
-mmap2(NULL, 712856, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 4, 0) = 0x40026000
-mprotect(0x400cc000, 28672, PROT_NONE)  = 0
-mmap2(0x400d3000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 4, 0xa5) = 0x400d3000
-close(4)                                = 0
-open("/lib/libgcc_s.so.1", O_RDONLY)    = -1 ENOENT (No such file or directory)
-open("/usr/lib/tls/v5l/fast-mult/half/libgcc_s.so.1", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/usr/lib/tls/v5l/fast-mult/half", 0xbed722e0) = -1 ENOENT (No such file or directory)
-open("/usr/lib/tls/v5l/fast-mult/libgcc_s.so.1", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/usr/lib/tls/v5l/fast-mult", 0xbed722e0) = -1 ENOENT (No such file or directory)
-open("/usr/lib/tls/v5l/half/libgcc_s.so.1", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/usr/lib/tls/v5l/half", 0xbed722e0) = -1 ENOENT (No such file or directory)
-open("/usr/lib/tls/v5l/libgcc_s.so.1", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/usr/lib/tls/v5l", 0xbed722e0)  = -1 ENOENT (No such file or directory)
-open("/usr/lib/tls/fast-mult/half/libgcc_s.so.1", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/usr/lib/tls/fast-mult/half", 0xbed722e0) = -1 ENOENT (No such file or directory)
-open("/usr/lib/tls/fast-mult/libgcc_s.so.1", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/usr/lib/tls/fast-mult", 0xbed722e0) = -1 ENOENT (No such file or directory)
-open("/usr/lib/tls/half/libgcc_s.so.1", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/usr/lib/tls/half", 0xbed722e0) = -1 ENOENT (No such file or directory)
-open("/usr/lib/tls/libgcc_s.so.1", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/usr/lib/tls", 0xbed722e0)      = -1 ENOENT (No such file or directory)
-open("/usr/lib/v5l/fast-mult/half/libgcc_s.so.1", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/usr/lib/v5l/fast-mult/half", 0xbed722e0) = -1 ENOENT (No such file or directory)
-open("/usr/lib/v5l/fast-mult/libgcc_s.so.1", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/usr/lib/v5l/fast-mult", 0xbed722e0) = -1 ENOENT (No such file or directory)
-open("/usr/lib/v5l/half/libgcc_s.so.1", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/usr/lib/v5l/half", 0xbed722e0) = -1 ENOENT (No such file or directory)
-open("/usr/lib/v5l/libgcc_s.so.1", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/usr/lib/v5l", 0xbed722e0)      = -1 ENOENT (No such file or directory)
-open("/usr/lib/fast-mult/half/libgcc_s.so.1", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/usr/lib/fast-mult/half", 0xbed722e0) = -1 ENOENT (No such file or directory)
-open("/usr/lib/fast-mult/libgcc_s.so.1", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/usr/lib/fast-mult", 0xbed722e0) = -1 ENOENT (No such file or directory)
-open("/usr/lib/half/libgcc_s.so.1", O_RDONLY) = -1 ENOENT (No such file or directory)
-stat64("/usr/lib/half", 0xbed722e0)     = -1 ENOENT (No such file or directory)
-open("/usr/lib/libgcc_s.so.1", O_RDONLY) = 4
-read(4, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0(\0\1\0\0\0\304\"\0\0004\0\0\0"..., 512) = 512
-fstat64(4, {st_mode=S_IFREG|0644, st_size=65824, ...}) = 0
-mmap2(NULL, 78540, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 4, 0) = 0x400d5000
-mprotect(0x400e1000, 28672, PROT_NONE)  = 0
-mmap2(0x400e8000, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 4, 0xb) = 0x400e8000
-close(4)                                = 0
-open("/lib/libc.so.6", O_RDONLY)        = 4
-read(4, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0(\0\1\0\0\0\340J\1\0004\0\0\0"..., 512) = 512
-fstat64(4, {st_mode=S_IFREG|0755, st_size=1249460, ...}) = 0
-mmap2(NULL, 1237404, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 4, 0) = 0x400e9000
-mprotect(0x4020b000, 28672, PROT_NONE)  = 0
-mmap2(0x40212000, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 4, 0x121) = 0x40212000
-mmap2(0x40215000, 8604, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x40215000
-close(4)                                = 0
-mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x4001e000
-set_tls(0x4001e720, 0x400256f4, 0x4001edf8, 0x40025058, 0x40) = 0
-mprotect(0x40212000, 8192, PROT_READ)   = 0
-mprotect(0x400d3000, 4096, PROT_READ)   = 0
-getpid()                                = 562
-getuid32()                              = 0
-brk(0)                                  = 0xf5000
-brk(0x117000)                           = 0x117000
-open("/proc/mounts", O_RDONLY)          = 4
-fstat64(4, {st_mode=S_IFREG|0444, st_size=0, ...}) = 0
-mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x4001f000
-read(4, "rootfs / rootfs rw 0 0\n/dev/root"..., 1024) = 655
-read(4, "", 1024)                       = 0
-close(4)                                = 0
-munmap(0x4001f000, 4096)                = 0
-lstat64("/dev", {st_mode=S_IFDIR|S_ISVTX|0777, st_size=2880, ...}) = 0
-lstat64("/dev/sda1", {st_mode=S_IFBLK|0660, st_rdev=makedev(8, 1), ...}) = 0
-umount("/mnt/usbdisk", 0
-
-And after that the process hangs:
-
-sh-3.2# ps
-  PID USER       VSZ STAT COMMAND
-    1 root      3256 S    init
-    2 root         0 SW   [kthreadd]
-    3 root         0 SW   [ksoftirqd/0]
-    4 root         0 SW   [watchdog/0]
-    5 root         0 SW   [events/0]
-    6 root         0 SW   [khelper]
-    9 root         0 SW   [async/mgr]
-  133 root         0 SW   [sync_supers]
-  135 root         0 SW   [bdi-default]
-  137 root         0 SW   [kblockd/0]
-  143 root         0 SW   [ata/0]
-  144 root         0 SW   [ata_aux]
-  152 root         0 SW   [khubd]
-  155 root         0 SW   [kseriod]
-  158 root         0 SW   [kmmcd]
-  178 root         0 SW   [rpciod/0]
-  186 root         0 SW   [khungtaskd]
-  187 root         0 SW   [kswapd0]
-  236 root         0 SW   [aio/0]
-  244 root         0 SW   [nfsiod]
-  250 root         0 SW   [crypto/0]
-  387 root         0 SW   [scsi_eh_0]
-  390 root         0 SW   [scsi_eh_1]
-  397 root         0 SW   [mtdblockd]
-  411 root         0 SW   [orion_spi]
-  494 root         0 SW   [usbhid_resumer]
-  515 root      2280 S    /bin/sh /sbin/mini_httpd_wrapper
-  516 root      2644 S    -/bin/sh
-  519 root      2176 S    /sbin/mini_httpd -D -d /var/www -u root -c **.cgi -i
-  527 root         0 SW   [scsi_eh_2]
-  550 root      3264 S    /sbin/mdev block
-  554 root      2604 S    /bin/sh /sbin/mdev_mount_usbdisk.sh
-  561 root      1836 S    strace umount -f -l /dev/sda1
-  562 root      3260 D    umount -f -l /dev/sda1
-  564 root      3260 R    ps
-sh-3.2#
-
-After a while I get this from my kernel every now and then:
-
-sh-3.2# INFO: task umount:562 blocked for more than 120 seconds.
-"echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
-umount        D c03467c0     0   562    561 0x00000100
-[<c03467c0>] (schedule+0x360/0x3f0) from [<c00d18f0>] (bdi_sched_wait+0xc/0x18)
-[<c00d18f0>] (bdi_sched_wait+0xc/0x18) from [<c03472e4>] (__wait_on_bit+0x60/0xac)
-[<c03472e4>] (__wait_on_bit+0x60/0xac) from [<c03473a4>] (out_of_line_wait_on_bit+0x74/0x80)
-[<c03473a4>] (out_of_line_wait_on_bit+0x74/0x80) from [<c00d1984>] (sync_inodes_sb+0x88/0x17c)
-[<c00d1984>] (sync_inodes_sb+0x88/0x17c) from [<c00d5c38>] (__sync_filesystem+0x30/0x6c)
-[<c00d5c38>] (__sync_filesystem+0x30/0x6c) from [<c00b6248>] (generic_shutdown_super+0x2c/0x130)
-[<c00b6248>] (generic_shutdown_super+0x2c/0x130) from [<c00b6368>] (kill_block_super+0x1c/0x38)
-[<c00b6368>] (kill_block_super+0x1c/0x38) from [<c00b66c0>] (deactivate_super+0x68/0x8c)
-[<c00b66c0>] (deactivate_super+0x68/0x8c) from [<c00cd734>] (sys_umount+0x2c8/0x2fc)
-[<c00cd734>] (sys_umount+0x2c8/0x2fc) from [<c0026b1c>] (__sys_trace_return+0x0/0x24)
-
-Any help would be welcome!
-
-Many thanks,
-Dieter
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
