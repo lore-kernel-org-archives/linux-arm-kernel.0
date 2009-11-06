@@ -1,32 +1,84 @@
 From: hongjiujing@126.com (tommy.hong)
-Date: Fri, 6 Nov 2009 15:45:58 +0800 (CST)
-Subject: Suggestion:S3C64XX and next-S3C MFC need IOCTL_MFC_RESET ?
-Message-ID: <13525022.780141257493558392.JavaMail.coremail@bj126app54.126.com>
+Date: Fri, 6 Nov 2009 16:17:51 +0800 (CST)
+Subject: [PATCH 02/17] ARM: S5PC1XX: registers rename
+In-Reply-To: <20091106031845.GG3913@prithivi.gnumonks.org>
+References: <20091106031845.GG3913@prithivi.gnumonks.org>
+	<1255421482-26455-1-git-send-email-m.szyprowski@samsung.com>
+	<1255421482-26455-2-git-send-email-m.szyprowski@samsung.com>
+	<1255421482-26455-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <28219630.804641257495471280.JavaMail.coremail@bj126app54.126.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,emailist!
-  
-  I think S3C64XX and next-s3c MFC driver need IOCTL_MFC_RESET,because if APP unlegal exit mfc operation or MFC met some uncorrect h264/mpeg4/vc1/wmv9 media stream,can cause MFC inter unit become uncorrect state,it need RESET to recover to work for next!When under that uncorrect condition,APP must use ioctl_MFC_RESET to recover!
-
- i have test it ,also OK even met uncorrect stream and unlegal app file descriptor exit !
+yeah,i agree
 
 
 
-patch may be similiar as following:
-
-               /*For MFC RESET,when met uncorrect stram or unlegal file descriptor exit ,for APP engineer*/
-                case IOCTL_MFC_RESET:
-                        MFC_Mutex_Lock();
-          
-                        MFC_HW_Init(); /*RESET MFC,download firmware ,reset mfc busy flag*/
-
-                        MFC_Mutex_Release();
-                        break;
 
 
-Tommy
 
+?2009-11-06?11:18:45?"Harald?Welte"?<laforge@gnumonks.org>????
+>Hi?Marek,
+>
+>On?Tue,?Oct?13,?2009?at?10:11:07AM?+0200,?Marek?Szyprowski?wrote:
+>
+>>?S5PC110?and?S5PC100?register?maps?differs?in?many?places,?rename?all
+>>?defined?registers?to?be?S5PC100?specific.?System?map?has?been?also?updated
+>>?to?cover?more?integrated?peripherals.
+>
+>The?general?idea?of?this?patch?is?fine.??However,?I?have?some?questions:
+>
+>>??/*?System?*/
+>>?-#define?S5PC100_PA_SYS		(0xE0100000)
+>>?-#define?S5PC100_PA_CLK		(S5PC100_PA_SYS?+?0x0)
+>>?-#define?S5PC100_PA_PWR		(S5PC100_PA_SYS?+?0x8000)
+>>?+#define?S5PC100_PA_CLK		(0xE0100000)
+>>?+#define?S5PC100_PA_CLK_OTHER	(0xE0200000)
+>>?+#define?S5PC100_PA_PWR		(0xE0108000)
+>
+>this?is?more?like?a?rename.??Why?was?this?done???It?would?be?good?to?explain?in
+>the?commitlog
+>
+>>?+/*?GPIO?*/
+>>?+#define?S5PC100_PA_GPIO		(0xE0300000)
+>>?+#define?S5PC1XX_PA_GPIO		S5PC100_PA_GPIO
+>>?+#define?S5PC1XX_VA_GPIO		S3C_ADDR(0x00500000)
+>
+>If?the?address?is?different?for?c100?and?c110:?why?do?we?need?a?S5CP1XX_*
+>definition???In?my?personal?opinion,?all?those?compile-time?defines?are?a
+>kludge?and?we?should?not?introduce?more?of?them.??They?will?bite?us?in?the?back
+>if?we?ever?in?the?future?want?to?build?a?kernel?that?can?boot?on?both?c100?and
+>c110.
+>
+>>??/*?ETC?*/
+>>??#define?S5PC100_PA_SDRAM	(0x20000000)
+>>?+#define?S5PC1XX_PA_SDRAM	S5PC100_PA_SDRAM
+>
+>Again?here.?We?already?have?the?c100?specific?define.??Why?add?a?new?c1xx?define?
+>
+>>??	/*?Maintainer:?Byungho?Min?<bhmin@samsung.com>?*/
+>>?-	.phys_io	=?S5PC1XX_PA_UART?&?0xfff00000,
+>>?+	.phys_io	=?S5PC100_PA_UART?&?0xfff00000,
+>
+>this?is?the?change?I?like.
+>
+>>??	.io_pg_offst	=?(((u32)S5PC1XX_VA_UART)?>>?18)?&?0xfffc,
+>>?-	.boot_params	=?S5PC100_PA_SDRAM?+?0x100,
+>>?+	.boot_params	=?S5PC1XX_PA_SDRAM?+?0x100,
+>
+>This?is?the?wrong?kind?of?change,?from?my?point?of?view.??We?don't?know?yet
+>if?all?future?s5pc1xx?products?will?also?have?the?same?address,?do?we?
+>
+>--?
+>-?Harald?Welte?<laforge@gnumonks.org>???????????http://laforge.gnumonks.org/
+>============================================================================
+>"Privacy?in?residential?applications?is?a?desirable?marketing?option."
+>??????????????????????????????????????????????????(ETSI?EN?300?175-7?Ch.?A6)
+>
+>_______________________________________________
+>linux-arm-kernel?mailing?list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091106/a25464f4/attachment-0001.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091106/1f8a0fb8/attachment.htm>
