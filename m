@@ -1,40 +1,109 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 06 Nov 2009 16:58:39 +0900
-Subject: About allocate the memory with non-secure attribute
-Message-ID: <000b01ca5eb6$f3e01c10$dba05430$%kim@samsung.com>
+From: jiujin.hong@mid-fun.com (tommy)
+Date: Fri, 06 Nov 2009 16:00:57 +0800
+Subject: about s3c64xx-ac97 irq and mmc interrupt trigger
+Message-ID: <1257494457.22587.0.camel@tommy-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+hi,all!
 
-In default case, the ARM CPU is in the secure state until secure state
-attribute is changed.
+Several days ago ,i have a post ,as following!
 
-We are developing the system MMU device driver which makes multimedia device
-can use virtual address instead of physical address.
+"HI,all!
+I have met a big error in s3c6410 linux2.6.24.2 BSP ,the same as the
+following
 
-Our system MMU operates as follows;
+"
+Kernel MMC/SD developers,
 
-1. The device driver requests the virtually continuous memory to the OS.
-2. When OS returns the page table as a result, the system MMU receives the
-pointer of page table.
-3. When HW Device generates the virtual addressing transaction, system MMU
-translate it into the physical address by referring page table.
-4. If the secure attribute of device's transaction is not matched with the
-attribute of its page table, system MMU generate the fault interrupt, and
-returns bus decode error to the HW Device.
 
-The problem is "the HW device generates the non-secure transaction, while
-page table has secure attribute."
+I've been encountering some problems when I abruptly remove SD card
+during data transfer (song playback ... more so when the amount of
+transfer is huge)
+The kernel gets stuck in mmc_request function in the loops below
+if (!mq) {
+printk(KERN_ERR "MMC: killing requests for dead queue ");
+while ((req = elv_next_request(q)) != NULL) {
+do {
+ret = end_that_request_chunk(req, 0,
+req->current_nr_sectors << 9);
+} while (ret);
+}
+return;
+}
+elv_next_requests returns the current request which is then ended with
+end_that_request_chunk, however the request is never dequeued. As a
+result, every
+iteration of the while returns the same request and this "while"
+becomes an infinite loop with the same req being returned each time
 
-And, we don't want to make HW device generates the secure transaction.
+I added a call to blkdev_dequeue_request(req); after the do_while but
+within the while and with this change the while loop always ends but I
+observed that the kernel MMC stack sometimes(infrequent though) does
+not respond to mmc_detect_change upon the next card insertion.
 
-Is there any solution to allocate the memory with non-secure attribute?
+I'm running an ARM9 port of 2.6.24.7 kernel on a custom board with a
+custom SD host controller and always use 4 bit transfer mode
 
-Thanks.
+Any help/info or similar experiences would be of real help.
+"
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-System LSI Division, SAMSUNG ELECTRONICS CO., LTD.
+Later i use __blk_end_request to replace end_that_request_chunk,can make
+this issue better!
+Now i reconsider this question,maybe a driver or hardware issue in BSP ?
+Because i read  2.6.24.7-kernel pxa2xx-ac97.c code, i found the
+following code :
+
+static irqreturn_t pxa2xx_ac97_irq(int irq, void *dev_id)
+{
+        long status;
+
+        status = GSR;
+        if (status) {
+                GSR = status;
+                gsr_bits |= status;
+                wake_up(&gsr_wq);
+
+#ifdef CONFIG_PXA27x
+                /* Although we don't use those we still need to clear
+them
+                   since they tend to spuriously trigger when MMC is
+used
+                   (hardware bug? go figure)... */
+                MISR = MISR_EOC;
+                PISR = PISR_EOC;
+                MCSR = MCSR_EOC;
+#endif
+
+                return IRQ_HANDLED;
+        }
+
+        return IRQ_NONE;
+}
+
+does samsung-s3c64xx BSP kernel (just for 2.6.24.2) s3c64xx-ac97.c also
+need similiar as 
+
+#ifdef CONFIG_S3C64XX
+                /* Although we don't use those we still need to clear
+them
+                   since they tend to spuriously trigger when MMC is
+used
+                   (hardware bug? go figure)... */
+                MISR = MISR_EOC;/* DMA End-of-Chain (exclusive clear)===
+Modem In
+Status Register */
+                PISR = PISR_EOC;/* DMA End-of-Chain (exclusive clear)
+=== /* PCM In
+Status Register */
+*/
+                MCSR = MCSR_EOC; /* DMA End-of-Chain (exclusive clear)
+==Mic In Status
+Register*/
+#endif
+
+
+to avoid mmc interrupt trigger ?
+
+
+Tommy@China
