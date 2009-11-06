@@ -1,16 +1,24 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Fri, 6 Nov 2009 10:05:50 +0900
-Subject: S3C64XX DMA driver fixes
-In-Reply-To: <4AF30227.2010802@softerra.com>
-References: <1257396253-32108-1-git-send-email-jassi.brar@samsung.com>
-	<4AF30227.2010802@softerra.com>
-Message-ID: <1b68c6790911051705p6c3c171ye413a535a42a7149@mail.gmail.com>
+From: laforge@gnumonks.org (Harald Welte)
+Date: Fri, 6 Nov 2009 12:20:26 +0900
+Subject: [PATCH 05/17] ARM: S5PC1XX: add GPIO L banks to register
+	definition
+In-Reply-To: <1255421482-26455-6-git-send-email-m.szyprowski@samsung.com>
+References: <1255421482-26455-1-git-send-email-m.szyprowski@samsung.com>
+	<1255421482-26455-2-git-send-email-m.szyprowski@samsung.com>
+	<1255421482-26455-3-git-send-email-m.szyprowski@samsung.com>
+	<1255421482-26455-4-git-send-email-m.szyprowski@samsung.com>
+	<1255421482-26455-5-git-send-email-m.szyprowski@samsung.com>
+	<1255421482-26455-6-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20091106032026.GI3913@prithivi.gnumonks.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 6, 2009 at 1:49 AM, Mikhail Lodygin <mishal@softerra.com> wrote:
-> Can you provide SPI driver (even if it not complete) to try?
-Am afraid you can't get it running without much effort. Its tightly coupled with
-the BSP that we use internally(I know its not a good thing).
-So i suggest you please wait until a few days.
-If u insist i can share it, though.
+On Tue, Oct 13, 2009 at 10:11:10AM +0200, Marek Szyprowski wrote:
+> Add GPIO L0-L4 banks to register definition.
+
+looks fine to me.
+-- 
+- Harald Welte <laforge@gnumonks.org>           http://laforge.gnumonks.org/
+============================================================================
+"Privacy in residential applications is a desirable marketing option."
+                                                  (ETSI EN 300 175-7 Ch. A6)
