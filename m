@@ -1,8 +1,10 @@
 From: laforge@gnumonks.org (Harald Welte)
-Date: Fri, 6 Nov 2009 12:30:37 +0900
-Subject: [PATCH 13/17] SMDKC100: add I2C0 and I2C1 buses support
-In-Reply-To: <1255421482-26455-14-git-send-email-m.szyprowski@samsung.com>
-References: <1255421482-26455-5-git-send-email-m.szyprowski@samsung.com>
+Date: Fri, 6 Nov 2009 12:30:09 +0900
+Subject: [PATCH 12/17] ARM: S5PC1xx: add platform helpers for i2c
+	adapter devices
+In-Reply-To: <1255421482-26455-13-git-send-email-m.szyprowski@samsung.com>
+References: <1255421482-26455-4-git-send-email-m.szyprowski@samsung.com>
+	<1255421482-26455-5-git-send-email-m.szyprowski@samsung.com>
 	<1255421482-26455-6-git-send-email-m.szyprowski@samsung.com>
 	<1255421482-26455-7-git-send-email-m.szyprowski@samsung.com>
 	<1255421482-26455-8-git-send-email-m.szyprowski@samsung.com>
@@ -11,16 +13,16 @@ References: <1255421482-26455-5-git-send-email-m.szyprowski@samsung.com>
 	<1255421482-26455-11-git-send-email-m.szyprowski@samsung.com>
 	<1255421482-26455-12-git-send-email-m.szyprowski@samsung.com>
 	<1255421482-26455-13-git-send-email-m.szyprowski@samsung.com>
-	<1255421482-26455-14-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20091106033037.GP3913@prithivi.gnumonks.org>
+Message-ID: <20091106033009.GO3913@prithivi.gnumonks.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 13, 2009 at 10:11:18AM +0200, Marek Szyprowski wrote:
-> Add required machine definitions for I2C 0 and 1 bus controllers.
-> Currently no I2C device are defined yet.
+On Tue, Oct 13, 2009 at 10:11:17AM +0200, Marek Szyprowski wrote:
+> Samsung S5PC100 has I2C bus controller compatible with the one known from
+> previous SoCs series. Add required platform setup and support code that
+> it can be used with s3c2410-i2c driver.
 
-same as previous patch: trivial and should be merged.
+this is straight forward.  I think Ben should merge it.
 -- 
 - Harald Welte <laforge@gnumonks.org>           http://laforge.gnumonks.org/
 ============================================================================
