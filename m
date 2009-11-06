@@ -1,247 +1,106 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 6 Nov 2009 15:53:10 +0100 (CET)
-Subject: [PATCH 6/6] mx31moboard: camera support
-In-Reply-To: <1257268191-19075-7-git-send-email-valentin.longchamp@epfl.ch>
-References: <1257268191-19075-1-git-send-email-valentin.longchamp@epfl.ch>
-	<1257268191-19075-2-git-send-email-valentin.longchamp@epfl.ch>
-	<1257268191-19075-3-git-send-email-valentin.longchamp@epfl.ch>
-	<1257268191-19075-4-git-send-email-valentin.longchamp@epfl.ch>
-	<1257268191-19075-5-git-send-email-valentin.longchamp@epfl.ch>
-	<1257268191-19075-6-git-send-email-valentin.longchamp@epfl.ch>
-	<1257268191-19075-7-git-send-email-valentin.longchamp@epfl.ch>
-Message-ID: <Pine.LNX.4.64.0911061551400.4389@axis700.grange>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 06 Nov 2009 16:02:17 +0100
+Subject: [PATCH 02/17] ARM: S5PC1XX: registers rename
+In-Reply-To: <20091106031845.GG3913@prithivi.gnumonks.org>
+References: <1255421482-26455-1-git-send-email-m.szyprowski@samsung.com>
+	<1255421482-26455-2-git-send-email-m.szyprowski@samsung.com>
+	<1255421482-26455-3-git-send-email-m.szyprowski@samsung.com>
+	<20091106031845.GG3913@prithivi.gnumonks.org>
+Message-ID: <000401ca5ef2$24a09240$6de1b6c0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 3 Nov 2009, Valentin Longchamp wrote:
+Hello,
 
-> We have two mt9t031 cameras that have a muxed bus on the robot.
-> Only one is currently initialized because of limitations in
-> soc_camera that should be removed later.
+On Friday, November 06, 2009 4:19 AM, Harald Welte wrote:
+ 
+> Hi Marek,
 > 
-> Signed-off-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
-
-As mentioned in my reply to another patch (4/6) in this series, now this 
-patch is missing the header include. But if Sascha is ready to get them 
-with this small inaccuracy
-
-Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-
-Thanks
-Guennadi
-
-> ---
->  arch/arm/mach-mx3/mx31moboard-marxbot.c |   86 ++++++++++++++++++++++++++++++-
->  arch/arm/mach-mx3/mx31moboard.c         |   36 +++++++++++++
->  2 files changed, 121 insertions(+), 1 deletions(-)
+> On Tue, Oct 13, 2009 at 10:11:07AM +0200, Marek Szyprowski wrote:
 > 
-> diff --git a/arch/arm/mach-mx3/mx31moboard-marxbot.c b/arch/arm/mach-mx3/mx31moboard-marxbot.c
-> index 6b06faf..e4e344e 100644
-> --- a/arch/arm/mach-mx3/mx31moboard-marxbot.c
-> +++ b/arch/arm/mach-mx3/mx31moboard-marxbot.c
-> @@ -16,9 +16,11 @@
->   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
->   */
->  
-> +#include <linux/delay.h>
->  #include <linux/gpio.h>
->  #include <linux/init.h>
->  #include <linux/interrupt.h>
-> +#include <linux/i2c.h>
->  #include <linux/platform_device.h>
->  #include <linux/types.h>
->  
-> @@ -28,6 +30,8 @@
->  #include <mach/iomux-mx3.h>
->  #include <mach/mmc.h>
->  
-> +#include <media/soc_camera.h>
-> +
->  #include "devices.h"
->  
->  static unsigned int marxbot_pins[] = {
-> @@ -37,7 +41,6 @@ static unsigned int marxbot_pins[] = {
->  	MX31_PIN_PC_CD2_B__SD2_CLK, MX31_PIN_PC_CD1_B__SD2_CMD,
->  	MX31_PIN_ATA_DIOR__GPIO3_28, MX31_PIN_ATA_DIOW__GPIO3_29,
->  	/* CSI */
-> -	MX31_PIN_CSI_D4__CSI_D4, MX31_PIN_CSI_D5__CSI_D5,
->  	MX31_PIN_CSI_D6__CSI_D6, MX31_PIN_CSI_D7__CSI_D7,
->  	MX31_PIN_CSI_D8__CSI_D8, MX31_PIN_CSI_D9__CSI_D9,
->  	MX31_PIN_CSI_D10__CSI_D10, MX31_PIN_CSI_D11__CSI_D11,
-> @@ -45,6 +48,7 @@ static unsigned int marxbot_pins[] = {
->  	MX31_PIN_CSI_D14__CSI_D14, MX31_PIN_CSI_D15__CSI_D15,
->  	MX31_PIN_CSI_HSYNC__CSI_HSYNC, MX31_PIN_CSI_MCLK__CSI_MCLK,
->  	MX31_PIN_CSI_PIXCLK__CSI_PIXCLK, MX31_PIN_CSI_VSYNC__CSI_VSYNC,
-> +	MX31_PIN_CSI_D4__GPIO3_4, MX31_PIN_CSI_D5__GPIO3_5,
->  	MX31_PIN_GPIO3_0__GPIO3_0, MX31_PIN_GPIO3_1__GPIO3_1,
->  	MX31_PIN_TXD2__GPIO1_28,
->  	/* dsPIC resets */
-> @@ -122,6 +126,83 @@ static void dspics_resets_init(void)
->  	}
->  }
->  
-> +#define TURRETCAM_POWER	IOMUX_TO_GPIO(MX31_PIN_GPIO3_1)
-> +#define BASECAM_POWER	IOMUX_TO_GPIO(MX31_PIN_CSI_D5)
-> +#define TURRETCAM_RST_B	IOMUX_TO_GPIO(MX31_PIN_GPIO3_0)
-> +#define BASECAM_RST_B	IOMUX_TO_GPIO(MX31_PIN_CSI_D4)
-> +#define CAM_CHOICE	IOMUX_TO_GPIO(MX31_PIN_TXD2)
-> +
-> +static int marxbot_basecam_power(struct device *dev, int on)
-> +{
-> +	gpio_set_value(BASECAM_POWER, !on);
-> +	return 0;
-> +}
-> +
-> +static int marxbot_basecam_reset(struct device *dev)
-> +{
-> +	gpio_set_value(BASECAM_RST_B, 0);
-> +	udelay(100);
-> +	gpio_set_value(BASECAM_RST_B, 1);
-> +	return 0;
-> +}
-> +
-> +static struct i2c_board_info marxbot_i2c_devices[] = {
-> +	{
-> +		I2C_BOARD_INFO("mt9t031", 0x5d),
-> +	},
-> +};
-> +
-> +static struct soc_camera_link base_iclink = {
-> +	.bus_id		= 0,		/* Must match with the camera ID */
-> +	.power		= marxbot_basecam_power,
-> +	.reset		= marxbot_basecam_reset,
-> +	.board_info	= &marxbot_i2c_devices[0],
-> +	.i2c_adapter_id	= 0,
-> +	.module_name	= "mt9t031",
-> +};
-> +
-> +static struct platform_device marxbot_camera[] = {
-> +	{
-> +		.name	= "soc-camera-pdrv",
-> +		.id	= 0,
-> +		.dev	= {
-> +			.platform_data = &base_iclink,
-> +		},
-> +	},
-> +};
-> +
-> +static struct platform_device *marxbot_cameras[] __initdata = {
-> +	&marxbot_camera[0],
-> +};
-> +
-> +static int __init marxbot_cam_init(void)
-> +{
-> +	int ret = gpio_request(CAM_CHOICE, "cam-choice");
-> +	if (ret)
-> +		return ret;
-> +	gpio_direction_output(CAM_CHOICE, 1);
-> +
-> +	ret = gpio_request(BASECAM_RST_B, "basecam-reset");
-> +	if (ret)
-> +		return ret;
-> +	gpio_direction_output(BASECAM_RST_B, 1);
-> +	ret = gpio_request(BASECAM_POWER, "basecam-standby");
-> +	if (ret)
-> +		return ret;
-> +	gpio_direction_output(BASECAM_POWER, 0);
-> +
-> +	ret = gpio_request(TURRETCAM_RST_B, "turretcam-reset");
-> +	if (ret)
-> +		return ret;
-> +	gpio_direction_output(TURRETCAM_RST_B, 1);
-> +	ret = gpio_request(TURRETCAM_POWER, "turretcam-standby");
-> +	if (ret)
-> +		return ret;
-> +	gpio_direction_output(TURRETCAM_POWER, 0);
-> +
-> +	return 0;
-> +}
-> +
->  /*
->   * system init for baseboard usage. Will be called by mx31moboard init.
->   */
-> @@ -136,6 +217,9 @@ void __init mx31moboard_marxbot_init(void)
->  
->  	mxc_register_device(&mxcsdhc_device1, &sdhc2_pdata);
->  
-> +	marxbot_cam_init();
-> +	platform_add_devices(marxbot_cameras, ARRAY_SIZE(marxbot_cameras));
-> +
->  	/* battery present pin */
->  	gpio_request(IOMUX_TO_GPIO(MX31_PIN_LCS0), "bat-present");
->  	gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_LCS0));
-> diff --git a/arch/arm/mach-mx3/mx31moboard.c b/arch/arm/mach-mx3/mx31moboard.c
-> index 2f95dcd..b167f13 100644
-> --- a/arch/arm/mach-mx3/mx31moboard.c
-> +++ b/arch/arm/mach-mx3/mx31moboard.c
-> @@ -17,6 +17,7 @@
->   */
->  
->  #include <linux/delay.h>
-> +#include <linux/dma-mapping.h>
->  #include <linux/fsl_devices.h>
->  #include <linux/gpio.h>
->  #include <linux/init.h>
-> @@ -403,6 +404,39 @@ static struct platform_device *devices[] __initdata = {
->  	&mx31moboard_leds_device,
->  };
->  
-> +static struct mx3_camera_pdata camera_pdata = {
-> +	.dma_dev	= &mx3_ipu.dev,
-> +	.flags		= MX3_CAMERA_DATAWIDTH_8 | MX3_CAMERA_DATAWIDTH_10,
-> +	.mclk_10khz	= 4800,
-> +};
-> +
-> +#define CAMERA_BUF_SIZE	(4*1024*1024)
-> +
-> +static int __init mx31moboard_cam_alloc_dma(const size_t buf_size)
-> +{
-> +	dma_addr_t dma_handle;
-> +	void *buf;
-> +	int dma;
-> +
-> +	if (buf_size < 2 * 1024 * 1024)
-> +		return -EINVAL;
-> +
-> +	buf = dma_alloc_coherent(NULL, buf_size, &dma_handle, GFP_KERNEL);
-> +	if (!buf) {
-> +		pr_err("%s: cannot allocate camera buffer-memory\n", __func__);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	memset(buf, 0, buf_size);
-> +
-> +	dma = dma_declare_coherent_memory(&mx3_camera.dev,
-> +					dma_handle, dma_handle, buf_size,
-> +					DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
-> +
-> +	/* The way we call dma_declare_coherent_memory only a malloc can fail */
-> +	return dma & DMA_MEMORY_MAP ? 0 : -ENOMEM;
-> +}
-> +
->  static int mx31moboard_baseboard;
->  core_param(mx31moboard_baseboard, mx31moboard_baseboard, int, 0444);
->  
-> @@ -436,6 +470,8 @@ static void __init mxc_board_init(void)
->  	mxc_register_device(&mxcsdhc_device0, &sdhc1_pdata);
->  
->  	mxc_register_device(&mx3_ipu, &mx3_ipu_data);
-> +	if (!mx31moboard_cam_alloc_dma(CAMERA_BUF_SIZE))
-> +		mxc_register_device(&mx3_camera, &camera_pdata);
->  
->  	usb_xcvr_reset();
->  
-> -- 
-> 1.6.3.3
+> > S5PC110 and S5PC100 register maps differs in many places, rename all
+> > defined registers to be S5PC100 specific. System map has been also updated
+> > to cover more integrated peripherals.
 > 
+> The general idea of this patch is fine.  However, I have some questions:
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >  /* System */
+> > -#define S5PC100_PA_SYS		(0xE0100000)
+> > -#define S5PC100_PA_CLK		(S5PC100_PA_SYS + 0x0)
+> > -#define S5PC100_PA_PWR		(S5PC100_PA_SYS + 0x8000)
+> > +#define S5PC100_PA_CLK		(0xE0100000)
+> > +#define S5PC100_PA_CLK_OTHER	(0xE0200000)
+> > +#define S5PC100_PA_PWR		(0xE0108000)
 > 
+> this is more like a rename.  Why was this done?  It would be good to explain in
+> the commitlog
 
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+I renamed these registers to better match the chip specification. The 'SYS'
+register name was borrowed from S3C64XX series and is a bit inadequate in C100.
+ 
+> > +/* GPIO */
+> > +#define S5PC100_PA_GPIO		(0xE0300000)
+> > +#define S5PC1XX_PA_GPIO		S5PC100_PA_GPIO
+> > +#define S5PC1XX_VA_GPIO		S3C_ADDR(0x00500000)
+> 
+> If the address is different for c100 and c110: why do we need a S5CP1XX_*
+> definition?  In my personal opinion, all those compile-time defines are a
+> kludge and we should not introduce more of them.  They will bite us in the back
+> if we ever in the future want to build a kernel that can boot on both c100 and
+> c110.
+
+These C1XX defines were the first step to prepare the code for C110 support. 
+
+S5PC110 register map differs completely from the S5PC100 one. These two SOCs
+cannot be easily handled by the same kernel binary image without some hacks and
+runtime fixups if we place them in the one kernel platform. Creating yet another
+kernel platform just because of these differences would unnecessarily duplicate
+a lot of code and would not use the potential of the current kernel
+infrastructure (separate include directories, resource&device driver model, etc).
+
+My idea was to introduce a sub-platforms in plat-s5pc1xx. Such sub-platforms
+would be exclusive - one for C100 and one for C110. Each of the sub-platforms would
+have its own include files (in mach-s5pc100 and mach-s5pc110 directories
+respectively) and most of the chip differences can be handled in compile time by
+proper macros. Macros for the common resources would use 'C1XX' names. In this
+approach common resources (GPIO, DMA, io space and so on) can be easily defined
+with C1XX defines. This also perfectly matches the current convention of common
+S3C_XXX defines (i.e. S3C_PA_UART, S3C_PA_FB, S3C_VA_VICn, S3C_PA_HSMMCn, and so
+on), so most of the code from arch/arm/plat-s3c/ can be reused without any
+modifications. I assume that the S3C prefix would be renamed to SAMSUNG sometime
+later.
+
+Sub-platform can be easily defined by a simple choice command in
+arch/arm/plat-s5pc1xx/Kconfig:
+
++choice
++        prompt "S5PC1xx SoC Type"
++        default ARCH_S5PC100
++
++config ARCH_S5PC100
++        bool "S5PC100"
++
++config ARCH_S5PC110
++        bool "S5PC110"
++
++endchoice
+
+Then each sub-platform can be easily defined basing on the CONFIG_ARCH_S5PC100
+and CONFIG_ARCH_S5PC110 defines.
+
+Similar approach is used in OMAP platform (there is only one platform directory,
+and the chip series is defined by a Kconfig choice option).
+
+> >  	.io_pg_offst	= (((u32)S5PC1XX_VA_UART) >> 18) & 0xfffc,
+> > -	.boot_params	= S5PC100_PA_SDRAM + 0x100,
+> > +	.boot_params	= S5PC1XX_PA_SDRAM + 0x100,
+> 
+> This is the wrong kind of change, from my point of view.  We don't know yet
+> if all future s5pc1xx products will also have the same address, do we?
+
+Right, I missed this one.
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
