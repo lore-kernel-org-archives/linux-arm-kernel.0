@@ -1,43 +1,76 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 7 Nov 2009 12:33:03 +0100
-Subject: [PATCH] [ARM] serial/pxa: work around Errata #75
-In-Reply-To: <771cded00911070145k4a44ac03ne4359a1fe34c5339@mail.gmail.com>
-References: <1257245235-14783-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20091106204046.GA8952@pengutronix.de>
-	<771cded00911070145k4a44ac03ne4359a1fe34c5339@mail.gmail.com>
-Message-ID: <20091107113303.GA6961@pengutronix.de>
+From: buytenh@wantstofly.org (Lennert Buytenhek)
+Date: Sat, 7 Nov 2009 14:56:15 +0100
+Subject: [PATCH,
+	RFC] PCI: deal with device incorrectly reporting I/O decoding being
+	enabled
+Message-ID: <20091107135615.GE18639@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+At least the Lava Quattro quad-port 16550A card can incorrectly report
+I/O decoding being enabled while it is in fact not, which means that
+the check in pcibios_enable_device() to see whether the new command
+word that we're intending to write into the device is different from
+the old current can trigger inadvertently, resulting in the write to
+enable I/O decoding never being done, and I/O decoding never being
+enabled.
 
-> > ? ? ? ? ? ? ? ?up->mcr &= ~UART_MCR_AFE;
-> >
-> > - ? ? ? serial_out(up, UART_LCR, cval | UART_LCR_DLAB);/* set DLAB */
-> > + ? ? ? serial_out(up, UART_LCR, cval | UART_LCR_DLAB); /* set DLAB */
-> > ? ? ? ?serial_out(up, UART_DLL, quot & 0xff); ? ? ? ? ?/* LS of divisor */
-> > +
-> > + ? ? ? /*
-> > + ? ? ? ?* work around Errata #75 according to Intel(R) PXA27x Processor Family
-> > + ? ? ? ?* Specification Update (Nov 2005)
-> > + ? ? ? ?*/
-> > + ? ? ? dll = serial_in(up, UART_DLL);
-> > + ? ? ? WARN_ON(dll != (quot & 0xff));
-> > +
-> Would you mind to use a loop at here? In order to make sure register
-> is updated as expected.
-Even if the thing described in the Errata happens UART_DLL is updated.
-It only speaks about the 2nd write.  So actually only
+Work around this by doing the write unconditionally (while still
+only doing the printk if the new word is different from the old one,
+to avoid dmesg spam).
 
-+	(void)serial_in(up, UART_DLL);
+Signed-off-by: Lennert Buytenhek <buytenh@wantstofly.org>
+--
+This is probably at least slightly controversial.  Any thoughts?
 
-alone would help, too.
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 8096819..cf170b9 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -662,11 +662,17 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
+ 	if ((dev->class >> 16) == PCI_BASE_CLASS_BRIDGE)
+ 		cmd |= PCI_COMMAND_IO | PCI_COMMAND_MEMORY;
+ 
+-	if (cmd != old_cmd) {
++	/*
++	 * Some devices (e.g. the Lava Quattro quad-port 16550A card)
++	 * can incorrectly report I/O decoding being enabled while it
++	 * is in fact not, so unconditionally perform the config space
++	 * write.
++	 */
++	if (cmd != old_cmd)
+ 		printk("PCI: enabling device %s (%04x -> %04x)\n",
+ 		       pci_name(dev), old_cmd, cmd);
+-		pci_write_config_word(dev, PCI_COMMAND, cmd);
+-	}
++	pci_write_config_word(dev, PCI_COMMAND, cmd);
++
+ 	return 0;
+ }
+ 
+diff --git a/drivers/pci/setup-res.c b/drivers/pci/setup-res.c
+index 706f82d..96fe13d 100644
+--- a/drivers/pci/setup-res.c
++++ b/drivers/pci/setup-res.c
+@@ -322,10 +322,16 @@ int pci_enable_resources(struct pci_dev *dev, int mask)
+ 			cmd |= PCI_COMMAND_MEMORY;
+ 	}
+ 
+-	if (cmd != old_cmd) {
++	/*
++	 * Some devices (e.g. the Lava Quattro quad-port 16550A card)
++	 * can incorrectly report I/O decoding being enabled while it
++	 * is in fact not, so unconditionally perform the config space
++	 * write.
++	 */
++	if (cmd != old_cmd)
+ 		dev_info(&dev->dev, "enabling device (%04x -> %04x)\n",
+ 			 old_cmd, cmd);
+-		pci_write_config_word(dev, PCI_COMMAND, cmd);
+-	}
++	pci_write_config_word(dev, PCI_COMMAND, cmd);
++
+ 	return 0;
+ }
 
-So no, I don't think a loop is better here.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+--
