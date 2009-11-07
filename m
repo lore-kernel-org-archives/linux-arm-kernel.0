@@ -1,37 +1,41 @@
-From: matthew@wil.cx (Matthew Wilcox)
-Date: Sat, 7 Nov 2009 08:03:05 -0700
-Subject: [PATCH,RFC] PCI: deal with device incorrectly reporting I/O
-	decoding being enabled
-In-Reply-To: <20091107135615.GE18639@mail.wantstofly.org>
-References: <20091107135615.GE18639@mail.wantstofly.org>
-Message-ID: <20091107150305.GQ10555@parisc-linux.org>
+From: kristoffer.ericson@gmail.com (Kristoffer Ericson)
+Date: Sat, 7 Nov 2009 17:54:51 +0100
+Subject: collie and SA1100 patches
+In-Reply-To: <20091107082846.GE1319@ucw.cz>
+References: <1254778533-3529-1-git-send-email-thommycheck@gmx.de>
+	<4ADDFADB.8090808@gmx.de>
+	<f17812d70910201243k6b9d1856g26becc89ff551994@mail.gmail.com>
+	<4AF08761.10904@gmx.de> <20091107082846.GE1319@ucw.cz>
+Message-ID: <20091107175451.0ee0ac3d.kristoffer.ericson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 07, 2009 at 02:56:15PM +0100, Lennert Buytenhek wrote:
-> At least the Lava Quattro quad-port 16550A card can incorrectly report
-> I/O decoding being enabled while it is in fact not, which means that
-> the check in pcibios_enable_device() to see whether the new command
-> word that we're intending to write into the device is different from
-> the old current can trigger inadvertently, resulting in the write to
-> enable I/O decoding never being done, and I/O decoding never being
-> enabled.
-> 
-> Work around this by doing the write unconditionally (while still
-> only doing the printk if the new word is different from the old one,
-> to avoid dmesg spam).
-> 
-> Signed-off-by: Lennert Buytenhek <buytenh@wantstofly.org>
-> --
-> This is probably at least slightly controversial.  Any thoughts?
+On Sat, 7 Nov 2009 09:28:47 +0100
+Pavel Machek <pavel@ucw.cz> wrote:
 
-I'm OK with this ... it might provoke bugs in some _other_ piece of hardware,
-but that seems pretty unlikely.
+> Hi!
+> 
+> > could somebody tell me how to proceed from here, please?
+> > Should I send some ping messages every two weeks or so?
+> 
+> Respin the series, yes. ARM maintainers are often slow :-(. Cc: akpm
+> I'd say. You are fixing old regressions.
+> 
 
-Reviewed-by: Matthew Wilcox <willy@linux.intel.com>
+Please add me to CC when you resend patch, missed your first send and like
+to keep updated on SA1100 changes.
+
+> 									Pavel
+> 
+> -- 
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
 
 -- 
-Matthew Wilcox				Intel Open Source Technology Centre
-"Bill, look, we understand that you're interested in selling us this
-operating system, but compare it to ours.  We can't possibly take such
-a retrograde step."
+Kristoffer Ericson <kristoffer.ericson@gmail.com>
