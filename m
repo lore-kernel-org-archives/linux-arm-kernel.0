@@ -1,45 +1,43 @@
-From: haavard.skinnemoen@atmel.com (Haavard Skinnemoen)
-Date: Sat, 7 Nov 2009 12:20:02 +0100
-Subject: [PATCH 3/3 v2] at91/atmel-mci: inclusion of sd/mmc driver in
-	at91sam9g45 chip and board
-In-Reply-To: <1257216943.4358.66.camel@ben-desktop>
-References: <acfa557032a93e2d3186981b16f7048a5a31028a.1256314995.git.nicolas.ferre@atmel.com>
-	<20090930155557.7dae503b@hskinnemoen-d830>
-	<a3b1332815576dc4d496937b8a5ab69d36818d00.1256314995.git.nicolas.ferre@atmel.com>
-	<cd73a99e0910271243x744c956bl598fef9fd4144840@mail.gmail.com>
-	<20091028083548.38f1d80c@hskinnemoen-d830>
-	<d6cda7730910271753o54acfa04t1225de460083325f@mail.gmail.com>
-	<cd73a99e0910281253x1bb72b74p47cb5110efb0871f@mail.gmail.com>
-	<1256763057.4362.36.camel@ben-desktop> <4AEF12B7.3040704@atmel.com>
-	<4AEF95E0.7040602@bluewatersys.com>
-	<1257216943.4358.66.camel@ben-desktop>
-Message-ID: <20091107122002.1ecf6483@hskinnemoen-d830>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 7 Nov 2009 12:33:03 +0100
+Subject: [PATCH] [ARM] serial/pxa: work around Errata #75
+In-Reply-To: <771cded00911070145k4a44ac03ne4359a1fe34c5339@mail.gmail.com>
+References: <1257245235-14783-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20091106204046.GA8952@pengutronix.de>
+	<771cded00911070145k4a44ac03ne4359a1fe34c5339@mail.gmail.com>
+Message-ID: <20091107113303.GA6961@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Nizette <bn@niasdigital.com> wrote:
-> On Tue, 2009-11-03 at 15:30 +1300, Ryan Mallon wrote:
-> > >   
-> > IIRC, we can't mark static inline functions as weak, and we don't want
-> > to turn gpio_is_valid into an actual function call. We could do some
-> > preprocessor magic, but that gets a bit messy.  
-> 
-> Messy but generally accepted.
+Hello,
 
-IIRC the most generally accepted way is to do
+> > ? ? ? ? ? ? ? ?up->mcr &= ~UART_MCR_AFE;
+> >
+> > - ? ? ? serial_out(up, UART_LCR, cval | UART_LCR_DLAB);/* set DLAB */
+> > + ? ? ? serial_out(up, UART_LCR, cval | UART_LCR_DLAB); /* set DLAB */
+> > ? ? ? ?serial_out(up, UART_DLL, quot & 0xff); ? ? ? ? ?/* LS of divisor */
+> > +
+> > + ? ? ? /*
+> > + ? ? ? ?* work around Errata #75 according to Intel(R) PXA27x Processor Family
+> > + ? ? ? ?* Specification Update (Nov 2005)
+> > + ? ? ? ?*/
+> > + ? ? ? dll = serial_in(up, UART_DLL);
+> > + ? ? ? WARN_ON(dll != (quot & 0xff));
+> > +
+> Would you mind to use a loop at here? In order to make sure register
+> is updated as expected.
+Even if the thing described in the Errata happens UART_DLL is updated.
+It only speaks about the 2nd write.  So actually only
 
-static inline bool gpio_is_valid(int pin)
-{
-	/* whatever */
-}
-#define gpio_is_valid gpio_is_valid
++	(void)serial_in(up, UART_DLL);
 
-in the platform code and
+alone would help, too.
 
-#ifndef gpio_is_valid
-/* provide definition of gpio_is_valid */
-#endif
+So no, I don't think a loop is better here.
 
-in the generic code. This way, there's only one symbol to grep for.
+Best regards
+Uwe
 
-Haavard
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
