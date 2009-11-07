@@ -1,46 +1,45 @@
-From: tbm@cyrius.com (Martin Michlmayr)
-Date: Sat, 7 Nov 2009 10:38:58 +0000
-Subject: [PATCH] Orion/Kirkwood: Enable GPIO_SYSFS in defconfig
-Message-ID: <20091107103858.GA7133@deprecation.cyrius.com>
+From: haavard.skinnemoen@atmel.com (Haavard Skinnemoen)
+Date: Sat, 7 Nov 2009 12:20:02 +0100
+Subject: [PATCH 3/3 v2] at91/atmel-mci: inclusion of sd/mmc driver in
+	at91sam9g45 chip and board
+In-Reply-To: <1257216943.4358.66.camel@ben-desktop>
+References: <acfa557032a93e2d3186981b16f7048a5a31028a.1256314995.git.nicolas.ferre@atmel.com>
+	<20090930155557.7dae503b@hskinnemoen-d830>
+	<a3b1332815576dc4d496937b8a5ab69d36818d00.1256314995.git.nicolas.ferre@atmel.com>
+	<cd73a99e0910271243x744c956bl598fef9fd4144840@mail.gmail.com>
+	<20091028083548.38f1d80c@hskinnemoen-d830>
+	<d6cda7730910271753o54acfa04t1225de460083325f@mail.gmail.com>
+	<cd73a99e0910281253x1bb72b74p47cb5110efb0871f@mail.gmail.com>
+	<1256763057.4362.36.camel@ben-desktop> <4AEF12B7.3040704@atmel.com>
+	<4AEF95E0.7040602@bluewatersys.com>
+	<1257216943.4358.66.camel@ben-desktop>
+Message-ID: <20091107122002.1ecf6483@hskinnemoen-d830>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that Orion and Kirkwood have been converted to GPIOLIB, let's
-enable GPIO_SYSFS which is useful for debugging.
+Ben Nizette <bn@niasdigital.com> wrote:
+> On Tue, 2009-11-03 at 15:30 +1300, Ryan Mallon wrote:
+> > >   
+> > IIRC, we can't mark static inline functions as weak, and we don't want
+> > to turn gpio_is_valid into an actual function call. We could do some
+> > preprocessor magic, but that gets a bit messy.  
+> 
+> Messy but generally accepted.
 
-Signed-off-by: Martin Michlmayr <tbm@cyrius.com>
+IIRC the most generally accepted way is to do
 
---- a/arch/arm/configs/kirkwood_defconfig
-+++ b/arch/arm/configs/kirkwood_defconfig
-@@ -1023,6 +1023,12 @@ CONFIG_SPI_ORION=y
- #
- # CONFIG_SPI_SPIDEV is not set
- # CONFIG_SPI_TLE62X0 is not set
-+
-+CONFIG_ARCH_REQUIRE_GPIOLIB=y
-+CONFIG_GPIOLIB=y
-+# CONFIG_DEBUG_GPIO is not set
-+CONFIG_GPIO_SYSFS=y
-+
- # CONFIG_W1 is not set
- # CONFIG_POWER_SUPPLY is not set
- # CONFIG_HWMON is not set
---- a/arch/arm/configs/orion5x_defconfig
-+++ b/arch/arm/configs/orion5x_defconfig
-@@ -977,6 +977,12 @@ CONFIG_I2C_MV64XXX=y
- # CONFIG_I2C_DEBUG_BUS is not set
- # CONFIG_I2C_DEBUG_CHIP is not set
- # CONFIG_SPI is not set
-+
-+CONFIG_ARCH_REQUIRE_GPIOLIB=y
-+CONFIG_GPIOLIB=y
-+# CONFIG_DEBUG_GPIO is not set
-+CONFIG_GPIO_SYSFS=y
-+
- # CONFIG_W1 is not set
- # CONFIG_POWER_SUPPLY is not set
- CONFIG_HWMON=y
+static inline bool gpio_is_valid(int pin)
+{
+	/* whatever */
+}
+#define gpio_is_valid gpio_is_valid
 
--- 
-Martin Michlmayr
-http://www.cyrius.com/
+in the platform code and
+
+#ifndef gpio_is_valid
+/* provide definition of gpio_is_valid */
+#endif
+
+in the generic code. This way, there's only one symbol to grep for.
+
+Haavard
