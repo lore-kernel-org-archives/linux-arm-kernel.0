@@ -1,23 +1,92 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sun, 8 Nov 2009 14:54:59 +0800
-Subject: [PATCH 1/2] Colibri/PXA320: Fix AC97 ifdefs and include
-In-Reply-To: <200911080305.11772.marek.vasut@gmail.com>
-References: <200911080305.11772.marek.vasut@gmail.com>
-Message-ID: <f17812d70911072254y2b174d01ue0381f408cd414be@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 8 Nov 2009 09:13:14 +0100
+Subject: dream: glue for mmc controller
+In-Reply-To: <20091103105737.GE20341@fluff.org.uk>
+References: <20091103105319.GA2492@elf.ucw.cz>
+	<20091103105737.GE20341@fluff.org.uk>
+Message-ID: <20091108081314.GA16482@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 8, 2009 at 10:05 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> From 39b8a11d86905c0ed50932aa4f57dce8c46e9dd9 Mon Sep 17 00:00:00 2001
-> From: Marek Vasut <marek.vasut@gmail.com>
-> Date: Sun, 8 Nov 2009 02:24:05 +0100
-> Subject: [PATCH 1/2] Colibri/PXA320: Fix AC97 ifdefs and include
->
-> The AC97 part wasn't initialized on Colibri/PXA320 because the macros were
-> wrong. Also, the code didn't compile because of a header file not being
-> included.
->
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+Hi!
 
-Fix looks obvious to me. Applied to 'fix', and Daniel, I assume you
-are OK with this.
+> > Good news is that GPIO support seems to work, and I am able to flash
+> > the keyboard backlight.
+> > 
+> > Does anyone have an idea what is wrong? Do I need some more
+> > infrastructure to set up (DMA transfers or something?)?
+> > 
+> > I'm only setting up one mmc channel; I believe the other one is for
+> > wifi, and it should work like this...?
+> > 								Pavel
+> > 
+> > diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+> > index 91e6f5c..16c0faa 100644
+> > --- a/arch/arm/mach-msm/Makefile
+> > +++ b/arch/arm/mach-msm/Makefile
+> > @@ -6,4 +6,4 @@ obj-y += clock.o clock-7x01a.o
+> >  
+> >  obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o
+> >  
+> > -obj-$(CONFIG_MACH_TROUT) += board-dream.o
+> > +obj-$(CONFIG_MACH_TROUT) += board-dream.o board-dream-mmc.o board-dream-gpio.o generic_gpio.o
+> > diff --git a/arch/arm/mach-msm/board-dream-gpio.c b/arch/arm/mach-msm/board-dream-gpio.c
+> > new file mode 100644
+> > index 0000000..7e86a99
+> > --- /dev/null
+> > +++ b/arch/arm/mach-msm/board-dream-gpio.c
+> > @@ -0,0 +1,301 @@
+> > +/* arch/arm/mach-msm/board-dream-gpio.c
+> > + *
+> > + * Copyright (C) 2008 Google, Inc.
+> > + *
+> > + * This software is licensed under the terms of the GNU General Public
+> > + * License version 2, as published by the Free Software Foundation, and
+> > + * may be copied, distributed, and modified under those terms.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + *
+> > + */
+> > +
+> > +#include <linux/kernel.h>
+> > +#include <linux/errno.h>
+> > +#include <linux/irq.h>
+> > +#include <linux/pm.h>
+> > +#include <linux/sysdev.h>
+> > +
+> > +#include <asm/io.h>
+> > +#include <asm/gpio.h>
+> linux/gpio.h
+> linux/io.h
+
+I got compile errors when trying to use linux/gpio.h:
+
+arch/arm/mach-msm/board-dream-gpio.c: In function
+'dream_gpio_configure':
+arch/arm/mach-msm/board-dream-gpio.c:109: error: 'GPIOF_OUTPUT_LOW'
+undeclared (first use in this function)
+arch/arm/mach-msm/board-dream-gpio.c:109: error: (Each undeclared
+identifier is reported only once
+arch/arm/mach-msm/board-dream-gpio.c:109: error: for each function it
+appears in.)
+arch/arm/mach-msm/board-dream-gpio.c:109: error: 'GPIOF_OUTPUT_HIGH'
+undeclared (first use in this function)
+arch/arm/mach-msm/board-dream-gpio.c: In function 'dream_init_gpio':
+arch/arm/mach-msm/board-dream-gpio.c:291: error: 'IRQF_TRIGGER_HIGH'
+undeclared (first use in this function)
+arch/arm/mach-msm/board-dream-gpio.c:293: error: implicit declaration
+of function 'set_irq_wake'
+
+> and why can't use you use gpiolib?
+
+This is what I inherited from google. What advantages are there to it?
+I'll eventually take a look.
+
+									Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
