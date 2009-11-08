@@ -1,49 +1,25 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Sun, 08 Nov 2009 19:49:33 +0100
-Subject: IXP4xx repetitive 16-bit/32-bit I/O macros/inlines.
-Message-ID: <m3iqdkc0n6.fsf@intrepid.localdomain>
+From: mfuzzey@gmail.com (Martin Fuzzey)
+Date: Sun, 08 Nov 2009 19:52:17 +0100
+Subject: [REPOST PATCH  0/3] MX21 USB Host Support
+Message-ID: <20091108185217.14742.32892.stgit@srv002.fuzzey.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Anybody using 32-bit PATA/SATA transfers on IXP4xx? :-)
+This patch series adds support for the USB host controller in the
+Freescale i.MX21 SoC.
 
-Long story, mostly with PCI in mind:
-- readb/readw/readl, writeb/writew/writel macros are value-preserving
-- __raw_* are order-preserving (i.e., strings are preserved)
-but the repetitive versions (outs[wl], ins[wl], ioread*_rep,
-iowrite*_rep) are supposed to preserve order as well (while lacking the
-__raw_ prefix).
+Only host mode (not function or OTG mode) is currently supported (the OTG
+port may be used in host only mode).
 
-Comments?
+Power management is not yet implemented (as it has not yet been implemented
+for MXC).
 
-Is it worth it to change the names to __raw_*, or maybe to some other
-variant like native_*, to avoid confusion? It's really confusing.
-There aren't many users in the tree (I'd also change readl() and friends
-to something like read_le32, but it would be massive, comments welcome).
+The driver has been tested with usbtest suite and has run for several days
+with other simultaneous USB activity (webcam + mass storage).
 
-Or perhaps we should have *_le32, *_be32, _order32? It should be
-something the compiler can optimize out if used with le32_to_cpu etc.
+The driver part is the same as that posted in June just rebased to 2.6.32-rc5
 
-
---- a/arch/arm/mach-ixp4xx/include/mach/io.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/io.h
-@@ -311,7 +311,7 @@ static inline void
- __ixp4xx_outsl(u32 io_addr, const u32 *vaddr, u32 count)
- {
- 	while (count--)
--		outl(*vaddr++, io_addr);
-+		outl(cpu_to_le32(*vaddr++), io_addr);
- }
- 
- static inline u8 
-@@ -366,7 +366,7 @@ static inline void
- __ixp4xx_insl(u32 io_addr, u32 *vaddr, u32 count)
- {
- 	while (count--)
--		*vaddr++ = inl(io_addr);
-+		*vaddr++ = le32_to_cpu(inl(io_addr));
- }
- 
- #define PIO_OFFSET      0x10000UL
--- 
-Krzysztof Halasa
+The changes to the platform resource part are:
+   * Clock patch dropped as now merged
+   * Let compiler count array indices in platform resources
+   * Use DMA_BIT_MASK
