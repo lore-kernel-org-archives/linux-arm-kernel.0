@@ -1,47 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 8 Nov 2009 17:45:03 +0000
-Subject: [PATCH 4/4] RealView: Add sparsemem support for the RealView
-	PBX platform
-In-Reply-To: <20091015122209.739.42849.stgit@pc1117.cambridge.arm.com>
-References: <20091015121927.739.32071.stgit@pc1117.cambridge.arm.com>
-	<20091015122209.739.42849.stgit@pc1117.cambridge.arm.com>
-Message-ID: <20091108174503.GB28368@n2100.arm.linux.org.uk>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Sun, 08 Nov 2009 19:49:33 +0100
+Subject: IXP4xx repetitive 16-bit/32-bit I/O macros/inlines.
+Message-ID: <m3iqdkc0n6.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2009 at 01:22:09PM +0100, Catalin Marinas wrote:
-> diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
-> index dfc9b0b..ba548ab 100644
-> --- a/arch/arm/mach-realview/Kconfig
-> +++ b/arch/arm/mach-realview/Kconfig
-> @@ -70,12 +70,14 @@ config MACH_REALVIEW_PBX
->  	bool "Support RealView/PBX platform"
->  	select ARM_GIC
->  	select HAVE_PATA_PLATFORM
-> +	select ARCH_SPARSEMEM_ENABLE if CPU_V7
-> +	select ZONE_DMA if SPARSEMEM
->  	help
->  	  Include support for the ARM(R) RealView PBX platform.
->  
->  config REALVIEW_HIGH_PHYS_OFFSET
->  	bool "High physical base address for the RealView platform"
-> -	depends on MMU && !MACH_REALVIEW_PB1176
-> +	depends on MMU && !MACH_REALVIEW_PB1176 && !SPARSEMEM
->  	default y
->  	help
->  	  RealView boards other than PB1176 have the RAM available at
-> @@ -84,4 +86,8 @@ config REALVIEW_HIGH_PHYS_OFFSET
->  	  memory to be accessed contiguously at the high physical
->  	  offset.
->  
-> +config ARCH_FLATMEM_ENABLE
-> +	bool
-> +	default y if ARCH_SPARSEMEM_ENABLE
-> +
+Anybody using 32-bit PATA/SATA transfers on IXP4xx? :-)
 
-I seem to have missed this.  Why do we want to enable flatmem support for
-_everything_ which enables sparsemem?
+Long story, mostly with PCI in mind:
+- readb/readw/readl, writeb/writew/writel macros are value-preserving
+- __raw_* are order-preserving (i.e., strings are preserved)
+but the repetitive versions (outs[wl], ins[wl], ioread*_rep,
+iowrite*_rep) are supposed to preserve order as well (while lacking the
+__raw_ prefix).
 
-In fact, why do you even have this at all?
+Comments?
 
-Not pulling your latest pull request due to this.
+Is it worth it to change the names to __raw_*, or maybe to some other
+variant like native_*, to avoid confusion? It's really confusing.
+There aren't many users in the tree (I'd also change readl() and friends
+to something like read_le32, but it would be massive, comments welcome).
+
+Or perhaps we should have *_le32, *_be32, _order32? It should be
+something the compiler can optimize out if used with le32_to_cpu etc.
+
+
+--- a/arch/arm/mach-ixp4xx/include/mach/io.h
++++ b/arch/arm/mach-ixp4xx/include/mach/io.h
+@@ -311,7 +311,7 @@ static inline void
+ __ixp4xx_outsl(u32 io_addr, const u32 *vaddr, u32 count)
+ {
+ 	while (count--)
+-		outl(*vaddr++, io_addr);
++		outl(cpu_to_le32(*vaddr++), io_addr);
+ }
+ 
+ static inline u8 
+@@ -366,7 +366,7 @@ static inline void
+ __ixp4xx_insl(u32 io_addr, u32 *vaddr, u32 count)
+ {
+ 	while (count--)
+-		*vaddr++ = inl(io_addr);
++		*vaddr++ = le32_to_cpu(inl(io_addr));
+ }
+ 
+ #define PIO_OFFSET      0x10000UL
+-- 
+Krzysztof Halasa
