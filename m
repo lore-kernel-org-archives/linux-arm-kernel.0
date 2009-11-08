@@ -1,37 +1,90 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Sun, 08 Nov 2009 22:07:41 +0100
-Subject: IXP4xx repetitive 16-bit/32-bit I/O macros/inlines.
-In-Reply-To: <4AF72907.1060705@hiramoto.org> (Karl Hiramoto's message of "Sun,
-	08 Nov 2009 21:24:39 +0100")
-References: <m3iqdkc0n6.fsf@intrepid.localdomain>
-	<4AF72907.1060705@hiramoto.org>
-Message-ID: <m3pr7safoi.fsf@intrepid.localdomain>
+From: ospite@studenti.unina.it (Antonio Ospite)
+Date: Sun, 8 Nov 2009 22:24:34 +0100
+Subject: Using statically allocated memory for platform_data.
+In-Reply-To: <20091102112316.16163f6a.ospite@studenti.unina.it>
+References: <20091102112316.16163f6a.ospite@studenti.unina.it>
+Message-ID: <20091108222434.284cd78f.ospite@studenti.unina.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Karl Hiramoto <karl@hiramoto.org> writes:
+On Mon, 2 Nov 2009 11:23:16 +0100
+Antonio Ospite <ospite@studenti.unina.it> wrote:
 
->> Anybody using 32-bit PATA/SATA transfers on IXP4xx? :-)
+> Hi,
+> 
+> I noted that in some mfd drivers (drivers/mfd/ezx-pcap.c and
+> drivers/mfd/da903x.c) there is code like this:
+> 
+> static int __devinit pcap_add_subdev(struct pcap_chip *pcap,
+>                                      struct pcap_subdev *subdev)
+> {
+>         struct platform_device *pdev;
+> 
+>         pdev = platform_device_alloc(subdev->name, subdev->id);
+>         pdev->dev.parent = &pcap->spi->dev;
+>         pdev->dev.platform_data = subdev->platform_data;
+> 
+>         return platform_device_add(pdev);
+> }
+> 
+> Note the _direct_assignment_ of platform data; then in board init code
+> there are often global struct pointers passed as subdev platform data,
+> see arch/arm/mach-pxa/em-x270.c::em_x270_da9030_subdevs for instance.
+> 
+> In these cases, whenever the subdev platform device is unregistered,
+> the call to platform_device_release() tries to kfree the platform data,
+> and being it statically allocated memory this triggers a bug from SLAB:
+> 	kernel BUG at mm/slab.c:521!
+> In my case this prevented proper device poweroff.
+> 
+> The question: should these mfd drivers use platform_device_add_data()
+> which allocates dynamic memory for *a copy* of platform data? Is this
+> simple solution acceptable even if there will be more memory used?
+> Or should we setup platform_data in dynamic memory from the beginning
+> in board init code? (which would be way less pretty IMHO).
+> 
 
-> Yes, on  HPT371 IDE chip on the PCI  bus to interface to compact flash
-> to store logs.
+Just for reference, in our local repository I am _temporarily_ working
+around the bug with a change like the following, even if I am leaking
+some memory. Any comments?
 
-$ grep inherits drivers/ata/pata_hpt37x.c
-        .inherits       = &ata_bmdma_port_ops,
-        .inherits       = &hpt370_port_ops,
-        .inherits       = &ata_bmdma_port_ops,
-        .inherits       = &hpt372_port_ops,
+diff --git a/drivers/mfd/ezx-pcap.c b/drivers/mfd/ezx-pcap.c
+index df405af..e4e999b 100644
+--- a/drivers/mfd/ezx-pcap.c
++++ b/drivers/mfd/ezx-pcap.c
+@@ -379,12 +379,17 @@ static int pcap_remove_subdev(struct device *dev, void *unused)
+        return 0;
+ }
 
-Looks like 16-bit port_ops.
++static void pcap_subdev_release(struct device *dev)
++{
++}
++
+ static int __devinit pcap_add_subdev(struct pcap_chip *pcap,
+                                                struct pcap_subdev *subdev)
+ {
+        struct platform_device *pdev;
 
-> For what it's worth I've only ever been able to make
-> PIO work, I've never had any luck with the IDE DMA modes.  It hasn't
-> been a high enough priority to investigate further.
+        pdev = platform_device_alloc(subdev->name, subdev->id);
++       pdev->dev.release = pcap_subdev_release;
+        pdev->dev.parent = &pcap->spi->dev;
+        pdev->dev.platform_data = subdev->platform_data;
 
-Interesting. I have no issues with DMA modes, with VIA VT6421A (this
-chip seems to have other critical problems), with CS5536 (PATA) and with
-SIL3512 (the patch has to be applied in big-endian mode, and another
-patch to sata_sil.c must be applied because IXP4xx can't do 8/16-bit
-PCI MMIO read).
 -- 
-Krzysztof Halasa
+Antonio Ospite
+http://ao2.it
+
+PGP public key ID: 0x4553B001
+
+A: Because it messes up the order in which people normally read text.
+   See http://en.wikipedia.org/wiki/Posting_style
+Q: Why is top-posting such a bad thing?
+A: Top-posting.
+Q: What is the most annoying thing in e-mail?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091108/021a9106/attachment-0001.sig>
