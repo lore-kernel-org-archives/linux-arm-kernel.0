@@ -1,238 +1,305 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 09 Nov 2009 09:51:40 +0000
-Subject: [PATCH 4/4] RealView: Add sparsemem support for the RealView
-	PBX platform
-In-Reply-To: <20091108174503.GB28368@n2100.arm.linux.org.uk>
-References: <20091015121927.739.32071.stgit@pc1117.cambridge.arm.com>
-	<20091015122209.739.42849.stgit@pc1117.cambridge.arm.com>
-	<20091108174503.GB28368@n2100.arm.linux.org.uk>
-Message-ID: <1257760300.21820.23.camel@pc1117.cambridge.arm.com>
+From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
+Date: Mon, 9 Nov 2009 03:09:55 +0530
+Subject: [PATCH] arm nomadik: Introduce plat-nomadik, MTU code re-organization
+Message-ID: <1257716395.29221.10.camel@vinay-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2009-11-08 at 17:45 +0000, Russell King - ARM Linux wrote:
-> On Thu, Oct 15, 2009 at 01:22:09PM +0100, Catalin Marinas wrote:
-> > diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
-> > index dfc9b0b..ba548ab 100644
-> > --- a/arch/arm/mach-realview/Kconfig
-> > +++ b/arch/arm/mach-realview/Kconfig
-> > @@ -70,12 +70,14 @@ config MACH_REALVIEW_PBX
-> >  	bool "Support RealView/PBX platform"
-> >  	select ARM_GIC
-> >  	select HAVE_PATA_PLATFORM
-> > +	select ARCH_SPARSEMEM_ENABLE if CPU_V7
-> > +	select ZONE_DMA if SPARSEMEM
-> >  	help
-> >  	  Include support for the ARM(R) RealView PBX platform.
-> >  
-> >  config REALVIEW_HIGH_PHYS_OFFSET
-> >  	bool "High physical base address for the RealView platform"
-> > -	depends on MMU && !MACH_REALVIEW_PB1176
-> > +	depends on MMU && !MACH_REALVIEW_PB1176 && !SPARSEMEM
-> >  	default y
-> >  	help
-> >  	  RealView boards other than PB1176 have the RAM available at
-> > @@ -84,4 +86,8 @@ config REALVIEW_HIGH_PHYS_OFFSET
-> >  	  memory to be accessed contiguously at the high physical
-> >  	  offset.
-> >  
-> > +config ARCH_FLATMEM_ENABLE
-> > +	bool
-> > +	default y if ARCH_SPARSEMEM_ENABLE
-> > +
-> 
-> I seem to have missed this.  Why do we want to enable flatmem support for
-> _everything_ which enables sparsemem?
+From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+Date: Mon, 9 Nov 2009 14:37:28 +0530
 
-Just to have the option of selecting either flatmem or sparsemem with
-PBX (though I don't have a strong opinion about this). This can also be
-done transparently via REALVIEW_HIGH_PHYS_OFFSET.
+Introduce the plat-nomadik folder for ST-Ericsson
+machines including the existing nomadik 8815 architecture.
+This also moves the existing MTU (MultiTimerUnit)
+of nomadik 8815 to the proposed plat-nomadik and adds
+HAS_MTU. The patch has been re-based to 2.6.32-rc6
 
-If you like the approach below, I'll push it to the for-rmk branch:
-
-
-RealView: Add sparsemem support for the RealView PBX platform
-
-From: Catalin Marinas <catalin.marinas@arm.com>
-
-The RealView PBX board has two 512MB blocks of memory - one at
-0x70000000 (with 256MB mirror at 0) and another at 0x20000000. Only the
-block at 0x70000000 (or the mirror at 0) may be used for DMA (e.g.
-framebuffer). This patch adds the sparsemem definitions to allow the use
-of all the memory split as follows:
-
-  256MB @ 0x00000000 (ZONE_DMA)
-  512MB @ 0x20000000 (ZONE_NORMAL)
-  256MB @ 0x80000000 (ZONE_NORMAL)
-
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+Acked-by: Alessandro Rubini <rubini@unipv.it>
 ---
- arch/arm/mach-realview/Kconfig               |    5 ++-
- arch/arm/mach-realview/core.c                |   21 +++++++++++
- arch/arm/mach-realview/include/mach/memory.h |   49 ++++++++++++++++++++++++++
- arch/arm/mach-realview/realview_pbx.c        |   22 +++++++++++-
- 4 files changed, 94 insertions(+), 3 deletions(-)
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/Makefile                                  |    1 +
+ arch/arm/mach-nomadik/Kconfig                      |    2 +-
+ arch/arm/mach-nomadik/Makefile                     |    2 +-
+ arch/arm/mach-nomadik/board-nhk8815.c              |   27 +++++++++++++++
+ arch/arm/mach-nomadik/include/mach/setup.h         |    2 +-
+ arch/arm/plat-nomadik/Kconfig                      |   22 ++++++++++++
+ arch/arm/plat-nomadik/Makefile                     |    5 +++
+ .../mach => plat-nomadik/include/plat}/mtu.h       |    9 +++--
+ arch/arm/{mach-nomadik => plat-nomadik}/timer.c    |   35 +++++--------------
+ 10 files changed, 74 insertions(+), 32 deletions(-)
+ create mode 100644 arch/arm/plat-nomadik/Kconfig
+ create mode 100644 arch/arm/plat-nomadik/Makefile
+ rename arch/arm/{mach-nomadik/include/mach => plat-nomadik/include/plat}/mtu.h (90%)
+ rename arch/arm/{mach-nomadik => plat-nomadik}/timer.c (81%)
 
-diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
-index dfc9b0b..c48e1f2 100644
---- a/arch/arm/mach-realview/Kconfig
-+++ b/arch/arm/mach-realview/Kconfig
-@@ -70,6 +70,8 @@ config MACH_REALVIEW_PBX
- 	bool "Support RealView/PBX platform"
- 	select ARM_GIC
- 	select HAVE_PATA_PLATFORM
-+	select ARCH_SPARSEMEM_ENABLE if CPU_V7 && !HIGH_PHYS_OFFSET
-+	select ZONE_DMA if SPARSEMEM
- 	help
- 	  Include support for the ARM(R) RealView PBX platform.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1c4119c..76cd466 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -787,6 +787,7 @@ source "arch/arm/mach-at91/Kconfig"
+ source "arch/arm/plat-mxc/Kconfig"
  
-@@ -82,6 +84,7 @@ config REALVIEW_HIGH_PHYS_OFFSET
- 	  0x70000000, 256MB of which being mirrored at 0x00000000. If
- 	  the board supports 512MB of RAM, this option allows the
- 	  memory to be accessed contiguously at the high physical
--	  offset.
-+	  offset. On the PBX board, disabling this option allows 1GB of
-+	  RAM to be used with SPARSEMEM.
+ source "arch/arm/mach-nomadik/Kconfig"
++source "arch/arm/plat-nomadik/Kconfig"
+ 
+ source "arch/arm/mach-netx/Kconfig"
+ 
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index a73caaf..1bee36f 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -176,6 +176,7 @@ machine-$(CONFIG_ARCH_MXC91231)		:= mxc91231
+ plat-$(CONFIG_ARCH_MXC)		:= mxc
+ plat-$(CONFIG_ARCH_OMAP)	:= omap
+ plat-$(CONFIG_PLAT_IOP)		:= iop
++plat-$(CONFIG_PLAT_NOMADIK)	:= nomadik
+ plat-$(CONFIG_PLAT_ORION)	:= orion
+ plat-$(CONFIG_PLAT_PXA)		:= pxa
+ plat-$(CONFIG_PLAT_S3C24XX)	:= s3c24xx s3c
+diff --git a/arch/arm/mach-nomadik/Kconfig b/arch/arm/mach-nomadik/Kconfig
+index 2a02b49..3c5e0f5 100644
+--- a/arch/arm/mach-nomadik/Kconfig
++++ b/arch/arm/mach-nomadik/Kconfig
+@@ -5,13 +5,13 @@ menu "Nomadik boards"
+ config MACH_NOMADIK_8815NHK
+ 	bool "ST 8815 Nomadik Hardware Kit (evaluation board)"
+ 	select NOMADIK_8815
++	select HAS_MTU
  
  endmenu
-diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
-index c21b0fd..9f29343 100644
---- a/arch/arm/mach-realview/core.c
-+++ b/arch/arm/mach-realview/core.c
-@@ -59,6 +59,25 @@
- /* used by entry-macro.S and platsmp.c */
- void __iomem *gic_cpu_base_addr;
  
-+#ifdef CONFIG_ZONE_DMA
-+/*
-+ * Adjust the zones if there are restrictions for DMA access.
-+ */
-+void __init realview_adjust_zones(int node, unsigned long *size,
-+				  unsigned long *hole)
-+{
-+	unsigned long dma_size = SZ_256M >> PAGE_SHIFT;
-+
-+	if (!machine_is_realview_pbx() || node || (size[0] <= dma_size))
-+		return;
-+
-+	size[ZONE_NORMAL] = size[0] - dma_size;
-+	size[ZONE_DMA] = dma_size;
-+	hole[ZONE_NORMAL] = hole[0];
-+	hole[ZONE_DMA] = 0;
-+}
-+#endif
-+
- /*
-  * This is the RealView sched_clock implementation.  This has
-  * a resolution of 41.7ns, and a maximum value of about 179s.
-@@ -543,7 +562,7 @@ static int realview_clcd_setup(struct clcd_fb *fb)
- 	fb->panel		= realview_clcd_panel();
+ config NOMADIK_8815
+ 	bool
  
- 	fb->fb.screen_base = dma_alloc_writecombine(&fb->dev->dev, framesize,
--						    &dma, GFP_KERNEL);
-+						    &dma, GFP_KERNEL | GFP_DMA);
- 	if (!fb->fb.screen_base) {
- 		printk(KERN_ERR "CLCD: unable to map framebuffer\n");
- 		return -ENOMEM;
-diff --git a/arch/arm/mach-realview/include/mach/memory.h b/arch/arm/mach-realview/include/mach/memory.h
-index 293c300..2417bbc 100644
---- a/arch/arm/mach-realview/include/mach/memory.h
-+++ b/arch/arm/mach-realview/include/mach/memory.h
-@@ -29,4 +29,53 @@
- #define PHYS_OFFSET		UL(0x00000000)
- #endif
+-
+ config I2C_BITBANG_8815NHK
+ 	tristate "Driver for bit-bang busses found on the 8815 NHK"
+ 	depends on I2C && MACH_NOMADIK_8815NHK
+diff --git a/arch/arm/mach-nomadik/Makefile b/arch/arm/mach-nomadik/Makefile
+index 4120409..36f67fb 100644
+--- a/arch/arm/mach-nomadik/Makefile
++++ b/arch/arm/mach-nomadik/Makefile
+@@ -7,7 +7,7 @@
  
-+#if !defined(__ASSEMBLY__) && defined(CONFIG_ZONE_DMA)
-+extern void realview_adjust_zones(int node, unsigned long *size,
-+				  unsigned long *hole);
-+#define arch_adjust_zones(node, size, hole) \
-+	realview_adjust_zones(node, size, hole)
+ # Object file lists.
+ 
+-obj-y			+= clock.o timer.o gpio.o
++obj-y			+= clock.o gpio.o
+ 
+ # Cpu revision
+ obj-$(CONFIG_NOMADIK_8815) += cpu-8815.o
+diff --git a/arch/arm/mach-nomadik/board-nhk8815.c b/arch/arm/mach-nomadik/board-nhk8815.c
+index 6bfd537..1163944 100644
+--- a/arch/arm/mach-nomadik/board-nhk8815.c
++++ b/arch/arm/mach-nomadik/board-nhk8815.c
+@@ -25,11 +25,18 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/irq.h>
+ #include <asm/mach/flash.h>
 +
-+#define ISA_DMA_THRESHOLD	(PHYS_OFFSET + SZ_256M - 1)
-+#define MAX_DMA_ADDRESS		(PAGE_OFFSET + SZ_256M)
-+#endif
++#include <plat/mtu.h>
 +
-+#ifdef CONFIG_SPARSEMEM
+ #include <mach/setup.h>
+ #include <mach/nand.h>
+ #include <mach/fsmc.h>
+ #include "clock.h"
+ 
++/* Initial value for SRC control register: all timers use MXTAL/8 source */
++#define SRC_CR_INIT_MASK	0x00007fff
++#define SRC_CR_INIT_VAL		0x2aaa8000
 +
-+/*
-+ * Sparsemem definitions for RealView PBX.
-+ *
-+ * The RealView PBX board has another block of 512MB of RAM at 0x20000000,
-+ * however only the block at 0x70000000 (or the 256MB mirror at 0x00000000)
-+ * may be used for DMA.
-+ *
-+ * The macros below define a section size of 256MB and a non-linear virtual to
-+ * physical mapping:
-+ *
-+ * 256MB @ 0x00000000 -> PAGE_OFFSET
-+ * 512MB @ 0x20000000 -> PAGE_OFFSET + 0x10000000
-+ * 256MB @ 0x80000000 -> PAGE_OFFSET + 0x30000000
-+ */
-+#ifdef CONFIG_REALVIEW_HIGH_PHYS_OFFSET
-+#error "SPARSEMEM not available with REALVIEW_HIGH_PHYS_OFFSET"
-+#endif
-+
-+#define MAX_PHYSMEM_BITS	32
-+#define SECTION_SIZE_BITS	28
-+
-+/* bank page offsets */
-+#define PAGE_OFFSET1	(PAGE_OFFSET + 0x10000000)
-+#define PAGE_OFFSET2	(PAGE_OFFSET + 0x30000000)
-+
-+#define __phys_to_virt(phys)						\
-+	((phys) >= 0x80000000 ?	(phys) - 0x80000000 + PAGE_OFFSET2 :	\
-+	 (phys) >= 0x20000000 ?	(phys) - 0x20000000 + PAGE_OFFSET1 :	\
-+	 (phys) + PAGE_OFFSET)
-+
-+#define __virt_to_phys(virt)						\
-+	 ((virt) >= PAGE_OFFSET2 ? (virt) - PAGE_OFFSET2 + 0x80000000 :	\
-+	  (virt) >= PAGE_OFFSET1 ? (virt) - PAGE_OFFSET1 + 0x20000000 :	\
-+	  (virt) - PAGE_OFFSET)
-+
-+#endif	/* CONFIG_SPARSEMEM */
-+
- #endif
-diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
-index 5d09d8b..ec39488 100644
---- a/arch/arm/mach-realview/realview_pbx.c
-+++ b/arch/arm/mach-realview/realview_pbx.c
-@@ -304,6 +304,26 @@ static struct sys_timer realview_pbx_timer = {
- 	.init		= realview_pbx_timer_init,
+ /* These adresses span 16MB, so use three individual pages */
+ static struct resource nhk8815_nand_resources[] = {
+ 	{
+@@ -239,6 +246,26 @@ static struct platform_device *nhk8815_platform_devices[] __initdata = {
+ 	/* will add more devices */
  };
  
-+static void realview_pbx_fixup(struct machine_desc *mdesc, struct tag *tags,
-+			       char **from, struct meminfo *meminfo)
++static void __init nomadik_timer_init(void)
 +{
-+#ifdef CONFIG_SPARSEMEM
-+	/*
-+	 * Memory configuration with SPARSEMEM enabled on RealView PBX (see
-+	 * asm/mach/memory.h for more information).
-+	 */
-+	meminfo->bank[0].start = 0;
-+	meminfo->bank[0].size = SZ_256M;
-+	meminfo->bank[1].start = 0x20000000;
-+	meminfo->bank[1].size = SZ_512M;
-+	meminfo->bank[2].start = 0x80000000;
-+	meminfo->bank[2].size = SZ_256M;
-+	meminfo->nr_banks = 3;
-+#else
-+	realview_fixup(mdesc, tags, from, meminfo);
-+#endif
++	u32 src_cr;
++
++	/* Configure timer sources in "system reset controller" ctrl reg */
++	src_cr = readl(io_p2v(NOMADIK_SRC_BASE));
++	src_cr &= SRC_CR_INIT_MASK;
++	src_cr |= SRC_CR_INIT_VAL;
++	writel(src_cr, io_p2v(NOMADIK_SRC_BASE));
++
++	/* Save global pointer to mtu, used by platform timer code */
++	mtu_base = io_p2v(NOMADIK_MTU0_BASE);
++
++	nmdk_timer_init();
 +}
 +
- static void __init realview_pbx_init(void)
++static struct sys_timer nomadik_timer = {
++	.init	= nomadik_timer_init,
++};
++
+ static void __init nhk8815_platform_init(void)
  {
  	int i;
-@@ -345,7 +365,7 @@ MACHINE_START(REALVIEW_PBX, "ARM-RealView PBX")
- 	.phys_io	= REALVIEW_PBX_UART0_BASE,
- 	.io_pg_offst	= (IO_ADDRESS(REALVIEW_PBX_UART0_BASE) >> 18) & 0xfffc,
- 	.boot_params	= PHYS_OFFSET + 0x00000100,
--	.fixup		= realview_fixup,
-+	.fixup		= realview_pbx_fixup,
- 	.map_io		= realview_pbx_map_io,
- 	.init_irq	= gic_init_irq,
- 	.timer		= &realview_pbx_timer,
-
-
+diff --git a/arch/arm/mach-nomadik/include/mach/setup.h b/arch/arm/mach-nomadik/include/mach/setup.h
+index a4e468c..b7897ed 100644
+--- a/arch/arm/mach-nomadik/include/mach/setup.h
++++ b/arch/arm/mach-nomadik/include/mach/setup.h
+@@ -15,7 +15,7 @@
+ extern void cpu8815_map_io(void);
+ extern void cpu8815_platform_init(void);
+ extern void cpu8815_init_irq(void);
+-extern struct sys_timer nomadik_timer;
++extern void nmdk_timer_init(void);
+ 
+ #endif /* NOMADIK_8815 */
+ 
+diff --git a/arch/arm/plat-nomadik/Kconfig b/arch/arm/plat-nomadik/Kconfig
+new file mode 100644
+index 0000000..e27ee31
+--- /dev/null
++++ b/arch/arm/plat-nomadik/Kconfig
+@@ -0,0 +1,22 @@
++# We keep common IP's here for Nomadik and other similar
++# familiy of processors from ST-Ericsson. At the moment we have
++# just MTU, others to follow soon.
++
++config PLAT_NOMADIK
++	bool
++	depends on ARCH_NOMADIK
++	default y
++	help
++	  Common platform code for Nomadik and other ST-Ericsson
++	  platforms.
++
++if PLAT_NOMADIK
++
++config HAS_MTU
++	bool
++	help
++	  Support for Multi Timer Unit. MTU provides access
++	  to multiple interrupt generating programmable
++	  32-bit free running decrementing counters.
++
++endif
+diff --git a/arch/arm/plat-nomadik/Makefile b/arch/arm/plat-nomadik/Makefile
+new file mode 100644
+index 0000000..37c7cdd
+--- /dev/null
++++ b/arch/arm/plat-nomadik/Makefile
+@@ -0,0 +1,5 @@
++# arch/arm/plat-nomadik/Makefile
++# Copyright 2009 ST-Ericsson
++# Licensed under GPLv2
++
++obj-$(CONFIG_HAS_MTU)	+= timer.o
+diff --git a/arch/arm/mach-nomadik/include/mach/mtu.h b/arch/arm/plat-nomadik/include/plat/mtu.h
+similarity index 90%
+rename from arch/arm/mach-nomadik/include/mach/mtu.h
+rename to arch/arm/plat-nomadik/include/plat/mtu.h
+index 76da7f0..42c9072 100644
+--- a/arch/arm/mach-nomadik/include/mach/mtu.h
++++ b/arch/arm/plat-nomadik/include/plat/mtu.h
+@@ -1,5 +1,8 @@
+-#ifndef __ASM_ARCH_MTU_H
+-#define __ASM_ARCH_MTU_H
++#ifndef __PLAT_MTU_H
++#define __PLAT_MTU_H
++
++/* should be set by the platform code */
++extern void __iomem *mtu_base;
+ 
+ /*
+  * The MTU device hosts four different counters, with 4 set of
+@@ -41,5 +44,5 @@
+ #define MTU_PCELL2	0xff8
+ #define MTU_PCELL3	0xffC
+ 
+-#endif /* __ASM_ARCH_MTU_H */
++#endif /* __PLAT_MTU_H */
+ 
+diff --git a/arch/arm/mach-nomadik/timer.c b/arch/arm/plat-nomadik/timer.c
+similarity index 81%
+rename from arch/arm/mach-nomadik/timer.c
+rename to arch/arm/plat-nomadik/timer.c
+index d1738e7..62f18ad 100644
+--- a/arch/arm/mach-nomadik/timer.c
++++ b/arch/arm/plat-nomadik/timer.c
+@@ -15,19 +15,14 @@
+ #include <linux/clockchips.h>
+ #include <linux/jiffies.h>
+ #include <asm/mach/time.h>
+-#include <mach/mtu.h>
+ 
+-#define TIMER_CTRL	0x80	/* No divisor */
+-#define TIMER_PERIODIC	0x40
+-#define TIMER_SZ32BIT	0x02
+-
+-/* Initial value for SRC control register: all timers use MXTAL/8 source */
+-#define SRC_CR_INIT_MASK	0x00007fff
+-#define SRC_CR_INIT_VAL		0x2aaa8000
++#include <plat/mtu.h>
+ 
+ static u32	nmdk_count;		/* accumulated count */
+ static u32	nmdk_cycle;		/* write-once */
+-static __iomem void *mtu_base;
++
++/* setup by the platform code */
++void __iomem *mtu_base;
+ 
+ /*
+  * clocksource: the MTU device is a decrementing counters, so we negate
+@@ -93,7 +88,7 @@ static struct clock_event_device nmdk_clkevt = {
+ static irqreturn_t nmdk_timer_interrupt(int irq, void *dev_id)
+ {
+ 	/* ack: "interrupt clear register" */
+-	writel( 1 << 0, mtu_base + MTU_ICR);
++	writel(1 << 0, mtu_base + MTU_ICR);
+ 
+ 	/* we can't count lost ticks, unfortunately */
+ 	nmdk_count += nmdk_cycle;
+@@ -125,24 +120,14 @@ static void nmdk_timer_reset(void)
+ 	writel(cr | MTU_CRn_ENA, mtu_base + MTU_CR(0));
+ }
+ 
+-static void __init nmdk_timer_init(void)
++void __init nmdk_timer_init(void)
+ {
+-	u32 src_cr;
+ 	unsigned long rate;
+ 	int bits;
+ 
+ 	rate = CLOCK_TICK_RATE; /* 2.4MHz */
+ 	nmdk_cycle = (rate + HZ/2) / HZ;
+ 
+-	/* Configure timer sources in "system reset controller" ctrl reg */
+-	src_cr = readl(io_p2v(NOMADIK_SRC_BASE));
+-	src_cr &= SRC_CR_INIT_MASK;
+-	src_cr |= SRC_CR_INIT_VAL;
+-	writel(src_cr, io_p2v(NOMADIK_SRC_BASE));
+-
+-	/* Save global pointer to mtu, used by functions above */
+-	mtu_base = io_p2v(NOMADIK_MTU0_BASE);
+-
+ 	/* Init the timer and register clocksource */
+ 	nmdk_timer_reset();
+ 
+@@ -150,7 +135,9 @@ static void __init nmdk_timer_init(void)
+ 	bits =  8*sizeof(nmdk_count);
+ 	nmdk_clksrc.mask = CLOCKSOURCE_MASK(bits);
+ 
+-	clocksource_register(&nmdk_clksrc);
++	if (clocksource_register(&nmdk_clksrc))
++		printk(KERN_ERR "timer: failed to initialize clock "
++			"source %s\n", nmdk_clksrc.name);
+ 
+ 	/* Register irq and clockevents */
+ 	setup_irq(IRQ_MTU0, &nmdk_timer_irq);
+@@ -158,7 +145,3 @@ static void __init nmdk_timer_init(void)
+ 	nmdk_clkevt.cpumask = cpumask_of(0);
+ 	clockevents_register_device(&nmdk_clkevt);
+ }
+-
+-struct sys_timer nomadik_timer = {
+-	.init		= nmdk_timer_init,
+-};
 -- 
-Catalin
+1.5.6.3
