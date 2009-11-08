@@ -1,22 +1,34 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 8 Nov 2009 09:04:51 +0000
-Subject: [PATCH,RFC] PCI: deal with device incorrectly reporting I/O
-	decoding being enabled
-In-Reply-To: <20091107150305.GQ10555@parisc-linux.org>
-References: <20091107135615.GE18639@mail.wantstofly.org>
-	<20091107150305.GQ10555@parisc-linux.org>
-Message-ID: <20091108090451.GA20529@n2100.arm.linux.org.uk>
+Date: Sun, 8 Nov 2009 09:10:10 +0000
+Subject: dream: glue for mmc controller
+In-Reply-To: <20091108081314.GA16482@elf.ucw.cz>
+References: <20091103105319.GA2492@elf.ucw.cz>
+	<20091103105737.GE20341@fluff.org.uk>
+	<20091108081314.GA16482@elf.ucw.cz>
+Message-ID: <20091108091009.GB20529@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 07, 2009 at 08:03:05AM -0700, Matthew Wilcox wrote:
-> I'm OK with this ... it might provoke bugs in some _other_ piece of hardware,
-> but that seems pretty unlikely.
+On Sun, Nov 08, 2009 at 09:13:14AM +0100, Pavel Machek wrote:
+> > > +#include <asm/io.h>
+> > > +#include <asm/gpio.h>
+> > linux/gpio.h
+> > linux/io.h
+> 
+> I got compile errors when trying to use linux/gpio.h:
+> 
+> arch/arm/mach-msm/board-dream-gpio.c: In function
+> 'dream_gpio_configure':
+> arch/arm/mach-msm/board-dream-gpio.c:109: error: 'GPIOF_OUTPUT_LOW'
+> undeclared (first use in this function)
 
-Please remember that some ARM hardware only has the capability to read
-and write full 32-bit quantities of configuration space, which means
-writing the control register can result in the status register being
-written as well.
+This means it's abusing the gpio header files - which are intended for
+the generic GPIO support, but are being used for this platforms private
+non-generic GPIO based stuff.
 
-That shouldn't be a problem, but is merely something else to consider
-which isn't obvious.
+> arch/arm/mach-msm/board-dream-gpio.c:291: error: 'IRQF_TRIGGER_HIGH'
+> undeclared (first use in this function)
+> arch/arm/mach-msm/board-dream-gpio.c:293: error: implicit declaration
+> of function 'set_irq_wake'
+
+That's showing its missing a linux/interrupt.h include.
