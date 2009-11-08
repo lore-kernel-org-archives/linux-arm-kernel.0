@@ -1,40 +1,47 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 8 Nov 2009 16:53:50 +0000
-Subject: [PATCH 1/6] pxa: support pxa168 LCD controller SPI operation
-In-Reply-To: <7c34ac520911022245x2845e5dex1311bd74a08606db@mail.gmail.com>
-References: <7c34ac520911022245x2845e5dex1311bd74a08606db@mail.gmail.com>
-Message-ID: <20091108165350.GA28368@n2100.arm.linux.org.uk>
+Date: Sun, 8 Nov 2009 17:45:03 +0000
+Subject: [PATCH 4/4] RealView: Add sparsemem support for the RealView
+	PBX platform
+In-Reply-To: <20091015122209.739.42849.stgit@pc1117.cambridge.arm.com>
+References: <20091015121927.739.32071.stgit@pc1117.cambridge.arm.com>
+	<20091015122209.739.42849.stgit@pc1117.cambridge.arm.com>
+Message-ID: <20091108174503.GB28368@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 03, 2009 at 02:45:20PM +0800, Jun Nie wrote:
-> diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
-> index 84d8327..27bdf2b 100644
-> --- a/drivers/video/pxa168fb.c
-> +++ b/drivers/video/pxa168fb.c
-> @@ -29,10 +29,91 @@
->  #include <linux/uaccess.h>
->  #include <video/pxa168fb.h>
-> 
-> +#include <mach/pxa168fb.h>
-> +#include <mach/gpio.h>
-
-linux/gpio.h
-
-> +int pxa168fb_spi_send(struct pxa168fb_info *fbi, void *value, int count,
-> +		unsigned int spi_gpio_cs, unsigned int interval_us)
-> +{
-> +	u32 x, spi_byte_len;
-> +	u8 *cmd = (u8 *)value;
-> +	int i, err, isr, iopad, ret = 0;
+On Thu, Oct 15, 2009 at 01:22:09PM +0100, Catalin Marinas wrote:
+> diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
+> index dfc9b0b..ba548ab 100644
+> --- a/arch/arm/mach-realview/Kconfig
+> +++ b/arch/arm/mach-realview/Kconfig
+> @@ -70,12 +70,14 @@ config MACH_REALVIEW_PBX
+>  	bool "Support RealView/PBX platform"
+>  	select ARM_GIC
+>  	select HAVE_PATA_PLATFORM
+> +	select ARCH_SPARSEMEM_ENABLE if CPU_V7
+> +	select ZONE_DMA if SPARSEMEM
+>  	help
+>  	  Include support for the ARM(R) RealView PBX platform.
+>  
+>  config REALVIEW_HIGH_PHYS_OFFSET
+>  	bool "High physical base address for the RealView platform"
+> -	depends on MMU && !MACH_REALVIEW_PB1176
+> +	depends on MMU && !MACH_REALVIEW_PB1176 && !SPARSEMEM
+>  	default y
+>  	help
+>  	  RealView boards other than PB1176 have the RAM available at
+> @@ -84,4 +86,8 @@ config REALVIEW_HIGH_PHYS_OFFSET
+>  	  memory to be accessed contiguously at the high physical
+>  	  offset.
+>  
+> +config ARCH_FLATMEM_ENABLE
+> +	bool
+> +	default y if ARCH_SPARSEMEM_ENABLE
 > +
-> +	if (gpio_is_valid(spi_gpio_cs)) {
-> +		err = gpio_request(spi_gpio_cs, "LCD_SPI_CS");
-> +		if (err) {
-> +			dev_err(fbi->dev, "failed to request GPIO for LCD CS\n");
-> +			return -1;
 
-Please stop using '-1' as a general error return value.  It has a specific
-meaning, translating as "operation not permitted" or "permission denied".
-This is not what this error is.  Always propagate error codes back when
-you have them.
+I seem to have missed this.  Why do we want to enable flatmem support for
+_everything_ which enables sparsemem?
+
+In fact, why do you even have this at all?
+
+Not pulling your latest pull request due to this.
