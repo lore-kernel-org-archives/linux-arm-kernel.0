@@ -1,22 +1,58 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 9 Nov 2009 16:58:03 +0800
-Subject: [PATCH 2/2 RESENT] [ARM] i2c/pxa: only define
-	'blue_murder'-function if DEBUG is #defined
-In-Reply-To: <1257754721-17325-2-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1257275000-18866-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1257754721-17325-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1257754721-17325-2-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <f17812d70911090058n4018619p617defe79f43b9d8@mail.gmail.com>
+From: dk-arm-linux@gmx.de (Dieter Kiermaier)
+Date: Mon, 9 Nov 2009 10:06:15 +0100
+Subject: orion/kirkwood pcie issue still open with rc6
+In-Reply-To: <20091109094958.4ba72970@marrow.netinsight.se>
+References: <200911090933.46240.dk-arm-linux@gmx.de>
+	<20091109094958.4ba72970@marrow.netinsight.se>
+Message-ID: <200911091006.15757.dk-arm-linux@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/11/9 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> From: Wolfram Sang <w.sang@pengutronix.de>
->
-> This talkative function is also called on timeouts. As timeouts can
-> happen on regular writes to EEPROMs (no error case), this creates false
-> positives. ?Giving lots of details is interesting only for developers
-> anyhow, so just use the function if DEBUG is #defined.
->
+Am Montag 09 November 2009 09:49:58 schrieb Simon Kagstrom:
+> On Mon, 9 Nov 2009 09:33:46 +0100
+> Dieter Kiermaier <dk-arm-linux@gmx.de> wrote:
+> 
+> > Ronan Shitrit from marvell gave me the information to clear bit 2 of physical
+> > address 0xf1020100 to enable bus scanning.
+> > I don't know what this really does but it helped to get my kernel up and running.
+> 
+> You have that in the functional specification for the kirkwood
+> processors:
+> 
+>   http://www.marvell.com/files/products/embedded_processors/kirkwood/FS_88F6180_9x_6281_OpenSource.pdf
+> 
+> See Appendix A for the register set and lookup address 0x20100 (the CPU
+> configuration register). Bit 2 in that register turns on/off error
+> propagation:
+> 
+>               Mbus-L Error propogation
+>               For a list of errors see "Error Handling".
+>               0 = NoErrProp: Error indications are not propagated to Mbus-L. The
+>                   transactions are completed normally.
+>               1 = ErrProp: Error indications are propagated to Mbus-L.
+> 
+> and clearing it sounds quite a bit like hiding the real problem :-).
+> 
 
-Well, this does look cleaner. Feel free to take my Ack.
+I've seen this and you're absolutely right. Thats why I've posted!
+
+> 
+> Probably it's best to try to find out what's causing this error (see
+> the Error Handling section of the PCIe chapter in the reference manual
+> above) so that that a proper fix can be implemented!
+
+And here my problems are starting ;)
+How can I implement error handling for that kind of reported errors?
+I'm sorry but I've absolutely no idea.
+
+> 
+> // Simon
+
+Many thanks,
+Dieter
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
