@@ -1,34 +1,71 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 09 Nov 2009 10:53:56 +0000
-Subject: [PATCH 4/4] RealView: Add sparsemem support for the RealView
-	PBX platform
-In-Reply-To: <20091109103957.GB15646@n2100.arm.linux.org.uk>
-References: <20091015121927.739.32071.stgit@pc1117.cambridge.arm.com>
-	<20091015122209.739.42849.stgit@pc1117.cambridge.arm.com>
-	<20091108174503.GB28368@n2100.arm.linux.org.uk>
-	<1257760300.21820.23.camel@pc1117.cambridge.arm.com>
-	<20091109101822.GA15646@n2100.arm.linux.org.uk>
-	<1257762846.21820.27.camel@pc1117.cambridge.arm.com>
-	<20091109103957.GB15646@n2100.arm.linux.org.uk>
-Message-ID: <1257764036.21820.29.camel@pc1117.cambridge.arm.com>
+From: fabioestevam@yahoo.com (Fabio Estevam)
+Date: Mon, 9 Nov 2009 03:08:50 -0800 (PST)
+Subject: [REPOST PATCH 3/3] MXC: add platform resources for i.MX21 USB
+	host controller.
+In-Reply-To: <20091108185231.14742.23365.stgit@srv002.fuzzey.net>
+Message-ID: <444518.41234.qm@web51002.mail.re2.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2009-11-09 at 10:39 +0000, Russell King - ARM Linux wrote:
-> On Mon, Nov 09, 2009 at 10:34:06AM +0000, Catalin Marinas wrote:
-> > I don't think it's worth the hassle anyway. If you have
-> > REALVIEW_HIGH_PHYS_OFFSET disabled and FLATMEM, you end up with only
-> > 256MB of RAM available, I don't really see a point in this
-> > configuration. With the new patch, if you don't like SPARSEMEM (maybe
-> > for benchmarking reasons), just enable REALVIEW_HIGH_PHYS_OFFSET.
-> > 
-> > So, are you OK with the latest patch?
+Martin,
+
+--- On Sun, 11/8/09, Martin Fuzzey <mfuzzey@gmail.com> wrote:
+
+> From: Martin Fuzzey <mfuzzey@gmail.com>
+> Subject: [REPOST PATCH 3/3] MXC: add platform resources for i.MX21 USB host controller.
+> To: "Greg KH" <greg@kroah.com>, "Sascha Hauer" <s.hauer@pengutronix.de>
+> Cc: linux-usb at vger.kernel.org, linux-arm-kernel at lists.infradead.org
+> Date: Sunday, November 8, 2009, 4:52 PM
 > 
-> In that case, yes.
+> 
+> Signed-off-by: Martin Fuzzey <mfuzzey@gmail.com>
+> 
+> ---
+> 
+>  arch/arm/mach-mx2/devices.c |???27
+> +++++++++++++++++++++++++++
+>  arch/arm/mach-mx2/devices.h |? ? 1 +
+>  2 files changed, 28 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx2/devices.c
+> b/arch/arm/mach-mx2/devices.c
+> index 3522397..4e6f5a0 100644
+> --- a/arch/arm/mach-mx2/devices.c
+> +++ b/arch/arm/mach-mx2/devices.c
+> @@ -565,3 +565,30 @@ int __init mxc_register_gpios(void)
+>  {
+>  ??? return mxc_gpio_init(imx_gpio_ports,
+> ARRAY_SIZE(imx_gpio_ports));
+>  }
+> +
+> +#ifdef CONFIG_MACH_MX21
+> +static struct resource mx21_usbhc_resources[] = {
+> +??? [0] = {
+> +??? ???
+> .start??? = USBOTG_BASE_ADDR,
+> +??? ???
+> .end??? = USBOTG_BASE_ADDR + 0x1FFF,
+> +??? ???
+> .flags??? = IORESOURCE_MEM,
+> +??? },
+> +??? [1] = {
+> +??? ???
+> .start??? ??? =
+> MXC_INT_USBHOST,
+> +??? ???
+> .end??? ??? =
+> MXC_INT_USBHOST,
+> +??? ???
+> .flags??? ??? =
+> IORESOURCE_IRQ,
+> +??? },
+> +};
 
-OK, I updated the for-rmk branch.
+Shouldn't you let the compiler count the array?
 
-Thanks.
+Regards,
 
--- 
-Catalin
+Fabio Estevam
+
+
+      
