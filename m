@@ -1,50 +1,29 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 9 Nov 2009 14:13:41 +0100
-Subject: dream: fastboot getting protocol errors
-In-Reply-To: <a55d774e0911090459q2e373b5bw9f4fafe71e631c70@mail.gmail.com>
-References: <20091109103602.GC2207@elf.ucw.cz>
-	<a55d774e0911090459q2e373b5bw9f4fafe71e631c70@mail.gmail.com>
-Message-ID: <20091109131340.GB23292@elf.ucw.cz>
+From: suse.auto@gmail.com (suse auto)
+Date: Mon, 9 Nov 2009 14:17:04 +0530
+Subject: Experimental patch is missing AT91 board
+Message-ID: <f64919da0911090047y5d17848fx39cf96227f197000@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2009-11-09 04:59:10, Brian Swetland wrote:
-> On Mon, Nov 9, 2009 at 2:36 AM, Pavel Machek <pavel@ucw.cz> wrote:
-> > Hi!
-> >
-> > I'm still fighting with porting MMC support to current mainline.
-> >
-> > Meanwhile: I'm getting this *way* too often -- with the htcUSB ?to
-> > 2xUSB reduction. Any ideas?
-> >
-> > root at amd:/data/l/android# ./fastboot -c "console=tty0
-> > root=/dev/mmcblk0p1 rootdelay=5 fbcon=rotate:1" boot
-> > /data/l/linux-msm/arch/arm/boot/zImage
-> > creating boot image...
-> > creating boot image - 1667072 bytes
-> > downloading 'boot.img'... FAILED (command write failed (Protocol
-> > error))
-> > root at amd:/data/l/android#
-> >
-> > ...and then it just goes away after powercycling the phone...
-> 
-> Unfortunately, I think that's just flakies in the htc bootloader.  I'm
-> not aware of any simple workaround.  Do you not see it fail if you use
-> a straight USB A->miniB cable?
+Hi,
 
-No, that seems to work reliably.
+I am trying to compile / build a linux kernel for AT91SAM9263EK board. I
+downloaded the Linux 2.6.30 from kernel.org. Then while I tried to download
+patches for the AT91 board, I could download the maintainer patch list (
+2.6.30-at91.patch.gz<http://maxim.org.za/AT91RM9200/2.6/2.6.30-at91.patch.gz
+>)
+from
+http://maxim.org.za/AT91RM9200/2.6/2.6.30-at91.patch.gz , but i could not
+get the experimental patch
+(2.6.30-at91-exp.tar.gz<
+ftp://www.at91.com/pub/linux/2.6.30-at91/2.6.30-at91-exp.tar.gz>)
+ from
+ftp://www.at91.com/pub/linux/2.6.30-at91/2.6.30-at91-exp.tar.gz.
 
-> I think that bootloader will still honor a secondstage bootloader
-> embedded in the boot.img (mkbootimg --second foo), or you could
-> replace the zimage in the boot.img with a second stage bootloader.
-> Either way, dunno if you want to dig into bootloader hackery to try to
-> resolve usb issues.
+can somebody tell me if this experimental patch is available else where?
+can you give any other suggestion for linux kernel for AT91 board?
 
-Ok, so its time to simply retry until it works...
-
-Thanks for info!
-									Pavel
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-Susan.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091109/77fae013/attachment.htm>
