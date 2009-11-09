@@ -1,123 +1,89 @@
 From: agust@denx.de (Anatolij Gustschin)
-Date: Mon,  9 Nov 2009 13:37:13 +0100
-Subject: [PATCH 1/2] qong: Add LCD display support
-Message-ID: <1257770234-1851-1-git-send-email-agust@denx.de>
+Date: Mon,  9 Nov 2009 13:37:14 +0100
+Subject: [PATCH 2/2] qong: add mc13783 support
+In-Reply-To: <1257770234-1851-1-git-send-email-agust@denx.de>
+References: <1257770234-1851-1-git-send-email-agust@denx.de>
+Message-ID: <1257770234-1851-2-git-send-email-agust@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch was tested with Vbest-VGG322403 and
-COM57H5M10XRC displays.
+Enables using MC13783's touchscreen interface on qong
+board.
 
 Signed-off-by: Anatolij Gustschin <agust@denx.de>
 ---
- arch/arm/mach-mx3/qong.c |   83 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 83 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx3/qong.c |   45 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 45 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-mx3/qong.c b/arch/arm/mach-mx3/qong.c
-index 07858d1..6626cc0 100644
+index 6626cc0..7422fdb 100644
 --- a/arch/arm/mach-mx3/qong.c
 +++ b/arch/arm/mach-mx3/qong.c
-@@ -37,6 +37,8 @@
- #include <mach/board-qong.h>
- #include <mach/imx-uart.h>
+@@ -39,6 +39,12 @@
  #include <mach/iomux-mx3.h>
-+#include <mach/ipu.h>
-+#include <mach/mx3fb.h>
+ #include <mach/ipu.h>
+ #include <mach/mx3fb.h>
++#include <linux/spi/spi.h>
++#include <linux/mfd/mc13783.h>
++
++#if defined(CONFIG_SPI_IMX) || defined(CONFIG_SPI_IMX_MODULE)
++#include <mach/spi.h>
++#endif
  #include "devices.h"
  
  /* FPGA defines */
-@@ -249,6 +251,84 @@ static void __init qong_init_fpga(void)
- 	qong_init_dnet();
+@@ -329,6 +335,42 @@ void qong_init_lcd(void)
+ 	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_D3_CLS, IOMUX_CONFIG_FUNC));
  }
  
-+static struct ipu_platform_data mx3_ipu_data = {
-+	.irq_base = MXC_IPU_IRQ_START,
++void qong_init_spi(void)
++{
++	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_CSPI2_SPI_RDY, IOMUX_CONFIG_FUNC));
++	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_CSPI2_SCLK, IOMUX_CONFIG_FUNC));
++	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_CSPI2_MISO, IOMUX_CONFIG_FUNC));
++	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_CSPI2_MOSI, IOMUX_CONFIG_FUNC));
++	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_CSPI2_SS0, IOMUX_CONFIG_FUNC));
++
++	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_GPIO1_3, IOMUX_CONFIG_GPIO));
++
++	if (!gpio_request(IOMUX_TO_GPIO(MX31_PIN_GPIO1_3), "spi1_irq"))
++		gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_GPIO1_3));
++}
++
++static struct mc13783_platform_data mc13783_pdata __initdata = {
++	.flags = MC13783_USE_TOUCHSCREEN,
 +};
 +
-+static const struct fb_videomode fb_modedb[] = {
++static struct spi_board_info qong_spi_devs[] __initdata = {
 +	{
-+		/* 320x240 @ 60 Hz Vbest */
-+		.name		= "Vbest-VGG322403",
-+		.refresh	= 60,
-+		.xres		= 320,
-+		.yres		= 240,
-+		.pixclock	= 156000,
-+		.left_margin	= 20,
-+		.right_margin	= 38,
-+		.upper_margin	= 7,
-+		.lower_margin	= 26,
-+		.hsync_len	= 30,
-+		.vsync_len	= 3,
-+		.sync		= FB_SYNC_OE_ACT_HIGH,
-+		.vmode		= FB_VMODE_NONINTERLACED,
-+		.flag		= 0,
-+	}, {
-+		/* 640x480 @ 60 Hz Casio COM57H5M10XRC */
-+		.name		= "COM57H5M10XRC",
-+		.refresh	= 60,
-+		.xres		= 640,
-+		.yres		= 480,
-+		.pixclock	= 40000,
-+		.left_margin	= 120,
-+		.right_margin	= 10,
-+		.upper_margin	= 35,
-+		.lower_margin	= 7,
-+		.hsync_len	= 30,
-+		.vsync_len	= 3,
-+		.sync		= FB_SYNC_OE_ACT_HIGH,
-+		.vmode		= FB_VMODE_NONINTERLACED,
-+		.flag		= 0,
++		.modalias	= "mc13783",
++		.max_speed_hz	= 1000000,
++		.bus_num	= 1,
++		.chip_select	= 0,
++		.irq		= IOMUX_TO_IRQ(MX31_PIN_GPIO1_3),
++		.platform_data	= &mc13783_pdata,
 +	},
 +};
 +
-+static struct mx3fb_platform_data mx3fb_pdata = {
-+	.dma_dev	= &mx3_ipu.dev,
-+	.name		= "Vbest-VGG322403",
-+	.mode		= fb_modedb,
-+	.num_modes	= ARRAY_SIZE(fb_modedb),
-+};
++static int qong_spi1_cs[] = { MXC_SPI_CS(0) };
 +
-+void qong_init_lcd(void)
-+{
-+	/* Init Display Interface */
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_LD0, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_LD1, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_LD2, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_LD3, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_LD4, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_LD5, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_LD6, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_LD7, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_LD8, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_LD9, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_LD10, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_LD11, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_LD12, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_LD13, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_LD14, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_LD15, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_LD16, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_LD17, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_VSYNC3, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_HSYNC, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_FPSHIFT, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_DRDY0, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_D3_REV, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_CONTRAST, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_D3_SPL, IOMUX_CONFIG_FUNC));
-+	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_D3_CLS, IOMUX_CONFIG_FUNC));
-+}
++struct spi_imx_master qong_spi1_master = {
++	.chipselect = qong_spi1_cs,
++	.num_chipselect = ARRAY_SIZE(qong_spi1_cs),
++};
 +
  /*
   * Board specific initialization.
   */
-@@ -257,6 +337,9 @@ static void __init mxc_board_init(void)
- 	mxc_init_imx_uart();
+@@ -338,8 +380,11 @@ static void __init mxc_board_init(void)
  	qong_init_nor_mtd();
  	qong_init_fpga();
-+	qong_init_lcd();
-+	mxc_register_device(&mx3_ipu, &mx3_ipu_data);
-+	mxc_register_device(&mx3_fb, &mx3fb_pdata);
+ 	qong_init_lcd();
++	qong_init_spi();
+ 	mxc_register_device(&mx3_ipu, &mx3_ipu_data);
+ 	mxc_register_device(&mx3_fb, &mx3fb_pdata);
++	spi_register_board_info(qong_spi_devs, ARRAY_SIZE(qong_spi_devs));
++	mxc_register_device(&mxc_spi_device1, &qong_spi1_master);
  }
  
  static void __init qong_timer_init(void)
