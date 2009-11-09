@@ -1,39 +1,27 @@
 From: swetland@google.com (Brian Swetland)
-Date: Mon, 9 Nov 2009 04:59:10 -0800
-Subject: dream: fastboot getting protocol errors
-In-Reply-To: <20091109103602.GC2207@elf.ucw.cz>
-References: <20091109103602.GC2207@elf.ucw.cz>
-Message-ID: <a55d774e0911090459q2e373b5bw9f4fafe71e631c70@mail.gmail.com>
+Date: Mon, 9 Nov 2009 05:06:01 -0800
+Subject: htc dream: attempts at mmc and framebuffer support
+In-Reply-To: <20091109111154.GB8750@elf.ucw.cz>
+References: <20091109111154.GB8750@elf.ucw.cz>
+Message-ID: <a55d774e0911090506r4baf53edpc0c5de35defcb96d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 9, 2009 at 2:36 AM, Pavel Machek <pavel@ucw.cz> wrote:
+On Mon, Nov 9, 2009 at 3:11 AM, Pavel Machek <pavel@ucw.cz> wrote:
 > Hi!
 >
-> I'm still fighting with porting MMC support to current mainline.
->
-> Meanwhile: I'm getting this *way* too often -- with the htcUSB ?to
-> 2xUSB reduction. Any ideas?
->
-> root at amd:/data/l/android# ./fastboot -c "console=tty0
-> root=/dev/mmcblk0p1 rootdelay=5 fbcon=rotate:1" boot
-> /data/l/linux-msm/arch/arm/boot/zImage
-> creating boot image...
-> creating boot image - 1667072 bytes
-> downloading 'boot.img'... FAILED (command write failed (Protocol
-> error))
-> root at amd:/data/l/android#
->
-> ...and then it just goes away after powercycling the phone...
+> I tried to get mmc and framebuffer to work, but could not. framebuffer
+> probably needs clock framework to work properly...
 
-Unfortunately, I think that's just flakies in the htc bootloader.  I'm
-not aware of any simple workaround.  Do you not see it fail if you use
-a straight USB A->miniB cable?
+Both fb and mmc will need operable clock control to function.  mmc
+will also need the vreg code (to adjust power to the sdcard slot).
+Both clk_* and vreg_* are already in, though I haven't put them
+through their paces in the latest kernel tree.  They both just wrap
+proc_comm (as the modem owns both clock and power control) and are
+pretty simple -- they should "just work".
 
-I think that bootloader will still honor a secondstage bootloader
-embedded in the boot.img (mkbootimg --second foo), or you could
-replace the zimage in the boot.img with a second stage bootloader.
-Either way, dunno if you want to dig into bootloader hackery to try to
-resolve usb issues.
+The framebuffer is "fun" to bootstrap -- it needs the mddi transport
+(serial video interface), mddi-to-lcdc bridge and panel init code, and
+the mdp dma code to go.
 
 Brian
