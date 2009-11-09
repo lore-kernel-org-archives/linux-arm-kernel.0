@@ -1,74 +1,67 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon,  9 Nov 2009 09:18:41 +0100
-Subject: [PATCH 2/2 RESENT] [ARM] i2c/pxa: only define 'blue_murder'-function
-	if DEBUG is #defined
-In-Reply-To: <1257754721-17325-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1257275000-18866-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1257754721-17325-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1257754721-17325-2-git-send-email-u.kleine-koenig@pengutronix.de>
+From: dk-arm-linux@gmx.de (Dieter Kiermaier)
+Date: Mon, 9 Nov 2009 09:33:46 +0100
+Subject: orion/kirkwood pcie issue still open with rc6
+Message-ID: <200911090933.46240.dk-arm-linux@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <w.sang@pengutronix.de>
+Hi Nicolas,
 
-This talkative function is also called on timeouts. As timeouts can
-happen on regular writes to EEPROMs (no error case), this creates false
-positives.  Giving lots of details is interesting only for developers
-anyhow, so just use the function if DEBUG is #defined.
+I've tried your latest kernel from orion.git and there is still a PCIe issue left.
+Please see my patch below.
+It would be very nice if someone could tell me why this patch helped me
+to boot my kernel :)
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: Jean Delvare <khali@linux-fr.org>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: Roel Kluin <roel.kluin@gmail.com>
-Cc: Pavel Machek <pavel@ucw.cz>
+
 ---
- drivers/i2c/busses/i2c-pxa.c |   24 ++++++++++++++----------
- 1 files changed, 14 insertions(+), 10 deletions(-)
+>From 6ce3d877a96186e0dda0c319b9b7eb8df5d10541 Mon Sep 17 00:00:00 2001
+From: Dieter Kiermaier <dk-arm-linux@gmx.de>
+Date: Mon, 9 Nov 2009 09:15:12 +0100
+Subject: [PATCH] Without this patch my kernel hangs during boot up while scanning the pci bus behind
+ a marvell 88SB2211 stepping A0 pcie to pci bridge.
 
-diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-index 40052c0..009e52e 100644
---- a/drivers/i2c/busses/i2c-pxa.c
-+++ b/drivers/i2c/busses/i2c-pxa.c
-@@ -208,16 +208,6 @@ static void i2c_pxa_show_state(struct pxa_i2c *i2c, int lno, const char *fname)
- }
+Ronan Shitrit from marvell gave me the information to clear bit 2 of physical
+address 0xf1020100 to enable bus scanning.
+I don't know what this really does but it helped to get my kernel up and running.
+
+Signed-off-by: Dieter Kiermaier <dk-arm-linux@gmx.de>
+---
+ arch/arm/mach-kirkwood/openrd_base-setup.c |   14 ++++++++++++++
+ 1 files changed, 14 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-kirkwood/openrd_base-setup.c b/arch/arm/mach-kirkwood/openrd_base-setup.c
+index 77617c7..21a1cf7 100644
+--- a/arch/arm/mach-kirkwood/openrd_base-setup.c
++++ b/arch/arm/mach-kirkwood/openrd_base-setup.c
+@@ -14,6 +14,7 @@
+ #include <linux/mtd/partitions.h>
+ #include <linux/ata_platform.h>
+ #include <linux/mv643xx_eth.h>
++#include <asm/io.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <mach/kirkwood.h>
+@@ -76,6 +77,19 @@ static void __init openrd_base_init(void)
  
- #define show_state(i2c) i2c_pxa_show_state(i2c, __LINE__, __func__)
--#else
--#define i2c_debug	0
--
--#define show_state(i2c) do { } while (0)
--#define decode_ISR(val) do { } while (0)
--#define decode_ICR(val) do { } while (0)
--#endif
--
--static void i2c_pxa_master_complete(struct pxa_i2c *i2c, int ret);
--static irqreturn_t i2c_pxa_handler(int this_irq, void *dev_id);
- 
- static void i2c_pxa_scream_blue_murder(struct pxa_i2c *i2c, const char *why)
+ static int __init openrd_base_pci_init(void)
  {
-@@ -233,6 +223,20 @@ static void i2c_pxa_scream_blue_murder(struct pxa_i2c *i2c, const char *why)
- 	printk("\n");
- }
++	u32 cpu_config_reg;
++	void __iomem *base;
++	
++	base = ioremap(0xf1020100, 4);
++	if (base)
++	{
++		cpu_config_reg = readl(base);
++		cpu_config_reg &= ~(1 << 2);
++		writel(cpu_config_reg, base);
++		printk("register 0x20100: %x\n", readl(base));
++	}
++	iounmap(base);
++	
+ 	if (machine_is_openrd_base())
+ 		kirkwood_pcie_init();
  
-+#else /* ifdef DEBUG */
-+
-+#define i2c_debug	0
-+
-+#define show_state(i2c) do { } while (0)
-+#define decode_ISR(val) do { } while (0)
-+#define decode_ICR(val) do { } while (0)
-+#define i2c_pxa_scream_blue_murder(i2c, why) do { } while (0)
-+
-+#endif /* ifdef DEBUG / else */
-+
-+static void i2c_pxa_master_complete(struct pxa_i2c *i2c, int ret);
-+static irqreturn_t i2c_pxa_handler(int this_irq, void *dev_id);
-+
- static inline int i2c_pxa_is_slavemode(struct pxa_i2c *i2c)
- {
- 	return !(readl(_ICR(i2c)) & ICR_SCLE);
 -- 
-1.6.5.2
+1.5.4.3
+
+Dieter
