@@ -1,5 +1,5 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 9 Nov 2009 19:14:20 +0000
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 09 Nov 2009 14:31:23 -0500 (EST)
 Subject: [PATCH] Use definition for cmpxchg swi
 In-Reply-To: <20091109190852.GD3808@shareable.org>
 References: <20091108200459.GA32760@n2100.arm.linux.org.uk>
@@ -8,11 +8,12 @@ References: <20091108200459.GA32760@n2100.arm.linux.org.uk>
 	<alpine.LFD.2.00.0911090953010.16711@xanadu.home>
 	<20091109173040.GA24358@n2100.arm.linux.org.uk>
 	<20091109190852.GD3808@shareable.org>
-Message-ID: <20091109191420.GA24833@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.0911091422310.16711@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 09, 2009 at 07:08:52PM +0000, Jamie Lokier wrote:
+On Mon, 9 Nov 2009, Jamie Lokier wrote:
+
 > Russell King - ARM Linux wrote:
 > > I'll add a comment then.
 > > 
@@ -22,21 +23,22 @@ On Mon, Nov 09, 2009 at 07:08:52PM +0000, Jamie Lokier wrote:
 > 
 > Meaning that nobody has ever actually used the original code? :-)
 
-Correct, because SMP on ARM architectures prior to V6 is rather rare.
-My only implementation of that is a pile of FPGAs implementing a 4-way
-ARM926 SMP system.
+Hard to tell.  This is certainly the last of the last resorts.
 
 > I notice that it loads the syscall number register for EABI
 > compatibility, but that instruction could be trivially omitted with
 > OABI-compatible kernels, couldn't it?
 
-It could.
+Maybe, but I don't think we should care that much.  This is only to 
+support maybe one or two dev boards in existence on the planet that 
+might even not be used anymore, and being the solution of last resort 
+means it is already much much slower than the alternatives.  So this is 
+not worth the bother.
 
 > By the way, did you change it to LDR to make it faster?  (I.e. does
 > that make it faster?)
 
-Well, we could use one mov and two orr instructions to load the minimum
-20 bits of syscall number (which equates to a minimum of 3 cycles) or
-one ldr, which can be 1 cycle if the cache is warm.  Since the result
-is not used in the following two instructions, there is no impact from
-result delays.
+It's most probably only a case of making the define usage simpler.
+
+
+Nicolas
