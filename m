@@ -1,45 +1,28 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 09 Nov 2009 10:34:06 +0000
-Subject: [PATCH 4/4] RealView: Add sparsemem support for the RealView
-	PBX platform
-In-Reply-To: <20091109101822.GA15646@n2100.arm.linux.org.uk>
-References: <20091015121927.739.32071.stgit@pc1117.cambridge.arm.com>
-	<20091015122209.739.42849.stgit@pc1117.cambridge.arm.com>
-	<20091108174503.GB28368@n2100.arm.linux.org.uk>
-	<1257760300.21820.23.camel@pc1117.cambridge.arm.com>
-	<20091109101822.GA15646@n2100.arm.linux.org.uk>
-Message-ID: <1257762846.21820.27.camel@pc1117.cambridge.arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 9 Nov 2009 11:36:02 +0100
+Subject: dream: fastboot getting protocol errors
+Message-ID: <20091109103602.GC2207@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2009-11-09 at 10:18 +0000, Russell King - ARM Linux wrote:
-> On Mon, Nov 09, 2009 at 09:51:40AM +0000, Catalin Marinas wrote:
-> > On Sun, 2009-11-08 at 17:45 +0000, Russell King - ARM Linux wrote:
-> > > On Thu, Oct 15, 2009 at 01:22:09PM +0100, Catalin Marinas wrote:
-> > > > +config ARCH_FLATMEM_ENABLE
-> > > > +	bool
-> > > > +	default y if ARCH_SPARSEMEM_ENABLE
-> > > > +
-> > > 
-> > > I seem to have missed this.  Why do we want to enable flatmem support for
-> > > _everything_ which enables sparsemem?
-> > 
-> > Just to have the option of selecting either flatmem or sparsemem with
-> > PBX (though I don't have a strong opinion about this). This can also be
-> > done transparently via REALVIEW_HIGH_PHYS_OFFSET.
-> 
-> If you want to do this, put ARCH_FLATMEM_ENABLE into arch/arm/Kconfig,
-> and arrange for the platform(s) where this is optional _and_ not the
-> default to select this symbol, in precisely the same way that
-> ARCH_SPARSEMEM_ENABLE is handled today.
+Hi!
 
-I don't think it's worth the hassle anyway. If you have
-REALVIEW_HIGH_PHYS_OFFSET disabled and FLATMEM, you end up with only
-256MB of RAM available, I don't really see a point in this
-configuration. With the new patch, if you don't like SPARSEMEM (maybe
-for benchmarking reasons), just enable REALVIEW_HIGH_PHYS_OFFSET.
+I'm still fighting with porting MMC support to current mainline.
 
-So, are you OK with the latest patch?
+Meanwhile: I'm getting this *way* too often -- with the htcUSB  to
+2xUSB reduction. Any ideas?
 
+root at amd:/data/l/android# ./fastboot -c "console=tty0
+root=/dev/mmcblk0p1 rootdelay=5 fbcon=rotate:1" boot
+/data/l/linux-msm/arch/arm/boot/zImage
+creating boot image...
+creating boot image - 1667072 bytes
+downloading 'boot.img'... FAILED (command write failed (Protocol
+error))
+root at amd:/data/l/android# 
+
+...and then it just goes away after powercycling the phone...
+									Pavel
 -- 
-Catalin
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
