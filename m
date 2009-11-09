@@ -1,44 +1,61 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 09 Nov 2009 14:31:23 -0500 (EST)
-Subject: [PATCH] Use definition for cmpxchg swi
-In-Reply-To: <20091109190852.GD3808@shareable.org>
-References: <20091108200459.GA32760@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0911082033580.16711@xanadu.home>
-	<20091109085137.GA14453@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0911090953010.16711@xanadu.home>
-	<20091109173040.GA24358@n2100.arm.linux.org.uk>
-	<20091109190852.GD3808@shareable.org>
-Message-ID: <alpine.LFD.2.00.0911091422310.16711@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 9 Nov 2009 13:08:12 -0800
+Subject: [PATCH] arm: omap: Use resource_size
+In-Reply-To: <20091109210558.GD23952@atomide.com>
+References: <1257788658-19824-1-git-send-email-tklauser@distanz.ch>
+	<20091109210558.GD23952@atomide.com>
+Message-ID: <20091109210811.GE23952@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 9 Nov 2009, Jamie Lokier wrote:
-
-> Russell King - ARM Linux wrote:
-> > I'll add a comment then.
+* Tony Lindgren <tony@atomide.com> [091109 13:05]:
+> * Tobias Klauser <tklauser@distanz.ch> [091109 09:44]:
+> > Use the resource_size function instead of manually calculating the
+> > resource size. This reduces the chance of introducing off-by-one errors
+> > and actually fixes one in mailbox.c.
 > > 
-> > Note, however, that the original code was buggy - it resulted in
-> > the '0xfff0' syscall being called instead of '0xffff0' - note the
-> > extra 4 bits there.
+> > Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
 > 
-> Meaning that nobody has ever actually used the original code? :-)
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-Hard to tell.  This is certainly the last of the last resorts.
+Hmm, sorry though this was part of some larger series.. Added to
+my omap-fixes queue.
 
-> I notice that it loads the syscall number register for EABI
-> compatibility, but that instruction could be trivially omitted with
-> OABI-compatible kernels, couldn't it?
+Regards,
 
-Maybe, but I don't think we should care that much.  This is only to 
-support maybe one or two dev boards in existence on the planet that 
-might even not be used anymore, and being the solution of last resort 
-means it is already much much slower than the alternatives.  So this is 
-not worth the bother.
-
-> By the way, did you change it to LDR to make it faster?  (I.e. does
-> that make it faster?)
-
-It's most probably only a case of making the define usage simpler.
-
-
-Nicolas
+Tony
+ 
+> > ---
+> >  arch/arm/mach-omap2/gpmc.c    |    2 +-
+> >  arch/arm/mach-omap2/mailbox.c |    2 +-
+> >  2 files changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+> > index 004da69..67af370 100644
+> > --- a/arch/arm/mach-omap2/gpmc.c
+> > +++ b/arch/arm/mach-omap2/gpmc.c
+> > @@ -366,7 +366,7 @@ int gpmc_cs_request(int cs, unsigned long size, unsigned long *base)
+> >  	if (r < 0)
+> >  		goto out;
+> >  
+> > -	gpmc_cs_enable_mem(cs, res->start, res->end - res->start + 1);
+> > +	gpmc_cs_enable_mem(cs, res->start, resource_size(res));
+> >  	*base = res->start;
+> >  	gpmc_cs_set_reserved(cs, 1);
+> >  out:
+> > diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
+> > index 46e1f2e..5ba3aa6 100644
+> > --- a/arch/arm/mach-omap2/mailbox.c
+> > +++ b/arch/arm/mach-omap2/mailbox.c
+> > @@ -300,7 +300,7 @@ static int __devinit omap2_mbox_probe(struct platform_device *pdev)
+> >  		dev_err(&pdev->dev, "invalid mem resource\n");
+> >  		return -ENODEV;
+> >  	}
+> > -	mbox_base = ioremap(res->start, res->end - res->start);
+> > +	mbox_base = ioremap(res->start, resource_size(res));
+> >  	if (!mbox_base)
+> >  		return -ENOMEM;
+> >  
+> > -- 
+> > 1.6.3.3
+> > 
