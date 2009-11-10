@@ -1,32 +1,76 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Tue, 10 Nov 2009 10:55:43 +0800
-Subject: [PATCH V1 1/3] i2c: imx: check busy bit when START/STOP
-In-Reply-To: <4e090d470910301947y2cd4e95x88f500c6c008d97d@mail.gmail.com>
-References: <1255772784-11387-1-git-send-email-linuxzsc@gmail.com>
-	<20091030004025.GG13398@fluff.org.uk>
-	<4e090d470910301947y2cd4e95x88f500c6c008d97d@mail.gmail.com>
-Message-ID: <4e090d470911091855s3ba15a8cp715b48df8a1c1431@mail.gmail.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Tue, 10 Nov 2009 03:50:19 +0100
+Subject: [PATCH v3] OMAP: DMA: Fix omapfb/lcdc on OMAP1510 broken when PM
+	set
+In-Reply-To: <20091109211424.GF23952@atomide.com>
+References: <200911051951.32020.jkrzyszt@tis.icnet.pl>
+	<20091109211424.GF23952@atomide.com>
+Message-ID: <200911100350.22368.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 31, 2009 at 10:47 AM, Richard Zhao <linuxzsc@gmail.com> wrote:
-> On Fri, Oct 30, 2009 at 8:40 AM, Ben Dooks <ben-linux@fluff.org> wrote:
->> Does anyone have any comments on these, or shall I look at merging
->> them as fixes?
->>
->> --
->> Ben (ben at fluff.org, http://www.fluff.org/)
->>
->> ?'a smiley only costs 4 bytes'
->>
+Monday 09 November 2009 22:14:24 Tony Lindgren napisa?(a):
+> * Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [091105 10:52]:
+> > With CONFIG_PM=y, the omapfb/lcdc device on Amstrad Delta, after
+> > initially starting correctly, breaks with the following error messages:
+> >
+> > omapfb omapfb: resetting (status 0xffffff96,reset count 1)
+> > ...
+> > omapfb omapfb: resetting (status 0xffffff96,reset count 100)
+> > omapfb omapfb: too many reset attempts, giving up.
+> >
+> > Looking closer at this I have found that it had been broken almost 2
+> > years ago with commit 2418996e3b100114edb2ae110d5d4acb928909d2, PM fixes
+> > for OMAP1.
+> >
+> > The definite reason for broken omapfb/lcdc behavoiur in PM mode
+> > appeared to be ARM_IDLECT1:IDLIF_ARM (bit 6) put into idle regardless of
+> > LCD DMA possibly running. The bit were set based on return value of the
+> > omap_dma_running() function that did not check for dedicated LCD DMA
+> > channel status. The patch below fixes this.
+> >
+> > Created against linux-2.6.32-rc6
+> >
+> > Tested on Amstrad Delta
+> >
+> > Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+> >
+> > ---
+> >
+> > Tuesday 03 November 2009 21:10:48 Tony Lindgren wrote:
+> > > * Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [091103 12:05]:
+> > > > Sorry, I've not checked for new mail before posting this one and
+> > > > missed your acceptance for my idea of fixing all omap1510, not only
+> > > > ams_delta. If there are no more comments, I'll submit v3 with
+> > > > cpu_is_omap1510() replacing machine_is_ams_delta().
+> > >
+> > > Sounds good to me.
+> > >
+> > > Tony
+> >
+> > --- linux-2.6.32-rc6/arch/arm/plat-omap/dma.c.orig	2009-11-03 20:37:49.000000000 +0100
+> > +++ linux-2.6.32-rc6/arch/arm/plat-omap/dma.c	2009-11-05 19:30:39.000000000 +0100
+> > @@ -1108,6 +1108,14 @@ int omap_dma_running(void)
+> >  {
+> >  	int lch;
+> >
+> > +	/*
+> > +	 * On OMAP1510, internal LCD controller will start the transfer
+> > +	 * when it gets enabled, so assume DMA running if LCD enabled.
+> > +	 */
+> > +	if (cpu_is_omap1510())
+> > +		if (omap_readw(0xfffec000 + 0x00) & (1 << 0))
+> > +			return 1;
+> > +
+> >  	/* Check if LCD DMA is running */
+> >  	if (cpu_is_omap16xx())
+> >  		if (omap_readw(OMAP1610_DMA_LCD_CCR) & OMAP_DMA_CCR_EN)
 >
-> Thanks, Ben! I've test these patch on imx31 pdk and imx51 pdk.
->
-> ?Richard
->
-Hi Guys,
+> Can you please use some define rather than the 0xfffec000 register
+> above?
 
-May I know what the series of patch is pending on?
+Tony,
+Sure. Expect a follow up very soon.
 
-Thanks
-Richard
+Thanks,
+Janusz
