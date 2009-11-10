@@ -1,58 +1,64 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Tue, 10 Nov 2009 17:46:01 +0100
-Subject: [PATCH]: S3C RTC driver: add support for S3C64xx
-In-Reply-To: <1b68c6790911100553m267f35dav9638fc6c0340978d@mail.gmail.com>
-References: <b2e8f9f70911091746t845b285m3d30314ce7e9fd07@mail.gmail.com>
-	<1b68c6790911100553m267f35dav9638fc6c0340978d@mail.gmail.com>
-Message-ID: <4AF998C9.3060208@gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 10 Nov 2009 18:03:40 +0100 (CET)
+Subject: [PATCH] Make MIPS dynamic clocksource/clockevent clock code
+	generic v2
+In-Reply-To: <1256078002-27919-1-git-send-email-linus.walleij@stericsson.com>
+References: <1256078002-27919-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <alpine.LFD.2.00.0911101734440.2897@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Op 10-11-09 14:53, jassi brar schreef:
-> On Tue, Nov 10, 2009 at 10:46 AM, Maurus Cuelenaere
-> <mcuelenaere@gmail.com>  wrote:
->    
->> <snip>
->>
->> +static struct s3c_rtc_platdata s3c_rtc_pdata = {
->> +       .rtc_type       = 0,
->> +};
->>      
-> 1) where is this structure defined?
->      Perhaps u forgot to share the plat/rtc.h
->    
+On Wed, 21 Oct 2009, Linus Walleij wrote:
 
-Hmm seems I did forgot to include plat/rtc.h ..
+> This moves the clocksource_set_clock() and clockevent_set_clock()
+> from the MIPS timer code into clockchips and clocksource where
+> it belongs. The patch was triggered by code posted by Mikael
+> Pettersson duplicating this code for the IOP ARM system. The
+> function signatures where altered slightly to fit into their
+> destination header files, unsigned int changed to u32 and inlined.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Tested-by: Mikael Pettersson <mikpe@it.uu.se>
+> Reviewed-by: Ralf Baechle <ralf@linux-mips.org>
+> ---
+> Changes v1->v2:
+> - Fixed Mikaels comments: spelling, terminology.
+> - Kept the functions inline: all uses and foreseen uses
+>   are once per kernel and all are in __init or __cpuinit sections.
 
-> 2) rtc_type isn't very neat. Runtime CPU detection is better.
->   Even better, if you manage to segregate the differences between
-> two versions and pass them via platform data somehow.
-> For, example, driver could assume resolution as pdata->resolution
-> instead of 128 or 32768 or whatever for future SoCs.
->    
+Not entirely true. We have the ability to dynamically switch on/off
+clocksources/events which might also change the clock frequency and
+requires recalculation of those factors.
 
-pdata->resolution sounds like a good idea.
+> - Unable to break out common code - the code is not common and
+>   implementing two execution paths will be more awkward.
 
->> <snip>
->>   #else
->> @@ -518,7 +563,7 @@ static struct platform_driver s3c2410_rtc_driver = {
->>         .suspend        = s3c_rtc_suspend,
->>         .resume         = s3c_rtc_resume,
->>         .driver         = {
->> -               .name   = "s3c2410-rtc",
->> +               .name   = "s3c-rtc",
->>                 .owner  = THIS_MODULE,
->>         },
->>   };
->>      
-> why not use platform_device_id ?
->    
+Come on. It's not rocket science to implement it as a common function
+with two inline wrappers for clock sources and clock events.
 
-I didn't know of platform_device_id, looks like a clean(er) solution for 
-this.
+> - Hoping the tglx likes it anyway.
 
+I looked in more detail and I found a flaw which is already in the
+MIPS implementation:
 
-I'll post an updated patch with Jassi's and Ben's remarks in mind.
+Both functions assume that the resulting shift/mult is chosen in way
+that the input value to the runtime conversion functions is always
+less than (1 << 32) nano seconds.
 
-Regards,
-Maurus Cuelenaere
+That limits NOHZ to sleeps of ~ 4 seconds. We had already discussions
+about sleep times which are in the 10 to 20 seconds range and power
+saving folks definitely want to extend this even further.
+
+The tradeoff for the clock conversion is accuracy, but we don't want
+to impose the maximum accuracy policy on everyone who wants to use the
+runtime conversion factor setup functions.
+
+I have a function coded which takes the maximum desired time span of
+the conversion into account, but I need to think more about how we
+define it. Runtime requested by the caller, some global Kconfig switch
+or whatever is the best.
+
+Thanks,
+
+	tglx
