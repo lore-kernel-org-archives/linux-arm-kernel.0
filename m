@@ -1,38 +1,34 @@
-From: matthieu.castet@parrot.com (Matthieu CASTET)
-Date: Tue, 10 Nov 2009 14:19:50 +0100
-Subject: Runtime code modification fails on arm
-In-Reply-To: <343d1bca0911100508w1b5b62d8n8242abd7eb97a0c@mail.gmail.com>
-References: <343d1bca0911100508w1b5b62d8n8242abd7eb97a0c@mail.gmail.com>
-Message-ID: <4AF96876.3090105@parrot.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 10 Nov 2009 14:25:26 +0100
+Subject: spitz battery driver
+In-Reply-To: <1257856464.6394.6.camel@utx.utx.cz>
+References: <20091109135813.GA1385@ucw.cz>
+	<f17812d70911091948p5331f11djc887443559b233db@mail.gmail.com>
+	<20091110104634.GA1395@ucw.cz> <1257856464.6394.6.camel@utx.utx.cz>
+Message-ID: <20091110132526.GC26144@atrey.karlin.mff.cuni.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Papalagi Pakeha a ?crit :
-> Hi,
+k
+> > > This is a good move. However, I assume the patch is still RFC now.
+> > > Or basically the coding style cleanup can be separated into another
+> > > patch?
+> > 
+> > Its rfc now. Parts of codingstyle cleanup should already be in your
+> > tree, I'll rediff it later.
 > 
-> I've got a program that is stored partially encrypted on the
-> filesystem and should decrypt itself in runtime after retrieving the
-> key from the hardware.
-> 
-> Essentially the implementation puts some of the program functions into
-> a separate ELF section (.cryptext) and then a helper script encrypts
-> this section directly in the binary file. Offset and size is
-> determined using "objdump -h".
-> 
-> When the program is started it finds the address of the encrypted
-> function, its length and decrypts it back to the original valid
-> instructions. This all works just fine on x86 but the same approach
-> fails on ARM. There the decryptor can read the encrypted code, can
-> write back the decrypted code, can verify that the code has been
-> written but once the function is called it segfaults or dies on
-> invalid instruction. To me it looks like the changed code is not
-> picked up and the cpu still tries to run the old, encrypted one.
-> 
-> Why is this happening? What is so different between x86 and ARM in
-> that field? I'm aware that my problem exhibits in userspace, not in
-> the kernel. I'm sorry if it's way off topic here.
-You need to flush the data cache and invalidate instruction one. For
-that you can use __ARM_NR_cacheflush syscall.
+> Pavel, could you compare your patch with the "power: implement platform
+> battery driver"??? patches from Paul Fertser just sent to LKML and
+> zaurus-devel list? Would it be complicated to migrate to it? I guess
 
+Complicated? No. Useful? Probably also no. Remove 50 lines for
+additional indirection? I'd prefer not to.
 
-Matthieu
+> that use of platform driver could allow to recycle major parts of the
+> charging driver by more devices.
+
+take a look at those patches. I'd rather use mainline battery api.
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
