@@ -1,126 +1,43 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Tue, 10 Nov 2009 04:20:16 +0100
-Subject: [PATCH] OMAP: DMA: Use some define rather than a hexadecimal constant
-	for LCD register
-Message-ID: <200911100420.19786.jkrzyszt@tis.icnet.pl>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 10 Nov 2009 12:27:15 +0900
+Subject: [PATCH] ARM: SAMSUNG: Add plat-samsung as starting point for
+	plat-s3c* moves
+In-Reply-To: <000a01ca61a5$c573d000$505b7000$%kim@samsung.com>
+References: <1257812406-17360-1-git-send-email-ben-linux@fluff.org>
+	<000a01ca61a5$c573d000$505b7000$%kim@samsung.com>
+Message-ID: <9c9fda240911091927m46ed0fccyfbbc8873eb9c5da9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch corrects the issue introduced with my previous patch:
-	"OMAP: DMA: Fix omapfb/lcdc on OMAP1510 broken when PM set"
-as pointed out by OMAP subsystem maintainer.
-
-Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
----
 Hi,
 
-I'd really like to have the first one get in as a fix in the -rc series,
-that's why I decided to correct the issue in a follow up.
+On Tue, Nov 10, 2009 at 10:33 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>
+> Hi, everyone
+>
+> On Tue, Nov 10, 2009 at 9:20PM +0900, Ben Dooks wrote:
+>
+>> We inted to re-organise the plat-s3c/plat-s3c24xx/plat-s3c64xx into a
+>> more generic plat-samsung with less code in the other plat- directories
+>> to make it easier to port new devices and try and clear up some of the
+>> naming issues with newer devices.
 
-Thanks,
-Janusz
----
-diff -upr linux-2.6.32-rc6.orig/arch/arm/plat-omap/dma.c linux-2.6.32-rc6/arch/arm/plat-omap/dma.c
---- linux-2.6.32-rc6.orig/arch/arm/plat-omap/dma.c	2009-11-05 19:30:39.000000000 +0100
-+++ linux-2.6.32-rc6/arch/arm/plat-omap/dma.c	2009-11-10 03:57:06.000000000 +0100
-@@ -34,6 +34,7 @@
- #include <mach/hardware.h>
- #include <mach/dma.h>
- 
-+#include <mach/omapfb.h>
- #include <mach/tc.h>
- 
- #undef DEBUG
-@@ -1113,7 +1114,7 @@ int omap_dma_running(void)
- 	 * when it gets enabled, so assume DMA running if LCD enabled.
- 	 */
- 	if (cpu_is_omap1510())
--		if (omap_readw(0xfffec000 + 0x00) & (1 << 0))
-+		if (omap_readw(OMAP_LCDC_CONTROL) & OMAP_LCDC_CTRL_LCD_EN)
- 			return 1;
- 
- 	/* Check if LCD DMA is running */
-diff -upr linux-2.6.32-rc6.orig/arch/arm/plat-omap/include/mach/omapfb.h linux-2.6.32-rc6/arch/arm/plat-omap/include/mach/omapfb.h
---- linux-2.6.32-rc6.orig/arch/arm/plat-omap/include/mach/omapfb.h	2009-11-03 20:37:49.000000000 +0100
-+++ linux-2.6.32-rc6/arch/arm/plat-omap/include/mach/omapfb.h	2009-11-10 03:52:00.000000000 +0100
-@@ -170,6 +170,38 @@ enum omapfb_update_mode {
- 
- #include <mach/board.h>
- 
-+#define OMAP_LCDC_BASE			0xfffec000
-+#define OMAP_LCDC_SIZE			256
-+#define OMAP_LCDC_IRQ			INT_LCD_CTRL
-+
-+#define OMAP_LCDC_CONTROL		(OMAP_LCDC_BASE + 0x00)
-+#define OMAP_LCDC_TIMING0		(OMAP_LCDC_BASE + 0x04)
-+#define OMAP_LCDC_TIMING1		(OMAP_LCDC_BASE + 0x08)
-+#define OMAP_LCDC_TIMING2		(OMAP_LCDC_BASE + 0x0c)
-+#define OMAP_LCDC_STATUS		(OMAP_LCDC_BASE + 0x10)
-+#define OMAP_LCDC_SUBPANEL		(OMAP_LCDC_BASE + 0x14)
-+#define OMAP_LCDC_LINE_INT		(OMAP_LCDC_BASE + 0x18)
-+#define OMAP_LCDC_DISPLAY_STATUS	(OMAP_LCDC_BASE + 0x1c)
-+
-+#define OMAP_LCDC_STAT_DONE		(1 << 0)
-+#define OMAP_LCDC_STAT_VSYNC		(1 << 1)
-+#define OMAP_LCDC_STAT_SYNC_LOST	(1 << 2)
-+#define OMAP_LCDC_STAT_ABC		(1 << 3)
-+#define OMAP_LCDC_STAT_LINE_INT		(1 << 4)
-+#define OMAP_LCDC_STAT_FUF		(1 << 5)
-+#define OMAP_LCDC_STAT_LOADED_PALETTE	(1 << 6)
-+
-+#define OMAP_LCDC_CTRL_LCD_EN		(1 << 0)
-+#define OMAP_LCDC_CTRL_LCD_TFT		(1 << 7)
-+#define OMAP_LCDC_CTRL_LINE_IRQ_CLR_SEL	(1 << 10)
-+
-+#define OMAP_LCDC_IRQ_VSYNC		(1 << 2)
-+#define OMAP_LCDC_IRQ_DONE		(1 << 3)
-+#define OMAP_LCDC_IRQ_LOADED_PALETTE	(1 << 4)
-+#define OMAP_LCDC_IRQ_LINE_NIRQ		(1 << 5)
-+#define OMAP_LCDC_IRQ_LINE		(1 << 6)
-+#define OMAP_LCDC_IRQ_MASK		(((1 << 5) - 1) << 2)
-+
- #define OMAP_LCDC_INV_VSYNC             0x0001
- #define OMAP_LCDC_INV_HSYNC             0x0002
- #define OMAP_LCDC_INV_PIX_CLOCK         0x0004
-diff -upr linux-2.6.32-rc6.orig/drivers/video/omap/lcdc.c linux-2.6.32-rc6/drivers/video/omap/lcdc.c
---- linux-2.6.32-rc6.orig/drivers/video/omap/lcdc.c	2009-11-03 20:37:49.000000000 +0100
-+++ linux-2.6.32-rc6/drivers/video/omap/lcdc.c	2009-11-10 03:51:16.000000000 +0100
-@@ -38,38 +38,6 @@
- 
- #define MODULE_NAME			"lcdc"
- 
--#define OMAP_LCDC_BASE			0xfffec000
--#define OMAP_LCDC_SIZE			256
--#define OMAP_LCDC_IRQ			INT_LCD_CTRL
--
--#define OMAP_LCDC_CONTROL		(OMAP_LCDC_BASE + 0x00)
--#define OMAP_LCDC_TIMING0		(OMAP_LCDC_BASE + 0x04)
--#define OMAP_LCDC_TIMING1		(OMAP_LCDC_BASE + 0x08)
--#define OMAP_LCDC_TIMING2		(OMAP_LCDC_BASE + 0x0c)
--#define OMAP_LCDC_STATUS		(OMAP_LCDC_BASE + 0x10)
--#define OMAP_LCDC_SUBPANEL		(OMAP_LCDC_BASE + 0x14)
--#define OMAP_LCDC_LINE_INT		(OMAP_LCDC_BASE + 0x18)
--#define OMAP_LCDC_DISPLAY_STATUS	(OMAP_LCDC_BASE + 0x1c)
--
--#define OMAP_LCDC_STAT_DONE		(1 << 0)
--#define OMAP_LCDC_STAT_VSYNC		(1 << 1)
--#define OMAP_LCDC_STAT_SYNC_LOST	(1 << 2)
--#define OMAP_LCDC_STAT_ABC		(1 << 3)
--#define OMAP_LCDC_STAT_LINE_INT		(1 << 4)
--#define OMAP_LCDC_STAT_FUF		(1 << 5)
--#define OMAP_LCDC_STAT_LOADED_PALETTE	(1 << 6)
--
--#define OMAP_LCDC_CTRL_LCD_EN		(1 << 0)
--#define OMAP_LCDC_CTRL_LCD_TFT		(1 << 7)
--#define OMAP_LCDC_CTRL_LINE_IRQ_CLR_SEL	(1 << 10)
--
--#define OMAP_LCDC_IRQ_VSYNC		(1 << 2)
--#define OMAP_LCDC_IRQ_DONE		(1 << 3)
--#define OMAP_LCDC_IRQ_LOADED_PALETTE	(1 << 4)
--#define OMAP_LCDC_IRQ_LINE_NIRQ		(1 << 5)
--#define OMAP_LCDC_IRQ_LINE		(1 << 6)
--#define OMAP_LCDC_IRQ_MASK		(((1 << 5) - 1) << 2)
--
- #define MAX_PALETTE_SIZE		PAGE_SIZE
- 
- enum lcdc_load_mode {
+Why do you miss the plat-s5pc1xx? Also add the plat-s5pc1xx series.
+
+>>
+>> Start by creating a small arch/arm/plat-samsung with no actuall code in
+>> so we can move items in as we process them.
+> (snip)
+>
+> Ok, good.
+>
+> We will be creating plat-s5p following to plat-samsung and will be submitted
+> soon.
+
+Why new plat-s5p is required? The main goal of plat-* directory is
+support the SoC common codes.
+Of course s5pc100 and s5pc110 is different features and different IPs
+but no need to create each plat directory.
+
+Thank you,
+Kyungmin Park
