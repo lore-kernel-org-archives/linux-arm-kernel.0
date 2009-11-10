@@ -1,82 +1,84 @@
-From: ospite@studenti.unina.it (Antonio Ospite)
-Date: Tue, 10 Nov 2009 13:48:37 +0100
-Subject: [PATCH 1/3] ezx: Add camera support for A780 and A910 EZX phones
-In-Reply-To: <f17812d70911032238i3ae6fa19g24720662b9079f24@mail.gmail.com>
-References: <1257266734-28673-1-git-send-email-ospite@studenti.unina.it>
-	<1257266734-28673-2-git-send-email-ospite@studenti.unina.it>
-	<f17812d70911032238i3ae6fa19g24720662b9079f24@mail.gmail.com>
-Message-ID: <20091110134837.207bb92a.ospite@studenti.unina.it>
+From: papalagi.pakeha@gmail.com (Papalagi Pakeha)
+Date: Wed, 11 Nov 2009 02:08:27 +1300
+Subject: Runtime code modification fails on arm
+Message-ID: <343d1bca0911100508w1b5b62d8n8242abd7eb97a0c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 Nov 2009 14:38:40 +0800
-Eric Miao <eric.y.miao@gmail.com> wrote:
+Hi,
 
-> Hi Antonio,
-> 
-> Patch looks generally OK except for the MFP/GPIO usage...
+I've got a program that is stored partially encrypted on the
+filesystem and should decrypt itself in runtime after retrieving the
+key from the hardware.
 
-Eric,
+Essentially the implementation puts some of the program functions into
+a separate ELF section (.cryptext) and then a helper script encrypts
+this section directly in the binary file. Offset and size is
+determined using "objdump -h".
 
-while I was at it I also checked the original code Motorola released.
+When the program is started it finds the address of the encrypted
+function, its length and decrypts it back to the original valid
+instructions. This all works just fine on x86 but the same approach
+fails on ARM. There the decryptor can read the encrypted code, can
+write back the decrypted code, can verify that the code has been
+written but once the function is called it segfaults or dies on
+invalid instruction. To me it looks like the changed code is not
+picked up and the cpu still tries to run the old, encrypted one.
 
-It has:
-     PGSR(GPIO_CAM_EN) |= GPIO_bit(GPIO_CAM_EN);
-     PGSR(GPIO_CAM_RST)|= GPIO_bit(GPIO_CAM_RST);
+Why is this happening? What is so different between x86 and ARM in
+that field? I'm aware that my problem exhibits in userspace, not in
+the kernel. I'm sorry if it's way off topic here.
 
-After checking PXA manual and arch/arm/mach-pxa/mfp-pxa2xx.c,
-I'd translate this to:
+Some relevant snippets of my code.
 
-diff --git a/arch/arm/mach-pxa/ezx.c b/arch/arm/mach-pxa/ezx.c
-index 77286a2..6a47a9d 100644
---- a/arch/arm/mach-pxa/ezx.c
-+++ b/arch/arm/mach-pxa/ezx.c
-@@ -281,8 +281,8 @@ static unsigned long gen1_pin_config[] __initdata = {
-        GPIO94_CIF_DD_5,
-        GPIO17_CIF_DD_6,
-        GPIO108_CIF_DD_7,
--       GPIO50_GPIO,                            /* CAM_EN */
--       GPIO19_GPIO,                            /* CAM_RST */
-+       GPIO50_GPIO | MFP_LPM_DRIVE_HIGH,       /* CAM_EN */
-+       GPIO19_GPIO | MFP_LPM_DRIVE_HIGH,       /* CAM_RST */
+// This function will get encrypted
+static char *treasure(void) __attribute__((section (".cryptext")));
+static char *treasure(void)
+{
+        return message;
+}
 
-        /* EMU */
-        GPIO120_GPIO,                           /* EMU_MUX1 */
-@@ -338,8 +338,8 @@ static unsigned long gen2_pin_config[] __initdata = {
-        GPIO48_CIF_DD_5,
-        GPIO93_CIF_DD_6,
-        GPIO12_CIF_DD_7,
--       GPIO50_GPIO,                            /* CAM_EN */
--       GPIO28_GPIO,                            /* CAM_RST */
-+       GPIO50_GPIO | MFP_LPM_DRIVE_HIGH,       /* CAM_EN */
-+       GPIO28_GPIO | MFP_LPM_DRIVE_HIGH,       /* CAM_RST */
-        GPIO17_GPIO,                            /* CAM_FLASH */
- };
- #endif
+static void decrypt(void)
+{
+        unsigned char *addr;
+        int i;
+        // decrypt all bytes of 'treasure()' function
+        for (addr = (unsigned char *)treasure; addr < (unsigned char
+*)treasure_key; addr++)
+                *addr ^= 0x01;    // For now this is our "encryption"
+}
 
+To make .cryptext writable and to find out how long treasure()
+function is I link the above with a simple asm file:
+// cryptext-secrion-arm.s
+        .section        .cryptext,"axw",%progbits
+        .type   treasure_key, %function
+        .globl  treasure_key
+treasure_key:
+        .size   treasure_key, .-treasure_key
 
-Is that right?
-I am putting also this into the next version I am going to send for
-submission, if you don't object.
+Note the "axw" in .section declaration - the "w" makes the section
+writable and enables decrypt() update the code. Objdump confirms that:
+ 11 .text         000003b8  00008388  00008388  00000388  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+ 12 .cryptext     0000001c  00008740  00008740  00000740  2**2
+                  CONTENTS, ALLOC, LOAD, CODE                <== this
+is not READONLY
 
-Thanks,
-   Antonio
+Complete source demonstrating the behaviour is here:
+http://cryptext.s3.amazonaws.com/cryptext.tar.gz - can be compiled
+either for x86 or for ARM
 
--- 
-Antonio Ospite
-http://ao2.it
+Unpacked files are available from here for your convenience:
+http://cryptext.s3.amazonaws.com/index.html
 
-PGP public key ID: 0x4553B001
+Does anyone have an idea what could be wrong here? Why does it work on
+x86 but fails to pick up the decrypted instructions on ARM? FWIW we
+use Samsung S3C2410 with kernel 2.6.27 and gcc 4.2.4 with glibc 2.3.3
+toolchain.
 
-A: Because it messes up the order in which people normally read text.
-   See http://en.wikipedia.org/wiki/Posting_style
-Q: Why is top-posting such a bad thing?
-A: Top-posting.
-Q: What is the most annoying thing in e-mail?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091110/651d22ec/attachment.sig>
+Any hints are welcome!
+
+Thanks
+
+PaPa
