@@ -1,68 +1,83 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 10 Nov 2009 23:13:28 +0800
-Subject: [PATCH 1/3] ezx: Add camera support for A780 and A910 EZX phones
-In-Reply-To: <20091110134837.207bb92a.ospite@studenti.unina.it>
-References: <1257266734-28673-1-git-send-email-ospite@studenti.unina.it>
-	<1257266734-28673-2-git-send-email-ospite@studenti.unina.it>
-	<f17812d70911032238i3ae6fa19g24720662b9079f24@mail.gmail.com>
-	<20091110134837.207bb92a.ospite@studenti.unina.it>
-Message-ID: <f17812d70911100713p3b51aac8k4e59c5df0b58a680@mail.gmail.com>
+From: rshitrit@marvell.com (Ronen Shitrit)
+Date: Tue, 10 Nov 2009 17:26:16 +0200
+Subject: orion/kirkwood pcie issue still open with rc6
+In-Reply-To: <200911091006.15757.dk-arm-linux@gmx.de>
+References: <200911090933.46240.dk-arm-linux@gmx.de>
+	<20091109094958.4ba72970@marrow.netinsight.se>
+	<200911091006.15757.dk-arm-linux@gmx.de>
+Message-ID: <309002C0DA137042828828FC53D7A9347E13FD4A92@IL-MB01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 10, 2009 at 8:48 PM, Antonio Ospite
-<ospite@studenti.unina.it> wrote:
-> On Wed, 4 Nov 2009 14:38:40 +0800
-> Eric Miao <eric.y.miao@gmail.com> wrote:
->
->> Hi Antonio,
->>
->> Patch looks generally OK except for the MFP/GPIO usage...
->
-> Eric,
->
-> while I was at it I also checked the original code Motorola released.
->
-> It has:
-> ? ? PGSR(GPIO_CAM_EN) |= GPIO_bit(GPIO_CAM_EN);
-> ? ? PGSR(GPIO_CAM_RST)|= GPIO_bit(GPIO_CAM_RST);
->
-> After checking PXA manual and arch/arm/mach-pxa/mfp-pxa2xx.c,
-> I'd translate this to:
->
-> diff --git a/arch/arm/mach-pxa/ezx.c b/arch/arm/mach-pxa/ezx.c
-> index 77286a2..6a47a9d 100644
-> --- a/arch/arm/mach-pxa/ezx.c
-> +++ b/arch/arm/mach-pxa/ezx.c
-> @@ -281,8 +281,8 @@ static unsigned long gen1_pin_config[] __initdata = {
-> ? ? ? ?GPIO94_CIF_DD_5,
-> ? ? ? ?GPIO17_CIF_DD_6,
-> ? ? ? ?GPIO108_CIF_DD_7,
-> - ? ? ? GPIO50_GPIO, ? ? ? ? ? ? ? ? ? ? ? ? ? ?/* CAM_EN */
-> - ? ? ? GPIO19_GPIO, ? ? ? ? ? ? ? ? ? ? ? ? ? ?/* CAM_RST */
-> + ? ? ? GPIO50_GPIO | MFP_LPM_DRIVE_HIGH, ? ? ? /* CAM_EN */
-> + ? ? ? GPIO19_GPIO | MFP_LPM_DRIVE_HIGH, ? ? ? /* CAM_RST */
->
-> ? ? ? ?/* EMU */
-> ? ? ? ?GPIO120_GPIO, ? ? ? ? ? ? ? ? ? ? ? ? ? /* EMU_MUX1 */
-> @@ -338,8 +338,8 @@ static unsigned long gen2_pin_config[] __initdata = {
-> ? ? ? ?GPIO48_CIF_DD_5,
-> ? ? ? ?GPIO93_CIF_DD_6,
-> ? ? ? ?GPIO12_CIF_DD_7,
-> - ? ? ? GPIO50_GPIO, ? ? ? ? ? ? ? ? ? ? ? ? ? ?/* CAM_EN */
-> - ? ? ? GPIO28_GPIO, ? ? ? ? ? ? ? ? ? ? ? ? ? ?/* CAM_RST */
-> + ? ? ? GPIO50_GPIO | MFP_LPM_DRIVE_HIGH, ? ? ? /* CAM_EN */
-> + ? ? ? GPIO28_GPIO | MFP_LPM_DRIVE_HIGH, ? ? ? /* CAM_RST */
-> ? ? ? ?GPIO17_GPIO, ? ? ? ? ? ? ? ? ? ? ? ? ? ?/* CAM_FLASH */
-> ?};
-> ?#endif
->
->
-> Is that right?
+Hi
 
-That's right.
+The bit below indicates whether to propagate external errors on the PCIE as external abort or not.
+In your case the external error is a PCI master abort, this is a legitimate error in case of issuing a configuration read to a device which doesn't exist on the bus.
 
-> I am putting also this into the next version I am going to send for
-> submission, if you don't object.
+To overcome the kernel fault and still enable the error propagation, there is the option to add handler which will look for the error cause and ignore it in case of master abort or to disable this bit before doing PCI config read.
 
-No I won't, feel free to.
+Regards
+
+
+-----Original Message-----
+From: linux-arm-kernel-bounces@lists.infradead.org [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Dieter Kiermaier
+Sent: Monday, November 09, 2009 11:06 AM
+To: linux-arm-kernel at lists.infradead.org
+Cc: Simon Kagstrom; Nicolas Pitre
+Subject: Re: orion/kirkwood pcie issue still open with rc6
+
+Am Montag 09 November 2009 09:49:58 schrieb Simon Kagstrom:
+> On Mon, 9 Nov 2009 09:33:46 +0100
+> Dieter Kiermaier <dk-arm-linux@gmx.de> wrote:
+>
+> > Ronan Shitrit from marvell gave me the information to clear bit 2 of physical
+> > address 0xf1020100 to enable bus scanning.
+> > I don't know what this really does but it helped to get my kernel up and running.
+>
+> You have that in the functional specification for the kirkwood
+> processors:
+>
+>   http://www.marvell.com/files/products/embedded_processors/kirkwood/FS_88F6180_9x_6281_OpenSource.pdf
+>
+> See Appendix A for the register set and lookup address 0x20100 (the CPU
+> configuration register). Bit 2 in that register turns on/off error
+> propagation:
+>
+>               Mbus-L Error propogation
+>               For a list of errors see "Error Handling".
+>               0 = NoErrProp: Error indications are not propagated to Mbus-L. The
+>                   transactions are completed normally.
+>               1 = ErrProp: Error indications are propagated to Mbus-L.
+>
+> and clearing it sounds quite a bit like hiding the real problem :-).
+>
+
+I've seen this and you're absolutely right. Thats why I've posted!
+
+>
+> Probably it's best to try to find out what's causing this error (see
+> the Error Handling section of the PCIe chapter in the reference manual
+> above) so that that a proper fix can be implemented!
+
+And here my problems are starting ;)
+How can I implement error handling for that kind of reported errors?
+I'm sorry but I've absolutely no idea.
+
+>
+> // Simon
+
+Many thanks,
+Dieter
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
