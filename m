@@ -1,28 +1,25 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 10 Nov 2009 08:56:34 +0100
-Subject: [RFC PATCH] Add an earlyprintk debug console
-In-Reply-To: <20091105123448.27637.97119.stgit@pc1117.cambridge.arm.com>
-References: <20091105123448.27637.97119.stgit@pc1117.cambridge.arm.com>
-Message-ID: <20091110075633.GB6157@ucw.cz>
+From: niej0001@gmail.com (Jun Nie)
+Date: Tue, 10 Nov 2009 16:11:56 +0800
+Subject: [PATCH 0/8] enable pxa168 LCD on two platform
+Message-ID: <7c34ac520911100011x60a354b0mf2e27e1c5fd0422@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2009-11-05 12:35:12, Catalin Marinas wrote:
-> This patch allows an earlyprintk console if CONFIG_DEBUG_LL is enabled,
-> using the printch asm function.
-> 
-> The patch is based on the original work by Sascha Hauer.
-> 
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Uwe Kleine-K??nig <u.kleine-koenig@pengutronix.de>
+This serial patches add LCD controller SPI support and enable frame
+buffer on two platform. Several small fix are included.
+comments from Eric and Russell are addressed.
 
-Yes, please. Figuring out debug_ll means earlyprintk is non-trivial
-and having to patch the code to get the output is unnice.
 
-ACK.
-								Pavel
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+ arch/arm/configs/pxa168_defconfig       |   86 +++++++++++++++-
+ arch/arm/configs/pxa910_defconfig       |   39 +++++++-
+ arch/arm/mach-mmp/aspenite.c            |  176 +++++++++++++++++++++++++++++++
+ arch/arm/mach-mmp/include/mach/pxa168.h |    8 ++
+ arch/arm/mach-mmp/include/mach/pxa910.h |    8 ++
+ arch/arm/mach-mmp/pxa168.c              |    3 +
+ arch/arm/mach-mmp/pxa910.c              |    4 +
+ arch/arm/mach-mmp/ttc_dkb.c             |  140 ++++++++++++++++++++++++
+ drivers/gpio/pca953x.c                  |    1 +
+ drivers/video/pxa168fb.c                |  102 ++++++++++++++++++
+ drivers/video/pxa168fb.h                |   24 +----
+ include/video/pxa168fb.h                |   49 ++++++++-
+ 12 files changed, 612 insertions(+), 28 deletions(-)
