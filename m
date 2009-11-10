@@ -1,68 +1,68 @@
-From: francesco.virlinzi@st.com (Francesco VIRLINZI)
-Date: Tue, 10 Nov 2009 15:00:59 +0100
-Subject: [Proposal] [PATCH] generic clock framework
-Message-ID: <4AF9721B.4070203@st.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 10 Nov 2009 23:13:28 +0800
+Subject: [PATCH 1/3] ezx: Add camera support for A780 and A910 EZX phones
+In-Reply-To: <20091110134837.207bb92a.ospite@studenti.unina.it>
+References: <1257266734-28673-1-git-send-email-ospite@studenti.unina.it>
+	<1257266734-28673-2-git-send-email-ospite@studenti.unina.it>
+	<f17812d70911032238i3ae6fa19g24720662b9079f24@mail.gmail.com>
+	<20091110134837.207bb92a.ospite@studenti.unina.it>
+Message-ID: <f17812d70911100713p3b51aac8k4e59c5df0b58a680@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all
+On Tue, Nov 10, 2009 at 8:48 PM, Antonio Ospite
+<ospite@studenti.unina.it> wrote:
+> On Wed, 4 Nov 2009 14:38:40 +0800
+> Eric Miao <eric.y.miao@gmail.com> wrote:
+>
+>> Hi Antonio,
+>>
+>> Patch looks generally OK except for the MFP/GPIO usage...
+>
+> Eric,
+>
+> while I was at it I also checked the original code Motorola released.
+>
+> It has:
+> ? ? PGSR(GPIO_CAM_EN) |= GPIO_bit(GPIO_CAM_EN);
+> ? ? PGSR(GPIO_CAM_RST)|= GPIO_bit(GPIO_CAM_RST);
+>
+> After checking PXA manual and arch/arm/mach-pxa/mfp-pxa2xx.c,
+> I'd translate this to:
+>
+> diff --git a/arch/arm/mach-pxa/ezx.c b/arch/arm/mach-pxa/ezx.c
+> index 77286a2..6a47a9d 100644
+> --- a/arch/arm/mach-pxa/ezx.c
+> +++ b/arch/arm/mach-pxa/ezx.c
+> @@ -281,8 +281,8 @@ static unsigned long gen1_pin_config[] __initdata = {
+> ? ? ? ?GPIO94_CIF_DD_5,
+> ? ? ? ?GPIO17_CIF_DD_6,
+> ? ? ? ?GPIO108_CIF_DD_7,
+> - ? ? ? GPIO50_GPIO, ? ? ? ? ? ? ? ? ? ? ? ? ? ?/* CAM_EN */
+> - ? ? ? GPIO19_GPIO, ? ? ? ? ? ? ? ? ? ? ? ? ? ?/* CAM_RST */
+> + ? ? ? GPIO50_GPIO | MFP_LPM_DRIVE_HIGH, ? ? ? /* CAM_EN */
+> + ? ? ? GPIO19_GPIO | MFP_LPM_DRIVE_HIGH, ? ? ? /* CAM_RST */
+>
+> ? ? ? ?/* EMU */
+> ? ? ? ?GPIO120_GPIO, ? ? ? ? ? ? ? ? ? ? ? ? ? /* EMU_MUX1 */
+> @@ -338,8 +338,8 @@ static unsigned long gen2_pin_config[] __initdata = {
+> ? ? ? ?GPIO48_CIF_DD_5,
+> ? ? ? ?GPIO93_CIF_DD_6,
+> ? ? ? ?GPIO12_CIF_DD_7,
+> - ? ? ? GPIO50_GPIO, ? ? ? ? ? ? ? ? ? ? ? ? ? ?/* CAM_EN */
+> - ? ? ? GPIO28_GPIO, ? ? ? ? ? ? ? ? ? ? ? ? ? ?/* CAM_RST */
+> + ? ? ? GPIO50_GPIO | MFP_LPM_DRIVE_HIGH, ? ? ? /* CAM_EN */
+> + ? ? ? GPIO28_GPIO | MFP_LPM_DRIVE_HIGH, ? ? ? /* CAM_RST */
+> ? ? ? ?GPIO17_GPIO, ? ? ? ? ? ? ? ? ? ? ? ? ? ?/* CAM_FLASH */
+> ?};
+> ?#endif
+>
+>
+> Is that right?
 
-I'm Francesco and I work in STMicroelectronics
+That's right.
 
-In the last ELC-E_2009 I spoke on a generic clock framework I'm working on
-  (see 
-http://tree.celinuxforum.org/CelfPubWiki/ELCEurope2009Presentations?action=AttachFile&do=view&target=ELC_E_2009_Generic_Clock_Framework.pdf).
+> I am putting also this into the next version I am going to send for
+> submission, if you don't object.
 
-I wrote the gcf to manage both clocks the platform_devices during a 
-clock operation.
-
-The main features are:
-  - it's integrated in the LDM
-  - it tracks the clock-to-clock relationship
-  - it tracks the clock-to-device relationship
-
-  - it has sysfs interface
-  - - the user can navigate the clock tree under /sys/clocks/...
-
-  - it uses the linux API (<linux/clk.h>) with some extra functions (to 
-register/unregister a clock
-    and other utility functions as clk_for_each())
-
-  - it involves the platform_device and the platform_driver in the clock 
-propagation.
-  - - basically each clock operation is managed as a transaction which 
-evolves step by step.
-  - - all the clock rates are evaluated (before the clk operation is 
-actually done)
-  - - each platform_device can check (before the clk operation is 
-actually done) the clk environment
-      it will have at the end of clock operation and if required it can 
-reject the operation.
-  - - each clock operation is actually executed only if all the 
-platform_devices accept the operation it-self
-
-
-Moreover a common clock framework could be used to avoid a lot of 
-duplicated and/or similar code
-  just a grep of 'EXPORT_SYMBOL\(clk_enable' under arch/arm finds 22 
-entries.
-
-The patch is based on a 2.6.30 kernel also if it has a preliminary 
-integration with the PM_RUNTIME
-  support.
-
-It works on our st40 (an sh4 cpu based system) no test/porting was done 
-on any ARM platform.
-
-It would be mainly a starting point for a discussion and I'm available 
-to extend/fix/share it.
-
-Regards
-  Francesco
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091110/a197b928/attachment-0001.htm>
--------------- next part --------------
-An embedded and charset-unspecified text was scrubbed...
-Name: 0001-generic-clock-framework.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091110/a197b928/attachment-0001.el>
+No I won't, feel free to.
