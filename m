@@ -1,89 +1,28 @@
-From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Wed, 11 Nov 2009 18:19:16 +0100
-Subject: orion/kirkwood pcie issue still open with 2.6.32-rc6 (marvell
-	stock 2.6.22.18 works!)
-In-Reply-To: <200911111811.07413.dk-arm-linux@gmx.de>
-References: <200911090933.46240.dk-arm-linux@gmx.de>
-	<200911111750.35330.dk-arm-linux@gmx.de>
-	<20091111165353.GA22741@mail.wantstofly.org>
-	<200911111811.07413.dk-arm-linux@gmx.de>
-Message-ID: <20091111171916.GC22741@mail.wantstofly.org>
+From: tbm@cyrius.com (Martin Michlmayr)
+Date: Wed, 11 Nov 2009 17:20:35 +0000
+Subject: Status of bzip2 and lzma kernel compression for ARM?
+In-Reply-To: <20091111170729.GG2605@pc-ran3241.res.insa>
+References: <20091111163404.GA4362@deprecation.cyrius.com>
+	<20091111170729.GG2605@pc-ran3241.res.insa>
+Message-ID: <20091111172035.GA9682@deprecation.cyrius.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 11, 2009 at 06:11:07PM +0100, Dieter Kiermaier wrote:
+* Albin Tonnerre <albin.tonnerre@free-electrons.com> [2009-11-11 18:07]:
+> Regarding Bzip2, some testing showed that the decompressor needs at least 3.5Mb
+> of memory available for malloc(), which is not available on ARM as head.S
+> allocates only 64kb, so I'm sure what to do about it. At this stage, I think
+> the most sensible thing to do is forgetting about using bzip2 on ARM.
 
-> > > 00:01.0 Class 0604: Device 11ab:2211 (rev 01)
-> > >         Control: I/O- Mem- BusMaster- SpecCycle- MemWINV- VGASnoop- ParErr+ Stepping- SERR+ FastB2B- DisINTx-
-> > 
-> > The bridge has been told not to forward MEM transactions to the secondary
-> > side, which explains what you're seeing.
-> 
-> Where can I see that the bridge doesn't want to forward mem transactions?
-> Please could you point me to the entry?
+I'm mostly interested in LZMA, so lack of bzip2 support would not be a
+problem for me.
 
-It's the "Mem" one (surprise! :)).  The minus in "Mem-" indicates that
-the bit is disabled in the Control register.
+> The LZMA patch relies on patch 2/4 of the LZO patchset, which I
+> resubmitted today: http://lkml.org/lkml/2009/11/11/129  I'll likely
+> submit the LZMA patch once I get Russell's approval on the ARM part
+> of the LZO patchset. In the
 
-The PCIe bridge spec says this about this bit:
-
-	Controls the bridge?s response as a target to memory accesses
-	on the primary interface that address a device that resides
-	behind the bridge in both the non-prefetchable and prefetchable
-	memory ranges (see Section 3.1) or targets a memory-mapped
-	location within the bridge itself (see Section 5.1.2.1).
-
-
-> > It's odd that this is happening, as normally pci_enable_bridges()
-> > takes care of enabling I/O and MEM decoding on bridges.
-> > 
-> > What other kernel patches are you using?  And can you put a full boot
-> > log somewhere?
->
-> I don't use other kernel patches (except changed openrd_base_pci_init()
-> as described in my last post).
-
-Can you apply this patch and make another boot log?
-
-
-
-diff --git a/drivers/pci/bus.c b/drivers/pci/bus.c
-index cef28a7..fb06be0 100644
---- a/drivers/pci/bus.c
-+++ b/drivers/pci/bus.c
-@@ -187,9 +187,14 @@ void pci_enable_bridges(struct pci_bus *bus)
- 	struct pci_dev *dev;
- 	int retval;
- 
-+	printk(KERN_INFO "pci_enable_bridges(%p)\n", bus);
-+
- 	list_for_each_entry(dev, &bus->devices, bus_list) {
-+		printk(KERN_INFO "..considering device %p\n", dev);
- 		if (dev->subordinate) {
-+			printk(KERN_INFO "..has subordinate\n", dev);
- 			if (!pci_is_enabled(dev)) {
-+				printk(KERN_INFO "..enabling\n", dev);
- 				retval = pci_enable_device(dev);
- 				pci_set_master(dev);
- 			}
-diff --git a/drivers/pci/setup-bus.c b/drivers/pci/setup-bus.c
-index b636e24..5ab9028 100644
---- a/drivers/pci/setup-bus.c
-+++ b/drivers/pci/setup-bus.c
-@@ -599,6 +599,8 @@ pci_assign_unassigned_resources(void)
- {
- 	struct pci_bus *bus;
- 
-+	printk(KERN_INFO "pci_assign_unassigned_resources()\n");
-+
- 	/* Depth first, calculate sizes and alignments of all
- 	   subordinate buses. */
- 	list_for_each_entry(bus, &pci_root_buses, node) {
-@@ -606,6 +608,7 @@ pci_assign_unassigned_resources(void)
- 	}
- 	/* Depth last, allocate resources and update the hardware. */
- 	list_for_each_entry(bus, &pci_root_buses, node) {
-+		printk(KERN_INFO "..allocating resources for bus %p\n", bus);
- 		pci_bus_assign_resources(bus);
- 		pci_enable_bridges(bus);
- 	}
+Excellent!  I'll give your patch a go on the weekend.
+-- 
+Martin Michlmayr
+http://www.cyrius.com/
