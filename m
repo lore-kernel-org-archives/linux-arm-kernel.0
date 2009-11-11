@@ -1,78 +1,118 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 11 Nov 2009 23:01:57 +0000
+Date: Wed, 11 Nov 2009 23:08:11 +0000
 Subject: [PATCH] ARM: SAMSUNG: Add plat-samsung as starting point for
 	plat-s3c* moves
-In-Reply-To: <9c9fda240911110031x5fd0e2f1sefc1edbc8cda4d@mail.gmail.com>
+In-Reply-To: <000001ca620b$2141c080$63c54180$%szyprowski@samsung.com>
 References: <1257812406-17360-1-git-send-email-ben-linux@fluff.org>
 	<000a01ca61a5$c573d000$505b7000$%kim@samsung.com>
 	<9c9fda240911091927m46ed0fccyfbbc8873eb9c5da9@mail.gmail.com>
 	<20091110094756.GN4048@prithivi.gnumonks.org>
 	<000001ca620b$2141c080$63c54180$%szyprowski@samsung.com>
-	<20091111045835.GO4047@prithivi.gnumonks.org>
-	<9c9fda240911110031x5fd0e2f1sefc1edbc8cda4d@mail.gmail.com>
-Message-ID: <20091111230156.GK4808@trinity.fluff.org>
+Message-ID: <20091111230811.GL4808@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 11, 2009 at 05:31:24PM +0900, Kyungmin Park wrote:
-> On Wed, Nov 11, 2009 at 1:58 PM, Harald Welte <laforge@gnumonks.org> wrote:
-> > Hi Marek,
-> We are waiting too much time. but nothing are change. As you mentioned
-> you and ben try to change frameworks and directories. However we did a
-> lot of works already. but your changes make it works twice since to
-> match framework changes
-
-Hey, if this stuff had been done earlier by any of the Samsung groups
-then we'd be at a state where the changes would have been done to inline
-code.
-
-I hope that a lot of these changes will not only improve the code but
-will be in such a way that simply editing the unsubbmitted/inprogress
-architectures will not be difficult. I hope that some of these changes
-will have quite a bit of the work scripted and thus fixups will be far
-less painful. I also to intend not only to document the patches properly
-but write some in-kernel documentation for the new systems so that it
-can be referenced by developers looking at what changed.
-
-There will be effort to ensure that these changes are not mandatory to
-proper kernel operation.
-
-You need to remember that I am doing this _in my spare time_ and thus
-cannot devote the sort of time to this code that other people would
-like. Hopefully the device changes (progressing) and clock changes
-will be published during this weekend for people to review.
-
-The actual change in directory structure may take more than this round
-of kernel submissions. Our first aim is to factor out as much common
-code as possible into plat-samung and deal with any fall out from these
-changes.
-
-> The point of view are different, you and LSI focuses on 64xx series
-> but I don't interest these SoCs. Since we are focusing on s5pc1xx
-> series whatever S5PV210 is.
-> Also I can't find any activities at ben's git or LSI git. Where's your
-> works and plan?
-
-Currently in progress, 
- 
-> If you want to change, please also change the s5pc1xx that merged at mainline.
-
-I will ensure all current defconfigs at-least build. I will throw the
-autobuilder at it to see what is going on.
-
-If someone can ensure that my last set of comments is replied to for the
-S5PC merges sent by Marek, then I may consider merging as many of those
-as possible (and at minimum the ones that will be affected by the changes).
- 
-> Thank you,
-> Kyungmin Park
+On Tue, Nov 10, 2009 at 02:38:42PM +0100, Marek Szyprowski wrote:
+> Hello,
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> On Tuesday, November 10, 2009 10:48 AM, Harald Welte wrote:
+> 
+> > Dear Kyungmin,
+> > 
+> > On Tue, Nov 10, 2009 at 12:27:15PM +0900, Kyungmin Park wrote:
+> > > >
+> > > >> We inted to re-organise the plat-s3c/plat-s3c24xx/plat-s3c64xx into a
+> > > >> more generic plat-samsung with less code in the other plat- directories
+> > > >> to make it easier to port new devices and try and clear up some of the
+> > > >> naming issues with newer devices.
+> > >
+> > > Why do you miss the plat-s5pc1xx? Also add the plat-s5pc1xx series.
+> > 
+> > Of course.  The code for the C100, C110, V210, etc. is also subject to
+> > this.  Maybe Ben simply wanted to be polite and indicate he does not
+> > intend to interfere with your current codebase.  After all, DMC is the
+> > maintainer of the C100 support in mainline, and we hope we can have your
+> > cooperation with this new structure.  But since we did not ask you yet,
+> > we couldn't assume that you would agree.
+> 
+> We are also interested in improving mainline support for C100 series as
+> well as upcoming C110.
 
--- 
+Did you see my comments on the last series you submitted?
+ 
+> > > Why new plat-s5p is required? The main goal of plat-* directory is
+> > > support the SoC common codes.
+> > 
+> > plat-samsung is intended for stuff that's shared between all the various
+> > arm9/arm11/a8 based SoCs.  This is so far in plat-s3c, even though it's
+> > not only used (and will not only be used) by s3c parts.
+> 
+> So most of the current code from plat-s3c (mainly common dev-* platform
+> resources, clocks, uart and gpio core functions) would be moved to
+> plat-samsung? Right?
+
+As much as possible.
+ 
+> > > Of course s5pc100 and s5pc110 is different features and different IPs
+> > > but no need to create each plat directory.
+> > 
+> > The 6440 shares some things with the c100, and the 6442 shares again
+> > some things with the c110.  So putting all those files into one
+> > directory seems to make it much easier to share code between the
+> > different parts as needed.  Also, it means that we have to do less
+> > moving around.
+> > 
+> > Imagine we continue with one plat-s5p64xx and plat-s5pc1xx, etc. for
+> > each new SoC.  Later we detect there is some sharing with an earlier
+> > product, then we need to move the file to plat-s5p.  This moving around
+> > of files causes breakage in patches that people are having in their
+> > private trees before they can move it mainline.
+> > 
+> > Also, don't you think it is somewhat weird that soon samsung would have
+> > as many plat-* directories as all other ARM SoC makers together?
+> 
+> These multiple plat-* directories for all Samsung chip series are in
+> fact a big overhead for kernel tree. I assume that You want to end with
+> only one plat-samsung directory. Am I right? What about multiple mach-*
+> directories (mach-s3c2400, ..., mach-s3c24a0, mach-s3c6400, mach-s3c6410,
+> mach-s5pc100, ...)? Do you plan to keep them? Maybe a multilevel structure
+> would be more aproperiate? (mach-samsung/s3c2400, mach-samsung/s3c6400, 
+> and so on)?
+
+I'm not sure what you mean by 'big overhead', could you elaborate on
+that statement.
+
+I personally do not think multiple plat- directories are much of a problem
+and much prefer them to some form of heirarchy as you are discussing here
+although there are probably merits either way.
+
+> How do you plan to handle different includes, register map, register
+> offset defines, etc in each chip series? Would this result in moving
+> the series specific include directories to mach-* directories?
+
+No, each driver header carries all the necessary defines for the
+version, since if the driver needs updating it is likely the header
+file for that driver will need updating too.
+
+For the maps, these are much more chip specific and will probably
+be changed to a more specific name to make them easier to find if
+they need to be common.
+
+Part of the device change will be to move to a table based system
+where there will be less need to have things defined in header
+files.
+
+We also want to try and ensure that <plat/xxx.h> xxx.h items are
+unique as possible to avoid finding a large number of matches
+for xxx.h in the header files and having to work out which one is
+being included.
+ 
+> How can we adapt the current plat-s5pcxx code to better match the
+> migration to common plat-samsung directory?
+
+Have a look at the documentation in the pre-release and then make
+some comments then (if you need to).
+
 -- 
 Ben
 
