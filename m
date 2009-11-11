@@ -1,18 +1,16 @@
 From: dk-arm-linux@gmx.de (Dieter Kiermaier)
-Date: Wed, 11 Nov 2009 17:43:06 +0100
+Date: Wed, 11 Nov 2009 17:50:35 +0100
 Subject: orion/kirkwood pcie issue still open with 2.6.32-rc6 (marvell
 	stock 2.6.22.18 works!)
 In-Reply-To: <20091111152134.GX18639@mail.wantstofly.org>
 References: <200911090933.46240.dk-arm-linux@gmx.de>
 	<200911111529.23176.dk-arm-linux@gmx.de>
 	<20091111152134.GX18639@mail.wantstofly.org>
-Message-ID: <200911111743.06702.dk-arm-linux@gmx.de>
+Message-ID: <200911111750.35330.dk-arm-linux@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lennert,
-
-
+Am Mittwoch 11 November 2009 16:21:34 schrieb Lennert Buytenhek:
 > On Wed, Nov 11, 2009 at 06:29:22AM -0800, Dieter Kiermaier wrote:
 > 
 > > > > > Ronan Shitrit from marvell gave me the information to clear bit 2 of physical
@@ -125,8 +123,6 @@ Hi Lennert,
 > Kirkwood boards all jump to the OS with this bit already cleared.
 > Perhaps we should clear it explicitly from Linux.
 > 
-I'm using prafullas latest u-boot from u-boot-marvell at denx.de.
-What u-boot are you using?
 > 
 > > and after succesfully boot my pci device isn't reachable - without any errors / warnings!
 > > I've enabled printk (echo 8 > /proc/sys/kernel/printk) and still no console output.
@@ -143,57 +139,130 @@ What u-boot are you using?
 > on your device, causing MEM/IO decoding not to have been enabled on
 > the device as seems to be the case in your dump?
 > 
-No - I've allready a minimal driver here - I will check. It looks like I've forgotten to load it for the dump, sorry :(
-Please see my driver probe below
-(the FPGA supports simple memory mapped LEDs at the moment):
 
-#define ARTISTA_MEM_SIZE (1024*1024)		/* I don't want to use all 64MBytes write for testing*/
+I've tested once again (I really forgotten to load my kernel module at the last mail, sorry again!).
+Here you can see the result (with a non working driver!);
 
+sh-3.2# uname -a
+Linux DB88FXX81 2.6.32-rc6-00014-g92bdfb9-dirty #3 PREEMPT Wed Nov 11 15:10:49 CET 2009 armv5tel GNU/Linux
+sh-3.2# cat /proc/iomem
+00000000-0fffffff : System RAM
+  00026000-00464fff : Kernel text
+  0048a000-00579c7b : Kernel data
+10000000-1fffffff : System RAM
+e0000000-e7ffffff : PCIe Memory Space
+  e0000000-e3ffffff : PCI Bus 0000:01
+    e0000000-e3ffffff : 0000:01:08.0
+      e0000000-e00fffff : mv_video MMIO
+f1010300-f101030f : rtc-mv
+  f1010300-f101030f : rtc-mv
+f1011000-f101101f : mv64xxx_i2c.0
+  f1011000-f101101f : mv64xxx_i2c adapter
+f1012000-f10120ff : serial8250.0
+  f1012000-f101201f : serial
+f1030000-f103ffff : regs
+f1050000-f1050fff : orion-ehci.0
+  f1050000-f1050fff : ehci_hcd
+f1060800-f10608ff : xor 0 low
+f1060900-f10609ff : xor 1 low
+f1060a00-f1060aff : xor 0 high
+f1060b00-f1060bff : xor 1 high
+f1072000-f1073fff : ge00 base
+f1080000-f1084fff : sata base
+f1090000-f10903ff : mvsdio
+  f1090000-f10903ff : mvsdio
+f3000000-f30003ff : orion_nand
+f4000000-f40007ff : sram
+sh-3.2# lspci -vv
+00:00.0 Class 0580: Device 11ab:6281 (rev 02)
+        Subsystem: Device 11ab:11ab
+        Control: I/O+ Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop- ParErr+ Stepping- SERR+ FastB2B- DisINTx-
+        Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort+ >SERR- <PERR- INTx-
+        Latency: 0, Cache Line Size: 32 bytes
+        Interrupt: pin A routed to IRQ 9
+        Region 0: Memory@<ignored> (64-bit, prefetchable)
+        Capabilities: [40] Power Management version 3
+                Flags: PMEClk- DSI- D1+ D2+ AuxCurrent=0mA PME(D0-,D1-,D2-,D3hot-,D3cold-)
+                Status: D0 NoSoftRst- PME-Enable- DSel=0 DScale=0 PME-
+        Capabilities: [50] MSI: Enable- Count=1/1 Maskable- 64bit+
+                Address: 0000000000000000  Data: 0000
+        Capabilities: [60] Express (v1) Root Port (Slot-), MSI 00
+                DevCap: MaxPayload 128 bytes, PhantFunc 0, Latency L0s <256ns, L1 <1us
+                        ExtTag- RBE+ FLReset-
+                DevCtl: Report errors: Correctable- Non-Fatal- Fatal- Unsupported-
+                        RlxdOrd- ExtTag- PhantFunc- AuxPwr- NoSnoop-
+                        MaxPayload 128 bytes, MaxReadReq 512 bytes
+                DevSta: CorrErr- UncorrErr- FatalErr- UnsuppReq- AuxPwr- TransPend-
+                LnkCap: Port #0, Speed 2.5GT/s, Width x1, ASPM L0s L1, Latency L0 <256ns, L1 unlimited
+                        ClockPM+ Surprise- LLActRep- BwNot-
+                LnkCtl: ASPM Disabled; RCB 128 bytes Disabled- Retrain- CommClk-
+                        ExtSynch- ClockPM- AutWidDis- BWInt- AutBWInt-
+                LnkSta: Speed 2.5GT/s, Width x1, TrErr- Train- SlotClk+ DLActive- BWMgmt- ABWMgmt-
+                RootCtl: ErrCorrectable- ErrNon-Fatal- ErrFatal- PMEIntEna- CRSVisible-
+                RootCap: CRSVisible-
+                RootSta: PME ReqID 0000, PMEStatus- PMEPending-
+        Capabilities: [100] Advanced Error Reporting
+                UESta:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt- UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
+                UEMsk:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt- UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
+                UESvrt: DLP+ SDES- TLP- FCP- CmpltTO- CmpltAbrt- UnxCmplt- RxOF+ MalfTLP+ ECRC- UnsupReq- ACSViol-
+                CESta:  RxErr- BadTLP- BadDLLP- Rollover- Timeout- NonFatalErr-
+                CEMsk:  RxErr- BadTLP- BadDLLP- Rollover- Timeout- NonFatalErr+
+                AERCap: First Error Pointer: 00, GenCap- CGenEn- ChkCap- ChkEn-
 
-static int probe(struct pci_dev *dev, const struct pci_device_id *id)
-{
-	int result;
-	int i=0, y=0;
+00:01.0 Class 0604: Device 11ab:2211 (rev 01)
+        Control: I/O- Mem- BusMaster- SpecCycle- MemWINV- VGASnoop- ParErr+ Stepping- SERR+ FastB2B- DisINTx-
+        Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR+ <PERR- INTx-
+        Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
+        I/O behind bridge: 00001000-00004fff
+        Memory behind bridge: e0000000-e3ffffff
+        Secondary status: 66MHz+ FastB2B+ ParErr- DEVSEL=medium >TAbort- <TAbort- <MAbort- <SERR- <PERR-
+        BridgeCtl: Parity+ SERR- NoISA- VGA- MAbort+ >Reset- FastB2B-
+                PriDiscTmr- SecDiscTmr- DiscTmrStat- DiscTmrSERREn-
+        Capabilities: [40] Power Management version 2
+                Flags: PMEClk- DSI- D1+ D2+ AuxCurrent=0mA PME(D0+,D1+,D2+,D3hot+,D3cold+)
+                Status: D0 NoSoftRst- PME-Enable- DSel=0 DScale=0 PME-
+                Bridge: PM- B3+
+        Capabilities: [48] Express (v1) PCI/PCI-X Bridge, MSI 00
+                DevCap: MaxPayload 128 bytes, PhantFunc 0, Latency L0s <64ns, L1 <1us
+                        ExtTag- AttnBtn- AttnInd- PwrInd- RBE- FLReset-
+                DevCtl: Report errors: Correctable- Non-Fatal- Fatal- Unsupported-
+                        RlxdOrd- ExtTag- PhantFunc- AuxPwr- NoSnoop- BrConfRtry-
+                        MaxPayload 128 bytes, MaxReadReq 512 bytes
+                DevSta: CorrErr- UncorrErr+ FatalErr- UnsuppReq+ AuxPwr- TransPend-
+                LnkCap: Port #0, Speed 2.5GT/s, Width x1, ASPM L0s, Latency L0 <256ns, L1 unlimited
+                        ClockPM- Surprise- LLActRep- BwNot-
+                LnkCtl: ASPM Disabled; Disabled- Retrain- CommClk-
+                        ExtSynch- ClockPM- AutWidDis- BWInt- AutBWInt-
+                LnkSta: Speed 2.5GT/s, Width x1, TrErr- Train- SlotClk+ DLActive- BWMgmt- ABWMgmt-
+        Capabilities: [100] Advanced Error Reporting
+                UESta:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt- UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq+ ACSViol-
+                UEMsk:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt- UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
+                UESvrt: DLP+ SDES- TLP- FCP+ CmpltTO- CmpltAbrt- UnxCmplt- RxOF- MalfTLP+ ECRC- UnsupReq- ACSViol-
+                CESta:  RxErr+ BadTLP- BadDLLP- Rollover- Timeout- NonFatalErr-
+                CEMsk:  RxErr- BadTLP- BadDLLP- Rollover- Timeout- NonFatalErr-
+                AERCap: First Error Pointer: 14, GenCap- CGenEn- ChkCap- ChkEn-
 
-	printk(KERN_DEBUG "anetfb probe() called\n");
-	
-	if ((result = pci_enable_device(dev)) < 0) {
-		return result;
-	}
+01:08.0 Class ff00: Device 1731:0101 (rev 10)
+        Control: I/O- Mem+ BusMaster- SpecCycle- MemWINV- VGASnoop- ParErr- Stepping- SERR+ FastB2B- DisINTx-
+        Status: Cap- 66MHz- UDF- FastB2B- ParErr+ DEVSEL=slow >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
+        Region 0: Memory at e0000000 (32-bit, non-prefetchable) [size=64M]
+        Region 1: I/O ports@<unassigned> [disabled]
+        Kernel driver in use: ArtistaNET-III frame buffer driver
 
-	memstart = pci_resource_start(dev, 0);
-	memlength = pci_resource_len(dev, 0);
+sh-3.2#
+sh-3.2# lsmod
+mv_video 3616 0 - Live 0xbf000000
+sh-3.2#
 
-	printk(KERN_DEBUG "anetfb probe() request_mem_region() for BAR0\n");
-	printk(KERN_DEBUG "anetfb probe() BAR0 start address:%lx BAR0 length:%lx\n", memstart, memlength);
-	if (!request_mem_region(memstart, ARTISTA_MEM_SIZE, "mv_video MMIO"))
-	{
-		printk(KERN_DEBUG "anetfb probe() request_mem_region() for BAR0 failed\n");
-		return -EIO;
-	}
+Again, many thanks for helping!
 
-	iomem_pointer=ioremap_nocache(memstart, ARTISTA_MEM_SIZE);
+Dieter
 
-	printk(KERN_DEBUG "anetfb trying to access iomem@address %x with length:%d...\n", iomem_pointer, ARTISTA_MEM_SIZE);
-
-	iowrite32(0x0, iomem_pointer);
-	printk(KERN_DEBUG "read register value via readl: %x\n", ioread32(iomem_pointer));
-	printk(KERN_DEBUG"write 1s to mem space...\n");
-	iowrite32(0xffffffff, iomem_pointer);
-	printk(KERN_DEBUG "read register value via readl: %x\n", ioread32(iomem_pointer));
-
-}
-
-This driver code works fine with 2.6.22.18 and doesn't with latest git kernels (back to 2.6.30 where sheevaplug support starts).
-With latest git kernels everytime 0xffffffff is returned by read calls.
 
 > For what it's worth, I have various mv78xx0 and Kirkwood boards with
 > 88SB2211 PCIe-to-PCI bridges on them, and they all work fine, and
 > the devices behind those bridges do too.
 > 
-Do you use marvell 88SB2211 PCIe-to-PCI bridge evalboards? I use this one: DB-88SB2211-B-Pex2PCI
-
-
 > _______________________________________________
 > linux-arm-kernel mailing list
 > linux-arm-kernel at lists.infradead.org
