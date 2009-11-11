@@ -1,41 +1,33 @@
-From: dk-arm-linux@gmx.de (Dieter Kiermaier)
-Date: Wed, 11 Nov 2009 18:11:07 +0100
-Subject: orion/kirkwood pcie issue still open with 2.6.32-rc6 (marvell
-	stock 2.6.22.18 works!)
-In-Reply-To: <20091111165353.GA22741@mail.wantstofly.org>
-References: <200911090933.46240.dk-arm-linux@gmx.de>
-	<200911111750.35330.dk-arm-linux@gmx.de>
-	<20091111165353.GA22741@mail.wantstofly.org>
-Message-ID: <200911111811.07413.dk-arm-linux@gmx.de>
+From: albin.tonnerre@free-electrons.com (Albin Tonnerre)
+Date: Wed, 11 Nov 2009 18:07:29 +0100
+Subject: Status of bzip2 and lzma kernel compression for ARM?
+In-Reply-To: <20091111163404.GA4362@deprecation.cyrius.com>
+References: <20091111163404.GA4362@deprecation.cyrius.com>
+Message-ID: <20091111170729.GG2605@pc-ran3241.res.insa>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch 11 November 2009 17:53:53 schrieb Lennert Buytenhek:
-> On Wed, Nov 11, 2009 at 05:50:35PM +0100, Dieter Kiermaier wrote:
-> 
-> > 00:01.0 Class 0604: Device 11ab:2211 (rev 01)
-> >         Control: I/O- Mem- BusMaster- SpecCycle- MemWINV- VGASnoop- ParErr+ Stepping- SERR+ FastB2B- DisINTx-
-> 
-> The bridge has been told not to forward MEM transactions to the secondary
-> side, which explains what you're seeing.
+On Wed, 11 Nov 2009 16:34 +0000, Martin Michlmayr wrote :
+> What's the status of bzip2 and lzma kernel compression for ARM?
+> The last messages I can find about this topic are from June and July:
+> http://lkml.org/lkml/2009/6/24/481
 
-Where can I see that the bridge doesn't want to forward mem transactions?
-Please could you point me to the entry?
-> 
-> It's odd that this is happening, as normally pci_enable_bridges()
-> takes care of enabling I/O and MEM decoding on bridges.
-> 
-> What other kernel patches are you using?  And can you put a full boot
-> log somewhere?
-I don't use other kernel patches (except changed openrd_base_pci_init() as described in my last post).
+Regarding Bzip2, some testing showed that the decompressor needs at least 3.5Mb
+of memory available for malloc(), which is not available on ARM as head.S
+allocates only 64kb, so I'm sure what to do about it. At this stage, I think
+the most sensible thing to do is forgetting about using bzip2 on ARM.
 
-You can find my boot log at
-http://pastebin.com/m6e118098
+> Where can I find the current patch to test and is anyone planning to
+> submit it for inclusion?
 
-Dieter
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+The LZMA patch relies on patch 2/4 of the LZO patchset, which I resubmitted
+today: http://lkml.org/lkml/2009/11/11/129. I'll likely submit the LZMA patch
+once I get Russell's approval on the ARM part of the LZO patchset. In the
+meantime, you can get it here: http://alioth.debian.org/~lutin-guest/patches/
+
+Regards,
+-- 
+Albin Tonnerre, Free Electrons
+Kernel, drivers and embedded Linux development,
+consulting, training and support.
+http://free-electrons.com
