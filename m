@@ -1,74 +1,31 @@
-From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Wed, 11 Nov 2009 22:23:15 +0300
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 11 Nov 2009 19:32:57 +0000
 Subject: [REGRESSION] 2eca40a8 breaks StrongARM compilation
-Message-ID: <20091111192315.GA29757@rainbow>
+In-Reply-To: <20091111192315.GA29757@rainbow>
+References: <20091111192315.GA29757@rainbow>
+Message-ID: <20091111193257.GA14775@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 2eca40a8 which went into 2.6.32-rc6 breaks compilation
-for ipaq h3600 and probably other SA1100 machines when CONFIG_CPU_FREQ
-is unset:
+On Wed, Nov 11, 2009 at 10:23:15PM +0300, Dmitry Artamonow wrote:
+> Commit 2eca40a8 which went into 2.6.32-rc6 breaks compilation
+> for ipaq h3600 and probably other SA1100 machines when CONFIG_CPU_FREQ
+> is unset:
 
-  CC      arch/arm/mach-sa1100/generic.o
-arch/arm/mach-sa1100/generic.c:117: error: redefinition of 'cpufreq_get'
-include/linux/cpufreq.h:299: error: previous definition of 'cpufreq_get'
-was here
-make[1]: *** [arch/arm/mach-sa1100/generic.o] Error 1
-make: *** [arch/arm/mach-sa1100] Error 2
+I'm aware, I have a very large patch which fixes SA1100, but there's
+other ARM machine classes which are similarly broken.
 
-The problem is that before 2eca40a8  StrongArm aready had its own
-version of cpufreq_get for CONFIG_CPU_FREQ=n case and now it clashed
-with one introduced in 2eca40a8. Removing strongarm version will cure
-compilation, but it then will break sa1100_fb driver in runtime, as it
-blindly uses value which cpufreq_get returns for calculating pixel clock
-divisor (see line 926 in drivers/video/sa1100fb.c) and 2eca40a8's cpufreq_get
-returns 0.
+We've been around this loop before, where a change like this was
+introduced and reverted.  The kernel community seems set to constantly
+repeat the same old mistakes time and time again.
 
-One option would be to make sa1100_fb use hardcoded frequency 206.4MHz
-(default on StrongARM CPUs) for CONFIG_CPU_FREQ=n case - see attached
-patch. But I'm not sure if this is a proper fix.
+> +#ifdef CONFIG_CPU_FREQ
+>  	pcd = get_pcd(var->pixclock, cpufreq_get(0));
+> +#else
+> +	pcd = get_pcd(var->pixclock, 206400);
+> +#endif
 
-Any ideas are welcome.
-
--- 
-Best regards,
-Dmitry "MAD" Artamonow
-
--------------- next part --------------
-diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
-index 23cfdd5..59a21c6 100644
---- a/arch/arm/mach-sa1100/generic.c
-+++ b/arch/arm/mach-sa1100/generic.c
-@@ -110,15 +110,6 @@ unsigned int sa11x0_getspeed(unsigned int cpu)
- 	return cclk_frequency_100khz[PPCR & 0xf] * 100;
- }
- 
--#else
--/*
-- * We still need to provide this so building without cpufreq works.
-- */
--unsigned int cpufreq_get(unsigned int cpu)
--{
--	return cclk_frequency_100khz[PPCR & 0xf] * 100;
--}
--EXPORT_SYMBOL(cpufreq_get);
- #endif
- 
- /*
-diff --git a/drivers/video/sa1100fb.c b/drivers/video/sa1100fb.c
-index cdaa873..4f2e4fe 100644
---- a/drivers/video/sa1100fb.c
-+++ b/drivers/video/sa1100fb.c
-@@ -923,7 +923,12 @@ static int sa1100fb_activate_var(struct fb_var_screeninfo *var, struct sa1100fb_
- 		LCCR2_BegFrmDel(var->upper_margin) +
- 		LCCR2_EndFrmDel(var->lower_margin);
- 
-+#ifdef CONFIG_CPU_FREQ
- 	pcd = get_pcd(var->pixclock, cpufreq_get(0));
-+#else
-+	pcd = get_pcd(var->pixclock, 206400);
-+#endif
-+
- 	new_regs.lccr3 = LCCR3_PixClkDiv(pcd) | fbi->lccr3 |
- 		(var->sync & FB_SYNC_HOR_HIGH_ACT ? LCCR3_HorSnchH : LCCR3_HorSnchL) |
- 		(var->sync & FB_SYNC_VERT_HIGH_ACT ? LCCR3_VrtSnchH : LCCR3_VrtSnchL);
+This is just not acceptable, and could lead to LCD panel damage due
+to wrong timings - not all platforms boot at 206.4MHz.  Given that
+it's far better that the kernel be obviously broken than silently
+wrong while causing hardware damage.
