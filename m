@@ -1,31 +1,60 @@
-From: chripell@gmail.com (christian pellegrin)
-Date: Wed, 11 Nov 2009 14:39:32 +0100
-Subject: atmel_serial losing characters under libmodbus
-In-Reply-To: <4AFAB1BE.4040008@gmail.com>
-References: <4AFAB1BE.4040008@gmail.com>
-Message-ID: <cabda6420911110539h4c0e976aja4478212886d3c22@mail.gmail.com>
+From: fercerpav@gmail.com (Paul Fertser)
+Date: Wed, 11 Nov 2009 16:48:44 +0300
+Subject: [PATCH 3/6] gta02: set pcf50633 charger_reference_current_ma
+In-Reply-To: <1257369899-325-3-git-send-email-fercerpav@gmail.com>
+References: <1257369899-325-1-git-send-email-fercerpav@gmail.com>
+	<1257369899-325-2-git-send-email-fercerpav@gmail.com>
+	<1257369899-325-3-git-send-email-fercerpav@gmail.com>
+Message-ID: <20091111134844.GB22476@home.pavel.comp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 11, 2009 at 1:44 PM, Josef Holzmayr
-<zentrale.at.work@gmail.com> wrote:
-> When using libmodbus on an atmel_serial line, it seems to lose about 1 char
-> in 50 that it's supposed to receive. This is independet of the baud rate, it
-> happens everywhere from 2400 to 19200. Full code excerpt from the lib is
-> below, but basically reading is just an select/read pair. Are there some
-> known issues with that particular tty device?
->
+Hi,
 
-Hi, the only serial port on AT91 that gives me troubles is the DBGU
-port which shares the interrupt with the timer tick. You see a lot of
-serial overruns there if you have the kernel compiled with HZ=1000 on
-that port (usually ttyS0).
+Ben, please give us an advice on how to proceed with this rather
+trivial patch. Anton doesn't merge the other patches from this series
+because we do not know via which tree to merge this particular patch.
 
-
+On Thu, Nov 05, 2009 at 12:24:56AM +0300, Paul Fertser wrote:
+> From: Lars-Peter Clausen <lars@metafoo.de>
+> 
+> This value is board-specific and is needed for calculations to set charging
+> current limit properly.
+> 
+> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
+> Acked-by: Nelson Castillo <arhuaco@freaks-unidos.net>
+> Signed-off-by: Paul Fertser <fercerpav@gmail.com>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+> 
+> Since this patch compile-depends on previous probably it should go through
+> the same tree as others. Nelson (gta02 maintainer) agrees with whatever you
+> think is best.
+> 
+> Anton Vorontsov is ok with merging it through his tree but needs an explicit
+> ack.
+> 
+>  arch/arm/mach-s3c2442/mach-gta02.c |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c2442/mach-gta02.c b/arch/arm/mach-s3c2442/mach-gta02.c
+> index 0fb385b..b0a3d74 100644
+> --- a/arch/arm/mach-s3c2442/mach-gta02.c
+> +++ b/arch/arm/mach-s3c2442/mach-gta02.c
+> @@ -268,6 +268,9 @@ struct pcf50633_platform_data gta02_pcf_pdata = {
+>  
+>  	.batteries = gta02_batteries,
+>  	.num_batteries = ARRAY_SIZE(gta02_batteries),
+> +
+> +	.charger_reference_current_ma = 1000,
+> +
+>  	.reg_init_data = {
+>  		[PCF50633_REGULATOR_AUTO] = {
+>  			.constraints = {
+> -- 
+> 1.6.4.4
+> 
 
 -- 
-Christian Pellegrin, see http://www.evolware.org/chri/
-"Real Programmers don't play tennis, or any other sport which requires
-you to change clothes. Mountain climbing is OK, and Real Programmers
-wear their climbing boots to work in case a mountain should suddenly
-spring up in the middle of the computer room."
+Be free, use free (http://www.gnu.org/philosophy/free-sw.html) software!
+mailto:fercerpav at gmail.com
