@@ -1,60 +1,290 @@
-From: fercerpav@gmail.com (Paul Fertser)
-Date: Wed, 11 Nov 2009 16:48:44 +0300
-Subject: [PATCH 3/6] gta02: set pcf50633 charger_reference_current_ma
-In-Reply-To: <1257369899-325-3-git-send-email-fercerpav@gmail.com>
-References: <1257369899-325-1-git-send-email-fercerpav@gmail.com>
-	<1257369899-325-2-git-send-email-fercerpav@gmail.com>
-	<1257369899-325-3-git-send-email-fercerpav@gmail.com>
-Message-ID: <20091111134844.GB22476@home.pavel.comp>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 11 Nov 2009 21:55:19 +0800
+Subject: [PATCH 1/3 v3] Add camera support for A780 and A910 EZX phones
+In-Reply-To: <1257937317-16655-1-git-send-email-ospite@studenti.unina.it>
+References: <Pine.LNX.4.64.0911101037280.5074@axis700.grange>
+	<1257937317-16655-1-git-send-email-ospite@studenti.unina.it>
+Message-ID: <f17812d70911110555t393353fbk184ad9db3af42ad4@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Ben, please give us an advice on how to proceed with this rather
-trivial patch. Anton doesn't merge the other patches from this series
-because we do not know via which tree to merge this particular patch.
-
-On Thu, Nov 05, 2009 at 12:24:56AM +0300, Paul Fertser wrote:
-> From: Lars-Peter Clausen <lars@metafoo.de>
-> 
-> This value is board-specific and is needed for calculations to set charging
-> current limit properly.
-> 
-> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
-> Acked-by: Nelson Castillo <arhuaco@freaks-unidos.net>
-> Signed-off-by: Paul Fertser <fercerpav@gmail.com>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+On Wed, Nov 11, 2009 at 7:01 PM, Antonio Ospite
+<ospite@studenti.unina.it> wrote:
+> Signed-off-by: Bart Visscher <bartv@thisnet.nl>
+> Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
+>
 > ---
-> 
-> Since this patch compile-depends on previous probably it should go through
-> the same tree as others. Nelson (gta02 maintainer) agrees with whatever you
-> think is best.
-> 
-> Anton Vorontsov is ok with merging it through his tree but needs an explicit
-> ack.
-> 
->  arch/arm/mach-s3c2442/mach-gta02.c |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c2442/mach-gta02.c b/arch/arm/mach-s3c2442/mach-gta02.c
-> index 0fb385b..b0a3d74 100644
-> --- a/arch/arm/mach-s3c2442/mach-gta02.c
-> +++ b/arch/arm/mach-s3c2442/mach-gta02.c
-> @@ -268,6 +268,9 @@ struct pcf50633_platform_data gta02_pcf_pdata = {
->  
->  	.batteries = gta02_batteries,
->  	.num_batteries = ARRAY_SIZE(gta02_batteries),
-> +
-> +	.charger_reference_current_ma = 1000,
-> +
->  	.reg_init_data = {
->  		[PCF50633_REGULATOR_AUTO] = {
->  			.constraints = {
-> -- 
-> 1.6.4.4
-> 
+> Changes since v2:
+>
+> ?- Bart's SOB goes first, as he is the original author.
+> ?- Add MFP_LPM_DRIVE_HIGH to camera gpios, as per Motorola original
+> ? code.
+> ?- s/pxacamera/camera/ in function names, as they are not used in
+> ? pxacamera_platform_data
+> ?- Adjust comments about CAM_RST which is active on rising edge
+> ?- Saner default values for nCAM_EN and CAM_RST gpios
+> ?- Setup gpios statically at board init.
+>
+> Eric, if it is easier for you I can send the three patches together again.
+>
 
--- 
-Be free, use free (http://www.gnu.org/philosophy/free-sw.html) software!
-mailto:fercerpav at gmail.com
+That's OK, I can find the rest two :)
+
+Guennadi,
+
+I need your Acked-by or Reviewed-by please.
+
+> Thanks,
+> ? Antonio
+>
+> ?arch/arm/mach-pxa/ezx.c | ?172 +++++++++++++++++++++++++++++++++++++++++++++-
+> ?1 files changed, 168 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/ezx.c b/arch/arm/mach-pxa/ezx.c
+> index 588b265..74423a6 100644
+> --- a/arch/arm/mach-pxa/ezx.c
+> +++ b/arch/arm/mach-pxa/ezx.c
+> @@ -17,8 +17,11 @@
+> ?#include <linux/delay.h>
+> ?#include <linux/pwm_backlight.h>
+> ?#include <linux/input.h>
+> +#include <linux/gpio.h>
+> ?#include <linux/gpio_keys.h>
+>
+> +#include <media/soc_camera.h>
+> +
+> ?#include <asm/setup.h>
+> ?#include <asm/mach-types.h>
+> ?#include <asm/mach/arch.h>
+> @@ -29,6 +32,7 @@
+> ?#include <plat/i2c.h>
+> ?#include <mach/hardware.h>
+> ?#include <mach/pxa27x_keypad.h>
+> +#include <mach/camera.h>
+>
+> ?#include "devices.h"
+> ?#include "generic.h"
+> @@ -38,6 +42,9 @@
+> ?#define GPIO15_A910_FLIP_LID ? ? ? ? ? 15
+> ?#define GPIO12_E680_LOCK_SWITCH ? ? ? ?12
+> ?#define GPIO15_E6_LOCK_SWITCH ? ? ? ? ?15
+> +#define GPIO50_nCAM_EN ? ? ? ? ? ? ? ? 50
+> +#define GPIO19_GEN1_CAM_RST ? ? ? ? ? ?19
+> +#define GPIO28_GEN2_CAM_RST ? ? ? ? ? ?28
+>
+> ?static struct platform_pwm_backlight_data ezx_backlight_data = {
+> ? ? ? ?.pwm_id ? ? ? ? = 0,
+> @@ -191,8 +198,8 @@ static unsigned long gen1_pin_config[] __initdata = {
+> ? ? ? ?GPIO94_CIF_DD_5,
+> ? ? ? ?GPIO17_CIF_DD_6,
+> ? ? ? ?GPIO108_CIF_DD_7,
+> - ? ? ? GPIO50_GPIO, ? ? ? ? ? ? ? ? ? ? ? ? ? ?/* CAM_EN */
+> - ? ? ? GPIO19_GPIO, ? ? ? ? ? ? ? ? ? ? ? ? ? ?/* CAM_RST */
+> + ? ? ? GPIO50_GPIO | MFP_LPM_DRIVE_HIGH, ? ? ? /* CAM_EN */
+> + ? ? ? GPIO19_GPIO | MFP_LPM_DRIVE_HIGH, ? ? ? /* CAM_RST */
+>
+> ? ? ? ?/* EMU */
+> ? ? ? ?GPIO120_GPIO, ? ? ? ? ? ? ? ? ? ? ? ? ? /* EMU_MUX1 */
+> @@ -248,8 +255,8 @@ static unsigned long gen2_pin_config[] __initdata = {
+> ? ? ? ?GPIO48_CIF_DD_5,
+> ? ? ? ?GPIO93_CIF_DD_6,
+> ? ? ? ?GPIO12_CIF_DD_7,
+> - ? ? ? GPIO50_GPIO, ? ? ? ? ? ? ? ? ? ? ? ? ? ?/* CAM_EN */
+> - ? ? ? GPIO28_GPIO, ? ? ? ? ? ? ? ? ? ? ? ? ? ?/* CAM_RST */
+> + ? ? ? GPIO50_GPIO | MFP_LPM_DRIVE_HIGH, ? ? ? /* CAM_EN */
+> + ? ? ? GPIO28_GPIO | MFP_LPM_DRIVE_HIGH, ? ? ? /* CAM_RST */
+> ? ? ? ?GPIO17_GPIO, ? ? ? ? ? ? ? ? ? ? ? ? ? ?/* CAM_FLASH */
+> ?};
+> ?#endif
+> @@ -683,8 +690,84 @@ static struct platform_device a780_gpio_keys = {
+> ? ? ? ?},
+> ?};
+>
+> +/* camera */
+> +static int a780_camera_init(void)
+> +{
+> + ? ? ? int err;
+> +
+> + ? ? ? /*
+> + ? ? ? ?* GPIO50_nCAM_EN is active low
+> + ? ? ? ?* GPIO19_GEN1_CAM_RST is active on rising edge
+> + ? ? ? ?*/
+> + ? ? ? err = gpio_request(GPIO50_nCAM_EN, "nCAM_EN");
+> + ? ? ? if (err) {
+> + ? ? ? ? ? ? ? pr_err("%s: Failed to request nCAM_EN\n", __func__);
+> + ? ? ? ? ? ? ? goto fail;
+> + ? ? ? }
+> +
+> + ? ? ? err = gpio_request(GPIO19_GEN1_CAM_RST, "CAM_RST");
+> + ? ? ? if (err) {
+> + ? ? ? ? ? ? ? pr_err("%s: Failed to request CAM_RST\n", __func__);
+> + ? ? ? ? ? ? ? goto fail_gpio_cam_rst;
+> + ? ? ? }
+> +
+> + ? ? ? gpio_direction_output(GPIO50_nCAM_EN, 1);
+> + ? ? ? gpio_direction_output(GPIO19_GEN1_CAM_RST, 0);
+> +
+> + ? ? ? return 0;
+> +
+> +fail_gpio_cam_rst:
+> + ? ? ? gpio_free(GPIO50_nCAM_EN);
+> +fail:
+> + ? ? ? return err;
+> +}
+> +
+> +static int a780_camera_power(struct device *dev, int on)
+> +{
+> + ? ? ? gpio_set_value(GPIO50_nCAM_EN, !on);
+> + ? ? ? return 0;
+> +}
+> +
+> +static int a780_camera_reset(struct device *dev)
+> +{
+> + ? ? ? gpio_set_value(GPIO19_GEN1_CAM_RST, 0);
+> + ? ? ? msleep(10);
+> + ? ? ? gpio_set_value(GPIO19_GEN1_CAM_RST, 1);
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +struct pxacamera_platform_data a780_pxacamera_platform_data = {
+> + ? ? ? .flags ?= PXA_CAMERA_MASTER | PXA_CAMERA_DATAWIDTH_8 |
+> + ? ? ? ? ? ? ? PXA_CAMERA_PCLK_EN | PXA_CAMERA_MCLK_EN,
+> + ? ? ? .mclk_10khz = 5000,
+> +};
+> +
+> +static struct i2c_board_info a780_camera_i2c_board_info = {
+> + ? ? ? I2C_BOARD_INFO("mt9m111", 0x5d),
+> +};
+> +
+> +static struct soc_camera_link a780_iclink = {
+> + ? ? ? .bus_id ? ? ? ? = 0,
+> + ? ? ? .flags ? ? ? ? ?= SOCAM_SENSOR_INVERT_PCLK,
+> + ? ? ? .i2c_adapter_id = 0,
+> + ? ? ? .board_info ? ? = &a780_camera_i2c_board_info,
+> + ? ? ? .module_name ? ?= "mt9m111",
+> + ? ? ? .power ? ? ? ? ?= a780_camera_power,
+> + ? ? ? .reset ? ? ? ? ?= a780_camera_reset,
+> +};
+> +
+> +static struct platform_device a780_camera = {
+> + ? ? ? .name ? = "soc-camera-pdrv",
+> + ? ? ? .id ? ? = 0,
+> + ? ? ? .dev ? ?= {
+> + ? ? ? ? ? ? ? .platform_data = &a780_iclink,
+> + ? ? ? },
+> +};
+> +
+> ?static struct platform_device *a780_devices[] __initdata = {
+> ? ? ? ?&a780_gpio_keys,
+> + ? ? ? &a780_camera,
+> ?};
+>
+> ?static void __init a780_init(void)
+> @@ -699,6 +782,9 @@ static void __init a780_init(void)
+>
+> ? ? ? ?pxa_set_keypad_info(&a780_keypad_platform_data);
+>
+> + ? ? ? a780_camera_init();
+> + ? ? ? pxa_set_camera_info(&a780_pxacamera_platform_data);
+> +
+> ? ? ? ?platform_add_devices(ARRAY_AND_SIZE(ezx_devices));
+> ? ? ? ?platform_add_devices(ARRAY_AND_SIZE(a780_devices));
+> ?}
+> @@ -864,8 +950,83 @@ static struct platform_device a910_gpio_keys = {
+> ? ? ? ?},
+> ?};
+>
+> +/* camera */
+> +static int a910_camera_init(void)
+> +{
+> + ? ? ? int err;
+> +
+> + ? ? ? /*
+> + ? ? ? ?* GPIO50_nCAM_EN is active low
+> + ? ? ? ?* GPIO28_GEN2_CAM_RST is active on rising edge
+> + ? ? ? ?*/
+> + ? ? ? err = gpio_request(GPIO50_nCAM_EN, "nCAM_EN");
+> + ? ? ? if (err) {
+> + ? ? ? ? ? ? ? pr_err("%s: Failed to request nCAM_EN\n", __func__);
+> + ? ? ? ? ? ? ? goto fail;
+> + ? ? ? }
+> +
+> + ? ? ? err = gpio_request(GPIO28_GEN2_CAM_RST, "CAM_RST");
+> + ? ? ? if (err) {
+> + ? ? ? ? ? ? ? pr_err("%s: Failed to request CAM_RST\n", __func__);
+> + ? ? ? ? ? ? ? goto fail_gpio_cam_rst;
+> + ? ? ? }
+> +
+> + ? ? ? gpio_direction_output(GPIO50_nCAM_EN, 1);
+> + ? ? ? gpio_direction_output(GPIO28_GEN2_CAM_RST, 0);
+> +
+> + ? ? ? return 0;
+> +
+> +fail_gpio_cam_rst:
+> + ? ? ? gpio_free(GPIO50_nCAM_EN);
+> +fail:
+> + ? ? ? return err;
+> +}
+> +
+> +static int a910_camera_power(struct device *dev, int on)
+> +{
+> + ? ? ? gpio_set_value(GPIO50_nCAM_EN, !on);
+> + ? ? ? return 0;
+> +}
+> +
+> +static int a910_camera_reset(struct device *dev)
+> +{
+> + ? ? ? gpio_set_value(GPIO28_GEN2_CAM_RST, 0);
+> + ? ? ? msleep(10);
+> + ? ? ? gpio_set_value(GPIO28_GEN2_CAM_RST, 1);
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +struct pxacamera_platform_data a910_pxacamera_platform_data = {
+> + ? ? ? .flags ?= PXA_CAMERA_MASTER | PXA_CAMERA_DATAWIDTH_8 |
+> + ? ? ? ? ? ? ? PXA_CAMERA_PCLK_EN | PXA_CAMERA_MCLK_EN,
+> + ? ? ? .mclk_10khz = 5000,
+> +};
+> +
+> +static struct i2c_board_info a910_camera_i2c_board_info = {
+> + ? ? ? I2C_BOARD_INFO("mt9m111", 0x5d),
+> +};
+> +
+> +static struct soc_camera_link a910_iclink = {
+> + ? ? ? .bus_id ? ? ? ? = 0,
+> + ? ? ? .i2c_adapter_id = 0,
+> + ? ? ? .board_info ? ? = &a910_camera_i2c_board_info,
+> + ? ? ? .module_name ? ?= "mt9m111",
+> + ? ? ? .power ? ? ? ? ?= a910_camera_power,
+> + ? ? ? .reset ? ? ? ? ?= a910_camera_reset,
+> +};
+> +
+> +static struct platform_device a910_camera = {
+> + ? ? ? .name ? = "soc-camera-pdrv",
+> + ? ? ? .id ? ? = 0,
+> + ? ? ? .dev ? ?= {
+> + ? ? ? ? ? ? ? .platform_data = &a910_iclink,
+> + ? ? ? },
+> +};
+> +
+> ?static struct platform_device *a910_devices[] __initdata = {
+> ? ? ? ?&a910_gpio_keys,
+> + ? ? ? &a910_camera,
+> ?};
+>
+> ?static void __init a910_init(void)
+> @@ -880,6 +1041,9 @@ static void __init a910_init(void)
+>
+> ? ? ? ?pxa_set_keypad_info(&a910_keypad_platform_data);
+>
+> + ? ? ? a910_camera_init();
+> + ? ? ? pxa_set_camera_info(&a910_pxacamera_platform_data);
+> +
+> ? ? ? ?platform_add_devices(ARRAY_AND_SIZE(ezx_devices));
+> ? ? ? ?platform_add_devices(ARRAY_AND_SIZE(a910_devices));
+> ?}
+> --
+> tg: (639a58f..) ezx/mach/camera_new (depends on: master)
+>
