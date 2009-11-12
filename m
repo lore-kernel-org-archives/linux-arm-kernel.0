@@ -1,34 +1,25 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Nov 2009 22:17:53 +0000
-Subject: [PATCH 1/8] pxa: support pxa168 LCD controller SPI operation
-In-Reply-To: <7c34ac520911111816q22dcf293r98d67a588bf83913@mail.gmail.com>
-References: <7c34ac520911100012s3504b2ek75670ecb057692a7@mail.gmail.com>
-	<7c34ac520911111816q22dcf293r98d67a588bf83913@mail.gmail.com>
-Message-ID: <20091112221753.GD12308@n2100.arm.linux.org.uk>
+Date: Thu, 12 Nov 2009 22:21:11 +0000
+Subject: [PATCH 8/8] pxa: add frame buffer on pxa910 ttc_dkb platform
+In-Reply-To: <7c34ac520911111820y5581951dya17ab06b904ff63f@mail.gmail.com>
+References: <7c34ac520911100012p7ff6d07dv7e37433f43757647@mail.gmail.com>
+	<7c34ac520911111820y5581951dya17ab06b904ff63f@mail.gmail.com>
+Message-ID: <20091112222111.GE12308@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 12, 2009 at 10:16:16AM +0800, Jun Nie wrote:
-> diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
-> index 84d8327..e1f1c5f 100644
-> --- a/drivers/video/pxa168fb.c
-> +++ b/drivers/video/pxa168fb.c
-> @@ -27,12 +27,90 @@
->  #include <linux/clk.h>
->  #include <linux/err.h>
->  #include <linux/uaccess.h>
-> +#include <linux/gpio.h>
->  #include <video/pxa168fb.h>
->  
-> +#include <mach/gpio.h>
-
-If you include linux/gpio.h, then if the right configuration symbol
-(CONFIG_GENERIC_GPIO) is selected, asm/gpio.h and therefore mach/gpio.h
-will be included for you.
-
-> +static inline void spi_gpio_assert(int spi_gpio_cs, int val)
+On Thu, Nov 12, 2009 at 10:20:20AM +0800, Jun Nie wrote:
+> +static int tpo_lcd_power(struct pxa168fb_info *fbi, unsigned int spi_gpio_cs, unsigned int spi_gpio_reset, int on)
 > +{
-> +	       if (gpio_is_valid(spi_gpio_cs))
-> +		                      gpio_set_value(spi_gpio_cs, val);
+> +	int err = 0;
+> +
+> +	if (on) {
+> +		if (spi_gpio_reset != -1) {
+> +			err = gpio_request(spi_gpio_reset, "TPO_LCD_SPI_RESET");
+> +			if (err) {
+> +				printk("failed to request GPIO for TPO LCD RESET\n");
+> +				return -1;
 
-This seems to have style problems - please run it through checkpatch.
+Do you really mean -EPERM here?  If not, use a proper error code such as
+the one you got from gpio_request().  (Never, ever, use a literal "-1" as
+an error indicator in the kernel.)
