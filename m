@@ -1,306 +1,34 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 12 Nov 2009 16:06:15 +0100
-Subject: [PATCH 8/9 v2] MXC: Add a digital audio multiplexer driver
-In-Reply-To: <1258022525-21078-9-git-send-email-s.hauer@pengutronix.de>
-References: <1258022525-21078-1-git-send-email-s.hauer@pengutronix.de>
-	<1258022525-21078-2-git-send-email-s.hauer@pengutronix.de>
-	<1258022525-21078-3-git-send-email-s.hauer@pengutronix.de>
-	<1258022525-21078-4-git-send-email-s.hauer@pengutronix.de>
-	<1258022525-21078-5-git-send-email-s.hauer@pengutronix.de>
-	<1258022525-21078-6-git-send-email-s.hauer@pengutronix.de>
-	<1258022525-21078-7-git-send-email-s.hauer@pengutronix.de>
-	<1258022525-21078-8-git-send-email-s.hauer@pengutronix.de>
-	<1258022525-21078-9-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20091112150615.GA30179@pengutronix.de>
+From: srk@ti.com (Govindarajan, Sriramakrishnan)
+Date: Thu, 12 Nov 2009 21:28:58 +0530
+Subject: NAND: failure reported with mtd_oobtest(read delay violated)
+Message-ID: <FCCFB4CDC6E5564B9182F639FC35608702FA5CC012@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here is an updated version of this patch with audmux instead of DAM
+Hello,
+On the OMAP3 EVM platform we are seeing failures when we run the mtd_oobtest repeatedly (overnight). Usually the failures are reported after 40-45 iterations.
 
-Sascha
+Further analysis with logic analyzer seems to indicate that for the specific instance where failure is observed, the time delay between dispatching the READ0 command and the start of read operation is violated. (udelay loop would start even before the write is reflected on the HW)
+
+OMAP3EVM implementation relies on command delay(chip_delay set to 50ms) and doesn't use wait pin monitoring. By adding a data memory barrier dmb() instruction right after the command phase the issue seems to be resolved.
+
+Have we seen similar behavior on other platforms that rely on command delay and do we specifically require a dmb() after the command is written?
+
+DIFF Details:(will post this a patch once I hear your review comments)
+
+diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
+index 2211386..8df3780 100644
+--- a/drivers/mtd/nand/nand_base.c
++++ b/drivers/mtd/nand/nand_base.c
+@@ -651,6 +651,7 @@ static void nand_command_lp(struct mtd_info *mtd, unsigned int command,
+                               NAND_NCE | NAND_CLE | NAND_CTRL_CHANGE);
+                chip->cmd_ctrl(mtd, NAND_CMD_NONE,
+                               NAND_NCE | NAND_CTRL_CHANGE);
++               dmb();
+
+                /* This applies to read commands */
+        default:
 
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-mx2/Kconfig               |    2 +
- arch/arm/mach-mx3/Kconfig               |    2 +
- arch/arm/plat-mxc/Kconfig               |    7 +++
- arch/arm/plat-mxc/Makefile              |    2 +
- arch/arm/plat-mxc/audmux-v1.c           |   53 +++++++++++++++++++++
- arch/arm/plat-mxc/audmux-v2.c           |   77 +++++++++++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/audmux.h |   52 +++++++++++++++++++++
- 7 files changed, 195 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-mxc/audmux-v1.c
- create mode 100644 arch/arm/plat-mxc/audmux-v2.c
- create mode 100644 arch/arm/plat-mxc/include/mach/audmux.h
-
-diff --git a/arch/arm/mach-mx2/Kconfig b/arch/arm/mach-mx2/Kconfig
-index c8a2eac..3e14da3 100644
---- a/arch/arm/mach-mx2/Kconfig
-+++ b/arch/arm/mach-mx2/Kconfig
-@@ -6,11 +6,13 @@ choice
- 
- config MACH_MX21
- 	bool "i.MX21 support"
-+	select ARCH_MXC_AUDMUX_V1
- 	help
- 	  This enables support for Freescale's MX2 based i.MX21 processor.
- 
- config MACH_MX27
- 	bool "i.MX27 support"
-+	select ARCH_MXC_AUDMUX_V1
- 	help
- 	  This enables support for Freescale's MX2 based i.MX27 processor.
- 
-diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
-index 851f245..ffdd211 100644
---- a/arch/arm/mach-mx3/Kconfig
-+++ b/arch/arm/mach-mx3/Kconfig
-@@ -2,11 +2,13 @@ if ARCH_MX3
- 
- config ARCH_MX31
- 	select ARCH_HAS_RNGA
-+	select ARCH_MXC_AUDMUX_V2
- 	bool
- 
- config ARCH_MX35
- 	bool
- 	select ARCH_MXC_IOMUX_V3
-+	select ARCH_MXC_AUDMUX_V2
- 
- comment "MX3 platforms:"
- 
-diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-index e8e92cb..8b0a1ee 100644
---- a/arch/arm/plat-mxc/Kconfig
-+++ b/arch/arm/plat-mxc/Kconfig
-@@ -78,4 +78,11 @@ config ARCH_HAS_RNGA
- 
- config ARCH_MXC_IOMUX_V3
- 	bool
-+
-+config ARCH_MXC_AUDMUX_V1
-+	bool
-+
-+config ARCH_MXC_AUDMUX_V2
-+	bool
-+
- endif
-diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
-index 545412f..4cbca9d 100644
---- a/arch/arm/plat-mxc/Makefile
-+++ b/arch/arm/plat-mxc/Makefile
-@@ -10,3 +10,5 @@ obj-$(CONFIG_ARCH_MX2) += iomux-mx1-mx2.o dma-mx1-mx2.o
- obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
- obj-$(CONFIG_MXC_PWM)  += pwm.o
- obj-$(CONFIG_MXC_ULPI) += ulpi.o
-+obj-$(CONFIG_ARCH_MXC_AUDMUX_V1) += audmux-v1.o
-+obj-$(CONFIG_ARCH_MXC_AUDMUX_V2) += audmux-v2.o
-diff --git a/arch/arm/plat-mxc/audmux-v1.c b/arch/arm/plat-mxc/audmux-v1.c
-new file mode 100644
-index 0000000..70ab5af
---- /dev/null
-+++ b/arch/arm/plat-mxc/audmux-v1.c
-@@ -0,0 +1,53 @@
-+/*
-+ * Copyright 2009 Pengutronix, Sascha Hauer <s.hauer@pengutronix.de>
-+ *
-+ * Initial development of this code was funded by
-+ * Phytec Messtechnik GmbH, http://www.phytec.de
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/clk.h>
-+#include <mach/audmux.h>
-+#include <mach/hardware.h>
-+
-+static void __iomem *audmux_base;
-+
-+#define MXC_AUDMUX_V1_PCR(x)	((x) * 4)
-+
-+int mxc_audmux_v1_configure_port(unsigned int port, unsigned int pcr)
-+{
-+	if (!audmux_base) {
-+		printk("%s: not configured\n", __func__);
-+		return -ENOSYS;
-+	}
-+
-+	writel(pcr, audmux_base + MXC_AUDMUX_V1_PCR(port));
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(mxc_audmux_v1_configure_port);
-+
-+static int mxc_audmux_v1_init(void)
-+{
-+	if (cpu_is_mx27() || cpu_is_mx21())
-+		audmux_base = IO_ADDRESS(AUDMUX_BASE_ADDR);
-+	return 0;
-+}
-+
-+postcore_initcall(mxc_audmux_v1_init);
-diff --git a/arch/arm/plat-mxc/audmux-v2.c b/arch/arm/plat-mxc/audmux-v2.c
-new file mode 100644
-index 0000000..fe8d46d
---- /dev/null
-+++ b/arch/arm/plat-mxc/audmux-v2.c
-@@ -0,0 +1,77 @@
-+/*
-+ * Copyright 2009 Pengutronix, Sascha Hauer <s.hauer@pengutronix.de>
-+ *
-+ * Initial development of this code was funded by
-+ * Phytec Messtechnik GmbH, http://www.phytec.de
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/clk.h>
-+#include <mach/audmux.h>
-+#include <mach/hardware.h>
-+
-+static struct clk *audmux_clk;
-+static void __iomem *audmux_base;
-+
-+#define MXC_AUDMUX_V2_PTCR(x)		((x) * 8)
-+#define MXC_AUDMUX_V2_PDCR(x)		((x) * 8 + 4)
-+
-+int mxc_audmux_v2_configure_port(unsigned int port, unsigned int ptcr,
-+		unsigned int pdcr)
-+{
-+	if (!audmux_base)
-+		return -ENOSYS;
-+
-+	if (audmux_clk)
-+		clk_enable(audmux_clk);
-+
-+	writel(ptcr, audmux_base + MXC_AUDMUX_V2_PTCR(port));
-+	writel(pdcr, audmux_base + MXC_AUDMUX_V2_PDCR(port));
-+
-+	if (audmux_clk)
-+		clk_disable(audmux_clk);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(mxc_audmux_v2_configure_port);
-+
-+static int mxc_audmux_v2_init(void)
-+{
-+	int ret;
-+
-+	if (cpu_is_mx31() || cpu_is_mx35())
-+		audmux_base = IO_ADDRESS(AUDMUX_BASE_ADDR);
-+	else
-+		return 0;
-+
-+	if (cpu_is_mx35()) {
-+		audmux_clk = clk_get(NULL, "audmux");
-+		if (IS_ERR(audmux_clk)) {
-+			audmux_base = NULL;
-+			ret = PTR_ERR(audmux_clk);
-+			printk(KERN_ERR "%s: cannot get clock: %d\n", __func__,
-+					ret);
-+			return ret;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+postcore_initcall(mxc_audmux_v2_init);
-diff --git a/arch/arm/plat-mxc/include/mach/audmux.h b/arch/arm/plat-mxc/include/mach/audmux.h
-new file mode 100644
-index 0000000..5cd6466
---- /dev/null
-+++ b/arch/arm/plat-mxc/include/mach/audmux.h
-@@ -0,0 +1,52 @@
-+#ifndef __MACH_AUDMUX_H
-+#define __MACH_AUDMUX_H
-+
-+#define MX27_AUDMUX_HPCR1_SSI0		0
-+#define MX27_AUDMUX_HPCR2_SSI1		1
-+#define MX27_AUDMUX_HPCR3_SSI_PINS_4	2
-+#define MX27_AUDMUX_PPCR1_SSI_PINS_1	3
-+#define MX27_AUDMUX_PPCR2_SSI_PINS_2	4
-+#define MX27_AUDMUX_PPCR3_SSI_PINS_3	5
-+
-+#define MX31_AUDMUX_PORT1_SSI0		0
-+#define MX31_AUDMUX_PORT2_SSI1		1
-+#define MX31_AUDMUX_PORT3_SSI_PINS_3	2
-+#define MX31_AUDMUX_PORT4_SSI_PINS_4	3
-+#define MX31_AUDMUX_PORT5_SSI_PINS_5	4
-+#define MX31_AUDMUX_PORT6_SSI_PINS_6	5
-+
-+/* Register definitions for the i.MX21/27 Digital Audio Multiplexer */
-+#define MXC_AUDMUX_V1_PCR_INMMASK(x)	((x) & 0xff)
-+#define MXC_AUDMUX_V1_PCR_INMEN		(1 << 8)
-+#define MXC_AUDMUX_V1_PCR_TXRXEN	(1 << 10)
-+#define MXC_AUDMUX_V1_PCR_SYN		(1 << 12)
-+#define MXC_AUDMUX_V1_PCR_RXDSEL(x)	(((x) & 0x7) << 13)
-+#define MXC_AUDMUX_V1_PCR_RFCSEL(x)	(((x) & 0xf) << 20)
-+#define MXC_AUDMUX_V1_PCR_RCLKDIR	(1 << 24)
-+#define MXC_AUDMUX_V1_PCR_RFSDIR	(1 << 25)
-+#define MXC_AUDMUX_V1_PCR_TFCSEL(x)	(((x) & 0xf) << 26)
-+#define MXC_AUDMUX_V1_PCR_TCLKDIR	(1 << 30)
-+#define MXC_AUDMUX_V1_PCR_TFSDIR	(1 << 31)
-+
-+/* Register definitions for the i.MX25/31/35 Digital Audio Multiplexer */
-+#define MXC_AUDMUX_V2_PTCR_TFSDIR	(1 << 31)
-+#define MXC_AUDMUX_V2_PTCR_TFSEL(x)	(((x) & 0xf) << 27)
-+#define MXC_AUDMUX_V2_PTCR_TCLKDIR	(1 << 26)
-+#define MXC_AUDMUX_V2_PTCR_TCSEL(x)	(((x) & 0xf) << 22)
-+#define MXC_AUDMUX_V2_PTCR_RFSDIR	(1 << 21)
-+#define MXC_AUDMUX_V2_PTCR_RFSEL(x)	(((x) & 0xf) << 17)
-+#define MXC_AUDMUX_V2_PTCR_RCLKDIR	(1 << 16)
-+#define MXC_AUDMUX_V2_PTCR_RCSEL(x)	(((x) & 0xf) << 12)
-+#define MXC_AUDMUX_V2_PTCR_SYN		(1 << 11)
-+
-+#define MXC_AUDMUX_V2_PDCR_RXDSEL(x)	(((x) & 0x7) << 13)
-+#define MXC_AUDMUX_V2_PDCR_TXRXEN	(1 << 12)
-+#define MXC_AUDMUX_V2_PDCR_MODE(x)	(((x) & 0x3) << 8)
-+#define MXC_AUDMUX_V2_PDCR_INMMASK(x)	((x) & 0xff)
-+
-+int mxc_audmux_v1_configure_port(unsigned int port, unsigned int pcr);
-+
-+int mxc_audmux_v2_configure_port(unsigned int port, unsigned int ptcr,
-+		unsigned int pdcr);
-+
-+#endif /* __MACH_AUDMUX_H */
--- 
-1.6.5.2
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards
+Sriram
