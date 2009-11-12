@@ -1,48 +1,47 @@
 From: alex@digriz.org.uk (Alexander Clouter)
-Date: Thu, 12 Nov 2009 18:44:40 +0000
-Subject: ARM: big performance waste in memcpy_{from,to}io
-References: <200911121749.49676.h.feurstein@gmail.com>
-Message-ID: <ol1us6-035.ln1@chipmunk.wormnet.eu>
+Date: Thu, 12 Nov 2009 19:01:32 +0000
+Subject: PCI hotplug supported on ARM (Kirkwood)?
+References: <200911121826.06792.dk-arm-linux@gmx.de>
+Message-ID: <cl2us6-035.ln1@chipmunk.wormnet.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hubert Feurstein <h.feurstein@gmail.com> wrote:
+Dieter Kiermaier <dk-arm-linux@gmx.de> wrote:
 > 
-> I'm working with an Contec Micro9 board (ep93xx-based with two Spansion-NOR-
-> Flash chips in parallel => 32bit memory-buswidth) and was wondering why the
-> read-performance of the flash (through /dev/mtd*) is so quite poor. So I 
-> connected a logic analyser to the data- and address-bus and recognized that 
-> the accesses to the same flash-word-address happens four times. This means 
-> that the flash is read byte-by-byte, which is IMO a big waste of performance 
-> since it would be possible to read the full word (four bytes) at once. So I 
-> digged around in the mtd-driver and found the function "memcpy_fromio" which 
-> is called to read the flash data. I was really surprised when looked to the 
-> implementation, which is:
+> is it possible to boot a FPGA which is connected to an PCI bus on a 
+> kirkwood cpu (via a pcie->pci bridge) at runtime (I call it hotplug)?
 > 
-> [snipped]
+> And after booting the FPGA e.g. via slave serial protocol loading the 
+> pci driver and access the device? This would be much easier to handle 
+> than flashing the fpga using u-boot.
 > 
-> Are there any drawbacks when using the good-and-fast "memcpy" ? On my Micro9-
-> board everything is running fine so far.
+> Is there any special framework I have to use? How can I tell the 
+> kernel to reenumerate the bus and reasign the pci resources?
 > 
+> I have googled a lot and also tried to find something at newsgroups or 
+> mailinglists but I haven't found some valuable information - at least 
+> not for me ;). Is this possible?
+> 
+I tried tackling this on my board by creating a new 'bus' and trying to 
+work around making the FPGA 'hotplugable' that way.  As the bus would 
+know about the process of reprogramming the FPGA, it could cleanly 
+unload and reload everything.
 
->From bogus@does.not.exist.com  Fri Nov  6 13:01:15 2009
-From: bogus@does.not.exist.com ()
-Date: Fri, 06 Nov 2009 18:01:15 -0000
-Subject: No subject
-Message-ID: <mailman.17.1258053123.2170.linux-arm-kernel@lists.infradead.org>
+http://marc.info/?l=linux-kernel&m=124441477117607&w=2
 
-NOR's too) do *not* support 32bit wide read's.  For example, if I 
-remember correctly, the NAND driver for orion will let you read 32bits 
-but write only 8bits at a time.  Other platforms are only 8bit wide in 
-both direction.  I guess the 'slow' memcpy version is used as 
-*everything* supports 8bit reads....I *guess* :)
+Never did get it to work and no one expressed any real interest in it 
+for the platform sadly; so I drifted off looking for other geeky things 
+to do.
 
-For the NAND world, we have plat_nand and you can populate 
-(read|write)_buf with your optimised version; of course you are using 
-NOR so I have no idea if you have to treat that differently....
+I am still personally keener on the bus model, but Geert suggested I 
+lump for a MFD.
+
+Whatever you do, if you can keep me in the loop then I can nick your 
+ideas/code and maybe get back into tinkering with my ARM board, that's 
+if I stop bricking my MIPS boards :-/
 
 Cheers
 
 -- 
 Alexander Clouter
-.sigmonster says: Make sure your code does nothing gracefully.
+.sigmonster says: There's a lot to be said for not saying a lot.
