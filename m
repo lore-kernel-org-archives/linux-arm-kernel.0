@@ -1,44 +1,89 @@
-From: dk-arm-linux@gmx.de (Dieter Kiermaier)
-Date: Thu, 12 Nov 2009 08:42:55 +0100
-Subject: [PATCH] ARM: enable PCI bridges after assigning resources (was
-	orion/kirkwood pcie issue still open with 2.6.32-rc6 (marvell
-	stock 2.6.22.18 works!))
-In-Reply-To: <20091112083126.2440aabd@marrow.netinsight.se>
-References: <200911090933.46240.dk-arm-linux@gmx.de>
-	<200911120823.46427.dk-arm-linux@gmx.de>
-	<20091112083126.2440aabd@marrow.netinsight.se>
-Message-ID: <200911120842.55533.dk-arm-linux@gmx.de>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 12 Nov 2009 08:13:07 +0100
+Subject: [PATCH] Remove __raw_* accessors from PL031 RTC
+Message-ID: <1258009987-11317-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag 12 November 2009 08:31:26 schrieb Simon Kagstrom:
-> On Thu, 12 Nov 2009 08:23:44 +0100
-> Dieter Kiermaier <dk-arm-linux@gmx.de> wrote:
-> 
-> > > When kernel is doing PCI resource assignment on ARM, nothing ever
-> > > enables PCI bridges, preventing any device behind them from working. The
-> > > following patch fixes this.
-> > 
-> > You hit it :)
-> > With your patch my FPGA works behind the bridge together with the marvell git u-boot.
-> >
-> > To see things clear:
-> > Is it possible that the marvell stock u-boot enables all devices before it starts the kernel
-> > and that's the reason why it worked if I booted the kernel from stock u-boot and it didn't
-> > work with the git u-boot?
-> 
-> The upstream (I suppose this is what you mean with "git"!) U-boot
-> doesn't touch the PCIe configuration at all as far as I know, but
-> probably the old Marvell U-boot does, and I guess that's the difference
-> we're seeing here.
-> 
-Yes i meant upstream u-boot (u-boot-marvell tree from denx git repository).
+This switches __raw_[read|write]l() for plain [read|write]l in
+the PL031 RTC driver. The sister driver for PL030 use the simple
+accessors as most PrimeCell drivers.
 
-> Anyway, if U-boot isn't using PCIe, it shouldn't touch it, so it's good
-> to get the fixes into the kernel.
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ drivers/rtc/rtc-pl031.c |   23 ++++++++++++-----------
+ 1 files changed, 12 insertions(+), 11 deletions(-)
 
-Yes. IMHO, too.
-
-> 
-> // Simon
-> 
+diff --git a/drivers/rtc/rtc-pl031.c b/drivers/rtc/rtc-pl031.c
+index f41873f..0264b11 100644
+--- a/drivers/rtc/rtc-pl031.c
++++ b/drivers/rtc/rtc-pl031.c
+@@ -51,10 +51,10 @@ static int pl031_ioctl(struct device *dev, unsigned int cmd, unsigned long arg)
+ 
+ 	switch (cmd) {
+ 	case RTC_AIE_OFF:
+-		__raw_writel(1, ldata->base + RTC_MIS);
++		writel(1, ldata->base + RTC_MIS);
+ 		return 0;
+ 	case RTC_AIE_ON:
+-		__raw_writel(0, ldata->base + RTC_MIS);
++		writel(0, ldata->base + RTC_MIS);
+ 		return 0;
+ 	}
+ 
+@@ -65,7 +65,7 @@ static int pl031_read_time(struct device *dev, struct rtc_time *tm)
+ {
+ 	struct pl031_local *ldata = dev_get_drvdata(dev);
+ 
+-	rtc_time_to_tm(__raw_readl(ldata->base + RTC_DR), tm);
++	rtc_time_to_tm(readl(ldata->base + RTC_DR), tm);
+ 
+ 	return 0;
+ }
+@@ -76,7 +76,7 @@ static int pl031_set_time(struct device *dev, struct rtc_time *tm)
+ 	struct pl031_local *ldata = dev_get_drvdata(dev);
+ 
+ 	rtc_tm_to_time(tm, &time);
+-	__raw_writel(time, ldata->base + RTC_LR);
++	writel(time, ldata->base + RTC_LR);
+ 
+ 	return 0;
+ }
+@@ -85,9 +85,9 @@ static int pl031_read_alarm(struct device *dev, struct rtc_wkalrm *alarm)
+ {
+ 	struct pl031_local *ldata = dev_get_drvdata(dev);
+ 
+-	rtc_time_to_tm(__raw_readl(ldata->base + RTC_MR), &alarm->time);
+-	alarm->pending = __raw_readl(ldata->base + RTC_RIS);
+-	alarm->enabled = __raw_readl(ldata->base + RTC_IMSC);
++	rtc_time_to_tm(readl(ldata->base + RTC_MR), &alarm->time);
++	alarm->pending = readl(ldata->base + RTC_RIS);
++	alarm->enabled = readl(ldata->base + RTC_IMSC);
+ 
+ 	return 0;
+ }
+@@ -99,8 +99,8 @@ static int pl031_set_alarm(struct device *dev, struct rtc_wkalrm *alarm)
+ 
+ 	rtc_tm_to_time(&alarm->time, &time);
+ 
+-	__raw_writel(time, ldata->base + RTC_MR);
+-	__raw_writel(!alarm->enabled, ldata->base + RTC_MIS);
++	writel(time, ldata->base + RTC_MR);
++	writel(!alarm->enabled, ldata->base + RTC_MIS);
+ 
+ 	return 0;
+ }
+@@ -180,8 +180,9 @@ err_req:
+ 
+ static struct amba_id pl031_ids[] __initdata = {
+ 	{
+-		 .id = 0x00041031,
+-	 	.mask = 0x000fffff, },
++		.id = 0x00041031,
++		.mask = 0x000fffff,
++	},
+ 	{0, 0},
+ };
+ 
+-- 
+1.6.2.5
