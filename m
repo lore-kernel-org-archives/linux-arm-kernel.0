@@ -1,25 +1,40 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Thu, 12 Nov 2009 09:43:43 +0100
-Subject: drivers/rtc/rtc-pl031.c uses __raw_readl()?
-In-Reply-To: <63386a3d0911110130j2056a355l16cade8d30edb6cd@mail.gmail.com>
-References: <63386a3d0911110130j2056a355l16cade8d30edb6cd@mail.gmail.com>
-Message-ID: <63386a3d0911120043y2143c7f5w7289bc83b2e31847@mail.gmail.com>
+From: alain@knaff.lu (Alain Knaff)
+Date: Thu, 12 Nov 2009 09:45:54 +0100
+Subject: Status of bzip2 and lzma kernel compression for ARM?
+In-Reply-To: <20091111172035.GA9682@deprecation.cyrius.com>
+References: <20091111163404.GA4362@deprecation.cyrius.com>
+	<20091111170729.GG2605@pc-ran3241.res.insa>
+	<20091111172035.GA9682@deprecation.cyrius.com>
+Message-ID: <4AFBCB42.60206@knaff.lu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/11/11 Linus Walleij <linus.ml.walleij@gmail.com>:
+On 11/11/09 18:20, Martin Michlmayr wrote:
+> * Albin Tonnerre <albin.tonnerre@free-electrons.com> [2009-11-11 18:07]:
+>> Regarding Bzip2, some testing showed that the decompressor needs at least 3.5Mb
+>> of memory available for malloc(), which is not available on ARM as head.S
+>> allocates only 64kb, so I'm sure what to do about it. At this stage, I think
+>> the most sensible thing to do is forgetting about using bzip2 on ARM.
+> 
+> I'm mostly interested in LZMA, so lack of bzip2 support would not be a
+> problem for me.
+> 
+>> The LZMA patch relies on patch 2/4 of the LZO patchset, which I
+>> resubmitted today: http://lkml.org/lkml/2009/11/11/129  I'll likely
+>> submit the LZMA patch once I get Russell's approval on the ARM part
+>> of the LZO patchset. In the
+> 
+> Excellent!  I'll give your patch a go on the weekend.
 
-> Is there some special reason as to why drivers/rtc/rtc-pl031.c uses
-> the __raw_[read|write]l() macro instead of plain [read|write]l()?
+My original patch was somehow able to do bzip2 on Arm (or at least in
+qemu's Arm  emulator). The "latest" version is for 2.6.30 (attached,
+originally posted last June). If there is sufficient interest, I'll update
+it for 2.6.31 or the latest release candidate of 2.6.32 .
 
-Reading the macro definitions I come to the conclusion that readl()
-is always little-endian and __raw_readl() is the machine endianness,
-so that if you put your ARM in BE mode or synthesize this PrimeCell
-on PPC, it will not work. PrimeCell registers are always LE I believe.
+Regards,
 
-Now none of that was exactly obvious so please correct me if I'm
-wrong!
-
-I sent a patch you can slam on.
-
-Linus Walleij
+Alain
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: arm.2.6.30.diff
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091112/e2abb313/attachment.el>
