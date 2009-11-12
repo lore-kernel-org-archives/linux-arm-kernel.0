@@ -1,60 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Nov 2009 22:32:37 +0000
-Subject: [PATCH 8/9 v2] MXC: Add a digital audio multiplexer driver
-In-Reply-To: <20091112150615.GA30179@pengutronix.de>
-References: <1258022525-21078-1-git-send-email-s.hauer@pengutronix.de>
-	<1258022525-21078-2-git-send-email-s.hauer@pengutronix.de>
-	<1258022525-21078-3-git-send-email-s.hauer@pengutronix.de>
-	<1258022525-21078-4-git-send-email-s.hauer@pengutronix.de>
-	<1258022525-21078-5-git-send-email-s.hauer@pengutronix.de>
-	<1258022525-21078-6-git-send-email-s.hauer@pengutronix.de>
-	<1258022525-21078-7-git-send-email-s.hauer@pengutronix.de>
-	<1258022525-21078-8-git-send-email-s.hauer@pengutronix.de>
-	<1258022525-21078-9-git-send-email-s.hauer@pengutronix.de>
-	<20091112150615.GA30179@pengutronix.de>
-Message-ID: <20091112223237.GF12308@n2100.arm.linux.org.uk>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Fri, 13 Nov 2009 00:17:03 +0100
+Subject: [PATCH] ARM: Prefix revision number in /proc/cpuinfo
+In-Reply-To: <20091112221307.GC12308@n2100.arm.linux.org.uk>
+References: <1258034287-4533-1-git-send-email-daniel@caiaq.de>
+	<20091112215201.GA12308@n2100.arm.linux.org.uk>
+	<20091112220314.GS14091@buzzloop.caiaq.de>
+	<20091112221307.GC12308@n2100.arm.linux.org.uk>
+Message-ID: <20091112231703.GT14091@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 12, 2009 at 04:06:15PM +0100, Sascha Hauer wrote:
-> +static int mxc_audmux_v2_init(void)
-> +{
-> +	int ret;
-> +
-> +	if (cpu_is_mx31() || cpu_is_mx35())
-> +		audmux_base = IO_ADDRESS(AUDMUX_BASE_ADDR);
-> +	else
-> +		return 0;
-> +
-> +	if (cpu_is_mx35()) {
-> +		audmux_clk = clk_get(NULL, "audmux");
-> +		if (IS_ERR(audmux_clk)) {
-> +			audmux_base = NULL;
-> +			ret = PTR_ERR(audmux_clk);
-> +			printk(KERN_ERR "%s: cannot get clock: %d\n", __func__,
-> +					ret);
-> +			return ret;
-> +		}
-> +	}
-> +
-> +	return 0;
-> +}
+On Thu, Nov 12, 2009 at 10:13:07PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Nov 12, 2009 at 11:03:14PM +0100, Daniel Mack wrote:
+> > On Thu, Nov 12, 2009 at 09:52:01PM +0000, Russell King - ARM Linux wrote:
+> > > On Thu, Nov 12, 2009 at 02:58:07PM +0100, Daniel Mack wrote:
+> > > > The revision field in /proc/cpuinfo is reported as hex number, so it
+> > > > should have a '0x' prefix to make that clear. Otherwise, parsers
+> > > > will take it as decimal number unless it contains a letter.
+> > > 
+> > > So what you're doing is possibly breaking existing parsers (which
+> > > probably already assume it is hex) to fix buggy parsers?
+> > 
+> > I wouldn't call that fixing a buggy parser. On my board, the revision is
+> > 0x101 which was parsed as 101. You can't know it is in hex unless you
+> > look at the sources.
+> 
+> However, we export lots of stuff from the kernel in hex without an '0x'
+> prefix.
+> 
+> The biggest point here, though, is that the field is already present and
+> has been used, created about 10 years ago for NetWinder stuff.  So we've
+> about 10 years of history of it being there.  Adding the '0x' prefix may
+> break existing parsers, which is a good enough reason not to change it.
+> 
+> Moreover, if you try to parse the field using strtoul, you'll generally
+> end up with it being interpreted as an _octal_ number due to the leading
+> zeros - which should be enough of a hint that it isn't a decimal number.
+> 
+> If you really feel strongly about it, then the only portable way of fixing
+> it would be to create a new entry in the file with the '0x' prefix.
 
-Hmm.  Wouldn't something like:
+Hmm, no. I think we will just force the parser to hex then. Not that
+important. It's just that all other fields in /proc/cpuinfo which are in
+hex _are_ prefixed indeed, but I see the risk of breaking existing
+parsers, so let's keep it the way it is.
 
-	if (cpu_is_mx35()) {
-		audmux_clk = clk_get(NULL, "audmux");
-		if (IS_ERR(audmux_clk)) {
-			int ret = PTR_ERR(audmux_clk);
-			printk(KERN_ERR "%s: cannot get clock: %d\n", __func__,
-					ret);
-			return ret;
-		}
-	}
-
-	if (cpu_is_mx31() || cpu_is_mx35())
-		audmux_base = IO_ADDRESS(AUDMUX_BASE_ADDR);
-
-	return 0;
-
-be a better and clearer way to write this?
+Thanks,
+Daniel
