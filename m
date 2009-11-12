@@ -1,69 +1,48 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 12 Nov 2009 19:37:18 +0100
-Subject: [PATCH] COH 901 331 fixes
-Message-ID: <1258051038-15615-1-git-send-email-linus.walleij@stericsson.com>
+From: alex@digriz.org.uk (Alexander Clouter)
+Date: Thu, 12 Nov 2009 18:44:40 +0000
+Subject: ARM: big performance waste in memcpy_{from,to}io
+References: <200911121749.49676.h.feurstein@gmail.com>
+Message-ID: <ol1us6-035.ln1@chipmunk.wormnet.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will fix some small issues with the COH 901 331 RTC driver:
-- Interrupt is disabled after alarm so that we don't fire
-  multiple interrupts.
-- We return 0 from the coh901331_alarm_irq_enable() ridding
-  a compile warning.
-- We alter the name in the U300 device registry to match that
-  of the driver so they sucessfully resolve.
+Hubert Feurstein <h.feurstein@gmail.com> wrote:
+> 
+> I'm working with an Contec Micro9 board (ep93xx-based with two Spansion-NOR-
+> Flash chips in parallel => 32bit memory-buswidth) and was wondering why the
+> read-performance of the flash (through /dev/mtd*) is so quite poor. So I 
+> connected a logic analyser to the data- and address-bus and recognized that 
+> the accesses to the same flash-word-address happens four times. This means 
+> that the flash is read byte-by-byte, which is IMO a big waste of performance 
+> since it would be possible to read the full word (four bytes) at once. So I 
+> digged around in the mtd-driver and found the function "memcpy_fromio" which 
+> is called to read the flash data. I was really surprised when looked to the 
+> implementation, which is:
+> 
+> [snipped]
+> 
+> Are there any drawbacks when using the good-and-fast "memcpy" ? On my Micro9-
+> board everything is running fine so far.
+> 
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
-I will put this into Russells tracker if the RTC maintainer
-doesn't mind.
----
- arch/arm/mach-u300/core.c   |    2 +-
- drivers/rtc/rtc-coh901331.c |   11 +++++++++++
- 2 files changed, 12 insertions(+), 1 deletions(-)
+>From bogus@does.not.exist.com  Fri Nov  6 13:01:15 2009
+From: bogus@does.not.exist.com ()
+Date: Fri, 06 Nov 2009 18:01:15 -0000
+Subject: No subject
+Message-ID: <mailman.17.1258053123.2170.linux-arm-kernel@lists.infradead.org>
 
-diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
-index be60d6d..653e25b 100644
---- a/arch/arm/mach-u300/core.c
-+++ b/arch/arm/mach-u300/core.c
-@@ -408,7 +408,7 @@ static struct platform_device keypad_device = {
- };
- 
- static struct platform_device rtc_device = {
--	.name = "rtc0",
-+	.name = "rtc-coh901331",
- 	.id = -1,
- 	.num_resources = ARRAY_SIZE(rtc_resources),
- 	.resource = rtc_resources,
-diff --git a/drivers/rtc/rtc-coh901331.c b/drivers/rtc/rtc-coh901331.c
-index 7fe1fa2..03ea530 100644
---- a/drivers/rtc/rtc-coh901331.c
-+++ b/drivers/rtc/rtc-coh901331.c
-@@ -58,7 +58,16 @@ static irqreturn_t coh901331_interrupt(int irq, void *data)
- 	clk_enable(rtap->clk);
- 	/* Ack IRQ */
- 	writel(1, rtap->virtbase + COH901331_IRQ_EVENT);
-+	/*
-+	 * Disable the interrupt. This is necessary because
-+	 * the RTC lives on a lower-clocked line and will
-+	 * not release the IRQ line until after a few (slower)
-+	 * clock cycles. The interrupt will be re-enabled when
-+	 * a new alarm is set anyway.
-+	 */
-+	writel(0, rtap->virtbase + COH901331_IRQ_MASK);
- 	clk_disable(rtap->clk);
-+
- 	/* Set alarm flag */
- 	rtc_update_irq(rtap->rtc, 1, RTC_AF);
- 
-@@ -128,6 +137,8 @@ static int coh901331_alarm_irq_enable(struct device *dev, unsigned int enabled)
- 	else
- 		writel(0, rtap->virtbase + COH901331_IRQ_MASK);
- 	clk_disable(rtap->clk);
-+
-+	return 0;
- }
- 
- static struct rtc_class_ops coh901331_ops = {
+NOR's too) do *not* support 32bit wide read's.  For example, if I 
+remember correctly, the NAND driver for orion will let you read 32bits 
+but write only 8bits at a time.  Other platforms are only 8bit wide in 
+both direction.  I guess the 'slow' memcpy version is used as 
+*everything* supports 8bit reads....I *guess* :)
+
+For the NAND world, we have plat_nand and you can populate 
+(read|write)_buf with your optimised version; of course you are using 
+NOR so I have no idea if you have to treat that differently....
+
+Cheers
+
 -- 
-1.6.2.1
+Alexander Clouter
+.sigmonster says: Make sure your code does nothing gracefully.
