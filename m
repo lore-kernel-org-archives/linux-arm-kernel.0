@@ -1,62 +1,38 @@
-From: alex@digriz.org.uk (Alexander Clouter)
-Date: Thu, 12 Nov 2009 15:42:49 +0000
-Subject: [PATCH] [ARM] Kirkwood: Prevent kernel from crashing if PCIe
-	bridge?is present
-References: <200911121519.42786.dk-arm-linux@gmx.de>
-Message-ID: <p0nts6-gt3.ln1@chipmunk.wormnet.eu>
+From: rdunlap@xenotime.net (Randy Dunlap)
+Date: Thu, 12 Nov 2009 08:46:58 -0800
+Subject: [PATCH 0/8] enable pxa168 LCD on two platform
+In-Reply-To: <10f740e80911112347o45ddc2ck1515220914b4c38f@mail.gmail.com>
+References: <7c34ac520911100011x60a354b0mf2e27e1c5fd0422@mail.gmail.com>
+	<20091111155058.4f8d355e.akpm@linux-foundation.org>
+	<4AFB4EA4.3060608@xenotime.net>
+	<10f740e80911112347o45ddc2ck1515220914b4c38f@mail.gmail.com>
+Message-ID: <20091112084658.3ca67cb2.rdunlap@xenotime.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dieter Kiermaier <dk-arm-linux@gmx.de> wrote:
->
-> [snipped]
+On Thu, 12 Nov 2009 08:47:49 +0100 Geert Uytterhoeven wrote:
+
+> On Thu, Nov 12, 2009 at 00:54, Randy Dunlap <rdunlap@xenotime.net> wrote:
+> > Andrew Morton wrote:
+> >> On Tue, 10 Nov 2009 16:11:56 +0800
+> >> Jun Nie <niej0001@gmail.com> wrote:
+> >>
+> >>> To: linux-arm-kernel at lists.infradead.org, linux-fbdev at vger.kernel.org
+> >>
+> >> I don't think linux-fbdev at vger.kernel.org exists? ?You wanted
+> >> linux-fbdev-devel at lists.sourceforge.net ?
+> >
+> > actually it does exist, but it's not used AFAIK.
+> > http://vger.kernel.org/vger-lists.html#linux-fbdev
+> >
+> > The sourceforge list is the one listed in the MAINTAINERS file.
 > 
-> static int __init openrd_base_pci_init(void)
-> {
-> +       u32 cpu_config_reg;
-> +       void __iomem *base;
-> +       base = ioremap(0xf1020100, 4);
->
-Ewwwwwwww. :)
+> Sending a patch to change that is on my (long) TODO list...
 
-If you dig through arch/arm/mach-orion5x/include/mach/orion5x.h you 
-should be able to work out that 0xf1020100 is probably best replaced 
-with something like (ORION5X_BRIDGE_PHYS_BASE | 0x100), once you add
-a matching ORION5X_BRIDGE_PHYS_BASE entry alongside the
-ORION5X_BRIDGE_VIRT_BASE[1].  Well, *I* prefer that sort of thing. :)
+That patch is the easy part.
 
-> +       if (base)
-> +       {
-> +               cpu_config_reg = readl(base);
-> +               cpu_config_reg &= ~(1 << 2);
-> +               writel(cpu_config_reg, base);
-> +       }
-> +       iounmap(base);
-> +
->        if (machine_is_openrd_base())
->                kirkwood_pcie_init();
-> -
->        return 0;
->  }
-> subsys_initcall(openrd_base_pci_init);
->
-As was recently explained to me[2], that code is going to run on *all* 
-kirkword platforms, not just the OpenRD.  I am guessing you want to 
-shove your additional code into a seperate int returning __init function 
-and call it from the machine_is_openrd_base() clause.
+We also need to have the new list archived and somehow do away
+with the old mailing list.
 
-Also, if for some strange reason the ioremap() failed, you are going to 
-call iounmap(NULL) so that should probably be moved up a line into the 
-'if' clause?  However on this one I *think* I have been told in the past 
-it cannot fail so you might be able to remove the 'if' clause 
-altogether.
-
-Cheers
-
-[1] unsure if at that point can can just jump straight in and tinker with
-	ORION5X_BRIDGE_VIRT_BASE?
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2009-October/002699.html
-
--- 
-Alexander Clouter
-.sigmonster says: Most people's favorite way to end a game is by winning.
+---
+~Randy
