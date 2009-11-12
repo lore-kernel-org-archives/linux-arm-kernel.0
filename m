@@ -1,34 +1,24 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 12 Nov 2009 08:40:59 +0100
-Subject: [PATCH 3/6] gta02: set pcf50633 charger_reference_current_ma
-In-Reply-To: <20091111153143.GA1610@oksana.dev.rtsoft.ru>
-References: <1257369899-325-1-git-send-email-fercerpav@gmail.com>
-	<1257369899-325-2-git-send-email-fercerpav@gmail.com>
-	<1257369899-325-3-git-send-email-fercerpav@gmail.com>
-	<20091111134844.GB22476@home.pavel.comp>
-	<20091111153143.GA1610@oksana.dev.rtsoft.ru>
-Message-ID: <20091112074059.GB11365@elf.ucw.cz>
+From: dk-arm-linux@gmx.de (Dieter Kiermaier)
+Date: Thu, 12 Nov 2009 18:26:06 +0100
+Subject: PCI hotplug supported on ARM (Kirkwood)?
+Message-ID: <200911121826.06792.dk-arm-linux@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2009-11-11 18:31:43, Anton Vorontsov wrote:
-> On Wed, Nov 11, 2009 at 04:48:44PM +0300, Paul Fertser wrote:
-> > Hi,
-> > 
-> > Ben, please give us an advice on how to proceed with this rather
-> > trivial patch. Anton doesn't merge the other patches from this series
-> > because we do not know via which tree to merge this particular patch.
-> 
-> Paul, I'll just merge the whole patch set but skip this particular
-> patch.
+Hi list,
 
-Feel free to merge that patch, too. It is clearly related to the
-other stuff, and Russell being totally unresponsive should not be
-reason to block patches.
+is it possible to boot a FPGA which is connected to an PCI bus on a kirkwood cpu (via a pcie->pci bridge)
+at runtime (I call it hotplug)?
 
-He is the maintainer, he was cc-ed, and at this point it is quite
-clear that he does not care.
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+And after booting the FPGA e.g. via slave serial protocol loading the pci driver and access the device?
+This would be much easier to handle than flashing the fpga using u-boot.
+
+Is there any special framework I have to use? How can I tell the kernel to reenumerate the bus and reasign
+the pci resources?
+
+I have googled a lot and also tried to find something at newsgroups or mailinglists but I haven't found some
+valuable information - at least not for me ;).
+Is this possible?
+
+Many thanks,
+Dieter
