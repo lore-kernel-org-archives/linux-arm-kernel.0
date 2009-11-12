@@ -1,35 +1,43 @@
-From: simon.kagstrom@netinsight.net (Simon Kagstrom)
-Date: Thu, 12 Nov 2009 08:53:03 +0100
-Subject: drivers/mtd/nand/orion_nand.c build failure with old ABI
-In-Reply-To: <alpine.LFD.2.00.0911111054500.16711@xanadu.home>
-References: <20091111153223.GA3688@deprecation.cyrius.com>
-	<alpine.LFD.2.00.0911111054500.16711@xanadu.home>
-Message-ID: <20091112085303.213dc75c@marrow.netinsight.se>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 12 Nov 2009 09:21:44 +0100
+Subject: [PATCH] Update Samsung S5PC100 SoC support
+Message-ID: <1258014122-18185-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 Nov 2009 10:55:43 -0500 (EST)
-Nicolas Pitre <nico@fluxnic.net> wrote:
+Hello,
 
-> On Wed, 11 Nov 2009, Martin Michlmayr wrote:
-> 
-> > drivers/mtd/nand/orion_nand.c fails to build when EABI is not set:
-> > 
-> >   CC      drivers/mtd/nand/orion_nand.o
-> > /tmp/ccDFyfwN.s: Assembler messages:
-> > /tmp/ccDFyfwN.s:120: Error: first destination register must be even -- `ldrd r3,[ip]'
-> > make[3]: *** [drivers/mtd/nand/orion_nand.o] Error 1
-> > make[2]: *** [drivers/mtd/nand] Error 2
-> 
-> Grrrrr.  Let me think of a workaround.
+This patch series updates Samsung S5PC100 SoC support. S5PC100 platform
+core has been extended with new clocks hierarchy implementation, gpio lib,
+support for external and gpio interrupts and some basics of power
+management (cpu idle and system reset). Also platform helpers for
+s3c framebuffer, i2c and hsmmc drivers has been added.
 
-Interesting problem. I looked in the GCC manual for a matching
-constraint to satisfy this, but didn't find anything that seems to fit
-right away. SPARC has the
+All these patches has been tested on SMDKC100 board.
 
-    `U'      Even register
+This patch series has been prepared against latest ARM Kernel tree from
+http://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-2.6-arm.git/
 
-constraint, and perhaps it would be make good sense to have the same
-for ARM. Not that it helps right the current situation, but anyway :-)
+This is a second version of this patch series. I've tried to address all
+the issues reported here on the mailing list.
 
-// Simon
+This patch series includes:
+
+[PATCH 01/18] ARM: MM: use 64bytes of L1 cache on plat S5PC1xx
+[PATCH 02/18] ARM: S5PC1XX: registers rename
+[PATCH 03/18] ARM: S5PC1XX: clock registers rename
+[PATCH 04/18] ARM: S5PC1XX: clocks reimplementation
+[PATCH 05/18] ARM: S5PC1XX: add GPIO L banks to register definition
+[PATCH 06/18] ARM: S5PC1XX: GPIO registers rename
+[PATCH 07/18] ARM: S5PC1xx: add gpiolib and external/gpio interrupt support
+[PATCH 08/18] ARM: S5PC1XX: add cpu idle and system reset support
+[PATCH 09/18] ARM: S3C: Prepare s3c64xx-specific s3c-fb register definition for reuse
+[PATCH 10/18] ARM: S5PC1xx: add platform helpers for s3c-fb device
+[PATCH 11/18] SMDKC100: enable S3C FrameBuffer
+[PATCH 12/18] drivers: fb: enable S3C FrameBuffer on S5PC1XX platform
+[PATCH 13/18] ARM: S5PC1xx: add platform helpers for i2c adapter devices
+[PATCH 14/18] SMDKC100: add I2C0 and I2C1 buses support
+[PATCH 15/18] drivers: i2c: s3c2410-i2c also on S5PC1XX platform
+[PATCH 16/18] ARM: S5PC1xx: add platform helpers for SDHCI host controllers
+[PATCH 17/18] SMDKC100: add SDHCI controllers 0, 1 and 2 support
+[PATCH 18/18] drivers: MMC: enable SDHCI-S3C on S5PC1XX platform
