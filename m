@@ -1,34 +1,62 @@
-From: srk@ti.com (Govindarajan, Sriramakrishnan)
-Date: Thu, 12 Nov 2009 21:28:58 +0530
-Subject: NAND: failure reported with mtd_oobtest(read delay violated)
-Message-ID: <FCCFB4CDC6E5564B9182F639FC35608702FA5CC012@dbde02.ent.ti.com>
+From: alex@digriz.org.uk (Alexander Clouter)
+Date: Thu, 12 Nov 2009 15:42:49 +0000
+Subject: [PATCH] [ARM] Kirkwood: Prevent kernel from crashing if PCIe
+	bridge?is present
+References: <200911121519.42786.dk-arm-linux@gmx.de>
+Message-ID: <p0nts6-gt3.ln1@chipmunk.wormnet.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-On the OMAP3 EVM platform we are seeing failures when we run the mtd_oobtest repeatedly (overnight). Usually the failures are reported after 40-45 iterations.
+Dieter Kiermaier <dk-arm-linux@gmx.de> wrote:
+>
+> [snipped]
+> 
+> static int __init openrd_base_pci_init(void)
+> {
+> +       u32 cpu_config_reg;
+> +       void __iomem *base;
+> +       base = ioremap(0xf1020100, 4);
+>
+Ewwwwwwww. :)
 
-Further analysis with logic analyzer seems to indicate that for the specific instance where failure is observed, the time delay between dispatching the READ0 command and the start of read operation is violated. (udelay loop would start even before the write is reflected on the HW)
+If you dig through arch/arm/mach-orion5x/include/mach/orion5x.h you 
+should be able to work out that 0xf1020100 is probably best replaced 
+with something like (ORION5X_BRIDGE_PHYS_BASE | 0x100), once you add
+a matching ORION5X_BRIDGE_PHYS_BASE entry alongside the
+ORION5X_BRIDGE_VIRT_BASE[1].  Well, *I* prefer that sort of thing. :)
 
-OMAP3EVM implementation relies on command delay(chip_delay set to 50ms) and doesn't use wait pin monitoring. By adding a data memory barrier dmb() instruction right after the command phase the issue seems to be resolved.
+> +       if (base)
+> +       {
+> +               cpu_config_reg = readl(base);
+> +               cpu_config_reg &= ~(1 << 2);
+> +               writel(cpu_config_reg, base);
+> +       }
+> +       iounmap(base);
+> +
+>        if (machine_is_openrd_base())
+>                kirkwood_pcie_init();
+> -
+>        return 0;
+>  }
+> subsys_initcall(openrd_base_pci_init);
+>
+As was recently explained to me[2], that code is going to run on *all* 
+kirkword platforms, not just the OpenRD.  I am guessing you want to 
+shove your additional code into a seperate int returning __init function 
+and call it from the machine_is_openrd_base() clause.
 
-Have we seen similar behavior on other platforms that rely on command delay and do we specifically require a dmb() after the command is written?
+Also, if for some strange reason the ioremap() failed, you are going to 
+call iounmap(NULL) so that should probably be moved up a line into the 
+'if' clause?  However on this one I *think* I have been told in the past 
+it cannot fail so you might be able to remove the 'if' clause 
+altogether.
 
-DIFF Details:(will post this a patch once I hear your review comments)
+Cheers
 
-diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-index 2211386..8df3780 100644
---- a/drivers/mtd/nand/nand_base.c
-+++ b/drivers/mtd/nand/nand_base.c
-@@ -651,6 +651,7 @@ static void nand_command_lp(struct mtd_info *mtd, unsigned int command,
-                               NAND_NCE | NAND_CLE | NAND_CTRL_CHANGE);
-                chip->cmd_ctrl(mtd, NAND_CMD_NONE,
-                               NAND_NCE | NAND_CTRL_CHANGE);
-+               dmb();
+[1] unsure if at that point can can just jump straight in and tinker with
+	ORION5X_BRIDGE_VIRT_BASE?
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2009-October/002699.html
 
-                /* This applies to read commands */
-        default:
-
-
-Regards
-Sriram
+-- 
+Alexander Clouter
+.sigmonster says: Most people's favorite way to end a game is by winning.
