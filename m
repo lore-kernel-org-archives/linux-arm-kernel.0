@@ -1,59 +1,69 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 12 Nov 2009 10:36:26 -0800
-Subject: [GIT PULL] omap-fixes for v2.6.32-rc6
-Message-ID: <20091112183626.GY24837@atomide.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 12 Nov 2009 19:37:18 +0100
+Subject: [PATCH] COH 901 331 fixes
+Message-ID: <1258051038-15615-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+This will fix some small issues with the COH 901 331 RTC driver:
+- Interrupt is disabled after alarm so that we don't fire
+  multiple interrupts.
+- We return 0 from the coh901331_alarm_irq_enable() ridding
+  a compile warning.
+- We alter the name in the U300 device registry to match that
+  of the driver so they sucessfully resolve.
 
-Please pull omap fixes from:
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+I will put this into Russells tracker if the RTC maintainer
+doesn't mind.
+---
+ arch/arm/mach-u300/core.c   |    2 +-
+ drivers/rtc/rtc-coh901331.c |   11 +++++++++++
+ 2 files changed, 12 insertions(+), 1 deletions(-)
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-
-Regards,
-
-Tony
-
-
-The following changes since commit b419148e567728f6af0c3b01965c1cc141e3e13a:
-  Linus Torvalds (1):
-        Linux 2.6.32-rc6
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-
-Grazvydas Ignotas (2):
-      omap3: pandora: Fix keypad keymap
-      omap3: update Pandora defconfig
-
-Janusz Krzysztofik (2):
-      omap: Fix omapfb/lcdc on OMAP1510 broken when PM set
-      omap1: Amstrad Delta defconfig fixes
-
-Jarkko Nikula (1):
-      omap3: beagle: Fix USB host port power control
-
-Mike Turquette (1):
-      omap3: Decrease cpufreq transition latency
-
-Sergio Aguirre (1):
-      omap3: 3430sdp: Enable Linux Regulator framework
-
-Tao Hu (1):
-      omap: Fix race condition in omap dma driver
-
-Tobias Klauser (1):
-      omap: Use resource_size
-
- arch/arm/configs/ams_delta_defconfig     |   24 +++++++---
- arch/arm/configs/omap3_pandora_defconfig |   49 +++++++++++++++++--
- arch/arm/configs/omap_3430sdp_defconfig  |    9 +++-
- arch/arm/mach-omap2/board-omap3beagle.c  |    2 +-
- arch/arm/mach-omap2/board-omap3pandora.c |   78 +++++++++++++++---------------
- arch/arm/mach-omap2/gpmc.c               |    2 +-
- arch/arm/mach-omap2/mailbox.c            |    2 +-
- arch/arm/plat-omap/cpu-omap.c            |    2 +-
- arch/arm/plat-omap/dma.c                 |   14 +++++
- 9 files changed, 126 insertions(+), 56 deletions(-)
+diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
+index be60d6d..653e25b 100644
+--- a/arch/arm/mach-u300/core.c
++++ b/arch/arm/mach-u300/core.c
+@@ -408,7 +408,7 @@ static struct platform_device keypad_device = {
+ };
+ 
+ static struct platform_device rtc_device = {
+-	.name = "rtc0",
++	.name = "rtc-coh901331",
+ 	.id = -1,
+ 	.num_resources = ARRAY_SIZE(rtc_resources),
+ 	.resource = rtc_resources,
+diff --git a/drivers/rtc/rtc-coh901331.c b/drivers/rtc/rtc-coh901331.c
+index 7fe1fa2..03ea530 100644
+--- a/drivers/rtc/rtc-coh901331.c
++++ b/drivers/rtc/rtc-coh901331.c
+@@ -58,7 +58,16 @@ static irqreturn_t coh901331_interrupt(int irq, void *data)
+ 	clk_enable(rtap->clk);
+ 	/* Ack IRQ */
+ 	writel(1, rtap->virtbase + COH901331_IRQ_EVENT);
++	/*
++	 * Disable the interrupt. This is necessary because
++	 * the RTC lives on a lower-clocked line and will
++	 * not release the IRQ line until after a few (slower)
++	 * clock cycles. The interrupt will be re-enabled when
++	 * a new alarm is set anyway.
++	 */
++	writel(0, rtap->virtbase + COH901331_IRQ_MASK);
+ 	clk_disable(rtap->clk);
++
+ 	/* Set alarm flag */
+ 	rtc_update_irq(rtap->rtc, 1, RTC_AF);
+ 
+@@ -128,6 +137,8 @@ static int coh901331_alarm_irq_enable(struct device *dev, unsigned int enabled)
+ 	else
+ 		writel(0, rtap->virtbase + COH901331_IRQ_MASK);
+ 	clk_disable(rtap->clk);
++
++	return 0;
+ }
+ 
+ static struct rtc_class_ops coh901331_ops = {
+-- 
+1.6.2.1
