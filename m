@@ -1,60 +1,46 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 12 Nov 2009 22:56:29 +0100
-Subject: [PATCH] [ARM] IMX: don't disable the uart clock if DEBUG_LL uses it
-Message-ID: <1258062989-14493-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 Nov 2009 21:59:47 +0000
+Subject: [PATCH 3/6] gta02: set pcf50633 charger_reference_current_ma
+In-Reply-To: <20091112074059.GB11365@elf.ucw.cz>
+References: <1257369899-325-1-git-send-email-fercerpav@gmail.com>
+	<1257369899-325-2-git-send-email-fercerpav@gmail.com>
+	<1257369899-325-3-git-send-email-fercerpav@gmail.com>
+	<20091111134844.GB22476@home.pavel.comp>
+	<20091111153143.GA1610@oksana.dev.rtsoft.ru>
+	<20091112074059.GB11365@elf.ucw.cz>
+Message-ID: <20091112215947.GB12308@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before the clock was left enabled only for DEBUG_LL_CONSOLE which
-requires an additional patch to exist at all.  With this patch applied
-DEBUG_LL_CONSOLE depends on DEBUG_LL, so this doesn't break.
+On Thu, Nov 12, 2009 at 08:40:59AM +0100, Pavel Machek wrote:
+> On Wed 2009-11-11 18:31:43, Anton Vorontsov wrote:
+> > On Wed, Nov 11, 2009 at 04:48:44PM +0300, Paul Fertser wrote:
+> > > Hi,
+> > > 
+> > > Ben, please give us an advice on how to proceed with this rather
+> > > trivial patch. Anton doesn't merge the other patches from this series
+> > > because we do not know via which tree to merge this particular patch.
+> > 
+> > Paul, I'll just merge the whole patch set but skip this particular
+> > patch.
+> 
+> Feel free to merge that patch, too. It is clearly related to the
+> other stuff, and Russell being totally unresponsive should not be
+> reason to block patches.
+> 
+> He is the maintainer, he was cc-ed, and at this point it is quite
+> clear that he does not care.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-mx2/clock_imx21.c |    2 +-
- arch/arm/mach-mx2/clock_imx27.c |    2 +-
- arch/arm/mach-mx3/clock-imx35.c |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+Err, WTF?  How do you come to the conclusion that I'm somehow related
+to Samsung stuff, or GTA03 stuff?  Oh, that's right, you don't let facts
+get in the way of blaming me for something.
 
-diff --git a/arch/arm/mach-mx2/clock_imx21.c b/arch/arm/mach-mx2/clock_imx21.c
-index eede798..91901b5 100644
---- a/arch/arm/mach-mx2/clock_imx21.c
-+++ b/arch/arm/mach-mx2/clock_imx21.c
-@@ -1000,7 +1000,7 @@ int __init mx21_clocks_init(unsigned long lref, unsigned long href)
- 	clk_enable(&per_clk[0]);
- 	clk_enable(&gpio_clk);
- 
--#ifdef CONFIG_DEBUG_LL_CONSOLE
-+#if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_ICEDCC)
- 	clk_enable(&uart_clk[0]);
- #endif
- 
-diff --git a/arch/arm/mach-mx2/clock_imx27.c b/arch/arm/mach-mx2/clock_imx27.c
-index ff5e332..f79af9b 100644
---- a/arch/arm/mach-mx2/clock_imx27.c
-+++ b/arch/arm/mach-mx2/clock_imx27.c
-@@ -751,7 +751,7 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk_enable(&emi_clk);
- 	clk_enable(&iim_clk);
- 
--#ifdef CONFIG_DEBUG_LL_CONSOLE
-+#if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_ICEDCC)
- 	clk_enable(&uart1_clk);
- #endif
- 
-diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
-index c595260..f221b42 100644
---- a/arch/arm/mach-mx3/clock-imx35.c
-+++ b/arch/arm/mach-mx3/clock-imx35.c
-@@ -456,7 +456,7 @@ int __init mx35_clocks_init()
- 	int i;
- 	unsigned int ll = 0;
- 
--#ifdef CONFIG_DEBUG_LL_CONSOLE
-+#if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_ICEDCC)
- 	ll = (3 << 16);
- #endif
- 
--- 
-1.6.5.2
+The GTA03 stuff is Samsung stuff.  I've never had much to do with
+Samsung stuff.  I'm certainly not the maintainer for it - that's
+Ben Dooks domain.
+
+I've been ignoring this because as far as I can see, it's got nothing
+to do with me, and therefore its pointless me acking it.
+
+Really Pavel, just take a moment to get your facts straight before you
+start blaming people.
