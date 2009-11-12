@@ -1,23 +1,13 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 12 Nov 2009 09:21:59 +0100
-Subject: [PATCH 15/18] drivers: i2c: s3c2410-i2c also on S5PC1XX platform
-In-Reply-To: <1258014122-18185-15-git-send-email-m.szyprowski@samsung.com>
+Date: Thu, 12 Nov 2009 09:21:49 +0100
+Subject: [PATCH 05/18] ARM: S5PC1XX: add GPIO L banks to register definition
+In-Reply-To: <1258014122-18185-5-git-send-email-m.szyprowski@samsung.com>
 References: <1258014122-18185-1-git-send-email-m.szyprowski@samsung.com>
 	<1258014122-18185-2-git-send-email-m.szyprowski@samsung.com>
 	<1258014122-18185-3-git-send-email-m.szyprowski@samsung.com>
 	<1258014122-18185-4-git-send-email-m.szyprowski@samsung.com>
 	<1258014122-18185-5-git-send-email-m.szyprowski@samsung.com>
-	<1258014122-18185-6-git-send-email-m.szyprowski@samsung.com>
-	<1258014122-18185-7-git-send-email-m.szyprowski@samsung.com>
-	<1258014122-18185-8-git-send-email-m.szyprowski@samsung.com>
-	<1258014122-18185-9-git-send-email-m.szyprowski@samsung.com>
-	<1258014122-18185-10-git-send-email-m.szyprowski@samsung.com>
-	<1258014122-18185-11-git-send-email-m.szyprowski@samsung.com>
-	<1258014122-18185-12-git-send-email-m.szyprowski@samsung.com>
-	<1258014122-18185-13-git-send-email-m.szyprowski@samsung.com>
-	<1258014122-18185-14-git-send-email-m.szyprowski@samsung.com>
-	<1258014122-18185-15-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1258014122-18185-16-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1258014122-18185-6-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,28 +15,87 @@ From: Kyungmin Park <kyungmin.park@samsung.com>
 
 From: Kyungmin Park <kyungmin.park@samsung.com>
 
-Samsung S5PC100 SoC has I2C controllers directly compatible to the one
-known from S3C24x0 SoCs. Enable support for s3c-i2c driver also on S5PC1xx
-platform.
+Add GPIO L0-L4 banks to register definition.
 
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/i2c/busses/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-s5pc100/include/mach/gpio.h |   30 ++++++++++++++++++++++------
+ 1 files changed, 23 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-index 737335f..5b173f3 100644
---- a/drivers/i2c/busses/Kconfig
-+++ b/drivers/i2c/busses/Kconfig
-@@ -494,7 +494,7 @@ config I2C_PXA_SLAVE
+diff --git a/arch/arm/mach-s5pc100/include/mach/gpio.h b/arch/arm/mach-s5pc100/include/mach/gpio.h
+index c74fc93..5d22961 100644
+--- a/arch/arm/mach-s5pc100/include/mach/gpio.h
++++ b/arch/arm/mach-s5pc100/include/mach/gpio.h
+@@ -47,6 +47,11 @@
+ #define S5PC1XX_GPIO_K1_NR	(6)
+ #define S5PC1XX_GPIO_K2_NR	(8)
+ #define S5PC1XX_GPIO_K3_NR	(8)
++#define S5PC1XX_GPIO_L0_NR	(8)
++#define S5PC1XX_GPIO_L1_NR	(8)
++#define S5PC1XX_GPIO_L2_NR	(8)
++#define S5PC1XX_GPIO_L3_NR	(8)
++#define S5PC1XX_GPIO_L4_NR	(8)
+ #define S5PC1XX_GPIO_MP00_NR	(8)
+ #define S5PC1XX_GPIO_MP01_NR	(8)
+ #define S5PC1XX_GPIO_MP02_NR	(8)
+@@ -64,9 +69,9 @@
+ 	((__gpio##_START) + (__gpio##_NR) + CONFIG_S3C_GPIO_SPACE + 1)
  
- config I2C_S3C2410
- 	tristate "S3C2410 I2C Driver"
--	depends on ARCH_S3C2410 || ARCH_S3C64XX
-+	depends on ARCH_S3C2410 || ARCH_S3C64XX || ARCH_S5PC1XX
- 	help
- 	  Say Y here to include support for I2C controller in the
- 	  Samsung S3C2410 based System-on-Chip devices.
+ enum s3c_gpio_number {
+-	S5PC1XX_GPIO_A0_START 	= 0,
+-	S5PC1XX_GPIO_A1_START 	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_A0),
+-	S5PC1XX_GPIO_B_START 	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_A1),
++	S5PC1XX_GPIO_A0_START	= 0,
++	S5PC1XX_GPIO_A1_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_A0),
++	S5PC1XX_GPIO_B_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_A1),
+ 	S5PC1XX_GPIO_C_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_B),
+ 	S5PC1XX_GPIO_D_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_C),
+ 	S5PC1XX_GPIO_E0_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_D),
+@@ -93,11 +98,17 @@ enum s3c_gpio_number {
+ 	S5PC1XX_GPIO_K1_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_K0),
+ 	S5PC1XX_GPIO_K2_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_K1),
+ 	S5PC1XX_GPIO_K3_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_K2),
+-	S5PC1XX_GPIO_MP00_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_K3),
++	S5PC1XX_GPIO_L0_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_K3),
++	S5PC1XX_GPIO_L1_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_L0),
++	S5PC1XX_GPIO_L2_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_L1),
++	S5PC1XX_GPIO_L3_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_L2),
++	S5PC1XX_GPIO_L4_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_L3),
++	S5PC1XX_GPIO_MP00_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_L4),
+ 	S5PC1XX_GPIO_MP01_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_MP00),
+ 	S5PC1XX_GPIO_MP02_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_MP01),
+ 	S5PC1XX_GPIO_MP03_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_MP02),
+ 	S5PC1XX_GPIO_MP04_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_MP03),
++	S5PC1XX_GPIO_END	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_MP04),
+ };
+ 
+ /* S5PC1XX GPIO number definitions. */
+@@ -130,17 +141,22 @@ enum s3c_gpio_number {
+ #define S5PC1XX_GPK1(_nr)	(S5PC1XX_GPIO_K1_START + (_nr))
+ #define S5PC1XX_GPK2(_nr)	(S5PC1XX_GPIO_K2_START + (_nr))
+ #define S5PC1XX_GPK3(_nr)	(S5PC1XX_GPIO_K3_START + (_nr))
++#define S5PC1XX_GPL0(_nr)	(S5PC1XX_GPIO_L0_START + (_nr))
++#define S5PC1XX_GPL1(_nr)	(S5PC1XX_GPIO_L1_START + (_nr))
++#define S5PC1XX_GPL2(_nr)	(S5PC1XX_GPIO_L2_START + (_nr))
++#define S5PC1XX_GPL3(_nr)	(S5PC1XX_GPIO_L3_START + (_nr))
++#define S5PC1XX_GPL4(_nr)	(S5PC1XX_GPIO_L4_START + (_nr))
+ #define S5PC1XX_MP00(_nr)	(S5PC1XX_GPIO_MP00_START + (_nr))
+ #define S5PC1XX_MP01(_nr)	(S5PC1XX_GPIO_MP01_START + (_nr))
+ #define S5PC1XX_MP02(_nr)	(S5PC1XX_GPIO_MP02_START + (_nr))
+ #define S5PC1XX_MP03(_nr)	(S5PC1XX_GPIO_MP03_START + (_nr))
+ #define S5PC1XX_MP04(_nr)	(S5PC1XX_GPIO_MP04_START + (_nr))
++#define S5PC1XX_MP05(_nr)	(S5PC1XX_GPIO_MP05_START + (_nr))
+ 
+-/* the end of the S5PC1XX specific gpios */
+-#define S5PC1XX_GPIO_END	(S5PC1XX_MP04(S5PC1XX_GPIO_MP04_NR) + 1)
++/* It used the end of the S5PC1XX gpios */
+ #define S3C_GPIO_END		S5PC1XX_GPIO_END
+ 
+ /* define the number of gpios we need to the one after the MP04() range */
+-#define ARCH_NR_GPIOS	(S5PC1XX_MP04(S5PC1XX_GPIO_MP04_NR) + 1)
++#define ARCH_NR_GPIOS		(S5PC1XX_GPIO_END + 1)
+ 
+ #include <asm-generic/gpio.h>
 -- 
 1.6.5
