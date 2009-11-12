@@ -1,44 +1,45 @@
 From: niej0001@gmail.com (Jun Nie)
-Date: Thu, 12 Nov 2009 10:17:21 +0800
-Subject: [PATCH 3/8] pxa: fix offset setting at initialization
-In-Reply-To: <7c34ac520911100012w3b441c50w9dffaa1100bcd5b7@mail.gmail.com>
-References: <7c34ac520911100012w3b441c50w9dffaa1100bcd5b7@mail.gmail.com>
-Message-ID: <7c34ac520911111817v22ff06dboc7d5f3c2e3da3126@mail.gmail.com>
+Date: Thu, 12 Nov 2009 10:17:47 +0800
+Subject: [PATCH 4/8] pxa: delete redundant vsync/hsync revert flag
+In-Reply-To: <7c34ac520911100012x3dfa948bn3e5106fc4c7c04f9@mail.gmail.com>
+References: <7c34ac520911100012x3dfa948bn3e5106fc4c7c04f9@mail.gmail.com>
+Message-ID: <7c34ac520911111817v169c88e1oea50457264490447@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 2009/11/10 Jun Nie <niej0001@gmail.com>:
-> From c4f8923a0d532a1f1b5defed639ef818a0d7a270 Mon Sep 17 00:00:00 2001
+> From f0ba46eda943db08e60bcfe536f876f09165a64c Mon Sep 17 00:00:00 2001
 > From: Jun Nie <njun@marvell.com>
-> Date: Tue, 10 Nov 2009 09:33:49 +0800
-> Subject: [PATCH] pxa: fix offset setting at initialization
+> Date: Tue, 10 Nov 2009 15:11:36 +0800
+> Subject: [PATCH] pxa: delete redundant ?vsync/hsync revert flag
+> ? ? ?var.sync can cover its function
 >
 > Signed-off-by: Jun Nie <njun@marvell.com>
 > ---
-> ?drivers/video/pxa168fb.c | ? ?1 +
-> ?1 files changed, 1 insertions(+), 0 deletions(-)
+> ?include/video/pxa168fb.h | ? ?2 --
+> ?1 files changed, 0 insertions(+), 2 deletions(-)
 >
-> diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
-> index 50f72e9..55c69a1 100644
-> --- a/drivers/video/pxa168fb.c
-> +++ b/drivers/video/pxa168fb.c
-> @@ -765,6 +765,7 @@ static int __init pxa168fb_probe(struct
-> platform_device *pdev)
-> ? ? ? ?}
->
-> ? ? ? ?info->fix.smem_start = (unsigned long)fbi->fb_start_dma;
-> + ? ? ? set_graphics_start(info, 0, 0);
->
-> ? ? ? ?/*
-> ? ? ? ? * Set video mode according to platform data.
+> diff --git a/include/video/pxa168fb.h b/include/video/pxa168fb.h
+> index 024767c..efbe469 100644
+> --- a/include/video/pxa168fb.h
+> +++ b/include/video/pxa168fb.h
+> @@ -142,8 +142,6 @@ struct pxa168fb_mach_info {
+> ? ? ? ?unsigned ? ? ? ?invert_composite_blank:1;
+> ? ? ? ?unsigned ? ? ? ?invert_pix_val_ena:1;
+> ? ? ? ?unsigned ? ? ? ?invert_pixclock:1;
+> - ? ? ? unsigned ? ? ? ?invert_vsync:1;
+> - ? ? ? unsigned ? ? ? ?invert_hsync:1;
+> ? ? ? ?unsigned ? ? ? ?panel_rbswap:1;
+> ? ? ? ?unsigned ? ? ? ?active:1;
+> ? ? ? ?unsigned ? ? ? ?enable_lcd:1;
 > --
 > 1.5.4.3
 >
 patch attached.
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: 0003-pxa-fix-offset-setting-at-initialization.patch
+Name: 0004-pxa-delete-redundant-vsync-hsync-revert-flag.patch
 Type: text/x-diff
-Size: 740 bytes
+Size: 822 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091112/8a36a698/attachment.bin>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091112/65bf3ba5/attachment.bin>
