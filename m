@@ -1,33 +1,16 @@
-From: tbm@cyrius.com (Martin Michlmayr)
-Date: Thu, 12 Nov 2009 21:06:31 +0000
-Subject: [PATCH v3 2/4] Add support for LZO-compressed kernels for ARM
-In-Reply-To: <1257942478-18719-3-git-send-email-albin.tonnerre@free-electrons.com>
-References: <1257942478-18719-1-git-send-email-albin.tonnerre@free-electrons.com>
-	<1257942478-18719-2-git-send-email-albin.tonnerre@free-electrons.com>
-	<1257942478-18719-3-git-send-email-albin.tonnerre@free-electrons.com>
-Message-ID: <20091112210631.GA29311@deprecation.cyrius.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 Nov 2009 21:52:01 +0000
+Subject: [PATCH] ARM: Prefix revision number in /proc/cpuinfo
+In-Reply-To: <1258034287-4533-1-git-send-email-daniel@caiaq.de>
+References: <1258034287-4533-1-git-send-email-daniel@caiaq.de>
+Message-ID: <20091112215201.GA12308@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Albin Tonnerre <albin.tonnerre@free-electrons.com> [2009-11-11 13:27]:
-> This is the second part of patch. This part includes:
->  - changes to ach/arch/boot/Makefile to make it easier to add new
->    compression types
->  - changes in arch/arm/boot/compressed/misc.c to allow the use of lzo or
->    gzip, depending on the config
+On Thu, Nov 12, 2009 at 02:58:07PM +0100, Daniel Mack wrote:
+> The revision field in /proc/cpuinfo is reported as hex number, so it
+> should have a '0x' prefix to make that clear. Otherwise, parsers
+> will take it as decimal number unless it contains a letter.
 
-I tested your arm patch together with your unsubmitted patch to allow
-lzma and it works great!  Thanks a lot for working on this.  Feel free
-to add my:
-
-Tested-by: Martin Michlmayr <tbm@cyrius.com>
-
-I tested lzma compressed kernels on the following ARM machines:
- - Linksys NSLU2 (ixp4xx)
- - SheevaPlug (kirkwood)
- - QNAP TS-219 (kirkwood)
- - Thecus N2100 (iop32x)
-
--- 
-Martin Michlmayr
-http://www.cyrius.com/
+So what you're doing is possibly breaking existing parsers (which
+probably already assume it is hex) to fix buggy parsers?
