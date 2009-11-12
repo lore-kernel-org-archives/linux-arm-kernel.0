@@ -1,7 +1,274 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 13 Nov 2009 04:04:44 -0500
-Subject: [PATCH 09/10] input: enable touch on 88pm860x
-Message-ID: <771cded00911130104s3bc6ff97ma3a7f7ad76ae9198@mail.gmail.com>
+From: haojian.zhuang@marvell.com (Haojian Zhuang)
+Date: Thu, 12 Nov 2009 12:15:51 -0500
+Subject: [PATCH] input: enable touch on 88pm860x
+Message-ID: <mailman.26.1258103092.2170.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+---
+ drivers/input/touchscreen/88pm860x-ts.c |  222 +++++++++++++++++++++++++++++++
+ drivers/input/touchscreen/Kconfig       |    7 +
+ drivers/input/touchscreen/Makefile      |    1 +
+ 3 files changed, 230 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/input/touchscreen/88pm860x-ts.c
+
+diff --git a/drivers/input/touchscreen/88pm860x-ts.c
+b/drivers/input/touchscreen/88pm860x-ts.c
+new file mode 100644
+index 0000000..b65ef13
+--- /dev/null
++++ b/drivers/input/touchscreen/88pm860x-ts.c
+@@ -0,0 +1,222 @@
++/*
++ * Touchscreen driver for Marvell 88PM860x
++ *
++ * Copyright (C) 2009 Marvell International Ltd.
++ * 	Haojian Zhuang <haojian.zhuang@marvell.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/input.h>
++#include <linux/mfd/88pm860x.h>
++
++#define MEAS_LEN		(8)
++#define ACCURATE_BIT		(12)
++
++/* touch register */
++#define MEAS_EN3		(0x52)
++
++#define MEAS_TSIX_1		(0x8D)
++#define MEAS_TSIX_2		(0x8E)
++#define MEAS_TSIY_1		(0x8F)
++#define MEAS_TSIY_2		(0x90)
++#define MEAS_TSIZ1_1		(0x91)
++#define MEAS_TSIZ1_2		(0x92)
++#define MEAS_TSIZ2_1		(0x93)
++#define MEAS_TSIZ2_2		(0x94)
++
++/* bit definitions of touch */
++#define MEAS_PD_EN		(1 << 3)
++#define MEAS_TSIX_EN		(1 << 4)
++#define MEAS_TSIY_EN		(1 << 5)
++
++struct pm860x_touch {
++	struct input_dev *idev;
++	struct pm860x_chip *chip;
++	int irq;
++	int count;	/* record open count */
++};
++
++static void pm860x_touch_handler(struct pm860x_chip *chip, int irq, void *data)
++{
++	struct pm860x_touch *touch = data;
++	unsigned char buf[MEAS_LEN];
++	int x, y, pen_down;
++	int ret;
++
++	pm860x_mask_irq(chip, irq);
++	ret = pm860x_bulk_read(chip->parent, DESC_8607, MEAS_TSIX_1,
++				MEAS_LEN, buf);
++	if (ret < 0)
++		goto out;
++
++	pen_down = buf[1] & (1 << 6);
++	x = ((buf[0] & 0xFF) << 4) | (buf[1] & 0x0F);
++	y = ((buf[2] & 0xFF) << 4) | (buf[3] & 0x0F);
++
++	if (pen_down) {
++		input_report_abs(touch->idev, ABS_X, x);
++		input_report_abs(touch->idev, ABS_Y, y);
++		input_report_abs(touch->idev, ABS_PRESSURE, 255);
++		input_report_abs(touch->idev, BTN_TOUCH, 1);
++	} else {
++		input_report_abs(touch->idev, ABS_PRESSURE, 0);
++		input_report_abs(touch->idev, ABS_TOOL_WIDTH, 1);
++		input_report_abs(touch->idev, BTN_TOUCH, 0);
++	}
++	input_sync(touch->idev);
++	pm860x_unmask_irq(chip, irq);
++
++	if (pen_down)
++		dev_dbg(chip->dev, "pen down at [%d, %d]\n", x, y);
++	else
++		dev_dbg(chip->dev, "pen release\n");
++out:
++	return;
++}
++
++static int pm860x_touch_open(struct input_dev *dev)
++{
++	struct pm860x_touch *touch = input_get_drvdata(dev);
++	struct pm860x_chip *chip = touch->chip;
++	int data, ret;
++
++	if (++touch->count) {
++		data = MEAS_PD_EN | MEAS_TSIX_EN | MEAS_TSIY_EN;
++		ret = pm860x_set_bits(chip->parent, DESC_8607, MEAS_EN3,
++					data, data);
++		if (ret < 0)
++			goto out;
++		pm860x_unmask_irq(chip, touch->irq);
++	}
++	return 0;
++out:
++	return ret;
++}
++
++static void pm860x_touch_close(struct input_dev *dev)
++{
++	struct pm860x_touch *touch = input_get_drvdata(dev);
++	struct pm860x_chip *chip = touch->chip;
++	int data;
++
++	if (--touch->count == 0) {
++		data = MEAS_PD_EN | MEAS_TSIX_EN | MEAS_TSIY_EN;
++		pm860x_set_bits(chip->parent, DESC_8607, MEAS_EN3,
++				data, 0);
++		pm860x_mask_irq(chip, touch->irq);
++	}
++}
++
++static int __devinit pm860x_touch_probe(struct platform_device *pdev)
++{
++	struct pm860x_chip *chip = dev_get_drvdata(pdev->dev.parent);
++	struct pm860x_plat_data *pm860x_pdata;
++	struct pm860x_touch_pdata *pdata;
++	struct pm860x_touch *touch;
++	int irq, ret;
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
++		dev_err(&pdev->dev, "No IRQ resource!\n");
++		return -EINVAL;
++	}
++
++	if (pdev->dev.parent->platform_data) {
++		pm860x_pdata = pdev->dev.parent->platform_data;
++		pdata = pm860x_pdata->touch;
++	} else
++		pdata = NULL;
++
++	touch = kzalloc(sizeof(struct pm860x_touch), GFP_KERNEL);
++	if (touch == NULL)
++		return -ENOMEM;
++	dev_set_drvdata(&pdev->dev, touch);
++
++	touch->idev = input_allocate_device();
++	if (touch->idev == NULL) {
++		dev_err(&pdev->dev, "Failed to allocate input device!\n");
++		ret = -ENOMEM;
++		goto out;
++	}
++
++	touch->idev->name = "88pm860x-touch";
++	touch->idev->dev.parent = &pdev->dev;
++	touch->idev->open = pm860x_touch_open;
++	touch->idev->close = pm860x_touch_close;
++	touch->chip = chip;
++	touch->irq = irq;
++	touch->count = 0;
++	input_set_drvdata(touch->idev, touch);
++
++	ret = pm860x_request_irq(chip, irq, pm860x_touch_handler, touch);
++	if (ret < 0)
++		goto out_irq;
++
++	set_bit(EV_ABS, touch->idev->evbit);
++	set_bit(ABS_X, touch->idev->absbit);
++	set_bit(ABS_Y, touch->idev->absbit);
++	set_bit(ABS_PRESSURE, touch->idev->absbit);
++	set_bit(EV_SYN, touch->idev->evbit);
++	set_bit(EV_KEY, touch->idev->evbit);
++	set_bit(BTN_TOUCH, touch->idev->keybit);
++
++	input_set_abs_params(touch->idev, ABS_X, 0, 1 << ACCURATE_BIT, 0, 0);
++	input_set_abs_params(touch->idev, ABS_Y, 0, 1 << ACCURATE_BIT, 0, 0);
++	input_set_abs_params(touch->idev, ABS_PRESSURE, 0, 255, 0, 0);
++	input_set_abs_params(touch->idev, ABS_TOOL_WIDTH, 0, 15, 0, 0);
++
++	ret = input_register_device(touch->idev);
++	if (ret < 0) {
++		dev_err(chip->dev, "Failed to register touch!\n");
++		goto out_rg;
++	}
++
++	platform_set_drvdata(pdev, touch);
++	return 0;
++out_rg:
++	pm860x_free_irq(chip, irq);
++out_irq:
++	input_free_device(touch->idev);
++out:
++	kfree(touch);
++	return ret;
++}
++
++static int __devexit pm860x_touch_remove(struct platform_device *pdev)
++{
++	struct pm860x_touch *touch = platform_get_drvdata(pdev);
++
++	input_unregister_device(touch->idev);
++	return 0;
++}
++
++static struct platform_driver pm860x_touch_driver = {
++	.driver	= {
++		.name	= "88pm860x-touch",
++		.owner	= THIS_MODULE,
++	},
++	.probe	= pm860x_touch_probe,
++	.remove	= pm860x_touch_remove,
++};
++
++static int __init pm860x_touch_init(void)
++{
++	return platform_driver_register(&pm860x_touch_driver);
++}
++module_init(pm860x_touch_init);
++
++static void __exit pm860x_touch_exit(void)
++{
++	platform_driver_unregister(&pm860x_touch_driver);
++}
++module_exit(pm860x_touch_exit);
++
++MODULE_DESCRIPTION("Touchscreen driver for Marvell Semiconductor 88PM860x");
++MODULE_AUTHOR("Haojian Zhuang <haojian.zhuang@marvell.com>");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:88pm860x-touch");
+diff --git a/drivers/input/touchscreen/Kconfig
+b/drivers/input/touchscreen/Kconfig
+index 8cc453c..0b06a53 100644
+--- a/drivers/input/touchscreen/Kconfig
++++ b/drivers/input/touchscreen/Kconfig
+@@ -530,4 +530,11 @@ config TOUCHSCREEN_PCAP
+
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called pcap_ts.
++
++config TOUCHSCREEN_88PM860X
++	bool "Marvell 88PM860x touchscreen"
++	depends on MFD_88PM860X
++	help
++	  Say Y here if you have a 88PM860x PMIC and want to enable
++	  support for the built-in touchscreen.
+ endif
+diff --git a/drivers/input/touchscreen/Makefile
+b/drivers/input/touchscreen/Makefile
+index 15fa62c..9180479 100644
+--- a/drivers/input/touchscreen/Makefile
++++ b/drivers/input/touchscreen/Makefile
+@@ -42,3 +42,4 @@ obj-$(CONFIG_TOUCHSCREEN_WM97XX_MAINSTONE)	+=
+mainstone-wm97xx.o
+ obj-$(CONFIG_TOUCHSCREEN_WM97XX_ZYLONITE)	+= zylonite-wm97xx.o
+ obj-$(CONFIG_TOUCHSCREEN_W90X900)	+= w90p910_ts.o
+ obj-$(CONFIG_TOUCHSCREEN_PCAP)		+= pcap_ts.o
++obj-$(CONFIG_TOUCHSCREEN_88PM860X)	+= 88pm860x-ts.o
+-- 
+1.5.6.5
