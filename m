@@ -1,264 +1,306 @@
-From: ospite@studenti.unina.it (Antonio Ospite)
-Date: Thu, 12 Nov 2009 15:47:04 +0100
-Subject: [PATCH 1/3 v4] Add camera support for A780 and A910 EZX phones
-In-Reply-To: <Pine.LNX.4.64.0911111857430.4072@axis700.grange>
-References: <Pine.LNX.4.64.0911111857430.4072@axis700.grange>
-Message-ID: <1258037224-6290-1-git-send-email-ospite@studenti.unina.it>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 12 Nov 2009 16:06:15 +0100
+Subject: [PATCH 8/9 v2] MXC: Add a digital audio multiplexer driver
+In-Reply-To: <1258022525-21078-9-git-send-email-s.hauer@pengutronix.de>
+References: <1258022525-21078-1-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-2-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-3-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-4-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-5-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-6-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-7-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-8-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-9-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20091112150615.GA30179@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Bart Visscher <bartv@thisnet.nl>
-Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
+Here is an updated version of this patch with audmux instead of DAM
+
+Sascha
+
+
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
-Changes since v3:
- - Check {a780,a910}_camera_init() return value, and register camera
-   conditionally.
+ arch/arm/mach-mx2/Kconfig               |    2 +
+ arch/arm/mach-mx3/Kconfig               |    2 +
+ arch/arm/plat-mxc/Kconfig               |    7 +++
+ arch/arm/plat-mxc/Makefile              |    2 +
+ arch/arm/plat-mxc/audmux-v1.c           |   53 +++++++++++++++++++++
+ arch/arm/plat-mxc/audmux-v2.c           |   77 +++++++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/audmux.h |   52 +++++++++++++++++++++
+ 7 files changed, 195 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/audmux-v1.c
+ create mode 100644 arch/arm/plat-mxc/audmux-v2.c
+ create mode 100644 arch/arm/plat-mxc/include/mach/audmux.h
 
- arch/arm/mach-pxa/ezx.c |  174 +++++++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 170 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-pxa/ezx.c b/arch/arm/mach-pxa/ezx.c
-index 588b265..46c32cf 100644
---- a/arch/arm/mach-pxa/ezx.c
-+++ b/arch/arm/mach-pxa/ezx.c
-@@ -17,8 +17,11 @@
- #include <linux/delay.h>
- #include <linux/pwm_backlight.h>
- #include <linux/input.h>
-+#include <linux/gpio.h>
- #include <linux/gpio_keys.h>
+diff --git a/arch/arm/mach-mx2/Kconfig b/arch/arm/mach-mx2/Kconfig
+index c8a2eac..3e14da3 100644
+--- a/arch/arm/mach-mx2/Kconfig
++++ b/arch/arm/mach-mx2/Kconfig
+@@ -6,11 +6,13 @@ choice
  
-+#include <media/soc_camera.h>
+ config MACH_MX21
+ 	bool "i.MX21 support"
++	select ARCH_MXC_AUDMUX_V1
+ 	help
+ 	  This enables support for Freescale's MX2 based i.MX21 processor.
+ 
+ config MACH_MX27
+ 	bool "i.MX27 support"
++	select ARCH_MXC_AUDMUX_V1
+ 	help
+ 	  This enables support for Freescale's MX2 based i.MX27 processor.
+ 
+diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
+index 851f245..ffdd211 100644
+--- a/arch/arm/mach-mx3/Kconfig
++++ b/arch/arm/mach-mx3/Kconfig
+@@ -2,11 +2,13 @@ if ARCH_MX3
+ 
+ config ARCH_MX31
+ 	select ARCH_HAS_RNGA
++	select ARCH_MXC_AUDMUX_V2
+ 	bool
+ 
+ config ARCH_MX35
+ 	bool
+ 	select ARCH_MXC_IOMUX_V3
++	select ARCH_MXC_AUDMUX_V2
+ 
+ comment "MX3 platforms:"
+ 
+diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+index e8e92cb..8b0a1ee 100644
+--- a/arch/arm/plat-mxc/Kconfig
++++ b/arch/arm/plat-mxc/Kconfig
+@@ -78,4 +78,11 @@ config ARCH_HAS_RNGA
+ 
+ config ARCH_MXC_IOMUX_V3
+ 	bool
 +
- #include <asm/setup.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -29,6 +32,7 @@
- #include <plat/i2c.h>
- #include <mach/hardware.h>
- #include <mach/pxa27x_keypad.h>
-+#include <mach/camera.h>
- 
- #include "devices.h"
- #include "generic.h"
-@@ -38,6 +42,9 @@
- #define GPIO15_A910_FLIP_LID 		15
- #define GPIO12_E680_LOCK_SWITCH 	12
- #define GPIO15_E6_LOCK_SWITCH 		15
-+#define GPIO50_nCAM_EN			50
-+#define GPIO19_GEN1_CAM_RST		19
-+#define GPIO28_GEN2_CAM_RST		28
- 
- static struct platform_pwm_backlight_data ezx_backlight_data = {
- 	.pwm_id		= 0,
-@@ -191,8 +198,8 @@ static unsigned long gen1_pin_config[] __initdata = {
- 	GPIO94_CIF_DD_5,
- 	GPIO17_CIF_DD_6,
- 	GPIO108_CIF_DD_7,
--	GPIO50_GPIO,				/* CAM_EN */
--	GPIO19_GPIO,				/* CAM_RST */
-+	GPIO50_GPIO | MFP_LPM_DRIVE_HIGH,	/* CAM_EN */
-+	GPIO19_GPIO | MFP_LPM_DRIVE_HIGH,	/* CAM_RST */
- 
- 	/* EMU */
- 	GPIO120_GPIO,				/* EMU_MUX1 */
-@@ -248,8 +255,8 @@ static unsigned long gen2_pin_config[] __initdata = {
- 	GPIO48_CIF_DD_5,
- 	GPIO93_CIF_DD_6,
- 	GPIO12_CIF_DD_7,
--	GPIO50_GPIO,				/* CAM_EN */
--	GPIO28_GPIO,				/* CAM_RST */
-+	GPIO50_GPIO | MFP_LPM_DRIVE_HIGH,	/* CAM_EN */
-+	GPIO28_GPIO | MFP_LPM_DRIVE_HIGH,	/* CAM_RST */
- 	GPIO17_GPIO,				/* CAM_FLASH */
- };
- #endif
-@@ -683,6 +690,81 @@ static struct platform_device a780_gpio_keys = {
- 	},
- };
- 
-+/* camera */
-+static int a780_camera_init(void)
++config ARCH_MXC_AUDMUX_V1
++	bool
++
++config ARCH_MXC_AUDMUX_V2
++	bool
++
+ endif
+diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+index 545412f..4cbca9d 100644
+--- a/arch/arm/plat-mxc/Makefile
++++ b/arch/arm/plat-mxc/Makefile
+@@ -10,3 +10,5 @@ obj-$(CONFIG_ARCH_MX2) += iomux-mx1-mx2.o dma-mx1-mx2.o
+ obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
+ obj-$(CONFIG_MXC_PWM)  += pwm.o
+ obj-$(CONFIG_MXC_ULPI) += ulpi.o
++obj-$(CONFIG_ARCH_MXC_AUDMUX_V1) += audmux-v1.o
++obj-$(CONFIG_ARCH_MXC_AUDMUX_V2) += audmux-v2.o
+diff --git a/arch/arm/plat-mxc/audmux-v1.c b/arch/arm/plat-mxc/audmux-v1.c
+new file mode 100644
+index 0000000..70ab5af
+--- /dev/null
++++ b/arch/arm/plat-mxc/audmux-v1.c
+@@ -0,0 +1,53 @@
++/*
++ * Copyright 2009 Pengutronix, Sascha Hauer <s.hauer@pengutronix.de>
++ *
++ * Initial development of this code was funded by
++ * Phytec Messtechnik GmbH, http://www.phytec.de
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++ */
++
++#include <linux/module.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/clk.h>
++#include <mach/audmux.h>
++#include <mach/hardware.h>
++
++static void __iomem *audmux_base;
++
++#define MXC_AUDMUX_V1_PCR(x)	((x) * 4)
++
++int mxc_audmux_v1_configure_port(unsigned int port, unsigned int pcr)
 +{
-+	int err;
-+
-+	/*
-+	 * GPIO50_nCAM_EN is active low
-+	 * GPIO19_GEN1_CAM_RST is active on rising edge
-+	 */
-+	err = gpio_request(GPIO50_nCAM_EN, "nCAM_EN");
-+	if (err) {
-+		pr_err("%s: Failed to request nCAM_EN\n", __func__);
-+		goto fail;
++	if (!audmux_base) {
++		printk("%s: not configured\n", __func__);
++		return -ENOSYS;
 +	}
 +
-+	err = gpio_request(GPIO19_GEN1_CAM_RST, "CAM_RST");
-+	if (err) {
-+		pr_err("%s: Failed to request CAM_RST\n", __func__);
-+		goto fail_gpio_cam_rst;
-+	}
-+
-+	gpio_direction_output(GPIO50_nCAM_EN, 1);
-+	gpio_direction_output(GPIO19_GEN1_CAM_RST, 0);
-+
-+	return 0;
-+
-+fail_gpio_cam_rst:
-+	gpio_free(GPIO50_nCAM_EN);
-+fail:
-+	return err;
-+}
-+
-+static int a780_camera_power(struct device *dev, int on)
-+{
-+	gpio_set_value(GPIO50_nCAM_EN, !on);
-+	return 0;
-+}
-+
-+static int a780_camera_reset(struct device *dev)
-+{
-+	gpio_set_value(GPIO19_GEN1_CAM_RST, 0);
-+	msleep(10);
-+	gpio_set_value(GPIO19_GEN1_CAM_RST, 1);
-+
-+	return 0;
-+}
-+
-+struct pxacamera_platform_data a780_pxacamera_platform_data = {
-+	.flags  = PXA_CAMERA_MASTER | PXA_CAMERA_DATAWIDTH_8 |
-+		PXA_CAMERA_PCLK_EN | PXA_CAMERA_MCLK_EN,
-+	.mclk_10khz = 5000,
-+};
-+
-+static struct i2c_board_info a780_camera_i2c_board_info = {
-+	I2C_BOARD_INFO("mt9m111", 0x5d),
-+};
-+
-+static struct soc_camera_link a780_iclink = {
-+	.bus_id         = 0,
-+	.flags          = SOCAM_SENSOR_INVERT_PCLK,
-+	.i2c_adapter_id = 0,
-+	.board_info     = &a780_camera_i2c_board_info,
-+	.module_name    = "mt9m111",
-+	.power          = a780_camera_power,
-+	.reset          = a780_camera_reset,
-+};
-+
-+static struct platform_device a780_camera = {
-+	.name   = "soc-camera-pdrv",
-+	.id     = 0,
-+	.dev    = {
-+		.platform_data = &a780_iclink,
-+	},
-+};
-+
- static struct platform_device *a780_devices[] __initdata = {
- 	&a780_gpio_keys,
- };
-@@ -699,6 +781,11 @@ static void __init a780_init(void)
- 
- 	pxa_set_keypad_info(&a780_keypad_platform_data);
- 
-+	if (a780_camera_init() == 0) {
-+		pxa_set_camera_info(&a780_pxacamera_platform_data);
-+		platform_device_register(&a780_camera);
-+	}
-+
- 	platform_add_devices(ARRAY_AND_SIZE(ezx_devices));
- 	platform_add_devices(ARRAY_AND_SIZE(a780_devices));
- }
-@@ -864,6 +951,80 @@ static struct platform_device a910_gpio_keys = {
- 	},
- };
- 
-+/* camera */
-+static int a910_camera_init(void)
-+{
-+	int err;
-+
-+	/*
-+	 * GPIO50_nCAM_EN is active low
-+	 * GPIO28_GEN2_CAM_RST is active on rising edge
-+	 */
-+	err = gpio_request(GPIO50_nCAM_EN, "nCAM_EN");
-+	if (err) {
-+		pr_err("%s: Failed to request nCAM_EN\n", __func__);
-+		goto fail;
-+	}
-+
-+	err = gpio_request(GPIO28_GEN2_CAM_RST, "CAM_RST");
-+	if (err) {
-+		pr_err("%s: Failed to request CAM_RST\n", __func__);
-+		goto fail_gpio_cam_rst;
-+	}
-+
-+	gpio_direction_output(GPIO50_nCAM_EN, 1);
-+	gpio_direction_output(GPIO28_GEN2_CAM_RST, 0);
-+
-+	return 0;
-+
-+fail_gpio_cam_rst:
-+	gpio_free(GPIO50_nCAM_EN);
-+fail:
-+	return err;
-+}
-+
-+static int a910_camera_power(struct device *dev, int on)
-+{
-+	gpio_set_value(GPIO50_nCAM_EN, !on);
-+	return 0;
-+}
-+
-+static int a910_camera_reset(struct device *dev)
-+{
-+	gpio_set_value(GPIO28_GEN2_CAM_RST, 0);
-+	msleep(10);
-+	gpio_set_value(GPIO28_GEN2_CAM_RST, 1);
++	writel(pcr, audmux_base + MXC_AUDMUX_V1_PCR(port));
 +
 +	return 0;
 +}
++EXPORT_SYMBOL_GPL(mxc_audmux_v1_configure_port);
 +
-+struct pxacamera_platform_data a910_pxacamera_platform_data = {
-+	.flags  = PXA_CAMERA_MASTER | PXA_CAMERA_DATAWIDTH_8 |
-+		PXA_CAMERA_PCLK_EN | PXA_CAMERA_MCLK_EN,
-+	.mclk_10khz = 5000,
-+};
++static int mxc_audmux_v1_init(void)
++{
++	if (cpu_is_mx27() || cpu_is_mx21())
++		audmux_base = IO_ADDRESS(AUDMUX_BASE_ADDR);
++	return 0;
++}
 +
-+static struct i2c_board_info a910_camera_i2c_board_info = {
-+	I2C_BOARD_INFO("mt9m111", 0x5d),
-+};
++postcore_initcall(mxc_audmux_v1_init);
+diff --git a/arch/arm/plat-mxc/audmux-v2.c b/arch/arm/plat-mxc/audmux-v2.c
+new file mode 100644
+index 0000000..fe8d46d
+--- /dev/null
++++ b/arch/arm/plat-mxc/audmux-v2.c
+@@ -0,0 +1,77 @@
++/*
++ * Copyright 2009 Pengutronix, Sascha Hauer <s.hauer@pengutronix.de>
++ *
++ * Initial development of this code was funded by
++ * Phytec Messtechnik GmbH, http://www.phytec.de
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++ */
 +
-+static struct soc_camera_link a910_iclink = {
-+	.bus_id         = 0,
-+	.i2c_adapter_id = 0,
-+	.board_info     = &a910_camera_i2c_board_info,
-+	.module_name    = "mt9m111",
-+	.power          = a910_camera_power,
-+	.reset          = a910_camera_reset,
-+};
++#include <linux/module.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/clk.h>
++#include <mach/audmux.h>
++#include <mach/hardware.h>
 +
-+static struct platform_device a910_camera = {
-+	.name   = "soc-camera-pdrv",
-+	.id     = 0,
-+	.dev    = {
-+		.platform_data = &a910_iclink,
-+	},
-+};
++static struct clk *audmux_clk;
++static void __iomem *audmux_base;
 +
- static struct platform_device *a910_devices[] __initdata = {
- 	&a910_gpio_keys,
- };
-@@ -880,6 +1041,11 @@ static void __init a910_init(void)
- 
- 	pxa_set_keypad_info(&a910_keypad_platform_data);
- 
-+	if (a910_camera_init() == 0) {
-+		pxa_set_camera_info(&a910_pxacamera_platform_data);
-+		platform_device_register(&a910_camera);
++#define MXC_AUDMUX_V2_PTCR(x)		((x) * 8)
++#define MXC_AUDMUX_V2_PDCR(x)		((x) * 8 + 4)
++
++int mxc_audmux_v2_configure_port(unsigned int port, unsigned int ptcr,
++		unsigned int pdcr)
++{
++	if (!audmux_base)
++		return -ENOSYS;
++
++	if (audmux_clk)
++		clk_enable(audmux_clk);
++
++	writel(ptcr, audmux_base + MXC_AUDMUX_V2_PTCR(port));
++	writel(pdcr, audmux_base + MXC_AUDMUX_V2_PDCR(port));
++
++	if (audmux_clk)
++		clk_disable(audmux_clk);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(mxc_audmux_v2_configure_port);
++
++static int mxc_audmux_v2_init(void)
++{
++	int ret;
++
++	if (cpu_is_mx31() || cpu_is_mx35())
++		audmux_base = IO_ADDRESS(AUDMUX_BASE_ADDR);
++	else
++		return 0;
++
++	if (cpu_is_mx35()) {
++		audmux_clk = clk_get(NULL, "audmux");
++		if (IS_ERR(audmux_clk)) {
++			audmux_base = NULL;
++			ret = PTR_ERR(audmux_clk);
++			printk(KERN_ERR "%s: cannot get clock: %d\n", __func__,
++					ret);
++			return ret;
++		}
 +	}
 +
- 	platform_add_devices(ARRAY_AND_SIZE(ezx_devices));
- 	platform_add_devices(ARRAY_AND_SIZE(a910_devices));
- }
++	return 0;
++}
++
++postcore_initcall(mxc_audmux_v2_init);
+diff --git a/arch/arm/plat-mxc/include/mach/audmux.h b/arch/arm/plat-mxc/include/mach/audmux.h
+new file mode 100644
+index 0000000..5cd6466
+--- /dev/null
++++ b/arch/arm/plat-mxc/include/mach/audmux.h
+@@ -0,0 +1,52 @@
++#ifndef __MACH_AUDMUX_H
++#define __MACH_AUDMUX_H
++
++#define MX27_AUDMUX_HPCR1_SSI0		0
++#define MX27_AUDMUX_HPCR2_SSI1		1
++#define MX27_AUDMUX_HPCR3_SSI_PINS_4	2
++#define MX27_AUDMUX_PPCR1_SSI_PINS_1	3
++#define MX27_AUDMUX_PPCR2_SSI_PINS_2	4
++#define MX27_AUDMUX_PPCR3_SSI_PINS_3	5
++
++#define MX31_AUDMUX_PORT1_SSI0		0
++#define MX31_AUDMUX_PORT2_SSI1		1
++#define MX31_AUDMUX_PORT3_SSI_PINS_3	2
++#define MX31_AUDMUX_PORT4_SSI_PINS_4	3
++#define MX31_AUDMUX_PORT5_SSI_PINS_5	4
++#define MX31_AUDMUX_PORT6_SSI_PINS_6	5
++
++/* Register definitions for the i.MX21/27 Digital Audio Multiplexer */
++#define MXC_AUDMUX_V1_PCR_INMMASK(x)	((x) & 0xff)
++#define MXC_AUDMUX_V1_PCR_INMEN		(1 << 8)
++#define MXC_AUDMUX_V1_PCR_TXRXEN	(1 << 10)
++#define MXC_AUDMUX_V1_PCR_SYN		(1 << 12)
++#define MXC_AUDMUX_V1_PCR_RXDSEL(x)	(((x) & 0x7) << 13)
++#define MXC_AUDMUX_V1_PCR_RFCSEL(x)	(((x) & 0xf) << 20)
++#define MXC_AUDMUX_V1_PCR_RCLKDIR	(1 << 24)
++#define MXC_AUDMUX_V1_PCR_RFSDIR	(1 << 25)
++#define MXC_AUDMUX_V1_PCR_TFCSEL(x)	(((x) & 0xf) << 26)
++#define MXC_AUDMUX_V1_PCR_TCLKDIR	(1 << 30)
++#define MXC_AUDMUX_V1_PCR_TFSDIR	(1 << 31)
++
++/* Register definitions for the i.MX25/31/35 Digital Audio Multiplexer */
++#define MXC_AUDMUX_V2_PTCR_TFSDIR	(1 << 31)
++#define MXC_AUDMUX_V2_PTCR_TFSEL(x)	(((x) & 0xf) << 27)
++#define MXC_AUDMUX_V2_PTCR_TCLKDIR	(1 << 26)
++#define MXC_AUDMUX_V2_PTCR_TCSEL(x)	(((x) & 0xf) << 22)
++#define MXC_AUDMUX_V2_PTCR_RFSDIR	(1 << 21)
++#define MXC_AUDMUX_V2_PTCR_RFSEL(x)	(((x) & 0xf) << 17)
++#define MXC_AUDMUX_V2_PTCR_RCLKDIR	(1 << 16)
++#define MXC_AUDMUX_V2_PTCR_RCSEL(x)	(((x) & 0xf) << 12)
++#define MXC_AUDMUX_V2_PTCR_SYN		(1 << 11)
++
++#define MXC_AUDMUX_V2_PDCR_RXDSEL(x)	(((x) & 0x7) << 13)
++#define MXC_AUDMUX_V2_PDCR_TXRXEN	(1 << 12)
++#define MXC_AUDMUX_V2_PDCR_MODE(x)	(((x) & 0x3) << 8)
++#define MXC_AUDMUX_V2_PDCR_INMMASK(x)	((x) & 0xff)
++
++int mxc_audmux_v1_configure_port(unsigned int port, unsigned int pcr);
++
++int mxc_audmux_v2_configure_port(unsigned int port, unsigned int ptcr,
++		unsigned int pdcr);
++
++#endif /* __MACH_AUDMUX_H */
 -- 
-tg: (639a58f..) ezx/mach/camera_new (depends on: master)
+1.6.5.2
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
