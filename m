@@ -1,54 +1,83 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 12 Nov 2009 17:51:41 +0100
-Subject: [PATCH 0/8] enable pxa168 LCD on two platform
-In-Reply-To: <20091112084658.3ca67cb2.rdunlap@xenotime.net>
-References: <7c34ac520911100011x60a354b0mf2e27e1c5fd0422@mail.gmail.com>
-	<20091111155058.4f8d355e.akpm@linux-foundation.org>
-	<4AFB4EA4.3060608@xenotime.net>
-	<10f740e80911112347o45ddc2ck1515220914b4c38f@mail.gmail.com>
-	<20091112084658.3ca67cb2.rdunlap@xenotime.net>
-Message-ID: <10f740e80911120851i2105393bkc0723e8ef05ff1b4@mail.gmail.com>
+From: dk-arm-linux@gmx.de (Dieter Kiermaier)
+Date: Thu, 12 Nov 2009 18:02:10 +0100
+Subject: [PATCH] [ARM] Kirkwood: Prevent kernel from crashing if PCIe
+	bridge?is present
+In-Reply-To: <p0nts6-gt3.ln1@chipmunk.wormnet.eu>
+References: <200911121519.42786.dk-arm-linux@gmx.de>
+	<p0nts6-gt3.ln1@chipmunk.wormnet.eu>
+Message-ID: <200911121802.10323.dk-arm-linux@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 12, 2009 at 17:46, Randy Dunlap <rdunlap@xenotime.net> wrote:
-> On Thu, 12 Nov 2009 08:47:49 +0100 Geert Uytterhoeven wrote:
->> On Thu, Nov 12, 2009 at 00:54, Randy Dunlap <rdunlap@xenotime.net> wrote:
->> > Andrew Morton wrote:
->> >> On Tue, 10 Nov 2009 16:11:56 +0800
->> >> Jun Nie <niej0001@gmail.com> wrote:
->> >>
->> >>> To: linux-arm-kernel at lists.infradead.org, linux-fbdev at vger.kernel.org
->> >>
->> >> I don't think linux-fbdev at vger.kernel.org exists? ?You wanted
->> >> linux-fbdev-devel at lists.sourceforge.net ?
->> >
->> > actually it does exist, but it's not used AFAIK.
->> > http://vger.kernel.org/vger-lists.html#linux-fbdev
->> >
->> > The sourceforge list is the one listed in the MAINTAINERS file.
->>
->> Sending a patch to change that is on my (long) TODO list...
->
-> That patch is the easy part.
->
-> We also need to have the new list archived and somehow do away
-> with the old mailing list.
+Am Donnerstag 12 November 2009 16:42:49 schrieb Alexander Clouter:
+> Dieter Kiermaier <dk-arm-linux@gmx.de> wrote:
+> >
+> > [snipped]
+> > 
+> > static int __init openrd_base_pci_init(void)
+> > {
+> > +       u32 cpu_config_reg;
+> > +       void __iomem *base;
+> > +       base = ioremap(0xf1020100, 4);
+> >
+> Ewwwwwwww. :)
+> 
+> If you dig through arch/arm/mach-orion5x/include/mach/orion5x.h you 
+> should be able to work out that 0xf1020100 is probably best replaced 
+> with something like (ORION5X_BRIDGE_PHYS_BASE | 0x100), once you add
+> a matching ORION5X_BRIDGE_PHYS_BASE entry alongside the
+> ORION5X_BRIDGE_VIRT_BASE[1].  Well, *I* prefer that sort of thing. :)
+> 
+> > +       if (base)
+> > +       {
+> > +               cpu_config_reg = readl(base);
+> > +               cpu_config_reg &= ~(1 << 2);
+> > +               writel(cpu_config_reg, base);
+> > +       }
+> > +       iounmap(base);
+> > +
+> >        if (machine_is_openrd_base())
+> >                kirkwood_pcie_init();
+> > -
+> >        return 0;
+> >  }
+> > subsys_initcall(openrd_base_pci_init);
+> >
+> As was recently explained to me[2], that code is going to run on *all* 
+> kirkword platforms, not just the OpenRD.  I am guessing you want to 
+> shove your additional code into a seperate int returning __init function 
+> and call it from the machine_is_openrd_base() clause.
+> 
 
-MARC started archiving it a few days ago, so the major hurdle is gone.
+If we go on thinking about that - I would prefer place the code - without the magick key ;) - 
+in kirkwood_pcie_init()?
+It will affect later or sooner more kirkwood boards if people switch form marvell stock u-boot
+to mainline u-boot.
+What do you think about that?
 
-Still to do:
-  - Send submissions predating the archiving to MARC,
-  - Add MARC archive to vger list webpage,
-  - Disable posting on the old lists.
+to [2]:
+Hm, is this really right? Why is there a function called openrd_base_pci_init() which is inside a file
+called openrd_base-setup.c and this function is called on a sheevaplug?
 
-Gr{oetje,eeting}s,
+I couldn't believe that (but to be honest I don't know it!).
+The 2 board do still have different machnumbers, right?
+I've expected that these machnumbers are to determine
+which board / hardware the kernel / u-boot is running.
+Isn't this the case?
 
-						Geert
+> Also, if for some strange reason the ioremap() failed, you are going to 
+> call iounmap(NULL) so that should probably be moved up a line into the 
+> 'if' clause?  However on this one I *think* I have been told in the past 
+> it cannot fail so you might be able to remove the 'if' clause 
+> altogether.
+sounds reasonable
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> Cheers
+> 
+> [1] unsure if at that point can can just jump straight in and tinker with
+> 	ORION5X_BRIDGE_VIRT_BASE?
+> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2009-October/002699.html
+> 
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+Dieter
