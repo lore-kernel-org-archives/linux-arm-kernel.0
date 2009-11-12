@@ -1,28 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 Nov 2009 14:06:50 +0000
-Subject: [PATCH] check put_user fail in do_signal when enable OABI_COMPACT
-In-Reply-To: <200911231459.13622.jpihet@mvista.com>
-References: <1256123277.3851.36.camel@debian-nb>
-	<200911041433.32010.jpihet@mvista.com>
-	<20091104193244.GC518@n2100.arm.linux.org.uk>
-	<200911231459.13622.jpihet@mvista.com>
-Message-ID: <20091123140650.GC18142@n2100.arm.linux.org.uk>
+From: rmartinez@teltronic.es (=?iso-8859-1?Q?Ricardo_Mart=EDnez?=)
+Date: Thu, 12 Nov 2009 20:36:32 +0100
+Subject: Soft reset problems
+Message-ID: <1179F41EAF7A40E79DC5B4B251AAD038@teltronic.es>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23, 2009 at 02:59:13PM +0100, Jean Pihet wrote:
-> Russell,
-> 
-> On Wednesday 04 November 2009 20:32:44 Russell King - ARM Linux wrote:
-> > On Wed, Nov 04, 2009 at 02:33:31PM +0100, Jean Pihet wrote:
-> > > Is this one OK? Can it be merged now that your fix for signal restart
-> > > has been merged into mainline?
-> >
-> > Yes.
-> May I ask you again to merge the patch? Is this one supposed to reach into 
-> mainline via your tree?
+Hi!
+ 
+I'm trying to soft reset an ARM926EJ.
+ 
+I'm using 
+    cpu_arm926_reset(ulong address) function which:
+           - flushes I/D caches
+            - jumps to "address", whose value in my case is NOR flash base
+addres where U-Boot stays (after remapping).
+ 
+    But it sometimes work, but most times hangs. Can this be caused by MMU
+not being switched off? 
+ 
+Any other hints?
+ 
+If you think it might be caused by MMU, how can be MMU disabled?
+ 
+Is there any other prefered method to soft reboot ARM926 from Linux? I've
+taken a look at some PXA, OMAP & AT91 code about soft rebooting. It seems
+they use Watchdog timer to reset, but my CPU does not have a watchdog.
+ 
+Thanks in advance,
+Ricardo Martinez
+ 
+ 
 
-I have a patch system to avoid patches being dropped like this... I'm
-really *bad* with emailed patches.
-
-Please submit to the patch system, thanks.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091112/95626f1a/attachment-0001.htm>
