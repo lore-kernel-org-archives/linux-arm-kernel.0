@@ -1,69 +1,124 @@
 From: niej0001@gmail.com (Jun Nie)
-Date: Thu, 12 Nov 2009 10:18:17 +0800
-Subject: [PATCH 5/8] pxa: frame buffer support both pxa168 and pxa910
-In-Reply-To: <7c34ac520911100012l43680a5fn1ffa2f44d8c27801@mail.gmail.com>
-References: <7c34ac520911100012l43680a5fn1ffa2f44d8c27801@mail.gmail.com>
-Message-ID: <7c34ac520911111818y3eb7773dr28cf9c23f4f545f4@mail.gmail.com>
+Date: Thu, 12 Nov 2009 10:18:46 +0800
+Subject: [PATCH 6/8] pxa: add gpio expander on pxa168 aspenite platform
+In-Reply-To: <7c34ac520911100012s176bff7bk7d57e86cd660632f@mail.gmail.com>
+References: <7c34ac520911100012s176bff7bk7d57e86cd660632f@mail.gmail.com>
+Message-ID: <7c34ac520911111818l645cc210m8252214130570eb@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 2009/11/10 Jun Nie <niej0001@gmail.com>:
-> From ce9b930b389f6b2ecbdf0102a6055f737c56979a Mon Sep 17 00:00:00 2001
+> From 0815be7cf3458a14da1462b40247dc7a3231142a Mon Sep 17 00:00:00 2001
 > From: Jun Nie <njun@marvell.com>
-> Date: Tue, 10 Nov 2009 09:43:57 +0800
-> Subject: [PATCH] pxa: frame buffer support both pxa168 and pxa910
+> Date: Tue, 3 Nov 2009 14:08:50 +0800
+> Subject: [PATCH] pxa: add gpio expander on pxa168 aspenite platform
 >
 > Signed-off-by: Jun Nie <njun@marvell.com>
 > ---
-> ?drivers/video/pxa168fb.c | ? ?6 ++++++
-> ?include/video/pxa168fb.h | ? ?3 +++
-> ?2 files changed, 9 insertions(+), 0 deletions(-)
+> ?arch/arm/mach-mmp/aspenite.c | ? 45 ++++++++++++++++++++++++++++++++++++++++++
+> ?drivers/gpio/pca953x.c ? ? ? | ? ?1 +
+> ?2 files changed, 46 insertions(+), 0 deletions(-)
 >
-> diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
-> index 55c69a1..ca0a4d3 100644
-> --- a/drivers/video/pxa168fb.c
-> +++ b/drivers/video/pxa168fb.c
-> @@ -879,12 +879,18 @@ failed:
-> ? ? ? ?return ret;
-> ?}
+> diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
+> index 115f728..b422bb5 100644
+> --- a/arch/arm/mach-mmp/aspenite.c
+> +++ b/arch/arm/mach-mmp/aspenite.c
+> @@ -16,6 +16,7 @@
+> ?#include <linux/mtd/mtd.h>
+> ?#include <linux/mtd/partitions.h>
+> ?#include <linux/mtd/nand.h>
+> +#include <linux/i2c/pca953x.h>
 >
-> + static const struct platform_device_id mmpfb_id_table[] = {
-> + ? ? ? ?{"pxa168-fb", PXA168_FB},
-> + ? ? ? ?{"pxa910-fb", PXA910_FB},
-> + };
+> ?#include <asm/mach-types.h>
+> ?#include <asm/mach/arch.h>
+> @@ -24,9 +25,14 @@
+> ?#include <mach/pxa168.h>
+> ?#include <mach/gpio.h>
+> ?#include <plat/pxa3xx_nand.h>
+> +#include <video/pxa168fb.h>
+>
+> ?#include "common.h"
+>
+> +/*used by expander max7312, 16 pins gpio expander */
+> +#define GPIO_EXT0(x) ? ? ? ? ? (NR_BUILTIN_GPIO + (x))
+> +#define GPIO_EXT1(x) ? ? ? ? ? (NR_BUILTIN_GPIO + 16 + (x))
 > +
-> ?static struct platform_driver pxa168fb_driver = {
-> ? ? ? ?.driver ? ? ? ? = {
-> ? ? ? ? ? ? ? ?.name ? = "pxa168-fb",
-> ? ? ? ? ? ? ? ?.owner ?= THIS_MODULE,
-> ? ? ? ?},
-> ? ? ? ?.probe ? ? ? ? ?= pxa168fb_probe,
-> + ? ? ? .id_table ? ? ? = mmpfb_id_table,
-> ?};
+> ?static unsigned long common_pin_config[] __initdata = {
+> ? ? ? ?/* Data Flash Interface */
+> ? ? ? ?GPIO0_DFI_D15,
+> @@ -134,6 +140,44 @@ static void __init apn_init_nand(void)
+> ?static void __init apn_init_nand(void) {}
+> ?#endif
 >
-> ?static int __devinit pxa168fb_init(void)
-> diff --git a/include/video/pxa168fb.h b/include/video/pxa168fb.h
-> index efbe469..41f21c5 100644
-> --- a/include/video/pxa168fb.h
-> +++ b/include/video/pxa168fb.h
-> @@ -86,6 +86,9 @@
-> ?#define PIX_FMT_PSEUDOCOLOR ? ?20
-> ?#define PIX_FMT_UYVY422PACK ? ?(0x1000|PIX_FMT_YUV422PACK)
->
-> +#define PXA168_FB 0x0168
-> +#define PXA910_FB 0x0910
+> +static struct i2c_pxa_platform_data pwri2c_info __initdata = {
+> + ? ? ? .use_pio ? ? ? ? ? ? ? ?= 1,
+> +};
 > +
-> ?/*
-> ?* PXA LCD controller private state.
-> ?*/
+> +#if defined(CONFIG_GPIO_PCA953X)
+> +/* GPIO expander max7312 could reuse PCA953X */
+> +static struct pca953x_platform_data max7312_data[] = {
+> + ? ? ? /* two max7312 in system */
+> +
+> + ? ? ? [0] = {
+> + ? ? ? ? ? ? ? .gpio_base ? ? ?= GPIO_EXT0(0),
+> + ? ? ? },
+> +
+> + ? ? ? [1] = {
+> + ? ? ? ? ? ? ? .gpio_base ? ? ?= GPIO_EXT1(0),
+> + ? ? ? },
+> +};
+> +#endif
+> +
+> +static struct i2c_board_info aspenite_i2c_board_info[] = {
+> +
+> +#if defined(CONFIG_GPIO_PCA953X)
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .type ? ? ? ? ? = "max7312",
+> + ? ? ? ? ? ? ? .addr ? ? ? ? ? = 0x10, ? ? ? ? ? ? ? ? /* 0x20/0x21 */
+> + ? ? ? ? ? ? ? .irq ? ? ? ? ? ?= IRQ_GPIO(122),
+> + ? ? ? ? ? ? ? .platform_data ?= &max7312_data[0],
+> + ? ? ? },
+> +
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .type ? ? ? ? ? = "max7312",
+> + ? ? ? ? ? ? ? .addr ? ? ? ? ? = 0x20, ? ? ? ? ? ? ? ? /* 0x40/0x41 */
+> + ? ? ? ? ? ? ? .irq ? ? ? ? ? ?= IRQ_GPIO(120),
+> + ? ? ? ? ? ? ? .platform_data ?= &max7312_data[1],
+> + ? ? ? },
+> +#endif
+> +};
+> +
+> ?static void __init common_init(void)
+> ?{
+> ? ? ? ?mfp_config(ARRAY_AND_SIZE(common_pin_config));
+> @@ -142,6 +186,7 @@ static void __init common_init(void)
+> ? ? ? ?pxa168_add_uart(1);
+>
+> ? ? ? ?apn_init_nand();
+> + ? ? ? pxa168_add_twsi(0, &pwri2c_info, ARRAY_AND_SIZE(aspenite_i2c_board_info));
+>
+> ? ? ? ?/* off-chip devices */
+> ? ? ? ?platform_device_register(&smc91x_device);
+> diff --git a/drivers/gpio/pca953x.c b/drivers/gpio/pca953x.c
+> index 6a2fb3f..7822684 100644
+> --- a/drivers/gpio/pca953x.c
+> +++ b/drivers/gpio/pca953x.c
+> @@ -39,6 +39,7 @@ static const struct i2c_device_id pca953x_id[] = {
+> ? ? ? ?{ "pca9557", 8, },
+>
+> ? ? ? ?{ "max7310", 8, },
+> + ? ? ? { "max7312", 16, },
+> ? ? ? ?{ "max7315", 8, },
+> ? ? ? ?{ "pca6107", 8, },
+> ? ? ? ?{ "tca6408", 8, },
 > --
 > 1.5.4.3
 >
 patch attached.
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: 0005-pxa-frame-buffer-support-both-pxa168-and-pxa910.patch
+Name: 0006-pxa-add-gpio-expander-on-pxa168-aspenite-platform.patch
 Type: text/x-diff
-Size: 1321 bytes
+Size: 2859 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091112/583216d7/attachment.bin>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091112/94ac553b/attachment-0001.bin>
