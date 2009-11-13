@@ -1,70 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 12 Nov 2009 16:09:56 -0800
-Subject: [PATCH 14/14] omap3: drop all IVA-related address base definitions
-In-Reply-To: <20091113000444.9034.41293.stgit@localhost>
-References: <20091113000444.9034.41293.stgit@localhost>
-Message-ID: <20091113000955.9034.72230.stgit@localhost>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 13 Nov 2009 11:48:41 +0800
+Subject: pxafb: RGBT555 support
+In-Reply-To: <200911121149.35771.pieterg@gmx.com>
+References: <200910291235.55826.pieterg@gmx.com>
+	<f17812d70911040633k27863332seaf29184ff38e7e7@mail.gmail.com>
+	<200911051727.03171.pieterg@gmx.com>
+	<200911121149.35771.pieterg@gmx.com>
+Message-ID: <f17812d70911121948p7e819bf3x9a43e5edccbcb3e9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Paul Walmsley <paul@pwsan.com>
+On Thu, Nov 12, 2009 at 6:49 PM, pieterg <pieterg@gmx.com> wrote:
+> On Thursday 05 November 2009 17:27:02 pieterg wrote:
+>> On Wednesday 04 November 2009 15:33:21 Eric Miao wrote:
+>> > >> Unfortunately, transparency is part of depth and it's really not
+>> > >> easy to distinguish between RGB565 and RGBT555 by depth and
+>> > >> bits_per_pixel only without introducing something else.
+>> > >
+>> > > So perhaps something like this (untested)?
+>> >
+>> > This looks good to me - please have this tested and I'll merge it
+>> > later if no other comments.
+>>
+>> Tested, and it works.
+>> Please use this version instead of the original one I posted, no matter
+>> how small it is, I still managed to get a typo in ;)
+>
+> Just for my information (and as a reminder perhaps), is this patch going to
+> make it?
+>
 
-All of the OMAP3 IVA physical address macros in
-plat-omap/include/plat/omap34xx.h are wrong[1]:
+Pieter,
 
-OMAP34XX_IVA_INTC_BASE: The IVA interrupt controller does not appear
-to be accessible from the L3 interconnect, and in any case is
-definitely not at 0x40000000; the latter address appears to be the
-internal IVA physical address base for the OMAP2420's interrupt control[2].
+You need to Signoff your patch before I can merge it, please see
+linux/Documentation/SubmittingPatches.
 
-OMAP34XX_DSP_BASE: The section of L3 physical address space mapped to
-the IVA starts at 0x5c000000, not 0x58000000.
-
-OMAP34XX_DSP_MEM_BASE: It's not clear what this refers to, but it's not
-in the L3 IVA address space.
-
-OMAP34XX_DSP_IPI_BASE: The Intrusive Port Interface is a relic from
-the OMAP2420 days and no longer applies to OMAP3.
-
-OMAP34XX_DSP_MMU_BASE: The DSP MMU is mapped at 0x5d000000, not 0x5a000000.
-
-
-Nothing that uses these can possibly be working, so drop them.  When
-future code needs these, correct versions can be added in.
-
-1. OMAP34xx Multimedia Device Silicon Revision 3.1.x Rev. W, Table 2-8:
-   "L3 Interconnect View of the IVA2.2 Subsystem Memory Space."  p. 229.
-
-2. OMAP2420 Multimedia Processor Silicon Revision 2.1.1, 2.2 (Rev. Q),
-   section 2.2.4.1, "IVA Memory Space Seen by L3", p. 132.
-
-3. ibid., section 4.3.11, "DSP IPI Overview", p. 200.
-
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/plat-omap/include/plat/omap34xx.h |    5 -----
- 1 files changed, 0 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/plat-omap/include/plat/omap34xx.h b/arch/arm/plat-omap/include/plat/omap34xx.h
-index 4655707..077f059 100644
---- a/arch/arm/plat-omap/include/plat/omap34xx.h
-+++ b/arch/arm/plat-omap/include/plat/omap34xx.h
-@@ -72,7 +72,6 @@
- #define OMAP3430_ISP_CSI2A_END		(OMAP3430_ISP_CSI2A_BASE   + 0x16F)
- #define OMAP3430_ISP_CSI2PHY_END	(OMAP3430_ISP_CSI2PHY_BASE + 0x007)
- 
--#define OMAP34XX_IVA_INTC_BASE	0x40000000
- #define OMAP34XX_HSUSB_OTG_BASE	(L4_34XX_BASE + 0xAB000)
- #define OMAP34XX_USBTLL_BASE	(L4_34XX_BASE + 0x62000)
- #define OMAP34XX_UHH_CONFIG_BASE	(L4_34XX_BASE + 0x64000)
-@@ -83,9 +82,5 @@
- 
- #define OMAP34XX_MAILBOX_BASE		(L4_34XX_BASE + 0x94000)
- 
--#define OMAP34XX_DSP_BASE	0x58000000
--#define OMAP34XX_DSP_MEM_BASE	(OMAP34XX_DSP_BASE + 0x0)
--#define OMAP34XX_DSP_IPI_BASE	(OMAP34XX_DSP_BASE + 0x1000000)
--#define OMAP34XX_DSP_MMU_BASE	(OMAP34XX_DSP_BASE + 0x2000000)
- #endif /* __ASM_ARCH_OMAP34XX_H */
- 
+Thanks
+- eric
