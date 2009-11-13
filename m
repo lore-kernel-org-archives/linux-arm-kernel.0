@@ -1,95 +1,24 @@
-From: dk-arm-linux@gmx.de (Dieter Kiermaier)
-Date: Fri, 13 Nov 2009 14:43:56 +0100
-Subject: PCI hotplug supported on ARM (Kirkwood)? - fakephp?
-In-Reply-To: <200911131221.43527.dk-arm-linux@gmx.de>
-References: <200911121826.06792.dk-arm-linux@gmx.de>
-	<cl2us6-035.ln1@chipmunk.wormnet.eu>
-	<200911131221.43527.dk-arm-linux@gmx.de>
-Message-ID: <200911131443.56429.dk-arm-linux@gmx.de>
+From: bgat@billgatliff.com (Bill Gatliff)
+Date: Fri, 13 Nov 2009 08:00:27 -0600
+Subject: ARM: big performance waste in memcpy_{from,to}io
+In-Reply-To: <20091113122438.GB29008@n2100.arm.linux.org.uk>
+References: <200911121749.49676.h.feurstein@gmail.com>	<ol1us6-035.ln1@chipmunk.wormnet.eu>	<200911131232.41716.h.feurstein@gmail.com>
+	<20091113122438.GB29008@n2100.arm.linux.org.uk>
+Message-ID: <4AFD667B.3020505@billgatliff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag 13 November 2009 12:21:43 schrieb Dieter Kiermaier:
-> Am Donnerstag 12 November 2009 20:01:32 schrieb Alexander Clouter:
-> 
-> > Dieter Kiermaier <dk-arm-linux@gmx.de> wrote:
-> > > 
-> > > is it possible to boot a FPGA which is connected to an PCI bus on a 
-> > > kirkwood cpu (via a pcie->pci bridge) at runtime (I call it hotplug)?
-> > > 
-> > > And after booting the FPGA e.g. via slave serial protocol loading the 
-> > > pci driver and access the device? This would be much easier to handle 
-> > > than flashing the fpga using u-boot.
-> > > 
-> > > Is there any special framework I have to use? How can I tell the 
-> > > kernel to reenumerate the bus and reasign the pci resources?
-> > > 
-> > > I have googled a lot and also tried to find something at newsgroups or 
-> > > mailinglists but I haven't found some valuable information - at least 
-> > > not for me ;). Is this possible?
-> > > 
-> > I tried tackling this on my board by creating a new 'bus' and trying to 
-> > work around making the FPGA 'hotplugable' that way.  As the bus would 
-> > know about the process of reprogramming the FPGA, it could cleanly 
-> > unload and reload everything.
-> > 
-> > http://marc.info/?l=linux-kernel&m=124441477117607&w=2
+Russell King - ARM Linux wrote:
+> The problem is whether optimising it will end up breaking existing users.
+>   
 
-Hm, your link seems to be down. Do you have a newer version of your code
-somewhere?
-
-> > 
-> > Never did get it to work and no one expressed any real interest in it 
-> > for the platform sadly; so I drifted off looking for other geeky things 
-> > to do.
-> > 
-> > I am still personally keener on the bus model, but Geert suggested I 
-> > lump for a MFD.
-> 
-> Hm, it looks like fakephp is what I was looking for but I see no way to compile
-> this module on my arm (kirkwood).
-> 
-
-fakephp seems to be integrated / ported into the pci layer?
-I have a /sys/bus/pci interface:
-
-It is possible to deactivate devices by doing:
-echo 1 > /sys/bus/pci/devices/0000\:01\:08.0/remove
-
-But it looks like  there is no way of reactivating /rescanning it?
-
-I've tried
-echo 1 > /sys/bus/pci/rescan
-but without any success.
-
-Does anybody have an idea?
-
-Many thanks,
-Dieter
+I say we throw in the optimized version and enable it by default, along
+with a Kconfig to defeat it upon user request at build time (or maybe a
+module parameter).  And then see who complains.
 
 
+b.g.
 
-
-
-> Does anybody know a way to compile it?
-> 
-> Many thanks,
-> Dieter
-> 
-> 
-> 
-> > 
-> > Whatever you do, if you can keep me in the loop then I can nick your 
-> > ideas/code and maybe get back into tinkering with my ARM board, that's 
-> > if I stop bricking my MIPS boards :-/
-> > 
-> > Cheers
-> > 
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+-- 
+Bill Gatliff
+bgat at billgatliff.com
