@@ -1,45 +1,30 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 13 Nov 2009 11:55:19 +0000
-Subject: [PATCH 05/10] mfd add irq support in 88pm860x
-In-Reply-To: <771cded00911130059q23c2bc97ja4509b7965f12eed@mail.gmail.com>
-References: <771cded00911130059q23c2bc97ja4509b7965f12eed@mail.gmail.com>
-Message-ID: <20091113115519.GA30966@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Nov 2009 12:20:45 +0000
+Subject: ARM926 Software reset problems
+In-Reply-To: <B3925569A02247AFA3847BB80F9342EF@teltronic.es>
+References: <B3925569A02247AFA3847BB80F9342EF@teltronic.es>
+Message-ID: <20091113122045.GA29008@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 13, 2009 at 03:59:21AM -0500, Haojian Zhuang wrote:
+On Fri, Nov 13, 2009 at 12:32:16PM +0100, Ricardo Mart?nez wrote:
+> I'm using 
+>     cpu_arm926_reset(ulong address) function which:
+>            - flushes I/D caches
+>             - jumps to "address", whose value in my case is NOR flash base
+> address where U-Boot stays (after remapping).
 
-> +int pm860x_request_irq(struct pm860x_chip *chip, int irq,
-> +		       void (*handle_irq)(struct pm860x_chip *, int, void *),
-> +		       void *data)
-> +{
+You should not be using this directly.  Software rebooting has a specific
+sequence, and the above is the very last step.
 
-It might be nice to make the IRQ handler be an irq_handler_t - that way
-if you convert the driver to use the generic IRQ infrastructure in
-future it'll be straightforward to transition the drivers by providing
-stub functions that pass through to generic IRQ.
+>     But it sometimes work, but most times hangs. Can this be caused by MMU
+> not being switched off? 
 
-Given that Thomas did the work it'd be good if we could use it
-eventually :) .
+cpu_arm926_reset() turns the MMU and caches off.
 
-> +#if 0
-> +	mask = PM8607_MISC1_INV_INT | PM8607_MISC1_INT_CLEAR
-> +		| PM8607_MISC1_INT_MASK;
-> +	data = PM8607_MISC1_INT_CLEAR;
-> +	chip->irq_mode = 1;
-> +	if (pdata) {
-> +		/*
-> +		 * irq_mode defines the way of clearing interrupt.
-> +		 * If it's 1, clear IRQ by write. Otherwise, clear it by read.
-> +		 * This control bit is valid from 88PM8607 B0 steping.
-> +		 */
-> +		if ((chip->chip_id >= PM8607_CHIP_B0) && (!pdata->irq_mode)) {
-> +			data = 0;
-> +			chip->irq_mode = 0;
-> +		}
-> +	}
-> +	ret = pm860x_set_bits(chip->parent, DESC_8607, PM8607_MISC1,
-> +			      mask, data);
-> +#else
+> Is there any other prefered method to soft reboot ARM926 from Linux? I've
+> taken a look at some PXA, OMAP & AT91 code about soft rebooting. It seems
+> they use Watchdog timer to reset, but my CPU does not have a watchdog.
 
-The if 0 stuff should just be removed for mainline.
+Don't call cpu_arm926_reset() directly.  Use kernel_restart() instead,
+or even better the reboot syscall from userspace.
