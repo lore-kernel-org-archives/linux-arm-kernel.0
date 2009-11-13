@@ -1,21 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Nov 2009 16:37:02 +0000
-Subject: ARM926 Software reset problems
-In-Reply-To: <B4B24B30208E45CE8347F29D228A3C82@teltronic.es>
-References: <B3925569A02247AFA3847BB80F9342EF@teltronic.es>
-	<20091113122045.GA29008@n2100.arm.linux.org.uk>
-	<8EBD063210E546E0BD6C80E8EF3AAD6B@teltronic.es>
-	<200911131559.51887.dk-arm-linux@gmx.de>
-	<B4B24B30208E45CE8347F29D228A3C82@teltronic.es>
-Message-ID: <20091113163702.GB31012@n2100.arm.linux.org.uk>
+From: dwalker@fifo99.com (Daniel Walker)
+Date: Fri, 13 Nov 2009 10:11:39 -0800
+Subject: Status of Dream series
+In-Reply-To: <20091111104748.GA26975@elf.ucw.cz>
+References: <20091111104748.GA26975@elf.ucw.cz>
+Message-ID: <1258135899.6411.7.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 13, 2009 at 05:31:44PM +0100, Ricardo Mart?nez wrote:
-> Russell: now it works, thank you very much. But ... it is still under test
-> because it sometimes hangs. For example, if I "flashcp" and overwrite
-> "uImage" and then reboot, it usually hangs. And upgrading kernel image is
-> something needed (not really often, of course) by my application.
+On Wed, 2009-11-11 at 11:47 +0100, Pavel Machek wrote:
+> Russell, what is the status of the "Dream" series? 
+> 
+>  [PATCH 1/3] msm: make debugging UART (for DEBUG_LL) configurable
+>  [PATCH 2/3] msm: add minimal board file for HTC Dream device
+>  [PATCH 3/3] msm: Add memory map for HTC Dream
+> 
+> Daniel Walker offered to maintain arch-msm tree, would that help? 
 
-Does flashcp leave the flash in status-read mode?  Does flashcp use
-the mtd devices to access the flash?
+Yeah, I can do it for now, but I can't accept patches for it via this
+email address.. I'm in the processes of setting up the right address for
+it .. Might take till next week tho.
+
+Daniel
