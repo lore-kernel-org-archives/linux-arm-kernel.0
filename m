@@ -1,30 +1,48 @@
-From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
-Date: Fri, 13 Nov 2009 16:15:05 +0100
-Subject: [RFC 11/11] ARM: avoid flushing I-cache in flush_cache_mm()
-In-Reply-To: <20091113151258.GB27752@flint.arm.linux.org.uk>
-References: <cover.1256683230.git.rmk+kernel@arm.linux.org.uk>
-	<f4e898a97589fdee3c689780212fe225e6732a6b.1256683230.git.rmk+kernel@arm.linux.org.uk>
-	<4AFD74CA.3040507@xenomai.org>
-	<20091113151258.GB27752@flint.arm.linux.org.uk>
-Message-ID: <4AFD77F9.9000204@xenomai.org>
+From: h.feurstein@gmail.com (Hubert Feurstein)
+Date: Fri, 13 Nov 2009 16:16:59 +0100
+Subject: ARM: big performance waste in memcpy_{from,to}io
+In-Reply-To: <20091113122438.GB29008@n2100.arm.linux.org.uk>
+References: <200911121749.49676.h.feurstein@gmail.com>
+	<ol1us6-035.ln1@chipmunk.wormnet.eu>
+	<200911131232.41716.h.feurstein@gmail.com>
+	<20091113122438.GB29008@n2100.arm.linux.org.uk>
+Message-ID: <385aa7580911130716l4b43b793ucb9fe7789ee2044f@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King wrote:
-> On Fri, Nov 13, 2009 at 04:01:30PM +0100, Gilles Chanteperdrix wrote:
->> Russell King wrote:
->>> flush_cache_mm() is called in two cases:
->>> 1. when a process exits, just before the page tables are torn down.
->>>    We can allow the stale lines to evict themselves over time without
->>>    causing any harm.
->> Is not there any risk to see cache lines evicted at a time when there
->> are no longer any page table entries for them? This was said to be a
->> problem during the early discussions on FCSE:
-> 
-> The discussion here is about the instruction cache - that doesn't write
-> back cache lines.
+2009/11/13 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Fri, Nov 13, 2009 at 12:32:41PM +0100, Hubert Feurstein wrote:
+>> The memcpy_{to,from}io-function don't has to care about the bus-width of the
+>> attached peripheral, because this is already handled correctly by the static
+>> memory controller of your arm-derivate (Of course this one has to be
+>> configured correctly to the peripherals bus width). In the rare case where you
+>> have to take care about that it is anyway a bad idea to use a memcpy_xxio-
+>> function.
+>
+> I believe there are SoCs where using 32-bit reads on lesser-width buses
+> generate faults. ?There are certainly SoCs which do abort reads/writes
+> to certain peripherals which aren't the right size.
+>
+>> Just want to ask the community if there is a really good reason why this
+>> bottle neck is still in the ARM kernel?
+>
+> No one has been bothered for the last 15 years to optimise it.
+>
 
-Ok. I should have read the patch. Sorry for the noise.
+Well, I do, because performance matters.
 
--- 
-                                          Gilles
+>> @Russell: What's your opinion on that?
+>
+> The problem is whether optimising it will end up breaking existing users.
+>
+
+Of course you are right, such a change will definitly needs good testing. But
+the fear of breaking things should never stop you from improving. Even if it
+turns out that the normal good optimized memcpy is not 100% suitable in all
+cases there are many other ways of improving memcpy_xxio. IMO a memcpy_xxio
+function should be something which uses the power of the architecture,
+because it is
+used so often. And as my tests showed there is big potential in it.
+
+Regards
+Hubert
