@@ -1,17 +1,95 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 13 Nov 2009 13:09:56 +0000
-Subject: [PATCH 09/10] input: enable touch on 88pm860x
-In-Reply-To: <771cded00911130104s3bc6ff97ma3a7f7ad76ae9198@mail.gmail.com>
-References: <771cded00911130104s3bc6ff97ma3a7f7ad76ae9198@mail.gmail.com>
-Message-ID: <20091113130956.GB21516@rakim.wolfsonmicro.main>
+From: dk-arm-linux@gmx.de (Dieter Kiermaier)
+Date: Fri, 13 Nov 2009 14:43:56 +0100
+Subject: PCI hotplug supported on ARM (Kirkwood)? - fakephp?
+In-Reply-To: <200911131221.43527.dk-arm-linux@gmx.de>
+References: <200911121826.06792.dk-arm-linux@gmx.de>
+	<cl2us6-035.ln1@chipmunk.wormnet.eu>
+	<200911131221.43527.dk-arm-linux@gmx.de>
+Message-ID: <200911131443.56429.dk-arm-linux@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 13, 2009 at 04:04:44AM -0500, Haojian Zhuang wrote:
-> +	} else {
-> +		input_report_abs(touch->idev, ABS_PRESSURE, 0);
-> +		input_report_abs(touch->idev, ABS_TOOL_WIDTH, 1);
-> +		input_report_abs(touch->idev, BTN_TOUCH, 0);
+Am Freitag 13 November 2009 12:21:43 schrieb Dieter Kiermaier:
+> Am Donnerstag 12 November 2009 20:01:32 schrieb Alexander Clouter:
+> 
+> > Dieter Kiermaier <dk-arm-linux@gmx.de> wrote:
+> > > 
+> > > is it possible to boot a FPGA which is connected to an PCI bus on a 
+> > > kirkwood cpu (via a pcie->pci bridge) at runtime (I call it hotplug)?
+> > > 
+> > > And after booting the FPGA e.g. via slave serial protocol loading the 
+> > > pci driver and access the device? This would be much easier to handle 
+> > > than flashing the fpga using u-boot.
+> > > 
+> > > Is there any special framework I have to use? How can I tell the 
+> > > kernel to reenumerate the bus and reasign the pci resources?
+> > > 
+> > > I have googled a lot and also tried to find something at newsgroups or 
+> > > mailinglists but I haven't found some valuable information - at least 
+> > > not for me ;). Is this possible?
+> > > 
+> > I tried tackling this on my board by creating a new 'bus' and trying to 
+> > work around making the FPGA 'hotplugable' that way.  As the bus would 
+> > know about the process of reprogramming the FPGA, it could cleanly 
+> > unload and reload everything.
+> > 
+> > http://marc.info/?l=linux-kernel&m=124441477117607&w=2
 
-This appears to be the only place ABS_TOOL_WIDTH is reported - could it
-not just be omitted?
+Hm, your link seems to be down. Do you have a newer version of your code
+somewhere?
+
+> > 
+> > Never did get it to work and no one expressed any real interest in it 
+> > for the platform sadly; so I drifted off looking for other geeky things 
+> > to do.
+> > 
+> > I am still personally keener on the bus model, but Geert suggested I 
+> > lump for a MFD.
+> 
+> Hm, it looks like fakephp is what I was looking for but I see no way to compile
+> this module on my arm (kirkwood).
+> 
+
+fakephp seems to be integrated / ported into the pci layer?
+I have a /sys/bus/pci interface:
+
+It is possible to deactivate devices by doing:
+echo 1 > /sys/bus/pci/devices/0000\:01\:08.0/remove
+
+But it looks like  there is no way of reactivating /rescanning it?
+
+I've tried
+echo 1 > /sys/bus/pci/rescan
+but without any success.
+
+Does anybody have an idea?
+
+Many thanks,
+Dieter
+
+
+
+
+
+> Does anybody know a way to compile it?
+> 
+> Many thanks,
+> Dieter
+> 
+> 
+> 
+> > 
+> > Whatever you do, if you can keep me in the loop then I can nick your 
+> > ideas/code and maybe get back into tinkering with my ARM board, that's 
+> > if I stop bricking my MIPS boards :-/
+> > 
+> > Cheers
+> > 
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
