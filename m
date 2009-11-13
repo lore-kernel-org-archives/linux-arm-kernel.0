@@ -1,44 +1,38 @@
-From: stevenrwalter@gmail.com (Steven Walter)
-Date: Fri, 13 Nov 2009 09:49:42 -0500
-Subject: cache aliasing in dup_mmap
-In-Reply-To: <20091105144830.GC21681@n2100.arm.linux.org.uk>
-References: <e06498070903061426o5875ad13hc6328aa0d3f08ed7@mail.gmail.com>
-	<e06498070903062020s22222594h7be318fb9f3fdaee@mail.gmail.com>
-	<ca992f110903080105ye955070t260e6a4334186986@mail.gmail.com>
-	<20090308121029.GA21277@n2100.arm.linux.org.uk>
-	<20090308143607.GA27349@n2100.arm.linux.org.uk>
-	<e06498070909290925q55777041q6f3ecfaf9847babb@mail.gmail.com>
-	<e06498070909290930w7745e1e3x2e224ad75ff62dbd@mail.gmail.com>
-	<20090929191108.GA13568@n2100.arm.linux.org.uk>
-	<20091005144623.GA20633@n2100.arm.linux.org.uk>
-	<20091105144830.GC21681@n2100.arm.linux.org.uk>
-Message-ID: <e06498070911130649k2051e4cfh2066cf0b9fdabbaf@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Nov 2009 14:51:10 +0000
+Subject: ARM926 Software reset problems
+In-Reply-To: <8EBD063210E546E0BD6C80E8EF3AAD6B@teltronic.es>
+References: <B3925569A02247AFA3847BB80F9342EF@teltronic.es>
+	<20091113122045.GA29008@n2100.arm.linux.org.uk>
+	<8EBD063210E546E0BD6C80E8EF3AAD6B@teltronic.es>
+Message-ID: <20091113145110.GA31012@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 5, 2009 at 9:48 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
->> I've not heard anything further. ?I've thrown the patches into the git
->> tree under a separate branch now (top two):
->>
->> http://ftp.arm.linux.org.uk/git/gitweb.cgi?p=linux-2.6-arm.git;a=shortlog;h=refs/heads/cup
->>
->> I do feel that more work needs to be done to the 2nd patch though.
->
-> Okay, enough. ?This issue is NOT going to get fixed unless you (or
-> someone else who can reproduce your problem) responds.
->
-> No response, no fix. ?Simple, really. ?I give you two weeks to respond
-> on this issue so it can be progressed before the above branch is trashed.
->
+On Fri, Nov 13, 2009 at 03:41:17PM +0100, Ricardo Mart?nez wrote:
+> I'm one step further. kernel_restart() uses arch_reset() which is hardware
+> dependent.
 
-I apologize for the late reply.  I have a build with your patches
-running in a reboot loop (the easiest way for us to reproduce the
-crash).  I should have a good indication of whether the patches fix
-the issue by Monday.
+kernel_restart() is not hardware dependent.  The backend of it (arch_reset)
+is because platforms reboot in their own specific manner.  It is up to the
+platform support implementer to make arch_reset() do the right thing on
+their platform.
 
-Just by examining the changes, your patches seem to be a superset of
-the change I made locally, which did fix the issue.  My fix was simply
-to add flush_cache_page before cow_user_page in mm/memory.c.
--- 
--Steven Walter <stevenrwalter@gmail.com>
+However, none of cpu_*reset nor arch_reset are intended to be called
+directly.  You _MUST_ call kernel_restart() to initiate a restart.  No
+other option will do - everything else is not supported and unreliable.
+
+> Most ARM9 make arch_reset() through Watchdog peripheral. But the CPU I'm
+> using does not have Watchdog timer.
+
+So why are you trying to make arch_reset() work through a non-existent
+watchdog?
+
+Just point arch_reset() at cpu_reset() like this:
+
+static void arch_reset(char mode, const char *cmd)
+{
+	cpu_reset(0);
+}
+
+as many other platforms do, and just call kernel_restart().
