@@ -1,87 +1,104 @@
-From: sandeen@sandeen.net (Eric Sandeen)
-Date: Fri, 13 Nov 2009 09:42:07 -0600
-Subject: [PATCH] arm: Iomega ix4-200d support
-In-Reply-To: <20091113085107.GJ13296@deprecation.cyrius.com>
-References: <4AFCF6FE.1010603@redhat.com>
-	<20091113085107.GJ13296@deprecation.cyrius.com>
-Message-ID: <4AFD7E4F.5040909@sandeen.net>
+From: rmartinez@teltronic.es (=?iso-8859-1?Q?Ricardo_Mart=EDnez?=)
+Date: Fri, 13 Nov 2009 17:31:44 +0100
+Subject: ARM926 Software reset problems
+In-Reply-To: <200911131559.51887.dk-arm-linux@gmx.de>
+References: <B3925569A02247AFA3847BB80F9342EF@teltronic.es>
+	<20091113122045.GA29008@n2100.arm.linux.org.uk>
+	<8EBD063210E546E0BD6C80E8EF3AAD6B@teltronic.es>
+	<200911131559.51887.dk-arm-linux@gmx.de>
+Message-ID: <B4B24B30208E45CE8347F29D228A3C82@teltronic.es>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Martin Michlmayr wrote:
-> * Eric Sandeen <sandeen@redhat.com> [2009-11-13 00:04]:
->> +config MACH_IX4_88F6281_NAS
->> +	bool "Iomega ix4-200d NAS"
+ 
+Thanks very much
+
+Russell: now it works, thank you very much. But ... it is still under test
+because it sometimes hangs. For example, if I "flashcp" and overwrite
+"uImage" and then reboot, it usually hangs. And upgrading kernel image is
+something needed (not really often, of course) by my application.
+
+Dieter: CPU is application specific, from a small vendor. Now, reset is
+asserted by an external component, an FPGA. CPU writes a command throug SPI
+in this FPGA and FPGA asserts RESET line. We want to get rid of any external
+components for reset.
+
+Thanks
+Ricardo Martinez
+
+
+-----Mensaje original-----
+De: Dieter Kiermaier [mailto:dk-arm-linux at gmx.de] 
+Enviado el: viernes, 13 de noviembre de 2009 16:00
+Para: linux-arm-kernel at lists.infradead.org
+CC: Ricardo Mart?nez
+Asunto: Re: ARM926 Software reset problems
+
+Am Freitag 13 November 2009 15:41:17 schrieb Ricardo Mart?nez:
 > 
-> If you look at Kconfig, you'll see that putting the CPU id in the MACH
-> name is quite unusual for NAS devices (it's only used for dev boards).
-> I'd make this IX4200D or NASIX400D.
-
-Ok
-
-> Also, the Kconfig entry should be at the end and not in the middle of
-> some reference boards.
-
-ok, not sure how it ended up there ;)
-
->> --- /dev/null
->> +++ b/arch/arm/mach-kirkwood/ix4-88f6281-setup.c
+> Hi Russell,
 > 
-> nasix4200d.c or ix4200d.c
+> Thanks for your help.
 > 
->> +/*
->> + * Marvell RD-88F6281 Reference Board Setup
+> I'm one step further. kernel_restart() uses arch_reset() which is 
+> hardware dependent.
 > 
-> That's obviously copy&paste...
+> Most ARM9 make arch_reset() through Watchdog peripheral. But the CPU 
+> I'm using does not have Watchdog timer.
 > 
->> + * This file is licensed under the terms of the GNU General Public
->> + * License version 2.  This program is licensed "as is" without any
->> + * warranty of any kind, whether express or implied.
+> I was trying to find an alternative, based only on software, but It 
+> may be not posible.
 > 
-> You should add your Copyright.  And probably the Copyright of the file
-> on which yours is baed.
 
-I'll have to find it :)
+Maybe there is another way. Please read the hardware manual careful.
+I now it from my last CPU (netsilicon ARM 926) that you have to write e.g.
+the CPU PLL register to fire a hardware reset.
+What CPU are you using?
 
->> +
->> +/* #ifdef IX4_BOARD MV_BOARD_INFO db88f6281AInfo db88f6281AInfoBoardMacInfo */
+Dieter
+
+> For example, in u-boot command line I can do reset just jumping back 
+> to start of u-boot code. This is more or less what "cpu_arm926_reset" 
+> does, but most times system hangs.
 > 
-> What's that?
-
-sorry, leftovers ...
-
->> +MACHINE_START(NASIX4200D, "Iomega NAS ix4-200d")
->> +	/* Maintainer: Saeed Bishara <saeed@marvell.com> */
+> Thanks,
+> Ricardo Martinez
 > 
-> That should be you.
-
-:)  aye.
-
-Argh, sorry, should have read this better before I sent it, it was a 
-quick hack - will clean this all up & resend.
-
->> --- a/arch/arm/tools/mach-types
->> +++ b/arch/arm/tools/mach-types
->> @@ -2132,6 +2132,7 @@ apollo			MACH_APOLLO		APOLLO			2141
->> at91cap9stk		MACH_AT91CAP9STK	AT91CAP9STK		2142
->> spc300			MACH_SPC300		SPC300			2143
->> eko			MACH_EKO		EKO			2144
->> +nasix4200d		MACH_IX4_88F6281_NAS	NASIX4200D		2145
 > 
-> That's a big no.  First of all, you have to register your own machine
-> ID at http://www.arm.linux.org.uk/developer/machines/  Second, when
-> you submit a patch, don't include mach-types since this is
-> auto-generated.
-
-OK
-
-> Finally, a question: it seems that the buttons and LEDs are not
-> supported by your patch.  Do you know how they are hooked up?
-
-I can try to find out.
-
-> Thanks for working on this
-
-Sure, sorry it's such a mess on the first pass, thanks for the review.  :)
-
--Eric
+> -----Mensaje original-----
+> De: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] Enviado 
+> el: viernes, 13 de noviembre de 2009 13:21
+> Para: Ricardo Mart?nez
+> CC: linux-arm-kernel at lists.infradead.org
+> Asunto: Re: ARM926 Software reset problems
+> 
+> On Fri, Nov 13, 2009 at 12:32:16PM +0100, Ricardo Mart?nez wrote:
+> > I'm using 
+> >     cpu_arm926_reset(ulong address) function which:
+> >            - flushes I/D caches
+> >             - jumps to "address", whose value in my case is NOR 
+> > flash base address where U-Boot stays (after remapping).
+> 
+> You should not be using this directly.  Software rebooting has a 
+> specific sequence, and the above is the very last step.
+> 
+> >     But it sometimes work, but most times hangs. Can this be caused 
+> > by MMU not being switched off?
+> 
+> cpu_arm926_reset() turns the MMU and caches off.
+> 
+> > Is there any other prefered method to soft reboot ARM926 from Linux? 
+> > I've taken a look at some PXA, OMAP & AT91 code about soft rebooting. 
+> > It seems they use Watchdog timer to reset, but my CPU does not have 
+> > a
+> watchdog.
+> 
+> Don't call cpu_arm926_reset() directly.  Use kernel_restart() instead, 
+> or even better the reboot syscall from userspace.
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
