@@ -1,59 +1,45 @@
-From: h.feurstein@gmail.com (Hubert Feurstein)
-Date: Fri, 13 Nov 2009 12:32:41 +0100
-Subject: ARM: big performance waste in memcpy_{from,to}io
-In-Reply-To: <ol1us6-035.ln1@chipmunk.wormnet.eu>
-References: <200911121749.49676.h.feurstein@gmail.com>
-	<ol1us6-035.ln1@chipmunk.wormnet.eu>
-Message-ID: <200911131232.41716.h.feurstein@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 13 Nov 2009 11:55:19 +0000
+Subject: [PATCH 05/10] mfd add irq support in 88pm860x
+In-Reply-To: <771cded00911130059q23c2bc97ja4509b7965f12eed@mail.gmail.com>
+References: <771cded00911130059q23c2bc97ja4509b7965f12eed@mail.gmail.com>
+Message-ID: <20091113115519.GA30966@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 12. November 2009 19:44:40 schrieb Alexander Clouter:
-> > Are there any drawbacks when using the good-and-fast "memcpy" ? On my
-> > Micro9- board everything is running fine so far.
-> 
-> From the small bit of MTD work I have done, some NAND's (and I guess
-> NOR's too) do *not* support 32bit wide read's.  For example, if I
-> remember correctly, the NAND driver for orion will let you read 32bits
-> but write only 8bits at a time.  Other platforms are only 8bit wide in
-> both direction.  I guess the 'slow' memcpy version is used as
-> *everything* supports 8bit reads....I *guess* :)
-> 
+On Fri, Nov 13, 2009 at 03:59:21AM -0500, Haojian Zhuang wrote:
 
-The Spansion NOR Flashes (like S29GL...) have a 16bit wide data bus, by using 
-two in parallel it looks like a 32bit-flash for the system. So 32bit reads 
-from the flash works just fine. But in fact that is not the point at all. And 
-it is not an issue of the mtd-driver, that's why I have posted this only to 
-the arm-linux-mailinglist and not to the mtd-list.
+> +int pm860x_request_irq(struct pm860x_chip *chip, int irq,
+> +		       void (*handle_irq)(struct pm860x_chip *, int, void *),
+> +		       void *data)
+> +{
 
-The memcpy_{to,from}io-function don't has to care about the bus-width of the 
-attached peripheral, because this is already handled correctly by the static 
-memory controller of your arm-derivate (Of course this one has to be 
-configured correctly to the peripherals bus width). In the rare case where you 
-have to take care about that it is anyway a bad idea to use a memcpy_xxio-
-function.
+It might be nice to make the IRQ handler be an irq_handler_t - that way
+if you convert the driver to use the generic IRQ infrastructure in
+future it'll be straightforward to transition the drivers by providing
+stub functions that pass through to generic IRQ.
 
-I've checked the implementations of some other architectures. And a lot of 
-them already have optimized memcpy_{from,to}io functions:
+Given that Thomas did the work it'd be good if we could use it
+eventually :) .
 
-	- alpha/io.c
-	- parisc/lib/io.c
-	- powerpc/kernel/io.c
-	- avr32/include/asm/io.h
-	- blackfin/include/asm/io.h
-	- cris/include/asm/io.h
-	- frv/include/asm/io.h
-	- h8300/include/asm/io.h
-	- m32r/include/asm/io.h
-	- m68k, microblaze, mips, mn10300, ...
+> +#if 0
+> +	mask = PM8607_MISC1_INV_INT | PM8607_MISC1_INT_CLEAR
+> +		| PM8607_MISC1_INT_MASK;
+> +	data = PM8607_MISC1_INT_CLEAR;
+> +	chip->irq_mode = 1;
+> +	if (pdata) {
+> +		/*
+> +		 * irq_mode defines the way of clearing interrupt.
+> +		 * If it's 1, clear IRQ by write. Otherwise, clear it by read.
+> +		 * This control bit is valid from 88PM8607 B0 steping.
+> +		 */
+> +		if ((chip->chip_id >= PM8607_CHIP_B0) && (!pdata->irq_mode)) {
+> +			data = 0;
+> +			chip->irq_mode = 0;
+> +		}
+> +	}
+> +	ret = pm860x_set_bits(chip->parent, DESC_8607, PM8607_MISC1,
+> +			      mask, data);
+> +#else
 
-One architecture which also uses the simple and slow version is 'sh' (and 
-maybe there are a few others).
-
-Just want to ask the community if there is a really good reason why this 
-bottle neck is still in the ARM kernel?
-
-@Russell: What's your opinion on that?
-
-best regards
-Hubert
+The if 0 stuff should just be removed for mainline.
