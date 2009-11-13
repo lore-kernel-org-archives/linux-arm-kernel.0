@@ -1,39 +1,67 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Fri, 13 Nov 2009 10:37:02 +0200
-Subject: NAND: failure reported with mtd_oobtest(read delay violated)
-In-Reply-To: <FCCFB4CDC6E5564B9182F639FC35608702FA5CC012@dbde02.ent.ti.com>
-References: <FCCFB4CDC6E5564B9182F639FC35608702FA5CC012@dbde02.ent.ti.com>
-Message-ID: <1258101422.21596.1191.camel@localhost>
+From: tbm@cyrius.com (Martin Michlmayr)
+Date: Fri, 13 Nov 2009 08:51:07 +0000
+Subject: [PATCH] arm: Iomega ix4-200d support
+In-Reply-To: <4AFCF6FE.1010603@redhat.com>
+References: <4AFCF6FE.1010603@redhat.com>
+Message-ID: <20091113085107.GJ13296@deprecation.cyrius.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2009-11-12 at 21:28 +0530, Govindarajan, Sriramakrishnan wrote:
-> Hello,
-> On the OMAP3 EVM platform we are seeing failures when we run the mtd_oobtest repeatedly (overnight). Usually the failures are reported after 40-45 iterations.
-> 
-> Further analysis with logic analyzer seems to indicate that for the specific instance where failure is observed, the time delay between dispatching the READ0 command and the start of read operation is violated. (udelay loop would start even before the write is reflected on the HW)
-> 
-> OMAP3EVM implementation relies on command delay(chip_delay set to 50ms) and doesn't use wait pin monitoring. By adding a data memory barrier dmb() instruction right after the command phase the issue seems to be resolved.
-> 
-> Have we seen similar behavior on other platforms that rely on command delay and do we specifically require a dmb() after the command is written?
-> 
-> DIFF Details:(will post this a patch once I hear your review comments)
-> 
-> diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-> index 2211386..8df3780 100644
-> --- a/drivers/mtd/nand/nand_base.c
-> +++ b/drivers/mtd/nand/nand_base.c
-> @@ -651,6 +651,7 @@ static void nand_command_lp(struct mtd_info *mtd, unsigned int command,
->                                NAND_NCE | NAND_CLE | NAND_CTRL_CHANGE);
->                 chip->cmd_ctrl(mtd, NAND_CMD_NONE,
->                                NAND_NCE | NAND_CTRL_CHANGE);
-> +               dmb();
+* Eric Sandeen <sandeen@redhat.com> [2009-11-13 00:04]:
+> +config MACH_IX4_88F6281_NAS
+> +	bool "Iomega ix4-200d NAS"
 
-Did you try using 'wmb()' instead? Not 100% sure, but it looks like the
-barrier you need. However, if you read
-'Documentation/memory-barriers.txt', you will probably find the right
-way to go.
+If you look at Kconfig, you'll see that putting the CPU id in the MACH
+name is quite unusual for NAS devices (it's only used for dev boards).
+I'd make this IX4200D or NASIX400D.
 
+Also, the Kconfig entry should be at the end and not in the middle of
+some reference boards.
+
+> --- /dev/null
+> +++ b/arch/arm/mach-kirkwood/ix4-88f6281-setup.c
+
+nasix4200d.c or ix4200d.c
+
+> +/*
+> + * Marvell RD-88F6281 Reference Board Setup
+
+That's obviously copy&paste...
+
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+
+You should add your Copyright.  And probably the Copyright of the file
+on which yours is baed.
+
+> +
+> +/* #ifdef IX4_BOARD MV_BOARD_INFO db88f6281AInfo db88f6281AInfoBoardMacInfo */
+
+What's that?
+
+> +MACHINE_START(NASIX4200D, "Iomega NAS ix4-200d")
+> +	/* Maintainer: Saeed Bishara <saeed@marvell.com> */
+
+That should be you.
+
+> --- a/arch/arm/tools/mach-types
+> +++ b/arch/arm/tools/mach-types
+> @@ -2132,6 +2132,7 @@ apollo			MACH_APOLLO		APOLLO			2141
+> at91cap9stk		MACH_AT91CAP9STK	AT91CAP9STK		2142
+> spc300			MACH_SPC300		SPC300			2143
+> eko			MACH_EKO		EKO			2144
+> +nasix4200d		MACH_IX4_88F6281_NAS	NASIX4200D		2145
+
+That's a big no.  First of all, you have to register your own machine
+ID at http://www.arm.linux.org.uk/developer/machines/  Second, when
+you submit a patch, don't include mach-types since this is
+auto-generated.
+
+Finally, a question: it seems that the buttons and LEDs are not
+supported by your patch.  Do you know how they are hooked up?
+
+Thanks for working on this
 -- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+Martin Michlmayr
+http://www.cyrius.com/
