@@ -1,36 +1,64 @@
-From: rmartinez@teltronic.es (=?iso-8859-1?Q?Ricardo_Mart=EDnez?=)
-Date: Fri, 13 Nov 2009 09:30:27 +0100
-Subject: Linux on ARM926EJ: Software reset problems
-Message-ID: <56948FFAC219492B8923C0852A8AC413@teltronic.es>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Fri, 13 Nov 2009 18:15:07 +0100
+Subject: New mach and platform support : lpc32xx
+Message-ID: <083DF309106F364B939360100EC290F804F53CD3B0@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
- 
-I'm trying to soft reset an ARM926EJ.
- 
-I'm using 
-    cpu_arm926_reset(ulong address) function which:
-           - flushes I/D caches
-            - jumps to "address", whose value in my case is NOR flash base
-addres where U-Boot stays (after remapping).
- 
-    But it sometimes work, but most times hangs. Can this be caused by MMU
-not being switched off? 
- 
-Any other hints?
- 
-If you think it might be caused by MMU, how can MMU be disabled?
- 
-Is there any other prefered method to soft reboot ARM926 from Linux? I've
-taken a look at some PXA, OMAP & AT91 code about soft rebooting. It seems
-they use Watchdog timer to reset, but my CPU does not have a watchdog.
- 
-Thanks in advance,
-Ricardo Martinez
- 
- 
+Hi,
+
+
+
+We are the process of getting Linux optimized to the NXP LPC32X0 SoC and would
+
+like to get the files submitted for inclusion into the mainline. Currently, this
+
+consists of 4 CPU variants (all very similar) and 3 different boards (all very
+
+different!).
+
+
+
+The kernel and most of the drivers have been ported to this board for about a
+
+year now, with occasional tweaks needed as the kernel version progresses. A
+
+number of developers are using the kernel on these boards now. We are getting
+
+a lot of requests to get this into mainline!
+
+
+
+I don't want to deluge everyone or anyone all at once, but would like to get
+
+this started!
+
+
+
+Most of the work for this is already done up to 2.6.32-rc6. Whats the best
+
+approach to get started here? I would like to start small with just the basic
+
+arch files with 1 or 2 boards and later add in the other support as more of the
+
+optimzied chip specific drivers are merged in. As of now, the only change
+
+required ouside of the existing kernel source tree is the arch/arm/Kconfig and
+
+arch/arm/Makefile files and the addition of the arch/arm/mach-lpc32xx/ subdir.
+
+
+
+Should I start posting patches for the basic mach- area first?
+
+
+
+thanks,
+
+Kevin Wells
+
+NXP Semiconductors
 
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091113/ed82aa81/attachment-0001.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091113/ddb0ade0/attachment-0001.htm>
