@@ -1,48 +1,107 @@
-From: h.feurstein@gmail.com (Hubert Feurstein)
-Date: Fri, 13 Nov 2009 16:16:59 +0100
-Subject: ARM: big performance waste in memcpy_{from,to}io
-In-Reply-To: <20091113122438.GB29008@n2100.arm.linux.org.uk>
-References: <200911121749.49676.h.feurstein@gmail.com>
-	<ol1us6-035.ln1@chipmunk.wormnet.eu>
-	<200911131232.41716.h.feurstein@gmail.com>
-	<20091113122438.GB29008@n2100.arm.linux.org.uk>
-Message-ID: <385aa7580911130716l4b43b793ucb9fe7789ee2044f@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 13 Nov 2009 17:39:58 +0100
+Subject: [PATCH v2] atmel_lcdfb Kconfig: remove long dependency line
+In-Reply-To: <29424085870c8c8cc3fe9d6e1f382a24f8a9ca2b.1257263893.git.nicolas.ferre@atmel.com>
+References: <29424085870c8c8cc3fe9d6e1f382a24f8a9ca2b.1257263893.git.nicolas.ferre@atmel.com>
+Message-ID: <1258130398-13737-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/11/13 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Fri, Nov 13, 2009 at 12:32:41PM +0100, Hubert Feurstein wrote:
->> The memcpy_{to,from}io-function don't has to care about the bus-width of the
->> attached peripheral, because this is already handled correctly by the static
->> memory controller of your arm-derivate (Of course this one has to be
->> configured correctly to the peripherals bus width). In the rare case where you
->> have to take care about that it is anyway a bad idea to use a memcpy_xxio-
->> function.
->
-> I believe there are SoCs where using 32-bit reads on lesser-width buses
-> generate faults. ?There are certainly SoCs which do abort reads/writes
-> to certain peripherals which aren't the right size.
->
->> Just want to ask the community if there is a really good reason why this
->> bottle neck is still in the ARM kernel?
->
-> No one has been bothered for the last 15 years to optimise it.
->
+Many Atmel SOC are embedding a LCD controller. This patch removes the long
+dependency line for this Atmel LCD framebuffer driver configuration entry.
+The HAVE_FB_ATMEL configuration option is located in the video Kconfig file
+as it may be setup by ARM/AT91 and AVR32 chips.
 
-Well, I do, because performance matters.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/Kconfig |    6 ++++++
+ arch/avr32/Kconfig         |    1 +
+ drivers/video/Kconfig      |    5 ++++-
+ 3 files changed, 11 insertions(+), 1 deletions(-)
 
->> @Russell: What's your opinion on that?
->
-> The problem is whether optimising it will end up breaking existing users.
->
-
-Of course you are right, such a change will definitly needs good testing. But
-the fear of breaking things should never stop you from improving. Even if it
-turns out that the normal good optimized memcpy is not 100% suitable in all
-cases there are many other ways of improving memcpy_xxio. IMO a memcpy_xxio
-function should be something which uses the power of the architecture,
-because it is
-used so often. And as my tests showed there is big potential in it.
-
-Regards
-Hubert
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index bb4cd27..3df124e 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -41,18 +41,21 @@ config ARCH_AT91SAM9261
+ 	select CPU_ARM926T
+ 	select GENERIC_TIME
+ 	select GENERIC_CLOCKEVENTS
++	select HAVE_FB_ATMEL
+ 
+ config ARCH_AT91SAM9G10
+ 	bool "AT91SAM9G10"
+ 	select CPU_ARM926T
+ 	select GENERIC_TIME
+ 	select GENERIC_CLOCKEVENTS
++	select HAVE_FB_ATMEL
+ 
+ config ARCH_AT91SAM9263
+ 	bool "AT91SAM9263"
+ 	select CPU_ARM926T
+ 	select GENERIC_TIME
+ 	select GENERIC_CLOCKEVENTS
++	select HAVE_FB_ATMEL
+ 
+ config ARCH_AT91SAM9RL
+ 	bool "AT91SAM9RL"
+@@ -60,6 +63,7 @@ config ARCH_AT91SAM9RL
+ 	select GENERIC_TIME
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_AT91_USART3
++	select HAVE_FB_ATMEL
+ 
+ config ARCH_AT91SAM9G20
+ 	bool "AT91SAM9G20"
+@@ -76,12 +80,14 @@ config ARCH_AT91SAM9G45
+ 	select GENERIC_TIME
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_AT91_USART3
++	select HAVE_FB_ATMEL
+ 
+ config ARCH_AT91CAP9
+ 	bool "AT91CAP9"
+ 	select CPU_ARM926T
+ 	select GENERIC_TIME
+ 	select GENERIC_CLOCKEVENTS
++	select HAVE_FB_ATMEL
+ 
+ config ARCH_AT91X40
+ 	bool "AT91x40"
+diff --git a/arch/avr32/Kconfig b/arch/avr32/Kconfig
+index 35e3bd9..d856354 100644
+--- a/arch/avr32/Kconfig
++++ b/arch/avr32/Kconfig
+@@ -92,6 +92,7 @@ config PLATFORM_AT32AP
+ 	select PERFORMANCE_COUNTERS
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select GENERIC_ALLOCATOR
++	select HAVE_FB_ATMEL
+ 
+ #
+ # CPU types
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index 9bbb285..6d3f291 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -5,6 +5,9 @@
+ menu "Graphics support"
+ 	depends on HAS_IOMEM
+ 
++config HAVE_FB_ATMEL
++	bool
++
+ source "drivers/char/agp/Kconfig"
+ 
+ source "drivers/gpu/vga/Kconfig"
+@@ -937,7 +940,7 @@ config FB_S1D13XXX
+ 
+ config FB_ATMEL
+ 	tristate "AT91/AT32 LCD Controller support"
+-	depends on FB && (ARCH_AT91SAM9261 || ARCH_AT91SAM9G10 || ARCH_AT91SAM9263 || ARCH_AT91SAM9RL || ARCH_AT91SAM9G45 || ARCH_AT91CAP9 || AVR32)
++	depends on FB && HAVE_FB_ATMEL
+ 	select FB_CFB_FILLRECT
+ 	select FB_CFB_COPYAREA
+ 	select FB_CFB_IMAGEBLIT
+-- 
+1.5.6.5
