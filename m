@@ -1,22 +1,20 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 13 Nov 2009 16:23:20 +0800
-Subject: [PATCH 1/3 v4] Add camera support for A780 and A910 EZX phones
-In-Reply-To: <Pine.LNX.4.64.0911122144380.15708@axis700.grange>
-References: <Pine.LNX.4.64.0911111857430.4072@axis700.grange>
-	<1258037224-6290-1-git-send-email-ospite@studenti.unina.it>
-	<Pine.LNX.4.64.0911122144380.15708@axis700.grange>
-Message-ID: <f17812d70911130023h6ad1a003i40d07d10acbbd21b@mail.gmail.com>
+Date: Fri, 13 Nov 2009 16:24:12 +0800
+Subject: [PATCH 2/3] ezx: Add leds-lp3944 support for A910 EZX phone
+In-Reply-To: <f17812d70911032240x39ee949fye2eb8475c78a7079@mail.gmail.com>
+References: <1257266734-28673-1-git-send-email-ospite@studenti.unina.it>
+	<1257266734-28673-2-git-send-email-ospite@studenti.unina.it>
+	<1257266734-28673-3-git-send-email-ospite@studenti.unina.it>
+	<f17812d70911032240x39ee949fye2eb8475c78a7079@mail.gmail.com>
+Message-ID: <f17812d70911130024q248cd7aepfb8d2a7eeca0dfda@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 13, 2009 at 4:49 AM, Guennadi Liakhovetski
-<g.liakhovetski@gmx.de> wrote:
-> On Thu, 12 Nov 2009, Antonio Ospite wrote:
+On Wed, Nov 4, 2009 at 2:40 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> This patch looks good, will apply later.
 >
->> Signed-off-by: Bart Visscher <bartv@thisnet.nl>
+> On Wed, Nov 4, 2009 at 12:45 AM, Antonio Ospite
+> <ospite@studenti.unina.it> wrote:
 >> Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
->
-> Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
->
 
-Applied, thanks.
+Applied to 'devel', thanks.
