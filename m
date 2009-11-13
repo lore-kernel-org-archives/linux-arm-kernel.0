@@ -1,22 +1,22 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 13 Nov 2009 16:13:32 +0800
-Subject: [PATCH 01/02] pxa: rename macro from pxa9xx to pxa93x
-In-Reply-To: <771cded00911041858u6873df81nd0eccad17f014759@mail.gmail.com>
-References: <771cded00911041858u6873df81nd0eccad17f014759@mail.gmail.com>
-Message-ID: <f17812d70911130013u12b1f381q9a05c068d91d0c91@mail.gmail.com>
+Date: Fri, 13 Nov 2009 16:23:20 +0800
+Subject: [PATCH 1/3 v4] Add camera support for A780 and A910 EZX phones
+In-Reply-To: <Pine.LNX.4.64.0911122144380.15708@axis700.grange>
+References: <Pine.LNX.4.64.0911111857430.4072@axis700.grange>
+	<1258037224-6290-1-git-send-email-ospite@studenti.unina.it>
+	<Pine.LNX.4.64.0911122144380.15708@axis700.grange>
+Message-ID: <f17812d70911130023h6ad1a003i40d07d10acbbd21b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 5, 2009 at 10:58 AM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> From 36b733f1d29ddae67b46f79b8ab6377abcf33c7a Mon Sep 17 00:00:00 2001
-> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Sun, 18 Oct 2009 06:09:32 -0400
-> Subject: [PATCH] [ARM] pxa: rename macro from pxa9xx to pxa93x
+On Fri, Nov 13, 2009 at 4:49 AM, Guennadi Liakhovetski
+<g.liakhovetski@gmx.de> wrote:
+> On Thu, 12 Nov 2009, Antonio Ospite wrote:
 >
-> Because original macro can only judge whether current CPU is pxa93x, rename
-> the macro to correct name.
+>> Signed-off-by: Bart Visscher <bartv@thisnet.nl>
+>> Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
 >
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+>
 
-Applied to 'devel'.
+Applied, thanks.
