@@ -1,61 +1,44 @@
-From: rmartinez@teltronic.es (=?iso-8859-1?Q?Ricardo_Mart=EDnez?=)
-Date: Fri, 13 Nov 2009 15:41:17 +0100
-Subject: ARM926 Software reset problems
-In-Reply-To: <20091113122045.GA29008@n2100.arm.linux.org.uk>
-References: <B3925569A02247AFA3847BB80F9342EF@teltronic.es>
-	<20091113122045.GA29008@n2100.arm.linux.org.uk>
-Message-ID: <8EBD063210E546E0BD6C80E8EF3AAD6B@teltronic.es>
+From: stevenrwalter@gmail.com (Steven Walter)
+Date: Fri, 13 Nov 2009 09:49:42 -0500
+Subject: cache aliasing in dup_mmap
+In-Reply-To: <20091105144830.GC21681@n2100.arm.linux.org.uk>
+References: <e06498070903061426o5875ad13hc6328aa0d3f08ed7@mail.gmail.com>
+	<e06498070903062020s22222594h7be318fb9f3fdaee@mail.gmail.com>
+	<ca992f110903080105ye955070t260e6a4334186986@mail.gmail.com>
+	<20090308121029.GA21277@n2100.arm.linux.org.uk>
+	<20090308143607.GA27349@n2100.arm.linux.org.uk>
+	<e06498070909290925q55777041q6f3ecfaf9847babb@mail.gmail.com>
+	<e06498070909290930w7745e1e3x2e224ad75ff62dbd@mail.gmail.com>
+	<20090929191108.GA13568@n2100.arm.linux.org.uk>
+	<20091005144623.GA20633@n2100.arm.linux.org.uk>
+	<20091105144830.GC21681@n2100.arm.linux.org.uk>
+Message-ID: <e06498070911130649k2051e4cfh2066cf0b9fdabbaf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Nov 5, 2009 at 9:48 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+>> I've not heard anything further. ?I've thrown the patches into the git
+>> tree under a separate branch now (top two):
+>>
+>> http://ftp.arm.linux.org.uk/git/gitweb.cgi?p=linux-2.6-arm.git;a=shortlog;h=refs/heads/cup
+>>
+>> I do feel that more work needs to be done to the 2nd patch though.
+>
+> Okay, enough. ?This issue is NOT going to get fixed unless you (or
+> someone else who can reproduce your problem) responds.
+>
+> No response, no fix. ?Simple, really. ?I give you two weeks to respond
+> on this issue so it can be progressed before the above branch is trashed.
+>
 
-Hi Russell,
+I apologize for the late reply.  I have a build with your patches
+running in a reboot loop (the easiest way for us to reproduce the
+crash).  I should have a good indication of whether the patches fix
+the issue by Monday.
 
-Thanks for your help.
-
-I'm one step further. kernel_restart() uses arch_reset() which is hardware
-dependent.
-
-Most ARM9 make arch_reset() through Watchdog peripheral. But the CPU I'm
-using does not have Watchdog timer.
-
-I was trying to find an alternative, based only on software, but It may be
-not posible.
-
-For example, in u-boot command line I can do reset just jumping back to
-start of u-boot code. This is more or less what "cpu_arm926_reset" does, but
-most times system hangs.
-
-Thanks,
-Ricardo Martinez
-
-
------Mensaje original-----
-De: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
-Enviado el: viernes, 13 de noviembre de 2009 13:21
-Para: Ricardo Mart?nez
-CC: linux-arm-kernel at lists.infradead.org
-Asunto: Re: ARM926 Software reset problems
-
-On Fri, Nov 13, 2009 at 12:32:16PM +0100, Ricardo Mart?nez wrote:
-> I'm using 
->     cpu_arm926_reset(ulong address) function which:
->            - flushes I/D caches
->             - jumps to "address", whose value in my case is NOR flash 
-> base address where U-Boot stays (after remapping).
-
-You should not be using this directly.  Software rebooting has a specific
-sequence, and the above is the very last step.
-
->     But it sometimes work, but most times hangs. Can this be caused by 
-> MMU not being switched off?
-
-cpu_arm926_reset() turns the MMU and caches off.
-
-> Is there any other prefered method to soft reboot ARM926 from Linux? 
-> I've taken a look at some PXA, OMAP & AT91 code about soft rebooting. 
-> It seems they use Watchdog timer to reset, but my CPU does not have a
-watchdog.
-
-Don't call cpu_arm926_reset() directly.  Use kernel_restart() instead, or
-even better the reboot syscall from userspace.
+Just by examining the changes, your patches seem to be a superset of
+the change I made locally, which did fix the issue.  My fix was simply
+to add flush_cache_page before cow_user_page in mm/memory.c.
+-- 
+-Steven Walter <stevenrwalter@gmail.com>
