@@ -1,107 +1,87 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 13 Nov 2009 17:39:58 +0100
-Subject: [PATCH v2] atmel_lcdfb Kconfig: remove long dependency line
-In-Reply-To: <29424085870c8c8cc3fe9d6e1f382a24f8a9ca2b.1257263893.git.nicolas.ferre@atmel.com>
-References: <29424085870c8c8cc3fe9d6e1f382a24f8a9ca2b.1257263893.git.nicolas.ferre@atmel.com>
-Message-ID: <1258130398-13737-1-git-send-email-nicolas.ferre@atmel.com>
+From: sandeen@sandeen.net (Eric Sandeen)
+Date: Fri, 13 Nov 2009 09:42:07 -0600
+Subject: [PATCH] arm: Iomega ix4-200d support
+In-Reply-To: <20091113085107.GJ13296@deprecation.cyrius.com>
+References: <4AFCF6FE.1010603@redhat.com>
+	<20091113085107.GJ13296@deprecation.cyrius.com>
+Message-ID: <4AFD7E4F.5040909@sandeen.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many Atmel SOC are embedding a LCD controller. This patch removes the long
-dependency line for this Atmel LCD framebuffer driver configuration entry.
-The HAVE_FB_ATMEL configuration option is located in the video Kconfig file
-as it may be setup by ARM/AT91 and AVR32 chips.
+Martin Michlmayr wrote:
+> * Eric Sandeen <sandeen@redhat.com> [2009-11-13 00:04]:
+>> +config MACH_IX4_88F6281_NAS
+>> +	bool "Iomega ix4-200d NAS"
+> 
+> If you look at Kconfig, you'll see that putting the CPU id in the MACH
+> name is quite unusual for NAS devices (it's only used for dev boards).
+> I'd make this IX4200D or NASIX400D.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/Kconfig |    6 ++++++
- arch/avr32/Kconfig         |    1 +
- drivers/video/Kconfig      |    5 ++++-
- 3 files changed, 11 insertions(+), 1 deletions(-)
+Ok
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index bb4cd27..3df124e 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -41,18 +41,21 @@ config ARCH_AT91SAM9261
- 	select CPU_ARM926T
- 	select GENERIC_TIME
- 	select GENERIC_CLOCKEVENTS
-+	select HAVE_FB_ATMEL
- 
- config ARCH_AT91SAM9G10
- 	bool "AT91SAM9G10"
- 	select CPU_ARM926T
- 	select GENERIC_TIME
- 	select GENERIC_CLOCKEVENTS
-+	select HAVE_FB_ATMEL
- 
- config ARCH_AT91SAM9263
- 	bool "AT91SAM9263"
- 	select CPU_ARM926T
- 	select GENERIC_TIME
- 	select GENERIC_CLOCKEVENTS
-+	select HAVE_FB_ATMEL
- 
- config ARCH_AT91SAM9RL
- 	bool "AT91SAM9RL"
-@@ -60,6 +63,7 @@ config ARCH_AT91SAM9RL
- 	select GENERIC_TIME
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_AT91_USART3
-+	select HAVE_FB_ATMEL
- 
- config ARCH_AT91SAM9G20
- 	bool "AT91SAM9G20"
-@@ -76,12 +80,14 @@ config ARCH_AT91SAM9G45
- 	select GENERIC_TIME
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_AT91_USART3
-+	select HAVE_FB_ATMEL
- 
- config ARCH_AT91CAP9
- 	bool "AT91CAP9"
- 	select CPU_ARM926T
- 	select GENERIC_TIME
- 	select GENERIC_CLOCKEVENTS
-+	select HAVE_FB_ATMEL
- 
- config ARCH_AT91X40
- 	bool "AT91x40"
-diff --git a/arch/avr32/Kconfig b/arch/avr32/Kconfig
-index 35e3bd9..d856354 100644
---- a/arch/avr32/Kconfig
-+++ b/arch/avr32/Kconfig
-@@ -92,6 +92,7 @@ config PLATFORM_AT32AP
- 	select PERFORMANCE_COUNTERS
- 	select ARCH_REQUIRE_GPIOLIB
- 	select GENERIC_ALLOCATOR
-+	select HAVE_FB_ATMEL
- 
- #
- # CPU types
-diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-index 9bbb285..6d3f291 100644
---- a/drivers/video/Kconfig
-+++ b/drivers/video/Kconfig
-@@ -5,6 +5,9 @@
- menu "Graphics support"
- 	depends on HAS_IOMEM
- 
-+config HAVE_FB_ATMEL
-+	bool
-+
- source "drivers/char/agp/Kconfig"
- 
- source "drivers/gpu/vga/Kconfig"
-@@ -937,7 +940,7 @@ config FB_S1D13XXX
- 
- config FB_ATMEL
- 	tristate "AT91/AT32 LCD Controller support"
--	depends on FB && (ARCH_AT91SAM9261 || ARCH_AT91SAM9G10 || ARCH_AT91SAM9263 || ARCH_AT91SAM9RL || ARCH_AT91SAM9G45 || ARCH_AT91CAP9 || AVR32)
-+	depends on FB && HAVE_FB_ATMEL
- 	select FB_CFB_FILLRECT
- 	select FB_CFB_COPYAREA
- 	select FB_CFB_IMAGEBLIT
--- 
-1.5.6.5
+> Also, the Kconfig entry should be at the end and not in the middle of
+> some reference boards.
+
+ok, not sure how it ended up there ;)
+
+>> --- /dev/null
+>> +++ b/arch/arm/mach-kirkwood/ix4-88f6281-setup.c
+> 
+> nasix4200d.c or ix4200d.c
+> 
+>> +/*
+>> + * Marvell RD-88F6281 Reference Board Setup
+> 
+> That's obviously copy&paste...
+> 
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2.  This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+> 
+> You should add your Copyright.  And probably the Copyright of the file
+> on which yours is baed.
+
+I'll have to find it :)
+
+>> +
+>> +/* #ifdef IX4_BOARD MV_BOARD_INFO db88f6281AInfo db88f6281AInfoBoardMacInfo */
+> 
+> What's that?
+
+sorry, leftovers ...
+
+>> +MACHINE_START(NASIX4200D, "Iomega NAS ix4-200d")
+>> +	/* Maintainer: Saeed Bishara <saeed@marvell.com> */
+> 
+> That should be you.
+
+:)  aye.
+
+Argh, sorry, should have read this better before I sent it, it was a 
+quick hack - will clean this all up & resend.
+
+>> --- a/arch/arm/tools/mach-types
+>> +++ b/arch/arm/tools/mach-types
+>> @@ -2132,6 +2132,7 @@ apollo			MACH_APOLLO		APOLLO			2141
+>> at91cap9stk		MACH_AT91CAP9STK	AT91CAP9STK		2142
+>> spc300			MACH_SPC300		SPC300			2143
+>> eko			MACH_EKO		EKO			2144
+>> +nasix4200d		MACH_IX4_88F6281_NAS	NASIX4200D		2145
+> 
+> That's a big no.  First of all, you have to register your own machine
+> ID at http://www.arm.linux.org.uk/developer/machines/  Second, when
+> you submit a patch, don't include mach-types since this is
+> auto-generated.
+
+OK
+
+> Finally, a question: it seems that the buttons and LEDs are not
+> supported by your patch.  Do you know how they are hooked up?
+
+I can try to find out.
+
+> Thanks for working on this
+
+Sure, sorry it's such a mess on the first pass, thanks for the review.  :)
+
+-Eric
