@@ -1,49 +1,80 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Fri, 13 Nov 2009 00:17:03 +0100
-Subject: [PATCH] ARM: Prefix revision number in /proc/cpuinfo
-In-Reply-To: <20091112221307.GC12308@n2100.arm.linux.org.uk>
-References: <1258034287-4533-1-git-send-email-daniel@caiaq.de>
-	<20091112215201.GA12308@n2100.arm.linux.org.uk>
-	<20091112220314.GS14091@buzzloop.caiaq.de>
-	<20091112221307.GC12308@n2100.arm.linux.org.uk>
-Message-ID: <20091112231703.GT14091@buzzloop.caiaq.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 12 Nov 2009 16:07:07 -0800
+Subject: [PATCH 00/14] Omap low-level device init updates for 2.6.33
+Message-ID: <20091113000444.9034.41293.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 12, 2009 at 10:13:07PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Nov 12, 2009 at 11:03:14PM +0100, Daniel Mack wrote:
-> > On Thu, Nov 12, 2009 at 09:52:01PM +0000, Russell King - ARM Linux wrote:
-> > > On Thu, Nov 12, 2009 at 02:58:07PM +0100, Daniel Mack wrote:
-> > > > The revision field in /proc/cpuinfo is reported as hex number, so it
-> > > > should have a '0x' prefix to make that clear. Otherwise, parsers
-> > > > will take it as decimal number unless it contains a letter.
-> > > 
-> > > So what you're doing is possibly breaking existing parsers (which
-> > > probably already assume it is hex) to fix buggy parsers?
-> > 
-> > I wouldn't call that fixing a buggy parser. On my board, the revision is
-> > 0x101 which was parsed as 101. You can't know it is in hex unless you
-> > look at the sources.
-> 
-> However, we export lots of stuff from the kernel in hex without an '0x'
-> prefix.
-> 
-> The biggest point here, though, is that the field is already present and
-> has been used, created about 10 years ago for NetWinder stuff.  So we've
-> about 10 years of history of it being there.  Adding the '0x' prefix may
-> break existing parsers, which is a good enough reason not to change it.
-> 
-> Moreover, if you try to parse the field using strtoul, you'll generally
-> end up with it being interpreted as an _octal_ number due to the leading
-> zeros - which should be enough of a hint that it isn't a decimal number.
-> 
-> If you really feel strongly about it, then the only portable way of fixing
-> it would be to create a new entry in the file with the '0x' prefix.
+Hi all,
 
-Hmm, no. I think we will just force the parser to hex then. Not that
-important. It's just that all other fields in /proc/cpuinfo which are in
-hex _are_ prefixed indeed, but I see the risk of breaking existing
-parsers, so let's keep it the way it is.
+Here are some patches for review for the upcoming merge window.
 
-Thanks,
-Daniel
+This series mostly updates the low-level device init code to
+support the new omap processors. Few more clean-up patches are
+included too.
+
+Regards,
+
+Tony
+
+---
+
+Anand Gadiyar (1):
+      omap: update plat/usb.h to allow ehci driver to build
+
+Felipe Balbi (1):
+      omap: Add platform init code for EHCI driver
+
+Felipe Contreras (1):
+      omap: iommu: reorganize
+
+Hiroshi DOYU (2):
+      omap: iommu: avoid remapping if it's been mapped in MPU side
+      omap: iovmm: remove cache flush operation
+
+Kevin Hilman (1):
+      omap3: keep SoC features on the same line
+
+Madhu (4):
+      omap3630: Add HSMMC related checks
+      omap3630: Configure HSMMC1 to 4-bit
+      omap3630: Set omap3630 MMC1 I/O speed to 52Mhz
+      omap3: HSMMC2 8-bit mux configuration
+
+Paul Walmsley (1):
+      omap3: drop all IVA-related address base definitions
+
+Peter Ujfalusi (1):
+      omap: McBSP: Do not use extensive spin locks for dma_op_mode
+
+Sriram (1):
+      omap3: evm: make HSMMC driver built-in
+
+Tony Lindgren (1):
+      omap3: move check_revision above check_features
+
+
+ arch/arm/configs/omap3_evm_defconfig       |    2 
+ arch/arm/mach-omap2/Makefile               |    1 
+ arch/arm/mach-omap2/board-3430sdp.c        |   13 ++
+ arch/arm/mach-omap2/board-omap3beagle.c    |   13 ++
+ arch/arm/mach-omap2/board-omap3evm.c       |   15 ++
+ arch/arm/mach-omap2/board-omap3pandora.c   |   13 ++
+ arch/arm/mach-omap2/board-overo.c          |   21 ++-
+ arch/arm/mach-omap2/devices.c              |    8 +
+ arch/arm/mach-omap2/id.c                   |   13 +-
+ arch/arm/mach-omap2/mmc-twl4030.c          |   17 ++
+ arch/arm/mach-omap2/mux.c                  |    8 +
+ arch/arm/mach-omap2/omap3-iommu.c          |   62 +++++----
+ arch/arm/mach-omap2/usb-ehci.c             |  192 ++++++++++++++++++++++++++++
+ arch/arm/plat-omap/include/plat/control.h  |    3 
+ arch/arm/plat-omap/include/plat/mux.h      |    4 +
+ arch/arm/plat-omap/include/plat/omap34xx.h |   11 +-
+ arch/arm/plat-omap/include/plat/usb.h      |   17 ++
+ arch/arm/plat-omap/iovmm.c                 |   13 +-
+ arch/arm/plat-omap/mcbsp.c                 |    6 -
+ 19 files changed, 363 insertions(+), 69 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/usb-ehci.c
+
+-- 
+Signature
