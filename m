@@ -1,7 +1,7 @@
 From: rmartinez@teltronic.es (=?iso-8859-1?Q?Ricardo_Mart=EDnez?=)
-Date: Thu, 12 Nov 2009 20:36:32 +0100
-Subject: Soft reset problems
-Message-ID: <1179F41EAF7A40E79DC5B4B251AAD038@teltronic.es>
+Date: Fri, 13 Nov 2009 09:30:27 +0100
+Subject: Linux on ARM926EJ: Software reset problems
+Message-ID: <56948FFAC219492B8923C0852A8AC413@teltronic.es>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,7 +20,7 @@ not being switched off?
  
 Any other hints?
  
-If you think it might be caused by MMU, how can be MMU disabled?
+If you think it might be caused by MMU, how can MMU be disabled?
  
 Is there any other prefered method to soft reboot ARM926 from Linux? I've
 taken a look at some PXA, OMAP & AT91 code about soft rebooting. It seems
@@ -33,4 +33,4 @@ Ricardo Martinez
 
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091112/95626f1a/attachment-0001.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091113/ed82aa81/attachment-0001.htm>
