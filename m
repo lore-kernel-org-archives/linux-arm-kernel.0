@@ -1,60 +1,49 @@
-From: dk-arm-linux@gmx.de (Dieter Kiermaier)
-Date: Fri, 13 Nov 2009 08:50:09 +0100
+From: simon.kagstrom@netinsight.net (Simon Kagstrom)
+Date: Fri, 13 Nov 2009 08:50:26 +0100
 Subject: [PATCH] [ARM] Kirkwood: Prevent kernel from crashing if PCIe
-	bridge is present
-In-Reply-To: <20091112205528.GA11304@n2100.arm.linux.org.uk>
+	bridge?is present
+In-Reply-To: <200911121802.10323.dk-arm-linux@gmx.de>
 References: <200911121519.42786.dk-arm-linux@gmx.de>
-	<20091112205528.GA11304@n2100.arm.linux.org.uk>
-Message-ID: <200911130850.09903.dk-arm-linux@gmx.de>
+	<p0nts6-gt3.ln1@chipmunk.wormnet.eu>
+	<200911121802.10323.dk-arm-linux@gmx.de>
+Message-ID: <20091113085026.4099d6eb@marrow.netinsight.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag 12 November 2009 21:55:28 schrieb Russell King - ARM Linux:
-> On Thu, Nov 12, 2009 at 03:19:42PM +0100, Dieter Kiermaier wrote:
-> > diff --git a/arch/arm/mach-kirkwood/openrd_base-setup.c b/arch/arm/mach-kirkwood/openrd_base-setup.c
-> > index 77617c7..9e57326 100644
-> > --- a/arch/arm/mach-kirkwood/openrd_base-setup.c
-> > +++ b/arch/arm/mach-kirkwood/openrd_base-setup.c
-> > @@ -14,6 +14,7 @@
-> >  #include <linux/mtd/partitions.h>
-> >  #include <linux/ata_platform.h>
-> >  #include <linux/mv643xx_eth.h>
-> > +#include <asm/io.h>
-> 
-> linux/io.h please (and please ensure future patches similarly use that
-> header rather than asm/io.h).  checkpatch will tell you this.
+On Thu, 12 Nov 2009 18:02:10 +0100
+Dieter Kiermaier <dk-arm-linux@gmx.de> wrote:
 
-Sorry for my stupid question but was is the difference?
-Is it that asm/* provides "architecture specific headers and linux/*
-abstract this on level more from the hardware?
+[openrd_base_pci_init]
+> > > +       if (base)
+> > > +       {
+> > > +               cpu_config_reg = readl(base);
+> > > +               cpu_config_reg &= ~(1 << 2);
+> > > +               writel(cpu_config_reg, base);
+> > > +       }
+> > > +       iounmap(base);
+> > > +
+> > >        if (machine_is_openrd_base())
+> > >                kirkwood_pcie_init();
+> > > -
+> > >        return 0;
+> > >  }
+> > > subsys_initcall(openrd_base_pci_init);
+>
+> Hm, is this really right? Why is there a function called openrd_base_pci_init() which is inside a file
+> called openrd_base-setup.c and this function is called on a sheevaplug?
 
-I've taken it form LDD (thanks Alessandro!)  but never thought about it.
+You can build the kernel with support for multiple boards, let's say
+sheevaplug and OpenRD base/client. Since this function is marked as a
+subsys_initcall, it will _always_ be called by the kernel when it has
+reached far enough into the startup - it doesn't matter which board
+support this function resides in.
 
-> 
-> >  #include <asm/mach-types.h>
-> >  #include <asm/mach/arch.h>
-> >  #include <mach/kirkwood.h>
-> > @@ -76,9 +77,19 @@ static void __init openrd_base_init(void)
-> >  
-> >  static int __init openrd_base_pci_init(void)
-> >  {
-> > +	u32 cpu_config_reg;
-> > +	void __iomem *base;
-> > +	base = ioremap(0xf1020100, 4);
-> > +	if (base)
-> > +	{
-> 
-> checkpatch will also tell you to put the opening brace on the previous line.
-> 
+Thus, even if you run on a sheevaplug board, it will run
+openrd_base_pci_init() and clear your bit. Like Alexander, I also did
+the same mistake :-)
 
-Something new I learned. I've read much docs but everyday there is something new
-like checkpatch.pl - sorry for missing that.
 
-Many thanks for commenting,
-Dieter
+Of course, in this particular case, it *should* probably be done for
+all boards - just not in the openrd_base board support code!
 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+// Simon
