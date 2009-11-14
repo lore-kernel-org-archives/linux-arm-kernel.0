@@ -1,64 +1,34 @@
-From: kevin.wells@nxp.com (Kevin Wells)
-Date: Fri, 13 Nov 2009 18:15:07 +0100
-Subject: New mach and platform support : lpc32xx
-Message-ID: <083DF309106F364B939360100EC290F804F53CD3B0@eu1rdcrdc1wx030.exi.nxp.com>
+From: abhijeet.tripathy@yahoo.co.in (abhijeet tripathi)
+Date: Sat, 14 Nov 2009 14:05:52 +0530 (IST)
+Subject: Kernel Panic while booting arm-pb1176
+Message-ID: <261969.43457.qm@web7602.mail.in.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Russel,
+
+I am attaching the console logs.
+
+--regards,
+Abhijeet
+
+--- On Sat, 14/11/09, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+
+> From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Subject: Re: Kernel Panic while booting arm-pb1176
+> To: "abhijeet tripathi" <abhijeet.tripathy@yahoo.co.in>
+> Cc: linux-arm-kernel at lists.infradead.org, "abhijeet" <abhijeet.tripathy@gmail.com>, mayur.nan at gmail.com
+> Date: Saturday, 14 November, 2009, 1:54 PM
+> On Sat, Nov 14, 2009 at 01:49:32PM
+> +0530, abhijeet tripathi wrote:
+> > Please let me know if you need any info from me.
+> 
+> Yes, the rest of the kernel messages.
+>
 
 
-
-We are the process of getting Linux optimized to the NXP LPC32X0 SoC and would
-
-like to get the files submitted for inclusion into the mainline. Currently, this
-
-consists of 4 CPU variants (all very similar) and 3 different boards (all very
-
-different!).
-
-
-
-The kernel and most of the drivers have been ported to this board for about a
-
-year now, with occasional tweaks needed as the kernel version progresses. A
-
-number of developers are using the kernel on these boards now. We are getting
-
-a lot of requests to get this into mainline!
-
-
-
-I don't want to deluge everyone or anyone all at once, but would like to get
-
-this started!
-
-
-
-Most of the work for this is already done up to 2.6.32-rc6. Whats the best
-
-approach to get started here? I would like to start small with just the basic
-
-arch files with 1 or 2 boards and later add in the other support as more of the
-
-optimzied chip specific drivers are merged in. As of now, the only change
-
-required ouside of the existing kernel source tree is the arch/arm/Kconfig and
-
-arch/arm/Makefile files and the addition of the arch/arm/mach-lpc32xx/ subdir.
-
-
-
-Should I start posting patches for the basic mach- area first?
-
-
-
-thanks,
-
-Kevin Wells
-
-NXP Semiconductors
-
+      The INTERNET now has a personality. YOURS! See your Yahoo! Homepage. http://in.yahoo.com/
 -------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091113/ddb0ade0/attachment-0001.htm>
+An embedded and charset-unspecified text was scrubbed...
+Name: pb1176_console_logs.txt
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091114/991bee60/attachment-0001.txt>
