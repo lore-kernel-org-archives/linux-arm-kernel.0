@@ -1,37 +1,58 @@
-From: abhijeet.tripathy@yahoo.co.in (abhijeet tripathi)
-Date: Sat, 14 Nov 2009 15:33:06 +0530 (IST)
-Subject: Kernel Panic while booting arm-pb1176
-In-Reply-To: <20091114085236.GA19214@n2100.arm.linux.org.uk>
-Message-ID: <265042.87910.qm@web7602.mail.in.yahoo.com>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Sat, 14 Nov 2009 15:58:50 +0100
+Subject: [PATCH] Convert viper to use plat_serial8250_port irqflags field
+Message-ID: <20091114155850.3adfdf86@taxman.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Use .irqflags in the plat_serial8250_port structure to set IRQ
+polarity, and get rid of the corresponding set_irq_type().
 
---- On Sat, 14/11/09, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+Signed-off-by: Marc Zyngier <maz@misterjones.org>
+---
+ arch/arm/mach-pxa/viper.c |   11 ++---------
+ 1 files changed, 2 insertions(+), 9 deletions(-)
 
-> From: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Subject: Re: Kernel Panic while booting arm-pb1176
-> To: "abhijeet tripathi" <abhijeet.tripathy@yahoo.co.in>
-> Cc: linux-arm-kernel at lists.infradead.org, "abhijeet" <abhijeet.tripathy@gmail.com>, mayur.nan at gmail.com
-> Date: Saturday, 14 November, 2009, 2:22 PM
-> On Sat, Nov 14, 2009 at 02:05:52PM
-> +0530, abhijeet tripathi wrote:
-> > I am attaching the console logs.
-> 
-> I think it's one for networking people.? Looks to me
-> like some MDIO
-> device is being registered twice.
-
-Thanks to your pointer.
-
-Disabling CONFIG_FIXED_PHY fixed the issue for me, you were right that MDIO was being registered twice.
+diff --git a/arch/arm/mach-pxa/viper.c b/arch/arm/mach-pxa/viper.c
+index d33c232..df168b9 100644
+--- a/arch/arm/mach-pxa/viper.c
++++ b/arch/arm/mach-pxa/viper.c
+@@ -301,15 +301,6 @@ static void __init viper_init_irq(void)
+ 	set_irq_chained_handler(gpio_to_irq(VIPER_CPLD_GPIO),
+ 				viper_irq_handler);
+ 	set_irq_type(gpio_to_irq(VIPER_CPLD_GPIO), IRQ_TYPE_EDGE_BOTH);
+-
+-#ifndef CONFIG_SERIAL_PXA
+-	/*
+-	 * 8250 doesn't support IRQ_TYPE being passed as part
+-	 * of the plat_serial8250_port structure...
+-	 */
+-	set_irq_type(gpio_to_irq(VIPER_UARTA_GPIO), IRQ_TYPE_EDGE_RISING);
+-	set_irq_type(gpio_to_irq(VIPER_UARTB_GPIO), IRQ_TYPE_EDGE_RISING);
+-#endif
+ }
  
-> Be sure to send them the full kernel boot log as well.
-> 
+ /* Flat Panel */
+@@ -539,6 +530,7 @@ static struct plat_serial8250_port serial_platform_data[] = {
+ 	{
+ 		.mapbase	= VIPER_UARTA_PHYS,
+ 		.irq		= gpio_to_irq(VIPER_UARTA_GPIO),
++		.irqflags	= IRQF_TRIGGER_RISING,
+ 		.uartclk	= 1843200,
+ 		.regshift	= 1,
+ 		.iotype		= UPIO_MEM,
+@@ -548,6 +540,7 @@ static struct plat_serial8250_port serial_platform_data[] = {
+ 	{
+ 		.mapbase	= VIPER_UARTB_PHYS,
+ 		.irq		= gpio_to_irq(VIPER_UARTB_GPIO),
++		.irqflags	= IRQF_TRIGGER_RISING,
+ 		.uartclk	= 1843200,
+ 		.regshift	= 1,
+ 		.iotype		= UPIO_MEM,
+-- 
+1.6.0.4
 
---regards,
-Abhijeet
 
 
-      The INTERNET now has a personality. YOURS! See your Yahoo! Homepage. http://in.yahoo.com/
+-- 
+I'm the slime oozin' out from your TV set...
