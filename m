@@ -1,472 +1,99 @@
-From: maz@misterjones.org (Marc Zyngier)
-Date: Sat, 14 Nov 2009 18:42:36 +0100
-Subject: [PATCH 2/2] Make Viper pcmcia support more generic to support Zeus
-In-Reply-To: <20091114182925.17eb58ea@taxman.wild-wind.fr.eu.org>
-References: <20091114182925.17eb58ea@taxman.wild-wind.fr.eu.org>
-Message-ID: <20091114184236.4b764b37@taxman.wild-wind.fr.eu.org>
+From: lilja.magnus@gmail.com (Magnus Lilja)
+Date: Sat, 14 Nov 2009 20:27:54 +0100
+Subject: [PATCH v1] MXC: Add SPI and MC13783 support for i.MX31 Litekit board.
+Message-ID: <1258226874-7340-1-git-send-email-lilja.magnus@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Arcom Zeus CF slot requires the same kind of support as the Viper.
-To avoid code duplication, introduce a platform device that abstracts
-the differences.
-
-This also allows for the removal of the ugly export of viper_cf_rst().
-
-Signed-off-by: Marc Zyngier <maz@misterjones.org>
+Signed-off-by: Magnus Lilja <lilja.magnus@gmail.com>
 ---
- arch/arm/mach-pxa/Kconfig                     |    7 ++
- arch/arm/mach-pxa/include/mach/arcom-pcmcia.h |   11 +++
- arch/arm/mach-pxa/include/mach/viper.h        |    2 -
- arch/arm/mach-pxa/viper.c                     |   20 ++++-
- arch/arm/mach-pxa/zeus.c                      |   29 ++++++
- drivers/pcmcia/Kconfig                        |    2 +-
- drivers/pcmcia/Makefile                       |    2 +-
- drivers/pcmcia/pxa2xx_base.c                  |    3 +-
- drivers/pcmcia/pxa2xx_viper.c                 |  119 ++++++++++++++++++-------
- 9 files changed, 155 insertions(+), 40 deletions(-)
- create mode 100644 arch/arm/mach-pxa/include/mach/arcom-pcmcia.h
 
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index a84a83f..4e8eb3f 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -63,6 +63,7 @@ config ARCH_VIPER
- 	select HAVE_PWM
- 	select PXA_HAVE_BOARD_IRQS
- 	select PXA_HAVE_ISA_IRQS
-+	select ARCOM_PCMCIA
+Tested with the mc13783-rtc/adc.c drivers from pengutronix (not in 
+mainline yet) on actual hardware.
+
+ arch/arm/mach-mx3/mx31lite.c |   42 ++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 42 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-mx3/mx31lite.c b/arch/arm/mach-mx3/mx31lite.c
+index a8d57de..228f6ac 100644
+--- a/arch/arm/mach-mx3/mx31lite.c
++++ b/arch/arm/mach-mx3/mx31lite.c
+@@ -25,6 +25,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/gpio.h>
+ #include <linux/smsc911x.h>
++#include <linux/mfd/mc13783.h>
++#include <linux/spi/spi.h>
  
- config MACH_ARCOM_ZEUS
- 	bool "Arcom/Eurotech ZEUS SBC"
-@@ -70,6 +71,12 @@ config MACH_ARCOM_ZEUS
- 	select ISA
- 	select PXA_HAVE_BOARD_IRQS
- 	select PXA_HAVE_ISA_IRQS
-+	select ARCOM_PCMCIA
+ #include <mach/hardware.h>
+ #include <asm/mach-types.h>
+@@ -39,6 +41,8 @@
+ #include <mach/iomux-mx3.h>
+ #include <mach/irqs.h>
+ #include <mach/mxc_nand.h>
++#include <mach/spi.h>
 +
-+config ARCOM_PCMCIA
-+	bool
-+	help
-+	  Generic option for Arcom Viper/Zeus PCMCIA
- 
- config MACH_BALLOON3
- 	bool "Balloon 3 board"
-diff --git a/arch/arm/mach-pxa/include/mach/arcom-pcmcia.h b/arch/arm/mach-pxa/include/mach/arcom-pcmcia.h
-new file mode 100644
-index 0000000..d428be4
---- /dev/null
-+++ b/arch/arm/mach-pxa/include/mach/arcom-pcmcia.h
-@@ -0,0 +1,11 @@
-+#ifndef __ARCOM_PCMCIA_H
-+#define __ARCOM_PCMCIA_H
-+
-+struct arcom_pcmcia_pdata {
-+	int	cd_gpio;
-+	int	rdy_gpio;
-+	int	pwr_gpio;
-+	void	(*reset)(int state);
-+};
-+
-+#endif
-diff --git a/arch/arm/mach-pxa/include/mach/viper.h b/arch/arm/mach-pxa/include/mach/viper.h
-index 10988c2..5f5fbf1 100644
---- a/arch/arm/mach-pxa/include/mach/viper.h
-+++ b/arch/arm/mach-pxa/include/mach/viper.h
-@@ -85,8 +85,6 @@
- /* Interrupt and Configuration Register (VIPER_ICR) */
- /* This is a write only register. Only CF_RST is used under Linux */
- 
--extern void viper_cf_rst(int state);
--
- #define VIPER_ICR_RETRIG	(1 << 0)
- #define VIPER_ICR_AUTO_CLR	(1 << 1)
- #define VIPER_ICR_R_DIS		(1 << 2)
-diff --git a/arch/arm/mach-pxa/viper.c b/arch/arm/mach-pxa/viper.c
-index cf0d71b..5352b4e 100644
---- a/arch/arm/mach-pxa/viper.c
-+++ b/arch/arm/mach-pxa/viper.c
-@@ -47,6 +47,7 @@
- #include <mach/pxafb.h>
- #include <plat/i2c.h>
- #include <mach/regs-uart.h>
-+#include <mach/arcom-pcmcia.h>
- #include <mach/viper.h>
- 
- #include <asm/setup.h>
-@@ -76,14 +77,28 @@ static void viper_icr_clear_bit(unsigned int bit)
- }
- 
- /* This function is used from the pcmcia module to reset the CF */
--void viper_cf_rst(int state)
-+static void viper_cf_reset(int state)
- {
- 	if (state)
- 		viper_icr_set_bit(VIPER_ICR_CF_RST);
- 	else
- 		viper_icr_clear_bit(VIPER_ICR_CF_RST);
- }
--EXPORT_SYMBOL(viper_cf_rst);
-+
-+static struct arcom_pcmcia_pdata viper_pcmcia_info = {
-+	.cd_gpio	= VIPER_CF_CD_GPIO,
-+	.rdy_gpio	= VIPER_CF_RDY_GPIO,
-+	.pwr_gpio	= VIPER_CF_POWER_GPIO,
-+	.reset		= viper_cf_reset,
-+};
-+
-+static struct platform_device viper_pcmcia_device = {
-+	.name		= "viper-pcmcia",
-+	.id		= -1,
-+	.dev		= {
-+		.platform_data	= &viper_pcmcia_info,
-+	},
-+};
+ #include "devices.h"
  
  /*
-  * The CPLD version register was not present on VIPER boards prior to
-@@ -685,6 +700,7 @@ static struct platform_device *viper_devs[] __initdata = {
- 	&viper_mtd_devices[0],
- 	&viper_mtd_devices[1],
- 	&viper_backlight_device,
-+	&viper_pcmcia_device,
+@@ -53,6 +57,13 @@ static unsigned int mx31lite_pins[] = {
+ 	MX31_PIN_RXD1__RXD1,
+ 	/* LAN9117 IRQ pin */
+ 	IOMUX_MODE(MX31_PIN_SFS6, IOMUX_CONFIG_GPIO),
++	/* MC13783 IRQ */
++	MX31_PIN_GPIO1_3__GPIO1_3,
++	/* SPI2 */
++	MX31_PIN_CSPI2_MOSI__MOSI,
++	MX31_PIN_CSPI2_MISO__MISO,
++	MX31_PIN_CSPI2_SCLK__SCLK,
++	MX31_PIN_CSPI2_SS0__SS0,
  };
  
- static mfp_cfg_t viper_pin_config[] __initdata = {
-diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
-index ae1c3d2..5b986a8 100644
---- a/arch/arm/mach-pxa/zeus.c
-+++ b/arch/arm/mach-pxa/zeus.c
-@@ -43,6 +43,7 @@
- #include <mach/mfp-pxa27x.h>
- #include <mach/pm.h>
- #include <mach/audio.h>
-+#include <mach/arcom-pcmcia.h>
- #include <mach/zeus.h>
- 
- #include "generic.h"
-@@ -428,6 +429,33 @@ static struct platform_device zeus_leds_device = {
+ static struct imxuart_platform_data uart_pdata = {
+@@ -92,6 +103,30 @@ static struct platform_device smsc911x_device = {
  	},
  };
  
-+static void zeus_cf_reset(int state)
-+{
-+	u16 cpld_state = __raw_readw(ZEUS_CPLD_CONTROL);
-+
-+	if (state)
-+		cpld_state |= ZEUS_CPLD_CONTROL_CF_RST;
-+	else
-+		cpld_state &= ~ZEUS_CPLD_CONTROL_CF_RST;
-+
-+	__raw_writew(cpld_state, ZEUS_CPLD_CONTROL);
-+}
-+
-+static struct arcom_pcmcia_pdata zeus_pcmcia_info = {
-+	.cd_gpio	= ZEUS_CF_CD_GPIO,
-+	.rdy_gpio	= ZEUS_CF_RDY_GPIO,
-+	.pwr_gpio	= ZEUS_CF_PWEN_GPIO,
-+	.reset		= zeus_cf_reset,
++static int mx31lite_spi1_cs[] = {
++	MXC_SPI_CS(0),
 +};
 +
-+static struct platform_device zeus_pcmcia_device = {
-+	.name		= "zeus-pcmcia",
-+	.id		= -1,
-+	.dev		= {
-+		.platform_data	= &zeus_pcmcia_info,
-+	},
++static struct spi_imx_master mx31lite_spi1_master = {
++	.chipselect	= mx31lite_spi1_cs,
++	.num_chipselect	= ARRAY_SIZE(mx31lite_spi1_cs),
 +};
 +
- static struct platform_device *zeus_devices[] __initdata = {
- 	&zeus_serial_device,
- 	&zeus_mtd_devices[0],
-@@ -436,6 +464,7 @@ static struct platform_device *zeus_devices[] __initdata = {
- 	&zeus_sram_device,
- 	&pxa2xx_spi_ssp3_device,
- 	&zeus_leds_device,
-+	&zeus_pcmcia_device,
- };
- 
- /* AC'97 */
-diff --git a/drivers/pcmcia/Kconfig b/drivers/pcmcia/Kconfig
-index 17f38a7..f684001 100644
---- a/drivers/pcmcia/Kconfig
-+++ b/drivers/pcmcia/Kconfig
-@@ -221,7 +221,7 @@ config PCMCIA_PXA2XX
- 	depends on ARM && ARCH_PXA && PCMCIA
- 	depends on (ARCH_LUBBOCK || MACH_MAINSTONE || PXA_SHARPSL \
- 		    || MACH_ARMCORE || ARCH_PXA_PALM || TRIZEPS_PCMCIA \
--		    || ARCH_VIPER || ARCH_PXA_ESERIES || MACH_STARGATE2)
-+		    || ARCOM_PCMCIA || ARCH_PXA_ESERIES || MACH_STARGATE2)
- 	help
- 	  Say Y here to include support for the PXA2xx PCMCIA controller
- 
-diff --git a/drivers/pcmcia/Makefile b/drivers/pcmcia/Makefile
-index a03a38a..e02edfd 100644
---- a/drivers/pcmcia/Makefile
-+++ b/drivers/pcmcia/Makefile
-@@ -69,7 +69,7 @@ pxa2xx-obj-$(CONFIG_ARCH_LUBBOCK)		+= pxa2xx_lubbock_cs.o
- pxa2xx-obj-$(CONFIG_MACH_MAINSTONE)		+= pxa2xx_mainstone.o
- pxa2xx-obj-$(CONFIG_PXA_SHARPSL)		+= pxa2xx_sharpsl.o
- pxa2xx-obj-$(CONFIG_MACH_ARMCORE)		+= pxa2xx_cm_x2xx_cs.o
--pxa2xx-obj-$(CONFIG_ARCH_VIPER)			+= pxa2xx_viper.o
-+pxa2xx-obj-$(CONFIG_ARCOM_PCMCIA)		+= pxa2xx_viper.o
- pxa2xx-obj-$(CONFIG_TRIZEPS_PCMCIA)		+= pxa2xx_trizeps4.o
- pxa2xx-obj-$(CONFIG_MACH_PALMTX)		+= pxa2xx_palmtx.o
- pxa2xx-obj-$(CONFIG_MACH_PALMTC)		+= pxa2xx_palmtc.o
-diff --git a/drivers/pcmcia/pxa2xx_base.c b/drivers/pcmcia/pxa2xx_base.c
-index 0e35acb..cb7b4ca 100644
---- a/drivers/pcmcia/pxa2xx_base.c
-+++ b/drivers/pcmcia/pxa2xx_base.c
-@@ -214,7 +214,8 @@ static void pxa2xx_configure_sockets(struct device *dev)
- 	MECR |= MECR_CIT;
- 
- 	/* Set MECR:NOS (Number Of Sockets) */
--	if ((ops->first + ops->nr) > 1 || machine_is_viper())
-+	if ((ops->first + ops->nr) > 1 ||
-+	    machine_is_viper() || machine_is_arcom_zeus())
- 		MECR |= MECR_NOS;
- 	else
- 		MECR &= ~MECR_NOS;
-diff --git a/drivers/pcmcia/pxa2xx_viper.c b/drivers/pcmcia/pxa2xx_viper.c
-index 1787136..7a16ae9 100644
---- a/drivers/pcmcia/pxa2xx_viper.c
-+++ b/drivers/pcmcia/pxa2xx_viper.c
-@@ -1,9 +1,8 @@
- /*
-- * VIPER PCMCIA support
-+ * Viper/Zeus PCMCIA support
-  *   Copyright 2004 Arcom Control Systems
-  *
-  * Maintained by Marc Zyngier <maz@misterjones.org>
-- * 			      <marc.zyngier@altran.com>
-  *
-  * Based on:
-  *   iPAQ h2200 PCMCIA support
-@@ -26,37 +25,47 @@
- 
- #include <asm/irq.h>
- 
--#include <mach/viper.h>
--#include <asm/mach-types.h>
-+#include <mach/arcom-pcmcia.h>
- 
- #include "soc_common.h"
- #include "pxa2xx_base.h"
- 
-+static struct platform_device *arcom_pcmcia_dev;
++static struct mc13783_platform_data mc13783_data = {
++	.flags = MC13783_USE_ADC | MC13783_USE_RTC,
++};
 +
- static struct pcmcia_irqs irqs[] = {
--	{ 0, gpio_to_irq(VIPER_CF_CD_GPIO),  "PCMCIA_CD" }
++static struct spi_board_info mx31lite_spi_devs[] = {
 +	{
-+		.sock	= 0,
-+		.str	= "PCMCIA_CD",
++		.modalias = "mc13783",
++		.irq = IOMUX_TO_IRQ(MX31_PIN_GPIO1_3),
++		.max_speed_hz = 1000000,
++		.bus_num = 1,
++		.chip_select = 0,
++		.platform_data = &mc13783_data,
 +	},
- };
- 
-+static inline struct arcom_pcmcia_pdata *viper_get_pdata(void)
-+{
-+	return arcom_pcmcia_dev->dev.platform_data;
-+}
++};
 +
- static int viper_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
- {
-+	struct arcom_pcmcia_pdata *pdata = viper_get_pdata();
- 	unsigned long flags;
- 
--	skt->irq = gpio_to_irq(VIPER_CF_RDY_GPIO);
-+	skt->irq = gpio_to_irq(pdata->rdy_gpio);
-+	irqs[0].irq = gpio_to_irq(pdata->cd_gpio);
- 
--	if (gpio_request(VIPER_CF_CD_GPIO, "CF detect"))
-+	if (gpio_request(pdata->cd_gpio, "CF detect"))
- 		goto err_request_cd;
- 
--	if (gpio_request(VIPER_CF_RDY_GPIO, "CF ready"))
-+	if (gpio_request(pdata->rdy_gpio, "CF ready"))
- 		goto err_request_rdy;
- 
--	if (gpio_request(VIPER_CF_POWER_GPIO, "CF power"))
-+	if (gpio_request(pdata->pwr_gpio, "CF power"))
- 		goto err_request_pwr;
- 
- 	local_irq_save(flags);
- 
--	/* GPIO 82 is the CF power enable line. initially off */
--	if (gpio_direction_output(VIPER_CF_POWER_GPIO, 0) ||
--	    gpio_direction_input(VIPER_CF_CD_GPIO) ||
--	    gpio_direction_input(VIPER_CF_RDY_GPIO)) {
-+	if (gpio_direction_output(pdata->pwr_gpio, 0) ||
-+	    gpio_direction_input(pdata->cd_gpio) ||
-+	    gpio_direction_input(pdata->rdy_gpio)) {
- 		local_irq_restore(flags);
- 		goto err_dir;
- 	}
-@@ -66,13 +75,13 @@ static int viper_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
- 	return soc_pcmcia_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
- 
- err_dir:
--	gpio_free(VIPER_CF_POWER_GPIO);
-+	gpio_free(pdata->pwr_gpio);
- err_request_pwr:
--	gpio_free(VIPER_CF_RDY_GPIO);
-+	gpio_free(pdata->rdy_gpio);
- err_request_rdy:
--	gpio_free(VIPER_CF_CD_GPIO);
-+	gpio_free(pdata->cd_gpio);
- err_request_cd:
--	printk(KERN_ERR "viper: Failed to setup PCMCIA GPIOs\n");
-+	dev_err(&arcom_pcmcia_dev->dev, "Failed to setup PCMCIA GPIOs\n");
- 	return -1;
- }
- 
-@@ -81,17 +90,21 @@ err_request_cd:
+ /*
+  * This structure defines the MX31 memory map.
   */
- static void viper_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
- {
-+	struct arcom_pcmcia_pdata *pdata = viper_get_pdata();
-+
- 	soc_pcmcia_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
--	gpio_free(VIPER_CF_POWER_GPIO);
--	gpio_free(VIPER_CF_RDY_GPIO);
--	gpio_free(VIPER_CF_CD_GPIO);
-+	gpio_free(pdata->pwr_gpio);
-+	gpio_free(pdata->rdy_gpio);
-+	gpio_free(pdata->cd_gpio);
- }
- 
- static void viper_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
- 				      struct pcmcia_state *state)
- {
--	state->detect = gpio_get_value(VIPER_CF_CD_GPIO) ? 0 : 1;
--	state->ready  = gpio_get_value(VIPER_CF_RDY_GPIO) ? 1 : 0;
-+	struct arcom_pcmcia_pdata *pdata = viper_get_pdata();
-+
-+	state->detect = !gpio_get_value(pdata->cd_gpio);
-+	state->ready  = !!gpio_get_value(pdata->rdy_gpio);
- 	state->bvd1   = 1;
- 	state->bvd2   = 1;
- 	state->wrprot = 0;
-@@ -102,20 +115,21 @@ static void viper_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
- static int viper_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
- 					 const socket_state_t *state)
- {
-+	struct arcom_pcmcia_pdata *pdata = viper_get_pdata();
-+
- 	/* Silently ignore Vpp, output enable, speaker enable. */
--	viper_cf_rst(state->flags & SS_RESET);
-+	pdata->reset(state->flags & SS_RESET);
- 
- 	/* Apply socket voltage */
- 	switch (state->Vcc) {
- 	case 0:
--		gpio_set_value(VIPER_CF_POWER_GPIO, 0);
-+		gpio_set_value(pdata->pwr_gpio, 0);
- 		break;
- 	case 33:
--		gpio_set_value(VIPER_CF_POWER_GPIO, 1);
-+		gpio_set_value(pdata->pwr_gpio, 1);
- 		break;
- 	default:
--		printk(KERN_ERR "%s: Unsupported Vcc:%d\n",
--		       __func__, state->Vcc);
-+		dev_err(&arcom_pcmcia_dev->dev, "Unsupported Vcc:%d\n", state->Vcc);
- 		return -1;
+@@ -139,6 +174,13 @@ static void __init mxc_board_init(void)
+ 		gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_SFS6));
+ 		platform_device_register(&smsc911x_device);
  	}
- 
-@@ -130,7 +144,7 @@ static void viper_pcmcia_socket_suspend(struct soc_pcmcia_socket *skt)
- {
++
++	/* SPI and MC13783 setup */
++	mxc_register_device(&mxc_spi_device1, &mx31lite_spi1_master);
++	gpio_request(IOMUX_TO_GPIO(MX31_PIN_GPIO1_3), "pmic-irq");
++	gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_GPIO1_3));
++	spi_register_board_info(mx31lite_spi_devs,
++				ARRAY_SIZE(mx31lite_spi_devs));
  }
  
--static struct pcmcia_low_level viper_pcmcia_ops __initdata = {
-+static struct pcmcia_low_level viper_pcmcia_ops = {
- 	.owner          	= THIS_MODULE,
- 	.hw_init        	= viper_pcmcia_hw_init,
- 	.hw_shutdown		= viper_pcmcia_hw_shutdown,
-@@ -143,17 +157,25 @@ static struct pcmcia_low_level viper_pcmcia_ops __initdata = {
- 
- static struct platform_device *viper_pcmcia_device;
- 
--static int __init viper_pcmcia_init(void)
-+static int viper_pcmcia_probe(struct platform_device *pdev)
- {
- 	int ret;
- 
--	if (!machine_is_viper())
--		return -ENODEV;
-+	/* I can't imagine more than one device, but you never know... */
-+	if (arcom_pcmcia_dev)
-+		return -EEXIST;
-+
-+	if (!pdev->dev.platform_data)
-+		return -EINVAL;
- 
- 	viper_pcmcia_device = platform_device_alloc("pxa2xx-pcmcia", -1);
- 	if (!viper_pcmcia_device)
- 		return -ENOMEM;
- 
-+	arcom_pcmcia_dev = pdev;
-+
-+	viper_pcmcia_device->dev.parent = &pdev->dev;
-+
- 	ret = platform_device_add_data(viper_pcmcia_device,
- 				       &viper_pcmcia_ops,
- 				       sizeof(viper_pcmcia_ops));
-@@ -161,18 +183,49 @@ static int __init viper_pcmcia_init(void)
- 	if (!ret)
- 		ret = platform_device_add(viper_pcmcia_device);
- 
--	if (ret)
-+	if (ret) {
- 		platform_device_put(viper_pcmcia_device);
-+		arcom_pcmcia_dev = NULL;
-+	}
- 
- 	return ret;
- }
- 
--static void __exit viper_pcmcia_exit(void)
-+static int viper_pcmcia_remove(struct platform_device *pdev)
- {
- 	platform_device_unregister(viper_pcmcia_device);
-+	arcom_pcmcia_dev = NULL;
-+	return 0;
-+}
-+
-+static struct platform_device_id viper_pcmcia_id_table[] = {
-+	{ .name = "viper-pcmcia", },
-+	{ .name = "zeus-pcmcia",  },
-+	{ },
-+};
-+
-+static struct platform_driver viper_pcmcia_driver = {
-+	.probe		= viper_pcmcia_probe,
-+	.remove		= viper_pcmcia_remove,
-+	.driver		= {
-+		.name	= "arcom-pcmcia",
-+		.owner	= THIS_MODULE,
-+	},
-+	.id_table	= viper_pcmcia_id_table,
-+};
-+
-+static int __init viper_pcmcia_init(void)
-+{
-+	return platform_driver_register(&viper_pcmcia_driver);
-+}
-+
-+static void __exit viper_pcmcia_exit(void)
-+{
-+	return platform_driver_unregister(&viper_pcmcia_driver);
- }
- 
- module_init(viper_pcmcia_init);
- module_exit(viper_pcmcia_exit);
- 
-+MODULE_DEVICE_TABLE(platform, viper_pcmcia_id_table);
- MODULE_LICENSE("GPL");
+ static void __init mx31lite_timer_init(void)
 -- 
-1.6.0.4
-
-
-
--- 
-I'm the slime oozin' out from your TV set...
+1.5.6
