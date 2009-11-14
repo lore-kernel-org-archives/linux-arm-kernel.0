@@ -1,32 +1,20 @@
 From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 13 Nov 2009 20:50:51 -0800
-Subject: [PATCH 06/10] mfd add subdevs in 88pm860x
-In-Reply-To: <771cded00911130100u2a97c6f4v968e40b912650482@mail.gmail.com>
-References: <771cded00911130100u2a97c6f4v968e40b912650482@mail.gmail.com>
-Message-ID: <20091114045051.GA4463@core.coreip.homeip.net>
+Date: Fri, 13 Nov 2009 20:56:59 -0800
+Subject: [PATCH 05/10] mfd add irq support in 88pm860x
+In-Reply-To: <771cded00911130059q23c2bc97ja4509b7965f12eed@mail.gmail.com>
+References: <771cded00911130059q23c2bc97ja4509b7965f12eed@mail.gmail.com>
+Message-ID: <20091114045659.GB4463@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 13, 2009 at 04:00:44AM -0500, Haojian Zhuang wrote:
-> 
-> -		count = ARRAY_SIZE(pm8607_devs);
-> -		for (i = 0; i < count; i++) {
-> -			ret = mfd_add_devices(chip->dev, i, &pm8607_devs[i],
-> -					      1, NULL, 0);
-> -			if (ret != 0) {
-> -				dev_err(chip->dev, "Failed to add subdevs\n");
-> -				goto out;
-> -			}
-> +		mfd_add_devices(chip->dev, 0, &regulator_devs[0],
-> +				      ARRAY_SIZE(regulator_devs),
-> +				      &regulator_resources[0], 0);
+On Fri, Nov 13, 2009 at 03:59:21AM -0500, Haojian Zhuang wrote:
 > +
-> +		if (pdata && pdata->touch) {
-> +			mfd_add_devices(chip->dev, 0, &touch_devs[0],
-> +					ARRAY_SIZE(touch_devs),
-> +					&touch_resources[0], 0);
+> +	mutex_lock(&chip->irq_lock);
+> +	memset(chip->irq, 0, sizeof(struct pm860x_irq) * PM860X_NUM_IRQ);
+> +	mutex_unlock(&chip->irq_lock);
 
-Where did error handling go?
+Why do you take lock here? Can anyone else be touching chip->irq at this
+point?
 
 -- 
 Dmitry
