@@ -1,351 +1,321 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Sat, 14 Nov 2009 03:06:39 +0100
-Subject: [RFC][PATCH] ARM: OMAP: McBSP: Use register cache
-In-Reply-To: <200908121239.26346.jkrzyszt@tis.icnet.pl>
-References: <200908121239.26346.jkrzyszt@tis.icnet.pl>
-Message-ID: <200911140306.44784.jkrzyszt@tis.icnet.pl>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 13 Nov 2009 18:54:26 -0800
+Subject: [PATCH 09/10] input: enable touch on 88pm860x
+In-Reply-To: <771cded00911130104s3bc6ff97ma3a7f7ad76ae9198@mail.gmail.com>
+References: <771cded00911130104s3bc6ff97ma3a7f7ad76ae9198@mail.gmail.com>
+Message-ID: <20091114025425.GA3587@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Haojian,
 
-This patch got outdated and does not apply any more, but the idea still hangs 
-in my queue. I am not sure why the patch has never been acknowledged nor 
-rejected. Maybe it just got missed?
-
-Could you please take a position on this idea?
-
-Thanks,
-Janusz
-
-http://www.spinics.net/lists/linux-omap/msg16720.html
-
-Wednesday 12 August 2009 12:39:25 Janusz Krzysztofik wrote:
-> Change the way McBSP registers are updated: use cached values instead of
-> relying upon those read back from the device.
->
-> With this patch, I have finally managed to get rid of all random
-> playback/recording hangups on my OMAP1510 based Amstrad Delta (buggy?)
-> hardware. Before that, I could suspect that values read back from McBSP
-> registers before updating them happened to be errornous.
->
-> I think there is one important point that makes this patch worth of
-> applying, apart from my hardware quality. With the current code, if it ever
-> happens to any machine, no matter if OMAP1510 or newer, to read incorrect
-> value from a McBSP register, this wrong value will get written back without
-> any checking. That can lead to hardware damage if, for example, an input
-> pin is turned into output as a result.
->
-> Created against linux-2.6.31-rc5
->
-> Tested on Amstrad Delta
->
-> Signed-off-by: Janusz Krzysztofik
->
+On Fri, Nov 13, 2009 at 04:04:44AM -0500, Haojian Zhuang wrote:
+> From 122d2c29ffef393b533628c2be8bdb308220331f Mon Sep 17 00:00:00 2001
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date: Thu, 12 Nov 2009 12:15:51 -0500
+> Subject: [PATCH] input: enable touch on 88pm860x
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 > ---
-> ---
-> linux-2.6.31-rc5/arch/arm/plat-omap/include/mach/mcbsp.h.orig	2009-08-11
-> 23:43:25.000000000 +0200 +++
-> linux-2.6.31-rc5/arch/arm/plat-omap/include/mach/mcbsp.h	2009-08-11
-> 23:45:46.000000000 +0200 @@ -377,6 +377,8 @@ struct omap_mcbsp {
->  	struct omap_mcbsp_platform_data *pdata;
->  	struct clk *iclk;
->  	struct clk *fclk;
+>  drivers/input/touchscreen/88pm860x-ts.c |  222 +++++++++++++++++++++++++++++++
+>  drivers/input/touchscreen/Kconfig       |    7 +
+>  drivers/input/touchscreen/Makefile      |    1 +
+>  3 files changed, 230 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/input/touchscreen/88pm860x-ts.c
+> 
+> diff --git a/drivers/input/touchscreen/88pm860x-ts.c
+> b/drivers/input/touchscreen/88pm860x-ts.c
+> new file mode 100644
+> index 0000000..b65ef13
+> --- /dev/null
+> +++ b/drivers/input/touchscreen/88pm860x-ts.c
+> @@ -0,0 +1,222 @@
+> +/*
+> + * Touchscreen driver for Marvell 88PM860x
+> + *
+> + * Copyright (C) 2009 Marvell International Ltd.
+> + * 	Haojian Zhuang <haojian.zhuang@marvell.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/input.h>
+> +#include <linux/mfd/88pm860x.h>
 > +
-> +	struct omap_mcbsp_reg_cfg reg_cache;
->  };
->  extern struct omap_mcbsp **mcbsp_ptr;
->  extern int omap_mcbsp_count;
-> --- linux-2.6.31-rc5/arch/arm/plat-omap/mcbsp.c.orig	2009-08-11
-> 23:43:25.000000000 +0200 +++
-> linux-2.6.31-rc5/arch/arm/plat-omap/mcbsp.c	2009-08-11 23:45:35.000000000
-> +0200 @@ -91,6 +91,7 @@ static void omap_mcbsp_dump_reg(u8 id)
->  static irqreturn_t omap_mcbsp_tx_irq_handler(int irq, void *dev_id)
->  {
->  	struct omap_mcbsp *mcbsp_tx = dev_id;
-> +	struct omap_mcbsp_reg_cfg *reg_cache = &mcbsp_tx->reg_cache;
->  	u16 irqst_spcr2;
->
->  	irqst_spcr2 = OMAP_MCBSP_READ(mcbsp_tx->io_base, SPCR2);
-> @@ -101,7 +102,7 @@ static irqreturn_t omap_mcbsp_tx_irq_han
->  			irqst_spcr2);
->  		/* Writing zero to XSYNC_ERR clears the IRQ */
->  		OMAP_MCBSP_WRITE(mcbsp_tx->io_base, SPCR2,
-> -			irqst_spcr2 & ~(XSYNC_ERR));
-> +			reg_cache->spcr2 &= ~(XSYNC_ERR));
->  	} else {
->  		complete(&mcbsp_tx->tx_irq_completion);
->  	}
-> @@ -112,6 +113,7 @@ static irqreturn_t omap_mcbsp_tx_irq_han
->  static irqreturn_t omap_mcbsp_rx_irq_handler(int irq, void *dev_id)
->  {
->  	struct omap_mcbsp *mcbsp_rx = dev_id;
-> +	struct omap_mcbsp_reg_cfg *reg_cache = &mcbsp_rx->reg_cache;
->  	u16 irqst_spcr1;
->
->  	irqst_spcr1 = OMAP_MCBSP_READ(mcbsp_rx->io_base, SPCR1);
-> @@ -122,7 +124,7 @@ static irqreturn_t omap_mcbsp_rx_irq_han
->  			irqst_spcr1);
->  		/* Writing zero to RSYNC_ERR clears the IRQ */
->  		OMAP_MCBSP_WRITE(mcbsp_rx->io_base, SPCR1,
-> -			irqst_spcr1 & ~(RSYNC_ERR));
-> +			reg_cache->spcr1 &= ~(RSYNC_ERR));
->  	} else {
->  		complete(&mcbsp_rx->tx_irq_completion);
->  	}
-> @@ -167,6 +169,7 @@ static void omap_mcbsp_rx_dma_callback(i
->  void omap_mcbsp_config(unsigned int id, const struct omap_mcbsp_reg_cfg
-> *config) {
->  	struct omap_mcbsp *mcbsp;
-> +	struct omap_mcbsp_reg_cfg *reg_cache;
->  	void __iomem *io_base;
->
->  	if (!omap_mcbsp_check_valid_id(id)) {
-> @@ -174,26 +177,27 @@ void omap_mcbsp_config(unsigned int id,
->  		return;
->  	}
->  	mcbsp = id_to_mcbsp_ptr(id);
-> +	reg_cache = &mcbsp->reg_cache;
->
->  	io_base = mcbsp->io_base;
->  	dev_dbg(mcbsp->dev, "Configuring McBSP%d  phys_base: 0x%08lx\n",
->  			mcbsp->id, mcbsp->phys_base);
->
->  	/* We write the given config */
-> -	OMAP_MCBSP_WRITE(io_base, SPCR2, config->spcr2);
-> -	OMAP_MCBSP_WRITE(io_base, SPCR1, config->spcr1);
-> -	OMAP_MCBSP_WRITE(io_base, RCR2, config->rcr2);
-> -	OMAP_MCBSP_WRITE(io_base, RCR1, config->rcr1);
-> -	OMAP_MCBSP_WRITE(io_base, XCR2, config->xcr2);
-> -	OMAP_MCBSP_WRITE(io_base, XCR1, config->xcr1);
-> -	OMAP_MCBSP_WRITE(io_base, SRGR2, config->srgr2);
-> -	OMAP_MCBSP_WRITE(io_base, SRGR1, config->srgr1);
-> -	OMAP_MCBSP_WRITE(io_base, MCR2, config->mcr2);
-> -	OMAP_MCBSP_WRITE(io_base, MCR1, config->mcr1);
-> -	OMAP_MCBSP_WRITE(io_base, PCR0, config->pcr0);
-> +	OMAP_MCBSP_WRITE(io_base, SPCR2, reg_cache->spcr2 = config->spcr2);
-> +	OMAP_MCBSP_WRITE(io_base, SPCR1, reg_cache->spcr1 = config->spcr1);
-> +	OMAP_MCBSP_WRITE(io_base, RCR2, reg_cache->rcr2 = config->rcr2);
-> +	OMAP_MCBSP_WRITE(io_base, RCR1, reg_cache->rcr1 = config->rcr1);
-> +	OMAP_MCBSP_WRITE(io_base, XCR2, reg_cache->xcr2 = config->xcr2);
-> +	OMAP_MCBSP_WRITE(io_base, XCR1, reg_cache->xcr1 = config->xcr1);
-> +	OMAP_MCBSP_WRITE(io_base, SRGR2, reg_cache->srgr2 = config->srgr2);
-> +	OMAP_MCBSP_WRITE(io_base, SRGR1, reg_cache->srgr1 = config->srgr1);
-> +	OMAP_MCBSP_WRITE(io_base, MCR2, reg_cache->mcr2 = config->mcr2);
-> +	OMAP_MCBSP_WRITE(io_base, MCR1, reg_cache->mcr1 = config->mcr1);
-> +	OMAP_MCBSP_WRITE(io_base, PCR0, reg_cache->pcr0 = config->pcr0);
->  	if (cpu_is_omap2430() || cpu_is_omap34xx()) {
-> -		OMAP_MCBSP_WRITE(io_base, XCCR, config->xccr);
-> -		OMAP_MCBSP_WRITE(io_base, RCCR, config->rccr);
-> +		OMAP_MCBSP_WRITE(io_base, XCCR, reg_cache->xccr = config->xccr);
-> +		OMAP_MCBSP_WRITE(io_base, RCCR, reg_cache->rccr = config->rccr);
->  	}
->  }
->  EXPORT_SYMBOL(omap_mcbsp_config);
-> @@ -232,6 +236,7 @@ EXPORT_SYMBOL(omap_mcbsp_set_io_type);
->  int omap_mcbsp_request(unsigned int id)
->  {
->  	struct omap_mcbsp *mcbsp;
-> +	struct omap_mcbsp_reg_cfg *reg_cache;
->  	int err;
->
->  	if (!omap_mcbsp_check_valid_id(id)) {
-> @@ -239,6 +244,7 @@ int omap_mcbsp_request(unsigned int id)
->  		return -ENODEV;
->  	}
->  	mcbsp = id_to_mcbsp_ptr(id);
-> +	reg_cache = &mcbsp->reg_cache;
->
->  	spin_lock(&mcbsp->lock);
->  	if (!mcbsp->free) {
-> @@ -261,8 +267,8 @@ int omap_mcbsp_request(unsigned int id)
->  	 * Make sure that transmitter, receiver and sample-rate generator are
->  	 * not running before activating IRQs.
->  	 */
-> -	OMAP_MCBSP_WRITE(mcbsp->io_base, SPCR1, 0);
-> -	OMAP_MCBSP_WRITE(mcbsp->io_base, SPCR2, 0);
-> +	OMAP_MCBSP_WRITE(mcbsp->io_base, SPCR1, reg_cache->spcr1 = 0);
-> +	OMAP_MCBSP_WRITE(mcbsp->io_base, SPCR2, reg_cache->spcr2 = 0);
->
->  	if (mcbsp->io_type == OMAP_MCBSP_IRQ_IO) {
->  		/* We need to get IRQs here */
-> @@ -335,42 +341,38 @@ EXPORT_SYMBOL(omap_mcbsp_free);
->  void omap_mcbsp_start(unsigned int id, int tx, int rx)
->  {
->  	struct omap_mcbsp *mcbsp;
-> +	struct omap_mcbsp_reg_cfg *reg_cache;
->  	void __iomem *io_base;
->  	int idle;
-> -	u16 w;
->
->  	if (!omap_mcbsp_check_valid_id(id)) {
->  		printk(KERN_ERR "%s: Invalid id (%d)\n", __func__, id + 1);
->  		return;
->  	}
->  	mcbsp = id_to_mcbsp_ptr(id);
-> +	reg_cache = &mcbsp->reg_cache;
->  	io_base = mcbsp->io_base;
->
-> -	mcbsp->rx_word_length = (OMAP_MCBSP_READ(io_base, RCR1) >> 5) & 0x7;
-> -	mcbsp->tx_word_length = (OMAP_MCBSP_READ(io_base, XCR1) >> 5) & 0x7;
-> +	mcbsp->rx_word_length = (reg_cache->rcr1 >> 5) & 0x7;
-> +	mcbsp->tx_word_length = (reg_cache->xcr1 >> 5) & 0x7;
->
-> -	idle = !((OMAP_MCBSP_READ(io_base, SPCR2) |
-> -		OMAP_MCBSP_READ(io_base, SPCR1)) & 1);
-> +	idle = !((reg_cache->spcr2 | reg_cache->spcr1) & 1);
->
->  	if (idle) {
->  		/* Start the sample generator */
-> -		w = OMAP_MCBSP_READ(io_base, SPCR2);
-> -		OMAP_MCBSP_WRITE(io_base, SPCR2, w | (1 << 6));
-> +		OMAP_MCBSP_WRITE(io_base, SPCR2, reg_cache->spcr2 |= (1 << 6));
->  	}
->
->  	/* Enable transmitter and receiver */
-> -	w = OMAP_MCBSP_READ(io_base, SPCR2);
-> -	OMAP_MCBSP_WRITE(io_base, SPCR2, w | (tx & 1));
-> +	OMAP_MCBSP_WRITE(io_base, SPCR2, reg_cache->spcr2 |= (tx & 1));
->
-> -	w = OMAP_MCBSP_READ(io_base, SPCR1);
-> -	OMAP_MCBSP_WRITE(io_base, SPCR1, w | (rx & 1));
-> +	OMAP_MCBSP_WRITE(io_base, SPCR1, reg_cache->spcr1 |= (rx & 1));
->
->  	udelay(100);
->
->  	if (idle) {
->  		/* Start frame sync */
-> -		w = OMAP_MCBSP_READ(io_base, SPCR2);
-> -		OMAP_MCBSP_WRITE(io_base, SPCR2, w | (1 << 7));
-> +		OMAP_MCBSP_WRITE(io_base, SPCR2, reg_cache->spcr2 |= (1 << 7));
->  	}
->
->  	/* Dump McBSP Regs */
-> @@ -381,9 +383,9 @@ EXPORT_SYMBOL(omap_mcbsp_start);
->  void omap_mcbsp_stop(unsigned int id, int tx, int rx)
->  {
->  	struct omap_mcbsp *mcbsp;
-> +	struct omap_mcbsp_reg_cfg *reg_cache;
->  	void __iomem *io_base;
->  	int idle;
-> -	u16 w;
->
->  	if (!omap_mcbsp_check_valid_id(id)) {
->  		printk(KERN_ERR "%s: Invalid id (%d)\n", __func__, id + 1);
-> @@ -391,23 +393,20 @@ void omap_mcbsp_stop(unsigned int id, in
->  	}
->
->  	mcbsp = id_to_mcbsp_ptr(id);
-> +	reg_cache = &mcbsp->reg_cache;
->  	io_base = mcbsp->io_base;
->
->  	/* Reset transmitter */
-> -	w = OMAP_MCBSP_READ(io_base, SPCR2);
-> -	OMAP_MCBSP_WRITE(io_base, SPCR2, w & ~(tx & 1));
-> +	OMAP_MCBSP_WRITE(io_base, SPCR2, reg_cache->spcr2 &= ~(tx & 1));
->
->  	/* Reset receiver */
-> -	w = OMAP_MCBSP_READ(io_base, SPCR1);
-> -	OMAP_MCBSP_WRITE(io_base, SPCR1, w & ~(rx & 1));
-> +	OMAP_MCBSP_WRITE(io_base, SPCR1, reg_cache->spcr1 &= ~(rx & 1));
->
-> -	idle = !((OMAP_MCBSP_READ(io_base, SPCR2) |
-> -		OMAP_MCBSP_READ(io_base, SPCR1)) & 1);
-> +	idle = !((reg_cache->spcr2 | reg_cache->spcr1) & 1);
->
->  	if (idle) {
->  		/* Reset the sample rate generator */
-> -		w = OMAP_MCBSP_READ(io_base, SPCR2);
-> -		OMAP_MCBSP_WRITE(io_base, SPCR2, w & ~(1 << 6));
-> +		OMAP_MCBSP_WRITE(io_base, SPCR2, reg_cache->spcr2 &= ~(1 << 6));
->  	}
->  }
->  EXPORT_SYMBOL(omap_mcbsp_stop);
-> @@ -557,6 +556,7 @@ EXPORT_SYMBOL(omap_mcbsp_recv_word);
->  int omap_mcbsp_spi_master_xmit_word_poll(unsigned int id, u32 word)
->  {
->  	struct omap_mcbsp *mcbsp;
-> +	struct omap_mcbsp_reg_cfg *reg_cache;
->  	void __iomem *io_base;
->  	omap_mcbsp_word_length tx_word_length;
->  	omap_mcbsp_word_length rx_word_length;
-> @@ -567,6 +567,7 @@ int omap_mcbsp_spi_master_xmit_word_poll
->  		return -ENODEV;
->  	}
->  	mcbsp = id_to_mcbsp_ptr(id);
-> +	reg_cache = &mcbsp->reg_cache;
->  	io_base = mcbsp->io_base;
->  	tx_word_length = mcbsp->tx_word_length;
->  	rx_word_length = mcbsp->rx_word_length;
-> @@ -580,9 +581,11 @@ int omap_mcbsp_spi_master_xmit_word_poll
->  		spcr2 = OMAP_MCBSP_READ(io_base, SPCR2);
->  		if (attempts++ > 1000) {
->  			/* We must reset the transmitter */
-> -			OMAP_MCBSP_WRITE(io_base, SPCR2, spcr2 & (~XRST));
-> +			OMAP_MCBSP_WRITE(io_base, SPCR2,
-> +					reg_cache->spcr2 &= (~XRST));
->  			udelay(10);
-> -			OMAP_MCBSP_WRITE(io_base, SPCR2, spcr2 | XRST);
-> +			OMAP_MCBSP_WRITE(io_base, SPCR2,
-> +					reg_cache->spcr2 |= XRST);
->  			udelay(10);
->  			dev_err(mcbsp->dev, "McBSP%d transmitter not "
->  				"ready\n", mcbsp->id);
-> @@ -601,9 +604,11 @@ int omap_mcbsp_spi_master_xmit_word_poll
->  		spcr1 = OMAP_MCBSP_READ(io_base, SPCR1);
->  		if (attempts++ > 1000) {
->  			/* We must reset the receiver */
-> -			OMAP_MCBSP_WRITE(io_base, SPCR1, spcr1 & (~RRST));
-> +			OMAP_MCBSP_WRITE(io_base, SPCR1,
-> +					reg_cache->spcr1 &= (~RRST));
->  			udelay(10);
-> -			OMAP_MCBSP_WRITE(io_base, SPCR1, spcr1 | RRST);
-> +			OMAP_MCBSP_WRITE(io_base, SPCR1,
-> +					reg_cache->spcr1 |= RRST);
->  			udelay(10);
->  			dev_err(mcbsp->dev, "McBSP%d receiver not "
->  				"ready\n", mcbsp->id);
-> @@ -623,6 +628,7 @@ EXPORT_SYMBOL(omap_mcbsp_spi_master_xmit
->  int omap_mcbsp_spi_master_recv_word_poll(unsigned int id, u32 *word)
->  {
->  	struct omap_mcbsp *mcbsp;
-> +	struct omap_mcbsp_reg_cfg *reg_cache;
->  	u32 clock_word = 0;
->  	void __iomem *io_base;
->  	omap_mcbsp_word_length tx_word_length;
-> @@ -635,6 +641,7 @@ int omap_mcbsp_spi_master_recv_word_poll
->  	}
->
->  	mcbsp = id_to_mcbsp_ptr(id);
-> +	reg_cache = &mcbsp->reg_cache;
->  	io_base = mcbsp->io_base;
->
->  	tx_word_length = mcbsp->tx_word_length;
-> @@ -649,9 +656,11 @@ int omap_mcbsp_spi_master_recv_word_poll
->  		spcr2 = OMAP_MCBSP_READ(io_base, SPCR2);
->  		if (attempts++ > 1000) {
->  			/* We must reset the transmitter */
-> -			OMAP_MCBSP_WRITE(io_base, SPCR2, spcr2 & (~XRST));
-> +			OMAP_MCBSP_WRITE(io_base, SPCR2,
-> +					reg_cache->spcr2 &= (~XRST));
->  			udelay(10);
-> -			OMAP_MCBSP_WRITE(io_base, SPCR2, spcr2 | XRST);
-> +			OMAP_MCBSP_WRITE(io_base, SPCR2,
-> +					reg_cache->spcr2 |= XRST);
->  			udelay(10);
->  			dev_err(mcbsp->dev, "McBSP%d transmitter not "
->  				"ready\n", mcbsp->id);
-> @@ -670,9 +679,11 @@ int omap_mcbsp_spi_master_recv_word_poll
->  		spcr1 = OMAP_MCBSP_READ(io_base, SPCR1);
->  		if (attempts++ > 1000) {
->  			/* We must reset the receiver */
-> -			OMAP_MCBSP_WRITE(io_base, SPCR1, spcr1 & (~RRST));
-> +			OMAP_MCBSP_WRITE(io_base, SPCR1,
-> +					reg_cache->spcr1 &= (~RRST));
->  			udelay(10);
-> -			OMAP_MCBSP_WRITE(io_base, SPCR1, spcr1 | RRST);
-> +			OMAP_MCBSP_WRITE(io_base, SPCR1,
-> +					reg_cache->spcr1 |= RRST);
->  			udelay(10);
->  			dev_err(mcbsp->dev, "McBSP%d receiver not "
->  				"ready\n", mcbsp->id);
+> +#define MEAS_LEN		(8)
+> +#define ACCURATE_BIT		(12)
+> +
+> +/* touch register */
+> +#define MEAS_EN3		(0x52)
+> +
+> +#define MEAS_TSIX_1		(0x8D)
+> +#define MEAS_TSIX_2		(0x8E)
+> +#define MEAS_TSIY_1		(0x8F)
+> +#define MEAS_TSIY_2		(0x90)
+> +#define MEAS_TSIZ1_1		(0x91)
+> +#define MEAS_TSIZ1_2		(0x92)
+> +#define MEAS_TSIZ2_1		(0x93)
+> +#define MEAS_TSIZ2_2		(0x94)
+> +
+> +/* bit definitions of touch */
+> +#define MEAS_PD_EN		(1 << 3)
+> +#define MEAS_TSIX_EN		(1 << 4)
+> +#define MEAS_TSIY_EN		(1 << 5)
+> +
+> +struct pm860x_touch {
+> +	struct input_dev *idev;
+> +	struct pm860x_chip *chip;
+> +	int irq;
+> +	int count;	/* record open count */
+> +};
+> +
+> +static void pm860x_touch_handler(struct pm860x_chip *chip, int irq, void *data)
+> +{
+> +	struct pm860x_touch *touch = data;
+> +	unsigned char buf[MEAS_LEN];
+> +	int x, y, pen_down;
+> +	int ret;
+> +
+> +	pm860x_mask_irq(chip, irq);
+> +	ret = pm860x_bulk_read(chip->parent, DESC_8607, MEAS_TSIX_1,
+> +				MEAS_LEN, buf);
+> +	if (ret < 0)
+> +		goto out;
+> +
+> +	pen_down = buf[1] & (1 << 6);
+> +	x = ((buf[0] & 0xFF) << 4) | (buf[1] & 0x0F);
+> +	y = ((buf[2] & 0xFF) << 4) | (buf[3] & 0x0F);
+> +
+> +	if (pen_down) {
+> +		input_report_abs(touch->idev, ABS_X, x);
+> +		input_report_abs(touch->idev, ABS_Y, y);
+> +		input_report_abs(touch->idev, ABS_PRESSURE, 255);
+> +		input_report_abs(touch->idev, BTN_TOUCH, 1);
+> +	} else {
+> +		input_report_abs(touch->idev, ABS_PRESSURE, 0);
+
+Your device does not seem to be reporting real pressure so please don't
+fake ABS_PRESSURE events.
+
+> +		input_report_abs(touch->idev, ABS_TOOL_WIDTH, 1);
+
+This event is used to report size of the touching object, if you don't
+know it do not report.
+
+> +		input_report_abs(touch->idev, BTN_TOUCH, 0);
+
+There certainly isn't EV_ABS/BTN_TOUCH event, you meant to use
+input_report_key().
+
+> +	}
+> +	input_sync(touch->idev);
+> +	pm860x_unmask_irq(chip, irq);
+> +
+> +	if (pen_down)
+> +		dev_dbg(chip->dev, "pen down at [%d, %d]\n", x, y);
+> +	else
+> +		dev_dbg(chip->dev, "pen release\n");
+> +out:
+> +	return;
+> +}
+> +
+> +static int pm860x_touch_open(struct input_dev *dev)
+> +{
+> +	struct pm860x_touch *touch = input_get_drvdata(dev);
+> +	struct pm860x_chip *chip = touch->chip;
+> +	int data, ret;
+> +
+> +	if (++touch->count) {
+
+Input core takes care to call open only when first client opens the
+device, no need to count here.
+
+> +		data = MEAS_PD_EN | MEAS_TSIX_EN | MEAS_TSIY_EN;
+> +		ret = pm860x_set_bits(chip->parent, DESC_8607, MEAS_EN3,
+> +					data, data);
+> +		if (ret < 0)
+> +			goto out;
+> +		pm860x_unmask_irq(chip, touch->irq);
+> +	}
+> +	return 0;
+> +out:
+> +	return ret;
+> +}
+> +
+> +static void pm860x_touch_close(struct input_dev *dev)
+> +{
+> +	struct pm860x_touch *touch = input_get_drvdata(dev);
+> +	struct pm860x_chip *chip = touch->chip;
+> +	int data;
+> +
+> +	if (--touch->count == 0) {
+
+Same goes for close.
+
+> +		data = MEAS_PD_EN | MEAS_TSIX_EN | MEAS_TSIY_EN;
+> +		pm860x_set_bits(chip->parent, DESC_8607, MEAS_EN3,
+> +				data, 0);
+> +		pm860x_mask_irq(chip, touch->irq);
+> +	}
+> +}
+> +
+> +static int __devinit pm860x_touch_probe(struct platform_device *pdev)
+> +{
+> +	struct pm860x_chip *chip = dev_get_drvdata(pdev->dev.parent);
+> +	struct pm860x_plat_data *pm860x_pdata;
+> +	struct pm860x_touch_pdata *pdata;
+> +	struct pm860x_touch *touch;
+> +	int irq, ret;
+> +
+> +	irq = platform_get_irq(pdev, 0);
+> +	if (irq < 0) {
+> +		dev_err(&pdev->dev, "No IRQ resource!\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	if (pdev->dev.parent->platform_data) {
+> +		pm860x_pdata = pdev->dev.parent->platform_data;
+> +		pdata = pm860x_pdata->touch;
+> +	} else
+> +		pdata = NULL;
+
+I don't see pdata being used...
+
+> +
+> +	touch = kzalloc(sizeof(struct pm860x_touch), GFP_KERNEL);
+> +	if (touch == NULL)
+> +		return -ENOMEM;
+> +	dev_set_drvdata(&pdev->dev, touch);
+> +
+> +	touch->idev = input_allocate_device();
+> +	if (touch->idev == NULL) {
+> +		dev_err(&pdev->dev, "Failed to allocate input device!\n");
+> +		ret = -ENOMEM;
+> +		goto out;
+> +	}
+> +
+> +	touch->idev->name = "88pm860x-touch";
+> +	touch->idev->dev.parent = &pdev->dev;
+> +	touch->idev->open = pm860x_touch_open;
+> +	touch->idev->close = pm860x_touch_close;
+> +	touch->chip = chip;
+> +	touch->irq = irq;
+> +	touch->count = 0;
+> +	input_set_drvdata(touch->idev, touch);
+> +
+> +	ret = pm860x_request_irq(chip, irq, pm860x_touch_handler, touch);
+> +	if (ret < 0)
+> +		goto out_irq;
+> +
+> +	set_bit(EV_ABS, touch->idev->evbit);
+> +	set_bit(ABS_X, touch->idev->absbit);
+> +	set_bit(ABS_Y, touch->idev->absbit);
+> +	set_bit(ABS_PRESSURE, touch->idev->absbit);
+> +	set_bit(EV_SYN, touch->idev->evbit);
+> +	set_bit(EV_KEY, touch->idev->evbit);
+> +	set_bit(BTN_TOUCH, touch->idev->keybit);
+
+__set_bit(), no need to lock the bus. Also temprary for input device
+looks more pleasing to an eye and probably saves a couple of bytes.
+
+> +
+> +	input_set_abs_params(touch->idev, ABS_X, 0, 1 << ACCURATE_BIT, 0, 0);
+> +	input_set_abs_params(touch->idev, ABS_Y, 0, 1 << ACCURATE_BIT, 0, 0);
+> +	input_set_abs_params(touch->idev, ABS_PRESSURE, 0, 255, 0, 0);
+> +	input_set_abs_params(touch->idev, ABS_TOOL_WIDTH, 0, 15, 0, 0);
+> +
+> +	ret = input_register_device(touch->idev);
+> +	if (ret < 0) {
+> +		dev_err(chip->dev, "Failed to register touch!\n");
+> +		goto out_rg;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, touch);
+> +	return 0;
+> +out_rg:
+> +	pm860x_free_irq(chip, irq);
+> +out_irq:
+> +	input_free_device(touch->idev);
+> +out:
+> +	kfree(touch);
+> +	return ret;
+> +}
+> +
+> +static int __devexit pm860x_touch_remove(struct platform_device *pdev)
+> +{
+> +	struct pm860x_touch *touch = platform_get_drvdata(pdev);
+> +
+> +	input_unregister_device(touch->idev);
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver pm860x_touch_driver = {
+> +	.driver	= {
+> +		.name	= "88pm860x-touch",
+> +		.owner	= THIS_MODULE,
+> +	},
+> +	.probe	= pm860x_touch_probe,
+> +	.remove	= pm860x_touch_remove,
+
+__devexit_p()
+
+> +};
+> +
+> +static int __init pm860x_touch_init(void)
+> +{
+> +	return platform_driver_register(&pm860x_touch_driver);
+> +}
+> +module_init(pm860x_touch_init);
+> +
+> +static void __exit pm860x_touch_exit(void)
+> +{
+> +	platform_driver_unregister(&pm860x_touch_driver);
+> +}
+> +module_exit(pm860x_touch_exit);
+> +
+> +MODULE_DESCRIPTION("Touchscreen driver for Marvell Semiconductor 88PM860x");
+> +MODULE_AUTHOR("Haojian Zhuang <haojian.zhuang@marvell.com>");
+> +MODULE_LICENSE("GPL");
+> +MODULE_ALIAS("platform:88pm860x-touch");
+> diff --git a/drivers/input/touchscreen/Kconfig
+> b/drivers/input/touchscreen/Kconfig
+> index 8cc453c..0b06a53 100644
+> --- a/drivers/input/touchscreen/Kconfig
+> +++ b/drivers/input/touchscreen/Kconfig
+> @@ -530,4 +530,11 @@ config TOUCHSCREEN_PCAP
+> 
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called pcap_ts.
+> +
+> +config TOUCHSCREEN_88PM860X
+> +	bool "Marvell 88PM860x touchscreen"
+> +	depends on MFD_88PM860X
+> +	help
+> +	  Say Y here if you have a 88PM860x PMIC and want to enable
+> +	  support for the built-in touchscreen.
+
+No module option?
+
+>  endif
+> diff --git a/drivers/input/touchscreen/Makefile
+> b/drivers/input/touchscreen/Makefile
+> index 15fa62c..9180479 100644
+> --- a/drivers/input/touchscreen/Makefile
+> +++ b/drivers/input/touchscreen/Makefile
+> @@ -42,3 +42,4 @@ obj-$(CONFIG_TOUCHSCREEN_WM97XX_MAINSTONE)	+=
+> mainstone-wm97xx.o
+>  obj-$(CONFIG_TOUCHSCREEN_WM97XX_ZYLONITE)	+= zylonite-wm97xx.o
+>  obj-$(CONFIG_TOUCHSCREEN_W90X900)	+= w90p910_ts.o
+>  obj-$(CONFIG_TOUCHSCREEN_PCAP)		+= pcap_ts.o
+> +obj-$(CONFIG_TOUCHSCREEN_88PM860X)	+= 88pm860x-ts.o
+
+Would appreciate if you arrange makefile alphabetically.
+
+Thanks.
+
+-- 
+Dmitry
