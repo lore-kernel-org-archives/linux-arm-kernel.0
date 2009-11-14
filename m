@@ -1,939 +1,471 @@
 From: maz@misterjones.org (Marc Zyngier)
-Date: Sat, 14 Nov 2009 18:41:11 +0100
-Subject: [PATCH 1/2] Basic support for Arcom Zeus SBC
+Date: Sat, 14 Nov 2009 18:42:36 +0100
+Subject: [PATCH 2/2] Make Viper pcmcia support more generic to support Zeus
 In-Reply-To: <20091114182925.17eb58ea@taxman.wild-wind.fr.eu.org>
 References: <20091114182925.17eb58ea@taxman.wild-wind.fr.eu.org>
-Message-ID: <20091114184111.2cf39ab3@taxman.wild-wind.fr.eu.org>
+Message-ID: <20091114184236.4b764b37@taxman.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The Arcom Zeus CF slot requires the same kind of support as the Viper.
+To avoid code duplication, introduce a platform device that abstracts
+the differences.
+
+This also allows for the removal of the ugly export of viper_cf_rst().
+
 Signed-off-by: Marc Zyngier <maz@misterjones.org>
 ---
- arch/arm/mach-pxa/Kconfig             |    7 +
- arch/arm/mach-pxa/Makefile            |    1 +
- arch/arm/mach-pxa/include/mach/zeus.h |   82 ++++
- arch/arm/mach-pxa/zeus.c              |  791 +++++++++++++++++++++++++++++++++
- 4 files changed, 881 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-pxa/include/mach/zeus.h
- create mode 100644 arch/arm/mach-pxa/zeus.c
+ arch/arm/mach-pxa/Kconfig                     |    7 ++
+ arch/arm/mach-pxa/include/mach/arcom-pcmcia.h |   11 +++
+ arch/arm/mach-pxa/include/mach/viper.h        |    2 -
+ arch/arm/mach-pxa/viper.c                     |   20 ++++-
+ arch/arm/mach-pxa/zeus.c                      |   29 ++++++
+ drivers/pcmcia/Kconfig                        |    2 +-
+ drivers/pcmcia/Makefile                       |    2 +-
+ drivers/pcmcia/pxa2xx_base.c                  |    3 +-
+ drivers/pcmcia/pxa2xx_viper.c                 |  119 ++++++++++++++++++-------
+ 9 files changed, 155 insertions(+), 40 deletions(-)
+ create mode 100644 arch/arm/mach-pxa/include/mach/arcom-pcmcia.h
 
 diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index 20e645a..a84a83f 100644
+index a84a83f..4e8eb3f 100644
 --- a/arch/arm/mach-pxa/Kconfig
 +++ b/arch/arm/mach-pxa/Kconfig
-@@ -64,6 +64,13 @@ config ARCH_VIPER
+@@ -63,6 +63,7 @@ config ARCH_VIPER
+ 	select HAVE_PWM
  	select PXA_HAVE_BOARD_IRQS
  	select PXA_HAVE_ISA_IRQS
++	select ARCOM_PCMCIA
  
-+config MACH_ARCOM_ZEUS
-+	bool "Arcom/Eurotech ZEUS SBC"
-+	select PXA27x
-+	select ISA
-+	select PXA_HAVE_BOARD_IRQS
-+	select PXA_HAVE_ISA_IRQS
+ config MACH_ARCOM_ZEUS
+ 	bool "Arcom/Eurotech ZEUS SBC"
+@@ -70,6 +71,12 @@ config MACH_ARCOM_ZEUS
+ 	select ISA
+ 	select PXA_HAVE_BOARD_IRQS
+ 	select PXA_HAVE_ISA_IRQS
++	select ARCOM_PCMCIA
 +
++config ARCOM_PCMCIA
++	bool
++	help
++	  Generic option for Arcom Viper/Zeus PCMCIA
+ 
  config MACH_BALLOON3
  	bool "Balloon 3 board"
- 	select PXA27x
-diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
-index b5d29e6..f64afda 100644
---- a/arch/arm/mach-pxa/Makefile
-+++ b/arch/arm/mach-pxa/Makefile
-@@ -38,6 +38,7 @@ obj-$(CONFIG_MACH_SAAR)		+= saar.o
- # 3rd Party Dev Platforms
- obj-$(CONFIG_ARCH_PXA_IDP)	+= idp.o
- obj-$(CONFIG_ARCH_VIPER)	+= viper.o
-+obj-$(CONFIG_MACH_ARCOM_ZEUS)	+= zeus.o
- obj-$(CONFIG_MACH_BALLOON3)	+= balloon3.o
- obj-$(CONFIG_MACH_CSB726)	+= csb726.o
- obj-$(CONFIG_CSB726_CSB701)	+= csb701.o
-diff --git a/arch/arm/mach-pxa/include/mach/zeus.h b/arch/arm/mach-pxa/include/mach/zeus.h
+diff --git a/arch/arm/mach-pxa/include/mach/arcom-pcmcia.h b/arch/arm/mach-pxa/include/mach/arcom-pcmcia.h
 new file mode 100644
-index 0000000..c387046
+index 0000000..d428be4
 --- /dev/null
-+++ b/arch/arm/mach-pxa/include/mach/zeus.h
-@@ -0,0 +1,82 @@
-+/*
-+ *  arch/arm/mach-pxa/include/mach/zeus.h
-+ *
-+ *  Author:	David Vrabel
-+ *  Created:	Sept 28, 2005
-+ *  Copyright:	Arcom Control Systems Ltd.
-+ *
-+ *  Maintained by: Marc Zyngier <maz@misterjones.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
++++ b/arch/arm/mach-pxa/include/mach/arcom-pcmcia.h
+@@ -0,0 +1,11 @@
++#ifndef __ARCOM_PCMCIA_H
++#define __ARCOM_PCMCIA_H
 +
-+#ifndef _MACH_ZEUS_H
-+#define _MACH_ZEUS_H
-+
-+/* Physical addresses */
-+#define ZEUS_FLASH_PHYS		PXA_CS0_PHYS
-+#define ZEUS_ETH0_PHYS		PXA_CS1_PHYS
-+#define ZEUS_ETH1_PHYS		PXA_CS2_PHYS
-+#define ZEUS_CPLD_PHYS		(PXA_CS4_PHYS+0x2000000)
-+#define ZEUS_SRAM_PHYS		PXA_CS5_PHYS
-+#define ZEUS_PC104IO_PHYS	(0x30000000)
-+
-+#define ZEUS_CPLD_VERSION_PHYS	(ZEUS_CPLD_PHYS + 0x00000000)
-+#define ZEUS_CPLD_ISA_IRQ_PHYS	(ZEUS_CPLD_PHYS + 0x00800000)
-+#define ZEUS_CPLD_CONTROL_PHYS	(ZEUS_CPLD_PHYS + 0x01000000)
-+#define ZEUS_CPLD_EXTWDOG_PHYS	(ZEUS_CPLD_PHYS + 0x01800000)
-+
-+/* GPIOs */
-+#define ZEUS_AC97_GPIO		0
-+#define ZEUS_WAKEUP_GPIO	1
-+#define ZEUS_UARTA_GPIO		9
-+#define ZEUS_UARTB_GPIO		10
-+#define ZEUS_UARTC_GPIO		12
-+#define ZEUS_UARTD_GPIO		11
-+#define ZEUS_ETH0_GPIO		14
-+#define ZEUS_ISA_GPIO		17
-+#define ZEUS_BKLEN_GPIO		19
-+#define ZEUS_USB2_PWREN_GPIO	22
-+#define ZEUS_PTT_GPIO		27
-+#define ZEUS_CF_CD_GPIO         35
-+#define ZEUS_MMC_WP_GPIO        52
-+#define ZEUS_MMC_CD_GPIO        53
-+#define ZEUS_EXTGPIO_GPIO	91
-+#define ZEUS_CF_PWEN_GPIO       97
-+#define ZEUS_CF_RDY_GPIO        99
-+#define ZEUS_LCD_EN_GPIO	101
-+#define ZEUS_ETH1_GPIO		113
-+#define ZEUS_CAN_GPIO		116
-+
-+#define ZEUS_EXT0_GPIO_BASE	128
-+#define ZEUS_EXT1_GPIO_BASE	160
-+#define ZEUS_USER_GPIO_BASE	192
-+
-+#define ZEUS_EXT0_GPIO(x)	(ZEUS_EXT0_GPIO_BASE + (x))
-+#define ZEUS_EXT1_GPIO(x)	(ZEUS_EXT1_GPIO_BASE + (x))
-+#define ZEUS_USER_GPIO(x)	(ZEUS_USER_GPIO_BASE + (x))
-+
-+/*
-+ * CPLD registers:
-+ * Only 4 registers, but spreaded over a 32MB address space.
-+ * Be gentle, and remap that over 32kB...
-+ */
-+
-+#define ZEUS_CPLD		(0xf0000000)
-+#define ZEUS_CPLD_VERSION	(ZEUS_CPLD + 0x0000)
-+#define ZEUS_CPLD_ISA_IRQ	(ZEUS_CPLD + 0x1000)
-+#define ZEUS_CPLD_CONTROL	(ZEUS_CPLD + 0x2000)
-+#define ZEUS_CPLD_EXTWDOG	(ZEUS_CPLD + 0x3000)
-+
-+/* CPLD register bits */
-+#define ZEUS_CPLD_CONTROL_CF_RST        0x01
-+
-+#define ZEUS_PC104IO		(0xf1000000)
-+
-+#define ZEUS_SRAM_SIZE		(256 * 1024)
++struct arcom_pcmcia_pdata {
++	int	cd_gpio;
++	int	rdy_gpio;
++	int	pwr_gpio;
++	void	(*reset)(int state);
++};
 +
 +#endif
+diff --git a/arch/arm/mach-pxa/include/mach/viper.h b/arch/arm/mach-pxa/include/mach/viper.h
+index 10988c2..5f5fbf1 100644
+--- a/arch/arm/mach-pxa/include/mach/viper.h
++++ b/arch/arm/mach-pxa/include/mach/viper.h
+@@ -85,8 +85,6 @@
+ /* Interrupt and Configuration Register (VIPER_ICR) */
+ /* This is a write only register. Only CF_RST is used under Linux */
+ 
+-extern void viper_cf_rst(int state);
+-
+ #define VIPER_ICR_RETRIG	(1 << 0)
+ #define VIPER_ICR_AUTO_CLR	(1 << 1)
+ #define VIPER_ICR_R_DIS		(1 << 2)
+diff --git a/arch/arm/mach-pxa/viper.c b/arch/arm/mach-pxa/viper.c
+index cf0d71b..5352b4e 100644
+--- a/arch/arm/mach-pxa/viper.c
++++ b/arch/arm/mach-pxa/viper.c
+@@ -47,6 +47,7 @@
+ #include <mach/pxafb.h>
+ #include <plat/i2c.h>
+ #include <mach/regs-uart.h>
++#include <mach/arcom-pcmcia.h>
+ #include <mach/viper.h>
+ 
+ #include <asm/setup.h>
+@@ -76,14 +77,28 @@ static void viper_icr_clear_bit(unsigned int bit)
+ }
+ 
+ /* This function is used from the pcmcia module to reset the CF */
+-void viper_cf_rst(int state)
++static void viper_cf_reset(int state)
+ {
+ 	if (state)
+ 		viper_icr_set_bit(VIPER_ICR_CF_RST);
+ 	else
+ 		viper_icr_clear_bit(VIPER_ICR_CF_RST);
+ }
+-EXPORT_SYMBOL(viper_cf_rst);
 +
++static struct arcom_pcmcia_pdata viper_pcmcia_info = {
++	.cd_gpio	= VIPER_CF_CD_GPIO,
++	.rdy_gpio	= VIPER_CF_RDY_GPIO,
++	.pwr_gpio	= VIPER_CF_POWER_GPIO,
++	.reset		= viper_cf_reset,
++};
 +
++static struct platform_device viper_pcmcia_device = {
++	.name		= "viper-pcmcia",
++	.id		= -1,
++	.dev		= {
++		.platform_data	= &viper_pcmcia_info,
++	},
++};
+ 
+ /*
+  * The CPLD version register was not present on VIPER boards prior to
+@@ -685,6 +700,7 @@ static struct platform_device *viper_devs[] __initdata = {
+ 	&viper_mtd_devices[0],
+ 	&viper_mtd_devices[1],
+ 	&viper_backlight_device,
++	&viper_pcmcia_device,
+ };
+ 
+ static mfp_cfg_t viper_pin_config[] __initdata = {
 diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
-new file mode 100644
-index 0000000..ae1c3d2
---- /dev/null
+index ae1c3d2..5b986a8 100644
+--- a/arch/arm/mach-pxa/zeus.c
 +++ b/arch/arm/mach-pxa/zeus.c
-@@ -0,0 +1,791 @@
-+/*
-+ *  Support for the Arcom ZEUS.
-+ *
-+ *  Copyright (C) 2006 Arcom Control Systems Ltd.
-+ *
-+ *  Loosely based on Arcom's 2.6.16.28.
-+ *  Maintained by Marc Zyngier <maz@misterjones.org>
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  published by the Free Software Foundation.
-+ */
+@@ -43,6 +43,7 @@
+ #include <mach/mfp-pxa27x.h>
+ #include <mach/pm.h>
+ #include <mach/audio.h>
++#include <mach/arcom-pcmcia.h>
+ #include <mach/zeus.h>
+ 
+ #include "generic.h"
+@@ -428,6 +429,33 @@ static struct platform_device zeus_leds_device = {
+ 	},
+ };
+ 
++static void zeus_cf_reset(int state)
++{
++	u16 cpld_state = __raw_readw(ZEUS_CPLD_CONTROL);
 +
-+#include <linux/cpufreq.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/pm.h>
-+#include <linux/gpio.h>
-+#include <linux/serial_8250.h>
-+#include <linux/dm9000.h>
-+#include <linux/mmc/host.h>
-+#include <linux/spi/spi.h>
-+#include <linux/mtd/mtd.h>
-+#include <linux/mtd/partitions.h>
-+#include <linux/mtd/physmap.h>
-+#include <linux/i2c.h>
-+#include <linux/i2c/pca953x.h>
++	if (state)
++		cpld_state |= ZEUS_CPLD_CONTROL_CF_RST;
++	else
++		cpld_state &= ~ZEUS_CPLD_CONTROL_CF_RST;
 +
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
++	__raw_writew(cpld_state, ZEUS_CPLD_CONTROL);
++}
 +
-+#include <plat/i2c.h>
-+
-+#include <mach/pxa2xx-regs.h>
-+#include <mach/regs-uart.h>
-+#include <mach/ohci.h>
-+#include <mach/mmc.h>
-+#include <mach/pxa27x-udc.h>
-+#include <mach/udc.h>
-+#include <mach/pxafb.h>
-+#include <mach/pxa2xx_spi.h>
-+#include <mach/mfp-pxa27x.h>
-+#include <mach/pm.h>
-+#include <mach/audio.h>
-+#include <mach/zeus.h>
-+
-+#include "generic.h"
-+
-+/*
-+ * Interrupt handling
-+ */
-+
-+static unsigned long zeus_irq_enabled_mask;
-+static const int zeus_isa_irqs[] = { 3, 4, 5, 6, 7, 10, 11, 12, };
-+static const int zeus_isa_irq_map[] = {
-+	0,		/* ISA irq #0, invalid */
-+	0,		/* ISA irq #1, invalid */
-+	0,		/* ISA irq #2, invalid */
-+	1 << 0,		/* ISA irq #3 */
-+	1 << 1,		/* ISA irq #4 */
-+	1 << 2,		/* ISA irq #5 */
-+	1 << 3,		/* ISA irq #6 */
-+	1 << 4,		/* ISA irq #7 */
-+	0,		/* ISA irq #8, invalid */
-+	0,		/* ISA irq #9, invalid */
-+	1 << 5,		/* ISA irq #10 */
-+	1 << 6,		/* ISA irq #11 */
-+	1 << 7,		/* ISA irq #12 */
++static struct arcom_pcmcia_pdata zeus_pcmcia_info = {
++	.cd_gpio	= ZEUS_CF_CD_GPIO,
++	.rdy_gpio	= ZEUS_CF_RDY_GPIO,
++	.pwr_gpio	= ZEUS_CF_PWEN_GPIO,
++	.reset		= zeus_cf_reset,
 +};
 +
-+static inline int zeus_irq_to_bitmask(unsigned int irq)
-+{
-+	return zeus_isa_irq_map[irq - PXA_ISA_IRQ(0)];
-+}
-+
-+static inline int zeus_bit_to_irq(int bit)
-+{
-+	return zeus_isa_irqs[bit] + PXA_ISA_IRQ(0);
-+}
-+
-+static void zeus_ack_irq(unsigned int irq)
-+{
-+	__raw_writew(zeus_irq_to_bitmask(irq), ZEUS_CPLD_ISA_IRQ);
-+}
-+
-+static void zeus_mask_irq(unsigned int irq)
-+{
-+	zeus_irq_enabled_mask &= ~(zeus_irq_to_bitmask(irq));
-+}
-+
-+static void zeus_unmask_irq(unsigned int irq)
-+{
-+	zeus_irq_enabled_mask |= zeus_irq_to_bitmask(irq);
-+}
-+
-+static inline unsigned long zeus_irq_pending(void)
-+{
-+	return __raw_readw(ZEUS_CPLD_ISA_IRQ) & zeus_irq_enabled_mask;
-+}
-+
-+static void zeus_irq_handler(unsigned int irq, struct irq_desc *desc)
-+{
-+	unsigned long pending;
-+
-+	pending = zeus_irq_pending();
-+	do {
-+		/* we're in a chained irq handler,
-+		 * so ack the interrupt by hand */
-+		desc->chip->ack(gpio_to_irq(ZEUS_ISA_GPIO));
-+
-+		if (likely(pending)) {
-+			irq = zeus_bit_to_irq(__ffs(pending));
-+			generic_handle_irq(irq);
-+		}
-+		pending = zeus_irq_pending();
-+	} while (pending);
-+}
-+
-+static struct irq_chip zeus_irq_chip = {
-+	.name	= "ISA",
-+	.ack	= zeus_ack_irq,
-+	.mask	= zeus_mask_irq,
-+	.unmask	= zeus_unmask_irq,
++static struct platform_device zeus_pcmcia_device = {
++	.name		= "zeus-pcmcia",
++	.id		= -1,
++	.dev		= {
++		.platform_data	= &zeus_pcmcia_info,
++	},
 +};
 +
-+static void __init zeus_init_irq(void)
+ static struct platform_device *zeus_devices[] __initdata = {
+ 	&zeus_serial_device,
+ 	&zeus_mtd_devices[0],
+@@ -436,6 +464,7 @@ static struct platform_device *zeus_devices[] __initdata = {
+ 	&zeus_sram_device,
+ 	&pxa2xx_spi_ssp3_device,
+ 	&zeus_leds_device,
++	&zeus_pcmcia_device,
+ };
+ 
+ /* AC'97 */
+diff --git a/drivers/pcmcia/Kconfig b/drivers/pcmcia/Kconfig
+index 17f38a7..f684001 100644
+--- a/drivers/pcmcia/Kconfig
++++ b/drivers/pcmcia/Kconfig
+@@ -221,7 +221,7 @@ config PCMCIA_PXA2XX
+ 	depends on ARM && ARCH_PXA && PCMCIA
+ 	depends on (ARCH_LUBBOCK || MACH_MAINSTONE || PXA_SHARPSL \
+ 		    || MACH_ARMCORE || ARCH_PXA_PALM || TRIZEPS_PCMCIA \
+-		    || ARCH_VIPER || ARCH_PXA_ESERIES || MACH_STARGATE2)
++		    || ARCOM_PCMCIA || ARCH_PXA_ESERIES || MACH_STARGATE2)
+ 	help
+ 	  Say Y here to include support for the PXA2xx PCMCIA controller
+ 
+diff --git a/drivers/pcmcia/Makefile b/drivers/pcmcia/Makefile
+index a03a38a..e02edfd 100644
+--- a/drivers/pcmcia/Makefile
++++ b/drivers/pcmcia/Makefile
+@@ -69,7 +69,7 @@ pxa2xx-obj-$(CONFIG_ARCH_LUBBOCK)		+= pxa2xx_lubbock_cs.o
+ pxa2xx-obj-$(CONFIG_MACH_MAINSTONE)		+= pxa2xx_mainstone.o
+ pxa2xx-obj-$(CONFIG_PXA_SHARPSL)		+= pxa2xx_sharpsl.o
+ pxa2xx-obj-$(CONFIG_MACH_ARMCORE)		+= pxa2xx_cm_x2xx_cs.o
+-pxa2xx-obj-$(CONFIG_ARCH_VIPER)			+= pxa2xx_viper.o
++pxa2xx-obj-$(CONFIG_ARCOM_PCMCIA)		+= pxa2xx_viper.o
+ pxa2xx-obj-$(CONFIG_TRIZEPS_PCMCIA)		+= pxa2xx_trizeps4.o
+ pxa2xx-obj-$(CONFIG_MACH_PALMTX)		+= pxa2xx_palmtx.o
+ pxa2xx-obj-$(CONFIG_MACH_PALMTC)		+= pxa2xx_palmtc.o
+diff --git a/drivers/pcmcia/pxa2xx_base.c b/drivers/pcmcia/pxa2xx_base.c
+index 0e35acb..cb7b4ca 100644
+--- a/drivers/pcmcia/pxa2xx_base.c
++++ b/drivers/pcmcia/pxa2xx_base.c
+@@ -214,7 +214,8 @@ static void pxa2xx_configure_sockets(struct device *dev)
+ 	MECR |= MECR_CIT;
+ 
+ 	/* Set MECR:NOS (Number Of Sockets) */
+-	if ((ops->first + ops->nr) > 1 || machine_is_viper())
++	if ((ops->first + ops->nr) > 1 ||
++	    machine_is_viper() || machine_is_arcom_zeus())
+ 		MECR |= MECR_NOS;
+ 	else
+ 		MECR &= ~MECR_NOS;
+diff --git a/drivers/pcmcia/pxa2xx_viper.c b/drivers/pcmcia/pxa2xx_viper.c
+index 1787136..7a16ae9 100644
+--- a/drivers/pcmcia/pxa2xx_viper.c
++++ b/drivers/pcmcia/pxa2xx_viper.c
+@@ -1,9 +1,8 @@
+ /*
+- * VIPER PCMCIA support
++ * Viper/Zeus PCMCIA support
+  *   Copyright 2004 Arcom Control Systems
+  *
+  * Maintained by Marc Zyngier <maz@misterjones.org>
+- * 			      <marc.zyngier@altran.com>
+  *
+  * Based on:
+  *   iPAQ h2200 PCMCIA support
+@@ -26,37 +25,47 @@
+ 
+ #include <asm/irq.h>
+ 
+-#include <mach/viper.h>
+-#include <asm/mach-types.h>
++#include <mach/arcom-pcmcia.h>
+ 
+ #include "soc_common.h"
+ #include "pxa2xx_base.h"
+ 
++static struct platform_device *arcom_pcmcia_dev;
++
+ static struct pcmcia_irqs irqs[] = {
+-	{ 0, gpio_to_irq(VIPER_CF_CD_GPIO),  "PCMCIA_CD" }
++	{
++		.sock	= 0,
++		.str	= "PCMCIA_CD",
++	},
+ };
+ 
++static inline struct arcom_pcmcia_pdata *viper_get_pdata(void)
 +{
-+	int level;
-+	int isa_irq;
++	return arcom_pcmcia_dev->dev.platform_data;
++}
 +
-+	pxa27x_init_irq();
+ static int viper_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
+ {
++	struct arcom_pcmcia_pdata *pdata = viper_get_pdata();
+ 	unsigned long flags;
+ 
+-	skt->irq = gpio_to_irq(VIPER_CF_RDY_GPIO);
++	skt->irq = gpio_to_irq(pdata->rdy_gpio);
++	irqs[0].irq = gpio_to_irq(pdata->cd_gpio);
+ 
+-	if (gpio_request(VIPER_CF_CD_GPIO, "CF detect"))
++	if (gpio_request(pdata->cd_gpio, "CF detect"))
+ 		goto err_request_cd;
+ 
+-	if (gpio_request(VIPER_CF_RDY_GPIO, "CF ready"))
++	if (gpio_request(pdata->rdy_gpio, "CF ready"))
+ 		goto err_request_rdy;
+ 
+-	if (gpio_request(VIPER_CF_POWER_GPIO, "CF power"))
++	if (gpio_request(pdata->pwr_gpio, "CF power"))
+ 		goto err_request_pwr;
+ 
+ 	local_irq_save(flags);
+ 
+-	/* GPIO 82 is the CF power enable line. initially off */
+-	if (gpio_direction_output(VIPER_CF_POWER_GPIO, 0) ||
+-	    gpio_direction_input(VIPER_CF_CD_GPIO) ||
+-	    gpio_direction_input(VIPER_CF_RDY_GPIO)) {
++	if (gpio_direction_output(pdata->pwr_gpio, 0) ||
++	    gpio_direction_input(pdata->cd_gpio) ||
++	    gpio_direction_input(pdata->rdy_gpio)) {
+ 		local_irq_restore(flags);
+ 		goto err_dir;
+ 	}
+@@ -66,13 +75,13 @@ static int viper_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
+ 	return soc_pcmcia_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
+ 
+ err_dir:
+-	gpio_free(VIPER_CF_POWER_GPIO);
++	gpio_free(pdata->pwr_gpio);
+ err_request_pwr:
+-	gpio_free(VIPER_CF_RDY_GPIO);
++	gpio_free(pdata->rdy_gpio);
+ err_request_rdy:
+-	gpio_free(VIPER_CF_CD_GPIO);
++	gpio_free(pdata->cd_gpio);
+ err_request_cd:
+-	printk(KERN_ERR "viper: Failed to setup PCMCIA GPIOs\n");
++	dev_err(&arcom_pcmcia_dev->dev, "Failed to setup PCMCIA GPIOs\n");
+ 	return -1;
+ }
+ 
+@@ -81,17 +90,21 @@ err_request_cd:
+  */
+ static void viper_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
+ {
++	struct arcom_pcmcia_pdata *pdata = viper_get_pdata();
 +
-+	/* Peripheral IRQs. It would be nice to move those inside driver
-+	   configuration, but it is not supported at the moment. */
-+	set_irq_type(gpio_to_irq(ZEUS_AC97_GPIO),	IRQ_TYPE_EDGE_RISING);
-+	set_irq_type(gpio_to_irq(ZEUS_WAKEUP_GPIO),	IRQ_TYPE_EDGE_RISING);
-+	set_irq_type(gpio_to_irq(ZEUS_PTT_GPIO),	IRQ_TYPE_EDGE_RISING);
-+	set_irq_type(gpio_to_irq(ZEUS_EXTGPIO_GPIO),	IRQ_TYPE_EDGE_FALLING);
-+	set_irq_type(gpio_to_irq(ZEUS_CAN_GPIO),	IRQ_TYPE_EDGE_FALLING);
+ 	soc_pcmcia_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
+-	gpio_free(VIPER_CF_POWER_GPIO);
+-	gpio_free(VIPER_CF_RDY_GPIO);
+-	gpio_free(VIPER_CF_CD_GPIO);
++	gpio_free(pdata->pwr_gpio);
++	gpio_free(pdata->rdy_gpio);
++	gpio_free(pdata->cd_gpio);
+ }
+ 
+ static void viper_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
+ 				      struct pcmcia_state *state)
+ {
+-	state->detect = gpio_get_value(VIPER_CF_CD_GPIO) ? 0 : 1;
+-	state->ready  = gpio_get_value(VIPER_CF_RDY_GPIO) ? 1 : 0;
++	struct arcom_pcmcia_pdata *pdata = viper_get_pdata();
 +
-+	/* Setup ISA IRQs */
-+	for (level = 0; level < ARRAY_SIZE(zeus_isa_irqs); level++) {
-+		isa_irq = zeus_bit_to_irq(level);
-+		set_irq_chip(isa_irq, &zeus_irq_chip);
-+		set_irq_handler(isa_irq, handle_edge_irq);
-+		set_irq_flags(isa_irq, IRQF_VALID | IRQF_PROBE);
++	state->detect = !gpio_get_value(pdata->cd_gpio);
++	state->ready  = !!gpio_get_value(pdata->rdy_gpio);
+ 	state->bvd1   = 1;
+ 	state->bvd2   = 1;
+ 	state->wrprot = 0;
+@@ -102,20 +115,21 @@ static void viper_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
+ static int viper_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
+ 					 const socket_state_t *state)
+ {
++	struct arcom_pcmcia_pdata *pdata = viper_get_pdata();
++
+ 	/* Silently ignore Vpp, output enable, speaker enable. */
+-	viper_cf_rst(state->flags & SS_RESET);
++	pdata->reset(state->flags & SS_RESET);
+ 
+ 	/* Apply socket voltage */
+ 	switch (state->Vcc) {
+ 	case 0:
+-		gpio_set_value(VIPER_CF_POWER_GPIO, 0);
++		gpio_set_value(pdata->pwr_gpio, 0);
+ 		break;
+ 	case 33:
+-		gpio_set_value(VIPER_CF_POWER_GPIO, 1);
++		gpio_set_value(pdata->pwr_gpio, 1);
+ 		break;
+ 	default:
+-		printk(KERN_ERR "%s: Unsupported Vcc:%d\n",
+-		       __func__, state->Vcc);
++		dev_err(&arcom_pcmcia_dev->dev, "Unsupported Vcc:%d\n", state->Vcc);
+ 		return -1;
+ 	}
+ 
+@@ -130,7 +144,7 @@ static void viper_pcmcia_socket_suspend(struct soc_pcmcia_socket *skt)
+ {
+ }
+ 
+-static struct pcmcia_low_level viper_pcmcia_ops __initdata = {
++static struct pcmcia_low_level viper_pcmcia_ops = {
+ 	.owner          	= THIS_MODULE,
+ 	.hw_init        	= viper_pcmcia_hw_init,
+ 	.hw_shutdown		= viper_pcmcia_hw_shutdown,
+@@ -143,17 +157,25 @@ static struct pcmcia_low_level viper_pcmcia_ops __initdata = {
+ 
+ static struct platform_device *viper_pcmcia_device;
+ 
+-static int __init viper_pcmcia_init(void)
++static int viper_pcmcia_probe(struct platform_device *pdev)
+ {
+ 	int ret;
+ 
+-	if (!machine_is_viper())
+-		return -ENODEV;
++	/* I can't imagine more than one device, but you never know... */
++	if (arcom_pcmcia_dev)
++		return -EEXIST;
++
++	if (!pdev->dev.platform_data)
++		return -EINVAL;
+ 
+ 	viper_pcmcia_device = platform_device_alloc("pxa2xx-pcmcia", -1);
+ 	if (!viper_pcmcia_device)
+ 		return -ENOMEM;
+ 
++	arcom_pcmcia_dev = pdev;
++
++	viper_pcmcia_device->dev.parent = &pdev->dev;
++
+ 	ret = platform_device_add_data(viper_pcmcia_device,
+ 				       &viper_pcmcia_ops,
+ 				       sizeof(viper_pcmcia_ops));
+@@ -161,18 +183,49 @@ static int __init viper_pcmcia_init(void)
+ 	if (!ret)
+ 		ret = platform_device_add(viper_pcmcia_device);
+ 
+-	if (ret)
++	if (ret) {
+ 		platform_device_put(viper_pcmcia_device);
++		arcom_pcmcia_dev = NULL;
 +	}
-+
-+	set_irq_type(gpio_to_irq(ZEUS_ISA_GPIO), IRQ_TYPE_EDGE_RISING);
-+	set_irq_chained_handler(gpio_to_irq(ZEUS_ISA_GPIO), zeus_irq_handler);
+ 
+ 	return ret;
+ }
+ 
+-static void __exit viper_pcmcia_exit(void)
++static int viper_pcmcia_remove(struct platform_device *pdev)
+ {
+ 	platform_device_unregister(viper_pcmcia_device);
++	arcom_pcmcia_dev = NULL;
++	return 0;
 +}
 +
-+
-+/*
-+ * Platform devices
-+ */
-+
-+/* Flash */
-+static struct resource zeus_mtd_resources[] = {
-+	[0] = { /* NOR Flash (up to 64MB) */
-+		.start	= ZEUS_FLASH_PHYS,
-+		.end	= ZEUS_FLASH_PHYS + SZ_64M - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = { /* SRAM */
-+		.start	= ZEUS_SRAM_PHYS,
-+		.end	= ZEUS_SRAM_PHYS + SZ_512K - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct physmap_flash_data zeus_flash_data[] = {
-+	[0] = {
-+		.width		= 2,
-+		.parts		= NULL,
-+		.nr_parts	= 0,
-+	},
-+};
-+
-+static struct platform_device zeus_mtd_devices[] = {
-+	[0] = {
-+		.name		= "physmap-flash",
-+		.id		= 0,
-+		.dev		= {
-+			.platform_data = &zeus_flash_data[0],
-+		},
-+		.resource	= &zeus_mtd_resources[0],
-+		.num_resources	= 1,
-+	},
-+};
-+
-+/* Serial */
-+static struct resource zeus_serial_resources[] = {
-+	{
-+		.start	= 0x10000000,
-+		.end	= 0x1000000f,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		.start	= 0x10800000,
-+		.end	= 0x1080000f,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		.start	= 0x11000000,
-+		.end	= 0x1100000f,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		.start	= 0x40100000,
-+		.end	= 0x4010001f,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		.start	= 0x40200000,
-+		.end	= 0x4020001f,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		.start	= 0x40700000,
-+		.end	= 0x4070001f,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct plat_serial8250_port serial_platform_data[] = {
-+	/* External UARTs */
-+	/* FIXME: Shared IRQs on COM1-COM4 will not work properly on v1i1 hardware. */
-+	{ /* COM1 */
-+		.mapbase	= 0x10000000,
-+		.irq		= gpio_to_irq(ZEUS_UARTA_GPIO),
-+		.irqflags	= IRQF_TRIGGER_RISING,
-+		.uartclk	= 14745600,
-+		.regshift	= 1,
-+		.flags		= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
-+		.iotype		= UPIO_MEM,
-+	},
-+	{ /* COM2 */
-+		.mapbase	= 0x10800000,
-+		.irq		= gpio_to_irq(ZEUS_UARTB_GPIO),
-+		.irqflags	= IRQF_TRIGGER_RISING,
-+		.uartclk	= 14745600,
-+		.regshift	= 1,
-+		.flags		= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
-+		.iotype		= UPIO_MEM,
-+	},
-+	{ /* COM3 */
-+		.mapbase	= 0x11000000,
-+		.irq		= gpio_to_irq(ZEUS_UARTC_GPIO),
-+		.irqflags	= IRQF_TRIGGER_RISING,
-+		.uartclk	= 14745600,
-+		.regshift	= 1,
-+		.flags		= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
-+		.iotype		= UPIO_MEM,
-+	},
-+	{ /* COM4 */
-+		.mapbase	= 0x11800000,
-+		.irq		= gpio_to_irq(ZEUS_UARTD_GPIO),
-+		.irqflags	= IRQF_TRIGGER_RISING,
-+		.uartclk	= 14745600,
-+		.regshift	= 1,
-+		.flags		= UPF_IOREMAP | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
-+		.iotype		= UPIO_MEM,
-+	},
-+	/* Internal UARTs */
-+	{ /* FFUART */
-+		.membase	= (void *)&FFUART,
-+		.mapbase	= __PREG(FFUART),
-+		.irq		= IRQ_FFUART,
-+		.uartclk	= 921600 * 16,
-+		.regshift	= 2,
-+		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
-+		.iotype		= UPIO_MEM,
-+	},
-+	{ /* BTUART */
-+		.membase	= (void *)&BTUART,
-+		.mapbase	= __PREG(BTUART),
-+		.irq		= IRQ_BTUART,
-+		.uartclk	= 921600 * 16,
-+		.regshift	= 2,
-+		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
-+		.iotype		= UPIO_MEM,
-+	},
-+	{ /* STUART */
-+		.membase	= (void *)&STUART,
-+		.mapbase	= __PREG(STUART),
-+		.irq		= IRQ_STUART,
-+		.uartclk	= 921600 * 16,
-+		.regshift	= 2,
-+		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
-+		.iotype		= UPIO_MEM,
-+	},
++static struct platform_device_id viper_pcmcia_id_table[] = {
++	{ .name = "viper-pcmcia", },
++	{ .name = "zeus-pcmcia",  },
 +	{ },
 +};
 +
-+static struct platform_device zeus_serial_device = {
-+	.name = "serial8250",
-+	.id   = PLAT8250_DEV_PLATFORM,
-+	.dev  = {
-+		.platform_data = serial_platform_data,
++static struct platform_driver viper_pcmcia_driver = {
++	.probe		= viper_pcmcia_probe,
++	.remove		= viper_pcmcia_remove,
++	.driver		= {
++		.name	= "arcom-pcmcia",
++		.owner	= THIS_MODULE,
 +	},
-+	.num_resources	= ARRAY_SIZE(zeus_serial_resources),
-+	.resource	= zeus_serial_resources,
++	.id_table	= viper_pcmcia_id_table,
 +};
 +
-+/* Ethernet */
-+static struct resource zeus_dm9k0_resource[] = {
-+	[0] = {
-+		.start = ZEUS_ETH0_PHYS,
-+		.end   = ZEUS_ETH0_PHYS + 1,
-+		.flags = IORESOURCE_MEM
-+	},
-+	[1] = {
-+		.start = ZEUS_ETH0_PHYS + 2,
-+		.end   = ZEUS_ETH0_PHYS + 3,
-+		.flags = IORESOURCE_MEM
-+	},
-+	[2] = {
-+		.start = gpio_to_irq(ZEUS_ETH0_GPIO),
-+		.end   = gpio_to_irq(ZEUS_ETH0_GPIO),
-+		.flags = IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE,
-+	},
-+};
-+
-+static struct resource zeus_dm9k1_resource[] = {
-+	[0] = {
-+		.start = ZEUS_ETH1_PHYS,
-+		.end   = ZEUS_ETH1_PHYS + 1,
-+		.flags = IORESOURCE_MEM
-+	},
-+	[1] = {
-+		.start = ZEUS_ETH1_PHYS + 2,
-+		.end   = ZEUS_ETH1_PHYS + 3,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	[2] = {
-+		.start = gpio_to_irq(ZEUS_ETH1_GPIO),
-+		.end   = gpio_to_irq(ZEUS_ETH1_GPIO),
-+		.flags = IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE,
-+	},
-+};
-+
-+static struct dm9000_plat_data zeus_dm9k_platdata = {
-+	.flags		= DM9000_PLATF_16BITONLY,
-+};
-+
-+static struct platform_device zeus_dm9k0_device = {
-+	.name		= "dm9000",
-+	.id		= 0,
-+	.num_resources	= ARRAY_SIZE(zeus_dm9k0_resource),
-+	.resource	= zeus_dm9k0_resource,
-+	.dev		= {
-+		.platform_data = &zeus_dm9k_platdata,
-+	}
-+};
-+
-+static struct platform_device zeus_dm9k1_device = {
-+	.name		= "dm9000",
-+	.id		= 1,
-+	.num_resources	= ARRAY_SIZE(zeus_dm9k1_resource),
-+	.resource	= zeus_dm9k1_resource,
-+	.dev		= {
-+		.platform_data = &zeus_dm9k_platdata,
-+	}
-+};
-+
-+/* External SRAM */
-+static struct resource zeus_sram_resource = {
-+	.start		= ZEUS_SRAM_PHYS,
-+	.end		= ZEUS_SRAM_PHYS + ZEUS_SRAM_SIZE * 2 - 1,
-+	.flags		= IORESOURCE_MEM,
-+};
-+
-+static struct platform_device zeus_sram_device = {
-+	.name		= "pxa2xx-8bit-sram",
-+	.id		= 0,
-+	.num_resources	= 1,
-+	.resource	= &zeus_sram_resource,
-+};
-+
-+/* SPI interface on SSP3 */
-+static struct pxa2xx_spi_master pxa2xx_spi_ssp3_master_info = {
-+	.num_chipselect = 1,
-+	.enable_dma     = 1,
-+};
-+
-+static struct platform_device pxa2xx_spi_ssp3_device = {
-+	.name = "pxa2xx-spi",
-+	.id = 3,
-+	.dev = {
-+		.platform_data = &pxa2xx_spi_ssp3_master_info,
-+	},
-+};
-+
-+/* Leds */
-+static struct gpio_led zeus_leds[] = {
-+	[0] = {
-+		.name		 = "zeus:yellow:1",
-+		.default_trigger = "heartbeat",
-+		.gpio		 = ZEUS_EXT0_GPIO(3),
-+		.active_low	 = 1,
-+	},
-+	[1] = {
-+		.name		 = "zeus:yellow:2",
-+		.default_trigger = "default-on",
-+		.gpio		 = ZEUS_EXT0_GPIO(4),
-+		.active_low	 = 1,
-+	},
-+	[2] = {
-+		.name		 = "zeus:yellow:3",
-+		.default_trigger = "default-on",
-+		.gpio		 = ZEUS_EXT0_GPIO(5),
-+		.active_low	 = 1,
-+	},
-+};
-+
-+static struct gpio_led_platform_data zeus_leds_info = {
-+	.leds		= zeus_leds,
-+	.num_leds	= ARRAY_SIZE(zeus_leds),
-+};
-+
-+static struct platform_device zeus_leds_device = {
-+	.name		= "leds-gpio",
-+	.id		= -1,
-+	.dev		= {
-+		.platform_data	= &zeus_leds_info,
-+	},
-+};
-+
-+static struct platform_device *zeus_devices[] __initdata = {
-+	&zeus_serial_device,
-+	&zeus_mtd_devices[0],
-+	&zeus_dm9k0_device,
-+	&zeus_dm9k1_device,
-+	&zeus_sram_device,
-+	&pxa2xx_spi_ssp3_device,
-+	&zeus_leds_device,
-+};
-+
-+/* AC'97 */
-+static pxa2xx_audio_ops_t zeus_ac97_info = {
-+	.reset_gpio = 95,
-+};
-+
-+
-+/*
-+ * USB host
-+ */
-+
-+static int zeus_ohci_init(struct device *dev)
++static int __init viper_pcmcia_init(void)
 +{
-+	int err;
-+
-+	/* Switch on port 2. */
-+	if ((err = gpio_request(ZEUS_USB2_PWREN_GPIO, "USB2_PWREN"))) {
-+		dev_err(dev, "Can't request USB2_PWREN\n");
-+		return err;
-+	}
-+
-+	if ((err = gpio_direction_output(ZEUS_USB2_PWREN_GPIO, 1))) {
-+		gpio_free(ZEUS_USB2_PWREN_GPIO);
-+		dev_err(dev, "Can't enable USB2_PWREN\n");
-+		return err;
-+	}
-+
-+	/* Port 2 is shared between host and client interface. */
-+	UP2OCR = UP2OCR_HXOE | UP2OCR_HXS | UP2OCR_DMPDE | UP2OCR_DPPDE;
-+
-+	return 0;
++	return platform_driver_register(&viper_pcmcia_driver);
 +}
 +
-+static void zeus_ohci_exit(struct device *dev)
++static void __exit viper_pcmcia_exit(void)
 +{
-+	/* Power-off port 2 */
-+	gpio_direction_output(ZEUS_USB2_PWREN_GPIO, 0);
-+	gpio_free(ZEUS_USB2_PWREN_GPIO);
-+}
-+
-+static struct pxaohci_platform_data zeus_ohci_platform_data = {
-+	.port_mode	= PMM_NPS_MODE,
-+	.flags		= ENABLE_PORT_ALL | POWER_CONTROL_LOW | POWER_SENSE_LOW,
-+	.init		= zeus_ohci_init,
-+	.exit		= zeus_ohci_exit,
-+};
-+
-+/*
-+ * Flat Panel
-+ */
-+
-+static void zeus_lcd_power(int on, struct fb_var_screeninfo *si)
-+{
-+	gpio_set_value(ZEUS_LCD_EN_GPIO, on);
-+}
-+
-+static void zeus_backlight_power(int on)
-+{
-+	gpio_set_value(ZEUS_BKLEN_GPIO, on);
-+}
-+
-+static int zeus_setup_fb_gpios(void)
-+{
-+	int err;
-+
-+	if ((err = gpio_request(ZEUS_LCD_EN_GPIO, "LCD_EN")))
-+		goto out_err;
-+
-+	if ((err = gpio_direction_output(ZEUS_LCD_EN_GPIO, 0)))
-+		goto out_err_lcd;
-+
-+	if ((err = gpio_request(ZEUS_BKLEN_GPIO, "BKLEN")))
-+		goto out_err_lcd;
-+
-+	if ((err = gpio_direction_output(ZEUS_BKLEN_GPIO, 0)))
-+		goto out_err_bkl;
-+
-+	return 0;
-+
-+out_err_bkl:
-+	gpio_free(ZEUS_BKLEN_GPIO);
-+out_err_lcd:
-+	gpio_free(ZEUS_LCD_EN_GPIO);
-+out_err:
-+	return err;
-+}
-+
-+static struct pxafb_mode_info zeus_fb_mode_info[] = {
-+	{
-+		.pixclock       = 39722,
-+
-+		.xres           = 640,
-+		.yres           = 480,
-+
-+		.bpp            = 16,
-+
-+		.hsync_len      = 63,
-+		.left_margin    = 16,
-+		.right_margin   = 81,
-+
-+		.vsync_len      = 2,
-+		.upper_margin   = 12,
-+		.lower_margin   = 31,
-+
-+		.sync		= 0,
-+	},
-+};
-+
-+static struct pxafb_mach_info zeus_fb_info = {
-+	.modes			= zeus_fb_mode_info,
-+	.num_modes		= 1,
-+	.lcd_conn		= LCD_COLOR_TFT_16BPP | LCD_PCLK_EDGE_FALL,
-+	.pxafb_lcd_power	= zeus_lcd_power,
-+	.pxafb_backlight_power	= zeus_backlight_power,
-+};
-+
-+/*
-+ * MMC/SD Device
-+ *
-+ * The card detect interrupt isn't debounced so we delay it by 250ms
-+ * to give the card a chance to fully insert/eject.
-+ */
-+
-+static struct pxamci_platform_data zeus_mci_platform_data = {
-+	.ocr_mask		= MMC_VDD_32_33|MMC_VDD_33_34,
-+	.detect_delay		= HZ/4,
-+	.gpio_card_detect       = ZEUS_MMC_CD_GPIO,
-+	.gpio_card_ro           = ZEUS_MMC_WP_GPIO,
-+	.gpio_card_ro_invert	= 1,
-+	.gpio_power             = -1
-+};
-+
-+/*
-+ * USB Device Controller
-+ */
-+static void zeus_udc_command(int cmd)
-+{
-+	switch (cmd) {
-+	case PXA2XX_UDC_CMD_DISCONNECT:
-+		pr_info("zeus: disconnecting USB client\n");
-+		UP2OCR = UP2OCR_HXOE | UP2OCR_HXS | UP2OCR_DMPDE | UP2OCR_DPPDE;
-+		break;
-+
-+	case PXA2XX_UDC_CMD_CONNECT:
-+		pr_info("zeus: connecting USB client\n");
-+		UP2OCR = UP2OCR_HXOE | UP2OCR_DPPUE;
-+		break;
-+	}
-+}
-+
-+static struct pxa2xx_udc_mach_info zeus_udc_info = {
-+	.udc_command = zeus_udc_command,
-+};
-+
-+static void zeus_power_off(void)
-+{
-+	local_irq_disable();
-+	pxa27x_cpu_suspend(PWRMODE_DEEPSLEEP);
-+}
-+
-+int zeus_get_pcb_info(struct i2c_client *client, unsigned gpio,
-+		      unsigned ngpio, void *context)
-+{
-+	int i;
-+	u8 pcb_info = 0;
-+
-+	for (i = 0; i < 8; i++) {
-+		int pcb_bit = gpio + i + 8;
-+
-+		if (gpio_request(pcb_bit, "pcb info")) {
-+			dev_err(&client->dev, "Can't request pcb info %d\n", i);
-+			continue;
-+		}
-+
-+		if (gpio_direction_input(pcb_bit)) {
-+			dev_err(&client->dev, "Can't read pcb info %d\n", i);
-+			gpio_free(pcb_bit);
-+			continue;
-+		}
-+
-+		pcb_info |= !!gpio_get_value(pcb_bit) << i;
-+
-+		gpio_free(pcb_bit);
-+	}
-+
-+	dev_info(&client->dev, "Zeus PCB version %d issue %d\n",
-+		 pcb_info >> 4, pcb_info & 0xf);
-+
-+	return 0;
-+}
-+
-+static struct pca953x_platform_data zeus_pca953x_pdata[] = {
-+	[0] = { .gpio_base	= ZEUS_EXT0_GPIO_BASE, },
-+	[1] = {
-+		.gpio_base	= ZEUS_EXT1_GPIO_BASE,
-+		.setup		= zeus_get_pcb_info,
-+	},
-+	[2] = { .gpio_base = ZEUS_USER_GPIO_BASE, },
-+};
-+
-+static struct i2c_board_info __initdata zeus_i2c_devices[] = {
-+	{
-+		I2C_BOARD_INFO("pca9535",	0x21),
-+		.platform_data	= &zeus_pca953x_pdata[0],
-+	},
-+	{
-+		I2C_BOARD_INFO("pca9535",	0x22),
-+		.platform_data	= &zeus_pca953x_pdata[1],
-+	},
-+	{
-+		I2C_BOARD_INFO("pca9535",	0x20),
-+		.platform_data	= &zeus_pca953x_pdata[2],
-+		.irq		= gpio_to_irq(ZEUS_EXTGPIO_GPIO),
-+	},
-+	{ I2C_BOARD_INFO("lm75a",	0x48) },
-+	{ I2C_BOARD_INFO("24c01",	0x50) },
-+	{ I2C_BOARD_INFO("isl1208",	0x6f) },
-+};
-+
-+static mfp_cfg_t zeus_pin_config[] __initdata = {
-+	GPIO15_nCS_1,
-+	GPIO78_nCS_2,
-+	GPIO80_nCS_4,
-+	GPIO33_nCS_5,
-+
-+	GPIO22_GPIO,
-+	GPIO32_MMC_CLK,
-+	GPIO92_MMC_DAT_0,
-+	GPIO109_MMC_DAT_1,
-+	GPIO110_MMC_DAT_2,
-+	GPIO111_MMC_DAT_3,
-+	GPIO112_MMC_CMD,
-+
-+	GPIO88_USBH1_PWR,
-+	GPIO89_USBH1_PEN,
-+	GPIO119_USBH2_PWR,
-+	GPIO120_USBH2_PEN,
-+
-+	GPIO86_LCD_LDD_16,
-+	GPIO87_LCD_LDD_17,
-+
-+	GPIO102_GPIO,
-+	GPIO104_CIF_DD_2,
-+	GPIO105_CIF_DD_1,
-+
-+	GPIO48_nPOE,
-+	GPIO49_nPWE,
-+	GPIO50_nPIOR,
-+	GPIO51_nPIOW,
-+	GPIO85_nPCE_1,
-+	GPIO54_nPCE_2,
-+	GPIO79_PSKTSEL,
-+	GPIO55_nPREG,
-+	GPIO56_nPWAIT,
-+	GPIO57_nIOIS16,
-+	GPIO36_GPIO,		/* CF CD */
-+	GPIO97_GPIO,		/* CF PWREN */
-+	GPIO99_GPIO,		/* CF RDY */
-+};
-+
-+static void __init zeus_init(void)
-+{
-+	u16 dm9000_msc = 0xe279;
-+
-+	system_rev = __raw_readw(ZEUS_CPLD_VERSION);
-+	pr_info("Zeus CPLD V%dI%d\n", (system_rev & 0xf0) >> 4, (system_rev & 0x0f));
-+
-+	/* Fix timings for dm9000s (CS1/CS2)*/
-+	MSC0 = (MSC0 & 0xffff) | (dm9000_msc << 16);
-+	MSC1 = (MSC1 & 0xffff0000) | dm9000_msc;
-+
-+	pm_power_off = zeus_power_off;
-+
-+	pxa2xx_mfp_config(ARRAY_AND_SIZE(zeus_pin_config));
-+
-+	platform_add_devices(zeus_devices, ARRAY_SIZE(zeus_devices));
-+
-+	pxa_set_ohci_info(&zeus_ohci_platform_data);
-+
-+	if (zeus_setup_fb_gpios())
-+		pr_err("Failed to setup fb gpios\n");
-+	else
-+		set_pxa_fb_info(&zeus_fb_info);
-+
-+	pxa_set_mci_info(&zeus_mci_platform_data);
-+	pxa_set_udc_info(&zeus_udc_info);
-+	pxa_set_ac97_info(&zeus_ac97_info);
-+	pxa_set_i2c_info(NULL);
-+	i2c_register_board_info(0, ARRAY_AND_SIZE(zeus_i2c_devices));
-+}
-+
-+static struct map_desc zeus_io_desc[] __initdata = {
-+	{
-+		.virtual = ZEUS_CPLD_VERSION,
-+		.pfn     = __phys_to_pfn(ZEUS_CPLD_VERSION_PHYS),
-+		.length  = 0x1000,
-+		.type    = MT_DEVICE,
-+	},
-+	{
-+		.virtual = ZEUS_CPLD_ISA_IRQ,
-+		.pfn     = __phys_to_pfn(ZEUS_CPLD_ISA_IRQ_PHYS),
-+		.length  = 0x1000,
-+		.type    = MT_DEVICE,
-+	},
-+	{
-+		.virtual = ZEUS_CPLD_CONTROL,
-+		.pfn     = __phys_to_pfn(ZEUS_CPLD_CONTROL_PHYS),
-+		.length  = 0x1000,
-+		.type    = MT_DEVICE,
-+	},
-+	{
-+		.virtual = ZEUS_CPLD_EXTWDOG,
-+		.pfn     = __phys_to_pfn(ZEUS_CPLD_EXTWDOG_PHYS),
-+		.length  = 0x1000,
-+		.type    = MT_DEVICE,
-+	},
-+	{
-+		.virtual = ZEUS_PC104IO,
-+		.pfn     = __phys_to_pfn(ZEUS_PC104IO_PHYS),
-+		.length  = 0x00800000,
-+		.type    = MT_DEVICE,
-+	},
-+};
-+
-+static void __init zeus_map_io(void)
-+{
-+	pxa_map_io();
-+
-+	iotable_init(zeus_io_desc, ARRAY_SIZE(zeus_io_desc));
-+
-+	/* Clear PSPR to ensure a full restart on wake-up. */
-+	PMCR = PSPR = 0;
-+
-+	/* enable internal 32.768Khz oscillator (ignore OSCC_OOK) */
-+	OSCC |= OSCC_OON;
-+
-+	/* Some clock cycles later (from OSCC_ON), programme PCFR (OPDE...).
-+	 * float chip selects and PCMCIA */
-+	PCFR = PCFR_OPDE | PCFR_DC_EN | PCFR_FS | PCFR_FP;
-+}
-+
-+MACHINE_START(ARCOM_ZEUS, "Arcom ZEUS")
-+	/* Maintainer: Marc Zyngier <maz@misterjones.org> */
-+	.phys_io	= 0x40000000,
-+	.io_pg_offst	= ((io_p2v(0x40000000) >> 18) & 0xfffc),
-+	.boot_params	= 0xa0000100,
-+	.map_io		= zeus_map_io,
-+	.init_irq	= zeus_init_irq,
-+	.timer		= &pxa_timer,
-+	.init_machine	= zeus_init,
-+MACHINE_END
-+
++	return platform_driver_unregister(&viper_pcmcia_driver);
+ }
+ 
+ module_init(viper_pcmcia_init);
+ module_exit(viper_pcmcia_exit);
+ 
++MODULE_DEVICE_TABLE(platform, viper_pcmcia_id_table);
+ MODULE_LICENSE("GPL");
 -- 
 1.6.0.4
+
 
 
 -- 
