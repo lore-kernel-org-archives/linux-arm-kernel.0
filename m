@@ -1,28 +1,50 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Sun, 15 Nov 2009 18:16:49 +0100
-Subject: IXP4xx: unneeded #include platform-specific include files?
-Message-ID: <m3fx8fso72.fsf@intrepid.localdomain>
+From: mad_soft@inbox.ru (Dmitry Artamonow)
+Date: Sun, 15 Nov 2009 20:30:48 +0300
+Subject: [PATCH 00/20] iPAQ h3100/h3600 work for 2.6.33
+In-Reply-To: <20091025153603.GA24490@rainbow>
+References: <1256414658-22611-1-git-send-email-mad_soft@inbox.ru>
+	<20091024211026.GE16451@n2100.arm.linux.org.uk>
+	<20091025153603.GA24490@rainbow>
+Message-ID: <20091115173048.GA19609@rainbow>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I wonder about one more thing: why are the platform-specific include
-files included by the non-platform code?
+On 18:36 Sun 25 Oct     , Dmitry Artamonow wrote:
+> On 22:10 Sat 24 Oct     , Russell King - ARM Linux wrote:
+> > 
+> > That's fine, and the patches to me at least look fine as well.  The only
+> > thing which gives me slight concern is the:
+> > 
+> > 	if (!gpio_request()) {
+> > 		gpio_direction_output();
+> > 		gpio_free();
+> > 	}
+> > 
+> > stuff, but I guess you can't get around that easily, especially if those
+> > GPIOs only become available at some time later.  It is something that
+> > eventually needs to be addressed though - consider that this can lead
+> > to unexpected (and silent) failures if the GPIOs aren't available when
+> > another driver initializes, and can't (eg) turn on the IrDA tranceiver.
+> 
+> Yes, you right here about silent failures. I think they could be made less
+> silent by inserting some pr_err()-s , though it would bloat code a
+> bit (I'd like to see request_gpio() itself emitting error message,
+> but currectly it does that only when CONFIG_DEBUG_GPIO is set).
+> Ok, here's incremental patch adding pr_err-s in attachment - if you're
+> OK with it I will roll it into [09/20] and rebase all following patches.
+> 
+> Also perhaps it's a good idea to always built-in htc-egpio driver
+> (by adding "select HTC_EGPIO" to h3100/h3600 Kconfig options) - that should
+> decrease probability of gpio_request failures a lot. Patch also
+> attached.
 
-mach-ixp4xx/include/mach/hardware.h:
+So, Russell, what's your opinion on these proposed additional changes?
+(btw, I found some minor flaws in "emit messages on failed gpio_request"
+patch, new version attached here).
 
-/* Platform specific details */
-#include "ixdp425.h"
-#include "avila.h"
-#include "coyote.h"
-#include "prpmc1100.h"
-#include "nslu2.h"
-#include "nas100d.h"
-#include "dsmg600.h"
-#include "fsg.h"
+I'm thinking about submitting full patchset into you patchsystem soon,
+but I'd like to know that everything is ok before doing that.
 
-I'm going to move them to the platform code, either incorporate them
-into platform .c files or #include "specific-platform.h" from there.
-
-Objections?
 -- 
-Krzysztof Halasa
+Best regards,
+Dmitry "MAD" Artamonow
