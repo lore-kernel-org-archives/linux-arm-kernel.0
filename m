@@ -1,107 +1,67 @@
 From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Sun, 15 Nov 2009 01:21:34 +0100
-Subject: IXP4xx: Indirect PCI MMIO compile failure and fix
-In-Reply-To: <20091114231854.GB30027@n2100.arm.linux.org.uk> (Russell King's
-	message of "Sat, 14 Nov 2009 23:18:54 +0000")
+Date: Sun, 15 Nov 2009 02:14:59 +0100
+Subject: IXP4xx: Indirect PCI MMIO compile failure
+In-Reply-To: <m3fx8gwudx.fsf@intrepid.localdomain> (Krzysztof Halasa's message
+	of "Sun, 15 Nov 2009 00:37:14 +0100")
 References: <m3pr7kyi9x.fsf@intrepid.localdomain>
 	<20091114210533.GA30027@n2100.arm.linux.org.uk>
 	<m34oowyako.fsf@intrepid.localdomain>
 	<20091114231854.GB30027@n2100.arm.linux.org.uk>
-Message-ID: <m37htswsc1.fsf_-_@intrepid.localdomain>
+	<m3fx8gwudx.fsf@intrepid.localdomain>
+Message-ID: <m33a4gwpv0.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm attaching the complete patch, it seems to work on my IXP425 with
-indirect PCI, the only PCI device is SIL3512 SATA mini-PCI card.
+Krzysztof Halasa <khc@pm.waw.pl> writes:
 
-That #include <linux/mm.h> wasn't a bright idea :-(
+> There is 1:1 mapping on IXP4xx with indirect PCI MMIO:
+>
+> static inline void __iomem *
+> __ixp4xx_ioremap(unsigned long addr, size_t size, unsigned int mtype)
+> {
+>         if((addr < PCIBIOS_MIN_MEM) || (addr > 0x4fffffff))
+>                 return __arm_ioremap(addr, size, mtype);
+>
+>         return (void __iomem *)addr;
+>         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Comments?
+Well, the 128 MB limit of indirect MMIO addressing seems to be bogus.
+I can't find anything about it in the Intel's manual (except that PCI
+address space is 0x48000000-0x4FFFFFFF and 0x48000000-0x4BFFFFFF is
+actually usable - in direct mode). Added a patch:
 
---- a/arch/arm/mach-ixp4xx/include/mach/io.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/io.h
-@@ -55,10 +55,16 @@ extern int ixp4xx_pci_write(u32 addr, u32 cmd, u32 data);
-  * access registers. If something outside of PCI is ioremap'd, we
-  * fallback to the default.
-  */
-+
-+static inline int is_pci_memory(u32 addr)
-+{
-+	return (addr >= PCIBIOS_MIN_MEM) && (addr <= 0x4FFFFFFF);
-+}
-+
- static inline void __iomem * __indirect_ioremap(unsigned long addr, size_t size,
- 						unsigned int mtype)
- {
--	if((addr < PCIBIOS_MIN_MEM) || (addr > 0x4fffffff))
-+	if (!is_pci_memory(addr))
- 		return __arm_ioremap(addr, size, mtype);
+--- a/arch/arm/mach-ixp4xx/include/mach/hardware.h
++++ b/arch/arm/mach-ixp4xx/include/mach/hardware.h
+@@ -18,7 +18,11 @@
+ #define __ASM_ARCH_HARDWARE_H__
  
- 	return (void __iomem *)addr;
-@@ -66,7 +72,7 @@ static inline void __iomem * __indirect_ioremap(unsigned long addr, size_t size,
+ #define PCIBIOS_MIN_IO		0x00001000
+-#define PCIBIOS_MIN_MEM		(cpu_is_ixp43x() ? 0x40000000 : 0x48000000)
++#ifdef CONFIG_IXP4XX_INDIRECT_PCI
++#define PCIBIOS_MIN_MEM		0x10000000
++#else
++#define PCIBIOS_MIN_MEM		0x48000000
++#endif
  
- static inline void __indirect_iounmap(void __iomem *addr)
- {
--	if ((__force u32)addr >= VMALLOC_START)
-+	if (!is_pci_memory((__force u32)addr))
- 		__iounmap(addr);
- }
- 
-@@ -94,7 +100,7 @@ static inline void __indirect_writeb(u8 value, volatile void __iomem *p)
- 	u32 addr = (u32)p;
- 	u32 n, byte_enables, data;
- 
--	if (addr >= VMALLOC_START) {
-+	if (!is_pci_memory(addr)) {
- 		__raw_writeb(value, addr);
- 		return;
- 	}
-@@ -117,7 +123,7 @@ static inline void __indirect_writew(u16 value, volatile void __iomem *p)
- 	u32 addr = (u32)p;
- 	u32 n, byte_enables, data;
- 
--	if (addr >= VMALLOC_START) {
-+	if (!is_pci_memory(addr)) {
- 		__raw_writew(value, addr);
- 		return;
- 	}
-@@ -138,7 +144,8 @@ static inline void __indirect_writesw(volatile void __iomem *bus_addr,
- static inline void __indirect_writel(u32 value, volatile void __iomem *p)
- {
- 	u32 addr = (__force u32)p;
--	if (addr >= VMALLOC_START) {
-+
-+	if (!is_pci_memory(addr)) {
- 		__raw_writel(value, p);
- 		return;
- 	}
-@@ -158,7 +165,7 @@ static inline unsigned char __indirect_readb(const volatile void __iomem *p)
- 	u32 addr = (u32)p;
- 	u32 n, byte_enables, data;
- 
--	if (addr >= VMALLOC_START)
-+	if (!is_pci_memory(addr))
- 		return __raw_readb(addr);
- 
- 	n = addr % 4;
-@@ -181,7 +188,7 @@ static inline unsigned short __indirect_readw(const volatile void __iomem *p)
- 	u32 addr = (u32)p;
- 	u32 n, byte_enables, data;
- 
--	if (addr >= VMALLOC_START)
-+	if (!is_pci_memory(addr))
- 		return __raw_readw(addr);
- 
- 	n = addr % 4;
-@@ -204,7 +211,7 @@ static inline unsigned long __indirect_readl(const volatile void __iomem *p)
- 	u32 addr = (__force u32)p;
- 	u32 data;
- 
--	if (addr >= VMALLOC_START)
-+	if (!is_pci_memory(addr))
- 		return __raw_readl(p);
- 
- 	if (ixp4xx_pci_read(addr, NP_CMD_MEMREAD, &data))
+ /*
+  * We override the standard dma-mask routines for bouncing.
 
+
+And:
+# lspci -v
+00:0d.0 RAID bus controller: Silicon Image, Inc. SiI 3512 [SATALink/SATARaid] Se
+rial ATA Controller (rev 01)
+        Subsystem: Silicon Image, Inc. SiI 3512 SATARaid Controller
+        Flags: bus master, 66MHz, medium devsel, latency 0, IRQ 29
+        I/O ports at 1010 [size=8]
+        I/O ports at 1020 [size=4]
+        I/O ports at 1018 [size=8]
+        I/O ports at 1024 [size=4]
+        I/O ports at 1000 [size=16]
+        Memory at 10080000 (32-bit, non-prefetchable) [size=512]
+                  ^^^^^^^^
+        [virtual] Expansion ROM at 10000000 [disabled] [size=512K]
+
+Needless to say, it works.
 -- 
 Krzysztof Halasa
