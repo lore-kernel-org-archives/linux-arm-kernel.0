@@ -1,32 +1,28 @@
-From: mike@mwester.net (Mike Westerhof)
-Date: Sun, 15 Nov 2009 12:41:32 -0600
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Sun, 15 Nov 2009 21:18:45 +0100
 Subject: IXP4xx: unneeded #include platform-specific include files?
-In-Reply-To: <m3fx8fso72.fsf@intrepid.localdomain>
+In-Reply-To: <19200.18453.644399.845601@pilspetsen.it.uu.se>
 References: <m3fx8fso72.fsf@intrepid.localdomain>
-Message-ID: <4B004B5C.7000306@mwester.net>
+	<19200.18453.644399.845601@pilspetsen.it.uu.se>
+Message-ID: <op.u3gddjdi2s3iss@ecaz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krzysztof Halasa wrote:
-> I wonder about one more thing: why are the platform-specific include
-> files included by the non-platform code?
-> 
-> mach-ixp4xx/include/mach/hardware.h:
-> 
-> /* Platform specific details */
-> #include "ixdp425.h"
-> #include "avila.h"
-> #include "coyote.h"
-> #include "prpmc1100.h"
-> #include "nslu2.h"
-> #include "nas100d.h"
-> #include "dsmg600.h"
-> #include "fsg.h"
-> 
-> I'm going to move them to the platform code, either incorporate them
-> into platform .c files or #include "specific-platform.h" from there.
-> 
-> Objections?
+On Sun, 15 Nov 2009 19:27:33 +0100, Mikael Pettersson <mikpe@it.uu.se> wrote:
 
-None at all (for nslu2 and dsmg600 platforms).
--Mike (mwester)
+> Krzysztof Halasa writes:
+>  > I'm going to move them to the platform code, either incorporate them
+>  > into platform .c files or #include "specific-platform.h" from there.
+>  >
+>  > Objections?
+>
+> None. Having worked on the Synology DS101 support for mach-ixp4xx
+> I'm 99,99% certain that platform details can and should be private.
+>
+
+Or people can simply stop the #define brain damage and use the GPIO defines.
+
+(hint: IRQ_IXP4XX_GPIO* for PCI stuff, and the gpio number in i2c_gpio_platform_data)
+
+
+Imre
