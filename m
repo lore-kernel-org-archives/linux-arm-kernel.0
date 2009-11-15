@@ -1,138 +1,214 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Sun, 15 Nov 2009 16:53:50 +0100
-Subject: IXP4xx: Indirect PCI MMIO compile failure
-In-Reply-To: <m33a4gwpv0.fsf@intrepid.localdomain> (Krzysztof Halasa's message
-	of "Sun, 15 Nov 2009 02:14:59 +0100")
-References: <m3pr7kyi9x.fsf@intrepid.localdomain>
-	<20091114210533.GA30027@n2100.arm.linux.org.uk>
-	<m34oowyako.fsf@intrepid.localdomain>
-	<20091114231854.GB30027@n2100.arm.linux.org.uk>
-	<m3fx8gwudx.fsf@intrepid.localdomain>
-	<m33a4gwpv0.fsf@intrepid.localdomain>
-Message-ID: <m3k4xrss1d.fsf@intrepid.localdomain>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Sun, 15 Nov 2009 17:55:50 +0100
+Subject: [RFC][PATCH] Add interrupt handling capability to pca953x
+Message-ID: <20091115175550.68964c72@taxman.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Well, the 128 MB limit of indirect MMIO addressing seems to be bogus.
-> I can't find anything about it in the Intel's manual (except that PCI
-> address space is 0x48000000-0x4FFFFFFF and 0x48000000-0x4BFFFFFF is
-> actually usable - in direct mode). Added a patch:
+Most of the GPIO expanders controlled by the pca953x driver are
+able to report changes on the input pins through an *INT pin.
 
-The full patch follows. It seems all IXP4xx CPUs can indirectly access
-the whole 4 GB PCI MMIO address space (using the non-prefetch
-registers). This is explicitly stated in IXP43x manual, and I've
-verified that it works on IXP425.
+This patch implements a very basic way for the platform code to
+be alerted when some input changes (both edge detection).
+It can be seen as a poor man irq_chip.
 
-Picked up 0x10000000 starting address to have 1 GB of PCI address space
-available (there is no cost associated with it and since that IXP43x
-devel board with its media-something device needed 256 MB or so...)
+Alternatively, this could be turned into a full-fledged irq_chip,
+though I'm not sure it is worth the complexity.
 
-Probably a mixed direct/indirect access (the first 64 MB direct and the
-rest indirect) would be a bit better, but if nobody uses it, I won't
-bother.
+The driver has been tested on an Arcom Zeus.
 
-Comments?
+Signed-off-by: Marc Zyngier <maz@misterjones.org>
+---
+ drivers/gpio/pca953x.c      |   96 +++++++++++++++++++++++++++++++++++++------
+ include/linux/i2c/pca953x.h |    7 +++-
+ 2 files changed, 89 insertions(+), 14 deletions(-)
 
---- a/arch/arm/mach-ixp4xx/Kconfig
-+++ b/arch/arm/mach-ixp4xx/Kconfig
-@@ -179,7 +179,7 @@ config IXP4XX_INDIRECT_PCI
- 	help
-           IXP4xx provides two methods of accessing PCI memory space:
+diff --git a/drivers/gpio/pca953x.c b/drivers/gpio/pca953x.c
+index 6a2fb3f..528b35f 100644
+--- a/drivers/gpio/pca953x.c
++++ b/drivers/gpio/pca953x.c
+@@ -14,6 +14,7 @@
+ #include <linux/module.h>
+ #include <linux/init.h>
+ #include <linux/gpio.h>
++#include <linux/interrupt.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c/pca953x.h>
+ #ifdef CONFIG_OF_GPIO
+@@ -26,23 +27,27 @@
+ #define PCA953X_INVERT         2
+ #define PCA953X_DIRECTION      3
  
--          1) A direct mapped window from 0x48000000 to 0x4bffffff (64MB).
-+          1) A direct mapped window from 0x48000000 to 0x4BFFFFFF (64MB).
-              To access PCI via this space, we simply ioremap() the BAR
-              into the kernel and we can use the standard read[bwl]/write[bwl]
-              macros. This is the preferred method due to speed but it
-@@ -187,13 +187,13 @@ config IXP4XX_INDIRECT_PCI
-              problematic if using video cards and other memory-heavy devices.
-           
-           2) If > 64MB of memory space is required, the IXP4xx can be 
--	     configured to use indirect registers to access PCI This allows 
--	     for up to 128MB (0x48000000 to 0x4fffffff) of memory on the bus. 
--	     The disadvantage of this is that every PCI access requires 
--	     three local register accesses plus a spinlock, but in some 
--	     cases the performance hit is acceptable. In addition, you cannot 
--	     mmap() PCI devices in this case due to the indirect nature
--	     of the PCI window.
-+	     configured to use indirect registers to access the whole PCI
-+	     memory space. This currently allows for up to 1 GB (0x10000000
-+	     to 0x4FFFFFFF) of memory on the bus. The disadvantage of this
-+	     is that every PCI access requires three local register accesses
-+	     plus a spinlock, but in some cases the performance hit is
-+	     acceptable. In addition, you cannot mmap() PCI devices in this
-+	     case due to the indirect nature of the PCI window.
++#define PCA953X_GPIOS	       0x00FF
++#define PCA953X_INT	       0x0100
++
+ static const struct i2c_device_id pca953x_id[] = {
+-	{ "pca9534", 8, },
+-	{ "pca9535", 16, },
++	{ "pca9534", 8  | PCA953X_INT, },
++	{ "pca9535", 16 | PCA953X_INT, },
+ 	{ "pca9536", 4, },
+-	{ "pca9537", 4, },
+-	{ "pca9538", 8, },
+-	{ "pca9539", 16, },
+-	{ "pca9554", 8, },
+-	{ "pca9555", 16, },
++	{ "pca9537", 4  | PCA953X_INT, },
++	{ "pca9538", 8  | PCA953X_INT, },
++	{ "pca9539", 16 | PCA953X_INT, },
++	{ "pca9554", 8  | PCA953X_INT, },
++	{ "pca9555", 16 | PCA953X_INT, },
+ 	{ "pca9556", 8, },
+ 	{ "pca9557", 8, },
  
- 	  By default, the direct method is used. Choose this option if you
- 	  need to use the indirect method instead. If you don't know
---- a/arch/arm/mach-ixp4xx/common-pci.c
-+++ b/arch/arm/mach-ixp4xx/common-pci.c
-@@ -481,11 +481,7 @@ int ixp4xx_setup(int nr, struct pci_sys_data *sys)
+ 	{ "max7310", 8, },
+-	{ "max7315", 8, },
+-	{ "pca6107", 8, },
+-	{ "tca6408", 8, },
+-	{ "tca6416", 16, },
++	{ "max7313", 16 | PCA953X_INT, },
++	{ "max7315", 8  | PCA953X_INT, },
++	{ "pca6107", 8  | PCA953X_INT, },
++	{ "tca6408", 8  | PCA953X_INT, },
++	{ "tca6416", 16 | PCA953X_INT, },
+ 	/* NYET:  { "tca6424", 24, }, */
+ 	{ }
+ };
+@@ -53,6 +58,11 @@ struct pca953x_chip {
+ 	uint16_t reg_output;
+ 	uint16_t reg_direction;
  
- 	res[1].name = "PCI Memory Space";
- 	res[1].start = PCIBIOS_MIN_MEM;
--#ifndef CONFIG_IXP4XX_INDIRECT_PCI
--	res[1].end = 0x4bffffff;
--#else
--	res[1].end = 0x4fffffff;
--#endif
-+	res[1].end = PCIBIOS_MAX_MEM;
- 	res[1].flags = IORESOURCE_MEM;
++	uint16_t int_mask;
++	uint16_t int_prev_input;
++	void (*interrupt)(uint16_t, uint16_t, void *);
++	void *context;
++
+ 	struct i2c_client *client;
+ 	struct pca953x_platform_data *dyn_pdata;
+ 	struct gpio_chip gpio_chip;
+@@ -202,6 +212,34 @@ static void pca953x_setup_gpio(struct pca953x_chip *chip, int gpios)
+ 	gc->names = chip->names;
+ }
  
- 	request_resource(&ioport_resource, &res[0]);
---- a/arch/arm/mach-ixp4xx/include/mach/hardware.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/hardware.h
-@@ -18,7 +18,13 @@
- #define __ASM_ARCH_HARDWARE_H__
- 
- #define PCIBIOS_MIN_IO		0x00001000
--#define PCIBIOS_MIN_MEM		(cpu_is_ixp43x() ? 0x40000000 : 0x48000000)
-+#ifdef CONFIG_IXP4XX_INDIRECT_PCI
-+#define PCIBIOS_MIN_MEM		0x10000000 /* 1 GB of indirect PCI MMIO space */
-+#define PCIBIOS_MAX_MEM		0x4FFFFFFF
-+#else
-+#define PCIBIOS_MIN_MEM		0x48000000 /* 64 MB of PCI MMIO space */
-+#define PCIBIOS_MAX_MEM		0x4BFFFFFF
-+#endif
- 
++static irqreturn_t pca953x_irq_quick_handler(int irq, void *devid)
++{
++	/* Always happy to serve... */
++	return IRQ_WAKE_THREAD;
++}
++
++static irqreturn_t pca953x_irq_handler(int irq, void *devid)
++{
++	struct pca953x_chip *chip = devid;
++	uint16_t reg_val;
++	uint16_t mask;
++	int ret;
++
++	ret = pca953x_read_reg(chip, PCA953X_INPUT, &reg_val);
++	if (ret)
++		return IRQ_HANDLED;
++
++	reg_val &= (chip->int_mask & chip->reg_direction);
++	mask = reg_val ^ chip->int_prev_input;
++
++	if (mask) {
++		chip->int_prev_input = reg_val;
++		chip->interrupt(reg_val, mask, chip->context);
++	}
++
++	return IRQ_HANDLED;
++}
++
  /*
-  * We override the standard dma-mask routines for bouncing.
-diff --git a/arch/arm/mach-ixp4xx/include/mach/io.h b/arch/arm/mach-ixp4xx/include/mach/io.h
-index c86381b..6547a29 100644
---- a/arch/arm/mach-ixp4xx/include/mach/io.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/io.h
-@@ -26,22 +26,20 @@ extern int ixp4xx_pci_write(u32 addr, u32 cmd, u32 data);
- /*
-  * IXP4xx provides two methods of accessing PCI memory space:
-  *
-- * 1) A direct mapped window from 0x48000000 to 0x4bffffff (64MB).
-+ * 1) A direct mapped window from 0x48000000 to 0x4BFFFFFF (64MB).
-  *    To access PCI via this space, we simply ioremap() the BAR
-  *    into the kernel and we can use the standard read[bwl]/write[bwl]
-  *    macros. This is the preffered method due to speed but it
-  *    limits the system to just 64MB of PCI memory. This can be 
-- *    problamatic if using video cards and other memory-heavy
-- *    targets.
-- *
-- * 2) If > 64MB of memory space is required, the IXP4xx can be configured
-- *    to use indirect registers to access PCI (as we do below for I/O
-- *    transactions). This allows for up to 128MB (0x48000000 to 0x4fffffff)
-- *    of memory on the bus. The disadvantage of this is that every 
-- *    PCI access requires three local register accesses plus a spinlock,
-- *    but in some cases the performance hit is acceptable. In addition,
-- *    you cannot mmap() PCI devices in this case.
-+ *    problematic if using video cards and other memory-heavy targets.
-  *
-+ * 2) If > 64MB of memory space is required, the IXP4xx can use indirect
-+ *    registers to access the whole 4 GB of PCI memory space (as we do below
-+ *    for I/O transactions). This allows currently for up to 1 GB (0x10000000
-+ *    to 0x4FFFFFFF) of memory on the bus. The disadvantage of this is that
-+ *    every PCI access requires three local register accesses plus a spinlock,
-+ *    but in some cases the performance hit is acceptable. In addition, you
-+ *    cannot mmap() PCI devices in this case.
+  * Handlers for alternative sources of platform_data
   */
- #ifndef	CONFIG_IXP4XX_INDIRECT_PCI
+@@ -286,7 +324,7 @@ static int __devinit pca953x_probe(struct i2c_client *client,
+ 	/* initialize cached registers from their original values.
+ 	 * we can't share this chip with another i2c master.
+ 	 */
+-	pca953x_setup_gpio(chip, id->driver_data);
++	pca953x_setup_gpio(chip, id->driver_data & PCA953X_GPIOS);
  
+ 	ret = pca953x_read_reg(chip, PCA953X_OUTPUT, &chip->reg_output);
+ 	if (ret)
+@@ -301,10 +339,39 @@ static int __devinit pca953x_probe(struct i2c_client *client,
+ 	if (ret)
+ 		goto out_failed;
+ 
++	if (pdata->interrupt && (id->driver_data & PCA953X_INT)) {
++		ret = pca953x_read_reg(chip, PCA953X_INPUT,
++				       &chip->int_prev_input);
++		if (ret)
++			goto out_failed;
++
++		chip->interrupt = pdata->interrupt;
++		chip->int_mask = pdata->mask;
++
++		/*
++		 * There is no way to know which GPIO line generated the
++		 * interrupt.  We have to rely on the previous read for
++		 * this purpose.
++		 */
++		chip->int_prev_input &= chip->int_mask & chip->reg_direction;
++
++		ret = request_threaded_irq(client->irq,
++					   pca953x_irq_quick_handler,
++					   pca953x_irq_handler, 0,
++					   dev_name(&client->dev), chip);
++		if (ret) {
++			dev_err(&client->dev, "failed to request irq %d\n",
++				client->irq);
++			goto out_failed;
++		}
++	}
+ 
+ 	ret = gpiochip_add(&chip->gpio_chip);
+-	if (ret)
++	if (ret) {
++		if (pdata->interrupt)
++			free_irq(client->irq, chip);
+ 		goto out_failed;
++	}
+ 
+ 	if (pdata->setup) {
+ 		ret = pdata->setup(client, chip->gpio_chip.base,
+@@ -345,6 +412,9 @@ static int pca953x_remove(struct i2c_client *client)
+ 		return ret;
+ 	}
+ 
++	if (chip->interrupt)
++		free_irq(client->irq, chip);
++
+ 	kfree(chip->dyn_pdata);
+ 	kfree(chip);
+ 	return 0;
+diff --git a/include/linux/i2c/pca953x.h b/include/linux/i2c/pca953x.h
+index 81736d6..1e787c0 100644
+--- a/include/linux/i2c/pca953x.h
++++ b/include/linux/i2c/pca953x.h
+@@ -7,7 +7,10 @@ struct pca953x_platform_data {
+ 	/* initial polarity inversion setting */
+ 	uint16_t	invert;
+ 
+-	void		*context;	/* param to setup/teardown */
++	/* input bitmask to trigger the interrupt callback */
++	uint16_t	mask;
++
++	void		*context;	/* param to setup/teardown/interrupt */
+ 
+ 	int		(*setup)(struct i2c_client *client,
+ 				unsigned gpio, unsigned ngpio,
+@@ -15,5 +18,7 @@ struct pca953x_platform_data {
+ 	int		(*teardown)(struct i2c_client *client,
+ 				unsigned gpio, unsigned ngpio,
+ 				void *context);
++	void		(*interrupt)(uint16_t val, uint16_t mask,
++				void *context);
+ 	char		**names;
+ };
+-- 
+1.6.0.4
+
+
 
 -- 
-Krzysztof Halasa
+I'm the slime oozin' out from your TV set...
