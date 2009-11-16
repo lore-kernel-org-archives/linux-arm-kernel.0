@@ -1,29 +1,26 @@
-From: dk-arm-linux@gmx.de (Dieter Kiermaier)
-Date: Mon, 16 Nov 2009 10:32:02 +0100
-Subject: ARM kirkwood: how to run kirkwood_pcie_init() from kernel module
-Message-ID: <200911161032.02873.dk-arm-linux@gmx.de>
+From: niej0001@gmail.com (Jun Nie)
+Date: Mon, 16 Nov 2009 17:33:58 +0800
+Subject: [PATCH 0/8] enable pxa168 LCD on two platform
+Message-ID: <7c34ac520911160133i47cfe4ectdcf8004204b51b3e@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+This the v3 of the serial patches, it add LCD controller SPI support
+and enable frame
+buffer on two platform. Several small fix are included. Comments from
+Russell and Eric are merged. Thank you!
 
-sorry for disturbing and also sorry for my - maybe strange - question ;)
 
-I've got the following problem:
-
-I want to boot my fpga before I start the pci layer.
-To achieve this it is necessary to start the pci layer somewhat after flashing my fpga.
-
-So what I need is to run kirkwood_pcie_init() from inside my (flashing) driver.
-Do you know a way how to realize this?
-
-The header common.h isn't meant to include it from anywhere else than from kirkwood *_setup.c files, right?
-
-Is it possible to do a EXPORT_SYMBOL(kirkwood_pcie_init) somehow?
-
-I've tried it allready but get linker warnings and function isn't called...
-
-Do you have an idea how I can do that?
-
-Many many thanks in advance,
-Dieter
+ arch/arm/configs/pxa168_defconfig       |   86 ++++++++++++++-
+ arch/arm/configs/pxa910_defconfig       |   39 +++++++-
+ arch/arm/mach-mmp/aspenite.c            |  182 +++++++++++++++++++++++++++++++
+ arch/arm/mach-mmp/include/mach/pxa168.h |    8 ++
+ arch/arm/mach-mmp/include/mach/pxa910.h |    8 ++
+ arch/arm/mach-mmp/pxa168.c              |    3 +
+ arch/arm/mach-mmp/pxa910.c              |    4 +
+ arch/arm/mach-mmp/ttc_dkb.c             |  144 ++++++++++++++++++++++++
+ drivers/gpio/pca953x.c                  |    1 +
+ drivers/video/pxa168fb.c                |  105 ++++++++++++++++++
+ drivers/video/pxa168fb.h                |   24 +----
+ include/video/pxa168fb.h                |   52 +++++++++-
+ 12 files changed, 628 insertions(+), 28 deletions(-)
