@@ -1,85 +1,37 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 16 Nov 2009 06:36:55 -0700
-Subject: [PATCH 3/3] OMAP clock/hwmod: fix off-by-one errors
+Date: Mon, 16 Nov 2009 06:36:54 -0700
+Subject: [PATCH 2/3] OMAP3: Clock: Fixed dpll3_m2x2 rate calculation
 In-Reply-To: <20091116133237.14128.39687.stgit@localhost.localdomain>
 References: <20091116133237.14128.39687.stgit@localhost.localdomain>
-Message-ID: <20091116133654.14128.175.stgit@localhost.localdomain>
+Message-ID: <20091116133653.14128.48304.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix loop bailout off-by-one bugs reported by Juha Lepp?nen
-<juha_motorsportcom@luukku.com>.
+From: Tero Kristo <tero.kristo@nokia.com>
 
+Current calculation does not take into account any changes to M2 divisor, and
+thus when we change VDD2 OPP, dpll3_m2x2 rate does not change. Fixed by
+re-routing dpll3_m2x2 parent to dpll3_m2.
+
+Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Juha Lepp?nen <juha_motorsportcom@luukku.com>
 ---
- arch/arm/mach-omap2/cm.c         |    2 +-
- arch/arm/mach-omap2/omap_hwmod.c |   12 +++++-------
- arch/arm/mach-omap2/prcm.c       |    4 ++--
- 3 files changed, 8 insertions(+), 10 deletions(-)
+ arch/arm/mach-omap2/clock34xx.h |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cm.c b/arch/arm/mach-omap2/cm.c
-index 8eb2dab..0766e52 100644
---- a/arch/arm/mach-omap2/cm.c
-+++ b/arch/arm/mach-omap2/cm.c
-@@ -65,6 +65,6 @@ int omap2_cm_wait_module_ready(s16 prcm_mod, u8 idlest_id, u8 idlest_shift)
- 	       (i++ < MAX_MODULE_READY_TIME))
- 		udelay(1);
- 
--	return (i < MAX_MODULE_READY_TIME) ? 0 : -EBUSY;
-+	return (i <= MAX_MODULE_READY_TIME) ? 0 : -EBUSY;
- }
- 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 633b216..a4a9518 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -759,14 +759,12 @@ static int _reset(struct omap_hwmod *oh)
- 	_write_sysconfig(v, oh);
- 
- 	c = 0;
--	while (c < MAX_MODULE_RESET_WAIT &&
--	       !(omap_hwmod_readl(oh, oh->sysconfig->syss_offs) &
--		 SYSS_RESETDONE_MASK)) {
-+	while (!(omap_hwmod_readl(oh, oh->sysconfig->syss_offs) &
-+		 SYSS_RESETDONE_MASK) &&
-+	       (c++ < MAX_MODULE_RESET_WAIT))
- 		udelay(1);
--		c++;
--	}
- 
--	if (c == MAX_MODULE_RESET_WAIT)
-+	if (c > MAX_MODULE_RESET_WAIT)
- 		WARN(1, "omap_hwmod: %s: failed to reset in %d usec\n",
- 		     oh->name, MAX_MODULE_RESET_WAIT);
- 	else
-@@ -777,7 +775,7 @@ static int _reset(struct omap_hwmod *oh)
- 	 * _wait_target_ready() or _reset()
- 	 */
- 
--	return (c == MAX_MODULE_RESET_WAIT) ? -ETIMEDOUT : 0;
-+	return (c > MAX_MODULE_RESET_WAIT) ? -ETIMEDOUT : 0;
- }
- 
- /**
-diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
-index 029d376..d486709 100644
---- a/arch/arm/mach-omap2/prcm.c
-+++ b/arch/arm/mach-omap2/prcm.c
-@@ -251,14 +251,14 @@ int omap2_cm_wait_idlest(void __iomem *reg, u32 mask, const char *name)
- 	       (i++ < MAX_MODULE_ENABLE_WAIT))
- 		udelay(1);
- 
--	if (i < MAX_MODULE_ENABLE_WAIT)
-+	if (i <= MAX_MODULE_ENABLE_WAIT)
- 		pr_debug("cm: Module associated with clock %s ready after %d "
- 			 "loops\n", name, i);
- 	else
- 		pr_err("cm: Module associated with clock %s didn't enable in "
- 		       "%d tries\n", name, MAX_MODULE_ENABLE_WAIT);
- 
--	return (i < MAX_MODULE_ENABLE_WAIT) ? 1 : 0;
-+	return (i <= MAX_MODULE_ENABLE_WAIT) ? 1 : 0;
+diff --git a/arch/arm/mach-omap2/clock34xx.h b/arch/arm/mach-omap2/clock34xx.h
+index a1b3de7..8fe1bcb 100644
+--- a/arch/arm/mach-omap2/clock34xx.h
++++ b/arch/arm/mach-omap2/clock34xx.h
+@@ -489,9 +489,9 @@ static struct clk core_ck = {
+ static struct clk dpll3_m2x2_ck = {
+ 	.name		= "dpll3_m2x2_ck",
+ 	.ops		= &clkops_null,
+-	.parent		= &dpll3_x2_ck,
++	.parent		= &dpll3_m2_ck,
+ 	.clkdm_name	= "dpll3_clkdm",
+-	.recalc		= &followparent_recalc,
++	.recalc		= &omap3_clkoutx2_recalc,
  };
  
- void __init omap2_set_globals_prcm(struct omap_globals *omap2_globals)
+ /* The PWRDN bit is apparently only available on 3430ES2 and above */
