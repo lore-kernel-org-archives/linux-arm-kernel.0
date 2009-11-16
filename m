@@ -1,42 +1,40 @@
-From: abhijeet.tripathy@yahoo.co.in (abhijeet tripathi)
-Date: Mon, 16 Nov 2009 20:49:36 +0530 (IST)
-Subject: kernel panic - Attempted to kill init
-In-Reply-To: <4B012FD3.7000907@who-ing.de>
-Message-ID: <174721.58417.qm@web7607.mail.in.yahoo.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 16 Nov 2009 16:30:51 +0100
+Subject: [GIT PULL] AT91 Kconfig rework
+Message-ID: <4B01702B.4080107@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks to all for the suggestions. It helped me to resolve the issue.
-I was missing EABI support in my kernel.
+Hi Russell,
 
---regards,
-Abhijeet
+This is AT91 Kconfig rework for next merge window. After 
+discussing it on the mailing-list and Ack by Andrew Victor, I 
+send you this patchset. You can pull it from:
 
---- On Mon, 16/11/09, Sebastian Heutling <heutling@who-ing.de> wrote:
+  git://github.com/at91linux/linux-2.6-at91.git for-rmk
 
-> From: Sebastian Heutling <heutling@who-ing.de>
-> Subject: Re: kernel panic - Attempted to kill init
-> To: "abhijeet tripathi" <abhijeet.tripathy@yahoo.co.in>
-> Cc: "linux-arm-kernel at lists.infradead.org" <linux-arm-kernel@lists.infradead.org>, "gmshastri at gmail.com" <gmshastri@gmail.com>, "abhijeet" <abhijeet.tripathy@gmail.com>, "mayur.nan at gmail.com" <mayur.nan@gmail.com>
-> Date: Monday, 16 November, 2009, 4:26 PM
-> On 11/16/2009 08:29 AM, abhijeet
-> tripathi wrote:
-> > Hello,
-> >
-> > I am trying to do a nfs booting of arm-pb1176 but I am
-> getting kernel panic "Kernel panic - not syncing: Attempted
-> to kill init!".
-> > I checked my filesystem and it has "/sbin/init".
-> Please let me know if I am missing anything. Below is the
-> console logs:
-> 
-> Might be that some shared libraries which "/sbin/init"
-> depends on are 
-> missing.
-> 
-> Basti
-> 
-> 
+And you will receive:
 
+Jean-Christophe PLAGNIOL-VILLARD (2):
+      at91: remove not needed depends on
+      at91: Kconfig simplification
 
-      The INTERNET now has a personality. YOURS! See your Yahoo! Homepage. http://in.yahoo.com/
+Nicolas Ferre (2):
+      at91: at91sam9g20ek modify dual slot evaluation kit
+      atmel_lcdfb Kconfig: remove long dependency line
+
+ arch/arm/mach-at91/Kconfig                     |  107 ++++++++++++++----------
+ arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c |   23 ++++--
+ arch/avr32/Kconfig                             |    1 +
+ drivers/video/Kconfig                          |    5 +-
+ 4 files changed, 83 insertions(+), 53 deletions(-)
+
+The patch
+"at91: at91sam9g20ek modify dual slot evaluation kit"
+is also already sent directly to Linus for .32-final (not 
+sure it can reach). Anyway, I guess that git can handle 
+that...
+
+Thanks. Best regards,
+-- 
+Nicolas Ferre
