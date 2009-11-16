@@ -1,8 +1,7 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 16 Nov 2009 21:34:55 +0100
-Subject: [PATCH 12/25] imx: copy constants from mx2x.h to mx21.h using the
-	appropriate namespace
-In-Reply-To: <1258403708-10287-11-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Mon, 16 Nov 2009 21:34:52 +0100
+Subject: [PATCH 09/25] imx: add namespace prefixes for symbols in mx31.h
+In-Reply-To: <1258403708-10287-8-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <20091116203406.GA6546@pengutronix.de>
 	<1258403708-10287-1-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1258403708-10287-2-git-send-email-u.kleine-koenig@pengutronix.de>
@@ -12,164 +11,128 @@ References: <20091116203406.GA6546@pengutronix.de>
 	<1258403708-10287-6-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1258403708-10287-7-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1258403708-10287-8-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-9-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-10-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-11-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1258403708-10287-12-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1258403708-10287-9-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The old names are still defined using the new names.
+
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/plat-mxc/include/mach/mx21.h |  114 ++++++++++++++++++++++++++++++++-
- 1 files changed, 113 insertions(+), 1 deletions(-)
+ arch/arm/plat-mxc/include/mach/mx31.h |   94 +++++++++++++++++++++-----------
+ 1 files changed, 62 insertions(+), 32 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/mx21.h b/arch/arm/plat-mxc/include/mach/mx21.h
-index 986f08b..bb297d8 100644
---- a/arch/arm/plat-mxc/include/mach/mx21.h
-+++ b/arch/arm/plat-mxc/include/mach/mx21.h
-@@ -25,6 +25,49 @@
- #ifndef __ASM_ARCH_MXC_MX21_H__
- #define __ASM_ARCH_MXC_MX21_H__
+diff --git a/arch/arm/plat-mxc/include/mach/mx31.h b/arch/arm/plat-mxc/include/mach/mx31.h
+index 14ac0dc..a4d6901 100644
+--- a/arch/arm/plat-mxc/include/mach/mx31.h
++++ b/arch/arm/plat-mxc/include/mach/mx31.h
+@@ -1,45 +1,75 @@
+ /*
+  * IRAM
+  */
+-#define MX31_IRAM_BASE_ADDR		0x1FFC0000	/* internal ram */
++#define MX31_IRAM_BASE_ADDR		0x1ffc0000	/* internal ram */
+ #define MX31_IRAM_SIZE			SZ_16K
  
-+#define MX21_AIPI_BASE_ADDR		0x10000000
-+#define MX21_AIPI_BASE_ADDR_VIRT	0xf4000000
-+#define MX21_AIPI_SIZE			SZ_1M
-+#define MX21_DMA_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x01000)
-+#define MX21_WDOG_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x02000)
-+#define MX21_GPT1_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x03000)
-+#define MX21_GPT2_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x04000)
-+#define MX21_GPT3_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x05000)
-+#define MX21_PWM_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x06000)
-+#define MX21_RTC_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x07000)
-+#define MX21_KPP_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x08000)
-+#define MX21_OWIRE_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x09000)
-+#define MX21_UART1_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x0a000)
-+#define MX21_UART2_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x0b000)
-+#define MX21_UART3_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x0c000)
-+#define MX21_UART4_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x0d000)
-+#define MX21_CSPI1_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x0e000)
-+#define MX21_CSPI2_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x0f000)
-+#define MX21_SSI1_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x10000)
-+#define MX21_SSI2_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x11000)
-+#define MX21_I2C_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x12000)
-+#define MX21_SDHC1_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x13000)
-+#define MX21_SDHC2_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x14000)
-+#define MX21_GPIO_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x15000)
-+#define MX21_AUDMUX_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x16000)
-+#define MX21_CSPI3_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x17000)
-+#define MX21_LCDC_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x21000)
-+#define MX21_SLCDC_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x22000)
-+#define MX21_USBOTG_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x24000)
-+#define MX21_EMMA_PP_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x26000)
-+#define MX21_EMMA_PRP_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x26400)
-+#define MX21_CCM_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x27000)
-+#define MX21_SYSCTRL_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x27800)
-+#define MX21_JAM_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x3e000)
-+#define MX21_MAX_BASE_ADDR			(MX21_AIPI_BASE_ADDR + 0x3f000)
-+
-+#define MX21_AVIC_BASE_ADDR		0x10040000
-+
-+#define MX21_SAHB1_BASE_ADDR		0x80000000
-+#define MX21_SAHB1_BASE_ADDR_VIRT	0xf4100000
-+#define MX21_SAHB1_SIZE			SZ_1M
-+#define MX21_CSI_BASE_ADDR			(MX2x_SAHB1_BASE_ADDR + 0x0000)
-+
- /* Memory regions and CS */
- #define MX21_SDRAM_BASE_ADDR		0xc0000000
- #define MX21_CSD1_BASE_ADDR		0xc4000000
-@@ -50,22 +93,91 @@
- #define MX21_IRAM_BASE_ADDR		0xffffe800	/* internal ram */
+-#define MX31_OTG_BASE_ADDR	(AIPS1_BASE_ADDR + 0x00088000)
+-#define ATA_BASE_ADDR		(AIPS1_BASE_ADDR + 0x0008C000)
+-#define UART4_BASE_ADDR 	(AIPS1_BASE_ADDR + 0x000B0000)
+-#define UART5_BASE_ADDR 	(AIPS1_BASE_ADDR + 0x000B4000)
++#define MX31_OTG_BASE_ADDR			(MX3x_AIPS1_BASE_ADDR + 0x88000)
++#define MX31_ATA_BASE_ADDR			(MX3x_AIPS1_BASE_ADDR + 0x8c000)
++#define MX31_UART4_BASE_ADDR			(MX3x_AIPS1_BASE_ADDR + 0xb0000)
++#define MX31_UART5_BASE_ADDR			(MX3x_AIPS1_BASE_ADDR + 0xb4000)
  
- /* fixed interrupt numbers */
-+#define MX21_INT_CSPI3		6
-+#define MX21_INT_GPIO		8
- #define MX21_INT_FIRI		9
-+#define MX21_INT_SDHC2		10
-+#define MX21_INT_SDHC1		11
-+#define MX21_INT_I2C		12
-+#define MX21_INT_SSI2		13
-+#define MX21_INT_SSI1		14
-+#define MX21_INT_CSPI2		15
-+#define MX21_INT_CSPI1		16
-+#define MX21_INT_UART4		17
-+#define MX21_INT_UART3		18
-+#define MX21_INT_UART2		19
-+#define MX21_INT_UART1		20
-+#define MX21_INT_KPP		21
-+#define MX21_INT_RTC		22
-+#define MX21_INT_PWM		23
-+#define MX21_INT_GPT3		24
-+#define MX21_INT_GPT2		25
-+#define MX21_INT_GPT1		26
-+#define MX21_INT_WDOG		27
-+#define MX21_INT_PCMCIA		28
-+#define MX21_INT_NANDFC		29
- #define MX21_INT_BMI		30
-+#define MX21_INT_CSI		31
-+#define MX21_INT_DMACH0		32
-+#define MX21_INT_DMACH1		33
-+#define MX21_INT_DMACH2		34
-+#define MX21_INT_DMACH3		35
-+#define MX21_INT_DMACH4		36
-+#define MX21_INT_DMACH5		37
-+#define MX21_INT_DMACH6		38
-+#define MX21_INT_DMACH7		39
-+#define MX21_INT_DMACH8		40
-+#define MX21_INT_DMACH9		41
-+#define MX21_INT_DMACH10	42
-+#define MX21_INT_DMACH11	43
-+#define MX21_INT_DMACH12	44
-+#define MX21_INT_DMACH13	45
-+#define MX21_INT_DMACH14	46
-+#define MX21_INT_DMACH15	47
- #define MX21_INT_EMMAENC	49
- #define MX21_INT_EMMADEC	50
-+#define MX21_INT_EMMAPRP	51
-+#define MX21_INT_EMMAPP		52
- #define MX21_INT_USBWKUP	53
- #define MX21_INT_USBDMA		54
- #define MX21_INT_USBHOST	55
- #define MX21_INT_USBFUNC	56
- #define MX21_INT_USBMNP		57
- #define MX21_INT_USBCTRL	58
--#define MX21_INT_USBCTRL	58
-+#define MX21_INT_SLCDC		60
-+#define MX21_INT_LCDC		61
+-#define MMC_SDHC1_BASE_ADDR	(SPBA0_BASE_ADDR + 0x00004000)
+-#define MMC_SDHC2_BASE_ADDR	(SPBA0_BASE_ADDR + 0x00008000)
+-#define SIM1_BASE_ADDR		(SPBA0_BASE_ADDR + 0x00018000)
+-#define IIM_BASE_ADDR		(SPBA0_BASE_ADDR + 0x0001C000)
++#define MX31_MMC_SDHC1_BASE_ADDR		(MX3x_SPBA0_BASE_ADDR + 0x04000)
++#define MX31_MMC_SDHC2_BASE_ADDR		(MX3x_SPBA0_BASE_ADDR + 0x08000)
++#define MX31_SIM1_BASE_ADDR			(MX3x_SPBA0_BASE_ADDR + 0x18000)
++#define MX31_IIM_BASE_ADDR			(MX3x_SPBA0_BASE_ADDR + 0x1c000)
  
- /* fixed DMA request numbers */
-+#define MX21_DMA_REQ_CSPI3_RX	1
-+#define MX21_DMA_REQ_CSPI3_TX	2
-+#define MX21_DMA_REQ_EXT	3
- #define MX21_DMA_REQ_FIRI_RX	4
-+#define MX21_DMA_REQ_SDHC2	6
-+#define MX21_DMA_REQ_SDHC1	7
-+#define MX21_DMA_REQ_SSI2_RX0	8
-+#define MX21_DMA_REQ_SSI2_TX0	9
-+#define MX21_DMA_REQ_SSI2_RX1	10
-+#define MX21_DMA_REQ_SSI2_TX1	11
-+#define MX21_DMA_REQ_SSI1_RX0	12
-+#define MX21_DMA_REQ_SSI1_TX0	13
-+#define MX21_DMA_REQ_SSI1_RX1	14
-+#define MX21_DMA_REQ_SSI1_TX1	15
-+#define MX21_DMA_REQ_CSPI2_RX	16
-+#define MX21_DMA_REQ_CSPI2_TX	17
-+#define MX21_DMA_REQ_CSPI1_RX	18
-+#define MX21_DMA_REQ_CSPI1_TX	19
-+#define MX21_DMA_REQ_UART4_RX	20
-+#define MX21_DMA_REQ_UART4_TX	21
-+#define MX21_DMA_REQ_UART3_RX	22
-+#define MX21_DMA_REQ_UART3_TX	23
-+#define MX21_DMA_REQ_UART2_RX	24
-+#define MX21_DMA_REQ_UART2_TX	25
-+#define MX21_DMA_REQ_UART1_RX	26
-+#define MX21_DMA_REQ_UART1_TX	27
- #define MX21_DMA_REQ_BMI_TX	28
- #define MX21_DMA_REQ_BMI_RX	29
-+#define MX21_DMA_REQ_CSI_STAT	30
-+#define MX21_DMA_REQ_CSI_RX	31
+-#define CSPI3_BASE_ADDR		(AIPS2_BASE_ADDR + 0x00084000)
+-#define FIRI_BASE_ADDR		(AIPS2_BASE_ADDR + 0x0008C000)
+-#define SCM_BASE_ADDR		(AIPS2_BASE_ADDR + 0x000AE000)
+-#define SMN_BASE_ADDR		(AIPS2_BASE_ADDR + 0x000AF000)
+-#define MPEG4_ENC_BASE_ADDR	(AIPS2_BASE_ADDR + 0x000C8000)
++#define MX31_CSPI3_BASE_ADDR			(MX3x_AIPS2_BASE_ADDR + 0x84000)
++#define MX31_FIRI_BASE_ADDR			(MX3x_AIPS2_BASE_ADDR + 0x8c000)
++#define MX31_SCM_BASE_ADDR			(MX3x_AIPS2_BASE_ADDR + 0xae000)
++#define MX31_SMN_BASE_ADDR			(MX3x_AIPS2_BASE_ADDR + 0xaf000)
++#define MX31_MPEG4_ENC_BASE_ADDR		(MX3x_AIPS2_BASE_ADDR + 0xc8000)
  
- /* these should go away */
- #define SDRAM_BASE_ADDR MX21_SDRAM_BASE_ADDR
+-#define MX31_NFC_BASE_ADDR	(X_MEMC_BASE_ADDR + 0x0000)
++#define MX31_NFC_BASE_ADDR			(MX3x_X_MEMC_BASE_ADDR + 0x0000)
+ 
+-#define MXC_INT_MPEG4_ENCODER	5
+-#define MXC_INT_FIRI		7
++#define MX31_INT_MPEG4_ENCODER	5
++#define MX31_INT_FIRI		7
+ #define MX31_INT_MMC_SDHC2	8
+-#define MXC_INT_MMC_SDHC1	9
++#define MX31_INT_MMC_SDHC1	9
+ #define MX31_INT_SSI2		11
+ #define MX31_INT_SSI1		12
+-#define MXC_INT_MBX		16
+-#define MXC_INT_CSPI3		17
+-#define MXC_INT_SIM2		20
+-#define MXC_INT_SIM1		21
+-#define MXC_INT_CCM_DVFS	31
+-#define MXC_INT_USB1		35
+-#define MXC_INT_USB2		36
+-#define MXC_INT_USB3		37
+-#define MXC_INT_USB4		38
+-#define MXC_INT_MSHC2		40
+-#define MXC_INT_UART4		46
+-#define MXC_INT_UART5		47
+-#define MXC_INT_CCM		53
+-#define MXC_INT_PCMCIA		54
++#define MX31_INT_MBX		16
++#define MX31_INT_CSPI3		17
++#define MX31_INT_SIM2		20
++#define MX31_INT_SIM1		21
++#define MX31_INT_CCM_DVFS	31
++#define MX31_INT_USB1		35
++#define MX31_INT_USB2		36
++#define MX31_INT_USB3		37
++#define MX31_INT_USB4		38
++#define MX31_INT_MSHC2		40
++#define MX31_INT_UART4		46
++#define MX31_INT_UART5		47
++#define MX31_INT_CCM		53
++#define MX31_INT_PCMCIA		54
+ 
++/* these should go away */
++#define ATA_BASE_ADDR MX31_ATA_BASE_ADDR
++#define UART4_BASE_ADDR MX31_UART4_BASE_ADDR
++#define UART5_BASE_ADDR MX31_UART5_BASE_ADDR
++#define MMC_SDHC1_BASE_ADDR MX31_MMC_SDHC1_BASE_ADDR
++#define MMC_SDHC2_BASE_ADDR MX31_MMC_SDHC2_BASE_ADDR
++#define SIM1_BASE_ADDR MX31_SIM1_BASE_ADDR
++#define IIM_BASE_ADDR MX31_IIM_BASE_ADDR
++#define CSPI3_BASE_ADDR MX31_CSPI3_BASE_ADDR
++#define FIRI_BASE_ADDR MX31_FIRI_BASE_ADDR
++#define SCM_BASE_ADDR MX31_SCM_BASE_ADDR
++#define SMN_BASE_ADDR MX31_SMN_BASE_ADDR
++#define MPEG4_ENC_BASE_ADDR MX31_MPEG4_ENC_BASE_ADDR
++#define MXC_INT_MPEG4_ENCODER MX31_INT_MPEG4_ENCODER
++#define MXC_INT_FIRI MX31_INT_FIRI
++#define MXC_INT_MMC_SDHC1 MX31_INT_MMC_SDHC1
++#define MXC_INT_MBX MX31_INT_MBX
++#define MXC_INT_CSPI3 MX31_INT_CSPI3
++#define MXC_INT_SIM2 MX31_INT_SIM2
++#define MXC_INT_SIM1 MX31_INT_SIM1
++#define MXC_INT_CCM_DVFS MX31_INT_CCM_DVFS
++#define MXC_INT_USB1 MX31_INT_USB1
++#define MXC_INT_USB2 MX31_INT_USB2
++#define MXC_INT_USB3 MX31_INT_USB3
++#define MXC_INT_USB4 MX31_INT_USB4
++#define MXC_INT_MSHC2 MX31_INT_MSHC2
++#define MXC_INT_UART4 MX31_INT_UART4
++#define MXC_INT_UART5 MX31_INT_UART5
++#define MXC_INT_CCM MX31_INT_CCM
++#define MXC_INT_PCMCIA MX31_INT_PCMCIA
 -- 
 1.6.5.2
