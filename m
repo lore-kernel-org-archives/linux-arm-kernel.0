@@ -1,38 +1,39 @@
 From: niej0001@gmail.com (Jun Nie)
-Date: Mon, 16 Nov 2009 17:34:32 +0800
-Subject: [PATCH 3/8] pxa: fix offset setting at initialization
-Message-ID: <7c34ac520911160134t3e378b28q45c2a662fabfb8d0@mail.gmail.com>
+Date: Mon, 16 Nov 2009 17:34:39 +0800
+Subject: [PATCH 4/8] pxa: delete redundant vsync/hsync revert flag
+Message-ID: <7c34ac520911160134r736e78cfh1d968fcf1d70e123@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jun Nie <njun@marvell.com>
-Date: Tue, 10 Nov 2009 09:33:49 +0800
-Subject: [PATCH] pxa: fix offset setting at initialization
+Date: Tue, 10 Nov 2009 15:11:36 +0800
+Subject: [PATCH] pxa: delete redundant vsync/hsync revert flag
+var.sync can cover its function
 
 Signed-off-by: Jun Nie <njun@marvell.com>
 ---
- drivers/video/pxa168fb.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ include/video/pxa168fb.h |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
-index e728be3..6283c16 100644
---- a/drivers/video/pxa168fb.c
-+++ b/drivers/video/pxa168fb.c
-@@ -765,6 +765,7 @@ static int __init pxa168fb_probe(struct
-platform_device *pdev)
- 	}
-
- 	info->fix.smem_start = (unsigned long)fbi->fb_start_dma;
-+	set_graphics_start(info, 0, 0);
-
- 	/*
- 	 * Set video mode according to platform data.
+diff --git a/include/video/pxa168fb.h b/include/video/pxa168fb.h
+index 01c18bc..53919fe 100644
+--- a/include/video/pxa168fb.h
++++ b/include/video/pxa168fb.h
+@@ -143,8 +143,6 @@ struct pxa168fb_mach_info {
+ 	unsigned	invert_composite_blank:1;
+ 	unsigned	invert_pix_val_ena:1;
+ 	unsigned	invert_pixclock:1;
+-	unsigned	invert_vsync:1;
+-	unsigned	invert_hsync:1;
+ 	unsigned	panel_rbswap:1;
+ 	unsigned	active:1;
+ 	unsigned	enable_lcd:1;
 -- 
 1.5.4.3
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: 0003-pxa-fix-offset-setting-at-initialization.patch
+Name: 0004-pxa-delete-redundant-vsync-hsync-revert-flag-var.sy.patch
 Type: text/x-diff
-Size: 740 bytes
+Size: 815 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091116/4a5e4c00/attachment.bin>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091116/411d5f4f/attachment.bin>
