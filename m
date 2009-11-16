@@ -1,16 +1,39 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 17 Nov 2009 00:44:34 +0800
-Subject: [PATCH] Convert viper to use plat_serial8250_port irqflags field
-In-Reply-To: <20091114155314.59674efb@taxman.wild-wind.fr.eu.org>
-References: <20091114155314.59674efb@taxman.wild-wind.fr.eu.org>
-Message-ID: <f17812d70911160844s3e88ef1fo4c848cce0628f9d7@mail.gmail.com>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Mon, 16 Nov 2009 17:56:26 +0100
+Subject: [PATCH 0/2] Support for the Arcom Zeus SBC, #2
+In-Reply-To: <f17812d70911160838s91f3b74w4cac9e78edb9fa46@mail.gmail.com>
+References: <20091114182925.17eb58ea@taxman.wild-wind.fr.eu.org>
+	<f17812d70911160838s91f3b74w4cac9e78edb9fa46@mail.gmail.com>
+Message-ID: <20091116175626.3a80983e@life-in-the-fast-lane>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 14, 2009 at 10:53 PM, Marc Zyngier <maz@misterjones.org> wrote:
-> Use .irqflags in the plat_serial8250_port structure to set IRQ
-> polarity, and get rid of the corresponding set_irq_type().
->
-> Signed-off-by: Marc Zyngier <maz@misterjones.org>
+On Tue, 17 Nov 2009 00:38:53 +0800
+Eric Miao <eric.y.miao@gmail.com> wrote:
 
-Applied to 'devel'. Thanks.
+> On Sun, Nov 15, 2009 at 1:29 AM, Marc Zyngier <maz@misterjones.org>
+> wrote:
+> > The Arcom Zeus is a pxa270 board with a PC104 bus, vaguely similar
+> > to the Arcom Viper. The following patches adds support for most of
+> > the on-board devices (though sound and CAN are still missing).
+> >
+> > Patches are against PXA devel branch. Please note that they depend
+> > on the following patch, currently queued in Eric's fix branch:
+> > http://git.kernel.org/?p=linux/kernel/git/ycmiao/pxa-linux-2.6.git;a=commit;h=b2b36316626f0d6b92c3675a2aa2726efc71d146
+> >
+> > The defconfig patch has been already posted before, and can be
+> > found in the archives at the following address:
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2009-November/004014.html
+> >
+> > This work started from Arcom's 2.6.16, but all bugs are of course
+> > mine.
+> 
+> Marc,
+> 
+> What's the difference of this #2 from #1 you posted earlier?
+
+#1 is based on 2.6.32-rc7. #2 is based on your PXA devel branch.
+
+	M.
+-- 
+Fast. Cheap. Reliable. Pick two.
