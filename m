@@ -1,41 +1,61 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 16 Nov 2009 06:36:53 -0700
-Subject: [PATCH 1/3] OMAP3 clock: Fix the DPLL freqsel computations
-In-Reply-To: <20091116133237.14128.39687.stgit@localhost.localdomain>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Nov 2009 14:08:30 +0000
+Subject: [PATCH 3/3] OMAP clock/hwmod: fix off-by-one errors
+In-Reply-To: <20091116133654.14128.175.stgit@localhost.localdomain>
 References: <20091116133237.14128.39687.stgit@localhost.localdomain>
-Message-ID: <20091116133649.14128.89383.stgit@localhost.localdomain>
+	<20091116133654.14128.175.stgit@localhost.localdomain>
+Message-ID: <20091116140830.GA31522@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@ti.com>
+On Mon, Nov 16, 2009 at 06:36:55AM -0700, Paul Walmsley wrote:
+> Fix loop bailout off-by-one bugs reported by Juha Lepp?nen
+> <juha_motorsportcom@luukku.com>.
 
-Fix the freqsel value computation. Use n instead of (n+1)
+I'm not sure the new code is any easier to read than the old code.
+And what with some checks post-loop being <= and others being >, it's
+a recipe for cut'n'paste errors happening.
 
-The formula in the TRM uses a zero-based N, hence the (n+1); however
-at this point in the clock34xx.c code, N is one-based.
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 633b216..a4a9518 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -759,14 +759,12 @@ static int _reset(struct omap_hwmod *oh)
+>  	_write_sysconfig(v, oh);
+>  
+>  	c = 0;
+> -	while (c < MAX_MODULE_RESET_WAIT &&
+> -	       !(omap_hwmod_readl(oh, oh->sysconfig->syss_offs) &
+> -		 SYSS_RESETDONE_MASK)) {
+> +	while (!(omap_hwmod_readl(oh, oh->sysconfig->syss_offs) &
+> +		 SYSS_RESETDONE_MASK) &&
+> +	       (c++ < MAX_MODULE_RESET_WAIT))
+>  		udelay(1);
+> -		c++;
+> -	}
+>  
+> -	if (c == MAX_MODULE_RESET_WAIT)
+> +	if (c > MAX_MODULE_RESET_WAIT)
+>  		WARN(1, "omap_hwmod: %s: failed to reset in %d usec\n",
+>  		     oh->name, MAX_MODULE_RESET_WAIT);
+>  	else
 
-Hayati Bayrakdar <h-bayrakdar@ti.com> and Nishanth Menon <nm@ti.com> helped
-track down this bug.
+How about:
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-[paul at pwsan.com: modified commit message]
-Cc: Hayati Bayrakdar <h-bayrakdar@ti.com>
-Cc: Nishanth Menon <nm@ti.com>
----
- arch/arm/mach-omap2/clock34xx.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+	for (c = 0; c <= MAX_MODULE_RESET_WAIT; c++) {
+		if (omap_hwmod_readl(oh, oh->sysconfig->syss_offs) &
+		    SYSS_RESETDONE_MASK) {
+			pr_debug("omap_hwmod: %s: reset in %d usec\n",
+				oh->name, c);
+			return 0;
+		}
+	}
 
-diff --git a/arch/arm/mach-omap2/clock34xx.c b/arch/arm/mach-omap2/clock34xx.c
-index c258f87..225c1a7 100644
---- a/arch/arm/mach-omap2/clock34xx.c
-+++ b/arch/arm/mach-omap2/clock34xx.c
-@@ -473,7 +473,7 @@ static u16 _omap3_dpll_compute_freqsel(struct clk *clk, u8 n)
- 	unsigned long fint;
- 	u16 f = 0;
- 
--	fint = clk->dpll_data->clk_ref->rate / (n + 1);
-+	fint = clk->dpll_data->clk_ref->rate / n;
- 
- 	pr_debug("clock: fint is %lu\n", fint);
- 
+	WARN(1, "omap_hwmod: %s: failed to reset in %d usec\n",
+                     oh->name, c - 1);
+	return -ETIMEDOUT;
+
+?
+
+Even better would be to turn this into a helper much like wait_event(),
+which would stop silly mistakes happening.
