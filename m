@@ -1,62 +1,64 @@
-From: dirk.behme@googlemail.com (Dirk Behme)
-Date: Mon, 16 Nov 2009 12:06:08 +0100
-Subject: [RFC 10/11] ARM: arrange for flush_cache_range() to always	flush
-	the I-cache
-In-Reply-To: <1258368415.6705.20.camel@pc1117.cambridge.arm.com>
-References: <cover.1256683230.git.rmk+kernel@arm.linux.org.uk>	<12475bd20f82c3a5e78d5b8e9d3cb266914c4727.1256683230.git.rmk+kernel@arm.linux.org.uk>	<1256745098.27121.48.camel@pc1117.cambridge.arm.com>	<20091028173709.GC20040@n2100.arm.linux.org.uk>	<1256838661.6874.67.camel@pc1117.cambridge.arm.com>
-	<1258368415.6705.20.camel@pc1117.cambridge.arm.com>
-Message-ID: <4B013220.10307@googlemail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 16 Nov 2009 12:10:55 +0100
+Subject: [PATCH] Update Samsung S5PC100 SoC support
+In-Reply-To: <20091113235317.GY4808@trinity.fluff.org>
+References: <1258014122-18185-1-git-send-email-m.szyprowski@samsung.com>
+	<20091113235317.GY4808@trinity.fluff.org>
+Message-ID: <002101ca66ad$7a50a000$6ef1e000$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas wrote:
-> Russell,
+Hello,
+
+On Saturday, November 14, 2009 12:53 AM Ben Dooks wrote:
+ 
+> On Thu, Nov 12, 2009 at 09:21:44AM +0100, Marek Szyprowski wrote:
+> > Hello,
+> >
+> > This patch series updates Samsung S5PC100 SoC support. S5PC100 platform
+> > core has been extended with new clocks hierarchy implementation, gpio lib,
+> > support for external and gpio interrupts and some basics of power
+> > management (cpu idle and system reset). Also platform helpers for
+> > s3c framebuffer, i2c and hsmmc drivers has been added.
 > 
-> On Thu, 2009-10-29 at 17:51 +0000, Catalin Marinas wrote:
->> On Wed, 2009-10-28 at 17:37 +0000, Russell King - ARM Linux wrote:
->>>  I'm not entirely
->>> sure what's happening with the other half of the fix (the thread seemed
->>> to die before reaching any kind of conclusion) but this is the right
->>> solution for the I-cache side of the problem.
->> I listed a few solutions there but not many replies. Let's try to sort
->> it out in this thread (maybe people got bored and ignored the other
->> thread completely :-)).
-> [...]
->> Flush the D-cache during copy_user_highpage()
->>
->> From: Catalin Marinas <catalin.marinas@arm.com>
->>
->> The I and D caches for copy-on-write pages on processors with
->> write-allocate caches become incoherent causing problems on application
->> relying on CoW for text pages (dynamic linker relocating symbols in a
->> text page). This patch flushes the D-cache for such pages.
->>
->> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
->> ---
->>  arch/arm/mm/copypage-v6.c |    1 +
->>  1 files changed, 1 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mm/copypage-v6.c b/arch/arm/mm/copypage-v6.c
->> index 4127a7b..f19ed4e 100644
->> --- a/arch/arm/mm/copypage-v6.c
->> +++ b/arch/arm/mm/copypage-v6.c
->> @@ -41,6 +41,7 @@ static void v6_copy_user_highpage_nonaliasing(struct page *to,
->>  	kfrom = kmap_atomic(from, KM_USER0);
->>  	kto = kmap_atomic(to, KM_USER1);
->>  	copy_page(kto, kfrom);
->> +	__cpuc_flush_dcache_page(kto);
->>  	kunmap_atomic(kto, KM_USER1);
->>  	kunmap_atomic(kfrom, KM_USER0);
->>  }
+> As such, a new branch git://git.fluff.org/bjdooks/linux next-s5pc1xx
+> has been created. This branch hasn't yet been build tested, or had the
+> patches that failed to apply on them.
 > 
-> Any thoughts one getting this merged (maybe in 2.6.33)? It seems that
-> no-one else has any views on this but the COW text pages problem is
-> still present.
+> The following from the series still need fixups before applying due to
+> the missing FB updates:
+> 
+> Applying: ARM: S5PC1xx: add platform helpers for SDHCI host controllers
+> Applying: ARM: S5PC1xx: add platform helpers for i2c adapter devices
+> 
+> I'll look at fixing these up tomorrow if the FB items haven't been sorted
+> out.
+> 
+> The shortlog is:
+> 
+> Kyungmin Park (9):
+>       ARM: SMDKC100: enable S3C FrameBuffer
+>       ARM: S5PC1XX: registers rename
+>       ARM: S5PC1XX: clock registers rename
+>       ARM: S5PC1XX: clocks reimplementation
+>       ARM: S5PC1XX: add GPIO L banks to register definition
+>       ARM: S5PC1XX: GPIO registers rename
+>       ARM: S5PC1XX: add cpu idle and system reset support
+>       ARM: SMDKC100: add I2C0 and I2C1 buses support
+>       ARM: SMDKC100: add SDHCI controllers 0, 1 and 2 support
+> 
+> If there are any problems, please let me know as soon as possible, as I
+> will be looking to merge these into my main next branch in the next day or
+> so to begin the final stages of the device and clock reworks.
 
-Yes. ARM11MPCore still suffers from this issue. Please understand my 
-silence as "I can't help with the discussion about this" :( And not 
-"I'm not interested in it any more".
+This version does not compile without fb patches. I will send an updated
+version (with your last remarks addressed) of the whole patch series soon.
+Is there a chance you would accept that fb patch?
 
-Many thanks for all the work you spent with this,
+I'm really curious of the device and clock reworks. I hope you will manage
+to get it working soon and prepare a pre-release version.
 
-Dirk
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
