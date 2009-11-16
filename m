@@ -1,20 +1,45 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Mon, 16 Nov 2009 10:44:56 +0100
-Subject: kernel panic - Attempted to kill init
-In-Reply-To: <564715.9008.qm@web7604.mail.in.yahoo.com>
-References: <564715.9008.qm@web7604.mail.in.yahoo.com>
-Message-ID: <20091116094456.GF14091@buzzloop.caiaq.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 16 Nov 2009 10:34:54 +0000
+Subject: [GIT PULL] Patches for 2.6.33
+Message-ID: <1258367694.6705.16.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2009 at 12:59:34PM +0530, abhijeet tripathi wrote:
-> I am trying to do a nfs booting of arm-pb1176 but I am getting kernel panic "Kernel panic - not syncing: Attempted to kill init!".
-> I checked my filesystem and it has "/sbin/init". Please let me know if I am missing anything. Below is the console logs:
+Hi Russell,
 
-You should enable CONFIG_USER_DEBUG and pass user_debug=255 as kernel
-parameter. That will give a more verbose debug output.
+Since the last pull from my branch there were four additional patches
+discussed on the list. Would you consider pulling (any of) them for
+2.6.33?
 
-Most probably, the EABI/OABI settings in your kernel and user space
-environment don't match.
+Thanks.
 
-Daniel
+
+The following changes since commit c97c5aa83c41a532bc67da356d77da929bc41b9c:
+  Catalin Marinas (1):
+        RealView: Add sparsemem support for the RealView PBX platform
+
+are available in the git repository at:
+
+  git://linux-arm.org/linux-2.6.git for-rmk
+
+Catalin Marinas (3):
+      Fix the machine description printing in __error_a
+      Add an earlyprintk debug console
+      ARMv7: Use lazy cache flushing if hardware broadcasts cache operations
+
+Varun Swara (1):
+      Do not allow the probing of the local timer
+
+ arch/arm/Kconfig.debug          |    8 +++++
+ arch/arm/include/asm/smp_plat.h |    9 ++++++
+ arch/arm/kernel/Makefile        |    1 +
+ arch/arm/kernel/early_printk.c  |   57 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/head-common.S   |    2 +-
+ arch/arm/kernel/smp_twd.c       |    1 +
+ arch/arm/mm/fault-armv.c        |    2 -
+ arch/arm/mm/flush.c             |    9 +++---
+ 8 files changed, 81 insertions(+), 8 deletions(-)
+ create mode 100644 arch/arm/kernel/early_printk.c
+
+-- 
+Catalin
