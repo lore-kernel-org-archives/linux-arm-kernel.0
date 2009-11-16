@@ -1,47 +1,39 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Nov 2009 22:20:16 +0000
-Subject: cache aliasing in dup_mmap
-In-Reply-To: <e06498070911160923i2273b6aai6f144b36289203d2@mail.gmail.com>
-References: <20090308121029.GA21277@n2100.arm.linux.org.uk>
-	<20090308143607.GA27349@n2100.arm.linux.org.uk>
-	<e06498070909290925q55777041q6f3ecfaf9847babb@mail.gmail.com>
-	<e06498070909290930w7745e1e3x2e224ad75ff62dbd@mail.gmail.com>
-	<20090929191108.GA13568@n2100.arm.linux.org.uk>
-	<20091005144623.GA20633@n2100.arm.linux.org.uk>
-	<20091105144830.GC21681@n2100.arm.linux.org.uk>
-	<e06498070911130649k2051e4cfh2066cf0b9fdabbaf@mail.gmail.com>
-	<20091116163028.GA3568@n2100.arm.linux.org.uk>
-	<e06498070911160923i2273b6aai6f144b36289203d2@mail.gmail.com>
-Message-ID: <20091116222016.GF3568@n2100.arm.linux.org.uk>
+Date: Mon, 16 Nov 2009 22:32:37 +0000
+Subject: [PATCH 17/25] imx/eukrea_cpuimx27: use new nand device
+	registration
+In-Reply-To: <1258403708-10287-17-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1258403708-10287-8-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1258403708-10287-9-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1258403708-10287-10-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1258403708-10287-11-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1258403708-10287-12-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1258403708-10287-13-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1258403708-10287-14-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1258403708-10287-15-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1258403708-10287-16-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1258403708-10287-17-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20091116223237.GG3568@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2009 at 12:23:36PM -0500, Steven Walter wrote:
-> Yes, SIGSEGV after 88 boots, with a crash that we previously
-> identified as caused by this cache corruption issue.  Attached are the
-> patches I used, as manually backported to 2.6.18.5.  Stock 2.6.18.5
-> would reliably crash in under 1000 reboots, whereas  with my ad-hoc
-> fix (also attached) we were able to run 8000 reboots before we ended
-> the test.
+On Mon, Nov 16, 2009 at 09:35:00PM +0100, Uwe Kleine-K?nig wrote:
+>  static void __init eukrea_cpuimx27_init(void)
+>  {
+> +	struct mxc_nand_platform_data mxc_nand_pdata = {
+> +		.width = 1,
+> +		.hw_ecc = 1,
+> +	};
+> +
 
-I can see no reason for the difference between the two.  The backport
-looks fine.
+Have you checked what code the compiler spits out for this?
 
-The only difference I can see is:
+What the compiler will do is create a copy of the structure data in the
+read-only data section.  It will allocate space on the stack, and memcpy
+from that read-only version to the stack version.  It will then use the
+stacked version for mxc_nand_data.
 
-- version which works
+This saves nothing - the data remains in-core.
 
-> diff --git a/src/mm/memory.c b/src/mm/memory.c
-> index 0b7a668..d0bc8c1 100644
-
-- version which doesn't
-
-> diff --git a/src/mm/memory.c b/src/mm/memory.c
-> index f508c60..69d8d32 100644
-
-That first index number gives the sha1 hash of the git object storing
-this file.  Since they're different, these two patches weren't applied
-to the same file.
-
-Could there be other changes in your tree which could be affecting the
-behaviour in this area?
+What you want to do is to keep the original definition, and mark it with
+__initdata so that it gets discarded.
