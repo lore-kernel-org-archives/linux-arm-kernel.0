@@ -1,41 +1,43 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 16 Nov 2009 19:56:52 +0100
-Subject: [PATCH 2/3] msm: add minimal board file for HTC Dream device
-In-Reply-To: <20091116165716.GD3568@n2100.arm.linux.org.uk> (Russell King's
-	message of "Mon\, 16 Nov 2009 16\:57\:16 +0000")
-References: <20091102104949.GA23456@elf.ucw.cz>
-	<20091116163659.GB3568@n2100.arm.linux.org.uk>
-	<a55d774e0911160843h22938604s8966a58ee71992a@mail.gmail.com>
-	<20091116165716.GD3568@n2100.arm.linux.org.uk>
-Message-ID: <87vdhagux7.fsf@free.fr>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 16 Nov 2009 14:19:11 -0600
+Subject: [GIT PULL] pxa: fixes for v2.6.32-rc7
+Message-ID: <f17812d70911161219o73c6e1a7v6d6f984db693763a@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+Hi Russell,
 
-> On Mon, Nov 16, 2009 at 08:43:20AM -0800, Brian Swetland wrote:
->> What's the best way to handle a situation where there is no valid
->> debug uart?  Could the arch/platform require DEBUG_LL be unset via
->> Kconfig directives if it is configured in a way where there is no
->> valid debug uart?
->
-> You're the first to have that issue.  Everyone else has a UART they
-> can always direct stuff at.
+Here are some minor fixes for v2.6.32-rc7, please consider pull.
 
-Just for the record, there are machine files without a debug UART, especially in
-the smartphone area.
+The following changes since commit 156171c71a0dc4bce12b4408bb1591f8fe32dc1a:
+  Linus Torvalds (1):
+        Linux 2.6.32-rc7
 
-In the PXA subworld I know, the UARTs are often used for :
- - a GSM chip (pxa ffuart)
- - a Bluetooth chip (pxa btuart)
- - a GPS chip (pxa stuart / hwuart)
- - an IR chip (pxa stuart / hwuart)
+are available in the git repository at:
 
-I didn't check through the mach-pxa/*.c, but mioa701.c accounts for one, and I
-think magician and hx4700 would be part of it too. That also means kernel
-debugging is _really_ painfull for these platforms.
+  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
 
-Cheers.
+Eric Miao (1):
+      [ARM] pxa: fix incorrect mfp_to_gpio() conversion
 
---
-Robert
+Marc Zyngier (1):
+      [ARM] pxa: fix interrupts number calculation when
+CONFIG_PXA_HAVE_ISA_IRQS=y
+
+Marek Vasut (1):
+      [ARM] pxa/colibri: fix AC97 ifdefs and add missing include
+
+Paul Parsons (1):
+      [ARM] pxa/hx4700: fix hx4700 touchscreen pressure values
+
+Roel Kluin (2):
+      [ARM] pxa: fix missing underscores in mfp-pxa910.h
+      [ARM] pxa: ensure mfp is in correct range in mfp_{read,write}
+
+ arch/arm/mach-mmp/include/mach/mfp-pxa910.h  |    2 +-
+ arch/arm/mach-pxa/colibri-pxa320.c           |    4 +++-
+ arch/arm/mach-pxa/hx4700.c                   |    2 +-
+ arch/arm/mach-pxa/include/mach/entry-macro.S |    1 +
+ arch/arm/plat-pxa/include/plat/mfp.h         |    2 +-
+ arch/arm/plat-pxa/mfp.c                      |    4 ++--
+ 6 files changed, 9 insertions(+), 6 deletions(-)
