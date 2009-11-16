@@ -1,75 +1,40 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 16 Nov 2009 21:35:00 +0100
-Subject: [PATCH 17/25] imx/eukrea_cpuimx27: use new nand device registration
-In-Reply-To: <1258403708-10287-16-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20091116203406.GA6546@pengutronix.de>
-	<1258403708-10287-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-2-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-3-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-4-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-5-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-6-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-7-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-8-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-9-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-10-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-11-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-12-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-13-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-14-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-15-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-16-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1258403708-10287-17-git-send-email-u.kleine-koenig@pengutronix.de>
+From: stevenrwalter@gmail.com (Steven Walter)
+Date: Mon, 16 Nov 2009 16:50:38 -0500
+Subject: cache aliasing in dup_mmap
+In-Reply-To: <20091116172856.GE3568@n2100.arm.linux.org.uk>
+References: <20090308121029.GA21277@n2100.arm.linux.org.uk>
+	<e06498070909290925q55777041q6f3ecfaf9847babb@mail.gmail.com>
+	<e06498070909290930w7745e1e3x2e224ad75ff62dbd@mail.gmail.com>
+	<20090929191108.GA13568@n2100.arm.linux.org.uk>
+	<20091005144623.GA20633@n2100.arm.linux.org.uk>
+	<20091105144830.GC21681@n2100.arm.linux.org.uk>
+	<e06498070911130649k2051e4cfh2066cf0b9fdabbaf@mail.gmail.com>
+	<20091116163028.GA3568@n2100.arm.linux.org.uk>
+	<e06498070911160923i2273b6aai6f144b36289203d2@mail.gmail.com>
+	<20091116172856.GE3568@n2100.arm.linux.org.uk>
+Message-ID: <e06498070911161350v485f0451p7828e6aa9120fe40@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/mach-mx2/eukrea_cpuimx27.c |   13 ++++++-------
- 1 files changed, 6 insertions(+), 7 deletions(-)
+On Mon, Nov 16, 2009 at 12:28 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+>> Yes, SIGSEGV after 88 boots, with a crash that we previously
+>> identified as caused by this cache corruption issue. ?Attached are the
+>> patches I used, as manually backported to 2.6.18.5. ?Stock 2.6.18.5
+>> would reliably crash in under 1000 reboots, whereas ?with my ad-hoc
+>> fix (also attached) we were able to run 8000 reboots before we ended
+>> the test.
+>
+> What is copypage-swl.S ?
 
-diff --git a/arch/arm/mach-mx2/eukrea_cpuimx27.c b/arch/arm/mach-mx2/eukrea_cpuimx27.c
-index 7b18760..1a7ce75 100644
---- a/arch/arm/mach-mx2/eukrea_cpuimx27.c
-+++ b/arch/arm/mach-mx2/eukrea_cpuimx27.c
-@@ -38,7 +38,6 @@
- #include <mach/i2c.h>
- #include <mach/iomux.h>
- #include <mach/imx-uart.h>
--#include <mach/mxc_nand.h>
- 
- #include "devices.h"
- 
-@@ -119,11 +118,6 @@ static struct imxuart_platform_data uart_pdata[] = {
- 	},
- };
- 
--static struct mxc_nand_platform_data eukrea_cpuimx27_nand_board_info = {
--	.width = 1,
--	.hw_ecc = 1,
--};
--
- static struct platform_device *platform_devices[] __initdata = {
- 	&eukrea_cpuimx27_nor_mtd_device,
- 	&mxc_fec_device,
-@@ -184,12 +178,17 @@ static struct platform_device serial_device = {
- 
- static void __init eukrea_cpuimx27_init(void)
- {
-+	struct mxc_nand_platform_data mxc_nand_pdata = {
-+		.width = 1,
-+		.hw_ecc = 1,
-+	};
-+
- 	mxc_gpio_setup_multiple_pins(eukrea_cpuimx27_pins,
- 		ARRAY_SIZE(eukrea_cpuimx27_pins), "CPUIMX27");
- 
- 	mxc_register_device(&mxc_uart_device0, &uart_pdata[0]);
- 
--	mxc_register_device(&mxc_nand_device, &eukrea_cpuimx27_nand_board_info);
-+	imx27_add_mxc_nand(&mxc_nand_pdata);
- 
- 	i2c_register_board_info(0, eukrea_cpuimx27_i2c_devices,
- 				ARRAY_SIZE(eukrea_cpuimx27_i2c_devices));
+copypage-swl.S contains optimized copy_user / clear_user routines for
+the custom ASIC we use.  Preimage attached.
 -- 
-1.6.5.2
+-Steven Walter <stevenrwalter@gmail.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: copypage-swl.S
+Type: application/octet-stream
+Size: 2592 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091116/24fb096c/attachment.obj>
