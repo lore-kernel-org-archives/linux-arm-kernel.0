@@ -1,103 +1,64 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 16 Nov 2009 21:34:06 +0100
-Subject: [PATCH 00/25] imx cleanups
-Message-ID: <20091116203406.GA6546@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon, 16 Nov 2009 21:34:45 +0100
+Subject: [PATCH 02/25] imx: reorder mx21.h
+In-Reply-To: <1258403708-10287-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20091116203406.GA6546@pengutronix.de>
+	<1258403708-10287-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1258403708-10287-2-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/plat-mxc/include/mach/mx21.h |   24 ++++++++++++------------
+ 1 files changed, 12 insertions(+), 12 deletions(-)
 
-this series is the start of a big cleanup of the imx support.  The
-overall goal is to support all SoCs with a single image.  Therefor a few
-things need to/should be done:
-
-  - clean up headers not to define the same constants (i.e. prefix
-    everything with the SoC's name)
-  - generalise device creation
-  - generalise static mappings
-  - probably much more
-
-Here I start with the first two items.
-
-On the way I plan to change all occurences of "mxc" to "imx".
-
-I hope this all can happen without much breakage.
-
-For now no #defines are removed only redefined.  So all code should
-continue to work as before.  Assuming this series is accepted new usage
-of the #defines without a SoC-prefix should be deprecated.  When all
-users are converted, the old #defines can go away.
-
-git branch, shortlog and diffstat can be found below.  It merges nearly
-fine into Sascha's mxc-master.  There's only a trivial conflict in
-arch/arm/plat-mxc/Makefile .
-
-Best regards
-Uwe
-
-The following changes since commit aa021baa3295fa6e3f367d80f8955dd5176656eb:
-  Linus Torvalds (1):
-        Merge git://git.kernel.org/.../mason/btrfs-unstable
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/ukl/linux-2.6.git imx
-
-Uwe Kleine-K?nig (25):
-      imx: reorder mx2x.h
-      imx: reorder mx21.h
-      imx: reorder mx27.h
-      imx: reorder mx3x.h
-      imx: add namespace prefixes for symbols in mx2x.h
-      imx: add namespace prefixes for symbols in mx21.h
-      imx: add namespace prefixes for symbols in mx27.h
-      imx: add namespace prefixes for symbols in mx3x.h
-      imx: add namespace prefixes for symbols in mx31.h
-      imx: add namespace prefixes for symbols in mx35.h
-      imx: reformat mx25.h to match the other platform includes
-      imx: copy constants from mx2x.h to mx21.h using the appropriate namespace
-      imx: copy constants from mx2x.h to mx27.h using the appropriate namespace
-      imx: copy constants from mx3x.h to mx31.h using the appropriate namespace
-      imx: copy constants from mx3x.h to mx35.h using the appropriate namespace
-      imx: generalize nand device registration
-      imx/eukrea_cpuimx27: use new nand device registration
-      imx/mx21ads: use new nand device registration
-      imx/mx27ads: use new nand device registration
-      imx/pca100: use new nand device registration
-      imx/pcm038: use new nand device registration
-      imx/armadillo5x0: use new nand device registration
-      imx/mx31lite: use new nand device registration
-      imx/pcm037: use new nand device registration
-      imx/mx25pdk: remove unused include
-
- arch/arm/mach-mx2/devices.h                     |    2 +
- arch/arm/mach-mx2/eukrea_cpuimx27.c             |   13 +-
- arch/arm/mach-mx2/mx21ads.c                     |   13 +-
- arch/arm/mach-mx2/mx27ads.c                     |   13 +-
- arch/arm/mach-mx2/pca100.c                      |   12 +-
- arch/arm/mach-mx2/pcm038.c                      |   13 +-
- arch/arm/mach-mx25/mx25pdk.c                    |    1 -
- arch/arm/mach-mx3/armadillo5x0.c                |   16 +-
- arch/arm/mach-mx3/devices.h                     |    1 +
- arch/arm/mach-mx3/mx31lite.c                    |   12 +-
- arch/arm/mach-mx3/pcm037.c                      |   12 +-
- arch/arm/mach-mxc91231/devices.h                |    2 +
- arch/arm/plat-mxc/Makefile                      |    2 +
- arch/arm/plat-mxc/devices/Makefile              |    1 +
- arch/arm/plat-mxc/devices/platform-mxc_nand.c   |   54 +++
- arch/arm/plat-mxc/include/mach/devices-common.h |   20 ++
- arch/arm/plat-mxc/include/mach/mx21.h           |  207 ++++++++++--
- arch/arm/plat-mxc/include/mach/mx25.h           |   10 +-
- arch/arm/plat-mxc/include/mach/mx27.h           |  315 ++++++++++++++----
- arch/arm/plat-mxc/include/mach/mx2x.h           |  339 ++++++++++++-------
- arch/arm/plat-mxc/include/mach/mx31.h           |  237 +++++++++++--
- arch/arm/plat-mxc/include/mach/mx35.h           |  201 ++++++++++-
- arch/arm/plat-mxc/include/mach/mx3x.h           |  413 +++++++++++++++--------
- 23 files changed, 1438 insertions(+), 471 deletions(-)
- create mode 100644 arch/arm/plat-mxc/devices/Makefile
- create mode 100644 arch/arm/plat-mxc/devices/platform-mxc_nand.c
- create mode 100644 arch/arm/plat-mxc/include/mach/devices-common.h
-
+diff --git a/arch/arm/plat-mxc/include/mach/mx21.h b/arch/arm/plat-mxc/include/mach/mx21.h
+index 21112c6..2b1fccb 100644
+--- a/arch/arm/plat-mxc/include/mach/mx21.h
++++ b/arch/arm/plat-mxc/include/mach/mx21.h
+@@ -34,8 +34,8 @@
+ #define CS2_BASE_ADDR           0xD0000000
+ #define CS3_BASE_ADDR           0xD1000000
+ #define CS4_BASE_ADDR           0xD2000000
+-#define CS5_BASE_ADDR           0xDD000000
+ #define PCMCIA_MEM_BASE_ADDR    0xD4000000
++#define CS5_BASE_ADDR           0xDD000000
+ 
+ /* NAND, SDRAM, WEIM etc controllers */
+ #define X_MEMC_BASE_ADDR        0xDF000000
+@@ -50,21 +50,21 @@
+ #define IRAM_BASE_ADDR          0xFFFFE800	/* internal ram */
+ 
+ /* fixed interrupt numbers */
++#define MXC_INT_FIRI            9
++#define MXC_INT_BMI             30
++#define MXC_INT_EMMAENC         49
++#define MXC_INT_EMMADEC         50
++#define MXC_INT_USBWKUP         53
++#define MXC_INT_USBDMA          54
++#define MXC_INT_USBHOST         55
++#define MXC_INT_USBFUNC         56
++#define MXC_INT_USBMNP          57
+ #define MXC_INT_USBCTRL         58
+ #define MXC_INT_USBCTRL         58
+-#define MXC_INT_USBMNP          57
+-#define MXC_INT_USBFUNC         56
+-#define MXC_INT_USBHOST         55
+-#define MXC_INT_USBDMA          54
+-#define MXC_INT_USBWKUP         53
+-#define MXC_INT_EMMADEC         50
+-#define MXC_INT_EMMAENC         49
+-#define MXC_INT_BMI             30
+-#define MXC_INT_FIRI            9
+ 
+ /* fixed DMA request numbers */
+-#define DMA_REQ_BMI_RX          29
+-#define DMA_REQ_BMI_TX          28
+ #define DMA_REQ_FIRI_RX         4
++#define DMA_REQ_BMI_TX          28
++#define DMA_REQ_BMI_RX          29
+ 
+ #endif /* __ASM_ARCH_MXC_MX21_H__ */
 -- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+1.6.5.2
