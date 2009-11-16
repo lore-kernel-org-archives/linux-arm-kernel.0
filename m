@@ -1,15 +1,13 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 16 Nov 2009 21:34:50 +0100
-Subject: [PATCH 07/25] imx: add namespace prefixes for symbols in mx27.h
-In-Reply-To: <1258403708-10287-6-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Mon, 16 Nov 2009 21:34:48 +0100
+Subject: [PATCH 05/25] imx: add namespace prefixes for symbols in mx2x.h
+In-Reply-To: <1258403708-10287-4-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <20091116203406.GA6546@pengutronix.de>
 	<1258403708-10287-1-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1258403708-10287-2-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1258403708-10287-3-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1258403708-10287-4-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-5-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-6-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1258403708-10287-7-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1258403708-10287-5-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,241 +15,366 @@ The old names are still defined using the new names.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/plat-mxc/include/mach/mx27.h |  201 ++++++++++++++++++++++-----------
- 1 files changed, 133 insertions(+), 68 deletions(-)
+ arch/arm/plat-mxc/include/mach/mx2x.h |  339 ++++++++++++++++++++++-----------
+ 1 files changed, 224 insertions(+), 115 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/mx27.h b/arch/arm/plat-mxc/include/mach/mx27.h
-index 0104c20..b619aa4 100644
---- a/arch/arm/plat-mxc/include/mach/mx27.h
-+++ b/arch/arm/plat-mxc/include/mach/mx27.h
-@@ -24,88 +24,87 @@
- #ifndef __ASM_ARCH_MXC_MX27_H__
- #define __ASM_ARCH_MXC_MX27_H__
+diff --git a/arch/arm/plat-mxc/include/mach/mx2x.h b/arch/arm/plat-mxc/include/mach/mx2x.h
+index c0df87f..1766c7c 100644
+--- a/arch/arm/plat-mxc/include/mach/mx2x.h
++++ b/arch/arm/plat-mxc/include/mach/mx2x.h
+@@ -26,50 +26,48 @@
+ /* The following addresses are common between i.MX21 and i.MX27 */
  
--#define MSHC_BASE_ADDR          (AIPI_BASE_ADDR + 0x18000)
--#define GPT5_BASE_ADDR          (AIPI_BASE_ADDR + 0x19000)
--#define GPT4_BASE_ADDR          (AIPI_BASE_ADDR + 0x1A000)
--#define UART5_BASE_ADDR         (AIPI_BASE_ADDR + 0x1B000)
--#define UART6_BASE_ADDR         (AIPI_BASE_ADDR + 0x1C000)
--#define I2C2_BASE_ADDR          (AIPI_BASE_ADDR + 0x1D000)
--#define SDHC3_BASE_ADDR         (AIPI_BASE_ADDR + 0x1E000)
--#define GPT6_BASE_ADDR          (AIPI_BASE_ADDR + 0x1F000)
--#define VPU_BASE_ADDR           (AIPI_BASE_ADDR + 0x23000)
--#define OTG_BASE_ADDR           USBOTG_BASE_ADDR
--#define SAHARA_BASE_ADDR        (AIPI_BASE_ADDR + 0x25000)
--#define IIM_BASE_ADDR           (AIPI_BASE_ADDR + 0x28000)
--#define RTIC_BASE_ADDR          (AIPI_BASE_ADDR + 0x2A000)
--#define FEC_BASE_ADDR           (AIPI_BASE_ADDR + 0x2B000)
--#define SCC_BASE_ADDR           (AIPI_BASE_ADDR + 0x2C000)
--#define ETB_BASE_ADDR           (AIPI_BASE_ADDR + 0x3B000)
--#define ETB_RAM_BASE_ADDR       (AIPI_BASE_ADDR + 0x3C000)
-+#define MX27_MSHC_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x18000)
-+#define MX27_GPT5_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x19000)
-+#define MX27_GPT4_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x1a000)
-+#define MX27_UART5_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x1b000)
-+#define MX27_UART6_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x1c000)
-+#define MX27_I2C2_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x1d000)
-+#define MX27_SDHC3_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x1e000)
-+#define MX27_GPT6_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x1f000)
-+#define MX27_VPU_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x23000)
-+#define MX27_OTG_BASE_ADDR			MX2x_USBOTG_BASE_ADDR
-+#define MX27_SAHARA_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x25000)
-+#define MX27_IIM_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x28000)
-+#define MX27_RTIC_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x2a000)
-+#define MX27_FEC_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x2b000)
-+#define MX27_SCC_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x2c000)
-+#define MX27_ETB_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x3b000)
-+#define MX27_ETB_RAM_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x3c000)
- 
- /* ROM patch */
--#define ROMP_BASE_ADDR          0x10041000
-+#define MX27_ROMP_BASE_ADDR		0x10041000
- 
--#define ATA_BASE_ADDR           (SAHB1_BASE_ADDR + 0x1000)
-+#define MX27_ATA_BASE_ADDR			(MX2x_SAHB1_BASE_ADDR + 0x1000)
- 
- /* Memory regions and CS */
--#define SDRAM_BASE_ADDR         0xA0000000
--#define CSD1_BASE_ADDR          0xB0000000
-+#define MX27_SDRAM_BASE_ADDR		0xa0000000
-+#define MX27_CSD1_BASE_ADDR		0xb0000000
- 
--#define CS0_BASE_ADDR           0xC0000000
--#define CS1_BASE_ADDR           0xC8000000
--#define CS2_BASE_ADDR           0xD0000000
--#define CS3_BASE_ADDR           0xD2000000
--#define CS4_BASE_ADDR           0xD4000000
--#define CS5_BASE_ADDR           0xD6000000
-+#define MX27_CS0_BASE_ADDR		0xc0000000
-+#define MX27_CS1_BASE_ADDR		0xc8000000
-+#define MX27_CS2_BASE_ADDR		0xd0000000
-+#define MX27_CS3_BASE_ADDR		0xd2000000
-+#define MX27_CS4_BASE_ADDR		0xd4000000
-+#define MX27_CS5_BASE_ADDR		0xd6000000
- 
- /* NAND, SDRAM, WEIM, M3IF, EMI controllers */
--#define X_MEMC_BASE_ADDR        0xD8000000
--#define X_MEMC_BASE_ADDR_VIRT   0xF4200000
--#define X_MEMC_SIZE             SZ_1M
-+#define MX27_X_MEMC_BASE_ADDR		0xd8000000
-+#define MX27_X_MEMC_BASE_ADDR_VIRT	0xf4200000
-+#define MX27_X_MEMC_SIZE		SZ_1M
-+#define MX27_NFC_BASE_ADDR			(MX27_X_MEMC_BASE_ADDR)
-+#define MX27_SDRAMC_BASE_ADDR			(MX27_X_MEMC_BASE_ADDR + 0x1000)
-+#define MX27_WEIM_BASE_ADDR			(MX27_X_MEMC_BASE_ADDR + 0x2000)
-+#define MX27_M3IF_BASE_ADDR			(MX27_X_MEMC_BASE_ADDR + 0x3000)
-+#define MX27_PCMCIA_CTL_BASE_ADDR		(MX27_X_MEMC_BASE_ADDR + 0x4000)
- 
--#define NFC_BASE_ADDR           (X_MEMC_BASE_ADDR)
--#define SDRAMC_BASE_ADDR        (X_MEMC_BASE_ADDR + 0x1000)
--#define WEIM_BASE_ADDR          (X_MEMC_BASE_ADDR + 0x2000)
--#define M3IF_BASE_ADDR          (X_MEMC_BASE_ADDR + 0x3000)
--#define PCMCIA_CTL_BASE_ADDR    (X_MEMC_BASE_ADDR + 0x4000)
+ /* Register offests */
+-#define AIPI_BASE_ADDR          0x10000000
+-#define AIPI_BASE_ADDR_VIRT     0xF4000000
+-#define AIPI_SIZE               SZ_1M
 -
--#define PCMCIA_MEM_BASE_ADDR    0xDC000000
-+#define MX27_PCMCIA_MEM_BASE_ADDR	0xdc000000
+-#define DMA_BASE_ADDR           (AIPI_BASE_ADDR + 0x01000)
+-#define WDOG_BASE_ADDR          (AIPI_BASE_ADDR + 0x02000)
+-#define GPT1_BASE_ADDR          (AIPI_BASE_ADDR + 0x03000)
+-#define GPT2_BASE_ADDR          (AIPI_BASE_ADDR + 0x04000)
+-#define GPT3_BASE_ADDR          (AIPI_BASE_ADDR + 0x05000)
+-#define PWM_BASE_ADDR           (AIPI_BASE_ADDR + 0x06000)
+-#define RTC_BASE_ADDR           (AIPI_BASE_ADDR + 0x07000)
+-#define KPP_BASE_ADDR           (AIPI_BASE_ADDR + 0x08000)
+-#define OWIRE_BASE_ADDR         (AIPI_BASE_ADDR + 0x09000)
+-#define UART1_BASE_ADDR         (AIPI_BASE_ADDR + 0x0A000)
+-#define UART2_BASE_ADDR         (AIPI_BASE_ADDR + 0x0B000)
+-#define UART3_BASE_ADDR         (AIPI_BASE_ADDR + 0x0C000)
+-#define UART4_BASE_ADDR         (AIPI_BASE_ADDR + 0x0D000)
+-#define CSPI1_BASE_ADDR         (AIPI_BASE_ADDR + 0x0E000)
+-#define CSPI2_BASE_ADDR         (AIPI_BASE_ADDR + 0x0F000)
+-#define SSI1_BASE_ADDR          (AIPI_BASE_ADDR + 0x10000)
+-#define SSI2_BASE_ADDR          (AIPI_BASE_ADDR + 0x11000)
+-#define I2C_BASE_ADDR           (AIPI_BASE_ADDR + 0x12000)
+-#define SDHC1_BASE_ADDR         (AIPI_BASE_ADDR + 0x13000)
+-#define SDHC2_BASE_ADDR         (AIPI_BASE_ADDR + 0x14000)
+-#define GPIO_BASE_ADDR          (AIPI_BASE_ADDR + 0x15000)
+-#define AUDMUX_BASE_ADDR        (AIPI_BASE_ADDR + 0x16000)
+-#define CSPI3_BASE_ADDR         (AIPI_BASE_ADDR + 0x17000)
+-#define LCDC_BASE_ADDR          (AIPI_BASE_ADDR + 0x21000)
+-#define SLCDC_BASE_ADDR         (AIPI_BASE_ADDR + 0x22000)
+-#define USBOTG_BASE_ADDR        (AIPI_BASE_ADDR + 0x24000)
+-#define EMMA_PP_BASE_ADDR       (AIPI_BASE_ADDR + 0x26000)
+-#define EMMA_PRP_BASE_ADDR      (AIPI_BASE_ADDR + 0x26400)
+-#define CCM_BASE_ADDR           (AIPI_BASE_ADDR + 0x27000)
+-#define SYSCTRL_BASE_ADDR       (AIPI_BASE_ADDR + 0x27800)
+-#define JAM_BASE_ADDR           (AIPI_BASE_ADDR + 0x3E000)
+-#define MAX_BASE_ADDR           (AIPI_BASE_ADDR + 0x3F000)
+-
+-#define AVIC_BASE_ADDR          0x10040000
+-
+-#define SAHB1_BASE_ADDR         0x80000000
+-#define SAHB1_BASE_ADDR_VIRT    0xF4100000
+-#define SAHB1_SIZE              SZ_1M
+-
+-#define CSI_BASE_ADDR           (SAHB1_BASE_ADDR + 0x0000)
++#define MX2x_AIPI_BASE_ADDR		0x10000000
++#define MX2x_AIPI_BASE_ADDR_VIRT	0xf4000000
++#define MX2x_AIPI_SIZE			SZ_1M
++#define MX2x_DMA_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x01000)
++#define MX2x_WDOG_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x02000)
++#define MX2x_GPT1_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x03000)
++#define MX2x_GPT2_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x04000)
++#define MX2x_GPT3_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x05000)
++#define MX2x_PWM_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x06000)
++#define MX2x_RTC_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x07000)
++#define MX2x_KPP_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x08000)
++#define MX2x_OWIRE_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x09000)
++#define MX2x_UART1_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x0a000)
++#define MX2x_UART2_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x0b000)
++#define MX2x_UART3_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x0c000)
++#define MX2x_UART4_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x0d000)
++#define MX2x_CSPI1_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x0e000)
++#define MX2x_CSPI2_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x0f000)
++#define MX2x_SSI1_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x10000)
++#define MX2x_SSI2_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x11000)
++#define MX2x_I2C_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x12000)
++#define MX2x_SDHC1_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x13000)
++#define MX2x_SDHC2_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x14000)
++#define MX2x_GPIO_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x15000)
++#define MX2x_AUDMUX_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x16000)
++#define MX2x_CSPI3_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x17000)
++#define MX2x_LCDC_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x21000)
++#define MX2x_SLCDC_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x22000)
++#define MX2x_USBOTG_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x24000)
++#define MX2x_EMMA_PP_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x26000)
++#define MX2x_EMMA_PRP_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x26400)
++#define MX2x_CCM_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x27000)
++#define MX2x_SYSCTRL_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x27800)
++#define MX2x_JAM_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x3e000)
++#define MX2x_MAX_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x3f000)
++
++#define MX2x_AVIC_BASE_ADDR		0x10040000
++
++#define MX2x_SAHB1_BASE_ADDR		0x80000000
++#define MX2x_SAHB1_BASE_ADDR_VIRT	0xf4100000
++#define MX2x_SAHB1_SIZE			SZ_1M
++#define MX2x_CSI_BASE_ADDR			(MX2x_SAHB1_BASE_ADDR + 0x0000)
  
- /* IRAM */
--#define IRAM_BASE_ADDR          0xFFFF4C00	/* internal ram */
-+#define MX27_IRAM_BASE_ADDR		0xffff4c00	/* internal ram */
+ /*
+  * This macro defines the physical to virtual address mapping for all the
+@@ -105,78 +103,189 @@
+ 	(((x) - X_MEMC_BASE_ADDR) + X_MEMC_BASE_ADDR_VIRT)
  
  /* fixed interrupt numbers */
--#define MXC_INT_I2C2		1
--#define MXC_INT_GPT6		2
--#define MXC_INT_GPT5		3
--#define MXC_INT_GPT4		4
--#define MXC_INT_RTIC		5
--#define MXC_INT_SDHC		7
--#define MXC_INT_SDHC3		9
--#define MXC_INT_ATA		30
--#define MXC_INT_UART6		48
--#define MXC_INT_UART5		49
--#define MXC_INT_FEC		50
--#define MXC_INT_VPU		53
--#define MXC_INT_USB1		54
--#define MXC_INT_USB2		55
--#define MXC_INT_USB3		56
--#define MXC_INT_SCC_SMN		57
--#define MXC_INT_SCC_SCM		58
--#define MXC_INT_SAHARA		59
--#define MXC_INT_IIM		62
--#define MXC_INT_CCM		63
-+#define MX27_INT_I2C2		1
-+#define MX27_INT_GPT6		2
-+#define MX27_INT_GPT5		3
-+#define MX27_INT_GPT4		4
-+#define MX27_INT_RTIC		5
-+#define MX27_INT_SDHC		7
-+#define MX27_INT_SDHC3		9
-+#define MX27_INT_ATA		30
-+#define MX27_INT_UART6		48
-+#define MX27_INT_UART5		49
-+#define MX27_INT_FEC		50
-+#define MX27_INT_VPU		53
-+#define MX27_INT_USB1		54
-+#define MX27_INT_USB2		55
-+#define MX27_INT_USB3		56
-+#define MX27_INT_SCC_SMN	57
-+#define MX27_INT_SCC_SCM	58
-+#define MX27_INT_SAHARA		59
-+#define MX27_INT_IIM		62
-+#define MX27_INT_CCM		63
+-#define MXC_INT_CSPI3		6
+-#define MXC_INT_GPIO		8
+-#define MXC_INT_SDHC2		10
+-#define MXC_INT_SDHC1		11
+-#define MXC_INT_I2C		12
+-#define MXC_INT_SSI2		13
+-#define MXC_INT_SSI1		14
+-#define MXC_INT_CSPI2		15
+-#define MXC_INT_CSPI1		16
+-#define MXC_INT_UART4		17
+-#define MXC_INT_UART3		18
+-#define MXC_INT_UART2		19
+-#define MXC_INT_UART1		20
+-#define MXC_INT_KPP		21
+-#define MXC_INT_RTC		22
+-#define MXC_INT_PWM		23
+-#define MXC_INT_GPT		INT_GPT1
+-#define MXC_INT_GPT3		24
+-#define MXC_INT_GPT2		25
+-#define MXC_INT_GPT1		26
+-#define MXC_INT_WDOG		27
+-#define MXC_INT_PCMCIA		28
+-#define MXC_INT_NANDFC		29
+-#define MXC_INT_CSI		31
+-#define MXC_INT_DMACH0		32
+-#define MXC_INT_DMACH1		33
+-#define MXC_INT_DMACH2		34
+-#define MXC_INT_DMACH3		35
+-#define MXC_INT_DMACH4		36
+-#define MXC_INT_DMACH5		37
+-#define MXC_INT_DMACH6		38
+-#define MXC_INT_DMACH7		39
+-#define MXC_INT_DMACH8		40
+-#define MXC_INT_DMACH9		41
+-#define MXC_INT_DMACH10		42
+-#define MXC_INT_DMACH11		43
+-#define MXC_INT_DMACH12		44
+-#define MXC_INT_DMACH13		45
+-#define MXC_INT_DMACH14		46
+-#define MXC_INT_DMACH15		47
+-#define MXC_INT_EMMAPRP		51
+-#define MXC_INT_EMMAPP		52
+-#define MXC_INT_SLCDC		60
+-#define MXC_INT_LCDC		61
++#define MX2x_INT_CSPI3		6
++#define MX2x_INT_GPIO		8
++#define MX2x_INT_SDHC2		10
++#define MX2x_INT_SDHC1		11
++#define MX2x_INT_I2C		12
++#define MX2x_INT_SSI2		13
++#define MX2x_INT_SSI1		14
++#define MX2x_INT_CSPI2		15
++#define MX2x_INT_CSPI1		16
++#define MX2x_INT_UART4		17
++#define MX2x_INT_UART3		18
++#define MX2x_INT_UART2		19
++#define MX2x_INT_UART1		20
++#define MX2x_INT_KPP		21
++#define MX2x_INT_RTC		22
++#define MX2x_INT_PWM		23
++#define MX2x_INT_GPT3		24
++#define MX2x_INT_GPT2		25
++#define MX2x_INT_GPT1		26
++#define MX2x_INT_WDOG		27
++#define MX2x_INT_PCMCIA		28
++#define MX2x_INT_NANDFC		29
++#define MX2x_INT_CSI		31
++#define MX2x_INT_DMACH0		32
++#define MX2x_INT_DMACH1		33
++#define MX2x_INT_DMACH2		34
++#define MX2x_INT_DMACH3		35
++#define MX2x_INT_DMACH4		36
++#define MX2x_INT_DMACH5		37
++#define MX2x_INT_DMACH6		38
++#define MX2x_INT_DMACH7		39
++#define MX2x_INT_DMACH8		40
++#define MX2x_INT_DMACH9		41
++#define MX2x_INT_DMACH10	42
++#define MX2x_INT_DMACH11	43
++#define MX2x_INT_DMACH12	44
++#define MX2x_INT_DMACH13	45
++#define MX2x_INT_DMACH14	46
++#define MX2x_INT_DMACH15	47
++#define MX2x_INT_EMMAPRP	51
++#define MX2x_INT_EMMAPP		52
++#define MX2x_INT_SLCDC		60
++#define MX2x_INT_LCDC		61
  
  /* fixed DMA request numbers */
--#define DMA_REQ_MSHC            4
--#define DMA_REQ_ATA_TX          28
--#define DMA_REQ_ATA_RCV         29
--#define DMA_REQ_UART5_TX        32
--#define DMA_REQ_UART5_RX        33
--#define DMA_REQ_UART6_TX        34
--#define DMA_REQ_UART6_RX        35
--#define DMA_REQ_SDHC3           36
--#define DMA_REQ_NFC             37
-+#define MX27_DMA_REQ_MSHC	4
-+#define MX27_DMA_REQ_ATA_TX	28
-+#define MX27_DMA_REQ_ATA_RCV	29
-+#define MX27_DMA_REQ_UART5_TX	32
-+#define MX27_DMA_REQ_UART5_RX	33
-+#define MX27_DMA_REQ_UART6_TX	34
-+#define MX27_DMA_REQ_UART6_RX	35
-+#define MX27_DMA_REQ_SDHC3	36
-+#define MX27_DMA_REQ_NFC	37
- 
- /* silicon revisions specific to i.MX27 */
- #define CHIP_REV_1_0		0x00
-@@ -115,6 +114,72 @@
- extern int mx27_revision(void);
- #endif
- 
--/* Mandatory defines used globally */
+-#define DMA_REQ_CSPI3_RX        1
+-#define DMA_REQ_CSPI3_TX        2
+-#define DMA_REQ_EXT             3
+-#define DMA_REQ_SDHC2           6
+-#define DMA_REQ_SDHC1           7
+-#define DMA_REQ_SSI2_RX0        8
+-#define DMA_REQ_SSI2_TX0        9
+-#define DMA_REQ_SSI2_RX1        10
+-#define DMA_REQ_SSI2_TX1        11
+-#define DMA_REQ_SSI1_RX0        12
+-#define DMA_REQ_SSI1_TX0        13
+-#define DMA_REQ_SSI1_RX1        14
+-#define DMA_REQ_SSI1_TX1        15
+-#define DMA_REQ_CSPI2_RX        16
+-#define DMA_REQ_CSPI2_TX        17
+-#define DMA_REQ_CSPI1_RX        18
+-#define DMA_REQ_CSPI1_TX        19
+-#define DMA_REQ_UART4_RX        20
+-#define DMA_REQ_UART4_TX        21
+-#define DMA_REQ_UART3_RX        22
+-#define DMA_REQ_UART3_TX        23
+-#define DMA_REQ_UART2_RX        24
+-#define DMA_REQ_UART2_TX        25
+-#define DMA_REQ_UART1_RX        26
+-#define DMA_REQ_UART1_TX        27
+-#define DMA_REQ_CSI_STAT        30
+-#define DMA_REQ_CSI_RX          31
++#define MX2x_DMA_REQ_CSPI3_RX	1
++#define MX2x_DMA_REQ_CSPI3_TX	2
++#define MX2x_DMA_REQ_EXT	3
++#define MX2x_DMA_REQ_SDHC2	6
++#define MX2x_DMA_REQ_SDHC1	7
++#define MX2x_DMA_REQ_SSI2_RX0	8
++#define MX2x_DMA_REQ_SSI2_TX0	9
++#define MX2x_DMA_REQ_SSI2_RX1	10
++#define MX2x_DMA_REQ_SSI2_TX1	11
++#define MX2x_DMA_REQ_SSI1_RX0	12
++#define MX2x_DMA_REQ_SSI1_TX0	13
++#define MX2x_DMA_REQ_SSI1_RX1	14
++#define MX2x_DMA_REQ_SSI1_TX1	15
++#define MX2x_DMA_REQ_CSPI2_RX	16
++#define MX2x_DMA_REQ_CSPI2_TX	17
++#define MX2x_DMA_REQ_CSPI1_RX	18
++#define MX2x_DMA_REQ_CSPI1_TX	19
++#define MX2x_DMA_REQ_UART4_RX	20
++#define MX2x_DMA_REQ_UART4_TX	21
++#define MX2x_DMA_REQ_UART3_RX	22
++#define MX2x_DMA_REQ_UART3_TX	23
++#define MX2x_DMA_REQ_UART2_RX	24
++#define MX2x_DMA_REQ_UART2_TX	25
++#define MX2x_DMA_REQ_UART1_RX	26
++#define MX2x_DMA_REQ_UART1_TX	27
++#define MX2x_DMA_REQ_CSI_STAT	30
++#define MX2x_DMA_REQ_CSI_RX	31
++
 +/* these should go away */
-+#define MSHC_BASE_ADDR MX27_MSHC_BASE_ADDR
-+#define GPT5_BASE_ADDR MX27_GPT5_BASE_ADDR
-+#define GPT4_BASE_ADDR MX27_GPT4_BASE_ADDR
-+#define UART5_BASE_ADDR MX27_UART5_BASE_ADDR
-+#define UART6_BASE_ADDR MX27_UART6_BASE_ADDR
-+#define I2C2_BASE_ADDR MX27_I2C2_BASE_ADDR
-+#define SDHC3_BASE_ADDR MX27_SDHC3_BASE_ADDR
-+#define GPT6_BASE_ADDR MX27_GPT6_BASE_ADDR
-+#define VPU_BASE_ADDR MX27_VPU_BASE_ADDR
-+#define OTG_BASE_ADDR MX27_OTG_BASE_ADDR
-+#define SAHARA_BASE_ADDR MX27_SAHARA_BASE_ADDR
-+#define IIM_BASE_ADDR MX27_IIM_BASE_ADDR
-+#define RTIC_BASE_ADDR MX27_RTIC_BASE_ADDR
-+#define FEC_BASE_ADDR MX27_FEC_BASE_ADDR
-+#define SCC_BASE_ADDR MX27_SCC_BASE_ADDR
-+#define ETB_BASE_ADDR MX27_ETB_BASE_ADDR
-+#define ETB_RAM_BASE_ADDR MX27_ETB_RAM_BASE_ADDR
-+#define ROMP_BASE_ADDR MX27_ROMP_BASE_ADDR
-+#define ATA_BASE_ADDR MX27_ATA_BASE_ADDR
-+#define SDRAM_BASE_ADDR MX27_SDRAM_BASE_ADDR
-+#define CSD1_BASE_ADDR MX27_CSD1_BASE_ADDR
-+#define CS0_BASE_ADDR MX27_CS0_BASE_ADDR
-+#define CS1_BASE_ADDR MX27_CS1_BASE_ADDR
-+#define CS2_BASE_ADDR MX27_CS2_BASE_ADDR
-+#define CS3_BASE_ADDR MX27_CS3_BASE_ADDR
-+#define CS4_BASE_ADDR MX27_CS4_BASE_ADDR
-+#define CS5_BASE_ADDR MX27_CS5_BASE_ADDR
-+#define X_MEMC_BASE_ADDR MX27_X_MEMC_BASE_ADDR
-+#define X_MEMC_BASE_ADDR_VIRT MX27_X_MEMC_BASE_ADDR_VIRT
-+#define X_MEMC_SIZE MX27_X_MEMC_SIZE
-+#define NFC_BASE_ADDR MX27_NFC_BASE_ADDR
-+#define SDRAMC_BASE_ADDR MX27_SDRAMC_BASE_ADDR
-+#define WEIM_BASE_ADDR MX27_WEIM_BASE_ADDR
-+#define M3IF_BASE_ADDR MX27_M3IF_BASE_ADDR
-+#define PCMCIA_CTL_BASE_ADDR MX27_PCMCIA_CTL_BASE_ADDR
-+#define PCMCIA_MEM_BASE_ADDR MX27_PCMCIA_MEM_BASE_ADDR
-+#define IRAM_BASE_ADDR MX27_IRAM_BASE_ADDR
-+#define MXC_INT_I2C2 MX27_INT_I2C2
-+#define MXC_INT_GPT6 MX27_INT_GPT6
-+#define MXC_INT_GPT5 MX27_INT_GPT5
-+#define MXC_INT_GPT4 MX27_INT_GPT4
-+#define MXC_INT_RTIC MX27_INT_RTIC
-+#define MXC_INT_SDHC MX27_INT_SDHC
-+#define MXC_INT_SDHC3 MX27_INT_SDHC3
-+#define MXC_INT_ATA MX27_INT_ATA
-+#define MXC_INT_UART6 MX27_INT_UART6
-+#define MXC_INT_UART5 MX27_INT_UART5
-+#define MXC_INT_FEC MX27_INT_FEC
-+#define MXC_INT_VPU MX27_INT_VPU
-+#define MXC_INT_USB1 MX27_INT_USB1
-+#define MXC_INT_USB2 MX27_INT_USB2
-+#define MXC_INT_USB3 MX27_INT_USB3
-+#define MXC_INT_SCC_SMN MX27_INT_SCC_SMN
-+#define MXC_INT_SCC_SCM MX27_INT_SCC_SCM
-+#define MXC_INT_SAHARA MX27_INT_SAHARA
-+#define MXC_INT_IIM MX27_INT_IIM
-+#define MXC_INT_CCM MX27_INT_CCM
-+#define DMA_REQ_MSHC MX27_DMA_REQ_MSHC
-+#define DMA_REQ_ATA_TX MX27_DMA_REQ_ATA_TX
-+#define DMA_REQ_ATA_RCV MX27_DMA_REQ_ATA_RCV
-+#define DMA_REQ_UART5_TX MX27_DMA_REQ_UART5_TX
-+#define DMA_REQ_UART5_RX MX27_DMA_REQ_UART5_RX
-+#define DMA_REQ_UART6_TX MX27_DMA_REQ_UART6_TX
-+#define DMA_REQ_UART6_RX MX27_DMA_REQ_UART6_RX
-+#define DMA_REQ_SDHC3 MX27_DMA_REQ_SDHC3
-+#define DMA_REQ_NFC MX27_DMA_REQ_NFC
++#define AIPI_BASE_ADDR MX2x_AIPI_BASE_ADDR
++#define AIPI_BASE_ADDR_VIRT MX2x_AIPI_BASE_ADDR_VIRT
++#define AIPI_SIZE MX2x_AIPI_SIZE
++#define DMA_BASE_ADDR MX2x_DMA_BASE_ADDR
++#define WDOG_BASE_ADDR MX2x_WDOG_BASE_ADDR
++#define GPT1_BASE_ADDR MX2x_GPT1_BASE_ADDR
++#define GPT2_BASE_ADDR MX2x_GPT2_BASE_ADDR
++#define GPT3_BASE_ADDR MX2x_GPT3_BASE_ADDR
++#define PWM_BASE_ADDR MX2x_PWM_BASE_ADDR
++#define RTC_BASE_ADDR MX2x_RTC_BASE_ADDR
++#define KPP_BASE_ADDR MX2x_KPP_BASE_ADDR
++#define OWIRE_BASE_ADDR MX2x_OWIRE_BASE_ADDR
++#define UART1_BASE_ADDR MX2x_UART1_BASE_ADDR
++#define UART2_BASE_ADDR MX2x_UART2_BASE_ADDR
++#define UART3_BASE_ADDR MX2x_UART3_BASE_ADDR
++#define UART4_BASE_ADDR MX2x_UART4_BASE_ADDR
++#define CSPI1_BASE_ADDR MX2x_CSPI1_BASE_ADDR
++#define CSPI2_BASE_ADDR MX2x_CSPI2_BASE_ADDR
++#define SSI1_BASE_ADDR MX2x_SSI1_BASE_ADDR
++#define SSI2_BASE_ADDR MX2x_SSI2_BASE_ADDR
++#define I2C_BASE_ADDR MX2x_I2C_BASE_ADDR
++#define SDHC1_BASE_ADDR MX2x_SDHC1_BASE_ADDR
++#define SDHC2_BASE_ADDR MX2x_SDHC2_BASE_ADDR
++#define GPIO_BASE_ADDR MX2x_GPIO_BASE_ADDR
++#define AUDMUX_BASE_ADDR MX2x_AUDMUX_BASE_ADDR
++#define CSPI3_BASE_ADDR MX2x_CSPI3_BASE_ADDR
++#define LCDC_BASE_ADDR MX2x_LCDC_BASE_ADDR
++#define SLCDC_BASE_ADDR MX2x_SLCDC_BASE_ADDR
++#define USBOTG_BASE_ADDR MX2x_USBOTG_BASE_ADDR
++#define EMMA_PP_BASE_ADDR MX2x_EMMA_PP_BASE_ADDR
++#define EMMA_PRP_BASE_ADDR MX2x_EMMA_PRP_BASE_ADDR
++#define CCM_BASE_ADDR MX2x_CCM_BASE_ADDR
++#define SYSCTRL_BASE_ADDR MX2x_SYSCTRL_BASE_ADDR
++#define JAM_BASE_ADDR MX2x_JAM_BASE_ADDR
++#define MAX_BASE_ADDR MX2x_MAX_BASE_ADDR
++#define AVIC_BASE_ADDR MX2x_AVIC_BASE_ADDR
++#define SAHB1_BASE_ADDR MX2x_SAHB1_BASE_ADDR
++#define SAHB1_BASE_ADDR_VIRT MX2x_SAHB1_BASE_ADDR_VIRT
++#define SAHB1_SIZE MX2x_SAHB1_SIZE
++#define CSI_BASE_ADDR MX2x_CSI_BASE_ADDR
++#define MXC_INT_CSPI3 MX2x_INT_CSPI3
++#define MXC_INT_GPIO MX2x_INT_GPIO
++#define MXC_INT_SDHC2 MX2x_INT_SDHC2
++#define MXC_INT_SDHC1 MX2x_INT_SDHC1
++#define MXC_INT_I2C MX2x_INT_I2C
++#define MXC_INT_SSI2 MX2x_INT_SSI2
++#define MXC_INT_SSI1 MX2x_INT_SSI1
++#define MXC_INT_CSPI2 MX2x_INT_CSPI2
++#define MXC_INT_CSPI1 MX2x_INT_CSPI1
++#define MXC_INT_UART4 MX2x_INT_UART4
++#define MXC_INT_UART3 MX2x_INT_UART3
++#define MXC_INT_UART2 MX2x_INT_UART2
++#define MXC_INT_UART1 MX2x_INT_UART1
++#define MXC_INT_KPP MX2x_INT_KPP
++#define MXC_INT_RTC MX2x_INT_RTC
++#define MXC_INT_PWM MX2x_INT_PWM
++#define MXC_INT_GPT3 MX2x_INT_GPT3
++#define MXC_INT_GPT2 MX2x_INT_GPT2
++#define MXC_INT_GPT1 MX2x_INT_GPT1
++#define MXC_INT_WDOG MX2x_INT_WDOG
++#define MXC_INT_PCMCIA MX2x_INT_PCMCIA
++#define MXC_INT_NANDFC MX2x_INT_NANDFC
++#define MXC_INT_CSI MX2x_INT_CSI
++#define MXC_INT_DMACH0 MX2x_INT_DMACH0
++#define MXC_INT_DMACH1 MX2x_INT_DMACH1
++#define MXC_INT_DMACH2 MX2x_INT_DMACH2
++#define MXC_INT_DMACH3 MX2x_INT_DMACH3
++#define MXC_INT_DMACH4 MX2x_INT_DMACH4
++#define MXC_INT_DMACH5 MX2x_INT_DMACH5
++#define MXC_INT_DMACH6 MX2x_INT_DMACH6
++#define MXC_INT_DMACH7 MX2x_INT_DMACH7
++#define MXC_INT_DMACH8 MX2x_INT_DMACH8
++#define MXC_INT_DMACH9 MX2x_INT_DMACH9
++#define MXC_INT_DMACH10 MX2x_INT_DMACH10
++#define MXC_INT_DMACH11 MX2x_INT_DMACH11
++#define MXC_INT_DMACH12 MX2x_INT_DMACH12
++#define MXC_INT_DMACH13 MX2x_INT_DMACH13
++#define MXC_INT_DMACH14 MX2x_INT_DMACH14
++#define MXC_INT_DMACH15 MX2x_INT_DMACH15
++#define MXC_INT_EMMAPRP MX2x_INT_EMMAPRP
++#define MXC_INT_EMMAPP MX2x_INT_EMMAPP
++#define MXC_INT_SLCDC MX2x_INT_SLCDC
++#define MXC_INT_LCDC MX2x_INT_LCDC
++#define DMA_REQ_CSPI3_RX MX2x_DMA_REQ_CSPI3_RX
++#define DMA_REQ_CSPI3_TX MX2x_DMA_REQ_CSPI3_TX
++#define DMA_REQ_EXT MX2x_DMA_REQ_EXT
++#define DMA_REQ_SDHC2 MX2x_DMA_REQ_SDHC2
++#define DMA_REQ_SDHC1 MX2x_DMA_REQ_SDHC1
++#define DMA_REQ_SSI2_RX0 MX2x_DMA_REQ_SSI2_RX0
++#define DMA_REQ_SSI2_TX0 MX2x_DMA_REQ_SSI2_TX0
++#define DMA_REQ_SSI2_RX1 MX2x_DMA_REQ_SSI2_RX1
++#define DMA_REQ_SSI2_TX1 MX2x_DMA_REQ_SSI2_TX1
++#define DMA_REQ_SSI1_RX0 MX2x_DMA_REQ_SSI1_RX0
++#define DMA_REQ_SSI1_TX0 MX2x_DMA_REQ_SSI1_TX0
++#define DMA_REQ_SSI1_RX1 MX2x_DMA_REQ_SSI1_RX1
++#define DMA_REQ_SSI1_TX1 MX2x_DMA_REQ_SSI1_TX1
++#define DMA_REQ_CSPI2_RX MX2x_DMA_REQ_CSPI2_RX
++#define DMA_REQ_CSPI2_TX MX2x_DMA_REQ_CSPI2_TX
++#define DMA_REQ_CSPI1_RX MX2x_DMA_REQ_CSPI1_RX
++#define DMA_REQ_CSPI1_TX MX2x_DMA_REQ_CSPI1_TX
++#define DMA_REQ_UART4_RX MX2x_DMA_REQ_UART4_RX
++#define DMA_REQ_UART4_TX MX2x_DMA_REQ_UART4_TX
++#define DMA_REQ_UART3_RX MX2x_DMA_REQ_UART3_RX
++#define DMA_REQ_UART3_TX MX2x_DMA_REQ_UART3_TX
++#define DMA_REQ_UART2_RX MX2x_DMA_REQ_UART2_RX
++#define DMA_REQ_UART2_TX MX2x_DMA_REQ_UART2_TX
++#define DMA_REQ_UART1_RX MX2x_DMA_REQ_UART1_RX
++#define DMA_REQ_UART1_TX MX2x_DMA_REQ_UART1_TX
++#define DMA_REQ_CSI_STAT MX2x_DMA_REQ_CSI_STAT
++#define DMA_REQ_CSI_RX MX2x_DMA_REQ_CSI_RX
  
- #endif /* __ASM_ARCH_MXC_MX27_H__ */
+ #endif /* __ASM_ARCH_MXC_MX2x_H__ */
 -- 
 1.6.5.2
