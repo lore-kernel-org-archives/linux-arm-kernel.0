@@ -1,165 +1,72 @@
-From: abhijeet.tripathy@yahoo.co.in (abhijeet tripathi)
-Date: Mon, 16 Nov 2009 12:59:34 +0530 (IST)
-Subject: kernel panic - Attempted to kill init
-Message-ID: <564715.9008.qm@web7604.mail.in.yahoo.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 16 Nov 2009 09:14:05 +0100
+Subject: [PATCH 09/18] ARM: S3C: Prepare s3c64xx-specific s3c-fb	register
+	definition for reuse
+In-Reply-To: <20091113233231.GQ4808@trinity.fluff.org>
+References: <1258014122-18185-1-git-send-email-m.szyprowski@samsung.com>
+	<1258014122-18185-2-git-send-email-m.szyprowski@samsung.com>
+	<1258014122-18185-3-git-send-email-m.szyprowski@samsung.com>
+	<1258014122-18185-4-git-send-email-m.szyprowski@samsung.com>
+	<1258014122-18185-5-git-send-email-m.szyprowski@samsung.com>
+	<1258014122-18185-6-git-send-email-m.szyprowski@samsung.com>
+	<1258014122-18185-7-git-send-email-m.szyprowski@samsung.com>
+	<1258014122-18185-8-git-send-email-m.szyprowski@samsung.com>
+	<1258014122-18185-9-git-send-email-m.szyprowski@samsung.com>
+	<1258014122-18185-10-git-send-email-m.szyprowski@samsung.com>
+	<20091113233231.GQ4808@trinity.fluff.org>
+Message-ID: <000101ca6694$c6a62290$53f267b0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-I am trying to do a nfs booting of arm-pb1176 but I am getting kernel panic "Kernel panic - not syncing: Attempted to kill init!".
-I checked my filesystem and it has "/sbin/init". Please let me know if I am missing anything. Below is the console logs:
+On November 14, 2009 12:33 AM Ben Dooks wrote:
 
-=======
-RealView_PB # tftpboot
-LAN9118 ethernet chip detected
-TFTP from server 10.170.0.51; our IP address is 10.170.0.53
-Filename 'at_uImage_pb1176'.
-Load address: 0x7fc0
-Loading: #################################################################
-         #################################################################
-         #################################################################
-         #################################################################
-         #################################################################
-         #################################################################
-         #################################################################
-         ##############################
-done
-Bytes transferred = 2483036 (25e35c hex)
-RealView_PB # bootm
-## Booting image at 00007fc0 ...
-   Image Name:   Linux-2.6.28-arm1
-   Image Type:   ARM Linux Kernel Image (uncompressed)
-   Data Size:    2482972 Bytes =  2.4 MB
-   Load Address: 00008000
-   Entry Point:  00008000
-OK
+> On Thu, Nov 12, 2009 at 09:21:53AM +0100, Marek Szyprowski wrote:
+> > S5PC1xx Samsung SOC series has very similar frame buffer hardware, so a lot
+> > of the code can be shared. Moved s3c64xx-specific s3c-fb register
+> > definitions from mach-s3c6400 to common platform directory as regs-fb-v4.h.
+> > The new v4 file will be common for S3C6400, S3C6410, S5PC100 and possibly
+> > others. Some s3c64xx series specific defines (palette handling) were left
+> > in s3c-6400/mach/regs-fb.h, because it is handled differently in S5PC1xx
+> > series.
+> >
+> > Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > ---
+> >  arch/arm/mach-s3c6400/include/mach/regs-fb.h |  236 +-------------------------
+> >  arch/arm/plat-s3c/include/plat/regs-fb-v4.h  |  235 +++++++++++++++++++++++++
+> >  2 files changed, 244 insertions(+), 227 deletions(-)
+> >  create mode 100644 arch/arm/plat-s3c/include/plat/regs-fb-v4.h
+> >
+> > diff --git a/arch/arm/mach-s3c6400/include/mach/regs-fb.h b/arch/arm/mach-s3c6400/include/mach/regs-
+> fb.h
+> > index 4701979..5fbc0d7 100644
+> > --- a/arch/arm/mach-s3c6400/include/mach/regs-fb.h
+> > +++ b/arch/arm/mach-s3c6400/include/mach/regs-fb.h
+> > @@ -1,195 +1,30 @@
+> > -/* arch/arm/mach-s3c6400/include/mach/regs-fb.h
+> > - *
+> > +/*
+> >   * Copyright 2008 Openmoko, Inc.
+> >   * Copyright 2008 Simtec Electronics
+> > - *      http://armlinux.simtec.co.uk/
+> > - *      Ben Dooks <ben@simtec.co.uk>
+> > - *
+> > - * S3C64XX - new-style framebuffer register definitions
+> > + * Copyright 2009 Samsung Electronics Co.
+> 
+> I'm not sure what you are trying to do here, it looks like a file
+> rename but leaving fragments of the original file?
 
-Starting kernel ...
+Yes. All registers that are common for S3C64XX and S5PC100 series were moved to
+plat/regs-fb-v4.h. Some registers that are specific for S3C64XX series (mainly
+palette registers) were left in mach-s3c6400/include/mach/regs-fb.h. I will resend
+this patch with git format-patch -C option enable, so it will be a bit easier to
+track what has been changed.
 
-Uncompressing Linux..........................................................................................................
-Initializing cgroup subsys cpu
-Linux version 2.6.28-arm1 (root at xscale) (gcc version 4.2.0) #20 PREEMPT Sat No9
-CPU: ARMv6-compatible processor [410fb764] revision 4 (ARMv7), cr=00c5387f
-CPU: VIPT aliasing data cache, VIPT aliasing instruction cache
-Machine: ARM-RealView PB1176
-Ignoring unrecognised tag 0x00000000
-Memory policy: ECC disabled, Data cache writeback
-Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 32512
-Kernel command line: mem=128M console=ttyAMA0,38400n8 ip=dhcp root=/dev/nfs rw
-PID hash table entries: 512 (order: 9, 2048 bytes)
-Console: colour dummy device 80x30
-Dentry cache hash table entries: 16384 (order: 4, 65536 bytes)
-Inode-cache hash table entries: 8192 (order: 3, 32768 bytes)
-allocated 655360 bytes of page_cgroup
-please try cgroup_disable=memory option if you don't want
-Memory: 128MB = 128MB total
-Memory: 123576KB available (4636K code, 737K data, 152K init)
-SLUB: Genslabs=12, HWalign=32, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
-Calibrating delay loop... 226.91 BogoMIPS (lpj=1134592)
-Security Framework initialized
-SELinux:  Initializing.
-Mount-cache hash table entries: 512
-Initializing cgroup subsys ns
-Initializing cgroup subsys cpuacct
-Initializing cgroup subsys memory
-Initializing cgroup subsys devices
-Initializing cgroup subsys freezer
-CPU: Testing write buffer coherency: ok
-net_namespace: 768 bytes
-regulator: core version 0.5
-NET: Registered protocol family 16
-L2X0 cache controller enabled
-SCSI subsystem initialized
-usbcore: registered new interface driver usbfs
-usbcore: registered new interface driver hub
-usbcore: registered new device driver usb
-NetLabel: Initializing
-NetLabel:  domain hash size = 128
-NetLabel:  protocols = UNLABELED CIPSOv4
-NetLabel:  unlabeled traffic allowed by default
-NET: Registered protocol family 2
-IP route cache hash table entries: 1024 (order: 0, 4096 bytes)
-TCP established hash table entries: 4096 (order: 3, 32768 bytes)
-TCP bind hash table entries: 4096 (order: 2, 16384 bytes)
-TCP: Hash tables configured (established 4096 bind 4096)
-TCP reno registered
-NET: Registered protocol family 1
-audit: initializing netlink socket (disabled)
-type=2000 audit(0.480:1): initialized
-VFS: Disk quotas dquot_6.5.1
-Dquot-cache hash table entries: 1024 (order 0, 4096 bytes)
-Installing knfsd (copyright (C) 1996 okir at monad.swb.de).
-msgmni has been set to 241
-alg: No test for stdrng (krng)
-Block layer SCSI generic (bsg) driver version 0.4 loaded (major 253)
-io scheduler noop registered
-io scheduler anticipatory registered
-io scheduler deadline registered
-io scheduler cfq registered (default)
-Non-volatile memory driver v1.2
-Serial: 8250/16550 driver4 ports, IRQ sharing enabled
-Serial: AMBA driver
-Serial: AMBA PL011 UART driver
-dev:f1: ttyAMA0 at MMIO 0x1010c000 (irq = 50) is a AMBA/PL011
-console [ttyAMA0] enabled
-dev:f2: ttyAMA1 at MMIO 0x1010d000 (irq = 51) is a AMBA/PL011
-dev:f3: ttyAMA2 at MMIO 0x1010e000 (irq = 52) is a AMBA/PL011
-fpga:09: ttyAMA3 at MMIO 0x1010f000 (irq = 53) is a AMBA/PL011
-brd: module loaded
-loop: module loaded
-smsc911x: Driver version 2008-10-21.
-smsc911x-mdio: probed
-eth0: attached PHY driver [SMSC LAN911x Internal PHY] (mii_bus:phy_addr=0:01, irq=-1)
-net eth0: MAC Address: 00:02:f7:00:2f:e7
-Driver 'sd' needs updating - please use bus_type methods
-Driver 'sr' needs updating - please use bus_type methods
-mice: PS/2 mouse device common for all mice
-device-mapper: uevent: version 1.0.3
-device-mapper: ioctl: 4.14.0-ioctl (2008-04-23) initialised: dm-devel at redhat.com
-cpuidle: using governor ladder
-cpuidle: using governor menu
-usbcore: registered new interface driver hiddev
-usbcore: registered new interface driver usbhid
-usbhid: v2.6:USB HID core driver
-nf_conntrack version 0.5.0 (2048 buckets, 8192 max)
-CONFIG_NF_CT_ACCT is deprecated and will be removed soon. Please use
-nf_conntrack.acct=1 kernel paramater, acct=1 nf_conntrack module option or
-sysctl net.netfilter.nf_conntrack_acct=1 to enable it.
-ip_tables: (C) 2000-2006 Netfilter Core Team
-TCP cubic registered
-Initializing XFRM netlink socket
-NET: Registered protocol family 17
-RPC: Registered udp transport module.
-RPC: Registered tcp transport module.
-VFP support v0.3: implementor 41 architecture 1 part 20 variant b rev 5
-registered taskstats version 1
-net eth0: SMSC911x/921x identified at 0xc8880000, IRQ: 74
-Sending DHCP requests .., OK
-IP-Config: Got DHCP answer from 10.170.0.51, my address is 10.170.0.53
-IP-Config: Complete:
-     device=eth0, addr=10.170.0.53, mask=255.255.255.0, gw=10.170.0.4,
-     host=10.170.0.53, domain=, nis-domain=(none),
-     bootserver=10.170.0.51, rootserver=10.170.0.51, rootpath=/mnt/opt/fs
-md: Waiting for all devices to be available before autodetect
-md: If you don't use raid, use raid=noautodetect
-md: Autodetecting RAID arrays.
-md: Scanned 0 and added 0 devices.
-md: autorun ...
-md: ... autorun DONE.
-Looking up port of RPC 100003/2 on 10.170.0.51
-Looking up port of RPC 100005/1 on 10.170.0.51
-VFS: Mounted root (nfs filesystem).
-Freeing init memory: 152K
-Kernel panic - not syncing: Attempted to kill init!
-Dumping ftrace buffer:
-   (ftrace buffer empty)
-=======
-
-Thanks in advance.
-
---regards,
-Abhijeet
-
-
-      The INTERNET now has a personality. YOURS! See your Yahoo! Homepage. http://in.yahoo.com/
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
