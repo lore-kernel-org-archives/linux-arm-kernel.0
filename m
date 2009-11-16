@@ -1,33 +1,23 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 17 Nov 2009 00:38:53 +0800
-Subject: [PATCH 0/2] Support for the Arcom Zeus SBC, #2
-In-Reply-To: <20091114182925.17eb58ea@taxman.wild-wind.fr.eu.org>
-References: <20091114182925.17eb58ea@taxman.wild-wind.fr.eu.org>
-Message-ID: <f17812d70911160838s91f3b74w4cac9e78edb9fa46@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Nov 2009 16:39:46 +0000
+Subject: Status of Dream series
+In-Reply-To: <20091111104748.GA26975@elf.ucw.cz>
+References: <20091111104748.GA26975@elf.ucw.cz>
+Message-ID: <20091116163946.GC3568@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 15, 2009 at 1:29 AM, Marc Zyngier <maz@misterjones.org> wrote:
-> The Arcom Zeus is a pxa270 board with a PC104 bus, vaguely similar to
-> the Arcom Viper. The following patches adds support for most of the
-> on-board devices (though sound and CAN are still missing).
->
-> Patches are against PXA devel branch. Please note that they depend on
-> the following patch, currently queued in Eric's fix branch:
-> http://git.kernel.org/?p=linux/kernel/git/ycmiao/pxa-linux-2.6.git;a=commit;h=b2b36316626f0d6b92c3675a2aa2726efc71d146
->
-> The defconfig patch has been already posted before, and can be found in
-> the archives at the following address:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2009-November/004014.html
->
-> This work started from Arcom's 2.6.16, but all bugs are of course mine.
+On Wed, Nov 11, 2009 at 11:47:48AM +0100, Pavel Machek wrote:
+> 
+> Russell, what is the status of the "Dream" series? 
+> 
+>  [PATCH 1/3] msm: make debugging UART (for DEBUG_LL) configurable
+>  [PATCH 2/3] msm: add minimal board file for HTC Dream device
+>  [PATCH 3/3] msm: Add memory map for HTC Dream
 
-Marc,
+See my reply today on patch 2/3; that is my only comment.
 
-What's the difference of this #2 from #1 you posted earlier?
+> Daniel Walker offered to maintain arch-msm tree, would that help? 
 
->
-> ? ? ? ?M.
-> --
-> I'm the slime oozin' out from your TV set...
->
+I thought from Daniel's private email to me on the 2/11 that this was
+his intention; I didn't see a question in it requiring an answer.
