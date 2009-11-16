@@ -1,65 +1,41 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 16 Nov 2009 10:31:34 -0800
-Subject: [PATCH v2 26/32] OMAP3: PM debug: allow runtime toggle of PM
-	features
-In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB030A8C87BF@dbde02.ent.ti.com>
-	(Thara Gopinath's message of "Fri\, 13 Nov 2009 15\:35\:57 +0530")
-References: <1256252993-24328-1-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-9-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-10-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-11-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-12-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-13-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-14-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-15-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-16-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-17-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-18-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-19-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-20-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-21-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-22-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-23-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-24-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-25-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-26-git-send-email-khilman@deeprootsystems.com>
-	<1256252993-24328-27-git-send-email-khilman@deeprootsystems.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB030A8C87BF@dbde02.ent.ti.com>
-Message-ID: <873a4el3sp.fsf@deeprootsystems.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 16 Nov 2009 19:56:52 +0100
+Subject: [PATCH 2/3] msm: add minimal board file for HTC Dream device
+In-Reply-To: <20091116165716.GD3568@n2100.arm.linux.org.uk> (Russell King's
+	message of "Mon\, 16 Nov 2009 16\:57\:16 +0000")
+References: <20091102104949.GA23456@elf.ucw.cz>
+	<20091116163659.GB3568@n2100.arm.linux.org.uk>
+	<a55d774e0911160843h22938604s8966a58ee71992a@mail.gmail.com>
+	<20091116165716.GD3568@n2100.arm.linux.org.uk>
+Message-ID: <87vdhagux7.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Gopinath, Thara" <thara@ti.com> writes:
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-[...]
-
->>>
->>>+void omap3_pm_off_mode_enable(int enable)
->>>+{
->>>+	struct power_state *pwrst;
->>>+	u32 state;
->>>+
->>>+	if (enable)
->>>+		state = PWRDM_POWER_OFF;
->>>+	else
->>>+		state = PWRDM_POWER_RET;
->>>+
->>>+	list_for_each_entry(pwrst, &pwrst_list, node) {
->>>+		pwrst->next_state = state;
->>>+		set_pwrdm_state(pwrst->pwrdm, state);
+> On Mon, Nov 16, 2009 at 08:43:20AM -0800, Brian Swetland wrote:
+>> What's the best way to handle a situation where there is no valid
+>> debug uart?  Could the arch/platform require DEBUG_LL be unset via
+>> Kconfig directives if it is configured in a way where there is no
+>> valid debug uart?
 >
-> Shld the next states of MPU and CORE domain also be changed? 
+> You're the first to have that issue.  Everyone else has a UART they
+> can always direct stuff at.
 
-No.  MPU & CORE are handled by CPUidle, and there the enable_off_mode
-flag is checked.
+Just for the record, there are machine files without a debug UART, especially in
+the smartphone area.
 
-> It should happen only in idle thread or system suspend path. Not at
-> any arbit point where user sets enable_off_mode.
+In the PXA subworld I know, the UARTs are often used for :
+ - a GSM chip (pxa ffuart)
+ - a Bluetooth chip (pxa btuart)
+ - a GPS chip (pxa stuart / hwuart)
+ - an IR chip (pxa stuart / hwuart)
 
-Why not?  
+I didn't check through the mach-pxa/*.c, but mioa701.c accounts for one, and I
+think magician and hx4700 would be part of it too. That also means kernel
+debugging is _really_ painfull for these platforms.
 
-If the domain is idle, it is turned off immediately.  If it's not idle,
-it doesn't transition until it is.
+Cheers.
 
-Kevin
-<
+--
+Robert
