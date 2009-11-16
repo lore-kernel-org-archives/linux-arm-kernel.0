@@ -1,7 +1,7 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 16 Nov 2009 21:35:06 +0100
-Subject: [PATCH 23/25] imx/mx31lite: use new nand device registration
-In-Reply-To: <1258403708-10287-22-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Mon, 16 Nov 2009 21:35:01 +0100
+Subject: [PATCH 18/25] imx/mx21ads: use new nand device registration
+In-Reply-To: <1258403708-10287-17-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <20091116203406.GA6546@pengutronix.de>
 	<1258403708-10287-1-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1258403708-10287-2-git-send-email-u.kleine-koenig@pengutronix.de>
@@ -20,62 +20,59 @@ References: <20091116203406.GA6546@pengutronix.de>
 	<1258403708-10287-15-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1258403708-10287-16-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1258403708-10287-17-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-18-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-19-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-20-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-21-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258403708-10287-22-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1258403708-10287-23-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1258403708-10287-18-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-mx3/mx31lite.c |   12 +++++-------
- 1 files changed, 5 insertions(+), 7 deletions(-)
+ arch/arm/mach-mx2/mx21ads.c |   13 ++++++-------
+ 1 files changed, 6 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-mx3/mx31lite.c b/arch/arm/mach-mx3/mx31lite.c
-index a8d57de..6884e59 100644
---- a/arch/arm/mach-mx3/mx31lite.c
-+++ b/arch/arm/mach-mx3/mx31lite.c
-@@ -38,7 +38,6 @@
+diff --git a/arch/arm/mach-mx2/mx21ads.c b/arch/arm/mach-mx2/mx21ads.c
+index cf5f77c..ae7ff28 100644
+--- a/arch/arm/mach-mx2/mx21ads.c
++++ b/arch/arm/mach-mx2/mx21ads.c
+@@ -31,7 +31,6 @@
  #include <mach/imx-uart.h>
- #include <mach/iomux-mx3.h>
- #include <mach/irqs.h>
+ #include <mach/imxfb.h>
+ #include <mach/iomux.h>
 -#include <mach/mxc_nand.h>
- #include "devices.h"
+ #include <mach/mmc.h>
+ #include <mach/board-mx21ads.h>
  
- /*
-@@ -59,11 +58,6 @@ static struct imxuart_platform_data uart_pdata = {
- 	.flags = IMXUART_HAVE_RTSCTS,
+@@ -227,11 +226,6 @@ static struct imxmmc_platform_data mx21ads_sdhc_pdata = {
+ 	.exit = mx21ads_sdhc_exit,
  };
  
--static struct mxc_nand_platform_data mx31lite_nand_board_info = {
+-static struct mxc_nand_platform_data mx21ads_nand_board_info = {
 -	.width = 1,
 -	.hw_ecc = 1,
 -};
 -
- static struct smsc911x_platform_config smsc911x_config = {
- 	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
- 	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
-@@ -123,13 +117,17 @@ void __init mx31lite_map_io(void)
-  */
- static void __init mxc_board_init(void)
+ static struct map_desc mx21ads_io_desc[] __initdata = {
+ 	/*
+ 	 * Memory-mapped I/O on MX21ADS Base board:
+@@ -260,6 +254,11 @@ static struct platform_device *platform_devices[] __initdata = {
+ 
+ static void __init mx21ads_board_init(void)
  {
 +	struct mxc_nand_platform_data mxc_nand_pdata = {
 +		.width = 1,
 +		.hw_ecc = 1,
 +	};
- 	int ret;
++
+ 	mxc_gpio_setup_multiple_pins(mx21ads_pins, ARRAY_SIZE(mx21ads_pins),
+ 			"mx21ads");
  
- 	mxc_iomux_setup_multiple_pins(mx31lite_pins, ARRAY_SIZE(mx31lite_pins),
- 				      "mx31lite");
+@@ -268,7 +267,7 @@ static void __init mx21ads_board_init(void)
+ 	mxc_register_device(&mxc_uart_device3, &uart_pdata);
+ 	mxc_register_device(&mxc_fb_device, &mx21ads_fb_data);
+ 	mxc_register_device(&mxc_sdhc_device0, &mx21ads_sdhc_pdata);
+-	mxc_register_device(&mxc_nand_device, &mx21ads_nand_board_info);
++	imx21_add_mxc_nand(&mxc_nand_pdata);
  
- 	mxc_register_device(&mxc_uart_device0, &uart_pdata);
--	mxc_register_device(&mxc_nand_device, &mx31lite_nand_board_info);
-+	imx31_add_mxc_nand(&mxc_nand_pdata);
- 
- 	/* SMSC9117 IRQ pin */
- 	ret = gpio_request(IOMUX_TO_GPIO(MX31_PIN_SFS6), "sms9117-irq");
+ 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
+ }
 -- 
 1.6.5.2
