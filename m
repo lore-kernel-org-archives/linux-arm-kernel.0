@@ -1,39 +1,39 @@
-From: maz@misterjones.org (Marc Zyngier)
-Date: Mon, 16 Nov 2009 17:56:26 +0100
-Subject: [PATCH 0/2] Support for the Arcom Zeus SBC, #2
-In-Reply-To: <f17812d70911160838s91f3b74w4cac9e78edb9fa46@mail.gmail.com>
-References: <20091114182925.17eb58ea@taxman.wild-wind.fr.eu.org>
-	<f17812d70911160838s91f3b74w4cac9e78edb9fa46@mail.gmail.com>
-Message-ID: <20091116175626.3a80983e@life-in-the-fast-lane>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Nov 2009 16:57:16 +0000
+Subject: [PATCH 2/3] msm: add minimal board file for HTC Dream device
+In-Reply-To: <a55d774e0911160843h22938604s8966a58ee71992a@mail.gmail.com>
+References: <20091102104949.GA23456@elf.ucw.cz>
+	<20091116163659.GB3568@n2100.arm.linux.org.uk>
+	<a55d774e0911160843h22938604s8966a58ee71992a@mail.gmail.com>
+Message-ID: <20091116165716.GD3568@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2009 00:38:53 +0800
-Eric Miao <eric.y.miao@gmail.com> wrote:
+On Mon, Nov 16, 2009 at 08:43:20AM -0800, Brian Swetland wrote:
+> What's the best way to handle a situation where there is no valid
+> debug uart?  Could the arch/platform require DEBUG_LL be unset via
+> Kconfig directives if it is configured in a way where there is no
+> valid debug uart?
 
-> On Sun, Nov 15, 2009 at 1:29 AM, Marc Zyngier <maz@misterjones.org>
-> wrote:
-> > The Arcom Zeus is a pxa270 board with a PC104 bus, vaguely similar
-> > to the Arcom Viper. The following patches adds support for most of
-> > the on-board devices (though sound and CAN are still missing).
-> >
-> > Patches are against PXA devel branch. Please note that they depend
-> > on the following patch, currently queued in Eric's fix branch:
-> > http://git.kernel.org/?p=linux/kernel/git/ycmiao/pxa-linux-2.6.git;a=commit;h=b2b36316626f0d6b92c3675a2aa2726efc71d146
-> >
-> > The defconfig patch has been already posted before, and can be
-> > found in the archives at the following address:
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2009-November/004014.html
-> >
-> > This work started from Arcom's 2.6.16, but all bugs are of course
-> > mine.
-> 
-> Marc,
-> 
-> What's the difference of this #2 from #1 you posted earlier?
+You're the first to have that issue.  Everyone else has a UART they
+can always direct stuff at.
 
-#1 is based on 2.6.32-rc7. #2 is based on your PXA devel branch.
+However, I believe you're making the issue far larger than it really is.
 
-	M.
--- 
-Fast. Cheap. Reliable. Pick two.
+1. If you define the DEBUG_LL macros to be empty, printascii() etc will
+   not touch any mapping.
+
+2. If no mapping is going to be touched by printascii(), does it matter
+   whether a UART is mapped via this early mapping stuff?
+
+The answer to (2) is no.
+
+So, you can still arrange for these fields to be populated with a valid
+value even if you don't intend to use the resulting mapping.  And so
+there's no need to force DEBUG_LL to be unset.
+
+If you really have no values you can use, make sure you set io_pg_offst
+to 0x3ffc - the last offset in the L1 page table.  This will cause the
+code to write a single dummy entry at the very top of the page table,
+which will then be overwritten by the generic ARM arch code for its own
+use.
