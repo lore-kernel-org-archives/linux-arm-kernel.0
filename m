@@ -1,33 +1,42 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 16 Nov 2009 16:11:09 +0100
-Subject: [GIT PULL] AT91 board fix for 2.6.32
-Message-ID: <4B016B8D.40701@atmel.com>
+From: abhijeet.tripathy@yahoo.co.in (abhijeet tripathi)
+Date: Mon, 16 Nov 2009 20:49:36 +0530 (IST)
+Subject: kernel panic - Attempted to kill init
+In-Reply-To: <4B012FD3.7000907@who-ing.de>
+Message-ID: <174721.58417.qm@web7607.mail.in.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Thanks to all for the suggestions. It helped me to resolve the issue.
+I was missing EABI support in my kernel.
 
-If it can reach mainline before .32-final, maybe you 
-can pull:
+--regards,
+Abhijeet
 
-  git://github.com/at91linux/linux-2.6-at91.git for-linus
+--- On Mon, 16/11/09, Sebastian Heutling <heutling@who-ing.de> wrote:
 
-and receive the following change:
+> From: Sebastian Heutling <heutling@who-ing.de>
+> Subject: Re: kernel panic - Attempted to kill init
+> To: "abhijeet tripathi" <abhijeet.tripathy@yahoo.co.in>
+> Cc: "linux-arm-kernel at lists.infradead.org" <linux-arm-kernel@lists.infradead.org>, "gmshastri at gmail.com" <gmshastri@gmail.com>, "abhijeet" <abhijeet.tripathy@gmail.com>, "mayur.nan at gmail.com" <mayur.nan@gmail.com>
+> Date: Monday, 16 November, 2009, 4:26 PM
+> On 11/16/2009 08:29 AM, abhijeet
+> tripathi wrote:
+> > Hello,
+> >
+> > I am trying to do a nfs booting of arm-pb1176 but I am
+> getting kernel panic "Kernel panic - not syncing: Attempted
+> to kill init!".
+> > I checked my filesystem and it has "/sbin/init".
+> Please let me know if I am missing anything. Below is the
+> console logs:
+> 
+> Might be that some shared libraries which "/sbin/init"
+> depends on are 
+> missing.
+> 
+> Basti
+> 
+> 
 
-Nicolas Ferre (1):
-      at91: at91sam9g20ek modify dual slot evaluation kit
 
-This will align code with real at91sam9g20 Evaluation Kit from Atmel. The 
-current one is not usable with the official revision of the board. This is 
-why I propose it for .32-final.
-
-Here are the stats for this commit:
-
- arch/arm/mach-at91/Kconfig                     |   20 +++++++++++---------
- arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c |   23 +++++++++++++++--------
- 2 files changed, 26 insertions(+), 17 deletions(-)
-
-Thanks,
-
--- 
-Nicolas Ferre
+      The INTERNET now has a personality. YOURS! See your Yahoo! Homepage. http://in.yahoo.com/
