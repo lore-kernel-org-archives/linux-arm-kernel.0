@@ -1,64 +1,53 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 16 Nov 2009 12:10:55 +0100
-Subject: [PATCH] Update Samsung S5PC100 SoC support
-In-Reply-To: <20091113235317.GY4808@trinity.fluff.org>
-References: <1258014122-18185-1-git-send-email-m.szyprowski@samsung.com>
-	<20091113235317.GY4808@trinity.fluff.org>
-Message-ID: <002101ca66ad$7a50a000$6ef1e000$%szyprowski@samsung.com>
+From: shinya.kuribayashi@necel.com (Shinya Kuribayashi)
+Date: Mon, 16 Nov 2009 20:40:14 +0900
+Subject: [PATCH 23/22] i2c-designware: i2c_dw_handle_tx_abort: Use dev_dbg()
+	for NOACK cases
+In-Reply-To: <4AF419B6.1000802@necel.com>
+References: <4AF419B6.1000802@necel.com>
+Message-ID: <4B013A1E.2050206@necel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+In the case of no-ACKs, we don't want to see dev_err() messages in the
+console, because some utilities like i2c-tools are capable of printing
+decorated console output.  This patch will ease such situations.
 
-On Saturday, November 14, 2009 12:53 AM Ben Dooks wrote:
+Signed-off-by: Shinya Kuribayashi <shinya.kuribayashi@necel.com>
+---
+
+Hi Ben,
+
+ This patch can be applied on the top of the v2 patchset (as 23/22).
+ I've tested the patch with both no-ACK cases and arbitration case.
+ As for errors other than NOACKs, it's worth doing dev_err().
+
+ drivers/i2c/busses/i2c-designware.c |    9 +++++++--
+ 1 files changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-designware.c b/drivers/i2c/busses/i2c-designware.c
+index 4534d45..9e18ef9 100644
+--- a/drivers/i2c/busses/i2c-designware.c
++++ b/drivers/i2c/busses/i2c-designware.c
+@@ -496,13 +496,18 @@ static int i2c_dw_handle_tx_abort(struct dw_i2c_dev *dev)
+ 	unsigned long abort_source = dev->abort_source;
+ 	int i;
  
-> On Thu, Nov 12, 2009 at 09:21:44AM +0100, Marek Szyprowski wrote:
-> > Hello,
-> >
-> > This patch series updates Samsung S5PC100 SoC support. S5PC100 platform
-> > core has been extended with new clocks hierarchy implementation, gpio lib,
-> > support for external and gpio interrupts and some basics of power
-> > management (cpu idle and system reset). Also platform helpers for
-> > s3c framebuffer, i2c and hsmmc drivers has been added.
-> 
-> As such, a new branch git://git.fluff.org/bjdooks/linux next-s5pc1xx
-> has been created. This branch hasn't yet been build tested, or had the
-> patches that failed to apply on them.
-> 
-> The following from the series still need fixups before applying due to
-> the missing FB updates:
-> 
-> Applying: ARM: S5PC1xx: add platform helpers for SDHCI host controllers
-> Applying: ARM: S5PC1xx: add platform helpers for i2c adapter devices
-> 
-> I'll look at fixing these up tomorrow if the FB items haven't been sorted
-> out.
-> 
-> The shortlog is:
-> 
-> Kyungmin Park (9):
->       ARM: SMDKC100: enable S3C FrameBuffer
->       ARM: S5PC1XX: registers rename
->       ARM: S5PC1XX: clock registers rename
->       ARM: S5PC1XX: clocks reimplementation
->       ARM: S5PC1XX: add GPIO L banks to register definition
->       ARM: S5PC1XX: GPIO registers rename
->       ARM: S5PC1XX: add cpu idle and system reset support
->       ARM: SMDKC100: add I2C0 and I2C1 buses support
->       ARM: SMDKC100: add SDHCI controllers 0, 1 and 2 support
-> 
-> If there are any problems, please let me know as soon as possible, as I
-> will be looking to merge these into my main next branch in the next day or
-> so to begin the final stages of the device and clock reworks.
-
-This version does not compile without fb patches. I will send an updated
-version (with your last remarks addressed) of the whole patch series soon.
-Is there a chance you would accept that fb patch?
-
-I'm really curious of the device and clock reworks. I hope you will manage
-to get it working soon and prepare a pre-release version.
-
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
++	if (abort_source & DW_IC_TX_ABRT_NOACK) {
++		for_each_bit(i, &abort_source, ARRAY_SIZE(abort_sources))
++			dev_dbg(dev->dev,
++				"%s: %s\n", __func__, abort_sources[i]);
++		return -EREMOTEIO;
++	}
++
+ 	for_each_bit(i, &abort_source, ARRAY_SIZE(abort_sources))
+ 		dev_err(dev->dev, "%s: %s\n", __func__, abort_sources[i]);
+ 
+ 	if (abort_source & DW_IC_TX_ARB_LOST)
+ 		return -EAGAIN;
+-	else if (abort_source & DW_IC_TX_ABRT_NOACK)
+-		return -EREMOTEIO;
+ 	else if (abort_source & DW_IC_TX_ABRT_GCALL_READ)
+ 		return -EINVAL; /* wrong msgs[] data */
+ 	else
+-- 
+1.6.5.2
