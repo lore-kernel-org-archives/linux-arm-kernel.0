@@ -1,89 +1,28 @@
 From: niej0001@gmail.com (Jun Nie)
-Date: Mon, 16 Nov 2009 17:34:56 +0800
-Subject: [PATCH 7/8] pxa: add frame buffer on pxa168 aspenite platform
-Message-ID: <7c34ac520911160134k57023db1we74073a87a3dd454@mail.gmail.com>
+Date: Mon, 16 Nov 2009 17:35:02 +0800
+Subject: [PATCH 8/8] pxa: add frame buffer on pxa910 ttc_dkb platform
+Message-ID: <7c34ac520911160135x2133c734ub15db7abc64b22a3@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jun Nie <njun@marvell.com>
-Date: Fri, 13 Nov 2009 15:12:19 +0800
-Subject: [PATCH] pxa: add frame buffer on pxa168 aspenite platform
+Date: Fri, 13 Nov 2009 15:07:45 +0800
+Subject: [PATCH] pxa: add frame buffer on pxa910 ttc_dkb platform
 
 Signed-off-by: Jun Nie <njun@marvell.com>
 ---
- arch/arm/configs/pxa168_defconfig       |   86 +++++++++++++++++++-
- arch/arm/mach-mmp/aspenite.c            |  136 +++++++++++++++++++++++++++++++
- arch/arm/mach-mmp/include/mach/pxa168.h |    8 ++
- arch/arm/mach-mmp/pxa168.c              |    3 +
- 4 files changed, 231 insertions(+), 2 deletions(-)
+ arch/arm/configs/pxa910_defconfig       |   39 ++++++++-
+ arch/arm/mach-mmp/include/mach/pxa910.h |    8 ++
+ arch/arm/mach-mmp/pxa910.c              |    4 +
+ arch/arm/mach-mmp/ttc_dkb.c             |  144 +++++++++++++++++++++++++++++++
+ 4 files changed, 194 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/configs/pxa168_defconfig
-b/arch/arm/configs/pxa168_defconfig
-index db5faea..b736517 100644
---- a/arch/arm/configs/pxa168_defconfig
-+++ b/arch/arm/configs/pxa168_defconfig
-@@ -509,7 +509,49 @@ CONFIG_UNIX98_PTYS=y
- # CONFIG_R3964 is not set
- # CONFIG_RAW_DRIVER is not set
- # CONFIG_TCG_TPM is not set
--# CONFIG_I2C is not set
-+CONFIG_I2C=y
-+CONFIG_I2C_BOARDINFO=y
-+# CONFIG_I2C_CHARDEV is not set
-+CONFIG_I2C_HELPER_AUTO=y
-+CONFIG_I2C_ALGOBIT=y
-+
-+#
-+# I2C Hardware Bus support
-+#
-+
-+#
-+# I2C system bus drivers (mostly embedded / system-on-chip)
-+#
-+# CONFIG_I2C_DESIGNWARE is not set
-+CONFIG_I2C_GPIO=y
-+# CONFIG_I2C_OCORES is not set
-+CONFIG_I2C_PXA=y
-+# CONFIG_I2C_PXA_SLAVE is not set
-+# CONFIG_I2C_SIMTEC is not set
-+
-+#
-+# External I2C/SMBus adapter drivers
-+#
-+# CONFIG_I2C_PARPORT_LIGHT is not set
-+# CONFIG_I2C_TAOS_EVM is not set
-+
-+#
-+# Other I2C/SMBus bus drivers
-+#
-+# CONFIG_I2C_PCA_PLATFORM is not set
-+# CONFIG_I2C_STUB is not set
-+
-+#
-+# Miscellaneous I2C Chip support
-+#
-+# CONFIG_DS1682 is not set
-+# CONFIG_SENSORS_PCF8574 is not set
-+# CONFIG_PCF8575 is not set
-+# CONFIG_SENSORS_TSL2550 is not set
-+# CONFIG_I2C_DEBUG_CORE is not set
-+# CONFIG_I2C_DEBUG_ALGO is not set
-+# CONFIG_I2C_DEBUG_BUS is not set
-+# CONFIG_I2C_DEBUG_CHIP is not set
- # CONFIG_SPI is not set
- CONFIG_ARCH_REQUIRE_GPIOLIB=y
- CONFIG_GPIOLIB=y
-@@ -523,6 +565,9 @@ CONFIG_GPIOLIB=y
- #
- # I2C GPIO expanders:
- #
-+# CONFIG_GPIO_MAX732X is not set
-+CONFIG_GPIO_PCA953X=y
-+# CONFIG_GPIO_PCF857X is not set
-
- #
- # PCI GPIO expanders:
-@@ -578,7 +623,34 @@ CONFIG_SSB_POSSIBLE=y
+diff --git a/arch/arm/configs/pxa910_defconfig
+b/arch/arm/configs/pxa910_defconfig
+index 8c7e299..b9b1a85 100644
+--- a/arch/arm/configs/pxa910_defconfig
++++ b/arch/arm/configs/pxa910_defconfig
+@@ -578,7 +578,34 @@ CONFIG_SSB_POSSIBLE=y
  #
  # CONFIG_VGASTATE is not set
  # CONFIG_VIDEO_OUTPUT_CONTROL is not set
@@ -92,9 +31,9 @@ index db5faea..b736517 100644
 +# CONFIG_FIRMWARE_EDID is not set
 +# CONFIG_FB_DDC is not set
 +# CONFIG_FB_BOOT_VESA_SUPPORT is not set
-+# CONFIG_FB_CFB_FILLRECT is not set
-+# CONFIG_FB_CFB_COPYAREA is not set
-+# CONFIG_FB_CFB_IMAGEBLIT is not set
++CONFIG_FB_CFB_FILLRECT=y
++CONFIG_FB_CFB_COPYAREA=y
++CONFIG_FB_CFB_IMAGEBLIT=y
 +# CONFIG_FB_CFB_REV_PIXELS_IN_BYTE is not set
 +# CONFIG_FB_SYS_FILLRECT is not set
 +# CONFIG_FB_SYS_COPYAREA is not set
@@ -119,7 +58,7 @@ index db5faea..b736517 100644
  # CONFIG_BACKLIGHT_LCD_SUPPORT is not set
 
  #
-@@ -591,6 +663,16 @@ CONFIG_SSB_POSSIBLE=y
+@@ -591,6 +618,16 @@ CONFIG_SSB_POSSIBLE=y
  #
  # CONFIG_VGA_CONSOLE is not set
  CONFIG_DUMMY_CONSOLE=y
@@ -136,113 +75,182 @@ index db5faea..b736517 100644
  # CONFIG_SOUND is not set
  # CONFIG_HID_SUPPORT is not set
  # CONFIG_USB_SUPPORT is not set
-diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
-index 21cecfc..25d7050 100644
---- a/arch/arm/mach-mmp/aspenite.c
-+++ b/arch/arm/mach-mmp/aspenite.c
-@@ -17,6 +17,7 @@
+diff --git a/arch/arm/mach-mmp/include/mach/pxa910.h
+b/arch/arm/mach-mmp/include/mach/pxa910.h
+index 6ae1ed7..7698793 100644
+--- a/arch/arm/mach-mmp/include/mach/pxa910.h
++++ b/arch/arm/mach-mmp/include/mach/pxa910.h
+@@ -4,6 +4,7 @@
+ #include <linux/i2c.h>
+ #include <mach/devices.h>
+ #include <plat/i2c.h>
++#include <video/pxa168fb.h>
+
+ extern struct pxa_device_desc pxa910_device_uart1;
+ extern struct pxa_device_desc pxa910_device_uart2;
+@@ -13,6 +14,7 @@ extern struct pxa_device_desc pxa910_device_pwm1;
+ extern struct pxa_device_desc pxa910_device_pwm2;
+ extern struct pxa_device_desc pxa910_device_pwm3;
+ extern struct pxa_device_desc pxa910_device_pwm4;
++extern struct pxa_device_desc pxa910_device_fb;
+
+ static inline int pxa910_add_uart(int id)
+ {
+@@ -64,4 +66,10 @@ static inline int pxa910_add_pwm(int id)
+
+ 	return pxa_register_device(d, NULL, 0);
+ }
++
++static inline int pxa910_add_fb(struct pxa168fb_mach_info *mi)
++{
++	return pxa_register_device(&pxa910_device_fb, mi, sizeof(*mi));
++}
++
+ #endif /* __ASM_MACH_PXA910_H */
+diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
+index 5882ca6..48162a0 100644
+--- a/arch/arm/mach-mmp/pxa910.c
++++ b/arch/arm/mach-mmp/pxa910.c
+@@ -110,6 +110,8 @@ static APBC_CLK(pwm2, PXA910_PWM2, 1, 13000000);
+ static APBC_CLK(pwm3, PXA910_PWM3, 1, 13000000);
+ static APBC_CLK(pwm4, PXA910_PWM4, 1, 13000000);
+
++static APMU_CLK(lcd, LCD, 0x003f, 312000000);
++
+ /* device and clock bindings */
+ static struct clk_lookup pxa910_clkregs[] = {
+ 	INIT_CLKREG(&clk_uart1, "pxa2xx-uart.0", NULL),
+@@ -120,6 +122,7 @@ static struct clk_lookup pxa910_clkregs[] = {
+ 	INIT_CLKREG(&clk_pwm2, "pxa910-pwm.1", NULL),
+ 	INIT_CLKREG(&clk_pwm3, "pxa910-pwm.2", NULL),
+ 	INIT_CLKREG(&clk_pwm4, "pxa910-pwm.3", NULL),
++	INIT_CLKREG(&clk_lcd, "pxa910-fb", "LCDCLK"),
+ };
+
+ static int __init pxa910_init(void)
+@@ -174,3 +177,4 @@ PXA910_DEVICE(pwm1, "pxa910-pwm", 0, NONE,
+0xd401a000, 0x10);
+ PXA910_DEVICE(pwm2, "pxa910-pwm", 1, NONE, 0xd401a400, 0x10);
+ PXA910_DEVICE(pwm3, "pxa910-pwm", 2, NONE, 0xd401a800, 0x10);
+ PXA910_DEVICE(pwm4, "pxa910-pwm", 3, NONE, 0xd401ac00, 0x10);
++PXA910_DEVICE(fb, "pxa910-fb", -1, LCD, 0xd420b000, 0x1c8);
+diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
+index dbd8cfd..15e64b4 100644
+--- a/arch/arm/mach-mmp/ttc_dkb.c
++++ b/arch/arm/mach-mmp/ttc_dkb.c
+@@ -14,6 +14,8 @@
+ #include <linux/mtd/mtd.h>
  #include <linux/mtd/partitions.h>
- #include <linux/mtd/nand.h>
- #include <linux/i2c/pca953x.h>
+ #include <linux/mtd/onenand.h>
 +#include <linux/delay.h>
++#include <video/pxa168fb.h>
 
  #include <asm/mach-types.h>
  #include <asm/mach/arch.h>
-@@ -66,6 +67,39 @@ static unsigned long common_pin_config[] __initdata = {
- 	/* UART1 */
- 	GPIO107_UART1_RXD,
- 	GPIO108_UART1_TXD,
+@@ -21,6 +23,7 @@
+ #include <mach/addr-map.h>
+ #include <mach/mfp-pxa910.h>
+ #include <mach/pxa910.h>
++#include <mach/gpio.h>
+
+ #include "common.h"
+
+@@ -54,8 +57,146 @@ static unsigned long ttc_dkb_pin_config[] __initdata = {
+ 	DF_WEn_DF_WEn,
+ 	DF_REn_DF_REn,
+ 	DF_RDY0_DF_RDY0,
 +
 +#ifdef CONFIG_FB_PXA168
 +	/* LCD */
-+	GPIO56_LCD_FCLK_RD,
-+	GPIO57_LCD_LCLK_A0,
-+	GPIO58_LCD_PCLK_WR,
-+	GPIO59_LCD_DENA_BIAS,
-+	GPIO60_LCD_DD0,
-+	GPIO61_LCD_DD1,
-+	GPIO62_LCD_DD2,
-+	GPIO63_LCD_DD3,
-+	GPIO64_LCD_DD4,
-+	GPIO65_LCD_DD5,
-+	GPIO66_LCD_DD6,
-+	GPIO67_LCD_DD7,
-+	GPIO68_LCD_DD8,
-+	GPIO69_LCD_DD9,
-+	GPIO70_LCD_DD10,
-+	GPIO71_LCD_DD11,
-+	GPIO72_LCD_DD12,
-+	GPIO73_LCD_DD13,
-+	GPIO74_LCD_DD14,
-+	GPIO75_LCD_DD15,
-+
-+	GPIO76_LCD_DD16,
-+	GPIO77_LCD_DD17,
-+	GPIO78_LCD_DD18,
-+	GPIO79_LCD_DD19,
-+	GPIO80_LCD_DD20,
-+	GPIO81_LCD_DD21,
-+	GPIO82_LCD_DD22,
-+	GPIO83_LCD_DD23,
++	GPIO81_LCD_FCLK,
++	GPIO82_LCD_LCLK,
++	GPIO83_LCD_PCLK,
++	GPIO84_LCD_DENA,
++	GPIO85_LCD_DD0,
++	GPIO86_LCD_DD1,
++	GPIO87_LCD_DD2,
++	GPIO88_LCD_DD3,
++	GPIO89_LCD_DD4,
++	GPIO90_LCD_DD5,
++	GPIO91_LCD_DD6,
++	GPIO92_LCD_DD7,
++	GPIO93_LCD_DD8,
++	GPIO94_LCD_DD9,
++	GPIO95_LCD_DD10,
++	GPIO96_LCD_DD11,
++	GPIO97_LCD_DD12,
++	GPIO98_LCD_DD13,
++	GPIO100_LCD_DD14,
++	GPIO101_LCD_DD15,
++	GPIO102_LCD_DD16,
++	GPIO103_LCD_DD17,
++	GPIO104_LCD_SPIDOUT,
++	GPIO105_LCD_SPIDIN,
++	GPIO107_LCD_CS1,
++	GPIO108_LCD_DCLK,
++	GPIO106_LCD_RESET,
 +#endif
- };
-
- static struct smc91x_platdata smc91x_info = {
-@@ -95,6 +129,105 @@ static struct platform_device smc91x_device = {
- 	.resource	= smc91x_resources,
- };
-
++};
++
 +#ifdef CONFIG_FB_PXA168
 +static u16 tpo_spi_cmdon[] = {
-+	0x080F,
-+	0x0C5F,
-+	0x1017,
-+	0x1420,
-+	0x1808,
-+	0x1c20,
-+	0x2020,
-+	0x2420,
-+	0x2820,
-+	0x2c20,
-+	0x3020,
-+	0x3420,
-+	0x3810,
-+	0x3c10,
-+	0x4010,
-+	0x4415,
-+	0x48aa,
-+	0x4cff,
-+	0x5086,
-+	0x548d,
-+	0x58d4,
-+	0x5cfb,
-+	0x602e,
-+	0x645a,
-+	0x6889,
-+	0x6cfe,
-+	0x705a,
-+	0x749b,
-+	0x78c5,
-+	0x7cff,
-+	0x80f0,
-+	0x84f0,
-+	0x8808,
++	0x0801,
++	0x0800,
++	0x0200,
++	0x0304,
++	0x040e,
++	0x0903,
++	0x0b18,
++	0x0c53,
++	0x0d01,
++	0x0ee0,
++	0x0f01,
++	0x1058,
++	0x201e,
++	0x210a,
++	0x220a,
++	0x231e,
++	0x2400,
++	0x2532,
++	0x2600,
++	0x27ac,
++	0x2904,
++	0x2aa2,
++	0x2b45,
++	0x2c45,
++	0x2d15,
++	0x2e5a,
++	0x2fff,
++	0x306b,
++	0x310d,
++	0x3248,
++	0x3382,
++	0x34bd,
++	0x35e7,
++	0x3618,
++	0x3794,
++	0x3801,
++	0x395d,
++	0x3aae,
++	0x3bff,
++	0x07c9,		/* auto power on */
 +};
 +
 +static u16 tpo_spi_cmdoff[] = {
-+	0x0c5e,		/* standby */
++	0x07d9,		/* auto power off */
 +};
 +
 +static int tpo_lcd_power(struct pxa168fb_info *fbi, unsigned int spi_gpio_cs,
 +		unsigned int spi_gpio_reset, int on)
 +{
 +	int err = 0;
++
 +	if (on) {
 +		if (spi_gpio_reset != -1) {
 +			err = gpio_request(spi_gpio_reset, "TPO_LCD_SPI_RESET");
 +			if (err) {
 +				printk(KERN_ERR "failed to request GPIO for TPO LCD RESET\n");
-+				return err;
++				return -EIO;
 +			}
 +			gpio_direction_output(spi_gpio_reset, 0);
 +			msleep(100);
@@ -251,116 +259,58 @@ index 21cecfc..25d7050 100644
 +			gpio_free(spi_gpio_reset);
 +		}
 +		return pxa168fb_spi_send(fbi, tpo_spi_cmdon,
-+				ARRAY_SIZE(tpo_spi_cmdon), spi_gpio_cs, 0, 1);
++				ARRAY_SIZE(tpo_spi_cmdon), spi_gpio_cs, 0, 40);
 +	} else
 +		return pxa168fb_spi_send(fbi, tpo_spi_cmdoff,
-+				ARRAY_SIZE(tpo_spi_cmdoff), spi_gpio_cs, 0, 1);
++				ARRAY_SIZE(tpo_spi_cmdoff), spi_gpio_cs, 0, 0);
 +}
 +
-+static struct fb_videomode video_modes_aspen[] = {
++static struct fb_videomode video_modes[] = {
++	/* lpj032l001b HVGA mode info */
 +	[0] = {
-+		.pixclock       = 30120,
++		.pixclock       = 100000,
 +		.refresh        = 60,
-+		.xres           = 800,
++		.xres           = 320,
 +		.yres           = 480,
-+		.hsync_len      = 1,
-+		.left_margin    = 215,
-+		.right_margin   = 40,
-+		.vsync_len      = 1,
-+		.upper_margin   = 34,
-+		.lower_margin   = 10,
++		.hsync_len      = 10,
++		.left_margin    = 15,
++		.right_margin   = 10,
++		.vsync_len      = 2,
++		.upper_margin   = 4,
++		.lower_margin   = 2,
 +		.sync           = 0,
 +	},
-+};
-+
-+struct pxa168fb_mach_info aspenite_lcd_info __initdata = {
-+	.id                     = "Base-aspen",
-+	.modes                  = video_modes_aspen,
-+	.num_modes              = ARRAY_SIZE(video_modes_aspen),
-+	.pix_fmt                = PIX_FMT_RGB565,
-+	.io_pin_allocation_mode = PIN_MODE_DUMB_24,
-+	.dumb_mode              = DUMB_MODE_RGB888,
-+	.active                 = 1,
-+	.spi_ctrl		= CFG_SCLKCNT(2) | CFG_TXBITS(16) |
-+		CFG_SPI_SEL(1) | CFG_SPI_3W4WB(1) | CFG_SPI_ENA(1),
-+	.spi_gpio_cs		= GPIO_EXT1(14),
-+	.spi_gpio_reset         = -1,
-+	.invert_pixclock	= 1,
-+	.pxa168fb_lcd_power     = tpo_lcd_power,
-+};
-+
-+#endif
-+
- #if defined(CONFIG_MTD_NAND) || defined(CONFIG_MTD_NAND_MODULE)
- static struct mtd_partition apn_nand_partitions[] = {
- 	{
-@@ -184,6 +317,9 @@ static void __init common_init(void)
-
- 	/* on-chip devices */
- 	pxa168_add_uart(1);
-+#ifdef CONFIG_FB_PXA168
-+	pxa168_add_fb(&aspenite_lcd_info);
-+#endif
-
- 	apn_init_nand();
- 	pxa168_add_twsi(0, &pwri2c_info,
-diff --git a/arch/arm/mach-mmp/include/mach/pxa168.h
-b/arch/arm/mach-mmp/include/mach/pxa168.h
-index d117ceb..d43fb13 100644
---- a/arch/arm/mach-mmp/include/mach/pxa168.h
-+++ b/arch/arm/mach-mmp/include/mach/pxa168.h
-@@ -4,6 +4,7 @@
- #include <linux/i2c.h>
- #include <mach/devices.h>
- #include <plat/i2c.h>
-+#include <video/pxa168fb.h>
-
- extern struct pxa_device_desc pxa168_device_uart1;
- extern struct pxa_device_desc pxa168_device_uart2;
-@@ -14,6 +15,7 @@ extern struct pxa_device_desc pxa168_device_pwm2;
- extern struct pxa_device_desc pxa168_device_pwm3;
- extern struct pxa_device_desc pxa168_device_pwm4;
- extern struct pxa_device_desc pxa168_device_nand;
-+extern struct pxa_device_desc pxa168_device_fb;
-
- static inline int pxa168_add_uart(int id)
- {
-@@ -65,4 +67,10 @@ static inline int pxa168_add_pwm(int id)
-
- 	return pxa_register_device(d, NULL, 0);
- }
-+
-+static inline int pxa168_add_fb(struct pxa168fb_mach_info *mi)
-+{
-+	return pxa_register_device(&pxa168_device_fb, mi, sizeof(*mi));
-+}
-+
- #endif /* __ASM_MACH_PXA168_H */
-diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
-index 59b393e..8be1e46 100644
---- a/arch/arm/mach-mmp/pxa168.c
-+++ b/arch/arm/mach-mmp/pxa168.c
-@@ -74,6 +74,7 @@ static APBC_CLK(pwm3, PXA168_PWM3, 1, 13000000);
- static APBC_CLK(pwm4, PXA168_PWM4, 1, 13000000);
-
- static APMU_CLK(nand, NAND, 0x1db, 208000000);
-+static APMU_CLK(lcd, LCD, 0x003f, 312000000);
-
- /* device and clock bindings */
- static struct clk_lookup pxa168_clkregs[] = {
-@@ -86,6 +87,7 @@ static struct clk_lookup pxa168_clkregs[] = {
- 	INIT_CLKREG(&clk_pwm2, "pxa168-pwm.1", NULL),
- 	INIT_CLKREG(&clk_pwm3, "pxa168-pwm.2", NULL),
- 	INIT_CLKREG(&clk_pwm4, "pxa168-pwm.3", NULL),
-+	INIT_CLKREG(&clk_lcd, "pxa168-fb", "LCDCLK"),
  };
 
- static int __init pxa168_init(void)
-@@ -132,3 +134,4 @@ PXA168_DEVICE(pwm2, "pxa168-pwm", 1, NONE,
-0xd401a400, 0x10);
- PXA168_DEVICE(pwm3, "pxa168-pwm", 2, NONE, 0xd401a800, 0x10);
- PXA168_DEVICE(pwm4, "pxa168-pwm", 3, NONE, 0xd401ac00, 0x10);
- PXA168_DEVICE(nand, "pxa3xx-nand", -1, NAND, 0xd4283000, 0x200, 97, 99);
-+PXA168_DEVICE(fb, "pxa168-fb", -1, LCD, 0xd420b000, 0x1c8);
++static struct pxa168fb_mach_info ttc_dkb_lcd_info __initdata = {
++	.id                     = "Base",
++	.modes                  = video_modes,
++	.num_modes              = ARRAY_SIZE(video_modes),
++	.pix_fmt                = PIX_FMT_RGB565,
++	.io_pin_allocation_mode = PIN_MODE_DUMB_18_SPI,
++	.dumb_mode              = DUMB_MODE_RGB666,
++	.active                 = 1,
++	.spi_ctrl               = CFG_SCLKCNT(16) | CFG_TXBITS(16) |
++		CFG_SPI_SEL(1) | CFG_SPI_3W4WB(1) | CFG_SPI_ENA(1),
++	.spi_gpio_cs            = -1,
++	.spi_gpio_reset		= mfp_to_gpio(MFP_PIN_GPIO106),
++	.invert_pixclock	= 1,
++	.pxa168fb_lcd_power	= tpo_lcd_power,
++};
++#endif
++
+ #if defined(CONFIG_MTD_ONENAND) || defined(CONFIG_MTD_ONENAND_MODULE)
+ static struct mtd_partition ttc_dkb_onenand_partitions[] = {
+ 	{
+@@ -123,6 +264,9 @@ static void __init ttc_dkb_init(void)
+
+ 	/* on-chip devices */
+ 	pxa910_add_uart(1);
++#ifdef CONFIG_FB_PXA168
++	pxa910_add_fb(&ttc_dkb_lcd_info);
++#endif
+
+ 	/* off-chip devices */
+ 	ttc_dkb_init_onenand();
 -- 
 1.5.4.3
