@@ -1,54 +1,42 @@
-From: giometti@enneenne.com (Rodolfo Giometti)
-Date: Tue, 17 Nov 2009 14:16:46 +0100
-Subject: [PATCH] arm pxa: remove "direction input" forcing for IRQ GPIOs
-In-Reply-To: <20091117130653.GX14091@buzzloop.caiaq.de>
-References: <1258456906-12338-1-git-send-email-giometti@linux.it>
-	<20091117114429.GT14091@buzzloop.caiaq.de>
-	<20091117120501.GC8008@gundam.enneenne.com>
-	<20091117123422.GU14091@buzzloop.caiaq.de>
-	<20091117123721.GG8008@gundam.enneenne.com>
-	<20091117124334.GW14091@buzzloop.caiaq.de>
-	<20091117125953.GI8008@gundam.enneenne.com>
-	<20091117130653.GX14091@buzzloop.caiaq.de>
-Message-ID: <20091117131646.GJ8008@gundam.enneenne.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 17 Nov 2009 14:49:44 +0100
+Subject: [PATCH 16/25] imx: generalize nand device registration
+In-Reply-To: <1258403708-10287-16-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1258403708-10287-7-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1258403708-10287-8-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1258403708-10287-9-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1258403708-10287-10-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1258403708-10287-11-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1258403708-10287-12-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1258403708-10287-13-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1258403708-10287-14-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1258403708-10287-15-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1258403708-10287-16-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20091117134944.GB3147@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2009 at 02:06:53PM +0100, Daniel Mack wrote:
-> On Tue, Nov 17, 2009 at 01:59:53PM +0100, Rodolfo Giometti wrote:
-> > On Tue, Nov 17, 2009 at 01:43:34PM +0100, Daniel Mack wrote:
-> > > On Tue, Nov 17, 2009 at 01:37:21PM +0100, Rodolfo Giometti wrote:
-> > > > On Tue, Nov 17, 2009 at 01:34:22PM +0100, Daniel Mack wrote:
-> > > > > For such situations, the pullup/pulldown functions are normally used.
-> > > > > Have you tried that?
-> > > > 
-> > > > Yes, the code has been tested on my board and it works perfectly.
-> > > 
-> > > What I mean is a mfp_cfg_t configuration as input pin with pull flags
-> > > MFP_PULL_{HIGH,LOW} set.
-> > 
-> > I see... no I didn't noticed such possibility.
-> > 
-> > however I suppose that even using such flags my patch is needed in
-> > order to avoid pxa_gpio_irq_type() forcing the input direction...
-> 
-> No, that's exactly my point. You don't need to set the pin to output
-> direction to make use of those pull features. More than that, when
-> confiugured as output, the pull flags actually don't make sense.
-> 
-> As an IRQ is always inbound, I agree with Eric that the code should
-> stay in there for safety and sanity.
+Hello,
 
-I see what you mean... I'll test those flags and report results ASAP.
+> +int __init imx_add_mxc_nand(resource_size_t base, int irq,
+> +		const struct mxc_nand_platform_data *pdata)
+> +{
+> +	static int id = 0;
+While looking at Russell's suggestion to use __initdata for pdata I
+noticed that id lives in .bss.  So I fixed that, too, by making the
+above line:
 
-Thanks,
+	static int id __initdata = 0;
 
-Rodolfo
+(Actually better would be:
+
+	static int id __initbss;
+
+but this doesn't exist.)
+
+Best regards
+Uwe
 
 -- 
-
-GNU/Linux Solutions                  e-mail: giometti at enneenne.com
-Linux Device Driver                          giometti at linux.it
-Embedded Systems                     phone:  +39 349 2432127
-UNIX programming                     skype:  rodolfo.giometti
-Freelance ICT Italia - Consulente ICT Italia - www.consulenti-ict.it
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
