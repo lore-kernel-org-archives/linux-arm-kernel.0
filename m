@@ -1,61 +1,38 @@
-From: giometti@enneenne.com (Rodolfo Giometti)
-Date: Tue, 17 Nov 2009 13:59:53 +0100
-Subject: [PATCH] arm pxa: remove "direction input" forcing for IRQ GPIOs
-In-Reply-To: <20091117124334.GW14091@buzzloop.caiaq.de>
-References: <1258456906-12338-1-git-send-email-giometti@linux.it>
-	<20091117114429.GT14091@buzzloop.caiaq.de>
-	<20091117120501.GC8008@gundam.enneenne.com>
-	<20091117123422.GU14091@buzzloop.caiaq.de>
-	<20091117123721.GG8008@gundam.enneenne.com>
-	<20091117124334.GW14091@buzzloop.caiaq.de>
-Message-ID: <20091117125953.GI8008@gundam.enneenne.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Tue, 17 Nov 2009 13:01:18 +0000
+Subject: [PATCH] drivers: MMC: enable SDHCI-S3C on S5PC1XX platform
+In-Reply-To: <20091117121143.09246257@life-in-the-fast-lane>
+References: <1258444374-21479-1-git-send-email-m.szyprowski@samsung.com>
+	<20091117121143.09246257@life-in-the-fast-lane>
+Message-ID: <20091117130116.GY23772@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2009 at 01:43:34PM +0100, Daniel Mack wrote:
-> On Tue, Nov 17, 2009 at 01:37:21PM +0100, Rodolfo Giometti wrote:
-> > On Tue, Nov 17, 2009 at 01:34:22PM +0100, Daniel Mack wrote:
-> > > On Tue, Nov 17, 2009 at 01:05:01PM +0100, Rodolfo Giometti wrote:
-> > > > On Tue, Nov 17, 2009 at 12:44:29PM +0100, Daniel Mack wrote:
-> > > > > On Tue, Nov 17, 2009 at 12:21:46PM +0100, Rodolfo Giometti wrote:
-> > > > > > PXA CPUs may use their GPIOs as IRQ lines even if they are selected as
-> > > > > > outputs (see for example figure 24-1 into PXA27x Processor Family
-> > > > > > Developer's Manual). So forcing GPIOs IRQ lines as inputs is not
-> > > > > > correct.
-> > > > > > 
-> > > > > > Programmers should set up GPIOs direction according to their usage and
-> > > > > > the function pxa_gpio_irq_type() should simply enable the IRQ
-> > > > > > detection.
-> > > > > 
-> > > > > Interesting. Is this an academic issue or do you actually use that?
-> > > > > That would mean you externally drive the IO pin level to something else
-> > > > > than the output driver provides, which isn't healthy at all.
-> > > > 
-> > > > It's a real configuration with no electrical drawbacks at all! Of
-> > > > course the driver's output must be passive (I use it to detect a CARD
-> > > > insert) but it's functional.
-> > > 
-> > > For such situations, the pullup/pulldown functions are normally used.
-> > > Have you tried that?
-> > 
-> > Yes, the code has been tested on my board and it works perfectly.
+On Tue, Nov 17, 2009 at 12:11:43PM +0100, Marc Zyngier wrote:
+> On Tue, 17 Nov 2009 08:52:54 +0100
+> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
 > 
-> What I mean is a mfp_cfg_t configuration as input pin with pull flags
-> MFP_PULL_{HIGH,LOW} set.
+> I think it was Ben that suggested once to introduce a HAVE_SDHCI_S3C
+> symbol, selected by interested parties (S3C, S5P, S5PC...).
 
-I see... no I didn't noticed such possibility.
+Yes, I did mention this and it is an option to either replace the patch
+now or to do at a later date to tidy things up. I'm not going to reject
+this patch now (or force a rewrite at this late stage)
 
-however I suppose that even using such flags my patch is needed in
-order to avoid pxa_gpio_irq_type() forcing the input direction...
+I'll try and look at acking the last set of SDHCI patches Thomas sent
+and see if akpm will pick them up for linux-mmc.
 
-Ciao,
+> Given the way Samsung SoCs are assembled (from an IP point of view), it
+> would make sense for one SoC to describe its features in
+> "HAVE_FEATURE_FOO" terms rather than each subsystem depending an ever
+> growing list of SoC.
 
-Rodolfo
+Yes, I was feeling that this is something that we should probably discuss
+either on linux-arm-kernel or to a wide audience. It might not suit
+everyone's taste, etc.
 
 -- 
+Ben
 
-GNU/Linux Solutions                  e-mail: giometti at enneenne.com
-Linux Device Driver                          giometti at linux.it
-Embedded Systems                     phone:  +39 349 2432127
-UNIX programming                     skype:  rodolfo.giometti
-Freelance ICT Italia - Consulente ICT Italia - www.consulenti-ict.it
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
