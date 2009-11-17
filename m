@@ -1,50 +1,74 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Tue, 17 Nov 2009 23:34:35 +0100
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Tue, 17 Nov 2009 23:47:09 +0100
 Subject: IXP4xx: unneeded #include platform-specific include files?
-In-Reply-To: <m3skcc4wrm.fsf@intrepid.localdomain>
+In-Reply-To: <op.u3j8zxsd2s3iss@richese> (Imre Kaloz's message of "Tue, 17 Nov
+	2009 23:34:35 +0100")
 References: <m3fx8fso72.fsf@intrepid.localdomain>
 	<19200.18453.644399.845601@pilspetsen.it.uu.se>
-	<op.u3gddjdi2s3iss@ecaz>
-	<m3y6m7qylr.fsf@intrepid.localdomain> <op.u3j6cak02s3iss@richese>
-	<m3ws1o4y3h.fsf@intrepid.localdomain> <op.u3j7xuh92s3iss@richese>
-	<m3skcc4wrm.fsf@intrepid.localdomain>
-Message-ID: <op.u3j8zxsd2s3iss@richese>
+	<op.u3gddjdi2s3iss@ecaz> <m3y6m7qylr.fsf@intrepid.localdomain>
+	<op.u3j6cak02s3iss@richese> <m3ws1o4y3h.fsf@intrepid.localdomain>
+	<op.u3j7xuh92s3iss@richese> <m3skcc4wrm.fsf@intrepid.localdomain>
+	<op.u3j8zxsd2s3iss@richese>
+Message-ID: <m3ocn04vma.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2009.11.17. 23:22:21 Krzysztof Halasa <khc@pm.waw.pl> wrote:
+"Imre Kaloz" <kaloz@openwrt.org> writes:
 
-> "Imre Kaloz" <kaloz@openwrt.org> writes:
->
->> Why wouldn't you want to remember that "INTA" was "GPIO8"? When you want to
->> touch those lines you do have to remember or look up what GPIO was that one.
->> So this hardly makes it easier to work with or to remember to -- it certainly
->> duplicates the assignments, as you've also noted.
->
-> Actually I'm not sure if I understand you correctly.
->
-> If I use GPIO8 (presumably in different places) I have to remember what
-> it is. This may be use with a couple of IRQ lines but gets harder and
-> harder with a more complicated machine. Macros like SLOT0_INTA etc.
-> don't have this problem. That's BTW why macros and symbolic names were
-> invented.
+> Yeah, you get rid of the external .h files for dropping all that bloat
+> into the setup
+> files. Honestly, do however you please, but this hardly makes sense
+> IMHO when you have
+> the chance to get rid of all this mess.
 
-I doubt they were invented for "#define a b" "#define b c" "#define c d" games.
+What I'm thinking about is (cut & paste):
 
->> The INTx naming convention is also stupid, as in most cases these are
->> not different
->> INT lines of the PCI slot but either separate slots or subdevices -- and note,
->> most of the boards only have INTa connected mechanically.
->>
->> And I didn't even get to the topic of *_PCI_MAX_DEV, *_PCI_IRQ_LINES
->> and the mania
->> of pci_irq_table usage..
->
-> But you've seen the patches I just posted, haven't you?
+--- a/arch/arm/mach-ixp4xx/avila-pci.c
++++ b/arch/arm/mach-ixp4xx/avila-pci.c
+@@ -27,49 +27,40 @@
+ #include <mach/hardware.h>
+ #include <asm/mach-types.h>
+ 
+-#define AVILA_PCI_MAX_DEV      4
+-#define LOFT_PCI_MAX_DEV       6
+-#define AVILA_PCI_IRQ_LINES    4
++#define AVILA_MAX_DEV  4
++#define LOFT_MAX_DEV   6
++#define IRQ_LINES      4
+ 
+ /* PCI controller GPIO to IRQ pin mappings */
+-#define AVILA_PCI_INTA_PIN     11
+-#define AVILA_PCI_INTB_PIN     10
+-#define AVILA_PCI_INTC_PIN     9
+-#define AVILA_PCI_INTD_PIN     8
+-
+-#define IRQ_AVILA_PCI_INTA     IRQ_IXP4XX_GPIO11
+-#define IRQ_AVILA_PCI_INTB     IRQ_IXP4XX_GPIO10
+-#define IRQ_AVILA_PCI_INTC     IRQ_IXP4XX_GPIO9
+-#define IRQ_AVILA_PCI_INTD     IRQ_IXP4XX_GPIO8
++#define INTA           11
++#define INTB           10
++#define INTC           9
++#define INTD           8
 
-Yeah, you get rid of the external .h files for dropping all that bloat into the setup
-files. Honestly, do however you please, but this hardly makes sense IMHO when you have
-the chance to get rid of all this mess.
+You can see the duplicate definitions removed.
+BTW: I don't like it much, but using ordinary GPIOx certainly
+isn't better.
 
+(Yep, I see at least one bug which the patches should fix, will do).
 
-Imre
+ void __init avila_pci_preinit(void)
+ {
+-       set_irq_type(IRQ_AVILA_PCI_INTA, IRQ_TYPE_LEVEL_LOW);
+-       set_irq_type(IRQ_AVILA_PCI_INTB, IRQ_TYPE_LEVEL_LOW);
+-       set_irq_type(IRQ_AVILA_PCI_INTC, IRQ_TYPE_LEVEL_LOW);
+-       set_irq_type(IRQ_AVILA_PCI_INTD, IRQ_TYPE_LEVEL_LOW);
+-
++       set_irq_type(IXP4XX_GPIO_IRQ(INTA), IRQ_TYPE_LEVEL_LOW);
++       set_irq_type(IXP4XX_GPIO_IRQ(INTB), IRQ_TYPE_LEVEL_LOW);
++       set_irq_type(IXP4XX_GPIO_IRQ(INTC), IRQ_TYPE_LEVEL_LOW);
++       set_irq_type(IXP4XX_GPIO_IRQ(INTD), IRQ_TYPE_LEVEL_LOW);
+        ixp4xx_pci_preinit();
+ }
+-- 
+Krzysztof Halasa
