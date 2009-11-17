@@ -1,64 +1,44 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Tue, 17 Nov 2009 13:39:35 +0100
-Subject: imx27 - hanging at freeing init memory -- getting some junk
-	characters here after on console ..
-In-Reply-To: <OF8F8BC118.05889ED4-ON65257671.0041E186-65257671.0041E18F@tcs.com>
-References: <20091117091713.GN14091@buzzloop.caiaq.de>
-	<20091117071744.GM14091@buzzloop.caiaq.de>
-	<20091110064900.GK14091@buzzloop.caiaq.de>
-	<20091104131500.GZ14091@buzzloop.caiaq.de>
-	<OF15AFD08D.F28F9544-ON65257664.002A1275-65257664.002A127F@tcs.com>
-	<OF899D5B75.A8958BE5-ON65257666.001F50BF-65257666.001F50C4@tcs.com>
-	<OF409EDC40.B7ED8C90-ON65257671.001667E7-65257671.001667F5@tcs.com>
-	<OF29677297.CAA27B00-ON65257671.002E6F4B-65257671.002E6F5C@tcs.com>
-	<OF8F8BC118.05889ED4-ON65257671.0041E186-65257671.0041E18F@tcs.com>
-Message-ID: <20091117123935.GV14091@buzzloop.caiaq.de>
+Date: Tue, 17 Nov 2009 13:43:34 +0100
+Subject: [PATCH] arm pxa: remove "direction input" forcing for IRQ GPIOs
+In-Reply-To: <20091117123721.GG8008@gundam.enneenne.com>
+References: <1258456906-12338-1-git-send-email-giometti@linux.it>
+	<20091117114429.GT14091@buzzloop.caiaq.de>
+	<20091117120501.GC8008@gundam.enneenne.com>
+	<20091117123422.GU14091@buzzloop.caiaq.de>
+	<20091117123721.GG8008@gundam.enneenne.com>
+Message-ID: <20091117124334.GW14091@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2009 at 05:29:35PM +0530, Vadivelan M wrote:
->    Thanks for the continuous support. 
->    As you have suggested we have tried in main kernel with default
->    configuration.
+On Tue, Nov 17, 2009 at 01:37:21PM +0100, Rodolfo Giometti wrote:
+> On Tue, Nov 17, 2009 at 01:34:22PM +0100, Daniel Mack wrote:
+> > On Tue, Nov 17, 2009 at 01:05:01PM +0100, Rodolfo Giometti wrote:
+> > > On Tue, Nov 17, 2009 at 12:44:29PM +0100, Daniel Mack wrote:
+> > > > On Tue, Nov 17, 2009 at 12:21:46PM +0100, Rodolfo Giometti wrote:
+> > > > > PXA CPUs may use their GPIOs as IRQ lines even if they are selected as
+> > > > > outputs (see for example figure 24-1 into PXA27x Processor Family
+> > > > > Developer's Manual). So forcing GPIOs IRQ lines as inputs is not
+> > > > > correct.
+> > > > > 
+> > > > > Programmers should set up GPIOs direction according to their usage and
+> > > > > the function pxa_gpio_irq_type() should simply enable the IRQ
+> > > > > detection.
+> > > > 
+> > > > Interesting. Is this an academic issue or do you actually use that?
+> > > > That would mean you externally drive the IO pin level to something else
+> > > > than the output driver provides, which isn't healthy at all.
+> > > 
+> > > It's a real configuration with no electrical drawbacks at all! Of
+> > > course the driver's output must be passive (I use it to detect a CARD
+> > > insert) but it's functional.
+> > 
+> > For such situations, the pullup/pulldown functions are normally used.
+> > Have you tried that?
 > 
->    Without any change its stopping at
+> Yes, the code has been tested on my board and it works perfectly.
 
-[...]
-
->    <1>Unhandled fault: external abort on non-linefetch (0x008) at 0xf4300000
->    Internal error: : 8 [#1]
->    Modules linked in:
->    CPU: 0    Not tainted  (2.6.27 #11)
->    PC is at mx27ads_timer_init+0x14/0x44
->    LR is at time_init+0x1c/0x24
->    pc : [<c0011390>]    lr : [<c000f8ac>]    psr: 800000d3
->    sp : c0429fa8  ip : c0429fb8  fp : c0429fb4
->    r10: a0021b58  r9 : 41069264  r8 : a0021b8c
->    r7 : c042ce5c  r6 : c0023f14  r5 : c044bcf0  r4 : c044bce4
->    r3 : f4300000  r2 : 00000000  r1 : 00000000  r0 : 019bfcc0
->    Flags: Nzcv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
->    Control: 0005317f  Table: a0004000  DAC: 00000017
->    Process swapper (pid: 0, stack limit = 0xc0428268)
->    Stack: (0xc0429fa8 to 0xc042a000)
->    9fa0:                   c0429fc4 c0429fb8 c000f8ac c001138c c0429ff4
->    c0429fc8
->    9fc0: c0008ae8 c000f8a0 c000853c 00000000 00000000 c0023f14 00000000
->    00053175
->    9fe0: c044c60c c0024318 00000000 c0429ff8 a0008034 c0008970 00000000
->    00000000
->    Backtrace:
->    [<c001137c>] (mx27ads_timer_init+0x0/0x44) from [<c000f8ac>]
->    (time_init+0x1c/0x24)
->    [<c000f890>] (time_init+0x0/0x24) from [<c0008ae8>]
->    (start_kernel+0x188/0x30c)
->    [<c0008960>] (start_kernel+0x0/0x30c) from [<a0008034>] (0xa0008034)
->     r6:c0024318 r5:c044c60c r4:00053175
->    Code: e92dd800 e24cb004 e59f3020 e59f0020 (e1d330b0)
->    <4>---[ end trace 1b75b31a2719ed1c ]---
->    <0>Kernel panic - not syncing: Attempted to kill the idle task!
-
-Assuming this is the reference hardware which you're running on, others
-should be able to reproduce this error. Unfortunately I can't help here,
-as I don't have access to any MX2 based hardware. Anyone else?
+What I mean is a mfp_cfg_t configuration as input pin with pull flags
+MFP_PULL_{HIGH,LOW} set.
 
 Daniel
