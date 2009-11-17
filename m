@@ -1,69 +1,34 @@
-From: maz@misterjones.org (Marc Zyngier)
-Date: Tue, 17 Nov 2009 12:00:18 +0100
-Subject: [PATCH] ARM: MM: use 64bytes of L1 cache on plat S5PC1xx
-In-Reply-To: <000701ca6766$90fbb2e0$b2f318a0$%szyprowski@samsung.com>
-References: <1258444074-20679-1-git-send-email-m.szyprowski@samsung.com>
-	<20091117091024.187d7cda@hina.wild-wind.fr.eu.org>
-	<000701ca6766$90fbb2e0$b2f318a0$%szyprowski@samsung.com>
-Message-ID: <20091117120018.583b6374@life-in-the-fast-lane>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 17 Nov 2009 05:04:57 -0600
+Subject: [PATCH 01/02] backlight: control WLED output current in da9034
+In-Reply-To: <771cded00911162327i2f0f6b15gf9a7cb7b1391ed74@mail.gmail.com>
+References: <771cded00911042357m7785312ewf29e39dd93b6d389@mail.gmail.com>
+	<771cded00911050020w3d9ef572h392603dcb9456f96@mail.gmail.com>
+	<771cded00911162327i2f0f6b15gf9a7cb7b1391ed74@mail.gmail.com>
+Message-ID: <f17812d70911170304p11b73172of0a85dda378e83b3@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2009 10:15:49 +0100
-Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+On Tue, Nov 17, 2009 at 1:27 AM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> On Thu, Nov 5, 2009 at 3:20 AM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
+>> On Thu, Nov 5, 2009 at 2:57 AM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
+>>> From ff0d136a181ce431a0db9582f18733425a51411d Mon Sep 17 00:00:00 2001
+>>> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+>>> Date: Thu, 5 Nov 2009 10:27:13 -0500
+>>> Subject: [PATCH] backlight: control WLED output current in da9034
+>>>
+>>> Update WLED output current source before changing brightness.
+>>>
+>>> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 
-Hi Marek,
+Haojian,
 
-> Hello,
-> 
-> On Tuesday, November 17, 2009 9:10 AM Marc Zyngier wrote:
-> 
-> > On Tue, 17 Nov 2009 08:47:54 +0100
-> > Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> > 
-> > > From: Kyungmin Park <kyungmin.park@samsung.com>
-> > >
-> > > Samsung S5PC1xx SoCs are Coretex8 based, so use 64 bytes of L1
-> > > cache line instead of the default 32 bytes.
-> > >
-> > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > > ---
-> > >  arch/arm/mm/Kconfig |    2 +-
-> > >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > >
-> > > diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> > > index 9264d81..7b7d4c3 100644
-> > > --- a/arch/arm/mm/Kconfig
-> > > +++ b/arch/arm/mm/Kconfig
-> > > @@ -774,5 +774,5 @@ config CACHE_XSC3L2
-> > >
-> > >  config ARM_L1_CACHE_SHIFT
-> > >  	int
-> > > -	default 6 if ARCH_OMAP3
-> > > +	default 6 if ARCH_OMAP3 || ARCH_S5PC1XX
-> > >  	default 5
-> > 
-> > If this feature is related to the S5PC1xx being a CortexA8, why not
-> > depend on CPU_V7 rather that adding each and every new CortexA8
-> > implementation to this list?
-> 
-> There can be ARM v7 CPUs with different size of L1 line cache -
-> Cortex-R4 is an example of such: 
-> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0363d/Caccifbd.html
-> (32 bytes of L1 cache line size).
-> 
-> This config option should depend on particular ARM core
-> implementation, otherwise it will be hard cover all possibilities.
+I've updated the patch as follows, changes:
 
-Then what about introducing a CORTEX_A8 symbol, selected by ARCH_OMAP3,
-ARCH_S5PC1XX and others to come, and that would select the right cache
-line value? We really want to avoid those ever growing dependency lines
-that lead to conflicts when applying patches from multiple sources.
+1. out_current --> output_current
+2. output_current will be set only once during probe - we don't need to
+adjust it every time backlight is changed, right?
+3. and thus removing the out_current field within da903x_backlight_data
 
-Unless we can have a Cortex-A8 implementation with a cache line that is
-not 64 bytes?
-
-	M.
--- 
-Fast. Cheap. Reliable. Pick two.
+Please help review and verify, thanks.
