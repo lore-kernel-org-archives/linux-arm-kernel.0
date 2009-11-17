@@ -1,49 +1,52 @@
 From: ospite@studenti.unina.it (Antonio Ospite)
-Date: Tue, 17 Nov 2009 23:04:20 +0100
-Subject: [PATCH 0/3] pxa_camera: remove init() callback
-Message-ID: <1258495463-26029-1-git-send-email-ospite@studenti.unina.it>
+Date: Tue, 17 Nov 2009 23:04:21 +0100
+Subject: [PATCH 1/3] em-x270: don't use pxa_camera init() callback
+In-Reply-To: <1258495463-26029-1-git-send-email-ospite@studenti.unina.it>
+References: <1258495463-26029-1-git-send-email-ospite@studenti.unina.it>
+Message-ID: <1258495463-26029-2-git-send-email-ospite@studenti.unina.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+pxa_camera init() is going to be removed.
 
-this series removes the init() callback from pxa_camera_platform_data, and
-fixes its users to do initialization statically at machine init time.
+Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
+---
+ arch/arm/mach-pxa/em-x270.c |    9 +++++----
+ 1 files changed, 5 insertions(+), 4 deletions(-)
 
-Guennadi requested this change because there seems to be no use cases for
-dynamic initialization. I also believe that the current semantics for this
-init() callback is ambiguous anyways, it is invoked in pxa_camera_activate(),
-hence at device node open, but its users use it like a generic initialization
-to be done at module init time (configure MFP, request GPIOs for *sensor*
-control).
-
-So removing it is definitely good.
-As a side note, If we were really exposing some dynamic and generic
-initialization, this could be done in soc-camera itself, not in pxa_camera
-anyways.
-
-Thanks,
-   Antonio
-
-Antonio Ospite (3):
-  em-x270: don't use pxa_camera init() callback
-  pcm990-baseboard: don't use pxa_camera init() callback
-  pxa_camera: remove init() callback
-
- arch/arm/mach-pxa/em-x270.c             |    9 +++++----
- arch/arm/mach-pxa/include/mach/camera.h |    2 --
- arch/arm/mach-pxa/pcm990-baseboard.c    |    8 +-------
- drivers/media/video/pxa_camera.c        |   10 ----------
- 4 files changed, 6 insertions(+), 23 deletions(-)
-
---
-Antonio Ospite
-http://ao2.it
-
-PGP public key ID: 0x4553B001
-
-A: Because it messes up the order in which people normally read text.
-   See http://en.wikipedia.org/wiki/Posting_style
-Q: Why is top-posting such a bad thing?
-A: Top-posting.
-Q: What is the most annoying thing in e-mail?
+diff --git a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
+index aec7f42..f71f34c 100644
+--- a/arch/arm/mach-pxa/em-x270.c
++++ b/arch/arm/mach-pxa/em-x270.c
+@@ -967,7 +967,7 @@ static inline void em_x270_init_gpio_keys(void) {}
+ #if defined(CONFIG_VIDEO_PXA27x) || defined(CONFIG_VIDEO_PXA27x_MODULE)
+ static struct regulator *em_x270_camera_ldo;
+ 
+-static int em_x270_sensor_init(struct device *dev)
++static int em_x270_sensor_init(void)
+ {
+ 	int ret;
+ 
+@@ -996,7 +996,6 @@ static int em_x270_sensor_init(struct device *dev)
+ }
+ 
+ struct pxacamera_platform_data em_x270_camera_platform_data = {
+-	.init	= em_x270_sensor_init,
+ 	.flags  = PXA_CAMERA_MASTER | PXA_CAMERA_DATAWIDTH_8 |
+ 		PXA_CAMERA_PCLK_EN | PXA_CAMERA_MCLK_EN,
+ 	.mclk_10khz = 2600,
+@@ -1049,8 +1048,10 @@ static struct platform_device em_x270_camera = {
+ 
+ static void  __init em_x270_init_camera(void)
+ {
+-	pxa_set_camera_info(&em_x270_camera_platform_data);
+-	platform_device_register(&em_x270_camera);
++	if (em_x270_sensor_init() == 0) {
++		pxa_set_camera_info(&em_x270_camera_platform_data);
++		platform_device_register(&em_x270_camera);
++	}
+ }
+ #else
+ static inline void em_x270_init_camera(void) {}
+-- 
+1.6.5.2
