@@ -1,31 +1,31 @@
 From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Tue, 17 Nov 2009 13:34:11 +0800
-Subject: [PATCH 1/3] NUC900: Adding nuc950 defconfig
-Message-ID: <4B0235D3.1020908@gmail.com>
+Date: Tue, 17 Nov 2009 13:36:47 +0800
+Subject: [PATCH 2/3] NUC900: Adding nuc960 defconfig
+Message-ID: <4B02366F.2080102@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Russell,
 
-Adding nuc950 default configure file.
+Adding nuc960 defconfig support for Winbond/Nuvoton nuc960 ARM SoC.
 
-Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
+Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>e
 
 ---
- arch/arm/configs/nuc950_defconfig |  922 +++++++++++++++++++++++++++++++++++++
+ arch/arm/configs/nuc960_defconfig |  922 +++++++++++++++++++++++++++++++++++++
  1 files changed, 922 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/configs/nuc950_defconfig
+ create mode 100644 arch/arm/configs/nuc960_defconfig
 
-diff --git a/arch/arm/configs/nuc950_defconfig b/arch/arm/configs/nuc950_defconfig
+diff --git a/arch/arm/configs/nuc960_defconfig b/arch/arm/configs/nuc960_defconfig
 new file mode 100644
-index 0000000..df1de9b
+index 0000000..4b2cd9e
 --- /dev/null
-+++ b/arch/arm/configs/nuc950_defconfig
++++ b/arch/arm/configs/nuc960_defconfig
 @@ -0,0 +1,922 @@
 +#
 +# Automatically generated make config: don't edit
 +# Linux kernel version: 2.6.32-rc7
-+# Tue Nov 17 12:31:33 2009
++# Tue Nov 17 12:20:11 2009
 +#
 +CONFIG_ARM=y
 +CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -200,7 +200,7 @@ index 0000000..df1de9b
 +# CONFIG_ARCH_DAVINCI is not set
 +# CONFIG_ARCH_OMAP is not set
 +# CONFIG_ARCH_BCMRING is not set
-+CONFIG_CPU_NUC950=y
++CONFIG_CPU_NUC960=y
 +
 +#
 +# W90P910 Machines
@@ -210,12 +210,12 @@ index 0000000..df1de9b
 +#
 +# NUC950 Machines
 +#
-+CONFIG_MACH_W90P950EVB=y
++# CONFIG_MACH_W90P950EVB is not set
 +
 +#
 +# NUC960 Machines
 +#
-+# CONFIG_MACH_W90N960EVB is not set
++CONFIG_MACH_W90N960EVB=y
 +
 +#
 +# NUC932 Machines
