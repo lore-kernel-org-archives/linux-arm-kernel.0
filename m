@@ -1,8 +1,7 @@
 From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Tue, 17 Nov 2009 22:15:45 +0100
-Subject: [PATCH 06/10] IXP4xx: move DSM G600 platform macros to the platform
-	code.
-Message-ID: <1258492549-16873-6-git-send-email-khc@pm.waw.pl>
+Date: Tue, 17 Nov 2009 22:15:46 +0100
+Subject: [PATCH 07/10] IXP4xx: move FSG platform macros to the platform code.
+Message-ID: <1258492549-16873-7-git-send-email-khc@pm.waw.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,19 +9,20 @@ From: Krzysztof Ha?asa <khc@pm.waw.pl>
 
 Signed-off-by: Krzysztof Ha?asa <khc@pm.waw.pl>
 ---
- arch/arm/mach-ixp4xx/dsmg600-pci.c           |   19 +++++++++-
- arch/arm/mach-ixp4xx/dsmg600-setup.c         |   17 ++++++++
- arch/arm/mach-ixp4xx/include/mach/dsmg600.h  |   52 --------------------------
+ arch/arm/mach-ixp4xx/fsg-pci.c               |   12 ++++++-
+ arch/arm/mach-ixp4xx/fsg-setup.c             |    8 ++++-
+ arch/arm/mach-ixp4xx/include/mach/fsg.h      |   50 --------------------------
  arch/arm/mach-ixp4xx/include/mach/hardware.h |    1 -
- arch/arm/mach-ixp4xx/include/mach/irqs.h     |   10 -----
- 5 files changed, 35 insertions(+), 64 deletions(-)
- delete mode 100644 arch/arm/mach-ixp4xx/include/mach/dsmg600.h
+ arch/arm/mach-ixp4xx/include/mach/irqs.h     |    7 ----
+ drivers/leds/leds-fsg.c                      |    7 ++++
+ 6 files changed, 25 insertions(+), 60 deletions(-)
+ delete mode 100644 arch/arm/mach-ixp4xx/include/mach/fsg.h
 
-diff --git a/arch/arm/mach-ixp4xx/dsmg600-pci.c b/arch/arm/mach-ixp4xx/dsmg600-pci.c
-index 926d15f..29a9e41 100644
---- a/arch/arm/mach-ixp4xx/dsmg600-pci.c
-+++ b/arch/arm/mach-ixp4xx/dsmg600-pci.c
-@@ -19,10 +19,27 @@
+diff --git a/arch/arm/mach-ixp4xx/fsg-pci.c b/arch/arm/mach-ixp4xx/fsg-pci.c
+index ca12a9c..2a1701b 100644
+--- a/arch/arm/mach-ixp4xx/fsg-pci.c
++++ b/arch/arm/mach-ixp4xx/fsg-pci.c
+@@ -19,10 +19,20 @@
  #include <linux/pci.h>
  #include <linux/init.h>
  #include <linux/irq.h>
@@ -30,69 +30,61 @@ index 926d15f..29a9e41 100644
  #include <asm/mach/pci.h>
  #include <asm/mach-types.h>
  
-+#define DSMG600_PCI_MAX_DEV	4
-+#define DSMG600_PCI_IRQ_LINES	3
++#define FSG_PCI_MAX_DEV		3
++#define FSG_PCI_IRQ_LINES	3
 +
 +/* PCI controller GPIO to IRQ pin mappings */
-+#define DSMG600_PCI_INTA_PIN	11
-+#define DSMG600_PCI_INTB_PIN	10
-+#define DSMG600_PCI_INTC_PIN	9
-+#define DSMG600_PCI_INTD_PIN	8
-+#define DSMG600_PCI_INTE_PIN	7
-+#define DSMG600_PCI_INTF_PIN	6
++#define FSG_PCI_INTA_PIN	6
++#define FSG_PCI_INTB_PIN	7
++#define FSG_PCI_INTC_PIN	5
++#define IRQ_FSG_PCI_INTA	IRQ_IXP4XX_GPIO6
++#define IRQ_FSG_PCI_INTB	IRQ_IXP4XX_GPIO7
++#define IRQ_FSG_PCI_INTC	IRQ_IXP4XX_GPIO5
 +
-+#define IRQ_DSMG600_PCI_INTA	IRQ_IXP4XX_GPIO11
-+#define IRQ_DSMG600_PCI_INTB	IRQ_IXP4XX_GPIO10
-+#define IRQ_DSMG600_PCI_INTC	IRQ_IXP4XX_GPIO9
-+#define IRQ_DSMG600_PCI_INTD	IRQ_IXP4XX_GPIO8
-+#define IRQ_DSMG600_PCI_INTE	IRQ_IXP4XX_GPIO7
-+#define IRQ_DSMG600_PCI_INTF	IRQ_IXP4XX_GPIO6
-+
- void __init dsmg600_pci_preinit(void)
+ void __init fsg_pci_preinit(void)
  {
- 	set_irq_type(IRQ_DSMG600_PCI_INTA, IRQ_TYPE_LEVEL_LOW);
-diff --git a/arch/arm/mach-ixp4xx/dsmg600-setup.c b/arch/arm/mach-ixp4xx/dsmg600-setup.c
-index a51bfa6..7c1fa54 100644
---- a/arch/arm/mach-ixp4xx/dsmg600-setup.c
-+++ b/arch/arm/mach-ixp4xx/dsmg600-setup.c
-@@ -33,6 +33,23 @@
- #include <asm/mach/time.h>
+ 	set_irq_type(IRQ_FSG_PCI_INTA, IRQ_TYPE_LEVEL_LOW);
+diff --git a/arch/arm/mach-ixp4xx/fsg-setup.c b/arch/arm/mach-ixp4xx/fsg-setup.c
+index 5add22f..e7f4bef 100644
+--- a/arch/arm/mach-ixp4xx/fsg-setup.c
++++ b/arch/arm/mach-ixp4xx/fsg-setup.c
+@@ -24,12 +24,18 @@
+ #include <linux/i2c.h>
+ #include <linux/i2c-gpio.h>
+ #include <linux/io.h>
+-
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/flash.h>
  #include <asm/gpio.h>
  
-+#define DSMG600_SDA_PIN		5
-+#define DSMG600_SCL_PIN		4
++#define FSG_SDA_PIN		12
++#define FSG_SCL_PIN		13
 +
-+/* DSM-G600 Timer Setting */
-+#define DSMG600_FREQ		66000000
++#define FSG_SB_GPIO		4	/* sync button */
++#define FSG_RB_GPIO		9	/* reset button */
++#define FSG_UB_GPIO		10	/* usb button */
 +
-+/* Buttons */
-+#define DSMG600_PB_GPIO		15	/* power button */
-+#define DSMG600_RB_GPIO		3	/* reset button */
-+
-+/* Power control */
-+#define DSMG600_PO_GPIO		2	/* power off */
-+
-+/* LEDs */
-+#define DSMG600_LED_PWR_GPIO	0
-+#define DSMG600_LED_WLAN_GPIO	14
-+
- static struct flash_platform_data dsmg600_flash_data = {
+ static struct flash_platform_data fsg_flash_data = {
  	.map_name		= "cfi_probe",
  	.width			= 2,
-diff --git a/arch/arm/mach-ixp4xx/include/mach/dsmg600.h b/arch/arm/mach-ixp4xx/include/mach/dsmg600.h
+diff --git a/arch/arm/mach-ixp4xx/include/mach/fsg.h b/arch/arm/mach-ixp4xx/include/mach/fsg.h
 deleted file mode 100644
-index dc087a3..0000000
---- a/arch/arm/mach-ixp4xx/include/mach/dsmg600.h
+index 1f02b7e..0000000
+--- a/arch/arm/mach-ixp4xx/include/mach/fsg.h
 +++ /dev/null
-@@ -1,52 +0,0 @@
+@@ -1,50 +0,0 @@
 -/*
-- * DSM-G600 platform specific definitions
+- * arch/arm/mach-ixp4xx/include/mach/fsg.h
 - *
-- * Copyright (C) 2006 Tower Technologies
-- * Author: Alessandro Zummo <a.zummo@towertech.it>
+- * Freecom FSG-3 platform specific definitions
 - *
-- * based on ixdp425.h:
-- *	Copyright 2004 (C) MontaVista, Software, Inc.
+- * Author: Rod Whitby <rod@whitby.id.au>
+- * Author: Tomasz Chmielewski <mangoo@wpkg.org>
+- * Maintainers: http://www.nslu2-linux.org
+- *
+- * Based on coyote.h by
+- * Copyright 2004 (c) MontaVista, Software, Inc.
 - *
 - * This file is licensed under  the terms of the GNU General Public
 - * License version 2. This program is licensed "as is" without any
@@ -103,72 +95,79 @@ index dc087a3..0000000
 -#error "Do not include this directly, instead #include <mach/hardware.h>"
 -#endif
 -
--#define DSMG600_SDA_PIN		5
--#define DSMG600_SCL_PIN		4
+-#define FSG_SDA_PIN		12
+-#define FSG_SCL_PIN		13
 -
 -/*
-- * DSMG600 PCI IRQs
+- * FSG PCI IRQs
 - */
--#define DSMG600_PCI_MAX_DEV	4
--#define DSMG600_PCI_IRQ_LINES	3
+-#define FSG_PCI_MAX_DEV		3
+-#define FSG_PCI_IRQ_LINES	3
 -
 -
 -/* PCI controller GPIO to IRQ pin mappings */
--#define DSMG600_PCI_INTA_PIN	11
--#define DSMG600_PCI_INTB_PIN	10
--#define DSMG600_PCI_INTC_PIN	9
--#define DSMG600_PCI_INTD_PIN	8
--#define DSMG600_PCI_INTE_PIN	7
--#define DSMG600_PCI_INTF_PIN	6
--
--/* DSM-G600 Timer Setting */
--#define DSMG600_FREQ 66000000
+-#define FSG_PCI_INTA_PIN	6
+-#define FSG_PCI_INTB_PIN	7
+-#define FSG_PCI_INTC_PIN	5
 -
 -/* Buttons */
 -
--#define DSMG600_PB_GPIO		15	/* power button */
--#define DSMG600_RB_GPIO		3	/* reset button */
--
--/* Power control */
--
--#define DSMG600_PO_GPIO		2	/* power off */
+-#define FSG_SB_GPIO		4	/* sync button */
+-#define FSG_RB_GPIO		9	/* reset button */
+-#define FSG_UB_GPIO		10	/* usb button */
 -
 -/* LEDs */
 -
--#define DSMG600_LED_PWR_GPIO	0
--#define DSMG600_LED_WLAN_GPIO	14
+-#define FSG_LED_WLAN_BIT	0
+-#define FSG_LED_WAN_BIT		1
+-#define FSG_LED_SATA_BIT	2
+-#define FSG_LED_USB_BIT		4
+-#define FSG_LED_RING_BIT	5
+-#define FSG_LED_SYNC_BIT	7
 diff --git a/arch/arm/mach-ixp4xx/include/mach/hardware.h b/arch/arm/mach-ixp4xx/include/mach/hardware.h
-index 05db635..555b8e1 100644
+index 555b8e1..8558073 100644
 --- a/arch/arm/mach-ixp4xx/include/mach/hardware.h
 +++ b/arch/arm/mach-ixp4xx/include/mach/hardware.h
-@@ -45,7 +45,6 @@
+@@ -45,6 +45,5 @@
  
  /* Platform specific details */
  #include "prpmc1100.h"
--#include "dsmg600.h"
- #include "fsg.h"
+-#include "fsg.h"
  
  #endif  /* _ASM_ARCH_HARDWARE_H */
 diff --git a/arch/arm/mach-ixp4xx/include/mach/irqs.h b/arch/arm/mach-ixp4xx/include/mach/irqs.h
-index dff26af..20053be 100644
+index 20053be..e256997 100644
 --- a/arch/arm/mach-ixp4xx/include/mach/irqs.h
 +++ b/arch/arm/mach-ixp4xx/include/mach/irqs.h
-@@ -79,16 +79,6 @@
+@@ -78,11 +78,4 @@
+ #define	IRQ_PRPMC1100_PCI_INTC	IRQ_IXP4XX_GPIO9
  #define	IRQ_PRPMC1100_PCI_INTD	IRQ_IXP4XX_GPIO8
  
- /*
-- * D-Link DSM-G600 RevA board IRQs
-- */
--#define        IRQ_DSMG600_PCI_INTA    IRQ_IXP4XX_GPIO11
--#define        IRQ_DSMG600_PCI_INTB    IRQ_IXP4XX_GPIO10
--#define        IRQ_DSMG600_PCI_INTC    IRQ_IXP4XX_GPIO9
--#define        IRQ_DSMG600_PCI_INTD    IRQ_IXP4XX_GPIO8
--#define        IRQ_DSMG600_PCI_INTE    IRQ_IXP4XX_GPIO7
--#define        IRQ_DSMG600_PCI_INTF    IRQ_IXP4XX_GPIO6
--
 -/*
-  * Freecom FSG-3 Board IRQs
-  */
- #define        IRQ_FSG_PCI_INTA        IRQ_IXP4XX_GPIO6
+- * Freecom FSG-3 Board IRQs
+- */
+-#define        IRQ_FSG_PCI_INTA        IRQ_IXP4XX_GPIO6
+-#define        IRQ_FSG_PCI_INTB        IRQ_IXP4XX_GPIO7
+-#define        IRQ_FSG_PCI_INTC        IRQ_IXP4XX_GPIO5
+-
+ #endif
+diff --git a/drivers/leds/leds-fsg.c b/drivers/leds/leds-fsg.c
+index 5f7c9c5..d11d05b 100644
+--- a/drivers/leds/leds-fsg.c
++++ b/drivers/leds/leds-fsg.c
+@@ -22,6 +22,13 @@
+ #include <mach/hardware.h>
+ #include <asm/io.h>
+ 
++#define FSG_LED_WLAN_BIT	0
++#define FSG_LED_WAN_BIT		1
++#define FSG_LED_SATA_BIT	2
++#define FSG_LED_USB_BIT		4
++#define FSG_LED_RING_BIT	5
++#define FSG_LED_SYNC_BIT	7
++
+ static short __iomem *latch_address;
+ static unsigned short latch_value;
+ 
 -- 
 1.6.5.2
