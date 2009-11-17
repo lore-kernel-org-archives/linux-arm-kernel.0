@@ -1,46 +1,32 @@
 From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 17 Nov 2009 11:56:38 -0500
-Subject: [PATCH] ep93xx: add missing newline between file header and code
-In-Reply-To: <200911171245.56363.h.feurstein@gmail.com>
-References: <200911171245.56363.h.feurstein@gmail.com>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901EE5529@mi8nycmail19.Mi8.com>
+Date: Tue, 17 Nov 2009 12:00:04 -0500
+Subject: [PATCH] arm pxa: remove "direction input" forcing for IRQ GPIOs
+In-Reply-To: <20091117114429.GT14091@buzzloop.caiaq.de>
+References: <1258456906-12338-1-git-send-email-giometti@linux.it>
+	<20091117114429.GT14091@buzzloop.caiaq.de>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901EE552D@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 17, 2009 4:46 AM, Hubert Feurstein wrote:
+On Tuesday, November 17, 2009 4:44 AM, Daniel Mack wrote:
+> On Tue, Nov 17, 2009 at 12:21:46PM +0100, Rodolfo Giometti wrote:
+>> PXA CPUs may use their GPIOs as IRQ lines even if they are selected as
+>> outputs (see for example figure 24-1 into PXA27x Processor Family
+>> Developer's Manual). So forcing GPIOs IRQ lines as inputs is not
+>> correct.
+>> 
+>> Programmers should set up GPIOs direction according to their usage and
+>> the function pxa_gpio_irq_type() should simply enable the IRQ
+>> detection.
 >
-> Signed-off-by: Hubert Feurstein <h.feurstein@gmail.com>
-> ---
->  Just for the sake of consistency across the ep93xx-tree.
-> 
->  arch/arm/mach-ep93xx/include/mach/hardware.h |    1 +
->  arch/arm/mach-ep93xx/include/mach/io.h       |    1 +
->  2 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ep93xx/include/mach/hardware.h b/arch/arm/mach-ep93xx/include/mach/hardware.h
-> index 349fa7c..5a3ce02 100644
-> --- a/arch/arm/mach-ep93xx/include/mach/hardware.h
-> +++ b/arch/arm/mach-ep93xx/include/mach/hardware.h
-> @@ -1,6 +1,7 @@
->  /*
->   * arch/arm/mach-ep93xx/include/mach/hardware.h
->   */
-> +
->  #ifndef __ASM_ARCH_HARDWARE_H
->  #define __ASM_ARCH_HARDWARE_H
->  
-> diff --git a/arch/arm/mach-ep93xx/include/mach/io.h b/arch/arm/mach-ep93xx/include/mach/io.h
-> index cebcc1c..594b77f 100644
-> --- a/arch/arm/mach-ep93xx/include/mach/io.h
-> +++ b/arch/arm/mach-ep93xx/include/mach/io.h
-> @@ -1,6 +1,7 @@
->  /*
->   * arch/arm/mach-ep93xx/include/mach/io.h
->   */
-> +
->  #ifndef __ASM_MACH_IO_H
->  #define __ASM_MACH_IO_H
+> Interesting. Is this an academic issue or do you actually use that?
+> That would mean you externally drive the IO pin level to something else
+> than the output driver provides, which isn't healthy at all.
 
-Nitpick janitor patch but..
+Actually, it appears this is a way of generating a software interrupt.
 
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+If the GPIO IRQ line is set as an output you could drive the pin to the
+appropriate level to generate an interrupt.
+
+Regards,
+Hartley
