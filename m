@@ -1,98 +1,152 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 17 Nov 2009 08:41:14 +0100
-Subject: [PATCH 04/14] ARM: S5PC1XX: add GPIO L banks to register definition
-In-Reply-To: <1258443684-19525-4-git-send-email-m.szyprowski@samsung.com>
+Date: Tue, 17 Nov 2009 08:41:20 +0100
+Subject: [PATCH 10/14] SMDKC100: enable S3C FrameBuffer
+In-Reply-To: <1258443684-19525-10-git-send-email-m.szyprowski@samsung.com>
 References: <1258443684-19525-1-git-send-email-m.szyprowski@samsung.com>
 	<1258443684-19525-2-git-send-email-m.szyprowski@samsung.com>
 	<1258443684-19525-3-git-send-email-m.szyprowski@samsung.com>
 	<1258443684-19525-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1258443684-19525-5-git-send-email-m.szyprowski@samsung.com>
+	<1258443684-19525-5-git-send-email-m.szyprowski@samsung.com>
+	<1258443684-19525-6-git-send-email-m.szyprowski@samsung.com>
+	<1258443684-19525-7-git-send-email-m.szyprowski@samsung.com>
+	<1258443684-19525-8-git-send-email-m.szyprowski@samsung.com>
+	<1258443684-19525-9-git-send-email-m.szyprowski@samsung.com>
+	<1258443684-19525-10-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1258443684-19525-11-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kyungmin Park <kyungmin.park@samsung.com>
 
-Add GPIO L0-L4 banks to register definition.
+Add required machine definitions for s3c-fb device.
+A 800x480 lcd device (simmilar to the one known from SMDK6410 boards) has
+been defined. The lcd controller is attached to GPIO lines and can be
+enabled/disabled with platform-lcd driver.
 
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/mach-s5pc100/include/mach/gpio.h |   30 ++++++++++++++++++++++------
- 1 files changed, 23 insertions(+), 7 deletions(-)
+ arch/arm/mach-s5pc100/Kconfig         |    2 +
+ arch/arm/mach-s5pc100/mach-smdkc100.c |   67 +++++++++++++++++++++++++++++++++
+ 2 files changed, 69 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s5pc100/include/mach/gpio.h b/arch/arm/mach-s5pc100/include/mach/gpio.h
-index c74fc93..5d22961 100644
---- a/arch/arm/mach-s5pc100/include/mach/gpio.h
-+++ b/arch/arm/mach-s5pc100/include/mach/gpio.h
-@@ -47,6 +47,11 @@
- #define S5PC1XX_GPIO_K1_NR	(6)
- #define S5PC1XX_GPIO_K2_NR	(8)
- #define S5PC1XX_GPIO_K3_NR	(8)
-+#define S5PC1XX_GPIO_L0_NR	(8)
-+#define S5PC1XX_GPIO_L1_NR	(8)
-+#define S5PC1XX_GPIO_L2_NR	(8)
-+#define S5PC1XX_GPIO_L3_NR	(8)
-+#define S5PC1XX_GPIO_L4_NR	(8)
- #define S5PC1XX_GPIO_MP00_NR	(8)
- #define S5PC1XX_GPIO_MP01_NR	(8)
- #define S5PC1XX_GPIO_MP02_NR	(8)
-@@ -64,9 +69,9 @@
- 	((__gpio##_START) + (__gpio##_NR) + CONFIG_S3C_GPIO_SPACE + 1)
+diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
+index b1a4ba5..5e6b9a3 100644
+--- a/arch/arm/mach-s5pc100/Kconfig
++++ b/arch/arm/mach-s5pc100/Kconfig
+@@ -17,6 +17,8 @@ config CPU_S5PC100
+ config MACH_SMDKC100
+ 	bool "SMDKC100"
+ 	select CPU_S5PC100
++	select S3C_DEV_FB
+ 	select S5PC1XX_SETUP_I2C1
++	select S5PC1XX_SETUP_FB_24BPP
+ 	help
+ 	  Machine support for the Samsung SMDKC100
+diff --git a/arch/arm/mach-s5pc100/mach-smdkc100.c b/arch/arm/mach-s5pc100/mach-smdkc100.c
+index daf6a2b..e8f4553 100644
+--- a/arch/arm/mach-s5pc100/mach-smdkc100.c
++++ b/arch/arm/mach-s5pc100/mach-smdkc100.c
+@@ -27,16 +27,21 @@
+ #include <asm/mach/map.h>
  
- enum s3c_gpio_number {
--	S5PC1XX_GPIO_A0_START 	= 0,
--	S5PC1XX_GPIO_A1_START 	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_A0),
--	S5PC1XX_GPIO_B_START 	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_A1),
-+	S5PC1XX_GPIO_A0_START	= 0,
-+	S5PC1XX_GPIO_A1_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_A0),
-+	S5PC1XX_GPIO_B_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_A1),
- 	S5PC1XX_GPIO_C_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_B),
- 	S5PC1XX_GPIO_D_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_C),
- 	S5PC1XX_GPIO_E0_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_D),
-@@ -93,11 +98,17 @@ enum s3c_gpio_number {
- 	S5PC1XX_GPIO_K1_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_K0),
- 	S5PC1XX_GPIO_K2_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_K1),
- 	S5PC1XX_GPIO_K3_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_K2),
--	S5PC1XX_GPIO_MP00_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_K3),
-+	S5PC1XX_GPIO_L0_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_K3),
-+	S5PC1XX_GPIO_L1_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_L0),
-+	S5PC1XX_GPIO_L2_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_L1),
-+	S5PC1XX_GPIO_L3_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_L2),
-+	S5PC1XX_GPIO_L4_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_L3),
-+	S5PC1XX_GPIO_MP00_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_L4),
- 	S5PC1XX_GPIO_MP01_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_MP00),
- 	S5PC1XX_GPIO_MP02_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_MP01),
- 	S5PC1XX_GPIO_MP03_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_MP02),
- 	S5PC1XX_GPIO_MP04_START	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_MP03),
-+	S5PC1XX_GPIO_END	= S5PC1XX_GPIO_NEXT(S5PC1XX_GPIO_MP04),
+ #include <mach/map.h>
++#include <mach/regs-fb.h>
++#include <video/platform_lcd.h>
+ 
+ #include <asm/irq.h>
+ #include <asm/mach-types.h>
+ 
+ #include <plat/regs-serial.h>
++#include <plat/gpio-cfg.h>
++#include <plat/regs-gpio.h>
+ 
+ #include <plat/clock.h>
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
+ #include <plat/s5pc100.h>
++#include <plat/fb.h>
+ 
+ #define UCON (S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK)
+ #define ULCON (S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB)
+@@ -73,9 +78,65 @@ static struct s3c2410_uartcfg smdkc100_uartcfgs[] __initdata = {
+ 	},
  };
  
- /* S5PC1XX GPIO number definitions. */
-@@ -130,17 +141,22 @@ enum s3c_gpio_number {
- #define S5PC1XX_GPK1(_nr)	(S5PC1XX_GPIO_K1_START + (_nr))
- #define S5PC1XX_GPK2(_nr)	(S5PC1XX_GPIO_K2_START + (_nr))
- #define S5PC1XX_GPK3(_nr)	(S5PC1XX_GPIO_K3_START + (_nr))
-+#define S5PC1XX_GPL0(_nr)	(S5PC1XX_GPIO_L0_START + (_nr))
-+#define S5PC1XX_GPL1(_nr)	(S5PC1XX_GPIO_L1_START + (_nr))
-+#define S5PC1XX_GPL2(_nr)	(S5PC1XX_GPIO_L2_START + (_nr))
-+#define S5PC1XX_GPL3(_nr)	(S5PC1XX_GPIO_L3_START + (_nr))
-+#define S5PC1XX_GPL4(_nr)	(S5PC1XX_GPIO_L4_START + (_nr))
- #define S5PC1XX_MP00(_nr)	(S5PC1XX_GPIO_MP00_START + (_nr))
- #define S5PC1XX_MP01(_nr)	(S5PC1XX_GPIO_MP01_START + (_nr))
- #define S5PC1XX_MP02(_nr)	(S5PC1XX_GPIO_MP02_START + (_nr))
- #define S5PC1XX_MP03(_nr)	(S5PC1XX_GPIO_MP03_START + (_nr))
- #define S5PC1XX_MP04(_nr)	(S5PC1XX_GPIO_MP04_START + (_nr))
-+#define S5PC1XX_MP05(_nr)	(S5PC1XX_GPIO_MP05_START + (_nr))
++/* LCD power controller */
++static void smdkc100_lcd_power_set(struct plat_lcd_data *pd,
++				   unsigned int power)
++{
++	/* backlight */
++	gpio_direction_output(S5PC100_GPD(0), power);
++
++	if (power) {
++		/* module reset */
++		gpio_direction_output(S5PC100_GPH0(6), 1);
++		mdelay(100);
++		gpio_direction_output(S5PC100_GPH0(6), 0);
++		mdelay(10);
++		gpio_direction_output(S5PC100_GPH0(6), 1);
++		mdelay(10);
++	}
++}
++
++static struct plat_lcd_data smdkc100_lcd_power_data = {
++	.set_power	= smdkc100_lcd_power_set,
++};
++
++static struct platform_device smdkc100_lcd_powerdev = {
++	.name			= "platform-lcd",
++	.dev.parent		= &s3c_device_fb.dev,
++	.dev.platform_data	= &smdkc100_lcd_power_data,
++};
++
++/* Frame Buffer */
++static struct s3c_fb_pd_win smdkc100_fb_win0 = {
++	/* this is to ensure we use win0 */
++	.win_mode	= {
++		.refresh	= 70,
++		.pixclock	= (8+13+3+800)*(7+5+1+480),
++		.left_margin	= 8,
++		.right_margin	= 13,
++		.upper_margin	= 7,
++		.lower_margin	= 5,
++		.hsync_len	= 3,
++		.vsync_len	= 1,
++		.xres		= 800,
++		.yres		= 480,
++	},
++	.max_bpp	= 32,
++	.default_bpp	= 16,
++};
++
++static struct s3c_fb_platdata smdkc100_lcd_pdata __initdata = {
++	.win[0]		= &smdkc100_fb_win0,
++	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
++	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
++	.setup_gpio	= s5pc100_fb_gpio_setup_24bpp,
++};
++
+ static struct map_desc smdkc100_iodesc[] = {};
  
--/* the end of the S5PC1XX specific gpios */
--#define S5PC1XX_GPIO_END	(S5PC1XX_MP04(S5PC1XX_GPIO_MP04_NR) + 1)
-+/* It used the end of the S5PC1XX gpios */
- #define S3C_GPIO_END		S5PC1XX_GPIO_END
+ static struct platform_device *smdkc100_devices[] __initdata = {
++	&s3c_device_fb,
++	&smdkc100_lcd_powerdev,
+ };
  
- /* define the number of gpios we need to the one after the MP04() range */
--#define ARCH_NR_GPIOS	(S5PC1XX_MP04(S5PC1XX_GPIO_MP04_NR) + 1)
-+#define ARCH_NR_GPIOS		(S5PC1XX_GPIO_END + 1)
+ static void __init smdkc100_map_io(void)
+@@ -87,6 +148,12 @@ static void __init smdkc100_map_io(void)
  
- #include <asm-generic/gpio.h>
+ static void __init smdkc100_machine_init(void)
+ {
++	s3c_fb_set_platdata(&smdkc100_lcd_pdata);
++
++	/* LCD init */
++	gpio_request(S5PC100_GPD(0), "GPD");
++	gpio_request(S5PC100_GPH0(6), "GPH0");
++	smdkc100_lcd_power_set(&smdkc100_lcd_power_data, 0);
+ 	platform_add_devices(smdkc100_devices, ARRAY_SIZE(smdkc100_devices));
+ }
+ 
 -- 
 1.6.4
