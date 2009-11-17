@@ -1,58 +1,49 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Tue, 17 Nov 2009 22:53:38 +0100
-Subject: IXP4xx: unneeded #include platform-specific include files?
-In-Reply-To: <op.u3j6cak02s3iss@richese> (Imre Kaloz's message of "Tue, 17 Nov
-	2009 22:37:13 +0100")
-References: <m3fx8fso72.fsf@intrepid.localdomain>
-	<19200.18453.644399.845601@pilspetsen.it.uu.se>
-	<op.u3gddjdi2s3iss@ecaz> <m3y6m7qylr.fsf@intrepid.localdomain>
-	<op.u3j6cak02s3iss@richese>
-Message-ID: <m3ws1o4y3h.fsf@intrepid.localdomain>
+From: ospite@studenti.unina.it (Antonio Ospite)
+Date: Tue, 17 Nov 2009 23:04:20 +0100
+Subject: [PATCH 0/3] pxa_camera: remove init() callback
+Message-ID: <1258495463-26029-1-git-send-email-ospite@studenti.unina.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Imre Kaloz" <kaloz@openwrt.org> writes:
+Hi,
 
-> Ok, I should be completely missing the point here, but could someone enlighten
-> me why would the following make sense? (nslu2 example)
->
-> #define NSLU2_PCI_INTA_PIN	11
-> #define NSLU2_PCI_INTB_PIN	10
-> #define NSLU2_PCI_INTC_PIN	9
-> #define NSLU2_PCI_INTD_PIN	8
->
-> #define        IRQ_NSLU2_PCI_INTA      IRQ_IXP4XX_GPIO11
-> #define        IRQ_NSLU2_PCI_INTB      IRQ_IXP4XX_GPIO10
-> #define        IRQ_NSLU2_PCI_INTC      IRQ_IXP4XX_GPIO9
+this series removes the init() callback from pxa_camera_platform_data, and
+fixes its users to do initialization statically at machine init time.
 
-Well, this isn't something I really like because it duplicates the
-assignments.
+Guennadi requested this change because there seems to be no use cases for
+dynamic initialization. I also believe that the current semantics for this
+init() callback is ambiguous anyways, it is invoked in pxa_camera_activate(),
+hence at device node open, but its users use it like a generic initialization
+to be done at module init time (configure MFP, request GPIOs for *sensor*
+control).
 
-> Then do all the "fun" in the setup code, instead of simply using
-> The already defined (and hardware wise more logical) IRQ_IXP4XX_GPIOx values like
-> I do in arch/arch/mach-ixp4xx/wg302v2-pci.c for example?
+So removing it is definitely good.
+As a side note, If we were really exposing some dynamic and generic
+initialization, this could be done in soc-camera itself, not in pxa_camera
+anyways.
 
-void __init wg302v2_pci_preinit(void)
-{
-        set_irq_type(IRQ_IXP4XX_GPIO8, IRQ_TYPE_LEVEL_LOW);
-        set_irq_type(IRQ_IXP4XX_GPIO9, IRQ_TYPE_LEVEL_LOW);
+Thanks,
+   Antonio
 
-        ixp4xx_pci_preinit();
-}
+Antonio Ospite (3):
+  em-x270: don't use pxa_camera init() callback
+  pcm990-baseboard: don't use pxa_camera init() callback
+  pxa_camera: remove init() callback
 
-static int __init wg302v2_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
-{
-        if (slot == 1)
-                return IRQ_IXP4XX_GPIO8;
-        else if (slot == 2)
-                return IRQ_IXP4XX_GPIO9;
-        else return -1;
-}
+ arch/arm/mach-pxa/em-x270.c             |    9 +++++----
+ arch/arm/mach-pxa/include/mach/camera.h |    2 --
+ arch/arm/mach-pxa/pcm990-baseboard.c    |    8 +-------
+ drivers/media/video/pxa_camera.c        |   10 ----------
+ 4 files changed, 6 insertions(+), 23 deletions(-)
 
-Not very different from what other platforms have, except that you have
-to remember the assignment. When the code gets more complicated you
-really don't want to remember that INTA is GPIO8, INTB is GPIO9, INTC,
-INTD, IDE_IRQ, USB_IRQ etc. And this gets even more complicated when the
-platform code supports more than one version of hw.
--- 
-Krzysztof Halasa
+--
+Antonio Ospite
+http://ao2.it
+
+PGP public key ID: 0x4553B001
+
+A: Because it messes up the order in which people normally read text.
+   See http://en.wikipedia.org/wiki/Posting_style
+Q: Why is top-posting such a bad thing?
+A: Top-posting.
+Q: What is the most annoying thing in e-mail?
