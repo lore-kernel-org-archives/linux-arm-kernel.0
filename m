@@ -1,43 +1,56 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Tue, 17 Nov 2009 10:17:13 +0100
-Subject: imx27 - hanging at freeing init memory -- getting some junk
-	characters here after on console ..
-In-Reply-To: <OF29677297.CAA27B00-ON65257671.002E6F4B-65257671.002E6F5C@tcs.com>
-References: <20091117071744.GM14091@buzzloop.caiaq.de>
-	<20091110064900.GK14091@buzzloop.caiaq.de>
-	<20091104131500.GZ14091@buzzloop.caiaq.de>
-	<OF15AFD08D.F28F9544-ON65257664.002A1275-65257664.002A127F@tcs.com>
-	<OF899D5B75.A8958BE5-ON65257666.001F50BF-65257666.001F50C4@tcs.com>
-	<OF409EDC40.B7ED8C90-ON65257671.001667E7-65257671.001667F5@tcs.com>
-	<OF29677297.CAA27B00-ON65257671.002E6F4B-65257671.002E6F5C@tcs.com>
-Message-ID: <20091117091713.GN14091@buzzloop.caiaq.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 17 Nov 2009 10:15:49 +0100
+Subject: [PATCH] ARM: MM: use 64bytes of L1 cache on plat S5PC1xx
+In-Reply-To: <20091117091024.187d7cda@hina.wild-wind.fr.eu.org>
+References: <1258444074-20679-1-git-send-email-m.szyprowski@samsung.com>
+	<20091117091024.187d7cda@hina.wild-wind.fr.eu.org>
+Message-ID: <000701ca6766$90fbb2e0$b2f318a0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2009 at 01:57:11PM +0530, Vadivelan M wrote:
->  Did you measure the junk characters or the 'working' serial output. The
->  question is whether the baud rate really changes.
->           -- Yes. we have measured the baud rate when the junk characters starts coming.
+Hello,
 
-Then the only explanation I have is that something seriously crashes
-your userspace binaries and makes the kernel go wild.
+On Tuesday, November 17, 2009 9:10 AM Marc Zyngier wrote:
 
->  Please send in patches of your modifications so people here can have a
->  look to what you did.
->           -- Please find the patches [please find the attachment . ]
+> On Tue, 17 Nov 2009 08:47:54 +0100
+> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> 
+> > From: Kyungmin Park <kyungmin.park@samsung.com>
+> >
+> > Samsung S5PC1xx SoCs are Coretex8 based, so use 64 bytes of L1 cache
+> > line instead of the default 32 bytes.
+> >
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > ---
+> >  arch/arm/mm/Kconfig |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> > index 9264d81..7b7d4c3 100644
+> > --- a/arch/arm/mm/Kconfig
+> > +++ b/arch/arm/mm/Kconfig
+> > @@ -774,5 +774,5 @@ config CACHE_XSC3L2
+> >
+> >  config ARM_L1_CACHE_SHIFT
+> >  	int
+> > -	default 6 if ARCH_OMAP3
+> > +	default 6 if ARCH_OMAP3 || ARCH_S5PC1XX
+> >  	default 5
+> 
+> If this feature is related to the S5PC1xx being a CortexA8, why not
+> depend on CPU_V7 rather that adding each and every new CortexA8
+> implementation to this list?
 
-I don't get what you're doing and why. Why do you patch around in
-vmalloc.h? What reason is there to modify the clock framework for that
-platform? And Those patches are obvisouly agains version 2.6.19.2 and
-not mainline? Without any word of elaboration, I'm afraid you're on your
-own.
+There can be ARM v7 CPUs with different size of L1 line cache -
+Cortex-R4 is an example of such: 
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0363d/Caccifbd.html
+(32 bytes of L1 cache line size).
 
-My suggestion is to take the MX27ADS platform which your kernel config
-is made for and try the current mainline kernel on that hardware.
-Without any of your patches. Then find out the difference between that
-setup and your own board.
+This config option should depend on particular ARM core implementation,
+otherwise it will be hard cover all possibilities.
 
-Albeit I don't have such hardware, but I'm quite confident the reference
-platform works well. Maybe someone of the MX2 people can acknowledge that.
-
-Daniel
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
