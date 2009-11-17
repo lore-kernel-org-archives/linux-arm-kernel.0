@@ -1,88 +1,300 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Wed, 18 Nov 2009 00:05:21 +0100
-Subject: IXP4xx: unneeded #include platform-specific include files?
-In-Reply-To: <m3ocn04vma.fsf@intrepid.localdomain>
-References: <m3fx8fso72.fsf@intrepid.localdomain>
-	<19200.18453.644399.845601@pilspetsen.it.uu.se>
-	<op.u3gddjdi2s3iss@ecaz>
-	<m3y6m7qylr.fsf@intrepid.localdomain> <op.u3j6cak02s3iss@richese>
-	<m3ws1o4y3h.fsf@intrepid.localdomain> <op.u3j7xuh92s3iss@richese>
-	<m3skcc4wrm.fsf@intrepid.localdomain> <op.u3j8zxsd2s3iss@richese>
-	<m3ocn04vma.fsf@intrepid.localdomain>
-Message-ID: <op.u3kae7qg2s3iss@richese>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 17 Nov 2009 15:05:24 -0800
+Subject: [PATCH 03/12] omap3: rx51: Add SDRAM init
+In-Reply-To: <20091117230324.19869.44927.stgit@localhost>
+References: <20091117230324.19869.44927.stgit@localhost>
+Message-ID: <20091117230524.19869.32639.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2009.11.17. 23:47:09 Krzysztof Halasa <khc@pm.waw.pl> wrote:
+From: Tero Kristo <tero.kristo@nokia.com>
 
-> "Imre Kaloz" <kaloz@openwrt.org> writes:
->
->> Yeah, you get rid of the external .h files for dropping all that bloat
->> into the setup
->> files. Honestly, do however you please, but this hardly makes sense
->> IMHO when you have
->> the chance to get rid of all this mess.
->
-> What I'm thinking about is (cut & paste):
->
-> --- a/arch/arm/mach-ixp4xx/avila-pci.c
-> +++ b/arch/arm/mach-ixp4xx/avila-pci.c
-> @@ -27,49 +27,40 @@
->  #include <mach/hardware.h>
->  #include <asm/mach-types.h>
->-#define AVILA_PCI_MAX_DEV      4
-> -#define LOFT_PCI_MAX_DEV       6
-> -#define AVILA_PCI_IRQ_LINES    4
-> +#define AVILA_MAX_DEV  4
-> +#define LOFT_MAX_DEV   6
-> +#define IRQ_LINES      4
-> /* PCI controller GPIO to IRQ pin mappings */
-> -#define AVILA_PCI_INTA_PIN     11
-> -#define AVILA_PCI_INTB_PIN     10
-> -#define AVILA_PCI_INTC_PIN     9
-> -#define AVILA_PCI_INTD_PIN     8
-> -
-> -#define IRQ_AVILA_PCI_INTA     IRQ_IXP4XX_GPIO11
-> -#define IRQ_AVILA_PCI_INTB     IRQ_IXP4XX_GPIO10
-> -#define IRQ_AVILA_PCI_INTC     IRQ_IXP4XX_GPIO9
-> -#define IRQ_AVILA_PCI_INTD     IRQ_IXP4XX_GPIO8
-> +#define INTA           11
-> +#define INTB           10
-> +#define INTC           9
-> +#define INTD           8
->
-> You can see the duplicate definitions removed.
-> BTW: I don't like it much, but using ordinary GPIOx certainly
-> isn't better.
->
-> (Yep, I see at least one bug which the patches should fix, will do).
->
->  void __init avila_pci_preinit(void)
->  {
-> -       set_irq_type(IRQ_AVILA_PCI_INTA, IRQ_TYPE_LEVEL_LOW);
-> -       set_irq_type(IRQ_AVILA_PCI_INTB, IRQ_TYPE_LEVEL_LOW);
-> -       set_irq_type(IRQ_AVILA_PCI_INTC, IRQ_TYPE_LEVEL_LOW);
-> -       set_irq_type(IRQ_AVILA_PCI_INTD, IRQ_TYPE_LEVEL_LOW);
-> -
-> +       set_irq_type(IXP4XX_GPIO_IRQ(INTA), IRQ_TYPE_LEVEL_LOW);
-> +       set_irq_type(IXP4XX_GPIO_IRQ(INTB), IRQ_TYPE_LEVEL_LOW);
-> +       set_irq_type(IXP4XX_GPIO_IRQ(INTC), IRQ_TYPE_LEVEL_LOW);
-> +       set_irq_type(IXP4XX_GPIO_IRQ(INTD), IRQ_TYPE_LEVEL_LOW);
->         ixp4xx_pci_preinit();
->  }
+This patch adds board specific SDRAM init for RX51. This patch is a
+collaboration of work from following people:
 
+Juha Yrjola: Original code
+Lauri Leukkunen: Port to RX51
+Tero Kristo: Support for multiple OPP:s, merge of patches
+Samu Onkalo: Fixed SDRAM parameters according to specs
+Kalle Jokiniemi: A fix for rounding error
 
-This is far more tolerable, but SLOT1-3 would be better. Also, the
-_MAX thingie should be dropped, for example the LOFT is nothing more
-then an avila with an USB2 controller on the same IRQ as slot 3, where
-the USB1.1 subdevices will show up as well. Those subdevices won't show
-up on a board without the USB controller, but all this will blow up when
-someone plugs a miniPCI USB controller into one of the slots, not to
-mention if he/she plugs in more ;)
+Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
+Cc: Samu Onkalo <samu.p.onkalo@nokia.com>
+Cc: Kalle Jokiniemi <kalle.jokiniemi@digia.com>
+Cc: Lauri Leukkunen <lauri.leukkunen@nokia.com>
+Cc: Juha Yrjola <juha.yrjola@solidboot.com>
+Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/Makefile           |    1 
+ arch/arm/mach-omap2/board-rx51-sdram.c |  221 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/board-rx51.c       |    7 +
+ 3 files changed, 228 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/board-rx51-sdram.c
 
-Now the best question: do those PCI subdevices need an IRQ? If there is only
-one IRQ connected to a PCI slot (probably), does it make sense to assign
-IRQs/GPIOs without any effect?
-
-
-Imre
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index f40619e..d56fb2b 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -72,6 +72,7 @@ obj-$(CONFIG_MACH_OMAP_3430SDP)		+= board-3430sdp.o \
+ 					   mmc-twl4030.o
+ obj-$(CONFIG_MACH_NOKIA_N8X0)		+= board-n8x0.o
+ obj-$(CONFIG_MACH_NOKIA_RX51)		+= board-rx51.o \
++					   board-rx51-sdram.o \
+ 					   board-rx51-peripherals.o \
+ 					   mmc-twl4030.o
+ obj-$(CONFIG_MACH_OMAP_ZOOM2)		+= board-zoom2.o \
+diff --git a/arch/arm/mach-omap2/board-rx51-sdram.c b/arch/arm/mach-omap2/board-rx51-sdram.c
+new file mode 100644
+index 0000000..f392844
+--- /dev/null
++++ b/arch/arm/mach-omap2/board-rx51-sdram.c
+@@ -0,0 +1,221 @@
++/*
++ * SDRC register values for RX51
++ *
++ * Copyright (C) 2008 Nokia Corporation
++ *
++ * Lauri Leukkunen <lauri.leukkunen@nokia.com>
++ *
++ * Original code by Juha Yrjola <juha.yrjola@solidboot.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/kernel.h>
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <linux/io.h>
++
++#include <plat/io.h>
++#include <plat/common.h>
++#include <plat/clock.h>
++#include <plat/sdrc.h>
++
++
++/* In picoseconds, except for tREF (ns), tXP, tCKE, tWTR (clks) */
++struct sdram_timings {
++	u32 casl;
++	u32 tDAL;
++	u32 tDPL;
++	u32 tRRD;
++	u32 tRCD;
++	u32 tRP;
++	u32 tRAS;
++	u32 tRC;
++	u32 tRFC;
++	u32 tXSR;
++
++	u32 tREF; /* in ns */
++
++	u32 tXP;
++	u32 tCKE;
++	u32 tWTR;
++};
++
++struct omap_sdrc_params rx51_sdrc_params[4];
++
++static const struct sdram_timings rx51_timings[] = {
++	{
++		.casl = 3,
++		.tDAL = 33000,
++		.tDPL = 15000,
++		.tRRD = 12000,
++		.tRCD = 22500,
++		.tRP = 18000,
++		.tRAS = 42000,
++		.tRC = 66000,
++		.tRFC = 138000,
++		.tXSR = 200000,
++
++		.tREF = 7800,
++
++		.tXP = 2,
++		.tCKE = 2,
++		.tWTR = 2
++	},
++};
++
++static unsigned long sdrc_get_fclk_period(long rate)
++{
++	/* In picoseconds */
++	return 1000000000 / rate;
++}
++
++static unsigned int sdrc_ps_to_ticks(unsigned int time_ps, long rate)
++{
++	unsigned long tick_ps;
++
++	/* Calculate in picosecs to yield more exact results */
++	tick_ps = sdrc_get_fclk_period(rate);
++
++	return (time_ps + tick_ps - 1) / tick_ps;
++}
++#undef DEBUG
++#ifdef DEBUG
++static int set_sdrc_timing_regval(u32 *regval, int st_bit, int end_bit,
++				int ticks, long rate, const char *name)
++#else
++static int set_sdrc_timing_regval(u32 *regval, int st_bit, int end_bit,
++			       int ticks)
++#endif
++{
++	int mask, nr_bits;
++
++	nr_bits = end_bit - st_bit + 1;
++	if (ticks >= 1 << nr_bits)
++		return -1;
++	mask = (1 << nr_bits) - 1;
++	*regval &= ~(mask << st_bit);
++	*regval |= ticks << st_bit;
++#ifdef DEBUG
++	printk(KERN_INFO "SDRC %s: %i ticks %i ns\n", name, ticks,
++			(unsigned int)sdrc_get_fclk_period(rate) * ticks /
++			1000);
++#endif
++
++	return 0;
++}
++
++#ifdef DEBUG
++#define SDRC_SET_ONE(reg, st, end, field, rate) \
++	if (set_sdrc_timing_regval((reg), (st), (end), \
++			rx51_timings->field, (rate), #field) < 0) \
++		err = -1;
++#else
++#define SDRC_SET_ONE(reg, st, end, field, rate) \
++	if (set_sdrc_timing_regval((reg), (st), (end), \
++			rx51_timings->field) < 0) \
++		err = -1;
++#endif
++
++#ifdef DEBUG
++static int set_sdrc_timing_regval_ps(u32 *regval, int st_bit, int end_bit,
++				int time, long rate, const char *name)
++#else
++static int set_sdrc_timing_regval_ps(u32 *regval, int st_bit, int end_bit,
++				int time, long rate)
++#endif
++{
++	int ticks, ret;
++	ret = 0;
++
++	if (time == 0)
++		ticks = 0;
++	else
++		ticks = sdrc_ps_to_ticks(time, rate);
++
++#ifdef DEBUG
++	ret = set_sdrc_timing_regval(regval, st_bit, end_bit, ticks,
++				     rate, name);
++#else
++	ret = set_sdrc_timing_regval(regval, st_bit, end_bit, ticks);
++#endif
++
++	return ret;
++}
++
++#ifdef DEBUG
++#define SDRC_SET_ONE_PS(reg, st, end, field, rate) \
++	if (set_sdrc_timing_regval_ps((reg), (st), (end), \
++			rx51_timings->field, \
++			(rate), #field) < 0) \
++		err = -1;
++
++#else
++#define SDRC_SET_ONE_PS(reg, st, end, field, rate) \
++	if (set_sdrc_timing_regval_ps((reg), (st), (end), \
++			rx51_timings->field, (rate)) < 0) \
++		err = -1;
++#endif
++
++static int sdrc_timings(int id, long rate)
++{
++	u32 ticks_per_ms;
++	u32 rfr, l;
++	u32 actim_ctrla = 0, actim_ctrlb = 0;
++	u32 rfr_ctrl;
++	int err = 0;
++	long l3_rate = rate / 1000;
++
++	SDRC_SET_ONE_PS(&actim_ctrla,  0,  4, tDAL, l3_rate);
++	SDRC_SET_ONE_PS(&actim_ctrla,  6,  8, tDPL, l3_rate);
++	SDRC_SET_ONE_PS(&actim_ctrla,  9, 11, tRRD, l3_rate);
++	SDRC_SET_ONE_PS(&actim_ctrla, 12, 14, tRCD, l3_rate);
++	SDRC_SET_ONE_PS(&actim_ctrla, 15, 17, tRP, l3_rate);
++	SDRC_SET_ONE_PS(&actim_ctrla, 18, 21, tRAS, l3_rate);
++	SDRC_SET_ONE_PS(&actim_ctrla, 22, 26, tRC, l3_rate);
++	SDRC_SET_ONE_PS(&actim_ctrla, 27, 31, tRFC, l3_rate);
++
++	SDRC_SET_ONE_PS(&actim_ctrlb,  0,  7, tXSR, l3_rate);
++
++	SDRC_SET_ONE(&actim_ctrlb,  8, 10, tXP, l3_rate);
++	SDRC_SET_ONE(&actim_ctrlb, 12, 14, tCKE, l3_rate);
++	SDRC_SET_ONE(&actim_ctrlb, 16, 17, tWTR, l3_rate);
++
++	ticks_per_ms = l3_rate;
++	rfr = rx51_timings[0].tREF * ticks_per_ms / 1000000;
++	if (rfr > 65535 + 50)
++		rfr = 65535;
++	else
++		rfr -= 50;
++
++#ifdef DEBUG
++	printk(KERN_INFO "SDRC tREF: %i ticks\n", rfr);
++#endif
++
++	l = rfr << 8;
++	rfr_ctrl = l | 0x1; /* autorefresh, reload counter with 1xARCV */
++
++	rx51_sdrc_params[id].rate = rate;
++	rx51_sdrc_params[id].actim_ctrla = actim_ctrla;
++	rx51_sdrc_params[id].actim_ctrlb = actim_ctrlb;
++	rx51_sdrc_params[id].rfr_ctrl = rfr_ctrl;
++	rx51_sdrc_params[id].mr = 0x32;
++
++	rx51_sdrc_params[id + 1].rate = 0;
++
++	return err;
++}
++
++struct omap_sdrc_params *rx51_get_sdram_timings(void)
++{
++	int err;
++
++	err = sdrc_timings(0, 41500000);
++	err |= sdrc_timings(1, 83000000);
++	err |= sdrc_timings(2, 166000000);
++
++	return &rx51_sdrc_params[0];
++}
++
+diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
+index f1e7e5b..1bb1de2 100644
+--- a/arch/arm/mach-omap2/board-rx51.c
++++ b/arch/arm/mach-omap2/board-rx51.c
+@@ -30,6 +30,8 @@
+ #include <plat/gpmc.h>
+ #include <plat/usb.h>
+ 
++struct omap_sdrc_params *rx51_get_sdram_timings(void);
++
+ static struct omap_lcd_config rx51_lcd_config = {
+ 	.ctrl_name	= "internal",
+ };
+@@ -55,9 +57,12 @@ static struct omap_board_config_kernel rx51_config[] = {
+ 
+ static void __init rx51_init_irq(void)
+ {
++	struct omap_sdrc_params *sdrc_params;
++
+ 	omap_board_config = rx51_config;
+ 	omap_board_config_size = ARRAY_SIZE(rx51_config);
+-	omap2_init_common_hw(NULL, NULL);
++	sdrc_params = rx51_get_sdram_timings();
++	omap2_init_common_hw(sdrc_params, sdrc_params);
+ 	omap_init_irq();
+ 	omap_gpio_init();
+ }
