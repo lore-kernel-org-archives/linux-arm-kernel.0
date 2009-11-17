@@ -1,43 +1,24 @@
-From: maz@misterjones.org (Marc Zyngier)
-Date: Tue, 17 Nov 2009 09:10:24 +0100
-Subject: [PATCH] ARM: MM: use 64bytes of L1 cache on plat S5PC1xx
-In-Reply-To: <1258444074-20679-1-git-send-email-m.szyprowski@samsung.com>
-References: <1258444074-20679-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20091117091024.187d7cda@hina.wild-wind.fr.eu.org>
+From: vadivelan.m@tcs.com (Vadivelan M)
+Date: Tue, 17 Nov 2009 13:57:11 +0530
+Subject: imx27 - hanging at freeing init memory -- getting some junk
+	characters here after on console ..
+In-Reply-To: <20091117071744.GM14091@buzzloop.caiaq.de>
+References: <20091117071744.GM14091@buzzloop.caiaq.de>,
+	<20091110064900.GK14091@buzzloop.caiaq.de>
+	<20091104131500.GZ14091@buzzloop.caiaq.de>
+	<OF15AFD08D.F28F9544-ON65257664.002A1275-65257664.002A127F@tcs.com>
+	<OF899D5B75.A8958BE5-ON65257666.001F50BF-65257666.001F50C4@tcs.com>
+	<OF409EDC40.B7ED8C90-ON65257671.001667E7-65257671.001667F5@tcs.com>
+Message-ID: <OF29677297.CAA27B00-ON65257671.002E6F4B-65257671.002E6F5C@tcs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2009 08:47:54 +0100
-Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-
-> From: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> Samsung S5PC1xx SoCs are Coretex8 based, so use 64 bytes of L1 cache
-> line instead of the default 32 bytes.
-> 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  arch/arm/mm/Kconfig |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index 9264d81..7b7d4c3 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -774,5 +774,5 @@ config CACHE_XSC3L2
->  
->  config ARM_L1_CACHE_SHIFT
->  	int
-> -	default 6 if ARCH_OMAP3
-> +	default 6 if ARCH_OMAP3 || ARCH_S5PC1XX
->  	default 5
-
-If this feature is related to the S5PC1xx being a CortexA8, why not
-depend on CPU_V7 rather that adding each and every new CortexA8
-implementation to this list?
-
-	M.
--- 
-And if you don't know where you're going, any road will take you
-there...
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091117/f8089b77/attachment-0001.htm>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: patch_mx27ads.zip
+Type: application/zip
+Size: 21771 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091117/f8089b77/attachment-0001.zip>
