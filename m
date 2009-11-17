@@ -1,64 +1,15 @@
-From: kevin.wells@nxp.com (Kevin Wells)
-Date: Mon, 16 Nov 2009 18:20:11 +0100
-Subject: submitting new ARM platforms
-Message-ID: <083DF309106F364B939360100EC290F804F54660AD@eu1rdcrdc1wx030.exi.nxp.com>
+From: vadivelan.m@tcs.com (Vadivelan M)
+Date: Tue, 17 Nov 2009 09:34:44 +0530
+Subject: imx27 - hanging at freeing init memory -- getting some junk
+	characters here after on console ..
+In-Reply-To: <20091110064900.GK14091@buzzloop.caiaq.de>
+References: <20091110064900.GK14091@buzzloop.caiaq.de>,
+	<20091104131500.GZ14091@buzzloop.caiaq.de>
+	<OF15AFD08D.F28F9544-ON65257664.002A1275-65257664.002A127F@tcs.com>
+	<OF899D5B75.A8958BE5-ON65257666.001F50BF-65257666.001F50C4@tcs.com>
+Message-ID: <OF409EDC40.B7ED8C90-ON65257671.001667E7-65257671.001667F5@tcs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-
-
-We are the process of getting Linux optimized to the NXP LPC32X0 SoC and would
-
-like to get the files submitted for inclusion into the mainline. Currently, this
-
-consists of 4 CPU variants (all very similar) and 3 different boards (all very
-
-different!).
-
-
-
-The kernel and most of the drivers have been ported to this board for about a
-
-year now, with occasional tweaks needed as the kernel version progresses. A
-
-number of developers are using the kernel on these boards now. We are getting
-
-a lot of requests to get this into mainline!
-
-
-
-I don't want to deluge everyone or anyone all at once, but would like to get
-
-this started!
-
-
-
-Most of the work for this is already done up to 2.6.32-rc6. Whats the best
-
-approach to get started here? I would like to start small with just the basic
-
-arch files with 1 or 2 boards and later add in the other support as more of the
-
-optimzied chip specific drivers are merged in. As of now, the only change
-
-required ouside of the existing kernel source tree is the arch/arm/Kconfig and
-
-arch/arm/Makefile files and the addition of the arch/arm/mach-lpc32xx/ subdir.
-
-
-
-Should I start posting patches for the basic mach- area first?
-
-
-
-thanks,
-
-Kevin Wells
-
-NXP Semiconductors
-
--------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091116/7285d3c9/attachment-0001.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091117/ea9258b3/attachment-0001.htm>
