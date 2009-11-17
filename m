@@ -1,29 +1,35 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 17 Nov 2009 00:29:41 -0600
-Subject: [PATCH 7/8] pxa: add frame buffer on pxa168 aspenite platform
-In-Reply-To: <7c34ac520911160134k57023db1we74073a87a3dd454@mail.gmail.com>
-References: <7c34ac520911160134k57023db1we74073a87a3dd454@mail.gmail.com>
-Message-ID: <f17812d70911162229s43ca6826k29c4c4a7e279144f@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 17 Nov 2009 01:30:20 -0500
+Subject: [PATCH 07/10] backlight: enable backlight in 88pm860x
+In-Reply-To: <20091114050257.GC4463@core.coreip.homeip.net>
+References: <771cded00911130102k36662e51j34e7e2825fdbde66@mail.gmail.com>
+	<20091114050257.GC4463@core.coreip.homeip.net>
+Message-ID: <771cded00911162230x25f5ad7cx6adad4c5e929fa3c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2009 at 3:34 AM, Jun Nie <niej0001@gmail.com> wrote:
-> From: Jun Nie <njun@marvell.com>
-> Date: Fri, 13 Nov 2009 15:12:19 +0800
-> Subject: [PATCH] pxa: add frame buffer on pxa168 aspenite platform
+On Sat, Nov 14, 2009 at 12:02 AM, Dmitry Torokhov
+<dmitry.torokhov@gmail.com> wrote:
+> On Fri, Nov 13, 2009 at 04:02:24AM -0500, Haojian Zhuang wrote:
+>> +
+>> +static int pm860x_backlight_set(struct backlight_device *bl, int brightness)
+>> +{
+>> + ? ? struct pm860x_backlight_data *data = bl_get_data(bl);
+>> + ? ? struct pm860x_chip *chip = data->chip;
+>> + ? ? unsigned char value;
+>> + ? ? int ret;
+>> +
+>> + ? ? if ((wled_a(data->port) < 0) || (wled_b(data->port) < 0)
+>> + ? ? ? ? ? ? || (wled_idc(data->port) < 0))
+>> + ? ? ? ? ? ? return -EINVAL;
+>> +
 >
-> Signed-off-by: Jun Nie <njun@marvell.com>
+> Do you even need to register blacklight device if data->port is negative?
+>
+> --
+> Dmitry
+>
 
-Hi Jun,
+Right. Code is updated.
 
-All previous patches have been merged in 'topic/pxa168fb' branch for
-testing purpose, and I'm having difficulties to merge these two. Could
-you take a look into my tree and rebase these two?
-
-Note - you need only reply these two mails instead of submitting
-another set of patches, and do remember to attach the patch esp.
-since you are using gmail web interface, which is going to mal-form
-the patch.
-
-Thanks.
-- eric
+Haojian
