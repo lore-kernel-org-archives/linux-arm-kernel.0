@@ -1,31 +1,32 @@
 From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Tue, 17 Nov 2009 13:36:47 +0800
-Subject: [PATCH 2/3] NUC900: Adding nuc960 defconfig
-Message-ID: <4B02366F.2080102@gmail.com>
+Date: Tue, 17 Nov 2009 13:39:36 +0800
+Subject: [PATCH 3/3] NUC900: Adding nuc932 defconfig
+Message-ID: <4B023718.3040507@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Russell,
 
-Adding nuc960 defconfig support for Winbond/Nuvoton nuc960 ARM SoC.
+Adding the nuc932 defconfig support for Winbond/Nuvoton nuc932 multimedia ARM SoC.
 
-Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>e
+
+Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
 
 ---
- arch/arm/configs/nuc960_defconfig |  922 +++++++++++++++++++++++++++++++++++++
+ arch/arm/configs/nuc932_defconfig |  922 +++++++++++++++++++++++++++++++++++++
  1 files changed, 922 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/configs/nuc960_defconfig
+ create mode 100644 arch/arm/configs/nuc932_defconfig
 
-diff --git a/arch/arm/configs/nuc960_defconfig b/arch/arm/configs/nuc960_defconfig
+diff --git a/arch/arm/configs/nuc932_defconfig b/arch/arm/configs/nuc932_defconfig
 new file mode 100644
-index 0000000..4b2cd9e
+index 0000000..ab99298
 --- /dev/null
-+++ b/arch/arm/configs/nuc960_defconfig
++++ b/arch/arm/configs/nuc932_defconfig
 @@ -0,0 +1,922 @@
 +#
 +# Automatically generated make config: don't edit
 +# Linux kernel version: 2.6.32-rc7
-+# Tue Nov 17 12:20:11 2009
++# Tue Nov 17 12:22:37 2009
 +#
 +CONFIG_ARM=y
 +CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -200,7 +201,7 @@ index 0000000..4b2cd9e
 +# CONFIG_ARCH_DAVINCI is not set
 +# CONFIG_ARCH_OMAP is not set
 +# CONFIG_ARCH_BCMRING is not set
-+CONFIG_CPU_NUC960=y
++CONFIG_CPU_NUC932=y
 +
 +#
 +# W90P910 Machines
@@ -215,12 +216,12 @@ index 0000000..4b2cd9e
 +#
 +# NUC960 Machines
 +#
-+CONFIG_MACH_W90N960EVB=y
++# CONFIG_MACH_W90N960EVB is not set
 +
 +#
 +# NUC932 Machines
 +#
-+# CONFIG_MACH_NUC932EVB is not set
++CONFIG_MACH_NUC932EVB=y
 +
 +#
 +# Processor Type
