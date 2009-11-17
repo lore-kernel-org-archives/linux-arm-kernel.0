@@ -1,37 +1,69 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 17 Nov 2009 11:02:56 +0100
-Subject: drivers/rtc/rtc-pl031.c uses __raw_readl()?
-In-Reply-To: <63386a3d0911120043y2143c7f5w7289bc83b2e31847@mail.gmail.com>
-References: <63386a3d0911110130j2056a355l16cade8d30edb6cd@mail.gmail.com>
-	<63386a3d0911120043y2143c7f5w7289bc83b2e31847@mail.gmail.com>
-Message-ID: <20091117100256.GC7407@pengutronix.de>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Tue, 17 Nov 2009 12:00:18 +0100
+Subject: [PATCH] ARM: MM: use 64bytes of L1 cache on plat S5PC1xx
+In-Reply-To: <000701ca6766$90fbb2e0$b2f318a0$%szyprowski@samsung.com>
+References: <1258444074-20679-1-git-send-email-m.szyprowski@samsung.com>
+	<20091117091024.187d7cda@hina.wild-wind.fr.eu.org>
+	<000701ca6766$90fbb2e0$b2f318a0$%szyprowski@samsung.com>
+Message-ID: <20091117120018.583b6374@life-in-the-fast-lane>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 12, 2009 at 09:43:43AM +0100, Linus Walleij wrote:
-> 2009/11/11 Linus Walleij <linus.ml.walleij@gmail.com>:
+On Tue, 17 Nov 2009 10:15:49 +0100
+Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+
+Hi Marek,
+
+> Hello,
 > 
-> > Is there some special reason as to why drivers/rtc/rtc-pl031.c uses
-> > the __raw_[read|write]l() macro instead of plain [read|write]l()?
+> On Tuesday, November 17, 2009 9:10 AM Marc Zyngier wrote:
 > 
-> Reading the macro definitions I come to the conclusion that readl()
-> is always little-endian and __raw_readl() is the machine endianness,
-Actually the readl part is not necessarily true I think.
+> > On Tue, 17 Nov 2009 08:47:54 +0100
+> > Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> > 
+> > > From: Kyungmin Park <kyungmin.park@samsung.com>
+> > >
+> > > Samsung S5PC1xx SoCs are Coretex8 based, so use 64 bytes of L1
+> > > cache line instead of the default 32 bytes.
+> > >
+> > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > > ---
+> > >  arch/arm/mm/Kconfig |    2 +-
+> > >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > >
+> > > diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> > > index 9264d81..7b7d4c3 100644
+> > > --- a/arch/arm/mm/Kconfig
+> > > +++ b/arch/arm/mm/Kconfig
+> > > @@ -774,5 +774,5 @@ config CACHE_XSC3L2
+> > >
+> > >  config ARM_L1_CACHE_SHIFT
+> > >  	int
+> > > -	default 6 if ARCH_OMAP3
+> > > +	default 6 if ARCH_OMAP3 || ARCH_S5PC1XX
+> > >  	default 5
+> > 
+> > If this feature is related to the S5PC1xx being a CortexA8, why not
+> > depend on CPU_V7 rather that adding each and every new CortexA8
+> > implementation to this list?
+> 
+> There can be ARM v7 CPUs with different size of L1 line cache -
+> Cortex-R4 is an example of such: 
+> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0363d/Caccifbd.html
+> (32 bytes of L1 cache line size).
+> 
+> This config option should depend on particular ARM core
+> implementation, otherwise it will be hard cover all possibilities.
 
-At least arch/arm/mach-bcmring/include/mach/io.h has:
+Then what about introducing a CORTEX_A8 symbol, selected by ARCH_OMAP3,
+ARCH_S5PC1XX and others to come, and that would select the right cache
+line value? We really want to avoid those ever growing dependency lines
+that lead to conflicts when applying patches from multiple sources.
 
-	/* Do not enable mem_pci for a big endian arm architecture or unexpected byteswaps will */
-	/* happen in readw/writew etc. */
+Unless we can have a Cortex-A8 implementation with a cache line that is
+not 64 bytes?
 
-	#define readb(c)        __raw_readb(c)
-	...
-
-But maybe this is a bug in mach-bcmring?!  Or a work-around of drivers
-using readb et al in wrong sitatations?
-
-Best regards
-Uwe
-
+	M.
 -- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Fast. Cheap. Reliable. Pick two.
