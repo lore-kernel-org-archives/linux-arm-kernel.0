@@ -1,42 +1,42 @@
-From: giometti@linux.it (Rodolfo Giometti)
-Date: Tue, 17 Nov 2009 12:21:46 +0100
-Subject: [PATCH] arm pxa: remove "direction input" forcing for IRQ GPIOs
-Message-ID: <1258456906-12338-1-git-send-email-giometti@linux.it>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 17 Nov 2009 05:29:30 -0600
+Subject: [PATCH 0/2] Support for the Arcom Zeus SBC, #2
+In-Reply-To: <20091116175626.3a80983e@life-in-the-fast-lane>
+References: <20091114182925.17eb58ea@taxman.wild-wind.fr.eu.org>
+	<f17812d70911160838s91f3b74w4cac9e78edb9fa46@mail.gmail.com>
+	<20091116175626.3a80983e@life-in-the-fast-lane>
+Message-ID: <f17812d70911170329o2647e980jf9f04050dc0b5a3b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PXA CPUs may use their GPIOs as IRQ lines even if they are selected as
-outputs (see for example figure 24-1 into PXA27x Processor Family
-Developer's Manual). So forcing GPIOs IRQ lines as inputs is not
-correct.
+On Mon, Nov 16, 2009 at 10:56 AM, Marc Zyngier <maz@misterjones.org> wrote:
+> On Tue, 17 Nov 2009 00:38:53 +0800
+> Eric Miao <eric.y.miao@gmail.com> wrote:
+>
+>> On Sun, Nov 15, 2009 at 1:29 AM, Marc Zyngier <maz@misterjones.org>
+>> wrote:
+>> > The Arcom Zeus is a pxa270 board with a PC104 bus, vaguely similar
+>> > to the Arcom Viper. The following patches adds support for most of
+>> > the on-board devices (though sound and CAN are still missing).
+>> >
+>> > Patches are against PXA devel branch. Please note that they depend
+>> > on the following patch, currently queued in Eric's fix branch:
+>> > http://git.kernel.org/?p=linux/kernel/git/ycmiao/pxa-linux-2.6.git;a=commit;h=b2b36316626f0d6b92c3675a2aa2726efc71d146
+>> >
+>> > The defconfig patch has been already posted before, and can be
+>> > found in the archives at the following address:
+>> > http://lists.infradead.org/pipermail/linux-arm-kernel/2009-November/004014.html
+>> >
+>> > This work started from Arcom's 2.6.16, but all bugs are of course
+>> > mine.
+>>
+>> Marc,
+>>
+>> What's the difference of this #2 from #1 you posted earlier?
+>
+> #1 is based on 2.6.32-rc7. #2 is based on your PXA devel branch.
+>
 
-Programmers should set up GPIOs direction according to their usage and
-the function pxa_gpio_irq_type() should simply enable the IRQ
-detection.
-
-Signed-off-by: Rodolfo Giometti <giometti@linux.it>
-Cc: raffaele.recalcati at bticino.it
----
- arch/arm/plat-pxa/gpio.c |    7 -------
- 1 files changed, 0 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/plat-pxa/gpio.c b/arch/arm/plat-pxa/gpio.c
-index 98548c6..3f17221 100644
---- a/arch/arm/plat-pxa/gpio.c
-+++ b/arch/arm/plat-pxa/gpio.c
-@@ -176,13 +176,6 @@ static int pxa_gpio_irq_type(unsigned int irq, unsigned int type)
- 		type = IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING;
- 	}
- 
--	gpdr = __raw_readl(c->regbase + GPDR_OFFSET);
--
--	if (__gpio_is_inverted(gpio))
--		__raw_writel(gpdr | mask,  c->regbase + GPDR_OFFSET);
--	else
--		__raw_writel(gpdr & ~mask, c->regbase + GPDR_OFFSET);
--
- 	if (type & IRQ_TYPE_EDGE_RISING)
- 		c->irq_edge_rise |= mask;
- 	else
--- 
-1.6.3.3
+OK, both patches look OK to me, merged into 'topic/zeus' at the moment
+(but will finally merged into devel) since I need 'fix' branch to hit the next
+-rc8 before I can rebase 'devel' on top of that.
