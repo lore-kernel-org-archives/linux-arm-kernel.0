@@ -1,73 +1,65 @@
-From: vikram.pandita@ti.com (Pandita, Vikram)
-Date: Tue, 17 Nov 2009 23:20:36 +0530
-Subject: [PATCH 3/3] OMAP clock/hwmod: fix off-by-one errors
-In-Reply-To: <alpine.DEB.2.00.0911171036430.27682@utopia.booyaka.com>
-References: <20091116133237.14128.39687.stgit@localhost.localdomain>
-	<20091116133654.14128.175.stgit@localhost.localdomain>
-	<20091116140830.GA31522@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.0911171036430.27682@utopia.booyaka.com>
-Message-ID: <FCCFB4CDC6E5564B9182F639FC35608702FA689E6A@dbde02.ent.ti.com>
+From: giometti@enneenne.com (Rodolfo Giometti)
+Date: Tue, 17 Nov 2009 19:02:00 +0100
+Subject: [PATCH] arm pxa: remove "direction input" forcing for IRQ GPIOs
+In-Reply-To: <20091117171116.GB14091@buzzloop.caiaq.de>
+References: <1258456906-12338-1-git-send-email-giometti@linux.it>
+	<20091117114429.GT14091@buzzloop.caiaq.de>
+	<20091117120501.GC8008@gundam.enneenne.com>
+	<20091117123422.GU14091@buzzloop.caiaq.de>
+	<20091117123721.GG8008@gundam.enneenne.com>
+	<20091117124334.GW14091@buzzloop.caiaq.de>
+	<20091117125953.GI8008@gundam.enneenne.com>
+	<20091117130653.GX14091@buzzloop.caiaq.de>
+	<20091117143846.GK8008@gundam.enneenne.com>
+	<20091117171116.GB14091@buzzloop.caiaq.de>
+Message-ID: <20091117180200.GL4737@enneenne.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul
+On Tue, Nov 17, 2009 at 06:11:16PM +0100, Daniel Mack wrote:
+> On Tue, Nov 17, 2009 at 03:38:47PM +0100, Rodolfo Giometti wrote:
+> > On Tue, Nov 17, 2009 at 02:06:53PM +0100, Daniel Mack wrote:
+> > > On Tue, Nov 17, 2009 at 01:59:53PM +0100, Rodolfo Giometti wrote:
+> > > > On Tue, Nov 17, 2009 at 01:43:34PM +0100, Daniel Mack wrote:
+> > > 
+> > > No, that's exactly my point. You don't need to set the pin to output
+> > > direction to make use of those pull features. More than that, when
+> > > confiugured as output, the pull flags actually don't make sense.
+> > 
+> > I just looking at pxa27x user manual but I don't see such pull-up
+> > functionality... are you sure these settings aren't pxa3xx specific?
+> > =:-o
+> 
+> I haven't checked the datasheet but the header files that defines this
+> macro only. And it didn't appear to be PXA3x specific.
 
->-----Original Message-----
-From: linux-omap-owner@vger.kernel.org [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Paul
->Walmsley
->Sent: Tuesday, November 17, 2009 11:39 AM
->To: Russell King - ARM Linux
->Cc: linux-arm-kernel at lists.infradead.org; Juha Lepp?nen; linux-omap at vger.kernel.org
->Subject: Re: [PATCH 3/3] OMAP clock/hwmod: fix off-by-one errors
-<snip>
->
->+/**
->+ * omap_test_timeout - busy-loop, testing a condition
->+ * @cond: condition to test until it evaluates to true
->+ * @timeout: maximum number of microseconds in the timeout
->+ * @index: loop index (integer)
->+ *
->+ * Loop waiting for @cond to become true or until at least @timeout
->+ * microseconds have passed.  To use, define some integer @index in the
->+ * calling code.  After running, if @index == @timeout, then the loop has
->+ * timed out.
->+ */
->+#define omap_test_timeout(cond, timeout, index)			\
->+({								\
->+	for (index = 0; index < timeout; index++) {		\
->+		if (cond)					\
->+			break;					\
->+		udelay(1);					\
->+	}							\
->+})
->+
+I cannot find such register nor pull-up/down management into whole
+PXA27x user manual.
 
-There is a similar kind of function implemented in USB host, that returns -ETIMEDOUT
-Which makes more sense for failure case.
+> Anyway, if this is unavailable on your hardware, the proper way would be
+> to place an external resistor on the board (given that you can modify
+> the schematics).
 
-Maybe such a generic function for all omaps is needed.
+Why should I do as you suggest when the CPU can support such
+electrical configuration?
 
-Refer:
-drivers/usb/host/ehci-hcd.c
-static int handshake (struct ehci_hcd *ehci, void __iomem *ptr,
-                      u32 mask, u32 done, int usec)
-{
-        u32     result;
+> I'm still not convinced that driving the pad as output GPIO and then
+> applying a different level externally to generate an IRQ is intended.
 
-        do {
-                result = ehci_readl(ehci, ptr);
-                if (result == ~(u32)0)          /* card removed */
-                        return -ENODEV;
-                result &= mask;
-                if (result == done)
-                        return 0;
-                udelay (1);
-                usec--;
-        } while (usec > 0);
-        return -ETIMEDOUT;
-}
+No external different level applyed! Just a pull-down enabled by a
+machanical switch: if no cards are inserted I read 1 but if I insert a
+card I got 0 due the pull-down enabling.
 
+I tested the code on my hardware who works perfectly.
 
-> #endif /* __ARCH_ARM_MACH_OMAP_COMMON_H */
->--
->1.6.5.GIT
+Ciao,
+
+Rodolfo
+
+-- 
+
+GNU/Linux Solutions                  e-mail: giometti at enneenne.com
+Linux Device Driver                          giometti at linux.it
+Embedded Systems                     phone:  +39 349 2432127
+UNIX programming                     skype:  rodolfo.giometti
+Freelance ICT Italia - Consulente ICT Italia - www.consulenti-ict.it
