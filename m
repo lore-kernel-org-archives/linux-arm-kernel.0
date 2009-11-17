@@ -1,7 +1,7 @@
 From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Tue, 17 Nov 2009 22:15:43 +0100
-Subject: [PATCH 04/10] IXP4xx: move NSLU2 platform macros to the platform code.
-Message-ID: <1258492549-16873-4-git-send-email-khc@pm.waw.pl>
+Date: Tue, 17 Nov 2009 22:15:41 +0100
+Subject: [PATCH 02/10] IXP4xx: move AVILA platform macros to the platform code.
+Message-ID: <1258492549-16873-2-git-send-email-khc@pm.waw.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -9,62 +9,87 @@ From: Krzysztof Ha?asa <khc@pm.waw.pl>
 
 Signed-off-by: Krzysztof Ha?asa <khc@pm.waw.pl>
 ---
+ arch/arm/mach-ixp4xx/avila-pci.c             |   16 ++++++++++-
+ arch/arm/mach-ixp4xx/avila-setup.c           |    4 ++-
+ arch/arm/mach-ixp4xx/include/mach/avila.h    |   39 --------------------------
  arch/arm/mach-ixp4xx/include/mach/hardware.h |    1 -
- arch/arm/mach-ixp4xx/include/mach/irqs.h     |    7 ---
- arch/arm/mach-ixp4xx/include/mach/nslu2.h    |   55 --------------------------
- arch/arm/mach-ixp4xx/nslu2-pci.c             |   13 ++++++-
- arch/arm/mach-ixp4xx/nslu2-setup.c           |   21 +++++++++-
- 5 files changed, 32 insertions(+), 65 deletions(-)
- delete mode 100644 arch/arm/mach-ixp4xx/include/mach/nslu2.h
+ arch/arm/mach-ixp4xx/include/mach/irqs.h     |    9 ------
+ 5 files changed, 18 insertions(+), 51 deletions(-)
+ delete mode 100644 arch/arm/mach-ixp4xx/include/mach/avila.h
 
-diff --git a/arch/arm/mach-ixp4xx/include/mach/hardware.h b/arch/arm/mach-ixp4xx/include/mach/hardware.h
-index 1fbed65..b949cd2 100644
---- a/arch/arm/mach-ixp4xx/include/mach/hardware.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/hardware.h
-@@ -45,7 +45,6 @@
- 
- /* Platform specific details */
- #include "prpmc1100.h"
--#include "nslu2.h"
- #include "nas100d.h"
- #include "dsmg600.h"
- #include "fsg.h"
-diff --git a/arch/arm/mach-ixp4xx/include/mach/irqs.h b/arch/arm/mach-ixp4xx/include/mach/irqs.h
-index e4c6cca..b7e372e 100644
---- a/arch/arm/mach-ixp4xx/include/mach/irqs.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/irqs.h
-@@ -79,13 +79,6 @@
- #define	IRQ_PRPMC1100_PCI_INTD	IRQ_IXP4XX_GPIO8
- 
- /*
-- * NSLU2 board IRQs
-- */
--#define        IRQ_NSLU2_PCI_INTA      IRQ_IXP4XX_GPIO11
--#define        IRQ_NSLU2_PCI_INTB      IRQ_IXP4XX_GPIO10
--#define        IRQ_NSLU2_PCI_INTC      IRQ_IXP4XX_GPIO9
+diff --git a/arch/arm/mach-ixp4xx/avila-pci.c b/arch/arm/mach-ixp4xx/avila-pci.c
+index 08d65dc..14df8cf 100644
+--- a/arch/arm/mach-ixp4xx/avila-pci.c
++++ b/arch/arm/mach-ixp4xx/avila-pci.c
+@@ -22,12 +22,26 @@
+ #include <linux/init.h>
+ #include <linux/irq.h>
+ #include <linux/delay.h>
 -
--/*
-  * NAS100D board IRQs
-  */
- #define        IRQ_NAS100D_PCI_INTA    IRQ_IXP4XX_GPIO11
-diff --git a/arch/arm/mach-ixp4xx/include/mach/nslu2.h b/arch/arm/mach-ixp4xx/include/mach/nslu2.h
+ #include <asm/mach/pci.h>
+ #include <asm/irq.h>
+ #include <mach/hardware.h>
+ #include <asm/mach-types.h>
+ 
++#define AVILA_PCI_MAX_DEV	4
++#define LOFT_PCI_MAX_DEV	6
++#define AVILA_PCI_IRQ_LINES	4
++
++/* PCI controller GPIO to IRQ pin mappings */
++#define AVILA_PCI_INTA_PIN	11
++#define AVILA_PCI_INTB_PIN	10
++#define AVILA_PCI_INTC_PIN	9
++#define AVILA_PCI_INTD_PIN	8
++
++#define IRQ_AVILA_PCI_INTA	IRQ_IXP4XX_GPIO11
++#define IRQ_AVILA_PCI_INTB	IRQ_IXP4XX_GPIO10
++#define IRQ_AVILA_PCI_INTC	IRQ_IXP4XX_GPIO9
++#define IRQ_AVILA_PCI_INTD	IRQ_IXP4XX_GPIO8
++
+ void __init avila_pci_preinit(void)
+ {
+ 	set_irq_type(IRQ_AVILA_PCI_INTA, IRQ_TYPE_LEVEL_LOW);
+diff --git a/arch/arm/mach-ixp4xx/avila-setup.c b/arch/arm/mach-ixp4xx/avila-setup.c
+index 797995c..6e558a7 100644
+--- a/arch/arm/mach-ixp4xx/avila-setup.c
++++ b/arch/arm/mach-ixp4xx/avila-setup.c
+@@ -19,7 +19,6 @@
+ #include <linux/serial_8250.h>
+ #include <linux/slab.h>
+ #include <linux/i2c-gpio.h>
+-
+ #include <asm/types.h>
+ #include <asm/setup.h>
+ #include <asm/memory.h>
+@@ -29,6 +28,9 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/flash.h>
+ 
++#define AVILA_SDA_PIN	7
++#define AVILA_SCL_PIN	6
++
+ static struct flash_platform_data avila_flash_data = {
+ 	.map_name	= "cfi_probe",
+ 	.width		= 2,
+diff --git a/arch/arm/mach-ixp4xx/include/mach/avila.h b/arch/arm/mach-ixp4xx/include/mach/avila.h
 deleted file mode 100644
-index 85d00ad..0000000
---- a/arch/arm/mach-ixp4xx/include/mach/nslu2.h
+index 1640cb6..0000000
+--- a/arch/arm/mach-ixp4xx/include/mach/avila.h
 +++ /dev/null
-@@ -1,55 +0,0 @@
+@@ -1,39 +0,0 @@
 -/*
-- * arch/arm/mach-ixp4xx/include/mach/nslu2.h
+- * arch/arm/mach-ixp4xx/include/mach/avila.h
 - *
-- * NSLU2 platform specific definitions
+- * Gateworks Avila platform specific definitions
 - *
-- * Author: Mark Rakes <mrakes AT mac.com>
-- * Maintainers: http://www.nslu2-linux.org
+- * Author: Michael-Luke Jones <mlj28@cam.ac.uk>
 - *
-- * based on ixdp425.h:
-- *	Copyright 2004 (c) MontaVista, Software, Inc.
+- * Based on ixdp425.h
+- * Author: Deepak Saxena <dsaxena@plexity.net>
 - *
-- * This file is licensed under the terms of the GNU General Public
+- * Copyright 2004 (c) MontaVista, Software, Inc.
+- *
+- * This file is licensed under  the terms of the GNU General Public
 - * License version 2. This program is licensed "as is" without any
 - * warranty of any kind, whether express or implied.
 - */
@@ -73,105 +98,55 @@ index 85d00ad..0000000
 -#error "Do not include this directly, instead #include <mach/hardware.h>"
 -#endif
 -
--#define NSLU2_SDA_PIN		7
--#define NSLU2_SCL_PIN		6
+-#define	AVILA_SDA_PIN		7
+-#define	AVILA_SCL_PIN		6
 -
 -/*
-- * NSLU2 PCI IRQs
+- * AVILA PCI IRQs
 - */
--#define NSLU2_PCI_MAX_DEV	3
--#define NSLU2_PCI_IRQ_LINES	3
+-#define AVILA_PCI_MAX_DEV	4
+-#define LOFT_PCI_MAX_DEV    6
+-#define AVILA_PCI_IRQ_LINES	4
 -
 -
 -/* PCI controller GPIO to IRQ pin mappings */
--#define NSLU2_PCI_INTA_PIN	11
--#define NSLU2_PCI_INTB_PIN	10
--#define NSLU2_PCI_INTC_PIN	9
--#define NSLU2_PCI_INTD_PIN	8
+-#define AVILA_PCI_INTA_PIN	11
+-#define AVILA_PCI_INTB_PIN	10
+-#define AVILA_PCI_INTC_PIN	9
+-#define AVILA_PCI_INTD_PIN	8
 -
--/* NSLU2 Timer */
--#define NSLU2_FREQ 66000000
 -
--/* Buttons */
--
--#define NSLU2_PB_GPIO		5	/* power button */
--#define NSLU2_PO_GPIO		8	/* power off */
--#define NSLU2_RB_GPIO		12	/* reset button */
--
--/* Buzzer */
--
--#define NSLU2_GPIO_BUZZ		4
--
--/* LEDs */
--
--#define NSLU2_LED_RED_GPIO	0
--#define NSLU2_LED_GRN_GPIO	1
--#define NSLU2_LED_DISK1_GPIO	3
--#define NSLU2_LED_DISK2_GPIO	2
-diff --git a/arch/arm/mach-ixp4xx/nslu2-pci.c b/arch/arm/mach-ixp4xx/nslu2-pci.c
-index 4429b84..9665bb0 100644
---- a/arch/arm/mach-ixp4xx/nslu2-pci.c
-+++ b/arch/arm/mach-ixp4xx/nslu2-pci.c
-@@ -18,10 +18,21 @@
- #include <linux/pci.h>
- #include <linux/init.h>
- #include <linux/irq.h>
--
- #include <asm/mach/pci.h>
- #include <asm/mach-types.h>
+diff --git a/arch/arm/mach-ixp4xx/include/mach/hardware.h b/arch/arm/mach-ixp4xx/include/mach/hardware.h
+index 30ca67b..72b7543 100644
+--- a/arch/arm/mach-ixp4xx/include/mach/hardware.h
++++ b/arch/arm/mach-ixp4xx/include/mach/hardware.h
+@@ -44,7 +44,6 @@
+ #include "platform.h"
  
-+#define NSLU2_PCI_MAX_DEV	3
-+#define NSLU2_PCI_IRQ_LINES	3
-+
-+/* PCI controller GPIO to IRQ pin mappings */
-+#define NSLU2_PCI_INTA_PIN	11
-+#define NSLU2_PCI_INTB_PIN	10
-+#define NSLU2_PCI_INTC_PIN	9
-+#define NSLU2_PCI_INTD_PIN	8
-+#define IRQ_NSLU2_PCI_INTA      IRQ_IXP4XX_GPIO11
-+#define IRQ_NSLU2_PCI_INTB      IRQ_IXP4XX_GPIO10
-+#define IRQ_NSLU2_PCI_INTC      IRQ_IXP4XX_GPIO9
-+
- void __init nslu2_pci_preinit(void)
- {
- 	set_irq_type(IRQ_NSLU2_PCI_INTA, IRQ_TYPE_LEVEL_LOW);
-diff --git a/arch/arm/mach-ixp4xx/nslu2-setup.c b/arch/arm/mach-ixp4xx/nslu2-setup.c
-index ff6a08d..c14e003 100644
---- a/arch/arm/mach-ixp4xx/nslu2-setup.c
-+++ b/arch/arm/mach-ixp4xx/nslu2-setup.c
-@@ -26,13 +26,32 @@
- #include <linux/i2c.h>
- #include <linux/i2c-gpio.h>
- #include <linux/io.h>
--
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/flash.h>
- #include <asm/mach/time.h>
- #include <asm/gpio.h>
+ /* Platform specific details */
+-#include "avila.h"
+ #include "coyote.h"
+ #include "prpmc1100.h"
+ #include "nslu2.h"
+diff --git a/arch/arm/mach-ixp4xx/include/mach/irqs.h b/arch/arm/mach-ixp4xx/include/mach/irqs.h
+index 4bb6d66..5cb19fe 100644
+--- a/arch/arm/mach-ixp4xx/include/mach/irqs.h
++++ b/arch/arm/mach-ixp4xx/include/mach/irqs.h
+@@ -71,15 +71,6 @@
+ #define	XSCALE_PMU_IRQ		(IRQ_IXP4XX_XSCALE_PMU)
  
-+#define NSLU2_SDA_PIN		7
-+#define NSLU2_SCL_PIN		6
-+
-+/* NSLU2 Timer */
-+#define NSLU2_FREQ 66000000
-+
-+/* Buttons */
-+#define NSLU2_PB_GPIO		5	/* power button */
-+#define NSLU2_PO_GPIO		8	/* power off */
-+#define NSLU2_RB_GPIO		12	/* reset button */
-+
-+/* Buzzer */
-+#define NSLU2_GPIO_BUZZ		4
-+
-+/* LEDs */
-+#define NSLU2_LED_RED_GPIO	0
-+#define NSLU2_LED_GRN_GPIO	1
-+#define NSLU2_LED_DISK1_GPIO	3
-+#define NSLU2_LED_DISK2_GPIO	2
-+
- static struct flash_platform_data nslu2_flash_data = {
- 	.map_name		= "cfi_probe",
- 	.width			= 2,
+ /*
+- * Gateworks Avila board IRQs
+- */
+-#define	IRQ_AVILA_PCI_INTA	IRQ_IXP4XX_GPIO11
+-#define	IRQ_AVILA_PCI_INTB	IRQ_IXP4XX_GPIO10
+-#define	IRQ_AVILA_PCI_INTC	IRQ_IXP4XX_GPIO9
+-#define	IRQ_AVILA_PCI_INTD	IRQ_IXP4XX_GPIO8
+-
+-
+-/*
+  * PrPMC1100 Board IRQs
+  */
+ #define	IRQ_PRPMC1100_PCI_INTA	IRQ_IXP4XX_GPIO11
 -- 
 1.6.5.2
