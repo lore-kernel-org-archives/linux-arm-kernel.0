@@ -1,33 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 17 Nov 2009 17:05:19 +0000
-Subject: [PATCH] ARM: MM: use 64bytes of L1 cache on plat S5PC1xx
-In-Reply-To: <20091117120018.583b6374@life-in-the-fast-lane>
-References: <1258444074-20679-1-git-send-email-m.szyprowski@samsung.com>
-	<20091117091024.187d7cda@hina.wild-wind.fr.eu.org>
-	<000701ca6766$90fbb2e0$b2f318a0$%szyprowski@samsung.com>
-	<20091117120018.583b6374@life-in-the-fast-lane>
-Message-ID: <20091117170519.GA1494@n2100.arm.linux.org.uk>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Tue, 17 Nov 2009 18:11:16 +0100
+Subject: [PATCH] arm pxa: remove "direction input" forcing for IRQ GPIOs
+In-Reply-To: <20091117143846.GK8008@gundam.enneenne.com>
+References: <1258456906-12338-1-git-send-email-giometti@linux.it>
+	<20091117114429.GT14091@buzzloop.caiaq.de>
+	<20091117120501.GC8008@gundam.enneenne.com>
+	<20091117123422.GU14091@buzzloop.caiaq.de>
+	<20091117123721.GG8008@gundam.enneenne.com>
+	<20091117124334.GW14091@buzzloop.caiaq.de>
+	<20091117125953.GI8008@gundam.enneenne.com>
+	<20091117130653.GX14091@buzzloop.caiaq.de>
+	<20091117143846.GK8008@gundam.enneenne.com>
+Message-ID: <20091117171116.GB14091@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2009 at 12:00:18PM +0100, Marc Zyngier wrote:
-> Then what about introducing a CORTEX_A8 symbol, selected by ARCH_OMAP3,
-> ARCH_S5PC1XX and others to come, and that would select the right cache
-> line value? We really want to avoid those ever growing dependency lines
-> that lead to conflicts when applying patches from multiple sources.
+On Tue, Nov 17, 2009 at 03:38:47PM +0100, Rodolfo Giometti wrote:
+> On Tue, Nov 17, 2009 at 02:06:53PM +0100, Daniel Mack wrote:
+> > On Tue, Nov 17, 2009 at 01:59:53PM +0100, Rodolfo Giometti wrote:
+> > > On Tue, Nov 17, 2009 at 01:43:34PM +0100, Daniel Mack wrote:
+> > 
+> > No, that's exactly my point. You don't need to set the pin to output
+> > direction to make use of those pull features. More than that, when
+> > confiugured as output, the pull flags actually don't make sense.
 > 
-> Unless we can have a Cortex-A8 implementation with a cache line that is
-> not 64 bytes?
+> I just looking at pxa27x user manual but I don't see such pull-up
+> functionality... are you sure these settings aren't pxa3xx specific?
+> =:-o
 
-CPUs of the same family can have different cache line sizes.  The only
-way to be sure is if you read the cache type registers and work it out.
+I haven't checked the datasheet but the header files that defines this
+macro only. And it didn't appear to be PXA3x specific.
 
-However, L1_CACHE_SHIFT must be a compile time constant - it can't be
-run-time calculated.  So, we chose to set L1_CACHE_SHIFT to be the
-largest size found for the SoC concerned.
+Anyway, if this is unavailable on your hardware, the proper way would be
+to place an external resistor on the board (given that you can modify
+the schematics).
 
-So, setting it to 64 for CPU_V7 makes no sense, since such CPUs can have
-larger or smaller cache line sizes - and that's about the same as trying
-to select the cache line size according to a CORTEX_A8 symbol...
+I'm still not convinced that driving the pad as output GPIO and then
+applying a different level externally to generate an IRQ is intended.
 
-The original patch seems to be the only sensible solution to this.
+Daniel
