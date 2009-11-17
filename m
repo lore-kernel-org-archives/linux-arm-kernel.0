@@ -1,62 +1,41 @@
-From: ospite@studenti.unina.it (Antonio Ospite)
-Date: Tue, 17 Nov 2009 23:04:23 +0100
-Subject: [PATCH 3/3] pxa_camera: remove init() callback
-In-Reply-To: <1258495463-26029-1-git-send-email-ospite@studenti.unina.it>
-References: <1258495463-26029-1-git-send-email-ospite@studenti.unina.it>
-Message-ID: <1258495463-26029-4-git-send-email-ospite@studenti.unina.it>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Tue, 17 Nov 2009 23:22:21 +0100
+Subject: IXP4xx: unneeded #include platform-specific include files?
+In-Reply-To: <op.u3j7xuh92s3iss@richese> (Imre Kaloz's message of "Tue, 17 Nov
+	2009 23:11:44 +0100")
+References: <m3fx8fso72.fsf@intrepid.localdomain>
+	<19200.18453.644399.845601@pilspetsen.it.uu.se>
+	<op.u3gddjdi2s3iss@ecaz> <m3y6m7qylr.fsf@intrepid.localdomain>
+	<op.u3j6cak02s3iss@richese> <m3ws1o4y3h.fsf@intrepid.localdomain>
+	<op.u3j7xuh92s3iss@richese>
+Message-ID: <m3skcc4wrm.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pxa_camera init() callback is sometimes abused to setup MFP for PXA CIF, or
-even to request GPIOs to be used by the camera *sensor*. These initializations
-can be performed statically in machine init functions.
+"Imre Kaloz" <kaloz@openwrt.org> writes:
 
-The current semantics for this init() callback is ambiguous anyways, it is
-invoked in pxa_camera_activate(), hence at device node open, but its users use
-it like a generic initialization to be done at module init time (configure
-MFP, request GPIOs for *sensor* control).
+> Why wouldn't you want to remember that "INTA" was "GPIO8"? When you want to
+> touch those lines you do have to remember or look up what GPIO was that one.
+> So this hardly makes it easier to work with or to remember to -- it certainly
+> duplicates the assignments, as you've also noted.
 
-Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
----
- arch/arm/mach-pxa/include/mach/camera.h |    2 --
- drivers/media/video/pxa_camera.c        |   10 ----------
- 2 files changed, 0 insertions(+), 12 deletions(-)
+Actually I'm not sure if I understand you correctly.
 
-diff --git a/arch/arm/mach-pxa/include/mach/camera.h b/arch/arm/mach-pxa/include/mach/camera.h
-index 31abe6d..6709b1c 100644
---- a/arch/arm/mach-pxa/include/mach/camera.h
-+++ b/arch/arm/mach-pxa/include/mach/camera.h
-@@ -35,8 +35,6 @@
- #define PXA_CAMERA_VSP		0x400
- 
- struct pxacamera_platform_data {
--	int (*init)(struct device *);
--
- 	unsigned long flags;
- 	unsigned long mclk_10khz;
- };
-diff --git a/drivers/media/video/pxa_camera.c b/drivers/media/video/pxa_camera.c
-index 51b683c..49f2bf9 100644
---- a/drivers/media/video/pxa_camera.c
-+++ b/drivers/media/video/pxa_camera.c
-@@ -882,18 +882,8 @@ static void recalculate_fifo_timeout(struct pxa_camera_dev *pcdev,
- 
- static void pxa_camera_activate(struct pxa_camera_dev *pcdev)
- {
--	struct pxacamera_platform_data *pdata = pcdev->pdata;
--	struct device *dev = pcdev->soc_host.v4l2_dev.dev;
- 	u32 cicr4 = 0;
- 
--	dev_dbg(dev, "Registered platform device at %p data %p\n",
--		pcdev, pdata);
--
--	if (pdata && pdata->init) {
--		dev_dbg(dev, "%s: Init gpios\n", __func__);
--		pdata->init(dev);
--	}
--
- 	/* disable all interrupts */
- 	__raw_writel(0x3ff, pcdev->base + CICR0);
- 
+If I use GPIO8 (presumably in different places) I have to remember what
+it is. This may be use with a couple of IRQ lines but gets harder and
+harder with a more complicated machine. Macros like SLOT0_INTA etc.
+don't have this problem. That's BTW why macros and symbolic names were
+invented.
+
+> The INTx naming convention is also stupid, as in most cases these are
+> not different
+> INT lines of the PCI slot but either separate slots or subdevices -- and note,
+> most of the boards only have INTa connected mechanically.
+>
+> And I didn't even get to the topic of *_PCI_MAX_DEV, *_PCI_IRQ_LINES
+> and the mania
+> of pci_irq_table usage..
+
+But you've seen the patches I just posted, haven't you?
 -- 
-1.6.5.2
+Krzysztof Halasa
