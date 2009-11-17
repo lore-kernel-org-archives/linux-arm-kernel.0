@@ -1,108 +1,51 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 17 Nov 2009 19:12:26 +0800
-Subject: [PATCH 01/02] backlight: control WLED output current in da9034
-In-Reply-To: <f17812d70911170304p11b73172of0a85dda378e83b3@mail.gmail.com>
-References: <771cded00911042357m7785312ewf29e39dd93b6d389@mail.gmail.com>
-	<771cded00911050020w3d9ef572h392603dcb9456f96@mail.gmail.com>
-	<771cded00911162327i2f0f6b15gf9a7cb7b1391ed74@mail.gmail.com>
-	<f17812d70911170304p11b73172of0a85dda378e83b3@mail.gmail.com>
-Message-ID: <771cded00911170312n10114eeam8c676c3b892a932d@mail.gmail.com>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Tue, 17 Nov 2009 12:11:43 +0100
+Subject: [PATCH] drivers: MMC: enable SDHCI-S3C on S5PC1XX platform
+In-Reply-To: <1258444374-21479-1-git-send-email-m.szyprowski@samsung.com>
+References: <1258444374-21479-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20091117121143.09246257@life-in-the-fast-lane>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2009 at 7:04 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Tue, Nov 17, 2009 at 1:27 AM, Haojian Zhuang
-> <haojian.zhuang@gmail.com> wrote:
->> On Thu, Nov 5, 2009 at 3:20 AM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
->>> On Thu, Nov 5, 2009 at 2:57 AM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
->>>> From ff0d136a181ce431a0db9582f18733425a51411d Mon Sep 17 00:00:00 2001
->>>> From: Haojian Zhuang <haojian.zhuang@marvell.com>
->>>> Date: Thu, 5 Nov 2009 10:27:13 -0500
->>>> Subject: [PATCH] backlight: control WLED output current in da9034
->>>>
->>>> Update WLED output current source before changing brightness.
->>>>
->>>> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
->
-> Haojian,
->
-> I've updated the patch as follows, changes:
->
-> 1. out_current --> output_current
-> 2. output_current will be set only once during probe - we don't need to
-> adjust it every time backlight is changed, right?
-> 3. and thus removing the out_current field within da903x_backlight_data
->
-> Please help review and verify, thanks.
->
-> From 1351ae291bd237d3a754bedd550ab1f6f9fdbb20 Mon Sep 17 00:00:00 2001
-> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Thu, 5 Nov 2009 10:27:13 -0500
-> Subject: [PATCH] da903x_bl: control WLED output current in da9034
->
-> Update WLED output current source before changing brightness.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+On Tue, 17 Nov 2009 08:52:54 +0100
+Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+
+> From: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> Samsung S5PC100 SoC has SDHCI controller compatible to the one known
+> from S3C64xx SoCs. Enable support for sdhci-s3c driver also on
+> S5PC1xx platform.
+> 
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Acked-by: Ben Dooks <ben-linux@fluff.org>
 > ---
-> ?drivers/video/backlight/da903x_bl.c | ? ?7 +++++++
-> ?include/linux/mfd/da903x.h ? ? ? ? ?| ? ?4 ++++
-> ?2 files changed, 11 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/video/backlight/da903x_bl.c
-> b/drivers/video/backlight/da903x_bl.c
-> index 701a108..9cbd01d 100644
-> --- a/drivers/video/backlight/da903x_bl.c
-> +++ b/drivers/video/backlight/da903x_bl.c
-> @@ -25,6 +25,7 @@
->
-> ?#define DA9034_WLED_CONTROL1 ? 0x3C
-> ?#define DA9034_WLED_CONTROL2 ? 0x3D
-> +#define DA9034_WLED_ISET(x) ? ?((x) & 0x1f)
->
-> ?#define DA9034_WLED_BOOST_EN ? (1 << 5)
->
-> @@ -101,6 +102,7 @@ static struct backlight_ops da903x_backlight_ops = {
->
-> ?static int da903x_backlight_probe(struct platform_device *pdev)
-> ?{
-> + ? ? ? struct da9034_backlight_pdata *pdata = pdev->dev.platform_data;
-> ? ? ? ?struct da903x_backlight_data *data;
-> ? ? ? ?struct backlight_device *bl;
-> ? ? ? ?int max_brightness;
-> @@ -127,6 +129,11 @@ static int da903x_backlight_probe(struct
-> platform_device *pdev)
-> ? ? ? ?data->da903x_dev = pdev->dev.parent;
-> ? ? ? ?data->current_brightness = 0;
->
-> + ? ? ? /* adjust the WLED output current */
-> + ? ? ? if (pdata)
-> + ? ? ? ? ? ? ? da903x_write(dev, DA9034_WLED_CONTROL2,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? DA9034_WLED_ISET(pdata->output_current));
-> +
-> ? ? ? ?bl = backlight_device_register(pdev->name, data->da903x_dev,
-> ? ? ? ? ? ? ? ? ? ? ? ?data, &da903x_backlight_ops);
-> ? ? ? ?if (IS_ERR(bl)) {
-> diff --git a/include/linux/mfd/da903x.h b/include/linux/mfd/da903x.h
-> index c63b65c..0aa3a1a 100644
-> --- a/include/linux/mfd/da903x.h
-> +++ b/include/linux/mfd/da903x.h
-> @@ -96,6 +96,10 @@ struct da9034_touch_pdata {
-> ? ? ? ?int ? ? y_inverted;
-> ?};
->
-> +struct da9034_backlight_pdata {
-> + ? ? ? int ? ? output_current; /* output current of WLED, from 0-31 (in mA) */
-> +};
-> +
-> ?/* DA9030 battery charger data */
-> ?struct power_supply_info;
->
-> --
-> 1.6.3.3
->
+>  drivers/mmc/host/Kconfig |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> index 432ae83..faddf82 100644
+> --- a/drivers/mmc/host/Kconfig
+> +++ b/drivers/mmc/host/Kconfig
+> @@ -96,7 +96,7 @@ config MMC_SDHCI_PLTFM
+>  
+>  config MMC_SDHCI_S3C
+>  	tristate "SDHCI support on Samsung S3C SoC"
+> -	depends on MMC_SDHCI && (PLAT_S3C24XX || PLAT_S3C64XX)
+> +	depends on MMC_SDHCI && (PLAT_S3C24XX || PLAT_S3C64XX ||
+> PLAT_S5PC1XX) help
+>  	  This selects the Secure Digital Host Controller Interface
+> (SDHCI) often referrered to as the HSMMC block in some of the Samsung
+> S3C
 
-I'm OK on this patch.
+I think it was Ben that suggested once to introduce a HAVE_SDHCI_S3C
+symbol, selected by interested parties (S3C, S5P, S5PC...).
 
-Thanks
-Haojian
+Given the way Samsung SoCs are assembled (from an IP point of view), it
+would make sense for one SoC to describe its features in
+"HAVE_FEATURE_FOO" terms rather than each subsystem depending an ever
+growing list of SoC.
+
+	M.
+-- 
+Fast. Cheap. Reliable. Pick two.
