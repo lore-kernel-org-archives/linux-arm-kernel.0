@@ -1,34 +1,42 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 18 Nov 2009 12:11:03 -0700 (MST)
-Subject: [PATCH 3/3] OMAP clock/hwmod: fix off-by-one errors
-In-Reply-To: <20091118184740.GQ29266@atomide.com>
-References: <20091116133237.14128.39687.stgit@localhost.localdomain>
-	<20091116133654.14128.175.stgit@localhost.localdomain>
-	<20091116140830.GA31522@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.0911171036430.27682@utopia.booyaka.com>
-	<FCCFB4CDC6E5564B9182F639FC35608702FA689E6A@dbde02.ent.ti.com>
-	<20091117222409.GH29266@atomide.com>
-	<20091118184740.GQ29266@atomide.com>
-Message-ID: <alpine.DEB.2.00.0911181202380.9248@utopia.booyaka.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 18 Nov 2009 11:19:47 -0800
+Subject: [PATCH 00/10] Omap mailbox updates for omap4 for 2.6.33
+Message-ID: <20091118191852.31148.93980.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Nov 2009, Tony Lindgren wrote:
+Hi all,
 
-> To me it sounds like this can wait until the merge window,
-> so not adding to omap-fixes for now.
+Here are omap4 related mailbox changes for review.
 
-Indeed, there's no rush on this one, so let's set it up for 2.6.33.
-I'll keep that macro in plat/system.h unless you or Russell have a better 
-suggestion.  It might be worth looking at the rest of the Linux codebase 
-to see if there are other potential users; maybe someone might be willing 
-to pick up a "kernel-janitor" task for this?
+Regards,
 
-Vikram, I agree with your comment.  Maybe someone can send a patch to 
-clean up ehci-hcd.c and any other users of the same idiom to use this 
-macro for 2.6.33?  Looks like also plat-omap/mailbox.c:__mbox_msg_send() 
-and mach-omap2/powerdomain.c:pwrdm_wait_transition() would be good 
-candidates for this, under arch/arm/*omap*.
+Tony
+
+---
+
+C A Subramaniam (6):
+      omap: mailbox: Add build specific changes to support omap mailbox
+      omap: mailbox: Add resources and mailbox register base address for OMAP4 mailbox
+      omap: mailbox: remove unnecessary arg for omap_mbox_msg_send
+      omap: mailbox: Adds code changes to support OMAP4 mailbox
+      omap: mailbox: OMAP4 Mailbox Patch to change the IRQ flag from IRQF_DISABLED to IRQF_SHARED
+      omap: mailbox: OMAP4 Mailbox-driver Patch to support tasklet implementation
+
+Hiroshi DOYU (4):
+      omap: mailbox: remove sequence bit checking
+      omap: mailbox: remove class interface
+      omap: mailbox: remove disable_/enable_mbox_irq in isr
+      omap: mailbox: Expose omap_mbox_enable()/disable_irq()
 
 
-- Paul
+ arch/arm/mach-omap2/Makefile               |    3 
+ arch/arm/mach-omap2/devices.c              |   36 +++-
+ arch/arm/mach-omap2/mailbox.c              |  140 ++++++++++++--
+ arch/arm/plat-omap/include/plat/mailbox.h  |   23 ++
+ arch/arm/plat-omap/include/plat/omap44xx.h |    2 
+ arch/arm/plat-omap/mailbox.c               |  282 +++++-----------------------
+ 6 files changed, 217 insertions(+), 269 deletions(-)
+
+-- 
+Signature
