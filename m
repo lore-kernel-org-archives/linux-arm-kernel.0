@@ -1,34 +1,40 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 18 Nov 2009 11:03:38 +0800
-Subject: [PATCH] hx4700: fix hx4700 touchscreen pressure values
-In-Reply-To: <E1NAYJo-00016g-PW@pih-relay04.plus.net>
-References: <E1NAYJo-00016g-PW@pih-relay04.plus.net>
-Message-ID: <f17812d70911171903v230b1598mc8e5ff2a4b5195b8@mail.gmail.com>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Tue, 17 Nov 2009 21:10:43 -0600
+Subject: ARM kirkwood: how to run kirkwood_pcie_init() from kernel module
+In-Reply-To: <200911161032.02873.dk-arm-linux@gmx.de>
+References: <200911161032.02873.dk-arm-linux@gmx.de>
+Message-ID: <c70ff3ad0911171910t2231317aw154ba6e455ca3511@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 18, 2009 at 8:22 AM, Paul Parsons <lost.distance@yahoo.com> wrote:
->> Does pressure actually work as expected -- that is not inverted?
->> Because I need this patch on spitz... ?but it may break your
->> machine...
->
-> You are right, the pressure values were being inverted on my hx4700.
-> Pressing hard generates somewhat lower Rt values than pressing lightly.
->
-> Since typical hx4700 Rt values are close to (pressure_max/2) anyway,
-> the inverted and non-inverted values were not very different.
-> For example:
->
-> Rt ? ? ?ts->pressure_max-Rt
-> 599 ? ? 425
-> 562 ? ? 462
-> 588 ? ? 436
-> 570 ? ? 454
->
-> So by all means submit your ads7846.c patch; it will not break hx4700.
->
+please note that this function linked into the init section.
 
-Is this generically true that the pressure is always inverted? Otherwise
-a platform specific field indicating this would be the better way to go.
-
-- eric
+On Mon, Nov 16, 2009 at 3:32 AM, Dieter Kiermaier <dk-arm-linux@gmx.de> wrote:
+> Hi all,
+>
+> sorry for disturbing and also sorry for my - maybe strange - question ;)
+>
+> I've got the following problem:
+>
+> I want to boot my fpga before I start the pci layer.
+> To achieve this it is necessary to start the pci layer somewhat after flashing my fpga.
+>
+> So what I need is to run kirkwood_pcie_init() from inside my (flashing) driver.
+> Do you know a way how to realize this?
+>
+> The header common.h isn't meant to include it from anywhere else than from kirkwood *_setup.c files, right?
+>
+> Is it possible to do a EXPORT_SYMBOL(kirkwood_pcie_init) somehow?
+>
+> I've tried it allready but get linker warnings and function isn't called...
+>
+> Do you have an idea how I can do that?
+>
+> Many many thanks in advance,
+> Dieter
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
