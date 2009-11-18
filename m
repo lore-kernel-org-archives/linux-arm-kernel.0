@@ -1,10 +1,9 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 18 Nov 2009 14:33:12 +0100
-Subject: [PATCH 17/19] ARM: S5PC1XX: add sdhci platform helpers for s5pc110
-	sub-platform
+Date: Wed, 18 Nov 2009 14:33:08 +0100
+Subject: [PATCH 13/19] ARM: S5PC1XX: add support for s5pc110 irqs
 In-Reply-To: <1258551194-16018-1-git-send-email-m.szyprowski@samsung.com>
 References: <1258551194-16018-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1258551194-16018-18-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1258551194-16018-14-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,344 +11,294 @@ From: Kyungmin Park <kyungmin.park@samsung.com>
 
 Samsung S5PC110 SoC are newer Samsung SoCs. Like S5PC100 they are based
 on CortexA8 ARM CPU, but have much more powerfull integrated periperals.
-This patch adds common SDHCI platform helper for S5PC110 sub-platform.
+This patch adds interrupt support on S5PC110 SoCs. Unlike S5PC100,
+S5PC110 has 4 VICs, so the S5PC110 specifi virtual memory area is
+extended to cover VIC3 register block.
 
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
 ---
- arch/arm/mach-s5pc110/Kconfig            |   12 +++
- arch/arm/mach-s5pc110/Makefile           |    2 +
- arch/arm/mach-s5pc110/cpu.c              |    5 +
- arch/arm/mach-s5pc110/setup-sdhci-gpio.c |  123 ++++++++++++++++++++++++++++++
- arch/arm/mach-s5pc110/setup-sdhci.c      |   59 ++++++++++++++
- arch/arm/plat-s3c/include/plat/sdhci.h   |   64 +++++++++++++++
- 6 files changed, 265 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5pc110/setup-sdhci-gpio.c
- create mode 100644 arch/arm/mach-s5pc110/setup-sdhci.c
+ arch/arm/mach-s5pc110/cpu.c                   |   10 ++
+ arch/arm/mach-s5pc110/include/mach/regs-irq.h |   25 +++
+ arch/arm/mach-s5pc110/include/plat/irqs.h     |  209 +++++++++++++++++++++++++
+ 3 files changed, 244 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-s5pc110/include/mach/regs-irq.h
+ create mode 100644 arch/arm/mach-s5pc110/include/plat/irqs.h
 
-diff --git a/arch/arm/mach-s5pc110/Kconfig b/arch/arm/mach-s5pc110/Kconfig
-index 123dbd3..47fe703 100644
---- a/arch/arm/mach-s5pc110/Kconfig
-+++ b/arch/arm/mach-s5pc110/Kconfig
-@@ -34,4 +34,16 @@ config S5PC110_SETUP_I2C2
- 	bool
- 	help
- 	  Common setup code for i2c bus 2.
-+
-+config S5PC110_SETUP_SDHCI
-+        bool
-+        select S5PC110_SETUP_SDHCI_GPIO
-+        help
-+          Internal helper functions for S5PC110 based SDHCI systems
-+
-+config S5PC110_SETUP_SDHCI_GPIO
-+	bool
-+	help
-+	  Common setup code for SDHCI gpio.
-+
- endif
-diff --git a/arch/arm/mach-s5pc110/Makefile b/arch/arm/mach-s5pc110/Makefile
-index 38be30f..ca1ff96 100644
---- a/arch/arm/mach-s5pc110/Makefile
-+++ b/arch/arm/mach-s5pc110/Makefile
-@@ -17,5 +17,7 @@ obj-$(CONFIG_CPU_S5PC110)	+= cpu.o
- obj-$(CONFIG_S5PC110_SETUP_I2C0)	+= setup-i2c0.o
- obj-$(CONFIG_S5PC110_SETUP_I2C1)	+= setup-i2c1.o
- obj-$(CONFIG_S5PC110_SETUP_I2C2)	+= setup-i2c2.o
-+obj-$(CONFIG_S5PC110_SETUP_SDHCI)       += setup-sdhci.o
-+obj-$(CONFIG_S5PC110_SETUP_SDHCI_GPIO)	+= setup-sdhci-gpio.o
- 
- # machine support
 diff --git a/arch/arm/mach-s5pc110/cpu.c b/arch/arm/mach-s5pc110/cpu.c
-index d16ba68..e72582f 100644
+index 6c9ebcb..3ea26ff 100644
 --- a/arch/arm/mach-s5pc110/cpu.c
 +++ b/arch/arm/mach-s5pc110/cpu.c
-@@ -86,6 +86,11 @@ void __init s5pc110_map_io(void)
- 	iotable_init(s5pc110_iodesc, ARRAY_SIZE(s5pc110_iodesc));
+@@ -43,6 +43,12 @@
+ /* Initial IO mappings */
  
- 	/* initialise device information early */
-+	s5pc110_default_sdhci0();
-+	s5pc110_default_sdhci1();
-+	s5pc110_default_sdhci2();
-+	s5pc110_default_sdhci3();
+ static struct map_desc s5pc110_iodesc[] __initdata = {
++	{
++		.virtual	= (unsigned long)S5PC1XX_VA_VIC(3),
++		.pfn		= __phys_to_pfn(S5PC1XX_PA_VIC(3)),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	},
+ };
+ 
+ static void s5pc110_idle(void)
+@@ -93,6 +99,10 @@ void __init s5pc110_init_clocks(int xtal)
+ 
+ void __init s5pc110_init_irq(void)
+ {
++	u32 vic_valid[] = {~0, ~0, ~0, ~0};
 +
- 	/* the i2c devices are directly compatible with s3c2440 */
- 	s3c_i2c0_setname("s3c2440-i2c");
- 	s3c_i2c1_setname("s3c2440-i2c");
-diff --git a/arch/arm/mach-s5pc110/setup-sdhci-gpio.c b/arch/arm/mach-s5pc110/setup-sdhci-gpio.c
++	/* VIC0, VIC1, VIC2, and VIC3 are fully populated. */
++	s5pc1xx_init_irq(vic_valid, ARRAY_SIZE(vic_valid));
+ }
+ 
+ struct sysdev_class s5pc110_sysclass = {
+diff --git a/arch/arm/mach-s5pc110/include/mach/regs-irq.h b/arch/arm/mach-s5pc110/include/mach/regs-irq.h
 new file mode 100644
-index 0000000..49db2a0
+index 0000000..b467e3b
 --- /dev/null
-+++ b/arch/arm/mach-s5pc110/setup-sdhci-gpio.c
-@@ -0,0 +1,123 @@
-+/* linux/arch/arm/plat-s5pc1xx/setup-sdhci-gpio.c
++++ b/arch/arm/mach-s5pc110/include/mach/regs-irq.h
+@@ -0,0 +1,25 @@
++/* linux/arch/arm/mach-s5pc110/include/mach/regs-irq.h
 + *
-+ * Copyright 2009 Samsung Eletronics
++ * Copyright 2009 Samsung Electronics Co.
++ *	Byungho Min <bhmin@samsung.com>
 + *
-+ * S5PC110 - Helper functions for setting up SDHCI device(s) GPIO (HSMMC)
++ * S5PC110 - IRQ register definitions
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 +*/
 +
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <linux/interrupt.h>
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
-+#include <linux/mmc/host.h>
-+#include <linux/mmc/card.h>
++#ifndef __ASM_ARCH_REGS_IRQ_H
++#define __ASM_ARCH_REGS_IRQ_H __FILE__
 +
-+#include <mach/gpio.h>
-+#include <plat/gpio-cfg.h>
-+#include <plat/regs-sdhci.h>
++#include <mach/map.h>
++#include <asm/hardware/vic.h>
 +
-+void s5pc110_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
-+{
-+	unsigned int gpio;
++/* interrupt controller */
++#define S5PC1XX_VIC0REG(x)          		((x) + S5PC1XX_VA_VIC(0))
++#define S5PC1XX_VIC1REG(x)          		((x) + S5PC1XX_VA_VIC(1))
++#define S5PC1XX_VIC2REG(x)         		((x) + S5PC1XX_VA_VIC(2))
++#define S5PC1XX_VIC3REG(x)         		((x) + S5PC1XX_VA_VIC(3))
 +
-+	/* Set all the necessary GPG0/GPG1 pins to special-function 2 */
-+	for (gpio = S5PC110_GPG0(0); gpio < S5PC110_GPG0(2); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+	}
-+	switch (width) {
-+	case 8:
-+		/* GPG1[3:6] special-funtion 3 */
-+		for (gpio = S5PC110_GPG1(3); gpio <= S5PC110_GPG1(6); gpio++) {
-+			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(3));
-+			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		}
-+	case 4:
-+		/* GPG0[3:6] special-funtion 2 */
-+		for (gpio = S5PC110_GPG0(3); gpio <= S5PC110_GPG0(6); gpio++) {
-+			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		}
-+	default:
-+		break;
-+	}
-+
-+	s3c_gpio_setpull(S5PC110_GPG0(2), S3C_GPIO_PULL_UP);
-+	s3c_gpio_cfgpin(S5PC110_GPG0(2), S3C_GPIO_SFN(2));
-+}
-+
-+void s5pc110_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
-+{
-+	unsigned int gpio;
-+
-+	/* Set all the necessary GPG1[0:1] pins to special-function 2 */
-+	for (gpio = S5PC110_GPG1(0); gpio < S5PC110_GPG1(2); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+	}
-+
-+	/* Data pin GPG1[3:6] to special-function 2 */
-+	for (gpio = S5PC110_GPG1(3); gpio <= S5PC110_GPG1(6); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+	}
-+
-+	s3c_gpio_setpull(S5PC110_GPG1(2), S3C_GPIO_PULL_UP);
-+	s3c_gpio_cfgpin(S5PC110_GPG1(2), S3C_GPIO_SFN(2));
-+}
-+
-+void s5pc110_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
-+{
-+	unsigned int gpio;
-+
-+	/* Set all the necessary GPG2[0:1] pins to special-function 2 */
-+	for (gpio = S5PC110_GPG2(0); gpio < S5PC110_GPG2(2); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+	}
-+
-+	switch (width) {
-+	case 8:
-+		/* Data pin GPG3[3:6] to special-function 3 */
-+		for (gpio = S5PC110_GPG3(3); gpio <= S5PC110_GPG3(6); gpio++) {
-+			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(3));
-+			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		}
-+	case 4:
-+		/* Data pin GPG2[3:6] to special-function 2 */
-+		for (gpio = S5PC110_GPG2(3); gpio <= S5PC110_GPG2(6); gpio++) {
-+			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		}
-+	default:
-+		break;
-+	}
-+
-+	s3c_gpio_setpull(S5PC110_GPG2(2), S3C_GPIO_PULL_UP);
-+	s3c_gpio_cfgpin(S5PC110_GPG2(2), S3C_GPIO_SFN(2));
-+}
-+
-+void s5pc110_setup_sdhci3_cfg_gpio(struct platform_device *dev, int width)
-+{
-+	unsigned int gpio;
-+
-+	/* Set all the necessary GPG3[0:1] pins to special-function 2 */
-+	for (gpio = S5PC110_GPG3(0); gpio < S5PC110_GPG3(2); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+	}
-+
-+	/* Data pin GPG3[3:6] to special-function 2 */
-+	for (gpio = S5PC110_GPG3(3); gpio <= S5PC110_GPG3(6); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+	}
-+
-+	s3c_gpio_setpull(S5PC110_GPG3(2), S3C_GPIO_PULL_UP);
-+	s3c_gpio_cfgpin(S5PC110_GPG3(2), S3C_GPIO_SFN(2));
-+}
-diff --git a/arch/arm/mach-s5pc110/setup-sdhci.c b/arch/arm/mach-s5pc110/setup-sdhci.c
++#endif /* __ASM_ARCH_REGS_IRQ_H */
+diff --git a/arch/arm/mach-s5pc110/include/plat/irqs.h b/arch/arm/mach-s5pc110/include/plat/irqs.h
 new file mode 100644
-index 0000000..c368bb5
+index 0000000..a650251
 --- /dev/null
-+++ b/arch/arm/mach-s5pc110/setup-sdhci.c
-@@ -0,0 +1,59 @@
-+/* linux/arch/arm/mach-s5pc100/setup-sdhci.c
++++ b/arch/arm/mach-s5pc110/include/plat/irqs.h
+@@ -0,0 +1,209 @@
++/* linux/arch/arm/plat-s5pc1xx/include/plat/irqs.h
 + *
-+ * Copyright 2008 Samsung Electronics
++ * Copyright 2009 Samsung Electronics Co.
++ *      Byungho Min <bhmin@samsung.com>
 + *
-+ * S5PC100 - Helper functions for settign up SDHCI device(s) (HSMMC)
++ * S5PC110 - Common IRQ support
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
++ * Based on plat-s3c64xx/include/plat/irqs.h
++ */
 +
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <linux/interrupt.h>
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
++#ifndef __ASM_PLAT_S5PC110_IRQS_H
++#define __ASM_PLAT_S5PC110_IRQS_H __FILE__
 +
-+#include <linux/mmc/card.h>
-+#include <linux/mmc/host.h>
++/* we keep the first set of CPU IRQs out of the range of
++ * the ISA space, so that the PC104 has them to itself
++ * and we don't end up having to do horrible things to the
++ * standard ISA drivers....
++ *
++ * note, since we're using the VICs, our start must be a
++ * mulitple of 32 to allow the common code to work
++ */
 +
-+#include <plat/regs-sdhci.h>
-+#include <plat/sdhci.h>
++#define S3C_IRQ_OFFSET		(32)
 +
-+/* clock sources for the mmc bus clock, order as for the ctrl2[5..4] */
++#define S3C_IRQ(x)		((x) + S3C_IRQ_OFFSET)
 +
-+char *s5pc110_hsmmc_clksrcs[4] = {
-+	[0] = "mmc-bus",
-+};
++#define S3C_VIC0_BASE		S3C_IRQ(0)
++#define S3C_VIC1_BASE		S3C_IRQ(32)
++#define S3C_VIC2_BASE		S3C_IRQ(64)
++#define S3C_VIC3_BASE		S3C_IRQ(96)
 +
-+void s5pc110_setup_sdhci_cfg_card(struct platform_device *dev,
-+				    void __iomem *r,
-+				    struct mmc_ios *ios,
-+				    struct mmc_card *card)
-+{
-+	u32 ctrl2, ctrl3;
++/* UART interrupts, each UART has 4 interupts per channel so
++ * use the space between the ISA and S3C main interrupts. Note, these
++ * are not in the same order as the S3C24XX series! */
 +
-+	/* don't need to alter anything acording to card-type */
++#define IRQ_S3CUART_BASE0	(16)
++#define IRQ_S3CUART_BASE1	(20)
++#define IRQ_S3CUART_BASE2	(24)
++#define IRQ_S3CUART_BASE3	(28)
 +
-+	writel(S3C64XX_SDHCI_CONTROL4_DRIVE_9mA, r + S3C64XX_SDHCI_CONTROL4);
++#define UART_IRQ_RXD		(0)
++#define UART_IRQ_ERR		(1)
++#define UART_IRQ_TXD		(2)
++#define UART_IRQ_MODEM		(3)
 +
-+	ctrl2 = readl(r + S3C_SDHCI_CONTROL2);
-+	ctrl2 &= S3C_SDHCI_CTRL2_SELBASECLK_MASK;
-+	ctrl2 |= (S3C64XX_SDHCI_CTRL2_ENSTAASYNCCLR |
-+		  S3C64XX_SDHCI_CTRL2_ENCMDCNFMSK |
-+		  S3C_SDHCI_CTRL2_ENFBCLKRX |
-+		  S3C_SDHCI_CTRL2_DFCNT_NONE |
-+		  S3C_SDHCI_CTRL2_ENCLKOUTHOLD);
++#define IRQ_S3CUART_RX0		(IRQ_S3CUART_BASE0 + UART_IRQ_RXD)
++#define IRQ_S3CUART_TX0		(IRQ_S3CUART_BASE0 + UART_IRQ_TXD)
++#define IRQ_S3CUART_ERR0	(IRQ_S3CUART_BASE0 + UART_IRQ_ERR)
 +
-+	if (ios->clock < 25 * 1000000)
-+		ctrl3 = (S3C_SDHCI_CTRL3_FCSEL3 |
-+			 S3C_SDHCI_CTRL3_FCSEL2 |
-+			 S3C_SDHCI_CTRL3_FCSEL1 |
-+			 S3C_SDHCI_CTRL3_FCSEL0);
-+	else
-+		ctrl3 = (S3C_SDHCI_CTRL3_FCSEL1 | S3C_SDHCI_CTRL3_FCSEL0);
++#define IRQ_S3CUART_RX1		(IRQ_S3CUART_BASE1 + UART_IRQ_RXD)
++#define IRQ_S3CUART_TX1		(IRQ_S3CUART_BASE1 + UART_IRQ_TXD)
++#define IRQ_S3CUART_ERR1	(IRQ_S3CUART_BASE1 + UART_IRQ_ERR)
 +
-+	writel(ctrl2, r + S3C_SDHCI_CONTROL2);
-+	writel(ctrl3, r + S3C_SDHCI_CONTROL3);
-+}
-diff --git a/arch/arm/plat-s3c/include/plat/sdhci.h b/arch/arm/plat-s3c/include/plat/sdhci.h
-index c71d078..cf71b93 100644
---- a/arch/arm/plat-s3c/include/plat/sdhci.h
-+++ b/arch/arm/plat-s3c/include/plat/sdhci.h
-@@ -74,6 +74,10 @@ extern void s3c64xx_setup_sdhci1_cfg_gpio(struct platform_device *, int w);
- extern void s5pc100_setup_sdhci0_cfg_gpio(struct platform_device *, int w);
- extern void s5pc100_setup_sdhci1_cfg_gpio(struct platform_device *, int w);
- extern void s5pc100_setup_sdhci2_cfg_gpio(struct platform_device *, int w);
-+extern void s5pc110_setup_sdhci0_cfg_gpio(struct platform_device *, int w);
-+extern void s5pc110_setup_sdhci1_cfg_gpio(struct platform_device *, int w);
-+extern void s5pc110_setup_sdhci2_cfg_gpio(struct platform_device *, int w);
-+extern void s5pc110_setup_sdhci3_cfg_gpio(struct platform_device *, int w);
- 
- /* S3C6400 SDHCI setup */
- 
-@@ -200,4 +204,64 @@ static inline void s5pc100_default_sdhci1(void) { }
- static inline void s5pc100_default_sdhci2(void) { }
- #endif /* CONFIG_S5PC100_SETUP_SDHCI */
- 
-+/* S5PC110 SDHCI setup */
-+#ifdef CONFIG_S5PC110_SETUP_SDHCI
-+extern char *s5pc110_hsmmc_clksrcs[4];
++#define IRQ_S3CUART_RX2		(IRQ_S3CUART_BASE2 + UART_IRQ_RXD)
++#define IRQ_S3CUART_TX2		(IRQ_S3CUART_BASE2 + UART_IRQ_TXD)
++#define IRQ_S3CUART_ERR2	(IRQ_S3CUART_BASE2 + UART_IRQ_ERR)
 +
-+extern void s5pc110_setup_sdhci_cfg_card(struct platform_device *dev,
-+					   void __iomem *r,
-+					   struct mmc_ios *ios,
-+					   struct mmc_card *card);
++#define IRQ_S3CUART_RX3		(IRQ_S3CUART_BASE3 + UART_IRQ_RXD)
++#define IRQ_S3CUART_TX3		(IRQ_S3CUART_BASE3 + UART_IRQ_TXD)
++#define IRQ_S3CUART_ERR3	(IRQ_S3CUART_BASE3 + UART_IRQ_ERR)
 +
-+#ifdef CONFIG_S3C_DEV_HSMMC
-+static inline void s5pc110_default_sdhci0(void)
-+{
-+	s3c_hsmmc0_def_platdata.clocks = s5pc110_hsmmc_clksrcs;
-+	s3c_hsmmc0_def_platdata.cfg_gpio = s5pc110_setup_sdhci0_cfg_gpio;
-+	s3c_hsmmc0_def_platdata.cfg_card = s5pc110_setup_sdhci_cfg_card;
-+}
-+#else
-+static inline void s5pc100_default_sdhci0(void) { }
-+#endif /* CONFIG_S3C_DEV_HSMMC */
++/* VIC based IRQs */
 +
-+#ifdef CONFIG_S3C_DEV_HSMMC1
-+static inline void s5pc110_default_sdhci1(void)
-+{
-+	s3c_hsmmc1_def_platdata.clocks = s5pc110_hsmmc_clksrcs;
-+	s3c_hsmmc1_def_platdata.cfg_gpio = s5pc110_setup_sdhci1_cfg_gpio;
-+	s3c_hsmmc1_def_platdata.cfg_card = s5pc110_setup_sdhci_cfg_card;
-+}
-+#else
-+static inline void s5pc110_default_sdhci1(void) { }
-+#endif /* CONFIG_S3C_DEV_HSMMC1 */
++#define S5PC1XX_IRQ_VIC0(x)	(S3C_VIC0_BASE + (x))
++#define S5PC1XX_IRQ_VIC1(x)	(S3C_VIC1_BASE + (x))
++#define S5PC1XX_IRQ_VIC2(x)	(S3C_VIC2_BASE + (x))
++#define S5PC110_IRQ_VIC3(x)	(S3C_VIC3_BASE + (x))
 +
-+#ifdef CONFIG_S3C_DEV_HSMMC2
-+static inline void s5pc110_default_sdhci2(void)
-+{
-+	s3c_hsmmc2_def_platdata.clocks = s5pc110_hsmmc_clksrcs;
-+	s3c_hsmmc2_def_platdata.cfg_gpio = s5pc110_setup_sdhci2_cfg_gpio;
-+	s3c_hsmmc2_def_platdata.cfg_card = s5pc110_setup_sdhci_cfg_card;
-+}
-+#else
-+static inline void s5pc110_default_sdhci2(void) { }
-+#endif /* CONFIG_S3C_DEV_HSMMC2 */
++/*
++ * VIC0: system, DMA, timer
++ */
++#define IRQ_EINT0		S5PC1XX_IRQ_VIC0(0)
++#define IRQ_EINT1		S5PC1XX_IRQ_VIC0(1)
++#define IRQ_EINT2		S5PC1XX_IRQ_VIC0(2)
++#define IRQ_EINT3		S5PC1XX_IRQ_VIC0(3)
++#define IRQ_EINT4		S5PC1XX_IRQ_VIC0(4)
++#define IRQ_EINT5		S5PC1XX_IRQ_VIC0(5)
++#define IRQ_EINT6		S5PC1XX_IRQ_VIC0(6)
++#define IRQ_EINT7		S5PC1XX_IRQ_VIC0(7)
++#define IRQ_EINT8		S5PC1XX_IRQ_VIC0(8)
++#define IRQ_EINT9		S5PC1XX_IRQ_VIC0(9)
++#define IRQ_EINT10		S5PC1XX_IRQ_VIC0(10)
++#define IRQ_EINT11		S5PC1XX_IRQ_VIC0(11)
++#define IRQ_EINT12		S5PC1XX_IRQ_VIC0(12)
++#define IRQ_EINT13		S5PC1XX_IRQ_VIC0(13)
++#define IRQ_EINT14		S5PC1XX_IRQ_VIC0(14)
++#define IRQ_EINT15		S5PC1XX_IRQ_VIC0(15)
++#define IRQ_EINT16_31		S5PC1XX_IRQ_VIC0(16)
++#define IRQ_BATF		S5PC1XX_IRQ_VIC0(17)
++#define IRQ_MDMA		S5PC1XX_IRQ_VIC0(18)
++#define IRQ_PDMA0		S5PC1XX_IRQ_VIC0(19)
++#define IRQ_PDMA1		S5PC1XX_IRQ_VIC0(20)
++#define IRQ_TIMER0		S5PC1XX_IRQ_VIC0(21)
++#define IRQ_TIMER1		S5PC1XX_IRQ_VIC0(22)
++#define IRQ_TIMER2		S5PC1XX_IRQ_VIC0(23)
++#define IRQ_TIMER3		S5PC1XX_IRQ_VIC0(24)
++#define IRQ_TIMER4		S5PC1XX_IRQ_VIC0(25)
++#define IRQ_SYSTIMER		S5PC1XX_IRQ_VIC0(26)
++#define IRQ_WDT			S5PC1XX_IRQ_VIC0(27)
++#define IRQ_RTC_ALARM		S5PC1XX_IRQ_VIC0(28)
++#define IRQ_RTC			IRQ_RTC_ALARM
++#define IRQ_RTC_TIC		S5PC1XX_IRQ_VIC0(29)
++#define IRQ_TICK		IRQ_RTC_TIC
++#define IRQ_GPIOINT		S5PC1XX_IRQ_VIC0(30)
++#define IRQ_FIMC3		S5PC1XX_IRQ_VIC0(31)
 +
-+#ifdef CONFIG_S3C_DEV_HSMMC3
-+static inline void s5pc110_default_sdhci3(void)
-+{
-+	s3c_hsmmc3_def_platdata.clocks = s5pc110_hsmmc_clksrcs;
-+	s3c_hsmmc3_def_platdata.cfg_gpio = s5pc110_setup_sdhci3_cfg_gpio;
-+	s3c_hsmmc3_def_platdata.cfg_card = s5pc110_setup_sdhci_cfg_card;
-+}
-+#else
-+static inline void s5pc110_default_sdhci3(void) { }
-+#endif /* CONFIG_S3C_DEV_HSMMC3 */
++/*
++ * VIC1: ARM, power, memory, connectivity
++ */
++#define IRQ_CORTEX0		S5PC1XX_IRQ_VIC1(0)
++#define IRQ_CORTEX1		S5PC1XX_IRQ_VIC1(1)
++#define IRQ_CORTEX2		S5PC1XX_IRQ_VIC1(2)
++#define IRQ_CORTEX3		S5PC1XX_IRQ_VIC1(3)
++#define IRQ_CORTEX4		S5PC1XX_IRQ_VIC1(4)
++#define IRQ_IEMAPC		S5PC1XX_IRQ_VIC1(5)
++#define IRQ_IEMIEC		S5PC1XX_IRQ_VIC1(6)
++#define IRQ_NFC			S5PC1XX_IRQ_VIC1(8)
++#define IRQ_CFC			S5PC1XX_IRQ_VIC1(9)
++#define IRQ_UART0		S5PC1XX_IRQ_VIC1(10)
++#define IRQ_UART1		S5PC1XX_IRQ_VIC1(11)
++#define IRQ_UART2		S5PC1XX_IRQ_VIC1(12)
++#define IRQ_UART3		S5PC1XX_IRQ_VIC1(13)
++#define IRQ_IIC			S5PC1XX_IRQ_VIC1(14)
++#define IRQ_SPI0		S5PC1XX_IRQ_VIC1(15)
++#define IRQ_SPI1		S5PC1XX_IRQ_VIC1(16)
++#define IRQ_SPI2		S5PC1XX_IRQ_VIC1(17)
++#define IRQ_IRDA		S5PC1XX_IRQ_VIC1(18)
++#define IRQ_I2C_PMIC_LINK	S5PC1XX_IRQ_VIC1(19)
++#define IRQ_I2C_HDMI_PHY	S5PC1XX_IRQ_VIC1(20)
++#define IRQ_HSIRX		S5PC1XX_IRQ_VIC1(21)
++#define IRQ_HSITX		S5PC1XX_IRQ_VIC1(22)
++#define IRQ_UHOST		S5PC1XX_IRQ_VIC1(23)
++#define IRQ_OTG			S5PC1XX_IRQ_VIC1(24)
++#define IRQ_MSM			S5PC1XX_IRQ_VIC1(25)
++#define IRQ_HSMMC0		S5PC1XX_IRQ_VIC1(26)
++#define IRQ_HSMMC1		S5PC1XX_IRQ_VIC1(27)
++#define IRQ_HSMMC2		S5PC1XX_IRQ_VIC1(28)
++#define IRQ_MIPICSI		S5PC1XX_IRQ_VIC1(29)
++#define IRQ_MIPIDSI		S5PC1XX_IRQ_VIC1(30)
++#define IRQ_ONENAND_AUDI	S5PC1XX_IRQ_VIC1(31)
 +
-+#else
-+static inline void s5pc110_default_sdhci0(void) { }
-+static inline void s5pc110_default_sdhci1(void) { }
-+static inline void s5pc110_default_sdhci2(void) { }
-+static inline void s5pc110_default_sdhci3(void) { }
-+#endif /* CONFIG_S5PC100_SETUP_SDHCI */
++/*
++ * VIC2: multimedia, audio, security
++ */
++#define IRQ_LCD0		S5PC1XX_IRQ_VIC2(0)
++#define IRQ_LCD1		S5PC1XX_IRQ_VIC2(1)
++#define IRQ_LCD2		S5PC1XX_IRQ_VIC2(2)
++#define IRQ_LCD3		S5PC1XX_IRQ_VIC2(3)
++#define IRQ_ROTATOR		S5PC1XX_IRQ_VIC2(4)
++#define IRQ_FIMC0		S5PC1XX_IRQ_VIC2(5)
++#define IRQ_FIMC1		S5PC1XX_IRQ_VIC2(6)
++#define IRQ_FIMC2		S5PC1XX_IRQ_VIC2(7)
++#define IRQ_JPEG		S5PC1XX_IRQ_VIC2(8)
++#define IRQ_2D			S5PC1XX_IRQ_VIC2(9)
++#define IRQ_3D			S5PC1XX_IRQ_VIC2(10)
++#define IRQ_MIXER		S5PC1XX_IRQ_VIC2(11)
++#define IRQ_HDMI		S5PC1XX_IRQ_VIC2(12)
++#define IRQ_IIC1		S5PC1XX_IRQ_VIC2(13)
++#define IRQ_HDMI_I2C		S5PC1XX_IRQ_VIC2(13)
++#define IRQ_MFC			S5PC1XX_IRQ_VIC2(14)
++#define IRQ_TVENC		S5PC1XX_IRQ_VIC2(15)
++#define IRQ_I2S0		S5PC1XX_IRQ_VIC2(16)
++#define IRQ_I2S1		S5PC1XX_IRQ_VIC2(17)
++#define IRQ_AC97		S5PC1XX_IRQ_VIC2(19)
++#define IRQ_PCM0		S5PC1XX_IRQ_VIC2(20)
++#define IRQ_PCM1		S5PC1XX_IRQ_VIC2(21)
++#define IRQ_SPDIF		S5PC1XX_IRQ_VIC2(22)
++#define IRQ_ADC			S5PC1XX_IRQ_VIC2(23)
++#define IRQ_PENDN		S5PC1XX_IRQ_VIC2(24)
++#define IRQ_TC			IRQ_PENDN
++#define IRQ_KEYPAD		S5PC1XX_IRQ_VIC2(25)
++#define IRQ_CG			S5PC1XX_IRQ_VIC2(26)
++#define IRQ_SEC			S5PC1XX_IRQ_VIC2(27)
++#define IRQ_SECRX		S5PC1XX_IRQ_VIC2(28)
++#define IRQ_SECTX		S5PC1XX_IRQ_VIC2(29)
++#define IRQ_SDMIRQ		S5PC1XX_IRQ_VIC2(30)
++#define IRQ_SDMFIQ		S5PC1XX_IRQ_VIC2(31)
 +
- #endif /* __PLAT_S3C_SDHCI_H */
++/* VIC3 used at S5PC110 */
++#define IRQ_IPC			S5PC110_IRQ_VIC3(0)
++#define IRQ_HOSTIF		S5PC110_IRQ_VIC3(1)
++#define IRQ_MMC3		S5PC110_IRQ_VIC3(2)
++#define IRQ_CEC			S5PC110_IRQ_VIC3(3)
++#define IRQ_TSI			S5PC110_IRQ_VIC3(4)
++#define IRQ_MDNIE0		S5PC110_IRQ_VIC3(5)
++#define IRQ_MDNIE1		S5PC110_IRQ_VIC3(6)
++#define IRQ_MDNIE2		S5PC110_IRQ_VIC3(7)
++#define IRQ_MDNIE3		S5PC110_IRQ_VIC3(8)
++#define IRQ_ADC1		S5PC110_IRQ_VIC3(9)
++#define IRQ_PENDN1		S5PC110_IRQ_VIC3(10)
++
++/* External interrupt */
++#define S3C_IRQ_EINT_BASE	(S5PC110_IRQ_VIC3(31) + 1)
++
++#define S3C_EINT(x)		(S3C_IRQ_EINT_BASE + (x - 16))
++#define IRQ_EINT(x)		(x < 16 ? IRQ_EINT0 + x : S3C_EINT(x))
++#define IRQ_EINT_BIT(x)		(x < IRQ_EINT16_31 ? x - IRQ_EINT0 : x - S3C_EINT(0))
++
++/* GPIO interrupt */
++#define S3C_IRQ_GPIO_BASE	(IRQ_EINT(31) + 1)
++#define S3C_IRQ_GPIO(x)		(S3C_IRQ_GPIO_BASE + (x))
++
++/*
++ * Until MP04 Groups -> 40 (exactly 39) Groups * 8 ~= 320 GPIOs
++ */
++#define NR_IRQS			(S3C_IRQ_GPIO(320) + 1)
++
++#endif /* __ASM_PLAT_S5PC1XX_IRQS_H */
++
 -- 
 1.6.4
