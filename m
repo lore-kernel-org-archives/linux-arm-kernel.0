@@ -1,60 +1,80 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Wed, 18 Nov 2009 08:34:30 +0200
-Subject: [PATCH 1/3] em-x270: don't use pxa_camera init() callback
-In-Reply-To: <1258495463-26029-2-git-send-email-ospite@studenti.unina.it>
-References: <1258495463-26029-1-git-send-email-ospite@studenti.unina.it>
-	<1258495463-26029-2-git-send-email-ospite@studenti.unina.it>
-Message-ID: <4B039576.3020105@compulab.co.il>
+From: dk-arm-linux@gmx.de (Dieter Kiermaier)
+Date: Wed, 18 Nov 2009 08:09:35 +0100
+Subject: ARM kirkwood: how to run kirkwood_pcie_init() from kernel module
+In-Reply-To: <c70ff3ad0911171910t2231317aw154ba6e455ca3511@mail.gmail.com>
+References: <200911161032.02873.dk-arm-linux@gmx.de>
+	<c70ff3ad0911171910t2231317aw154ba6e455ca3511@mail.gmail.com>
+Message-ID: <200911180809.36672.dk-arm-linux@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+
+> please note that this function linked into the init section.
+
+I was not able to call the kirkwood_pcie_init. Is there a way?
+My idea after fighting a few hours with this issue was that
+I couldn't call init functions because init code is freed from kernel after bootup,
+isn't it?
 
 
-Antonio Ospite wrote:
-> pxa_camera init() is going to be removed.
+But finally I got it working with fakephp by doing:
+
+#disconnect my fpga
+echo 0 > /sys/bus/pci/slots/0000:01:08.0/power
+#disconnect my bridge
+echo 0 > /sys/bus/pci/slots/0000:00:01.0/power
+#
+flashing my fpga.......
+#initiate bus rescan
+echo 1 > /sys/bus/pci/rescan
+
+I have no idea why it doesn't work without fakephp (because pci subsystem also allows disabling
+the devices via sysfs) but if I did it without fakephp
+echo 1 > /sys/bus/pci/rescan
+has absolutely no effect.
+
+
+
+But now it works as expected.
+
+Many thanks,
+Dieter
+
+
 > 
-> Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
-> ---
->  arch/arm/mach-pxa/em-x270.c |    9 +++++----
->  1 files changed, 5 insertions(+), 4 deletions(-)
-
-Acked-by: Mike Rapoport <mike@compulab.co.il>
-
-> diff --git a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
-> index aec7f42..f71f34c 100644
-> --- a/arch/arm/mach-pxa/em-x270.c
-> +++ b/arch/arm/mach-pxa/em-x270.c
-> @@ -967,7 +967,7 @@ static inline void em_x270_init_gpio_keys(void) {}
->  #if defined(CONFIG_VIDEO_PXA27x) || defined(CONFIG_VIDEO_PXA27x_MODULE)
->  static struct regulator *em_x270_camera_ldo;
->  
-> -static int em_x270_sensor_init(struct device *dev)
-> +static int em_x270_sensor_init(void)
->  {
->  	int ret;
->  
-> @@ -996,7 +996,6 @@ static int em_x270_sensor_init(struct device *dev)
->  }
->  
->  struct pxacamera_platform_data em_x270_camera_platform_data = {
-> -	.init	= em_x270_sensor_init,
->  	.flags  = PXA_CAMERA_MASTER | PXA_CAMERA_DATAWIDTH_8 |
->  		PXA_CAMERA_PCLK_EN | PXA_CAMERA_MCLK_EN,
->  	.mclk_10khz = 2600,
-> @@ -1049,8 +1048,10 @@ static struct platform_device em_x270_camera = {
->  
->  static void  __init em_x270_init_camera(void)
->  {
-> -	pxa_set_camera_info(&em_x270_camera_platform_data);
-> -	platform_device_register(&em_x270_camera);
-> +	if (em_x270_sensor_init() == 0) {
-> +		pxa_set_camera_info(&em_x270_camera_platform_data);
-> +		platform_device_register(&em_x270_camera);
-> +	}
->  }
->  #else
->  static inline void em_x270_init_camera(void) {}
-
--- 
-Sincerely yours,
-Mike.
+> On Mon, Nov 16, 2009 at 3:32 AM, Dieter Kiermaier <dk-arm-linux@gmx.de> wrote:
+> > Hi all,
+> >
+> > sorry for disturbing and also sorry for my - maybe strange - question ;)
+> >
+> > I've got the following problem:
+> >
+> > I want to boot my fpga before I start the pci layer.
+> > To achieve this it is necessary to start the pci layer somewhat after flashing my fpga.
+> >
+> > So what I need is to run kirkwood_pcie_init() from inside my (flashing) driver.
+> > Do you know a way how to realize this?
+> >
+> > The header common.h isn't meant to include it from anywhere else than from kirkwood *_setup.c files, right?
+> >
+> > Is it possible to do a EXPORT_SYMBOL(kirkwood_pcie_init) somehow?
+> >
+> > I've tried it allready but get linker warnings and function isn't called...
+> >
+> > Do you have an idea how I can do that?
+> >
+> > Many many thanks in advance,
+> > Dieter
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
