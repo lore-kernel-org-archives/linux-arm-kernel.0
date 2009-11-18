@@ -1,64 +1,77 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 18 Nov 2009 11:21:04 -0800
-Subject: [PATCH 06/10] omap: mailbox: remove unnecessary arg for
-	omap_mbox_msg_send
+Date: Wed, 18 Nov 2009 11:21:16 -0800
+Subject: [PATCH 07/10] omap: mailbox: Expose omap_mbox_enable()/disable_irq()
 In-Reply-To: <20091118191852.31148.93980.stgit@localhost>
 References: <20091118191852.31148.93980.stgit@localhost>
-Message-ID: <20091118192104.31148.12162.stgit@localhost>
+Message-ID: <20091118192115.31148.73960.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: C A Subramaniam <subramaniam.ca@ti.com>
+From: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
 
-Also removed from tx_data
+Expose omap_mbox_enable()/disable_irq()
 
-Signed-off-by: C A Subramaniam <subramaniam.ca@ti.com>
-Acked-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
 ---
- arch/arm/plat-omap/include/plat/mailbox.h |    2 +-
- arch/arm/plat-omap/mailbox.c              |    4 +---
- 2 files changed, 2 insertions(+), 4 deletions(-)
+ arch/arm/plat-omap/include/plat/mailbox.h |   12 ++++++++++++
+ arch/arm/plat-omap/mailbox.c              |   12 ++----------
+ 2 files changed, 14 insertions(+), 10 deletions(-)
 
 diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-omap/include/plat/mailbox.h
-index 319306a..8260a3f 100644
+index 8260a3f..bf06953 100644
 --- a/arch/arm/plat-omap/include/plat/mailbox.h
 +++ b/arch/arm/plat-omap/include/plat/mailbox.h
-@@ -63,7 +63,7 @@ struct omap_mbox {
- 	void			(*err_notify)(void);
- };
- 
--int omap_mbox_msg_send(struct omap_mbox *, mbox_msg_t msg, void *);
-+int omap_mbox_msg_send(struct omap_mbox *, mbox_msg_t msg);
- void omap_mbox_init_seq(struct omap_mbox *);
- 
- struct omap_mbox *omap_mbox_get(const char *);
-diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
-index b49bb29..99ecf80 100644
---- a/arch/arm/plat-omap/mailbox.c
-+++ b/arch/arm/plat-omap/mailbox.c
-@@ -88,7 +88,6 @@ static int __mbox_msg_send(struct omap_mbox *mbox, mbox_msg_t msg)
- 
- struct omap_msg_tx_data {
- 	mbox_msg_t	msg;
--	void		*arg;
- };
- 
- static void omap_msg_tx_end_io(struct request *rq, int error)
-@@ -97,7 +96,7 @@ static void omap_msg_tx_end_io(struct request *rq, int error)
- 	__blk_put_request(rq->q, rq);
+@@ -92,4 +92,16 @@ static inline void omap_mbox_restore_ctx(struct omap_mbox *mbox)
+ 	mbox->ops->restore_ctx(mbox);
  }
  
--int omap_mbox_msg_send(struct omap_mbox *mbox, mbox_msg_t msg, void* arg)
-+int omap_mbox_msg_send(struct omap_mbox *mbox, mbox_msg_t msg)
++static inline void omap_mbox_enable_irq(struct omap_mbox *mbox,
++					omap_mbox_irq_t irq)
++{
++	mbox->ops->enable_irq(mbox, irq);
++}
++
++static inline void omap_mbox_disable_irq(struct omap_mbox *mbox,
++					 omap_mbox_irq_t irq)
++{
++	mbox->ops->disable_irq(mbox, irq);
++}
++
+ #endif /* MAILBOX_H */
+diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
+index 99ecf80..e6b3115 100644
+--- a/arch/arm/plat-omap/mailbox.c
++++ b/arch/arm/plat-omap/mailbox.c
+@@ -50,14 +50,6 @@ static inline int mbox_fifo_full(struct omap_mbox *mbox)
+ }
+ 
+ /* Mailbox IRQ handle functions */
+-static inline void enable_mbox_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq)
+-{
+-	mbox->ops->enable_irq(mbox, irq);
+-}
+-static inline void disable_mbox_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq)
+-{
+-	mbox->ops->disable_irq(mbox, irq);
+-}
+ static inline void ack_mbox_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq)
  {
- 	struct omap_msg_tx_data *tx_data;
- 	struct request *rq;
-@@ -114,7 +113,6 @@ int omap_mbox_msg_send(struct omap_mbox *mbox, mbox_msg_t msg, void* arg)
- 	}
+ 	if (mbox->ops->ack_irq)
+@@ -144,7 +136,7 @@ static void mbox_tx_work(struct work_struct *work)
  
- 	tx_data->msg = msg;
--	tx_data->arg = arg;
- 	rq->end_io = omap_msg_tx_end_io;
- 	blk_insert_request(q, rq, 0, tx_data);
+ 		ret = __mbox_msg_send(mbox, tx_data->msg);
+ 		if (ret) {
+-			enable_mbox_irq(mbox, IRQ_TX);
++			omap_mbox_enable_irq(mbox, IRQ_TX);
+ 			spin_lock(q->queue_lock);
+ 			blk_requeue_request(q, rq);
+ 			spin_unlock(q->queue_lock);
+@@ -196,7 +188,7 @@ static void mbox_rxq_fn(struct request_queue *q)
  
+ static void __mbox_tx_interrupt(struct omap_mbox *mbox)
+ {
+-	disable_mbox_irq(mbox, IRQ_TX);
++	omap_mbox_disable_irq(mbox, IRQ_TX);
+ 	ack_mbox_irq(mbox, IRQ_TX);
+ 	schedule_work(&mbox->txq->work);
+ }
