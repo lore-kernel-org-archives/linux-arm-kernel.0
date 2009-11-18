@@ -1,45 +1,30 @@
-From: sha@pengutronix.de (Sascha Hauer)
-Date: Wed, 18 Nov 2009 10:46:50 +0100
-Subject: [PATCH 00/25] imx cleanups
-In-Reply-To: <20091116203406.GA6546@pengutronix.de>
-References: <20091116203406.GA6546@pengutronix.de>
-Message-ID: <20091118094650.GL30179@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 18 Nov 2009 10:49:07 +0100
+Subject: MXC patches for next merge window
+In-Reply-To: <1258022525-21078-1-git-send-email-s.hauer@pengutronix.de>
+References: <1258022525-21078-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20091118094907.GM30179@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2009 at 09:34:06PM +0100, Uwe Kleine-K?nig wrote:
-> Hello,
+On Thu, Nov 12, 2009 at 11:41:56AM +0100, Sascha Hauer wrote:
+> Hi,
 > 
-> this series is the start of a big cleanup of the imx support.  The
-> overall goal is to support all SoCs with a single image.  Therefor a few
-> things need to/should be done:
+> Here are some patches for the next merge window to review which aim at sound
+> and add Nand support for the pcm043 board.
 > 
->   - clean up headers not to define the same constants (i.e. prefix
->     everything with the SoC's name)
->   - generalise device creation
->   - generalise static mappings
->   - probably much more
+> Sascha
 > 
-> Here I start with the first two items.
+> The following changes since commit 52d797c8c0b53e3940427ff0c43ef4356f1d668e:
+>   Uwe Kleine-K?nig (1):
+>         imx/gpio: Use handle_level_irq
 > 
-> On the way I plan to change all occurences of "mxc" to "imx".
+> are available in the git repository at:
 > 
-> I hope this all can happen without much breakage.
-> 
-> For now no #defines are removed only redefined.  So all code should
-> continue to work as before.  Assuming this series is accepted new usage
-> of the #defines without a SoC-prefix should be deprecated.  When all
-> users are converted, the old #defines can go away.
-> 
-> git branch, shortlog and diffstat can be found below.  It merges nearly
-> fine into Sascha's mxc-master.  There's only a trivial conflict in
-> arch/arm/plat-mxc/Makefile .
+>   git://git.pengutronix.de/git/imx/linux-2.6.git mxc-master-pu
 
-I merged this series up to patch 15/25. I'm not sure with the device
-generalisation as we currently need the device pointers for the IPU and
-the regulator framework. So the nand device generalisation as is is not
-suitable as a template on how device registration can work in the
-future.
+Added this series to mxc-master (including the comments I received for
+these patches)
 
 Sascha
 
