@@ -1,33 +1,42 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 18 Nov 2009 19:25:29 +0100
+From: dwalker@fifo99.com (Daniel Walker)
+Date: Wed, 18 Nov 2009 10:42:35 +0000
 Subject: Status of Dream series
-In-Reply-To: <20091116163946.GC3568@n2100.arm.linux.org.uk>
+In-Reply-To: <20091118181824.GK25150@elf.ucw.cz>
 References: <20091111104748.GA26975@elf.ucw.cz>
-	<20091116163946.GC3568@n2100.arm.linux.org.uk>
-Message-ID: <20091118182529.GL25150@elf.ucw.cz>
+	<1258135899.6411.7.camel@c-dwalke-linux.qualcomm.com>
+	<20091118170238.GE20887@elf.ucw.cz> <1258537122.8014.2.camel@ubuntu>
+	<20091118181824.GK25150@elf.ucw.cz>
+Message-ID: <1258540955.8014.4.camel@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2009-11-16 16:39:46, Russell King - ARM Linux wrote:
-> On Wed, Nov 11, 2009 at 11:47:48AM +0100, Pavel Machek wrote:
-> > 
-> > Russell, what is the status of the "Dream" series? 
-> > 
-> >  [PATCH 1/3] msm: make debugging UART (for DEBUG_LL) configurable
-> >  [PATCH 2/3] msm: add minimal board file for HTC Dream device
-> >  [PATCH 3/3] msm: Add memory map for HTC Dream
+On Wed, 2009-11-18 at 19:18 +0100, Pavel Machek wrote:
+> Hi!
 > 
-> See my reply today on patch 2/3; that is my only comment.
-
-Good, so it is ok to add reviewed-by: tags on the fixed versions?
-
-> > Daniel Walker offered to maintain arch-msm tree, would that help? 
+> > > > > Russell, what is the status of the "Dream" series? 
+> > > > > 
+> > > > >  [PATCH 1/3] msm: make debugging UART (for DEBUG_LL) configurable
+> > > > >  [PATCH 2/3] msm: add minimal board file for HTC Dream device
+> > > > >  [PATCH 3/3] msm: Add memory map for HTC Dream
+> > > > > 
+> > > > > Daniel Walker offered to maintain arch-msm tree, would that help? 
+> > > > 
+> > > > Yeah, I can do it for now, but I can't accept patches for it via this
+> > > > email address.. I'm in the processes of setting up the right address for
+> > > > it .. Might take till next week tho.
+> > > 
+> > > Ok, can I just add your acked-by, and send them to akpm/rmk? These
+> > > three are simple enough...
+> > 
+> > Didn't Russell have some pending comments? Anyway, I have them already
+> > in my korg git tree. So I can move them forward from there , but it's
+> > temporary ..
 > 
-> I thought from Daniel's private email to me on the 2/11 that this was
-> his intention; I didn't see a question in it requiring an answer.
+> Here's fixed #2. I guess we can add rmk's reviewed-by (and yours?) and
+> send them forward?
 
-So... Daniel is now the new arch-msm maintainer? Good.
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+I'll add my sign off, put them into my git tree (which is included in
+linux-next) , the eventually push them to Linus when the merge window
+opens ..
+
+Daniel
