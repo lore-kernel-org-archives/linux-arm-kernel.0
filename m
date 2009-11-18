@@ -1,35 +1,71 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 18 Nov 2009 10:49:07 +0100
-Subject: MXC patches for next merge window
-In-Reply-To: <1258022525-21078-1-git-send-email-s.hauer@pengutronix.de>
-References: <1258022525-21078-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20091118094907.GM30179@pengutronix.de>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 18 Nov 2009 11:10:06 +0100 (CET)
+Subject: [PATCH 1/3] em-x270: don't use pxa_camera init() callback
+In-Reply-To: <1258495463-26029-2-git-send-email-ospite@studenti.unina.it>
+References: <1258495463-26029-1-git-send-email-ospite@studenti.unina.it>
+	<1258495463-26029-2-git-send-email-ospite@studenti.unina.it>
+Message-ID: <Pine.LNX.4.64.0911181107540.5702@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 12, 2009 at 11:41:56AM +0100, Sascha Hauer wrote:
-> Hi,
-> 
-> Here are some patches for the next merge window to review which aim at sound
-> and add Nand support for the pcm043 board.
-> 
-> Sascha
-> 
-> The following changes since commit 52d797c8c0b53e3940427ff0c43ef4356f1d668e:
->   Uwe Kleine-K?nig (1):
->         imx/gpio: Use handle_level_irq
-> 
-> are available in the git repository at:
-> 
->   git://git.pengutronix.de/git/imx/linux-2.6.git mxc-master-pu
+On Tue, 17 Nov 2009, Antonio Ospite wrote:
 
-Added this series to mxc-master (including the comments I received for
-these patches)
+> pxa_camera init() is going to be removed.
 
-Sascha
+My nitpick here would be - I would put it the other way round. We do not 
+remove .init() in platforms, because it is going to be removed, but rather 
+we perform initialisation statically, because we think this is better so, 
+and then .init becomes useless and gets removed.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
+> Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
+
+Thanks
+Guennadi
+
+> ---
+>  arch/arm/mach-pxa/em-x270.c |    9 +++++----
+>  1 files changed, 5 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
+> index aec7f42..f71f34c 100644
+> --- a/arch/arm/mach-pxa/em-x270.c
+> +++ b/arch/arm/mach-pxa/em-x270.c
+> @@ -967,7 +967,7 @@ static inline void em_x270_init_gpio_keys(void) {}
+>  #if defined(CONFIG_VIDEO_PXA27x) || defined(CONFIG_VIDEO_PXA27x_MODULE)
+>  static struct regulator *em_x270_camera_ldo;
+>  
+> -static int em_x270_sensor_init(struct device *dev)
+> +static int em_x270_sensor_init(void)
+>  {
+>  	int ret;
+>  
+> @@ -996,7 +996,6 @@ static int em_x270_sensor_init(struct device *dev)
+>  }
+>  
+>  struct pxacamera_platform_data em_x270_camera_platform_data = {
+> -	.init	= em_x270_sensor_init,
+>  	.flags  = PXA_CAMERA_MASTER | PXA_CAMERA_DATAWIDTH_8 |
+>  		PXA_CAMERA_PCLK_EN | PXA_CAMERA_MCLK_EN,
+>  	.mclk_10khz = 2600,
+> @@ -1049,8 +1048,10 @@ static struct platform_device em_x270_camera = {
+>  
+>  static void  __init em_x270_init_camera(void)
+>  {
+> -	pxa_set_camera_info(&em_x270_camera_platform_data);
+> -	platform_device_register(&em_x270_camera);
+> +	if (em_x270_sensor_init() == 0) {
+> +		pxa_set_camera_info(&em_x270_camera_platform_data);
+> +		platform_device_register(&em_x270_camera);
+> +	}
+>  }
+>  #else
+>  static inline void em_x270_init_camera(void) {}
+> -- 
+> 1.6.5.2
+> 
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
