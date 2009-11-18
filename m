@@ -1,33 +1,27 @@
-From: jbe@pengutronix.de (Juergen Beisert)
-Date: Wed, 18 Nov 2009 11:39:18 +0100
-Subject: [PATCH 2/3] pcm990-baseboard: don't use pxa_camera init() callback
-In-Reply-To: <Pine.LNX.4.64.0911181110180.5702@axis700.grange>
-References: <1258495463-26029-1-git-send-email-ospite@studenti.unina.it>
-	<1258495463-26029-3-git-send-email-ospite@studenti.unina.it>
-	<Pine.LNX.4.64.0911181110180.5702@axis700.grange>
-Message-ID: <200911181139.19336.jbe@pengutronix.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 18 Nov 2009 11:42:20 +0100
+Subject: [PATCH v3] Update Samsung S5PC100 SoC support
+In-Reply-To: <20091117235914.GZ4808@trinity.fluff.org>
+References: <1258443684-19525-1-git-send-email-m.szyprowski@samsung.com>
+	<20091117235914.GZ4808@trinity.fluff.org>
+Message-ID: <004301ca683b$d0761840$716248c0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mittwoch, 18. November 2009, Guennadi Liakhovetski wrote:
-> On Tue, 17 Nov 2009, Antonio Ospite wrote:
-> > pxa_camera init() is going to be removed.
-> > Configure PXA CIF pins directly in machine init function.
->
-> Same comment as to patch 1/3.
->
-> > Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
->
-> Even though the change seems obvious, it better be tested - in case
-> someone reconfigures camera pins somewhere after
-> pcm990_baseboard_init()... Juergen, would you be able to test it?
+Hello,
 
-Lets see, if I can grab some hardware.
+On Wednesday, November 18, 2009 12:59 AM Ben Dooks wrote:
 
-jbe
+> On Tue, Nov 17, 2009 at 08:41:10AM +0100, Marek Szyprowski wrote:
+> > Hello,
+> 
+> ok, series applied and pushed to git.fluff.org.
+> 
+> Will do a quick build test and then get on with other stuff.
 
--- 
-Pengutronix e.K.                              | Juergen Beisert             |
-Linux Solutions for Science and Industry      | Phone: +49-8766-939 228     |
-Vertretung Sued/Muenchen, Germany             | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686              | http://www.pengutronix.de/  |
+Thanks. Let me know if you get any problems.
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
