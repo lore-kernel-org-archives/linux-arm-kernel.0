@@ -1,31 +1,50 @@
-From: mfuzzey@gmail.com (Martin Fuzzey)
-Date: Wed, 18 Nov 2009 10:42:42 +0100
-Subject: [REPOST PATCH 1/3] MXC: Add i.MX21 specific USB host controller
-	driver.
-In-Reply-To: <20091110051603.GA27314@kroah.com>
-References: <20091108185217.14742.32892.stgit@srv002.fuzzey.net>
-	<20091108185222.14742.11572.stgit@srv002.fuzzey.net>
-	<20091110051603.GA27314@kroah.com>
-Message-ID: <ba4215e10911180142w204b8e85mc8b55bc329d54ffb@mail.gmail.com>
+From: sha@pengutronix.de (Sascha Hauer)
+Date: Wed, 18 Nov 2009 10:46:50 +0100
+Subject: [PATCH 00/25] imx cleanups
+In-Reply-To: <20091116203406.GA6546@pengutronix.de>
+References: <20091116203406.GA6546@pengutronix.de>
+Message-ID: <20091118094650.GL30179@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 10, 2009 at 6:16 AM, Greg KH <greg@kroah.com> wrote:
-> I didn't notice anything objectionable here, but host controller drivers
-> are not my speciality. ?If it's working for you, that is a good reason
-> to get it in for wider testing.
->
+On Mon, Nov 16, 2009 at 09:34:06PM +0100, Uwe Kleine-K?nig wrote:
+> Hello,
+> 
+> this series is the start of a big cleanup of the imx support.  The
+> overall goal is to support all SoCs with a single image.  Therefor a few
+> things need to/should be done:
+> 
+>   - clean up headers not to define the same constants (i.e. prefix
+>     everything with the SoC's name)
+>   - generalise device creation
+>   - generalise static mappings
+>   - probably much more
+> 
+> Here I start with the first two items.
+> 
+> On the way I plan to change all occurences of "mxc" to "imx".
+> 
+> I hope this all can happen without much breakage.
+> 
+> For now no #defines are removed only redefined.  So all code should
+> continue to work as before.  Assuming this series is accepted new usage
+> of the #defines without a SoC-prefix should be deprecated.  When all
+> users are converted, the old #defines can go away.
+> 
+> git branch, shortlog and diffstat can be found below.  It merges nearly
+> fine into Sascha's mxc-master.  There's only a trivial conflict in
+> arch/arm/plat-mxc/Makefile .
 
-Yes it's working fine for me.
+I merged this series up to patch 15/25. I'm not sure with the device
+generalisation as we currently need the device pointers for the IPU and
+the regulator framework. So the nand device generalisation as is is not
+suitable as a template on how device registration can work in the
+future.
 
-There have been no other comments on the driver part - do I need to do
-anything else to get it in?
+Sascha
 
-If it's ok to repost just the platform resource bits with the couple
-of mods requested (spelling mistake and letting compiler count array
-indices) I'll just do that - seems stupid to repost the unmodified
-driver.
-
-Cheers,
-
-Martin
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
