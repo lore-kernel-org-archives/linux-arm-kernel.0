@@ -1,44 +1,27 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 18 Nov 2009 16:42:56 +0100
-Subject: [PATCH 3/5] ARM: MX3: add SPI devices for mx31lite
-In-Reply-To: <20091118153708.GN30179@pengutronix.de>
-References: <1258551702-8631-1-git-send-email-daniel@caiaq.de>
-	<1258551702-8631-2-git-send-email-daniel@caiaq.de>
-	<1258551702-8631-3-git-send-email-daniel@caiaq.de>
-	<20091118153708.GN30179@pengutronix.de>
-Message-ID: <20091118154256.GI14091@buzzloop.caiaq.de>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Wed, 18 Nov 2009 17:51:55 +0100
+Subject: my IXP4xx patch queue
+In-Reply-To: <20091118102916.GC30544@pengutronix.de> ("Uwe =?utf-8?Q?Klein?=
+	=?utf-8?Q?e-K=C3=B6nig=22's?=
+	message of "Wed, 18 Nov 2009 11:29:16 +0100")
+References: <m3bpj06f05.fsf@intrepid.localdomain>
+	<20091118102916.GC30544@pengutronix.de>
+Message-ID: <m3hbsru66s.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 18, 2009 at 04:37:08PM +0100, Sascha Hauer wrote:
-> On Wed, Nov 18, 2009 at 02:41:40PM +0100, Daniel Mack wrote:
-> >  /*
-> > + * SPI
-> > + *
-> > + * The MX13783 is hard-wired on the module, hence the corresponding
-> > + * bus is registered here and not in the board code, in contrast to
-> > + * the other SPI bus.
-> > + */
-> 
-> 
-> The mc13783 bus is registered in the -db file, and not here. I think you
-> mixed something up here.
+Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> writes:
 
-Hmm, no, that actually correct. The problem is that all devices on the
-SPI bus have to be registered in one block via spi_register_board_info,
-and as I don't know whether other boards will have more devices
-connected, the registration is done in the board support file, not in
-the module code.
+>> I'll git-send-email the latest stuff now. No In-Reply-To:/References
+>> since I think the mailserver will hold/drop any mail lacking "Re: "
+>> with these headers.
+> AFAIK this is not true if your headers match
+> /^X-Mailer: git-send-email/ .
+>
+> My last series took 13 minutes on infradead.org machines and I didn't
+> get any bounces about being moderated and the mails don't have headers
+> suggesting that they were manually accepted.
 
-The bus itself, however, is hardwired, so it makes no sense to add it
-conditionally.
-
-> s/MX13783/MC13783/
-
-That's true :) Care to fix it on the fly or do you want me to resend?
-There is btw another typo in the first mail of this series: In its
-subject, it should have 'ARM' not 'ARN'.
-
-The tradeoff of too small terminal fonts ;)
-
-Daniel
+Ahh, I didn't know about that, thanks for info.
+-- 
+Krzysztof Halasa
