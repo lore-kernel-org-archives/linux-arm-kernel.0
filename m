@@ -1,29 +1,52 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 18 Nov 2009 04:34:22 -0700
-Subject: [PATCH 0/4] OMAP hwmod improvements for 2.6.33
-Message-ID: <20091118113212.8617.3864.stgit@localhost.localdomain>
+Date: Wed, 18 Nov 2009 04:34:26 -0700
+Subject: [PATCH 1/4] OMAP3 hwmod: reprogram OCP_SYSCONFIG register after
+	setting SOFTRESET
+In-Reply-To: <20091118113212.8617.3864.stgit@localhost.localdomain>
+References: <20091118113212.8617.3864.stgit@localhost.localdomain>
+Message-ID: <20091118113422.8617.11630.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Reprogram the module's OCP_SYSCONFIG register after module reset (SOFTRESET
+= 1).  This may not be needed, but the definition of the reset performed by
+the SOFTRESET bit is unclear.
 
-here are some updates for the OMAP hardware module code for 2.6.33.
-There are likely to be more after these, but am posting these early for
-comments and for other branch maintainers who are interested to use in
-their trees.
+Kevin Hilman <khilman@deeprootsystems.com> tested an earlier version of
+this patch.
 
-
-- Paul
-
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Tested-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
+ arch/arm/mach-omap2/omap_hwmod.c |   18 +++++++++++++-----
+ 1 files changed, 13 insertions(+), 5 deletions(-)
 
-Paul Walmsley (4):
-      OMAP3 hwmod: reprogram OCP_SYSCONFIG register after setting SOFTRESET
-      OMAP3 hwmod: Add automatic OCP_SYSCONFIG AUTOIDLE handling
-      OMAP hwmod: add names to module MPU IRQ lines
-      OMAP3 hwmod: drop most of the OCP_SYSCONFIG.CLOCKACTIVITY code
-
-
- arch/arm/mach-omap2/omap_hwmod.c             |  148 ++++++++++----------------
- arch/arm/plat-omap/include/plat/omap_hwmod.h |   26 ++++-
- 2 files changed, 79 insertions(+), 95 deletions(-)
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 633b216..4aab1b8 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -948,11 +948,19 @@ static int _setup(struct omap_hwmod *oh)
+ 
+ 	_enable(oh);
+ 
+-	if (!(oh->flags & HWMOD_INIT_NO_RESET))
+-		_reset(oh);
+-
+-	/* XXX OCP AUTOIDLE bit? */
+-	/* XXX OCP ENAWAKEUP bit? */
++	if (!(oh->flags & HWMOD_INIT_NO_RESET)) {
++		/*
++		 * XXX Do the OCP_SYSCONFIG bits need to be
++		 * reprogrammed after a reset?  If not, then this can
++		 * be removed.  If they do, then probably the
++		 * _enable() function should be split to avoid the
++		 * rewrite of the OCP_SYSCONFIG register.
++		 */
++		if (oh->sysconfig) {
++			_update_sysc_cache(oh);
++			_sysc_enable(oh);
++		}
++	}
+ 
+ 	if (!(oh->flags & HWMOD_INIT_NO_IDLE))
+ 		_idle(oh);
