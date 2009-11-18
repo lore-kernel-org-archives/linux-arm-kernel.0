@@ -1,30 +1,37 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 18 Nov 2009 18:08:03 +0100
-Subject: Status of Dream series
-In-Reply-To: <1258135899.6411.7.camel@c-dwalke-linux.qualcomm.com>
-References: <20091111104748.GA26975@elf.ucw.cz>
-	<1258135899.6411.7.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <20091118170238.GE20887@elf.ucw.cz>
+Date: Wed, 18 Nov 2009 18:28:49 +0100
+Subject: [PATCH] hx4700: fix hx4700 touchscreen pressure values
+In-Reply-To: <E1NAYJo-00016g-PW@pih-relay04.plus.net>
+References: <E1NAYJo-00016g-PW@pih-relay04.plus.net>
+Message-ID: <20091118172849.GD25150@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > Russell, what is the status of the "Dream" series? 
-> > 
-> >  [PATCH 1/3] msm: make debugging UART (for DEBUG_LL) configurable
-> >  [PATCH 2/3] msm: add minimal board file for HTC Dream device
-> >  [PATCH 3/3] msm: Add memory map for HTC Dream
-> > 
-> > Daniel Walker offered to maintain arch-msm tree, would that help? 
+On Wed 2009-11-18 00:22:41, Paul Parsons wrote:
+> > Does pressure actually work as expected -- that is not inverted?
+> > Because I need this patch on spitz...  but it may break your
+> > machine...
 > 
-> Yeah, I can do it for now, but I can't accept patches for it via this
-> email address.. I'm in the processes of setting up the right address for
-> it .. Might take till next week tho.
+> You are right, the pressure values were being inverted on my hx4700.
+> Pressing hard generates somewhat lower Rt values than pressing lightly.
+> 
+> Since typical hx4700 Rt values are close to (pressure_max/2) anyway,
+> the inverted and non-inverted values were not very different.
+> For example:
+> 
+> Rt      ts->pressure_max-Rt
+> 599     425
+> 562     462
+> 588     436
+> 570     454
+> 
+> So by all means submit your ads7846.c patch; it will not break hx4700.
 
-Ok, can I just add your acked-by, and send them to akpm/rmk? These
-three are simple enough...
-									Pavel
+Dmitry, those pressure values are reverted on more than one machine,
+and we do not have anyone reporting it works ok for them. Can we
+perhaps just.... fix it?
+								Pavel
+
 -- 
 (english) http://www.livejournal.com/~pavelmachek
 (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
