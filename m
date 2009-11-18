@@ -1,80 +1,31 @@
-From: dk-arm-linux@gmx.de (Dieter Kiermaier)
-Date: Wed, 18 Nov 2009 08:09:35 +0100
-Subject: ARM kirkwood: how to run kirkwood_pcie_init() from kernel module
-In-Reply-To: <c70ff3ad0911171910t2231317aw154ba6e455ca3511@mail.gmail.com>
-References: <200911161032.02873.dk-arm-linux@gmx.de>
-	<c70ff3ad0911171910t2231317aw154ba6e455ca3511@mail.gmail.com>
-Message-ID: <200911180809.36672.dk-arm-linux@gmx.de>
+From: mfuzzey@gmail.com (Martin Fuzzey)
+Date: Wed, 18 Nov 2009 10:42:42 +0100
+Subject: [REPOST PATCH 1/3] MXC: Add i.MX21 specific USB host controller
+	driver.
+In-Reply-To: <20091110051603.GA27314@kroah.com>
+References: <20091108185217.14742.32892.stgit@srv002.fuzzey.net>
+	<20091108185222.14742.11572.stgit@srv002.fuzzey.net>
+	<20091110051603.GA27314@kroah.com>
+Message-ID: <ba4215e10911180142w204b8e85mc8b55bc329d54ffb@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Nov 10, 2009 at 6:16 AM, Greg KH <greg@kroah.com> wrote:
+> I didn't notice anything objectionable here, but host controller drivers
+> are not my speciality. ?If it's working for you, that is a good reason
+> to get it in for wider testing.
+>
 
-> please note that this function linked into the init section.
+Yes it's working fine for me.
 
-I was not able to call the kirkwood_pcie_init. Is there a way?
-My idea after fighting a few hours with this issue was that
-I couldn't call init functions because init code is freed from kernel after bootup,
-isn't it?
+There have been no other comments on the driver part - do I need to do
+anything else to get it in?
 
+If it's ok to repost just the platform resource bits with the couple
+of mods requested (spelling mistake and letting compiler count array
+indices) I'll just do that - seems stupid to repost the unmodified
+driver.
 
-But finally I got it working with fakephp by doing:
+Cheers,
 
-#disconnect my fpga
-echo 0 > /sys/bus/pci/slots/0000:01:08.0/power
-#disconnect my bridge
-echo 0 > /sys/bus/pci/slots/0000:00:01.0/power
-#
-flashing my fpga.......
-#initiate bus rescan
-echo 1 > /sys/bus/pci/rescan
-
-I have no idea why it doesn't work without fakephp (because pci subsystem also allows disabling
-the devices via sysfs) but if I did it without fakephp
-echo 1 > /sys/bus/pci/rescan
-has absolutely no effect.
-
-
-
-But now it works as expected.
-
-Many thanks,
-Dieter
-
-
-> 
-> On Mon, Nov 16, 2009 at 3:32 AM, Dieter Kiermaier <dk-arm-linux@gmx.de> wrote:
-> > Hi all,
-> >
-> > sorry for disturbing and also sorry for my - maybe strange - question ;)
-> >
-> > I've got the following problem:
-> >
-> > I want to boot my fpga before I start the pci layer.
-> > To achieve this it is necessary to start the pci layer somewhat after flashing my fpga.
-> >
-> > So what I need is to run kirkwood_pcie_init() from inside my (flashing) driver.
-> > Do you know a way how to realize this?
-> >
-> > The header common.h isn't meant to include it from anywhere else than from kirkwood *_setup.c files, right?
-> >
-> > Is it possible to do a EXPORT_SYMBOL(kirkwood_pcie_init) somehow?
-> >
-> > I've tried it allready but get linker warnings and function isn't called...
-> >
-> > Do you have an idea how I can do that?
-> >
-> > Many many thanks in advance,
-> > Dieter
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Martin
