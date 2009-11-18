@@ -1,41 +1,34 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 18 Nov 2009 09:39:34 -0800
-Subject: [PATCH] hx4700: fix hx4700 touchscreen pressure values
-In-Reply-To: <20091118172849.GD25150@elf.ucw.cz>
-References: <E1NAYJo-00016g-PW@pih-relay04.plus.net>
-	<20091118172849.GD25150@elf.ucw.cz>
-Message-ID: <20091118173934.GA4458@core.coreip.homeip.net>
+From: dwalker@fifo99.com (Daniel Walker)
+Date: Wed, 18 Nov 2009 09:38:42 +0000
+Subject: Status of Dream series
+In-Reply-To: <20091118170238.GE20887@elf.ucw.cz>
+References: <20091111104748.GA26975@elf.ucw.cz>
+	<1258135899.6411.7.camel@c-dwalke-linux.qualcomm.com>
+	<20091118170238.GE20887@elf.ucw.cz>
+Message-ID: <1258537122.8014.2.camel@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 18, 2009 at 06:28:49PM +0100, Pavel Machek wrote:
-> On Wed 2009-11-18 00:22:41, Paul Parsons wrote:
-> > > Does pressure actually work as expected -- that is not inverted?
-> > > Because I need this patch on spitz...  but it may break your
-> > > machine...
-> > 
-> > You are right, the pressure values were being inverted on my hx4700.
-> > Pressing hard generates somewhat lower Rt values than pressing lightly.
-> > 
-> > Since typical hx4700 Rt values are close to (pressure_max/2) anyway,
-> > the inverted and non-inverted values were not very different.
-> > For example:
-> > 
-> > Rt      ts->pressure_max-Rt
-> > 599     425
-> > 562     462
-> > 588     436
-> > 570     454
-> > 
-> > So by all means submit your ads7846.c patch; it will not break hx4700.
+On Wed, 2009-11-18 at 18:08 +0100, Pavel Machek wrote:
+> Hi!
 > 
-> Dmitry, those pressure values are reverted on more than one machine,
-> and we do not have anyone reporting it works ok for them. Can we
-> perhaps just.... fix it?
+> > > Russell, what is the status of the "Dream" series? 
+> > > 
+> > >  [PATCH 1/3] msm: make debugging UART (for DEBUG_LL) configurable
+> > >  [PATCH 2/3] msm: add minimal board file for HTC Dream device
+> > >  [PATCH 3/3] msm: Add memory map for HTC Dream
+> > > 
+> > > Daniel Walker offered to maintain arch-msm tree, would that help? 
+> > 
+> > Yeah, I can do it for now, but I can't accept patches for it via this
+> > email address.. I'm in the processes of setting up the right address for
+> > it .. Might take till next week tho.
+> 
+> Ok, can I just add your acked-by, and send them to akpm/rmk? These
+> three are simple enough...
 
-OK, so we have 4 instances where pressure is inverted and nobody wants
-to come out with a non-inverted example... I'll queue for .33 then - .32
-it too close to the release.
+Didn't Russell have some pending comments? Anyway, I have them already
+in my korg git tree. So I can move them forward from there , but it's
+temporary ..
 
--- 
-Dmitry
+Daniel
