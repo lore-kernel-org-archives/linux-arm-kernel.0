@@ -1,42 +1,85 @@
-From: dwalker@fifo99.com (Daniel Walker)
-Date: Wed, 18 Nov 2009 10:42:35 +0000
-Subject: Status of Dream series
-In-Reply-To: <20091118181824.GK25150@elf.ucw.cz>
-References: <20091111104748.GA26975@elf.ucw.cz>
-	<1258135899.6411.7.camel@c-dwalke-linux.qualcomm.com>
-	<20091118170238.GE20887@elf.ucw.cz> <1258537122.8014.2.camel@ubuntu>
-	<20091118181824.GK25150@elf.ucw.cz>
-Message-ID: <1258540955.8014.4.camel@ubuntu>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 18 Nov 2009 10:47:40 -0800
+Subject: [PATCH 3/3] OMAP clock/hwmod: fix off-by-one errors
+In-Reply-To: <20091117222409.GH29266@atomide.com>
+References: <20091116133237.14128.39687.stgit@localhost.localdomain>
+	<20091116133654.14128.175.stgit@localhost.localdomain>
+	<20091116140830.GA31522@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.0911171036430.27682@utopia.booyaka.com>
+	<FCCFB4CDC6E5564B9182F639FC35608702FA689E6A@dbde02.ent.ti.com>
+	<20091117222409.GH29266@atomide.com>
+Message-ID: <20091118184740.GQ29266@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2009-11-18 at 19:18 +0100, Pavel Machek wrote:
-> Hi!
-> 
-> > > > > Russell, what is the status of the "Dream" series? 
-> > > > > 
-> > > > >  [PATCH 1/3] msm: make debugging UART (for DEBUG_LL) configurable
-> > > > >  [PATCH 2/3] msm: add minimal board file for HTC Dream device
-> > > > >  [PATCH 3/3] msm: Add memory map for HTC Dream
-> > > > > 
-> > > > > Daniel Walker offered to maintain arch-msm tree, would that help? 
-> > > > 
-> > > > Yeah, I can do it for now, but I can't accept patches for it via this
-> > > > email address.. I'm in the processes of setting up the right address for
-> > > > it .. Might take till next week tho.
-> > > 
-> > > Ok, can I just add your acked-by, and send them to akpm/rmk? These
-> > > three are simple enough...
+* Tony Lindgren <tony@atomide.com> [091117 14:24]:
+> * Pandita, Vikram <vikram.pandita@ti.com> [091117 09:50]:
+> > Paul
 > > 
-> > Didn't Russell have some pending comments? Anyway, I have them already
-> > in my korg git tree. So I can move them forward from there , but it's
-> > temporary ..
+> > >-----Original Message-----
+> > >From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Paul
+> > >Walmsley
+> > >Sent: Tuesday, November 17, 2009 11:39 AM
+> > >To: Russell King - ARM Linux
+> > >Cc: linux-arm-kernel at lists.infradead.org; Juha Lepp?nen; linux-omap at vger.kernel.org
+> > >Subject: Re: [PATCH 3/3] OMAP clock/hwmod: fix off-by-one errors
+> > <snip>
+> > >
+> > >+/**
+> > >+ * omap_test_timeout - busy-loop, testing a condition
+> > >+ * @cond: condition to test until it evaluates to true
+> > >+ * @timeout: maximum number of microseconds in the timeout
+> > >+ * @index: loop index (integer)
+> > >+ *
+> > >+ * Loop waiting for @cond to become true or until at least @timeout
+> > >+ * microseconds have passed.  To use, define some integer @index in the
+> > >+ * calling code.  After running, if @index == @timeout, then the loop has
+> > >+ * timed out.
+> > >+ */
+> > >+#define omap_test_timeout(cond, timeout, index)			\
+> > >+({								\
+> > >+	for (index = 0; index < timeout; index++) {		\
+> > >+		if (cond)					\
+> > >+			break;					\
+> > >+		udelay(1);					\
+> > >+	}							\
+> > >+})
+> > >+
+> > 
+> > There is a similar kind of function implemented in USB host, that returns -ETIMEDOUT
+> > Which makes more sense for failure case.
+> > 
+> > Maybe such a generic function for all omaps is needed.
+> > 
+> > Refer:
+> > drivers/usb/host/ehci-hcd.c
+> > static int handshake (struct ehci_hcd *ehci, void __iomem *ptr,
+> >                       u32 mask, u32 done, int usec)
+> > {
+> >         u32     result;
+> > 
+> >         do {
+> >                 result = ehci_readl(ehci, ptr);
+> >                 if (result == ~(u32)0)          /* card removed */
+> >                         return -ENODEV;
+> >                 result &= mask;
+> >                 if (result == done)
+> >                         return 0;
+> >                 udelay (1);
+> >                 usec--;
+> >         } while (usec > 0);
+> >         return -ETIMEDOUT;
+> > }
+> > 
+> > 
+> > > #endif /* __ARCH_ARM_MACH_OMAP_COMMON_H */
 > 
-> Here's fixed #2. I guess we can add rmk's reviewed-by (and yours?) and
-> send them forward?
+> Well we need to stick to minimal changes if we plan to send this in as a fix.
+> Anything more complex we should do the next merge window.
 
-I'll add my sign off, put them into my git tree (which is included in
-linux-next) , the eventually push them to Linus when the merge window
-opens ..
+To me it sounds like this can wait until the merge window,
+so not adding to omap-fixes for now.
 
-Daniel
+Regards,
+
+Tony
