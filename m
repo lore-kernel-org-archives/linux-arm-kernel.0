@@ -1,70 +1,72 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 18 Nov 2009 22:32:41 +0000
-Subject: [PATCH] Add Samsung S5PC110 SoC support
-In-Reply-To: <1258551194-16018-1-git-send-email-m.szyprowski@samsung.com>
-References: <1258551194-16018-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20091118223241.GD4808@trinity.fluff.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 18 Nov 2009 14:47:47 -0800
+Subject: [PATCH 05/12] omap3evm: Add board revision function, v2
+In-Reply-To: <19F8576C6E063C45BE387C64729E7394043702B5B5@dbde02.ent.ti.com>
+References: <20091116232435.24892.81547.stgit@localhost>
+	<20091116232734.24892.33820.stgit@localhost>
+	<19F8576C6E063C45BE387C64729E7394043702B5B5@dbde02.ent.ti.com>
+Message-ID: <20091118224746.GU29266@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 18, 2009 at 02:32:55PM +0100, Marek Szyprowski wrote:
-> Hello,
+* Hiremath, Vaibhav <hvaibhav@ti.com> [091116 19:56]:
 > 
-> This preliminary patch series adds support for Samsung S5PC110 SoC.
-> S5PC110 belongs to S5PC1XX family (CortexA8 ARM core), but differs in
-> many places from the S5PC100 SoC: new memory map, different clock
-> hierarchy, new gpio banks and much more powerful integrated peripherals.
-> Such differences cannot be easily handled in the current Samsung
-> machine&platform framework. To avoid duplication of code and adding yet
-> another plat-* directory, we decided to introduce sub-platforms in
-> the current s5pc1xx platform.
-> 
-> First 8 patches prepare s5pc1xx platform code for introduction of the
-> new sub-platform approach. Then in the next 11 patches all core
-> functions and drivers are subsequently added, so S5PC110 sub-platform
-> gets similar level of support as S5PC100.
-> 
-> This patch series has been prepared against latest ARM Kernel tree from
-> http://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-2.6-arm.git/
-> 
-> I know that Ben is working hard on new Samsung SoC platform framework,
-> but stabilizing it and porting all the existing Samsung platforms would
-> take time. This sub-platform solution is already prepared and until the
-> new framework will be available and merged, we would like to use our
-> approach.
+> > -----Original Message-----
+> > From: Tony Lindgren [mailto:tony at atomide.com]
+> > Sent: Tuesday, November 17, 2009 4:58 AM
+> > To: linux-arm-kernel at lists.infradead.org
+> > Cc: Gupta, Ajay Kumar; linux-omap at vger.kernel.org; Hiremath,
+> > Vaibhav; Premi, Sanjeev
+> > Subject: [PATCH 05/12] omap3evm: Add board revision function
+> > 
+> > From: Ajay Kumar Gupta <ajay.gupta@ti.com>
+> > 
+> > Added function to differentiate between the OMAP3EVM revisions. The
+> > chip-id of the ethernet PHY is being used for this purpose.
+> > 
+> > Rev A to D : 0x01150000
+> > Rev >= E   : 0x92200000
+> > 
+> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> > Signed-off-by: Ajay Kumar Gupta <ajay.gupta@ti.com>
+> > Signed-off-by: Sanjeev Premi <premi@ti.com>
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > ---
+> >  arch/arm/mach-omap2/board-omap3evm.c    |   33
+> > +++++++++++++++++++++++++++++++
+> >  arch/arm/plat-omap/include/plat/board.h |   18 +++++++++++++++++
+> >  2 files changed, 51 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-
+> > omap2/board-omap3evm.c
+> > index 1edf06a..6bb9a37 100644
+> > --- a/arch/arm/mach-omap2/board-omap3evm.c
+> > +++ b/arch/arm/mach-omap2/board-omap3evm.c
+> > @@ -46,9 +46,40 @@
+> > 
+> >  #define OMAP3EVM_ETHR_START	0x2c000000
+> >  #define OMAP3EVM_ETHR_SIZE	1024
+> > +#define OMAP3EVM_ETHR_ID_REV	0x50
+> >  #define OMAP3EVM_ETHR_GPIO_IRQ	176
+> >  #define OMAP3EVM_SMC911X_CS	5
+> > 
+> > +static u8 omap3_evm_version;
+> > +
+> > +u8 get_omap3_evm_rev(void)
+> > +{
+> > +	return omap3_evm_version;
+> > +}
+> > +EXPORT_SYMBOL(get_omap3_evm_rev);
+> > +
+> > +static void __init omap3_evm_get_revision(void)
+> > +{
+> > +	void __iomem *ioaddr;
+> > +	unsigned int smsc_id;
+> > +
+> > +	/* Ethernet PHY ID is stored at ID_REV register */
+> > +	ioaddr = ioremap_nocache(OMAP3EVM_ETHR_START, SZ_1K);
+> [Hiremath, Vaibhav] I think we should check for the return value.
 
-running these through checkpatch first would have been a good idea:
+Good catch, updated version below.
 
-fyi, these need fixing:
-
-WARNING: externs should be avoided in .c files
-#666: FILE: arch/arm/plat-s5pc1xx/s5pc110-clocks.c:92:
-+extern struct clk clk_dout_hclkm;
-
-WARNING: externs should be avoided in .c files
-#667: FILE: arch/arm/plat-s5pc1xx/s5pc110-clocks.c:93:
-+extern struct clk clk_dout_hclkd;
-
-WARNING: externs should be avoided in .c files
-#668: FILE: arch/arm/plat-s5pc1xx/s5pc110-clocks.c:94:
-+extern struct clk clk_dout_hclkp;
-
-WARNING: externs should be avoided in .c files
-#669: FILE: arch/arm/plat-s5pc1xx/s5pc110-clocks.c:95:
-+extern struct clk clk_dout_pclkd;
-
-WARNING: externs should be avoided in .c files
-#670: FILE: arch/arm/plat-s5pc1xx/s5pc110-clocks.c:96:
-+extern struct clk clk_dout_pclkp;
-
-#348: FILE: arch/arm/mach-s5pc110/include/plat/irqs.h:197:
-+#define IRQ_EINT_BIT(x)		(x < IRQ_EINT16_31 ? x - IRQ_EINT0 : x - S3C_EINT(0))
-
-could this be made an inline, or@least have x encased in brackets to
-avoid any problems with macro expansion?
-
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Tony
