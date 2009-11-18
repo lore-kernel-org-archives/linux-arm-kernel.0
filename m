@@ -1,21 +1,180 @@
-From: utx@penguin.cz (Stanislav Brabec)
-Date: Wed, 18 Nov 2009 15:38:53 +0100
-Subject: 2.6.32-rc7: compile regression on spitz
-In-Reply-To: <20091118090100.GA1399@ucw.cz>
-References: <20091118090100.GA1399@ucw.cz>
-Message-ID: <1258555133.3454.2.camel@hammer.suse.cz>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 18 Nov 2009 16:37:08 +0100
+Subject: [PATCH 3/5] ARM: MX3: add SPI devices for mx31lite
+In-Reply-To: <1258551702-8631-3-git-send-email-daniel@caiaq.de>
+References: <1258551702-8631-1-git-send-email-daniel@caiaq.de>
+	<1258551702-8631-2-git-send-email-daniel@caiaq.de>
+	<1258551702-8631-3-git-send-email-daniel@caiaq.de>
+Message-ID: <20091118153708.GN30179@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pavel Machek wrote:
-> If CONFIG_AKITA is not set, spitz fails to compile. It worked ok in
-> rc5. Fix is one more ifdef...
+Hi Daniel,
 
-That was my mistake in 5e0fa3f.
+On Wed, Nov 18, 2009 at 02:41:40PM +0100, Daniel Mack wrote:
+> Some header files were reordered while I was at it.
+> The only device currently registered is the ATLAS PMIC chip.
+> 
+> Signed-off-by: Daniel Mack <daniel@caiaq.de>
+> ---
+>  arch/arm/mach-mx3/mx31lite-db.c |   43 +++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mx3/mx31lite.c    |   36 ++++++++++++++++++++++++++++++-
+>  2 files changed, 77 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx3/mx31lite-db.c b/arch/arm/mach-mx3/mx31lite-db.c
+> index 45abae1..1ab92f6 100644
+> --- a/arch/arm/mach-mx3/mx31lite-db.c
+> +++ b/arch/arm/mach-mx3/mx31lite-db.c
+> @@ -28,6 +28,8 @@
+>  #include <linux/types.h>
+>  #include <linux/init.h>
+>  #include <linux/gpio.h>
+> +#include <linux/spi/spi.h>
+> +#include <linux/mfd/mc13783.h>
+>  
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+> @@ -39,6 +41,7 @@
+>  #include <mach/iomux-mx3.h>
+>  #include <mach/board-mx31lite.h>
+>  #include <mach/mmc.h>
+> +#include <mach/spi.h>
+>  
+>  #include "devices.h"
+>  
+> @@ -55,6 +58,14 @@ static unsigned int litekit_db_board_pins[] __initdata = {
+>  	MX31_PIN_RTS1__RTS1,
+>  	MX31_PIN_TXD1__TXD1,
+>  	MX31_PIN_RXD1__RXD1,
+> +	/* SPI 0 */
+> +	MX31_PIN_CSPI1_SCLK__SCLK,
+> +	MX31_PIN_CSPI1_MOSI__MOSI,
+> +	MX31_PIN_CSPI1_MISO__MISO,
+> +	MX31_PIN_CSPI1_SPI_RDY__SPI_RDY,
+> +	MX31_PIN_CSPI1_SS0__SS0,
+> +	MX31_PIN_CSPI1_SS1__SS1,
+> +	MX31_PIN_CSPI1_SS2__SS2,
+>  };
+>  
+>  /* UART */
+> @@ -130,6 +141,35 @@ static struct imxmmc_platform_data mmc_pdata = {
+>  	.exit	   = mxc_mmc1_exit,
+>  };
+>  
+> +/* SPI */
+> +
+> +static int spi_internal_chipselect[] = {
+> +	MXC_SPI_CS(0),
+> +	MXC_SPI_CS(1),
+> +	MXC_SPI_CS(2),
+> +};
+> +
+> +static struct spi_imx_master spi0_pdata = {
+> +	.chipselect	= spi_internal_chipselect,
+> +	.num_chipselect	= ARRAY_SIZE(spi_internal_chipselect),
+> +};
+> +
+> +static struct mc13783_platform_data mc13783_pdata __initdata = {
+> +	.flags  = MC13783_USE_RTC |
+> +		  MC13783_USE_REGULATOR,
+> +};
+> +
+> +static struct spi_board_info litekit_spi_devs[] __initdata = {
+> +	{
+> +		.modalias       = "mc13783",
+> +		.max_speed_hz   = 1000000,
+> +		.bus_num	= 1,
+> +		.chip_select    = 0,
+> +		.platform_data  = &mc13783_pdata,
+> +		.irq		= IOMUX_TO_IRQ(MX31_PIN_GPIO1_3),
+> +	},
+> +};
+> +
+>  void __init mx31lite_db_init(void)
+>  {
+>  	mxc_iomux_setup_multiple_pins(litekit_db_board_pins,
+> @@ -137,5 +177,8 @@ void __init mx31lite_db_init(void)
+>  					"development board pins");
+>  	mxc_register_device(&mxc_uart_device0, &uart_pdata);
+>  	mxc_register_device(&mxcsdhc_device0, &mmc_pdata);
+> +	mxc_register_device(&mxc_spi_device0, &spi0_pdata);
+> +	spi_register_board_info(litekit_spi_devs,
+> +				ARRAY_SIZE(litekit_spi_devs));
+>  }
+>  
+> diff --git a/arch/arm/mach-mx3/mx31lite.c b/arch/arm/mach-mx3/mx31lite.c
+> index dc993a8..b8d8ee1 100644
+> --- a/arch/arm/mach-mx3/mx31lite.c
+> +++ b/arch/arm/mach-mx3/mx31lite.c
+> @@ -2,6 +2,7 @@
+>   *  Copyright (C) 2000 Deep Blue Solutions Ltd
+>   *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
+>   *  Copyright 2005-2007 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *  Copyright (C) 2009 Daniel Mack <daniel@caiaq.de>
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License as published by
+> @@ -26,19 +27,22 @@
+>  #include <linux/gpio.h>
+>  #include <linux/smsc911x.h>
+>  
+> -#include <mach/hardware.h>
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/time.h>
+>  #include <asm/mach/map.h>
+> -#include <mach/common.h>
+>  #include <asm/page.h>
+>  #include <asm/setup.h>
+> +
+> +#include <mach/hardware.h>
+> +#include <mach/common.h>
+>  #include <mach/board-mx31lite.h>
+>  #include <mach/imx-uart.h>
+>  #include <mach/iomux-mx3.h>
+>  #include <mach/irqs.h>
+>  #include <mach/mxc_nand.h>
+> +#include <mach/spi.h>
+> +
+>  #include "devices.h"
+>  
+>  /*
+> @@ -48,6 +52,14 @@
+>  static unsigned int mx31lite_pins[] = {
+>  	/* LAN9117 IRQ pin */
+>  	IOMUX_MODE(MX31_PIN_SFS6, IOMUX_CONFIG_GPIO),
+> +	/* SPI 1 */
+> +	MX31_PIN_CSPI2_SCLK__SCLK,
+> +	MX31_PIN_CSPI2_MOSI__MOSI,
+> +	MX31_PIN_CSPI2_MISO__MISO,
+> +	MX31_PIN_CSPI2_SPI_RDY__SPI_RDY,
+> +	MX31_PIN_CSPI2_SS0__SS0,
+> +	MX31_PIN_CSPI2_SS1__SS1,
+> +	MX31_PIN_CSPI2_SS2__SS2,
+>  };
+>  
+>  static struct mxc_nand_platform_data mx31lite_nand_board_info = {
+> @@ -84,6 +96,25 @@ static struct platform_device smsc911x_device = {
+>  };
+>  
+>  /*
+> + * SPI
+> + *
+> + * The MX13783 is hard-wired on the module, hence the corresponding
+> + * bus is registered here and not in the board code, in contrast to
+> + * the other SPI bus.
+> + */
 
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
-Acked-by: Stanislav Brabec <utx@penguin.cz>
+
+The mc13783 bus is registered in the -db file, and not here. I think you
+mixed something up here.
+
+s/MX13783/MC13783/
+
+Sascha
 
 -- 
-Stanislav Brabec
-http://www.penguin.cz/~utx
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
