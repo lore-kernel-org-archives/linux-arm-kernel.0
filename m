@@ -1,76 +1,70 @@
-From: leochen@broadcom.com (Leo (Hao) Chen)
-Date: Wed, 18 Nov 2009 14:25:27 -0800
-Subject: [PATCH] BCMRING: use generic io access macros
-Message-ID: <20091118222527.GB11579@broadcom.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Wed, 18 Nov 2009 22:32:41 +0000
+Subject: [PATCH] Add Samsung S5PC110 SoC support
+In-Reply-To: <1258551194-16018-1-git-send-email-m.szyprowski@samsung.com>
+References: <1258551194-16018-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20091118223241.GD4808@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch to cleanup the mach/io.h, using the new generic io access
-macros.
+On Wed, Nov 18, 2009 at 02:32:55PM +0100, Marek Szyprowski wrote:
+> Hello,
+> 
+> This preliminary patch series adds support for Samsung S5PC110 SoC.
+> S5PC110 belongs to S5PC1XX family (CortexA8 ARM core), but differs in
+> many places from the S5PC100 SoC: new memory map, different clock
+> hierarchy, new gpio banks and much more powerful integrated peripherals.
+> Such differences cannot be easily handled in the current Samsung
+> machine&platform framework. To avoid duplication of code and adding yet
+> another plat-* directory, we decided to introduce sub-platforms in
+> the current s5pc1xx platform.
+> 
+> First 8 patches prepare s5pc1xx platform code for introduction of the
+> new sub-platform approach. Then in the next 11 patches all core
+> functions and drivers are subsequently added, so S5PC110 sub-platform
+> gets similar level of support as S5PC100.
+> 
+> This patch series has been prepared against latest ARM Kernel tree from
+> http://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-2.6-arm.git/
+> 
+> I know that Ben is working hard on new Samsung SoC platform framework,
+> but stabilizing it and porting all the existing Samsung platforms would
+> take time. This sub-platform solution is already prepared and until the
+> new framework will be available and merged, we would like to use our
+> approach.
 
-From: Leo Chen <leochen@broadcom.com>
-Date: Wed, 18 Nov 2009 14:20:47 -0800
-Subject: [PATCH] bcmring: use generic io macros defined in asm/io.h
+running these through checkpatch first would have been a good idea:
 
-removed old macro definition for io access, using the generic macros
-defined in asm/io.h
+fyi, these need fixing:
 
-Signed-off-by: Leo Hao Chen <leochen@broadcom.com>
----
- arch/arm/mach-bcmring/include/mach/io.h |   35 +++++-------------------------
- 1 files changed, 6 insertions(+), 29 deletions(-)
+WARNING: externs should be avoided in .c files
+#666: FILE: arch/arm/plat-s5pc1xx/s5pc110-clocks.c:92:
++extern struct clk clk_dout_hclkm;
 
-diff --git a/arch/arm/mach-bcmring/include/mach/io.h b/arch/arm/mach-bcmring/include/mach/io.h
-index 4db0eff..dae5e9b 100644
---- a/arch/arm/mach-bcmring/include/mach/io.h
-+++ b/arch/arm/mach-bcmring/include/mach/io.h
-@@ -23,34 +23,11 @@
- 
- #define IO_SPACE_LIMIT 0xffffffff
- 
--#define __io(a)         ((void __iomem *)HW_IO_PHYS_TO_VIRT(a))
--
--/* Do not enable mem_pci for a big endian arm architecture or unexpected byteswaps will */
--/* happen in readw/writew etc. */
--
--#define readb(c)        __raw_readb(c)
--#define readw(c)        __raw_readw(c)
--#define readl(c)        __raw_readl(c)
--#define readb_relaxed(addr) readb(addr)
--#define readw_relaxed(addr) readw(addr)
--#define readl_relaxed(addr) readl(addr)
--
--#define readsb(p, d, l)   __raw_readsb(p, d, l)
--#define readsw(p, d, l)   __raw_readsw(p, d, l)
--#define readsl(p, d, l)   __raw_readsl(p, d, l)
--
--#define writeb(v, c)     __raw_writeb(v, c)
--#define writew(v, c)     __raw_writew(v, c)
--#define writel(v, c)     __raw_writel(v, c)
--
--#define writesb(p, d, l)  __raw_writesb(p, d, l)
--#define writesw(p, d, l)  __raw_writesw(p, d, l)
--#define writesl(p, d, l)  __raw_writesl(p, d, l)
--
--#define memset_io(c, v, l)    _memset_io((c), (v), (l))
--#define memcpy_fromio(a, c, l)    _memcpy_fromio((a), (c), (l))
--#define memcpy_toio(c, a, l)  _memcpy_toio((c), (a), (l))
--
--#define eth_io_copy_and_sum(s, c, l, b) eth_copy_and_sum((s), (c), (l), (b))
-+/*
-+ * We don't actually have real ISA nor PCI buses, but there is so many
-+ * drivers out there that might just work if we fake them...
-+ */
-+#define __io(a)		__typesafe_io(a)
-+#define __mem_pci(a)	(a)
- 
- #endif
--- 
-1.6.0.6
+WARNING: externs should be avoided in .c files
+#667: FILE: arch/arm/plat-s5pc1xx/s5pc110-clocks.c:93:
++extern struct clk clk_dout_hclkd;
+
+WARNING: externs should be avoided in .c files
+#668: FILE: arch/arm/plat-s5pc1xx/s5pc110-clocks.c:94:
++extern struct clk clk_dout_hclkp;
+
+WARNING: externs should be avoided in .c files
+#669: FILE: arch/arm/plat-s5pc1xx/s5pc110-clocks.c:95:
++extern struct clk clk_dout_pclkd;
+
+WARNING: externs should be avoided in .c files
+#670: FILE: arch/arm/plat-s5pc1xx/s5pc110-clocks.c:96:
++extern struct clk clk_dout_pclkp;
+
+#348: FILE: arch/arm/mach-s5pc110/include/plat/irqs.h:197:
++#define IRQ_EINT_BIT(x)		(x < IRQ_EINT16_31 ? x - IRQ_EINT0 : x - S3C_EINT(0))
+
+could this be made an inline, or@least have x encased in brackets to
+avoid any problems with macro expansion?
 
 -- 
+Ben
 
-Leo Hao Chen
-
-------------------------
-Life is short, run long.
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
