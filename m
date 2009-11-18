@@ -1,43 +1,191 @@
-From: leochen@broadcom.com (Leo (Hao) Chen)
-Date: Wed, 18 Nov 2009 14:19:48 -0800
-Subject: drivers/rtc/rtc-pl031.c uses __raw_readl()?
-In-Reply-To: <20091117100256.GC7407@pengutronix.de>
-References: <63386a3d0911110130j2056a355l16cade8d30edb6cd@mail.gmail.com>
-	<63386a3d0911120043y2143c7f5w7289bc83b2e31847@mail.gmail.com>
-	<20091117100256.GC7407@pengutronix.de>
-Message-ID: <20091118221948.GA11579@broadcom.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 18 Nov 2009 14:21:09 -0800
+Subject: [PATCH] ARM: Add spi controller driver support for NUC900
+In-Reply-To: <4B024748.9080001@gmail.com>
+References: <4B024748.9080001@gmail.com>
+Message-ID: <20091118142109.ff2c5ef6.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2009 at 02:02:56AM -0800, Uwe Kleine-K?nig wrote:
-> On Thu, Nov 12, 2009 at 09:43:43AM +0100, Linus Walleij wrote:
-> > 2009/11/11 Linus Walleij <linus.ml.walleij@gmail.com>:
-> > 
-> > > Is there some special reason as to why drivers/rtc/rtc-pl031.c uses
-> > > the __raw_[read|write]l() macro instead of plain [read|write]l()?
-> > 
-> > Reading the macro definitions I come to the conclusion that readl()
-> > is always little-endian and __raw_readl() is the machine endianness,
-> Actually the readl part is not necessarily true I think.
-> 
-> At least arch/arm/mach-bcmring/include/mach/io.h has:
-> 
-> 	/* Do not enable mem_pci for a big endian arm architecture or unexpected byteswaps will */
-> 	/* happen in readw/writew etc. */
-> 
-> 	#define readb(c)        __raw_readb(c)
-> 	...
-> 
-> But maybe this is a bug in mach-bcmring?!  Or a work-around of drivers
-> using readb et al in wrong sitatations?
+On Tue, 17 Nov 2009 14:48:40 +0800
+Wan ZongShun <mcuos.com@gmail.com> wrote:
 
-Our code was based on older io.h. No need to keep our own readb
-definition any more. We'll clean them up by using the
-generic readb defined in asm/io.h.
+> Dear David,
+> 
+> Add winbond/nuvoton NUC900 spi controller driver support, 
+> on my evaluation board,there is a winbond w25x16 spi flash,
+> so I test my spi controller driver with m25p80.c.
+> 
+>
+> ...
+>
+> +static inline struct w90p910_spi *to_hw(struct spi_device *sdev)
+> +{
+> +	return spi_master_get_devdata(sdev->master);
+> +}
+> +
+> +static void w90p910_slave_seclect(struct spi_device *spi, unsigned int ssr)
 
--- 
+I think you meant "select" here?
 
-Leo Hao Chen
+> +{
+> +	struct w90p910_spi *hw = to_hw(spi);
+> +	unsigned int val;
+> +	unsigned int cs = spi->mode & SPI_CS_HIGH ? 1 : 0;
+> +	unsigned int cpol = spi->mode & SPI_CPOL ? 1 : 0;
+> +
+> +	val = __raw_readl(hw->regs + USI_SSR);
+> +
+> +	if (!cs)
+> +		val &= ~SELECTLEV;
+> +	else
+> +		val |= SELECTLEV;
+> +
+> +	if (!ssr)
+> +		val &= ~SELECTSLAVE;
+> +	else
+> +		val |= SELECTSLAVE;
+> +
+> +	__raw_writel(val, hw->regs + USI_SSR);
+> +
+> +	val = __raw_readl(hw->regs + USI_CNT);
+> +
+> +	if (!cpol)
+> +		val &= ~SELECTPOL;
+> +	else
+> +		val |= SELECTPOL;
+> +
+> +	__raw_writel(val, hw->regs + USI_CNT);
+> +}
 
-------------------------
-Life is short, run long.
+That's a read-modify-write operation.  What locking prevents two
+threads of control from altering the USI_SSR and USI_CNT registers at
+the same time, resulting in an indeterminate setting?
+
+> +static void w90p910_spi_chipsel(struct spi_device *spi, int value)
+> +{
+> +	switch (value) {
+> +	case BITBANG_CS_INACTIVE:
+> +		w90p910_slave_seclect(spi, 0);
+> +		break;
+> +
+> +	case BITBANG_CS_ACTIVE:
+> +		w90p910_slave_seclect(spi, 1);
+> +		break;
+> +	}
+> +}
+> +
+> +static void w90p910_spi_setup_txnum(struct w90p910_spi *hw,
+> +							unsigned int txnum)
+> +{
+> +	unsigned int val;
+> +
+> +	val = __raw_readl(hw->regs + USI_CNT);
+> +
+> +	if (!txnum)
+> +		val &= ~TXNUM;
+> +	else
+> +		val |= txnum << 0x08;
+> +
+> +	__raw_writel(val, hw->regs + USI_CNT);
+> +
+> +}
+> +
+> +static void w90p910_spi_setup_txbitlen(struct w90p910_spi *hw,
+> +							unsigned int txbitlen)
+> +{
+> +	unsigned int val;
+> +
+> +	val = __raw_readl(hw->regs + USI_CNT);
+> +
+> +	val |= (txbitlen << 0x03);
+> +
+> +	__raw_writel(val, hw->regs + USI_CNT);
+> +}
+> +
+> +static void w90p910_spi_gobusy(struct w90p910_spi *hw)
+> +{
+> +	unsigned int val;
+> +
+> +	val = __raw_readl(hw->regs + USI_CNT);
+> +
+> +	val |= GOBUSY;
+> +
+> +	__raw_writel(val, hw->regs + USI_CNT);
+> +}
+
+ditto, ditto, ditto.
+
+> +static int w90p910_spi_setupxfer(struct spi_device *spi,
+> +				 struct spi_transfer *t)
+> +{
+> +	return 0;
+> +}
+> +
+> +static int w90p910_spi_setup(struct spi_device *spi)
+> +{
+> +	return 0;
+> +}
+> +
+> +static inline unsigned int hw_txbyte(struct w90p910_spi *hw, int count)
+> +{
+> +	return hw->tx ? hw->tx[count] : 0;
+> +}
+> +
+> +static int w90p910_spi_txrx(struct spi_device *spi, struct spi_transfer *t)
+> +{
+> +	struct w90p910_spi *hw = to_hw(spi);
+> +
+> +	hw->tx = t->tx_buf;
+> +	hw->rx = t->rx_buf;
+> +	hw->len = t->len;
+> +	hw->count = 0;
+> +
+> +	init_completion(&hw->done);
+> +
+> +	__raw_writel(hw_txbyte(hw, 0x0), hw->regs + USI_TX0);
+> +
+> +	w90p910_spi_gobusy(hw);
+> +
+> +	wait_for_completion(&hw->done);
+> +
+> +	return hw->count;
+> +}
+
+The init_completion() should be unneeded?  The structure was
+initialised at setup time and will be left in a reusable state after a
+complete()/wait_for_completion().  Reinitialising the structure all the
+time like this adds risk that it will be scribbled on while in use.
+
+>
+> ...
+>
+> +static int __devexit w90p910_spi_remove(struct platform_device *dev)
+> +{
+> +	struct w90p910_spi *hw = platform_get_drvdata(dev);
+> +
+> +	platform_set_drvdata(dev, NULL);
+> +
+> +	spi_unregister_master(hw->master);
+> +
+> +	clk_disable(hw->clk);
+> +	clk_put(hw->clk);
+
+As far as I can tell, a hardware interrupt could still be pending, or
+be under service while the above code is executing?
+
+If so, I expect bad things will happen?
+
+> +	free_irq(hw->irq, hw);
+> +	iounmap(hw->regs);
+> +
+> +	release_resource(hw->ioarea);
+> +	kfree(hw->ioarea);
+> +
+> +	spi_master_put(hw->master);
+> +	return 0;
+> +}
+> +
+>
+> ...
+>
