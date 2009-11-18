@@ -1,191 +1,76 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 18 Nov 2009 14:21:09 -0800
-Subject: [PATCH] ARM: Add spi controller driver support for NUC900
-In-Reply-To: <4B024748.9080001@gmail.com>
-References: <4B024748.9080001@gmail.com>
-Message-ID: <20091118142109.ff2c5ef6.akpm@linux-foundation.org>
+From: leochen@broadcom.com (Leo (Hao) Chen)
+Date: Wed, 18 Nov 2009 14:25:27 -0800
+Subject: [PATCH] BCMRING: use generic io access macros
+Message-ID: <20091118222527.GB11579@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2009 14:48:40 +0800
-Wan ZongShun <mcuos.com@gmail.com> wrote:
+The patch to cleanup the mach/io.h, using the new generic io access
+macros.
 
-> Dear David,
-> 
-> Add winbond/nuvoton NUC900 spi controller driver support, 
-> on my evaluation board,there is a winbond w25x16 spi flash,
-> so I test my spi controller driver with m25p80.c.
-> 
->
-> ...
->
-> +static inline struct w90p910_spi *to_hw(struct spi_device *sdev)
-> +{
-> +	return spi_master_get_devdata(sdev->master);
-> +}
-> +
-> +static void w90p910_slave_seclect(struct spi_device *spi, unsigned int ssr)
+From: Leo Chen <leochen@broadcom.com>
+Date: Wed, 18 Nov 2009 14:20:47 -0800
+Subject: [PATCH] bcmring: use generic io macros defined in asm/io.h
 
-I think you meant "select" here?
+removed old macro definition for io access, using the generic macros
+defined in asm/io.h
 
-> +{
-> +	struct w90p910_spi *hw = to_hw(spi);
-> +	unsigned int val;
-> +	unsigned int cs = spi->mode & SPI_CS_HIGH ? 1 : 0;
-> +	unsigned int cpol = spi->mode & SPI_CPOL ? 1 : 0;
-> +
-> +	val = __raw_readl(hw->regs + USI_SSR);
-> +
-> +	if (!cs)
-> +		val &= ~SELECTLEV;
-> +	else
-> +		val |= SELECTLEV;
-> +
-> +	if (!ssr)
-> +		val &= ~SELECTSLAVE;
-> +	else
-> +		val |= SELECTSLAVE;
-> +
-> +	__raw_writel(val, hw->regs + USI_SSR);
-> +
-> +	val = __raw_readl(hw->regs + USI_CNT);
-> +
-> +	if (!cpol)
-> +		val &= ~SELECTPOL;
-> +	else
-> +		val |= SELECTPOL;
-> +
-> +	__raw_writel(val, hw->regs + USI_CNT);
-> +}
+Signed-off-by: Leo Hao Chen <leochen@broadcom.com>
+---
+ arch/arm/mach-bcmring/include/mach/io.h |   35 +++++-------------------------
+ 1 files changed, 6 insertions(+), 29 deletions(-)
 
-That's a read-modify-write operation.  What locking prevents two
-threads of control from altering the USI_SSR and USI_CNT registers at
-the same time, resulting in an indeterminate setting?
+diff --git a/arch/arm/mach-bcmring/include/mach/io.h b/arch/arm/mach-bcmring/include/mach/io.h
+index 4db0eff..dae5e9b 100644
+--- a/arch/arm/mach-bcmring/include/mach/io.h
++++ b/arch/arm/mach-bcmring/include/mach/io.h
+@@ -23,34 +23,11 @@
+ 
+ #define IO_SPACE_LIMIT 0xffffffff
+ 
+-#define __io(a)         ((void __iomem *)HW_IO_PHYS_TO_VIRT(a))
+-
+-/* Do not enable mem_pci for a big endian arm architecture or unexpected byteswaps will */
+-/* happen in readw/writew etc. */
+-
+-#define readb(c)        __raw_readb(c)
+-#define readw(c)        __raw_readw(c)
+-#define readl(c)        __raw_readl(c)
+-#define readb_relaxed(addr) readb(addr)
+-#define readw_relaxed(addr) readw(addr)
+-#define readl_relaxed(addr) readl(addr)
+-
+-#define readsb(p, d, l)   __raw_readsb(p, d, l)
+-#define readsw(p, d, l)   __raw_readsw(p, d, l)
+-#define readsl(p, d, l)   __raw_readsl(p, d, l)
+-
+-#define writeb(v, c)     __raw_writeb(v, c)
+-#define writew(v, c)     __raw_writew(v, c)
+-#define writel(v, c)     __raw_writel(v, c)
+-
+-#define writesb(p, d, l)  __raw_writesb(p, d, l)
+-#define writesw(p, d, l)  __raw_writesw(p, d, l)
+-#define writesl(p, d, l)  __raw_writesl(p, d, l)
+-
+-#define memset_io(c, v, l)    _memset_io((c), (v), (l))
+-#define memcpy_fromio(a, c, l)    _memcpy_fromio((a), (c), (l))
+-#define memcpy_toio(c, a, l)  _memcpy_toio((c), (a), (l))
+-
+-#define eth_io_copy_and_sum(s, c, l, b) eth_copy_and_sum((s), (c), (l), (b))
++/*
++ * We don't actually have real ISA nor PCI buses, but there is so many
++ * drivers out there that might just work if we fake them...
++ */
++#define __io(a)		__typesafe_io(a)
++#define __mem_pci(a)	(a)
+ 
+ #endif
+-- 
+1.6.0.6
 
-> +static void w90p910_spi_chipsel(struct spi_device *spi, int value)
-> +{
-> +	switch (value) {
-> +	case BITBANG_CS_INACTIVE:
-> +		w90p910_slave_seclect(spi, 0);
-> +		break;
-> +
-> +	case BITBANG_CS_ACTIVE:
-> +		w90p910_slave_seclect(spi, 1);
-> +		break;
-> +	}
-> +}
-> +
-> +static void w90p910_spi_setup_txnum(struct w90p910_spi *hw,
-> +							unsigned int txnum)
-> +{
-> +	unsigned int val;
-> +
-> +	val = __raw_readl(hw->regs + USI_CNT);
-> +
-> +	if (!txnum)
-> +		val &= ~TXNUM;
-> +	else
-> +		val |= txnum << 0x08;
-> +
-> +	__raw_writel(val, hw->regs + USI_CNT);
-> +
-> +}
-> +
-> +static void w90p910_spi_setup_txbitlen(struct w90p910_spi *hw,
-> +							unsigned int txbitlen)
-> +{
-> +	unsigned int val;
-> +
-> +	val = __raw_readl(hw->regs + USI_CNT);
-> +
-> +	val |= (txbitlen << 0x03);
-> +
-> +	__raw_writel(val, hw->regs + USI_CNT);
-> +}
-> +
-> +static void w90p910_spi_gobusy(struct w90p910_spi *hw)
-> +{
-> +	unsigned int val;
-> +
-> +	val = __raw_readl(hw->regs + USI_CNT);
-> +
-> +	val |= GOBUSY;
-> +
-> +	__raw_writel(val, hw->regs + USI_CNT);
-> +}
+-- 
 
-ditto, ditto, ditto.
+Leo Hao Chen
 
-> +static int w90p910_spi_setupxfer(struct spi_device *spi,
-> +				 struct spi_transfer *t)
-> +{
-> +	return 0;
-> +}
-> +
-> +static int w90p910_spi_setup(struct spi_device *spi)
-> +{
-> +	return 0;
-> +}
-> +
-> +static inline unsigned int hw_txbyte(struct w90p910_spi *hw, int count)
-> +{
-> +	return hw->tx ? hw->tx[count] : 0;
-> +}
-> +
-> +static int w90p910_spi_txrx(struct spi_device *spi, struct spi_transfer *t)
-> +{
-> +	struct w90p910_spi *hw = to_hw(spi);
-> +
-> +	hw->tx = t->tx_buf;
-> +	hw->rx = t->rx_buf;
-> +	hw->len = t->len;
-> +	hw->count = 0;
-> +
-> +	init_completion(&hw->done);
-> +
-> +	__raw_writel(hw_txbyte(hw, 0x0), hw->regs + USI_TX0);
-> +
-> +	w90p910_spi_gobusy(hw);
-> +
-> +	wait_for_completion(&hw->done);
-> +
-> +	return hw->count;
-> +}
-
-The init_completion() should be unneeded?  The structure was
-initialised at setup time and will be left in a reusable state after a
-complete()/wait_for_completion().  Reinitialising the structure all the
-time like this adds risk that it will be scribbled on while in use.
-
->
-> ...
->
-> +static int __devexit w90p910_spi_remove(struct platform_device *dev)
-> +{
-> +	struct w90p910_spi *hw = platform_get_drvdata(dev);
-> +
-> +	platform_set_drvdata(dev, NULL);
-> +
-> +	spi_unregister_master(hw->master);
-> +
-> +	clk_disable(hw->clk);
-> +	clk_put(hw->clk);
-
-As far as I can tell, a hardware interrupt could still be pending, or
-be under service while the above code is executing?
-
-If so, I expect bad things will happen?
-
-> +	free_irq(hw->irq, hw);
-> +	iounmap(hw->regs);
-> +
-> +	release_resource(hw->ioarea);
-> +	kfree(hw->ioarea);
-> +
-> +	spi_master_put(hw->master);
-> +	return 0;
-> +}
-> +
->
-> ...
->
+------------------------
+Life is short, run long.
