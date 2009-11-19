@@ -1,52 +1,46 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Thu, 19 Nov 2009 21:19:08 +0900
-Subject: [PATCH 09/19] drivers: serial: add support for Samsung S5PC110
-	SoC uart
-In-Reply-To: <000e01ca6911$24ea5d20$6ebf1760$%szyprowski@samsung.com>
-References: <1258551194-16018-1-git-send-email-m.szyprowski@samsung.com>
-	<1b68c6790911180614y355f656fs828177ecc845ec8e@mail.gmail.com>
-	<20091118221345.GB4808@trinity.fluff.org>
-	<1b68c6790911181844p3fb32525h11f79f942afb2d64@mail.gmail.com>
-	<20091119103336.GB15460@sirena.org.uk>
-	<1b68c6790911190305w33e777e3n1ed6b172d67f1639@mail.gmail.com>
-	<20091119110827.GE9763@rakim.wolfsonmicro.main>
-	<20091119113841.GJ13376@n2100.arm.linux.org.uk>
-	<20091119114833.GH9763@rakim.wolfsonmicro.main>
-	<000e01ca6911$24ea5d20$6ebf1760$%szyprowski@samsung.com>
-Message-ID: <1b68c6790911190419s290d41abn72cb221d267e0c00@mail.gmail.com>
+From: dsilvers@simtec.co.uk (Daniel Silverstone)
+Date: Thu, 19 Nov 2009 13:52:36 +0000
+Subject: [patch 1/1] TOUCHSCREEN: S3C24XX touchscreen driver from
+	Arnaud  Patard.
+In-Reply-To: <4B052D50.2070002@simtec.co.uk>
+References: <20091118232939.201290297@fluff.org.uk>
+	<20091118232948.063635416@fluff.org.uk>
+	<20091119025930.GA20172@core.coreip.homeip.net>
+	<4B052D50.2070002@simtec.co.uk>
+Message-ID: <20091119135236.GB5535@digital-scurf.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19, 2009 at 9:09 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Hello,
->
-> On Thursday, November 19, 2009 12:49 PM Mark Brown wrote:
->
->> On Thu, Nov 19, 2009 at 11:38:41AM +0000, Russell King - ARM Linux wrote:
->>
->> > I'm not sure what you're commenting on precisely, but the Samsung code as
->> > a whole doesn't use the clk API very well, and I suspect that is starting
->> > to cause people to have to pass clock names around.
->>
->> That's what I'd thought originally but it's not quite the problem here.
->> The issue is that Samsung serial port clock is chosen from a mux and the
->> logic to select which of the inputs to that mux should be used is in the
->> serial driver. ?This means that if the set of parent clocks changes then
->> the serial driver needs to be told what they are.
->>
->> My suggestion was to push this logic down into the clock API so the
->> serial driver just requests a rate and then clock API picks the best
->> option from the mux. ?As well as being nicer from the clock API point of
->> view this would also allow other drivers to use the same logic since
->> these muxes are a standard idiom for Samsung SoCs.
->
-> What if a device does not operate properly when clocked from one of the
-> available clock sources (lets say machine specific problem)? There must
-> be a way of setting which clock(s) should not be considered when calculating
-> best choice for particular device.
-That shudn't be a concern. for example, if some machine doesn't provide clock
-at some PAD, which could be used as a source, then the clock API wud read the
-clock as 0 and the calculations wudn't pick that source up. Likewise, any such
-'unusable' clock in the machine wud be marked by having invalid(0) rates.
-The problem is moving this uart-mux into the the Clock API.
+On Thu, Nov 19, 2009 at 11:34:40AM +0000, Ben Dooks wrote:
+>>> +		input_report_key(ts.input, BTN_TOUCH, 1);
+>>> +		input_report_abs(ts.input, ABS_PRESSURE, 1);
+>> No fake pressure events please, BTN_TOUCH should be enough.
+> I'd have to check, IIRC tslib needs these to function properly.
+
+Indeed it does -- otherwise it won't work.  Yes you could try going around and
+patching TSLIB but so many people use it that it is principle-of-least-surprise
+to produce pressure events.
+
+>>> +	ts.input->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
+>>> +	input_set_abs_params(ts.input, ABS_X, 0, 0x3FF, 0, 0);
+>>> +	input_set_abs_params(ts.input, ABS_Y, 0, 0x3FF, 0, 0);
+>>> +	input_set_abs_params(ts.input, ABS_PRESSURE, 0, 1, 0, 0);
+>> Drop ABS_PRESSURE.
+> ok, see above.
+
+The same applies here -- claim ABS_PRESSURE or tslib won't operate with the
+touchscreen.
+
+While it is tempting to be 100% exactly correct to what the hardware reports
+(which is only TOUCH not PRESSURE) it is preferable to work with the software
+which the majority of people use -- namely tslib.
+
+I would strongly argue against removing the ABS_PRESSURE stuff personally,
+despite it being essentially a lie.
+
+Regards,
+
+Daniel.
+
+-- 
+Daniel Silverstone                              http://www.simtec.co.uk/
