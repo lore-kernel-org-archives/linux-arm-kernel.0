@@ -1,163 +1,47 @@
-From: ramaxlo@gmail.com (Ramax Lo)
-Date: Thu, 19 Nov 2009 09:45:01 +0800
-Subject: [patch 1/1] TOUCHSCREEN: S3C24XX touchscreen driver from Arnaud
-	Patard.
-In-Reply-To: <20091118232948.063635416@fluff.org.uk>
-References: <20091118232939.201290297@fluff.org.uk>
-	<20091118232948.063635416@fluff.org.uk>
-Message-ID: <901c91090911181745n43e2ede4g559b06a993cc322f@mail.gmail.com>
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Thu, 19 Nov 2009 11:44:14 +0900
+Subject: [PATCH 09/19] drivers: serial: add support for Samsung S5PC110
+	SoC uart
+In-Reply-To: <20091118221345.GB4808@trinity.fluff.org>
+References: <1258551194-16018-1-git-send-email-m.szyprowski@samsung.com>
+	<1258551194-16018-10-git-send-email-m.szyprowski@samsung.com>
+	<1b68c6790911180614y355f656fs828177ecc845ec8e@mail.gmail.com>
+	<20091118221345.GB4808@trinity.fluff.org>
+Message-ID: <1b68c6790911181844p3fb32525h11f79f942afb2d64@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/11/19 Ben Dooks <ben@simtec.co.uk>:
-<snip>
-> +static int __init s3c2410ts_probe(struct platform_device *pdev)
-> +{
-> +	struct s3c2410_ts_mach_info *info;
-> +	struct device *dev = &pdev->dev;
-> +	struct input_dev *input_dev;
-> +	struct resource *res;
-> +	int ret = -EINVAL;
-> +
-> +	/* Initialise input stuff */
-> +	memset(&ts, 0, sizeof(struct s3c2410ts));
-> +
-> +	ts.dev = dev;
-> +
-> +	info = pdev->dev.platform_data;
-> +	if (!info) {
-> +		dev_err(dev, "no platform data, cannot attach\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	dev_dbg(dev, "initialising touchscreen\n");
-> +
-> +	ts.clock = clk_get(dev, "adc");
-> +	if (IS_ERR(ts.clock)) {
-> +		dev_err(dev, "cannot get adc clock source\n");
-> +		return -ENOENT;
-> +	}
-> +
-> +	clk_enable(ts.clock);
-> +	dev_dbg(dev, "got and enabled clocks\n");
-> +
-> +	ts.irq_tc = ret = platform_get_irq(pdev, 0);
-> +	if (ret < 0) {
-> +		dev_err(dev, "no resource for interrupt\n");
-> +		goto err_clk;
-> +	}
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_err(dev, "no resource for registers\n");
-> +		ret = -ENOENT;
-> +		goto err_clk;
-> +	}
-> +
-> +	ts.io = ioremap(res->start, resource_size(res));
-> +	if (ts.io == NULL) {
-> +		dev_err(dev, "cannot map registers\n");
-> +		ret = -ENOMEM;
-> +		goto err_clk;
-> +	}
-> +
-> +	/* Configure the touchscreen external FETs on the S3C2410 */
-> +	if (!platform_get_device_id(pdev)->driver_data)
-> +		s3c2410_ts_connect();
-> +
-> +	ts.client = s3c_adc_register(pdev, s3c24xx_ts_select,
-> +				     s3c24xx_ts_conversion, 1);
-> +	if (IS_ERR(ts.client)) {
-> +		dev_err(dev, "failed to register adc client\n");
-> +		ret = PTR_ERR(ts.client);
-> +		goto err_iomap;
-> +	}
-> +
-> +	/* Initialise registers */
-> +	if ((info->delay & 0xffff) > 0)
-> +		writel(info->delay & 0xffff, ts.io + S3C2410_ADCDLY);
-> +
-> +	writel(WAIT4INT | INT_DOWN, ts.io + S3C2410_ADCTSC);
-> +
-> +	input_dev = input_allocate_device();
-> +	if (!input_dev) {
-> +		dev_err(dev, "Unable to allocate the input device !!\n");
-> +		ret = -ENOMEM;
-> +		goto err_iomap;
-> +	}
-> +
-> +	ts.input = input_dev;
-> +	ts.input->evbit[0] = BIT_MASK(EV_SYN) | BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
-> +	ts.input->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
-> +	input_set_abs_params(ts.input, ABS_X, 0, 0x3FF, 0, 0);
-> +	input_set_abs_params(ts.input, ABS_Y, 0, 0x3FF, 0, 0);
-> +	input_set_abs_params(ts.input, ABS_PRESSURE, 0, 1, 0, 0);
-> +
-> +	ts.input->name = s3c2410ts_name;
-> +	ts.input->id.bustype = BUS_HOST;
-> +	ts.input->id.vendor = 0xDEAD;
-> +	ts.input->id.product = 0xBEEF;
-> +	ts.input->id.version = S3C2410TSVERSION;
-> +
-> +	ts.shift = info->oversampling_shift;
-> +
-> +	if (request_irq(ts.irq_tc, stylus_irq, IRQF_DISABLED,
-> +			"s3c2410_ts_pen", ts.input)) {
-> +		dev_err(dev, "cannot get TC interrupt\n");
-> +		ret = -EIO;
-> +		goto err_inputdev;
-> +	}
-> +
-> +	dev_info(dev, "driver attached, registering input device\n");
-> +
-> +	/* All went ok, so register to the input system */
-> +	ret = input_register_device(ts.input);
-> +	if (ret < 0) {
-> +		dev_err(dev, "failed to register input device\n");
-> +		ret = -EIO;
-> +		goto err_tcirq;
-> +	}
-> +
-> +	return 0;
-> +
-> + err_tcirq:
-> +	free_irq(ts.irq_tc, ts.input);
-> + err_inputdev:
-> +	input_unregister_device(ts.input);
-> + err_iomap:
-> +	iounmap(ts.io);
-
-Isn't s3c_adc_release() needed for freeing unused adc client?
-
-> + err_clk:
-> +	clk_put(ts.clock);
-> +	return ret;
-> +}
-> +
-> +/**
-> + * s3c2410ts_remove - device core removal entry point
-> + * @pdev: The device we are being removed from.
-> + *
-> + * Free up our state ready to be removed.
-> + */
-> +static int s3c2410ts_remove(struct platform_device *pdev)
-> +{
-> +	free_irq(ts.irq_tc, ts.input);
-> +
-> +	clk_disable(ts.clock);
-> +	clk_put(ts.clock);
-> +
-> +	input_unregister_device(ts.input);
-> +	iounmap(ts.io);
-
-The same reason.
-
-> +
-> +	return 0;
-> +}
-
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On Thu, Nov 19, 2009 at 7:13 AM, Ben Dooks <ben-linux@fluff.org> wrote:
+> On Wed, Nov 18, 2009 at 11:14:52PM +0900, jassi brar wrote:
+>> On Wed, Nov 18, 2009 at 10:33 PM, Marek Szyprowski
+>> <m.szyprowski@samsung.com> wrote:
+>> > From: Kyungmin Park <kyungmin.park@samsung.com>
+>> >
+>> > Samsung S5PC110 SoCs have UART that differs a bit from the one known
+>> > from the previous Samsung SoCs. This patch adds support for this new
+>> > driver.
+>> >
+>> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 >
+>> Not just about this c110 patch: I think this string comparison thing
+>> isn't very neat.
+>> I think we'd better be doing it by indexing into an array of clock
+>> names(which can be
+>> defined in some platform specific code).
+>
+> I don't mind changing to using a table, but the table is probably best
+> off here, closest to the UART drivers in question.
+well as per current implementation of drivers/serial/samsung.c we can't
+do much about it.
+
+Ideally, each SoC(if not yet, maybe in future) can have different
+number/names of possible source clocks for signal generation. Let us
+not depend upon even defaults(fclk, pclk etc)
+Let each platform code(SoC specific) define names of all possible
+source clocks and let the board init code pass on the potential source
+clocks by some bit-mask(or some other mechanism) while setting the
+platform data.
+The samsung.c could then simply go thru the array of source clock
+names and the bit-mask, in platform_data, while selecting the best possible
+ source for the baud rate under consideration.
