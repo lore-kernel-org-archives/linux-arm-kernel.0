@@ -1,34 +1,91 @@
-From: laforge@gnumonks.org (Harald Welte)
-Date: Thu, 19 Nov 2009 06:47:57 +0100
+From: shinel@foxmail.com (Shine Liu)
+Date: Thu, 19 Nov 2009 13:46:55 +0800
 Subject: [patch 1/1] TOUCHSCREEN: S3C24XX touchscreen driver from
 	Arnaud Patard.
-In-Reply-To: <20091119025930.GA20172@core.coreip.homeip.net>
+In-Reply-To: <20091118232948.063635416@fluff.org.uk>
 References: <20091118232939.201290297@fluff.org.uk>
 	<20091118232948.063635416@fluff.org.uk>
-	<20091119025930.GA20172@core.coreip.homeip.net>
-Message-ID: <20091119054757.GE13105@prithivi.gnumonks.org>
+Message-ID: <1258609615.2676.31.camel@shinel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Dmitry,
+Hi,Ben
 
-On Wed, Nov 18, 2009 at 06:59:30PM -0800, Dmitry Torokhov wrote:
+Besides Dmitry's comments,
 
-> Thank you for the patch. First thing first - do we have an agreement
-> from all Samsung folks and other interested parties that _this_ is the
-> driver? Because it's like 3rd implementation that came across...
+On Wed, 2009-11-18 at 23:29 +0000, Ben Dooks wrote:
 
-I think it is important we finally merge _a_ driver, giving users a useful
-touchscreen after many, many years of delay.  Whoever has issues with that
-driver should simply address those issues and propose incremental patches to
-it.
+> +config TOUCHSCREEN_S3C2410
+> +       tristate "Samsung S3C2410 touchscreen input driver"
+> +       depends on ARCH_S3C2410 && INPUT && INPUT_TOUCHSCREEN
+> +       select SERIO
+> +       help
+> +         Say Y here if you have the s3c2410 touchscreen.
+> +
+> +         If unsure, say N.
+> +
+> +         To compile this driver as a module, choose M here: the
+> +         module will be called s3c2410_ts.
 
-This is speaking with both my former Openmoko "hat" as well as considering
-what is most important for Samsung System LSI.
+S3C24XX_ADC should be added to the depends.
 
-Regards,
--- 
-- Harald Welte <laforge@gnumonks.org>           http://laforge.gnumonks.org/
-============================================================================
-"Privacy in residential applications is a desirable marketing option."
-                                                  (ETSI EN 300 175-7 Ch. A6)
+> +#include <linux/slab.h>
+
+I think this is not really needed because kernel.h is included already.
+
+
+> +
+> +	ts.clock = clk_get(dev, "adc");
+> +	if (IS_ERR(ts.clock)) {
+> +		dev_err(dev, "cannot get adc clock source\n");
+> +		return -ENOENT;
+> +	}
+> +
+> +	clk_enable(ts.clock);
+> +	dev_dbg(dev, "got and enabled clocks\n");
+
+Well, we take 2410_ts as s3c adc client, so these work has been done in
+s3c_adc_probe function of arch/arm/plat-s3c24xx.c
+
+This should be duplicated.
+
+And "#include <linux/clk.h>" is not needed because we don't use these
+APIs
+
+
+> + err_clk:
+> +       clk_put(ts.clock);
+> +       return ret;
+> +}
+
+Above reason and also for those "goto err_clk;"
+
+> );
+> +
+> +	clk_disable(ts.clock);
+> +	clk_put(ts.clock);
+
+Same as above
+
+> +
+> +#ifdef CONFIG_PM
+> +static int s3c2410ts_suspend(struct platform_device *pdev, pm_message_t state)
+> +{
+> +	writel(TSC_SLEEP, ts.io + S3C2410_ADCTSC);
+> +	disable_irq(ts.irq_tc);
+
+Same as above
+
+> +
+> +static int s3c2410ts_resume(struct platform_device *pdev)
+> +{
+> +	struct s3c2410_ts_mach_info *info = pdev->dev.platform_data;
+> +
+> +	clk_enable(ts.clock);
+
+Same as above
+
+
+Cheers,
+
+Shine
