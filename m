@@ -1,7 +1,7 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 19 Nov 2009 16:48:26 +0100
-Subject: [PATCH 12/12] pcm037: Add sound support
-In-Reply-To: <1258645706-9071-12-git-send-email-s.hauer@pengutronix.de>
+Date: Thu, 19 Nov 2009 16:48:21 +0100
+Subject: [PATCH 07/12] add phycore sound support
+In-Reply-To: <1258645706-9071-7-git-send-email-s.hauer@pengutronix.de>
 References: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
 	<1258645706-9071-2-git-send-email-s.hauer@pengutronix.de>
 	<1258645706-9071-3-git-send-email-s.hauer@pengutronix.de>
@@ -9,151 +9,202 @@ References: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
 	<1258645706-9071-5-git-send-email-s.hauer@pengutronix.de>
 	<1258645706-9071-6-git-send-email-s.hauer@pengutronix.de>
 	<1258645706-9071-7-git-send-email-s.hauer@pengutronix.de>
-	<1258645706-9071-8-git-send-email-s.hauer@pengutronix.de>
-	<1258645706-9071-9-git-send-email-s.hauer@pengutronix.de>
-	<1258645706-9071-10-git-send-email-s.hauer@pengutronix.de>
-	<1258645706-9071-11-git-send-email-s.hauer@pengutronix.de>
-	<1258645706-9071-12-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1258645706-9071-13-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1258645706-9071-8-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-mx3/pcm037.c |   72 ++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 72 insertions(+), 0 deletions(-)
+ sound/soc/imx/phycore.c |  181 +++++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 181 insertions(+), 0 deletions(-)
+ create mode 100644 sound/soc/imx/phycore.c
 
-diff --git a/arch/arm/mach-mx3/pcm037.c b/arch/arm/mach-mx3/pcm037.c
-index 6cbaabe..15584b5 100644
---- a/arch/arm/mach-mx3/pcm037.c
-+++ b/arch/arm/mach-mx3/pcm037.c
-@@ -33,6 +33,7 @@
- #include <linux/irq.h>
- #include <linux/fsl_devices.h>
- #include <linux/can/platform/sja1000.h>
-+#include <linux/mfd/mc13783.h>
- 
- #include <media/soc_camera.h>
- 
-@@ -51,6 +52,9 @@
- #include <mach/mx3_camera.h>
- #include <mach/mx3fb.h>
- #include <mach/mxc_nand.h>
-+#include <mach/spi.h>
-+#include <mach/audmux.h>
-+#include <mach/ssi.h>
- 
- #include "devices.h"
- #include "pcm037.h"
-@@ -124,6 +128,8 @@ static unsigned int pcm037_pins[] = {
- 	MX31_PIN_CSPI3_SPI_RDY__CTS3,
- 	/* LAN9217 irq pin */
- 	IOMUX_MODE(MX31_PIN_GPIO3_1, IOMUX_CONFIG_GPIO),
-+	/* MC13783 IRQ pim */
-+	IOMUX_MODE(MX31_PIN_GPIO3_0, IOMUX_CONFIG_GPIO),
- 	/* Onewire */
- 	MX31_PIN_BATT_LINE__OWIRE,
- 	/* Framebuffer */
-@@ -172,6 +178,15 @@ static unsigned int pcm037_pins[] = {
- 	MX31_PIN_CSI_VSYNC__CSI_VSYNC,
- 	/* GPIO */
- 	IOMUX_MODE(MX31_PIN_ATA_DMACK, IOMUX_CONFIG_GPIO),
-+	/* SSI */
-+	MX31_PIN_STXD4__STXD4,
-+	MX31_PIN_SRXD4__SRXD4,
-+	MX31_PIN_SCK4__SCK4,
-+	MX31_PIN_SFS4__SFS4,
-+	MX31_PIN_STXD5__STXD5,
-+	MX31_PIN_SRXD5__SRXD5,
-+	MX31_PIN_SCK5__SCK5,
-+	MX31_PIN_SFS5__SFS5,
- };
- 
- static struct physmap_flash_data pcm037_flash_data = {
-@@ -407,6 +422,31 @@ static void pcm970_sdhc1_exit(struct device *dev, void *data)
- 	gpio_free(SDHC1_GPIO_WP);
- }
- 
-+#ifdef CONFIG_SPI
-+static struct mc13783_platform_data pcm037_pmic = {
-+	.flags = MC13783_USE_ADC | MC13783_USE_TOUCHSCREEN |
-+		 MC13783_USE_CODEC,
-+};
+diff --git a/sound/soc/imx/phycore.c b/sound/soc/imx/phycore.c
+new file mode 100644
+index 0000000..35e5875
+--- /dev/null
++++ b/sound/soc/imx/phycore.c
+@@ -0,0 +1,181 @@
++/*
++ * phycore.c  --  SoC audio for imx_phycore
++ *
++ * Copyright 2009 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
++ *
++ *  This program is free software; you can redistribute  it and/or modify it
++ *  under  the terms of  the GNU General  Public License as published by the
++ *  Free Software Foundation;  either version 2 of the  License, or (at your
++ *  option) any later version.
++ *
++ */
 +
-+static unsigned int pcm037_spi_cs[] = {MXC_SPI_CS(0), };
++#include <linux/module.h>
++#include <linux/moduleparam.h>
++#include <linux/device.h>
++#include <linux/i2c.h>
++#include <sound/core.h>
++#include <sound/pcm.h>
++#include <sound/soc.h>
++#include <sound/soc-dapm.h>
++#include <asm/mach-types.h>
 +
-+static struct spi_imx_master pcm037_spi_0_data = {
-+	.chipselect = pcm037_spi_cs,
-+	.num_chipselect = ARRAY_SIZE(pcm037_spi_cs),
-+};
++#include "../codecs/mc13783.h"
++#include "../codecs/wm9712.h"
++#include "imx-ssi.h"
 +
-+static struct spi_board_info pcm037_spi_board_info[] __initdata = {
-+	{
-+		.modalias	= "mc13783",
-+		.irq		= IOMUX_TO_IRQ(MX31_PIN_GPIO3_0),
-+		.max_speed_hz	= 3000000,
-+		.bus_num	= 0,
-+		.platform_data	= &pcm037_pmic,
-+		.chip_select	= 0,
++static struct snd_soc_card imx_phycore;
++
++static int imx_phycore_hifi_hw_params(struct snd_pcm_substream *substream,
++	struct snd_pcm_hw_params *params)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct snd_soc_dai *cpu_dai = rtd->dai->cpu_dai;
++	struct snd_soc_dai *codec_dai = rtd->dai->codec_dai;
++	int ret = 0;
++
++	/* set cpu DAI configuration */
++	if (machine_is_pcm038() || machine_is_pcm037()) {
++		snd_soc_dai_set_fmt(cpu_dai,
++				SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
++				SND_SOC_DAIFMT_CBM_CFM);
++		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
++			snd_soc_dai_set_fmt(codec_dai,
++				SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
++				SND_SOC_DAIFMT_CBM_CFM);
++		} else {
++			snd_soc_dai_set_fmt(codec_dai,
++				SND_SOC_DAIFMT_DSP_A | SND_SOC_DAIFMT_NB_NF |
++				SND_SOC_DAIFMT_CBM_CFM);
++			snd_soc_dai_set_tdm_slot(codec_dai, 0, 0, 4, 0);
++		}
++		snd_soc_dai_set_sysclk(codec_dai, MC13783_CLK_CLIA, 26000000, 0);
++
++		/* Put DC field of STCCR to 1 (not zero) */
++		ret = cpu_dai->ops->set_tdm_slot(cpu_dai, 0x0, 0xfffffffc, 4, 0);
 +	}
++	if (ret < 0) {
++		printk(KERN_ERR "Error from cpu DAI configuration\n");
++		return ret;
++	}
++
++	return ret;
++}
++
++static int imx_phycore_hifi_hw_free(struct snd_pcm_substream *substream)
++{
++	return 0;
++}
++
++static struct snd_soc_ops imx_phycore_hifi_ops = {
++	.hw_params = imx_phycore_hifi_hw_params,
++	.hw_free = imx_phycore_hifi_hw_free,
 +};
-+#endif /* CONFIG_SPI */
 +
- static struct imxmmc_platform_data sdhc_pdata = {
- #ifdef PCM970_SDHC_RW_SWITCH
- 	.get_ro = pcm970_sdhc1_get_ro,
-@@ -543,6 +583,10 @@ static struct platform_device pcm970_sja1000 = {
- 	.num_resources = ARRAY_SIZE(pcm970_sja1000_resources),
- };
- 
-+struct imx_ssi_platform_data pcm037_ssi_pdata = {
-+//	.flags = IMX_SSI_DMA,
++static int imx_phycore_probe(struct platform_device *pdev)
++{
++	return 0;
++}
++
++static int imx_phycore_remove(struct platform_device *pdev)
++{
++	return 0;
++}
++
++#ifdef CONFIG_SND_SOC_MC13783
++static struct snd_soc_dai_link imx_phycore_dai_mc13783[] = {
++	{
++		.name = "MC13783 Playback",
++		.stream_name	= "Playback",
++		.codec_dai	= &mc13783_dai[0],
++		.ops		= &imx_phycore_hifi_ops,
++	}, {
++		.name = "MC13783 Capture",
++		.stream_name	= "Capture",
++		.codec_dai	= &mc13783_dai[1],
++		.ops		= &imx_phycore_hifi_ops,
++	},
 +};
-+
- /*
-  * Board specific initialization.
-  */
-@@ -550,6 +594,26 @@ static void __init mxc_board_init(void)
- {
- 	int ret;
- 
-+	mxc_audmux_v2_configure_port(MX31_AUDMUX_PORT1_SSI0,
-+			MXC_AUDMUX_V2_PTCR_TFSDIR |
-+			MXC_AUDMUX_V2_PTCR_TCLKDIR |
-+			MXC_AUDMUX_V2_PTCR_TFSEL(MX31_AUDMUX_PORT4_SSI_PINS_4) |
-+			MXC_AUDMUX_V2_PTCR_TCSEL(MX31_AUDMUX_PORT4_SSI_PINS_4) |
-+			MXC_AUDMUX_V2_PTCR_RFSDIR |
-+			MXC_AUDMUX_V2_PTCR_RCLKDIR |
-+			MXC_AUDMUX_V2_PTCR_RFSEL(MX31_AUDMUX_PORT5_SSI_PINS_5) |
-+			MXC_AUDMUX_V2_PTCR_RCSEL(MX31_AUDMUX_PORT5_SSI_PINS_5),
-+			MXC_AUDMUX_V2_PDCR_RXDSEL(MX31_AUDMUX_PORT5_SSI_PINS_5));
-+	mxc_audmux_v2_configure_port(MX31_AUDMUX_PORT5_SSI_PINS_5,
-+			0,
-+			MXC_AUDMUX_V2_PDCR_RXDSEL(MX31_AUDMUX_PORT1_SSI0));
-+	mxc_audmux_v2_configure_port(MX31_AUDMUX_PORT4_SSI_PINS_4,
-+			MXC_AUDMUX_V2_PTCR_TFSEL(MX31_AUDMUX_PORT1_SSI0) |
-+			MXC_AUDMUX_V2_PTCR_TCSEL(MX31_AUDMUX_PORT1_SSI0) |
-+			MXC_AUDMUX_V2_PTCR_RFSEL(MX31_AUDMUX_PORT1_SSI0) |
-+			MXC_AUDMUX_V2_PTCR_RCSEL(MX31_AUDMUX_PORT1_SSI0),
-+			0);
-+
- 	mxc_iomux_setup_multiple_pins(pcm037_pins, ARRAY_SIZE(pcm037_pins),
- 			"pcm037");
- 
-@@ -605,6 +669,14 @@ static void __init mxc_board_init(void)
- 		mxc_register_device(&mx3_camera, &camera_pdata);
- 
- 	platform_device_register(&pcm970_sja1000);
-+
-+#ifdef CONFIG_SPI
-+	mxc_register_device(&mxc_spi_device0, &pcm037_spi_0_data);
-+
-+	spi_register_board_info(pcm037_spi_board_info,
-+			ARRAY_SIZE(pcm037_spi_board_info));
 +#endif
-+	mxc_register_device(&imx_ssi_device0, &pcm037_ssi_pdata);
- }
- 
- static void __init pcm037_timer_init(void)
++
++#ifdef CONFIG_SND_SOC_WM9712
++static struct snd_soc_dai_link imx_phycore_dai_ac97[] = {
++	{
++		.name		= "HiFi",
++		.stream_name	= "HiFi",
++		.codec_dai	= &wm9712_dai[WM9712_DAI_AC97_HIFI],
++		.ops		= &imx_phycore_hifi_ops,
++	},
++};
++#endif
++
++static struct snd_soc_card imx_phycore = {
++	.name		= "PhyCORE-audio",
++	.platform	= &imx_soc_platform,
++	.probe		= imx_phycore_probe,
++	.remove		= imx_phycore_remove,
++	.dai_link	= NULL, /* runtime */
++	.num_links	= 0, /* runtime */
++};
++
++static struct snd_soc_device imx_phycore_snd_devdata = {
++	.card		= &imx_phycore,
++	.codec_dev	= NULL, /* runtime */
++};
++
++static struct platform_device *imx_phycore_snd_device;
++
++static int __init imx_phycore_init(void)
++{
++	int ret;
++
++	if (machine_is_pcm038() || machine_is_pcm037()) {
++#ifdef CONFIG_SND_SOC_MC13783
++		imx_phycore_snd_devdata.codec_dev = &soc_codec_dev_mc13783;
++		imx_phycore.dai_link = imx_phycore_dai_mc13783;
++		imx_phycore.num_links = ARRAY_SIZE(imx_phycore_dai_mc13783);
++#endif
++	} else if (machine_is_pcm043() || machine_is_pca100()) {
++#ifdef CONFIG_SND_SOC_WM9712
++		imx_phycore_snd_devdata.codec_dev = &soc_codec_dev_wm9712;
++		imx_phycore.dai_link = imx_phycore_dai_ac97;
++		imx_phycore.num_links = ARRAY_SIZE(imx_phycore_dai_ac97);
++#endif
++	} else
++		/* return happy. We might run on a totally different machine */
++		return 0;
++
++	imx_phycore_snd_device = platform_device_alloc("soc-audio", -1);
++	if (!imx_phycore_snd_device)
++		return -ENOMEM;
++
++#ifdef CONFIG_SND_SOC_MC13783
++	imx_phycore_dai_mc13783[0].cpu_dai = imx_ssi_pcm_dai[0];
++	imx_phycore_dai_mc13783[1].cpu_dai = imx_ssi_pcm_dai[0];
++#endif
++#ifdef CONFIG_SND_SOC_WM9712
++	imx_phycore_dai_ac97[0].cpu_dai = imx_ssi_pcm_dai[0];
++#endif
++	platform_set_drvdata(imx_phycore_snd_device, &imx_phycore_snd_devdata);
++	imx_phycore_snd_devdata.dev = &imx_phycore_snd_device->dev;
++	ret = platform_device_add(imx_phycore_snd_device);
++
++	if (ret) {
++		printk(KERN_ERR "ASoC: Platform device allocation failed\n");
++		platform_device_put(imx_phycore_snd_device);
++	}
++
++	return ret;
++}
++
++static void __exit imx_phycore_exit(void)
++{
++	platform_device_unregister(imx_phycore_snd_device);
++}
++
++late_initcall(imx_phycore_init);
++module_exit(imx_phycore_exit);
++
++MODULE_AUTHOR("Sascha Hauer <s.hauer@pengutronix.de>");
++MODULE_DESCRIPTION("PhyCORE ALSA SoC driver");
++MODULE_LICENSE("GPL");
 -- 
 1.6.5.2
