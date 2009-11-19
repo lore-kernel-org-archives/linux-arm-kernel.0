@@ -1,71 +1,48 @@
 From: valentin.longchamp@epfl.ch (Valentin Longchamp)
-Date: Thu, 19 Nov 2009 15:23:03 +0100
-Subject: [PATCH 2/7] mx31moboard: serial port fix
+Date: Thu, 19 Nov 2009 15:23:06 +0100
+Subject: [PATCH 5/7] mx31moboard: initialize ipu device for all the boards
 In-Reply-To: <1258640588-12705-1-git-send-email-valentin.longchamp@epfl.ch>
 References: <1258640588-12705-1-git-send-email-valentin.longchamp@epfl.ch>
-Message-ID: <1258640588-12705-3-git-send-email-valentin.longchamp@epfl.ch>
+Message-ID: <1258640588-12705-6-git-send-email-valentin.longchamp@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We get rid of CTS/RTS lines on uart0 on our platform.
-This is the port we use as main kernel console. We do not
-want it to be blocking because of CTS/RTS signals, not allowing
-the system to boot or print messages.
-
-However we often use it with a bluetooth module needing CTS/RTS
-lines as backup login in case of trouble. To be able to use it,
-we assert CTS low so that the module can always send chars.
-
 Signed-off-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
 ---
- arch/arm/mach-mx3/mx31moboard.c |   20 ++++++++++++++++----
- 1 files changed, 16 insertions(+), 4 deletions(-)
+ arch/arm/mach-mx3/mx31moboard.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-mx3/mx31moboard.c b/arch/arm/mach-mx3/mx31moboard.c
-index 9243de5..ff74fab 100644
+index 20ce5a0..fa306dc 100644
 --- a/arch/arm/mach-mx3/mx31moboard.c
 +++ b/arch/arm/mach-mx3/mx31moboard.c
-@@ -45,8 +45,8 @@
+@@ -40,6 +40,7 @@
+ #include <mach/hardware.h>
+ #include <mach/imx-uart.h>
+ #include <mach/iomux-mx3.h>
++#include <mach/ipu.h>
+ #include <mach/i2c.h>
+ #include <mach/mmc.h>
+ #include <mach/spi.h>
+@@ -387,6 +388,10 @@ static void mx31moboard_init_sel_gpios(void)
+ 	}
+ }
  
- static unsigned int moboard_pins[] = {
- 	/* UART0 */
--	MX31_PIN_CTS1__CTS1, MX31_PIN_RTS1__RTS1,
- 	MX31_PIN_TXD1__TXD1, MX31_PIN_RXD1__RXD1,
-+	MX31_PIN_CTS1__GPIO2_7,
- 	/* UART4 */
- 	MX31_PIN_PC_RST__CTS5, MX31_PIN_PC_VS2__RTS5,
- 	MX31_PIN_PC_BVD2__TXD5, MX31_PIN_PC_BVD1__RXD5,
-@@ -101,7 +101,18 @@ static struct platform_device mx31moboard_flash = {
- 	.num_resources = 1,
- };
- 
--static struct imxuart_platform_data uart_pdata = {
-+static int moboard_uart0_init(struct platform_device *pdev)
-+{
-+	gpio_request(IOMUX_TO_GPIO(MX31_PIN_CTS1), "uart0-cts-hack");
-+	gpio_direction_output(IOMUX_TO_GPIO(MX31_PIN_CTS1), 0);
-+	return 0;
-+}
-+
-+static struct imxuart_platform_data uart0_pdata = {
-+	.init = moboard_uart0_init,
++static struct ipu_platform_data mx3_ipu_data = {
++	.irq_base = MXC_IPU_IRQ_START,
 +};
 +
-+static struct imxuart_platform_data uart4_pdata = {
- 	.flags = IMXUART_HAVE_RTSCTS,
- };
+ static struct platform_device *devices[] __initdata = {
+ 	&mx31moboard_flash,
+ 	&mx31moboard_leds_device,
+@@ -424,6 +429,8 @@ static void __init mxc_board_init(void)
  
-@@ -284,8 +295,9 @@ static void __init mxc_board_init(void)
+ 	mxc_register_device(&mxcsdhc_device0, &sdhc1_pdata);
  
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
- 
--	mxc_register_device(&mxc_uart_device0, &uart_pdata);
--	mxc_register_device(&mxc_uart_device4, &uart_pdata);
-+	mxc_register_device(&mxc_uart_device0, &uart0_pdata);
++	mxc_register_device(&mx3_ipu, &mx3_ipu_data);
 +
-+	mxc_register_device(&mxc_uart_device4, &uart4_pdata);
+ 	usb_xcvr_reset();
  
- 	mx31moboard_init_sel_gpios();
- 
+ 	moboard_usbotg_init();
 -- 
 1.6.3.3
