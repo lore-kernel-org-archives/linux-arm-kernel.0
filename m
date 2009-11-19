@@ -1,183 +1,247 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Thu, 19 Nov 2009 12:02:08 +0100
-Subject: [PATCH 3/6] ARM: MX3: add SPI devices for mx31lite
-In-Reply-To: <1258628531-15783-2-git-send-email-daniel@caiaq.de>
-References: <1258628531-15783-1-git-send-email-daniel@caiaq.de>
-	<1258628531-15783-2-git-send-email-daniel@caiaq.de>
-Message-ID: <1258628531-15783-3-git-send-email-daniel@caiaq.de>
+Date: Thu, 19 Nov 2009 12:02:06 +0100
+Subject: [PATCH 1/6] ARM: MX3: modularize 'mx31lite' code
+Message-ID: <1258628531-15783-1-git-send-email-daniel@caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some header files were reordered while I was at it.
-The only device currently registered is the ATLAS PMIC (MC13783) chip.
+This commit splits the support code for LogicPD's mx31lite hardware
+into module and board specific parts.
+
+This introduces a new mandatory coreparam called 'mx31lite_baseboard'
+which specifies the base board support to use. For now, only the LiteKit
+development board is supported, and developers of own boards are
+encouraged to use that as reference.
+
+The UART support moved to the board code.
+Some comments were amended along the way.
 
 Signed-off-by: Daniel Mack <daniel@caiaq.de>
 ---
- arch/arm/mach-mx3/mx31lite-db.c |   24 +++++++++++++++++++
- arch/arm/mach-mx3/mx31lite.c    |   49 +++++++++++++++++++++++++++++++++++++-
- 2 files changed, 71 insertions(+), 2 deletions(-)
+ arch/arm/mach-mx3/Makefile                      |    2 +-
+ arch/arm/mach-mx3/mx31lite-db.c                 |   71 +++++++++++++++++++++++
+ arch/arm/mach-mx3/mx31lite.c                    |   36 +++++------
+ arch/arm/plat-mxc/include/mach/board-mx31lite.h |   39 +++++++++++--
+ 4 files changed, 121 insertions(+), 27 deletions(-)
+ create mode 100644 arch/arm/mach-mx3/mx31lite-db.c
 
+diff --git a/arch/arm/mach-mx3/Makefile b/arch/arm/mach-mx3/Makefile
+index 6b97754..ed492d3 100644
+--- a/arch/arm/mach-mx3/Makefile
++++ b/arch/arm/mach-mx3/Makefile
+@@ -9,7 +9,7 @@ obj-$(CONFIG_ARCH_MX31)		+= clock.o iomux.o
+ obj-$(CONFIG_ARCH_MX35)		+= clock-imx35.o
+ obj-$(CONFIG_MACH_MX31ADS)	+= mx31ads.o
+ obj-$(CONFIG_MACH_MX31LILLY)	+= mx31lilly.o mx31lilly-db.o
+-obj-$(CONFIG_MACH_MX31LITE)	+= mx31lite.o
++obj-$(CONFIG_MACH_MX31LITE)	+= mx31lite.o mx31lite-db.o
+ obj-$(CONFIG_MACH_PCM037)	+= pcm037.o
+ obj-$(CONFIG_MACH_PCM037_EET)	+= pcm037_eet.o
+ obj-$(CONFIG_MACH_MX31_3DS)	+= mx31pdk.o
 diff --git a/arch/arm/mach-mx3/mx31lite-db.c b/arch/arm/mach-mx3/mx31lite-db.c
-index 45abae1..f60cf08 100644
---- a/arch/arm/mach-mx3/mx31lite-db.c
+new file mode 100644
+index 0000000..751d15e
+--- /dev/null
 +++ b/arch/arm/mach-mx3/mx31lite-db.c
-@@ -28,6 +28,7 @@
- #include <linux/types.h>
- #include <linux/init.h>
- #include <linux/gpio.h>
-+#include <linux/platform_device.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -39,6 +40,7 @@
- #include <mach/iomux-mx3.h>
- #include <mach/board-mx31lite.h>
- #include <mach/mmc.h>
-+#include <mach/spi.h>
- 
- #include "devices.h"
- 
-@@ -55,6 +57,14 @@ static unsigned int litekit_db_board_pins[] __initdata = {
- 	MX31_PIN_RTS1__RTS1,
- 	MX31_PIN_TXD1__TXD1,
- 	MX31_PIN_RXD1__RXD1,
-+	/* SPI 0 */
-+	MX31_PIN_CSPI1_SCLK__SCLK,
-+	MX31_PIN_CSPI1_MOSI__MOSI,
-+	MX31_PIN_CSPI1_MISO__MISO,
-+	MX31_PIN_CSPI1_SPI_RDY__SPI_RDY,
-+	MX31_PIN_CSPI1_SS0__SS0,
-+	MX31_PIN_CSPI1_SS1__SS1,
-+	MX31_PIN_CSPI1_SS2__SS2,
- };
- 
- /* UART */
-@@ -130,6 +140,19 @@ static struct imxmmc_platform_data mmc_pdata = {
- 	.exit	   = mxc_mmc1_exit,
- };
- 
-+/* SPI */
+@@ -0,0 +1,71 @@
++/*
++ *  LogicPD i.MX31 SOM-LV development board support
++ *
++ *    Copyright (c) 2009 Daniel Mack <daniel@caiaq.de>
++ *
++ *  based on code for other MX31 boards,
++ *
++ *    Copyright 2005-2007 Freescale Semiconductor
++ *    Copyright (c) 2009 Alberto Panizzo <maramaopercheseimorto@gmail.com>
++ *    Copyright (C) 2009 Valentin Longchamp, EPFL Mobots group
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
 +
-+static int spi_internal_chipselect[] = {
-+	MXC_SPI_CS(0),
-+	MXC_SPI_CS(1),
-+	MXC_SPI_CS(2),
-+};
++#include <linux/kernel.h>
++#include <linux/types.h>
++#include <linux/init.h>
++#include <linux/gpio.h>
 +
-+static struct spi_imx_master spi0_pdata = {
-+	.chipselect	= spi_internal_chipselect,
-+	.num_chipselect	= ARRAY_SIZE(spi_internal_chipselect),
-+};
-+
- void __init mx31lite_db_init(void)
- {
- 	mxc_iomux_setup_multiple_pins(litekit_db_board_pins,
-@@ -137,5 +160,6 @@ void __init mx31lite_db_init(void)
- 					"development board pins");
- 	mxc_register_device(&mxc_uart_device0, &uart_pdata);
- 	mxc_register_device(&mxcsdhc_device0, &mmc_pdata);
-+	mxc_register_device(&mxc_spi_device0, &spi0_pdata);
- }
- 
-diff --git a/arch/arm/mach-mx3/mx31lite.c b/arch/arm/mach-mx3/mx31lite.c
-index dc993a8..03762a3 100644
---- a/arch/arm/mach-mx3/mx31lite.c
-+++ b/arch/arm/mach-mx3/mx31lite.c
-@@ -2,6 +2,7 @@
-  *  Copyright (C) 2000 Deep Blue Solutions Ltd
-  *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
-  *  Copyright 2005-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *  Copyright (C) 2009 Daniel Mack <daniel@caiaq.de>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published by
-@@ -25,20 +26,25 @@
- #include <linux/platform_device.h>
- #include <linux/gpio.h>
- #include <linux/smsc911x.h>
-+#include <linux/mfd/mc13783.h>
-+#include <linux/spi/spi.h>
- 
--#include <mach/hardware.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
- #include <asm/mach/map.h>
--#include <mach/common.h>
- #include <asm/page.h>
- #include <asm/setup.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
 +
 +#include <mach/hardware.h>
 +#include <mach/common.h>
- #include <mach/board-mx31lite.h>
- #include <mach/imx-uart.h>
- #include <mach/iomux-mx3.h>
- #include <mach/irqs.h>
- #include <mach/mxc_nand.h>
-+#include <mach/spi.h>
++#include <mach/imx-uart.h>
++#include <mach/iomux-mx3.h>
++#include <mach/board-mx31lite.h>
 +
++#include "devices.h"
++
++/*
++ * This file contains board-specific initialization routines for the
++ * LogicPD i.MX31 SOM-LV development board, aka 'LiteKit'.
++ * If you design an own baseboard for the module, use this file as base
++ * for support code.
++ */
++
++static unsigned int litekit_db_board_pins[] __initdata = {
++	/* UART1 */
++	MX31_PIN_CTS1__CTS1,
++	MX31_PIN_RTS1__RTS1,
++	MX31_PIN_TXD1__TXD1,
++	MX31_PIN_RXD1__RXD1,
++};
++
++/* UART */
++static struct imxuart_platform_data uart_pdata __initdata = {
++	.flags = IMXUART_HAVE_RTSCTS,
++};
++
++void __init mx31lite_db_init(void)
++{
++	mxc_iomux_setup_multiple_pins(litekit_db_board_pins,
++					ARRAY_SIZE(litekit_db_board_pins),
++					"development board pins");
++	mxc_register_device(&mxc_uart_device0, &uart_pdata);
++}
++
+diff --git a/arch/arm/mach-mx3/mx31lite.c b/arch/arm/mach-mx3/mx31lite.c
+index a8d57de..dc993a8 100644
+--- a/arch/arm/mach-mx3/mx31lite.c
++++ b/arch/arm/mach-mx3/mx31lite.c
+@@ -42,23 +42,14 @@
  #include "devices.h"
  
  /*
-@@ -48,6 +54,14 @@
+- * This file contains the board-specific initialization routines.
++ * This file contains the module-specific initialization routines.
+  */
+ 
  static unsigned int mx31lite_pins[] = {
+-	/* UART1 */
+-	MX31_PIN_CTS1__CTS1,
+-	MX31_PIN_RTS1__RTS1,
+-	MX31_PIN_TXD1__TXD1,
+-	MX31_PIN_RXD1__RXD1,
  	/* LAN9117 IRQ pin */
  	IOMUX_MODE(MX31_PIN_SFS6, IOMUX_CONFIG_GPIO),
-+	/* SPI 1 */
-+	MX31_PIN_CSPI2_SCLK__SCLK,
-+	MX31_PIN_CSPI2_MOSI__MOSI,
-+	MX31_PIN_CSPI2_MISO__MISO,
-+	MX31_PIN_CSPI2_SPI_RDY__SPI_RDY,
-+	MX31_PIN_CSPI2_SS0__SS0,
-+	MX31_PIN_CSPI2_SS1__SS1,
-+	MX31_PIN_CSPI2_SS2__SS2,
  };
  
+-static struct imxuart_platform_data uart_pdata = {
+-	.flags = IMXUART_HAVE_RTSCTS,
+-};
+-
  static struct mxc_nand_platform_data mx31lite_nand_board_info = {
-@@ -84,6 +98,35 @@ static struct platform_device smsc911x_device = {
- };
+ 	.width = 1,
+ 	.hw_ecc = 1,
+@@ -118,17 +109,27 @@ void __init mx31lite_map_io(void)
+ 	iotable_init(mx31lite_io_desc, ARRAY_SIZE(mx31lite_io_desc));
+ }
  
- /*
-+ * SPI
-+ *
-+ * The MC13783 is the only hard-wired SPI device on the module.
-+ */
+-/*
+- * Board specific initialization.
+- */
++static int mx31lite_baseboard;
++core_param(mx31lite_baseboard, mx31lite_baseboard, int, 0444);
 +
-+static int spi_internal_chipselect[] = {
-+	MXC_SPI_CS(0),
-+};
+ static void __init mxc_board_init(void)
+ {
+ 	int ret;
+ 
++	switch (mx31lite_baseboard) {
++	case MX31LITE_NOBOARD:
++		break;
++	case MX31LITE_DB:
++		mx31lite_db_init();
++		break;
++	default:
++		printk(KERN_ERR "Illegal mx31lite_baseboard type %d\n",
++				mx31lite_baseboard);
++	}
 +
-+static struct spi_imx_master spi1_pdata = {
-+	.chipselect	= spi_internal_chipselect,
-+	.num_chipselect	= ARRAY_SIZE(spi_internal_chipselect),
-+};
-+
-+static struct mc13783_platform_data mc13783_pdata __initdata = {
-+	.flags  = MC13783_USE_RTC |
-+		  MC13783_USE_REGULATOR,
-+};
-+
-+static struct spi_board_info mc13783_spi_dev __initdata = {
-+	.modalias       = "mc13783",
-+	.max_speed_hz   = 1000000,
-+	.bus_num	= 1,
-+	.chip_select    = 0,
-+	.platform_data  = &mc13783_pdata,
-+	.irq		= IOMUX_TO_IRQ(MX31_PIN_GPIO1_3),
-+};
-+
-+/*
-  * This structure defines the MX31 memory map.
-  */
- static struct map_desc mx31lite_io_desc[] __initdata = {
-@@ -131,6 +174,8 @@ static void __init mxc_board_init(void)
+ 	mxc_iomux_setup_multiple_pins(mx31lite_pins, ARRAY_SIZE(mx31lite_pins),
  				      "mx31lite");
  
+-	mxc_register_device(&mxc_uart_device0, &uart_pdata);
  	mxc_register_device(&mxc_nand_device, &mx31lite_nand_board_info);
-+	mxc_register_device(&mxc_spi_device1, &spi1_pdata);
-+	spi_register_board_info(&mc13783_spi_dev, 1);
  
  	/* SMSC9117 IRQ pin */
- 	ret = gpio_request(IOMUX_TO_GPIO(MX31_PIN_SFS6), "sms9117-irq");
+@@ -150,12 +151,7 @@ struct sys_timer mx31lite_timer = {
+ 	.init	= mx31lite_timer_init,
+ };
+ 
+-/*
+- * The following uses standard kernel macros defined in arch.h in order to
+- * initialize __mach_desc_MX31LITE data structure.
+- */
+-
+-MACHINE_START(MX31LITE, "LogicPD MX31 LITEKIT")
++MACHINE_START(MX31LITE, "LogicPD i.MX31 SOM")
+ 	/* Maintainer: Freescale Semiconductor, Inc. */
+ 	.phys_io        = AIPS1_BASE_ADDR,
+ 	.io_pg_offst    = ((AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
+diff --git a/arch/arm/plat-mxc/include/mach/board-mx31lite.h b/arch/arm/plat-mxc/include/mach/board-mx31lite.h
+index 8e64325..0184b63 100644
+--- a/arch/arm/plat-mxc/include/mach/board-mx31lite.h
++++ b/arch/arm/plat-mxc/include/mach/board-mx31lite.h
+@@ -1,15 +1,42 @@
+ /*
+  * Copyright 2007 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright (C) 2009 Daniel Mack <daniel@caiaq.de>
++ *
++ * Based on code for mobots boards,
++ *   Copyright (C) 2009 Valentin Longchamp, EPFL Mobots group
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
+  */
+ 
++#ifndef __ASM_ARCH_MXC_BOARD_MX31LITE_H__
++#define __ASM_ARCH_MXC_BOARD_MX31LITE_H__
++
++#ifndef __ASSEMBLY__
++
++enum mx31lilly_boards {
++	MX31LITE_NOBOARD	= 0,
++	MX31LITE_DB		= 1,
++};
++
+ /*
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
++ * This CPU module needs a baseboard to work. After basic initializing
++ * its own devices, it calls baseboard's init function.
+  */
+ 
+-#ifndef __ASM_ARCH_MXC_BOARD_MX31LITE_H__
+-#define __ASM_ARCH_MXC_BOARD_MX31LITE_H__
++extern void mx31lite_db_init(void);
+ 
+-#endif /* __ASM_ARCH_MXC_BOARD_MX31LITE_H__ */
++#endif
+ 
++#endif /* __ASM_ARCH_MXC_BOARD_MX31LITE_H__ */
 -- 
 1.6.5.2
