@@ -1,22 +1,41 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 19 Nov 2009 17:23:23 +0900
-Subject: [PATCH 10/19] ARM: S5PC1XX: add S5PC110 memory map
-In-Reply-To: <20091118200032.GF23772@trinity.fluff.org>
-References: <1258551194-16018-1-git-send-email-m.szyprowski@samsung.com>
-	<1258551194-16018-11-git-send-email-m.szyprowski@samsung.com>
-	<20091118200032.GF23772@trinity.fluff.org>
-Message-ID: <9c9fda240911190023l4bcf544cg55e4cca8a9cb7a6a@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 19 Nov 2009 09:38:25 +0100
+Subject: [PATCH 3/5] ARM: MX3: add SPI devices for mx31lite
+In-Reply-To: <20091118154256.GI14091@buzzloop.caiaq.de>
+References: <1258551702-8631-1-git-send-email-daniel@caiaq.de>
+	<1258551702-8631-2-git-send-email-daniel@caiaq.de>
+	<1258551702-8631-3-git-send-email-daniel@caiaq.de>
+	<20091118153708.GN30179@pengutronix.de>
+	<20091118154256.GI14091@buzzloop.caiaq.de>
+Message-ID: <20091119083825.GO30179@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Nov 18, 2009 at 04:42:56PM +0100, Daniel Mack wrote:
+> On Wed, Nov 18, 2009 at 04:37:08PM +0100, Sascha Hauer wrote:
+> > On Wed, Nov 18, 2009 at 02:41:40PM +0100, Daniel Mack wrote:
+> > >  /*
+> > > + * SPI
+> > > + *
+> > > + * The MX13783 is hard-wired on the module, hence the corresponding
+> > > + * bus is registered here and not in the board code, in contrast to
+> > > + * the other SPI bus.
+> > > + */
+> > 
+> > 
+> > The mc13783 bus is registered in the -db file, and not here. I think you
+> > mixed something up here.
+> 
+> Hmm, no, that actually correct. The problem is that all devices on the
+> SPI bus have to be registered in one block via spi_register_board_info,
 
-On Thu, Nov 19, 2009 at 5:00 AM, Ben Dooks <ben-linux@fluff.org> wrote:
-> There's stuff in here from 'Byungho Min <bhmin@samsung.com>'
-> but no mention of an ack or signoff from this person.
+Looking at the SPI code I see no reason why it shouldn't be possible to call
+spi_register_board_info multiple times.
 
-Mr. Min also works together with me. He knows that this changes since
-we use the same git.
+Sascha
 
-Thank you,
-Kyungmin Park
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
