@@ -1,71 +1,52 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Thu, 19 Nov 2009 16:40:50 +0800
-Subject: [PATCH] ARM: Add spi controller driver support for NUC900
-In-Reply-To: <20091118234928.8d86a9f9.akpm@linux-foundation.org>
-References: <4B024748.9080001@gmail.com>
-	<20091118142109.ff2c5ef6.akpm@linux-foundation.org>
-	<e68bb3470911182223r28e9bac0lf185c1443168ff52@mail.gmail.com>
-	<20091118234928.8d86a9f9.akpm@linux-foundation.org>
-Message-ID: <e68bb3470911190040v2c14bbcfi46177cd58649e1c@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 19 Nov 2009 08:57:35 +0000
+Subject: cache aliasing in dup_mmap
+In-Reply-To: <20091116222016.GF3568@n2100.arm.linux.org.uk>
+References: <20090308143607.GA27349@n2100.arm.linux.org.uk>
+	<e06498070909290925q55777041q6f3ecfaf9847babb@mail.gmail.com>
+	<e06498070909290930w7745e1e3x2e224ad75ff62dbd@mail.gmail.com>
+	<20090929191108.GA13568@n2100.arm.linux.org.uk>
+	<20091005144623.GA20633@n2100.arm.linux.org.uk>
+	<20091105144830.GC21681@n2100.arm.linux.org.uk>
+	<e06498070911130649k2051e4cfh2066cf0b9fdabbaf@mail.gmail.com>
+	<20091116163028.GA3568@n2100.arm.linux.org.uk>
+	<e06498070911160923i2273b6aai6f144b36289203d2@mail.gmail.com>
+	<20091116222016.GF3568@n2100.arm.linux.org.uk>
+Message-ID: <20091119085735.GA14178@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/11/19 Andrew Morton <akpm@linux-foundation.org>:
-> On Thu, 19 Nov 2009 14:23:49 +0800 Wan ZongShun <mcuos.com@gmail.com> wrote:
->
->> >> +static int __devexit w90p910_spi_remove(struct platform_device *dev)
->> >> +{
->> >> + __ __ struct w90p910_spi *hw = platform_get_drvdata(dev);
->> >> +
->> >> + __ __ platform_set_drvdata(dev, NULL);
->> >> +
->> >> + __ __ spi_unregister_master(hw->master);
->> >> +
->> >> + __ __ clk_disable(hw->clk);
->> >> + __ __ clk_put(hw->clk);
->> >
->> > As far as I can tell, a hardware interrupt could still be pending, or
->> > be under service while the above code is executing?
->> >
->> > If so, I expect bad things will happen?
->>
->> Do you mean that I should put this 'free_irq()' in the front of
->> w90p910_spi_remove___
->>
->> such as:
->> "
->> free_irq(hw->irq, hw);
->>
->> platform_set_drvdata(dev, NULL);
->>
->> spi_unregister_master(hw->master);
->>
->> clk_disable(hw->clk);
->> clk_put(hw->clk);
->
-> I don't know, because I don't know what operation the hardware needs to
-> stop it from generating interrupts. ?Perhaps that's clk_disable()?
+On Mon, Nov 16, 2009 at 10:20:16PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Nov 16, 2009 at 12:23:36PM -0500, Steven Walter wrote:
+> > Yes, SIGSEGV after 88 boots, with a crash that we previously
+> > identified as caused by this cache corruption issue.  Attached are the
+> > patches I used, as manually backported to 2.6.18.5.  Stock 2.6.18.5
+> > would reliably crash in under 1000 reboots, whereas  with my ad-hoc
+> > fix (also attached) we were able to run 8000 reboots before we ended
+> > the test.
+> 
+> I can see no reason for the difference between the two.  The backport
+> looks fine.
+> 
+> The only difference I can see is:
+> 
+> - version which works
+> 
+> > diff --git a/src/mm/memory.c b/src/mm/memory.c
+> > index 0b7a668..d0bc8c1 100644
+> 
+> - version which doesn't
+> 
+> > diff --git a/src/mm/memory.c b/src/mm/memory.c
+> > index f508c60..69d8d32 100644
+> 
+> That first index number gives the sha1 hash of the git object storing
+> this file.  Since they're different, these two patches weren't applied
+> to the same file.
+> 
+> Could there be other changes in your tree which could be affecting the
+> behaviour in this area?
 
-The interrupt will be not occur as long as I run clk_disable().
-
-> Once you've stopped the source of interrupts then the code should wait
-> for the IRQ handler to complete if it's running on another CPU. ?Yes,
-> free_irq() does that.
-
-So, regarding my system of single CPU, maybe I need put this
-'clk_disable()' in the front of function of w90p910_spi_remove().
-
-right?
-
-> It's only after the clk_disable() and the free_irq() that you can
-> guarantee that no interrupt handler will run and attempt to access the
-> device and its associated data structures.
->
->
-
-
-
--- 
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I'm afraid that I have nothing further to suggest, and so I'm shelving
+the patches.  That means this problem will remain unresolved in future
+kernels.
