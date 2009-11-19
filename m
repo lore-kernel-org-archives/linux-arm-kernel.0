@@ -1,24 +1,54 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 19 Nov 2009 16:32:41 +0000
-Subject: i.MX audio support
-In-Reply-To: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
-References: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20091119163241.GB31336@rakim.wolfsonmicro.main>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 19 Nov 2009 09:03:21 -0800
+Subject: [patch 1/1] TOUCHSCREEN: S3C24XX touchscreen driver from
+	Arnaud  Patard.
+In-Reply-To: <20091119135236.GB5535@digital-scurf.org>
+References: <20091118232939.201290297@fluff.org.uk>
+	<20091118232948.063635416@fluff.org.uk>
+	<20091119025930.GA20172@core.coreip.homeip.net>
+	<4B052D50.2070002@simtec.co.uk>
+	<20091119135236.GB5535@digital-scurf.org>
+Message-ID: <20091119170321.GB15647@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19, 2009 at 04:48:14PM +0100, Sascha Hauer wrote:
+On Thu, Nov 19, 2009 at 01:52:36PM +0000, Daniel Silverstone wrote:
+> On Thu, Nov 19, 2009 at 11:34:40AM +0000, Ben Dooks wrote:
+> >>> +		input_report_key(ts.input, BTN_TOUCH, 1);
+> >>> +		input_report_abs(ts.input, ABS_PRESSURE, 1);
+> >> No fake pressure events please, BTN_TOUCH should be enough.
+> > I'd have to check, IIRC tslib needs these to function properly.
+> 
+> Indeed it does -- otherwise it won't work.  Yes you could try going around and
+> patching TSLIB but so many people use it that it is principle-of-least-surprise
+> to produce pressure events.
+> 
+> >>> +	ts.input->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
+> >>> +	input_set_abs_params(ts.input, ABS_X, 0, 0x3FF, 0, 0);
+> >>> +	input_set_abs_params(ts.input, ABS_Y, 0, 0x3FF, 0, 0);
+> >>> +	input_set_abs_params(ts.input, ABS_PRESSURE, 0, 1, 0, 0);
+> >> Drop ABS_PRESSURE.
+> > ok, see above.
+> 
+> The same applies here -- claim ABS_PRESSURE or tslib won't operate with the
+> touchscreen.
+> 
+> While it is tempting to be 100% exactly correct to what the hardware reports
+> (which is only TOUCH not PRESSURE) it is preferable to work with the software
+> which the majority of people use -- namely tslib.
+> 
+> I would strongly argue against removing the ABS_PRESSURE stuff personally,
+> despite it being essentially a lie.
+> 
 
-> There already is a driver for i.MX in the tree, this one is a nearly complete
-> rewrite. I haven't touched the in Kernel driver with these patches. The in
-> Kernel driver has several problems, it doesn't use ioremap, uses direct pointer
-> derefs instead of proper access functions and the only board supported so far is
-> itself not supported in mainline.
+And I would strongly argue that you just need to update your tslib,
+especially given the fact that this issue was dealt with there about a
+year ago.  And if you really need that fix to be in released (read
+'tagged') version of tslib - please speak to its maintainer.
 
-BTW, unless I notice anything particularly bad in there I'm inclined to
-just merge all the arch/arm patches by themselves since obviously you're
-the maintainer they'd normally go via - I'm assuming the other patches
-depend on them?
+Why everyone thinks that it is a good idea to pile workarounds for
+software issues in the kernel but updating the other parts of software
+stack is a big no-no?
 
-Thanks a lot for doing this work - I've got some boards that I could
-make a lot of use of if we had i.MX3x audio support in mainline!
+-- 
+Dmitry
