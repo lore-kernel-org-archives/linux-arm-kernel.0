@@ -1,91 +1,221 @@
-From: shinel@foxmail.com (Shine Liu)
-Date: Thu, 19 Nov 2009 13:46:55 +0800
-Subject: [patch 1/1] TOUCHSCREEN: S3C24XX touchscreen driver from
-	Arnaud Patard.
-In-Reply-To: <20091118232948.063635416@fluff.org.uk>
-References: <20091118232939.201290297@fluff.org.uk>
-	<20091118232948.063635416@fluff.org.uk>
-Message-ID: <1258609615.2676.31.camel@shinel>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Thu, 19 Nov 2009 14:23:49 +0800
+Subject: [PATCH] ARM: Add spi controller driver support for NUC900
+In-Reply-To: <20091118142109.ff2c5ef6.akpm@linux-foundation.org>
+References: <4B024748.9080001@gmail.com>
+	<20091118142109.ff2c5ef6.akpm@linux-foundation.org>
+Message-ID: <e68bb3470911182223r28e9bac0lf185c1443168ff52@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,Ben
+Dear Andrew,
 
-Besides Dmitry's comments,
+Thanks a lot for your help, and I have a question below.
 
-On Wed, 2009-11-18 at 23:29 +0000, Ben Dooks wrote:
+2009/11/19 Andrew Morton <akpm@linux-foundation.org>:
+> On Tue, 17 Nov 2009 14:48:40 +0800
+> Wan ZongShun <mcuos.com@gmail.com> wrote:
+>
+>> Dear David,
+>>
+>> Add winbond/nuvoton NUC900 spi controller driver support,
+>> on my evaluation board,there is a winbond w25x16 spi flash,
+>> so I test my spi controller driver with m25p80.c.
+>>
+>>
+>> ...
+>>
+>> +static inline struct w90p910_spi *to_hw(struct spi_device *sdev)
+>> +{
+>> + ? ? return spi_master_get_devdata(sdev->master);
+>> +}
+>> +
+>> +static void w90p910_slave_seclect(struct spi_device *spi, unsigned int ssr)
+>
+> I think you meant "select" here?
+>
+>> +{
+>> + ? ? struct w90p910_spi *hw = to_hw(spi);
+>> + ? ? unsigned int val;
+>> + ? ? unsigned int cs = spi->mode & SPI_CS_HIGH ? 1 : 0;
+>> + ? ? unsigned int cpol = spi->mode & SPI_CPOL ? 1 : 0;
+>> +
+>> + ? ? val = __raw_readl(hw->regs + USI_SSR);
+>> +
+>> + ? ? if (!cs)
+>> + ? ? ? ? ? ? val &= ~SELECTLEV;
+>> + ? ? else
+>> + ? ? ? ? ? ? val |= SELECTLEV;
+>> +
+>> + ? ? if (!ssr)
+>> + ? ? ? ? ? ? val &= ~SELECTSLAVE;
+>> + ? ? else
+>> + ? ? ? ? ? ? val |= SELECTSLAVE;
+>> +
+>> + ? ? __raw_writel(val, hw->regs + USI_SSR);
+>> +
+>> + ? ? val = __raw_readl(hw->regs + USI_CNT);
+>> +
+>> + ? ? if (!cpol)
+>> + ? ? ? ? ? ? val &= ~SELECTPOL;
+>> + ? ? else
+>> + ? ? ? ? ? ? val |= SELECTPOL;
+>> +
+>> + ? ? __raw_writel(val, hw->regs + USI_CNT);
+>> +}
+>
+> That's a read-modify-write operation. ?What locking prevents two
+> threads of control from altering the USI_SSR and USI_CNT registers at
+> the same time, resulting in an indeterminate setting?
+>
+>> +static void w90p910_spi_chipsel(struct spi_device *spi, int value)
+>> +{
+>> + ? ? switch (value) {
+>> + ? ? case BITBANG_CS_INACTIVE:
+>> + ? ? ? ? ? ? w90p910_slave_seclect(spi, 0);
+>> + ? ? ? ? ? ? break;
+>> +
+>> + ? ? case BITBANG_CS_ACTIVE:
+>> + ? ? ? ? ? ? w90p910_slave_seclect(spi, 1);
+>> + ? ? ? ? ? ? break;
+>> + ? ? }
+>> +}
+>> +
+>> +static void w90p910_spi_setup_txnum(struct w90p910_spi *hw,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int txnum)
+>> +{
+>> + ? ? unsigned int val;
+>> +
+>> + ? ? val = __raw_readl(hw->regs + USI_CNT);
+>> +
+>> + ? ? if (!txnum)
+>> + ? ? ? ? ? ? val &= ~TXNUM;
+>> + ? ? else
+>> + ? ? ? ? ? ? val |= txnum << 0x08;
+>> +
+>> + ? ? __raw_writel(val, hw->regs + USI_CNT);
+>> +
+>> +}
+>> +
+>> +static void w90p910_spi_setup_txbitlen(struct w90p910_spi *hw,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int txbitlen)
+>> +{
+>> + ? ? unsigned int val;
+>> +
+>> + ? ? val = __raw_readl(hw->regs + USI_CNT);
+>> +
+>> + ? ? val |= (txbitlen << 0x03);
+>> +
+>> + ? ? __raw_writel(val, hw->regs + USI_CNT);
+>> +}
+>> +
+>> +static void w90p910_spi_gobusy(struct w90p910_spi *hw)
+>> +{
+>> + ? ? unsigned int val;
+>> +
+>> + ? ? val = __raw_readl(hw->regs + USI_CNT);
+>> +
+>> + ? ? val |= GOBUSY;
+>> +
+>> + ? ? __raw_writel(val, hw->regs + USI_CNT);
+>> +}
+>
+> ditto, ditto, ditto.
+>
+>> +static int w90p910_spi_setupxfer(struct spi_device *spi,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct spi_transfer *t)
+>> +{
+>> + ? ? return 0;
+>> +}
+>> +
+>> +static int w90p910_spi_setup(struct spi_device *spi)
+>> +{
+>> + ? ? return 0;
+>> +}
+>> +
+>> +static inline unsigned int hw_txbyte(struct w90p910_spi *hw, int count)
+>> +{
+>> + ? ? return hw->tx ? hw->tx[count] : 0;
+>> +}
+>> +
+>> +static int w90p910_spi_txrx(struct spi_device *spi, struct spi_transfer *t)
+>> +{
+>> + ? ? struct w90p910_spi *hw = to_hw(spi);
+>> +
+>> + ? ? hw->tx = t->tx_buf;
+>> + ? ? hw->rx = t->rx_buf;
+>> + ? ? hw->len = t->len;
+>> + ? ? hw->count = 0;
+>> +
+>> + ? ? init_completion(&hw->done);
+>> +
+>> + ? ? __raw_writel(hw_txbyte(hw, 0x0), hw->regs + USI_TX0);
+>> +
+>> + ? ? w90p910_spi_gobusy(hw);
+>> +
+>> + ? ? wait_for_completion(&hw->done);
+>> +
+>> + ? ? return hw->count;
+>> +}
+>
+> The init_completion() should be unneeded? ?The structure was
+> initialised at setup time and will be left in a reusable state after a
+> complete()/wait_for_completion(). ?Reinitialising the structure all the
+> time like this adds risk that it will be scribbled on while in use.
+>
+>>
+>> ...
+>>
+>> +static int __devexit w90p910_spi_remove(struct platform_device *dev)
+>> +{
+>> + ? ? struct w90p910_spi *hw = platform_get_drvdata(dev);
+>> +
+>> + ? ? platform_set_drvdata(dev, NULL);
+>> +
+>> + ? ? spi_unregister_master(hw->master);
+>> +
+>> + ? ? clk_disable(hw->clk);
+>> + ? ? clk_put(hw->clk);
+>
+> As far as I can tell, a hardware interrupt could still be pending, or
+> be under service while the above code is executing?
+>
+> If so, I expect bad things will happen?
 
-> +config TOUCHSCREEN_S3C2410
-> +       tristate "Samsung S3C2410 touchscreen input driver"
-> +       depends on ARCH_S3C2410 && INPUT && INPUT_TOUCHSCREEN
-> +       select SERIO
-> +       help
-> +         Say Y here if you have the s3c2410 touchscreen.
-> +
-> +         If unsure, say N.
-> +
-> +         To compile this driver as a module, choose M here: the
-> +         module will be called s3c2410_ts.
+Do you mean that I should put this 'free_irq()' in the front of
+w90p910_spi_remove?
 
-S3C24XX_ADC should be added to the depends.
+such as:
+"
+free_irq(hw->irq, hw);
 
-> +#include <linux/slab.h>
+platform_set_drvdata(dev, NULL);
 
-I think this is not really needed because kernel.h is included already.
+spi_unregister_master(hw->master);
 
+clk_disable(hw->clk);
+clk_put(hw->clk);
+"
 
-> +
-> +	ts.clock = clk_get(dev, "adc");
-> +	if (IS_ERR(ts.clock)) {
-> +		dev_err(dev, "cannot get adc clock source\n");
-> +		return -ENOENT;
-> +	}
-> +
-> +	clk_enable(ts.clock);
-> +	dev_dbg(dev, "got and enabled clocks\n");
-
-Well, we take 2410_ts as s3c adc client, so these work has been done in
-s3c_adc_probe function of arch/arm/plat-s3c24xx.c
-
-This should be duplicated.
-
-And "#include <linux/clk.h>" is not needed because we don't use these
-APIs
+>> + ? ? free_irq(hw->irq, hw);
+>> + ? ? iounmap(hw->regs);
+>> +
+>> + ? ? release_resource(hw->ioarea);
+>> + ? ? kfree(hw->ioarea);
+>> +
+>> + ? ? spi_master_put(hw->master);
+>> + ? ? return 0;
+>> +}
+>> +
+>>
+>> ...
+>>
+>
+>
 
 
-> + err_clk:
-> +       clk_put(ts.clock);
-> +       return ret;
-> +}
 
-Above reason and also for those "goto err_clk;"
-
-> );
-> +
-> +	clk_disable(ts.clock);
-> +	clk_put(ts.clock);
-
-Same as above
-
-> +
-> +#ifdef CONFIG_PM
-> +static int s3c2410ts_suspend(struct platform_device *pdev, pm_message_t state)
-> +{
-> +	writel(TSC_SLEEP, ts.io + S3C2410_ADCTSC);
-> +	disable_irq(ts.irq_tc);
-
-Same as above
-
-> +
-> +static int s3c2410ts_resume(struct platform_device *pdev)
-> +{
-> +	struct s3c2410_ts_mach_info *info = pdev->dev.platform_data;
-> +
-> +	clk_enable(ts.clock);
-
-Same as above
-
-
-Cheers,
-
-Shine
+-- 
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
