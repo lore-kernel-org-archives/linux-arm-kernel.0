@@ -1,120 +1,159 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 19 Nov 2009 16:48:16 +0100
-Subject: [PATCH 02/12] mxc: iomux v3: remove resource handling
-In-Reply-To: <1258645706-9071-2-git-send-email-s.hauer@pengutronix.de>
+Date: Thu, 19 Nov 2009 16:48:26 +0100
+Subject: [PATCH 12/12] pcm037: Add sound support
+In-Reply-To: <1258645706-9071-12-git-send-email-s.hauer@pengutronix.de>
 References: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
 	<1258645706-9071-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1258645706-9071-3-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-3-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-4-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-5-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-6-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-7-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-8-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-9-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-10-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-11-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-12-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1258645706-9071-13-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current model does not allow to put a pad into different modes
-once a pins is allocated. Remove the resource handling.
-
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/plat-mxc/include/mach/iomux-v3.h |   17 +-------------
- arch/arm/plat-mxc/iomux-v3.c              |   36 +---------------------------
- 2 files changed, 3 insertions(+), 50 deletions(-)
+ arch/arm/mach-mx3/pcm037.c |   72 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 72 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-v3.h b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-index a0fa402..1deda01 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-v3.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-@@ -88,9 +88,7 @@ struct pad_desc {
- #define PAD_CTL_SRE_FAST		(1 << 0)
+diff --git a/arch/arm/mach-mx3/pcm037.c b/arch/arm/mach-mx3/pcm037.c
+index 6cbaabe..15584b5 100644
+--- a/arch/arm/mach-mx3/pcm037.c
++++ b/arch/arm/mach-mx3/pcm037.c
+@@ -33,6 +33,7 @@
+ #include <linux/irq.h>
+ #include <linux/fsl_devices.h>
+ #include <linux/can/platform/sja1000.h>
++#include <linux/mfd/mc13783.h>
  
- /*
-- * setups a single pad:
-- * 	- reserves the pad so that it is not claimed by another driver
-- * 	- setups the iomux according to the configuration
-+ * setups a single pad in the iomuxer
-  */
- int mxc_iomux_v3_setup_pad(struct pad_desc *pad);
+ #include <media/soc_camera.h>
  
-@@ -101,19 +99,6 @@ int mxc_iomux_v3_setup_pad(struct pad_desc *pad);
- int mxc_iomux_v3_setup_multiple_pads(struct pad_desc *pad_list, unsigned count);
+@@ -51,6 +52,9 @@
+ #include <mach/mx3_camera.h>
+ #include <mach/mx3fb.h>
+ #include <mach/mxc_nand.h>
++#include <mach/spi.h>
++#include <mach/audmux.h>
++#include <mach/ssi.h>
  
- /*
-- * releases a single pad:
-- * 	- make it available for a future use by another driver
-- * 	- DOES NOT reconfigure the IOMUX in its reset state
-- */
--void mxc_iomux_v3_release_pad(struct pad_desc *pad);
--
--/*
-- * releases multiple pads
-- * convenvient way to call the above function with tables
-- */
--void mxc_iomux_v3_release_multiple_pads(struct pad_desc *pad_list, int count);
--
--/*
-  * Initialise the iomux controller
-  */
- void mxc_iomux_v3_init(void __iomem *iomux_v3_base);
-diff --git a/arch/arm/plat-mxc/iomux-v3.c b/arch/arm/plat-mxc/iomux-v3.c
-index 851ca99..b318c6a 100644
---- a/arch/arm/plat-mxc/iomux-v3.c
-+++ b/arch/arm/plat-mxc/iomux-v3.c
-@@ -31,19 +31,11 @@
+ #include "devices.h"
+ #include "pcm037.h"
+@@ -124,6 +128,8 @@ static unsigned int pcm037_pins[] = {
+ 	MX31_PIN_CSPI3_SPI_RDY__CTS3,
+ 	/* LAN9217 irq pin */
+ 	IOMUX_MODE(MX31_PIN_GPIO3_1, IOMUX_CONFIG_GPIO),
++	/* MC13783 IRQ pim */
++	IOMUX_MODE(MX31_PIN_GPIO3_0, IOMUX_CONFIG_GPIO),
+ 	/* Onewire */
+ 	MX31_PIN_BATT_LINE__OWIRE,
+ 	/* Framebuffer */
+@@ -172,6 +178,15 @@ static unsigned int pcm037_pins[] = {
+ 	MX31_PIN_CSI_VSYNC__CSI_VSYNC,
+ 	/* GPIO */
+ 	IOMUX_MODE(MX31_PIN_ATA_DMACK, IOMUX_CONFIG_GPIO),
++	/* SSI */
++	MX31_PIN_STXD4__STXD4,
++	MX31_PIN_SRXD4__SRXD4,
++	MX31_PIN_SCK4__SCK4,
++	MX31_PIN_SFS4__SFS4,
++	MX31_PIN_STXD5__STXD5,
++	MX31_PIN_SRXD5__SRXD5,
++	MX31_PIN_SCK5__SCK5,
++	MX31_PIN_SFS5__SFS5,
+ };
  
- static void __iomem *base;
- 
--static unsigned long iomux_v3_pad_alloc_map[0x200 / BITS_PER_LONG];
--
- /*
-- * setups a single pin:
-- * 	- reserves the pin so that it is not claimed by another driver
-- * 	- setups the iomux according to the configuration
-+ * setups a single pad in the iomuxer
-  */
- int mxc_iomux_v3_setup_pad(struct pad_desc *pad)
- {
--	unsigned int pad_ofs = pad->pad_ctrl_ofs;
--
--	if (test_and_set_bit(pad_ofs >> 2, iomux_v3_pad_alloc_map))
--		return -EBUSY;
- 	if (pad->mux_ctrl_ofs)
- 		__raw_writel(pad->mux_mode, base + pad->mux_ctrl_ofs);
- 
-@@ -66,37 +58,13 @@ int mxc_iomux_v3_setup_multiple_pads(struct pad_desc *pad_list, unsigned count)
- 	for (i = 0; i < count; i++) {
- 		ret = mxc_iomux_v3_setup_pad(p);
- 		if (ret)
--			goto setup_error;
-+			return ret;
- 		p++;
- 	}
- 	return 0;
--
--setup_error:
--	mxc_iomux_v3_release_multiple_pads(pad_list, i);
--	return ret;
+ static struct physmap_flash_data pcm037_flash_data = {
+@@ -407,6 +422,31 @@ static void pcm970_sdhc1_exit(struct device *dev, void *data)
+ 	gpio_free(SDHC1_GPIO_WP);
  }
- EXPORT_SYMBOL(mxc_iomux_v3_setup_multiple_pads);
  
--void mxc_iomux_v3_release_pad(struct pad_desc *pad)
--{
--	unsigned int pad_ofs = pad->pad_ctrl_ofs;
--
--	clear_bit(pad_ofs >> 2, iomux_v3_pad_alloc_map);
--}
--EXPORT_SYMBOL(mxc_iomux_v3_release_pad);
--
--void mxc_iomux_v3_release_multiple_pads(struct pad_desc *pad_list, int count)
--{
--	struct pad_desc *p = pad_list;
--	int i;
--
--	for (i = 0; i < count; i++) {
--		mxc_iomux_v3_release_pad(p);
--		p++;
--	}
--}
--EXPORT_SYMBOL(mxc_iomux_v3_release_multiple_pads);
--
- void mxc_iomux_v3_init(void __iomem *iomux_v3_base)
++#ifdef CONFIG_SPI
++static struct mc13783_platform_data pcm037_pmic = {
++	.flags = MC13783_USE_ADC | MC13783_USE_TOUCHSCREEN |
++		 MC13783_USE_CODEC,
++};
++
++static unsigned int pcm037_spi_cs[] = {MXC_SPI_CS(0), };
++
++static struct spi_imx_master pcm037_spi_0_data = {
++	.chipselect = pcm037_spi_cs,
++	.num_chipselect = ARRAY_SIZE(pcm037_spi_cs),
++};
++
++static struct spi_board_info pcm037_spi_board_info[] __initdata = {
++	{
++		.modalias	= "mc13783",
++		.irq		= IOMUX_TO_IRQ(MX31_PIN_GPIO3_0),
++		.max_speed_hz	= 3000000,
++		.bus_num	= 0,
++		.platform_data	= &pcm037_pmic,
++		.chip_select	= 0,
++	}
++};
++#endif /* CONFIG_SPI */
++
+ static struct imxmmc_platform_data sdhc_pdata = {
+ #ifdef PCM970_SDHC_RW_SWITCH
+ 	.get_ro = pcm970_sdhc1_get_ro,
+@@ -543,6 +583,10 @@ static struct platform_device pcm970_sja1000 = {
+ 	.num_resources = ARRAY_SIZE(pcm970_sja1000_resources),
+ };
+ 
++struct imx_ssi_platform_data pcm037_ssi_pdata = {
++//	.flags = IMX_SSI_DMA,
++};
++
+ /*
+  * Board specific initialization.
+  */
+@@ -550,6 +594,26 @@ static void __init mxc_board_init(void)
  {
- 	base = iomux_v3_base;
+ 	int ret;
+ 
++	mxc_audmux_v2_configure_port(MX31_AUDMUX_PORT1_SSI0,
++			MXC_AUDMUX_V2_PTCR_TFSDIR |
++			MXC_AUDMUX_V2_PTCR_TCLKDIR |
++			MXC_AUDMUX_V2_PTCR_TFSEL(MX31_AUDMUX_PORT4_SSI_PINS_4) |
++			MXC_AUDMUX_V2_PTCR_TCSEL(MX31_AUDMUX_PORT4_SSI_PINS_4) |
++			MXC_AUDMUX_V2_PTCR_RFSDIR |
++			MXC_AUDMUX_V2_PTCR_RCLKDIR |
++			MXC_AUDMUX_V2_PTCR_RFSEL(MX31_AUDMUX_PORT5_SSI_PINS_5) |
++			MXC_AUDMUX_V2_PTCR_RCSEL(MX31_AUDMUX_PORT5_SSI_PINS_5),
++			MXC_AUDMUX_V2_PDCR_RXDSEL(MX31_AUDMUX_PORT5_SSI_PINS_5));
++	mxc_audmux_v2_configure_port(MX31_AUDMUX_PORT5_SSI_PINS_5,
++			0,
++			MXC_AUDMUX_V2_PDCR_RXDSEL(MX31_AUDMUX_PORT1_SSI0));
++	mxc_audmux_v2_configure_port(MX31_AUDMUX_PORT4_SSI_PINS_4,
++			MXC_AUDMUX_V2_PTCR_TFSEL(MX31_AUDMUX_PORT1_SSI0) |
++			MXC_AUDMUX_V2_PTCR_TCSEL(MX31_AUDMUX_PORT1_SSI0) |
++			MXC_AUDMUX_V2_PTCR_RFSEL(MX31_AUDMUX_PORT1_SSI0) |
++			MXC_AUDMUX_V2_PTCR_RCSEL(MX31_AUDMUX_PORT1_SSI0),
++			0);
++
+ 	mxc_iomux_setup_multiple_pins(pcm037_pins, ARRAY_SIZE(pcm037_pins),
+ 			"pcm037");
+ 
+@@ -605,6 +669,14 @@ static void __init mxc_board_init(void)
+ 		mxc_register_device(&mx3_camera, &camera_pdata);
+ 
+ 	platform_device_register(&pcm970_sja1000);
++
++#ifdef CONFIG_SPI
++	mxc_register_device(&mxc_spi_device0, &pcm037_spi_0_data);
++
++	spi_register_board_info(pcm037_spi_board_info,
++			ARRAY_SIZE(pcm037_spi_board_info));
++#endif
++	mxc_register_device(&imx_ssi_device0, &pcm037_ssi_pdata);
+ }
+ 
+ static void __init pcm037_timer_init(void)
 -- 
 1.6.5.2
