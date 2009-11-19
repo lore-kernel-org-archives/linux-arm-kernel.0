@@ -1,47 +1,70 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 19 Nov 2009 18:32:30 +0000
-Subject: [alsa-devel] i.MX audio support
-In-Reply-To: <20091119174755.GU30179@pengutronix.de>
-	(sfid-20091119_174902_751652_79B3A281)
-References: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
-	<20091119163241.GB31336@rakim.wolfsonmicro.main>
-	<20091119174755.GU30179@pengutronix.de>
-	(sfid-20091119_174902_751652_79B3A281)
-Message-ID: <BBD75ED1-D1F8-421B-8B62-17C786975733@opensource.wolfsonmicro.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 19 Nov 2009 19:49:51 +0100
+Subject: [PATCH] SPI: drain MXC SPI transfer buffer when probing device
+In-Reply-To: <1258627487-7408-1-git-send-email-daniel@caiaq.de>
+References: <1258627487-7408-1-git-send-email-daniel@caiaq.de>
+Message-ID: <20091119184951.GA26816@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 Nov 2009, at 17:47, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+Hello Daniel,
 
-> On Thu, Nov 19, 2009 at 04:32:41PM +0000, Mark Brown wrote:
->> On Thu, Nov 19, 2009 at 04:48:14PM +0100, Sascha Hauer wrote:
->>
->>> There already is a driver for i.MX in the tree, this one is a  
->>> nearly complete
->>> rewrite. I haven't touched the in Kernel driver with these  
->>> patches. The in
->>> Kernel driver has several problems, it doesn't use ioremap, uses  
->>> direct pointer
->>> derefs instead of proper access functions and the only board  
->>> supported so far is
->>> itself not supported in mainline.
->>
->> BTW, unless I notice anything particularly bad in there I'm  
->> inclined to
->> just merge all the arch/arm patches by themselves since obviously  
->> you're
->> the maintainer they'd normally go via - I'm assuming the other  
->> patches
->> depend on them?
->
-> I'd prefer merging the arm patches myself as I'm afraid of bothering
-> upstream upstream with merge conflicts. I think I can rebase this  
-> series
-> in a way that there won't be compile breakages during merge.
+On Thu, Nov 19, 2009 at 11:44:47AM +0100, Daniel Mack wrote:
+> On the MX31litekit, the bootloader seems to communicate with the MC13783
+> PMIC chip before booting Linux. However, it does not flush all the
+> buffers properly after that, which makes the imx-spi driver read
+> bogus data when probing the MC13783.
+> 
+> Fix that by draining the SPI buffer on startup.
+> 
+> Signed-off-by: Daniel Mack <daniel@caiaq.de>
+> Cc: David Brownell <dbrownell@users.sourceforge.net>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: spi-devel-general at lists.sourceforge.net
+> ---
+>  drivers/spi/spi_imx.c |    7 +++++++
+>  1 files changed, 7 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
+> index 89c22ef..a3894fd 100644
+> --- a/drivers/spi/spi_imx.c
+> +++ b/drivers/spi/spi_imx.c
+> @@ -42,8 +42,11 @@
+>  #define MXC_CSPITXDATA		0x04
+>  #define MXC_CSPICTRL		0x08
+>  #define MXC_CSPIINT		0x0c
+> +#define MXC_CSPISTAT		0x14
+On imx27 the register at offset 0x14 is called PERIODREG ...
 
-Please do say when you're submitting if this is you're intention - if  
-you just send me patches without any other comment I'll tend to assume  
-that your intention is that I should apply them and go ahead and do so  
-if they review OK. Merging via ARM is OK providing the build doesn't  
-get broken. If that happens we can do the same thing as has been done  
-with TWL4030 and merge a branch into both trees.
+>  #define MXC_RESET		0x1c
+>  
+> +#define MXC_CSPISTAT_RR		(1 << 3)
+... and bits 0..14 are called WAIT.
+
+
+> +
+>  /* generic defines to abstract from the different register layouts */
+>  #define MXC_INT_RR	(1 << 0) /* Receive data ready interrupt */
+>  #define MXC_INT_TE	(1 << 1) /* Transmit FIFO empty interrupt */
+> @@ -593,6 +596,10 @@ static int __init spi_imx_probe(struct platform_device *pdev)
+>  	if (!cpu_is_mx31() || !cpu_is_mx35())
+>  		writel(1, spi_imx->base + MXC_RESET);
+>  
+> +	/* drain the buffer */
+> +	while (readl(spi_imx->base + MXC_CSPISTAT) & MXC_CSPISTAT_RR)
+> +		readl(spi_imx->base + MXC_CSPIRXDATA);
+> +
+So this needs protection by
+
+	if (cpu_is_mx31() || cpu_is_mx35())
+
+(note, I didn't check the mx35 reference!).
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
