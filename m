@@ -1,105 +1,34 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 19 Nov 2009 09:14:23 -0800
-Subject: [patch 1/1] TOUCHSCREEN: S3C24XX touchscreen driver from Arnaud
-	Patard.
-In-Reply-To: <4B052D50.2070002@simtec.co.uk>
-References: <20091118232939.201290297@fluff.org.uk>
-	<20091118232948.063635416@fluff.org.uk>
-	<20091119025930.GA20172@core.coreip.homeip.net>
-	<4B052D50.2070002@simtec.co.uk>
-Message-ID: <20091119171423.GD15647@core.coreip.homeip.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 19 Nov 2009 17:24:46 +0000
+Subject: Can anyone help test Cortex A9 patches?
+In-Reply-To: <20091119090328.GC13376@n2100.arm.linux.org.uk>
+References: <20091119090328.GC13376@n2100.arm.linux.org.uk>
+Message-ID: <1258651486.24487.55.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19, 2009 at 11:34:40AM +0000, Ben Dooks wrote:
-> Dmitry Torokhov wrote:
->
->>> +
->>> +static char *s3c2410ts_name = "s3c2410 TouchScreen";
+On Thu, 2009-11-19 at 09:03 +0000, Russell King - ARM Linux wrote:
+> I need help testing Cortex A9 patches.  What I need is someone with a
+> fairly fully fledged Cortex A9 platform with the ability to build and
+> test recent kernels - and therefore be able to test my patches without
+> modification.
+> 
+> Specifically, I'm looking for someone who can reproduce data corruption
+> on DMA transfers from devices caused by Cortex A9's speculative prefetching
+> 
+> Unfortunately, I have no way to reproduce this problem here (I have no
+> Cortex A9 hardware), and as such I can't test the fixes.
 
-Btw, "static char s3c2410ts_name[]" will save you a pointer. But, it
-looks like it is used only once, in probe(), so just put it there.
+I can get access to a PBX-A9 board but there is no DMA support on it, so
+not able to reproduce the problem.
 
->>> +
->>> +/* Per-touchscreen data. */
->>> +
->>> +/**
->>> + * struct s3c2410ts - driver touchscreen state.
->>> + * @client: The ADC client we registered with the core driver.
->>> + * @dev: The device we are bound to.
->>> + * @input: The input device we registered with the input subsystem.
->>> + * @clock: The clock for the adc.
->>> + * @io: Pointer to the IO base.
->>> + * @xp: The accumulated X position data.
->>> + * @yp: The accumulated Y position data.
->>> + * @irq_tc: The interrupt number for pen up/down interrupt
->>> + * @count: The number of samples collected.
->>> + * @shift: The log2 of the maximum count to read in one go.
->>> + */
->>
->> These sructures are driver-internal and so don't need to be kernel-doc-ed.
->> Same goes for the driver-private functions.
->
-> I like having the documentation, and I would much prefer to leave it
-> in as useful.
->
+What's the background to this? Has anyone reported issues?
 
-Ah, I wasn't requiesting to remove the documentation, I was just saying
-that since these data structures and fucntions are driver-provate they
-don't need to use kernel-doc style.
-
->>> +
->>> +		input_report_key(ts.input, BTN_TOUCH, 1);
->>> +		input_report_abs(ts.input, ABS_PRESSURE, 1);
->>
->> No fake pressure events please, BTN_TOUCH should be enough.
->
-> I'd have to check, IIRC tslib needs these to function properly.
->
-
-Just update your tslib, the issue was fixed there last November.
-
->>> +{
->>> +	struct s3c2410_ts_mach_info *info;
->>> +	struct device *dev = &pdev->dev;
->>> +	struct input_dev *input_dev;
->>> +	struct resource *res;
->>> +	int ret = -EINVAL;
->>
->> Can we call it "error" (since that's what you use it for).
->
-> Is it really necessary to change this?
->
-
-No, it is my personal preference/style. In case when it is used like:
-
-	var = blah();
-	if (var)
-		goto err_unblah;
-
-	return 0;
-
-err_unblah:
-	unblah();
-	return var;
-}
-
-I prefer that var called 'error'. If the value is returned on both error
-and success paths then I call it 'ret', 'retval', etc.
-
-But no, if you prefer 'ret' that is fine too.
-
->>
->>> +	.suspend	= s3c2410ts_suspend,
->>> +	.resume		= s3c2410ts_resume,
->>
->> Switch to pm_ops.
->
-> ok, will do. may as well remove the #ifdef CONFIG_PM
-> for such small amount of code too.
->
-
-As long as it does not break when CONFIG_PM is not set...
+Another thing we have is domain switching overriding the NX bit on
+ioremap'ed regions and therefore getting speculative prefetches from
+that area (in theory, it's hard to predict what the CPU would try to
+prefetch). But we don't set the manager domain for too long and it would
+be hard to trigger a failure.
 
 -- 
-Dmitry
+Catalin
