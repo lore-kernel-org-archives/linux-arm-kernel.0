@@ -1,43 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Nov 2009 17:33:08 +0000
-Subject: Can anyone help test Cortex A9 patches?
-In-Reply-To: <1258651486.24487.55.camel@pc1117.cambridge.arm.com>
-References: <20091119090328.GC13376@n2100.arm.linux.org.uk>
-	<1258651486.24487.55.camel@pc1117.cambridge.arm.com>
-Message-ID: <20091119173308.GC22232@n2100.arm.linux.org.uk>
+From: ben@simtec.co.uk (Ben Dooks)
+Date: Thu, 19 Nov 2009 17:48:24 +0000
+Subject: [patch 1/1] TOUCHSCREEN: S3C24XX touchscreen driver from	Arnaud
+	Patard.
+In-Reply-To: <20091119170321.GB15647@core.coreip.homeip.net>
+References: <20091118232939.201290297@fluff.org.uk>	<20091118232948.063635416@fluff.org.uk>	<20091119025930.GA20172@core.coreip.homeip.net>	<4B052D50.2070002@simtec.co.uk>	<20091119135236.GB5535@digital-scurf.org>
+	<20091119170321.GB15647@core.coreip.homeip.net>
+Message-ID: <4B0584E8.3040800@simtec.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19, 2009 at 05:24:46PM +0000, Catalin Marinas wrote:
-> On Thu, 2009-11-19 at 09:03 +0000, Russell King - ARM Linux wrote:
-> > I need help testing Cortex A9 patches.  What I need is someone with a
-> > fairly fully fledged Cortex A9 platform with the ability to build and
-> > test recent kernels - and therefore be able to test my patches without
-> > modification.
-> > 
-> > Specifically, I'm looking for someone who can reproduce data corruption
-> > on DMA transfers from devices caused by Cortex A9's speculative prefetching
-> > 
-> > Unfortunately, I have no way to reproduce this problem here (I have no
-> > Cortex A9 hardware), and as such I can't test the fixes.
-> 
-> I can get access to a PBX-A9 board but there is no DMA support on it, so
-> not able to reproduce the problem.
-> 
-> What's the background to this? Has anyone reported issues?
+Dmitry Torokhov wrote:
+> On Thu, Nov 19, 2009 at 01:52:36PM +0000, Daniel Silverstone wrote:
+>> On Thu, Nov 19, 2009 at 11:34:40AM +0000, Ben Dooks wrote:
+>>>>> +		input_report_key(ts.input, BTN_TOUCH, 1);
+>>>>> +		input_report_abs(ts.input, ABS_PRESSURE, 1);
+>>>> No fake pressure events please, BTN_TOUCH should be enough.
+>>> I'd have to check, IIRC tslib needs these to function properly.
+>> Indeed it does -- otherwise it won't work.  Yes you could try going around and
+>> patching TSLIB but so many people use it that it is principle-of-least-surprise
+>> to produce pressure events.
+>>
+>>>>> +	ts.input->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
+>>>>> +	input_set_abs_params(ts.input, ABS_X, 0, 0x3FF, 0, 0);
+>>>>> +	input_set_abs_params(ts.input, ABS_Y, 0, 0x3FF, 0, 0);
+>>>>> +	input_set_abs_params(ts.input, ABS_PRESSURE, 0, 1, 0, 0);
+>>>> Drop ABS_PRESSURE.
+>>> ok, see above.
+>> The same applies here -- claim ABS_PRESSURE or tslib won't operate with the
+>> touchscreen.
+>>
+>> While it is tempting to be 100% exactly correct to what the hardware reports
+>> (which is only TOUCH not PRESSURE) it is preferable to work with the software
+>> which the majority of people use -- namely tslib.
+>>
+>> I would strongly argue against removing the ABS_PRESSURE stuff personally,
+>> despite it being essentially a lie.
 
-Well, I had a fast response from people this morning, and the patch has
-been successfully tested against a recent kernel.  So problem mostly
-solved.
+ok, i'll remove it and anyone who can't be bothered to update their
+tslib can hack in their own solution if they really care about it.
 
-Essentially corruption caused by speculative prefetches from buffers while
-they are mapped for DMA.  You were sent an email late last month about
-the problem:
+> And I would strongly argue that you just need to update your tslib,
+> especially given the fact that this issue was dealt with there about a
+> year ago.  And if you really need that fix to be in released (read
+> 'tagged') version of tslib - please speak to its maintainer.
 
-http://lists.arm.linux.org.uk/lurker/message/20091031.131319.18796aa1.en.html
+> Why everyone thinks that it is a good idea to pile workarounds for
+> software issues in the kernel but updating the other parts of software
+> stack is a big no-no?
 
-Unfortunately, the reporter seems to have taken the subsequent messages
-off the list.  Morevoer, the original reporter said the patch didn't help,
-however since he applied it to an older kernel and got rejects, I'm going
-to dismiss that.  I can find nothing wrong with my patch which would mean
-his original problem would not be fixed.
+it can be much more difficult to update a userland than to hack the
+kernel...
