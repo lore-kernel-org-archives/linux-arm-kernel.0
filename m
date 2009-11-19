@@ -1,221 +1,230 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Thu, 19 Nov 2009 14:23:49 +0800
-Subject: [PATCH] ARM: Add spi controller driver support for NUC900
-In-Reply-To: <20091118142109.ff2c5ef6.akpm@linux-foundation.org>
-References: <4B024748.9080001@gmail.com>
-	<20091118142109.ff2c5ef6.akpm@linux-foundation.org>
-Message-ID: <e68bb3470911182223r28e9bac0lf185c1443168ff52@mail.gmail.com>
+From: shinel@foxmail.com (Shine Liu)
+Date: Thu, 19 Nov 2009 14:53:06 +0800
+Subject: [PATCH v2] ARM:S3C2440: MINI2440 Remove some improper __initdata
+	qualifiers
+In-Reply-To: <200910211129.26044.jbe@pengutronix.de>
+References: <1256095984.1600.109.camel@shinel>
+	<200910211129.26044.jbe@pengutronix.de>
+Message-ID: <1258613586.2676.77.camel@shinel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew,
+Hi, Ben
 
-Thanks a lot for your help, and I have a question below.
+I resend this patch has been posted to linux-arm-kernel last month.
+Orignal mail refer http://www.spinics.net/lists/arm-kernel/msg75741.html
 
-2009/11/19 Andrew Morton <akpm@linux-foundation.org>:
-> On Tue, 17 Nov 2009 14:48:40 +0800
-> Wan ZongShun <mcuos.com@gmail.com> wrote:
->
->> Dear David,
->>
->> Add winbond/nuvoton NUC900 spi controller driver support,
->> on my evaluation board,there is a winbond w25x16 spi flash,
->> so I test my spi controller driver with m25p80.c.
->>
->>
->> ...
->>
->> +static inline struct w90p910_spi *to_hw(struct spi_device *sdev)
->> +{
->> + ? ? return spi_master_get_devdata(sdev->master);
->> +}
->> +
->> +static void w90p910_slave_seclect(struct spi_device *spi, unsigned int ssr)
->
-> I think you meant "select" here?
->
->> +{
->> + ? ? struct w90p910_spi *hw = to_hw(spi);
->> + ? ? unsigned int val;
->> + ? ? unsigned int cs = spi->mode & SPI_CS_HIGH ? 1 : 0;
->> + ? ? unsigned int cpol = spi->mode & SPI_CPOL ? 1 : 0;
->> +
->> + ? ? val = __raw_readl(hw->regs + USI_SSR);
->> +
->> + ? ? if (!cs)
->> + ? ? ? ? ? ? val &= ~SELECTLEV;
->> + ? ? else
->> + ? ? ? ? ? ? val |= SELECTLEV;
->> +
->> + ? ? if (!ssr)
->> + ? ? ? ? ? ? val &= ~SELECTSLAVE;
->> + ? ? else
->> + ? ? ? ? ? ? val |= SELECTSLAVE;
->> +
->> + ? ? __raw_writel(val, hw->regs + USI_SSR);
->> +
->> + ? ? val = __raw_readl(hw->regs + USI_CNT);
->> +
->> + ? ? if (!cpol)
->> + ? ? ? ? ? ? val &= ~SELECTPOL;
->> + ? ? else
->> + ? ? ? ? ? ? val |= SELECTPOL;
->> +
->> + ? ? __raw_writel(val, hw->regs + USI_CNT);
->> +}
->
-> That's a read-modify-write operation. ?What locking prevents two
-> threads of control from altering the USI_SSR and USI_CNT registers at
-> the same time, resulting in an indeterminate setting?
->
->> +static void w90p910_spi_chipsel(struct spi_device *spi, int value)
->> +{
->> + ? ? switch (value) {
->> + ? ? case BITBANG_CS_INACTIVE:
->> + ? ? ? ? ? ? w90p910_slave_seclect(spi, 0);
->> + ? ? ? ? ? ? break;
->> +
->> + ? ? case BITBANG_CS_ACTIVE:
->> + ? ? ? ? ? ? w90p910_slave_seclect(spi, 1);
->> + ? ? ? ? ? ? break;
->> + ? ? }
->> +}
->> +
->> +static void w90p910_spi_setup_txnum(struct w90p910_spi *hw,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int txnum)
->> +{
->> + ? ? unsigned int val;
->> +
->> + ? ? val = __raw_readl(hw->regs + USI_CNT);
->> +
->> + ? ? if (!txnum)
->> + ? ? ? ? ? ? val &= ~TXNUM;
->> + ? ? else
->> + ? ? ? ? ? ? val |= txnum << 0x08;
->> +
->> + ? ? __raw_writel(val, hw->regs + USI_CNT);
->> +
->> +}
->> +
->> +static void w90p910_spi_setup_txbitlen(struct w90p910_spi *hw,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int txbitlen)
->> +{
->> + ? ? unsigned int val;
->> +
->> + ? ? val = __raw_readl(hw->regs + USI_CNT);
->> +
->> + ? ? val |= (txbitlen << 0x03);
->> +
->> + ? ? __raw_writel(val, hw->regs + USI_CNT);
->> +}
->> +
->> +static void w90p910_spi_gobusy(struct w90p910_spi *hw)
->> +{
->> + ? ? unsigned int val;
->> +
->> + ? ? val = __raw_readl(hw->regs + USI_CNT);
->> +
->> + ? ? val |= GOBUSY;
->> +
->> + ? ? __raw_writel(val, hw->regs + USI_CNT);
->> +}
->
-> ditto, ditto, ditto.
->
->> +static int w90p910_spi_setupxfer(struct spi_device *spi,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct spi_transfer *t)
->> +{
->> + ? ? return 0;
->> +}
->> +
->> +static int w90p910_spi_setup(struct spi_device *spi)
->> +{
->> + ? ? return 0;
->> +}
->> +
->> +static inline unsigned int hw_txbyte(struct w90p910_spi *hw, int count)
->> +{
->> + ? ? return hw->tx ? hw->tx[count] : 0;
->> +}
->> +
->> +static int w90p910_spi_txrx(struct spi_device *spi, struct spi_transfer *t)
->> +{
->> + ? ? struct w90p910_spi *hw = to_hw(spi);
->> +
->> + ? ? hw->tx = t->tx_buf;
->> + ? ? hw->rx = t->rx_buf;
->> + ? ? hw->len = t->len;
->> + ? ? hw->count = 0;
->> +
->> + ? ? init_completion(&hw->done);
->> +
->> + ? ? __raw_writel(hw_txbyte(hw, 0x0), hw->regs + USI_TX0);
->> +
->> + ? ? w90p910_spi_gobusy(hw);
->> +
->> + ? ? wait_for_completion(&hw->done);
->> +
->> + ? ? return hw->count;
->> +}
->
-> The init_completion() should be unneeded? ?The structure was
-> initialised at setup time and will be left in a reusable state after a
-> complete()/wait_for_completion(). ?Reinitialising the structure all the
-> time like this adds risk that it will be scribbled on while in use.
->
->>
->> ...
->>
->> +static int __devexit w90p910_spi_remove(struct platform_device *dev)
->> +{
->> + ? ? struct w90p910_spi *hw = platform_get_drvdata(dev);
->> +
->> + ? ? platform_set_drvdata(dev, NULL);
->> +
->> + ? ? spi_unregister_master(hw->master);
->> +
->> + ? ? clk_disable(hw->clk);
->> + ? ? clk_put(hw->clk);
->
-> As far as I can tell, a hardware interrupt could still be pending, or
-> be under service while the above code is executing?
->
-> If so, I expect bad things will happen?
-
-Do you mean that I should put this 'free_irq()' in the front of
-w90p910_spi_remove?
-
-such as:
-"
-free_irq(hw->irq, hw);
-
-platform_set_drvdata(dev, NULL);
-
-spi_unregister_master(hw->master);
-
-clk_disable(hw->clk);
-clk_put(hw->clk);
-"
-
->> + ? ? free_irq(hw->irq, hw);
->> + ? ? iounmap(hw->regs);
->> +
->> + ? ? release_resource(hw->ioarea);
->> + ? ? kfree(hw->ioarea);
->> +
->> + ? ? spi_master_put(hw->master);
->> + ? ? return 0;
->> +}
->> +
->>
->> ...
->>
->
->
+Best Regards, 
+Shine
 
 
 
--- 
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Signed-off-by: Michel Pollet <buserror@gmail.com>
+Signed-off-by: Shine Liu <liuxian@redflag-linux.com>
+------------------------------------------------------
+
+
+--- a/arch/arm/mach-s3c2440/mach-mini2440.c     2009-10-21 10:18:52.000000000 +0800
++++ b/arch/arm/mach-s3c2440/mach-mini2440.c     2009-10-21 21:29:44.000000000 +0800
+@@ -61,7 +61,7 @@
+ 
+ #define MACH_MINI2440_DM9K_BASE (S3C2410_CS4 + 0x300)
+ 
+-static struct map_desc mini2440_iodesc[] __initdata = {
++static struct map_desc mini2440_iodesc[] = {
+        /* nothing to declare, move along */
+ };
+ 
+@@ -233,7 +233,7 @@
+ 
+ /* MMC/SD  */
+ 
+-static struct s3c24xx_mci_pdata mini2440_mmc_cfg __initdata = {
++static struct s3c24xx_mci_pdata mini2440_mmc_cfg = {
+    .gpio_detect   = S3C2410_GPG(8),
+    .gpio_wprotect = S3C2410_GPH(8),
+    .set_power     = NULL,
+@@ -242,7 +242,7 @@
+ 
+ /* NAND Flash on MINI2440 board */
+ 
+-static struct mtd_partition mini2440_default_nand_part[] __initdata = {
++static struct mtd_partition mini2440_default_nand_part[] = {
+        [0] = {
+                .name   = "u-boot",
+                .size   = SZ_256K,
+@@ -267,7 +267,7 @@
+        },
+ };
+ 
+-static struct s3c2410_nand_set mini2440_nand_sets[] __initdata = {
++static struct s3c2410_nand_set mini2440_nand_sets[] = {
+        [0] = {
+                .name           = "nand",
+                .nr_chips       = 1,
+@@ -277,7 +277,7 @@
+        },
+ };
+ 
+-static struct s3c2410_platform_nand mini2440_nand_info __initdata = {
++static struct s3c2410_platform_nand mini2440_nand_info = {
+        .tacls          = 0,
+        .twrph0         = 25,
+        .twrph1         = 15,
+@@ -288,7 +288,7 @@
+ 
+ /* DM9000AEP 10/100 ethernet controller */
+ 
+-static struct resource mini2440_dm9k_resource[] __initdata = {
++static struct resource mini2440_dm9k_resource[] = {
+        [0] = {
+                .start = MACH_MINI2440_DM9K_BASE,
+                .end   = MACH_MINI2440_DM9K_BASE + 3,
+@@ -310,11 +310,11 @@
+  * The DM9000 has no eeprom, and it's MAC address is set by
+  * the bootloader before starting the kernel.
+  */
+-static struct dm9000_plat_data mini2440_dm9k_pdata __initdata = {
++static struct dm9000_plat_data mini2440_dm9k_pdata = {
+        .flags          = (DM9000_PLATF_16BITONLY | DM9000_PLATF_NO_EEPROM),
+ };
+ 
+-static struct platform_device mini2440_device_eth __initdata = {
++static struct platform_device mini2440_device_eth = {
+        .name           = "dm9000",
+        .id             = -1,
+        .num_resources  = ARRAY_SIZE(mini2440_dm9k_resource),
+@@ -341,7 +341,7 @@
+  *     |  |  +----+  +----+
+  *       .....
+  */
+-static struct gpio_keys_button mini2440_buttons[] __initdata = {
++static struct gpio_keys_button mini2440_buttons[] = {
+        {
+                .gpio           = S3C2410_GPG(0),               /* K1 */
+                .code           = KEY_F1,
+@@ -384,12 +384,12 @@
+ #endif
+ };
+ 
+-static struct gpio_keys_platform_data mini2440_button_data __initdata = {
++static struct gpio_keys_platform_data mini2440_button_data = {
+        .buttons        = mini2440_buttons,
+        .nbuttons       = ARRAY_SIZE(mini2440_buttons),
+ };
+ 
+-static struct platform_device mini2440_button_device __initdata = {
++static struct platform_device mini2440_button_device = {
+        .name           = "gpio-keys",
+        .id             = -1,
+        .dev            = {
+@@ -399,41 +399,41 @@
+ 
+ /* LEDS */
+ 
+-static struct s3c24xx_led_platdata mini2440_led1_pdata __initdata = {
++static struct s3c24xx_led_platdata mini2440_led1_pdata = {
+        .name           = "led1",
+        .gpio           = S3C2410_GPB(5),
+        .flags          = S3C24XX_LEDF_ACTLOW | S3C24XX_LEDF_TRISTATE,
+        .def_trigger    = "heartbeat",
+ };
+ 
+-static struct s3c24xx_led_platdata mini2440_led2_pdata __initdata = {
++static struct s3c24xx_led_platdata mini2440_led2_pdata = {
+        .name           = "led2",
+        .gpio           = S3C2410_GPB(6),
+        .flags          = S3C24XX_LEDF_ACTLOW | S3C24XX_LEDF_TRISTATE,
+        .def_trigger    = "nand-disk",
+ };
+ 
+-static struct s3c24xx_led_platdata mini2440_led3_pdata __initdata = {
++static struct s3c24xx_led_platdata mini2440_led3_pdata = {
+        .name           = "led3",
+        .gpio           = S3C2410_GPB(7),
+        .flags          = S3C24XX_LEDF_ACTLOW | S3C24XX_LEDF_TRISTATE,
+        .def_trigger    = "mmc0",
+ };
+ 
+-static struct s3c24xx_led_platdata mini2440_led4_pdata __initdata = {
++static struct s3c24xx_led_platdata mini2440_led4_pdata = {
+        .name           = "led4",
+        .gpio           = S3C2410_GPB(8),
+        .flags          = S3C24XX_LEDF_ACTLOW | S3C24XX_LEDF_TRISTATE,
+        .def_trigger    = "",
+ };
+ 
+-static struct s3c24xx_led_platdata mini2440_led_backlight_pdata __initdata = {
++static struct s3c24xx_led_platdata mini2440_led_backlight_pdata = {
+        .name           = "backlight",
+        .gpio           = S3C2410_GPG(4),
+        .def_trigger    = "backlight",
+ };
+ 
+-static struct platform_device mini2440_led1 __initdata = {
++static struct platform_device mini2440_led1 = {
+        .name           = "s3c24xx_led",
+        .id             = 1,
+        .dev            = {
+@@ -441,7 +441,7 @@
+        },
+ };
+ 
+-static struct platform_device mini2440_led2 __initdata = {
++static struct platform_device mini2440_led2 = {
+        .name           = "s3c24xx_led",
+        .id             = 2,
+        .dev            = {
+@@ -449,7 +449,7 @@
+        },
+ };
+ 
+-static struct platform_device mini2440_led3 __initdata = {
++static struct platform_device mini2440_led3 = {
+        .name           = "s3c24xx_led",
+        .id             = 3,
+        .dev            = {
+@@ -457,7 +457,7 @@
+        },
+ };
+ 
+-static struct platform_device mini2440_led4 __initdata = {
++static struct platform_device mini2440_led4 = {
+        .name           = "s3c24xx_led",
+        .id             = 4,
+        .dev            = {
+@@ -465,7 +465,7 @@
+        },
+ };
+ 
+-static struct platform_device mini2440_led_backlight __initdata = {
++static struct platform_device mini2440_led_backlight = {
+        .name           = "s3c24xx_led",
+        .id             = 5,
+        .dev            = {
+@@ -475,14 +475,14 @@
+ 
+ /* AUDIO */
+ 
+-static struct s3c24xx_uda134x_platform_data mini2440_audio_pins __initdata = {
++static struct s3c24xx_uda134x_platform_data mini2440_audio_pins = {
+        .l3_clk = S3C2410_GPB(4),
+        .l3_mode = S3C2410_GPB(2),
+        .l3_data = S3C2410_GPB(3),
+        .model = UDA134X_UDA1341
+ };
+ 
+-static struct platform_device mini2440_audio __initdata = {
++static struct platform_device mini2440_audio = {
+        .name           = "s3c24xx_uda134x",
+        .id             = 0,
+        .dev            = {
+@@ -498,7 +498,7 @@
+        .page_size      = 16,
+ };
+ 
+-static struct i2c_board_info mini2440_i2c_devs[] __initdata = {
++static struct i2c_board_info mini2440_i2c_devs[] = {
+        {
+                I2C_BOARD_INFO("24c08", 0x50),
+                .platform_data = &at24c08,
