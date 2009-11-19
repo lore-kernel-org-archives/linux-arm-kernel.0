@@ -1,34 +1,112 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 19 Nov 2009 16:48:18 +0100
-Subject: [PATCH 04/12] i.MX31 clock: rename SSI clocks to driver name
-In-Reply-To: <1258645706-9071-4-git-send-email-s.hauer@pengutronix.de>
+Date: Thu, 19 Nov 2009 16:48:25 +0100
+Subject: [PATCH 11/12] pca100: add sound support
+In-Reply-To: <1258645706-9071-11-git-send-email-s.hauer@pengutronix.de>
 References: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
 	<1258645706-9071-2-git-send-email-s.hauer@pengutronix.de>
 	<1258645706-9071-3-git-send-email-s.hauer@pengutronix.de>
 	<1258645706-9071-4-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1258645706-9071-5-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-5-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-6-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-7-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-8-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-9-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-10-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-11-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1258645706-9071-12-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-mx3/clock.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-mx2/pca100.c |   52 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 52 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mx3/clock.c b/arch/arm/mach-mx3/clock.c
-index b2a3bcf..3089786 100644
---- a/arch/arm/mach-mx3/clock.c
-+++ b/arch/arm/mach-mx3/clock.c
-@@ -558,8 +558,8 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("mxc_w1.0", NULL, owire_clk)
- 	_REGISTER_CLOCK("mxc-mmc.0", NULL, sdhc1_clk)
- 	_REGISTER_CLOCK("mxc-mmc.1", NULL, sdhc2_clk)
--	_REGISTER_CLOCK(NULL, "ssi", ssi1_clk)
--	_REGISTER_CLOCK(NULL, "ssi", ssi2_clk)
-+	_REGISTER_CLOCK("imx-ssi.0", NULL, ssi1_clk)
-+	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
- 	_REGISTER_CLOCK(NULL, "firi", firi_clk)
- 	_REGISTER_CLOCK(NULL, "ata", ata_clk)
- 	_REGISTER_CLOCK(NULL, "rtic", rtic_clk)
+diff --git a/arch/arm/mach-mx2/pca100.c b/arch/arm/mach-mx2/pca100.c
+index aea3d34..e0eb21f 100644
+--- a/arch/arm/mach-mx2/pca100.c
++++ b/arch/arm/mach-mx2/pca100.c
+@@ -26,6 +26,7 @@
+ #include <linux/spi/eeprom.h>
+ #include <linux/irq.h>
+ #include <linux/gpio.h>
++#include <linux/delay.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+@@ -41,6 +42,8 @@
+ #include <mach/mxc_nand.h>
+ #include <mach/irqs.h>
+ #include <mach/mmc.h>
++#include <mach/audmux.h>
++#include <mach/ssi.h>
+ 
+ #include "devices.h"
+ 
+@@ -182,15 +185,64 @@ static struct imxmmc_platform_data sdhc_pdata = {
+ 	.exit = pca100_sdhc2_exit,
+ };
+ 
++static void pca100_ac97_warm_reset(struct snd_ac97 *ac97)
++{
++	printk("%s\n", __func__);
++
++	mxc_gpio_mode(GPIO_PORTC | 20 | GPIO_GPIO | GPIO_OUT);
++	gpio_set_value(GPIO_PORTC + 20, 1);
++	udelay(2);
++	gpio_set_value(GPIO_PORTC + 20, 0);
++	mxc_gpio_mode(PC20_PF_SSI1_FS);
++	msleep(2);
++}
++
++static void pca100_ac97_cold_reset(struct snd_ac97 *ac97)
++{
++	printk("%s\n", __func__);
++
++	mxc_gpio_mode(GPIO_PORTC | 20 | GPIO_GPIO | GPIO_OUT);  /* FS */
++	gpio_set_value(GPIO_PORTC + 20, 0);
++	mxc_gpio_mode(GPIO_PORTC | 22 | GPIO_GPIO | GPIO_OUT);  /* TX */
++	gpio_set_value(GPIO_PORTC + 22, 0);
++	mxc_gpio_mode(GPIO_PORTC | 28 | GPIO_GPIO | GPIO_OUT);  /* reset */
++	gpio_set_value(GPIO_PORTC + 28, 0);
++	udelay(10);
++	gpio_set_value(GPIO_PORTC + 28, 1);
++	mxc_gpio_mode(PC20_PF_SSI1_FS);
++	mxc_gpio_mode(PC22_PF_SSI1_TXD);
++	msleep(2);
++}
++
++static struct imx_ssi_platform_data pca100_ssi_pdata = {
++	.ac97_reset		= pca100_ac97_cold_reset,
++	.ac97_warm_reset	= pca100_ac97_warm_reset,
++	.flags			= IMX_SSI_USE_AC97,
++};
++
+ static void __init pca100_init(void)
+ {
+ 	int ret;
+ 
++	/* SSI unit */
++	mxc_audmux_v1_configure_port(MX27_AUDMUX_HPCR1_SSI0,
++				  MXC_AUDMUX_V1_PCR_SYN | /* 4wire mode */
++				  MXC_AUDMUX_V1_PCR_TFCSEL(3) |
++				  MXC_AUDMUX_V1_PCR_TCLKDIR | /* clock is output */
++				  MXC_AUDMUX_V1_PCR_RXDSEL(3));
++	mxc_audmux_v1_configure_port(4,
++				  MXC_AUDMUX_V1_PCR_SYN | /* 4wire mode */
++				  MXC_AUDMUX_V1_PCR_TFCSEL(0) |
++				  MXC_AUDMUX_V1_PCR_TFSDIR |
++				  MXC_AUDMUX_V1_PCR_RXDSEL(0));
++
+ 	ret = mxc_gpio_setup_multiple_pins(pca100_pins,
+ 			ARRAY_SIZE(pca100_pins), "PCA100");
+ 	if (ret)
+ 		printk(KERN_ERR "pca100: Failed to setup pins (%d)\n", ret);
+ 
++	mxc_register_device(&imx_ssi_device0, &pca100_ssi_pdata);
++
+ 	mxc_register_device(&mxc_uart_device0, &uart_pdata);
+ 
+ 	mxc_gpio_mode(GPIO_PORTC | 29 | GPIO_GPIO | GPIO_IN);
 -- 
 1.6.5.2
