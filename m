@@ -1,21 +1,69 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Nov 2009 22:48:39 +0000
-Subject: [PATCH] NUC900: rename w90p910 defconfig
-In-Reply-To: <20091119224210.GG22232@n2100.arm.linux.org.uk>
-References: <4B023990.9070308@gmail.com>
-	<20091119224210.GG22232@n2100.arm.linux.org.uk>
-Message-ID: <20091119224839.GH22232@n2100.arm.linux.org.uk>
+Date: Thu, 19 Nov 2009 23:01:22 +0000
+Subject: [GIT PULL] AT91 Kconfig rework
+In-Reply-To: <4B01702B.4080107@atmel.com>
+References: <4B01702B.4080107@atmel.com>
+Message-ID: <20091119230122.GI22232@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19, 2009 at 10:42:10PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Nov 17, 2009 at 01:50:08PM +0800, Wan ZongShun wrote:
-> > Dear Russell,
-> > 
-> > Rename the w90p910 default configure file.
-> > 
-> > Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
+On Mon, Nov 16, 2009 at 04:30:51PM +0100, Nicolas Ferre wrote:
+> Hi Russell,
 > 
-> Ok.
+> This is AT91 Kconfig rework for next merge window. After 
+> discussing it on the mailing-list and Ack by Andrew Victor, I 
+> send you this patchset. You can pull it from:
+> 
+>   git://github.com/at91linux/linux-2.6-at91.git for-rmk
 
-And same for the set of three defconfig patches posted along with this one.
+FYI:
+
+$ git pull git://github.com/at91linux/linux-2.6-at91.git for-rmk
+remote: Counting objects: 41, done.
+remote: Compressing objects: 100% (28/28), done.
+remote: Total 30 (delta 26), reused 2 (delta 2)
+Unpacking objects: 100% (30/30), done.
+
+>From bogus@does.not.exist.com  Fri Nov  6 13:01:15 2009
+From: bogus@does.not.exist.com ()
+Date: Fri, 06 Nov 2009 18:01:15 -0000
+Subject: No subject
+Message-ID: <mailman.49.1258671701.2170.linux-arm-kernel@lists.infradead.org>
+
+Auto-merging arch/arm/mach-at91/Kconfig
+CONFLICT (content): Merge conflict in arch/arm/mach-at91/Kconfig
+Recorded preimage for 'arch/arm/mach-at91/Kconfig'
+Automatic merge failed; fix conflicts and then commit the result.
+$ git diff-files -u
+diff --cc arch/arm/mach-at91/Kconfig
+index 2fd8843,3df124e..0000000
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@@ -320,7 -337,7 +337,11 @@@ config MACH_AT91SAM9G20E
+  
+  config MACH_AT91SAM9G20EK_2MMC
+  	bool "Atmel AT91SAM9G20-EK Evaluation Kit with 2 SD/MMC Slots"
+++<<<<<<< HEAD:arch/arm/mach-at91/Kconfig
+ +	depends on ARCH_AT91SAM9G20
+++=======
++ 	select HAVE_NAND_ATMEL_BUSWIDTH_16
+++>>>>>>> 0912e5359f89f303f53fd4874dadab77a4949a8a:arch/arm/mach-at91/Kconfig
+  	help
+  	  Select this if you are using an Atmel AT91SAM9G20-EK Evaluation Kit
+  	  with 2 SD/MMC Slots. This is the case for AT91SAM9G20-EK rev. C and
+@@@ -394,7 -411,7 +415,11 @@@ config MTD_AT91_DATAFLASH_CAR
+  
+  config MTD_NAND_ATMEL_BUSWIDTH_16
+  	bool "Enable 16-bit data bus interface to NAND flash"
+++<<<<<<< HEAD:arch/arm/mach-at91/Kconfig
+ +	depends on (MACH_AT91SAM9260EK || MACH_AT91SAM9261EK || MACH_AT91SAM9G10EK || MACH_AT91SAM9263EK || MACH_AT91SAM9G20EK || MACH_AT91SAM9G20EK_2MMC || MACH_AT91SAM9G45EKES || MACH_AT91CAP9ADK)
+++=======
++ 	depends on HAVE_NAND_ATMEL_BUSWIDTH_16
+++>>>>>>> 0912e5359f89f303f53fd4874dadab77a4949a8a:arch/arm/mach-at91/Kconfig
+  	help
+  	  On AT91SAM926x boards both types of NAND flash can be present
+  	  (8 and 16 bit data bus width).
+
+What's the resolution?  I think the first is just to include both, but
+the second looks like the first depends needs deleting to leave only the
+second?
