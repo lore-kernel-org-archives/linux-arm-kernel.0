@@ -1,46 +1,38 @@
-From: dsilvers@simtec.co.uk (Daniel Silverstone)
-Date: Thu, 19 Nov 2009 13:52:36 +0000
-Subject: [patch 1/1] TOUCHSCREEN: S3C24XX touchscreen driver from
-	Arnaud  Patard.
-In-Reply-To: <4B052D50.2070002@simtec.co.uk>
-References: <20091118232939.201290297@fluff.org.uk>
-	<20091118232948.063635416@fluff.org.uk>
-	<20091119025930.GA20172@core.coreip.homeip.net>
-	<4B052D50.2070002@simtec.co.uk>
-Message-ID: <20091119135236.GB5535@digital-scurf.org>
+From: valentin.longchamp@epfl.ch (Valentin Longchamp)
+Date: Thu, 19 Nov 2009 15:15:21 +0100
+Subject: [PATCH 1/1] mx31moboard: change initial reset status for robot
+	microcontolers
+Message-ID: <1258640121-12637-1-git-send-email-valentin.longchamp@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19, 2009 at 11:34:40AM +0000, Ben Dooks wrote:
->>> +		input_report_key(ts.input, BTN_TOUCH, 1);
->>> +		input_report_abs(ts.input, ABS_PRESSURE, 1);
->> No fake pressure events please, BTN_TOUCH should be enough.
-> I'd have to check, IIRC tslib needs these to function properly.
+We want the microcontrolers to be held in reset during kernel boot.
 
-Indeed it does -- otherwise it won't work.  Yes you could try going around and
-patching TSLIB but so many people use it that it is principle-of-least-surprise
-to produce pressure events.
+This patch is trivial and should go into next -rc.
 
->>> +	ts.input->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
->>> +	input_set_abs_params(ts.input, ABS_X, 0, 0x3FF, 0, 0);
->>> +	input_set_abs_params(ts.input, ABS_Y, 0, 0x3FF, 0, 0);
->>> +	input_set_abs_params(ts.input, ABS_PRESSURE, 0, 1, 0, 0);
->> Drop ABS_PRESSURE.
-> ok, see above.
+Signed-off-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
+---
+ arch/arm/mach-mx3/mx31moboard-marxbot.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-The same applies here -- claim ABS_PRESSURE or tslib won't operate with the
-touchscreen.
-
-While it is tempting to be 100% exactly correct to what the hardware reports
-(which is only TOUCH not PRESSURE) it is preferable to work with the software
-which the majority of people use -- namely tslib.
-
-I would strongly argue against removing the ABS_PRESSURE stuff personally,
-despite it being essentially a lie.
-
-Regards,
-
-Daniel.
-
+diff --git a/arch/arm/mach-mx3/mx31moboard-marxbot.c b/arch/arm/mach-mx3/mx31moboard-marxbot.c
+index 2bfaffb..325e10b 100644
+--- a/arch/arm/mach-mx3/mx31moboard-marxbot.c
++++ b/arch/arm/mach-mx3/mx31moboard-marxbot.c
+@@ -110,12 +110,12 @@ static struct imxmmc_platform_data sdhc2_pdata = {
+ static void dspics_resets_init(void)
+ {
+ 	if (!gpio_request(TRSLAT_RST_B, "translator-rst")) {
+-		gpio_direction_output(TRSLAT_RST_B, 1);
++		gpio_direction_output(TRSLAT_RST_B, 0);
+ 		gpio_export(TRSLAT_RST_B, false);
+ 	}
+ 
+ 	if (!gpio_request(DSPICS_RST_B, "dspics-rst")) {
+-		gpio_direction_output(DSPICS_RST_B, 1);
++		gpio_direction_output(DSPICS_RST_B, 0);
+ 		gpio_export(DSPICS_RST_B, false);
+ 	}
+ }
 -- 
-Daniel Silverstone                              http://www.simtec.co.uk/
+1.6.3.3
