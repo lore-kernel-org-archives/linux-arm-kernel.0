@@ -1,47 +1,59 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 19 Nov 2009 17:49:28 +0000
-Subject: Can anyone help test Cortex A9 patches?
-In-Reply-To: <20091119173308.GC22232@n2100.arm.linux.org.uk>
-References: <20091119090328.GC13376@n2100.arm.linux.org.uk>
-	<1258651486.24487.55.camel@pc1117.cambridge.arm.com>
-	<20091119173308.GC22232@n2100.arm.linux.org.uk>
-Message-ID: <1258652968.24487.61.camel@pc1117.cambridge.arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 19 Nov 2009 18:53:27 +0100
+Subject: i.MX audio support
+In-Reply-To: <20091119162830.GA31336@rakim.wolfsonmicro.main>
+References: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
+	<20091119162830.GA31336@rakim.wolfsonmicro.main>
+Message-ID: <20091119175327.GV30179@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2009-11-19 at 17:33 +0000, Russell King - ARM Linux wrote:
-> On Thu, Nov 19, 2009 at 05:24:46PM +0000, Catalin Marinas wrote:
-> > On Thu, 2009-11-19 at 09:03 +0000, Russell King - ARM Linux wrote:
-> > > I need help testing Cortex A9 patches.  What I need is someone with a
-> > > fairly fully fledged Cortex A9 platform with the ability to build and
-> > > test recent kernels - and therefore be able to test my patches without
-> > > modification.
-> > > 
-> > > Specifically, I'm looking for someone who can reproduce data corruption
-> > > on DMA transfers from devices caused by Cortex A9's speculative prefetching
-> > > 
-> > > Unfortunately, I have no way to reproduce this problem here (I have no
-> > > Cortex A9 hardware), and as such I can't test the fixes.
-> > 
-> > I can get access to a PBX-A9 board but there is no DMA support on it, so
-> > not able to reproduce the problem.
-> > 
-> > What's the background to this? Has anyone reported issues?
-> 
-> Well, I had a fast response from people this morning, and the patch has
-> been successfully tested against a recent kernel.  So problem mostly
-> solved.
-> 
-> Essentially corruption caused by speculative prefetches from buffers while
-> they are mapped for DMA.  You were sent an email late last month about
-> the problem:
-> 
-> http://lists.arm.linux.org.uk/lurker/message/20091031.131319.18796aa1.en.html
+Hi Mark,
 
-It's a bit worrying that I don't have this e-mail in my inbox (nor
-deleted items). I have to check the spam filter.
+On Thu, Nov 19, 2009 at 04:28:30PM +0000, Mark Brown wrote:
+> On Thu, Nov 19, 2009 at 04:48:14PM +0100, Sascha Hauer wrote:
+> 
+> > There already is a driver for i.MX in the tree, this one is a nearly complete
+> > rewrite. I haven't touched the in Kernel driver with these patches. The in
+> > Kernel driver has several problems, it doesn't use ioremap, uses direct pointer
+> > derefs instead of proper access functions and the only board supported so far is
+> > itself not supported in mainline.
+> 
+> I've CCed in Javier who wrote the currently merged code.
+> 
+> I'll review these patches tomorrow or over the weekend, however this
+> jumps out at me as being something that we'd want to fix before merging
+> since having two drivers for the same bit of hardware always leads to
+> problems going forwards.  I don't mind how this is addressed, replacing
+> the existing driver or incrementally fixing it would both work for me
+> (the latter is obviously preferrable but equally well we don't want to
+> get bogged down).
 
-Thanks for the link anyway, I'll have a look tomorrow (have to go now).
+My work isn't based on the mainline driver but some older (also
+Freescale based) code. Putting this into an incremental series would
+mean quite some work.
+Lets wait for your review before making further decisions.
+
+> 
+> The approach of using FIQ for i.MX3x until SDMA gets merged seems like a
+> reasonable one.  It's not ideal but it will work and it shouldn't create
+> any problems transitioning to SDMA when that is submitted.
+
+Which is in unforseeable future. So far I haven't seen anyone getting
+far on this task.
+
+> 
+> BTW, might be nice to use --no-chain-reply-to for git send-email - it
+> makes long patch sets look a lot nicer in a threaded mail reader.  Not a
+> big deal, though.
+
+I usually use the chain reply option because otherwise the patches
+sometimes get the wrong order when doing git am on a mailbox.
+
+Sascha
 
 -- 
-Catalin
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
