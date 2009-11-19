@@ -1,52 +1,78 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Thu, 19 Nov 2009 11:39:45 +0100
-Subject: [PATCH] SPI: drain MXC SPI transfer buffer when probing device
-Message-ID: <mailman.48.1258657314.2170.linux-arm-kernel@lists.infradead.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 19 Nov 2009 19:03:00 +0000
+Subject: [alsa-devel] [PATCH 07/12] add phycore sound support
+In-Reply-To: <1258645706-9071-8-git-send-email-s.hauer@pengutronix.de>
+References: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-2-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-3-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-4-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-5-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-6-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-7-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-8-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20091119190300.GB2814@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the MX31litekit, the bootloader seems to communicate with the MC13783
-PMIC chip before booting Linux. However, it does not flush all the
-buffers properly after that, which makes the imx-spi driver read
-bogus data when probing the MC13783.
+On Thu, Nov 19, 2009 at 04:48:21PM +0100, Sascha Hauer wrote:
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Fix that by draining the SPI receive buffer on startup.
+> +	if (machine_is_pcm038() || machine_is_pcm037()) {
 
-Signed-off-by: Daniel Mack <daniel@caiaq.de>
-Cc: David Brownell <dbrownell@users.sourceforge.net>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: spi-devel-general at lists.sourceforge.net
----
- drivers/spi/spi_imx.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+Just check when probing the driver.
 
-diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
-index 89c22ef..1b17f44 100644
---- a/drivers/spi/spi_imx.c
-+++ b/drivers/spi/spi_imx.c
-@@ -44,6 +44,9 @@
- #define MXC_CSPIINT		0x0c
- #define MXC_RESET		0x1c
- 
-+#define MX3_CSPISTAT		0x14
-+#define MX3_CSPISTAT_RR		(1 << 3)
-+
- /* generic defines to abstract from the different register layouts */
- #define MXC_INT_RR	(1 << 0) /* Receive data ready interrupt */
- #define MXC_INT_TE	(1 << 1) /* Transmit FIFO empty interrupt */
-@@ -593,6 +596,11 @@ static int __init spi_imx_probe(struct platform_device *pdev)
- 	if (!cpu_is_mx31() || !cpu_is_mx35())
- 		writel(1, spi_imx->base + MXC_RESET);
- 
-+	/* drain receive buffer */
-+	if (cpu_is_mx31() || cpu_is_mx35())
-+		while (readl(spi_imx->base + MX3_CSPISTAT) & MX3_CSPISTAT_RR)
-+			readl(spi_imx->base + MXC_CSPIRXDATA);
-+
- 	spi_imx->intctrl(spi_imx, 0);
- 
- 	ret = spi_bitbang_start(&spi_imx->bitbang);
--- 
-1.6.5.2
+> +		snd_soc_dai_set_fmt(cpu_dai,
+> +				SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
+> +				SND_SOC_DAIFMT_CBM_CFM);
+> +		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+> +			snd_soc_dai_set_fmt(codec_dai,
+> +				SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
+> +				SND_SOC_DAIFMT_CBM_CFM);
+> +		} else {
+> +			snd_soc_dai_set_fmt(codec_dai,
+> +				SND_SOC_DAIFMT_DSP_A | SND_SOC_DAIFMT_NB_NF |
+> +				SND_SOC_DAIFMT_CBM_CFM);
+> +			snd_soc_dai_set_tdm_slot(codec_dai, 0, 0, 4, 0);
+> +		}
+
+This looks very wrong.  The CPU is unconditionally configured to use I2S
+mode but the CODEC may be configured to use either I2S or DSP mode
+depending on the direction of audio.  The CPU and CODEC should at least
+be in the same mode...
+
+> +		/* Put DC field of STCCR to 1 (not zero) */
+> +		ret = cpu_dai->ops->set_tdm_slot(cpu_dai, 0x0, 0xfffffffc, 4, 0);
+
+That comment doesn't really clarify anything for me...
+
+> +static int imx_phycore_hifi_hw_free(struct snd_pcm_substream *substream)
+> +{
+> +	return 0;
+> +}
+
+> +static int imx_phycore_probe(struct platform_device *pdev)
+> +{
+> +	return 0;
+> +}
+> +
+> +static int imx_phycore_remove(struct platform_device *pdev)
+> +{
+> +	return 0;
+> +}
+
+Remove these if they have no content.
+
+> +#ifdef CONFIG_SND_SOC_WM9712
+> +static struct snd_soc_dai_link imx_phycore_dai_ac97[] = {
+> +	{
+> +		.name		= "HiFi",
+> +		.stream_name	= "HiFi",
+> +		.codec_dai	= &wm9712_dai[WM9712_DAI_AC97_HIFI],
+> +		.ops		= &imx_phycore_hifi_ops,
+> +	},
+> +};
+> +#endif
+
+I'd make this a second machine driver, it doesn't appear to have
+anything in common with the Atlas based system and the conditionals make
+everything more complicated.
