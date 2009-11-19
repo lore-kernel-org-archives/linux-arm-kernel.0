@@ -1,215 +1,42 @@
 From: valentin.longchamp@epfl.ch (Valentin Longchamp)
-Date: Thu, 19 Nov 2009 15:23:05 +0100
-Subject: [PATCH 4/7] mx31moboard: SPI and MC13783 voltage regulator support
+Date: Thu, 19 Nov 2009 15:35:07 +0100
+Subject: [PATCH 0/6] mx31moboard: patches for next merge window (V3)
 In-Reply-To: <1258640588-12705-1-git-send-email-valentin.longchamp@epfl.ch>
 References: <1258640588-12705-1-git-send-email-valentin.longchamp@epfl.ch>
-Message-ID: <1258640588-12705-5-git-send-email-valentin.longchamp@epfl.ch>
+Message-ID: <4B05579B.6010400@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+There are 7 patches in this series, and not 6 though the title (damn 
+copy-paste).
 
-Signed-off-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
----
- arch/arm/mach-mx3/mx31moboard-marxbot.c |   13 ++++
- arch/arm/mach-mx3/mx31moboard.c         |  120 ++++++++++++++++++++++++++++++-
- 2 files changed, 132 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-mx3/mx31moboard-marxbot.c b/arch/arm/mach-mx3/mx31moboard-marxbot.c
-index 6b06faf..11da3c7 100644
---- a/arch/arm/mach-mx3/mx31moboard-marxbot.c
-+++ b/arch/arm/mach-mx3/mx31moboard-marxbot.c
-@@ -20,6 +20,7 @@
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/platform_device.h>
-+#include <linux/spi/spi.h>
- #include <linux/types.h>
- 
- #include <mach/common.h>
-@@ -122,6 +123,15 @@ static void dspics_resets_init(void)
- 	}
- }
- 
-+static struct spi_board_info marxbot_spi_board_info[] __initdata = {
-+	{
-+		.modalias = "spidev",
-+		.max_speed_hz = 300000,
-+		.bus_num = 1,
-+		.chip_select = 1, /* according spi1_cs[] ! */
-+	},
-+};
-+
- /*
-  * system init for baseboard usage. Will be called by mx31moboard init.
-  */
-@@ -136,6 +146,9 @@ void __init mx31moboard_marxbot_init(void)
- 
- 	mxc_register_device(&mxcsdhc_device1, &sdhc2_pdata);
- 
-+	spi_register_board_info(marxbot_spi_board_info,
-+		ARRAY_SIZE(marxbot_spi_board_info));
-+
- 	/* battery present pin */
- 	gpio_request(IOMUX_TO_GPIO(MX31_PIN_LCS0), "bat-present");
- 	gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_LCS0));
-diff --git a/arch/arm/mach-mx3/mx31moboard.c b/arch/arm/mach-mx3/mx31moboard.c
-index ff74fab..20ce5a0 100644
---- a/arch/arm/mach-mx3/mx31moboard.c
-+++ b/arch/arm/mach-mx3/mx31moboard.c
-@@ -26,6 +26,9 @@
- #include <linux/mtd/physmap.h>
- #include <linux/mtd/partitions.h>
- #include <linux/platform_device.h>
-+#include <linux/regulator/machine.h>
-+#include <linux/mfd/mc13783.h>
-+#include <linux/spi/spi.h>
- #include <linux/types.h>
- 
- #include <asm/mach-types.h>
-@@ -39,7 +42,7 @@
- #include <mach/iomux-mx3.h>
- #include <mach/i2c.h>
- #include <mach/mmc.h>
--#include <mach/mx31.h>
-+#include <mach/spi.h>
- 
- #include "devices.h"
- 
-@@ -79,6 +82,16 @@ static unsigned int moboard_pins[] = {
- 	/* SEL */
- 	MX31_PIN_DTR_DCE1__GPIO2_8, MX31_PIN_DSR_DCE1__GPIO2_9,
- 	MX31_PIN_RI_DCE1__GPIO2_10, MX31_PIN_DCD_DCE1__GPIO2_11,
-+	/* SPI1 */
-+	MX31_PIN_CSPI2_MOSI__MOSI, MX31_PIN_CSPI2_MISO__MISO,
-+	MX31_PIN_CSPI2_SCLK__SCLK, MX31_PIN_CSPI2_SPI_RDY__SPI_RDY,
-+	MX31_PIN_CSPI2_SS0__SS0, MX31_PIN_CSPI2_SS2__SS2,
-+	/* Atlas IRQ */
-+	MX31_PIN_GPIO1_3__GPIO1_3,
-+	/* SPI2 */
-+	MX31_PIN_CSPI3_MOSI__MOSI, MX31_PIN_CSPI3_MISO__MISO,
-+	MX31_PIN_CSPI3_SCLK__SCLK, MX31_PIN_CSPI3_SPI_RDY__SPI_RDY,
-+	MX31_PIN_CSPI2_SS1__CSPI3_SS1,
- };
- 
- static struct physmap_flash_data mx31moboard_flash_data = {
-@@ -124,6 +137,103 @@ static struct imxi2c_platform_data moboard_i2c1_pdata = {
- 	.bitrate = 100000,
- };
- 
-+static int moboard_spi1_cs[] = {
-+	MXC_SPI_CS(0),
-+	MXC_SPI_CS(2),
-+};
-+
-+static struct spi_imx_master moboard_spi1_master = {
-+	.chipselect	= moboard_spi1_cs,
-+	.num_chipselect	= ARRAY_SIZE(moboard_spi1_cs),
-+};
-+
-+static struct regulator_consumer_supply sdhc_consumers[] = {
-+	{
-+		.dev	= &mxcsdhc_device0.dev,
-+		.supply	= "sdhc0_vcc",
-+	},
-+	{
-+		.dev	= &mxcsdhc_device1.dev,
-+		.supply	= "sdhc1_vcc",
-+	},
-+};
-+
-+static struct regulator_init_data sdhc_vreg_data = {
-+	.constraints = {
-+		.min_uV = 2700000,
-+		.max_uV = 3000000,
-+		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
-+			REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
-+		.valid_modes_mask = REGULATOR_MODE_NORMAL |
-+			REGULATOR_MODE_FAST,
-+		.always_on = 0,
-+		.boot_on = 1,
-+	},
-+	.num_consumer_supplies = ARRAY_SIZE(sdhc_consumers),
-+	.consumer_supplies = sdhc_consumers,
-+};
-+
-+static struct regulator_consumer_supply cam_consumers[] = {
-+	{
-+		.dev	= &mx3_camera.dev,
-+		.supply	= "cam_vcc",
-+	},
-+};
-+
-+static struct regulator_init_data cam_vreg_data = {
-+	.constraints = {
-+		.min_uV = 2700000,
-+		.max_uV = 3000000,
-+		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
-+			REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
-+		.valid_modes_mask = REGULATOR_MODE_NORMAL |
-+			REGULATOR_MODE_FAST,
-+		.always_on = 0,
-+		.boot_on = 1,
-+	},
-+	.num_consumer_supplies = ARRAY_SIZE(cam_consumers),
-+	.consumer_supplies = cam_consumers,
-+};
-+
-+static struct mc13783_regulator_init_data moboard_regulators[] = {
-+	{
-+		.id = MC13783_REGU_VMMC1,
-+		.init_data = &sdhc_vreg_data,
-+	},
-+	{
-+		.id = MC13783_REGU_VCAM,
-+		.init_data = &cam_vreg_data,
-+	},
-+};
-+
-+static struct mc13783_platform_data moboard_pmic = {
-+	.regulators = moboard_regulators,
-+	.num_regulators = ARRAY_SIZE(moboard_regulators),
-+	.flags = MC13783_USE_REGULATOR | MC13783_USE_REGULATOR |
-+		MC13783_USE_RTC,
-+};
-+
-+static struct spi_board_info moboard_spi_board_info[] __initdata = {
-+	{
-+		.modalias = "mc13783",
-+		.irq = IOMUX_TO_IRQ(MX31_PIN_GPIO1_3),
-+		.max_speed_hz = 300000,
-+		.bus_num = 1,
-+		.chip_select = 0,
-+		.platform_data = &moboard_pmic,
-+		.mode = SPI_CS_HIGH,
-+	},
-+};
-+
-+static int moboard_spi2_cs[] = {
-+	MXC_SPI_CS(1),
-+};
-+
-+static struct spi_imx_master moboard_spi2_master = {
-+	.chipselect	= moboard_spi2_cs,
-+	.num_chipselect	= ARRAY_SIZE(moboard_spi2_cs),
-+};
-+
- #define SDHC1_CD IOMUX_TO_GPIO(MX31_PIN_ATA_CS0)
- #define SDHC1_WP IOMUX_TO_GPIO(MX31_PIN_ATA_CS1)
- 
-@@ -304,6 +414,14 @@ static void __init mxc_board_init(void)
- 	mxc_register_device(&mxc_i2c_device0, &moboard_i2c0_pdata);
- 	mxc_register_device(&mxc_i2c_device1, &moboard_i2c1_pdata);
- 
-+	mxc_register_device(&mxc_spi_device1, &moboard_spi1_master);
-+	mxc_register_device(&mxc_spi_device2, &moboard_spi2_master);
-+
-+	gpio_request(IOMUX_TO_GPIO(MX31_PIN_GPIO1_3), "pmic-irq");
-+	gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_GPIO1_3));
-+	spi_register_board_info(moboard_spi_board_info,
-+		ARRAY_SIZE(moboard_spi_board_info));
-+
- 	mxc_register_device(&mxcsdhc_device0, &sdhc1_pdata);
- 
- 	usb_xcvr_reset();
--- 
-1.6.3.3
+Valentin Longchamp wrote:
+> Here are the patches I would like to push during the next merge window for
+> the mx31moboard platform.
+> 
+> Sascha, I have seen that you already have commited last version to your
+> mxc-master-pu branch, could you please update with that series ?
+> 
+> It consists of a fix for a small hardware design issue for the main serial
+> port, a few GPIOs used on the robots that are declared, camera support and
+> finally MC13783 support as it is now getting ready.
+> 
+> For MC13783, RTC should come to mainline soon and it works well.
+> 
+> The camera part works for one camera. The soc_camera needs some reworking
+> before we are able to support the two cameras we have on the robot
+> 
+> USB host support for mx31 should make into next merge window and is now
+> part of this series for the mx31moboard platform.
+> 
+> Changes since v1:
+> - changed the patches order
+> - support for a single camera
+> - corrected typos and comments from earlier version
+> 
+> Changes since v2:
+> - moved mx3_camera include to the correct patch (thanks Guennadi)
+> - moved SPIDEV device init into marxbot file
+> - added usb host support
+> 
+> Val
