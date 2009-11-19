@@ -1,35 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Nov 2009 09:43:59 +0000
-Subject: drivers/rtc/rtc-pl031.c uses __raw_readl()?
-In-Reply-To: <20091113232637.GB8637@n2100.arm.linux.org.uk>
-References: <63386a3d0911110130j2056a355l16cade8d30edb6cd@mail.gmail.com>
-	<63386a3d0911120043y2143c7f5w7289bc83b2e31847@mail.gmail.com>
-	<20091113232637.GB8637@n2100.arm.linux.org.uk>
-Message-ID: <20091119094359.GF13376@n2100.arm.linux.org.uk>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Thu, 19 Nov 2009 17:49:22 +0800
+Subject: [PATCH] ARM: Add spi controller driver support for NUC900
+In-Reply-To: <20091119090204.GB13376@n2100.arm.linux.org.uk>
+References: <4B024748.9080001@gmail.com>
+	<20091118142109.ff2c5ef6.akpm@linux-foundation.org>
+	<e68bb3470911182223r28e9bac0lf185c1443168ff52@mail.gmail.com>
+	<20091118234928.8d86a9f9.akpm@linux-foundation.org>
+	<e68bb3470911190040v2c14bbcfi46177cd58649e1c@mail.gmail.com>
+	<20091119090204.GB13376@n2100.arm.linux.org.uk>
+Message-ID: <e68bb3470911190149k3bc77ef6h26475bc7272784b8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 13, 2009 at 11:26:37PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Nov 12, 2009 at 09:43:43AM +0100, Linus Walleij wrote:
-> > 2009/11/11 Linus Walleij <linus.ml.walleij@gmail.com>:
-> > 
-> > > Is there some special reason as to why drivers/rtc/rtc-pl031.c uses
-> > > the __raw_[read|write]l() macro instead of plain [read|write]l()?
-> > 
-> > Reading the macro definitions I come to the conclusion that readl()
-> > is always little-endian and __raw_readl() is the machine endianness,
-> > so that if you put your ARM in BE mode or synthesize this PrimeCell
-> > on PPC, it will not work. PrimeCell registers are always LE I believe.
-> > 
-> > Now none of that was exactly obvious so please correct me if I'm
-> > wrong!
-> 
-> I think it's a question for Catalin - unfortunately the AMBA specifications
-> (which I guess is where there's a definitive statement on the endianness
-> for APB peripherals) is only available to registered users via the ARM
-> website.
+2009/11/19 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Thu, Nov 19, 2009 at 04:40:50PM +0800, Wan ZongShun wrote:
+>> 2009/11/19 Andrew Morton <akpm@linux-foundation.org>:
+>> > I don't know, because I don't know what operation the hardware needs to
+>> > stop it from generating interrupts. ?Perhaps that's clk_disable()?
+>>
+>> The interrupt will be not occur as long as I run clk_disable().
+>>
+>> > Once you've stopped the source of interrupts then the code should wait
+>> > for the IRQ handler to complete if it's running on another CPU. ?Yes,
+>> > free_irq() does that.
+>>
+>> So, regarding my system of single CPU, maybe I need put this
+>> 'clk_disable()' in the front of function of w90p910_spi_remove().
+>>
+>> right?
+>
+> Depending on the hardware, that's not the right answer. ?If turning off
+> the clock also causes register accesses to the device to abort, it is
+> a very dangerous thing to do.
+>
+> It can also be dangerous if the clock is used to synchronise the interrupt
+> output - it can lead to the output being permanently asserted if the clock
+> is turned off with it asserted.
+>
+> Normally devices have an "interrupt enable" register. ?You should disable
+> all interrupts from the device using this register after unregistering
+> the driver from the (SPI) subsystem.
 
-So where do we stand on this?  Are Primecell registers always LE?  Or
-can they be BE if running in one of the BE modes?
+sir, so I need implement a API to disable spi device interrupt by
+"interrupt enable" register?
+but I did not find the operation in other ARM platform when they close
+your spi driver.
 
-I'm not merging the patch until we have a definitive answer on this.
+or something I missed?
+
+>
+
+
+
+-- 
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
