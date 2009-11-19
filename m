@@ -1,38 +1,65 @@
 From: valentin.longchamp@epfl.ch (Valentin Longchamp)
-Date: Thu, 19 Nov 2009 15:15:21 +0100
-Subject: [PATCH 1/1] mx31moboard: change initial reset status for robot
-	microcontolers
-Message-ID: <1258640121-12637-1-git-send-email-valentin.longchamp@epfl.ch>
+Date: Thu, 19 Nov 2009 15:23:02 +0100
+Subject: [PATCH 1/7] mx31: various pins used for mx31moboard
+In-Reply-To: <1258640588-12705-1-git-send-email-valentin.longchamp@epfl.ch>
+References: <1258640588-12705-1-git-send-email-valentin.longchamp@epfl.ch>
+Message-ID: <1258640588-12705-2-git-send-email-valentin.longchamp@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We want the microcontrolers to be held in reset during kernel boot.
-
-This patch is trivial and should go into next -rc.
-
 Signed-off-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
 ---
- arch/arm/mach-mx3/mx31moboard-marxbot.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/plat-mxc/include/mach/iomux-mx3.h |   18 +++++++++++++++++-
+ 1 files changed, 17 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-mx3/mx31moboard-marxbot.c b/arch/arm/mach-mx3/mx31moboard-marxbot.c
-index 2bfaffb..325e10b 100644
---- a/arch/arm/mach-mx3/mx31moboard-marxbot.c
-+++ b/arch/arm/mach-mx3/mx31moboard-marxbot.c
-@@ -110,12 +110,12 @@ static struct imxmmc_platform_data sdhc2_pdata = {
- static void dspics_resets_init(void)
- {
- 	if (!gpio_request(TRSLAT_RST_B, "translator-rst")) {
--		gpio_direction_output(TRSLAT_RST_B, 1);
-+		gpio_direction_output(TRSLAT_RST_B, 0);
- 		gpio_export(TRSLAT_RST_B, false);
- 	}
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx3.h b/arch/arm/plat-mxc/include/mach/iomux-mx3.h
+index 446f867..50efa24 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-mx3.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-mx3.h
+@@ -623,6 +623,8 @@ enum iomux_pins {
+ #define MX31_PIN_GPIO3_0__GPIO3_0	IOMUX_MODE(MX31_PIN_GPIO3_0, IOMUX_CONFIG_GPIO)
+ #define MX31_PIN_GPIO3_1__GPIO3_1	IOMUX_MODE(MX31_PIN_GPIO3_1, IOMUX_CONFIG_GPIO)
+ #define MX31_PIN_TXD2__GPIO1_28		IOMUX_MODE(MX31_PIN_TXD2, IOMUX_CONFIG_GPIO)
++#define MX31_PIN_CSI_D4__GPIO3_4	IOMUX_MODE(MX31_PIN_CSI_D4, IOMUX_CONFIG_GPIO)
++#define MX31_PIN_CSI_D5__GPIO3_5	IOMUX_MODE(MX31_PIN_CSI_D5, IOMUX_CONFIG_GPIO)
+ #define MX31_PIN_USBOTG_DATA0__USBOTG_DATA0    IOMUX_MODE(MX31_PIN_USBOTG_DATA0, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_USBOTG_DATA1__USBOTG_DATA1    IOMUX_MODE(MX31_PIN_USBOTG_DATA1, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_USBOTG_DATA2__USBOTG_DATA2    IOMUX_MODE(MX31_PIN_USBOTG_DATA2, IOMUX_CONFIG_FUNC)
+@@ -642,12 +644,22 @@ enum iomux_pins {
+ #define MX31_PIN_CSPI1_SS2__USBH1_RCV          IOMUX_MODE(MX31_PIN_CSPI1_SS2,  IOMUX_CONFIG_ALT1)
+ #define MX31_PIN_CSPI1_SCLK__USBH1_OEB         IOMUX_MODE(MX31_PIN_CSPI1_SCLK, IOMUX_CONFIG_ALT1)
+ #define MX31_PIN_CSPI1_SPI_RDY__USBH1_FS       IOMUX_MODE(MX31_PIN_CSPI1_SPI_RDY, IOMUX_CONFIG_ALT1)
++#define MX31_PIN_SFS6__USBH1_SUSPEND	IOMUX_MODE(MX31_PIN_SFS6, IOMUX_CONFIG_FUNC)
++#define MX31_PIN_NFRE_B__GPIO1_11	IOMUX_MODE(MX31_PIN_NFRE_B, IOMUX_CONFIG_GPIO)
++#define MX31_PIN_NFALE__GPIO1_12	IOMUX_MODE(MX31_PIN_NFALE, IOMUX_CONFIG_GPIO)
+ #define MX31_PIN_USBH2_DATA0__USBH2_DATA0      IOMUX_MODE(MX31_PIN_USBH2_DATA0, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_USBH2_DATA1__USBH2_DATA1      IOMUX_MODE(MX31_PIN_USBH2_DATA1, IOMUX_CONFIG_FUNC)
++#define MX31_PIN_STXD3__USBH2_DATA2	IOMUX_MODE(MX31_PIN_STXD3, IOMUX_CONFIG_FUNC)
++#define MX31_PIN_SRXD3__USBH2_DATA3	IOMUX_MODE(MX31_PIN_SRXD3, IOMUX_CONFIG_FUNC)
++#define MX31_PIN_SCK3__USBH2_DATA4	IOMUX_MODE(MX31_PIN_SCK3, IOMUX_CONFIG_FUNC)
++#define MX31_PIN_SFS3__USBH2_DATA5	IOMUX_MODE(MX31_PIN_SFS3, IOMUX_CONFIG_FUNC)
++#define MX31_PIN_STXD6__USBH2_DATA6	IOMUX_MODE(MX31_PIN_STXD6, IOMUX_CONFIG_FUNC)
++#define MX31_PIN_SRXD6__USBH2_DATA7	IOMUX_MODE(MX31_PIN_SRXD6, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_USBH2_CLK__USBH2_CLK          IOMUX_MODE(MX31_PIN_USBH2_CLK, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_USBH2_DIR__USBH2_DIR          IOMUX_MODE(MX31_PIN_USBH2_DIR, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_USBH2_NXT__USBH2_NXT          IOMUX_MODE(MX31_PIN_USBH2_NXT, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_USBH2_STP__USBH2_STP          IOMUX_MODE(MX31_PIN_USBH2_STP, IOMUX_CONFIG_FUNC)
++#define MX31_PIN_SCK6__GPIO1_25		IOMUX_MODE(MX31_PIN_SCK6, IOMUX_CONFIG_GPIO)
+ #define MX31_PIN_USB_OC__GPIO1_30	IOMUX_MODE(MX31_PIN_USB_OC, IOMUX_CONFIG_GPIO)
+ #define MX31_PIN_I2C_DAT__I2C1_SDA	IOMUX_MODE(MX31_PIN_I2C_DAT, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_I2C_CLK__I2C1_SCL	IOMUX_MODE(MX31_PIN_I2C_CLK, IOMUX_CONFIG_FUNC)
+@@ -693,7 +705,11 @@ enum iomux_pins {
+ #define MX31_PIN_DCD_DCE1__GPIO2_11	IOMUX_MODE(MX31_PIN_DCD_DCE1, IOMUX_CONFIG_GPIO)
+ #define MX31_PIN_STXD5__GPIO1_21       IOMUX_MODE(MX31_PIN_STXD5, IOMUX_CONFIG_GPIO)
+ #define MX31_PIN_SRXD5__GPIO1_22       IOMUX_MODE(MX31_PIN_SRXD5, IOMUX_CONFIG_GPIO)
+-
++#define MX31_PIN_GPIO1_3__GPIO1_3	IOMUX_MODE(MX31_PIN_GPIO1_3, IOMUX_CONFIG_GPIO)
++#define MX31_PIN_CSPI2_SS1__CSPI3_SS1	IOMUX_MODE(MX31_PIN_CSPI2_SS1, IOMUX_CONFIG_ALT1)
++#define MX31_PIN_RTS1__GPIO2_6		IOMUX_MODE(MX31_PIN_RTS1, IOMUX_CONFIG_GPIO)
++#define MX31_PIN_CTS1__GPIO2_7		IOMUX_MODE(MX31_PIN_CTS1, IOMUX_CONFIG_GPIO)
++#define MX31_PIN_LCS0__GPIO3_23		IOMUX_MODE(MX31_PIN_LCS0, IOMUX_CONFIG_GPIO)
  
- 	if (!gpio_request(DSPICS_RST_B, "dspics-rst")) {
--		gpio_direction_output(DSPICS_RST_B, 1);
-+		gpio_direction_output(DSPICS_RST_B, 0);
- 		gpio_export(DSPICS_RST_B, false);
- 	}
- }
+ /*XXX: The SS0, SS1, SS2, SS3 lines of spi3 are multiplexed by cspi2_ss0, cspi2_ss1, cspi1_ss0
+  * cspi1_ss1*/
 -- 
 1.6.3.3
