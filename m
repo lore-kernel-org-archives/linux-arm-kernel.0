@@ -1,47 +1,632 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Thu, 19 Nov 2009 11:44:14 +0900
-Subject: [PATCH 09/19] drivers: serial: add support for Samsung S5PC110
-	SoC uart
-In-Reply-To: <20091118221345.GB4808@trinity.fluff.org>
-References: <1258551194-16018-1-git-send-email-m.szyprowski@samsung.com>
-	<1258551194-16018-10-git-send-email-m.szyprowski@samsung.com>
-	<1b68c6790911180614y355f656fs828177ecc845ec8e@mail.gmail.com>
-	<20091118221345.GB4808@trinity.fluff.org>
-Message-ID: <1b68c6790911181844p3fb32525h11f79f942afb2d64@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 18 Nov 2009 18:59:30 -0800
+Subject: [patch 1/1] TOUCHSCREEN: S3C24XX touchscreen driver from
+	Arnaud Patard.
+In-Reply-To: <20091118232948.063635416@fluff.org.uk>
+References: <20091118232939.201290297@fluff.org.uk>
+	<20091118232948.063635416@fluff.org.uk>
+Message-ID: <20091119025930.GA20172@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19, 2009 at 7:13 AM, Ben Dooks <ben-linux@fluff.org> wrote:
-> On Wed, Nov 18, 2009 at 11:14:52PM +0900, jassi brar wrote:
->> On Wed, Nov 18, 2009 at 10:33 PM, Marek Szyprowski
->> <m.szyprowski@samsung.com> wrote:
->> > From: Kyungmin Park <kyungmin.park@samsung.com>
->> >
->> > Samsung S5PC110 SoCs have UART that differs a bit from the one known
->> > from the previous Samsung SoCs. This patch adds support for this new
->> > driver.
->> >
->> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->
->> Not just about this c110 patch: I think this string comparison thing
->> isn't very neat.
->> I think we'd better be doing it by indexing into an array of clock
->> names(which can be
->> defined in some platform specific code).
->
-> I don't mind changing to using a table, but the table is probably best
-> off here, closest to the UART drivers in question.
-well as per current implementation of drivers/serial/samsung.c we can't
-do much about it.
+Hi Ben,
 
-Ideally, each SoC(if not yet, maybe in future) can have different
-number/names of possible source clocks for signal generation. Let us
-not depend upon even defaults(fclk, pclk etc)
-Let each platform code(SoC specific) define names of all possible
-source clocks and let the board init code pass on the potential source
-clocks by some bit-mask(or some other mechanism) while setting the
-platform data.
-The samsung.c could then simply go thru the array of source clock
-names and the bit-mask, in platform_data, while selecting the best possible
- source for the baud rate under consideration.
+On Wed, Nov 18, 2009 at 11:29:40PM +0000, Ben Dooks wrote:
+> From: Arnaud Patard <arnaud.patard@rtp-net.org>
+> 
+> S3C24XX touchscreen driver, originally written by Arnaud Patard and
+> other contributors. This driver is the version from the Simtec Electronics
+> tree, and as such is the best place to start and thus proposed to be
+> merged into the linux input system.
+> 
+
+Thank you for the patch. First thing first - do we have an agreement
+from all Samsung folks and other interested parties that _this_ is the
+driver? Because it's like 3rd implementation that came across...
+
+> The driver has had substantial testing as well as a number of tidying
+> up passes done by Ben Dooks, as noted:
+> 
+> - added kernel-doc comments to most of the routines
+> - removed old code from pre adc framework days
+> - updated device probe code to use platform id list matching
+> - cleaned up debug, since printk() now has timestamp feature
+> - ensure code uses dev_() reporting macros where necessary
+> 
+> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> Signed-off-by: Simtec Linux Team <linux@simtec.co.uk>
+> Signed-off-by: Ben Dooks <ben@simtec.co.uk>
+> 
+> ---
+>  drivers/input/touchscreen/Kconfig      |   18 +
+>  drivers/input/touchscreen/Makefile     |    1 
+>  drivers/input/touchscreen/s3c2410_ts.c |  464 +++++++++++++++++++++++++++++++++
+>  3 files changed, 483 insertions(+)
+> 
+> 
+> Index: b/drivers/input/touchscreen/Kconfig
+> ===================================================================
+> --- a/drivers/input/touchscreen/Kconfig	2009-11-09 22:28:23.000000000 +0000
+> +++ b/drivers/input/touchscreen/Kconfig	2009-11-10 10:38:44.000000000 +0000
+> @@ -133,6 +133,24 @@ config TOUCHSCREEN_FUJITSU
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called fujitsu-ts.
+>  
+> +config TOUCHSCREEN_S3C2410
+> +	tristate "Samsung S3C2410 touchscreen input driver"
+> +	depends on ARCH_S3C2410 && INPUT && INPUT_TOUCHSCREEN
+
+INPUT && INPUT_TOUCHSCREEN are superfluous.
+
+> +	select SERIO
+
+I don't think you need SERIO
+
+> +	help
+> +	  Say Y here if you have the s3c2410 touchscreen.
+> +
+> +	  If unsure, say N.
+> +
+> +	  To compile this driver as a module, choose M here: the
+> +	  module will be called s3c2410_ts.
+> +
+> +config TOUCHSCREEN_S3C2410_DEBUG
+> +	boolean "Samsung S3C2410 touchscreen debug messages"
+> +	depends on TOUCHSCREEN_S3C2410
+> +	help
+> +	  Select this if you want debug messages
+
+Where is this used?
+
+> +
+>  config TOUCHSCREEN_GUNZE
+>  	tristate "Gunze AHL-51S touchscreen"
+>  	select SERIO
+> Index: b/drivers/input/touchscreen/Makefile
+> ===================================================================
+> --- a/drivers/input/touchscreen/Makefile	2009-11-09 22:28:23.000000000 +0000
+> +++ b/drivers/input/touchscreen/Makefile	2009-11-10 10:38:44.000000000 +0000
+> @@ -26,6 +26,7 @@ obj-$(CONFIG_TOUCHSCREEN_HP7XX)		+= jorn
+>  obj-$(CONFIG_TOUCHSCREEN_HTCPEN)	+= htcpen.o
+>  obj-$(CONFIG_TOUCHSCREEN_USB_COMPOSITE)	+= usbtouchscreen.o
+>  obj-$(CONFIG_TOUCHSCREEN_PENMOUNT)	+= penmount.o
+> +obj-$(CONFIG_TOUCHSCREEN_S3C2410)	+= s3c2410_ts.o
+>  obj-$(CONFIG_TOUCHSCREEN_TOUCHIT213)	+= touchit213.o
+>  obj-$(CONFIG_TOUCHSCREEN_TOUCHRIGHT)	+= touchright.o
+>  obj-$(CONFIG_TOUCHSCREEN_TOUCHWIN)	+= touchwin.o
+> Index: b/drivers/input/touchscreen/s3c2410_ts.c
+> ===================================================================
+> --- /dev/null	1970-01-01 00:00:00.000000000 +0000
+> +++ b/drivers/input/touchscreen/s3c2410_ts.c	2009-11-10 10:47:38.000000000 +0000
+> @@ -0,0 +1,464 @@
+> +/* drivers/input/touchscreen/s3c2410_ts.c
+> + *
+> + * Samsung S3C24XX touchscreen driver
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the term of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+> + *
+> + * Copyright 2004 Arnaud Patard <arnaud.patard@rtp-net.org>
+> + * Copyright 2008 Ben Dooks <ben-linux@fluff.org>
+> + * Copyright 2009 Simtec Electronics <linux@simtec.co.uk>
+> + *
+> + * Additional work by Herbert P?tzl <herbert@13thfloor.at> and
+> + * Harald Welte <laforge@openmoko.org>
+> + */
+> +
+> +#include <linux/errno.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/slab.h>
+> +#include <linux/gpio.h>
+> +#include <linux/input.h>
+> +#include <linux/init.h>
+> +#include <linux/serio.h>
+
+No serio in sight.
+
+> +#include <linux/delay.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
+> +
+> +#include <plat/adc.h>
+> +#include <plat/regs-adc.h>
+> +
+> +#include <mach/regs-gpio.h>
+> +#include <mach/ts.h>
+> +
+> +/* For ts.dev.id.version */
+> +#define S3C2410TSVERSION	0x0101
+> +
+> +#define TSC_SLEEP  (S3C2410_ADCTSC_PULL_UP_DISABLE | S3C2410_ADCTSC_XY_PST(0))
+> +
+> +#define INT_DOWN	(0)
+> +#define INT_UP		(1 << 8)
+> +
+> +#define WAIT4INT	(S3C2410_ADCTSC_YM_SEN | \
+> +			 S3C2410_ADCTSC_YP_SEN | \
+> +			 S3C2410_ADCTSC_XP_SEN | \
+> +			 S3C2410_ADCTSC_XY_PST(3))
+> +
+> +#define AUTOPST		(S3C2410_ADCTSC_YM_SEN | \
+> +			 S3C2410_ADCTSC_YP_SEN | \
+> +			 S3C2410_ADCTSC_XP_SEN | \
+> +			 S3C2410_ADCTSC_AUTO_PST | \
+> +			 S3C2410_ADCTSC_XY_PST(0))
+> +
+> +#define DEBUG_LVL    KERN_DEBUG
+
+Don't seem to be used.
+
+> +
+> +static char *s3c2410ts_name = "s3c2410 TouchScreen";
+> +
+> +/* Per-touchscreen data. */
+> +
+> +/**
+> + * struct s3c2410ts - driver touchscreen state.
+> + * @client: The ADC client we registered with the core driver.
+> + * @dev: The device we are bound to.
+> + * @input: The input device we registered with the input subsystem.
+> + * @clock: The clock for the adc.
+> + * @io: Pointer to the IO base.
+> + * @xp: The accumulated X position data.
+> + * @yp: The accumulated Y position data.
+> + * @irq_tc: The interrupt number for pen up/down interrupt
+> + * @count: The number of samples collected.
+> + * @shift: The log2 of the maximum count to read in one go.
+> + */
+
+These sructures are driver-internal and so don't need to be kernel-doc-ed.
+Same goes for the driver-private functions.
+
+> +struct s3c2410ts {
+> +	struct s3c_adc_client *client;
+> +	struct device *dev;
+> +	struct input_dev *input;
+> +	struct clk *clock;
+> +	void __iomem *io;
+> +	unsigned long xp;
+> +	unsigned long yp;
+> +	int irq_tc;
+> +	int count;
+> +	int shift;
+> +};
+> +
+> +static struct s3c2410ts ts;
+> +
+> +/**
+> + * s3c2410_ts_connect - configure gpio for s3c2410 systems
+> + *
+> + * Configure the GPIO for the S3C2410 system, where we have external FETs
+> + * connected to the device (later systems such as the S3C2440 integrate
+> + * these into the device).
+> +*/
+> +static inline void s3c2410_ts_connect(void)
+> +{
+> +	s3c2410_gpio_cfgpin(S3C2410_GPG(12), S3C2410_GPG12_XMON);
+> +	s3c2410_gpio_cfgpin(S3C2410_GPG(13), S3C2410_GPG13_nXPON);
+> +	s3c2410_gpio_cfgpin(S3C2410_GPG(14), S3C2410_GPG14_YMON);
+> +	s3c2410_gpio_cfgpin(S3C2410_GPG(15), S3C2410_GPG15_nYPON);
+
+No gpiolib? Also, should it be in the driver or maybe in the platform
+code?
+
+> +}
+> +
+> +/**
+> + * get_down - return the down state of the pen
+> + * @data0: The data read from ADCDAT0 register.
+> + * @data1: The data read from ADCDAT1 register.
+> + *
+> + * Return non-zero if both readings show that the pen is down.
+> + */
+> +static inline int get_down(unsigned long data0, unsigned long data1)
+
+bool?
+
+> +{
+> +	/* returns true if both data values show stylus down */
+> +	return (!(data0 & S3C2410_ADCDAT0_UPDOWN) &&
+> +		!(data1 & S3C2410_ADCDAT0_UPDOWN));
+> +}
+> +
+> +static void touch_timer_fire(unsigned long data)
+> +{
+> +	unsigned long data0;
+> +	unsigned long data1;
+> +	int down;
+
+bool?
+
+> +
+> +	data0 = readl(ts.io + S3C2410_ADCDAT0);
+> +	data1 = readl(ts.io + S3C2410_ADCDAT1);
+> +
+> +	down = get_down(data0, data1);
+> +
+> +	if (ts.count == (1<<ts.shift)) {
+
+Syyle: x << y
+
+> +		ts.xp >>= ts.shift;
+> +		ts.yp >>= ts.shift;
+> +
+> +		dev_dbg(ts.dev, "%s: X=%lu, Y=%lu, count=%d\n",
+> +			__func__, ts.xp, ts.yp, ts.count);
+> +
+> +		input_report_abs(ts.input, ABS_X, ts.xp);
+> +		input_report_abs(ts.input, ABS_Y, ts.yp);
+> +
+> +		input_report_key(ts.input, BTN_TOUCH, 1);
+> +		input_report_abs(ts.input, ABS_PRESSURE, 1);
+
+No fake pressure events please, BTN_TOUCH should be enough.
+
+> +		input_sync(ts.input);
+> +
+> +		ts.xp = 0;
+> +		ts.yp = 0;
+> +		ts.count = 0;
+> +	}
+> +
+> +	if (down) {
+> +		s3c_adc_start(ts.client, 0, 1 << ts.shift);
+> +	} else {
+> +		ts.count = 0;
+> +
+> +		input_report_key(ts.input, BTN_TOUCH, 0);
+> +		input_report_abs(ts.input, ABS_PRESSURE, 0);
+> +		input_sync(ts.input);
+> +
+> +		writel(WAIT4INT | INT_DOWN, ts.io + S3C2410_ADCTSC);
+> +	}
+> +}
+> +
+> +static struct timer_list touch_timer = TIMER_INITIALIZER(touch_timer_fire, 0, 0);
+
+static DEFINE_TIMER(...);
+
+> +
+> +/**
+> + * stylus_irq - touchscreen stylus event interrupt
+> + * @irq: The interrupt number
+> + * @dev_id: The device ID.
+> + *
+> + * Called when the IRQ_TC is fired for a pen up or down event.
+> + */
+> +static irqreturn_t stylus_irq(int irq, void *dev_id)
+> +{
+> +	unsigned long data0;
+> +	unsigned long data1;
+> +	int down;
+> +
+> +	data0 = readl(ts.io + S3C2410_ADCDAT0);
+> +	data1 = readl(ts.io + S3C2410_ADCDAT1);
+> +
+> +	down = get_down(data0, data1);
+> +
+> +	/* TODO we should never get an interrupt with down set while
+> +	 * the timer is running, but maybe we ought to verify that the
+> +	 * timer isn't running anyways. */
+> +
+> +	if (down)
+> +		s3c_adc_start(ts.client, 0, 1 << ts.shift);
+> +	else
+> +		dev_info(ts.dev, "%s: count=%d\n", __func__, ts.count);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +/**
+> + * s3c24xx_ts_conversion - ADC conversion callback
+> + * @client: The client that was registered with the ADC core.
+> + * @data0: The reading from ADCDAT0.
+> + * @data1: The reading from ADCDAT1.
+> + * @left: The number of samples left.
+> + *
+> + * Called when a conversion has finished.
+> + */
+> +static void s3c24xx_ts_conversion(struct s3c_adc_client *client,
+> +				  unsigned data0, unsigned data1,
+> +				  unsigned *left)
+> +{
+> +	dev_dbg(ts.dev, "%s: %d,%d\n", __func__, data0, data1);
+> +
+> +	ts.xp += data0;
+> +	ts.yp += data1;
+> +
+> +	ts.count++;
+> +
+> +	/* From tests, it seems that it is unlikely to get a pen-up
+> +	 * event during the conversion process which means we can
+> +	 * ignore any pen-up events with less than the requisite
+> +	 * count done.
+> +	 *
+> +	 * In several thousand conversions, no pen-ups where detected
+> +	 * before count completed.
+> +	 */
+> +}
+> +
+> +/**
+> + * s3c24xx_ts_select - ADC selection callback.
+> + * @client: The client that was registered with the ADC core.
+> + * @select: The reason for select.
+> + *
+> + * Called when the ADC core selects (or deslects) us as a client.
+> + */
+> +static void s3c24xx_ts_select(struct s3c_adc_client *client, unsigned select)
+> +{
+> +	if (select) {
+> +		writel(S3C2410_ADCTSC_PULL_UP_DISABLE | AUTOPST,
+> +		       ts.io + S3C2410_ADCTSC);
+> +	} else {
+> +		mod_timer(&touch_timer, jiffies+1);
+> +		writel(WAIT4INT | INT_UP, ts.io + S3C2410_ADCTSC);
+> +	}
+> +}
+> +
+> +/**
+> + * s3c2410ts_probe - device core probe entry point
+> + * @pdev: The device we are being bound to.
+> + *
+> + * Initialise, find and allocate any resources we need to run and then
+> + * register with the ADC and input systems.
+> + */
+> +static int __init s3c2410ts_probe(struct platform_device *pdev)
+
+__devinit or switch to platform_driver_probe().
+
+> +{
+> +	struct s3c2410_ts_mach_info *info;
+> +	struct device *dev = &pdev->dev;
+> +	struct input_dev *input_dev;
+> +	struct resource *res;
+> +	int ret = -EINVAL;
+
+Can we call it "error" (since that's what you use it for).
+> +
+> +	/* Initialise input stuff */
+> +	memset(&ts, 0, sizeof(struct s3c2410ts));
+> +
+> +	ts.dev = dev;
+> +
+> +	info = pdev->dev.platform_data;
+> +	if (!info) {
+> +		dev_err(dev, "no platform data, cannot attach\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	dev_dbg(dev, "initialising touchscreen\n");
+> +
+> +	ts.clock = clk_get(dev, "adc");
+> +	if (IS_ERR(ts.clock)) {
+> +		dev_err(dev, "cannot get adc clock source\n");
+> +		return -ENOENT;
+> +	}
+> +
+> +	clk_enable(ts.clock);
+> +	dev_dbg(dev, "got and enabled clocks\n");
+> +
+> +	ts.irq_tc = ret = platform_get_irq(pdev, 0);
+> +	if (ret < 0) {
+> +		dev_err(dev, "no resource for interrupt\n");
+> +		goto err_clk;
+> +	}
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		dev_err(dev, "no resource for registers\n");
+> +		ret = -ENOENT;
+> +		goto err_clk;
+> +	}
+> +
+
+request_mem_region() here?
+
+> +	ts.io = ioremap(res->start, resource_size(res));
+> +	if (ts.io == NULL) {
+> +		dev_err(dev, "cannot map registers\n");
+> +		ret = -ENOMEM;
+> +		goto err_clk;
+> +	}
+> +
+> +	/* Configure the touchscreen external FETs on the S3C2410 */
+> +	if (!platform_get_device_id(pdev)->driver_data)
+> +		s3c2410_ts_connect();
+> +
+> +	ts.client = s3c_adc_register(pdev, s3c24xx_ts_select,
+> +				     s3c24xx_ts_conversion, 1);
+> +	if (IS_ERR(ts.client)) {
+> +		dev_err(dev, "failed to register adc client\n");
+> +		ret = PTR_ERR(ts.client);
+> +		goto err_iomap;
+> +	}
+> +
+> +	/* Initialise registers */
+> +	if ((info->delay & 0xffff) > 0)
+> +		writel(info->delay & 0xffff, ts.io + S3C2410_ADCDLY);
+> +
+> +	writel(WAIT4INT | INT_DOWN, ts.io + S3C2410_ADCTSC);
+> +
+> +	input_dev = input_allocate_device();
+> +	if (!input_dev) {
+> +		dev_err(dev, "Unable to allocate the input device !!\n");
+> +		ret = -ENOMEM;
+> +		goto err_iomap;
+> +	}
+> +
+> +	ts.input = input_dev;
+> +	ts.input->evbit[0] = BIT_MASK(EV_SYN) | BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
+
+No need setting EV_SYN explicitely.
+
+> +	ts.input->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
+> +	input_set_abs_params(ts.input, ABS_X, 0, 0x3FF, 0, 0);
+> +	input_set_abs_params(ts.input, ABS_Y, 0, 0x3FF, 0, 0);
+> +	input_set_abs_params(ts.input, ABS_PRESSURE, 0, 1, 0, 0);
+
+Drop ABS_PRESSURE.
+
+> +
+> +	ts.input->name = s3c2410ts_name;
+> +	ts.input->id.bustype = BUS_HOST;
+> +	ts.input->id.vendor = 0xDEAD;
+> +	ts.input->id.product = 0xBEEF;
+> +	ts.input->id.version = S3C2410TSVERSION;
+> +
+> +	ts.shift = info->oversampling_shift;
+> +
+> +	if (request_irq(ts.irq_tc, stylus_irq, IRQF_DISABLED,
+> +			"s3c2410_ts_pen", ts.input)) {
+> +		dev_err(dev, "cannot get TC interrupt\n");
+> +		ret = -EIO;
+
+Don't mangle what request_irq returned.
+
+> +		goto err_inputdev;
+> +	}
+> +
+> +	dev_info(dev, "driver attached, registering input device\n");
+> +
+> +	/* All went ok, so register to the input system */
+> +	ret = input_register_device(ts.input);
+> +	if (ret < 0) {
+> +		dev_err(dev, "failed to register input device\n");
+> +		ret = -EIO;
+> +		goto err_tcirq;
+> +	}
+> +
+> +	return 0;
+> +
+> + err_tcirq:
+> +	free_irq(ts.irq_tc, ts.input);
+
+del_timer_sync().
+
+> + err_inputdev:
+> +	input_unregister_device(ts.input);
+> + err_iomap:
+> +	iounmap(ts.io);
+> + err_clk:
+> +	clk_put(ts.clock);
+> +	return ret;
+> +}
+> +
+> +/**
+> + * s3c2410ts_remove - device core removal entry point
+> + * @pdev: The device we are being removed from.
+> + *
+> + * Free up our state ready to be removed.
+> + */
+> +static int s3c2410ts_remove(struct platform_device *pdev)
+> +{
+> +	free_irq(ts.irq_tc, ts.input);
+
+del_timer_sync().
+
+> +
+> +	clk_disable(ts.clock);
+> +	clk_put(ts.clock);
+> +
+> +	input_unregister_device(ts.input);
+> +	iounmap(ts.io);
+
+release_mem_region()
+
+> +
+> +	return 0;
+> +}
+> +
+> +#ifdef CONFIG_PM
+> +static int s3c2410ts_suspend(struct platform_device *pdev, pm_message_t state)
+> +{
+> +	writel(TSC_SLEEP, ts.io + S3C2410_ADCTSC);
+> +	disable_irq(ts.irq_tc);
+> +	clk_disable(ts.clock);
+> +
+> +	return 0;
+> +}
+> +
+> +static int s3c2410ts_resume(struct platform_device *pdev)
+> +{
+> +	struct s3c2410_ts_mach_info *info = pdev->dev.platform_data;
+> +
+> +	clk_enable(ts.clock);
+> +
+> +	/* Initialise registers */
+> +	if ((info->delay & 0xffff) > 0)
+> +		writel(info->delay & 0xffff, ts.io + S3C2410_ADCDLY);
+> +
+> +	writel(WAIT4INT | INT_DOWN, ts.io + S3C2410_ADCTSC);
+> +
+> +	return 0;
+> +}
+> +
+> +#else
+> +#define s3c2410ts_suspend NULL
+> +#define s3c2410ts_resume  NULL
+> +#endif
+> +
+> +static struct platform_device_id s3cts_driver_ids[] = {
+> +	{ "s3c2410-ts", 0 },
+> +	{ "s3c2440-ts", 1 },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(platform, s3cts_driver_ids);
+> +
+> +static struct platform_driver s3c_ts_driver = {
+> +	.driver         = {
+> +		.name   = "s3c24xx-ts",
+> +		.owner  = THIS_MODULE,
+> +	},
+> +	.id_table	= s3cts_driver_ids,
+> +	.probe		= s3c2410ts_probe,
+> +	.remove		= s3c2410ts_remove,
+
+__devexit_p()
+
+> +	.suspend	= s3c2410ts_suspend,
+> +	.resume		= s3c2410ts_resume,
+
+Switch to pm_ops.
+
+> +};
+> +
+> +static int __init s3c2410ts_init(void)
+> +{
+> +	return platform_driver_register(&s3c_ts_driver);
+> +}
+> +
+> +static void __exit s3c2410ts_exit(void)
+> +{
+> +	platform_driver_unregister(&s3c_ts_driver);
+> +}
+> +
+> +module_init(s3c2410ts_init);
+> +module_exit(s3c2410ts_exit);
+> +
+> +MODULE_AUTHOR("Arnaud Patard <arnaud.patard@rtp-net.org>, "
+> +	      "Ben Dooks <ben@simtec.co.uk>, "
+> +	      "Simtec Electronics <linux@simtec.co.uk>");
+> +MODULE_DESCRIPTION("S3C24XX Touchscreen driver");
+> +MODULE_LICENSE("GPL v2");
+> 
+
+Thanks!
+
+-- 
+Dmitry
