@@ -1,99 +1,83 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 19 Nov 2009 16:48:14 +0100
-Subject: i.MX audio support
-Message-ID: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
+Date: Thu, 19 Nov 2009 16:48:23 +0100
+Subject: [PATCH 09/12] pcm038: add sound support
+In-Reply-To: <1258645706-9071-9-git-send-email-s.hauer@pengutronix.de>
+References: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-2-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-3-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-4-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-5-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-6-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-7-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-8-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-9-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1258645706-9071-10-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-mx2/pcm038.c |   23 ++++++++++++++++++++++-
+ 1 files changed, 22 insertions(+), 1 deletions(-)
 
-Hi All,
-
-This series adds support for AOSC on i.MX platforms. It uses DMA where
-available (i.MX27) and fiq otherwise. The driver works on all Phytec i.MX
-platforms, so the i.MX27, i.MX31 and the i.MX35 are supported including
-AC97 support.
-
-There already is a driver for i.MX in the tree, this one is a nearly complete
-rewrite. I haven't touched the in Kernel driver with these patches. The in
-Kernel driver has several problems, it doesn't use ioremap, uses direct pointer
-derefs instead of proper access functions and the only board supported so far is
-itself not supported in mainline.
-
-AC97 support is a problem on i.MX. I found no way to tell the SSI controller
-which slots it should capture, so all slots the codec decides to send go into
-one single FIFO. The WM9712 I worked with sends data in slot 12 which we have
-to sort out manually from the FIFO, so I think there is no way to work around
-the fiq handler using the DMA engine with AC97.
-
-The devdma code is actually a copy of sound/arm/devdma.[ch]. It should probably
-be selected somehow instead of duplicated.
-
-I'm not very familiar with ALSA, so I expect some comments in this area. Let
-me know what has to be done to get this into mainline.
-
-This series depends on the SSI resources and audmux support being present. I posted
-these patches on arm linux kernel recently and they are available here:
-
-git://git.pengutronix.de/git/imx/linux-2.6.git mxc-master
-
-
-Any comments welcome.
-
-  Sascha
-
-The following changes since commit 3f92a8bd5fb13e7e2505c65d1548910eaa843024:
-  Uwe Kleine-K?nig (1):
-        imx: copy constants from mx3x.h to mx35.h using the appropriate namespace
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/imx/linux-2.6.git asoc
-
-Sascha Hauer (12):
-      mx3: Add SSI pins to iomux table
-      mxc: iomux v3: remove resource handling
-      add a mc13783 codec driver
-      i.MX31 clock: rename SSI clocks to driver name
-      mxc: mx1/mx2 DMA: add a possibility to create an endless DMA transfer
-      imx-ssi sound driver
-      add phycore sound support
-      sound/soc/imx: Makefile/Kconfig changes for new driver
-      pcm038: add sound support
-      pcm043: add sound support
-      pca100: add sound support
-      pcm037: Add sound support
-
- arch/arm/mach-mx2/pca100.c                   |   52 +
- arch/arm/mach-mx2/pcm038.c                   |   23 +-
- arch/arm/mach-mx3/clock.c                    |    4 +-
- arch/arm/mach-mx3/pcm037.c                   |   72 ++
- arch/arm/mach-mx3/pcm043.c                   |  102 ++
- arch/arm/plat-mxc/Makefile                   |    1 +
- arch/arm/plat-mxc/dma-mx1-mx2.c              |    3 +-
- arch/arm/plat-mxc/include/mach/dma-mx1-mx2.h |    8 +
- arch/arm/plat-mxc/include/mach/iomux-mx3.h   |    8 +
- arch/arm/plat-mxc/include/mach/iomux-v3.h    |   17 +-
- arch/arm/plat-mxc/include/mach/ssi.h         |   17 +
- arch/arm/plat-mxc/iomux-v3.c                 |   36 +-
- arch/arm/plat-mxc/ssi-fiq.S                  |  134 +++
- sound/soc/codecs/Kconfig                     |    3 +
- sound/soc/codecs/Makefile                    |    2 +
- sound/soc/codecs/mc13783.c                   |  739 ++++++++++++++
- sound/soc/codecs/mc13783.h                   |   29 +
- sound/soc/imx/Kconfig                        |   15 +-
- sound/soc/imx/Makefile                       |    9 +-
- sound/soc/imx/devdma.c                       |   80 ++
- sound/soc/imx/devdma.h                       |    3 +
- sound/soc/imx/imx-ssi.c                      | 1349 ++++++++++++++++++++++++++
- sound/soc/imx/imx-ssi.h                      |   24 +
- sound/soc/imx/phycore.c                      |  181 ++++
- 24 files changed, 2851 insertions(+), 60 deletions(-)
- create mode 100644 arch/arm/plat-mxc/include/mach/ssi.h
- create mode 100644 arch/arm/plat-mxc/ssi-fiq.S
- create mode 100644 sound/soc/codecs/mc13783.c
- create mode 100644 sound/soc/codecs/mc13783.h
- create mode 100644 sound/soc/imx/devdma.c
- create mode 100644 sound/soc/imx/devdma.h
- create mode 100644 sound/soc/imx/imx-ssi.c
- create mode 100644 sound/soc/imx/imx-ssi.h
- create mode 100644 sound/soc/imx/phycore.c
+diff --git a/arch/arm/mach-mx2/pcm038.c b/arch/arm/mach-mx2/pcm038.c
+index 906d59b..7d11da1 100644
+--- a/arch/arm/mach-mx2/pcm038.c
++++ b/arch/arm/mach-mx2/pcm038.c
+@@ -39,7 +39,9 @@
+ #include <mach/iomux.h>
+ #include <mach/imx-uart.h>
+ #include <mach/mxc_nand.h>
++#include <mach/audmux.h>
+ #include <mach/spi.h>
++#include <mach/ssi.h>
+ 
+ #include "devices.h"
+ 
+@@ -264,7 +266,7 @@ static struct mc13783_platform_data pcm038_pmic = {
+ 	.regulators = pcm038_regulators,
+ 	.num_regulators = ARRAY_SIZE(pcm038_regulators),
+ 	.flags = MC13783_USE_ADC | MC13783_USE_REGULATOR |
+-		 MC13783_USE_TOUCHSCREEN,
++		 MC13783_USE_TOUCHSCREEN | MC13783_USE_CODEC,
+ };
+ 
+ static struct spi_board_info pcm038_spi_board_info[] __initdata = {
+@@ -279,16 +281,35 @@ static struct spi_board_info pcm038_spi_board_info[] __initdata = {
+ 	}
+ };
+ 
++struct imx_ssi_platform_data pcm038_ssi_pdata = {
++//	.flags = IMX_SSI_DMA,
++};
++
+ static void __init pcm038_init(void)
+ {
+ 	mxc_gpio_setup_multiple_pins(pcm038_pins, ARRAY_SIZE(pcm038_pins),
+ 			"PCM038");
+ 
++	mxc_audmux_v1_configure_port(MX27_AUDMUX_HPCR1_SSI0,
++		MXC_AUDMUX_V1_PCR_TFSDIR |
++		MXC_AUDMUX_V1_PCR_TCLKDIR |
++		MXC_AUDMUX_V1_PCR_TFCSEL(MX27_AUDMUX_PPCR1_SSI_PINS_1) |
++		MXC_AUDMUX_V1_PCR_RFSDIR |
++		MXC_AUDMUX_V1_PCR_RCLKDIR |
++		MXC_AUDMUX_V1_PCR_RFCSEL(MX27_AUDMUX_HPCR3_SSI_PINS_4) |
++		MXC_AUDMUX_V1_PCR_RXDSEL(MX27_AUDMUX_HPCR3_SSI_PINS_4));
++	mxc_audmux_v1_configure_port(MX27_AUDMUX_HPCR3_SSI_PINS_4,
++		MXC_AUDMUX_V1_PCR_RXDSEL(MX27_AUDMUX_HPCR1_SSI0));
++	mxc_audmux_v1_configure_port(MX27_AUDMUX_PPCR1_SSI_PINS_1,
++		MXC_AUDMUX_V1_PCR_TFCSEL(MX27_AUDMUX_HPCR1_SSI0) |
++		MXC_AUDMUX_V1_PCR_RFCSEL(MX27_AUDMUX_HPCR1_SSI0));
++
+ 	pcm038_init_sram();
+ 
+ 	mxc_register_device(&mxc_uart_device0, &uart_pdata[0]);
+ 	mxc_register_device(&mxc_uart_device1, &uart_pdata[1]);
+ 	mxc_register_device(&mxc_uart_device2, &uart_pdata[2]);
++	mxc_register_device(&imx_ssi_device0, &pcm038_ssi_pdata);
+ 
+ 	mxc_gpio_mode(PE16_AF_OWIRE);
+ 	mxc_register_device(&mxc_nand_device, &pcm038_nand_board_info);
+-- 
+1.6.5.2
