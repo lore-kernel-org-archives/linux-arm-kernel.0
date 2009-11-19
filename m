@@ -1,112 +1,58 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 19 Nov 2009 16:48:25 +0100
-Subject: [PATCH 11/12] pca100: add sound support
-In-Reply-To: <1258645706-9071-11-git-send-email-s.hauer@pengutronix.de>
+Date: Thu, 19 Nov 2009 16:48:19 +0100
+Subject: [PATCH 05/12] mxc: mx1/mx2 DMA: add a possibility to create an
+	endless DMA transfer
+In-Reply-To: <1258645706-9071-5-git-send-email-s.hauer@pengutronix.de>
 References: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
 	<1258645706-9071-2-git-send-email-s.hauer@pengutronix.de>
 	<1258645706-9071-3-git-send-email-s.hauer@pengutronix.de>
 	<1258645706-9071-4-git-send-email-s.hauer@pengutronix.de>
 	<1258645706-9071-5-git-send-email-s.hauer@pengutronix.de>
-	<1258645706-9071-6-git-send-email-s.hauer@pengutronix.de>
-	<1258645706-9071-7-git-send-email-s.hauer@pengutronix.de>
-	<1258645706-9071-8-git-send-email-s.hauer@pengutronix.de>
-	<1258645706-9071-9-git-send-email-s.hauer@pengutronix.de>
-	<1258645706-9071-10-git-send-email-s.hauer@pengutronix.de>
-	<1258645706-9071-11-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1258645706-9071-12-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1258645706-9071-6-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This is useful for audio where we do not want to setup a new scatterlist
+after playing 4GB of audio data. This would cause skips in the playback.
+
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-mx2/pca100.c |   52 ++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 52 insertions(+), 0 deletions(-)
+ arch/arm/plat-mxc/dma-mx1-mx2.c              |    3 ++-
+ arch/arm/plat-mxc/include/mach/dma-mx1-mx2.h |    8 ++++++++
+ 2 files changed, 10 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-mx2/pca100.c b/arch/arm/mach-mx2/pca100.c
-index aea3d34..e0eb21f 100644
---- a/arch/arm/mach-mx2/pca100.c
-+++ b/arch/arm/mach-mx2/pca100.c
-@@ -26,6 +26,7 @@
- #include <linux/spi/eeprom.h>
- #include <linux/irq.h>
- #include <linux/gpio.h>
-+#include <linux/delay.h>
+diff --git a/arch/arm/plat-mxc/dma-mx1-mx2.c b/arch/arm/plat-mxc/dma-mx1-mx2.c
+index 7764643..9c1b3f9 100644
+--- a/arch/arm/plat-mxc/dma-mx1-mx2.c
++++ b/arch/arm/plat-mxc/dma-mx1-mx2.c
+@@ -156,7 +156,8 @@ static inline int imx_dma_sg_next(int channel, struct scatterlist *sg)
+ 	}
  
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
-@@ -41,6 +42,8 @@
- #include <mach/mxc_nand.h>
- #include <mach/irqs.h>
- #include <mach/mmc.h>
-+#include <mach/audmux.h>
-+#include <mach/ssi.h>
+ 	now = min(imxdma->resbytes, sg->length);
+-	imxdma->resbytes -= now;
++	if (imxdma->resbytes != IMX_DMA_LENGTH_LOOP)
++		imxdma->resbytes -= now;
  
- #include "devices.h"
+ 	if ((imxdma->dma_mode & DMA_MODE_MASK) == DMA_MODE_READ)
+ 		__raw_writel(sg->dma_address, DMA_BASE + DMA_DAR(channel));
+diff --git a/arch/arm/plat-mxc/include/mach/dma-mx1-mx2.h b/arch/arm/plat-mxc/include/mach/dma-mx1-mx2.h
+index b3876cc..07be8ad 100644
+--- a/arch/arm/plat-mxc/include/mach/dma-mx1-mx2.h
++++ b/arch/arm/plat-mxc/include/mach/dma-mx1-mx2.h
+@@ -58,6 +58,14 @@ imx_dma_setup_single(int channel, dma_addr_t dma_address,
+ 		unsigned int dma_length, unsigned int dev_addr,
+ 		unsigned int dmamode);
  
-@@ -182,15 +185,64 @@ static struct imxmmc_platform_data sdhc_pdata = {
- 	.exit = pca100_sdhc2_exit,
- };
- 
-+static void pca100_ac97_warm_reset(struct snd_ac97 *ac97)
-+{
-+	printk("%s\n", __func__);
 +
-+	mxc_gpio_mode(GPIO_PORTC | 20 | GPIO_GPIO | GPIO_OUT);
-+	gpio_set_value(GPIO_PORTC + 20, 1);
-+	udelay(2);
-+	gpio_set_value(GPIO_PORTC + 20, 0);
-+	mxc_gpio_mode(PC20_PF_SSI1_FS);
-+	msleep(2);
-+}
++/*
++ * Use this flag as the dma_length argument to imx_dma_setup_sg()
++ * to create an endless running dma loop. The end of the scatterlist
++ * must be linked to the beginning for this to work.
++ */
++#define IMX_DMA_LENGTH_LOOP	((unsigned int)-1)
 +
-+static void pca100_ac97_cold_reset(struct snd_ac97 *ac97)
-+{
-+	printk("%s\n", __func__);
-+
-+	mxc_gpio_mode(GPIO_PORTC | 20 | GPIO_GPIO | GPIO_OUT);  /* FS */
-+	gpio_set_value(GPIO_PORTC + 20, 0);
-+	mxc_gpio_mode(GPIO_PORTC | 22 | GPIO_GPIO | GPIO_OUT);  /* TX */
-+	gpio_set_value(GPIO_PORTC + 22, 0);
-+	mxc_gpio_mode(GPIO_PORTC | 28 | GPIO_GPIO | GPIO_OUT);  /* reset */
-+	gpio_set_value(GPIO_PORTC + 28, 0);
-+	udelay(10);
-+	gpio_set_value(GPIO_PORTC + 28, 1);
-+	mxc_gpio_mode(PC20_PF_SSI1_FS);
-+	mxc_gpio_mode(PC22_PF_SSI1_TXD);
-+	msleep(2);
-+}
-+
-+static struct imx_ssi_platform_data pca100_ssi_pdata = {
-+	.ac97_reset		= pca100_ac97_cold_reset,
-+	.ac97_warm_reset	= pca100_ac97_warm_reset,
-+	.flags			= IMX_SSI_USE_AC97,
-+};
-+
- static void __init pca100_init(void)
- {
- 	int ret;
- 
-+	/* SSI unit */
-+	mxc_audmux_v1_configure_port(MX27_AUDMUX_HPCR1_SSI0,
-+				  MXC_AUDMUX_V1_PCR_SYN | /* 4wire mode */
-+				  MXC_AUDMUX_V1_PCR_TFCSEL(3) |
-+				  MXC_AUDMUX_V1_PCR_TCLKDIR | /* clock is output */
-+				  MXC_AUDMUX_V1_PCR_RXDSEL(3));
-+	mxc_audmux_v1_configure_port(4,
-+				  MXC_AUDMUX_V1_PCR_SYN | /* 4wire mode */
-+				  MXC_AUDMUX_V1_PCR_TFCSEL(0) |
-+				  MXC_AUDMUX_V1_PCR_TFSDIR |
-+				  MXC_AUDMUX_V1_PCR_RXDSEL(0));
-+
- 	ret = mxc_gpio_setup_multiple_pins(pca100_pins,
- 			ARRAY_SIZE(pca100_pins), "PCA100");
- 	if (ret)
- 		printk(KERN_ERR "pca100: Failed to setup pins (%d)\n", ret);
- 
-+	mxc_register_device(&imx_ssi_device0, &pca100_ssi_pdata);
-+
- 	mxc_register_device(&mxc_uart_device0, &uart_pdata);
- 
- 	mxc_gpio_mode(GPIO_PORTC | 29 | GPIO_GPIO | GPIO_IN);
+ int
+ imx_dma_setup_sg(int channel, struct scatterlist *sg,
+ 		unsigned int sgcount, unsigned int dma_length,
 -- 
 1.6.5.2
