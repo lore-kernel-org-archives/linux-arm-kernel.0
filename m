@@ -1,85 +1,41 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 19 Nov 2009 20:08:53 +0100
-Subject: [PATCH] SPI: drain MXC SPI transfer buffer when probing device
-In-Reply-To: <20091119190142.GO14091@buzzloop.caiaq.de>
-References: <1258627487-7408-1-git-send-email-daniel@caiaq.de>
-	<20091119184951.GA26816@pengutronix.de>
-	<20091119190142.GO14091@buzzloop.caiaq.de>
-Message-ID: <20091119190853.GC26816@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 19 Nov 2009 20:15:40 +0100
+Subject: [PATCH 1/2 RESEND#2] i2c/pxa: remove unused macro
+In-Reply-To: <1257754721-17325-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1257754721-17325-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1258658141-30340-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Commit
 
-On Thu, Nov 19, 2009 at 08:01:42PM +0100, Daniel Mack wrote:
-> Hi Uwe,
-> 
-> On Thu, Nov 19, 2009 at 07:49:51PM +0100, Uwe Kleine-K?nig wrote:
-> > On Thu, Nov 19, 2009 at 11:44:47AM +0100, Daniel Mack wrote:
-> > > On the MX31litekit, the bootloader seems to communicate with the MC13783
-> > > PMIC chip before booting Linux. However, it does not flush all the
-> > > buffers properly after that, which makes the imx-spi driver read
-> > > bogus data when probing the MC13783.
-> > > 
-> > > Fix that by draining the SPI buffer on startup.
-> > > 
-> > > Signed-off-by: Daniel Mack <daniel@caiaq.de>
-> > > Cc: David Brownell <dbrownell@users.sourceforge.net>
-> > > Cc: Andrew Morton <akpm@linux-foundation.org>
-> > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > > Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > > Cc: spi-devel-general at lists.sourceforge.net
-> > > ---
-> > >  drivers/spi/spi_imx.c |    7 +++++++
-> > >  1 files changed, 7 insertions(+), 0 deletions(-)
-> > > 
-> > > diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
-> > > index 89c22ef..a3894fd 100644
-> > > --- a/drivers/spi/spi_imx.c
-> > > +++ b/drivers/spi/spi_imx.c
-> > > @@ -42,8 +42,11 @@
-> > >  #define MXC_CSPITXDATA		0x04
-> > >  #define MXC_CSPICTRL		0x08
-> > >  #define MXC_CSPIINT		0x0c
-> > > +#define MXC_CSPISTAT		0x14
-> > On imx27 the register at offset 0x14 is called PERIODREG ...
-> > 
-> > >  #define MXC_RESET		0x1c
-> > >  
-> > > +#define MXC_CSPISTAT_RR		(1 << 3)
-> > ... and bits 0..14 are called WAIT.
-> > 
-> > 
-> > > +
-> > >  /* generic defines to abstract from the different register layouts */
-> > >  #define MXC_INT_RR	(1 << 0) /* Receive data ready interrupt */
-> > >  #define MXC_INT_TE	(1 << 1) /* Transmit FIFO empty interrupt */
-> > > @@ -593,6 +596,10 @@ static int __init spi_imx_probe(struct platform_device *pdev)
-> > >  	if (!cpu_is_mx31() || !cpu_is_mx35())
-> > >  		writel(1, spi_imx->base + MXC_RESET);
-> > >  
-> > > +	/* drain the buffer */
-> > > +	while (readl(spi_imx->base + MXC_CSPISTAT) & MXC_CSPISTAT_RR)
-> > > +		readl(spi_imx->base + MXC_CSPIRXDATA);
-> > > +
-> > So this needs protection by
-> > 
-> > 	if (cpu_is_mx31() || cpu_is_mx35())
-> 
-> Oh, I wasn't aware of such differences, thanks for checking!
-> 
-> > (note, I didn't check the mx35 reference!).
-> 
-> But I did now, and mx35 seems to be compatible. I also changed the
-> register define names to avoid confusion.
-hmm, I'm not really happy with the naming, but as I don't have a better
-idea now, it's OK for me.
+	beea494 ([ARM] Remove EEPROM slave emulation from i2c-pxa driver.)
+
+removed all uses of eedbg, so the definition can go, too.
+
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Cc: Jean Delvare <khali@linux-fr.org>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Roel Kluin <roel.kluin@gmail.com>
+Acked-by: Pavel Machek <pavel@ucw.cz>
+---
+ drivers/i2c/busses/i2c-pxa.c |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+index 0495557..40052c0 100644
+--- a/drivers/i2c/busses/i2c-pxa.c
++++ b/drivers/i2c/busses/i2c-pxa.c
+@@ -216,8 +216,6 @@ static void i2c_pxa_show_state(struct pxa_i2c *i2c, int lno, const char *fname)
+ #define decode_ICR(val) do { } while (0)
+ #endif
  
-You can take it as an ack.
-
-Best regards
-Uwe
-
+-#define eedbg(lvl, x...) do { if ((lvl) < 1) { printk(KERN_DEBUG "" x); } } while(0)
+-
+ static void i2c_pxa_master_complete(struct pxa_i2c *i2c, int ret);
+ static irqreturn_t i2c_pxa_handler(int this_irq, void *dev_id);
+ 
 -- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+1.6.5.2
