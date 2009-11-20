@@ -1,64 +1,81 @@
-From: rkiyerpersonal@gmail.com (Rajanikanth H.V)
-Date: Fri, 20 Nov 2009 18:30:30 +0530
-Subject: Can anyone help test Cortex A9 patches?
-In-Reply-To: <20091119173308.GC22232@n2100.arm.linux.org.uk>
-References: <20091119090328.GC13376@n2100.arm.linux.org.uk>
-	<1258651486.24487.55.camel@pc1117.cambridge.arm.com>
-	<20091119173308.GC22232@n2100.arm.linux.org.uk>
-Message-ID: <d82162470911200500t6a4e49d9od9e4bbaad3764a43@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 20 Nov 2009 14:42:34 +0100
+Subject: [PATCH 02/20] ARM: S5PC1XX: create sub-platform for S5PC100 SoCs
+In-Reply-To: <1258551194-16018-1-git-send-email-m.szyprowski@samsung.com>
+References: <1258551194-16018-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1258724572-19176-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+From: Kyungmin Park <kyungmin.park@samsung.com>
 
-Patch to fix "DMA Cache Coherency issue on A9-SMP" is working,
-Since i am using 2.6.29 version of kernel, i manually patched the
-files which are
-relevant to our SOC.
+Samsung S5PC100 and S5PC110 SoCs differs a lot in register map and other
+core platform definitions, so it is not possible to have both SoCs in
+the current platform framework without runtime hacks. To address this
+issue a sub-platform has been introduced, so each SoC in sub-platform
+can have its own set of include files (register map, irq&gpio
+definitions, etc)
 
-Thanks a lot.
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ arch/arm/Makefile             |    2 +-
+ arch/arm/mach-s5pc100/Kconfig |    4 ++++
+ arch/arm/plat-s5pc1xx/Kconfig |   10 ++++++++++
+ 3 files changed, 15 insertions(+), 1 deletions(-)
 
-Regards,
-Rajanikanth
-
-On Thu, Nov 19, 2009 at 11:03 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Nov 19, 2009 at 05:24:46PM +0000, Catalin Marinas wrote:
->> On Thu, 2009-11-19 at 09:03 +0000, Russell King - ARM Linux wrote:
->> > I need help testing Cortex A9 patches. ?What I need is someone with a
->> > fairly fully fledged Cortex A9 platform with the ability to build and
->> > test recent kernels - and therefore be able to test my patches without
->> > modification.
->> >
->> > Specifically, I'm looking for someone who can reproduce data corruption
->> > on DMA transfers from devices caused by Cortex A9's speculative prefetching
->> >
->> > Unfortunately, I have no way to reproduce this problem here (I have no
->> > Cortex A9 hardware), and as such I can't test the fixes.
->>
->> I can get access to a PBX-A9 board but there is no DMA support on it, so
->> not able to reproduce the problem.
->>
->> What's the background to this? Has anyone reported issues?
->
-> Well, I had a fast response from people this morning, and the patch has
-> been successfully tested against a recent kernel. ?So problem mostly
-> solved.
->
-> Essentially corruption caused by speculative prefetches from buffers while
-> they are mapped for DMA. ?You were sent an email late last month about
-> the problem:
->
-> http://lists.arm.linux.org.uk/lurker/message/20091031.131319.18796aa1.en.html
->
-> Unfortunately, the reporter seems to have taken the subsequent messages
-> off the list. ?Morevoer, the original reporter said the patch didn't help,
-> however since he applied it to an older kernel and got rejects, I'm going
-> to dismiss that. ?I can find nothing wrong with my patch which would mean
-> his original problem would not be fixed.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index a73caaf..daea150 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -160,7 +160,7 @@ machine-$(CONFIG_ARCH_RPC)		:= rpc
+ machine-$(CONFIG_ARCH_S3C2410)		:= s3c2410 s3c2400 s3c2412 s3c2440 s3c2442 s3c2443
+ machine-$(CONFIG_ARCH_S3C24A0)		:= s3c24a0
+ machine-$(CONFIG_ARCH_S3C64XX)		:= s3c6400 s3c6410
+-machine-$(CONFIG_ARCH_S5PC1XX)		:= s5pc100
++machine-$(CONFIG_ARCH_S5PC100)		:= s5pc100
+ machine-$(CONFIG_ARCH_SA1100)		:= sa1100
+ machine-$(CONFIG_ARCH_SHARK)		:= shark
+ machine-$(CONFIG_ARCH_STMP378X)		:= stmp378x
+diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
+index 0dd2b8c..d72f881 100644
+--- a/arch/arm/mach-s5pc100/Kconfig
++++ b/arch/arm/mach-s5pc100/Kconfig
+@@ -5,6 +5,8 @@
+ #
+ # Licensed under GPLv2
+ 
++if ARCH_S5PC100
++
+ # Configuration options for the S5PC100 CPU
+ 
+ config CPU_S5PC100
+@@ -34,3 +36,5 @@ config MACH_SMDKC100
+ 	select S5PC100_SETUP_SDHCI
+ 	help
+ 	  Machine support for the Samsung SMDKC100
++
++endif
+diff --git a/arch/arm/plat-s5pc1xx/Kconfig b/arch/arm/plat-s5pc1xx/Kconfig
+index 1608e62..eee2abb 100644
+--- a/arch/arm/plat-s5pc1xx/Kconfig
++++ b/arch/arm/plat-s5pc1xx/Kconfig
+@@ -23,6 +23,16 @@ config PLAT_S5PC1XX
+ 
+ if PLAT_S5PC1XX
+ 
++choice
++	prompt "S5PC1xx SoC Type"
++	default ARCH_S5PC100
++
++config ARCH_S5PC100
++	bool "S5PC100"
++
++endchoice
++
++
+ # Configuration options shared by all S3C64XX implementations
+ 
+ config CPU_S5PC100_INIT
+-- 
+1.6.4
