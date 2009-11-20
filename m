@@ -1,43 +1,42 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Fri, 20 Nov 2009 11:32:10 +0100
-Subject: [alsa-devel] i.MX audio support
-In-Reply-To: <20091120095109.GW30179@pengutronix.de>
-References: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
-	<20091119162830.GA31336@rakim.wolfsonmicro.main>
-	<20091119175327.GV30179@pengutronix.de>
-	<20091119185426.GA2814@sirena.org.uk>
-	<eedb5540911192351l5abc7a18s5a218f9b20b58d1b@mail.gmail.com>
-	<20091120095109.GW30179@pengutronix.de>
-Message-ID: <eedb5540911200232u21767102i8310e62b952c77bb@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 20 Nov 2009 11:57:26 +0100
+Subject: [PATCH 2/3] staging/dream: add missing include files
+In-Reply-To: <20091119225602.GC18710@kroah.com>
+References: <20091101222717.GB20740@elf.ucw.cz>
+	<20091119225602.GC18710@kroah.com>
+Message-ID: <20091120105726.GH11212@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I would agree if the current code worked and would be good shape.
-> Unfortunately it's not. It hardcodes the fact that there are 2 SSI units
-> (i.MX51 has three of them). Instead of writel/readl it uses direct pointer
-> derefs. The driver skips audio while it reinitialises the DMA engine. In
-> mx1_mx2_pcm_open() there are several memory leaks. The driver does not
-> call clk_get itself but depends on the board doing it. The only
-> available board support depends on a board not present in the kernel, so
-> we are not able to compile it (and it won't because the audmux
-> definitions are missing)
+On Thu 2009-11-19 14:56:02, Greg KH wrote:
+> On Sun, Nov 01, 2009 at 11:27:17PM +0100, Pavel Machek wrote:
+> > Add missing files/includes neccessary for Dream compilation.
+> >     
+> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> 
+> This patch includes a file that is not in the drivers/staging/
+> directory, and it does this Kconfig mess:
 
-We have still some pending HW changes in our board so we are not ready
-to submit it now. Anyway it would have been nice to have such this
-comments when I submitted my patches to avoid unnecessary rework.
+Oops, sorry. That one escaped me. I'll submit fixed version.
 
-> This all leads to a huge series of patches and much work and in the end
-> we would have a nearly rewritten driver.
+> > +config GENERIC_GPIO
+> > +	bool
+> > +	default y
+> 
+> Which breaks the i386 build.  Don't force on a general config option
+> like this, that's not nice at all :(
 
-All right, just let me test your patch in our board and comment.
+Ok, I should figure out how to limit it to arch-msm.
 
-Thank you.
+> So I'll not apply this one, and the 3/3 patch.
 
+Where can I get the tree to diff against?
+gregkh-08-staging-2.6.32-rc7-git4.patch just reverts everything.
+
+I guess I can extract it from
+://www.kernel.org/pub/linux/kernel/people/gregkh/gregkh-2.6/patches/series ...
+
+									Pavel
 -- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
