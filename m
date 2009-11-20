@@ -1,121 +1,71 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Fri, 20 Nov 2009 15:34:28 +0100
-Subject: [PATCH 6/8] S3C: merge ADC drivers and add support for the S3C64xx
-In-Reply-To: <200911201416.16299.anarsoul@gmail.com>
-References: <b2e8f9f70911200404w12cc286fw3fa763c3e04fa1f9@mail.gmail.com>
-	<200911201416.16299.anarsoul@gmail.com>
-Message-ID: <4B06A8F4.5070307@gmail.com>
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Fri, 20 Nov 2009 23:42:36 +0900
+Subject: [PATCH 01/20] ARM: S5PC100: use 0x30008000 as memory base
+In-Reply-To: <1258724572-19176-2-git-send-email-m.szyprowski@samsung.com>
+References: <1258551194-16018-1-git-send-email-m.szyprowski@samsung.com>
+	<1258724572-19176-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1b68c6790911200642j792834e9q47d605b80c2e36d2@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Op 20-11-09 13:16, Vasily Khoruzhick schreef:
-> ? ????????? ?? 20 ?????? 2009 14:04:10 ????? Maurus Cuelenaere ???????:
->    
->> This moves the S3C24xx ADC driver to plat-s3c and adds support
->> for the S3C64xx.
->>
->> Signed-off-by: Maurus Cuelenaere<mcuelenaere@gmail.com>
->> ---
->>   arch/arm/plat-s3c/Kconfig                 |    7 +++++
->>   arch/arm/plat-s3c/Makefile                |    4 +++
->>   arch/arm/{plat-s3c24xx =>  plat-s3c}/adc.c |   17 +++++++++--
->>   arch/arm/plat-s3c/include/plat/regs-adc.h |    3 ++
->>   arch/arm/plat-s3c24xx/Kconfig             |    7 -----
->>   arch/arm/plat-s3c24xx/Makefile            |    1 -
->>   arch/arm/plat-s3c64xx/Makefile            |    1 +
->>   arch/arm/plat-s3c64xx/dev-adc.c           |   42
->>   +++++++++++++++++++++++++++++ 8 files changed, 71 insertions(+), 11
->>   deletions(-)
->>   rename arch/arm/{plat-s3c24xx =>  plat-s3c}/adc.c (95%)
->>   create mode 100644 arch/arm/plat-s3c64xx/dev-adc.c
->>
->> diff --git a/arch/arm/plat-s3c/Kconfig b/arch/arm/plat-s3c/Kconfig
->> index 57e685b..4184084 100644
->> --- a/arch/arm/plat-s3c/Kconfig
->> +++ b/arch/arm/plat-s3c/Kconfig
->> @@ -159,6 +159,13 @@ config S3C_GPIO_CFG_S3C64XX
->>   	  Internal configuration to enable S3C64XX style GPIO configuration
->>   	  functions.
->>
->> +config S3C_ADC
->> +	bool "ADC common driver support"
->> +	help
->> +	  Core support for the ADC block found in the S3C SoC systems
->> +	  for drivers such as the touchscreen and hwmon to use to share
->> +	  this resource.
->> +
->>   # DMA
->>
->>   config S3C_DMA
->> diff --git a/arch/arm/plat-s3c/Makefile b/arch/arm/plat-s3c/Makefile
->> index 50444da..960fb43 100644
->> --- a/arch/arm/plat-s3c/Makefile
->> +++ b/arch/arm/plat-s3c/Makefile
->> @@ -32,6 +32,10 @@ obj-$(CONFIG_S3C2410_PM_CHECK)	+= pm-check.o
->>
->>   obj-$(CONFIG_HAVE_PWM)		+= pwm.o
->>
->> +# ADC support
->> +
->> +obj-$(CONFIG_S3C_ADC)		+= adc.o
->> +
->>   # devices
->>
->>   obj-$(CONFIG_S3C_DEV_HSMMC)	+= dev-hsmmc.o
->> diff --git a/arch/arm/plat-s3c24xx/adc.c b/arch/arm/plat-s3c/adc.c
->> similarity index 95%
->> rename from arch/arm/plat-s3c24xx/adc.c
->> rename to arch/arm/plat-s3c/adc.c
->> index df47322..572b7be 100644
->> --- a/arch/arm/plat-s3c24xx/adc.c
->> +++ b/arch/arm/plat-s3c/adc.c
->> @@ -1,10 +1,10 @@
->> -/* arch/arm/plat-s3c24xx/adc.c
->> +/* arch/arm/plat-s3c/adc.c
->>    *
->>    * Copyright (c) 2008 Simtec Electronics
->>    *	http://armlinux.simtec.co.uk/
->>    *	Ben Dooks<ben@simtec.co.uk>,<ben-linux@fluff.org>
->>    *
->> - * S3C24XX ADC device core
->> + * S3C ADC device core
->>    *
->>    * This program is free software; you can redistribute it and/or modify
->>    * it under the terms of the GNU General Public License as published by
->> @@ -72,10 +72,18 @@ static LIST_HEAD(adc_pending);
->>
->>   #define adc_dbg(_adc, msg...) dev_dbg(&(_adc)->pdev->dev, msg)
->>
->> +#define AUTOPST (S3C2410_ADCTSC_YM_SEN | S3C2410_ADCTSC_YP_SEN | \
->> +		S3C2410_ADCTSC_XP_SEN | S3C2410_ADCTSC_AUTO_PST | \
->> +		S3C2410_ADCTSC_XY_PST(0))
->> +
->>   static inline void s3c_adc_convert(struct adc_device *adc)
->>   {
->>   	unsigned con = readl(adc->regs + S3C2410_ADCCON);
->>
->> +	if (adc->cur->is_ts)
->> +		writel(S3C2410_ADCTSC_PULL_UP_DISABLE | AUTOPST,
->> +			adc->regs + S3C2410_ADCTSC);
->> +
->>   	con |= S3C2410_ADCCON_ENABLE_START;
->>   	writel(con, adc->regs + S3C2410_ADCCON);
->>   }
->> @@ -260,6 +268,9 @@ static irqreturn_t s3c_adc_irq(int irq, void *pw)
->>   	unsigned long flags;
->>   	unsigned data0, data1;
->>
->> +	/* Clear ADC interrupt */
->> +	__raw_writel(0x0, adc->regs + S3C6400_ADCCLRINT);
->> +
->>      
-> s3c24xx has not ADCCLRINT register, so I suspect it'll break s3c24xx-
-> compatibility
-Hmm right, that doesn't seem right; this should in an if(adc->type == 
-S3C64XX) check..
+On Fri, Nov 20, 2009 at 10:42 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> From: Kyungmin Park <kyungmin.park@samsung.com>
+>
+> We decided to use 0x3000'0000 as base memory address on S5PC1XX SoCs
+> (s5pc100 and s5pc110).
+you might as well want to explain the reason behind it, if any?
 
-Also that if(adc->cur->is_ts) change above seems unrelated, let me 
-resend this patch.
-
-Regards,
-Maurus Cuelenaere
+> A patch to u-boot that configures SMDKC100 board and sets base memory
+> as 0x3000'0000 has been already posted.
+>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+> ?arch/arm/mach-s5pc100/Makefile.boot ? ? ? ? | ? ?4 ++--
+> ?arch/arm/mach-s5pc100/include/mach/map.h ? ?| ? ?2 +-
+> ?arch/arm/mach-s5pc100/include/mach/memory.h | ? ?2 +-
+> ?3 files changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mach-s5pc100/Makefile.boot b/arch/arm/mach-s5pc100/Makefile.boot
+> index ff90aa1..b0909e3 100644
+> --- a/arch/arm/mach-s5pc100/Makefile.boot
+> +++ b/arch/arm/mach-s5pc100/Makefile.boot
+> @@ -1,2 +1,2 @@
+> - ? zreladdr-y ?:= 0x20008000
+> -params_phys-y ?:= 0x20000100
+> + ? zreladdr-y ?:= 0x30008000
+> +params_phys-y ?:= 0x30000100
+> diff --git a/arch/arm/mach-s5pc100/include/mach/map.h b/arch/arm/mach-s5pc100/include/mach/map.h
+> index 4681ebe..f90c033 100644
+> --- a/arch/arm/mach-s5pc100/include/mach/map.h
+> +++ b/arch/arm/mach-s5pc100/include/mach/map.h
+> @@ -113,7 +113,7 @@
+> ?#define S5PC100_PA_TSADC ? ? ? (0xF3000000)
+>
+> ?/* ETC */
+> -#define S5PC100_PA_SDRAM ? ? ? (0x20000000)
+> +#define S5PC100_PA_SDRAM ? ? ? (0x30000000)
+> ?#define S5PC1XX_PA_SDRAM ? ? ? S5PC100_PA_SDRAM
+>
+> ?/* compatibility defines. */
+> diff --git a/arch/arm/mach-s5pc100/include/mach/memory.h b/arch/arm/mach-s5pc100/include/mach/memory.h
+> index 4b60d18..21cc182 100644
+> --- a/arch/arm/mach-s5pc100/include/mach/memory.h
+> +++ b/arch/arm/mach-s5pc100/include/mach/memory.h
+> @@ -13,6 +13,6 @@
+> ?#ifndef __ASM_ARCH_MEMORY_H
+> ?#define __ASM_ARCH_MEMORY_H
+>
+> -#define PHYS_OFFSET ? ? ? ? ? ?UL(0x20000000)
+> +#define PHYS_OFFSET ? ? ? ? ? ?UL(0x30000000)
+>
+> ?#endif
+> --
+> 1.6.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
