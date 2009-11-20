@@ -1,43 +1,93 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 20 Nov 2009 10:51:10 +0100
-Subject: [alsa-devel] i.MX audio support
-In-Reply-To: <eedb5540911192351l5abc7a18s5a218f9b20b58d1b@mail.gmail.com>
-References: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
-	<20091119162830.GA31336@rakim.wolfsonmicro.main>
-	<20091119175327.GV30179@pengutronix.de>
-	<20091119185426.GA2814@sirena.org.uk>
-	<eedb5540911192351l5abc7a18s5a218f9b20b58d1b@mail.gmail.com>
-Message-ID: <20091120095109.GW30179@pengutronix.de>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Fri, 20 Nov 2009 17:54:45 +0800
+Subject: RFC [PATCH 6/9] Added lpc32xx platform.h file
+In-Reply-To: <4B06657F.8010800@gmail.com>
+References: <083DF309106F364B939360100EC290F804F54D560F@eu1rdcrdc1wx030.exi.nxp.com>
+	<e68bb3470911192317s1203ae5k750ec6372539e433@mail.gmail.com>
+	<4B06657F.8010800@gmail.com>
+Message-ID: <e68bb3470911200154h58871b5y64f1078853bff16f@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+2009/11/20 Paulius Zaleckas <paulius.zaleckas@gmail.com>:
+> On 11/20/2009 09:17 AM, Wan ZongShun wrote:
+>>
+>> Hi Kevin,
+>>
+>> And, this patch could not be applied in my Linux 2.6.32-rc7, error
+>> occurs as following:
+>>
+>> zswan at zswan-laptop:~/git-2.6/linux-2.6$ patch -p1< ?Added\ lpc32xx\
+>> platform.h\ file.eml
+>> patching file arch/arm/mach-lpc32xx/include/mach/platform.h
+>> patch: **** malformed patch at line 1063: ?*/
+>>
+>> why?
+>>
+>
+> [...]
+>
+>>> +/*
+>>> + * p3_mux_set, p3_mux_clr, p3_mux_state register defines
+>>> + */
+>>> +#define P3_GPO2_MAT10 ? ? ? ? ? ? ? ? ?_BIT(2)
+>>> +#define P3_GPO6_PWM43 ? ? ? ? ? ? ? ? ?_BIT(6)
+>>> +#define P3_GPO8_PWM42 ? ? ? ? ? ? ? ? ?_BIT(8)
+>>> +#define P3_GPO9_PWM41 ? ? ? ? ? ? ? ? ?_BIT(9)
+>>> +#define P3_GPO10_PWM36 ? ? ? ? ? ? ? ? _BIT(10)
+>>> +#define P3_GPO12_PWM35 ? ? ? ? ? ? ? ? _BIT(12)
+>>> +#define P3_GPO13_PWM34 ? ? ? ? ? ? ? ? _BIT(13)
+>>> +#define P3_GPO15_PWM33 ? ? ? ? ? ? ? ? _BIT(15)
+>>> +#define P3_GPO16_PWM32 ? ? ? ? ? ? ? ? _BIT(16)
+>>> +#define P3_GPO18_PWM31 ? ? ? ? ? ? ? ? _BIT(18)
+>>> +
+>>> +/*
+>>> + * SSP module register offsets
+>>> ?*/
+>
+> because the + is missing...
 
-On Fri, Nov 20, 2009 at 08:51:31AM +0100, javier Martin wrote:
-> Theoretically, current merged code only supports i.MX21/27 in the DMA
-> part. So it would be correct adding a DMA separate driver for i.MX31.
-> 
-> However I disagree with completely new SSI code. It should be possible
-> to add an arch define to export proper DMA structures whether we are
-> using i.MX21/27 or i.MX31 in the current SSI driver.
+Oh, this is really true, just be a odd missing.
 
-I would agree if the current code worked and would be good shape.
-Unfortunately it's not. It hardcodes the fact that there are 2 SSI units
-(i.MX51 has three of them). Instead of writel/readl it uses direct pointer
-derefs. The driver skips audio while it reinitialises the DMA engine. In
-mx1_mx2_pcm_open() there are several memory leaks. The driver does not
-call clk_get itself but depends on the board doing it. The only
-available board support depends on a board not present in the kernel, so
-we are not able to compile it (and it won't because the audmux
-definitions are missing)
+>>> +#define LSSP_CR0(x) ? ? ? ? ? ? ? ? ? ?(x + 0x00)
+>>> +#define LSSP_CR1(x) ? ? ? ? ? ? ? ? ? ?(x + 0x04)
+>>> +#define LSSP_DATA(x) ? ? ? ? ? ? ? ? ? (x + 0x08)
+>>> +#define LSSP_SR(x) ? ? ? ? ? ? ? ? ? ? (x + 0x0C)
+>>> +#define LSSP_CPSR(x) ? ? ? ? ? ? ? ? ? (x + 0x10)
+>>> +#define LSSP_IMSC(x) ? ? ? ? ? ? ? ? ? (x + 0x14)
+>>> +#define LSSP_ICR(x) ? ? ? ? ? ? ? ? ? ?(x + 0x20)
+>>> +
+>>> +#define LSSP_ICR_RORIC ? ? ? ? ? ? ? ? (1<< ?0)
+>>> +#define LSSP_ICR_RTIC ? ? ? ? ? ? ? ? ?(1<< ?1)
+>>> +#define LSSP_CR0_DSS(n) ? ? ? ? ? ? ? ? ? ? ? ?_SBF(0, (((n) - 1)&
+>>> ?0xF))
+>>> +#define LSSP_CR0_FRF_SPI ? ? ? ? ? ? ? 0x0
+>>> +#define LSSP_CR0_CPOL(n) ? ? ? ? ? ? ? _SBF(6, ((n)& ?0x01))
+>>> +#define LSSP_CR0_CPHA(n) ? ? ? ? ? ? ? _SBF(7, ((n)& ?0x01))
+>>> +#define LSSP_CR0_SCR(n) ? ? ? ? ? ? ? ? ? ? ? ?_SBF(8, ((n)& ?0xFF))
+>>> +#define LSSP_CR1_SSP_ENABLE ? ? ? ? ? ?(1<< ?1)
+>>> +#define LSSP_CPSR_CPDVSR(n) ? ? ? ? ? ?_SBF(0, (n)& ?0xFE)
+>>> +#define LSSP_SR_RNE ? ? ? ? ? ? ? ? ? ?(1<< ?2)
+>>> +
+>>> +#endif
+>>> --
+>>> 1.6.0.6
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+>>
+>>
+>>
+>
+>
 
-This all leads to a huge series of patches and much work and in the end
-we would have a nearly rewritten driver.
 
-Sascha
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
