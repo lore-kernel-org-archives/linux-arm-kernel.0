@@ -1,96 +1,102 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 20 Nov 2009 18:03:00 +0000
-Subject: [PATCH 3/7] ARM: dma-mapping: provide dma_to_page()
+Date: Sat, 20 Nov 2009 18:04:00 +0000
+Subject: [PATCH 4/7] ARM: dma-mapping: split dma_unmap_page() from
+	dma_unmap_single()
 In-Reply-To: <20091120182539.GG16920@n2100.arm.linux.org.uk>
 References: <20091120182539.GG16920@n2100.arm.linux.org.uk>
-Message-ID: <E1NBYE5-0005ky-8T@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1NBYE8-0005l1-GI@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+We will need to treat dma_unmap_page() differently from dma_unmap_single()
+
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/include/asm/dma-mapping.h          |   10 ++++++++++
- arch/arm/mach-iop13xx/include/mach/memory.h |    2 ++
- arch/arm/mach-ks8695/include/mach/memory.h  |    7 +++++++
- arch/arm/plat-omap/include/mach/memory.h    |    7 +++++++
- 4 files changed, 26 insertions(+), 0 deletions(-)
+ arch/arm/common/dmabounce.c        |   21 ++++++++++++++++++---
+ arch/arm/include/asm/dma-mapping.h |    8 +++++---
+ 2 files changed, 23 insertions(+), 6 deletions(-)
 
+diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
+index 734ac91..5a375e5 100644
+--- a/arch/arm/common/dmabounce.c
++++ b/arch/arm/common/dmabounce.c
+@@ -342,6 +342,22 @@ dma_addr_t dma_map_single(struct device *dev, void *ptr, size_t size,
+ }
+ EXPORT_SYMBOL(dma_map_single);
+ 
++/*
++ * see if a mapped address was really a "safe" buffer and if so, copy
++ * the data from the safe buffer back to the unsafe buffer and free up
++ * the safe buffer.  (basically return things back to the way they
++ * should be)
++ */
++void dma_unmap_single(struct device *dev, dma_addr_t dma_addr, size_t size,
++		enum dma_data_direction dir)
++{
++	dev_dbg(dev, "%s(ptr=%p,size=%d,dir=%x)\n",
++		__func__, (void *) dma_addr, size, dir);
++
++	unmap_single(dev, dma_addr, size, dir);
++}
++EXPORT_SYMBOL(dma_unmap_single);
++
+ dma_addr_t dma_map_page(struct device *dev, struct page *page,
+ 		unsigned long offset, size_t size, enum dma_data_direction dir)
+ {
+@@ -366,8 +382,7 @@ EXPORT_SYMBOL(dma_map_page);
+  * the safe buffer.  (basically return things back to the way they
+  * should be)
+  */
+-
+-void dma_unmap_single(struct device *dev, dma_addr_t dma_addr, size_t size,
++void dma_unmap_page(struct device *dev, dma_addr_t dma_addr, size_t size,
+ 		enum dma_data_direction dir)
+ {
+ 	dev_dbg(dev, "%s(ptr=%p,size=%d,dir=%x)\n",
+@@ -375,7 +390,7 @@ void dma_unmap_single(struct device *dev, dma_addr_t dma_addr, size_t size,
+ 
+ 	unmap_single(dev, dma_addr, size, dir);
+ }
+-EXPORT_SYMBOL(dma_unmap_single);
++EXPORT_SYMBOL(dma_unmap_page);
+ 
+ int dmabounce_sync_for_cpu(struct device *dev, dma_addr_t addr,
+ 		unsigned long off, size_t sz, enum dma_data_direction dir)
 diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index 5d78eb1..f06d80c 100644
+index f06d80c..a96300b 100644
 --- a/arch/arm/include/asm/dma-mapping.h
 +++ b/arch/arm/include/asm/dma-mapping.h
-@@ -20,6 +20,11 @@ static inline dma_addr_t page_to_dma(struct device *dev, struct page *page)
- 	return (dma_addr_t)__pfn_to_bus(page_to_pfn(page));
- }
+@@ -257,9 +257,11 @@ extern int dma_needs_bounce(struct device*, dma_addr_t, size_t);
+  */
+ extern dma_addr_t dma_map_single(struct device *, void *, size_t,
+ 		enum dma_data_direction);
++extern void dma_unmap_single(struct device *, dma_addr_t, size_t,
++		enum dma_data_direction);
+ extern dma_addr_t dma_map_page(struct device *, struct page *,
+ 		unsigned long, size_t, enum dma_data_direction);
+-extern void dma_unmap_single(struct device *, dma_addr_t, size_t,
++extern void dma_unmap_page(struct device *, dma_addr_t, size_t,
+ 		enum dma_data_direction);
  
-+static inline struct page *dma_to_page(struct device *dev, dma_addr_t addr)
-+{
-+	return pfn_to_page(__bus_to_pfn(addr));
-+}
-+
- static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
+ /*
+@@ -352,7 +354,6 @@ static inline void dma_unmap_single(struct device *dev, dma_addr_t handle,
  {
- 	return (void *)__bus_to_virt(addr);
-@@ -35,6 +40,11 @@ static inline dma_addr_t page_to_dma(struct device *dev, struct page *page)
- 	return __arch_page_to_dma(dev, page);
+ 	/* nothing to do */
  }
+-#endif /* CONFIG_DMABOUNCE */
  
-+static inline struct page *dma_to_page(struct device *dev, dma_addr_t addr)
-+{
-+	return __arch_dma_to_page(dev, addr);
-+}
-+
- static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
+ /**
+  * dma_unmap_page - unmap a buffer previously mapped through dma_map_page()
+@@ -371,8 +372,9 @@ static inline void dma_unmap_single(struct device *dev, dma_addr_t handle,
+ static inline void dma_unmap_page(struct device *dev, dma_addr_t handle,
+ 		size_t size, enum dma_data_direction dir)
  {
- 	return __arch_dma_to_virt(dev, addr);
-diff --git a/arch/arm/mach-iop13xx/include/mach/memory.h b/arch/arm/mach-iop13xx/include/mach/memory.h
-index 42ae29b..25b1da9 100644
---- a/arch/arm/mach-iop13xx/include/mach/memory.h
-+++ b/arch/arm/mach-iop13xx/include/mach/memory.h
-@@ -64,6 +64,8 @@ static inline unsigned long __lbus_to_virt(dma_addr_t x)
- 		(dma_addr_t)page_to_phys(page);				\
- 	})
+-	dma_unmap_single(dev, handle, size, dir);
++	/* nothing to do */
+ }
++#endif /* CONFIG_DMABOUNCE */
  
-+#define __arch_dma_to_page(dev, addr)	phys_to_page(addr)
-+
- #endif /* CONFIG_ARCH_IOP13XX */
- #endif /* !ASSEMBLY */
- 
-diff --git a/arch/arm/mach-ks8695/include/mach/memory.h b/arch/arm/mach-ks8695/include/mach/memory.h
-index 76e5308..ffa19aa 100644
---- a/arch/arm/mach-ks8695/include/mach/memory.h
-+++ b/arch/arm/mach-ks8695/include/mach/memory.h
-@@ -41,6 +41,13 @@ extern struct bus_type platform_bus_type;
- 		__dma = __dma - PHYS_OFFSET + KS8695_PCIMEM_PA; \
- 	   __dma; })
- 
-+#define __arch_dma_to_page(dev, x)	\
-+	({ dma_addr_t __dma = x;				\
-+	   if (!is_lbus_device(dev))				\
-+		__dma += PHYS_OFFSET - KS8695_PCIMEM_PA;	\
-+	   phys_to_page(__dma);					\
-+	})
-+
- #endif
- 
- #endif
-diff --git a/arch/arm/plat-omap/include/mach/memory.h b/arch/arm/plat-omap/include/mach/memory.h
-index 9ad41dc..3325f7b 100644
---- a/arch/arm/plat-omap/include/mach/memory.h
-+++ b/arch/arm/plat-omap/include/mach/memory.h
-@@ -68,6 +68,13 @@
- 		__dma = __dma - PHYS_OFFSET + OMAP1510_LB_OFFSET; \
- 	   __dma; })
- 
-+#define __arch_dma_to_page(dev, addr)	\
-+	({ dma_addr_t __dma = addr;				\
-+	   if (is_lbus_device(dev))				\
-+		__dma += PHYS_OFFSET - OMAP1510_LB_OFFSET;	\
-+	   phys_to_page(__dma);					\
-+	})
-+
- #define __arch_dma_to_virt(dev, addr)	({ (void *) (is_lbus_device(dev) ? \
- 						lbus_to_virt(addr) : \
- 						__phys_to_virt(addr)); })
+ /**
+  * dma_sync_single_range_for_cpu
 -- 
 1.6.2.5
