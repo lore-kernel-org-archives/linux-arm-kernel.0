@@ -1,66 +1,76 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 20 Nov 2009 04:13:50 -0500
-Subject: [PATCH 09/10] input: enable touch on 88pm860x
-In-Reply-To: <20091120084457.GD3009@core.coreip.homeip.net>
-References: <771cded00911130104s3bc6ff97ma3a7f7ad76ae9198@mail.gmail.com>
-	<20091114025425.GA3587@core.coreip.homeip.net>
-	<771cded00911162227i24cd5a4cv9899e220b1c37c6e@mail.gmail.com>
-	<20091118051646.GC31480@core.coreip.homeip.net>
-	<771cded00911191902s171a9fe4ucb21ea0c75bb12cb@mail.gmail.com>
-	<20091120084457.GD3009@core.coreip.homeip.net>
-Message-ID: <771cded00911200113u24e9f7e3pb0b4f6325467ab71@mail.gmail.com>
+Date: Fri, 20 Nov 2009 04:14:45 -0500
+Subject: [PATCH 06/10] mfd add subdevs in 88pm860x
+In-Reply-To: <771cded00911191907v847b0en76a340a6dfc47725@mail.gmail.com>
+References: <771cded00911130100u2a97c6f4v968e40b912650482@mail.gmail.com>
+	<20091114045051.GA4463@core.coreip.homeip.net>
+	<771cded00911162231i6b548138sf348f20fdd508296@mail.gmail.com>
+	<20091118051631.GB31480@core.coreip.homeip.net>
+	<771cded00911191907v847b0en76a340a6dfc47725@mail.gmail.com>
+Message-ID: <771cded00911200114n4a040842rff7e42c122b127ba@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2009 at 3:44 AM, Dmitry Torokhov
-<dmitry.torokhov@gmail.com> wrote:
-> Hi Haojian,
->
-> On Thu, Nov 19, 2009 at 10:02:23PM -0500, Haojian Zhuang wrote:
->> +
->> +static int __devexit pm860x_touch_remove(struct platform_device *pdev)
->> +{
->> + ? ? struct pm860x_touch *touch = platform_get_drvdata(pdev);
->> +
->
-> "pm860x_free_irq(chip, irq);" is still missing here.
->
->> + ? ? input_unregister_device(touch->idev);
->> + ? ? return 0;
->> +}
->> +
+On Thu, Nov 19, 2009 at 10:07 PM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> On Wed, Nov 18, 2009 at 12:16 AM, Dmitry Torokhov
+> <dmitry.torokhov@gmail.com> wrote:
+>>> @@ -354,23 +510,46 @@ int __devinit pm860x_device_init(struct
+>>> pm860x_chip *chip, void *pdata)
+>>> ? ? ? ? ? ? ? mutex_init(&mixed_chip.io_lock);
+>>>
+>>> ? ? ? if (!strcmp(chip->id.name, "88PM8607")) {
+>>> - ? ? ? ? ? ? ret = __88pm8607_init(chip, (struct pm860x_plat_data *)pdata);
+>>> + ? ? ? ? ? ? ret = __88pm8607_init(chip, pdata);
+>>> ? ? ? ? ? ? ? if (ret < 0)
+>>> ? ? ? ? ? ? ? ? ? ? ? goto out;
+>>>
+>>> - ? ? ? ? ? ? count = ARRAY_SIZE(pm8607_devs);
+>>> - ? ? ? ? ? ? for (i = 0; i < count; i++) {
+>>> - ? ? ? ? ? ? ? ? ? ? ret = mfd_add_devices(chip->dev, i, &pm8607_devs[i],
+>>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 1, NULL, 0);
+>>> - ? ? ? ? ? ? ? ? ? ? if (ret != 0) {
+>>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_err(chip->dev, "Failed to add subdevs\n");
+>>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto out;
+>>> - ? ? ? ? ? ? ? ? ? ? }
+>>> + ? ? ? ? ? ? ret = mfd_add_devices(chip->dev, 0, &regulator_devs[0],
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(regulator_devs),
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &regulator_resources[0], 0);
+>>> + ? ? ? ? ? ? if (ret < 0)
+>>> + ? ? ? ? ? ? ? ? ? ? dev_err(chip->dev, "Failed to add regulator subdev\n");
+>>> +
+>>> + ? ? ? ? ? ? if (pdata && pdata->touch) {
+>>> + ? ? ? ? ? ? ? ? ? ? ret = mfd_add_devices(chip->dev, 0, &touch_devs[0],
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(touch_devs),
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &touch_resources[0], 0);
+>>> + ? ? ? ? ? ? ? ? ? ? if (ret < 0)
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_err(chip->dev, "Failed to add touch "
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "subdev\n");
 >>
->> ? ? ? ? To compile this driver as a module, choose M here: the
->> ? ? ? ? module will be called pcap_ts.
->> +
->> +config TOUCHSCREEN_88PM860X
->> + ? ? tristate "Marvell 88PM860x touchscreen"
->> + ? ? depends on MFD_88PM860X
->> + ? ? help
->> + ? ? ? Say Y here if you have a 88PM860x PMIC and want to enable
->> + ? ? ? support for the built-in touchscreen.
+>> Umm, when I was asking for error handling I expected more than just
+>> printing a message. What about cleanup? Is device functional without
+>> half of the devices? Do we want to have a crippled device?
+>>
+>> Thanks.
+>>
+>> --
+>> Dmitry
+>>
 >
-> "To compile this driver as a module..."
+> updated
 >
-> Thanks!
->
-> Other than that:
->
-> ? ? ? ?Acked-by: Dmitry Torokhov <dtor@mail.ru>
->
-> --
-> Dmitry
+> Thanks
+> Haojian
 >
 
-Fixed. Actually it could be built as module already. Now append more
-comments on it.
+Update for releasing irq if registering mfd subdevices failure.
 
 Thanks
 Haojian
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: 0009-input-enable-touch-on-88pm860x.patch
+Name: 0006-mfd-append-subdev-into-88pm860x-driver.patch
 Type: text/x-patch
-Size: 8855 bytes
+Size: 14568 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091120/b99dd893/attachment.bin>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091120/594a3446/attachment-0001.bin>
