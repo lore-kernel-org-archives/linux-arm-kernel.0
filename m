@@ -1,50 +1,63 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 20 Nov 2009 14:42:52 +0100
-Subject: [PATCH 20/20] MAINTAINERS: add ARM/S5PC100 and ARM/S5PC110
-	architectures
+Date: Fri, 20 Nov 2009 14:42:48 +0100
+Subject: [PATCH 16/20] ARM: S5PC1XX: enable S5PC110 sub-platform
 In-Reply-To: <1258551194-16018-1-git-send-email-m.szyprowski@samsung.com>
 References: <1258551194-16018-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1258724572-19176-21-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1258724572-19176-17-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kyungmin Park <kyungmin.park@samsung.com>
 
-Add entries for the ARM S5PC100 and ARM S5PC110 architectures that are
-currently being maintained by ourself.
+Samsung S5PC110 SoC are newer Samsung SoCs. Like S5PC100 they are based
+on CortexA8 ARM CPU, but have much more powerfull integrated periperals.
+This patch enables S5PC110 sub-platform.
 
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- MAINTAINERS |   16 ++++++++++++++++
- 1 files changed, 16 insertions(+), 0 deletions(-)
+ arch/arm/Kconfig              |    1 +
+ arch/arm/Makefile             |    1 +
+ arch/arm/plat-s5pc1xx/Kconfig |    3 +++
+ 3 files changed, 5 insertions(+), 0 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 81d68d5..de7daad 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -877,6 +877,22 @@ W:	http://www.fluff.org/ben/linux/
- S:	Maintained
- F:	arch/arm/mach-s3c6410/
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1c4119c..280c38e 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -770,6 +770,7 @@ source "arch/arm/plat-stmp3xxx/Kconfig"
  
-+ARM/S5PC100 ARM ARCHITECTURE
-+M:	Kyungmin Park <kyungmin.park@samsung.com>
-+M:	Marek Szyprowski <m.szyprowski@samsung.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
-+S:	Supported
-+F:	arch/arm/mach-s5pc100/
+ if ARCH_S5PC1XX
+ source "arch/arm/mach-s5pc100/Kconfig"
++source "arch/arm/mach-s5pc110/Kconfig"
+ endif
+ 
+ source "arch/arm/mach-lh7a40x/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index daea150..d9daa45 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -161,6 +161,7 @@ machine-$(CONFIG_ARCH_S3C2410)		:= s3c2410 s3c2400 s3c2412 s3c2440 s3c2442 s3c24
+ machine-$(CONFIG_ARCH_S3C24A0)		:= s3c24a0
+ machine-$(CONFIG_ARCH_S3C64XX)		:= s3c6400 s3c6410
+ machine-$(CONFIG_ARCH_S5PC100)		:= s5pc100
++machine-$(CONFIG_ARCH_S5PC110)		:= s5pc110
+ machine-$(CONFIG_ARCH_SA1100)		:= sa1100
+ machine-$(CONFIG_ARCH_SHARK)		:= shark
+ machine-$(CONFIG_ARCH_STMP378X)		:= stmp378x
+diff --git a/arch/arm/plat-s5pc1xx/Kconfig b/arch/arm/plat-s5pc1xx/Kconfig
+index 4a3347d..b310314 100644
+--- a/arch/arm/plat-s5pc1xx/Kconfig
++++ b/arch/arm/plat-s5pc1xx/Kconfig
+@@ -30,6 +30,9 @@ choice
+ config ARCH_S5PC100
+ 	bool "S5PC100"
+ 
++config ARCH_S5PC110
++	bool "S5PC110"
 +
-+ARM/S5PC110 ARM ARCHITECTURE
-+M:	Kyungmin Park <kyungmin.park@samsung.com>
-+M:	Marek Szyprowski <m.szyprowski@samsung.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
-+S:	Supported
-+F:	arch/arm/mach-s5pc110/
-+
- ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
- M:	Lennert Buytenhek <kernel@wantstofly.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ endchoice
+ 
+ 
 -- 
 1.6.4
