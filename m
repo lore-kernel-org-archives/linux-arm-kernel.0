@@ -1,125 +1,39 @@
-From: jszhang3@gmail.com (JiSheng Zhang)
-Date: Fri, 20 Nov 2009 11:43:22 +0800
-Subject: [BUG]2.6.27.y some contents lost after writing to mmaped file
-In-Reply-To: <2df346410911191941w6f540563u78a1a5f9ba989b6d@mail.gmail.com>
-References: <2df346410911151938r1eb5c5e4q9930ac179d61ef01@mail.gmail.com>
-	<20091117015655.GA8683@suse.de> <20091117123622.GI27677@think>
-	<20091117190635.GB31105@duck.suse.cz> <20091118221756.367c005e@ustc>
-	<2df346410911191941w6f540563u78a1a5f9ba989b6d@mail.gmail.com>
-Message-ID: <2df346410911191943u3294adeci34494d36af344dc7@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 19 Nov 2009 22:56:45 -0600
+Subject: [PATCH 7/8] pxa: add frame buffer on pxa168 aspenite platform
+In-Reply-To: <7c34ac520911191838k45fa4708vd8b606e9ad6a8d7@mail.gmail.com>
+References: <7c34ac520911160134k57023db1we74073a87a3dd454@mail.gmail.com>
+	<f17812d70911162229s43ca6826k29c4c4a7e279144f@mail.gmail.com>
+	<7c34ac520911190103q4ba79c60w11dfc8255b69abfa@mail.gmail.com>
+	<f17812d70911190829u6831a176j7caae7e0bee3fa53@mail.gmail.com>
+	<7c34ac520911191838k45fa4708vd8b606e9ad6a8d7@mail.gmail.com>
+Message-ID: <f17812d70911192056m64b31c62hd050c0567e098cb@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-oops, I forgot to cc linux-arm-kernel
+On Thu, Nov 19, 2009 at 8:38 PM, Jun Nie <niej0001@gmail.com> wrote:
+> 2009/11/20 Eric Miao <eric.y.miao@gmail.com>:
+>>> + ? ? ? int err = 0;
+>>> + ? ? ? if (on) {
+>>> + ? ? ? ? ? ? ? if (spi_gpio_reset != -1) {
+>>> + ? ? ? ? ? ? ? ? ? ? ? err = gpio_request(spi_gpio_reset, "TPO_LCD_SPI_RESET");
+>>> + ? ? ? ? ? ? ? ? ? ? ? if (err) {
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? printk(KERN_ERR "failed to request GPIO for TPO LCD RESET\n");
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? return err;
+>>> + ? ? ? ? ? ? ? ? ? ? ? }
+>>> + ? ? ? ? ? ? ? ? ? ? ? gpio_direction_output(spi_gpio_reset, 0);
+>>> + ? ? ? ? ? ? ? ? ? ? ? msleep(100);
+>>
+>> This is really a loooong delay, there any specific reason for such a long
+>> delay, I'm seeing this to slow down the boot up significantly?
+>>
+>> Otherwise looks OK to me, and I prefer the defconfig file change to
+>> be a separate patch please.
+>>
+>
+> Actually, This is just an example for other real products. There is no
+> such spi_reset pin on Aspenite , so machine info set it spi_gpio_reset
+> == -1. Or do you think we should delete these lines?
+>
 
-2009/11/20 JiSheng Zhang <jszhang3@gmail.com>:
-> Hi,
->
-> Russell King wrote
->>- CPU type
-> ARM926EJ-S
->>- is it a SMP CPU
-> no. UP
->>- are you running a SMP kernel
-> no
->>- board type
-> an soc
->
->
->>- the storage peripheral being used for this test
-> memory and harddrive
->>- is DMA being used for this periperal
-> for memory, DMA? for harddrive, yes
->>- any additional block layers (eg, lvm, dm, md)
-> no
->>- filesystem type
-> tmpfs and ext3
->
-> 2009/11/18 JiSheng Zhang <jszhang3@gmail.com>:
->> On Tue, 17 Nov 2009 20:06:35 +0100
->> Jan Kara <jack@suse.cz> wrote:
->>
->>> On Tue 17-11-09 07:36:22, Chris Mason wrote:
->>> > On Mon, Nov 16, 2009 at 05:56:55PM -0800, Greg KH wrote:
->>> > > On Mon, Nov 16, 2009 at 11:38:57AM +0800, JiSheng Zhang wrote:
->>> > > > Hi,
->>> > > >
->>> > > > I triggered a failure in an fs test with fsx-linux from ltp. It seems that
->>> > > > fsx-linux failed at mmap->write sequence.
->>> > > >
->>> > > > Tested kernel is 2.6.27.12 and 2.6.27.39
->>> > >
->>> > > Does this work on any kernel you have tested? ?Or is it a regression?
->>> > >
->>> > > > Tested file system: ext3, tmpfs.
->>> > > > IMHO, it impacts all file systems.
->>> > > >
->>> > > > Some fsx-linux log is:
->>> > > >
->>> > > > READ BAD DATA: offset = 0x2771b, size = 0xa28e
->>> > > > OFFSET ?GOOD ? ?BAD ? ? RANGE
->>> > > > 0x287e0 0x35c9 ?0x15a9 ? ? 0x80
->>> > > > operation# (mod 256) for the bad datamay be 21
->>> > > > ...
->>> > > > 7828: 1257514978.306753 READ ? ? 0x23dba thru 0x25699 (0x18e0 bytes)
->>> > > > 7829: 1257514978.306899 MAPWRITE 0x27eeb thru 0x2a516 (0x262c bytes)
->>> > > > ?******WWWW
->>> > > > 7830: 1257514978.307504 READ ? ? 0x2771b thru 0x319a8 (0xa28e bytes)
->>> > > > ?***RRRR***
->>> > > > Correct content saved for comparison
->>> > > > ...
->>> ? Hmm, how long does it take to reproduce? I'm running fsx-linux on tmpfs
->>> for a while on 2.6.27.21 and didn't hit the problem yet.
->>
->> I forget to mention that the test were done on an arm board with 64M ram.
->> I have tested fsx-linux again on pc, it seems that failure go away.
->>
->>>
->>> > > Are you sure that the LTP is correct? ?It wouldn't be the first time it
->>> > > wasn't...
->>> >
->>> > I'm afraid fsx usually finds bugs. ?I thought Jan Kara recently fixed
->>> > something here in ext3, does 2.6.32-rc work?
->>> ? Yeah, fsx usually finds bugs. Note that he sees the problem also on tmpfs
->>> so it's not ext3 problem. Anyway, trying to reproduce with 2.6.32-rc? would
->>> be interesting.
->>
->> Currently the arm board doesn't support 2.6.32-rc. But I test with 2.6.32-rc7
->> On my pc box, there's no failure so far.
->>
->>>
->>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? Honza
->>
->> I found this via google:
->> http://marc.info/?t=118026315000001&r=1&w=2
->>
->> I even tried the code from
->> http://marc.info/?l=linux-arch&m=118030601701617&w=2
->> I got mostly:
->> firstfirstfirst
->> firstfirstfirst
->> firstfirstfirst
->>
->>
->> No change after pass "MS_SYNC|MS_INVALIDATE" to msync and make the
->> flush_dcache_page() call unconditional in do_generic_mapping_read.
->> This behavior is different from what I read from the mail thread above.
->>
->>> void do_generic_mapping_read(struct address_space *mapping,
->>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct file_ra_state *_ra,
->>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct file *filp,
->>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?loff_t *ppos,
->>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?read_descriptor_t *desc,
->>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?read_actor_t actor)
->>> {
->>> ...
->>> ? ? ? ? ? ? ? ? /* If users can be writing to this page using arbitrary
->>> ? ? ? ? ? ? ? ? ?* virtual addresses, take care about potential aliasing
->>> ? ? ? ? ? ? ? ? ?* before reading the page on the kernel side.
->>> ? ? ? ? ? ? ? ? ?*/
->>> ? ? ? ? ? ? ? ? if (1 || mapping_writably_mapped(mapping))
->>> ? ? ? ? ? ? ? ? ? ? ? ? flush_dcache_page(page);
->>
->> Then I run fsx-linux after the above modification, fsx-linux failed all
->> the same both on tmpfs and ext3
->
+I see no reason for it to stay there then, please remove.
