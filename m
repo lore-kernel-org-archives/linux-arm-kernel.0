@@ -1,19 +1,67 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 19 Nov 2009 22:04:10 -0500
-Subject: [PATCH 07/10] backlight: enable backlight in 88pm860x
-In-Reply-To: <771cded00911162230x25f5ad7cx6adad4c5e929fa3c@mail.gmail.com>
-References: <771cded00911130102k36662e51j34e7e2825fdbde66@mail.gmail.com>
-	<20091114050257.GC4463@core.coreip.homeip.net>
-	<771cded00911162230x25f5ad7cx6adad4c5e929fa3c@mail.gmail.com>
-Message-ID: <771cded00911191904wc435e7auee90510221bac989@mail.gmail.com>
+Date: Thu, 19 Nov 2009 22:07:48 -0500
+Subject: [PATCH 06/10] mfd add subdevs in 88pm860x
+In-Reply-To: <20091118051631.GB31480@core.coreip.homeip.net>
+References: <771cded00911130100u2a97c6f4v968e40b912650482@mail.gmail.com>
+	<20091114045051.GA4463@core.coreip.homeip.net>
+	<771cded00911162231i6b548138sf348f20fdd508296@mail.gmail.com>
+	<20091118051631.GB31480@core.coreip.homeip.net>
+Message-ID: <771cded00911191907v847b0en76a340a6dfc47725@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-updated with module supported
+On Wed, Nov 18, 2009 at 12:16 AM, Dmitry Torokhov
+<dmitry.torokhov@gmail.com> wrote:
+>> @@ -354,23 +510,46 @@ int __devinit pm860x_device_init(struct
+>> pm860x_chip *chip, void *pdata)
+>> ? ? ? ? ? ? ? mutex_init(&mixed_chip.io_lock);
+>>
+>> ? ? ? if (!strcmp(chip->id.name, "88PM8607")) {
+>> - ? ? ? ? ? ? ret = __88pm8607_init(chip, (struct pm860x_plat_data *)pdata);
+>> + ? ? ? ? ? ? ret = __88pm8607_init(chip, pdata);
+>> ? ? ? ? ? ? ? if (ret < 0)
+>> ? ? ? ? ? ? ? ? ? ? ? goto out;
+>>
+>> - ? ? ? ? ? ? count = ARRAY_SIZE(pm8607_devs);
+>> - ? ? ? ? ? ? for (i = 0; i < count; i++) {
+>> - ? ? ? ? ? ? ? ? ? ? ret = mfd_add_devices(chip->dev, i, &pm8607_devs[i],
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 1, NULL, 0);
+>> - ? ? ? ? ? ? ? ? ? ? if (ret != 0) {
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_err(chip->dev, "Failed to add subdevs\n");
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto out;
+>> - ? ? ? ? ? ? ? ? ? ? }
+>> + ? ? ? ? ? ? ret = mfd_add_devices(chip->dev, 0, &regulator_devs[0],
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(regulator_devs),
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &regulator_resources[0], 0);
+>> + ? ? ? ? ? ? if (ret < 0)
+>> + ? ? ? ? ? ? ? ? ? ? dev_err(chip->dev, "Failed to add regulator subdev\n");
+>> +
+>> + ? ? ? ? ? ? if (pdata && pdata->touch) {
+>> + ? ? ? ? ? ? ? ? ? ? ret = mfd_add_devices(chip->dev, 0, &touch_devs[0],
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(touch_devs),
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &touch_resources[0], 0);
+>> + ? ? ? ? ? ? ? ? ? ? if (ret < 0)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_err(chip->dev, "Failed to add touch "
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "subdev\n");
+>
+> Umm, when I was asking for error handling I expected more than just
+> printing a message. What about cleanup? Is device functional without
+> half of the devices? Do we want to have a crippled device?
+>
+> Thanks.
+>
+> --
+> Dmitry
+>
+
+updated
+
+Thanks
+Haojian
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: 0007-backlight-enable-backlight-in-88pm860x.patch
+Name: 0006-mfd-append-subdev-into-88pm860x-driver.patch
 Type: text/x-patch
-Size: 9638 bytes
+Size: 14320 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091119/d4b6376b/attachment-0001.bin>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091119/a44e6eca/attachment.bin>
