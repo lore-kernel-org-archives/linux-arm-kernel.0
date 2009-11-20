@@ -1,611 +1,582 @@
 From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Fri, 20 Nov 2009 13:26:31 +0800
-Subject: [PATCH v2]: NUC900: Add spi driver support for nuc900
-Message-ID: <4B062887.90803@gmail.com>
+Date: Fri, 20 Nov 2009 13:32:40 +0800
+Subject: RFC [PATCH 5/9] Added phy3250 platform for the lcp3250
+In-Reply-To: <083DF309106F364B939360100EC290F804F54D560E@eu1rdcrdc1wx030.exi.nxp.com>
+References: <083DF309106F364B939360100EC290F804F54D560E@eu1rdcrdc1wx030.exi.nxp.com>
+Message-ID: <4B0629F8.5060202@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear sirs,
+Dear Kevin Wells ,
 
-Thanks a lot for your help,and I fix the spi driver and re-submit it.
+Could you use the checkpatch.pl to fix your current patch?
+I see the following info:
+
+WARNING: space prohibited between function name and open parenthesis '('
+#616: FILE: arch/arm/mach-lpc32xx/phy3250.c:528:
++       .io_pg_offst    = ((io_p2v (UART5_BASE))>>18) & 0xfffc,
+
+total: 123 errors, 21 warnings, 534 lines checked
 
 
-Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
 
----
- arch/arm/mach-w90x900/include/mach/nuc900_spi.h |   35 ++
- drivers/spi/Kconfig                             |    7 +
- drivers/spi/Makefile                            |    1 +
- drivers/spi/spi_nuc900.c                        |  509 +++++++++++++++++++++++
- 4 files changed, 552 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-w90x900/include/mach/nuc900_spi.h
- create mode 100644 drivers/spi/spi_nuc900.c
+thanks!
 
-diff --git a/arch/arm/mach-w90x900/include/mach/nuc900_spi.h b/arch/arm/mach-w90x900/include/mach/nuc900_spi.h
-new file mode 100644
-index 0000000..24ea23b
---- /dev/null
-+++ b/arch/arm/mach-w90x900/include/mach/nuc900_spi.h
-@@ -0,0 +1,35 @@
-+/*
-+ * arch/arm/mach-w90x900/include/mach/nuc900_spi.h
-+ *
-+ * Copyright (c) 2009 Nuvoton technology corporation.
-+ *
-+ * Wan ZongShun <mcuos.com@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation;version 2 of the License.
-+ *
-+ */
-+
-+#ifndef __ASM_ARCH_SPI_H
-+#define __ASM_ARCH_SPI_H
-+
-+extern void mfp_set_groupg(struct device *dev);
-+
-+struct w90p910_spi_info {
-+	unsigned int num_cs;
-+	unsigned int lsb;
-+	unsigned int txneg;
-+	unsigned int rxneg;
-+	unsigned int divider;
-+	unsigned int sleep;
-+	unsigned int txnum;
-+	unsigned int txbitlen;
-+	int bus_num;
-+};
-+
-+struct w90p910_spi_chip {
-+	unsigned char bits_per_word;
-+};
-+
-+#endif /* __ASM_ARCH_SPI_H */
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index 4b6f7cb..2e1b20c 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -244,6 +244,13 @@ config SPI_XILINX
- 	  See the "OPB Serial Peripheral Interface (SPI) (v1.00e)"
- 	  Product Specification document (DS464) for hardware details.
- 
-+config SPI_NUC900
-+	tristate "Nuvoton NUC900 series SPI"
-+	depends on ARCH_W90X900 && EXPERIMENTAL
-+	select SPI_BITBANG
-+	help
-+	  SPI driver for Nuvoton NUC900 series ARM SoCs
-+
- #
- # Add new SPI master controllers in alphabetical order above this line
- #
-diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
-index 21a1182..694a4cb 100644
---- a/drivers/spi/Makefile
-+++ b/drivers/spi/Makefile
-@@ -33,6 +33,7 @@ obj-$(CONFIG_SPI_TXX9)			+= spi_txx9.o
- obj-$(CONFIG_SPI_XILINX)		+= xilinx_spi.o
- obj-$(CONFIG_SPI_SH_SCI)		+= spi_sh_sci.o
- obj-$(CONFIG_SPI_STMP3XXX)		+= spi_stmp.o
-+obj-$(CONFIG_SPI_NUC900)		+= spi_nuc900.o
- # 	... add above this line ...
- 
- # SPI protocol drivers (device/link on bus)
-diff --git a/drivers/spi/spi_nuc900.c b/drivers/spi/spi_nuc900.c
-new file mode 100644
-index 0000000..6836fd1
---- /dev/null
-+++ b/drivers/spi/spi_nuc900.c
-@@ -0,0 +1,509 @@
-+/* linux/drivers/spi/spi_nuc900.c
-+ *
-+ * Copyright (c) 2009 Nuvoton technology.
-+ * Wan ZongShun <mcuos.com@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+*/
-+
-+#include <linux/init.h>
-+#include <linux/spinlock.h>
-+#include <linux/workqueue.h>
-+#include <linux/interrupt.h>
-+#include <linux/delay.h>
-+#include <linux/errno.h>
-+#include <linux/err.h>
-+#include <linux/clk.h>
-+#include <linux/device.h>
-+#include <linux/platform_device.h>
-+#include <linux/gpio.h>
-+#include <linux/io.h>
-+
-+#include <linux/spi/spi.h>
-+#include <linux/spi/spi_bitbang.h>
-+
-+#include <mach/nuc900_spi.h>
-+
-+/* usi registers offset */
-+#define USI_CNT		0x00
-+#define USI_DIV		0x04
-+#define USI_SSR		0x08
-+#define USI_RX0		0x10
-+#define USI_TX0		0x10
-+
-+/* usi register bit */
-+#define ENINT		(0x01 << 17)
-+#define ENFLG		(0x01 << 16)
-+#define TXNUM		(0x03 << 8)
-+#define TXNEG		(0x01 << 2)
-+#define RXNEG		(0x01 << 1)
-+#define LSB		(0x01 << 10)
-+#define SELECTLEV	(0x01 << 2)
-+#define SELECTPOL	(0x01 << 31)
-+#define SELECTSLAVE	0x01
-+#define GOBUSY		0x01
-+
-+struct w90p910_spi {
-+	struct spi_bitbang	 bitbang;
-+	struct completion	 done;
-+	void __iomem		*regs;
-+	int			 irq;
-+	int			 len;
-+	int			 count;
-+	const unsigned char	*tx;
-+	unsigned char		*rx;
-+	struct clk		*clk;
-+	struct resource		*ioarea;
-+	struct spi_master	*master;
-+	struct spi_device	*curdev;
-+	struct device		*dev;
-+	struct w90p910_spi_info *pdata;
-+	spinlock_t		lock;
-+};
-+
-+static inline struct w90p910_spi *to_hw(struct spi_device *sdev)
-+{
-+	return spi_master_get_devdata(sdev->master);
-+}
-+
-+static void w90p910_slave_select(struct spi_device *spi, unsigned int ssr)
-+{
-+	struct w90p910_spi *hw = to_hw(spi);
-+	unsigned int val;
-+	unsigned int cs = spi->mode & SPI_CS_HIGH ? 1 : 0;
-+	unsigned int cpol = spi->mode & SPI_CPOL ? 1 : 0;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&hw->lock, flags);
-+
-+	val = __raw_readl(hw->regs + USI_SSR);
-+
-+	if (!cs)
-+		val &= ~SELECTLEV;
-+	else
-+		val |= SELECTLEV;
-+
-+	if (!ssr)
-+		val &= ~SELECTSLAVE;
-+	else
-+		val |= SELECTSLAVE;
-+
-+	__raw_writel(val, hw->regs + USI_SSR);
-+
-+	val = __raw_readl(hw->regs + USI_CNT);
-+
-+	if (!cpol)
-+		val &= ~SELECTPOL;
-+	else
-+		val |= SELECTPOL;
-+
-+	__raw_writel(val, hw->regs + USI_CNT);
-+
-+	spin_unlock_irqrestore(&hw->lock, flags);
-+}
-+
-+static void w90p910_spi_chipsel(struct spi_device *spi, int value)
-+{
-+	switch (value) {
-+	case BITBANG_CS_INACTIVE:
-+		w90p910_slave_select(spi, 0);
-+		break;
-+
-+	case BITBANG_CS_ACTIVE:
-+		w90p910_slave_select(spi, 1);
-+		break;
-+	}
-+}
-+
-+static void w90p910_spi_setup_txnum(struct w90p910_spi *hw,
-+							unsigned int txnum)
-+{
-+	unsigned int val;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&hw->lock, flags);
-+
-+	val = __raw_readl(hw->regs + USI_CNT);
-+
-+	if (!txnum)
-+		val &= ~TXNUM;
-+	else
-+		val |= txnum << 0x08;
-+
-+	__raw_writel(val, hw->regs + USI_CNT);
-+
-+	spin_unlock_irqrestore(&hw->lock, flags);
-+
-+}
-+
-+static void w90p910_spi_setup_txbitlen(struct w90p910_spi *hw,
-+							unsigned int txbitlen)
-+{
-+	unsigned int val;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&hw->lock, flags);
-+
-+	val = __raw_readl(hw->regs + USI_CNT);
-+
-+	val |= (txbitlen << 0x03);
-+
-+	__raw_writel(val, hw->regs + USI_CNT);
-+
-+	spin_unlock_irqrestore(&hw->lock, flags);
-+}
-+
-+static void w90p910_spi_gobusy(struct w90p910_spi *hw)
-+{
-+	unsigned int val;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&hw->lock, flags);
-+
-+	val = __raw_readl(hw->regs + USI_CNT);
-+
-+	val |= GOBUSY;
-+
-+	__raw_writel(val, hw->regs + USI_CNT);
-+
-+	spin_unlock_irqrestore(&hw->lock, flags);
-+}
-+
-+static int w90p910_spi_setupxfer(struct spi_device *spi,
-+				 struct spi_transfer *t)
-+{
-+	return 0;
-+}
-+
-+static int w90p910_spi_setup(struct spi_device *spi)
-+{
-+	return 0;
-+}
-+
-+static inline unsigned int hw_txbyte(struct w90p910_spi *hw, int count)
-+{
-+	return hw->tx ? hw->tx[count] : 0;
-+}
-+
-+static int w90p910_spi_txrx(struct spi_device *spi, struct spi_transfer *t)
-+{
-+	struct w90p910_spi *hw = to_hw(spi);
-+
-+	hw->tx = t->tx_buf;
-+	hw->rx = t->rx_buf;
-+	hw->len = t->len;
-+	hw->count = 0;
-+
-+	__raw_writel(hw_txbyte(hw, 0x0), hw->regs + USI_TX0);
-+
-+	w90p910_spi_gobusy(hw);
-+
-+	wait_for_completion(&hw->done);
-+
-+	return hw->count;
-+}
-+
-+static irqreturn_t w90p910_spi_irq(int irq, void *dev)
-+{
-+	struct w90p910_spi *hw = dev;
-+	unsigned int status;
-+	unsigned int count = hw->count;
-+
-+	status = __raw_readl(hw->regs + USI_CNT);
-+	__raw_writel(status, hw->regs + USI_CNT);
-+
-+	if (status & ENFLG) {
-+		hw->count++;
-+
-+		if (hw->rx)
-+			hw->rx[count] = __raw_readl(hw->regs + USI_RX0);
-+		count++;
-+
-+		if (count < hw->len) {
-+			__raw_writel(hw_txbyte(hw, count), hw->regs + USI_TX0);
-+			w90p910_spi_gobusy(hw);
-+		} else {
-+			complete(&hw->done);
-+		}
-+
-+		return IRQ_HANDLED;
-+	}
-+
-+	complete(&hw->done);
-+	return IRQ_HANDLED;
-+}
-+
-+static void w90p910_tx_edge(struct w90p910_spi *hw, unsigned int edge)
-+{
-+	unsigned int val;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&hw->lock, flags);
-+
-+	val = __raw_readl(hw->regs + USI_CNT);
-+
-+	if (edge)
-+		val |= TXNEG;
-+	else
-+		val &= ~TXNEG;
-+	__raw_writel(val, hw->regs + USI_CNT);
-+
-+	spin_unlock_irqrestore(&hw->lock, flags);
-+}
-+
-+static void w90p910_rx_edge(struct w90p910_spi *hw, unsigned int edge)
-+{
-+	unsigned int val;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&hw->lock, flags);
-+
-+	val = __raw_readl(hw->regs + USI_CNT);
-+
-+	if (edge)
-+		val |= RXNEG;
-+	else
-+		val &= ~RXNEG;
-+	__raw_writel(val, hw->regs + USI_CNT);
-+
-+	spin_unlock_irqrestore(&hw->lock, flags);
-+}
-+
-+static void w90p910_send_first(struct w90p910_spi *hw, unsigned int lsb)
-+{
-+	unsigned int val;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&hw->lock, flags);
-+
-+	val = __raw_readl(hw->regs + USI_CNT);
-+
-+	if (lsb)
-+		val |= LSB;
-+	else
-+		val &= ~LSB;
-+	__raw_writel(val, hw->regs + USI_CNT);
-+
-+	spin_unlock_irqrestore(&hw->lock, flags);
-+}
-+
-+static void w90p910_set_sleep(struct w90p910_spi *hw, unsigned int sleep)
-+{
-+	unsigned int val;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&hw->lock, flags);
-+
-+	val = __raw_readl(hw->regs + USI_CNT);
-+
-+	if (sleep)
-+		val |= (sleep << 12);
-+	else
-+		val &= ~(0x0f << 12);
-+	__raw_writel(val, hw->regs + USI_CNT);
-+
-+	spin_unlock_irqrestore(&hw->lock, flags);
-+}
-+
-+static void w90p910_enable_int(struct w90p910_spi *hw, unsigned int enable)
-+{
-+	unsigned int val;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&hw->lock, flags);
-+
-+	val = __raw_readl(hw->regs + USI_CNT);
-+
-+	if (enable)
-+		val |= ENINT;
-+	else
-+		val &= ~ENINT;
-+
-+	__raw_writel(val, hw->regs + USI_CNT);
-+
-+	spin_unlock_irqrestore(&hw->lock, flags);
-+}
-+
-+static void w90p910_set_divider(struct w90p910_spi *hw)
-+{
-+	__raw_writel(hw->pdata->divider, hw->regs + USI_DIV);
-+}
-+
-+static void w90p910_init_spi(struct w90p910_spi *hw)
-+{
-+	clk_enable(hw->clk);
-+	spin_lock_init(&hw->lock);
-+
-+	w90p910_tx_edge(hw, hw->pdata->txneg);
-+	w90p910_rx_edge(hw, hw->pdata->rxneg);
-+	w90p910_send_first(hw, hw->pdata->lsb);
-+	w90p910_set_sleep(hw, hw->pdata->sleep);
-+	w90p910_spi_setup_txbitlen(hw, hw->pdata->txbitlen);
-+	w90p910_spi_setup_txnum(hw, hw->pdata->txnum);
-+	w90p910_set_divider(hw);
-+	w90p910_enable_int(hw, 1);
-+}
-+
-+static int __devinit w90p910_spi_probe(struct platform_device *pdev)
-+{
-+	struct w90p910_spi *hw;
-+	struct spi_master *master;
-+	struct resource *res;
-+	int err = 0;
-+
-+	master = spi_alloc_master(&pdev->dev, sizeof(struct w90p910_spi));
-+	if (master == NULL) {
-+		dev_err(&pdev->dev, "No memory for spi_master\n");
-+		err = -ENOMEM;
-+		goto err_nomem;
-+	}
-+
-+	hw = spi_master_get_devdata(master);
-+	memset(hw, 0, sizeof(struct w90p910_spi));
-+
-+	hw->master = spi_master_get(master);
-+	hw->pdata  = pdev->dev.platform_data;
-+	hw->dev = &pdev->dev;
-+
-+	if (hw->pdata == NULL) {
-+		dev_err(&pdev->dev, "No platform data supplied\n");
-+		err = -ENOENT;
-+		goto err_pdata;
-+	}
-+
-+	platform_set_drvdata(pdev, hw);
-+	init_completion(&hw->done);
-+
-+	master->mode_bits          = SPI_MODE_0;
-+	master->num_chipselect     = hw->pdata->num_cs;
-+	master->bus_num            = hw->pdata->bus_num;
-+	hw->bitbang.master         = hw->master;
-+	hw->bitbang.setup_transfer = w90p910_spi_setupxfer;
-+	hw->bitbang.chipselect     = w90p910_spi_chipsel;
-+	hw->bitbang.txrx_bufs      = w90p910_spi_txrx;
-+	hw->bitbang.master->setup  = w90p910_spi_setup;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (res == NULL) {
-+		dev_err(&pdev->dev, "Cannot get IORESOURCE_MEM\n");
-+		err = -ENOENT;
-+		goto err_pdata;
-+	}
-+
-+	hw->ioarea = request_mem_region(res->start,
-+					resource_size(res), pdev->name);
-+
-+	if (hw->ioarea == NULL) {
-+		dev_err(&pdev->dev, "Cannot reserve region\n");
-+		err = -ENXIO;
-+		goto err_pdata;
-+	}
-+
-+	hw->regs = ioremap(res->start, resource_size(res));
-+	if (hw->regs == NULL) {
-+		dev_err(&pdev->dev, "Cannot map IO\n");
-+		err = -ENXIO;
-+		goto err_iomap;
-+	}
-+
-+	hw->irq = platform_get_irq(pdev, 0);
-+	if (hw->irq < 0) {
-+		dev_err(&pdev->dev, "No IRQ specified\n");
-+		err = -ENOENT;
-+		goto err_irq;
-+	}
-+
-+	err = request_irq(hw->irq, w90p910_spi_irq, 0, pdev->name, hw);
-+	if (err) {
-+		dev_err(&pdev->dev, "Cannot claim IRQ\n");
-+		goto err_irq;
-+	}
-+
-+	hw->clk = clk_get(&pdev->dev, "spi");
-+	if (IS_ERR(hw->clk)) {
-+		dev_err(&pdev->dev, "No clock for device\n");
-+		err = PTR_ERR(hw->clk);
-+		goto err_clk;
-+	}
-+
-+	mfp_set_groupg(&pdev->dev);
-+	w90p910_init_spi(hw);
-+
-+	err = spi_bitbang_start(&hw->bitbang);
-+	if (err) {
-+		dev_err(&pdev->dev, "Failed to register SPI master\n");
-+		goto err_register;
-+	}
-+
-+	return 0;
-+
-+err_register:
-+	clk_disable(hw->clk);
-+	clk_put(hw->clk);
-+err_clk:
-+	free_irq(hw->irq, hw);
-+err_irq:
-+	iounmap(hw->regs);
-+err_iomap:
-+	release_resource(hw->ioarea);
-+	kfree(hw->ioarea);
-+err_pdata:
-+	spi_master_put(hw->master);;
-+
-+err_nomem:
-+	return err;
-+}
-+
-+static int __devexit w90p910_spi_remove(struct platform_device *dev)
-+{
-+	struct w90p910_spi *hw = platform_get_drvdata(dev);
-+
-+	w90p910_enable_int(hw, 0);
-+
-+	free_irq(hw->irq, hw);
-+
-+	platform_set_drvdata(dev, NULL);
-+
-+	spi_unregister_master(hw->master);
-+
-+	clk_disable(hw->clk);
-+	clk_put(hw->clk);
-+
-+	iounmap(hw->regs);
-+
-+	release_resource(hw->ioarea);
-+	kfree(hw->ioarea);
-+
-+	spi_master_put(hw->master);
-+	return 0;
-+}
-+
-+static struct platform_driver w90p910_spi_driver = {
-+	.probe		= w90p910_spi_probe,
-+	.remove		= __devexit_p(w90p910_spi_remove),
-+	.driver		= {
-+		.name	= "w90p910-spi",
-+		.owner	= THIS_MODULE,
-+	},
-+};
-+
-+static int __init w90p910_spi_init(void)
-+{
-+	return platform_driver_register(&w90p910_spi_driver);
-+}
-+
-+static void __exit w90p910_spi_exit(void)
-+{
-+	platform_driver_unregister(&w90p910_spi_driver);
-+}
-+
-+module_init(w90p910_spi_init);
-+module_exit(w90p910_spi_exit);
-+
-+MODULE_AUTHOR("Wan ZongShun <mcuos.com@gmail.com>");
-+MODULE_DESCRIPTION("w90p910 spi driver!");
-+MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:w90p910-spi");
--- 
-1.5.6.3
+
+> Added phy3250 platform for the lcp3250
+> 
+> Signed-off-by: Kevin Wells <kevin.wells@nxp.com>
+> ---
+>  arch/arm/mach-lpc32xx/phy3250.c |  534 +++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 534 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-lpc32xx/phy3250.c
+> 
+> diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
+> new file mode 100644
+> index 0000000..844c344
+> --- /dev/null
+> +++ b/arch/arm/mach-lpc32xx/phy3250.c
+> @@ -0,0 +1,534 @@
+> +/*
+> + *  linux/arch/arm/mach-lpc32xx/phy3250.c
+> + *
+> + *  Copyright (C) 2009 NXP Semiconductors
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+> + */
+> +
+> +#include <linux/tty.h>
+> +#include <linux/init.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/sysdev.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/irq.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/sysdev.h>
+> +#include <linux/input.h>
+> +#include <linux/device.h>
+> +#include <linux/spi/spi.h>
+> +#include <linux/spi/eeprom.h>
+> +#include <linux/delay.h>
+> +#include <linux/leds.h>
+> +#include <linux/gpio.h>
+> +#include <linux/mmc/host.h>
+> +#include <linux/amba/bus.h>
+> +#include <linux/amba/clcd.h>
+> +#include <linux/amba/mmci.h>
+> +#include <linux/amba/pl022.h>
+> +
+> +#include <mach/hardware.h>
+> +#include <asm/setup.h>
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/irq.h>
+> +#include <asm/mach/irq.h>
+> +#include <asm/mach/map.h>
+> +
+> +#include <mach/platform.h>
+> +#include <mach/clock.h>
+> +#include <mach/gpio.h>
+> +#include "common.h"
+> +
+> +/*
+> + * Mapped GPIOLIB GPIOs
+> + */
+> +#define SPI0_CS_GPIO   LPC32XX_GPIO(GPIO_P3_GRP, 5)
+> +#define LCD_POWER_GPIO LPC32XX_GPIO(GPO_P3_GRP, 0)
+> +#define BKL_POWER_GPIO LPC32XX_GPIO(GPO_P3_GRP, 4)
+> +#define LED_GPIO       LPC32XX_GPIO(GPO_P3_GRP, 1)
+> +
+> +static void phy3250_spi_cs_set(u32 control);
+> +
+> +
+> +#define PHY_HW_VER_VAL 0x000A3250
+> +#define SEEPROM_READ          0x03
+> +#define PHY3250_SEEPROM_SIZE  0x8000
+> +#define PHY3250_SEEPROM_CFGOFS (PHY3250_SEEPROM_SIZE - 0x100)
+> +
+> +/*
+> + * Structure used to define the hardware for the Phytec board
+> + */
+> +struct phytec_hardware {
+> +  u32 dramcfg;
+> +  u32 syscfg;
+> +  u8  mac[8]; /* Only the first 6 are used */
+> +  u32 rsvd [5];
+> +  u32 fieldvval;
+> +} PHY_HW_T;
+> +static struct phytec_hardware phyhwdata;
+> +
+> +/*
+> + * Load board hardware descriptor to get MAC address
+> + */
+> +static void __init phy3250_load_hw_desc(void)
+> +{
+> +       u32 tmp, addr, saveclk;
+> +       int i, len;
+> +       u8 *p8, cmd [4], in [4];
+> +       u32 sspiobase = io_p2v(SSP0_BASE);
+> +
+> +       saveclk = readl(CLKPWR_SSP_CLK_CTRL(CLKPWR_IOBASE));
+> +       writel((saveclk | CLKPWR_SSPCTRL_SSPCLK0_EN),
+> +               CLKPWR_SSP_CLK_CTRL(CLKPWR_IOBASE));
+> +
+> +       writel(0, LSSP_ICR(sspiobase));
+> +       writel((LSSP_ICR_RORIC | LSSP_ICR_RTIC), LSSP_IMSC(sspiobase));
+> +
+> +       /* Setup default SPI mode at about 5MHz */
+> +       writel((LSSP_CR0_DSS(8) | LSSP_CR0_FRF_SPI | LSSP_CR0_CPOL(0) |
+> +               LSSP_CR0_CPHA(0) | LSSP_CR0_SCR(40)), LSSP_CR0(sspiobase));
+> +       writel(LSSP_CR1_SSP_ENABLE, LSSP_CR1(sspiobase));
+> +       writel(LSSP_CPSR_CPDVSR(40), LSSP_CPSR(sspiobase));
+> +
+> +       while (readl(LSSP_SR(sspiobase)) & LSSP_SR_RNE)
+> +               tmp = readl(LSSP_DATA(sspiobase));
+> +
+> +       len = sizeof (phyhwdata);
+> +       p8 = (u8 *) &phyhwdata;
+> +       addr = PHY3250_SEEPROM_CFGOFS;
+> +       while (len > 0) {
+> +               phy3250_spi_cs_set(0);
+> +
+> +               /* Issue read command and address for 1 byte */
+> +               cmd[0] = SEEPROM_READ;
+> +               cmd[1] = ((addr >> 8) & 0xFF);
+> +               cmd[2] = ((addr >> 0) & 0xFF);
+> +               cmd[3] = 0xFF;
+> +               for (i = 0; i < 4; i++)
+> +                       writel((u32) cmd [i], LSSP_DATA(sspiobase));
+> +
+> +               /* Save 3 null bytes and 1 data byte */
+> +               i = 0;
+> +               while (i < 4) {
+> +                       if (readl(LSSP_SR(sspiobase)) & LSSP_SR_RNE) {
+> +                               in[i] = (u8) readl(LSSP_DATA(sspiobase));
+> +                               i++;
+> +                       }
+> +               }
+> +
+> +               /* Only that last byte matters */
+> +               *p8 = in [3];
+> +               p8++;
+> +               len--;
+> +               addr++;
+> +
+> +               phy3250_spi_cs_set(1);
+> +       }
+> +
+> +       writel(0, LSSP_CR0(sspiobase));
+> +
+> +       if (phyhwdata.fieldvval != PHY_HW_VER_VAL)
+> +               printk(KERN_ERR "Invalid Phytec board descriptor!\n");
+> +
+> +       /* Shutdown SSP clock to save power */
+> +       writel((saveclk & ~CLKPWR_SSPCTRL_SSPCLK0_EN),
+> +               CLKPWR_SSP_CLK_CTRL(CLKPWR_IOBASE));
+> +}
+> +
+> +/*
+> + * AMBA LCD controller
+> + */
+> +static struct clcd_panel conn_lcd_panel = {
+> +       .mode           = {
+> +               .name           = "QVGA portrait",
+> +               .refresh        = 60,
+> +               .xres           = 240,
+> +               .yres           = 320,
+> +               .pixclock       = 191828,
+> +               .left_margin    = 22,
+> +               .right_margin   = 11,
+> +               .upper_margin   = 2,
+> +               .lower_margin   = 1,
+> +               .hsync_len      = 5,
+> +               .vsync_len      = 2,
+> +               .sync           = 0,
+> +               .vmode          = FB_VMODE_NONINTERLACED,
+> +       },
+> +       .width          = -1,
+> +       .height         = -1,
+> +       .tim2           = (TIM2_IVS | TIM2_IHS),
+> +       .cntl           = (CNTL_BGR | CNTL_LCDTFT | CNTL_LCDVCOMP(1) |
+> +                               CNTL_LCDBPP16_565),
+> +       .bpp            = 16,
+> +};
+> +#define PANEL_SIZE (3 * SZ_64K)
+> +
+> +static int lpc32xx_clcd_setup(struct clcd_fb *fb)
+> +{
+> +       dma_addr_t dma;
+> +
+> +       fb->fb.screen_base = (void *) NULL;
+> +#if defined(CONFIG_MACH_LPC32XX_IRAM_FOR_CLCD)
+> +       if (PANEL_SIZE <= LPC32XX_IRAM_SIZE) {
+> +               fb->fb.screen_base = (void *) io_p2v(IRAM_BASE);
+> +               fb->fb.fix.smem_start = (dma_addr_t) IRAM_BASE;
+> +       }
+> +#endif
+> +
+> +       if (fb->fb.screen_base == NULL) {
+> +               fb->fb.screen_base = dma_alloc_writecombine(&fb->dev->dev,
+> +                       PANEL_SIZE, &dma, GFP_KERNEL);
+> +               fb->fb.fix.smem_start = dma;
+> +       }
+> +
+> +       if (!fb->fb.screen_base) {
+> +               printk(KERN_ERR "CLCD: unable to map framebuffer\n");
+> +               return -ENOMEM;
+> +       }
+> +
+> +       fb->fb.fix.smem_len = PANEL_SIZE;
+> +       fb->panel = &conn_lcd_panel;
+> +
+> +       gpio_request(LCD_POWER_GPIO, "LCD power");
+> +       gpio_direction_output(LCD_POWER_GPIO, 1);
+> +       gpio_request(BKL_POWER_GPIO, "LCD backlight power");
+> +       gpio_direction_output(BKL_POWER_GPIO, 1);
+> +
+> +       return 0;
+> +}
+> +
+> +static int lpc32xx_clcd_mmap(struct clcd_fb *fb, struct vm_area_struct *vma)
+> +{
+> +#if defined(CONFIG_MACH_LPC32XX_IRAM_FOR_CLCD)
+> +       if (PANEL_SIZE <= LPC32XX_IRAM_SIZE) {
+> +               vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+> +               if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
+> +                       (vma->vm_end - vma->vm_start), vma->vm_page_prot)) {
+> +                       return -EAGAIN;
+> +               }
+> +
+> +               return 0;
+> +       }
+> +       else
+> +#endif
+> +
+> +       return dma_mmap_writecombine(&fb->dev->dev, vma,
+> +                                    fb->fb.screen_base,
+> +                                    fb->fb.fix.smem_start,
+> +                                    fb->fb.fix.smem_len);
+> +}
+> +
+> +static void lpc32xx_clcd_remove(struct clcd_fb *fb)
+> +{
+> +#if defined(CONFIG_MACH_LPC32XX_IRAM_FOR_CLCD)
+> +       if (PANEL_SIZE > LPC32XX_IRAM_SIZE)
+> +#endif
+> +
+> +       dma_free_writecombine(&fb->dev->dev, fb->fb.fix.smem_len,
+> +                             fb->fb.screen_base, fb->fb.fix.smem_start);
+> +}
+> +
+> +#if defined (CONFIG_PHY3250_QVGA_PANEL_1307_0)
+> +#define LCD_BKL_ON     0
+> +#define LCD_BKL_OFF    1
+> +#elif defined (CONFIG_PHY3250_QVGA_PANEL_1307_1)
+> +#define LCD_BKL_ON     1
+> +#define LCD_BKL_OFF    0
+> +#endif
+> +
+> +static void clcd_disable(struct clcd_fb *fb)
+> +{
+> +       gpio_set_value(BKL_POWER_GPIO, LCD_BKL_OFF);
+> +       gpio_set_value(LCD_POWER_GPIO, 0);
+> +}
+> +
+> +static void clcd_enable(struct clcd_fb *fb)
+> +{
+> +       gpio_set_value(BKL_POWER_GPIO, LCD_BKL_ON);
+> +       gpio_set_value(LCD_POWER_GPIO, 1);
+> +}
+> +
+> +static struct clcd_board lpc32xx_clcd_data = {
+> +       .name           = "Phytec LCD",
+> +       .check          = clcdfb_check,
+> +       .decode         = clcdfb_decode,
+> +       .disable        = clcd_disable,
+> +       .enable         = clcd_enable,
+> +       .setup          = lpc32xx_clcd_setup,
+> +       .mmap           = lpc32xx_clcd_mmap,
+> +       .remove         = lpc32xx_clcd_remove,
+> +};
+> +
+> +static struct amba_device clcd_device = {
+> +       .dev                            = {
+> +               .coherent_dma_mask      = ~0,
+> +               .init_name              = "dev:clcd",
+> +               .platform_data          = &lpc32xx_clcd_data,
+> +       },
+> +       .res                            = {
+> +               .start                  = LCD_BASE,
+> +               .end                    = (LCD_BASE + SZ_4K - 1),
+> +               .flags                  = IORESOURCE_MEM,
+> +       },
+> +       .dma_mask                       = ~0,
+> +       .irq                            = {IRQ_LCD, NO_IRQ},
+> +};
+> +
+> +/*
+> + * AMBA SSP (SPI)
+> + */
+> +static void phy3250_spi_cs_set(u32 control)
+> +{
+> +       gpio_set_value(SPI0_CS_GPIO, (int) control);
+> +}
+> +
+> +static struct pl022_config_chip spi0_chip_info = {
+> +       .lbm                    = LOOPBACK_DISABLED,
+> +       .com_mode               = POLLING_TRANSFER,
+> +       .iface                  = SSP_INTERFACE_MOTOROLA_SPI,
+> +       .hierarchy              = SSP_SLAVE,
+> +       .slave_tx_disable       = 0,
+> +       .endian_tx              = SSP_TX_LSB,
+> +       .endian_rx              = SSP_RX_LSB,
+> +       .data_size              = SSP_DATA_BITS_8,
+> +       .rx_lev_trig            = SSP_RX_8_OR_MORE_ELEM,
+> +       .tx_lev_trig            = SSP_TX_8_OR_MORE_EMPTY_LOC,
+> +       .clk_phase              = SSP_CLK_SECOND_EDGE,
+> +       .clk_pol                = SSP_CLK_POL_IDLE_LOW,
+> +       .ctrl_len               = SSP_BITS_8,
+> +       .wait_state             = SSP_MWIRE_WAIT_ZERO,
+> +       .duplex                 = SSP_MICROWIRE_CHANNEL_FULL_DUPLEX,
+> +       .cs_control             = phy3250_spi_cs_set,
+> +};
+> +
+> +static struct pl022_ssp_controller lpc32xx_ssp0_data = {
+> +       .bus_id                 = 0,
+> +       .num_chipselect         = 1,
+> +       .enable_dma             = 0
+> +};
+> +
+> +static struct amba_device ssp0_device = {
+> +       .dev                            = {
+> +               .coherent_dma_mask      = ~0,
+> +               .init_name              = "dev:ssp0",
+> +               .platform_data          = &lpc32xx_ssp0_data,
+> +       },
+> +       .res                            = {
+> +               .start                  = SSP0_BASE,
+> +               .end                    = (SSP0_BASE + SZ_4K - 1),
+> +               .flags                  = IORESOURCE_MEM,
+> +       },
+> +       .dma_mask                       = ~0,
+> +       .irq                            = {IRQ_SSP0, NO_IRQ},
+> +};
+> +
+> +/* AT25 driver registration */
+> +static int __init phy3250_spi_board_register(void)
+> +{
+> +#if defined(CONFIG_SPI_SPIDEV) || defined(CONFIG_SPI_SPIDEV_MODULE)
+> +       struct spi_board_info info[] = {
+> +               {
+> +                       .modalias = "spidev",
+> +                       .max_speed_hz = 5000000,
+> +                       .bus_num = 0,
+> +                       .chip_select = 0,
+> +                       .controller_data = &spi0_chip_info,
+> +               },
+> +       };
+> +
+> +#else
+> +       static struct spi_eeprom eeprom = {
+> +               .name = "at25256a",
+> +               .byte_len = 0x8000,
+> +               .page_size = 64,
+> +               .flags = EE_ADDR2,
+> +       };
+> +       struct spi_board_info info[] = {
+> +               {
+> +                       .modalias = "at25",
+> +                       .max_speed_hz = 5000000,
+> +                       .bus_num = 0,
+> +                       .chip_select = 0,
+> +                       .platform_data = &eeprom,
+> +                       .controller_data = &spi0_chip_info,
+> +               },
+> +       };
+> +#endif
+> +       return spi_register_board_info(info, ARRAY_SIZE(info));
+> +}
+> +arch_initcall(phy3250_spi_board_register);
+> +
+> +/*
+> + * USB OHCI
+> + */
+> +static u64 ohci_dmamask = ~(u32) 0;
+> +static struct resource ohci_resources[] = {
+> +       {
+> +               .start = IO_ADDRESS(USB_BASE),
+> +               .end = IO_ADDRESS(USB_BASE + 0x100),
+> +               .flags = IORESOURCE_MEM,
+> +       }, {
+> +               .start = IRQ_USB_HOST,
+> +               .flags = IORESOURCE_IRQ,
+> +       },
+> +};
+> +
+> +struct platform_device ohci_device = {
+> +       .name = "usb-ohci",
+> +       .id = -1,
+> +       .dev = {
+> +               .dma_mask = &ohci_dmamask,
+> +               .coherent_dma_mask = 0xFFFFFFFF,
+> +               },
+> +       .num_resources = ARRAY_SIZE(ohci_resources),
+> +       .resource = ohci_resources,
+> +};
+> +
+> +static struct i2c_board_info __initdata phy3250_i2c_board_info [] = {
+> +       {
+> +               I2C_BOARD_INFO("rtc-pcf8563", 0x51),
+> +       },
+> +};
+> +
+> +static struct gpio_led phy_leds[] = {
+> +       {
+> +               .name                   = "led0",
+> +               .gpio                   = LED_GPIO,
+> +               .active_low             = 1,
+> +               .default_trigger        = "heartbeat",
+> +       },
+> +};
+> +
+> +static struct gpio_led_platform_data led_data = {
+> +       .leds = phy_leds,
+> +       .num_leds = ARRAY_SIZE(phy_leds),
+> +};
+> +
+> +static struct platform_device lpc32xx_gpio_led_device = {
+> +       .name                   = "leds-gpio",
+> +       .id                     = -1,
+> +       .dev.platform_data      = &led_data,
+> +};
+> +
+> +static struct platform_device* phy3250_devs[] __initdata = {
+> +       &i2c0_device,
+> +       &i2c2_device,
+> +       &watchdog_device,
+> +       &lpc32xx_gpio_led_device,
+> +};
+> +
+> +static struct amba_device *amba_devs[] __initdata = {
+> +       &clcd_device,
+> +       &ssp0_device,
+> +};
+> +
+> +/*
+> + * Board specific functions
+> + */
+> +static void __init phy3250_board_init(void)
+> +{
+> +       u32 tmp;
+> +       int i;
+> +
+> +       /* Setup clocks and gpios before anything else! */
+> +       clk_init();
+> +       lpc32xx_gpio_init();
+> +
+> +       /* Register GPIOs used on this board */
+> +       gpio_request(SPI0_CS_GPIO, "spi0 cs");
+> +       gpio_direction_output(SPI0_CS_GPIO, 1);
+> +
+> +       /* Setup network interface for RMII mode */
+> +       tmp = readl(CLKPWR_MACCLK_CTRL(CLKPWR_IOBASE));
+> +       tmp &= ~CLKPWR_MACCTRL_PINS_MSK;
+> +       tmp |= CLKPWR_MACCTRL_USE_RMII_PINS;
+> +       writel(tmp, CLKPWR_MACCLK_CTRL(CLKPWR_IOBASE));
+> +
+> +       /* Setup SLC NAND controller muxing */
+> +       writel(CLKPWR_NANDCLK_SEL_SLC,
+> +               CLKPWR_NAND_CLK_CTRL(CLKPWR_IOBASE));
+> +
+> +       /* Setup LCD muxing to RGB565 */
+> +       tmp = readl(CLKPWR_LCDCLK_CTRL(CLKPWR_IOBASE)) &
+> +               ~(CLKPWR_LCDCTRL_LCDTYPE_MSK | CLKPWR_LCDCTRL_PSCALE_MSK);
+> +       tmp |= CLKPWR_LCDCTRL_LCDTYPE_TFT16;
+> +       writel(tmp, CLKPWR_LCDCLK_CTRL(CLKPWR_IOBASE));
+> +
+> +       /* Set up I2C levels */
+> +       tmp = readl(CLKPWR_I2C_CLK_CTRL(CLKPWR_IOBASE));
+> +       tmp |= CLKPWR_I2CCLK_USBI2CHI_DRIVE | CLKPWR_I2CCLK_I2C2HI_DRIVE;
+> +       writel(tmp, CLKPWR_I2C_CLK_CTRL(CLKPWR_IOBASE));
+> +
+> +       /* Enable DMA for I2S1 channel */
+> +       tmp = readl(CLKPWR_I2S_CLK_CTRL(CLKPWR_IOBASE));
+> +       tmp = CLKPWR_I2SCTRL_I2S1_USE_DMA;
+> +       writel(tmp, CLKPWR_I2S_CLK_CTRL(CLKPWR_IOBASE));
+> +
+> +       /* Load the board hardware descriptor, as some other board functions
+> +          require it's data */
+> +       phy3250_load_hw_desc();
+> +
+> +       serial_init();
+> +
+> +       /* AMBA peripheral clocks need to be enabled prior to AMBA device
+> +          detection or a data fault will occur, so we enable the clocks
+> +          here. However, we don't want to enable them if the peripheral
+> +          isn't included in the image */
+> +#if defined (CONFIG_MMC_ARMMMCI)
+> +       tmp = readl(CLKPWR_MS_CTRL(CLKPWR_IOBASE));
+> +       writel((tmp | CLKPWR_MSCARD_SDCARD_EN | CLKPWR_MSCARD_MSDIO_PU_EN),
+> +               CLKPWR_MS_CTRL(CLKPWR_IOBASE));
+> +#endif
+> +#if defined (CONFIG_FB_ARMCLCD)
+> +       tmp = readl(CLKPWR_LCDCLK_CTRL(CLKPWR_IOBASE));
+> +       writel((tmp | CLKPWR_LCDCTRL_CLK_EN),
+> +               CLKPWR_LCDCLK_CTRL(CLKPWR_IOBASE));
+> +#endif
+> +#if defined (CONFIG_SPI_PL022)
+> +       tmp = readl(CLKPWR_SSP_CLK_CTRL(CLKPWR_IOBASE));
+> +       writel((tmp | CLKPWR_SSPCTRL_SSPCLK0_EN),
+> +               CLKPWR_SSP_CLK_CTRL(CLKPWR_IOBASE));
+> +#endif
+> +
+> +       platform_add_devices(phy3250_devs, ARRAY_SIZE(phy3250_devs));
+> +       for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
+> +               struct amba_device *d = amba_devs[i];
+> +               amba_device_register(d, &iomem_resource);
+> +       }
+> +
+> +       /* Disable UART5->USB transparent mode or USB won't work */
+> +       tmp = readl(UARTCTL_CTRL(io_p2v(UART_CTRL_BASE)));
+> +       tmp &= ~UART_U5_ROUTE_TO_USB;
+> +       writel(tmp, UARTCTL_CTRL(io_p2v(UART_CTRL_BASE)));
+> +
+> +       /* Test clock needed for UDA1380 initial init */
+> +       writel((CLKPWR_TESTCLK2_SEL_MOSC | CLKPWR_TESTCLK_TESTCLK2_EN),
+> +               CLKPWR_TEST_CLK_SEL(CLKPWR_IOBASE));
+> +
+> +       i2c_register_board_info(0, phy3250_i2c_board_info,
+> +                               ARRAY_SIZE(phy3250_i2c_board_info));
+> +}
+> +
+> +MACHINE_START (LPC3XXX, "Phytec 3250 board with the LPC3250 Microcontroller")
+> +       /* Maintainer: Kevin Wells, NXP Semiconductors */
+> +       .phys_io        = UART5_BASE,
+> +       .io_pg_offst    = ((io_p2v (UART5_BASE))>>18) & 0xfffc,
+> +       .boot_params    = 0x80000100,
+> +       .map_io         = lpc32xx_map_io,
+> +       .init_irq       = lpc32xx_init_irq,
+> +       .timer          = &lpc32xx_timer,
+> +       .init_machine   = phy3250_board_init,
+> +MACHINE_END
+> --
+> 1.6.0.6
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
