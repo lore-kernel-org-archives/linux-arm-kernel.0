@@ -1,339 +1,208 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 20 Nov 2009 18:07:00 +0000
-Subject: [PATCH 7/7] ARM: dma-mapping: no need to clean overlapping cache
-	lines on invalidate
+Date: Sat, 20 Nov 2009 18:05:00 +0000
+Subject: [PATCH 5/7] ARM: dma-mapping: use the idea of buffer ownership
 In-Reply-To: <20091120182539.GG16920@n2100.arm.linux.org.uk>
 References: <20091120182539.GG16920@n2100.arm.linux.org.uk>
-Message-ID: <E1NBYEI-0005lA-8a@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1NBYED-0005l4-2A@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we now clean the DMA buffers on map, there's no need to clean
-overlapping cache lines on invalidation anymore.  (Note: the DMA API
-prohibits other data sharing the same cache line as a DMA buffer
-anyway.)
+The DMA API has the notion of buffer ownership; make it explicit in the
+ARM implementation of this API.  This gives us a set of hooks to allow
+us to deal with CPU cache issues arising from non-cache coherent DMA.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mm/cache-fa.S      |    5 -----
- arch/arm/mm/cache-v4wb.S    |    5 -----
- arch/arm/mm/cache-v6.S      |   13 -------------
- arch/arm/mm/cache-v7.S      |    6 ------
- arch/arm/mm/proc-arm1020.S  |    8 --------
- arch/arm/mm/proc-arm1020e.S |    4 ----
- arch/arm/mm/proc-arm1022.S  |    4 ----
- arch/arm/mm/proc-arm1026.S  |    4 ----
- arch/arm/mm/proc-arm920.S   |    4 ----
- arch/arm/mm/proc-arm922.S   |    4 ----
- arch/arm/mm/proc-arm925.S   |    6 ------
- arch/arm/mm/proc-arm926.S   |    6 ------
- arch/arm/mm/proc-arm946.S   |    7 -------
- arch/arm/mm/proc-feroceon.S |    4 ----
- arch/arm/mm/proc-mohawk.S   |    4 ----
- arch/arm/mm/proc-xsc3.S     |    4 ----
- arch/arm/mm/proc-xscale.S   |    4 ----
- 17 files changed, 0 insertions(+), 92 deletions(-)
+ arch/arm/common/dmabounce.c        |    9 ++---
+ arch/arm/include/asm/dma-mapping.h |   64 ++++++++++++++++++++++++++---------
+ arch/arm/mm/dma-mapping.c          |   13 ++++---
+ 3 files changed, 59 insertions(+), 27 deletions(-)
 
-diff --git a/arch/arm/mm/cache-fa.S b/arch/arm/mm/cache-fa.S
-index b63a8f7..1711386 100644
---- a/arch/arm/mm/cache-fa.S
-+++ b/arch/arm/mm/cache-fa.S
-@@ -157,12 +157,7 @@ ENTRY(fa_flush_kern_dcache_page)
-  *	- end	 - virtual end address
-  */
- ENTRY(fa_dma_inv_range)
--	tst	r0, #CACHE_DLINESIZE - 1
- 	bic	r0, r0, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r0, c7, c14, 1		@ clean & invalidate D entry
--	tst	r1, #CACHE_DLINESIZE - 1
--	bic	r1, r1, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r1, c7, c14, 1		@ clean & invalidate D entry
- 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
-diff --git a/arch/arm/mm/cache-v4wb.S b/arch/arm/mm/cache-v4wb.S
-index 2ebc1b3..553931a 100644
---- a/arch/arm/mm/cache-v4wb.S
-+++ b/arch/arm/mm/cache-v4wb.S
-@@ -173,16 +173,11 @@ ENTRY(v4wb_coherent_user_range)
-  *	- end	 - virtual end address
-  */
- ENTRY(v4wb_dma_inv_range)
--	tst	r0, #CACHE_DLINESIZE - 1
- 	bic	r0, r0, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
--	tst	r1, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
- 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
- 	mov	pc, lr
+diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
+index 5a375e5..bc3e269 100644
+--- a/arch/arm/common/dmabounce.c
++++ b/arch/arm/common/dmabounce.c
+@@ -277,7 +277,7 @@ static inline dma_addr_t map_single(struct device *dev, void *ptr, size_t size,
+ 		 * We don't need to sync the DMA buffer since
+ 		 * it was allocated via the coherent allocators.
+ 		 */
+-		dma_cache_maint(ptr, size, dir);
++		__dma_single_cpu_to_dev(ptr, size, dir);
+ 	}
+ 
+ 	return dma_addr;
+@@ -310,15 +310,14 @@ static inline void unmap_single(struct device *dev, dma_addr_t dma_addr,
+ 			/*
+ 			 * DMA buffers must have the same cache properties
+ 			 * as if they were really used for DMA - which means
+-			 * data must be written back to RAM.  Note that
+-			 * we don't use dmac_flush_range() here for the
+-			 * bidirectional case because we know the cache
+-			 * lines will be coherent with the data written.
++			 * data must be written back to RAM.
+ 			 */
+ 			dmac_clean_range(ptr, ptr + size);
+ 			outer_clean_range(__pa(ptr), __pa(ptr) + size);
+ 		}
+ 		free_safe_buffer(dev->archdata.dmabounce, buf);
++	} else {
++		__dma_single_dev_to_cpu(dma_to_virt(dev, dma_addr), size, dir);
+ 	}
+ }
+ 
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index a96300b..e850f5c 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -57,20 +57,49 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
+ #endif
  
  /*
-diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
-index 295e25d..d1dfd87 100644
---- a/arch/arm/mm/cache-v6.S
-+++ b/arch/arm/mm/cache-v6.S
-@@ -195,20 +195,7 @@ ENTRY(v6_flush_kern_dcache_page)
-  *	- end     - virtual end address of region
+- * DMA-consistent mapping functions.  These allocate/free a region of
+- * uncached, unwrite-buffered mapped memory space for use with DMA
+- * devices.  This is the "generic" version.  The PCI specific version
+- * is in pci.h
+- *
+- * Note: Drivers should NOT use this function directly, as it will break
+- * platforms with CONFIG_DMABOUNCE.
+- * Use the driver DMA support - see dma-mapping.h (dma_sync_*)
++ * Private support functions: these are not part of the API and are
++ * liable to change.  Drivers must not use these.
   */
- ENTRY(v6_dma_inv_range)
--	tst	r0, #D_CACHE_LINE_SIZE - 1
- 	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
--#ifdef HARVARD_CACHE
--	mcrne	p15, 0, r0, c7, c10, 1		@ clean D line
--#else
--	mcrne	p15, 0, r0, c7, c11, 1		@ clean unified line
--#endif
--	tst	r1, #D_CACHE_LINE_SIZE - 1
--	bic	r1, r1, #D_CACHE_LINE_SIZE - 1
--#ifdef HARVARD_CACHE
--	mcrne	p15, 0, r1, c7, c14, 1		@ clean & invalidate D line
--#else
--	mcrne	p15, 0, r1, c7, c15, 1		@ clean & invalidate unified line
--#endif
- 1:
- #ifdef HARVARD_CACHE
- 	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D line
-diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-index e1bd975..893ee59 100644
---- a/arch/arm/mm/cache-v7.S
-+++ b/arch/arm/mm/cache-v7.S
-@@ -218,13 +218,7 @@ ENDPROC(v7_flush_kern_dcache_page)
- ENTRY(v7_dma_inv_range)
- 	dcache_line_size r2, r3
- 	sub	r3, r2, #1
--	tst	r0, r3
- 	bic	r0, r0, r3
--	mcrne	p15, 0, r0, c7, c14, 1		@ clean & invalidate D / U line
--
--	tst	r1, r3
--	bic	r1, r1, r3
--	mcrne	p15, 0, r1, c7, c14, 1		@ clean & invalidate D / U line
- 1:
- 	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D / U line
- 	add	r0, r0, r2
-diff --git a/arch/arm/mm/proc-arm1020.S b/arch/arm/mm/proc-arm1020.S
-index d9fb4b9..7bbf624 100644
---- a/arch/arm/mm/proc-arm1020.S
-+++ b/arch/arm/mm/proc-arm1020.S
-@@ -267,15 +267,7 @@ ENTRY(arm1020_flush_kern_dcache_page)
- ENTRY(arm1020_dma_inv_range)
- 	mov	ip, #0
- #ifndef CONFIG_CPU_DCACHE_DISABLE
--	tst	r0, #CACHE_DLINESIZE - 1
- 	bic	r0, r0, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, ip, c7, c10, 4
--	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
--	mcrne	p15, 0, ip, c7, c10, 4		@ drain WB
--	tst	r1, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, ip, c7, c10, 4
--	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
--	mcrne	p15, 0, ip, c7, c10, 4		@ drain WB
- 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
-diff --git a/arch/arm/mm/proc-arm1020e.S b/arch/arm/mm/proc-arm1020e.S
-index 7453b75..d379cb7 100644
---- a/arch/arm/mm/proc-arm1020e.S
-+++ b/arch/arm/mm/proc-arm1020e.S
-@@ -260,11 +260,7 @@ ENTRY(arm1020e_flush_kern_dcache_page)
- ENTRY(arm1020e_dma_inv_range)
- 	mov	ip, #0
- #ifndef CONFIG_CPU_DCACHE_DISABLE
--	tst	r0, #CACHE_DLINESIZE - 1
- 	bic	r0, r0, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
--	tst	r1, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
- 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
-diff --git a/arch/arm/mm/proc-arm1022.S b/arch/arm/mm/proc-arm1022.S
-index 8eb72d7..f5a7949 100644
---- a/arch/arm/mm/proc-arm1022.S
-+++ b/arch/arm/mm/proc-arm1022.S
-@@ -249,11 +249,7 @@ ENTRY(arm1022_flush_kern_dcache_page)
- ENTRY(arm1022_dma_inv_range)
- 	mov	ip, #0
- #ifndef CONFIG_CPU_DCACHE_DISABLE
--	tst	r0, #CACHE_DLINESIZE - 1
- 	bic	r0, r0, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
--	tst	r1, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
- 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
-diff --git a/arch/arm/mm/proc-arm1026.S b/arch/arm/mm/proc-arm1026.S
-index 3b59f0d..1dc26f8 100644
---- a/arch/arm/mm/proc-arm1026.S
-+++ b/arch/arm/mm/proc-arm1026.S
-@@ -243,11 +243,7 @@ ENTRY(arm1026_flush_kern_dcache_page)
- ENTRY(arm1026_dma_inv_range)
- 	mov	ip, #0
- #ifndef CONFIG_CPU_DCACHE_DISABLE
--	tst	r0, #CACHE_DLINESIZE - 1
- 	bic	r0, r0, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
--	tst	r1, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
- 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
-diff --git a/arch/arm/mm/proc-arm920.S b/arch/arm/mm/proc-arm920.S
-index 2b7c197..078a873 100644
---- a/arch/arm/mm/proc-arm920.S
-+++ b/arch/arm/mm/proc-arm920.S
-@@ -239,11 +239,7 @@ ENTRY(arm920_flush_kern_dcache_page)
-  * (same as v4wb)
-  */
- ENTRY(arm920_dma_inv_range)
--	tst	r0, #CACHE_DLINESIZE - 1
- 	bic	r0, r0, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
--	tst	r1, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
- 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
-diff --git a/arch/arm/mm/proc-arm922.S b/arch/arm/mm/proc-arm922.S
-index 06a1aa4..22ca857 100644
---- a/arch/arm/mm/proc-arm922.S
-+++ b/arch/arm/mm/proc-arm922.S
-@@ -241,11 +241,7 @@ ENTRY(arm922_flush_kern_dcache_page)
-  * (same as v4wb)
-  */
- ENTRY(arm922_dma_inv_range)
--	tst	r0, #CACHE_DLINESIZE - 1
- 	bic	r0, r0, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
--	tst	r1, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
- 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
-diff --git a/arch/arm/mm/proc-arm925.S b/arch/arm/mm/proc-arm925.S
-index cb53435..ff04299 100644
---- a/arch/arm/mm/proc-arm925.S
-+++ b/arch/arm/mm/proc-arm925.S
-@@ -283,12 +283,6 @@ ENTRY(arm925_flush_kern_dcache_page)
-  * (same as v4wb)
-  */
- ENTRY(arm925_dma_inv_range)
--#ifndef CONFIG_CPU_DCACHE_WRITETHROUGH
--	tst	r0, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
--	tst	r1, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
--#endif
- 	bic	r0, r0, #CACHE_DLINESIZE - 1
- 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
- 	add	r0, r0, #CACHE_DLINESIZE
-diff --git a/arch/arm/mm/proc-arm926.S b/arch/arm/mm/proc-arm926.S
-index 1c48487..4b4c717 100644
---- a/arch/arm/mm/proc-arm926.S
-+++ b/arch/arm/mm/proc-arm926.S
-@@ -246,12 +246,6 @@ ENTRY(arm926_flush_kern_dcache_page)
-  * (same as v4wb)
-  */
- ENTRY(arm926_dma_inv_range)
--#ifndef CONFIG_CPU_DCACHE_WRITETHROUGH
--	tst	r0, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
--	tst	r1, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
--#endif
- 	bic	r0, r0, #CACHE_DLINESIZE - 1
- 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
- 	add	r0, r0, #CACHE_DLINESIZE
-diff --git a/arch/arm/mm/proc-arm946.S b/arch/arm/mm/proc-arm946.S
-index 40c0449..589a61c 100644
---- a/arch/arm/mm/proc-arm946.S
-+++ b/arch/arm/mm/proc-arm946.S
-@@ -215,18 +215,11 @@ ENTRY(arm946_flush_kern_dcache_page)
-  * (same as arm926)
-  */
- ENTRY(arm946_dma_inv_range)
--#ifndef CONFIG_CPU_DCACHE_WRITETHROUGH
--	tst	r0, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
--	tst	r1, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
--#endif
- 	bic	r0, r0, #CACHE_DLINESIZE - 1
- 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
+ extern void dma_cache_maint(const void *kaddr, size_t size, int rw);
+ extern void dma_cache_maint_page(struct page *page, unsigned long offset,
+ 				 size_t size, int rw);
  
  /*
-diff --git a/arch/arm/mm/proc-feroceon.S b/arch/arm/mm/proc-feroceon.S
-index d0d7795..b2f264e 100644
---- a/arch/arm/mm/proc-feroceon.S
-+++ b/arch/arm/mm/proc-feroceon.S
-@@ -274,11 +274,7 @@ ENTRY(feroceon_range_flush_kern_dcache_page)
-  */
- 	.align	5
- ENTRY(feroceon_dma_inv_range)
--	tst	r0, #CACHE_DLINESIZE - 1
- 	bic	r0, r0, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
--	tst	r1, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
- 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
-diff --git a/arch/arm/mm/proc-mohawk.S b/arch/arm/mm/proc-mohawk.S
-index 52b5fd7..191ea6d 100644
---- a/arch/arm/mm/proc-mohawk.S
-+++ b/arch/arm/mm/proc-mohawk.S
-@@ -218,10 +218,6 @@ ENTRY(mohawk_flush_kern_dcache_page)
-  * (same as v4wb)
-  */
- ENTRY(mohawk_dma_inv_range)
--	tst	r0, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
--	tst	r1, #CACHE_DLINESIZE - 1
--	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
- 	bic	r0, r0, #CACHE_DLINESIZE - 1
- 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
- 	add	r0, r0, #CACHE_DLINESIZE
-diff --git a/arch/arm/mm/proc-xsc3.S b/arch/arm/mm/proc-xsc3.S
-index 2028f37..2c1ac69 100644
---- a/arch/arm/mm/proc-xsc3.S
-+++ b/arch/arm/mm/proc-xsc3.S
-@@ -257,11 +257,7 @@ ENTRY(xsc3_flush_kern_dcache_page)
-  *	- end	 - virtual end address
-  */
- ENTRY(xsc3_dma_inv_range)
--	tst	r0, #CACHELINESIZE - 1
- 	bic	r0, r0, #CACHELINESIZE - 1
--	mcrne	p15, 0, r0, c7, c10, 1		@ clean L1 D line
--	tst	r1, #CACHELINESIZE - 1
--	mcrne	p15, 0, r1, c7, c10, 1		@ clean L1 D line
- 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate L1 D line
- 	add	r0, r0, #CACHELINESIZE
- 	cmp	r0, r1
-diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
-index f056c28..3170348 100644
---- a/arch/arm/mm/proc-xscale.S
-+++ b/arch/arm/mm/proc-xscale.S
-@@ -315,11 +315,7 @@ ENTRY(xscale_flush_kern_dcache_page)
-  *	- end	 - virtual end address
-  */
- ENTRY(xscale_dma_inv_range)
--	tst	r0, #CACHELINESIZE - 1
- 	bic	r0, r0, #CACHELINESIZE - 1
--	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
--	tst	r1, #CACHELINESIZE - 1
--	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
- 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
- 	add	r0, r0, #CACHELINESIZE
- 	cmp	r0, r1
++ * The DMA API is built upon the notion of "buffer ownership".  A buffer
++ * is either exclusively owned by the CPU (and therefore may be accessed
++ * by it) or exclusively owned by the DMA device.  These helper functions
++ * represent the transitions between these two ownership states.
++ *
++ * As above, these are private support functions and not part of the API.
++ * Drivers must not use these.
++ */
++static inline void __dma_single_cpu_to_dev(const void *kaddr, size_t size,
++	enum dma_data_direction dir)
++{
++	if (!arch_is_coherent())
++		dma_cache_maint(kaddr, size, dir);
++}
++
++static inline void __dma_single_dev_to_cpu(const void *kaddr, size_t size,
++	enum dma_data_direction dir)
++{
++	/* nothing to do */
++}
++
++static inline void __dma_page_cpu_to_dev(struct page *page, unsigned long off,
++	size_t size, enum dma_data_direction dir)
++{
++	if (!arch_is_coherent())
++		dma_cache_maint_page(page, off, size, dir);
++}
++
++static inline void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
++	size_t size, enum dma_data_direction dir)
++{
++	/* nothing to do */
++}
++
++/*
+  * Return whether the given device DMA address mask can be supported
+  * properly.  For example, if your device can only drive the low 24-bits
+  * during bus mastering, then you would pass 0x00ffffff as the mask
+@@ -304,8 +333,7 @@ static inline dma_addr_t dma_map_single(struct device *dev, void *cpu_addr,
+ {
+ 	BUG_ON(!valid_dma_direction(dir));
+ 
+-	if (!arch_is_coherent())
+-		dma_cache_maint(cpu_addr, size, dir);
++	__dma_single_cpu_to_dev(cpu_addr, size, dir);
+ 
+ 	return virt_to_dma(dev, cpu_addr);
+ }
+@@ -329,8 +357,7 @@ static inline dma_addr_t dma_map_page(struct device *dev, struct page *page,
+ {
+ 	BUG_ON(!valid_dma_direction(dir));
+ 
+-	if (!arch_is_coherent())
+-		dma_cache_maint_page(page, offset, size, dir);
++	__dma_page_cpu_to_dev(page, offset, size, dir);
+ 
+ 	return page_to_dma(dev, page) + offset;
+ }
+@@ -352,7 +379,7 @@ static inline dma_addr_t dma_map_page(struct device *dev, struct page *page,
+ static inline void dma_unmap_single(struct device *dev, dma_addr_t handle,
+ 		size_t size, enum dma_data_direction dir)
+ {
+-	/* nothing to do */
++	__dma_single_dev_to_cpu(dma_to_virt(dev, handle), size, dir);
+ }
+ 
+ /**
+@@ -372,7 +399,8 @@ static inline void dma_unmap_single(struct device *dev, dma_addr_t handle,
+ static inline void dma_unmap_page(struct device *dev, dma_addr_t handle,
+ 		size_t size, enum dma_data_direction dir)
+ {
+-	/* nothing to do */
++	__dma_page_dev_to_cpu(dma_to_page(dev, handle), handle & ~PAGE_MASK,
++		size, dir);
+ }
+ #endif /* CONFIG_DMABOUNCE */
+ 
+@@ -400,7 +428,10 @@ static inline void dma_sync_single_range_for_cpu(struct device *dev,
+ {
+ 	BUG_ON(!valid_dma_direction(dir));
+ 
+-	dmabounce_sync_for_cpu(dev, handle, offset, size, dir);
++	if (!dmabounce_sync_for_cpu(dev, handle, offset, size, dir))
++		return;
++
++	__dma_single_dev_to_cpu(dma_to_virt(dev, handle) + offset, size, dir);
+ }
+ 
+ static inline void dma_sync_single_range_for_device(struct device *dev,
+@@ -412,8 +443,7 @@ static inline void dma_sync_single_range_for_device(struct device *dev,
+ 	if (!dmabounce_sync_for_device(dev, handle, offset, size, dir))
+ 		return;
+ 
+-	if (!arch_is_coherent())
+-		dma_cache_maint(dma_to_virt(dev, handle) + offset, size, dir);
++	__dma_single_cpu_to_dev(dma_to_virt(dev, handle) + offset, size, dir);
+ }
+ 
+ static inline void dma_sync_single_for_cpu(struct device *dev,
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index b9590a7..5bd2e0d 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -708,8 +708,12 @@ void dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+ 	int i;
+ 
+ 	for_each_sg(sg, s, nents, i) {
+-		dmabounce_sync_for_cpu(dev, sg_dma_address(s), 0,
+-					sg_dma_len(s), dir);
++		if (!dmabounce_sync_for_cpu(dev, sg_dma_address(s), 0,
++					    sg_dma_len(s), dir))
++			continue;
++
++		__dma_page_dev_to_cpu(sg_page(s), s->offset,
++				      s->length, dir);
+ 	}
+ }
+ EXPORT_SYMBOL(dma_sync_sg_for_cpu);
+@@ -732,9 +736,8 @@ void dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
+ 					sg_dma_len(s), dir))
+ 			continue;
+ 
+-		if (!arch_is_coherent())
+-			dma_cache_maint_page(sg_page(s), s->offset,
+-					     s->length, dir);
++		__dma_page_cpu_to_dev(sg_page(s), s->offset,
++				      s->length, dir);
+ 	}
+ }
+ EXPORT_SYMBOL(dma_sync_sg_for_device);
 -- 
 1.6.2.5
