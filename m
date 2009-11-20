@@ -1,225 +1,275 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 20 Nov 2009 14:42:40 +0100
-Subject: [PATCH 08/20] ARM: S5PC1XX: move common s5pc1xx s3c-fb regs to
-	platform directory
+Date: Fri, 20 Nov 2009 14:42:35 +0100
+Subject: [PATCH 03/20] ARM: S5PC1XX: prepare common cpu&clocks code for S5PC110
+	sub-platform
 In-Reply-To: <1258551194-16018-1-git-send-email-m.szyprowski@samsung.com>
 References: <1258551194-16018-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1258724572-19176-9-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1258724572-19176-4-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pawel Osciak <p.osciak@samsung.com>
+From: Kyungmin Park <kyungmin.park@samsung.com>
 
-Framebuffer register blocks on S5PC100 and S5PC110 differ only slightly.
-This patch moves all register definitions that are common for S5PC100
-and S5PC110 to plat-s3c/plat/regs-fb-v5.h.
+CLK_OTHER register block is specific for S5PC100 SoC, so move the
+definition to mach-s5pc100/cpu.c. Size of CLK and PWR register block is
+different on S5PC100 and S5PC110, thus new defines are introduced.
 
-Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
+Clock and pll hierarchy is completely different between S5PC100 and
+S5PC110 SoCs, so move related includes to new sub-platform and rename
+plat-s5pc1xx/clocks.c and plat-s5pc1xx/s5pc100-clock.c to
+s5pc100-clocks.c (periperal clocks definition) and s5pc100-plls.c (core
+pll hierarchy definition).
+
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/mach-s5pc100/include/mach/regs-fb.h       |  133 ++------------------
- .../include/plat/regs-fb-v5.h}                     |   15 +--
- 2 files changed, 15 insertions(+), 133 deletions(-)
- copy arch/arm/{mach-s5pc100/include/mach/regs-fb.h => plat-s3c/include/plat/regs-fb-v5.h} (93%)
+ arch/arm/mach-s5pc100/Kconfig                      |    2 --
+ arch/arm/mach-s5pc100/Makefile                     |    3 +++
+ .../clock.c => mach-s5pc100/clocks.c}              |    4 ++--
+ arch/arm/mach-s5pc100/cpu.c                        |    6 ++++++
+ arch/arm/mach-s5pc100/include/mach/map.h           |    2 ++
+ .../include/plat/regs-clock.h                      |    2 +-
+ .../include/plat/regs-power.h                      |    2 +-
+ .../s5pc100-clock.c => mach-s5pc100/plls.c}        |    2 +-
+ .../s5pc100-init.c => mach-s5pc100/uarts.c}        |    2 +-
+ arch/arm/plat-s5pc1xx/Kconfig                      |   12 +-----------
+ arch/arm/plat-s5pc1xx/Makefile                     |    4 ----
+ arch/arm/plat-s5pc1xx/cpu.c                        |   18 ++++++------------
+ 12 files changed, 24 insertions(+), 35 deletions(-)
+ rename arch/arm/{plat-s5pc1xx/clock.c => mach-s5pc100/clocks.c} (99%)
+ rename arch/arm/{plat-s5pc1xx => mach-s5pc100}/include/plat/regs-clock.h (99%)
+ rename arch/arm/{plat-s5pc1xx => mach-s5pc100}/include/plat/regs-power.h (98%)
+ rename arch/arm/{plat-s5pc1xx/s5pc100-clock.c => mach-s5pc100/plls.c} (99%)
+ rename arch/arm/{plat-s5pc1xx/s5pc100-init.c => mach-s5pc100/uarts.c} (94%)
 
-diff --git a/arch/arm/mach-s5pc100/include/mach/regs-fb.h b/arch/arm/mach-s5pc100/include/mach/regs-fb.h
-index 1732cd2..49764cb 100644
---- a/arch/arm/mach-s5pc100/include/mach/regs-fb.h
-+++ b/arch/arm/mach-s5pc100/include/mach/regs-fb.h
-@@ -1,139 +1,22 @@
--/* arch/arm/mach-s5pc100/include/mach/regs-fb.h
-- *
-+/*
-  * Copyright 2009 Samsung Electronics Co.
-  *   Pawel Osciak <p.osciak@samsung.com>
+diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
+index d72f881..1dbb5f1 100644
+--- a/arch/arm/mach-s5pc100/Kconfig
++++ b/arch/arm/mach-s5pc100/Kconfig
+@@ -11,8 +11,6 @@ if ARCH_S5PC100
+ 
+ config CPU_S5PC100
+ 	bool
+-	select CPU_S5PC100_INIT
+-	select CPU_S5PC100_CLOCK
+ 	help
+ 	  Enable S5PC100 CPU support
+ 
+diff --git a/arch/arm/mach-s5pc100/Makefile b/arch/arm/mach-s5pc100/Makefile
+index 809ff10..dc6b0ff 100644
+--- a/arch/arm/mach-s5pc100/Makefile
++++ b/arch/arm/mach-s5pc100/Makefile
+@@ -12,6 +12,9 @@ obj-				:=
+ # Core support for S5PC100 system
+ 
+ obj-$(CONFIG_CPU_S5PC100)	+= cpu.o
++obj-$(CONFIG_CPU_S5PC100)	+= clocks.o
++obj-$(CONFIG_CPU_S5PC100)	+= plls.o
++obj-$(CONFIG_CPU_S5PC100)	+= uarts.o
+ 
+ # Helper and device support
+ 
+diff --git a/arch/arm/plat-s5pc1xx/clock.c b/arch/arm/mach-s5pc100/clocks.c
+similarity index 99%
+rename from arch/arm/plat-s5pc1xx/clock.c
+rename to arch/arm/mach-s5pc100/clocks.c
+index 26c21d8..a191beb 100644
+--- a/arch/arm/plat-s5pc1xx/clock.c
++++ b/arch/arm/mach-s5pc100/clocks.c
+@@ -1,8 +1,8 @@
+-/* linux/arch/arm/plat-s5pc1xx/clock.c
++/* linux/arch/arm/mach-s5pc100/clocks.c
   *
-- * Framebuffer register definitions for Samsung S5PC100.
-+ * Machine-specific framebuffer definitions for Samsung S5PC100.
+  * Copyright 2009 Samsung Electronics Co.
+  *
+- * S5PC1XX Base clock support
++ * S5PC100 - Clocks support
+  *
+  * Based on plat-s3c64xx/clock.c
+  *
+diff --git a/arch/arm/mach-s5pc100/cpu.c b/arch/arm/mach-s5pc100/cpu.c
+index d79e757..41fdecf 100644
+--- a/arch/arm/mach-s5pc100/cpu.c
++++ b/arch/arm/mach-s5pc100/cpu.c
+@@ -46,6 +46,12 @@
+ /* Initial IO mappings */
+ 
+ static struct map_desc s5pc100_iodesc[] __initdata = {
++	{
++		.virtual	= (unsigned long)S5PC1XX_VA_CLK_OTHER,
++		.pfn		= __phys_to_pfn(S5PC1XX_PA_CLK_OTHER),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	}
+ };
+ 
+ static void s5pc100_idle(void)
+diff --git a/arch/arm/mach-s5pc100/include/mach/map.h b/arch/arm/mach-s5pc100/include/mach/map.h
+index f90c033..88f267a 100644
+--- a/arch/arm/mach-s5pc100/include/mach/map.h
++++ b/arch/arm/mach-s5pc100/include/mach/map.h
+@@ -46,6 +46,8 @@
+ #define S5PC1XX_VA_CLK		(S3C_VA_SYS + 0x10000)
+ #define S5PC1XX_VA_PWR		(S3C_VA_SYS + 0x20000)
+ #define S5PC1XX_VA_CLK_OTHER	(S3C_VA_SYS + 0x30000)
++#define S5PC1XX_SZ_CLK		SZ_4K
++#define S5PC1XX_SZ_PWR		SZ_4K
+ 
+ /* GPIO */
+ #define S5PC100_PA_GPIO		(0xE0300000)
+diff --git a/arch/arm/plat-s5pc1xx/include/plat/regs-clock.h b/arch/arm/mach-s5pc100/include/plat/regs-clock.h
+similarity index 99%
+rename from arch/arm/plat-s5pc1xx/include/plat/regs-clock.h
+rename to arch/arm/mach-s5pc100/include/plat/regs-clock.h
+index c5cc86e..f0a007b 100644
+--- a/arch/arm/plat-s5pc1xx/include/plat/regs-clock.h
++++ b/arch/arm/mach-s5pc100/include/plat/regs-clock.h
+@@ -3,7 +3,7 @@
+  * Copyright 2009 Samsung Electronics Co.
+  *	Byungho Min <bhmin@samsung.com>
+  *
+- * S5PC1XX clock register definitions
++ * S5PC100 clock register definitions
   *
   * This program is free software; you can redistribute it and/or modify
   * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
--*/
--
--#ifndef __ASM_ARCH_REGS_FB_H
--#define __ASM_ARCH_REGS_FB_H __FILE__
--
--#include <plat/regs-fb-v4.h>
--
--/* VP1 interface timing control */
--#define VP1CON0						(0x118)
--#define VP1_RATECON_EN					(1 << 31)
--#define VP1_CLKRATE_MASK				(0xff)
--
--#define VP1CON1						(0x11c)
--#define VP1_VTREGCON_EN					(1 << 31)
--#define VP1_VBPD_MASK					(0xfff)
--#define VP1_VBPD_SHIFT					(16)
--
--
--#define WPALCON_H					(0x19c)
--#define WPALCON_L					(0x1a0)
--
--/* Pallete contro for WPAL0 and WPAL1 is the same as in S3C64xx, but
-- * different for WPAL2-4
-- */
--/* In WPALCON_L (aka WPALCON) */
--#define WPALCON_W1PAL_32BPP_A888			(0x7 << 3)
--#define WPALCON_W0PAL_32BPP_A888			(0x7 << 0)
--
--/* To set W2PAL-W4PAL consist of one bit from WPALCON_L and two from WPALCON_H,
-- * e.g. W2PAL[2..0] is made of (WPALCON_H[10..9], WPALCON_L[6]).
-- */
--#define WPALCON_L_WxPAL_L_MASK				(0x1)
--#define WPALCON_L_W2PAL_L_SHIFT				(6)
--#define WPALCON_L_W3PAL_L_SHIFT				(7)
--#define WPALCON_L_W4PAL_L_SHIFT				(8)
--
--#define WPALCON_L_WxPAL_H_MASK				(0x3)
--#define WPALCON_H_W2PAL_H_SHIFT				(9)
--#define WPALCON_H_W3PAL_H_SHIFT				(13)
--#define WPALCON_H_W4PAL_H_SHIFT				(17)
--
--/* Per-window alpha value registers */
--/* For window 0 8-bit alpha values are in VIDW0ALPHAx,
-- * for windows 1-4 alpha values consist of two parts, the 4 low bits are
-- * taken from VIDWxALPHAx and 4 high bits are from VIDOSDxC,
-- * e.g. WIN1_ALPHA0_B[7..0] = (VIDOSD1C[3..0], VIDW1ALPHA0[3..0])
-- */
--#define VIDWxALPHA0(_win)				(0x200 + (_win * 8))
--#define VIDWxALPHA1(_win)				(0x204 + (_win * 8))
--
--/* Only for window 0 in VIDW0ALPHAx. */
--#define VIDW0ALPHAx_R(_x)				((_x) << 16)
--#define VIDW0ALPHAx_R_MASK				(0xff << 16)
--#define VIDW0ALPHAx_R_SHIFT				(16)
--#define VIDW0ALPHAx_G(_x)				((_x) << 8)
--#define VIDW0ALPHAx_G_MASK				(0xff << 8)
--#define VIDW0ALPHAx_G_SHIFT				(8)
--#define VIDW0ALPHAx_B(_x)				((_x) << 0)
--#define VIDW0ALPHAx_B_MASK				(0xff << 0)
--#define VIDW0ALPHAx_B_SHIFT				(0)
--
--/* Low 4 bits of alpha0-1 for windows 1-4 */
--#define VIDW14ALPHAx_R_L(_x)				((_x) << 16)
--#define VIDW14ALPHAx_R_L_MASK				(0xf << 16)
--#define VIDW14ALPHAx_R_L_SHIFT				(16)
--#define VIDW14ALPHAx_G_L(_x)				((_x) << 8)
--#define VIDW14ALPHAx_G_L_MASK				(0xf << 8)
--#define VIDW14ALPHAx_G_L_SHIFT				(8)
--#define VIDW14ALPHAx_B_L(_x)				((_x) << 0)
--#define VIDW14ALPHAx_B_L_MASK				(0xf << 0)
--#define VIDW14ALPHAx_B_L_SHIFT				(0)
--
--
--/* Per-window blending equation control registers */
--#define BLENDEQx(_win)					(0x244 + ((_win) * 4))
--#define BLENDEQ1					(0x244)
--#define BLENDEQ2					(0x248)
--#define BLENDEQ3					(0x24c)
--#define BLENDEQ4					(0x250)
--
--#define BLENDEQx_Q_FUNC(_x)				((_x) << 18)
--#define BLENDEQx_Q_FUNC_MASK				(0xf << 18)
--#define BLENDEQx_P_FUNC(_x)				((_x) << 12)
--#define BLENDEQx_P_FUNC_MASK				(0xf << 12)
--#define BLENDEQx_B_FUNC(_x)				((_x) << 6)
--#define BLENDEQx_B_FUNC_MASK				(0xf << 6)
--#define BLENDEQx_A_FUNC(_x)				((_x) << 0)
--#define BLENDEQx_A_FUNC_MASK				(0xf << 0)
--
--#define BLENDCON					(0x260)
--#define BLENDCON_8BIT_ALPHA				(1 << 0)
--
--/* Per-window palette base addresses (start of palette memory).
-- * Each window palette area consists of 256 32-bit entries.
-- * START is the first address (entry 0th), END is the address of 255th entry.
-  */
--#define WIN0_PAL_BASE					(0x2400)
--#define WIN0_PAL_END					(0x27fc)
--#define WIN1_PAL_BASE					(0x2800)
--#define WIN1_PAL_END					(0x2bfc)
--#define WIN2_PAL_BASE					(0x2c00)
--#define WIN2_PAL_END					(0x2ffc)
--#define WIN3_PAL_BASE					(0x3000)
--#define WIN3_PAL_END					(0x33fc)
--#define WIN4_PAL_BASE					(0x3400)
--#define WIN4_PAL_END					(0x37fc)
- 
--#define WIN0_PAL(_entry)			(WIN0_PAL_BASE + ((_entry) * 4))
--#define WIN1_PAL(_entry)			(WIN1_PAL_BASE + ((_entry) * 4))
--#define WIN2_PAL(_entry)			(WIN2_PAL_BASE + ((_entry) * 4))
--#define WIN3_PAL(_entry)			(WIN3_PAL_BASE + ((_entry) * 4))
--#define WIN4_PAL(_entry)			(WIN4_PAL_BASE + ((_entry) * 4))
-+#ifndef __ASM_ARCH_MACH_REGS_FB_H
-+#define __ASM_ARCH_MACH_REGS_FB_H __FILE__
- 
--static inline unsigned int s3c_fb_pal_reg(unsigned int window, int reg)
--{
--	switch (window) {
--	case 0: return WIN0_PAL(reg);
--	case 1: return WIN1_PAL(reg);
--	case 2: return WIN2_PAL(reg);
--	case 3: return WIN3_PAL(reg);
--	case 4: return WIN4_PAL(reg);
--	}
-+#include <plat/regs-fb-v5.h>
- 
--	BUG();
--}
-+#define PRTCON						(0xc)
-+#define PRTCON_PROTECT					(1 << 11)
- 
- 
--#endif /* __ASM_ARCH_REGS_FB_H */
-+#endif /* __ASM_ARCH_MACH_REGS_FB_H */
- 
-diff --git a/arch/arm/mach-s5pc100/include/mach/regs-fb.h b/arch/arm/plat-s3c/include/plat/regs-fb-v5.h
-similarity index 93%
-copy from arch/arm/mach-s5pc100/include/mach/regs-fb.h
-copy to arch/arm/plat-s3c/include/plat/regs-fb-v5.h
-index 1732cd2..0e0686d 100644
---- a/arch/arm/mach-s5pc100/include/mach/regs-fb.h
-+++ b/arch/arm/plat-s3c/include/plat/regs-fb-v5.h
-@@ -1,17 +1,16 @@
--/* arch/arm/mach-s5pc100/include/mach/regs-fb.h
-- *
-+/*
+diff --git a/arch/arm/plat-s5pc1xx/include/plat/regs-power.h b/arch/arm/mach-s5pc100/include/plat/regs-power.h
+similarity index 98%
+rename from arch/arm/plat-s5pc1xx/include/plat/regs-power.h
+rename to arch/arm/mach-s5pc100/include/plat/regs-power.h
+index 02ffa49..50a9679 100644
+--- a/arch/arm/plat-s5pc1xx/include/plat/regs-power.h
++++ b/arch/arm/mach-s5pc100/include/plat/regs-power.h
+@@ -3,7 +3,7 @@
   * Copyright 2009 Samsung Electronics Co.
-  *   Pawel Osciak <p.osciak@samsung.com>
+  *	Jongse Won <jongse.won@samsung.com>
   *
-- * Framebuffer register definitions for Samsung S5PC100.
-+ * Common framebuffer register definitions for Samsung S5PC1xx family.
+- * S5PC1XX clock register definitions
++ * S5PC100 power controll register definitions
   *
   * This program is free software; you can redistribute it and/or modify
   * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
--*/
-+ */
+diff --git a/arch/arm/plat-s5pc1xx/s5pc100-clock.c b/arch/arm/mach-s5pc100/plls.c
+similarity index 99%
+rename from arch/arm/plat-s5pc1xx/s5pc100-clock.c
+rename to arch/arm/mach-s5pc100/plls.c
+index b436d44..cd3f6a7 100644
+--- a/arch/arm/plat-s5pc1xx/s5pc100-clock.c
++++ b/arch/arm/mach-s5pc100/plls.c
+@@ -1,4 +1,4 @@
+-/* linux/arch/arm/plat-s5pc1xx/s5pc100-clock.c
++/* linux/arch/arm/mach-s5pc100/s5pc100-plls.c
+  *
+  * Copyright 2009 Samsung Electronics, Co.
+  *	Byungho Min <bhmin@samsung.com>
+diff --git a/arch/arm/plat-s5pc1xx/s5pc100-init.c b/arch/arm/mach-s5pc100/uarts.c
+similarity index 94%
+rename from arch/arm/plat-s5pc1xx/s5pc100-init.c
+rename to arch/arm/mach-s5pc100/uarts.c
+index c587108..32972f2 100644
+--- a/arch/arm/plat-s5pc1xx/s5pc100-init.c
++++ b/arch/arm/mach-s5pc100/uarts.c
+@@ -1,4 +1,4 @@
+-/* linux/arch/arm/plat-s5pc1xx/s5pc100-init.c
++/* linux/arch/arm/mach-s5pc100/uarts.c
+  *
+  * Copyright 2009 Samsung Electronics Co.
+  *      Byungho Min <bhmin@samsung.com>
+diff --git a/arch/arm/plat-s5pc1xx/Kconfig b/arch/arm/plat-s5pc1xx/Kconfig
+index eee2abb..7131ce9 100644
+--- a/arch/arm/plat-s5pc1xx/Kconfig
++++ b/arch/arm/plat-s5pc1xx/Kconfig
+@@ -33,17 +33,7 @@ config ARCH_S5PC100
+ endchoice
  
--#ifndef __ASM_ARCH_REGS_FB_H
--#define __ASM_ARCH_REGS_FB_H __FILE__
-+#ifndef __ASM_ARCH_REGS_FB_V5_H
-+#define __ASM_ARCH_REGS_FB_V5_H __FILE__
  
- #include <plat/regs-fb-v4.h>
+-# Configuration options shared by all S3C64XX implementations
+-
+-config CPU_S5PC100_INIT
+-	bool
+-	help
+-	  Common initialisation code for the S5PC1XX
+-
+-config CPU_S5PC100_CLOCK
+-	bool
+-	help
+-	  Common clock support code for the S5PC1XX
++# configuration options shared by all S5PC1XX implementations
  
-@@ -36,7 +35,7 @@
- #define WPALCON_W1PAL_32BPP_A888			(0x7 << 3)
- #define WPALCON_W0PAL_32BPP_A888			(0x7 << 0)
+ # platform specific device setup
  
--/* To set W2PAL-W4PAL consist of one bit from WPALCON_L and two from WPALCON_H,
-+/* W2PAL-W4PAL consist of one bit from WPALCON_L and two from WPALCON_H,
-  * e.g. W2PAL[2..0] is made of (WPALCON_H[10..9], WPALCON_L[6]).
-  */
- #define WPALCON_L_WxPAL_L_MASK				(0x1)
-@@ -135,5 +134,5 @@ static inline unsigned int s3c_fb_pal_reg(unsigned int window, int reg)
+diff --git a/arch/arm/plat-s5pc1xx/Makefile b/arch/arm/plat-s5pc1xx/Makefile
+index 278f268..39dd0a1 100644
+--- a/arch/arm/plat-s5pc1xx/Makefile
++++ b/arch/arm/plat-s5pc1xx/Makefile
+@@ -14,14 +14,10 @@ obj-				:=
+ obj-y				+= dev-uart.o
+ obj-y				+= cpu.o
+ obj-y				+= irq.o irq-gpio.o irq-eint.o
+-obj-y				+= clock.o
+ obj-y				+= gpiolib.o
+ 
+ # CPU support
+ 
+-obj-$(CONFIG_CPU_S5PC100_INIT)	+= s5pc100-init.o
+-obj-$(CONFIG_CPU_S5PC100_CLOCK)	+= s5pc100-clock.o
+-
+ # Device setup
+ 
+ obj-$(CONFIG_S5P_GPIO_CFG_S5PC1XX) += gpio-config.o
+diff --git a/arch/arm/plat-s5pc1xx/cpu.c b/arch/arm/plat-s5pc1xx/cpu.c
+index 02baeaa..ecd6d38 100644
+--- a/arch/arm/plat-s5pc1xx/cpu.c
++++ b/arch/arm/plat-s5pc1xx/cpu.c
+@@ -50,18 +50,11 @@ static struct cpu_table cpu_ids[] __initdata = {
+ };
+ /* minimal IO mapping */
+ 
+-/* see notes on uart map in arch/arm/mach-s5pc100/include/mach/debug-macro.S */
+-#define UART_OFFS (S3C_PA_UART & 0xffff)
+ 
+ static struct map_desc s5pc1xx_iodesc[] __initdata = {
+ 	{
+-		.virtual	= (unsigned long)S5PC1XX_VA_CLK_OTHER,
+-		.pfn		= __phys_to_pfn(S5PC1XX_PA_CLK_OTHER),
+-		.length		= SZ_4K,
+-		.type		= MT_DEVICE,
+-	}, {
+ 		.virtual	= (unsigned long)S5PC1XX_VA_GPIO,
+-		.pfn		= __phys_to_pfn(S5PC100_PA_GPIO),
++		.pfn		= __phys_to_pfn(S5PC1XX_PA_GPIO),
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE,
+ 	}, {
+@@ -72,15 +65,15 @@ static struct map_desc s5pc1xx_iodesc[] __initdata = {
+ 	}, {
+ 		.virtual	= (unsigned long)S5PC1XX_VA_CLK,
+ 		.pfn		= __phys_to_pfn(S5PC1XX_PA_CLK),
+-		.length		= SZ_4K,
++		.length		= S5PC1XX_SZ_CLK,
+ 		.type		= MT_DEVICE,
+ 	}, {
+ 		.virtual	= (unsigned long)S5PC1XX_VA_PWR,
+ 		.pfn		= __phys_to_pfn(S5PC1XX_PA_PWR),
+-		.length		= SZ_4K,
++		.length		= S5PC1XX_SZ_PWR,
+ 		.type		= MT_DEVICE,
+ 	}, {
+-		.virtual	= (unsigned long)(S5PC1XX_VA_UART),
++		.virtual	= (unsigned long)S5PC1XX_VA_UART,
+ 		.pfn		= __phys_to_pfn(S5PC1XX_PA_UART),
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE,
+@@ -115,8 +108,9 @@ void __init s5pc1xx_init_io(struct map_desc *mach_desc, int size)
+ 
+ 	/* initialise the io descriptors we need for initialisation */
+ 	iotable_init(s5pc1xx_iodesc, ARRAY_SIZE(s5pc1xx_iodesc));
+-	iotable_init(mach_desc, size);
+ 
+ 	idcode = __raw_readl(S5PC1XX_VA_CHIPID);
+ 	s3c_init_cpu(idcode, cpu_ids, ARRAY_SIZE(cpu_ids));
++
++	iotable_init(mach_desc, size);
  }
- 
- 
--#endif /* __ASM_ARCH_REGS_FB_H */
-+#endif /* __ASM_ARCH_REGS_FB_V5_H */
- 
 -- 
 1.6.4
