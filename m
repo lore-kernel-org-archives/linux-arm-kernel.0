@@ -1,42 +1,38 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 20 Nov 2009 11:57:26 +0100
-Subject: [PATCH 2/3] staging/dream: add missing include files
-In-Reply-To: <20091119225602.GC18710@kroah.com>
-References: <20091101222717.GB20740@elf.ucw.cz>
-	<20091119225602.GC18710@kroah.com>
-Message-ID: <20091120105726.GH11212@elf.ucw.cz>
+From: valentin.longchamp@epfl.ch (Valentin Longchamp)
+Date: Fri, 20 Nov 2009 12:04:15 +0100
+Subject: [PATCH 1/1] mx31moboard: change initial reset status for robot
+	microcontollers
+In-Reply-To: <4B06748A.6050709@ru.mvista.com>
+References: <1258640121-12637-1-git-send-email-valentin.longchamp@epfl.ch>
+	<1258711647-25993-1-git-send-email-valentin.longchamp@epfl.ch>
+	<4B06748A.6050709@ru.mvista.com>
+Message-ID: <4B0677AF.5020008@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2009-11-19 14:56:02, Greg KH wrote:
-> On Sun, Nov 01, 2009 at 11:27:17PM +0100, Pavel Machek wrote:
-> > Add missing files/includes neccessary for Dream compilation.
-> >     
-> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+Sergei Shtylyov wrote:
+> Hello.
 > 
-> This patch includes a file that is not in the drivers/staging/
-> directory, and it does this Kconfig mess:
-
-Oops, sorry. That one escaped me. I'll submit fixed version.
-
-> > +config GENERIC_GPIO
-> > +	bool
-> > +	default y
+> Valentin Longchamp wrote:
 > 
-> Which breaks the i386 build.  Don't force on a general config option
-> like this, that's not nice at all :(
+>> We want the microcontrollers to be held in reset during kernel boot.
+>>
+>> I just removed a typo in the changelog and commit message, thanks Uwe.
+>>
+>> This patch is trivial and should go into next -rc.
+>>   
+> 
+>    You should put such comments under --- tearline, so that that will be 
+> automatically dropped when applying the patch.
+> 
 
-Ok, I should figure out how to limit it to arch-msm.
+Thanks for the comment, now I have found out that I can do it with the 
+--anotate option of git-send-email. Resend comming now.
 
-> So I'll not apply this one, and the 3/3 patch.
+Val
 
-Where can I get the tree to diff against?
-gregkh-08-staging-2.6.32-rc7-git4.patch just reverts everything.
-
-I guess I can extract it from
-://www.kernel.org/pub/linux/kernel/people/gregkh/gregkh-2.6/patches/series ...
-
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Valentin Longchamp, PhD Student, EPFL-STI-LSRO1
+valentin.longchamp at epfl.ch, Phone: +41216937827
+http://people.epfl.ch/valentin.longchamp
+MEA3485, Station 9, CH-1015 Lausanne
