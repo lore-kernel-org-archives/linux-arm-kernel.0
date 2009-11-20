@@ -1,28 +1,28 @@
 From: kevin.wells@nxp.com (Kevin Wells)
-Date: Fri, 20 Nov 2009 02:11:24 +0100
-Subject: RFC [PATCH 4/9] Added lpc32xx clock handler
-Message-ID: <083DF309106F364B939360100EC290F804F54D560D@eu1rdcrdc1wx030.exi.nxp.com>
+Date: Fri, 20 Nov 2009 02:11:28 +0100
+Subject: RFC [PATCH 5/9] Added phy3250 platform for the lcp3250
+Message-ID: <083DF309106F364B939360100EC290F804F54D560E@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added lpc32xx clock handler
+Added phy3250 platform for the lcp3250
 
 Signed-off-by: Kevin Wells <kevin.wells@nxp.com>
 ---
- arch/arm/mach-lpc32xx/clock.c | 1680 +++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 1680 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-lpc32xx/clock.c
+ arch/arm/mach-lpc32xx/phy3250.c |  534 +++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 534 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-lpc32xx/phy3250.c
 
-diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
+diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
 new file mode 100644
-index 0000000..8533ea4
+index 0000000..844c344
 --- /dev/null
-+++ b/arch/arm/mach-lpc32xx/clock.c
-@@ -0,0 +1,1680 @@
++++ b/arch/arm/mach-lpc32xx/phy3250.c
+@@ -0,0 +1,534 @@
 +/*
-+ *  linux/arch/arm/mach-lpc32xx/clock.c
++ *  linux/arch/arm/mach-lpc32xx/phy3250.c
 + *
-+ *  Copyright (C) 2008 NXP Semiconductors
++ *  Copyright (C) 2009 NXP Semiconductors
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -39,1665 +39,519 @@ index 0000000..8533ea4
 + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 + */
 +
-+#include <linux/module.h>
-+#include <linux/kernel.h>
-+#include <linux/list.h>
-+#include <linux/errno.h>
++#include <linux/tty.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/sysdev.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/dma-mapping.h>
++#include <linux/sysdev.h>
++#include <linux/input.h>
 +#include <linux/device.h>
-+#include <linux/err.h>
-+#include <linux/clk.h>
++#include <linux/spi/spi.h>
++#include <linux/spi/eeprom.h>
 +#include <linux/delay.h>
++#include <linux/leds.h>
++#include <linux/gpio.h>
++#include <linux/mmc/host.h>
 +#include <linux/amba/bus.h>
 +#include <linux/amba/clcd.h>
++#include <linux/amba/mmci.h>
++#include <linux/amba/pl022.h>
 +
 +#include <mach/hardware.h>
-+#include <asm/io.h>
-+#include <asm/clkdev.h>
-+#include <mach/clkdev.h>
++#include <asm/setup.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/irq.h>
++#include <asm/mach/irq.h>
++#include <asm/mach/map.h>
 +
 +#include <mach/platform.h>
 +#include <mach/clock.h>
-+#include <mach/i2c.h>
++#include <mach/gpio.h>
 +#include "common.h"
 +
-+static struct clk osc_pll397;
-+static struct clk osc_main;
-+static struct clk clk_armpll;
-+static struct clk clk_usbpll;
++/*
++ * Mapped GPIOLIB GPIOs
++ */
++#define SPI0_CS_GPIO   LPC32XX_GPIO(GPIO_P3_GRP, 5)
++#define LCD_POWER_GPIO LPC32XX_GPIO(GPO_P3_GRP, 0)
++#define BKL_POWER_GPIO LPC32XX_GPIO(GPO_P3_GRP, 4)
++#define LED_GPIO       LPC32XX_GPIO(GPO_P3_GRP, 1)
 +
-+static void clk_upate_children(struct clk *clk);
-+static void local_update_armpll_rate(void);
-+static void local_update_usbpll_rate(void);
++static void phy3250_spi_cs_set(u32 control);
++
++
++#define PHY_HW_VER_VAL 0x000A3250
++#define SEEPROM_READ          0x03
++#define PHY3250_SEEPROM_SIZE  0x8000
++#define PHY3250_SEEPROM_CFGOFS (PHY3250_SEEPROM_SIZE - 0x100)
 +
 +/*
-+ * Structure used for setting up and querying the HCLK PLL
++ * Structure used to define the hardware for the Phytec board
 + */
-+typedef struct {
-+       int analog_on;
-+       int cco_bypass_b15;
-+       int direct_output_b14;
-+       int fdbk_div_ctrl_b13;
-+       int pll_p;
-+       int pll_n;
-+       u32 pll_m;
-+} CLKPWR_HCLK_PLL_SETUP_T;
++struct phytec_hardware {
++  u32 dramcfg;
++  u32 syscfg;
++  u8  mac[8]; /* Only the first 6 are used */
++  u32 rsvd [5];
++  u32 fieldvval;
++} PHY_HW_T;
++static struct phytec_hardware phyhwdata;
 +
 +/*
-+ * Post divider values for PLLs based on selected register value
++ * Load board hardware descriptor to get MAC address
 + */
-+static u32 pll_postdivs[4] = {1, 2, 4, 8};
-+
-+#define USB_OTG_IOBASE io_p2v(USB_BASE)
-+
-+static int local_clk_dummy_set_rate(struct clk *clk, u32 rate)
++static void __init phy3250_load_hw_desc(void)
 +{
-+       return 0;
-+}
++       u32 tmp, addr, saveclk;
++       int i, len;
++       u8 *p8, cmd [4], in [4];
++       u32 sspiobase = io_p2v(SSP0_BASE);
 +
-+static u32 local_clk_get_st_rate(struct clk *clk)
-+{
-+       return clk->rate;
-+}
++       saveclk = readl(CLKPWR_SSP_CLK_CTRL(CLKPWR_IOBASE));
++       writel((saveclk | CLKPWR_SSPCTRL_SSPCLK0_EN),
++               CLKPWR_SSP_CLK_CTRL(CLKPWR_IOBASE));
 +
-+static int local_clk_dummy_enable(struct clk *clk, int enable)
-+{
-+       return 0;
-+}
++       writel(0, LSSP_ICR(sspiobase));
++       writel((LSSP_ICR_RORIC | LSSP_ICR_RTIC), LSSP_IMSC(sspiobase));
 +
-+/* Primary system clock sources */
-+static struct clk osc_32KHz = {
-+       .owner          = NULL,
-+       .parent         = NULL,
-+       .rate           = CLOCK_OSC_FREQ,
-+       .flags          = CLK_FLAG_FIXED,
-+       .usecount       = 0,
-+       .set_rate       = &local_clk_dummy_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = NULL,
-+       .get_rate       = &local_clk_get_st_rate,
-+       .enable         = &local_clk_dummy_enable,
-+       .enable_reg     = 0,
-+       .enable_mask    = 0,
-+};
++       /* Setup default SPI mode at about 5MHz */
++       writel((LSSP_CR0_DSS(8) | LSSP_CR0_FRF_SPI | LSSP_CR0_CPOL(0) |
++               LSSP_CR0_CPHA(0) | LSSP_CR0_SCR(40)), LSSP_CR0(sspiobase));
++       writel(LSSP_CR1_SSP_ENABLE, LSSP_CR1(sspiobase));
++       writel(LSSP_CPSR_CPDVSR(40), LSSP_CPSR(sspiobase));
 +
-+static void clk_upate_children(struct clk *clk)
-+{
-+       local_update_armpll_rate();
-+       local_update_usbpll_rate();
-+}
++       while (readl(LSSP_SR(sspiobase)) & LSSP_SR_RNE)
++               tmp = readl(LSSP_DATA(sspiobase));
 +
-+static int local_pll397_set_rate(struct clk *clk, u32 rate)
-+{
-+       u32 reg;
++       len = sizeof (phyhwdata);
++       p8 = (u8 *) &phyhwdata;
++       addr = PHY3250_SEEPROM_CFGOFS;
++       while (len > 0) {
++               phy3250_spi_cs_set(0);
 +
-+       reg = readl(CLKPWR_PLL397_CTRL(CLKPWR_IOBASE));
++               /* Issue read command and address for 1 byte */
++               cmd[0] = SEEPROM_READ;
++               cmd[1] = ((addr >> 8) & 0xFF);
++               cmd[2] = ((addr >> 0) & 0xFF);
++               cmd[3] = 0xFF;
++               for (i = 0; i < 4; i++)
++                       writel((u32) cmd [i], LSSP_DATA(sspiobase));
 +
-+       /* Disable if rate is 0 */
-+       if (rate == 0)  {
-+               /* 1 = disable for PLL397 */
-+               reg |= CLKPWR_SYSCTRL_PLL397_DIS;
-+               writel(reg, CLKPWR_PLL397_CTRL(CLKPWR_IOBASE));
-+               clk->rate = 0;
-+       }
-+       else {
-+               /* Enable PLL397 */
-+               reg &= ~CLKPWR_SYSCTRL_PLL397_DIS;
-+               writel(reg, CLKPWR_PLL397_CTRL(CLKPWR_IOBASE));
-+               clk->rate = CLOCK_OSC_FREQ * 397;
-+
-+               /* Wait for PLL397 lock */
-+               while ((readl(CLKPWR_PLL397_CTRL(CLKPWR_IOBASE)) &
-+                       CLKPWR_SYSCTRL_PLL397_STS) == 0);
-+       }
-+
-+       clk_upate_children(clk);
-+
-+       return 0;
-+}
-+
-+static int local_pll397_enable(struct clk *clk, int enable)
-+{
-+       return (int) local_pll397_set_rate(clk, (u32) enable);
-+}
-+
-+
-+static int local_oscmain_set_rate(struct clk *clk, u32 rate)
-+{
-+       u32 reg;
-+
-+       reg = readl(CLKPWR_MAIN_OSC_CTRL(CLKPWR_IOBASE));
-+
-+       /* Disable if rate is 0 */
-+       if (rate == 0) {
-+               /* 1 = disable for main oscillator */
-+               reg |= CLKPWR_MOSC_DISABLE;
-+               writel(reg, CLKPWR_MAIN_OSC_CTRL(CLKPWR_IOBASE));
-+               clk->rate = 0;
-+       }
-+       else {
-+               /* Enable main oscillator */
-+               reg &= ~CLKPWR_MOSC_DISABLE;
-+               writel(reg, CLKPWR_MAIN_OSC_CTRL(CLKPWR_IOBASE));
-+               clk->rate = MAIN_OSC_FREQ;
-+
-+               /* Wait for main oscillator to start */
-+               while ((readl(CLKPWR_MAIN_OSC_CTRL(CLKPWR_IOBASE)) &
-+                       CLKPWR_MOSC_DISABLE) != 0);
-+       }
-+
-+       clk_upate_children(clk);
-+
-+       return 0;
-+}
-+
-+static int local_oscmain_enable(struct clk *clk, int enable)
-+{
-+       return (int) local_oscmain_set_rate(clk, (u32) enable);
-+}
-+
-+static int local_sysclk_set_rate(struct clk *clk, u32 rate)
-+{
-+       u32 reg, ret = 0;
-+
-+       reg = readl(CLKPWR_SYSCLK_CTRL(CLKPWR_IOBASE));
-+
-+       if (rate == 0) {
-+               /* 0 = Switch to main oscillator */
-+               reg &= ~CLKPWR_SYSCTRL_USEPLL397;
-+               writel(reg, CLKPWR_SYSCLK_CTRL(CLKPWR_IOBASE));
-+               clk->parent = &osc_main;
-+       }
-+       else {
-+               /* 1 = Switch to PLL397 opscillator */
-+               reg |= CLKPWR_SYSCTRL_USEPLL397;
-+               writel(reg, CLKPWR_SYSCLK_CTRL(CLKPWR_IOBASE));
-+               clk->parent = &osc_pll397;
-+       }
-+
-+       clk->rate = clk->parent->rate;
-+
-+       clk_upate_children(clk);
-+
-+       return ret;
-+}
-+
-+static int local_sysclk_set_parent(struct clk *clk, struct clk *parent)
-+{
-+       u32 reg, ret = 0;
-+
-+       reg = readl(CLKPWR_SYSCLK_CTRL(CLKPWR_IOBASE));
-+
-+       if (parent == &osc_main)
-+               local_sysclk_set_rate(parent, 0);
-+       else if (parent == &osc_pll397)
-+               local_sysclk_set_rate(parent, 1);
-+       else
-+               ret = -EINVAL;
-+
-+       return ret;
-+}
-+
-+static struct clk osc_pll397 = {
-+       .owner          = NULL,
-+       .parent         = &osc_32KHz,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_pll397_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = NULL,
-+       .get_rate       = NULL,
-+       .enable         = &local_pll397_enable,
-+       .enable_reg     = 0,
-+       .enable_mask    = 0,
-+};
-+
-+static struct clk osc_main = {
-+       .owner          = NULL,
-+       .parent         = NULL,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_oscmain_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = NULL,
-+       .get_rate       = NULL,
-+       .enable         = &local_oscmain_enable,
-+       .enable_reg     = 0,
-+       .enable_mask    = 0,
-+};
-+static struct clk clk_sys = {
-+       .owner          = NULL,
-+       .parent         = &osc_main,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_sysclk_set_rate,
-+       .set_parent     = local_sysclk_set_parent,
-+       .round_rate     = NULL,
-+       .get_rate       = NULL,
-+       .enable         = &local_clk_dummy_enable,
-+       .enable_reg     = 0,
-+       .enable_mask    = 0,
-+};
-+
-+/*
-+ * Computes PLL rate from PLL register and input clock
-+ */
-+static u32 local_clk_check_pll_setup(u32 ifreq,
-+       CLKPWR_HCLK_PLL_SETUP_T *pllsetup)
-+{
-+       u32 i64freq, p, m, n, fcco, fref, cfreq;
-+       int mode;
-+
-+       /* PLL requirements */
-+       /* ifreq must be >= 1MHz and <= 20MHz */
-+       /* FCCO must be >= 156MHz and <= 320MHz */
-+       /* FREF must be >= 1MHz and <= 27MHz. */
-+       /* Assume the passed input data is not valid */
-+
-+       i64freq = ifreq;
-+       m = pllsetup->pll_m;
-+       n = pllsetup->pll_n;
-+       p = pllsetup->pll_p;
-+
-+       mode = (pllsetup->cco_bypass_b15 << 2) |
-+               (pllsetup->direct_output_b14 << 1) |
-+       pllsetup->fdbk_div_ctrl_b13;
-+
-+       switch (mode)
-+       {
-+       case 0x0: /* Non-integer mode */
-+               cfreq = (m * i64freq) / (2 * p * n);
-+               fcco = (m * i64freq) / n;
-+               fref = i64freq / n;
-+               break;
-+
-+       case 0x1: /* integer mode */
-+               cfreq = (m * i64freq) / n;
-+               fcco = (m * i64freq) / (n * 2 * p);
-+               fref = i64freq / n;
-+               break;
-+
-+       case 0x2:
-+       case 0x3: /* Direct mode */
-+               cfreq = (m * i64freq) / n;
-+               fcco = cfreq;
-+               fref = i64freq / n;
-+               break;
-+
-+       case 0x4:
-+       case 0x5: /* Bypass mode */
-+               cfreq = i64freq / (2 * p);
-+               fcco = 156000000;
-+               fref = 1000000;
-+               break;
-+
-+       case 0x6:
-+       case 0x7: /* Direct bypass mode */
-+       default:
-+               cfreq = i64freq;
-+               fcco = 156000000;
-+               fref = 1000000;
-+               break;
-+       }
-+
-+       if ((fcco < 156000000) || (fcco > 320000000))
-+               cfreq = 0;
-+
-+       if ((fref < 1000000) || (fref > 27000000))
-+               cfreq = 0;
-+
-+       return (u32) cfreq;
-+}
-+
-+/*
-+ * Convert a PLL register value to a PLL output frequency
-+ */
-+u32 local_clk_get_pllrate_from_reg(u32 inputclk, u32 regval)
-+{
-+       CLKPWR_HCLK_PLL_SETUP_T pllcfg;
-+
-+       pllcfg.cco_bypass_b15 = 0;
-+       pllcfg.direct_output_b14 = 0;
-+       pllcfg.fdbk_div_ctrl_b13 = 0;
-+       if ((regval & CLKPWR_HCLKPLL_CCO_BYPASS) != 0)
-+               pllcfg.cco_bypass_b15 = 1;
-+       if ((regval & CLKPWR_HCLKPLL_POSTDIV_BYPASS) != 0)
-+               pllcfg.direct_output_b14 = 1;
-+       if ((regval & CLKPWR_HCLKPLL_FDBK_SEL_FCLK) != 0)
-+               pllcfg.fdbk_div_ctrl_b13 = 1;
-+       pllcfg.pll_m = 1 + ((regval >> 1) & 0xFF);
-+       pllcfg.pll_n = 1 + ((regval >> 9) & 0x3);
-+       pllcfg.pll_p = pll_postdivs[((regval >> 11) & 0x3)];
-+
-+       return local_clk_check_pll_setup(inputclk, &pllcfg);
-+}
-+
-+/*
-+ * Update the ARM core PLL frequency rate variable from the actual PLL setting
-+ */
-+static void local_update_armpll_rate(void)
-+{
-+       u32 clkin, pllreg;
-+
-+       clkin = clk_armpll.parent->rate;
-+       pllreg = readl(CLKPWR_HCLKPLL_CTRL(CLKPWR_IOBASE)) & 0x1FFFF;
-+
-+       clk_armpll.rate = local_clk_get_pllrate_from_reg(clkin, pllreg);
-+}
-+
-+static int clkpwr_abs(int v1, int v2) {
-+       if (v1 > v2)
-+               return v1 - v2;
-+
-+       return v2 - v1;
-+}
-+
-+/*
-+ * Find a PLL configuration for the selected input frequency
-+ */
-+static u32 local_clk_find_pll_cfg(u32 pllin_freq, u32 target_freq,
-+       CLKPWR_HCLK_PLL_SETUP_T *pllsetup)
-+{
-+       u32 ifreq, freqtol, m, n, p, fclkout = 0;
-+       u32 flag = 0, freqret = 0;
-+
-+       /* Determine frequency tolerance limits */
-+       freqtol = target_freq / 250;
-+       ifreq = pllin_freq;
-+
-+       /* Is direct bypass mode possible? */
-+       if (clkpwr_abs(pllin_freq, target_freq) <= freqtol) {
-+               flag = 1;
-+               pllsetup->analog_on = 0;
-+               pllsetup->cco_bypass_b15 = 1;
-+               pllsetup->direct_output_b14 = 1;
-+               pllsetup->fdbk_div_ctrl_b13 = 1;
-+               pllsetup->pll_p = pll_postdivs[0];
-+               pllsetup->pll_n = 1;
-+               pllsetup->pll_m = 1;
-+               fclkout = local_clk_check_pll_setup(ifreq, pllsetup);
-+       }
-+       else if (target_freq <= ifreq) {
-+               pllsetup->analog_on = 0;
-+               pllsetup->cco_bypass_b15 = 1;
-+               pllsetup->direct_output_b14 = 0;
-+               pllsetup->fdbk_div_ctrl_b13 = 1;
-+               pllsetup->pll_n = 1;
-+               pllsetup->pll_m = 1;
-+               for (p = 0; ((p <= 3) && (flag == 0)); p++) {
-+                       pllsetup->pll_p = pll_postdivs[p];
-+                       fclkout = local_clk_check_pll_setup(ifreq, pllsetup);
-+                       if (clkpwr_abs(target_freq, fclkout) <= freqtol)
-+                               flag = 1;
-+               }
-+       }
-+
-+       /* Is direct mode possible? */
-+       if (flag == 0) {
-+               pllsetup->analog_on = 1;
-+               pllsetup->cco_bypass_b15 = 0;
-+               pllsetup->direct_output_b14 = 1;
-+               pllsetup->fdbk_div_ctrl_b13 = 0;
-+               pllsetup->pll_p = pll_postdivs[0];
-+               for (m = 1; ((m <= 256) && (flag == 0)); m++) {
-+                       for (n = 1; ((n <= 4) && (flag == 0)); n++) {
-+                               /* Compute output frequency for this value */
-+                               pllsetup->pll_n = n;
-+                               pllsetup->pll_m = m;
-+                               fclkout = local_clk_check_pll_setup(ifreq,
-+                                       pllsetup);
-+                               if (clkpwr_abs(target_freq, fclkout) <=
-+                                       freqtol)
-+                                       flag = 1;
++               /* Save 3 null bytes and 1 data byte */
++               i = 0;
++               while (i < 4) {
++                       if (readl(LSSP_SR(sspiobase)) & LSSP_SR_RNE) {
++                               in[i] = (u8) readl(LSSP_DATA(sspiobase));
++                               i++;
 +                       }
 +               }
++
++               /* Only that last byte matters */
++               *p8 = in [3];
++               p8++;
++               len--;
++               addr++;
++
++               phy3250_spi_cs_set(1);
 +       }
 +
-+       /* Is integer mode possible? */
-+       if (flag == 0) {
-+               pllsetup->analog_on = 1;
-+               pllsetup->cco_bypass_b15 = 0;
-+               pllsetup->direct_output_b14 = 0;
-+               pllsetup->fdbk_div_ctrl_b13 = 1;
-+               for (m = 1; ((m <= 256) && (flag == 0)); m++) {
-+                       for (n = 1; ((n <= 4) && (flag == 0)); n++) {
-+                               for (p = 0; ((p < 4) && (flag == 0)); p++) {
-+                                       /* Compute output frequency */
-+                                       pllsetup->pll_p = pll_postdivs[p];
-+                                       pllsetup->pll_n = n;
-+                                       pllsetup->pll_m = m;
-+                                       fclkout = local_clk_check_pll_setup(
-+                                               ifreq, pllsetup);
-+                                       if (clkpwr_abs(target_freq,
-+                                               fclkout) <= freqtol)
-+                                               flag = 1;
-+                               }
-+                       }
-+               }
-+       }
++       writel(0, LSSP_CR0(sspiobase));
 +
-+       if (flag == 0)  {
-+               /* Try non-integer mode */
-+               pllsetup->analog_on = 1;
-+               pllsetup->cco_bypass_b15 = 0;
-+               pllsetup->direct_output_b14 = 0;
-+               pllsetup->fdbk_div_ctrl_b13 = 0;
-+               for (m = 1; ((m <= 256) && (flag == 0)); m++) {
-+                       for (n = 1; ((n <= 4) && (flag == 0)); n++) {
-+                               for (p = 0; ((p < 4) && (flag == 0)); p++) {
-+                                       /* Compute output frequency */
-+                                       pllsetup->pll_p = pll_postdivs[p];
-+                                       pllsetup->pll_n = n;
-+                                       pllsetup->pll_m = m;
-+                                       fclkout = local_clk_check_pll_setup(
-+                                               ifreq, pllsetup);
-+                                       if (clkpwr_abs(target_freq,
-+                                               fclkout) <= freqtol)
-+                                               flag = 1;
-+                               }
-+                       }
-+               }
-+       }
++       if (phyhwdata.fieldvval != PHY_HW_VER_VAL)
++               printk(KERN_ERR "Invalid Phytec board descriptor!\n");
 +
-+       if (flag == 1)
-+               freqret = fclkout;
-+
-+       return freqret;
++       /* Shutdown SSP clock to save power */
++       writel((saveclk & ~CLKPWR_SSPCTRL_SSPCLK0_EN),
++               CLKPWR_SSP_CLK_CTRL(CLKPWR_IOBASE));
 +}
 +
 +/*
-+ * Setup the HCLK PLL with a PLL structure
++ * AMBA LCD controller
 + */
-+static u32 local_clk_hclkpll_setup(CLKPWR_HCLK_PLL_SETUP_T *pHCLKPllSetup)
-+{
-+       u32 tv, tmp = 0;
-+
-+       if (pHCLKPllSetup->analog_on != 0)
-+               tmp |= CLKPWR_HCLKPLL_POWER_UP;
-+
-+       if (pHCLKPllSetup->cco_bypass_b15 != 0)
-+               tmp |= CLKPWR_HCLKPLL_CCO_BYPASS;
-+
-+       if (pHCLKPllSetup->direct_output_b14 != 0)
-+               tmp |= CLKPWR_HCLKPLL_POSTDIV_BYPASS;
-+
-+       if (pHCLKPllSetup->fdbk_div_ctrl_b13 != 0)
-+               tmp |= CLKPWR_HCLKPLL_FDBK_SEL_FCLK;
-+
-+       switch (pHCLKPllSetup->pll_p) {
-+       case 1:
-+               tv = 0;
-+               break;
-+
-+       case 2:
-+               tv = 1;
-+               break;
-+
-+       case 4:
-+               tv = 2;
-+               break;
-+
-+       case 8:
-+               tv = 3;
-+               break;
-+
-+       default:
-+               return 0;
-+       }
-+
-+       tmp |= CLKPWR_HCLKPLL_POSTDIV_2POW(tv);
-+       tmp |= CLKPWR_HCLKPLL_PREDIV_PLUS1(pHCLKPllSetup->pll_n - 1);
-+       tmp |= CLKPWR_HCLKPLL_PLLM(pHCLKPllSetup->pll_m - 1);
-+
-+       writel(tmp, CLKPWR_HCLKPLL_CTRL(CLKPWR_IOBASE));
-+
-+       return local_clk_check_pll_setup(clk_armpll.parent->rate,
-+               pHCLKPllSetup);
-+}
-+
-+static int local_armpll_set_rate(struct clk *clk, u32 rate)
-+{
-+       u32 clkin;
-+       CLKPWR_HCLK_PLL_SETUP_T pllsetup;
-+
-+       if ((rate < 33000000) || (rate > 266000000))
-+               return -EINVAL;
-+
-+       /* Get input frequency to PLL */
-+       clkin = clk->parent->rate;
-+
-+       /* Try to find a good rate setup */
-+       if (local_clk_find_pll_cfg(clkin, rate, &pllsetup) == 0)
-+               return -EINVAL;
-+
-+       /* Setup PLL */
-+       local_clk_hclkpll_setup(&pllsetup);
-+       clk->rate = local_clk_check_pll_setup(clkin, &pllsetup);
-+
-+       return 0;
-+}
-+
-+static int local_armpll_enable(struct clk *clk, int enable)
-+{
-+       u32 reg;
-+
-+       /* Read PLL reg */
-+       reg = readl(CLKPWR_HCLKPLL_CTRL(CLKPWR_IOBASE));
-+
-+       if (enable == 0) {
-+               /* Disable PLL - not recommended unless you really know
-+                  what your are doing (must be in direct-run mode!) */
-+               reg &= ~CLKPWR_HCLKPLL_POWER_UP;
-+               writel(reg, CLKPWR_HCLKPLL_CTRL(CLKPWR_IOBASE));
-+               clk->rate = 0;
-+       }
-+       else {
-+               reg |= CLKPWR_HCLKPLL_POWER_UP;
-+               writel(reg, CLKPWR_HCLKPLL_CTRL(CLKPWR_IOBASE));
-+
-+               /* Wait for PLL lock */
-+               while ((readl(CLKPWR_HCLKPLL_CTRL(CLKPWR_IOBASE)) &
-+                       CLKPWR_HCLKPLL_PLL_STS) == 0);
-+
-+               local_update_armpll_rate();
-+       }
-+
-+       return 0;
-+}
-+
-+/*
-+ * Update the USB PLL frequency rate variable from the actual PLL setting
-+ */
-+static void local_update_usbpll_rate(void)
-+{
-+       u32 clkin, pllreg;
-+
-+       clkin = clk_armpll.parent->rate;
-+       pllreg = readl(CLKPWR_USB_CTRL(CLKPWR_IOBASE)) & 0x1FFFF;
-+
-+       if ((pllreg & CLKPWR_USBCTRL_PLL_PWRUP) == 0)
-+               clk_usbpll.rate = 0;
-+       else
-+               clk_usbpll.rate = local_clk_get_pllrate_from_reg(clkin,
-+                       pllreg);
-+}
-+
-+/*
-+ * Setup the USB PLL with a PLL structure
-+ */
-+static u32 local_clk_usbpll_setup(CLKPWR_HCLK_PLL_SETUP_T *pHCLKPllSetup)
-+{
-+       u32 tv, reg, tmp = 0;
-+
-+       if (pHCLKPllSetup->analog_on != 0)
-+               tmp |= CLKPWR_HCLKPLL_POWER_UP;
-+
-+       if (pHCLKPllSetup->cco_bypass_b15 != 0)
-+               tmp |= CLKPWR_HCLKPLL_CCO_BYPASS;
-+
-+       if (pHCLKPllSetup->direct_output_b14 != 0)
-+               tmp |= CLKPWR_HCLKPLL_POSTDIV_BYPASS;
-+
-+       if (pHCLKPllSetup->fdbk_div_ctrl_b13 != 0)
-+               tmp |= CLKPWR_HCLKPLL_FDBK_SEL_FCLK;
-+
-+       switch (pHCLKPllSetup->pll_p) {
-+       case 1:
-+               tv = 0;
-+               break;
-+
-+       case 2:
-+               tv = 1;
-+               break;
-+
-+       case 4:
-+               tv = 2;
-+               break;
-+
-+       case 8:
-+               tv = 3;
-+               break;
-+
-+       default:
-+               return 0;
-+       }
-+
-+       tmp |= CLKPWR_HCLKPLL_POSTDIV_2POW(tv);
-+       tmp |= CLKPWR_HCLKPLL_PREDIV_PLUS1(pHCLKPllSetup->pll_n - 1);
-+       tmp |= CLKPWR_HCLKPLL_PLLM(pHCLKPllSetup->pll_m - 1);
-+
-+       reg = readl(CLKPWR_USB_CTRL(CLKPWR_IOBASE)) & ~0x1FFFF;
-+       reg |= tmp;
-+       writel(reg, CLKPWR_USB_CTRL(CLKPWR_IOBASE));
-+
-+       return local_clk_check_pll_setup(clk_usbpll.parent->rate,
-+               pHCLKPllSetup);
-+}
-+
-+static int local_usbpll_enable(struct clk *clk, int enable)
-+{
-+       u32 reg;
-+       int ret = -ENODEV, qj = (jiffies / 4);
-+
-+       reg = readl(CLKPWR_USB_CTRL(CLKPWR_IOBASE));
-+
-+       if (enable == 0) {
-+               reg &= ~(CLKPWR_USBCTRL_CLK_EN1 | CLKPWR_USBCTRL_CLK_EN2);
-+               writel(reg, CLKPWR_USB_CTRL(CLKPWR_IOBASE));
-+       }
-+       else if (reg & CLKPWR_USBCTRL_PLL_PWRUP) {
-+               reg |= CLKPWR_USBCTRL_CLK_EN1;
-+               writel(reg, CLKPWR_USB_CTRL(CLKPWR_IOBASE));
-+
-+               /* Wait for PLL lock */
-+               while (qj < jiffies) {
-+                       reg = readl(CLKPWR_USB_CTRL(CLKPWR_IOBASE));
-+                       if (reg & CLKPWR_USBCTRL_PLL_STS)
-+                               ret = 0;
-+               }
-+
-+               if (ret == 0) {
-+                       reg |= CLKPWR_USBCTRL_CLK_EN2;
-+                       writel(reg, CLKPWR_USB_CTRL(CLKPWR_IOBASE));
-+               }
-+       }
-+
-+       return ret;
-+}
-+
-+static int local_usbpll_set_rate(struct clk *clk, u32 rate)
-+{
-+       u32 clkin, reg, usbdiv;
-+       CLKPWR_HCLK_PLL_SETUP_T pllsetup;
-+
-+       /* Unlike other clocks, this clock has a KHz input rate, so bump
-+          it up to work with the PLL function */
-+       rate = rate * 1000;
-+
-+       local_usbpll_enable(clk, 0);
-+
-+       if (rate == 0)
-+               return 0;
-+
-+       clkin = clk->parent->rate;
-+       usbdiv = readl(CLKPWR_USBCLK_PDIV(CLKPWR_IOBASE)) + 1;
-+       clkin = clkin / usbdiv;
-+
-+       /* Try to find a good rate setup */
-+       if (local_clk_find_pll_cfg(clkin, rate, &pllsetup) == 0)
-+               return -EINVAL;
-+
-+       reg = readl(CLKPWR_USB_CTRL(CLKPWR_IOBASE));
-+       reg |= CLKPWR_USBCTRL_CLK_EN1;
-+       writel(reg, CLKPWR_USB_CTRL(CLKPWR_IOBASE));
-+
-+       pllsetup.analog_on = 1;
-+       local_clk_usbpll_setup(&pllsetup);
-+
-+       clk->rate = local_clk_check_pll_setup(clkin, &pllsetup);
-+
-+       reg = readl(CLKPWR_USB_CTRL(CLKPWR_IOBASE));
-+       reg |= CLKPWR_USBCTRL_CLK_EN2;
-+       writel(reg, CLKPWR_USB_CTRL(CLKPWR_IOBASE));
-+
-+       return 0;
-+}
-+
-+/* Derived system clock sources */
-+static struct clk clk_armpll = {
-+       .owner          = NULL,
-+       .parent         = &clk_sys,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_armpll_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = NULL,
-+       .get_rate       = &local_clk_get_st_rate,
-+       .enable         = &local_armpll_enable,
-+       .enable_reg     = 0,
-+       .enable_mask    = 0,
-+};
-+static struct clk clk_usbpll = {
-+       .owner          = NULL,
-+       .parent         = &osc_main,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_usbpll_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = NULL,
-+       .get_rate       = &local_clk_get_st_rate,
-+       .enable         = &local_usbpll_enable,
-+       .enable_reg     = 0,
-+       .enable_mask    = 0,
-+};
-+
-+static u32 clk_get_hclk_div(void) {
-+       static const u32 hclkdivs[4] = {1, 2, 4, 4};
-+       return hclkdivs[CLKPWR_HCLKDIV_DIV_2POW(
-+               readl(CLKPWR_HCLK_DIV(CLKPWR_IOBASE)))];
-+}
-+
-+/*
-+ * Set new HCLK bus divider value
-+ */
-+static int clk_set_hclk_div(struct clk *clk, u32 div)
-+{
-+       u32 hclkdiv = readl(CLKPWR_HCLK_DIV(CLKPWR_IOBASE));
-+
-+       hclkdiv &= ~CLKPWR_HCLKDIV_DIV_2POW(0x3);
-+       switch (div) {
-+       case 1:
-+       case 2:
-+               hclkdiv |= CLKPWR_HCLKDIV_DIV_2POW(div - 1);
-+               break;
-+
-+       case 4:
-+       default:
-+               hclkdiv |= CLKPWR_HCLKDIV_DIV_2POW(2);
-+               break;
-+       }
-+       writel(hclkdiv, CLKPWR_HCLK_DIV(CLKPWR_IOBASE));
-+
-+       return 0;
-+}
-+
-+static u32 local_hclk_get_rate(struct clk *clk)
-+{
-+       return clk->parent->rate / clk_get_hclk_div();
-+}
-+
-+u32 clk_get_pclk_div(void)
-+{
-+       return (1 + ((readl(CLKPWR_HCLK_DIV(CLKPWR_IOBASE)) >> 2) &
-+               0x1F));
-+}
-+
-+/*
-+ * Set new PCLK bus divider value
-+ */
-+static int clk_set_pclk_div(struct clk *clk, u32 div)
-+{
-+       u32 hclkdiv = readl(CLKPWR_HCLK_DIV(CLKPWR_IOBASE));
-+
-+       hclkdiv &= ~CLKPWR_HCLKDIV_PCLK_DIV(0x1F);
-+       if (div > 32)
-+               div = 32;
-+
-+       hclkdiv |= CLKPWR_HCLKDIV_PCLK_DIV(div - 1);
-+       writel(hclkdiv, CLKPWR_HCLK_DIV(CLKPWR_IOBASE));
-+
-+       return 0;
-+}
-+
-+static u32 local_pclk_get_rate(struct clk *clk)
-+{
-+       return clk->parent->rate / clk_get_pclk_div();
-+}
-+
-+/* Bus clocks */
-+static struct clk clk_hclk = {
-+       .owner          = NULL,
-+       .parent         = &clk_armpll,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &clk_set_hclk_div,
-+       .set_parent     = NULL,
-+       .round_rate     = NULL,
-+       .get_rate       = &local_hclk_get_rate,
-+       .enable         = &local_clk_dummy_enable,
-+       .enable_reg     = 0,
-+       .enable_mask    = 0,
-+};
-+static struct clk clk_pclk = {
-+       .owner          = NULL,
-+       .parent         = &clk_armpll,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &clk_set_pclk_div,
-+       .set_parent     = NULL,
-+       .round_rate     = NULL,
-+       .get_rate       = &local_pclk_get_rate,
-+       .enable         = &local_clk_dummy_enable,
-+       .enable_reg     = 0,
-+};
-+
-+static int local_onoff_set_rate(struct clk *clk, u32 rate)
-+{
-+       u32 tmp;
-+
-+       tmp = readl(clk->enable_reg);
-+
-+       if (rate == 0)
-+               tmp &= ~clk->enable_mask;
-+       else
-+               tmp |= clk->enable_mask;
-+
-+       writel(tmp, clk->enable_reg);
-+
-+       return 0;
-+}
-+
-+static u32 local_get_periph_rate(struct clk *clk)
-+{
-+       u32 tmp;
-+
-+       tmp = readl(clk->enable_reg) & clk->enable_mask;
-+
-+       if (!tmp)
-+               return 0;
-+
-+       if (clk->parent != NULL) {
-+               /* If the parent clock has a get_rate function, call it */
-+               if (clk->parent->get_rate != NULL)
-+                       return clk->parent->get_rate(clk->parent);
-+
-+               return clk->parent->rate;
-+       }
-+
-+       return 1;
-+}
-+
-+/* This function is required for drivers that expect a clock rate even
-+ * when the clock is disabled */
-+static u32 local_get_byp_periph_rate(struct clk *clk)
-+{
-+       if (clk->parent != NULL) {
-+               /* If the parent clock has a get_rate function, call it */
-+               if (clk->parent->get_rate != NULL)
-+                       return clk->parent->get_rate(clk->parent);
-+
-+               return clk->parent->rate;
-+       }
-+
-+       return 1;
-+}
-+
-+static int local_onoff_enable(struct clk *clk, int enable)
-+{
-+       return local_onoff_set_rate(clk, enable);
-+}
-+
-+static u32 local_onoff_round_rate(struct clk *clk, u32 rate)
-+{
-+       return (rate ? 1 : 0);
-+}
-+
-+/* Peripheral clock sources */
-+static struct clk clk_timer0 = {
-+       .owner          = NULL,
-+       .parent         = &clk_pclk,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_onoff_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &local_get_periph_rate,
-+       .enable         = &local_onoff_enable,
-+       .enable_reg     = CLKPWR_TIMERS_PWMS_CLK_CTRL_1(CLKPWR_IOBASE),
-+       .enable_mask    = CLKPWR_TMRPWMCLK_TIMER0_EN,
-+};
-+static struct clk clk_timer1 = {
-+       .owner          = NULL,
-+       .parent         = &clk_pclk,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_onoff_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &local_get_periph_rate,
-+       .enable         = &local_onoff_enable,
-+       .enable_reg     = CLKPWR_TIMERS_PWMS_CLK_CTRL_1(CLKPWR_IOBASE),
-+       .enable_mask    = CLKPWR_TMRPWMCLK_TIMER1_EN,
-+};
-+static struct clk clk_timer2 = {
-+       .owner          = NULL,
-+       .parent         = &clk_pclk,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_onoff_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &local_get_periph_rate,
-+       .enable         = &local_onoff_enable,
-+       .enable_reg     = CLKPWR_TIMERS_PWMS_CLK_CTRL_1(CLKPWR_IOBASE),
-+       .enable_mask    = CLKPWR_TMRPWMCLK_TIMER2_EN,
-+};
-+static struct clk clk_timer3 = {
-+       .owner          = NULL,
-+       .parent         = &clk_pclk,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_onoff_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &local_get_periph_rate,
-+       .enable         = &local_onoff_enable,
-+       .enable_reg     = CLKPWR_TIMERS_PWMS_CLK_CTRL_1(CLKPWR_IOBASE),
-+       .enable_mask    = CLKPWR_TMRPWMCLK_TIMER3_EN,
-+};
-+static struct clk clk_wdt = {
-+       .owner          = NULL,
-+       .parent         = &clk_pclk,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_onoff_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &local_get_periph_rate,
-+       .enable         = &local_onoff_enable,
-+       .enable_reg     = CLKPWR_TIMER_CLK_CTRL(CLKPWR_IOBASE),
-+       .enable_mask    = CLKPWR_PWMCLK_WDOG_EN,
-+};
-+static struct clk clk_vfp9 = {
-+       .owner          = NULL,
-+       .parent         = &clk_pclk,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_onoff_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &local_get_periph_rate,
-+       .enable         = &local_onoff_enable,
-+       .enable_reg     = CLKPWR_DEBUG_CTRL(CLKPWR_IOBASE),
-+       .enable_mask    = CLKPWR_VFP_CLOCK_ENABLE_BIT,
-+};
-+static struct clk clk_dma = {
-+       .owner          = NULL,
-+       .parent         = &clk_hclk,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_onoff_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &local_get_periph_rate,
-+       .enable         = &local_onoff_enable,
-+       .enable_reg     = CLKPWR_DMA_CLK_CTRL(CLKPWR_IOBASE),
-+       .enable_mask    = CLKPWR_DMACLKCTRL_CLK_EN,
-+};
-+
-+static struct clk clk_uart3 = {
-+       .owner          = NULL,
-+       .parent         = &clk_pclk,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_onoff_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &local_get_periph_rate,
-+       .enable         = &local_onoff_enable,
-+       .enable_reg     = CLKPWR_UART_CLK_CTRL(CLKPWR_IOBASE),
-+       .enable_mask    = CLKPWR_UARTCLKCTRL_UART3_EN,
-+};
-+
-+static struct clk clk_uart4 = {
-+       .owner          = NULL,
-+       .parent         = &clk_pclk,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_onoff_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &local_get_periph_rate,
-+       .enable         = &local_onoff_enable,
-+       .enable_reg     = CLKPWR_UART_CLK_CTRL(CLKPWR_IOBASE),
-+       .enable_mask    = CLKPWR_UARTCLKCTRL_UART4_EN,
-+};
-+
-+static struct clk clk_uart5 = {
-+       .owner          = NULL,
-+       .parent         = &clk_pclk,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_onoff_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &local_get_periph_rate,
-+       .enable         = &local_onoff_enable,
-+       .enable_reg     = CLKPWR_UART_CLK_CTRL(CLKPWR_IOBASE),
-+       .enable_mask    = CLKPWR_UARTCLKCTRL_UART5_EN,
-+};
-+
-+static struct clk clk_uart6 = {
-+       .owner          = NULL,
-+       .parent         = &clk_pclk,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_onoff_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &local_get_periph_rate,
-+       .enable         = &local_onoff_enable,
-+       .enable_reg     = CLKPWR_UART_CLK_CTRL(CLKPWR_IOBASE),
-+       .enable_mask    = CLKPWR_UARTCLKCTRL_UART6_EN,
-+};
-+
-+static struct clk clk_i2c0 = {
-+       .owner          = NULL,
-+       .parent         = &clk_hclk,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_onoff_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &local_get_periph_rate,
-+       .enable         = &local_onoff_enable,
-+       .enable_reg     = CLKPWR_I2C_CLK_CTRL(CLKPWR_IOBASE),
-+       .enable_mask    = CLKPWR_I2CCLK_I2C1CLK_EN,
-+};
-+
-+static struct clk clk_i2c1 = {
-+       .owner          = NULL,
-+       .parent         = &clk_hclk,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_onoff_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &local_get_periph_rate,
-+       .enable         = &local_onoff_enable,
-+       .enable_reg     = CLKPWR_I2C_CLK_CTRL(CLKPWR_IOBASE),
-+       .enable_mask    = CLKPWR_I2CCLK_I2C2CLK_EN,
-+};
-+
-+static struct clk clk_i2c2 = {
-+       .owner          = NULL,
-+       .parent         = &clk_pclk,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_onoff_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &local_get_periph_rate,
-+       .enable         = &local_onoff_enable,
-+       .enable_reg     = USB_OTG_IOBASE + 0xFF4,
-+       .enable_mask    = 0x4,
-+};
-+
-+/* The AMBA pl022 driver expects a non-0 clock rate even if the clock is
-+ * enabled. The get_rate functions for these clocks will not check the
-+ * enable flag and will return the 'expected' frequency even if the clock
-+ * is disabled. */
-+static struct clk clk_ssp0 = {
-+       .owner          = NULL,
-+       .parent         = &clk_hclk,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_onoff_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &local_get_byp_periph_rate,
-+       .enable         = &local_onoff_enable,
-+       .enable_reg     = CLKPWR_SSP_CLK_CTRL(CLKPWR_IOBASE),
-+       .enable_mask    = CLKPWR_SSPCTRL_SSPCLK0_EN,
-+};
-+static struct clk clk_ssp1 = {
-+       .owner          = NULL,
-+       .parent         = &clk_hclk,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_onoff_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &local_get_byp_periph_rate,
-+       .enable         = &local_onoff_enable,
-+       .enable_reg     = CLKPWR_SSP_CLK_CTRL(CLKPWR_IOBASE),
-+       .enable_mask    = CLKPWR_SSPCTRL_SSPCLK1_EN,
-+};
-+
-+static struct clk clk_kscan = {
-+       .owner          = NULL,
-+       .parent         = &osc_32KHz,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_onoff_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &local_get_periph_rate,
-+       .enable         = &local_onoff_enable,
-+       .enable_reg     = CLKPWR_KEY_CLK_CTRL(CLKPWR_IOBASE),
-+       .enable_mask    = CLKPWR_KEYCLKCTRL_CLK_EN,
-+};
-+
-+static struct clk clk_nand = {
-+       .owner          = NULL,
-+       .parent         = &clk_hclk,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_onoff_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &local_get_periph_rate,
-+       .enable         = &local_onoff_enable,
-+       .enable_reg     = CLKPWR_NAND_CLK_CTRL(CLKPWR_IOBASE),
-+       .enable_mask    = CLKPWR_NANDCLK_SLCCLK_EN,
-+};
-+
-+static struct clk clk_i2s0 = {
-+       .owner          = NULL,
-+       .parent         = &clk_hclk,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_onoff_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &local_get_periph_rate,
-+       .enable         = &local_onoff_enable,
-+       .enable_reg     = CLKPWR_I2S_CLK_CTRL(CLKPWR_IOBASE),
-+       .enable_mask    = CLKPWR_I2SCTRL_I2SCLK0_EN,
-+};
-+static struct clk clk_i2s1 = {
-+       .owner          = NULL,
-+       .parent         = &clk_hclk,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_onoff_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &local_get_periph_rate,
-+       .enable         = &local_onoff_enable,
-+       .enable_reg     = CLKPWR_I2S_CLK_CTRL(CLKPWR_IOBASE),
-+       .enable_mask    = CLKPWR_I2SCTRL_I2SCLK1_EN,
-+};
-+
-+static int tsc_onoff_enable(struct clk *clk, int enable)
-+{
-+       u32 tmp;
-+
-+       /* Make sure 32KHz clock is the selected clock */
-+       tmp = readl(CLKPWR_ADC_CLK_CTRL_1(CLKPWR_IOBASE));
-+       tmp &= ~CLKPWR_ADCCTRL1_PCLK_SEL;
-+       writel(tmp, CLKPWR_ADC_CLK_CTRL_1(CLKPWR_IOBASE));
-+
-+       if (enable == 0)
-+               writel(0, clk->enable_reg);
-+       else
-+               writel(clk->enable_mask, clk->enable_reg);
-+
-+       return 0;
-+}
-+
-+static int tsc_set_rate(struct clk *clk, u32 rate)
-+{
-+       return tsc_onoff_enable(clk, rate);
-+}
-+
-+static struct clk clk_tsc = {
-+       .owner          = NULL,
-+       .parent         = &osc_32KHz,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &tsc_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &local_get_periph_rate,
-+       .enable         = &tsc_onoff_enable,
-+       .enable_reg     = CLKPWR_ADC_CLK_CTRL(CLKPWR_IOBASE),
-+       .enable_mask    = CLKPWR_ADC32CLKCTRL_CLK_EN,
-+};
-+
-+static int mmc_onoff_enable(struct clk *clk, int enable)
-+{
-+       u32 tmp;
-+
-+       tmp = readl(CLKPWR_MS_CTRL(CLKPWR_IOBASE)) &
-+               ~(CLKPWR_MSCARD_SDCARD_EN|CLKPWR_MSCARD_SDCARD_DIV(15));
-+
-+       /* If rate is 0, disable clock */
-+       if (enable != 0)
-+               tmp |= CLKPWR_MSCARD_SDCARD_EN | CLKPWR_MSCARD_SDCARD_DIV(1);
-+
-+       writel(tmp, CLKPWR_MS_CTRL(CLKPWR_IOBASE));
-+
-+       return 0;
-+}
-+
-+static u32 mmc_get_rate(struct clk *clk)
-+{
-+       u32 div, tmp, rate;
-+
-+       div = readl(CLKPWR_MS_CTRL(CLKPWR_IOBASE));
-+       tmp = div & CLKPWR_MSCARD_SDCARD_EN;
-+
-+       if (!tmp)
-+               return 0;
-+
-+       /* Get the parent clock rate */
-+       rate = clk->parent->get_rate(clk->parent);
-+
-+       /* Get the LCD controller clock divider value */
-+       div = div & 0xF;
-+
-+       if (!div)
-+               return 0;
-+
-+       tmp = rate / div;
-+
-+       return tmp;
-+}
-+static int mmc_set_rate(struct clk *clk, u32 rate)
-+{
-+       if (rate == 0)
-+               mmc_onoff_enable(clk, 0);
-+       else
-+               mmc_onoff_enable(clk, 1);
-+
-+       return 0;
-+}
-+static struct clk clk_mmc = {
-+       .owner          = NULL,
-+       .parent         = &clk_armpll,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &mmc_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &mmc_get_rate,
-+       .enable         = &mmc_onoff_enable,
-+       .enable_reg     = CLKPWR_MS_CTRL(CLKPWR_IOBASE),
-+       .enable_mask    = CLKPWR_MSCARD_SDCARD_EN,
-+};
-+
-+static struct clk clk_net = {
-+       .owner          = NULL,
-+       .parent         = &clk_hclk,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_onoff_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &local_get_periph_rate,
-+       .enable         = &local_onoff_enable,
-+       .enable_reg     = CLKPWR_MACCLK_CTRL(CLKPWR_IOBASE),
-+       .enable_mask    = (CLKPWR_MACCTRL_DMACLK_EN |
-+               CLKPWR_MACCTRL_MMIOCLK_EN | CLKPWR_MACCTRL_HRCCLK_EN),
-+};
-+
-+static u32 clcd_get_rate(struct clk *clk)
-+{
-+       u32 tmp, div, rate;
-+
-+       tmp = readl(CLKPWR_LCDCLK_CTRL(CLKPWR_IOBASE)) &
-+               CLKPWR_LCDCTRL_CLK_EN;
-+
-+       if (!tmp)
-+               return 0;
-+
-+       rate = clk->parent->get_rate(clk->parent);
-+       tmp = readl((io_p2v(LCD_BASE)) + CLCD_TIM2);
-+
-+       /* Only supports internal clocking */
-+       if (tmp & TIM2_BCD)
-+               return rate;
-+
-+       div = (tmp & 0x1F) | ((tmp & 0xF8) >> 22);
-+       tmp = rate / (2 + div);
-+
-+       return tmp;
-+}
-+
-+static int clcd_set_rate(struct clk *clk, u32 rate)
-+{
-+       u32 tmp, prate, div;
-+
-+       tmp = readl((io_p2v(LCD_BASE)) + CLCD_TIM2);
-+       prate = clk->parent->get_rate(clk->parent);
-+
-+       if (rate == 0)
-+               local_onoff_enable(clk, 0);
-+       else if (rate == prate) {
-+               tmp |= TIM2_BCD;
-+               local_onoff_enable(clk, 1);
-+       }
-+       else {
-+               /* Find closest divider */
-+               div = prate / rate;
-+               if (div == 1)
-+                       div = 0;
-+               else
-+                       div -= 2;
-+
-+               tmp &= ~(0xF800001F);
-+               tmp &= ~TIM2_BCD;
-+               tmp |= (div & 0x1F);
-+               tmp |= (((div >> 5) & 0x1F) << 27);
-+               writel(tmp, ((io_p2v(LCD_BASE)) + CLCD_TIM2));
-+               local_onoff_enable(clk, 1);
-+       }
-+
-+       return 0;
-+}
-+static struct clk clk_lcd = {
-+       .owner          = NULL,
-+       .parent         = &clk_hclk,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &clcd_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &clcd_get_rate,
-+       .enable         = &local_onoff_enable,
-+       .enable_reg     = CLKPWR_LCDCLK_CTRL(CLKPWR_IOBASE),
-+       .enable_mask    = CLKPWR_LCDCTRL_CLK_EN,
-+};
-+
-+static struct clk clk_usbd = {
-+       .owner          = NULL,
-+       .parent         = &clk_usbpll,
-+       .rate           = 0,
-+       .flags          = 0,
-+       .usecount       = 0,
-+       .set_rate       = &local_onoff_set_rate,
-+       .set_parent     = NULL,
-+       .round_rate     = &local_onoff_round_rate,
-+       .get_rate       = &local_get_periph_rate,
-+       .enable         = &local_onoff_enable,
-+       .enable_reg     = CLKPWR_USB_CTRL(CLKPWR_IOBASE),
-+       .enable_mask    = CLKPWR_USBCTRL_HCLK_EN,
-+};
-+
-+static inline void clk_lock(void)
-+{
-+       local_irq_disable();
-+}
-+
-+static inline void clk_unlock(void)
-+{
-+       local_irq_enable();
-+}
-+
-+static int local_clk_enable(struct clk *clk)
-+{
-+       int ret = 0;
-+
-+       if (clk->parent != NULL)
-+               ret = local_clk_enable(clk->parent);
-+
-+       if (clk->usecount == 0)
-+               clk->enable(clk, 1);
-+
-+       clk->usecount++;
-+
-+       return ret;
-+}
-+
-+static int local_clk_disable(struct clk *clk)
-+{
-+       int ret = 0;
-+
-+       clk->usecount--;
-+
-+       if (clk->usecount == 0)
-+               clk->enable(clk, 0);
-+
-+       if ((clk->parent != NULL) && (ret == 0))
-+               ret = local_clk_disable(clk->parent);
-+
-+       return ret;
-+}
-+
-+static unsigned long local_clk_get_rate(struct clk *clk)
-+{
-+       if (clk->rate != 0)
-+               return clk->rate;
-+
-+       if (clk->get_rate != NULL)
-+               return (clk->get_rate)(clk);
-+
-+       if (clk->parent != NULL)
-+               return local_clk_get_rate(clk->parent);
-+
-+       return 0;
-+}
-+
-+/*
-+ * clk_enable - inform the system when the clock source should be running.
-+ */
-+int clk_enable(struct clk *clk)
-+{
-+       int ret;
-+
-+       if ((IS_ERR(clk)) || (clk == NULL))
-+               return -ENODEV;
-+
-+       clk_lock();
-+       ret = local_clk_enable(clk);
-+       clk_unlock();
-+
-+       return ret;
-+}
-+
-+/*
-+ * clk_disable - inform the system when the clock source is no longer required
-+ */
-+void clk_disable(struct clk *clk)
-+{
-+       if ((IS_ERR(clk)) || (clk == NULL))
-+               return;
-+
-+       clk_lock();
-+       local_clk_disable(clk);
-+       clk_unlock();
-+}
-+
-+/*
-+ * clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
-+ *               This is only valid once the clock source has been enabled
-+ */
-+unsigned long clk_get_rate(struct clk *clk)
-+{
-+       unsigned long rate = 0;
-+
-+       if (!IS_ERR(clk))
-+               rate = local_clk_get_rate(clk);
-+
-+       return rate;
-+}
-+
-+/*
-+ * clk_round_rate - adjust a rate to the exact rate a clock can provide
-+ */
-+long clk_round_rate(struct clk *clk, unsigned long rate)
-+{
-+       if (!IS_ERR(clk)) {
-+               clk_lock();
-+               rate = clk->round_rate(clk, rate);
-+               clk_unlock();
-+       }
-+       else
-+               rate = 0;
-+
-+       return rate;
-+}
-+
-+/*
-+ * clk_set_rate - set the clock rate for a clock source
-+ */
-+int clk_set_rate(struct clk *clk, unsigned long rate)
-+{
-+       int ret = -ENODEV;
-+
-+       if (!IS_ERR(clk)) {
-+               clk_lock();
-+               ret = (clk->set_rate)(clk, rate);
-+               clk_unlock();
-+       }
-+
-+       return ret;
-+}
-+
-+/*
-+ * clk_set_parent - set the parent clock source for this clock
-+ */
-+int clk_set_parent(struct clk *clk, struct clk *parent)
-+{
-+       int ret = -ENODEV;
-+
-+       if (!IS_ERR(clk)) {
-+               if (!clk->set_parent) {
-+                       clk_lock();
-+                       ret = clk->set_parent(clk, parent);
-+                       clk_unlock();
-+               }
-+       }
-+
-+       return ret;
-+}
-+
-+/*
-+ * clk_get_parent - get the parent clock source for this clock
-+ */
-+struct clk *clk_get_parent(struct clk *clk)
-+{
-+       return clk->parent;
-+}
-+
-+EXPORT_SYMBOL(clk_disable);
-+EXPORT_SYMBOL(clk_enable);
-+EXPORT_SYMBOL(clk_get_rate);
-+EXPORT_SYMBOL(clk_round_rate);
-+EXPORT_SYMBOL(clk_set_rate);
-+EXPORT_SYMBOL(clk_set_parent);
-+EXPORT_SYMBOL(clk_get_parent);
-+
-+static void clk_inc_counts(struct clk *clk)
-+{
-+       clk->usecount++;
-+
-+       if (clk->parent != NULL)
-+               clk_inc_counts(clk->parent);
-+}
-+
-+int clk_is_sysclk_mainosc(void)
-+{
-+       u32 reg;
-+
-+       /* Update PLL397 or main osc use count and parent based on
-+          current SYSCLK selection */
-+       reg = readl(CLKPWR_SYSCLK_CTRL(CLKPWR_IOBASE));
-+       if ((reg & CLKPWR_SYSCTRL_SYSCLKMUX) == 0)
-+               return 1;
-+
-+       return 0;
-+}
-+
-+#define _REGISTER_CLOCK(d, n, c) \
-+       { \
-+               .dev_id = d, \
-+               .con_id = n, \
-+               .clk = &c, \
++static struct clcd_panel conn_lcd_panel = {
++       .mode           = {
++               .name           = "QVGA portrait",
++               .refresh        = 60,
++               .xres           = 240,
++               .yres           = 320,
++               .pixclock       = 191828,
++               .left_margin    = 22,
++               .right_margin   = 11,
++               .upper_margin   = 2,
++               .lower_margin   = 1,
++               .hsync_len      = 5,
++               .vsync_len      = 2,
++               .sync           = 0,
++               .vmode          = FB_VMODE_NONINTERLACED,
 +       },
-+static struct clk_lookup lookups[] __initdata = {
-+       _REGISTER_CLOCK(NULL, "osc_32KHz", osc_32KHz)
-+       _REGISTER_CLOCK(NULL, "osc_pll397", osc_pll397)
-+       _REGISTER_CLOCK(NULL, "osc_main", osc_main)
-+       _REGISTER_CLOCK(NULL, "sys_ck", clk_sys)
-+       _REGISTER_CLOCK(NULL, "arm_pll_ck", clk_armpll)
-+       _REGISTER_CLOCK(NULL, "ck_pll5", clk_usbpll)
-+       _REGISTER_CLOCK(NULL, "hclk_ck", clk_hclk)
-+       _REGISTER_CLOCK(NULL, "pclk_ck", clk_pclk)
-+       _REGISTER_CLOCK(NULL, "timer0_ck", clk_timer0)
-+       _REGISTER_CLOCK(NULL, "timer1_ck", clk_timer1)
-+       _REGISTER_CLOCK(NULL, "timer2_ck", clk_timer2)
-+       _REGISTER_CLOCK(NULL, "timer3_ck", clk_timer3)
-+       _REGISTER_CLOCK(NULL, "vfp9_ck", clk_vfp9)
-+       _REGISTER_CLOCK(NULL, "clk_dmac", clk_dma)
-+       _REGISTER_CLOCK("watchdog", NULL, clk_wdt)
-+       _REGISTER_CLOCK(NULL, "uart3_ck", clk_uart3)
-+       _REGISTER_CLOCK(NULL, "uart4_ck", clk_uart4)
-+       _REGISTER_CLOCK(NULL, "uart5_ck", clk_uart5)
-+       _REGISTER_CLOCK(NULL, "uart6_ck", clk_uart6)
-+       _REGISTER_CLOCK("pnx-i2c.0", NULL, clk_i2c0)
-+       _REGISTER_CLOCK("pnx-i2c.1", NULL, clk_i2c1)
-+       _REGISTER_CLOCK("pnx-i2c.2", NULL, clk_i2c2)
-+       _REGISTER_CLOCK("dev:ssp0", NULL, clk_ssp0)
-+       _REGISTER_CLOCK("dev:ssp1", NULL, clk_ssp1)
-+       _REGISTER_CLOCK("lpc32xx_keys.0", NULL, clk_kscan)
-+       _REGISTER_CLOCK("lpc32xx-nand.0", "nand_ck", clk_nand)
-+       _REGISTER_CLOCK("tbd", "i2s0_ck", clk_i2s0)
-+       _REGISTER_CLOCK("tbd", "i2s1_ck", clk_i2s1)
-+       _REGISTER_CLOCK("lpc32xx-ts", NULL, clk_tsc)
-+       _REGISTER_CLOCK("dev:mmc0", "MCLK", clk_mmc)
-+       _REGISTER_CLOCK("lpc-net.0", NULL, clk_net)
-+       _REGISTER_CLOCK("dev:clcd", NULL, clk_lcd)
-+       _REGISTER_CLOCK("lpc32xx_udc", "ck_usbd", clk_usbd)
++       .width          = -1,
++       .height         = -1,
++       .tim2           = (TIM2_IVS | TIM2_IHS),
++       .cntl           = (CNTL_BGR | CNTL_LCDTFT | CNTL_LCDVCOMP(1) |
++                               CNTL_LCDBPP16_565),
++       .bpp            = 16,
++};
++#define PANEL_SIZE (3 * SZ_64K)
++
++static int lpc32xx_clcd_setup(struct clcd_fb *fb)
++{
++       dma_addr_t dma;
++
++       fb->fb.screen_base = (void *) NULL;
++#if defined(CONFIG_MACH_LPC32XX_IRAM_FOR_CLCD)
++       if (PANEL_SIZE <= LPC32XX_IRAM_SIZE) {
++               fb->fb.screen_base = (void *) io_p2v(IRAM_BASE);
++               fb->fb.fix.smem_start = (dma_addr_t) IRAM_BASE;
++       }
++#endif
++
++       if (fb->fb.screen_base == NULL) {
++               fb->fb.screen_base = dma_alloc_writecombine(&fb->dev->dev,
++                       PANEL_SIZE, &dma, GFP_KERNEL);
++               fb->fb.fix.smem_start = dma;
++       }
++
++       if (!fb->fb.screen_base) {
++               printk(KERN_ERR "CLCD: unable to map framebuffer\n");
++               return -ENOMEM;
++       }
++
++       fb->fb.fix.smem_len = PANEL_SIZE;
++       fb->panel = &conn_lcd_panel;
++
++       gpio_request(LCD_POWER_GPIO, "LCD power");
++       gpio_direction_output(LCD_POWER_GPIO, 1);
++       gpio_request(BKL_POWER_GPIO, "LCD backlight power");
++       gpio_direction_output(BKL_POWER_GPIO, 1);
++
++       return 0;
++}
++
++static int lpc32xx_clcd_mmap(struct clcd_fb *fb, struct vm_area_struct *vma)
++{
++#if defined(CONFIG_MACH_LPC32XX_IRAM_FOR_CLCD)
++       if (PANEL_SIZE <= LPC32XX_IRAM_SIZE) {
++               vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
++               if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
++                       (vma->vm_end - vma->vm_start), vma->vm_page_prot)) {
++                       return -EAGAIN;
++               }
++
++               return 0;
++       }
++       else
++#endif
++
++       return dma_mmap_writecombine(&fb->dev->dev, vma,
++                                    fb->fb.screen_base,
++                                    fb->fb.fix.smem_start,
++                                    fb->fb.fix.smem_len);
++}
++
++static void lpc32xx_clcd_remove(struct clcd_fb *fb)
++{
++#if defined(CONFIG_MACH_LPC32XX_IRAM_FOR_CLCD)
++       if (PANEL_SIZE > LPC32XX_IRAM_SIZE)
++#endif
++
++       dma_free_writecombine(&fb->dev->dev, fb->fb.fix.smem_len,
++                             fb->fb.screen_base, fb->fb.fix.smem_start);
++}
++
++#if defined (CONFIG_PHY3250_QVGA_PANEL_1307_0)
++#define LCD_BKL_ON     0
++#define LCD_BKL_OFF    1
++#elif defined (CONFIG_PHY3250_QVGA_PANEL_1307_1)
++#define LCD_BKL_ON     1
++#define LCD_BKL_OFF    0
++#endif
++
++static void clcd_disable(struct clcd_fb *fb)
++{
++       gpio_set_value(BKL_POWER_GPIO, LCD_BKL_OFF);
++       gpio_set_value(LCD_POWER_GPIO, 0);
++}
++
++static void clcd_enable(struct clcd_fb *fb)
++{
++       gpio_set_value(BKL_POWER_GPIO, LCD_BKL_ON);
++       gpio_set_value(LCD_POWER_GPIO, 1);
++}
++
++static struct clcd_board lpc32xx_clcd_data = {
++       .name           = "Phytec LCD",
++       .check          = clcdfb_check,
++       .decode         = clcdfb_decode,
++       .disable        = clcd_disable,
++       .enable         = clcd_enable,
++       .setup          = lpc32xx_clcd_setup,
++       .mmap           = lpc32xx_clcd_mmap,
++       .remove         = lpc32xx_clcd_remove,
 +};
 +
-+int __init clk_init(void)
++static struct amba_device clcd_device = {
++       .dev                            = {
++               .coherent_dma_mask      = ~0,
++               .init_name              = "dev:clcd",
++               .platform_data          = &lpc32xx_clcd_data,
++       },
++       .res                            = {
++               .start                  = LCD_BASE,
++               .end                    = (LCD_BASE + SZ_4K - 1),
++               .flags                  = IORESOURCE_MEM,
++       },
++       .dma_mask                       = ~0,
++       .irq                            = {IRQ_LCD, NO_IRQ},
++};
++
++/*
++ * AMBA SSP (SPI)
++ */
++static void phy3250_spi_cs_set(u32 control)
 +{
-+       u32 reg;
++       gpio_set_value(SPI0_CS_GPIO, (int) control);
++}
++
++static struct pl022_config_chip spi0_chip_info = {
++       .lbm                    = LOOPBACK_DISABLED,
++       .com_mode               = POLLING_TRANSFER,
++       .iface                  = SSP_INTERFACE_MOTOROLA_SPI,
++       .hierarchy              = SSP_SLAVE,
++       .slave_tx_disable       = 0,
++       .endian_tx              = SSP_TX_LSB,
++       .endian_rx              = SSP_RX_LSB,
++       .data_size              = SSP_DATA_BITS_8,
++       .rx_lev_trig            = SSP_RX_8_OR_MORE_ELEM,
++       .tx_lev_trig            = SSP_TX_8_OR_MORE_EMPTY_LOC,
++       .clk_phase              = SSP_CLK_SECOND_EDGE,
++       .clk_pol                = SSP_CLK_POL_IDLE_LOW,
++       .ctrl_len               = SSP_BITS_8,
++       .wait_state             = SSP_MWIRE_WAIT_ZERO,
++       .duplex                 = SSP_MICROWIRE_CHANNEL_FULL_DUPLEX,
++       .cs_control             = phy3250_spi_cs_set,
++};
++
++static struct pl022_ssp_controller lpc32xx_ssp0_data = {
++       .bus_id                 = 0,
++       .num_chipselect         = 1,
++       .enable_dma             = 0
++};
++
++static struct amba_device ssp0_device = {
++       .dev                            = {
++               .coherent_dma_mask      = ~0,
++               .init_name              = "dev:ssp0",
++               .platform_data          = &lpc32xx_ssp0_data,
++       },
++       .res                            = {
++               .start                  = SSP0_BASE,
++               .end                    = (SSP0_BASE + SZ_4K - 1),
++               .flags                  = IORESOURCE_MEM,
++       },
++       .dma_mask                       = ~0,
++       .irq                            = {IRQ_SSP0, NO_IRQ},
++};
++
++/* AT25 driver registration */
++static int __init phy3250_spi_board_register(void)
++{
++#if defined(CONFIG_SPI_SPIDEV) || defined(CONFIG_SPI_SPIDEV_MODULE)
++       struct spi_board_info info[] = {
++               {
++                       .modalias = "spidev",
++                       .max_speed_hz = 5000000,
++                       .bus_num = 0,
++                       .chip_select = 0,
++                       .controller_data = &spi0_chip_info,
++               },
++       };
++
++#else
++       static struct spi_eeprom eeprom = {
++               .name = "at25256a",
++               .byte_len = 0x8000,
++               .page_size = 64,
++               .flags = EE_ADDR2,
++       };
++       struct spi_board_info info[] = {
++               {
++                       .modalias = "at25",
++                       .max_speed_hz = 5000000,
++                       .bus_num = 0,
++                       .chip_select = 0,
++                       .platform_data = &eeprom,
++                       .controller_data = &spi0_chip_info,
++               },
++       };
++#endif
++       return spi_register_board_info(info, ARRAY_SIZE(info));
++}
++arch_initcall(phy3250_spi_board_register);
++
++/*
++ * USB OHCI
++ */
++static u64 ohci_dmamask = ~(u32) 0;
++static struct resource ohci_resources[] = {
++       {
++               .start = IO_ADDRESS(USB_BASE),
++               .end = IO_ADDRESS(USB_BASE + 0x100),
++               .flags = IORESOURCE_MEM,
++       }, {
++               .start = IRQ_USB_HOST,
++               .flags = IORESOURCE_IRQ,
++       },
++};
++
++struct platform_device ohci_device = {
++       .name = "usb-ohci",
++       .id = -1,
++       .dev = {
++               .dma_mask = &ohci_dmamask,
++               .coherent_dma_mask = 0xFFFFFFFF,
++               },
++       .num_resources = ARRAY_SIZE(ohci_resources),
++       .resource = ohci_resources,
++};
++
++static struct i2c_board_info __initdata phy3250_i2c_board_info [] = {
++       {
++               I2C_BOARD_INFO("rtc-pcf8563", 0x51),
++       },
++};
++
++static struct gpio_led phy_leds[] = {
++       {
++               .name                   = "led0",
++               .gpio                   = LED_GPIO,
++               .active_low             = 1,
++               .default_trigger        = "heartbeat",
++       },
++};
++
++static struct gpio_led_platform_data led_data = {
++       .leds = phy_leds,
++       .num_leds = ARRAY_SIZE(phy_leds),
++};
++
++static struct platform_device lpc32xx_gpio_led_device = {
++       .name                   = "leds-gpio",
++       .id                     = -1,
++       .dev.platform_data      = &led_data,
++};
++
++static struct platform_device* phy3250_devs[] __initdata = {
++       &i2c0_device,
++       &i2c2_device,
++       &watchdog_device,
++       &lpc32xx_gpio_led_device,
++};
++
++static struct amba_device *amba_devs[] __initdata = {
++       &clcd_device,
++       &ssp0_device,
++};
++
++/*
++ * Board specific functions
++ */
++static void __init phy3250_board_init(void)
++{
++       u32 tmp;
 +       int i;
 +
-+       /* Set initial rates for PLL397 and main oscillator */
-+       reg = readl(CLKPWR_PLL397_CTRL(CLKPWR_IOBASE));
-+       if ((reg & CLKPWR_SYSCTRL_PLL397_DIS) != 0)
-+               osc_pll397.rate = 0;
-+       else {
-+               osc_pll397.rate = 397 * osc_32KHz.rate;
-+               clk_inc_counts(&osc_32KHz);
++       /* Setup clocks and gpios before anything else! */
++       clk_init();
++       lpc32xx_gpio_init();
++
++       /* Register GPIOs used on this board */
++       gpio_request(SPI0_CS_GPIO, "spi0 cs");
++       gpio_direction_output(SPI0_CS_GPIO, 1);
++
++       /* Setup network interface for RMII mode */
++       tmp = readl(CLKPWR_MACCLK_CTRL(CLKPWR_IOBASE));
++       tmp &= ~CLKPWR_MACCTRL_PINS_MSK;
++       tmp |= CLKPWR_MACCTRL_USE_RMII_PINS;
++       writel(tmp, CLKPWR_MACCLK_CTRL(CLKPWR_IOBASE));
++
++       /* Setup SLC NAND controller muxing */
++       writel(CLKPWR_NANDCLK_SEL_SLC,
++               CLKPWR_NAND_CLK_CTRL(CLKPWR_IOBASE));
++
++       /* Setup LCD muxing to RGB565 */
++       tmp = readl(CLKPWR_LCDCLK_CTRL(CLKPWR_IOBASE)) &
++               ~(CLKPWR_LCDCTRL_LCDTYPE_MSK | CLKPWR_LCDCTRL_PSCALE_MSK);
++       tmp |= CLKPWR_LCDCTRL_LCDTYPE_TFT16;
++       writel(tmp, CLKPWR_LCDCLK_CTRL(CLKPWR_IOBASE));
++
++       /* Set up I2C levels */
++       tmp = readl(CLKPWR_I2C_CLK_CTRL(CLKPWR_IOBASE));
++       tmp |= CLKPWR_I2CCLK_USBI2CHI_DRIVE | CLKPWR_I2CCLK_I2C2HI_DRIVE;
++       writel(tmp, CLKPWR_I2C_CLK_CTRL(CLKPWR_IOBASE));
++
++       /* Enable DMA for I2S1 channel */
++       tmp = readl(CLKPWR_I2S_CLK_CTRL(CLKPWR_IOBASE));
++       tmp = CLKPWR_I2SCTRL_I2S1_USE_DMA;
++       writel(tmp, CLKPWR_I2S_CLK_CTRL(CLKPWR_IOBASE));
++
++       /* Load the board hardware descriptor, as some other board functions
++          require it's data */
++       phy3250_load_hw_desc();
++
++       serial_init();
++
++       /* AMBA peripheral clocks need to be enabled prior to AMBA device
++          detection or a data fault will occur, so we enable the clocks
++          here. However, we don't want to enable them if the peripheral
++          isn't included in the image */
++#if defined (CONFIG_MMC_ARMMMCI)
++       tmp = readl(CLKPWR_MS_CTRL(CLKPWR_IOBASE));
++       writel((tmp | CLKPWR_MSCARD_SDCARD_EN | CLKPWR_MSCARD_MSDIO_PU_EN),
++               CLKPWR_MS_CTRL(CLKPWR_IOBASE));
++#endif
++#if defined (CONFIG_FB_ARMCLCD)
++       tmp = readl(CLKPWR_LCDCLK_CTRL(CLKPWR_IOBASE));
++       writel((tmp | CLKPWR_LCDCTRL_CLK_EN),
++               CLKPWR_LCDCLK_CTRL(CLKPWR_IOBASE));
++#endif
++#if defined (CONFIG_SPI_PL022)
++       tmp = readl(CLKPWR_SSP_CLK_CTRL(CLKPWR_IOBASE));
++       writel((tmp | CLKPWR_SSPCTRL_SSPCLK0_EN),
++               CLKPWR_SSP_CLK_CTRL(CLKPWR_IOBASE));
++#endif
++
++       platform_add_devices(phy3250_devs, ARRAY_SIZE(phy3250_devs));
++       for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
++               struct amba_device *d = amba_devs[i];
++               amba_device_register(d, &iomem_resource);
 +       }
-+       reg = readl(CLKPWR_MAIN_OSC_CTRL(CLKPWR_IOBASE));
-+       if ((reg & CLKPWR_MOSC_DISABLE) != 0)
-+               osc_main.rate = 0;
-+       else
-+               osc_main.rate = MAIN_OSC_FREQ;
 +
-+       /* Update PLL397 or main osc use count and parent based on
-+          current SYSCLK selection */
-+       if (clk_is_sysclk_mainosc() != 0)
-+               clk_sys.parent = &osc_main;
-+       else
-+               clk_sys.parent = &osc_pll397;
-+       clk_sys.rate = clk_sys.parent->rate;
++       /* Disable UART5->USB transparent mode or USB won't work */
++       tmp = readl(UARTCTL_CTRL(io_p2v(UART_CTRL_BASE)));
++       tmp &= ~UART_U5_ROUTE_TO_USB;
++       writel(tmp, UARTCTL_CTRL(io_p2v(UART_CTRL_BASE)));
 +
-+       /* Compute the ARM PLL and USB PLL frequencies */
-+       local_update_armpll_rate();
-+       local_update_usbpll_rate();
-+       if (clk_usbpll.rate != 0)
-+               clk_inc_counts(&osc_main);
++       /* Test clock needed for UDA1380 initial init */
++       writel((CLKPWR_TESTCLK2_SEL_MOSC | CLKPWR_TESTCLK_TESTCLK2_EN),
++               CLKPWR_TEST_CLK_SEL(CLKPWR_IOBASE));
 +
-+       /* HCLK and PCLKs are always on and use the ARM PLL clock*/
-+       clk_inc_counts(clk_hclk.parent);
-+       clk_inc_counts(clk_pclk.parent);
-+
-+       /* Timer 0 is used for the system clock tick. It was pre-initialized
-+          prior to this elsewhere */
-+       clk_inc_counts(clk_timer0.parent);
-+
-+       /* Register all clocks */
-+       for (i = 0; i < ARRAY_SIZE(lookups); i++)
-+               clkdev_add(&lookups[i]);
-+
-+       return 0;
++       i2c_register_board_info(0, phy3250_i2c_board_info,
++                               ARRAY_SIZE(phy3250_i2c_board_info));
 +}
++
++MACHINE_START (LPC3XXX, "Phytec 3250 board with the LPC3250 Microcontroller")
++       /* Maintainer: Kevin Wells, NXP Semiconductors */
++       .phys_io        = UART5_BASE,
++       .io_pg_offst    = ((io_p2v (UART5_BASE))>>18) & 0xfffc,
++       .boot_params    = 0x80000100,
++       .map_io         = lpc32xx_map_io,
++       .init_irq       = lpc32xx_init_irq,
++       .timer          = &lpc32xx_timer,
++       .init_machine   = phy3250_board_init,
++MACHINE_END
 --
 1.6.0.6
