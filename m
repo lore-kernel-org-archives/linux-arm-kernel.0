@@ -1,36 +1,31 @@
 From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Fri, 20 Nov 2009 13:03:58 +0100
-Subject: [PATCH 2/8] s3c6410: Enable ADMA feature in 6410 sdhci controller.
-Message-ID: <b2e8f9f70911200403r49e1fc4od58bd4a0d66a1e77@mail.gmail.com>
+Date: Fri, 20 Nov 2009 13:04:01 +0100
+Subject: [PATCH 3/8] S3C64xx: remove SDHCI_QUIRK_NO_MULTIBLOCK
+Message-ID: <b2e8f9f70911200404pca38ab6ycdca740ce81a6847@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables ADMA feature in 6410 SDHCI controller
-driver.
+This fixes SDIO as that requires multiblock transfers
 
 Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
 ---
- drivers/mmc/host/sdhci-s3c.c |    7 +------
- 1 files changed, 1 insertions(+), 6 deletions(-)
+ drivers/mmc/host/sdhci-s3c.c |    3 ---
+ 1 files changed, 0 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-index 50997d2..0f8ff86 100644
+index 0f8ff86..4623876 100644
 --- a/drivers/mmc/host/sdhci-s3c.c
 +++ b/drivers/mmc/host/sdhci-s3c.c
-@@ -316,12 +316,7 @@ static int __devinit sdhci_s3c_probe(struct
+@@ -324,9 +324,6 @@ static int __devinit sdhci_s3c_probe(struct
 platform_device *pdev)
- 	host->irq = irq;
+ 	 * support as well. */
+ 	host->quirks |= SDHCI_QUIRK_BROKEN_DMA;
 
- 	/* Setup quirks for the controller */
+-	/* PIO currently has problems with multi-block IO */
+-	host->quirks |= SDHCI_QUIRK_NO_MULTIBLOCK;
 -
--	/* Currently with ADMA enabled we are getting some length
--	 * interrupts that are not being dealt with, do disable
--	 * ADMA until this is sorted out. */
--	host->quirks |= SDHCI_QUIRK_BROKEN_ADMA;
--	host->quirks |= SDHCI_QUIRK_32BIT_ADMA_SIZE;
-+	host->quirks |= SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC;
+ #endif /* CONFIG_MMC_SDHCI_S3C_DMA */
 
- #ifndef CONFIG_MMC_SDHCI_S3C_DMA
-
+ 	/* It seems we do not get an DATA transfer complete on non-busy
 -- 
 1.6.5.3
