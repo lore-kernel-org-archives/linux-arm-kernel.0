@@ -1,93 +1,42 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Fri, 20 Nov 2009 17:54:45 +0800
-Subject: RFC [PATCH 6/9] Added lpc32xx platform.h file
-In-Reply-To: <4B06657F.8010800@gmail.com>
-References: <083DF309106F364B939360100EC290F804F54D560F@eu1rdcrdc1wx030.exi.nxp.com>
-	<e68bb3470911192317s1203ae5k750ec6372539e433@mail.gmail.com>
-	<4B06657F.8010800@gmail.com>
-Message-ID: <e68bb3470911200154h58871b5y64f1078853bff16f@mail.gmail.com>
+From: valentin.longchamp@epfl.ch (Valentin Longchamp)
+Date: Fri, 20 Nov 2009 11:07:27 +0100
+Subject: [PATCH 1/1] mx31moboard: change initial reset status for robot
+	microcontollers
+In-Reply-To: <1258640121-12637-1-git-send-email-valentin.longchamp@epfl.ch>
+References: <1258640121-12637-1-git-send-email-valentin.longchamp@epfl.ch>
+Message-ID: <1258711647-25993-1-git-send-email-valentin.longchamp@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/11/20 Paulius Zaleckas <paulius.zaleckas@gmail.com>:
-> On 11/20/2009 09:17 AM, Wan ZongShun wrote:
->>
->> Hi Kevin,
->>
->> And, this patch could not be applied in my Linux 2.6.32-rc7, error
->> occurs as following:
->>
->> zswan at zswan-laptop:~/git-2.6/linux-2.6$ patch -p1< ?Added\ lpc32xx\
->> platform.h\ file.eml
->> patching file arch/arm/mach-lpc32xx/include/mach/platform.h
->> patch: **** malformed patch at line 1063: ?*/
->>
->> why?
->>
->
-> [...]
->
->>> +/*
->>> + * p3_mux_set, p3_mux_clr, p3_mux_state register defines
->>> + */
->>> +#define P3_GPO2_MAT10 ? ? ? ? ? ? ? ? ?_BIT(2)
->>> +#define P3_GPO6_PWM43 ? ? ? ? ? ? ? ? ?_BIT(6)
->>> +#define P3_GPO8_PWM42 ? ? ? ? ? ? ? ? ?_BIT(8)
->>> +#define P3_GPO9_PWM41 ? ? ? ? ? ? ? ? ?_BIT(9)
->>> +#define P3_GPO10_PWM36 ? ? ? ? ? ? ? ? _BIT(10)
->>> +#define P3_GPO12_PWM35 ? ? ? ? ? ? ? ? _BIT(12)
->>> +#define P3_GPO13_PWM34 ? ? ? ? ? ? ? ? _BIT(13)
->>> +#define P3_GPO15_PWM33 ? ? ? ? ? ? ? ? _BIT(15)
->>> +#define P3_GPO16_PWM32 ? ? ? ? ? ? ? ? _BIT(16)
->>> +#define P3_GPO18_PWM31 ? ? ? ? ? ? ? ? _BIT(18)
->>> +
->>> +/*
->>> + * SSP module register offsets
->>> ?*/
->
-> because the + is missing...
+We want the microcontrollers to be held in reset during kernel boot.
 
-Oh, this is really true, just be a odd missing.
+I just removed a typo in the changelog and commit message, thanks Uwe.
 
->>> +#define LSSP_CR0(x) ? ? ? ? ? ? ? ? ? ?(x + 0x00)
->>> +#define LSSP_CR1(x) ? ? ? ? ? ? ? ? ? ?(x + 0x04)
->>> +#define LSSP_DATA(x) ? ? ? ? ? ? ? ? ? (x + 0x08)
->>> +#define LSSP_SR(x) ? ? ? ? ? ? ? ? ? ? (x + 0x0C)
->>> +#define LSSP_CPSR(x) ? ? ? ? ? ? ? ? ? (x + 0x10)
->>> +#define LSSP_IMSC(x) ? ? ? ? ? ? ? ? ? (x + 0x14)
->>> +#define LSSP_ICR(x) ? ? ? ? ? ? ? ? ? ?(x + 0x20)
->>> +
->>> +#define LSSP_ICR_RORIC ? ? ? ? ? ? ? ? (1<< ?0)
->>> +#define LSSP_ICR_RTIC ? ? ? ? ? ? ? ? ?(1<< ?1)
->>> +#define LSSP_CR0_DSS(n) ? ? ? ? ? ? ? ? ? ? ? ?_SBF(0, (((n) - 1)&
->>> ?0xF))
->>> +#define LSSP_CR0_FRF_SPI ? ? ? ? ? ? ? 0x0
->>> +#define LSSP_CR0_CPOL(n) ? ? ? ? ? ? ? _SBF(6, ((n)& ?0x01))
->>> +#define LSSP_CR0_CPHA(n) ? ? ? ? ? ? ? _SBF(7, ((n)& ?0x01))
->>> +#define LSSP_CR0_SCR(n) ? ? ? ? ? ? ? ? ? ? ? ?_SBF(8, ((n)& ?0xFF))
->>> +#define LSSP_CR1_SSP_ENABLE ? ? ? ? ? ?(1<< ?1)
->>> +#define LSSP_CPSR_CPDVSR(n) ? ? ? ? ? ?_SBF(0, (n)& ?0xFE)
->>> +#define LSSP_SR_RNE ? ? ? ? ? ? ? ? ? ?(1<< ?2)
->>> +
->>> +#endif
->>> --
->>> 1.6.0.6
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
->>
->>
->>
->
->
+This patch is trivial and should go into next -rc.
 
+Signed-off-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
+---
+ arch/arm/mach-mx3/mx31moboard-marxbot.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-
+diff --git a/arch/arm/mach-mx3/mx31moboard-marxbot.c b/arch/arm/mach-mx3/mx31moboard-marxbot.c
+index 2bfaffb..325e10b 100644
+--- a/arch/arm/mach-mx3/mx31moboard-marxbot.c
++++ b/arch/arm/mach-mx3/mx31moboard-marxbot.c
+@@ -110,12 +110,12 @@ static struct imxmmc_platform_data sdhc2_pdata = {
+ static void dspics_resets_init(void)
+ {
+ 	if (!gpio_request(TRSLAT_RST_B, "translator-rst")) {
+-		gpio_direction_output(TRSLAT_RST_B, 1);
++		gpio_direction_output(TRSLAT_RST_B, 0);
+ 		gpio_export(TRSLAT_RST_B, false);
+ 	}
+ 
+ 	if (!gpio_request(DSPICS_RST_B, "dspics-rst")) {
+-		gpio_direction_output(DSPICS_RST_B, 1);
++		gpio_direction_output(DSPICS_RST_B, 0);
+ 		gpio_export(DSPICS_RST_B, false);
+ 	}
+ }
 -- 
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+1.6.3.3
