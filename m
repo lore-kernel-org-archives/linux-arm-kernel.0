@@ -1,79 +1,115 @@
-From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
-Date: Fri, 20 Nov 2009 12:29:11 -0800
-Subject: [PATCH 2/2] dma: change coherent memory to normal noncached
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 Nov 2009 21:04:51 +0000
+Subject: [PATCH 1/2] system: mb, wmb and rmb should do a memory barrier
+	even for non SMP
 In-Reply-To: <1258748951-10548-1-git-send-email-adharmap@codeaurora.org>
 References: <1258748951-10548-1-git-send-email-adharmap@codeaurora.org>
-Message-ID: <1258748951-10548-2-git-send-email-adharmap@codeaurora.org>
+Message-ID: <20091120210451.GH16920@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need dma_alloc_coherent() to use its own page protection modifier,
-which causes it to behave the same as dma_alloc_writecombine() on ARMv7,
-and with the existing behaviour (for the time being) on ARMv6 and below.
-We should leave pgprot_noncached() well alone until we know that its
-other places need to be changed.
+On Fri, Nov 20, 2009 at 12:29:10PM -0800, Abhijeet Dharmapurikar wrote:
+> Russell and Catalin, since you were the original creator of these changes can
+> you sign-off on these?
+>  
+>  arch/arm/include/asm/system.h |   23 +++++++++++++++++------
+>  1 files changed, 17 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+> index ac44fa8..d68e135 100644
+> --- a/arch/arm/include/asm/system.h
+> +++ b/arch/arm/include/asm/system.h
+> @@ -140,20 +140,31 @@ extern unsigned int user_debug;
+>  #endif
+>  
+>  #ifndef CONFIG_SMP
+> -#define mb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
+> -#define rmb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
+> -#define wmb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
+> +#if __LINUX_ARM_ARCH__ <=  6
+> +#define mb()    do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
+> +#define rmb()   do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
+> +#define wmb()   do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
+> +#else
+> +/*
+> + * pgprot_noncached() creates Normal uncached mappings, therefore mandatory
+> + * barriers are needed.
+> + */
+> +#define mb()            dmb()
+> +#define rmb()           dmb()
+> +#define wmb()           dmb()
+> +#endif
+>  #define smp_mb()	barrier()
+>  #define smp_rmb()	barrier()
+>  #define smp_wmb()	barrier()
+>  #else
+> -#define mb()		dmb()
+> -#define rmb()		dmb()
+> -#define wmb()		dmb()
+> +#define mb()            dmb()
+> +#define rmb()           dmb()
+> +#define wmb()           dmb()
+>  #define smp_mb()	dmb()
+>  #define smp_rmb()	dmb()
+>  #define smp_wmb()	dmb()
+>  #endif
 
-Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
----
- arch/arm/include/asm/pgtable.h |   15 +++++++++++++--
- arch/arm/mm/dma-mapping.c      |    4 ++--
- 2 files changed, 15 insertions(+), 4 deletions(-)
+That looks far more complicated than it needs to be.  Note that I have a
+large pile of DMA API related changes pending (those which I sent this
+afternoon are about half of what's to come).
 
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index a27ec4c..0fd8d83 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -307,16 +307,27 @@ PTE_BIT_FUNC(mkyoung,   |= L_PTE_YOUNG);
+This is what I have queued up for this file:
+
+diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+index d65b2f5..058e7e9 100644
+--- a/arch/arm/include/asm/system.h
++++ b/arch/arm/include/asm/system.h
+@@ -138,21 +138,26 @@ extern unsigned int user_debug;
+ #define dmb() __asm__ __volatile__ ("" : : : "memory")
+ #endif
  
- static inline pte_t pte_mkspecial(pte_t pte) { return pte; }
- 
-+#define __pgprot_modify(prot, mask, bits)                \
-+	__pgprot((pgprot_val(prot) & ~(mask)) | (bits))
-+
- /*
-  * Mark the prot value as uncacheable and unbufferable.
-  */
- #define pgprot_noncached(prot) \
--	__pgprot((pgprot_val(prot) & ~L_PTE_MT_MASK) | L_PTE_MT_UNCACHED)
-+	__pgprot_modify(prot, L_PTE_MT_MASK, L_PTE_MT_UNCACHED)
- #define pgprot_writecombine(prot) \
--	__pgprot((pgprot_val(prot) & ~L_PTE_MT_MASK) | L_PTE_MT_BUFFERABLE)
-+	__pgprot_modify(prot, L_PTE_MT_MASK, L_PTE_MT_BUFFERABLE)
- #define pgprot_device(prot) \
- 	__pgprot((pgprot_val(prot) & ~L_PTE_MT_MASK) | L_PTE_MT_DEV_NONSHARED)
- 
-+#if __LINUX_ARM_ARCH__ >= 7
-+#define pgprot_dmacoherent(prot) \
-+	__pgprot_modify(prot, L_PTE_MT_MASK|L_PTE_EXEC, L_PTE_MT_BUFFERABLE)
+-#ifndef CONFIG_SMP
++#if __LINUX_ARM_ARCH__ >= 7 || defined(CONFIG_SMP)
++#define mb()		dmb()
++#define rmb()		dmb()
++#define wmb()		dmb()
 +#else
-+#define pgprot_dmacoherent(prot) \
-+	__pgprot_modify(prot, L_PTE_MT_MASK|L_PTE_EXEC, L_PTE_MT_UNCACHED)
+ #define mb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
+ #define rmb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
+ #define wmb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
 +#endif
 +
- #define pmd_none(pmd)		(!pmd_val(pmd))
- #define pmd_present(pmd)	(pmd_val(pmd))
- #define pmd_bad(pmd)		(pmd_val(pmd) & 2)
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 0b38ec8..8e2ff87 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -291,7 +291,7 @@ dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gf
- 	}
++#ifndef CONFIG_SMP
+ #define smp_mb()	barrier()
+ #define smp_rmb()	barrier()
+ #define smp_wmb()	barrier()
+ #else
+-#define mb()		dmb()
+-#define rmb()		dmb()
+-#define wmb()		dmb()
+-#define smp_mb()	dmb()
+-#define smp_rmb()	dmb()
+-#define smp_wmb()	dmb()
++#define smp_mb()	mb()
++#define smp_rmb()	rmb()
++#define smp_wmb()	wmb()
+ #endif
++
+ #define read_barrier_depends()		do { } while(0)
+ #define smp_read_barrier_depends()	do { } while(0)
  
- 	return __dma_alloc(dev, size, handle, gfp,
--			   pgprot_noncached(pgprot_kernel));
-+			   pgprot_dmacoherent(pgprot_kernel));
- }
- EXPORT_SYMBOL(dma_alloc_coherent);
- 
-@@ -340,7 +340,7 @@ static int dma_mmap(struct device *dev, struct vm_area_struct *vma,
- int dma_mmap_coherent(struct device *dev, struct vm_area_struct *vma,
- 		      void *cpu_addr, dma_addr_t dma_addr, size_t size)
- {
--	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-+	vma->vm_page_prot = pgprot_dmacoherent(vma->vm_page_prot);
- 	return dma_mmap(dev, vma, cpu_addr, dma_addr, size);
- }
- EXPORT_SYMBOL(dma_mmap_coherent);
--- 
-1.5.6.3
+
+Basically, what the above is implementing are these statements from
+memory-barriers.txt:
+
+  All memory barriers except the data dependency barriers imply a compiler
+  barrier. Data dependencies do not impose any additional compiler ordering.
+
+  SMP memory barriers are reduced to compiler barriers on uniprocessor compiled
+  systems because it is assumed that a CPU will appear to be self-consistent,
+  and will order overlapping accesses correctly with respect to itself.
+
+Or to put it another way, smp barriers are a compiler barrier if !SMP, or
+their mandatory versions if SMP.
+
+We then chose the mandatory versions depending on other configuration.
