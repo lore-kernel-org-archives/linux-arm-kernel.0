@@ -1,28 +1,82 @@
 From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Fri, 20 Nov 2009 13:03:50 +0100
-Subject: [PATCH 0/8] S3C64xx fixes
-Message-ID: <b2e8f9f70911200403k38acc43cu68520db26d0a2148@mail.gmail.com>
+Date: Fri, 20 Nov 2009 13:03:55 +0100
+Subject: [PATCH 1/8] s3c6410: Add new quirk in sdhci driver and update ADMA
+	descriptor build.
+Message-ID: <b2e8f9f70911200403v62982365x174fb56dfb26eecd@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The s3c6410 sdhci controller does not support the 'End' attribute and
+NOP attribute in the same 8-Byte ADMA descriptor. This patch adds a
+new quirk to identify sdhci host contollers with such behaviour.
+In addition to this, for controllers using the new quirk, the last
+entry in the ADMA descritor table is marked with the 'End' attribute
+(instead of using a NOP descriptor with 'End' attribute).
 
-I'm working on getting the SmartQ7 supported in mainline (which isn't ready for
-submission yet), but I've got a few S3C64xx patches which it depends on that I'm
-submitting for inclusion.
+Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+---
+ drivers/mmc/host/sdhci.c |   35 ++++++++++++++++++++++-------------
+ drivers/mmc/host/sdhci.h |    2 ++
+ 2 files changed, 24 insertions(+), 13 deletions(-)
 
-Most of these have been posted before, but didn't get much/any response.
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index c279fbc..8be2613 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -487,19 +487,28 @@ static int sdhci_adma_table_pre(struct sdhci_host *host,
+ 		WARN_ON((desc - host->adma_desc) > (128 * 2 + 1) * 4);
+ 	}
 
-[PATCH 1/8] s3c6410: Add new quirk in sdhci driver and update ADMA
-descriptor build.
-[PATCH 2/8] s3c6410: Enable ADMA feature in 6410 sdhci controller.
-[PATCH 3/8] S3C64xx: remove SDHCI_QUIRK_NO_MULTIBLOCK
-[PATCH 4/8] S3C64xx: add HSMMC2 support
-[PATCH 5/8] S3C64xx: fix USB OTG compilation
-[PATCH 6/8] S3C: merge ADC drivers and add support for the S3C64xx
-[PATCH 7/8] S3C64xx: add support for all group 0 external interrupts
-[PATCH 8/8] S3C64xx: add support to the RTC driver
+-	/*
+-	 * Add a terminating entry.
+-	 */
+-	desc[7] = 0;
+-	desc[6] = 0;
+-	desc[5] = 0;
+-	desc[4] = 0;
+-
+-	desc[3] = 0;
+-	desc[2] = 0;
+-
+-	desc[1] = 0x00;
+-	desc[0] = 0x03; /* nop, end, valid */
++	if (host->quirks & SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC) {
++		/*
++		* Mark the last descriptor as the terminating descriptor
++		*/
++		if (desc != host->adma_desc) {
++			desc -= 8;
++			desc[0] |= 0x2; /* end */
++		}
++	} else {
++		/*
++		* Add a terminating entry.
++		*/
++		desc[7] = 0;
++		desc[6] = 0;
++		desc[5] = 0;
++		desc[4] = 0;
++
++		desc[3] = 0;
++		desc[2] = 0;
++		desc[1] = 0x00;
++		desc[0] = 0x03; /* nop, end, valid */
++	}
 
+ 	/*
+ 	 * Resync align buffer as we might have changed it.
+diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+index ce5f1d7..f9b5e13 100644
+--- a/drivers/mmc/host/sdhci.h
++++ b/drivers/mmc/host/sdhci.h
+@@ -234,6 +234,8 @@ struct sdhci_host {
+ #define SDHCI_QUIRK_DELAY_AFTER_POWER			(1<<23)
+ /* Controller uses SDCLK instead of TMCLK for data timeouts */
+ #define SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK		(1<<24)
++/* Controller cannot support End Attribute in NOP ADMA descriptor */
++#define SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC		(1<<25)
 
-Thanks,
-Maurus Cuelenaere
+ 	int			irq;		/* Device IRQ */
+ 	void __iomem *		ioaddr;		/* Mapped address */
+-- 
+1.6.5.3
