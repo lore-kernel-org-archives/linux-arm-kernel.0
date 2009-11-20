@@ -1,34 +1,46 @@
-From: niej0001@gmail.com (Jun Nie)
-Date: Fri, 20 Nov 2009 10:38:18 +0800
-Subject: [PATCH 7/8] pxa: add frame buffer on pxa168 aspenite platform
-In-Reply-To: <f17812d70911190829u6831a176j7caae7e0bee3fa53@mail.gmail.com>
-References: <7c34ac520911160134k57023db1we74073a87a3dd454@mail.gmail.com>
-	<f17812d70911162229s43ca6826k29c4c4a7e279144f@mail.gmail.com>
-	<7c34ac520911190103q4ba79c60w11dfc8255b69abfa@mail.gmail.com>
-	<f17812d70911190829u6831a176j7caae7e0bee3fa53@mail.gmail.com>
-Message-ID: <7c34ac520911191838k45fa4708vd8b606e9ad6a8d7@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Thu, 19 Nov 2009 22:02:23 -0500
+Subject: [PATCH 09/10] input: enable touch on 88pm860x
+In-Reply-To: <20091118051646.GC31480@core.coreip.homeip.net>
+References: <771cded00911130104s3bc6ff97ma3a7f7ad76ae9198@mail.gmail.com>
+	<20091114025425.GA3587@core.coreip.homeip.net>
+	<771cded00911162227i24cd5a4cv9899e220b1c37c6e@mail.gmail.com>
+	<20091118051646.GC31480@core.coreip.homeip.net>
+Message-ID: <771cded00911191902s171a9fe4ucb21ea0c75bb12cb@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/11/20 Eric Miao <eric.y.miao@gmail.com>:
->> + ? ? ? int err = 0;
->> + ? ? ? if (on) {
->> + ? ? ? ? ? ? ? if (spi_gpio_reset != -1) {
->> + ? ? ? ? ? ? ? ? ? ? ? err = gpio_request(spi_gpio_reset, "TPO_LCD_SPI_RESET");
->> + ? ? ? ? ? ? ? ? ? ? ? if (err) {
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? printk(KERN_ERR "failed to request GPIO for TPO LCD RESET\n");
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? return err;
->> + ? ? ? ? ? ? ? ? ? ? ? }
->> + ? ? ? ? ? ? ? ? ? ? ? gpio_direction_output(spi_gpio_reset, 0);
->> + ? ? ? ? ? ? ? ? ? ? ? msleep(100);
+On Wed, Nov 18, 2009 at 12:16 AM, Dmitry Torokhov
+<dmitry.torokhov@gmail.com> wrote:
+> On Tue, Nov 17, 2009 at 01:27:42AM -0500, Haojian Zhuang wrote:
+>>
+>> Up to now, I don't support module yet. When each component of this
+>> PMIC is ready, I'll enable module.
+>>
 >
-> This is really a loooong delay, there any specific reason for such a long
-> delay, I'm seeing this to slow down the boot up significantly?
+> I would do it rather sooner than later - then you'd notice that you are
+> not freeing IRQ in pm860x_touch_remove() when you'd try to reload your
+> module.
 >
-> Otherwise looks OK to me, and I prefer the defconfig file change to
-> be a separate patch please.
+>> +
+>> +static int __devexit pm860x_touch_remove(struct platform_device *pdev)
+>> +{
+>> + ? ? struct pm860x_touch *touch = platform_get_drvdata(pdev);
+>> +
+>> + ? ? input_unregister_device(touch->idev);
+>> + ? ? return 0;
+>> +}
+>> +
+>
+> --
+> Dmitry
 >
 
-Actually, This is just an example for other real products. There is no
-such spi_reset pin on Aspenite , so machine info set it spi_gpio_reset
-== -1. Or do you think we should delete these lines?
+updated with module supported.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0009-input-enable-touch-on-88pm860x.patch
+Type: text/x-patch
+Size: 8700 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091119/f62f38d6/attachment-0001.bin>
