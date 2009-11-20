@@ -1,10 +1,10 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 20 Nov 2009 14:42:49 +0100
-Subject: [PATCH 17/20] ARM: S5PC1XX: add sdhci platform helpers for s5pc110
+Date: Fri, 20 Nov 2009 14:42:47 +0100
+Subject: [PATCH 15/20] ARM: S5PC1XX: add i2c platform helpers on s5pc110
 	sub-platform
 In-Reply-To: <1258551194-16018-1-git-send-email-m.szyprowski@samsung.com>
 References: <1258551194-16018-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1258724572-19176-18-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1258724572-19176-16-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,81 +12,98 @@ From: Kyungmin Park <kyungmin.park@samsung.com>
 
 Samsung S5PC110 SoC are newer Samsung SoCs. Like S5PC100 they are based
 on CortexA8 ARM CPU, but have much more powerfull integrated periperals.
-This patch adds common SDHCI platform helper for S5PC110 sub-platform.
+This patch adds required I2C platform helpers. S5PC110 SoCs has 3 I2C
+controllers.
 
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Byungho Min <bhmin@samsung.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/mach-s5pc110/Kconfig            |   12 +++
- arch/arm/mach-s5pc110/Makefile           |    2 +
- arch/arm/mach-s5pc110/cpu.c              |    5 +
- arch/arm/mach-s5pc110/setup-sdhci-gpio.c |  123 ++++++++++++++++++++++++++++++
- arch/arm/mach-s5pc110/setup-sdhci.c      |   59 ++++++++++++++
- arch/arm/plat-s3c/include/plat/sdhci.h   |   64 +++++++++++++++
- 6 files changed, 265 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5pc110/setup-sdhci-gpio.c
- create mode 100644 arch/arm/mach-s5pc110/setup-sdhci.c
+ arch/arm/mach-s5pc110/Kconfig        |   18 +++++++++
+ arch/arm/mach-s5pc110/Makefile       |    3 +
+ arch/arm/mach-s5pc110/cpu.c          |    3 +
+ arch/arm/mach-s5pc110/setup-i2c0.c   |   31 +++++++++++++++
+ arch/arm/mach-s5pc110/setup-i2c1.c   |   31 +++++++++++++++
+ arch/arm/mach-s5pc110/setup-i2c2.c   |   32 ++++++++++++++++
+ arch/arm/plat-s3c/Kconfig            |    5 ++
+ arch/arm/plat-s3c/Makefile           |    1 +
+ arch/arm/plat-s3c/dev-i2c2.c         |   69 ++++++++++++++++++++++++++++++++++
+ arch/arm/plat-s3c/include/plat/iic.h |    2 +
+ 10 files changed, 195 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-s5pc110/setup-i2c0.c
+ create mode 100644 arch/arm/mach-s5pc110/setup-i2c1.c
+ create mode 100644 arch/arm/mach-s5pc110/setup-i2c2.c
+ create mode 100644 arch/arm/plat-s3c/dev-i2c2.c
 
 diff --git a/arch/arm/mach-s5pc110/Kconfig b/arch/arm/mach-s5pc110/Kconfig
-index 6b4d977..0e13f54 100644
+index 4257b96..6b4d977 100644
 --- a/arch/arm/mach-s5pc110/Kconfig
 +++ b/arch/arm/mach-s5pc110/Kconfig
-@@ -32,4 +32,16 @@ config S5PC110_SETUP_I2C2
- 	bool
+@@ -14,4 +14,22 @@ config CPU_S5PC110
  	help
- 	  Common setup code for i2c bus 2.
+ 	  Enable S5PC110 CPU support
+ 
++config S5PC110_SETUP_I2C0
++	bool
++	default y
++	help
++	  Common setup code for i2c bus 0.
 +
-+config S5PC110_SETUP_SDHCI
-+        bool
-+        select S5PC110_SETUP_SDHCI_GPIO
-+        help
-+          Internal helper functions for S5PC110 based SDHCI systems
++	  Note, currently since i2c0 is always compiled, this setup helper
++	  is always compiled with it.
 +
-+config S5PC110_SETUP_SDHCI_GPIO
++config S5PC110_SETUP_I2C1
 +	bool
 +	help
-+	  Common setup code for SDHCI gpio.
++	  Common setup code for i2c bus 1.
 +
++config S5PC110_SETUP_I2C2
++	bool
++	help
++	  Common setup code for i2c bus 2.
  endif
 diff --git a/arch/arm/mach-s5pc110/Makefile b/arch/arm/mach-s5pc110/Makefile
-index 93311b3..cf8f4ef 100644
+index 3849e27..93311b3 100644
 --- a/arch/arm/mach-s5pc110/Makefile
 +++ b/arch/arm/mach-s5pc110/Makefile
-@@ -21,5 +21,7 @@ obj-$(CONFIG_CPU_S5PC110)	+= uarts.o
- obj-$(CONFIG_S5PC110_SETUP_I2C0)	+= setup-i2c0.o
- obj-$(CONFIG_S5PC110_SETUP_I2C1)	+= setup-i2c1.o
- obj-$(CONFIG_S5PC110_SETUP_I2C2)	+= setup-i2c2.o
-+obj-$(CONFIG_S5PC110_SETUP_SDHCI)       += setup-sdhci.o
-+obj-$(CONFIG_S5PC110_SETUP_SDHCI_GPIO)	+= setup-sdhci-gpio.o
+@@ -18,5 +18,8 @@ obj-$(CONFIG_CPU_S5PC110)	+= plls.o
+ obj-$(CONFIG_CPU_S5PC110)	+= uarts.o
+ 
+ # Helper and device support
++obj-$(CONFIG_S5PC110_SETUP_I2C0)	+= setup-i2c0.o
++obj-$(CONFIG_S5PC110_SETUP_I2C1)	+= setup-i2c1.o
++obj-$(CONFIG_S5PC110_SETUP_I2C2)	+= setup-i2c2.o
  
  # machine support
 diff --git a/arch/arm/mach-s5pc110/cpu.c b/arch/arm/mach-s5pc110/cpu.c
-index d16ba68..e72582f 100644
+index 3ea26ff..d16ba68 100644
 --- a/arch/arm/mach-s5pc110/cpu.c
 +++ b/arch/arm/mach-s5pc110/cpu.c
-@@ -86,6 +86,11 @@ void __init s5pc110_map_io(void)
+@@ -86,6 +86,9 @@ void __init s5pc110_map_io(void)
  	iotable_init(s5pc110_iodesc, ARRAY_SIZE(s5pc110_iodesc));
  
  	/* initialise device information early */
-+	s5pc110_default_sdhci0();
-+	s5pc110_default_sdhci1();
-+	s5pc110_default_sdhci2();
-+	s5pc110_default_sdhci3();
-+
- 	/* the i2c devices are directly compatible with s3c2440 */
- 	s3c_i2c0_setname("s3c2440-i2c");
- 	s3c_i2c1_setname("s3c2440-i2c");
-diff --git a/arch/arm/mach-s5pc110/setup-sdhci-gpio.c b/arch/arm/mach-s5pc110/setup-sdhci-gpio.c
++	/* the i2c devices are directly compatible with s3c2440 */
++	s3c_i2c0_setname("s3c2440-i2c");
++	s3c_i2c1_setname("s3c2440-i2c");
+ }
+ 
+ void __init s5pc110_init_clocks(int xtal)
+diff --git a/arch/arm/mach-s5pc110/setup-i2c0.c b/arch/arm/mach-s5pc110/setup-i2c0.c
 new file mode 100644
-index 0000000..49db2a0
+index 0000000..596b139
 --- /dev/null
-+++ b/arch/arm/mach-s5pc110/setup-sdhci-gpio.c
-@@ -0,0 +1,123 @@
-+/* linux/arch/arm/plat-s5pc1xx/setup-sdhci-gpio.c
++++ b/arch/arm/mach-s5pc110/setup-i2c0.c
+@@ -0,0 +1,31 @@
++/*
++ * linux/arch/arm/mach-s5pc110/setup-i2c2.c
 + *
-+ * Copyright 2009 Samsung Eletronics
++ * Copyright 2009 Samsung Electronics Co.
++ *	Byungho Min <bhmin@samsung.com>
 + *
-+ * S5PC110 - Helper functions for setting up SDHCI device(s) GPIO (HSMMC)
++ * Base S5PC110 I2C bus 0 gpio configuration
++ *
++ * Based on plat-s3c64xx/setup-i2c0.c
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -95,127 +112,35 @@ index 0000000..49db2a0
 +
 +#include <linux/kernel.h>
 +#include <linux/types.h>
-+#include <linux/interrupt.h>
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
-+#include <linux/mmc/host.h>
-+#include <linux/mmc/card.h>
++
++struct platform_device; /* don't need the contents */
 +
 +#include <mach/gpio.h>
++#include <plat/iic.h>
 +#include <plat/gpio-cfg.h>
-+#include <plat/regs-sdhci.h>
 +
-+void s5pc110_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
++void s3c_i2c0_cfg_gpio(struct platform_device *dev)
 +{
-+	unsigned int gpio;
-+
-+	/* Set all the necessary GPG0/GPG1 pins to special-function 2 */
-+	for (gpio = S5PC110_GPG0(0); gpio < S5PC110_GPG0(2); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+	}
-+	switch (width) {
-+	case 8:
-+		/* GPG1[3:6] special-funtion 3 */
-+		for (gpio = S5PC110_GPG1(3); gpio <= S5PC110_GPG1(6); gpio++) {
-+			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(3));
-+			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		}
-+	case 4:
-+		/* GPG0[3:6] special-funtion 2 */
-+		for (gpio = S5PC110_GPG0(3); gpio <= S5PC110_GPG0(6); gpio++) {
-+			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		}
-+	default:
-+		break;
-+	}
-+
-+	s3c_gpio_setpull(S5PC110_GPG0(2), S3C_GPIO_PULL_UP);
-+	s3c_gpio_cfgpin(S5PC110_GPG0(2), S3C_GPIO_SFN(2));
++	s3c_gpio_cfgpin(S5PC110_GPD1(0), S3C_GPIO_SFN(2));
++	s3c_gpio_setpull(S5PC110_GPD1(0), S3C_GPIO_PULL_UP);
++	s3c_gpio_cfgpin(S5PC110_GPD1(1), S3C_GPIO_SFN(2));
++	s3c_gpio_setpull(S5PC110_GPD1(1), S3C_GPIO_PULL_UP);
 +}
-+
-+void s5pc110_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
-+{
-+	unsigned int gpio;
-+
-+	/* Set all the necessary GPG1[0:1] pins to special-function 2 */
-+	for (gpio = S5PC110_GPG1(0); gpio < S5PC110_GPG1(2); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+	}
-+
-+	/* Data pin GPG1[3:6] to special-function 2 */
-+	for (gpio = S5PC110_GPG1(3); gpio <= S5PC110_GPG1(6); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+	}
-+
-+	s3c_gpio_setpull(S5PC110_GPG1(2), S3C_GPIO_PULL_UP);
-+	s3c_gpio_cfgpin(S5PC110_GPG1(2), S3C_GPIO_SFN(2));
-+}
-+
-+void s5pc110_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
-+{
-+	unsigned int gpio;
-+
-+	/* Set all the necessary GPG2[0:1] pins to special-function 2 */
-+	for (gpio = S5PC110_GPG2(0); gpio < S5PC110_GPG2(2); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+	}
-+
-+	switch (width) {
-+	case 8:
-+		/* Data pin GPG3[3:6] to special-function 3 */
-+		for (gpio = S5PC110_GPG3(3); gpio <= S5PC110_GPG3(6); gpio++) {
-+			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(3));
-+			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		}
-+	case 4:
-+		/* Data pin GPG2[3:6] to special-function 2 */
-+		for (gpio = S5PC110_GPG2(3); gpio <= S5PC110_GPG2(6); gpio++) {
-+			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		}
-+	default:
-+		break;
-+	}
-+
-+	s3c_gpio_setpull(S5PC110_GPG2(2), S3C_GPIO_PULL_UP);
-+	s3c_gpio_cfgpin(S5PC110_GPG2(2), S3C_GPIO_SFN(2));
-+}
-+
-+void s5pc110_setup_sdhci3_cfg_gpio(struct platform_device *dev, int width)
-+{
-+	unsigned int gpio;
-+
-+	/* Set all the necessary GPG3[0:1] pins to special-function 2 */
-+	for (gpio = S5PC110_GPG3(0); gpio < S5PC110_GPG3(2); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+	}
-+
-+	/* Data pin GPG3[3:6] to special-function 2 */
-+	for (gpio = S5PC110_GPG3(3); gpio <= S5PC110_GPG3(6); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+	}
-+
-+	s3c_gpio_setpull(S5PC110_GPG3(2), S3C_GPIO_PULL_UP);
-+	s3c_gpio_cfgpin(S5PC110_GPG3(2), S3C_GPIO_SFN(2));
-+}
-diff --git a/arch/arm/mach-s5pc110/setup-sdhci.c b/arch/arm/mach-s5pc110/setup-sdhci.c
+diff --git a/arch/arm/mach-s5pc110/setup-i2c1.c b/arch/arm/mach-s5pc110/setup-i2c1.c
 new file mode 100644
-index 0000000..c368bb5
+index 0000000..cd9649b
 --- /dev/null
-+++ b/arch/arm/mach-s5pc110/setup-sdhci.c
-@@ -0,0 +1,59 @@
-+/* linux/arch/arm/mach-s5pc100/setup-sdhci.c
++++ b/arch/arm/mach-s5pc110/setup-i2c1.c
+@@ -0,0 +1,31 @@
++/*
++ * linux/arch/arm/mach-s5pc110/setup-i2c1.c
 + *
-+ * Copyright 2008 Samsung Electronics
++ * Copyright 2009 Samsung Electronics Co.
++ *	Byungho Min <bhmin@samsung.com>
 + *
-+ * S5PC100 - Helper functions for settign up SDHCI device(s) (HSMMC)
++ * Base S5PC110 I2C bus 1 gpio configuration
++ *
++ * Based on plat-s3c64xx/setup-i2c1.c
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -224,131 +149,176 @@ index 0000000..c368bb5
 +
 +#include <linux/kernel.h>
 +#include <linux/types.h>
-+#include <linux/interrupt.h>
++
++struct platform_device; /* don't need the contents */
++
++#include <mach/gpio.h>
++#include <plat/iic.h>
++#include <plat/gpio-cfg.h>
++
++void s3c_i2c1_cfg_gpio(struct platform_device *dev)
++{
++	s3c_gpio_cfgpin(S5PC110_GPD1(2), S3C_GPIO_SFN(2));
++	s3c_gpio_setpull(S5PC110_GPD1(2), S3C_GPIO_PULL_UP);
++	s3c_gpio_cfgpin(S5PC110_GPD1(3), S3C_GPIO_SFN(2));
++	s3c_gpio_setpull(S5PC110_GPD1(3), S3C_GPIO_PULL_UP);
++}
+diff --git a/arch/arm/mach-s5pc110/setup-i2c2.c b/arch/arm/mach-s5pc110/setup-i2c2.c
+new file mode 100644
+index 0000000..aa20628
+--- /dev/null
++++ b/arch/arm/mach-s5pc110/setup-i2c2.c
+@@ -0,0 +1,32 @@
++/*
++ * linux/arch/arm/mach-s5pc110/setup-i2c2.c
++ *
++ * Copyright (C) 2009 Samsung Electronics Co.Ltd
++ *	Byungho Min <bhmin@samsung.com>
++ *
++ * Base S5PC110 I2C bus 2 gpio configuration
++ *
++ * Based on plat-s3c64xx/setup-i2c1.c
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#include <linux/kernel.h>
++#include <linux/types.h>
++
++struct platform_device; /* don't need the contents */
++
++#include <mach/gpio.h>
++#include <plat/iic.h>
++#include <plat/gpio-cfg.h>
++
++void s3c_i2c2_cfg_gpio(struct platform_device *dev)
++{
++	s3c_gpio_cfgpin(S5PC110_GPD1(4), S3C_GPIO_SFN(2));
++	s3c_gpio_setpull(S5PC110_GPD1(4), S3C_GPIO_PULL_UP);
++	s3c_gpio_cfgpin(S5PC110_GPD1(5), S3C_GPIO_SFN(2));
++	s3c_gpio_setpull(S5PC110_GPD1(5), S3C_GPIO_PULL_UP);
++}
+diff --git a/arch/arm/plat-s3c/Kconfig b/arch/arm/plat-s3c/Kconfig
+index e139a72..afdfca2 100644
+--- a/arch/arm/plat-s3c/Kconfig
++++ b/arch/arm/plat-s3c/Kconfig
+@@ -194,6 +194,11 @@ config S3C_DEV_I2C1
+ 	help
+ 	  Compile in platform device definitions for I2C channel 1
+ 
++config S3C_DEV_I2C2
++	bool
++	help
++	  Compile in platform device definitions for I2C channel 2
++
+ config S3C_DEV_FB
+ 	bool
+ 	help
+diff --git a/arch/arm/plat-s3c/Makefile b/arch/arm/plat-s3c/Makefile
+index 50444da..c40e312 100644
+--- a/arch/arm/plat-s3c/Makefile
++++ b/arch/arm/plat-s3c/Makefile
+@@ -39,6 +39,7 @@ obj-$(CONFIG_S3C_DEV_HSMMC1)	+= dev-hsmmc1.o
+ obj-$(CONFIG_S3C_DEV_HSMMC2)	+= dev-hsmmc2.o
+ obj-y				+= dev-i2c0.o
+ obj-$(CONFIG_S3C_DEV_I2C1)	+= dev-i2c1.o
++obj-$(CONFIG_S3C_DEV_I2C2)	+= dev-i2c2.o
+ obj-$(CONFIG_S3C_DEV_FB)	+= dev-fb.o
+ obj-$(CONFIG_S3C_DEV_USB_HOST)	+= dev-usb.o
+ obj-$(CONFIG_S3C_DEV_USB_HSOTG)	+= dev-usb-hsotg.o
+diff --git a/arch/arm/plat-s3c/dev-i2c2.c b/arch/arm/plat-s3c/dev-i2c2.c
+new file mode 100644
+index 0000000..49ec279
+--- /dev/null
++++ b/arch/arm/plat-s3c/dev-i2c2.c
+@@ -0,0 +1,69 @@
++/*
++ * linux/arch/arm/plat-s3c/dev-i2c2.c
++ *
++ * Copyright (C) 2009 Samsung Electronics Co.Ltd
++ *	Byungho Min <bhmin@samsung.com>
++ *
++ * S3C series device definition for i2c device 2
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#include <linux/kernel.h>
++#include <linux/string.h>
 +#include <linux/platform_device.h>
-+#include <linux/io.h>
 +
-+#include <linux/mmc/card.h>
-+#include <linux/mmc/host.h>
++#include <mach/cpu.h>
++#include <mach/irqs.h>
++#include <mach/map.h>
 +
-+#include <plat/regs-sdhci.h>
-+#include <plat/sdhci.h>
++#include <plat/regs-iic.h>
++#include <plat/iic.h>
++#include <plat/devs.h>
 +
-+/* clock sources for the mmc bus clock, order as for the ctrl2[5..4] */
-+
-+char *s5pc110_hsmmc_clksrcs[4] = {
-+	[0] = "mmc-bus",
++static struct resource s3c_i2c_resource[] = {
++	[0] = {
++		.start = S3C_PA_IIC2,
++		.end   = S3C_PA_IIC2 + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_I2C_PMIC_LINK,
++		.end   = IRQ_I2C_PMIC_LINK,
++		.flags = IORESOURCE_IRQ,
++	},
 +};
 +
-+void s5pc110_setup_sdhci_cfg_card(struct platform_device *dev,
-+				    void __iomem *r,
-+				    struct mmc_ios *ios,
-+				    struct mmc_card *card)
++struct platform_device s3c_device_i2c2 = {
++	.name		  = "s3c2440-i2c",
++	.id		  = 2,
++	.num_resources	  = ARRAY_SIZE(s3c_i2c_resource),
++	.resource	  = s3c_i2c_resource,
++};
++
++static struct s3c2410_platform_i2c default_i2c_data2 __initdata = {
++	.flags		= 0,
++	.bus_num	= 2,
++	.slave_addr	= 0x10,
++	.frequency	= 400*1000,
++	.sda_delay	= 100,
++};
++
++void __init s3c_i2c2_set_platdata(struct s3c2410_platform_i2c *pd)
 +{
-+	u32 ctrl2, ctrl3;
++	struct s3c2410_platform_i2c *npd;
 +
-+	/* don't need to alter anything acording to card-type */
++	if (!pd)
++		pd = &default_i2c_data2;
 +
-+	writel(S3C64XX_SDHCI_CONTROL4_DRIVE_9mA, r + S3C64XX_SDHCI_CONTROL4);
++	npd = kmemdup(pd, sizeof(struct s3c2410_platform_i2c), GFP_KERNEL);
++	if (!npd)
++		printk(KERN_ERR "%s: no memory for platform data\n", __func__);
++	else if (!npd->cfg_gpio)
++		npd->cfg_gpio = s3c_i2c2_cfg_gpio;
 +
-+	ctrl2 = readl(r + S3C_SDHCI_CONTROL2);
-+	ctrl2 &= S3C_SDHCI_CTRL2_SELBASECLK_MASK;
-+	ctrl2 |= (S3C64XX_SDHCI_CTRL2_ENSTAASYNCCLR |
-+		  S3C64XX_SDHCI_CTRL2_ENCMDCNFMSK |
-+		  S3C_SDHCI_CTRL2_ENFBCLKRX |
-+		  S3C_SDHCI_CTRL2_DFCNT_NONE |
-+		  S3C_SDHCI_CTRL2_ENCLKOUTHOLD);
-+
-+	if (ios->clock < 25 * 1000000)
-+		ctrl3 = (S3C_SDHCI_CTRL3_FCSEL3 |
-+			 S3C_SDHCI_CTRL3_FCSEL2 |
-+			 S3C_SDHCI_CTRL3_FCSEL1 |
-+			 S3C_SDHCI_CTRL3_FCSEL0);
-+	else
-+		ctrl3 = (S3C_SDHCI_CTRL3_FCSEL1 | S3C_SDHCI_CTRL3_FCSEL0);
-+
-+	writel(ctrl2, r + S3C_SDHCI_CONTROL2);
-+	writel(ctrl3, r + S3C_SDHCI_CONTROL3);
++	s3c_device_i2c2.dev.platform_data = npd;
 +}
-diff --git a/arch/arm/plat-s3c/include/plat/sdhci.h b/arch/arm/plat-s3c/include/plat/sdhci.h
-index c71d078..cf71b93 100644
---- a/arch/arm/plat-s3c/include/plat/sdhci.h
-+++ b/arch/arm/plat-s3c/include/plat/sdhci.h
-@@ -74,6 +74,10 @@ extern void s3c64xx_setup_sdhci1_cfg_gpio(struct platform_device *, int w);
- extern void s5pc100_setup_sdhci0_cfg_gpio(struct platform_device *, int w);
- extern void s5pc100_setup_sdhci1_cfg_gpio(struct platform_device *, int w);
- extern void s5pc100_setup_sdhci2_cfg_gpio(struct platform_device *, int w);
-+extern void s5pc110_setup_sdhci0_cfg_gpio(struct platform_device *, int w);
-+extern void s5pc110_setup_sdhci1_cfg_gpio(struct platform_device *, int w);
-+extern void s5pc110_setup_sdhci2_cfg_gpio(struct platform_device *, int w);
-+extern void s5pc110_setup_sdhci3_cfg_gpio(struct platform_device *, int w);
+diff --git a/arch/arm/plat-s3c/include/plat/iic.h b/arch/arm/plat-s3c/include/plat/iic.h
+index 67450f1..9f22675 100644
+--- a/arch/arm/plat-s3c/include/plat/iic.h
++++ b/arch/arm/plat-s3c/include/plat/iic.h
+@@ -54,9 +54,11 @@ struct s3c2410_platform_i2c {
+  */
+ extern void s3c_i2c0_set_platdata(struct s3c2410_platform_i2c *i2c);
+ extern void s3c_i2c1_set_platdata(struct s3c2410_platform_i2c *i2c);
++extern void s3c_i2c2_set_platdata(struct s3c2410_platform_i2c *i2c);
  
- /* S3C6400 SDHCI setup */
+ /* defined by architecture to configure gpio */
+ extern void s3c_i2c0_cfg_gpio(struct platform_device *dev);
+ extern void s3c_i2c1_cfg_gpio(struct platform_device *dev);
++extern void s3c_i2c2_cfg_gpio(struct platform_device *dev);
  
-@@ -200,4 +204,64 @@ static inline void s5pc100_default_sdhci1(void) { }
- static inline void s5pc100_default_sdhci2(void) { }
- #endif /* CONFIG_S5PC100_SETUP_SDHCI */
- 
-+/* S5PC110 SDHCI setup */
-+#ifdef CONFIG_S5PC110_SETUP_SDHCI
-+extern char *s5pc110_hsmmc_clksrcs[4];
-+
-+extern void s5pc110_setup_sdhci_cfg_card(struct platform_device *dev,
-+					   void __iomem *r,
-+					   struct mmc_ios *ios,
-+					   struct mmc_card *card);
-+
-+#ifdef CONFIG_S3C_DEV_HSMMC
-+static inline void s5pc110_default_sdhci0(void)
-+{
-+	s3c_hsmmc0_def_platdata.clocks = s5pc110_hsmmc_clksrcs;
-+	s3c_hsmmc0_def_platdata.cfg_gpio = s5pc110_setup_sdhci0_cfg_gpio;
-+	s3c_hsmmc0_def_platdata.cfg_card = s5pc110_setup_sdhci_cfg_card;
-+}
-+#else
-+static inline void s5pc100_default_sdhci0(void) { }
-+#endif /* CONFIG_S3C_DEV_HSMMC */
-+
-+#ifdef CONFIG_S3C_DEV_HSMMC1
-+static inline void s5pc110_default_sdhci1(void)
-+{
-+	s3c_hsmmc1_def_platdata.clocks = s5pc110_hsmmc_clksrcs;
-+	s3c_hsmmc1_def_platdata.cfg_gpio = s5pc110_setup_sdhci1_cfg_gpio;
-+	s3c_hsmmc1_def_platdata.cfg_card = s5pc110_setup_sdhci_cfg_card;
-+}
-+#else
-+static inline void s5pc110_default_sdhci1(void) { }
-+#endif /* CONFIG_S3C_DEV_HSMMC1 */
-+
-+#ifdef CONFIG_S3C_DEV_HSMMC2
-+static inline void s5pc110_default_sdhci2(void)
-+{
-+	s3c_hsmmc2_def_platdata.clocks = s5pc110_hsmmc_clksrcs;
-+	s3c_hsmmc2_def_platdata.cfg_gpio = s5pc110_setup_sdhci2_cfg_gpio;
-+	s3c_hsmmc2_def_platdata.cfg_card = s5pc110_setup_sdhci_cfg_card;
-+}
-+#else
-+static inline void s5pc110_default_sdhci2(void) { }
-+#endif /* CONFIG_S3C_DEV_HSMMC2 */
-+
-+#ifdef CONFIG_S3C_DEV_HSMMC3
-+static inline void s5pc110_default_sdhci3(void)
-+{
-+	s3c_hsmmc3_def_platdata.clocks = s5pc110_hsmmc_clksrcs;
-+	s3c_hsmmc3_def_platdata.cfg_gpio = s5pc110_setup_sdhci3_cfg_gpio;
-+	s3c_hsmmc3_def_platdata.cfg_card = s5pc110_setup_sdhci_cfg_card;
-+}
-+#else
-+static inline void s5pc110_default_sdhci3(void) { }
-+#endif /* CONFIG_S3C_DEV_HSMMC3 */
-+
-+#else
-+static inline void s5pc110_default_sdhci0(void) { }
-+static inline void s5pc110_default_sdhci1(void) { }
-+static inline void s5pc110_default_sdhci2(void) { }
-+static inline void s5pc110_default_sdhci3(void) { }
-+#endif /* CONFIG_S5PC100_SETUP_SDHCI */
-+
- #endif /* __PLAT_S3C_SDHCI_H */
+ #endif /* __ASM_ARCH_IIC_H */
 -- 
 1.6.4
