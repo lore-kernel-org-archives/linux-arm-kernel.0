@@ -1,24 +1,29 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 20 Nov 2009 11:17:03 +0000
-Subject: i.MX audio support
-In-Reply-To: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
-References: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20091120111703.GB20236@rakim.wolfsonmicro.main>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 20 Nov 2009 12:39:15 +0100
+Subject: Allow selecting MSM framebuffer in Kconfig
+Message-ID: <20091120113915.GA5154@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19, 2009 at 04:48:14PM +0100, Sascha Hauer wrote:
 
-> one single FIFO. The WM9712 I worked with sends data in slot 12 which we have
-> to sort out manually from the FIFO, so I think there is no way to work around
-> the fiq handler using the DMA engine with AC97.
+Allow user to select MSM framebuffer support in Kconfig.
 
-Slot 12 is used for GPIOs to allow them to be read/written without
-register accesses - I'd expect that data there will not be uncommon.
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-> The devdma code is actually a copy of sound/arm/devdma.[ch]. It should probably
-> be selected somehow instead of duplicated.
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index 188e1ba..b3e05e4 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -2127,7 +2127,7 @@ config FB_PRE_INIT_FB
+ 	  the bootloader.
+ 
+ config FB_MSM
+-	tristate
++	tristate "MSM Framebuffer support"
+ 	depends on FB && ARCH_MSM
+ 	select FB_CFB_FILLRECT
+ 	select FB_CFB_COPYAREA
 
-Yes, ideally.  A simple Makefile change in sound/arm should do the
-trick.  Other than this I'm happy with all the patches I've not
-specifically commented on.
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
