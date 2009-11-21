@@ -1,22 +1,33 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 21 Nov 2009 18:59:47 +0000
-Subject: [PATCH 07/10] ARM: PNX4008: move i2c suspend/resume callbacks
-	into driver
-In-Reply-To: <63386a3d0911210927u47c7d6d6i65fc7d60563f8db2@mail.gmail.com>
-References: <20091120144422.GA18223@n2100.arm.linux.org.uk>
-	<E1NBUkU-0004Pm-Nv@rmk-PC.arm.linux.org.uk>
-	<63386a3d0911210927u47c7d6d6i65fc7d60563f8db2@mail.gmail.com>
-Message-ID: <20091121185947.GD13956@n2100.arm.linux.org.uk>
+Date: Sat, 21 Nov 2009 19:00:37 +0000
+Subject: [PATCH] ARM: MX3: fix CPU revision number detection
+In-Reply-To: <1258820364-32693-1-git-send-email-daniel@caiaq.de>
+References: <1258820364-32693-1-git-send-email-daniel@caiaq.de>
+Message-ID: <20091121190037.GE13956@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 21, 2009 at 06:27:54PM +0100, Linus Walleij wrote:
-> If you have this up for testing anyway, would it be advisable to take this
-> opportunity to also switch i2c-pnx over to using struct dev_pm_ops?
+On Sat, Nov 21, 2009 at 05:19:24PM +0100, Daniel Mack wrote:
+> diff --git a/arch/arm/mach-mx3/cpu.c b/arch/arm/mach-mx3/cpu.c
+> new file mode 100644
+> index 0000000..b09f338
+> --- /dev/null
+> +++ b/arch/arm/mach-mx3/cpu.c
+> @@ -0,0 +1,57 @@
+> +/*
+> + * MX3 CPU type detection
+> + *
+> + * Copyright (c) 2009 Daniel Mack <daniel@caiaq.de>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <mach/hardware.h>
+> +#include <mach/iim.h>
+> +#include <asm/io.h>
 
-These patches are only compile-tested, and that's partly why there's soo
-many of them - each one does one transformation, which makes it easy to
-review for correctness.
-
-I'm also hoping that Kevin will test them on later PNX hardware so that
-they can be submitted.
+I see red.  linux/io.h please.
