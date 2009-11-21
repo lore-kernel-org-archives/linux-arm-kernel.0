@@ -1,27 +1,40 @@
-From: rkiyerpersonal@gmail.com (Rajanikanth H.V)
-Date: Sat, 21 Nov 2009 23:26:18 +0530
-Subject: [PATCH 0/7] dma-mapping: Cortex A9 speculative prefetch fixes
-In-Reply-To: <20091120182539.GG16920@n2100.arm.linux.org.uk>
-References: <20091120182539.GG16920@n2100.arm.linux.org.uk>
-Message-ID: <d82162470911210956p675cf153vbab1fda421b350da@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 21 Nov 2009 19:49:47 +0100
+Subject: Fix backlight limiting
+Message-ID: <20091121184947.GA2349@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
-I think you have missed to paste the refined patch, can you please
-resend the same.
+I have my trees quite modified in that area, testers welcome.
 
-thanks,
-Rajanikanth
+---
 
-On Fri, Nov 20, 2009 at 11:55 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> An equivalent patch has been tested by a couple of folk who now
-> report success. ?Here's the refined patch set. ?Acks, further
-> testing, and tested-by stuff welcome.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+This should fix backlight limiting on 2.6.32-rc... 
+
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
+
+Binary files arm.middle/mach-pxa/built-in.o and arm/mach-pxa/built-in.o differ
+diff -ur arm.middle/mach-pxa/sharpsl_pm.c arm/mach-pxa/sharpsl_pm.c
+--- a/arch/arm/mach-pxa/sharpsl_pm.c	2009-11-21 11:06:45.000000000 +0100
++++ b/arch/arm/mach-pxa/sharpsl_pm.c	2009-11-21 11:09:57.000000000 +0100
+@@ -179,7 +179,6 @@
+ 	dev_dbg(sharpsl_pm.dev, "Battery: voltage: %d, status: %d, percentage: %d, time: %ld\n", voltage,
+ 			sharpsl_pm.battstat.mainbat_status, sharpsl_pm.battstat.mainbat_percent, jiffies);
+ 
+-#ifdef CONFIG_BACKLIGHT_CORGI
+ 	/* If battery is low. limit backlight intensity to save power. */
+ 	if ((sharpsl_pm.battstat.ac_status != APM_AC_ONLINE)
+ 	    && ((sharpsl_pm.battstat.mainbat_status == APM_BATTERY_STATUS_LOW)
+@@ -192,7 +191,6 @@
+ 		sharpsl_pm.machinfo->backlight_limit(0);
+ 		sharpsl_pm.flags &= ~SHARPSL_BL_LIMIT;
+ 	}
+-#endif
+ 
+ 	/* Suspend if critical battery level */
+ 	if ((sharpsl_pm.battstat.ac_status != APM_AC_ONLINE)
+
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
