@@ -1,44 +1,22 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 22 Nov 2009 00:46:11 +0100
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sun, 22 Nov 2009 09:33:35 -0600
 Subject: 2.6.32-rc7: compile regression on spitz
-In-Reply-To: <20091118090100.GA1399@ucw.cz>
+In-Reply-To: <1258555133.3454.2.camel@hammer.suse.cz>
 References: <20091118090100.GA1399@ucw.cz>
-Message-ID: <20091121234611.GG1411@ucw.cz>
+	<1258555133.3454.2.camel@hammer.suse.cz>
+Message-ID: <f17812d70911220733va9997a1ibb6bbc8551f9c613@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2009-11-18 10:01:00, Pavel Machek wrote:
-> 
-> If CONFIG_AKITA is not set, spitz fails to compile. It worked ok in
-> rc5. Fix is one more ifdef...
-> 
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+2009/11/18 Stanislav Brabec <utx@penguin.cz>:
+> Pavel Machek wrote:
+>> If CONFIG_AKITA is not set, spitz fails to compile. It worked ok in
+>> rc5. Fix is one more ifdef...
+>
+> That was my mistake in 5e0fa3f.
+>
+>> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> Acked-by: Stanislav Brabec <utx@penguin.cz>
+>
 
-Eric, this being after-rc5 regression... it would be nice to actually
-fix it for final...
-								Pavel
-
-> --- a/arch/arm/mach-pxa/spitz.c	2009-11-17 17:10:21.000000000 +0100
-> +++ b/arch/arm/mach-pxa/spitz.c	2009-11-18 05:55:21.000000000 +0100
-> @@ -802,10 +802,12 @@
->  {
->  	spitz_ficp_platform_data.gpio_pwdown = SPITZ_GPIO_IR_ON;
->  
-> +#ifdef CONFIG_MACH_BORZOI
->  	if (machine_is_borzoi()) {
->  		sharpsl_nand_platform_data.badblock_pattern = &sharpsl_akita_bbt;
->  		sharpsl_nand_platform_data.ecc_layout = &akita_oobinfo;
->  	}
-> +#endif
->  
->  	platform_scoop_config = &spitz_pcmcia_config;
->  
-> 
-> 
-> 
-> 
-> 
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Applied to 'fix'.
