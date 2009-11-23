@@ -1,68 +1,32 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Mon, 23 Nov 2009 22:28:30 +0000
-Subject: CAS implementation may be broken
-In-Reply-To: <4B08055C.3000408@45mercystreet.com>
-Message-ID: <20091123222830.GA5598@shareable.org>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Mon, 23 Nov 2009 23:11:43 +0000
+Subject: [PATCH v2] i2c-designware updates
+In-Reply-To: <4AF419B6.1000802@necel.com>
+References: <4AF419B6.1000802@necel.com>
+Message-ID: <20091123231143.GA32202@fluff.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Toby Douglass wrote:
-> Load-linked/conditional-store architectures solve ABA by having the 
-> store fail if the destination has been touched since the load was performed.
+On Fri, Nov 06, 2009 at 09:42:30PM +0900, Shinya Kuribayashi wrote:
+> Hi Baruch and Ben,
 > 
-> Currently, the code appears to violate this, by repeating the CAS 
-> *anyway*.  In fact, the appropriate behaviour would seem to be *not* to 
-> loop, but rather, to issue the ldrex/strex *once*, and indicate to the 
-> user if the store succeed or failed.
+> here's v2 patchset of DesignWare I2C driver (i2c-designware.c).
+> I did all test I can do for now (including arbitration tests), and
+> fixed more issues left in the v1 patchset.  I think now the driver is
+> in reasonable shape for the mainline, and hope gets merged.
+> 
+> The patches which already have Baruch's Acked-by: line are logically
+> same as the previous v1 patches.  For the rest are revised version of
+> v1 patches, or newly added in v2.
+> 
+> There are 22 patches in total and might be slightly annoying.  I'll
+> send subsequent patches only to linux-i2c.
 
-I believe Catalin's explained why it does not work even doing
-LDREX/STREX once, because the thread can pause before the LDREX.  So
-you must begin fetching pointers after the LDREX.
+These are all queued at:
 
-(At least I think so.  I'm prepared to be shown to be wrong :-)
+	git://git.fluff.org/bjdooks/linux.git next-i2c-designware
 
-If you're writing code intended for other LL/SC architectures too, and
-following Catalin's suggestion to put LDR between LDREX and STREX,
-then you might have to check if the other architectures permit loads
-between the LL and SC.
+-- 
+Ben (ben at fluff.org, http://www.fluff.org/)
 
-> This requires a prototype change, because the return value is the 
-> original value of the destination and so is unable to indicate, when 
-> returning that value, if it is returned from a successful or 
-> unsuccessful swap.
-
-Nonetheless, such a prototype change might be an improvement anyway.
-
-Some platforms provide compare_and_swap_bool() operations, which do as
-you describe: Compare, conditionally store, and return bool to indicate
-success.  No loop.
-
-That could be an improvement for some algorithms, because often if the
-store doesn't happen, the *inputs* to compare_and_swap() need to be
-recalculated anyway before another try is likely to succeed.  What's
-the point in having code which expands to two loops:
-
-    do {
-       old = get_something;
-       new = calc_something;
-
-       /* oldval = compare_and_swap(ptr, old, new); */
-       do {
-           __asm__("LL/SC" : (failed), (oldval) : (ptr), (old), (new));
-       } while (failed && oldval == old);
-
-    } while (oldval != old);
-
-When it can often be a smaller loop, which probably executes a little
-faster too in various cases:
-
-    do {
-       old = get_something;
-       new = calc_something;
-
-       /* oldval = compare_and_swap_bool(ptr, old, new); */
-       __asm__("LL/SC" : (failed), (oldval) : (ptr), (old), (new));
-
-    } while (failed);
-
--- Jamie
+  'a smiley only costs 4 bytes'
