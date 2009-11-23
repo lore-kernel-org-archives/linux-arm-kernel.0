@@ -1,22 +1,26 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 Nov 2009 10:29:55 +0000
-Subject: [PATCH 0/7] dma-mapping: Cortex A9 speculative prefetch fixes
-In-Reply-To: <20091121140037.GI6741@wear.picochip.com>
-References: <20091120182539.GG16920@n2100.arm.linux.org.uk>
-	<20091121140037.GI6741@wear.picochip.com>
-Message-ID: <20091123102955.GB16050@n2100.arm.linux.org.uk>
+Date: Mon, 23 Nov 2009 10:38:14 +0000
+Subject: [PATCH 09/19] drivers: serial: add support for Samsung S5PC110
+	SoC uart
+In-Reply-To: <000e01ca6911$24ea5d20$6ebf1760$%szyprowski@samsung.com>
+References: <1258551194-16018-10-git-send-email-m.szyprowski@samsung.com>
+	<1b68c6790911180614y355f656fs828177ecc845ec8e@mail.gmail.com>
+	<20091118221345.GB4808@trinity.fluff.org>
+	<1b68c6790911181844p3fb32525h11f79f942afb2d64@mail.gmail.com>
+	<20091119103336.GB15460@sirena.org.uk>
+	<1b68c6790911190305w33e777e3n1ed6b172d67f1639@mail.gmail.com>
+	<20091119110827.GE9763@rakim.wolfsonmicro.main>
+	<20091119113841.GJ13376@n2100.arm.linux.org.uk>
+	<20091119114833.GH9763@rakim.wolfsonmicro.main>
+	<000e01ca6911$24ea5d20$6ebf1760$%szyprowski@samsung.com>
+Message-ID: <20091123103814.GA16741@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 21, 2009 at 02:00:37PM +0000, Jamie Iles wrote:
-> On Fri, Nov 20, 2009 at 06:25:39PM +0000, Russell King - ARM Linux wrote:
-> > An equivalent patch has been tested by a couple of folk who now
-> > report success.  Here's the refined patch set.  Acks, further
-> > testing, and tested-by stuff welcome.
-> Tested against 2.6.32-rc8 on an ARM1176JZ-S platform and this fixes the issues
-> that we were seeing.
-> 
-> Tested-By: Jamie Iles <jamie@jamieiles.com>
+On Thu, Nov 19, 2009 at 01:09:23PM +0100, Marek Szyprowski wrote:
+> What if a device does not operate properly when clocked from one of the
+> available clock sources (lets say machine specific problem)? There must
+> be a way of setting which clock(s) should not be considered when calculating
+> best choice for particular device.
 
-Thanks Jamie.  We're a little too late for 2.6.32, but it'll be merged
-during the post 2.6.32 window.
+Do you have a real life case where this is true?
