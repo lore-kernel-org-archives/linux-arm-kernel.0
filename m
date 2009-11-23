@@ -1,84 +1,43 @@
 From: valentin.longchamp@epfl.ch (Valentin Longchamp)
-Date: Mon, 23 Nov 2009 19:16:36 +0100
-Subject: [PATCH 2/3] mx31moboard: SPI corrections
-In-Reply-To: <1259000197-18627-2-git-send-email-valentin.longchamp@epfl.ch>
+Date: Mon, 23 Nov 2009 19:16:35 +0100
+Subject: [PATCH 1/3] mx31: pins used for mx31moboard USB
+In-Reply-To: <1259000197-18627-1-git-send-email-valentin.longchamp@epfl.ch>
 References: <1259000197-18627-1-git-send-email-valentin.longchamp@epfl.ch>
-	<1259000197-18627-2-git-send-email-valentin.longchamp@epfl.ch>
-Message-ID: <1259000197-18627-3-git-send-email-valentin.longchamp@epfl.ch>
+Message-ID: <1259000197-18627-2-git-send-email-valentin.longchamp@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds requirement for ADC on mc13783 and moves the spidev declaration
-to marxbot file.
-
 Signed-off-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
 ---
- arch/arm/mach-mx3/mx31moboard-marxbot.c |   13 +++++++++++++
- arch/arm/mach-mx3/mx31moboard.c         |    7 +------
- 2 files changed, 14 insertions(+), 6 deletions(-)
+ arch/arm/plat-mxc/include/mach/iomux-mx3.h |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mx3/mx31moboard-marxbot.c b/arch/arm/mach-mx3/mx31moboard-marxbot.c
-index 7f3c71c..738c118 100644
---- a/arch/arm/mach-mx3/mx31moboard-marxbot.c
-+++ b/arch/arm/mach-mx3/mx31moboard-marxbot.c
-@@ -21,6 +21,7 @@
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/i2c.h>
-+#include <linux/spi/spi.h>
- #include <linux/platform_device.h>
- #include <linux/types.h>
- 
-@@ -126,6 +127,15 @@ static void dspics_resets_init(void)
- 	}
- }
- 
-+static struct spi_board_info marxbot_spi_board_info[] __initdata = {
-+	{
-+		.modalias = "spidev",
-+		.max_speed_hz = 300000,
-+		.bus_num = 1,
-+		.chip_select = 1, /* according spi1_cs[] ! */
-+	},
-+};
-+
- #define TURRETCAM_POWER	IOMUX_TO_GPIO(MX31_PIN_GPIO3_1)
- #define BASECAM_POWER	IOMUX_TO_GPIO(MX31_PIN_CSI_D5)
- #define TURRETCAM_RST_B	IOMUX_TO_GPIO(MX31_PIN_GPIO3_0)
-@@ -217,6 +227,9 @@ void __init mx31moboard_marxbot_init(void)
- 
- 	mxc_register_device(&mx31_sdhc_device1, &sdhc2_pdata);
- 
-+	spi_register_board_info(marxbot_spi_board_info,
-+		ARRAY_SIZE(marxbot_spi_board_info));
-+
- 	marxbot_cam_init();
- 	platform_add_devices(marxbot_cameras, ARRAY_SIZE(marxbot_cameras));
- 
-diff --git a/arch/arm/mach-mx3/mx31moboard.c b/arch/arm/mach-mx3/mx31moboard.c
-index 8b786ca..db77608 100644
---- a/arch/arm/mach-mx3/mx31moboard.c
-+++ b/arch/arm/mach-mx3/mx31moboard.c
-@@ -213,6 +213,7 @@ static struct mc13783_platform_data moboard_pmic = {
- 	.regulators = moboard_regulators,
- 	.num_regulators = ARRAY_SIZE(moboard_regulators),
- 	.flags = MC13783_USE_REGULATOR | MC13783_USE_RTC,
-+		MC13783_USE_ADC,
- };
- 
- static struct spi_board_info moboard_spi_board_info[] __initdata = {
-@@ -225,12 +226,6 @@ static struct spi_board_info moboard_spi_board_info[] __initdata = {
- 		.platform_data = &moboard_pmic,
- 		.mode = SPI_CS_HIGH,
- 	},
--	{
--		.modalias = "spidev",
--		.max_speed_hz = 300000,
--		.bus_num = 1,
--		.chip_select = 1, /* according spi1_cs[] ! */
--	},
- };
- 
- static int moboard_spi2_cs[] = {
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx3.h b/arch/arm/plat-mxc/include/mach/iomux-mx3.h
+index 0dcfb77..50efa24 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-mx3.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-mx3.h
+@@ -644,12 +644,22 @@ enum iomux_pins {
+ #define MX31_PIN_CSPI1_SS2__USBH1_RCV          IOMUX_MODE(MX31_PIN_CSPI1_SS2,  IOMUX_CONFIG_ALT1)
+ #define MX31_PIN_CSPI1_SCLK__USBH1_OEB         IOMUX_MODE(MX31_PIN_CSPI1_SCLK, IOMUX_CONFIG_ALT1)
+ #define MX31_PIN_CSPI1_SPI_RDY__USBH1_FS       IOMUX_MODE(MX31_PIN_CSPI1_SPI_RDY, IOMUX_CONFIG_ALT1)
++#define MX31_PIN_SFS6__USBH1_SUSPEND	IOMUX_MODE(MX31_PIN_SFS6, IOMUX_CONFIG_FUNC)
++#define MX31_PIN_NFRE_B__GPIO1_11	IOMUX_MODE(MX31_PIN_NFRE_B, IOMUX_CONFIG_GPIO)
++#define MX31_PIN_NFALE__GPIO1_12	IOMUX_MODE(MX31_PIN_NFALE, IOMUX_CONFIG_GPIO)
+ #define MX31_PIN_USBH2_DATA0__USBH2_DATA0      IOMUX_MODE(MX31_PIN_USBH2_DATA0, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_USBH2_DATA1__USBH2_DATA1      IOMUX_MODE(MX31_PIN_USBH2_DATA1, IOMUX_CONFIG_FUNC)
++#define MX31_PIN_STXD3__USBH2_DATA2	IOMUX_MODE(MX31_PIN_STXD3, IOMUX_CONFIG_FUNC)
++#define MX31_PIN_SRXD3__USBH2_DATA3	IOMUX_MODE(MX31_PIN_SRXD3, IOMUX_CONFIG_FUNC)
++#define MX31_PIN_SCK3__USBH2_DATA4	IOMUX_MODE(MX31_PIN_SCK3, IOMUX_CONFIG_FUNC)
++#define MX31_PIN_SFS3__USBH2_DATA5	IOMUX_MODE(MX31_PIN_SFS3, IOMUX_CONFIG_FUNC)
++#define MX31_PIN_STXD6__USBH2_DATA6	IOMUX_MODE(MX31_PIN_STXD6, IOMUX_CONFIG_FUNC)
++#define MX31_PIN_SRXD6__USBH2_DATA7	IOMUX_MODE(MX31_PIN_SRXD6, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_USBH2_CLK__USBH2_CLK          IOMUX_MODE(MX31_PIN_USBH2_CLK, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_USBH2_DIR__USBH2_DIR          IOMUX_MODE(MX31_PIN_USBH2_DIR, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_USBH2_NXT__USBH2_NXT          IOMUX_MODE(MX31_PIN_USBH2_NXT, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_USBH2_STP__USBH2_STP          IOMUX_MODE(MX31_PIN_USBH2_STP, IOMUX_CONFIG_FUNC)
++#define MX31_PIN_SCK6__GPIO1_25		IOMUX_MODE(MX31_PIN_SCK6, IOMUX_CONFIG_GPIO)
+ #define MX31_PIN_USB_OC__GPIO1_30	IOMUX_MODE(MX31_PIN_USB_OC, IOMUX_CONFIG_GPIO)
+ #define MX31_PIN_I2C_DAT__I2C1_SDA	IOMUX_MODE(MX31_PIN_I2C_DAT, IOMUX_CONFIG_FUNC)
+ #define MX31_PIN_I2C_CLK__I2C1_SCL	IOMUX_MODE(MX31_PIN_I2C_CLK, IOMUX_CONFIG_FUNC)
 -- 
 1.6.3.3
