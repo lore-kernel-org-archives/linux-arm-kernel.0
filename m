@@ -1,28 +1,22 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 23 Nov 2009 11:28:07 +0100
-Subject: [PATCH 0/6] mx31moboard: patches for next merge window (V3)
-In-Reply-To: <1258640588-12705-1-git-send-email-valentin.longchamp@epfl.ch>
-References: <1258640588-12705-1-git-send-email-valentin.longchamp@epfl.ch>
-Message-ID: <20091123102807.GB30179@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 Nov 2009 10:29:55 +0000
+Subject: [PATCH 0/7] dma-mapping: Cortex A9 speculative prefetch fixes
+In-Reply-To: <20091121140037.GI6741@wear.picochip.com>
+References: <20091120182539.GG16920@n2100.arm.linux.org.uk>
+	<20091121140037.GI6741@wear.picochip.com>
+Message-ID: <20091123102955.GB16050@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Valentin,
-
-On Thu, Nov 19, 2009 at 03:23:01PM +0100, Valentin Longchamp wrote:
-> Here are the patches I would like to push during the next merge window for
-> the mx31moboard platform.
+On Sat, Nov 21, 2009 at 02:00:37PM +0000, Jamie Iles wrote:
+> On Fri, Nov 20, 2009 at 06:25:39PM +0000, Russell King - ARM Linux wrote:
+> > An equivalent patch has been tested by a couple of folk who now
+> > report success.  Here's the refined patch set.  Acks, further
+> > testing, and tested-by stuff welcome.
+> Tested against 2.6.32-rc8 on an ARM1176JZ-S platform and this fixes the issues
+> that we were seeing.
 > 
-> Sascha, I have seen that you already have commited last version to your
-> mxc-master-pu branch, could you please update with that series ?
+> Tested-By: Jamie Iles <jamie@jamieiles.com>
 
-Can you provide incremental patches instead please?
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks Jamie.  We're a little too late for 2.6.32, but it'll be merged
+during the post 2.6.32 window.
