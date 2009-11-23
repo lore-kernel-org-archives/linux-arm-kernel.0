@@ -1,29 +1,85 @@
-From: jkosina@suse.cz (Jiri Kosina)
-Date: Mon, 23 Nov 2009 10:25:15 +0100 (CET)
-Subject: [PATCH TRIVIAL] atmel_lcdfb.c: Fix sinfo->irqbase from %lu to
-	%d in dev_info().
-In-Reply-To: <4B0A4813.7060305@evidence.eu.com>
-References: <1255083621-25147-1-git-send-email-nicolas.ferre@atmel.com>
-	<alpine.LSU.2.00.0910091730560.19284@wotan.suse.de>
-	<4B0A4813.7060305@evidence.eu.com>
-Message-ID: <alpine.LSU.2.00.0911231023140.6953@wotan.suse.de>
+From: jack_wang@usish.com (jack wang)
+Date: Mon, 23 Nov 2009 17:59:58 +0800
+Subject: [rtc-linux] [PATCH] ARM: NUC900: add rtc controller driver
+	support for NUC900
+In-Reply-To: <e68bb3470911230130j7ce8e81cp355de325c5fab759@mail.gmail.com>
+References: <e68bb3470911190026q5bcf73a0r5431de4ce285ed92@mail.gmail.com>
+	<e68bb3470911200656k16245526la863f2865a3aa4d1@mail.gmail.com>
+	<D7863ABD8A8A4912A693215721E64C8D@usish.com.cn>
+	<e68bb3470911230130j7ce8e81cp355de325c5fab759@mail.gmail.com>
+Message-ID: <6A307B6986654E208CF0CA87C603BAB0@usish.com.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Nov 2009, Claudio Scordino wrote:
 
->    may I ask you the current status of this patch ? I noticed that it
-> has not been merged, yet.
-> 
-> Do we have any idea when it will be done ?
-> 
-> Since it is a trivial fix, I think it should be merged before the
-> release of v2.6.32 (i.e., waiting the next merge window does not make
-> much sense for such a trivial fix...).
+Hi jack,
 
-I usually don't send pull requests for trivial queue to Linus more than 
-once per release cycle.
+2009/11/23 jack wang <jack_wang@usish.com>:
+> +static int __devinit nuc900_rtc_probe(struct platform_device *pdev)
+> +{
+> + ? ? ? struct resource *res;
+> + ? ? ? struct nuc900_rtc *nuc900_rtc;
+> + ? ? ? int err;
+> +
+> + ? ? ? nuc900_rtc = kzalloc(sizeof(struct nuc900_rtc), GFP_KERNEL);
+> + ? ? ? if (!nuc900_rtc) {
+> + ? ? ? ? ? ? ? err = -ENOMEM;
+> + ? ? ? ? ? ? ? goto fail1;
+> [jack] Here goto fail1 is not quite right, You'd better just return err
+> instead or just use if (!nu900_rtc) return -ENOMEM;
 
--- 
-Jiri Kosina
-SUSE Labs, Novell Inc.
+Hmmm, good, it is right, but why did not 'CC' other people? :)
+
+Thanks !
+
+[Jack]I am not subscribe arm dev list, just review from
+http://www.spinics.net/lists , but now CC'ing added :-)
+
+Wang Jinpu
+
+> + ? ? ? }
+> +
+> + ? ? ? res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> + ? ? ? if (!res) {
+> + ? ? ? ? ? ? ? err = -ENXIO;
+> + ? ? ? ? ? ? ? goto fail1;
+> + ? ? ? }
+> +
+> + ? ? ? if (!request_mem_region(res->start, resource_size(res),
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pdev->name)) {
+> + ? ? ? ? ? ? ? err = -EBUSY;
+> + ? ? ? ? ? ? ? goto fail1;
+> + ? ? ? }
+> +
+> + ? ? ? nuc900_rtc->rtc_reg = ioremap(res->start, resource_size(res));
+> + ? ? ? if (!nuc900_rtc->rtc_reg) {
+> + ? ? ? ? ? ? ? err = -ENOMEM;
+> + ? ? ? ? ? ? ? goto fail2;
+> + ? ? ? }
+> +
+> + ? ? ? nuc900_rtc->irq_num = platform_get_irq(pdev, 0);
+> + ? ? ? if (request_irq(nuc900_rtc->irq_num, nuc900_rtc_interrupt,
+> + ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED, "nuc900rtc", nuc900_rtc)) {
+> + ? ? ? ? ? ? ? err = -EBUSY;
+> + ? ? ? ? ? ? ? goto fail3;
+> + ? ? ? }
+> +
+> + ? ? ? nuc900_rtc->rtcdev = rtc_device_register(pdev->name, &pdev->dev,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &nuc900_rtc_ops,
+> THIS_MODULE);
+> + ? ? ? if (IS_ERR(nuc900_rtc->rtcdev)) {
+> + ? ? ? ? ? ? ? err = PTR_ERR(nuc900_rtc->rtcdev);
+> + ? ? ? ? ? ? ? goto fail4;
+> + ? ? ? }
+> +
+> + ? ? ? platform_set_drvdata(pdev, nuc900_rtc->rtcdev);
+> + ? ? ? nuc900_rtc_enbale_timeirq(nuc900_rtc, 1);
+> +
+> + ? ? ? return 0;
+> +
+> +fail4: free_irq(nuc900_rtc->irq_num, nuc900_rtc);
+> +fail3: iounmap(nuc900_rtc->rtc_reg);
+> +fail2: release_mem_region(res->start, resource_size(res));
+> +fail1: kfree(nuc900_rtc);
+> + ? ? ? return err;
+> +}
