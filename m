@@ -1,23 +1,34 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Mon, 23 Nov 2009 12:09:39 +0100
-Subject: [PATCH] ARM: MX3: lilly1131: move MC13783 device registration
-In-Reply-To: <20091123104522.GD30179@pengutronix.de>
-References: <1258825240-2992-1-git-send-email-daniel@caiaq.de>
-	<20091123104522.GD30179@pengutronix.de>
-Message-ID: <20091123110939.GG14091@buzzloop.caiaq.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 23 Nov 2009 12:00:01 +0000
+Subject: [PATCH 06/12] imx-ssi sound driver
+In-Reply-To: <ed82fe3e0911211812i49342b0eg2afe861c866db90c@mail.gmail.com>
+References: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-2-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-3-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-4-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-5-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-6-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-7-git-send-email-s.hauer@pengutronix.de>
+	<ed82fe3e0911211812i49342b0eg2afe861c866db90c@mail.gmail.com>
+Message-ID: <20091123120000.GC24326@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Sat, Nov 21, 2009 at 08:12:34PM -0600, Timur Tabi wrote:
 
-On Mon, Nov 23, 2009 at 11:45:22AM +0100, Sascha Hauer wrote:
-> On Sat, Nov 21, 2009 at 06:40:40PM +0100, Daniel Mack wrote:
-> > Register the MC13783 device in the module code.
-> > 
-> > Signed-off-by: Daniel Mack <daniel@caiaq.de>
-> 
-> Added to mxc-master.
+> Why did you write a new SSI driver when there already is one in sound/soc/fsl?
 
-Thanks! Did you pick the LiteKit patches, too?
+I can't speak for Sascha here but the i.MX BSPs provided by your
+colleagues on the i.MX team also have an independant driver for the SSI
+port.  The latest public version of the Freescale i.MX code I'm aware of
+is in the recent Ubuntu kernels - I've not yet checked but I'd not be
+surprised to see substantial code sharing between Sascha's code and the
+BSP for the SSI-specific bits.
 
-Daniel
+It would be very much desirable to unify the various drivers, though I
+would prefer to avoid making this a blocker for getting i.MX3x "DMA"
+support in mainline.  Taking a brief glance through the code it looks
+like there's some platform-specifics in the drivers - the i.MX one has
+optional DMA support due to the whole SDMA issue, while the PowerPC one
+is including asm/immap_86xx.h for something.  Perhaps pulling the common
+code into a library would be a good approach here?
