@@ -1,32 +1,43 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 23 Nov 2009 23:11:43 +0000
-Subject: [PATCH v2] i2c-designware updates
-In-Reply-To: <4AF419B6.1000802@necel.com>
-References: <4AF419B6.1000802@necel.com>
-Message-ID: <20091123231143.GA32202@fluff.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 Nov 2009 23:13:53 +0000
+Subject: CAS implementation may be broken
+In-Reply-To: <20091123222830.GA5598@shareable.org>
+References: <4B08055C.3000408@45mercystreet.com>
+	<20091123222830.GA5598@shareable.org>
+Message-ID: <20091123231353.GJ18142@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 06, 2009 at 09:42:30PM +0900, Shinya Kuribayashi wrote:
-> Hi Baruch and Ben,
-> 
-> here's v2 patchset of DesignWare I2C driver (i2c-designware.c).
-> I did all test I can do for now (including arbitration tests), and
-> fixed more issues left in the v1 patchset.  I think now the driver is
-> in reasonable shape for the mainline, and hope gets merged.
-> 
-> The patches which already have Baruch's Acked-by: line are logically
-> same as the previous v1 patches.  For the rest are revised version of
-> v1 patches, or newly added in v2.
-> 
-> There are 22 patches in total and might be slightly annoying.  I'll
-> send subsequent patches only to linux-i2c.
+On Mon, Nov 23, 2009 at 10:28:30PM +0000, Jamie Lokier wrote:
+> That could be an improvement for some algorithms, because often if the
+> store doesn't happen, the *inputs* to compare_and_swap() need to be
+> recalculated anyway before another try is likely to succeed.  What's
+> the point in having code which expands to two loops:
 
-These are all queued at:
+The point is that often its cheaper to retry the LL/SC than it is to
+do the recalculation.
 
-	git://git.fluff.org/bjdooks/linux.git next-i2c-designware
+However, I don't think you've understood the original problem at all.
+The issue is that for a particular 32-bit word, the behaviour required
+is:
 
--- 
-Ben (ben at fluff.org, http://www.fluff.org/)
+ - if no change occurs between the _original_ read and the atomic update,
+   then go ahead with the update
+ - if any change has occured, do not update, but go back and recalculate
+   from the beginning.
 
-  'a smiley only costs 4 bytes'
+This is because, even if the value at the pointer is restored back to
+the numerically identical value it had at the start, the requirement is
+for the store to fail.
+
+No amount of loops (or lack of loops) solves that, even if you have a
+proper single atomic 32-bit CAS instruction.
+
+You need to be far more clever, and there's some hints on wikipedia
+about possible solutions.  They assume that you can CAS more bits than
+your intended value though, which we don't have.
+
+I believe there is a solution to the ABA problem using atomic operations
+with one 32-bit word and a separate counter to identify updates, but it
+requires a little more time than I have available this evening to fully
+put together.
