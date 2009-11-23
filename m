@@ -1,60 +1,31 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Mon, 23 Nov 2009 15:48:51 +0800
-Subject: [PATCH] NUC900: add spi resource plaform_data structure initialization
-Message-ID: <4B0A3E63.1080904@gmail.com>
+From: a.zummo@towertech.it (Alessandro Zummo)
+Date: Mon, 23 Nov 2009 09:21:41 +0100
+Subject: [rtc-linux] [PATCH] ARM: NUC900: add rtc controller driver
+	support  for NUC900
+In-Reply-To: <4B0A2D31.5020307@gmail.com>
+References: <4B097FA0.8040308@gmail.com>
+	<20091122214107.1a0c4e72@linux.lan.towertech.it>
+	<4B0A2D31.5020307@gmail.com>
+Message-ID: <20091123092141.519d0ec1@linux.lan.towertech.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Russell,
+On Mon, 23 Nov 2009 14:35:29 +0800
+Wan ZongShun <mcuos.com@gmail.com> wrote:
 
-Add spi resource plaform_data structure initialization.
+> Thanks a lot for your advice, and I have fixed my patch.
+> But, I have a question ,which is that why do not implement ops->ioctl()
+> unless absolutely necessary? and I see many other rtc driver have implemented it. 
 
-Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
+ That's because the RTC framework will provide one
+ for you if you define the irq functions in your 
+ rtc_ops. check *_irq_enable, irq_set_state, irq_set_freq.
 
----
- arch/arm/mach-w90x900/dev.c |   16 ++++++++++++++++
- 1 files changed, 16 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-w90x900/dev.c b/arch/arm/mach-w90x900/dev.c
-index 2a6f98d..51f17b7 100644
---- a/arch/arm/mach-w90x900/dev.c
-+++ b/arch/arm/mach-w90x900/dev.c
-@@ -32,6 +32,7 @@
- #include <asm/mach-types.h>
- 
- #include <mach/regs-serial.h>
-+#include <mach/nuc900_spi.h>
- #include <mach/map.h>
- 
- #include "cpu.h"
-@@ -196,6 +197,18 @@ static struct platform_device nuc900_device_emc = {
- 
- /* SPI device */
- 
-+static struct w90p910_spi_info nuc900_spiflash_data = {
-+	.num_cs		= 1,
-+	.lsb		= 0,
-+	.txneg		= 1,
-+	.rxneg		= 0,
-+	.divider	= 24,
-+	.sleep		= 0,
-+	.txnum		= 0,
-+	.txbitlen	= 1,
-+	.bus_num	= 0,
-+};
-+
- static struct resource nuc900_spi_resource[] = {
- 	[0] = {
- 		.start = W90X900_PA_I2C + SPIOFFSET,
-@@ -214,6 +227,9 @@ static struct platform_device nuc900_device_spi = {
- 	.id		= -1,
- 	.num_resources	= ARRAY_SIZE(nuc900_spi_resource),
- 	.resource	= nuc900_spi_resource,
-+	.dev		= {
-+				.platform_data = &nuc900_spiflash_data,
-+			}
- };
- 
- /* spi device, spi flash info */
 -- 
-1.5.6.3
+
+ Best regards,
+
+ Alessandro Zummo,
+  Tower Technologies - Torino, Italy
+
+  http://www.towertech.it
