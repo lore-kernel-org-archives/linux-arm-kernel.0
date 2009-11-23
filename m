@@ -1,43 +1,31 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Mon, 23 Nov 2009 16:31:11 +0100
-Subject: [PATCH] MX27: Add USB platform devices and resources
-In-Reply-To: <37367b3a0911230718s3dd16d99n1b2ce858b79218ca@mail.gmail.com>
-References: <eedb5540907150626m3dbf815bif92ff179b6ebfe58@mail.gmail.com>
-	<20090716081235.GQ2714@pengutronix.de>
-	<37367b3a0911230436i5d44cd80y182316ef056d6b31@mail.gmail.com>
-	<37367b3a0911230718s3dd16d99n1b2ce858b79218ca@mail.gmail.com>
-Message-ID: <20091123153111.GM14091@buzzloop.caiaq.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 23 Nov 2009 15:34:39 +0000
+Subject: CAS implementation may be broken
+In-Reply-To: <4B08055C.3000408@45mercystreet.com>
+References: <4B08055C.3000408@45mercystreet.com>
+Message-ID: <1258990479.8088.39.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23, 2009 at 01:18:03PM -0200, Alan Carvalho de Assis wrote:
-> Now sending to right linux-arm address...
-> 
-> On 11/23/09, Alan Carvalho de Assis <acassis@gmail.com> wrote:
-> > Hi Sascha,
-> >
-> > On 7/16/09, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> >> On Wed, Jul 15, 2009 at 03:26:21PM +0200, javier Martin wrote:
-> >>> This adds clocks and resources for usb in i.mx27 SoC.
-> >>
-> >> Ok, applied to mxc-master.
-> >>
-> >
-> > What do we need now to get USB working on i.MX27?
-> >
-> 
-> (replying myself)
-> I think this Daniel Mack's patch will be necessary:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2009-June/002972.html
+On Sat, 2009-11-21 at 15:21 +0000, Toby Douglass wrote:
+> Load-linked/conditional-store architectures solve ABA by having the
+> store fail if the destination has been touched since the load was performed.
 
-The patch you refer to only contains the relevant bits for MX31, you
-would need to tweak it a little to make MX27 work as well. I think this
-has been done already by someone, but I can't remember exactly.
+So, for your problem, CAS wouldn't solve it on any architecture, not
+just ARM if it is implemented with LL/SC.
 
-> Sascha, what is missing to this patch be applied?
+Something like below may work (untested and haven't put much thought
+into it). Basically you need atomicity between the moment you first get
+the head pointer and the moment you update it. CAS doesn't ensure this
+since the first load of the [head] pointer would be standard LDR (even
+if it is LDREX, you get another LDREX which resets the link with the
+STREX):
 
-The patch above and some others are already queued for 2.6.33. The ARM
-specific things are in Sascha's mxc-master, the rest in the USB tree.
+1:	LDREX	orig_head, [head]
+	LDR	orig_next, [orig_head, #next]
+	STREX	res, orig_next, [head]
+	cmp	res, #0
+	bne	1b
 
-Daniel
+-- 
+Catalin
