@@ -1,34 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 Nov 2009 20:31:10 +0000
-Subject: cache aliasing in dup_mmap
-In-Reply-To: <e06498070911191008t1861e730u5cdb49187af00ae0@mail.gmail.com>
-References: <e06498070909290930w7745e1e3x2e224ad75ff62dbd@mail.gmail.com>
-	<20090929191108.GA13568@n2100.arm.linux.org.uk>
-	<20091005144623.GA20633@n2100.arm.linux.org.uk>
-	<20091105144830.GC21681@n2100.arm.linux.org.uk>
-	<e06498070911130649k2051e4cfh2066cf0b9fdabbaf@mail.gmail.com>
-	<20091116163028.GA3568@n2100.arm.linux.org.uk>
-	<e06498070911160923i2273b6aai6f144b36289203d2@mail.gmail.com>
-	<20091116222016.GF3568@n2100.arm.linux.org.uk>
-	<20091119085735.GA14178@n2100.arm.linux.org.uk>
-	<e06498070911191008t1861e730u5cdb49187af00ae0@mail.gmail.com>
-Message-ID: <20091123203110.GH18142@n2100.arm.linux.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 23 Nov 2009 21:32:04 +0100
+Subject: spitz: suspend/resume broken in pxa tree
+Message-ID: <20091123203204.GA26942@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19, 2009 at 01:08:01PM -0500, Steven Walter wrote:
-> On Thu, Nov 19, 2009 at 3:57 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > I'm afraid that I have nothing further to suggest, and so I'm shelving
-> > the patches. ?That means this problem will remain unresolved in future
-> > kernels.
-> 
-> I had the tester restart the reboot-loop, and so far it's done ~1200
-> runs with no problem.  I'm thinking now that either I hosed something
-> up with the build initially, or else the tester didn't flash it
-> correctly.  1200 runs isn't enough to be conclusive, but it's a lot
-> better than 88.  I'll let you know when we have something more
-> definitive.
+Hi!
 
-I'd just like to keep this issue hot so it doesn't get forgotten about.
-Are we at a conclusive point on this?
+I tried checking out Eric's pxa tree (I hope I got it right), and 
+
+commit b0bd7b56ff4a0672d11751e4f20505d1cad1e132
+Merge: 989eadd 0352170
+Author: Eric Miao <eric.y.miao@gmail.com>
+Date:   Wed Nov 11 22:51:19 2009 +0800
+
+    Merge branch 'topic/cm-x300' into for-next
+    
+    Conflicts:
+        arch/arm/mach-pxa/cm-x300.c
+
+(which should be current head?) seems to boot ok, but there's no
+reaction on power button after suspend :-(.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
