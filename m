@@ -1,73 +1,68 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 23 Nov 2009 21:34:10 +0000
-Subject: [PATCH 5/8] S3C64xx: fix USB OTG compilation
-In-Reply-To: <b2e8f9f70911200404u61f42858h6651995113935528@mail.gmail.com>
-References: <b2e8f9f70911200404u61f42858h6651995113935528@mail.gmail.com>
-Message-ID: <20091123213410.GH4808@trinity.fluff.org>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Mon, 23 Nov 2009 22:28:30 +0000
+Subject: CAS implementation may be broken
+In-Reply-To: <4B08055C.3000408@45mercystreet.com>
+Message-ID: <20091123222830.GA5598@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2009 at 01:04:08PM +0100, Maurus Cuelenaere wrote:
-> This adds the S3C_VA_USB_HSPHY mapping.
+Toby Douglass wrote:
+> Load-linked/conditional-store architectures solve ABA by having the 
+> store fail if the destination has been touched since the load was performed.
+> 
+> Currently, the code appears to violate this, by repeating the CAS 
+> *anyway*.  In fact, the appropriate behaviour would seem to be *not* to 
+> loop, but rather, to issue the ldrex/strex *once*, and indicate to the 
+> user if the store succeed or failed.
 
-will apply, not sure whether to try another fixes patch or to
-add this to -next.
- 
-> Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
-> ---
->  arch/arm/mach-s3c6400/include/mach/map.h |    4 ++++
->  arch/arm/plat-s3c64xx/cpu.c              |    5 +++++
->  2 files changed, 9 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c6400/include/mach/map.h
-> b/arch/arm/mach-s3c6400/include/mach/map.h
-> index fc8b223..f3b48f8 100644
-> --- a/arch/arm/mach-s3c6400/include/mach/map.h
-> +++ b/arch/arm/mach-s3c6400/include/mach/map.h
-> @@ -64,6 +64,9 @@
-> 
->  #define S3C64XX_PA_USBHOST	(0x74300000)
-> 
-> +#define S3C64XX_PA_USB_HSPHY	(0x7C100000)
-> +#define S3C64XX_VA_USB_HSPHY	S3C_ADDR_CPU(0x00200000)
-> +
->  /* place VICs close together */
->  #define S3C_VA_VIC0		(S3C_VA_IRQ + 0x00)
->  #define S3C_VA_VIC1		(S3C_VA_IRQ + 0x10000)
-> @@ -79,5 +82,6 @@
->  #define S3C_PA_FB		S3C64XX_PA_FB
->  #define S3C_PA_USBHOST		S3C64XX_PA_USBHOST
->  #define S3C_PA_USB_HSOTG	S3C64XX_PA_USB_HSOTG
-> +#define S3C_VA_USB_HSPHY	S3C64XX_VA_USB_HSPHY
-> 
->  #endif /* __ASM_ARCH_6400_MAP_H */
-> diff --git a/arch/arm/plat-s3c64xx/cpu.c b/arch/arm/plat-s3c64xx/cpu.c
-> index b1fdd83..49796d2 100644
-> --- a/arch/arm/plat-s3c64xx/cpu.c
-> +++ b/arch/arm/plat-s3c64xx/cpu.c
-> @@ -107,6 +107,11 @@ static struct map_desc s3c_iodesc[] __initdata = {
->  		.pfn		= __phys_to_pfn(S3C64XX_PA_WATCHDOG),
->  		.length		= SZ_4K,
->  		.type		= MT_DEVICE,
-> +	}, {
-> +		.virtual	= (unsigned long)S3C_VA_USB_HSPHY,
-> +		.pfn		= __phys_to_pfn(S3C64XX_PA_USB_HSPHY),
-> +		.length		= SZ_1K,
-> +		.type		= MT_DEVICE,
->  	},
->  };
-> 
-> -- 
-> 1.6.5.3
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I believe Catalin's explained why it does not work even doing
+LDREX/STREX once, because the thread can pause before the LDREX.  So
+you must begin fetching pointers after the LDREX.
 
--- 
--- 
-Ben
+(At least I think so.  I'm prepared to be shown to be wrong :-)
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+If you're writing code intended for other LL/SC architectures too, and
+following Catalin's suggestion to put LDR between LDREX and STREX,
+then you might have to check if the other architectures permit loads
+between the LL and SC.
+
+> This requires a prototype change, because the return value is the 
+> original value of the destination and so is unable to indicate, when 
+> returning that value, if it is returned from a successful or 
+> unsuccessful swap.
+
+Nonetheless, such a prototype change might be an improvement anyway.
+
+Some platforms provide compare_and_swap_bool() operations, which do as
+you describe: Compare, conditionally store, and return bool to indicate
+success.  No loop.
+
+That could be an improvement for some algorithms, because often if the
+store doesn't happen, the *inputs* to compare_and_swap() need to be
+recalculated anyway before another try is likely to succeed.  What's
+the point in having code which expands to two loops:
+
+    do {
+       old = get_something;
+       new = calc_something;
+
+       /* oldval = compare_and_swap(ptr, old, new); */
+       do {
+           __asm__("LL/SC" : (failed), (oldval) : (ptr), (old), (new));
+       } while (failed && oldval == old);
+
+    } while (oldval != old);
+
+When it can often be a smaller loop, which probably executes a little
+faster too in various cases:
+
+    do {
+       old = get_something;
+       new = calc_something;
+
+       /* oldval = compare_and_swap_bool(ptr, old, new); */
+       __asm__("LL/SC" : (failed), (oldval) : (ptr), (old), (new));
+
+    } while (failed);
+
+-- Jamie
