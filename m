@@ -1,31 +1,33 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 23 Nov 2009 15:34:39 +0000
-Subject: CAS implementation may be broken
-In-Reply-To: <4B08055C.3000408@45mercystreet.com>
-References: <4B08055C.3000408@45mercystreet.com>
-Message-ID: <1258990479.8088.39.camel@pc1117.cambridge.arm.com>
+From: jpihet@mvista.com (Jean Pihet)
+Date: Mon, 23 Nov 2009 17:20:50 +0100
+Subject: [PATCH] check put_user fail in do_signal when enable OABI_COMPACT
+In-Reply-To: <20091123140650.GC18142@n2100.arm.linux.org.uk>
+References: <1256123277.3851.36.camel@debian-nb>
+	<200911231459.13622.jpihet@mvista.com>
+	<20091123140650.GC18142@n2100.arm.linux.org.uk>
+Message-ID: <200911231720.50378.jpihet@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2009-11-21 at 15:21 +0000, Toby Douglass wrote:
-> Load-linked/conditional-store architectures solve ABA by having the
-> store fail if the destination has been touched since the load was performed.
+On Monday 23 November 2009 15:06:50 Russell King - ARM Linux wrote:
+> On Mon, Nov 23, 2009 at 02:59:13PM +0100, Jean Pihet wrote:
+> > Russell,
+> >
+> > On Wednesday 04 November 2009 20:32:44 Russell King - ARM Linux wrote:
+> > > On Wed, Nov 04, 2009 at 02:33:31PM +0100, Jean Pihet wrote:
+> > > > Is this one OK? Can it be merged now that your fix for signal restart
+> > > > has been merged into mainline?
+> > >
+> > > Yes.
+> >
+> > May I ask you again to merge the patch? Is this one supposed to reach
+> > into mainline via your tree?
+>
+> I have a patch system to avoid patches being dropped like this... I'm
+> really *bad* with emailed patches.
+>
+> Please submit to the patch system, thanks.
+Ah ok! It is submitted as patch 5793/1.
 
-So, for your problem, CAS wouldn't solve it on any architecture, not
-just ARM if it is implemented with LL/SC.
-
-Something like below may work (untested and haven't put much thought
-into it). Basically you need atomicity between the moment you first get
-the head pointer and the moment you update it. CAS doesn't ensure this
-since the first load of the [head] pointer would be standard LDR (even
-if it is LDREX, you get another LDREX which resets the link with the
-STREX):
-
-1:	LDREX	orig_head, [head]
-	LDR	orig_next, [orig_head, #next]
-	STREX	res, orig_next, [head]
-	cmp	res, #0
-	bne	1b
-
--- 
-Catalin
+Thanks,
+Jean
