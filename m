@@ -1,33 +1,59 @@
-From: trd@45mercystreet.com (Toby Douglass)
-Date: Tue, 24 Nov 2009 10:38:57 +0100
-Subject: CAS implementation may be broken
-In-Reply-To: <20091123231353.GJ18142@n2100.arm.linux.org.uk>
-References: <4B08055C.3000408@45mercystreet.com>
-	<20091123222830.GA5598@shareable.org>
-	<20091123231353.GJ18142@n2100.arm.linux.org.uk>
-Message-ID: <4B0BA9B1.9050803@45mercystreet.com>
+From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
+Date: Tue, 24 Nov 2009 03:47:43 +0530
+Subject: [PATCH] ARM l2x0: check whether l2x0 already enabled
+Message-ID: <1259014663.2742.3.camel@vinay-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
+From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+Date: Tue, 24 Nov 2009 13:59:20 +0530
 
-[snip]
+If running in non-secure mode, accessing
+control and auxiliary registers of l2x0
+will fault.
 
-No comments on everything else and the other posts; still digesting them.
+Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+---
+ arch/arm/mm/cache-l2x0.c |   24 +++++++++++++++---------
+ 1 files changed, 15 insertions(+), 9 deletions(-)
 
-> I believe there is a solution to the ABA problem using atomic operations
-> with one 32-bit word and a separate counter to identify updates, but it
-> requires a little more time than I have available this evening to fully
-> put together.
-
-I've implemented the pointer-counter solution on x86/x64.  Indeed, it 
-turns out you can use them on ARM, since there is a double-word ldrex. 
-However, and this is part of what I'm currently thinking about, I was 
-under the impression LL/SC meant *single word CAS* could work without a 
-counter.
-
-I think you'd never implement pointer-counter in the kernel, as your 
-basic CAS, because plain CAS is all you need for certain things and the 
-user can easily implement pointer-counter on top of plain CAS.
-
-OTOH, perhaps it is nice to offer a plain CAS API and an ABA-safe CAS API.
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index b480f1d..7c0d056 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -99,18 +99,24 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+ 
+ 	l2x0_base = base;
+ 
+-	/* disable L2X0 */
+-	writel(0, l2x0_base + L2X0_CTRL);
++	/* check if l2x0 controller is already enabled.
++	 * if you are booting from non-secure mode
++	 * accessing the below registers will fault.
++	 */
++	if (!(readl(l2x0_base + L2X0_CTRL) & 1)) {
+ 
+-	aux = readl(l2x0_base + L2X0_AUX_CTRL);
+-	aux &= aux_mask;
+-	aux |= aux_val;
+-	writel(aux, l2x0_base + L2X0_AUX_CTRL);
++		/* L2x0 controller is disabled */
+ 
+-	l2x0_inv_all();
++		aux = readl(l2x0_base + L2X0_AUX_CTRL);
++		aux &= aux_mask;
++		aux |= aux_val;
++		writel(aux, l2x0_base + L2X0_AUX_CTRL);
+ 
+-	/* enable L2X0 */
+-	writel(1, l2x0_base + L2X0_CTRL);
++		l2x0_inv_all();
++
++		/* enable L2X0 */
++		writel(1, l2x0_base + L2X0_CTRL);
++	}
+ 
+ 	outer_cache.inv_range = l2x0_inv_range;
+ 	outer_cache.clean_range = l2x0_clean_range;
+-- 
+1.6.3.GIT
