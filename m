@@ -1,45 +1,34 @@
-From: vitalywool@gmail.com (Vitaly Wool)
-Date: Mon, 23 Nov 2009 21:22:44 +0300
-Subject: [PATCH 07/10] ARM: PNX4008: move i2c suspend/resume callbacks
-	into driver
-In-Reply-To: <20091121125347.GE7998@n2100.arm.linux.org.uk>
-References: <20091120144422.GA18223@n2100.arm.linux.org.uk>
-	<E1NBUkU-0004Pm-Nv@rmk-PC.arm.linux.org.uk>
-	<20091121125347.GE7998@n2100.arm.linux.org.uk>
-Message-ID: <acd2a5930911231022i60eda84di12799fb4a55faab9@mail.gmail.com>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Tue, 24 Nov 2009 00:42:13 +0100
+Subject: [PATCH 1/1] WDT clock rate based on returned rate from clk_get_rate
+Message-ID: <083DF309106F364B939360100EC290F804F55464A3@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 21, 2009 at 3:53 PM, Russell King - ARM Linux <
-linux@arm.linux.org.uk> wrote:
+[PATCH] WDT clock rate based on returned rate from clk_get_rate()
+ instead of WDOG_COUNTER_RATE define
 
-> On Fri, Nov 20, 2009 at 10:50:34AM +0000, Russell King - ARM Linux wrote:
-> > -static int i2c_pnx_suspend(struct platform_device *pdev, pm_message_t
-> state)
-> > -{
-> > -     int retval = 0;
-> > -#ifdef CONFIG_PM
-> > -     retval = set_clock_run(pdev);
-> > -#endif
->
-> BTW, a comment from PNX folk (Vitaly/Kevin) would be appreciated.  Why
-> does PNX enable the clock when going into suspend?  Should I assume that
-> this should actually be disabling the clock?
->
+---
+ drivers/watchdog/pnx4008_wdt.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-As far as I recall, at some point there was a function that was taking the
-second boolean parameter (enable or disable the clock). So now it is, yes,
-not making much sense.
+diff --git a/drivers/watchdog/pnx4008_wdt.c b/drivers/watchdog/pnx4008_wdt.c
+index cbfe3ca..259cdb8 100644
+--- a/drivers/watchdog/pnx4008_wdt.c
++++ b/drivers/watchdog/pnx4008_wdt.c
+@@ -110,7 +110,8 @@ static void wdt_enable(void)
+      __raw_writel(MATCH_INT, WDTIM_INT(wdt_base));
+      /* the longest pulse period 65541/(13*10^6) seconds ~ 5 ms. */
+      __raw_writel(0xFFFF, WDTIM_PULSE(wdt_base));
+-     __raw_writel(heartbeat * WDOG_COUNTER_RATE, WDTIM_MATCH0(wdt_base));
++     __raw_writel(heartbeat * clk_get_rate(wdt_clk),
++           WDTIM_MATCH0(wdt_base));
+      /*enable counter, stop when debugger active */
+      __raw_writel(COUNT_ENAB | DEBUG_EN, WDTIM_CTRL(wdt_base));
 
+--
+1.6.0.6
 
-> Also, if Vitaly doesn't have anything to do with PNX4008 anymore, it
-> would be a good idea to update the MAINTAINERS file.
->
-
-I'd like to keep maintaining this platform, but it's also up to NXP because
-I don't have the actual working hardware now so there's not much I can do.
-
-Vitaly
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091123/e92db2c0/attachment-0001.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091124/d9aede1e/attachment-0001.htm>
