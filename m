@@ -1,98 +1,97 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Mon, 23 Nov 2009 18:05:01 +0800
-Subject: [rtc-linux] [PATCH] ARM: NUC900: add rtc controller driver
-	support for NUC900
-In-Reply-To: <6A307B6986654E208CF0CA87C603BAB0@usish.com.cn>
-References: <e68bb3470911190026q5bcf73a0r5431de4ce285ed92@mail.gmail.com>
-	<e68bb3470911200656k16245526la863f2865a3aa4d1@mail.gmail.com>
-	<D7863ABD8A8A4912A693215721E64C8D@usish.com.cn>
-	<e68bb3470911230130j7ce8e81cp355de325c5fab759@mail.gmail.com>
-	<6A307B6986654E208CF0CA87C603BAB0@usish.com.cn>
-Message-ID: <e68bb3470911230205u7c40abfdhafac945a74185cd0@mail.gmail.com>
+From: rene.wolf@mbda-systems.de (Wolf, Rene, HRO-GP)
+Date: Mon, 23 Nov 2009 10:39:15 +0100
+Subject: AW: MX3 SDMA?
+In-Reply-To: <59b21cf20911191019v4b030b75qf383b3832607768a@mail.gmail.com>
+References: <20091119172708.GN14091@buzzloop.caiaq.de>
+	<59b21cf20911191019v4b030b75qf383b3832607768a@mail.gmail.com>
+Message-ID: <87077C4F48609F4392621D9F99DDE20901202E30@tesla.star.galaxy.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Okay, thanks a lot for your reviewing.
+Hi All,
 
-2009/11/23 jack wang <jack_wang@usish.com>:
->
-> Hi jack,
->
-> 2009/11/23 jack wang <jack_wang@usish.com>:
->> +static int __devinit nuc900_rtc_probe(struct platform_device *pdev)
->> +{
->> + ? ? ? struct resource *res;
->> + ? ? ? struct nuc900_rtc *nuc900_rtc;
->> + ? ? ? int err;
->> +
->> + ? ? ? nuc900_rtc = kzalloc(sizeof(struct nuc900_rtc), GFP_KERNEL);
->> + ? ? ? if (!nuc900_rtc) {
->> + ? ? ? ? ? ? ? err = -ENOMEM;
->> + ? ? ? ? ? ? ? goto fail1;
->> [jack] Here goto fail1 is not quite right, You'd better just return err
->> instead or just use if (!nu900_rtc) return -ENOMEM;
->
-> Hmmm, good, it is right, but why did not 'CC' other people? :)
->
-> Thanks !
->
-> [Jack]I am not subscribe arm dev list, just review from
-> http://www.spinics.net/lists , but now CC'ing added :-)
->
-> Wang Jinpu
->
->> + ? ? ? }
->> +
->> + ? ? ? res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> + ? ? ? if (!res) {
->> + ? ? ? ? ? ? ? err = -ENXIO;
->> + ? ? ? ? ? ? ? goto fail1;
->> + ? ? ? }
->> +
->> + ? ? ? if (!request_mem_region(res->start, resource_size(res),
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pdev->name)) {
->> + ? ? ? ? ? ? ? err = -EBUSY;
->> + ? ? ? ? ? ? ? goto fail1;
->> + ? ? ? }
->> +
->> + ? ? ? nuc900_rtc->rtc_reg = ioremap(res->start, resource_size(res));
->> + ? ? ? if (!nuc900_rtc->rtc_reg) {
->> + ? ? ? ? ? ? ? err = -ENOMEM;
->> + ? ? ? ? ? ? ? goto fail2;
->> + ? ? ? }
->> +
->> + ? ? ? nuc900_rtc->irq_num = platform_get_irq(pdev, 0);
->> + ? ? ? if (request_irq(nuc900_rtc->irq_num, nuc900_rtc_interrupt,
->> + ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED, "nuc900rtc", nuc900_rtc)) {
->> + ? ? ? ? ? ? ? err = -EBUSY;
->> + ? ? ? ? ? ? ? goto fail3;
->> + ? ? ? }
->> +
->> + ? ? ? nuc900_rtc->rtcdev = rtc_device_register(pdev->name, &pdev->dev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &nuc900_rtc_ops,
->> THIS_MODULE);
->> + ? ? ? if (IS_ERR(nuc900_rtc->rtcdev)) {
->> + ? ? ? ? ? ? ? err = PTR_ERR(nuc900_rtc->rtcdev);
->> + ? ? ? ? ? ? ? goto fail4;
->> + ? ? ? }
->> +
->> + ? ? ? platform_set_drvdata(pdev, nuc900_rtc->rtcdev);
->> + ? ? ? nuc900_rtc_enbale_timeirq(nuc900_rtc, 1);
->> +
->> + ? ? ? return 0;
->> +
->> +fail4: free_irq(nuc900_rtc->irq_num, nuc900_rtc);
->> +fail3: iounmap(nuc900_rtc->rtc_reg);
->> +fail2: release_mem_region(res->start, resource_size(res));
->> +fail1: kfree(nuc900_rtc);
->> + ? ? ? return err;
->> +}
->
->
+> The last attempt was made by someone in September but I didn't
+> see any result at all:
+
+I'm still waiting to get a green light on my work, sorry.
+
+What I did was to port the API as found in LTIB to 2.6.31.
+But I couldn't test it fully. I only tried to register a DMA chan.,
+which works, and shows up in '/proc/sdma/channels'.
+And as written in
+http://lists.infradead.org/pipermail/linux-arm-kernel/2009-September/001219.html
+there's still SOME work ahead. For once, matching the conventions
+among i.MX SoCs. The other thing is the binary code inside the SDMA
+driver, wich will not be allowed inside the kernel and must be
+ported to get loaded from user space.
+
+If one wants to do this the clean way, I would suggest, writing an
+assembler for the SDMA. The information provided in the official
+reference manual of the i.MX31 should be sufficient for that. Then
+one should analyze the API provided by LTIB and check how to get
+the code up and running inside the SDMA. After that, a new and
+clean API (the one from LTIB is quite confusing) must be written.
+
+I hope that this will help somebody, coz I do not have the resources
+at the moment, to either complete the first, or start the latter :-(
+
+
+Cheers
+Rene 
 
 
 
--- 
+Rene Wolf
+LFK-Lenkflugk?rpersysteme GmbH
+Human Resources Operations & Policy, HRO
+Landshuter Stra?e 26, 85716 Unterschlei?heim, GERMANY
+Phone: +49 89 3179 8337
+Fax: +49 8252 99 8964
+E-Mail: rene.wolf at mbda-systems.de
+
+http://www.mbda.net
+
+Chairman of the Supervisory Board: Antoine Bouvier
+Managing Director: Werner Kaltenegger
+Registered Office: Schrobenhausen
+Commercial Register: Amtsgericht Ingolstadt, HRB 4365
+
+-----Urspr?ngliche Nachricht-----
+Von: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-bounces at lists.infradead.org] Im Auftrag von Magnus Lilja
+Gesendet: Donnerstag, 19. November 2009 19:19
+An: Daniel Mack
+Cc: Sascha Hauer; linux-arm-kernel at lists.infradead.org
+Betreff: Re: MX3 SDMA?
+
+Hi Daniel,
+
+2009/11/19 Daniel Mack <daniel@caiaq.de>:
+> Hi,
+>
+> I wonder whether anyone is currently working on porting the SDMA engie
+> from Freescale's BSPs to mainline?
+>
+> If not, what would be a sane approach to start that? From what I've
+> seen, there is support specifically for the SoC's on-chip peripherals
+> which could be implemented with an API similar to the clock framework
+> (ie, matching via device names).
+>
+> As this engine features an own RISC processor and is a huge monster, I
+> would assume starting with supporting a subset of features would make
+> sense.
+>
+> Plans, ideas?
+
+The last attempt was made by someone in September but I didn't see any
+result at all:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2009-September/000886.html
+http://lists.infradead.org/pipermail/linux-arm-kernel/2009-September/001024.html
+http://lists.infradead.org/pipermail/linux-arm-kernel/2009-October/001806.html
+
+
+Regards, Magnus
+
+_______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel at lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
