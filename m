@@ -1,61 +1,34 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 Nov 2009 20:28:56 +0000
-Subject: [RFC 10/11] ARM: arrange for flush_cache_range() to always
-	flush the I-cache
-In-Reply-To: <alpine.LFD.2.00.0911221517340.2059@xanadu.home>
-References: <cover.1256683230.git.rmk+kernel@arm.linux.org.uk>
-	<12475bd20f82c3a5e78d5b8e9d3cb266914c4727.1256683230.git.rmk+kernel@arm.linux.org.uk>
-	<1256745098.27121.48.camel@pc1117.cambridge.arm.com>
-	<20091028173709.GC20040@n2100.arm.linux.org.uk>
-	<1256838661.6874.67.camel@pc1117.cambridge.arm.com>
-	<1258368415.6705.20.camel@pc1117.cambridge.arm.com>
-	<20091116105854.GB27894@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0911221517340.2059@xanadu.home>
-Message-ID: <20091123202856.GG18142@n2100.arm.linux.org.uk>
+Date: Mon, 23 Nov 2009 20:31:10 +0000
+Subject: cache aliasing in dup_mmap
+In-Reply-To: <e06498070911191008t1861e730u5cdb49187af00ae0@mail.gmail.com>
+References: <e06498070909290930w7745e1e3x2e224ad75ff62dbd@mail.gmail.com>
+	<20090929191108.GA13568@n2100.arm.linux.org.uk>
+	<20091005144623.GA20633@n2100.arm.linux.org.uk>
+	<20091105144830.GC21681@n2100.arm.linux.org.uk>
+	<e06498070911130649k2051e4cfh2066cf0b9fdabbaf@mail.gmail.com>
+	<20091116163028.GA3568@n2100.arm.linux.org.uk>
+	<e06498070911160923i2273b6aai6f144b36289203d2@mail.gmail.com>
+	<20091116222016.GF3568@n2100.arm.linux.org.uk>
+	<20091119085735.GA14178@n2100.arm.linux.org.uk>
+	<e06498070911191008t1861e730u5cdb49187af00ae0@mail.gmail.com>
+Message-ID: <20091123203110.GH18142@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 22, 2009 at 03:28:30PM -0500, Nicolas Pitre wrote:
-> On Mon, 16 Nov 2009, Russell King - ARM Linux wrote:
+On Thu, Nov 19, 2009 at 01:08:01PM -0500, Steven Walter wrote:
+> On Thu, Nov 19, 2009 at 3:57 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > I'm afraid that I have nothing further to suggest, and so I'm shelving
+> > the patches. ?That means this problem will remain unresolved in future
+> > kernels.
 > 
-> > On Mon, Nov 16, 2009 at 10:46:55AM +0000, Catalin Marinas wrote:
-> > > > diff --git a/arch/arm/mm/copypage-v6.c b/arch/arm/mm/copypage-v6.c
-> > > > index 4127a7b..f19ed4e 100644
-> > > > --- a/arch/arm/mm/copypage-v6.c
-> > > > +++ b/arch/arm/mm/copypage-v6.c
-> > > > @@ -41,6 +41,7 @@ static void v6_copy_user_highpage_nonaliasing(struct page *to,
-> > > >  	kfrom = kmap_atomic(from, KM_USER0);
-> > > >  	kto = kmap_atomic(to, KM_USER1);
-> > > >  	copy_page(kto, kfrom);
-> > > > +	__cpuc_flush_dcache_page(kto);
-> > > >  	kunmap_atomic(kto, KM_USER1);
-> > > >  	kunmap_atomic(kfrom, KM_USER0);
-> > > >  }
-> > > 
-> > > Any thoughts one getting this merged (maybe in 2.6.33)? It seems that
-> > > no-one else has any views on this but the COW text pages problem is
-> > > still present.
-> > 
-> > Well, it would be useful to get some comment from Nicolas since
-> > kunmap_atomic() will call this function for highmem pages.  We might want
-> > to avoid doing the dcache flush thing multiple times for these, but it
-> > looks to me like testing PageHighMem(to) leaves us a hole.
-> 
-> Better test page_address(to) and skip the flush if it is NULL.  That's 
-> what we do elsewhere already.  If page_addressto) is NULL then there is 
-> no long lasting mapping for that page and the cache will be flushed upon 
-> kunmap_atomic().  Hence:
-> 
-> #ifdef CONFIG_HIGHMEM
-> 	/*
-> 	 * kmap_atomic() doesn't set the page virtual address, and
-> 	 * kunmap_atomic() takes care of cache flushing already.
-> 	 */
-> 	if (page_address(to) != NULL)
-> #endif
-> 		__cpuc_flush_dcache_page(kto);
+> I had the tester restart the reboot-loop, and so far it's done ~1200
+> runs with no problem.  I'm thinking now that either I hosed something
+> up with the build initially, or else the tester didn't flash it
+> correctly.  1200 runs isn't enough to be conclusive, but it's a lot
+> better than 88.  I'll let you know when we have something more
+> definitive.
 
-Okay, can we get this combined with Catalin's patch and applied to all
-applicable processors (which I assume would be just v6 and v7) ?
-
-Catalin?
+I'd just like to keep this issue hot so it doesn't get forgotten about.
+Are we at a conclusive point on this?
