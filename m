@@ -1,41 +1,36 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 23 Nov 2009 15:13:16 +0000
-Subject: CAS implementation may be broken
-In-Reply-To: <4B08055C.3000408@45mercystreet.com>
-References: <4B08055C.3000408@45mercystreet.com>
-Message-ID: <1258989196.8088.28.camel@pc1117.cambridge.arm.com>
+From: acassis@gmail.com (Alan Carvalho de Assis)
+Date: Mon, 23 Nov 2009 13:18:03 -0200
+Subject: [PATCH] MX27: Add USB platform devices and resources
+In-Reply-To: <37367b3a0911230436i5d44cd80y182316ef056d6b31@mail.gmail.com>
+References: <eedb5540907150626m3dbf815bif92ff179b6ebfe58@mail.gmail.com>
+	<20090716081235.GQ2714@pengutronix.de>
+	<37367b3a0911230436i5d44cd80y182316ef056d6b31@mail.gmail.com>
+Message-ID: <37367b3a0911230718s3dd16d99n1b2ce858b79218ca@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2009-11-21 at 15:21 +0000, Toby Douglass wrote:
-> I may be *utterly* wrong, and I'm expecting that someone here is simply
-> going to look at what I'm about to say and explain to me what I've
-> misunderstood, but I suspect it may be that atomic compare-and-swap is
-> incorrectly implemented in the Linux kernel on ARM v6 and above (e.g.
-> using ldrex and strex).
+Now sending to right linux-arm address...
 
-Well, you have to define "correctly" or you may just need a different
-function for what you want. In this implementation, CAS is expected to
-succeed if the the old value matches the memory one. The loop is present
-to always guarantee that it will succeed if the condition matches.
+On 11/23/09, Alan Carvalho de Assis <acassis@gmail.com> wrote:
+> Hi Sascha,
+>
+> On 7/16/09, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+>> On Wed, Jul 15, 2009 at 03:26:21PM +0200, javier Martin wrote:
+>>> This adds clocks and resources for usb in i.mx27 SoC.
+>>
+>> Ok, applied to mxc-master.
+>>
+>
+> What do we need now to get USB working on i.MX27?
+>
 
-Note that the exclusive monitor state is cleared (and hence STREX fails)
-a every context switch or a return from an exception, i.e. interrupt).
-> 
-> The issue is the ABA problem.
-[...]
-> The problem is *we then come round in the do-while loop again*.  We have
-> *not* updated our exchange value.  So THIS second time around, we
-> *repeat* our strex and we DO swap - and we just swapped in completely
-> the wrong next pointer, from way back before the stack was totally
-> changed by all the other threads popping and pushing.
+(replying myself)
+I think this Daniel Mack's patch will be necessary:
 
-But the first thread (paused) one may may actually wait before the LDREX
-(the old value was loaded with an LDR), so the LDREX/STREX pair would
-succeed anyway. That's not really a solution unless you also use LDREX
-for loading the old value to be passed to CAS. IOW, you need your own
-implementation of what you are trying to achieve (and not modifying
-CAS).
+http://lists.infradead.org/pipermail/linux-arm-kernel/2009-June/002972.html
 
--- 
-Catalin
+Sascha, what is missing to this patch be applied?
+
+Best Regards,
+
+Alan
