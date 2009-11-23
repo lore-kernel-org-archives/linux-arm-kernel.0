@@ -1,97 +1,350 @@
-From: rene.wolf@mbda-systems.de (Wolf, Rene, HRO-GP)
-Date: Mon, 23 Nov 2009 10:39:15 +0100
-Subject: AW: MX3 SDMA?
-In-Reply-To: <59b21cf20911191019v4b030b75qf383b3832607768a@mail.gmail.com>
-References: <20091119172708.GN14091@buzzloop.caiaq.de>
-	<59b21cf20911191019v4b030b75qf383b3832607768a@mail.gmail.com>
-Message-ID: <87077C4F48609F4392621D9F99DDE20901202E30@tesla.star.galaxy.io>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 Nov 2009 10:26:17 +0000
+Subject: [PATCH 7/7] ARM: dma-mapping: no need to clean overlapping cache
+	lines on invalidate
+In-Reply-To: <alpine.LFD.2.00.0911221714190.2059@xanadu.home>
+References: <alpine.LFD.2.00.0911221714190.2059@xanadu.home>
+Message-ID: <E1NCW7d-0000kn-Rt@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Since we now clean the DMA buffers on map, there's no need to clean
+overlapping cache lines on invalidation anymore.  (Note: the DMA API
+prohibits other data sharing the same cache line as a DMA buffer
+anyway.)
 
-> The last attempt was made by someone in September but I didn't
-> see any result at all:
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mm/cache-fa.S      |    5 -----
+ arch/arm/mm/cache-v4wb.S    |    5 -----
+ arch/arm/mm/cache-v6.S      |   13 -------------
+ arch/arm/mm/cache-v7.S      |    6 ------
+ arch/arm/mm/proc-arm1020.S  |    8 --------
+ arch/arm/mm/proc-arm1020e.S |    4 ----
+ arch/arm/mm/proc-arm1022.S  |    4 ----
+ arch/arm/mm/proc-arm1026.S  |    4 ----
+ arch/arm/mm/proc-arm920.S   |    4 ----
+ arch/arm/mm/proc-arm922.S   |    4 ----
+ arch/arm/mm/proc-arm925.S   |    6 ------
+ arch/arm/mm/proc-arm926.S   |    6 ------
+ arch/arm/mm/proc-arm946.S   |    7 -------
+ arch/arm/mm/proc-feroceon.S |    8 --------
+ arch/arm/mm/proc-mohawk.S   |    4 ----
+ arch/arm/mm/proc-xsc3.S     |    4 ----
+ arch/arm/mm/proc-xscale.S   |    4 ----
+ 17 files changed, 0 insertions(+), 96 deletions(-)
 
-I'm still waiting to get a green light on my work, sorry.
-
-What I did was to port the API as found in LTIB to 2.6.31.
-But I couldn't test it fully. I only tried to register a DMA chan.,
-which works, and shows up in '/proc/sdma/channels'.
-And as written in
-http://lists.infradead.org/pipermail/linux-arm-kernel/2009-September/001219.html
-there's still SOME work ahead. For once, matching the conventions
-among i.MX SoCs. The other thing is the binary code inside the SDMA
-driver, wich will not be allowed inside the kernel and must be
-ported to get loaded from user space.
-
-If one wants to do this the clean way, I would suggest, writing an
-assembler for the SDMA. The information provided in the official
-reference manual of the i.MX31 should be sufficient for that. Then
-one should analyze the API provided by LTIB and check how to get
-the code up and running inside the SDMA. After that, a new and
-clean API (the one from LTIB is quite confusing) must be written.
-
-I hope that this will help somebody, coz I do not have the resources
-at the moment, to either complete the first, or start the latter :-(
-
-
-Cheers
-Rene 
-
-
-
-Rene Wolf
-LFK-Lenkflugk?rpersysteme GmbH
-Human Resources Operations & Policy, HRO
-Landshuter Stra?e 26, 85716 Unterschlei?heim, GERMANY
-Phone: +49 89 3179 8337
-Fax: +49 8252 99 8964
-E-Mail: rene.wolf at mbda-systems.de
-
-http://www.mbda.net
-
-Chairman of the Supervisory Board: Antoine Bouvier
-Managing Director: Werner Kaltenegger
-Registered Office: Schrobenhausen
-Commercial Register: Amtsgericht Ingolstadt, HRB 4365
-
------Urspr?ngliche Nachricht-----
-Von: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-bounces at lists.infradead.org] Im Auftrag von Magnus Lilja
-Gesendet: Donnerstag, 19. November 2009 19:19
-An: Daniel Mack
-Cc: Sascha Hauer; linux-arm-kernel at lists.infradead.org
-Betreff: Re: MX3 SDMA?
-
-Hi Daniel,
-
-2009/11/19 Daniel Mack <daniel@caiaq.de>:
-> Hi,
->
-> I wonder whether anyone is currently working on porting the SDMA engie
-> from Freescale's BSPs to mainline?
->
-> If not, what would be a sane approach to start that? From what I've
-> seen, there is support specifically for the SoC's on-chip peripherals
-> which could be implemented with an API similar to the clock framework
-> (ie, matching via device names).
->
-> As this engine features an own RISC processor and is a huge monster, I
-> would assume starting with supporting a subset of features would make
-> sense.
->
-> Plans, ideas?
-
-The last attempt was made by someone in September but I didn't see any
-result at all:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2009-September/000886.html
-http://lists.infradead.org/pipermail/linux-arm-kernel/2009-September/001024.html
-http://lists.infradead.org/pipermail/linux-arm-kernel/2009-October/001806.html
-
-
-Regards, Magnus
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/mm/cache-fa.S b/arch/arm/mm/cache-fa.S
+index b63a8f7..1711386 100644
+--- a/arch/arm/mm/cache-fa.S
++++ b/arch/arm/mm/cache-fa.S
+@@ -157,12 +157,7 @@ ENTRY(fa_flush_kern_dcache_page)
+  *	- end	 - virtual end address
+  */
+ ENTRY(fa_dma_inv_range)
+-	tst	r0, #CACHE_DLINESIZE - 1
+ 	bic	r0, r0, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r0, c7, c14, 1		@ clean & invalidate D entry
+-	tst	r1, #CACHE_DLINESIZE - 1
+-	bic	r1, r1, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r1, c7, c14, 1		@ clean & invalidate D entry
+ 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
+ 	add	r0, r0, #CACHE_DLINESIZE
+ 	cmp	r0, r1
+diff --git a/arch/arm/mm/cache-v4wb.S b/arch/arm/mm/cache-v4wb.S
+index 2ebc1b3..553931a 100644
+--- a/arch/arm/mm/cache-v4wb.S
++++ b/arch/arm/mm/cache-v4wb.S
+@@ -173,16 +173,11 @@ ENTRY(v4wb_coherent_user_range)
+  *	- end	 - virtual end address
+  */
+ ENTRY(v4wb_dma_inv_range)
+-	tst	r0, #CACHE_DLINESIZE - 1
+ 	bic	r0, r0, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
+-	tst	r1, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
+ 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
+ 	add	r0, r0, #CACHE_DLINESIZE
+ 	cmp	r0, r1
+ 	blo	1b
+-	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
+ 	mov	pc, lr
+ 
+ /*
+diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
+index 295e25d..d1dfd87 100644
+--- a/arch/arm/mm/cache-v6.S
++++ b/arch/arm/mm/cache-v6.S
+@@ -195,20 +195,7 @@ ENTRY(v6_flush_kern_dcache_page)
+  *	- end     - virtual end address of region
+  */
+ ENTRY(v6_dma_inv_range)
+-	tst	r0, #D_CACHE_LINE_SIZE - 1
+ 	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
+-#ifdef HARVARD_CACHE
+-	mcrne	p15, 0, r0, c7, c10, 1		@ clean D line
+-#else
+-	mcrne	p15, 0, r0, c7, c11, 1		@ clean unified line
+-#endif
+-	tst	r1, #D_CACHE_LINE_SIZE - 1
+-	bic	r1, r1, #D_CACHE_LINE_SIZE - 1
+-#ifdef HARVARD_CACHE
+-	mcrne	p15, 0, r1, c7, c14, 1		@ clean & invalidate D line
+-#else
+-	mcrne	p15, 0, r1, c7, c15, 1		@ clean & invalidate unified line
+-#endif
+ 1:
+ #ifdef HARVARD_CACHE
+ 	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D line
+diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+index e1bd975..893ee59 100644
+--- a/arch/arm/mm/cache-v7.S
++++ b/arch/arm/mm/cache-v7.S
+@@ -218,13 +218,7 @@ ENDPROC(v7_flush_kern_dcache_page)
+ ENTRY(v7_dma_inv_range)
+ 	dcache_line_size r2, r3
+ 	sub	r3, r2, #1
+-	tst	r0, r3
+ 	bic	r0, r0, r3
+-	mcrne	p15, 0, r0, c7, c14, 1		@ clean & invalidate D / U line
+-
+-	tst	r1, r3
+-	bic	r1, r1, r3
+-	mcrne	p15, 0, r1, c7, c14, 1		@ clean & invalidate D / U line
+ 1:
+ 	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D / U line
+ 	add	r0, r0, r2
+diff --git a/arch/arm/mm/proc-arm1020.S b/arch/arm/mm/proc-arm1020.S
+index d9fb4b9..7bbf624 100644
+--- a/arch/arm/mm/proc-arm1020.S
++++ b/arch/arm/mm/proc-arm1020.S
+@@ -267,15 +267,7 @@ ENTRY(arm1020_flush_kern_dcache_page)
+ ENTRY(arm1020_dma_inv_range)
+ 	mov	ip, #0
+ #ifndef CONFIG_CPU_DCACHE_DISABLE
+-	tst	r0, #CACHE_DLINESIZE - 1
+ 	bic	r0, r0, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, ip, c7, c10, 4
+-	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
+-	mcrne	p15, 0, ip, c7, c10, 4		@ drain WB
+-	tst	r1, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, ip, c7, c10, 4
+-	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
+-	mcrne	p15, 0, ip, c7, c10, 4		@ drain WB
+ 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
+ 	add	r0, r0, #CACHE_DLINESIZE
+ 	cmp	r0, r1
+diff --git a/arch/arm/mm/proc-arm1020e.S b/arch/arm/mm/proc-arm1020e.S
+index 7453b75..d379cb7 100644
+--- a/arch/arm/mm/proc-arm1020e.S
++++ b/arch/arm/mm/proc-arm1020e.S
+@@ -260,11 +260,7 @@ ENTRY(arm1020e_flush_kern_dcache_page)
+ ENTRY(arm1020e_dma_inv_range)
+ 	mov	ip, #0
+ #ifndef CONFIG_CPU_DCACHE_DISABLE
+-	tst	r0, #CACHE_DLINESIZE - 1
+ 	bic	r0, r0, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
+-	tst	r1, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
+ 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
+ 	add	r0, r0, #CACHE_DLINESIZE
+ 	cmp	r0, r1
+diff --git a/arch/arm/mm/proc-arm1022.S b/arch/arm/mm/proc-arm1022.S
+index 8eb72d7..f5a7949 100644
+--- a/arch/arm/mm/proc-arm1022.S
++++ b/arch/arm/mm/proc-arm1022.S
+@@ -249,11 +249,7 @@ ENTRY(arm1022_flush_kern_dcache_page)
+ ENTRY(arm1022_dma_inv_range)
+ 	mov	ip, #0
+ #ifndef CONFIG_CPU_DCACHE_DISABLE
+-	tst	r0, #CACHE_DLINESIZE - 1
+ 	bic	r0, r0, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
+-	tst	r1, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
+ 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
+ 	add	r0, r0, #CACHE_DLINESIZE
+ 	cmp	r0, r1
+diff --git a/arch/arm/mm/proc-arm1026.S b/arch/arm/mm/proc-arm1026.S
+index 3b59f0d..1dc26f8 100644
+--- a/arch/arm/mm/proc-arm1026.S
++++ b/arch/arm/mm/proc-arm1026.S
+@@ -243,11 +243,7 @@ ENTRY(arm1026_flush_kern_dcache_page)
+ ENTRY(arm1026_dma_inv_range)
+ 	mov	ip, #0
+ #ifndef CONFIG_CPU_DCACHE_DISABLE
+-	tst	r0, #CACHE_DLINESIZE - 1
+ 	bic	r0, r0, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
+-	tst	r1, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
+ 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
+ 	add	r0, r0, #CACHE_DLINESIZE
+ 	cmp	r0, r1
+diff --git a/arch/arm/mm/proc-arm920.S b/arch/arm/mm/proc-arm920.S
+index 2b7c197..078a873 100644
+--- a/arch/arm/mm/proc-arm920.S
++++ b/arch/arm/mm/proc-arm920.S
+@@ -239,11 +239,7 @@ ENTRY(arm920_flush_kern_dcache_page)
+  * (same as v4wb)
+  */
+ ENTRY(arm920_dma_inv_range)
+-	tst	r0, #CACHE_DLINESIZE - 1
+ 	bic	r0, r0, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
+-	tst	r1, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
+ 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
+ 	add	r0, r0, #CACHE_DLINESIZE
+ 	cmp	r0, r1
+diff --git a/arch/arm/mm/proc-arm922.S b/arch/arm/mm/proc-arm922.S
+index 06a1aa4..22ca857 100644
+--- a/arch/arm/mm/proc-arm922.S
++++ b/arch/arm/mm/proc-arm922.S
+@@ -241,11 +241,7 @@ ENTRY(arm922_flush_kern_dcache_page)
+  * (same as v4wb)
+  */
+ ENTRY(arm922_dma_inv_range)
+-	tst	r0, #CACHE_DLINESIZE - 1
+ 	bic	r0, r0, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
+-	tst	r1, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
+ 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
+ 	add	r0, r0, #CACHE_DLINESIZE
+ 	cmp	r0, r1
+diff --git a/arch/arm/mm/proc-arm925.S b/arch/arm/mm/proc-arm925.S
+index cb53435..ff04299 100644
+--- a/arch/arm/mm/proc-arm925.S
++++ b/arch/arm/mm/proc-arm925.S
+@@ -283,12 +283,6 @@ ENTRY(arm925_flush_kern_dcache_page)
+  * (same as v4wb)
+  */
+ ENTRY(arm925_dma_inv_range)
+-#ifndef CONFIG_CPU_DCACHE_WRITETHROUGH
+-	tst	r0, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
+-	tst	r1, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
+-#endif
+ 	bic	r0, r0, #CACHE_DLINESIZE - 1
+ 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
+ 	add	r0, r0, #CACHE_DLINESIZE
+diff --git a/arch/arm/mm/proc-arm926.S b/arch/arm/mm/proc-arm926.S
+index 1c48487..4b4c717 100644
+--- a/arch/arm/mm/proc-arm926.S
++++ b/arch/arm/mm/proc-arm926.S
+@@ -246,12 +246,6 @@ ENTRY(arm926_flush_kern_dcache_page)
+  * (same as v4wb)
+  */
+ ENTRY(arm926_dma_inv_range)
+-#ifndef CONFIG_CPU_DCACHE_WRITETHROUGH
+-	tst	r0, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
+-	tst	r1, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
+-#endif
+ 	bic	r0, r0, #CACHE_DLINESIZE - 1
+ 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
+ 	add	r0, r0, #CACHE_DLINESIZE
+diff --git a/arch/arm/mm/proc-arm946.S b/arch/arm/mm/proc-arm946.S
+index 40c0449..589a61c 100644
+--- a/arch/arm/mm/proc-arm946.S
++++ b/arch/arm/mm/proc-arm946.S
+@@ -215,18 +215,11 @@ ENTRY(arm946_flush_kern_dcache_page)
+  * (same as arm926)
+  */
+ ENTRY(arm946_dma_inv_range)
+-#ifndef CONFIG_CPU_DCACHE_WRITETHROUGH
+-	tst	r0, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
+-	tst	r1, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
+-#endif
+ 	bic	r0, r0, #CACHE_DLINESIZE - 1
+ 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
+ 	add	r0, r0, #CACHE_DLINESIZE
+ 	cmp	r0, r1
+ 	blo	1b
+-	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
+ 	mov	pc, lr
+ 
+ /*
+diff --git a/arch/arm/mm/proc-feroceon.S b/arch/arm/mm/proc-feroceon.S
+index d0d7795..1262b92 100644
+--- a/arch/arm/mm/proc-feroceon.S
++++ b/arch/arm/mm/proc-feroceon.S
+@@ -274,11 +274,7 @@ ENTRY(feroceon_range_flush_kern_dcache_page)
+  */
+ 	.align	5
+ ENTRY(feroceon_dma_inv_range)
+-	tst	r0, #CACHE_DLINESIZE - 1
+ 	bic	r0, r0, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
+-	tst	r1, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
+ 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
+ 	add	r0, r0, #CACHE_DLINESIZE
+ 	cmp	r0, r1
+@@ -289,10 +285,6 @@ ENTRY(feroceon_dma_inv_range)
+ 	.align	5
+ ENTRY(feroceon_range_dma_inv_range)
+ 	mrs	r2, cpsr
+-	tst	r0, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
+-	tst	r1, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
+ 	cmp	r1, r0
+ 	subne	r1, r1, #1			@ top address is inclusive
+ 	orr	r3, r2, #PSR_I_BIT
+diff --git a/arch/arm/mm/proc-mohawk.S b/arch/arm/mm/proc-mohawk.S
+index 52b5fd7..191ea6d 100644
+--- a/arch/arm/mm/proc-mohawk.S
++++ b/arch/arm/mm/proc-mohawk.S
+@@ -218,10 +218,6 @@ ENTRY(mohawk_flush_kern_dcache_page)
+  * (same as v4wb)
+  */
+ ENTRY(mohawk_dma_inv_range)
+-	tst	r0, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
+-	tst	r1, #CACHE_DLINESIZE - 1
+-	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
+ 	bic	r0, r0, #CACHE_DLINESIZE - 1
+ 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
+ 	add	r0, r0, #CACHE_DLINESIZE
+diff --git a/arch/arm/mm/proc-xsc3.S b/arch/arm/mm/proc-xsc3.S
+index 2028f37..2c1ac69 100644
+--- a/arch/arm/mm/proc-xsc3.S
++++ b/arch/arm/mm/proc-xsc3.S
+@@ -257,11 +257,7 @@ ENTRY(xsc3_flush_kern_dcache_page)
+  *	- end	 - virtual end address
+  */
+ ENTRY(xsc3_dma_inv_range)
+-	tst	r0, #CACHELINESIZE - 1
+ 	bic	r0, r0, #CACHELINESIZE - 1
+-	mcrne	p15, 0, r0, c7, c10, 1		@ clean L1 D line
+-	tst	r1, #CACHELINESIZE - 1
+-	mcrne	p15, 0, r1, c7, c10, 1		@ clean L1 D line
+ 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate L1 D line
+ 	add	r0, r0, #CACHELINESIZE
+ 	cmp	r0, r1
+diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
+index f056c28..3170348 100644
+--- a/arch/arm/mm/proc-xscale.S
++++ b/arch/arm/mm/proc-xscale.S
+@@ -315,11 +315,7 @@ ENTRY(xscale_flush_kern_dcache_page)
+  *	- end	 - virtual end address
+  */
+ ENTRY(xscale_dma_inv_range)
+-	tst	r0, #CACHELINESIZE - 1
+ 	bic	r0, r0, #CACHELINESIZE - 1
+-	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
+-	tst	r1, #CACHELINESIZE - 1
+-	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
+ 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
+ 	add	r0, r0, #CACHELINESIZE
+ 	cmp	r0, r1
+-- 
+1.6.2.5
