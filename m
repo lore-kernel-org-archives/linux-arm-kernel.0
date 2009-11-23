@@ -1,472 +1,390 @@
-From: njun@marvell.com (Jun Nie)
-Date: Mon, 23 Nov 2009 10:32:51 +0800
-Subject: [PATCH] pxa: add frame buffer on pxa910 ttc_dkb platform
-Message-ID: <mailman.53.1258955732.2170.linux-arm-kernel@lists.infradead.org>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Mon, 23 Nov 2009 14:35:29 +0800
+Subject: [rtc-linux] [PATCH] ARM: NUC900: add rtc controller driver support
+	for NUC900
+In-Reply-To: <20091122214107.1a0c4e72@linux.lan.towertech.it>
+References: <4B097FA0.8040308@gmail.com>
+	<20091122214107.1a0c4e72@linux.lan.towertech.it>
+Message-ID: <4B0A2D31.5020307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jun Nie <njun@marvell.com>
+Dear Alessandro,
+
+Thanks a lot for your advice, and I have fixed my patch.
+But, I have a question ,which is that why do not implement ops->ioctl()
+unless absolutely necessary? and I see many other rtc driver have implemented it. 
+
+
+Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
+
 ---
- arch/arm/configs/pxa910_defconfig       |   39 ++++++++-
- arch/arm/mach-mmp/include/mach/pxa910.h |    7 ++
- arch/arm/mach-mmp/pxa910.c              |    3 +
- arch/arm/mach-mmp/ttc_dkb.c             |  144 +++++++++++++++++++++++++++=
-++++
- 4 files changed, 192 insertions(+), 1 deletions(-)
+ drivers/rtc/Kconfig      |    6 +
+ drivers/rtc/Makefile     |    1 +
+ drivers/rtc/rtc-nuc900.c |  326 ++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 333 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/rtc/rtc-nuc900.c
 
-diff --git a/arch/arm/configs/pxa910_defconfig
-b/arch/arm/configs/pxa910_defconfig
-index 8c7e299..b9b1a85 100644
---- a/arch/arm/configs/pxa910_defconfig
-+++ b/arch/arm/configs/pxa910_defconfig
-@@ -578,7 +578,34 @@ CONFIG_SSB_POSSIBLE=3Dy
- #
- # CONFIG_VGASTATE is not set
- # CONFIG_VIDEO_OUTPUT_CONTROL is not set
--# CONFIG_FB is not set
-+CONFIG_FB=3Dy
-+# CONFIG_FIRMWARE_EDID is not set
-+# CONFIG_FB_DDC is not set
-+# CONFIG_FB_BOOT_VESA_SUPPORT is not set
-+CONFIG_FB_CFB_FILLRECT=3Dy
-+CONFIG_FB_CFB_COPYAREA=3Dy
-+CONFIG_FB_CFB_IMAGEBLIT=3Dy
-+# CONFIG_FB_CFB_REV_PIXELS_IN_BYTE is not set
-+# CONFIG_FB_SYS_FILLRECT is not set
-+# CONFIG_FB_SYS_COPYAREA is not set
-+# CONFIG_FB_SYS_IMAGEBLIT is not set
-+# CONFIG_FB_FOREIGN_ENDIAN is not set
-+# CONFIG_FB_SYS_FOPS is not set
-+# CONFIG_FB_SVGALIB is not set
-+# CONFIG_FB_MACMODES is not set
-+# CONFIG_FB_BACKLIGHT is not set
-+# CONFIG_FB_MODE_HELPERS is not set
-+# CONFIG_FB_TILEBLITTING is not set
+diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+index 3c20dae..266ce62 100644
+--- a/drivers/rtc/Kconfig
++++ b/drivers/rtc/Kconfig
+@@ -573,6 +573,12 @@ config RTC_DRV_AB3100
+ 	  Select this to enable the ST-Ericsson AB3100 Mixed Signal IC RTC
+ 	  support. This chip contains a battery- and capacitor-backed RTC.
+ 
++config RTC_DRV_NUC900
++	tristate "NUC910/NUC920 RTC driver"
++	depends on RTC_CLASS && ARCH_W90X900
++	help
++	  If you say yes here you get support for the RTC subsystem of the
++	  NUC910/NUC920 used in embedded systems.
+ 
+ comment "on-CPU RTC drivers"
+ 
+diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
+index aa3fbd5..d511774 100644
+--- a/drivers/rtc/Makefile
++++ b/drivers/rtc/Makefile
+@@ -53,6 +53,7 @@ obj-$(CONFIG_RTC_MXC)		+= rtc-mxc.o
+ obj-$(CONFIG_RTC_DRV_MAX6900)	+= rtc-max6900.o
+ obj-$(CONFIG_RTC_DRV_MAX6902)	+= rtc-max6902.o
+ obj-$(CONFIG_RTC_DRV_MV)	+= rtc-mv.o
++obj-$(CONFIG_RTC_DRV_NUC900)	+= rtc-nuc900.o
+ obj-$(CONFIG_RTC_DRV_OMAP)	+= rtc-omap.o
+ obj-$(CONFIG_RTC_DRV_PCAP)	+= rtc-pcap.o
+ obj-$(CONFIG_RTC_DRV_PCF8563)	+= rtc-pcf8563.o
+diff --git a/drivers/rtc/rtc-nuc900.c b/drivers/rtc/rtc-nuc900.c
+new file mode 100644
+index 0000000..6a08f09
+--- /dev/null
++++ b/drivers/rtc/rtc-nuc900.c
+@@ -0,0 +1,326 @@
++/*
++ * Copyright (c) 2008-2009 Nuvoton technology corporation.
++ *
++ * Wan ZongShun <mcuos.com@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation;version 2 of the License.
++ *
++ */
 +
-+#
-+# Frame buffer hardware drivers
-+#
-+# CONFIG_FB_S1D13XXX is not set
-+CONFIG_FB_PXA168=3Dy
-+# CONFIG_FB_VIRTUAL is not set
-+# CONFIG_FB_METRONOME is not set
-+# CONFIG_FB_MB862XX is not set
-+# CONFIG_FB_BROADSHEET is not set
- # CONFIG_BACKLIGHT_LCD_SUPPORT is not set
-
- #
-@@ -591,6 +618,16 @@ CONFIG_SSB_POSSIBLE=3Dy
- #
- # CONFIG_VGA_CONSOLE is not set
- CONFIG_DUMMY_CONSOLE=3Dy
-+CONFIG_FRAMEBUFFER_CONSOLE=3Dy
-+CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=3Dy
-+# CONFIG_FRAMEBUFFER_CONSOLE_ROTATION is not set
-+# CONFIG_FONTS is not set
-+CONFIG_FONT_8x8=3Dy
-+CONFIG_FONT_8x16=3Dy
-+CONFIG_LOGO=3Dy
-+# CONFIG_LOGO_LINUX_MONO is not set
-+CONFIG_LOGO_LINUX_VGA16=3Dy
-+CONFIG_LOGO_LINUX_CLUT224=3Dy
- # CONFIG_SOUND is not set
- # CONFIG_HID_SUPPORT is not set
- # CONFIG_USB_SUPPORT is not set
-diff --git a/arch/arm/mach-mmp/include/mach/pxa910.h
-b/arch/arm/mach-mmp/include/mach/pxa910.h
-index 4f0b4ec..0236182 100644
---- a/arch/arm/mach-mmp/include/mach/pxa910.h
-+++ b/arch/arm/mach-mmp/include/mach/pxa910.h
-@@ -5,6 +5,7 @@
- #include <mach/devices.h>
- #include <plat/i2c.h>
- #include <plat/pxa3xx_nand.h>
-+#include <video/pxa168fb.h>
-
- extern struct pxa_device_desc pxa910_device_uart1;
- extern struct pxa_device_desc pxa910_device_uart2;
-@@ -15,6 +16,7 @@ extern struct pxa_device_desc pxa910_device_pwm2;
- extern struct pxa_device_desc pxa910_device_pwm3;
- extern struct pxa_device_desc pxa910_device_pwm4;
- extern struct pxa_device_desc pxa910_device_nand;
-+extern struct pxa_device_desc pxa910_device_fb;
-
- static inline int pxa910_add_uart(int id)
- {
-@@ -71,4 +73,9 @@ static inline int pxa910_add_nand(struct
-pxa3xx_nand_platform_data *info)
- {
- 	return pxa_register_device(&pxa910_device_nand, info, sizeof(*info));
- }
-+
-+static inline int pxa910_add_fb(struct pxa168fb_mach_info *mi)
-+{
-+	return pxa_register_device(&pxa910_device_fb, mi, sizeof(*mi));
-+}
- #endif /* __ASM_MACH_PXA910_H */
-diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
-index d404950..7b91ea6 100644
---- a/arch/arm/mach-mmp/pxa910.c
-+++ b/arch/arm/mach-mmp/pxa910.c
-@@ -111,6 +111,7 @@ static APBC_CLK(pwm3, PXA910_PWM3, 1, 13000000);
- static APBC_CLK(pwm4, PXA910_PWM4, 1, 13000000);
-
- static APMU_CLK(nand, NAND, 0x01db, 208000000);
-+static APMU_CLK(lcd, LCD, 0x003f, 312000000);
-
- /* device and clock bindings */
- static struct clk_lookup pxa910_clkregs[] =3D {
-@@ -123,6 +124,7 @@ static struct clk_lookup pxa910_clkregs[] =3D {
- 	INIT_CLKREG(&clk_pwm3, "pxa910-pwm.2", NULL),
- 	INIT_CLKREG(&clk_pwm4, "pxa910-pwm.3", NULL),
- 	INIT_CLKREG(&clk_nand, "pxa3xx-nand", NULL),
-+	INIT_CLKREG(&clk_lcd, "pxa910-fb", "LCDCLK"),
- };
-
- static int __init pxa910_init(void)
-@@ -178,3 +180,4 @@ PXA910_DEVICE(pwm2, "pxa910-pwm", 1, NONE,
-0xd401a400, 0x10);
- PXA910_DEVICE(pwm3, "pxa910-pwm", 2, NONE, 0xd401a800, 0x10);
- PXA910_DEVICE(pwm4, "pxa910-pwm", 3, NONE, 0xd401ac00, 0x10);
- PXA910_DEVICE(nand, "pxa3xx-nand", -1, NAND, 0xd4283000, 0x80, 97, 99);
-+PXA910_DEVICE(fb, "pxa910-fb", -1, LCD, 0xd420b000, 0x1c8);
-diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
-index bb26cb5..d3e7e1f 100644
---- a/arch/arm/mach-mmp/ttc_dkb.c
-+++ b/arch/arm/mach-mmp/ttc_dkb.c
-@@ -14,7 +14,10 @@
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
- #include <linux/mtd/onenand.h>
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/rtc.h>
 +#include <linux/delay.h>
-+#include <linux/gpio.h>
-
-+#include <video/pxa168fb.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/flash.h>
-@@ -31,6 +34,37 @@ static unsigned long ttc_dkb_pin_config[] __initdata =3D=
- {
- 	GPIO47_UART2_RXD,
- 	GPIO48_UART2_TXD,
-
-+#ifdef CONFIG_FB_PXA168
-+	/* LCD */
-+	GPIO81_LCD_FCLK,
-+	GPIO82_LCD_LCLK,
-+	GPIO83_LCD_PCLK,
-+	GPIO84_LCD_DENA,
-+	GPIO85_LCD_DD0,
-+	GPIO86_LCD_DD1,
-+	GPIO87_LCD_DD2,
-+	GPIO88_LCD_DD3,
-+	GPIO89_LCD_DD4,
-+	GPIO90_LCD_DD5,
-+	GPIO91_LCD_DD6,
-+	GPIO92_LCD_DD7,
-+	GPIO93_LCD_DD8,
-+	GPIO94_LCD_DD9,
-+	GPIO95_LCD_DD10,
-+	GPIO96_LCD_DD11,
-+	GPIO97_LCD_DD12,
-+	GPIO98_LCD_DD13,
-+	GPIO100_LCD_DD14,
-+	GPIO101_LCD_DD15,
-+	GPIO102_LCD_DD16,
-+	GPIO103_LCD_DD17,
-+	GPIO104_LCD_SPIDOUT,
-+	GPIO105_LCD_SPIDIN,
-+	GPIO107_LCD_CS1,
-+	GPIO108_LCD_DCLK,
-+	GPIO106_LCD_RESET,
-+#endif
++#include <linux/io.h>
++#include <linux/bcd.h>
 +
- 	/* DFI */
- 	DF_IO0_ND_IO0,
- 	DF_IO1_ND_IO1,
-@@ -56,6 +90,113 @@ static unsigned long ttc_dkb_pin_config[] __initdata =
-=3D {
- 	DF_RDY0_DF_RDY0,
- };
-
-+#ifdef CONFIG_FB_PXA168
-+static u16 tpo_spi_cmdon[] =3D {
-+	0x0801,
-+	0x0800,
-+	0x0200,
-+	0x0304,
-+	0x040e,
-+	0x0903,
-+	0x0b18,
-+	0x0c53,
-+	0x0d01,
-+	0x0ee0,
-+	0x0f01,
-+	0x1058,
-+	0x201e,
-+	0x210a,
-+	0x220a,
-+	0x231e,
-+	0x2400,
-+	0x2532,
-+	0x2600,
-+	0x27ac,
-+	0x2904,
-+	0x2aa2,
-+	0x2b45,
-+	0x2c45,
-+	0x2d15,
-+	0x2e5a,
-+	0x2fff,
-+	0x306b,
-+	0x310d,
-+	0x3248,
-+	0x3382,
-+	0x34bd,
-+	0x35e7,
-+	0x3618,
-+	0x3794,
-+	0x3801,
-+	0x395d,
-+	0x3aae,
-+	0x3bff,
-+	0x07c9,		/* auto power on */
++/* RTC Control Registers */
++#define REG_RTC_INIR		0x00
++#define REG_RTC_AER		0x04
++#define REG_RTC_FCR		0x08
++#define REG_RTC_TLR		0x0C
++#define REG_RTC_CLR		0x10
++#define REG_RTC_TSSR		0x14
++#define REG_RTC_DWR		0x18
++#define REG_RTC_TAR		0x1C
++#define REG_RTC_CAR		0x20
++#define REG_RTC_LIR		0x24
++#define REG_RTC_RIER		0x28
++#define REG_RTC_RIIR		0x2C
++#define REG_RTC_TTR		0x30
++
++#define RTCSET			0x01
++#define AERRWENB		0x10000
++#define INIRRESET		0xa5eb1357
++#define AERPOWERON		0xA965
++#define AERPOWEROFF		0x0000
++#define LEAPYEAR		0x0001
++#define TICKENB			0x80
++#define TICKINTENB		0x0002
++#define ALARMINTENB		0x0001
++
++struct nuc900_rtc {
++	int			irq_num;
++	void __iomem		*rtc_reg;
++	struct rtc_device	*rtcdev;
++	spinlock_t		lock;
 +};
 +
-+static u16 tpo_spi_cmdoff[] =3D {
-+	0x07d9,		/* auto power off */
++struct nuc900_bcd_time {
++	int bcd_sec;
++	int bcd_min;
++	int bcd_hour;
++	int bcd_mday;
++	int bcd_mon;
++	int bcd_year;
 +};
 +
-+static int tpo_lcd_power(struct pxa168fb_info *fbi, unsigned int spi_gpio_=
-cs,
-+		unsigned int spi_gpio_reset, int on)
++static irqreturn_t nuc900_rtc_interrupt(int irq, void *_rtc)
 +{
-+	int err =3D 0;
++	struct nuc900_rtc *rtc = _rtc;
++	unsigned long events = 0, rtc_irq;
 +
-+	if (on) {
-+		if (spi_gpio_reset !=3D -1) {
-+			err =3D gpio_request(spi_gpio_reset, "TPO_LCD_SPI_RESET");
-+			if (err) {
-+				printk(KERN_ERR "failed to request GPIO for TPO LCD RESET\n");
-+				return -EIO;
-+			}
-+			gpio_direction_output(spi_gpio_reset, 0);
-+			msleep(1);
-+			gpio_set_value(spi_gpio_reset, 1);
-+			msleep(11);
-+			gpio_free(spi_gpio_reset);
-+		}
-+		return pxa168fb_spi_send(fbi, tpo_spi_cmdon,
-+				ARRAY_SIZE(tpo_spi_cmdon), spi_gpio_cs, 0, 40);
-+	} else
-+		return pxa168fb_spi_send(fbi, tpo_spi_cmdoff,
-+				ARRAY_SIZE(tpo_spi_cmdoff), spi_gpio_cs, 0, 0);
++	rtc_irq = __raw_readl(rtc->rtc_reg + REG_RTC_RIIR);
++
++	if (rtc_irq & ALARMINTENB) {
++		rtc_irq &= ~ALARMINTENB;
++		__raw_writel(rtc_irq, rtc->rtc_reg + REG_RTC_RIIR);
++		events |= RTC_AF | RTC_IRQF;
++	}
++
++	if (rtc_irq & TICKINTENB) {
++		rtc_irq &= ~TICKINTENB;
++		__raw_writel(rtc_irq, rtc->rtc_reg + REG_RTC_RIIR);
++		events |= RTC_UF | RTC_IRQF;
++	}
++
++	rtc_update_irq(rtc->rtcdev, 1, events);
++
++	return IRQ_HANDLED;
 +}
 +
-+static struct fb_videomode video_modes[] =3D {
-+	/* lpj032l001b HVGA mode info */
-+	[0] =3D {
-+		.pixclock       =3D 100000,
-+		.refresh        =3D 60,
-+		.xres           =3D 320,
-+		.yres           =3D 480,
-+		.hsync_len      =3D 10,
-+		.left_margin    =3D 15,
-+		.right_margin   =3D 10,
-+		.vsync_len      =3D 2,
-+		.upper_margin   =3D 4,
-+		.lower_margin   =3D 2,
-+		.sync           =3D 0,
++static void check_rtc_power(struct nuc900_rtc *nuc900_rtc)
++{
++	unsigned int i;
++	__raw_writel(INIRRESET, nuc900_rtc->rtc_reg + REG_RTC_INIR);
++
++	mdelay(10);
++
++	__raw_writel(AERPOWERON, nuc900_rtc->rtc_reg + REG_RTC_AER);
++
++	for (i = 0; i < 1000000; i++) {
++		if (__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB)
++			break;
++	}
++}
++
++static void nuc900_rtc_decodetime(unsigned int timereg,
++				unsigned int calreg, struct rtc_time *tm)
++{
++	tm->tm_mday	= bcd2bin(calreg >> 0);
++	tm->tm_mon	= bcd2bin(calreg >> 8);
++	tm->tm_year	= bcd2bin(calreg >> 16) + 2000;
++
++	tm->tm_sec	= bcd2bin(timereg >> 0);
++	tm->tm_min	= bcd2bin(timereg >> 8);
++	tm->tm_hour	= bcd2bin(timereg >> 16);
++
++	rtc_valid_tm(tm);
++}
++
++static void nuc900_rtc_encodetime(struct rtc_time *settm,
++						struct nuc900_bcd_time *gettm)
++{
++	gettm->bcd_mday = bin2bcd(settm->tm_mday << 0);
++	gettm->bcd_mon  = bin2bcd(settm->tm_mon << 8);
++	gettm->bcd_year = bin2bcd(settm->tm_year << 16) - 2000;
++
++	gettm->bcd_sec  = bin2bcd(settm->tm_sec << 0);
++	gettm->bcd_min  = bin2bcd(settm->tm_min << 8);
++	gettm->bcd_hour = bin2bcd(settm->tm_hour << 16);
++}
++
++static void nuc900_rtc_enbale_timeirq(struct nuc900_rtc *rtc,
++							unsigned int enable)
++{
++	if (enable)
++		__raw_writel(__raw_readl(rtc->rtc_reg + REG_RTC_RIER)|
++				(TICKINTENB), rtc->rtc_reg + REG_RTC_RIER);
++	else
++		__raw_writel(__raw_readl(rtc->rtc_reg + REG_RTC_RIER)&
++				(~TICKINTENB), rtc->rtc_reg + REG_RTC_RIER);
++}
++
++static void nuc900_rtc_enbale_alarmirq(struct nuc900_rtc *rtc,
++							unsigned int enable)
++{
++	if (enable)
++		__raw_writel(__raw_readl(rtc->rtc_reg + REG_RTC_RIER)|
++				(ALARMINTENB), rtc->rtc_reg + REG_RTC_RIER);
++	else
++		__raw_writel(__raw_readl(rtc->rtc_reg + REG_RTC_RIER)&
++				(~ALARMINTENB), rtc->rtc_reg + REG_RTC_RIER);
++}
++
++static int nuc900_rtc_read_time(struct device *dev, struct rtc_time *tm)
++{
++	struct nuc900_rtc *rtc = dev_get_drvdata(dev);
++	unsigned int timeval, clrval;
++
++	timeval = __raw_readl(rtc->rtc_reg + REG_RTC_TLR);
++	clrval	= __raw_readl(rtc->rtc_reg + REG_RTC_CLR);
++
++	nuc900_rtc_decodetime(timeval, clrval, tm);
++
++	return 0;
++}
++
++static int nuc900_rtc_set_time(struct device *dev, struct rtc_time *tm)
++{
++	struct nuc900_rtc *rtc = dev_get_drvdata(dev);
++	struct nuc900_bcd_time gettm;
++	unsigned long val;
++
++	rtc_valid_tm(tm);
++
++	nuc900_rtc_encodetime(tm, &gettm);
++
++	check_rtc_power(rtc);
++
++	val = gettm.bcd_mday | gettm.bcd_mon | gettm.bcd_year;
++	__raw_writel(val, rtc->rtc_reg + REG_RTC_CLR);
++
++	val = gettm.bcd_sec | gettm.bcd_min | gettm.bcd_hour;
++	__raw_writel(val, rtc->rtc_reg + REG_RTC_TLR);
++
++	return 0;
++}
++
++static int nuc900_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
++{
++	struct nuc900_rtc *rtc = dev_get_drvdata(dev);
++	unsigned int timeval, carval;
++
++	timeval = __raw_readl(rtc->rtc_reg + REG_RTC_TAR);
++	carval	= __raw_readl(rtc->rtc_reg + REG_RTC_CAR);
++
++	nuc900_rtc_decodetime(timeval, carval, &alrm->time);
++
++	return 0;
++}
++
++static int nuc900_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
++{
++	struct nuc900_rtc *rtc = dev_get_drvdata(dev);
++	struct nuc900_bcd_time tm;
++	unsigned long val;
++
++	nuc900_rtc_encodetime(&alrm->time, &tm);
++
++	check_rtc_power(rtc);
++
++	val = tm.bcd_mday | tm.bcd_mon | tm.bcd_year;
++	__raw_writel(val, rtc->rtc_reg + REG_RTC_CAR);
++
++	val = tm.bcd_sec | tm.bcd_min | tm.bcd_hour;
++	__raw_writel(val, rtc->rtc_reg + REG_RTC_TAR);
++
++	if (alrm->enabled)
++		nuc900_rtc_enbale_alarmirq(rtc, 1);
++
++	return 0;
++}
++
++static struct rtc_class_ops nuc900_rtc_ops = {
++	.read_time = nuc900_rtc_read_time,
++	.set_time = nuc900_rtc_set_time,
++	.read_alarm = nuc900_rtc_read_alarm,
++	.set_alarm = nuc900_rtc_set_alarm,
++};
++
++static int __devinit nuc900_rtc_probe(struct platform_device *pdev)
++{
++	struct resource *res;
++	struct nuc900_rtc *nuc900_rtc;
++	int err;
++
++	nuc900_rtc = kzalloc(sizeof(struct nuc900_rtc), GFP_KERNEL);
++	if (!nuc900_rtc) {
++		err = -ENOMEM;
++		goto fail1;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		err = -ENXIO;
++		goto fail1;
++	}
++
++	if (!request_mem_region(res->start, resource_size(res),
++				pdev->name)) {
++		err = -EBUSY;
++		goto fail1;
++	}
++
++	nuc900_rtc->rtc_reg = ioremap(res->start, resource_size(res));
++	if (!nuc900_rtc->rtc_reg) {
++		err = -ENOMEM;
++		goto fail2;
++	}
++
++	nuc900_rtc->irq_num = platform_get_irq(pdev, 0);
++	if (request_irq(nuc900_rtc->irq_num, nuc900_rtc_interrupt,
++			IRQF_DISABLED, "nuc900rtc", nuc900_rtc)) {
++		err = -EBUSY;
++		goto fail3;
++	}
++
++	nuc900_rtc->rtcdev = rtc_device_register(pdev->name, &pdev->dev,
++						&nuc900_rtc_ops, THIS_MODULE);
++	if (IS_ERR(nuc900_rtc->rtcdev)) {
++		err = PTR_ERR(nuc900_rtc->rtcdev);
++		goto fail4;
++	}
++
++	platform_set_drvdata(pdev, nuc900_rtc->rtcdev);
++	nuc900_rtc_enbale_timeirq(nuc900_rtc, 1);
++
++	return 0;
++
++fail4:	free_irq(nuc900_rtc->irq_num, nuc900_rtc);
++fail3:	iounmap(nuc900_rtc->rtc_reg);
++fail2:	release_mem_region(res->start, resource_size(res));
++fail1:	kfree(nuc900_rtc);
++	return err;
++}
++
++static int __devexit nuc900_rtc_remove(struct platform_device *pdev)
++{
++	struct nuc900_rtc *nuc900_rtc = platform_get_drvdata(pdev);
++	struct resource *res;
++
++	nuc900_rtc_enbale_timeirq(nuc900_rtc, 0);
++	nuc900_rtc_enbale_alarmirq(nuc900_rtc, 0);
++
++	rtc_device_unregister(nuc900_rtc->rtcdev);
++	free_irq(nuc900_rtc->irq_num, nuc900_rtc);
++	iounmap(nuc900_rtc->rtc_reg);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	release_mem_region(res->start, resource_size(res));
++
++	kfree(nuc900_rtc);
++
++	platform_set_drvdata(pdev, NULL);
++
++	return 0;
++}
++
++static struct platform_driver nuc900_rtc_driver = {
++	.remove		= __devexit_p(nuc900_rtc_remove),
++	.driver		= {
++		.name	= "nuc900-rtc",
++		.owner	= THIS_MODULE,
 +	},
 +};
 +
-+static struct pxa168fb_mach_info ttc_dkb_lcd_info __initdata =3D {
-+	.id                     =3D "Base",
-+	.modes                  =3D video_modes,
-+	.num_modes              =3D ARRAY_SIZE(video_modes),
-+	.pix_fmt                =3D PIX_FMT_RGB565,
-+	.io_pin_allocation_mode =3D PIN_MODE_DUMB_18_SPI,
-+	.dumb_mode              =3D DUMB_MODE_RGB666,
-+	.active                 =3D 1,
-+	.spi_ctrl               =3D CFG_SCLKCNT(16) | CFG_TXBITS(16) |
-+		CFG_SPI_SEL(1) | CFG_SPI_3W4WB(1) | CFG_SPI_ENA(1),
-+	.spi_gpio_cs            =3D -1,
-+	.spi_gpio_reset		=3D mfp_to_gpio(MFP_PIN_GPIO106),
-+	.invert_pixclock	=3D 1,
-+	.pxa168fb_lcd_power	=3D tpo_lcd_power,
-+};
-+#endif
++static int __init nuc900_rtc_init(void)
++{
++	return platform_driver_probe(&nuc900_rtc_driver, nuc900_rtc_probe);
++}
 +
- static struct mtd_partition ttc_dkb_onenand_partitions[] =3D {
- 	{
- 		.name		=3D "bootloader",
-@@ -118,6 +259,9 @@ static void __init ttc_dkb_init(void)
-
- 	/* on-chip devices */
- 	pxa910_add_uart(1);
-+#ifdef CONFIG_FB_PXA168
-+	pxa910_add_fb(&ttc_dkb_lcd_info);
-+#endif
-
- 	/* off-chip devices */
- 	platform_add_devices(ARRAY_AND_SIZE(ttc_dkb_devices));
---=20
-1.5.4.3
-
---0016e648d096a337a404790378a7
-Content-Type: text/x-diff; charset=US-ASCII; 
-	name="0002-pxa-add-frame-buffer-on-pxa910-ttc_dkb-platform.patch"
-Content-Disposition: attachment; 
-	filename="0002-pxa-add-frame-buffer-on-pxa910-ttc_dkb-platform.patch"
-Content-Transfer-Encoding: base64
-X-Attachment-Id: f_g2cton4l0
-
-RnJvbSA5MTQ3OWZlNzZlMzE2ODY3NDdiMDE2ZDY2NjdhMTRkM2FlYzNiMDc0IE1vbiBTZXAgMTcg
-MDA6MDA6MDAgMjAwMQpGcm9tOiBKdW4gTmllIDxuanVuQG1hcnZlbGwuY29tPgpEYXRlOiBNb24s
-IDIzIE5vdiAyMDA5IDEwOjMyOjUxICswODAwClN1YmplY3Q6IFtQQVRDSF0gcHhhOiBhZGQgZnJh
-bWUgYnVmZmVyIG9uIHB4YTkxMCB0dGNfZGtiIHBsYXRmb3JtCgpTaWduZWQtb2ZmLWJ5OiBKdW4g
-TmllIDxuanVuQG1hcnZlbGwuY29tPgotLS0KIGFyY2gvYXJtL2NvbmZpZ3MvcHhhOTEwX2RlZmNv
-bmZpZyAgICAgICB8ICAgMzkgKysrKysrKystCiBhcmNoL2FybS9tYWNoLW1tcC9pbmNsdWRlL21h
-Y2gvcHhhOTEwLmggfCAgICA3ICsrCiBhcmNoL2FybS9tYWNoLW1tcC9weGE5MTAuYyAgICAgICAg
-ICAgICAgfCAgICAzICsKIGFyY2gvYXJtL21hY2gtbW1wL3R0Y19ka2IuYyAgICAgICAgICAgICB8
-ICAxNDQgKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKwogNCBmaWxlcyBjaGFuZ2VkLCAx
-OTIgaW5zZXJ0aW9ucygrKSwgMSBkZWxldGlvbnMoLSkKCmRpZmYgLS1naXQgYS9hcmNoL2FybS9j
-b25maWdzL3B4YTkxMF9kZWZjb25maWcgYi9hcmNoL2FybS9jb25maWdzL3B4YTkxMF9kZWZjb25m
-aWcKaW5kZXggOGM3ZTI5OS4uYjliMWE4NSAxMDA2NDQKLS0tIGEvYXJjaC9hcm0vY29uZmlncy9w
-eGE5MTBfZGVmY29uZmlnCisrKyBiL2FyY2gvYXJtL2NvbmZpZ3MvcHhhOTEwX2RlZmNvbmZpZwpA
-QCAtNTc4LDcgKzU3OCwzNCBAQCBDT05GSUdfU1NCX1BPU1NJQkxFPXkKICMKICMgQ09ORklHX1ZH
-QVNUQVRFIGlzIG5vdCBzZXQKICMgQ09ORklHX1ZJREVPX09VVFBVVF9DT05UUk9MIGlzIG5vdCBz
-ZXQKLSMgQ09ORklHX0ZCIGlzIG5vdCBzZXQKK0NPTkZJR19GQj15CisjIENPTkZJR19GSVJNV0FS
-RV9FRElEIGlzIG5vdCBzZXQKKyMgQ09ORklHX0ZCX0REQyBpcyBub3Qgc2V0CisjIENPTkZJR19G
-Ql9CT09UX1ZFU0FfU1VQUE9SVCBpcyBub3Qgc2V0CitDT05GSUdfRkJfQ0ZCX0ZJTExSRUNUPXkK
-K0NPTkZJR19GQl9DRkJfQ09QWUFSRUE9eQorQ09ORklHX0ZCX0NGQl9JTUFHRUJMSVQ9eQorIyBD
-T05GSUdfRkJfQ0ZCX1JFVl9QSVhFTFNfSU5fQllURSBpcyBub3Qgc2V0CisjIENPTkZJR19GQl9T
-WVNfRklMTFJFQ1QgaXMgbm90IHNldAorIyBDT05GSUdfRkJfU1lTX0NPUFlBUkVBIGlzIG5vdCBz
-ZXQKKyMgQ09ORklHX0ZCX1NZU19JTUFHRUJMSVQgaXMgbm90IHNldAorIyBDT05GSUdfRkJfRk9S
-RUlHTl9FTkRJQU4gaXMgbm90IHNldAorIyBDT05GSUdfRkJfU1lTX0ZPUFMgaXMgbm90IHNldAor
-IyBDT05GSUdfRkJfU1ZHQUxJQiBpcyBub3Qgc2V0CisjIENPTkZJR19GQl9NQUNNT0RFUyBpcyBu
-b3Qgc2V0CisjIENPTkZJR19GQl9CQUNLTElHSFQgaXMgbm90IHNldAorIyBDT05GSUdfRkJfTU9E
-RV9IRUxQRVJTIGlzIG5vdCBzZXQKKyMgQ09ORklHX0ZCX1RJTEVCTElUVElORyBpcyBub3Qgc2V0
-CisKKyMKKyMgRnJhbWUgYnVmZmVyIGhhcmR3YXJlIGRyaXZlcnMKKyMKKyMgQ09ORklHX0ZCX1Mx
-RDEzWFhYIGlzIG5vdCBzZXQKK0NPTkZJR19GQl9QWEExNjg9eQorIyBDT05GSUdfRkJfVklSVFVB
-TCBpcyBub3Qgc2V0CisjIENPTkZJR19GQl9NRVRST05PTUUgaXMgbm90IHNldAorIyBDT05GSUdf
-RkJfTUI4NjJYWCBpcyBub3Qgc2V0CisjIENPTkZJR19GQl9CUk9BRFNIRUVUIGlzIG5vdCBzZXQK
-ICMgQ09ORklHX0JBQ0tMSUdIVF9MQ0RfU1VQUE9SVCBpcyBub3Qgc2V0CiAKICMKQEAgLTU5MSw2
-ICs2MTgsMTYgQEAgQ09ORklHX1NTQl9QT1NTSUJMRT15CiAjCiAjIENPTkZJR19WR0FfQ09OU09M
-RSBpcyBub3Qgc2V0CiBDT05GSUdfRFVNTVlfQ09OU09MRT15CitDT05GSUdfRlJBTUVCVUZGRVJf
-Q09OU09MRT15CitDT05GSUdfRlJBTUVCVUZGRVJfQ09OU09MRV9ERVRFQ1RfUFJJTUFSWT15Cisj
-IENPTkZJR19GUkFNRUJVRkZFUl9DT05TT0xFX1JPVEFUSU9OIGlzIG5vdCBzZXQKKyMgQ09ORklH
-X0ZPTlRTIGlzIG5vdCBzZXQKK0NPTkZJR19GT05UXzh4OD15CitDT05GSUdfRk9OVF84eDE2PXkK
-K0NPTkZJR19MT0dPPXkKKyMgQ09ORklHX0xPR09fTElOVVhfTU9OTyBpcyBub3Qgc2V0CitDT05G
-SUdfTE9HT19MSU5VWF9WR0ExNj15CitDT05GSUdfTE9HT19MSU5VWF9DTFVUMjI0PXkKICMgQ09O
-RklHX1NPVU5EIGlzIG5vdCBzZXQKICMgQ09ORklHX0hJRF9TVVBQT1JUIGlzIG5vdCBzZXQKICMg
-Q09ORklHX1VTQl9TVVBQT1JUIGlzIG5vdCBzZXQKZGlmZiAtLWdpdCBhL2FyY2gvYXJtL21hY2gt
-bW1wL2luY2x1ZGUvbWFjaC9weGE5MTAuaCBiL2FyY2gvYXJtL21hY2gtbW1wL2luY2x1ZGUvbWFj
-aC9weGE5MTAuaAppbmRleCA0ZjBiNGVjLi4wMjM2MTgyIDEwMDY0NAotLS0gYS9hcmNoL2FybS9t
-YWNoLW1tcC9pbmNsdWRlL21hY2gvcHhhOTEwLmgKKysrIGIvYXJjaC9hcm0vbWFjaC1tbXAvaW5j
-bHVkZS9tYWNoL3B4YTkxMC5oCkBAIC01LDYgKzUsNyBAQAogI2luY2x1ZGUgPG1hY2gvZGV2aWNl
-cy5oPgogI2luY2x1ZGUgPHBsYXQvaTJjLmg+CiAjaW5jbHVkZSA8cGxhdC9weGEzeHhfbmFuZC5o
-PgorI2luY2x1ZGUgPHZpZGVvL3B4YTE2OGZiLmg+CiAKIGV4dGVybiBzdHJ1Y3QgcHhhX2Rldmlj
-ZV9kZXNjIHB4YTkxMF9kZXZpY2VfdWFydDE7CiBleHRlcm4gc3RydWN0IHB4YV9kZXZpY2VfZGVz
-YyBweGE5MTBfZGV2aWNlX3VhcnQyOwpAQCAtMTUsNiArMTYsNyBAQCBleHRlcm4gc3RydWN0IHB4
-YV9kZXZpY2VfZGVzYyBweGE5MTBfZGV2aWNlX3B3bTI7CiBleHRlcm4gc3RydWN0IHB4YV9kZXZp
-Y2VfZGVzYyBweGE5MTBfZGV2aWNlX3B3bTM7CiBleHRlcm4gc3RydWN0IHB4YV9kZXZpY2VfZGVz
-YyBweGE5MTBfZGV2aWNlX3B3bTQ7CiBleHRlcm4gc3RydWN0IHB4YV9kZXZpY2VfZGVzYyBweGE5
-MTBfZGV2aWNlX25hbmQ7CitleHRlcm4gc3RydWN0IHB4YV9kZXZpY2VfZGVzYyBweGE5MTBfZGV2
-aWNlX2ZiOwogCiBzdGF0aWMgaW5saW5lIGludCBweGE5MTBfYWRkX3VhcnQoaW50IGlkKQogewpA
-QCAtNzEsNCArNzMsOSBAQCBzdGF0aWMgaW5saW5lIGludCBweGE5MTBfYWRkX25hbmQoc3RydWN0
-IHB4YTN4eF9uYW5kX3BsYXRmb3JtX2RhdGEgKmluZm8pCiB7CiAJcmV0dXJuIHB4YV9yZWdpc3Rl
-cl9kZXZpY2UoJnB4YTkxMF9kZXZpY2VfbmFuZCwgaW5mbywgc2l6ZW9mKCppbmZvKSk7CiB9CisK
-K3N0YXRpYyBpbmxpbmUgaW50IHB4YTkxMF9hZGRfZmIoc3RydWN0IHB4YTE2OGZiX21hY2hfaW5m
-byAqbWkpCit7CisJcmV0dXJuIHB4YV9yZWdpc3Rlcl9kZXZpY2UoJnB4YTkxMF9kZXZpY2VfZmIs
-IG1pLCBzaXplb2YoKm1pKSk7Cit9CiAjZW5kaWYgLyogX19BU01fTUFDSF9QWEE5MTBfSCAqLwpk
-aWZmIC0tZ2l0IGEvYXJjaC9hcm0vbWFjaC1tbXAvcHhhOTEwLmMgYi9hcmNoL2FybS9tYWNoLW1t
-cC9weGE5MTAuYwppbmRleCBkNDA0OTUwLi43YjkxZWE2IDEwMDY0NAotLS0gYS9hcmNoL2FybS9t
-YWNoLW1tcC9weGE5MTAuYworKysgYi9hcmNoL2FybS9tYWNoLW1tcC9weGE5MTAuYwpAQCAtMTEx
-LDYgKzExMSw3IEBAIHN0YXRpYyBBUEJDX0NMSyhwd20zLCBQWEE5MTBfUFdNMywgMSwgMTMwMDAw
-MDApOwogc3RhdGljIEFQQkNfQ0xLKHB3bTQsIFBYQTkxMF9QV000LCAxLCAxMzAwMDAwMCk7CiAK
-IHN0YXRpYyBBUE1VX0NMSyhuYW5kLCBOQU5ELCAweDAxZGIsIDIwODAwMDAwMCk7CitzdGF0aWMg
-QVBNVV9DTEsobGNkLCBMQ0QsIDB4MDAzZiwgMzEyMDAwMDAwKTsKIAogLyogZGV2aWNlIGFuZCBj
-bG9jayBiaW5kaW5ncyAqLwogc3RhdGljIHN0cnVjdCBjbGtfbG9va3VwIHB4YTkxMF9jbGtyZWdz
-W10gPSB7CkBAIC0xMjMsNiArMTI0LDcgQEAgc3RhdGljIHN0cnVjdCBjbGtfbG9va3VwIHB4YTkx
-MF9jbGtyZWdzW10gPSB7CiAJSU5JVF9DTEtSRUcoJmNsa19wd20zLCAicHhhOTEwLXB3bS4yIiwg
-TlVMTCksCiAJSU5JVF9DTEtSRUcoJmNsa19wd200LCAicHhhOTEwLXB3bS4zIiwgTlVMTCksCiAJ
-SU5JVF9DTEtSRUcoJmNsa19uYW5kLCAicHhhM3h4LW5hbmQiLCBOVUxMKSwKKwlJTklUX0NMS1JF
-RygmY2xrX2xjZCwgInB4YTkxMC1mYiIsICJMQ0RDTEsiKSwKIH07CiAKIHN0YXRpYyBpbnQgX19p
-bml0IHB4YTkxMF9pbml0KHZvaWQpCkBAIC0xNzgsMyArMTgwLDQgQEAgUFhBOTEwX0RFVklDRShw
-d20yLCAicHhhOTEwLXB3bSIsIDEsIE5PTkUsIDB4ZDQwMWE0MDAsIDB4MTApOwogUFhBOTEwX0RF
-VklDRShwd20zLCAicHhhOTEwLXB3bSIsIDIsIE5PTkUsIDB4ZDQwMWE4MDAsIDB4MTApOwogUFhB
-OTEwX0RFVklDRShwd200LCAicHhhOTEwLXB3bSIsIDMsIE5PTkUsIDB4ZDQwMWFjMDAsIDB4MTAp
-OwogUFhBOTEwX0RFVklDRShuYW5kLCAicHhhM3h4LW5hbmQiLCAtMSwgTkFORCwgMHhkNDI4MzAw
-MCwgMHg4MCwgOTcsIDk5KTsKK1BYQTkxMF9ERVZJQ0UoZmIsICJweGE5MTAtZmIiLCAtMSwgTENE
-LCAweGQ0MjBiMDAwLCAweDFjOCk7CmRpZmYgLS1naXQgYS9hcmNoL2FybS9tYWNoLW1tcC90dGNf
-ZGtiLmMgYi9hcmNoL2FybS9tYWNoLW1tcC90dGNfZGtiLmMKaW5kZXggYmIyNmNiNS4uZDNlN2Ux
-ZiAxMDA2NDQKLS0tIGEvYXJjaC9hcm0vbWFjaC1tbXAvdHRjX2RrYi5jCisrKyBiL2FyY2gvYXJt
-L21hY2gtbW1wL3R0Y19ka2IuYwpAQCAtMTQsNyArMTQsMTAgQEAKICNpbmNsdWRlIDxsaW51eC9t
-dGQvbXRkLmg+CiAjaW5jbHVkZSA8bGludXgvbXRkL3BhcnRpdGlvbnMuaD4KICNpbmNsdWRlIDxs
-aW51eC9tdGQvb25lbmFuZC5oPgorI2luY2x1ZGUgPGxpbnV4L2RlbGF5Lmg+CisjaW5jbHVkZSA8
-bGludXgvZ3Bpby5oPgogCisjaW5jbHVkZSA8dmlkZW8vcHhhMTY4ZmIuaD4KICNpbmNsdWRlIDxh
-c20vbWFjaC10eXBlcy5oPgogI2luY2x1ZGUgPGFzbS9tYWNoL2FyY2guaD4KICNpbmNsdWRlIDxh
-c20vbWFjaC9mbGFzaC5oPgpAQCAtMzEsNiArMzQsMzcgQEAgc3RhdGljIHVuc2lnbmVkIGxvbmcg
-dHRjX2RrYl9waW5fY29uZmlnW10gX19pbml0ZGF0YSA9IHsKIAlHUElPNDdfVUFSVDJfUlhELAog
-CUdQSU80OF9VQVJUMl9UWEQsCiAKKyNpZmRlZiBDT05GSUdfRkJfUFhBMTY4CisJLyogTENEICov
-CisJR1BJTzgxX0xDRF9GQ0xLLAorCUdQSU84Ml9MQ0RfTENMSywKKwlHUElPODNfTENEX1BDTEss
-CisJR1BJTzg0X0xDRF9ERU5BLAorCUdQSU84NV9MQ0RfREQwLAorCUdQSU84Nl9MQ0RfREQxLAor
-CUdQSU84N19MQ0RfREQyLAorCUdQSU84OF9MQ0RfREQzLAorCUdQSU84OV9MQ0RfREQ0LAorCUdQ
-SU85MF9MQ0RfREQ1LAorCUdQSU85MV9MQ0RfREQ2LAorCUdQSU85Ml9MQ0RfREQ3LAorCUdQSU85
-M19MQ0RfREQ4LAorCUdQSU85NF9MQ0RfREQ5LAorCUdQSU85NV9MQ0RfREQxMCwKKwlHUElPOTZf
-TENEX0REMTEsCisJR1BJTzk3X0xDRF9ERDEyLAorCUdQSU85OF9MQ0RfREQxMywKKwlHUElPMTAw
-X0xDRF9ERDE0LAorCUdQSU8xMDFfTENEX0REMTUsCisJR1BJTzEwMl9MQ0RfREQxNiwKKwlHUElP
-MTAzX0xDRF9ERDE3LAorCUdQSU8xMDRfTENEX1NQSURPVVQsCisJR1BJTzEwNV9MQ0RfU1BJRElO
-LAorCUdQSU8xMDdfTENEX0NTMSwKKwlHUElPMTA4X0xDRF9EQ0xLLAorCUdQSU8xMDZfTENEX1JF
-U0VULAorI2VuZGlmCisKIAkvKiBERkkgKi8KIAlERl9JTzBfTkRfSU8wLAogCURGX0lPMV9ORF9J
-TzEsCkBAIC01Niw2ICs5MCwxMTMgQEAgc3RhdGljIHVuc2lnbmVkIGxvbmcgdHRjX2RrYl9waW5f
-Y29uZmlnW10gX19pbml0ZGF0YSA9IHsKIAlERl9SRFkwX0RGX1JEWTAsCiB9OwogCisjaWZkZWYg
-Q09ORklHX0ZCX1BYQTE2OAorc3RhdGljIHUxNiB0cG9fc3BpX2NtZG9uW10gPSB7CisJMHgwODAx
-LAorCTB4MDgwMCwKKwkweDAyMDAsCisJMHgwMzA0LAorCTB4MDQwZSwKKwkweDA5MDMsCisJMHgw
-YjE4LAorCTB4MGM1MywKKwkweDBkMDEsCisJMHgwZWUwLAorCTB4MGYwMSwKKwkweDEwNTgsCisJ
-MHgyMDFlLAorCTB4MjEwYSwKKwkweDIyMGEsCisJMHgyMzFlLAorCTB4MjQwMCwKKwkweDI1MzIs
-CisJMHgyNjAwLAorCTB4MjdhYywKKwkweDI5MDQsCisJMHgyYWEyLAorCTB4MmI0NSwKKwkweDJj
-NDUsCisJMHgyZDE1LAorCTB4MmU1YSwKKwkweDJmZmYsCisJMHgzMDZiLAorCTB4MzEwZCwKKwkw
-eDMyNDgsCisJMHgzMzgyLAorCTB4MzRiZCwKKwkweDM1ZTcsCisJMHgzNjE4LAorCTB4Mzc5NCwK
-KwkweDM4MDEsCisJMHgzOTVkLAorCTB4M2FhZSwKKwkweDNiZmYsCisJMHgwN2M5LAkJLyogYXV0
-byBwb3dlciBvbiAqLworfTsKKworc3RhdGljIHUxNiB0cG9fc3BpX2NtZG9mZltdID0geworCTB4
-MDdkOSwJCS8qIGF1dG8gcG93ZXIgb2ZmICovCit9OworCitzdGF0aWMgaW50IHRwb19sY2RfcG93
-ZXIoc3RydWN0IHB4YTE2OGZiX2luZm8gKmZiaSwgdW5zaWduZWQgaW50IHNwaV9ncGlvX2NzLAor
-CQl1bnNpZ25lZCBpbnQgc3BpX2dwaW9fcmVzZXQsIGludCBvbikKK3sKKwlpbnQgZXJyID0gMDsK
-KworCWlmIChvbikgeworCQlpZiAoc3BpX2dwaW9fcmVzZXQgIT0gLTEpIHsKKwkJCWVyciA9IGdw
-aW9fcmVxdWVzdChzcGlfZ3Bpb19yZXNldCwgIlRQT19MQ0RfU1BJX1JFU0VUIik7CisJCQlpZiAo
-ZXJyKSB7CisJCQkJcHJpbnRrKEtFUk5fRVJSICJmYWlsZWQgdG8gcmVxdWVzdCBHUElPIGZvciBU
-UE8gTENEIFJFU0VUXG4iKTsKKwkJCQlyZXR1cm4gLUVJTzsKKwkJCX0KKwkJCWdwaW9fZGlyZWN0
-aW9uX291dHB1dChzcGlfZ3Bpb19yZXNldCwgMCk7CisJCQltc2xlZXAoMSk7CisJCQlncGlvX3Nl
-dF92YWx1ZShzcGlfZ3Bpb19yZXNldCwgMSk7CisJCQltc2xlZXAoMTEpOworCQkJZ3Bpb19mcmVl
-KHNwaV9ncGlvX3Jlc2V0KTsKKwkJfQorCQlyZXR1cm4gcHhhMTY4ZmJfc3BpX3NlbmQoZmJpLCB0
-cG9fc3BpX2NtZG9uLAorCQkJCUFSUkFZX1NJWkUodHBvX3NwaV9jbWRvbiksIHNwaV9ncGlvX2Nz
-LCAwLCA0MCk7CisJfSBlbHNlCisJCXJldHVybiBweGExNjhmYl9zcGlfc2VuZChmYmksIHRwb19z
-cGlfY21kb2ZmLAorCQkJCUFSUkFZX1NJWkUodHBvX3NwaV9jbWRvZmYpLCBzcGlfZ3Bpb19jcywg
-MCwgMCk7Cit9CisKK3N0YXRpYyBzdHJ1Y3QgZmJfdmlkZW9tb2RlIHZpZGVvX21vZGVzW10gPSB7
-CisJLyogbHBqMDMybDAwMWIgSFZHQSBtb2RlIGluZm8gKi8KKwlbMF0gPSB7CisJCS5waXhjbG9j
-ayAgICAgICA9IDEwMDAwMCwKKwkJLnJlZnJlc2ggICAgICAgID0gNjAsCisJCS54cmVzICAgICAg
-ICAgICA9IDMyMCwKKwkJLnlyZXMgICAgICAgICAgID0gNDgwLAorCQkuaHN5bmNfbGVuICAgICAg
-PSAxMCwKKwkJLmxlZnRfbWFyZ2luICAgID0gMTUsCisJCS5yaWdodF9tYXJnaW4gICA9IDEwLAor
-CQkudnN5bmNfbGVuICAgICAgPSAyLAorCQkudXBwZXJfbWFyZ2luICAgPSA0LAorCQkubG93ZXJf
-bWFyZ2luICAgPSAyLAorCQkuc3luYyAgICAgICAgICAgPSAwLAorCX0sCit9OworCitzdGF0aWMg
-c3RydWN0IHB4YTE2OGZiX21hY2hfaW5mbyB0dGNfZGtiX2xjZF9pbmZvIF9faW5pdGRhdGEgPSB7
-CisJLmlkICAgICAgICAgICAgICAgICAgICAgPSAiQmFzZSIsCisJLm1vZGVzICAgICAgICAgICAg
-ICAgICAgPSB2aWRlb19tb2RlcywKKwkubnVtX21vZGVzICAgICAgICAgICAgICA9IEFSUkFZX1NJ
-WkUodmlkZW9fbW9kZXMpLAorCS5waXhfZm10ICAgICAgICAgICAgICAgID0gUElYX0ZNVF9SR0I1
-NjUsCisJLmlvX3Bpbl9hbGxvY2F0aW9uX21vZGUgPSBQSU5fTU9ERV9EVU1CXzE4X1NQSSwKKwku
-ZHVtYl9tb2RlICAgICAgICAgICAgICA9IERVTUJfTU9ERV9SR0I2NjYsCisJLmFjdGl2ZSAgICAg
-ICAgICAgICAgICAgPSAxLAorCS5zcGlfY3RybCAgICAgICAgICAgICAgID0gQ0ZHX1NDTEtDTlQo
-MTYpIHwgQ0ZHX1RYQklUUygxNikgfAorCQlDRkdfU1BJX1NFTCgxKSB8IENGR19TUElfM1c0V0Io
-MSkgfCBDRkdfU1BJX0VOQSgxKSwKKwkuc3BpX2dwaW9fY3MgICAgICAgICAgICA9IC0xLAorCS5z
-cGlfZ3Bpb19yZXNldAkJPSBtZnBfdG9fZ3BpbyhNRlBfUElOX0dQSU8xMDYpLAorCS5pbnZlcnRf
-cGl4Y2xvY2sJPSAxLAorCS5weGExNjhmYl9sY2RfcG93ZXIJPSB0cG9fbGNkX3Bvd2VyLAorfTsK
-KyNlbmRpZgorCiBzdGF0aWMgc3RydWN0IG10ZF9wYXJ0aXRpb24gdHRjX2RrYl9vbmVuYW5kX3Bh
-cnRpdGlvbnNbXSA9IHsKIAl7CiAJCS5uYW1lCQk9ICJib290bG9hZGVyIiwKQEAgLTExOCw2ICsy
-NTksOSBAQCBzdGF0aWMgdm9pZCBfX2luaXQgdHRjX2RrYl9pbml0KHZvaWQpCiAKIAkvKiBvbi1j
-aGlwIGRldmljZXMgKi8KIAlweGE5MTBfYWRkX3VhcnQoMSk7CisjaWZkZWYgQ09ORklHX0ZCX1BY
-QTE2OAorCXB4YTkxMF9hZGRfZmIoJnR0Y19ka2JfbGNkX2luZm8pOworI2VuZGlmCiAKIAkvKiBv
-ZmYtY2hpcCBkZXZpY2VzICovCiAJcGxhdGZvcm1fYWRkX2RldmljZXMoQVJSQVlfQU5EX1NJWkUo
-dHRjX2RrYl9kZXZpY2VzKSk7Ci0tIAoxLjUuNC4zCgo=
---0016e648d096a337a404790378a7--
++static void __exit nuc900_rtc_exit(void)
++{
++	platform_driver_unregister(&nuc900_rtc_driver);
++}
++
++module_init(nuc900_rtc_init);
++module_exit(nuc900_rtc_exit);
++
++MODULE_AUTHOR("Wan ZongShun <mcuos.com@gmail.com>");
++MODULE_DESCRIPTION("nuc910/nuc920 RTC driver");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:nuc900-rtc");
+-- 
+1.5.6.3
