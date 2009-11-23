@@ -1,42 +1,53 @@
-From: trd@45mercystreet.com (Toby Douglass)
-Date: Mon, 23 Nov 2009 21:34:33 +0100
-Subject: CAS implementation may be broken
-In-Reply-To: <20091123200620.GF18142@n2100.arm.linux.org.uk>
-References: <4AF1C361.8090405@45mercystreet.com>
-	<20091104190544.GA518@n2100.arm.linux.org.uk>
-	<4AF1FBA4.4070307@xenomai.org> <4B08055C.3000408@45mercystreet.com>
-	<20091123150842.GD18142@n2100.arm.linux.org.uk>
-	<4B0ADE3B.3040307@45mercystreet.com>
-	<20091123200620.GF18142@n2100.arm.linux.org.uk>
-Message-ID: <4B0AF1D9.3030008@45mercystreet.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 Nov 2009 20:39:31 +0000
+Subject: [PATCH 00/20] iPAQ h3100/h3600 work for 2.6.33
+In-Reply-To: <20091115173048.GA19609@rainbow>
+References: <1256414658-22611-1-git-send-email-mad_soft@inbox.ru>
+	<20091024211026.GE16451@n2100.arm.linux.org.uk>
+	<20091025153603.GA24490@rainbow> <20091115173048.GA19609@rainbow>
+Message-ID: <20091123203931.GI18142@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Mon, Nov 23, 2009 at 08:10:51PM +0100, Toby Douglass wrote:
->> This was the thrust of the original post; however, Catalin has raised  
->> arguments against it which I have not yet digested, so what I'm writing  
->> here, where it is simply an enlargement on the OP, has the same flaws;  
->> it's only in response to your specific point.  I'm not trying to assert  
->> this *is* what happens, in spite of what Catalin has written.
+On Sun, Nov 15, 2009 at 08:30:48PM +0300, Dmitry Artamonow wrote:
+> On 18:36 Sun 25 Oct     , Dmitry Artamonow wrote:
+> > On 22:10 Sat 24 Oct     , Russell King - ARM Linux wrote:
+> > > 
+> > > That's fine, and the patches to me at least look fine as well.  The only
+> > > thing which gives me slight concern is the:
+> > > 
+> > > 	if (!gpio_request()) {
+> > > 		gpio_direction_output();
+> > > 		gpio_free();
+> > > 	}
+> > > 
+> > > stuff, but I guess you can't get around that easily, especially if those
+> > > GPIOs only become available at some time later.  It is something that
+> > > eventually needs to be addressed though - consider that this can lead
+> > > to unexpected (and silent) failures if the GPIOs aren't available when
+> > > another driver initializes, and can't (eg) turn on the IrDA tranceiver.
+> > 
+> > Yes, you right here about silent failures. I think they could be made less
+> > silent by inserting some pr_err()-s , though it would bloat code a
+> > bit (I'd like to see request_gpio() itself emitting error message,
+> > but currectly it does that only when CONFIG_DEBUG_GPIO is set).
+> > Ok, here's incremental patch adding pr_err-s in attachment - if you're
+> > OK with it I will roll it into [09/20] and rebase all following patches.
+> > 
+> > Also perhaps it's a good idea to always built-in htc-egpio driver
+> > (by adding "select HTC_EGPIO" to h3100/h3600 Kconfig options) - that should
+> > decrease probability of gpio_request failures a lot. Patch also
+> > attached.
 > 
-> Well, I've thought it through quite a bit now, and I have an expansive
-> reply to your email.  In summary, there is nothing wrong with the
-> existing code; your use of it is the problem.
+> So, Russell, what's your opinion on these proposed additional changes?
+> (btw, I found some minor flaws in "emit messages on failed gpio_request"
+> patch, new version attached here).
 > 
-> I can post the expansive reply if you need the details.
+> I'm thinking about submitting full patchset into you patchsystem soon,
+> but I'd like to know that everything is ok before doing that.
 
-I would be very grateful if you could - although if it is extensive and 
-well-understood, you might want to spare the list and email me directly.
+Well, I'm not sure what Thomas Kunze is doing, I've not heard from him in
+a while.
 
-I've been working every hour there is for the last three weekends trying 
-to get CAS working properly on ARM under Linux; any fresh insight or 
-knowledge from others may give me what I need to work out what I've 
-mis-understood (before I go insane :-)
-
-> In short, consider what happens if you consider a slightly different order
-> of operations, where you have calculated 'ptr', 'old' and 'new' for cmpxchg
-> but you haven't executed the first ldrex.
-
-This is, I think, what Catalin said - I'm grappling with this at the 
-moment; I don't have a reply to it yet, positive or negative.
+How do your patches affect his?  Are your patches a superset of Thomas's
+patches?  If not, should Thomas's be merged first?
