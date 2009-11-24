@@ -1,73 +1,32 @@
-From: tero.kristo@nokia.com (Tero Kristo)
-Date: Tue, 24 Nov 2009 12:37:03 +0200
-Subject: [PATCH 1/2] ARM: Implemented support for VFP PM context saving
-In-Reply-To: <1259059024-23719-1-git-send-email-tero.kristo@nokia.com>
-References: <>
- <1259059024-23719-1-git-send-email-tero.kristo@nokia.com>
-Message-ID: <1259059024-23719-2-git-send-email-tero.kristo@nokia.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 24 Nov 2009 11:19:56 +0000
+Subject: CAS implementation may be broken
+In-Reply-To: <20091124013231.GB14645@shareable.org>
+References: <20091124013231.GB14645@shareable.org>
+Message-ID: <1259061596.13956.15.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tero Kristo <tero.kristo@nokia.com>
+On Tue, 2009-11-24 at 01:32 +0000, Jamie Lokier wrote:
+> Russell King - ARM Linux wrote:
+> > On Mon, Nov 23, 2009 at 10:28:30PM +0000, Jamie Lokier wrote:
+> > > That could be an improvement for some algorithms, because often if the
+> > > store doesn't happen, the *inputs* to compare_and_swap() need to be
+> > > recalculated anyway before another try is likely to succeed.  What's
+> > > the point in having code which expands to two loops:
+> >
+> > The point is that often its cheaper to retry the LL/SC than it is to
+> > do the recalculation.
+> >
+> > However, I don't think you've understood the original problem at all.
+> 
+> I think I have - I agreed with you and Catalin already that LL/SC does
+> not suffice.  But do you mean that Catalin's suggestion to put the
+> LDREX before the LDR does not work either?  (Maybe it needs a barrier
+> too).
 
-In some ARM architectures, like OMAP3, the VFP context can be lost during
-dynamic sleep cycle. For this purpose, there is now a function
-vfp_pm_save_context() that should be called before the VFP is assumed to
-lose context. Next VFP trap will then restore context automatically.
+It definitely needs a barrier after the LDREX and maybe one after STREX
+but that depends on the semantics of such operation.
 
-We need to have the last_VFP_context[cpu] cleared after the save in idle,
-else the restore would fail to restore when it sees that the last_VFP_context
-is same as the current threads vfp_state. This happens when the same
-process/thread traps an exception post idle.
-
-Main work for this patch was done by Peter and Rajendra. Some cleanup and
-optimization by Tero.
-
-Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
-Cc: Vishwanath Sripathy <vishwanath.bs@ti.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Richard Woodruff <r-woodruff2@ti.com>
-Cc: Peter 'p2' De Schrijver <peter.de-schrijver@nokia.com>
----
- arch/arm/vfp/vfpmodule.c |   25 +++++++++++++++++++++++++
- 1 files changed, 25 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index 2d7423a..80a08bd 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -329,6 +329,31 @@ static void vfp_enable(void *unused)
- #ifdef CONFIG_PM
- #include <linux/sysdev.h>
- 
-+void vfp_pm_save_context(void)
-+{
-+	struct thread_info *thread = current_thread_info();
-+	u32 fpexc = fmrx(FPEXC);
-+	__u32 cpu = thread->cpu;
-+
-+	if (last_VFP_context[cpu]) {
-+		if (!(fpexc & FPEXC_EN)) {
-+			/* enable vfp now to save context */
-+			vfp_enable(NULL);
-+			fmxr(FPEXC, fmrx(FPEXC) | FPEXC_EN);
-+		}
-+		vfp_save_state(last_VFP_context[cpu], fpexc);
-+
-+		/* Disable vfp. The next inst traps an exception and restores*/
-+		fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
-+
-+		/*
-+		 * This is needed else the restore might fail if it sees
-+		 * last_VFP_context if same as the current threads vfp_state.
-+		 */
-+		last_VFP_context[cpu] = NULL;
-+	}
-+}
-+
- static int vfp_pm_suspend(struct sys_device *dev, pm_message_t state)
- {
- 	struct thread_info *ti = current_thread_info();
 -- 
-1.5.4.3
+Catalin
