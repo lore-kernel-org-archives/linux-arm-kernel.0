@@ -1,63 +1,51 @@
-From: acassis@gmail.com (Alan Carvalho de Assis)
-Date: Tue, 24 Nov 2009 10:31:12 -0200
-Subject: USB support on i.MX27
-In-Reply-To: <20091124115737.GR14091@buzzloop.caiaq.de>
-References: <37367b3a0911240343u58e3b3d2le5d48e638348a3ad@mail.gmail.com>
-	<20091124115737.GR14091@buzzloop.caiaq.de>
-Message-ID: <37367b3a0911240431m3bbf9520of88152c299f80ceb@mail.gmail.com>
+From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
+Date: Tue, 24 Nov 2009 06:05:08 +0530
+Subject: [PATCH] ARM l2x0: check whether l2x0 already enabled
+In-Reply-To: <f2235a630911240411x67ad7e05k218b32e8d732dd0c@mail.gmail.com>
+References: <1259014663.2742.3.camel@vinay-desktop>
+	<f2235a630911240411x67ad7e05k218b32e8d732dd0c@mail.gmail.com>
+Message-ID: <1259022908.2742.9.camel@vinay-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Tue, 2009-11-24 at 13:11 +0100, Surinder P Singh wrote:
+> On Tue, Nov 24, 2009 at 3:47 AM, srinidhi kasagar
+> <srinidhi.kasagar@stericsson.com> wrote:
+> > From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+> > Date: Tue, 24 Nov 2009 13:59:20 +0530
+> >
+> > If running in non-secure mode, accessing
+> > control and auxiliary registers of l2x0
+> > will fault.
+> >
+> > Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+> > ---
+> >  arch/arm/mm/cache-l2x0.c |   24 +++++++++++++++---------
+> >  1 files changed, 15 insertions(+), 9 deletions(-)
+> >
+> > diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> > index b480f1d..7c0d056 100644
+> > --- a/arch/arm/mm/cache-l2x0.c
+> > +++ b/arch/arm/mm/cache-l2x0.c
+> > @@ -99,18 +99,24 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+> >
+> >        l2x0_base = base;
+> >
+> > -       /* disable L2X0 */
+> > -       writel(0, l2x0_base + L2X0_CTRL);
+> > +       /* check if l2x0 controller is already enabled.
+> > +        * if you are booting from non-secure mode
+> > +        * accessing the below registers will fault.
+> > +        */
+> > +       if (!(readl(l2x0_base + L2X0_CTRL) & 1)) {
+> 
+> 2 points:
+> 
+> 1. Since this code is also valid for devices based on pre-ARMv6, maybe
+> making this code conditional for >=ARMv6 would be cleaner ?
+rather it depends on l2 controller being used. L210 controllers
+do not have such restrictions whereas l220/pl310 have such kind
+of secure/non-secure restrictions. So would it be better to keep
+condition based on l2 controller being used?
 
-On 11/24/09, Daniel Mack <daniel@caiaq.de> wrote:
-> On Tue, Nov 24, 2009 at 09:43:41AM -0200, Alan Carvalho de Assis wrote:
->> I am trying to add USB support to i.MX27 on mainline linux kernel, I
->> am following your modifications as in this post:
->>
->> "Re: Comment to "[PATCH 7/8] Add EHCI support for MX27 and MX31 based
->> boards"
->>
->> I can't find xcvr.h and isp1504_xcvr.h then I copied fsl_xcvr.h from
->> FSL kernel to mainline:
->>
->> alan at metropolis:~/ltib-patches/ltib/rpm/BUILD/linux$ cp
->> include/linux/usb/fsl_xcvr.h
->> ~/linux/pengutronix/linux-2.6/include/linux/usb/xcvr.h
->>
->> But I can't to figure out where to find isp1504_xcvr.h.
->
-> There is nothing special about the ISP1504. On the register level, it is
-> compliant to generic ULPI transceivers, and hence the driver in mainline
-> was named accordingly. There is nothing you need to add from the BSPs
-> anymore, everything is on its way to mainline already.
->
-
-Hmm, then don't need I to add ISP1504 driver from FSL kernel? Great!
-
->> Could you please help me to get USB working on iMX27ADS?
->
-> There are a number of boards that implement USB support already for MX3,
-> and they're all in Sascha's tree. Most of them have been added just
-> recently, so make sure you're looking at the newest source. As mentioned
-> above, for ISP1504, you just need create a generic ULPI transceiver.
->
-
-I am using mxc-master updated but there is nothing related to usb or
-otg on mx31lilly.c. Fortunately I figure out mx31moboard.c has it. I
-will base on it for now.
-
-> The only thing that is missing is code that maps the .flags and maybe
-> .portsc settings from the mxc_usbh_platform_data struct to the
-> appropriate registers on MX27. And of course, your board support will
-> need some IOMUX settings.
->
-
-Yes, to configure external pins, but I will base on old FSL kernel to
-get it working.
-
-Thank you very much again for your help and patience.
-
-Best Regards,
-
-Alan
+Srinidhi
