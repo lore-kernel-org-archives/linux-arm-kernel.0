@@ -1,22 +1,32 @@
-From: saeed@marvell.com (Saeed Bishara)
-Date: Wed, 25 Nov 2009 00:28:42 +0200
-Subject: [PATCH 1/3] ARM: add base support for Marvell Dove SoC
-In-Reply-To: <1259084033-7283-2-git-send-email-saeed@marvell.com>
-References: <1259084033-7283-1-git-send-email-saeed@marvell.com>
-	<1259084033-7283-2-git-send-email-saeed@marvell.com>
-Message-ID: <FCBE654890C0334289D0AD3AF4EF009F89684D7F09@IL-MB01.marvell.com>
+From: trd@45mercystreet.com (Toby Douglass)
+Date: Tue, 24 Nov 2009 23:34:56 +0100
+Subject: CAS implementation may be broken
+In-Reply-To: <1259061596.13956.15.camel@pc1117.cambridge.arm.com>
+References: <20091124013231.GB14645@shareable.org>
+	<1259061596.13956.15.camel@pc1117.cambridge.arm.com>
+Message-ID: <4B0C5F90.7050503@45mercystreet.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-    For some reason, my previous email didn't reach the mailing list.
-    Here is the patch as an attachment with some minor updates (replaced mach/gpio.h to linux/gpio.h)
+I wrote:
+> I thought about this a little.  If the memory barrier is immediately 
+> before and given the next instruction is the LDREX, *all* threads coming 
+> to the LDREX *must* have preceeding them a DMB and so be up to date on 
+> memory, regardless of pauses in thread execution.
 
-saeed
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-ARM-add-base-support-for-Marvell-Dove-SoC.patch.bz2
-Type: application/octet-stream
-Size: 21270 bytes
-Desc: 0001-ARM-add-base-support-for-Marvell-Dove-SoC.patch.bz2
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091125/d0463ee0/attachment-0001.obj>
+Additionally; the DMB afterwards seemed to have no value.  You could 
+perform the STREX and then your thread could pause indefinitely and were 
+you in a situation where you store was not immediately visible or 
+correctly ordered to another thread, that thread would then read the old 
+value.
+
+A more common example would be that another thread is reading the 
+destination value for some reason, and reads after the STREX and before 
+the trailing DMB.
+
+This implies you need a DMB as the instruction immediately preceding 
+every read and every write of destination.  On x86/x64, all the atomic 
+ops (e.g. the LOCK prefix) act as full memory barriers.
+
+Note that I'm not yet fully conversant with the issues in multi-core 
+threading, so I may be writing rubbish :-)
