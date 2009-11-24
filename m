@@ -1,305 +1,74 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Tue, 24 Nov 2009 21:39:43 +0200
-Subject: [PATCH v2] mx27: Add basic support for Maxtrack i-MXT TD60
-In-Reply-To: <37367b3a0911241021u68ac346dmf30fc98f252b1d35@mail.gmail.com>
-References: <37367b3a0911241021u68ac346dmf30fc98f252b1d35@mail.gmail.com>
-Message-ID: <c70ff3ad0911241139g2b5b706fp936a009867ac7674@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 24 Nov 2009 20:00:19 +0000
+Subject: [PATCH v2 06/17] ARM: dma-mapping: fix for speculative accesses
+In-Reply-To: <1259081261.16239.28.camel@pc1117.cambridge.arm.com>
+References: <E1NBYEF-0005l7-Tq@rmk-PC.arm.linux.org.uk>
+	<E1NCZ7p-0002A0-Ib@rmk-PC.arm.linux.org.uk>
+	<c70ff3ad0911230725h6d688c09k8576b66d012f29f0@mail.gmail.com>
+	<20091123172722.GE18142@n2100.arm.linux.org.uk>
+	<1259081261.16239.28.camel@pc1117.cambridge.arm.com>
+Message-ID: <20091124200019.GH17481@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2009 at 8:21 PM, Alan Carvalho de Assis
-<acassis@gmail.com> wrote:
-> Signed-off-by: Alan Carvalho de Assis <acassis@gmail.com>
-> ---
-> ?arch/arm/mach-mx2/Kconfig ? ?| ? ?7 ++
-> ?arch/arm/mach-mx2/Makefile ? | ? ?1 +
-> ?arch/arm/mach-mx2/mxt_td60.c | ?245 ++++++++++++++++++++++++++++++++++++++++++
-> ?3 files changed, 253 insertions(+), 0 deletions(-)
-> ?create mode 100644 arch/arm/mach-mx2/mxt_td60.c
->
-> diff --git a/arch/arm/mach-mx2/Kconfig b/arch/arm/mach-mx2/Kconfig
-> index 3e14da3..b96c6a3 100644
-> --- a/arch/arm/mach-mx2/Kconfig
-> +++ b/arch/arm/mach-mx2/Kconfig
-> @@ -104,4 +104,11 @@ config MACH_PCA100
-> ? ? ? ? ?Include support for phyCARD-s (aka pca100) platform. This
-> ? ? ? ? ?includes specific configurations for the module and its peripherals.
->
-> +config MACH_MXT_TD60
-> + ? ? ? bool "Maxtrack i-MXT TD60"
-> + ? ? ? depends on MACH_MX27
-> + ? ? ? help
-> + ? ? ? ? Include support for i-MXT (aka td60) platform. This
-> + ? ? ? ? includes specific configurations for the module and its peripherals.
-> +
-> ?endif
-> diff --git a/arch/arm/mach-mx2/Makefile b/arch/arm/mach-mx2/Makefile
-> index 19560f0..52aca0a 100644
-> --- a/arch/arm/mach-mx2/Makefile
-> +++ b/arch/arm/mach-mx2/Makefile
-> @@ -20,4 +20,5 @@ obj-$(CONFIG_MACH_MX27LITE) += mx27lite.o
-> ?obj-$(CONFIG_MACH_EUKREA_CPUIMX27) += eukrea_cpuimx27.o
-> ?obj-$(CONFIG_MACH_EUKREA_MBIMX27_BASEBOARD) += eukrea_mbimx27-baseboard.o
-> ?obj-$(CONFIG_MACH_PCA100) += pca100.o
-> +obj-$(CONFIG_MACH_MXT_TD60) += mxt_td60.o
->
-> diff --git a/arch/arm/mach-mx2/mxt_td60.c b/arch/arm/mach-mx2/mxt_td60.c
-> new file mode 100644
-> index 0000000..4b288c5
-> --- /dev/null
-> +++ b/arch/arm/mach-mx2/mxt_td60.c
-> @@ -0,0 +1,245 @@
-> +/*
-> + * ?Copyright (C) 2000 Deep Blue Solutions Ltd
-> + * ?Copyright (C) 2002 Shane Nay (shane at minirl.com)
-> + * ?Copyright 2006-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA ?02111-1307 ?USA
-> + */
-> +
-> +#include <linux/platform_device.h>
-> +#include <linux/mtd/mtd.h>
-> +#include <linux/mtd/map.h>
-> +#include <linux/mtd/partitions.h>
-> +#include <linux/mtd/physmap.h>
-> +#include <linux/i2c.h>
-> +#include <linux/irq.h>
-> +#include <mach/common.h>
-> +#include <mach/hardware.h>
-> +#include <asm/mach-types.h>
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/time.h>
-> +#include <asm/mach/map.h>
-> +#include <linux/gpio.h>
-> +#include <mach/imx-uart.h>
-> +#include <mach/iomux.h>
-> +#include <mach/mxc_nand.h>
-> +#include <mach/i2c.h>
-> +#include <mach/imxfb.h>
-> +#include <mach/mmc.h>
-> +
-> +#include "devices.h"
-> +
-> +static unsigned int mxt_td60_pins[] = {
-shouldn't this be __initdata?
-> + ? ? ? /* UART0 */
-> + ? ? ? PE12_PF_UART1_TXD,
-> + ? ? ? PE13_PF_UART1_RXD,
-> + ? ? ? PE14_PF_UART1_CTS,
-> + ? ? ? PE15_PF_UART1_RTS,
-> + ? ? ? /* UART1 */
-> + ? ? ? PE3_PF_UART2_CTS,
-> + ? ? ? PE4_PF_UART2_RTS,
-> + ? ? ? PE6_PF_UART2_TXD,
-> + ? ? ? PE7_PF_UART2_RXD,
-> + ? ? ? /* UART2 */
-> + ? ? ? PE8_PF_UART3_TXD,
-> + ? ? ? PE9_PF_UART3_RXD,
-> + ? ? ? PE10_PF_UART3_CTS,
-> + ? ? ? PE11_PF_UART3_RTS,
-> + ? ? ? /* UART3 */
-> + ? ? ? PB26_AF_UART4_RTS,
-> + ? ? ? PB28_AF_UART4_TXD,
-> + ? ? ? PB29_AF_UART4_CTS,
-> + ? ? ? PB31_AF_UART4_RXD,
-> + ? ? ? /* UART4 */
-> + ? ? ? PB18_AF_UART5_TXD,
-> + ? ? ? PB19_AF_UART5_RXD,
-> + ? ? ? PB20_AF_UART5_CTS,
-> + ? ? ? PB21_AF_UART5_RTS,
-> + ? ? ? /* UART5 */
-> + ? ? ? PB10_AF_UART6_TXD,
-> + ? ? ? PB12_AF_UART6_CTS,
-> + ? ? ? PB11_AF_UART6_RXD,
-> + ? ? ? PB13_AF_UART6_RTS,
-> + ? ? ? /* FEC */
-> + ? ? ? PD0_AIN_FEC_TXD0,
-> + ? ? ? PD1_AIN_FEC_TXD1,
-> + ? ? ? PD2_AIN_FEC_TXD2,
-> + ? ? ? PD3_AIN_FEC_TXD3,
-> + ? ? ? PD4_AOUT_FEC_RX_ER,
-> + ? ? ? PD5_AOUT_FEC_RXD1,
-> + ? ? ? PD6_AOUT_FEC_RXD2,
-> + ? ? ? PD7_AOUT_FEC_RXD3,
-> + ? ? ? PD8_AF_FEC_MDIO,
-> + ? ? ? PD9_AIN_FEC_MDC,
-> + ? ? ? PD10_AOUT_FEC_CRS,
-> + ? ? ? PD11_AOUT_FEC_TX_CLK,
-> + ? ? ? PD12_AOUT_FEC_RXD0,
-> + ? ? ? PD13_AOUT_FEC_RX_DV,
-> + ? ? ? PD14_AOUT_FEC_RX_CLK,
-> + ? ? ? PD15_AOUT_FEC_COL,
-> + ? ? ? PD16_AIN_FEC_TX_ER,
-> + ? ? ? PF23_AIN_FEC_TX_EN,
-> + ? ? ? /* I2C1 */
-> + ? ? ? PD17_PF_I2C_DATA,
-> + ? ? ? PD18_PF_I2C_CLK,
-> + ? ? ? /* I2C2 */
-> + ? ? ? PC5_PF_I2C2_SDA,
-> + ? ? ? PC6_PF_I2C2_SCL,
-> + ? ? ? /* FB */
-> + ? ? ? PA5_PF_LSCLK,
-> + ? ? ? PA6_PF_LD0,
-> + ? ? ? PA7_PF_LD1,
-> + ? ? ? PA8_PF_LD2,
-> + ? ? ? PA9_PF_LD3,
-> + ? ? ? PA10_PF_LD4,
-> + ? ? ? PA11_PF_LD5,
-> + ? ? ? PA12_PF_LD6,
-> + ? ? ? PA13_PF_LD7,
-> + ? ? ? PA14_PF_LD8,
-> + ? ? ? PA15_PF_LD9,
-> + ? ? ? PA16_PF_LD10,
-> + ? ? ? PA17_PF_LD11,
-> + ? ? ? PA18_PF_LD12,
-> + ? ? ? PA19_PF_LD13,
-> + ? ? ? PA20_PF_LD14,
-> + ? ? ? PA21_PF_LD15,
-> + ? ? ? PA22_PF_LD16,
-> + ? ? ? PA23_PF_LD17,
-> + ? ? ? PA25_PF_CLS,
-> + ? ? ? PA27_PF_SPL_SPR,
-> + ? ? ? PA28_PF_HSYNC,
-> + ? ? ? PA29_PF_VSYNC,
-> + ? ? ? PA30_PF_CONTRAST,
-> + ? ? ? PA31_PF_OE_ACD,
-> + ? ? ? /* OWIRE */
-> + ? ? ? PE16_AF_OWIRE,
-> + ? ? ? /* SDHC1*/
-> + ? ? ? PE18_PF_SD1_D0,
-> + ? ? ? PE19_PF_SD1_D1,
-> + ? ? ? PE20_PF_SD1_D2,
-> + ? ? ? PE21_PF_SD1_D3,
-> + ? ? ? PE22_PF_SD1_CMD,
-> + ? ? ? PE23_PF_SD1_CLK,
-> + ? ? ? /* SDHC2*/
-> + ? ? ? PB4_PF_SD2_D0,
-> + ? ? ? PB5_PF_SD2_D1,
-> + ? ? ? PB6_PF_SD2_D2,
-> + ? ? ? PB7_PF_SD2_D3,
-> + ? ? ? PB8_PF_SD2_CMD,
-> + ? ? ? PB9_PF_SD2_CLK,
-> +};
-> +
-> +static struct mxc_nand_platform_data mxt_td60_nand_board_info = {
-> + ? ? ? .width = 1,
-> + ? ? ? .hw_ecc = 1,
-> +};
-> +
-> +static struct imxi2c_platform_data mxt_td60_i2c_data = {
-> + ? ? ? .bitrate = 100000,
-> +};
-> +
-> +static struct i2c_board_info mxt_td60_i2c_devices[] = {
-> +};
-> +
-> +static struct imxi2c_platform_data mxt_td60_i2c2_data = {
-> + ? ? ? .bitrate = 100000,
-> +};
-> +
-> +static struct i2c_board_info mxt_td60_i2c2_devices[] = {
-> +};
-> +
-> +static int mxt_td60_sdhc1_init(struct device *dev, irq_handler_t detect_irq,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? void *data)
-> +{
-> + ? ? ? return request_irq(IRQ_GPIOE(21), detect_irq, IRQF_TRIGGER_RISING,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "sdhc1-card-detect", data);
-> +}
-> +
-> +static void mxt_td60_sdhc1_exit(struct device *dev, void *data)
-> +{
-> + ? ? ? free_irq(IRQ_GPIOE(21), data);
-> +}
-> +
-> +static struct imxmmc_platform_data sdhc1_pdata = {
-> + ? ? ? .init = mxt_td60_sdhc1_init,
-> + ? ? ? .exit = mxt_td60_sdhc1_exit,
-> +};
-> +
-> +static struct platform_device *platform_devices[] __initdata = {
-> + ? ? ? &mxc_fec_device,
-> +};
-> +
-> +static struct imxuart_platform_data uart_pdata[] = {
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .flags = IMXUART_HAVE_RTSCTS,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .flags = IMXUART_HAVE_RTSCTS,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .flags = IMXUART_HAVE_RTSCTS,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .flags = IMXUART_HAVE_RTSCTS,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .flags = IMXUART_HAVE_RTSCTS,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .flags = IMXUART_HAVE_RTSCTS,
-> + ? ? ? },
-> +};
-> +
-> +static void __init mxt_td60_board_init(void)
-> +{
-> + ? ? ? mxc_gpio_setup_multiple_pins(mxt_td60_pins, ARRAY_SIZE(mxt_td60_pins),
-> + ? ? ? ? ? ? ? ? ? ? ? "mxt_td60");
-> +
-> + ? ? ? mxc_register_device(&mxc_uart_device0, &uart_pdata[0]);
-> + ? ? ? mxc_register_device(&mxc_uart_device1, &uart_pdata[1]);
-> + ? ? ? mxc_register_device(&mxc_uart_device2, &uart_pdata[2]);
-> + ? ? ? mxc_register_device(&mxc_uart_device3, &uart_pdata[3]);
-> + ? ? ? mxc_register_device(&mxc_uart_device4, &uart_pdata[4]);
-> + ? ? ? mxc_register_device(&mxc_uart_device5, &uart_pdata[5]);
-> + ? ? ? mxc_register_device(&mxc_nand_device, &mxt_td60_nand_board_info);
-> +
-> + ? ? ? i2c_register_board_info(0, mxt_td60_i2c_devices,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(mxt_td60_i2c_devices));
-> +
-> + ? ? ? i2c_register_board_info(1, mxt_td60_i2c2_devices,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(mxt_td60_i2c2_devices));
-> +
-> + ? ? ? mxc_register_device(&mxc_i2c_device0, &mxt_td60_i2c_data);
-> + ? ? ? mxc_register_device(&mxc_i2c_device1, &mxt_td60_i2c2_data);
-> + ? ? ? mxc_register_device(&mxc_sdhc_device0, &sdhc1_pdata);
-> +
-> + ? ? ? platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
-> +}
-> +
-> +static void __init mxt_td60_timer_init(void)
-> +{
-> + ? ? ? mx27_clocks_init(26000000);
-> +}
-> +
-> +static struct sys_timer mxt_td60_timer = {
-> + ? ? ? .init ? = mxt_td60_timer_init,
-> +};
-> +
-> +MACHINE_START(MXT_TD60, "Maxtrack i-MXT TD60")
-> + ? ? ? /* maintainer: Maxtrack Industrial */
-> + ? ? ? .phys_io ? ? ? ?= AIPI_BASE_ADDR,
-> + ? ? ? .io_pg_offst ? ?= ((AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
-> + ? ? ? .boot_params ? ?= PHYS_OFFSET + 0x100,
-> + ? ? ? .map_io ? ? ? ? = mx27_map_io,
-> + ? ? ? .init_irq ? ? ? = mx27_init_irq,
-> + ? ? ? .init_machine ? = mxt_td60_board_init,
-> + ? ? ? .timer ? ? ? ? ?= &mxt_td60_timer,
-> +MACHINE_END
-> +
-> --
-> 1.6.0.4
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+On Tue, Nov 24, 2009 at 04:47:41PM +0000, Catalin Marinas wrote:
+> On Mon, 2009-11-23 at 17:27 +0000, Russell King - ARM Linux wrote:
+> > On Mon, Nov 23, 2009 at 05:25:06PM +0200, saeed bishara wrote:
+> > > > +       if (dir == DMA_FROM_DEVICE) {
+> > > > +               outer_inv_range(paddr, paddr + size);
+> > > > +               dmac_inv_range(kaddr, kaddr + size);
+> > > it's not clear why outer cache invalidated before inner cache, and, I
+> > > think that it may be incorrect, how can you be sure that a dirty line
+> > > that is in inner cache can't be moved down to outer cache?
+> > 
+> > I think you have a point, but also see Catalin's point.  When we are
+> > invalidating, we have to invalidate the outer caches before the inner
+> > caches, otherwise there is a danger that the inner caches could
+> > prefetch from the outer between the two operations.
+> 
+> Good point. In the cpu_to_dev case, we can invalidate the inner cache
+> before the outer cache as it may be faster than cleaning. We also don't
+> care about speculative fetches at this point, only about random cache
+> line evictions.
+> 
+> In the dev_to_cpu case, we must invalidate the outer cache before the
+> inner cache.
+> 
+> Otherwise I'm ok with the patch.
+
+Having looked into pushing the 3rd argument down into per-CPU code, I've
+come up against two problems:
+
+1. the dmabounce (hacky, I wish it'd die) code wants to be able to place
+   the cache in the same state as if the buffer was used for DMA - it
+   does this by calling dmac_clean_range() and outer_clean_range().
+
+2. various MTD map drivers want the ARM private flush_ioremap_region,
+   which is built on top of dmac_inv_cache.
+
+You can't reliably implement either of these two functions using the new
+dmac_(map|unmap)_range interfaces without making the callers knowledgeable
+about the implementation of the map/unmap range interfaces.
+
+This means we currently end up with five DMA operation pointers in the
+cpu_cache_fns:
+
+        void (*dma_map_range)(const void *, size_t, int);
+        void (*dma_unmap_range)(const void *, size_t, int);
+        void (*dma_inv_range)(const void *, const void *);
+        void (*dma_clean_range)(const void *, const void *);
+        void (*dma_flush_range)(const void *, const void *);
+
+which is rather excessive, especially as two will no longer have anything
+to do with DMA.
+
+I'm tempted to say that for 2.6.33, we'll take the performance hit for CPUs
+older than ARMv7 of needlessly doing DMA cache maintainence on both map and
+unmap, and we'll try to sort it out for 2.6.34.
+
+The alternative is that we persist with streaming DMA being broken on ARMv7
+for 2.6.33.
+
+(This is why I like interfaces designed around purpose rather, than used
+according to their function.  Function defined interfaces are a major PITA
+if you need to go back and modify stuff - they make it much harder.)
