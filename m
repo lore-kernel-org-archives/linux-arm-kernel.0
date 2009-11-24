@@ -1,25 +1,28 @@
-From: Piotr.Rozycki@enea.com (Piotr Rozycki)
-Date: Tue, 24 Nov 2009 10:55:22 +0100
-Subject: frame buffer i.MX31 ADS SHARP LCD
-Message-ID: <DC6F86A94046A64094043D44A3A708F70C1137E4@sestoex02.enea.se>
+From: snake8087@hotmail.com (Piotr Rozycki)
+Date: Tue, 24 Nov 2009 14:36:03 +0100
+Subject: i.MX31 LCD
+Message-ID: <COL118-W2232887D9A2670DE48FCFBBA9D0@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
 
 Hi
 
  
 
-I wonder if there is a good driver code examples for i.MX31 ADS platform
-to read something from the frame buffer with SHARP LCD. 
+I woundering if any one knows if there are some good example of SHARP LCD driver that reads something from frame buffer for
 
-Ideally, a code with only one c-file and h file.
+i.MX31 ADS platform. Prefeably in one or two file.
 
  
 
 best regards
 
-Peter
-
+Peter 
+ 		 	   		  
+_________________________________________________________________
+Hitta hetaste singlarna p? MSN Dejting!
+http://dejting.se.msn.com/channel/index.aspx?trackingid=1002952
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091124/354b7656/attachment-0001.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091124/ff60e280/attachment-0001.htm>
