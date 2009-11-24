@@ -1,60 +1,71 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 24 Nov 2009 13:05:56 +0000
-Subject: [RFC 10/11] ARM: arrange for flush_cache_range() to
-	alwaysflush the I-cache
-In-Reply-To: <20091123202856.GG18142@n2100.arm.linux.org.uk>
-References: <20091123202856.GG18142@n2100.arm.linux.org.uk>
-Message-ID: <1259067956.13956.17.camel@pc1117.cambridge.arm.com>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Tue, 24 Nov 2009 14:07:17 +0100
+Subject: USB support on i.MX27
+In-Reply-To: <37367b3a0911240431m3bbf9520of88152c299f80ceb@mail.gmail.com>
+References: <37367b3a0911240343u58e3b3d2le5d48e638348a3ad@mail.gmail.com>
+	<20091124115737.GR14091@buzzloop.caiaq.de>
+	<37367b3a0911240431m3bbf9520of88152c299f80ceb@mail.gmail.com>
+Message-ID: <20091124130717.GS14091@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2009-11-23 at 20:28 +0000, Russell King - ARM Linux wrote:
-> On Sun, Nov 22, 2009 at 03:28:30PM -0500, Nicolas Pitre wrote:
-> > On Mon, 16 Nov 2009, Russell King - ARM Linux wrote:
+On Tue, Nov 24, 2009 at 10:31:12AM -0200, Alan Carvalho de Assis wrote:
+> On 11/24/09, Daniel Mack <daniel@caiaq.de> wrote:
+> > On Tue, Nov 24, 2009 at 09:43:41AM -0200, Alan Carvalho de Assis wrote:
+> >> I am trying to add USB support to i.MX27 on mainline linux kernel, I
+> >> am following your modifications as in this post:
+> >>
+> >> "Re: Comment to "[PATCH 7/8] Add EHCI support for MX27 and MX31 based
+> >> boards"
+> >>
+> >> I can't find xcvr.h and isp1504_xcvr.h then I copied fsl_xcvr.h from
+> >> FSL kernel to mainline:
+> >>
+> >> alan at metropolis:~/ltib-patches/ltib/rpm/BUILD/linux$ cp
+> >> include/linux/usb/fsl_xcvr.h
+> >> ~/linux/pengutronix/linux-2.6/include/linux/usb/xcvr.h
+> >>
+> >> But I can't to figure out where to find isp1504_xcvr.h.
 > >
-> > > On Mon, Nov 16, 2009 at 10:46:55AM +0000, Catalin Marinas wrote:
-> > > > > diff --git a/arch/arm/mm/copypage-v6.c b/arch/arm/mm/copypage-v6.c
-> > > > > index 4127a7b..f19ed4e 100644
-> > > > > --- a/arch/arm/mm/copypage-v6.c
-> > > > > +++ b/arch/arm/mm/copypage-v6.c
-> > > > > @@ -41,6 +41,7 @@ static void v6_copy_user_highpage_nonaliasing(struct page *to,
-> > > > >         kfrom = kmap_atomic(from, KM_USER0);
-> > > > >         kto = kmap_atomic(to, KM_USER1);
-> > > > >         copy_page(kto, kfrom);
-> > > > > +       __cpuc_flush_dcache_page(kto);
-> > > > >         kunmap_atomic(kto, KM_USER1);
-> > > > >         kunmap_atomic(kfrom, KM_USER0);
-> > > > >  }
-> > > >
-> > > > Any thoughts one getting this merged (maybe in 2.6.33)? It seems that
-> > > > no-one else has any views on this but the COW text pages problem is
-> > > > still present.
-> > >
-> > > Well, it would be useful to get some comment from Nicolas since
-> > > kunmap_atomic() will call this function for highmem pages.  We might want
-> > > to avoid doing the dcache flush thing multiple times for these, but it
-> > > looks to me like testing PageHighMem(to) leaves us a hole.
+> > There is nothing special about the ISP1504. On the register level, it is
+> > compliant to generic ULPI transceivers, and hence the driver in mainline
+> > was named accordingly. There is nothing you need to add from the BSPs
+> > anymore, everything is on its way to mainline already.
 > >
-> > Better test page_address(to) and skip the flush if it is NULL.  That's
-> > what we do elsewhere already.  If page_addressto) is NULL then there is
-> > no long lasting mapping for that page and the cache will be flushed upon
-> > kunmap_atomic().  Hence:
-> >
-> > #ifdef CONFIG_HIGHMEM
-> >       /*
-> >        * kmap_atomic() doesn't set the page virtual address, and
-> >        * kunmap_atomic() takes care of cache flushing already.
-> >        */
-> >       if (page_address(to) != NULL)
-> > #endif
-> >               __cpuc_flush_dcache_page(kto);
 > 
-> Okay, can we get this combined with Catalin's patch and applied to all
-> applicable processors (which I assume would be just v6 and v7) ?
+> Hmm, then don't need I to add ISP1504 driver from FSL kernel? Great!
 
-I'm ok with this.
+Correct.
 
-Thanks.
+> > There are a number of boards that implement USB support already for MX3,
+> > and they're all in Sascha's tree. Most of them have been added just
+> > recently, so make sure you're looking at the newest source. As mentioned
+> > above, for ISP1504, you just need create a generic ULPI transceiver.
+> >
+> 
+> I am using mxc-master updated but there is nothing related to usb or
+> otg on mx31lilly.c. Fortunately I figure out mx31moboard.c has it. I
+> will base on it for now.
 
--- 
-Catalin
+The support is in mx31lilly-db.c which is the _board_ specific code.
+People might decide to not have USB on their custom boards, and so this
+functions are not enabled from the module code (mx31lilly.c).
+
+> > The only thing that is missing is code that maps the .flags and maybe
+> > .portsc settings from the mxc_usbh_platform_data struct to the
+> > appropriate registers on MX27. And of course, your board support will
+> > need some IOMUX settings.
+> >
+> 
+> Yes, to configure external pins, but I will base on old FSL kernel to
+> get it working.
+
+Mixing those versions is not recommended. Try using a kernel based on
+mxc-master, apply the pending USB patches manually and modify the EHCI
+driver so it works for MX27. A patch that diffs between your version and
+the latest USB patches would be appreciated.
+
+If that works, a second patch to add USB to MX27ADS would be the next
+step.
+
+Daniel
