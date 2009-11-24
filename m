@@ -1,42 +1,51 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Tue, 24 Nov 2009 12:57:37 +0100
-Subject: USB support on i.MX27
-In-Reply-To: <37367b3a0911240343u58e3b3d2le5d48e638348a3ad@mail.gmail.com>
-References: <37367b3a0911240343u58e3b3d2le5d48e638348a3ad@mail.gmail.com>
-Message-ID: <20091124115737.GR14091@buzzloop.caiaq.de>
+From: srplsnh@gmail.com (Surinder P Singh)
+Date: Tue, 24 Nov 2009 17:41:25 +0530
+Subject: [PATCH] ARM l2x0: check whether l2x0 already enabled
+In-Reply-To: <1259014663.2742.3.camel@vinay-desktop>
+References: <1259014663.2742.3.camel@vinay-desktop>
+Message-ID: <f2235a630911240411x67ad7e05k218b32e8d732dd0c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2009 at 09:43:41AM -0200, Alan Carvalho de Assis wrote:
-> I am trying to add USB support to i.MX27 on mainline linux kernel, I
-> am following your modifications as in this post:
-> 
-> "Re: Comment to "[PATCH 7/8] Add EHCI support for MX27 and MX31 based boards"
-> 
-> I can't find xcvr.h and isp1504_xcvr.h then I copied fsl_xcvr.h from
-> FSL kernel to mainline:
-> 
-> alan at metropolis:~/ltib-patches/ltib/rpm/BUILD/linux$ cp
-> include/linux/usb/fsl_xcvr.h
-> ~/linux/pengutronix/linux-2.6/include/linux/usb/xcvr.h
-> 
-> But I can't to figure out where to find isp1504_xcvr.h.
+On Tue, Nov 24, 2009 at 3:47 AM, srinidhi kasagar
+<srinidhi.kasagar@stericsson.com> wrote:
+> From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+> Date: Tue, 24 Nov 2009 13:59:20 +0530
+>
+> If running in non-secure mode, accessing
+> control and auxiliary registers of l2x0
+> will fault.
+>
+> Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+> ---
+> ?arch/arm/mm/cache-l2x0.c | ? 24 +++++++++++++++---------
+> ?1 files changed, 15 insertions(+), 9 deletions(-)
+>
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index b480f1d..7c0d056 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -99,18 +99,24 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+>
+> ? ? ? ?l2x0_base = base;
+>
+> - ? ? ? /* disable L2X0 */
+> - ? ? ? writel(0, l2x0_base + L2X0_CTRL);
+> + ? ? ? /* check if l2x0 controller is already enabled.
+> + ? ? ? ?* if you are booting from non-secure mode
+> + ? ? ? ?* accessing the below registers will fault.
+> + ? ? ? ?*/
+> + ? ? ? if (!(readl(l2x0_base + L2X0_CTRL) & 1)) {
 
-There is nothing special about the ISP1504. On the register level, it is
-compliant to generic ULPI transceivers, and hence the driver in mainline
-was named accordingly. There is nothing you need to add from the BSPs
-anymore, everything is on its way to mainline already.
+2 points:
 
-> Could you please help me to get USB working on iMX27ADS?
+1. Since this code is also valid for devices based on pre-ARMv6, maybe
+making this code conditional for >=ARMv6 would be cleaner ?
 
-There are a number of boards that implement USB support already for MX3,
-and they're all in Sascha's tree. Most of them have been added just
-recently, so make sure you're looking at the newest source. As mentioned
-above, for ISP1504, you just need create a generic ULPI transceiver.
+2. Even for trustzone capable devices, would'nt it be better to read
+the Secure Configuration Register (SCR) to determine the CPU's current
+state (secure/non-secure) and only write to the L2 cache cntrl
+registers if you're in non-secure state ?
 
-The only thing that is missing is code that maps the .flags and maybe
-.portsc settings from the mxc_usbh_platform_data struct to the
-appropriate registers on MX27. And of course, your board support will
-need some IOMUX settings.
-
-Daniel
+Cheers,
+sp
