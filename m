@@ -1,27 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 24 Nov 2009 22:56:05 +0000
-Subject: CAS implementation may be broken
-In-Reply-To: <4B0C5F90.7050503@45mercystreet.com>
-References: <20091124013231.GB14645@shareable.org>
-	<1259061596.13956.15.camel@pc1117.cambridge.arm.com>
-	<4B0C5F90.7050503@45mercystreet.com>
-Message-ID: <20091124225605.GJ17481@n2100.arm.linux.org.uk>
+From: fabioestevam@yahoo.com (Fabio Estevam)
+Date: Tue, 24 Nov 2009 15:19:42 -0800 (PST)
+Subject: [PATCH v2] mx27: Add basic support for Maxtrack i-MXT TD60
+In-Reply-To: <37367b3a0911241021u68ac346dmf30fc98f252b1d35@mail.gmail.com>
+Message-ID: <154077.29305.qm@web51006.mail.re2.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2009 at 11:34:56PM +0100, Toby Douglass wrote:
-> I wrote:
->> I thought about this a little.  If the memory barrier is immediately  
->> before and given the next instruction is the LDREX, *all* threads 
->> coming to the LDREX *must* have preceeding them a DMB and so be up to 
->> date on memory, regardless of pauses in thread execution.
->
-> Additionally; the DMB afterwards seemed to have no value.  You could  
-> perform the STREX and then your thread could pause indefinitely and were  
-> you in a situation where you store was not immediately visible or  
-> correctly ordered to another thread, that thread would then read the old  
-> value.
+Hi Alan,
 
-The two DMBs are there to prevent other loads and stores on the _local_
-CPU being speculated inside the compare-and-swap operation, either by
-the compiler or the CPU.
+--- On Tue, 11/24/09, Alan Carvalho de Assis <acassis@gmail.com> wrote:
+
+> From: Alan Carvalho de Assis <acassis@gmail.com>
+> Subject: [PATCH v2] mx27: Add basic support for Maxtrack i-MXT TD60
+> To: "linux-arm-kernel" <linux-arm-kernel@lists.infradead.org>
+> Cc: "Sascha Hauer" <s.hauer@pengutronix.de>, "Russell King - ARM Linux" <linux@arm.linux.org.uk>, "Daniel Mack" <daniel@caiaq.de>
+> Date: Tuesday, November 24, 2009, 4:21 PM
+> Signed-off-by: Alan Carvalho de Assis
+> <acassis@gmail.com>
+> ---
+>  arch/arm/mach-mx2/Kconfig? ? |? ? 7
+> ++
+>  arch/arm/mach-mx2/Makefile???|? ?
+> 1 +
+>  arch/arm/mach-mx2/mxt_td60.c |? 245
+> ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 253 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mx2/mxt_td60.c
+
+Don't you need to add entries to include/asm-arm/arch-mxc/debug-macro.S and arch /arm/plat-mxc/include/mach/board-mxt_td60.h like other MX27 based boards?
+
+Regards,
+
+Fabio Estevam
+
+
+      
