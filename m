@@ -1,294 +1,45 @@
-From: acassis@gmail.com (Alan Carvalho de Assis)
-Date: Tue, 24 Nov 2009 16:21:02 -0200
-Subject: [PATCH v2] mx27: Add basic support for Maxtrack i-MXT TD60
-Message-ID: <37367b3a0911241021u68ac346dmf30fc98f252b1d35@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 24 Nov 2009 14:12:03 -0500 (EST)
+Subject: [PATCH v2 06/17] ARM: dma-mapping: fix for speculative accesses
+In-Reply-To: <20091124162250.GA17481@n2100.arm.linux.org.uk>
+References: <E1NBYEF-0005l7-Tq@rmk-PC.arm.linux.org.uk>
+	<E1NCZ7p-0002A0-Ib@rmk-PC.arm.linux.org.uk>
+	<c70ff3ad0911230725h6d688c09k8576b66d012f29f0@mail.gmail.com>
+	<20091123172722.GE18142@n2100.arm.linux.org.uk>
+	<c70ff3ad0911240746v3438bba9y556cca3f027b3dd7@mail.gmail.com>
+	<20091124162250.GA17481@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.0911241346140.2059@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Alan Carvalho de Assis <acassis@gmail.com>
----
- arch/arm/mach-mx2/Kconfig    |    7 ++
- arch/arm/mach-mx2/Makefile   |    1 +
- arch/arm/mach-mx2/mxt_td60.c |  245 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 253 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mx2/mxt_td60.c
+On Tue, 24 Nov 2009, Russell King - ARM Linux wrote:
 
-diff --git a/arch/arm/mach-mx2/Kconfig b/arch/arm/mach-mx2/Kconfig
-index 3e14da3..b96c6a3 100644
---- a/arch/arm/mach-mx2/Kconfig
-+++ b/arch/arm/mach-mx2/Kconfig
-@@ -104,4 +104,11 @@ config MACH_PCA100
- 	  Include support for phyCARD-s (aka pca100) platform. This
- 	  includes specific configurations for the module and its peripherals.
+> > I want to help with that testing, is there any git tree where I can
+> > pull the code from?
+> 
+> There isn't, because apparantly under git rules, as soon as I publish it
+> in git form it must be fixed.  So I'm keeping the stuff private and only
+> issuing patches on this mailing list.
 
-+config MACH_MXT_TD60
-+	bool "Maxtrack i-MXT TD60"
-+	depends on MACH_MX27
-+	help
-+	  Include support for i-MXT (aka td60) platform. This
-+	  includes specific configurations for the module and its peripherals.
-+
- endif
-diff --git a/arch/arm/mach-mx2/Makefile b/arch/arm/mach-mx2/Makefile
-index 19560f0..52aca0a 100644
---- a/arch/arm/mach-mx2/Makefile
-+++ b/arch/arm/mach-mx2/Makefile
-@@ -20,4 +20,5 @@ obj-$(CONFIG_MACH_MX27LITE) += mx27lite.o
- obj-$(CONFIG_MACH_EUKREA_CPUIMX27) += eukrea_cpuimx27.o
- obj-$(CONFIG_MACH_EUKREA_MBIMX27_BASEBOARD) += eukrea_mbimx27-baseboard.o
- obj-$(CONFIG_MACH_PCA100) += pca100.o
-+obj-$(CONFIG_MACH_MXT_TD60) += mxt_td60.o
+I think you should be perfectly fine publishing some Git branches with 
+the explicit indication that such branches are unstable and volatile.  
+After all that's exactly what the high profile linux-next repository is 
+about, and everyone should know already that basing any work on top of 
+linux-next is a good way to screw oneself.  And even then there is 'git 
+rebase' to let you move your stuff onto a stable base if needed.
 
-diff --git a/arch/arm/mach-mx2/mxt_td60.c b/arch/arm/mach-mx2/mxt_td60.c
-new file mode 100644
-index 0000000..4b288c5
---- /dev/null
-+++ b/arch/arm/mach-mx2/mxt_td60.c
-@@ -0,0 +1,245 @@
-+/*
-+ *  Copyright (C) 2000 Deep Blue Solutions Ltd
-+ *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
-+ *  Copyright 2006-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+
-+#include <linux/platform_device.h>
-+#include <linux/mtd/mtd.h>
-+#include <linux/mtd/map.h>
-+#include <linux/mtd/partitions.h>
-+#include <linux/mtd/physmap.h>
-+#include <linux/i2c.h>
-+#include <linux/irq.h>
-+#include <mach/common.h>
-+#include <mach/hardware.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/time.h>
-+#include <asm/mach/map.h>
-+#include <linux/gpio.h>
-+#include <mach/imx-uart.h>
-+#include <mach/iomux.h>
-+#include <mach/mxc_nand.h>
-+#include <mach/i2c.h>
-+#include <mach/imxfb.h>
-+#include <mach/mmc.h>
-+
-+#include "devices.h"
-+
-+static unsigned int mxt_td60_pins[] = {
-+	/* UART0 */
-+	PE12_PF_UART1_TXD,
-+	PE13_PF_UART1_RXD,
-+	PE14_PF_UART1_CTS,
-+	PE15_PF_UART1_RTS,
-+	/* UART1 */
-+	PE3_PF_UART2_CTS,
-+	PE4_PF_UART2_RTS,
-+	PE6_PF_UART2_TXD,
-+	PE7_PF_UART2_RXD,
-+	/* UART2 */
-+	PE8_PF_UART3_TXD,
-+	PE9_PF_UART3_RXD,
-+	PE10_PF_UART3_CTS,
-+	PE11_PF_UART3_RTS,
-+	/* UART3 */
-+	PB26_AF_UART4_RTS,
-+	PB28_AF_UART4_TXD,
-+	PB29_AF_UART4_CTS,
-+	PB31_AF_UART4_RXD,
-+	/* UART4 */
-+	PB18_AF_UART5_TXD,
-+	PB19_AF_UART5_RXD,
-+	PB20_AF_UART5_CTS,
-+	PB21_AF_UART5_RTS,
-+	/* UART5 */
-+	PB10_AF_UART6_TXD,
-+	PB12_AF_UART6_CTS,
-+	PB11_AF_UART6_RXD,
-+	PB13_AF_UART6_RTS,
-+	/* FEC */
-+	PD0_AIN_FEC_TXD0,
-+	PD1_AIN_FEC_TXD1,
-+	PD2_AIN_FEC_TXD2,
-+	PD3_AIN_FEC_TXD3,
-+	PD4_AOUT_FEC_RX_ER,
-+	PD5_AOUT_FEC_RXD1,
-+	PD6_AOUT_FEC_RXD2,
-+	PD7_AOUT_FEC_RXD3,
-+	PD8_AF_FEC_MDIO,
-+	PD9_AIN_FEC_MDC,
-+	PD10_AOUT_FEC_CRS,
-+	PD11_AOUT_FEC_TX_CLK,
-+	PD12_AOUT_FEC_RXD0,
-+	PD13_AOUT_FEC_RX_DV,
-+	PD14_AOUT_FEC_RX_CLK,
-+	PD15_AOUT_FEC_COL,
-+	PD16_AIN_FEC_TX_ER,
-+	PF23_AIN_FEC_TX_EN,
-+	/* I2C1 */
-+	PD17_PF_I2C_DATA,
-+	PD18_PF_I2C_CLK,
-+	/* I2C2 */
-+	PC5_PF_I2C2_SDA,
-+	PC6_PF_I2C2_SCL,
-+	/* FB */
-+	PA5_PF_LSCLK,
-+	PA6_PF_LD0,
-+	PA7_PF_LD1,
-+	PA8_PF_LD2,
-+	PA9_PF_LD3,
-+	PA10_PF_LD4,
-+	PA11_PF_LD5,
-+	PA12_PF_LD6,
-+	PA13_PF_LD7,
-+	PA14_PF_LD8,
-+	PA15_PF_LD9,
-+	PA16_PF_LD10,
-+	PA17_PF_LD11,
-+	PA18_PF_LD12,
-+	PA19_PF_LD13,
-+	PA20_PF_LD14,
-+	PA21_PF_LD15,
-+	PA22_PF_LD16,
-+	PA23_PF_LD17,
-+	PA25_PF_CLS,
-+	PA27_PF_SPL_SPR,
-+	PA28_PF_HSYNC,
-+	PA29_PF_VSYNC,
-+	PA30_PF_CONTRAST,
-+	PA31_PF_OE_ACD,
-+	/* OWIRE */
-+	PE16_AF_OWIRE,
-+	/* SDHC1*/
-+	PE18_PF_SD1_D0,
-+	PE19_PF_SD1_D1,
-+	PE20_PF_SD1_D2,
-+	PE21_PF_SD1_D3,
-+	PE22_PF_SD1_CMD,
-+	PE23_PF_SD1_CLK,
-+	/* SDHC2*/
-+	PB4_PF_SD2_D0,
-+	PB5_PF_SD2_D1,
-+	PB6_PF_SD2_D2,
-+	PB7_PF_SD2_D3,
-+	PB8_PF_SD2_CMD,
-+	PB9_PF_SD2_CLK,
-+};
-+
-+static struct mxc_nand_platform_data mxt_td60_nand_board_info = {
-+	.width = 1,
-+	.hw_ecc = 1,
-+};
-+
-+static struct imxi2c_platform_data mxt_td60_i2c_data = {
-+	.bitrate = 100000,
-+};
-+
-+static struct i2c_board_info mxt_td60_i2c_devices[] = {
-+};
-+
-+static struct imxi2c_platform_data mxt_td60_i2c2_data = {
-+	.bitrate = 100000,
-+};
-+
-+static struct i2c_board_info mxt_td60_i2c2_devices[] = {
-+};
-+
-+static int mxt_td60_sdhc1_init(struct device *dev, irq_handler_t detect_irq,
-+				void *data)
-+{
-+	return request_irq(IRQ_GPIOE(21), detect_irq, IRQF_TRIGGER_RISING,
-+				"sdhc1-card-detect", data);
-+}
-+
-+static void mxt_td60_sdhc1_exit(struct device *dev, void *data)
-+{
-+	free_irq(IRQ_GPIOE(21), data);
-+}
-+
-+static struct imxmmc_platform_data sdhc1_pdata = {
-+	.init = mxt_td60_sdhc1_init,
-+	.exit = mxt_td60_sdhc1_exit,
-+};
-+
-+static struct platform_device *platform_devices[] __initdata = {
-+	&mxc_fec_device,
-+};
-+
-+static struct imxuart_platform_data uart_pdata[] = {
-+	{
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	}, {
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	}, {
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	}, {
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	}, {
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	}, {
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	},
-+};
-+
-+static void __init mxt_td60_board_init(void)
-+{
-+	mxc_gpio_setup_multiple_pins(mxt_td60_pins, ARRAY_SIZE(mxt_td60_pins),
-+			"mxt_td60");
-+
-+	mxc_register_device(&mxc_uart_device0, &uart_pdata[0]);
-+	mxc_register_device(&mxc_uart_device1, &uart_pdata[1]);
-+	mxc_register_device(&mxc_uart_device2, &uart_pdata[2]);
-+	mxc_register_device(&mxc_uart_device3, &uart_pdata[3]);
-+	mxc_register_device(&mxc_uart_device4, &uart_pdata[4]);
-+	mxc_register_device(&mxc_uart_device5, &uart_pdata[5]);
-+	mxc_register_device(&mxc_nand_device, &mxt_td60_nand_board_info);
-+
-+	i2c_register_board_info(0, mxt_td60_i2c_devices,
-+				ARRAY_SIZE(mxt_td60_i2c_devices));
-+
-+	i2c_register_board_info(1, mxt_td60_i2c2_devices,
-+				ARRAY_SIZE(mxt_td60_i2c2_devices));
-+
-+	mxc_register_device(&mxc_i2c_device0, &mxt_td60_i2c_data);
-+	mxc_register_device(&mxc_i2c_device1, &mxt_td60_i2c2_data);
-+	mxc_register_device(&mxc_sdhc_device0, &sdhc1_pdata);
-+
-+	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
-+}
-+
-+static void __init mxt_td60_timer_init(void)
-+{
-+	mx27_clocks_init(26000000);
-+}
-+
-+static struct sys_timer mxt_td60_timer = {
-+	.init	= mxt_td60_timer_init,
-+};
-+
-+MACHINE_START(MXT_TD60, "Maxtrack i-MXT TD60")
-+	/* maintainer: Maxtrack Industrial */
-+	.phys_io	= AIPI_BASE_ADDR,
-+	.io_pg_offst	= ((AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
-+	.boot_params	= PHYS_OFFSET + 0x100,
-+	.map_io		= mx27_map_io,
-+	.init_irq	= mx27_init_irq,
-+	.init_machine	= mxt_td60_board_init,
-+	.timer		= &mxt_td60_timer,
-+MACHINE_END
-+
--- 
-1.6.0.4
+A very few individuals apparently have difficulties with the distinction 
+between a stable and an unstable Git branch which should be their own 
+problem.  That shouldn't prevent the rest of the world from using Git in 
+such a way.  Even Linus is not against a daily rebasing linux-next.
+
+You still can expand your Git branch namespace for clarity.  Branches 
+such as those are quite unambiguous:
+
+	unstable/wip/dma_mapping_v1
+	unstable/wip/dma_mapping_v2
+
+Etc.
+
+
+Nicolas
