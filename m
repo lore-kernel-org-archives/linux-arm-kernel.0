@@ -1,32 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 24 Nov 2009 15:19:18 +0000
-Subject: [PATCH 1/2] ARM: Implemented support for VFP PM context saving
-In-Reply-To: <1259068826.13956.22.camel@pc1117.cambridge.arm.com>
-References: <1259059024-23719-1-git-send-email-tero.kristo@nokia.com>
-	<1259059024-23719-2-git-send-email-tero.kristo@nokia.com>
-	<20091124114836.GA10510@n2100.arm.linux.org.uk>
-	<1259068826.13956.22.camel@pc1117.cambridge.arm.com>
-Message-ID: <20091124151918.GB14462@n2100.arm.linux.org.uk>
+From: schindele@nentec.de (Juergen Schindele)
+Date: Tue, 24 Nov 2009 17:22:43 +0200
+Subject: IXP425: help on HSS channelized service
+In-Reply-To: <4B0BDFC1.7010506@kaskonetworks.it>
+References: <4B0BDFC1.7010506@kaskonetworks.it>
+Message-ID: <200911241622.43464.schindele@nentec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2009 at 01:20:26PM +0000, Catalin Marinas wrote:
-> BTW, the two patches below were mentioned to me some time ago but I
-> haven't got the time to look at them:
-> 
-> [ARM] vfp: Fix bug in vfp_pm_suspend
-> https://www.codeaurora.org/gitweb/quic/le/?p=kernel/msm.git;a=commit;h=88984c9b2d69c222ee1e2afc948ca73f597d40ff
+Am Dienstag, 24. November 2009 schrieb Davide Di Gesualdo:
+> Hi all,
+Dear Davide,
+i am using ixp4xx-hss for an HDLC.X21 frontend in packetized mode
+with all timeslots from kernel version 2.6.27.36
+To receive correctly i had to modify the parameters 
+in "hss_config_set_pcr" function. I compared to intel software stack
+for IXP425 which was already working for us. 
 
-This one is bad - it gets the current CPU by directly referencing ti->cpu.
-Too bad if you have kernel preemption enabled; the value obtained that
-way is effectively meaningless.  The only way to get a meaningful value
-is via 'get_cpu()' and after you've done with using it, 'put_cpu()'.
-That ensures you can't be preempted onto a different CPU mid-operation.
+in function static void hss_config_set_pcr(struct port *port)
+....
+-		msg.data32 = PCR_FRM_SYNC_OUTPUT_RISING | PCR_MSB_ENDIAN |
+-			PCR_TX_DATA_ENABLE;
++		msg.data32 = PCR_FRM_SYNC_ACTIVE_HIGH | PCR_MSB_ENDIAN |
++			PCR_TX_DATA_ENABLE | PCR_FCLK_EDGE_RISING | PCR_FRM_PULSE_DISABLED;
+....
 
-It's safe in vfp_notifier because we're called in an already atomic context.
+Nevertheless i am receiving correct data but packet len is always zero!
+Have you already encountered this ???
 
-> [ARM] vfp: Add additional vfp interfaces
-> https://www.codeaurora.org/gitweb/quic/le/?p=kernel/msm.git;a=commit;h=393e4bfaaf79377d29cd6bb2228f87601aeca668
+Bye 
+> I'm writing a kernel module for a HSS channelized service on IXP425 
+> processor, based on ixp4xx_hss. I'm developing on a IXDPG425 Intel 
+> board, and the HSS bus is attached to four Si3210 ProSLIC chips.
+> The purpose of this module is to read/write from/to HSS 8-byte buffers 
+> in raw mode (no particular alignment is required). In write direction, 
+> everything seems ok: if I write a buffer like
+> char buf[] = {0xcb, 0xcb, 0xcb, 0xcb, 0xcb, 0xcb, 0xcb, 0xcb};
+> on a fixed timeslot and then read the TXD pin signal with a scope, I can 
+> see the correct waveform at the correct place; I've also tried to write 
+> a tone with a fixed freqeuncy, and I've listened it correctly.
+> The problem comes with read direction: I've tried to make a loopback by 
+> copying the rxbuffer in the txbuffer, but I can't hear my voice back 
+> (instead I hear something like a continous buzz). I'm quite sure I read 
+> the rxbuffer in the correct way (I do the same when I write txbuffer, 
+> which works properly!). This is the ISR for HSS read-complete interrupt:
+--------------------------------------------------------------
+J?rgen Schindele  
+Software-Entwicklung
 
-I don't like what's in this one.  Lack of explaination in the commit log
-doesn't help.
+NENTEC Netzwerktechnologie GmbH
+Greschbachstr. 12
+76229 Karlsruhe
+Deutschland
+Telefon: +49 721 94249-51
+Telefax: +49 721 94249-10
+E-Mail:  schindele at nentec.de
+WEB:     www.nentec.de
+ 
+Gesch?ftsf?hrung: Klaus Becker, Roland Knapp
+Sitz der Gesellschaft: Karlsruhe
+Handelsregister: Amtsgericht Mannheim HRB 107658
+
+--------------------------------------------------------------
