@@ -1,78 +1,78 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 24 Nov 2009 15:36:24 +0000
-Subject: CAS implementation may be broken
-In-Reply-To: <4B0BF899.7060106@45mercystreet.com>
-References: <4B08055C.3000408@45mercystreet.com>
-	<1258989196.8088.28.camel@pc1117.cambridge.arm.com>
-	<4B0BF899.7060106@45mercystreet.com>
-Message-ID: <20091124153624.GC14462@n2100.arm.linux.org.uk>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Tue, 24 Nov 2009 17:46:02 +0200
+Subject: [PATCH v2 06/17] ARM: dma-mapping: fix for speculative accesses
+In-Reply-To: <20091123172722.GE18142@n2100.arm.linux.org.uk>
+References: <E1NBYEF-0005l7-Tq@rmk-PC.arm.linux.org.uk>
+	<E1NCZ7p-0002A0-Ib@rmk-PC.arm.linux.org.uk>
+	<c70ff3ad0911230725h6d688c09k8576b66d012f29f0@mail.gmail.com>
+	<20091123172722.GE18142@n2100.arm.linux.org.uk>
+Message-ID: <c70ff3ad0911240746v3438bba9y556cca3f027b3dd7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2009 at 04:15:37PM +0100, Toby Douglass wrote:
-> So, now I'm puzzled.  I was under the impression it was possible to use  
-> LL/SC to solve ABA.
-
-Well, what you can do is:
-
-	LL
-	compute new value
-	SC
-
-The problem for LL/SC architectures is that this creates a big region
-where we hope that no one else performs another 'load locked' operation.
-
-LL/SC based architectures doing this traditionally fall fowl of a problem.
-Consider the following:
-
-do {
-	LL
-	complex computation to new value
-	SC
-} while (store failed)
-
-and have that running on two CPUs trying to modify the same location.  It
-can hang both CPUs up in that loop for a _very_ long time.  This is
-primerily why we've ended up with a CAS implementation, and everything
-is implemented as:
-
-	do {
-		load current
-		compute new value
-		do {
-			LL old
-			old == current?
-				SC new
-		} while SC failed
-	} while old != current
-
-(I argued initially for a LL / SC interface but the arguments I was making
-were shot down by Linus et.al. as completely unreasonable and technically
-idiotic.)
-
-Actually, I'm rather surprised that our existing LDREX/STREX implementations
-don't suffer from this problem.  Consider two CPUs operating in lock-step:
-
-	CPU0		CPU1
-	ldrex
-	add		ldrex
-	strex (fails)	add
-	repeat		strex (fails)
-	ldrex		repeat
-	add		ldrex
-	strex (fails)	add
-	repeat		strex (fails)
-	...		repeat
-			...
-
-In this scenario, the loops _never_ terminate.  The usual solution is to
-add delays into the loop which depend on the CPU number, thus ensuring
-that two CPUs execute a different number of instructions each time around
-the loop.
-
-> My feeling in this, for what it's worth, is that this seems an excessive  
-> requirement for something which is necessary for lock-free data  
-> structures; they are becoming important as the number of cores in SMP  
-> systems continues to double.
-
-Hasn't the lock-free issue been solved by things like rcu?
+On Mon, Nov 23, 2009 at 7:27 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Nov 23, 2009 at 05:25:06PM +0200, saeed bishara wrote:
+>> > + ? ? ? if (dir == DMA_FROM_DEVICE) {
+>> > + ? ? ? ? ? ? ? outer_inv_range(paddr, paddr + size);
+>> > + ? ? ? ? ? ? ? dmac_inv_range(kaddr, kaddr + size);
+>> it's not clear why outer cache invalidated before inner cache, and, I
+>> think that it may be incorrect, how can you be sure that a dirty line
+>> that is in inner cache can't be moved down to outer cache?
+>
+> I think you have a point, but also see Catalin's point. ?When we are
+> invalidating, we have to invalidate the outer caches before the inner
+> caches, otherwise there is a danger that the inner caches could
+> prefetch from the outer between the two operations.
+>
+> I think that the only thing we can do is as my previous version did,
+> and always clean the caches at this point - first the inner and then
+> the outer caches.
+this makes sense, if  a specific CPU needs the outer cache to be
+invalidated before the inner one, then that better be done in a
+separate patch as this is a different issue and has nothing to do with
+the speculative prefetch
+>
+> The only other alternative would be to invalidate the outer cache,
+> then the inner cache, followed again by the outer cache. ?I don't
+> currently have a feeling for how expensive that would be against
+> just cleaning them.
+>
+> Catalin, any thoughts?
+>
+>
+>> > +void ___dma_single_dev_to_cpu(const void *kaddr, size_t size,
+>> > + ? ? ? enum dma_data_direction dir)
+>> > +{
+>> > + ? ? ? BUG_ON(!virt_addr_valid(kaddr) || !virt_addr_valid(kaddr + size - 1));
+>> > +
+>> > + ? ? ? /* don't bother invalidating if DMA to device */
+>> > + ? ? ? if (dir != DMA_TO_DEVICE) {
+>> > + ? ? ? ? ? ? ? unsigned long paddr = __pa(kaddr);
+>> > + ? ? ? ? ? ? ? outer_inv_range(paddr, paddr + size);
+>> > + ? ? ? ? ? ? ? dmac_inv_range(kaddr, kaddr + size);
+>> > + ? ? ? }
+>> that code implies that cache invalidate will be applied also for CPU's
+>> that doesn't suffer from speculative prefetch issue, right?
+>
+> Yes, but we need to do this for bidirectional mappings as well (which
+> would've only been cleaned.)
+>
+> What would be useful is if someone could run some tests on the performance
+> impact of this (eg, measuring the DMA performance of a SATA hard drive)
+> and comparing the resulting performance.
+>
+> I _could_ do that, but it would mean taking down my network and running
+> the tests on a fairly old machine.
+I want to help with that testing, is there any git tree where I can
+pull the code from?
+>
+> If it does turn out to be a problem, we can change the 'inv_range' and
+> 'clean_range' functions to be 'dev_to_cpu' and 'cpu_to_dev' functions,
+> and push the decisions about what to do at each point down into the
+> per-CPU assembly.
+the thing is that the inv_range or dev_to_cpu is called before and
+after the DMA operation.
+and for the systems that doesn't have speculative prefetch, we don't
+that function to be called at all after the DMA operation.
+>
