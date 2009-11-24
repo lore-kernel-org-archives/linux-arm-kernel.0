@@ -1,45 +1,63 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Tue, 24 Nov 2009 01:32:31 +0000
-Subject: CAS implementation may be broken
-In-Reply-To: <20091123231353.GJ18142@n2100.arm.linux.org.uk>
-References: <4B08055C.3000408@45mercystreet.com>
-	<20091123222830.GA5598@shareable.org>
-	<20091123231353.GJ18142@n2100.arm.linux.org.uk>
-Message-ID: <20091124013231.GB14645@shareable.org>
+From: Bo.Liu@windriver.com (Tonyliu)
+Date: Tue, 24 Nov 2009 10:45:37 +0800
+Subject: Linux on ARM926EJ: Software reset problems
+In-Reply-To: <56948FFAC219492B8923C0852A8AC413@teltronic.es>
+References: <56948FFAC219492B8923C0852A8AC413@teltronic.es>
+Message-ID: <4B0B48D1.8080809@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Mon, Nov 23, 2009 at 10:28:30PM +0000, Jamie Lokier wrote:
-> > That could be an improvement for some algorithms, because often if the
-> > store doesn't happen, the *inputs* to compare_and_swap() need to be
-> > recalculated anyway before another try is likely to succeed.  What's
-> > the point in having code which expands to two loops:
-> 
-> The point is that often its cheaper to retry the LL/SC than it is to
-> do the recalculation.
-> 
-> However, I don't think you've understood the original problem at all.
+Ricardo Mart?nez wrote:
+> Hi!
+>  
+> I'm trying to soft reset an ARM926EJ.
+>  
+> I'm using
+>     cpu_arm926_reset(ulong address) function which:
+>            - flushes I/D caches
+>             - jumps to "address", whose value in my case is NOR flash 
+> base addres where U-Boot stays (after remapping).
+>  
+>     But it sometimes work, but most times hangs. Can this be caused by 
+> MMU not being switched off?
+Probably yes but not exactly.  After reset by hardware signal generated 
+by Watchdog or something else, all SoC modules are in default
+certain state besides ARM core, but in your case, it's not sure.
 
-I think I have - I agreed with you and Catalin already that LL/SC does
-not suffice.  But do you mean that Catalin's suggestion to put the
-LDREX before the LDR does not work either?  (Maybe it needs a barrier
-too).
+>  
+> Any other hints?
+>  
+> If you think it might be caused by MMU, how can MMU be disabled?
+use "MCR p15, 0, Rd, c1, c0, 0" to write CP15 register 1 for MMU 
+enable/disable.
 
-It probably looks like I didn't understand because I've mixed two
-quite different issues in the same mail (same in this one), because I
-think the CAS_BOOL has merit.  Having implemented both variants in
-userspace, it's actually quite annoying to use CAS and have to
-remember the input and compare it with the output sometimes.
+>  
+> Is there any other prefered method to soft reboot ARM926 from Linux? 
+> I've taken a look at some PXA, OMAP & AT91 code about soft rebooting. 
+> It seems they use Watchdog timer to reset, but my CPU does not have a 
+> watchdog.
+You can try cpu_reset(addr), refer to cpu_arm926_reset() in 
+arch/arm/mm/proc-arm926.S.
 
-For some algorithms, you're right that it can be cheaper to retry the
-LL/SC.  But for some algorithms you know the retry will never succeed
-and is a waste of time and code space, e.g. ones which do CAS on a
-counter which is always incremented.  It makes the caller a bit more
-long-winded too.
+Tony
+>  
+> Thanks in advance,
+> Ricardo Martinez
+>  
+>  
+> ------------------------------------------------------------------------
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>   
 
-The final argument is: you can implement CAS in terms of CAS_BOOL, but
-you can't do it the other way.  Because everyone copied x86's CAS at
-the begining, that's the one we got.
 
--- Jamie
+-- 
+Tony Liu | Liu Bo
+-------------------------------------------------------------
+WIND RIVER | China Development Center
+Tel: 86-10-8477-8542 ext: 8542 |  Fax: 86-10-64790367
+(M): 86-136-7117-3612
+Address: 15/F, Wangjing TowerB, Chaoyang District, Beijing, P.R.China
