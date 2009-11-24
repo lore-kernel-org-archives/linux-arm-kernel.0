@@ -1,28 +1,27 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 24 Nov 2009 08:42:58 +0100
-Subject: [PATCH] ARM: MX3: lilly1131: move MC13783 device registration
-In-Reply-To: <20091123110939.GG14091@buzzloop.caiaq.de>
-References: <1258825240-2992-1-git-send-email-daniel@caiaq.de>
-	<20091123104522.GD30179@pengutronix.de>
-	<20091123110939.GG14091@buzzloop.caiaq.de>
-Message-ID: <20091124074258.GG30179@pengutronix.de>
+Date: Tue, 24 Nov 2009 08:45:28 +0100
+Subject: [PATCH 0/3] mx31moboard: inc patches to mxc-master
+In-Reply-To: <1259000197-18627-1-git-send-email-valentin.longchamp@epfl.ch>
+References: <1259000197-18627-1-git-send-email-valentin.longchamp@epfl.ch>
+Message-ID: <20091124074528.GH30179@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23, 2009 at 12:09:39PM +0100, Daniel Mack wrote:
+On Mon, Nov 23, 2009 at 07:16:34PM +0100, Valentin Longchamp wrote:
 > Hi Sascha,
 > 
-> On Mon, Nov 23, 2009 at 11:45:22AM +0100, Sascha Hauer wrote:
-> > On Sat, Nov 21, 2009 at 06:40:40PM +0100, Daniel Mack wrote:
-> > > Register the MC13783 device in the module code.
-> > > 
-> > > Signed-off-by: Daniel Mack <daniel@caiaq.de>
-> > 
-> > Added to mxc-master.
-> 
-> Thanks! Did you pick the LiteKit patches, too?
+> Here are the patches in incremental form.
 
-Yes
+Ok, applied.
+
+> 
+> There is a small SPI correction and it adds support for USB host
+> as the driver should come with 2.6.33.
+> 
+> The series was generated with you mxc-master-pu branch. It would be
+> nice that this gets in 2.6.33 as well.
+
+No, I'm still working on these.
 
 Sascha
 
