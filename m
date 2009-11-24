@@ -1,59 +1,95 @@
-From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
-Date: Tue, 24 Nov 2009 03:47:43 +0530
-Subject: [PATCH] ARM l2x0: check whether l2x0 already enabled
-Message-ID: <1259014663.2742.3.camel@vinay-desktop>
+From: tero.kristo@nokia.com (Tero Kristo)
+Date: Tue, 24 Nov 2009 12:37:04 +0200
+Subject: [PATCH 2/2] OMAP3: Implemented VFP restore/save context
+In-Reply-To: <1259059024-23719-2-git-send-email-tero.kristo@nokia.com>
+References: <> <1259059024-23719-1-git-send-email-tero.kristo@nokia.com>
+	<1259059024-23719-2-git-send-email-tero.kristo@nokia.com>
+Message-ID: <1259059024-23719-3-git-send-email-tero.kristo@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-Date: Tue, 24 Nov 2009 13:59:20 +0530
+From: Tero Kristo <tero.kristo@nokia.com>
 
-If running in non-secure mode, accessing
-control and auxiliary registers of l2x0
-will fault.
+VFP save context is called before MPU/NEON off. Restore is not needed as
+the next VFP trap will restore context automatically. Uses the support
+routine implemented in arch/arm/vfp/vfpmodule.c.
 
-Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
+Cc: Vishwanath Sripathy <vishwanath.bs@ti.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Richard Woodruff <r-woodruff2@ti.com>
+Cc: Peter 'p2' De Schrijver <peter.de-schrijver@nokia.com>
 ---
- arch/arm/mm/cache-l2x0.c |   24 +++++++++++++++---------
- 1 files changed, 15 insertions(+), 9 deletions(-)
+ arch/arm/mach-omap2/pm.h     |    1 +
+ arch/arm/mach-omap2/pm34xx.c |   21 ++++++++++++++++++++-
+ 2 files changed, 21 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index b480f1d..7c0d056 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -99,18 +99,24 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+index 4f22107..dd5bbaf 100644
+--- a/arch/arm/mach-omap2/pm.h
++++ b/arch/arm/mach-omap2/pm.h
+@@ -18,6 +18,7 @@ extern u32 sleep_while_idle;
+ extern u32 voltage_off_while_idle;
  
- 	l2x0_base = base;
+ extern void *omap3_secure_ram_storage;
++extern void vfp_pm_save_context(void);
+ extern void omap3_pm_off_mode_enable(int);
+ extern void omap_sram_idle(void);
+ extern int omap3_can_sleep(void);
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index b26ae5b..4b01303 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -321,6 +321,18 @@ static void restore_control_register(u32 val)
+ 	__asm__ __volatile__ ("mcr p15, 0, %0, c1, c0, 0" : : "r" (val));
+ }
  
--	/* disable L2X0 */
--	writel(0, l2x0_base + L2X0_CTRL);
-+	/* check if l2x0 controller is already enabled.
-+	 * if you are booting from non-secure mode
-+	 * accessing the below registers will fault.
-+	 */
-+	if (!(readl(l2x0_base + L2X0_CTRL) & 1)) {
- 
--	aux = readl(l2x0_base + L2X0_AUX_CTRL);
--	aux &= aux_mask;
--	aux |= aux_val;
--	writel(aux, l2x0_base + L2X0_AUX_CTRL);
-+		/* L2x0 controller is disabled */
- 
--	l2x0_inv_all();
-+		aux = readl(l2x0_base + L2X0_AUX_CTRL);
-+		aux &= aux_mask;
-+		aux |= aux_val;
-+		writel(aux, l2x0_base + L2X0_AUX_CTRL);
- 
--	/* enable L2X0 */
--	writel(1, l2x0_base + L2X0_CTRL);
-+		l2x0_inv_all();
++static inline void omap3_save_neon_context(void)
++{
++#ifdef CONFIG_VFP
++	vfp_pm_save_context();
++#endif
++}
 +
-+		/* enable L2X0 */
-+		writel(1, l2x0_base + L2X0_CTRL);
++static inline void omap3_restore_neon_context(void)
++{
++	return;
++}
++
+ /* Function to restore the table entry that was modified for enabling MMU */
+ static void restore_table_entry(void)
+ {
+@@ -365,6 +377,7 @@ void omap_sram_idle(void)
+ 	/* save_state = 3 => L1, L2 and logic lost */
+ 	int save_state = 0;
+ 	int mpu_next_state = PWRDM_POWER_ON;
++	int neon_next_state = PWRDM_POWER_ON;
+ 	int per_next_state = PWRDM_POWER_ON;
+ 	int core_next_state = PWRDM_POWER_ON;
+ 	int core_prev_state, per_prev_state;
+@@ -398,8 +411,12 @@ void omap_sram_idle(void)
+ 	pwrdm_pre_transition();
+ 
+ 	/* NEON control */
+-	if (pwrdm_read_pwrst(neon_pwrdm) == PWRDM_POWER_ON)
++	if (pwrdm_read_pwrst(neon_pwrdm) == PWRDM_POWER_ON) {
+ 		pwrdm_set_next_pwrst(neon_pwrdm, mpu_next_state);
++		neon_next_state = mpu_next_state;
++		if (neon_next_state == PWRDM_POWER_OFF)
++			omap3_save_neon_context();
 +	}
  
- 	outer_cache.inv_range = l2x0_inv_range;
- 	outer_cache.clean_range = l2x0_clean_range;
+ 	/* PER */
+ 	per_next_state = pwrdm_read_next_pwrst(per_pwrdm);
+@@ -537,6 +554,8 @@ void omap_sram_idle(void)
+ 		omap3_disable_io_chain();
+ 	}
+ 
++	if (neon_next_state == PWRDM_POWER_OFF)
++		omap3_restore_neon_context();
+ 
+ 	pwrdm_post_transition();
+ }
 -- 
-1.6.3.GIT
+1.5.4.3
