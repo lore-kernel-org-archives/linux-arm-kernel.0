@@ -1,31 +1,37 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Tue, 24 Nov 2009 18:36:57 +0100
-Subject: [PATCH] ARM: MX3: fix CPU revision number detection
-In-Reply-To: <20091121192249.GF13956@n2100.arm.linux.org.uk>
-References: <1258820364-32693-1-git-send-email-daniel@caiaq.de>
-	<20091121190037.GE13956@n2100.arm.linux.org.uk>
-	<20091121192249.GF13956@n2100.arm.linux.org.uk>
-Message-ID: <20091124173657.GC14091@buzzloop.caiaq.de>
+From: acassis@gmail.com (Alan Carvalho de Assis)
+Date: Tue, 24 Nov 2009 15:44:02 -0200
+Subject: [PATCH] mx27: Add basic support for Maxtrack i-MXT TD60
+In-Reply-To: <20091124172746.GF17481@n2100.arm.linux.org.uk>
+References: <37367b3a0911240922m5df3ec4fn7186eceb7c1cd456@mail.gmail.com>
+	<20091124172746.GF17481@n2100.arm.linux.org.uk>
+Message-ID: <37367b3a0911240944v643c0aabv3d7caf13fadffebc@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 21, 2009 at 07:22:49PM +0000, Russell King - ARM Linux wrote:
-> On Sat, Nov 21, 2009 at 07:00:37PM +0000, Russell King - ARM Linux wrote:
-> > On Sat, Nov 21, 2009 at 05:19:24PM +0100, Daniel Mack wrote:
-> > > +#include <asm/io.h>
-> > 
-> > I see red.  linux/io.h please.
-> 
-> BTW, as a reminder, the reason I pick up on these soo much is because
-> I've configured my mail client (mutt) to highlight them:
-> 
-> color body white red "\\+.*(#include <(asm|mach)/(gp)?io\.h>|return -1|default n)"
-> 
-> which matches new uses of 'asm/io.h', 'mach/io.h', 'asm/gpio.h',
-> 'mach/gpio.h', 'return -1' and 'default n' in patches.
+Hi Russell,
 
-That is quite handy, but when my own patches are parsed by mutt, it's
-usually too late ;) I'll hack a git-pre-commit script to prevent that in
-the future. Or does anyone have that ready yet?
+On 11/24/09, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Tue, Nov 24, 2009 at 03:22:33PM -0200, Alan Carvalho de Assis wrote:
+>> +#include <linux/platform_device.h>
+>> +#include <linux/mtd/mtd.h>
+>> +#include <linux/mtd/map.h>
+>> +#include <linux/mtd/partitions.h>
+>> +#include <linux/mtd/physmap.h>
+>> +#include <linux/i2c.h>
+>> +#include <linux/irq.h>
+>> +#include <mach/common.h>
+>> +#include <mach/hardware.h>
+>> +#include <asm/mach-types.h>
+>> +#include <asm/mach/arch.h>
+>> +#include <asm/mach/time.h>
+>> +#include <asm/mach/map.h>
+>> +#include <mach/gpio.h>
+>
+> I see red!  linux/gpio.h please.
+>
 
-Daniel
+Sure, I based on MX27ADS. I will send a new patch.
+
+Thank you,
+
+Alan
