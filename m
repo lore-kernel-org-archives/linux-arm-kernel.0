@@ -1,107 +1,31 @@
-From: davide.digesualdo@kaskonetworks.it (Davide Di Gesualdo)
-Date: Tue, 24 Nov 2009 14:29:37 +0100
-Subject: IXP425: help on HSS channelized service
-Message-ID: <4B0BDFC1.7010506@kaskonetworks.it>
+From: srplsnh@gmail.com (Surinder P Singh)
+Date: Tue, 24 Nov 2009 19:05:47 +0530
+Subject: [PATCH] ARM l2x0: check whether l2x0 already enabled
+In-Reply-To: <1259022908.2742.9.camel@vinay-desktop>
+References: <1259014663.2742.3.camel@vinay-desktop>
+	<f2235a630911240411x67ad7e05k218b32e8d732dd0c@mail.gmail.com>
+	<1259022908.2742.9.camel@vinay-desktop>
+Message-ID: <f2235a630911240535u4c75914buad3cb1239d5bb598@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-I'm writing a kernel module for a HSS channelized service on IXP425 
-processor, based on ixp4xx_hss. I'm developing on a IXDPG425 Intel 
-board, and the HSS bus is attached to four Si3210 ProSLIC chips.
-The purpose of this module is to read/write from/to HSS 8-byte buffers 
-in raw mode (no particular alignment is required). In write direction, 
-everything seems ok: if I write a buffer like
-char buf[] = {0xcb, 0xcb, 0xcb, 0xcb, 0xcb, 0xcb, 0xcb, 0xcb};
-on a fixed timeslot and then read the TXD pin signal with a scope, I can 
-see the correct waveform at the correct place; I've also tried to write 
-a tone with a fixed freqeuncy, and I've listened it correctly.
-The problem comes with read direction: I've tried to make a loopback by 
-copying the rxbuffer in the txbuffer, but I can't hear my voice back 
-(instead I hear something like a continous buzz). I'm quite sure I read 
-the rxbuffer in the correct way (I do the same when I write txbuffer, 
-which works properly!). This is the ISR for HSS read-complete interrupt:
+On Tue, Nov 24, 2009 at 6:05 AM, srinidhi kasagar
+<srinidhi.kasagar@stericsson.com> wrote:
 
-static void hss_chan_irq(void *pdev)
-{
-	struct port *port = pdev;
-	int ch, bytes_received;
-	unsigned int first, errors, tx_list, rx_offset, v;
-	char *rx_buf, *tx_buf;
+>> 2 points:
+>>
+>> 1. Since this code is also valid for devices based on pre-ARMv6, maybe
+>> making this code conditional for >=ARMv6 would be cleaner ?
+> rather it depends on l2 controller being used. L210 controllers
+> do not have such restrictions whereas l220/pl310 have such kind
+> of secure/non-secure restrictions. So would it be better to keep
+> condition based on l2 controller being used?
+>
 
-	spin_lock(&npe_lock);
-	while ((v = qmgr_get_entry(queue_ids[port->id].chan))) {
-		first = v >> 24;
-		errors = (v >> 16) & 0xFF;
-		tx_list = (v >> 8) & 0xFF;
-		rx_offset = v & 0xFF;
+Thats probably better. You can read the L2 cache ID register to figure
+out if its a L210/220 or PL310 and so on. You can couple this check
+with the cpu secure/non-secure state before deciding to write to the
+registers.
 
-		BUG_ON(rx_offset % CHAN_RX_TRIGGER);
-		BUG_ON(rx_offset >= CHAN_RX_FRAMES);
-		BUG_ON(tx_list >= CHAN_TX_LISTS);
-
-		bytes_received = rx_offset - port->chan_current_rx;
-		if(bytes_received < 0)
-			bytes_received += CHAN_RX_FRAMES;
-
-		dma_sync_single(port->dev, port->chan_rx_buf_phys, 
-chan_rx_buf_len(port), DMA_FROM_DEVICE);
-
-		while(bytes_received >= CHAN_RX_TRIGGER) {
-			if(port->chan_current_rx >= CHAN_RX_FRAMES)
-				port->chan_current_rx = 0;
-	
-			if(port->chan_current_tx >= CHAN_TX_FRAMES)
-				port->chan_current_tx = 0;
-
-			for(ch = 0; ch < MAX_CHAN_DEVICES; ch++) {
-				if(port->chan_devices[ch]->opened) {
-					tx_buf = chan_tx_buf(port) + port->chan_current_tx + 
-(CHAN_TX_FRAMES * port->chan_devices[ch]->timeslot);
-					rx_buf = chan_rx_buf(port) + port->chan_current_rx + 
-(CHAN_RX_FRAMES * port->chan_devices[ch]->timeslot);
-
-					memcpy(tx_buf, rx_buf, CHAN_RX_TRIGGER);
-				}
-			}
-			bytes_received -= CHAN_RX_TRIGGER;
-			port->chan_current_rx += CHAN_RX_TRIGGER;
-			port->chan_current_tx += CHAN_RX_TRIGGER;
-		}
-		dma_sync_single(port->dev, port->chan_tx_buf_phys, 
-chan_tx_buf_len(port), DMA_TO_DEVICE);
-	}
-	spin_unlock(&npe_lock);
-}
-
-with buffers configuration as follow:
-
-#define MIN_FRAME_SIZE		16
-#define MAX_FRAME_SIZE		256
-#define MAX_CHANNELS		(MAX_FRAME_SIZE / 8)
-#define MAX_CHAN_DEVICES	32
-
-#define CHAN_RX_TRIGGER		8
-#define CHAN_RX_FRAMES		128
-#define CHAN_TX_LIST_FRAMES	32
-#define CHAN_TX_LISTS		4
-#define CHAN_TX_FRAMES		(CHAN_TX_LIST_FRAMES * CHAN_TX_LISTS)
-
-port->chan_current_rx is initialized as 0, port->chan_current_tx is 
-initialized as 16; all 32 timeslots are configured as VOICE64K; the NPE 
-configuration functions are the ones coded by Krzysztof Halasa.
-
-Any suggestion would be really appreciated!
-Thanks,
-
-Davide Di Gesualdo
-
--- 
-Davide Di Gesualdo
-Kasko Networks S.r.l.
-P.zza Regina Margherita, 7
-L'Aquila (AQ) - CAP 67100 - Italy
-Labs: +39 0862200460
-Mobile: +39 3206203127
-VoIP: +39 0857993233
-Skype: davide.digesualdo
+Cheers,
+sp
