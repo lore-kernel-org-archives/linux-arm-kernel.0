@@ -1,78 +1,45 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Tue, 24 Nov 2009 17:46:02 +0200
-Subject: [PATCH v2 06/17] ARM: dma-mapping: fix for speculative accesses
-In-Reply-To: <20091123172722.GE18142@n2100.arm.linux.org.uk>
-References: <E1NBYEF-0005l7-Tq@rmk-PC.arm.linux.org.uk>
-	<E1NCZ7p-0002A0-Ib@rmk-PC.arm.linux.org.uk>
-	<c70ff3ad0911230725h6d688c09k8576b66d012f29f0@mail.gmail.com>
-	<20091123172722.GE18142@n2100.arm.linux.org.uk>
-Message-ID: <c70ff3ad0911240746v3438bba9y556cca3f027b3dd7@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 24 Nov 2009 15:59:26 +0000
+Subject: CAS implementation may be broken
+In-Reply-To: <20091123222830.GA5598@shareable.org>
+References: <20091123222830.GA5598@shareable.org>
+Message-ID: <1259078366.16239.14.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23, 2009 at 7:27 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Nov 23, 2009 at 05:25:06PM +0200, saeed bishara wrote:
->> > + ? ? ? if (dir == DMA_FROM_DEVICE) {
->> > + ? ? ? ? ? ? ? outer_inv_range(paddr, paddr + size);
->> > + ? ? ? ? ? ? ? dmac_inv_range(kaddr, kaddr + size);
->> it's not clear why outer cache invalidated before inner cache, and, I
->> think that it may be incorrect, how can you be sure that a dirty line
->> that is in inner cache can't be moved down to outer cache?
->
-> I think you have a point, but also see Catalin's point. ?When we are
-> invalidating, we have to invalidate the outer caches before the inner
-> caches, otherwise there is a danger that the inner caches could
-> prefetch from the outer between the two operations.
->
-> I think that the only thing we can do is as my previous version did,
-> and always clean the caches at this point - first the inner and then
-> the outer caches.
-this makes sense, if  a specific CPU needs the outer cache to be
-invalidated before the inner one, then that better be done in a
-separate patch as this is a different issue and has nothing to do with
-the speculative prefetch
->
-> The only other alternative would be to invalidate the outer cache,
-> then the inner cache, followed again by the outer cache. ?I don't
-> currently have a feeling for how expensive that would be against
-> just cleaning them.
->
-> Catalin, any thoughts?
->
->
->> > +void ___dma_single_dev_to_cpu(const void *kaddr, size_t size,
->> > + ? ? ? enum dma_data_direction dir)
->> > +{
->> > + ? ? ? BUG_ON(!virt_addr_valid(kaddr) || !virt_addr_valid(kaddr + size - 1));
->> > +
->> > + ? ? ? /* don't bother invalidating if DMA to device */
->> > + ? ? ? if (dir != DMA_TO_DEVICE) {
->> > + ? ? ? ? ? ? ? unsigned long paddr = __pa(kaddr);
->> > + ? ? ? ? ? ? ? outer_inv_range(paddr, paddr + size);
->> > + ? ? ? ? ? ? ? dmac_inv_range(kaddr, kaddr + size);
->> > + ? ? ? }
->> that code implies that cache invalidate will be applied also for CPU's
->> that doesn't suffer from speculative prefetch issue, right?
->
-> Yes, but we need to do this for bidirectional mappings as well (which
-> would've only been cleaned.)
->
-> What would be useful is if someone could run some tests on the performance
-> impact of this (eg, measuring the DMA performance of a SATA hard drive)
-> and comparing the resulting performance.
->
-> I _could_ do that, but it would mean taking down my network and running
-> the tests on a fairly old machine.
-I want to help with that testing, is there any git tree where I can
-pull the code from?
->
-> If it does turn out to be a problem, we can change the 'inv_range' and
-> 'clean_range' functions to be 'dev_to_cpu' and 'cpu_to_dev' functions,
-> and push the decisions about what to do at each point down into the
-> per-CPU assembly.
-the thing is that the inv_range or dev_to_cpu is called before and
-after the DMA operation.
-and for the systems that doesn't have speculative prefetch, we don't
-that function to be called at all after the DMA operation.
->
+On Mon, 2009-11-23 at 22:28 +0000, Jamie Lokier wrote:
+> Toby Douglass wrote:
+> > Load-linked/conditional-store architectures solve ABA by having the
+> > store fail if the destination has been touched since the load was performed.
+> >
+> > Currently, the code appears to violate this, by repeating the CAS
+> > *anyway*.  In fact, the appropriate behaviour would seem to be *not* to
+> > loop, but rather, to issue the ldrex/strex *once*, and indicate to the
+> > user if the store succeed or failed.
+> 
+> I believe Catalin's explained why it does not work even doing
+> LDREX/STREX once, because the thread can pause before the LDREX.  So
+> you must begin fetching pointers after the LDREX.
+> 
+> (At least I think so.  I'm prepared to be shown to be wrong :-)
+> 
+> If you're writing code intended for other LL/SC architectures too, and
+> following Catalin's suggestion to put LDR between LDREX and STREX,
+> then you might have to check if the other architectures permit loads
+> between the LL and SC.
+
+That's a good point. ARM doesn't allow this either, though probably
+current implementations don't have any problem with it. From the ARM ARM
+A3.4.5:
+
+        An implementation might clear an exclusive monitor between the
+        LDREX and the STREX, without any application-related cause. For
+        example, this might happen because of cache evictions. Code
+        written for such an implementation must avoid having any
+        *explicit memory accesses* or cache maintenance operations
+        between the LDREX and STREX instructions
+
+So on some future implementations it could live-lock.
+
+-- 
+Catalin
