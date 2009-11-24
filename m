@@ -1,26 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 24 Nov 2009 17:27:46 +0000
-Subject: [PATCH] mx27: Add basic support for Maxtrack i-MXT TD60
-In-Reply-To: <37367b3a0911240922m5df3ec4fn7186eceb7c1cd456@mail.gmail.com>
-References: <37367b3a0911240922m5df3ec4fn7186eceb7c1cd456@mail.gmail.com>
-Message-ID: <20091124172746.GF17481@n2100.arm.linux.org.uk>
+From: saeed@marvell.com (Saeed Bishara)
+Date: Tue, 24 Nov 2009 19:33:50 +0200
+Subject: [PATCH 0/3] add support for Marvell's Dove SoC
+Message-ID: <1259084033-7283-1-git-send-email-saeed@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2009 at 03:22:33PM -0200, Alan Carvalho de Assis wrote:
-> +#include <linux/platform_device.h>
-> +#include <linux/mtd/mtd.h>
-> +#include <linux/mtd/map.h>
-> +#include <linux/mtd/partitions.h>
-> +#include <linux/mtd/physmap.h>
-> +#include <linux/i2c.h>
-> +#include <linux/irq.h>
-> +#include <mach/common.h>
-> +#include <mach/hardware.h>
-> +#include <asm/mach-types.h>
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/time.h>
-> +#include <asm/mach/map.h>
-> +#include <mach/gpio.h>
+This patch series adds support for the Marvell's Dove SoC (88AP510).
 
-I see red!  linux/gpio.h please.
+The following interfaces/features are enabled by this series:
+ CPU in ARMv6 mode
+ L2 Cache
+ Uart
+ Giga Ethernet
+ SPI
+ RTC
+ XOR dma engines
+ PCIE
+ USB
+ SATA
+ I2C
+ GPIO
+
+ 
