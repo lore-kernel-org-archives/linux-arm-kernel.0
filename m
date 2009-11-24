@@ -1,53 +1,32 @@
-From: saeed@marvell.com (Saeed Bishara)
-Date: Tue, 24 Nov 2009 19:33:53 +0200
-Subject: [PATCH 3/3] rtc: add support for Dove soc to the rtc-mv driver.
-In-Reply-To: <1259084033-7283-3-git-send-email-saeed@marvell.com>
-References: <1259084033-7283-1-git-send-email-saeed@marvell.com>
-	<1259084033-7283-2-git-send-email-saeed@marvell.com>
-	<1259084033-7283-3-git-send-email-saeed@marvell.com>
-Message-ID: <1259084033-7283-4-git-send-email-saeed@marvell.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 24 Nov 2009 17:35:03 +0000
+Subject: [PATCH] Flush the D-cache during copy_user_highpage()
+In-Reply-To: <20091124172645.GE17481@n2100.arm.linux.org.uk>
+References: <20091124170321.GD17481@n2100.arm.linux.org.uk>
+	<1259082375.16239.37.camel@pc1117.cambridge.arm.com>
+	<20091124172645.GE17481@n2100.arm.linux.org.uk>
+Message-ID: <1259084103.16239.38.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Saeed Bishara <saeed@marvell.com>
----
- arch/arm/configs/dove_defconfig |    3 ++-
- drivers/rtc/Kconfig             |    2 +-
- 2 files changed, 3 insertions(+), 2 deletions(-)
+On Tue, 2009-11-24 at 17:26 +0000, Russell King - ARM Linux wrote:
+> On Tue, Nov 24, 2009 at 05:06:15PM +0000, Catalin Marinas wrote:
+> > On Tue, 2009-11-24 at 17:03 +0000, Russell King - ARM Linux wrote:
+> > > On Tue, Nov 24, 2009 at 05:00:39PM +0000, Catalin Marinas wrote:
+> > > > The I and D caches for copy-on-write pages on processors with
+> > > > write-allocate caches become incoherent causing problems on application
+> > > > relying on CoW for text pages (dynamic linker relocating symbols in a
+> > > > text page). This patch flushes the D-cache for such pages.
+> > > 
+> > > Don't we need to do this on ARMv7 as well?
+> > 
+> > Do you mean an improvement to the patch description?
+> 
+> Don't worry, I'm being silly - there isn't an ARMv7 version of the
+> copy page functions.  Your patch is fine.
 
-diff --git a/arch/arm/configs/dove_defconfig b/arch/arm/configs/dove_defconfig
-index 837bb52..b3a4916 100644
---- a/arch/arm/configs/dove_defconfig
-+++ b/arch/arm/configs/dove_defconfig
-@@ -1,7 +1,7 @@
- #
- # Automatically generated make config: don't edit
- # Linux kernel version: 2.6.32-rc6
--# Tue Nov 24 13:51:23 2009
-+# Tue Nov 24 13:53:37 2009
- #
- CONFIG_ARM=y
- CONFIG_SYS_SUPPORTS_APM_EMULATION=y
-@@ -1209,6 +1209,7 @@ CONFIG_RTC_INTF_DEV=y
- #
- # on-CPU RTC drivers
- #
-+CONFIG_RTC_DRV_MV=y
- CONFIG_DMADEVICES=y
- 
- #
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index 3c20dae..e11e1cd 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -780,7 +780,7 @@ config RTC_DRV_TX4939
- 
- config RTC_DRV_MV
- 	tristate "Marvell SoC RTC"
--	depends on ARCH_KIRKWOOD
-+	depends on ARCH_KIRKWOOD || ARCH_DOVE
- 	help
- 	  If you say yes here you will get support for the in-chip RTC
- 	  that can be found in some of Marvell's SoC devices, such as
+So, do you want a pull request, send it to the patch system or you just
+pick it up from the list?
+
 -- 
-1.6.0.4
+Catalin
