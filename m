@@ -1,63 +1,34 @@
-From: Bo.Liu@windriver.com (Tonyliu)
-Date: Tue, 24 Nov 2009 10:45:37 +0800
-Subject: Linux on ARM926EJ: Software reset problems
-In-Reply-To: <56948FFAC219492B8923C0852A8AC413@teltronic.es>
-References: <56948FFAC219492B8923C0852A8AC413@teltronic.es>
-Message-ID: <4B0B48D1.8080809@windriver.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 24 Nov 2009 08:42:58 +0100
+Subject: [PATCH] ARM: MX3: lilly1131: move MC13783 device registration
+In-Reply-To: <20091123110939.GG14091@buzzloop.caiaq.de>
+References: <1258825240-2992-1-git-send-email-daniel@caiaq.de>
+	<20091123104522.GD30179@pengutronix.de>
+	<20091123110939.GG14091@buzzloop.caiaq.de>
+Message-ID: <20091124074258.GG30179@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ricardo Mart?nez wrote:
-> Hi!
->  
-> I'm trying to soft reset an ARM926EJ.
->  
-> I'm using
->     cpu_arm926_reset(ulong address) function which:
->            - flushes I/D caches
->             - jumps to "address", whose value in my case is NOR flash 
-> base addres where U-Boot stays (after remapping).
->  
->     But it sometimes work, but most times hangs. Can this be caused by 
-> MMU not being switched off?
-Probably yes but not exactly.  After reset by hardware signal generated 
-by Watchdog or something else, all SoC modules are in default
-certain state besides ARM core, but in your case, it's not sure.
+On Mon, Nov 23, 2009 at 12:09:39PM +0100, Daniel Mack wrote:
+> Hi Sascha,
+> 
+> On Mon, Nov 23, 2009 at 11:45:22AM +0100, Sascha Hauer wrote:
+> > On Sat, Nov 21, 2009 at 06:40:40PM +0100, Daniel Mack wrote:
+> > > Register the MC13783 device in the module code.
+> > > 
+> > > Signed-off-by: Daniel Mack <daniel@caiaq.de>
+> > 
+> > Added to mxc-master.
+> 
+> Thanks! Did you pick the LiteKit patches, too?
 
->  
-> Any other hints?
->  
-> If you think it might be caused by MMU, how can MMU be disabled?
-use "MCR p15, 0, Rd, c1, c0, 0" to write CP15 register 1 for MMU 
-enable/disable.
+Yes
 
->  
-> Is there any other prefered method to soft reboot ARM926 from Linux? 
-> I've taken a look at some PXA, OMAP & AT91 code about soft rebooting. 
-> It seems they use Watchdog timer to reset, but my CPU does not have a 
-> watchdog.
-You can try cpu_reset(addr), refer to cpu_arm926_reset() in 
-arch/arm/mm/proc-arm926.S.
-
-Tony
->  
-> Thanks in advance,
-> Ricardo Martinez
->  
->  
-> ------------------------------------------------------------------------
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->   
+Sascha
 
 
 -- 
-Tony Liu | Liu Bo
--------------------------------------------------------------
-WIND RIVER | China Development Center
-Tel: 86-10-8477-8542 ext: 8542 |  Fax: 86-10-64790367
-(M): 86-136-7117-3612
-Address: 15/F, Wangjing TowerB, Chaoyang District, Beijing, P.R.China
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
