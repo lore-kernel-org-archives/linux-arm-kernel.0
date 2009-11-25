@@ -1,60 +1,38 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 25 Nov 2009 08:46:31 +0100
-Subject: [alsa-devel] [PATCH 03/12] add a mc13783 codec driver
-In-Reply-To: <20091119193008.GC2814@sirena.org.uk>
-References: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
-	<1258645706-9071-2-git-send-email-s.hauer@pengutronix.de>
-	<1258645706-9071-3-git-send-email-s.hauer@pengutronix.de>
-	<1258645706-9071-4-git-send-email-s.hauer@pengutronix.de>
-	<20091119193008.GC2814@sirena.org.uk>
-Message-ID: <20091125074631.GB27548@pengutronix.de>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Wed, 25 Nov 2009 09:02:20 +0100
+Subject: [PATCH 16/38] move s3c_pwm_remove to .devexit.text
+In-Reply-To: <1259096853-18909-16-git-send-email-u.kleine-koenig@pengutronix.de>
+	("Uwe =?utf-8?Q?Kleine-K=C3=B6nig=22's?= message of "Tue\,
+	24 Nov 2009 22\:07\:11 +0100")
+References: <1259096853-18909-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-2-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-3-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-4-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-5-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-6-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-7-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-8-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-9-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-10-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-11-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-12-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-13-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-14-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-15-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-16-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <87tywjav77.fsf@macbook.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+>>>>> "Uwe" == Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> writes:
 
-> > +static int mc13783_set_tdm_slot_codec(struct snd_soc_dai *dai,
-> > +	unsigned int tx_mask, unsigned int rx_mask, int slots, int slot_width)
-> > +{
-> > +	struct snd_soc_codec *codec = dai->codec;
-> > +	unsigned int reg;
-> > +
-> > +	if (slots != 4)
-> > +		return -EINVAL;
-> > +
-> > +	reg = mc13783_read(codec, PMIC_SSI_NETWORK);
-> > +
-> > +	reg &= ~(0xfff << 0);
-> > +	reg |= (0x00 << 2);	/* primary timeslot RX/TX(?) is 0 */
-> > +	reg |= (0x01 << 4);	/* secondary timeslot TX is 1 */
-> > +	reg |= (0x01 << 6);	/* secondary timeslot RX is 1 */
-> 
-> This appears to be pretty much ignoring the supplied arguments and using
-> a fixed configuration?
-> 
+ Uwe> The function s3c_pwm_remove is used only wrapped by __devexit_p so define
+ Uwe> it using __devexit.
 
-The problem here is that I don't really understand what arguments I
-should supply to this function and how to parse them to archieve what I
-want.
+ Uwe> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+ Uwe> Acked-by: Sam Ravnborg <sam@ravnborg.org>
 
-The MC13783 Voice Codec always uses a network mode to send data. It has
-a fixed width of four slots.
-
-PMIC_SSI_NETWORK[2:3] defines the slot for primary transmit/receive
-PMIC_SSI_NETWORK[4:5] defines the secondary transmit timeslot
-PMIC_SSI_NETWORK[6:7] defines the secondary receive timeslot
-
-The Codec has two channels and it's not primarily desgined to do stereo
-Audio. I want to put the primary channel into the first timeslot and
-the secondary channel into the second timeslot.
-
-Any idea how to do this correctly?
-
-Sascha
-
+Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Bye, Peter Korsgaard
