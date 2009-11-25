@@ -1,163 +1,402 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 25 Nov 2009 11:42:29 +0100
-Subject: [PATCH 15/17] ARM: pxa/raumfeld: add support for I2C controlled
-	devices
+Date: Wed, 25 Nov 2009 11:42:30 +0100
+Subject: [PATCH 16/17] ALSA: ARM: add Raumfeld audio support
 In-Reply-To: <1259145751-3331-1-git-send-email-daniel@caiaq.de>
 References: <1259145751-3331-1-git-send-email-daniel@caiaq.de>
-Message-ID: <1259145751-3331-16-git-send-email-daniel@caiaq.de>
+Message-ID: <1259145751-3331-17-git-send-email-daniel@caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Daniel Mack <daniel@caiaq.de>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: alsa-devel at alsa-project.org
 ---
- arch/arm/mach-pxa/raumfeld.c |   75 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 75 insertions(+), 0 deletions(-)
+ sound/soc/pxa/Kconfig    |    9 ++
+ sound/soc/pxa/Makefile   |    2 +
+ sound/soc/pxa/raumfeld.c |  338 ++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 349 insertions(+), 0 deletions(-)
+ create mode 100644 sound/soc/pxa/raumfeld.c
 
-diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
-index 9a234e7..9b1b52c 100644
---- a/arch/arm/mach-pxa/raumfeld.c
-+++ b/arch/arm/mach-pxa/raumfeld.c
-@@ -26,10 +26,12 @@
- #include <linux/input.h>
- #include <linux/rotary_encoder.h>
- #include <linux/gpio_keys.h>
-+#include <linux/input/eeti_ts.h>
- #include <linux/leds.h>
- #include <linux/w1-gpio.h>
- #include <linux/sched.h>
- #include <linux/pwm_backlight.h>
+diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
+index dcb3181..9c3bfd9 100644
+--- a/sound/soc/pxa/Kconfig
++++ b/sound/soc/pxa/Kconfig
+@@ -117,6 +117,15 @@ config SND_SOC_ZYLONITE
+ 	  Say Y if you want to add support for SoC audio on the
+ 	  Marvell Zylonite reference platform.
+ 
++config SND_SOC_RAUMFELD
++	tristate "SoC Audio support Raumfeld audio adapter"
++	depends on SND_PXA2XX_SOC && (MACH_RAUMFELD_SPEAKER || MACH_RAUMFELD_CONNECTOR)
++	select SND_PXA_SOC_SSP
++	select SND_SOC_CS4270
++	select SND_SOC_AK4104
++	help
++	  Say Y if you want to add support for SoC audio on Raumfeld devices
++
+ config SND_PXA2XX_SOC_MAGICIAN
+ 	tristate "SoC Audio support for HTC Magician"
+ 	depends on SND_PXA2XX_SOC && MACH_MAGICIAN
+diff --git a/sound/soc/pxa/Makefile b/sound/soc/pxa/Makefile
+index 6e096b4..f3e08fd 100644
+--- a/sound/soc/pxa/Makefile
++++ b/sound/soc/pxa/Makefile
+@@ -23,6 +23,7 @@ snd-soc-zylonite-objs := zylonite.o
+ snd-soc-magician-objs := magician.o
+ snd-soc-mioa701-objs := mioa701_wm9713.o
+ snd-soc-imote2-objs := imote2.o
++snd-soc-raumfeld-objs := raumfeld.o
+ 
+ obj-$(CONFIG_SND_PXA2XX_SOC_CORGI) += snd-soc-corgi.o
+ obj-$(CONFIG_SND_PXA2XX_SOC_POODLE) += snd-soc-poodle.o
+@@ -37,3 +38,4 @@ obj-$(CONFIG_SND_PXA2XX_SOC_MAGICIAN) += snd-soc-magician.o
+ obj-$(CONFIG_SND_PXA2XX_SOC_MIOA701) += snd-soc-mioa701.o
+ obj-$(CONFIG_SND_SOC_ZYLONITE) += snd-soc-zylonite.o
+ obj-$(CONFIG_SND_PXA2XX_SOC_IMOTE2) += snd-soc-imote2.o
++obj-$(CONFIG_SND_SOC_RAUMFELD) += snd-soc-raumfeld.o
+diff --git a/sound/soc/pxa/raumfeld.c b/sound/soc/pxa/raumfeld.c
+new file mode 100644
+index 0000000..7efc30a
+--- /dev/null
++++ b/sound/soc/pxa/raumfeld.c
+@@ -0,0 +1,338 @@
++/*
++ * raumfeld_audio.c  --  SoC audio for Raumfeld audio devices
++ *
++ * Copyright (c) 2009 Daniel Mack <daniel@caiaq.de>
++ *
++ * based on code from:
++ *
++ *    Wolfson Microelectronics PLC.
++ *    Openedhand Ltd.
++ *    Liam Girdwood <lrg@slimlogic.co.uk>
++ *    Richard Purdie <richard@openedhand.com>
++ *
++ * This program is free software; you can redistribute  it and/or modify it
++ * under  the terms of  the GNU General  Public License as published by the
++ * Free Software Foundation;  either version 2 of the  License, or (at your
++ * option) any later version.
++ */
++
++#include <linux/module.h>
 +#include <linux/i2c.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/spi_gpio.h>
- #include <linux/lis3lv02d.h>
-@@ -37,6 +39,7 @@
- #include <linux/regulator/consumer.h>
- #include <linux/pda_power.h>
- #include <linux/power_supply.h>
-+#include <linux/regulator/max8660.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -49,6 +52,7 @@
- #include <mach/ohci.h>
- #include <mach/pxafb.h>
- #include <mach/mmc.h>
-+#include <plat/i2c.h>
- 
- #include "generic.h"
- #include "devices.h"
-@@ -116,6 +120,10 @@ static mfp_cfg_t raumfeld_pin_config[] __initdata = {
- 	GPIO0_2_USBH_PEN,
- 	GPIO1_2_USBH_PWR,
- 
-+	/* I2C */
-+	GPIO21_I2C_SCL | MFP_LPM_FLOAT | MFP_PULL_FLOAT,
-+	GPIO22_I2C_SDA | MFP_LPM_FLOAT | MFP_PULL_FLOAT,
++#include <linux/delay.h>
++#include <sound/pcm.h>
++#include <sound/soc.h>
++#include <sound/soc-dapm.h>
++#include <asm/mach-types.h>
++#include <mach/mfp-pxa3xx.h>
++#include <mach/mfp-pxa300.h>
 +
- 	/* SPI */
- 	GPIO34_GPIO,	/* SPDIF_CS */
- 	GPIO96_GPIO,	/* MCLK_CS */
-@@ -778,6 +786,64 @@ static void __init raumfeld_power_init(void)
- 		platform_device_register(&raumfeld_power_supply);
- }
- 
-+/**
-+ * Regulator support for vcc_wifi
++#include "../codecs/cs4270.h"
++#include "../codecs/ak4104.h"
++#include "pxa2xx-pcm.h"
++#include "pxa-ssp.h"
++
++extern void raumfeld_enable_audio(bool en);
++
++static struct i2c_client *max9486_client;
++static struct i2c_board_info max9486_hwmon_info = {
++	I2C_BOARD_INFO("max9485", 0x63),
++};
++
++/* set_max9485_clk() - call with
++ * 	clk = 0 for 11.2896 MHz
++ * 	clk = 1 for 12.2880 MHz
 + */
 +
-+static struct regulator_consumer_supply vcc_wifi_supply =
-+	REGULATOR_SUPPLY("vcc_wifi", "pxa2xx-mci.0");
++static void set_max9485_clk(int clk)
++{
++	char buf = clk ? 0x23 : 0x22;
++	i2c_master_send(max9486_client, &buf, 1);
++}
 +
-+static struct regulator_init_data vcc_wifi_init_data = {
-+	.constraints = {
-+		.min_uV = WIFI_VOLTAGE,
-+		.max_uV = WIFI_VOLTAGE,
-+		.valid_modes_mask = REGULATOR_MODE_NORMAL,
-+		.valid_ops_mask = REGULATOR_CHANGE_STATUS |
-+				  REGULATOR_CHANGE_VOLTAGE,
-+	},
-+	.consumer_supplies = &vcc_wifi_supply,
-+	.num_consumer_supplies = 1,
++/* CS4270 */
++static int raumfeld_cs4270_startup(struct snd_pcm_substream *substream)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct snd_soc_dai *codec_dai = rtd->dai->codec_dai;
++
++	set_max9485_clk(0);
++
++	return snd_soc_dai_set_sysclk(codec_dai, 0, 11289600, 0);
++}
++
++static void raumfeld_cs4270_shutdown(struct snd_pcm_substream *substream)
++{
++}
++
++static int raumfeld_cs4270_hw_params(struct snd_pcm_substream *substream,
++				     struct snd_pcm_hw_params *params)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct snd_soc_dai *codec_dai = rtd->dai->codec_dai;
++	struct snd_soc_dai *cpu_dai = rtd->dai->cpu_dai;
++	unsigned int fmt, clk = 0;
++	int ret = 0;
++
++	switch (params_rate(params)) {
++	case 8000:
++	case 16000:
++	case 48000:
++	case 96000:
++		set_max9485_clk(1);
++		clk = 12288000;
++		break;
++	case 11025:
++	case 22050:
++	case 44100:
++	case 88200:
++		set_max9485_clk(0);
++		clk = 11289600;
++		break;
++	}
++
++	fmt = SND_SOC_DAIFMT_I2S |
++	      SND_SOC_DAIFMT_NB_NF |
++	      SND_SOC_DAIFMT_CBS_CFS;
++
++	/* setup the CODEC DAI */
++	ret = snd_soc_dai_set_fmt(codec_dai, fmt);
++	if (ret < 0)
++		return ret;
++
++	ret = snd_soc_dai_set_sysclk(codec_dai, 0, clk, 0);
++	if (ret < 0)
++		return ret;
++
++	/* setup the CPU DAI */
++	ret = snd_soc_dai_set_pll(cpu_dai, 0, 0, clk);
++	if (ret < 0)
++		return ret;
++
++	ret = snd_soc_dai_set_fmt(cpu_dai, fmt);
++	if (ret < 0)
++		return ret;
++
++	ret = snd_soc_dai_set_clkdiv(cpu_dai, PXA_SSP_DIV_SCR, 4);
++	if (ret < 0)
++		return ret;
++
++	ret = snd_soc_dai_set_sysclk(cpu_dai, PXA_SSP_CLK_EXT, 0, 1);
++	if (ret < 0)
++		return ret;
++
++	return 0;
++}
++
++static struct snd_soc_ops raumfeld_cs4270_ops = {
++	.startup = raumfeld_cs4270_startup,
++	.hw_params = raumfeld_cs4270_hw_params,
++	.shutdown = raumfeld_cs4270_shutdown,
 +};
 +
-+struct max8660_subdev_data max8660_v6_subdev_data = {
-+	.id		= MAX8660_V6,
-+	.name		= "vcc_wifi",
-+	.platform_data	= &vcc_wifi_init_data,
++static int raumfeld_cs4270_init(struct snd_soc_codec *codec)
++{
++	return 0;
++}
++
++static int raumfeld_line_suspend(struct platform_device *pdev, pm_message_t state)
++{
++	raumfeld_enable_audio(false);
++	return 0;
++}
++
++static int raumfeld_line_resume(struct platform_device *pdev)
++{
++	raumfeld_enable_audio(true);
++	return 0;
++}
++
++static struct snd_soc_dai_link raumfeld_line_dai = {
++	.name		= "CS4270",
++	.stream_name	= "CS4270",
++	.cpu_dai	= &pxa_ssp_dai[PXA_DAI_SSP1],
++	.codec_dai	= &cs4270_dai,
++	.init		= raumfeld_cs4270_init,
++	.ops		= &raumfeld_cs4270_ops,
 +};
 +
-+static struct max8660_platform_data max8660_pdata = {
-+	.subdevs = &max8660_v6_subdev_data,
-+	.num_subdevs = 1,
++static struct snd_soc_card snd_soc_line_raumfeld = {
++	.name		= "Raumfeld analog",
++	.platform	= &pxa2xx_soc_platform,
++	.dai_link	= &raumfeld_line_dai,
++	.suspend_post	= raumfeld_line_suspend,
++	.resume_pre	= raumfeld_line_resume,
++	.num_links	= 1,
 +};
 +
-+/**
-+ * I2C devices
-+ */
 +
-+static struct i2c_board_info raumfeld_pwri2c_board_info = {
-+	.type		= "max8660",
-+	.addr		= 0x34,
-+	.platform_data	= &max8660_pdata,
++/* AK4104 */
++
++static int raumfeld_ak4104_startup(struct snd_pcm_substream *substream)
++{
++	return 0;
++}
++
++static void raumfeld_ak4104_shutdown(struct snd_pcm_substream *substream)
++{
++}
++
++static int raumfeld_ak4104_hw_params(struct snd_pcm_substream *substream,
++				     struct snd_pcm_hw_params *params)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct snd_soc_dai *codec_dai = rtd->dai->codec_dai;
++	struct snd_soc_dai *cpu_dai = rtd->dai->cpu_dai;
++	int fmt, ret = 0, clk = 0;
++
++	switch (params_rate(params)) {
++	case 8000:
++	case 16000:
++	case 48000:
++	case 96000:
++		set_max9485_clk(1);
++		clk = 12288000;
++		break;
++	case 11025:
++	case 22050:
++	case 44100:
++	case 88200:
++		set_max9485_clk(0);
++		clk = 11289600;
++		break;
++	}
++
++	fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF;
++
++	/* setup the CODEC DAI */
++	ret = snd_soc_dai_set_fmt(codec_dai, fmt | SND_SOC_DAIFMT_CBS_CFS);
++	if (ret < 0)
++		return ret;
++
++	/* setup the CPU DAI */
++	ret = snd_soc_dai_set_pll(cpu_dai, 0, 0, clk);
++	if (ret < 0)
++		return ret;
++
++	ret = snd_soc_dai_set_fmt(cpu_dai, fmt | SND_SOC_DAIFMT_CBS_CFS);
++	if (ret < 0)
++		return ret;
++
++	ret = snd_soc_dai_set_clkdiv(cpu_dai, PXA_SSP_DIV_SCR, 4);
++	if (ret < 0)
++		return ret;
++
++	ret = snd_soc_dai_set_sysclk(cpu_dai, PXA_SSP_CLK_EXT, 0, 1);
++	if (ret < 0)
++		return ret;
++
++	return 0;
++}
++
++static struct snd_soc_ops raumfeld_ak4104_ops = {
++	.startup = raumfeld_ak4104_startup,
++	.hw_params = raumfeld_ak4104_hw_params,
++	.shutdown = raumfeld_ak4104_shutdown,
 +};
 +
-+static struct i2c_board_info raumfeld_connector_i2c_board_info[] __initdata = {
-+	{
-+		.type	= "cs4270",
-+		.addr	= 0x48,
-+	},
++static int raumfeld_ak4104_init(struct snd_soc_codec *codec)
++{
++	return 0;
++}
++
++static struct snd_soc_dai_link raumfeld_spdif_dai = {
++	.name		= "ak4104",
++	.stream_name	= "Playback",
++	.cpu_dai	= &pxa_ssp_dai[PXA_DAI_SSP2],
++	.codec_dai	= &ak4104_dai,
++	.init		= raumfeld_ak4104_init,
++	.ops		= &raumfeld_ak4104_ops,
 +};
 +
-+static struct eeti_ts_platform_data eeti_ts_pdata = {
-+	.irq_active_high = 1,
++static struct snd_soc_card snd_soc_spdif_raumfeld = {
++	.name		= "Raumfeld S/PDIF",
++	.platform	= &pxa2xx_soc_platform,
++	.dai_link	= &raumfeld_spdif_dai,
++	.num_links	= 1
 +};
 +
-+static struct i2c_board_info raumfeld_controller_i2c_board_info __initdata = {
-+	.type	= "eeti_ts",
-+	.addr	= 0x0a,
-+	.irq	= gpio_to_irq(mfp_to_gpio(GPIO_TOUCH_IRQ)),
-+	.platform_data = &eeti_ts_pdata,
++/* raumfeld_audio audio subsystem */
++static struct snd_soc_device raumfeld_line_devdata = {
++	.card = &snd_soc_line_raumfeld,
++	.codec_dev = &soc_codec_device_cs4270,
 +};
 +
- static struct platform_device *raumfeld_common_devices[] = {
- 	&raumfeld_gpio_keys_device,
- 	&raumfeld_led_device,
-@@ -813,6 +879,9 @@ static void __init raumfeld_common_init(void)
- 	platform_add_devices(ARRAY_AND_SIZE(raumfeld_common_devices));
- 	pxa3xx_set_nand_info(&raumfeld_nand_info);
- 	pxa_set_mci_info(&raumfeld_mci_platform_data);
-+	pxa_set_i2c_info(NULL);
-+	pxa3xx_set_i2c_power_info(NULL);
-+	i2c_register_board_info(1, &raumfeld_pwri2c_board_info, 1);
- }
- 
- static void __init raumfeld_controller_init(void)
-@@ -835,6 +904,7 @@ static void __init raumfeld_controller_init(void)
- 	pxa3xx_mfp_config(ARRAY_AND_SIZE(raumfeld_controller_pin_config));
- 	platform_add_devices(ARRAY_AND_SIZE(raumfeld_controller_devices));
- 	spi_register_board_info(ARRAY_AND_SIZE(controller_spi_devices));
-+	i2c_register_board_info(0, &raumfeld_controller_i2c_board_info, 1);
- 
- 	gpio_request(mfp_to_gpio(GPIO_SHUTDOWN_BATT), "battery shutdown");
- 	gpio_direction_output(mfp_to_gpio(GPIO_SHUTDOWN_BATT), 0);
-@@ -850,6 +920,9 @@ static void __init raumfeld_connector_init(void)
- 	pxa3xx_mfp_config(ARRAY_AND_SIZE(raumfeld_ssp1_pin_config));
- 	pxa3xx_mfp_config(ARRAY_AND_SIZE(raumfeld_ssp2_pin_config));
- 	spi_register_board_info(ARRAY_AND_SIZE(connector_spi_devices));
-+	i2c_register_board_info(0,
-+			ARRAY_AND_SIZE(raumfeld_connector_i2c_board_info));
++static struct snd_soc_device raumfeld_spdif_devdata = {
++	.card = &snd_soc_spdif_raumfeld,
++	.codec_dev = &soc_codec_device_ak4104,
++};
 +
- 	raumfeld_common_init();
- 	raumfeld_eth_init();
- 
-@@ -866,6 +939,8 @@ static void __init raumfeld_speaker_init(void)
- 	pxa3xx_mfp_config(ARRAY_AND_SIZE(raumfeld_ssp1_pin_config));
- 	platform_add_devices(ARRAY_AND_SIZE(raumfeld_speaker_devices));
- 	spi_register_board_info(ARRAY_AND_SIZE(speaker_spi_devices));
-+	i2c_register_board_info(0,
-+			ARRAY_AND_SIZE(raumfeld_connector_i2c_board_info));
- 
- 	raumfeld_common_init();
- 	raumfeld_eth_init();
++static struct platform_device *raumfeld_audio_line_device;
++static struct platform_device *raumfeld_audio_spdif_device;
++
++static int __init raumfeld_audio_init(void)
++{
++	int ret;
++
++	if (!machine_is_raumfeld_speaker() &&
++	    !machine_is_raumfeld_connector())
++		return 0;
++
++	max9486_client = i2c_new_device(i2c_get_adapter(0),
++					 &max9486_hwmon_info);
++
++	if (!max9486_client)
++		return -ENOMEM;
++
++	set_max9485_clk(1);
++
++	/* LINE */
++	raumfeld_audio_line_device = platform_device_alloc("soc-audio", 0);
++	if (!raumfeld_audio_line_device)
++		return -ENOMEM;
++
++	platform_set_drvdata(raumfeld_audio_line_device,
++			     &raumfeld_line_devdata);
++	raumfeld_line_devdata.dev = &raumfeld_audio_line_device->dev;
++	ret = platform_device_add(raumfeld_audio_line_device);
++	if (ret)
++		platform_device_put(raumfeld_audio_line_device);
++
++	if (machine_is_raumfeld_speaker())
++		return ret;
++
++	/* S/PDIF */
++	raumfeld_audio_spdif_device = platform_device_alloc("soc-audio", 1);
++	if (!raumfeld_audio_spdif_device) {
++		platform_device_put(raumfeld_audio_line_device);
++		return -ENOMEM;
++	}
++
++	platform_set_drvdata(raumfeld_audio_spdif_device,
++			     &raumfeld_spdif_devdata);
++	raumfeld_spdif_devdata.dev = &raumfeld_audio_spdif_device->dev;
++	ret = platform_device_add(raumfeld_audio_spdif_device);
++	if (ret) {
++		platform_device_put(raumfeld_audio_line_device);
++		platform_device_put(raumfeld_audio_spdif_device);
++	}
++
++	return ret;
++}
++
++static void __exit raumfeld_audio_exit(void)
++{
++	platform_device_unregister(raumfeld_audio_line_device);
++
++	if (machine_is_raumfeld_connector())
++		platform_device_unregister(raumfeld_audio_spdif_device);
++
++	i2c_unregister_device(max9486_client);
++}
++
++module_init(raumfeld_audio_init);
++module_exit(raumfeld_audio_exit);
++
++/* Module information */
++MODULE_AUTHOR("Daniel Mack <daniel@caiaq.de>");
++MODULE_DESCRIPTION("Raumfeld audio SoC");
++MODULE_LICENSE("GPL");
 -- 
 1.6.5.2
