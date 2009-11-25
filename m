@@ -1,67 +1,49 @@
-From: khw0178.kim@samsung.com (=?ks_c_5601-1987?B?sejH9r/1?=)
-Date: Wed, 25 Nov 2009 13:52:29 +0900
-Subject: [PATCH] VIC: add the Software priority masking code for PL192
-Message-ID: <007801ca6d8b$17fae200$656c170c@dsn.sec.samsung.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Wed, 25 Nov 2009 07:52:08 +0100
+Subject: USB support on i.MX27
+In-Reply-To: <37367b3a0911240343u58e3b3d2le5d48e638348a3ad@mail.gmail.com>
+References: <37367b3a0911240343u58e3b3d2le5d48e638348a3ad@mail.gmail.com>
+Message-ID: <eedb5540911242252w62f0a1cfo3a3f24dfa060957b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch provide software priority masking 
-for PL192 feature regarding S/W priority mask.
+2009/11/24 Alan Carvalho de Assis <acassis@gmail.com>
 
-Signed-off-by: Hyunwoong Kim khw0178.kim at samsung.com
----
-    arch/arm/common/vic.c                        |    15++-
-    arch/arm/include/asm/hardware/vic.h    |    2+
+> Hi Javier,
+>
+> I am trying to add USB support to i.MX27 on mainline linux kernel, I
+> am following your modifications as in this post:
+>
+> "Re: Comment to "[PATCH 7/8] Add EHCI support for MX27 and MX31 based
+> boards"
+>
+> I can't find xcvr.h and isp1504_xcvr.h then I copied fsl_xcvr.h from
+> FSL kernel to mainline:
+>
+> alan at metropolis:~/ltib-patches/ltib/rpm/BUILD/linux$ cp
+> include/linux/usb/fsl_xcvr.h
+> ~/linux/pengutronix/linux-2.6/include/linux/usb/xcvr.h
+>
+> But I can't to figure out where to find isp1504_xcvr.h.
+>
+> Could you please help me to get USB working on iMX27ADS?
+>
 
-diff -Nur --exclude=.git linux-2.6.29-samsung/arch/arm/common/vic.c 
-pre-linux-2.6.29-samsung/arch/arm/common/vic.c
---- linux-2.6.29-samsung/arch/arm/common/vic.c  2009-11-25 13:36:04.672713977 +0900
-+++ pre-linux-2.6.29-samsung/arch/arm/common/vic.c      2009-11-25 13:23:24.666816598 +0900
-@@ -27,8 +27,21 @@
+Hum, normally the only thing you must be careful with is about enabling
+isp1504 transceiver through a GPIO.
+Also note that tests were issued with an early version of Daniel Mack's
+patches which AFAIK have been slightly modified since then, specially the
+part regarding to generic xcvr framework.
 
- static void vic_mask_irq(unsigned int irq)
- {
-+       unsigned int prio_value;
-+       unsigned int sw_prio;
-        void __iomem *base = get_irq_chip_data(irq);
--       irq &= 31;
-+       if(irq > 63){
-+               irq &= 31;
-+               prio_value = readl(base + VIC_PL192_DAISY_PRIO);
-+               sw_prio = readl(base + VIC_PL192_SWPRIO_MASK);
-+               writel(sw_prio >> (16-prio_value), base + VIC_PL192_SWPRIO_MASK);
-+       }
-+       else if(irq <= 63){
-+               irq &= 31;
-+               prio_value = readl(base + VIC_VECT_CNTL0 + (0x4 * irq));
-+               sw_prio = readl(base + VIC_PL192_SWPRIO_MASK);
-+               writel(sw_prio >> (16-prio_value), base + VIC_PL192_SWPRIO_MASK);
-+       }
-        writel(1 << irq, base + VIC_INT_ENABLE_CLEAR);
- }
 
-@@ -36,6 +49,7 @@
- {
-        void __iomem *base = get_irq_chip_data(irq);
-        irq &= 31;
-+       writel(0xFFFF, base + VIC_PL192_SWPRIO_MASK);
-        writel(1 << irq, base + VIC_INT_ENABLE);
- }
-
-diff -Nur --exclude=.git linux-2.6.29-samsung/arch/arm/include/asm/hardware/vic.h
- pre-linux-2.6.29-samsung/arch/arm/include/asm/hardware/vic.h
---- linux-2.6.29-samsung/arch/arm/include/asm/hardware/vic.h    2009-11-25 13:36:04.703713854 +0900
-+++ pre-linux-2.6.29-samsung/arch/arm/include/asm/hardware/vic.h        2009-11-25 13:23:24.666816598 +0900
-@@ -31,6 +31,8 @@
- #define VIC_PROTECT                    0x20
- #define VIC_PL190_VECT_ADDR            0x30    /* PL190 only */
- #define VIC_PL190_DEF_VECT_ADDR                0x34    /* PL190 only */
-+#define VIC_PL192_SWPRIO_MASK          0x24
-+#define VIC_PL192_DAISY_PRIO           0x28
-
- #define VIC_VECT_ADDR0                 0x100   /* 0 to 15 (0..31 PL192) */
- #define VIC_VECT_CNTL0                 0x200   /* 0 to 15 (0..31 PL192) */
-~
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091125/91373478/attachment-0001.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091125/361b1e6a/attachment-0001.htm>
