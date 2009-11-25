@@ -1,66 +1,42 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 25 Nov 2009 13:24:36 +0100
-Subject: [PATCH 16/17] ALSA: ARM: add Raumfeld audio support
-In-Reply-To: <20091125110218.GD17420@opensource.wolfsonmicro.com>
+Date: Wed, 25 Nov 2009 13:28:57 +0100
+Subject: [PATCH 12/17] ARM: pxa/raumfeld: add audio related functions
+In-Reply-To: <20091125114106.GA3175@sirena.org.uk>
 References: <1259145751-3331-1-git-send-email-daniel@caiaq.de>
-	<1259145751-3331-17-git-send-email-daniel@caiaq.de>
-	<20091125110218.GD17420@opensource.wolfsonmicro.com>
-Message-ID: <20091125122436.GI29442@buzzloop.caiaq.de>
+	<1259145751-3331-13-git-send-email-daniel@caiaq.de>
+	<20091125114106.GA3175@sirena.org.uk>
+Message-ID: <20091125122857.GJ29442@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2009 at 11:02:18AM +0000, Mark Brown wrote:
+On Wed, Nov 25, 2009 at 11:41:07AM +0000, Mark Brown wrote:
+> On Wed, Nov 25, 2009 at 11:42:26AM +0100, Daniel Mack wrote:
 > 
-> > +static struct i2c_board_info max9486_hwmon_info = {
-> > +	I2C_BOARD_INFO("max9485", 0x63),
-> > +};
+> > +	if (en) {
+> > +		gpio_set_value(mfp_to_gpio(GPIO_AUDIO_VA_ENABLE), 1);
 > 
-> This should be in the board file under arch/arm.
+> This looks like you want to add regulator support to the CODEC.
 
-Well, the problem is that if I do it there, I don't get a handle for the
-actual data transfer, which I now get from i2c_new_device(). There is no
-driver matching this device (it wasn't taken because it's 'too simple').
+Well, that's not really a regulator but just a GPIO that drives a FET.
+Doesn't using the regulator framework seem a little overdone?
 
-How would I get a handle to pass to i2c_master_send() or an equivalent
-function?
-
-> > +extern void raumfeld_enable_audio(bool en);
-> 
-> This should be in a proper header file somewhere.
-
-Hmm, I thought so too, but it would be the only thing to add there.
-Hence I decided to not do that. You really prefer that?
-
-> > +static void raumfeld_cs4270_shutdown(struct snd_pcm_substream *substream)
-> > +{
-> > +}
+> > +		gpio_set_value(mfp_to_gpio(GPIO_MCLK_RESET), 1);
 > > +
+> > +		/* wait some time to let VA and the clocks become stable */
+> > +		schedule_timeout(HZ/10);
+> > +
+> > +		gpio_set_value(mfp_to_gpio(GPIO_SPDIF_RESET), 1);
+> > +		gpio_set_value(mfp_to_gpio(GPIO_CODEC_RESET), 1);
 > 
-> Remove this and the other empty functions.
+> The relevant drivers really need to know about this...  if you are going
+> to stick with this approach I'd push all this stuff into the audio
+> driver, splitting it into this separate file isn't really buying
+> anything since it's all machine specific and nothing except the audio
+> driver needs to know what's going on.
 
-Hmm, I tried that and it crashed the kernel. I will check again as that
-was some month ago.
-
-> > +	case 96000:
-> > +		set_max9485_clk(1);
-> 
-> It might be a bit more legible to have some constants for the arguments
-> for this function - it's not entirely clear what's going on, the 1 and 0
-> look like a boolean but that's not what's really going on here.  It may
-> be better to do this as a proper driver, there was at least one driver I
-> remember being posted for a TDM clock generator which I think got
-> merged.
-
-No, it wasn't.
-
-  http://marc.info/?l=linux-i2c&m=122457836326525&w=2
-
-Jean Delvare's last comment on this was:
-
-> Honestly I don't see any value in this driver. There's nothing you can
-> do with it that you couldn't already do without it.
-
-The driver itself would do the right thing, but I doubt that
-resubmitting will help much.
+The idea was to only let the board support file know about GPIO
+definitions, so the audio part doesn't need to know about the details.
+But I can move that if you like. However, I don't see much benefit - I
+would merely just move the whole function over.
 
 Daniel
