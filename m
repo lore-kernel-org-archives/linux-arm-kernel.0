@@ -1,33 +1,65 @@
 From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Wed, 25 Nov 2009 14:33:15 +0300
-Subject: [PATCH] pxa/hx4700: actually use platform_lcd driver
-Message-ID: <1259148795-10335-1-git-send-email-mad_soft@inbox.ru>
+Date: Wed, 25 Nov 2009 14:36:30 +0300
+Subject: [PATCH] pxa: fix gpio_to_irq() for GPIOs on expander chips
+Message-ID: <1259148990-10372-1-git-send-email-mad_soft@inbox.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit e2c509c7e6 ([ARM] pxa/hx4700: use platform_lcd driver)
-missed to actually register platform device for LCD.
-It causes following GCC warning:
-arch/arm/mach-pxa/hx4700.c:553: warning: 'hx4700_lcd' defined but not used
+Commit 9db95cb6c430b added support for gpios on PXA93x/950 and
+increased PXA_GPIO_IRQ_NUM from 128 to 192, but missed to update
+NR_BUILTIN_GPIO. This led to broken gpio_to_irq() for off-chip GPIOs.
+Adjust NR_BUILTIN_GPIO accordingly, and also increase ARCH_NR_GPIOS,
+as there exist platforms (hx4700) with more than 64 off-chip GPIOs,
+so default value 256 is not enough.
 
 Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
 ---
- arch/arm/mach-pxa/hx4700.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/mach-pxa/include/mach/gpio.h |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
-This is a fix for 2.6.32.
+This is a fix for 2.6.32 regression.
+Found this while testing 2.6.32-rc8 on hx4700. Here's errors in log
+on unpatched kernel (all related to gpios on ASIC3 chip):
+[   37.369051] gpio-vbus gpio-vbus: can't request irq 286, err: -22
+[   37.398158] gpio-vbus: probe of gpio-vbus failed with error -22
+...
+[   37.683452] gpio-keys: Unable to claim irq 278; error -22
+[   37.700759] gpio-keys: probe of gpio-keys failed with error -22
+...
+[   38.025748] pda-power pda-power: request ac irq failed
+[   38.044569] pda-power: probe of pda-power failed with error -22
 
-diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-index 83bd3c6..af44db2 100644
---- a/arch/arm/mach-pxa/hx4700.c
-+++ b/arch/arm/mach-pxa/hx4700.c
-@@ -820,6 +820,7 @@ static struct platform_device *devices[] __initdata = {
- 	&gpio_keys,
- 	&backlight,
- 	&w3220,
-+	&hx4700_lcd,
- 	&egpio,
- 	&bq24022,
- 	&gpio_vbus,
+And after increasing NR_BUILTIN_GPIO to 192, I got this:
+[  207.323467] gpiochip_add: gpios 256..263 (htc-egpio) not registered
+
+With both NR_BUILTIN_GPIO and ARCH_NR_GPIOS increased there's no more
+gpio-related errors.
+
+I'm a bit unsure if this patch don't have any side effects on other PXA
+platforms, and I even don't understand how exactly NR_BUILTIN_GPIO
+and PXA_GPIO_IRQ_NUM affect gpios on expanders, so please check thoroughly!
+
+diff --git a/arch/arm/mach-pxa/include/mach/gpio.h b/arch/arm/mach-pxa/include/mach/gpio.h
+index b024a8b..bf53894 100644
+--- a/arch/arm/mach-pxa/include/mach/gpio.h
++++ b/arch/arm/mach-pxa/include/mach/gpio.h
+@@ -24,6 +24,8 @@
+ #ifndef __ASM_ARCH_PXA_GPIO_H
+ #define __ASM_ARCH_PXA_GPIO_H
+ 
++#define ARCH_NR_GPIOS	320
++
+ #include <mach/irqs.h>
+ #include <mach/hardware.h>
+ #include <asm-generic/gpio.h>
+@@ -99,7 +101,7 @@
+ #define GAFR(x)		GPIO_REG(0x54 + (((x) & 0x70) >> 2))
+ 
+ 
+-#define NR_BUILTIN_GPIO 128
++#define NR_BUILTIN_GPIO 192
+ 
+ #define gpio_to_bank(gpio)	((gpio) >> 5)
+ #define gpio_to_irq(gpio)	IRQ_GPIO(gpio)
 -- 
 1.6.3.4
