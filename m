@@ -1,30 +1,38 @@
-From: acassis@gmail.com (Alan Carvalho de Assis)
-Date: Wed, 25 Nov 2009 08:52:08 -0200
-Subject: [PATCH v2] mx27: Add basic support for Maxtrack i-MXT TD60
-In-Reply-To: <c70ff3ad0911241139g2b5b706fp936a009867ac7674@mail.gmail.com>
-References: <37367b3a0911241021u68ac346dmf30fc98f252b1d35@mail.gmail.com>
-	<c70ff3ad0911241139g2b5b706fp936a009867ac7674@mail.gmail.com>
-Message-ID: <37367b3a0911250252h746c2166n4eef27cf1046fbbe@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 25 Nov 2009 11:02:18 +0000
+Subject: [PATCH 16/17] ALSA: ARM: add Raumfeld audio support
+In-Reply-To: <1259145751-3331-17-git-send-email-daniel@caiaq.de>
+References: <1259145751-3331-1-git-send-email-daniel@caiaq.de>
+	<1259145751-3331-17-git-send-email-daniel@caiaq.de>
+Message-ID: <20091125110218.GD17420@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Saeed,
+On Wed, Nov 25, 2009 at 11:42:30AM +0100, Daniel Mack wrote:
 
-On 11/24/09, saeed bishara <saeed.bishara@gmail.com> wrote:
->> ...
->> +#include <mach/i2c.h>
->> +#include <mach/imxfb.h>
->> +#include <mach/mmc.h>
->> +
->> +#include "devices.h"
->> +
->> +static unsigned int mxt_td60_pins[] = {
-> shouldn't this be __initdata?
+> +static struct i2c_board_info max9486_hwmon_info = {
+> +	I2C_BOARD_INFO("max9485", 0x63),
+> +};
 
-I think it could be used, but I don't see others MX27 boards using it.
+This should be in the board file under arch/arm.
 
-Sascha, what you think?
+> +extern void raumfeld_enable_audio(bool en);
 
-Regards,
+This should be in a proper header file somewhere.
 
-Alan
+> +static void raumfeld_cs4270_shutdown(struct snd_pcm_substream *substream)
+> +{
+> +}
+> +
+
+Remove this and the other empty functions.
+
+> +	case 96000:
+> +		set_max9485_clk(1);
+
+It might be a bit more legible to have some constants for the arguments
+for this function - it's not entirely clear what's going on, the 1 and 0
+look like a boolean but that's not what's really going on here.  It may
+be better to do this as a proper driver, there was at least one driver I
+remember being posted for a TDM clock generator which I think got
+merged.
