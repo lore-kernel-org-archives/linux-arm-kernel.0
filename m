@@ -1,68 +1,52 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Wed, 25 Nov 2009 13:27:52 +0200
-Subject: ARM: pxa: add support for Raumfeld audio devices
-In-Reply-To: <1259145751-3331-1-git-send-email-daniel@caiaq.de>
-References: <1259145751-3331-1-git-send-email-daniel@caiaq.de>
-Message-ID: <4B0D14B8.1000207@compulab.co.il>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 25 Nov 2009 12:30:34 +0100
+Subject: [alsa-devel] [PATCH 03/12] add a mc13783 codec driver
+In-Reply-To: <20091125111037.GE17420@opensource.wolfsonmicro.com>
+References: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-2-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-3-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-4-git-send-email-s.hauer@pengutronix.de>
+	<20091119193008.GC2814@sirena.org.uk>
+	<20091125074631.GB27548@pengutronix.de>
+	<20091125103959.GB17420@opensource.wolfsonmicro.com>
+	<20091125110854.GC27548@pengutronix.de>
+	<20091125111037.GE17420@opensource.wolfsonmicro.com>
+Message-ID: <20091125113034.GD27548@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel,
+On Wed, Nov 25, 2009 at 11:10:37AM +0000, Mark Brown wrote:
+> On Wed, Nov 25, 2009 at 12:08:54PM +0100, Sascha Hauer wrote:
+> > On Wed, Nov 25, 2009 at 10:39:59AM +0000, Mark Brown wrote:
+> 
+> > > What are "primary" and "secondary" here?  If they are broadly unrelated
+> > > except for the clocking (which is what this sounds like) then they
+> > > probably should be handled as separate DAIs.
+> 
+> > I thought about this, but can I do stereo with two seperate DAIs?
+> 
+> Again, what are "primary" and "secondary"?
 
-Daniel Mack wrote:
-> Hi,
-> 
-> Here is a series of 17 patches to support the multiroom audio devices
-> produced and sold by Raumfeld. The kernel is based on mainline, and all
-> other pieces needed by these devices have already been submitted over
-> the last months.
-> 
-> What was still missing is the board support code which I would like to
-> let it life in the mainline git, too. The series is based on top of
-> Eric's pxa-devel tree.
-> 
-> For more information about the hardware, see http://www.raumfeld.com/en/
-> 
-> If that's still possible, I'd be happy if they could make it to 2.6.33.
-> 
-> Please note that one patch depends on the MAX8660 power regulator driver
-> which I cherry-picked in my tree. As there's need for a special include
-> file, I don't know what the best way would be to avoid build breakage.
-> Maybe queue it for 2.6.33-rc2, after the regulator tree has been merged?
-> 
-> Daniel
-> 
-> [PATCH 01/17] ARM: pxa/raumfeld: add basic structure for devices
-> [PATCH 02/17] ARM: pxa/raumfeld: add GPIO definitions
-> [PATCH 03/17] ARM: pxa/raumfeld: add SMSC9220 ethernet support
-> [PATCH 04/17] ARM: pxa/raumfeld: add OHCI function
-> [PATCH 05/17] ARM: pxa/raumfeld: add rotary encoder support
-> [PATCH 06/17] ARM: pxa/raumfeld: add GPIO buttons
-> [PATCH 07/17] ARM: pxa/raumfeld: add GPIO connected LEDs
-> [PATCH 08/17] ARM: pxa/raumfeld: add one-wire function
-> [PATCH 09/17] ARM: pxa/raumfeld: add NAND partitions
-> [PATCH 10/17] ARM: pxa/raumfeld: add framebuffer and backlight devices
-> [PATCH 11/17] ARM: pxa/raumfeld: add SPI controlled devices
-> [PATCH 12/17] ARM: pxa/raumfeld: add audio related functions
-> [PATCH 13/17] ARM: pxa/raumfeld: add Marvell Libertas via SDIO
-> [PATCH 14/17] ARM: pxa/raumfeld: add power supply framework
-> [PATCH 15/17] ARM: pxa/raumfeld: add support for I2C controlled devices
-> [PATCH 16/17] ALSA: ARM: add Raumfeld audio support
-> [PATCH 17/17] ARM: pxa/raumfeld: Add defconfig
+Please have a look at page 3 of:
 
-I don't know what about others, but I find it difficult to follow too many small
-patches. I'd personally prefer to have
-"[PATCH 1/2] ARM: pxa: add raumfeld board support"
-"[PATCH 1/2] ARM: pxa/raumfeld: add defconfig"
+http://www.freescale.com/files/rf_if/doc/data_sheet/MC13783.pdf
 
-Once again, it's my personal preference :)
+Maybe this explains best the situation we have here.
+Right in the middle of the diagram you see the A/D converters in the
+Voice Codec. As you see it has two monaural A/D converters. One of them
+is the primary, the other is the secondary converter (don't ask me which
+of them is which, I'd had to lookup myself)
+The input sources of these ADCs can't be controlled completely
+independent and they are designed to be used for example with two
+microphones in a mobile phone. (I guess that's why they call them
+'primary' and 'secondary', not 'left' and 'right'). But of course you
+can also do stereo with them.
 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Sascha
+
 
 -- 
-Sincerely yours,
-Mike.
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
