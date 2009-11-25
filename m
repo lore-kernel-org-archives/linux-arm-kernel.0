@@ -1,50 +1,68 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 25 Nov 2009 11:11:56 +0000
-Subject: CAS implementation may be broken
-In-Reply-To: <4B0C5D1D.6040603@45mercystreet.com>
-References: <4B0C5D1D.6040603@45mercystreet.com>
-Message-ID: <1259147516.30270.51.camel@pc1117.cambridge.arm.com>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Wed, 25 Nov 2009 13:27:52 +0200
+Subject: ARM: pxa: add support for Raumfeld audio devices
+In-Reply-To: <1259145751-3331-1-git-send-email-daniel@caiaq.de>
+References: <1259145751-3331-1-git-send-email-daniel@caiaq.de>
+Message-ID: <4B0D14B8.1000207@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2009-11-24 at 22:24 +0000, Toby Douglass wrote:
-> Catalin Marinas wrote:
-> > On Tue, 2009-11-24 at 01:32 +0000, Jamie Lokier wrote:
-> >> Russell King - ARM Linux wrote:
-> 
-> >>> However, I don't think you've understood the original problem at all.
-> 
-> >> I think I have - I agreed with you and Catalin already that LL/SC does
-> >> not suffice.  But do you mean that Catalin's suggestion to put the
-> >> LDREX before the LDR does not work either?  (Maybe it needs a barrier
-> >> too).
-> 
-> > It definitely needs a barrier after the LDREX and maybe one after STREX
-> > but that depends on the semantics of such operation.
-> 
-> In the latest kernel, there is a memory barrier (the DMB instruction on
-> v7 and above) immediately before and immediately after the call to the
-> CAS function.
-> 
-> I thought about this a little.  If the memory barrier is immediately
-> before and given the next instruction is the LDREX, *all* threads coming
-> to the LDREX *must* have preceeding them a DMB and so be up to date on
-> memory, regardless of pauses in thread execution.
-> 
-> This however is in conflict with Catalin's comments.
+Daniel,
 
-My comment was to a new implementation for the ABA issue using LDR for
-the next pointer after LDREX and these would need to be separated by a
-barrier. Looking at this a bit more, it isn't actually needed since the
-subsequent LDR uses the pointer read by LDREX and thus creating an
-address dependency ("the value returned by a read access is used to
-compute the virtual address of a subsequent read or write access") which
-implies strict ordering between LDREX and LDR (A3.8.2 in the ARM ARM).
-But as I said, LDR between LDREX/STREX may no always work.
+Daniel Mack wrote:
+> Hi,
+> 
+> Here is a series of 17 patches to support the multiroom audio devices
+> produced and sold by Raumfeld. The kernel is based on mainline, and all
+> other pieces needed by these devices have already been submitted over
+> the last months.
+> 
+> What was still missing is the board support code which I would like to
+> let it life in the mainline git, too. The series is based on top of
+> Eric's pxa-devel tree.
+> 
+> For more information about the hardware, see http://www.raumfeld.com/en/
+> 
+> If that's still possible, I'd be happy if they could make it to 2.6.33.
+> 
+> Please note that one patch depends on the MAX8660 power regulator driver
+> which I cherry-picked in my tree. As there's need for a special include
+> file, I don't know what the best way would be to avoid build breakage.
+> Maybe queue it for 2.6.33-rc2, after the regulator tree has been merged?
+> 
+> Daniel
+> 
+> [PATCH 01/17] ARM: pxa/raumfeld: add basic structure for devices
+> [PATCH 02/17] ARM: pxa/raumfeld: add GPIO definitions
+> [PATCH 03/17] ARM: pxa/raumfeld: add SMSC9220 ethernet support
+> [PATCH 04/17] ARM: pxa/raumfeld: add OHCI function
+> [PATCH 05/17] ARM: pxa/raumfeld: add rotary encoder support
+> [PATCH 06/17] ARM: pxa/raumfeld: add GPIO buttons
+> [PATCH 07/17] ARM: pxa/raumfeld: add GPIO connected LEDs
+> [PATCH 08/17] ARM: pxa/raumfeld: add one-wire function
+> [PATCH 09/17] ARM: pxa/raumfeld: add NAND partitions
+> [PATCH 10/17] ARM: pxa/raumfeld: add framebuffer and backlight devices
+> [PATCH 11/17] ARM: pxa/raumfeld: add SPI controlled devices
+> [PATCH 12/17] ARM: pxa/raumfeld: add audio related functions
+> [PATCH 13/17] ARM: pxa/raumfeld: add Marvell Libertas via SDIO
+> [PATCH 14/17] ARM: pxa/raumfeld: add power supply framework
+> [PATCH 15/17] ARM: pxa/raumfeld: add support for I2C controlled devices
+> [PATCH 16/17] ALSA: ARM: add Raumfeld audio support
+> [PATCH 17/17] ARM: pxa/raumfeld: Add defconfig
 
-You may need barriers before and after you routine as we do in the CAS
-case but it depends how you define your routine, you may ask the caller
-of such routine to add the barriers explicitly.
+I don't know what about others, but I find it difficult to follow too many small
+patches. I'd personally prefer to have
+"[PATCH 1/2] ARM: pxa: add raumfeld board support"
+"[PATCH 1/2] ARM: pxa/raumfeld: add defconfig"
+
+Once again, it's my personal preference :)
+
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
 -- 
-Catalin
+Sincerely yours,
+Mike.
