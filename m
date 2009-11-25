@@ -1,44 +1,54 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 25 Nov 2009 08:27:15 +0100
-Subject: [PATCH v2] mx27: Add basic support for Maxtrack i-MXT TD60
-In-Reply-To: <154077.29305.qm@web51006.mail.re2.yahoo.com>
-References: <37367b3a0911241021u68ac346dmf30fc98f252b1d35@mail.gmail.com>
-	<154077.29305.qm@web51006.mail.re2.yahoo.com>
-Message-ID: <20091125072715.GS30179@pengutronix.de>
+Date: Wed, 25 Nov 2009 08:46:31 +0100
+Subject: [alsa-devel] [PATCH 03/12] add a mc13783 codec driver
+In-Reply-To: <20091119193008.GC2814@sirena.org.uk>
+References: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-2-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-3-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-4-git-send-email-s.hauer@pengutronix.de>
+	<20091119193008.GC2814@sirena.org.uk>
+Message-ID: <20091125074631.GB27548@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2009 at 03:19:42PM -0800, Fabio Estevam wrote:
-> Hi Alan,
-> 
-> --- On Tue, 11/24/09, Alan Carvalho de Assis <acassis@gmail.com> wrote:
-> 
-> > From: Alan Carvalho de Assis <acassis@gmail.com>
-> > Subject: [PATCH v2] mx27: Add basic support for Maxtrack i-MXT TD60
-> > To: "linux-arm-kernel" <linux-arm-kernel@lists.infradead.org>
-> > Cc: "Sascha Hauer" <s.hauer@pengutronix.de>, "Russell King - ARM Linux" <linux@arm.linux.org.uk>, "Daniel Mack" <daniel@caiaq.de>
-> > Date: Tuesday, November 24, 2009, 4:21 PM
-> > Signed-off-by: Alan Carvalho de Assis
-> > <acassis@gmail.com>
-> > ---
-> >  arch/arm/mach-mx2/Kconfig? ? |? ? 7
-> > ++
-> >  arch/arm/mach-mx2/Makefile???|? ?
-> > 1 +
-> >  arch/arm/mach-mx2/mxt_td60.c |? 245
-> > ++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 253 insertions(+), 0 deletions(-)
-> >  create mode 100644 arch/arm/mach-mx2/mxt_td60.c
-> 
-> Don't you need to add entries to
-> include/asm-arm/arch-mxc/debug-macro.S and arch
-> /arm/plat-mxc/include/mach/board-mxt_td60.h like other MX27 based
-> boards?
+Hi Mark,
 
-There is no board specific code in debug-macro.S any more.
-board-mxt_td60.h is not needed, too. However, adding the board to
-uncompress.h might be a good idea to see the "uncompressing Linux"
-string.
+> > +static int mc13783_set_tdm_slot_codec(struct snd_soc_dai *dai,
+> > +	unsigned int tx_mask, unsigned int rx_mask, int slots, int slot_width)
+> > +{
+> > +	struct snd_soc_codec *codec = dai->codec;
+> > +	unsigned int reg;
+> > +
+> > +	if (slots != 4)
+> > +		return -EINVAL;
+> > +
+> > +	reg = mc13783_read(codec, PMIC_SSI_NETWORK);
+> > +
+> > +	reg &= ~(0xfff << 0);
+> > +	reg |= (0x00 << 2);	/* primary timeslot RX/TX(?) is 0 */
+> > +	reg |= (0x01 << 4);	/* secondary timeslot TX is 1 */
+> > +	reg |= (0x01 << 6);	/* secondary timeslot RX is 1 */
+> 
+> This appears to be pretty much ignoring the supplied arguments and using
+> a fixed configuration?
+> 
+
+The problem here is that I don't really understand what arguments I
+should supply to this function and how to parse them to archieve what I
+want.
+
+The MC13783 Voice Codec always uses a network mode to send data. It has
+a fixed width of four slots.
+
+PMIC_SSI_NETWORK[2:3] defines the slot for primary transmit/receive
+PMIC_SSI_NETWORK[4:5] defines the secondary transmit timeslot
+PMIC_SSI_NETWORK[6:7] defines the secondary receive timeslot
+
+The Codec has two channels and it's not primarily desgined to do stereo
+Audio. I want to put the primary channel into the first timeslot and
+the secondary channel into the second timeslot.
+
+Any idea how to do this correctly?
 
 Sascha
 
