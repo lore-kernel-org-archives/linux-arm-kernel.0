@@ -1,164 +1,163 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 25 Nov 2009 11:42:28 +0100
-Subject: [PATCH 14/17] ARM: pxa/raumfeld: add power supply framework
+Date: Wed, 25 Nov 2009 11:42:29 +0100
+Subject: [PATCH 15/17] ARM: pxa/raumfeld: add support for I2C controlled
+	devices
 In-Reply-To: <1259145751-3331-1-git-send-email-daniel@caiaq.de>
 References: <1259145751-3331-1-git-send-email-daniel@caiaq.de>
-Message-ID: <1259145751-3331-15-git-send-email-daniel@caiaq.de>
+Message-ID: <1259145751-3331-16-git-send-email-daniel@caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Daniel Mack <daniel@caiaq.de>
 ---
- arch/arm/mach-pxa/raumfeld.c |  119 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 119 insertions(+), 0 deletions(-)
+ arch/arm/mach-pxa/raumfeld.c |   75 ++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 75 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
-index 1b54778..9a234e7 100644
+index 9a234e7..9b1b52c 100644
 --- a/arch/arm/mach-pxa/raumfeld.c
 +++ b/arch/arm/mach-pxa/raumfeld.c
-@@ -35,6 +35,8 @@
+@@ -26,10 +26,12 @@
+ #include <linux/input.h>
+ #include <linux/rotary_encoder.h>
+ #include <linux/gpio_keys.h>
++#include <linux/input/eeti_ts.h>
+ #include <linux/leds.h>
+ #include <linux/w1-gpio.h>
+ #include <linux/sched.h>
+ #include <linux/pwm_backlight.h>
++#include <linux/i2c.h>
+ #include <linux/spi/spi.h>
+ #include <linux/spi/spi_gpio.h>
  #include <linux/lis3lv02d.h>
- #include <linux/delay.h>
+@@ -37,6 +39,7 @@
  #include <linux/regulator/consumer.h>
-+#include <linux/pda_power.h>
-+#include <linux/power_supply.h>
+ #include <linux/pda_power.h>
+ #include <linux/power_supply.h>
++#include <linux/regulator/max8660.h>
  
  #include <asm/mach-types.h>
  #include <asm/mach/arch.h>
-@@ -675,6 +677,107 @@ static struct pxamci_platform_data raumfeld_mci_platform_data = {
- 	.gpio_power		= -1,
- };
+@@ -49,6 +52,7 @@
+ #include <mach/ohci.h>
+ #include <mach/pxafb.h>
+ #include <mach/mmc.h>
++#include <plat/i2c.h>
  
-+/*
-+ * External power / charge logic
+ #include "generic.h"
+ #include "devices.h"
+@@ -116,6 +120,10 @@ static mfp_cfg_t raumfeld_pin_config[] __initdata = {
+ 	GPIO0_2_USBH_PEN,
+ 	GPIO1_2_USBH_PWR,
+ 
++	/* I2C */
++	GPIO21_I2C_SCL | MFP_LPM_FLOAT | MFP_PULL_FLOAT,
++	GPIO22_I2C_SDA | MFP_LPM_FLOAT | MFP_PULL_FLOAT,
++
+ 	/* SPI */
+ 	GPIO34_GPIO,	/* SPDIF_CS */
+ 	GPIO96_GPIO,	/* MCLK_CS */
+@@ -778,6 +786,64 @@ static void __init raumfeld_power_init(void)
+ 		platform_device_register(&raumfeld_power_supply);
+ }
+ 
++/**
++ * Regulator support for vcc_wifi
 + */
 +
-+static int gpio_charge_dc_ok;
-+static int gpio_charge_usb_ok;
-+static int gpio_charge_usb_susp;
-+static int gpio_charge_ind;
++static struct regulator_consumer_supply vcc_wifi_supply =
++	REGULATOR_SUPPLY("vcc_wifi", "pxa2xx-mci.0");
 +
-+static int power_supply_init(struct device *dev)
-+{
-+	return 0;
-+}
-+
-+static void power_supply_exit(struct device *dev)
-+{
-+}
-+
-+static int raumfeld_is_ac_online(void)
-+{
-+	return !gpio_get_value(gpio_charge_dc_ok);
-+}
-+
-+static int raumfeld_is_usb_online(void)
-+{
-+	return 0;
-+}
-+
-+static char *raumfeld_power_supplicants[] = { "ds2760-battery.0" };
-+
-+static struct pda_power_pdata power_supply_info = {
-+	.init			= power_supply_init,
-+	.is_ac_online		= raumfeld_is_ac_online,
-+	.is_usb_online		= raumfeld_is_usb_online,
-+	.exit			= power_supply_exit,
-+	.supplied_to		= raumfeld_power_supplicants,
-+	.num_supplicants	= ARRAY_SIZE(raumfeld_power_supplicants)
++static struct regulator_init_data vcc_wifi_init_data = {
++	.constraints = {
++		.min_uV = WIFI_VOLTAGE,
++		.max_uV = WIFI_VOLTAGE,
++		.valid_modes_mask = REGULATOR_MODE_NORMAL,
++		.valid_ops_mask = REGULATOR_CHANGE_STATUS |
++				  REGULATOR_CHANGE_VOLTAGE,
++	},
++	.consumer_supplies = &vcc_wifi_supply,
++	.num_consumer_supplies = 1,
 +};
 +
-+static struct resource power_supply_resources[] = {
++struct max8660_subdev_data max8660_v6_subdev_data = {
++	.id		= MAX8660_V6,
++	.name		= "vcc_wifi",
++	.platform_data	= &vcc_wifi_init_data,
++};
++
++static struct max8660_platform_data max8660_pdata = {
++	.subdevs = &max8660_v6_subdev_data,
++	.num_subdevs = 1,
++};
++
++/**
++ * I2C devices
++ */
++
++static struct i2c_board_info raumfeld_pwri2c_board_info = {
++	.type		= "max8660",
++	.addr		= 0x34,
++	.platform_data	= &max8660_pdata,
++};
++
++static struct i2c_board_info raumfeld_connector_i2c_board_info[] __initdata = {
 +	{
-+		.name  = "ac",
-+		.flags = IORESOURCE_IRQ |
-+			 IORESOURCE_IRQ_HIGHEDGE | IORESOURCE_IRQ_LOWEDGE,
-+		.start = GPIO_CHARGE_DC_OK,
-+		.end   = GPIO_CHARGE_DC_OK,
++		.type	= "cs4270",
++		.addr	= 0x48,
 +	},
 +};
 +
-+static irqreturn_t charge_done_irq(int irq, void *dev_id)
-+{
-+	struct power_supply *psy;
-+
-+	psy = power_supply_get_by_name("ds2760-battery.0");
-+
-+	if (psy)
-+		power_supply_set_battery_charged(psy);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static struct platform_device raumfeld_power_supply = {
-+	.name = "pda-power",
-+	.id   = -1,
-+	.dev  = {
-+		.platform_data = &power_supply_info,
-+	},
-+	.resource      = power_supply_resources,
-+	.num_resources = ARRAY_SIZE(power_supply_resources),
++static struct eeti_ts_platform_data eeti_ts_pdata = {
++	.irq_active_high = 1,
 +};
 +
-+static void __init raumfeld_power_init(void)
-+{
-+	int err;
-+
-+	/* Set PEN2 high to enable maximum charge current */
-+	gpio_request(mfp_to_gpio(GPIO_CHRG_PEN2), "CHRG_PEN2");
-+	gpio_direction_output(mfp_to_gpio(GPIO_CHRG_PEN2), 1);
-+
-+	gpio_charge_ind = mfp_to_gpio(GPIO_CHARGE_IND);
-+	gpio_charge_dc_ok = mfp_to_gpio(GPIO_CHARGE_DC_OK);
-+	gpio_charge_usb_ok = mfp_to_gpio(GPIO_CHARGE_USB_OK);
-+	gpio_charge_usb_susp = mfp_to_gpio(GPIO_CHARGE_USB_SUSP);
-+
-+	gpio_request(gpio_charge_ind, "CHARGE_IND");
-+	gpio_request(gpio_charge_dc_ok, "CABLE_DC_OK");
-+	gpio_request(gpio_charge_usb_ok, "CABLE_USB_OK");
-+	gpio_request(gpio_charge_usb_susp, "CHARGE_USB_SUSP");
-+	gpio_direction_output(gpio_charge_usb_susp, 0);
-+
-+	err = request_irq(mfp_to_gpio(gpio_to_irq(GPIO_CHARGE_DONE)),
-+			&charge_done_irq, IORESOURCE_IRQ_LOWEDGE,
-+			"charge_done", NULL);
-+
-+	if (err < 0)
-+		printk(KERN_ERR "%s: unable to register irq %d\n", __func__,
-+			GPIO_CHARGE_DONE);
-+	else
-+		platform_device_register(&raumfeld_power_supply);
-+}
++static struct i2c_board_info raumfeld_controller_i2c_board_info __initdata = {
++	.type	= "eeti_ts",
++	.addr	= 0x0a,
++	.irq	= gpio_to_irq(mfp_to_gpio(GPIO_TOUCH_IRQ)),
++	.platform_data = &eeti_ts_pdata,
++};
 +
  static struct platform_device *raumfeld_common_devices[] = {
  	&raumfeld_gpio_keys_device,
  	&raumfeld_led_device,
-@@ -718,10 +821,26 @@ static void __init raumfeld_controller_init(void)
- 		&rotary_encoder_device,
- 	};
+@@ -813,6 +879,9 @@ static void __init raumfeld_common_init(void)
+ 	platform_add_devices(ARRAY_AND_SIZE(raumfeld_common_devices));
+ 	pxa3xx_set_nand_info(&raumfeld_nand_info);
+ 	pxa_set_mci_info(&raumfeld_mci_platform_data);
++	pxa_set_i2c_info(NULL);
++	pxa3xx_set_i2c_power_info(NULL);
++	i2c_register_board_info(1, &raumfeld_pwri2c_board_info, 1);
+ }
  
-+	mfp_cfg_t raumfeld_controller_pin_config[] = {
-+		/* CHRG_USB_OK */
-+		GPIO101_GPIO | MFP_PULL_HIGH,
-+		/* CHRG_USB_OK */
-+		GPIO112_GPIO | MFP_PULL_HIGH,
-+		/* CHRG_USB_SUSP */
-+		GPIO102_GPIO,
-+		/* DISPLAY_ENABLE */
-+		GPIO106_GPIO,
-+	};
-+
-+	pxa3xx_mfp_config(ARRAY_AND_SIZE(raumfeld_controller_pin_config));
+ static void __init raumfeld_controller_init(void)
+@@ -835,6 +904,7 @@ static void __init raumfeld_controller_init(void)
+ 	pxa3xx_mfp_config(ARRAY_AND_SIZE(raumfeld_controller_pin_config));
  	platform_add_devices(ARRAY_AND_SIZE(raumfeld_controller_devices));
  	spi_register_board_info(ARRAY_AND_SIZE(controller_spi_devices));
++	i2c_register_board_info(0, &raumfeld_controller_i2c_board_info, 1);
  
-+	gpio_request(mfp_to_gpio(GPIO_SHUTDOWN_BATT), "battery shutdown");
-+	gpio_direction_output(mfp_to_gpio(GPIO_SHUTDOWN_BATT), 0);
+ 	gpio_request(mfp_to_gpio(GPIO_SHUTDOWN_BATT), "battery shutdown");
+ 	gpio_direction_output(mfp_to_gpio(GPIO_SHUTDOWN_BATT), 0);
+@@ -850,6 +920,9 @@ static void __init raumfeld_connector_init(void)
+ 	pxa3xx_mfp_config(ARRAY_AND_SIZE(raumfeld_ssp1_pin_config));
+ 	pxa3xx_mfp_config(ARRAY_AND_SIZE(raumfeld_ssp2_pin_config));
+ 	spi_register_board_info(ARRAY_AND_SIZE(connector_spi_devices));
++	i2c_register_board_info(0,
++			ARRAY_AND_SIZE(raumfeld_connector_i2c_board_info));
 +
  	raumfeld_common_init();
-+	raumfeld_power_init();
- 	raumfeld_lcd_init();
- 	raumfeld_w1_init();
- }
+ 	raumfeld_eth_init();
+ 
+@@ -866,6 +939,8 @@ static void __init raumfeld_speaker_init(void)
+ 	pxa3xx_mfp_config(ARRAY_AND_SIZE(raumfeld_ssp1_pin_config));
+ 	platform_add_devices(ARRAY_AND_SIZE(raumfeld_speaker_devices));
+ 	spi_register_board_info(ARRAY_AND_SIZE(speaker_spi_devices));
++	i2c_register_board_info(0,
++			ARRAY_AND_SIZE(raumfeld_connector_i2c_board_info));
+ 
+ 	raumfeld_common_init();
+ 	raumfeld_eth_init();
 -- 
 1.6.5.2
