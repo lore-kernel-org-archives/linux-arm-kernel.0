@@ -1,63 +1,86 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 25 Nov 2009 11:42:18 +0100
-Subject: [PATCH 04/17] ARM: pxa/raumfeld: add OHCI function
+Date: Wed, 25 Nov 2009 11:42:19 +0100
+Subject: [PATCH 05/17] ARM: pxa/raumfeld: add rotary encoder support
 In-Reply-To: <1259145751-3331-1-git-send-email-daniel@caiaq.de>
 References: <1259145751-3331-1-git-send-email-daniel@caiaq.de>
-Message-ID: <1259145751-3331-5-git-send-email-daniel@caiaq.de>
+Message-ID: <1259145751-3331-6-git-send-email-daniel@caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All Raumfeld devices feature an USB (OHCI) host port.
+The 'Controller' and 'Speaker S/M' have a rotary encoder device for
+volume control.
 
 Signed-off-by: Daniel Mack <daniel@caiaq.de>
 ---
- arch/arm/mach-pxa/raumfeld.c |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
+ arch/arm/mach-pxa/raumfeld.c |   35 +++++++++++++++++++++++++++++++++++
+ 1 files changed, 35 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
-index 82af0dc..2d47dc2 100644
+index 2d47dc2..a2a2b18 100644
 --- a/arch/arm/mach-pxa/raumfeld.c
 +++ b/arch/arm/mach-pxa/raumfeld.c
-@@ -31,6 +31,7 @@
- #include <mach/pxa3xx-regs.h>
- #include <mach/mfp-pxa3xx.h>
- #include <mach/mfp-pxa300.h>
-+#include <mach/ohci.h>
+@@ -23,6 +23,8 @@
+ #include <linux/interrupt.h>
+ #include <linux/gpio.h>
+ #include <linux/smsc911x.h>
++#include <linux/input.h>
++#include <linux/rotary_encoder.h>
  
- #include "generic.h"
- #include "devices.h"
-@@ -93,6 +94,10 @@ static mfp_cfg_t raumfeld_pin_config[] __initdata = {
- 
- 	/* UART3 */
- 	GPIO110_UART3_RXD,
-+
-+	/* USB Host */
-+	GPIO0_2_USBH_PEN,
-+	GPIO1_2_USBH_PWR,
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -153,6 +155,27 @@ static struct pxaohci_platform_data raumfeld_ohci_info = {
+ 	.flags		= ENABLE_PORT1,
  };
  
- /*
-@@ -140,6 +145,13 @@ static void __init raumfeld_eth_init(void)
- 	platform_device_register(&smc91x_device);
- }
- 
 +/**
-+ * USB (OHCI) support
++ * Rotary encoder input device
 + */
-+static struct pxaohci_platform_data raumfeld_ohci_info = {
-+	.port_mode      = PMM_GLOBAL_MODE,
-+	.flags		= ENABLE_PORT1,
++static struct rotary_encoder_platform_data raumfeld_rotary_encoder_info = {
++	.steps		= 24,
++	.axis		= REL_X,
++	.relative_axis	= 1,
++	.gpio_a		= mfp_to_gpio(GPIO_VOLENC_A),
++	.gpio_b		= mfp_to_gpio(GPIO_VOLENC_B),
++	.inverted_a	= 1,
++	.inverted_b	= 0,
 +};
- 
++
++static struct platform_device rotary_encoder_device = {
++	.name		= "rotary-encoder",
++	.id		= 0,
++	.dev		= {
++		.platform_data = &raumfeld_rotary_encoder_info,
++	}
++};
++
  static void __init raumfeld_common_init(void)
  {
-@@ -157,6 +169,7 @@ static void __init raumfeld_common_init(void)
- 	gpio_direction_output(mfp_to_gpio(GPIO_SHUTDOWN_SUPPLY), 0);
- 
- 	pxa3xx_mfp_config(ARRAY_AND_SIZE(raumfeld_pin_config));
-+	pxa_set_ohci_info(&raumfeld_ohci_info);
- }
+ 	enable_irq_wake(IRQ_WAKEUP0);
+@@ -174,6 +197,12 @@ static void __init raumfeld_common_init(void)
  
  static void __init raumfeld_controller_init(void)
+ {
++	struct platform_device *raumfeld_controller_devices[] = {
++		&rotary_encoder_device,
++	};
++
++	platform_add_devices(ARRAY_AND_SIZE(raumfeld_controller_devices));
++
+ 	raumfeld_common_init();
+ }
+ 
+@@ -185,6 +214,12 @@ static void __init raumfeld_connector_init(void)
+ 
+ static void __init raumfeld_speaker_init(void)
+ {
++	struct platform_device *raumfeld_speaker_devices[] = {
++		&rotary_encoder_device,
++	};
++
++	platform_add_devices(ARRAY_AND_SIZE(raumfeld_speaker_devices));
++
+ 	raumfeld_common_init();
+ 	raumfeld_eth_init();
+ }
 -- 
 1.6.5.2
