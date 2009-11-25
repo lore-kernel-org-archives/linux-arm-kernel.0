@@ -1,22 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Nov 2009 17:02:00 +0000
-Subject: [PATCH 08/17] ARM: pxa/raumfeld: add one-wire function
-In-Reply-To: <1259145751-3331-9-git-send-email-daniel@caiaq.de>
-References: <1259145751-3331-1-git-send-email-daniel@caiaq.de>
-	<1259145751-3331-9-git-send-email-daniel@caiaq.de>
-Message-ID: <20091125170200.GF5136@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 25 Nov 2009 17:02:01 +0000
+Subject: [PATCH v2 07/17] ARM: dma-mapping: no need to cleanoverlapping
+	cache lines on invalidate
+In-Reply-To: <20091125163119.GB5136@n2100.arm.linux.org.uk>
+References: <20091125163119.GB5136@n2100.arm.linux.org.uk>
+Message-ID: <1259168521.1367.9.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2009 at 11:42:22AM +0100, Daniel Mack wrote:
-> +/**
-> + * One-wire (W1 bus) support
-> + */
-> +static void w1_enable_external_pullup(int enable)
-> +{
-> +	gpio_set_value(mfp_to_gpio(GPIO_W1_PULLUP_ENABLE), enable);
-> +	schedule_timeout(HZ);
+On Wed, 2009-11-25 at 16:31 +0000, Russell King - ARM Linux wrote:
+> In fact, I've made the decision.  I'm not merging this for the upcoming
+> merge window.  It will wait another cycle to give us time to properly
+> sort this problem out in a sane way, rather than rushing through with
+> a half baked solution.
 
-Shouldn't you be using msleep() here?  schedule_timeout() can terminate
-prematurely, particularly if there's a signal pending.  msleep() will
-wait for the full timeout.
+That would be a good idea. But please try to publish a volatile branch
+somewhere for testing this easily (maybe before getting into -next).
+
+-- 
+Catalin
+
+P.S. I'm off for the rest of the week with very limited e-mail access.
