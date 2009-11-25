@@ -1,42 +1,32 @@
-From: philipp.zabel@gmail.com (pHilipp Zabel)
-Date: Wed, 25 Nov 2009 13:04:40 +0100
-Subject: [PATCH] pxa/hx4700: actually use platform_lcd driver
-In-Reply-To: <1259148795-10335-1-git-send-email-mad_soft@inbox.ru>
-References: <1259148795-10335-1-git-send-email-mad_soft@inbox.ru>
-Message-ID: <74d0deb30911250404m23001d38p77ba355804fcbc47@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 25 Nov 2009 12:12:30 +0000
+Subject: [PATCH v2 06/17] ARM: dma-mapping: fix for speculative accesses
+In-Reply-To: <20091124162250.GA17481@n2100.arm.linux.org.uk>
+References: <E1NBYEF-0005l7-Tq@rmk-PC.arm.linux.org.uk>
+	<E1NCZ7p-0002A0-Ib@rmk-PC.arm.linux.org.uk>
+	<c70ff3ad0911230725h6d688c09k8576b66d012f29f0@mail.gmail.com>
+	<20091123172722.GE18142@n2100.arm.linux.org.uk>
+	<c70ff3ad0911240746v3438bba9y556cca3f027b3dd7@mail.gmail.com>
+	<20091124162250.GA17481@n2100.arm.linux.org.uk>
+Message-ID: <20091125121230.GA3737@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2009 at 12:33 PM, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
-> Commit e2c509c7e6 ([ARM] pxa/hx4700: use platform_lcd driver)
-> missed to actually register platform device for LCD.
-> It causes following GCC warning:
-> arch/arm/mach-pxa/hx4700.c:553: warning: 'hx4700_lcd' defined but not used
->
-> Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
-> ---
-> ?arch/arm/mach-pxa/hx4700.c | ? ?1 +
-> ?1 files changed, 1 insertions(+), 0 deletions(-)
->
-> This is a fix for 2.6.32.
->
-> diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-> index 83bd3c6..af44db2 100644
-> --- a/arch/arm/mach-pxa/hx4700.c
-> +++ b/arch/arm/mach-pxa/hx4700.c
-> @@ -820,6 +820,7 @@ static struct platform_device *devices[] __initdata = {
-> ? ? ? ?&gpio_keys,
-> ? ? ? ?&backlight,
-> ? ? ? ?&w3220,
-> + ? ? ? &hx4700_lcd,
-> ? ? ? ?&egpio,
-> ? ? ? ?&bq24022,
-> ? ? ? ?&gpio_vbus,
-> --
-> 1.6.3.4
->
->
+On Tue, Nov 24, 2009 at 04:22:50PM +0000, Russell King - ARM Linux wrote:
 
-Thanks, this got lost in my local tree during the switch to platform_lcd.
+> There isn't, because apparantly under git rules, as soon as I publish it
+> in git form it must be fixed.  So I'm keeping the stuff private and only
+> issuing patches on this mailing list.
 
-Acked-by: Philipp Zabel <philipp.zabel@gmail.com>
+Rebasing is only a big deal if it's a branch other people are supposed
+to be working off, or (to a lesser extent) on a "final submission"
+branch for reviewed and stable patches.  A branch that's used for work
+in progress where the patches are being constantly revised isn't a
+problem here.
+
+The issue with branches other people are working off is that it's
+painful for them to have to constantly rebase or otherwise update for
+your history.  The issue with final submission branches is that rebasing
+those means that the history no longer shows the tree that was actually
+reviewed and accepted (and hopefully tested) which makes history
+analysis to locate breakages such as bisection less useful.
