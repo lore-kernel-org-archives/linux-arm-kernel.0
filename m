@@ -1,41 +1,40 @@
-From: trd@45mercystreet.com (Toby Douglass)
-Date: Wed, 25 Nov 2009 19:57:18 +0100
-Subject: CAS implementation may be broken
-In-Reply-To: <1259147516.30270.51.camel@pc1117.cambridge.arm.com>
-References: <4B0C5D1D.6040603@45mercystreet.com>
-	<1259147516.30270.51.camel@pc1117.cambridge.arm.com>
-Message-ID: <4B0D7E0E.4030203@45mercystreet.com>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Wed, 25 Nov 2009 22:19:26 +0100
+Subject: [PATCH 07/10] ARM: PNX4008: move i2c suspend/resume callbacks
+	into driver
+In-Reply-To: <20091121185947.GD13956@n2100.arm.linux.org.uk>
+References: <20091120144422.GA18223@n2100.arm.linux.org.uk>
+	<E1NBUkU-0004Pm-Nv@rmk-PC.arm.linux.org.uk>
+	<63386a3d0911210927u47c7d6d6i65fc7d60563f8db2@mail.gmail.com>
+	<20091121185947.GD13956@n2100.arm.linux.org.uk>
+Message-ID: <083DF309106F364B939360100EC290F804F55C9221@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So, I'm thinking now; where does this leave us?
+> Subject: Re: [PATCH 07/10] ARM: PNX4008: move i2c suspend/resume callbacks
+> into driver
+> 
+> On Sat, Nov 21, 2009 at 06:27:54PM +0100, Linus Walleij wrote:
+> > If you have this up for testing anyway, would it be advisable to take
+> this
+> > opportunity to also switch i2c-pnx over to using struct dev_pm_ops?
+> 
 
-We see that LDREX/SDREX cannot be used on their own in a single word CAS 
-to prevent ABA since we cannot rely on using LDR inside an LDREX/SDREX 
-pair.  (You guys knew this; I'm just stating it here to lead in).
+With the clock change below, suspend and resume won't be needed anymore.
 
-This means you must use a pointer-counter pair (with its potential for 
-failure) or memory handling; the same situation as we find on x86 and 
-x64, for example.  That's okay - not perfect, but we're not deficient 
-compared to other common platforms.
+> These patches are only compile-tested, and that's partly why there's soo
+> many of them - each one does one transformation, which makes it easy to
+> review for correctness.
+> 
+> I'm also hoping that Kevin will test them on later PNX hardware so that
+> they can be submitted.
 
-I think however it leaves open one question; do we wish for the 
-LDREX/SDREX CAS to fail if destination has been modified, or to retry, 
-as it does now.
+All the I2C patches work fine. In regards to the clock being enabled on
+suspend, I think that's a bug - it should be disabled. It only uses extra
+power keeping the clock gated on when an I2C transaction isn't in progress.
+The clock can be gated on prior to an I2C transaction starting and
+then gated off at the end of it. This will save a small trickle of power.
 
- From a lock-free data structure point of view, failure on modification 
-is more efficient, since we will always need to recompute our exchange 
-value; going to the extra trouble of forcing the CAS (which will then 
-fail anyway, because the counter part of the pointer-counter pair will 
-not match) is a waste of time.
+I'll send over patch with these changes.
 
-The behaviour we have now can be easily implemented (a loop) on top of 
-the non-retry CAS; but the non-retry CAS behaviour cannot be implemented 
-on top of what we have now.
-
-However, the world and his dog expects x86/x64 style behaviour - we can 
-do better, but it may not be what users expect.
-
-Ah - there is one other issue - it seems reasonable that the CAS that 
-exists now should be extended to support 8 byte swaps, since it already 
-supports 1, 2 and 4 byte swaps.
+Kevin
