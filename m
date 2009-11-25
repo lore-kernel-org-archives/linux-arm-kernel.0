@@ -1,65 +1,45 @@
-From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Wed, 25 Nov 2009 14:36:30 +0300
-Subject: [PATCH] pxa: fix gpio_to_irq() for GPIOs on expander chips
-Message-ID: <1259148990-10372-1-git-send-email-mad_soft@inbox.ru>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 25 Nov 2009 12:00:55 +0000
+Subject: [alsa-devel] [PATCH 03/12] add a mc13783 codec driver
+In-Reply-To: <20091125113034.GD27548@pengutronix.de>
+References: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-2-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-3-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-4-git-send-email-s.hauer@pengutronix.de>
+	<20091119193008.GC2814@sirena.org.uk>
+	<20091125074631.GB27548@pengutronix.de>
+	<20091125103959.GB17420@opensource.wolfsonmicro.com>
+	<20091125110854.GC27548@pengutronix.de>
+	<20091125111037.GE17420@opensource.wolfsonmicro.com>
+	<20091125113034.GD27548@pengutronix.de>
+Message-ID: <20091125120055.GC3175@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 9db95cb6c430b added support for gpios on PXA93x/950 and
-increased PXA_GPIO_IRQ_NUM from 128 to 192, but missed to update
-NR_BUILTIN_GPIO. This led to broken gpio_to_irq() for off-chip GPIOs.
-Adjust NR_BUILTIN_GPIO accordingly, and also increase ARCH_NR_GPIOS,
-as there exist platforms (hx4700) with more than 64 off-chip GPIOs,
-so default value 256 is not enough.
+On Wed, Nov 25, 2009 at 12:30:34PM +0100, Sascha Hauer wrote:
+> On Wed, Nov 25, 2009 at 11:10:37AM +0000, Mark Brown wrote:
 
-Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
----
- arch/arm/mach-pxa/include/mach/gpio.h |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+> > Again, what are "primary" and "secondary"?
 
-This is a fix for 2.6.32 regression.
-Found this while testing 2.6.32-rc8 on hx4700. Here's errors in log
-on unpatched kernel (all related to gpios on ASIC3 chip):
-[   37.369051] gpio-vbus gpio-vbus: can't request irq 286, err: -22
-[   37.398158] gpio-vbus: probe of gpio-vbus failed with error -22
-...
-[   37.683452] gpio-keys: Unable to claim irq 278; error -22
-[   37.700759] gpio-keys: probe of gpio-keys failed with error -22
-...
-[   38.025748] pda-power pda-power: request ac irq failed
-[   38.044569] pda-power: probe of pda-power failed with error -22
+> Maybe this explains best the situation we have here.
+> Right in the middle of the diagram you see the A/D converters in the
+> Voice Codec. As you see it has two monaural A/D converters. One of them
+> is the primary, the other is the secondary converter (don't ask me which
+> of them is which, I'd had to lookup myself)
 
-And after increasing NR_BUILTIN_GPIO to 192, I got this:
-[  207.323467] gpiochip_add: gpios 256..263 (htc-egpio) not registered
+So all you've really got here is stereo in one direction and mono in the
+other with flexible placement of the slots.
 
-With both NR_BUILTIN_GPIO and ARCH_NR_GPIOS increased there's no more
-gpio-related errors.
+> The input sources of these ADCs can't be controlled completely
+> independent and they are designed to be used for example with two
+> microphones in a mobile phone. (I guess that's why they call them
+> 'primary' and 'secondary', not 'left' and 'right'). But of course you
+> can also do stereo with them.
 
-I'm a bit unsure if this patch don't have any side effects on other PXA
-platforms, and I even don't understand how exactly NR_BUILTIN_GPIO
-and PXA_GPIO_IRQ_NUM affect gpios on expanders, so please check thoroughly!
+You could either treat them independently or just assume they're going
+to be used as a stereo pair and put them in one DAI.  A third option is
+to define DAIs for both cases and then trust machine drivers not to mix
+the stereo and mono options inappropriately.  It's really up to you.
 
-diff --git a/arch/arm/mach-pxa/include/mach/gpio.h b/arch/arm/mach-pxa/include/mach/gpio.h
-index b024a8b..bf53894 100644
---- a/arch/arm/mach-pxa/include/mach/gpio.h
-+++ b/arch/arm/mach-pxa/include/mach/gpio.h
-@@ -24,6 +24,8 @@
- #ifndef __ASM_ARCH_PXA_GPIO_H
- #define __ASM_ARCH_PXA_GPIO_H
- 
-+#define ARCH_NR_GPIOS	320
-+
- #include <mach/irqs.h>
- #include <mach/hardware.h>
- #include <asm-generic/gpio.h>
-@@ -99,7 +101,7 @@
- #define GAFR(x)		GPIO_REG(0x54 + (((x) & 0x70) >> 2))
- 
- 
--#define NR_BUILTIN_GPIO 128
-+#define NR_BUILTIN_GPIO 192
- 
- #define gpio_to_bank(gpio)	((gpio) >> 5)
- #define gpio_to_irq(gpio)	IRQ_GPIO(gpio)
--- 
-1.6.3.4
+For the random placement of the two channels look at the set_channel_map
+API.
