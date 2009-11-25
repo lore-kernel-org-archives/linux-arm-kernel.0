@@ -1,209 +1,112 @@
 From: mike@compulab.co.il (Mike Rapoport)
-Date: Wed, 25 Nov 2009 17:26:32 +0200
-Subject: [PATCH 01/17] ARM: pxa/raumfeld: add basic structure for devices
-In-Reply-To: <1259145751-3331-2-git-send-email-daniel@caiaq.de>
+Date: Wed, 25 Nov 2009 17:26:36 +0200
+Subject: [PATCH 03/17] ARM: pxa/raumfeld: add SMSC9220 ethernet support
+In-Reply-To: <1259145751-3331-4-git-send-email-daniel@caiaq.de>
 References: <1259145751-3331-1-git-send-email-daniel@caiaq.de>
-	<1259145751-3331-2-git-send-email-daniel@caiaq.de>
-Message-ID: <4B0D4CA8.4020107@compulab.co.il>
+	<1259145751-3331-4-git-send-email-daniel@caiaq.de>
+Message-ID: <4B0D4CAC.9080403@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel,
-Below are my comments to the patches. Some of the comments apply to several
-patches, but I'm too lazy to copy them into relevant threads :)
 
 
 Daniel Mack wrote:
-> No function yet, just the file skeletons.
+> The 'Connector' and 'Speaker S/M' devices have an SMSC9220 ethernet chip
+> onboard.
 > 
 > Signed-off-by: Daniel Mack <daniel@caiaq.de>
 > ---
->  arch/arm/mach-pxa/Kconfig    |   18 ++++++
->  arch/arm/mach-pxa/Makefile   |    3 +
->  arch/arm/mach-pxa/raumfeld.c |  122 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 143 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-pxa/raumfeld.c
+>  arch/arm/mach-pxa/raumfeld.c |   51 ++++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 51 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-> index 20e645a..f4dd069 100644
-> --- a/arch/arm/mach-pxa/Kconfig
-> +++ b/arch/arm/mach-pxa/Kconfig
-> @@ -399,6 +399,24 @@ config MACH_TREO680
->  	  Say Y here if you intend to run this kernel on Palm Treo 680
->  	  smartphone.
->  
-> +config MACH_RAUMFELD_RC
-> +	bool "Raumfeld Controller"
-> +	select PXA3xx
-> +	select CPU_PXA300
-> +	select HAVE_PWM
-> +
-> +config MACH_RAUMFELD_CONNECTOR
-> +	bool "Raumfeld Connector"
-> +	select PXA3xx
-> +	select CPU_PXA300
-> +	select PXA_SSP
-> +
-> +config MACH_RAUMFELD_SPEAKER
-> +	bool "Raumfeld Speaker"
-> +	select PXA3xx
-> +	select CPU_PXA300
-> +	select PXA_SSP
-> +
->  config PXA_SHARPSL
->  	bool "SHARP Zaurus SL-5600, SL-C7xx and SL-Cxx00 Models"
->  	select SHARP_SCOOP
-> diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
-> index b5d29e6..1ed7509 100644
-> --- a/arch/arm/mach-pxa/Makefile
-> +++ b/arch/arm/mach-pxa/Makefile
-> @@ -88,6 +88,9 @@ obj-$(CONFIG_MACH_E740)		+= e740.o
->  obj-$(CONFIG_MACH_E750)		+= e750.o
->  obj-$(CONFIG_MACH_E400)		+= e400.o
->  obj-$(CONFIG_MACH_E800)		+= e800.o
-> +obj-$(CONFIG_MACH_RAUMFELD_RC)		+= raumfeld.o
-> +obj-$(CONFIG_MACH_RAUMFELD_CONNECTOR)	+= raumfeld.o
-> +obj-$(CONFIG_MACH_RAUMFELD_SPEAKER)	+= raumfeld.o
->  
->  # Support for blinky lights
->  led-y := leds.o
 > diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
-> new file mode 100644
-> index 0000000..89ead5f
-> --- /dev/null
+> index 075e337..82af0dc 100644
+> --- a/arch/arm/mach-pxa/raumfeld.c
 > +++ b/arch/arm/mach-pxa/raumfeld.c
-> @@ -0,0 +1,122 @@
+> @@ -19,7 +19,10 @@
+>  #include <linux/init.h>
+>  #include <linux/kernel.h>
+>  #include <linux/sysdev.h>
+> +#include <linux/platform_device.h>
+>  #include <linux/interrupt.h>
+> +#include <linux/gpio.h>
+> +#include <linux/smsc911x.h>
+>  
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+> @@ -92,6 +95,52 @@ static mfp_cfg_t raumfeld_pin_config[] __initdata = {
+>  	GPIO110_UART3_RXD,
+>  };
+>  
 > +/*
-> + * arch/arm/mach-pxa/raumfeld.c
-> + *
-> + * Support for the following Raumfeld devices:
-> + *
-> + * 	* Controller
-> + *  	* Connector
-> + *  	* Speaker S/M
-> + *
-> + * See http://www.raumfeld.com for details.
-> + *
-> + * Copyright (c) 2009 Daniel Mack <daniel@caiaq.de>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
+> + * SMSC LAN9220 Ethernet
 > + */
 > +
-> +#include <linux/init.h>
-> +#include <linux/kernel.h>
-> +#include <linux/sysdev.h>
-> +#include <linux/interrupt.h>
-> +
-> +#include <asm/mach-types.h>
-> +#include <asm/mach/arch.h>
-> +
-> +#include <mach/hardware.h>
-> +#include <mach/pxa3xx-regs.h>
-> +#include <mach/mfp-pxa3xx.h>
-> +#include <mach/mfp-pxa300.h>
-> +
-> +#include "generic.h"
-> +#include "devices.h"
-> +#include "clock.h"
-> +
-> +/*
-> + * GPIO configuration (common for all hardware platforms)
-> + */
-> +static mfp_cfg_t raumfeld_pin_config[] __initdata = {
-> +	/* UART1 */
-> +	GPIO77_UART1_RXD,
-> +	GPIO78_UART1_TXD,
-> +	GPIO79_UART1_CTS,
-> +	GPIO81_UART1_DSR,
-> +	GPIO83_UART1_DTR,
-> +	GPIO84_UART1_RTS,
-> +
-> +	/* UART3 */
-> +	GPIO110_UART3_RXD,
+> +static struct resource smc91x_resources[] = {
+> +	{
+> +		.start	= PXA3xx_CS2_PHYS,
+> +		.end	= PXA3xx_CS2_PHYS + 0xfffff,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	{
+> +		.start	= gpio_to_irq(mfp_to_gpio(GPIO_ETH_IRQ)),
+> +		.end	= gpio_to_irq(mfp_to_gpio(GPIO_ETH_IRQ)),
+> +		.flags	= IORESOURCE_IRQ | IRQF_TRIGGER_FALLING,
+> +	}
 > +};
 > +
-> +static void __init raumfeld_common_init(void)
+> +static struct smsc911x_platform_config raumfeld_smsc911x_config = {
+> +	.phy_interface	= PHY_INTERFACE_MODE_MII,
+> +	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
+> +	.irq_type	= SMSC911X_IRQ_TYPE_OPEN_DRAIN,
+> +	.flags		= SMSC911X_USE_32BIT | SMSC911X_SAVE_MAC_ADDRESS,
+> +};
+> +
+> +static struct platform_device smc91x_device = {
+> +	.name		= "smsc911x",
+> +	.id		= -1,
+> +	.num_resources	= ARRAY_SIZE(smc91x_resources),
+> +	.resource	= smc91x_resources,
+> +	.dev		= {
+> +		.platform_data = &raumfeld_smsc911x_config,
+> +	}
+> +};
+> +
+> +static mfp_cfg_t raumfeld_eth_pin_config[] __initdata = {
+> +	GPIO1_nCS2,			/* CS */
+> +	GPIO40_GPIO | MFP_PULL_HIGH,	/* IRQ */
+> +};
+
+Wouldn't it be better to keep mfp tables for common pins and each of board
+variants rather than configure mfp for particular interface? This applies for
+other patches that have
++	pxa3xx_mfp_config(ARRAY_AND_SIZE(raumfeld_<something>_pin_config));
+as well. :)
+
+> +static void __init raumfeld_eth_init(void)
 > +{
-> +	enable_irq_wake(IRQ_WAKEUP0);
-> +	pxa_set_ffuart_info(NULL);
-> +
-> +	gpio_request(mfp_to_gpio(GPIO_W2W_RESET), "Wi2Wi reset");
-
-gpio_request may fail, thought it's unlikely to happen. Anyway, adding check for
-it's return value seems to be a good practice.
-
-> +	gpio_direction_output(mfp_to_gpio(GPIO_W2W_RESET), 0);
-> +
-> +	gpio_request(mfp_to_gpio(GPIO_W2W_PDN), "Wi2Wi powerup");
-> +	gpio_direction_output(mfp_to_gpio(GPIO_W2W_PDN), 0);
-> +
-> +	/* this can be used to switch off the device */
-> +	gpio_request(mfp_to_gpio(GPIO_SHUTDOWN_SUPPLY), "supply shutdown");
-> +	gpio_direction_output(mfp_to_gpio(GPIO_SHUTDOWN_SUPPLY), 0);
-> +
-> +	pxa3xx_mfp_config(ARRAY_AND_SIZE(raumfeld_pin_config));
+> +	pxa3xx_mfp_config(ARRAY_AND_SIZE(raumfeld_eth_pin_config));
+> +	platform_device_register(&smc91x_device);
 > +}
 > +
-> +static void __init raumfeld_controller_init(void)
-> +{
-> +	raumfeld_common_init();
-> +}
 > +
-> +static void __init raumfeld_connector_init(void)
-> +{
-> +	raumfeld_common_init();
-> +}
-> +
-> +static void __init raumfeld_speaker_init(void)
-> +{
-> +	raumfeld_common_init();
-> +}
-
-I failed to follow what peripherals are common to what boards, but after
-applying all the patches it seems that all three _init functions are really
-similar. Have you considered having one _init function for all three machines
-and calling machine-specific init based on machine_is_X?
-
-> +/* physical memory regions */
-> +#define	RAUMFELD_SDRAM_BASE	0xa0000000	/* SDRAM region */
-> +
-> +#ifdef CONFIG_MACH_RAUMFELD_RC
-> +MACHINE_START(RAUMFELD_RC, "Raumfeld Controller")
-> +	.phys_io	= 0x40000000,
-> +	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
-> +	.boot_params	= RAUMFELD_SDRAM_BASE + 0x100,
-> +	.init_machine	= raumfeld_controller_init,
-> +	.map_io		= pxa_map_io,
-> +	.init_irq	= pxa3xx_init_irq,
-> +	.timer		= &pxa_timer,
-> +MACHINE_END
-> +#endif
-> +
-> +#ifdef CONFIG_MACH_RAUMFELD_CONNECTOR
-> +MACHINE_START(RAUMFELD_CONNECTOR, "Raumfeld Connector")
-> +	.phys_io	= 0x40000000,
-> +	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
-> +	.boot_params	= RAUMFELD_SDRAM_BASE + 0x100,
-> +	.init_machine	= raumfeld_connector_init,
-> +	.map_io		= pxa_map_io,
-> +	.init_irq	= pxa3xx_init_irq,
-> +	.timer		= &pxa_timer,
-> +MACHINE_END
-> +#endif
-> +
-> +#ifdef CONFIG_MACH_RAUMFELD_SPEAKER
-> +MACHINE_START(RAUMFELD_SPEAKER, "Raumfeld Speaker")
-> +	.phys_io	= 0x40000000,
-> +	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
-> +	.boot_params	= RAUMFELD_SDRAM_BASE + 0x100,
-> +	.init_machine	= raumfeld_speaker_init,
-> +	.map_io		= pxa_map_io,
-> +	.init_irq	= pxa3xx_init_irq,
-> +	.timer		= &pxa_timer,
-> +MACHINE_END
-> +#endif
+>  static void __init raumfeld_common_init(void)
+>  {
+>  	enable_irq_wake(IRQ_WAKEUP0);
+> @@ -118,11 +167,13 @@ static void __init raumfeld_controller_init(void)
+>  static void __init raumfeld_connector_init(void)
+>  {
+>  	raumfeld_common_init();
+> +	raumfeld_eth_init();
+>  }
+>  
+>  static void __init raumfeld_speaker_init(void)
+>  {
+>  	raumfeld_common_init();
+> +	raumfeld_eth_init();
+>  }
+>  
+>  /* physical memory regions */
 
 -- 
 Sincerely yours,
