@@ -1,60 +1,45 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Nov 2009 16:26:41 +0000
-Subject: [PATCH v2 06/17] ARM: dma-mapping: fix for speculative accesses
-In-Reply-To: <1259151279.30270.56.camel@pc1117.cambridge.arm.com>
-References: <20091124200019.GH17481@n2100.arm.linux.org.uk>
-	<1259151279.30270.56.camel@pc1117.cambridge.arm.com>
-Message-ID: <20091125162641.GA5136@n2100.arm.linux.org.uk>
+Date: Wed, 25 Nov 2009 16:31:19 +0000
+Subject: [PATCH v2 07/17] ARM: dma-mapping: no need to clean
+	overlapping cache lines on invalidate
+In-Reply-To: <1259151582.30270.61.camel@pc1117.cambridge.arm.com>
+References: <E1NBYEI-0005lA-8a@rmk-PC.arm.linux.org.uk>
+	<E1NCZ7s-0002A3-0R@rmk-PC.arm.linux.org.uk>
+	<1259151582.30270.61.camel@pc1117.cambridge.arm.com>
+Message-ID: <20091125163119.GB5136@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2009 at 12:14:39PM +0000, Catalin Marinas wrote:
-> I'm getting confused. Can we not just implement a generic dma_map_range
-> and dma_unmap_range in terms of dma_clean_range and dma_inv_range as
-> low-level CPU support functions?
+On Wed, Nov 25, 2009 at 12:19:42PM +0000, Catalin Marinas wrote:
+> On Mon, 2009-11-23 at 13:38 +0000, Russell King - ARM Linux wrote:
+> > Since we now clean the DMA buffers on map, 
+> 
+> Is this still valid with the latest patch you sent?
 
-That depends if you want to create something like:
+Again, welcome to why the DMA functions end up being screwed over my
+ARMv7... and why I think we should hold off merging this until
+post-2.6.33 when we've had time to properly sorted out issues like
+this.
 
-static void dma_unmap_range(const void *kaddr, size_t size, enum dma_direction dir)
-{
-	if ((cpu_is_xxx() || cpu_is_yyy()...) && dir != DMA_TO_DEVICE) {
-		outer_inv_range(kaddr, kaddr + size);
-		dma_inv_range(kaddr, kaddr + size);
-	}
-}
+> > there's no need to clean
+> > overlapping cache lines on invalidation anymore.  (Note: the DMA API
+> > prohibits other data sharing the same cache line as a DMA buffer
+> > anyway.)
+> 
+> Why was this cleaning ever needed if the DMA API prohibits cache line
+> sharing?
+>
+> Even if we do cleaning on map, having shared cache lines is broken since
+> you may do an invalidate on unmap but the shared cache line may have
+> been dirtied.
 
-static void dma_map_range(const void *kaddr, size_t size, enum dma_direction dir)
-{
-	if (cpu_is_xxx() || cpu_is_yyy()) {
-		if (dir == DMA_TO_DEVICE) {
-			dma_clean_range(kaddr, kaddr + size);
-			outer_clean_range(kaddr, kaddr + size);
-		} else {
-			dma_inv_range(kaddr, kaddr + size);
-			outer_inv_range(kaddr, kaddr + size);
-		}
-	} else {
-		switch (dir) {
-		case DMA_TO_DEVICE:
-			dma_clean_range(kaddr, kaddr + size);
-			outer_clean_range(kaddr, kaddr + size);
-			break;
-		case DMA_FROM_DEVICE:
-			dma_inv_range(kaddr, kaddr + size);
-			outer_inv_range(kaddr, kaddr + size);
-			break;
-		case DMA_BIDIRECTIONAL:
-			dma_flush_range(kaddr, kaddr + size);
-			outer_flush_range(kaddr, kaddr + size);
-			break;
-		}
-	}
-}
+It happens, particularly with SCSI.
 
-This is utterly stupid, since the functions we're calling are already
-CPU specific, and adds extra needless overhead where its plainly not
-necessary - just because we have two stupid cases, one where the API
-is being mis-used and one where its being used in hacky code.
+And congratuations on realising why it's not permitted.  I do wish
+other people would see the light and not do things like DMA directly
+to the kernel stack and similar tricks.
 
-I'd rather have the decisions about what to do on map/unmap entirely
-in CPU specific code, but first we need to eliminate the two hacks.
+In fact, I've made the decision.  I'm not merging this for the upcoming
+merge window.  It will wait another cycle to give us time to properly
+sort this problem out in a sane way, rather than rushing through with
+a half baked solution.
