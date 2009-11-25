@@ -1,22 +1,25 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Nov 2009 16:53:01 +0000
-Subject: [PATCH 00/20] iPAQ h3100/h3600 work for 2.6.33
-In-Reply-To: <20091124212541.GA5751@rainbow>
-References: <1256414658-22611-1-git-send-email-mad_soft@inbox.ru>
-	<20091024211026.GE16451@n2100.arm.linux.org.uk>
-	<20091025153603.GA24490@rainbow> <20091115173048.GA19609@rainbow>
-	<20091123203931.GI18142@n2100.arm.linux.org.uk>
-	<20091124212541.GA5751@rainbow>
-Message-ID: <20091125165301.GC5136@n2100.arm.linux.org.uk>
+Date: Wed, 25 Nov 2009 16:56:54 +0000
+Subject: [PATCH 03/17] ARM: pxa/raumfeld: add SMSC9220 ethernet support
+In-Reply-To: <20091125154947.GP29442@buzzloop.caiaq.de>
+References: <1259145751-3331-1-git-send-email-daniel@caiaq.de>
+	<1259145751-3331-4-git-send-email-daniel@caiaq.de>
+	<4B0D4CAC.9080403@compulab.co.il>
+	<20091125154947.GP29442@buzzloop.caiaq.de>
+Message-ID: <20091125165654.GD5136@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2009 at 12:25:41AM +0300, Dmitry Artamonow wrote:
-> Oh, and forgot to mention - your 'sa1100' branch is currently based on
-> 2.6.32-rc3, you'll need to rebase it on more current -rc before applying
-> my patches, because of 4918a0139 (ARM: 5752/1: SA1100: fix building of
-> h3100), which went in -rc4.
+On Wed, Nov 25, 2009 at 04:49:47PM +0100, Daniel Mack wrote:
+> I had it that way, but the idea is to prevent double definitions. What
+> we have now is a config for all pins needed by the ethernet device, and
+> each machine which needs that just references it. It looks more straight
+> forward this way, but eventually that might be a matter of taste :)
+> 
+> Unless anyone has a strong opinion abouth that, I'd like to keep it as
+> it is now.
 
-Ok, sa1100 rebased; please submit your patch series to the patch system,
-or alternatively if you have a git tree, base it off my sa1100 branch
-and I'll pull that instead.
+How about just having each board setup all MFP configuration at boot time
+and be done with it - yes, it'll mean some duplication for the pins which
+are common, but at least you know when looking at board N how all the pins
+are configured.
