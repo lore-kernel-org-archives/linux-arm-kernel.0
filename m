@@ -1,124 +1,111 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 25 Nov 2009 11:42:26 +0100
-Subject: [PATCH 12/17] ARM: pxa/raumfeld: add audio related functions
+Date: Wed, 25 Nov 2009 11:42:27 +0100
+Subject: [PATCH 13/17] ARM: pxa/raumfeld: add Marvell Libertas via SDIO
 In-Reply-To: <1259145751-3331-1-git-send-email-daniel@caiaq.de>
 References: <1259145751-3331-1-git-send-email-daniel@caiaq.de>
-Message-ID: <1259145751-3331-13-git-send-email-daniel@caiaq.de>
+Message-ID: <1259145751-3331-14-git-send-email-daniel@caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Daniel Mack <daniel@caiaq.de>
 ---
- arch/arm/mach-pxa/raumfeld.c |   68 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 68 insertions(+), 0 deletions(-)
+ arch/arm/mach-pxa/raumfeld.c |   56 ++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 56 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
-index 43a8195..1516990 100644
+index 1516990..1b54778 100644
 --- a/arch/arm/mach-pxa/raumfeld.c
 +++ b/arch/arm/mach-pxa/raumfeld.c
-@@ -33,6 +33,7 @@
- #include <linux/spi/spi.h>
+@@ -34,6 +34,7 @@
  #include <linux/spi/spi_gpio.h>
  #include <linux/lis3lv02d.h>
-+#include <linux/delay.h>
+ #include <linux/delay.h>
++#include <linux/regulator/consumer.h>
  
  #include <asm/mach-types.h>
  #include <asm/mach/arch.h>
-@@ -561,6 +562,64 @@ static struct spi_board_info controller_spi_devices[] __initdata = {
- 	SPI_LIS3,
+@@ -45,6 +46,7 @@
+ #include <mach/pxa3xx_nand.h>
+ #include <mach/ohci.h>
+ #include <mach/pxafb.h>
++#include <mach/mmc.h>
+ 
+ #include "generic.h"
+ #include "devices.h"
+@@ -116,6 +118,14 @@ static mfp_cfg_t raumfeld_pin_config[] __initdata = {
+ 	GPIO34_GPIO,	/* SPDIF_CS */
+ 	GPIO96_GPIO,	/* MCLK_CS */
+ 	GPIO125_GPIO,	/* ACCEL_CS */
++
++	/* MMC */
++	GPIO3_MMC1_DAT0,
++	GPIO4_MMC1_DAT1,
++	GPIO5_MMC1_DAT2,
++	GPIO6_MMC1_DAT3,
++	GPIO7_MMC1_CLK,
++	GPIO8_MMC1_CMD,
+ };
+ 
+ /*
+@@ -620,6 +630,51 @@ static mfp_cfg_t raumfeld_ssp2_pin_config[] = {
+ 	GPIO29_SSP2_EXTCLK,
  };
  
 +/**
-+ * Audio related things
++ * MMC for Marvell Libertas 8688 via SDIO
 + */
-+void raumfeld_enable_audio(bool en)
++
++#define WIFI_VOLTAGE	3300000
++
++static void raumfeld_mci_setpower(struct device *dev, unsigned int on)
 +{
-+	if (!machine_is_raumfeld_speaker() &&
-+	    !machine_is_raumfeld_connector())
++	int ret = 0;
++	struct regulator *regulator = regulator_get(dev, "vcc_wifi");
++
++	/* bring up V6 for SDIO/WLAN */
++	if (IS_ERR(regulator)) {
++		printk(KERN_ERR "%s(): unable to get regulator. err = %ld\n",
++			__func__, PTR_ERR(regulator));
 +		return;
-+
-+	if (en) {
-+		gpio_set_value(mfp_to_gpio(GPIO_AUDIO_VA_ENABLE), 1);
-+		gpio_set_value(mfp_to_gpio(GPIO_MCLK_RESET), 1);
-+
-+		/* wait some time to let VA and the clocks become stable */
-+		schedule_timeout(HZ/10);
-+
-+		gpio_set_value(mfp_to_gpio(GPIO_SPDIF_RESET), 1);
-+		gpio_set_value(mfp_to_gpio(GPIO_CODEC_RESET), 1);
-+	} else {
-+		gpio_set_value(mfp_to_gpio(GPIO_MCLK_RESET), 0);
-+		gpio_set_value(mfp_to_gpio(GPIO_SPDIF_RESET), 0);
-+		gpio_set_value(mfp_to_gpio(GPIO_CODEC_RESET), 0);
-+		gpio_set_value(mfp_to_gpio(GPIO_AUDIO_VA_ENABLE), 0);
 +	}
++
++	if (on && !regulator_is_enabled(regulator)) {
++		ret = regulator_enable(regulator);
++		if (!ret)
++			ret = regulator_set_voltage(regulator,
++					WIFI_VOLTAGE, WIFI_VOLTAGE);
++	} else if (!on && regulator_is_enabled(regulator))
++		ret = regulator_disable(regulator);
++
++	if (ret)
++		printk(KERN_ERR "%s: unable to %sable regulator: ret = %d\n",
++				__func__, on ? "en" : "dis", ret);
++
++	regulator_put(regulator);
++
++	gpio_set_value(mfp_to_gpio(GPIO_W2W_RESET), on);
++	gpio_set_value(mfp_to_gpio(GPIO_W2W_PDN), on);
 +}
 +
-+static void raumfeld_claim_audio_gpios(void)
-+{
-+	gpio_request(mfp_to_gpio(GPIO_AUDIO_VA_ENABLE), "Audio VA enable");
-+	gpio_direction_output(mfp_to_gpio(GPIO_AUDIO_VA_ENABLE), 0);
-+
-+	gpio_request(mfp_to_gpio(GPIO_MCLK_RESET), "MCLK reset");
-+	gpio_direction_output(mfp_to_gpio(GPIO_MCLK_RESET), 0);
-+
-+	gpio_request(mfp_to_gpio(GPIO_CODEC_RESET), "cs4270 codec reset");
-+	gpio_direction_output(mfp_to_gpio(GPIO_CODEC_RESET), 0);
-+
-+	gpio_request(mfp_to_gpio(GPIO_SPDIF_RESET), "ak4104 s/pdif reset");
-+	gpio_direction_output(mfp_to_gpio(GPIO_SPDIF_RESET), 0);
-+}
-+
-+static mfp_cfg_t raumfeld_ssp1_pin_config[] = {
-+	/* SSP for I2S */
-+	GPIO85_SSP1_SCLK,
-+	GPIO89_SSP1_EXTCLK,
-+	GPIO86_SSP1_FRM,
-+	GPIO87_SSP1_TXD,
-+	GPIO88_SSP1_RXD,
-+	GPIO90_SSP1_SYSCLK,
-+};
-+
-+static mfp_cfg_t raumfeld_ssp2_pin_config[] = {
-+	GPIO25_SSP2_SCLK,
-+	GPIO26_SSP2_FRM,
-+	GPIO27_SSP2_TXD,
-+	GPIO29_SSP2_EXTCLK,
++static struct pxamci_platform_data raumfeld_mci_platform_data = {
++	.detect_delay		= 20,
++	.ocr_mask		= MMC_VDD_32_33 | MMC_VDD_33_34,
++	.setpower		= raumfeld_mci_setpower,
++	.gpio_card_detect	= -1,
++	.gpio_card_ro		= -1,
++	.gpio_power		= -1,
 +};
 +
  static struct platform_device *raumfeld_common_devices[] = {
  	&raumfeld_gpio_keys_device,
  	&raumfeld_led_device,
-@@ -613,9 +672,14 @@ static void __init raumfeld_controller_init(void)
- 
- static void __init raumfeld_connector_init(void)
- {
-+	pxa3xx_mfp_config(ARRAY_AND_SIZE(raumfeld_ssp1_pin_config));
-+	pxa3xx_mfp_config(ARRAY_AND_SIZE(raumfeld_ssp2_pin_config));
- 	spi_register_board_info(ARRAY_AND_SIZE(connector_spi_devices));
- 	raumfeld_common_init();
- 	raumfeld_eth_init();
-+
-+	raumfeld_claim_audio_gpios();
-+	raumfeld_enable_audio(true);
+@@ -654,6 +709,7 @@ static void __init raumfeld_common_init(void)
+ 	pxa_set_ohci_info(&raumfeld_ohci_info);
+ 	platform_add_devices(ARRAY_AND_SIZE(raumfeld_common_devices));
+ 	pxa3xx_set_nand_info(&raumfeld_nand_info);
++	pxa_set_mci_info(&raumfeld_mci_platform_data);
  }
  
- static void __init raumfeld_speaker_init(void)
-@@ -624,11 +688,15 @@ static void __init raumfeld_speaker_init(void)
- 		&rotary_encoder_device,
- 	};
- 
-+	pxa3xx_mfp_config(ARRAY_AND_SIZE(raumfeld_ssp1_pin_config));
- 	platform_add_devices(ARRAY_AND_SIZE(raumfeld_speaker_devices));
- 	spi_register_board_info(ARRAY_AND_SIZE(speaker_spi_devices));
- 
- 	raumfeld_common_init();
- 	raumfeld_eth_init();
-+
-+	raumfeld_claim_audio_gpios();
-+	raumfeld_enable_audio(true);
- }
- 
- /* physical memory regions */
+ static void __init raumfeld_controller_init(void)
 -- 
 1.6.5.2
