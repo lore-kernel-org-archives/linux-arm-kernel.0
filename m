@@ -1,26 +1,28 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 25 Nov 2009 13:36:01 +0000
-Subject: [PATCH 13/17] ARM: pxa/raumfeld: add Marvell Libertas via SDIO
-In-Reply-To: <20091125130435.GD14091@buzzloop.caiaq.de>
-References: <1259145751-3331-1-git-send-email-daniel@caiaq.de>
-	<1259145751-3331-14-git-send-email-daniel@caiaq.de>
-	<20091125114946.GB3175@sirena.org.uk>
-	<20091125130435.GD14091@buzzloop.caiaq.de>
-Message-ID: <20091125133601.GC14045@rakim.wolfsonmicro.main>
+From: a.zummo@towertech.it (Alessandro Zummo)
+Date: Wed, 25 Nov 2009 14:36:34 +0100
+Subject: [rtc-linux] Re: [PATCH V3] ARM: NUC900: add RTC driver support
+	for  nuc910 and nuc920
+In-Reply-To: <713d0d430911250451x51e0196bwdcbe5e8f087c3f8c@mail.gmail.com>
+References: <4B0D1FFB.5060403@gmail.com>
+	<713d0d430911250451x51e0196bwdcbe5e8f087c3f8c@mail.gmail.com>
+Message-ID: <20091125143634.1b8e0839@linux.lan.towertech.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2009 at 02:04:35PM +0100, Daniel Mack wrote:
-> On Wed, Nov 25, 2009 at 11:49:47AM +0000, Mark Brown wrote:
+On Wed, 25 Nov 2009 20:51:24 +0800
+Hu Ruihuan <specter118@gmail.com> wrote:
 
-> > Either use regulator_get_exclusive() (at which point you own the
-> > regulator) or keep track of the on/off switch yourself.
+> I think you should lock irq before the serial read and write to the
+> REG_RTC_RIER register.
 
-> The issue I was facing here was that the mmc power enable callback was
-> called more than once with the same value for 'on', so the calls were
-> not balanced and the regulator driver bailed.
+ the lock seems not used anymore. the rtc framework has some locking
+ of his own, driver authors are suggested to check if it's enough.
 
-If you use regulator_get_exclusive() then your usage is OK since other
-users can't collide with your usage, otherwise you'd need to remember
-the state in your driver if the caller isn't giving you balanced
-enable/disable calls.
+-- 
+
+ Best regards,
+
+ Alessandro Zummo,
+  Tower Technologies - Torino, Italy
+
+  http://www.towertech.it
