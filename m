@@ -1,45 +1,42 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 25 Nov 2009 12:00:55 +0000
-Subject: [alsa-devel] [PATCH 03/12] add a mc13783 codec driver
-In-Reply-To: <20091125113034.GD27548@pengutronix.de>
-References: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
-	<1258645706-9071-2-git-send-email-s.hauer@pengutronix.de>
-	<1258645706-9071-3-git-send-email-s.hauer@pengutronix.de>
-	<1258645706-9071-4-git-send-email-s.hauer@pengutronix.de>
-	<20091119193008.GC2814@sirena.org.uk>
-	<20091125074631.GB27548@pengutronix.de>
-	<20091125103959.GB17420@opensource.wolfsonmicro.com>
-	<20091125110854.GC27548@pengutronix.de>
-	<20091125111037.GE17420@opensource.wolfsonmicro.com>
-	<20091125113034.GD27548@pengutronix.de>
-Message-ID: <20091125120055.GC3175@sirena.org.uk>
+From: philipp.zabel@gmail.com (pHilipp Zabel)
+Date: Wed, 25 Nov 2009 13:04:40 +0100
+Subject: [PATCH] pxa/hx4700: actually use platform_lcd driver
+In-Reply-To: <1259148795-10335-1-git-send-email-mad_soft@inbox.ru>
+References: <1259148795-10335-1-git-send-email-mad_soft@inbox.ru>
+Message-ID: <74d0deb30911250404m23001d38p77ba355804fcbc47@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2009 at 12:30:34PM +0100, Sascha Hauer wrote:
-> On Wed, Nov 25, 2009 at 11:10:37AM +0000, Mark Brown wrote:
+On Wed, Nov 25, 2009 at 12:33 PM, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
+> Commit e2c509c7e6 ([ARM] pxa/hx4700: use platform_lcd driver)
+> missed to actually register platform device for LCD.
+> It causes following GCC warning:
+> arch/arm/mach-pxa/hx4700.c:553: warning: 'hx4700_lcd' defined but not used
+>
+> Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
+> ---
+> ?arch/arm/mach-pxa/hx4700.c | ? ?1 +
+> ?1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> This is a fix for 2.6.32.
+>
+> diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+> index 83bd3c6..af44db2 100644
+> --- a/arch/arm/mach-pxa/hx4700.c
+> +++ b/arch/arm/mach-pxa/hx4700.c
+> @@ -820,6 +820,7 @@ static struct platform_device *devices[] __initdata = {
+> ? ? ? ?&gpio_keys,
+> ? ? ? ?&backlight,
+> ? ? ? ?&w3220,
+> + ? ? ? &hx4700_lcd,
+> ? ? ? ?&egpio,
+> ? ? ? ?&bq24022,
+> ? ? ? ?&gpio_vbus,
+> --
+> 1.6.3.4
+>
+>
 
-> > Again, what are "primary" and "secondary"?
+Thanks, this got lost in my local tree during the switch to platform_lcd.
 
-> Maybe this explains best the situation we have here.
-> Right in the middle of the diagram you see the A/D converters in the
-> Voice Codec. As you see it has two monaural A/D converters. One of them
-> is the primary, the other is the secondary converter (don't ask me which
-> of them is which, I'd had to lookup myself)
-
-So all you've really got here is stereo in one direction and mono in the
-other with flexible placement of the slots.
-
-> The input sources of these ADCs can't be controlled completely
-> independent and they are designed to be used for example with two
-> microphones in a mobile phone. (I guess that's why they call them
-> 'primary' and 'secondary', not 'left' and 'right'). But of course you
-> can also do stereo with them.
-
-You could either treat them independently or just assume they're going
-to be used as a stereo pair and put them in one DAI.  A third option is
-to define DAIs for both cases and then trust machine drivers not to mix
-the stereo and mono options inappropriately.  It's really up to you.
-
-For the random placement of the two channels look at the set_channel_map
-API.
+Acked-by: Philipp Zabel <philipp.zabel@gmail.com>
