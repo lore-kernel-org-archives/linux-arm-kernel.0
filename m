@@ -1,218 +1,102 @@
-From: specter118@gmail.com (Hu Ruihuan)
-Date: Wed, 25 Nov 2009 20:51:24 +0800
-Subject: [PATCH V3] ARM: NUC900: add RTC driver support for nuc910 and
-	nuc920
-In-Reply-To: <4B0D1FFB.5060403@gmail.com>
-References: <4B0D1FFB.5060403@gmail.com>
-Message-ID: <713d0d430911250451x51e0196bwdcbe5e8f087c3f8c@mail.gmail.com>
+From: davide.digesualdo@kaskonetworks.it (Davide Di Gesualdo)
+Date: Wed, 25 Nov 2009 13:52:21 +0100
+Subject: IXP425: help on HSS channelized service
+In-Reply-To: <200911241622.43464.schindele@nentec.de>
+References: <4B0BDFC1.7010506@kaskonetworks.it>
+	<200911241622.43464.schindele@nentec.de>
+Message-ID: <4B0D2885.2030103@kaskonetworks.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Dear Alessandro,
->
-> This is a fixed patch which was tested via rtc test program located in Documentation/rtc.txt.
->
-> Thanks for your help.
->
-> Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
-> ---
-> ?drivers/rtc/Kconfig ? ? ?| ? ?6 +
-> ?drivers/rtc/Makefile ? ? | ? ?1 +
-> ?drivers/rtc/rtc-nuc900.c | ?334 ++++++++++++++++++++++++++++++++++++++++++++++
-> ?3 files changed, 341 insertions(+), 0 deletions(-)
-> ?create mode 100644 drivers/rtc/rtc-nuc900.c
->
-> diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-> index 3c20dae..266ce62 100644
-> --- a/drivers/rtc/Kconfig
-> +++ b/drivers/rtc/Kconfig
-> @@ -573,6 +573,12 @@ config RTC_DRV_AB3100
-> ? ? ? ? ?Select this to enable the ST-Ericsson AB3100 Mixed Signal IC RTC
-> ? ? ? ? ?support. This chip contains a battery- and capacitor-backed RTC.
->
-> +config RTC_DRV_NUC900
-> + ? ? ? tristate "NUC910/NUC920 RTC driver"
-> + ? ? ? depends on RTC_CLASS && ARCH_W90X900
-> + ? ? ? help
-> + ? ? ? ? If you say yes here you get support for the RTC subsystem of the
-> + ? ? ? ? NUC910/NUC920 used in embedded systems.
->
-> ?comment "on-CPU RTC drivers"
->
-> diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
-> index aa3fbd5..d511774 100644
-> --- a/drivers/rtc/Makefile
-> +++ b/drivers/rtc/Makefile
-> @@ -53,6 +53,7 @@ obj-$(CONFIG_RTC_MXC) ? ? ? ? += rtc-mxc.o
-> ?obj-$(CONFIG_RTC_DRV_MAX6900) ?+= rtc-max6900.o
-> ?obj-$(CONFIG_RTC_DRV_MAX6902) ?+= rtc-max6902.o
-> ?obj-$(CONFIG_RTC_DRV_MV) ? ? ? += rtc-mv.o
-> +obj-$(CONFIG_RTC_DRV_NUC900) ? += rtc-nuc900.o
-> ?obj-$(CONFIG_RTC_DRV_OMAP) ? ? += rtc-omap.o
-> ?obj-$(CONFIG_RTC_DRV_PCAP) ? ? += rtc-pcap.o
-> ?obj-$(CONFIG_RTC_DRV_PCF8563) ?+= rtc-pcf8563.o
-> diff --git a/drivers/rtc/rtc-nuc900.c b/drivers/rtc/rtc-nuc900.c
-> new file mode 100644
-> index 0000000..09383e2
-> --- /dev/null
-> +++ b/drivers/rtc/rtc-nuc900.c
-> @@ -0,0 +1,334 @@
-> +/*
-> + * Copyright (c) 2008-2009 Nuvoton technology corporation.
-> + *
-> + * Wan ZongShun <mcuos.com@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation;version 2 of the License.
-> + *
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/init.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/rtc.h>
-> +#include <linux/delay.h>
-> +#include <linux/io.h>
-> +#include <linux/bcd.h>
-> +
-> +/* RTC Control Registers */
-> +#define REG_RTC_INIR ? ? ? ? ? 0x00
-> +#define REG_RTC_AER ? ? ? ? ? ?0x04
-> +#define REG_RTC_FCR ? ? ? ? ? ?0x08
-> +#define REG_RTC_TLR ? ? ? ? ? ?0x0C
-> +#define REG_RTC_CLR ? ? ? ? ? ?0x10
-> +#define REG_RTC_TSSR ? ? ? ? ? 0x14
-> +#define REG_RTC_DWR ? ? ? ? ? ?0x18
-> +#define REG_RTC_TAR ? ? ? ? ? ?0x1C
-> +#define REG_RTC_CAR ? ? ? ? ? ?0x20
-> +#define REG_RTC_LIR ? ? ? ? ? ?0x24
-> +#define REG_RTC_RIER ? ? ? ? ? 0x28
-> +#define REG_RTC_RIIR ? ? ? ? ? 0x2C
-> +#define REG_RTC_TTR ? ? ? ? ? ?0x30
-> +
-> +#define RTCSET ? ? ? ? ? ? ? ? 0x01
-> +#define AERRWENB ? ? ? ? ? ? ? 0x10000
-> +#define INIRRESET ? ? ? ? ? ? ?0xa5eb1357
-> +#define AERPOWERON ? ? ? ? ? ? 0xA965
-> +#define AERPOWEROFF ? ? ? ? ? ?0x0000
-> +#define LEAPYEAR ? ? ? ? ? ? ? 0x0001
-> +#define TICKENB ? ? ? ? ? ? ? ? ? ? ? ?0x80
-> +#define TICKINTENB ? ? ? ? ? ? 0x0002
-> +#define ALARMINTENB ? ? ? ? ? ?0x0001
-> +#define MODE24 ? ? ? ? ? ? ? ? 0x0001
-> +
-> +struct nuc900_rtc {
-> + ? ? ? int ? ? ? ? ? ? ? ? ? ? irq_num;
-> + ? ? ? void __iomem ? ? ? ? ? ?*rtc_reg;
-> + ? ? ? struct rtc_device ? ? ? *rtcdev;
-> + ? ? ? spinlock_t ? ? ? ? ? ? ?lock;
-> +};
-> +
-> +struct nuc900_bcd_time {
-> + ? ? ? int bcd_sec;
-> + ? ? ? int bcd_min;
-> + ? ? ? int bcd_hour;
-> + ? ? ? int bcd_mday;
-> + ? ? ? int bcd_mon;
-> + ? ? ? int bcd_year;
-> +};
-> +
-> +static irqreturn_t nuc900_rtc_interrupt(int irq, void *_rtc)
-> +{
-> + ? ? ? struct nuc900_rtc *rtc = _rtc;
-> + ? ? ? unsigned long events = 0, rtc_irq;
-> +
-> + ? ? ? rtc_irq = __raw_readl(rtc->rtc_reg + REG_RTC_RIIR);
-> +
-> + ? ? ? if (rtc_irq & ALARMINTENB) {
-> + ? ? ? ? ? ? ? rtc_irq &= ~ALARMINTENB;
-> + ? ? ? ? ? ? ? __raw_writel(rtc_irq, rtc->rtc_reg + REG_RTC_RIIR);
-> + ? ? ? ? ? ? ? events |= RTC_AF | RTC_IRQF;
-> + ? ? ? }
-> +
-> + ? ? ? if (rtc_irq & TICKINTENB) {
-> + ? ? ? ? ? ? ? rtc_irq &= ~TICKINTENB;
-> + ? ? ? ? ? ? ? __raw_writel(rtc_irq, rtc->rtc_reg + REG_RTC_RIIR);
-> + ? ? ? ? ? ? ? events |= RTC_UF | RTC_IRQF;
-> + ? ? ? }
-> +
-> + ? ? ? rtc_update_irq(rtc->rtcdev, 1, events);
-> +
-> + ? ? ? return IRQ_HANDLED;
-> +}
-> +
-> +static void check_rtc_power(struct nuc900_rtc *nuc900_rtc)
-> +{
-> + ? ? ? unsigned int i;
-> + ? ? ? __raw_writel(INIRRESET, nuc900_rtc->rtc_reg + REG_RTC_INIR);
-> +
-> + ? ? ? mdelay(10);
-> +
-> + ? ? ? __raw_writel(AERPOWERON, nuc900_rtc->rtc_reg + REG_RTC_AER);
-> +
-> + ? ? ? for (i = 0; i < 1000000; i++) {
-> + ? ? ? ? ? ? ? if (__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB)
-> + ? ? ? ? ? ? ? ? ? ? ? break;
-> + ? ? ? }
-> +}
-> +
-> +static void nuc900_rtc_bcd2bin(unsigned int timereg,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int calreg, struct rtc_time *tm)
-> +{
-> + ? ? ? tm->tm_mday ? ? = bcd2bin(calreg >> 0);
-> + ? ? ? tm->tm_mon ? ? ?= bcd2bin(calreg >> 8);
-> + ? ? ? tm->tm_year ? ? = bcd2bin(calreg >> 16) + 100;
-> +
-> + ? ? ? tm->tm_sec ? ? ?= bcd2bin(timereg >> 0);
-> + ? ? ? tm->tm_min ? ? ?= bcd2bin(timereg >> 8);
-> + ? ? ? tm->tm_hour ? ? = bcd2bin(timereg >> 16);
-> +
-> + ? ? ? rtc_valid_tm(tm);
-> +}
-> +
-> +static void nuc900_rtc_bin2bcd(struct rtc_time *settm,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct nuc900_bcd_time *gettm)
-> +{
-> + ? ? ? gettm->bcd_mday = bin2bcd(settm->tm_mday) << 0;
-> + ? ? ? gettm->bcd_mon ?= bin2bcd(settm->tm_mon) << 8;
-> + ? ? ? gettm->bcd_year = bin2bcd(settm->tm_year - 100) << 16;
-> +
-> + ? ? ? gettm->bcd_sec ?= bin2bcd(settm->tm_sec) << 0;
-> + ? ? ? gettm->bcd_min ?= bin2bcd(settm->tm_min) << 8;
-> + ? ? ? gettm->bcd_hour = bin2bcd(settm->tm_hour) << 16;
-> +}
-> +
-> +static int nuc900_update_irq_enable(struct device *dev, unsigned int enabled)
-> +{
-> + ? ? ? struct nuc900_rtc *rtc = dev_get_drvdata(dev);
-> +
-> + ? ? ? if (enabled)
-> + ? ? ? ? ? ? ? __raw_writel(__raw_readl(rtc->rtc_reg + REG_RTC_RIER)|
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (TICKINTENB), rtc->rtc_reg + REG_RTC_RIER);
-> + ? ? ? else
-> + ? ? ? ? ? ? ? __raw_writel(__raw_readl(rtc->rtc_reg + REG_RTC_RIER)&
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (~TICKINTENB), rtc->rtc_reg + REG_RTC_RIER);
-> +
-> + ? ? ? return 0;
-> +}
-I think you should lock irq before the serial read and write to the
-REG_RTC_RIER register.
+Hello Juergen,
+I'm sure the configuration of PCR for my application is ok (it's ported 
+from a kernel module which uses Intel Access Library).. anyway, it looks 
+like the following:
+		// tx
+		msg.data32 = 	PCR_FRM_SYNC_OUTPUT_RISING |
+				PCR_MSB_ENDIAN |
+				PCR_FRM_SYNC_RISINGEDGE |
+				PCR_TX_DATA_ENABLE |
+				PCR_DCLK_EDGE_RISING |
+				PCR_SYNC_CLK_DIR_OUTPUT |
+				PCR_SOF_NO_FBIT;
+		// rx
+		msg.data32 =    PCR_FRM_SYNC_RISINGEDGE |
+                                 PCR_MSB_ENDIAN |
+                                 PCR_SOF_NO_FBIT;
+
+Bye!
+
+Juergen Schindele ha scritto:
+> Am Dienstag, 24. November 2009 schrieb Davide Di Gesualdo:
+>> Hi all,
+> Dear Davide,
+> i am using ixp4xx-hss for an HDLC.X21 frontend in packetized mode
+> with all timeslots from kernel version 2.6.27.36
+> To receive correctly i had to modify the parameters 
+> in "hss_config_set_pcr" function. I compared to intel software stack
+> for IXP425 which was already working for us. 
+> 
+> in function static void hss_config_set_pcr(struct port *port)
+> ....
+> -		msg.data32 = PCR_FRM_SYNC_OUTPUT_RISING | PCR_MSB_ENDIAN |
+> -			PCR_TX_DATA_ENABLE;
+> +		msg.data32 = PCR_FRM_SYNC_ACTIVE_HIGH | PCR_MSB_ENDIAN |
+> +			PCR_TX_DATA_ENABLE | PCR_FCLK_EDGE_RISING | PCR_FRM_PULSE_DISABLED;
+> ....
+> 
+> Nevertheless i am receiving correct data but packet len is always zero!
+> Have you already encountered this ???
+> 
+> Bye 
+>> I'm writing a kernel module for a HSS channelized service on IXP425 
+>> processor, based on ixp4xx_hss. I'm developing on a IXDPG425 Intel 
+>> board, and the HSS bus is attached to four Si3210 ProSLIC chips.
+>> The purpose of this module is to read/write from/to HSS 8-byte buffers 
+>> in raw mode (no particular alignment is required). In write direction, 
+>> everything seems ok: if I write a buffer like
+>> char buf[] = {0xcb, 0xcb, 0xcb, 0xcb, 0xcb, 0xcb, 0xcb, 0xcb};
+>> on a fixed timeslot and then read the TXD pin signal with a scope, I can 
+>> see the correct waveform at the correct place; I've also tried to write 
+>> a tone with a fixed freqeuncy, and I've listened it correctly.
+>> The problem comes with read direction: I've tried to make a loopback by 
+>> copying the rxbuffer in the txbuffer, but I can't hear my voice back 
+>> (instead I hear something like a continous buzz). I'm quite sure I read 
+>> the rxbuffer in the correct way (I do the same when I write txbuffer, 
+>> which works properly!). This is the ISR for HSS read-complete interrupt:
+> --------------------------------------------------------------
+> J?rgen Schindele  
+> Software-Entwicklung
+> 
+> NENTEC Netzwerktechnologie GmbH
+> Greschbachstr. 12
+> 76229 Karlsruhe
+> Deutschland
+> Telefon: +49 721 94249-51
+> Telefax: +49 721 94249-10
+> E-Mail:  schindele at nentec.de
+> WEB:     www.nentec.de
+>  
+> Gesch?ftsf?hrung: Klaus Becker, Roland Knapp
+> Sitz der Gesellschaft: Karlsruhe
+> Handelsregister: Amtsgericht Mannheim HRB 107658
+> 
+> --------------------------------------------------------------
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
 
 
-> +
-> +static int nuc900_alarm_irq_enable(struct device *dev, unsigned int enabled)
-> +{
-> + ? ? ? struct nuc900_rtc *rtc = dev_get_drvdata(dev);
-> +
-> + ? ? ? if (enabled)
-> + ? ? ? ? ? ? ? __raw_writel(__raw_readl(rtc->rtc_reg + REG_RTC_RIER)|
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (ALARMINTENB), rtc->rtc_reg + REG_RTC_RIER);
-> + ? ? ? else
-> + ? ? ? ? ? ? ? __raw_writel(__raw_readl(rtc->rtc_reg + REG_RTC_RIER)&
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (~ALARMINTENB), rtc->rtc_reg + REG_RTC_RIER);
-> +
-> + ? ? ? return 0;
-> +}
-> +
-ditto
+-- 
+Davide Di Gesualdo
+Kasko Networks S.r.l.
+P.zza Regina Margherita, 7
+L'Aquila (AQ) - CAP 67100 - Italy
+Labs: +39 0862200460
+Mobile: +39 3206203127
+VoIP: +39 0857993233
+Skype: davide.digesualdo
