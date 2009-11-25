@@ -1,96 +1,85 @@
 From: mike@compulab.co.il (Mike Rapoport)
-Date: Wed, 25 Nov 2009 17:26:38 +0200
-Subject: [PATCH 05/17] ARM: pxa/raumfeld: add rotary encoder support
-In-Reply-To: <1259145751-3331-6-git-send-email-daniel@caiaq.de>
+Date: Wed, 25 Nov 2009 17:26:41 +0200
+Subject: [PATCH 09/17] ARM: pxa/raumfeld: add NAND partitions
+In-Reply-To: <1259145751-3331-10-git-send-email-daniel@caiaq.de>
 References: <1259145751-3331-1-git-send-email-daniel@caiaq.de>
-	<1259145751-3331-6-git-send-email-daniel@caiaq.de>
-Message-ID: <4B0D4CAE.50709@compulab.co.il>
+	<1259145751-3331-10-git-send-email-daniel@caiaq.de>
+Message-ID: <4B0D4CB1.4000608@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
 Daniel Mack wrote:
-> The 'Controller' and 'Speaker S/M' have a rotary encoder device for
-> volume control.
-> 
 > Signed-off-by: Daniel Mack <daniel@caiaq.de>
 > ---
->  arch/arm/mach-pxa/raumfeld.c |   35 +++++++++++++++++++++++++++++++++++
->  1 files changed, 35 insertions(+), 0 deletions(-)
+>  arch/arm/mach-pxa/raumfeld.c |   36 ++++++++++++++++++++++++++++++++++++
+>  1 files changed, 36 insertions(+), 0 deletions(-)
 > 
 > diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
-> index 2d47dc2..a2a2b18 100644
+> index 5d85f98..66b9af1 100644
 > --- a/arch/arm/mach-pxa/raumfeld.c
 > +++ b/arch/arm/mach-pxa/raumfeld.c
-> @@ -23,6 +23,8 @@
->  #include <linux/interrupt.h>
->  #include <linux/gpio.h>
->  #include <linux/smsc911x.h>
-> +#include <linux/input.h>
-> +#include <linux/rotary_encoder.h>
+> @@ -37,6 +37,7 @@
+>  #include <mach/pxa3xx-regs.h>
+>  #include <mach/mfp-pxa3xx.h>
+>  #include <mach/mfp-pxa300.h>
+> +#include <mach/pxa3xx_nand.h>
+>  #include <mach/ohci.h>
 >  
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> @@ -153,6 +155,27 @@ static struct pxaohci_platform_data raumfeld_ohci_info = {
->  	.flags		= ENABLE_PORT1,
->  };
+>  #include "generic.h"
+> @@ -152,6 +153,40 @@ static void __init raumfeld_eth_init(void)
+>  }
 >  
-> +/**
-> + * Rotary encoder input device
+>  /**
+> + * NAND
 > + */
-> +static struct rotary_encoder_platform_data raumfeld_rotary_encoder_info = {
-> +	.steps		= 24,
-> +	.axis		= REL_X,
-> +	.relative_axis	= 1,
-> +	.gpio_a		= mfp_to_gpio(GPIO_VOLENC_A),
-> +	.gpio_b		= mfp_to_gpio(GPIO_VOLENC_B),
-> +	.inverted_a	= 1,
-> +	.inverted_b	= 0,
+> +static struct mtd_partition raumfeld_nand_partitions[] = {
+> +	{
+> +		.name		= "Bootloader",
+> +		.offset		= 0,
+> +		.size		= 0xa0000,
+> +		.mask_flags	= MTD_WRITEABLE, /* force read-only */
+> +	},
+> +	{
+> +		.name		= "BootloaderEnvironment",
+> +		.offset		= 0xa0000,
+> +		.size		= 0x20000,
+> +	},
+> +	{
+> +		.name		= "BootloaderSplashScreen",
+> +		.offset		= 0xc0000,
+> +		.size		= 0x60000,
+> +	},
+> +	{
+> +		.name		= "UBI",
+> +		.offset		= 0x120000,
+> +		.size		= MTDPART_SIZ_FULL,
+> +	},
 > +};
 > +
-> +static struct platform_device rotary_encoder_device = {
-> +	.name		= "rotary-encoder",
-> +	.id		= 0,
-> +	.dev		= {
-> +		.platform_data = &raumfeld_rotary_encoder_info,
-> +	}
+> +static struct pxa3xx_nand_platform_data raumfeld_nand_info = {
+> +	.enable_arbiter	= 1,
+> +	.keep_config	= 1,
+> +	.parts		= raumfeld_nand_partitions,
+> +	.nr_parts	= ARRAY_SIZE(raumfeld_nand_partitions),
 > +};
 > +
->  static void __init raumfeld_common_init(void)
->  {
->  	enable_irq_wake(IRQ_WAKEUP0);
-> @@ -174,6 +197,12 @@ static void __init raumfeld_common_init(void)
+> +/**
+>   * USB (OHCI) support
+>   */
+>  static struct pxaohci_platform_data raumfeld_ohci_info = {
+> @@ -355,6 +390,7 @@ static void __init raumfeld_common_init(void)
+>  	pxa3xx_mfp_config(ARRAY_AND_SIZE(raumfeld_pin_config));
+>  	pxa_set_ohci_info(&raumfeld_ohci_info);
+>  	platform_add_devices(ARRAY_AND_SIZE(raumfeld_common_devices));
+> +	pxa3xx_set_nand_info(&raumfeld_nand_info);
+
+Wouldn't it be nicer to group all the pxa_set_* calls together?
+
+>  }
 >  
 >  static void __init raumfeld_controller_init(void)
->  {
-> +	struct platform_device *raumfeld_controller_devices[] = {
-> +		&rotary_encoder_device,
-> +	};
-
-Any reason to keep the devices array inside the function? I think it makes the
-code less readable.
-
-> +	platform_add_devices(ARRAY_AND_SIZE(raumfeld_controller_devices));
-> +
->  	raumfeld_common_init();
->  }
->  
-> @@ -185,6 +214,12 @@ static void __init raumfeld_connector_init(void)
->  
->  static void __init raumfeld_speaker_init(void)
->  {
-> +	struct platform_device *raumfeld_speaker_devices[] = {
-> +		&rotary_encoder_device,
-> +	};
-
-ditto
-
-> +	platform_add_devices(ARRAY_AND_SIZE(raumfeld_speaker_devices));
-> +
->  	raumfeld_common_init();
->  	raumfeld_eth_init();
->  }
 
 -- 
 Sincerely yours,
