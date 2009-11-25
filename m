@@ -1,62 +1,47 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 25 Nov 2009 14:04:35 +0100
-Subject: [PATCH 13/17] ARM: pxa/raumfeld: add Marvell Libertas via SDIO
-In-Reply-To: <20091125114946.GB3175@sirena.org.uk>
-References: <1259145751-3331-1-git-send-email-daniel@caiaq.de>
-	<1259145751-3331-14-git-send-email-daniel@caiaq.de>
-	<20091125114946.GB3175@sirena.org.uk>
-Message-ID: <20091125130435.GD14091@buzzloop.caiaq.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 25 Nov 2009 13:07:23 +0000
+Subject: [PATCH 12/17] ARM: pxa/raumfeld: add audio related functions
+In-Reply-To: <20091125122857.GJ29442@buzzloop.caiaq.de>
+References: <20091125122857.GJ29442@buzzloop.caiaq.de>
+Message-ID: <20091125130723.GA14045@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2009 at 11:49:47AM +0000, Mark Brown wrote:
-> On Wed, Nov 25, 2009 at 11:42:27AM +0100, Daniel Mack wrote:
-> 
-> > +#include <linux/regulator/consumer.h>
-> 
-> The regulator consumer stuff here feels like it'd be better put into the
-> driver itself since it doesn't seem to be specific to the machine -
-> other machines could use the same glue with different machine setup.
+On Wed, Nov 25, 2009 at 01:28:57PM +0100, Daniel Mack wrote:
+> On Wed, Nov 25, 2009 at 11:41:07AM +0000, Mark Brown wrote:
+> > On Wed, Nov 25, 2009 at 11:42:26AM +0100, Daniel Mack wrote:
 
-AH, the pxamci driver already does that. So I'll just name the supply
-'vmmc' and that's it. Will test that soon.
+> > > +	if (en) {
+> > > +		gpio_set_value(mfp_to_gpio(GPIO_AUDIO_VA_ENABLE), 1);
 
-> > +static void raumfeld_mci_setpower(struct device *dev, unsigned int on)
-> > +{
-> > +	int ret = 0;
-> > +	struct regulator *regulator = regulator_get(dev, "vcc_wifi");
-> 
-> Don't do this, take one reference to the regulaor at startup and then
-> use that throughout the lifetime of the sysetm.  If you don't do that
-> then the API may decide that the regulator is idle and disable it for
-> you.
-> 
-> I suspect that supply name might want to be just plain "vcc" unless the
-> chip really does have a single supply labelled as vcc_wifi - the name
-> should ideally match that used in the datasheet.
-> 
-> > +
-> > +	/* bring up V6 for SDIO/WLAN */
-> > +	if (IS_ERR(regulator)) {
-> > +		printk(KERN_ERR "%s(): unable to get regulator. err = %ld\n",
-> > +			__func__, PTR_ERR(regulator));
-> > +		return;
-> > +	}
-> > +
-> > +	if (on && !regulator_is_enabled(regulator)) {
-> > +		ret = regulator_enable(regulator);
-> 
-> Nack, if you're doing regulator_get() you should never need to check
-> regulator_is_enabled() since you can't know if something else is
-> incrementing or decrementing the reference count independantly of you.
-> Either use regulator_get_exclusive() (at which point you own the
-> regulator) or keep track of the on/off switch yourself.
+> > This looks like you want to add regulator support to the CODEC.
 
-The issue I was facing here was that the mmc power enable callback was
-called more than once with the same value for 'on', so the calls were
-not balanced and the regulator driver bailed.
+> Well, that's not really a regulator but just a GPIO that drives a FET.
+> Doesn't using the regulator framework seem a little overdone?
 
-Anyway, that will all go away when letting the driver do the regultar
-calls. Thanks for explaining that.
+No, the main goal here is to make sure the CODEC driver knows what's
+going on with its power.  In your system it is a trivial GPIO based
+regulator that's doing the power control but other systems might have
+something different.  Looking at it from the other angle, nothing about
+powering on and off the CODEC ought to be board specific.
 
-Daniel
+I do also have a plan in the back of my mind to use the runtime PM
+infrastructure to allow ASoC to push things down into BIAS_OFF when
+they're idle rather than just BIAS_STANDBY which this won't play well
+with.
+
+> > The relevant drivers really need to know about this...  if you are going
+> > to stick with this approach I'd push all this stuff into the audio
+
+> The idea was to only let the board support file know about GPIO
+> definitions, so the audio part doesn't need to know about the details.
+
+The audio driver is already entirely board specific, knowing about the
+GPIOs isn't going to make any odds here.  At the minute reading the
+code it looks like part of the audio driver has randomly been lifted out
+into a separate file for no particular reason.
+
+> But I can move that if you like. However, I don't see much benefit - I
+> would merely just move the whole function over.
+
+If nothing else it'll fix the extern in a .c file issue.
