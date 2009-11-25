@@ -1,33 +1,33 @@
-From: Thomas.Kunze@gmx.com (Thomas Kunze)
-Date: Wed, 25 Nov 2009 18:48:05 +0100
-Subject: [PATCH 00/20] iPAQ h3100/h3600 work for 2.6.33
-In-Reply-To: <20091125165301.GC5136@n2100.arm.linux.org.uk>
-References: <1256414658-22611-1-git-send-email-mad_soft@inbox.ru>	<20091024211026.GE16451@n2100.arm.linux.org.uk>	<20091025153603.GA24490@rainbow>
-	<20091115173048.GA19609@rainbow>	<20091123203931.GI18142@n2100.arm.linux.org.uk>	<20091124212541.GA5751@rainbow>
-	<20091125165301.GC5136@n2100.arm.linux.org.uk>
-Message-ID: <4B0D6DD5.6090403@gmx.com>
+From: john.ogness@linutronix.de (John Ogness)
+Date: Wed, 25 Nov 2009 19:19:58 +0100
+Subject: [PATCH] MXC: set GPIO IRQ handler
+Message-ID: <807htelb5d.fsf@merkur.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux schrieb:
-> On Wed, Nov 25, 2009 at 12:25:41AM +0300, Dmitry Artamonow wrote:
->   
->> Oh, and forgot to mention - your 'sa1100' branch is currently based on
->> 2.6.32-rc3, you'll need to rebase it on more current -rc before applying
->> my patches, because of 4918a0139 (ARM: 5752/1: SA1100: fix building of
->> h3100), which went in -rc4.
->>     
->
-> Ok, sa1100 rebased; please submit your patch series to the patch system,
-> or alternatively if you have a git tree, base it off my sa1100 branch
-> and I'll pull that instead.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->   
-What about the collie patches? Should I do the same?
+The irq chip function gpio_set_irq_type() correctly sets the i.MX
+registers but does not set the irq handler. This means that all
+gpio-based irq's are handled with handle_edge_irq().
 
-Regards,
-Thomas
+This patch corrects this by also setting the appropriate handler.
+
+This patch is against 2.6.32-rc8.
+
+Signed-off-by: John Ogness <john.ogness@linutronix.de>
+---
+ arch/arm/plat-mxc/gpio.c |    5 +++++
+ 1 file changed, 5 insertions(+)
+--- a/arch/arm/plat-mxc/gpio.c
++++ b/arch/arm/plat-mxc/gpio.c
+@@ -126,6 +126,11 @@ static int gpio_set_irq_type(u32 irq, u3
+ 	__raw_writel(val | (edge << (bit << 1)), reg);
+ 	_clear_gpio_irqstatus(port, gpio & 0x1f);
+ 
++	if (type & (IRQ_TYPE_LEVEL_LOW | IRQ_TYPE_LEVEL_HIGH))
++		__set_irq_handler_unlocked(irq, handle_level_irq);
++	else if (type & (IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING))
++		__set_irq_handler_unlocked(irq, handle_edge_irq);
++
+ 	return 0;
+ }
+ 
