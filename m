@@ -1,46 +1,50 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Wed, 25 Nov 2009 01:24:06 +0000
-Subject: CAS implementation may be broken
-In-Reply-To: <4B0BF899.7060106@45mercystreet.com>
-References: <4B08055C.3000408@45mercystreet.com>
-	<1258989196.8088.28.camel@pc1117.cambridge.arm.com>
-	<4B0BF899.7060106@45mercystreet.com>
-Message-ID: <20091125012406.GB13142@shareable.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 25 Nov 2009 08:27:15 +0100
+Subject: [PATCH v2] mx27: Add basic support for Maxtrack i-MXT TD60
+In-Reply-To: <154077.29305.qm@web51006.mail.re2.yahoo.com>
+References: <37367b3a0911241021u68ac346dmf30fc98f252b1d35@mail.gmail.com>
+	<154077.29305.qm@web51006.mail.re2.yahoo.com>
+Message-ID: <20091125072715.GS30179@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Toby Douglass wrote:
-> Catalin Marinas wrote:
-> Interestingly, I saw a day or two ago that there is a double-word 
-> version of LDREX.  The atomic-ptr project, which forms the basis of the 
-> GCC garbage collector, relies on this; it does not in fact use LL/SC on 
-> ARM, but rather uses double-word CAS using a pointer-counter pair.
+On Tue, Nov 24, 2009 at 03:19:42PM -0800, Fabio Estevam wrote:
+> Hi Alan,
+> 
+> --- On Tue, 11/24/09, Alan Carvalho de Assis <acassis@gmail.com> wrote:
+> 
+> > From: Alan Carvalho de Assis <acassis@gmail.com>
+> > Subject: [PATCH v2] mx27: Add basic support for Maxtrack i-MXT TD60
+> > To: "linux-arm-kernel" <linux-arm-kernel@lists.infradead.org>
+> > Cc: "Sascha Hauer" <s.hauer@pengutronix.de>, "Russell King - ARM Linux" <linux@arm.linux.org.uk>, "Daniel Mack" <daniel@caiaq.de>
+> > Date: Tuesday, November 24, 2009, 4:21 PM
+> > Signed-off-by: Alan Carvalho de Assis
+> > <acassis@gmail.com>
+> > ---
+> >  arch/arm/mach-mx2/Kconfig? ? |? ? 7
+> > ++
+> >  arch/arm/mach-mx2/Makefile???|? ?
+> > 1 +
+> >  arch/arm/mach-mx2/mxt_td60.c |? 245
+> > ++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 253 insertions(+), 0 deletions(-)
+> >  create mode 100644 arch/arm/mach-mx2/mxt_td60.c
+> 
+> Don't you need to add entries to
+> include/asm-arm/arch-mxc/debug-macro.S and arch
+> /arm/plat-mxc/include/mach/board-mxt_td60.h like other MX27 based
+> boards?
 
-Note that pointer-counter is not really reliable.
+There is no board specific code in debug-macro.S any more.
+board-mxt_td60.h is not needed, too. However, adding the board to
+uncompress.h might be a good idea to see the "uncompressing Linux"
+string.
 
-If a thread is suspended for the time taken for exactly 2^32 operations
-by other threads, it fails.  (Assuming 32-bit pointer + 32-bit counter).
+Sascha
 
-That's unlikely, but not impossible.
 
-Consider a program with 100 threads and one CPU, each thread in a
-tight loop doing atomic_op(&p) and some other things.  It's quite
-reasonable for 1 thread to be descheduled for the amount of time taken
-for 2^32 iterations from all the other threads, if the pointer-counter
-CAS operation is fast, which it increasingly is.
-
-Remember, this is one CPU so it's in L1 cache, and modern CPUs execute
-2^32 operations in a single second.  CAS operations are not
-single-cycle _yet_, but they continue to get faster.
-
-With 100 threads running without sleeping, the kernel may well
-deschedule one of them for several seconds as it cycles through them
-all and gives them "non-interactive" timeslices.
-
-It's also quite likely to wrap if someone used kill -STOP, and later
-kill -CONT on a thread, or if they're debugging one of the threads.
-
-Of course even if the counter wraps, you still have to be 1/2^32
-unlucky to see the same value.  But that's enough to make it unreliable.
-
--- Jamie
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
