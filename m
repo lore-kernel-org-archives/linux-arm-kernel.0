@@ -1,32 +1,42 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 25 Nov 2009 12:12:30 +0000
-Subject: [PATCH v2 06/17] ARM: dma-mapping: fix for speculative accesses
-In-Reply-To: <20091124162250.GA17481@n2100.arm.linux.org.uk>
-References: <E1NBYEF-0005l7-Tq@rmk-PC.arm.linux.org.uk>
-	<E1NCZ7p-0002A0-Ib@rmk-PC.arm.linux.org.uk>
-	<c70ff3ad0911230725h6d688c09k8576b66d012f29f0@mail.gmail.com>
-	<20091123172722.GE18142@n2100.arm.linux.org.uk>
-	<c70ff3ad0911240746v3438bba9y556cca3f027b3dd7@mail.gmail.com>
-	<20091124162250.GA17481@n2100.arm.linux.org.uk>
-Message-ID: <20091125121230.GA3737@sirena.org.uk>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Wed, 25 Nov 2009 13:14:22 +0100
+Subject: ARM: pxa: add support for Raumfeld audio devices
+In-Reply-To: <4B0D14B8.1000207@compulab.co.il>
+References: <1259145751-3331-1-git-send-email-daniel@caiaq.de>
+	<4B0D14B8.1000207@compulab.co.il>
+Message-ID: <20091125121421.GH29442@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2009 at 04:22:50PM +0000, Russell King - ARM Linux wrote:
+On Wed, Nov 25, 2009 at 01:27:52PM +0200, Mike Rapoport wrote:
+> Daniel Mack wrote:
+> > [PATCH 01/17] ARM: pxa/raumfeld: add basic structure for devices
+> > [PATCH 02/17] ARM: pxa/raumfeld: add GPIO definitions
+> > [PATCH 03/17] ARM: pxa/raumfeld: add SMSC9220 ethernet support
+> > [PATCH 04/17] ARM: pxa/raumfeld: add OHCI function
+> > [PATCH 05/17] ARM: pxa/raumfeld: add rotary encoder support
+> > [PATCH 06/17] ARM: pxa/raumfeld: add GPIO buttons
+> > [PATCH 07/17] ARM: pxa/raumfeld: add GPIO connected LEDs
+> > [PATCH 08/17] ARM: pxa/raumfeld: add one-wire function
+> > [PATCH 09/17] ARM: pxa/raumfeld: add NAND partitions
+> > [PATCH 10/17] ARM: pxa/raumfeld: add framebuffer and backlight devices
+> > [PATCH 11/17] ARM: pxa/raumfeld: add SPI controlled devices
+> > [PATCH 12/17] ARM: pxa/raumfeld: add audio related functions
+> > [PATCH 13/17] ARM: pxa/raumfeld: add Marvell Libertas via SDIO
+> > [PATCH 14/17] ARM: pxa/raumfeld: add power supply framework
+> > [PATCH 15/17] ARM: pxa/raumfeld: add support for I2C controlled devices
+> > [PATCH 16/17] ALSA: ARM: add Raumfeld audio support
+> > [PATCH 17/17] ARM: pxa/raumfeld: Add defconfig
+> 
+> I don't know what about others, but I find it difficult to follow too many small
+> patches. I'd personally prefer to have
+> "[PATCH 1/2] ARM: pxa: add raumfeld board support"
+> "[PATCH 1/2] ARM: pxa/raumfeld: add defconfig"
+> 
+> Once again, it's my personal preference :)
 
-> There isn't, because apparantly under git rules, as soon as I publish it
-> in git form it must be fixed.  So I'm keeping the stuff private and only
-> issuing patches on this mailing list.
+Well, I was told it is a lot easier to review patches when they're
+split up in smaller pieces. However, I would be fine if they are
+squashed when merged :)
 
-Rebasing is only a big deal if it's a branch other people are supposed
-to be working off, or (to a lesser extent) on a "final submission"
-branch for reviewed and stable patches.  A branch that's used for work
-in progress where the patches are being constantly revised isn't a
-problem here.
-
-The issue with branches other people are working off is that it's
-painful for them to have to constantly rebase or otherwise update for
-your history.  The issue with final submission branches is that rebasing
-those means that the history no longer shows the tree that was actually
-reviewed and accepted (and hopefully tested) which makes history
-analysis to locate breakages such as bisection less useful.
+Daniel
