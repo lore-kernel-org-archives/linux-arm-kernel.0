@@ -1,38 +1,22 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Nov 2009 16:59:45 +0000
-Subject: [PATCH 05/17] ARM: pxa/raumfeld: add rotary encoder support
-In-Reply-To: <4B0D4CAE.50709@compulab.co.il>
+Date: Wed, 25 Nov 2009 17:02:00 +0000
+Subject: [PATCH 08/17] ARM: pxa/raumfeld: add one-wire function
+In-Reply-To: <1259145751-3331-9-git-send-email-daniel@caiaq.de>
 References: <1259145751-3331-1-git-send-email-daniel@caiaq.de>
-	<1259145751-3331-6-git-send-email-daniel@caiaq.de>
-	<4B0D4CAE.50709@compulab.co.il>
-Message-ID: <20091125165945.GE5136@n2100.arm.linux.org.uk>
+	<1259145751-3331-9-git-send-email-daniel@caiaq.de>
+Message-ID: <20091125170200.GF5136@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2009 at 05:26:38PM +0200, Mike Rapoport wrote:
-> Daniel Mack wrote:
-> > @@ -174,6 +197,12 @@ static void __init raumfeld_common_init(void)
-> >  
-> >  static void __init raumfeld_controller_init(void)
-> >  {
-> > +	struct platform_device *raumfeld_controller_devices[] = {
-> > +		&rotary_encoder_device,
-> > +	};
-> 
-> Any reason to keep the devices array inside the function? I think it makes the
-> code less readable.
+On Wed, Nov 25, 2009 at 11:42:22AM +0100, Daniel Mack wrote:
+> +/**
+> + * One-wire (W1 bus) support
+> + */
+> +static void w1_enable_external_pullup(int enable)
+> +{
+> +	gpio_set_value(mfp_to_gpio(GPIO_W1_PULLUP_ENABLE), enable);
+> +	schedule_timeout(HZ);
 
-Also, non-static initialized structures and arrays inside functions are
-a waste of space.  You might as well write it like this, because the
-following is exactly what the compiler will be doing for you:
-
-static const struct platform_device *__raumfeld_controller_devices[] = {
-	&rotary_encoder_device,
-};
-
-static void __init raumfeld_controller_init(void)
-{
-	struct platform_device *raumfeld_controller_devices[ARRAY_SIZE(__raumfeld_controller_devices)];
-	memcpy(raumfeld_controller_devices, __raumfeld_controller_devices, sizeof(__raumfeld_controller_devices));
-	...
-}
+Shouldn't you be using msleep() here?  schedule_timeout() can terminate
+prematurely, particularly if there's a signal pending.  msleep() will
+wait for the full timeout.
