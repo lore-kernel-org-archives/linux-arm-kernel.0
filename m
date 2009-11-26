@@ -1,43 +1,19 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Fri, 27 Nov 2009 08:46:01 +1300
-Subject: [PATCH] add PATA host controller support for Cirrus Logic's EP93xx
-	CPUs
-In-Reply-To: <200911261651.40928.bzolnier@gmail.com>
-References: <200911261651.40928.bzolnier@gmail.com>
-Message-ID: <4B0EDAF9.7080902@bluewatersys.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 26 Nov 2009 23:11:26 +0100
+Subject: [PATCH 1/3] ARM: pxa/raumfeld: add platform support
+In-Reply-To: <20091126191840.GA8756@n2100.arm.linux.org.uk>
+References: <1259258341-31114-1-git-send-email-daniel@caiaq.de>
+	<200911262013.47713.marek.vasut@gmail.com>
+	<20091126191840.GA8756@n2100.arm.linux.org.uk>
+Message-ID: <200911262311.26533.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bartlomiej Zolnierkiewicz wrote:
-> Based on the older IDE host driver by Joao Ramos and review comments
-> for it from Sergei Shtylyov.  Not yet tested with the real hardware.
-
+Dne ?t 26. listopadu 2009 20:18:40 Russell King - ARM Linux napsal(a):
+> On Thu, Nov 26, 2009 at 08:13:47PM +0100, Marek Vasut wrote:
+> > Why don't we separate the common MFP configuration into another table as
+> > some platforms do ? The code duplication is horrible here ...
 > 
-> Sidenote:
+> Please read the comments on the previous patch series for this.
 > 
-> I have neither the hardware nor much personal interest in adding support
-> for it so I did it mainly cause:
-> 
-> - IDE host driver wasn't merged due to policy change and I hate seeing fair
->   amount of review work from me & Sergei going into waste. :)
-> 
-> - I was curious about some claims I've been hearing recently so I decided to
->   verify them in practice (porting the driver to libata was relatively easy
->   but unfortunately in the process it gained almost 50% in the LOC count..).
-> 
-> so if somebody would like to take over this patch feel free to do it.
-
-Thanks for doing this. I'll see if I can dig out a hard-drive and give
-this a test. I had some comments, but I will fix them up myself if I get
-round to testing this.
-
-~Ryan
-
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+So is it your preference or is there any valid argument to support your way ?
