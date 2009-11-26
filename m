@@ -1,24 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Nov 2009 10:50:02 +0000
-Subject: [RESENT PATCH] Don't disable irqs in set_next_event and
-	set_mode callbacks
-In-Reply-To: <1259231164-21242-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1253518763-15087-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1259231164-21242-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20091126105002.GB2393@n2100.arm.linux.org.uk>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Thu, 26 Nov 2009 12:10:13 +0100
+Subject: [PATCH] MMC: pxamci: call pdata->setpower even when regulator is used
+Message-ID: <1259233813-2724-1-git-send-email-daniel@caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 26, 2009 at 11:26:04AM +0100, Uwe Kleine-K?nig wrote:
-> These functions are called with irqs already off.
-> 
-> AT91RM2000 had a WARN_ON_ONCE if irqs were enabled since Nov 2008 with
-> noone reporting having hit it.
+On platforms where the vmmc regulator is used, it might still be
+necessary to call the platform data's setpower() callback in order to
+drive GPIOs to power up hardware.
 
-Can we please start to create some documentation for this, even if it
-just starts off as "these callbacks are always called with irqs
-disabled" or some such thing.
+I can't see any pxamci user with power regulators enabled, hence this
+shouldn't break anything.
 
-I find the generic time stuff extremely difficult to work with, and I
-suspect I'm not the only one.  This is probably why people like to be
-sure by having their own IRQ disabling.
+Signed-off-by: Daniel Mack <daniel@caiaq.de>
+Cc: Pierre Ossman <pierre@ossman.eu>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: linux-mmc at vger.kernel.org
+---
+ drivers/mmc/host/pxamci.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
+index b00d673..c35df2b 100644
+--- a/drivers/mmc/host/pxamci.c
++++ b/drivers/mmc/host/pxamci.c
+@@ -84,7 +84,7 @@ static inline void pxamci_init_ocr(struct pxamci_host *host)
+ 		host->mmc->ocr_avail = mmc_regulator_get_ocrmask(host->vcc);
+ 		if (host->pdata && host->pdata->ocr_mask)
+ 			dev_warn(mmc_dev(host->mmc),
+-				"ocr_mask/setpower will not be used\n");
++				"given ocr_mask will not be used\n");
+ 	}
+ #endif
+ 	if (host->vcc == NULL) {
+@@ -109,7 +109,7 @@ static inline void pxamci_set_power(struct pxamci_host *host, unsigned int vdd)
+ 		gpio_set_value(host->pdata->gpio_power,
+ 			       !!on ^ host->pdata->gpio_power_invert);
+ 	}
+-	if (!host->vcc && host->pdata && host->pdata->setpower)
++	if (host->pdata && host->pdata->setpower)
+ 		host->pdata->setpower(mmc_dev(host->mmc), vdd);
+ }
+ 
+-- 
+1.6.5.2
