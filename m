@@ -1,60 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 26 Nov 2009 10:15:50 -0800
-Subject: [PATCH 0/8] Omap mux changes for v2.6.33 merge window (Series
-	short description)
-In-Reply-To: <4B0E6479.50608@compulab.co.il>
-References: <20091126001646.1546.34352.stgit@localhost>
-	<20091126002038.GH4348@atomide.com> <4B0E6479.50608@compulab.co.il>
-Message-ID: <20091126181550.GJ4348@atomide.com>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Thu, 26 Nov 2009 20:03:26 +0100
+Subject: IXP425: help on HSS channelized service
+In-Reply-To: <20091126144956.GA7150@n2100.arm.linux.org.uk> (Russell King's
+	message of "Thu, 26 Nov 2009 14:49:56 +0000")
+References: <4B0BDFC1.7010506@kaskonetworks.it>
+	<m3d437bi7i.fsf@intrepid.localdomain>
+	<200911261543.08448.schindele@nentec.de>
+	<20091126144956.GA7150@n2100.arm.linux.org.uk>
+Message-ID: <m33a41un0h.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mike Rapoport <mike@compulab.co.il> [091126 03:19]:
-> Tony,
-> 
-> Tony Lindgren wrote:
-> > * Tony Lindgren <tony@atomide.com> [091125 16:17]:
-> >> Hi all,
-> >>
-> >> Here are some omap mux updates for review. These
-> >> are intended for the v2.6.33 merge window.
-> > 
-> > Forgot to edit the subject :)
-> > 
-> > Also, these patches are available in the mux branch
-> > of the linux-omap tree for easy testing.
-> 
-> After all the discussions we had, what would be preferable way to define the
-> board mux configuration? The omap_board_mux array or a calls for
-> omap_mux_init_signal?
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-You should be able to just boot with CONFIG_DEBUG_FS,
-check how the pins are set, and adjust as needed via sysfs.
-Then when happy with the settings, just do:
+>> struct desc {
+>>         u32 next;               /* pointer to next buffer, unused */
+>> 
+>> #ifdef __ARMEB__
+>>         u16 buf_len;            /* buffer length */
+>>         u16 pkt_len;            /* packet length */
+>>         u32 data;               /* pointer to data buffer in RAM */
+>>         u8 status;
+>>         u8 error_count;
+>>         u16 __reserved;
+>> #else
+>>         u16 pkt_len;            /* packet length */
+>>         u16 buf_len;            /* buffer length */
+>>         u32 data;               /* pointer to data buffer in RAM */
+>>         u16 __reserved;
+>>         u8 error_count;
+>>         u8 status;
+>> #endif
+>>         u32 __reserved1[4];
+>
+> If these structures are sensitive to the byte-endian, they should be
+> defined using [bl]e(32|16|8) so that sparse can check that you're
+> using appropriate cpu_to_xxx() and xxx_to_cpu() endian conversions on
+> them.
 
-# cat /sys/kernel/debug/omap_mux/board                    
-OMAP3_MUX(CAM_D0, OMAP_PIN_INPUT | OMAP_PIN_OFF_WAKEUPENABLE | OMAP_MUX_MODE4),
-OMAP3_MUX(CAM_D10, OMAP_PIN_OUTPUT | OMAP_MUX_MODE7), 
-OMAP3_MUX(CAM_D11, OMAP_PIN_INPUT | OMAP_PIN_OFF_WAKEUPENABLE | OMAP_MUX_MODE4),
-OMAP3_MUX(CAM_D1, OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE | OMAP_MUX_MODE4),
-OMAP3_MUX(CAM_D2, OMAP_PIN_INPUT | OMAP_PIN_OFF_WAKEUPENABLE | OMAP_MUX_MODE4), 
-OMAP3_MUX(CAM_D3, OMAP_PIN_OUTPUT | OMAP_MUX_MODE4),
-OMAP3_MUX(CAM_D4, OMAP_PIN_OUTPUT | OMAP_MUX_MODE7),
-OMAP3_MUX(CAM_D5, OMAP_PIN_OUTPUT | OMAP_MUX_MODE4),
-OMAP3_MUX(CAM_D6, OMAP_PIN_INPUT | OMAP_MUX_MODE0),
-OMAP3_MUX(CAM_D7, OMAP_PIN_INPUT | OMAP_MUX_MODE0),
-OMAP3_MUX(CAM_D8, OMAP_PIN_INPUT | OMAP_MUX_MODE0),
-OMAP3_MUX(CAM_D9, OMAP_PIN_INPUT | OMAP_MUX_MODE0),
-...
+The values are in CPU order. I'll run sparse on this stuff, haven't done
+that in a (too) long time.
 
-And then use the output for the struct omap_board_mux board_mux[]
-in your board-*.c files.
-
-For the common device init functions and omap_hwmod, we probably
-want to use the signal names. That allows more generic initialization
-of the internal devices, but some pins for sure still need to
-be muxed in a board specific way.
-
-Regards,
-
-Tony
+It used to work in both LE and BE modes, though.
+-- 
+Krzysztof Halasa
