@@ -1,28 +1,76 @@
-From: trd@45mercystreet.com (Toby Douglass)
-Date: Thu, 26 Nov 2009 17:14:19 +0100
-Subject: CAS implementation may be broken
-In-Reply-To: <20091125012406.GB13142@shareable.org>
-References: <4B08055C.3000408@45mercystreet.com>
-	<1258989196.8088.28.camel@pc1117.cambridge.arm.com>
-	<4B0BF899.7060106@45mercystreet.com>
-	<20091125012406.GB13142@shareable.org>
-Message-ID: <4B0EA95B.20401@45mercystreet.com>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Thu, 26 Nov 2009 17:03:39 +0000
+Subject: [PATCH] add PATA host controller support for Cirrus Logic's
+	EP93xx CPUs
+In-Reply-To: <200911261651.40928.bzolnier@gmail.com>
+References: <200911261651.40928.bzolnier@gmail.com>
+Message-ID: <20091126170339.218f6674@lxorguk.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jamie Lokier wrote:
-> Toby Douglass wrote:
 
->> Interestingly, I saw a day or two ago that there is a double-word 
->> version of LDREX.  The atomic-ptr project, which forms the basis of the 
->> GCC garbage collector, relies on this; it does not in fact use LL/SC on 
->> ARM, but rather uses double-word CAS using a pointer-counter pair.
+> +static void pata_ep93xx_set_piomode(struct ata_port *ap,
+> +				    struct ata_device *adev)
+> +{
+> +	void __iomem *base = ap->host->private_data;
+> +	struct ata_device *pair = ata_dev_pair(adev);
+> +	const struct ata_timing *t = ata_timing_find_mode(adev->pio_mode);
+> +	const struct ata_timing *cmd_t = t;
+> +	u32 reg = IDECFG_IDEEN | IDECFG_PIO;
+> +	u8 pio = adev->pio_mode - XFER_PIO_0;
+> +
+> +	if (pair && pair->pio_mode < adev->pio_mode)
+> +		cmd_t = ata_timing_find_mode(pair->pio_mode);
+> +
+> +	/*
+> +	 * store the adequate PIO mode timings, to be used later
+> +	 * by pata_ep93xx_{read,write}
+> +	 */
+> +	adev->private_data = (void *)t;
+> +	ap->private_data = (void *)cmd_t;
+> +
+> +	/* reconfigure IDE controller according to PIO mode (?) */
 
-> Note that pointer-counter is not really reliable.
+This would probably be better in both drivers as a simple table. It would
+then not be a switch but collapse the entire pile into a single
 
-[snip case]
+	writel(pio_timing[pio], base + IDECFG);
 
-> Of course even if the counter wraps, you still have to be 1/2^32
-> unlucky to see the same value.  But that's enough to make it unreliable.
 
-I concur, but it's not a problem on 64-bit.
+> +static u16 __pata_ep93xx_read(void __iomem *base, void *addr,
+> +			      struct ata_timing *t)
+> +{
+> +	u32 reg;
+> +
+> +	reg = (unsigned long)addr | IDECTRL_DIORN | IDECTRL_DIOWN;
+> +	writel(reg, base + IDECTRL);
+> +	ndelay(t->setup);
+
+This implies a bus with no posting, which seems to the case from the
+other driver code.
+
+> +	while (!pata_ep93xx_check_iordy(base))
+> +		cpu_relax();
+
+And if the drive was hot unplugged this is doom incorporated (plus we
+might not be using an IORDY mode.
+
+>
+> +	while (!pata_ep93xx_check_iordy(base))
+> +		cpu_relax();
+
+Ditto
+
+
+I don't see anything wrong in the conversion. 
+
+The size thing is true - libata tried to abstract at a higher level which
+in turn avoids lots of computed branches to one liners and lets the
+compiler inline stuff better (eg all the private read/write methods into
+a single call free tf_* etc). It could I guess provide an "awkward
+case" skeleton tf_* and other sets of functions that were passed inb/outb
+ops. One for Jeff to ponder ?
+
+
+
+Alan
