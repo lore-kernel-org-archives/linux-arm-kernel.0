@@ -1,46 +1,41 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Thu, 26 Nov 2009 12:10:13 +0100
-Subject: [PATCH] MMC: pxamci: call pdata->setpower even when regulator is used
-Message-ID: <1259233813-2724-1-git-send-email-daniel@caiaq.de>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Thu, 26 Nov 2009 13:20:25 +0200
+Subject: [PATCH 0/8] Omap mux changes for v2.6.33 merge window (Series
+	short description)
+In-Reply-To: <20091126002038.GH4348@atomide.com>
+References: <20091126001646.1546.34352.stgit@localhost>
+	<20091126002038.GH4348@atomide.com>
+Message-ID: <4B0E6479.50608@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On platforms where the vmmc regulator is used, it might still be
-necessary to call the platform data's setpower() callback in order to
-drive GPIOs to power up hardware.
+Tony,
 
-I can't see any pxamci user with power regulators enabled, hence this
-shouldn't break anything.
+Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [091125 16:17]:
+>> Hi all,
+>>
+>> Here are some omap mux updates for review. These
+>> are intended for the v2.6.33 merge window.
+> 
+> Forgot to edit the subject :)
+> 
+> Also, these patches are available in the mux branch
+> of the linux-omap tree for easy testing.
 
-Signed-off-by: Daniel Mack <daniel@caiaq.de>
-Cc: Pierre Ossman <pierre@ossman.eu>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: linux-mmc at vger.kernel.org
----
- drivers/mmc/host/pxamci.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+After all the discussions we had, what would be preferable way to define the
+board mux configuration? The omap_board_mux array or a calls for
+omap_mux_init_signal?
 
-diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
-index b00d673..c35df2b 100644
---- a/drivers/mmc/host/pxamci.c
-+++ b/drivers/mmc/host/pxamci.c
-@@ -84,7 +84,7 @@ static inline void pxamci_init_ocr(struct pxamci_host *host)
- 		host->mmc->ocr_avail = mmc_regulator_get_ocrmask(host->vcc);
- 		if (host->pdata && host->pdata->ocr_mask)
- 			dev_warn(mmc_dev(host->mmc),
--				"ocr_mask/setpower will not be used\n");
-+				"given ocr_mask will not be used\n");
- 	}
- #endif
- 	if (host->vcc == NULL) {
-@@ -109,7 +109,7 @@ static inline void pxamci_set_power(struct pxamci_host *host, unsigned int vdd)
- 		gpio_set_value(host->pdata->gpio_power,
- 			       !!on ^ host->pdata->gpio_power_invert);
- 	}
--	if (!host->vcc && host->pdata && host->pdata->setpower)
-+	if (host->pdata && host->pdata->setpower)
- 		host->pdata->setpower(mmc_dev(host->mmc), vdd);
- }
- 
+> Regards,
+> 
+> Tony
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
 -- 
-1.6.5.2
+Sincerely yours,
+Mike.
