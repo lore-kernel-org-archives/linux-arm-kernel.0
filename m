@@ -1,16 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Nov 2009 19:18:40 +0000
-Subject: [PATCH 1/3] ARM: pxa/raumfeld: add platform support
-In-Reply-To: <200911262013.47713.marek.vasut@gmail.com>
-References: <1259258341-31114-1-git-send-email-daniel@caiaq.de>
-	<1259258341-31114-2-git-send-email-daniel@caiaq.de>
-	<200911262013.47713.marek.vasut@gmail.com>
-Message-ID: <20091126191840.GA8756@n2100.arm.linux.org.uk>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Thu, 26 Nov 2009 20:39:33 +0100
+Subject: IXP425: help on HSS channelized service
+In-Reply-To: <200911261543.08448.schindele@nentec.de> (Juergen Schindele's
+	message of "Thu, 26 Nov 2009 16:43:07 +0200")
+References: <4B0BDFC1.7010506@kaskonetworks.it>
+	<m3d437bi7i.fsf@intrepid.localdomain>
+	<200911261543.08448.schindele@nentec.de>
+Message-ID: <m3y6ltt6ru.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 26, 2009 at 08:13:47PM +0100, Marek Vasut wrote:
-> Why don't we separate the common MFP configuration into another table as some 
-> platforms do ? The code duplication is horrible here ...
+Juergen Schindele <schindele@nentec.de> writes:
 
-Please read the comments on the previous patch series for this.
+>> The buffers have different structures for RX and TX.
+> This was a very good hint :-). I discovered that the 
+> "struct desc" used in the kernel mainline driver is quite 
+> different from the one used in INTEL code !?????.
+
+Actually I meant the structures for channelized I/O RX and TX.
+
+> When I replace the "struct desc" (see below) it works fine for me.
+> Isn't there a general problem with this driver when it works only 
+> for channelized mode (your case) ???
+
+It most certainly works in packetized (HDLC) mode.
+
+Perhaps you're using IXP46x/43x CPU and the new firmware (3.x)?
+The driver works with fw 2.4 (and some older), i.e. the last firmware
+which works with IXP42x and 46x/43x.
+-- 
+Krzysztof Halasa
