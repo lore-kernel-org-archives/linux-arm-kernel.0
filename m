@@ -1,35 +1,21 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 26 Nov 2009 08:57:24 +0100
-Subject: [PATCH] MXC: set GPIO IRQ handler
-In-Reply-To: <807htelb5d.fsf@merkur.tec.linutronix.de>
-References: <807htelb5d.fsf@merkur.tec.linutronix.de>
-Message-ID: <20091126075724.GA12179@pengutronix.de>
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Thu, 26 Nov 2009 17:01:11 +0900
+Subject: Patches for S3C64XX SPI controller driver
+In-Reply-To: <20091126070952.GA24774@jasper.tkos.co.il>
+References: <1259218079-9755-1-git-send-email-jassi.brar@samsung.com>
+	<20091126070952.GA24774@jasper.tkos.co.il>
+Message-ID: <1b68c6790911260001u405b4a22m6da9a9ea4ba4b9bf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello John,
-
-On Wed, Nov 25, 2009 at 07:19:58PM +0100, John Ogness wrote:
-> The irq chip function gpio_set_irq_type() correctly sets the i.MX
-> registers but does not set the irq handler.
-I assume you see some breakage without your patch?  In mainline?
-
->                                             This means that all
-> gpio-based irq's are handled with handle_edge_irq().
-This is not true in mainline, until 060d20d (imx/gpio: Use
-handle_level_irq) (currently in imx/mxc-master) hits Linus' tree ...
-
-> This patch corrects this by also setting the appropriate handler.
-> 
-> This patch is against 2.6.32-rc8.
-... so there is no hurry.
-
-Can you please test with 060d20d if your breakage still occurs and
-if it is still valid report some details (for me and the commit log)?
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+On Thu, Nov 26, 2009 at 4:09 PM, Baruch Siach <baruch@tkos.co.il> wrote:
+> Hi Jassi,
+>
+> On Thu, Nov 26, 2009 at 03:47:59PM +0900, Jassi Brar wrote:
+>> ?In subsequent mails, I am going to submit new SPI driver
+>> for the S3C64xx Samsung SoCs.
+>
+> You should CC spi-devel-general at lists.sourceforge.net. See MAINTAINERS.
+my bad. it was supposed to be spi-devel-general instead of linux-mmc.
+it's just that i was so involved with mmc over spi, i messed up at the
+last moment :(
