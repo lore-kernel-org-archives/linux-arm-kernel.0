@@ -1,24 +1,35 @@
 From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
-Date: Fri, 27 Nov 2009 05:26:07 +0530
-Subject: [PATCH v4 4/6] ARM: U8500 Makefile.boot
-Message-ID: <1259279767.13327.73.camel@vinay-desktop>
+Date: Fri, 27 Nov 2009 05:26:16 +0530
+Subject: [PATCH v4 5/6] ARM nomadik: enable U8500 for common platform
+Message-ID: <1259279776.13327.74.camel@vinay-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-Date: Fri, 27 Nov 2009 15:45:58 +0530
+Date: Fri, 27 Nov 2009 15:46:48 +0530
 
-The Makefile.boot for the U8500 platform
+Enable U8500 architecture to get access to
+the common code shared across various
+ST-Ericsson's machines like nomadik.
 
 Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+Acked-by: Andrea Gallo <andrea.gallo@stericsson.com>
 ---
- .../{mach-footbridge => mach-ux500}/Makefile.boot  |    0
- 1 files changed, 0 insertions(+), 0 deletions(-)
- copy arch/arm/{mach-footbridge => mach-ux500}/Makefile.boot (100%)
+ arch/arm/plat-nomadik/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-footbridge/Makefile.boot b/arch/arm/mach-ux500/Makefile.boot
-similarity index 100%
-copy from arch/arm/mach-footbridge/Makefile.boot
-copy to arch/arm/mach-ux500/Makefile.boot
+diff --git a/arch/arm/plat-nomadik/Kconfig b/arch/arm/plat-nomadik/Kconfig
+index e27ee31..159daf5 100644
+--- a/arch/arm/plat-nomadik/Kconfig
++++ b/arch/arm/plat-nomadik/Kconfig
+@@ -4,7 +4,7 @@
+ 
+ config PLAT_NOMADIK
+ 	bool
+-	depends on ARCH_NOMADIK
++	depends on ARCH_NOMADIK || ARCH_U8500
+ 	default y
+ 	help
+ 	  Common platform code for Nomadik and other ST-Ericsson
 -- 
 1.6.3.GIT
