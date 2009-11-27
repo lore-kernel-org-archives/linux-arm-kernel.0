@@ -1,81 +1,49 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 27 Nov 2009 22:10:06 +0100
-Subject: [PATCH] warn about shared irqs requesting IRQF_DISABLED registered
-	with setup_irq
-In-Reply-To: <20091127195857.GB28193@n2100.arm.linux.org.uk>
-References: <20091127195857.GB28193@n2100.arm.linux.org.uk>
-Message-ID: <1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 27 Nov 2009 22:31:15 +0100 (CET)
+Subject: [RESENT PATCH] Don't disable irqs in set_next_event and set_mode
+	callbacks
+In-Reply-To: <20091127204414.GD28193@n2100.arm.linux.org.uk>
+References: <1253518763-15087-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259231164-21242-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20091126105002.GB2393@n2100.arm.linux.org.uk>
+	<20091126113158.GC2393@n2100.arm.linux.org.uk>
+	<20091127104454.GA26570@pengutronix.de>
+	<20091127195857.GB28193@n2100.arm.linux.org.uk>
+	<20091127203823.GA28789@pengutronix.de>
+	<20091127204414.GD28193@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.0911272203400.24119@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IRQF_DISABLED is not guaranteed on shared irqs.  There is already a
-warning in place for irqs registered with request_irq (introduced in
-470c66239ef03).  Move it to __setup_irq, this way it triggers for both
-request_irq and setup_irq.
+On Fri, 27 Nov 2009, Russell King - ARM Linux wrote:
+> On Fri, Nov 27, 2009 at 09:38:23PM +0100, Uwe Kleine-K?nig wrote:
+> > OK, so this should make it save for mach-nomadik/timer.c,
+> > mach-pxa/time.c and mach-sa1100/time.c.
+> > 
+> > Only mach-at91/at91rm9200_time.c and mach-at91/at91sam926x_time.c
+> > request with IRQF_SHARED | IRQF_DISABLED.
+> > So for there the right solution is to let the local_irq_save in place
+> > and add a comment that it is needed as the timer irq is shared.
+> > This hopefully stopps people copying it unnecessarily.
+> 
+> Given that the gentime code spits out warnings if its called with IRQs
+> enabled, I don't think keeping the local_irq_save() in place is worth
+> it - especially given Thomas' response.
+> 
+> We've seen such warnings on AT91 (though I don't think we got positively
+> to the bottom of it with the reporter.)  If you _do_ want to ensure that
 
-One irq that is now warned about is the timer tick on at91 (ARCH=arm).
+Any pointer ?
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: David Brownell <dbrownell@users.sourceforge.net>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-Cc: Ingo Molnar <mingo@elte.hu>
-Cc: Nicolas Pitre <nico@marvell.com>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: John Stultz <johnstul@us.ibm.com>
-Cc: Rusty Russell <rusty@rustcorp.com.au>
-Cc: Remy Bohmer <linux@bohmer.net>,
-Cc: Hugh Dickins <hugh.dickins@tiscali.co.uk>,
-Cc: Andrea Gallo <andrea.gallo@stericsson.com>,
-Cc: Thomas Gleixner <tglx@linutronix.de>,
-Cc: linux-arm-kernel at lists.infradead.org
----
- kernel/irq/manage.c |   26 +++++++++++++-------------
- 1 files changed, 13 insertions(+), 13 deletions(-)
+> AT91 is safe, wrapping the call to dev->event_handler(dev) in the AT91
+> interrupt handler with a local_irq_save/local_irq_restore would seem
+> sensible.
 
-diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-index bde4c66..59f4b54 100644
---- a/kernel/irq/manage.c
-+++ b/kernel/irq/manage.c
-@@ -613,6 +613,19 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
- 	int nested, shared = 0;
- 	int ret;
- 
-+	/*
-+	 * handle_IRQ_event() always ignores IRQF_DISABLED except for
-+	 * the _first_ irqaction (sigh).  That can cause oopsing, but
-+	 * the behavior is classified as "will not fix" so we need to
-+	 * start nudging drivers away from using that idiom.
-+	 */
-+	if ((new->flags & (IRQF_SHARED|IRQF_DISABLED)) ==
-+					(IRQF_SHARED|IRQF_DISABLED)) {
-+		pr_warning(
-+		  "IRQ %d/%s: IRQF_DISABLED is not guaranteed on shared IRQs\n",
-+			irq, new->name);
-+	}
-+
- 	if (!desc)
- 		return -EINVAL;
- 
-@@ -1008,19 +1021,6 @@ int request_threaded_irq(unsigned int irq, irq_handler_t handler,
- 	struct irq_desc *desc;
- 	int retval;
- 
--	/*
--	 * handle_IRQ_event() always ignores IRQF_DISABLED except for
--	 * the _first_ irqaction (sigh).  That can cause oopsing, but
--	 * the behavior is classified as "will not fix" so we need to
--	 * start nudging drivers away from using that idiom.
--	 */
--	if ((irqflags & (IRQF_SHARED|IRQF_DISABLED)) ==
--					(IRQF_SHARED|IRQF_DISABLED)) {
--		pr_warning(
--		  "IRQ %d/%s: IRQF_DISABLED is not guaranteed on shared IRQs\n",
--			irq, devname);
--	}
--
- #ifdef CONFIG_LOCKDEP
- 	/*
- 	 * Lockdep wants atomic interrupt handlers:
--- 
-1.6.5.2
+The only way how that would happen is when the serial interrupt would
+be set up _BEFORE_ the timer interrupt and when the serial handler
+would enable interrupts at some point. Shared interrupt handlers are
+called in order of setup.
+
+Thanks,
+
+	tglx
