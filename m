@@ -1,69 +1,116 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 27 Nov 2009 16:43:58 +0000
-Subject: [PATCH 6/7] S3C6410: Use platform data to supply pin configuration
-	for IISv4
+Date: Fri, 27 Nov 2009 16:43:57 +0000
+Subject: [PATCH 5/7] S3C6410: Define CLK_AUDIO2 for IISv4 block
 In-Reply-To: <20091127164312.GA11913@rakim.wolfsonmicro.main>
 References: <20091127164312.GA11913@rakim.wolfsonmicro.main>
-Message-ID: <1259340239-12067-6-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1259340239-12067-5-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Follow the lead of the PCM controller and make the driver less
-directly dependant on the particular CPU configuration.
+Note that due to the way the S3C clock API does matching based on
+the ID of the platform device the ID of CLK_AUDIO2 is set to -1.
 
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/plat-s3c64xx/dev-audio.c |   22 ++++++++++++++++++++++
- 1 files changed, 22 insertions(+), 0 deletions(-)
+ arch/arm/plat-s3c64xx/include/plat/regs-clock.h |    4 ++
+ arch/arm/plat-s3c64xx/s3c6400-clock.c           |   43 +++++++++++++++++++++++
+ 2 files changed, 47 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-s3c64xx/dev-audio.c b/arch/arm/plat-s3c64xx/dev-audio.c
-index a21a88f..e49e1eb 100644
---- a/arch/arm/plat-s3c64xx/dev-audio.c
-+++ b/arch/arm/plat-s3c64xx/dev-audio.c
-@@ -20,8 +20,10 @@
+diff --git a/arch/arm/plat-s3c64xx/include/plat/regs-clock.h b/arch/arm/plat-s3c64xx/include/plat/regs-clock.h
+index ff46e7f..8c429bb 100644
+--- a/arch/arm/plat-s3c64xx/include/plat/regs-clock.h
++++ b/arch/arm/plat-s3c64xx/include/plat/regs-clock.h
+@@ -25,6 +25,7 @@
+ #define S3C_EPLL_CON0		S3C_CLKREG(0x14)
+ #define S3C_EPLL_CON1		S3C_CLKREG(0x18)
+ #define S3C_CLK_SRC		S3C_CLKREG(0x1C)
++#define S3C_CLK_SRC2		S3C_CLKREG(0x10C)
+ #define S3C_CLK_DIV0		S3C_CLKREG(0x20)
+ #define S3C_CLK_DIV1		S3C_CLKREG(0x24)
+ #define S3C_CLK_DIV2		S3C_CLKREG(0x28)
+@@ -221,5 +222,8 @@
+ #define S3C6400_CLKSRC_UHOST_MASK	(0x3 << 5)
+ #define S3C6400_CLKSRC_UHOST_SHIFT	(5)
  
- #include <plat/devs.h>
- #include <plat/audio.h>
-+#include <plat/gpio-bank-c.h>
- #include <plat/gpio-bank-d.h>
- #include <plat/gpio-bank-e.h>
-+#include <plat/gpio-bank-h.h>
- #include <plat/gpio-cfg.h>
++/* CLK_SRC2 */
++#define S3C6410_CLKSRC_AUDIO2_MASK	(0x7 << 0)
++#define S3C6410_CLKSRC_AUDIO2_SHIFT	(0)
  
- static struct resource s3c64xx_iis0_resource[] = {
-@@ -56,6 +58,23 @@ struct platform_device s3c64xx_device_iis1 = {
+ #endif /* _PLAT_REGS_CLOCK_H */
+diff --git a/arch/arm/plat-s3c64xx/s3c6400-clock.c b/arch/arm/plat-s3c64xx/s3c6400-clock.c
+index b7e2015..1dee8c5 100644
+--- a/arch/arm/plat-s3c64xx/s3c6400-clock.c
++++ b/arch/arm/plat-s3c64xx/s3c6400-clock.c
+@@ -507,6 +507,11 @@ static struct clk clk_iis_cd1 = {
+ 	.id		= -1,
  };
- EXPORT_SYMBOL(s3c64xx_device_iis1);
  
-+static int s3c64xx_iisv4_cfg_gpio(struct platform_device *pdev)
-+{
-+	s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C64XX_GPC4_I2S_V40_DO0);
-+	s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C64XX_GPC5_I2S_V40_DO1);
-+	s3c_gpio_cfgpin(S3C64XX_GPC(7), S3C64XX_GPC7_I2S_V40_DO2);
-+	s3c_gpio_cfgpin(S3C64XX_GPH(6), S3C64XX_GPH6_I2S_V40_BCLK);
-+	s3c_gpio_cfgpin(S3C64XX_GPH(7), S3C64XX_GPH7_I2S_V40_CDCLK);
-+	s3c_gpio_cfgpin(S3C64XX_GPH(8), S3C64XX_GPH8_I2S_V40_LRCLK);
-+	s3c_gpio_cfgpin(S3C64XX_GPH(9), S3C64XX_GPH9_I2S_V40_DI);
-+
-+	return 0;
-+}
-+
-+static struct s3c_audio_pdata s3c64xx_iisv4_pdata = {
-+	.cfg_gpio = s3c64xx_iisv4_cfg_gpio,
++static struct clk clk_iis_v4_cd = {
++	.name		= "iis_v40_cdclk",
++	.id		= -1,
 +};
 +
- static struct resource s3c64xx_iisv4_resource[] = {
- 	[0] = {
- 		.start = S3C64XX_PA_IISV4,
-@@ -69,6 +88,9 @@ struct platform_device s3c64xx_device_iisv4 = {
- 	.id		  = -1,
- 	.num_resources	  = ARRAY_SIZE(s3c64xx_iisv4_resource),
- 	.resource	  = s3c64xx_iisv4_resource,
-+	.dev = {
-+		.platform_data = &s3c64xx_iisv4_pdata,
-+	},
+ static struct clk clk_pcm_cd = {
+ 	.name		= "pcm_cdclk",
+ 	.id		= -1,
+@@ -576,6 +581,42 @@ static struct clksrc_clk clk_audio1 = {
+ 	.reg_src	= S3C_CLK_SRC,
  };
- EXPORT_SYMBOL(s3c64xx_device_iisv4);
  
++static struct clk *clkset_audio2_list[] = {
++	[0] = &clk_mout_epll.clk,
++	[1] = &clk_dout_mpll,
++	[2] = &clk_fin_epll,
++	[3] = &clk_iis_v4_cd,
++	[4] = &clk_pcm_cd,
++};
++
++static struct clk_sources clkset_audio2 = {
++	.sources	= clkset_audio2_list,
++	.nr_sources	= ARRAY_SIZE(clkset_audio2_list),
++};
++
++/* Note that due to hard coding of clock ID to platform device ID we
++ * declare the ID for this clock as -1 even though it's called AUDIO2
++ * by the datasheet.
++ */
++static struct clksrc_clk clk_audio2 = {
++	.clk	= {
++		.name		= "audio-bus",
++		.id		= -1,
++		.ctrlbit        = S3C6410_CLKCON_SCLK_AUDIO2,
++		.enable		= s3c64xx_sclk_ctrl,
++		.set_parent	= s3c64xx_setparent_clksrc,
++		.get_rate	= s3c64xx_getrate_clksrc,
++		.set_rate	= s3c64xx_setrate_clksrc,
++		.round_rate	= s3c64xx_roundrate_clksrc,
++	},
++	.shift		= S3C6410_CLKSRC_AUDIO2_SHIFT,
++	.mask		= S3C6410_CLKSRC_AUDIO2_MASK,
++	.sources	= &clkset_audio2,
++	.divider_shift	= S3C6410_CLKDIV2_AUDIO2_SHIFT,
++	.reg_divider	= S3C_CLK_DIV2,
++	.reg_src	= S3C_CLK_SRC2,
++};
++
+ static struct clksrc_clk clk_irda = {
+ 	.clk	= {
+ 		.name		= "irda-bus",
+@@ -638,6 +679,7 @@ static struct clksrc_clk *init_parents[] = {
+ 	&clk_spi1,
+ 	&clk_audio0,
+ 	&clk_audio1,
++	&clk_audio2,
+ 	&clk_irda,
+ 	&clk_camif,
+ };
+@@ -742,6 +784,7 @@ static struct clk *clks[] __initdata = {
+ 	&clk_spi1.clk,
+ 	&clk_audio0.clk,
+ 	&clk_audio1.clk,
++	&clk_audio2.clk,
+ 	&clk_irda.clk,
+ 	&clk_camif.clk,
+ 	&clk_arm,
 -- 
 1.6.5.3
