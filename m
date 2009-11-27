@@ -1,40 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Nov 2009 22:04:25 +0000
-Subject: [PATCH 00/20] iPAQ h3100/h3600 work for 2.6.33
-In-Reply-To: <4B103A34.8020308@gmx.com>
-References: <1256414658-22611-1-git-send-email-mad_soft@inbox.ru>
-	<20091024211026.GE16451@n2100.arm.linux.org.uk>
-	<20091025153603.GA24490@rainbow> <20091115173048.GA19609@rainbow>
-	<20091123203931.GI18142@n2100.arm.linux.org.uk>
-	<20091124212541.GA5751@rainbow>
-	<20091125165301.GC5136@n2100.arm.linux.org.uk>
-	<4B0D6DD5.6090403@gmx.com>
-	<20091125221113.GJ5136@n2100.arm.linux.org.uk>
-	<4B103A34.8020308@gmx.com>
-Message-ID: <20091127220425.GF28193@n2100.arm.linux.org.uk>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 27 Nov 2009 23:18:00 +0100 (CET)
+Subject: [PATCH] warn about shared irqs requesting IRQF_DISABLED registered
+	with setup_irq
+In-Reply-To: <1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20091127195857.GB28193@n2100.arm.linux.org.uk>
+	<1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <alpine.LFD.2.00.0911272234460.24119@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 27, 2009 at 09:44:36PM +0100, Thomas Kunze wrote:
-> Russell King - ARM Linux schrieb:
->> On Wed, Nov 25, 2009 at 06:48:05PM +0100, Thomas Kunze wrote:
->> Yes please.  I'd like to get all my outstanding branches sorted and
->> merged into the 'devel' stuff so it can sit in linux-next for a while
->> before the merge window.
->>   
-> Please pull the for-lak branch at  
-> git://git.linuxtogo.org/home/thesing/collie.git
-> It contains the collie patches on top of 2.6.32-rc8 (see  
-> http://git.linuxtogo.org/?p=thesing/collie.git;a=shortlog;h=refs/heads/for-lak)
+On Fri, 27 Nov 2009, Uwe Kleine-K?nig wrote:
 
-In order to pull, I'd like to see at least a diffstat - you can get
-this by:
+> IRQF_DISABLED is not guaranteed on shared irqs.  There is already a
+> warning in place for irqs registered with request_irq (introduced in
+> 470c66239ef03).  Move it to __setup_irq, this way it triggers for both
+> request_irq and setup_irq.
+> 
+> One irq that is now warned about is the timer tick on at91 (ARCH=arm).
 
-git diff --stat origin...
+And how does that help ? The interrupt is shared between the timer and
+the debug port. There is nothing you can do about that.
 
-assuming that you have an 'origin' branch which relates to Linus'
-pristine kernel source.  This is so that I can confirm that I have
-what you intended me to pull.
+The interupt handlers are called in order of setup. The AT91 timer
+irq is set up first and if that's not the case then it needs to be
+fixed and the only way to catch it is in the affected interrupt
+handler.
 
-Even better would be to use something like git request-pull or something
-which generates a substantially similar output.
+Applying your patch does not change the hardware and will just result
+in useless, annoying and confusing dmesg warnings.
+
+> Cc: Rusty Russell <rusty@rustcorp.com.au>
+> Cc: Remy Bohmer <linux@bohmer.net>,
+> Cc: Hugh Dickins <hugh.dickins@tiscali.co.uk>,
+> Cc: Andrea Gallo <andrea.gallo@stericsson.com>,
+
+Nice that you added me (and others) to that long list, but ...
+
+> Cc: Thomas Gleixner <tglx@linutronix.de>,
+------------------------------------------^
+
+Thanks,
+
+	tglx
