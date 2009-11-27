@@ -1,58 +1,49 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 27 Nov 2009 21:38:23 +0100
-Subject: [RESENT PATCH] Don't disable irqs in set_next_event and
-	set_mode callbacks
-In-Reply-To: <20091127195857.GB28193@n2100.arm.linux.org.uk>
-References: <1253518763-15087-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1259231164-21242-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20091126105002.GB2393@n2100.arm.linux.org.uk>
-	<20091126113158.GC2393@n2100.arm.linux.org.uk>
-	<20091127104454.GA26570@pengutronix.de>
-	<20091127195857.GB28193@n2100.arm.linux.org.uk>
-Message-ID: <20091127203823.GA28789@pengutronix.de>
+From: ospite@studenti.unina.it (Antonio Ospite)
+Date: Fri, 27 Nov 2009 21:39:39 +0100
+Subject: [PATCH 0/3] pxa_camera: remove init() callback
+In-Reply-To: <1258495463-26029-1-git-send-email-ospite@studenti.unina.it>
+References: <1258495463-26029-1-git-send-email-ospite@studenti.unina.it>
+Message-ID: <20091127213939.9bb235fa.ospite@studenti.unina.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+On Tue, 17 Nov 2009 23:04:20 +0100
+Antonio Ospite <ospite@studenti.unina.it> wrote:
 
-On Fri, Nov 27, 2009 at 07:58:57PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Nov 27, 2009 at 11:44:55AM +0100, Uwe Kleine-K?nig wrote:
-> > Hello,
-> > 
-> > On Thu, Nov 26, 2009 at 11:31:58AM +0000, Russell King - ARM Linux wrote:
-> > > tick_do_broadcast
-> > > +-tick_do_periodic_broadcast
-> > > | `-tick_handle_periodic_broadcast
-> > > |   `- dev->event_handler
-> > > `-tick_handle_oneshot_broadcast
-> > >    `- dev->event_handler
-> > I currently fail to trace where the irqs are disabled, but I have an
-> > at91rm2000 machine and the warning doesn't trigger.
-> > Where are irqs reenabled after exception entry?  Is it before or after
-> > the handler is called?
+> Hi,
 > 
-> If interrupt handlers are requested with IRQF_DISABLED (as timer
-> interrupts should be), they will be called with IRQs disabled.
+> this series removes the init() callback from pxa_camera_platform_data, and
+> fixes its users to do initialization statically at machine init time.
 > 
-> There is one exception: if an interrupt is requested with
-> IRQF_SHARED|IRQF_DISABLED and either another handler enables interrupts
-> itself and leaves them enabled, or was requested without IRQF_DISABLED.
-> In this case, such a handler can still be called with IRQs enabled.
-OK, so this should make it save for mach-nomadik/timer.c,
-mach-pxa/time.c and mach-sa1100/time.c.
+[...]
+> Antonio Ospite (3):
+>   em-x270: don't use pxa_camera init() callback
+>   pcm990-baseboard: don't use pxa_camera init() callback
 
-Only mach-at91/at91rm9200_time.c and mach-at91/at91sam926x_time.c
-request with IRQF_SHARED | IRQF_DISABLED.
-So for there the right solution is to let the local_irq_save in place
-and add a comment that it is needed as the timer irq is shared.
-This hopefully stopps people copying it unnecessarily.
+Eric, if Guennadi ACKs v2 for these two please apply them only, we are
+postponing the third one, hence you can discard it.
 
-@Eric: do you still prefer the warning or is it OK for you now to remove
-the irq saving for nomadik, pxa and sa1100?
+>   pxa_camera: remove init() callback
+> 
 
-Best regards
-Uwe
+Thanks,
+   Antonio
 
 -- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Antonio Ospite
+http://ao2.it
+
+PGP public key ID: 0x4553B001
+
+A: Because it messes up the order in which people normally read text.
+   See http://en.wikipedia.org/wiki/Posting_style
+Q: Why is top-posting such a bad thing?
+A: Top-posting.
+Q: What is the most annoying thing in e-mail?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091127/23d5141f/attachment.sig>
