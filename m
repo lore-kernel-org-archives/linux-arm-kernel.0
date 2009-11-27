@@ -1,13 +1,21 @@
-From: joao.ramos@inov.pt (=?ISO-8859-1?Q?Jo=E3o_Ramos?=)
-Date: Thu, 26 Nov 2009 22:15:50 +0000
-Subject: [PATCH] add PATA host controller support for Cirrus Logic's EP93xx
-	CPUs
-In-Reply-To: <4B0EDAF9.7080902@bluewatersys.com>
-References: <200911261651.40928.bzolnier@gmail.com>
-	<4B0EDAF9.7080902@bluewatersys.com>
-Message-ID: <4B0EFE16.6020808@inov.pt>
+From: girishks2000@gmail.com (Girish KS)
+Date: Fri, 27 Nov 2009 13:30:31 +0900
+Subject: Disabling MMU Option for arm946E processor
+Message-ID: <6edb5f450911262030g46cdf564j27ccad2297e71fe3@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+>
+> Hello ,
+> I am new to linux platform.I am porting linux kernel 2.6.31.6 to a 946E
+> based (non MMU) board. The config option MMU for kernel version 2.6.31.6 is
+> defaulted to y. How can i override this option without changing the
+> arch/arm/Kconfig.
+>
+>
+> Regards
+> Girish K S
+>
+-------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091126/0e7396e4/attachment-0001.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091127/91f546ab/attachment.htm>
