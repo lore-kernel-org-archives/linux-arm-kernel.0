@@ -1,31 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 27 Nov 2009 08:16:20 -0800
-Subject: [PATCH 0/8] Omap mux changes for v2.6.33 merge window (Series
-	short description)
-In-Reply-To: <20091126002038.GH4348@atomide.com>
-References: <20091126001646.1546.34352.stgit@localhost>
-	<20091126002038.GH4348@atomide.com>
-Message-ID: <20091127161620.GL4348@atomide.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 27 Nov 2009 16:43:13 +0000
+Subject: [PATCH 0/7] S3C64XX IISv4 support
+Message-ID: <20091127164312.GA11913@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [091125 16:19]:
-> * Tony Lindgren <tony@atomide.com> [091125 16:17]:
-> > Hi all,
-> > 
-> > Here are some omap mux updates for review. These
-> > are intended for the v2.6.33 merge window.
-> 
-> Forgot to edit the subject :)
-> 
-> Also, these patches are available in the mux branch
-> of the linux-omap tree for easy testing.
+This patch series adds the arch/arm changes required to support the
+IISv4 block on the S3C6410 CPU, plus providing hookup for the block on
+the SMDK6410.  I know it's a bit late but it'd be great if we could get
+this into 2.6.33 - it'd be *very* handy for ASoC development.
 
-Also forgot to thank Benoit Cousson and Paul Walmsley
-for generating big parts of the omap mux register data.
+Jassi (1):
+      S3C64XX: Declare IISv4 PCLK for S3C6410
 
-Without this help the code would not be be complete.
+Mark Brown (6):
+      S3C64XX: Staticise platform data for PCM devices
+      S3C6410: Correct names of IISv4 data output pin definitions
+      S3C64XX: Add support for CLK_SRC2 configured clocks
+      S3C6410: Define CLK_AUDIO2 for IISv4 block
+      S3C6410: Use platform data to supply pin configuration for IISv4
+      SMDK6410: Register IISv4 device
 
-Cheers,
-
-Tony
+ arch/arm/mach-s3c6410/mach-smdk6410.c            |    1 +
+ arch/arm/plat-s3c64xx/clock.c                    |    8 +++
+ arch/arm/plat-s3c64xx/dev-audio.c                |   26 ++++++++-
+ arch/arm/plat-s3c64xx/include/plat/gpio-bank-c.h |    6 +-
+ arch/arm/plat-s3c64xx/include/plat/regs-clock.h  |    4 ++
+ arch/arm/plat-s3c64xx/s3c6400-clock.c            |   64 +++++++++++++++++++++-
+ 6 files changed, 101 insertions(+), 8 deletions(-)
