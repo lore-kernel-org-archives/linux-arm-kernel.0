@@ -1,23 +1,36 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Nov 2009 19:49:50 +0000
-Subject: [PATCH v4 0/6] ARM:  ST-Ericsson's U8500 SMP platform, a new
-	patch set
-In-Reply-To: <1259279725.13327.65.camel@vinay-desktop>
-References: <1259279725.13327.65.camel@vinay-desktop>
-Message-ID: <20091127194950.GA28193@n2100.arm.linux.org.uk>
+Date: Fri, 27 Nov 2009 19:58:57 +0000
+Subject: [RESENT PATCH] Don't disable irqs in set_next_event and
+	set_mode callbacks
+In-Reply-To: <20091127104454.GA26570@pengutronix.de>
+References: <1253518763-15087-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259231164-21242-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20091126105002.GB2393@n2100.arm.linux.org.uk>
+	<20091126113158.GC2393@n2100.arm.linux.org.uk>
+	<20091127104454.GA26570@pengutronix.de>
+Message-ID: <20091127195857.GB28193@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 27, 2009 at 05:25:25AM +0530, srinidhi kasagar wrote:
-> From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-> Date: Fri, 27 Nov 2009 16:24:37 +0530
+On Fri, Nov 27, 2009 at 11:44:55AM +0100, Uwe Kleine-K?nig wrote:
+> Hello,
 > 
-> This is the v4 version of patch set which adds U8500 machine.
-> v3 patch was posted to this list on 12th October 2009 and I 
-> have addressed the comments from Jean christophe on this version. 
-> 
-> The patch series has a dependency on the patch 5786/1 available in
-> Russell's patch tracking system. 5786/1 must be applied first.
+> On Thu, Nov 26, 2009 at 11:31:58AM +0000, Russell King - ARM Linux wrote:
+> > tick_do_broadcast
+> > +-tick_do_periodic_broadcast
+> > | `-tick_handle_periodic_broadcast
+> > |   `- dev->event_handler
+> > `-tick_handle_oneshot_broadcast
+> >    `- dev->event_handler
+> I currently fail to trace where the irqs are disabled, but I have an
+> at91rm2000 machine and the warning doesn't trigger.
+> Where are irqs reenabled after exception entry?  Is it before or after
+> the handler is called?
 
-This looks fine - unless anyone has any objections, I'd suggest submitting
-to the patch system since it depends on this currently unmerged patch.
+If interrupt handlers are requested with IRQF_DISABLED (as timer
+interrupts should be), they will be called with IRQs disabled.
+
+There is one exception: if an interrupt is requested with
+IRQF_SHARED|IRQF_DISABLED and either another handler enables interrupts
+itself and leaves them enabled, or was requested without IRQF_DISABLED.
+In this case, such a handler can still be called with IRQs enabled.
