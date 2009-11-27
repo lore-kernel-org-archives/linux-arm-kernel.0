@@ -1,51 +1,39 @@
-From: schindele@nentec.de (Juergen Schindele)
-Date: Fri, 27 Nov 2009 10:21:34 +0200
-Subject: IXP425: help on HSS channelized service
-In-Reply-To: <m3y6ltt6ru.fsf@intrepid.localdomain>
-References: <4B0BDFC1.7010506@kaskonetworks.it>
-	<200911261543.08448.schindele@nentec.de>
-	<m3y6ltt6ru.fsf@intrepid.localdomain>
-Message-ID: <200911270921.35517.schindele@nentec.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 Nov 2009 08:50:05 +0000
+Subject: [PATCH 1/3] ARM: pxa/raumfeld: add platform support
+In-Reply-To: <200911270249.24357.marek.vasut@gmail.com>
+References: <1259258341-31114-1-git-send-email-daniel@caiaq.de>
+	<200911262311.26533.marek.vasut@gmail.com>
+	<20091126221929.GB8756@n2100.arm.linux.org.uk>
+	<200911270249.24357.marek.vasut@gmail.com>
+Message-ID: <20091127085005.GA27009@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 26. November 2009 schrieb Krzysztof Halasa:
-> Juergen Schindele <schindele@nentec.de> writes:
+On Fri, Nov 27, 2009 at 02:49:24AM +0100, Marek Vasut wrote:
+> Dne ?t 26. listopadu 2009 23:19:30 Russell King - ARM Linux napsal(a):
+> > On Thu, Nov 26, 2009 at 11:11:26PM +0100, Marek Vasut wrote:
+> > > Dne ?t 26. listopadu 2009 20:18:40 Russell King - ARM Linux napsal(a):
+> > > > On Thu, Nov 26, 2009 at 08:13:47PM +0100, Marek Vasut wrote:
+> > > > > Why don't we separate the common MFP configuration into another table
+> > > > > as some platforms do ? The code duplication is horrible here ...
+> > > >
+> > > > Please read the comments on the previous patch series for this.
+> > >
+> > > So is it your preference or is there any valid argument to support your
+> > > way ?
+> > 
+> > The original way was to have many small tables setting up the MFP
+> > according to which devices were going to be registered.
 > 
-> >> The buffers have different structures for RX and TX.
-> > This was a very good hint :-). I discovered that the 
-> > "struct desc" used in the kernel mainline driver is quite 
-> > different from the one used in INTEL code !?????.
+> Yeah, that's weird.
+> > 
+> > Mike suggested to have one common table and a per-board table, but the
+> > response was that this could lead to duplications and other similar
+> > problems.
 > 
-> Actually I meant the structures for channelized I/O RX and TX.
-> 
-> > When I replace the "struct desc" (see below) it works fine for me.
-> > Isn't there a general problem with this driver when it works only 
-> > for channelized mode (your case) ???
-> 
-> It most certainly works in packetized (HDLC) mode.
-> 
-> Perhaps you're using IXP46x/43x CPU and the new firmware (3.x)?
-> The driver works with fw 2.4 (and some older), i.e. the last firmware
-> which works with IXP42x and 46x/43x.
-Thanks for your info. I thing thats the problem about it. I am using 
-an 2.0 firmware from INTEL and that could be the problem.
-Investigating......
+> Why duplications ? One common table (it's obvious which pins would be there) and 
+> 3 small tables containing the rest would be nice.
 
---------------------------------------------------------------
-J?rgen Schindele  
-Software-Entwicklung
-
-NENTEC Netzwerktechnologie GmbH
-Greschbachstr. 12
-76229 Karlsruhe
-Deutschland
-Telefon: +49 721 94249-51
-Telefax: +49 721 94249-10
-E-Mail:  schindele at nentec.de
-WEB:     www.nentec.de
- 
-Gesch?ftsf?hrung: Klaus Becker, Roland Knapp
-Sitz der Gesellschaft: Karlsruhe
-Handelsregister: Amtsgericht Mannheim HRB 107658
---------------------------------------------------------------
+Duplications when things are modified.  Like I said, read the original
+thread; this was covered there.
