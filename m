@@ -1,96 +1,107 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Fri, 27 Nov 2009 15:58:21 +0100
-Subject: [PATCH 02/10] support 88pm8606 in 860x driver
-In-Reply-To: <771cded00911211625g74601e5die59a680f36903cb3@mail.gmail.com>
-References: <771cded00911130054p2ef293ebse84b1de3cf4fa9fd@mail.gmail.com>
-	<20091120150215.GF3733@sortiz.org>
-	<771cded00911211625g74601e5die59a680f36903cb3@mail.gmail.com>
-Message-ID: <20091127145820.GA3640@sortiz.org>
+From: acassis@gmail.com (Alan Carvalho de Assis)
+Date: Fri, 27 Nov 2009 14:09:54 -0200
+Subject: [PATCH] mx27: mxt_td60: Add support to SD/MMC
+Message-ID: <1259338194-24132-1-git-send-email-acassis@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Haojian,
+This patch configures iomux and i2c io expander in order to add
+support to SD/MMC cards on i-MXT TD60.
 
-On Sun, Nov 22, 2009 at 08:25:48AM +0800, Haojian Zhuang wrote:
-> On Fri, Nov 20, 2009 at 11:02 PM, Samuel Ortiz <sameo@linux.intel.com> wrote:
-> > Hi Haojian,
-> >
-> > On Fri, Nov 13, 2009 at 03:54:52AM -0500, Haojian Zhuang wrote:
-> >> From 52a43fa137c45e62ced134b240c387b600f4ac0e Mon Sep 17 00:00:00 2001
-> >> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> >> Date: Fri, 6 Nov 2009 09:22:52 -0500
-> >> Subject: [PATCH] mfd: support 88pm8606 in 860x driver
-> >>
-> >> 88PM8606 and 88PM8607 are always used together. Although they're two discrete
-> >> chips, the logic function is tightly linked. For example, USB charger driver
-> >> is based on these two devices.
-> >>
-> >> Now share one driver to these two devices. Create a logical chip structure
-> >> that contains both 8606 device and 8607 device.
-> > I think it's a really good idea to have one driver for those 2 devices.
-> > However, I dont see much point in having the mixed_88pm860x common structure.
-> > That forces you in having a static structure there for no real benefit. In
-> > fact, by having it you're restricting yourself to the current HW
-> > configuration, i.e. at most 1 8806 and 1 8807.
-> Yes, I just want to restrict at most 1 8806 and 1 8807 in system. Or
-> we should have 1 8806 or 1 8807 in system.
-> Although I defined mixed_88pm860x common structure, I didn't use it
-> directly. I used pm860x_reg_read() to make use of this structure. In
-> all I2C operations, there's a descriptor indicator. This indicator is
-> used call 8807 operation in 8806 client. Since USB charger is the
-> device of 8806, it also need to access 8807 register. Otherwise, I
-> have to assert two i2c clients in 8806 device driver.
-Ok, I dont have the HW specs for those 2 devices, but it seems to me that
-wanting to link those 2 is a platform design, not a driver one. In other
-words, I dont see why it wouldnt be possible to have a platform with e.g only
-one 8806 or only one 8807. Is that correct ? If that's so, then you need to
-re-design this driver and forget about your static mixed structure.
-If your platform is designed so that you need to access one of the potentially
-available 8807 from one of the potentially available 8806, then you need to
-define an API to which you'd pass some platform data that would basically tell
-which of the 8807 you want to access.
+Signed-off-by: Alan Carvalho de Assis <acassis@gmail.com>
+---
+ arch/arm/mach-mx2/mxt_td60.c           |   39 ++++++++++++++++++++++++++++++-
+ arch/arm/plat-mxc/include/mach/iomux.h |    1 +
+ 2 files changed, 38 insertions(+), 2 deletions(-)
 
-On the other hand if it is impossible from a HW point of view to have a
-platform design where you'd have either a single 8806 or a single 8807, then 2
-things:
-- Your driver design would be ok.
-- Those chip designs are really bad as it should be one and only one single
-(and in particular only use one single i2c address space and id)
-
-Cheers,
-Samuel.
-
-
-> The only benefit of mixed_88pm860x is linking 8806 and 8807 together.
-> So 8806 device could directly fetch registers of 8807 device.
-> >
-> > You could just have a struct pm860x_chip with buck3_double field (should be a
-> > bool, by the way), a mutex, and be fine with it.
-> Yes, only one mutex is enough. In the 0002 patch, I defined mutex in
-> 8806, 8807 and mixed_88pm860x. It's over-designed. I removed mutex in
-> 8806 and 8807 in the followed patches. So there's only one mutex in
-> mixed_88pm860x structure.
-> >
-> > Besides this, the patch looks good to me.
-> >
-> > Cheers,
-> > Samuel.
-> >
-> >> All I2C operations are accessed by 860x-i2c driver. In order to support both
-> >> I2C client address, the read/write API is changed in below.
-> >>
-> >> reg_read(chip, descriptor, offset)
-> >> reg_write(chip, descriptor, offset, data)
-> >>
-> >> At here, descriptor is DESC_8606 or DESC_8607 that means operation on which
-> >> real device.
-> >>
-> >> The benefit is that client drivers only need one kind of read/write API. I2C
-> >> and MFD driver can be shared in both 8606 and 8607.
-> >>
-> >> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> >> ---
-
+diff --git a/arch/arm/mach-mx2/mxt_td60.c b/arch/arm/mach-mx2/mxt_td60.c
+index dd251f5..03dbbdc 100644
+--- a/arch/arm/mach-mx2/mxt_td60.c
++++ b/arch/arm/mach-mx2/mxt_td60.c
+@@ -36,6 +36,7 @@
+ #include <mach/iomux.h>
+ #include <mach/mxc_nand.h>
+ #include <mach/i2c.h>
++#include <linux/i2c/pca953x.h>
+ #include <mach/imxfb.h>
+ #include <mach/mmc.h>
+ 
+@@ -132,6 +133,7 @@ static unsigned int mxt_td60_pins[] __initdata = {
+ 	PE21_PF_SD1_D3,
+ 	PE22_PF_SD1_CMD,
+ 	PE23_PF_SD1_CLK,
++	PF8_AF_ATA_IORDY,
+ 	/* SDHC2*/
+ 	PB4_PF_SD2_D0,
+ 	PB5_PF_SD2_D1,
+@@ -150,7 +152,40 @@ static struct imxi2c_platform_data mxt_td60_i2c_data = {
+ 	.bitrate = 100000,
+ };
+ 
++/* PCA9557 */
++static int mxt_td60_pca9557_setup(struct i2c_client *client,
++				unsigned gpio_base, unsigned ngpio,
++				void *context)
++{
++	static int mxt_td60_gpio_value[] = {
++		-1, -1, -1, -1, -1, -1, -1, 1
++	};
++	int n;
++
++	for (n = 0; n < ARRAY_SIZE(mxt_td60_gpio_value); ++n) {
++		gpio_request(gpio_base + n, "MXT_TD60 GPIO Exp");
++		if (mxt_td60_gpio_value[n] < 0)
++			gpio_direction_input(gpio_base + n);
++		else
++			gpio_direction_output(gpio_base + n,
++						mxt_td60_gpio_value[n]);
++		gpio_export(gpio_base + n, 0);
++	}
++
++	return 0;
++}
++
++static struct pca953x_platform_data mxt_td60_pca9557_pdata = {
++	.gpio_base	= 240, /* place PCA9557 after all MX27 gpio pins */
++	.invert		= 0, /* Do not invert */
++	.setup		= mxt_td60_pca9557_setup,
++};
++
+ static struct i2c_board_info mxt_td60_i2c_devices[] = {
++	{
++		I2C_BOARD_INFO("pca9557", 0x18),
++		.platform_data = &mxt_td60_pca9557_pdata,
++	},
+ };
+ 
+ static struct imxi2c_platform_data mxt_td60_i2c2_data = {
+@@ -201,13 +236,13 @@ static struct imx_fb_platform_data mxt_td60_fb_data = {
+ static int mxt_td60_sdhc1_init(struct device *dev, irq_handler_t detect_irq,
+ 				void *data)
+ {
+-	return request_irq(IRQ_GPIOE(21), detect_irq, IRQF_TRIGGER_RISING,
++	return request_irq(IRQ_GPIOF(8), detect_irq, IRQF_TRIGGER_FALLING,
+ 				"sdhc1-card-detect", data);
+ }
+ 
+ static void mxt_td60_sdhc1_exit(struct device *dev, void *data)
+ {
+-	free_irq(IRQ_GPIOE(21), data);
++	free_irq(IRQ_GPIOF(8), data);
+ }
+ 
+ static struct imxmmc_platform_data sdhc1_pdata = {
+diff --git a/arch/arm/plat-mxc/include/mach/iomux.h b/arch/arm/plat-mxc/include/mach/iomux.h
+index 6d49f8a..011cfcd 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux.h
++++ b/arch/arm/plat-mxc/include/mach/iomux.h
+@@ -123,6 +123,7 @@
+ #define IRQ_GPIOC(x)  (IRQ_GPIOB(32) + x)
+ #define IRQ_GPIOD(x)  (IRQ_GPIOC(32) + x)
+ #define IRQ_GPIOE(x)  (IRQ_GPIOD(32) + x)
++#define IRQ_GPIOF(x)  (IRQ_GPIOE(32) + x)
+ 
+ 
+ extern void mxc_gpio_mode(int gpio_mode);
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+1.6.0.4
