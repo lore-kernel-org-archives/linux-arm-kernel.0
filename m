@@ -1,19 +1,89 @@
-From: acassis@gmail.com (Alan Carvalho de Assis)
-Date: Fri, 27 Nov 2009 12:40:52 -0200
-Subject: [PATCH v4] mx27: Add basic support for Maxtrack i-MXT TD60
-In-Reply-To: <20091127123307.GT29442@buzzloop.caiaq.de>
-References: <37367b3a0911250924u2224c484id539e8007abfed34@mail.gmail.com>
-	<20091127080329.GH27548@pengutronix.de>
-	<37367b3a0911270426x39a7539dw4aa3965ecefa31e7@mail.gmail.com>
-	<20091127123307.GT29442@buzzloop.caiaq.de>
-Message-ID: <37367b3a0911270640m64ddb179w6cb1c6060069fdca@mail.gmail.com>
+From: ospite@studenti.unina.it (Antonio Ospite)
+Date: Fri, 27 Nov 2009 15:47:22 +0100
+Subject: [PATCH 3/3] pxa_camera: remove init() callback
+In-Reply-To: <Pine.LNX.4.64.0911271535580.4383@axis700.grange>
+References: <1258495463-26029-1-git-send-email-ospite@studenti.unina.it>
+	<1258495463-26029-4-git-send-email-ospite@studenti.unina.it>
+	<Pine.LNX.4.64.0911271503460.4383@axis700.grange>
+	<20091127153230.d042d92e.ospite@studenti.unina.it>
+	<Pine.LNX.4.64.0911271535580.4383@axis700.grange>
+Message-ID: <20091127154722.0347b956.ospite@studenti.unina.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/09, Daniel Mack <daniel@caiaq.de> wrote:
->> I will try to use a Email Client to post patches.
->
-> Or use 'git send-email'.
+On Fri, 27 Nov 2009 15:37:19 +0100 (CET)
+Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+
+> On Fri, 27 Nov 2009, Antonio Ospite wrote:
+> 
+> > On Fri, 27 Nov 2009 15:06:53 +0100 (CET)
+> > Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> > 
+> > > On Tue, 17 Nov 2009, Antonio Ospite wrote:
+> > > 
+> > > > pxa_camera init() callback is sometimes abused to setup MFP for PXA CIF, or
+> > > > even to request GPIOs to be used by the camera *sensor*. These initializations
+> > > > can be performed statically in machine init functions.
+> > > > 
+> > > > The current semantics for this init() callback is ambiguous anyways, it is
+> > > > invoked in pxa_camera_activate(), hence at device node open, but its users use
+> > > > it like a generic initialization to be done at module init time (configure
+> > > > MFP, request GPIOs for *sensor* control).
+> > > > 
+> > > > Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
+> > > 
+> > > Antonio, to make the merging easier and avoid imposing extra dependencies, 
+> > > I would postpone this to 2.6.34, and just remove uses of .init() by 
+> > > pxa-camera users as per your other two patches. Would this be ok with you?
+> > > 
+> > > Thanks
+> > > Guennadi
+> > >
+> > 
+> > Perfectly fine with me.
+> > 
+> > Feel also free to anticipate me and edit the commit messages to
+> > whatever you want in the first two patches. Now that we aren't removing
+> > init() immediately after these it makes even more sense to change the
+> > phrasing from a future referencing
+> > 	"init() is going to be removed"
+> > to a more present focused
+> > 	"better not to use init() at all"
+> > form.
+> 
+> I cannot edit those subject lines, because I will not be handling those 
+> patches, they will go via the PXA tree, that's why it is easier to wait 
+> with the pxa patch.
 >
 
-Thanks Daniel, it worked fine here :-)
+I see, I am sending a v2 for the first two patches with changed commit
+messages in some hours then. Sorry for the delay.
+
+> Thanks
+> Guennadi
+> ---
+> Guennadi Liakhovetski, Ph.D.
+> Freelance Open-Source Software Developer
+> http://www.open-technology.de/
+
+Regards,
+   Antonio
+
+-- 
+Antonio Ospite
+http://ao2.it
+
+PGP public key ID: 0x4553B001
+
+A: Because it messes up the order in which people normally read text.
+   See http://en.wikipedia.org/wiki/Posting_style
+Q: Why is top-posting such a bad thing?
+A: Top-posting.
+Q: What is the most annoying thing in e-mail?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091127/172f15ac/attachment.sig>
