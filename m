@@ -1,67 +1,35 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 26 Nov 2009 20:13:09 -0500 (EST)
-Subject: Git pull request: Orion/Kirkwood/Dove stuff for next merge window
-Message-ID: <alpine.LFD.2.00.0911262005410.2059@xanadu.home>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Fri, 27 Nov 2009 01:37:26 +0000
+Subject: CAS implementation may be broken
+In-Reply-To: <4B0EA95B.20401@45mercystreet.com>
+References: <4B08055C.3000408@45mercystreet.com>
+	<1258989196.8088.28.camel@pc1117.cambridge.arm.com>
+	<4B0BF899.7060106@45mercystreet.com>
+	<20091125012406.GB13142@shareable.org>
+	<4B0EA95B.20401@45mercystreet.com>
+Message-ID: <20091127013726.GB6094@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell, please pull the following:
+Toby Douglass wrote:
+> Jamie Lokier wrote:
+> >Note that pointer-counter is not really reliable.
+> 
+> [snip case]
+> 
+> >Of course even if the counter wraps, you still have to be 1/2^32
+> >unlucky to see the same value.  But that's enough to make it unreliable.
+> 
+> I concur, but it's not a problem on 64-bit.
 
-	git://git.marvell.com/orion for-rmk
+Agree, about 64-bit.  (Until we have much faster CPUs :-)
 
-This contains updates for Kirkwood and addition of support for the Dove 
-SOC.
+It's occurred to me that it's possible to make pointer-counter safe.
 
-Lennert Buytenhek (1):
-      ARM: Add Tauros2 L2 cache controller support
+Simply, when about to wrap, send a signal to every thread.  The signal
+handler should check if the thread it has interrupted is inside a
+pointer-counter critical section, and if yes, force the interrupted
+code to synchronise with all the other threads in another way, such as
+using a mutex.
 
-Martin Michlmayr (4):
-      [ARM] Kirkwood: Add support for QNAP TS-41x Turbo NAS
-      [ARM] Kirkwood: Add MPP36 for QNAP TS-11x/TS-21x
-      [ARM] Kirkwood: Add QNAP TS-110/TS-210 to Kconfig help text
-      [ARM] Kirkwood: Remove code duplication in QNAP setup files
-
-Saeed Bishara (2):
-      ARM: add base support for Marvell Dove SoC
-      RTC: let Dove soc select the rtc-mv driver.
-
- arch/arm/Kconfig                              |   13 +
- arch/arm/Makefile                             |    1 +
- arch/arm/boot/compressed/head.S               |    6 +
- arch/arm/configs/dove_defconfig               | 1620 +++++++++++++++++++
- arch/arm/include/asm/hardware/cache-tauros2.h |   11 +
- arch/arm/mach-dove/Kconfig                    |   14 +
- arch/arm/mach-dove/Makefile                   |    3 +
- arch/arm/mach-dove/Makefile.boot              |    3 +
- arch/arm/mach-dove/addr-map.c                 |  149 ++
- arch/arm/mach-dove/common.c                   |  781 +++++++++
- arch/arm/mach-dove/common.h                   |   40 +
- arch/arm/mach-dove/dove-db-setup.c            |  102 ++
- arch/arm/mach-dove/include/mach/bridge-regs.h |   58 +
- arch/arm/mach-dove/include/mach/debug-macro.S |   20 +
- arch/arm/mach-dove/include/mach/dove.h        |  180 ++
- arch/arm/mach-dove/include/mach/entry-macro.S |   39 +
- arch/arm/mach-dove/include/mach/gpio.h        |   49 +
- arch/arm/mach-dove/include/mach/hardware.h    |   26 +
- arch/arm/mach-dove/include/mach/io.h          |   20 +
- arch/arm/mach-dove/include/mach/irqs.h        |  101 ++
- arch/arm/mach-dove/include/mach/memory.h      |   10 +
- arch/arm/mach-dove/include/mach/pm.h          |   54 +
- arch/arm/mach-dove/include/mach/system.h      |   36 +
- arch/arm/mach-dove/include/mach/timex.h       |    9 +
- arch/arm/mach-dove/include/mach/uncompress.h  |   37 +
- arch/arm/mach-dove/include/mach/vmalloc.h     |    5 +
- arch/arm/mach-dove/irq.c                      |  133 ++
- arch/arm/mach-dove/pcie.c                     |  238 +++
- arch/arm/mach-kirkwood/Kconfig                |   12 +-
- arch/arm/mach-kirkwood/Makefile               |    3 +-
- arch/arm/mach-kirkwood/ts219-setup.c          |  108 +--
- arch/arm/mach-kirkwood/ts41x-setup.c          |  154 ++
- arch/arm/mach-kirkwood/tsx1x-common.c         |  113 ++
- arch/arm/mach-kirkwood/tsx1x-common.h         |    7 +
- arch/arm/mm/Kconfig                           |   11 +-
- arch/arm/mm/Makefile                          |    2 +-
- arch/arm/mm/cache-tauros2.c                   |  263 +++
- arch/arm/mm/proc-v6.S                         |   33 +-
- drivers/rtc/Kconfig                           |    2 +-
- 39 files changed, 4356 insertions(+), 110 deletions(-)
+-- Jamie
