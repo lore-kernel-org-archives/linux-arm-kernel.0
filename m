@@ -1,33 +1,23 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 27 Nov 2009 20:08:55 +0100 (CET)
-Subject: [RESENT PATCH] Don't disable irqs in set_next_event and set_mode
-	callbacks
-In-Reply-To: <20091127104454.GA26570@pengutronix.de>
-References: <1253518763-15087-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1259231164-21242-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20091126105002.GB2393@n2100.arm.linux.org.uk>
-	<20091126113158.GC2393@n2100.arm.linux.org.uk>
-	<20091127104454.GA26570@pengutronix.de>
-Message-ID: <alpine.LFD.2.00.0911272004480.24119@localhost.localdomain>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 Nov 2009 19:49:50 +0000
+Subject: [PATCH v4 0/6] ARM:  ST-Ericsson's U8500 SMP platform, a new
+	patch set
+In-Reply-To: <1259279725.13327.65.camel@vinay-desktop>
+References: <1259279725.13327.65.camel@vinay-desktop>
+Message-ID: <20091127194950.GA28193@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Nov 2009, Uwe Kleine-K?nig wrote:
-> > which basically leaves us with the implementations interrupt handling
-> > function.  If that always calls the event handler with IRQs disabled,
-> > then set_next_event will also be called with IRQs disabled.
-> Thomas, do you care to shed light on this?
+On Fri, Nov 27, 2009 at 05:25:25AM +0530, srinidhi kasagar wrote:
+> From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+> Date: Fri, 27 Nov 2009 16:24:37 +0530
+> 
+> This is the v4 version of patch set which adds U8500 machine.
+> v3 patch was posted to this list on 12th October 2009 and I 
+> have addressed the comments from Jean christophe on this version. 
+> 
+> The patch series has a dependency on the patch 5786/1 available in
+> Russell's patch tracking system. 5786/1 must be applied first.
 
-I answered this before and still all CE functions are called with irqs
-disabled. The timer interrupt is required to run with irqs disabled
-and it was so before we switched to CE and the generic implementation.
-
-> If you don't care I suggest to add the same check as for at91rm2000 for
-> the other platforms and see what happens.
-
-And as last time I suggest to add a comment to the ce struct
-documentation, only this time I'll do it myself.
-
-Thanks,
-
-	tglx
+This looks fine - unless anyone has any objections, I'd suggest submitting
+to the patch system since it depends on this currently unmerged patch.
