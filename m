@@ -1,336 +1,106 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 27 Nov 2009 13:46:57 +0800
-Subject: [PATCH 1/3] ARM: pxa/raumfeld: add platform support
-In-Reply-To: <1259258341-31114-2-git-send-email-daniel@caiaq.de>
-References: <1259258341-31114-1-git-send-email-daniel@caiaq.de>
-	<1259258341-31114-2-git-send-email-daniel@caiaq.de>
-Message-ID: <f17812d70911262146s2d044b06n8be1aec10b2c117c@mail.gmail.com>
+From: adobriyan@gmail.com (Alexey Dobriyan)
+Date: Fri, 27 Nov 2009 09:37:46 +0300
+Subject: [PATCH] arm: convert /proc/cpu/aligment to seq_file
+Message-ID: <20091127063746.GB25983@x200.malnet.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 27, 2009 at 1:58 AM, Daniel Mack <daniel@caiaq.de> wrote:
-> This adds support for Raumfeld's 'Controller', 'Connector', 'Speaker S'
-> and 'Speaker M' devices. They're all based on PXA303 SoCs.
->
-> Signed-off-by: Daniel Mack <daniel@caiaq.de>
+Signed-off-by: Alexey Dobriyan <adobriyan@gmail.com>
+---
 
-Sorry Daniel, late on this.Patches are really clean and I assume you
-have merged all the previous patchset into these three ones in your
-v2 submission right? Some minor issues see below:
+ arch/arm/mm/alignment.c |   54 ++++++++++++++++++++++++------------------------
+ 1 file changed, 27 insertions(+), 27 deletions(-)
 
-> ---
-> ?arch/arm/mach-pxa/Kconfig ? ?| ? 18 +
-> ?arch/arm/mach-pxa/Makefile ? | ? ?3 +
-> ?arch/arm/mach-pxa/raumfeld.c | 1040 ++++++++++++++++++++++++++++++++++++++++++
-> ?3 files changed, 1061 insertions(+), 0 deletions(-)
-> ?create mode 100644 arch/arm/mach-pxa/raumfeld.c
->
-...
-> +/* inputs */
-> +#define GPIO_ON_OFF ? ? ? ? ? ?MFP_PIN_GPIO14
-> +#define GPIO_VOLENC_A ? ? ? ? ?MFP_PIN_GPIO19
-
-This is incorrect, MFP_PIN_GPIOxx is definition for the MFP, not strictly
-equal to the GPIO number, mfp_to_gpio() is for that purpose, but for
-simplicity, I'd prefer the following definition:
-
-#define GPIO_ON_OFF (14)
-
-And same to all the GPIO definitions below.
-
-> +#define GPIO_VOLENC_B ? ? ? ? ?MFP_PIN_GPIO20
-> +#define GPIO_CHARGE_DONE ? ? ? MFP_PIN_GPIO23
-> +#define GPIO_CHARGE_IND ? ? ? ? ? ? ? ?MFP_PIN_GPIO27
-.....
-> +
-> +/*
-> + * GPIO configurations
-> + */
-> +static mfp_cfg_t __raumfeld_controller_pin_config[] = {
-> + ? ? ? /* UART1 */
-> + ? ? ? GPIO77_UART1_RXD,
-
-Separate tables are fine. As long as they can be discarded later (which
-suggests a __initdata here), I don't mind a little bit of duplication provided
-the code is cleaner.
-
-> +
-> +/*
-> + * SMSC LAN9220 Ethernet
-> + */
-> +
-> +static struct resource smc91x_resources[] = {
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .start ?= PXA3xx_CS2_PHYS,
-> + ? ? ? ? ? ? ? .end ? ?= PXA3xx_CS2_PHYS + 0xfffff,
-> + ? ? ? ? ? ? ? .flags ?= IORESOURCE_MEM,
-> + ? ? ? },
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .start ?= gpio_to_irq(mfp_to_gpio(GPIO_ETH_IRQ)),
-> + ? ? ? ? ? ? ? .end ? ?= gpio_to_irq(mfp_to_gpio(GPIO_ETH_IRQ)),
-
-As pointed out, GPIO_ETH_IRQ sounds like a "GPIO" to me, so might be
-
-.start = gpio_to_irq(GPIO_ETH_IRQ)
-
-here is enough, otherwise use PIN_* not GPIO_* to avoid confusion?
-
-.start = gpio_to_irq(mfp_to_gpio(PIN_ETH_IRQ)),
-
-> + ? ? ? ? ? ? ? .flags ?= IORESOURCE_IRQ | IRQF_TRIGGER_FALLING,
-> + ? ? ? }
-> +};
-> +
-> +static struct smsc911x_platform_config raumfeld_smsc911x_config = {
-> + ? ? ? .phy_interface ?= PHY_INTERFACE_MODE_MII,
-> + ? ? ? .irq_polarity ? = SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
-> + ? ? ? .irq_type ? ? ? = SMSC911X_IRQ_TYPE_OPEN_DRAIN,
-> + ? ? ? .flags ? ? ? ? ?= SMSC911X_USE_32BIT | SMSC911X_SAVE_MAC_ADDRESS,
-> +};
-> +
-> +static struct platform_device smc91x_device = {
-> + ? ? ? .name ? ? ? ? ? = "smsc911x",
-> + ? ? ? .id ? ? ? ? ? ? = -1,
-> + ? ? ? .num_resources ?= ARRAY_SIZE(smc91x_resources),
-> + ? ? ? .resource ? ? ? = smc91x_resources,
-> + ? ? ? .dev ? ? ? ? ? ?= {
-> + ? ? ? ? ? ? ? .platform_data = &raumfeld_smsc911x_config,
-> + ? ? ? }
-> +};
-> +
-> +/**
-> + * NAND
-> + */
-
-....
-
-> +
-> +static struct rotary_encoder_platform_data raumfeld_rotary_encoder_info = {
-> + ? ? ? .steps ? ? ? ? ?= 24,
-> + ? ? ? .axis ? ? ? ? ? = REL_X,
-> + ? ? ? .relative_axis ?= 1,
-> + ? ? ? .gpio_a ? ? ? ? = mfp_to_gpio(GPIO_VOLENC_A),
-> + ? ? ? .gpio_b ? ? ? ? = mfp_to_gpio(GPIO_VOLENC_B),
-
-ditto
-
-> + ? ? ? .inverted_a ? ? = 1,
-> + ? ? ? .inverted_b ? ? = 0,
-> +};
-> +
-> +static struct platform_device rotary_encoder_device = {
-> + ? ? ? .name ? ? ? ? ? = "rotary-encoder",
-> + ? ? ? .id ? ? ? ? ? ? = 0,
-> + ? ? ? .dev ? ? ? ? ? ?= {
-> + ? ? ? ? ? ? ? .platform_data = &raumfeld_rotary_encoder_info,
-> + ? ? ? }
-> +};
-> +
-> +/**
-> + * GPIO buttons
-> + */
-> +
-> +static struct gpio_keys_button gpio_keys_button[] = {
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .code ? ? ? ? ? ? ? ? ? = KEY_F1,
-> + ? ? ? ? ? ? ? .type ? ? ? ? ? ? ? ? ? = EV_KEY,
-> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = mfp_to_gpio(GPIO_KEY1),
-> + ? ? ? ? ? ? ? .active_low ? ? ? ? ? ? = 1,
-> + ? ? ? ? ? ? ? .wakeup ? ? ? ? ? ? ? ? = 0,
-> + ? ? ? ? ? ? ? .debounce_interval ? ? ?= 5, /* ms */
-> + ? ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "Button 1",
-> + ? ? ? },
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .code ? ? ? ? ? ? ? ? ? = KEY_F2,
-> + ? ? ? ? ? ? ? .type ? ? ? ? ? ? ? ? ? = EV_KEY,
-> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = mfp_to_gpio(GPIO_KEY2),
-> + ? ? ? ? ? ? ? .active_low ? ? ? ? ? ? = 1,
-> + ? ? ? ? ? ? ? .wakeup ? ? ? ? ? ? ? ? = 0,
-> + ? ? ? ? ? ? ? .debounce_interval ? ? ?= 5, /* ms */
-> + ? ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "Button 2",
-> + ? ? ? },
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .code ? ? ? ? ? ? ? ? ? = KEY_F3,
-> + ? ? ? ? ? ? ? .type ? ? ? ? ? ? ? ? ? = EV_KEY,
-> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = mfp_to_gpio(GPIO_KEY3),
-> + ? ? ? ? ? ? ? .active_low ? ? ? ? ? ? = 1,
-> + ? ? ? ? ? ? ? .wakeup ? ? ? ? ? ? ? ? = 0,
-> + ? ? ? ? ? ? ? .debounce_interval ? ? ?= 5, /* ms */
-> + ? ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "Button 3",
-> + ? ? ? },
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .code ? ? ? ? ? ? ? ? ? = KEY_F4,
-> + ? ? ? ? ? ? ? .type ? ? ? ? ? ? ? ? ? = EV_KEY,
-> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = mfp_to_gpio(GPIO_RESCUE_BOOT),
-> + ? ? ? ? ? ? ? .active_low ? ? ? ? ? ? = 0,
-> + ? ? ? ? ? ? ? .wakeup ? ? ? ? ? ? ? ? = 0,
-> + ? ? ? ? ? ? ? .debounce_interval ? ? ?= 5, /* ms */
-> + ? ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "rescue boot button",
-> + ? ? ? },
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .code ? ? ? ? ? ? ? ? ? = KEY_F5,
-> + ? ? ? ? ? ? ? .type ? ? ? ? ? ? ? ? ? = EV_SW,
-> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = mfp_to_gpio(GPIO_DOCK_DETECT),
-> + ? ? ? ? ? ? ? .active_low ? ? ? ? ? ? = 1,
-> + ? ? ? ? ? ? ? .wakeup ? ? ? ? ? ? ? ? = 0,
-> + ? ? ? ? ? ? ? .debounce_interval ? ? ?= 5, /* ms */
-> + ? ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "dock detect",
-> + ? ? ? },
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .code ? ? ? ? ? ? ? ? ? = KEY_F6,
-> + ? ? ? ? ? ? ? .type ? ? ? ? ? ? ? ? ? = EV_KEY,
-> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = mfp_to_gpio(GPIO_ON_OFF),
-> + ? ? ? ? ? ? ? .active_low ? ? ? ? ? ? = 0,
-> + ? ? ? ? ? ? ? .wakeup ? ? ? ? ? ? ? ? = 0,
-> + ? ? ? ? ? ? ? .debounce_interval ? ? ?= 5, /* ms */
-> + ? ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "on/off button",
-> + ? ? ? },
-> +};
-> +
-> +static struct gpio_keys_platform_data gpio_keys_platform_data = {
-> + ? ? ? .buttons ? ? ? ?= gpio_keys_button,
-> + ? ? ? .nbuttons ? ? ? = ARRAY_SIZE(gpio_keys_button),
-> + ? ? ? .rep ? ? ? ? ? ?= 0,
-> +};
-> +
-> +static struct platform_device raumfeld_gpio_keys_device = {
-> + ? ? ? .name ? = "gpio-keys",
-> + ? ? ? .id ? ? = -1,
-> + ? ? ? .dev ? ?= {
-> + ? ? ? ? ? ? ? .platform_data ?= &gpio_keys_platform_data,
-> + ? ? ? }
-> +};
-> +
-> +/**
-> + * GPIO LEDs
-> + */
-> +
-> +static struct gpio_led raumfeld_leds[] = {
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "raumfeld:1",
-> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? = mfp_to_gpio(GPIO_LED1),
-> + ? ? ? ? ? ? ? .active_low ? ? = 1,
-> + ? ? ? ? ? ? ? .default_state ?= LEDS_GPIO_DEFSTATE_ON,
-> + ? ? ? },
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "raumfeld:2",
-> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? = mfp_to_gpio(GPIO_LED2),
-> + ? ? ? ? ? ? ? .active_low ? ? = 0,
-> + ? ? ? ? ? ? ? .default_state ?= LEDS_GPIO_DEFSTATE_OFF,
-> + ? ? ? }
-> +};
-> +
-> +static struct gpio_led_platform_data raumfeld_led_platform_data = {
-> + ? ? ? .leds ? ? ? ? ? = raumfeld_leds,
-> + ? ? ? .num_leds ? ? ? = ARRAY_SIZE(raumfeld_leds),
-> +};
-> +
-> +static struct platform_device raumfeld_led_device = {
-> + ? ? ? .name ? = "leds-gpio",
-> + ? ? ? .id ? ? = -1,
-> + ? ? ? .dev ? ?= {
-> + ? ? ? ? ? ? ? .platform_data = &raumfeld_led_platform_data,
-> + ? ? ? },
-> +};
-> +
-> +/**
-> + * One-wire (W1 bus) support
-> + */
-> +
-> +static void w1_enable_external_pullup(int enable)
-> +{
-> + ? ? ? gpio_set_value(mfp_to_gpio(GPIO_W1_PULLUP_ENABLE), enable);
-> + ? ? ? msleep(100);
-> +}
-> +
-> +static struct w1_gpio_platform_data w1_gpio_platform_data = {
-> + ? ? ? .pin ? ? ? ? ? ? ? ? ? ?= mfp_to_gpio(GPIO_ONE_WIRE),
-> + ? ? ? .is_open_drain ? ? ? ? ?= 0,
-> + ? ? ? .enable_external_pullup = w1_enable_external_pullup,
-> +};
-> +
-> +struct platform_device raumfeld_w1_gpio_device = {
-> + ? ? ? .name ? = "w1-gpio",
-> + ? ? ? .dev ? ?= {
-> + ? ? ? ? ? ? ? .platform_data = &w1_gpio_platform_data
-> + ? ? ? }
-> +};
-> +
-> +static void __init raumfeld_w1_init(void)
-> +{
-> + ? ? ? int ret = gpio_request(mfp_to_gpio(GPIO_W1_PULLUP_ENABLE),
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "W1 external pullup enable");
-> +
-> + ? ? ? if (ret < 0)
-> + ? ? ? ? ? ? ? pr_warning("Unable to request GPIO_W1_PULLUP_ENABLE\n");
-> + ? ? ? else
-> + ? ? ? ? ? ? ? gpio_direction_output(mfp_to_gpio(GPIO_W1_PULLUP_ENABLE), 0);
-> +
-> + ? ? ? platform_device_register(&raumfeld_w1_gpio_device);
-> +}
-> +
-> +/**
-> + * Framebuffer device
-> + */
-> +
-> +/* PWM controlled backlight */
-> +static struct platform_pwm_backlight_data raumfeld_pwm_backlight_data = {
-> + ? ? ? .pwm_id ? ? ? ? = 0,
-> + ? ? ? .max_brightness = 100,
-> + ? ? ? .dft_brightness = 100,
-> + ? ? ? /* 10000 ns = 10 ms ^= 100 kHz */
-> + ? ? ? .pwm_period_ns ?= 10000,
-> +};
-> +
-> +static struct platform_device raumfeld_pwm_backlight_device = {
-> + ? ? ? .name ? = "pwm-backlight",
-> + ? ? ? .dev ? ?= {
-> + ? ? ? ? ? ? ? .parent ? ? ? ? = &pxa27x_device_pwm0.dev,
-> + ? ? ? ? ? ? ? .platform_data ?= &raumfeld_pwm_backlight_data,
-> + ? ? ? }
-> +};
-> +
-> +/* LT3593 controlled backlight */
-> +static struct gpio_led raumfeld_lt3593_led = {
-> + ? ? ? .name ? ? ? ? ? = "backlight",
-> + ? ? ? .gpio ? ? ? ? ? = mfp_to_gpio(MFP_PIN_GPIO17),
-> + ? ? ? .default_state ?= LEDS_GPIO_DEFSTATE_ON,
-> +};
-> +
-> +static struct gpio_led_platform_data raumfeld_lt3593_platform_data = {
-> + ? ? ? .leds ? ? ? ? ? = &raumfeld_lt3593_led,
-> + ? ? ? .num_leds ? ? ? = 1,
-> +};
-> +
-> +static struct platform_device raumfeld_lt3593_device = {
-> + ? ? ? .name ? = "leds-lt3593",
-> + ? ? ? .id ? ? = -1,
-> + ? ? ? .dev ? ?= {
-> + ? ? ? ? ? ? ? .platform_data = &raumfeld_lt3593_platform_data,
-> + ? ? ? },
-> +};
-> +
-> +static struct pxafb_mode_info sharp_lq043t3dx02_mode = {
-> + ? ? ? .pixclock ? ? ? = 111000,
-> + ? ? ? .xres ? ? ? ? ? = 480,
-> + ? ? ? .yres ? ? ? ? ? = 272,
-> + ? ? ? .bpp ? ? ? ? ? ?= 16,
-> + ? ? ? .hsync_len ? ? ?= 4,
-> + ? ? ? .left_margin ? ?= 2,
-> + ? ? ? .right_margin ? = 1,
-> + ? ? ? .vsync_len ? ? ?= 1,
-> + ? ? ? .upper_margin ? = 3,
-> + ? ? ? .lower_margin ? = 1,
-> + ? ? ? .sync ? ? ? ? ? = 0,
-> +};
-> +
-> +static struct pxafb_mach_info raumfeld_sharp_lcd_info = {
-> + ? ? ? .modes ? ? ? ? ?= &sharp_lq043t3dx02_mode,
-> + ? ? ? .num_modes ? ? ?= 1,
-> + ? ? ? .video_mem_size = 0x400000,
-> + ? ? ? .lcd_conn ? ? ? = LCD_COLOR_TFT_16BPP | LCD_PCLK_EDGE_FALL,
-> +#ifdef CONFIG_PXA3XX_GCU
-> + ? ? ? .acceleration_enabled = 1,
-> +#endif
-
-I wonder this may be postponed to later merge window.
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -16,6 +16,7 @@
+ #include <linux/errno.h>
+ #include <linux/string.h>
+ #include <linux/proc_fs.h>
++#include <linux/seq_file.h>
+ #include <linux/init.h>
+ #include <linux/sched.h>
+ #include <linux/uaccess.h>
+@@ -91,36 +92,29 @@ static const char *usermode_action[] = {
+ 	"signal+warn"
+ };
+ 
+-static int
+-proc_alignment_read(char *page, char **start, off_t off, int count, int *eof,
+-		    void *data)
++static int alignment_proc_show(struct seq_file *m, void *v)
+ {
+-	char *p = page;
+-	int len;
+-
+-	p += sprintf(p, "User:\t\t%lu\n", ai_user);
+-	p += sprintf(p, "System:\t\t%lu\n", ai_sys);
+-	p += sprintf(p, "Skipped:\t%lu\n", ai_skipped);
+-	p += sprintf(p, "Half:\t\t%lu\n", ai_half);
+-	p += sprintf(p, "Word:\t\t%lu\n", ai_word);
++	seq_printf(m, "User:\t\t%lu\n", ai_user);
++	seq_printf(m, "System:\t\t%lu\n", ai_sys);
++	seq_printf(m, "Skipped:\t%lu\n", ai_skipped);
++	seq_printf(m, "Half:\t\t%lu\n", ai_half);
++	seq_printf(m, "Word:\t\t%lu\n", ai_word);
+ 	if (cpu_architecture() >= CPU_ARCH_ARMv5TE)
+-		p += sprintf(p, "DWord:\t\t%lu\n", ai_dword);
+-	p += sprintf(p, "Multi:\t\t%lu\n", ai_multi);
+-	p += sprintf(p, "User faults:\t%i (%s)\n", ai_usermode,
++		seq_printf(m, "DWord:\t\t%lu\n", ai_dword);
++	seq_printf(m, "Multi:\t\t%lu\n", ai_multi);
++	seq_printf(m, "User faults:\t%i (%s)\n", ai_usermode,
+ 			usermode_action[ai_usermode]);
+ 
+-	len = (p - page) - off;
+-	if (len < 0)
+-		len = 0;
+-
+-	*eof = (len <= count) ? 1 : 0;
+-	*start = page + off;
++	return 0;
++}
+ 
+-	return len;
++static int alignment_proc_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, alignment_proc_show, NULL);
+ }
+ 
+-static int proc_alignment_write(struct file *file, const char __user *buffer,
+-				unsigned long count, void *data)
++static ssize_t alignment_proc_write(struct file *file, const char __user *buffer,
++				    size_t count, loff_t *pos)
+ {
+ 	char mode;
+ 
+@@ -133,6 +127,14 @@ static int proc_alignment_write(struct file *file, const char __user *buffer,
+ 	return count;
+ }
+ 
++static const struct file_operations alignment_proc_fops = {
++	.owner		= THIS_MODULE,
++	.open		= alignment_proc_open,
++	.read		= seq_read,
++	.llseek		= seq_lseek,
++	.release	= single_release,
++	.write		= alignment_proc_write,
++};
+ #endif /* CONFIG_PROC_FS */
+ 
+ union offset_union {
+@@ -902,12 +904,10 @@ static int __init alignment_init(void)
+ 	if (!res)
+ 		return -ENOMEM;
+ 
+-	res = create_proc_entry("alignment", S_IWUSR | S_IRUGO, res);
++	res = proc_create("alignment", S_IWUSR | S_IRUGO, res,
++			  &alignment_proc_fops);
+ 	if (!res)
+ 		return -ENOMEM;
+-
+-	res->read_proc = proc_alignment_read;
+-	res->write_proc = proc_alignment_write;
+ #endif
+ 
+ 	/*
