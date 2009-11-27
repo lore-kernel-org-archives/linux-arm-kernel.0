@@ -1,49 +1,35 @@
-From: ospite@studenti.unina.it (Antonio Ospite)
-Date: Fri, 27 Nov 2009 21:39:39 +0100
-Subject: [PATCH 0/3] pxa_camera: remove init() callback
-In-Reply-To: <1258495463-26029-1-git-send-email-ospite@studenti.unina.it>
-References: <1258495463-26029-1-git-send-email-ospite@studenti.unina.it>
-Message-ID: <20091127213939.9bb235fa.ospite@studenti.unina.it>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 Nov 2009 20:44:14 +0000
+Subject: [RESENT PATCH] Don't disable irqs in set_next_event and
+	set_mode callbacks
+In-Reply-To: <20091127203823.GA28789@pengutronix.de>
+References: <1253518763-15087-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259231164-21242-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20091126105002.GB2393@n2100.arm.linux.org.uk>
+	<20091126113158.GC2393@n2100.arm.linux.org.uk>
+	<20091127104454.GA26570@pengutronix.de>
+	<20091127195857.GB28193@n2100.arm.linux.org.uk>
+	<20091127203823.GA28789@pengutronix.de>
+Message-ID: <20091127204414.GD28193@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2009 23:04:20 +0100
-Antonio Ospite <ospite@studenti.unina.it> wrote:
-
-> Hi,
+On Fri, Nov 27, 2009 at 09:38:23PM +0100, Uwe Kleine-K?nig wrote:
+> OK, so this should make it save for mach-nomadik/timer.c,
+> mach-pxa/time.c and mach-sa1100/time.c.
 > 
-> this series removes the init() callback from pxa_camera_platform_data, and
-> fixes its users to do initialization statically at machine init time.
-> 
-[...]
-> Antonio Ospite (3):
->   em-x270: don't use pxa_camera init() callback
->   pcm990-baseboard: don't use pxa_camera init() callback
+> Only mach-at91/at91rm9200_time.c and mach-at91/at91sam926x_time.c
+> request with IRQF_SHARED | IRQF_DISABLED.
+> So for there the right solution is to let the local_irq_save in place
+> and add a comment that it is needed as the timer irq is shared.
+> This hopefully stopps people copying it unnecessarily.
 
-Eric, if Guennadi ACKs v2 for these two please apply them only, we are
-postponing the third one, hence you can discard it.
+Given that the gentime code spits out warnings if its called with IRQs
+enabled, I don't think keeping the local_irq_save() in place is worth
+it - especially given Thomas' response.
 
->   pxa_camera: remove init() callback
-> 
-
-Thanks,
-   Antonio
-
--- 
-Antonio Ospite
-http://ao2.it
-
-PGP public key ID: 0x4553B001
-
-A: Because it messes up the order in which people normally read text.
-   See http://en.wikipedia.org/wiki/Posting_style
-Q: Why is top-posting such a bad thing?
-A: Top-posting.
-Q: What is the most annoying thing in e-mail?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091127/23d5141f/attachment.sig>
+We've seen such warnings on AT91 (though I don't think we got positively
+to the bottom of it with the reporter.)  If you _do_ want to ensure that
+AT91 is safe, wrapping the call to dev->event_handler(dev) in the AT91
+interrupt handler with a local_irq_save/local_irq_restore would seem
+sensible.
