@@ -1,34 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Nov 2009 22:19:30 +0000
-Subject: [PATCH 1/3] ARM: pxa/raumfeld: add platform support
-In-Reply-To: <200911262311.26533.marek.vasut@gmail.com>
-References: <1259258341-31114-1-git-send-email-daniel@caiaq.de>
-	<200911262013.47713.marek.vasut@gmail.com>
-	<20091126191840.GA8756@n2100.arm.linux.org.uk>
-	<200911262311.26533.marek.vasut@gmail.com>
-Message-ID: <20091126221929.GB8756@n2100.arm.linux.org.uk>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 26 Nov 2009 20:13:09 -0500 (EST)
+Subject: Git pull request: Orion/Kirkwood/Dove stuff for next merge window
+Message-ID: <alpine.LFD.2.00.0911262005410.2059@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 26, 2009 at 11:11:26PM +0100, Marek Vasut wrote:
-> Dne ?t 26. listopadu 2009 20:18:40 Russell King - ARM Linux napsal(a):
-> > On Thu, Nov 26, 2009 at 08:13:47PM +0100, Marek Vasut wrote:
-> > > Why don't we separate the common MFP configuration into another table as
-> > > some platforms do ? The code duplication is horrible here ...
-> > 
-> > Please read the comments on the previous patch series for this.
-> > 
-> So is it your preference or is there any valid argument to support your way ?
+Russell, please pull the following:
 
-The original way was to have many small tables setting up the MFP
-according to which devices were going to be registered.
+	git://git.marvell.com/orion for-rmk
 
-Mike suggested to have one common table and a per-board table, but the
-response was that this could lead to duplications and other similar
-problems.
+This contains updates for Kirkwood and addition of support for the Dove 
+SOC.
 
-So I suggested the obvious alternative solution which solves all the
-stated issues.
+Lennert Buytenhek (1):
+      ARM: Add Tauros2 L2 cache controller support
 
-So not really a preference nor supported by a pressing reason.  Merely
-just a solution which makes all the currently stated issues go away.
+Martin Michlmayr (4):
+      [ARM] Kirkwood: Add support for QNAP TS-41x Turbo NAS
+      [ARM] Kirkwood: Add MPP36 for QNAP TS-11x/TS-21x
+      [ARM] Kirkwood: Add QNAP TS-110/TS-210 to Kconfig help text
+      [ARM] Kirkwood: Remove code duplication in QNAP setup files
+
+Saeed Bishara (2):
+      ARM: add base support for Marvell Dove SoC
+      RTC: let Dove soc select the rtc-mv driver.
+
+ arch/arm/Kconfig                              |   13 +
+ arch/arm/Makefile                             |    1 +
+ arch/arm/boot/compressed/head.S               |    6 +
+ arch/arm/configs/dove_defconfig               | 1620 +++++++++++++++++++
+ arch/arm/include/asm/hardware/cache-tauros2.h |   11 +
+ arch/arm/mach-dove/Kconfig                    |   14 +
+ arch/arm/mach-dove/Makefile                   |    3 +
+ arch/arm/mach-dove/Makefile.boot              |    3 +
+ arch/arm/mach-dove/addr-map.c                 |  149 ++
+ arch/arm/mach-dove/common.c                   |  781 +++++++++
+ arch/arm/mach-dove/common.h                   |   40 +
+ arch/arm/mach-dove/dove-db-setup.c            |  102 ++
+ arch/arm/mach-dove/include/mach/bridge-regs.h |   58 +
+ arch/arm/mach-dove/include/mach/debug-macro.S |   20 +
+ arch/arm/mach-dove/include/mach/dove.h        |  180 ++
+ arch/arm/mach-dove/include/mach/entry-macro.S |   39 +
+ arch/arm/mach-dove/include/mach/gpio.h        |   49 +
+ arch/arm/mach-dove/include/mach/hardware.h    |   26 +
+ arch/arm/mach-dove/include/mach/io.h          |   20 +
+ arch/arm/mach-dove/include/mach/irqs.h        |  101 ++
+ arch/arm/mach-dove/include/mach/memory.h      |   10 +
+ arch/arm/mach-dove/include/mach/pm.h          |   54 +
+ arch/arm/mach-dove/include/mach/system.h      |   36 +
+ arch/arm/mach-dove/include/mach/timex.h       |    9 +
+ arch/arm/mach-dove/include/mach/uncompress.h  |   37 +
+ arch/arm/mach-dove/include/mach/vmalloc.h     |    5 +
+ arch/arm/mach-dove/irq.c                      |  133 ++
+ arch/arm/mach-dove/pcie.c                     |  238 +++
+ arch/arm/mach-kirkwood/Kconfig                |   12 +-
+ arch/arm/mach-kirkwood/Makefile               |    3 +-
+ arch/arm/mach-kirkwood/ts219-setup.c          |  108 +--
+ arch/arm/mach-kirkwood/ts41x-setup.c          |  154 ++
+ arch/arm/mach-kirkwood/tsx1x-common.c         |  113 ++
+ arch/arm/mach-kirkwood/tsx1x-common.h         |    7 +
+ arch/arm/mm/Kconfig                           |   11 +-
+ arch/arm/mm/Makefile                          |    2 +-
+ arch/arm/mm/cache-tauros2.c                   |  263 +++
+ arch/arm/mm/proc-v6.S                         |   33 +-
+ drivers/rtc/Kconfig                           |    2 +-
+ 39 files changed, 4356 insertions(+), 110 deletions(-)
