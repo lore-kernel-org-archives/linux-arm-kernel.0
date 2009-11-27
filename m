@@ -1,43 +1,51 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 27 Nov 2009 23:18:00 +0100 (CET)
-Subject: [PATCH] warn about shared irqs requesting IRQF_DISABLED registered
-	with setup_irq
-In-Reply-To: <1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20091127195857.GB28193@n2100.arm.linux.org.uk>
-	<1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <alpine.LFD.2.00.0911272234460.24119@localhost.localdomain>
+Date: Fri, 27 Nov 2009 23:20:11 +0100 (CET)
+Subject: [RESENT PATCH] Don't disable irqs in set_next_event and set_mode
+	callbacks
+In-Reply-To: <20091127215930.GE28193@n2100.arm.linux.org.uk>
+References: <1253518763-15087-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259231164-21242-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20091126105002.GB2393@n2100.arm.linux.org.uk>
+	<20091126113158.GC2393@n2100.arm.linux.org.uk>
+	<20091127104454.GA26570@pengutronix.de>
+	<20091127195857.GB28193@n2100.arm.linux.org.uk>
+	<20091127203823.GA28789@pengutronix.de>
+	<20091127204414.GD28193@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.0911272203400.24119@localhost.localdomain>
+	<20091127215930.GE28193@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.0911272318260.24119@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Nov 2009, Uwe Kleine-K?nig wrote:
-
-> IRQF_DISABLED is not guaranteed on shared irqs.  There is already a
-> warning in place for irqs registered with request_irq (introduced in
-> 470c66239ef03).  Move it to __setup_irq, this way it triggers for both
-> request_irq and setup_irq.
+On Fri, 27 Nov 2009, Russell King - ARM Linux wrote:
+> On Fri, Nov 27, 2009 at 10:31:15PM +0100, Thomas Gleixner wrote:
+> > On Fri, 27 Nov 2009, Russell King - ARM Linux wrote:
+> > > On Fri, Nov 27, 2009 at 09:38:23PM +0100, Uwe Kleine-K?nig wrote:
+> > > > OK, so this should make it save for mach-nomadik/timer.c,
+> > > > mach-pxa/time.c and mach-sa1100/time.c.
+> > > > 
+> > > > Only mach-at91/at91rm9200_time.c and mach-at91/at91sam926x_time.c
+> > > > request with IRQF_SHARED | IRQF_DISABLED.
+> > > > So for there the right solution is to let the local_irq_save in place
+> > > > and add a comment that it is needed as the timer irq is shared.
+> > > > This hopefully stopps people copying it unnecessarily.
+> > > 
+> > > Given that the gentime code spits out warnings if its called with IRQs
+> > > enabled, I don't think keeping the local_irq_save() in place is worth
+> > > it - especially given Thomas' response.
+> > > 
+> > > We've seen such warnings on AT91 (though I don't think we got positively
+> > > to the bottom of it with the reporter.)  If you _do_ want to ensure that
+> > 
+> > Any pointer ?
 > 
-> One irq that is now warned about is the timer tick on at91 (ARCH=arm).
+> http://lists.arm.linux.org.uk/lurker/thread/20091030.165300.55a15962.en.html
 
-And how does that help ? The interrupt is shared between the timer and
-the debug port. There is nothing you can do about that.
+That thread ends unfortunately at the point where it started to be
+interesting.
 
-The interupt handlers are called in order of setup. The AT91 timer
-irq is set up first and if that's not the case then it needs to be
-fixed and the only way to catch it is in the affected interrupt
-handler.
-
-Applying your patch does not change the hardware and will just result
-in useless, annoying and confusing dmesg warnings.
-
-> Cc: Rusty Russell <rusty@rustcorp.com.au>
-> Cc: Remy Bohmer <linux@bohmer.net>,
-> Cc: Hugh Dickins <hugh.dickins@tiscali.co.uk>,
-> Cc: Andrea Gallo <andrea.gallo@stericsson.com>,
-
-Nice that you added me (and others) to that long list, but ...
-
-> Cc: Thomas Gleixner <tglx@linutronix.de>,
-------------------------------------------^
+I have AT91 platforms myself and we have not seen any problem at
+all.
 
 Thanks,
 
