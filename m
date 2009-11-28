@@ -1,38 +1,55 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 28 Nov 2009 18:09:53 +0000
-Subject: [PATCH 1/3] ARM: add base support for Marvell Dove SoC
-In-Reply-To: <alpine.LFD.2.00.0911281140080.5388@xanadu.home>
-References: <1259084033-7283-1-git-send-email-saeed@marvell.com>
-	<1259084033-7283-2-git-send-email-saeed@marvell.com>
-	<FCBE654890C0334289D0AD3AF4EF009F89684D7F09@IL-MB01.marvell.com>
-	<20091127200521.GC28193@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0911271547110.2059@xanadu.home>
-	<c70ff3ad0911280004y5a78bed2ndc134c2a7e8b4382@mail.gmail.com>
-	<alpine.LFD.2.00.0911281140080.5388@xanadu.home>
-Message-ID: <20091128180953.GA497@n2100.arm.linux.org.uk>
+Date: Sat, 28 Nov 2009 18:24:39 +0000
+Subject: [PATCH] ARM: Introduce HAVE_IOREAD_AND_IOWRITE macro.
+In-Reply-To: <m3zl6owvvi.fsf@intrepid.localdomain>
+References: <m3zl6owvvi.fsf@intrepid.localdomain>
+Message-ID: <20091128182439.GB497@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 28, 2009 at 11:41:39AM -0500, Nicolas Pitre wrote:
-> On Sat, 28 Nov 2009, saeed bishara wrote:
+On Sun, Nov 15, 2009 at 12:05:05AM +0100, Krzysztof Halasa wrote:
+> Define HAVE_IOREAD_AND_IOWRITE macro to indicate that the architecture has its
+> own set of ioread*() and iowrite*() routines and doesn't need the generic one
+> in arch/arm/include/asm/io.h.
 > 
-> > The board id that supported by this patch is 1788, the board name in
-> > the machines registry updated to dove_db, but the Type Identifier
-> > needs to be changed from MACH_TYPE_MACH_MARVELL_NEW1 to
-> > MACH_TYPE_DOVE_DB.
-> 
-> The orion repo has the right machine identifier already. No changes 
-> needed there.
+> Previously the ioread8 existence was tested, but it may be a function instead
+> of a macro (I want to get rid of IXP4xx ioread*/iowrite* macros).
 
-Meanwhile, I've been deleting it from my updates to mainline ever since it
-was created back in 2008 because it looked like someone screwed up their
-entry, and registered 1789 instead of talking to me.
+Missed this.
 
-This means if I pull the dovedb stuff into mainline now, it's probably
-going to break builds.
+If you want to override a function, it's preferred to do it the way we're
+doing it.
 
-Since I've only just updated the mach-types file in mainline this week,
-I'm not happy about adding it in, especially as the current update is
-still outstanding for Linus.
+In otherwords, if you want to override a symbol using an inline function.
+Eg:
 
-A little bit of communication goes a long way...
+#ifndef ndelay
+static inline void ndelay(unsigned long x)
+{
+        udelay(DIV_ROUND_UP(x, 1000));
+}
+#define ndelay(x) ndelay(x)
+#endif
+
+#ifndef div_u64_rem
+static inline u64 div_u64_rem(u64 dividend, u32 divisor, u32 *remainder)
+{
+        *remainder = do_div(dividend, divisor);
+        return dividend;
+}
+#endif
+
+#ifndef div_s64_rem
+extern s64 div_s64_rem(s64 dividend, s32 divisor, s32 *remainder);
+#endif
+
+#ifndef div64_u64
+extern u64 div64_u64(u64 dividend, u64 divisor);
+#endif
+
+etc.
+
+You just do this to use your own version:
+
+extern u64 div_u64_rem(u64 dividend, u32 divisor, u32 *remainder)
+#define div_u64_rem div_u64_rem
