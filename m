@@ -1,29 +1,18 @@
-From: timur@freescale.com (Timur Tabi)
-Date: Sat, 28 Nov 2009 16:00:47 -0600
-Subject: [PATCH 06/12] imx-ssi sound driver
-In-Reply-To: <20091123121321.GF30179@pengutronix.de>
-References: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
-	<1258645706-9071-2-git-send-email-s.hauer@pengutronix.de>
-	<1258645706-9071-3-git-send-email-s.hauer@pengutronix.de>
-	<1258645706-9071-4-git-send-email-s.hauer@pengutronix.de>
-	<1258645706-9071-5-git-send-email-s.hauer@pengutronix.de>
-	<1258645706-9071-6-git-send-email-s.hauer@pengutronix.de>
-	<1258645706-9071-7-git-send-email-s.hauer@pengutronix.de>
-	<ed82fe3e0911211812i49342b0eg2afe861c866db90c@mail.gmail.com>
-	<20091123120000.GC24326@rakim.wolfsonmicro.main>
-	<20091123121321.GF30179@pengutronix.de>
-Message-ID: <4B119D8F.3030509@freescale.com>
+From: david-b@pacbell.net (David Brownell)
+Date: Sat, 28 Nov 2009 14:09:13 -0800
+Subject: [PATCH] warn about shared irqs requesting IRQF_DISABLED
+	registered with setup_irq
+In-Reply-To: <20091128200344.GA1272@pengutronix.de>
+References: <20091127195857.GB28193@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.0911272234460.24119@localhost.localdomain>
+	<20091128200344.GA1272@pengutronix.de>
+Message-ID: <200911281409.13807.david-b@pacbell.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha Hauer wrote:
->> while the PowerPC one
->> >  is including asm/immap_86xx.h for something.
-> This include seems unused. Timur, can you confirm this?
+On Saturday 28 November 2009, Uwe Kleine-K?nig wrote:
+> ?I just thought that a
+> warning that is triggered with request_irq and request_threaded_irq
+> shouldn't be skipped when using setup_irq.
 
-I can confirm that immap_86xx.h is *not* needed for fsl_ssi.c.  When I update 
-the driver for the P1022, I'll remove it.
-
--- 
-Timur Tabi
-Linux Kernel Developer @ Freescale
+Seems fair to me.
