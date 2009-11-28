@@ -1,40 +1,28 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Sat, 28 Nov 2009 10:04:06 +0200
-Subject: [PATCH 1/3] ARM: add base support for Marvell Dove SoC
-In-Reply-To: <alpine.LFD.2.00.0911271547110.2059@xanadu.home>
-References: <1259084033-7283-1-git-send-email-saeed@marvell.com>
-	<1259084033-7283-2-git-send-email-saeed@marvell.com>
-	<FCBE654890C0334289D0AD3AF4EF009F89684D7F09@IL-MB01.marvell.com>
-	<20091127200521.GC28193@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0911271547110.2059@xanadu.home>
-Message-ID: <c70ff3ad0911280004y5a78bed2ndc134c2a7e8b4382@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 28 Nov 2009 10:22:46 +0000
+Subject: [PATCH v4 0/6] ARM:  ST-Ericsson's U8500 SMP platform, a new
+	patch set
+In-Reply-To: <20091127194950.GA28193@n2100.arm.linux.org.uk>
+References: <1259279725.13327.65.camel@vinay-desktop>
+	<20091127194950.GA28193@n2100.arm.linux.org.uk>
+Message-ID: <20091128102246.GB25671@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The board id that supported by this patch is 1788, the board name in
-the machines registry updated to dove_db, but the Type Identifier
-needs to be changed from MACH_TYPE_MACH_MARVELL_NEW1 to
-MACH_TYPE_DOVE_DB.
+On Fri, Nov 27, 2009 at 07:49:50PM +0000, Russell King - ARM Linux wrote:
+> On Fri, Nov 27, 2009 at 05:25:25AM +0530, srinidhi kasagar wrote:
+> > From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+> > Date: Fri, 27 Nov 2009 16:24:37 +0530
+> > 
+> > This is the v4 version of patch set which adds U8500 machine.
+> > v3 patch was posted to this list on 12th October 2009 and I 
+> > have addressed the comments from Jean christophe on this version. 
+> > 
+> > The patch series has a dependency on the patch 5786/1 available in
+> > Russell's patch tracking system. 5786/1 must be applied first.
+> 
+> This looks fine - unless anyone has any objections, I'd suggest submitting
+> to the patch system since it depends on this currently unmerged patch.
 
-saeed
-
-On Fri, Nov 27, 2009 at 10:48 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Fri, 27 Nov 2009, Russell King - ARM Linux wrote:
->
->> On Wed, Nov 25, 2009 at 12:28:42AM +0200, Saeed Bishara wrote:
->> > ? ? For some reason, my previous email didn't reach the mailing list.
->> > ? ? Here is the patch as an attachment with some minor updates (replaced
->> > mach/gpio.h to linux/gpio.h)
->>
->> Also #include <asm/io.h> and (any) #include <mach/io.h> -> linux/io.h please.
->
-> I amended the orion Git repository directly to fix those.
->
->
-> Nicolas
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+One last thing - please also provide a patch for the top level MAINTAINERS
+file for this.
