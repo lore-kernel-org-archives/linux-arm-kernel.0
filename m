@@ -1,52 +1,58 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 28 Nov 2009 21:03:44 +0100
-Subject: [PATCH] warn about shared irqs requesting IRQF_DISABLED
-	registered with setup_irq
-In-Reply-To: <alpine.LFD.2.00.0911272234460.24119@localhost.localdomain>
-References: <20091127195857.GB28193@n2100.arm.linux.org.uk>
-	<1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.00.0911272234460.24119@localhost.localdomain>
-Message-ID: <20091128200344.GA1272@pengutronix.de>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Sat, 28 Nov 2009 21:12:31 +0100
+Subject: [PATCH] ARM: Introduce HAVE_IOREAD_AND_IOWRITE macro.
+In-Reply-To: <20091128182439.GB497@n2100.arm.linux.org.uk> (Russell King's
+	message of "Sat, 28 Nov 2009 18:24:39 +0000")
+References: <m3zl6owvvi.fsf@intrepid.localdomain>
+	<20091128182439.GB497@n2100.arm.linux.org.uk>
+Message-ID: <m3skbywgr4.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 27, 2009 at 11:18:00PM +0100, Thomas Gleixner wrote:
-> On Fri, 27 Nov 2009, Uwe Kleine-K?nig wrote:
-> 
-> > IRQF_DISABLED is not guaranteed on shared irqs.  There is already a
-> > warning in place for irqs registered with request_irq (introduced in
-> > 470c66239ef03).  Move it to __setup_irq, this way it triggers for both
-> > request_irq and setup_irq.
-> > 
-> > One irq that is now warned about is the timer tick on at91 (ARCH=arm).
-> 
-> And how does that help ? The interrupt is shared between the timer and
-> the debug port. There is nothing you can do about that.
-> 
-> The interupt handlers are called in order of setup. The AT91 timer
-> irq is set up first and if that's not the case then it needs to be
-> fixed and the only way to catch it is in the affected interrupt
-> handler.
-Russell already suggests to save (and restore) irqs in the handler
-before (and after resp.) calling the clockevent functions.
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-Should it use the raw_ variants?
- 
-> Applying your patch does not change the hardware and will just result
-> in useless, annoying and confusing dmesg warnings.
-My patch wasn't mainly to help in the at91 case.  I just thought that a
-warning that is triggered with request_irq and request_threaded_irq
-shouldn't be skipped when using setup_irq.
+> Missed this.
+>
+> If you want to override a function, it's preferred to do it the way we're
+> doing it.
+>
+> In otherwords, if you want to override a symbol using an inline function.
+> Eg:
+>
+> #ifndef ndelay
+> static inline void ndelay(unsigned long x)
+> {
+>         udelay(DIV_ROUND_UP(x, 1000));
+> }
+> #define ndelay(x) ndelay(x)
+> #endif
 
-Maybe the warning should only be printed if there's a mismatch between
-different actions of the same irq regarding IRQF_DISABLED?!
+I fear someone may want to remove this later thinking that
+"#define a() a()" is not necessary.
 
-I will prepare a patch for both (i.e. fixing the at91 ISRs and the
-warning about IRQF_DISABLED | IRQF_SHARED) but probably only on Monday.
- 
-Best regards
-Uwe
+Also we'd need to test each individual macro in the generic header since
+we don't know if having ioread8 also means having other functions.
 
+#ifndef ioread8
+define ioread8()
+#endif
+
+#ifndef ioread16
+define ioread16()
+...
+
+etc.
+
+One self-explaining HAVE_IOREAD_AND_IOWRITE has no such problems.
+
+But I can convert to these #ifndef ioread{8,16,etc} of course if you
+wish. Please let me know if you want only ioread8 tested, or all of
+them respectively.
+
+What is important to me is that the IXP4xx functions are not called
+__ixp4xx_something() if they do just the something() (instead of maybe
+__raw_something() or __indirect_something()).
+
+Thanks.
 -- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Krzysztof Halasa
