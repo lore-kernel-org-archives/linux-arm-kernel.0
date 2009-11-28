@@ -1,43 +1,49 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sat, 28 Nov 2009 14:03:38 -0500 (EST)
-Subject: [PATCH 1/3] ARM: add base support for Marvell Dove SoC
-In-Reply-To: <20091128180953.GA497@n2100.arm.linux.org.uk>
-References: <1259084033-7283-1-git-send-email-saeed@marvell.com>
-	<1259084033-7283-2-git-send-email-saeed@marvell.com>
-	<FCBE654890C0334289D0AD3AF4EF009F89684D7F09@IL-MB01.marvell.com>
-	<20091127200521.GC28193@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0911271547110.2059@xanadu.home>
-	<c70ff3ad0911280004y5a78bed2ndc134c2a7e8b4382@mail.gmail.com>
-	<alpine.LFD.2.00.0911281140080.5388@xanadu.home>
-	<20091128180953.GA497@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.0911281401001.5820@xanadu.home>
+From: timur@freescale.com (Timur Tabi)
+Date: Sat, 28 Nov 2009 13:53:30 -0600
+Subject: [PATCH 06/12] imx-ssi sound driver
+In-Reply-To: <20091123121055.GE30179@pengutronix.de>
+References: <1258645706-9071-1-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-2-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-3-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-4-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-5-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-6-git-send-email-s.hauer@pengutronix.de>
+	<1258645706-9071-7-git-send-email-s.hauer@pengutronix.de>
+	<ed82fe3e0911211812i49342b0eg2afe861c866db90c@mail.gmail.com>
+	<20091123121055.GE30179@pengutronix.de>
+Message-ID: <4B117FBA.601@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 28 Nov 2009, Russell King - ARM Linux wrote:
+Sascha Hauer wrote:
+> Mainly because I wasn't aware of the fact that the fsl driver is the
+> same:(
 
-> On Sat, Nov 28, 2009 at 11:41:39AM -0500, Nicolas Pitre wrote:
-> > On Sat, 28 Nov 2009, saeed bishara wrote:
-> > 
-> > > The board id that supported by this patch is 1788, the board name in
-> > > the machines registry updated to dove_db, but the Type Identifier
-> > > needs to be changed from MACH_TYPE_MACH_MARVELL_NEW1 to
-> > > MACH_TYPE_DOVE_DB.
-> > 
-> > The orion repo has the right machine identifier already. No changes 
-> > needed there.
-> 
-> Meanwhile, I've been deleting it from my updates to mainline ever since it
-> was created back in 2008 because it looked like someone screwed up their
-> entry, and registered 1789 instead of talking to me.
-> 
-> This means if I pull the dovedb stuff into mainline now, it's probably
-> going to break builds.
+So "fsl-ssi.c" was not a clue? :-)
 
-I think we can live with that.  Things will fix themselves when both the 
-machine id update and the Dove support are merged together upstream.  
-Dove is a new architecture so no one ever attempted to build it before 
+>
+> I'm currently looking if and how the code can be merged. I don't know if
+> it's worth it though since the common code doesn't seem to be very big.
+
+That's probably because my driver only supports I2S and yours supports AC97. 
+Please, DMA is different.  I wasn't really expecting you to be able to re-use 
+my driver, but I figured you could at least re-use the macros I've defined in 
+fsl-ssi.h
+
+> There will have to be some changes in the fsl-ssi driver. For example I
+> need the irq handler for my fiq handler which means that the fsl-ssi
+> driver is not allowed to request the irq for it's statistic.
+
+That shouldn't be a problem, since the statistics never show anything useful 
 anyway.
 
+> The other
+> thing is the hardware accesses as we do not have in_be*, out_be* and
+> setbits/clrbits. Of course all these things are doable and shouldn't be
+> a showstopper.
 
-Nicolas
+These should be defined in the arch/arm header files anyway.
+
+-- 
+Timur Tabi
+Linux Kernel Developer @ Freescale
