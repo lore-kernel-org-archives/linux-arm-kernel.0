@@ -1,95 +1,38 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Sat, 28 Nov 2009 17:55:13 +0100
-Subject: my IXP4xx git tree
-Message-ID: <m3iqcuy4ge.fsf@intrepid.localdomain>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 28 Nov 2009 18:09:53 +0000
+Subject: [PATCH 1/3] ARM: add base support for Marvell Dove SoC
+In-Reply-To: <alpine.LFD.2.00.0911281140080.5388@xanadu.home>
+References: <1259084033-7283-1-git-send-email-saeed@marvell.com>
+	<1259084033-7283-2-git-send-email-saeed@marvell.com>
+	<FCBE654890C0334289D0AD3AF4EF009F89684D7F09@IL-MB01.marvell.com>
+	<20091127200521.GC28193@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.0911271547110.2059@xanadu.home>
+	<c70ff3ad0911280004y5a78bed2ndc134c2a7e8b4382@mail.gmail.com>
+	<alpine.LFD.2.00.0911281140080.5388@xanadu.home>
+Message-ID: <20091128180953.GA497@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On Sat, Nov 28, 2009 at 11:41:39AM -0500, Nicolas Pitre wrote:
+> On Sat, 28 Nov 2009, saeed bishara wrote:
+> 
+> > The board id that supported by this patch is 1788, the board name in
+> > the machines registry updated to dove_db, but the Type Identifier
+> > needs to be changed from MACH_TYPE_MACH_MARVELL_NEW1 to
+> > MACH_TYPE_DOVE_DB.
+> 
+> The orion repo has the right machine identifier already. No changes 
+> needed there.
 
-I've prepared my IXP4xx tree for this merge window. I'm going to send it
-to Linus but perhaps you'd prefer to handle it yourself instead? This
-includes the patches I posted ~ 10 days ago, simplifying the IXP4xx PCI
-IO macros/functions and moving platform headers to their .c files.
+Meanwhile, I've been deleting it from my updates to mainline ever since it
+was created back in 2008 because it looked like someone screwed up their
+entry, and registered 1789 instead of talking to me.
 
-The following changes since Linux 2.6.32-rc7 are available at:
+This means if I pull the dovedb stuff into mainline now, it's probably
+going to break builds.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/chris/linux-2.6.git ixp4xx
+Since I've only just updated the mach-types file in mainline this week,
+I'm not happy about adding it in, especially as the current update is
+still outstanding for Linus.
 
-Krzysztof Ha?asa (19):
-      IXP4xx: change the timer base frequency to 66.666000 MHz.
-      IXP4xx: Fix normally-disabled debugging text in drivers/net/arm/ixp4xx_eth.c.
-      ARM: fix insl() and outsl() endianness on IXP4xx architecture.
-      IXP4xx: Rename indirect MMIO primitives from __ixp4xx_* to __indirect_*.
-      ARM: Introduce HAVE_IOREAD_AND_IOWRITE macro.
-      IXP4xx: Drop "__ixp4xx_" prefix from in/out/ioread/iowrite functions for clarity.
-      IXP4xx: Fix compilation failure with CONFIG_IXP4XX_INDIRECT_PCI.
-      IXP4xx: Extend PCI MMIO indirect address space to 1 GB.
-      IXP4xx: move IXDP425 platform macros to the platform code.
-      IXP4xx: move AVILA platform macros to the platform code.
-      IXP4xx: move Coyote platform macros to the platform code.
-      IXP4xx: move NSLU2 platform macros to the platform code.
-      IXP4xx: move NAS100D platform macros to the platform code.
-      IXP4xx: move DSM G600 platform macros to the platform code.
-      IXP4xx: move FSG platform macros to the platform code.
-      IXP4xx: Remove unused Motorola PrPMC1100 platform macros.
-      IXP4xx: move Gemtek GTWX5715 platform macros to the platform code.
-      IXP4xx: Introduce IXP4XX_GPIO_IRQ(n) macro and convert IXP4xx platform files.
-      IXP4xx: GTWX5715 platform only has two PCI IRQ lines, not four.
-
-Roel Kluin (1):
-      IXP4xx: Ensure index is positive in irq_to_gpio() and npe_request().
-
- arch/arm/include/asm/io.h                     |    2 +-
- arch/arm/mach-ixp2000/include/mach/io.h       |    2 +
- arch/arm/mach-ixp4xx/Kconfig                  |   22 +-
- arch/arm/mach-ixp4xx/avila-pci.c              |   42 ++--
- arch/arm/mach-ixp4xx/avila-setup.c            |    4 +-
- arch/arm/mach-ixp4xx/common-pci.c             |    6 +-
- arch/arm/mach-ixp4xx/common.c                 |    2 +-
- arch/arm/mach-ixp4xx/coyote-pci.c             |   22 +-
- arch/arm/mach-ixp4xx/coyote-setup.c           |    9 +
- arch/arm/mach-ixp4xx/dsmg600-pci.c            |   46 +++--
- arch/arm/mach-ixp4xx/dsmg600-setup.c          |   17 ++
- arch/arm/mach-ixp4xx/fsg-pci.c                |   31 ++-
- arch/arm/mach-ixp4xx/fsg-setup.c              |    8 +-
- arch/arm/mach-ixp4xx/goramo_mlr.c             |   45 ++--
- arch/arm/mach-ixp4xx/gtwx5715-pci.c           |   40 ++--
- arch/arm/mach-ixp4xx/gtwx5715-setup.c         |   30 +++-
- arch/arm/mach-ixp4xx/include/mach/avila.h     |   39 ----
- arch/arm/mach-ixp4xx/include/mach/coyote.h    |   33 ---
- arch/arm/mach-ixp4xx/include/mach/dsmg600.h   |   52 -----
- arch/arm/mach-ixp4xx/include/mach/fsg.h       |   50 -----
- arch/arm/mach-ixp4xx/include/mach/gpio.h      |    2 +-
- arch/arm/mach-ixp4xx/include/mach/gtwx5715.h  |  116 ----------
- arch/arm/mach-ixp4xx/include/mach/hardware.h  |   18 +-
- arch/arm/mach-ixp4xx/include/mach/io.h        |  292 ++++++++++---------------
- arch/arm/mach-ixp4xx/include/mach/irqs.h      |   69 +------
- arch/arm/mach-ixp4xx/include/mach/ixdp425.h   |   39 ----
- arch/arm/mach-ixp4xx/include/mach/nas100d.h   |   52 -----
- arch/arm/mach-ixp4xx/include/mach/npe.h       |    2 +-
- arch/arm/mach-ixp4xx/include/mach/nslu2.h     |   55 -----
- arch/arm/mach-ixp4xx/include/mach/prpmc1100.h |   33 ---
- arch/arm/mach-ixp4xx/include/mach/timex.h     |    2 +-
- arch/arm/mach-ixp4xx/ixdp425-pci.c            |   43 ++--
- arch/arm/mach-ixp4xx/ixdp425-setup.c          |   12 +-
- arch/arm/mach-ixp4xx/ixp4xx_npe.c             |    2 +-
- arch/arm/mach-ixp4xx/nas100d-pci.c            |   41 ++--
- arch/arm/mach-ixp4xx/nas100d-setup.c          |   16 ++-
- arch/arm/mach-ixp4xx/nslu2-pci.c              |   35 ++--
- arch/arm/mach-ixp4xx/nslu2-setup.c            |   21 ++-
- drivers/leds/leds-fsg.c                       |    7 +
- drivers/net/arm/ixp4xx_eth.c                  |    2 +-
- 40 files changed, 452 insertions(+), 909 deletions(-)
- delete mode 100644 arch/arm/mach-ixp4xx/include/mach/avila.h
- delete mode 100644 arch/arm/mach-ixp4xx/include/mach/coyote.h
- delete mode 100644 arch/arm/mach-ixp4xx/include/mach/dsmg600.h
- delete mode 100644 arch/arm/mach-ixp4xx/include/mach/fsg.h
- delete mode 100644 arch/arm/mach-ixp4xx/include/mach/gtwx5715.h
- delete mode 100644 arch/arm/mach-ixp4xx/include/mach/ixdp425.h
- delete mode 100644 arch/arm/mach-ixp4xx/include/mach/nas100d.h
- delete mode 100644 arch/arm/mach-ixp4xx/include/mach/nslu2.h
- delete mode 100644 arch/arm/mach-ixp4xx/include/mach/prpmc1100.h
-
--- 
-Krzysztof Halasa
+A little bit of communication goes a long way...
