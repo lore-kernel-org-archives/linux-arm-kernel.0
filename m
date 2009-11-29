@@ -1,224 +1,390 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 29 Nov 2009 12:16:14 +0000
-Subject: [PATCH V2] ARM: NUC900: add GDMA driver support for nuc900
-	platform
-In-Reply-To: <713d0d430911260242j579d86b3r7eeade0007d2a94c@mail.gmail.com>
-References: <713d0d430911260242j579d86b3r7eeade0007d2a94c@mail.gmail.com>
-Message-ID: <20091129121614.GA11445@n2100.arm.linux.org.uk>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Sun, 29 Nov 2009 20:37:23 +0800
+Subject: [PATCH V4]ARM: NUC900: add RTC driver support for nuc910 and nuc920
+Message-ID: <4B126B03.1060901@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some comments below.
+Dear Alessandro,
 
-On Thu, Nov 26, 2009 at 06:42:12PM +0800, Hu Ruihuan wrote:
-> +#include <linux/module.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/init.h>
-> +#include <linux/spinlock.h>
-> +#include <linux/errno.h>
-> +#include <linux/io.h>
-> +
-> +#include <asm/system.h>
+I fixed this patch and submitted it again.
 
-You shouldn't need asm/system.h
+thanks!
 
-> +#include <asm/irq.h>
-> +#include <asm/atomic.h>
-> +#include <mach/hardware.h>
-> +
-> +#define NUC900_DMA_CHANNELS           (2)
-> +#define DMA_BASE                               (W90X900_VA_GDMA)
-> +#define GDMA_INTCS                             (DMA_BASE + 0xa0)
-> +
-> +#define GDMA_GDGA                              (0x1c)
-> +#define TC0F                                   (0x01 << 8)
-> +#define TC1F                                   (0x01 << 10)
-> +#define ENTC0F                                 (0x01)
-> +#define ENTC1F                                 (0x01 << 2)
-> +
-> +#define GDMAEN                                 (0x01)
-> +#define GDMAMS                                 (0x03 << 2)
-> +#define DADIR                                  (0x01 << 4)
-> +#define SADIR                                  (0x01 << 5)
-> +#define DAFIX                                  (0x01 << 6)
-> +#define SAFIX                                  (0x01 << 7)
-> +#define D_INTS                                 (0x01 << 10)
-> +#define TWSMASK                                (0x03 << 12)
-> +#define TWS                                    (0x02 << 12)
-> +
-> +#define RUN                                    (0x01 << 3)
-> +#define NON_DSCRIP                             (0x01 << 2)
-> +#define ORDEN                                  (0x01 << 1)
-> +#define RESET                                  (0x01)
-> +#define DSCRIPMASK                             (0x0F)
-> +#define CMDINFOMASK                            (0x03FFF)
-> +
-> +#define COUTN_TRANSFER                         (0x1000)/*count[13:0]=1024*/
-> +#define CHANNELINERV                           (0x20)
-> +
-> +typedef void (*dma_callback_t)(void *data);
-> +
-> +struct nuc900_dma_descp {
-> +       unsigned int next_descp;
-> +       unsigned int srcaddr;
-> +       unsigned int dstaddr;
-> +       unsigned int commandinfo;
-> +};
-> +
-> +struct nuc900_dma_t {
-> +       const char *device;             /* this channel device, 0  if unused */
-> +       dma_callback_t callback;        /* to call when DMA completes */
-> +       void __iomem *dma_reg;
-> +       void *data;                     /* ... with private data ptr */
-> +       struct nuc900_dma_descp *descp;
-> +};
-> +
-> +static struct nuc900_dma_t dma_chan[nuc900_DMA_CHANNELS];
-> +static struct nuc900_dma_t *dmachan0, *dmachan1;
-> +static atomic_t  shared_irq_using;
-> +static spinlock_t dma_chan_lock;
+signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
 
-Maybe consider using DEFINE_SPINLOCK(dma_chan_lock) ?
+---
+ drivers/rtc/Kconfig      |    6 +
+ drivers/rtc/Makefile     |    1 +
+ drivers/rtc/rtc-nuc900.c |  331 ++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 338 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/rtc/rtc-nuc900.c
 
-> +
-> +
-> +
-> +static int register_dmachan_fromname(const char *dev_name,
-> +                       struct nuc900_dma_t *dma, unsigned int *irq_request)
-> +{
-> +       int err;
-> +
-> +       BUG_ON(!dev_name);
-> +
-> +       err = 0;
-> +
-> +       if (!(dmachan0->device) && !(dmachan1->device)) {
-> +               dma = dmachan0;
-> +               *irq_request = 1;
-> +       } else if ((dmachan0->device) && !(dmachan1->device)) {
-> +                       if (strcmp(dmachan0->device, dev_name) == 0)
-> +                               err = -EBUSY;
-> +                       else
-> +                               dma = dmachan1;
-> +       } else if ((dmachan1->device) && !(dmachan0->device)) {
-> +                       if (strcmp(dmachan1->device, dev_name) == 0)
-> +                               err = -EBUSY;
-> +                       else
-> +                               dma = dmachan0;
-> +       } else
-> +               err = -EBUSY;
-> +
-> +       return err;
-> +
-> +}
-
-Again, this initializes the local 'dma' pointer but doesn't return it.
-If you want to be able to return a pointer as well as an error code,
-try using linux/err.h:
-
-struct nuc900_dma_t *register_dma_from_chan(const char *dev_name,
-		unsigned int *irq_request)
-{
-	struct nuc900_dma_t *ret;
-	...
-		if (strcmp(dmachanX->device, dev_name) == 0)
-			ret = ERR_PTR(-EBUSY);
-		else
-			ret = dmachan1;
-	...
-	return ret;
-}
-
-and use it as:
-
-	struct nuc900_dma_t *dma;
-
-	dma = register_dma_from_chan(...);
-	if (IS_ERR(dma)) {
-		err = PTR_ERR(dma);
-		return err;
-	}
-
-This has advantages over the 'return via pointer-to-pointer in function
-arguments' in that you can't end up with errors where your pointer is
-not initialized.
-
-> +
-> +static void match_dmachan_fromname(const char *dev_name,
-> +                                       struct nuc900_dma_t *dma)
-> +{
-> +       BUG_ON(!dev_name);
-> +
-> +       if (dmachan1->device) {
-> +               if (strcmp(dmachan1->device, dev_name) == 0)
-> +                       dma = dmachan1;
-> +       } else if (dmachan0->device) {
-> +               if (strcmp(dmachan0->device, dev_name) == 0)
-> +                       dma = dmachan0;
-> +       }
-
-This code doesn't actually do anything - 'dma' is a local pointer which
-you're initializing but not using.
-
-> +}
-> +
-> +static irqreturn_t dma_irq_handler(int irq, void *dev_id)
-> +{
-> +       int status;
-> +       local_irq_disable();
-> +       status = __raw_readl(GDMA_GDGA);
-> +
-> +       if (status & (TC0F)) {
-> +               __raw_writel((~TC0F), GDMA_GDGA);
-> +               local_irq_enable();
-> +               dmachan0->callback(dmachan0->data);
-> +       }
-> +
-> +       if (status & (TC1F)) {
-> +               __raw_writel((~TC1F), GDMA_GDGA);
-> +               local_irq_enable();
-> +               dmachan1->callback(dmachan1->data);
-> +       }
-
-if both TC0F and TC1F are both set, you'll write ~TC0F with IRQs disabled
-but ~TC1F with IRQs enabled.  Wouldn't something like:
-
-	local_irq_disable();
-	status = __raw_readl(GDMA_GDGA) & (TC0F|TC1F);
-	__raw_writel(~status, GDMA_GDGA);
-	local_irq_enable();
-
-	if (status & TC0F)
-		dmachan0->callback(dmachan0->data);
-	if (status & TC1F)
-		dmachan1->callback(dmachan1->data);
-
-be better?
-
-> +
-> +       return IRQ_HANDLED;
-> +}
-> +
-> +int nuc900_request_dma(const char *dev_name, dma_callback_t callback,
-> +                                                               void *data)
-> +{
-> +       struct nuc900_dma_t *dma = NULL;
-> +       int err, irq_request;
-> +
-> +       err = 0;
-> +       irq_request = 0;
-> +       spin_lock(&dma_chan_lock);
-> +       err = register_dmachan_fromname(dev_name, dma, &irq_request);
-> +
-> +       if (err < 0) {
-> +               spin_unlock(&dma_chan_lock);
-> +               return err;
-> +       }
-> +
-> +       dma->device = dev_name;
-> +
-> +       if (irq_request) {
-> +               err = request_irq(IRQ_GDMAGROUP, dma_irq_handler, IRQF_SHARED|
-> +                               IRQF_DISABLED, NULL, NULL);
-
-Not sure why you don't claim this at initialization time.
+diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+index 3c20dae..266ce62 100644
+--- a/drivers/rtc/Kconfig
++++ b/drivers/rtc/Kconfig
+@@ -573,6 +573,12 @@ config RTC_DRV_AB3100
+ 	  Select this to enable the ST-Ericsson AB3100 Mixed Signal IC RTC
+ 	  support. This chip contains a battery- and capacitor-backed RTC.
+ 
++config RTC_DRV_NUC900
++	tristate "NUC910/NUC920 RTC driver"
++	depends on RTC_CLASS && ARCH_W90X900
++	help
++	  If you say yes here you get support for the RTC subsystem of the
++	  NUC910/NUC920 used in embedded systems.
+ 
+ comment "on-CPU RTC drivers"
+ 
+diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
+index aa3fbd5..d511774 100644
+--- a/drivers/rtc/Makefile
++++ b/drivers/rtc/Makefile
+@@ -53,6 +53,7 @@ obj-$(CONFIG_RTC_MXC)		+= rtc-mxc.o
+ obj-$(CONFIG_RTC_DRV_MAX6900)	+= rtc-max6900.o
+ obj-$(CONFIG_RTC_DRV_MAX6902)	+= rtc-max6902.o
+ obj-$(CONFIG_RTC_DRV_MV)	+= rtc-mv.o
++obj-$(CONFIG_RTC_DRV_NUC900)	+= rtc-nuc900.o
+ obj-$(CONFIG_RTC_DRV_OMAP)	+= rtc-omap.o
+ obj-$(CONFIG_RTC_DRV_PCAP)	+= rtc-pcap.o
+ obj-$(CONFIG_RTC_DRV_PCF8563)	+= rtc-pcf8563.o
+diff --git a/drivers/rtc/rtc-nuc900.c b/drivers/rtc/rtc-nuc900.c
+new file mode 100644
+index 0000000..6002309
+--- /dev/null
++++ b/drivers/rtc/rtc-nuc900.c
+@@ -0,0 +1,331 @@
++/*
++ * Copyright (c) 2008-2009 Nuvoton technology corporation.
++ *
++ * Wan ZongShun <mcuos.com@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation;version 2 of the License.
++ *
++ */
++
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/rtc.h>
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/bcd.h>
++
++/* RTC Control Registers */
++#define REG_RTC_INIR		0x00
++#define REG_RTC_AER		0x04
++#define REG_RTC_FCR		0x08
++#define REG_RTC_TLR		0x0C
++#define REG_RTC_CLR		0x10
++#define REG_RTC_TSSR		0x14
++#define REG_RTC_DWR		0x18
++#define REG_RTC_TAR		0x1C
++#define REG_RTC_CAR		0x20
++#define REG_RTC_LIR		0x24
++#define REG_RTC_RIER		0x28
++#define REG_RTC_RIIR		0x2C
++#define REG_RTC_TTR		0x30
++
++#define RTCSET			0x01
++#define AERRWENB		0x10000
++#define INIRRESET		0xa5eb1357
++#define AERPOWERON		0xA965
++#define AERPOWEROFF		0x0000
++#define LEAPYEAR		0x0001
++#define TICKENB			0x80
++#define TICKINTENB		0x0002
++#define ALARMINTENB		0x0001
++#define MODE24			0x0001
++
++struct nuc900_rtc {
++	int			irq_num;
++	void __iomem		*rtc_reg;
++	struct rtc_device	*rtcdev;
++};
++
++struct nuc900_bcd_time {
++	int bcd_sec;
++	int bcd_min;
++	int bcd_hour;
++	int bcd_mday;
++	int bcd_mon;
++	int bcd_year;
++};
++
++static irqreturn_t nuc900_rtc_interrupt(int irq, void *_rtc)
++{
++	struct nuc900_rtc *rtc = _rtc;
++	unsigned long events = 0, rtc_irq;
++
++	rtc_irq = __raw_readl(rtc->rtc_reg + REG_RTC_RIIR);
++
++	if (rtc_irq & ALARMINTENB) {
++		rtc_irq &= ~ALARMINTENB;
++		__raw_writel(rtc_irq, rtc->rtc_reg + REG_RTC_RIIR);
++		events |= RTC_AF | RTC_IRQF;
++	}
++
++	if (rtc_irq & TICKINTENB) {
++		rtc_irq &= ~TICKINTENB;
++		__raw_writel(rtc_irq, rtc->rtc_reg + REG_RTC_RIIR);
++		events |= RTC_UF | RTC_IRQF;
++	}
++
++	rtc_update_irq(rtc->rtcdev, 1, events);
++
++	return IRQ_HANDLED;
++}
++
++static void check_rtc_power(struct nuc900_rtc *nuc900_rtc)
++{
++	unsigned int i;
++	__raw_writel(INIRRESET, nuc900_rtc->rtc_reg + REG_RTC_INIR);
++
++	mdelay(10);
++
++	__raw_writel(AERPOWERON, nuc900_rtc->rtc_reg + REG_RTC_AER);
++
++	for (i = 0; i < 1000000; i++) {
++		if (__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB)
++			break;
++	}
++}
++
++static void nuc900_rtc_bcd2bin(unsigned int timereg,
++				unsigned int calreg, struct rtc_time *tm)
++{
++	tm->tm_mday	= bcd2bin(calreg >> 0);
++	tm->tm_mon	= bcd2bin(calreg >> 8);
++	tm->tm_year	= bcd2bin(calreg >> 16) + 100;
++
++	tm->tm_sec	= bcd2bin(timereg >> 0);
++	tm->tm_min	= bcd2bin(timereg >> 8);
++	tm->tm_hour	= bcd2bin(timereg >> 16);
++
++	rtc_valid_tm(tm);
++}
++
++static void nuc900_rtc_bin2bcd(struct rtc_time *settm,
++						struct nuc900_bcd_time *gettm)
++{
++	gettm->bcd_mday = bin2bcd(settm->tm_mday) << 0;
++	gettm->bcd_mon  = bin2bcd(settm->tm_mon) << 8;
++	gettm->bcd_year = bin2bcd(settm->tm_year - 100) << 16;
++
++	gettm->bcd_sec  = bin2bcd(settm->tm_sec) << 0;
++	gettm->bcd_min  = bin2bcd(settm->tm_min) << 8;
++	gettm->bcd_hour = bin2bcd(settm->tm_hour) << 16;
++}
++
++static int nuc900_update_irq_enable(struct device *dev, unsigned int enabled)
++{
++	struct nuc900_rtc *rtc = dev_get_drvdata(dev);
++
++	if (enabled)
++		__raw_writel(__raw_readl(rtc->rtc_reg + REG_RTC_RIER)|
++				(TICKINTENB), rtc->rtc_reg + REG_RTC_RIER);
++	else
++		__raw_writel(__raw_readl(rtc->rtc_reg + REG_RTC_RIER)&
++				(~TICKINTENB), rtc->rtc_reg + REG_RTC_RIER);
++
++	return 0;
++}
++
++static int nuc900_alarm_irq_enable(struct device *dev, unsigned int enabled)
++{
++	struct nuc900_rtc *rtc = dev_get_drvdata(dev);
++
++	if (enabled)
++		__raw_writel(__raw_readl(rtc->rtc_reg + REG_RTC_RIER)|
++				(ALARMINTENB), rtc->rtc_reg + REG_RTC_RIER);
++	else
++		__raw_writel(__raw_readl(rtc->rtc_reg + REG_RTC_RIER)&
++				(~ALARMINTENB), rtc->rtc_reg + REG_RTC_RIER);
++
++	return 0;
++}
++
++static int nuc900_rtc_read_time(struct device *dev, struct rtc_time *tm)
++{
++	struct nuc900_rtc *rtc = dev_get_drvdata(dev);
++	unsigned int timeval, clrval;
++
++	timeval = __raw_readl(rtc->rtc_reg + REG_RTC_TLR);
++	clrval	= __raw_readl(rtc->rtc_reg + REG_RTC_CLR);
++
++	nuc900_rtc_bcd2bin(timeval, clrval, tm);
++
++	return 0;
++}
++
++static int nuc900_rtc_set_time(struct device *dev, struct rtc_time *tm)
++{
++	struct nuc900_rtc *rtc = dev_get_drvdata(dev);
++	struct nuc900_bcd_time gettm;
++	unsigned long val;
++
++	nuc900_rtc_bin2bcd(tm, &gettm);
++
++	check_rtc_power(rtc);
++
++	val = gettm.bcd_mday | gettm.bcd_mon | gettm.bcd_year;
++	__raw_writel(val, rtc->rtc_reg + REG_RTC_CLR);
++
++	val = gettm.bcd_sec | gettm.bcd_min | gettm.bcd_hour;
++	__raw_writel(val, rtc->rtc_reg + REG_RTC_TLR);
++
++	return 0;
++}
++
++static int nuc900_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
++{
++	struct nuc900_rtc *rtc = dev_get_drvdata(dev);
++	unsigned int timeval, carval;
++
++	timeval = __raw_readl(rtc->rtc_reg + REG_RTC_TAR);
++	carval	= __raw_readl(rtc->rtc_reg + REG_RTC_CAR);
++
++	nuc900_rtc_bcd2bin(timeval, carval, &alrm->time);
++
++	return 0;
++}
++
++static int nuc900_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
++{
++	struct nuc900_rtc *rtc = dev_get_drvdata(dev);
++	struct nuc900_bcd_time tm;
++	unsigned long val;
++
++	nuc900_rtc_bin2bcd(&alrm->time, &tm);
++
++	check_rtc_power(rtc);
++
++	val = tm.bcd_mday | tm.bcd_mon | tm.bcd_year;
++	__raw_writel(val, rtc->rtc_reg + REG_RTC_CAR);
++
++	val = tm.bcd_sec | tm.bcd_min | tm.bcd_hour;
++	__raw_writel(val, rtc->rtc_reg + REG_RTC_TAR);
++
++	return 0;
++}
++
++static struct rtc_class_ops nuc900_rtc_ops = {
++	.read_time = nuc900_rtc_read_time,
++	.set_time = nuc900_rtc_set_time,
++	.read_alarm = nuc900_rtc_read_alarm,
++	.set_alarm = nuc900_rtc_set_alarm,
++	.alarm_irq_enable = nuc900_alarm_irq_enable,
++	.update_irq_enable = nuc900_update_irq_enable,
++};
++
++static int __devinit nuc900_rtc_probe(struct platform_device *pdev)
++{
++	struct resource *res;
++	struct nuc900_rtc *nuc900_rtc;
++	int err = 0;
++
++	nuc900_rtc = kzalloc(sizeof(struct nuc900_rtc), GFP_KERNEL);
++	if (!nuc900_rtc) {
++		dev_err(&pdev->dev, "kzalloc nuc900_rtc failed\n");
++		return -ENOMEM;
++	}
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_err(&pdev->dev, "platform_get_resource failed\n");
++		err = -ENXIO;
++		goto fail1;
++	}
++
++	if (!request_mem_region(res->start, resource_size(res),
++				pdev->name)) {
++		dev_err(&pdev->dev, "request_mem_region failed\n");
++		err = -EBUSY;
++		goto fail1;
++	}
++
++	nuc900_rtc->rtc_reg = ioremap(res->start, resource_size(res));
++	if (!nuc900_rtc->rtc_reg) {
++		dev_err(&pdev->dev, "ioremap rtc_reg failed\n");
++		err = -ENOMEM;
++		goto fail2;
++	}
++
++	nuc900_rtc->irq_num = platform_get_irq(pdev, 0);
++	if (request_irq(nuc900_rtc->irq_num, nuc900_rtc_interrupt,
++				IRQF_DISABLED, "nuc900rtc", nuc900_rtc)) {
++		dev_err(&pdev->dev, "NUC900 RTC request irq failed\n");
++		err = -EBUSY;
++		goto fail3;
++	}
++
++	nuc900_rtc->rtcdev = rtc_device_register(pdev->name, &pdev->dev,
++						&nuc900_rtc_ops, THIS_MODULE);
++	if (IS_ERR(nuc900_rtc->rtcdev)) {
++		dev_err(&pdev->dev, "rtc device register faild\n");
++		err = PTR_ERR(nuc900_rtc->rtcdev);
++		goto fail4;
++	}
++
++	platform_set_drvdata(pdev, nuc900_rtc);
++	__raw_writel(__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_TSSR) | MODE24,
++					nuc900_rtc->rtc_reg + REG_RTC_TSSR);
++
++	return 0;
++
++fail4:	free_irq(nuc900_rtc->irq_num, nuc900_rtc);
++fail3:	iounmap(nuc900_rtc->rtc_reg);
++fail2:	release_mem_region(res->start, resource_size(res));
++fail1:	kfree(nuc900_rtc);
++	return err;
++}
++
++static int __devexit nuc900_rtc_remove(struct platform_device *pdev)
++{
++	struct nuc900_rtc *nuc900_rtc = platform_get_drvdata(pdev);
++	struct resource *res;
++
++	rtc_device_unregister(nuc900_rtc->rtcdev);
++	free_irq(nuc900_rtc->irq_num, nuc900_rtc);
++	iounmap(nuc900_rtc->rtc_reg);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	release_mem_region(res->start, resource_size(res));
++
++	kfree(nuc900_rtc);
++
++	platform_set_drvdata(pdev, NULL);
++
++	return 0;
++}
++
++static struct platform_driver nuc900_rtc_driver = {
++	.remove		= __devexit_p(nuc900_rtc_remove),
++	.driver		= {
++		.name	= "nuc900-rtc",
++		.owner	= THIS_MODULE,
++	},
++};
++
++static int __init nuc900_rtc_init(void)
++{
++	return platform_driver_probe(&nuc900_rtc_driver, nuc900_rtc_probe);
++}
++
++static void __exit nuc900_rtc_exit(void)
++{
++	platform_driver_unregister(&nuc900_rtc_driver);
++}
++
++module_init(nuc900_rtc_init);
++module_exit(nuc900_rtc_exit);
++
++MODULE_AUTHOR("Wan ZongShun <mcuos.com@gmail.com>");
++MODULE_DESCRIPTION("nuc910/nuc920 RTC driver");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:nuc900-rtc");
+-- 
+1.5.6.3
