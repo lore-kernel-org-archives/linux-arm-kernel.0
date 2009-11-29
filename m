@@ -1,19 +1,27 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sun, 29 Nov 2009 10:29:44 +0800
-Subject: [PATCH 2/3 v2] pcm990-baseboard: don't use pxa_camera init()
-	callback
-In-Reply-To: <1259353896-16892-1-git-send-email-ospite@studenti.unina.it>
-References: <Pine.LNX.4.64.0911181110180.5702@axis700.grange>
-	<1259353896-16892-1-git-send-email-ospite@studenti.unina.it>
-Message-ID: <f17812d70911281829h6f653c72q21ded878d1181bf7@mail.gmail.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Sun, 29 Nov 2009 02:31:18 +0000
+Subject: [PATCH] warn about shared irqs requesting IRQF_DISABLED
+	registered with setup_irq
+In-Reply-To: <alpine.LFD.2.00.0911282239430.24119@localhost.localdomain>
+References: <20091127195857.GB28193@n2100.arm.linux.org.uk>
+	<1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.00.0911272234460.24119@localhost.localdomain>
+	<20091128200344.GA1272@pengutronix.de>
+	<alpine.LFD.2.00.0911282239430.24119@localhost.localdomain>
+Message-ID: <20091129023118.GA21529@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 28, 2009 at 4:31 AM, Antonio Ospite
-<ospite@studenti.unina.it> wrote:
-> pxa_camera init() is ambiguous, it's better to configure PXA CIF pins
-> statically in machine init function.
->
-> Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
+Thomas Gleixner wrote:
+> What about analysing the code and verifying that the setup order is
+> correct ?
+> 
+> Adding save/restore_irq just because you have no clue what the code
+> does is utter nonsense.
 
-I'll grab this and get it exposed to next -rc phase.
+Wouldn't it be quite a lot nicer if generic setup moved the
+IRQF_DISABLED handler to be first in the list, if that actually works
+in a useful way rather than simply being a quirk that irqs are
+disabled for the first one?
+
+-- Jamie
