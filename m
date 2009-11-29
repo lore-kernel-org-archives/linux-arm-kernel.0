@@ -1,50 +1,16 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Sun, 29 Nov 2009 20:03:29 +0800
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 29 Nov 2009 12:16:14 +0000
 Subject: [PATCH V2] ARM: NUC900: add GDMA driver support for nuc900
 	platform
 In-Reply-To: <713d0d430911260242j579d86b3r7eeade0007d2a94c@mail.gmail.com>
 References: <713d0d430911260242j579d86b3r7eeade0007d2a94c@mail.gmail.com>
-Message-ID: <4B126311.5090104@gmail.com>
+Message-ID: <20091129121614.GA11445@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Hu Ruihuan 
+Some comments below.
 
-Thanks a lot for your patch, regarding this dma driver, it looks good to me,
-
-but for submitting this patch, there are two points you should take care as following: 
-
-(1)Please use 'scripts/checkpatch.pl' to check your patch.
-
-(2)Before you submit some patches, Please read the Documentation/email-clients.txt
-and check your email client.
-
-
-> Hi, Wan ZongShun
->     This is the gdma driver for NUC900 platform, it is based apon the
-> code several days ago I have submited.
-> 
-> Signed-off-by: Hu Ruihuan <specter118@163.com>
-> ----
-> iff -Naur linux-2.6.32-rc8/arch/arm/mach-w90x900/dma.c
-> linux-2.6.32-rc8-modify/arch/arm/mach-w90x900/dma.c
-> --- linux-2.6.32-rc8/arch/arm/mach-w90x900/dma.c        1970-01-01
-> 08:00:00.000000000 +0800
-> +++ linux-2.6.32-rc8-modify/arch/arm/mach-w90x900/dma.c 2010-11-20
-> 00:06:44.000000000 +0800
-> @@ -0,0 +1,318 @@
-> +/*
-> + * arch/arm/mach-w90p910/dma.c
-> + *
-> + * Support functions for the w90p910 internal DMA channels.
-> + *
-> + * Wan Zongshun <mcuos.com@gmail.com>
-> + * Hu Ruihuan <specter118@gmail.com>
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
+On Thu, Nov 26, 2009 at 06:42:12PM +0800, Hu Ruihuan wrote:
 > +#include <linux/module.h>
 > +#include <linux/interrupt.h>
 > +#include <linux/init.h>
@@ -53,6 +19,9 @@ and check your email client.
 > +#include <linux/io.h>
 > +
 > +#include <asm/system.h>
+
+You shouldn't need asm/system.h
+
 > +#include <asm/irq.h>
 > +#include <asm/atomic.h>
 > +#include <mach/hardware.h>
@@ -108,6 +77,9 @@ and check your email client.
 > +static struct nuc900_dma_t *dmachan0, *dmachan1;
 > +static atomic_t  shared_irq_using;
 > +static spinlock_t dma_chan_lock;
+
+Maybe consider using DEFINE_SPINLOCK(dma_chan_lock) ?
+
 > +
 > +
 > +
@@ -139,6 +111,38 @@ and check your email client.
 > +       return err;
 > +
 > +}
+
+Again, this initializes the local 'dma' pointer but doesn't return it.
+If you want to be able to return a pointer as well as an error code,
+try using linux/err.h:
+
+struct nuc900_dma_t *register_dma_from_chan(const char *dev_name,
+		unsigned int *irq_request)
+{
+	struct nuc900_dma_t *ret;
+	...
+		if (strcmp(dmachanX->device, dev_name) == 0)
+			ret = ERR_PTR(-EBUSY);
+		else
+			ret = dmachan1;
+	...
+	return ret;
+}
+
+and use it as:
+
+	struct nuc900_dma_t *dma;
+
+	dma = register_dma_from_chan(...);
+	if (IS_ERR(dma)) {
+		err = PTR_ERR(dma);
+		return err;
+	}
+
+This has advantages over the 'return via pointer-to-pointer in function
+arguments' in that you can't end up with errors where your pointer is
+not initialized.
+
 > +
 > +static void match_dmachan_fromname(const char *dev_name,
 > +                                       struct nuc900_dma_t *dma)
@@ -152,6 +156,10 @@ and check your email client.
 > +               if (strcmp(dmachan0->device, dev_name) == 0)
 > +                       dma = dmachan0;
 > +       }
+
+This code doesn't actually do anything - 'dma' is a local pointer which
+you're initializing but not using.
+
 > +}
 > +
 > +static irqreturn_t dma_irq_handler(int irq, void *dev_id)
@@ -171,6 +179,22 @@ and check your email client.
 > +               local_irq_enable();
 > +               dmachan1->callback(dmachan1->data);
 > +       }
+
+if both TC0F and TC1F are both set, you'll write ~TC0F with IRQs disabled
+but ~TC1F with IRQs enabled.  Wouldn't something like:
+
+	local_irq_disable();
+	status = __raw_readl(GDMA_GDGA) & (TC0F|TC1F);
+	__raw_writel(~status, GDMA_GDGA);
+	local_irq_enable();
+
+	if (status & TC0F)
+		dmachan0->callback(dmachan0->data);
+	if (status & TC1F)
+		dmachan1->callback(dmachan1->data);
+
+be better?
+
 > +
 > +       return IRQ_HANDLED;
 > +}
@@ -196,175 +220,5 @@ and check your email client.
 > +       if (irq_request) {
 > +               err = request_irq(IRQ_GDMAGROUP, dma_irq_handler, IRQF_SHARED|
 > +                               IRQF_DISABLED, NULL, NULL);
-> +               if (err) {
-> +                       dma->device = NULL;
-> +                       spin_unlock(&dma_chan_lock);
-> +                       return err;
-> +               }
-> +       }
-> +
-> +
-> +       atomic_inc( &shared_irq_using);
-> +       dma->callback = callback;
-> +       dma->data = data;
-> +       spin_unlock(&dma_chan_lock);
-> +       return 0;
-> +}
-> +EXPORT_SYMBOL(nuc900_request_dma);
-> +
-> +int nuc900_free_dma(const char *dev_name)
-> +{
-> +       struct nuc900_dma_t *dma = NULL;
-> +
-> +       BUG_ON(!dev_name);
-> +       WARN_ON(shared_irq_using.counter == 0);
-> +       spin_lock(&dma_chan_lock);
-> +       match_dmachan_fromname(dev_name, dma);
-> +
-> +       if (!dma)
-> +               return -ENXIO;
-> +
-> +       dma->device = NULL;
-> +       spin_unlock(&dma_chan_lock);
-> +
-> +       atomic_dec(&shared_irq_using);
-> +
-> +
-> +       if (!(shared_irq_using.counter))
-> +               free_irq(IRQ_GDMAGROUP, dma);
-> +
-> +       kzfree(dma->descp);
-> +       return 0;
-> +}
-> +EXPORT_SYMBOL(nuc900_free_dma);
-> +
-> +static unsigned int set_start_cmd(unsigned int start)
-> +{
-> +       unsigned int dscp_cmd;
-> +
-> +       dscp_cmd = 0;
-> +
-> +       if (start) {
-> +               dscp_cmd = (ORDEN|RUN);
-> +               dscp_cmd &= ~(NON_DSCRIP|RESET);
-> +       } else {
-> +               dscp_cmd = (NON_DSCRIP);
-> +       }
-> +               dscp_cmd &= DSCRIPMASK;
-> +
-> +       return dscp_cmd;
-> +}
-> +
-> +static unsigned int set_cmd_info(unsigned int countsize)
-> +{
-> +       unsigned int cmd_info;
-> +
-> +       cmd_info = (countsize >> 2);
-> +
-> +       cmd_info = (((cmd_info & CMDINFOMASK) << 18)|GDMAEN|D_INTS);
-> +       cmd_info &= ~(GDMAMS|DADIR|SADIR|DAFIX|SAFIX|TWSMASK);
-> +       cmd_info |= TWS;
-> +
-> +       return cmd_info;
-> +
-> +}
-> +
-> +static unsigned int get_descplist_num(unsigned int size, unsigned int *leave)
-> +{
-> +       unsigned int dscp_num, other_num;
-> +
-> +       dscp_num = 0;
-> +       other_num = 0;
-> +
-> +       dscp_num = size / COUTN_TRANSFER;
-> +       other_num = size % COUTN_TRANSFER;
-> +
-> +       if (other_num)
-> +               dscp_num += 1;
-> +
-> +       *leave = other_num;
-> +
-> +       return dscp_num;
-> +
-> +}
-> +
-> +int nuc900_start_dma(const char *dev_name, dma_addr_t dma_src,
-> +                                       dma_addr_t dma_dst, unsigned int size)
-> +{
-> +       struct nuc900_dma_descp *descp = NULL;
-> +       struct nuc900_dma_t *dma = NULL;
-> +       unsigned int i, dscp_num, other_num, val;
-> +
-> +       BUG_ON((!size|!dev_name));
-> +
-> +       match_dmachan_fromname(dev_name, dma);
-> +
-> +       if (!dma)
-> +               return -ENXIO;
-> +
-> +       dscp_num = get_descplist_num(size, &other_num);
-> +
-> +       descp = kzalloc(dscp_num * sizeof(struct nuc900_dma_t), GFP_KERNEL);
-> +
-> +       if (!descp)
-> +               return -ENOMEM;
-> +
-> +       dma->descp = descp;
-> +
-> +       for (i = 0; i < dscp_num; i++) {
-> +               descp->next_descp = set_start_cmd(1);
-> +               descp->srcaddr = dma_src + COUTN_TRANSFER * i;
-> +               descp->dstaddr = dma_dst + COUTN_TRANSFER * i;
-> +               descp->commandinfo = set_cmd_info(COUTN_TRANSFER);
-> +               descp++;
-> +       }
-> +       descp--;
-> +       descp->next_descp = set_start_cmd(0);
-> +       descp->commandinfo = set_cmd_info(other_num);
-> +
-> +
-> +       val = set_start_cmd(1);
-> +       val |= (unsigned int)(dma->descp);
-> +       local_irq_disable();
-> +       __raw_writel(val, dma->dma_reg + GDMA_GDGA);
-> +
-> +       val = __raw_readl(GDMA_INTCS);
-> +       val |= (ENTC0F|ENTC1F);
-> +       __raw_writel(val, GDMA_INTCS);
-> +       local_irq_enable();
-> +
-> +       return 0;
-> +}
-> +EXPORT_SYMBOL(nuc900_start_dma);
-> +
-> +void __init nuc900_init_dma(void)
-> +{
-> +       unsigned        i;
-> +       struct nuc900_dma_t *dma_channel;
-> +       spin_lock_init(&dma_chan_lock);
-> +       for (i = 0; i < NUC900_DMA_CHANNELS; i++) {
-> +               dma_channel = &dma_chan[i];
-> +               dma_channel->dma_reg = DMA_BASE + i * CHANNELINERV;
-> +               dma_channel->device = NULL;
-> +       }
-> +
-> +       dmachan0 = &dma_chan[0];
-> +       dmachan1 = &dma_chan[1];
-> +}
-> diff -Naur linux-2.6.32-rc8/arch/arm/mach-w90x900/Makefile
-> linux-2.6.32-rc8-modify/arch/arm/mach-w90x900/Makefile
-> --- linux-2.6.32-rc8/arch/arm/mach-w90x900/Makefile     2009-11-20
-> 06:32:38.000000000 +0800
-> +++ linux-2.6.32-rc8-modify/arch/arm/mach-w90x900/Makefile      2010-11-20
-> 00:02:07.000000000 +0800
-> @@ -5,7 +5,7 @@
->  # Object file lists.
-> 
->  obj-y                          := irq.o time.o mfp.o gpio.o clock.o
-> -obj-y                          += clksel.o dev.o cpu.o
-> +obj-y                          += clksel.o dev.o cpu.o dma.o
->  # W90X900 CPU support files
-> 
->  obj-$(CONFIG_CPU_W90P910)      += nuc910.o
-> ----
-> 
+
+Not sure why you don't claim this at initialization time.
