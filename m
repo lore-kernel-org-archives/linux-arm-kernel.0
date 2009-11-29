@@ -1,30 +1,19 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sun, 29 Nov 2009 10:25:47 +0800
-Subject: [PATCH 0/3] pxa_camera: remove init() callback
-In-Reply-To: <20091127213939.9bb235fa.ospite@studenti.unina.it>
-References: <1258495463-26029-1-git-send-email-ospite@studenti.unina.it>
-	<20091127213939.9bb235fa.ospite@studenti.unina.it>
-Message-ID: <f17812d70911281825q5be6a000p24063a1bf0f17be7@mail.gmail.com>
+Date: Sun, 29 Nov 2009 10:29:44 +0800
+Subject: [PATCH 2/3 v2] pcm990-baseboard: don't use pxa_camera init()
+	callback
+In-Reply-To: <1259353896-16892-1-git-send-email-ospite@studenti.unina.it>
+References: <Pine.LNX.4.64.0911181110180.5702@axis700.grange>
+	<1259353896-16892-1-git-send-email-ospite@studenti.unina.it>
+Message-ID: <f17812d70911281829h6f653c72q21ded878d1181bf7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 28, 2009 at 4:39 AM, Antonio Ospite
+On Sat, Nov 28, 2009 at 4:31 AM, Antonio Ospite
 <ospite@studenti.unina.it> wrote:
-> On Tue, 17 Nov 2009 23:04:20 +0100
-> Antonio Ospite <ospite@studenti.unina.it> wrote:
+> pxa_camera init() is ambiguous, it's better to configure PXA CIF pins
+> statically in machine init function.
 >
->> Hi,
->>
->> this series removes the init() callback from pxa_camera_platform_data, and
->> fixes its users to do initialization statically at machine init time.
->>
-> [...]
->> Antonio Ospite (3):
->> ? em-x270: don't use pxa_camera init() callback
->> ? pcm990-baseboard: don't use pxa_camera init() callback
->
-> Eric, if Guennadi ACKs v2 for these two please apply them only, we are
-> postponing the third one, hence you can discard it.
->
+> Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
 
-OK, fine.
+I'll grab this and get it exposed to next -rc phase.
