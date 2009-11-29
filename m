@@ -1,20 +1,27 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Sun, 29 Nov 2009 09:31:53 +0100
-Subject: [PATCH 3/3] ARM: pxa/raumfeld: Add defconfig
-In-Reply-To: <f17812d70911281918h5d71e65elfd621b093e3b4298@mail.gmail.com>
-References: <1259326031-8856-1-git-send-email-daniel@caiaq.de>
-	<1259326031-8856-2-git-send-email-daniel@caiaq.de>
-	<1259326031-8856-3-git-send-email-daniel@caiaq.de>
-	<1259326031-8856-4-git-send-email-daniel@caiaq.de>
-	<f17812d70911281918h5d71e65elfd621b093e3b4298@mail.gmail.com>
-Message-ID: <20091129083153.GB14091@buzzloop.caiaq.de>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 29 Nov 2009 09:34:25 +0100
+Subject: [PATCH] ARM: gta02: Add gpio bank B quirk for hardware
+	revision 5 and earlier
+In-Reply-To: <1259377532-8012-5-git-send-email-lars@metafoo.de>
+References: <1259377532-8012-1-git-send-email-lars@metafoo.de>
+	<1259377532-8012-2-git-send-email-lars@metafoo.de>
+	<1259377532-8012-3-git-send-email-lars@metafoo.de>
+	<1259377532-8012-4-git-send-email-lars@metafoo.de>
+	<1259377532-8012-5-git-send-email-lars@metafoo.de>
+Message-ID: <20091129083425.GB1530@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 29, 2009 at 11:18:56AM +0800, Eric Miao wrote:
-> On Fri, Nov 27, 2009 at 8:47 PM, Daniel Mack <daniel@caiaq.de> wrote:
-> > Signed-off-by: Daniel Mack <daniel@caiaq.de>
-> 
-> Applied.
+Hi!
 
-Thanks Eric!
+> On gta02 hardware revision 5 and earlier the basis resistors for transistors of
+> the leds are missing and reading their gpio pin status will always return 0.
+> So we have to shadow the led states in software. This is done by "hijacking"
+> the gpio accessor functions for bank B.
+
+Should that be done in LED driver, instead?
+									Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
