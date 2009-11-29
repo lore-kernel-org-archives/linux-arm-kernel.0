@@ -1,23 +1,23 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sun, 29 Nov 2009 11:01:20 +0800
-Subject: [PATCH 01/01] pxa: update flash structure in onenand info
-In-Reply-To: <771cded00911200011y57cb484eu34eb2da649cfd8ec@mail.gmail.com>
-References: <771cded00911200011y57cb484eu34eb2da649cfd8ec@mail.gmail.com>
-Message-ID: <f17812d70911281901q3f64790bu61c51525cf3f390f@mail.gmail.com>
+Date: Sun, 29 Nov 2009 11:04:38 +0800
+Subject: gpio: pca953x: add support for MAX7312
+In-Reply-To: <200911281851.19960.david-b@pacbell.net>
+References: <f17812d70911281821j602dc2bcvbda387e3e989e466@mail.gmail.com>
+	<200911281851.19960.david-b@pacbell.net>
+Message-ID: <f17812d70911281904gde58b61q3940de467d7ad81a@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2009 at 4:11 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> From 10bca87635458d50843ab2669372d0f53bcd1325 Mon Sep 17 00:00:00 2001
-> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Fri, 20 Nov 2009 10:57:16 -0500
-> Subject: [PATCH] [ARM] pxa: update flash structure in onenand info
+On Sun, Nov 29, 2009 at 10:51 AM, David Brownell <david-b@pacbell.net> wrote:
+> On Saturday 28 November 2009, Eric Miao wrote:
+>> >From e7a5c19103616e7e9252d189d455d136b4c25c51 Mon Sep 17 00:00:00 2001
+>> From: Jun Nie <njun@marvell.com>
+>> Date: Sun, 29 Nov 2009 09:41:54 +0800
+>> Subject: [PATCH] gpio: pca953x: add support for MAX7312
+>>
+>> Signed-off-by: Jun Nie <njun@marvell.com>
+>> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
 >
-> Since flash structure is changed from flash_platform_data to
-> onenand_platform_data in generic driver. Update the struct in saar
-> and ttc platform driver.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Acked-by: David Brownell <dbrownell@users.sourceforge.net>
 
-Applied.
+Thanks.
