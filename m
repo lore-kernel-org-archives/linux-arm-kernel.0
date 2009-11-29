@@ -1,32 +1,29 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Sun, 29 Nov 2009 11:56:51 +0100
-Subject: [PATCH] ARM: gta02: Add gpio bank B quirk for hardware	revision
-	5 and earlier
-In-Reply-To: <20091129083425.GB1530@ucw.cz>
-References: <1259377532-8012-1-git-send-email-lars@metafoo.de>
-	<1259377532-8012-2-git-send-email-lars@metafoo.de>
-	<1259377532-8012-3-git-send-email-lars@metafoo.de>
-	<1259377532-8012-4-git-send-email-lars@metafoo.de>
-	<1259377532-8012-5-git-send-email-lars@metafoo.de>
-	<20091129083425.GB1530@ucw.cz>
-Message-ID: <4B125373.9020505@metafoo.de>
+From: Thomas.Kunze@gmx.com (Thomas Kunze)
+Date: Sun, 29 Nov 2009 12:44:42 +0100
+Subject: [PATCH 6/9] add gpiolib support to ucb1x00
+In-Reply-To: <20091128124751.GD25671@n2100.arm.linux.org.uk>
+References: <1254778533-3529-1-git-send-email-thommycheck@gmx.de>	<1254778533-3529-2-git-send-email-thommycheck@gmx.de>	<1254778533-3529-3-git-send-email-thommycheck@gmx.de>	<1254778533-3529-4-git-send-email-thommycheck@gmx.de>	<1254778533-3529-5-git-send-email-thommycheck@gmx.de>	<1254778533-3529-6-git-send-email-thommycheck@gmx.de>	<1254778533-3529-7-git-send-email-thommycheck@gmx.de>
+	<20091128124751.GD25671@n2100.arm.linux.org.uk>
+Message-ID: <4B125EAA.20704@gmx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pavel Machek wrote:
-> Hi!
+Russell King - ARM Linux schrieb:
+> On Mon, Oct 05, 2009 at 11:35:30PM +0200, Thomas Kunze wrote:
+>   
+>> The old access methods to the gpios will be removed when
+>> all users has been converted. (mainly ucb1x00-ts)
+>>     
 >
->> On gta02 hardware revision 5 and earlier the basis resistors for
->> transistors of the leds are missing and reading their gpio pin
->> status will always return 0. So we have to shadow the led states
->> in software. This is done by "hijacking" the gpio accessor
->> functions for bank B.
->
-> Should that be done in LED driver, instead? Pave
-Hi
+> btw, what was the point in moving private includes out of drivers/mfd
+> into include/linux/mfd?  If they're private, they should stay private
+> and local to the relevant files IMHO.
+>   
+I moved the touchscreen driver to drivers/input/touchscreen and the 
+battery driver (in drivers/power) needs those too.
+There is an out of tree sound driver for ucb1x00 thats in the sound 
+directory. So moving those includes to a more accessable
+location makes sense to me.
 
-Nope, that won't work. Every time a gpio on gpb is changed the leds
-will turn off. So we would have to ship a special version of each
-driver using a gpio pin form gpb. We certainly don't want to do that.
-
-- Lars
+Regards,
+Thomas
