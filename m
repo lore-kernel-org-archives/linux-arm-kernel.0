@@ -1,17 +1,22 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sun, 29 Nov 2009 11:19:36 +0800
-Subject: [PATCH 1/3] ARM: pxa/raumfeld: add platform support
-In-Reply-To: <1259326031-8856-2-git-send-email-daniel@caiaq.de>
-References: <1259326031-8856-1-git-send-email-daniel@caiaq.de>
-	<1259326031-8856-2-git-send-email-daniel@caiaq.de>
-Message-ID: <f17812d70911281919p2f49c0d6y9f209c5b9198db0c@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 29 Nov 2009 09:31:06 +0100
+Subject: [PATCH] ARM: gta02: Add button support
+In-Reply-To: <1259377532-8012-2-git-send-email-lars@metafoo.de>
+References: <1259377532-8012-1-git-send-email-lars@metafoo.de>
+	<1259377532-8012-2-git-send-email-lars@metafoo.de>
+Message-ID: <20091129083105.GA1530@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 27, 2009 at 8:47 PM, Daniel Mack <daniel@caiaq.de> wrote:
-> This adds support for Raumfeld's 'Controller', 'Connector', 'Speaker S'
-> and 'Speaker M' devices. They're all based on PXA303 SoCs.
->
-> Signed-off-by: Daniel Mack <daniel@caiaq.de>
+On Sat 2009-11-28 04:05:29, Lars-Peter Clausen wrote:
+> The gta02 has two buttons which are connected to gpio pins and thus can get
+> supported by using the generic gpio-keys driver.
+> 
+> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
+> Acked-By: Nelson Castillo <arhuaco@freaks-unidos.net>
 
-Applied.
+ACK.
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
