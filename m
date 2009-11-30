@@ -1,56 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 30 Nov 2009 10:54:15 -0800
-Subject: [PATCH 1/8] omap2: mux: intoduce omap_mux_{read,write}
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02BBE6475E@dbde02.ent.ti.com>
-References: <20091126001646.1546.34352.stgit@localhost>
-	<20091126001849.1546.76887.stgit@localhost>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02BBE6475E@dbde02.ent.ti.com>
-Message-ID: <20091130185415.GT4348@atomide.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Mon, 30 Nov 2009 18:56:13 +0000
+Subject: [PATCH] ARM: gta02: Add gpio bank B quirk for hardware revision 5
+	and earlier
+In-Reply-To: <20091130123141.GH13328@elf.ucw.cz>
+References: <1259377532-8012-1-git-send-email-lars@metafoo.de>
+	<1259377532-8012-2-git-send-email-lars@metafoo.de>
+	<1259377532-8012-3-git-send-email-lars@metafoo.de>
+	<1259377532-8012-4-git-send-email-lars@metafoo.de>
+	<1259377532-8012-5-git-send-email-lars@metafoo.de>
+	<20091129083425.GB1530@ucw.cz> <4B125373.9020505@metafoo.de>
+	<20091130123141.GH13328@elf.ucw.cz>
+Message-ID: <20091130185613.GA6289@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shilimkar, Santosh <santosh.shilimkar@ti.com> [091129 02:02]:
-> > -----Original Message-----
-> > From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> > owner at vger.kernel.org] On Behalf Of Tony Lindgren
-> > Sent: Thursday, November 26, 2009 5:49 AM
-> > To: linux-arm-kernel at lists.infradead.org
-> > Cc: linux-omap at vger.kernel.org; Mike Rapoport
-> > Subject: [PATCH 1/8] omap2: mux: intoduce omap_mux_{read,write}
+Pavel Machek wrote:
+> On Sun 2009-11-29 11:56:51, Lars-Peter Clausen wrote:
+> > Pavel Machek wrote:
+> > > Hi!
+> > >
+> > >> On gta02 hardware revision 5 and earlier the basis resistors for
+> > >> transistors of the leds are missing and reading their gpio pin
+> > >> status will always return 0. So we have to shadow the led states
+> > >> in software. This is done by "hijacking" the gpio accessor
+> > >> functions for bank B.
+> > >
+> > > Should that be done in LED driver, instead? Pave
+> > Hi
 > > 
-> > From: Mike Rapoport <mike@compulab.co.il>
-> > 
-> > intoduce omap_mux_{read,write}
-
-<snip>
- 
-> >  int __init omap2_mux_init(void)
-> >  {
-> > +	u32 mux_pbase;
-> > +
-> > +	if (cpu_is_omap2420())
-> > +		mux_pbase = OMAP2420_CTRL_BASE + OMAP_MUX_BASE_OFFSET;
-> > +	else if (cpu_is_omap2430())
-> > +		mux_pbase = OMAP243X_CTRL_BASE + OMAP_MUX_BASE_OFFSET;
-> > +	else if (cpu_is_omap34xx())
-> > +		mux_pbase = OMAP343X_CTRL_BASE + OMAP_MUX_BASE_OFFSET;
-> > +
-> > +	mux_base = ioremap(mux_pbase, OMAP_MUX_BASE_SZ);
+> > Nope, that won't work. Every time a gpio on gpb is changed the leds
+> > will turn off. So we would have to ship a special version of each
+> > driver using a gpio pin form gpb. We certainly don't want to do that.
 > 
-> The control modules on OMAP's divided into 2 domains with different base address
-> 1. pads in CORE power domain
-> 2. Pads in wakeup domain.
-> 
-> If we map these two separately, then we can differentiate the wakeup capable pads.
-> Not sure whether I am making any sense here but just thought it would be useful.
+> _Any_ GPIO pin change will turn off the LED? Wow, the hardware is
+> severely misdesigned then, ok. That means you do need to modify GPIO
+> :-(. You probably should state it clearly in the comments.
 
-OK, maybe we can consider doing that later on.
+I don't think it's necessarily a hardware misdesign if you can't read
+back the value of output-only GPIOs, even though it's inconvenient.
+But from the sound of that comment, I'd worry about the current consumed :-)
 
-If we separate the core and wakeup domains for muxing, we should
-do it in a way where it's transparent to the users. Otherwise
-the the muxing again gets confusing easily if we have separate sets
-of functions for the core and wakeup domains.
-
-Regards,
-
-Tony
+-- Jamie
