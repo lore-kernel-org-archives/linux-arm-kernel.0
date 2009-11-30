@@ -1,124 +1,74 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 30 Nov 2009 17:18:12 +0100
-Subject: [PATCH 8/9 v2] MXC: Add a digital audio multiplexer driver
-In-Reply-To: <eedb5540911300815u5cf60634jd58918f454269028@mail.gmail.com>
-References: <1258022525-21078-8-git-send-email-s.hauer@pengutronix.de>
-	<1258022525-21078-9-git-send-email-s.hauer@pengutronix.de>
-	<20091112150615.GA30179@pengutronix.de>
-	<eedb5540911300356p2b41eeaakee050953ad39ec26@mail.gmail.com>
-	<20091130121017.GN27548@pengutronix.de>
-	<eedb5540911300425n374af9f0k5346d85fdb79eb11@mail.gmail.com>
-	<20091130123412.GP27548@pengutronix.de>
-	<eedb5540911300509t11cc783cr8e97eda66ee382a@mail.gmail.com>
-	<20091130160356.GT27548@pengutronix.de>
-	<eedb5540911300815u5cf60634jd58918f454269028@mail.gmail.com>
-Message-ID: <20091130161812.GU27548@pengutronix.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 30 Nov 2009 11:23:49 -0500 (EST)
+Subject: Git pull request: Orion/Kirkwood/Dove stuff for next merge window
+In-Reply-To: <alpine.LFD.2.00.0911262005410.2059@xanadu.home>
+References: <alpine.LFD.2.00.0911262005410.2059@xanadu.home>
+Message-ID: <alpine.LFD.2.00.0911301122270.5820@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2009 at 05:15:45PM +0100, javier Martin wrote:
-> 2009/11/30 Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> > On Mon, Nov 30, 2009 at 02:09:16PM +0100, javier Martin wrote:
-> > > From fa87b65915e78ad29a8e4f3f22b26ed0fa6dc7f5 Mon Sep 17 00:00:00 2001
-> > >
-> > > > From: Sascha Hauer <s.hauer@pengutronix.de>
-> > > > Date: Mon, 30 Nov 2009 13:31:29 +0100
-> > > > Subject: [PATCH] i.MX27 audmux: Fix register offsets
-> > > >
-> > > > The PPCR registers start at 0x10, not 0xc. Fix this.
-> > > >
-> > > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > > > ---
-> > > >  arch/arm/plat-mxc/include/mach/audmux.h |    6 +++---
-> > > >  1 files changed, 3 insertions(+), 3 deletions(-)
-> > > >
-> > > > diff --git a/arch/arm/plat-mxc/include/mach/audmux.h
-> > > > b/arch/arm/plat-mxc/include/mach/audmux.h
-> > > > index 5cd6466..dcc12d4 100644
-> > > > --- a/arch/arm/plat-mxc/include/mach/audmux.h
-> > > > +++ b/arch/arm/plat-mxc/include/mach/audmux.h
-> > > > @@ -4,9 +4,9 @@
-> > > >  #define MX27_AUDMUX_HPCR1_SSI0         0
-> > > >  #define MX27_AUDMUX_HPCR2_SSI1         1
-> > > >  #define MX27_AUDMUX_HPCR3_SSI_PINS_4   2
-> > > > -#define MX27_AUDMUX_PPCR1_SSI_PINS_1   3
-> > > > -#define MX27_AUDMUX_PPCR2_SSI_PINS_2   4
-> > > > -#define MX27_AUDMUX_PPCR3_SSI_PINS_3   5
-> > > > +#define MX27_AUDMUX_PPCR1_SSI_PINS_1   4
-> > > > +#define MX27_AUDMUX_PPCR2_SSI_PINS_2   5
-> > > > +#define MX27_AUDMUX_PPCR3_SSI_PINS_3   6
-> > > >
-> > >
-> > > Be careful,
-> > > I think this patch breaks some of the boards currently using
-> > > MXC_AUDMUX_V1_PCR_RXDSEL(x) and similar macros defined in mach/audmux.h
-> > (for
-> > > example pcm038).
-> > > For those macros the old AUDMUX register indexes are fine.
-> > >
-> > > I suggest fixing this inside audmux_v1.c instead of modifying
-> > mach/audmux.h.
-> >
-> > Ok. The AUDMUX V1 is used on i.MX21 and i.MX27 and both have this hole
-> > in the register space, so fixing it in the driver should be safe.
-> >
-> > How about this one then?
-> >
-> > Sascha
-> >
-> >
-> > From 297b5c4cea40c2e7023bbdb96a0c90c13b0e02a1 Mon Sep 17 00:00:00 2001
-> > From: Sascha Hauer <s.hauer@pengutronix.de>
-> > Date: Mon, 30 Nov 2009 13:31:29 +0100
-> > Subject: [PATCH] i.MX27 audmux: Fix register offsets
-> >
-> > The PPCR registers start at 0x10, not 0xc. Fix this.
-> >
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> >  arch/arm/plat-mxc/audmux-v1.c |    4 ++++
-> >  1 files changed, 4 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/plat-mxc/audmux-v1.c b/arch/arm/plat-mxc/audmux-v1.c
-> > index 70ab5af..8fbce7b 100644
-> > --- a/arch/arm/plat-mxc/audmux-v1.c
-> > +++ b/arch/arm/plat-mxc/audmux-v1.c
-> > @@ -37,6 +37,10 @@ int mxc_audmux_v1_configure_port(unsigned int port,
-> > unsigned int pcr)
-> >                return -ENOSYS;
-> >        }
-> >
-> > +       /* handle hole in the register space */
-> > +       if (port > 2)
-> > +               port++;
-> > +
-> >         writel(pcr, audmux_base + MXC_AUDMUX_V1_PCR(port));
-> >
-> >        return 0;
-> > --
-> > 1.6.5.2
-> >
-> 
-> Sascha,
-> there are actually two holes, with this current patch, PPCR3 still receives
-> a wrong value:
-> 
-> 0x1001_6000 (HPCR1)
-> 0x1001_6004 (HPCR2)
-> 0x1001_6008 (HPCR3)
-> 0x1001_600C (hole)
-> 0x1001_6010 (PPCR1)
-> 0x1001_6014 (PPCR2)
-> 0x1001_6018 (hole)
-> 0x1001_601C (PPCR3)
+Ping.
 
-Grumpf. I'm not creating a new patch before getting some sleep.
+On Thu, 26 Nov 2009, Nicolas Pitre wrote:
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> Russell, please pull the following:
+> 
+> 	git://git.marvell.com/orion for-rmk
+> 
+> This contains updates for Kirkwood and addition of support for the Dove 
+> SOC.
+> 
+> Lennert Buytenhek (1):
+>       ARM: Add Tauros2 L2 cache controller support
+> 
+> Martin Michlmayr (4):
+>       [ARM] Kirkwood: Add support for QNAP TS-41x Turbo NAS
+>       [ARM] Kirkwood: Add MPP36 for QNAP TS-11x/TS-21x
+>       [ARM] Kirkwood: Add QNAP TS-110/TS-210 to Kconfig help text
+>       [ARM] Kirkwood: Remove code duplication in QNAP setup files
+> 
+> Saeed Bishara (2):
+>       ARM: add base support for Marvell Dove SoC
+>       RTC: let Dove soc select the rtc-mv driver.
+> 
+>  arch/arm/Kconfig                              |   13 +
+>  arch/arm/Makefile                             |    1 +
+>  arch/arm/boot/compressed/head.S               |    6 +
+>  arch/arm/configs/dove_defconfig               | 1620 +++++++++++++++++++
+>  arch/arm/include/asm/hardware/cache-tauros2.h |   11 +
+>  arch/arm/mach-dove/Kconfig                    |   14 +
+>  arch/arm/mach-dove/Makefile                   |    3 +
+>  arch/arm/mach-dove/Makefile.boot              |    3 +
+>  arch/arm/mach-dove/addr-map.c                 |  149 ++
+>  arch/arm/mach-dove/common.c                   |  781 +++++++++
+>  arch/arm/mach-dove/common.h                   |   40 +
+>  arch/arm/mach-dove/dove-db-setup.c            |  102 ++
+>  arch/arm/mach-dove/include/mach/bridge-regs.h |   58 +
+>  arch/arm/mach-dove/include/mach/debug-macro.S |   20 +
+>  arch/arm/mach-dove/include/mach/dove.h        |  180 ++
+>  arch/arm/mach-dove/include/mach/entry-macro.S |   39 +
+>  arch/arm/mach-dove/include/mach/gpio.h        |   49 +
+>  arch/arm/mach-dove/include/mach/hardware.h    |   26 +
+>  arch/arm/mach-dove/include/mach/io.h          |   20 +
+>  arch/arm/mach-dove/include/mach/irqs.h        |  101 ++
+>  arch/arm/mach-dove/include/mach/memory.h      |   10 +
+>  arch/arm/mach-dove/include/mach/pm.h          |   54 +
+>  arch/arm/mach-dove/include/mach/system.h      |   36 +
+>  arch/arm/mach-dove/include/mach/timex.h       |    9 +
+>  arch/arm/mach-dove/include/mach/uncompress.h  |   37 +
+>  arch/arm/mach-dove/include/mach/vmalloc.h     |    5 +
+>  arch/arm/mach-dove/irq.c                      |  133 ++
+>  arch/arm/mach-dove/pcie.c                     |  238 +++
+>  arch/arm/mach-kirkwood/Kconfig                |   12 +-
+>  arch/arm/mach-kirkwood/Makefile               |    3 +-
+>  arch/arm/mach-kirkwood/ts219-setup.c          |  108 +--
+>  arch/arm/mach-kirkwood/ts41x-setup.c          |  154 ++
+>  arch/arm/mach-kirkwood/tsx1x-common.c         |  113 ++
+>  arch/arm/mach-kirkwood/tsx1x-common.h         |    7 +
+>  arch/arm/mm/Kconfig                           |   11 +-
+>  arch/arm/mm/Makefile                          |    2 +-
+>  arch/arm/mm/cache-tauros2.c                   |  263 +++
+>  arch/arm/mm/proc-v6.S                         |   33 +-
+>  drivers/rtc/Kconfig                           |    2 +-
+>  39 files changed, 4356 insertions(+), 110 deletions(-)
+> 
