@@ -1,43 +1,30 @@
-From: schindele@nentec.de (Juergen Schindele)
-Date: Mon, 30 Nov 2009 10:18:12 +0200
-Subject: IXP425: help on HSS channelized service
-In-Reply-To: <m3bpinplos.fsf@intrepid.localdomain>
-References: <4B0BDFC1.7010506@kaskonetworks.it>
-	<200911270921.35517.schindele@nentec.de>
-	<m3bpinplos.fsf@intrepid.localdomain>
-Message-ID: <200911300918.13568.schindele@nentec.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 30 Nov 2009 10:05:12 +0100
+Subject: [patch v2 0/2] Add USB Gadget support for mx35pdk
+In-Reply-To: <20091127104434.558432151@yahoo.com>
+References: <20091126151019.837865490@yahoo.com>>
+	<20091127104434.558432151@yahoo.com>
+Message-ID: <20091130090512.GM27548@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, 28. November 2009 schrieben Sie:
-> Juergen Schindele <schindele@nentec.de> writes:
+On Fri, Nov 27, 2009 at 11:44:34AM +0100, Harro Haan wrote:
+> [patch v2 1/2] mx35: register usb_ahb clock in clock-imx35.c
+> [patch v2 2/2] mx35: add usb gadget support in mx35pdk.c
 > 
-> >> Perhaps you're using IXP46x/43x CPU and the new firmware (3.x)?
-> >> The driver works with fw 2.4 (and some older), i.e. the last firmware
-> >> which works with IXP42x and 46x/43x.
-> > Thanks for your info. I thing thats the problem about it. I am using 
-> > an 2.0 firmware from INTEL and that could be the problem.
+> Changes with respect to previous version of patch:
+> - The patch is split up per file as requested
+> - Removed unneeded change in USB Gadget Kconfig
 > 
-> If that's really 2.0 and not 3.0 then you can upgrade to 2.4 which is
-> compatible with the HSS driver.
-Yes i have already tried with 2.4 and it works without modification.
-With the modification i posted it work also with 2.0. 
-Thanks for your help !
+> The patch is baselined on:
+> git://git.pengutronix.de/git/imx/linux-2.6.git mxc-master
 
---------------------------------------------------------------
-J?rgen Schindele  
-Software-Entwicklung
+Ok, applied.
 
-NENTEC Netzwerktechnologie GmbH
-Greschbachstr. 12
-76229 Karlsruhe
-Deutschland
-Telefon: +49 721 94249-51
-Telefax: +49 721 94249-10
-E-Mail:  schindele at nentec.de
-WEB:     www.nentec.de
- 
-Gesch?ftsf?hrung: Klaus Becker, Roland Knapp
-Sitz der Gesellschaft: Karlsruhe
-Handelsregister: Amtsgericht Mannheim HRB 107658
---------------------------------------------------------------
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
