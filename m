@@ -1,30 +1,74 @@
-From: karl@micro-technic.com (Karl Olsen)
-Date: Mon, 30 Nov 2009 14:48:36 +0100
-Subject: [PATCH 1/3] AT91: update at91_eth_data for ETX2-3 on PA10-11
-References: <20091129234917.GB18841@game.jcrosoft.org><1259574486-13391-1-git-send-email-derkling@gmail.com>
-	<1259574486-13391-2-git-send-email-derkling@gmail.com>
-Message-ID: <E1B6D643836E44EEA8CC65C5C68E6966@KARL>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 30 Nov 2009 14:54:54 +0100 (CET)
+Subject: Get rid of IRQF_DISABLED - (was [PATCH] genirq: warn about
+	IRQF_SHARED|IRQF_DISABLED)
+In-Reply-To: <1259578067-29169-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259578067-29169-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <alpine.LFD.2.00.0911301225110.24119@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------ Original Message ----- 
-From: "Patrick Bellasi" <derkling@gmail.com>
-To: <linux-arm-kernel@lists.infradead.org>
-Cc: "Patrick Bellasi" <derkling@gmail.com>; "Jean-Christophe
-PLAGNIOL-VILLARD" <plagnioj@jcrosoft.com>; "Andrew Victor"
-<linux@maxim.org.za>
-Sent: Monday, November 30, 2009 10:48 AM
-Subject: [PATCH 1/3] AT91: update at91_eth_data for ETX2-3 on PA10-11
+On Mon, 30 Nov 2009, Uwe Kleine-K?nig wrote:
+> For shared irqs IRQF_DISABLED is only guaranteed for the first handler.
+> So only warn starting at the second registration.
+> 
+> The warning is moved to __setup_irq having the additional benefit of
+> catching actions registered using setup_irq not only register_irq.
+> 
+> This doesn't fix the cases where setup order is wrong but it should
+> report the broken cases more reliably.
 
-> This patch update the at91_eth_data to handle the usage of PA10 and PA11
-> for EMAC's EXT2 and EXT3 signals.
->
-> The default configuration overlaps with TWI signals, using the new
-> platform data configuration option "use_twi_pins" it is possible to use
-> a different pin routing.
+The whole IRQF_DISABLED trickery is questionable and I'm pretty
+unhappy about the warning in general.
 
-As everybody until now has used the TWI pins, wouldn't it be better to leave
-them as the default, and introduce a "use_mcda_pins" option for PA10-11
-instead?
+While it is true that there is no guarantee of IRQF_DISABLED on shared
+interrupts (at least not for the secondary handlers) we really need to
+think about the reason why we want to run interrupt handlers with
+interrupts enabled at all.
 
-Karl Olsen
+The separation of interrupt handlers which run with interrupts
+disabled/enabled goes all the way back to Linux 1.0, which had two
+interrupt handling modes:
+
+1) handlers installed with SA_INTERRUPT ran atomically with interrupts
+   disabled.
+
+2) handlers installed without SA_INTERRUPT ran with interrupts enabled
+   as they did more complex stuff like signal handling in the kernel.
+
+The interrupt which was always run with interrupts disabled was the
+timer interrupt because some of the "slower" interrupt handlers were
+relying on jiffies being updated, which is only possible when they run
+with interrupts enabled and no such handler can interrupt the timer
+interrupt.
+
+In the 2.1.x timeframe the discussion about shared interrupt handlers
+and the treatment of SA_INTERRUPT (today IRQF_DISABLED) was resolved
+by changing the code to what we have right now. If you read back in
+the archives you will find the same arguments as we have seen in this
+thread and a boatload of different solutions to that.
+
+The real question is why we want to run an interrupt handler with
+interrupts enabled at all. There are two reaons AFAICT:
+
+1) interrupt handler relies on jiffies being updated:
+
+   I don't think that this is the case anymore and if we still have
+   code which does it is probably historic crap which is unused for
+   quite a time.
+
+2) interrupt handler runs a long time:
+
+   I'm sure we still have some of those especially in the
+   archaelogical corners of drivers/* and in the creative space of the
+   embedded "oh, I don't know why but it works" departement. That's
+   code which needs to be fixed anyway.
+
+The correct solution IMNSHO is to get rid of IRQF_DISABLED and run
+interrupt handlers always with interrupts disabled and require them
+not to reenable interrupts themself.
+
+Thoughts ?
+
+	 tglx
