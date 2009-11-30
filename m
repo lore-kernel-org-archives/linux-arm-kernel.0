@@ -1,91 +1,69 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 30 Nov 2009 20:51:29 +0100
-Subject: Get rid of IRQF_DISABLED - (was [PATCH] genirq: warn about
-	IRQF_SHARED|IRQF_DISABLED)
-In-Reply-To: <alpine.LFD.2.00.0911301225110.24119@localhost.localdomain>
-References: <1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1259578067-29169-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.00.0911301225110.24119@localhost.localdomain>
-Message-ID: <20091130195129.GA19172@pengutronix.de>
+From: acassis@gmail.com (Alan Carvalho de Assis)
+Date: Mon, 30 Nov 2009 17:57:07 -0200
+Subject: USB support on i.MX27
+In-Reply-To: <37367b3a0911300707l2abafe3buf99f624c3c90b99@mail.gmail.com>
+References: <37367b3a0911240343u58e3b3d2le5d48e638348a3ad@mail.gmail.com>
+	<eedb5540911242252w62f0a1cfo3a3f24dfa060957b@mail.gmail.com>
+	<20091127101654.GP14091@buzzloop.caiaq.de>
+	<37367b3a0911300707l2abafe3buf99f624c3c90b99@mail.gmail.com>
+Message-ID: <37367b3a0911301157k2a15cb80q5624cbd3f96063b8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Daniel,
 
-On Mon, Nov 30, 2009 at 02:54:54PM +0100, Thomas Gleixner wrote:
-> On Mon, 30 Nov 2009, Uwe Kleine-K?nig wrote:
-> > For shared irqs IRQF_DISABLED is only guaranteed for the first handler.
-> > So only warn starting at the second registration.
-> > 
-> > The warning is moved to __setup_irq having the additional benefit of
-> > catching actions registered using setup_irq not only register_irq.
-> > 
-> > This doesn't fix the cases where setup order is wrong but it should
-> > report the broken cases more reliably.
-> 
-> The whole IRQF_DISABLED trickery is questionable and I'm pretty
-> unhappy about the warning in general.
-> 
-> While it is true that there is no guarantee of IRQF_DISABLED on shared
-> interrupts (at least not for the secondary handlers) we really need to
-> think about the reason why we want to run interrupt handlers with
-> interrupts enabled at all.
-> 
-> The separation of interrupt handlers which run with interrupts
-> disabled/enabled goes all the way back to Linux 1.0, which had two
-> interrupt handling modes:
-> 
-> 1) handlers installed with SA_INTERRUPT ran atomically with interrupts
->    disabled.
-> 
-> 2) handlers installed without SA_INTERRUPT ran with interrupts enabled
->    as they did more complex stuff like signal handling in the kernel.
+On 11/30/09, Alan Carvalho de Assis <acassis@gmail.com> wrote:
+>
+> USB Host1 worked fine, but USB Host2 (connected to ISP1504) is crashing:
+>
+> FEC Ethernet Driver
+> fec: PHY @ 0x3, ID 0x0007c0f1 -- LAN8710
+> ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+> mxc-ehci mxc-ehci.1: initializing i.MX USB Controller
+> mxc-ehci mxc-ehci.1: Freescale On-Chip EHCI Host Controller
+> mxc-ehci mxc-ehci.1: new USB bus registered, assigned bus number 1
+> mxc-ehci mxc-ehci.1: irq 54, io mem 0x10024200
+> mxc-ehci mxc-ehci.1: USB 2.0 started, EHCI 1.00
+> usb usb1: configuration #1 chosen from 1 choice
+> hub 1-0:1.0: USB hub found
+> hub 1-0:1.0: 1 port detected
+> mxc-ehci mxc-ehci.2: initializing i.MX USB Controller
+> timeout polling for ULPI device
+> timeout polling for ULPI device
+> timeout polling for ULPI device
+> timeout polling for ULPI device
+> ULPI transceiver vendor/product ID 0xffffff92/0xffffff92
+> ULPI ID does not match any known transceiver.
+> mxc-ehci mxc-ehci.2: unable to init transceiver
+> mxc-ehci mxc-ehci.2: Freescale On-Chip EHCI Host Controller
+> mxc-ehci mxc-ehci.2: new USB bus registered, assigned bus number 2
+> Unhandled fault: external abort on non-linefetch (0x808) at 0xc8896584
+> Internal error: : 808 [#1] PREEMPT
+>...
 
-> The interrupt which was always run with interrupts disabled was the
-> timer interrupt because some of the "slower" interrupt handlers were
-> relying on jiffies being updated, which is only possible when they run
-> with interrupts enabled and no such handler can interrupt the timer
-> interrupt.
-> 
-> In the 2.1.x timeframe the discussion about shared interrupt handlers
-> and the treatment of SA_INTERRUPT (today IRQF_DISABLED) was resolved
-> by changing the code to what we have right now. If you read back in
-> the archives you will find the same arguments as we have seen in this
-> thread and a boatload of different solutions to that.
-> 
-> The real question is why we want to run an interrupt handler with
-> interrupts enabled at all. There are two reaons AFAICT:
-> 
-> 1) interrupt handler relies on jiffies being updated:
-> 
->    I don't think that this is the case anymore and if we still have
->    code which does it is probably historic crap which is unused for
->    quite a time.
-> 
-> 2) interrupt handler runs a long time:
-> 
->    I'm sure we still have some of those especially in the
->    archaelogical corners of drivers/* and in the creative space of the
->    embedded "oh, I don't know why but it works" departement. That's
->    code which needs to be fixed anyway.
+I forgot to comment, I am configuring usbh2's portsc as on mx31lite:
 
-I think there is
+.portsc = MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
 
- 3) you can only benefit from decent priority hardware if irqs are
-    processed while irqs are enabled.
+I defined and configured usbh2 pins:
+        /* USBH2 */
+        PA0_PF_USBH2_CLK,
+        PA1_PF_USBH2_DIR,
+        PA3_PF_USBH2_NXT,
+        PA4_PF_USBH2_STP,
+        PD22_AF_USBH2_DATA0,
+        PD24_AF_USBH2_DATA1,
+        PD23_AF_USBH2_DATA2,
+        PD20_AF_USBH2_DATA3,
+        PD19_AF_USBH2_DATA4,
+        PD26_AF_USBH2_DATA5,
+        PD21_AF_USBH2_DATA6,
+        PA2_PF_USBH2_DATA7,
+        PA24_AIN_SLDCD1_D0, /* EN_B */
+        PA26_PF_PS, /* RES_B */
 
-I think 
+What you think could be this issue?
 
-	git grep handle_fasteoi_irq
+Thank you very much,
 
-gives an overview here: some hits in arch/powerpc, arch/sparc and
-arch/x86/kernel/apic/io_apic.c.  (There is handle_prio_irq in
-arch/arm/mach-ns9xxx, but the priodecoder is crappy and actually it
-should use handle_level_irq IIRC.)
-
-Best regards
-Uwe
- 
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Alan
