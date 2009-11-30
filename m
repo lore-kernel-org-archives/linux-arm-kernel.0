@@ -1,66 +1,47 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 30 Nov 2009 14:19:42 +0100
-Subject: [alsa-devel] [PATCH V2] Add i.MX sound support
-In-Reply-To: <eedb5540911300513j3730078v1393b9b42dca497b@mail.gmail.com>
-References: <1259163666-30344-1-git-send-email-s.hauer@pengutronix.de>
-	<eedb5540911260753u369d6cffp97c05089cdd30868@mail.gmail.com>
-	<20091127075834.GG27548@pengutronix.de>
-	<eedb5540911270101o4bf06b2ct6ff22e29b7c1fe15@mail.gmail.com>
-	<20091127095416.GK27548@pengutronix.de>
-	<eedb5540911300243t20ecf407o317b414720cf962e@mail.gmail.com>
-	<20091130124305.GQ27548@pengutronix.de>
-	<eedb5540911300513j3730078v1393b9b42dca497b@mail.gmail.com>
-Message-ID: <20091130131942.GR27548@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 30 Nov 2009 14:21:16 +0100
+Subject: kernel BUG at kernel/posix-cpu-timers.c:1389!
+In-Reply-To: <20091102165441.GE5785@n2100.arm.linux.org.uk>
+References: <3972542e0910300953s725bebd0ua5a0d1db557d408a@mail.gmail.com>
+	<f17812d70910310732o5568a183i2504d2d926a95df1@mail.gmail.com>
+	<4AEF0D3D.4070708@atmel.com>
+	<20091102165441.GE5785@n2100.arm.linux.org.uk>
+Message-ID: <20091130132116.GA18171@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2009 at 02:13:47PM +0100, javier Martin wrote:
-> 2009/11/30 Sascha Hauer <s.hauer@pengutronix.de>
+On Mon, Nov 02, 2009 at 04:54:41PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Nov 02, 2009 at 05:47:57PM +0100, Nicolas Ferre wrote:
+> > in arch/arm/mach-at91/at91sam926x_time.c +125
+> >  .flags = IRQF_SHARED | IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+> > 
+> > IRQF_DISABLED is positionned. But on the other hand, I saw in the kernel
+> > booting messages that:
+> > "IRQ 1/rtc0: IRQF_DISABLED is not guaranteed on shared IRQs"
+> > 
+> > What does this mean ? what is the difference with former way of managing
+> > shared interrupts ?
 > 
-> > On Mon, Nov 30, 2009 at 11:43:23AM +0100, javier Martin wrote:
-> > > Hi Sascha,
-> > > have you tested capture direction on an i.MX27 based board?
-> > >
-> > > I have been testing your patches in the place you suggested and playback
-> > > seems to work fine but I have several problems with capture stream. I
-> > found
-> > > a BUG in the audmux_v1 code
-> > > and I have fixed it but I am still having problems with capture. The file
-> > > keeps empty and nothing is recorded.
-> >
-> > Capture works fine on my boards.
-> >
-> >
-> >
-> > > Please could you try the following on an i.MX27 based board?
-> > >
-> > > arecord -t raw -c 1 -f S16_LE test.wav
-> >
-> > Does it work with two channels? Do you use DMA or FIQ? Could you try the
-> > other variant?
-> >
+> If the first IRQ action which is run was registered without IRQF_DISABLED
+> the entire set will be run without interrupts disabled.
+... unless one of the handlers enables irqs, so all bets are off for all
+but the first handler.
+ 
+> > And above all, what is the proper way to set an IRQ on a shared
+> > interrupt line ?
 > 
->  Unfortunately, I can't test it using two channels because our board has a
-> wm8974 mono codec. Please could you point me how can I change between FIQ
-> and DMA? I thought FIQ was only for AC97,
+> The only real solution is to ensure that all requesters use IRQF_DISABLED.
+Back to the original problem: can you provide the contents of
+/proc/interrupts and the output of dmesg?
 
-It's around line 662:
+I once saw that an oops containing the last time and location when irqs
+where enabled and disabled.  That would be great here.  I don't know
+off-hand where to find a patch and it doesn't seem to be supported in
+mainline.  I will come back on this.
 
-
-	if ((cpu_is_mx27() || cpu_is_mx21()) &&
-			!(ssi->flags & IMX_SSI_USE_AC97)) {
-		ssi->flags |= IMX_SSI_DMA;
-		platform = imx_ssi_dma_mx2_init(pdev, ssi);
-	} else
-		platform = imx_ssi_fiq_init(pdev, ssi);
-
-Just make sure IMX_SSI_DMA is cleared and imx_ssi_fiq_init() is called.
-
-Sascha
-
+Best regards
+Uwe
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
