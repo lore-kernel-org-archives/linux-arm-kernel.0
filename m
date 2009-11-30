@@ -1,37 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Nov 2009 09:20:22 +0000
-Subject: cache aliasing in dup_mmap
-In-Reply-To: <20091123203110.GH18142@n2100.arm.linux.org.uk>
-References: <20090929191108.GA13568@n2100.arm.linux.org.uk>
-	<20091005144623.GA20633@n2100.arm.linux.org.uk>
-	<20091105144830.GC21681@n2100.arm.linux.org.uk>
-	<e06498070911130649k2051e4cfh2066cf0b9fdabbaf@mail.gmail.com>
-	<20091116163028.GA3568@n2100.arm.linux.org.uk>
-	<e06498070911160923i2273b6aai6f144b36289203d2@mail.gmail.com>
-	<20091116222016.GF3568@n2100.arm.linux.org.uk>
-	<20091119085735.GA14178@n2100.arm.linux.org.uk>
-	<e06498070911191008t1861e730u5cdb49187af00ae0@mail.gmail.com>
-	<20091123203110.GH18142@n2100.arm.linux.org.uk>
-Message-ID: <20091130092022.GA1638@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 30 Nov 2009 10:28:49 +0100
+Subject: [PATCH] warn about shared irqs requesting IRQF_DISABLED
+	registered with setup_irq
+In-Reply-To: <20091129151840.GA30813@shareable.org>
+References: <20091127195857.GB28193@n2100.arm.linux.org.uk>
+	<1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.00.0911272234460.24119@localhost.localdomain>
+	<20091128200344.GA1272@pengutronix.de>
+	<alpine.LFD.2.00.0911282239430.24119@localhost.localdomain>
+	<20091129023118.GA21529@shareable.org>
+	<20091129102635.GA22653@pengutronix.de>
+	<20091129151840.GA30813@shareable.org>
+Message-ID: <20091130092849.GA6896@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23, 2009 at 08:31:10PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Nov 19, 2009 at 01:08:01PM -0500, Steven Walter wrote:
-> > On Thu, Nov 19, 2009 at 3:57 AM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> > > I'm afraid that I have nothing further to suggest, and so I'm shelving
-> > > the patches. ?That means this problem will remain unresolved in future
-> > > kernels.
-> > 
-> > I had the tester restart the reboot-loop, and so far it's done ~1200
-> > runs with no problem.  I'm thinking now that either I hosed something
-> > up with the build initially, or else the tester didn't flash it
-> > correctly.  1200 runs isn't enough to be conclusive, but it's a lot
-> > better than 88.  I'll let you know when we have something more
-> > definitive.
-> 
-> I'd just like to keep this issue hot so it doesn't get forgotten about.
-> Are we at a conclusive point on this?
+Hello Jamie,
 
-Today is decision day.  Do we go with these two patches or not?
+On Sun, Nov 29, 2009 at 03:18:40PM +0000, Jamie Lokier wrote:
+> According to this thread, at the moment when you have multiple
+> IRQF_DISABLED|IRQF_SHARED ISRs, only the first one is run with
+> interrupts disabled.
+No.  When you have multiple IRQF_SHARED ISRs *all* are run with irqs
+disabled if the first has IRQF_DISABLED.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
