@@ -1,56 +1,18 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 30 Nov 2009 14:23:20 -0800
-Subject: [PATCH V4]ARM: NUC900: add RTC driver support for nuc910 and
-	nuc920
-In-Reply-To: <4B126B03.1060901@gmail.com>
-References: <4B126B03.1060901@gmail.com>
-Message-ID: <20091130142320.01f0c212.akpm@linux-foundation.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 30 Nov 2009 23:19:20 +0000
+Subject: [PATCH 1/1] Remove suspend/resume functionality, add dynamic
+	clocking
+In-Reply-To: <083DF309106F364B939360100EC290F804F55C9225@eu1rdcrdc1wx030.exi.nxp.com>
+References: <083DF309106F364B939360100EC290F804F55C9225@eu1rdcrdc1wx030.exi.nxp.com>
+Message-ID: <20091130231920.GB10705@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 29 Nov 2009 20:37:23 +0800
-Wan ZongShun <mcuos.com@gmail.com> wrote:
+On Wed, Nov 25, 2009 at 10:23:21PM +0100, Kevin Wells wrote:
+> Remove suspend/resume functionality, I2C driver gates clock on
+> only when an I2C transaction is in progress
 
-> Dear Alessandro,
-> 
-> I fixed this patch and submitted it again.
-> 
-> thanks!
-> 
-> signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
+Well, I'm happy with this (we have other drivers which don't do anything
+spectacular in their suspend handling as well.)
 
-That's not a terribly useful changelog.
-
->
-> ...
->
-> +static void check_rtc_power(struct nuc900_rtc *nuc900_rtc)
-> +{
-> +	unsigned int i;
-> +	__raw_writel(INIRRESET, nuc900_rtc->rtc_reg + REG_RTC_INIR);
-> +
-> +	mdelay(10);
-> +
-> +	__raw_writel(AERPOWERON, nuc900_rtc->rtc_reg + REG_RTC_AER);
-> +
-> +	for (i = 0; i < 1000000; i++) {
-> +		if (__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB)
-> +			break;
-> +	}
-> +}
-
-I don't like that function much.
-
-- It's not obvious what it actually does (I don't know), so it should
-  have some comment explaining this.
-
-- It's called "check_rtc_power", but it doesn't actually "check"
-  anything.
-
-- If that enormously expensive loop times out, the function will not
-  inform the caller of this, so it will be called again and again and
-  will continue to be enormously expensive.
-
->
-> ...
->
+Can you submit it to the patch system please?
