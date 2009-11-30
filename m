@@ -1,422 +1,1511 @@
 From: derkling@gmail.com (Patrick Bellasi)
-Date: Mon, 30 Nov 2009 10:48:05 +0100
-Subject: [PATCH 2/3] [AT91] Add support for the Daricom C3-Ax03 board
-In-Reply-To: <1259574486-13391-2-git-send-email-derkling@gmail.com>
+Date: Mon, 30 Nov 2009 10:48:06 +0100
+Subject: [PATCH 3/3] [AT91] Add defconfig for the Daricom C3-Ax03 board
+In-Reply-To: <1259574486-13391-3-git-send-email-derkling@gmail.com>
 References: <20091129234917.GB18841@game.jcrosoft.org>
 	<1259574486-13391-1-git-send-email-derkling@gmail.com>
 	<1259574486-13391-2-git-send-email-derkling@gmail.com>
-Message-ID: <1259574486-13391-3-git-send-email-derkling@gmail.com>
+	<1259574486-13391-3-git-send-email-derkling@gmail.com>
+Message-ID: <1259574486-13391-4-git-send-email-derkling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial support for the Daricom C3-Ax03 board.
+This patch add the default configuration for the Daricom C3-Ax03 board.
 
 Signed-off-by: Patrick Bellasi <derkling@gmail.com
 ---
- arch/arm/mach-at91/Kconfig        |    6 +
- arch/arm/mach-at91/Makefile       |    1 +
- arch/arm/mach-at91/board-c3ax03.c |  364 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 371 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-at91/board-c3ax03.c
+ arch/arm/configs/c3ax03_defconfig | 1483 +++++++++++++++++++++++++++++++++++++
+ 1 files changed, 1483 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/configs/c3ax03_defconfig
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 2fd8843..7cfc4e6 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -231,6 +231,12 @@ config MACH_CPU9260
- 	  Select this if you are using a Eukrea Electromatique's
- 	  CPU9260 Board <http://www.eukrea.com/>
- 
-+config MACH_C3AX03
-+	bool "Daricom C3-Ax03 board"
-+	help
-+	  Select this if you are using the Daricom C3-Ax03 Ex Telemetry Device.
-+	  <http://www.daricom.it>
-+
- endif
- 
- # ----------------------------------------------------------
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index ada440a..4f74746 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -44,6 +44,7 @@ obj-$(CONFIG_MACH_USB_A9260)	+= board-usb-a9260.o
- obj-$(CONFIG_MACH_QIL_A9260)	+= board-qil-a9260.o
- obj-$(CONFIG_MACH_AFEB9260)	+= board-afeb-9260v1.o
- obj-$(CONFIG_MACH_CPU9260)	+= board-cpu9krea.o
-+obj-$(CONFIG_MACH_C3AX03)	+= board-c3ax03.o
- 
- # AT91SAM9261 board-specific support
- obj-$(CONFIG_MACH_AT91SAM9261EK) += board-sam9261ek.o
-diff --git a/arch/arm/mach-at91/board-c3ax03.c b/arch/arm/mach-at91/board-c3ax03.c
+diff --git a/arch/arm/configs/c3ax03_defconfig b/arch/arm/configs/c3ax03_defconfig
 new file mode 100644
-index 0000000..b172233
+index 0000000..2776ecc
 --- /dev/null
-+++ b/arch/arm/mach-at91/board-c3ax03.c
-@@ -0,0 +1,364 @@
-+/*
-+ * linux/arch/arm/mach-at91/board-c3ax03.c
-+ *
-+ * Adapted from various board files in arch/arm/mach-at91
-+ *
-+ *  Copyright (C) 2009-2010 Patrick Bellasi (derkling at gmail.com)
-+ *  Copyright (C) 2009-2010 Daricom srl (www.daricom.it)
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
++++ b/arch/arm/configs/c3ax03_defconfig
+@@ -0,0 +1,1483 @@
++#
++# Automatically generated make config: don't edit
++# Linux kernel version: 2.6.32-rc8
++# Sat Nov 28 13:50:57 2009
++#
++CONFIG_ARM=y
++CONFIG_SYS_SUPPORTS_APM_EMULATION=y
++CONFIG_GENERIC_GPIO=y
++CONFIG_GENERIC_TIME=y
++CONFIG_GENERIC_CLOCKEVENTS=y
++CONFIG_GENERIC_HARDIRQS=y
++CONFIG_STACKTRACE_SUPPORT=y
++CONFIG_HAVE_LATENCYTOP_SUPPORT=y
++CONFIG_LOCKDEP_SUPPORT=y
++CONFIG_TRACE_IRQFLAGS_SUPPORT=y
++CONFIG_HARDIRQS_SW_RESEND=y
++CONFIG_GENERIC_IRQ_PROBE=y
++CONFIG_RWSEM_GENERIC_SPINLOCK=y
++CONFIG_GENERIC_HWEIGHT=y
++CONFIG_GENERIC_CALIBRATE_DELAY=y
++CONFIG_GENERIC_HARDIRQS_NO__DO_IRQ=y
++CONFIG_VECTORS_BASE=0xffff0000
++CONFIG_DEFCONFIG_LIST="/lib/modules/$UNAME_RELEASE/.config"
++CONFIG_CONSTRUCTORS=y
 +
-+#include <linux/types.h>
-+#include <linux/init.h>
-+#include <linux/mm.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/spi/spi.h>
-+#include <linux/spi/flash.h>
-+#include <linux/clk.h>
-+#include <linux/input.h>
-+#include <linux/gpio_keys.h>
-+#include <linux/i2c.h>
-+#include <linux/i2c/pca953x.h>
++#
++# General setup
++#
++CONFIG_EXPERIMENTAL=y
++CONFIG_BROKEN_ON_SMP=y
++CONFIG_LOCK_KERNEL=y
++CONFIG_INIT_ENV_ARG_LIMIT=32
++CONFIG_LOCALVERSION=""
++CONFIG_LOCALVERSION_AUTO=y
++# CONFIG_SWAP is not set
++CONFIG_SYSVIPC=y
++CONFIG_SYSVIPC_SYSCTL=y
++# CONFIG_POSIX_MQUEUE is not set
++# CONFIG_BSD_PROCESS_ACCT is not set
++# CONFIG_TASKSTATS is not set
++# CONFIG_AUDIT is not set
 +
-+#include <asm/setup.h>
-+#include <asm/mach-types.h>
-+#include <asm/irq.h>
++#
++# RCU Subsystem
++#
++CONFIG_TREE_RCU=y
++# CONFIG_TREE_PREEMPT_RCU is not set
++# CONFIG_RCU_TRACE is not set
++CONFIG_RCU_FANOUT=32
++# CONFIG_RCU_FANOUT_EXACT is not set
++# CONFIG_TREE_RCU_TRACE is not set
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++CONFIG_LOG_BUF_SHIFT=14
++# CONFIG_GROUP_SCHED is not set
++# CONFIG_CGROUPS is not set
++CONFIG_SYSFS_DEPRECATED=y
++CONFIG_SYSFS_DEPRECATED_V2=y
++# CONFIG_RELAY is not set
++CONFIG_NAMESPACES=y
++# CONFIG_UTS_NS is not set
++# CONFIG_IPC_NS is not set
++# CONFIG_USER_NS is not set
++# CONFIG_PID_NS is not set
++# CONFIG_NET_NS is not set
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_INITRAMFS_SOURCE=""
++CONFIG_RD_GZIP=y
++CONFIG_RD_BZIP2=y
++CONFIG_RD_LZMA=y
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_SYSCTL=y
++CONFIG_ANON_INODES=y
++# CONFIG_EMBEDDED is not set
++CONFIG_UID16=y
++CONFIG_SYSCTL_SYSCALL=y
++CONFIG_KALLSYMS=y
++# CONFIG_KALLSYMS_ALL is not set
++# CONFIG_KALLSYMS_EXTRA_PASS is not set
++CONFIG_HOTPLUG=y
++CONFIG_PRINTK=y
++CONFIG_BUG=y
++CONFIG_ELF_CORE=y
++CONFIG_BASE_FULL=y
++CONFIG_FUTEX=y
++CONFIG_EPOLL=y
++CONFIG_SIGNALFD=y
++CONFIG_TIMERFD=y
++CONFIG_EVENTFD=y
++CONFIG_SHMEM=y
++CONFIG_AIO=y
 +
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+#include <asm/mach/irq.h>
++#
++# Kernel Performance Events And Counters
++#
++CONFIG_VM_EVENT_COUNTERS=y
++CONFIG_COMPAT_BRK=y
++CONFIG_SLAB=y
++# CONFIG_SLUB is not set
++# CONFIG_SLOB is not set
++# CONFIG_PROFILING is not set
++CONFIG_HAVE_OPROFILE=y
++# CONFIG_KPROBES is not set
++CONFIG_HAVE_KPROBES=y
++CONFIG_HAVE_KRETPROBES=y
++CONFIG_HAVE_CLK=y
 +
-+#include <mach/hardware.h>
-+#include <mach/board.h>
-+#include <mach/gpio.h>
-+#include <mach/at91sam9_smc.h>
++#
++# GCOV-based kernel profiling
++#
++# CONFIG_GCOV_KERNEL is not set
++# CONFIG_SLOW_WORK is not set
++CONFIG_HAVE_GENERIC_DMA_COHERENT=y
++CONFIG_SLABINFO=y
++CONFIG_RT_MUTEXES=y
++CONFIG_BASE_SMALL=0
++CONFIG_MODULES=y
++# CONFIG_MODULE_FORCE_LOAD is not set
++CONFIG_MODULE_UNLOAD=y
++# CONFIG_MODULE_FORCE_UNLOAD is not set
++# CONFIG_MODVERSIONS is not set
++# CONFIG_MODULE_SRCVERSION_ALL is not set
++CONFIG_BLOCK=y
++CONFIG_LBDAF=y
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_BLK_DEV_INTEGRITY is not set
 +
-+#include "sam9_smc.h"
-+#include "generic.h"
++#
++# IO Schedulers
++#
++CONFIG_IOSCHED_NOOP=y
++CONFIG_IOSCHED_AS=y
++# CONFIG_IOSCHED_DEADLINE is not set
++# CONFIG_IOSCHED_CFQ is not set
++CONFIG_DEFAULT_AS=y
++# CONFIG_DEFAULT_DEADLINE is not set
++# CONFIG_DEFAULT_CFQ is not set
++# CONFIG_DEFAULT_NOOP is not set
++CONFIG_DEFAULT_IOSCHED="anticipatory"
++# CONFIG_FREEZER is not set
 +
-+static void __init c3ax03_map_io(void)
-+{
-+	/* Initialize processor: 18.432 MHz crystal */
-+	at91sam9260_initialize(18432000);
++#
++# System Type
++#
++CONFIG_MMU=y
++# CONFIG_ARCH_AAEC2000 is not set
++# CONFIG_ARCH_INTEGRATOR is not set
++# CONFIG_ARCH_REALVIEW is not set
++# CONFIG_ARCH_VERSATILE is not set
++CONFIG_ARCH_AT91=y
++# CONFIG_ARCH_CLPS711X is not set
++# CONFIG_ARCH_GEMINI is not set
++# CONFIG_ARCH_EBSA110 is not set
++# CONFIG_ARCH_EP93XX is not set
++# CONFIG_ARCH_FOOTBRIDGE is not set
++# CONFIG_ARCH_MXC is not set
++# CONFIG_ARCH_STMP3XXX is not set
++# CONFIG_ARCH_NETX is not set
++# CONFIG_ARCH_H720X is not set
++# CONFIG_ARCH_NOMADIK is not set
++# CONFIG_ARCH_IOP13XX is not set
++# CONFIG_ARCH_IOP32X is not set
++# CONFIG_ARCH_IOP33X is not set
++# CONFIG_ARCH_IXP23XX is not set
++# CONFIG_ARCH_IXP2000 is not set
++# CONFIG_ARCH_IXP4XX is not set
++# CONFIG_ARCH_L7200 is not set
++# CONFIG_ARCH_KIRKWOOD is not set
++# CONFIG_ARCH_LOKI is not set
++# CONFIG_ARCH_MV78XX0 is not set
++# CONFIG_ARCH_ORION5X is not set
++# CONFIG_ARCH_MMP is not set
++# CONFIG_ARCH_KS8695 is not set
++# CONFIG_ARCH_NS9XXX is not set
++# CONFIG_ARCH_W90X900 is not set
++# CONFIG_ARCH_PNX4008 is not set
++# CONFIG_ARCH_PXA is not set
++# CONFIG_ARCH_MSM is not set
++# CONFIG_ARCH_RPC is not set
++# CONFIG_ARCH_SA1100 is not set
++# CONFIG_ARCH_S3C2410 is not set
++# CONFIG_ARCH_S3C64XX is not set
++# CONFIG_ARCH_S5PC1XX is not set
++# CONFIG_ARCH_SHARK is not set
++# CONFIG_ARCH_LH7A40X is not set
++# CONFIG_ARCH_U300 is not set
++# CONFIG_ARCH_DAVINCI is not set
++# CONFIG_ARCH_OMAP is not set
++# CONFIG_ARCH_BCMRING is not set
 +
-+	/* DGBU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
++#
++# Atmel AT91 System-on-Chip
++#
++# CONFIG_ARCH_AT91RM9200 is not set
++CONFIG_ARCH_AT91SAM9260=y
++# CONFIG_ARCH_AT91SAM9261 is not set
++# CONFIG_ARCH_AT91SAM9G10 is not set
++# CONFIG_ARCH_AT91SAM9263 is not set
++# CONFIG_ARCH_AT91SAM9RL is not set
++# CONFIG_ARCH_AT91SAM9G20 is not set
++# CONFIG_ARCH_AT91SAM9G45 is not set
++# CONFIG_ARCH_AT91CAP9 is not set
++# CONFIG_ARCH_AT91X40 is not set
++CONFIG_AT91_PMC_UNIT=y
 +
-+	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
-+	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS |
-+			ATMEL_UART_RTS | ATMEL_UART_DTR | ATMEL_UART_DSR |
-+			ATMEL_UART_DCD | ATMEL_UART_RI);
++#
++# AT91SAM9260 Variants
++#
++# CONFIG_ARCH_AT91SAM9260_SAM9XE is not set
 +
-+	/* USART1 on ttyS2. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
-+	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS |
-+			ATMEL_UART_RTS | ATMEL_UART_DTR | ATMEL_UART_DSR |
-+			ATMEL_UART_DCD | ATMEL_UART_RI);
++#
++# AT91SAM9260 / AT91SAM9XE Board Type
++#
++# CONFIG_MACH_AT91SAM9260EK is not set
++# CONFIG_MACH_CAM60 is not set
++# CONFIG_MACH_SAM9_L9260 is not set
++# CONFIG_MACH_AFEB9260 is not set
++# CONFIG_MACH_USB_A9260 is not set
++# CONFIG_MACH_QIL_A9260 is not set
++# CONFIG_MACH_CPU9260 is not set
++CONFIG_MACH_C3AX03=y
 +
-+	/* USART2 on ttyS3. (Rx & Tx only) */
-+	at91_register_uart(AT91SAM9260_ID_US2, 3, 0);
++#
++# AT91 Board Options
++#
 +
-+	/* USART3 on ttyS4. (Rx, Tx, RTS, CTS) */
-+	at91_register_uart(AT91SAM9260_ID_US3, 4, ATMEL_UART_CTS |
-+			ATMEL_UART_RTS);
++#
++# AT91 Feature Selections
++#
++CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
++CONFIG_AT91_TIMER_HZ=1000
++CONFIG_AT91_EARLY_DBGU=y
++# CONFIG_AT91_EARLY_USART0 is not set
++# CONFIG_AT91_EARLY_USART1 is not set
++# CONFIG_AT91_EARLY_USART2 is not set
++# CONFIG_AT91_EARLY_USART3 is not set
++# CONFIG_AT91_EARLY_USART4 is not set
++# CONFIG_AT91_EARLY_USART5 is not set
 +
-+	/* set serial console to ttyS0 (ie, DBGU) */
-+	at91_set_serial_console(0);
-+}
++#
++# Processor Type
++#
++CONFIG_CPU_32=y
++CONFIG_CPU_ARM926T=y
++CONFIG_CPU_32v5=y
++CONFIG_CPU_ABRT_EV5TJ=y
++CONFIG_CPU_PABRT_LEGACY=y
++CONFIG_CPU_CACHE_VIVT=y
++CONFIG_CPU_COPY_V4WB=y
++CONFIG_CPU_TLB_V4WBI=y
++CONFIG_CPU_CP15=y
++CONFIG_CPU_CP15_MMU=y
 +
-+static void __init c3ax03_init_irq(void)
-+{
-+	at91sam9260_init_interrupts(NULL);
-+}
++#
++# Processor Features
++#
++CONFIG_ARM_THUMB=y
++# CONFIG_CPU_ICACHE_DISABLE is not set
++# CONFIG_CPU_DCACHE_DISABLE is not set
++# CONFIG_CPU_DCACHE_WRITETHROUGH is not set
++# CONFIG_CPU_CACHE_ROUND_ROBIN is not set
++CONFIG_ARM_L1_CACHE_SHIFT=5
 +
-+/*
-+ * USB Host port
-+ */
-+static struct at91_usbh_data __initdata c3ax03_usbh_data = {
-+	.ports		= 1, 		/* PQFP version of AT91SAM9260 */
-+};
++#
++# Bus support
++#
++# CONFIG_PCI_SYSCALL is not set
++# CONFIG_ARCH_SUPPORTS_MSI is not set
++# CONFIG_PCCARD is not set
 +
-+/*
-+ * USB Device port
-+ */
-+static struct at91_udc_data __initdata c3ax03_udc_data = {
-+	.vbus_pin	= AT91_PIN_PC5,
-+	.pullup_pin	= 1,		/* using external pull-up */
-+};
++#
++# Kernel Features
++#
++# CONFIG_NO_HZ is not set
++# CONFIG_HIGH_RES_TIMERS is not set
++CONFIG_GENERIC_CLOCKEVENTS_BUILD=y
++CONFIG_VMSPLIT_3G=y
++# CONFIG_VMSPLIT_2G is not set
++# CONFIG_VMSPLIT_1G is not set
++CONFIG_PAGE_OFFSET=0xC0000000
++# CONFIG_PREEMPT_NONE is not set
++# CONFIG_PREEMPT_VOLUNTARY is not set
++CONFIG_PREEMPT=y
++CONFIG_HZ=1000
++CONFIG_AEABI=y
++CONFIG_OABI_COMPAT=y
++# CONFIG_ARCH_SPARSEMEM_DEFAULT is not set
++# CONFIG_ARCH_SELECT_MEMORY_MODEL is not set
++# CONFIG_HIGHMEM is not set
++CONFIG_SELECT_MEMORY_MODEL=y
++CONFIG_FLATMEM_MANUAL=y
++# CONFIG_DISCONTIGMEM_MANUAL is not set
++# CONFIG_SPARSEMEM_MANUAL is not set
++CONFIG_FLATMEM=y
++CONFIG_FLAT_NODE_MEM_MAP=y
++CONFIG_PAGEFLAGS_EXTENDED=y
++CONFIG_SPLIT_PTLOCK_CPUS=4096
++# CONFIG_PHYS_ADDR_T_64BIT is not set
++CONFIG_ZONE_DMA_FLAG=0
++CONFIG_VIRT_TO_BUS=y
++CONFIG_HAVE_MLOCK=y
++CONFIG_HAVE_MLOCKED_PAGE_BIT=y
++# CONFIG_KSM is not set
++CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
++# CONFIG_LEDS is not set
++CONFIG_ALIGNMENT_TRAP=y
++# CONFIG_UACCESS_WITH_MEMCPY is not set
 +
-+/*
-+* I2C
-+*/
-+static struct pca953x_platform_data c3ax03_gpio_ext_pdata_0 = {
-+	.gpio_base = 0, /* PCA9555 */
-+};
++#
++# Boot options
++#
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_CMDLINE="debug mem=32M console=ttyS0,115200 root=/dev/mtdblock4 rootfstype=jffs2 rw"
++# CONFIG_XIP_KERNEL is not set
++# CONFIG_KEXEC is not set
 +
-+static struct i2c_board_info __initdata c3ax03_i2c_devices[] = {
-+    {	/* PCA9555: 16-bit I2C-bus and SMBus I/O port with interrupt */
-+	I2C_BOARD_INFO("pca9555", 0x27),
-+	.platform_data = &c3ax03_gpio_ext_pdata_0,
-+    },
-+};
++#
++# CPU Power Management
++#
++# CONFIG_CPU_IDLE is not set
 +
-+/*
-+ * NAND devices
-+ */
-+static struct mtd_partition __initdata c3ax03_nand_partitions[] = {
-+	{	/* 16 KB */
-+		.name	= "AT91Bootstrap",
-+		.offset	= 0,
-+		.size	= 16 * 1024,
-+	},
-+	{	/* 16 KB, offset 0x4000 */
-+		.name	= "UBoot-env",
-+		.offset	= MTDPART_OFS_NXTBLK,
-+		.size	= 16 * 1024,
-+	},
-+	{
-+		/* 224 KB, offset 0x8000 */
-+		.name	= "UBoot",
-+		.offset	= MTDPART_OFS_NXTBLK,
-+		.size	= 224 * 1024,
-+	},
-+	{	/*  2048 KB, offset 0x40000 */
-+		.name	= "Kernel",
-+		.offset	= MTDPART_OFS_NXTBLK,
-+		.size	= 2048 * 1024,
-+	},
-+	{	/* Up to flash size (default 32MB), offset 0x240000 */
-+		.name	= "Filesystem",
-+		.offset	= MTDPART_OFS_NXTBLK,
-+		.size	= MTDPART_SIZ_FULL,
-+	}
-+};
++#
++# Floating point emulation
++#
 +
-+static struct mtd_partition * __init c3ax03_nand_partinfo(int size, int
-+		*num_partitions)
-+{
-+	*num_partitions = ARRAY_SIZE(c3ax03_nand_partitions);
-+	return c3ax03_nand_partitions;
-+}
++#
++# At least one emulation must be selected
++#
++CONFIG_FPE_NWFPE=y
++# CONFIG_FPE_NWFPE_XP is not set
++# CONFIG_FPE_FASTFPE is not set
++# CONFIG_VFP is not set
 +
-+static struct atmel_nand_data __initdata c3ax03_nand_data = {
-+	.ale		= 21,
-+	.cle		= 22,
-+	.rdy_pin	= AT91_PIN_PC13,
-+	.enable_pin	= AT91_PIN_PC14,
-+	.partition_info	= c3ax03_nand_partinfo,
-+	.bus_width_16	= 0,
-+};
++#
++# Userspace binary formats
++#
++CONFIG_BINFMT_ELF=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_HAVE_AOUT=y
++# CONFIG_BINFMT_AOUT is not set
++# CONFIG_BINFMT_MISC is not set
 +
-+static struct sam9_smc_config __initdata c3ax03_nand_smc_config = {
-+	.ncs_read_setup		= 0,
-+	.nrd_setup		= 1,
-+	.ncs_write_setup	= 0,
-+	.nwe_setup		= 1,
++#
++# Power management options
++#
++# CONFIG_PM is not set
++CONFIG_ARCH_SUSPEND_POSSIBLE=y
++CONFIG_NET=y
 +
-+	.ncs_read_pulse		= 3,
-+	.nrd_pulse		= 3,
-+	.ncs_write_pulse	= 3,
-+	.nwe_pulse		= 3,
++#
++# Networking options
++#
++CONFIG_PACKET=y
++# CONFIG_PACKET_MMAP is not set
++CONFIG_UNIX=y
++# CONFIG_NET_KEY is not set
++CONFIG_INET=y
++# CONFIG_IP_MULTICAST is not set
++# CONFIG_IP_ADVANCED_ROUTER is not set
++CONFIG_IP_FIB_HASH=y
++CONFIG_IP_PNP=y
++# CONFIG_IP_PNP_DHCP is not set
++CONFIG_IP_PNP_BOOTP=y
++# CONFIG_IP_PNP_RARP is not set
++# CONFIG_NET_IPIP is not set
++# CONFIG_NET_IPGRE is not set
++# CONFIG_ARPD is not set
++# CONFIG_SYN_COOKIES is not set
++# CONFIG_INET_AH is not set
++# CONFIG_INET_ESP is not set
++# CONFIG_INET_IPCOMP is not set
++# CONFIG_INET_XFRM_TUNNEL is not set
++# CONFIG_INET_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++CONFIG_INET_DIAG=y
++CONFIG_INET_TCP_DIAG=y
++# CONFIG_TCP_CONG_ADVANCED is not set
++CONFIG_TCP_CONG_CUBIC=y
++CONFIG_DEFAULT_TCP_CONG="cubic"
++# CONFIG_TCP_MD5SIG is not set
++# CONFIG_IPV6 is not set
++# CONFIG_NETWORK_SECMARK is not set
++# CONFIG_NETFILTER is not set
++# CONFIG_IP_DCCP is not set
++# CONFIG_IP_SCTP is not set
++# CONFIG_RDS is not set
++# CONFIG_TIPC is not set
++# CONFIG_ATM is not set
++# CONFIG_BRIDGE is not set
++# CONFIG_NET_DSA is not set
++# CONFIG_VLAN_8021Q is not set
++# CONFIG_DECNET is not set
++# CONFIG_LLC2 is not set
++# CONFIG_IPX is not set
++# CONFIG_ATALK is not set
++# CONFIG_X25 is not set
++# CONFIG_LAPB is not set
++# CONFIG_ECONET is not set
++# CONFIG_WAN_ROUTER is not set
++# CONFIG_PHONET is not set
++# CONFIG_IEEE802154 is not set
++# CONFIG_NET_SCHED is not set
++# CONFIG_DCB is not set
 +
-+	.read_cycle		= 5,
-+	.write_cycle		= 5,
++#
++# Network testing
++#
++# CONFIG_NET_PKTGEN is not set
++# CONFIG_HAMRADIO is not set
++# CONFIG_CAN is not set
++# CONFIG_IRDA is not set
++# CONFIG_BT is not set
++# CONFIG_AF_RXRPC is not set
++# CONFIG_WIRELESS is not set
++# CONFIG_WIMAX is not set
++# CONFIG_RFKILL is not set
++# CONFIG_NET_9P is not set
 +
-+	.mode			= AT91_SMC_READMODE | AT91_SMC_WRITEMODE |
-+		AT91_SMC_EXNWMODE_DISABLE | AT91_SMC_DBW_8,
++#
++# Device Drivers
++#
 +
-+	.tdf_cycles		= 2,
-+};
++#
++# Generic Driver Options
++#
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++# CONFIG_DEVTMPFS is not set
++CONFIG_STANDALONE=y
++CONFIG_PREVENT_FIRMWARE_BUILD=y
++CONFIG_FW_LOADER=y
++CONFIG_FIRMWARE_IN_KERNEL=y
++CONFIG_EXTRA_FIRMWARE=""
++# CONFIG_DEBUG_DRIVER is not set
++# CONFIG_DEBUG_DEVRES is not set
++# CONFIG_SYS_HYPERVISOR is not set
++# CONFIG_CONNECTOR is not set
++CONFIG_MTD=y
++# CONFIG_MTD_DEBUG is not set
++# CONFIG_MTD_TESTS is not set
++# CONFIG_MTD_CONCAT is not set
++CONFIG_MTD_PARTITIONS=y
++# CONFIG_MTD_REDBOOT_PARTS is not set
++# CONFIG_MTD_CMDLINE_PARTS is not set
++# CONFIG_MTD_AFS_PARTS is not set
++# CONFIG_MTD_AR7_PARTS is not set
 +
-+static void __init c3ax03_add_device_nand(void)
-+{
++#
++# User Modules And Translation Layers
++#
++CONFIG_MTD_CHAR=y
++CONFIG_MTD_BLKDEVS=y
++CONFIG_MTD_BLOCK=y
++# CONFIG_FTL is not set
++# CONFIG_NFTL is not set
++# CONFIG_INFTL is not set
++# CONFIG_RFD_FTL is not set
++# CONFIG_SSFDC is not set
++# CONFIG_MTD_OOPS is not set
 +
-+	/* configure chip-select 3 (PC14) */
-+	sam9_smc_configure(3, &c3ax03_nand_smc_config);
++#
++# RAM/ROM/Flash chip drivers
++#
++# CONFIG_MTD_CFI is not set
++# CONFIG_MTD_JEDECPROBE is not set
++CONFIG_MTD_MAP_BANK_WIDTH_1=y
++CONFIG_MTD_MAP_BANK_WIDTH_2=y
++CONFIG_MTD_MAP_BANK_WIDTH_4=y
++# CONFIG_MTD_MAP_BANK_WIDTH_8 is not set
++# CONFIG_MTD_MAP_BANK_WIDTH_16 is not set
++# CONFIG_MTD_MAP_BANK_WIDTH_32 is not set
++CONFIG_MTD_CFI_I1=y
++CONFIG_MTD_CFI_I2=y
++# CONFIG_MTD_CFI_I4 is not set
++# CONFIG_MTD_CFI_I8 is not set
++# CONFIG_MTD_RAM is not set
++# CONFIG_MTD_ROM is not set
++# CONFIG_MTD_ABSENT is not set
 +
-+	at91_add_device_nand(&c3ax03_nand_data);
-+}
++#
++# Mapping drivers for chip access
++#
++# CONFIG_MTD_COMPLEX_MAPPINGS is not set
++# CONFIG_MTD_PLATRAM is not set
 +
++#
++# Self-contained MTD device drivers
++#
++CONFIG_MTD_DATAFLASH=y
++# CONFIG_MTD_DATAFLASH_WRITE_VERIFY is not set
++# CONFIG_MTD_DATAFLASH_OTP is not set
++# CONFIG_MTD_M25P80 is not set
++# CONFIG_MTD_SST25L is not set
++# CONFIG_MTD_SLRAM is not set
++# CONFIG_MTD_PHRAM is not set
++# CONFIG_MTD_MTDRAM is not set
++# CONFIG_MTD_BLOCK2MTD is not set
 +
-+/*
-+ * MACB Ethernet device
-+ */
-+static struct at91_eth_data __initdata c3ax03_macb_data = {
-+	.phy_irq_pin	= AT91_PIN_PA7,
-+	.is_rmii	= 0,
-+	.use_twi_pins	= 0,
-+};
++#
++# Disk-On-Chip Device Drivers
++#
++# CONFIG_MTD_DOC2000 is not set
++# CONFIG_MTD_DOC2001 is not set
++# CONFIG_MTD_DOC2001PLUS is not set
++# CONFIG_MTD_NAND is not set
++# CONFIG_MTD_ONENAND is not set
 +
++#
++# LPDDR flash memory drivers
++#
++# CONFIG_MTD_LPDDR is not set
 +
-+/*
-+ * MCI (SD/MMC)
-+ */
-+static struct at91_mmc_data __initdata c3ax03_mmc_data = {
-+	.slot_b		= 1,
-+	.wire4		= 1,
-+};
++#
++# UBI - Unsorted block images
++#
++# CONFIG_MTD_UBI is not set
++# CONFIG_PARPORT is not set
++CONFIG_BLK_DEV=y
++# CONFIG_BLK_DEV_COW_COMMON is not set
++# CONFIG_BLK_DEV_LOOP is not set
++# CONFIG_BLK_DEV_NBD is not set
++# CONFIG_BLK_DEV_UB is not set
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_COUNT=16
++CONFIG_BLK_DEV_RAM_SIZE=8192
++# CONFIG_BLK_DEV_XIP is not set
++# CONFIG_CDROM_PKTCDVD is not set
++# CONFIG_ATA_OVER_ETH is not set
++# CONFIG_MG_DISK is not set
++CONFIG_MISC_DEVICES=y
++# CONFIG_ATMEL_TCLIB is not set
++# CONFIG_ICS932S401 is not set
++CONFIG_ATMEL_SSC=y
++# CONFIG_ENCLOSURE_SERVICES is not set
++# CONFIG_ISL29003 is not set
++# CONFIG_C2PORT is not set
 +
-+/*
-+ * LEDs
-+ */
-+static struct gpio_led c3ax03_leds[] = {
-+	{	/* "bottom" led, green, userled1 to be defined */
-+		.name			= "led:cpu",
-+		.gpio			= AT91_PIN_PB18,
-+		.active_low		= 1,
-+		.default_trigger	= "none",
-+	},
-+	{	/* "power" led, yellow */
-+		.name			= "led:heartbeat",
-+		.gpio			= AT91_PIN_PB19,
-+		.default_trigger	= "heartbeat",
-+	}
-+};
++#
++# EEPROM support
++#
++# CONFIG_EEPROM_AT24 is not set
++# CONFIG_EEPROM_AT25 is not set
++# CONFIG_EEPROM_LEGACY is not set
++# CONFIG_EEPROM_MAX6875 is not set
++# CONFIG_EEPROM_93CX6 is not set
++CONFIG_HAVE_IDE=y
++# CONFIG_IDE is not set
 +
-+/*
-+ * GPIOs
-+ */
-+static struct gpio_keys_button c3ax03_buttons[] = {
-+	{
-+		.gpio           = AT91_PIN_PC0, 	/*PA9*/
-+		.code           = 0x00,
-+		.desc           = "Battery Power",
-+		.active_low     = 1,
-+		.wakeup         = 0,
-+	},
-+	{
-+		.gpio           = AT91_PIN_PC13, 	/*PB13*/
-+		.code           = 0x01,
-+		.desc           = "OdoCanGps Intr",
-+		.active_low     = 1,
-+		.wakeup         = 1,
-+	},
-+	{
-+		.gpio           = AT91_PIN_PC15, 	/*PC15*/
-+		.code           = 0x02,
-+		.desc           = "Digital Intr",
-+		.active_low     = 1,
-+		.wakeup         = 1,
-+	}
-+};
++#
++# SCSI device support
++#
++# CONFIG_RAID_ATTRS is not set
++CONFIG_SCSI=y
++CONFIG_SCSI_DMA=y
++# CONFIG_SCSI_TGT is not set
++# CONFIG_SCSI_NETLINK is not set
++CONFIG_SCSI_PROC_FS=y
 +
-+static struct gpio_keys_platform_data c3ax03_button_data = {
-+	.buttons        = c3ax03_buttons,
-+	.nbuttons       = ARRAY_SIZE(c3ax03_buttons),
-+};
++#
++# SCSI support type (disk, tape, CD-ROM)
++#
++CONFIG_BLK_DEV_SD=y
++# CONFIG_CHR_DEV_ST is not set
++# CONFIG_CHR_DEV_OSST is not set
++# CONFIG_BLK_DEV_SR is not set
++# CONFIG_CHR_DEV_SG is not set
++# CONFIG_CHR_DEV_SCH is not set
++CONFIG_SCSI_MULTI_LUN=y
++# CONFIG_SCSI_CONSTANTS is not set
++# CONFIG_SCSI_LOGGING is not set
++# CONFIG_SCSI_SCAN_ASYNC is not set
++CONFIG_SCSI_WAIT_SCAN=m
 +
-+static struct platform_device c3ax03_button_device = {
-+	.name           = "gpio-keys",
-+	.id             = -1,
-+	.num_resources  = 0,
-+	.dev            = {
-+		.platform_data  = &c3ax03_button_data,
-+	}
-+};
++#
++# SCSI Transports
++#
++# CONFIG_SCSI_SPI_ATTRS is not set
++# CONFIG_SCSI_FC_ATTRS is not set
++# CONFIG_SCSI_ISCSI_ATTRS is not set
++# CONFIG_SCSI_SAS_LIBSAS is not set
++# CONFIG_SCSI_SRP_ATTRS is not set
++CONFIG_SCSI_LOWLEVEL=y
++# CONFIG_ISCSI_TCP is not set
++# CONFIG_LIBFC is not set
++# CONFIG_LIBFCOE is not set
++# CONFIG_SCSI_DEBUG is not set
++# CONFIG_SCSI_DH is not set
++# CONFIG_SCSI_OSD_INITIATOR is not set
++# CONFIG_ATA is not set
++# CONFIG_MD is not set
++CONFIG_NETDEVICES=y
++# CONFIG_DUMMY is not set
++# CONFIG_BONDING is not set
++# CONFIG_MACVLAN is not set
++# CONFIG_EQUALIZER is not set
++# CONFIG_TUN is not set
++# CONFIG_VETH is not set
++CONFIG_PHYLIB=y
 +
-+static void __init c3ax03_add_device_buttons(void)
-+{
-+	at91_set_gpio_input(AT91_PIN_PC0, 1);
-+	at91_set_deglitch(AT91_PIN_PC0, 1);
++#
++# MII PHY device drivers
++#
++# CONFIG_MARVELL_PHY is not set
++# CONFIG_DAVICOM_PHY is not set
++# CONFIG_QSEMI_PHY is not set
++# CONFIG_LXT_PHY is not set
++# CONFIG_CICADA_PHY is not set
++# CONFIG_VITESSE_PHY is not set
++# CONFIG_SMSC_PHY is not set
++# CONFIG_BROADCOM_PHY is not set
++# CONFIG_ICPLUS_PHY is not set
++# CONFIG_REALTEK_PHY is not set
++# CONFIG_NATIONAL_PHY is not set
++# CONFIG_STE10XP is not set
++# CONFIG_LSI_ET1011C_PHY is not set
++# CONFIG_FIXED_PHY is not set
++# CONFIG_MDIO_BITBANG is not set
++CONFIG_NET_ETHERNET=y
++CONFIG_MII=y
++CONFIG_MACB=y
++# CONFIG_AX88796 is not set
++# CONFIG_SMC91X is not set
++# CONFIG_DM9000 is not set
++# CONFIG_ENC28J60 is not set
++# CONFIG_ETHOC is not set
++# CONFIG_SMC911X is not set
++# CONFIG_SMSC911X is not set
++# CONFIG_DNET is not set
++# CONFIG_IBM_NEW_EMAC_ZMII is not set
++# CONFIG_IBM_NEW_EMAC_RGMII is not set
++# CONFIG_IBM_NEW_EMAC_TAH is not set
++# CONFIG_IBM_NEW_EMAC_EMAC4 is not set
++# CONFIG_IBM_NEW_EMAC_NO_FLOW_CTRL is not set
++# CONFIG_IBM_NEW_EMAC_MAL_CLR_ICINTSTAT is not set
++# CONFIG_IBM_NEW_EMAC_MAL_COMMON_ERR is not set
++# CONFIG_B44 is not set
++# CONFIG_KS8842 is not set
++# CONFIG_KS8851 is not set
++# CONFIG_KS8851_MLL is not set
++# CONFIG_NETDEV_1000 is not set
++# CONFIG_NETDEV_10000 is not set
++CONFIG_WLAN=y
++# CONFIG_WLAN_PRE80211 is not set
++# CONFIG_WLAN_80211 is not set
 +
-+	at91_set_gpio_input(AT91_PIN_PC13, 1);
-+	at91_set_deglitch(AT91_PIN_PC13, 1);
++#
++# Enable WiMAX (Networking options) to see the WiMAX drivers
++#
 +
-+	at91_set_gpio_input(AT91_PIN_PC15, 1);
-+	at91_set_deglitch(AT91_PIN_PC15, 1);
++#
++# USB Network Adapters
++#
++# CONFIG_USB_CATC is not set
++# CONFIG_USB_KAWETH is not set
++# CONFIG_USB_PEGASUS is not set
++# CONFIG_USB_RTL8150 is not set
++# CONFIG_USB_USBNET is not set
++# CONFIG_WAN is not set
++CONFIG_PPP=y
++# CONFIG_PPP_MULTILINK is not set
++# CONFIG_PPP_FILTER is not set
++# CONFIG_PPP_ASYNC is not set
++# CONFIG_PPP_SYNC_TTY is not set
++# CONFIG_PPP_DEFLATE is not set
++# CONFIG_PPP_BSDCOMP is not set
++# CONFIG_PPP_MPPE is not set
++# CONFIG_PPPOE is not set
++# CONFIG_PPPOL2TP is not set
++# CONFIG_SLIP is not set
++CONFIG_SLHC=y
++# CONFIG_NETCONSOLE is not set
++# CONFIG_NETPOLL is not set
++# CONFIG_NET_POLL_CONTROLLER is not set
++# CONFIG_ISDN is not set
++# CONFIG_PHONE is not set
 +
-+	platform_device_register(&c3ax03_button_device);
++#
++# Input device support
++#
++CONFIG_INPUT=y
++# CONFIG_INPUT_FF_MEMLESS is not set
++# CONFIG_INPUT_POLLDEV is not set
 +
-+};
++#
++# Userland interfaces
++#
++CONFIG_INPUT_MOUSEDEV=y
++# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++CONFIG_INPUT_MOUSEDEV_SCREEN_X=1024
++CONFIG_INPUT_MOUSEDEV_SCREEN_Y=768
++# CONFIG_INPUT_JOYDEV is not set
++CONFIG_INPUT_EVDEV=y
++# CONFIG_INPUT_EVBUG is not set
 +
-+static void __init c3ax03_init_gpio(void)
-+{
++#
++# Input Device Drivers
++#
++CONFIG_INPUT_KEYBOARD=y
++# CONFIG_KEYBOARD_ADP5588 is not set
++# CONFIG_KEYBOARD_ATKBD is not set
++# CONFIG_QT2160 is not set
++# CONFIG_KEYBOARD_LKKBD is not set
++CONFIG_KEYBOARD_GPIO=y
++# CONFIG_KEYBOARD_MATRIX is not set
++# CONFIG_KEYBOARD_MAX7359 is not set
++# CONFIG_KEYBOARD_NEWTON is not set
++# CONFIG_KEYBOARD_OPENCORES is not set
++# CONFIG_KEYBOARD_STOWAWAY is not set
++# CONFIG_KEYBOARD_SUNKBD is not set
++# CONFIG_KEYBOARD_XTKBD is not set
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_INPUT_JOYSTICK is not set
++# CONFIG_INPUT_TABLET is not set
++# CONFIG_INPUT_TOUCHSCREEN is not set
++# CONFIG_INPUT_MISC is not set
 +
-+	/* USART2 (ttyS3) Multiplexer */
-+	gpio_request(AT91_PIN_PB16, "ttyS3_mux0");
-+	gpio_request(AT91_PIN_PB17, "ttyS3_mux1");
-+	gpio_direction_output(AT91_PIN_PB16, 0);
-+	gpio_direction_output(AT91_PIN_PB17, 0);
-+	gpio_export(AT91_PIN_PB16, false);
-+	gpio_export(AT91_PIN_PB17, false);
++#
++# Hardware I/O ports
++#
++# CONFIG_SERIO is not set
++# CONFIG_GAMEPORT is not set
 +
-+	/* ODO-CAN-GPS Reset (Active Low) */
-+	gpio_request(AT91_PIN_PB3, "ocg_rst"); /*PB12*/
-+	gpio_direction_output(AT91_PIN_PB3, 1);
-+	gpio_export(AT91_PIN_PB3, true);
++#
++# Character devices
++#
++CONFIG_VT=y
++CONFIG_CONSOLE_TRANSLATIONS=y
++CONFIG_VT_CONSOLE=y
++CONFIG_HW_CONSOLE=y
++# CONFIG_VT_HW_CONSOLE_BINDING is not set
++CONFIG_DEVKMEM=y
++# CONFIG_SERIAL_NONSTANDARD is not set
 +
-+	/* GSM GPIO - User availabled GPIO */
-+	gpio_request(AT91_PIN_PC26, "gsm_gpio"); /*PB29*/
-+	at91_set_gpio_input(AT91_PIN_PC26, 0);
-+	gpio_export(AT91_PIN_PC26, true);
-+	/* GSM Reset (Active Low) */
-+	gpio_request(AT91_PIN_PC27, "gsm_rst"); /*PB30*/
-+	at91_set_gpio_input(AT91_PIN_PC27, 0);
-+	gpio_export(AT91_PIN_PC27, true);
-+	/* GSM Power (Active Low) */
-+	gpio_request(AT91_PIN_PC28, "gsm_pwr"); /*PB31*/
-+	at91_set_gpio_input(AT91_PIN_PC28, 0);
-+	gpio_export(AT91_PIN_PC28, true);
++#
++# Serial drivers
++#
++# CONFIG_SERIAL_8250 is not set
 +
-+	/* ADC Multiplexer (Channels 0-14, Default Channel 15 (null input)) */
-+	gpio_request(AT91_PIN_PC22, "admux0"); /*PC6*/
-+	gpio_request(AT91_PIN_PC23, "admux1"); /*PC7*/
-+	gpio_request(AT91_PIN_PC24, "admux2"); /*PC8*/
-+	gpio_request(AT91_PIN_PC25, "admux3"); /*PC9*/
-+	gpio_direction_output(AT91_PIN_PC22, 1);
-+	gpio_direction_output(AT91_PIN_PC23, 1);
-+	gpio_direction_output(AT91_PIN_PC24, 1);
-+	gpio_direction_output(AT91_PIN_PC25, 1);
-+	gpio_export(AT91_PIN_PC22, false);
-+	gpio_export(AT91_PIN_PC23, false);
-+	gpio_export(AT91_PIN_PC24, false);
-+	gpio_export(AT91_PIN_PC25, false);
++#
++# Non-8250 serial port support
++#
++CONFIG_SERIAL_ATMEL=y
++CONFIG_SERIAL_ATMEL_CONSOLE=y
++CONFIG_SERIAL_ATMEL_PDC=y
++# CONFIG_SERIAL_ATMEL_TTYAT is not set
++# CONFIG_SERIAL_MAX3100 is not set
++CONFIG_SERIAL_CORE=y
++CONFIG_SERIAL_CORE_CONSOLE=y
++CONFIG_UNIX98_PTYS=y
++# CONFIG_DEVPTS_MULTIPLE_INSTANCES is not set
++CONFIG_LEGACY_PTYS=y
++CONFIG_LEGACY_PTY_COUNT=256
++# CONFIG_IPMI_HANDLER is not set
++# CONFIG_HW_RANDOM is not set
++# CONFIG_R3964 is not set
++# CONFIG_RAW_DRIVER is not set
++# CONFIG_TCG_TPM is not set
++CONFIG_I2C=y
++CONFIG_I2C_BOARDINFO=y
++CONFIG_I2C_COMPAT=y
++CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_HELPER_AUTO=y
++CONFIG_I2C_ALGOBIT=y
 +
-+}
++#
++# I2C Hardware Bus support
++#
 +
-+static void __init c3ax03_board_init(void)
-+{
-+	/* Serial */
-+	at91_add_device_serial();
-+	/* USB Host */
-+	at91_add_device_usbh(&c3ax03_usbh_data);
-+	/* USB Device */
-+	at91_add_device_udc(&c3ax03_udc_data);
-+	/* I2C */
-+	at91_add_device_i2c(c3ax03_i2c_devices,
-+			ARRAY_SIZE(c3ax03_i2c_devices));
-+	/* NAND FLash*/
-+	c3ax03_add_device_nand();
-+	/* Ethernet */
-+	at91_add_device_eth(&c3ax03_macb_data);
-+	/* MMC */
-+	at91_add_device_mmc(0, &c3ax03_mmc_data);
-+	/* LEDs */
-+	at91_gpio_leds(c3ax03_leds, ARRAY_SIZE(c3ax03_leds));
-+	/* Interrupts */
-+	c3ax03_add_device_buttons();
-+	/* GPIOs */
-+	c3ax03_init_gpio();
-+}
++#
++# I2C system bus drivers (mostly embedded / system-on-chip)
++#
++# CONFIG_I2C_DESIGNWARE is not set
++CONFIG_I2C_GPIO=y
++# CONFIG_I2C_OCORES is not set
++# CONFIG_I2C_SIMTEC is not set
 +
-+MACHINE_START(C3AX03, "Daricom C3-Ax03")
-+	/* Maintainer: Patrick Bellasi */
-+	.phys_io	= AT91_BASE_SYS,
-+	.io_pg_offst	= (AT91_VA_BASE_SYS >> 18) & 0xfffc,
-+	.boot_params	= AT91_SDRAM_BASE + 0x100,
-+	.timer		= &at91sam926x_timer,
-+	.map_io		= c3ax03_map_io,
-+	.init_irq	= c3ax03_init_irq,
-+	.init_machine	= c3ax03_board_init,
-+MACHINE_END
++#
++# External I2C/SMBus adapter drivers
++#
++# CONFIG_I2C_PARPORT_LIGHT is not set
++# CONFIG_I2C_TAOS_EVM is not set
++# CONFIG_I2C_TINY_USB is not set
++
++#
++# Other I2C/SMBus bus drivers
++#
++# CONFIG_I2C_PCA_PLATFORM is not set
++# CONFIG_I2C_STUB is not set
++
++#
++# Miscellaneous I2C Chip support
++#
++# CONFIG_DS1682 is not set
++# CONFIG_SENSORS_TSL2550 is not set
++# CONFIG_I2C_DEBUG_CORE is not set
++# CONFIG_I2C_DEBUG_ALGO is not set
++# CONFIG_I2C_DEBUG_BUS is not set
++# CONFIG_I2C_DEBUG_CHIP is not set
++CONFIG_SPI=y
++# CONFIG_SPI_DEBUG is not set
++CONFIG_SPI_MASTER=y
++
++#
++# SPI Master Controller Drivers
++#
++CONFIG_SPI_ATMEL=y
++# CONFIG_SPI_BITBANG is not set
++# CONFIG_SPI_GPIO is not set
++
++#
++# SPI Protocol Masters
++#
++# CONFIG_SPI_SPIDEV is not set
++# CONFIG_SPI_TLE62X0 is not set
++
++#
++# PPS support
++#
++# CONFIG_PPS is not set
++CONFIG_ARCH_REQUIRE_GPIOLIB=y
++CONFIG_GPIOLIB=y
++CONFIG_DEBUG_GPIO=y
++CONFIG_GPIO_SYSFS=y
++
++#
++# Memory mapped GPIO expanders:
++#
++
++#
++# I2C GPIO expanders:
++#
++# CONFIG_GPIO_MAX732X is not set
++CONFIG_GPIO_PCA953X=y
++# CONFIG_GPIO_PCF857X is not set
++
++#
++# PCI GPIO expanders:
++#
++
++#
++# SPI GPIO expanders:
++#
++# CONFIG_GPIO_MAX7301 is not set
++# CONFIG_GPIO_MCP23S08 is not set
++# CONFIG_GPIO_MC33880 is not set
++
++#
++# AC97 GPIO expanders:
++#
++# CONFIG_W1 is not set
++# CONFIG_POWER_SUPPLY is not set
++# CONFIG_HWMON is not set
++# CONFIG_THERMAL is not set
++CONFIG_WATCHDOG=y
++CONFIG_WATCHDOG_NOWAYOUT=y
++
++#
++# Watchdog Device Drivers
++#
++# CONFIG_SOFT_WATCHDOG is not set
++# CONFIG_AT91SAM9X_WATCHDOG is not set
++
++#
++# USB-based Watchdog Cards
++#
++# CONFIG_USBPCWATCHDOG is not set
++CONFIG_SSB_POSSIBLE=y
++
++#
++# Sonics Silicon Backplane
++#
++# CONFIG_SSB is not set
++
++#
++# Multifunction device drivers
++#
++# CONFIG_MFD_CORE is not set
++# CONFIG_MFD_SM501 is not set
++# CONFIG_MFD_ASIC3 is not set
++# CONFIG_HTC_EGPIO is not set
++# CONFIG_HTC_PASIC3 is not set
++# CONFIG_TPS65010 is not set
++# CONFIG_TWL4030_CORE is not set
++# CONFIG_MFD_TMIO is not set
++# CONFIG_MFD_T7L66XB is not set
++# CONFIG_MFD_TC6387XB is not set
++# CONFIG_MFD_TC6393XB is not set
++# CONFIG_PMIC_DA903X is not set
++# CONFIG_MFD_WM8400 is not set
++# CONFIG_MFD_WM831X is not set
++# CONFIG_MFD_WM8350_I2C is not set
++# CONFIG_MFD_PCF50633 is not set
++# CONFIG_MFD_MC13783 is not set
++# CONFIG_AB3100_CORE is not set
++# CONFIG_EZX_PCAP is not set
++# CONFIG_REGULATOR is not set
++# CONFIG_MEDIA_SUPPORT is not set
++
++#
++# Graphics support
++#
++# CONFIG_VGASTATE is not set
++# CONFIG_VIDEO_OUTPUT_CONTROL is not set
++# CONFIG_FB is not set
++# CONFIG_BACKLIGHT_LCD_SUPPORT is not set
++
++#
++# Display device support
++#
++# CONFIG_DISPLAY_SUPPORT is not set
++
++#
++# Console display driver support
++#
++# CONFIG_VGA_CONSOLE is not set
++CONFIG_DUMMY_CONSOLE=y
++# CONFIG_SOUND is not set
++# CONFIG_HID_SUPPORT is not set
++CONFIG_USB_SUPPORT=y
++CONFIG_USB_ARCH_HAS_HCD=y
++CONFIG_USB_ARCH_HAS_OHCI=y
++# CONFIG_USB_ARCH_HAS_EHCI is not set
++CONFIG_USB=y
++# CONFIG_USB_DEBUG is not set
++# CONFIG_USB_ANNOUNCE_NEW_DEVICES is not set
++
++#
++# Miscellaneous USB options
++#
++CONFIG_USB_DEVICEFS=y
++CONFIG_USB_DEVICE_CLASS=y
++# CONFIG_USB_DYNAMIC_MINORS is not set
++# CONFIG_USB_OTG is not set
++# CONFIG_USB_MON is not set
++# CONFIG_USB_WUSB is not set
++# CONFIG_USB_WUSB_CBAF is not set
++
++#
++# USB Host Controller Drivers
++#
++# CONFIG_USB_C67X00_HCD is not set
++# CONFIG_USB_OXU210HP_HCD is not set
++# CONFIG_USB_ISP116X_HCD is not set
++# CONFIG_USB_ISP1760_HCD is not set
++# CONFIG_USB_ISP1362_HCD is not set
++CONFIG_USB_OHCI_HCD=y
++# CONFIG_USB_OHCI_BIG_ENDIAN_DESC is not set
++# CONFIG_USB_OHCI_BIG_ENDIAN_MMIO is not set
++CONFIG_USB_OHCI_LITTLE_ENDIAN=y
++# CONFIG_USB_SL811_HCD is not set
++# CONFIG_USB_R8A66597_HCD is not set
++# CONFIG_USB_HWA_HCD is not set
++# CONFIG_USB_MUSB_HDRC is not set
++# CONFIG_USB_GADGET_MUSB_HDRC is not set
++
++#
++# USB Device Class drivers
++#
++# CONFIG_USB_ACM is not set
++# CONFIG_USB_PRINTER is not set
++# CONFIG_USB_WDM is not set
++# CONFIG_USB_TMC is not set
++
++#
++# NOTE: USB_STORAGE depends on SCSI but BLK_DEV_SD may
++#
++
++#
++# also be needed; see USB_STORAGE Help for more info
++#
++CONFIG_USB_STORAGE=y
++# CONFIG_USB_STORAGE_DEBUG is not set
++# CONFIG_USB_STORAGE_DATAFAB is not set
++# CONFIG_USB_STORAGE_FREECOM is not set
++# CONFIG_USB_STORAGE_ISD200 is not set
++# CONFIG_USB_STORAGE_USBAT is not set
++# CONFIG_USB_STORAGE_SDDR09 is not set
++# CONFIG_USB_STORAGE_SDDR55 is not set
++# CONFIG_USB_STORAGE_JUMPSHOT is not set
++# CONFIG_USB_STORAGE_ALAUDA is not set
++# CONFIG_USB_STORAGE_ONETOUCH is not set
++# CONFIG_USB_STORAGE_KARMA is not set
++# CONFIG_USB_STORAGE_CYPRESS_ATACB is not set
++# CONFIG_USB_LIBUSUAL is not set
++
++#
++# USB Imaging devices
++#
++# CONFIG_USB_MDC800 is not set
++# CONFIG_USB_MICROTEK is not set
++
++#
++# USB port drivers
++#
++CONFIG_USB_SERIAL=y
++# CONFIG_USB_SERIAL_CONSOLE is not set
++# CONFIG_USB_EZUSB is not set
++# CONFIG_USB_SERIAL_GENERIC is not set
++# CONFIG_USB_SERIAL_AIRCABLE is not set
++# CONFIG_USB_SERIAL_ARK3116 is not set
++# CONFIG_USB_SERIAL_BELKIN is not set
++# CONFIG_USB_SERIAL_CH341 is not set
++# CONFIG_USB_SERIAL_WHITEHEAT is not set
++# CONFIG_USB_SERIAL_DIGI_ACCELEPORT is not set
++# CONFIG_USB_SERIAL_CP210X is not set
++# CONFIG_USB_SERIAL_CYPRESS_M8 is not set
++# CONFIG_USB_SERIAL_EMPEG is not set
++CONFIG_USB_SERIAL_FTDI_SIO=m
++# CONFIG_USB_SERIAL_FUNSOFT is not set
++# CONFIG_USB_SERIAL_VISOR is not set
++# CONFIG_USB_SERIAL_IPAQ is not set
++# CONFIG_USB_SERIAL_IR is not set
++# CONFIG_USB_SERIAL_EDGEPORT is not set
++# CONFIG_USB_SERIAL_EDGEPORT_TI is not set
++# CONFIG_USB_SERIAL_GARMIN is not set
++# CONFIG_USB_SERIAL_IPW is not set
++# CONFIG_USB_SERIAL_IUU is not set
++# CONFIG_USB_SERIAL_KEYSPAN_PDA is not set
++# CONFIG_USB_SERIAL_KEYSPAN is not set
++# CONFIG_USB_SERIAL_KLSI is not set
++# CONFIG_USB_SERIAL_KOBIL_SCT is not set
++# CONFIG_USB_SERIAL_MCT_U232 is not set
++# CONFIG_USB_SERIAL_MOS7720 is not set
++# CONFIG_USB_SERIAL_MOS7840 is not set
++# CONFIG_USB_SERIAL_MOTOROLA is not set
++# CONFIG_USB_SERIAL_NAVMAN is not set
++CONFIG_USB_SERIAL_PL2303=m
++# CONFIG_USB_SERIAL_OTI6858 is not set
++# CONFIG_USB_SERIAL_QUALCOMM is not set
++# CONFIG_USB_SERIAL_SPCP8X5 is not set
++# CONFIG_USB_SERIAL_HP4X is not set
++# CONFIG_USB_SERIAL_SAFE is not set
++# CONFIG_USB_SERIAL_SIEMENS_MPI is not set
++# CONFIG_USB_SERIAL_SIERRAWIRELESS is not set
++# CONFIG_USB_SERIAL_SYMBOL is not set
++# CONFIG_USB_SERIAL_TI is not set
++# CONFIG_USB_SERIAL_CYBERJACK is not set
++# CONFIG_USB_SERIAL_XIRCOM is not set
++# CONFIG_USB_SERIAL_OPTION is not set
++# CONFIG_USB_SERIAL_OMNINET is not set
++# CONFIG_USB_SERIAL_OPTICON is not set
++# CONFIG_USB_SERIAL_DEBUG is not set
++
++#
++# USB Miscellaneous drivers
++#
++# CONFIG_USB_EMI62 is not set
++# CONFIG_USB_EMI26 is not set
++# CONFIG_USB_ADUTUX is not set
++# CONFIG_USB_SEVSEG is not set
++# CONFIG_USB_RIO500 is not set
++# CONFIG_USB_LEGOTOWER is not set
++# CONFIG_USB_LCD is not set
++# CONFIG_USB_BERRY_CHARGE is not set
++# CONFIG_USB_LED is not set
++# CONFIG_USB_CYPRESS_CY7C63 is not set
++# CONFIG_USB_CYTHERM is not set
++# CONFIG_USB_IDMOUSE is not set
++# CONFIG_USB_FTDI_ELAN is not set
++# CONFIG_USB_APPLEDISPLAY is not set
++# CONFIG_USB_LD is not set
++# CONFIG_USB_TRANCEVIBRATOR is not set
++# CONFIG_USB_IOWARRIOR is not set
++# CONFIG_USB_TEST is not set
++# CONFIG_USB_ISIGHTFW is not set
++# CONFIG_USB_VST is not set
++CONFIG_USB_GADGET=y
++# CONFIG_USB_GADGET_DEBUG is not set
++# CONFIG_USB_GADGET_DEBUG_FILES is not set
++# CONFIG_USB_GADGET_DEBUG_FS is not set
++CONFIG_USB_GADGET_VBUS_DRAW=2
++CONFIG_USB_GADGET_SELECTED=y
++CONFIG_USB_GADGET_AT91=y
++CONFIG_USB_AT91=y
++# CONFIG_USB_GADGET_ATMEL_USBA is not set
++# CONFIG_USB_GADGET_FSL_USB2 is not set
++# CONFIG_USB_GADGET_LH7A40X is not set
++# CONFIG_USB_GADGET_OMAP is not set
++# CONFIG_USB_GADGET_PXA25X is not set
++# CONFIG_USB_GADGET_R8A66597 is not set
++# CONFIG_USB_GADGET_PXA27X is not set
++# CONFIG_USB_GADGET_S3C_HSOTG is not set
++# CONFIG_USB_GADGET_IMX is not set
++# CONFIG_USB_GADGET_S3C2410 is not set
++# CONFIG_USB_GADGET_M66592 is not set
++# CONFIG_USB_GADGET_AMD5536UDC is not set
++# CONFIG_USB_GADGET_FSL_QE is not set
++# CONFIG_USB_GADGET_CI13XXX is not set
++# CONFIG_USB_GADGET_NET2280 is not set
++# CONFIG_USB_GADGET_GOKU is not set
++# CONFIG_USB_GADGET_LANGWELL is not set
++# CONFIG_USB_GADGET_DUMMY_HCD is not set
++# CONFIG_USB_GADGET_DUALSPEED is not set
++CONFIG_USB_ZERO=m
++# CONFIG_USB_AUDIO is not set
++# CONFIG_USB_ETH is not set
++CONFIG_USB_GADGETFS=m
++CONFIG_USB_FILE_STORAGE=m
++# CONFIG_USB_FILE_STORAGE_TEST is not set
++CONFIG_USB_G_SERIAL=m
++# CONFIG_USB_MIDI_GADGET is not set
++# CONFIG_USB_G_PRINTER is not set
++# CONFIG_USB_CDC_COMPOSITE is not set
++
++#
++# OTG and related infrastructure
++#
++# CONFIG_USB_GPIO_VBUS is not set
++# CONFIG_NOP_USB_XCEIV is not set
++CONFIG_MMC=y
++# CONFIG_MMC_DEBUG is not set
++# CONFIG_MMC_UNSAFE_RESUME is not set
++
++#
++# MMC/SD/SDIO Card Drivers
++#
++CONFIG_MMC_BLOCK=y
++CONFIG_MMC_BLOCK_BOUNCE=y
++# CONFIG_SDIO_UART is not set
++# CONFIG_MMC_TEST is not set
++
++#
++# MMC/SD/SDIO Host Controller Drivers
++#
++# CONFIG_MMC_SDHCI is not set
++CONFIG_MMC_AT91=y
++# CONFIG_MMC_ATMELMCI is not set
++# CONFIG_MMC_SPI is not set
++# CONFIG_MEMSTICK is not set
++# CONFIG_NEW_LEDS is not set
++# CONFIG_ACCESSIBILITY is not set
++CONFIG_RTC_LIB=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_HCTOSYS=y
++CONFIG_RTC_HCTOSYS_DEVICE="rtc0"
++# CONFIG_RTC_DEBUG is not set
++
++#
++# RTC interfaces
++#
++CONFIG_RTC_INTF_SYSFS=y
++CONFIG_RTC_INTF_PROC=y
++CONFIG_RTC_INTF_DEV=y
++# CONFIG_RTC_INTF_DEV_UIE_EMUL is not set
++# CONFIG_RTC_DRV_TEST is not set
++
++#
++# I2C RTC drivers
++#
++# CONFIG_RTC_DRV_DS1307 is not set
++# CONFIG_RTC_DRV_DS1374 is not set
++# CONFIG_RTC_DRV_DS1672 is not set
++# CONFIG_RTC_DRV_MAX6900 is not set
++# CONFIG_RTC_DRV_RS5C372 is not set
++# CONFIG_RTC_DRV_ISL1208 is not set
++# CONFIG_RTC_DRV_X1205 is not set
++# CONFIG_RTC_DRV_PCF8563 is not set
++# CONFIG_RTC_DRV_PCF8583 is not set
++# CONFIG_RTC_DRV_M41T80 is not set
++# CONFIG_RTC_DRV_S35390A is not set
++# CONFIG_RTC_DRV_FM3130 is not set
++# CONFIG_RTC_DRV_RX8581 is not set
++# CONFIG_RTC_DRV_RX8025 is not set
++
++#
++# SPI RTC drivers
++#
++# CONFIG_RTC_DRV_M41T94 is not set
++# CONFIG_RTC_DRV_DS1305 is not set
++# CONFIG_RTC_DRV_DS1390 is not set
++# CONFIG_RTC_DRV_MAX6902 is not set
++# CONFIG_RTC_DRV_R9701 is not set
++# CONFIG_RTC_DRV_RS5C348 is not set
++# CONFIG_RTC_DRV_DS3234 is not set
++# CONFIG_RTC_DRV_PCF2123 is not set
++
++#
++# Platform RTC drivers
++#
++# CONFIG_RTC_DRV_CMOS is not set
++# CONFIG_RTC_DRV_DS1286 is not set
++# CONFIG_RTC_DRV_DS1511 is not set
++# CONFIG_RTC_DRV_DS1553 is not set
++# CONFIG_RTC_DRV_DS1742 is not set
++# CONFIG_RTC_DRV_STK17TA8 is not set
++# CONFIG_RTC_DRV_M48T86 is not set
++# CONFIG_RTC_DRV_M48T35 is not set
++# CONFIG_RTC_DRV_M48T59 is not set
++# CONFIG_RTC_DRV_BQ4802 is not set
++# CONFIG_RTC_DRV_V3020 is not set
++
++#
++# on-CPU RTC drivers
++#
++CONFIG_RTC_DRV_AT91SAM9=y
++CONFIG_RTC_DRV_AT91SAM9_RTT=0
++CONFIG_RTC_DRV_AT91SAM9_GPBR=0
++# CONFIG_DMADEVICES is not set
++# CONFIG_AUXDISPLAY is not set
++# CONFIG_UIO is not set
++
++#
++# TI VLYNQ
++#
++# CONFIG_STAGING is not set
++
++#
++# File systems
++#
++# CONFIG_EXT2_FS is not set
++CONFIG_EXT3_FS=y
++# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
++CONFIG_EXT3_FS_XATTR=y
++CONFIG_EXT3_FS_POSIX_ACL=y
++CONFIG_EXT3_FS_SECURITY=y
++# CONFIG_EXT4_FS is not set
++CONFIG_JBD=y
++# CONFIG_JBD_DEBUG is not set
++CONFIG_FS_MBCACHE=y
++# CONFIG_REISERFS_FS is not set
++# CONFIG_JFS_FS is not set
++CONFIG_FS_POSIX_ACL=y
++# CONFIG_XFS_FS is not set
++# CONFIG_GFS2_FS is not set
++# CONFIG_OCFS2_FS is not set
++# CONFIG_BTRFS_FS is not set
++# CONFIG_NILFS2_FS is not set
++CONFIG_FILE_LOCKING=y
++CONFIG_FSNOTIFY=y
++CONFIG_DNOTIFY=y
++CONFIG_INOTIFY=y
++CONFIG_INOTIFY_USER=y
++# CONFIG_QUOTA is not set
++# CONFIG_AUTOFS_FS is not set
++# CONFIG_AUTOFS4_FS is not set
++# CONFIG_FUSE_FS is not set
++
++#
++# Caches
++#
++# CONFIG_FSCACHE is not set
++
++#
++# CD-ROM/DVD Filesystems
++#
++# CONFIG_ISO9660_FS is not set
++# CONFIG_UDF_FS is not set
++
++#
++# DOS/FAT/NT Filesystems
++#
++CONFIG_FAT_FS=y
++# CONFIG_MSDOS_FS is not set
++CONFIG_VFAT_FS=y
++CONFIG_FAT_DEFAULT_CODEPAGE=437
++CONFIG_FAT_DEFAULT_IOCHARSET="iso8859-1"
++# CONFIG_NTFS_FS is not set
++
++#
++# Pseudo filesystems
++#
++CONFIG_PROC_FS=y
++CONFIG_PROC_SYSCTL=y
++CONFIG_PROC_PAGE_MONITOR=y
++CONFIG_SYSFS=y
++CONFIG_TMPFS=y
++# CONFIG_TMPFS_POSIX_ACL is not set
++# CONFIG_HUGETLB_PAGE is not set
++# CONFIG_CONFIGFS_FS is not set
++CONFIG_MISC_FILESYSTEMS=y
++# CONFIG_ADFS_FS is not set
++# CONFIG_AFFS_FS is not set
++# CONFIG_HFS_FS is not set
++# CONFIG_HFSPLUS_FS is not set
++# CONFIG_BEFS_FS is not set
++# CONFIG_BFS_FS is not set
++# CONFIG_EFS_FS is not set
++CONFIG_JFFS2_FS=y
++CONFIG_JFFS2_FS_DEBUG=0
++CONFIG_JFFS2_FS_WRITEBUFFER=y
++# CONFIG_JFFS2_FS_WBUF_VERIFY is not set
++# CONFIG_JFFS2_SUMMARY is not set
++# CONFIG_JFFS2_FS_XATTR is not set
++CONFIG_JFFS2_COMPRESSION_OPTIONS=y
++CONFIG_JFFS2_ZLIB=y
++# CONFIG_JFFS2_LZO is not set
++CONFIG_JFFS2_RTIME=y
++# CONFIG_JFFS2_RUBIN is not set
++# CONFIG_JFFS2_CMODE_NONE is not set
++CONFIG_JFFS2_CMODE_PRIORITY=y
++# CONFIG_JFFS2_CMODE_SIZE is not set
++# CONFIG_JFFS2_CMODE_FAVOURLZO is not set
++CONFIG_CRAMFS=y
++# CONFIG_SQUASHFS is not set
++# CONFIG_VXFS_FS is not set
++# CONFIG_MINIX_FS is not set
++# CONFIG_OMFS_FS is not set
++# CONFIG_HPFS_FS is not set
++# CONFIG_QNX4FS_FS is not set
++# CONFIG_ROMFS_FS is not set
++# CONFIG_SYSV_FS is not set
++# CONFIG_UFS_FS is not set
++CONFIG_NETWORK_FILESYSTEMS=y
++CONFIG_NFS_FS=y
++# CONFIG_NFS_V3 is not set
++# CONFIG_NFS_V4 is not set
++CONFIG_ROOT_NFS=y
++# CONFIG_NFSD is not set
++CONFIG_LOCKD=y
++CONFIG_NFS_COMMON=y
++CONFIG_SUNRPC=y
++# CONFIG_RPCSEC_GSS_KRB5 is not set
++# CONFIG_RPCSEC_GSS_SPKM3 is not set
++# CONFIG_SMB_FS is not set
++# CONFIG_CIFS is not set
++# CONFIG_NCP_FS is not set
++# CONFIG_CODA_FS is not set
++# CONFIG_AFS_FS is not set
++
++#
++# Partition Types
++#
++# CONFIG_PARTITION_ADVANCED is not set
++CONFIG_MSDOS_PARTITION=y
++CONFIG_NLS=y
++CONFIG_NLS_DEFAULT="iso8859-1"
++CONFIG_NLS_CODEPAGE_437=y
++# CONFIG_NLS_CODEPAGE_737 is not set
++# CONFIG_NLS_CODEPAGE_775 is not set
++CONFIG_NLS_CODEPAGE_850=y
++# CONFIG_NLS_CODEPAGE_852 is not set
++# CONFIG_NLS_CODEPAGE_855 is not set
++# CONFIG_NLS_CODEPAGE_857 is not set
++# CONFIG_NLS_CODEPAGE_860 is not set
++# CONFIG_NLS_CODEPAGE_861 is not set
++# CONFIG_NLS_CODEPAGE_862 is not set
++# CONFIG_NLS_CODEPAGE_863 is not set
++# CONFIG_NLS_CODEPAGE_864 is not set
++# CONFIG_NLS_CODEPAGE_865 is not set
++# CONFIG_NLS_CODEPAGE_866 is not set
++# CONFIG_NLS_CODEPAGE_869 is not set
++# CONFIG_NLS_CODEPAGE_936 is not set
++# CONFIG_NLS_CODEPAGE_950 is not set
++# CONFIG_NLS_CODEPAGE_932 is not set
++# CONFIG_NLS_CODEPAGE_949 is not set
++# CONFIG_NLS_CODEPAGE_874 is not set
++# CONFIG_NLS_ISO8859_8 is not set
++# CONFIG_NLS_CODEPAGE_1250 is not set
++# CONFIG_NLS_CODEPAGE_1251 is not set
++# CONFIG_NLS_ASCII is not set
++CONFIG_NLS_ISO8859_1=y
++# CONFIG_NLS_ISO8859_2 is not set
++# CONFIG_NLS_ISO8859_3 is not set
++# CONFIG_NLS_ISO8859_4 is not set
++# CONFIG_NLS_ISO8859_5 is not set
++# CONFIG_NLS_ISO8859_6 is not set
++# CONFIG_NLS_ISO8859_7 is not set
++# CONFIG_NLS_ISO8859_9 is not set
++# CONFIG_NLS_ISO8859_13 is not set
++# CONFIG_NLS_ISO8859_14 is not set
++# CONFIG_NLS_ISO8859_15 is not set
++# CONFIG_NLS_KOI8_R is not set
++# CONFIG_NLS_KOI8_U is not set
++# CONFIG_NLS_UTF8 is not set
++# CONFIG_DLM is not set
++
++#
++# Kernel hacking
++#
++# CONFIG_PRINTK_TIME is not set
++CONFIG_ENABLE_WARN_DEPRECATED=y
++CONFIG_ENABLE_MUST_CHECK=y
++CONFIG_FRAME_WARN=1024
++# CONFIG_MAGIC_SYSRQ is not set
++# CONFIG_STRIP_ASM_SYMS is not set
++# CONFIG_UNUSED_SYMBOLS is not set
++CONFIG_DEBUG_FS=y
++# CONFIG_HEADERS_CHECK is not set
++CONFIG_DEBUG_KERNEL=y
++# CONFIG_DEBUG_SHIRQ is not set
++CONFIG_DETECT_SOFTLOCKUP=y
++# CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC is not set
++CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC_VALUE=0
++CONFIG_DETECT_HUNG_TASK=y
++# CONFIG_BOOTPARAM_HUNG_TASK_PANIC is not set
++CONFIG_BOOTPARAM_HUNG_TASK_PANIC_VALUE=0
++# CONFIG_SCHED_DEBUG is not set
++# CONFIG_SCHEDSTATS is not set
++# CONFIG_TIMER_STATS is not set
++# CONFIG_DEBUG_OBJECTS is not set
++# CONFIG_DEBUG_SLAB is not set
++# CONFIG_DEBUG_KMEMLEAK is not set
++CONFIG_DEBUG_PREEMPT=y
++# CONFIG_DEBUG_RT_MUTEXES is not set
++# CONFIG_RT_MUTEX_TESTER is not set
++# CONFIG_DEBUG_SPINLOCK is not set
++# CONFIG_DEBUG_MUTEXES is not set
++# CONFIG_DEBUG_LOCK_ALLOC is not set
++# CONFIG_PROVE_LOCKING is not set
++# CONFIG_LOCK_STAT is not set
++# CONFIG_DEBUG_SPINLOCK_SLEEP is not set
++# CONFIG_DEBUG_LOCKING_API_SELFTESTS is not set
++# CONFIG_DEBUG_KOBJECT is not set
++CONFIG_DEBUG_BUGVERBOSE=y
++# CONFIG_DEBUG_INFO is not set
++# CONFIG_DEBUG_VM is not set
++# CONFIG_DEBUG_WRITECOUNT is not set
++CONFIG_DEBUG_MEMORY_INIT=y
++# CONFIG_DEBUG_LIST is not set
++# CONFIG_DEBUG_SG is not set
++# CONFIG_DEBUG_NOTIFIERS is not set
++# CONFIG_DEBUG_CREDENTIALS is not set
++# CONFIG_BOOT_PRINTK_DELAY is not set
++# CONFIG_RCU_TORTURE_TEST is not set
++# CONFIG_RCU_CPU_STALL_DETECTOR is not set
++# CONFIG_BACKTRACE_SELF_TEST is not set
++# CONFIG_DEBUG_BLOCK_EXT_DEVT is not set
++# CONFIG_DEBUG_FORCE_WEAK_PER_CPU is not set
++# CONFIG_FAULT_INJECTION is not set
++# CONFIG_LATENCYTOP is not set
++# CONFIG_SYSCTL_SYSCALL_CHECK is not set
++# CONFIG_PAGE_POISONING is not set
++CONFIG_HAVE_FUNCTION_TRACER=y
++CONFIG_TRACING_SUPPORT=y
++CONFIG_FTRACE=y
++# CONFIG_FUNCTION_TRACER is not set
++# CONFIG_IRQSOFF_TRACER is not set
++# CONFIG_PREEMPT_TRACER is not set
++# CONFIG_SCHED_TRACER is not set
++# CONFIG_ENABLE_DEFAULT_TRACERS is not set
++# CONFIG_BOOT_TRACER is not set
++CONFIG_BRANCH_PROFILE_NONE=y
++# CONFIG_PROFILE_ANNOTATED_BRANCHES is not set
++# CONFIG_PROFILE_ALL_BRANCHES is not set
++# CONFIG_STACK_TRACER is not set
++# CONFIG_KMEMTRACE is not set
++# CONFIG_WORKQUEUE_TRACER is not set
++# CONFIG_BLK_DEV_IO_TRACE is not set
++# CONFIG_DYNAMIC_DEBUG is not set
++# CONFIG_SAMPLES is not set
++CONFIG_HAVE_ARCH_KGDB=y
++# CONFIG_KGDB is not set
++CONFIG_ARM_UNWIND=y
++CONFIG_DEBUG_USER=y
++CONFIG_DEBUG_ERRORS=y
++# CONFIG_DEBUG_STACK_USAGE is not set
++CONFIG_DEBUG_LL=y
++# CONFIG_DEBUG_ICEDCC is not set
++
++#
++# Security options
++#
++# CONFIG_KEYS is not set
++# CONFIG_SECURITY is not set
++# CONFIG_SECURITYFS is not set
++# CONFIG_SECURITY_FILE_CAPABILITIES is not set
++# CONFIG_CRYPTO is not set
++# CONFIG_BINARY_PRINTF is not set
++
++#
++# Library routines
++#
++CONFIG_BITREVERSE=y
++CONFIG_GENERIC_FIND_LAST_BIT=y
++# CONFIG_CRC_CCITT is not set
++# CONFIG_CRC16 is not set
++# CONFIG_CRC_T10DIF is not set
++# CONFIG_CRC_ITU_T is not set
++CONFIG_CRC32=y
++# CONFIG_CRC7 is not set
++# CONFIG_LIBCRC32C is not set
++CONFIG_ZLIB_INFLATE=y
++CONFIG_ZLIB_DEFLATE=y
++CONFIG_DECOMPRESS_GZIP=y
++CONFIG_DECOMPRESS_BZIP2=y
++CONFIG_DECOMPRESS_LZMA=y
++CONFIG_HAS_IOMEM=y
++CONFIG_HAS_IOPORT=y
++CONFIG_HAS_DMA=y
++CONFIG_NLATTR=y
 -- 
 1.6.3.3
