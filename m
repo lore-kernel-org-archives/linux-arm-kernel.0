@@ -1,30 +1,40 @@
-From: avictor.za@gmail.com (Andrew Victor)
-Date: Mon, 30 Nov 2009 22:36:54 +0200
-Subject: [PATCH 1/3] AT91: update at91_eth_data for ETX2-3 on PA10-11
-In-Reply-To: <1259574486-13391-2-git-send-email-derkling@gmail.com>
-References: <20091129234917.GB18841@game.jcrosoft.org>
-	<1259574486-13391-1-git-send-email-derkling@gmail.com>
-	<1259574486-13391-2-git-send-email-derkling@gmail.com>
-Message-ID: <cd73a99e0911301236pd18a382o6faa04c15b3bf9c@mail.gmail.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Mon, 30 Nov 2009 20:39:33 +0000
+Subject: [PATCH] warn about shared irqs requesting IRQF_DISABLED
+	registered with setup_irq
+In-Reply-To: <20091129152757.GF11445@n2100.arm.linux.org.uk>
+References: <20091127195857.GB28193@n2100.arm.linux.org.uk>
+	<1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.00.0911272234460.24119@localhost.localdomain>
+	<20091128200344.GA1272@pengutronix.de>
+	<alpine.LFD.2.00.0911282239430.24119@localhost.localdomain>
+	<20091129023118.GA21529@shareable.org>
+	<20091129102635.GA22653@pengutronix.de>
+	<20091129151840.GA30813@shareable.org>
+	<20091129152757.GF11445@n2100.arm.linux.org.uk>
+Message-ID: <20091130203933.GC5560@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Patrick,
+Russell King - ARM Linux wrote:
+> On Sun, Nov 29, 2009 at 03:18:40PM +0000, Jamie Lokier wrote:
+> > Or we could do away with this silliness and just switch everything to
+> > threaded interrupts with RT-priorities ;-)
+> 
+> ... thereby needlessly increasing the latency of all interrupt handling
+> and probably breaking some devices.
 
-> This patch update the at91_eth_data to handle the usage of PA10 and PA11
-> for EMAC's EXT2 and EXT3 signals.
+It's not that cut and dried.  RT gives you priorities where you might
+not have had them before, so in some cases can reduce worst-case
+latency for critical devices.  IRQF_DISABLED is a cheap two-level
+priority scheme; RT threaded interrupts extend it.
 
-> @@ -83,6 +83,7 @@ struct at91_eth_data {
-> ? ? ? ?u32 ? ? ? ? ? ? phy_mask;
-> ? ? ? ?u8 ? ? ? ? ? ? ?phy_irq_pin; ? ?/* PHY IRQ */
-> ? ? ? ?u8 ? ? ? ? ? ? ?is_rmii; ? ? ? ?/* using RMII interface? */
-> + ? ? ? u8 ? ? ? ? ? ? ?use_twi_pins; ? /* ETX2-ETX3 on PA23-PA24 */
-> ?};
+The extra processing increases latency, yes, but that is in a sense a
+scheduling fast-path problem; it's not _intrinsic_ to threaded
+interrupts that they have to have higher latency (you don't have to
+use the normal calculation or task switch to get equivalent
+behaviour), but undoubtedly trying to optimise that leads to very
+twisty code and state representations, and I don't see it happening in
+Linux any time soon.
 
-The "at91_eth_data" structure is used on all AT91 processors with a
-MACB peripheral (AT572D940HF, CAP9, 9620, 9263).
-So this isn't really a nice cross-platform change.
-
-
-Regards,
-  Andrew Victor
+-- Jamie
