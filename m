@@ -1,19 +1,39 @@
-From: girishks2000@gmail.com (Girish KS)
-Date: Sun, 29 Nov 2009 11:26:49 +0900
-Subject: Disabling MMU in latest kernel
-Message-ID: <6edb5f450911281826m66cbed86nbe1577a5cdd9c592@mail.gmail.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Mon, 30 Nov 2009 11:43:23 +0100
+Subject: [alsa-devel] [PATCH V2] Add i.MX sound support
+In-Reply-To: <20091127095416.GK27548@pengutronix.de>
+References: <1259163666-30344-1-git-send-email-s.hauer@pengutronix.de>
+	<eedb5540911260753u369d6cffp97c05089cdd30868@mail.gmail.com>
+	<20091127075834.GG27548@pengutronix.de>
+	<eedb5540911270101o4bf06b2ct6ff22e29b7c1fe15@mail.gmail.com>
+	<20091127095416.GK27548@pengutronix.de>
+Message-ID: <eedb5540911300243t20ecf407o317b414720cf962e@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello ,
-I am new to linux platform.I am porting linux kernel 2.6.31.6 to a 946E
-based (non MMU) board. The config option MMU for kernel version 2.6.31.6 is
-defaulted to y. How can i override this option without changing the
-arch/arm/Kconfig.
+Hi Sascha,
+have you tested capture direction on an i.MX27 based board?
 
+I have been testing your patches in the place you suggested and playback
+seems to work fine but I have several problems with capture stream. I found
+a BUG in the audmux_v1 code
+and I have fixed it but I am still having problems with capture. The file
+keeps empty and nothing is recorded.
 
-Regards
-Girish K S
+Please could you try the following on an i.MX27 based board?
+
+arecord -t raw -c 1 -f S16_LE test.wav
+
+Thank you.
+
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091129/20dcb879/attachment-0001.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091130/96640f2d/attachment-0001.htm>
