@@ -1,120 +1,28 @@
 From: javier.martin@vista-silicon.com (javier Martin)
-Date: Mon, 30 Nov 2009 17:15:45 +0100
-Subject: [PATCH 8/9 v2] MXC: Add a digital audio multiplexer driver
-In-Reply-To: <20091130160356.GT27548@pengutronix.de>
-References: <1258022525-21078-6-git-send-email-s.hauer@pengutronix.de>
-	<1258022525-21078-8-git-send-email-s.hauer@pengutronix.de>
-	<1258022525-21078-9-git-send-email-s.hauer@pengutronix.de>
-	<20091112150615.GA30179@pengutronix.de>
-	<eedb5540911300356p2b41eeaakee050953ad39ec26@mail.gmail.com>
-	<20091130121017.GN27548@pengutronix.de>
-	<eedb5540911300425n374af9f0k5346d85fdb79eb11@mail.gmail.com>
-	<20091130123412.GP27548@pengutronix.de>
-	<eedb5540911300509t11cc783cr8e97eda66ee382a@mail.gmail.com>
-	<20091130160356.GT27548@pengutronix.de>
-Message-ID: <eedb5540911300815u5cf60634jd58918f454269028@mail.gmail.com>
+Date: Mon, 30 Nov 2009 17:40:38 +0100
+Subject: [PATCH 1/3] ASoC: Add a new imx-ssi sound driver
+In-Reply-To: <20091125155807.GD12750@rakim.wolfsonmicro.main>
+References: <1259163666-30344-1-git-send-email-s.hauer@pengutronix.de>
+	<1259163666-30344-2-git-send-email-s.hauer@pengutronix.de>
+	<20091125155807.GD12750@rakim.wolfsonmicro.main>
+Message-ID: <eedb5540911300840p230fc57fh3fd5c8453b0e1f73@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/11/30 Sascha Hauer <s.hauer@pengutronix.de>
+Dear Sascha,
+in "imx_ssi_set_dai_fmt()" callback you should add something like:
 
-> On Mon, Nov 30, 2009 at 02:09:16PM +0100, javier Martin wrote:
-> > From fa87b65915e78ad29a8e4f3f22b26ed0fa6dc7f5 Mon Sep 17 00:00:00 2001
-> >
-> > > From: Sascha Hauer <s.hauer@pengutronix.de>
-> > > Date: Mon, 30 Nov 2009 13:31:29 +0100
-> > > Subject: [PATCH] i.MX27 audmux: Fix register offsets
-> > >
-> > > The PPCR registers start at 0x10, not 0xc. Fix this.
-> > >
-> > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > > ---
-> > >  arch/arm/plat-mxc/include/mach/audmux.h |    6 +++---
-> > >  1 files changed, 3 insertions(+), 3 deletions(-)
-> > >
-> > > diff --git a/arch/arm/plat-mxc/include/mach/audmux.h
-> > > b/arch/arm/plat-mxc/include/mach/audmux.h
-> > > index 5cd6466..dcc12d4 100644
-> > > --- a/arch/arm/plat-mxc/include/mach/audmux.h
-> > > +++ b/arch/arm/plat-mxc/include/mach/audmux.h
-> > > @@ -4,9 +4,9 @@
-> > >  #define MX27_AUDMUX_HPCR1_SSI0         0
-> > >  #define MX27_AUDMUX_HPCR2_SSI1         1
-> > >  #define MX27_AUDMUX_HPCR3_SSI_PINS_4   2
-> > > -#define MX27_AUDMUX_PPCR1_SSI_PINS_1   3
-> > > -#define MX27_AUDMUX_PPCR2_SSI_PINS_2   4
-> > > -#define MX27_AUDMUX_PPCR3_SSI_PINS_3   5
-> > > +#define MX27_AUDMUX_PPCR1_SSI_PINS_1   4
-> > > +#define MX27_AUDMUX_PPCR2_SSI_PINS_2   5
-> > > +#define MX27_AUDMUX_PPCR3_SSI_PINS_3   6
-> > >
-> >
-> > Be careful,
-> > I think this patch breaks some of the boards currently using
-> > MXC_AUDMUX_V1_PCR_RXDSEL(x) and similar macros defined in mach/audmux.h
-> (for
-> > example pcm038).
-> > For those macros the old AUDMUX register indexes are fine.
-> >
-> > I suggest fixing this inside audmux_v1.c instead of modifying
-> mach/audmux.h.
->
-> Ok. The AUDMUX V1 is used on i.MX21 and i.MX27 and both have this hole
-> in the register space, so fixing it in the driver should be safe.
->
-> How about this one then?
->
-> Sascha
->
->
-> From 297b5c4cea40c2e7023bbdb96a0c90c13b0e02a1 Mon Sep 17 00:00:00 2001
-> From: Sascha Hauer <s.hauer@pengutronix.de>
-> Date: Mon, 30 Nov 2009 13:31:29 +0100
-> Subject: [PATCH] i.MX27 audmux: Fix register offsets
->
-> The PPCR registers start at 0x10, not 0xc. Fix this.
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  arch/arm/plat-mxc/audmux-v1.c |    4 ++++
->  1 files changed, 4 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/plat-mxc/audmux-v1.c b/arch/arm/plat-mxc/audmux-v1.c
-> index 70ab5af..8fbce7b 100644
-> --- a/arch/arm/plat-mxc/audmux-v1.c
-> +++ b/arch/arm/plat-mxc/audmux-v1.c
-> @@ -37,6 +37,10 @@ int mxc_audmux_v1_configure_port(unsigned int port,
-> unsigned int pcr)
->                return -ENOSYS;
->        }
->
-> +       /* handle hole in the register space */
-> +       if (port > 2)
-> +               port++;
-> +
->         writel(pcr, audmux_base + MXC_AUDMUX_V1_PCR(port));
->
->        return 0;
-> --
-> 1.6.5.2
->
+    /* sync */
+    scr |= SSI_SCR_SYN;
 
-Sascha,
-there are actually two holes, with this current patch, PPCR3 still receives
-a wrong value:
+This would enable SSI working in SYN mode which means that RX and TX
+sections will share same frame and bit clocks. Right now I can't imagine a
+situation where this is not desirable. Moreover, if I don't add SYN mode I
+cannot get it working in my i.mx27 based board with an wm8974.
 
-0x1001_6000 (HPCR1)
-0x1001_6004 (HPCR2)
-0x1001_6008 (HPCR3)
-0x1001_600C (hole)
-0x1001_6010 (PPCR1)
-0x1001_6014 (PPCR2)
-0x1001_6018 (hole)
-0x1001_601C (PPCR3)
+With this line it works flawlessly, good job.
 
-
-Thank you.
-
+Thanks.
 -- 
 Javier Martin
 Vista Silicon S.L.
@@ -125,56 +33,4 @@ Avda de los Castros s/n
 www.vista-silicon.com
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091130/33464ed9/attachment-0001.htm>
-
->From bogus@does.not.exist.com  Fri Nov  6 13:01:15 2009
-From: bogus@does.not.exist.com ()
-Date: Fri, 06 Nov 2009 18:01:15 -0000
-Subject: No subject
-Message-ID: <mailman.60.1259665861.2170.linux-arm-kernel@lists.infradead.org>
-
-<div class=3D"im">From: Sascha Hauer &lt;<a href=3D"mailto:s.hauer@pengutro=
-nix.de">s.hauer at pengutronix.de</a>&gt;<br>
-Date: Mon, 30 Nov 2009 13:31:29 +0100<br>
-Subject: [PATCH] i.MX27 audmux: Fix register offsets<br>
-<br>
-The PPCR registers start at 0x10, not 0xc. Fix this.<br>
-<br>
-Signed-off-by: Sascha Hauer &lt;<a href=3D"mailto:s.hauer@pengutronix.de">s=
-.hauer at pengutronix.de</a>&gt;<br>
----<br>
-</div>=A0arch/arm/plat-mxc/audmux-v1.c | =A0 =A04 ++++<br>
-<div class=3D"im">=A01 files changed, 4 insertions(+), 0 deletions(-)<br>
-<br>
-</div>diff --git a/arch/arm/plat-mxc/audmux-v1.c b/arch/arm/plat-mxc/audmux=
--v1.c<br>
-index 70ab5af..8fbce7b 100644<br>
---- a/arch/arm/plat-mxc/audmux-v1.c<br>
-+++ b/arch/arm/plat-mxc/audmux-v1.c<br>
-@@ -37,6 +37,10 @@ int mxc_audmux_v1_configure_port(unsigned int port, unsi=
-gned int pcr)<br>
- =A0 =A0 =A0 =A0 =A0 =A0 =A0 =A0return -ENOSYS;<br>
- =A0 =A0 =A0 =A0}<br>
-<br>
-+ =A0 =A0 =A0 /* handle hole in the register space */<br>
-+ =A0 =A0 =A0 if (port &gt; 2)<br>
-+ =A0 =A0 =A0 =A0 =A0 =A0 =A0 port++;<br>
-+<br>
-<div class=3D"im"> =A0 =A0 =A0 =A0writel(pcr, audmux_base + MXC_AUDMUX_V1_P=
-CR(port));<br>
-<br>
- =A0 =A0 =A0 =A0return 0;<br>
-</div><div><div></div><div>--<br>
-1.6.5.2<br></div></div></blockquote><div>=A0<br>Sascha,<br>there are actual=
-ly two holes, with this current patch, PPCR3 still receives a wrong value:<=
-br><br></div>0x1001_6000 (HPCR1) <br>0x1001_6004 (HPCR2)<br>0x1001_6008 (HP=
-CR3) <br>
-0x1001_600C (hole)<br>0x1001_6010 (PPCR1)<br>0x1001_6014 (PPCR2)<br>0x1001_=
-6018 (hole)<br>0x1001_601C (PPCR3)<br><br></div><br clear=3D"all">Thank you=
-.<br><br>-- <br>Javier Martin<br>Vista Silicon S.L.<br>CDTUC - FASE C - Ofi=
-cina S-345<br>
-Avda de los Castros s/n<br>39005- Santander. Cantabria. Spain<br>+34 942 25=
- 32 60<br><a href=3D"http://www.vista-silicon.com">www.vista-silicon.com</a=
-><br>
-
---0016e6d9a0e82a18a0047998f48a--
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091130/d8ff866f/attachment-0001.htm>
