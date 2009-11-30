@@ -1,43 +1,35 @@
-From: david-b@pacbell.net (David Brownell)
-Date: Mon, 30 Nov 2009 12:53:28 -0800
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 30 Nov 2009 22:23:46 +0100 (CET)
 Subject: Get rid of IRQF_DISABLED - (was [PATCH] genirq: warn about
 	IRQF_SHARED|IRQF_DISABLED)
-In-Reply-To: <20091130150100.GB7028@n2100.arm.linux.org.uk>
+In-Reply-To: <20091130195129.GA19172@pengutronix.de>
 References: <1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20091130144702.14bea0ee@lxorguk.ukuu.org.uk>
-	<20091130150100.GB7028@n2100.arm.linux.org.uk>
-Message-ID: <200911301253.29325.david-b@pacbell.net>
+	<1259578067-29169-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.00.0911301225110.24119@localhost.localdomain>
+	<20091130195129.GA19172@pengutronix.de>
+Message-ID: <alpine.LFD.2.00.0911302216030.24119@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 30 November 2009, Russell King - ARM Linux wrote:
-> On Mon, Nov 30, 2009 at 02:47:02PM +0000, Alan Cox wrote:
-> > SHARED|DISABLED ought to WARN_ON() and if that doesn't motivate people
-> > then return -EINVAL.
+On Mon, 30 Nov 2009, Uwe Kleine-K?nig wrote:
+> I think there is
 > 
-> That is an impossibility.  There is hardware out there (AT91) where
-> the timer interrupt is shared with other peripherals, and you end
-> up with a mixture of irqs-disabled and irqs-enabled handlers sharing
-> the same interrupt.
+>  3) you can only benefit from decent priority hardware if irqs are
+>     processed while irqs are enabled.
+> 
+> I think 
+> 
+> 	git grep handle_fasteoi_irq
+> 
+> gives an overview here: some hits in arch/powerpc, arch/sparc and
+> arch/x86/kernel/apic/io_apic.c.  (There is handle_prio_irq in
 
-For the record:  AT91 isn't restricted to the system timers hooked
-up on irq 0 ... there's also drivers/clocksource/tcb_clksrc.c (not
-at the same hardware priority).
+No. That handler is not an indicator for prio hardware actively used
+in the sense of allowing higher prio interrupts to interrupt a current
+running lower priority one. It can be used when the irq controller
+does not fire the interrupt again before the eoi acknowledge has been
+done.
 
-But to concur, this is indeed messy.  Both the system timer and
-the serial console generally share the same IRQ; both are very
-timing-sensitive.  I've seen console character dropouts after
-tweaking timer IRQ handling.  And I've never convinced myself
-that Linux handles the hardware IRQ priority on those chips as
-well as it could.  
+Thanks,
 
-
-> My point is that if we outlaw irqs-disabled shared interrupts, it puts
-> Atmel AT91 support into immediate difficulties.
-
-ISTR that those TCB modules don't share IRQs with other peripherals.
-
-Also, that Linux doesn't use them for much else.  I've yet to see a
-three-phase motor driver using the TCB's PWM capabilities, for example.
-
-- Dave
+	tglx
