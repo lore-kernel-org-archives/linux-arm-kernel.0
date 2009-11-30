@@ -1,81 +1,88 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 30 Nov 2009 11:47:47 +0100
-Subject: [PATCH] genirq: warn about IRQF_SHARED|IRQF_DISABLED at the right
-	place
-In-Reply-To: <1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1259578067-29169-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 30 Nov 2009 13:10:17 +0100
+Subject: [PATCH 8/9 v2] MXC: Add a digital audio multiplexer driver
+In-Reply-To: <eedb5540911300356p2b41eeaakee050953ad39ec26@mail.gmail.com>
+References: <1258022525-21078-2-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-3-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-4-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-5-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-6-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-7-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-8-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-9-git-send-email-s.hauer@pengutronix.de>
+	<20091112150615.GA30179@pengutronix.de>
+	<eedb5540911300356p2b41eeaakee050953ad39ec26@mail.gmail.com>
+Message-ID: <20091130121017.GN27548@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For shared irqs IRQF_DISABLED is only guaranteed for the first handler.
-So only warn starting at the second registration.
+On Mon, Nov 30, 2009 at 12:56:19PM +0100, javier Martin wrote:
+> Hi Sascha,
+> as you know I have been testing your i.MX27 support and I have found a
+> problem in this audmux patch.
+> 
+> Please, see my comment below:
+> 
+> 
+> +++ b/arch/arm/plat-mxc/audmux-v1.c
+> > @@ -0,0 +1,53 @@
+> > +/*
+> > + * Copyright 2009 Pengutronix, Sascha Hauer <s.hauer@pengutronix.de>
+> > + *
+> > + * Initial development of this code was funded by
+> > + * Phytec Messtechnik GmbH, http://www.phytec.de
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + *
+> > + * You should have received a copy of the GNU General Public License
+> > + * along with this program; if not, write to the Free Software
+> > + * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+> > + */
+> > +
+> > +#include <linux/module.h>
+> > +#include <linux/err.h>
+> > +#include <linux/io.h>
+> > +#include <linux/clk.h>
+> > +#include <mach/audmux.h>
+> > +#include <mach/hardware.h>
+> > +
+> > +static void __iomem *audmux_base;
+> > +
+> > +#define MXC_AUDMUX_V1_PCR(x)   ((x) * 4)
+> >
+> 
+> You cannot calculate AUDMUX register offsets this way because according to
+> i.MX27 manual:
+> 
+> 0x1001_6000 (HPCR1)
+> 0x1001_6004 (HPCR2)
+> 0x1001_6008 (HPCR3)
+> 0x1001_6010 (PPCR1)  <-- You are using 0x0C for this
+> 0x1001_6014 (PPCR2)  <--- You are using 0x10 for this
+> 0x1001_601C (PPCR3)  <--- You are using 0x18 for this
 
-The warning is moved to __setup_irq having the additional benefit of
-catching actions registered using setup_irq not only register_irq.
+It's fine the way it is. See mach/audmux.h:
 
-This doesn't fix the cases where setup order is wrong but it should
-report the broken cases more reliably.
+#define MX27_AUDMUX_HPCR1_SSI0		0
+#define MX27_AUDMUX_HPCR2_SSI1		1
+#define MX27_AUDMUX_HPCR3_SSI_PINS_4	2
+#define MX27_AUDMUX_PPCR1_SSI_PINS_1	3
+#define MX27_AUDMUX_PPCR2_SSI_PINS_2	4
+#define MX27_AUDMUX_PPCR3_SSI_PINS_3	5
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: David Brownell <dbrownell@users.sourceforge.net>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-Cc: Ingo Molnar <mingo@elte.hu>
-Cc: Nicolas Pitre <nico@marvell.com>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: John Stultz <johnstul@us.ibm.com>
-Cc: Rusty Russell <rusty@rustcorp.com.au>
-Cc: Remy Bohmer <linux@bohmer.net>
-Cc: Hugh Dickins <hugh.dickins@tiscali.co.uk>
-Cc: Andrea Gallo <andrea.gallo@stericsson.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jamie Lokier <jamie@shareable.org>
-Cc: linux-arm-kernel at lists.infradead.org
----
- kernel/irq/manage.c |   23 ++++++++++-------------
- 1 files changed, 10 insertions(+), 13 deletions(-)
+Sascha
 
-diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-index bde4c66..d8f7415 100644
---- a/kernel/irq/manage.c
-+++ b/kernel/irq/manage.c
-@@ -702,6 +702,16 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
- 			goto mismatch;
- #endif
- 
-+		/*
-+		 * handle_IRQ_event() only honors IRQF_DISABLED for the _first_
-+		 * irqaction.  As the first handler might reenable irqs all bets
-+		 * are off for the later handlers even if the first one has
-+		 * IRQF_DISABLED, too.
-+		 */
-+		if (new->flags & IRQF_DISABLED)
-+			pr_warning("IRQ %d/%s: IRQF_DISABLED is not guaranteed "
-+					"on shared IRQs\n", irq, new->name);
-+
- 		/* add new interrupt at end of irq queue */
- 		do {
- 			old_ptr = &old->next;
-@@ -1008,19 +1018,6 @@ int request_threaded_irq(unsigned int irq, irq_handler_t handler,
- 	struct irq_desc *desc;
- 	int retval;
- 
--	/*
--	 * handle_IRQ_event() always ignores IRQF_DISABLED except for
--	 * the _first_ irqaction (sigh).  That can cause oopsing, but
--	 * the behavior is classified as "will not fix" so we need to
--	 * start nudging drivers away from using that idiom.
--	 */
--	if ((irqflags & (IRQF_SHARED|IRQF_DISABLED)) ==
--					(IRQF_SHARED|IRQF_DISABLED)) {
--		pr_warning(
--		  "IRQ %d/%s: IRQF_DISABLED is not guaranteed on shared IRQs\n",
--			irq, devname);
--	}
--
- #ifdef CONFIG_LOCKDEP
- 	/*
- 	 * Lockdep wants atomic interrupt handlers:
+
 -- 
-1.6.5.2
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
