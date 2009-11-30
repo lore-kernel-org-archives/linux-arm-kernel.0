@@ -1,19 +1,56 @@
 From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 30 Nov 2009 14:13:17 -0800
-Subject: [PATCH v2]: NUC900: Add spi driver support for nuc900
-In-Reply-To: <e68bb3470911252240x7f10dbf1n7e8423340f3a7d25@mail.gmail.com>
-References: <4B062887.90803@gmail.com>
-	<e68bb3470911252240x7f10dbf1n7e8423340f3a7d25@mail.gmail.com>
-Message-ID: <20091130141317.3f02c553.akpm@linux-foundation.org>
+Date: Mon, 30 Nov 2009 14:23:20 -0800
+Subject: [PATCH V4]ARM: NUC900: add RTC driver support for nuc910 and
+	nuc920
+In-Reply-To: <4B126B03.1060901@gmail.com>
+References: <4B126B03.1060901@gmail.com>
+Message-ID: <20091130142320.01f0c212.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Nov 2009 14:40:59 +0800
+On Sun, 29 Nov 2009 20:37:23 +0800
 Wan ZongShun <mcuos.com@gmail.com> wrote:
 
-> Hi Andrew
+> Dear Alessandro,
 > 
-> How about this spi driver, Could it be applied?
+> I fixed this patch and submitted it again.
 > 
+> thanks!
+> 
+> signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
 
-I cannot find a "patch v3" which addresses the review comments thus far?
+That's not a terribly useful changelog.
+
+>
+> ...
+>
+> +static void check_rtc_power(struct nuc900_rtc *nuc900_rtc)
+> +{
+> +	unsigned int i;
+> +	__raw_writel(INIRRESET, nuc900_rtc->rtc_reg + REG_RTC_INIR);
+> +
+> +	mdelay(10);
+> +
+> +	__raw_writel(AERPOWERON, nuc900_rtc->rtc_reg + REG_RTC_AER);
+> +
+> +	for (i = 0; i < 1000000; i++) {
+> +		if (__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB)
+> +			break;
+> +	}
+> +}
+
+I don't like that function much.
+
+- It's not obvious what it actually does (I don't know), so it should
+  have some comment explaining this.
+
+- It's called "check_rtc_power", but it doesn't actually "check"
+  anything.
+
+- If that enormously expensive loop times out, the function will not
+  inform the caller of this, so it will be called again and again and
+  will continue to be enormously expensive.
+
+>
+> ...
+>
