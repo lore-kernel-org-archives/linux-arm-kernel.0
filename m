@@ -1,43 +1,26 @@
-From: avictor.za@gmail.com (Andrew Victor)
-Date: Mon, 30 Nov 2009 22:15:38 +0200
-Subject: Get rid of IRQF_DISABLED - (was [PATCH] genirq: warn about
-	IRQF_SHARED|IRQF_DISABLED)
-In-Reply-To: <20091130150100.GB7028@n2100.arm.linux.org.uk>
+From: david-b@pacbell.net (David Brownell)
+Date: Mon, 30 Nov 2009 12:21:30 -0800
+Subject: [PATCH] genirq: warn about IRQF_SHARED|IRQF_DISABLED at the right
+	place
+In-Reply-To: <1259578067-29169-1-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1259578067-29169-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.00.0911301225110.24119@localhost.localdomain>
-	<1259589780.26472.18.camel@laptop>
-	<alpine.LFD.2.00.0911301519120.24119@localhost.localdomain>
-	<20091130144702.14bea0ee@lxorguk.ukuu.org.uk>
-	<20091130150100.GB7028@n2100.arm.linux.org.uk>
-Message-ID: <cd73a99e0911301215i7a61b468w3b49325bd1fda3ac@mail.gmail.com>
+Message-ID: <200911301221.30601.david-b@pacbell.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
+On Monday 30 November 2009, Uwe Kleine-K?nig wrote:
+> +???????????????if (new->flags & IRQF_DISABLED)
+> +???????????????????????pr_warning("IRQ %d/%s: IRQF_DISABLED is not guaranteed "
+> +???????????????????????????????????????"on shared IRQs\n", irq, new->name);
 
-> There is hardware out there (AT91) where
-> the timer interrupt is shared with other peripherals, and you end
-> up with a mixture of irqs-disabled and irqs-enabled handlers sharing
-> the same interrupt.
+This should have copied the original test ... this way,
+it's dropping the SHARED constraint, and trying to morph
+into a generic "IRQF_DISABLED is eeebil!" test.
 
-For the AT91 case I don't think this shouldn't matter.
-
-The AT91's have a priority-level interrupt controller, so:
-  1. a lower-priority interrupt won't interrupt a higher-priority
-  2. shared interrupts cannot interrupt each other until irq_finish()
-is called (a write to AIC_EOICR)
-
-Since the Timer, DBGU serial port (and other system peripherals) are
-on the same priority level they cannot interrupt each other.
-(ie, basically as-if always irqs-disabled).
-
-The case of irqs-enabled does means that a higher-priority interrupt
-could interrupt [*], but it's not a shared-IRQ in that case.
-
-([*] The system peripherals have the highest priority by default, so
-the user would need to override the defaults for this to occur)
+If it just moved the original test, I'd have no problem
+with the patch.
 
 
-Regards,
- Andrew Victor
+... although it'd still not address the general mess in
+this area, it'd at least not introduce false warnings.
