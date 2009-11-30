@@ -1,64 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Nov 2009 19:23:21 +0000
-Subject: cache aliasing in dup_mmap
-In-Reply-To: <20091130190950.GB5560@shareable.org>
-References: <20091105144830.GC21681@n2100.arm.linux.org.uk>
-	<e06498070911130649k2051e4cfh2066cf0b9fdabbaf@mail.gmail.com>
-	<20091116163028.GA3568@n2100.arm.linux.org.uk>
-	<e06498070911160923i2273b6aai6f144b36289203d2@mail.gmail.com>
-	<20091116222016.GF3568@n2100.arm.linux.org.uk>
-	<20091119085735.GA14178@n2100.arm.linux.org.uk>
-	<e06498070911191008t1861e730u5cdb49187af00ae0@mail.gmail.com>
-	<20091123203110.GH18142@n2100.arm.linux.org.uk>
-	<20091130092022.GA1638@n2100.arm.linux.org.uk>
-	<20091130190950.GB5560@shareable.org>
-Message-ID: <20091130192321.GA10705@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 30 Nov 2009 20:51:29 +0100
+Subject: Get rid of IRQF_DISABLED - (was [PATCH] genirq: warn about
+	IRQF_SHARED|IRQF_DISABLED)
+In-Reply-To: <alpine.LFD.2.00.0911301225110.24119@localhost.localdomain>
+References: <1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259578067-29169-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.00.0911301225110.24119@localhost.localdomain>
+Message-ID: <20091130195129.GA19172@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2009 at 07:09:50PM +0000, Jamie Lokier wrote:
-> Russell King - ARM Linux wrote:
-> > On Mon, Nov 23, 2009 at 08:31:10PM +0000, Russell King - ARM Linux wrote:
-> > > On Thu, Nov 19, 2009 at 01:08:01PM -0500, Steven Walter wrote:
-> > > > On Thu, Nov 19, 2009 at 3:57 AM, Russell King - ARM Linux
-> > > > <linux@arm.linux.org.uk> wrote:
-> > > > > I'm afraid that I have nothing further to suggest, and so I'm shelving
-> > > > > the patches. ?That means this problem will remain unresolved in future
-> > > > > kernels.
-> > > > 
-> > > > I had the tester restart the reboot-loop, and so far it's done ~1200
-> > > > runs with no problem.  I'm thinking now that either I hosed something
-> > > > up with the build initially, or else the tester didn't flash it
-> > > > correctly.  1200 runs isn't enough to be conclusive, but it's a lot
-> > > > better than 88.  I'll let you know when we have something more
-> > > > definitive.
-> > > 
-> > > I'd just like to keep this issue hot so it doesn't get forgotten about.
-> > > Are we at a conclusive point on this?
+Hello,
+
+On Mon, Nov 30, 2009 at 02:54:54PM +0100, Thomas Gleixner wrote:
+> On Mon, 30 Nov 2009, Uwe Kleine-K?nig wrote:
+> > For shared irqs IRQF_DISABLED is only guaranteed for the first handler.
+> > So only warn starting at the second registration.
 > > 
-> > Today is decision day.  Do we go with these two patches or not?
+> > The warning is moved to __setup_irq having the additional benefit of
+> > catching actions registered using setup_irq not only register_irq.
+> > 
+> > This doesn't fix the cases where setup order is wrong but it should
+> > report the broken cases more reliably.
 > 
-> Way back when this thread started, I had a think about the proposed
-> fix and thought it was insufficient in some cases.  That is, the race
-> could still occur but not as often.  But it was hard to explain, and I
-> don't think I did so adequately.
+> The whole IRQF_DISABLED trickery is questionable and I'm pretty
+> unhappy about the warning in general.
+> 
+> While it is true that there is no guarantee of IRQF_DISABLED on shared
+> interrupts (at least not for the secondary handlers) we really need to
+> think about the reason why we want to run interrupt handlers with
+> interrupts enabled at all.
+> 
+> The separation of interrupt handlers which run with interrupts
+> disabled/enabled goes all the way back to Linux 1.0, which had two
+> interrupt handling modes:
+> 
+> 1) handlers installed with SA_INTERRUPT ran atomically with interrupts
+>    disabled.
+> 
+> 2) handlers installed without SA_INTERRUPT ran with interrupts enabled
+>    as they did more complex stuff like signal handling in the kernel.
 
-The only hole I can see would be if we context switched:
+> The interrupt which was always run with interrupts disabled was the
+> timer interrupt because some of the "slower" interrupt handlers were
+> relying on jiffies being updated, which is only possible when they run
+> with interrupts enabled and no such handler can interrupt the timer
+> interrupt.
+> 
+> In the 2.1.x timeframe the discussion about shared interrupt handlers
+> and the treatment of SA_INTERRUPT (today IRQF_DISABLED) was resolved
+> by changing the code to what we have right now. If you read back in
+> the archives you will find the same arguments as we have seen in this
+> thread and a boatload of different solutions to that.
+> 
+> The real question is why we want to run an interrupt handler with
+> interrupts enabled at all. There are two reaons AFAICT:
+> 
+> 1) interrupt handler relies on jiffies being updated:
+> 
+>    I don't think that this is the case anymore and if we still have
+>    code which does it is probably historic crap which is unused for
+>    quite a time.
+> 
+> 2) interrupt handler runs a long time:
+> 
+>    I'm sure we still have some of those especially in the
+>    archaelogical corners of drivers/* and in the creative space of the
+>    embedded "oh, I don't know why but it works" departement. That's
+>    code which needs to be fixed anyway.
 
-        kto = kmap_atomic(to, KM_USER0);
-        kfrom = kmap_atomic(from, KM_USER1);
-+       flush_cache_page(vma, vaddr, page_to_pfn(from));
+I think there is
 
-	/* HERE */
+ 3) you can only benefit from decent priority hardware if irqs are
+    processed while irqs are enabled.
 
-        xsc3_mc_copy_user_page(kto, kfrom);
-        kunmap_atomic(kfrom, KM_USER1);
-        kunmap_atomic(kto, KM_USER0);
+I think 
 
-so that we were no longer reading data from userspace.  Luckily,
-kmap_atomic() prevents preemptions occuring, so the above code should
-be regarded as being entirely single-threaded - we won't get any context
-switching all the time that 'to' is kmapped.
+	git grep handle_fasteoi_irq
 
-And it doesn't apply to SMP systems because there are no public SMP
-systems before ARMv6, and SMP systems are required to be PIPT.
+gives an overview here: some hits in arch/powerpc, arch/sparc and
+arch/x86/kernel/apic/io_apic.c.  (There is handle_prio_irq in
+arch/arm/mach-ns9xxx, but the priodecoder is crappy and actually it
+should use handle_level_irq IIRC.)
+
+Best regards
+Uwe
+ 
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
