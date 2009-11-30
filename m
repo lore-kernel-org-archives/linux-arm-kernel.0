@@ -1,76 +1,59 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 30 Nov 2009 10:54:24 +0100 (CET)
-Subject: [PATCH] warn about shared irqs requesting IRQF_DISABLED registered
-	with setup_irq
-In-Reply-To: <20091129151840.GA30813@shareable.org>
-References: <20091127195857.GB28193@n2100.arm.linux.org.uk>
-	<1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.00.0911272234460.24119@localhost.localdomain>
-	<20091128200344.GA1272@pengutronix.de>
-	<alpine.LFD.2.00.0911282239430.24119@localhost.localdomain>
-	<20091129023118.GA21529@shareable.org>
-	<20091129102635.GA22653@pengutronix.de>
-	<20091129151840.GA30813@shareable.org>
-Message-ID: <alpine.LFD.2.00.0911301033340.24119@localhost.localdomain>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Mon, 30 Nov 2009 11:19:44 +0100
+Subject: [PATCH 02/10] support 88pm8606 in 860x driver
+In-Reply-To: <771cded00911291743u76688d24ja40a30472ebd6af8@mail.gmail.com>
+References: <771cded00911130054p2ef293ebse84b1de3cf4fa9fd@mail.gmail.com>
+	<20091120150215.GF3733@sortiz.org>
+	<771cded00911211625g74601e5die59a680f36903cb3@mail.gmail.com>
+	<20091127145820.GA3640@sortiz.org>
+	<771cded00911291743u76688d24ja40a30472ebd6af8@mail.gmail.com>
+Message-ID: <20091130101943.GA3696@sortiz.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 29 Nov 2009, Jamie Lokier wrote:
-> > > Wouldn't it be quite a lot nicer if generic setup moved the
-> > > IRQF_DISABLED handler to be first in the list, if that actually works
-> > > in a useful way rather than simply being a quirk that irqs are
-> > > disabled for the first one?
-> > Hmm, what happens if an ISR runs with irqs disabled even though it
-> > doesn't expect it?  I wouldn't bet that nothing breaks.
+Hi Haojian,
+
+On Sun, Nov 29, 2009 at 08:43:45PM -0500, Haojian Zhuang wrote:
+> > On the other hand if it is impossible from a HW point of view to have a
+> > platform design where you'd have either a single 8806 or a single 8807, then 2
+> > things:
+> > - Your driver design would be ok.
+> [Haojian]: Great Thanks :)
+> > - Those chip designs are really bad as it should be one and only one single
+> > (and in particular only use one single i2c address space and id)
+> [Haojian]: I agree this opinion that the same functionality logic
+> should be placed into one chip and using single i2c address. If same
+> functionality logic can be in one chip, the driver could be simpler
+> without glue logic.
+> >
+> > Cheers,
+> > Samuel.
+> >
+> >
+> Hi Samuel,
 > 
-> Moving the IRQF_DISABLED handler to be first will run an ISR with
-> interrupts disabled which *does* expect it, so that's good.
-> 
-> According to this thread, at the moment when you have multiple
-> IRQF_DISABLED|IRQF_SHARED ISRs, only the first one is run with
-> interrupts disabled.
+> I tried to add some comments of the chip's background. Up to now, I
+> can't find a better idea to handle this driver without mixed structure
+> since usb charger linkes them tightly. If there's a better prototype
+> to handle this, I'll adopt it.
+Thanks for the explanations, I appreciate.
+Only the board definition can describe what's the relationship between your
+8806 and 8807, so here is what I propose: Add an i2c address to your 880x
+platform data, and have only a 8806 definition on your board specific file.
+Then from the 880x driver, you check for the platform data i2c address. If
+it's a valid one, that means we are expecting a 8807 to be present on the
+board and thus we can instantiate this i2c device by calling i2c_new_device().
+That will give you a link to your 8807 i2c client from your 8806. The
+advantage of that solution is to keep the 880x driver board and design
+neutral while avoiding any static definitions.
+Waiting for your feedback.
 
-Wrong. The flags of the first action are checked to decide whether
-interrupts are enabled _before_ calling the action handler.
-
-So for shared interrupts we have the following combinations:
-
-     action1            action2
-A    -	                -
-B    IRQF_DISABLED      -
-C    -                  IRQF_DISABLED
-D    IRQF_DISABLED      IRQF_DISABLED
-
-A) Correct behaviour for action1 and action2
-
-B) Correct behaviour for action1, but action2 is called with
-   interrupts disabled
-
-C) Correct behaviour for action1, but action2 is called with
-   interrupts enabled
+Cheers,
+Samuel.
  
-D) Correct behaviour for action1 and action2 in theory
+> Thanks
+> Haojian
 
-> In fact I don't see why the kernel cannot put _all_ of the
-> IRQ_DISABLED handlers at the beginning of the list, traverse those
-> with interrupts disabled, then enable interrupts them for the
-> remaining handlers.
-
-That does not work reliable, because IRQF_DISABLED is just describing
-the calling convention of the interrupt.
-
-It does not say, that the handler is not allowed to enable
-interrupts. So for D) there is no guarantee that the action1 handler
-keeps interrupts disabled. If it enables interrupts in the handler
-then the assumptions of action2 are already violated.
-
-> > IMHO the best is if a warning is printed or registering fails if shared
-> > irq actions don't agree about wanting IRQF_DISABLED.
-
-No, we print a warning when IRQF_SHARED is used with IRQF_DISABLED as
-there is no point about agreeing on something which can not be
-guaranteed at all.
-
-Thanks,
-
-	tglx
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
