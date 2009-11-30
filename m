@@ -1,95 +1,49 @@
-From: amit.kucheria@canonical.com (Amit Kucheria)
-Date: Fri, 4 Dec 2009 01:02:41 +0200
-Subject: [PATCH] arm: mxc: utilise usecount field in clock operations
-Message-ID: <3b125ff8668917c7969b2cdf733f94cb415c83bd.1275034568.git.amit.kucheria@verdurent.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Tue, 01 Dec 2009 06:59:11 +1100
+Subject: Get rid of IRQF_DISABLED - (was [PATCH] genirq: warn about
+	IRQF_SHARED|IRQF_DISABLED)
+In-Reply-To: <alpine.LFD.2.00.0911301519120.24119@localhost.localdomain>
+References: <1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259578067-29169-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.00.0911301225110.24119@localhost.localdomain>
+	<1259589780.26472.18.camel@laptop>
+	<alpine.LFD.2.00.0911301519120.24119@localhost.localdomain>
+Message-ID: <1259611151.2076.101.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the clock refcounting when reparenting is used.
+On Mon, 2009-11-30 at 15:24 +0100, Thomas Gleixner wrote:
+> 
+> > Except I guess that will upset some of the IRQ priority folks, like
+> > power, where they (iirc) have a stack per irq prio level.
+> 
+> Is that actually used ? Ben ?
 
-Boot-tested on imx51 babbage board.
+Nah, we have 2 dedicated stacks.. one for external interrupts and one
+for softirq. On embedded we also have a separate stack for the critical
+interrupts and machine checks but both are special (critical interrupts
+are aking to FIQ on ARM).
 
-Sascha pointed out a good explanation of refcounting here:
-http://www.spinics.net/lists/arm-kernel/msg85879.html
+> > But its not like the core kernel knows about these nesting rules and
+> can actually track any of that muck.
+> 
+> True.
 
-Signed-off-by: Amit Kucheria <amit.kucheria@canonical.com>
----
- arch/arm/plat-mxc/clock.c |   37 +++++++++++++++++++++++++------------
- 1 files changed, 25 insertions(+), 12 deletions(-)
+Well, thing is, in cases where we have a sane PIC, the PIC itself is
+perfectly good at keeping the source and anything of the same priority
+or lower masked while we handle an irq.
 
-diff --git a/arch/arm/plat-mxc/clock.c b/arch/arm/plat-mxc/clock.c
-index 323ff8c..2ed3ab1 100644
---- a/arch/arm/plat-mxc/clock.c
-+++ b/arch/arm/plat-mxc/clock.c
-@@ -52,13 +52,14 @@ static void __clk_disable(struct clk *clk)
- {
- 	if (clk == NULL || IS_ERR(clk))
- 		return;
--
--	__clk_disable(clk->parent);
--	__clk_disable(clk->secondary);
--
- 	WARN_ON(!clk->usecount);
--	if (!(--clk->usecount) && clk->disable)
--		clk->disable(clk);
-+
-+	if (!(--clk->usecount)) {
-+		if (clk->disable)
-+			clk->disable(clk);
-+		__clk_disable(clk->parent);
-+		__clk_disable(clk->secondary);
-+	}
- }
- 
- static int __clk_enable(struct clk *clk)
-@@ -66,12 +67,13 @@ static int __clk_enable(struct clk *clk)
- 	if (clk == NULL || IS_ERR(clk))
- 		return -EINVAL;
- 
--	__clk_enable(clk->parent);
--	__clk_enable(clk->secondary);
--
--	if (clk->usecount++ == 0 && clk->enable)
--		clk->enable(clk);
-+	if (clk->usecount++ == 0) {
-+		__clk_enable(clk->parent);
-+		__clk_enable(clk->secondary);
- 
-+		if (clk->enable)
-+			clk->enable(clk);
-+	}
- 	return 0;
- }
- 
-@@ -160,17 +162,28 @@ EXPORT_SYMBOL(clk_set_rate);
- int clk_set_parent(struct clk *clk, struct clk *parent)
- {
- 	int ret = -EINVAL;
-+	struct clk *old;
- 
- 	if (clk == NULL || IS_ERR(clk) || parent == NULL ||
- 	    IS_ERR(parent) || clk->set_parent == NULL)
- 		return ret;
- 
-+	if (clk->usecount)
-+		clk_enable(parent);
-+
- 	mutex_lock(&clocks_mutex);
- 	ret = clk->set_parent(clk, parent);
--	if (ret == 0)
-+	if (ret == 0) {
-+		old = clk->parent;
- 		clk->parent = parent;
-+	} else {
-+		old = parent;
-+	}
- 	mutex_unlock(&clocks_mutex);
- 
-+	if (clk->usecount)
-+		clk_disable(old);
-+
- 	return ret;
- }
- EXPORT_SYMBOL(clk_set_parent);
--- 
-1.7.0.4
+So disabling local CPU IRQs will basically add an unnecessary blocking
+of both timer interrupts and perfmon interrupts while doing so.
+
+Yes, all driver interrupt handlers -should- be only running short amount
+of code in their handlers but you know how it is. The drift introduced
+on timer and perfmon events can be a problem, the later might even make
+it difficult to figure out what an -interrupt- is taking more time than
+it should.
+
+I would suggest we timestamp the handlers in the core btw and warn if
+they take too long so we get a chance to track down the bad guys.
+
+Cheers,
+Ben.
