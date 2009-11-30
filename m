@@ -1,48 +1,148 @@
-From: Konstantin.Malolin@palm.com (Konstantin Malolin)
-Date: Mon, 30 Nov 2009 20:12:32 -0800
-Subject: strace failure on ARM Linux 2.6.31-rc7 running on TI OMAP3 hardware 
-In-Reply-To: <9C159646F76EA0498E7891D8121707A523CD024CC3@ushqwmb02.palm1.palmone.com>
-References: <9C159646F76EA0498E7891D8121707A523CD024CC2@ushqwmb02.palm1.palmone.com>,
-	<9C159646F76EA0498E7891D8121707A523CD024CC3@ushqwmb02.palm1.palmone.com>
-Message-ID: <9C159646F76EA0498E7891D8121707A523CD024CC5@ushqwmb02.palm1.palmone.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 30 Nov 2009 13:31:29 +0100
+Subject: [PATCH] i.MX27 audmux: Fix register offsets
+Message-ID: <mailman.61.1259752849.2170.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I believe this must be a kernel bug.
-Attached are two strace binaries :
+We have two holes in the register space. The driver did not
+handle this. Fix it.
 
-strace_arm and strace_t2
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/plat-mxc/audmux-v1.c |    9 +++++++--
+ 1 files changed, 7 insertions(+), 2 deletions(-)
 
-The difference between them is that strace_arm is compiled as an original ARM ISA,
-strace_t2 is compiled for Thumb2 (-mthumb -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp).
+diff --git a/arch/arm/plat-mxc/audmux-v1.c b/arch/arm/plat-mxc/audmux-v1.c
+index 70ab5af..da6387d 100644
+--- a/arch/arm/plat-mxc/audmux-v1.c
++++ b/arch/arm/plat-mxc/audmux-v1.c
+@@ -28,7 +28,9 @@
+ 
+ static void __iomem *audmux_base;
+ 
+-#define MXC_AUDMUX_V1_PCR(x)	((x) * 4)
++static unsigned char port_mapping[] = {
++	0x0, 0x4, 0x8, 0x10, 0x14, 0x1c,
++};
+ 
+ int mxc_audmux_v1_configure_port(unsigned int port, unsigned int pcr)
+ {
+@@ -37,7 +39,10 @@ int mxc_audmux_v1_configure_port(unsigned int port, unsigned int pcr)
+ 		return -ENOSYS;
+ 	}
+ 
+-	writel(pcr, audmux_base + MXC_AUDMUX_V1_PCR(port));
++	if (port >= ARRAY_SIZE(port_mapping))
++		return -EINVAL;
++
++	writel(pcr, audmux_base + port_mapping[port]);
+ 
+ 	return 0;
+ }
+-- 
+1.6.5.2
 
-I tried these compilers :
 
-gcc version 4.2.1 (CodeSourcery Sourcery G++ Lite 2007q3-51)
-gcc version 4.3.3 (Sourcery G++ 4.3-234)
-gcc version 4.4.1 (Sourcery G++ 4.4-71)
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
 
-The bug shows up with all of them, most easily reproduces with an strace binary built with 2007q3-51.
 
-If run by this way on an OMAP3 system, 2.6.31-rc7 plain vanilla kernel :
+>From bogus@does.not.exist.com  Fri Nov  6 13:01:15 2009
+From: bogus@does.not.exist.com ()
+Date: Fri, 06 Nov 2009 18:01:15 -0000
+Subject: No subject
+Message-ID: <mailman.68.1260108978.2170.linux-arm-kernel@lists.infradead.org>
 
-./strace_arm ./strace_t2 echo "abc" 2> /dev/null
+working as intended.
 
-the strace_arm fails randomly with either signal 11 or 4
-The PC locations point to some junk areas in functions padding.
-Please note that the only scheme when the failure occures is this : ARM binary traces Thumb2 binary.
-When ARM traces ARM, Thumb2 traces Thumb2, Thumb2 traces ARM, the failure doesn't show up.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: strace_arm
-Type: application/octet-stream
-Size: 205669 bytes
-Desc: strace_arm
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091130/bf8d952e/attachment-0002.obj>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: strace_t2
-Type: application/octet-stream
-Size: 191476 bytes
-Desc: strace_t2
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091130/bf8d952e/attachment-0003.obj>
+The only explaination I have at present is that the CPU is buggy, and
+for whatever reason, it _is_ caching the values for a C=0 B=1 mapping.
+Maybe not a buggy L1 but a buggy L2 cache?
+
+No idea, I know nothing about Feroceon CPUs, so I'm afraid its up to
+others to investigate why they're having this problem.  All I can say
+is that from the kernel point of view, the kernel is doing everything
+it should.
+
+
+>From bogus@does.not.exist.com  Fri Nov  6 13:01:15 2009
+From: bogus@does.not.exist.com ()
+Date: Fri, 06 Nov 2009 18:01:15 -0000
+Subject: No subject
+Message-ID: <mailman.75.1260172499.2170.linux-arm-kernel@lists.infradead.org>
+
+working as intended.
+
+The only explaination I have at present is that the CPU is buggy, and
+for whatever reason, it _is_ caching the values for a C=3D0 B=3D1 mapping.
+Maybe not a buggy L1 but a buggy L2 cache?
+
+No idea, I know nothing about Feroceon CPUs, so I'm afraid its up to
+others to investigate why they're having this problem.  All I can say
+is that from the kernel point of view, the kernel is doing everything
+it should.
+
+
+>From bogus@does.not.exist.com  Fri Nov  6 13:01:15 2009
+From: bogus@does.not.exist.com ()
+Date: Fri, 06 Nov 2009 18:01:15 -0000
+Subject: No subject
+Message-ID: <mailman.77.1260289106.2170.linux-arm-kernel@lists.infradead.org>
+
+<div class=3D"im">From: Sascha Hauer &lt;<a href=3D"mailto:s.hauer@pengutro=
+nix.de">s.hauer at pengutronix.de</a>&gt;<br>
+Date: Mon, 30 Nov 2009 13:31:29 +0100<br>
+Subject: [PATCH] i.MX27 audmux: Fix register offsets<br>
+<br>
+</div>We have two holes in the register space. The driver did not<br>
+handle this. Fix it.<br>
+<div class=3D"im"><br>
+Signed-off-by: Sascha Hauer &lt;<a href=3D"mailto:s.hauer@pengutronix.de">s=
+.hauer at pengutronix.de</a>&gt;<br>
+---<br>
+</div>=A0arch/arm/plat-mxc/audmux-v1.c | =A0 =A09 +++++++--<br>
+<div class=3D"im">=A01 files changed, 7 insertions(+), 2 deletions(-)<br>
+<br>
+diff --git a/arch/arm/plat-mxc/audmux-v1.c b/arch/arm/plat-mxc/audmux-v1.c<=
+br>
+</div>index 70ab5af..da6387d 100644<br>
+<div class=3D"im">--- a/arch/arm/plat-mxc/audmux-v1.c<br>
++++ b/arch/arm/plat-mxc/audmux-v1.c<br>
+</div>@@ -28,7 +28,9 @@<br>
+<div class=3D"im"><br>
+=A0static void __iomem *audmux_base;<br>
+<br>
+-#define MXC_AUDMUX_V1_PCR(x) =A0 ((x) * 4)<br>
+</div>+static unsigned char port_mapping[] =3D {<br>
++ =A0 =A0 =A0 0x0, 0x4, 0x8, 0x10, 0x14, 0x1c,<br>
++};<br>
+<div class=3D"im"><br>
+=A0int mxc_audmux_v1_configure_port(unsigned int port, unsigned int pcr)<br=
+>
+</div>=A0{<br>
+@@ -37,7 +39,10 @@ int mxc_audmux_v1_configure_port(unsigned int port, unsi=
+gned int pcr)<br>
+ =A0 =A0 =A0 =A0 =A0 =A0 =A0 =A0return -ENOSYS;<br>
+ =A0 =A0 =A0 =A0}<br>
+<br>
+- =A0 =A0 =A0 writel(pcr, audmux_base + MXC_AUDMUX_V1_PCR(port));<br>
++ =A0 =A0 =A0 if (port &gt;=3D ARRAY_SIZE(port_mapping))<br>
++ =A0 =A0 =A0 =A0 =A0 =A0 =A0 return -EINVAL;<br>
++<br>
++ =A0 =A0 =A0 writel(pcr, audmux_base + port_mapping[port]);<br>
+<div class=3D"im"><br>
+ =A0 =A0 =A0 =A0return 0;<br>
+=A0}<br>
+--<br>
+1.6.5.2<br></div></blockquote></div><br>Yes,<br>it works now. Thank you for=
+ your patience with this.<br clear=3D"all"><br>-- <br>Javier Martin<br>Vist=
+a Silicon S.L.<br>CDTUC - FASE C - Oficina S-345<br>Avda de los Castros s/n=
+<br>
+39005- Santander. Cantabria. Spain<br>+34 942 25 32 60<br><a href=3D"http:/=
+/www.vista-silicon.com">www.vista-silicon.com</a><br>
+
+--0016e6d9a0e87b335c0479be44de--
