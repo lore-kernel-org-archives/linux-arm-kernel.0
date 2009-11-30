@@ -1,14 +1,81 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Nov 2009 10:34:33 +0000
-Subject: [PATCH 2/3] [AT91] Add support for the Daricom C3-Ax03 board
-In-Reply-To: <1259574486-13391-3-git-send-email-derkling@gmail.com>
-References: <20091129234917.GB18841@game.jcrosoft.org>
-	<1259574486-13391-3-git-send-email-derkling@gmail.com>
-Message-ID: <20091130103433.GE1638@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon, 30 Nov 2009 11:47:47 +0100
+Subject: [PATCH] genirq: warn about IRQF_SHARED|IRQF_DISABLED at the right
+	place
+In-Reply-To: <1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1259578067-29169-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2009 at 10:48:05AM +0100, Patrick Bellasi wrote:
-> +#include <mach/gpio.h>
+For shared irqs IRQF_DISABLED is only guaranteed for the first handler.
+So only warn starting at the second registration.
 
-linux/gpio.h
+The warning is moved to __setup_irq having the additional benefit of
+catching actions registered using setup_irq not only register_irq.
+
+This doesn't fix the cases where setup order is wrong but it should
+report the broken cases more reliably.
+
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Cc: David Brownell <dbrownell@users.sourceforge.net>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+Cc: Ingo Molnar <mingo@elte.hu>
+Cc: Nicolas Pitre <nico@marvell.com>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: John Stultz <johnstul@us.ibm.com>
+Cc: Rusty Russell <rusty@rustcorp.com.au>
+Cc: Remy Bohmer <linux@bohmer.net>
+Cc: Hugh Dickins <hugh.dickins@tiscali.co.uk>
+Cc: Andrea Gallo <andrea.gallo@stericsson.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jamie Lokier <jamie@shareable.org>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ kernel/irq/manage.c |   23 ++++++++++-------------
+ 1 files changed, 10 insertions(+), 13 deletions(-)
+
+diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
+index bde4c66..d8f7415 100644
+--- a/kernel/irq/manage.c
++++ b/kernel/irq/manage.c
+@@ -702,6 +702,16 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
+ 			goto mismatch;
+ #endif
+ 
++		/*
++		 * handle_IRQ_event() only honors IRQF_DISABLED for the _first_
++		 * irqaction.  As the first handler might reenable irqs all bets
++		 * are off for the later handlers even if the first one has
++		 * IRQF_DISABLED, too.
++		 */
++		if (new->flags & IRQF_DISABLED)
++			pr_warning("IRQ %d/%s: IRQF_DISABLED is not guaranteed "
++					"on shared IRQs\n", irq, new->name);
++
+ 		/* add new interrupt at end of irq queue */
+ 		do {
+ 			old_ptr = &old->next;
+@@ -1008,19 +1018,6 @@ int request_threaded_irq(unsigned int irq, irq_handler_t handler,
+ 	struct irq_desc *desc;
+ 	int retval;
+ 
+-	/*
+-	 * handle_IRQ_event() always ignores IRQF_DISABLED except for
+-	 * the _first_ irqaction (sigh).  That can cause oopsing, but
+-	 * the behavior is classified as "will not fix" so we need to
+-	 * start nudging drivers away from using that idiom.
+-	 */
+-	if ((irqflags & (IRQF_SHARED|IRQF_DISABLED)) ==
+-					(IRQF_SHARED|IRQF_DISABLED)) {
+-		pr_warning(
+-		  "IRQ %d/%s: IRQF_DISABLED is not guaranteed on shared IRQs\n",
+-			irq, devname);
+-	}
+-
+ #ifdef CONFIG_LOCKDEP
+ 	/*
+ 	 * Lockdep wants atomic interrupt handlers:
+-- 
+1.6.5.2
