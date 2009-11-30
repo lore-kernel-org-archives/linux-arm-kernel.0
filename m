@@ -1,49 +1,40 @@
 From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Tue, 01 Dec 2009 06:59:11 +1100
+Date: Tue, 01 Dec 2009 08:42:11 +1100
 Subject: Get rid of IRQF_DISABLED - (was [PATCH] genirq: warn about
 	IRQF_SHARED|IRQF_DISABLED)
-In-Reply-To: <alpine.LFD.2.00.0911301519120.24119@localhost.localdomain>
+In-Reply-To: <alpine.LFD.2.00.0911302225050.24119@localhost.localdomain>
 References: <1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1259578067-29169-1-git-send-email-u.kleine-koenig@pengutronix.de>
 	<alpine.LFD.2.00.0911301225110.24119@localhost.localdomain>
 	<1259589780.26472.18.camel@laptop>
 	<alpine.LFD.2.00.0911301519120.24119@localhost.localdomain>
-Message-ID: <1259611151.2076.101.camel@pasglop>
+	<1259611151.2076.101.camel@pasglop>
+	<alpine.LFD.2.00.0911302225050.24119@localhost.localdomain>
+Message-ID: <1259617331.2076.146.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2009-11-30 at 15:24 +0100, Thomas Gleixner wrote:
+On Mon, 2009-11-30 at 22:31 +0100, Thomas Gleixner wrote:
+
+> Are the perf events on power generally coming through the standard irq
+> handler code path and/or sensitive to local_irq_disable() ?
+
+They are in HW yes. On ppc64, we do soft-disabling, which mean that we
+can still get the perf events within a local_irq_disable() region
+provided we don't get another interrupt within that region that forces
+us to hard disable so it would make the problem less bad I suppose.
+
+> > I would suggest we timestamp the handlers in the core btw and warn
+> if
+> > they take too long so we get a chance to track down the bad guys.
 > 
-> > Except I guess that will upset some of the IRQ priority folks, like
-> > power, where they (iirc) have a stack per irq prio level.
-> 
-> Is that actually used ? Ben ?
+> The hassle is to find a time which we think is appropriate as a
+> threshold which is of course depending on the cpu power of a
+> system. Also I wonder whether we'd need to make such a warning thing
+> aware of irq nesting.
 
-Nah, we have 2 dedicated stacks.. one for external interrupts and one
-for softirq. On embedded we also have a separate stack for the critical
-interrupts and machine checks but both are special (critical interrupts
-are aking to FIQ on ARM).
-
-> > But its not like the core kernel knows about these nesting rules and
-> can actually track any of that muck.
-> 
-> True.
-
-Well, thing is, in cases where we have a sane PIC, the PIC itself is
-perfectly good at keeping the source and anything of the same priority
-or lower masked while we handle an irq.
-
-So disabling local CPU IRQs will basically add an unnecessary blocking
-of both timer interrupts and perfmon interrupts while doing so.
-
-Yes, all driver interrupt handlers -should- be only running short amount
-of code in their handlers but you know how it is. The drift introduced
-on timer and perfmon events can be a problem, the later might even make
-it difficult to figure out what an -interrupt- is taking more time than
-it should.
-
-I would suggest we timestamp the handlers in the core btw and warn if
-they take too long so we get a chance to track down the bad guys.
+But if we always disable interrupts while running the handlers, we don't
+nest right ?
 
 Cheers,
 Ben.
