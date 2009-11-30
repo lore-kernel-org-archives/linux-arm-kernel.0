@@ -1,45 +1,108 @@
-From: awalls@radix.net (Andy Walls)
-Date: Mon, 30 Nov 2009 20:42:53 -0500
-Subject: Get rid of IRQF_DISABLED - (was [PATCH] genirq: warn about
-	IRQF_SHARED|IRQF_DISABLED)
-In-Reply-To: <200911301238.35750.david-b@pacbell.net>
-References: <1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.00.0911301519120.24119@localhost.localdomain>
-	<20091130144702.14bea0ee@lxorguk.ukuu.org.uk>
-	<200911301238.35750.david-b@pacbell.net>
-Message-ID: <1259631774.3099.26.camel@palomino.walls.org>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Mon, 30 Nov 2009 12:56:19 +0100
+Subject: [PATCH 8/9 v2] MXC: Add a digital audio multiplexer driver
+In-Reply-To: <20091112150615.GA30179@pengutronix.de>
+References: <1258022525-21078-1-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-2-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-3-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-4-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-5-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-6-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-7-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-8-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-9-git-send-email-s.hauer@pengutronix.de>
+	<20091112150615.GA30179@pengutronix.de>
+Message-ID: <eedb5540911300356p2b41eeaakee050953ad39ec26@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2009-11-30 at 12:38 -0800, David Brownell wrote:
-> On Monday 30 November 2009, Alan Cox wrote:
-> > SHARED|DISABLED ought to WARN_ON() and if that doesn't motivate people
-> > then return -EINVAL. And with any luck that'll prove 6 months later that
-> > most of the offenders are not used and we can delete them wholesale.
-> 
-> So ... merge an updated version of the original patch, to
-> get full WARN coverage?
-> 
-> We've had that warning for a long time now.  The original
-> patch just covered non-request_irq() cases.  So by your
-> timetable we're ready for the "return -EINVAL" stage of
-> the migration... at least, for request_irq() callers.
+Hi Sascha,
+as you know I have been testing your i.MX27 support and I have found a
+problem in this audmux patch.
 
-OK, I'm motivated.  I haven't followed the discussion closely though.
-
-Can someone give me a clue as to the preferred way to correct this:
-
-        /* Register IRQ */
-        retval = request_irq(cx->pci_dev->irq, cx18_irq_handler,
-                             IRQF_SHARED | IRQF_DISABLED,
-                             cx->v4l2_dev.name, (void *)cx);
+Please, see my comment below:
 
 
-?
-The top half handler performs as little work as it possibly can and
-schedules the long duration activites on a workqueue already.
++++ b/arch/arm/plat-mxc/audmux-v1.c
+> @@ -0,0 +1,53 @@
+> +/*
+> + * Copyright 2009 Pengutronix, Sascha Hauer <s.hauer@pengutronix.de>
+> + *
+> + * Initial development of this code was funded by
+> + * Phytec Messtechnik GmbH, http://www.phytec.de
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/clk.h>
+> +#include <mach/audmux.h>
+> +#include <mach/hardware.h>
+> +
+> +static void __iomem *audmux_base;
+> +
+> +#define MXC_AUDMUX_V1_PCR(x)   ((x) * 4)
+>
 
-The device is always on a plug-in PCI card.
+You cannot calculate AUDMUX register offsets this way because according to
+i.MX27 manual:
 
-Regards,
-Andy
+0x1001_6000 (HPCR1)
+0x1001_6004 (HPCR2)
+0x1001_6008 (HPCR3)
+0x1001_6010 (PPCR1)  <-- You are using 0x0C for this
+0x1001_6014 (PPCR2)  <--- You are using 0x10 for this
+0x1001_601C (PPCR3)  <--- You are using 0x18 for this
+
+
++int mxc_audmux_v1_configure_port(unsigned int port, unsigned int pcr)
+> +{
+> +       if (!audmux_base) {
+> +               printk("%s: not configured\n", __func__);
+> +               return -ENOSYS;
+> +       }
+> +
+> +       writel(pcr, audmux_base + MXC_AUDMUX_V1_PCR(port));
+> +
+> +       return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(mxc_audmux_v1_configure_port);
+> +
+> +static int mxc_audmux_v1_init(void)
+> +{
+> +       if (cpu_is_mx27() || cpu_is_mx21())
+> +               audmux_base = IO_ADDRESS(AUDMUX_BASE_ADDR);
+> +       return 0;
+> +}
+> +
+> +postcore_initcall(mxc_audmux_v1_init);
+>
+>
+
+Thank you.
+
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091130/7a393e51/attachment-0001.htm>
