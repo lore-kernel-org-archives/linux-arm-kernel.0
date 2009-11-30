@@ -1,58 +1,119 @@
 From: javier.martin@vista-silicon.com (javier Martin)
-Date: Mon, 30 Nov 2009 14:13:47 +0100
-Subject: [alsa-devel] [PATCH V2] Add i.MX sound support
-In-Reply-To: <20091130124305.GQ27548@pengutronix.de>
-References: <1259163666-30344-1-git-send-email-s.hauer@pengutronix.de>
-	<eedb5540911260753u369d6cffp97c05089cdd30868@mail.gmail.com>
-	<20091127075834.GG27548@pengutronix.de>
-	<eedb5540911270101o4bf06b2ct6ff22e29b7c1fe15@mail.gmail.com>
-	<20091127095416.GK27548@pengutronix.de>
-	<eedb5540911300243t20ecf407o317b414720cf962e@mail.gmail.com>
-	<20091130124305.GQ27548@pengutronix.de>
-Message-ID: <eedb5540911300513j3730078v1393b9b42dca497b@mail.gmail.com>
+Date: Mon, 30 Nov 2009 17:15:45 +0100
+Subject: [PATCH 8/9 v2] MXC: Add a digital audio multiplexer driver
+In-Reply-To: <20091130160356.GT27548@pengutronix.de>
+References: <1258022525-21078-6-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-8-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-9-git-send-email-s.hauer@pengutronix.de>
+	<20091112150615.GA30179@pengutronix.de>
+	<eedb5540911300356p2b41eeaakee050953ad39ec26@mail.gmail.com>
+	<20091130121017.GN27548@pengutronix.de>
+	<eedb5540911300425n374af9f0k5346d85fdb79eb11@mail.gmail.com>
+	<20091130123412.GP27548@pengutronix.de>
+	<eedb5540911300509t11cc783cr8e97eda66ee382a@mail.gmail.com>
+	<20091130160356.GT27548@pengutronix.de>
+Message-ID: <eedb5540911300815u5cf60634jd58918f454269028@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 2009/11/30 Sascha Hauer <s.hauer@pengutronix.de>
 
-> On Mon, Nov 30, 2009 at 11:43:23AM +0100, javier Martin wrote:
-> > Hi Sascha,
-> > have you tested capture direction on an i.MX27 based board?
+> On Mon, Nov 30, 2009 at 02:09:16PM +0100, javier Martin wrote:
+> > From fa87b65915e78ad29a8e4f3f22b26ed0fa6dc7f5 Mon Sep 17 00:00:00 2001
 > >
-> > I have been testing your patches in the place you suggested and playback
-> > seems to work fine but I have several problems with capture stream. I
-> found
-> > a BUG in the audmux_v1 code
-> > and I have fixed it but I am still having problems with capture. The file
-> > keeps empty and nothing is recorded.
->
-> Capture works fine on my boards.
->
->
->
-> > Please could you try the following on an i.MX27 based board?
+> > > From: Sascha Hauer <s.hauer@pengutronix.de>
+> > > Date: Mon, 30 Nov 2009 13:31:29 +0100
+> > > Subject: [PATCH] i.MX27 audmux: Fix register offsets
+> > >
+> > > The PPCR registers start at 0x10, not 0xc. Fix this.
+> > >
+> > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > > ---
+> > >  arch/arm/plat-mxc/include/mach/audmux.h |    6 +++---
+> > >  1 files changed, 3 insertions(+), 3 deletions(-)
+> > >
+> > > diff --git a/arch/arm/plat-mxc/include/mach/audmux.h
+> > > b/arch/arm/plat-mxc/include/mach/audmux.h
+> > > index 5cd6466..dcc12d4 100644
+> > > --- a/arch/arm/plat-mxc/include/mach/audmux.h
+> > > +++ b/arch/arm/plat-mxc/include/mach/audmux.h
+> > > @@ -4,9 +4,9 @@
+> > >  #define MX27_AUDMUX_HPCR1_SSI0         0
+> > >  #define MX27_AUDMUX_HPCR2_SSI1         1
+> > >  #define MX27_AUDMUX_HPCR3_SSI_PINS_4   2
+> > > -#define MX27_AUDMUX_PPCR1_SSI_PINS_1   3
+> > > -#define MX27_AUDMUX_PPCR2_SSI_PINS_2   4
+> > > -#define MX27_AUDMUX_PPCR3_SSI_PINS_3   5
+> > > +#define MX27_AUDMUX_PPCR1_SSI_PINS_1   4
+> > > +#define MX27_AUDMUX_PPCR2_SSI_PINS_2   5
+> > > +#define MX27_AUDMUX_PPCR3_SSI_PINS_3   6
+> > >
 > >
-> > arecord -t raw -c 1 -f S16_LE test.wav
+> > Be careful,
+> > I think this patch breaks some of the boards currently using
+> > MXC_AUDMUX_V1_PCR_RXDSEL(x) and similar macros defined in mach/audmux.h
+> (for
+> > example pcm038).
+> > For those macros the old AUDMUX register indexes are fine.
+> >
+> > I suggest fixing this inside audmux_v1.c instead of modifying
+> mach/audmux.h.
 >
-> Does it work with two channels? Do you use DMA or FIQ? Could you try the
-> other variant?
+> Ok. The AUDMUX V1 is used on i.MX21 and i.MX27 and both have this hole
+> in the register space, so fixing it in the driver should be safe.
+>
+> How about this one then?
+>
+> Sascha
+>
+>
+> From 297b5c4cea40c2e7023bbdb96a0c90c13b0e02a1 Mon Sep 17 00:00:00 2001
+> From: Sascha Hauer <s.hauer@pengutronix.de>
+> Date: Mon, 30 Nov 2009 13:31:29 +0100
+> Subject: [PATCH] i.MX27 audmux: Fix register offsets
+>
+> The PPCR registers start at 0x10, not 0xc. Fix this.
+>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  arch/arm/plat-mxc/audmux-v1.c |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/plat-mxc/audmux-v1.c b/arch/arm/plat-mxc/audmux-v1.c
+> index 70ab5af..8fbce7b 100644
+> --- a/arch/arm/plat-mxc/audmux-v1.c
+> +++ b/arch/arm/plat-mxc/audmux-v1.c
+> @@ -37,6 +37,10 @@ int mxc_audmux_v1_configure_port(unsigned int port,
+> unsigned int pcr)
+>                return -ENOSYS;
+>        }
+>
+> +       /* handle hole in the register space */
+> +       if (port > 2)
+> +               port++;
+> +
+>         writel(pcr, audmux_base + MXC_AUDMUX_V1_PCR(port));
+>
+>        return 0;
+> --
+> 1.6.5.2
 >
 
- Unfortunately, I can't test it using two channels because our board has a
-wm8974 mono codec. Please could you point me how can I change between FIQ
-and DMA? I thought FIQ was only for AC97,
+Sascha,
+there are actually two holes, with this current patch, PPCR3 still receives
+a wrong value:
 
-It helped me a lot during development to use a tool like memedit
-> (http://www.pengutronix.de/software/memedit/index_en.html) to show a
-> register dump of the SSI/Audmux units of a working setup and a non
-> working setup. Usually the differences showed quite fast why one was
-> working and the other was not.
->
+0x1001_6000 (HPCR1)
+0x1001_6004 (HPCR2)
+0x1001_6008 (HPCR3)
+0x1001_600C (hole)
+0x1001_6010 (PPCR1)
+0x1001_6014 (PPCR2)
+0x1001_6018 (hole)
+0x1001_601C (PPCR3)
 
- Indeed, this will be my next step.
 
- Thank you for the tip.
-
+Thank you.
 
 -- 
 Javier Martin
@@ -64,4 +125,56 @@ Avda de los Castros s/n
 www.vista-silicon.com
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091130/f71483c3/attachment-0001.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091130/33464ed9/attachment-0001.htm>
+
+>From bogus@does.not.exist.com  Fri Nov  6 13:01:15 2009
+From: bogus@does.not.exist.com ()
+Date: Fri, 06 Nov 2009 18:01:15 -0000
+Subject: No subject
+Message-ID: <mailman.60.1259665861.2170.linux-arm-kernel@lists.infradead.org>
+
+<div class=3D"im">From: Sascha Hauer &lt;<a href=3D"mailto:s.hauer@pengutro=
+nix.de">s.hauer at pengutronix.de</a>&gt;<br>
+Date: Mon, 30 Nov 2009 13:31:29 +0100<br>
+Subject: [PATCH] i.MX27 audmux: Fix register offsets<br>
+<br>
+The PPCR registers start at 0x10, not 0xc. Fix this.<br>
+<br>
+Signed-off-by: Sascha Hauer &lt;<a href=3D"mailto:s.hauer@pengutronix.de">s=
+.hauer at pengutronix.de</a>&gt;<br>
+---<br>
+</div>=A0arch/arm/plat-mxc/audmux-v1.c | =A0 =A04 ++++<br>
+<div class=3D"im">=A01 files changed, 4 insertions(+), 0 deletions(-)<br>
+<br>
+</div>diff --git a/arch/arm/plat-mxc/audmux-v1.c b/arch/arm/plat-mxc/audmux=
+-v1.c<br>
+index 70ab5af..8fbce7b 100644<br>
+--- a/arch/arm/plat-mxc/audmux-v1.c<br>
++++ b/arch/arm/plat-mxc/audmux-v1.c<br>
+@@ -37,6 +37,10 @@ int mxc_audmux_v1_configure_port(unsigned int port, unsi=
+gned int pcr)<br>
+ =A0 =A0 =A0 =A0 =A0 =A0 =A0 =A0return -ENOSYS;<br>
+ =A0 =A0 =A0 =A0}<br>
+<br>
++ =A0 =A0 =A0 /* handle hole in the register space */<br>
++ =A0 =A0 =A0 if (port &gt; 2)<br>
++ =A0 =A0 =A0 =A0 =A0 =A0 =A0 port++;<br>
++<br>
+<div class=3D"im"> =A0 =A0 =A0 =A0writel(pcr, audmux_base + MXC_AUDMUX_V1_P=
+CR(port));<br>
+<br>
+ =A0 =A0 =A0 =A0return 0;<br>
+</div><div><div></div><div>--<br>
+1.6.5.2<br></div></div></blockquote><div>=A0<br>Sascha,<br>there are actual=
+ly two holes, with this current patch, PPCR3 still receives a wrong value:<=
+br><br></div>0x1001_6000 (HPCR1) <br>0x1001_6004 (HPCR2)<br>0x1001_6008 (HP=
+CR3) <br>
+0x1001_600C (hole)<br>0x1001_6010 (PPCR1)<br>0x1001_6014 (PPCR2)<br>0x1001_=
+6018 (hole)<br>0x1001_601C (PPCR3)<br><br></div><br clear=3D"all">Thank you=
+.<br><br>-- <br>Javier Martin<br>Vista Silicon S.L.<br>CDTUC - FASE C - Ofi=
+cina S-345<br>
+Avda de los Castros s/n<br>39005- Santander. Cantabria. Spain<br>+34 942 25=
+ 32 60<br><a href=3D"http://www.vista-silicon.com">www.vista-silicon.com</a=
+><br>
+
+--0016e6d9a0e82a18a0047998f48a--
