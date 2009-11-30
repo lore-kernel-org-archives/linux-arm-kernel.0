@@ -1,47 +1,30 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 30 Nov 2009 21:27:18 +0100
-Subject: [PATCH] genirq: warn about IRQF_SHARED|IRQF_DISABLED at the
-	right place
-In-Reply-To: <200911301221.30601.david-b@pacbell.net>
-References: <1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1259578067-29169-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<200911301221.30601.david-b@pacbell.net>
-Message-ID: <20091130202718.GC19172@pengutronix.de>
+From: avictor.za@gmail.com (Andrew Victor)
+Date: Mon, 30 Nov 2009 22:36:54 +0200
+Subject: [PATCH 1/3] AT91: update at91_eth_data for ETX2-3 on PA10-11
+In-Reply-To: <1259574486-13391-2-git-send-email-derkling@gmail.com>
+References: <20091129234917.GB18841@game.jcrosoft.org>
+	<1259574486-13391-1-git-send-email-derkling@gmail.com>
+	<1259574486-13391-2-git-send-email-derkling@gmail.com>
+Message-ID: <cd73a99e0911301236pd18a382o6faa04c15b3bf9c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2009 at 12:21:30PM -0800, David Brownell wrote:
-> On Monday 30 November 2009, Uwe Kleine-K?nig wrote:
-> > +???????????????if (new->flags & IRQF_DISABLED)
-> > +???????????????????????pr_warning("IRQ %d/%s: IRQF_DISABLED is not guaranteed "
-> > +???????????????????????????????????????"on shared IRQs\n", irq, new->name);
-> 
-> This should have copied the original test ... this way,
-> it's dropping the SHARED constraint, and trying to morph
-> into a generic "IRQF_DISABLED is eeebil!" test.
-No, it doesn't.  The inserted code is in an if block:
+hi Patrick,
 
-	old_ptr = &desc->action;
-	old = *old_ptr;
-	if (old) {
-		/* ... */
-		if (!((old->flags & new->flags) & IRQF_SHARED) ||
-			((old->flags ^ new->flags) & IRQF_TRIGGER_MASK)) {
-			old_name = old->name;
-			goto mismatch;
-		}
+> This patch update the at91_eth_data to handle the usage of PA10 and PA11
+> for EMAC's EXT2 and EXT3 signals.
 
-		...
+> @@ -83,6 +83,7 @@ struct at91_eth_data {
+> ? ? ? ?u32 ? ? ? ? ? ? phy_mask;
+> ? ? ? ?u8 ? ? ? ? ? ? ?phy_irq_pin; ? ?/* PHY IRQ */
+> ? ? ? ?u8 ? ? ? ? ? ? ?is_rmii; ? ? ? ?/* using RMII interface? */
+> + ? ? ? u8 ? ? ? ? ? ? ?use_twi_pins; ? /* ETX2-ETX3 on PA23-PA24 */
+> ?};
 
-+		if (new->flags & IRQF_DISABLED)
-+			pr_warning("...");
+The "at91_eth_data" structure is used on all AT91 processors with a
+MACB peripheral (AT572D940HF, CAP9, 9620, 9263).
+So this isn't really a nice cross-platform change.
 
-and the mismatch label is further below.  So the warning is still only
-hit if a shared irq is registered.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Regards,
+  Andrew Victor
