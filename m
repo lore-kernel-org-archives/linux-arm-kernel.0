@@ -1,39 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Nov 2009 15:43:29 +0000
-Subject: Get rid of IRQF_DISABLED - (was [PATCH] genirq: warn about
-	IRQF_SHARED|IRQF_DISABLED)
-In-Reply-To: <20091130153223.0e510a9b@lxorguk.ukuu.org.uk>
-References: <1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1259578067-29169-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.00.0911301225110.24119@localhost.localdomain>
-	<1259589780.26472.18.camel@laptop>
-	<alpine.LFD.2.00.0911301519120.24119@localhost.localdomain>
-	<20091130144702.14bea0ee@lxorguk.ukuu.org.uk>
-	<20091130150100.GB7028@n2100.arm.linux.org.uk>
-	<20091130153223.0e510a9b@lxorguk.ukuu.org.uk>
-Message-ID: <20091130154329.GC7028@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon, 30 Nov 2009 16:53:24 +0100
+Subject: [PATCH v2] MAINTAINERS: add tree and file pattern for ARM IMX
+In-Reply-To: <1259596034-18167-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1259596034-18167-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1259596404-19131-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2009 at 03:32:23PM +0000, Alan Cox wrote:
-> On Mon, 30 Nov 2009 15:01:00 +0000
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > On Mon, Nov 30, 2009 at 02:47:02PM +0000, Alan Cox wrote:
-> > > SHARED|DISABLED ought to WARN_ON() and if that doesn't motivate people
-> > > then return -EINVAL.
-> > 
-> > That is an impossibility.  There is hardware out there (AT91) where
-> > the timer interrupt is shared with other peripherals, and you end
-> > up with a mixture of irqs-disabled and irqs-enabled handlers sharing
-> > the same interrupt.
-> 
-> Well that will encourage people to fix it.
-> 
-> > My point is that if we outlaw irqs-disabled shared interrupts, it puts
-> > Atmel AT91 support into immediate difficulties.
-> 
-> If a driver disables the timer irq across a tick aren't you already in
-> trouble ?
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+---
+Hello,
 
-Not with this clockevents code - you can miss timer interrupts and the core
-time keeping code catches up automatically.
+in the first patch I forgot a trailing slash for arch/arm/plat-mxc/.
+
+Best regards
+Uwe
+
+ MAINTAINERS |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index c824b4d..d40cf36 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -637,6 +637,9 @@ ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
+ M:	Sascha Hauer <kernel@pengutronix.de>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
++T:	git://git.pengutronix.de/git/imx/linux-2.6.git
++F:	arch/arm/mach-mx*/
++F:	arch/arm/plat-mxc/
+ 
+ ARM/GLOMATION GESBC9312SX MACHINE SUPPORT
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+-- 
+1.6.5.2
