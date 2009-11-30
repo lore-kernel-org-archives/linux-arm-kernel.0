@@ -1,73 +1,70 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 30 Nov 2009 10:32:50 +0100 (CET)
-Subject: [PATCH] MXC: set GPIO IRQ handler
-In-Reply-To: <20091129202721.GA22137@pengutronix.de>
-References: <807htelb5d.fsf@merkur.tec.linutronix.de>
-	<20091126075724.GA12179@pengutronix.de>
-	<alpine.LFD.2.00.0911280005010.24119@localhost.localdomain>
-	<20091129202721.GA22137@pengutronix.de>
-Message-ID: <alpine.LFD.2.00.0911300948140.24119@localhost.localdomain>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 30 Nov 2009 09:37:54 +0000
+Subject: [ LPC3250 ] discontinuous DDR-Ram : problem of write buffer
+	coherency
+In-Reply-To: <002c01ca6dd5$f19eac90$d4dc05b0$@savary@kerlink.fr>
+References: <002c01ca6dd5$f19eac90$d4dc05b0$@savary@kerlink.fr>
+Message-ID: <20091130093754.GB1638@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe,
-
-On Sun, 29 Nov 2009, Uwe Kleine-K?nig wrote:
-> > > Can you please test with 060d20d if your breakage still occurs and
-> > > if it is still valid report some details (for me and the commit log)?
-> > 
-> > Could you please provide useful details, i.e. a short explanation why
-> > that commit is the superior fix, instead of forcing people to clone a
-> > git tree to figure out what you are (not) talking about ?
-> As I misread John's commit log I thought that he already has looked at
-> the imx tree.  (Which seems natural when working with that platform.)
-> I just noticed that the tree isn't listed in MAINTAINERS, I will send a
-> patch for that.
+On Wed, Nov 25, 2009 at 02:48:16PM +0100, Pierre Savary wrote:
+> #if defined(CONFIG_MACH_LPC32XX_DRAM_SIZE_64)
+> /*
+>  * This support is added for systems that have 2 64MByte devices on
+> different
+>  * chip selects (DYCS0 and DYCS1). In this configuration, there is a memory
+>  * hole between the 2 devices such that the addresses are as follows:
+>  * DYCS0 - 0x80000000 - 0x83ffffff (node 0, 16Kpages)
+>  * DYCS1 - 0xa0000000 - 0xa3ffffff (node 1, 16Kpages)
+>  */
+> #define KVADDR_TO_NID(addr) \
+>       (((unsigned long) (addr) - PAGE_OFFSET) >> 26)
 > 
-> Having the commit log of 060d20d I don't consider it too hard to work
-> out why my commit should fix John's problem, too.
+> #define LOCAL_MAP_NR(addr) \
+>        (((unsigned long)(addr) & 0x03ffffff) >> PAGE_SHIFT)
+> 
+> #define __virt_to_phys(x) \
+> 	((((unsigned long) (x) & ~0x04000000) - PAGE_OFFSET + PHYS_OFFSET)
+> |\
+> 	(((unsigned long) (x) & 0x04000000) << 3))
+> 
+> #define __phys_to_virt(x) \
+> 	((((unsigned long) (x) & ~0x20000000) - PHYS_OFFSET + PAGE_OFFSET)
+> |\
+> 	(((unsigned long) (x) & 0x20000000) >> 3))
+> #endif
+> [...]
 
-Do you actually read, what people write ?
+Two questions to start with:
+1. Please use sparsemem rather than discontigmem.  Discontigmem is for
+   NUMA.
+2. Do you actually require the non-linear phys_to_virt/virt_to_phys
+   translations?
 
-1) I asked you to add that information into your reply and not request
-   people to clone a git tree to figure out what you are talking about
+> CPU: Testing write buffer coherency: <4>------------[ cut here ]------------
+> WARNING: at
+> /mnt/workdir/gestion_conf_klk/klk-SWe/sources/linux/linux-2.6.27.8/mm/vmallo
+> c.c:107 map_vm_area+0x114/0x1d0()
 
-2) I said your changelog is crap. And again:
+This means you have mappings in the vmalloc region, and hence we were
+unable to create the mapping we desired.
 
-> >     imx/gpio: Use handle_level_irq
-> >     
-> >     According to Russell King handle_edge_irq is only useful for "edge-based
-> >     inputs where the controller does not remember transitions with the input
-> >     masked."
-> >
-> >     So using handle_edge_irq unconditionally for both edge and level irqs is
-> >     wrong. 
+> /mnt/workdir/gestion_conf_klk/klk-SWe/sources/linux/linux-2.6.27.8/mm/memory
+> .c:130: bad pmd a080041e.
 
-It's not wrong because Russell explained when to use handle_edge_irq.
+And this means we couldn't tear down the mapping because there was a
+section mapping in the way, and it nicely tells us that the contents
+of the 1st level page table was 0xa080041e.
 
-It's fundamentally wrong to use handle_edge_irq for level type
-interrupts. And that's the bug in the current code.
+That is:
 
-The natural adhoc fix for this is what John posted with an
-understandable explanation.
+- section
+- TEXCB=xxx11
+- bit4=1
+- domain 0
+- kernel rw user na
+- phys 0xa0800000
 
-Now the better solution is to use handle_level_irq for both types
-because the interrupt controller is well designed.
-
-> > That does not make John's patch incorrect. Using handle_level_irq for
-> > both is merily an optimization which would be even more understandable
-> > if there would be an useful comment in the code.
-> I didn't say that John's patch is wrong.  And instead of documenting
-> that handle_level_irq (which is named a bit misleading) is capable of
-> handling edge irqs on imx, too, what about creating a handler with a
-> better name (say handle_generic_irq?---open for better suggestions) and
-> making handle_level_irq a deprecated wrapper for it?
-
-Come on, such a name change is pretty useless as it does not explain
-why you can use it for both edge and level on imx. The reason why you
-can do so is that the irq controller is not discarding edge
-transitions when the interrupt is masked.
-
-Thanks,
-
-	tglx
+Looks like a RAM mapping in the middle of the vmalloc area.  I've no idea
+how you've managed to do that.
