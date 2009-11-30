@@ -1,38 +1,56 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 30 Nov 2009 18:48:43 +0100 (CET)
-Subject: Get rid of IRQF_DISABLED - (was [PATCH] genirq: warn about
-	IRQF_SHARED|IRQF_DISABLED)
-In-Reply-To: <20091130143956.GA8227@n2100.arm.linux.org.uk>
-References: <1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1259578067-29169-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.00.0911301225110.24119@localhost.localdomain>
-	<20091130143703.GA7028@n2100.arm.linux.org.uk>
-	<20091130143956.GA8227@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.0911301847221.24119@localhost.localdomain>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 30 Nov 2009 10:54:15 -0800
+Subject: [PATCH 1/8] omap2: mux: intoduce omap_mux_{read,write}
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02BBE6475E@dbde02.ent.ti.com>
+References: <20091126001646.1546.34352.stgit@localhost>
+	<20091126001849.1546.76887.stgit@localhost>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02BBE6475E@dbde02.ent.ti.com>
+Message-ID: <20091130185415.GT4348@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Nov 2009, Russell King - ARM Linux wrote:
+* Shilimkar, Santosh <santosh.shilimkar@ti.com> [091129 02:02]:
+> > -----Original Message-----
+> > From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> > owner at vger.kernel.org] On Behalf Of Tony Lindgren
+> > Sent: Thursday, November 26, 2009 5:49 AM
+> > To: linux-arm-kernel at lists.infradead.org
+> > Cc: linux-omap at vger.kernel.org; Mike Rapoport
+> > Subject: [PATCH 1/8] omap2: mux: intoduce omap_mux_{read,write}
+> > 
+> > From: Mike Rapoport <mike@compulab.co.il>
+> > 
+> > intoduce omap_mux_{read,write}
 
-> On Mon, Nov 30, 2009 at 02:37:03PM +0000, Russell King - ARM Linux wrote:
-> > Now, at the risk of covering old ground, how about we have two separate
-> > irqaction lists, one for handlers to be called with irqs disabled and
-> > one for handlers with irqs enabled.  We run the irqs-disabled list
-> > first, naturally with irqs disabled.  If, at the end of that run (or
-> > maybe after each handler), IRQs have ended being enabled, print some
-> > diagnostics.  (We're going to need something like this to ensure that
-> > drivers interrupt handlers don't enable IRQs themselves.)  Then enable
-> > IRQs and run the irqs-enabled chain.
+<snip>
+ 
+> >  int __init omap2_mux_init(void)
+> >  {
+> > +	u32 mux_pbase;
+> > +
+> > +	if (cpu_is_omap2420())
+> > +		mux_pbase = OMAP2420_CTRL_BASE + OMAP_MUX_BASE_OFFSET;
+> > +	else if (cpu_is_omap2430())
+> > +		mux_pbase = OMAP243X_CTRL_BASE + OMAP_MUX_BASE_OFFSET;
+> > +	else if (cpu_is_omap34xx())
+> > +		mux_pbase = OMAP343X_CTRL_BASE + OMAP_MUX_BASE_OFFSET;
+> > +
+> > +	mux_base = ioremap(mux_pbase, OMAP_MUX_BASE_SZ);
 > 
-> Oh, and the other interesting thing to do may be to have a way of
-> measuring how much time irq handlers run for, so that handlers taking
-> an excessive time (more than 0.5ms or so - thinking about the 1000Hz
-> timer rate found on some arches) can be targetted.
+> The control modules on OMAP's divided into 2 domains with different base address
+> 1. pads in CORE power domain
+> 2. Pads in wakeup domain.
+> 
+> If we map these two separately, then we can differentiate the wakeup capable pads.
+> Not sure whether I am making any sense here but just thought it would be useful.
 
-.33 will have trace points for this, so the infrastructure is there or
-do you think about something permanent which does not depend on the
-tracer ?
+OK, maybe we can consider doing that later on.
 
-Thanks,
+If we separate the core and wakeup domains for muxing, we should
+do it in a way where it's transparent to the users. Otherwise
+the the muxing again gets confusing easily if we have separate sets
+of functions for the core and wakeup domains.
 
-	tglx
+Regards,
+
+Tony
