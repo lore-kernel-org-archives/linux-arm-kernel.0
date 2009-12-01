@@ -1,21 +1,42 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 01 Dec 2009 18:29:50 +0000
-Subject: Disabling MMU Option for arm946E processor
-In-Reply-To: <6edb5f450911262030g46cdf564j27ccad2297e71fe3@mail.gmail.com>
-References: <6edb5f450911262030g46cdf564j27ccad2297e71fe3@mail.gmail.com>
-Message-ID: <1259692190.2121.235.camel@pc1117.cambridge.arm.com>
+Date: Tue, 01 Dec 2009 18:35:04 +0000
+Subject: [PATCH] ARM l2x0: check whether l2x0 already enabled
+In-Reply-To: <1259176233.30221.4.camel@vinay-desktop>
+References: <1259176233.30221.4.camel@vinay-desktop>
+Message-ID: <1259692504.2121.237.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2009-11-27 at 04:30 +0000, Girish KS wrote:
->         I am new to linux platform.I am porting linux kernel 2.6.31.6
->         to a 946E based (non MMU) board. The config option MMU for
->         kernel version 2.6.31.6 is defaulted to y. How can i override
->         this option without changing the arch/arm/Kconfig. 
+On Wed, 2009-11-25 at 19:10 +0000, srinidhi kasagar wrote:
+> On Tue, 2009-11-24 at 14:55 +0100, Catalin Marinas wrote:
+> > On Tue, 2009-11-24 at 13:35 +0000, Surinder P Singh wrote:
+> > > On Tue, Nov 24, 2009 at 6:05 AM, srinidhi kasagar
+> > > <srinidhi.kasagar@stericsson.com> wrote:
+> > >
+> > > >> 2 points:
+> > > >>
+> > > >> 1. Since this code is also valid for devices based on pre-ARMv6, maybe
+> > > >> making this code conditional for >=ARMv6 would be cleaner ?
+> > > > rather it depends on l2 controller being used. L210 controllers
+> > > > do not have such restrictions whereas l220/pl310 have such kind
+> > > > of secure/non-secure restrictions. So would it be better to keep
+> > > > condition based on l2 controller being used?
+> > > >
+> > >
+> > > Thats probably better. You can read the L2 cache ID register to figure
+> > > out if its a L210/220 or PL310 and so on. You can couple this check
+> > > with the cpu secure/non-secure state before deciding to write to the
+> > > registers.
+> >
+> > I don't think it's worth the hassle. Just always check whether it is
+> > already enabled without additional ifdefs. IIRC, L210 is used on
+> > RealView PB1176 (not entirely sure).
+> 
+> So, does the patch which I have sent still valid which just checks
+> whether l2x0 is already enabled?
 
-Commit 3c4279750c7d3f88a0638a44e257d7d8d10732f2 was merged in
-2.6.32-rc1. You may want to try the latest -rc kernel as it has several
-patches for no-MMU support.
+OK with me as well, just minor issues with the coding style (the
+multi-line comment).
 
 -- 
 Catalin
