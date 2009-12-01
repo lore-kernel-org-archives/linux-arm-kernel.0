@@ -1,384 +1,98 @@
-From: aditya.ps@samsung.com (aditya)
-Date: Tue,  1 Dec 2009 17:39:55 +0900
-Subject: [PATCH] [ARM] [S3C64XX] Add support for hr timer
-Message-ID: <1259656795-8766-1-git-send-email-aditya.ps@samsung.com>
+From: derkling@gmail.com (Patrick Bellasi)
+Date: Tue, 1 Dec 2009 09:58:57 +0100
+Subject: [PATCH 1/3] AT91: update at91_eth_data for ETX2-3 on PA10-11
+In-Reply-To: <cd73a99e0911301236pd18a382o6faa04c15b3bf9c@mail.gmail.com>
+References: <20091129234917.GB18841@game.jcrosoft.org>
+	<1259574486-13391-1-git-send-email-derkling@gmail.com>
+	<1259574486-13391-2-git-send-email-derkling@gmail.com>
+	<cd73a99e0911301236pd18a382o6faa04c15b3bf9c@mail.gmail.com>
+Message-ID: <aa8983610912010058j738df89fyd75e9e75973e94ed@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add support for the S3C64XX hr timer.
+On Mon, Nov 30, 2009 at 9:36 PM, Andrew Victor <avictor.za@gmail.com> wrote:
+> hi Patrick,
+>
+>> This patch update the at91_eth_data to handle the usage of PA10 and PA11
+>> for EMAC's EXT2 and EXT3 signals.
+>
+>> @@ -83,6 +83,7 @@ struct at91_eth_data {
+>> ? ? ? ?u32 ? ? ? ? ? ? phy_mask;
+>> ? ? ? ?u8 ? ? ? ? ? ? ?phy_irq_pin; ? ?/* PHY IRQ */
+>> ? ? ? ?u8 ? ? ? ? ? ? ?is_rmii; ? ? ? ?/* using RMII interface? */
+>> + ? ? ? u8 ? ? ? ? ? ? ?use_twi_pins; ? /* ETX2-ETX3 on PA23-PA24 */
+>> ?};
+>
+> The "at91_eth_data" structure is used on all AT91 processors with a
+> MACB peripheral (AT572D940HF, CAP9, 9620, 9263).
+> So this isn't really a nice cross-platform change.
 
-Signed-off-by: Aditya Pratap Sharma <aditya.ps@samsung.com>
----
- arch/arm/mach-s3c6410/Kconfig               |    2 +
- arch/arm/plat-s3c/Makefile                  |   10 +
- arch/arm/plat-s3c/hr-time.c                 |  301 +++++++++++++++++++++++++++
- arch/arm/plat-s3c/include/plat/regs-timer.h |   11 +
- 4 files changed, 324 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-s3c/hr-time.c
+That's true: different chips use different GPIO multiplexing.
+However, we should provide an "extensible" support for board which
+don't use the reference design routing.
 
-diff --git a/arch/arm/mach-s3c6410/Kconfig b/arch/arm/mach-s3c6410/Kconfig
-index f9d0f09..29cfd0c 100644
---- a/arch/arm/mach-s3c6410/Kconfig
-+++ b/arch/arm/mach-s3c6410/Kconfig
-@@ -11,6 +11,8 @@ config CPU_S3C6410
- 	bool
- 	select CPU_S3C6400_INIT
- 	select CPU_S3C6400_CLOCK
-+	select GENERIC_TIME
-+	select GENERIC_CLOCKEVENTS
- 	help
- 	  Enable S3C6410 CPU support
- 
-diff --git a/arch/arm/plat-s3c/Makefile b/arch/arm/plat-s3c/Makefile
-index 3c09109..6c612aa 100644
---- a/arch/arm/plat-s3c/Makefile
-+++ b/arch/arm/plat-s3c/Makefile
-@@ -12,7 +12,17 @@ obj-				:=
- # Core support for all Samsung SoCs
- 
- obj-y				+=  init.o
-+ifdef CONFIG_NO_HZ
-+obj-y				+= hr-time.o
-+else
-+
-+ifndef CONFIG_HIGH_RES_TIMERS
- obj-y				+= time.o
-+else
-+obj-y				+= hr-time.o
-+endif
-+
-+endif
- obj-y				+= clock.o
- obj-y				+= pwm-clock.o
- obj-y				+= gpio.o
-diff --git a/arch/arm/plat-s3c/hr-time.c b/arch/arm/plat-s3c/hr-time.c
-new file mode 100644
-index 0000000..76fd91f
---- /dev/null
-+++ b/arch/arm/plat-s3c/hr-time.c
-@@ -0,0 +1,301 @@
-+/*
-+ * linux/arch/arm/plat-s3c/hr-time.c
-+ *
-+ * S3C6410 high resolution Timers
-+ *
-+ * Copyright (c) 2006 Samsung Electronics
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/delay.h>
-+#include <linux/interrupt.h>
-+#include <linux/sched.h>
-+#include <linux/spinlock.h>
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/clocksource.h>
-+#include <linux/clockchips.h>
-+#include <linux/io.h>
-+#include <linux/leds.h>
-+#include <asm/system.h>
-+#include <asm/irq.h>
-+#include <asm/mach/irq.h>
-+#include <asm/mach/time.h>
-+#include <asm/mach-types.h>
-+#include <mach/hardware.h>
-+#include <mach/map.h>
-+#include <mach/regs-irq.h>
-+#include <mach/tick.h>
-+#include <plat/regs-timer.h>
-+#include <plat/clock.h>
-+#include <plat/cpu.h>
-+
-+
-+static void s3c64xx_timer_setup(void);
-+
-+static inline void s3c64xx_tick_set_autoreset(void)
-+{
-+	unsigned long tcon;
-+	tcon  = __raw_readl(S3C2410_TCON);
-+	tcon |= (S3C2410_TCON_T4RELOAD);
-+	__raw_writel(tcon, S3C2410_TCON);
-+}
-+
-+static inline void s3c64xx_tick_remove_autoreset(void)
-+{
-+	unsigned long tcon;
-+	tcon  = __raw_readl(S3C2410_TCON);
-+	tcon &= ~(S3C2410_TCON_T4RELOAD);
-+	__raw_writel(tcon, S3C2410_TCON);
-+}
-+
-+static void s3c64xx_tick_timer_start(unsigned long load_val,
-+					int autoreset)
-+{
-+	unsigned long tcon;
-+	unsigned long tcfg1;
-+	unsigned long tcfg0;
-+	unsigned long tcstat;
-+
-+	tcon  = __raw_readl(S3C2410_TCON);
-+	tcfg1 = __raw_readl(S3C2410_TCFG1);
-+	tcfg0 = __raw_readl(S3C2410_TCFG0);
-+
-+	tcstat = __raw_readl(S3C64XX_TINT_CSTAT);
-+	tcstat |=  S3C_TINT_CSTAT_T4INTEN;
-+	__raw_writel(tcstat, S3C64XX_TINT_CSTAT);
-+	__raw_writel(load_val - 1, S3C2410_TCNTB(4));
-+
-+	tcfg1 &= ~S3C2410_TCFG1_MUX4_MASK;
-+	tcfg1 |= S3C2410_TCFG1_MUX4_DIV2;
-+
-+	tcfg0 &= ~S3C2410_TCFG_PRESCALER1_MASK;
-+	tcfg0 |= (0) << S3C2410_TCFG_PRESCALER1_SHIFT;
-+
-+	__raw_writel(tcfg1, S3C2410_TCFG1);
-+	__raw_writel(tcfg0, S3C2410_TCFG0);
-+
-+	tcon &= ~(S3C2410_TCON_T4START|S3C2410_TCON_T4MANUALUPD
-+					|S3C2410_TCON_T4RELOAD);
-+	tcon |= S3C2410_TCON_T4MANUALUPD;
-+	if (autoreset)
-+		tcon |= S3C2410_TCON_T4RELOAD;
-+	__raw_writel(tcon, S3C2410_TCON);
-+
-+	/* start the timer running */
-+	tcon |= S3C2410_TCON_T4START;
-+	tcon &= ~S3C2410_TCON_T4MANUALUPD;
-+	__raw_writel(tcon, S3C2410_TCON);
-+}
-+
-+static inline void s3c64xx_tick_timer_stop(void)
-+{
-+	unsigned long tcon;
-+	tcon  = __raw_readl(S3C2410_TCON);
-+	tcon &= ~(S3C2410_TCON_T4START);
-+	__raw_writel(tcon, S3C2410_TCON);
-+}
-+
-+static void s3c64xx_sched_timer_start(unsigned long load_val,
-+					int autoreset)
-+{
-+	unsigned long tcon;
-+	unsigned long tcfg1;
-+	unsigned long tcfg0;
-+	unsigned long tcstat;
-+
-+	tcstat = __raw_readl(S3C64XX_TINT_CSTAT);
-+	tcstat |=  S3C_TINT_CSTAT_T2INTEN;
-+	__raw_writel(tcstat, S3C64XX_TINT_CSTAT);
-+
-+	tcon  = __raw_readl(S3C2410_TCON);
-+	tcfg1 = __raw_readl(S3C2410_TCFG1);
-+	tcfg0 = __raw_readl(S3C2410_TCFG0);
-+
-+	__raw_writel(load_val - 1, S3C2410_TCNTB(2));
-+	__raw_writel(load_val - 1, S3C2410_TCMPB(2));
-+
-+	tcon &= ~(S3C2410_TCON_T2RELOAD|(!S3C2410_TCON_T2INVERT)
-+			|S3C2410_TCON_T2MANUALUPD|S3C2410_TCON_T2START);
-+	if (autoreset)
-+		tcon |= S3C2410_TCON_T2RELOAD;
-+	tcon |= S3C2410_TCON_T2MANUALUPD;
-+	__raw_writel(tcon, S3C2410_TCON);
-+
-+	/* start the timer running */
-+	tcon |= S3C2410_TCON_T2START;
-+	tcon &= ~S3C2410_TCON_T2MANUALUPD;
-+	__raw_writel(tcon, S3C2410_TCON);
-+}
-+
-+/*
-+ * ---------------------------------------------------------------------------
-+ * PWM timer 4 ... count down to zero, interrupt, reload
-+ * ---------------------------------------------------------------------------
-+ */
-+static int s3c64xx_tick_set_next_event(unsigned long cycles,
-+				   struct clock_event_device *evt)
-+{
-+	s3c64xx_tick_timer_start(cycles, 0);
-+	return 0;
-+}
-+static void s3c64xx_tick_set_mode(enum clock_event_mode mode,
-+			      struct clock_event_device *evt)
-+{
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		s3c64xx_tick_set_autoreset();
-+		break;
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		s3c64xx_tick_timer_stop();
-+		s3c64xx_tick_remove_autoreset();
-+		break;
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+		break;
-+	case CLOCK_EVT_MODE_RESUME:
-+		s3c64xx_timer_setup();
-+		break;
-+	}
-+}
-+
-+static struct clock_event_device tick_tmr = {
-+	.name		= "pwm_timer4",
-+	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+	.shift		= 32,
-+	.set_next_event	= s3c64xx_tick_set_next_event,
-+	.set_mode	= s3c64xx_tick_set_mode,
-+};
-+
-+irqreturn_t s3c64xx_tick_timer_interrupt(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = &tick_tmr;
-+	evt->event_handler(evt);
-+	return IRQ_HANDLED;
-+}
-+
-+static struct irqaction s3c64xx_tick_timer_irq = {
-+	.name		= "pwm_timer4",
-+	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.handler	= s3c64xx_tick_timer_interrupt,
-+};
-+
-+static void __init s3c64xx_init_dynamic_tick_timer(unsigned long rate)
-+{
-+	s3c64xx_tick_timer_start((rate / HZ) - 1, 1);
-+	tick_tmr.mult = div_sc(rate, NSEC_PER_SEC, tick_tmr.shift);
-+	tick_tmr.max_delta_ns = clockevent_delta2ns(-1, &tick_tmr);
-+	tick_tmr.min_delta_ns = clockevent_delta2ns(1, &tick_tmr);
-+
-+	tick_tmr.cpumask = get_cpu_mask(0);
-+	clockevents_register_device(&tick_tmr);
-+}
-+
-+/*
-+ * ---------------------------------------------------------------------------
-+ * PWM timer 2 ... free running 32-bit clock source and scheduler clock
-+ * ---------------------------------------------------------------------------
-+ */
-+static unsigned long s3c64xx_mpu_timer2_overflows;
-+
-+irqreturn_t s3c64xx_mpu_timer2_interrupt(int irq, void *dev_id)
-+{
-+	s3c64xx_mpu_timer2_overflows++;
-+	return IRQ_HANDLED;
-+}
-+
-+struct irqaction s3c64xx_timer2_irq = {
-+	.name		= "pwm_timer2",
-+	.flags		= IRQF_DISABLED ,
-+	.handler	= s3c64xx_mpu_timer2_interrupt,
-+};
-+
-+
-+/* Read timer 2 Count Observation Register */
-+static cycle_t s3c64xx_sched_timer_read(struct clocksource *cs)
-+{
-+	return (cycle_t)~__raw_readl(S3C_TIMERREG(0x2c));
-+}
-+
-+struct clocksource clocksource_s3c64xx = {
-+	.name		= "clock_source_timer2",
-+	.rating		= 300,
-+	.read		= s3c64xx_sched_timer_read,
-+	.mask		= CLOCKSOURCE_MASK(32),
-+	.shift		= 20,
-+	.flags		= CLOCK_SOURCE_IS_CONTINUOUS ,
-+};
-+
-+static void __init s3c64xx_init_clocksource(unsigned long rate)
-+{
-+	clocksource_s3c64xx.mult
-+		= clocksource_khz2mult(rate/1000, clocksource_s3c64xx.shift);
-+	s3c64xx_sched_timer_start(~0, 1);
-+
-+	if (clocksource_register(&clocksource_s3c64xx))
-+		printk(KERN_ERR "%s: can't register clocksource\n",
-+			clocksource_s3c64xx.name);
-+}
-+
-+/*
-+ * ---------------------------------------------------------------------------
-+ *  Tick Timer initialization
-+ * ---------------------------------------------------------------------------
-+ */
-+static void s3c64xx_dynamic_timer_setup(void)
-+{
-+	struct clk	*ck_ref = clk_get(NULL, "timers");
-+	unsigned long	rate;
-+
-+	if (IS_ERR(ck_ref))
-+		panic("failed to get clock for system timer");
-+
-+	rate = clk_get_rate(ck_ref);
-+	clk_put(ck_ref);
-+
-+	s3c64xx_init_dynamic_tick_timer(rate);
-+	s3c64xx_init_clocksource(rate);
-+}
-+
-+static void s3c64xx_timer_setup(void)
-+{
-+	struct clk	*ck_ref = clk_get(NULL, "timers");
-+	unsigned long	rate;
-+
-+	if (IS_ERR(ck_ref))
-+		panic("failed to get clock for system timer");
-+
-+	rate = clk_get_rate(ck_ref);
-+	clk_put(ck_ref);
-+	s3c64xx_tick_timer_start((rate / HZ) - 1, 1);
-+	s3c64xx_sched_timer_start(~0, 1);
-+}
-+
-+
-+static void __init s3c64xx_dynamic_timer_init(void)
-+{
-+	s3c64xx_dynamic_timer_setup();
-+	setup_irq(IRQ_TIMER2, &s3c64xx_timer2_irq);
-+	setup_irq(IRQ_TIMER4, &s3c64xx_tick_timer_irq);
-+}
-+
-+
-+struct sys_timer s3c24xx_timer = {
-+	.init		= s3c64xx_dynamic_timer_init,
-+};
-+
-diff --git a/arch/arm/plat-s3c/include/plat/regs-timer.h b/arch/arm/plat-s3c/include/plat/regs-timer.h
-index d097d92..e9994db 100644
---- a/arch/arm/plat-s3c/include/plat/regs-timer.h
-+++ b/arch/arm/plat-s3c/include/plat/regs-timer.h
-@@ -117,6 +117,17 @@
- #define S3C2410_TCON_T0INVERT	  (1<<2)
- #define S3C2410_TCON_T0MANUALUPD  (1<<1)
- #define S3C2410_TCON_T0START	  (1<<0)
-+/* Interrupt Control and Status register*/
-+#define S3C_TINT_CSTAT_T4INT	(1<<9)
-+#define S3C_TINT_CSTAT_T3INT	(1<<8)
-+#define S3C_TINT_CSTAT_T2INT	(1<<7)
-+#define S3C_TINT_CSTAT_T1INT	(1<<6)
-+#define S3C_TINT_CSTAT_T0INT	(1<<5)
-+#define S3C_TINT_CSTAT_T4INTEN	(1<<4)
-+#define S3C_TINT_CSTAT_T3INTEN	(1<<3)
-+#define S3C_TINT_CSTAT_T2INTEN	(1<<2)
-+#define S3C_TINT_CSTAT_T1INTEN	(1<<1)
-+#define S3C_TINT_CSTAT_T0INTEN	(1<<0)
- 
- #endif /*  __ASM_ARCH_REGS_TIMER_H */
- 
+Personally I don't like the solution proposed by Jean-Christophe to
+use a name which is "generic enough to match all soc": indeed that
+solution is not well self-describing.
+
+I noticed that the board.h already use ifdefs to customise data
+structures for different SoC. This could be a valuable solution to
+support SoC specific data too.
+Thus, I personally prefer the solution showed thereafter, where we have:
+1. explicit definition of what SoC support that configuration parameter
+2. use a self-explaining name which provide a more readable code
+within the SoC specific code that use the data structure (e.g.
+at91sam9260_devices.c)
+3. the same approach could be extended to others data structure,
+whenever it is necessary, without triggering a new discussion on ML
+about what could be "the better name for..."
+
+So, what about that?
+
+iff --git a/arch/arm/mach-at91/include/mach/board.h
+b/arch/arm/mach-at91/include/mach/board.h
+index f452ae5..7fbcee3 100644
+--- a/arch/arm/mach-at91/include/mach/board.h
++++ b/arch/arm/mach-at91/include/mach/board.h
+@@ -83,7 +83,9 @@ struct at91_eth_data {
+        u32             phy_mask;
+        u8              phy_irq_pin;    /* PHY IRQ */
+        u8              is_rmii;        /* using RMII interface? */
++#if defined(CONFIG_ARCH_AT91SAM9260)
+        u8              use_twi_pins;   /* ETX2-ETX3 on PA23-PA24 */
++#endif
+ };
+ extern void __init at91_add_device_eth(struct at91_eth_data *data);
+
+
+> Regards,
+> ?Andrew Victor
+Bye Patrick
+
 -- 
-1.6.2.5
+#include <best/regards.h>
+
+DERKLING
+LRU 338214 (http://counter.li.org)
+
+<---------------------------------------------------------------------------------------------------------->
+   Patrick Bellasi <bellasi@elet dot polimi dot it>
+   PhD student at Politecnico di Milano
+
+   Contacts:
+    - ICQ         344672588
+    - MSN       derkling at yahoo dot it
+    - Skype     derkling
+
+   Personal Sites:
+    - Bookmarks
+           http://del.icio.us/derkling
+    - Bibliography
+           http://www.bibsonomy.org/user/derkling
+
+   Privacy:
+    - GnuPG     0x72ABC1EE (keyserver.linux.it)
+       pub      1024D/72ABC1EE 2003-12-04
+       Key fingerprint = 3958 7B5F 36EC D1F8 C752
+                                9589 C3B7 FD49 72AB C1EE
+<---------------------------------------------------------------------------------------------------------->
