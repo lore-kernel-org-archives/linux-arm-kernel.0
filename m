@@ -1,45 +1,31 @@
-From: panda@chelcom.ru (Andrey Porodko)
-Date: Sat, 5 Dec 2009 15:54:42 +0500
-Subject: [PATCH] Neuros OSD2 board platform code patch for supporting msp430
- microcontroller and sound soc.
-Message-ID: <mailman.76.1260288061.2170.linux-arm-kernel@lists.infradead.org>
+From: tbarr@multitech.com (Tim Barr)
+Date: Tue, 1 Dec 2009 09:16:23 -0600
+Subject: [PATCH 1/3] AT91: update at91_eth_data for ETX2-3 on PA10-11
+Message-ID: <1CD05B980C94AC408B37C82BBABAA3E6129306D9@mtsexchange.dc.multitech.prv>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initial release. Neuros OSD2 board i2c platform data description for MSP430
-microprocessor and Audio SOC support. MSP430 firmware perform various operations.
-Such as IR remote, RTC timer and etc. Audio SOC is very similar to DM6446EVM
-board, the only difference here is i2c port address.
+One point of interest, I have checked both Atmel EK designs
+(9260 and 9G20) and they both use PA10 and PA11 for EMAC EXT2
+and EXT3. Since the EK boards are built to use the RMII version
+of the EMAC interface, the pin assignments of PA23 and PA24 in 
+the kernel were not much of an issue. But since my design uses
+MII for part cost and EMI issues, I have to change the pin
+assignments.
 
-Signed-off-by: Andrey Porodko <panda@chelcom.ru>
----
- arch/arm/mach-davinci/board-neuros-osd2.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+Tim Barr
+Development Engineer
 
-diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
-index bd9ca07..28b3d67 100644
---- a/arch/arm/mach-davinci/board-neuros-osd2.c
-+++ b/arch/arm/mach-davinci/board-neuros-osd2.c
-@@ -202,6 +202,12 @@ static struct davinci_i2c_platform_data ntosd2_i2c_pdata = {
- };
- 
- static struct i2c_board_info __initdata ntosd2_i2c_info[] =  {
-+	{					/* MSP430 interface	*/
-+		I2C_BOARD_INFO("davinci_msp", NTOSD2_MSP430_I2C_ADDR),
-+	},
-+	{
-+		I2C_BOARD_INFO("tlv320aic3x", NTOSD2_AUDIOSOC_I2C_ADDR),
-+	},
- };
- 
- static	int ntosd2_init_i2c(void)
--- 
-1.5.6.5
+Multi-Tech Systems, Inc.
 
--------------------------------------------------------------------------
-
-
--- 
-Best regards
-Andrey A. Porodko
- 
+> On Mon, Nov 30, 2009 at 10:04 PM, Tim Barr 
+> <tbarr@multitech.com> wrote:
+> > I see a bigger problem here. It is more of an issue of how to
+> > handle signals that have more than one pin assignment option.
+> Yes, that's the point.
+> Moreover, according to my own (perhaps limited) knowledge, at 
+> least the at91 machine dependent code provides a good glue 
+> code almost only for boards which are quite similar to the 
+> reference design. The problem is that instead each SoC allows 
+> for different signal routing.
+> 
