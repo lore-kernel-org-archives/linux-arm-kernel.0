@@ -1,57 +1,44 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 1 Dec 2009 16:59:08 +0100
-Subject: [PATCH 1/3] AT91: update at91_eth_data for ETX2-3 on PA10-11
-In-Reply-To: <aa8983610912010058j738df89fyd75e9e75973e94ed@mail.gmail.com>
-References: <20091129234917.GB18841@game.jcrosoft.org>
-	<1259574486-13391-1-git-send-email-derkling@gmail.com>
-	<1259574486-13391-2-git-send-email-derkling@gmail.com>
-	<cd73a99e0911301236pd18a382o6faa04c15b3bf9c@mail.gmail.com>
-	<aa8983610912010058j738df89fyd75e9e75973e94ed@mail.gmail.com>
-Message-ID: <20091201155908.GF18841@game.jcrosoft.org>
+Date: Tue, 1 Dec 2009 17:02:44 +0100
+Subject: [PATCH v4 0/6] ARM:  ST-Ericsson's U8500 SMP platform, a new
+	patch set
+In-Reply-To: <20091201113759.GC29135@n2100.arm.linux.org.uk>
+References: <1259279725.13327.65.camel@vinay-desktop>
+	<20091127194950.GA28193@n2100.arm.linux.org.uk>
+	<20091128102246.GB25671@n2100.arm.linux.org.uk>
+	<20091130003604.GC18841@game.jcrosoft.org>
+	<20091201113759.GC29135@n2100.arm.linux.org.uk>
+Message-ID: <20091201160244.GG18841@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:58 Tue 01 Dec     , Patrick Bellasi wrote:
-> On Mon, Nov 30, 2009 at 9:36 PM, Andrew Victor <avictor.za@gmail.com> wrote:
-> > hi Patrick,
-> >
-> >> This patch update the at91_eth_data to handle the usage of PA10 and PA11
-> >> for EMAC's EXT2 and EXT3 signals.
-> >
-> >> @@ -83,6 +83,7 @@ struct at91_eth_data {
-> >> ? ? ? ?u32 ? ? ? ? ? ? phy_mask;
-> >> ? ? ? ?u8 ? ? ? ? ? ? ?phy_irq_pin; ? ?/* PHY IRQ */
-> >> ? ? ? ?u8 ? ? ? ? ? ? ?is_rmii; ? ? ? ?/* using RMII interface? */
-> >> + ? ? ? u8 ? ? ? ? ? ? ?use_twi_pins; ? /* ETX2-ETX3 on PA23-PA24 */
-> >> ?};
-> >
-> > The "at91_eth_data" structure is used on all AT91 processors with a
-> > MACB peripheral (AT572D940HF, CAP9, 9620, 9263).
-> > So this isn't really a nice cross-platform change.
+On 11:37 Tue 01 Dec     , Russell King - ARM Linux wrote:
+> On Mon, Nov 30, 2009 at 01:36:04AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 10:22 Sat 28 Nov     , Russell King - ARM Linux wrote:
+> > > On Fri, Nov 27, 2009 at 07:49:50PM +0000, Russell King - ARM Linux wrote:
+> > > > On Fri, Nov 27, 2009 at 05:25:25AM +0530, srinidhi kasagar wrote:
+> > > > > From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+> > > > > Date: Fri, 27 Nov 2009 16:24:37 +0530
+> > > > > 
+> > > > > This is the v4 version of patch set which adds U8500 machine.
+> > > > > v3 patch was posted to this list on 12th October 2009 and I 
+> > > > > have addressed the comments from Jean christophe on this version. 
+> > > > > 
+> > > > > The patch series has a dependency on the patch 5786/1 available in
+> > > > > Russell's patch tracking system. 5786/1 must be applied first.
+> > > > 
+> > > > This looks fine - unless anyone has any objections, I'd suggest submitting
+> > > > to the patch system since it depends on this currently unmerged patch.
+> > > 
+> > > One last thing - please also provide a patch for the top level MAINTAINERS
+> > > file for this.
+> > Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 > 
-> That's true: different chips use different GPIO multiplexing.
-> However, we should provide an "extensible" support for board which
-> don't use the reference design routing.
+> What's that acked-by for?
+the current patch series is fine
 > 
-> Personally I don't like the solution proposed by Jean-Christophe to
-> use a name which is "generic enough to match all soc": indeed that
-> solution is not well self-describing.
-> 
-> I noticed that the board.h already use ifdefs to customise data
-> structures for different SoC. This could be a valuable solution to
-> support SoC specific data too.
-> Thus, I personally prefer the solution showed thereafter, where we have:
-> 1. explicit definition of what SoC support that configuration parameter
-> 2. use a self-explaining name which provide a more readable code
-> within the SoC specific code that use the data structure (e.g.
-> at91sam9260_devices.c)
-> 3. the same approach could be extended to others data structure,
-> whenever it is necessary, without triggering a new discussion on ML
-> about what could be "the better name for..."
-except here the TWI description is incorrect as you do not care about the twi
-when you configured the MACB as I can want to use the two pin for something
-else than I2C. So we need to describe want we want to do about the MACB and
-not a possible alternated functionnality.
+> Still waiting for a MAINTAINERS patch.
+agreed too
 
 Best Regards,
 J.
