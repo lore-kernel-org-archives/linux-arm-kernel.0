@@ -1,45 +1,57 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 1 Dec 2009 16:49:20 +0100
-Subject: [PATCH 1/3] ASoC: Add a new imx-ssi sound driver
-In-Reply-To: <eedb5540911300909vf042b39l44e06b432351b@mail.gmail.com>
-References: <1259163666-30344-1-git-send-email-s.hauer@pengutronix.de>
-	<1259163666-30344-2-git-send-email-s.hauer@pengutronix.de>
-	<20091125155807.GD12750@rakim.wolfsonmicro.main>
-	<eedb5540911300840p230fc57fh3fd5c8453b0e1f73@mail.gmail.com>
-	<eedb5540911300909vf042b39l44e06b432351b@mail.gmail.com>
-Message-ID: <20091201154920.GW27548@pengutronix.de>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 1 Dec 2009 16:59:08 +0100
+Subject: [PATCH 1/3] AT91: update at91_eth_data for ETX2-3 on PA10-11
+In-Reply-To: <aa8983610912010058j738df89fyd75e9e75973e94ed@mail.gmail.com>
+References: <20091129234917.GB18841@game.jcrosoft.org>
+	<1259574486-13391-1-git-send-email-derkling@gmail.com>
+	<1259574486-13391-2-git-send-email-derkling@gmail.com>
+	<cd73a99e0911301236pd18a382o6faa04c15b3bf9c@mail.gmail.com>
+	<aa8983610912010058j738df89fyd75e9e75973e94ed@mail.gmail.com>
+Message-ID: <20091201155908.GF18841@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2009 at 06:09:24PM +0100, javier Martin wrote:
-> 2009/11/30 javier Martin <javier.martin@vista-silicon.com>
+On 09:58 Tue 01 Dec     , Patrick Bellasi wrote:
+> On Mon, Nov 30, 2009 at 9:36 PM, Andrew Victor <avictor.za@gmail.com> wrote:
+> > hi Patrick,
+> >
+> >> This patch update the at91_eth_data to handle the usage of PA10 and PA11
+> >> for EMAC's EXT2 and EXT3 signals.
+> >
+> >> @@ -83,6 +83,7 @@ struct at91_eth_data {
+> >> ? ? ? ?u32 ? ? ? ? ? ? phy_mask;
+> >> ? ? ? ?u8 ? ? ? ? ? ? ?phy_irq_pin; ? ?/* PHY IRQ */
+> >> ? ? ? ?u8 ? ? ? ? ? ? ?is_rmii; ? ? ? ?/* using RMII interface? */
+> >> + ? ? ? u8 ? ? ? ? ? ? ?use_twi_pins; ? /* ETX2-ETX3 on PA23-PA24 */
+> >> ?};
+> >
+> > The "at91_eth_data" structure is used on all AT91 processors with a
+> > MACB peripheral (AT572D940HF, CAP9, 9620, 9263).
+> > So this isn't really a nice cross-platform change.
 > 
-> > Dear Sascha,
-> > in "imx_ssi_set_dai_fmt()" callback you should add something like:
-> >
-> >     /* sync */
-> >     scr |= SSI_SCR_SYN;
-> >
-> > This would enable SSI working in SYN mode which means that RX and TX
-> > sections will share same frame and bit clocks. Right now I can't imagine a
-> > situation where this is not desirable. Moreover, if I don't add SYN mode I
-> > cannot get it working in my i.mx27 based board with an wm8974.
-> >
+> That's true: different chips use different GPIO multiplexing.
+> However, we should provide an "extensible" support for board which
+> don't use the reference design routing.
 > 
-> Well, after a chat with Mark it seems that it is not so uncommon that RX and
-> TX sections have different clocks. So you could add a flag in the platform
-> data similar to the one that switches between FIQ and DMA so that people can
-> choose if they want the feature or not.
+> Personally I don't like the solution proposed by Jean-Christophe to
+> use a name which is "generic enough to match all soc": indeed that
+> solution is not well self-describing.
+> 
+> I noticed that the board.h already use ifdefs to customise data
+> structures for different SoC. This could be a valuable solution to
+> support SoC specific data too.
+> Thus, I personally prefer the solution showed thereafter, where we have:
+> 1. explicit definition of what SoC support that configuration parameter
+> 2. use a self-explaining name which provide a more readable code
+> within the SoC specific code that use the data structure (e.g.
+> at91sam9260_devices.c)
+> 3. the same approach could be extended to others data structure,
+> whenever it is necessary, without triggering a new discussion on ML
+> about what could be "the better name for..."
+except here the TWI description is incorrect as you do not care about the twi
+when you configured the MACB as I can want to use the two pin for something
+else than I2C. So we need to describe want we want to do about the MACB and
+not a possible alternated functionnality.
 
-Ok, will do. I myself use the asynchronous mode. The MC13783 I use has
-two SSI ports, one for capture and one for playback. I route both ports
-to the same SSI unit using the audio muxer.
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Best Regards,
+J.
