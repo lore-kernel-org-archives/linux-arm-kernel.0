@@ -1,35 +1,42 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 1 Dec 2009 18:03:07 +0000
-Subject: Git pull request: Orion/Kirkwood/Dove stuff for next merge window
-In-Reply-To: <alpine.LFD.2.00.0912011245430.5820@xanadu.home>
-References: <alpine.LFD.2.00.0911262005410.2059@xanadu.home>
-	<alpine.LFD.2.00.0911301122270.5820@xanadu.home>
-	<20091130163011.GD7028@n2100.arm.linux.org.uk>
-	<20091201095654.GA29135@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0912011245430.5820@xanadu.home>
-Message-ID: <20091201180307.GB3453@n2100.arm.linux.org.uk>
+Date: Tue, 1 Dec 2009 18:08:42 +0000
+Subject: cache aliasing in dup_mmap
+In-Reply-To: <20091130092022.GA1638@n2100.arm.linux.org.uk>
+References: <20091005144623.GA20633@n2100.arm.linux.org.uk>
+	<20091105144830.GC21681@n2100.arm.linux.org.uk>
+	<e06498070911130649k2051e4cfh2066cf0b9fdabbaf@mail.gmail.com>
+	<20091116163028.GA3568@n2100.arm.linux.org.uk>
+	<e06498070911160923i2273b6aai6f144b36289203d2@mail.gmail.com>
+	<20091116222016.GF3568@n2100.arm.linux.org.uk>
+	<20091119085735.GA14178@n2100.arm.linux.org.uk>
+	<e06498070911191008t1861e730u5cdb49187af00ae0@mail.gmail.com>
+	<20091123203110.GH18142@n2100.arm.linux.org.uk>
+	<20091130092022.GA1638@n2100.arm.linux.org.uk>
+Message-ID: <20091201180842.GC3453@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 01, 2009 at 12:48:42PM -0500, Nicolas Pitre wrote:
-> On Tue, 1 Dec 2009, Russell King - ARM Linux wrote:
-> 
-> > On Mon, Nov 30, 2009 at 04:30:11PM +0000, Russell King - ARM Linux wrote:
-> > > On Mon, Nov 30, 2009 at 11:23:49AM -0500, Nicolas Pitre wrote:
-> > > > Ping.
+On Mon, Nov 30, 2009 at 09:20:22AM +0000, Russell King - ARM Linux wrote:
+> On Mon, Nov 23, 2009 at 08:31:10PM +0000, Russell King - ARM Linux wrote:
+> > On Thu, Nov 19, 2009 at 01:08:01PM -0500, Steven Walter wrote:
+> > > On Thu, Nov 19, 2009 at 3:57 AM, Russell King - ARM Linux
+> > > <linux@arm.linux.org.uk> wrote:
+> > > > I'm afraid that I have nothing further to suggest, and so I'm shelving
+> > > > the patches. ?That means this problem will remain unresolved in future
+> > > > kernels.
 > > > 
-> > > Not pulling just yet.
+> > > I had the tester restart the reboot-loop, and so far it's done ~1200
+> > > runs with no problem.  I'm thinking now that either I hosed something
+> > > up with the build initially, or else the tester didn't flash it
+> > > correctly.  1200 runs isn't enough to be conclusive, but it's a lot
+> > > better than 88.  I'll let you know when we have something more
+> > > definitive.
 > > 
-> > I'm sorry, I can't pull with this dove db crap in.  The machine database
-> > is in a mess with respect to it - there's at least two dove_db machine IDs
-> > registered.
-> > 
-> > Saeed needs to talk to me to get it sorted _first_ before submitting it
-> > for mainline.  Please drop it from your tree.
+> > I'd just like to keep this issue hot so it doesn't get forgotten about.
+> > Are we at a conclusive point on this?
 > 
-> Given that the second dove_db should be renamed to dove_db2 according to 
-> Saeed (and I think you made the change already) then are you OK to pull 
-> it as is now?
+> Today is decision day.  Do we go with these two patches or not?
 
-Err, eventually.  I seem to have destroyed a number of commits in my tree,
-thanks to having to wait for ages on people to verify stuff...
+Right, I've had enough of being patient and trying to get responses.  I
+will not be merging these fixes for 2.6.33.  What's another three months
+or so when it's already taken nine months to get this far already?
