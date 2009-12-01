@@ -1,42 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 1 Dec 2009 18:08:42 +0000
-Subject: cache aliasing in dup_mmap
-In-Reply-To: <20091130092022.GA1638@n2100.arm.linux.org.uk>
-References: <20091005144623.GA20633@n2100.arm.linux.org.uk>
-	<20091105144830.GC21681@n2100.arm.linux.org.uk>
-	<e06498070911130649k2051e4cfh2066cf0b9fdabbaf@mail.gmail.com>
-	<20091116163028.GA3568@n2100.arm.linux.org.uk>
-	<e06498070911160923i2273b6aai6f144b36289203d2@mail.gmail.com>
-	<20091116222016.GF3568@n2100.arm.linux.org.uk>
-	<20091119085735.GA14178@n2100.arm.linux.org.uk>
-	<e06498070911191008t1861e730u5cdb49187af00ae0@mail.gmail.com>
-	<20091123203110.GH18142@n2100.arm.linux.org.uk>
-	<20091130092022.GA1638@n2100.arm.linux.org.uk>
-Message-ID: <20091201180842.GC3453@n2100.arm.linux.org.uk>
+From: ben@trinity.fluff.org (Ben Dooks)
+Date: Tue, 1 Dec 2009 18:08:51 +0000
+Subject: [PATCH 1/7] S3C64XX: Staticise platform data for PCM devices
+In-Reply-To: <1b68c6790911271740i3323528eqefbe71ef4c793518@mail.gmail.com>
+References: <20091127164312.GA11913@rakim.wolfsonmicro.main>
+	<1259340239-12067-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<1b68c6790911271740i3323528eqefbe71ef4c793518@mail.gmail.com>
+Message-ID: <20091201180851.GJ4808@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2009 at 09:20:22AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Nov 23, 2009 at 08:31:10PM +0000, Russell King - ARM Linux wrote:
-> > On Thu, Nov 19, 2009 at 01:08:01PM -0500, Steven Walter wrote:
-> > > On Thu, Nov 19, 2009 at 3:57 AM, Russell King - ARM Linux
-> > > <linux@arm.linux.org.uk> wrote:
-> > > > I'm afraid that I have nothing further to suggest, and so I'm shelving
-> > > > the patches. ?That means this problem will remain unresolved in future
-> > > > kernels.
-> > > 
-> > > I had the tester restart the reboot-loop, and so far it's done ~1200
-> > > runs with no problem.  I'm thinking now that either I hosed something
-> > > up with the build initially, or else the tester didn't flash it
-> > > correctly.  1200 runs isn't enough to be conclusive, but it's a lot
-> > > better than 88.  I'll let you know when we have something more
-> > > definitive.
-> > 
-> > I'd just like to keep this issue hot so it doesn't get forgotten about.
-> > Are we at a conclusive point on this?
-> 
-> Today is decision day.  Do we go with these two patches or not?
+On Sat, Nov 28, 2009 at 10:40:47AM +0900, jassi brar wrote:
+> On Sat, Nov 28, 2009 at 1:43 AM, Mark Brown
+> <broonie@opensource.wolfsonmicro.com> wrote:
+> > The symbols aren't declared and don't need to be exported, they go
+> > along with the device structure.
+> yes, that was a careless omission on my part. thanks.
 
-Right, I've had enough of being patient and trying to get responses.  I
-will not be merging these fixes for 2.6.33.  What's another three months
-or so when it's already taken nine months to get this far already?
+would be nice to supply an Acked-by: line if you think this is a good idea.
+ 
+> > Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> > ---
+> > ?arch/arm/plat-s3c64xx/dev-audio.c | ? ?4 ++--
+> > ?1 files changed, 2 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm/plat-s3c64xx/dev-audio.c b/arch/arm/plat-s3c64xx/dev-audio.c
+> > index 9e07344..a21a88f 100644
+> > --- a/arch/arm/plat-s3c64xx/dev-audio.c
+> > +++ b/arch/arm/plat-s3c64xx/dev-audio.c
+> > @@ -118,7 +118,7 @@ static struct resource s3c64xx_pcm0_resource[] = {
+> > ? ? ? ?},
+> > ?};
+> >
+> > -struct s3c_audio_pdata s3c_pcm0_pdata = {
+> > +static struct s3c_audio_pdata s3c_pcm0_pdata = {
+> > ? ? ? ?.cfg_gpio = s3c64xx_pcm_cfg_gpio,
+> > ?};
+> >
+> > @@ -151,7 +151,7 @@ static struct resource s3c64xx_pcm1_resource[] = {
+> > ? ? ? ?},
+> > ?};
+> >
+> > -struct s3c_audio_pdata s3c_pcm1_pdata = {
+> > +static struct s3c_audio_pdata s3c_pcm1_pdata = {
+> > ? ? ? ?.cfg_gpio = s3c64xx_pcm_cfg_gpio,
+> > ?};
+> >
+> > --
+> > 1.6.5.3
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
