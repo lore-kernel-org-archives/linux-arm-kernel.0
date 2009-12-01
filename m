@@ -1,403 +1,95 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Wed, 02 Dec 2009 00:12:36 +0800
-Subject: [PATCH V5]ARM: NUC900: add RTC driver support for nuc910 and nuc920
-Message-ID: <4B154074.20203@gmail.com>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Tue,  1 Dec 2009 18:17:18 +0100
+Subject: [PATCH] mmc: pxamci: call mmc_remove_host() before freeing resources
+Message-ID: <1259687838-31722-1-git-send-email-daniel@caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew,
+mmc_remove_host() will cause the mmc core to switch off the bus power by
+eventually calling pxamci_set_ios(). This function uses the regulator or
+the GPIO which have been freed already.
 
-Has that patch v4 been applied by you? due to I got the mail:
-'+ arm-nuc900-add-rtc-driver-support-for-nuc910-and-nuc920.patch added to -mm tree'
+This causes the following Oops on module unload.
 
-Regarding your advice for 'check_rtc_power', I have modified some codes and thanks for your comment. 
+[   49.519649] Unable to handle kernel paging request at virtual address 30303a70
+[   49.526878] pgd = c7084000
+[   49.529563] [30303a70] *pgd=00000000
+[   49.533136] Internal error: Oops: 5 [#1]
+[   49.537025] last sysfs file: /sys/devices/platform/pxa27x-ohci/usb1/1-1/1-1:1.0/host0/target0:0:0/0:0:0:0/scsi_level
+[   49.547471] Modules linked in: pxamci(-) eeti_ts
+[   49.552061] CPU: 0    Not tainted  (2.6.32-rc8 #322)
+[   49.557001] PC is at regulator_is_enabled+0x3c/0xbc
+[   49.561846] LR is at regulator_is_enabled+0x30/0xbc
+[   49.566691] pc : [<c01a2448>]    lr : [<c01a243c>]    psr: 60000013
+[   49.566702] sp : c7083e70  ip : 30303a30  fp : 00000000
+[   49.578093] r10: c705e200  r9 : c7082000  r8 : c705e2e0
+[   49.583280] r7 : c7061340  r6 : c7061340  r5 : c7083e70  r4 : 00000000
+[   49.589759] r3 : c04dc434  r2 : c04dc434  r1 : c03eecea  r0 : 00000047
+[   49.596241] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+[   49.603329] Control: 0000397f  Table: a7084018  DAC: 00000015
+[   49.609031] Process rmmod (pid: 1101, stack limit = 0xc7082278)
+[   49.614908] Stack: (0xc7083e70 to 0xc7084000)
+[   49.619238] 3e60:                                     c7082000 c703c4f8 c705ea00 c04f4074
+[   49.627366] 3e80: 00000000 c705e3a0 ffffffff c0247ddc c70361a0 00000000 c705e3a0 ffffffff
+[   49.635499] 3ea0: c705e200 bf006400 c78c4f00 c705e200 c705e3a0 ffffffff c705e200 ffffffff
+[   49.643633] 3ec0: c04d8ac8 c02476d0 ffffffff c0247c60 c705e200 c0248678 c705e200 c0249064
+[   49.651765] 3ee0: ffffffff bf006204 c04d8ad0 c04d8ad0 c04d8ac8 bf007490 00000880 c00440c4
+[   49.659898] 3f00: 0000b748 c01c5708 bf007490 c01c44c8 c04d8ac8 c04d8afc bf007490 c01c4570
+[   49.668031] 3f20: bf007490 bf00750c c04f4258 c01c37a4 00000000 bf00750c c7083f44 c007b014
+[   49.676162] 3f40: 4000d000 6d617870 08006963 00000001 00000000 c7085000 00000001 00000000
+[   49.684287] 3f60: 4000d000 c7083f8c 00000001 bea01a54 00005401 c7ab1400 c00440c4 00082000
+[   49.692420] 3f80: bf00750c 00000880 c7083f8c 00000000 4000cfa8 00000000 00000880 bea01cc8
+[   49.700552] 3fa0: 00000081 c0043f40 00000000 00000880 bea01cc8 00000880 00000006 00000000
+[   49.708677] 3fc0: 00000000 00000880 bea01cc8 00000081 00000097 0000cca4 0000b748 00000000
+[   49.716802] 3fe0: 4001a4f0 bea01cc0 00018bf4 4001a4fc 20000010 bea01cc8 a063e021 a063e421
+[   49.724958] [<c01a2448>] (regulator_is_enabled+0x3c/0xbc) from [<c0247ddc>] (mmc_regulator_set_ocr+0x14/0xd8)
+[   49.734836] [<c0247ddc>] (mmc_regulator_set_ocr+0x14/0xd8) from [<bf006400>] (pxamci_set_ios+0xd8/0x17c [pxamci])
+[   49.745044] [<bf006400>] (pxamci_set_ios+0xd8/0x17c [pxamci]) from [<c02476d0>] (mmc_power_off+0x50/0x58)
+[   49.754555] [<c02476d0>] (mmc_power_off+0x50/0x58) from [<c0247c60>] (mmc_detach_bus+0x68/0xc4)
+[   49.763207] [<c0247c60>] (mmc_detach_bus+0x68/0xc4) from [<c0248678>] (mmc_stop_host+0xd4/0x1bc)
+[   49.771944] [<c0248678>] (mmc_stop_host+0xd4/0x1bc) from [<c0249064>] (mmc_remove_host+0xc/0x20)
+[   49.780681] [<c0249064>] (mmc_remove_host+0xc/0x20) from [<bf006204>] (pxamci_remove+0xc8/0x174 [pxamci])
+[   49.790211] [<bf006204>] (pxamci_remove+0xc8/0x174 [pxamci]) from [<c01c5708>] (platform_drv_remove+0x1c/0x24)
+[   49.800164] [<c01c5708>] (platform_drv_remove+0x1c/0x24) from [<c01c44c8>] (__device_release_driver+0x7c/0xc4)
+[   49.810110] [<c01c44c8>] (__device_release_driver+0x7c/0xc4) from [<c01c4570>] (driver_detach+0x60/0x8c)
+[   49.819535] [<c01c4570>] (driver_detach+0x60/0x8c) from [<c01c37a4>] (bus_remove_driver+0x90/0xcc)
+[   49.828452] [<c01c37a4>] (bus_remove_driver+0x90/0xcc) from [<c007b014>] (sys_delete_module+0x1d8/0x254)
+[   49.837891] [<c007b014>] (sys_delete_module+0x1d8/0x254) from [<c0043f40>] (ret_fast_syscall+0x0/0x28)
+[   49.847145] Code: eb06c53a e596c030 e1a0500d e59f106c (e59c0040)
+[   49.853566] ---[ end trace b5fa66a00cea142f ]---
 
-This patch named v5,and I fixed 'check_rtc_power' function, maybe I can make a patch relative to that patch v4?
-
-Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
+Signed-off-by: Daniel Mack <daniel@caiaq.de>
+Reported-by: Sven Neumann <s.neumann@raumfeld.com>
+Cc: Pierre Ossman <pierre@ossman.eu>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: linux-mmc at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: stable at kernel.org
 ---
- drivers/rtc/Kconfig      |    6 +
- drivers/rtc/Makefile     |    1 +
- drivers/rtc/rtc-nuc900.c |  342 ++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 349 insertions(+), 0 deletions(-)
- create mode 100644 drivers/rtc/rtc-nuc900.c
+ drivers/mmc/host/pxamci.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index 3c20dae..266ce62 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -573,6 +573,12 @@ config RTC_DRV_AB3100
- 	  Select this to enable the ST-Ericsson AB3100 Mixed Signal IC RTC
- 	  support. This chip contains a battery- and capacitor-backed RTC.
+diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
+index c35df2b..fb0978c 100644
+--- a/drivers/mmc/host/pxamci.c
++++ b/drivers/mmc/host/pxamci.c
+@@ -760,6 +760,8 @@ static int pxamci_remove(struct platform_device *pdev)
+ 	if (mmc) {
+ 		struct pxamci_host *host = mmc_priv(mmc);
  
-+config RTC_DRV_NUC900
-+	tristate "NUC910/NUC920 RTC driver"
-+	depends on RTC_CLASS && ARCH_W90X900
-+	help
-+	  If you say yes here you get support for the RTC subsystem of the
-+	  NUC910/NUC920 used in embedded systems.
++		mmc_remove_host(mmc);
++
+ 		if (host->pdata) {
+ 			gpio_cd = host->pdata->gpio_card_detect;
+ 			gpio_ro = host->pdata->gpio_card_ro;
+@@ -779,8 +781,6 @@ static int pxamci_remove(struct platform_device *pdev)
+ 		if (host->pdata && host->pdata->exit)
+ 			host->pdata->exit(&pdev->dev, mmc);
  
- comment "on-CPU RTC drivers"
- 
-diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
-index aa3fbd5..d511774 100644
---- a/drivers/rtc/Makefile
-+++ b/drivers/rtc/Makefile
-@@ -53,6 +53,7 @@ obj-$(CONFIG_RTC_MXC)		+= rtc-mxc.o
- obj-$(CONFIG_RTC_DRV_MAX6900)	+= rtc-max6900.o
- obj-$(CONFIG_RTC_DRV_MAX6902)	+= rtc-max6902.o
- obj-$(CONFIG_RTC_DRV_MV)	+= rtc-mv.o
-+obj-$(CONFIG_RTC_DRV_NUC900)	+= rtc-nuc900.o
- obj-$(CONFIG_RTC_DRV_OMAP)	+= rtc-omap.o
- obj-$(CONFIG_RTC_DRV_PCAP)	+= rtc-pcap.o
- obj-$(CONFIG_RTC_DRV_PCF8563)	+= rtc-pcf8563.o
-diff --git a/drivers/rtc/rtc-nuc900.c b/drivers/rtc/rtc-nuc900.c
-new file mode 100644
-index 0000000..bf59c9c
---- /dev/null
-+++ b/drivers/rtc/rtc-nuc900.c
-@@ -0,0 +1,342 @@
-+/*
-+ * Copyright (c) 2008-2009 Nuvoton technology corporation.
-+ *
-+ * Wan ZongShun <mcuos.com@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation;version 2 of the License.
-+ *
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+#include <linux/rtc.h>
-+#include <linux/delay.h>
-+#include <linux/io.h>
-+#include <linux/bcd.h>
-+
-+/* RTC Control Registers */
-+#define REG_RTC_INIR		0x00
-+#define REG_RTC_AER		0x04
-+#define REG_RTC_FCR		0x08
-+#define REG_RTC_TLR		0x0C
-+#define REG_RTC_CLR		0x10
-+#define REG_RTC_TSSR		0x14
-+#define REG_RTC_DWR		0x18
-+#define REG_RTC_TAR		0x1C
-+#define REG_RTC_CAR		0x20
-+#define REG_RTC_LIR		0x24
-+#define REG_RTC_RIER		0x28
-+#define REG_RTC_RIIR		0x2C
-+#define REG_RTC_TTR		0x30
-+
-+#define RTCSET			0x01
-+#define AERRWENB		0x10000
-+#define INIRRESET		0xa5eb1357
-+#define AERPOWERON		0xA965
-+#define AERPOWEROFF		0x0000
-+#define LEAPYEAR		0x0001
-+#define TICKENB			0x80
-+#define TICKINTENB		0x0002
-+#define ALARMINTENB		0x0001
-+#define MODE24			0x0001
-+
-+struct nuc900_rtc {
-+	int			irq_num;
-+	void __iomem		*rtc_reg;
-+	struct rtc_device	*rtcdev;
-+};
-+
-+struct nuc900_bcd_time {
-+	int bcd_sec;
-+	int bcd_min;
-+	int bcd_hour;
-+	int bcd_mday;
-+	int bcd_mon;
-+	int bcd_year;
-+};
-+
-+static irqreturn_t nuc900_rtc_interrupt(int irq, void *_rtc)
-+{
-+	struct nuc900_rtc *rtc = _rtc;
-+	unsigned long events = 0, rtc_irq;
-+
-+	rtc_irq = __raw_readl(rtc->rtc_reg + REG_RTC_RIIR);
-+
-+	if (rtc_irq & ALARMINTENB) {
-+		rtc_irq &= ~ALARMINTENB;
-+		__raw_writel(rtc_irq, rtc->rtc_reg + REG_RTC_RIIR);
-+		events |= RTC_AF | RTC_IRQF;
-+	}
-+
-+	if (rtc_irq & TICKINTENB) {
-+		rtc_irq &= ~TICKINTENB;
-+		__raw_writel(rtc_irq, rtc->rtc_reg + REG_RTC_RIIR);
-+		events |= RTC_UF | RTC_IRQF;
-+	}
-+
-+	rtc_update_irq(rtc->rtcdev, 1, events);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int *check_rtc_access_enable(struct nuc900_rtc *nuc900_rtc)
-+{
-+	unsigned int i;
-+	__raw_writel(INIRRESET, nuc900_rtc->rtc_reg + REG_RTC_INIR);
-+
-+	mdelay(10);
-+
-+	__raw_writel(AERPOWERON, nuc900_rtc->rtc_reg + REG_RTC_AER);
-+
-+	for (i = 0; i < 1000; i++) {
-+		if (__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB)
-+			return 0;
-+	}
-+
-+	if ((__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_AER) & AERRWENB) == 0x0)
-+		return ERR_PTR(-ENODEV);
-+
-+	return ERR_PTR(-EPERM);
-+}
-+
-+static void nuc900_rtc_bcd2bin(unsigned int timereg,
-+				unsigned int calreg, struct rtc_time *tm)
-+{
-+	tm->tm_mday	= bcd2bin(calreg >> 0);
-+	tm->tm_mon	= bcd2bin(calreg >> 8);
-+	tm->tm_year	= bcd2bin(calreg >> 16) + 100;
-+
-+	tm->tm_sec	= bcd2bin(timereg >> 0);
-+	tm->tm_min	= bcd2bin(timereg >> 8);
-+	tm->tm_hour	= bcd2bin(timereg >> 16);
-+
-+	rtc_valid_tm(tm);
-+}
-+
-+static void nuc900_rtc_bin2bcd(struct rtc_time *settm,
-+						struct nuc900_bcd_time *gettm)
-+{
-+	gettm->bcd_mday = bin2bcd(settm->tm_mday) << 0;
-+	gettm->bcd_mon  = bin2bcd(settm->tm_mon) << 8;
-+	gettm->bcd_year = bin2bcd(settm->tm_year - 100) << 16;
-+
-+	gettm->bcd_sec  = bin2bcd(settm->tm_sec) << 0;
-+	gettm->bcd_min  = bin2bcd(settm->tm_min) << 8;
-+	gettm->bcd_hour = bin2bcd(settm->tm_hour) << 16;
-+}
-+
-+static int nuc900_update_irq_enable(struct device *dev, unsigned int enabled)
-+{
-+	struct nuc900_rtc *rtc = dev_get_drvdata(dev);
-+
-+	if (enabled)
-+		__raw_writel(__raw_readl(rtc->rtc_reg + REG_RTC_RIER)|
-+				(TICKINTENB), rtc->rtc_reg + REG_RTC_RIER);
-+	else
-+		__raw_writel(__raw_readl(rtc->rtc_reg + REG_RTC_RIER)&
-+				(~TICKINTENB), rtc->rtc_reg + REG_RTC_RIER);
-+
-+	return 0;
-+}
-+
-+static int nuc900_alarm_irq_enable(struct device *dev, unsigned int enabled)
-+{
-+	struct nuc900_rtc *rtc = dev_get_drvdata(dev);
-+
-+	if (enabled)
-+		__raw_writel(__raw_readl(rtc->rtc_reg + REG_RTC_RIER)|
-+				(ALARMINTENB), rtc->rtc_reg + REG_RTC_RIER);
-+	else
-+		__raw_writel(__raw_readl(rtc->rtc_reg + REG_RTC_RIER)&
-+				(~ALARMINTENB), rtc->rtc_reg + REG_RTC_RIER);
-+
-+	return 0;
-+}
-+
-+static int nuc900_rtc_read_time(struct device *dev, struct rtc_time *tm)
-+{
-+	struct nuc900_rtc *rtc = dev_get_drvdata(dev);
-+	unsigned int timeval, clrval;
-+
-+	timeval = __raw_readl(rtc->rtc_reg + REG_RTC_TLR);
-+	clrval	= __raw_readl(rtc->rtc_reg + REG_RTC_CLR);
-+
-+	nuc900_rtc_bcd2bin(timeval, clrval, tm);
-+
-+	return 0;
-+}
-+
-+static int nuc900_rtc_set_time(struct device *dev, struct rtc_time *tm)
-+{
-+	struct nuc900_rtc *rtc = dev_get_drvdata(dev);
-+	struct nuc900_bcd_time gettm;
-+	unsigned long val;
-+	int *err;
-+
-+	nuc900_rtc_bin2bcd(tm, &gettm);
-+
-+	err = check_rtc_access_enable(rtc);
-+	if (IS_ERR(err))
-+		return PTR_ERR(err);
-+
-+	val = gettm.bcd_mday | gettm.bcd_mon | gettm.bcd_year;
-+	__raw_writel(val, rtc->rtc_reg + REG_RTC_CLR);
-+
-+	val = gettm.bcd_sec | gettm.bcd_min | gettm.bcd_hour;
-+	__raw_writel(val, rtc->rtc_reg + REG_RTC_TLR);
-+
-+	return 0;
-+}
-+
-+static int nuc900_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
-+{
-+	struct nuc900_rtc *rtc = dev_get_drvdata(dev);
-+	unsigned int timeval, carval;
-+
-+	timeval = __raw_readl(rtc->rtc_reg + REG_RTC_TAR);
-+	carval	= __raw_readl(rtc->rtc_reg + REG_RTC_CAR);
-+
-+	nuc900_rtc_bcd2bin(timeval, carval, &alrm->time);
-+
-+	return 0;
-+}
-+
-+static int nuc900_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
-+{
-+	struct nuc900_rtc *rtc = dev_get_drvdata(dev);
-+	struct nuc900_bcd_time tm;
-+	unsigned long val;
-+	int *err;
-+
-+	nuc900_rtc_bin2bcd(&alrm->time, &tm);
-+
-+	err = check_rtc_access_enable(rtc);
-+	if (IS_ERR(err))
-+		return PTR_ERR(err);
-+
-+	val = tm.bcd_mday | tm.bcd_mon | tm.bcd_year;
-+	__raw_writel(val, rtc->rtc_reg + REG_RTC_CAR);
-+
-+	val = tm.bcd_sec | tm.bcd_min | tm.bcd_hour;
-+	__raw_writel(val, rtc->rtc_reg + REG_RTC_TAR);
-+
-+	return 0;
-+}
-+
-+static struct rtc_class_ops nuc900_rtc_ops = {
-+	.read_time = nuc900_rtc_read_time,
-+	.set_time = nuc900_rtc_set_time,
-+	.read_alarm = nuc900_rtc_read_alarm,
-+	.set_alarm = nuc900_rtc_set_alarm,
-+	.alarm_irq_enable = nuc900_alarm_irq_enable,
-+	.update_irq_enable = nuc900_update_irq_enable,
-+};
-+
-+static int __devinit nuc900_rtc_probe(struct platform_device *pdev)
-+{
-+	struct resource *res;
-+	struct nuc900_rtc *nuc900_rtc;
-+	int err = 0;
-+
-+	nuc900_rtc = kzalloc(sizeof(struct nuc900_rtc), GFP_KERNEL);
-+	if (!nuc900_rtc) {
-+		dev_err(&pdev->dev, "kzalloc nuc900_rtc failed\n");
-+		return -ENOMEM;
-+	}
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "platform_get_resource failed\n");
-+		err = -ENXIO;
-+		goto fail1;
-+	}
-+
-+	if (!request_mem_region(res->start, resource_size(res),
-+				pdev->name)) {
-+		dev_err(&pdev->dev, "request_mem_region failed\n");
-+		err = -EBUSY;
-+		goto fail1;
-+	}
-+
-+	nuc900_rtc->rtc_reg = ioremap(res->start, resource_size(res));
-+	if (!nuc900_rtc->rtc_reg) {
-+		dev_err(&pdev->dev, "ioremap rtc_reg failed\n");
-+		err = -ENOMEM;
-+		goto fail2;
-+	}
-+
-+	nuc900_rtc->irq_num = platform_get_irq(pdev, 0);
-+	if (request_irq(nuc900_rtc->irq_num, nuc900_rtc_interrupt,
-+				IRQF_DISABLED, "nuc900rtc", nuc900_rtc)) {
-+		dev_err(&pdev->dev, "NUC900 RTC request irq failed\n");
-+		err = -EBUSY;
-+		goto fail3;
-+	}
-+
-+	nuc900_rtc->rtcdev = rtc_device_register(pdev->name, &pdev->dev,
-+						&nuc900_rtc_ops, THIS_MODULE);
-+	if (IS_ERR(nuc900_rtc->rtcdev)) {
-+		dev_err(&pdev->dev, "rtc device register faild\n");
-+		err = PTR_ERR(nuc900_rtc->rtcdev);
-+		goto fail4;
-+	}
-+
-+	platform_set_drvdata(pdev, nuc900_rtc);
-+	__raw_writel(__raw_readl(nuc900_rtc->rtc_reg + REG_RTC_TSSR) | MODE24,
-+					nuc900_rtc->rtc_reg + REG_RTC_TSSR);
-+
-+	return 0;
-+
-+fail4:	free_irq(nuc900_rtc->irq_num, nuc900_rtc);
-+fail3:	iounmap(nuc900_rtc->rtc_reg);
-+fail2:	release_mem_region(res->start, resource_size(res));
-+fail1:	kfree(nuc900_rtc);
-+	return err;
-+}
-+
-+static int __devexit nuc900_rtc_remove(struct platform_device *pdev)
-+{
-+	struct nuc900_rtc *nuc900_rtc = platform_get_drvdata(pdev);
-+	struct resource *res;
-+
-+	rtc_device_unregister(nuc900_rtc->rtcdev);
-+	free_irq(nuc900_rtc->irq_num, nuc900_rtc);
-+	iounmap(nuc900_rtc->rtc_reg);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	release_mem_region(res->start, resource_size(res));
-+
-+	kfree(nuc900_rtc);
-+
-+	platform_set_drvdata(pdev, NULL);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver nuc900_rtc_driver = {
-+	.remove		= __devexit_p(nuc900_rtc_remove),
-+	.driver		= {
-+		.name	= "nuc900-rtc",
-+		.owner	= THIS_MODULE,
-+	},
-+};
-+
-+static int __init nuc900_rtc_init(void)
-+{
-+	return platform_driver_probe(&nuc900_rtc_driver, nuc900_rtc_probe);
-+}
-+
-+static void __exit nuc900_rtc_exit(void)
-+{
-+	platform_driver_unregister(&nuc900_rtc_driver);
-+}
-+
-+module_init(nuc900_rtc_init);
-+module_exit(nuc900_rtc_exit);
-+
-+MODULE_AUTHOR("Wan ZongShun <mcuos.com@gmail.com>");
-+MODULE_DESCRIPTION("nuc910/nuc920 RTC driver");
-+MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:nuc900-rtc");
+-		mmc_remove_host(mmc);
+-
+ 		pxamci_stop_clock(host);
+ 		writel(TXFIFO_WR_REQ|RXFIFO_RD_REQ|CLK_IS_OFF|STOP_CMD|
+ 		       END_CMD_RES|PRG_DONE|DATA_TRAN_DONE,
 -- 
-1.5.6.3
+1.6.5.2
