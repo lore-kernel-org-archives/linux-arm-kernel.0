@@ -1,38 +1,45 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Mon, 30 Nov 2009 23:30:35 +0000
+From: awalls@radix.net (Andy Walls)
+Date: Mon, 30 Nov 2009 20:42:53 -0500
 Subject: Get rid of IRQF_DISABLED - (was [PATCH] genirq: warn about
 	IRQF_SHARED|IRQF_DISABLED)
-In-Reply-To: <alpine.LFD.2.00.0911302255590.24119@localhost.localdomain>
+In-Reply-To: <200911301238.35750.david-b@pacbell.net>
 References: <1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1259578067-29169-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.00.0911301225110.24119@localhost.localdomain>
-	<20091130143703.GA7028@n2100.arm.linux.org.uk>
-	<20091130145122.7057a1e3@lxorguk.ukuu.org.uk>
-	<alpine.LFD.2.00.0911302255590.24119@localhost.localdomain>
-Message-ID: <20091130233035.2a404f62@lxorguk.ukuu.org.uk>
+	<alpine.LFD.2.00.0911301519120.24119@localhost.localdomain>
+	<20091130144702.14bea0ee@lxorguk.ukuu.org.uk>
+	<200911301238.35750.david-b@pacbell.net>
+Message-ID: <1259631774.3099.26.camel@palomino.walls.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Either that or we decide to push such beasts into the threaded irq
-> space to keep them working until the last card hits the trashcan. I
-> know that this would still need to disable the interrupt on the PIC
-> level, but we have already mechanisms for that in the threaded code.
+On Mon, 2009-11-30 at 12:38 -0800, David Brownell wrote:
+> On Monday 30 November 2009, Alan Cox wrote:
+> > SHARED|DISABLED ought to WARN_ON() and if that doesn't motivate people
+> > then return -EINVAL. And with any luck that'll prove 6 months later that
+> > most of the offenders are not used and we can delete them wholesale.
+> 
+> So ... merge an updated version of the original patch, to
+> get full WARN coverage?
+> 
+> We've had that warning for a long time now.  The original
+> patch just covered non-request_irq() cases.  So by your
+> timetable we're ready for the "return -EINVAL" stage of
+> the migration... at least, for request_irq() callers.
 
-The 8390 is essentially a single thread device so treating interrupts as
-events indicating work is to be done might make sense
+OK, I'm motivated.  I haven't followed the discussion closely though.
 
-Unfortunately you cannot check the interrupt flags on the chip without
-switching to page 0, which will cause any parallel tx to crap itself and
-potentially hang the box. It's a design from single CPU days and the
-programming model is solely around 'stack the register window selected,
-do stuff in irq, put it back', so any parallel execution ends in tears,
-even peeking to see if the IRQ is ours.
+Can someone give me a clue as to the preferred way to correct this:
 
-These chips still keep popping up in old boxes although the rtl8139 seems
-to have exterminated them at last in all the ultra-cheap devices.
+        /* Register IRQ */
+        retval = request_irq(cx->pci_dev->irq, cx18_irq_handler,
+                             IRQF_SHARED | IRQF_DISABLED,
+                             cx->v4l2_dev.name, (void *)cx);
 
-Pushing them into threaded IRQ space with PIC masking seems to make
-complete sense. The wonderously gothic IRQ magic becomes a mutex, the IRQ
-handler may sleep blocking the IRQ during a transmit and the transmit
-path may block during an IRQ thread execution. Reset works as a mutex and
-all the crap and magic goes away.
+
+?
+The top half handler performs as little work as it possibly can and
+schedules the long duration activites on a workqueue already.
+
+The device is always on a plug-in PCI card.
+
+Regards,
+Andy
