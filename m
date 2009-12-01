@@ -1,40 +1,17 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Tue, 01 Dec 2009 08:42:11 +1100
-Subject: Get rid of IRQF_DISABLED - (was [PATCH] genirq: warn about
-	IRQF_SHARED|IRQF_DISABLED)
-In-Reply-To: <alpine.LFD.2.00.0911302225050.24119@localhost.localdomain>
-References: <1259356206-14843-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1259578067-29169-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.00.0911301225110.24119@localhost.localdomain>
-	<1259589780.26472.18.camel@laptop>
-	<alpine.LFD.2.00.0911301519120.24119@localhost.localdomain>
-	<1259611151.2076.101.camel@pasglop>
-	<alpine.LFD.2.00.0911302225050.24119@localhost.localdomain>
-Message-ID: <1259617331.2076.146.camel@pasglop>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Tue,  1 Dec 2009 01:43:06 +0000
+Subject: Samsung clock changes
+Message-ID: <1259631793-25480-1-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2009-11-30 at 22:31 +0100, Thomas Gleixner wrote:
+Initial run of clock changes, only tested past the 'they build'
+stage. If someone else can test and report success then that
+would be helpful.
 
-> Are the perf events on power generally coming through the standard irq
-> handler code path and/or sensitive to local_irq_disable() ?
+git branch next-samsung-clock will get you these plus most of
+the other s3c64xx and s3c24xx changes since 2.6.32-rc7.
 
-They are in HW yes. On ppc64, we do soft-disabling, which mean that we
-can still get the perf events within a local_irq_disable() region
-provided we don't get another interrupt within that region that forces
-us to hard disable so it would make the problem less bad I suppose.
-
-> > I would suggest we timestamp the handlers in the core btw and warn
-> if
-> > they take too long so we get a chance to track down the bad guys.
-> 
-> The hassle is to find a time which we think is appropriate as a
-> threshold which is of course depending on the cpu power of a
-> system. Also I wonder whether we'd need to make such a warning thing
-> aware of irq nesting.
-
-But if we always disable interrupts while running the handlers, we don't
-nest right ?
-
-Cheers,
-Ben.
+As such the s5pc1xx code has only be touched as far as fixing
+the merge problems with the update 'clk_ops' code and has yet
+to have the common clksrc code patches applied to it.
