@@ -1,61 +1,25 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Wed, 02 Dec 2009 14:26:16 +1300
-Subject: [PATCH] add PATA host controller support for Cirrus Logic's EP93xx
-	CPUs
-In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901FB03AB@mi8nycmail19.Mi8.com>
-References: <200911261651.40928.bzolnier@gmail.com>
-	<4B15BAA1.2010408@bluewatersys.com>
-	<200912020206.59659.bzolnier@gmail.com>
-	<BD79186B4FD85F4B8E60E381CAEE190901FB03AB@mi8nycmail19.Mi8.com>
-Message-ID: <4B15C238.70909@bluewatersys.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 2 Dec 2009 12:34:53 +0800
+Subject: [PATCH] MMC: pxamci: call pdata->setpower even when regulator is
+	used
+In-Reply-To: <1259233813-2724-1-git-send-email-daniel@caiaq.de>
+References: <1259233813-2724-1-git-send-email-daniel@caiaq.de>
+Message-ID: <f17812d70912012034t57ebde8fmb7f7971109436775@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-H Hartley Sweeten wrote:
-> On Tuesday, December 01, 2009 6:07 PM, Bartlomiej Zolnierkiewicz wrote:
->> On Wednesday 02 December 2009 01:53:53 am Ryan Mallon wrote:
->>> Bartlomiej Zolnierkiewicz wrote:
->>>> Based on the older IDE host driver by Joao Ramos and review comments
->>>> for it from Sergei Shtylyov.  Not yet tested with the real hardware.
->>>>
->>> Hi Bartlomiej,
->>>
->>> I have got as far as patching this into my kernel and doing a build test
->>> (still need to find a hard-disk to test). I got some build errors, see
->>> below:
->> Hi,
->>
->> Many thanks for picking this driver up.
->>
->> The following preparatory libata one-liner is needed to make it build:
->>
->> 	http://patchwork.kernel.org/patch/62926/
->>
->> and you may also need to update ep93xx ide gpio patch:
->>
->> 	http://thread.gmane.org/gmane.linux.ports.arm.kernel/57688/focus=58730
->>
->> to current kernels to make the hardware work.
-> 
-> Ryan,
-> 
-> I updated the core parts of this patch with the ide gpio stuff.  This will
-> patch cleanly to 2.6.32-rc8 but will have problems after the 2.6.33 merge
-> due to the core keypad support already in Russell's tree.
-> 
-> But, for what it's worth....
+On Thu, Nov 26, 2009 at 7:10 PM, Daniel Mack <daniel@caiaq.de> wrote:
+> On platforms where the vmmc regulator is used, it might still be
+> necessary to call the platform data's setpower() callback in order to
+> drive GPIOs to power up hardware.
+>
+> I can't see any pxamci user with power regulators enabled, hence this
+> shouldn't break anything.
+>
 
-Thanks. I had planned reposting this as a patch series for the driver
-and the core stuff once I get it working. At my current pace, I think it
-will be after 2.6.33 :-).
-
-~Ryan
-
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+I was thinking about this for quite a time, and I'm afraid that this patch
+solves only one corner case - that some specific actions need to be
+taken _after_ mmc regulator is adjusted, while excluding the possibility
+for that to happen _before_. I wonder maybe for those corner cases,
+if one can just manipulate the vmmc regulator and other specific stuffs
+within ->setpower().
