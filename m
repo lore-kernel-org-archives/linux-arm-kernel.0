@@ -1,78 +1,39 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Wed, 02 Dec 2009 13:53:53 +1300
-Subject: [PATCH] add PATA host controller support for Cirrus Logic's EP93xx
-	CPUs
-In-Reply-To: <200911261651.40928.bzolnier@gmail.com>
+From: bzolnier@gmail.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 2 Dec 2009 02:06:59 +0100
+Subject: [PATCH] add PATA host controller support for Cirrus Logic's
+	EP93xx CPUs
+In-Reply-To: <4B15BAA1.2010408@bluewatersys.com>
 References: <200911261651.40928.bzolnier@gmail.com>
-Message-ID: <4B15BAA1.2010408@bluewatersys.com>
+	<4B15BAA1.2010408@bluewatersys.com>
+Message-ID: <200912020206.59659.bzolnier@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bartlomiej Zolnierkiewicz wrote:
-> Based on the older IDE host driver by Joao Ramos and review comments
-> for it from Sergei Shtylyov.  Not yet tested with the real hardware.
->
+On Wednesday 02 December 2009 01:53:53 am Ryan Mallon wrote:
+> Bartlomiej Zolnierkiewicz wrote:
+> > Based on the older IDE host driver by Joao Ramos and review comments
+> > for it from Sergei Shtylyov.  Not yet tested with the real hardware.
+> >
+> 
+> Hi Bartlomiej,
+> 
+> I have got as far as patching this into my kernel and doing a build test
+> (still need to find a hard-disk to test). I got some build errors, see
+> below:
 
-Hi Bartlomiej,
+Hi,
 
-I have got as far as patching this into my kernel and doing a build test
-(still need to find a hard-disk to test). I got some build errors, see
-below:
+Many thanks for picking this driver up.
 
-> +static void pata_ep93xx_set_piomode(struct ata_port *ap,
-> +				    struct ata_device *adev)
-> +{
-> +	void __iomem *base = ap->host->private_data;
-> +	struct ata_device *pair = ata_dev_pair(adev);
-> +	const struct ata_timing *t = ata_timing_find_mode(adev->pio_mode);
-> +	const struct ata_timing *cmd_t = t;
-> +	u32 reg = IDECFG_IDEEN | IDECFG_PIO;
-> +	u8 pio = adev->pio_mode - XFER_PIO_0;
-> +
-> +	if (pair && pair->pio_mode < adev->pio_mode)
-> +		cmd_t = ata_timing_find_mode(pair->pio_mode);
-> +
-> +	/*
-> +	 * store the adequate PIO mode timings, to be used later
-> +	 * by pata_ep93xx_{read,write}
-> +	 */
-> +	adev->private_data = (void *)t;
-> +	ap->private_data = (void *)cmd_t;
+The following preparatory libata one-liner is needed to make it build:
 
-struct ata_device has no member called private_data. Do we need to store
-both t and cmd_t, or can we just store cmd_t in ap->private_data?
+	http://patchwork.kernel.org/patch/62926/
 
-If we need both, can we have something like this (not sure if the member
-names are sensible):
+and you may also need to update ep93xx ide gpio patch:
 
-	struct ep93xx_ata_timing {
-		struct ata_timing *dev_timing;
-		struct ata_timing *pair_timing;
-	};
+	http://thread.gmane.org/gmane.linux.ports.arm.kernel/57688/focus=58730
 
-and store that struct in ap?
+to current kernels to make the hardware work.
 
-> +unsigned int pata_ep93xx_data_xfer(struct ata_device *adev, unsigned char *buf,
-> +				   unsigned int buflen, int rw)
-> +{
-> +	struct ata_port *ap = adev->link->ap;
-> +	void __iomem *base = ap->host->private_data;
-> +	void *data_addr = ap->ioaddr.data_addr;
-> +	u16 *data = (u16 *)buf;
-> +	struct ata_timing *t = adev->private_data;
-
-This is the only place that uses the ata_timing structure stored in
-adev->private_data, can this be changed to:
-
-	struct ata_timing *t = ap->private_data;
-
-~Ryan
-
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+--
+Bartlomiej Zolnierkiewicz
