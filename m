@@ -1,23 +1,74 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 2 Dec 2009 20:41:22 +0000
+From: ospite@studenti.unina.it (Antonio Ospite)
+Date: Wed, 2 Dec 2009 21:48:53 +0100
 Subject: [PATCH] leds: Add LED class driver for regulator driven LEDs.
-In-Reply-To: <20091202213131.1393a956.ospite@studenti.unina.it>
+In-Reply-To: <20091202204026.GA18311@rakim.wolfsonmicro.main>
 References: <1259775625-25973-1-git-send-email-ospite@studenti.unina.it>
-	<1259778235.3588.141.camel@odin>
-	<20091202213131.1393a956.ospite@studenti.unina.it>
-Message-ID: <20091202204121.GB18311@rakim.wolfsonmicro.main>
+	<20091202180658.GA12292@rakim.wolfsonmicro.main>
+	<20091202212521.500f7a46.ospite@studenti.unina.it>
+	<20091202204026.GA18311@rakim.wolfsonmicro.main>
+Message-ID: <20091202214853.d97b860c.ospite@studenti.unina.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 02, 2009 at 09:31:31PM +0100, Antonio Ospite wrote:
-> Liam Girdwood <lrg@slimlogic.co.uk> wrote:
+On Wed, 2 Dec 2009 20:40:26 +0000
+Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
 
-> > Some regulators may not support voltage change (via hw design or
-> > constraints) so set_voltage() will fail. We probably want to handle this
-> > regulator type so we don't call set_voltage().
+> On Wed, Dec 02, 2009 at 09:25:21PM +0100, Antonio Ospite wrote:
+> > Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+> 
+> > > There's no need to do this since the regulator API matches consumers
+> > > based on struct device as well as name so you can have as many LEDs as
+> > > you like all using the same supply name mapping to different regulators.
+> 
+> > I need some more explanation here, I am currently using the driver with
+> > this code:
+> 
+> > +/* VVIB: Vibrator on A780, A1200, A910, E6, E2 */
+> > +static struct regulator_consumer_supply pcap_regulator_VVIB_consumers
+> > [] = {
+> > +	{ .dev_name = "leds-regulator", .supply = "vibrator", },
+> 
+> So you're instantiating the device with .id set to -1 (as your code
+> below shows), meaning there's only one leds-regulator in the system and
+> there's no need to number them.  If you had more than one of them then
+> you'd number them and then have something like:
+> 
+> 	{ .dev_name = "leds-regulator.0", supply = "vled" },
+> 	{ .dev_name = "leds-regulator.1", supply = "vled" },
+> 
+> when setting up the supplies.
+>
 
-> Ok, I'll read more about the regulator framework to find out how to
-> check regulator capabilities.
+Ok, the .id in .dev_name is what I was missing.
 
-Checking for errors when counting and listing the voltages ought to
-cover this.
+> > If I set the .supply value fixed, how can I assign different
+> > regulators to different leds? Should I use the address to the platform
+> > device (a780_vibrator in this case) for .dev when defining the
+> > regulator in the first place?
+> 
+> There is no need to use the .dev field, that is kept to avoid build
+> breakage transitioning to dev_name.
+
+Now everything is clear.
+
+Thanks,
+   Antonio
+
+-- 
+Antonio Ospite
+http://ao2.it
+
+PGP public key ID: 0x4553B001
+
+A: Because it messes up the order in which people normally read text.
+   See http://en.wikipedia.org/wiki/Posting_style
+Q: Why is top-posting such a bad thing?
+A: Top-posting.
+Q: What is the most annoying thing in e-mail?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091202/fd58a9fa/attachment.sig>
