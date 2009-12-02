@@ -1,41 +1,22 @@
-From: rubini-list@gnudd.com (Alessandro Rubini)
-Date: Wed, 2 Dec 2009 09:04:03 +0100
-Subject: [PATCH] MAINTAINERS: Add arm Nomadik support
-Message-ID: <20091202080403.GA27129@mail.gnudd.com>
+From: davidjon@xenontk.org (David John)
+Date: Wed, 02 Dec 2009 13:39:36 +0530
+Subject: Document on ARM memory barriers
+In-Reply-To: <1259693108.2121.244.camel@pc1117.cambridge.arm.com>
+References: <1259693108.2121.244.camel@pc1117.cambridge.arm.com>
+Message-ID: <4B1620C0.8030200@xenontk.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alessandro Rubini <rubini@unipv.it>
+On 12/02/2009 12:15 AM, Catalin Marinas wrote:
+> FYI,
+> 
+> A document which I found useful is now publicly available. It explains
+> the use of memory barriers on ARM and provides several examples:
+> 
+> http://infocenter.arm.com/help/topic/com.arm.doc.genc007826/Barrier_Litmus_Tests_and_Cookbook_A08.pdf
+> 
 
-Signed-off-by: Alessandro Rubini <rubini@unipv.it>
-Acked-by: Andrea Gallo <andrea.gallo@stericsson.com>
----
+Thank you for posting that link. That was a very interesting read.
 
-I added plat-nomadik/ which is not yet mainstream, but will include
-blocks that are common to Nomadik 8815 and newer U8500 core. There already
-is a patch in Russell's queue that moves my timer code to plat-nomadik.
-
- MAINTAINERS |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 16129e6..7d4b5cc 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -771,6 +771,14 @@ ARM/NEC MOBILEPRO 900/c MACHINE SUPPORT
- M:	Michael Petchkovsky <mkpetch@internode.on.net>
- S:	Maintained
- 
-+ARM/NOMADIK ARCHITECTURE
-+M:     Alessandro Rubini <rubini@unipv.it>
-+M:     STEricsson <STEricsson_nomadik_linux@list.st.com>
-+L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:     Maintained
-+F:     arch/arm/mach-nomadik/
-+F:     arch/arm/plat-nomadik/
-+
- ARM/OPENMOKO NEO FREERUNNER (GTA02) MACHINE SUPPORT
- M:	Nelson Castillo <arhuaco@freaks-unidos.net>
- L:	openmoko-kernel at lists.openmoko.org (subscribers-only)
--- 
-1.6.0.2
+Regards,
+David.
