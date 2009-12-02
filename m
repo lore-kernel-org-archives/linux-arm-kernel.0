@@ -1,91 +1,77 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Wed, 2 Dec 2009 09:50:15 +0900
-Subject: [PATCH 4/7] S3C64XX: Declare IISv4 PCLK for S3C6410
-In-Reply-To: <20091201214201.GP4808@trinity.fluff.org>
-References: <20091127164312.GA11913@rakim.wolfsonmicro.main>
-	<1259340239-12067-4-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<20091201214201.GP4808@trinity.fluff.org>
-Message-ID: <1b68c6790912011650p58cc6b27n90b032167ebb9bc8@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 2 Dec 2009 08:50:44 +0800
+Subject: [PATCH] mmc: pxamci: call mmc_remove_host() before freeing
+	resources
+In-Reply-To: <1259687838-31722-1-git-send-email-daniel@caiaq.de>
+References: <1259687838-31722-1-git-send-email-daniel@caiaq.de>
+Message-ID: <f17812d70912011650h48a6c391s426ffc8b4b653fc8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 2, 2009 at 6:42 AM, Ben Dooks <ben-linux@fluff.org> wrote:
-> On Fri, Nov 27, 2009 at 04:43:56PM +0000, Mark Brown wrote:
->> From: Jassi <jassi.brar@samsung.com>
->>
->> [Updated the device ID to -1 since there's only one IISv4 device but the
->> S3C clock API tries to match based on the ID of the requesting device
->> (and not the name) -- broonie.]
+On Wed, Dec 2, 2009 at 1:17 AM, Daniel Mack <daniel@caiaq.de> wrote:
+> mmc_remove_host() will cause the mmc core to switch off the bus power by
+> eventually calling pxamci_set_ios(). This function uses the regulator or
+> the GPIO which have been freed already.
 >
-> I had a quick look at the other clock changes and there are a couple
-> of questions that have come up:
+> This causes the following Oops on module unload.
 >
-> 1) If changing the .id field of the iisv4 device really a good idea,
-> ? especially if there might be more than one of them in the future?
-I agree.
-Also, changing indices of devices with disregard to their respective clock
-might force further adhoc changes in system resources.
+> [ ? 49.519649] Unable to handle kernel paging request at virtual address 30303a70
+> [ ? 49.526878] pgd = c7084000
+> [ ? 49.529563] [30303a70] *pgd=00000000
+> [ ? 49.533136] Internal error: Oops: 5 [#1]
+> [ ? 49.537025] last sysfs file: /sys/devices/platform/pxa27x-ohci/usb1/1-1/1-1:1.0/host0/target0:0:0/0:0:0:0/scsi_level
+> [ ? 49.547471] Modules linked in: pxamci(-) eeti_ts
+> [ ? 49.552061] CPU: 0 ? ?Not tainted ?(2.6.32-rc8 #322)
+> [ ? 49.557001] PC is at regulator_is_enabled+0x3c/0xbc
+> [ ? 49.561846] LR is at regulator_is_enabled+0x30/0xbc
+> [ ? 49.566691] pc : [<c01a2448>] ? ?lr : [<c01a243c>] ? ?psr: 60000013
+> [ ? 49.566702] sp : c7083e70 ?ip : 30303a30 ?fp : 00000000
+> [ ? 49.578093] r10: c705e200 ?r9 : c7082000 ?r8 : c705e2e0
+> [ ? 49.583280] r7 : c7061340 ?r6 : c7061340 ?r5 : c7083e70 ?r4 : 00000000
+> [ ? 49.589759] r3 : c04dc434 ?r2 : c04dc434 ?r1 : c03eecea ?r0 : 00000047
+> [ ? 49.596241] Flags: nZCv ?IRQs on ?FIQs on ?Mode SVC_32 ?ISA ARM ?Segment user
+> [ ? 49.603329] Control: 0000397f ?Table: a7084018 ?DAC: 00000015
+> [ ? 49.609031] Process rmmod (pid: 1101, stack limit = 0xc7082278)
+> [ ? 49.614908] Stack: (0xc7083e70 to 0xc7084000)
+> [ ? 49.619238] 3e60: ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? c7082000 c703c4f8 c705ea00 c04f4074
+> [ ? 49.627366] 3e80: 00000000 c705e3a0 ffffffff c0247ddc c70361a0 00000000 c705e3a0 ffffffff
+> [ ? 49.635499] 3ea0: c705e200 bf006400 c78c4f00 c705e200 c705e3a0 ffffffff c705e200 ffffffff
+> [ ? 49.643633] 3ec0: c04d8ac8 c02476d0 ffffffff c0247c60 c705e200 c0248678 c705e200 c0249064
+> [ ? 49.651765] 3ee0: ffffffff bf006204 c04d8ad0 c04d8ad0 c04d8ac8 bf007490 00000880 c00440c4
+> [ ? 49.659898] 3f00: 0000b748 c01c5708 bf007490 c01c44c8 c04d8ac8 c04d8afc bf007490 c01c4570
+> [ ? 49.668031] 3f20: bf007490 bf00750c c04f4258 c01c37a4 00000000 bf00750c c7083f44 c007b014
+> [ ? 49.676162] 3f40: 4000d000 6d617870 08006963 00000001 00000000 c7085000 00000001 00000000
+> [ ? 49.684287] 3f60: 4000d000 c7083f8c 00000001 bea01a54 00005401 c7ab1400 c00440c4 00082000
+> [ ? 49.692420] 3f80: bf00750c 00000880 c7083f8c 00000000 4000cfa8 00000000 00000880 bea01cc8
+> [ ? 49.700552] 3fa0: 00000081 c0043f40 00000000 00000880 bea01cc8 00000880 00000006 00000000
+> [ ? 49.708677] 3fc0: 00000000 00000880 bea01cc8 00000081 00000097 0000cca4 0000b748 00000000
+> [ ? 49.716802] 3fe0: 4001a4f0 bea01cc0 00018bf4 4001a4fc 20000010 bea01cc8 a063e021 a063e421
+> [ ? 49.724958] [<c01a2448>] (regulator_is_enabled+0x3c/0xbc) from [<c0247ddc>] (mmc_regulator_set_ocr+0x14/0xd8)
+> [ ? 49.734836] [<c0247ddc>] (mmc_regulator_set_ocr+0x14/0xd8) from [<bf006400>] (pxamci_set_ios+0xd8/0x17c [pxamci])
+> [ ? 49.745044] [<bf006400>] (pxamci_set_ios+0xd8/0x17c [pxamci]) from [<c02476d0>] (mmc_power_off+0x50/0x58)
+> [ ? 49.754555] [<c02476d0>] (mmc_power_off+0x50/0x58) from [<c0247c60>] (mmc_detach_bus+0x68/0xc4)
+> [ ? 49.763207] [<c0247c60>] (mmc_detach_bus+0x68/0xc4) from [<c0248678>] (mmc_stop_host+0xd4/0x1bc)
+> [ ? 49.771944] [<c0248678>] (mmc_stop_host+0xd4/0x1bc) from [<c0249064>] (mmc_remove_host+0xc/0x20)
+> [ ? 49.780681] [<c0249064>] (mmc_remove_host+0xc/0x20) from [<bf006204>] (pxamci_remove+0xc8/0x174 [pxamci])
+> [ ? 49.790211] [<bf006204>] (pxamci_remove+0xc8/0x174 [pxamci]) from [<c01c5708>] (platform_drv_remove+0x1c/0x24)
+> [ ? 49.800164] [<c01c5708>] (platform_drv_remove+0x1c/0x24) from [<c01c44c8>] (__device_release_driver+0x7c/0xc4)
+> [ ? 49.810110] [<c01c44c8>] (__device_release_driver+0x7c/0xc4) from [<c01c4570>] (driver_detach+0x60/0x8c)
+> [ ? 49.819535] [<c01c4570>] (driver_detach+0x60/0x8c) from [<c01c37a4>] (bus_remove_driver+0x90/0xcc)
+> [ ? 49.828452] [<c01c37a4>] (bus_remove_driver+0x90/0xcc) from [<c007b014>] (sys_delete_module+0x1d8/0x254)
+> [ ? 49.837891] [<c007b014>] (sys_delete_module+0x1d8/0x254) from [<c0043f40>] (ret_fast_syscall+0x0/0x28)
+> [ ? 49.847145] Code: eb06c53a e596c030 e1a0500d e59f106c (e59c0040)
+> [ ? 49.853566] ---[ end trace b5fa66a00cea142f ]---
+>
+> Signed-off-by: Daniel Mack <daniel@caiaq.de>
+> Reported-by: Sven Neumann <s.neumann@raumfeld.com>
+> Cc: Pierre Ossman <pierre@ossman.eu>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: linux-mmc at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: stable at kernel.org
+> ---
+> ?drivers/mmc/host/pxamci.c | ? ?4 ++--
 
-I think, best wud be to modify s3c64xx_i2s.c to support 2 channel, 6
-channel, h/w mixing(maybe LP-Audio feature too) and pass flag for each
-feature via platform data
-by something like:-  .has_6_channels, .has_hw_mixer, .has_lp_audio etc
+Looks like a correct fix to me.
 
-The point to note here is to write drivers around functionality, rather than
-version, of the controller.
-
-> 2) The clock name for the current audio bus clock for the iisv4 unit
-> ? is wrong as we're using it for both the iis and iisv4 blocks. It
-> ? might be worth renaming the clock for the iisv4 audio bus before
-> ? looking at changing the usage of the clock support (once the current
-> ? changes have been sorted)
-> As such is the #ifdef of the clock code when the S3C6410 support
-> really necesary?
->
->> Signed-Off-by: Jassi <jassi.brar@samsung.com>
->> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
->> ---
->> ?arch/arm/plat-s3c64xx/clock.c | ? ?8 ++++++++
->> ?1 files changed, 8 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/plat-s3c64xx/clock.c b/arch/arm/plat-s3c64xx/clock.c
->> index 7a36e89..2f1548e 100644
->> --- a/arch/arm/plat-s3c64xx/clock.c
->> +++ b/arch/arm/plat-s3c64xx/clock.c
->> @@ -129,6 +129,14 @@ static struct clk init_clocks_disable[] = {
->> ? ? ? ? ? ? ? .enable ? ? ? ? = s3c64xx_pclk_ctrl,
->> ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= S3C_CLKCON_PCLK_IIS1,
->> ? ? ? }, {
->> +#ifdef CONFIG_CPU_S3C6410
->> + ? ? ? ? ? ? .name ? ? ? ? ? = "iis",
->> + ? ? ? ? ? ? .id ? ? ? ? ? ? = -1, ?/* There's only one IISv4 port */
->> + ? ? ? ? ? ? .parent ? ? ? ? = &clk_p,
->> + ? ? ? ? ? ? .enable ? ? ? ? = s3c64xx_pclk_ctrl,
->> + ? ? ? ? ? ? .ctrlbit ? ? ? ?= S3C6410_CLKCON_PCLK_IIS2,
->> + ? ? }, {
->> +#endif
->> ? ? ? ? ? ? ? .name ? ? ? ? ? = "spi",
->> ? ? ? ? ? ? ? .id ? ? ? ? ? ? = 0,
->> ? ? ? ? ? ? ? .parent ? ? ? ? = &clk_p,
->> --
->> 1.6.5.3
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-> --
-> --
-> Ben
->
-> Q: ? ? ?What's a light-year?
-> A: ? ? ?One-third less calories than a regular year.
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Acked-by: Eric Miao <eric.y.miao@gmail.com>
