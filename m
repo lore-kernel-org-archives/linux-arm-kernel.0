@@ -1,38 +1,33 @@
-From: acassis@gmail.com (Alan Carvalho de Assis)
-Date: Wed, 2 Dec 2009 16:58:23 -0200
+From: andy@warmcat.com (Andy Green)
+Date: Wed, 02 Dec 2009 19:35:33 +0000
 Subject: [PATCH 1/1] fix occasional ULPI timeouts with ehci-mxc
-In-Reply-To: <1259770381-16987-1-git-send-email-valentin.longchamp@epfl.ch>
+In-Reply-To: <37367b3a0912021058j2801df5l2c937ac339bc5f6b@mail.gmail.com>
 References: <1259770381-16987-1-git-send-email-valentin.longchamp@epfl.ch>
-Message-ID: <37367b3a0912021058j2801df5l2c937ac339bc5f6b@mail.gmail.com>
+	<37367b3a0912021058j2801df5l2c937ac339bc5f6b@mail.gmail.com>
+Message-ID: <4B16C185.80905@warmcat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Valentin,
+On 12/02/09 18:58, Somebody in the thread at some point said:
 
-On 12/2/09, Valentin Longchamp <valentin.longchamp@epfl.ch> wrote:
-> On various mxc boards, the intial ULPI reads resulted in a timeout
-> which prevented the transceiver to be identified and thus the ehci
-> device to be probed.
+Hi -
+
+> mx27# usb 2-1: new low speed USB device using mxc-ehci and address 2
+> hub 2-0:1.0: unable to enumerate USB device on port 1
 >
-> Initializing the hardware lines connected to the transceiver (through
-> pdata->init call) before actually enabling clocks and configuring
-> registers in the devices fixes this problem.
->
+> What you think about it?
 
-Unfortunately it didn't solve the issues on my not working board.
+What did you do with your chip select line on the ULPI PHY?
 
-Also I noticed on "working" board the PSW_N pin is not going to low.
-I created an ulpi with USB_OTG_DRV_VBUS and USB_OTG_DRV_VBUS_EXT.
+The first iMX LiteKIT board I had was an old revision where they had 
+tied the PHY chip select pin asserted.  The ULPI PHY acted braindamaged 
+because glitchy junk from during poweron / reset was taken as real data 
+and it never recovered during the session.
 
-Then I forced VBUS to high directly (connecting it to VCC, I know it
-is very *dangerous*) in order power on a mouse connected to USB port.
-It detected a device was attached, but didn't enumerate it:
+Later versions of the LiteKIT changed this to be pulled deasserted and a 
+GPIO can drive it asserted after reset is all done.  After I got a later 
+revision with that mod, and drove the GPIO, suddenly all was well.
 
-mx27# usb 2-1: new low speed USB device using mxc-ehci and address 2
-hub 2-0:1.0: unable to enumerate USB device on port 1
+Never going to get that week back though.
 
-What you think about it?
-
-Best Regards,
-
-Alan
+-Andy
