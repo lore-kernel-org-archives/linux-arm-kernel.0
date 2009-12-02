@@ -1,44 +1,65 @@
-From: yeasah@comrex.com (Yeasah Pell)
-Date: Wed, 02 Dec 2009 11:39:10 -0500
-Subject: strange, spurious seeming vector exception on pxa300
-In-Reply-To: <20091202160400.GE14091@buzzloop.caiaq.de>
-References: <4B159524.2020408@comrex.com>	<f17812d70912012200m4532317eue21baf5e10925455@mail.gmail.com>	<f17812d70912012207x28178b1bh98fbf560b6da536@mail.gmail.com>	<4B167C69.6060903@comrex.com>	<20091202155057.GA30669@n2100.arm.linux.org.uk>
-	<20091202160400.GE14091@buzzloop.caiaq.de>
-Message-ID: <4B16982E.2000704@comrex.com>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Wed, 2 Dec 2009 17:49:30 +0100
+Subject: [PATCH 1/1] fix occasional ULPI timeouts with ehci-mxc
+In-Reply-To: <1259770381-16987-1-git-send-email-valentin.longchamp@epfl.ch>
+References: <1259770381-16987-1-git-send-email-valentin.longchamp@epfl.ch>
+Message-ID: <20091202164930.GG14091@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Mack wrote:
-> On Wed, Dec 02, 2009 at 03:50:57PM +0000, Russell King - ARM Linux wrote:
->>
->>
->> Given that the conditions are clearly wrong for a vector exception, I would
->> say that you're hitting some kind of hardware bug - maybe caused by a dirty
->> power supply to the PXA, causing it to misbehave?
->>     
+On Wed, Dec 02, 2009 at 05:13:01PM +0100, Valentin Longchamp wrote:
+> On various mxc boards, the intial ULPI reads resulted in a timeout
+> which prevented the transceiver to be identified and thus the ehci
+> device to be probed.
+> 
+> Initializing the hardware lines connected to the transceiver (through
+> pdata->init call) before actually enabling clocks and configuring
+> registers in the devices fixes this problem.
 
-Of course I desperately want to believe this, as then I can ignore all 
-this insanity and move on, but it's a bit difficult to swallow that some 
-kind of hardware issue would cause a failure that is so consistent (same 
-instruction every time, regardless of physical/virtual memory locations, 
-compilation flags, etc.) yet caused absolutely no other perceptible 
-problems...
+Hmm, glad to hear it fixed your problem :) However, there is no real
+ULPI communication done on the viewports before the board specific
+init function is called, and the timeouts that are reported come from
+the transceiver probing which is called at a later point.
 
-> We've had trouble of that kind as well some month ago with an early
-> prototype. It wasn't an exception we got, but the bug was clearly
-> hitting the same code path every single time, so this issue might be
-> related. Eventually it went away with new board revision which made wire
-> patching around the DDR SDRAM unnecessary (i.e, cleaner signal pathes).
->
-> Strange enough, I would have expected such flaws to cause processor
-> misbeviour of all sorts, totally random and unpredictable. The fact that
-> is was the same function we always ended up in is still some kind of
-> miracle I can't explain.
->
-> Daniel
->   
+Even with that patch applied, one board I have here fails to initialize
+the OTG port.
 
-...and having some anecdotal evidence of that kind of situation 
-happening is helpful.
+> Signed-off-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
 
-Thanks, guys.
+As it fixes a real world problem and doesn't seem to be harmful to
+anyone else:
+
+Acked-by: Daniel Mack <daniel@caiaq.de>
+
+>  drivers/usb/host/ehci-mxc.c |   18 +++++++++---------
+>  1 files changed, 9 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+> index 35c56f4..689b683 100644
+> --- a/drivers/usb/host/ehci-mxc.c
+> +++ b/drivers/usb/host/ehci-mxc.c
+
+[...]
+
+> @@ -192,15 +201,6 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+>  	if (ret < 0)
+>  		goto err_init;
+>  
+> -	/* call platform specific init function */
+> -	if (pdata->init) {
+> -		ret = pdata->init(pdev);
+> -		if (ret) {
+> -			dev_err(dev, "platform init failed\n");
+> -			goto err_init;
+> -		}
+> -	}
+> -
+>  	/* most platforms need some time to settle changed IO settings */
+>  	mdelay(10);
+
+You should probably also move the mdelay() and the comment then, right?
+And as you're on it, the delay make more sense inside the
+'if (pdata->init)' block ...
+
+Thanks,
+Daniel
