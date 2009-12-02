@@ -1,53 +1,78 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 2 Dec 2009 01:52:17 +0100
-Subject: [PATCH] MMC: pxamci: call pdata->setpower even when regulator
-	is used
-In-Reply-To: <1259233813-2724-1-git-send-email-daniel@caiaq.de>
-References: <1259233813-2724-1-git-send-email-daniel@caiaq.de>
-Message-ID: <20091202005217.GT14091@buzzloop.caiaq.de>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Wed, 02 Dec 2009 13:53:53 +1300
+Subject: [PATCH] add PATA host controller support for Cirrus Logic's EP93xx
+	CPUs
+In-Reply-To: <200911261651.40928.bzolnier@gmail.com>
+References: <200911261651.40928.bzolnier@gmail.com>
+Message-ID: <4B15BAA1.2010408@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping.
+Bartlomiej Zolnierkiewicz wrote:
+> Based on the older IDE host driver by Joao Ramos and review comments
+> for it from Sergei Shtylyov.  Not yet tested with the real hardware.
+>
 
-On Thu, Nov 26, 2009 at 12:10:13PM +0100, Daniel Mack wrote:
-> On platforms where the vmmc regulator is used, it might still be
-> necessary to call the platform data's setpower() callback in order to
-> drive GPIOs to power up hardware.
-> 
-> I can't see any pxamci user with power regulators enabled, hence this
-> shouldn't break anything.
-> 
-> Signed-off-by: Daniel Mack <daniel@caiaq.de>
-> Cc: Pierre Ossman <pierre@ossman.eu>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: linux-mmc at vger.kernel.org
-> ---
->  drivers/mmc/host/pxamci.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
-> index b00d673..c35df2b 100644
-> --- a/drivers/mmc/host/pxamci.c
-> +++ b/drivers/mmc/host/pxamci.c
-> @@ -84,7 +84,7 @@ static inline void pxamci_init_ocr(struct pxamci_host *host)
->  		host->mmc->ocr_avail = mmc_regulator_get_ocrmask(host->vcc);
->  		if (host->pdata && host->pdata->ocr_mask)
->  			dev_warn(mmc_dev(host->mmc),
-> -				"ocr_mask/setpower will not be used\n");
-> +				"given ocr_mask will not be used\n");
->  	}
->  #endif
->  	if (host->vcc == NULL) {
-> @@ -109,7 +109,7 @@ static inline void pxamci_set_power(struct pxamci_host *host, unsigned int vdd)
->  		gpio_set_value(host->pdata->gpio_power,
->  			       !!on ^ host->pdata->gpio_power_invert);
->  	}
-> -	if (!host->vcc && host->pdata && host->pdata->setpower)
-> +	if (host->pdata && host->pdata->setpower)
->  		host->pdata->setpower(mmc_dev(host->mmc), vdd);
->  }
->  
-> -- 
-> 1.6.5.2
-> 
+Hi Bartlomiej,
+
+I have got as far as patching this into my kernel and doing a build test
+(still need to find a hard-disk to test). I got some build errors, see
+below:
+
+> +static void pata_ep93xx_set_piomode(struct ata_port *ap,
+> +				    struct ata_device *adev)
+> +{
+> +	void __iomem *base = ap->host->private_data;
+> +	struct ata_device *pair = ata_dev_pair(adev);
+> +	const struct ata_timing *t = ata_timing_find_mode(adev->pio_mode);
+> +	const struct ata_timing *cmd_t = t;
+> +	u32 reg = IDECFG_IDEEN | IDECFG_PIO;
+> +	u8 pio = adev->pio_mode - XFER_PIO_0;
+> +
+> +	if (pair && pair->pio_mode < adev->pio_mode)
+> +		cmd_t = ata_timing_find_mode(pair->pio_mode);
+> +
+> +	/*
+> +	 * store the adequate PIO mode timings, to be used later
+> +	 * by pata_ep93xx_{read,write}
+> +	 */
+> +	adev->private_data = (void *)t;
+> +	ap->private_data = (void *)cmd_t;
+
+struct ata_device has no member called private_data. Do we need to store
+both t and cmd_t, or can we just store cmd_t in ap->private_data?
+
+If we need both, can we have something like this (not sure if the member
+names are sensible):
+
+	struct ep93xx_ata_timing {
+		struct ata_timing *dev_timing;
+		struct ata_timing *pair_timing;
+	};
+
+and store that struct in ap?
+
+> +unsigned int pata_ep93xx_data_xfer(struct ata_device *adev, unsigned char *buf,
+> +				   unsigned int buflen, int rw)
+> +{
+> +	struct ata_port *ap = adev->link->ap;
+> +	void __iomem *base = ap->host->private_data;
+> +	void *data_addr = ap->ioaddr.data_addr;
+> +	u16 *data = (u16 *)buf;
+> +	struct ata_timing *t = adev->private_data;
+
+This is the only place that uses the ata_timing structure stored in
+adev->private_data, can this be changed to:
+
+	struct ata_timing *t = ap->private_data;
+
+~Ryan
+
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
