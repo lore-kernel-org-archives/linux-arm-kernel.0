@@ -1,37 +1,56 @@
-From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
-Date: Wed, 02 Dec 2009 10:03:00 +0100
-Subject: USB support on i.MX27
-In-Reply-To: <4B162897.1080402@epfl.ch>
-References: <37367b3a0911240343u58e3b3d2le5d48e638348a3ad@mail.gmail.com>	<eedb5540911242252w62f0a1cfo3a3f24dfa060957b@mail.gmail.com>	<20091127101654.GP14091@buzzloop.caiaq.de>	<37367b3a0911300707l2abafe3buf99f624c3c90b99@mail.gmail.com>	<37367b3a0911301157k2a15cb80q5624cbd3f96063b8@mail.gmail.com>	<37367b3a0912010616r26ff385bqe6b85db1c510822f@mail.gmail.com>	<20091201142609.GP14091@buzzloop.caiaq.de>	<37367b3a0912010651s2f7b6d0csc8fc73e088195697@mail.gmail.com>
-	<4B162897.1080402@epfl.ch>
-Message-ID: <4B162D44.3070709@eukrea.com>
+From: derkling@gmail.com (Patrick Bellasi)
+Date: Wed, 2 Dec 2009 10:11:03 +0100
+Subject: [PATCH 1/3] AT91: update at91_eth_data for ETX2-3 on PA10-11
+In-Reply-To: <20091201155908.GF18841@game.jcrosoft.org>
+References: <20091129234917.GB18841@game.jcrosoft.org>
+	<1259574486-13391-1-git-send-email-derkling@gmail.com>
+	<1259574486-13391-2-git-send-email-derkling@gmail.com>
+	<cd73a99e0911301236pd18a382o6faa04c15b3bf9c@mail.gmail.com>
+	<aa8983610912010058j738df89fyd75e9e75973e94ed@mail.gmail.com>
+	<20091201155908.GF18841@game.jcrosoft.org>
+Message-ID: <aa8983610912020111j2f88cc6bg383c15ef756c5f56@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Dec 1, 2009 at 4:59 PM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+>> >> @@ -83,6 +83,7 @@ struct at91_eth_data {
+>> >> ? ? ? ?u32 ? ? ? ? ? ? phy_mask;
+>> >> ? ? ? ?u8 ? ? ? ? ? ? ?phy_irq_pin; ? ?/* PHY IRQ */
+>> >> ? ? ? ?u8 ? ? ? ? ? ? ?is_rmii; ? ? ? ?/* using RMII interface? */
+>> >> + ? ? ? u8 ? ? ? ? ? ? ?use_twi_pins; ? /* ETX2-ETX3 on PA23-PA24 */
+>> >> ?};
+>> >
+> except here the TWI description is incorrect as you do not care about the twi
+> when you configured the MACB as I can want to use the two pin for something
+> else than I2C. So we need to describe want we want to do about the MACB and
+> not a possible alternated functionnality.
 
-Valentin Longchamp a ?crit :
-> Alan Carvalho de Assis wrote:
->> On 12/1/09, Daniel Mack <daniel@caiaq.de> wrote:
->>> Hmm, I don't follow. You added some debug output and it started working,
->>> is that what you say? Do we possibly need memory barriers somewhere?
->>>
->>
->> Basically it, but I will do more tests to isolate the issue.
->>
->> In fact there is a board where the issue remain, but using old kernel
->> (2.6.22) both work.
-> 
-> I am also investigating this issue. The same happens sometimes with my 
-> USB host with ULPI-ISP1504, but it never happens with the USB slave with 
-> the exact same hardware ULPI-ISP1504, that's why I have the feeling that 
-> it's a purely software issue.
-> 
-we once met a similar problem on i.MX27 : in fact, during IOMUX 
-configuration, some pins were togled on the ULPI and the ISP1504 was 
-taking this toggles as a command and was taking control of the ULPI bus 
-which means the IMX wasn't anymore able to talk to it through ULPI. Just 
-reseting the ISP1504 allawed the boot to continue fine.
-Maybe your issue is similar to this.
+Maybe I am misunderstanding what you are complaining about.
+However let me try to explain better the intent.
 
-Eric
+A board code use the "use_twi_pins" in the configuration of the
+behaviours of the MACB.
+Thus, this read as: "I need a MACB which use the pins that can be used
+for the TWI too".
+Of course, I'm not caring about TWI during MACB configuration, I'm
+just giving an input to the soc-specific code to say: "please route my
+ ETX2-ETX3 signals to the same pins where the TWI's are".
+This should be a quite clear statement because in this specific SoC
+(at91sam9260) the TWI hardware block can be attached only to these
+pins. To be even more clear, I suggested to ifdef the use_twi_pins to
+allow its usage only on the at91sam9260 SoC, that is the only one
+where the statement "I need a MACB which use the pins that can be used
+for the TWI too" makes sense.
+
+If I want to use the two pins for something else, no problems: I'll
+not define use_twi_pins=1 on my MACB configuration, and this (correct
+me if I'm wrong) will turn out to be equivalent to set use_twi_pins=0,
+and I'll setup these pins somewhere else in the board code.
+
+I hope to have been more clear in describing the intent of this new member.
+Put in these terms: what do you think?
+
+> Best Regards,
+> J.
+Bye Patrick
