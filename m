@@ -1,53 +1,57 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 2 Dec 2009 11:20:57 +0000
+Date: Wed, 2 Dec 2009 12:10:53 +0000
 Subject: [PATCH 4/7] S3C64XX: Declare IISv4 PCLK for S3C6410
-In-Reply-To: <20091201214201.GP4808@trinity.fluff.org>
+In-Reply-To: <1b68c6790912011650p58cc6b27n90b032167ebb9bc8@mail.gmail.com>
 References: <20091127164312.GA11913@rakim.wolfsonmicro.main>
 	<1259340239-12067-4-git-send-email-broonie@opensource.wolfsonmicro.com>
 	<20091201214201.GP4808@trinity.fluff.org>
-Message-ID: <20091202112057.GB12661@rakim.wolfsonmicro.main>
+	<1b68c6790912011650p58cc6b27n90b032167ebb9bc8@mail.gmail.com>
+Message-ID: <20091202121053.GC12661@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 01, 2009 at 09:42:01PM +0000, Ben Dooks wrote:
-> On Fri, Nov 27, 2009 at 04:43:56PM +0000, Mark Brown wrote:
+On Wed, Dec 02, 2009 at 09:50:15AM +0900, jassi brar wrote:
+> On Wed, Dec 2, 2009 at 6:42 AM, Ben Dooks <ben-linux@fluff.org> wrote:
 
-> > [Updated the device ID to -1 since there's only one IISv4 device but the
-> > S3C clock API tries to match based on the ID of the requesting device
+> > 1) If changing the .id field of the iisv4 device really a good idea,
+> > ? especially if there might be more than one of them in the future?
 
-> I had a quick look at the other clock changes and there are a couple
-> of questions that have come up:
+> Also, changing indices of devices with disregard to their respective clock
+> might force further adhoc changes in system resources.
 
-> 1) If changing the .id field of the iisv4 device really a good idea,
->    especially if there might be more than one of them in the future?
+Well, from that point of view we'd be much better off with clkdev which
+completely avoids the need to fiddle with id numbers to match clocks and
+devices; the fact that this is a concern is really a limitation of the
+clock API and open to fragility.  There would also be issues if someone
+decided to do something like hang the PCM controllers off CLKAUDIO1 and
+2 instead of 0 and 1, for example.  It's only a concern because there is
+insufficient abstracton between the devices and clocks.
 
-Half the problem here is that the current S3C clock implementation is
-doing a half clkdevish thing and matching on the id field of the struct
-device that gets passed in with no indirection.  This means that the
-either the devices or the clocks need their ids fixing to match the
-other.  If we're worrying about further chips sharing the same clock
-tree definition tables we also need to worry about the possibility that
-a chip is going to come along which swaps out the hookup for one IP
-block with another unrelated IP block.
+> I think, best wud be to modify s3c64xx_i2s.c to support 2 channel, 6
+> channel, h/w mixing(maybe LP-Audio feature too) and pass flag for each
+> feature via platform data
+> by something like:-  .has_6_channels, .has_hw_mixer, .has_lp_audio etc
 
-With the current scheme I imagine that all of this would be handled with
-conditional registration of the affected clocks based on the chip we're
-running on.
+> The point to note here is to write drivers around functionality, rather than
+> version, of the controller.
 
-> 2) The clock name for the current audio bus clock for the iisv4 unit
->    is wrong as we're using it for both the iis and iisv4 blocks. It
+This can also be addressed via use of library code (which is what's
+happening at the minute for the stuff that's shared between the 24xx and
+64xx series).  You can also look at this from the point of view of
+saying that IP blocks that are documented as having separate programming
+interfaces should be presented in a similar way to the user so that it's
+easier for them to find the functionality they need.
 
-I'm not sure what you mean by this.  The IIS and IISv4 blocks both use
-the same clock names in their documentation (as does the PCM block).
+None of the approach I'm suggesting means that we can't have a single
+driver file which handles more than one revision of the controller, we
+can always move the registration of multiple variants into a single
+source file.  The benefit is that we're not forced to do that so if the
+conditional code gets to be too much which does seem likely - there's
+already differences going from 24xx to 64xx, and I seem to recall that
+there are some incompatibilities between IISv2 and IISv4 on the 6410 too.
 
->    might be worth renaming the clock for the iisv4 audio bus before
->    looking at changing the usage of the clock support (once the current
->    changes have been sorted)
-
-What name would you suggest?
-
-> As such is the #ifdef of the clock code when the S3C6410 support
-> really necesary?
-
-I inherited that bit from Jassi's original patch.  The IISv4 block is
-not present on the S3C6400 so it didn't seem unreasonable.
+Since Samsung have not been willing to share documentation (I do have
+access to some but not all) it's hard to comment in detail on the most
+tasteful way of handling all these things but I have particular concerns
+about trying to fit more substantial functionality like hardware mixing
+support into the existing driver.
