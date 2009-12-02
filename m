@@ -1,36 +1,46 @@
-From: yeasah@comrex.com (Yeasah Pell)
-Date: Tue, 01 Dec 2009 17:13:56 -0500
-Subject: strange, spurious seeming vector exception on pxa300
-Message-ID: <4B159524.2020408@comrex.com>
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Wed, 2 Dec 2009 09:22:23 +0900
+Subject: [PATCH 1/7] S3C64XX: Staticise platform data for PCM devices
+In-Reply-To: <1259340239-12067-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <20091127164312.GA11913@rakim.wolfsonmicro.main>
+	<1259340239-12067-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1b68c6790912011622g6eb8f5e6kd1c27b59053255b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Has anybody ever seen vector exceptions happen on an ARM (xscale, 
-pxa300) without 26-bit mode being used? I have some application and 
-kernel code which appears to work on most hardware, but we have at least 
-one board which causes periodic messages:
+On Sat, Nov 28, 2009 at 1:43 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> The symbols aren't declared and don't need to be exported, they go
+> along with the device structure.
+>
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+> ?arch/arm/plat-s3c64xx/dev-audio.c | ? ?4 ++--
+> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/plat-s3c64xx/dev-audio.c b/arch/arm/plat-s3c64xx/dev-audio.c
+> index 9e07344..a21a88f 100644
+> --- a/arch/arm/plat-s3c64xx/dev-audio.c
+> +++ b/arch/arm/plat-s3c64xx/dev-audio.c
+> @@ -118,7 +118,7 @@ static struct resource s3c64xx_pcm0_resource[] = {
+> ? ? ? ?},
+> ?};
+>
+> -struct s3c_audio_pdata s3c_pcm0_pdata = {
+> +static struct s3c_audio_pdata s3c_pcm0_pdata = {
+> ? ? ? ?.cfg_gpio = s3c64xx_pcm_cfg_gpio,
+> ?};
+>
+> @@ -151,7 +151,7 @@ static struct resource s3c64xx_pcm1_resource[] = {
+> ? ? ? ?},
+> ?};
+>
+> -struct s3c_audio_pdata s3c_pcm1_pdata = {
+> +static struct s3c_audio_pdata s3c_pcm1_pdata = {
+> ? ? ? ?.cfg_gpio = s3c64xx_pcm_cfg_gpio,
+> ?};
+>
+> --
+> 1.6.5.3
 
-Unhandled fault: vector exception (0x010) at 0x412c8a90
-
-(I also fudged the fault handler a bit to dump the SPSR: 0x80000010)
-
-These messages correspond with a SEGV being sent to the application. The 
-code address is always the same, but the instruction in question is just 
-an ordinary load just like many others surrounding it. It's in a hot 
-path so it's being run successfully for thousands of iterations before 
-the problem manifests. Running in gdb and ignoring the SEGV causes the 
-application to continue normally, so apparently the load is successful 
-(the particular load operation in question is critical to proper 
-operation of the app)
-
-The definition of a vector exception as I understand it seems to be at 
-odds with the context in which the exception is being generated (for one 
-thing the CPU's not in 26-bit mode, and for another thing the data 
-address is nowhere near the exception vectors), so it seems like it 
-might be spurious somehow.
-
-If anybody has any theory how this might happen other than some kind of 
-hardware fault, please let me know! It's driving me absolutely nuts.
-
-Thanks,
-Yeasah Pell
+Acked-By: Jassi Brar <jassi.brar@samsung.com>
