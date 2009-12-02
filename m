@@ -1,39 +1,37 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 2 Dec 2009 12:03:26 +0100
-Subject: [PATCH] mmc: pxamci: call mmc_remove_host() before freeing
-	resources
-In-Reply-To: <f17812d70912011650h48a6c391s426ffc8b4b653fc8@mail.gmail.com>
-References: <1259687838-31722-1-git-send-email-daniel@caiaq.de>
-	<f17812d70912011650h48a6c391s426ffc8b4b653fc8@mail.gmail.com>
-Message-ID: <20091202110326.GZ14091@buzzloop.caiaq.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 2 Dec 2009 12:20:43 +0100
+Subject: [PATCH 8/9 v2] MXC: Add a digital audio multiplexer driver
+In-Reply-To: <eedb5540911300815u5cf60634jd58918f454269028@mail.gmail.com>
+References: <1258022525-21078-8-git-send-email-s.hauer@pengutronix.de>
+	<1258022525-21078-9-git-send-email-s.hauer@pengutronix.de>
+	<20091112150615.GA30179@pengutronix.de>
+	<eedb5540911300356p2b41eeaakee050953ad39ec26@mail.gmail.com>
+	<20091130121017.GN27548@pengutronix.de>
+	<eedb5540911300425n374af9f0k5346d85fdb79eb11@mail.gmail.com>
+	<20091130123412.GP27548@pengutronix.de>
+	<eedb5540911300509t11cc783cr8e97eda66ee382a@mail.gmail.com>
+	<20091130160356.GT27548@pengutronix.de>
+	<eedb5540911300815u5cf60634jd58918f454269028@mail.gmail.com>
+Message-ID: <20091202112043.GA15126@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 02, 2009 at 08:50:44AM +0800, Eric Miao wrote:
-> On Wed, Dec 2, 2009 at 1:17 AM, Daniel Mack <daniel@caiaq.de> wrote:
-> > mmc_remove_host() will cause the mmc core to switch off the bus power by
-> > eventually calling pxamci_set_ios(). This function uses the regulator or
-> > the GPIO which have been freed already.
-> >
-> > This causes the following Oops on module unload.
-> >
-
-[...]
-
-> >
-> > Signed-off-by: Daniel Mack <daniel@caiaq.de>
-> > Reported-by: Sven Neumann <s.neumann@raumfeld.com>
-> > Cc: Pierre Ossman <pierre@ossman.eu>
-> > Cc: Eric Miao <eric.y.miao@gmail.com>
-> > Cc: linux-mmc at vger.kernel.org
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: stable at kernel.org
-> > ---
-> > ?drivers/mmc/host/pxamci.c | ? ?4 ++--
+On Mon, Nov 30, 2009 at 05:15:45PM +0100, javier Martin wrote:
 > 
-> Looks like a correct fix to me.
+> Sascha,
+> there are actually two holes, with this current patch, PPCR3 still receives
+> a wrong value:
 > 
-> Acked-by: Eric Miao <eric.y.miao@gmail.com>
+> 0x1001_6000 (HPCR1)
+> 0x1001_6004 (HPCR2)
+> 0x1001_6008 (HPCR3)
+> 0x1001_600C (hole)
+> 0x1001_6010 (PPCR1)
+> 0x1001_6014 (PPCR2)
+> 0x1001_6018 (hole)
+> 0x1001_601C (PPCR3)
 
-Would be good to still get this into .32 - who will take care of picking
-this?
+
+Lets hope I had enough sleep this night...
+
+Sascha
