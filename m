@@ -1,36 +1,120 @@
-From: acassis@gmail.com (Alan Carvalho de Assis)
-Date: Wed, 2 Dec 2009 18:25:43 -0200
-Subject: [PATCH 1/1] fix occasional ULPI timeouts with ehci-mxc
-In-Reply-To: <4B16C185.80905@warmcat.com>
-References: <1259770381-16987-1-git-send-email-valentin.longchamp@epfl.ch>
-	<37367b3a0912021058j2801df5l2c937ac339bc5f6b@mail.gmail.com>
-	<4B16C185.80905@warmcat.com>
-Message-ID: <37367b3a0912021225l67455ca2q2c7d0464279f446e@mail.gmail.com>
+From: ospite@studenti.unina.it (Antonio Ospite)
+Date: Wed, 2 Dec 2009 21:31:31 +0100
+Subject: [PATCH] leds: Add LED class driver for regulator driven LEDs.
+In-Reply-To: <1259778235.3588.141.camel@odin>
+References: <1259775625-25973-1-git-send-email-ospite@studenti.unina.it>
+	<1259778235.3588.141.camel@odin>
+Message-ID: <20091202213131.1393a956.ospite@studenti.unina.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+On Wed, 02 Dec 2009 18:23:55 +0000
+Liam Girdwood <lrg@slimlogic.co.uk> wrote:
 
-On 12/2/09, Andy Green <andy@warmcat.com> wrote:
+> On Wed, 2009-12-02 at 18:40 +0100, Antonio Ospite wrote:
+> > This driver provides an interface for controlling LEDs (or vibrators)
+> > connected to PMICs for which there is a regulator framework driver.
+> > 
+> > This driver can be used, for instance, to control vibrator on all Motorola EZX
+> > phones using the pcap-regulator driver services.
+> > 
+> > Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
+> 
+> Some very minor points below.
+> 
+
+Thanks for reviewing the code.
+
+[...]
+> > +
+> > +static void led_work(struct work_struct *work)
+> > +{
+> > +	struct regulator_led *led;
+> > +	int voltage;
+> > +	int ret;
+> > +
+> > +	led = container_of(work, struct regulator_led, work);
+> > +
+> > +	mutex_lock(&led->mutex);
+> > +
+> > +	if (led->value == 0) {
+> 
+> LED_OFF instead of 0 here ?
 >
-> What did you do with your chip select line on the ULPI PHY?
+
+Ok.
+
+> > +		regulator_led_disable(led);
+> > +		goto out;
+> > +	}
+> > +
+> > +	voltage = led_regulator_get_vdd(led->vcc, led->value);
+> > +	dev_dbg(led->cdev.dev, "brightness: %d voltage: %d",
+> > +			led->value, voltage);
+> > +
+> > +	ret = regulator_set_voltage(led->vcc, voltage, voltage);
+> > +	if (ret != 0)
+> > +		dev_err(led->cdev.dev, "Failed to set voltage %d: %d\n",
+> > +			voltage, ret);
+> 
+> Some regulators may not support voltage change (via hw design or
+> constraints) so set_voltage() will fail. We probably want to handle this
+> regulator type so we don't call set_voltage().
 >
 
-I turn this line (CS_N) low before initializing ISP1504.
+Ok, I'll read more about the regulator framework to find out how to
+check regulator capabilities.
 
-> The first iMX LiteKIT board I had was an old revision where they had
-> tied the PHY chip select pin asserted.  The ULPI PHY acted braindamaged
-> because glitchy junk from during poweron / reset was taken as real data
-> and it never recovered during the session.
+> > +
+> > +	regulator_led_enable(led);
+> > +
+> > +out:
+> > +	mutex_unlock(&led->mutex);
+> > +}
+> > +
+[...]
+> > +static int regulator_led_probe(struct platform_device *pdev)
+> > +{
+> > +	struct led_regulator_platform_data *pdata = pdev->dev.platform_data;
+> > +	struct regulator_led *led;
+> > +	struct regulator *vcc;
+> > +	int ret;
+> > +
+> > +	if (pdata == NULL) {
+> > +		dev_err(&pdev->dev, "no platform data\n");
+> > +		return -ENODEV;
+> > +	}
+> > +
+> > +	vcc = regulator_get(&pdev->dev, pdata->supply);
+> > +	if (IS_ERR(vcc)) {
+> > +		dev_err(&pdev->dev, "Cannot get vcc for %s\n", pdata->name);
+> > +		return PTR_ERR(vcc);;
+> 
+> double ;; here
 >
-> Later versions of the LiteKIT changed this to be pulled deasserted and a
-> GPIO can drive it asserted after reset is all done.  After I got a later
-> revision with that mod, and drove the GPIO, suddenly all was well.
->
 
-I was thinking it could be some hw issues, but this is not, because
-using old kernel everything works fine.
+Thanks.
 
-Best Regards,
+[...]
 
-Alan
+Regards,
+   Antonio 
+
+-- 
+Antonio Ospite
+http://ao2.it
+
+PGP public key ID: 0x4553B001
+
+A: Because it messes up the order in which people normally read text.
+   See http://en.wikipedia.org/wiki/Posting_style
+Q: Why is top-posting such a bad thing?
+A: Top-posting.
+Q: What is the most annoying thing in e-mail?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091202/9a79008c/attachment.sig>
