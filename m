@@ -1,31 +1,77 @@
-From: tbarr@multitech.com (Tim Barr)
-Date: Tue, 1 Dec 2009 09:16:23 -0600
-Subject: [PATCH 1/3] AT91: update at91_eth_data for ETX2-3 on PA10-11
-Message-ID: <1CD05B980C94AC408B37C82BBABAA3E6129306D9@mtsexchange.dc.multitech.prv>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Wed, 2 Dec 2009 13:46:46 +0100
+Subject: [PATCH 8/9 v2] MXC: Add a digital audio multiplexer driver
+In-Reply-To: <20091202112043.GA15126@pengutronix.de>
+References: <1258022525-21078-8-git-send-email-s.hauer@pengutronix.de>
+	<20091112150615.GA30179@pengutronix.de>
+	<eedb5540911300356p2b41eeaakee050953ad39ec26@mail.gmail.com>
+	<20091130121017.GN27548@pengutronix.de>
+	<eedb5540911300425n374af9f0k5346d85fdb79eb11@mail.gmail.com>
+	<20091130123412.GP27548@pengutronix.de>
+	<eedb5540911300509t11cc783cr8e97eda66ee382a@mail.gmail.com>
+	<20091130160356.GT27548@pengutronix.de>
+	<eedb5540911300815u5cf60634jd58918f454269028@mail.gmail.com>
+	<20091202112043.GA15126@pengutronix.de>
+Message-ID: <eedb5540912020446n1da36bb0h229205ca8d73a030@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One point of interest, I have checked both Atmel EK designs
-(9260 and 9G20) and they both use PA10 and PA11 for EMAC EXT2
-and EXT3. Since the EK boards are built to use the RMII version
-of the EMAC interface, the pin assignments of PA23 and PA24 in 
-the kernel were not much of an issue. But since my design uses
-MII for part cost and EMI issues, I have to change the pin
-assignments.
+> From 4c8b581dd28588940a328632e406baab574e0ce5 Mon Sep 17 00:00:00 2001
+> From: Sascha Hauer <s.hauer@pengutronix.de>
+> Date: Mon, 30 Nov 2009 13:31:29 +0100
+> Subject: [PATCH] i.MX27 audmux: Fix register offsets
+>
+> We have two holes in the register space. The driver did not
+> handle this. Fix it.
+>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  arch/arm/plat-mxc/audmux-v1.c |    9 +++++++--
+>  1 files changed, 7 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/plat-mxc/audmux-v1.c b/arch/arm/plat-mxc/audmux-v1.c
+> index 70ab5af..da6387d 100644
+> --- a/arch/arm/plat-mxc/audmux-v1.c
+> +++ b/arch/arm/plat-mxc/audmux-v1.c
+> @@ -28,7 +28,9 @@
+>
+>  static void __iomem *audmux_base;
+>
+> -#define MXC_AUDMUX_V1_PCR(x)   ((x) * 4)
+> +static unsigned char port_mapping[] = {
+> +       0x0, 0x4, 0x8, 0x10, 0x14, 0x1c,
+> +};
+>
+>  int mxc_audmux_v1_configure_port(unsigned int port, unsigned int pcr)
+>  {
+> @@ -37,7 +39,10 @@ int mxc_audmux_v1_configure_port(unsigned int port,
+> unsigned int pcr)
+>                return -ENOSYS;
+>        }
+>
+> -       writel(pcr, audmux_base + MXC_AUDMUX_V1_PCR(port));
+> +       if (port >= ARRAY_SIZE(port_mapping))
+> +               return -EINVAL;
+> +
+> +       writel(pcr, audmux_base + port_mapping[port]);
+>
+>        return 0;
+>  }
+> --
+> 1.6.5.2
+>
 
-Tim Barr
-Development Engineer
+Yes,
+it works now. Thank you for your patience with this.
 
-Multi-Tech Systems, Inc.
-
-> On Mon, Nov 30, 2009 at 10:04 PM, Tim Barr 
-> <tbarr@multitech.com> wrote:
-> > I see a bigger problem here. It is more of an issue of how to
-> > handle signals that have more than one pin assignment option.
-> Yes, that's the point.
-> Moreover, according to my own (perhaps limited) knowledge, at 
-> least the at91 machine dependent code provides a good glue 
-> code almost only for boards which are quite similar to the 
-> reference design. The problem is that instead each SoC allows 
-> for different signal routing.
-> 
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091202/f10ccfe5/attachment-0001.htm>
