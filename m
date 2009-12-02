@@ -1,74 +1,51 @@
-From: ospite@studenti.unina.it (Antonio Ospite)
-Date: Wed, 2 Dec 2009 21:48:53 +0100
-Subject: [PATCH] leds: Add LED class driver for regulator driven LEDs.
-In-Reply-To: <20091202204026.GA18311@rakim.wolfsonmicro.main>
-References: <1259775625-25973-1-git-send-email-ospite@studenti.unina.it>
-	<20091202180658.GA12292@rakim.wolfsonmicro.main>
-	<20091202212521.500f7a46.ospite@studenti.unina.it>
-	<20091202204026.GA18311@rakim.wolfsonmicro.main>
-Message-ID: <20091202214853.d97b860c.ospite@studenti.unina.it>
+From: andy@warmcat.com (Andy Green)
+Date: Wed, 02 Dec 2009 21:13:05 +0000
+Subject: [PATCH 1/1] fix occasional ULPI timeouts with ehci-mxc
+In-Reply-To: <37367b3a0912021225l67455ca2q2c7d0464279f446e@mail.gmail.com>
+References: <1259770381-16987-1-git-send-email-valentin.longchamp@epfl.ch>	
+	<37367b3a0912021058j2801df5l2c937ac339bc5f6b@mail.gmail.com>	
+	<4B16C185.80905@warmcat.com>
+	<37367b3a0912021225l67455ca2q2c7d0464279f446e@mail.gmail.com>
+Message-ID: <4B16D861.6090307@warmcat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Dec 2009 20:40:26 +0000
-Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+On 12/02/09 20:25, Somebody in the thread at some point said:
 
-> On Wed, Dec 02, 2009 at 09:25:21PM +0100, Antonio Ospite wrote:
-> > Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
-> 
-> > > There's no need to do this since the regulator API matches consumers
-> > > based on struct device as well as name so you can have as many LEDs as
-> > > you like all using the same supply name mapping to different regulators.
-> 
-> > I need some more explanation here, I am currently using the driver with
-> > this code:
-> 
-> > +/* VVIB: Vibrator on A780, A1200, A910, E6, E2 */
-> > +static struct regulator_consumer_supply pcap_regulator_VVIB_consumers
-> > [] = {
-> > +	{ .dev_name = "leds-regulator", .supply = "vibrator", },
-> 
-> So you're instantiating the device with .id set to -1 (as your code
-> below shows), meaning there's only one leds-regulator in the system and
-> there's no need to number them.  If you had more than one of them then
-> you'd number them and then have something like:
-> 
-> 	{ .dev_name = "leds-regulator.0", supply = "vled" },
-> 	{ .dev_name = "leds-regulator.1", supply = "vled" },
-> 
-> when setting up the supplies.
+Hi Alan -
+
+>> What did you do with your chip select line on the ULPI PHY?
 >
+> I turn this line (CS_N) low before initializing ISP1504.
 
-Ok, the .id in .dev_name is what I was missing.
+It's more a question about what that input on the PHY chip sees during 
+powerup / reset... it needs to be nicely and definitely high the whole 
+time so it will ignore what happens then.  Is it pulled up, or just 
+connected to the iMX GPIO?  iMX GPIO alone may not be enough.  They 
+mostly default to 100K pullup but even that may not be enabled early in 
+the powerup action.
 
-> > If I set the .supply value fixed, how can I assign different
-> > regulators to different leds? Should I use the address to the platform
-> > device (a780_vibrator in this case) for .dev when defining the
-> > regulator in the first place?
-> 
-> There is no need to use the .dev field, that is kept to avoid build
-> breakage transitioning to dev_name.
+A 10K to your IO voltage rail on CS_N solved it for the LiteKIT and on 
+the boards we have made.
 
-Now everything is clear.
+>> The first iMX LiteKIT board I had was an old revision where they had
+>> tied the PHY chip select pin asserted.  The ULPI PHY acted braindamaged
+>> because glitchy junk from during poweron / reset was taken as real data
+>> and it never recovered during the session.
+>>
+>> Later versions of the LiteKIT changed this to be pulled deasserted and a
+>> GPIO can drive it asserted after reset is all done.  After I got a later
+>> revision with that mod, and drove the GPIO, suddenly all was well.
+>
+> I was thinking it could be some hw issues, but this is not, because
+> using old kernel everything works fine.
 
-Thanks,
-   Antonio
+OK.
 
--- 
-Antonio Ospite
-http://ao2.it
+But on the old LiteKIT where it was tied low, it was erratic: worked 
+sometimes and not others depending on the random details of what went 
+where in what order during powerup each time.  If you didn't see it work 
+on this older kernel over a bunch of powercycles keep the idea in a back 
+pocket :-)
 
-PGP public key ID: 0x4553B001
-
-A: Because it messes up the order in which people normally read text.
-   See http://en.wikipedia.org/wiki/Posting_style
-Q: Why is top-posting such a bad thing?
-A: Top-posting.
-Q: What is the most annoying thing in e-mail?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091202/fd58a9fa/attachment.sig>
+-Andy
