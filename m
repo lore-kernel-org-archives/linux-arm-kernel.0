@@ -1,52 +1,101 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 03 Dec 2009 03:07:05 -0700
-Subject: [PATCH 4/8] OMAP2xxx clock: remove implicit dependency between rate
-	CPU flag and clkdev_omap CPU flag
+Date: Thu, 03 Dec 2009 03:07:07 -0700
+Subject: [PATCH 7/8] OMAP1 clock: convert test in disable_unused() to use
+	ENABLE_ON_INIT
 In-Reply-To: <20091203095830.1203.76290.stgit@localhost.localdomain>
 References: <20091203095830.1203.76290.stgit@localhost.localdomain>
-Message-ID: <20091203100704.1203.53963.stgit@localhost.localdomain>
+Message-ID: <20091203100706.1203.7214.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cpu_mask is reused in the OMAP2xxx clock code to match against both the
-CPU-specific rate flags (e.g., RATE_IN_2420) and the OMAP clkdev integration
-code CPU flags (e.g., CK_242X).  This means that any patch that renumbers the
-CK_* macros, as the next patch does, will probably break.  This patch
-separates the clkdev_omap and clksel_rate CPU type detection flags so
-the CK_* macros can be renumbered freely.
+mach-omap1/clock.c:omap1_clk_disable_unused() contains a test that
+assumes that the clock structures are available in the file's
+namespace.  After a following patch, this will no longer be the case.
+So we need to reimplement that test.  It turns out that we already
+have a facility in the clock framework to handle this case - the
+ENABLE_ON_INIT flag - used on OMAP2/3.  Remove the offending test and
+mark the clocks that it was intended to catch as ENABLE_ON_INIT.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/clock24xx.c |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap1/clock.c |   11 -----------
+ arch/arm/mach-omap1/clock.h |   17 ++++++++++++++++-
+ 2 files changed, 16 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clock24xx.c b/arch/arm/mach-omap2/clock24xx.c
-index e60d1c0..5f201d2 100644
---- a/arch/arm/mach-omap2/clock24xx.c
-+++ b/arch/arm/mach-omap2/clock24xx.c
-@@ -751,13 +751,16 @@ int __init omap2_clk_init(void)
- 	struct prcm_config *prcm;
- 	struct omap_clk *c;
- 	u32 clkrate;
-+	u16 cpu_clkflg;
+diff --git a/arch/arm/mach-omap1/clock.c b/arch/arm/mach-omap1/clock.c
+index e006493..26a887c 100644
+--- a/arch/arm/mach-omap1/clock.c
++++ b/arch/arm/mach-omap1/clock.c
+@@ -718,17 +718,6 @@ static void __init omap1_clk_disable_unused(struct clk *clk)
+ 	if ((regval32 & (1 << clk->enable_bit)) == 0)
+ 		return;
  
- 	if (cpu_is_omap242x()) {
- 		prcm_clksrc_ctrl = OMAP2420_PRCM_CLKSRC_CTRL;
- 		cpu_mask = RATE_IN_242X;
-+		cpu_clkflg = CK_242X;
- 	} else if (cpu_is_omap2430()) {
- 		prcm_clksrc_ctrl = OMAP2430_PRCM_CLKSRC_CTRL;
- 		cpu_mask = RATE_IN_243X;
-+		cpu_clkflg = CK_243X;
- 	}
+-	/* FIXME: This clock seems to be necessary but no-one
+-	 * has asked for its activation. */
+-	if (clk == &tc2_ck		/* FIX: pm.c (SRAM), CCP, Camera */
+-	    || clk == &ck_dpll1out.clk	/* FIX: SoSSI, SSR */
+-	    || clk == &arm_gpio_ck	/* FIX: GPIO code for 1510 */
+-		) {
+-		printk(KERN_INFO "FIXME: Clock \"%s\" seems unused\n",
+-		       clk->name);
+-		return;
+-	}
+-
+ 	printk(KERN_INFO "Disabling unused clock \"%s\"... ", clk->name);
+ 	clk->ops->disable(clk);
+ 	printk(" done\n");
+diff --git a/arch/arm/mach-omap1/clock.h b/arch/arm/mach-omap1/clock.h
+index 29ffa97..70195ca 100644
+--- a/arch/arm/mach-omap1/clock.h
++++ b/arch/arm/mach-omap1/clock.h
+@@ -157,12 +157,17 @@ static struct clk ck_dpll1 = {
+ 	.parent		= &ck_ref,
+ };
  
- 	clk_init(&omap2_clk_functions);
-@@ -771,7 +774,7 @@ int __init omap2_clk_init(void)
- 	propagate_rate(&sys_ck);
++/*
++ * FIXME: This clock seems to be necessary but no-one has asked for its
++ * activation.  [ FIX: SoSSI, SSR ]
++ */
+ static struct arm_idlect1_clk ck_dpll1out = {
+ 	.clk = {
+ 		.name		= "ck_dpll1out",
+ 		.ops		= &clkops_generic,
+ 		.parent		= &ck_dpll1,
+-		.flags		= CLOCK_IDLE_CONTROL | ENABLE_REG_32BIT,
++		.flags		= CLOCK_IDLE_CONTROL | ENABLE_REG_32BIT |
++				  ENABLE_ON_INIT,
+ 		.enable_reg	= OMAP1_IO_ADDRESS(ARM_IDLECT2),
+ 		.enable_bit	= EN_CKOUT_ARM,
+ 		.recalc		= &followparent_recalc,
+@@ -207,10 +212,15 @@ static struct arm_idlect1_clk armper_ck = {
+ 	.idlect_shift	= 2,
+ };
  
- 	for (c = omap24xx_clks; c < omap24xx_clks + ARRAY_SIZE(omap24xx_clks); c++)
--		if (c->cpu & cpu_mask) {
-+		if (c->cpu & cpu_clkflg) {
- 			clkdev_add(&c->lk);
- 			clk_register(c->lk.clk);
- 			omap2_init_clk_clkdm(c->lk.clk);
++/*
++ * FIXME: This clock seems to be necessary but no-one has asked for its
++ * activation.  [ GPIO code for 1510 ]
++ */
+ static struct clk arm_gpio_ck = {
+ 	.name		= "arm_gpio_ck",
+ 	.ops		= &clkops_generic,
+ 	.parent		= &ck_dpll1,
++	.flags		= ENABLE_ON_INIT,
+ 	.enable_reg	= OMAP1_IO_ADDRESS(ARM_IDLECT2),
+ 	.enable_bit	= EN_GPIOCK,
+ 	.recalc		= &followparent_recalc,
+@@ -372,10 +382,15 @@ static struct clk tc1_ck = {
+ 	.recalc		= &followparent_recalc,
+ };
+ 
++/*
++ * FIXME: This clock seems to be necessary but no-one has asked for its
++ * activation.  [ pm.c (SRAM), CCP, Camera ]
++ */
+ static struct clk tc2_ck = {
+ 	.name		= "tc2_ck",
+ 	.ops		= &clkops_generic,
+ 	.parent		= &tc_ck.clk,
++	.flags		= ENABLE_ON_INIT,
+ 	.enable_reg	= OMAP1_IO_ADDRESS(ARM_IDLECT3),
+ 	.enable_bit	= EN_TC2_CK,
+ 	.recalc		= &followparent_recalc,
