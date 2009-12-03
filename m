@@ -1,34 +1,34 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 03 Dec 2009 06:49:51 -0700
-Subject: [PATCH 05/10] OMAP: omap_device: add to_omap_device() macro
+Date: Thu, 03 Dec 2009 06:49:52 -0700
+Subject: [PATCH 06/10] OMAP: omap_device: use UINT_MAX for default wakeup
+	latency limit
 In-Reply-To: <20091203134852.17146.81997.stgit@localhost.localdomain>
 References: <20091203134852.17146.81997.stgit@localhost.localdomain>
-Message-ID: <20091203134949.17146.97658.stgit@localhost.localdomain>
+Message-ID: <20091203134951.17146.23073.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Hilman <khilman@deeprootsystems.com>
 
-Following the model of to_platform_device(), add to_omap_device()
-macro so a platform_device pointer can be converted into an
-omap_device pointer.
+The _dev_wakeup_lat_limit field of struct omap_device is u32, so use
+UINT_MAX instead of INT_MAX for the default maximum.
 
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/plat-omap/include/plat/omap_device.h |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+ arch/arm/plat-omap/omap_device.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
-index 11a9773..d939246 100644
---- a/arch/arm/plat-omap/include/plat/omap_device.h
-+++ b/arch/arm/plat-omap/include/plat/omap_device.h
-@@ -137,5 +137,7 @@ struct omap_device_pm_latency {
- };
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index bb16e62..54fe0a2 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -459,7 +459,7 @@ int omap_device_enable(struct platform_device *pdev)
+ 	ret = _omap_device_activate(od, IGNORE_WAKEUP_LAT);
  
+ 	od->dev_wakeup_lat = 0;
+-	od->_dev_wakeup_lat_limit = INT_MAX;
++	od->_dev_wakeup_lat_limit = UINT_MAX;
+ 	od->_state = OMAP_DEVICE_STATE_ENABLED;
  
--#endif
-+/* Get omap_device pointer from platform_device pointer */
-+#define to_omap_device(x) container_of((x), struct omap_device, pdev)
- 
-+#endif
+ 	return ret;
