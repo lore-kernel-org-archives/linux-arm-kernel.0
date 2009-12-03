@@ -1,21 +1,65 @@
-From: rmk@arm.linux.org.uk (Russell King)
-Date: Thu, 3 Dec 2009 10:29:11 +0000
-Subject: [PATCH 8/8] OMAP1 clock: convert mach-omap1/clock.h to
-	mach-omap1/clock_data.c
-In-Reply-To: <20091203100707.1203.98247.stgit@localhost.localdomain>
-References: <20091203095830.1203.76290.stgit@localhost.localdomain>
-	<20091203100707.1203.98247.stgit@localhost.localdomain>
-Message-ID: <20091203102911.GB30423@flint.arm.linux.org.uk>
+From: valentin.longchamp@epfl.ch (Valentin Longchamp)
+Date: Thu,  3 Dec 2009 11:35:58 +0100
+Subject: [PATCH 1/1] fix occasional ULPI timeouts with ehci-mxc
+In-Reply-To: <4B169E48.2000804@epfl.ch>
+References: <4B169E48.2000804@epfl.ch>
+Message-ID: <1259836558-3007-1-git-send-email-valentin.longchamp@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also, why are you emailing me at my rmk+kernel address and claiming
-that I used this address to make the suggestion.  It was my
-linux@ address.
+On various mxc boards, the intial ULPI reads resulted in a timeout
+which prevented the transceiver to be identified and thus the ehci
+device to be probed.
 
-Deleting these mails from this mailbox.
+Initializing the hardware lines connected to the transceiver (through
+pdata->init call) before actually enabling clocks and configuring
+registers in the devices fixes this problem.
 
+Signed-off-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
+---
+ drivers/usb/host/ehci-mxc.c |   23 +++++++++++------------
+ 1 files changed, 11 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+index 35c56f4..23cd917 100644
+--- a/drivers/usb/host/ehci-mxc.c
++++ b/drivers/usb/host/ehci-mxc.c
+@@ -162,6 +162,17 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+ 		goto err_ioremap;
+ 	}
+ 
++	/* call platform specific init function */
++	if (pdata->init) {
++		ret = pdata->init(pdev);
++		if (ret) {
++			dev_err(dev, "platform init failed\n");
++			goto err_init;
++		}
++		/* platforms need some time to settle changed IO settings */
++		mdelay(10);
++	}
++
+ 	/* enable clocks */
+ 	priv->usbclk = clk_get(dev, "usb");
+ 	if (IS_ERR(priv->usbclk)) {
+@@ -192,18 +203,6 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+ 	if (ret < 0)
+ 		goto err_init;
+ 
+-	/* call platform specific init function */
+-	if (pdata->init) {
+-		ret = pdata->init(pdev);
+-		if (ret) {
+-			dev_err(dev, "platform init failed\n");
+-			goto err_init;
+-		}
+-	}
+-
+-	/* most platforms need some time to settle changed IO settings */
+-	mdelay(10);
+-
+ 	/* Initialize the transceiver */
+ 	if (pdata->otg) {
+ 		pdata->otg->io_priv = hcd->regs + ULPI_VIEWPORT_OFFSET;
 -- 
-Russell King
- Linux kernel    2.6 ARM Linux   - http://www.arm.linux.org.uk/
- maintainer of:
+1.6.3.3
