@@ -1,49 +1,118 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 3 Dec 2009 22:01:39 +0000
-Subject: [PATCH 1/7] S3C64XX: Staticise platform data for PCM devices
-In-Reply-To: <1259340239-12067-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <20091127164312.GA11913@rakim.wolfsonmicro.main>
-	<1259340239-12067-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <20091203220139.GQ4808@trinity.fluff.org>
+Date: Thu, 3 Dec 2009 22:06:37 +0000
+Subject: [PATCH 3/5] SPI S3C64XX: Header for passing platform data
+In-Reply-To: <1259218097-9845-1-git-send-email-jassi.brar@samsung.com>
+References: <1259218097-9845-1-git-send-email-jassi.brar@samsung.com>
+Message-ID: <20091203220637.GR4808@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 27, 2009 at 04:43:53PM +0000, Mark Brown wrote:
-> The symbols aren't declared and don't need to be exported, they go
-> along with the device structure.
-
-hmm, the platform data configuration patch seems to be missing, is this
-based on something earlier that has been missed?
- 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/plat-s3c64xx/dev-audio.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+On Thu, Nov 26, 2009 at 03:48:17PM +0900, Jassi Brar wrote:
+> We need a way to pass controller specific information to the
+> SPI device driver. For that purpose a new header is made.
 > 
-> diff --git a/arch/arm/plat-s3c64xx/dev-audio.c b/arch/arm/plat-s3c64xx/dev-audio.c
-> index 9e07344..a21a88f 100644
-> --- a/arch/arm/plat-s3c64xx/dev-audio.c
-> +++ b/arch/arm/plat-s3c64xx/dev-audio.c
-> @@ -118,7 +118,7 @@ static struct resource s3c64xx_pcm0_resource[] = {
->  	},
->  };
->  
-> -struct s3c_audio_pdata s3c_pcm0_pdata = {
-> +static struct s3c_audio_pdata s3c_pcm0_pdata = {
->  	.cfg_gpio = s3c64xx_pcm_cfg_gpio,
->  };
->  
-> @@ -151,7 +151,7 @@ static struct resource s3c64xx_pcm1_resource[] = {
->  	},
->  };
->  
-> -struct s3c_audio_pdata s3c_pcm1_pdata = {
-> +static struct s3c_audio_pdata s3c_pcm1_pdata = {
->  	.cfg_gpio = s3c64xx_pcm_cfg_gpio,
->  };
->  
+> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
+> ---
+>  arch/arm/plat-s3c64xx/include/plat/spi.h |   68 ++++++++++++++++++++++++++++++
+>  1 files changed, 68 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/plat-s3c64xx/include/plat/spi.h
+> 
+> diff --git a/arch/arm/plat-s3c64xx/include/plat/spi.h b/arch/arm/plat-s3c64xx/include/plat/spi.h
+> new file mode 100644
+> index 0000000..d65ddfd
+> --- /dev/null
+> +++ b/arch/arm/plat-s3c64xx/include/plat/spi.h
+
+let's not have all these called spi.h, it will make life more difficult
+when trying to find which spi.h we are searching for in our platform
+support.
+
+> @@ -0,0 +1,68 @@
+> +/* linux/arch/arm/plat-s3c64xx/include/plat/spi.h
+> + *
+> + * Copyright (C) 2009 Samsung Electronics Ltd.
+> + *	Jaswinder Singh <jassi.brar@samsung.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __S3C64XX_PLAT_SPI_H
+> +#define __S3C64XX_PLAT_SPI_H __FILE__
+> +
+> +#define S3C64XX_SPI_SRCCLK_PCLK		0
+> +#define S3C64XX_SPI_SRCCLK_SPIBUS	1
+> +#define S3C64XX_SPI_SRCCLK_48M		2
+> +
+> +#define BUSNUM(b)		(b)
+> +
+> +/**
+> + * struct s3c64xx_spi_csinfo - ChipSelect description
+> + * @fb_delay: Slave specific feedback delay.
+> + * @set_level: CS line control.
+> + */
+> +struct s3c64xx_spi_csinfo {
+> +	u8 fb_delay;
+> +	void (*set_level)(int lvl);
+> +};
+
+I think set_level should be called 'set_cs' to make it clearer what is
+being done here.
+
+> +/**
+> + * struct s3c64xx_spi_cntrlr_info - SPI Controller defining structure
+> + * @src_clk_nr: Clock source index for the CLK_CFG[SPI_CLKSEL] field.
+> + * @src_clk_name: Platform name of the corresponding clock.
+> + * @src_clk: Pointer to the source clock.
+> + * @num_cs: Number of CS this controller emulates.
+> + * @cs: Array describing each CS.
+> + * @cfg_gpio: Configure pins for this SPI controller.
+> + * @fifo_lvl_mask: All tx fifo_lvl fields start at offset-6
+> + * @rx_lvl_offset: Depends on tx fifo_lvl field and bus number
+> + * @high_speed: If the controller supports HIGH_SPEED_EN bit
+> + */
+> +struct s3c64xx_spi_cntrlr_info {
+
+how about not bothering with the _cntrlr_ here and just call it
+s3c64xx_spi_info instead?
+
+> +	int src_clk_nr;
+> +	char *src_clk_name;
+> +	struct clk *src_clk;
+
+do not pass 'struct clk *' in via platform data.
+
+> +	int num_cs;
+> +	struct s3c64xx_spi_csinfo *cs;
+> +
+> +	int (*cfg_gpio)(struct platform_device *pdev);
+> +
+> +	/* Following two fields are for future compatibility */
+> +	int fifo_lvl_mask;
+> +	int rx_lvl_offset;
+> +	int high_speed;
+> +};
+
+I was wondering if a single 'set_cs' callback here would be in order,
+given each spi device can already hold a chip-select number for use
+with such callbacks, so:
+
+void (*set_cs)(struct s3c64xx_spi_cntrlr_info *us, struct spi_device *sel, int to);
+
+> +/**
+> + * s3c64xx_spi_set_info - SPI Controller configure callback by the board
+> + *				initialization code.
+> + * @cntrlr: SPI controller number the configuration is for.
+> + * @src_clk_nr: Clock the SPI controller is to use to generate SPI clocks.
+> + * @cs: Pointer to the array of CS descriptions.
+> + * @num_cs: Number of elements in the 'cs' array.
+> + */
+> +extern void s3c64xx_spi_set_info(int cntrlr, int src_clk_nr, int num_cs);
+> +
+> +#endif /* __S3C64XX_PLAT_SPI_H */
 > -- 
-> 1.6.5.3
+> 1.6.2.5
 > 
 > 
 > _______________________________________________
