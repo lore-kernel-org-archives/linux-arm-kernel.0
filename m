@@ -1,31 +1,35 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 3 Dec 2009 15:09:55 +0000
-Subject: [PATCH] mmc: move regulator handling to core
-In-Reply-To: <20091203145825.GA26651@n2100.arm.linux.org.uk>
-References: <1259844390-10541-1-git-send-email-daniel@caiaq.de>
-	<20091203130627.GA31254@rakim.wolfsonmicro.main>
-	<20091203131423.GV14091@buzzloop.caiaq.de>
-	<20091203132241.GB31533@rakim.wolfsonmicro.main>
-	<20091203145825.GA26651@n2100.arm.linux.org.uk>
-Message-ID: <20091203150955.GA10297@rakim.wolfsonmicro.main>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 3 Dec 2009 08:26:55 -0700 (MST)
+Subject: [PATCH v2 8/8] OMAP1 clock: convert mach-omap1/clock.h to
+	mach-omap1/clock_data.c
+In-Reply-To: <20091203150300.GB26651@n2100.arm.linux.org.uk>
+References: <20091203095830.1203.76290.stgit@localhost.localdomain>
+	<20091203100707.1203.98247.stgit@localhost.localdomain>
+	<20091203102700.GA30423@flint.arm.linux.org.uk>
+	<alpine.DEB.2.00.0912030331360.13408@utopia.booyaka.com>
+	<20091203104354.GB20379@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.0912030355050.13408@utopia.booyaka.com>
+	<alpine.DEB.2.00.0912030424050.13408@utopia.booyaka.com>
+	<20091203121157.GC20379@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.0912030520360.13408@utopia.booyaka.com>
+	<20091203150300.GB26651@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.00.0912030822060.13408@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2009 at 02:58:25PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Dec 03, 2009 at 01:22:41PM +0000, Mark Brown wrote:
+Hello Russell,
 
-> > without power control).  This goes back to the thing about using
-> > regulator_get_exclusive(), the message given was that the MMC drivers
-> > really needed to be able to guarantee that the power would be removed
-> > when that was requested.
+On Thu, 3 Dec 2009, Russell King - ARM Linux wrote:
 
-> If you take some cards through a series of steps and they stop responding,
-> it's normally because you've caused their internal state machine to
-> transition to "invalid" mode.
+> On Thu, Dec 03, 2009 at 05:33:44AM -0700, Paul Walmsley wrote:
+> > My preference was to keep data separated from code in the source files; I 
+> > think it is slightly more readable.
+> 
+> It's less readable because instead of having similar stuff together, it's
+> at opposite ends of the file.
 
-> Further commands are ignored.  The only recovery is to power cycle them.
+Okay.  Our opinions differ.  I'm happy to make this change to align it 
+with what you like.
 
-I assume that this is something it's desirable to be able to do in the
-face of poor hardware rather than something that the Linux MMC stack is
-actively using in normal operation (modulo issues with the general
-quality of implementation of MMC hardware)?
+
+- Paul
