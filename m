@@ -1,18 +1,28 @@
 From: tero.kristo@nokia.com (Tero Kristo)
-Date: Thu,  3 Dec 2009 15:35:53 +0200
-Subject: [PATCHv2 2/2] OMAP3: Implemented VFP restore/save context
-In-Reply-To: <1259847353-22725-2-git-send-email-tero.kristo@nokia.com>
-References: <> <1259847353-22725-1-git-send-email-tero.kristo@nokia.com>
-	<1259847353-22725-2-git-send-email-tero.kristo@nokia.com>
-Message-ID: <1259847353-22725-3-git-send-email-tero.kristo@nokia.com>
+Date: Thu,  3 Dec 2009 15:35:52 +0200
+Subject: [PATCHv2 1/2] ARM: VFP: Fixed suspend and added context save support
+In-Reply-To: <1259847353-22725-1-git-send-email-tero.kristo@nokia.com>
+References: <>
+ <1259847353-22725-1-git-send-email-tero.kristo@nokia.com>
+Message-ID: <1259847353-22725-2-git-send-email-tero.kristo@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tero Kristo <tero.kristo@nokia.com>
 
-VFP save context is called before MPU/NEON off. Restore is not needed as
-the next VFP trap will restore context automatically. Uses the support
-routine implemented in arch/arm/vfp/vfpmodule.c.
+In some ARM architectures, like OMAP3, the VFP context can be lost during
+dynamic sleep cycle. For this purpose, there is now a function
+vfp_pm_save_context() that should be called before the VFP is assumed to
+lose context. Next VFP trap will then restore context automatically.
+
+We need to have the last_VFP_context[cpu] cleared after the save in idle,
+else the restore would fail to restore when it sees that the last_VFP_context
+is same as the current threads vfp_state. This happens when the same
+process/thread traps an exception post idle.
+
+This patch also fixes a potential problem with vfp_pm_suspend(), where
+VFP context can be lost if the current process does not have VFP enabled.
+Fixed by calling vfp_pm_save_context().
 
 Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
 Cc: Vishwanath Sripathy <vishwanath.bs@ti.com>
@@ -20,61 +30,55 @@ Cc: Rajendra Nayak <rnayak@ti.com>
 Cc: Richard Woodruff <r-woodruff2@ti.com>
 Cc: Peter 'p2' De Schrijver <peter.de-schrijver@nokia.com>
 ---
- arch/arm/mach-omap2/pm.h     |    1 +
- arch/arm/mach-omap2/pm34xx.c |   14 +++++++++++++-
- 2 files changed, 14 insertions(+), 1 deletions(-)
+ arch/arm/vfp/vfpmodule.c |   28 ++++++++++++++++++++--------
+ 1 files changed, 20 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-index e0c94ea..bf9b7f9 100644
---- a/arch/arm/mach-omap2/pm.h
-+++ b/arch/arm/mach-omap2/pm.h
-@@ -23,6 +23,7 @@ extern void omap_sram_idle(void);
- extern int omap3_can_sleep(void);
- extern int set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
- extern int omap3_idle_init(void);
-+extern void vfp_pm_save_context(void);
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index 2d7423a..920a33b 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -329,22 +329,34 @@ static void vfp_enable(void *unused)
+ #ifdef CONFIG_PM
+ #include <linux/sysdev.h>
  
- struct prm_setup_times_vc {
- 	u16 clksetup;
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 009bc55..624a7af 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -321,6 +321,13 @@ static void restore_control_register(u32 val)
- 	__asm__ __volatile__ ("mcr p15, 0, %0, c1, c0, 0" : : "r" (val));
- }
+-static int vfp_pm_suspend(struct sys_device *dev, pm_message_t state)
++void vfp_pm_save_context(void)
+ {
+-	struct thread_info *ti = current_thread_info();
+ 	u32 fpexc = fmrx(FPEXC);
++	unsigned int cpu = get_cpu();
++
++	/* Save last_VFP_context if needed */
++	if (last_VFP_context[cpu]) {
++		/* Enable vfp to save context */
++		if (!(fpexc & FPEXC_EN)) {
++			vfp_enable(NULL);
++			fmxr(FPEXC, fpexc | FPEXC_EN);
++		}
  
-+static inline void omap3_save_neon_context(void)
-+{
-+#ifdef CONFIG_VFP
-+	vfp_pm_save_context();
-+#endif
+-	/* if vfp is on, then save state for resumption */
+-	if (fpexc & FPEXC_EN) {
+ 		printk(KERN_DEBUG "%s: saving vfp state\n", __func__);
+-		vfp_save_state(&ti->vfpstate, fpexc);
++		vfp_save_state(last_VFP_context[cpu], fpexc);
+ 
+ 		/* disable, just in case */
+-		fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
++		fmxr(FPEXC, fpexc & ~FPEXC_EN);
++
++		last_VFP_context[cpu] = NULL;
+ 	}
+ 
+-	/* clear any information we had about last context state */
+-	memset(last_VFP_context, 0, sizeof(last_VFP_context));
++	put_cpu();
 +}
 +
- /* Function to restore the table entry that was modified for enabling MMU */
- static void restore_table_entry(void)
- {
-@@ -365,6 +372,7 @@ void omap_sram_idle(void)
- 	/* save_state = 3 => L1, L2 and logic lost */
- 	int save_state = 0;
- 	int mpu_next_state = PWRDM_POWER_ON;
-+	int neon_next_state = PWRDM_POWER_ON;
- 	int per_next_state = PWRDM_POWER_ON;
- 	int core_next_state = PWRDM_POWER_ON;
- 	int core_prev_state, per_prev_state;
-@@ -398,8 +406,12 @@ void omap_sram_idle(void)
- 	pwrdm_pre_transition();
++static int vfp_pm_suspend(struct sys_device *dev, pm_message_t state)
++{
++	vfp_pm_save_context();
  
- 	/* NEON control */
--	if (pwrdm_read_pwrst(neon_pwrdm) == PWRDM_POWER_ON)
-+	if (pwrdm_read_pwrst(neon_pwrdm) == PWRDM_POWER_ON) {
- 		pwrdm_set_next_pwrst(neon_pwrdm, mpu_next_state);
-+		neon_next_state = mpu_next_state;
-+		if (neon_next_state == PWRDM_POWER_OFF)
-+			omap3_save_neon_context();
-+	}
- 
- 	/* PER */
- 	per_next_state = pwrdm_read_next_pwrst(per_pwrdm);
+ 	return 0;
+ }
 -- 
 1.5.4.3
