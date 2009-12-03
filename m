@@ -1,34 +1,66 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 03 Dec 2009 06:49:55 -0700
-Subject: [PATCH 08/10] OMAP: hwmod: warn on missing clockdomain
+Date: Thu, 03 Dec 2009 06:49:59 -0700
+Subject: [PATCH 10/10] OMAP: omap_device: track latency in nanoseconds
 In-Reply-To: <20091203134852.17146.81997.stgit@localhost.localdomain>
 References: <20091203134852.17146.81997.stgit@localhost.localdomain>
-Message-ID: <20091203134954.17146.50776.stgit@localhost.localdomain>
+Message-ID: <20091203134957.17146.62589.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Hilman <khilman@deeprootsystems.com>
 
-WARN if a clock/hwmod is missing a clockdomain association since
-resulting hwmod will not be able to correctly enable/disable clocks.
+Rather than having to do a usecs = nsecs / NSECS_PER_USEC to
+track latency in usecs, just track it in nanoseconds.
 
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ arch/arm/plat-omap/include/plat/omap_device.h |    4 ++--
+ arch/arm/plat-omap/omap_device.c              |    8 ++++----
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index cb5bf34..adc86e0 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -352,6 +352,9 @@ static int _init_main_clk(struct omap_hwmod *oh)
- 		ret = -EINVAL;
- 	oh->_clk = c;
+diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
+index d939246..dc1fac1 100644
+--- a/arch/arm/plat-omap/include/plat/omap_device.h
++++ b/arch/arm/plat-omap/include/plat/omap_device.h
+@@ -50,8 +50,8 @@
+  * @pm_lats: ptr to an omap_device_pm_latency table
+  * @pm_lats_cnt: ARRAY_SIZE() of what is passed to @pm_lats
+  * @pm_lat_level: array index of the last odpl entry executed - -1 if never
+- * @dev_wakeup_lat: dev wakeup latency in microseconds
+- * @_dev_wakeup_lat_limit: dev wakeup latency limit in usec - set by OMAP PM
++ * @dev_wakeup_lat: dev wakeup latency in nanoseconds
++ * @_dev_wakeup_lat_limit: dev wakeup latency limit in nsec - set by OMAP PM
+  * @_state: one of OMAP_DEVICE_STATE_* (see above)
+  * @flags: device flags
+  *
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index 51c9d56..1e5648d 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -142,10 +142,10 @@ static int _omap_device_activate(struct omap_device *od, u8 ignore_lat)
+ 		read_persistent_clock(&b);
  
-+	WARN(!c->clkdm, "omap_hwmod: %s: missing clockdomain for %s.\n",
-+	     oh->clkdev_con_id, c->name);
-+
- 	return ret;
- }
+ 		c = timespec_sub(b, a);
+-		act_lat = timespec_to_ns(&c) / NSEC_PER_USEC;
++		act_lat = timespec_to_ns(&c);
  
+ 		pr_debug("omap_device: %s: pm_lat %d: activate: elapsed time "
+-			 "%llu usec\n", od->pdev.name, od->pm_lat_level,
++			 "%llu nsec\n", od->pdev.name, od->pm_lat_level,
+ 			 act_lat);
+ 
+ 		WARN(act_lat > odpl->activate_lat, "omap_device: %s.%d: "
+@@ -198,10 +198,10 @@ static int _omap_device_deactivate(struct omap_device *od, u8 ignore_lat)
+ 		read_persistent_clock(&b);
+ 
+ 		c = timespec_sub(b, a);
+-		deact_lat = timespec_to_ns(&c) / NSEC_PER_USEC;
++		deact_lat = timespec_to_ns(&c);
+ 
+ 		pr_debug("omap_device: %s: pm_lat %d: deactivate: elapsed time "
+-			 "%llu usec\n", od->pdev.name, od->pm_lat_level,
++			 "%llu nsec\n", od->pdev.name, od->pm_lat_level,
+ 			 deact_lat);
+ 
+ 		WARN(deact_lat > odpl->deactivate_lat, "omap_device: %s.%d: "
