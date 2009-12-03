@@ -1,82 +1,79 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 03 Dec 2009 06:45:36 -0700
-Subject: [PATCH 4/9] OMAP powerdomain/PM: use symbolic constants for the max
-	number of power states
+Date: Thu, 03 Dec 2009 06:45:39 -0700
+Subject: [PATCH 6/9] OMAP2/3 powerdomain: return errors rather than returning
+	the output of IS_ERR()
 In-Reply-To: <20091203134321.16229.87539.stgit@localhost.localdomain>
 References: <20091203134321.16229.87539.stgit@localhost.localdomain>
-Message-ID: <20091203134535.16229.31415.stgit@localhost.localdomain>
+Message-ID: <20091203134537.16229.73790.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace some bare constants with power states.
+From: Roel Kluin <roel.kluin@gmail.com>
 
+IS_ERR returns only 1 or 0, and the functions return a negative error
+in other cases anyways.
+
+Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/pm-debug.c                |    4 ++--
- arch/arm/mach-omap2/powerdomain.c             |    2 +-
- arch/arm/plat-omap/include/plat/powerdomain.h |    6 ++++--
- 3 files changed, 7 insertions(+), 5 deletions(-)
+ arch/arm/mach-omap2/powerdomain.c |   12 ++++++------
+ 1 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
-index 8baa30d..860b755 100644
---- a/arch/arm/mach-omap2/pm-debug.c
-+++ b/arch/arm/mach-omap2/pm-debug.c
-@@ -326,7 +326,7 @@ int pm_dbg_regset_save(int reg_set)
- 	return 0;
- }
- 
--static const char pwrdm_state_names[][4] = {
-+static const char pwrdm_state_names[][PWRDM_MAX_PWRSTS] = {
- 	"OFF",
- 	"RET",
- 	"INA",
-@@ -381,7 +381,7 @@ static int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *user)
- 
- 	seq_printf(s, "%s (%s)", pwrdm->name,
- 			pwrdm_state_names[pwrdm->state]);
--	for (i = 0; i < 4; i++)
-+	for (i = 0; i < PWRDM_MAX_PWRSTS; i++)
- 		seq_printf(s, ",%s:%d", pwrdm_state_names[i],
- 			pwrdm->state_counter[i]);
- 
 diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 4147267..1dd1a38 100644
+index 1dd1a38..47d5768 100644
 --- a/arch/arm/mach-omap2/powerdomain.c
 +++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -158,7 +158,7 @@ static __init void _pwrdm_setup(struct powerdomain *pwrdm)
- {
- 	int i;
+@@ -478,7 +478,7 @@ int pwrdm_add_wkdep(struct powerdomain *pwrdm1, struct powerdomain *pwrdm2)
+ 	if (IS_ERR(p)) {
+ 		pr_debug("powerdomain: hardware cannot set/clear wake up of "
+ 			 "%s when %s wakes up\n", pwrdm1->name, pwrdm2->name);
+-		return IS_ERR(p);
++		return PTR_ERR(p);
+ 	}
  
--	for (i = 0; i < 4; i++)
-+	for (i = 0; i < PWRDM_MAX_PWRSTS; i++)
- 		pwrdm->state_counter[i] = 0;
+ 	pr_debug("powerdomain: hardware will wake up %s when %s wakes up\n",
+@@ -511,7 +511,7 @@ int pwrdm_del_wkdep(struct powerdomain *pwrdm1, struct powerdomain *pwrdm2)
+ 	if (IS_ERR(p)) {
+ 		pr_debug("powerdomain: hardware cannot set/clear wake up of "
+ 			 "%s when %s wakes up\n", pwrdm1->name, pwrdm2->name);
+-		return IS_ERR(p);
++		return PTR_ERR(p);
+ 	}
  
- 	pwrdm_wait_transition(pwrdm);
-diff --git a/arch/arm/plat-omap/include/plat/powerdomain.h b/arch/arm/plat-omap/include/plat/powerdomain.h
-index 3d45ee1..5a80ddb 100644
---- a/arch/arm/plat-omap/include/plat/powerdomain.h
-+++ b/arch/arm/plat-omap/include/plat/powerdomain.h
-@@ -28,6 +28,8 @@
- #define PWRDM_POWER_INACTIVE	0x2
- #define PWRDM_POWER_ON		0x3
+ 	pr_debug("powerdomain: hardware will no longer wake up %s after %s "
+@@ -548,7 +548,7 @@ int pwrdm_read_wkdep(struct powerdomain *pwrdm1, struct powerdomain *pwrdm2)
+ 	if (IS_ERR(p)) {
+ 		pr_debug("powerdomain: hardware cannot set/clear wake up of "
+ 			 "%s when %s wakes up\n", pwrdm1->name, pwrdm2->name);
+-		return IS_ERR(p);
++		return PTR_ERR(p);
+ 	}
  
-+#define PWRDM_MAX_PWRSTS	4
-+
- /* Powerdomain allowable state bitfields */
- #define PWRSTS_OFF_ON		((1 << PWRDM_POWER_OFF) | \
- 				 (1 << PWRDM_POWER_ON))
-@@ -118,11 +120,11 @@ struct powerdomain {
- 	struct list_head node;
+ 	return prm_read_mod_bits_shift(pwrdm1->prcm_offs, PM_WKDEP,
+@@ -582,7 +582,7 @@ int pwrdm_add_sleepdep(struct powerdomain *pwrdm1, struct powerdomain *pwrdm2)
+ 		pr_debug("powerdomain: hardware cannot set/clear sleep "
+ 			 "dependency affecting %s from %s\n", pwrdm1->name,
+ 			 pwrdm2->name);
+-		return IS_ERR(p);
++		return PTR_ERR(p);
+ 	}
  
- 	int state;
--	unsigned state_counter[4];
-+	unsigned state_counter[PWRDM_MAX_PWRSTS];
+ 	pr_debug("powerdomain: will prevent %s from sleeping if %s is active\n",
+@@ -621,7 +621,7 @@ int pwrdm_del_sleepdep(struct powerdomain *pwrdm1, struct powerdomain *pwrdm2)
+ 		pr_debug("powerdomain: hardware cannot set/clear sleep "
+ 			 "dependency affecting %s from %s\n", pwrdm1->name,
+ 			 pwrdm2->name);
+-		return IS_ERR(p);
++		return PTR_ERR(p);
+ 	}
  
- #ifdef CONFIG_PM_DEBUG
- 	s64 timer;
--	s64 state_timer[4];
-+	s64 state_timer[PWRDM_MAX_PWRSTS];
- #endif
- };
+ 	pr_debug("powerdomain: will no longer prevent %s from sleeping if "
+@@ -664,7 +664,7 @@ int pwrdm_read_sleepdep(struct powerdomain *pwrdm1, struct powerdomain *pwrdm2)
+ 		pr_debug("powerdomain: hardware cannot set/clear sleep "
+ 			 "dependency affecting %s from %s\n", pwrdm1->name,
+ 			 pwrdm2->name);
+-		return IS_ERR(p);
++		return PTR_ERR(p);
+ 	}
  
+ 	return prm_read_mod_bits_shift(pwrdm1->prcm_offs, OMAP3430_CM_SLEEPDEP,
