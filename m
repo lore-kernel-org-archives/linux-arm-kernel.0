@@ -1,72 +1,32 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Thu, 3 Dec 2009 11:55:34 +0100
-Subject: [PATCH 1/1] fix occasional ULPI timeouts with ehci-mxc
-In-Reply-To: <1259836558-3007-1-git-send-email-valentin.longchamp@epfl.ch>
-References: <4B169E48.2000804@epfl.ch>
-	<1259836558-3007-1-git-send-email-valentin.longchamp@epfl.ch>
-Message-ID: <20091203105534.GN14091@buzzloop.caiaq.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 3 Dec 2009 03:57:08 -0700 (MST)
+Subject: [PATCH 8/8] OMAP1 clock: convert mach-omap1/clock.h to
+	mach-omap1/clock_data.c
+In-Reply-To: <20091203104354.GB20379@n2100.arm.linux.org.uk>
+References: <20091203095830.1203.76290.stgit@localhost.localdomain>
+	<20091203100707.1203.98247.stgit@localhost.localdomain>
+	<20091203102700.GA30423@flint.arm.linux.org.uk>
+	<alpine.DEB.2.00.0912030331360.13408@utopia.booyaka.com>
+	<20091203104354.GB20379@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.00.0912030355050.13408@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2009 at 11:35:58AM +0100, Valentin Longchamp wrote:
-> On various mxc boards, the intial ULPI reads resulted in a timeout
-> which prevented the transceiver to be identified and thus the ehci
-> device to be probed.
-> 
-> Initializing the hardware lines connected to the transceiver (through
-> pdata->init call) before actually enabling clocks and configuring
-> registers in the devices fixes this problem.
-> 
-> Signed-off-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
+Hello Russell,
 
-Acked-by: Daniel Mack <daniel@caiaq.de>
+On Thu, 3 Dec 2009, Russell King - ARM Linux wrote:
+
+> You say this, but you're keeping the associated code around as well
+> which is pointless.
+
+Could you elaborate?
+
+> You also say about polluting the symbol table unnecessarily.  What
+> about the pollution caused by having two (or more) functions made
+> public rather than just one data structure?
+
+Good point.  Will move the clkops structures to the appropriate clock.c 
+files, and mark the functions static.
 
 
-> ---
->  drivers/usb/host/ehci-mxc.c |   23 +++++++++++------------
->  1 files changed, 11 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
-> index 35c56f4..23cd917 100644
-> --- a/drivers/usb/host/ehci-mxc.c
-> +++ b/drivers/usb/host/ehci-mxc.c
-> @@ -162,6 +162,17 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
->  		goto err_ioremap;
->  	}
->  
-> +	/* call platform specific init function */
-> +	if (pdata->init) {
-> +		ret = pdata->init(pdev);
-> +		if (ret) {
-> +			dev_err(dev, "platform init failed\n");
-> +			goto err_init;
-> +		}
-> +		/* platforms need some time to settle changed IO settings */
-> +		mdelay(10);
-> +	}
-> +
->  	/* enable clocks */
->  	priv->usbclk = clk_get(dev, "usb");
->  	if (IS_ERR(priv->usbclk)) {
-> @@ -192,18 +203,6 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
->  	if (ret < 0)
->  		goto err_init;
->  
-> -	/* call platform specific init function */
-> -	if (pdata->init) {
-> -		ret = pdata->init(pdev);
-> -		if (ret) {
-> -			dev_err(dev, "platform init failed\n");
-> -			goto err_init;
-> -		}
-> -	}
-> -
-> -	/* most platforms need some time to settle changed IO settings */
-> -	mdelay(10);
-> -
->  	/* Initialize the transceiver */
->  	if (pdata->otg) {
->  		pdata->otg->io_priv = hcd->regs + ULPI_VIEWPORT_OFFSET;
-> -- 
-> 1.6.3.3
-> 
+- Paul
