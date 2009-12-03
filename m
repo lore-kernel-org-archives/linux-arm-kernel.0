@@ -1,117 +1,47 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 2 Dec 2009 19:17:09 -0800
-Subject: 32-rc1 aka 32-rc2: warning at manage.c:361 (set_irq_wake),
-	matrix-keypad related?
-In-Reply-To: <20091007211225.GB17805@elf.ucw.cz>
-References: <20090930200746.GA1384@ucw.cz>
-	<20091006050649.GH27881@core.coreip.homeip.net>
-	<20091006075816.GA1362@ucw.cz>
-	<20091007043603.GC10204@core.coreip.homeip.net>
-	<f17812d70910070742y5e27f9c3u38e3299b94f33613@mail.gmail.com>
-	<20091007163327.GA12053@core.coreip.homeip.net>
-	<20091007211225.GB17805@elf.ucw.cz>
-Message-ID: <20091203031709.GE9121@core.coreip.homeip.net>
+From: eltshanli@gmail.com (Li Jie)
+Date: Thu, 3 Dec 2009 15:26:20 +0800
+Subject: [PATCH] ARM: NUC900: Implements putc() which is needed when
+	uncompressing linux
+Message-ID: <8fb2581d0912022326y6d128b78xaca22aeeeed899a7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 07, 2009 at 11:12:26PM +0200, Pavel Machek wrote:
-> 
-> > > > OK, so it looks like your box refuses to set up one of the GPIOs as a
-> > > > wakeup source... Hmm, either your box is wrong ;) or matrix_keypad
-> > > > driver needs to maintain a separate list of wakeup GPIOs.
-> > > >
-> > > 
-> > > This is due to the nature of PXA processor, where not every GPIO can
-> > > be configured as a wakeup source. Mmm.... we can either return a
-> > > pseudo value indicating setting wakeup on that GPIO is OK (which
-> > > doesn't sound like a good idea), or we can just ignore the failure of
-> > > enable_irq_wake() in matrix_keypad?
-> > 
-> > We ignore the failure right now in the mainline but that causes stack
-> > traces on resume as we trying to disable not enabled wakeup GPIOs. That
-> > was original Pavel's complaint.
-> 
-> Yep...
-> 
-> I'd say that BUG() simply should not trigger if wakeup can not be
-> enabled/disabled for particular source...?
+Hi,
 
-Pavel,
+This patch implements the putc(), 'Uncompressing linux...done' can be
+outputs when booting zImage.
 
-Could you please try the patch below and let me know if it fixes the
-problem for you?
-
-Thanks.
-
--- 
-Dmitry
-
-Input: matrix-keypad - handle cases when GPIOs can't be wakeup sources
-
-From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-
-Signed-off-by: Dmitry Torokhov <dtor@mail.ru>
+Signed-off-by: lijie <eltshanli@gmail.com>
 ---
+ arch/arm/mach-w90x900/include/mach/uncompress.h |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
- drivers/input/keyboard/matrix_keypad.c |   29 ++++++++++++++++++++++-------
- 1 files changed, 22 insertions(+), 7 deletions(-)
+diff --git a/arch/arm/mach-w90x900/include/mach/uncompress.h
+b/arch/arm/mach-w90x900/include/mach/uncompress.h
+index 050d9fe..56f1a74 100644
+--- a/arch/arm/mach-w90x900/include/mach/uncompress.h
++++ b/arch/arm/mach-w90x900/include/mach/uncompress.h
+@@ -22,11 +22,21 @@
 
+ #include <mach/regs-serial.h>
+ #include <mach/map.h>
++#include <linux/serial_reg.h>
 
-diff --git a/drivers/input/keyboard/matrix_keypad.c b/drivers/input/keyboard/matrix_keypad.c
-index 91cfe51..a1152ba 100644
---- a/drivers/input/keyboard/matrix_keypad.c
-+++ b/drivers/input/keyboard/matrix_keypad.c
-@@ -29,11 +29,13 @@ struct matrix_keypad {
- 	unsigned short *keycodes;
- 	unsigned int row_shift;
- 
-+	DECLARE_BITMAP(disabled_gpios, MATRIX_MAX_ROWS);
+ #define arch_decomp_wdog()
+
++#define TX_DONE	(UART_LSR_TEMT | UART_LSR_THRE)
++static volatile u32 * uart_base = (u32 *)UART0_PA;
 +
- 	uint32_t last_key_state[MATRIX_MAX_COLS];
- 	struct delayed_work work;
-+	spinlock_t lock;
- 	bool scan_pending;
- 	bool stopped;
--	spinlock_t lock;
- };
- 
- /*
-@@ -221,9 +223,16 @@ static int matrix_keypad_suspend(struct platform_device *pdev, pm_message_t stat
- 
- 	matrix_keypad_stop(keypad->input_dev);
- 
--	if (device_may_wakeup(&pdev->dev))
--		for (i = 0; i < pdata->num_row_gpios; i++)
--			enable_irq_wake(gpio_to_irq(pdata->row_gpios[i]));
-+	if (device_may_wakeup(&pdev->dev)) {
-+		for (i = 0; i < pdata->num_row_gpios; i++) {
-+			if (!test_bit(i, keypad->disabled_gpios)) {
-+				unsigned int gpio = pdata->row_gpios[i];
+ static void putc(int ch)
+ {
++	/* Check THRE and TEMT bits before we transmit the character.
++	 */
++	while ((uart_base[UART_LSR] & TX_DONE) != TX_DONE)
++		barrier();
 +
-+				if (enable_irq_wake(gpio_to_irq(gpio)) == 0)
-+					__set_bit(i, keypad->disabled_gpios);
-+			}
-+		}
-+	}
- 
- 	return 0;
++	*uart_base = ch;
  }
-@@ -234,9 +243,15 @@ static int matrix_keypad_resume(struct platform_device *pdev)
- 	const struct matrix_keypad_platform_data *pdata = keypad->pdata;
- 	int i;
- 
--	if (device_may_wakeup(&pdev->dev))
--		for (i = 0; i < pdata->num_row_gpios; i++)
--			disable_irq_wake(gpio_to_irq(pdata->row_gpios[i]));
-+	if (device_may_wakeup(&pdev->dev)) {
-+		for (i = 0; i < pdata->num_row_gpios; i++) {
-+			if (test_and_clear_bit(i, keypad->disabled_gpios)) {
-+				unsigned int gpio = pdata->row_gpios[i];
-+
-+				disable_irq_wake(gpio_to_irq(gpio));
-+			}
-+		}
-+	}
- 
- 	matrix_keypad_start(keypad->input_dev);
- 
+
+ static inline void flush(void)
+-- 
+1.6.5.3
