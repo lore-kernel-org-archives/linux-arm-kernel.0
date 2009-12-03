@@ -1,29 +1,29 @@
-From: r.schwebel@pengutronix.de (Robert Schwebel)
-Date: Thu, 3 Dec 2009 20:33:21 +0100
-Subject: [PATCH] mx31moboard: fix typo
-In-Reply-To: <20091203193034.GD22533@pengutronix.de>
-References: <20091203193034.GD22533@pengutronix.de>
-Message-ID: <20091203193321.GE22533@pengutronix.de>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Thu,  3 Dec 2009 21:35:19 +0200
+Subject: [PATCH 0/2] ep93xx: TS-72xx watchdog driver
+Message-ID: <cover.1259866661.git.mika.westerberg@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2009 at 08:30:34PM +0100, Robert Schwebel wrote:
-> Currently, linux-next breaks due to a typo introduced in commit
-> 33c4d91928bea4444b067e620496befbeb87029c
-> 
-> This patch fixes it.
+Hi,
 
-But something else must be missing, I still get this:
+Technologic Systems TS-72xx SBCs (TS-7200, TS-7250 and TS-7260) have
+watchdog timer that is implemented in external CPLD chip. This set of
+patches provide implementation of watchdog driver for that chip.
 
-arch/arm/mach-mx3/mx31moboard.c: In function 'moboard_usbh2_init':
-arch/arm/mach-mx3/mx31moboard.c:395: error: 'mx31_usbh2' undeclared (first use in this function)
-arch/arm/mach-mx3/mx31moboard.c:395: error: (Each undeclared identifier is reported only once
-arch/arm/mach-mx3/mx31moboard.c:395: error: for each function it appears in.)
-make[1]: *** [arch/arm/mach-mx3/mx31moboard.o] Error 1
+I tested this on TS-7260 board.
 
-rsc
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+MW
+
+Mika Westerberg (2):
+  ep93xx: implemented watchdog timer driver for TS-72xx SBCs
+  ep93xx: added platform side support for TS-72xx WDT driver
+
+ arch/arm/mach-ep93xx/include/mach/ts72xx.h |    2 +
+ arch/arm/mach-ep93xx/ts72xx.c              |   21 ++
+ drivers/watchdog/Kconfig                   |   11 +
+ drivers/watchdog/Makefile                  |    1 +
+ drivers/watchdog/ts72xx_wdt.c              |  458 ++++++++++++++++++++++++++++
+ 5 files changed, 493 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/watchdog/ts72xx_wdt.c
