@@ -1,58 +1,34 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 03 Dec 2009 06:49:54 -0700
-Subject: [PATCH 07/10] OMAP: omap_device: use read_persistent_clock() instead
-	of getnstimeofday()
+Date: Thu, 03 Dec 2009 06:49:55 -0700
+Subject: [PATCH 08/10] OMAP: hwmod: warn on missing clockdomain
 In-Reply-To: <20091203134852.17146.81997.stgit@localhost.localdomain>
 References: <20091203134852.17146.81997.stgit@localhost.localdomain>
-Message-ID: <20091203134952.17146.59330.stgit@localhost.localdomain>
+Message-ID: <20091203134954.17146.50776.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Hilman <khilman@deeprootsystems.com>
 
-During suspend and resume, when omap_device deactivation and
-activation is happening, the timekeeping subsystem has likely already
-been suspended.  Thus getnstimeofday() will fail and trigger a WARN().
-
-Use read_persistent_clock() instead of getnstimeofday() to avoid this.
+WARN if a clock/hwmod is missing a clockdomain association since
+resulting hwmod will not be able to correctly enable/disable clocks.
 
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/plat-omap/omap_device.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index 54fe0a2..9a502af 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -134,12 +134,12 @@ static int _omap_device_activate(struct omap_device *od, u8 ignore_lat)
- 		    (od->dev_wakeup_lat <= od->_dev_wakeup_lat_limit))
- 			break;
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index cb5bf34..adc86e0 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -352,6 +352,9 @@ static int _init_main_clk(struct omap_hwmod *oh)
+ 		ret = -EINVAL;
+ 	oh->_clk = c;
  
--		getnstimeofday(&a);
-+		read_persistent_clock(&a);
++	WARN(!c->clkdm, "omap_hwmod: %s: missing clockdomain for %s.\n",
++	     oh->clkdev_con_id, c->name);
++
+ 	return ret;
+ }
  
- 		/* XXX check return code */
- 		odpl->activate_func(od);
- 
--		getnstimeofday(&b);
-+		read_persistent_clock(&b);
- 
- 		c = timespec_sub(b, a);
- 		act_lat = timespec_to_ns(&c) * NSEC_PER_USEC;
-@@ -190,12 +190,12 @@ static int _omap_device_deactivate(struct omap_device *od, u8 ignore_lat)
- 		     od->_dev_wakeup_lat_limit))
- 			break;
- 
--		getnstimeofday(&a);
-+		read_persistent_clock(&a);
- 
- 		/* XXX check return code */
- 		odpl->deactivate_func(od);
- 
--		getnstimeofday(&b);
-+		read_persistent_clock(&b);
- 
- 		c = timespec_sub(b, a);
- 		deact_lat = timespec_to_ns(&c) * NSEC_PER_USEC;
