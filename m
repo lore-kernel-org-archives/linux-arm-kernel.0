@@ -1,34 +1,48 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 03 Dec 2009 06:49:52 -0700
-Subject: [PATCH 06/10] OMAP: omap_device: use UINT_MAX for default wakeup
-	latency limit
+Date: Thu, 03 Dec 2009 06:49:57 -0700
+Subject: [PATCH 09/10] OMAP: omap_device: fix nsec/usec conversion in latency
+	calculations
 In-Reply-To: <20091203134852.17146.81997.stgit@localhost.localdomain>
 References: <20091203134852.17146.81997.stgit@localhost.localdomain>
-Message-ID: <20091203134951.17146.23073.stgit@localhost.localdomain>
+Message-ID: <20091203134955.17146.60626.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Hilman <khilman@deeprootsystems.com>
 
-The _dev_wakeup_lat_limit field of struct omap_device is u32, so use
-UINT_MAX instead of INT_MAX for the default maximum.
+Use
+
+   usecs = nsecs / NSEC_PER_USEC;
+
+instead of
+
+   usecs = nsecs * NSEC_PER_USEC;
 
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/plat-omap/omap_device.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/plat-omap/omap_device.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index bb16e62..54fe0a2 100644
+index 9a502af..51c9d56 100644
 --- a/arch/arm/plat-omap/omap_device.c
 +++ b/arch/arm/plat-omap/omap_device.c
-@@ -459,7 +459,7 @@ int omap_device_enable(struct platform_device *pdev)
- 	ret = _omap_device_activate(od, IGNORE_WAKEUP_LAT);
+@@ -142,7 +142,7 @@ static int _omap_device_activate(struct omap_device *od, u8 ignore_lat)
+ 		read_persistent_clock(&b);
  
- 	od->dev_wakeup_lat = 0;
--	od->_dev_wakeup_lat_limit = INT_MAX;
-+	od->_dev_wakeup_lat_limit = UINT_MAX;
- 	od->_state = OMAP_DEVICE_STATE_ENABLED;
+ 		c = timespec_sub(b, a);
+-		act_lat = timespec_to_ns(&c) * NSEC_PER_USEC;
++		act_lat = timespec_to_ns(&c) / NSEC_PER_USEC;
  
- 	return ret;
+ 		pr_debug("omap_device: %s: pm_lat %d: activate: elapsed time "
+ 			 "%llu usec\n", od->pdev.name, od->pm_lat_level,
+@@ -198,7 +198,7 @@ static int _omap_device_deactivate(struct omap_device *od, u8 ignore_lat)
+ 		read_persistent_clock(&b);
+ 
+ 		c = timespec_sub(b, a);
+-		deact_lat = timespec_to_ns(&c) * NSEC_PER_USEC;
++		deact_lat = timespec_to_ns(&c) / NSEC_PER_USEC;
+ 
+ 		pr_debug("omap_device: %s: pm_lat %d: deactivate: elapsed time "
+ 			 "%llu usec\n", od->pdev.name, od->pm_lat_level,
