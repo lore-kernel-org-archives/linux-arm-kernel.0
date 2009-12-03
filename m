@@ -1,37 +1,52 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 03 Dec 2009 06:49:40 -0700
-Subject: [PATCH 00/10] OMAP: omap_hwmod/omap_device patches for 2.6.33
-Message-ID: <20091203134852.17146.81997.stgit@localhost.localdomain>
+Date: Thu, 03 Dec 2009 06:49:41 -0700
+Subject: [PATCH 01/10] OMAP3 hwmod: reprogram OCP_SYSCONFIG register after
+	setting SOFTRESET
+In-Reply-To: <20091203134852.17146.81997.stgit@localhost.localdomain>
+References: <20091203134852.17146.81997.stgit@localhost.localdomain>
+Message-ID: <20091203134940.17146.90982.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Reprogram the module's OCP_SYSCONFIG register after module reset (SOFTRESET
+= 1).  This may not be needed, but the definition of the reset performed by
+the SOFTRESET bit is unclear.
 
-This series contains some updates and bugfixes for the omap_hwmod/omap_device
-code, intended for the 2.6.33 merge window.
+Kevin Hilman <khilman@deeprootsystems.com> tested an earlier version of
+this patch.
 
-
-- Paul
-
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Tested-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
+ arch/arm/mach-omap2/omap_hwmod.c |   18 +++++++++++++-----
+ 1 files changed, 13 insertions(+), 5 deletions(-)
 
-Kevin Hilman (6):
-      OMAP: omap_device: add to_omap_device() macro
-      OMAP: omap_device: use UINT_MAX for default wakeup latency limit
-      OMAP: omap_device: use read_persistent_clock() instead of getnstimeofday()
-      OMAP: hwmod: warn on missing clockdomain
-      OMAP: omap_device: fix nsec/usec conversion in latency calculations
-      OMAP: omap_device: track latency in nanoseconds
-
-Paul Walmsley (4):
-      OMAP3 hwmod: reprogram OCP_SYSCONFIG register after setting SOFTRESET
-      OMAP3 hwmod: Add automatic OCP_SYSCONFIG AUTOIDLE handling
-      OMAP hwmod: add names to module MPU IRQ lines
-      OMAP3 hwmod: drop most of the OCP_SYSCONFIG.CLOCKACTIVITY code
-
-
- arch/arm/mach-omap2/omap_hwmod.c              |  151 ++++++++++---------------
- arch/arm/plat-omap/include/plat/omap_device.h |    8 +
- arch/arm/plat-omap/include/plat/omap_hwmod.h  |   26 ++++
- arch/arm/plat-omap/omap_device.c              |   18 +--
- 4 files changed, 96 insertions(+), 107 deletions(-)
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 633b216..4aab1b8 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -948,11 +948,19 @@ static int _setup(struct omap_hwmod *oh)
+ 
+ 	_enable(oh);
+ 
+-	if (!(oh->flags & HWMOD_INIT_NO_RESET))
+-		_reset(oh);
+-
+-	/* XXX OCP AUTOIDLE bit? */
+-	/* XXX OCP ENAWAKEUP bit? */
++	if (!(oh->flags & HWMOD_INIT_NO_RESET)) {
++		/*
++		 * XXX Do the OCP_SYSCONFIG bits need to be
++		 * reprogrammed after a reset?  If not, then this can
++		 * be removed.  If they do, then probably the
++		 * _enable() function should be split to avoid the
++		 * rewrite of the OCP_SYSCONFIG register.
++		 */
++		if (oh->sysconfig) {
++			_update_sysc_cache(oh);
++			_sysc_enable(oh);
++		}
++	}
+ 
+ 	if (!(oh->flags & HWMOD_INIT_NO_IDLE))
+ 		_idle(oh);
