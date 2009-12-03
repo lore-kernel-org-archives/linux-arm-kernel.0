@@ -1,76 +1,122 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 03 Dec 2009 06:45:44 -0700
-Subject: [PATCH 8/9] OMAP3: PM: Fix for MPU power domain MEM BANK position
+Date: Thu, 03 Dec 2009 06:45:43 -0700
+Subject: [PATCH 7/9] OMAP3: SDRC: Place SDRC AC timing and MR changes in CORE
+	DVFS SRAM code behind Kconfig
 In-Reply-To: <20091203134321.16229.87539.stgit@localhost.localdomain>
 References: <20091203134321.16229.87539.stgit@localhost.localdomain>
-Message-ID: <20091203134543.16229.85418.stgit@localhost.localdomain>
+Message-ID: <20091203134539.16229.20330.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thara Gopinath <thara@ti.com>
+The code that reprograms the SDRC memory controller during CORE DVFS,
+mach-omap2/sram34xx.S:omap3_sram_configure_core_dpll(), does not
+ensure that all L3 initiators are prevented from accessing the SDRAM
+before modifying the SDRC AC timing and MR registers.  This can cause
+memory to be corrupted or cause the SDRC to enter an unpredictable
+state.  This patch places that code behind a Kconfig option,
+CONFIG_OMAP3_SDRC_AC_TIMING for now, and adds a note explaining what
+is going on.  Ideally the code can be added back in once supporting
+code is present to ensure that other initiators aren't touching the
+SDRAM.  At the very least, these registers should be reprogrammable
+during kernel init to deal with buggy bootloaders.  Users who know
+that all other system initiators will not be touching the SDRAM can
+also re-enable this Kconfig option.
 
-MPU power domain bank 0 bits are displayed in position of bank 1
-in PWRSTS and PREPWRSTS registers. So read them from correct
-position
+This is a modification of a patch originally written by Rajendra Nayak
+<rnayak@ti.com> (the original is at http://patchwork.kernel.org/patch/51927/).
+Rather than removing the code completely, this patch just comments it out.
 
-Signed-off-by: Thara Gopinath <thara@ti.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Thanks to Beno?t Cousson <b-cousson@ti.com> and Christophe Sucur
+<c-sucur@ti.com> for explaining the technical basis for this and for
+explaining what can be done to make this path work in future code.
+Thanks to Richard Woodruff <r-woodruff2@ti.com> and Nishanth Menon
+<nm@ti.com> for their comments.
+
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Christophe Sucur <c-sucur@ti.com>
+Cc: Beno?t Cousson <b-cousson@ti.com>
+Cc: Richard Woodruff <r-woodruff2@ti.com>
+Cc: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/mach-omap2/powerdomain.c             |    6 ++++++
- arch/arm/mach-omap2/powerdomains34xx.h        |    1 +
- arch/arm/plat-omap/include/plat/powerdomain.h |    5 ++++-
- 3 files changed, 11 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/Kconfig    |   13 +++++++++++++
+ arch/arm/mach-omap2/sram34xx.S |   19 +++++++++++++++++--
+ 2 files changed, 30 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 47d5768..26b3f3e 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -983,6 +983,9 @@ int pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
- 	if (pwrdm->banks < (bank + 1))
- 		return -EEXIST;
- 
-+	if (pwrdm->flags & PWRDM_HAS_MPU_QUIRK)
-+		bank = 1;
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index aad194f..a8d2610 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -100,3 +100,16 @@ config MACH_OMAP_ZOOM2
+ config MACH_OMAP_4430SDP
+ 	bool "OMAP 4430 SDP board"
+ 	depends on ARCH_OMAP4
 +
- 	/*
- 	 * The register bit names below may not correspond to the
- 	 * actual names of the bits in each powerdomain's register,
-@@ -1030,6 +1033,9 @@ int pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
- 	if (pwrdm->banks < (bank + 1))
- 		return -EEXIST;
- 
-+	if (pwrdm->flags & PWRDM_HAS_MPU_QUIRK)
-+		bank = 1;
++config OMAP3_SDRC_AC_TIMING
++	bool "Enable SDRC AC timing register changes"
++	depends on ARCH_OMAP3 && ARCH_OMAP34XX
++	default n
++	help
++	  If you know that none of your system initiators will attempt to
++	  access SDRAM during CORE DVFS, select Y here.  This should boost
++	  SDRAM performance at lower CORE OPPs.  There are relatively few
++	  users who will wish to say yes at this point - almost everyone will
++	  wish to say no.  Selecting yes without understanding what is
++	  going on could result in system crashes;
 +
- 	/*
- 	 * The register bit names below may not correspond to the
- 	 * actual names of the bits in each powerdomain's register,
-diff --git a/arch/arm/mach-omap2/powerdomains34xx.h b/arch/arm/mach-omap2/powerdomains34xx.h
-index fd09b08..588f7e0 100644
---- a/arch/arm/mach-omap2/powerdomains34xx.h
-+++ b/arch/arm/mach-omap2/powerdomains34xx.h
-@@ -190,6 +190,7 @@ static struct powerdomain mpu_34xx_pwrdm = {
- 	.wkdep_srcs	  = mpu_34xx_wkdeps,
- 	.pwrsts		  = PWRSTS_OFF_RET_ON,
- 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
-+	.flags		  = PWRDM_HAS_MPU_QUIRK,
- 	.banks		  = 1,
- 	.pwrsts_mem_ret	  = {
- 		[0] = PWRSTS_OFF_RET,
-diff --git a/arch/arm/plat-omap/include/plat/powerdomain.h b/arch/arm/plat-omap/include/plat/powerdomain.h
-index 56bb1b9..0b96005 100644
---- a/arch/arm/plat-omap/include/plat/powerdomain.h
-+++ b/arch/arm/plat-omap/include/plat/powerdomain.h
-@@ -42,7 +42,10 @@
- 
- /* Powerdomain flags */
- #define PWRDM_HAS_HDWR_SAR	(1 << 0) /* hardware save-and-restore support */
--
-+#define PWRDM_HAS_MPU_QUIRK	(1 << 1) /* MPU pwr domain has MEM bank 0 bits
-+					  * in MEM bank 1 position. This is
-+					  * true for OMAP3430
-+					  */
- 
- /*
-  * Number of memory banks that are power-controllable.	On OMAP3430, the
+diff --git a/arch/arm/mach-omap2/sram34xx.S b/arch/arm/mach-omap2/sram34xx.S
+index 82aa4a3..de99ba2 100644
+--- a/arch/arm/mach-omap2/sram34xx.S
++++ b/arch/arm/mach-omap2/sram34xx.S
+@@ -91,8 +91,19 @@
+  *  new SDRC_ACTIM_CTRL_B_1 register contents
+  *  new SDRC_MR_1 register value
+  *
+- * If the param SDRC_RFR_CTRL_1 is 0, the parameters
+- *  are not programmed into the SDRC CS1 registers
++ * If the param SDRC_RFR_CTRL_1 is 0, the parameters are not programmed into
++ * the SDRC CS1 registers
++ *
++ * NOTE: This code no longer attempts to program the SDRC AC timing and MR
++ * registers.  This is because the code currently cannot ensure that all
++ * L3 initiators (e.g., sDMA, IVA, DSS DISPC, etc.) are not accessing the
++ * SDRAM when the registers are written.  If the registers are changed while
++ * an initiator is accessing SDRAM, memory can be corrupted and/or the SDRC
++ * may enter an unpredictable state.  In the future, the intent is to
++ * re-enable this code in cases where we can ensure that no initiators are
++ * touching the SDRAM.  Until that time, users who know that their use case
++ * can satisfy the above requirement can enable the CONFIG_OMAP3_SDRC_AC_TIMING
++ * option.
+  */
+ ENTRY(omap3_sram_configure_core_dpll)
+ 	stmfd	sp!, {r1-r12, lr}	@ store regs to stack
+@@ -219,6 +230,7 @@ configure_sdrc:
+ 	ldr	r12, omap_sdrc_rfr_ctrl_0_val	@ fetch value from SRAM
+ 	ldr	r11, omap3_sdrc_rfr_ctrl_0	@ fetch addr from SRAM
+ 	str	r12, [r11]			@ store
++#ifdef CONFIG_OMAP3_SDRC_AC_TIMING
+ 	ldr	r12, omap_sdrc_actim_ctrl_a_0_val
+ 	ldr	r11, omap3_sdrc_actim_ctrl_a_0
+ 	str	r12, [r11]
+@@ -228,11 +240,13 @@ configure_sdrc:
+ 	ldr	r12, omap_sdrc_mr_0_val
+ 	ldr	r11, omap3_sdrc_mr_0
+ 	str	r12, [r11]
++#endif
+ 	ldr	r12, omap_sdrc_rfr_ctrl_1_val
+ 	cmp	r12, #0			@ if SDRC_RFR_CTRL_1 is 0,
+ 	beq	skip_cs1_prog		@  do not program cs1 params
+ 	ldr	r11, omap3_sdrc_rfr_ctrl_1
+ 	str	r12, [r11]
++#ifdef CONFIG_OMAP3_SDRC_AC_TIMING
+ 	ldr	r12, omap_sdrc_actim_ctrl_a_1_val
+ 	ldr	r11, omap3_sdrc_actim_ctrl_a_1
+ 	str	r12, [r11]
+@@ -242,6 +256,7 @@ configure_sdrc:
+ 	ldr	r12, omap_sdrc_mr_1_val
+ 	ldr	r11, omap3_sdrc_mr_1
+ 	str	r12, [r11]
++#endif
+ skip_cs1_prog:
+ 	ldr	r12, [r11]		@ posted-write barrier for SDRC
+ 	bx	lr
