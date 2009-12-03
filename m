@@ -1,45 +1,80 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Thu, 3 Dec 2009 14:32:00 +0100
-Subject: [PATCH] mmc: move regulator handling to core
-In-Reply-To: <20091203132241.GB31533@rakim.wolfsonmicro.main>
-References: <1259844390-10541-1-git-send-email-daniel@caiaq.de>
-	<20091203130627.GA31254@rakim.wolfsonmicro.main>
-	<20091203131423.GV14091@buzzloop.caiaq.de>
-	<20091203132241.GB31533@rakim.wolfsonmicro.main>
-Message-ID: <20091203133200.GX14091@buzzloop.caiaq.de>
+From: tero.kristo@nokia.com (Tero Kristo)
+Date: Thu,  3 Dec 2009 15:35:53 +0200
+Subject: [PATCHv2 2/2] OMAP3: Implemented VFP restore/save context
+In-Reply-To: <1259847353-22725-2-git-send-email-tero.kristo@nokia.com>
+References: <> <1259847353-22725-1-git-send-email-tero.kristo@nokia.com>
+	<1259847353-22725-2-git-send-email-tero.kristo@nokia.com>
+Message-ID: <1259847353-22725-3-git-send-email-tero.kristo@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2009 at 01:22:41PM +0000, Mark Brown wrote:
-> On Thu, Dec 03, 2009 at 02:14:23PM +0100, Daniel Mack wrote:
+From: Tero Kristo <tero.kristo@nokia.com>
 
-[...]
+VFP save context is called before MPU/NEON off. Restore is not needed as
+the next VFP trap will restore context automatically. Uses the support
+routine implemented in arch/arm/vfp/vfpmodule.c.
 
-> > I would expect the power to be killed when the last user stops using it.
-> > Which should result in the same effect if you only have one host, one
-> > regulator, and one user.
-> 
-> Yes, it's always fine in that case (modulo always_on and/or regulators
-> without power control). 
+Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
+Cc: Vishwanath Sripathy <vishwanath.bs@ti.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Richard Woodruff <r-woodruff2@ti.com>
+Cc: Peter 'p2' De Schrijver <peter.de-schrijver@nokia.com>
+---
+ arch/arm/mach-omap2/pm.h     |    1 +
+ arch/arm/mach-omap2/pm34xx.c |   14 +++++++++++++-
+ 2 files changed, 14 insertions(+), 1 deletions(-)
 
-Well, it didn't for me and always_on, though, due to the return values I
-described.
-
-> This goes back to the thing about using
-> regulator_get_exclusive(), the message given was that the MMC drivers
-> really needed to be able to guarantee that the power would be removed
-> when that was requested.
->
-> Like I say, if there isn't a *strict* requirement but it's only
-> desirable (possibly strongly desirable) then your approach is obviously
-> preferable.
-
-The mmci people would need to answer that. To me, the code just looked
-like a power saving feature.
-
-If this driver needs it, the only tweak to my patch to let that
-particular call site use regulator_get_exclusive, and the core will
-still do the right thing. For this case, the behaviour should be exactly
-the same than it currently is, correct?
-
-Daniel
+diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+index e0c94ea..bf9b7f9 100644
+--- a/arch/arm/mach-omap2/pm.h
++++ b/arch/arm/mach-omap2/pm.h
+@@ -23,6 +23,7 @@ extern void omap_sram_idle(void);
+ extern int omap3_can_sleep(void);
+ extern int set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
+ extern int omap3_idle_init(void);
++extern void vfp_pm_save_context(void);
+ 
+ struct prm_setup_times_vc {
+ 	u16 clksetup;
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 009bc55..624a7af 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -321,6 +321,13 @@ static void restore_control_register(u32 val)
+ 	__asm__ __volatile__ ("mcr p15, 0, %0, c1, c0, 0" : : "r" (val));
+ }
+ 
++static inline void omap3_save_neon_context(void)
++{
++#ifdef CONFIG_VFP
++	vfp_pm_save_context();
++#endif
++}
++
+ /* Function to restore the table entry that was modified for enabling MMU */
+ static void restore_table_entry(void)
+ {
+@@ -365,6 +372,7 @@ void omap_sram_idle(void)
+ 	/* save_state = 3 => L1, L2 and logic lost */
+ 	int save_state = 0;
+ 	int mpu_next_state = PWRDM_POWER_ON;
++	int neon_next_state = PWRDM_POWER_ON;
+ 	int per_next_state = PWRDM_POWER_ON;
+ 	int core_next_state = PWRDM_POWER_ON;
+ 	int core_prev_state, per_prev_state;
+@@ -398,8 +406,12 @@ void omap_sram_idle(void)
+ 	pwrdm_pre_transition();
+ 
+ 	/* NEON control */
+-	if (pwrdm_read_pwrst(neon_pwrdm) == PWRDM_POWER_ON)
++	if (pwrdm_read_pwrst(neon_pwrdm) == PWRDM_POWER_ON) {
+ 		pwrdm_set_next_pwrst(neon_pwrdm, mpu_next_state);
++		neon_next_state = mpu_next_state;
++		if (neon_next_state == PWRDM_POWER_OFF)
++			omap3_save_neon_context();
++	}
+ 
+ 	/* PER */
+ 	per_next_state = pwrdm_read_next_pwrst(per_pwrdm);
+-- 
+1.5.4.3
