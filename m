@@ -1,78 +1,150 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 03 Dec 2009 06:49:48 -0700
-Subject: [PATCH 03/10] OMAP hwmod: add names to module MPU IRQ lines
+Date: Thu, 03 Dec 2009 06:49:49 -0700
+Subject: [PATCH 04/10] OMAP3 hwmod: drop most of the
+	OCP_SYSCONFIG.CLOCKACTIVITY code
 In-Reply-To: <20091203134852.17146.81997.stgit@localhost.localdomain>
 References: <20091203134852.17146.81997.stgit@localhost.localdomain>
-Message-ID: <20091203134943.17146.88603.stgit@localhost.localdomain>
+Message-ID: <20091203134948.17146.69091.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the existing u8 array of module MPU IRQ lines with a struct
-that includes a name - similar to the existing struct
-omap_hwmod_dma_info.  Device drivers can then use
-platform_get_resource_byname() to retrieve specific IRQs without nasty
-dependencies on array ordering.
+Earlier, the hwmod code had considered the OCP_SYSCONFIG.CLOCKACTIVITY
+bits to be incremental power saving bits, controlling internal IP
+block clock gates.  This was a misapprehension.  The CLOCKACTIVITY
+bits are used to indicate, in advance, which clocks will be cut when
+the module acknowledges an idle request.  This enables the IP block to
+take whatever action is necessary to complete any in-progress work
+before asserting its IdleAck.
 
-Thanks to Beno?t Cousson <b-cousson@ti.com> and Kevin Hilman
-<khilman@deeprootsystems.com> for feedback on this approach.
+In the current Linux-OMAP code, this implies that the clock framework
+should be changing module CLOCKACTIVITY bits as module clocks are enabled
+and disabled.  We don't do that yet, but in the future, we should.
+This must wait until the clock tree is annotated with omap_hwmod pointers
+(or vice-versa).  In the meantime, drop most of the hwmod code that
+controls CLOCKACTIVITY bits to avoid confusion.
+
+This patch has benefited from many illuminating discussions with (in
+alphabetical order) Beno?t Cousson <b-cousson@ti.com>, Rajendra Nayak
+<rnayak@ti.com>, and Sebastien Sabatier <s-sabatier1@ti.com>.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Sebastien Sabatier <s-sabatier1@ti.com>
 Cc: Beno?t Cousson <b-cousson@ti.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c             |    5 +++--
- arch/arm/plat-omap/include/plat/omap_hwmod.h |   18 ++++++++++++++++--
- 2 files changed, 19 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |   88 ++------------------------------------
+ 1 files changed, 5 insertions(+), 83 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 709ec5d..234567b 100644
+index 234567b..cb5bf34 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -1389,8 +1389,9 @@ int omap_hwmod_fill_resources(struct omap_hwmod *oh, struct resource *res)
- 	/* For each IRQ, DMA, memory area, fill in array.*/
+@@ -591,6 +591,11 @@ static void _sysc_enable(struct omap_hwmod *oh)
  
- 	for (i = 0; i < oh->mpu_irqs_cnt; i++) {
--		(res + r)->start = *(oh->mpu_irqs + i);
--		(res + r)->end = *(oh->mpu_irqs + i);
-+		(res + r)->name = (oh->mpu_irqs + i)->name;
-+		(res + r)->start = (oh->mpu_irqs + i)->irq;
-+		(res + r)->end = (oh->mpu_irqs + i)->irq;
- 		(res + r)->flags = IORESOURCE_IRQ;
- 		r++;
- 	}
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index 643a972..007935a 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -64,7 +64,21 @@ struct omap_device;
+ 	/* XXX OCP ENAWAKEUP bit? */
  
++	/*
++	 * XXX The clock framework should handle this, by
++	 * calling into this code.  But this must wait until the
++	 * clock structures are tagged with omap_hwmod entries
++	 */
+ 	if (oh->flags & HWMOD_SET_DEFAULT_CLOCKACT &&
+ 	    oh->sysconfig->sysc_flags & SYSC_HAS_CLOCKACTIVITY)
+ 		_set_clockactivity(oh, oh->sysconfig->clockact, &v);
+@@ -917,33 +922,6 @@ static int _shutdown(struct omap_hwmod *oh)
+ }
  
  /**
-- * struct omap_hwmod_dma_info - MPU address space handled by the hwmod
-+ * struct omap_hwmod_irq_info - MPU IRQs used by the hwmod
-+ * @name: name of the IRQ channel (module local name)
-+ * @irq_ch: IRQ channel ID
-+ *
-+ * @name should be something short, e.g., "tx" or "rx".  It is for use
-+ * by platform_get_resource_byname().  It is defined locally to the
-+ * hwmod.
-+ */
-+struct omap_hwmod_irq_info {
-+	const char	*name;
-+	u16		irq;
-+};
-+
-+/**
-+ * struct omap_hwmod_dma_info - DMA channels used by the hwmod
-  * @name: name of the DMA channel (module local name)
-  * @dma_ch: DMA channel ID
+- * _write_clockact_lock - set the module's clockactivity bits
+- * @oh: struct omap_hwmod *
+- * @clockact: CLOCKACTIVITY field bits
+- *
+- * Writes the CLOCKACTIVITY bits @clockact to the hwmod @oh
+- * OCP_SYSCONFIG register.  Returns -EINVAL if the hwmod is in the
+- * wrong state or returns 0.
+- */
+-static int _write_clockact_lock(struct omap_hwmod *oh, u8 clockact)
+-{
+-	u32 v;
+-
+-	if (!oh->sysconfig ||
+-	    !(oh->sysconfig->sysc_flags & SYSC_HAS_CLOCKACTIVITY))
+-		return -EINVAL;
+-
+-	mutex_lock(&omap_hwmod_mutex);
+-	v = oh->_sysc_cache;
+-	_set_clockactivity(oh, clockact, &v);
+-	_write_sysconfig(v, oh);
+-	mutex_unlock(&omap_hwmod_mutex);
+-
+-	return 0;
+-}
+-
+-
+-/**
+  * _setup - do initial configuration of omap_hwmod
+  * @oh: struct omap_hwmod *
   *
-@@ -379,7 +393,7 @@ struct omap_hwmod_omap4_prcm {
- struct omap_hwmod {
- 	const char			*name;
- 	struct omap_device		*od;
--	u8				*mpu_irqs;
-+	struct omap_hwmod_irq_info	*mpu_irqs;
- 	struct omap_hwmod_dma_info	*sdma_chs;
- 	union {
- 		struct omap_hwmod_omap2_prcm omap2;
+@@ -1496,62 +1474,6 @@ int omap_hwmod_del_initiator_dep(struct omap_hwmod *oh,
+ }
+ 
+ /**
+- * omap_hwmod_set_clockact_none - set clockactivity test to BOTH
+- * @oh: struct omap_hwmod *
+- *
+- * On some modules, this function can affect the wakeup latency vs.
+- * power consumption balance.  Intended to be called by the
+- * omap_device layer.  Passes along the return value from
+- * _write_clockact_lock().
+- */
+-int omap_hwmod_set_clockact_both(struct omap_hwmod *oh)
+-{
+-	return _write_clockact_lock(oh, CLOCKACT_TEST_BOTH);
+-}
+-
+-/**
+- * omap_hwmod_set_clockact_none - set clockactivity test to MAIN
+- * @oh: struct omap_hwmod *
+- *
+- * On some modules, this function can affect the wakeup latency vs.
+- * power consumption balance.  Intended to be called by the
+- * omap_device layer.  Passes along the return value from
+- * _write_clockact_lock().
+- */
+-int omap_hwmod_set_clockact_main(struct omap_hwmod *oh)
+-{
+-	return _write_clockact_lock(oh, CLOCKACT_TEST_MAIN);
+-}
+-
+-/**
+- * omap_hwmod_set_clockact_none - set clockactivity test to ICLK
+- * @oh: struct omap_hwmod *
+- *
+- * On some modules, this function can affect the wakeup latency vs.
+- * power consumption balance.  Intended to be called by the
+- * omap_device layer.  Passes along the return value from
+- * _write_clockact_lock().
+- */
+-int omap_hwmod_set_clockact_iclk(struct omap_hwmod *oh)
+-{
+-	return _write_clockact_lock(oh, CLOCKACT_TEST_ICLK);
+-}
+-
+-/**
+- * omap_hwmod_set_clockact_none - set clockactivity test to NONE
+- * @oh: struct omap_hwmod *
+- *
+- * On some modules, this function can affect the wakeup latency vs.
+- * power consumption balance.  Intended to be called by the
+- * omap_device layer.  Passes along the return value from
+- * _write_clockact_lock().
+- */
+-int omap_hwmod_set_clockact_none(struct omap_hwmod *oh)
+-{
+-	return _write_clockact_lock(oh, CLOCKACT_TEST_NONE);
+-}
+-
+-/**
+  * omap_hwmod_enable_wakeup - allow device to wake up the system
+  * @oh: struct omap_hwmod *
+  *
