@@ -1,122 +1,135 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 03 Dec 2009 06:45:43 -0700
-Subject: [PATCH 7/9] OMAP3: SDRC: Place SDRC AC timing and MR changes in CORE
-	DVFS SRAM code behind Kconfig
+Date: Thu, 03 Dec 2009 06:45:46 -0700
+Subject: [PATCH 9/9] OMAP clock/hwmod: fix off-by-one errors
 In-Reply-To: <20091203134321.16229.87539.stgit@localhost.localdomain>
 References: <20091203134321.16229.87539.stgit@localhost.localdomain>
-Message-ID: <20091203134539.16229.20330.stgit@localhost.localdomain>
+Message-ID: <20091203134544.16229.26195.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code that reprograms the SDRC memory controller during CORE DVFS,
-mach-omap2/sram34xx.S:omap3_sram_configure_core_dpll(), does not
-ensure that all L3 initiators are prevented from accessing the SDRAM
-before modifying the SDRC AC timing and MR registers.  This can cause
-memory to be corrupted or cause the SDRC to enter an unpredictable
-state.  This patch places that code behind a Kconfig option,
-CONFIG_OMAP3_SDRC_AC_TIMING for now, and adds a note explaining what
-is going on.  Ideally the code can be added back in once supporting
-code is present to ensure that other initiators aren't touching the
-SDRAM.  At the very least, these registers should be reprogrammable
-during kernel init to deal with buggy bootloaders.  Users who know
-that all other system initiators will not be touching the SDRAM can
-also re-enable this Kconfig option.
+Fix loop bailout off-by-one bugs reported by Juha Lepp?nen
+<juha_motorsportcom@luukku.com>.
 
-This is a modification of a patch originally written by Rajendra Nayak
-<rnayak@ti.com> (the original is at http://patchwork.kernel.org/patch/51927/).
-Rather than removing the code completely, this patch just comments it out.
-
-Thanks to Beno?t Cousson <b-cousson@ti.com> and Christophe Sucur
-<c-sucur@ti.com> for explaining the technical basis for this and for
-explaining what can be done to make this path work in future code.
-Thanks to Richard Woodruff <r-woodruff2@ti.com> and Nishanth Menon
-<nm@ti.com> for their comments.
+This second version incorporates comments from Russell King
+<linux@arm.linux.org.uk>.  A new macro, 'omap_test_timeout', has
+been created, with cleaner code, and existing code has been converted
+to use it.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Christophe Sucur <c-sucur@ti.com>
-Cc: Beno?t Cousson <b-cousson@ti.com>
-Cc: Richard Woodruff <r-woodruff2@ti.com>
-Cc: Nishanth Menon <nm@ti.com>
+Cc: Juha Lepp?nen <juha_motorsportcom@luukku.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
- arch/arm/mach-omap2/Kconfig    |   13 +++++++++++++
- arch/arm/mach-omap2/sram34xx.S |   19 +++++++++++++++++--
- 2 files changed, 30 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/cm.c                 |    7 ++++---
+ arch/arm/mach-omap2/omap_hwmod.c         |   13 +++++--------
+ arch/arm/mach-omap2/prcm.c               |    5 ++---
+ arch/arm/plat-omap/include/plat/common.h |   20 ++++++++++++++++++++
+ 4 files changed, 31 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index aad194f..a8d2610 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -100,3 +100,16 @@ config MACH_OMAP_ZOOM2
- config MACH_OMAP_4430SDP
- 	bool "OMAP 4430 SDP board"
- 	depends on ARCH_OMAP4
+diff --git a/arch/arm/mach-omap2/cm.c b/arch/arm/mach-omap2/cm.c
+index 8eb2dab..58e4a1c 100644
+--- a/arch/arm/mach-omap2/cm.c
++++ b/arch/arm/mach-omap2/cm.c
+@@ -21,6 +21,8 @@
+ 
+ #include <asm/atomic.h>
+ 
++#include <plat/common.h>
 +
-+config OMAP3_SDRC_AC_TIMING
-+	bool "Enable SDRC AC timing register changes"
-+	depends on ARCH_OMAP3 && ARCH_OMAP34XX
-+	default n
-+	help
-+	  If you know that none of your system initiators will attempt to
-+	  access SDRAM during CORE DVFS, select Y here.  This should boost
-+	  SDRAM performance at lower CORE OPPs.  There are relatively few
-+	  users who will wish to say yes at this point - almost everyone will
-+	  wish to say no.  Selecting yes without understanding what is
-+	  going on could result in system crashes;
-+
-diff --git a/arch/arm/mach-omap2/sram34xx.S b/arch/arm/mach-omap2/sram34xx.S
-index 82aa4a3..de99ba2 100644
---- a/arch/arm/mach-omap2/sram34xx.S
-+++ b/arch/arm/mach-omap2/sram34xx.S
-@@ -91,8 +91,19 @@
-  *  new SDRC_ACTIM_CTRL_B_1 register contents
-  *  new SDRC_MR_1 register value
-  *
-- * If the param SDRC_RFR_CTRL_1 is 0, the parameters
-- *  are not programmed into the SDRC CS1 registers
-+ * If the param SDRC_RFR_CTRL_1 is 0, the parameters are not programmed into
-+ * the SDRC CS1 registers
+ #include "cm.h"
+ #include "cm-regbits-24xx.h"
+ #include "cm-regbits-34xx.h"
+@@ -61,9 +63,8 @@ int omap2_cm_wait_module_ready(s16 prcm_mod, u8 idlest_id, u8 idlest_shift)
+ 	mask = 1 << idlest_shift;
+ 
+ 	/* XXX should be OMAP2 CM */
+-	while (((cm_read_mod_reg(prcm_mod, cm_idlest_reg) & mask) != ena) &&
+-	       (i++ < MAX_MODULE_READY_TIME))
+-		udelay(1);
++	omap_test_timeout(((cm_read_mod_reg(prcm_mod, cm_idlest_reg) & mask) == ena),
++			  MAX_MODULE_READY_TIME, i);
+ 
+ 	return (i < MAX_MODULE_READY_TIME) ? 0 : -EBUSY;
+ }
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 633b216..7aaf5f1 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -45,6 +45,7 @@
+ #include <linux/mutex.h>
+ #include <linux/bootmem.h>
+ 
++#include <plat/common.h>
+ #include <plat/cpu.h>
+ #include <plat/clockdomain.h>
+ #include <plat/powerdomain.h>
+@@ -736,7 +737,7 @@ static int _wait_target_ready(struct omap_hwmod *oh)
+ static int _reset(struct omap_hwmod *oh)
+ {
+ 	u32 r, v;
+-	int c;
++	int c = 0;
+ 
+ 	if (!oh->sysconfig ||
+ 	    !(oh->sysconfig->sysc_flags & SYSC_HAS_SOFTRESET) ||
+@@ -758,13 +759,9 @@ static int _reset(struct omap_hwmod *oh)
+ 		return r;
+ 	_write_sysconfig(v, oh);
+ 
+-	c = 0;
+-	while (c < MAX_MODULE_RESET_WAIT &&
+-	       !(omap_hwmod_readl(oh, oh->sysconfig->syss_offs) &
+-		 SYSS_RESETDONE_MASK)) {
+-		udelay(1);
+-		c++;
+-	}
++	omap_test_timeout((omap_hwmod_readl(oh, oh->sysconfig->syss_offs) &
++			   SYSS_RESETDONE_MASK),
++			  MAX_MODULE_RESET_WAIT, c);
+ 
+ 	if (c == MAX_MODULE_RESET_WAIT)
+ 		WARN(1, "omap_hwmod: %s: failed to reset in %d usec\n",
+diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
+index 9208b6e..79637c2 100644
+--- a/arch/arm/mach-omap2/prcm.c
++++ b/arch/arm/mach-omap2/prcm.c
+@@ -241,9 +241,8 @@ int omap2_cm_wait_idlest(void __iomem *reg, u32 mask, const char *name)
+ 		BUG();
+ 
+ 	/* Wait for lock */
+-	while (((__raw_readl(reg) & mask) != ena) &&
+-	       (i++ < MAX_MODULE_ENABLE_WAIT))
+-		udelay(1);
++	omap_test_timeout(((__raw_readl(reg) & mask) == ena),
++			  MAX_MODULE_ENABLE_WAIT, i);
+ 
+ 	if (i < MAX_MODULE_ENABLE_WAIT)
+ 		pr_debug("cm: Module associated with clock %s ready after %d "
+diff --git a/arch/arm/plat-omap/include/plat/common.h b/arch/arm/plat-omap/include/plat/common.h
+index 064f173..e977967 100644
+--- a/arch/arm/plat-omap/include/plat/common.h
++++ b/arch/arm/plat-omap/include/plat/common.h
+@@ -71,4 +71,24 @@ void omap2_set_globals_sdrc(struct omap_globals *);
+ void omap2_set_globals_control(struct omap_globals *);
+ void omap2_set_globals_prcm(struct omap_globals *);
+ 
++/**
++ * omap_test_timeout - busy-loop, testing a condition
++ * @cond: condition to test until it evaluates to true
++ * @timeout: maximum number of microseconds in the timeout
++ * @index: loop index (integer)
 + *
-+ * NOTE: This code no longer attempts to program the SDRC AC timing and MR
-+ * registers.  This is because the code currently cannot ensure that all
-+ * L3 initiators (e.g., sDMA, IVA, DSS DISPC, etc.) are not accessing the
-+ * SDRAM when the registers are written.  If the registers are changed while
-+ * an initiator is accessing SDRAM, memory can be corrupted and/or the SDRC
-+ * may enter an unpredictable state.  In the future, the intent is to
-+ * re-enable this code in cases where we can ensure that no initiators are
-+ * touching the SDRAM.  Until that time, users who know that their use case
-+ * can satisfy the above requirement can enable the CONFIG_OMAP3_SDRC_AC_TIMING
-+ * option.
-  */
- ENTRY(omap3_sram_configure_core_dpll)
- 	stmfd	sp!, {r1-r12, lr}	@ store regs to stack
-@@ -219,6 +230,7 @@ configure_sdrc:
- 	ldr	r12, omap_sdrc_rfr_ctrl_0_val	@ fetch value from SRAM
- 	ldr	r11, omap3_sdrc_rfr_ctrl_0	@ fetch addr from SRAM
- 	str	r12, [r11]			@ store
-+#ifdef CONFIG_OMAP3_SDRC_AC_TIMING
- 	ldr	r12, omap_sdrc_actim_ctrl_a_0_val
- 	ldr	r11, omap3_sdrc_actim_ctrl_a_0
- 	str	r12, [r11]
-@@ -228,11 +240,13 @@ configure_sdrc:
- 	ldr	r12, omap_sdrc_mr_0_val
- 	ldr	r11, omap3_sdrc_mr_0
- 	str	r12, [r11]
-+#endif
- 	ldr	r12, omap_sdrc_rfr_ctrl_1_val
- 	cmp	r12, #0			@ if SDRC_RFR_CTRL_1 is 0,
- 	beq	skip_cs1_prog		@  do not program cs1 params
- 	ldr	r11, omap3_sdrc_rfr_ctrl_1
- 	str	r12, [r11]
-+#ifdef CONFIG_OMAP3_SDRC_AC_TIMING
- 	ldr	r12, omap_sdrc_actim_ctrl_a_1_val
- 	ldr	r11, omap3_sdrc_actim_ctrl_a_1
- 	str	r12, [r11]
-@@ -242,6 +256,7 @@ configure_sdrc:
- 	ldr	r12, omap_sdrc_mr_1_val
- 	ldr	r11, omap3_sdrc_mr_1
- 	str	r12, [r11]
-+#endif
- skip_cs1_prog:
- 	ldr	r12, [r11]		@ posted-write barrier for SDRC
- 	bx	lr
++ * Loop waiting for @cond to become true or until@least @timeout
++ * microseconds have passed.  To use, define some integer @index in the
++ * calling code.  After running, if @index == @timeout, then the loop has
++ * timed out.
++ */
++#define omap_test_timeout(cond, timeout, index)			\
++({								\
++	for (index = 0; index < timeout; index++) {		\
++		if (cond)					\
++			break;					\
++		udelay(1);					\
++	}							\
++})
++
+ #endif /* __ARCH_ARM_MACH_OMAP_COMMON_H */
