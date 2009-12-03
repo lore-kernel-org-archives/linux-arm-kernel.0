@@ -1,79 +1,41 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 03 Dec 2009 06:45:39 -0700
-Subject: [PATCH 6/9] OMAP2/3 powerdomain: return errors rather than returning
-	the output of IS_ERR()
+Date: Thu, 03 Dec 2009 06:45:37 -0700
+Subject: [PATCH 5/9] OMAP powerdomain: rearrange struct powerdomain to save
+	some memory
 In-Reply-To: <20091203134321.16229.87539.stgit@localhost.localdomain>
 References: <20091203134321.16229.87539.stgit@localhost.localdomain>
-Message-ID: <20091203134537.16229.73790.stgit@localhost.localdomain>
+Message-ID: <20091203134536.16229.35852.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roel Kluin <roel.kluin@gmail.com>
+This patch rearranges the order of structure members in struct powerdomain
+to avoid wasting memory due to alignment restrictions.
 
-IS_ERR returns only 1 or 0, and the functions return a negative error
-in other cases anyways.
-
-Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/powerdomain.c |   12 ++++++------
- 1 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/plat-omap/include/plat/powerdomain.h |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 1dd1a38..47d5768 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -478,7 +478,7 @@ int pwrdm_add_wkdep(struct powerdomain *pwrdm1, struct powerdomain *pwrdm2)
- 	if (IS_ERR(p)) {
- 		pr_debug("powerdomain: hardware cannot set/clear wake up of "
- 			 "%s when %s wakes up\n", pwrdm1->name, pwrdm2->name);
--		return IS_ERR(p);
-+		return PTR_ERR(p);
- 	}
+diff --git a/arch/arm/plat-omap/include/plat/powerdomain.h b/arch/arm/plat-omap/include/plat/powerdomain.h
+index 5a80ddb..56bb1b9 100644
+--- a/arch/arm/plat-omap/include/plat/powerdomain.h
++++ b/arch/arm/plat-omap/include/plat/powerdomain.h
+@@ -87,15 +87,15 @@ struct powerdomain {
+ 	/* Used to represent the OMAP chip types containing this pwrdm */
+ 	const struct omap_chip_id omap_chip;
  
- 	pr_debug("powerdomain: hardware will wake up %s when %s wakes up\n",
-@@ -511,7 +511,7 @@ int pwrdm_del_wkdep(struct powerdomain *pwrdm1, struct powerdomain *pwrdm2)
- 	if (IS_ERR(p)) {
- 		pr_debug("powerdomain: hardware cannot set/clear wake up of "
- 			 "%s when %s wakes up\n", pwrdm1->name, pwrdm2->name);
--		return IS_ERR(p);
-+		return PTR_ERR(p);
- 	}
+-	/* Bit shift of this powerdomain's PM_WKDEP/CM_SLEEPDEP bit */
+-	const u8 dep_bit;
+-
+ 	/* Powerdomains that can be told to wake this powerdomain up */
+ 	struct pwrdm_dep *wkdep_srcs;
  
- 	pr_debug("powerdomain: hardware will no longer wake up %s after %s "
-@@ -548,7 +548,7 @@ int pwrdm_read_wkdep(struct powerdomain *pwrdm1, struct powerdomain *pwrdm2)
- 	if (IS_ERR(p)) {
- 		pr_debug("powerdomain: hardware cannot set/clear wake up of "
- 			 "%s when %s wakes up\n", pwrdm1->name, pwrdm2->name);
--		return IS_ERR(p);
-+		return PTR_ERR(p);
- 	}
+ 	/* Powerdomains that can be told to keep this pwrdm from inactivity */
+ 	struct pwrdm_dep *sleepdep_srcs;
  
- 	return prm_read_mod_bits_shift(pwrdm1->prcm_offs, PM_WKDEP,
-@@ -582,7 +582,7 @@ int pwrdm_add_sleepdep(struct powerdomain *pwrdm1, struct powerdomain *pwrdm2)
- 		pr_debug("powerdomain: hardware cannot set/clear sleep "
- 			 "dependency affecting %s from %s\n", pwrdm1->name,
- 			 pwrdm2->name);
--		return IS_ERR(p);
-+		return PTR_ERR(p);
- 	}
++	/* Bit shift of this powerdomain's PM_WKDEP/CM_SLEEPDEP bit */
++	const u8 dep_bit;
++
+ 	/* Possible powerdomain power states */
+ 	const u8 pwrsts;
  
- 	pr_debug("powerdomain: will prevent %s from sleeping if %s is active\n",
-@@ -621,7 +621,7 @@ int pwrdm_del_sleepdep(struct powerdomain *pwrdm1, struct powerdomain *pwrdm2)
- 		pr_debug("powerdomain: hardware cannot set/clear sleep "
- 			 "dependency affecting %s from %s\n", pwrdm1->name,
- 			 pwrdm2->name);
--		return IS_ERR(p);
-+		return PTR_ERR(p);
- 	}
- 
- 	pr_debug("powerdomain: will no longer prevent %s from sleeping if "
-@@ -664,7 +664,7 @@ int pwrdm_read_sleepdep(struct powerdomain *pwrdm1, struct powerdomain *pwrdm2)
- 		pr_debug("powerdomain: hardware cannot set/clear sleep "
- 			 "dependency affecting %s from %s\n", pwrdm1->name,
- 			 pwrdm2->name);
--		return IS_ERR(p);
-+		return PTR_ERR(p);
- 	}
- 
- 	return prm_read_mod_bits_shift(pwrdm1->prcm_offs, OMAP3430_CM_SLEEPDEP,
