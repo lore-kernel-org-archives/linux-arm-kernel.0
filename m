@@ -1,39 +1,68 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Thu, 3 Dec 2009 14:43:24 +0100
-Subject: [PATCH] mmc: move regulator handling to core
-In-Reply-To: <20091203134031.GA1311@rakim.wolfsonmicro.main>
-References: <1259844390-10541-1-git-send-email-daniel@caiaq.de>
-	<20091203130627.GA31254@rakim.wolfsonmicro.main>
-	<20091203131423.GV14091@buzzloop.caiaq.de>
-	<20091203132241.GB31533@rakim.wolfsonmicro.main>
-	<20091203133200.GX14091@buzzloop.caiaq.de>
-	<20091203134031.GA1311@rakim.wolfsonmicro.main>
-Message-ID: <20091203134324.GB14091@buzzloop.caiaq.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 03 Dec 2009 06:45:32 -0700
+Subject: [PATCH 1/9] OMAP2/3 PRCM: don't export prm_*(), cm_*() functions
+In-Reply-To: <20091203134321.16229.87539.stgit@localhost.localdomain>
+References: <20091203134321.16229.87539.stgit@localhost.localdomain>
+Message-ID: <20091203134530.16229.16918.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2009 at 01:40:32PM +0000, Mark Brown wrote:
-> On Thu, Dec 03, 2009 at 02:32:00PM +0100, Daniel Mack wrote:
+Device drivers and loadable modules should not be calling these
+prm_* and cm_* functions, so stop exporting them.  Only core code
+and device driver integration code (in arch/arm/*omap*) should
+call these functions.
 
-[...]
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/prcm.c |    6 ------
+ 1 files changed, 0 insertions(+), 6 deletions(-)
 
-> > The mmci people would need to answer that. To me, the code just looked
-> > like a power saving feature.
-> 
-> > If this driver needs it, the only tweak to my patch to let that
-> > particular call site use regulator_get_exclusive, and the core will
-> > still do the right thing. For this case, the behaviour should be exactly
-> > the same than it currently is, correct?
-> 
-> No, you'll also need to update the way the driver bootstraps the
-> reference count since with regulator_get_exclusive() the reference count
-> is initialised to 1 if the regulator is enabled when it is claimed.
-
-Ok, fine. It's still just the driver which would need amendment, not the
-core. Thanks for explaining this.
-
-Let's wait for the mmci maintainers to speak up on this particular
-point.
-
-Thanks,
-Daniel
+diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
+index 029d376..9208b6e 100644
+--- a/arch/arm/mach-omap2/prcm.c
++++ b/arch/arm/mach-omap2/prcm.c
+@@ -170,14 +170,12 @@ u32 prm_read_mod_reg(s16 module, u16 idx)
+ {
+ 	return __omap_prcm_read(prm_base, module, idx);
+ }
+-EXPORT_SYMBOL(prm_read_mod_reg);
+ 
+ /* Write into a register in a PRM module */
+ void prm_write_mod_reg(u32 val, s16 module, u16 idx)
+ {
+ 	__omap_prcm_write(val, prm_base, module, idx);
+ }
+-EXPORT_SYMBOL(prm_write_mod_reg);
+ 
+ /* Read-modify-write a register in a PRM module. Caller must lock */
+ u32 prm_rmw_mod_reg_bits(u32 mask, u32 bits, s16 module, s16 idx)
+@@ -191,21 +189,18 @@ u32 prm_rmw_mod_reg_bits(u32 mask, u32 bits, s16 module, s16 idx)
+ 
+ 	return v;
+ }
+-EXPORT_SYMBOL(prm_rmw_mod_reg_bits);
+ 
+ /* Read a register in a CM module */
+ u32 cm_read_mod_reg(s16 module, u16 idx)
+ {
+ 	return __omap_prcm_read(cm_base, module, idx);
+ }
+-EXPORT_SYMBOL(cm_read_mod_reg);
+ 
+ /* Write into a register in a CM module */
+ void cm_write_mod_reg(u32 val, s16 module, u16 idx)
+ {
+ 	__omap_prcm_write(val, cm_base, module, idx);
+ }
+-EXPORT_SYMBOL(cm_write_mod_reg);
+ 
+ /* Read-modify-write a register in a CM module. Caller must lock */
+ u32 cm_rmw_mod_reg_bits(u32 mask, u32 bits, s16 module, s16 idx)
+@@ -219,7 +214,6 @@ u32 cm_rmw_mod_reg_bits(u32 mask, u32 bits, s16 module, s16 idx)
+ 
+ 	return v;
+ }
+-EXPORT_SYMBOL(cm_rmw_mod_reg_bits);
+ 
+ /**
+  * omap2_cm_wait_idlest - wait for IDLEST bit to indicate module readiness
