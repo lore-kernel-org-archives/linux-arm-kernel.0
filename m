@@ -1,48 +1,58 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 03 Dec 2009 06:49:57 -0700
-Subject: [PATCH 09/10] OMAP: omap_device: fix nsec/usec conversion in latency
-	calculations
+Date: Thu, 03 Dec 2009 06:49:54 -0700
+Subject: [PATCH 07/10] OMAP: omap_device: use read_persistent_clock() instead
+	of getnstimeofday()
 In-Reply-To: <20091203134852.17146.81997.stgit@localhost.localdomain>
 References: <20091203134852.17146.81997.stgit@localhost.localdomain>
-Message-ID: <20091203134955.17146.60626.stgit@localhost.localdomain>
+Message-ID: <20091203134952.17146.59330.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Hilman <khilman@deeprootsystems.com>
 
-Use
+During suspend and resume, when omap_device deactivation and
+activation is happening, the timekeeping subsystem has likely already
+been suspended.  Thus getnstimeofday() will fail and trigger a WARN().
 
-   usecs = nsecs / NSEC_PER_USEC;
-
-instead of
-
-   usecs = nsecs * NSEC_PER_USEC;
+Use read_persistent_clock() instead of getnstimeofday() to avoid this.
 
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/plat-omap/omap_device.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/plat-omap/omap_device.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index 9a502af..51c9d56 100644
+index 54fe0a2..9a502af 100644
 --- a/arch/arm/plat-omap/omap_device.c
 +++ b/arch/arm/plat-omap/omap_device.c
-@@ -142,7 +142,7 @@ static int _omap_device_activate(struct omap_device *od, u8 ignore_lat)
- 		read_persistent_clock(&b);
+@@ -134,12 +134,12 @@ static int _omap_device_activate(struct omap_device *od, u8 ignore_lat)
+ 		    (od->dev_wakeup_lat <= od->_dev_wakeup_lat_limit))
+ 			break;
+ 
+-		getnstimeofday(&a);
++		read_persistent_clock(&a);
+ 
+ 		/* XXX check return code */
+ 		odpl->activate_func(od);
+ 
+-		getnstimeofday(&b);
++		read_persistent_clock(&b);
  
  		c = timespec_sub(b, a);
--		act_lat = timespec_to_ns(&c) * NSEC_PER_USEC;
-+		act_lat = timespec_to_ns(&c) / NSEC_PER_USEC;
+ 		act_lat = timespec_to_ns(&c) * NSEC_PER_USEC;
+@@ -190,12 +190,12 @@ static int _omap_device_deactivate(struct omap_device *od, u8 ignore_lat)
+ 		     od->_dev_wakeup_lat_limit))
+ 			break;
  
- 		pr_debug("omap_device: %s: pm_lat %d: activate: elapsed time "
- 			 "%llu usec\n", od->pdev.name, od->pm_lat_level,
-@@ -198,7 +198,7 @@ static int _omap_device_deactivate(struct omap_device *od, u8 ignore_lat)
- 		read_persistent_clock(&b);
+-		getnstimeofday(&a);
++		read_persistent_clock(&a);
+ 
+ 		/* XXX check return code */
+ 		odpl->deactivate_func(od);
+ 
+-		getnstimeofday(&b);
++		read_persistent_clock(&b);
  
  		c = timespec_sub(b, a);
--		deact_lat = timespec_to_ns(&c) * NSEC_PER_USEC;
-+		deact_lat = timespec_to_ns(&c) / NSEC_PER_USEC;
- 
- 		pr_debug("omap_device: %s: pm_lat %d: deactivate: elapsed time "
- 			 "%llu usec\n", od->pdev.name, od->pm_lat_level,
+ 		deact_lat = timespec_to_ns(&c) * NSEC_PER_USEC;
