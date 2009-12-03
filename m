@@ -1,127 +1,78 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 03 Dec 2009 06:49:43 -0700
-Subject: [PATCH 02/10] OMAP3 hwmod: Add automatic OCP_SYSCONFIG AUTOIDLE
-	handling
+Date: Thu, 03 Dec 2009 06:49:48 -0700
+Subject: [PATCH 03/10] OMAP hwmod: add names to module MPU IRQ lines
 In-Reply-To: <20091203134852.17146.81997.stgit@localhost.localdomain>
 References: <20091203134852.17146.81997.stgit@localhost.localdomain>
-Message-ID: <20091203134941.17146.9931.stgit@localhost.localdomain>
+Message-ID: <20091203134943.17146.88603.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fills in the OCP_SYSCONFIG.AUTOIDLE handling in the OMAP
-hwmod code.
+Replace the existing u8 array of module MPU IRQ lines with a struct
+that includes a name - similar to the existing struct
+omap_hwmod_dma_info.  Device drivers can then use
+platform_get_resource_byname() to retrieve specific IRQs without nasty
+dependencies on array ordering.
 
-After this patch, the hwmod code will set the module AUTOIDLE bit
-(generally <module>.OCP_SYSCONFIG.AUTOIDLE) to 1 by default upon
-enable.  If the hwmod flag HWMOD_NO_OCP_AUTOIDLE is set, AUTOIDLE will
-be set to 0 upon enable.  Upon module disable, AUTOIDLE will be set to
-1.
-
-Enabling module autoidle should save some power.  The only reason to
-not set the OCP_SYSCONFIG.AUTOIDLE bit is if there is a bug in the
-module RTL, e.g., the MPUINTC block on OMAP3.
-
-Comments from Kevin Hilman <khilman@deeprootsystems.com> inspired this patch,
-and Kevin tested an earlier version of this patch.
+Thanks to Beno?t Cousson <b-cousson@ti.com> and Kevin Hilman
+<khilman@deeprootsystems.com> for feedback on this approach.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Tested-by: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: Beno?t Cousson <b-cousson@ti.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c             |   37 +++++++++++++++++++++++++-
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    8 +++++-
- 2 files changed, 42 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c             |    5 +++--
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |   18 ++++++++++++++++--
+ 2 files changed, 19 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 4aab1b8..709ec5d 100644
+index 709ec5d..234567b 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -210,6 +210,32 @@ static int _set_softreset(struct omap_hwmod *oh, u32 *v)
- }
+@@ -1389,8 +1389,9 @@ int omap_hwmod_fill_resources(struct omap_hwmod *oh, struct resource *res)
+ 	/* For each IRQ, DMA, memory area, fill in array.*/
  
- /**
-+ * _set_module_autoidle: set the OCP_SYSCONFIG AUTOIDLE field in @v
-+ * @oh: struct omap_hwmod *
-+ * @autoidle: desired AUTOIDLE bitfield value (0 or 1)
-+ * @v: pointer to register contents to modify
-+ *
-+ * Update the module autoidle bit in @v to be @autoidle for the @oh
-+ * hwmod.  The autoidle bit controls whether the module can gate
-+ * internal clocks automatically when it isn't doing anything; the
-+ * exact function of this bit varies on a per-module basis.  This
-+ * function does not write to the hardware.  Returns -EINVAL upon
-+ * error or 0 upon success.
-+ */
-+static int _set_module_autoidle(struct omap_hwmod *oh, u8 autoidle,
-+				u32 *v)
-+{
-+	if (!oh->sysconfig ||
-+	    !(oh->sysconfig->sysc_flags & SYSC_HAS_AUTOIDLE))
-+		return -EINVAL;
-+
-+	*v &= ~SYSC_AUTOIDLE_MASK;
-+	*v |= autoidle << SYSC_AUTOIDLE_SHIFT;
-+
-+	return 0;
-+}
-+
-+/**
-  * _enable_wakeup: set OCP_SYSCONFIG.ENAWAKEUP bit in the hardware
-  * @oh: struct omap_hwmod *
-  *
-@@ -557,7 +583,13 @@ static void _sysc_enable(struct omap_hwmod *oh)
- 		_set_master_standbymode(oh, idlemode, &v);
+ 	for (i = 0; i < oh->mpu_irqs_cnt; i++) {
+-		(res + r)->start = *(oh->mpu_irqs + i);
+-		(res + r)->end = *(oh->mpu_irqs + i);
++		(res + r)->name = (oh->mpu_irqs + i)->name;
++		(res + r)->start = (oh->mpu_irqs + i)->irq;
++		(res + r)->end = (oh->mpu_irqs + i)->irq;
+ 		(res + r)->flags = IORESOURCE_IRQ;
+ 		r++;
  	}
- 
--	/* XXX OCP AUTOIDLE bit? */
-+	if (oh->sysconfig->sysc_flags & SYSC_HAS_AUTOIDLE) {
-+		idlemode = (oh->flags & HWMOD_NO_OCP_AUTOIDLE) ?
-+			0 : 1;
-+		_set_module_autoidle(oh, idlemode, &v);
-+	}
-+
-+	/* XXX OCP ENAWAKEUP bit? */
- 
- 	if (oh->flags & HWMOD_SET_DEFAULT_CLOCKACT &&
- 	    oh->sysconfig->sysc_flags & SYSC_HAS_CLOCKACTIVITY)
-@@ -622,7 +654,8 @@ static void _sysc_shutdown(struct omap_hwmod *oh)
- 	if (oh->sysconfig->sysc_flags & SYSC_HAS_MIDLEMODE)
- 		_set_master_standbymode(oh, HWMOD_IDLEMODE_FORCE, &v);
- 
--	/* XXX clear OCP AUTOIDLE bit? */
-+	if (oh->sysconfig->sysc_flags & SYSC_HAS_AUTOIDLE)
-+		_set_module_autoidle(oh, 1, &v);
- 
- 	_write_sysconfig(v, oh);
- }
 diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index dbdd123..643a972 100644
+index 643a972..007935a 100644
 --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
 +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -50,6 +50,8 @@ struct omap_device;
- #define SYSC_ENAWAKEUP_MASK		(1 << SYSC_ENAWAKEUP_SHIFT)
- #define SYSC_SOFTRESET_SHIFT		1
- #define SYSC_SOFTRESET_MASK		(1 << SYSC_SOFTRESET_SHIFT)
-+#define SYSC_AUTOIDLE_SHIFT		0
-+#define SYSC_AUTOIDLE_MASK		(1 << SYSC_AUTOIDLE_SHIFT)
+@@ -64,7 +64,21 @@ struct omap_device;
  
- /* OCP SYSSTATUS bit shifts/masks */
- #define SYSS_RESETDONE_SHIFT		0
-@@ -294,13 +296,17 @@ struct omap_hwmod_omap4_prcm {
-  *     SDRAM controller, etc.
-  * HWMOD_INIT_NO_IDLE: don't idle this module at boot - important for SDRAM
-  *     controller, etc.
-+ * HWMOD_NO_AUTOIDLE: disable module autoidle (OCP_SYSCONFIG.AUTOIDLE)
-+ *     when module is enabled, rather than the default, which is to
-+ *     enable autoidle
-  * HWMOD_SET_DEFAULT_CLOCKACT: program CLOCKACTIVITY bits@startup
-  */
- #define HWMOD_SWSUP_SIDLE			(1 << 0)
- #define HWMOD_SWSUP_MSTANDBY			(1 << 1)
- #define HWMOD_INIT_NO_RESET			(1 << 2)
- #define HWMOD_INIT_NO_IDLE			(1 << 3)
--#define HWMOD_SET_DEFAULT_CLOCKACT		(1 << 4)
-+#define HWMOD_NO_OCP_AUTOIDLE			(1 << 4)
-+#define HWMOD_SET_DEFAULT_CLOCKACT		(1 << 5)
  
- /*
-  * omap_hwmod._int_flags definitions
+ /**
+- * struct omap_hwmod_dma_info - MPU address space handled by the hwmod
++ * struct omap_hwmod_irq_info - MPU IRQs used by the hwmod
++ * @name: name of the IRQ channel (module local name)
++ * @irq_ch: IRQ channel ID
++ *
++ * @name should be something short, e.g., "tx" or "rx".  It is for use
++ * by platform_get_resource_byname().  It is defined locally to the
++ * hwmod.
++ */
++struct omap_hwmod_irq_info {
++	const char	*name;
++	u16		irq;
++};
++
++/**
++ * struct omap_hwmod_dma_info - DMA channels used by the hwmod
+  * @name: name of the DMA channel (module local name)
+  * @dma_ch: DMA channel ID
+  *
+@@ -379,7 +393,7 @@ struct omap_hwmod_omap4_prcm {
+ struct omap_hwmod {
+ 	const char			*name;
+ 	struct omap_device		*od;
+-	u8				*mpu_irqs;
++	struct omap_hwmod_irq_info	*mpu_irqs;
+ 	struct omap_hwmod_dma_info	*sdma_chs;
+ 	union {
+ 		struct omap_hwmod_omap2_prcm omap2;
