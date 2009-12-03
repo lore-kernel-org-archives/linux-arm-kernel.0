@@ -1,41 +1,30 @@
-From: r.schwebel@pengutronix.de (Robert Schwebel)
-Date: Thu, 3 Dec 2009 20:36:39 +0100
-Subject: [PATCH 1/1] fix occasional ULPI timeouts with ehci-mxc
-In-Reply-To: <37367b3a0912030821w22f72bd1tf200646e32da2158@mail.gmail.com>
-References: <1259770381-16987-1-git-send-email-valentin.longchamp@epfl.ch>
-	<37367b3a0912021058j2801df5l2c937ac339bc5f6b@mail.gmail.com>
-	<4B16C185.80905@warmcat.com>
-	<37367b3a0912021225l67455ca2q2c7d0464279f446e@mail.gmail.com>
-	<4B16D861.6090307@warmcat.com>
-	<37367b3a0912030645m12db4f12j7991081e7d2bca00@mail.gmail.com>
-	<4B17D104.4040800@warmcat.com>
-	<37367b3a0912030821w22f72bd1tf200646e32da2158@mail.gmail.com>
-Message-ID: <20091203193639.GF22533@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Dec 2009 19:41:32 +0000
+Subject: [PATCH 4/4]ARM: NUC900: enable uart support for nuc932
+In-Reply-To: <4B167281.1090708@gmail.com>
+References: <4B167281.1090708@gmail.com>
+Message-ID: <20091203194132.GA27666@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2009 at 02:21:17PM -0200, Alan Carvalho de Assis wrote:
-> On 12/3/09, Andy Green <andy@warmcat.com> wrote:
-> >
-> > You're super welcome... glad that time spent wandering in the desert was
-> > able to help someone else in the end :-)
-> >
-> 
-> Yes, it was a big saga, but finally it is working very nice.
-> 
-> Now we need few things to get a good imx27 support in the kernel. I
-> think the camera and the VPU support are the most important drivers
-> missing.
-> 
-> I think mx1_camera.c could be modified to support mx27 CSI, but to the
-> VPU I have no idea.
+On Wed, Dec 02, 2009 at 09:58:25PM +0800, Wan ZongShun wrote:
+> diff --git a/arch/arm/mach-w90x900/clock.h b/arch/arm/mach-w90x900/clock.h
+> index b9ea2e6..2a2a54a 100644
+> --- a/arch/arm/mach-w90x900/clock.h
+> +++ b/arch/arm/mach-w90x900/clock.h
+> @@ -14,8 +14,10 @@
+>  
+>  #ifndef CONFIG_CPU_NUC932
+>  #define EXTCLK	15000000
+> +#define UARTCLK	11313600
+>  #else
+>  #define EXTCLK	27000000
+> +#define UARTCLK	57139200
+>  #endif
 
-Sascha has CSI drivers for the MX27, but I'm not sure in which state
-they are.
+As far as I can see, these are the only thing which prevent a single
+kernel being built to cover both NUC900 and NUC932.
 
-rsc
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Can we make their selection something which is done at runtime instead
+of compile time?  This comments goes for patch 5837/1 in the patch
+system as well.
