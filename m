@@ -1,118 +1,57 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 3 Dec 2009 22:06:37 +0000
-Subject: [PATCH 3/5] SPI S3C64XX: Header for passing platform data
-In-Reply-To: <1259218097-9845-1-git-send-email-jassi.brar@samsung.com>
-References: <1259218097-9845-1-git-send-email-jassi.brar@samsung.com>
-Message-ID: <20091203220637.GR4808@trinity.fluff.org>
+Date: Thu, 3 Dec 2009 22:07:18 +0000
+Subject: [PATCH 15/38] move s3c_adc_remove to .devexit.text
+In-Reply-To: <1259096853-18909-15-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1259096853-18909-6-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-7-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-8-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-9-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-10-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-11-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-12-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-13-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-14-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1259096853-18909-15-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20091203220718.GS4808@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 26, 2009 at 03:48:17PM +0900, Jassi Brar wrote:
-> We need a way to pass controller specific information to the
-> SPI device driver. For that purpose a new header is made.
-> 
-> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
+On Tue, Nov 24, 2009 at 10:07:10PM +0100, Uwe Kleine-K?nig wrote:
+> The function s3c_adc_remove is used only wrapped by __devexit_p so define
+> it using __devexit.
+
+Shall I put these into my tree?
+ 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Acked-by: Sam Ravnborg <sam@ravnborg.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Acked-By: Ben Dooks <ben@simtec.co.uk>
+> Cc: Ramax Lo <ramaxlo@gmail.com>
+> Cc: Nelson Castillo <arhuaco@freaks-unidos.net>
+> Cc: linux-kernel at vger.kernel.org
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Alexey Dobriyan <adobriyan@gmail.com>
+> Cc: Ryan Mallon <ryan@bluewatersys.com>
+> Cc: linux-arm-kernel at lists.infradead.org
 > ---
->  arch/arm/plat-s3c64xx/include/plat/spi.h |   68 ++++++++++++++++++++++++++++++
->  1 files changed, 68 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/plat-s3c64xx/include/plat/spi.h
+>  arch/arm/plat-s3c24xx/adc.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/plat-s3c64xx/include/plat/spi.h b/arch/arm/plat-s3c64xx/include/plat/spi.h
-> new file mode 100644
-> index 0000000..d65ddfd
-> --- /dev/null
-> +++ b/arch/arm/plat-s3c64xx/include/plat/spi.h
-
-let's not have all these called spi.h, it will make life more difficult
-when trying to find which spi.h we are searching for in our platform
-support.
-
-> @@ -0,0 +1,68 @@
-> +/* linux/arch/arm/plat-s3c64xx/include/plat/spi.h
-> + *
-> + * Copyright (C) 2009 Samsung Electronics Ltd.
-> + *	Jaswinder Singh <jassi.brar@samsung.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __S3C64XX_PLAT_SPI_H
-> +#define __S3C64XX_PLAT_SPI_H __FILE__
-> +
-> +#define S3C64XX_SPI_SRCCLK_PCLK		0
-> +#define S3C64XX_SPI_SRCCLK_SPIBUS	1
-> +#define S3C64XX_SPI_SRCCLK_48M		2
-> +
-> +#define BUSNUM(b)		(b)
-> +
-> +/**
-> + * struct s3c64xx_spi_csinfo - ChipSelect description
-> + * @fb_delay: Slave specific feedback delay.
-> + * @set_level: CS line control.
-> + */
-> +struct s3c64xx_spi_csinfo {
-> +	u8 fb_delay;
-> +	void (*set_level)(int lvl);
-> +};
-
-I think set_level should be called 'set_cs' to make it clearer what is
-being done here.
-
-> +/**
-> + * struct s3c64xx_spi_cntrlr_info - SPI Controller defining structure
-> + * @src_clk_nr: Clock source index for the CLK_CFG[SPI_CLKSEL] field.
-> + * @src_clk_name: Platform name of the corresponding clock.
-> + * @src_clk: Pointer to the source clock.
-> + * @num_cs: Number of CS this controller emulates.
-> + * @cs: Array describing each CS.
-> + * @cfg_gpio: Configure pins for this SPI controller.
-> + * @fifo_lvl_mask: All tx fifo_lvl fields start at offset-6
-> + * @rx_lvl_offset: Depends on tx fifo_lvl field and bus number
-> + * @high_speed: If the controller supports HIGH_SPEED_EN bit
-> + */
-> +struct s3c64xx_spi_cntrlr_info {
-
-how about not bothering with the _cntrlr_ here and just call it
-s3c64xx_spi_info instead?
-
-> +	int src_clk_nr;
-> +	char *src_clk_name;
-> +	struct clk *src_clk;
-
-do not pass 'struct clk *' in via platform data.
-
-> +	int num_cs;
-> +	struct s3c64xx_spi_csinfo *cs;
-> +
-> +	int (*cfg_gpio)(struct platform_device *pdev);
-> +
-> +	/* Following two fields are for future compatibility */
-> +	int fifo_lvl_mask;
-> +	int rx_lvl_offset;
-> +	int high_speed;
-> +};
-
-I was wondering if a single 'set_cs' callback here would be in order,
-given each spi device can already hold a chip-select number for use
-with such callbacks, so:
-
-void (*set_cs)(struct s3c64xx_spi_cntrlr_info *us, struct spi_device *sel, int to);
-
-> +/**
-> + * s3c64xx_spi_set_info - SPI Controller configure callback by the board
-> + *				initialization code.
-> + * @cntrlr: SPI controller number the configuration is for.
-> + * @src_clk_nr: Clock the SPI controller is to use to generate SPI clocks.
-> + * @cs: Pointer to the array of CS descriptions.
-> + * @num_cs: Number of elements in the 'cs' array.
-> + */
-> +extern void s3c64xx_spi_set_info(int cntrlr, int src_clk_nr, int num_cs);
-> +
-> +#endif /* __S3C64XX_PLAT_SPI_H */
+> diff --git a/arch/arm/plat-s3c24xx/adc.c b/arch/arm/plat-s3c24xx/adc.c
+> index df47322..ce47627 100644
+> --- a/arch/arm/plat-s3c24xx/adc.c
+> +++ b/arch/arm/plat-s3c24xx/adc.c
+> @@ -365,7 +365,7 @@ static int s3c_adc_probe(struct platform_device *pdev)
+>  	return ret;
+>  }
+>  
+> -static int s3c_adc_remove(struct platform_device *pdev)
+> +static int __devexit s3c_adc_remove(struct platform_device *pdev)
+>  {
+>  	struct adc_device *adc = platform_get_drvdata(pdev);
+>  
 > -- 
-> 1.6.2.5
+> 1.6.5.2
 > 
 > 
 > _______________________________________________
