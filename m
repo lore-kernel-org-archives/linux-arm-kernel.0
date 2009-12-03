@@ -1,65 +1,45 @@
-From: valentin.longchamp@epfl.ch (Valentin Longchamp)
-Date: Thu,  3 Dec 2009 11:35:58 +0100
-Subject: [PATCH 1/1] fix occasional ULPI timeouts with ehci-mxc
-In-Reply-To: <4B169E48.2000804@epfl.ch>
-References: <4B169E48.2000804@epfl.ch>
-Message-ID: <1259836558-3007-1-git-send-email-valentin.longchamp@epfl.ch>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 3 Dec 2009 03:36:48 -0700 (MST)
+Subject: [PATCH 8/8] OMAP1 clock: convert mach-omap1/clock.h to
+	mach-omap1/clock_data.c
+In-Reply-To: <20091203102700.GA30423@flint.arm.linux.org.uk>
+References: <20091203095830.1203.76290.stgit@localhost.localdomain>
+	<20091203100707.1203.98247.stgit@localhost.localdomain>
+	<20091203102700.GA30423@flint.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.00.0912030331360.13408@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On various mxc boards, the intial ULPI reads resulted in a timeout
-which prevented the transceiver to be identified and thus the ehci
-device to be probed.
+Hello Russell,
 
-Initializing the hardware lines connected to the transceiver (through
-pdata->init call) before actually enabling clocks and configuring
-registers in the devices fixes this problem.
+On Thu, 3 Dec 2009, Russell King wrote:
 
-Signed-off-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
----
- drivers/usb/host/ehci-mxc.c |   23 +++++++++++------------
- 1 files changed, 11 insertions(+), 12 deletions(-)
+> On Thu, Dec 03, 2009 at 03:07:08AM -0700, Paul Walmsley wrote:
+> > -static int clk_omap1_dummy_enable(struct clk *clk)
+> > +int clk_omap1_dummy_enable(struct clk *clk)
+> >  {
+> >  	return 0;
+> >  }
+> >  
+> > -static void clk_omap1_dummy_disable(struct clk *clk)
+> > +void clk_omap1_dummy_disable(struct clk *clk)
+> >  {
+> >  }
+> >  
+> > -static const struct clkops clkops_dummy = {
+> > -	.enable = clk_omap1_dummy_enable,
+> > -	.disable = clk_omap1_dummy_disable,
+> > -};
+> 
+> I've no idea why you're moving the clkops into these other files - I think
+> this is going far too far.  Why not just make the clkops structures non-
+> static?
 
-diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
-index 35c56f4..23cd917 100644
---- a/drivers/usb/host/ehci-mxc.c
-+++ b/drivers/usb/host/ehci-mxc.c
-@@ -162,6 +162,17 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
- 		goto err_ioremap;
- 	}
- 
-+	/* call platform specific init function */
-+	if (pdata->init) {
-+		ret = pdata->init(pdev);
-+		if (ret) {
-+			dev_err(dev, "platform init failed\n");
-+			goto err_init;
-+		}
-+		/* platforms need some time to settle changed IO settings */
-+		mdelay(10);
-+	}
-+
- 	/* enable clocks */
- 	priv->usbclk = clk_get(dev, "usb");
- 	if (IS_ERR(priv->usbclk)) {
-@@ -192,18 +203,6 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
- 	if (ret < 0)
- 		goto err_init;
- 
--	/* call platform specific init function */
--	if (pdata->init) {
--		ret = pdata->init(pdev);
--		if (ret) {
--			dev_err(dev, "platform init failed\n");
--			goto err_init;
--		}
--	}
--
--	/* most platforms need some time to settle changed IO settings */
--	mdelay(10);
--
- 	/* Initialize the transceiver */
- 	if (pdata->otg) {
- 		pdata->otg->io_priv = hcd->regs + ULPI_VIEWPORT_OFFSET;
--- 
-1.6.3.3
+clkops that are shared between multiple platforms, such as clkops_null, 
+are indeed non-static.  However, many of the clkops are only used by one 
+OMAP variant, so it seemed pointless to make them non-static.  No point in 
+polluting the symbol table unnecessarily.  Is there some reason that all 
+of them should be non-static?
+
+
+- Paul
