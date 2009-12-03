@@ -1,48 +1,67 @@
-From: rubini-list@gnudd.com (Alessandro Rubini)
-Date: Thu, 3 Dec 2009 13:04:38 +0100
-Subject: [PATCH 2/2] arm nomadik: add platform device for rng in cpu-8815
-In-Reply-To: <defe399f8475d30be15ee694eadd45afa9cc64ca.1259840968.git.rubini
-	@unipv.it>
-References: <defe399f8475d30be15ee694eadd45afa9cc64ca.1259840968.git.rubini@
-	unipv.it>
-Message-ID: <9145f5b33119f62a02f158e0e764795dc9d38a2b.1259840968.git.rubini@unipv.it>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Dec 2009 12:11:57 +0000
+Subject: [PATCH v2 8/8] OMAP1 clock: convert mach-omap1/clock.h to
+	mach-omap1/clock_data.c
+In-Reply-To: <alpine.DEB.2.00.0912030424050.13408@utopia.booyaka.com>
+References: <20091203095830.1203.76290.stgit@localhost.localdomain>
+	<20091203100707.1203.98247.stgit@localhost.localdomain>
+	<20091203102700.GA30423@flint.arm.linux.org.uk>
+	<alpine.DEB.2.00.0912030331360.13408@utopia.booyaka.com>
+	<20091203104354.GB20379@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.0912030355050.13408@utopia.booyaka.com>
+	<alpine.DEB.2.00.0912030424050.13408@utopia.booyaka.com>
+Message-ID: <20091203121157.GC20379@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alessandro Rubini <rubini@unipv.it>
+On Thu, Dec 03, 2009 at 04:24:35AM -0700, Paul Walmsley wrote:
+> @@ -42,134 +47,19 @@ static void clk_omap1_dummy_disable(struct clk *clk)
+>  {
+>  }
+>  
+> -static const struct clkops clkops_dummy = {
+> -	.enable = clk_omap1_dummy_enable,
+> -	.disable = clk_omap1_dummy_disable,
+> -};
+...
+> +/*
+> + * clkops
+> + */
+>  
+> -	/* Turn off DSP and ARM_TIMXO. Make sure ARM_INTHCK is not divided */
+> -	/* (on 730, bit 13 must not be cleared) */
+> -	if (cpu_is_omap7xx())
+> -		omap_writew(omap_readw(ARM_CKCTL) & 0x2fff, ARM_CKCTL);
+> -	else
+> -		omap_writew(omap_readw(ARM_CKCTL) & 0x0fff, ARM_CKCTL);
+> +const struct clkops clkops_dspck = {
+> +	.enable		= omap1_clk_enable_dsp_domain,
+> +	.disable	= omap1_clk_disable_dsp_domain,
+> +};
+>  
+> -	/* Put DSP/MPUI into reset until needed */
+> -	omap_writew(0, ARM_RSTCT1);
+> -	omap_writew(1, ARM_RSTCT2);
+> -	omap_writew(0x400, ARM_IDLECT1);
+> +const struct clkops clkops_dummy = {
+> +	.enable		= clk_omap1_dummy_enable,
+> +	.disable	= clk_omap1_dummy_disable,
+> +};
+>  
+> -	/*
+> -	 * According to OMAP5910 Erratum SYS_DMA_1, bit DMACK_REQ (bit 8)
+> -	 * of the ARM_IDLECT2 register must be set to zero. The power-on
+> -	 * default value of this bit is one.
+> -	 */
+> -	omap_writew(0x0000, ARM_IDLECT2);	/* Turn LCD clock off also */
+> +const struct clkops clkops_uart = {
+> +	.enable		= omap1_clk_enable_uart_functional,
+> +	.disable	= omap1_clk_disable_uart_functional,
+> +};
 
+What is the reasoning for moving all clkops away from their associated
+enable/disable functions right to the end of the file?
 
-Signed-off-by: Alessandro Rubini <rubini@unipv.it>
-Acked-by: Andrea Gallo <andrea.gallo@stericsson.com>
-Cc: Matt Mackall <mpm@selenic.com>
-Cc: Herbert Xu <herbert@gondor.apana.org.au>
----
- arch/arm/mach-nomadik/cpu-8815.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
-index f93c596..26fdd02 100644
---- a/arch/arm/mach-nomadik/cpu-8815.c
-+++ b/arch/arm/mach-nomadik/cpu-8815.c
-@@ -86,11 +86,19 @@ static struct amba_device cpu8815_amba_gpio[] = {
- 	},
- };
- 
-+static struct amba_device cpu8815_amba_rng = {
-+	.dev = {
-+		.init_name = "rng",
-+	},
-+	__MEM_4K_RESOURCE(NOMADIK_RNG_BASE),
-+};
-+
- static struct amba_device *amba_devs[] __initdata = {
- 	cpu8815_amba_gpio + 0,
- 	cpu8815_amba_gpio + 1,
- 	cpu8815_amba_gpio + 2,
- 	cpu8815_amba_gpio + 3,
-+	&cpu8815_amba_rng
- };
- 
- static int __init cpu8815_init(void)
--- 
-1.6.0.2
+Isn't it better to have like stuff together, in much the same way that
+it's preferred to have EXPORT_SYMBOL next to their function/data that
+it's exporting?
