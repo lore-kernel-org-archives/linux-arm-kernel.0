@@ -1,101 +1,70 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 03 Dec 2009 03:07:07 -0700
-Subject: [PATCH 7/8] OMAP1 clock: convert test in disable_unused() to use
-	ENABLE_ON_INIT
+Date: Thu, 03 Dec 2009 03:07:04 -0700
+Subject: [PATCH 3/8] OMAP2/3: move SDRC macros to mach-omap2/sdrc.h
 In-Reply-To: <20091203095830.1203.76290.stgit@localhost.localdomain>
 References: <20091203095830.1203.76290.stgit@localhost.localdomain>
-Message-ID: <20091203100706.1203.7214.stgit@localhost.localdomain>
+Message-ID: <20091203100703.1203.90524.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mach-omap1/clock.c:omap1_clk_disable_unused() contains a test that
-assumes that the clock structures are available in the file's
-namespace.  After a following patch, this will no longer be the case.
-So we need to reimplement that test.  It turns out that we already
-have a facility in the clock framework to handle this case - the
-ENABLE_ON_INIT flag - used on OMAP2/3.  Remove the offending test and
-mark the clocks that it was intended to catch as ENABLE_ON_INIT.
+clock34xx.c contains some macros which probably belong in mach-omap2/sdrc.h.
+Move those macros to mach-omap2/sdrc.h.
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Paul Walmsley <paul at pwsan.com
 ---
- arch/arm/mach-omap1/clock.c |   11 -----------
- arch/arm/mach-omap1/clock.h |   17 ++++++++++++++++-
- 2 files changed, 16 insertions(+), 12 deletions(-)
+ arch/arm/mach-omap2/clock34xx.c |   14 --------------
+ arch/arm/mach-omap2/sdrc.h      |   16 ++++++++++++++++
+ 2 files changed, 16 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/clock.c b/arch/arm/mach-omap1/clock.c
-index e006493..26a887c 100644
---- a/arch/arm/mach-omap1/clock.c
-+++ b/arch/arm/mach-omap1/clock.c
-@@ -718,17 +718,6 @@ static void __init omap1_clk_disable_unused(struct clk *clk)
- 	if ((regval32 & (1 << clk->enable_bit)) == 0)
- 		return;
+diff --git a/arch/arm/mach-omap2/clock34xx.c b/arch/arm/mach-omap2/clock34xx.c
+index a4b903d..3929544 100644
+--- a/arch/arm/mach-omap2/clock34xx.c
++++ b/arch/arm/mach-omap2/clock34xx.c
+@@ -322,22 +322,8 @@ static struct omap_clk omap34xx_clks[] = {
  
--	/* FIXME: This clock seems to be necessary but no-one
--	 * has asked for its activation. */
--	if (clk == &tc2_ck		/* FIX: pm.c (SRAM), CCP, Camera */
--	    || clk == &ck_dpll1out.clk	/* FIX: SoSSI, SSR */
--	    || clk == &arm_gpio_ck	/* FIX: GPIO code for 1510 */
--		) {
--		printk(KERN_INFO "FIXME: Clock \"%s\" seems unused\n",
--		       clk->name);
--		return;
--	}
+ #define MAX_DPLL_WAIT_TRIES		1000000
+ 
+-#define MIN_SDRC_DLL_LOCK_FREQ		83000000
 -
- 	printk(KERN_INFO "Disabling unused clock \"%s\"... ", clk->name);
- 	clk->ops->disable(clk);
- 	printk(" done\n");
-diff --git a/arch/arm/mach-omap1/clock.h b/arch/arm/mach-omap1/clock.h
-index 29ffa97..70195ca 100644
---- a/arch/arm/mach-omap1/clock.h
-+++ b/arch/arm/mach-omap1/clock.h
-@@ -157,12 +157,17 @@ static struct clk ck_dpll1 = {
- 	.parent		= &ck_ref,
- };
+ #define CYCLES_PER_MHZ			1000000
  
-+/*
-+ * FIXME: This clock seems to be necessary but no-one has asked for its
-+ * activation.  [ FIX: SoSSI, SSR ]
-+ */
- static struct arm_idlect1_clk ck_dpll1out = {
- 	.clk = {
- 		.name		= "ck_dpll1out",
- 		.ops		= &clkops_generic,
- 		.parent		= &ck_dpll1,
--		.flags		= CLOCK_IDLE_CONTROL | ENABLE_REG_32BIT,
-+		.flags		= CLOCK_IDLE_CONTROL | ENABLE_REG_32BIT |
-+				  ENABLE_ON_INIT,
- 		.enable_reg	= OMAP1_IO_ADDRESS(ARM_IDLECT2),
- 		.enable_bit	= EN_CKOUT_ARM,
- 		.recalc		= &followparent_recalc,
-@@ -207,10 +212,15 @@ static struct arm_idlect1_clk armper_ck = {
- 	.idlect_shift	= 2,
- };
+-/* Scale factor for fixed-point arith in omap3_core_dpll_m2_set_rate() */
+-#define SDRC_MPURATE_SCALE		8
+-
+-/* 2^SDRC_MPURATE_BASE_SHIFT: MPU MHz that SDRC_MPURATE_LOOPS is defined for */
+-#define SDRC_MPURATE_BASE_SHIFT		9
+-
+-/*
+- * SDRC_MPURATE_LOOPS: Number of MPU loops to execute at
+- * 2^MPURATE_BASE_SHIFT MHz for SDRC to stabilize
+- */
+-#define SDRC_MPURATE_LOOPS		96
+-
+ /*
+  * DPLL5_FREQ_FOR_USBHOST: USBHOST and USBTLL are the only clocks
+  * that are sourced by DPLL5, and both of these require this clock
+diff --git a/arch/arm/mach-omap2/sdrc.h b/arch/arm/mach-omap2/sdrc.h
+index 48207b0..12fc7da 100644
+--- a/arch/arm/mach-omap2/sdrc.h
++++ b/arch/arm/mach-omap2/sdrc.h
+@@ -56,4 +56,20 @@ static inline u32 sms_read_reg(u16 reg)
+ 			OMAP2_L3_IO_ADDRESS(OMAP343X_SDRC_BASE + (reg))
+ #endif	/* __ASSEMBLER__ */
  
++/* Minimum frequency that the SDRC DLL can lock@*/
++#define MIN_SDRC_DLL_LOCK_FREQ		83000000
++
++/* Scale factor for fixed-point arith in omap3_core_dpll_m2_set_rate() */
++#define SDRC_MPURATE_SCALE		8
++
++/* 2^SDRC_MPURATE_BASE_SHIFT: MPU MHz that SDRC_MPURATE_LOOPS is defined for */
++#define SDRC_MPURATE_BASE_SHIFT		9
++
 +/*
-+ * FIXME: This clock seems to be necessary but no-one has asked for its
-+ * activation.  [ GPIO code for 1510 ]
++ * SDRC_MPURATE_LOOPS: Number of MPU loops to execute at
++ * 2^MPURATE_BASE_SHIFT MHz for SDRC to stabilize
 + */
- static struct clk arm_gpio_ck = {
- 	.name		= "arm_gpio_ck",
- 	.ops		= &clkops_generic,
- 	.parent		= &ck_dpll1,
-+	.flags		= ENABLE_ON_INIT,
- 	.enable_reg	= OMAP1_IO_ADDRESS(ARM_IDLECT2),
- 	.enable_bit	= EN_GPIOCK,
- 	.recalc		= &followparent_recalc,
-@@ -372,10 +382,15 @@ static struct clk tc1_ck = {
- 	.recalc		= &followparent_recalc,
- };
- 
-+/*
-+ * FIXME: This clock seems to be necessary but no-one has asked for its
-+ * activation.  [ pm.c (SRAM), CCP, Camera ]
-+ */
- static struct clk tc2_ck = {
- 	.name		= "tc2_ck",
- 	.ops		= &clkops_generic,
- 	.parent		= &tc_ck.clk,
-+	.flags		= ENABLE_ON_INIT,
- 	.enable_reg	= OMAP1_IO_ADDRESS(ARM_IDLECT3),
- 	.enable_bit	= EN_TC2_CK,
- 	.recalc		= &followparent_recalc,
++#define SDRC_MPURATE_LOOPS		96
++
++
+ #endif
