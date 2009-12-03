@@ -1,50 +1,82 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 03 Dec 2009 06:45:30 -0700
-Subject: [PATCH 0/9] Minor powerdomain/clockdomain/SDRC patches for 2.6.33
-Message-ID: <20091203134321.16229.87539.stgit@localhost.localdomain>
+Date: Thu, 03 Dec 2009 06:45:36 -0700
+Subject: [PATCH 4/9] OMAP powerdomain/PM: use symbolic constants for the max
+	number of power states
+In-Reply-To: <20091203134321.16229.87539.stgit@localhost.localdomain>
+References: <20091203134321.16229.87539.stgit@localhost.localdomain>
+Message-ID: <20091203134535.16229.31415.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Replace some bare constants with power states.
 
-This series contains some powerdomain, clockdomain, and SDRC patches
-intended for 2.6.33.  There's not much of great importance here;
-perhaps the most notable patch is "OMAP3: SDRC: Place SDRC AC timing
-and MR changes in CORE DVFS SRAM code behind Kconfig", which can reduce
-lockups on systems with many active initiators during CORE DVFS, but has
-the downside of reducing SDRAM performance.
-
-
-- Paul
-
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
 ---
+ arch/arm/mach-omap2/pm-debug.c                |    4 ++--
+ arch/arm/mach-omap2/powerdomain.c             |    2 +-
+ arch/arm/plat-omap/include/plat/powerdomain.h |    6 ++++--
+ 3 files changed, 7 insertions(+), 5 deletions(-)
 
-Paul Walmsley (7):
-      OMAP2/3 PRCM: don't export prm_*(), cm_*() functions
-      OMAP clockdomain/powerdomain: remove CONFIG_OMAP_DEBUG_{CLOCK,POWER}DOMAIN
-      OMAP clockdomain/powerdomain: optimize out sleepdep code on OMAP24xx
-      OMAP powerdomain/PM: use symbolic constants for the max number of power states
-      OMAP powerdomain: rearrange struct powerdomain to save some memory
-      OMAP3: SDRC: Place SDRC AC timing and MR changes in CORE DVFS SRAM code behind Kconfig
-      OMAP clock/hwmod: fix off-by-one errors
-
-Roel Kluin (1):
-      OMAP2/3 powerdomain: return errors rather than returning the output of IS_ERR()
-
-Thara Gopinath (1):
-      OMAP3: PM: Fix for MPU power domain MEM BANK position
-
-
- arch/arm/mach-omap2/Kconfig                   |   13 +++++
- arch/arm/mach-omap2/clockdomain.c             |    6 +-
- arch/arm/mach-omap2/cm.c                      |    7 ++-
- arch/arm/mach-omap2/omap_hwmod.c              |   13 ++---
- arch/arm/mach-omap2/pm-debug.c                |    4 +-
- arch/arm/mach-omap2/powerdomain.c             |   36 ++++++++-------
- arch/arm/mach-omap2/powerdomains34xx.h        |    1 
- arch/arm/mach-omap2/prcm.c                    |   11 +---
- arch/arm/mach-omap2/sram34xx.S                |   19 +++++++-
- arch/arm/plat-omap/Kconfig                    |   62 ++++++++-----------------
- arch/arm/plat-omap/include/plat/common.h      |   20 ++++++++
- arch/arm/plat-omap/include/plat/powerdomain.h |   17 ++++---
- 12 files changed, 117 insertions(+), 92 deletions(-)
+diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
+index 8baa30d..860b755 100644
+--- a/arch/arm/mach-omap2/pm-debug.c
++++ b/arch/arm/mach-omap2/pm-debug.c
+@@ -326,7 +326,7 @@ int pm_dbg_regset_save(int reg_set)
+ 	return 0;
+ }
+ 
+-static const char pwrdm_state_names[][4] = {
++static const char pwrdm_state_names[][PWRDM_MAX_PWRSTS] = {
+ 	"OFF",
+ 	"RET",
+ 	"INA",
+@@ -381,7 +381,7 @@ static int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *user)
+ 
+ 	seq_printf(s, "%s (%s)", pwrdm->name,
+ 			pwrdm_state_names[pwrdm->state]);
+-	for (i = 0; i < 4; i++)
++	for (i = 0; i < PWRDM_MAX_PWRSTS; i++)
+ 		seq_printf(s, ",%s:%d", pwrdm_state_names[i],
+ 			pwrdm->state_counter[i]);
+ 
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index 4147267..1dd1a38 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -158,7 +158,7 @@ static __init void _pwrdm_setup(struct powerdomain *pwrdm)
+ {
+ 	int i;
+ 
+-	for (i = 0; i < 4; i++)
++	for (i = 0; i < PWRDM_MAX_PWRSTS; i++)
+ 		pwrdm->state_counter[i] = 0;
+ 
+ 	pwrdm_wait_transition(pwrdm);
+diff --git a/arch/arm/plat-omap/include/plat/powerdomain.h b/arch/arm/plat-omap/include/plat/powerdomain.h
+index 3d45ee1..5a80ddb 100644
+--- a/arch/arm/plat-omap/include/plat/powerdomain.h
++++ b/arch/arm/plat-omap/include/plat/powerdomain.h
+@@ -28,6 +28,8 @@
+ #define PWRDM_POWER_INACTIVE	0x2
+ #define PWRDM_POWER_ON		0x3
+ 
++#define PWRDM_MAX_PWRSTS	4
++
+ /* Powerdomain allowable state bitfields */
+ #define PWRSTS_OFF_ON		((1 << PWRDM_POWER_OFF) | \
+ 				 (1 << PWRDM_POWER_ON))
+@@ -118,11 +120,11 @@ struct powerdomain {
+ 	struct list_head node;
+ 
+ 	int state;
+-	unsigned state_counter[4];
++	unsigned state_counter[PWRDM_MAX_PWRSTS];
+ 
+ #ifdef CONFIG_PM_DEBUG
+ 	s64 timer;
+-	s64 state_timer[4];
++	s64 state_timer[PWRDM_MAX_PWRSTS];
+ #endif
+ };
+ 
