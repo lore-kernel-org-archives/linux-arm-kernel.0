@@ -1,43 +1,51 @@
-From: acassis@gmail.com (Alan Carvalho de Assis)
-Date: Thu, 3 Dec 2009 14:37:22 -0200
-Subject: [PATCH 1/1] fix occasional ULPI timeouts with ehci-mxc
-In-Reply-To: <20091203162939.GG29442@buzzloop.caiaq.de>
-References: <1259770381-16987-1-git-send-email-valentin.longchamp@epfl.ch>
-	<37367b3a0912021058j2801df5l2c937ac339bc5f6b@mail.gmail.com>
-	<4B16C185.80905@warmcat.com>
-	<37367b3a0912021225l67455ca2q2c7d0464279f446e@mail.gmail.com>
-	<4B16D861.6090307@warmcat.com>
-	<37367b3a0912030645m12db4f12j7991081e7d2bca00@mail.gmail.com>
-	<4B17D104.4040800@warmcat.com>
-	<37367b3a0912030821w22f72bd1tf200646e32da2158@mail.gmail.com>
-	<20091203162939.GG29442@buzzloop.caiaq.de>
-Message-ID: <37367b3a0912030837l7fa19aa4x6feff867fda87f30@mail.gmail.com>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Thu, 3 Dec 2009 20:20:44 +0100
+Subject: [PATCH] mmc: move regulator handling to core
+In-Reply-To: <4B17CADB.1070406@nokia.com>
+References: <1259844390-10541-1-git-send-email-daniel@caiaq.de>
+	<4B17CADB.1070406@nokia.com>
+Message-ID: <20091203192044.GJ14091@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Thu, Dec 03, 2009 at 04:27:39PM +0200, Adrian Hunter wrote:
+> gDaniel Mack wrote:
 
-On 12/3/09, Daniel Mack <daniel@caiaq.de> wrote:
-> On Thu, Dec 03, 2009 at 02:21:17PM -0200, Alan Carvalho de Assis wrote:
->> On 12/3/09, Andy Green <andy@warmcat.com> wrote:
->> >
->> > You're super welcome... glad that time spent wandering in the desert was
->> > able to help someone else in the end :-)
->> >
->>
->> Yes, it was a big saga, but finally it is working very nice.
->
-> Good to hear :)
->
->> Now we need few things to get a good imx27 support in the kernel. I
->> think the camera and the VPU support are the most important drivers
->> missing.
->
-> Do you have any patches ready for MX27 EHCI?
->
+[...]
 
-Yes, I'm preparing a patch to add usb support on TD60.
+> > drivers/mmc/core/core.c   |   36 ++++++++++++++++++++----------------
+> > drivers/mmc/core/host.c   |    3 +++
+> > drivers/mmc/host/mmci.c   |   28 ++++++++++++----------------
+> > drivers/mmc/host/mmci.h   |    1 -
+> > drivers/mmc/host/pxamci.c |   20 ++++++++------------
+> > include/linux/mmc/host.h  |   10 ++++++----
+> 
+> What about arch/arm/mach-omap2/mmc-twl4030.c ?
 
-Best Regards,
+Argh, missed that one. And this particular case doesn't fit to my
+modifications. I don't know the code well ...  We would need to
+have a struct mmc_host * in all the functions there calling
+mmc_regulator_{set,get}_ocr. Any idea how to resolve that?
 
-Alan
+> >--- a/drivers/mmc/core/host.c
+> >+++ b/drivers/mmc/core/host.c
+> >@@ -18,6 +18,7 @@
+> > #include <linux/leds.h>
+> > #include <linux/mmc/host.h>
+> >+#include <linux/regulator/consumer.h>
+> > #include "core.h"
+> > #include "host.h"
+> >@@ -154,6 +155,8 @@ void mmc_remove_host(struct mmc_host *host)
+> > 	mmc_remove_host_debugfs(host);
+> > #endif
+> >+	regulator_put(host->vcc);
+> >+
+> 
+> If the core is doing a 'regulator_put()' shouldn't it also be doing
+> a 'regulator_get()'?  Why not leave it to the drivers?
+
+Yes, I can change the patch to do that, no problem. The major reason why
+I didn't put the regulator_get() to the mmc core is that I need to have
+the platform_device to obtain its name.
+
+Daniel
