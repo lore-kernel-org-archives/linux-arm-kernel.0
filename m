@@ -1,51 +1,34 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Thu, 3 Dec 2009 20:20:44 +0100
-Subject: [PATCH] mmc: move regulator handling to core
-In-Reply-To: <4B17CADB.1070406@nokia.com>
-References: <1259844390-10541-1-git-send-email-daniel@caiaq.de>
-	<4B17CADB.1070406@nokia.com>
-Message-ID: <20091203192044.GJ14091@buzzloop.caiaq.de>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Thu, 3 Dec 2009 20:30:34 +0100
+Subject: [PATCH] mx31moboard: fix typo
+Message-ID: <20091203193034.GD22533@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2009 at 04:27:39PM +0200, Adrian Hunter wrote:
-> gDaniel Mack wrote:
+Currently, linux-next breaks due to a typo introduced in commit
+33c4d91928bea4444b067e620496befbeb87029c
 
-[...]
+This patch fixes it.
 
-> > drivers/mmc/core/core.c   |   36 ++++++++++++++++++++----------------
-> > drivers/mmc/core/host.c   |    3 +++
-> > drivers/mmc/host/mmci.c   |   28 ++++++++++++----------------
-> > drivers/mmc/host/mmci.h   |    1 -
-> > drivers/mmc/host/pxamci.c |   20 ++++++++------------
-> > include/linux/mmc/host.h  |   10 ++++++----
-> 
-> What about arch/arm/mach-omap2/mmc-twl4030.c ?
+Signed-off-by: Robert Schwebel <r.schwebel@pengutronix.de>
+Cc: Valentin Longchamp <valentin.longchamp@epfl.ch>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-mx3/mx31moboard.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Argh, missed that one. And this particular case doesn't fit to my
-modifications. I don't know the code well ...  We would need to
-have a struct mmc_host * in all the functions there calling
-mmc_regulator_{set,get}_ocr. Any idea how to resolve that?
-
-> >--- a/drivers/mmc/core/host.c
-> >+++ b/drivers/mmc/core/host.c
-> >@@ -18,6 +18,7 @@
-> > #include <linux/leds.h>
-> > #include <linux/mmc/host.h>
-> >+#include <linux/regulator/consumer.h>
-> > #include "core.h"
-> > #include "host.h"
-> >@@ -154,6 +155,8 @@ void mmc_remove_host(struct mmc_host *host)
-> > 	mmc_remove_host_debugfs(host);
-> > #endif
-> >+	regulator_put(host->vcc);
-> >+
-> 
-> If the core is doing a 'regulator_put()' shouldn't it also be doing
-> a 'regulator_get()'?  Why not leave it to the drivers?
-
-Yes, I can change the patch to do that, no problem. The major reason why
-I didn't put the regulator_get() to the mmc core is that I need to have
-the platform_device to obtain its name.
-
-Daniel
+diff --git a/arch/arm/mach-mx3/mx31moboard.c b/arch/arm/mach-mx3/mx31moboard.c
+index 1ec679a..b705291 100644
+--- a/arch/arm/mach-mx3/mx31moboard.c
++++ b/arch/arm/mach-mx3/mx31moboard.c
+@@ -226,7 +226,7 @@ static struct mc13783_regulator_init_data moboard_regulators[] = {
+ static struct mc13783_platform_data moboard_pmic = {
+ 	.regulators = moboard_regulators,
+ 	.num_regulators = ARRAY_SIZE(moboard_regulators),
+-	.flags = MC13783_USE_REGULATOR | MC13783_USE_RTC,
++	.flags = MC13783_USE_REGULATOR | MC13783_USE_RTC |
+ 		MC13783_USE_ADC,
+ };
+ 
+-- 
+1.5.6.5
