@@ -1,171 +1,48 @@
 From: rubini-list@gnudd.com (Alessandro Rubini)
-Date: Thu, 3 Dec 2009 13:04:24 +0100
-Subject: [PATCH 1/2] arm nomadik: add hardware RNG driver
-Message-ID: <defe399f8475d30be15ee694eadd45afa9cc64ca.1259840968.git.rubini@unipv.it>
+Date: Thu, 3 Dec 2009 13:04:38 +0100
+Subject: [PATCH 2/2] arm nomadik: add platform device for rng in cpu-8815
+In-Reply-To: <defe399f8475d30be15ee694eadd45afa9cc64ca.1259840968.git.rubini
+	@unipv.it>
+References: <defe399f8475d30be15ee694eadd45afa9cc64ca.1259840968.git.rubini@
+	unipv.it>
+Message-ID: <9145f5b33119f62a02f158e0e764795dc9d38a2b.1259840968.git.rubini@unipv.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Alessandro Rubini <rubini@unipv.it>
 
-The hardware random number generator by ST is used in both the Nomadik
-8815 SoC and the U8500. It returns 16 bits every 400ns with automatic
-delay if a read is issued too early. It depends on PLAT_NOMADIK.
 
 Signed-off-by: Alessandro Rubini <rubini@unipv.it>
 Acked-by: Andrea Gallo <andrea.gallo@stericsson.com>
 Cc: Matt Mackall <mpm@selenic.com>
 Cc: Herbert Xu <herbert@gondor.apana.org.au>
 ---
+ arch/arm/mach-nomadik/cpu-8815.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-Please note that PLAT_NOMADIK is not yet merged (current upstream has
-ARCH_NOMADIK as the U8500 is not there, yet).  However, it's in
-Russell's queue, and I think it's better to avoid using MACH_NOMADIK
-for a while and then patch this again.  I've obviously tested it in my
-tree which includes Srinidhi's PLAT_NOMADIK patch.
-
- drivers/char/hw_random/Kconfig       |   12 ++++
- drivers/char/hw_random/Makefile      |    1 +
- drivers/char/hw_random/nomadik-rng.c |  103 ++++++++++++++++++++++++++++++++++
- 3 files changed, 116 insertions(+), 0 deletions(-)
- create mode 100644 drivers/char/hw_random/nomadik-rng.c
-
-diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
-index 8706026..6ea1014 100644
---- a/drivers/char/hw_random/Kconfig
-+++ b/drivers/char/hw_random/Kconfig
-@@ -186,3 +186,15 @@ config HW_RANDOM_MXC_RNGA
- 	  module will be called mxc-rnga.
+diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
+index f93c596..26fdd02 100644
+--- a/arch/arm/mach-nomadik/cpu-8815.c
++++ b/arch/arm/mach-nomadik/cpu-8815.c
+@@ -86,11 +86,19 @@ static struct amba_device cpu8815_amba_gpio[] = {
+ 	},
+ };
  
- 	  If unsure, say Y.
-+
-+config HW_RANDOM_NOMADIK
-+	tristate "ST-Ericsson Nomadik Random Number Generator support"
-+	depends on HW_RANDOM && PLAT_NOMADIK
-+	---help---
-+	  This driver provides kernel-side support for the Random Number
-+	  Generator hardware found on ST-Ericsson SoCs (8815 and 8500).
-+
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called nomadik-rng.
-+
-+	  If unsure, say Y.
-diff --git a/drivers/char/hw_random/Makefile b/drivers/char/hw_random/Makefile
-index 5eeb130..4273308 100644
---- a/drivers/char/hw_random/Makefile
-+++ b/drivers/char/hw_random/Makefile
-@@ -18,3 +18,4 @@ obj-$(CONFIG_HW_RANDOM_VIRTIO) += virtio-rng.o
- obj-$(CONFIG_HW_RANDOM_TX4939) += tx4939-rng.o
- obj-$(CONFIG_HW_RANDOM_MXC_RNGA) += mxc-rnga.o
- obj-$(CONFIG_HW_RANDOM_OCTEON) += octeon-rng.o
-+obj-$(CONFIG_HW_RANDOM_NOMADIK) += nomadik-rng.o
-diff --git a/drivers/char/hw_random/nomadik-rng.c b/drivers/char/hw_random/nomadik-rng.c
-new file mode 100644
-index 0000000..0110543
---- /dev/null
-+++ b/drivers/char/hw_random/nomadik-rng.c
-@@ -0,0 +1,103 @@
-+/*
-+ * Nomadik RNG support
-+ *  Copyright 2009 Alessandro Rubini
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License as published by
-+ *  the Free Software Foundation; either version 2 of the License, or
-+ *  (at your option) any later version.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/device.h>
-+#include <linux/amba/bus.h>
-+#include <linux/hw_random.h>
-+#include <linux/io.h>
-+
-+static int nmk_rng_read(struct hwrng *rng, u32 *buffer)
-+{
-+	void __iomem *base = (void __iomem *)rng->priv;
-+
-+	/*
-+	 * We have the low 16 bits as random data. It takes 0.4us to read them
-+	 * so return only one 32-bit sample (minimum allowed).
-+	 * High bits are guaranteed to be 0.
-+	 */
-+	*buffer = __raw_readl(base + 8) << 16 | __raw_readl(base + 8);
-+	return 4;
-+}
-+
-+/* we have@most one RNG per machine, granted */
-+static struct hwrng nmk_rng = {
-+	.name		= "nomadik",
-+	.data_read	= nmk_rng_read,
-+};
-+
-+static int nmk_rng_probe(struct amba_device *dev, struct amba_id *id)
-+{
-+	void __iomem *base;
-+	int ret;
-+
-+	ret = amba_request_regions(dev, dev->dev.init_name);
-+	if (ret)
-+		return ret;
-+	ret = -ENOMEM;
-+	base = ioremap(dev->res.start, resource_size(&dev->res));
-+	if (!base)
-+		goto out_release;
-+	nmk_rng.priv = (unsigned long)base;
-+	ret = hwrng_register(&nmk_rng);
-+	if (ret)
-+		goto out_unmap;
-+	return 0;
-+
-+out_unmap:
-+	iounmap(base);
-+out_release:
-+	amba_release_regions(dev);
-+	return ret;
-+}
-+
-+static int nmk_rng_remove(struct amba_device *dev)
-+{
-+	void __iomem *base = (void __iomem *)nmk_rng.priv;
-+	hwrng_unregister(&nmk_rng);
-+	iounmap(base);
-+	amba_release_regions(dev);
-+	return 0;
-+}
-+
-+static struct amba_id nmk_rng_ids[] = {
-+	{
-+		.id	= 0x000805e1,
-+		.mask	= 0x000fffff, /* top bits are rev and cfg: accept all */
++static struct amba_device cpu8815_amba_rng = {
++	.dev = {
++		.init_name = "rng",
 +	},
-+	{0, 0},
++	__MEM_4K_RESOURCE(NOMADIK_RNG_BASE),
 +};
 +
-+static struct amba_driver nmk_rng_driver = {
-+	.drv = {
-+		.owner = THIS_MODULE,
-+		.name = "rng",
-+		},
-+	.probe = nmk_rng_probe,
-+	.remove = nmk_rng_remove,
-+	.id_table = nmk_rng_ids,
-+};
-+
-+static int __init nmk_rng_init(void)
-+{
-+	return amba_driver_register(&nmk_rng_driver);
-+}
-+
-+static void __devexit nmk_rng_exit(void)
-+{
-+	amba_driver_unregister(&nmk_rng_driver);
-+}
-+
-+module_init(nmk_rng_init);
-+module_exit(nmk_rng_exit);
-+
-+MODULE_LICENSE("GPL");
+ static struct amba_device *amba_devs[] __initdata = {
+ 	cpu8815_amba_gpio + 0,
+ 	cpu8815_amba_gpio + 1,
+ 	cpu8815_amba_gpio + 2,
+ 	cpu8815_amba_gpio + 3,
++	&cpu8815_amba_rng
+ };
+ 
+ static int __init cpu8815_init(void)
 -- 
 1.6.0.2
