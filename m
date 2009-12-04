@@ -1,197 +1,242 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 4 Dec 2009 08:15:42 +0800
-Subject: [GIT PULL] pxa: patches for this merge window
-Message-ID: <f17812d70912031615q24fa7fc8gf01cac9ae83557b5@mail.gmail.com>
+From: amit.kucheria@canonical.com (Amit Kucheria)
+Date: Fri,  4 Dec 2009 04:47:01 +0200
+Subject: [RFC][PATCH 01/10] arm: mxc: New interrupt controller (TZIC) for
+	i.MX5 family
+In-Reply-To: <cover.1259893118.git.amit.kucheria@canonical.com>
+References: <cover.1259893118.git.amit.kucheria@canonical.com>
+Message-ID: <e99e70e2a619693064130a747b6ee3a93273337b.1259893118.git.amit.kucheria@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Freescale i.MX51 processor uses a different interrupt controller. Add the
+driver and fix the Makefile to account for it.
 
-The following changes since commit 648f4e3e50c4793d9dbf9a09afa193631f76fa26:
-  Linus Torvalds (1):
-        Linux 2.6.32-rc8
+Signed-off-by: Amit Kucheria <amit.kucheria@canonical.com>
+---
+ arch/arm/plat-mxc/Kconfig  |    4 +
+ arch/arm/plat-mxc/Makefile |    9 ++-
+ arch/arm/plat-mxc/tzic.c   |  180 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 192 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/tzic.c
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git devel
-
-Antonio Ospite (5):
-      [ARM] pxa/ezx: add camera support for A780 and A910 EZX phones
-      [ARM] pxa/ezx: add leds-lp3944 support for A910 EZX phone
-      [ARM] pxa/ezx: update ezx_defconfig now that ezx-pcap is in
-      [ARM] pxa/em-x270: don't use pxa_camera init() callback
-      [ARM] pxa/pcm990: don't use pxa_camera init() callback
-
-Dmitry Artamonow (1):
-      [ARM] pxa/hx4700: actually use platform_lcd driver
-
-Eric Miao (5):
-      [ARM] pxa: re-order platforms in Kconfig and Makefile
-      [ARM] pxa: use platform_device_id table for SSP driver
-      [ARM] pxa: introduce CONFIG_MACH_ZYLONITE{300,320} for CPU_PXA* removing
-      [ARM] pxa: select CPU_PXA310 for MACH_COLIBRI300
-      [ARM] pxa: make CPU_PXA* to be selectable hidden options
-
-Haojian Zhuang (20):
-      pxamci: introduce mmc_has_26mhz() and include pxa935
-      backlight: da903x_bl: control WLED output current in da9034
-      [ARM] pxa/saar: set default WLED output current
-      pxa3xx_nand: fix memory out of bound
-      pxa3xx_nand: reset read buffer before reading
-      pxa3xx_nand: adjust timing of Micron NAND flash
-      pxa3xx_nand: remove hardcode register address
-      pxa3xx_nand: remove hardcode irq number
-      pxa3xx_nand: disable nand irq in initialization
-      pxa3xx_nand: add new nand chip support
-      pxa3xx_nand: update dependancy to support ARCH_MMP
-      pxa3xx_nand: move pxa3xx_nand.h common into plat directory
-      [ARM] pxa: add nand device and clock for pxa168/pxa910
-      [ARM] pxa: add nand support in aspensite board
-      [ARM] pxa: add onenand support for TTC-DKB
-      [ARM] pxa: add onenand support for SAAR
-      [ARM] pxa: update flash structure in onenand info
-      [ARM] pxa: add missing irq events for pxa168
-      [ARM] pxa: add apmu clock support in mmp
-      [ARM] pxa: rename macro from pxa9xx to pxa93x
-
-Igor Grinberg (12):
-      [ARM] pxa: register U2D clock for pxa3xx
-      [ARM] pxa: add U2D registers and bits definitions
-      [ARM] pxa/cm-x300: add revision difference handling
-      [ARM] pxa/cm-x300: add TDO35S lcd support
-      [ARM] pxa/cm-x300: add ac97 controller registration
-      [ARM] pxa/cm-x300: add Wi2Wi chip (Bluetooth and WiFi) initialization
-      [ARM] pxa/cm-x300: add support for PXA310 cpu
-      [ARM] pxa/cm-x300: enable USB port 2 for PXA300
-      [ARM] pxa/cm-x300: add da9030 support
-      [ARM] pxa/cm-x300: update authors and copyright
-      [ARM] pxa/cm-x300: update defconfig
-      [ARM] pxa/cm-x300: add PWM backlight support
-
-Jonathan Cameron (1):
-      MAINTAINERS: Add entries for IMote 2 and Stargate 2
-
-Jun Nie (2):
-      pxa168fb: fix offset setting at initialization
-      pxa168fb: remove useless vsync/hsync invert flag
-
-Marc Zyngier (1):
-      [ARM] pxa/viper: convert to use plat_serial8250_port irqflags field
-
-Mike Rapoport (2):
-      backlight: tdo24m: ensure chip select changes between transfers
-      [ARM] pxa: add EXT_WAKEUP interrupts handling for pxa3xx
-
-Pavel Machek (2):
-      [ARM] pxa/zaurus: cleanup sharpsl_pm.c
-      [ARM] pxa/zaurus: rename spitz_battery_levels_* to sharpsl_*
-
-Pieter Grimmerink (1):
-      pxafb: add transparency field to pxafb_mode_info struct
-
-Russell King (1):
-      [ARM] pxa: allow platforms to control which uarts are registered
-
-Sven Neumann (1):
-      pxafb: use passed fb_var_screeninfo struct in pxafb_pan_display()
-
-Tom?? ?ech (2):
-      [ARM] pxa/treo: generalisation of Treo680 code
-      [ARM] pxa/treo: add Palm Centro 685 support
-
- MAINTAINERS                                        |   13 +
- arch/arm/configs/cm_x300_defconfig                 |  351 +++++---
- arch/arm/configs/ezx_defconfig                     |  947 ++++++++++++++------
- arch/arm/mach-mmp/aspenite.c                       |   39 +
- arch/arm/mach-mmp/clock.c                          |   15 +
- arch/arm/mach-mmp/clock.h                          |    1 +
- arch/arm/mach-mmp/include/mach/irqs.h              |    4 +-
- arch/arm/mach-mmp/include/mach/pxa168.h            |    7 +
- arch/arm/mach-mmp/include/mach/pxa910.h            |    7 +
- arch/arm/mach-mmp/pxa168.c                         |    5 +
- arch/arm/mach-mmp/pxa910.c                         |    4 +
- arch/arm/mach-mmp/ttc_dkb.c                        |   87 ++
- arch/arm/mach-pxa/Kconfig                          |  638 +++++++------
- arch/arm/mach-pxa/Makefile                         |   90 +-
- arch/arm/mach-pxa/balloon3.c                       |    4 +
- arch/arm/mach-pxa/cm-x2xx.c                        |    4 +
- arch/arm/mach-pxa/cm-x300.c                        |  260 +++++-
- arch/arm/mach-pxa/colibri-pxa270.c                 |    3 +
- arch/arm/mach-pxa/colibri-pxa300.c                 |    4 +
- arch/arm/mach-pxa/colibri-pxa320.c                 |    4 +
- arch/arm/mach-pxa/colibri-pxa3xx.c                 |    2 +-
- arch/arm/mach-pxa/corgi.c                          |    4 +
- arch/arm/mach-pxa/corgi_pm.c                       |    4 +-
- arch/arm/mach-pxa/csb726.c                         |    3 +
- arch/arm/mach-pxa/devices.c                        |   30 +-
- arch/arm/mach-pxa/e330.c                           |    3 +
- arch/arm/mach-pxa/e350.c                           |    3 +
- arch/arm/mach-pxa/e400.c                           |    3 +
- arch/arm/mach-pxa/e740.c                           |    3 +
- arch/arm/mach-pxa/e750.c                           |    3 +
- arch/arm/mach-pxa/e800.c                           |    3 +
- arch/arm/mach-pxa/em-x270.c                        |   13 +-
- arch/arm/mach-pxa/ezx.c                            |  251 +++++-
- arch/arm/mach-pxa/generic.h                        |    5 +
- arch/arm/mach-pxa/gumstix.c                        |    5 +
- arch/arm/mach-pxa/h5000.c                          |    3 +
- arch/arm/mach-pxa/himalaya.c                       |    3 +
- arch/arm/mach-pxa/hx4700.c                         |    5 +
- arch/arm/mach-pxa/idp.c                            |    3 +
- arch/arm/mach-pxa/imote2.c                         |    6 +-
- arch/arm/mach-pxa/include/mach/hardware.h          |    7 +-
- arch/arm/mach-pxa/include/mach/palmtreo.h          |   67 ++
- arch/arm/mach-pxa/include/mach/pxafb.h             |    3 +-
- arch/arm/mach-pxa/include/mach/regs-u2d.h          |  199 ++++
- arch/arm/mach-pxa/include/mach/treo680.h           |   49 -
- arch/arm/mach-pxa/littleton.c                      |    8 +-
- arch/arm/mach-pxa/lpd270.c                         |    4 +
- arch/arm/mach-pxa/lubbock.c                        |    4 +
- arch/arm/mach-pxa/magician.c                       |    4 +
- arch/arm/mach-pxa/mainstone.c                      |    4 +
- arch/arm/mach-pxa/mioa701.c                        |    3 +
- arch/arm/mach-pxa/mp900.c                          |    3 +
- arch/arm/mach-pxa/palmld.c                         |    4 +
- arch/arm/mach-pxa/palmt5.c                         |    4 +
- arch/arm/mach-pxa/palmtc.c                         |    5 +
- arch/arm/mach-pxa/palmte2.c                        |    4 +
- arch/arm/mach-pxa/{treo680.c => palmtreo.c}        |  365 ++++++--
- arch/arm/mach-pxa/palmtx.c                         |    4 +
- arch/arm/mach-pxa/palmz72.c                        |    4 +
- arch/arm/mach-pxa/pcm027.c                         |    4 +
- arch/arm/mach-pxa/pcm990-baseboard.c               |    8 +-
- arch/arm/mach-pxa/poodle.c                         |    4 +
- arch/arm/mach-pxa/pxa25x.c                         |    7 +-
- arch/arm/mach-pxa/pxa27x.c                         |    3 -
- arch/arm/mach-pxa/pxa3xx.c                         |   47 +-
- arch/arm/mach-pxa/saar.c                           |  105 +++-
- arch/arm/mach-pxa/sharpsl.h                        |    4 +-
- arch/arm/mach-pxa/sharpsl_pm.c                     |  112 ++--
- arch/arm/mach-pxa/spitz.c                          |    4 +
- arch/arm/mach-pxa/spitz_pm.c                       |   14 +-
- arch/arm/mach-pxa/ssp.c                            |   73 +--
- arch/arm/mach-pxa/stargate2.c                      |    4 +
- arch/arm/mach-pxa/tavorevb.c                       |    4 +
- arch/arm/mach-pxa/tosa.c                           |    5 +
- arch/arm/mach-pxa/trizeps4.c                       |    4 +
- arch/arm/mach-pxa/viper.c                          |   15 +-
- arch/arm/mach-pxa/xcep.c                           |    5 +
- arch/arm/mach-pxa/zylonite.c                       |    6 +-
- arch/arm/mm/mmu.c                                  |    2 +-
- .../mach => plat-pxa/include/plat}/pxa3xx_nand.h   |    0
- drivers/mmc/host/pxamci.c                          |   10 +-
- drivers/mtd/nand/Kconfig                           |    2 +-
- drivers/mtd/nand/pxa3xx_nand.c                     |   82 ++-
- drivers/video/backlight/da903x_bl.c                |    7 +
- drivers/video/backlight/tdo24m.c                   |    1 +
- drivers/video/pxa168fb.c                           |    1 +
- drivers/video/pxafb.c                              |   23 +-
- include/linux/mfd/da903x.h                         |    4 +
- include/video/pxa168fb.h                           |    2 -
- 89 files changed, 3068 insertions(+), 1081 deletions(-)
- create mode 100644 arch/arm/mach-pxa/include/mach/palmtreo.h
- create mode 100644 arch/arm/mach-pxa/include/mach/regs-u2d.h
- delete mode 100644 arch/arm/mach-pxa/include/mach/treo680.h
- rename arch/arm/mach-pxa/{treo680.c => palmtreo.c} (53%)
- rename arch/arm/{mach-pxa/include/mach =>
-plat-pxa/include/plat}/pxa3xx_nand.h (100%)
+diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+index ca5c7c2..11bf691 100644
+--- a/arch/arm/plat-mxc/Kconfig
++++ b/arch/arm/plat-mxc/Kconfig
+@@ -75,4 +75,8 @@ config ARCH_HAS_RNGA
+ 
+ config ARCH_MXC_IOMUX_V3
+ 	bool
++
++config MXC_TZIC
++	bool
++	depends on ARCH_MXC
+ endif
+diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+index e3212c8..5be53ca 100644
+--- a/arch/arm/plat-mxc/Makefile
++++ b/arch/arm/plat-mxc/Makefile
+@@ -3,7 +3,14 @@
+ #
+ 
+ # Common support
+-obj-y := irq.o clock.o gpio.o time.o devices.o cpu.o system.o
++obj-y := clock.o gpio.o time.o devices.o cpu.o system.o
++
++# MX51 uses the TZIC interrupt controller, older platforms use AVIC
++ifeq ($(CONFIG_MXC_TZIC),y)
++obj-y += tzic.o
++else
++obj-y += irq.o
++endif
+ 
+ obj-$(CONFIG_ARCH_MX1) += iomux-mx1-mx2.o dma-mx1-mx2.o
+ obj-$(CONFIG_ARCH_MX2) += iomux-mx1-mx2.o dma-mx1-mx2.o
+diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
+new file mode 100644
+index 0000000..3af8fc6
+--- /dev/null
++++ b/arch/arm/plat-mxc/tzic.c
+@@ -0,0 +1,180 @@
++/*
++ * Copyright 2004-2009 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/module.h>
++#include <linux/moduleparam.h>
++#include <linux/init.h>
++#include <linux/device.h>
++#include <linux/errno.h>
++#include <mach/hardware.h>
++#include <linux/io.h>
++#include <asm/mach/irq.h>
++
++/*
++ *****************************************
++ * TZIC Registers                        *
++ *****************************************
++ */
++
++#define TZIC_INTCNTL            0x0000	/* control register */
++#define TZIC_INTTYPE            0x0004	/* Controller type register */
++#define TZIC_IMPID              0x0008	/* Distributor Implementer Identification Register */
++#define TZIC_PRIOMASK           0x000C	/* Priority Mask Reg */
++#define TZIC_SYNCCTRL           0x0010	/* Synchronizer Control register */
++#define TZIC_DSMINT             0x0014	/* DSM interrupt Holdoffregister */
++#define TZIC_INTSEC0            0x0080	/* interrupt security register 0 */
++#define TZIC_ENSET0             0x0100	/* Enable Set Register 0 */
++#define TZIC_ENCLEAR0           0x0180	/* Enable Clear Register 0 */
++#define TZIC_SRCSET0            0x0200	/* Source Set Register 0 */
++#define TZIC_SRCCLAR0           0x0280	/* Source Clear Register 0 */
++#define TZIC_PRIORITY0          0x0400	/* Priority Register 0 */
++#define TZIC_PND0               0x0D00	/* Pending Register 0 */
++#define TZIC_HIPND0             0x0D80	/* High Priority Pending Register */
++#define TZIC_WAKEUP0            0x0E00	/* Wakeup Config Register */
++#define TZIC_SWINT              0x0F00	/* Software Interrupt Rigger Register */
++#define TZIC_ID0                0x0FD0	/* Indentification Register 0 */
++
++void __iomem *tzic_base;
++
++/*!
++ * Disable interrupt number "irq" in the TZIC
++ *
++ * @param  irq          interrupt source number
++ */
++static void mxc_mask_irq(unsigned int irq)
++{
++	int index, off;
++
++	index = irq >> 5;
++	off = irq & 0x1F;
++	__raw_writel(1 << off, tzic_base + TZIC_ENCLEAR0 + (index << 2));
++}
++
++/*!
++ * Enable interrupt number "irq" in the TZIC
++ *
++ * @param  irq          interrupt source number
++ */
++static void mxc_unmask_irq(unsigned int irq)
++{
++	int index, off;
++
++	index = irq >> 5;
++	off = irq & 0x1F;
++	__raw_writel(1 << off, tzic_base + TZIC_ENSET0 + (index << 2));
++}
++
++static unsigned int wakeup_intr[4];
++
++/*
++ * Set interrupt number "irq" in the TZIC as a wake-up source.
++ *
++ * @param  irq          interrupt source number
++ * @param  enable       enable as wake-up if equal to non-zero
++ * 			disble as wake-up if equal to zero
++ *
++ * @return       This function returns 0 on success.
++ */
++static int mxc_set_wake_irq(unsigned int irq, unsigned int enable)
++{
++	unsigned int index, off;
++
++	index = irq >> 5;
++	off = irq & 0x1F;
++
++	if (index > 3)
++		return -1;
++
++	if (enable)
++		wakeup_intr[index] |= (1 << off);
++	else
++		wakeup_intr[index] &= ~(1 << off);
++
++	return 0;
++}
++
++static struct irq_chip mxc_tzic_chip = {
++	.name = "MXC_TZIC",
++	.ack = mxc_mask_irq,
++	.mask = mxc_mask_irq,
++	.unmask = mxc_unmask_irq,
++	.set_wake = mxc_set_wake_irq,
++};
++
++/*
++ * This function initializes the TZIC hardware and disables all the
++ * interrupts. It registers the interrupt enable and disable functions
++ * to the kernel for each interrupt source.
++ */
++void __init mxc_init_irq(void __iomem *irqbase)
++{
++	int i;
++
++	tzic_base = irqbase;
++	/* put the TZIC into the reset value with
++	 * all interrupts disabled
++	 */
++	i = __raw_readl(tzic_base + TZIC_INTCNTL);
++
++	__raw_writel(0x80010001, tzic_base + TZIC_INTCNTL);
++	i = __raw_readl(tzic_base + TZIC_INTCNTL);
++	__raw_writel(0x1f, tzic_base + TZIC_PRIOMASK);
++	i = __raw_readl(tzic_base + TZIC_PRIOMASK);
++	__raw_writel(0x02, tzic_base + TZIC_SYNCCTRL);
++	i = __raw_readl(tzic_base + TZIC_SYNCCTRL);
++	for (i = 0; i < 4; i++) {
++		__raw_writel(0xFFFFFFFF, tzic_base + TZIC_INTSEC0 + i * 4);
++	}
++	/* disable all interrupts */
++	for (i = 0; i < 4; i++) {
++		__raw_writel(0xFFFFFFFF, tzic_base + TZIC_ENCLEAR0 + i * 4);
++	}
++
++	/* all IRQ no FIQ Warning :: No selection */
++
++	for (i = 0; i < MXC_INTERNAL_IRQS; i++) {
++		set_irq_chip(i, &mxc_tzic_chip);
++		set_irq_handler(i, handle_level_irq);
++		set_irq_flags(i, IRQF_VALID);
++	}
++
++	printk(KERN_INFO "MXC IRQ initialized\n");
++}
++
++/*
++ * enable wakeup interrupt
++ *
++ * @param is_idle		1 if called in idle loop (enset registers);
++ *				0 to be used when called from low power entry
++ * @return			0 if successful; non-zero otherwise
++ *
++ */
++int tzic_enable_wake(int is_idle)
++{
++	unsigned int i, v;
++
++	__raw_writel(1, tzic_base + TZIC_DSMINT);
++	if (unlikely(__raw_readl(tzic_base + TZIC_DSMINT) == 0))
++		return -EAGAIN;
++
++	if (likely(is_idle)) {
++		for (i = 0; i < 4; i++) {
++			v = __raw_readl(tzic_base + TZIC_ENSET0 + i * 4);
++			__raw_writel(v, tzic_base + TZIC_WAKEUP0 + i * 4);
++		}
++	} else {
++		for (i = 0; i < 4; i++) {
++			v = wakeup_intr[i];
++			__raw_writel(v, tzic_base + TZIC_WAKEUP0 + i * 4);
++		}
++	}
++	return 0;
++}
+-- 
+1.6.3.3
