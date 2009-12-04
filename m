@@ -1,50 +1,66 @@
-From: ospite@studenti.unina.it (Antonio Ospite)
-Date: Fri, 4 Dec 2009 13:39:43 +0100
-Subject: [PATCH] leds: Add LED class driver for regulator driven LEDs.
-In-Reply-To: <20091202180658.GA12292@rakim.wolfsonmicro.main>
-References: <1259775625-25973-1-git-send-email-ospite@studenti.unina.it>
-	<20091202180658.GA12292@rakim.wolfsonmicro.main>
-Message-ID: <20091204133943.ddf0e53d.ospite@studenti.unina.it>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 4 Dec 2009 13:43:01 +0100
+Subject: Please pull mxc patches
+Message-ID: <20091204124301.GR15126@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Dec 2009 18:06:58 +0000
-Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+The following changes since commit
+4998f1a30cf8e21c5bc0766fde4fa58e1adabd72:
+  Sascha Hauer (1):
+        mxc: mx1/mx2 DMA: add a possibility to create an endless DMA
+transfer
 
-> > +	vcc = regulator_get(&pdev->dev, pdata->supply);
-> > +	if (IS_ERR(vcc)) {
-> > +		dev_err(&pdev->dev, "Cannot get vcc for %s\n", pdata->name);
-> > +		return PTR_ERR(vcc);;
-> > +	}
-> 
-> You almost certainly want regulator_get_exclusive() here; this driver
-> can't function properly if something else is using the regulator and
-> holding the LED on or off without it.  You'll also want to check the
-> status of the LED on startup and update your internal status to match
-> that.
+are available in the git repository at:
 
-When you refer to "the status of the LED on startup" do you mean a
-initial brightness value passed via leds-regulator platform data, or the
-initial status or the regulator itself?
+  git://git.pengutronix.de/git/imx/linux-2.6.git for-rmk
 
-Thanks,
-   Antonio
+Alan Carvalho de Assis (2):
+      mx27: Add basic support for Maxtrack i-MXT TD60
+      mx27: mxt_td60: Add support to SD/MMC
+
+Harro Haan (2):
+      mx35: register usb_ahb clock in clock-imx35.c
+      mx35: add usb gadget support in mx35pdk.c
+
+Robert Schwebel (1):
+      mx31moboard: fix typo
+
+Sascha Hauer (1):
+      i.MX27 audmux: Fix register offsets
+
+Uwe Kleine-K?nig (2):
+      IMX: don't disable the uart clock if DEBUG_LL uses it
+      MAINTAINERS: add tree and file pattern for ARM IMX
+
+Yoichi Yuasa (1):
+      Add KZM-ARM11-01 support
+
+ MAINTAINERS                                     |    3 +
+ arch/arm/configs/mx3_defconfig                  |  101 +++++---
+ arch/arm/mach-mx2/Kconfig                       |    7 +
+ arch/arm/mach-mx2/Makefile                      |    1 +
+ arch/arm/mach-mx2/clock_imx21.c                 |    2 +-
+ arch/arm/mach-mx2/clock_imx27.c                 |    2 +-
+ arch/arm/mach-mx2/mxt_td60.c                    |  319 +++++++++++++++++++++++
+ arch/arm/mach-mx3/Kconfig                       |    8 +
+ arch/arm/mach-mx3/Makefile                      |    1 +
+ arch/arm/mach-mx3/clock-imx35.c                 |    5 +-
+ arch/arm/mach-mx3/kzmarm11.c                    |  268 +++++++++++++++++++
+ arch/arm/mach-mx3/mx31moboard.c                 |    2 +-
+ arch/arm/mach-mx3/mx35pdk.c                     |   12 +
+ arch/arm/plat-mxc/audmux-v1.c                   |    9 +-
+ arch/arm/plat-mxc/include/mach/board-kzmarm11.h |   39 +++
+ arch/arm/plat-mxc/include/mach/iomux-mx3.h      |    8 +
+ arch/arm/plat-mxc/include/mach/iomux.h          |    1 +
+ arch/arm/plat-mxc/include/mach/uncompress.h     |    1 +
+ 18 files changed, 750 insertions(+), 39 deletions(-)
+ create mode 100644 arch/arm/mach-mx2/mxt_td60.c
+ create mode 100644 arch/arm/mach-mx3/kzmarm11.c
+ create mode 100644 arch/arm/plat-mxc/include/mach/board-kzmarm11.h
 
 -- 
-Antonio Ospite
-http://ao2.it
-
-PGP public key ID: 0x4553B001
-
-A: Because it messes up the order in which people normally read text.
-   See http://en.wikipedia.org/wiki/Posting_style
-Q: Why is top-posting such a bad thing?
-A: Top-posting.
-Q: What is the most annoying thing in e-mail?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091204/315580c2/attachment.sig>
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
