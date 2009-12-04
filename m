@@ -1,25 +1,150 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 4 Dec 2009 12:03:08 +0100
-Subject: [RFC][PATCH 05/10] mxc: Add board support for the i.MX51
-	babbage board
-In-Reply-To: <0559d42bc9f32e30264fea6ca6fa679121f6a241.1259893118.git.amit.kucheria@canonical.com>
-References: <cover.1259893118.git.amit.kucheria@canonical.com>
-	<0559d42bc9f32e30264fea6ca6fa679121f6a241.1259893118.git.amit.kucheria@canonical.com>
-Message-ID: <20091204110308.GK15126@pengutronix.de>
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Fri, 4 Dec 2009 20:06:12 +0900
+Subject: [PATCH 3/5] SPI S3C64XX: Header for passing platform data
+In-Reply-To: <20091203220637.GR4808@trinity.fluff.org>
+References: <1259218097-9845-1-git-send-email-jassi.brar@samsung.com>
+	<20091203220637.GR4808@trinity.fluff.org>
+Message-ID: <1b68c6790912040306m3098cba9wf67bfe5bfefb7e23@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 04, 2009 at 04:47:05AM +0200, Amit Kucheria wrote:
-> Add basic clock support, cpu identification, I/O mapping and serial port. Boot
-> tested on Freescale Babbage 2.5 board.
+On Fri, Dec 4, 2009 at 7:06 AM, Ben Dooks <ben-linux@fluff.org> wrote:
+> On Thu, Nov 26, 2009 at 03:48:17PM +0900, Jassi Brar wrote:
+>> We need a way to pass controller specific information to the
+>> SPI device driver. For that purpose a new header is made.
+>>
+>> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
+>> ---
+>> ?arch/arm/plat-s3c64xx/include/plat/spi.h | ? 68 ++++++++++++++++++++++++++++++
+>> ?1 files changed, 68 insertions(+), 0 deletions(-)
+>> ?create mode 100644 arch/arm/plat-s3c64xx/include/plat/spi.h
+>>
+>> diff --git a/arch/arm/plat-s3c64xx/include/plat/spi.h b/arch/arm/plat-s3c64xx/include/plat/spi.h
+>> new file mode 100644
+>> index 0000000..d65ddfd
+>> --- /dev/null
+>> +++ b/arch/arm/plat-s3c64xx/include/plat/spi.h
+>
+> let's not have all these called spi.h, it will make life more difficult
+> when trying to find which spi.h we are searching for in our platform
+> support.
+We can call it s3c64xx-spi.h but won't that be kinda redundant as it's
+in plat-s3c64xx ?
 
-Can you split this into two patches, one for the i.MX51 support and one
-for the babbage board?
+>> @@ -0,0 +1,68 @@
+>> +/* linux/arch/arm/plat-s3c64xx/include/plat/spi.h
+>> + *
+>> + * Copyright (C) 2009 Samsung Electronics Ltd.
+>> + * ? Jaswinder Singh <jassi.brar@samsung.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#ifndef __S3C64XX_PLAT_SPI_H
+>> +#define __S3C64XX_PLAT_SPI_H __FILE__
+>> +
+>> +#define S3C64XX_SPI_SRCCLK_PCLK ? ? ? ? ? ? ?0
+>> +#define S3C64XX_SPI_SRCCLK_SPIBUS ? ?1
+>> +#define S3C64XX_SPI_SRCCLK_48M ? ? ? ? ? ? ? 2
+>> +
+>> +#define BUSNUM(b) ? ? ? ? ? ?(b)
+>> +
+>> +/**
+>> + * struct s3c64xx_spi_csinfo - ChipSelect description
+>> + * @fb_delay: Slave specific feedback delay.
+>> + * @set_level: CS line control.
+>> + */
+>> +struct s3c64xx_spi_csinfo {
+>> + ? ? u8 fb_delay;
+>> + ? ? void (*set_level)(int lvl);
+>> +};
+>
+> I think set_level should be called 'set_cs' to make it clearer what is
+> being done here.
+Well, in the driver we instantiate the structure pointer as 'cs', so all
+the calls look like "cs->set_level" so I think that should be ok,
+as it's quite obvious its all about cs(ChipSelect).
 
-Sascha
+>> +/**
+>> + * struct s3c64xx_spi_cntrlr_info - SPI Controller defining structure
+>> + * @src_clk_nr: Clock source index for the CLK_CFG[SPI_CLKSEL] field.
+>> + * @src_clk_name: Platform name of the corresponding clock.
+>> + * @src_clk: Pointer to the source clock.
+>> + * @num_cs: Number of CS this controller emulates.
+>> + * @cs: Array describing each CS.
+>> + * @cfg_gpio: Configure pins for this SPI controller.
+>> + * @fifo_lvl_mask: All tx fifo_lvl fields start at offset-6
+>> + * @rx_lvl_offset: Depends on tx fifo_lvl field and bus number
+>> + * @high_speed: If the controller supports HIGH_SPEED_EN bit
+>> + */
+>> +struct s3c64xx_spi_cntrlr_info {
+>
+> how about not bothering with the _cntrlr_ here and just call it
+> s3c64xx_spi_info instead?
+Sure.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>> + ? ? int src_clk_nr;
+>> + ? ? char *src_clk_name;
+>> + ? ? struct clk *src_clk;
+>
+> do not pass 'struct clk *' in via platform data.
+Since this is not initialized in platform code: just a pointer
+made available to the driver. So, yes, this can be made a
+member of s3c64xx_spi_driver_data rather.
+
+>> + ? ? int num_cs;
+>> + ? ? struct s3c64xx_spi_csinfo *cs;
+>> +
+>> + ? ? int (*cfg_gpio)(struct platform_device *pdev);
+>> +
+>> + ? ? /* Following two fields are for future compatibility */
+>> + ? ? int fifo_lvl_mask;
+>> + ? ? int rx_lvl_offset;
+>> + ? ? int high_speed;
+>> +};
+>
+> I was wondering if a single 'set_cs' callback here would be in order,
+> given each spi device can already hold a chip-select number for use
+> with such callbacks, so:
+>
+> void (*set_cs)(struct s3c64xx_spi_cntrlr_info *us, struct spi_device *sel, int to);
+In that case the machine code wud have to map the chipselect number to
+appropriate function/switch-case. Switch-case maybe ok, but calling some
+function to toggle CS might result in bigger lags between CS and appearance
+of clock on the bus.
+
+>> +/**
+>> + * s3c64xx_spi_set_info - SPI Controller configure callback by the board
+>> + * ? ? ? ? ? ? ? ? ? ? ? ? ? initialization code.
+>> + * @cntrlr: SPI controller number the configuration is for.
+>> + * @src_clk_nr: Clock the SPI controller is to use to generate SPI clocks.
+>> + * @cs: Pointer to the array of CS descriptions.
+>> + * @num_cs: Number of elements in the 'cs' array.
+>> + */
+>> +extern void s3c64xx_spi_set_info(int cntrlr, int src_clk_nr, int num_cs);
+>> +
+>> +#endif /* __S3C64XX_PLAT_SPI_H */
+>> --
+>> 1.6.2.5
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+> --
+> --
+> Ben
+>
+> Q: ? ? ?What's a light-year?
+> A: ? ? ?One-third less calories than a regular year.
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
