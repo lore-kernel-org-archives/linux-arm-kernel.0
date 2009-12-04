@@ -1,109 +1,36 @@
-From: ospite@studenti.unina.it (Antonio Ospite)
-Date: Fri, 4 Dec 2009 13:57:57 +0100
-Subject: [PATCH] leds: Add LED class driver for regulator driven LEDs.
-In-Reply-To: <20091202204121.GB18311@rakim.wolfsonmicro.main>
-References: <1259775625-25973-1-git-send-email-ospite@studenti.unina.it>
-	<1259778235.3588.141.camel@odin>
-	<20091202213131.1393a956.ospite@studenti.unina.it>
-	<20091202204121.GB18311@rakim.wolfsonmicro.main>
-Message-ID: <20091204135757.d7533e20.ospite@studenti.unina.it>
+From: jic23@cam.ac.uk (Jonathan Cameron)
+Date: Fri, 04 Dec 2009 13:08:15 +0000
+Subject: Query about pxa27x_udc.c
+Message-ID: <4B1909BF.9050704@cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Dec 2009 20:41:22 +0000
-Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
-
-> On Wed, Dec 02, 2009 at 09:31:31PM +0100, Antonio Ospite wrote:
-> > Liam Girdwood <lrg@slimlogic.co.uk> wrote:
-> 
-> > > Some regulators may not support voltage change (via hw design or
-> > > constraints) so set_voltage() will fail. We probably want to handle this
-> > > regulator type so we don't call set_voltage().
-> 
-> > Ok, I'll read more about the regulator framework to find out how to
-> > check regulator capabilities.
-> 
-> Checking for errors when counting and listing the voltages ought to
-> cover this.
-
-This is the incremental change I have in mind; if it's ok, then
-a v2 is on its way.
-
-diff --git a/drivers/leds/leds-regulator.c b/drivers/leds/leds-regulator.c
-index f4c508b..8146d12 100644
---- a/drivers/leds/leds-regulator.c
-+++ b/drivers/leds/leds-regulator.c
-@@ -34,14 +34,23 @@ struct regulator_led {
-
- static inline int led_regulator_get_max_brightness(struct regulator *supply)
- {
--       return regulator_count_voltages(supply);
-+       int ret = regulator_count_voltages(supply);
-+
-+       /* even if regulator can't change voltages,
-+        * we still assume it can change status
-+        * and the LED can be turned on and off.
-+        */
-+       if (ret == -EINVAL)
-+               return 1;
-+
-+       return ret;
- }
-
- static int led_regulator_get_vdd(struct regulator *supply,
-                enum led_brightness brightness)
- {
-        if (brightness == 0)
--               return 0;
-+               return -EINVAL;
-
-        return regulator_list_voltage(supply, brightness - 1);
- }
-@@ -95,13 +104,15 @@ static void led_work(struct work_struct *work)
-        }
-
-        voltage = led_regulator_get_vdd(led->vcc, led->value);
--       dev_dbg(led->cdev.dev, "brightness: %d voltage: %d",
--                       led->value, voltage);
--
--       ret = regulator_set_voltage(led->vcc, voltage, voltage);
--       if (ret != 0)
--               dev_err(led->cdev.dev, "Failed to set voltage %d: %d\n",
--                       voltage, ret);
-+       if (voltage) {
-+               dev_dbg(led->cdev.dev, "brightness: %d voltage: %d",
-+                               led->value, voltage);
-+
-+               ret = regulator_set_voltage(led->vcc, voltage, voltage);
-+               if (ret != 0)
-+                       dev_err(led->cdev.dev, "Failed to set voltage %d: %d\n",
-+                               voltage, ret);
-+       }
-
-        regulator_led_enable(led);
+Just had the following pop up in a compile of linux-next
 
 
-In the last hunk I could have checked (max_brightness > 1) in place
-of (voltage) given the first hunk, any opinion?
+drivers/usb/gadget/pxa27x_udc.c: In function 'pxa_udc_irq':
+drivers/usb/gadget/pxa27x_udc.c:2232: warning: array subscript is above array bounds
+drivers/usb/gadget/pxa27x_udc.c:2232: warning: array subscript is above array bounds
+drivers/usb/gadget/pxa27x_udc.c:2233: warning: array subscript is above array bounds
 
-Thanks,
-   Antonio
+I'm not sure what the lines in question are actually doing (and at least
+at first glance they can never access anything in the array).
 
--- 
-Antonio Ospite
-http://ao2.it
 
-PGP public key ID: 0x4553B001
+	for (i = 16; udcisr1 != 0 && i < 24; udcisr1 >>= 2, i++) {
+		udc_writel(udc, UDCISR1, UDCISR_INT(i - 16, UDCISR_INT_MASK));
+		if (!(udcisr1 & UDCISR_INT_MASK))
+			continue;
 
-A: Because it messes up the order in which people normally read text.
-   See http://en.wikipedia.org/wiki/Posting_style
-Q: Why is top-posting such a bad thing?
-A: Top-posting.
-Q: What is the most annoying thing in e-mail?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091204/8e19f4b9/attachment.sig>
+		ep = &udc->pxa_ep[i];
+		ep->stats.irqs++;
+		handle_ep(ep);
+	}
+
+Where the warning is about the call to &udc->pxa_ep[i]
+
+Seeing as that appears to only ever contain 15 elements this doesn't look good.
+I haven't waded through everything that happens to this structure so I guess it might
+be doing something less than obvious.
+
+Jonathan
