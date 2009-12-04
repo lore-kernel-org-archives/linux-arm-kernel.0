@@ -1,43 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Dec 2009 19:13:49 +0000
+From: hs@denx.de (Heiko Schocher)
+Date: Fri, 04 Dec 2009 20:33:37 +0100
 Subject: shared memory problem on ARM v5TE using threads
-In-Reply-To: <4B194C8B.7070505@denx.de>
+In-Reply-To: <alpine.LFD.2.00.0912041254220.31174@xanadu.home>
 References: <4B18F141.7070101@denx.de>
-	<20091204131307.GE15887@n2100.arm.linux.org.uk>
-	<4B1911B4.7080907@denx.de>
-	<20091204154231.GB20386@n2100.arm.linux.org.uk>
-	<4B1931B3.90301@denx.de>
-	<20091204163850.GC20386@n2100.arm.linux.org.uk>
-	<4B194C8B.7070505@denx.de>
-Message-ID: <20091204191349.GG20386@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.0912041222040.31174@xanadu.home>
+	<4B194B39.50301@denx.de>
+	<alpine.LFD.2.00.0912041254220.31174@xanadu.home>
+Message-ID: <4B196411.2020709@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Well, the kernel messages of relevance from the dump are:
+Hello Nicolas Pitre,
 
-shmtest2:351: c7220140 c72179c0 0 41170000 64a1
-shmtest2:351: vma c7217968 addr 40961000 pte 064a13cf
-shmtest2:351: modified 064a13c7
-shmtest2:351: aliases 1
-shmtest2:351: vma c72179c0 addr 41170000 pte 064a13cf
-shmtest2:351: modified 064a13c7
-shmtest2:352: c7220140 c7217548 0 4197f000 64a1
-shmtest2:352: vma c7217968 addr 40961000 pte 064a13c7
-shmtest2:352: vma c72179c0 addr 41170000 pte 064a13c7
-shmtest2:352: aliases 2
-shmtest2:352: vma c7217548 addr 4197f000 pte 064a13cf
-shmtest2:352: modified 064a13c7
-shmtest2:354: c7220140 c7217650 0 4218e000 64a1
-shmtest2:354: vma c7217968 addr 40961000 pte 064a13c7
-shmtest2:354: vma c72179c0 addr 41170000 pte 064a13c7
-shmtest2:354: vma c7217548 addr 4197f000 pte 064a13c7
-shmtest2:354: aliases 3
-shmtest2:354: vma c7217650 addr 4218e000 pte 064a13cf
-shmtest2:354: modified 064a13c7
+Nicolas Pitre wrote:
+> On Fri, 4 Dec 2009, Heiko Schocher wrote:
+> 
+>> Hello Nicolas Pitre,
+>>
+>> Nicolas Pitre wrote:
+>>> On Fri, 4 Dec 2009, Heiko Schocher wrote:
+>>>
+>>>> Hello,
+>>>>
+>>>> I have the following shared mem problem on a ARM v5TE
+>>>> processor using Linux version 2.6.28,
+>>> Could you apply this patch and test again:
+>>>
+>>> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=08e445bd6a
+>> Thanks for your reply. I applied this patch, but it didn;t help.
+> 
+> OK. Then could you test with Linux version 2.6.32, just to be sure the 
+> issue still exists there?
 
-which shows that the PTEs are having their 'cacheable' bit correctly
-cleared, thus making changes to the page in RAM immediately visible to
-the user program.
+I try to start a 2.6.32 kernel, but maybe I need some time for it.
 
-Could it be that the CPU you're using doesn't support the C=0 B=1
-PTE encoding properly, and still caches data in such a region?
+bye
+Heiko
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
