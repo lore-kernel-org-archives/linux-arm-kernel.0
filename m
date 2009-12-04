@@ -1,85 +1,42 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 4 Dec 2009 10:41:22 +0100
-Subject: [RFC][PATCH 02/10] arm: mxc: base support for Freescale i.MX51
-	processor
-In-Reply-To: <6608c4dca645d87efce78ae0b7dbad265004f482.1259893118.git.amit.kucheria@canonical.com>
-References: <cover.1259893118.git.amit.kucheria@canonical.com>
-	<6608c4dca645d87efce78ae0b7dbad265004f482.1259893118.git.amit.kucheria@canonical.com>
-Message-ID: <20091204094122.GC10910@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 04 Dec 2009 09:55:48 +0000
+Subject: [GIT PULL] Patches for 2.6.33
+In-Reply-To: <1258369405.6705.28.camel@pc1117.cambridge.arm.com>
+References: <1258367694.6705.16.camel@pc1117.cambridge.arm.com>
+	<20091116105325.GA27894@n2100.arm.linux.org.uk>
+	<1258369405.6705.28.camel@pc1117.cambridge.arm.com>
+Message-ID: <1259920548.12495.6.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Russell,
 
-On Fri, Dec 04, 2009 at 04:47:02AM +0200, Amit Kucheria wrote:
-> Kconfig and Makefiles to enable the i.MX51 processor separated to help ease
-> the review process
+On Mon, 2009-11-16 at 11:03 +0000, Catalin Marinas wrote:
+> Anyway, the for-rmk branch now looks like this:
 > 
-> Signed-off-by: Amit Kucheria <amit.kucheria@canonical.com>
-> ---
->  arch/arm/Makefile               |    1 +
->  arch/arm/mach-mx5/Kconfig       |   17 +++++++++++++++++
->  arch/arm/mach-mx5/Makefile      |    9 +++++++++
->  arch/arm/mach-mx5/Makefile.boot |    3 +++
->  arch/arm/plat-mxc/Kconfig       |    8 ++++++++
->  5 files changed, 38 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mx5/Kconfig
->  create mode 100644 arch/arm/mach-mx5/Makefile
->  create mode 100644 arch/arm/mach-mx5/Makefile.boot
+> The following changes since commit c97c5aa83c41a532bc67da356d77da929bc41b9c:
+>   Catalin Marinas (1):
+>         RealView: Add sparsemem support for the RealView PBX platform
 > 
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index a73caaf..daedbf2 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -145,6 +145,7 @@ machine-$(CONFIG_ARCH_MX1)		:= mx1
->  machine-$(CONFIG_ARCH_MX2)		:= mx2
->  machine-$(CONFIG_ARCH_MX25)		:= mx25
->  machine-$(CONFIG_ARCH_MX3)		:= mx3
-> +machine-$(CONFIG_ARCH_MX5)		:= mx5
->  machine-$(CONFIG_ARCH_NETX)		:= netx
->  machine-$(CONFIG_ARCH_NOMADIK)		:= nomadik
->  machine-$(CONFIG_ARCH_NS9XXX)		:= ns9xxx
-> diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-> new file mode 100644
-> index 0000000..80a749c
-> --- /dev/null
-> +++ b/arch/arm/mach-mx5/Kconfig
-> @@ -0,0 +1,17 @@
-> +if ARCH_MX5
-> +
-> +config ARCH_MX51
-> +	bool
-> +	default y
-> +	select MXC_TZIC
-> +	select ARCH_MXC_IOMUX_V3
-> +
-> +comment "MX5 platforms:"
-> +
-> +config MACH_MX51_BABBAGE
-> +	bool "Support MX51 BABBAGE platforms"
-> +	help
-> +	  Include support for MX51 Babbage platform. This includes specific
-> +	  configurations for the board and its peripherals.
-> +
-> +endif
-> diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-> new file mode 100644
-> index 0000000..e4cf91f
-> --- /dev/null
-> +++ b/arch/arm/mach-mx5/Makefile
-> @@ -0,0 +1,9 @@
-> +#
-> +# Makefile for the linux kernel.
-> +#
-> +
-> +# Object file lists.
-> +obj-y   := cpu.o mm.o clock.o devices.o
-I couldn't find arch/arm/mach-mx5/cpu.c neither in your series nor in
-mainline.  Didn't check the others.  Is it just me?
+> are available in the git repository at:
+> 
+>   git://linux-arm.org/linux-2.6.git for-rmk
+> 
+> Catalin Marinas (1):
+>       Add an earlyprintk debug console
+> 
+> Varun Swara (1):
+>       Do not allow the probing of the local timer
 
-Best regards
-Uwe
+Did you managed to pull these two patches? It looks like the other
+patches in my for-rmk branch (including the sparsemem support for PBX)
+went in during the -rc series and they are now in 2.6.32 (thanks!).
+
+Do you plan to push the other two that were left during this merging
+window? I can rebase the for-rmk branch to 2.6.32 so that it only
+contains these two patches.
+
+Thanks.
 
 -- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Catalin
