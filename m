@@ -1,150 +1,56 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Fri, 4 Dec 2009 20:06:12 +0900
-Subject: [PATCH 3/5] SPI S3C64XX: Header for passing platform data
-In-Reply-To: <20091203220637.GR4808@trinity.fluff.org>
-References: <1259218097-9845-1-git-send-email-jassi.brar@samsung.com>
-	<20091203220637.GR4808@trinity.fluff.org>
-Message-ID: <1b68c6790912040306m3098cba9wf67bfe5bfefb7e23@mail.gmail.com>
+From: alex@digriz.org.uk (Alexander Clouter)
+Date: Fri, 4 Dec 2009 10:28:21 +0000
+Subject: [PATCH 1/2] ep93xx: implemented watchdog timer driver for TS-72xx
+	SBCs
+References: <cover.1259866661.git.mika.westerberg@iki.fi>
+	<3518ebf38d7a0038262cd20beb5283198e99e22e.1259866661.git.mika.westerberg@iki.fi>
+Message-ID: <5r4nu6-pia.ln1@chipmunk.wormnet.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 4, 2009 at 7:06 AM, Ben Dooks <ben-linux@fluff.org> wrote:
-> On Thu, Nov 26, 2009 at 03:48:17PM +0900, Jassi Brar wrote:
->> We need a way to pass controller specific information to the
->> SPI device driver. For that purpose a new header is made.
->>
->> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
->> ---
->> ?arch/arm/plat-s3c64xx/include/plat/spi.h | ? 68 ++++++++++++++++++++++++++++++
->> ?1 files changed, 68 insertions(+), 0 deletions(-)
->> ?create mode 100644 arch/arm/plat-s3c64xx/include/plat/spi.h
->>
->> diff --git a/arch/arm/plat-s3c64xx/include/plat/spi.h b/arch/arm/plat-s3c64xx/include/plat/spi.h
->> new file mode 100644
->> index 0000000..d65ddfd
->> --- /dev/null
->> +++ b/arch/arm/plat-s3c64xx/include/plat/spi.h
+Mika Westerberg <mika.westerberg@iki.fi> wrote:
 >
-> let's not have all these called spi.h, it will make life more difficult
-> when trying to find which spi.h we are searching for in our platform
-> support.
-We can call it s3c64xx-spi.h but won't that be kinda redundant as it's
-in plat-s3c64xx ?
+> Technologic Systems TS-72xx SBCs have external glue logic
+> CPLD which includes watchdog timer. This driver implements
+> kernel support for that.
+> 
+> Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
+> ---
+> drivers/watchdog/Kconfig      |   11 +
+> drivers/watchdog/Makefile     |    1 +
+> drivers/watchdog/ts72xx_wdt.c |  458 +++++++++++++++++++++++++++++++++++++++++
+> 3 files changed, 470 insertions(+), 0 deletions(-)
+> create mode 100644 drivers/watchdog/ts72xx_wdt.c
+> 
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index 3711b88..5204612 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -289,6 +289,17 @@ config ADX_WATCHDOG
+>          Say Y here if you want support for the watchdog timer on Avionic
+>          Design Xanthos boards.
+> 
+> +config TS72XX_WATCHDOG
+> +       tristate "TS-72XX SBC Watchdog"
+> +       depends on MACH_TS72XX
+> +       help
+> +         Technologic Systems TS-7200, TS-7250 and TS-7260 boards have
+> +         watchdog timer implemented in a external CPLD chip. Say Y here
+> +         if you want to support for the watchdog timer on TS-72XX boards.
+> +
+> +         To compile this driver as a module, choose M here: the
+> +         module will be called ts72xx_wdt.
+> +
+> # AVR32 Architecture
+>
+....and also on the TS-78XX boards.  Although my TS-7800 board is being 
+neglected at the moment it would be great if you could replace 
+everywhere you put ts72xx with ts7xxx and such.  Means when I add the 
+platform hooks for the TS-78xx I do not have to submit a patch that is a 
+rather intrusive rename/relabelling one.
 
->> @@ -0,0 +1,68 @@
->> +/* linux/arch/arm/plat-s3c64xx/include/plat/spi.h
->> + *
->> + * Copyright (C) 2009 Samsung Electronics Ltd.
->> + * ? Jaswinder Singh <jassi.brar@samsung.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#ifndef __S3C64XX_PLAT_SPI_H
->> +#define __S3C64XX_PLAT_SPI_H __FILE__
->> +
->> +#define S3C64XX_SPI_SRCCLK_PCLK ? ? ? ? ? ? ?0
->> +#define S3C64XX_SPI_SRCCLK_SPIBUS ? ?1
->> +#define S3C64XX_SPI_SRCCLK_48M ? ? ? ? ? ? ? 2
->> +
->> +#define BUSNUM(b) ? ? ? ? ? ?(b)
->> +
->> +/**
->> + * struct s3c64xx_spi_csinfo - ChipSelect description
->> + * @fb_delay: Slave specific feedback delay.
->> + * @set_level: CS line control.
->> + */
->> +struct s3c64xx_spi_csinfo {
->> + ? ? u8 fb_delay;
->> + ? ? void (*set_level)(int lvl);
->> +};
->
-> I think set_level should be called 'set_cs' to make it clearer what is
-> being done here.
-Well, in the driver we instantiate the structure pointer as 'cs', so all
-the calls look like "cs->set_level" so I think that should be ok,
-as it's quite obvious its all about cs(ChipSelect).
+Cheers
 
->> +/**
->> + * struct s3c64xx_spi_cntrlr_info - SPI Controller defining structure
->> + * @src_clk_nr: Clock source index for the CLK_CFG[SPI_CLKSEL] field.
->> + * @src_clk_name: Platform name of the corresponding clock.
->> + * @src_clk: Pointer to the source clock.
->> + * @num_cs: Number of CS this controller emulates.
->> + * @cs: Array describing each CS.
->> + * @cfg_gpio: Configure pins for this SPI controller.
->> + * @fifo_lvl_mask: All tx fifo_lvl fields start at offset-6
->> + * @rx_lvl_offset: Depends on tx fifo_lvl field and bus number
->> + * @high_speed: If the controller supports HIGH_SPEED_EN bit
->> + */
->> +struct s3c64xx_spi_cntrlr_info {
->
-> how about not bothering with the _cntrlr_ here and just call it
-> s3c64xx_spi_info instead?
-Sure.
-
->> + ? ? int src_clk_nr;
->> + ? ? char *src_clk_name;
->> + ? ? struct clk *src_clk;
->
-> do not pass 'struct clk *' in via platform data.
-Since this is not initialized in platform code: just a pointer
-made available to the driver. So, yes, this can be made a
-member of s3c64xx_spi_driver_data rather.
-
->> + ? ? int num_cs;
->> + ? ? struct s3c64xx_spi_csinfo *cs;
->> +
->> + ? ? int (*cfg_gpio)(struct platform_device *pdev);
->> +
->> + ? ? /* Following two fields are for future compatibility */
->> + ? ? int fifo_lvl_mask;
->> + ? ? int rx_lvl_offset;
->> + ? ? int high_speed;
->> +};
->
-> I was wondering if a single 'set_cs' callback here would be in order,
-> given each spi device can already hold a chip-select number for use
-> with such callbacks, so:
->
-> void (*set_cs)(struct s3c64xx_spi_cntrlr_info *us, struct spi_device *sel, int to);
-In that case the machine code wud have to map the chipselect number to
-appropriate function/switch-case. Switch-case maybe ok, but calling some
-function to toggle CS might result in bigger lags between CS and appearance
-of clock on the bus.
-
->> +/**
->> + * s3c64xx_spi_set_info - SPI Controller configure callback by the board
->> + * ? ? ? ? ? ? ? ? ? ? ? ? ? initialization code.
->> + * @cntrlr: SPI controller number the configuration is for.
->> + * @src_clk_nr: Clock the SPI controller is to use to generate SPI clocks.
->> + * @cs: Pointer to the array of CS descriptions.
->> + * @num_cs: Number of elements in the 'cs' array.
->> + */
->> +extern void s3c64xx_spi_set_info(int cntrlr, int src_clk_nr, int num_cs);
->> +
->> +#endif /* __S3C64XX_PLAT_SPI_H */
->> --
->> 1.6.2.5
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-> --
-> --
-> Ben
->
-> Q: ? ? ?What's a light-year?
-> A: ? ? ?One-third less calories than a regular year.
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+-- 
+Alexander Clouter
+.sigmonster says: Monday is an awful way to spend one seventh of your life.
