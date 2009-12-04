@@ -1,52 +1,17 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Dec 2009 10:38:04 +0000
-Subject: [RFC][PATCH 01/10] arm: mxc: New interrupt controller (TZIC)
-	for i.MX5 family
-In-Reply-To: <e99e70e2a619693064130a747b6ee3a93273337b.1259893118.git.amit.kucheria@canonical.com>
+Date: Fri, 4 Dec 2009 10:38:50 +0000
+Subject: [RFC][PATCH 02/10] arm: mxc: base support for Freescale i.MX51
+	processor
+In-Reply-To: <6608c4dca645d87efce78ae0b7dbad265004f482.1259893118.git.amit.kucheria@canonical.com>
 References: <cover.1259893118.git.amit.kucheria@canonical.com>
-	<e99e70e2a619693064130a747b6ee3a93273337b.1259893118.git.amit.kucheria@canonical.com>
-Message-ID: <20091204103804.GB15887@n2100.arm.linux.org.uk>
+	<6608c4dca645d87efce78ae0b7dbad265004f482.1259893118.git.amit.kucheria@canonical.com>
+Message-ID: <20091204103850.GC15887@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A few comments:
+On Fri, Dec 04, 2009 at 04:47:02AM +0200, Amit Kucheria wrote:
+> Kconfig and Makefiles to enable the i.MX51 processor separated to help ease
+> the review process
 
-On Fri, Dec 04, 2009 at 04:47:01AM +0200, Amit Kucheria wrote:
-> +#include <linux/module.h>
-> +#include <linux/moduleparam.h>
-> +#include <linux/init.h>
-> +#include <linux/device.h>
-> +#include <linux/errno.h>
-> +#include <mach/hardware.h>
-> +#include <linux/io.h>
-
-linux/ includes all together please.
-
-> +void __iomem *tzic_base;
-
-static?
-
-> +
-> +/*!
-
-This isn't kerneldoc standard.
-
-> +static int mxc_set_wake_irq(unsigned int irq, unsigned int enable)
-> +{
-> +	unsigned int index, off;
-> +
-> +	index = irq >> 5;
-> +	off = irq & 0x1F;
-> +
-> +	if (index > 3)
-> +		return -1;
-
-Never use -1 as an error code.  -1 is bad.  Look up in
-asm-generic/errno-base.h to see what error code 1 means.
-
-Please chose a far better error code.  Same goes for any other uses
-of '-1' in this kind of context.
-
-> +	printk(KERN_INFO "MXC IRQ initialized\n");
-
-MXC or TZIC?
+This should probably come in the series after the other files have been
+created.
