@@ -1,51 +1,45 @@
-From: alex@digriz.org.uk (Alexander Clouter)
-Date: Fri, 4 Dec 2009 11:49:50 +0000
-Subject: [PATCH 1/2] ep93xx: implemented watchdog timer driver for
-	TS-72xx SBCs
-In-Reply-To: <20091204114507.GB993@chipmunk>
-References: <cover.1259866661.git.mika.westerberg@iki.fi>
-	<3518ebf38d7a0038262cd20beb5283198e99e22e.1259866661.git.mika.westerberg@iki.fi>
-	<5r4nu6-pia.ln1@chipmunk.wormnet.eu>
-	<20091204113358.GE5626@gw.healthdatacare.com>
-	<20091204114507.GB993@chipmunk>
-Message-ID: <20091204114950.GC993@chipmunk>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Fri, 4 Dec 2009 12:58:05 +0100
+Subject: [PATCH] mmc: move regulator handling to core
+In-Reply-To: <4B181BB4.1020800@nokia.com>
+References: <1259844390-10541-1-git-send-email-daniel@caiaq.de>
+	<4B17CADB.1070406@nokia.com>
+	<20091203192044.GJ14091@buzzloop.caiaq.de>
+	<4B181BB4.1020800@nokia.com>
+Message-ID: <20091204115805.GS14091@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Dec 03, 2009 at 10:12:36PM +0200, Adrian Hunter wrote:
+> Daniel Mack wrote:
+> >On Thu, Dec 03, 2009 at 04:27:39PM +0200, Adrian Hunter wrote:
 
-* Alexander Clouter <alex@digriz.org.uk> [2009-12-04 11:45:07+0000]:
->
-> * Mika Westerberg <mika.westerberg@iki.fi> [2009-12-04 13:33:58+0200]:
+> >>What about arch/arm/mach-omap2/mmc-twl4030.c ?
 > >
-> > On Fri, Dec 04, 2009 at 10:28:21AM +0000, Alexander Clouter wrote:
-> > 
-> > > ....and also on the TS-78XX boards.  Although my TS-7800 board is being 
-> > > neglected at the moment it would be great if you could replace 
-> > > everywhere you put ts72xx with ts7xxx and such.  Means when I add the 
-> > > platform hooks for the TS-78xx I do not have to submit a patch that is a 
-> > > rather intrusive rename/relabelling one.
-> > 
-> > Is the TS-7800 watchdog timer similar than the ones in TS-72xx SBCs? I couldn't
-> > find any documentation about that in TS web site. If this is the case then
-> > I would be more than happy to do this stuff.
-> > 
-> TS made the FPGA/AVR code/hardware more or less identical to retain 
-> backwards compatibility.  Obviously the platform specific resource maps 
-> might be a little different but that is all.  The NAND, for example, is 
-> also identical on both, the TS-7800 however adds a hardware ECC and 
-> option to allow DMA transfers.
+> >Argh, missed that one. And this particular case doesn't fit to my
+> >modifications. I don't know the code well ...  We would need to
+> >have a struct mmc_host * in all the functions there calling
+> >mmc_regulator_{set,get}_ocr. Any idea how to resolve that?
+> >
 > 
-> The details are only really documented in the source code of a tool TS 
-> provide:
-> 
-> http://svn.lee.org/swarm/trunk/spu/src/dillo7800/root/ts7800ctl.c
-> 
-Hmmmm, on closer reinspection, the AVR hides behind an I2C bus so 
-probably worth forgetting the renaming suggestion.
+> Pass it down from the omap_hsmmc driver.
 
-Cheers
+It's not that easy, unfortunately, because this code does not conform to
+all the other mmc host drivers in tree.
 
--- 
-Alexander Clouter
-.sigmonster says: There Is No Cabal.
+I don't understand why things are done the way it is currently
+implemented. Why isn't there a mmc_host for each slot, and why is a
+regulator reference acquired for each slot, and not once for the whole
+device?
+
+Even with the default 'vcc' supply factored out to the mmc core, the
+'vmmc_aux' regulator would still need some extra attention, but I would
+also do that from the omap_hsmmc driver rather than in the plaform
+support code.
+
+Moving the regulator handling to the mmc core would require a major
+cleanup to all this code, but I don't have such hardware to test my
+modifications. Can anyone help here?
+
+Thanks,
+Daniel
