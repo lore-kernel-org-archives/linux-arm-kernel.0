@@ -1,50 +1,45 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Fri, 4 Dec 2009 14:00:14 +0200
-Subject: [PATCH 1/2] ep93xx: implemented watchdog timer driver for
-	TS-72xx SBCs
-In-Reply-To: <20091204114950.GC993@chipmunk>
-References: <cover.1259866661.git.mika.westerberg@iki.fi>
-	<3518ebf38d7a0038262cd20beb5283198e99e22e.1259866661.git.mika.westerberg@iki.fi>
-	<5r4nu6-pia.ln1@chipmunk.wormnet.eu>
-	<20091204113358.GE5626@gw.healthdatacare.com>
-	<20091204114507.GB993@chipmunk> <20091204114950.GC993@chipmunk>
-Message-ID: <20091204120014.GF5626@gw.healthdatacare.com>
+From: sha@pengutronix.de (Sascha Hauer)
+Date: Fri, 4 Dec 2009 13:20:45 +0100
+Subject: [PATCH] mx31moboard: fix typo
+In-Reply-To: <4B18EEFC.8030904@epfl.ch>
+References: <20091203193034.GD22533@pengutronix.de>
+	<20091203193321.GE22533@pengutronix.de>
+	<4B18CAC7.30907@epfl.ch> <4B18EEFC.8030904@epfl.ch>
+Message-ID: <20091204122045.GQ15126@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 04, 2009 at 11:49:50AM +0000, Alexander Clouter wrote:
-> Hi,
-> 
-> * Alexander Clouter <alex@digriz.org.uk> [2009-12-04 11:45:07+0000]:
-> >
-> > * Mika Westerberg <mika.westerberg@iki.fi> [2009-12-04 13:33:58+0200]:
-> > >
-> > > On Fri, Dec 04, 2009 at 10:28:21AM +0000, Alexander Clouter wrote:
-> > > 
-> > > > ....and also on the TS-78XX boards.  Although my TS-7800 board is being 
-> > > > neglected at the moment it would be great if you could replace 
-> > > > everywhere you put ts72xx with ts7xxx and such.  Means when I add the 
-> > > > platform hooks for the TS-78xx I do not have to submit a patch that is a 
-> > > > rather intrusive rename/relabelling one.
-> > > 
-> > > Is the TS-7800 watchdog timer similar than the ones in TS-72xx SBCs? I couldn't
-> > > find any documentation about that in TS web site. If this is the case then
-> > > I would be more than happy to do this stuff.
-> > > 
-> > TS made the FPGA/AVR code/hardware more or less identical to retain 
-> > backwards compatibility.  Obviously the platform specific resource maps 
-> > might be a little different but that is all.  The NAND, for example, is 
-> > also identical on both, the TS-7800 however adds a hardware ECC and 
-> > option to allow DMA transfers.
-> > 
-> > The details are only really documented in the source code of a tool TS 
-> > provide:
-> > 
-> > http://svn.lee.org/swarm/trunk/spu/src/dillo7800/root/ts7800ctl.c
-> > 
-> Hmmmm, on closer reinspection, the AVR hides behind an I2C bus so 
-> probably worth forgetting the renaming suggestion.
+On Fri, Dec 04, 2009 at 12:14:04PM +0100, Valentin Longchamp wrote:
+> Valentin Longchamp wrote:
+>> Robert Schwebel wrote:
+>>
+>>> But something else must be missing, I still get this:
+>>>
+>>> arch/arm/mach-mx3/mx31moboard.c: In function 'moboard_usbh2_init':
+>>> arch/arm/mach-mx3/mx31moboard.c:395: error: 'mx31_usbh2' undeclared (first use in this function)
+>>> arch/arm/mach-mx3/mx31moboard.c:395: error: (Each undeclared identifier is reported only once
+>>> arch/arm/mach-mx3/mx31moboard.c:395: error: for each function it appears in.)
+>>> make[1]: *** [arch/arm/mach-mx3/mx31moboard.o] Error 1
+>>>
+>>
+>> This comes from the usb host support for mx31 that should come with  
+>> 2.6.33. Does linux-next already include these patches ?
+>>
+>
+> Hum, sorry, my bad, this was based on mxc_master_*pu* (don't ask me why,  
+> maybe not enough coffee). This branch includes the changes for using soc  
+> specific defines by Sascha.
+>
+> Sacha, any chance these hit mainline/next soon ? Or do you want me to  
+> send correcting patch ?
 
-OK. Thanks for the information. I'll keep it as ts72xx for now.
+Please send a fixup patch.
 
-MW
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
