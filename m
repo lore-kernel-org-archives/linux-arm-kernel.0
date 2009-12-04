@@ -1,44 +1,51 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Fri, 04 Dec 2009 16:58:43 +0100
-Subject: shared memory problem on ARM v5TE using threads
-In-Reply-To: <20091204154231.GB20386@n2100.arm.linux.org.uk>
-References: <4B18F141.7070101@denx.de>
-	<20091204131307.GE15887@n2100.arm.linux.org.uk>
-	<4B1911B4.7080907@denx.de>
-	<20091204154231.GB20386@n2100.arm.linux.org.uk>
-Message-ID: <4B1931B3.90301@denx.de>
+From: jic23@cam.ac.uk (Jonathan Cameron)
+Date: Fri, 04 Dec 2009 16:27:51 +0000
+Subject: [PATCH] pcmcia: Fix additional platforms after removal of skt->irq
+	in 66024db57d5b9011e274b314affad68f370c0d6f
+In-Reply-To: <104e2dd0700bd7921433779187c189ff7795d385.1256684685.git.rmk+kernel@arm.linux.org.uk>
+References: <925a8da0d92cdf1f37aaef988fcc63bf9744576e.1256684685.git.rmk+kernel@arm.linux.org.uk>
+	<104e2dd0700bd7921433779187c189ff7795d385.1256684685.git.rmk+kernel@arm.linux.org.uk>
+Message-ID: <4B193887.8090608@cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell King,
+Signed-off-by: Jonathan Cameron <jic23@cam.ac.uk>
+---
 
-Russell King - ARM Linux wrote:
-> On Fri, Dec 04, 2009 at 02:42:12PM +0100, Heiko Schocher wrote:
->> Hello Russell King,
->>
->> Russell King - ARM Linux wrote:
->>> On Fri, Dec 04, 2009 at 12:23:45PM +0100, Heiko Schocher wrote:
->>>> [4] Log from Demoprogramm, not working
->>> I think this is messed up - this is not from your first script but your
->>> second script which starts four independent read processes.
->>>
->>> I determined this because:
->>> (1) the read thread addresses are mostly the same
->>> (2) there are four "Read form in_msg" strings, which you only print
->>> once at the start of the program.
->> Ups, sorry for the confusion, here 2 logs with the right values:
-> 
-> I don't remember whether 2.6.28 has highmem.  Can you check whether you're
-> using highmem please?
+Russell's original patch is currently in linux-next (and hence I'm
+guessing heading for the merge window?).  In the intervening time,
+2 platforms have been added using the now nonexistent skt-irq.
+This patch fixes them as per the other platforms.
 
-No, there is no HIGHMEM in the defconfig, if you mean this config option.
+ drivers/pcmcia/pxa2xx_palmtc.c    |    2 +-
+ drivers/pcmcia/pxa2xx_stargate2.c |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-You can find the complete defconfig here:
-
-http://git.denx.de/?p=linux-2.6-denx.git;a=blob;f=arch/arm/configs/suen3_defconfig;h=905f9bc6a36c03ab41b97a292fca5b3a0011a2a0;hb=3dc3e4dc957f216ec5cdcd2a770f5c4b0cefca4a
-
-bye
-Heiko
+diff --git a/drivers/pcmcia/pxa2xx_palmtc.c b/drivers/pcmcia/pxa2xx_palmtc.c
+index 3a8993e..459a232 100644
+--- a/drivers/pcmcia/pxa2xx_palmtc.c
++++ b/drivers/pcmcia/pxa2xx_palmtc.c
+@@ -67,7 +67,7 @@ static int palmtc_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
+ 	if (ret)
+ 		goto err7;
+ 
+-	skt->irq = IRQ_GPIO(GPIO_NR_PALMTC_PCMCIA_READY);
++	skt->socket.pci_irq = IRQ_GPIO(GPIO_NR_PALMTC_PCMCIA_READY);
+ 	return 0;
+ 
+ err7:
+diff --git a/drivers/pcmcia/pxa2xx_stargate2.c b/drivers/pcmcia/pxa2xx_stargate2.c
+index 490749e..d08802f 100644
+--- a/drivers/pcmcia/pxa2xx_stargate2.c
++++ b/drivers/pcmcia/pxa2xx_stargate2.c
+@@ -40,7 +40,7 @@ static struct pcmcia_irqs irqs[] = {
+ 
+ static int sg2_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
+ {
+-	skt->irq = IRQ_GPIO(SG2_S0_GPIO_READY);
++	skt->socket.pci_irq = IRQ_GPIO(SG2_S0_GPIO_READY);
+ 	return soc_pcmcia_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
+ }
+ 
 -- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+1.6.4.4
