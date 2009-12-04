@@ -1,53 +1,123 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 4 Dec 2009 12:28:11 +0100
-Subject: [RFC][PATCH 04/10] arm: mxc: Fix Drive Strength Field in the
-	IOMUX controller
-In-Reply-To: <20091204093824.GB10910@pengutronix.de>
+Date: Fri, 4 Dec 2009 12:30:54 +0100
+Subject: [RFC][PATCH 08/10] arm: mxc: Add IO multiplexing support for FEC
+In-Reply-To: <dbab65547b41b82719df19067b50db9c82eeb6d6.1259893118.git.amit.kucheria@canonical.com>
 References: <cover.1259893118.git.amit.kucheria@canonical.com>
-	<a079a0627e77f2df590840e4798fc067f4436160.1259893118.git.amit.kucheria@canonical.com>
-	<20091204093824.GB10910@pengutronix.de>
-Message-ID: <20091204112811.GN15126@pengutronix.de>
+	<dbab65547b41b82719df19067b50db9c82eeb6d6.1259893118.git.amit.kucheria@canonical.com>
+Message-ID: <20091204113054.GO15126@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 04, 2009 at 10:38:24AM +0100, Uwe Kleine-K?nig wrote:
-> Hello,
+On Fri, Dec 04, 2009 at 04:47:08AM +0200, Amit Kucheria wrote:
+> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 > 
-> On Fri, Dec 04, 2009 at 04:47:04AM +0200, Amit Kucheria wrote:
-> > i.MX51 defines 4 values:
-> > 
-> > 00: Low Drive Strength
-> > 01: Medium Drive Strength
-> > 10: High Drive Strength
-> > 11: Max Drive Strength
-> > 
-> > Signed-off-by: Amit Kucheria <amit.kucheria@canonical.com>
-> > ---
-> >  arch/arm/plat-mxc/include/mach/iomux-v3.h |    8 +++++---
-> >  1 files changed, 5 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/plat-mxc/include/mach/iomux-v3.h b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-> > index a0fa402..8c351d6 100644
-> > --- a/arch/arm/plat-mxc/include/mach/iomux-v3.h
-> > +++ b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-> > @@ -81,11 +81,13 @@ struct pad_desc {
-> >  
-> >  #define PAD_CTL_ODE			(1 << 3)
-> >  
-> > -#define PAD_CTL_DSE_STANDARD		(0 << 1)
-> > -#define PAD_CTL_DSE_HIGH		(1 << 1)
-> > -#define PAD_CTL_DSE_MAX			(2 << 1)
-> > +#define PAD_CTL_DSE_LOW			(0 << 1)
-> > +#define PAD_CTL_DSE_MED			(1 << 1)
-> > +#define PAD_CTL_DSE_HIGH		(2 << 1)
-> > +#define PAD_CTL_DSE_MAX			(3 << 1)
-> Does the new values work on other SOCs having iomux-v3, too?
+> Setup correct multiplexing in order to use the FEC ethernet device on the
+> Babbage board.
+> 
+> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> Signed-off-by: Amit Kucheria <amit.kucheria@canonical.com>
+> ---
+>  arch/arm/mach-mx5/board-mx51_babbage.c    |   43 +++++++++++++++++++++++++++++
+>  arch/arm/plat-mxc/include/mach/iomux-v3.h |    8 +++++
+>  2 files changed, 51 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+> index a1bc9c4..cefcb90 100644
+> --- a/arch/arm/mach-mx5/board-mx51_babbage.c
+> +++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+> @@ -33,6 +33,8 @@ extern void __init mx51_babbage_io_init(void);
+>  #define MX51_UART2_PAD_CTRL	(PAD_CTL_PKE | PAD_CTL_PUE | PAD_CTL_DSE_HIGH | PAD_CTL_SRE_FAST)
+>  #define MX51_UART3_PAD_CTRL	(PAD_CTL_PKE | PAD_CTL_DSE_HIGH | PAD_CTL_SRE_FAST)
+>  
+> +#define MX51_FEC_PAD_CTRL	(PAD_CTL_DRV_VOT_HIGH | PAD_CTL_DRV_HIGH)
+> +
+>  /* UART1 */
+>  #define MX51_BABBAGE_PAD_UART1_RXD__UART1_RXD	IOMUX_PAD(0x618, 0x228,	IOMUX_CONFIG_ALT0, 0x9e4,   0, MX51_UART1_PAD_CTRL | PAD_CTL_SRE_FAST)
+>  #define MX51_BABBAGE_PAD_UART1_TXD__UART1_TXD	IOMUX_PAD(0x61C, 0x22C, IOMUX_CONFIG_ALT0, 0x0,   0, MX51_UART1_PAD_CTRL | PAD_CTL_SRE_FAST)
+> @@ -52,6 +54,28 @@ extern void __init mx51_babbage_io_init(void);
+>  
+>  #define MX51_BABBAGE_PAD_GPIO_1_8__GPIO1_8	IOMUX_PAD(0x814, 0x3E8, 0, 0x0, 1, (PAD_CTL_SRE_SLOW | PAD_CTL_DSE_MED | PAD_CTL_PUS_100K_UP |  PAD_CTL_HYS))
+>  
+> +/* FEC */
+> +#define MX51_BABBAGE_PAD_EIM_EB2__MDIO		IOMUX_PAD(0x468, 0x0d4, IOMUX_CONFIG_ALT3, 0x954,   0, MX51_FEC_PAD_CTRL)
+> +#define MX51_BABBAGE_PAD_NANDF_CS3__MDC		IOMUX_PAD(0x524, 0x13C, IOMUX_CONFIG_ALT2, 0x0, 0, MX51_FEC_PAD_CTRL)
+> +#define MX51_BABBAGE_PAD_EIM_CS3__RDATA3	IOMUX_PAD(0x480, 0x0ec, IOMUX_CONFIG_ALT3, 0x964,   0, MX51_FEC_PAD_CTRL)
+> +#define MX51_BABBAGE_PAD_EIM_CS2__RDATA2	IOMUX_PAD(0x47c, 0x0e8, IOMUX_CONFIG_ALT3, 0x960,   0, MX51_FEC_PAD_CTRL)
+> +#define MX51_BABBAGE_PAD_EIM_EB3__RDATA1	IOMUX_PAD(0x46c, 0x0d8, IOMUX_CONFIG_ALT3, 0x95c,   0, MX51_FEC_PAD_CTRL)
+> +#define MX51_BABBAGE_PAD_NANDF_RB6__RDATA0	IOMUX_PAD(0x5DC, 0x134, IOMUX_CONFIG_ALT1, 0x958, 0, MX51_FEC_PAD_CTRL)
+> +#define MX51_BABBAGE_PAD_NANDF_D11__RX_DV	IOMUX_PAD(0x54C, 0x164, IOMUX_CONFIG_ALT2, 0x96c, 0, MX51_FEC_PAD_CTRL)
+> +#define MX51_BABBAGE_PAD_NANDF_RB3__RX_CLK	IOMUX_PAD(0x504, 0x128, IOMUX_CONFIG_ALT1, 0x968, 0, MX51_FEC_PAD_CTRL)
+> +#define MX51_BABBAGE_PAD_EIM_CS4__RX_ER		IOMUX_PAD(0x484, 0x0f0, IOMUX_CONFIG_ALT3, 0x970,   0, MX51_FEC_PAD_CTRL)
+> +#define MX51_BABBAGE_PAD_NANDF_RDY_INT__TX_CLK	IOMUX_PAD(0x538, 0x150, IOMUX_CONFIG_ALT1, 0x974, 0, MX51_FEC_PAD_CTRL)
+> +#define MX51_BABBAGE_PAD_NANDF_CS7__TX_EN	IOMUX_PAD(0x534, 0x14C, IOMUX_CONFIG_ALT1, 0x0, 0, MX51_FEC_PAD_CTRL)
+> +#define MX51_BABBAGE_PAD_NANDF_D8__TDATA0	IOMUX_PAD(0x558, 0x170, IOMUX_CONFIG_ALT2, 0x0, 0, MX51_FEC_PAD_CTRL)
+> +#define MX51_BABBAGE_PAD_NANDF_CS4__TDATA1	IOMUX_PAD(0x528, 0x140, IOMUX_CONFIG_ALT2, 0x0, 0, MX51_FEC_PAD_CTRL)
+> +#define MX51_BABBAGE_PAD_NANDF_CS5__TDATA2	IOMUX_PAD(0x52C, 0x144, IOMUX_CONFIG_ALT2, 0x0, 0, MX51_FEC_PAD_CTRL)
+> +#define MX51_BABBAGE_PAD_NANDF_CS6__TDATA3	IOMUX_PAD(0x530, 0x148, IOMUX_CONFIG_ALT2, 0x0, 0, MX51_FEC_PAD_CTRL)
+> +#define MX51_BABBAGE_PAD_NANDF_RB2__COL		IOMUX_PAD(0x500, 0x124, IOMUX_CONFIG_ALT1, 0x94c, 0, MX51_FEC_PAD_CTRL)
+> +#define MX51_BABBAGE_PAD_EIM_CS5__CRS		IOMUX_PAD(0x52C, 0x144, IOMUX_CONFIG_ALT3, 0x950, 0, MX51_FEC_PAD_CTRL)
 
-They should work. on i.MX35 (2 << 1) and (3 << 1) are both max driving
-strength. It's only that the names change, but these macros are unused
-currently, so this shouldn't hurt.
+These are generic and should go to iomux-mx51.h
 
-Sascha
+> +
+> +
+> +
+> +
+>  static struct platform_device *devices[] __initdata = {
+>  	&mxc_fec_device,
+>  };
+> @@ -72,6 +96,25 @@ static struct pad_desc mx51babbage_pads[] = {
+>  	MX51_BABBAGE_PAD_EIM_D26__UART3_TXD,
+>  	MX51_BABBAGE_PAD_EIM_D27__UART3_RTS,
+>  	MX51_BABBAGE_PAD_EIM_D24__UART3_CTS,
+> +
+> +	/* FEC */
+> +	MX51_BABBAGE_PAD_EIM_EB2__MDIO,
+> +	MX51_BABBAGE_PAD_NANDF_CS3__MDC,
+> +	MX51_BABBAGE_PAD_EIM_CS3__RDATA3,
+> +	MX51_BABBAGE_PAD_EIM_CS2__RDATA2,
+> +	MX51_BABBAGE_PAD_EIM_EB3__RDATA1,
+> +	MX51_BABBAGE_PAD_NANDF_RB6__RDATA0,
+> +	MX51_BABBAGE_PAD_NANDF_D11__RX_DV,
+> +	MX51_BABBAGE_PAD_NANDF_RB3__RX_CLK,
+> +	MX51_BABBAGE_PAD_EIM_CS4__RX_ER,
+> +	MX51_BABBAGE_PAD_NANDF_RDY_INT__TX_CLK,
+> +	MX51_BABBAGE_PAD_NANDF_CS7__TX_EN,
+> +	MX51_BABBAGE_PAD_NANDF_D8__TDATA0,
+> +	MX51_BABBAGE_PAD_NANDF_CS4__TDATA1,
+> +	MX51_BABBAGE_PAD_NANDF_CS5__TDATA2,
+> +	MX51_BABBAGE_PAD_NANDF_CS6__TDATA3,
+> +	MX51_BABBAGE_PAD_NANDF_RB2__COL,
+> +	MX51_BABBAGE_PAD_EIM_CS5__CRS	,
+>  };
+>  
+>  /* Serial ports */
+> diff --git a/arch/arm/plat-mxc/include/mach/iomux-v3.h b/arch/arm/plat-mxc/include/mach/iomux-v3.h
+> index 8c351d6..78c71f0 100644
+> --- a/arch/arm/plat-mxc/include/mach/iomux-v3.h
+> +++ b/arch/arm/plat-mxc/include/mach/iomux-v3.h
+> @@ -89,6 +89,14 @@ struct pad_desc {
+>  #define PAD_CTL_SRE_FAST		(1 << 0)
+>  #define PAD_CTL_SRE_SLOW		(0 << 0)
+>  
+> +#define PAD_CTL_DRV_LOW			(0 << 1)
+> +#define PAD_CTL_DRV_MEDIUM		(1 << 1)
+> +#define PAD_CTL_DRV_HIGH		(2 << 1)
+> +#define PAD_CTL_DRV_MAX			(3 << 1)
+
+These are duplicates of PAD_CTL_SRE_* defined directly above.
+
+> +
+> +#define PAD_CTL_DRV_VOT_LOW		(0 << 13)
+> +#define PAD_CTL_DRV_VOT_HIGH		(1 << 13)
+> +
+>  /*
+>   * setups a single pad:
+>   * 	- reserves the pad so that it is not claimed by another driver
+> -- 
+> 1.6.3.3
+> 
+> 
 
 -- 
 Pengutronix e.K.                           |                             |
