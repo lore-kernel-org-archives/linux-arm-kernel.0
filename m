@@ -1,64 +1,614 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 4 Dec 2009 00:41:48 -0500
-Subject: [PATCH 1/3] ARM: add base support for Marvell Dove SoC
-In-Reply-To: <1259084033-7283-2-git-send-email-saeed@marvell.com>
-References: <1259084033-7283-1-git-send-email-saeed@marvell.com>
-	<1259084033-7283-2-git-send-email-saeed@marvell.com>
-Message-ID: <771cded00912032141x368ae423n6603edbd7acd3f10@mail.gmail.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Fri, 4 Dec 2009 08:10:36 +0200
+Subject: [PATCH 1/2] ep93xx: implemented watchdog timer driver for
+	TS-72xx SBCs
+In-Reply-To: <4B181A6E.8000408@bluewatersys.com>
+References: <cover.1259866661.git.mika.westerberg@iki.fi>
+	<3518ebf38d7a0038262cd20beb5283198e99e22e.1259866661.git.mika.westerberg@iki.fi>
+	<4B181A6E.8000408@bluewatersys.com>
+Message-ID: <20091204061036.GD5626@gw.healthdatacare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
-> index 70f75d2..ebfe6c1 100644
-> --- a/arch/arm/mm/proc-v6.S
-> +++ b/arch/arm/mm/proc-v6.S
-> @@ -130,9 +130,16 @@ ENTRY(cpu_v6_set_pte_ext)
->
->
->
-> -
-> + ? ? ? .type ? cpu_v6_name, #object
-> ?cpu_v6_name:
-> ? ? ? ?.asciz ?"ARMv6-compatible processor"
-> + ? ? ? .size ? cpu_v6_name, . - cpu_v6_name
-> +
-> + ? ? ? .type ? cpu_pj4_name, #object
-> +cpu_pj4_name:
-> + ? ? ? .asciz ?"Marvell PJ4 processor"
-> + ? ? ? .size ? cpu_pj4_name, . - cpu_pj4_name
-> +
-> ? ? ? ?.align
->
-> ? ? ? ?__INIT
-> @@ -241,3 +248,27 @@ __v6_proc_info:
-> ? ? ? ?.long ? v6_user_fns
-> ? ? ? ?.long ? v6_cache_fns
-> ? ? ? ?.size ? __v6_proc_info, . - __v6_proc_info
-> +
-> + ? ? ? .type ? __pj4_v6_proc_info, #object
-> +__pj4_v6_proc_info:
-> + ? ? ? .long ? 0x560f5810
-> + ? ? ? .long ? 0xff0ffff0
-> + ? ? ? .long ? PMD_TYPE_SECT | \
-> + ? ? ? ? ? ? ? PMD_SECT_BUFFERABLE | \
-> + ? ? ? ? ? ? ? PMD_SECT_CACHEABLE | \
-These two flags are different from flags used in v6 proc_info. Is PJ4
-full compatible to armv6? Is there any reason to select
-PMD_SECT_BUFFERABLE & PMD_SECT_CACHEABLE at here?
-> + ? ? ? ? ? ? ? PMD_SECT_AP_WRITE | \
-> + ? ? ? ? ? ? ? PMD_SECT_AP_READ
-> + ? ? ? .long ? PMD_TYPE_SECT | \
-> + ? ? ? ? ? ? ? PMD_SECT_XN | \
-> + ? ? ? ? ? ? ? PMD_SECT_AP_WRITE | \
-> + ? ? ? ? ? ? ? PMD_SECT_AP_READ
-> + ? ? ? b ? ? ? __v6_setup
-> + ? ? ? .long ? cpu_arch_name
-> + ? ? ? .long ? cpu_elf_name
-> + ? ? ? .long ? HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
-> + ? ? ? .long ? cpu_pj4_name
-> + ? ? ? .long ? v6_processor_functions
-> + ? ? ? .long ? v6wbi_tlb_fns
-> + ? ? ? .long ? v6_user_fns
-> + ? ? ? .long ? v6_cache_fns
-> + ? ? ? .size ? __v6_proc_info, . - __v6_proc_info
-You created __pj4_v6_proc_info. But you still used __v6_proc_info at here. Why?
+Hi Ryan,
+
+On Fri, Dec 04, 2009 at 09:07:10AM +1300, Ryan Mallon wrote:
+> Mika Westerberg wrote:
+> > Technologic Systems TS-72xx SBCs have external glue logic
+> > CPLD which includes watchdog timer. This driver implements
+> > kernel support for that.
+> 
+> Hi Mika, looks good. Some comments below.
+
+Thank you very much for your comments. My answers to the comments are
+below.
+
+I'll wait a bit if someone else still has comments and then prepare
+version 2 of the patches.
+
+Thanks,
+MW
+
+> 
+> > Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
+> > ---
+> >  drivers/watchdog/Kconfig      |   11 +
+> >  drivers/watchdog/Makefile     |    1 +
+> >  drivers/watchdog/ts72xx_wdt.c |  458 +++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 470 insertions(+), 0 deletions(-)
+> >  create mode 100644 drivers/watchdog/ts72xx_wdt.c
+> > 
+> > diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> > index 3711b88..5204612 100644
+> > --- a/drivers/watchdog/Kconfig
+> > +++ b/drivers/watchdog/Kconfig
+> > @@ -289,6 +289,17 @@ config ADX_WATCHDOG
+> >  	  Say Y here if you want support for the watchdog timer on Avionic
+> >  	  Design Xanthos boards.
+> >  
+> > +config TS72XX_WATCHDOG
+> > +	tristate "TS-72XX SBC Watchdog"
+> > +	depends on MACH_TS72XX
+> > +	help
+> > +	  Technologic Systems TS-7200, TS-7250 and TS-7260 boards have
+> > +	  watchdog timer implemented in a external CPLD chip. Say Y here
+> > +	  if you want to support for the watchdog timer on TS-72XX boards.
+> > +
+> > +	  To compile this driver as a module, choose M here: the
+> > +	  module will be called ts72xx_wdt.
+> > +
+> >  # AVR32 Architecture
+> >  
+> >  config AT32AP700X_WDT
+> > diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+> > index 699199b..8e8a9b4 100644
+> > --- a/drivers/watchdog/Makefile
+> > +++ b/drivers/watchdog/Makefile
+> > @@ -46,6 +46,7 @@ obj-$(CONFIG_COH901327_WATCHDOG) += coh901327_wdt.o
+> >  obj-$(CONFIG_STMP3XXX_WATCHDOG) += stmp3xxx_wdt.o
+> >  obj-$(CONFIG_NUC900_WATCHDOG) += nuc900_wdt.o
+> >  obj-$(CONFIG_ADX_WATCHDOG) += adx_wdt.o
+> > +obj-$(CONFIG_TS72XX_WATCHDOG) += ts72xx_wdt.o
+> >  
+> >  # AVR32 Architecture
+> >  obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
+> > diff --git a/drivers/watchdog/ts72xx_wdt.c b/drivers/watchdog/ts72xx_wdt.c
+> > new file mode 100644
+> > index 0000000..88b75b9
+> > --- /dev/null
+> > +++ b/drivers/watchdog/ts72xx_wdt.c
+> > @@ -0,0 +1,458 @@
+> > +/*
+> > + * Watchdog driver for Technologic Systems TS-72xx based SBCs
+> > + * (TS-7200, TS-7250 and TS-7260). These boards have external
+> > + * glue logic CPLD chip, which includes programmable watchdog
+> > + * timer.
+> > + *
+> > + * Copyright (c) 2009 Mika Westerberg <mika.westerberg@iki.fi>
+> > + *
+> > + * This driver is based on ep93xx_wdt and wm831x_wdt drivers.
+> > + *
+> > + * This file is licensed under the terms of the GNU General Public
+> > + * License version 2. This program is licensed "as is" without any
+> > + * warranty of any kind, whether express or implied.
+> > + */
+> 
+> Nitpick: Space between top comment and first line of includes.
+
+Will fix to v2.
+
+> 
+> > +#include <linux/fs.h>
+> > +#include <linux/io.h>
+> > +#include <linux/module.h>
+> > +#include <linux/moduleparam.h>
+> > +#include <linux/miscdevice.h>
+> > +#include <linux/mutex.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/watchdog.h>
+> > +#include <linux/uaccess.h>
+> > +
+> > +#define TS72XX_WDT_FEED_VAL		0x05
+> > +#define TS72XX_WDT_DEFAULT_TIMEOUT	8
+> > +
+> > +static int timeout = TS72XX_WDT_DEFAULT_TIMEOUT;
+> > +module_param(timeout, int, 0);
+> > +MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds. "
+> > +			  "(1 <= timeout <= 8, default="
+> > +			  __MODULE_STRING(TS72XX_WDT_DEFAULT_TIMEOUT)
+> > +			  ")");
+> > +
+> > +static int nowayout = WATCHDOG_NOWAYOUT;
+> > +module_param(nowayout, int, 0);
+> > +MODULE_PARM_DESC(nowayout, "Disable watchdog shutdown on close");
+> > +
+> > +/**
+> > + * struct ts72xx_wdt - watchdog control structure
+> > + * @lock: lock that protects this structure
+> > + * @flags: flags controlling watchdog device state
+> > + * @control_reg: watchdog control register
+> > + * @feed_reg: watchdog feed register
+> > + * @pdev: back pointer to platform dev
+> > + */
+> > +struct ts72xx_wdt {
+> > +	struct mutex	lock;
+> > +	int		timeout;
+> > +
+> > +#define TS72XX_WDT_BUSY_FLAG		1
+> > +#define TS72XX_WDT_EXPECT_CLOSE_FLAG	2
+> > +	int		flags;
+> > +
+> > +	void __iomem	*control_reg;
+> > +	void __iomem	*feed_reg;
+> > +
+> > +	struct platform_device *pdev;
+> > +};
+> > +
+> > +struct platform_device *ts72xx_wdt_pdev;
+> > +
+> > +/*
+> > + * TS-72xx Watchdog supports following timeouts (value written
+> > + * to control register):
+> > + *	value	description
+> > + *	-------------------------
+> > + * 	0x00	watchdog disabled
+> > + *	0x01	250ms
+> > + *	0x02	500ms
+> > + *	0x03	1s
+> > + *	0x04	reserved
+> > + *	0x05	2s
+> > + *	0x06	4s
+> > + *	0x07	8s
+> > + *
+> > + * Timeouts below 1s are not very usable so we don't
+> > + * allow them at all.
+> > + */
+> > +static const struct {
+> > +	int	timeout;
+> > +	u8	ctrval;
+> > +} ts72xx_wdt_map[] = {
+> > +	{ 1, 3 },
+> > +	{ 2, 5 },
+> > +	{ 4, 6 },
+> > +	{ 8, 7 },
+> > +};
+> > +
+> > +/**
+> > + * normalize_timeout() - normalizes given timeout
+> > + * @new_timeout: timeout in seconds to be normalized
+> > + *
+> > + * This function normalizes given timeout value (in seconds)
+> > + * to value that is valid to TS-72xx watchdog timer. Valid
+> > + * values are 1, 2, 4 and 8 seconds. Timeout is rounded up
+> > + * to nearest valid timeout so for example value 3 yields
+> > + * 4 etc.
+> > + */
+> > +static int normalize_timeout(int new_timeout)
+> > +{
+> > +	int i;
+> > +
+> > +	/* first limit it to 1 - 8 seconds */
+> > +	if (new_timeout < 1)
+> > +		new_timeout = 1;
+> > +	else if (new_timeout > 8)
+> > +		new_timeout = 8;
+> 
+> You can do:
+> 
+> 	new_timeout = clamp_val(new_timeout, 1, 8);
+> 
+> for the same effect here.
+
+Wow, I didn't even know that such functions (macros) exists
+in kernel :) I will fix this in v2.
+
+> 
+> > +
+> > +	for (i = 0; i < ARRAY_SIZE(ts72xx_wdt_map); i++) {
+> > +		if (ts72xx_wdt_map[i].timeout >= new_timeout)
+> > +			return ts72xx_wdt_map[i].timeout;
+> > +	}
+> > +
+> > +	BUG();
+> > +	/*NOTREACHED*/
+> 
+> This is reached if !CONFIG_BUG, you should return -EINVAL, and handle it
+> gracefully in the caller.
+
+OK. Will be fixed in v2.
+
+> 
+> > +}
+> > +
+> > +/**
+> > + * timeout_to_ctrval() - converts given timeout to control register value
+> > + * @new_timeout: timeout in seconds to be converted (1, 2, 4 or 8)
+> > + *
+> > + * This function converts timeout in seconds to valid control register
+> > + * value. Note that @new_timeout must be normalized first with call to
+> > + * normalize_timeout().
+> > + */
+> 
+> If you must call normalize timeout first, the can the two functions be
+> combined so that you only need to do the loop once?
+
+Yeah, that's probably better way. I'll try to combine them
+in v2.
+
+> 
+> > +static u8 timeout_to_ctrval(int new_timeout)
+> > +{
+> > +	int i;
+> > +
+> > +	for (i = 0; i < ARRAY_SIZE(ts72xx_wdt_map); i++) {
+> > +		if (ts72xx_wdt_map[i].timeout == new_timeout)
+> > +			return ts72xx_wdt_map[i].ctrval;
+> > +	}
+> > +
+> > +	BUG();
+> > +	/*NOTREACHED*/
+> 
+> Same as above, should return -EINVAL
+
+Will fix in v2.
+
+> 
+> > +}
+> > +
+> > +/**
+> > + * ts72xx_wdt_kick() - kick the watchdog
+> > + * @wdt: watchdog to be kicked
+> > + *
+> > + * Called with @wdt->lock held.
+> > + */
+> > +static void ts72xx_wdt_kick(struct ts72xx_wdt *wdt)
+> 
+> Should probably be marked inline.
+
+Ok. Will do.
+
+> 
+> > +{
+> > +	__raw_writeb(TS72XX_WDT_FEED_VAL, wdt->feed_reg);
+> > +}
+> > +
+> > +/**
+> > + * ts72xx_wdt_start() - starts the watchdog timer
+> > + * @wdt: watchdog to be started
+> > + *
+> > + * This function programs timeout to watchdog timer
+> > + * and starts it.
+> > + *
+> > + * Called with @wdt->lock held.
+> > + */
+> > +static void ts72xx_wdt_start(struct ts72xx_wdt *wdt)
+> > +{
+> > +	/*
+> > +	 * To program the wdt, it first must be "fed" and
+> > +	 * only after that (within 30 usecs) the configuration
+> > +	 * can be changed.
+> > +	 */
+> > +	ts72xx_wdt_kick(wdt);
+> > +	__raw_writeb(timeout_to_ctrval(wdt->timeout), wdt->control_reg);
+> > +}
+> > +
+> > +/**
+> > + * ts72xx_wdt_stop() - stops the watchdog timer
+> > + * @wdt: watchdog to be stopped
+> > + *
+> > + * Called with @wdt->lock held.
+> > + */
+> > +static void ts72xx_wdt_stop(struct ts72xx_wdt *wdt)
+> > +{
+> > +	ts72xx_wdt_kick(wdt);
+> > +	__raw_writeb(0, wdt->control_reg);
+> > +}
+> > +
+> > +static int ts72xx_wdt_open(struct inode *inode, struct file *file)
+> > +{
+> > +	struct ts72xx_wdt *wdt = platform_get_drvdata(ts72xx_wdt_pdev);
+> > +
+> > +	if (mutex_lock_interruptible(&wdt->lock))
+> > +		return -ERESTARTSYS;
+> > +
+> > +	if ((wdt->flags & TS72XX_WDT_BUSY_FLAG) != 0) {
+> > +		mutex_unlock(&wdt->lock);
+> > +		return -EBUSY;
+> > +	}
+> > +
+> > +	wdt->flags = TS72XX_WDT_BUSY_FLAG;
+> > +	wdt->timeout = normalize_timeout(timeout);
+> > +	file->private_data = wdt;
+> > +
+> > +	ts72xx_wdt_start(wdt);
+> > +
+> > +	mutex_unlock(&wdt->lock);
+> > +	return nonseekable_open(inode, file);
+> > +}
+> > +
+> > +static int ts72xx_wdt_release(struct inode *inode, struct file *file)
+> > +{
+> > +	struct ts72xx_wdt *wdt = (struct ts72xx_wdt *)file->private_data;
+> > +
+> > +	if (mutex_lock_interruptible(&wdt->lock))
+> > +		return -ERESTARTSYS;
+> > +
+> > +	if ((wdt->flags & TS72XX_WDT_EXPECT_CLOSE_FLAG) != 0) {
+> > +		ts72xx_wdt_stop(wdt);
+> > +	} else {
+> > +		dev_warn(&wdt->pdev->dev,
+> > +			 "TS-72XX WDT device closed unexpectly. "
+> > +			 "Watchdog timer will not stop!\n");
+> > +		/*
+> > +		 * Kick it one more time, to give userland some time
+> > +		 * to recover (for example, respawning the kicker
+> > +		 * daemon).
+> > +		 */
+> > +		ts72xx_wdt_kick(wdt);
+> > +	}
+> > +
+> > +	wdt->flags = 0;
+> > +
+> > +	mutex_unlock(&wdt->lock);
+> > +	return 0;
+> > +}
+> > +
+> > +static ssize_t ts72xx_wdt_write(struct file *file,
+> > +				const char __user *data,
+> > +				size_t len,
+> > +				loff_t *ppos)
+> > +{
+> > +	struct ts72xx_wdt *wdt = (struct ts72xx_wdt *)file->private_data;
+> > +
+> > +	if (!len)
+> > +		return 0;
+> > +
+> > +	if (mutex_lock_interruptible(&wdt->lock))
+> > +		return -ERESTARTSYS;
+> > +
+> > +	ts72xx_wdt_kick(wdt);
+> > +
+> > +	/*
+> > +	 * Support for magic character closing. User process
+> > +	 * writes 'V' into the device, just before it is closed.
+> > +	 * This means that we know that the wdt timer can be
+> > +	 * stopped after user closes the device.
+> > +	 */
+> > +	if (!nowayout) {
+> > +		int i;
+> > +
+> > +		for (i = 0; i < len; i++) {
+> > +			char c;
+> > +
+> > +			/* In case it was set long ago */
+> > +			wdt->flags &= ~TS72XX_WDT_EXPECT_CLOSE_FLAG;
+> > +
+> > +			if (get_user(c, data + i)) {
+> > +				mutex_unlock(&wdt->lock);
+> > +				return -EFAULT;
+> > +			}
+> > +			if (c == 'V') {
+> > +				wdt->flags |= TS72XX_WDT_EXPECT_CLOSE_FLAG;
+> > +				break;
+> > +			}
+> > +		}
+> > +	}
+> > +
+> > +	mutex_unlock(&wdt->lock);
+> > +	return len;
+> > +}
+> > +
+> > +static const struct watchdog_info winfo = {
+> > +	.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
+> > +	.firmware_version = 1,
+> > +	.identity = "TS-72XX WDT",
+> > +};
+> 
+> Nitpick: Tab align struct assignments.
+
+Ok. Will fix in v2.
+
+> 
+> > +
+> > +static long ts72xx_wdt_ioctl(struct file *file, unsigned int cmd,
+> > +			     unsigned long arg)
+> > +{
+> > +	struct ts72xx_wdt *wdt = (struct ts72xx_wdt *)file->private_data;
+> > +	void __user *argp = (void __user *)arg;
+> > +	int __user *p = (int __user *)argp;
+> > +	int error = 0;
+> > +
+> > +	if (mutex_lock_interruptible(&wdt->lock))
+> > +		return -ERESTARTSYS;
+> > +
+> > +	switch (cmd) {
+> > +	case WDIOC_GETSUPPORT:
+> > +		error = copy_to_user(argp, &winfo, sizeof(winfo));
+> > +		break;
+> > +
+> > +	case WDIOC_KEEPALIVE:
+> > +		ts72xx_wdt_kick(wdt);
+> > +		break;
+> > +
+> > +	case WDIOC_SETOPTIONS: {
+> > +		int options;
+> > +
+> > +		if (get_user(options, p)) {
+> > +			error = -EFAULT;
+> > +			break;
+> > +		}
+> > +
+> > +		error = -EINVAL;
+> > +
+> > +		if ((options & WDIOS_DISABLECARD) != 0) {
+> > +			ts72xx_wdt_stop(wdt);
+> > +			error = 0;
+> > +		}
+> > +		if ((options & WDIOS_ENABLECARD) != 0) {
+> > +			ts72xx_wdt_start(wdt);
+> > +			error = 0;
+> > +		}
+> > +
+> > +		break;
+> > +	}
+> > +
+> > +	case WDIOC_SETTIMEOUT: {
+> > +		int new_timeout;
+> > +
+> > +		if (get_user(new_timeout, p)) {
+> > +			error = -EFAULT;
+> > +		} else {
+> > +			ts72xx_wdt_stop(wdt);
+> > +			wdt->timeout = normalize_timeout(new_timeout);
+> > +			ts72xx_wdt_start(wdt);
+> > +		}
+> > +		/*FALLTHROUGH*/
+> > +	}
+> > +
+> > +	case WDIOC_GETTIMEOUT:
+> > +		if (put_user(wdt->timeout, p))
+> > +			error = -EFAULT;
+> > +		break;
+> > +
+> > +	default:
+> > +		error = -ENOTTY;
+> > +		break;
+> > +	}
+> > +
+> > +	mutex_unlock(&wdt->lock);
+> > +	return error;
+> > +}
+> > +
+> > +static const struct file_operations ts72xx_wdt_fops = {
+> > +	.owner		= THIS_MODULE,
+> > +	.llseek		= no_llseek,
+> > +	.open		= ts72xx_wdt_open,
+> > +	.release	= ts72xx_wdt_release,
+> > +	.write		= ts72xx_wdt_write,
+> > +	.unlocked_ioctl	= ts72xx_wdt_ioctl,
+> > +};
+> > +
+> > +static struct miscdevice ts72xx_wdt_miscdev = {
+> > +	.minor		= WATCHDOG_MINOR,
+> > +	.name		= "watchdog",
+> > +	.fops		= &ts72xx_wdt_fops,
+> > +};
+> > +
+> > +static __devinit int ts72xx_wdt_probe(struct platform_device *pdev)
+> > +{
+> > +	struct ts72xx_wdt *wdt;
+> > +	struct resource *res;
+> > +	int error = -EIO;
+> > +
+> > +	wdt = kzalloc(sizeof(*wdt), GFP_KERNEL);
+> 
+> 	sizeof(struct ts72xx_wdt)
+> 
+> is the preferred style I think. If the other watchdog drivers do it this
+> way just leave it though.
+
+It seems that both styles are used in watchdog drivers. I'll change
+this to the preferred style in v2.
+
+> 
+> > +	if (!wdt)
+> > +		return -ENOMEM;
+> > +
+> > +	mutex_init(&wdt->lock);
+> > +
+> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	if (!res)
+> > +		goto fail;
+> > +
+> > +	wdt->control_reg = ioremap(res->start, resource_size(res));
+> > +	if (!wdt->control_reg)
+> > +		goto fail;
+> > +
+> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> > +	if (!res)
+> > +		goto fail;
+> > +
+> > +	wdt->feed_reg = ioremap(res->start, resource_size(res));
+> > +	if (!wdt->feed_reg)
+> > +		goto fail;
+> > +
+> > +	error = misc_register(&ts72xx_wdt_miscdev);
+> > +	if (error)
+> > +		goto fail;
+> > +
+> > +	platform_set_drvdata(pdev, wdt);
+> > +	ts72xx_wdt_pdev = pdev;
+> > +	wdt->pdev = pdev;
+> > +
+> > +	dev_info(&pdev->dev, "TS-72xx Watchdog driver\n");
+> > +
+> > +	return 0;
+> > +
+> > +fail:
+> > +	platform_set_drvdata(pdev, NULL);
+> 
+> I don't think you need this in the error path since platform_set_drvdata
+> is called after the last goto fail.
+
+Ah, good catch. Will fix in v2.
+
+> 
+> > +	if (wdt->control_reg)
+> > +		iounmap(wdt->control_reg);
+> > +	if (wdt->feed_reg)
+> > +		iounmap(wdt->feed_reg);
+> > +
+> > +	kfree(wdt);
+> > +	return error;
+> > +}
+> > +
+> > +static __devexit int ts72xx_wdt_remove(struct platform_device *pdev)
+> > +{
+> > +	struct ts72xx_wdt *wdt =
+> > +		(struct ts72xx_wdt *)platform_get_drvdata(pdev);
+> > +
+> > +	if (wdt->control_reg)
+> > +		iounmap(wdt->control_reg);
+> > +	if (wdt->feed_reg)
+> > +		iounmap(wdt->feed_reg);
+> > +
+> > +	kfree(wdt);
+> > +
+> > +	platform_set_drvdata(pdev, NULL);
+> > +	return misc_deregister(&ts72xx_wdt_miscdev);
+> > +}
+> > +
+> > +static struct platform_driver ts72xx_wdt_driver = {
+> > +	.probe = ts72xx_wdt_probe,
+> > +	.remove = __devexit_p(ts72xx_wdt_remove),
+> > +	.driver = {
+> > +		.name = "ts72xx-wdt",
+> > +	},
+> > +};
+> > +
+> > +static __init int ts72xx_wdt_init(void)
+> > +{
+> > +	return platform_driver_register(&ts72xx_wdt_driver);
+> > +}
+> > +module_init(ts72xx_wdt_init);
+> > +
+> > +static __exit void ts72xx_wdt_exit(void)
+> > +{
+> > +	platform_driver_unregister(&ts72xx_wdt_driver);
+> > +}
+> > +module_exit(ts72xx_wdt_exit);
+> > +
+> > +MODULE_AUTHOR("Mika Westerberg <mika.westerberg@iki.fi>");
+> > +MODULE_DESCRIPTION("TS-72xx SBC Watchdog");
+> > +MODULE_LICENSE("GPL");
+> > +MODULE_ALIAS("platform:ts72xx-wdt");
+> 
+> 
+> -- 
+> Bluewater Systems Ltd - ARM Technology Solution Centre
+> 
+> Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+> ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+> http://www.bluewatersys.com	New Zealand
+> Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+> Fax:   +64 3 3779135			  USA 1800 261 2934
