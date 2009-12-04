@@ -1,34 +1,73 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 04 Dec 2009 12:56:59 -0500 (EST)
-Subject: shared memory problem on ARM v5TE using threads
-In-Reply-To: <4B194B39.50301@denx.de>
-References: <4B18F141.7070101@denx.de>
-	<alpine.LFD.2.00.0912041222040.31174@xanadu.home>
-	<4B194B39.50301@denx.de>
-Message-ID: <alpine.LFD.2.00.0912041254220.31174@xanadu.home>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Fri, 4 Dec 2009 19:05:54 +0100
+Subject: [PATCH] mx27: mxt_td60: Add USB Support
+In-Reply-To: <1259948719-10008-1-git-send-email-acassis@gmail.com>
+References: <1259948719-10008-1-git-send-email-acassis@gmail.com>
+Message-ID: <20091204180554.GX14091@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 4 Dec 2009, Heiko Schocher wrote:
-
-> Hello Nicolas Pitre,
+On Fri, Dec 04, 2009 at 03:45:19PM -0200, Alan Carvalho de Assis wrote:
+> This patch add USB support on i-MXT TD60 to Host1 and Host2 ports.
 > 
-> Nicolas Pitre wrote:
-> > On Fri, 4 Dec 2009, Heiko Schocher wrote:
-> > 
-> >> Hello,
-> >>
-> >> I have the following shared mem problem on a ARM v5TE
-> >> processor using Linux version 2.6.28,
-> > 
-> > Could you apply this patch and test again:
-> > 
-> > http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=08e445bd6a
-> 
-> Thanks for your reply. I applied this patch, but it didn;t help.
+> Signed-off-by: Alan Carvalho de Assis <acassis@gmail.com>
+> ---
+>  arch/arm/mach-mx2/Kconfig                   |    1 +
+>  arch/arm/mach-mx2/mxt_td60.c                |  106 +++++++++++++++++++++++++++
+>  arch/arm/plat-mxc/include/mach/iomux-mx27.h |   14 ++++
 
-OK. Then could you test with Linux version 2.6.32, just to be sure the 
-issue still exists there?
+Changes to iomux-mx27.h should go in an extra patch, I think.
 
+[...]
 
-Nicolas
+> +static int isp1105_init(struct otg_transceiver *otg)
+> +{
+> +	mxc_gpio_mode(GPIO_PORTB | 23 | GPIO_GPIO | GPIO_OUT);
+> +	gpio_set_value(GPIO_PORTB + 23, 1);
+> +	mxc_gpio_mode(GPIO_PORTC | 31 | GPIO_GPIO | GPIO_OUT);
+> +	gpio_set_value(GPIO_PORTC + 31, 1);
+> +	return 0;
+> +}
+
+gpio_request() is needed here.
+
+> +static int isp1105_set_vbus(struct otg_transceiver *otg, bool on)
+> +{
+> +	if (on)
+> +		gpio_set_value(GPIO_PORTB + 27, 0);
+> +	else
+> +		gpio_set_value(GPIO_PORTB + 27, 1);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct mxc_usbh_platform_data usbh1_pdata = {
+> +	.portsc	= MXC_EHCI_MODE_UTMI | MXC_EHCI_SERIAL,
+> +	.flags	= MXC_EHCI_POWER_PINS_ENABLED | MXC_EHCI_INTERFACE_SINGLE_UNI,
+> +};
+> +
+> +static int __init usbh1_init(void)
+> +{
+> +	struct otg_transceiver *otg;
+> +
+> +	otg = kzalloc(sizeof(*otg), GFP_KERNEL);
+> +	if (!otg)
+> +		return -ENOMEM;
+> +
+> +	otg->label	= "ISP1105";
+> +	otg->init	= isp1105_init;
+> +	otg->set_vbus	= isp1105_set_vbus;
+> +
+> +	usbh1_pdata.otg = otg;
+> +
+> +	return mxc_register_device(&mxc_usbh1, &usbh1_pdata);
+> +}
+
+Ideally, you would make that a more generic driver of its own, which lives in
+drivers/usb/otg/ and is named something like 'transceiver-gpio'. You would
+instanciate it by passing a platform data struct to set the gpios you want it
+to use. This might sound overdone, but it would make your code reusable.
+
+The calls to mxc_gpio_mode() would remain in your platform code, of course.
+
+Daniel
