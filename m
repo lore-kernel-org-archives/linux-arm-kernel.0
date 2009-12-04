@@ -1,45 +1,50 @@
-From: sha@pengutronix.de (Sascha Hauer)
-Date: Fri, 4 Dec 2009 13:20:45 +0100
-Subject: [PATCH] mx31moboard: fix typo
-In-Reply-To: <4B18EEFC.8030904@epfl.ch>
-References: <20091203193034.GD22533@pengutronix.de>
-	<20091203193321.GE22533@pengutronix.de>
-	<4B18CAC7.30907@epfl.ch> <4B18EEFC.8030904@epfl.ch>
-Message-ID: <20091204122045.GQ15126@pengutronix.de>
+From: ospite@studenti.unina.it (Antonio Ospite)
+Date: Fri, 4 Dec 2009 13:39:43 +0100
+Subject: [PATCH] leds: Add LED class driver for regulator driven LEDs.
+In-Reply-To: <20091202180658.GA12292@rakim.wolfsonmicro.main>
+References: <1259775625-25973-1-git-send-email-ospite@studenti.unina.it>
+	<20091202180658.GA12292@rakim.wolfsonmicro.main>
+Message-ID: <20091204133943.ddf0e53d.ospite@studenti.unina.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 04, 2009 at 12:14:04PM +0100, Valentin Longchamp wrote:
-> Valentin Longchamp wrote:
->> Robert Schwebel wrote:
->>
->>> But something else must be missing, I still get this:
->>>
->>> arch/arm/mach-mx3/mx31moboard.c: In function 'moboard_usbh2_init':
->>> arch/arm/mach-mx3/mx31moboard.c:395: error: 'mx31_usbh2' undeclared (first use in this function)
->>> arch/arm/mach-mx3/mx31moboard.c:395: error: (Each undeclared identifier is reported only once
->>> arch/arm/mach-mx3/mx31moboard.c:395: error: for each function it appears in.)
->>> make[1]: *** [arch/arm/mach-mx3/mx31moboard.o] Error 1
->>>
->>
->> This comes from the usb host support for mx31 that should come with  
->> 2.6.33. Does linux-next already include these patches ?
->>
->
-> Hum, sorry, my bad, this was based on mxc_master_*pu* (don't ask me why,  
-> maybe not enough coffee). This branch includes the changes for using soc  
-> specific defines by Sascha.
->
-> Sacha, any chance these hit mainline/next soon ? Or do you want me to  
-> send correcting patch ?
+On Wed, 2 Dec 2009 18:06:58 +0000
+Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
 
-Please send a fixup patch.
+> > +	vcc = regulator_get(&pdev->dev, pdata->supply);
+> > +	if (IS_ERR(vcc)) {
+> > +		dev_err(&pdev->dev, "Cannot get vcc for %s\n", pdata->name);
+> > +		return PTR_ERR(vcc);;
+> > +	}
+> 
+> You almost certainly want regulator_get_exclusive() here; this driver
+> can't function properly if something else is using the regulator and
+> holding the LED on or off without it.  You'll also want to check the
+> status of the LED on startup and update your internal status to match
+> that.
 
-Sascha
+When you refer to "the status of the LED on startup" do you mean a
+initial brightness value passed via leds-regulator platform data, or the
+initial status or the regulator itself?
 
+Thanks,
+   Antonio
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Antonio Ospite
+http://ao2.it
+
+PGP public key ID: 0x4553B001
+
+A: Because it messes up the order in which people normally read text.
+   See http://en.wikipedia.org/wiki/Posting_style
+Q: Why is top-posting such a bad thing?
+A: Top-posting.
+Q: What is the most annoying thing in e-mail?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091204/315580c2/attachment.sig>
