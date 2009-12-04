@@ -1,69 +1,149 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Dec 2009 16:59:29 +0000
-Subject: shared memory problem on ARM v5TE using threads
-In-Reply-To: <20091204163850.GC20386@n2100.arm.linux.org.uk>
-References: <4B18F141.7070101@denx.de>
-	<20091204131307.GE15887@n2100.arm.linux.org.uk>
-	<4B1911B4.7080907@denx.de>
-	<20091204154231.GB20386@n2100.arm.linux.org.uk>
-	<4B1931B3.90301@denx.de>
-	<20091204163850.GC20386@n2100.arm.linux.org.uk>
-Message-ID: <20091204165929.GD20386@n2100.arm.linux.org.uk>
+From: randy.dunlap@oracle.com (Randy Dunlap)
+Date: Fri, 4 Dec 2009 09:01:39 -0800
+Subject: [RFC][PATCH 01/10] arm: mxc: New interrupt controller (TZIC)
+	for i.MX5 family
+In-Reply-To: <e99e70e2a619693064130a747b6ee3a93273337b.1259893118.git.amit.kucheria@canonical.com>
+References: <cover.1259893118.git.amit.kucheria@canonical.com>
+	<e99e70e2a619693064130a747b6ee3a93273337b.1259893118.git.amit.kucheria@canonical.com>
+Message-ID: <20091204090139.ff60024c.randy.dunlap@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 04, 2009 at 04:38:50PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Dec 04, 2009 at 04:58:43PM +0100, Heiko Schocher wrote:
-> > Hello Russell King,
-> > 
-> > Russell King - ARM Linux wrote:
-> > > On Fri, Dec 04, 2009 at 02:42:12PM +0100, Heiko Schocher wrote:
-> > >> Hello Russell King,
-> > >>
-> > >> Russell King - ARM Linux wrote:
-> > >>> On Fri, Dec 04, 2009 at 12:23:45PM +0100, Heiko Schocher wrote:
-> > >>>> [4] Log from Demoprogramm, not working
-> > >>> I think this is messed up - this is not from your first script but your
-> > >>> second script which starts four independent read processes.
-> > >>>
-> > >>> I determined this because:
-> > >>> (1) the read thread addresses are mostly the same
-> > >>> (2) there are four "Read form in_msg" strings, which you only print
-> > >>> once at the start of the program.
-> > >> Ups, sorry for the confusion, here 2 logs with the right values:
-> > > 
-> > > I don't remember whether 2.6.28 has highmem.  Can you check whether you're
-> > > using highmem please?
-> > 
-> > No, there is no HIGHMEM in the defconfig, if you mean this config option.
-> > 
-> > You can find the complete defconfig here:
-> > 
-> > http://git.denx.de/?p=linux-2.6-denx.git;a=blob;f=arch/arm/configs/suen3_defconfig;h=905f9bc6a36c03ab41b97a292fca5b3a0011a2a0;hb=3dc3e4dc957f216ec5cdcd2a770f5c4b0cefca4a
+On Fri,  4 Dec 2009 04:47:01 +0200 Amit Kucheria wrote:
+
+> Freescale i.MX51 processor uses a different interrupt controller. Add the
+> driver and fix the Makefile to account for it.
 > 
-> Please apply this patch and re-run your program.  Expect a fair bit of
-> output - the last 50 or so lines from the kernel messages should cover
-> everything that's required.  Also useful would be the output from the
-> program giving the addresses of the shm regions.
+> Signed-off-by: Amit Kucheria <amit.kucheria@canonical.com>
+> ---
+>  arch/arm/plat-mxc/Kconfig  |    4 +
+>  arch/arm/plat-mxc/Makefile |    9 ++-
+>  arch/arm/plat-mxc/tzic.c   |  180 ++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 192 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/plat-mxc/tzic.c
+> 
+> diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
+> new file mode 100644
+> index 0000000..3af8fc6
+> --- /dev/null
+> +++ b/arch/arm/plat-mxc/tzic.c
+> @@ -0,0 +1,180 @@
+> +/*
+> + * Copyright 2004-2009 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+...
+> +
+> +/*!
+> + * Disable interrupt number "irq" in the TZIC
+> + *
+> + * @param  irq          interrupt source number
+> + */
 
-BTW, so that other people know: the use of highmem on VIVT caches _will_
-result in buggy shared mmap[*] behaviour similar to what you're seeing; the
-ARM fixup in update_mmu_cache() is rendered inoperative for the existing
-mappings.
-
-Luckily, however, when the conditions for applying the fixup are triggered,
-you _will_ get a kernel oops.
-
-Since the fix for this involves touching every other architecture (because
-we need the page table pointer passed into update_mmu_cache), I will not
-be forwarding this fix for 2.6.32.X - the patch is just far too big to
-consider.
-
-That all said, Heiko, since you're not using highmem, this will not be
-affecting you.
+Hi,
+What processes these function comments (if anything does)?
 
 
-* - this occurs when the same physical pages are mapped multiple times
-into the same MM space.  Our work-around for this is to mark the pages
-non-cachable bufferable, or if the write buffer fails the coherency test,
-non-cachable non-bufferable.
+> +static void mxc_mask_irq(unsigned int irq)
+> +{
+> +	int index, off;
+> +
+> +	index = irq >> 5;
+> +	off = irq & 0x1F;
+> +	__raw_writel(1 << off, tzic_base + TZIC_ENCLEAR0 + (index << 2));
+> +}
+> +
+> +/*!
+> + * Enable interrupt number "irq" in the TZIC
+> + *
+> + * @param  irq          interrupt source number
+> + */
+> +static void mxc_unmask_irq(unsigned int irq)
+> +{
+> +	int index, off;
+> +
+> +	index = irq >> 5;
+> +	off = irq & 0x1F;
+> +	__raw_writel(1 << off, tzic_base + TZIC_ENSET0 + (index << 2));
+> +}
+> +
+> +static unsigned int wakeup_intr[4];
+> +
+> +/*
+> + * Set interrupt number "irq" in the TZIC as a wake-up source.
+> + *
+> + * @param  irq          interrupt source number
+> + * @param  enable       enable as wake-up if equal to non-zero
+> + * 			disble as wake-up if equal to zero
+> + *
+> + * @return       This function returns 0 on success.
+> + */
+> +static int mxc_set_wake_irq(unsigned int irq, unsigned int enable)
+> +{
+> +	unsigned int index, off;
+> +
+> +	index = irq >> 5;
+> +	off = irq & 0x1F;
+> +
+> +	if (index > 3)
+> +		return -1;
+> +
+> +	if (enable)
+> +		wakeup_intr[index] |= (1 << off);
+> +	else
+> +		wakeup_intr[index] &= ~(1 << off);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct irq_chip mxc_tzic_chip = {
+> +	.name = "MXC_TZIC",
+> +	.ack = mxc_mask_irq,
+> +	.mask = mxc_mask_irq,
+> +	.unmask = mxc_unmask_irq,
+> +	.set_wake = mxc_set_wake_irq,
+> +};
+> +
+...
+> +
+> +/*
+> + * enable wakeup interrupt
+> + *
+> + * @param is_idle		1 if called in idle loop (enset registers);
+> + *				0 to be used when called from low power entry
+> + * @return			0 if successful; non-zero otherwise
+> + *
+> + */
+> +int tzic_enable_wake(int is_idle)
+> +{
+> +	unsigned int i, v;
+> +
+> +	__raw_writel(1, tzic_base + TZIC_DSMINT);
+> +	if (unlikely(__raw_readl(tzic_base + TZIC_DSMINT) == 0))
+> +		return -EAGAIN;
+> +
+> +	if (likely(is_idle)) {
+> +		for (i = 0; i < 4; i++) {
+> +			v = __raw_readl(tzic_base + TZIC_ENSET0 + i * 4);
+> +			__raw_writel(v, tzic_base + TZIC_WAKEUP0 + i * 4);
+> +		}
+> +	} else {
+> +		for (i = 0; i < 4; i++) {
+> +			v = wakeup_intr[i];
+> +			__raw_writel(v, tzic_base + TZIC_WAKEUP0 + i * 4);
+> +		}
+> +	}
+> +	return 0;
+> +}
+> -- 
+
+thanks,
+---
+~Randy
