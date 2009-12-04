@@ -1,25 +1,22 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Dec 2009 17:24:17 +0000
-Subject: [RFC PATCH 01/10] PCMCIA: soc_common: convert to a stand alone
-	module
-In-Reply-To: <4B194458.6040403@cam.ac.uk>
-References: <925a8da0d92cdf1f37aaef988fcc63bf9744576e.1256684685.git.rmk+kernel@arm.linux.org.uk>
-	<4B194458.6040403@cam.ac.uk>
-Message-ID: <20091204172417.GE20386@n2100.arm.linux.org.uk>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 04 Dec 2009 12:25:55 -0500 (EST)
+Subject: shared memory problem on ARM v5TE using threads
+In-Reply-To: <4B18F141.7070101@denx.de>
+References: <4B18F141.7070101@denx.de>
+Message-ID: <alpine.LFD.2.00.0912041222040.31174@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 04, 2009 at 05:18:16PM +0000, Jonathan Cameron wrote:
-> Hi Russell,
+On Fri, 4 Dec 2009, Heiko Schocher wrote:
+
+> Hello,
 > 
-> This one is causing me some build problems.
+> I have the following shared mem problem on a ARM v5TE
+> processor using Linux version 2.6.28,
 
-Well, I've no idea what's happened to Dominik.  While I may be the
-author of these patches, I didn't commit them, so they're out of my
-control.
+Could you apply this patch and test again:
 
-There are some outstanding merge issues which SFR identified, and so
-far Dominik has been quiet on them.
+http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=08e445bd6a
 
-For the time being, I'll merge your patch into my git tree, but unless
-Dominik hands my patches back to me for merging, it will be lost.
+
+Nicolas
