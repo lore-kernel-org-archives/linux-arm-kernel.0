@@ -1,23 +1,26 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Dec 2009 17:31:44 +0000
-Subject: shared memory problem on ARM v5TE using threads
-In-Reply-To: <alpine.LFD.2.00.0912041222040.31174@xanadu.home>
-References: <4B18F141.7070101@denx.de>
-	<alpine.LFD.2.00.0912041222040.31174@xanadu.home>
-Message-ID: <20091204173143.GF20386@n2100.arm.linux.org.uk>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 04 Dec 2009 12:37:14 -0500 (EST)
+Subject: [PATCH 1/3] ARM: add base support for Marvell Dove SoC
+In-Reply-To: <771cded00912032141x368ae423n6603edbd7acd3f10@mail.gmail.com>
+References: <1259084033-7283-1-git-send-email-saeed@marvell.com>
+	<1259084033-7283-2-git-send-email-saeed@marvell.com>
+	<771cded00912032141x368ae423n6603edbd7acd3f10@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.0912041234290.31174@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 04, 2009 at 12:25:55PM -0500, Nicolas Pitre wrote:
-> On Fri, 4 Dec 2009, Heiko Schocher wrote:
-> 
-> > Hello,
-> > 
-> > I have the following shared mem problem on a ARM v5TE
-> > processor using Linux version 2.6.28,
-> 
-> Could you apply this patch and test again:
-> 
-> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=08e445bd6a
+On Fri, 4 Dec 2009, Haojian Zhuang wrote:
 
-That's almost certainly the problem, thanks Nicolas.
+> > + ? ? ? .long ? cpu_pj4_name
+> > + ? ? ? .long ? v6_processor_functions
+> > + ? ? ? .long ? v6wbi_tlb_fns
+> > + ? ? ? .long ? v6_user_fns
+> > + ? ? ? .long ? v6_cache_fns
+> > + ? ? ? .size ? __v6_proc_info, . - __v6_proc_info
+> You created __pj4_v6_proc_info. But you still used __v6_proc_info at 
+> here. Why?
+
+I fixed that one already when committing the patch into Git.
+
+
+Nicolas
