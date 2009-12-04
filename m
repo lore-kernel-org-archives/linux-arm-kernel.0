@@ -1,36 +1,19 @@
-From: jic23@cam.ac.uk (Jonathan Cameron)
-Date: Fri, 04 Dec 2009 13:08:15 +0000
-Subject: Query about pxa27x_udc.c
-Message-ID: <4B1909BF.9050704@cam.ac.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 Dec 2009 13:13:07 +0000
+Subject: shared memory problem on ARM v5TE using threads
+In-Reply-To: <4B18F141.7070101@denx.de>
+References: <4B18F141.7070101@denx.de>
+Message-ID: <20091204131307.GE15887@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just had the following pop up in a compile of linux-next
+On Fri, Dec 04, 2009 at 12:23:45PM +0100, Heiko Schocher wrote:
+> [4] Log from Demoprogramm, not working
 
+I think this is messed up - this is not from your first script but your
+second script which starts four independent read processes.
 
-drivers/usb/gadget/pxa27x_udc.c: In function 'pxa_udc_irq':
-drivers/usb/gadget/pxa27x_udc.c:2232: warning: array subscript is above array bounds
-drivers/usb/gadget/pxa27x_udc.c:2232: warning: array subscript is above array bounds
-drivers/usb/gadget/pxa27x_udc.c:2233: warning: array subscript is above array bounds
-
-I'm not sure what the lines in question are actually doing (and at least
-at first glance they can never access anything in the array).
-
-
-	for (i = 16; udcisr1 != 0 && i < 24; udcisr1 >>= 2, i++) {
-		udc_writel(udc, UDCISR1, UDCISR_INT(i - 16, UDCISR_INT_MASK));
-		if (!(udcisr1 & UDCISR_INT_MASK))
-			continue;
-
-		ep = &udc->pxa_ep[i];
-		ep->stats.irqs++;
-		handle_ep(ep);
-	}
-
-Where the warning is about the call to &udc->pxa_ep[i]
-
-Seeing as that appears to only ever contain 15 elements this doesn't look good.
-I haven't waded through everything that happens to this structure so I guess it might
-be doing something less than obvious.
-
-Jonathan
+I determined this because:
+(1) the read thread addresses are mostly the same
+(2) there are four "Read form in_msg" strings, which you only print
+once at the start of the program.
