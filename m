@@ -1,25 +1,20 @@
-From: mpm@selenic.com (Matt Mackall)
-Date: Sat, 5 Dec 2009 12:56:46 -0600
-Subject: [PATCH V2 1/2] arm nomadik: add hardware RNG driver
-In-Reply-To: <376a2243795aadfb87c8a7f5ea039.1260011962.git.rubini@unipv.it>
-References: <376a2243795aadfb87c8a7f5ea039.1260011962.git.rubini@unipv.it>
-Message-ID: <20091205185646.GQ8789@waste.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 5 Dec 2009 23:11:01 +0100
+Subject: tree with htc dream support
+Message-ID: <20091205221100.GA32522@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 05, 2009 at 12:31:28PM +0100, Alessandro Rubini wrote:
-> From: Alessandro Rubini <rubini@unipv.it>
-> 
-> The hardware random number generator by ST is used in both the Nomadik
-> 8815 SoC and the U8500. It returns 16 bits every 400ns with automatic
-> delay if a read is issued too early. It depends on PLAT_NOMADIK.
-> 
-> Signed-off-by: Alessandro Rubini <rubini@unipv.it>
-> Acked-by: Andrea Gallo <andrea.gallo@stericsson.com>
+Hi!
 
-Looks good to me.
+Where is the tree with HTC Dream support? I thought it was 
 
-Acked-by: Matt Mackall <mpm@selenic.com>
+http://git.kernel.org/?p=linux/kernel/git/dwalker/linux-msm.git;a=summary
 
+but it does not seem to contain basic dream support (board file and
+serial console) and I thought that was going to linus for 2.6.33...?
+
+									Pavel
 -- 
-Mathematics is the supreme nostalgia of our time.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
