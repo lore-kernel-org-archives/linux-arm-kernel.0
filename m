@@ -1,21 +1,45 @@
-From: andrey.porodko@gmail.com (Andrey A. Porodko)
-Date: Tue, 08 Dec 2009 21:00:45 +0500
-Subject: Patch for MSP430 and SOC audio support for Neuros OSD2 platform
-	code.
-In-Reply-To: <4B1BC0E7.1010403@chelcom.ru>
-References: <4B1BC0E7.1010403@chelcom.ru>
-Message-ID: <4B1E782D.3000102@gmail.com>
+From: panda@chelcom.ru (Andrey Porodko)
+Date: Sat, 5 Dec 2009 15:54:42 +0500
+Subject: [PATCH] Neuros OSD2 board platform code patch for supporting msp430
+ microcontroller and sound soc.
+Message-ID: <mailman.76.1260288061.2170.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Initial release. Neuros OSD2 board i2c platform data description for MSP430
+microprocessor and Audio SOC support. MSP430 firmware perform various operations.
+Such as IR remote, RTC timer and etc. Audio SOC is very similar to DM6446EVM
+board, the only difference here is i2c port address.
 
-Hello,
+Signed-off-by: Andrey Porodko <panda@chelcom.ru>
+---
+ arch/arm/mach-davinci/board-neuros-osd2.c |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-Please, consider this patch for Neuros OSD2 platform code. Particular
-drivers code have been sent to consideration of respective maintainers.
-
-Thank you.
-
-P.S. Change log added.
+diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
+index bd9ca07..28b3d67 100644
+--- a/arch/arm/mach-davinci/board-neuros-osd2.c
++++ b/arch/arm/mach-davinci/board-neuros-osd2.c
+@@ -202,6 +202,12 @@ static struct davinci_i2c_platform_data ntosd2_i2c_pdata = {
+ };
+ 
+ static struct i2c_board_info __initdata ntosd2_i2c_info[] =  {
++	{					/* MSP430 interface	*/
++		I2C_BOARD_INFO("davinci_msp", NTOSD2_MSP430_I2C_ADDR),
++	},
++	{
++		I2C_BOARD_INFO("tlv320aic3x", NTOSD2_AUDIOSOC_I2C_ADDR),
++	},
+ };
+ 
+ static	int ntosd2_init_i2c(void)
+-- 
+1.5.6.5
 
 -------------------------------------------------------------------------
+
+
+-- 
+Best regards
+Andrey A. Porodko
+ 
