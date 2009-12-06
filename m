@@ -1,37 +1,38 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Sat, 05 Dec 2009 15:12:17 -0800
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 6 Dec 2009 08:41:21 +0100
 Subject: tree with htc dream support
-In-Reply-To: <20091205221100.GA32522@elf.ucw.cz>
+In-Reply-To: <1260054737.23633.35.camel@desktop>
 References: <20091205221100.GA32522@elf.ucw.cz>
-Message-ID: <1260054737.23633.35.camel@desktop>
+	<1260054737.23633.35.camel@desktop>
+Message-ID: <20091206074120.GA1615@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2009-12-05 at 23:11 +0100, Pavel Machek wrote:
-> Hi!
+Hi!
+
+> > Where is the tree with HTC Dream support? I thought it was 
+> > 
+> > http://git.kernel.org/?p=linux/kernel/git/dwalker/linux-msm.git;a=summary
+> > 
+> > but it does not seem to contain basic dream support (board file and
+> > serial console) and I thought that was going to linus for 2.6.33...?
 > 
-> Where is the tree with HTC Dream support? I thought it was 
+> It's here
 > 
-> http://git.kernel.org/?p=linux/kernel/git/dwalker/linux-msm.git;a=summary
+> git://codeaurora.org/quic/kernel/dwalker/linux-msm.git
+...
+> It's been in Linux-next for maybe two weeks .. I've been trying to
+> decide if I should submit it for 2.6.33. I'm going to be adding boat
+> loads of additional msm code and doing a fairly large merge for
+> 2.6.34 .. So your code would get better testing if we wait for that.
 > 
-> but it does not seem to contain basic dream support (board file and
-> serial console) and I thought that was going to linus for 2.6.33...?
+> However, If you really want it in 2.6.33 I'll try to accommodate you.
 
-It's here
+It would be good to get it in 2.6.33, so that we can build on it, and
+so that you are marked as official maintainer etc. I do not think that
+code would benefit from any additional delays...
+								Pavel
 
-git://codeaurora.org/quic/kernel/dwalker/linux-msm.git
-
-In the "testing" branch .. 
-
-or
-
-https://www.codeaurora.org/gitweb/quic/kernel/?p=dwalker/linux-msm.git;a=shortlog;h=refs/heads/testing
-
-It's been in Linux-next for maybe two weeks .. I've been trying to
-decide if I should submit it for 2.6.33. I'm going to be adding boat
-loads of additional msm code and doing a fairly large merge for
-2.6.34 .. So your code would get better testing if we wait for that.
-
-However, If you really want it in 2.6.33 I'll try to accommodate you.
-
-Daniel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
