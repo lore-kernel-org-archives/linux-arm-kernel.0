@@ -1,67 +1,34 @@
-From: dirk.behme@googlemail.com (Dirk Behme)
-Date: Sun, 06 Dec 2009 10:11:31 +0100
-Subject: [RFC PATCH 0/2] Race in vfp_notifier()
-In-Reply-To: <1250008803.30628.7.camel@pc1117.cambridge.arm.com>
-References: <20090422171355.19555.89735.stgit@pc1117.cambridge.arm.com>	
-	<4A819B36.3010809@googlemail.com>
-	<1250008803.30628.7.camel@pc1117.cambridge.arm.com>
-Message-ID: <4B1B7543.909@googlemail.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Sun,  6 Dec 2009 11:38:57 +0200
+Subject: [PATCH v2 0/2] ep93xx: TS-72xx watchdog driver
+Message-ID: <cover.1260089508.git.mika.westerberg@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas wrote:
-> On Tue, 2009-08-11 at 18:24 +0200, Dirk Behme wrote:
->> Catalin Marinas wrote:
->>> Hi,
->>>
->>> We've been hitting this bug probably for more than a year but I only
->>> recently got time to investigate. The second patch has a short
->>> description of what's going on and the proposed fix. My fix requires
->>> something like cmpxchg which wasn't available for ARM (though patches
->>> were posted in the past).
->>>
->>> If you have any better solution, please let me know.
->>>
->>> Thanks.
->>>
->>>
->>> Catalin Marinas (2):
->>>       Fix a race in the vfp_notifier() function on SMP systems
->>>       Add cmpxchg support for ARMv6+ SMP systems
->>>
->>>
->>>  arch/arm/include/asm/system.h |   48 +++++++++++++++++++++++++++++++++++++++++
->>>  arch/arm/kernel/traps.c       |    8 +++++++
->>>  arch/arm/vfp/vfpmodule.c      |   25 +++++++++++++++++++--
->>>  3 files changed, 78 insertions(+), 3 deletions(-)
->> What's the recent status of this patch series?
->>
->> It looks like the recent version of
->>
->> Add cmpxchg support for ARMv6+ SMP systems
->> http://lkml.indiana.edu/hypermail/linux/kernel/0906.0/01049.html
->> -> [ARM] Add cmpxchg support for ARMv6+ systems (v5)
->>
->> is applied to 2.6.30-rc8, but what's about
->>
->> Fix a race in the vfp_notifier() function on SMP systems
->> http://article.gmane.org/gmane.linux.ports.arm.kernel/56631
-> 
-> I haven't received an ack yet (and I also forgot to repost). But it is
-> in the same category with the ASID roll-over patch and Russell doesn't
-> currently have a working SMP system to check these.
+Hi,
 
-I'd like to ping on this again ;)
+Technologic Systems TS-72xx SBCs (TS-7200, TS-7250 and TS-7260) have
+watchdog timer that is implemented in external CPLD chip. This set of
+patches provide implementation of watchdog driver for that chip.
 
-Would be nice to get something like this merged.
+This is version 2 of the patches. Changes to initial version are:
+	- changed code according to the comments from
+	  Ryan Mallon and H Hartley Sweeten
+	- added some error printings to probe function
 
-For reference:
+I tested this on TS-7260 board.
 
-http://article.gmane.org/gmane.linux.ports.arm.kernel/56631
-http://www.linux-arm.org/git?p=linux-2.6.git;a=commit;h=0f69b76d17642205990f0d6a3da2a9fbe86edd90
+Thanks,
+MW
 
-Russell: Any comments?
+Mika Westerberg (2):
+  ep93xx: implemented watchdog timer driver for TS-72xx SBCs
+  ep93xx: added platform side support for TS-72xx WDT driver
 
-Many thanks and best regards
-
-Dirk
+ arch/arm/mach-ep93xx/include/mach/ts72xx.h |    2 +
+ arch/arm/mach-ep93xx/ts72xx.c              |   21 ++
+ drivers/watchdog/Kconfig                   |   11 +
+ drivers/watchdog/Makefile                  |    1 +
+ drivers/watchdog/ts72xx_wdt.c              |  516 ++++++++++++++++++++++++++++
+ 5 files changed, 551 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/watchdog/ts72xx_wdt.c
