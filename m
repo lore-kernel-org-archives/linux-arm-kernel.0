@@ -1,28 +1,42 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Sun, 6 Dec 2009 14:44:34 +0200
-Subject: [PATCH 1/3] ARM: add base support for Marvell Dove SoC
-In-Reply-To: <771cded00912032141x368ae423n6603edbd7acd3f10@mail.gmail.com>
-References: <1259084033-7283-1-git-send-email-saeed@marvell.com>
-	<1259084033-7283-2-git-send-email-saeed@marvell.com>
-	<771cded00912032141x368ae423n6603edbd7acd3f10@mail.gmail.com>
-Message-ID: <c70ff3ad0912060444nf65446ubce39029ca8b9247@mail.gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Sun,  6 Dec 2009 15:45:43 +0200
+Subject: [PATCH] [ARM] pxa/em-x270: fix usb hub power up/reset sequence
+Message-ID: <1260107143-11779-1-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +__pj4_v6_proc_info:
->> + ? ? ? .long ? 0x560f5810
->> + ? ? ? .long ? 0xff0ffff0
->> + ? ? ? .long ? PMD_TYPE_SECT | \
->> + ? ? ? ? ? ? ? PMD_SECT_BUFFERABLE | \
->> + ? ? ? ? ? ? ? PMD_SECT_CACHEABLE | \
-> These two flags are different from flags used in v6 proc_info. Is PJ4
-> full compatible to armv6? Is there any reason to select
-> PMD_SECT_BUFFERABLE & PMD_SECT_CACHEABLE at here?
-good catch, those flags should be replace with PMD_FLAGS, this with
-break SMP support according to the following commit:
-"ARM: ensure initial page tables are setup for SMP systems"
 
-Nico, should I send a patch that deletes those flags or to resend the
-updated patch?
+Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+---
+ arch/arm/mach-pxa/em-x270.c |   11 +++++------
+ 1 files changed, 5 insertions(+), 6 deletions(-)
 
-saeed
+diff --git a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
+index aec7f42..86a8732 100644
+--- a/arch/arm/mach-pxa/em-x270.c
++++ b/arch/arm/mach-pxa/em-x270.c
+@@ -497,16 +497,15 @@ static int em_x270_usb_hub_init(void)
+ 		goto err_free_vbus_gpio;
+ 
+ 	/* USB Hub power-on and reset */
+-	gpio_direction_output(usb_hub_reset, 0);
++	gpio_direction_output(usb_hub_reset, 1);
++	gpio_direction_output(GPIO9_USB_VBUS_EN, 0);
+ 	regulator_enable(em_x270_usb_ldo);
+-	gpio_set_value(usb_hub_reset, 1);
+ 	gpio_set_value(usb_hub_reset, 0);
++	gpio_set_value(usb_hub_reset, 1);
+ 	regulator_disable(em_x270_usb_ldo);
+ 	regulator_enable(em_x270_usb_ldo);
+-	gpio_set_value(usb_hub_reset, 1);
+-
+-	/* enable VBUS */
+-	gpio_direction_output(GPIO9_USB_VBUS_EN, 1);
++	gpio_set_value(usb_hub_reset, 0);
++	gpio_set_value(GPIO9_USB_VBUS_EN, 1);
+ 
+ 	return 0;
+ 
+-- 
+1.6.4.4
