@@ -1,27 +1,44 @@
-From: david-b@pacbell.net (David Brownell)
-Date: Sun, 6 Dec 2009 12:23:00 -0800
-Subject: [BUG] pxa27x_udc: possible recursive locking detected in
-	pxa_ep_queue
-In-Reply-To: <Pine.LNX.4.44L0.0912061458540.7903-100000@netrider.rowland.org>
-References: <Pine.LNX.4.44L0.0912061458540.7903-100000@netrider.rowland.org>
-Message-ID: <200912061223.00528.david-b@pacbell.net>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 6 Dec 2009 09:47:31 +0100
+Subject: [PATCH 1/1] Remove suspend/resume functionality, add dynamic
+	clocking
+In-Reply-To: <083DF309106F364B939360100EC290F804F5659CFF@eu1rdcrdc1wx030.exi.nxp.com>
+References: <083DF309106F364B939360100EC290F804F55C9225@eu1rdcrdc1wx030.exi.nxp.com>
+	<20091126090252.GB12179@pengutronix.de>
+	<083DF309106F364B939360100EC290F804F5659CFF@eu1rdcrdc1wx030.exi.nxp.com>
+Message-ID: <20091206084731.GE2766@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 06 December 2009, Alan Stern wrote:
-> That's what other device controller drivers do. ?There's no choice. ?
-> (Except that I'm not sure they have individual locks for endpoints -- 
-> just one single big spinlock.)
+Hi!
 
-Right; such fine grain locking tends to be more hassle than it's
-worth.  ISTR studies from a while back showing locks need to be
-quite heavily contended before splitting them is worth much.  Any
-per-controller lock for a UDC is unlikely to see much contention.
+> > Subject: Re: [PATCH 1/1] Remove suspend/resume functionality, add dynamic
+> > clocking
+> > 
+> > Hello,
+> > 
+> > can you please add something like "i2c-pnx: " to the subject?
+> > (Actually it's a great strategy *not* to put it into the Subject.  This
+> > way it attracts far more attention :-)
+> > 
+> 
+> Good point!
+> 
+> > > Remove suspend/resume functionality, I2C driver gates clock on
+> > > only when an I2C transaction is in progress
+> > What happens when the machine suspends while a transfer is in progress?
+> > (This might be a problem that already existed before.)  If this is
+> > really a problem the easiest "fix" is to let the suspend callback return
+> > -EBUSY in this case.
+> 
+> The suspend callback is now removed. It's actually not needed with this
+> change. The I2C clocks will turn on prior to a transaction and then turn
+> off at the completion.
 
+Are you sure its unneeded? What if someone attempts to suspend the
+system when a transaction is running?
+								Pavel
 
-> In fact, host controller drivers do the analogous thing. ?When they
-> give back completed URBs, they release their private spinlocks.
-
-For *exactly* the same reason.  Upper level driver code shouldn't
-need to worry about whether it's re-entering some random bit of
-lower level code.  As a rule, it can't know about that code.
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
