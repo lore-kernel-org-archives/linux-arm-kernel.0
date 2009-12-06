@@ -1,42 +1,38 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun,  6 Dec 2009 15:45:43 +0200
-Subject: [PATCH] [ARM] pxa/em-x270: fix usb hub power up/reset sequence
-Message-ID: <1260107143-11779-1-git-send-email-grinberg@compulab.co.il>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Sun, 06 Dec 2009 05:51:27 -0800
+Subject: tree with htc dream support
+In-Reply-To: <20091206074120.GA1615@ucw.cz>
+References: <20091205221100.GA32522@elf.ucw.cz>
+	<1260054737.23633.35.camel@desktop>  <20091206074120.GA1615@ucw.cz>
+Message-ID: <1260107487.23633.55.camel@desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, 2009-12-06 at 08:41 +0100, Pavel Machek wrote:
+> Hi!
+> 
+> > > Where is the tree with HTC Dream support? I thought it was 
+> > > 
+> > > http://git.kernel.org/?p=linux/kernel/git/dwalker/linux-msm.git;a=summary
+> > > 
+> > > but it does not seem to contain basic dream support (board file and
+> > > serial console) and I thought that was going to linus for 2.6.33...?
+> > 
+> > It's here
+> > 
+> > git://codeaurora.org/quic/kernel/dwalker/linux-msm.git
+> ...
+> > It's been in Linux-next for maybe two weeks .. I've been trying to
+> > decide if I should submit it for 2.6.33. I'm going to be adding boat
+> > loads of additional msm code and doing a fairly large merge for
+> > 2.6.34 .. So your code would get better testing if we wait for that.
+> > 
+> > However, If you really want it in 2.6.33 I'll try to accommodate you.
+> 
+> It would be good to get it in 2.6.33, so that we can build on it, and
+> so that you are marked as official maintainer etc. I do not think that
+> code would benefit from any additional delays...
 
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-Signed-off-by: Mike Rapoport <mike@compulab.co.il>
----
- arch/arm/mach-pxa/em-x270.c |   11 +++++------
- 1 files changed, 5 insertions(+), 6 deletions(-)
+Ok. Fine with me, unless someone else has a specific objection .
 
-diff --git a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
-index aec7f42..86a8732 100644
---- a/arch/arm/mach-pxa/em-x270.c
-+++ b/arch/arm/mach-pxa/em-x270.c
-@@ -497,16 +497,15 @@ static int em_x270_usb_hub_init(void)
- 		goto err_free_vbus_gpio;
- 
- 	/* USB Hub power-on and reset */
--	gpio_direction_output(usb_hub_reset, 0);
-+	gpio_direction_output(usb_hub_reset, 1);
-+	gpio_direction_output(GPIO9_USB_VBUS_EN, 0);
- 	regulator_enable(em_x270_usb_ldo);
--	gpio_set_value(usb_hub_reset, 1);
- 	gpio_set_value(usb_hub_reset, 0);
-+	gpio_set_value(usb_hub_reset, 1);
- 	regulator_disable(em_x270_usb_ldo);
- 	regulator_enable(em_x270_usb_ldo);
--	gpio_set_value(usb_hub_reset, 1);
--
--	/* enable VBUS */
--	gpio_direction_output(GPIO9_USB_VBUS_EN, 1);
-+	gpio_set_value(usb_hub_reset, 0);
-+	gpio_set_value(GPIO9_USB_VBUS_EN, 1);
- 
- 	return 0;
- 
--- 
-1.6.4.4
+Daniel
