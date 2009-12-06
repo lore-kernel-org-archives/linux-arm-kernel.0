@@ -1,40 +1,35 @@
-From: panda@chelcom.ru (Andrey Porodko)
-Date: Sat, 5 Dec 2009 15:54:42 +0500
-Subject: [PATCH] Neuros OSD2 board platform code patch for supporting msp430
- microcontroller and sound soc.
-Message-ID: <mailman.69.1260110450.2170.linux-arm-kernel@lists.infradead.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sun, 06 Dec 2009 10:42:50 -0500 (EST)
+Subject: [PATCH 1/3] ARM: add base support for Marvell Dove SoC
+In-Reply-To: <c70ff3ad0912060444nf65446ubce39029ca8b9247@mail.gmail.com>
+References: <1259084033-7283-1-git-send-email-saeed@marvell.com>
+	<1259084033-7283-2-git-send-email-saeed@marvell.com>
+	<771cded00912032141x368ae423n6603edbd7acd3f10@mail.gmail.com>
+	<c70ff3ad0912060444nf65446ubce39029ca8b9247@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.0912061041310.31174@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Andrey Porodko <panda@chelcom.ru>
----
- arch/arm/mach-davinci/board-neuros-osd2.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+On Sun, 6 Dec 2009, saeed bishara wrote:
 
-diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c
-b/arch/arm/mach-davinci/board-neuros-osd2.c
-index bd9ca07..28b3d67 100644
---- a/arch/arm/mach-davinci/board-neuros-osd2.c
-+++ b/arch/arm/mach-davinci/board-neuros-osd2.c
-@@ -202,6 +202,12 @@ static struct davinci_i2c_platform_data
-ntosd2_i2c_pdata = {
- };
- 
- static struct i2c_board_info __initdata ntosd2_i2c_info[] =  {
-+    {                    /* MSP430 interface    */
-+        I2C_BOARD_INFO("davinci_msp", NTOSD2_MSP430_I2C_ADDR),
-+    },
-+    {
-+        I2C_BOARD_INFO("tlv320aic3x", NTOSD2_AUDIOSOC_I2C_ADDR),
-+    },
- };
- 
- static    int ntosd2_init_i2c(void)
--- 
-1.5.6.5
+> >> +__pj4_v6_proc_info:
+> >> + ? ? ? .long ? 0x560f5810
+> >> + ? ? ? .long ? 0xff0ffff0
+> >> + ? ? ? .long ? PMD_TYPE_SECT | \
+> >> + ? ? ? ? ? ? ? PMD_SECT_BUFFERABLE | \
+> >> + ? ? ? ? ? ? ? PMD_SECT_CACHEABLE | \
+> > These two flags are different from flags used in v6 proc_info. Is PJ4
+> > full compatible to armv6? Is there any reason to select
+> > PMD_SECT_BUFFERABLE & PMD_SECT_CACHEABLE at here?
+> good catch, those flags should be replace with PMD_FLAGS, this with
+> break SMP support according to the following commit:
+> "ARM: ensure initial page tables are setup for SMP systems"
+> 
+> Nico, should I send a patch that deletes those flags or to resend the
+> updated patch?
+
+Please simply send a patch to fix it on top of what's already in the Git 
+repo.
 
 
--- 
-Best regards
-Andrey A. Porodko
- 
+Nicolas
