@@ -1,22 +1,32 @@
-From: specter118@gmail.com (Hu Ruihuan)
-Date: Tue, 8 Dec 2009 02:11:38 +0800
-Subject: [PATCH V2] ARM: NUC900: add GDMA driver support for nuc900
-	platform
-In-Reply-To: <20091207171851.GD26821@n2100.arm.linux.org.uk>
-References: <713d0d430911260242j579d86b3r7eeade0007d2a94c@mail.gmail.com>
-	<20091129121614.GA11445@n2100.arm.linux.org.uk>
-	<713d0d430912070753o28a8d538qa71b8af8c4415d73@mail.gmail.com>
-	<20091207171851.GD26821@n2100.arm.linux.org.uk>
-Message-ID: <713d0d430912071011w76600af1l867d8f52b61d53da@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 7 Dec 2009 19:22:29 +0100
+Subject: MXC: MC13783 Voltage regulation full support
+In-Reply-To: <1260199017.2166.14.camel@climbing-alby>
+References: <1260199017.2166.14.camel@climbing-alby>
+Message-ID: <20091207182229.GA25509@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-yes,why?
+Hello Alberto,
 
-2009/12/8 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Mon, Dec 07, 2009 at 11:53:39PM +0800, Hu Ruihuan wrote:
->> Hi,Russell
->> ? Thank you for your advice, it's my patch below follow your advice.
->
-> Did you look at the patch before you sent it?
->
+On Mon, Dec 07, 2009 at 04:16:57PM +0100, Alberto Panizzo wrote:
+> Hi! I am working on imx31pdk board support.
+> 
+> This board use strongly the power management chip Freescale MC13783
+> to set and enable power supply to devices, so a complete regulator 
+> driver for this chip is needed.
+> 
+> I ask you, anyone is working on this task now?
+> 
+> Or are there some problems pending that explain why the present driver
+> can only enable or disable regulators? 
+I think the only problem was that Sascha havn't had the need for full
+regulators and so didn't invest the time.  Note that the driver changed
+in next if you plan to send patches.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
