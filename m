@@ -1,28 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Dec 2009 19:35:48 +0000
-Subject: non barrier versions of dma_map functions
-In-Reply-To: <7f6a66b765002fcc815937b5d8d085cf.squirrel@www.codeaurora.org>
-References: <7f6a66b765002fcc815937b5d8d085cf.squirrel@www.codeaurora.org>
-Message-ID: <20091207193548.GG26821@n2100.arm.linux.org.uk>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Mon, 7 Dec 2009 21:03:26 +0100
+Subject: [RFC][PATCH 03/10] arm: mxc: changes to common plat-mxc codeto
+	add support for i.MX5
+In-Reply-To: <DE2504B3A515524BBE6934369EFDC0DA08C2A879@az33exm20.fsl.freescale.net>
+References: <cover.1259893118.git.amit.kucheria@canonical.com>
+	<58eb7d14c6cf56cbc874657dff5789c47116b49e.1259893118.git.amit.kucheria@canonical.com>
+	<DE2504B3A515524BBE6934369EFDC0DA08C2A56C@az33exm20.fsl.freescale.net>
+	<20091204105908.GJ15126@pengutronix.de>
+	<DE2504B3A515524BBE6934369EFDC0DA08C2A879@az33exm20.fsl.freescale.net>
+Message-ID: <20091207200326.GU22533@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2009 at 11:37:21AM -0800, adharmap at codeaurora.org wrote:
-> We have a situation where we need to dma map multiple cached buffers for a
-> single dma transaction.
+Rob,
+
+On Mon, Dec 07, 2009 at 10:17:52AM -0700, Herring Robert-RA7055 wrote:
+> Sorry, my mistake. Sasha is correct that MX27 is v1 and MX25 is v2.
 > 
-> The current DMA api suggests the use of dma_map_single for cache
-> consistency. On ARMv7 it performs the necessary cache-operations and calls
-> data sync barrier instruction (DSB). In our case we would be executing
-> multiple DSB instruction before starting the dma operation - we need
-> memory to be consistent only after we map the last buffer.
+> timer_is_v1 is just !timer_is_v2, so really only one is needed. I would
+> define it like this to avoid having to change the timer code again for
+> any new chips:
+> 
+> #define timer_is_v2()   (!(cpu_is_mx1() || cpu_is_mx21() ||
+> cpu_is_mx27()))
 
-Is it a problem and do you have numbers to illustrate why it is a
-problem, or is this just theory?
+Are you sure that FSL won't invent a v3 timer in the future?
 
-I suspect that the DSB doesn't figure in the bigger scheme of things
-(such as running the cache maintainence operations.)  Moreover, there's
-bigger issues (such as the DMA cache maintainence on ARMv7 actually
-*being* correct - by invalidating after the DMA has completed) to be
-getting on with at the moment that things as you're suggesting aren't
-worth worrying about.
+rsc
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
