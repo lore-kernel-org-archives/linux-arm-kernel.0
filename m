@@ -1,66 +1,53 @@
-From: acassis@gmail.com (Alan Carvalho de Assis)
-Date: Mon, 7 Dec 2009 09:39:04 -0200
-Subject: [PATCH] mx27: mxt_td60: Add USB Support
-In-Reply-To: <20091204180554.GX14091@buzzloop.caiaq.de>
-References: <1259948719-10008-1-git-send-email-acassis@gmail.com>
-	<20091204180554.GX14091@buzzloop.caiaq.de>
-Message-ID: <37367b3a0912070339o44b6badcjbcd47034f5589b72@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Dec 2009 11:42:18 +0000
+Subject: shared memory problem on ARM v5TE using threads
+In-Reply-To: <c70ff3ad0912070331y751900dbj62847dddb8521f4d@mail.gmail.com>
+References: <4B1911B4.7080907@denx.de>
+	<20091204154231.GB20386@n2100.arm.linux.org.uk>
+	<4B1931B3.90301@denx.de>
+	<20091204163850.GC20386@n2100.arm.linux.org.uk>
+	<4B194C8B.7070505@denx.de>
+	<20091204191349.GG20386@n2100.arm.linux.org.uk>
+	<4B196473.2040407@denx.de>
+	<309002C0DA137042828828FC53D7A9347E212D1152@IL-MB01.marvell.com>
+	<20091206141601.GB28932@n2100.arm.linux.org.uk>
+	<c70ff3ad0912070331y751900dbj62847dddb8521f4d@mail.gmail.com>
+Message-ID: <20091207114218.GA19348@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Mon, Dec 07, 2009 at 01:31:41PM +0200, saeed bishara wrote:
+> > I ran it on an ARM926EJ-S, which is ARMv5 and worked fine.
+> >
+> does it have L2 cache?
 
-On 12/4/09, Daniel Mack <daniel@caiaq.de> wrote:
-> On Fri, Dec 04, 2009 at 03:45:19PM -0200, Alan Carvalho de Assis wrote:
->> This patch add USB support on i-MXT TD60 to Host1 and Host2 ports.
->>
->> Signed-off-by: Alan Carvalho de Assis <acassis@gmail.com>
->> ---
->>  arch/arm/mach-mx2/Kconfig                   |    1 +
->>  arch/arm/mach-mx2/mxt_td60.c                |  106
->> +++++++++++++++++++++++++++
->>  arch/arm/plat-mxc/include/mach/iomux-mx27.h |   14 ++++
->
-> Changes to iomux-mx27.h should go in an extra patch, I think.
->
+No.
 
-Yes, I agree.
-
-> [...]
+> > If there's no problem with C=0 B=1 mappings on Kirkwood, I've no idea
+> > what's going on, and I don't have any suggestion on what to try next.
+> >
+> > The log shows that the kernel is doing the right thing: when we detect
+> > two mappings for the same page in the same MM space, we clean and
+> > invalidate any existing cacheable mappings visible in the MM space
+> > (both L1 and L2), and switch all visible mappings to C=0 B=1 mappings.
+> > This makes the area non-cacheable.
 >
->> +static int isp1105_init(struct otg_transceiver *otg)
->> +{
->> +	mxc_gpio_mode(GPIO_PORTB | 23 | GPIO_GPIO | GPIO_OUT);
->> +	gpio_set_value(GPIO_PORTB + 23, 1);
->> +	mxc_gpio_mode(GPIO_PORTC | 31 | GPIO_GPIO | GPIO_OUT);
->> +	gpio_set_value(GPIO_PORTC + 31, 1);
->> +	return 0;
->> +}
->
-> gpio_request() is needed here.
->
+> what about the PTE of the MM space of the write process? if it remains
+> C=1 B=1, then it's data will be at the L2, and as the L2 is not
+> flushed on context switch, then that explains this behavior.
 
-Sure, I missed it.
+That's probably the issue, and it means that _all_ shared writable
+mappings on your processor will be broken.
 
-> Ideally, you would make that a more generic driver of its own, which lives
-> in
-> drivers/usb/otg/ and is named something like 'transceiver-gpio'. You would
-> instanciate it by passing a platform data struct to set the gpios you want
-> it
-> to use. This might sound overdone, but it would make your code reusable.
->
-> The calls to mxc_gpio_mode() would remain in your platform code, of course.
->
+Oh dear, that really is bad news.
 
-Ok, I need your support here. I'm using mxc-master and I looked for
-something related to "transceiver gpio", but no success. I found some
-gpio related to usb gadget, but this is not the case. Could you point
-me to right function?
+There are two solutions to this which I can currently think of:
+1. flush the L2 cache on every context switch
+2. make all shared writable mappings non-cacheable
 
-Thank you very much,
+Neither of those two options appeals.  Since it's only one set of CPUs
+which are affected, we really don't want to apply any fix for this to the
+generic ARM kernel code - especially when all other L2 caches are sensibly
+implemented as PIPT rather than VIVT.
 
-Alan
-
-> Daniel
->
->
+Can we please forget that Feroceon CPUs exist? ;)
