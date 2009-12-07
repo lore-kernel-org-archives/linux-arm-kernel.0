@@ -1,64 +1,66 @@
-From: ra7055@freescale.com (Herring Robert-RA7055)
-Date: Mon, 7 Dec 2009 14:21:42 -0700
-Subject: [RFC][PATCH 03/10] arm: mxc: changes to common plat-mxc codetoadd
-	support for i.MX5
-In-Reply-To: <20091207200326.GU22533@pengutronix.de>
-References: <cover.1259893118.git.amit.kucheria@canonical.com>
-	<58eb7d14c6cf56cbc874657dff5789c47116b49e.1259893118.git.amit.kucheria@canonical.com>
-	<DE2504B3A515524BBE6934369EFDC0DA08C2A56C@az33exm20.fsl.freescale.net>
-	<20091204105908.GJ15126@pengutronix
-	<20091207200326.GU22533@pengutronix.de>
-Message-ID: <DE2504B3A515524BBE6934369EFDC0DA08C2A949@az33exm20.fsl.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Dec 2009 22:12:10 +0000
+Subject: [CFT:PATCH] Remove a seemingly unnecessary cache flush
+Message-ID: <20091207221210.GI26821@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert,
+While looking into the possible msync() issue (which turned out to be a
+non-issue - it's covered by clever code), I found that we're flushing
+the same page multiple times.
 
-> -----Original Message-----
-> From: Robert Schwebel [mailto:r.schwebel at pengutronix.de] 
-> Sent: Monday, December 07, 2009 2:03 PM
-> To: Herring Robert-RA7055
-> Cc: Sascha Hauer; Amit Kucheria; List Linux Kernel; 
-> grant.likely at secretlab.ca; valentin.longchamp at epfl.ch; 
-> daniel at caiaq.de; Nguyen Dinh-R00091; 
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [RFC][PATCH 03/10] arm: mxc: changes to common 
-> plat-mxc codetoadd support for i.MX5
-> 
-> Rob,
-> 
-> On Mon, Dec 07, 2009 at 10:17:52AM -0700, Herring Robert-RA7055 wrote:
-> > Sorry, my mistake. Sasha is correct that MX27 is v1 and MX25 is v2.
-> > 
-> > timer_is_v1 is just !timer_is_v2, so really only one is 
-> needed. I would
-> > define it like this to avoid having to change the timer 
-> code again for
-> > any new chips:
-> > 
-> > #define timer_is_v2()   (!(cpu_is_mx1() || cpu_is_mx21() ||
-> > cpu_is_mx27()))
-> 
-> Are you sure that FSL won't invent a v3 timer in the future?
+Normally, update_mmu_cache() would not be doing anything on architectures
+which don't have a software-loaded TLB.  However, we use this hook for
+two things:
 
-There is no change on my radar, and it has not changed in 5 years. As
-long as I'm around it won't change if I can help it. What is coming are
-chips with a mixture of i.MX and stmp (Sigmatel) blocks. So there could
-be a chip with the stmp timer, but it is completely different anyway.
+1. for our delayed flush_dcache_page().
+2. to fix up multiple shared write-able mappings of the same page.
 
-Regards,
-Rob
+However, as of 8 years ago, I committed this patch (sorry for the
+bkbits URL):
 
-> 
-> rsc
-> -- 
-> Pengutronix e.K.                           |                  
->            |
-> Industrial Linux Solutions                 | 
-> http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: 
-> +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   
-> +49-5121-206917-5555 |
-> 
-> 
+http://linux.bkbits.net:8080/linux-2.6/?PAGE=patch&REV=3dd7c1f9DypjNd1HyQFAOsA3p7mYig
+
+What the majority of that patch is doing is adding the user-mapping
+flushing to __flush_dcache_page() - that's fine, and it's explained in
+the changeset comments.
+
+It also tries to merge the new __flush_dcache_page() code inside
+make_coherent() - make_coherent() is sort-of already doing most of what
+__flush_dcache_page() does, and for good measure it does a final
+flush_cache_page().
+
+The unused addition of 'dirty' seems to suggest that this extra
+flush_cache_page should have been conditional on that.
+
+Moreover, this final flush_cache_page() should not be needed - the whole
+"delayed flush_dcache_page" thing only happens when there are no pre-
+existing mappings of the page, and so there should be no user mappings
+to worry about.
+
+Hence, I believe it is safe to get rid of this - but this patch will
+need some rigorous testing.  My ARM VersatilePB926 still boots without
+this additional patch - but that's not a very good test.  I can't say
+much more than that for the time being.
+
+Note: for ARMv6 and later, flush_cache_page() is a no-op, so please
+don't bother testing this patch there.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mm/fault-armv.c |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
+index 7296022..666a871 100644
+--- a/arch/arm/mm/fault-armv.c
++++ b/arch/arm/mm/fault-armv.c
+@@ -127,8 +127,6 @@ make_coherent(struct address_space *mapping, struct vm_area_struct *vma, unsigne
+ 	flush_dcache_mmap_unlock(mapping);
+ 	if (aliases)
+ 		adjust_pte(vma, addr);
+-	else
+-		flush_cache_page(vma, addr, pfn);
+ }
+ 
+ /*
