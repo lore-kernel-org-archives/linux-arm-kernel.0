@@ -1,41 +1,31 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sun, 06 Dec 2009 20:35:59 -0500 (EST)
-Subject: [PATCH 1/3] ARM: add base support for Marvell Dove SoC
-In-Reply-To: <20091206172306.GA787@n2100.arm.linux.org.uk>
-References: <1259084033-7283-1-git-send-email-saeed@marvell.com>
-	<1259084033-7283-2-git-send-email-saeed@marvell.com>
-	<20091206172306.GA787@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.0912062034340.31174@xanadu.home>
+From: mkl0301@hotmail.com (mkl lin)
+Date: Mon, 7 Dec 2009 03:13:32 +0000
+Subject: dma_cache_maint_contiguous should be patched as dma_cache_maint do
+Message-ID: <SNT109-W5018A3A559755D12BA4C73A7900@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 6 Dec 2009, Russell King - ARM Linux wrote:
 
-> On Tue, Nov 24, 2009 at 07:33:51PM +0200, Saeed Bishara wrote:
-> > diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> > index 9264d81..1549863 100644
-> > --- a/arch/arm/mm/Kconfig
-> > +++ b/arch/arm/mm/Kconfig
-> > @@ -388,7 +388,7 @@ config CPU_FEROCEON_OLD_ID
-> >  
-> >  # ARMv6
-> >  config CPU_V6
-> > -	bool "Support ARM V6 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
-> > +	bool "Support ARM V6 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX || ARCH_DOVE
-> 
-> Should I assume that the V6 processor is optional on Dove?  Does it run
-> without a processor present?  Probably not.
+hi,
 
-There is an ARMv7 option too.
+I'm new to this ML and kernel hacking, so please correct me if I'm wrong.
 
-> If so, then you don't want to append to this line - doing so makes the
-> option visible.  If your platform _always_ has a V6 processor, select
-> it just like everyone else does.
-> 
-> The only reason to extend that conditional is if a V6 processor is
-> to be optional.
+I had had an issue on USB data read, which is often incorrect. With the help of this ML and some luck, I think the following patch that patch dma_cache_maint should be applied to dma_cache_maint_contiguous, which is called by dma_cache_maint_page.
 
-It is.
+Broadcast the DMA cache operations on ARMv6 SMP hardware
+http://linux-arm.org/git?p=linux-2.6.git;a=commitdiff;h=f1c242dc5f326713578e469c9f5be647978ebe24
 
+Best Regrds,
+Mac LIn
 
-Nicolas
+ 		 	   		  
+_________________________________________________________________
+Windows Live: Friends get your Flickr, Yelp, and Digg updates when they e-mail you.
+http://www.microsoft.com/middleeast/windows/windowslive/see-it-in-action/social-network-basics.aspx?ocid=PID23461::T:WLMTAGL:ON:WL:en-xm:SI_SB_3:092010
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: patch
+Type: application/octet-stream
+Size: 772 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091207/9222ab68/attachment.obj>
