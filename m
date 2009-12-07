@@ -1,75 +1,83 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 07 Dec 2009 14:13:34 +0000
-Subject: [PATCH 3/6] Fix a race in the vfp_notifier() function on SMP systems
+Date: Mon, 07 Dec 2009 14:13:58 +0000
+Subject: [PATCH 4/6] ARMv7: Use lazy cache flushing if hardware broadcasts
+	cache operations
 In-Reply-To: <20091207135603.30429.74812.stgit@pc1117.cambridge.arm.com>
 References: <20091207135603.30429.74812.stgit@pc1117.cambridge.arm.com>
-Message-ID: <20091207141325.30429.13315.stgit@pc1117.cambridge.arm.com>
+Message-ID: <20091207141339.30429.28247.stgit@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vfp_notifier(THREAD_NOTIFY_RELEASE) maybe be called with thread->cpu
-different from the current one, causing a race condition with both the
-THREAD_NOTIFY_SWITCH path and vfp_support_entry().
+ARMv7 processors like Cortex-A9 broadcast the cache maintenance
+operations in hardware. The patch adds the CPU ID checks for such
+feature and allows the flush_dcache_page/update_mmu_cache pair to work
+in lazy flushing mode similar to the UP case.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/vfp/vfpmodule.c |   25 ++++++++++++++++++++++---
- 1 files changed, 22 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/smp_plat.h |    9 +++++++++
+ arch/arm/mm/fault-armv.c        |    2 --
+ arch/arm/mm/flush.c             |    9 ++++-----
+ 3 files changed, 13 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index 2d7423a..fa6692a 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -14,6 +14,7 @@
- #include <linux/signal.h>
- #include <linux/sched.h>
- #include <linux/init.h>
-+#include <linux/rcupdate.h>
- 
- #include <asm/thread_notify.h>
- #include <asm/vfp.h>
-@@ -49,14 +50,21 @@ static int vfp_notifier(struct notifier_block *self, unsigned long cmd, void *v)
- 
- #ifdef CONFIG_SMP
- 		/*
-+		 * RCU locking is needed in case last_VFP_context[cpu] is
-+		 * released on a different CPU.
-+		 */
-+		rcu_read_lock();
-+		vfp = last_VFP_context[cpu];
-+		/*
- 		 * On SMP, if VFP is enabled, save the old state in
- 		 * case the thread migrates to a different CPU. The
- 		 * restoring is done lazily.
- 		 */
--		if ((fpexc & FPEXC_EN) && last_VFP_context[cpu]) {
--			vfp_save_state(last_VFP_context[cpu], fpexc);
--			last_VFP_context[cpu]->hard.cpu = cpu;
-+		if ((fpexc & FPEXC_EN) && vfp) {
-+			vfp_save_state(vfp, fpexc);
-+			vfp->hard.cpu = cpu;
- 		}
-+		rcu_read_unlock();
- 		/*
- 		 * Thread migration, just force the reloading of the
- 		 * state on the new CPU in case the VFP registers
-@@ -91,8 +99,19 @@ static int vfp_notifier(struct notifier_block *self, unsigned long cmd, void *v)
- 	}
- 
- 	/* flush and release case: Per-thread VFP cleanup. */
-+#ifndef CONFIG_SMP
- 	if (last_VFP_context[cpu] == vfp)
- 		last_VFP_context[cpu] = NULL;
-+#else
-+	/*
-+	 * Since release_thread() may be called from a different CPU, we use
-+	 * cmpxchg() here to avoid a race with the vfp_support_entry() code
-+	 * which modifies last_VFP_context[cpu]. Note that on SMP systems, a
-+	 * STR instruction on a different CPU clears the global exclusive
-+	 * monitor state.
-+	 */
-+	(void)cmpxchg(&last_VFP_context[cpu], vfp, NULL);
-+#endif
- 
- 	return NOTIFY_DONE;
+diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
+index 59303e2..e587167 100644
+--- a/arch/arm/include/asm/smp_plat.h
++++ b/arch/arm/include/asm/smp_plat.h
+@@ -13,4 +13,13 @@ static inline int tlb_ops_need_broadcast(void)
+ 	return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 2;
  }
+ 
++#ifndef CONFIG_SMP
++#define cache_ops_need_broadcast()	0
++#else
++static inline int cache_ops_need_broadcast(void)
++{
++	return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 1;
++}
++#endif
++
+ #endif
+diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
+index d0d17b6..bb60117 100644
+--- a/arch/arm/mm/fault-armv.c
++++ b/arch/arm/mm/fault-armv.c
+@@ -153,10 +153,8 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr, pte_t pte)
+ 
+ 	page = pfn_to_page(pfn);
+ 	mapping = page_mapping(page);
+-#ifndef CONFIG_SMP
+ 	if (test_and_clear_bit(PG_dcache_dirty, &page->flags))
+ 		__flush_dcache_page(mapping, page);
+-#endif
+ 	if (mapping) {
+ 		if (cache_is_vivt())
+ 			make_coherent(mapping, vma, addr, pfn);
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index 7f294f3..2d3325d 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -15,6 +15,7 @@
+ #include <asm/cachetype.h>
+ #include <asm/system.h>
+ #include <asm/tlbflush.h>
++#include <asm/smp_plat.h>
+ 
+ #include "mm.h"
+ 
+@@ -198,12 +199,10 @@ void flush_dcache_page(struct page *page)
+ {
+ 	struct address_space *mapping = page_mapping(page);
+ 
+-#ifndef CONFIG_SMP
+-	if (!PageHighMem(page) && mapping && !mapping_mapped(mapping))
++	if (!cache_ops_need_broadcast() &&
++	    !PageHighMem(page) && mapping && !mapping_mapped(mapping))
+ 		set_bit(PG_dcache_dirty, &page->flags);
+-	else
+-#endif
+-	{
++	else {
+ 		__flush_dcache_page(mapping, page);
+ 		if (mapping && cache_is_vivt())
+ 			__flush_dcache_aliases(mapping, page);
