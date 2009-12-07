@@ -1,48 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Dec 2009 17:17:31 +0000
-Subject: shared memory problem on ARM v5TE using threads
-In-Reply-To: <alpine.LFD.2.00.0912071048030.31174@xanadu.home>
-References: <4B196473.2040407@denx.de>
-	<309002C0DA137042828828FC53D7A9347E212D1152@IL-MB01.marvell.com>
-	<20091206141601.GB28932@n2100.arm.linux.org.uk>
-	<c70ff3ad0912070331y751900dbj62847dddb8521f4d@mail.gmail.com>
-	<20091207114218.GA19348@n2100.arm.linux.org.uk>
-	<4B1CF3ED.9080307@denx.de>
-	<309002C0DA137042828828FC53D7A9347E212D150D@IL-MB01.marvell.com>
-	<20091207145235.GD19348@n2100.arm.linux.org.uk>
-	<20091207154019.GA26821@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0912071048030.31174@xanadu.home>
-Message-ID: <20091207171731.GC26821@n2100.arm.linux.org.uk>
+From: ra7055@freescale.com (Herring Robert-RA7055)
+Date: Mon, 7 Dec 2009 10:17:52 -0700
+Subject: [RFC][PATCH 03/10] arm: mxc: changes to common plat-mxc codeto
+	add support for i.MX5
+In-Reply-To: <20091204105908.GJ15126@pengutronix.de>
+References: <cover.1259893118.git.amit.kucheria@canonical.com>
+	<58eb7d14c6cf56cbc874657dff5789c47116b49e.1259893118.git.amit.kucheria@canonical.com>
+	<DE2504B3A515524BBE6934369EFDC0DA08C2A56C@az33exm20.fsl.freescale.net>
+	<20091204083451.GG15126@pengutronix
+	<20091204105908.GJ15126@pengutronix.de>
+Message-ID: <DE2504B3A515524BBE6934369EFDC0DA08C2A879@az33exm20.fsl.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2009 at 10:57:00AM -0500, Nicolas Pitre wrote:
-> Last time I checked the Feroceon doc, there was no way to have inner 
-> non-cacheable outer write-back behavior.  And as I mentioned in my 
-> previous email, while debugging the issue on an XSC3, the TEX=111 CB=00 
-> combination didn't appear to behave as expected (no one bothered to 
-> verify my findings at the time either).
+Sasha, Amit,
 
-Probably because either no one cared or no one had the hardware to be
-able to check.
+> -----Original Message-----
+> From: Sascha Hauer [mailto:s.hauer at pengutronix.de] 
+> Sent: Friday, December 04, 2009 4:59 AM
+> To: Amit Kucheria
+> Cc: Herring Robert-RA7055; List Linux Kernel; 
+> linux-arm-kernel at lists.infradead.org; 
+> valentin.longchamp at epfl.ch; daniel at caiaq.de; 
+> grant.likely at secretlab.ca; Nguyen Dinh-R00091
+> Subject: Re: [RFC][PATCH 03/10] arm: mxc: changes to common 
+> plat-mxc codeto add support for i.MX5
+> 
+> On Fri, Dec 04, 2009 at 12:31:02PM +0200, Amit Kucheria wrote:
+> > Some comments below:
+> > 
+> > On 09 Dec 04, Sascha Hauer wrote:
+> > > On Thu, Dec 03, 2009 at 08:12:58PM -0700, Herring 
+> Robert-RA7055 wrote:
+> > > > Amit,
+> > > > 
+> > > > I would suggest you refactor the timer code into 
+> version 1 and version 2
+> > > > either as 2 separate files or with a timer_is_v2() 
+> function rather than
+> > > > the mess of cpu_is_X macros it currently has. 
+> Essentially there are 2
+> > > > versions of the timer hardware. Version 1 is found on 
+> MX1/MXL and MX21.
+> > > > Version 2 is found on MX25, MX27, MX31, MX35, MX37, 
+> MX51, and future
+> > > > parts. I will send you what we have done in our tree.
+> > > Like this:
+> > > 
+> > > 
+> > > commit ed6bbc59e3f6b33b48a0d5ac053220cd318ceee7
+> > > Author: Sascha Hauer <s.hauer@pengutronix.de>
+> > > Date:   Tue Nov 17 16:31:13 2009 +0100
+> > > 
+> > >     mxc timer: Add mx51 support
+> > >     
+> > >     Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > > 
+> > > diff --git a/arch/arm/plat-mxc/time.c b/arch/arm/plat-mxc/time.c
+> > > index 844567e..0c45509 100644
+> > > --- a/arch/arm/plat-mxc/time.c
+> > > +++ b/arch/arm/plat-mxc/time.c
+> > > @@ -57,6 +57,9 @@
+> > >  #define MX3_TCN			0x24
+> > >  #define MX3_TCMP		0x10
+> > >  
+> > > +#define timer_is_v1()	(cpu_is_mx1() || cpu_is_mx27())
+> >                                                         ^^^^
+> >                                       Shouldn't this be 
+> mx21 according to
+> > 				      Rob's comment?
+> 
+> i.MX1, i.MX21 and i.MX27 are identical, at least that's what the code
+> shows, so it should be:
+> 
+> #define timer_is_v1()      (cpu_is_mx1() || cpu_is_mx21() || 
+> cpu_is_mx27())
+> #define timer_is_v2()      (cpu_is_mx3() || cpu_is_mx25() || 
+> cpu_is_mx51() || cpu_is_mxc91231())
 
-> So I concluded that there is no 
-> such thing as inner non-cacheable outer write-back on ARMv5.  This was 
-> consigned in commit 08e445bd6a.
+Sorry, my mistake. Sasha is correct that MX27 is v1 and MX25 is v2.
 
-Well, there is no such thing as L2 cache on ARMv5 architecture.  L2 cache
-is present on Xscale3 and Feroceon purely as a CPU vendor addition.
+timer_is_v1 is just !timer_is_v2, so really only one is needed. I would
+define it like this to avoid having to change the timer code again for
+any new chips:
 
-On Xscale3, it was extended to have the TEX bits in the page table.
-However, Feroceon, being an independently designed CPU, appears to have
-L2 cache but without the TEX bits - which gives us less options to solve
-this issue.
+#define timer_is_v2()   (!(cpu_is_mx1() || cpu_is_mx21() ||
+cpu_is_mx27()))
 
-However, I don't think tricks like making all shared writable mappings
-uncacheable is going to fix it either as I mentioned in my previous
-message.
-
-Consider the effect of that kind of fix: take for instance a SHM mapping
-between the X server and a client for transferring bitmap data (eg,
-mplayer).  Do we really want it marked non-cacheable?  I think you can
-say goodbye to video playback on these platforms.
+Regards,
+Rob
+ 
