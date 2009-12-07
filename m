@@ -1,19 +1,25 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 7 Dec 2009 11:49:11 +0000
-Subject: [PATCH] leds: Add LED class driver for regulator driven LEDs.
-In-Reply-To: <20091204135757.d7533e20.ospite@studenti.unina.it>
-References: <1259775625-25973-1-git-send-email-ospite@studenti.unina.it>
-	<1259778235.3588.141.camel@odin>
-	<20091202213131.1393a956.ospite@studenti.unina.it>
-	<20091202204121.GB18311@rakim.wolfsonmicro.main>
-	<20091204135757.d7533e20.ospite@studenti.unina.it>
-Message-ID: <20091207114911.GB26965@rakim.wolfsonmicro.main>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Dec 2009 12:04:11 +0000
+Subject: [patch 1/4] [ARM] mmp: support PJ4 core
+In-Reply-To: <771cded00912062218w1296d9eem32ead5466b675838@mail.gmail.com>
+References: <771cded00912062218w1296d9eem32ead5466b675838@mail.gmail.com>
+Message-ID: <20091207120411.GB19348@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 04, 2009 at 01:57:57PM +0100, Antonio Ospite wrote:
+On Mon, Dec 07, 2009 at 01:18:50AM -0500, Haojian Zhuang wrote:
+> >From e4abbf0b65f7581867bbca492741fe5617bc346d Mon Sep 17 00:00:00 2001
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date: Fri, 4 Dec 2009 08:35:17 -0500
+> Subject: [PATCH] [ARM] mmp: support PJ4 core
+> 
+> Marvell PJ4 core is compatible to ARMv6 architecture.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 
-> This is the incremental change I have in mind; if it's ok, then
-> a v2 is on its way.
+Saeed Bishara already submitted this as part of the Marvell Dove
+patchset - though it looks like it should've been submitted separately
+as you have done (since the core is a shared entity.)
 
-Yes, this looks reasonable I think.
+Shouldn't Lennert's sign-off also be on this patch (did it originate
+from the Dove folk?)
