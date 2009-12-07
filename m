@@ -1,23 +1,104 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 7 Dec 2009 05:58:07 -0700 (MST)
-Subject: [PATCH 0/8] OMAP clock: convert static definitions in header
-	files to C files
-In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB030ABC2908@dbde02.ent.ti.com>
-References: <5A47E75E594F054BAF48C5E4FC4B92AB030ABC2908@dbde02.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.0912070557130.7084@utopia.booyaka.com>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Mon, 7 Dec 2009 14:38:32 +0100
+Subject: [PATCH 02/10] support 88pm8606 in 860x driver
+In-Reply-To: <771cded00912070447t1b1b5105m4ade492b2bc7e70d@mail.gmail.com>
+References: <771cded00911130054p2ef293ebse84b1de3cf4fa9fd@mail.gmail.com>
+	<20091120150215.GF3733@sortiz.org>
+	<771cded00911211625g74601e5die59a680f36903cb3@mail.gmail.com>
+	<20091127145820.GA3640@sortiz.org>
+	<771cded00911291743u76688d24ja40a30472ebd6af8@mail.gmail.com>
+	<20091130101943.GA3696@sortiz.org>
+	<771cded00912062334q7f92bf25hb9e7a10f8720812@mail.gmail.com>
+	<20091207113927.GB7279@sortiz.org>
+	<20091207131508.3ed89841@hyperion.delvare>
+	<771cded00912070447t1b1b5105m4ade492b2bc7e70d@mail.gmail.com>
+Message-ID: <20091207143832.68db35c7@hyperion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra et al,
+On Mon, 7 Dec 2009 07:47:44 -0500, Haojian Zhuang wrote:
+> >
+> > Some more background would be welcome, yes. In particular on how the
+> > 8806 and 8807 relate to each other, and what kind of chips they are.
+> > And what problem you are trying to solve in the first place ;)
+> 
+> These two chips can be used together for power management. 8807 is
+> focus on regulator, RTC, touch, vibrator. 8806 is focus on backlight,
+> led, charger, and so on. When charger is in use, it also need to
+> access registers in 8807. In original implementation, one static mixed
+> structure is defined to link these two chips together. One i2c driver
+> was serviced for both 8806 and 8807 by i2c id table. Now Samuel is
+> help me to remove the static mixed structure.
 
-On Fri, 4 Dec 2009, Nayak, Rajendra wrote:
+I agree that a static structure is not a good idea and it's better to
+avoid it if possible.
 
-> Some patches in this series seem to be missing, specifically 5/8 and 6/8.
-> Can you please re-post?
+> User can use them together or use only one.
 
-They are now posted at:
+By "user" you mean hardware designer? Or end-user?
 
-    http://www.pwsan.com/omap/patches/clk_twist/
+> > In any case, you never get to duplicate the i2c-pxa driver code
+> > anywhere. If you have several I2C bus segments controlled by PXA-like
+> > hardware, then you instantiate that many i2c_adapters, all driven by
+> > the same driver (i2c-pxa.)
+> >
+> > Calling i2c_new_device() from an i2c client's probe() routine is rather
+> > unusual. I can't really think of a good reason to do this. If the first
+> > client was declared as part of platform init data, I'd expect the
+> > second to be declared there as well.
+> >
+> > There's one which is somewhat similar though: chips which reply to more
+> > than one I2C address. The extra addresses are reserved using
+> > i2c_new_dummy(). This gives you an i2c_client handle for easy register
+> > access. This might be suitable for the problem at hand, but I can't
+> > tell for sure without knowing the details.
+> >
+> 
+> Does it mean that i2c_new_dummy()/i2c_new_device() is doing the same
+> thing like declaring of i2c chip in platform init data?
 
+i2c_new_device() is indeed very similar to declaring the i2c chip in
+platform init data. The key difference is that you need an i2c_adapter
+handle for i2c_new_device(), while the adapter is referenced by its
+number in the platform init data.
 
-- Paul
+i2c_new_dummy() is a little different, it doesn't create a real device,
+no probe/remove method will be called. It only reserves a given I2C
+address (on the specified adapter) for your own use.
+
+Now that I understand better what problem you are trying to solve, here
+are a few hints.
+
+As suggested by Samuel, you can have a single device declared in the
+platform init data. Attach custom data to this device, where you
+declare if the other chip is present and at which address it lives.
+Then in the probe() function of the driver, check the data and call
+i2c_new_dummy() on the address in question if present.
+
+There are constraints and requirements to this approach: both chips
+must be connected to the same I2C adapter, the same driver must handle
+both devices, and your driver must be ready to deal with the main device
+being either a 8807 or a 8806, and the secondary chip being present or
+not. Shouldn't be overly difficult though.
+
+Calling i2c_new_device() instead of i2c_new_dummy() may lead to cleaner
+driver code, however I am far from certain than i2c-core will let you
+do it. It might deadlock. I just don't know.
+
+An alternative approach is to declare both devices as part of the
+platform init data, and let them be registered separately. Then have a
+dedicated registration/removal calls at the end of the probe() method /
+beginning of the remove() method. The registration function would track
+which devices are up and operational, and when it spots two devices
+which would work together, it adds the respective information to each
+device so that it can reach its sibling. The removal function would
+clean up the links when either sibling is removed.
+
+This also has limitations, as you need a way to decide which devices go
+by pair. But assuming that both devices are always on the same I2C
+adapter, it shouldn't be too difficult. It is probably cleaner than the
+other options, as it is symmetrical, but it might be overkill depending
+on the cases you really must handle in practice.
+
+-- 
+Jean Delvare
