@@ -1,138 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Dec 2009 17:56:08 +0000
-Subject: shared memory problem on ARM v5TE using threads
-In-Reply-To: <alpine.LFD.2.00.0912071219100.31174@xanadu.home>
-References: <309002C0DA137042828828FC53D7A9347E212D1152@IL-MB01.marvell.com>
-	<20091206141601.GB28932@n2100.arm.linux.org.uk>
-	<c70ff3ad0912070331y751900dbj62847dddb8521f4d@mail.gmail.com>
-	<20091207114218.GA19348@n2100.arm.linux.org.uk>
-	<4B1CF3ED.9080307@denx.de>
-	<309002C0DA137042828828FC53D7A9347E212D150D@IL-MB01.marvell.com>
-	<20091207145235.GD19348@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0912071027480.31174@xanadu.home>
-	<20091207170546.GB26821@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0912071219100.31174@xanadu.home>
-Message-ID: <20091207175608.GE26821@n2100.arm.linux.org.uk>
+From: ra7055@freescale.com (Herring Robert-RA7055)
+Date: Mon, 7 Dec 2009 11:06:14 -0700
+Subject: [RFC][PATCH 03/10] arm: mxc: changes to common plat-mxc codeto
+	add support for i.MX5
+In-Reply-To: <20091204083451.GG15126@pengutronix.de>
+References: <cover.1259893118.git.amit.kucheria@canonical.com>
+	<58eb7d14c6cf56cbc874657dff5789c47116b49e.1259893118.git.amit.kucheria@canonical.com>
+	<DE2504B3A515524BBE6934369EFDC0DA08C2A56C@az33exm20.fsl.freescale.net>
+	<20091204083451.GG15126@pengutronix.de>
+Message-ID: <DE2504B3A515524BBE6934369EFDC0DA08C2A8A7@az33exm20.fsl.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2009 at 12:33:20PM -0500, Nicolas Pitre wrote:
-> On Mon, 7 Dec 2009, Russell King - ARM Linux wrote:
-> > It seems the original commit (08e445bd6a) only partly addresses the problem;
-> > it's broken in so many other ways, as is highlighted by this test case.
-> > Was it originally created for Xscale3 or Feroceon?  Was the problem actually
-> > found to exist on Xscale3 and Feroceon?
-> 
-> It fixed a test case that was discovered on XSC3 and turned up to be 
-> valid on Feroceon as well.  I probably have the source for it somewhere.  
-> The case was multiple mmap() of the same memory area within the same 
-> process.  I think (but that needs confirmation) that this fixed a real 
-> life db4 issue as well.
+Sasha,
 
-I have a test case for this as well.
+> @@ -296,7 +299,7 @@ void __init mxc_timer_init(struct clk 
+> *timer_clk, void __iomem *base, int irq)
+>  	__raw_writel(0, timer_base + MXC_TCTL);
+>  	__raw_writel(0, timer_base + MXC_TPRER); /* see 
+> datasheet note */
+>  
+> -	if (cpu_is_mx3() || cpu_is_mx25())
+> +	if (timer_is_v2())
+>  		tctl_val = MX3_TCTL_CLK_IPG | MX3_TCTL_FRR | 
+> MX3_TCTL_WAITEN | MXC_TCTL_TEN;
 
-> > Any read or write via another cacheable mapping will result in the L2
-> > being loaded with data.  One instance is as shown in the original posters
-> > test program - where a shared writable mapping exists in another process.
-> > 
-> > Another case would be having a shared writable mapping, and using read()/
-> > write() on the mapped file.  This is normally taken care of with
-> > flush_dcache_page(), but this does not do any L2 cache maintainence on
-> > Feroceon.
-> 
-> I thought those were already handled by making L1 uncacheable (and L2 
-> cleaned) as soon as a second user of a shared mapping was 
-> encountered.
+The timer clock input needs to be per_clk, not ipg_clk on MX51. It is
+safe to always be set to per_clk because per_clk == ipg_clk on MX31/35
+and MX27 IIRC. This makes the clock constant even with cpu and bus
+scaling and allows disabling of PLLs.
 
-That doesn't work - the kernel mapping will still be cacheable, and it is
-the kernel mapping that read() and write() will use.  Their coherency
-issue is resolved by flush_dcache_page() performed _before_ the access
-(note: there is no coherency after a write access, so WBWA caches are
-probably broken wrt this.)
+#define MX3_TCTL_CLK_PER       (2 << 6)
 
-So:
-	Process/Thread
-	1/1		2/1		2/2		3/1	kernel
-	map(MAP_SHARED)	map(MAP_SHARED)	map(MAP_SHARED)
-	write mapping
-								flush L1
-			read mapping
-					read mapping
+       if (timer_is_v2())
+               tctl_val = MX3_TCTL_CLK_PER | MX3_TCTL_FRR |
+MX3_TCTL_WAITEN | MXC_TCTL_TEN;
 
-Now, lets say we flush the L1 and L2 caches, and we mark all these
-mappings uncachable.  Now, another process does a read from the file
-backing this mapping:
-
-								flush L1
-							read
-								flush_dcache_page()
-								read data
-								(loads L2 cache)
-								flush L1
-	write mapping
-	(does not hit L2)
-								flush L1
-			read mapping
-			(does not hit L2,
-			sees data from 1/1)
-					read mapping
-					(does not hit L2,
-					sees data from 1/1)
-								flush L1
-							read
-								flush_dcache_page()
-								read data
-								(from L2 cache
-								 and doesn't
-								 see updates
-								 from 1/1)
-
-What I'm slightly more worried about as well is whether PIO writeouts
-will write the data from process 1/1 onto disk.
-
-> > Another case is any kind of mmap() of the same file - in other words, it
-> > doesn't have to be another shared mmap to bring data into the L2 cache.
-> 
-> But that case is fine, no?  L2 being PIPT you get the same cached data 
-> for both mappings, and a write will COW the page.
-
-The point is its a way to get data into the L2 cache, which will be
-visible via other cachable mappings and mask the shared-mapped updates.
-I wasn't considering a COW to a private mapping.
-
-> > Now, at first throught, if we disable the cache for all shared writable
-> > mappings in addition to what we're already doing, does this solve the
-> > problem?  Well, it means that the writes will bypass the caches and hit
-> > the RAM directly.  The reads from the other shared mappings will read
-> > direct from the RAM.
-> > 
-> > A private mapping using the same page will use the same page, and it
-> > will not be marked uncacheable.  Accesses to it will draw data into the
-> > L2 cache.
-> 
-> Hmmm...
-> 
-> > PIO kernel mode accesses will also use the cached copy, and that _is_
-> > a problem - it means when we update the backing file on disk, we'll
-> > write out the L2 cached data rather than what really should be written
-> > out - the updated data from the writable shared mappings.
-> > 
-> > So it seems that at least these affected CPUs need flush_dcache_page()
-> > to also do L2 cache maintainence.  I don't think that's enough to cover
-> > all cases though - it probably also needs to do L2 cache maintainence
-> > in all the other flush_cache_* functions as well.
-> 
-> /me starts to feel the head ache
-
-You're not the only one...
-
-I'm going to try and prove the msync() problem I mentioned at the end of
-my mail - it's probably going to be easier to prove and solve (and impacts
-more ARM CPUs than this problem.)
-
-As for this problem, I'm not certain what the solution is.
-
-In the mean time, as a work-around, I suggest that any CPU with L1 VIVT
-cache (which thereby requires the make_coherent() code) has its L2 cache
-disabled.  That should at least allow the system to behave as correctly
-as it does for other ARM VIVT CPUs.
+Regards,
+Rob
