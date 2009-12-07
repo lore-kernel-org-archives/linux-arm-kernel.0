@@ -1,22 +1,28 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 7 Dec 2009 18:30:56 +0000
-Subject: MXC: MC13783 Voltage regulation full support
-In-Reply-To: <20091207182229.GA25509@pengutronix.de>
-References: <1260199017.2166.14.camel@climbing-alby>
-	<20091207182229.GA25509@pengutronix.de>
-Message-ID: <20091207183056.GB9018@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Dec 2009 18:39:57 +0000
+Subject: [PATCH V2] ARM: NUC900: add GDMA driver support for nuc900
+	platform
+In-Reply-To: <713d0d430912071011w76600af1l867d8f52b61d53da@mail.gmail.com>
+References: <713d0d430911260242j579d86b3r7eeade0007d2a94c@mail.gmail.com>
+	<20091129121614.GA11445@n2100.arm.linux.org.uk>
+	<713d0d430912070753o28a8d538qa71b8af8c4415d73@mail.gmail.com>
+	<20091207171851.GD26821@n2100.arm.linux.org.uk>
+	<713d0d430912071011w76600af1l867d8f52b61d53da@mail.gmail.com>
+Message-ID: <20091207183957.GF26821@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2009 at 07:22:29PM +0100, Uwe Kleine-K?nig wrote:
-> On Mon, Dec 07, 2009 at 04:16:57PM +0100, Alberto Panizzo wrote:
+.yleritne selif eht gniteled eb ot sraeppa tI
 
-> > Or are there some problems pending that explain why the present driver
-> > can only enable or disable regulators? 
+On Tue, Dec 08, 2009 at 02:11:38AM +0800, Hu Ruihuan wrote:
+> yes,why?
+> 
+> 2009/12/8 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> > On Mon, Dec 07, 2009 at 11:53:39PM +0800, Hu Ruihuan wrote:
+> >> Hi,Russell
+> >> ? Thank you for your advice, it's my patch below follow your advice.
+> >
+> > Did you look at the patch before you sent it?
+> >
 
-> I think the only problem was that Sascha havn't had the need for full
-> regulators and so didn't invest the time.  Note that the driver changed
-> in next if you plan to send patches.
-
-The hardware can certainly work with the API, the Freescale drivers have
-done so for a while.
+(My reply is backwards because you've top-posted.  Please don't do that.)
