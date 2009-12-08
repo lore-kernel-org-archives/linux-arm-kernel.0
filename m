@@ -1,122 +1,154 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue,  8 Dec 2009 02:07:23 +0000
-Subject: [[clock v2]] ARM: S3C64XX: Remove unused clock definitions from clock
-	header
+Date: Tue,  8 Dec 2009 02:07:25 +0000
+Subject: [[clock v2]] ARM: S3C64XX: Fixup .reg_src and .reg_div with named
+	initialisers
 In-Reply-To: <1260238045-12694-1-git-send-email-ben-linux@fluff.org>
 References: <1260238045-12694-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1260238045-12694-7-git-send-email-ben-linux@fluff.org>
+Message-ID: <1260238045-12694-9-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Harald Welte <laforge@gnumonks.org>
+Change these two fields to have named initialisers as per the
+review comments from Kyungmin Park.
 
-Clean out the definitions we are no longer using after the new clock
-code updates.
+sed used:
 
-Signed-off-by: Harald Welte <laforge@gnumonks.org>
-[ben-linux at fluff.org: split from initial patch provided]
+s@\.reg_src\(.*\)=\(.*\){\(.*\),\(.*\),\(.*\)}@.reg_src\1=\2{ .reg =\3, .shift =\4, .size =\5 }@g
+
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/plat-s3c64xx/include/plat/regs-clock.h |   71 +----------------------
- 1 files changed, 1 insertions(+), 70 deletions(-)
+ arch/arm/plat-s3c64xx/s3c6400-clock.c |   28 ++++++++++++++--------------
+ 1 files changed, 14 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/plat-s3c64xx/include/plat/regs-clock.h b/arch/arm/plat-s3c64xx/include/plat/regs-clock.h
-index ff46e7f..3ef6274 100644
---- a/arch/arm/plat-s3c64xx/include/plat/regs-clock.h
-+++ b/arch/arm/plat-s3c64xx/include/plat/regs-clock.h
-@@ -35,14 +35,6 @@
- #define S3C_MEM0_GATE		S3C_CLKREG(0x3C)
+diff --git a/arch/arm/plat-s3c64xx/s3c6400-clock.c b/arch/arm/plat-s3c64xx/s3c6400-clock.c
+index 79e4bd7..8f6a0d1 100644
+--- a/arch/arm/plat-s3c64xx/s3c6400-clock.c
++++ b/arch/arm/plat-s3c64xx/s3c6400-clock.c
+@@ -68,7 +68,7 @@ static struct clksrc_clk clk_mout_apll = {
+ 		.name		= "mout_apll",
+ 		.id		= -1,
+ 	},
+-	.reg_src	= { S3C_CLK_SRC, 0, 1 },
++	.reg_src	= { .reg = S3C_CLK_SRC, .shift = 0, .size = 1  },
+ 	.sources	= &clk_src_apll,
+ };
  
- /* CLKDIV0 */
--#define S3C6400_CLKDIV0_MFC_MASK	(0xf << 28)
--#define S3C6400_CLKDIV0_MFC_SHIFT	(28)
--#define S3C6400_CLKDIV0_JPEG_MASK	(0xf << 24)
--#define S3C6400_CLKDIV0_JPEG_SHIFT	(24)
--#define S3C6400_CLKDIV0_CAM_MASK	(0xf << 20)
--#define S3C6400_CLKDIV0_CAM_SHIFT	(20)
--#define S3C6400_CLKDIV0_SECURITY_MASK	(0x3 << 18)
--#define S3C6400_CLKDIV0_SECURITY_SHIFT	(18)
- #define S3C6400_CLKDIV0_PCLK_MASK	(0xf << 12)
- #define S3C6400_CLKDIV0_PCLK_SHIFT	(12)
- #define S3C6400_CLKDIV0_HCLK2_MASK	(0x7 << 9)
-@@ -51,42 +43,11 @@
- #define S3C6400_CLKDIV0_HCLK_SHIFT	(8)
- #define S3C6400_CLKDIV0_MPLL_MASK	(0x1 << 4)
- #define S3C6400_CLKDIV0_MPLL_SHIFT	(4)
-+
- #define S3C6400_CLKDIV0_ARM_MASK	(0x7 << 0)
- #define S3C6410_CLKDIV0_ARM_MASK	(0xf << 0)
- #define S3C6400_CLKDIV0_ARM_SHIFT	(0)
+@@ -92,7 +92,7 @@ static struct clksrc_clk clk_mout_epll = {
+ 		.name		= "mout_epll",
+ 		.id		= -1,
+ 	},
+-	.reg_src	= { S3C_CLK_SRC, 2, 1 },
++	.reg_src	= { .reg = S3C_CLK_SRC, .shift = 2, .size = 1  },
+ 	.sources	= &clk_src_epll,
+ };
  
--/* CLKDIV1 */
--#define S3C6410_CLKDIV1_FIMC_MASK	(0xf << 24)
--#define S3C6410_CLKDIV1_FIMC_SHIFT	(24)
--#define S3C6400_CLKDIV1_UHOST_MASK	(0xf << 20)
--#define S3C6400_CLKDIV1_UHOST_SHIFT	(20)
--#define S3C6400_CLKDIV1_SCALER_MASK	(0xf << 16)
--#define S3C6400_CLKDIV1_SCALER_SHIFT	(16)
--#define S3C6400_CLKDIV1_LCD_MASK	(0xf << 12)
--#define S3C6400_CLKDIV1_LCD_SHIFT	(12)
--#define S3C6400_CLKDIV1_MMC2_MASK	(0xf << 8)
--#define S3C6400_CLKDIV1_MMC2_SHIFT	(8)
--#define S3C6400_CLKDIV1_MMC1_MASK	(0xf << 4)
--#define S3C6400_CLKDIV1_MMC1_SHIFT	(4)
--#define S3C6400_CLKDIV1_MMC0_MASK	(0xf << 0)
--#define S3C6400_CLKDIV1_MMC0_SHIFT	(0)
--
--/* CLKDIV2 */
--#define S3C6410_CLKDIV2_AUDIO2_MASK	(0xf << 24)
--#define S3C6410_CLKDIV2_AUDIO2_SHIFT	(24)
--#define S3C6400_CLKDIV2_IRDA_MASK	(0xf << 20)
--#define S3C6400_CLKDIV2_IRDA_SHIFT	(20)
--#define S3C6400_CLKDIV2_UART_MASK	(0xf << 16)
--#define S3C6400_CLKDIV2_UART_SHIFT	(16)
--#define S3C6400_CLKDIV2_AUDIO1_MASK	(0xf << 12)
--#define S3C6400_CLKDIV2_AUDIO1_SHIFT	(12)
--#define S3C6400_CLKDIV2_AUDIO0_MASK	(0xf << 8)
--#define S3C6400_CLKDIV2_AUDIO0_SHIFT	(8)
--#define S3C6400_CLKDIV2_SPI1_MASK	(0xf << 4)
--#define S3C6400_CLKDIV2_SPI1_SHIFT	(4)
--#define S3C6400_CLKDIV2_SPI0_MASK	(0xf << 0)
--#define S3C6400_CLKDIV2_SPI0_SHIFT	(0)
--
- /* HCLK GATE Registers */
- #define S3C_CLKCON_HCLK_3DSE	(1<<31)
- #define S3C_CLKCON_HCLK_UHOST	(1<<29)
-@@ -192,34 +153,4 @@
- #define S3C6400_CLKSRC_EPLL_MOUT_SHIFT	(2)
- #define S3C6400_CLKSRC_MFC		(1 << 4)
+@@ -111,7 +111,7 @@ static struct clksrc_clk clk_mout_mpll = {
+ 		.name		= "mout_mpll",
+ 		.id		= -1,
+ 	},
+-	.reg_src	= { S3C_CLK_SRC, 1, 1 },
++	.reg_src	= { .reg = S3C_CLK_SRC, .shift = 1, .size = 1  },
+ 	.sources	= &clk_src_mpll,
+ };
  
--#define S3C6410_CLKSRC_TV27_MASK	(0x1 << 31)
--#define S3C6410_CLKSRC_TV27_SHIFT	(31)
--#define S3C6410_CLKSRC_DAC27_MASK	(0x1 << 30)
--#define S3C6410_CLKSRC_DAC27_SHIFT	(30)
--#define S3C6400_CLKSRC_SCALER_MASK	(0x3 << 28)
--#define S3C6400_CLKSRC_SCALER_SHIFT	(28)
--#define S3C6400_CLKSRC_LCD_MASK		(0x3 << 26)
--#define S3C6400_CLKSRC_LCD_SHIFT	(26)
--#define S3C6400_CLKSRC_IRDA_MASK	(0x3 << 24)
--#define S3C6400_CLKSRC_IRDA_SHIFT	(24)
--#define S3C6400_CLKSRC_MMC2_MASK	(0x3 << 22)
--#define S3C6400_CLKSRC_MMC2_SHIFT	(22)
--#define S3C6400_CLKSRC_MMC1_MASK	(0x3 << 20)
--#define S3C6400_CLKSRC_MMC1_SHIFT	(20)
--#define S3C6400_CLKSRC_MMC0_MASK	(0x3 << 18)
--#define S3C6400_CLKSRC_MMC0_SHIFT	(18)
--#define S3C6400_CLKSRC_SPI1_MASK	(0x3 << 16)
--#define S3C6400_CLKSRC_SPI1_SHIFT	(16)
--#define S3C6400_CLKSRC_SPI0_MASK	(0x3 << 14)
--#define S3C6400_CLKSRC_SPI0_SHIFT	(14)
--#define S3C6400_CLKSRC_UART_MASK	(0x1 << 13)
--#define S3C6400_CLKSRC_UART_SHIFT	(13)
--#define S3C6400_CLKSRC_AUDIO1_MASK	(0x7 << 10)
--#define S3C6400_CLKSRC_AUDIO1_SHIFT	(10)
--#define S3C6400_CLKSRC_AUDIO0_MASK	(0x7 << 7)
--#define S3C6400_CLKSRC_AUDIO0_SHIFT	(7)
--#define S3C6400_CLKSRC_UHOST_MASK	(0x3 << 5)
--#define S3C6400_CLKSRC_UHOST_SHIFT	(5)
--
--
- #endif /* _PLAT_REGS_CLOCK_H */
+@@ -317,7 +317,7 @@ static struct clksrc_clk clksrcs[] = {
+ 			.ctrlbit        = S3C_CLKCON_SCLK_MMC0,
+ 			.enable		= s3c64xx_sclk_ctrl,
+ 		},
+-		.reg_src	= { S3C_CLK_SRC, 18, 2 },
++		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 18, .size = 2  },
+ 		.reg_div	= { S3C_CLK_DIV1, 0, 4 },
+ 		.sources	= &clkset_spi_mmc,
+ 	}, {
+@@ -327,7 +327,7 @@ static struct clksrc_clk clksrcs[] = {
+ 			.ctrlbit        = S3C_CLKCON_SCLK_MMC1,
+ 			.enable		= s3c64xx_sclk_ctrl,
+ 		},
+-		.reg_src	= { S3C_CLK_SRC, 20, 2 },
++		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 20, .size = 2  },
+ 		.reg_div	= { S3C_CLK_DIV1, 4, 4 },
+ 		.sources	= &clkset_spi_mmc,
+ 	}, {
+@@ -337,7 +337,7 @@ static struct clksrc_clk clksrcs[] = {
+ 			.ctrlbit        = S3C_CLKCON_SCLK_MMC2,
+ 			.enable		= s3c64xx_sclk_ctrl,
+ 		},
+-		.reg_src	= { S3C_CLK_SRC, 22, 2 },
++		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 22, .size = 2  },
+ 		.reg_div 	= { S3C_CLK_DIV1, 8, 4 },
+ 		.sources	= &clkset_spi_mmc,
+ 	}, {
+@@ -347,7 +347,7 @@ static struct clksrc_clk clksrcs[] = {
+ 			.ctrlbit        = S3C_CLKCON_SCLK_UHOST,
+ 			.enable		= s3c64xx_sclk_ctrl,
+ 		},
+-		.reg_src 	= { S3C_CLK_SRC, 5, 2 },
++		.reg_src 	= { .reg = S3C_CLK_SRC, .shift = 5, .size = 2  },
+ 		.reg_div	= { S3C_CLK_DIV1, 20, 4 },
+ 		.sources	= &clkset_uhost,
+ 	}, {
+@@ -357,7 +357,7 @@ static struct clksrc_clk clksrcs[] = {
+ 			.ctrlbit        = S3C_CLKCON_SCLK_UART,
+ 			.enable		= s3c64xx_sclk_ctrl,
+ 		},
+-		.reg_src	= { S3C_CLK_SRC, 13, 1 },
++		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 13, .size = 1  },
+ 		.reg_div	= { S3C_CLK_DIV2, 16, 4 },
+ 		.sources	= &clkset_uart,
+ 	}, {
+@@ -368,7 +368,7 @@ static struct clksrc_clk clksrcs[] = {
+ 			.ctrlbit        = S3C_CLKCON_SCLK_SPI0,
+ 			.enable		= s3c64xx_sclk_ctrl,
+ 		},
+-		.reg_src	= { S3C_CLK_SRC, 14, 2 },
++		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 14, .size = 2  },
+ 		.reg_div	= { S3C_CLK_DIV2, 0, 4 },
+ 		.sources	= &clkset_spi_mmc,
+ 	}, {
+@@ -378,7 +378,7 @@ static struct clksrc_clk clksrcs[] = {
+ 			.ctrlbit        = S3C_CLKCON_SCLK_SPI1,
+ 			.enable		= s3c64xx_sclk_ctrl,
+ 		},
+-		.reg_src	= { S3C_CLK_SRC, 16, 2 },
++		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 16, .size = 2  },
+ 		.reg_div	= { S3C_CLK_DIV2, 4, 4 },
+ 		.sources	= &clkset_spi_mmc,
+ 	}, {
+@@ -388,7 +388,7 @@ static struct clksrc_clk clksrcs[] = {
+ 			.ctrlbit        = S3C_CLKCON_SCLK_AUDIO0,
+ 			.enable		= s3c64xx_sclk_ctrl,
+ 		},
+-		.reg_src	= { S3C_CLK_SRC, 7, 3 },
++		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 7, .size = 3  },
+ 		.reg_div	= { S3C_CLK_DIV2, 8, 4 },
+ 		.sources	= &clkset_audio0,
+ 	}, {
+@@ -398,7 +398,7 @@ static struct clksrc_clk clksrcs[] = {
+ 			.ctrlbit        = S3C_CLKCON_SCLK_AUDIO1,
+ 			.enable		= s3c64xx_sclk_ctrl,
+ 		},
+-		.reg_src	= { S3C_CLK_SRC, 10, 3 },
++		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 10, .size = 3  },
+ 		.reg_div	= { S3C_CLK_DIV2, 12, 4 },
+ 		.sources	= &clkset_audio1,
+ 	}, {
+@@ -408,7 +408,7 @@ static struct clksrc_clk clksrcs[] = {
+ 			.ctrlbit        = S3C_CLKCON_SCLK_IRDA,
+ 			.enable		= s3c64xx_sclk_ctrl,
+ 		},
+-		.reg_src	= { S3C_CLK_SRC, 24, 2 },
++		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 24, .size = 2  },
+ 		.reg_div	= { S3C_CLK_DIV2, 20, 4 },
+ 		.sources	= &clkset_irda,
+ 	}, {
+@@ -419,7 +419,7 @@ static struct clksrc_clk clksrcs[] = {
+ 			.enable		= s3c64xx_sclk_ctrl,
+ 		},
+ 		.reg_div	= { S3C_CLK_DIV0, 20, 4 },
+-		.reg_src	= { NULL, 0, 0 },
++		.reg_src	= { .reg = NULL, .shift = 0, .size = 0  },
+ 		.sources	= &clkset_camif,
+ 	},
+ };
 -- 
 1.5.6.5
