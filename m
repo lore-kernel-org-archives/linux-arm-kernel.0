@@ -1,129 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Dec 2009 22:45:50 +0000
-Subject: GPIO support for HTC Dream
-In-Reply-To: <20091208102842.GH12264@elf.ucw.cz>
-References: <20091208102842.GH12264@elf.ucw.cz>
-Message-ID: <20091208224550.GA26915@n2100.arm.linux.org.uk>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Tue, 8 Dec 2009 23:06:24 +0000
+Subject: [PATCH] S3C24XX: DMA: Use valid index when accessing array
+In-Reply-To: <1260286961-24097-1-git-send-email-ramaxlo@gmail.com>
+References: <1260286961-24097-1-git-send-email-ramaxlo@gmail.com>
+Message-ID: <20091208230624.GB20364@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2009 at 11:28:43AM +0100, Pavel Machek wrote:
-> Add GPIO support for HTC Dream.
->     
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+On Tue, Dec 08, 2009 at 11:42:41PM +0800, Ramax Lo wrote:
+> The DMA_CH_VALID bit used in the channel index should be masked out before
+> using it to access the channel array.
+
+ok, applied to s3c24xx-updates.
+ 
+> Signed-off-by: Ramax Lo <ramaxlo@gmail.com>
+> ---
+>  arch/arm/plat-s3c24xx/dma.c |    6 ++++--
+>  1 files changed, 4 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-> index f780086..774c50e 100644
-> --- a/arch/arm/mach-msm/Kconfig
-> +++ b/arch/arm/mach-msm/Kconfig
-> @@ -40,4 +40,8 @@ config MACH_TROUT
->  	help
->  	  Support for the HTC Dream, T-Mobile G1, Android ADP1 devices.
+> diff --git a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
+> index f046f8c..3623b2e 100644
+> --- a/arch/arm/plat-s3c24xx/dma.c
+> +++ b/arch/arm/plat-s3c24xx/dma.c
+> @@ -1403,11 +1403,13 @@ static struct s3c2410_dma_chan *s3c2410_dma_map_channel(int channel)
+>  		ord = &dma_order->channels[channel];
 >  
-> +config GENERIC_GPIO
-> +	bool
-> +	default y
-
-Please arrange for this to be handled just like every other ARM
-platform via a 'select' statement - eg:
-
-config ARCH_AT91
-        bool "Atmel AT91"
-        select GENERIC_GPIO
-        select ARCH_REQUIRE_GPIOLIB
-        select HAVE_CLK
-
-It is not nice to have multiple definitions of the same symbol scattered
-throughout the Kconfig files.
-
-> +
->  endif
-> diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-> index 91e6f5c..4c2567e 100644
-> --- a/arch/arm/mach-msm/Makefile
-> +++ b/arch/arm/mach-msm/Makefile
-> @@ -6,4 +6,4 @@ obj-y += clock.o clock-7x01a.o
+>  		for (ch = 0; ch < dma_channels; ch++) {
+> +			int tmp;
+>  			if (!is_channel_valid(ord->list[ch]))
+>  				continue;
 >  
->  obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o
->  
-> -obj-$(CONFIG_MACH_TROUT) += board-dream.o
-> +obj-$(CONFIG_MACH_TROUT) += board-dream.o board-dream-gpio.o generic_gpio.o 
-> diff --git a/arch/arm/mach-msm/board-dream-gpio.c b/arch/arm/mach-msm/board-dream-gpio.c
-> new file mode 100644
-> index 0000000..1b23a84
-> --- /dev/null
-> +++ b/arch/arm/mach-msm/board-dream-gpio.c
-> @@ -0,0 +1,301 @@
-> +/* arch/arm/mach-msm/board-dream-gpio.c
-> + *
-> + * Copyright (C) 2008 Google, Inc.
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/errno.h>
-> +#include <linux/irq.h>
-> +#include <linux/pm.h>
-> +#include <linux/sysdev.h>
-> +#include <linux/io.h> 
-> +
-> +#include <asm/gpio.h>
+> -			if (s3c2410_chans[ord->list[ch]].in_use == 0) {
+> -				ch = ord->list[ch] & ~DMA_CH_VALID;
+> +			tmp = ord->list[ch] & ~DMA_CH_VALID;
+> +			if (s3c2410_chans[tmp].in_use == 0) {
+> +				ch = tmp;
+>  				goto found;
+>  			}
+>  		}
+> -- 
+> 1.5.4.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-linux/gpio.h is preferred over asm/gpio.h
+-- 
+-- 
+Ben
 
-> diff --git a/arch/arm/mach-msm/board-dream.c b/arch/arm/mach-msm/board-dream.c
-> index d238e2c..4758957 100644
-> --- a/arch/arm/mach-msm/board-dream.c
-> +++ b/arch/arm/mach-msm/board-dream.c
-> @@ -18,11 +18,13 @@
->  #include <linux/kernel.h>
->  #include <linux/init.h>
->  #include <linux/platform_device.h>
-> +#include <linux/delay.h>
->  
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
->  #include <asm/setup.h>
-> +#include <asm/gpio.h>
-
-ditto.
-
-> diff --git a/arch/arm/mach-msm/generic_gpio.c b/arch/arm/mach-msm/generic_gpio.c
-> new file mode 100644
-> index 0000000..fe24d38
-> --- /dev/null
-> +++ b/arch/arm/mach-msm/generic_gpio.c
-> @@ -0,0 +1,274 @@
-> +/* arch/arm/mach-msm/generic_gpio.c
-> + *
-> + * Copyright (C) 2007 Google, Inc.
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/errno.h>
-> +#include <linux/slab.h>
-> +#include <linux/spinlock.h>
-> +#include <asm/gpio.h>
-
-ditto.
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
