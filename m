@@ -1,44 +1,48 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 8 Dec 2009 22:12:58 +0100
-Subject: [PATCH 0/5] spi-imx: some updates
-Message-ID: <20091208211258.GA13706@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue,  8 Dec 2009 22:14:06 +0100
+Subject: [PATCH 1/5] spi-imx: use platform_driver_probe as probe lives in
+	.init.text
+In-Reply-To: <20091208211258.GA13706@pengutronix.de>
+References: <20091208211258.GA13706@pengutronix.de>
+Message-ID: <1260306850-14945-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Using platform_driver_register with a probe function defined using
+__init is wrong.
 
-this series depends on "spi: drain MXC SPI transfer buffer when probing
-device" which is currently in -mm and also included in my spi-imx branch
-(see below).  IMHO at least my first patch should go into .33 as it
-fixes an oops.
+This fixes an oops after:
 
-I'll post the patches for review as a reply to this mail.
+	cd /sys/bus/platform/drivers/spi_imx
+	echo -n spi_imx.0 > unbind
+	echo -n spi_imx.0 > bind
 
-Best regards
-Uwe
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Cc: David Brownell <dbrownell@users.sourceforge.net>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/spi/spi_imx.c |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
 
-The following changes since commit 6035ccd8e9e40bb654fbfdef325902ab531679a5:
-  Linus Torvalds (1):
-        Merge branch 'for-2.6.33' of git://git.kernel.dk/linux-2.6-block
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/ukl/linux-2.6.git spi-imx
-
-Daniel Mack (1):
-      spi: drain MXC SPI transfer buffer when probing device
-
-Sascha Hauer (1):
-      spi-imx: Add mx25 support
-
-Uwe Kleine-K?nig (4):
-      spi-imx: use platform_driver_probe as probe lives in .init.text
-      spi-imx: correct check for platform_get_irq failing
-      spi-imx: use positive logic to distinguish cpu variants
-      spi-imx: don't access struct device directly but use dev_get_platdata
-
- drivers/spi/spi_imx.c |   23 +++++++++++++++--------
- 1 files changed, 15 insertions(+), 8 deletions(-)
+diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
+index 1b17f44..c83ca05 100644
+--- a/drivers/spi/spi_imx.c
++++ b/drivers/spi/spi_imx.c
+@@ -666,13 +666,12 @@ static struct platform_driver spi_imx_driver = {
+ 		   .name = DRIVER_NAME,
+ 		   .owner = THIS_MODULE,
+ 		   },
+-	.probe = spi_imx_probe,
+ 	.remove = __exit_p(spi_imx_remove),
+ };
+ 
+ static int __init spi_imx_init(void)
+ {
+-	return platform_driver_register(&spi_imx_driver);
++	return platform_driver_probe(&spi_imx_driver, spi_imx_probe);
+ }
+ 
+ static void __exit spi_imx_exit(void)
 -- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+1.6.5.2
