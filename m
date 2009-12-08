@@ -1,65 +1,45 @@
 From: jbe@pengutronix.de (Juergen Beisert)
-Date: Tue, 8 Dec 2009 13:01:25 +0100
+Date: Tue, 8 Dec 2009 13:07:17 +0100
 Subject: [PATCH] [NAND] S3C2410: Fix NFC clock enable/disable imbalance
-	(2nd try)
-In-Reply-To: <200912081123.06630.jbe@pengutronix.de>
+In-Reply-To: <4B1E3815.9020901@ru.mvista.com>
 References: <200912081056.40210.jbe@pengutronix.de>
-	<200912081123.06630.jbe@pengutronix.de>
-Message-ID: <200912081301.25597.jbe@pengutronix.de>
+	<4B1E3815.9020901@ru.mvista.com>
+Message-ID: <200912081307.17955.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When unmounting an mtd filesystem the s3c2410_nand_select_chip() function
-gets called again with "chip == -1". In this case the current code disables
-the NFC clock at least a second time, so it does not work anymore.
-Clock disabling should only happen if it was really enabled.
+On Dienstag, 8. Dezember 2009, Sergei Shtylyov wrote:
+> Hello.
+>
+> Juergen Beisert wrote:
+> > When unmounting an mtd filesystem the s3c2410_nand_select_chip() function
+> > gets called again with "chip == -1". In this case the current code
+> > disables the NFC clock at least a second time, so it does not work
+> > anymore. Clock disabling should only happen if it was really enabled.
+> >
+> > Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
+> >
+> > ---
+> >  drivers/mtd/nand/s3c2410.c |    8 ++++++--
+> >  1 file changed, 6 insertions(+), 2 deletions(-)
+> >
+> > Index: linux-2.6.32/drivers/mtd/nand/s3c2410.c
+> > ===================================================================
+> > --- linux-2.6.32.orig/drivers/mtd/nand/s3c2410.c
+> > +++ linux-2.6.32/drivers/mtd/nand/s3c2410.c
+> > @@ -329,12 +329,16 @@ static void s3c2410_nand_select_chip(str
+> >  	struct s3c2410_nand_mtd *nmtd;
+> >  	struct nand_chip *this = mtd->priv;
+> >  	unsigned long cur;
+> > +	int clock_enabled;
+>
+>    Could be *bool*...
 
-Due to a lack of a query function if a clock is already enabled (and how often),
-we must count enable/disable calls by our own here.
+I'm not sure. When this function is called more than once to disable a NAND 
+device chip select, who knows if it might be called more than once to enable 
+it? Just an idea.
 
-Note: Other enable/disable sequences can be found in the power management
-functions. I'm not sure if they interfere with this local enable/disable count.
-
-Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
-Acked-by: Wolfram Sang <wsa@pengutronix.de>
-
----
- drivers/mtd/nand/s3c2410.c |    9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
-
-Index: linux-2.6.32/drivers/mtd/nand/s3c2410.c
-===================================================================
---- linux-2.6.32.orig/drivers/mtd/nand/s3c2410.c
-+++ linux-2.6.32/drivers/mtd/nand/s3c2410.c
-@@ -329,12 +329,15 @@ static void s3c2410_nand_select_chip(str
- 	struct s3c2410_nand_mtd *nmtd;
- 	struct nand_chip *this = mtd->priv;
- 	unsigned long cur;
-+	static int clock_enable_cnt = 0;
- 
- 	nmtd = this->priv;
- 	info = nmtd->info;
- 
--	if (chip != -1 && allow_clk_stop(info))
-+	if (chip != -1 && allow_clk_stop(info)) {
- 		clk_enable(info->clk);
-+		clock_enable_cnt++;
-+	}
- 
- 	cur = readl(info->sel_reg);
- 
-@@ -356,8 +359,10 @@ static void s3c2410_nand_select_chip(str
- 
- 	writel(cur, info->sel_reg);
- 
--	if (chip == -1 && allow_clk_stop(info))
-+	if (chip == -1 && allow_clk_stop(info) && clock_enable_cnt > 0) {
- 		clk_disable(info->clk);
-+		clock_enable_cnt--;
-+	}
- }
- 
- /* s3c2410_nand_hwcontrol
+jbe
 
 -- 
 Pengutronix e.K.                              | Juergen Beisert             |
