@@ -1,112 +1,30 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Wed, 09 Dec 2009 11:10:54 +1300
-Subject: GPIO support for HTC Dream
-In-Reply-To: <20091208214658.GC4164@elf.ucw.cz>
-References: <20091208102842.GH12264@elf.ucw.cz>
-	<4B1EB57D.6070408@bluewatersys.com>
-	<20091208214658.GC4164@elf.ucw.cz>
-Message-ID: <4B1ECEEE.3000209@bluewatersys.com>
+From: stevenrwalter@gmail.com (Steven Walter)
+Date: Tue, 8 Dec 2009 17:17:47 -0500
+Subject: cache aliasing in dup_mmap
+In-Reply-To: <20091130092022.GA1638@n2100.arm.linux.org.uk>
+References: <20090929191108.GA13568@n2100.arm.linux.org.uk>
+	<20091105144830.GC21681@n2100.arm.linux.org.uk>
+	<e06498070911130649k2051e4cfh2066cf0b9fdabbaf@mail.gmail.com>
+	<20091116163028.GA3568@n2100.arm.linux.org.uk>
+	<e06498070911160923i2273b6aai6f144b36289203d2@mail.gmail.com>
+	<20091116222016.GF3568@n2100.arm.linux.org.uk>
+	<20091119085735.GA14178@n2100.arm.linux.org.uk>
+	<e06498070911191008t1861e730u5cdb49187af00ae0@mail.gmail.com>
+	<20091123203110.GH18142@n2100.arm.linux.org.uk>
+	<20091130092022.GA1638@n2100.arm.linux.org.uk>
+Message-ID: <e06498070912081417i614a0308x80f516145ee28472@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pavel Machek wrote:
-> Add GPIO support for HTC Dream.
-> 
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> 
-> +int register_gpio_chip(struct gpio_chip *new_gpio_chip)
-> +{
-> +	int err = 0;
-> +	struct gpio_chip *gpio_chip;
-> +	int i;
-> +	unsigned long irq_flags;
-> +	/* Start/end indexes into chip array */
-> +	unsigned int start, end;
-> +	int size = (new_gpio_chip->end + 1 - new_gpio_chip->start) *
-> +		   sizeof(new_gpio_chip->state[0]);
-> +
-> +	new_gpio_chip->state = kzalloc(size, GFP_KERNEL);
-> +	if (new_gpio_chip->state == NULL) {
-> +		printk(KERN_ERR "register_gpio_chip: failed to allocate state\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	spin_lock_irqsave(&gpio_chips_lock, irq_flags);
-> +	start = GPIO_NUM_TO_CHIP_INDEX(new_gpio_chip->start);
-> +	end = GPIO_NUM_TO_CHIP_INDEX(new_gpio_chip->end);
-> +
-> +	if (end >= gpio_chip_array_size) {
-> +		/* New gpio chip array */
-> +		struct gpio_chip **new_array;
-> +		/* Size of gpio chip array */
-> +		unsigned long array_size = end + 1;
-> +
-> +		new_array = kmalloc(array_size * sizeof(new_array[0]), GFP_ATOMIC);
-> +		if (!new_array) {
-> +			printk(KERN_ERR "register_gpio_chip: failed to allocate array\n");
-> +			err = -ENOMEM;
-> +			goto failed;
-> +		}
-> +		for (i = 0; i < gpio_chip_array_size; i++)
-> +			new_array[i] = gpio_chip_array[i];
-> +		for (i = gpio_chip_array_size; i < array_size; i++)
-> +			new_array[i] = NULL;
-> +		gpio_chip_array = new_array;
-> +		gpio_chip_array_size = array_size;
-> +	}
-> +
-> +	list_for_each_entry(gpio_chip, &gpio_chip_list, list) {
-> +		if (gpio_chip->start > new_gpio_chip->end) {
-> +			list_add_tail(&new_gpio_chip->list, &gpio_chip->list);
-> +			goto added;
-> +		}
-> +		if (gpio_chip->end >= new_gpio_chip->start) {
-> +			printk(KERN_ERR "register_gpio_source %u-%u overlaps with %u-%u\n",
-> +			       new_gpio_chip->start, new_gpio_chip->end,
-> +			       gpio_chip->start, gpio_chip->end);
-> +			err = -EBUSY;
-> +			goto failed;
-> +		}
-> +	}
-> +
-> +	list_add_tail(&new_gpio_chip->list, &gpio_chip_list);
-> +added:
-> +	for (i = start; i <= end; i++) {
-> +		if ((!gpio_chip_array[i]) || gpio_chip_array[i]->start > new_gpio_chip->start)
-> +			gpio_chip_array[i] = new_gpio_chip;
-> +	}
-> +failed:
-> +	spin_unlock_irqrestore(&gpio_chips_lock, irq_flags);
-> +	if (err)
-> +		kfree(new_gpio_chip->state);
-> +	return err;
-> +}
+On Mon, Nov 30, 2009 at 4:20 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Nov 23, 2009 at 08:31:10PM +0000, Russell King - ARM Linux wrote:
+>> I'd just like to keep this issue hot so it doesn't get forgotten about.
+>> Are we at a conclusive point on this?
+>
+> Today is decision day. ?Do we go with these two patches or not?
 
-This is still really screwy. Why are you creating your own version of
-struct gpio_chip in addition to the one in include/asm-generic/gpio.h
-(which you also appear to include in some places). It makes the code
-extremely confusing. Other architectures use wrapper structures. Can you
-have something like this instead:
-
-	struct dream_gpio_chip {
-		struct gpio_chip chip;
-
-		/* Dream specific bits */
-	};
-
-The name of this function also needs to be changed to something less
-generic since it is being exported globally.
-
-I also think this function is doing way to much work for what it is.
-Does it really need to be this complicated?
-
-~Ryan
-
+Okay, results are in, albeit later than advertised.  We had ~2600 runs
+on the patched kernel and it appears that the cache issue is fixed.
 -- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+-Steven Walter <stevenrwalter@gmail.com>
