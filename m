@@ -1,33 +1,64 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 8 Dec 2009 11:16:00 +0100
-Subject: [PATCH 2/3] staging/dream: add missing include files
-In-Reply-To: <20091120110728.GB10644@n2100.arm.linux.org.uk>
-References: <20091101222717.GB20740@elf.ucw.cz>
-	<20091119225602.GC18710@kroah.com>
-	<20091120105726.GH11212@elf.ucw.cz>
-	<20091120110728.GB10644@n2100.arm.linux.org.uk>
-Message-ID: <20091208101559.GF12264@elf.ucw.cz>
+From: jbe@pengutronix.de (Juergen Beisert)
+Date: Tue, 8 Dec 2009 11:23:06 +0100
+Subject: [PATCH] [NAND] S3C2410: Fix NFC clock enable/disable imbalance
+In-Reply-To: <200912081056.40210.jbe@pengutronix.de>
+References: <200912081056.40210.jbe@pengutronix.de>
+Message-ID: <200912081123.06630.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2009-11-20 11:07:28, Russell King - ARM Linux wrote:
-> On Fri, Nov 20, 2009 at 11:57:26AM +0100, Pavel Machek wrote:
-> > On Thu 2009-11-19 14:56:02, Greg KH wrote:
-> > > On Sun, Nov 01, 2009 at 11:27:17PM +0100, Pavel Machek wrote:
-> > > > +config GENERIC_GPIO
-> > > > +	bool
-> > > > +	default y
-> > > 
-> > > Which breaks the i386 build.  Don't force on a general config option
-> > > like this, that's not nice at all :(
-> > 
-> > Ok, I should figure out how to limit it to arch-msm.
-> 
-> You do it by 'select'ing the symbol in arch/arm/Kconfig.  See the many
-> other examples therein of how to do it.
+Hi,
 
-Thanks.
-									Pavel
+ups, forget this patch, does't work as expected (thanks Wolfram!). Will try 
+again later...
+
+Juergen Beisert wrote:
+> When unmounting an mtd filesystem the s3c2410_nand_select_chip() function
+> gets called again with "chip == -1". In this case the current code disables
+> the NFC clock at least a second time, so it does not work anymore.
+> Clock disabling should only happen if it was really enabled.
+>
+> Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
+>
+> ---
+>  drivers/mtd/nand/s3c2410.c |    8 ++++++--
+>  1 file changed, 6 insertions(+), 2 deletions(-)
+>
+> Index: linux-2.6.32/drivers/mtd/nand/s3c2410.c
+> ===================================================================
+> --- linux-2.6.32.orig/drivers/mtd/nand/s3c2410.c
+> +++ linux-2.6.32/drivers/mtd/nand/s3c2410.c
+> @@ -329,12 +329,16 @@ static void s3c2410_nand_select_chip(str
+>  	struct s3c2410_nand_mtd *nmtd;
+>  	struct nand_chip *this = mtd->priv;
+>  	unsigned long cur;
+> +	int clock_enabled;
+>
+>  	nmtd = this->priv;
+>  	info = nmtd->info;
+>
+> -	if (chip != -1 && allow_clk_stop(info))
+> +	if (chip != -1 && allow_clk_stop(info)) {
+>  		clk_enable(info->clk);
+> +		clock_enabled = 1;
+> +	} else
+> +		clock_enabled = 0;
+>
+>  	cur = readl(info->sel_reg);
+>
+> @@ -356,7 +360,7 @@ static void s3c2410_nand_select_chip(str
+>
+>  	writel(cur, info->sel_reg);
+>
+> -	if (chip == -1 && allow_clk_stop(info))
+> +	if (chip == -1 && allow_clk_stop(info) && clock_enabled != 0)
+>  		clk_disable(info->clk);
+>  }
+
+Juergen
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Pengutronix e.K.                              | Juergen Beisert             |
+Linux Solutions for Science and Industry      | Phone: +49-8766-939 228     |
+Vertretung Sued/Muenchen, Germany             | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686              | http://www.pengutronix.de/  |
