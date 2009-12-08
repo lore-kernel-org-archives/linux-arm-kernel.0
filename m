@@ -1,51 +1,40 @@
-From: leochen@broadcom.com (Leo (Hao) Chen)
-Date: Mon, 7 Dec 2009 18:39:29 -0800
-Subject: [PATCH] Bcmring: fix build error with bcmring_defconfig
-Message-ID: <20091208023929.GP26191@broadcom.com>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Tue, 8 Dec 2009 11:03:25 +0800
+Subject: [PATCH V2] ARM: NUC900: add GDMA driver support for nuc900
+	platform
+In-Reply-To: <713d0d430912071011w76600af1l867d8f52b61d53da@mail.gmail.com>
+References: <713d0d430911260242j579d86b3r7eeade0007d2a94c@mail.gmail.com>
+	<20091129121614.GA11445@n2100.arm.linux.org.uk>
+	<713d0d430912070753o28a8d538qa71b8af8c4415d73@mail.gmail.com>
+	<20091207171851.GD26821@n2100.arm.linux.org.uk>
+	<713d0d430912071011w76600af1l867d8f52b61d53da@mail.gmail.com>
+Message-ID: <e68bb3470912071903u4657b911nc56bf0f667c37e9e@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi  Hu,
 
-Hi,
+When you make your patch via 'diff -uNr a b xx.patch', Please do pay
+attention to the order of a and b.
 
-This patch is to fix the build error with bcmring_defconfig.
+I think you would want to add the DMA driver rather than delete this,
+notice your all  '-'  symbol of this patch.
 
-The error is caught by KAutoBuild.
-
-/var/tmp/kernel-orig/usr/include/linux/perf_event.h:22: included file
-'asm-arm/hw_breakpoint.h' is not exported
-make[3]: *** [/var/tmp/kernel-orig/usr/include/linux/.check] Error 123
-make[2]: *** [linux] Error 2
-make[1]: *** [headers_check] Error 2
-make: *** [vmlinux] Error 2
-make: Leaving directory `/var/tmp/kernel-orig'
-
-From: Leo Chen <leochen@broadcom.com>
-Date: Mon, 7 Dec 2009 18:36:58 -0800
-Subject: [PATCH] disable header check to fix build error of bcmring_defconfig
+2009/12/8 Hu Ruihuan <specter118@gmail.com>:
+> yes,why?
+>
+> 2009/12/8 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+>> On Mon, Dec 07, 2009 at 11:53:39PM +0800, Hu Ruihuan wrote:
+>>> Hi,Russell
+>>> ? Thank you for your advice, it's my patch below follow your advice.
+>>
+>> Did you look at the patch before you sent it?
+>>
+>
 
 
-Signed-off-by: Leo Hao Chen <leochen@broadcom.com>
----
- arch/arm/configs/bcmring_defconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/configs/bcmring_defconfig b/arch/arm/configs/bcmring_defconfig
-index bcc0bac..04b063b 100644
---- a/arch/arm/configs/bcmring_defconfig
-+++ b/arch/arm/configs/bcmring_defconfig
-@@ -678,7 +678,7 @@ CONFIG_FRAME_WARN=1024
- CONFIG_MAGIC_SYSRQ=y
- # CONFIG_UNUSED_SYMBOLS is not set
- # CONFIG_DEBUG_FS is not set
--CONFIG_HEADERS_CHECK=y
-+# CONFIG_HEADERS_CHECK is not set
- # CONFIG_DEBUG_KERNEL is not set
- # CONFIG_DEBUG_BUGVERBOSE is not set
- # CONFIG_DEBUG_MEMORY_INIT is not set
--- 
-1.6.0.6
 
 -- 
-
-Leo Hao Chen
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
