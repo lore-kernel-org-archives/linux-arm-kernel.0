@@ -1,41 +1,112 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 8 Dec 2009 23:07:24 +0100
-Subject: [PATCH 1/2 RESEND#2] i2c/pxa: remove unused macro
-In-Reply-To: <20091208224456.0baf422b@hyperion.delvare>
-References: <1257754721-17325-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258658141-30340-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20091208211810.GB13706@pengutronix.de>
-	<20091208224456.0baf422b@hyperion.delvare>
-Message-ID: <20091208220724.GA14696@pengutronix.de>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Wed, 09 Dec 2009 11:10:54 +1300
+Subject: GPIO support for HTC Dream
+In-Reply-To: <20091208214658.GC4164@elf.ucw.cz>
+References: <20091208102842.GH12264@elf.ucw.cz>
+	<4B1EB57D.6070408@bluewatersys.com>
+	<20091208214658.GC4164@elf.ucw.cz>
+Message-ID: <4B1ECEEE.3000209@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
-
-On Tue, Dec 08, 2009 at 10:44:56PM +0100, Jean Delvare wrote:
-> On Tue, 8 Dec 2009 22:18:10 +0100, Uwe Kleine-K?nig wrote:
-> > Hi Jean,
-> > 
-> > On Thu, Nov 19, 2009 at 08:15:40PM +0100, Uwe Kleine-K?nig wrote:
-> > > Commit
-> > > 
-> > > 	beea494 ([ARM] Remove EEPROM slave emulation from i2c-pxa driver.)
-> > > 
-> > > removed all uses of eedbg, so the definition can go, too.
-> > do you have comments to my patches?  I think they should go in via your
-> > tree.
+Pavel Machek wrote:
+> Add GPIO support for HTC Dream.
 > 
-> I think you should read MAINTAINERS again.
-Ah, so the maintainer is Ben Dooks, but the tree seems to be your's.
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> 
+> +int register_gpio_chip(struct gpio_chip *new_gpio_chip)
+> +{
+> +	int err = 0;
+> +	struct gpio_chip *gpio_chip;
+> +	int i;
+> +	unsigned long irq_flags;
+> +	/* Start/end indexes into chip array */
+> +	unsigned int start, end;
+> +	int size = (new_gpio_chip->end + 1 - new_gpio_chip->start) *
+> +		   sizeof(new_gpio_chip->state[0]);
+> +
+> +	new_gpio_chip->state = kzalloc(size, GFP_KERNEL);
+> +	if (new_gpio_chip->state == NULL) {
+> +		printk(KERN_ERR "register_gpio_chip: failed to allocate state\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	spin_lock_irqsave(&gpio_chips_lock, irq_flags);
+> +	start = GPIO_NUM_TO_CHIP_INDEX(new_gpio_chip->start);
+> +	end = GPIO_NUM_TO_CHIP_INDEX(new_gpio_chip->end);
+> +
+> +	if (end >= gpio_chip_array_size) {
+> +		/* New gpio chip array */
+> +		struct gpio_chip **new_array;
+> +		/* Size of gpio chip array */
+> +		unsigned long array_size = end + 1;
+> +
+> +		new_array = kmalloc(array_size * sizeof(new_array[0]), GFP_ATOMIC);
+> +		if (!new_array) {
+> +			printk(KERN_ERR "register_gpio_chip: failed to allocate array\n");
+> +			err = -ENOMEM;
+> +			goto failed;
+> +		}
+> +		for (i = 0; i < gpio_chip_array_size; i++)
+> +			new_array[i] = gpio_chip_array[i];
+> +		for (i = gpio_chip_array_size; i < array_size; i++)
+> +			new_array[i] = NULL;
+> +		gpio_chip_array = new_array;
+> +		gpio_chip_array_size = array_size;
+> +	}
+> +
+> +	list_for_each_entry(gpio_chip, &gpio_chip_list, list) {
+> +		if (gpio_chip->start > new_gpio_chip->end) {
+> +			list_add_tail(&new_gpio_chip->list, &gpio_chip->list);
+> +			goto added;
+> +		}
+> +		if (gpio_chip->end >= new_gpio_chip->start) {
+> +			printk(KERN_ERR "register_gpio_source %u-%u overlaps with %u-%u\n",
+> +			       new_gpio_chip->start, new_gpio_chip->end,
+> +			       gpio_chip->start, gpio_chip->end);
+> +			err = -EBUSY;
+> +			goto failed;
+> +		}
+> +	}
+> +
+> +	list_add_tail(&new_gpio_chip->list, &gpio_chip_list);
+> +added:
+> +	for (i = start; i <= end; i++) {
+> +		if ((!gpio_chip_array[i]) || gpio_chip_array[i]->start > new_gpio_chip->start)
+> +			gpio_chip_array[i] = new_gpio_chip;
+> +	}
+> +failed:
+> +	spin_unlock_irqrestore(&gpio_chips_lock, irq_flags);
+> +	if (err)
+> +		kfree(new_gpio_chip->state);
+> +	return err;
+> +}
 
-So I assume you take it when Ben give's his S-o-b or Ben has write
-access to the tree?
+This is still really screwy. Why are you creating your own version of
+struct gpio_chip in addition to the one in include/asm-generic/gpio.h
+(which you also appear to include in some places). It makes the code
+extremely confusing. Other architectures use wrapper structures. Can you
+have something like this instead:
 
-Ben, what do you think about my patches?
+	struct dream_gpio_chip {
+		struct gpio_chip chip;
 
-Best regards
-Uwe
+		/* Dream specific bits */
+	};
+
+The name of this function also needs to be changed to something less
+generic since it is being exported globally.
+
+I also think this function is doing way to much work for what it is.
+Does it really need to be this complicated?
+
+~Ryan
 
 -- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
