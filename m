@@ -1,41 +1,30 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Tue, 8 Dec 2009 10:25:46 -0800
-Subject: Missing ARM/BCMRING MTD NAND DRIVER files?
-In-Reply-To: <1260296515.27677.45.camel@Joe-Laptop.home>
-References: <1260296515.27677.45.camel@Joe-Laptop.home>
-Message-ID: <9383297B60843144AC17878B479520F110B62DF365@SJEXCHCCR01.corp.ad.broadcom.com>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 08 Dec 2009 10:29:34 -0800
+Subject: [PATCH] MAINTAINERS: rename PALM TREO section and file patterns
+Message-ID: <1260296974.27677.48.camel@Joe-Laptop.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-They have been sitting in David Woodhouse's GIT tree.
-They are already in linux-next. and should have made it
- in 2.6.32 put did not get pulled.
-Just waiting a pull from Linus in 2.6.33. 
+Signed-off-by: Joe Perches <joe@perches.com>
 
-Cheers,
- Scott
-
------Original Message-----
-From: Joe Perches [mailto:joe at perches.com] 
-Sent: December 8, 2009 10:22 AM
-To: Leo (Hao) Chen; Scott Branden; linux-mtd
-Cc: linux-arm-kernel at lists.infradead.org
-Subject: Missing ARM/BCMRING MTD NAND DRIVER files?
-
-Commit 57a473f2f97cf3bca78df08aac2f438ddef03bee added
-this MAINTAINERS entry, but not the files listed.
-
-No other commit added these files either.
-
-Are these files supposed to be part of kernel sources?
-If not, I think the MAINTAINERS entry should be removed.
-
-ARM/BCMRING MTD NAND DRIVER
-M:	Leo Chen <leochen@broadcom.com>
-M:	Scott Branden <sbranden@broadcom.com>
-L:	linux-mtd at lists.infradead.org
-S:	Maintained
-F:	drivers/mtd/nand/bcm_umi_nand.c
-F:	drivers/mtd/nand/bcm_umi_bch.c
-F:	drivers/mtd/nand/bcm_umi_hamming.c
-F:	drivers/mtd/nand/nand_bcm_umi.h
+diff --git a/MAINTAINERS b/MAINTAINERS
+index ea781c1..66dd284 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -822,13 +822,13 @@ F:	arch/arm/mach-pxa/palmte2.c
+ F:	arch/arm/mach-pxa/include/mach/palmtc.h
+ F:	arch/arm/mach-pxa/palmtc.c
+ 
+-ARM/PALM TREO 680 SUPPORT
++ARM/PALM TREO SUPPORT
+ M:	Tomas Cech <sleep_walker@suse.cz>
+ L:	linux-arm-kernel at lists.infradead.org
+ W:	http://hackndev.com
+ S:	Maintained
+-F:	arch/arm/mach-pxa/include/mach/treo680.h
+-F:	arch/arm/mach-pxa/treo680.c
++F:	arch/arm/mach-pxa/include/mach/palmtreo.h
++F:	arch/arm/mach-pxa/palmtreo.c
+ 
+ ARM/PALMZ72 SUPPORT
+ M:	Sergey Lapin <slapin@ossfans.org>
