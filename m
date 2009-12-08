@@ -1,30 +1,55 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue,  8 Dec 2009 10:55:38 +0100
-Subject: [PATCH] ARM: Convert BUG() to use unreachable()
-Message-ID: <1260266138-17684-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: jbe@pengutronix.de (Juergen Beisert)
+Date: Tue, 8 Dec 2009 10:56:40 +0100
+Subject: [PATCH] [NAND] S3C2410: Fix NFC clock enable/disable imbalance
+Message-ID: <200912081056.40210.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new unreachable() macro instead of for(;;);
+When unmounting an mtd filesystem the s3c2410_nand_select_chip() function
+gets called again with "chip == -1". In this case the current code disables
+the NFC clock at least a second time, so it does not work anymore.
+Clock disabling should only happen if it was really enabled.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: David Daney <ddaney@caviumnetworks.com>
+Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
+
 ---
- arch/arm/kernel/traps.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/mtd/nand/s3c2410.c |    8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 3f361a7..25b50c4 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -681,7 +681,7 @@ void __attribute__((noreturn)) __bug(const char *file, int line)
- 	*(int *)0 = 0;
+Index: linux-2.6.32/drivers/mtd/nand/s3c2410.c
+===================================================================
+--- linux-2.6.32.orig/drivers/mtd/nand/s3c2410.c
++++ linux-2.6.32/drivers/mtd/nand/s3c2410.c
+@@ -329,12 +329,16 @@ static void s3c2410_nand_select_chip(str
+ 	struct s3c2410_nand_mtd *nmtd;
+ 	struct nand_chip *this = mtd->priv;
+ 	unsigned long cur;
++	int clock_enabled;
  
- 	/* Avoid "noreturn function does return" */
--	for (;;);
-+	unreachable();
+ 	nmtd = this->priv;
+ 	info = nmtd->info;
+ 
+-	if (chip != -1 && allow_clk_stop(info))
++	if (chip != -1 && allow_clk_stop(info)) {
+ 		clk_enable(info->clk);
++		clock_enabled = 1;
++	} else
++		clock_enabled = 0;
+ 
+ 	cur = readl(info->sel_reg);
+ 
+@@ -356,7 +360,7 @@ static void s3c2410_nand_select_chip(str
+ 
+ 	writel(cur, info->sel_reg);
+ 
+-	if (chip == -1 && allow_clk_stop(info))
++	if (chip == -1 && allow_clk_stop(info) && clock_enabled != 0)
+ 		clk_disable(info->clk);
  }
- EXPORT_SYMBOL(__bug);
  
+
 -- 
-1.6.5.2
+Pengutronix e.K.                              | Juergen Beisert             |
+Linux Solutions for Science and Industry      | Phone: +49-8766-939 228     |
+Vertretung Sued/Muenchen, Germany             | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686              | http://www.pengutronix.de/  |
