@@ -1,48 +1,36 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue,  8 Dec 2009 22:14:06 +0100
-Subject: [PATCH 1/5] spi-imx: use platform_driver_probe as probe lives in
-	.init.text
-In-Reply-To: <20091208211258.GA13706@pengutronix.de>
+Date: Tue,  8 Dec 2009 22:14:07 +0100
+Subject: [PATCH 2/5] spi-imx: correct check for platform_get_irq failing
+In-Reply-To: <1260306850-14945-1-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <20091208211258.GA13706@pengutronix.de>
-Message-ID: <1260306850-14945-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260306850-14945-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1260306850-14945-2-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using platform_driver_register with a probe function defined using
-__init is wrong.
-
-This fixes an oops after:
-
-	cd /sys/bus/platform/drivers/spi_imx
-	echo -n spi_imx.0 > unbind
-	echo -n spi_imx.0 > bind
+platform_get_irq returns -ENXIO if there is no entry.  So don't check
+return value being nonzero but greater or equal to zero.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 Cc: David Brownell <dbrownell@users.sourceforge.net>
 Cc: Andrew Morton <akpm@linux-foundation.org>
 Cc: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/spi/spi_imx.c |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
+ drivers/spi/spi_imx.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
-index 1b17f44..c83ca05 100644
+index c83ca05..d8d9a35 100644
 --- a/drivers/spi/spi_imx.c
 +++ b/drivers/spi/spi_imx.c
-@@ -666,13 +666,12 @@ static struct platform_driver spi_imx_driver = {
- 		   .name = DRIVER_NAME,
- 		   .owner = THIS_MODULE,
- 		   },
--	.probe = spi_imx_probe,
- 	.remove = __exit_p(spi_imx_remove),
- };
+@@ -554,7 +554,7 @@ static int __init spi_imx_probe(struct platform_device *pdev)
+ 	}
  
- static int __init spi_imx_init(void)
- {
--	return platform_driver_register(&spi_imx_driver);
-+	return platform_driver_probe(&spi_imx_driver, spi_imx_probe);
- }
- 
- static void __exit spi_imx_exit(void)
+ 	spi_imx->irq = platform_get_irq(pdev, 0);
+-	if (!spi_imx->irq) {
++	if (spi_imx->irq < 0) {
+ 		ret = -EINVAL;
+ 		goto out_iounmap;
+ 	}
 -- 
 1.6.5.2
