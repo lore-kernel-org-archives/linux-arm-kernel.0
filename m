@@ -1,41 +1,41 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 08 Dec 2009 14:03:32 -0800
-Subject: GPIO support for HTC Dream
-In-Reply-To: <20091208214658.GC4164@elf.ucw.cz>
-References: <20091208102842.GH12264@elf.ucw.cz>
-	<4B1EB57D.6070408@bluewatersys.com> <20091208214658.GC4164@elf.ucw.cz>
-Message-ID: <1260309812.27677.117.camel@Joe-Laptop.home>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 8 Dec 2009 23:07:24 +0100
+Subject: [PATCH 1/2 RESEND#2] i2c/pxa: remove unused macro
+In-Reply-To: <20091208224456.0baf422b@hyperion.delvare>
+References: <1257754721-17325-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1258658141-30340-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20091208211810.GB13706@pengutronix.de>
+	<20091208224456.0baf422b@hyperion.delvare>
+Message-ID: <20091208220724.GA14696@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2009-12-08 at 22:46 +0100, Pavel Machek wrote:
-> Add GPIO support for HTC Dream.
+Hi Jean,
 
-Hi Pavel.  Thanks for this.
+On Tue, Dec 08, 2009 at 10:44:56PM +0100, Jean Delvare wrote:
+> On Tue, 8 Dec 2009 22:18:10 +0100, Uwe Kleine-K?nig wrote:
+> > Hi Jean,
+> > 
+> > On Thu, Nov 19, 2009 at 08:15:40PM +0100, Uwe Kleine-K?nig wrote:
+> > > Commit
+> > > 
+> > > 	beea494 ([ARM] Remove EEPROM slave emulation from i2c-pxa driver.)
+> > > 
+> > > removed all uses of eedbg, so the definition can go, too.
+> > do you have comments to my patches?  I think they should go in via your
+> > tree.
+> 
+> I think you should read MAINTAINERS again.
+Ah, so the maintainer is Ben Dooks, but the tree seems to be your's.
 
-Maybe it'd be nicer to use pr_<level> and add
-#define pr_fmt(fmt) KBUILD_MODNAME ":%s: " fmt, __func__
-?
+So I assume you take it when Ben give's his S-o-b or Ben has write
+access to the tree?
 
-> +++ b/arch/arm/mach-msm/board-dream-gpio.c
-> +static int dream_gpio_write(struct gpio_chip *chip, unsigned n, unsigned on)
-[]
-> +		printk(KERN_ERR "dream_gpio_write called on input %d\n", n);
-		pr_err("called on input %d\n", n);
-[]
-> +static void dream_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
-[]
-> +			printk(KERN_ERR "dream_gpio_irq_handler: got masked "
-			pr_err("got masked interrupt: %d:%02x\n"
-> +++ b/arch/arm/mach-msm/generic_gpio.c
-[]
-> +int register_gpio_chip(struct gpio_chip *new_gpio_chip)
-[]
-> +		printk(KERN_ERR "register_gpio_chip: failed to allocate state\n");
-		pr_err("failed to allocate state\n");
-> +			printk(KERN_ERR "register_gpio_chip: failed to allocate array\n");
-			pr_err("failed to allocate array\n");
-[]
-> +			printk(KERN_ERR "register_gpio_source %u-%u overlaps with %u-%u\n",
-Wrong function name?
-			pr_err("%u-%u overlaps with %u-%u\n",
+Ben, what do you think about my patches?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
