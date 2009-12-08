@@ -1,64 +1,35 @@
-From: jbe@pengutronix.de (Juergen Beisert)
-Date: Tue, 8 Dec 2009 11:23:06 +0100
-Subject: [PATCH] [NAND] S3C2410: Fix NFC clock enable/disable imbalance
-In-Reply-To: <200912081056.40210.jbe@pengutronix.de>
-References: <200912081056.40210.jbe@pengutronix.de>
-Message-ID: <200912081123.06630.jbe@pengutronix.de>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 8 Dec 2009 11:23:51 +0100
+Subject: dream: glue for mmc controller
+In-Reply-To: <20091108091009.GB20529@n2100.arm.linux.org.uk>
+References: <20091103105319.GA2492@elf.ucw.cz>
+	<20091103105737.GE20341@fluff.org.uk>
+	<20091108081314.GA16482@elf.ucw.cz>
+	<20091108091009.GB20529@n2100.arm.linux.org.uk>
+Message-ID: <20091208102351.GG12264@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun 2009-11-08 09:10:10, Russell King - ARM Linux wrote:
+> On Sun, Nov 08, 2009 at 09:13:14AM +0100, Pavel Machek wrote:
+> > > > +#include <asm/io.h>
+> > > > +#include <asm/gpio.h>
+> > > linux/gpio.h
+> > > linux/io.h
+> > 
+> > I got compile errors when trying to use linux/gpio.h:
+> > 
+> > arch/arm/mach-msm/board-dream-gpio.c: In function
+> > 'dream_gpio_configure':
+> > arch/arm/mach-msm/board-dream-gpio.c:109: error: 'GPIOF_OUTPUT_LOW'
+> > undeclared (first use in this function)
+> 
+> This means it's abusing the gpio header files - which are intended for
+> the generic GPIO support, but are being used for this platforms private
+> non-generic GPIO based stuff.
 
-ups, forget this patch, does't work as expected (thanks Wolfram!). Will try 
-again later...
-
-Juergen Beisert wrote:
-> When unmounting an mtd filesystem the s3c2410_nand_select_chip() function
-> gets called again with "chip == -1". In this case the current code disables
-> the NFC clock at least a second time, so it does not work anymore.
-> Clock disabling should only happen if it was really enabled.
->
-> Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
->
-> ---
->  drivers/mtd/nand/s3c2410.c |    8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
->
-> Index: linux-2.6.32/drivers/mtd/nand/s3c2410.c
-> ===================================================================
-> --- linux-2.6.32.orig/drivers/mtd/nand/s3c2410.c
-> +++ linux-2.6.32/drivers/mtd/nand/s3c2410.c
-> @@ -329,12 +329,16 @@ static void s3c2410_nand_select_chip(str
->  	struct s3c2410_nand_mtd *nmtd;
->  	struct nand_chip *this = mtd->priv;
->  	unsigned long cur;
-> +	int clock_enabled;
->
->  	nmtd = this->priv;
->  	info = nmtd->info;
->
-> -	if (chip != -1 && allow_clk_stop(info))
-> +	if (chip != -1 && allow_clk_stop(info)) {
->  		clk_enable(info->clk);
-> +		clock_enabled = 1;
-> +	} else
-> +		clock_enabled = 0;
->
->  	cur = readl(info->sel_reg);
->
-> @@ -356,7 +360,7 @@ static void s3c2410_nand_select_chip(str
->
->  	writel(cur, info->sel_reg);
->
-> -	if (chip == -1 && allow_clk_stop(info))
-> +	if (chip == -1 && allow_clk_stop(info) && clock_enabled != 0)
->  		clk_disable(info->clk);
->  }
-
-Juergen
-
+Ok, will fix.
+									Pavel
 -- 
-Pengutronix e.K.                              | Juergen Beisert             |
-Linux Solutions for Science and Industry      | Phone: +49-8766-939 228     |
-Vertretung Sued/Muenchen, Germany             | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686              | http://www.pengutronix.de/  |
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
