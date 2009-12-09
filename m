@@ -1,46 +1,134 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 8 Dec 2009 23:15:12 -0700
-Subject: [PATCH 0/5] spi-imx: some updates
-In-Reply-To: <20091208163546.3354a7f5.akpm@linux-foundation.org>
-References: <20091208211258.GA13706@pengutronix.de>
-	<20091208153239.af0b5bb8.akpm@linux-foundation.org>
-	<fa686aa40912081625y3750a7fegbac38926182e38c6@mail.gmail.com>
-	<20091208163546.3354a7f5.akpm@linux-foundation.org>
-Message-ID: <fa686aa40912082215l30f0b843ve891d27648c24526@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 9 Dec 2009 00:50:29 -0700 (MST)
+Subject: [GIT PULL] OMAP clock, SDRC, PM, hwmod updates for 2.6.33
+Message-ID: <alpine.DEB.2.00.0912090035280.5316@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 8, 2009 at 5:35 PM, Andrew Morton <akpm@linux-foundation.org> wrote:
-> On Tue, 8 Dec 2009 17:25:59 -0700
-> Grant Likely <grant.likely@secretlab.ca> wrote:
->
->> I'm new to the job, so I'm being cautions about which things I'm pick
->> up. ?However, I'll happily merge anything that Andrew says is okay.
->
-> oop. ?If I'm going to send a patch to a subsystem maintainer I'll usually give
-> it less attention than the ones I plan to merge myself.
->
-> Oh well, at least this way people will get their patches merged easily ;)
 
-Hmmm... maybe I'll be more selective then.
+Hello Tony,
 
-I've also got JH to set up a patchwork page for SPI so that I won't
-drop anything on the floor.  I could certainly use some help with
-triaging & acking the stuff in there.  Anyone want to volunteer?
+The following changes since commit 9a01609e1885b827b979d6d9dd86f43208a9e5fc:
+  Olof Johansson (1):
+        arm: omap: Add omap3_defconfig
 
->> Andrew, when in the merge window do you typically send out patch
->> queues?
->
-> Late. ?I stage the -mm patches after linux-next so I spend most of the
-> merge window waiting for people to get their stuff into mainline.
+are available in the git repository at:
 
-Okay, thanks.
+  git://git.pwsan.com/linux-2.6 for_2_6_33
 
-> Often there are stragglers who I need to route around. ?It's usually
-> not a significant problem though.
+Kevin Hilman (6):
+      OMAP: omap_device: add to_omap_device() macro
+      OMAP: omap_device: use UINT_MAX for default wakeup latency limit
+      OMAP: omap_device: use read_persistent_clock() instead of getnstimeofday()
+      OMAP: hwmod: warn on missing clockdomain
+      OMAP: omap_device: fix nsec/usec conversion in latency calculations
+      OMAP: omap_device: track latency in nanoseconds
 
-g.
+Paul Walmsley (19):
+      OMAP1/2/3 clock: remove paranoid checks in preparation for clock{,2xxx,3xxx}_data.c
+      OMAP2 clock: APLL code shouldn't rely on static clocks in its local namespace
+      OMAP2/3: move SDRC macros to mach-omap2/sdrc.h
+      OMAP2xxx clock: remove implicit dependency between rate CPU flag and clkdev_omap CPU flag
+      OMAP3 clock: convert clock34xx.h to clock34xx_data.c
+      OMAP2 clock: convert clock24xx.h to clock2xxx_data.c, opp2xxx*
+      OMAP1 clock: convert test in disable_unused() to use ENABLE_ON_INIT
+      OMAP1 clock: convert mach-omap1/clock.h to mach-omap1/clock_data.c
+      OMAP2/3 PRCM: don't export prm_*(), cm_*() functions
+      OMAP clockdomain/powerdomain: remove CONFIG_OMAP_DEBUG_{CLOCK,POWER}DOMAIN
+      OMAP clockdomain/powerdomain: optimize out sleepdep code on OMAP24xx
+      OMAP powerdomain/PM: use symbolic constants for the max number of power states
+      OMAP powerdomain: rearrange struct powerdomain to save some memory
+      OMAP3: SDRC: Place SDRC AC timing and MR changes in CORE DVFS SRAM code behind Kconfig
+      OMAP clock/hwmod: fix off-by-one errors
+      OMAP3 hwmod: reprogram OCP_SYSCONFIG register after setting SOFTRESET
+      OMAP3 hwmod: Add automatic OCP_SYSCONFIG AUTOIDLE handling
+      OMAP hwmod: add names to module MPU IRQ lines
+      OMAP3 hwmod: drop most of the OCP_SYSCONFIG.CLOCKACTIVITY code
 
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Rajendra Nayak (11):
+      ARM: OMAP4: PM: Fix the PRM and CM base addresses
+      ARM: OMAP4: PM: PRM/CM module offsets for OMAP4
+      ARM: OMAP4: PM: Adds CM1/2 register defs for OMAP4
+      ARM: OMAP4: PM: Adds PRM register defs for OMAP4
+      ARM: OMAP4: PM: Adds PRM register shift and mask bits
+      ARM: OMAP4: PM: Adds CM1/2 register field masks
+      ARM: OMAP4: PM: OMAP4 clock tree and clkdev registration
+      ARM: OMAP4: PM: Add dummy hooks for OMAP4 dpll api's
+      ARM: OMAP4: PM: Move DPLL control apis to dpll.c
+      ARM: OMAP4: PM: Add support for OMAP4 dpll api's
+      ARM: OMAP4: PM: Add init api for DPLL nodes
+
+Roel Kluin (1):
+      OMAP2/3 powerdomain: return errors rather than returning the output of IS_ERR()
+
+Thara Gopinath (1):
+      OMAP3: PM: Fix for MPU power domain MEM BANK position
+
+ arch/arm/mach-omap1/Makefile                       |    3 +-
+ arch/arm/mach-omap1/clock.c                        |  499 +---
+ arch/arm/mach-omap1/clock.h                        |  647 +----
+ arch/arm/mach-omap1/clock_data.c                   |  843 +++++
+ arch/arm/mach-omap1/io.c                           |    3 +-
+ arch/arm/mach-omap1/opp.h                          |   28 +
+ arch/arm/mach-omap1/opp_data.c                     |   59 +
+ arch/arm/mach-omap2/Kconfig                        |   13 +
+ arch/arm/mach-omap2/Makefile                       |   14 +-
+ arch/arm/mach-omap2/clock.c                        |   47 +-
+ arch/arm/mach-omap2/clock.h                        |   50 +-
+ arch/arm/mach-omap2/clock24xx.c                    |  805 -----
+ .../mach-omap2/{clock24xx.h => clock2xxx_data.c}   |  836 ++----
+ arch/arm/mach-omap2/clock34xx.c                    |  953 +------
+ arch/arm/mach-omap2/clock34xx.h                    | 2999 +------------------
+ arch/arm/mach-omap2/clock34xx_data.c               | 3289 ++++++++++++++++++++
+ arch/arm/mach-omap2/clock44xx.c                    |   33 +
+ arch/arm/mach-omap2/clock44xx.h                    |   15 +
+ arch/arm/mach-omap2/clock44xx_data.c               | 2766 ++++++++++++++++
+ arch/arm/mach-omap2/clockdomain.c                  |    6 +-
+ arch/arm/mach-omap2/cm-regbits-44xx.h              | 1474 +++++++++
+ arch/arm/mach-omap2/cm.c                           |    7 +-
+ arch/arm/mach-omap2/cm.h                           |   15 +-
+ arch/arm/mach-omap2/cm44xx.h                       |  358 +++
+ arch/arm/mach-omap2/dpll.c                         |  538 ++++
+ arch/arm/mach-omap2/gpmc.c                         |    2 +-
+ arch/arm/mach-omap2/io.c                           |    4 +-
+ arch/arm/mach-omap2/omap_hwmod.c                   |  164 +-
+ arch/arm/mach-omap2/pm-debug.c                     |    4 +-
+ arch/arm/mach-omap2/powerdomain.c                  |   36 +-
+ arch/arm/mach-omap2/powerdomains34xx.h             |    1 +
+ arch/arm/mach-omap2/prcm-common.h                  |   73 +-
+ arch/arm/mach-omap2/prcm.c                         |   13 +-
+ arch/arm/mach-omap2/prm-regbits-44xx.h             | 2205 +++++++++++++
+ arch/arm/mach-omap2/prm.h                          |    8 +-
+ arch/arm/mach-omap2/prm44xx.h                      |  411 +++
+ arch/arm/mach-omap2/sdrc.h                         |   19 +
+ arch/arm/mach-omap2/sram34xx.S                     |   19 +-
+ arch/arm/plat-omap/Kconfig                         |   63 +-
+ arch/arm/plat-omap/clock.c                         |   26 -
+ arch/arm/plat-omap/common.c                        |    2 +
+ arch/arm/plat-omap/include/plat/clkdev_omap.h      |   41 +
+ arch/arm/plat-omap/include/plat/clock.h            |    5 +
+ arch/arm/plat-omap/include/plat/common.h           |   21 +
+ arch/arm/plat-omap/include/plat/omap44xx.h         |    6 +-
+ arch/arm/plat-omap/include/plat/omap_device.h      |    8 +-
+ arch/arm/plat-omap/include/plat/omap_hwmod.h       |   26 +-
+ arch/arm/plat-omap/include/plat/powerdomain.h      |   17 +-
+ arch/arm/plat-omap/omap_device.c                   |   18 +-
+ 49 files changed, 12947 insertions(+), 6545 deletions(-)
+ create mode 100644 arch/arm/mach-omap1/clock_data.c
+ create mode 100644 arch/arm/mach-omap1/opp.h
+ create mode 100644 arch/arm/mach-omap1/opp_data.c
+ delete mode 100644 arch/arm/mach-omap2/clock24xx.c
+ rename arch/arm/mach-omap2/{clock24xx.h => clock2xxx_data.c} (73%)
+ create mode 100644 arch/arm/mach-omap2/clock34xx_data.c
+ create mode 100644 arch/arm/mach-omap2/clock44xx.c
+ create mode 100644 arch/arm/mach-omap2/clock44xx.h
+ create mode 100644 arch/arm/mach-omap2/clock44xx_data.c
+ create mode 100644 arch/arm/mach-omap2/cm-regbits-44xx.h
+ create mode 100644 arch/arm/mach-omap2/cm44xx.h
+ create mode 100644 arch/arm/mach-omap2/dpll.c
+ create mode 100644 arch/arm/mach-omap2/prm-regbits-44xx.h
+ create mode 100644 arch/arm/mach-omap2/prm44xx.h
+ create mode 100644 arch/arm/plat-omap/include/plat/clkdev_omap.h
+
+
+- Paul
