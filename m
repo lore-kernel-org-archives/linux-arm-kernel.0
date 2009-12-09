@@ -1,384 +1,1130 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 08 Dec 2009 16:50:31 -0800
-Subject: [PATCH 3/9] omap1: Use gen_nand
+Date: Tue, 08 Dec 2009 16:50:43 -0800
+Subject: [PATCH 4/9] omap1: DMA: move LCD related code from plat-omap to
+	mach-omap1
 In-Reply-To: <20091209004630.5944.40334.stgit@localhost>
 References: <20091209004630.5944.40334.stgit@localhost>
-Message-ID: <20091209005030.5944.87470.stgit@localhost>
+Message-ID: <20091209005043.5944.76025.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ladislav Michl <ladis@linux-mips.org>
+From: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
 
-Since omapnand driver never find its way into mainline, switch to gen_nand instead.
-Following patch is compile tested only, but it is based on code I wrote for
-NetStar board and runtime tested it there.
+All of the LCD DMA code in plat-omap/dma.c appears to be OMAP1-only (and
+apparently only is available on a subset of OMAP1 chips).
 
-Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
-Cc: Imre Deak <imre.deak@nokia.com>
-Cc: Brian Swetland <swetland@google.com>
-Cc: Kevin Hilman <kjh@hilman.org>
+Move this code to mach-omap1/lcd_dma.c.
+
+Tested on OMAP1510 Amstrad Delta.
+Compile-tested with omap_generic_2420_defconfig.
+
+Reported-by: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+Reviewed-by: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap1/board-fsample.c  |   50 ++++++++++++++++++++++--------
- arch/arm/mach-omap1/board-h2.c       |   49 ++++++++++++++++++++++++------
- arch/arm/mach-omap1/board-h3.c       |   56 ++++++++++++++++++++++++----------
- arch/arm/mach-omap1/board-perseus2.c |   48 ++++++++++++++++++++++-------
- 4 files changed, 152 insertions(+), 51 deletions(-)
+ arch/arm/mach-omap1/Makefile               |    4 
+ arch/arm/mach-omap1/include/mach/lcd_dma.h |   78 +++++
+ arch/arm/mach-omap1/lcd_dma.c              |  447 ++++++++++++++++++++++++++++
+ arch/arm/plat-omap/dma.c                   |  410 --------------------------
+ arch/arm/plat-omap/include/plat/dma.h      |   60 +---
+ 5 files changed, 541 insertions(+), 458 deletions(-)
+ create mode 100644 arch/arm/mach-omap1/include/mach/lcd_dma.h
+ create mode 100644 arch/arm/mach-omap1/lcd_dma.c
 
-diff --git a/arch/arm/mach-omap1/board-fsample.c b/arch/arm/mach-omap1/board-fsample.c
-index 91e7b2f..7e70c3c 100644
---- a/arch/arm/mach-omap1/board-fsample.c
-+++ b/arch/arm/mach-omap1/board-fsample.c
-@@ -31,7 +31,6 @@
- #include <mach/gpio.h>
- #include <plat/mux.h>
- #include <plat/fpga.h>
--#include <plat/nand.h>
- #include <plat/keypad.h>
- #include <plat/common.h>
- #include <plat/board.h>
-@@ -174,8 +173,40 @@ static struct platform_device nor_device = {
- 	.resource	= &nor_resource,
- };
- 
--static struct omap_nand_platform_data nand_data = {
--	.options	= NAND_SAMSUNG_LP_OPTIONS,
-+static void nand_cmd_ctl(struct mtd_info *mtd, int cmd,	unsigned int ctrl)
-+{
-+	struct nand_chip *this = mtd->priv;
-+	unsigned long mask;
+diff --git a/arch/arm/mach-omap1/Makefile b/arch/arm/mach-omap1/Makefile
+index 51bc195..fe75cdd 100644
+--- a/arch/arm/mach-omap1/Makefile
++++ b/arch/arm/mach-omap1/Makefile
+@@ -51,3 +51,7 @@ led-$(CONFIG_MACH_OMAP_INNOVATOR)	+= leds-innovator.o
+ led-$(CONFIG_MACH_OMAP_PERSEUS2)	+= leds-h2p2-debug.o
+ led-$(CONFIG_MACH_OMAP_OSK)		+= leds-osk.o
+ obj-$(CONFIG_LEDS)			+= $(led-y)
 +
-+	if (cmd == NAND_CMD_NONE)
++ifneq ($(CONFIG_FB_OMAP),)
++obj-y += lcd_dma.o
++endif
+diff --git a/arch/arm/mach-omap1/include/mach/lcd_dma.h b/arch/arm/mach-omap1/include/mach/lcd_dma.h
+new file mode 100644
+index 0000000..d7a457b
+--- /dev/null
++++ b/arch/arm/mach-omap1/include/mach/lcd_dma.h
+@@ -0,0 +1,78 @@
++/*
++ *  arch/arm/mach-omap1/include/mach/lcd_dma.h
++ *
++ * Extracted from arch/arm/plat-omap/include/plat/dma.h
++ *  Copyright (C) 2003 Nokia Corporation
++ *  Author: Juha Yrj?l? <juha.yrjola@nokia.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
++ */
++#ifndef __MACH_OMAP1_LCD_DMA_H__
++#define __MACH_OMAP1_LCD_DMA_H__
++
++/* Hardware registers for LCD DMA */
++#define OMAP1510_DMA_LCD_BASE		(0xfffedb00)
++#define OMAP1510_DMA_LCD_CTRL		(OMAP1510_DMA_LCD_BASE + 0x00)
++#define OMAP1510_DMA_LCD_TOP_F1_L	(OMAP1510_DMA_LCD_BASE + 0x02)
++#define OMAP1510_DMA_LCD_TOP_F1_U	(OMAP1510_DMA_LCD_BASE + 0x04)
++#define OMAP1510_DMA_LCD_BOT_F1_L	(OMAP1510_DMA_LCD_BASE + 0x06)
++#define OMAP1510_DMA_LCD_BOT_F1_U	(OMAP1510_DMA_LCD_BASE + 0x08)
++
++#define OMAP1610_DMA_LCD_BASE		(0xfffee300)
++#define OMAP1610_DMA_LCD_CSDP		(OMAP1610_DMA_LCD_BASE + 0xc0)
++#define OMAP1610_DMA_LCD_CCR		(OMAP1610_DMA_LCD_BASE + 0xc2)
++#define OMAP1610_DMA_LCD_CTRL		(OMAP1610_DMA_LCD_BASE + 0xc4)
++#define OMAP1610_DMA_LCD_TOP_B1_L	(OMAP1610_DMA_LCD_BASE + 0xc8)
++#define OMAP1610_DMA_LCD_TOP_B1_U	(OMAP1610_DMA_LCD_BASE + 0xca)
++#define OMAP1610_DMA_LCD_BOT_B1_L	(OMAP1610_DMA_LCD_BASE + 0xcc)
++#define OMAP1610_DMA_LCD_BOT_B1_U	(OMAP1610_DMA_LCD_BASE + 0xce)
++#define OMAP1610_DMA_LCD_TOP_B2_L	(OMAP1610_DMA_LCD_BASE + 0xd0)
++#define OMAP1610_DMA_LCD_TOP_B2_U	(OMAP1610_DMA_LCD_BASE + 0xd2)
++#define OMAP1610_DMA_LCD_BOT_B2_L	(OMAP1610_DMA_LCD_BASE + 0xd4)
++#define OMAP1610_DMA_LCD_BOT_B2_U	(OMAP1610_DMA_LCD_BASE + 0xd6)
++#define OMAP1610_DMA_LCD_SRC_EI_B1	(OMAP1610_DMA_LCD_BASE + 0xd8)
++#define OMAP1610_DMA_LCD_SRC_FI_B1_L	(OMAP1610_DMA_LCD_BASE + 0xda)
++#define OMAP1610_DMA_LCD_SRC_EN_B1	(OMAP1610_DMA_LCD_BASE + 0xe0)
++#define OMAP1610_DMA_LCD_SRC_FN_B1	(OMAP1610_DMA_LCD_BASE + 0xe4)
++#define OMAP1610_DMA_LCD_LCH_CTRL	(OMAP1610_DMA_LCD_BASE + 0xea)
++#define OMAP1610_DMA_LCD_SRC_FI_B1_U	(OMAP1610_DMA_LCD_BASE + 0xf4)
++
++/* LCD DMA block numbers */
++enum {
++	OMAP_LCD_DMA_B1_TOP,
++	OMAP_LCD_DMA_B1_BOTTOM,
++	OMAP_LCD_DMA_B2_TOP,
++	OMAP_LCD_DMA_B2_BOTTOM
++};
++
++/* LCD DMA functions */
++extern int omap_request_lcd_dma(void (*callback)(u16 status, void *data),
++				void *data);
++extern void omap_free_lcd_dma(void);
++extern void omap_setup_lcd_dma(void);
++extern void omap_enable_lcd_dma(void);
++extern void omap_stop_lcd_dma(void);
++extern void omap_set_lcd_dma_ext_controller(int external);
++extern void omap_set_lcd_dma_single_transfer(int single);
++extern void omap_set_lcd_dma_b1(unsigned long addr, u16 fb_xres, u16 fb_yres,
++				int data_type);
++extern void omap_set_lcd_dma_b1_rotation(int rotate);
++extern void omap_set_lcd_dma_b1_vxres(unsigned long vxres);
++extern void omap_set_lcd_dma_b1_mirror(int mirror);
++extern void omap_set_lcd_dma_b1_scale(unsigned int xscale, unsigned int yscale);
++
++extern int omap_lcd_dma_running(void);
++
++#endif /* __MACH_OMAP1_LCD_DMA_H__ */
+diff --git a/arch/arm/mach-omap1/lcd_dma.c b/arch/arm/mach-omap1/lcd_dma.c
+new file mode 100644
+index 0000000..4889514
+--- /dev/null
++++ b/arch/arm/mach-omap1/lcd_dma.c
+@@ -0,0 +1,447 @@
++/*
++ * linux/arch/arm/mach-omap1/lcd_dma.c
++ *
++ * Extracted from arch/arm/plat-omap/dma.c
++ * Copyright (C) 2003 - 2008 Nokia Corporation
++ * Author: Juha Yrj?l? <juha.yrjola@nokia.com>
++ * DMA channel linking for 1610 by Samuel Ortiz <samuel.ortiz@nokia.com>
++ * Graphics DMA and LCD DMA graphics tranformations
++ * by Imre Deak <imre.deak@nokia.com>
++ * OMAP2/3 support Copyright (C) 2004-2007 Texas Instruments, Inc.
++ * Merged to support both OMAP1 and OMAP2 by Tony Lindgren <tony@atomide.com>
++ * Some functions based on earlier dma-omap.c Copyright (C) 2001 RidgeRun, Inc.
++ *
++ * Copyright (C) 2009 Texas Instruments
++ * Added OMAP4 support - Santosh Shilimkar <santosh.shilimkar@ti.com>
++ *
++ * Support functions for the OMAP internal DMA channels.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#include <linux/module.h>
++#include <linux/spinlock.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++
++#include <mach/hardware.h>
++#include <plat/dma.h>
++
++int omap_lcd_dma_running(void)
++{
++	/*
++	 * On OMAP1510, internal LCD controller will start the transfer
++	 * when it gets enabled, so assume DMA running if LCD enabled.
++	 */
++	if (cpu_is_omap1510())
++		if (omap_readw(0xfffec000 + 0x00) & (1 << 0))
++			return 1;
++
++	/* Check if LCD DMA is running */
++	if (cpu_is_omap16xx())
++		if (omap_readw(OMAP1610_DMA_LCD_CCR) & OMAP_DMA_CCR_EN)
++			return 1;
++
++	return 0;
++}
++
++static struct lcd_dma_info {
++	spinlock_t lock;
++	int reserved;
++	void (*callback)(u16 status, void *data);
++	void *cb_data;
++
++	int active;
++	unsigned long addr, size;
++	int rotate, data_type, xres, yres;
++	int vxres;
++	int mirror;
++	int xscale, yscale;
++	int ext_ctrl;
++	int src_port;
++	int single_transfer;
++} lcd_dma;
++
++void omap_set_lcd_dma_b1(unsigned long addr, u16 fb_xres, u16 fb_yres,
++			 int data_type)
++{
++	lcd_dma.addr = addr;
++	lcd_dma.data_type = data_type;
++	lcd_dma.xres = fb_xres;
++	lcd_dma.yres = fb_yres;
++}
++EXPORT_SYMBOL(omap_set_lcd_dma_b1);
++
++void omap_set_lcd_dma_src_port(int port)
++{
++	lcd_dma.src_port = port;
++}
++
++void omap_set_lcd_dma_ext_controller(int external)
++{
++	lcd_dma.ext_ctrl = external;
++}
++EXPORT_SYMBOL(omap_set_lcd_dma_ext_controller);
++
++void omap_set_lcd_dma_single_transfer(int single)
++{
++	lcd_dma.single_transfer = single;
++}
++EXPORT_SYMBOL(omap_set_lcd_dma_single_transfer);
++
++void omap_set_lcd_dma_b1_rotation(int rotate)
++{
++	if (cpu_is_omap1510()) {
++		printk(KERN_ERR "DMA rotation is not supported in 1510 mode\n");
++		BUG();
++		return;
++	}
++	lcd_dma.rotate = rotate;
++}
++EXPORT_SYMBOL(omap_set_lcd_dma_b1_rotation);
++
++void omap_set_lcd_dma_b1_mirror(int mirror)
++{
++	if (cpu_is_omap1510()) {
++		printk(KERN_ERR "DMA mirror is not supported in 1510 mode\n");
++		BUG();
++	}
++	lcd_dma.mirror = mirror;
++}
++EXPORT_SYMBOL(omap_set_lcd_dma_b1_mirror);
++
++void omap_set_lcd_dma_b1_vxres(unsigned long vxres)
++{
++	if (cpu_is_omap1510()) {
++		printk(KERN_ERR "DMA virtual resulotion is not supported "
++				"in 1510 mode\n");
++		BUG();
++	}
++	lcd_dma.vxres = vxres;
++}
++EXPORT_SYMBOL(omap_set_lcd_dma_b1_vxres);
++
++void omap_set_lcd_dma_b1_scale(unsigned int xscale, unsigned int yscale)
++{
++	if (cpu_is_omap1510()) {
++		printk(KERN_ERR "DMA scale is not supported in 1510 mode\n");
++		BUG();
++	}
++	lcd_dma.xscale = xscale;
++	lcd_dma.yscale = yscale;
++}
++EXPORT_SYMBOL(omap_set_lcd_dma_b1_scale);
++
++static void set_b1_regs(void)
++{
++	unsigned long top, bottom;
++	int es;
++	u16 w;
++	unsigned long en, fn;
++	long ei, fi;
++	unsigned long vxres;
++	unsigned int xscale, yscale;
++
++	switch (lcd_dma.data_type) {
++	case OMAP_DMA_DATA_TYPE_S8:
++		es = 1;
++		break;
++	case OMAP_DMA_DATA_TYPE_S16:
++		es = 2;
++		break;
++	case OMAP_DMA_DATA_TYPE_S32:
++		es = 4;
++		break;
++	default:
++		BUG();
++		return;
++	}
++
++	vxres = lcd_dma.vxres ? lcd_dma.vxres : lcd_dma.xres;
++	xscale = lcd_dma.xscale ? lcd_dma.xscale : 1;
++	yscale = lcd_dma.yscale ? lcd_dma.yscale : 1;
++	BUG_ON(vxres < lcd_dma.xres);
++
++#define PIXADDR(x, y) (lcd_dma.addr +					\
++		((y) * vxres * yscale + (x) * xscale) * es)
++#define PIXSTEP(sx, sy, dx, dy) (PIXADDR(dx, dy) - PIXADDR(sx, sy) - es + 1)
++
++	switch (lcd_dma.rotate) {
++	case 0:
++		if (!lcd_dma.mirror) {
++			top = PIXADDR(0, 0);
++			bottom = PIXADDR(lcd_dma.xres - 1, lcd_dma.yres - 1);
++			/* 1510 DMA requires the bottom address to be 2 more
++			 * than the actual last memory access location. */
++			if (cpu_is_omap1510() &&
++				lcd_dma.data_type == OMAP_DMA_DATA_TYPE_S32)
++					bottom += 2;
++			ei = PIXSTEP(0, 0, 1, 0);
++			fi = PIXSTEP(lcd_dma.xres - 1, 0, 0, 1);
++		} else {
++			top = PIXADDR(lcd_dma.xres - 1, 0);
++			bottom = PIXADDR(0, lcd_dma.yres - 1);
++			ei = PIXSTEP(1, 0, 0, 0);
++			fi = PIXSTEP(0, 0, lcd_dma.xres - 1, 1);
++		}
++		en = lcd_dma.xres;
++		fn = lcd_dma.yres;
++		break;
++	case 90:
++		if (!lcd_dma.mirror) {
++			top = PIXADDR(0, lcd_dma.yres - 1);
++			bottom = PIXADDR(lcd_dma.xres - 1, 0);
++			ei = PIXSTEP(0, 1, 0, 0);
++			fi = PIXSTEP(0, 0, 1, lcd_dma.yres - 1);
++		} else {
++			top = PIXADDR(lcd_dma.xres - 1, lcd_dma.yres - 1);
++			bottom = PIXADDR(0, 0);
++			ei = PIXSTEP(0, 1, 0, 0);
++			fi = PIXSTEP(1, 0, 0, lcd_dma.yres - 1);
++		}
++		en = lcd_dma.yres;
++		fn = lcd_dma.xres;
++		break;
++	case 180:
++		if (!lcd_dma.mirror) {
++			top = PIXADDR(lcd_dma.xres - 1, lcd_dma.yres - 1);
++			bottom = PIXADDR(0, 0);
++			ei = PIXSTEP(1, 0, 0, 0);
++			fi = PIXSTEP(0, 1, lcd_dma.xres - 1, 0);
++		} else {
++			top = PIXADDR(0, lcd_dma.yres - 1);
++			bottom = PIXADDR(lcd_dma.xres - 1, 0);
++			ei = PIXSTEP(0, 0, 1, 0);
++			fi = PIXSTEP(lcd_dma.xres - 1, 1, 0, 0);
++		}
++		en = lcd_dma.xres;
++		fn = lcd_dma.yres;
++		break;
++	case 270:
++		if (!lcd_dma.mirror) {
++			top = PIXADDR(lcd_dma.xres - 1, 0);
++			bottom = PIXADDR(0, lcd_dma.yres - 1);
++			ei = PIXSTEP(0, 0, 0, 1);
++			fi = PIXSTEP(1, lcd_dma.yres - 1, 0, 0);
++		} else {
++			top = PIXADDR(0, 0);
++			bottom = PIXADDR(lcd_dma.xres - 1, lcd_dma.yres - 1);
++			ei = PIXSTEP(0, 0, 0, 1);
++			fi = PIXSTEP(0, lcd_dma.yres - 1, 1, 0);
++		}
++		en = lcd_dma.yres;
++		fn = lcd_dma.xres;
++		break;
++	default:
++		BUG();
++		return;	/* Suppress warning about uninitialized vars */
++	}
++
++	if (cpu_is_omap1510()) {
++		omap_writew(top >> 16, OMAP1510_DMA_LCD_TOP_F1_U);
++		omap_writew(top, OMAP1510_DMA_LCD_TOP_F1_L);
++		omap_writew(bottom >> 16, OMAP1510_DMA_LCD_BOT_F1_U);
++		omap_writew(bottom, OMAP1510_DMA_LCD_BOT_F1_L);
++
++		return;
++	}
++
++	/* 1610 regs */
++	omap_writew(top >> 16, OMAP1610_DMA_LCD_TOP_B1_U);
++	omap_writew(top, OMAP1610_DMA_LCD_TOP_B1_L);
++	omap_writew(bottom >> 16, OMAP1610_DMA_LCD_BOT_B1_U);
++	omap_writew(bottom, OMAP1610_DMA_LCD_BOT_B1_L);
++
++	omap_writew(en, OMAP1610_DMA_LCD_SRC_EN_B1);
++	omap_writew(fn, OMAP1610_DMA_LCD_SRC_FN_B1);
++
++	w = omap_readw(OMAP1610_DMA_LCD_CSDP);
++	w &= ~0x03;
++	w |= lcd_dma.data_type;
++	omap_writew(w, OMAP1610_DMA_LCD_CSDP);
++
++	w = omap_readw(OMAP1610_DMA_LCD_CTRL);
++	/* Always set the source port as SDRAM for now*/
++	w &= ~(0x03 << 6);
++	if (lcd_dma.callback != NULL)
++		w |= 1 << 1;		/* Block interrupt enable */
++	else
++		w &= ~(1 << 1);
++	omap_writew(w, OMAP1610_DMA_LCD_CTRL);
++
++	if (!(lcd_dma.rotate || lcd_dma.mirror ||
++	      lcd_dma.vxres || lcd_dma.xscale || lcd_dma.yscale))
 +		return;
 +
-+	mask = (ctrl & NAND_CLE) ? 0x02 : 0;
-+	if (ctrl & NAND_ALE)
-+		mask |= 0x04;
-+	writeb(cmd, (unsigned long)this->IO_ADDR_W | mask);
++	w = omap_readw(OMAP1610_DMA_LCD_CCR);
++	/* Set the double-indexed addressing mode */
++	w |= (0x03 << 12);
++	omap_writew(w, OMAP1610_DMA_LCD_CCR);
++
++	omap_writew(ei, OMAP1610_DMA_LCD_SRC_EI_B1);
++	omap_writew(fi >> 16, OMAP1610_DMA_LCD_SRC_FI_B1_U);
++	omap_writew(fi, OMAP1610_DMA_LCD_SRC_FI_B1_L);
 +}
 +
-+#define FSAMPLE_NAND_RB_GPIO_PIN	62
-+
-+static int nand_dev_ready(struct mtd_info *mtd)
++static irqreturn_t lcd_dma_irq_handler(int irq, void *dev_id)
 +{
-+	return gpio_get_value(FSAMPLE_NAND_RB_GPIO_PIN);
++	u16 w;
++
++	w = omap_readw(OMAP1610_DMA_LCD_CTRL);
++	if (unlikely(!(w & (1 << 3)))) {
++		printk(KERN_WARNING "Spurious LCD DMA IRQ\n");
++		return IRQ_NONE;
++	}
++	/* Ack the IRQ */
++	w |= (1 << 3);
++	omap_writew(w, OMAP1610_DMA_LCD_CTRL);
++	lcd_dma.active = 0;
++	if (lcd_dma.callback != NULL)
++		lcd_dma.callback(w, lcd_dma.cb_data);
++
++	return IRQ_HANDLED;
 +}
 +
-+static const char *part_probes[] = { "cmdlinepart", NULL };
++int omap_request_lcd_dma(void (*callback)(u16 status, void *data),
++			 void *data)
++{
++	spin_lock_irq(&lcd_dma.lock);
++	if (lcd_dma.reserved) {
++		spin_unlock_irq(&lcd_dma.lock);
++		printk(KERN_ERR "LCD DMA channel already reserved\n");
++		BUG();
++		return -EBUSY;
++	}
++	lcd_dma.reserved = 1;
++	spin_unlock_irq(&lcd_dma.lock);
++	lcd_dma.callback = callback;
++	lcd_dma.cb_data = data;
++	lcd_dma.active = 0;
++	lcd_dma.single_transfer = 0;
++	lcd_dma.rotate = 0;
++	lcd_dma.vxres = 0;
++	lcd_dma.mirror = 0;
++	lcd_dma.xscale = 0;
++	lcd_dma.yscale = 0;
++	lcd_dma.ext_ctrl = 0;
++	lcd_dma.src_port = 0;
 +
-+static struct platform_nand_data nand_data = {
-+	.chip	= {
-+		.nr_chips		= 1,
-+		.chip_offset		= 0,
-+		.options		= NAND_SAMSUNG_LP_OPTIONS,
-+		.part_probe_types	= part_probes,
-+	},
-+	.ctrl	= {
-+		.cmd_ctrl	= nand_cmd_ctl,
-+		.dev_ready	= nand_dev_ready,
-+	},
- };
++	return 0;
++}
++EXPORT_SYMBOL(omap_request_lcd_dma);
++
++void omap_free_lcd_dma(void)
++{
++	spin_lock(&lcd_dma.lock);
++	if (!lcd_dma.reserved) {
++		spin_unlock(&lcd_dma.lock);
++		printk(KERN_ERR "LCD DMA is not reserved\n");
++		BUG();
++		return;
++	}
++	if (!cpu_is_omap1510())
++		omap_writew(omap_readw(OMAP1610_DMA_LCD_CCR) & ~1,
++			    OMAP1610_DMA_LCD_CCR);
++	lcd_dma.reserved = 0;
++	spin_unlock(&lcd_dma.lock);
++}
++EXPORT_SYMBOL(omap_free_lcd_dma);
++
++void omap_enable_lcd_dma(void)
++{
++	u16 w;
++
++	/*
++	 * Set the Enable bit only if an external controller is
++	 * connected. Otherwise the OMAP internal controller will
++	 * start the transfer when it gets enabled.
++	 */
++	if (cpu_is_omap1510() || !lcd_dma.ext_ctrl)
++		return;
++
++	w = omap_readw(OMAP1610_DMA_LCD_CTRL);
++	w |= 1 << 8;
++	omap_writew(w, OMAP1610_DMA_LCD_CTRL);
++
++	lcd_dma.active = 1;
++
++	w = omap_readw(OMAP1610_DMA_LCD_CCR);
++	w |= 1 << 7;
++	omap_writew(w, OMAP1610_DMA_LCD_CCR);
++}
++EXPORT_SYMBOL(omap_enable_lcd_dma);
++
++void omap_setup_lcd_dma(void)
++{
++	BUG_ON(lcd_dma.active);
++	if (!cpu_is_omap1510()) {
++		/* Set some reasonable defaults */
++		omap_writew(0x5440, OMAP1610_DMA_LCD_CCR);
++		omap_writew(0x9102, OMAP1610_DMA_LCD_CSDP);
++		omap_writew(0x0004, OMAP1610_DMA_LCD_LCH_CTRL);
++	}
++	set_b1_regs();
++	if (!cpu_is_omap1510()) {
++		u16 w;
++
++		w = omap_readw(OMAP1610_DMA_LCD_CCR);
++		/*
++		 * If DMA was already active set the end_prog bit to have
++		 * the programmed register set loaded into the active
++		 * register set.
++		 */
++		w |= 1 << 11;		/* End_prog */
++		if (!lcd_dma.single_transfer)
++			w |= (3 << 8);	/* Auto_init, repeat */
++		omap_writew(w, OMAP1610_DMA_LCD_CCR);
++	}
++}
++EXPORT_SYMBOL(omap_setup_lcd_dma);
++
++void omap_stop_lcd_dma(void)
++{
++	u16 w;
++
++	lcd_dma.active = 0;
++	if (cpu_is_omap1510() || !lcd_dma.ext_ctrl)
++		return;
++
++	w = omap_readw(OMAP1610_DMA_LCD_CCR);
++	w &= ~(1 << 7);
++	omap_writew(w, OMAP1610_DMA_LCD_CCR);
++
++	w = omap_readw(OMAP1610_DMA_LCD_CTRL);
++	w &= ~(1 << 8);
++	omap_writew(w, OMAP1610_DMA_LCD_CTRL);
++}
++EXPORT_SYMBOL(omap_stop_lcd_dma);
++
++static int __init omap_init_lcd_dma(void)
++{
++	int r;
++
++	if (cpu_is_omap16xx()) {
++		u16 w;
++
++		/* this would prevent OMAP sleep */
++		w = omap_readw(OMAP1610_DMA_LCD_CTRL);
++		w &= ~(1 << 8);
++		omap_writew(w, OMAP1610_DMA_LCD_CTRL);
++	}
++
++	spin_lock_init(&lcd_dma.lock);
++
++	r = request_irq(INT_DMA_LCD, lcd_dma_irq_handler, 0,
++			"LCD DMA", NULL);
++	if (r != 0)
++		printk(KERN_ERR "unable to request IRQ for LCD DMA "
++			       "(error %d)\n", r);
++
++	return r;
++}
++
++arch_initcall(omap_init_lcd_dma);
++
+diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+index be4ce07..3897f56 100644
+--- a/arch/arm/plat-omap/dma.c
++++ b/arch/arm/plat-omap/dma.c
+@@ -47,7 +47,6 @@ enum { DMA_CHAIN_STARTED, DMA_CHAIN_NOTSTARTED };
+ #endif
  
- static struct resource nand_resource = {
-@@ -185,7 +216,7 @@ static struct resource nand_resource = {
- };
+ #define OMAP_DMA_ACTIVE			0x01
+-#define OMAP_DMA_CCR_EN			(1 << 7)
+ #define OMAP2_DMA_CSR_CLEAR_MASK	0xffe
  
- static struct platform_device nand_device = {
--	.name		= "omapnand",
-+	.name		= "gen_nand",
- 	.id		= 0,
- 	.dev		= {
- 		.platform_data	= &nand_data,
-@@ -243,13 +274,6 @@ static struct platform_device *devices[] __initdata = {
- 	&lcd_device,
- };
+ #define OMAP_FUNC_MUX_ARM_BASE		(0xfffe1000 + 0xec)
+@@ -1120,17 +1119,8 @@ int omap_dma_running(void)
+ {
+ 	int lch;
  
--#define P2_NAND_RB_GPIO_PIN	62
+-	/*
+-	 * On OMAP1510, internal LCD controller will start the transfer
+-	 * when it gets enabled, so assume DMA running if LCD enabled.
+-	 */
+-	if (cpu_is_omap1510())
+-		if (omap_readw(0xfffec000 + 0x00) & (1 << 0))
+-			return 1;
 -
--static int nand_dev_ready(struct omap_nand_platform_data *data)
+-	/* Check if LCD DMA is running */
+-	if (cpu_is_omap16xx())
+-		if (omap_readw(OMAP1610_DMA_LCD_CCR) & OMAP_DMA_CCR_EN)
++	if (cpu_class_is_omap1())
++		if (omap_lcd_dma_running())
+ 			return 1;
+ 
+ 	for (lch = 0; lch < dma_chan_count; lch++)
+@@ -1990,377 +1980,6 @@ static struct irqaction omap24xx_dma_irq;
+ 
+ /*----------------------------------------------------------------------------*/
+ 
+-static struct lcd_dma_info {
+-	spinlock_t lock;
+-	int reserved;
+-	void (*callback)(u16 status, void *data);
+-	void *cb_data;
+-
+-	int active;
+-	unsigned long addr, size;
+-	int rotate, data_type, xres, yres;
+-	int vxres;
+-	int mirror;
+-	int xscale, yscale;
+-	int ext_ctrl;
+-	int src_port;
+-	int single_transfer;
+-} lcd_dma;
+-
+-void omap_set_lcd_dma_b1(unsigned long addr, u16 fb_xres, u16 fb_yres,
+-			 int data_type)
 -{
--	return gpio_get_value(P2_NAND_RB_GPIO_PIN);
+-	lcd_dma.addr = addr;
+-	lcd_dma.data_type = data_type;
+-	lcd_dma.xres = fb_xres;
+-	lcd_dma.yres = fb_yres;
+-}
+-EXPORT_SYMBOL(omap_set_lcd_dma_b1);
+-
+-void omap_set_lcd_dma_src_port(int port)
+-{
+-	lcd_dma.src_port = port;
 -}
 -
- static struct omap_lcd_config fsample_lcd_config __initdata = {
- 	.ctrl_name	= "internal",
- };
-@@ -260,9 +284,9 @@ static struct omap_board_config_kernel fsample_config[] = {
- 
- static void __init omap_fsample_init(void)
- {
--	if (gpio_request(P2_NAND_RB_GPIO_PIN, "NAND ready") < 0)
-+	if (gpio_request(FSAMPLE_NAND_RB_GPIO_PIN, "NAND ready") < 0)
- 		BUG();
--	nand_data.dev_ready = nand_dev_ready;
-+	gpio_direction_input(FSAMPLE_NAND_RB_GPIO_PIN);
- 
- 	omap_cfg_reg(L3_1610_FLASH_CS2B_OE);
- 	omap_cfg_reg(M8_1610_FLASH_CS2B_WE);
-diff --git a/arch/arm/mach-omap1/board-h2.c b/arch/arm/mach-omap1/board-h2.c
-index eeafe6e..fa7cece 100644
---- a/arch/arm/mach-omap1/board-h2.c
-+++ b/arch/arm/mach-omap1/board-h2.c
-@@ -41,7 +41,6 @@
- #include <plat/mux.h>
- #include <plat/dma.h>
- #include <plat/tc.h>
--#include <plat/nand.h>
- #include <plat/irda.h>
- #include <plat/usb.h>
- #include <plat/keypad.h>
-@@ -180,11 +179,43 @@ static struct mtd_partition h2_nand_partitions[] = {
- 	},
- };
- 
--/* dip switches control NAND chip access:  8 bit, 16 bit, or neither */
--static struct omap_nand_platform_data h2_nand_data = {
--	.options	= NAND_SAMSUNG_LP_OPTIONS,
--	.parts		= h2_nand_partitions,
--	.nr_parts	= ARRAY_SIZE(h2_nand_partitions),
-+static void h2_nand_cmd_ctl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
-+{
-+	struct nand_chip *this = mtd->priv;
-+	unsigned long mask;
-+
-+	if (cmd == NAND_CMD_NONE)
-+		return;
-+
-+	mask = (ctrl & NAND_CLE) ? 0x02 : 0;
-+	if (ctrl & NAND_ALE)
-+		mask |= 0x04;
-+	writeb(cmd, (unsigned long)this->IO_ADDR_W | mask);
-+}
-+
-+#define H2_NAND_RB_GPIO_PIN	62
-+
-+static int h2_nand_dev_ready(struct mtd_info *mtd)
-+{
-+	return gpio_get_value(H2_NAND_RB_GPIO_PIN);
-+}
-+
-+static const char *h2_part_probes[] = { "cmdlinepart", NULL };
-+
-+struct platform_nand_data h2_nand_platdata = {
-+	.chip	= {
-+		.nr_chips		= 1,
-+		.chip_offset		= 0,
-+		.nr_partitions		= ARRAY_SIZE(h2_nand_partitions),
-+		.partitions		= h2_nand_partitions,
-+		.options		= NAND_SAMSUNG_LP_OPTIONS,
-+		.part_probe_types	= h2_part_probes,
-+	},
-+	.ctrl	= {
-+		.cmd_ctrl	= h2_nand_cmd_ctl,
-+		.dev_ready	= h2_nand_dev_ready,
-+
-+	},
- };
- 
- static struct resource h2_nand_resource = {
-@@ -192,10 +223,10 @@ static struct resource h2_nand_resource = {
- };
- 
- static struct platform_device h2_nand_device = {
--	.name		= "omapnand",
-+	.name		= "gen_nand",
- 	.id		= 0,
- 	.dev		= {
--		.platform_data	= &h2_nand_data,
-+		.platform_data	= &h2_nand_platdata,
- 	},
- 	.num_resources	= 1,
- 	.resource	= &h2_nand_resource,
-@@ -378,8 +409,6 @@ static struct omap_board_config_kernel h2_config[] __initdata = {
- 	{ OMAP_TAG_LCD,		&h2_lcd_config },
- };
- 
--#define H2_NAND_RB_GPIO_PIN	62
--
- static void __init h2_init(void)
- {
- 	/* Here we assume the NOR boot config:  NOR on CS3 (possibly swapped
-diff --git a/arch/arm/mach-omap1/board-h3.c b/arch/arm/mach-omap1/board-h3.c
-index e0aee66..6a7f9c3 100644
---- a/arch/arm/mach-omap1/board-h3.c
-+++ b/arch/arm/mach-omap1/board-h3.c
-@@ -43,7 +43,6 @@
- #include <mach/irqs.h>
- #include <plat/mux.h>
- #include <plat/tc.h>
--#include <plat/nand.h>
- #include <plat/usb.h>
- #include <plat/keypad.h>
- #include <plat/dma.h>
-@@ -182,11 +181,43 @@ static struct mtd_partition nand_partitions[] = {
- 	},
- };
- 
--/* dip switches control NAND chip access:  8 bit, 16 bit, or neither */
--static struct omap_nand_platform_data nand_data = {
--	.options	= NAND_SAMSUNG_LP_OPTIONS,
--	.parts		= nand_partitions,
--	.nr_parts	= ARRAY_SIZE(nand_partitions),
-+static void nand_cmd_ctl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
-+{
-+	struct nand_chip *this = mtd->priv;
-+	unsigned long mask;
-+
-+	if (cmd == NAND_CMD_NONE)
-+		return;
-+
-+	mask = (ctrl & NAND_CLE) ? 0x02 : 0;
-+	if (ctrl & NAND_ALE)
-+		mask |= 0x04;
-+	writeb(cmd, (unsigned long)this->IO_ADDR_W | mask);
-+}
-+
-+#define H3_NAND_RB_GPIO_PIN	10
-+
-+static int nand_dev_ready(struct mtd_info *mtd)
-+{
-+	return gpio_get_value(H3_NAND_RB_GPIO_PIN);
-+}
-+
-+static const char *part_probes[] = { "cmdlinepart", NULL };
-+
-+struct platform_nand_data nand_platdata = {
-+	.chip	= {
-+		.nr_chips		= 1,
-+		.chip_offset		= 0,
-+		.nr_partitions		= ARRAY_SIZE(nand_partitions),
-+		.partitions		= nand_partitions,
-+		.options		= NAND_SAMSUNG_LP_OPTIONS,
-+		.part_probe_types	= part_probes,
-+	},
-+	.ctrl	= {
-+		.cmd_ctrl	= nand_cmd_ctl,
-+		.dev_ready	= nand_dev_ready,
-+
-+	},
- };
- 
- static struct resource nand_resource = {
-@@ -194,10 +225,10 @@ static struct resource nand_resource = {
- };
- 
- static struct platform_device nand_device = {
--	.name		= "omapnand",
-+	.name		= "gen_nand",
- 	.id		= 0,
- 	.dev		= {
--		.platform_data	= &nand_data,
-+		.platform_data	= &nand_platdata,
- 	},
- 	.num_resources	= 1,
- 	.resource	= &nand_resource,
-@@ -342,13 +373,6 @@ static struct i2c_board_info __initdata h3_i2c_board_info[] = {
- 	},
- };
- 
--#define H3_NAND_RB_GPIO_PIN	10
--
--static int nand_dev_ready(struct omap_nand_platform_data *data)
+-void omap_set_lcd_dma_ext_controller(int external)
 -{
--	return gpio_get_value(H3_NAND_RB_GPIO_PIN);
+-	lcd_dma.ext_ctrl = external;
+-}
+-EXPORT_SYMBOL(omap_set_lcd_dma_ext_controller);
+-
+-void omap_set_lcd_dma_single_transfer(int single)
+-{
+-	lcd_dma.single_transfer = single;
+-}
+-EXPORT_SYMBOL(omap_set_lcd_dma_single_transfer);
+-
+-void omap_set_lcd_dma_b1_rotation(int rotate)
+-{
+-	if (omap_dma_in_1510_mode()) {
+-		printk(KERN_ERR "DMA rotation is not supported in 1510 mode\n");
+-		BUG();
+-		return;
+-	}
+-	lcd_dma.rotate = rotate;
+-}
+-EXPORT_SYMBOL(omap_set_lcd_dma_b1_rotation);
+-
+-void omap_set_lcd_dma_b1_mirror(int mirror)
+-{
+-	if (omap_dma_in_1510_mode()) {
+-		printk(KERN_ERR "DMA mirror is not supported in 1510 mode\n");
+-		BUG();
+-	}
+-	lcd_dma.mirror = mirror;
+-}
+-EXPORT_SYMBOL(omap_set_lcd_dma_b1_mirror);
+-
+-void omap_set_lcd_dma_b1_vxres(unsigned long vxres)
+-{
+-	if (omap_dma_in_1510_mode()) {
+-		printk(KERN_ERR "DMA virtual resulotion is not supported "
+-				"in 1510 mode\n");
+-		BUG();
+-	}
+-	lcd_dma.vxres = vxres;
+-}
+-EXPORT_SYMBOL(omap_set_lcd_dma_b1_vxres);
+-
+-void omap_set_lcd_dma_b1_scale(unsigned int xscale, unsigned int yscale)
+-{
+-	if (omap_dma_in_1510_mode()) {
+-		printk(KERN_ERR "DMA scale is not supported in 1510 mode\n");
+-		BUG();
+-	}
+-	lcd_dma.xscale = xscale;
+-	lcd_dma.yscale = yscale;
+-}
+-EXPORT_SYMBOL(omap_set_lcd_dma_b1_scale);
+-
+-static void set_b1_regs(void)
+-{
+-	unsigned long top, bottom;
+-	int es;
+-	u16 w;
+-	unsigned long en, fn;
+-	long ei, fi;
+-	unsigned long vxres;
+-	unsigned int xscale, yscale;
+-
+-	switch (lcd_dma.data_type) {
+-	case OMAP_DMA_DATA_TYPE_S8:
+-		es = 1;
+-		break;
+-	case OMAP_DMA_DATA_TYPE_S16:
+-		es = 2;
+-		break;
+-	case OMAP_DMA_DATA_TYPE_S32:
+-		es = 4;
+-		break;
+-	default:
+-		BUG();
+-		return;
+-	}
+-
+-	vxres = lcd_dma.vxres ? lcd_dma.vxres : lcd_dma.xres;
+-	xscale = lcd_dma.xscale ? lcd_dma.xscale : 1;
+-	yscale = lcd_dma.yscale ? lcd_dma.yscale : 1;
+-	BUG_ON(vxres < lcd_dma.xres);
+-
+-#define PIXADDR(x, y) (lcd_dma.addr +					\
+-		((y) * vxres * yscale + (x) * xscale) * es)
+-#define PIXSTEP(sx, sy, dx, dy) (PIXADDR(dx, dy) - PIXADDR(sx, sy) - es + 1)
+-
+-	switch (lcd_dma.rotate) {
+-	case 0:
+-		if (!lcd_dma.mirror) {
+-			top = PIXADDR(0, 0);
+-			bottom = PIXADDR(lcd_dma.xres - 1, lcd_dma.yres - 1);
+-			/* 1510 DMA requires the bottom address to be 2 more
+-			 * than the actual last memory access location. */
+-			if (omap_dma_in_1510_mode() &&
+-				lcd_dma.data_type == OMAP_DMA_DATA_TYPE_S32)
+-					bottom += 2;
+-			ei = PIXSTEP(0, 0, 1, 0);
+-			fi = PIXSTEP(lcd_dma.xres - 1, 0, 0, 1);
+-		} else {
+-			top = PIXADDR(lcd_dma.xres - 1, 0);
+-			bottom = PIXADDR(0, lcd_dma.yres - 1);
+-			ei = PIXSTEP(1, 0, 0, 0);
+-			fi = PIXSTEP(0, 0, lcd_dma.xres - 1, 1);
+-		}
+-		en = lcd_dma.xres;
+-		fn = lcd_dma.yres;
+-		break;
+-	case 90:
+-		if (!lcd_dma.mirror) {
+-			top = PIXADDR(0, lcd_dma.yres - 1);
+-			bottom = PIXADDR(lcd_dma.xres - 1, 0);
+-			ei = PIXSTEP(0, 1, 0, 0);
+-			fi = PIXSTEP(0, 0, 1, lcd_dma.yres - 1);
+-		} else {
+-			top = PIXADDR(lcd_dma.xres - 1, lcd_dma.yres - 1);
+-			bottom = PIXADDR(0, 0);
+-			ei = PIXSTEP(0, 1, 0, 0);
+-			fi = PIXSTEP(1, 0, 0, lcd_dma.yres - 1);
+-		}
+-		en = lcd_dma.yres;
+-		fn = lcd_dma.xres;
+-		break;
+-	case 180:
+-		if (!lcd_dma.mirror) {
+-			top = PIXADDR(lcd_dma.xres - 1, lcd_dma.yres - 1);
+-			bottom = PIXADDR(0, 0);
+-			ei = PIXSTEP(1, 0, 0, 0);
+-			fi = PIXSTEP(0, 1, lcd_dma.xres - 1, 0);
+-		} else {
+-			top = PIXADDR(0, lcd_dma.yres - 1);
+-			bottom = PIXADDR(lcd_dma.xres - 1, 0);
+-			ei = PIXSTEP(0, 0, 1, 0);
+-			fi = PIXSTEP(lcd_dma.xres - 1, 1, 0, 0);
+-		}
+-		en = lcd_dma.xres;
+-		fn = lcd_dma.yres;
+-		break;
+-	case 270:
+-		if (!lcd_dma.mirror) {
+-			top = PIXADDR(lcd_dma.xres - 1, 0);
+-			bottom = PIXADDR(0, lcd_dma.yres - 1);
+-			ei = PIXSTEP(0, 0, 0, 1);
+-			fi = PIXSTEP(1, lcd_dma.yres - 1, 0, 0);
+-		} else {
+-			top = PIXADDR(0, 0);
+-			bottom = PIXADDR(lcd_dma.xres - 1, lcd_dma.yres - 1);
+-			ei = PIXSTEP(0, 0, 0, 1);
+-			fi = PIXSTEP(0, lcd_dma.yres - 1, 1, 0);
+-		}
+-		en = lcd_dma.yres;
+-		fn = lcd_dma.xres;
+-		break;
+-	default:
+-		BUG();
+-		return;	/* Suppress warning about uninitialized vars */
+-	}
+-
+-	if (omap_dma_in_1510_mode()) {
+-		omap_writew(top >> 16, OMAP1510_DMA_LCD_TOP_F1_U);
+-		omap_writew(top, OMAP1510_DMA_LCD_TOP_F1_L);
+-		omap_writew(bottom >> 16, OMAP1510_DMA_LCD_BOT_F1_U);
+-		omap_writew(bottom, OMAP1510_DMA_LCD_BOT_F1_L);
+-
+-		return;
+-	}
+-
+-	/* 1610 regs */
+-	omap_writew(top >> 16, OMAP1610_DMA_LCD_TOP_B1_U);
+-	omap_writew(top, OMAP1610_DMA_LCD_TOP_B1_L);
+-	omap_writew(bottom >> 16, OMAP1610_DMA_LCD_BOT_B1_U);
+-	omap_writew(bottom, OMAP1610_DMA_LCD_BOT_B1_L);
+-
+-	omap_writew(en, OMAP1610_DMA_LCD_SRC_EN_B1);
+-	omap_writew(fn, OMAP1610_DMA_LCD_SRC_FN_B1);
+-
+-	w = omap_readw(OMAP1610_DMA_LCD_CSDP);
+-	w &= ~0x03;
+-	w |= lcd_dma.data_type;
+-	omap_writew(w, OMAP1610_DMA_LCD_CSDP);
+-
+-	w = omap_readw(OMAP1610_DMA_LCD_CTRL);
+-	/* Always set the source port as SDRAM for now*/
+-	w &= ~(0x03 << 6);
+-	if (lcd_dma.callback != NULL)
+-		w |= 1 << 1;		/* Block interrupt enable */
+-	else
+-		w &= ~(1 << 1);
+-	omap_writew(w, OMAP1610_DMA_LCD_CTRL);
+-
+-	if (!(lcd_dma.rotate || lcd_dma.mirror ||
+-	      lcd_dma.vxres || lcd_dma.xscale || lcd_dma.yscale))
+-		return;
+-
+-	w = omap_readw(OMAP1610_DMA_LCD_CCR);
+-	/* Set the double-indexed addressing mode */
+-	w |= (0x03 << 12);
+-	omap_writew(w, OMAP1610_DMA_LCD_CCR);
+-
+-	omap_writew(ei, OMAP1610_DMA_LCD_SRC_EI_B1);
+-	omap_writew(fi >> 16, OMAP1610_DMA_LCD_SRC_FI_B1_U);
+-	omap_writew(fi, OMAP1610_DMA_LCD_SRC_FI_B1_L);
 -}
 -
- static void __init h3_init(void)
- {
- 	/* Here we assume the NOR boot config:  NOR on CS3 (possibly swapped
-@@ -366,7 +390,7 @@ static void __init h3_init(void)
- 	nand_resource.end += SZ_4K - 1;
- 	if (gpio_request(H3_NAND_RB_GPIO_PIN, "NAND ready") < 0)
- 		BUG();
--	nand_data.dev_ready = nand_dev_ready;
-+	gpio_direction_input(H3_NAND_RB_GPIO_PIN);
- 
- 	/* GPIO10 Func_MUX_CTRL reg bit 29:27, Configure V2 to mode1 as GPIO */
- 	/* GPIO10 pullup/down register, Enable pullup on GPIO10 */
-diff --git a/arch/arm/mach-omap1/board-perseus2.c b/arch/arm/mach-omap1/board-perseus2.c
-index b9ea312..1387a4f 100644
---- a/arch/arm/mach-omap1/board-perseus2.c
-+++ b/arch/arm/mach-omap1/board-perseus2.c
-@@ -31,7 +31,6 @@
- #include <mach/gpio.h>
- #include <plat/mux.h>
- #include <plat/fpga.h>
--#include <plat/nand.h>
- #include <plat/keypad.h>
- #include <plat/common.h>
- #include <plat/board.h>
-@@ -141,8 +140,40 @@ static struct platform_device nor_device = {
- 	.resource	= &nor_resource,
- };
- 
--static struct omap_nand_platform_data nand_data = {
--	.options	= NAND_SAMSUNG_LP_OPTIONS,
-+static void nand_cmd_ctl(struct mtd_info *mtd, int cmd,	unsigned int ctrl)
-+{
-+	struct nand_chip *this = mtd->priv;
-+	unsigned long mask;
-+
-+	if (cmd == NAND_CMD_NONE)
-+		return;
-+
-+	mask = (ctrl & NAND_CLE) ? 0x02 : 0;
-+	if (ctrl & NAND_ALE)
-+		mask |= 0x04;
-+	writeb(cmd, (unsigned long)this->IO_ADDR_W | mask);
-+}
-+
-+#define P2_NAND_RB_GPIO_PIN	62
-+
-+static int nand_dev_ready(struct mtd_info *mtd)
-+{
-+	return gpio_get_value(P2_NAND_RB_GPIO_PIN);
-+}
-+
-+static const char *part_probes[] = { "cmdlinepart", NULL };
-+
-+static struct platform_nand_data nand_data = {
-+	.chip	= {
-+		.nr_chips		= 1,
-+		.chip_offset		= 0,
-+		.options		= NAND_SAMSUNG_LP_OPTIONS,
-+		.part_probe_types	= part_probes,
-+	},
-+	.ctrl	= {
-+		.cmd_ctrl	= nand_cmd_ctl,
-+		.dev_ready	= nand_dev_ready,
-+	},
- };
- 
- static struct resource nand_resource = {
-@@ -152,7 +183,7 @@ static struct resource nand_resource = {
- };
- 
- static struct platform_device nand_device = {
--	.name		= "omapnand",
-+	.name		= "gen_nand",
- 	.id		= 0,
- 	.dev		= {
- 		.platform_data	= &nand_data,
-@@ -211,13 +242,6 @@ static struct platform_device *devices[] __initdata = {
- 	&lcd_device,
- };
- 
--#define P2_NAND_RB_GPIO_PIN	62
--
--static int nand_dev_ready(struct omap_nand_platform_data *data)
+-static irqreturn_t lcd_dma_irq_handler(int irq, void *dev_id)
 -{
--	return gpio_get_value(P2_NAND_RB_GPIO_PIN);
+-	u16 w;
+-
+-	w = omap_readw(OMAP1610_DMA_LCD_CTRL);
+-	if (unlikely(!(w & (1 << 3)))) {
+-		printk(KERN_WARNING "Spurious LCD DMA IRQ\n");
+-		return IRQ_NONE;
+-	}
+-	/* Ack the IRQ */
+-	w |= (1 << 3);
+-	omap_writew(w, OMAP1610_DMA_LCD_CTRL);
+-	lcd_dma.active = 0;
+-	if (lcd_dma.callback != NULL)
+-		lcd_dma.callback(w, lcd_dma.cb_data);
+-
+-	return IRQ_HANDLED;
 -}
 -
- static struct omap_lcd_config perseus2_lcd_config __initdata = {
- 	.ctrl_name	= "internal",
- };
-@@ -230,7 +254,7 @@ static void __init omap_perseus2_init(void)
+-int omap_request_lcd_dma(void (*callback)(u16 status, void *data),
+-			 void *data)
+-{
+-	spin_lock_irq(&lcd_dma.lock);
+-	if (lcd_dma.reserved) {
+-		spin_unlock_irq(&lcd_dma.lock);
+-		printk(KERN_ERR "LCD DMA channel already reserved\n");
+-		BUG();
+-		return -EBUSY;
+-	}
+-	lcd_dma.reserved = 1;
+-	spin_unlock_irq(&lcd_dma.lock);
+-	lcd_dma.callback = callback;
+-	lcd_dma.cb_data = data;
+-	lcd_dma.active = 0;
+-	lcd_dma.single_transfer = 0;
+-	lcd_dma.rotate = 0;
+-	lcd_dma.vxres = 0;
+-	lcd_dma.mirror = 0;
+-	lcd_dma.xscale = 0;
+-	lcd_dma.yscale = 0;
+-	lcd_dma.ext_ctrl = 0;
+-	lcd_dma.src_port = 0;
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL(omap_request_lcd_dma);
+-
+-void omap_free_lcd_dma(void)
+-{
+-	spin_lock(&lcd_dma.lock);
+-	if (!lcd_dma.reserved) {
+-		spin_unlock(&lcd_dma.lock);
+-		printk(KERN_ERR "LCD DMA is not reserved\n");
+-		BUG();
+-		return;
+-	}
+-	if (!enable_1510_mode)
+-		omap_writew(omap_readw(OMAP1610_DMA_LCD_CCR) & ~1,
+-			    OMAP1610_DMA_LCD_CCR);
+-	lcd_dma.reserved = 0;
+-	spin_unlock(&lcd_dma.lock);
+-}
+-EXPORT_SYMBOL(omap_free_lcd_dma);
+-
+-void omap_enable_lcd_dma(void)
+-{
+-	u16 w;
+-
+-	/*
+-	 * Set the Enable bit only if an external controller is
+-	 * connected. Otherwise the OMAP internal controller will
+-	 * start the transfer when it gets enabled.
+-	 */
+-	if (enable_1510_mode || !lcd_dma.ext_ctrl)
+-		return;
+-
+-	w = omap_readw(OMAP1610_DMA_LCD_CTRL);
+-	w |= 1 << 8;
+-	omap_writew(w, OMAP1610_DMA_LCD_CTRL);
+-
+-	lcd_dma.active = 1;
+-
+-	w = omap_readw(OMAP1610_DMA_LCD_CCR);
+-	w |= 1 << 7;
+-	omap_writew(w, OMAP1610_DMA_LCD_CCR);
+-}
+-EXPORT_SYMBOL(omap_enable_lcd_dma);
+-
+-void omap_setup_lcd_dma(void)
+-{
+-	BUG_ON(lcd_dma.active);
+-	if (!enable_1510_mode) {
+-		/* Set some reasonable defaults */
+-		omap_writew(0x5440, OMAP1610_DMA_LCD_CCR);
+-		omap_writew(0x9102, OMAP1610_DMA_LCD_CSDP);
+-		omap_writew(0x0004, OMAP1610_DMA_LCD_LCH_CTRL);
+-	}
+-	set_b1_regs();
+-	if (!enable_1510_mode) {
+-		u16 w;
+-
+-		w = omap_readw(OMAP1610_DMA_LCD_CCR);
+-		/*
+-		 * If DMA was already active set the end_prog bit to have
+-		 * the programmed register set loaded into the active
+-		 * register set.
+-		 */
+-		w |= 1 << 11;		/* End_prog */
+-		if (!lcd_dma.single_transfer)
+-			w |= (3 << 8);	/* Auto_init, repeat */
+-		omap_writew(w, OMAP1610_DMA_LCD_CCR);
+-	}
+-}
+-EXPORT_SYMBOL(omap_setup_lcd_dma);
+-
+-void omap_stop_lcd_dma(void)
+-{
+-	u16 w;
+-
+-	lcd_dma.active = 0;
+-	if (enable_1510_mode || !lcd_dma.ext_ctrl)
+-		return;
+-
+-	w = omap_readw(OMAP1610_DMA_LCD_CCR);
+-	w &= ~(1 << 7);
+-	omap_writew(w, OMAP1610_DMA_LCD_CCR);
+-
+-	w = omap_readw(OMAP1610_DMA_LCD_CTRL);
+-	w &= ~(1 << 8);
+-	omap_writew(w, OMAP1610_DMA_LCD_CTRL);
+-}
+-EXPORT_SYMBOL(omap_stop_lcd_dma);
+-
+ void omap_dma_global_context_save(void)
  {
- 	if (gpio_request(P2_NAND_RB_GPIO_PIN, "NAND ready") < 0)
- 		BUG();
--	nand_data.dev_ready = nand_dev_ready;
-+	gpio_direction_input(P2_NAND_RB_GPIO_PIN);
+ 	omap_dma_global_context.dma_irqenable_l0 =
+@@ -2465,14 +2084,6 @@ static int __init omap_init_dma(void)
+ 			dma_chan_count = 16;
+ 		} else
+ 			dma_chan_count = 9;
+-		if (cpu_is_omap16xx()) {
+-			u16 w;
+-
+-			/* this would prevent OMAP sleep */
+-			w = omap_readw(OMAP1610_DMA_LCD_CTRL);
+-			w &= ~(1 << 8);
+-			omap_writew(w, OMAP1610_DMA_LCD_CTRL);
+-		}
+ 	} else if (cpu_class_is_omap2()) {
+ 		u8 revision = dma_read(REVISION) & 0xff;
+ 		printk(KERN_INFO "OMAP DMA hardware revision %d.%d\n",
+@@ -2483,7 +2094,6 @@ static int __init omap_init_dma(void)
+ 		return 0;
+ 	}
  
- 	omap_cfg_reg(L3_1610_FLASH_CS2B_OE);
- 	omap_cfg_reg(M8_1610_FLASH_CS2B_WE);
+-	spin_lock_init(&lcd_dma.lock);
+ 	spin_lock_init(&dma_chan_lock);
+ 
+ 	for (ch = 0; ch < dma_chan_count; ch++) {
+@@ -2548,22 +2158,6 @@ static int __init omap_init_dma(void)
+ 		}
+ 	}
+ 
+-
+-	/* FIXME: Update LCD DMA to work on 24xx */
+-	if (cpu_class_is_omap1()) {
+-		r = request_irq(INT_DMA_LCD, lcd_dma_irq_handler, 0,
+-				"LCD DMA", NULL);
+-		if (r != 0) {
+-			int i;
+-
+-			printk(KERN_ERR "unable to request IRQ for LCD DMA "
+-			       "(error %d)\n", r);
+-			for (i = 0; i < dma_chan_count; i++)
+-				free_irq(omap1_dma_irq[i], (void *) (i + 1));
+-			goto out_free;
+-		}
+-	}
+-
+ 	return 0;
+ 
+ out_free:
+diff --git a/arch/arm/plat-omap/include/plat/dma.h b/arch/arm/plat-omap/include/plat/dma.h
+index 1c017b2..4ede9e1 100644
+--- a/arch/arm/plat-omap/include/plat/dma.h
++++ b/arch/arm/plat-omap/include/plat/dma.h
+@@ -401,33 +401,6 @@
+ 
+ /*----------------------------------------------------------------------------*/
+ 
+-/* Hardware registers for LCD DMA */
+-#define OMAP1510_DMA_LCD_BASE		(0xfffedb00)
+-#define OMAP1510_DMA_LCD_CTRL		(OMAP1510_DMA_LCD_BASE + 0x00)
+-#define OMAP1510_DMA_LCD_TOP_F1_L	(OMAP1510_DMA_LCD_BASE + 0x02)
+-#define OMAP1510_DMA_LCD_TOP_F1_U	(OMAP1510_DMA_LCD_BASE + 0x04)
+-#define OMAP1510_DMA_LCD_BOT_F1_L	(OMAP1510_DMA_LCD_BASE + 0x06)
+-#define OMAP1510_DMA_LCD_BOT_F1_U	(OMAP1510_DMA_LCD_BASE + 0x08)
+-
+-#define OMAP1610_DMA_LCD_BASE		(0xfffee300)
+-#define OMAP1610_DMA_LCD_CSDP		(OMAP1610_DMA_LCD_BASE + 0xc0)
+-#define OMAP1610_DMA_LCD_CCR		(OMAP1610_DMA_LCD_BASE + 0xc2)
+-#define OMAP1610_DMA_LCD_CTRL		(OMAP1610_DMA_LCD_BASE + 0xc4)
+-#define OMAP1610_DMA_LCD_TOP_B1_L	(OMAP1610_DMA_LCD_BASE + 0xc8)
+-#define OMAP1610_DMA_LCD_TOP_B1_U	(OMAP1610_DMA_LCD_BASE + 0xca)
+-#define OMAP1610_DMA_LCD_BOT_B1_L	(OMAP1610_DMA_LCD_BASE + 0xcc)
+-#define OMAP1610_DMA_LCD_BOT_B1_U	(OMAP1610_DMA_LCD_BASE + 0xce)
+-#define OMAP1610_DMA_LCD_TOP_B2_L	(OMAP1610_DMA_LCD_BASE + 0xd0)
+-#define OMAP1610_DMA_LCD_TOP_B2_U	(OMAP1610_DMA_LCD_BASE + 0xd2)
+-#define OMAP1610_DMA_LCD_BOT_B2_L	(OMAP1610_DMA_LCD_BASE + 0xd4)
+-#define OMAP1610_DMA_LCD_BOT_B2_U	(OMAP1610_DMA_LCD_BASE + 0xd6)
+-#define OMAP1610_DMA_LCD_SRC_EI_B1	(OMAP1610_DMA_LCD_BASE + 0xd8)
+-#define OMAP1610_DMA_LCD_SRC_FI_B1_L	(OMAP1610_DMA_LCD_BASE + 0xda)
+-#define OMAP1610_DMA_LCD_SRC_EN_B1	(OMAP1610_DMA_LCD_BASE + 0xe0)
+-#define OMAP1610_DMA_LCD_SRC_FN_B1	(OMAP1610_DMA_LCD_BASE + 0xe4)
+-#define OMAP1610_DMA_LCD_LCH_CTRL	(OMAP1610_DMA_LCD_BASE + 0xea)
+-#define OMAP1610_DMA_LCD_SRC_FI_B1_U	(OMAP1610_DMA_LCD_BASE + 0xf4)
+-
+ #define OMAP1_DMA_TOUT_IRQ		(1 << 0)
+ #define OMAP_DMA_DROP_IRQ		(1 << 1)
+ #define OMAP_DMA_HALF_IRQ		(1 << 2)
+@@ -441,6 +414,8 @@
+ #define OMAP2_DMA_SUPERVISOR_ERR_IRQ	(1 << 10)
+ #define OMAP2_DMA_MISALIGNED_ERR_IRQ	(1 << 11)
+ 
++#define OMAP_DMA_CCR_EN			(1 << 7)
++
+ #define OMAP_DMA_DATA_TYPE_S8		0x00
+ #define OMAP_DMA_DATA_TYPE_S16		0x01
+ #define OMAP_DMA_DATA_TYPE_S32		0x02
+@@ -503,14 +478,6 @@
+ #define DMA_CH_PRIO_HIGH		0x1
+ #define DMA_CH_PRIO_LOW			0x0 /* Def */
+ 
+-/* LCD DMA block numbers */
+-enum {
+-	OMAP_LCD_DMA_B1_TOP,
+-	OMAP_LCD_DMA_B1_BOTTOM,
+-	OMAP_LCD_DMA_B2_TOP,
+-	OMAP_LCD_DMA_B2_BOTTOM
+-};
+-
+ enum omap_dma_burst_mode {
+ 	OMAP_DMA_DATA_BURST_DIS = 0,
+ 	OMAP_DMA_DATA_BURST_4,
+@@ -661,20 +628,13 @@ extern int omap_modify_dma_chain_params(int chain_id,
+ extern int omap_dma_chain_status(int chain_id);
+ #endif
+ 
+-/* LCD DMA functions */
+-extern int omap_request_lcd_dma(void (*callback)(u16 status, void *data),
+-				void *data);
+-extern void omap_free_lcd_dma(void);
+-extern void omap_setup_lcd_dma(void);
+-extern void omap_enable_lcd_dma(void);
+-extern void omap_stop_lcd_dma(void);
+-extern void omap_set_lcd_dma_ext_controller(int external);
+-extern void omap_set_lcd_dma_single_transfer(int single);
+-extern void omap_set_lcd_dma_b1(unsigned long addr, u16 fb_xres, u16 fb_yres,
+-				int data_type);
+-extern void omap_set_lcd_dma_b1_rotation(int rotate);
+-extern void omap_set_lcd_dma_b1_vxres(unsigned long vxres);
+-extern void omap_set_lcd_dma_b1_mirror(int mirror);
+-extern void omap_set_lcd_dma_b1_scale(unsigned int xscale, unsigned int yscale);
++#if defined(CONFIG_ARCH_OMAP1) && defined(CONFIG_FB_OMAP)
++#include <mach/lcd_dma.h>
++#else
++static inline int omap_lcd_dma_running(void)
++{
++	return 0;
++}
++#endif
+ 
+ #endif /* __ASM_ARCH_DMA_H */
