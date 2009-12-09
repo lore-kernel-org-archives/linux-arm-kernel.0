@@ -1,77 +1,56 @@
-From: menon.nishanth@gmail.com (Nishanth Menon)
-Date: Wed, 9 Dec 2009 13:53:57 -0600
-Subject: [PATCH 1/6] OMAP4: Fix cpu detection
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02BC0A826E@dbde02.ent.ti.com>
-References: <1260383350-32681-1-git-send-email-santosh.shilimkar@ti.com>
-	<782515bb0912091130r2fabec47v5c48057592edb070@mail.gmail.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02BC0A826E@dbde02.ent.ti.com>
-Message-ID: <782515bb0912091153j78f4fc4am51858c0f680198ad@mail.gmail.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Thu, 10 Dec 2009 12:40:37 +1300
+Subject: GPIO support for HTC Dream
+In-Reply-To: <4B1ECEEE.3000209@bluewatersys.com>
+References: <20091208102842.GH12264@elf.ucw.cz>	<4B1EB57D.6070408@bluewatersys.com>	<20091208214658.GC4164@elf.ucw.cz>
+	<4B1ECEEE.3000209@bluewatersys.com>
+Message-ID: <4B203575.6050407@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 9, 2009 at 1:50 PM, Shilimkar, Santosh
-<santosh.shilimkar@ti.com> wrote:
-> Thanks Nishant !!
->
->> > + ? ? ? if ((hawkeye == 0xb852) && (rev == 0x0)) {
->> > + ? ? ? ? ? ? ? omap_revision = OMAP4430_REV_ES1_0;
->> > + ? ? ? ? ? ? ? pr_info("OMAP%04x %s\n", omap_rev() >> 16, rev_name);
->> > + ? ? ? ? ? ? ? return;
->> > + ? ? ? }
->> > +
->> > + ? ? ? printk(KERN_ERR "Unknown OMAP CPU id\n");
->> a) Do you want to state unknown OMAP4 CPU id?
->> b) why not use pr_err?
-> OK
->
->> > @@ -280,7 +280,7 @@ void __init omap2_set_globals_343x(void)
->> > ?#if defined(CONFIG_ARCH_OMAP4)
->> > ?static struct omap_globals omap4_globals = {
->> > ? ? ? ?.class ?= OMAP443X_CLASS,
->> > - ? ? ? .tap ? ?= OMAP2_L4_IO_ADDRESS(0x4830a000),
->> > + ? ? ? .tap ? ?= OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE),
+Ryan Mallon wrote:
+> Pavel Machek wrote:
+>> Add GPIO support for HTC Dream.
 >>
->> What does this have to do with the subject of the patch? I agree it is
->> a good thing to have, but probably belongs elsewhere.
-> This is everything to do with subject. ID_CODE reg is in SCM and you
-> Need a right base to read that reg, Isn't it ?
-
-Gotcha.. thanks, could be an info useful in your rev2 commit message.
-
+>> Signed-off-by: Pavel Machek <pavel@ucw.cz>
 >>
->> > ? ? ? ?.ctrl ? = OMAP2_L4_IO_ADDRESS(OMAP443X_CTRL_BASE),
->> > ? ? ? ?.prm ? ?= OMAP2_L4_IO_ADDRESS(OMAP4430_PRM_BASE),
->> > ? ? ? ?.cm ? ? = OMAP2_L4_IO_ADDRESS(OMAP4430_CM_BASE),
->> > diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
->> > index 2e17890..2a141ba 100644
->> > --- a/arch/arm/plat-omap/include/plat/cpu.h
->> > +++ b/arch/arm/plat-omap/include/plat/cpu.h
->> > @@ -443,7 +443,8 @@ IS_OMAP_TYPE(3517, 0x3517)
->> > ?#define OMAP3505_REV(v) ? ? ? ? ? ? ? ?(OMAP35XX_CLASS | (0x3505 << 16) | (v << 12))
->> > ?#define OMAP3517_REV(v) ? ? ? ? ? ? ? ?(OMAP35XX_CLASS | (0x3517 << 16) | (v << 12))
->> >
->> > -#define OMAP443X_CLASS ? ? ? ? 0x44300034
->> > +#define OMAP443X_CLASS ? ? ? ? 0x44300044
->> > +#define OMAP4430_REV_ES1_0 ? ? 0x44300044
->> Errr.. why? I suspect this might be to get the class and subclass right..
->>
->> Dont we need an cpu_is_omap_4430() to use it correctly? (unless I
->> missed a pending patch series as I am checking l-o kernel codebase)..
->> do we need the following?
->> IS_OMAP_CLASS(44xx, 0x44)
->> IS_OMAP_SUBCLASS(443x, 0x443)
->>
->> then you will have is_omap_443x() and you can now:
->> #define cpu_is_omap4430 is_omap443x()
-> This has to be done and I planning to do this in next series. This series just
-> enables the basic boot on ES1.0.
+>> +int register_gpio_chip(struct gpio_chip *new_gpio_chip)
+>> +{
 
-not sure, but might be good to do this in this patch as the CLASS and
-ES1 value change dont make much sense without it.. it should not
-change your basic boot behavior.
+...
 
->
-> Regards,
-> Santosh
->
->
+> 
+> This is still really screwy. Why are you creating your own version of
+> struct gpio_chip in addition to the one in include/asm-generic/gpio.h
+> (which you also appear to include in some places). It makes the code
+> extremely confusing. Other architectures use wrapper structures. Can you
+> have something like this instead:
+> 
+> 	struct dream_gpio_chip {
+> 		struct gpio_chip chip;
+> 
+> 		/* Dream specific bits */
+> 	};
+> 
+> The name of this function also needs to be changed to something less
+> generic since it is being exported globally.
+> 
+> I also think this function is doing way to much work for what it is.
+> Does it really need to be this complicated?
+
+Further to this, I think it is worth doing the work to make this gpiolib
+now. Most of the other ARM chips now support gpiolib, so it would seem a
+bit of a step backwards to start adding new chips which don't. I think
+that adding the gpiolib support will also cleanup the mess that is
+register_gpio_chip, since this is all already handled by the gpiolib core.
+
+~Ryan
+
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
