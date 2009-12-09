@@ -1,20 +1,36 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 9 Dec 2009 10:47:37 +0000
-Subject: [PATCH 3/7] ARM: S3C64XX: Add I2S resources in platform code
-In-Reply-To: <1260333123-11609-1-git-send-email-jassisinghbrar@gmail.com>
-References: <1260333123-11609-1-git-send-email-jassisinghbrar@gmail.com>
-Message-ID: <20091209104736.GA19851@opensource.wolfsonmicro.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 09 Dec 2009 13:04:31 +0200
+Subject: [GIT PULL] Patches for 2.6.33-rc1
+In-Reply-To: <1260355174.13499.8.camel@pc1117.cambridge.arm.com>
+References: <1260353349.13499.4.camel@pc1117.cambridge.arm.com>
+	<1260354044.19669.1267.camel@localhost>
+	<1260355174.13499.8.camel@pc1117.cambridge.arm.com>
+Message-ID: <1260356671.19669.1296.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 09, 2009 at 01:32:03PM +0900, jassisinghbrar at gmail.com wrote:
+On Wed, 2009-12-09 at 10:39 +0000, Catalin Marinas wrote:
+> On Wed, 2009-12-09 at 10:20 +0000, Artem Bityutskiy wrote:
+> > It is so much helpful when people add proper prefixes to patches, like
+> > ARM or something. I wander, do we have a requirement for this somewhere?
+> > But please, consider doing this, this makes it easier surfing git-log or
+> > gitk info.
+> 
+> It would be useful, indeed, so I haven't seen an official statement from
+> Russell on this (and I usually run gitk on specific directories). 
+> 
+> Traditionally we used the patch system which was adding a prefix but
+> since it cannot cope with a different author from the submitter, I just
+> use Git these days (I don't mind either way).
 
-> +static int s3c64xx_i2sv4_cfg_gpio(struct platform_device *pdev)
-> +{
-> +	s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C64XX_GPC4_I2S0_V40_DO);
-> +	s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C64XX_GPC5_I2S1_V40_DO);
-> +	s3c_gpio_cfgpin(S3C64XX_GPC(7), S3C64XX_GPC7_I2S2_V40_DO);
+Well, for people like me who did not use the patch system long time
+before and did not get accustomed to it, the system is looks very
+ancient and sub-standard.
 
-A variant of this should already have been merged, and the names of the
-GPIO defines were altered to make it look less like there's multiple
-controllers rather than multiple data lines.
+But since I'm not an ARM developer, I do complain about this. If ARM
+people find the system good, and the standard lkml-sytle patch exchange
+culture does not work for them - fine :)
+
+-- 
+Best Regards,
+Artem Bityutskiy (????? ????????)
