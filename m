@@ -1,32 +1,36 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 8 Dec 2009 18:50:35 -0700
-Subject: [spi-devel-general] [PATCH 0/5] spi-imx: some updates
-In-Reply-To: <1b68c6790912081647p39f0b285q2c164ab41c673aeb@mail.gmail.com>
-References: <20091208211258.GA13706@pengutronix.de>
-	<20091208153239.af0b5bb8.akpm@linux-foundation.org>
-	<fa686aa40912081625y3750a7fegbac38926182e38c6@mail.gmail.com>
-	<1b68c6790912081647p39f0b285q2c164ab41c673aeb@mail.gmail.com>
-Message-ID: <fa686aa40912081750l18218736red1dd633a173f594@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 Dec 2009 18:13:29 -0800
+Subject: [PATCH 1/9] omap: use smc91x_platdata to setup smc91x
+In-Reply-To: <20091209004958.5944.81769.stgit@localhost>
+References: <20091209004630.5944.40334.stgit@localhost>
+	<20091209004958.5944.81769.stgit@localhost>
+Message-ID: <20091209021329.GK24013@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 8, 2009 at 5:47 PM, jassi brar <jassisinghbrar@gmail.com> wrote:
-> On Wed, Dec 9, 2009 at 9:25 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
->> I'm new to the job, so I'm being cautions about which things I'm pick
->> up. ?However, I'll happily merge anything that Andrew says is okay.
->> Andrew, when in the merge window do you typically send out patch
->> queues?
->>
->
-> Grant, may I know of your tree, if it's public?
+* Tony Lindgren <tony@atomide.com> [091208 16:48]:
+> From: Ladislav Michl <ladis@linux-mips.org>
+> 
+> Use smc91x_platdata to setup smc91x, so we can get rid of OMAP specific stuff
+> in smc91x driver
+> 
+> Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap1/board-fsample.c   |   10 ++++++++++
+>  arch/arm/mach-omap1/board-h2.c        |   10 ++++++++++
+>  arch/arm/mach-omap1/board-h3.c        |   10 ++++++++++
+>  arch/arm/mach-omap1/board-innovator.c |   13 +++++++++++++
+>  arch/arm/mach-omap1/board-osk.c       |   10 ++++++++++
+>  arch/arm/mach-omap1/board-perseus2.c  |   10 ++++++++++
+>  arch/arm/mach-omap1/board-voiceblue.c |   10 ++++++++++
+>  arch/arm/mach-omap2/board-apollon.c   |   10 ++++++++++
+>  arch/arm/mach-omap2/gpmc-smc91x.c     |    8 +++++---
+>  arch/arm/plat-omap/debug-devices.c    |   10 ++++++++++
+>  10 files changed, 98 insertions(+), 3 deletions(-)
 
-It's the next-spi branch of:
+Looks like this needs a minor change to build for innovator 1610.
+Will merge in the following fix as otherwise the smc91x_platdata
+is not defined for 1610.
 
-git://git.secretlab.ca/git/linux-2.6.git
-
-g.
-
-
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Tony
