@@ -1,41 +1,78 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Wed, 9 Dec 2009 09:47:17 +0900
-Subject: [spi-devel-general] [PATCH 0/5] spi-imx: some updates
-In-Reply-To: <fa686aa40912081625y3750a7fegbac38926182e38c6@mail.gmail.com>
-References: <20091208211258.GA13706@pengutronix.de>
-	<20091208153239.af0b5bb8.akpm@linux-foundation.org>
-	<fa686aa40912081625y3750a7fegbac38926182e38c6@mail.gmail.com>
-Message-ID: <1b68c6790912081647p39f0b285q2c164ab41c673aeb@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 08 Dec 2009 16:49:44 -0800
+Subject: [PATCH 0/9] Few more omap patches for v2.6.33 merge window
+Message-ID: <20091209004630.5944.40334.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 9, 2009 at 9:25 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> 2009/12/8 Andrew Morton <akpm@linux-foundation.org>:
->> On Tue, 8 Dec 2009 22:12:58 +0100
->> Uwe Kleine-K__nig <u.kleine-koenig@pengutronix.de> wrote:
->>
->>> this series depends on "spi: drain MXC SPI transfer buffer when probing
->>> device" which is currently in -mm and also included in my spi-imx branch
->>> (see below). ?IMHO at least my first patch should go into .33 as it
->>> fixes an oops.
->>
->> I queued all five for 2.6.33.
->
-> I had also picked up "drain MXC SPI transfer..." into my next-spi tree
-> earlier today. ?After a few days I'll send Linus a pull request. ?I
-> just need to make sure that Ben's tree gets pulled first because I've
-> got other stuff in there depending on it.
->
->> Once I've merged up the current -mm patch queue:
-> [... list of patches snipped ...]
->> I shall stop sending SPI patches to Linus. ?I'll send any which I
->> accumulate to Grant instead.
->
-> I'm new to the job, so I'm being cautions about which things I'm pick
-> up. ?However, I'll happily merge anything that Andrew says is okay.
-> Andrew, when in the merge window do you typically send out patch
-> queues?
->
+Hi all,
 
-Grant, may I know of your tree, if it's public?
-thanks
+Here are few more patches that have been posted earlier to
+linux-omap list but not yet posted to LAKML.
+
+The series has few clean-up patches, updates Pandor board
+file, adds omap7xx USB support and minimal support for
+Always Innovating Touch Book.
+
+Regards,
+
+Tony
+
+
+---
+
+Cory Maccarrone (2):
+      omap1: Add omap7xx USB support
+      omap1: I2C mux and clocks for omap7xx
+
+Grazvydas Ignotas (1):
+      omap3: pandora: board file updates for .33
+
+Gregoire Gentil (2):
+      omap3: Board file of Always Innovating OMAP3-based Touch Book
+      omap3: Defconfig file of Always Innovating OMAP3-based Touch Book
+
+Janusz Krzysztofik (1):
+      omap1: DMA: move LCD related code from plat-omap to mach-omap1
+
+Ladislav Michl (3):
+      omap: use smc91x_platdata to setup smc91x
+      smc91x: remove OMAP specific bits
+      omap1: Use gen_nand
+
+
+ arch/arm/configs/omap3_touchbook_defconfig | 2431 ++++++++++++++++++++++++++++
+ arch/arm/mach-omap1/Makefile               |    4 
+ arch/arm/mach-omap1/board-fsample.c        |   60 +
+ arch/arm/mach-omap1/board-h2.c             |   59 +
+ arch/arm/mach-omap1/board-h3.c             |   66 +
+ arch/arm/mach-omap1/board-htcherald.c      |   64 +
+ arch/arm/mach-omap1/board-innovator.c      |   13 
+ arch/arm/mach-omap1/board-osk.c            |   10 
+ arch/arm/mach-omap1/board-perseus2.c       |   58 +
+ arch/arm/mach-omap1/board-voiceblue.c      |   10 
+ arch/arm/mach-omap1/clock.c                |    4 
+ arch/arm/mach-omap1/i2c.c                  |   10 
+ arch/arm/mach-omap1/include/mach/lcd_dma.h |   78 +
+ arch/arm/mach-omap1/lcd_dma.c              |  447 +++++
+ arch/arm/mach-omap1/mux.c                  |    8 
+ arch/arm/mach-omap2/Kconfig                |    5 
+ arch/arm/mach-omap2/Makefile               |    3 
+ arch/arm/mach-omap2/board-apollon.c        |   10 
+ arch/arm/mach-omap2/board-omap3pandora.c   |   26 
+ arch/arm/mach-omap2/board-omap3touchbook.c |  572 +++++++
+ arch/arm/mach-omap2/gpmc-smc91x.c          |    8 
+ arch/arm/plat-omap/debug-devices.c         |   10 
+ arch/arm/plat-omap/dma.c                   |  410 -----
+ arch/arm/plat-omap/include/plat/dma.h      |   60 -
+ arch/arm/plat-omap/include/plat/mux.h      |    6 
+ arch/arm/plat-omap/usb.c                   |    8 
+ drivers/net/smc91x.h                       |   15 
+ 27 files changed, 3900 insertions(+), 555 deletions(-)
+ create mode 100644 arch/arm/configs/omap3_touchbook_defconfig
+ create mode 100644 arch/arm/mach-omap1/include/mach/lcd_dma.h
+ create mode 100644 arch/arm/mach-omap1/lcd_dma.c
+ create mode 100644 arch/arm/mach-omap2/board-omap3touchbook.c
+
+-- 
+Signature
