@@ -1,111 +1,42 @@
-From: zero@colonel-panic.org (Peter Horton)
-Date: Wed, 9 Dec 2009 13:50:48 +0000
-Subject: [PATCH] Fix AT91SAM9G20 reset
-Message-ID: <20091209135048.GA30670@turtle.localnet>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Wed, 9 Dec 2009 21:57:09 +0800
+Subject: [PATCH] mx31moboard: fix typo
+In-Reply-To: <4B1F9BC2.6010205@epfl.ch>
+References: <20091203193034.GD22533@pengutronix.de>
+	<20091203193321.GE22533@pengutronix.de>
+	<Pine.LNX.4.64.0912041013380.3981@axis700.grange>
+	<4B19473D.7010801@epfl.ch>
+	<20091204174623.GW14091@buzzloop.caiaq.de>
+	<4B1F9BC2.6010205@epfl.ch>
+Message-ID: <20091209135709.GG28375@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix AT91SAM9G20 reset as per the errata in the data sheet.
+On Wed, Dec 09, 2009 at 01:44:50PM +0100, Valentin Longchamp wrote:
+> Daniel Mack wrote:
+> >Could you double check whether the clock is running? The only thing I can
+> >think of is differences in the bootloaders. I still have the proprietary
+> >'losh' running here, which I have no sources for.
+> >
+> 
+> The clock is running (well, at least the parent ipg_clk and the
+> gating is configured for the clock running, thanks to
+> clk_enable(&iim_clk);
+> 
+> About the bootloader, on our boards we have redboot, adapted from
+> the release Freescale did for the ADS. So it may be a bootloader
+> issue. What could be missing in my bootloader that makes this read
+> fail ?
+> 
+> I would say that maybe someting the EMI or SPBA configuration is
+> missing so that I can access the addresses in this range. Any ideas
+> ?
 
-If the SDRAM is not cleanly shutdown before reset it can be left driving
-the bus, which then stops the bootloader booting from NAND.
+I don't, sorry. I was hoping anyone else has more documentation - at
+least the reference manual makes me believe there is more that just that
+2 pages.
 
-Signed-off-by: Peter Horton <phorton@bitbox.co.uk>
---
+In worst case we need to revert that patch, but I would like to avoid
+that.
 
-Index: linux-2.6.32/arch/arm/mach-at91/Makefile
-===================================================================
---- linux-2.6.32.orig/arch/arm/mach-at91/Makefile	2009-12-09 13:33:28.000000000 +0000
-+++ linux-2.6.32/arch/arm/mach-at91/Makefile	2009-12-09 13:33:28.000000000 +0000
-@@ -16,7 +16,7 @@
- obj-$(CONFIG_ARCH_AT91SAM9G10)	+= at91sam9261.o at91sam926x_time.o at91sam9261_devices.o sam9_smc.o
- obj-$(CONFIG_ARCH_AT91SAM9263)	+= at91sam9263.o at91sam926x_time.o at91sam9263_devices.o sam9_smc.o
- obj-$(CONFIG_ARCH_AT91SAM9RL)	+= at91sam9rl.o at91sam926x_time.o at91sam9rl_devices.o sam9_smc.o
--obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260.o at91sam926x_time.o at91sam9260_devices.o  sam9_smc.o
-+obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260.o at91sam926x_time.o at91sam9260_devices.o  sam9_smc.o at91sam9g20_reset.o
-  obj-$(CONFIG_ARCH_AT91SAM9G45)	+= at91sam9g45.o at91sam926x_time.o at91sam9g45_devices.o sam9_smc.o
- obj-$(CONFIG_ARCH_AT91CAP9)	+= at91cap9.o at91sam926x_time.o at91cap9_devices.o sam9_smc.o
- obj-$(CONFIG_ARCH_AT91X40)	+= at91x40.o at91x40_time.o
-Index: linux-2.6.32/arch/arm/mach-at91/at91sam9260.c
-===================================================================
---- linux-2.6.32.orig/arch/arm/mach-at91/at91sam9260.c	2009-12-03 03:51:21.000000000 +0000
-+++ linux-2.6.32/arch/arm/mach-at91/at91sam9260.c	2009-12-09 13:45:50.000000000 +0000
-@@ -25,6 +25,8 @@
- #include "generic.h"
- #include "clock.h"
- 
-+extern void at91sam9g20_reset(void);
-+
- static struct map_desc at91sam9260_io_desc[] __initdata = {
- 	{
- 		.virtual	= AT91_VA_BASE_SYS,
-@@ -327,7 +329,11 @@
- 	else
- 		iotable_init(at91sam9260_sram_desc, ARRAY_SIZE(at91sam9260_sram_desc));
- 
--	at91_arch_reset = at91sam9260_reset;
-+	if (cpu_is_at91sam9g20())
-+		at91_arch_reset = at91sam9g20_reset;
-+	else
-+		at91_arch_reset = at91sam9260_reset;
-+
- 	pm_power_off = at91sam9260_poweroff;
- 	at91_extern_irq = (1 << AT91SAM9260_ID_IRQ0) | (1 << AT91SAM9260_ID_IRQ1)
- 			| (1 << AT91SAM9260_ID_IRQ2);
-Index: linux-2.6.32/arch/arm/mach-at91/at91sam9g20_reset.S
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.32/arch/arm/mach-at91/at91sam9g20_reset.S	2009-12-09 13:33:28.000000000 +0000
-@@ -0,0 +1,52 @@
-+/*
-+ * (C) BitBox Ltd 2009
-+ *
-+ * reset AT91SAM9G20 as per errata
-+ *
-+ * unless the SDRAM is cleanly shutdown before we hit the
-+ * reset register it can be left driving the data bus and
-+ * killing the chance of a subsequent boot from NAND
-+ */
-+
-+#define CP15_CR_I			(1 << 12)
-+
-+#define SYS_VIRT_OFS			(-0x01000000)
-+
-+#define SDRAMC_BASE			(SYS_VIRT_OFS + 0xffffea00)
-+#define  SDRAMC_TR			0x0004
-+#define  SDRAMC_LPR			0x0010
-+#define   SDRAMC_LPCB_POWER_DOWN	2
-+
-+#define RSTC_BASE			(SYS_VIRT_OFS + 0xfffffd00)
-+#define  RSTC_CR			0x0000
-+#define   RSTC_PROCRST			(1 << 0)
-+#define   RSTC_PERRST			(1 << 2)
-+#define   RSTC_KEY			(0xa5 << 24)
-+
-+			.arm
-+
-+			.globl	at91sam9g20_reset
-+
-+at91sam9g20_reset:	mov	r0, #0
-+			mcr	p15, 0, r0, c7, c5, 0	@ flush I-cache
-+
-+			mrc	p15, 0, r0, c1, c0, 0
-+			orr	r0, r0, #CP15_CR_I
-+			mcr	p15, 0, r0, c1, c0, 0	@ enable I-cache
-+
-+			ldr	r0, =SDRAMC_BASE	@ preload constants
-+			ldr	r1, =RSTC_BASE
-+
-+			mov	r2, #1
-+			mov	r3, #SDRAMC_LPCB_POWER_DOWN
-+			ldr	r4, =RSTC_KEY | RSTC_PERRST | RSTC_PROCRST
-+
-+			.balign	32			@ align to cache line
-+
-+			str	r2, [r0, #SDRAMC_TR]	@ disable SDRAM access
-+			str	r3, [r0, #SDRAMC_LPR]	@ power down SDRAM
-+			str	r4, [r1, #RSTC_CR]	@ reset processor
-+
-+			b	.
-+
-+/* vi:set ft=ignore ai: */
+Daniel
