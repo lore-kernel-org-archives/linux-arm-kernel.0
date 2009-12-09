@@ -1,54 +1,92 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed,  9 Dec 2009 23:59:09 +0530
-Subject: [PATCH 5/6] OMAP4: Remove the secondary wait loop.
-In-Reply-To: <1260383350-32681-4-git-send-email-santosh.shilimkar@ti.com>
-References: <1260383350-32681-1-git-send-email-santosh.shilimkar@ti.com>
-	<1260383350-32681-2-git-send-email-santosh.shilimkar@ti.com>
-	<1260383350-32681-3-git-send-email-santosh.shilimkar@ti.com>
-	<1260383350-32681-4-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1260383350-32681-5-git-send-email-santosh.shilimkar@ti.com>
+Date: Wed,  9 Dec 2009 23:59:05 +0530
+Subject: [PATCH 1/6] OMAP4: Fix cpu detection
+Message-ID: <1260383350-32681-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The secondary cores wakes up in time so the wait loop is not
-necessary anymore.
+This patch fixes the OMAP4430 cpu detection. Since the omap ID
+register is not fused in OMAP4430 ES1.0 silicon, identification is
+done using ARM CPUID register.
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/omap-smp.c |    7 -------
- 1 files changed, 0 insertions(+), 7 deletions(-)
+ arch/arm/mach-omap2/id.c              |   27 ++++++++++++++++++++++++++-
+ arch/arm/plat-omap/common.c           |    2 +-
+ arch/arm/plat-omap/include/plat/cpu.h |    3 ++-
+ 3 files changed, 29 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-index 59e8478..38153e5 100644
---- a/arch/arm/mach-omap2/omap-smp.c
-+++ b/arch/arm/mach-omap2/omap-smp.c
-@@ -17,7 +17,6 @@
-  */
- #include <linux/init.h>
- #include <linux/device.h>
--#include <linux/jiffies.h>
- #include <linux/smp.h>
- #include <linux/io.h>
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index f48a4b2..52c6478 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -246,6 +246,31 @@ void __init omap3_check_revision(void)
+ 	}
+ }
  
-@@ -62,8 +61,6 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
++void __init omap4_check_revision(void)
++{
++	u32 idcode;
++	u16 hawkeye;
++	u8 rev;
++	char *rev_name = "ES1.0";
++
++	/*
++	 * The IC rev detection is done with hawkeye and rev.
++	 * Note that rev does not map directly to defined processor
++	 * revision numbers as ES1.0 uses value 0.
++	 */
++	idcode = read_tap_reg(OMAP_TAP_IDCODE);
++	hawkeye = (idcode >> 12) & 0xffff;
++	rev = (idcode >> 28) & 0xff;
++
++	if ((hawkeye == 0xb852) && (rev == 0x0)) {
++		omap_revision = OMAP4430_REV_ES1_0;
++		pr_info("OMAP%04x %s\n", omap_rev() >> 16, rev_name);
++		return;
++	}
++
++	printk(KERN_ERR "Unknown OMAP CPU id\n");
++}
++
+ #define OMAP3_SHOW_FEATURE(feat)		\
+ 	if (omap3_has_ ##feat())		\
+ 		printk(#feat" ");
+@@ -336,7 +361,7 @@ void __init omap2_check_revision(void)
+ 		omap3_check_features();
+ 		omap3_cpuinfo();
+ 	} else if (cpu_is_omap44xx()) {
+-		printk(KERN_INFO "FIXME: CPU revision = OMAP4430\n");
++		omap4_check_revision();
+ 		return;
+ 	} else {
+ 		pr_err("OMAP revision unknown, please fix!\n");
+diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
+index cc050b3..3473a80 100644
+--- a/arch/arm/plat-omap/common.c
++++ b/arch/arm/plat-omap/common.c
+@@ -280,7 +280,7 @@ void __init omap2_set_globals_343x(void)
+ #if defined(CONFIG_ARCH_OMAP4)
+ static struct omap_globals omap4_globals = {
+ 	.class	= OMAP443X_CLASS,
+-	.tap	= OMAP2_L4_IO_ADDRESS(0x4830a000),
++	.tap	= OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE),
+ 	.ctrl	= OMAP2_L4_IO_ADDRESS(OMAP443X_CTRL_BASE),
+ 	.prm	= OMAP2_L4_IO_ADDRESS(OMAP4430_PRM_BASE),
+ 	.cm	= OMAP2_L4_IO_ADDRESS(OMAP4430_CM_BASE),
+diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
+index 2e17890..2a141ba 100644
+--- a/arch/arm/plat-omap/include/plat/cpu.h
++++ b/arch/arm/plat-omap/include/plat/cpu.h
+@@ -443,7 +443,8 @@ IS_OMAP_TYPE(3517, 0x3517)
+ #define OMAP3505_REV(v)		(OMAP35XX_CLASS | (0x3505 << 16) | (v << 12))
+ #define OMAP3517_REV(v)		(OMAP35XX_CLASS | (0x3517 << 16) | (v << 12))
  
- int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
--	unsigned long timeout;
--
- 	/*
- 	 * Set synchronisation state between this boot processor
- 	 * and the secondary one
-@@ -80,10 +77,6 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	flush_cache_all();
- 	smp_wmb();
+-#define OMAP443X_CLASS		0x44300034
++#define OMAP443X_CLASS		0x44300044
++#define OMAP4430_REV_ES1_0	0x44300044
  
--	timeout = jiffies + (1 * HZ);
--	while (time_before(jiffies, timeout))
--		;
--
- 	/*
- 	 * Now the secondary core is starting up let it run its
- 	 * calibrations, then wait for it to finish
+ /*
+  * omap_chip bits
 -- 
 1.6.0.4
