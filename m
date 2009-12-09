@@ -1,51 +1,111 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 09 Dec 2009 13:21:22 +0000
-Subject: [GIT PULL] Patches for 2.6.33-rc1
-In-Reply-To: <20091209124933.GE9018@sirena.org.uk>
-References: <1260353349.13499.4.camel@pc1117.cambridge.arm.com>
-	<1260354044.19669.1267.camel@localhost>
-	<1260355174.13499.8.camel@pc1117.cambridge.arm.com>
-	<20091209124933.GE9018@sirena.org.uk>
-Message-ID: <1260364882.13499.46.camel@pc1117.cambridge.arm.com>
+From: zero@colonel-panic.org (Peter Horton)
+Date: Wed, 9 Dec 2009 13:50:48 +0000
+Subject: [PATCH] Fix AT91SAM9G20 reset
+Message-ID: <20091209135048.GA30670@turtle.localnet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2009-12-09 at 12:49 +0000, Mark Brown wrote:
-> On Wed, Dec 09, 2009 at 10:39:34AM +0000, Catalin Marinas wrote:
-> 
-> > It would be useful, indeed, so I haven't seen an official statement
-> from
-> > Russell on this (and I usually run gitk on specific directories).
-> 
-> I'd suggest using ARM: like the patch system does.  In general looking
-> at the logs for the directory/file you're updating and using the same
-> prefix as most of the commits works well.
+Fix AT91SAM9G20 reset as per the errata in the data sheet.
 
-I updated the branch :-)
+If the SDRAM is not cleanly shutdown before reset it can be left driving
+the bus, which then stops the bootloader booting from NAND.
 
+Signed-off-by: Peter Horton <phorton@bitbox.co.uk>
+--
 
-The following changes since commit 22763c5cf3690a681551162c15d34d935308c8d7:
-  Linus Torvalds (1):
-        Linux 2.6.32
-
-are available in the git repository at:
-
-  git://linux-arm.org/linux-2.6.git for-rmk
-
-Catalin Marinas (2):
-      ARM: Add an earlyprintk debug console
-      ARM: RealView: Fix typo in the RealView/PBX Kconfig entry
-
-Varun Swara (1):
-      ARM: Do not allow the probing of the local timer
-
- arch/arm/Kconfig.debug         |    8 +++++
- arch/arm/kernel/Makefile       |    1 +
- arch/arm/kernel/early_printk.c |   57 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/smp_twd.c      |    1 +
- arch/arm/mach-realview/Kconfig |    2 +-
- 5 files changed, 68 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/kernel/early_printk.c
-
--- 
-Catalin
+Index: linux-2.6.32/arch/arm/mach-at91/Makefile
+===================================================================
+--- linux-2.6.32.orig/arch/arm/mach-at91/Makefile	2009-12-09 13:33:28.000000000 +0000
++++ linux-2.6.32/arch/arm/mach-at91/Makefile	2009-12-09 13:33:28.000000000 +0000
+@@ -16,7 +16,7 @@
+ obj-$(CONFIG_ARCH_AT91SAM9G10)	+= at91sam9261.o at91sam926x_time.o at91sam9261_devices.o sam9_smc.o
+ obj-$(CONFIG_ARCH_AT91SAM9263)	+= at91sam9263.o at91sam926x_time.o at91sam9263_devices.o sam9_smc.o
+ obj-$(CONFIG_ARCH_AT91SAM9RL)	+= at91sam9rl.o at91sam926x_time.o at91sam9rl_devices.o sam9_smc.o
+-obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260.o at91sam926x_time.o at91sam9260_devices.o  sam9_smc.o
++obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260.o at91sam926x_time.o at91sam9260_devices.o  sam9_smc.o at91sam9g20_reset.o
+  obj-$(CONFIG_ARCH_AT91SAM9G45)	+= at91sam9g45.o at91sam926x_time.o at91sam9g45_devices.o sam9_smc.o
+ obj-$(CONFIG_ARCH_AT91CAP9)	+= at91cap9.o at91sam926x_time.o at91cap9_devices.o sam9_smc.o
+ obj-$(CONFIG_ARCH_AT91X40)	+= at91x40.o at91x40_time.o
+Index: linux-2.6.32/arch/arm/mach-at91/at91sam9260.c
+===================================================================
+--- linux-2.6.32.orig/arch/arm/mach-at91/at91sam9260.c	2009-12-03 03:51:21.000000000 +0000
++++ linux-2.6.32/arch/arm/mach-at91/at91sam9260.c	2009-12-09 13:45:50.000000000 +0000
+@@ -25,6 +25,8 @@
+ #include "generic.h"
+ #include "clock.h"
+ 
++extern void at91sam9g20_reset(void);
++
+ static struct map_desc at91sam9260_io_desc[] __initdata = {
+ 	{
+ 		.virtual	= AT91_VA_BASE_SYS,
+@@ -327,7 +329,11 @@
+ 	else
+ 		iotable_init(at91sam9260_sram_desc, ARRAY_SIZE(at91sam9260_sram_desc));
+ 
+-	at91_arch_reset = at91sam9260_reset;
++	if (cpu_is_at91sam9g20())
++		at91_arch_reset = at91sam9g20_reset;
++	else
++		at91_arch_reset = at91sam9260_reset;
++
+ 	pm_power_off = at91sam9260_poweroff;
+ 	at91_extern_irq = (1 << AT91SAM9260_ID_IRQ0) | (1 << AT91SAM9260_ID_IRQ1)
+ 			| (1 << AT91SAM9260_ID_IRQ2);
+Index: linux-2.6.32/arch/arm/mach-at91/at91sam9g20_reset.S
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ linux-2.6.32/arch/arm/mach-at91/at91sam9g20_reset.S	2009-12-09 13:33:28.000000000 +0000
+@@ -0,0 +1,52 @@
++/*
++ * (C) BitBox Ltd 2009
++ *
++ * reset AT91SAM9G20 as per errata
++ *
++ * unless the SDRAM is cleanly shutdown before we hit the
++ * reset register it can be left driving the data bus and
++ * killing the chance of a subsequent boot from NAND
++ */
++
++#define CP15_CR_I			(1 << 12)
++
++#define SYS_VIRT_OFS			(-0x01000000)
++
++#define SDRAMC_BASE			(SYS_VIRT_OFS + 0xffffea00)
++#define  SDRAMC_TR			0x0004
++#define  SDRAMC_LPR			0x0010
++#define   SDRAMC_LPCB_POWER_DOWN	2
++
++#define RSTC_BASE			(SYS_VIRT_OFS + 0xfffffd00)
++#define  RSTC_CR			0x0000
++#define   RSTC_PROCRST			(1 << 0)
++#define   RSTC_PERRST			(1 << 2)
++#define   RSTC_KEY			(0xa5 << 24)
++
++			.arm
++
++			.globl	at91sam9g20_reset
++
++at91sam9g20_reset:	mov	r0, #0
++			mcr	p15, 0, r0, c7, c5, 0	@ flush I-cache
++
++			mrc	p15, 0, r0, c1, c0, 0
++			orr	r0, r0, #CP15_CR_I
++			mcr	p15, 0, r0, c1, c0, 0	@ enable I-cache
++
++			ldr	r0, =SDRAMC_BASE	@ preload constants
++			ldr	r1, =RSTC_BASE
++
++			mov	r2, #1
++			mov	r3, #SDRAMC_LPCB_POWER_DOWN
++			ldr	r4, =RSTC_KEY | RSTC_PERRST | RSTC_PROCRST
++
++			.balign	32			@ align to cache line
++
++			str	r2, [r0, #SDRAMC_TR]	@ disable SDRAM access
++			str	r3, [r0, #SDRAMC_LPR]	@ power down SDRAM
++			str	r4, [r1, #RSTC_CR]	@ reset processor
++
++			b	.
++
++/* vi:set ft=ignore ai: */
