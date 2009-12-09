@@ -1,7 +1,7 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 9 Dec 2009 08:09:42 -0500
-Subject: [PATCH v2 01/09] mfd: split 88pm8607 driver
-Message-ID: <771cded00912090509y7f234ca7id31a805822497f4d@mail.gmail.com>
+Date: Wed, 9 Dec 2009 08:11:22 -0500
+Subject: [PATCH v2 02/09] mfd: support 88pm8606 in 860x driver
+Message-ID: <771cded00912090511s3f28dd7tf0dcbc54c0c50970@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
