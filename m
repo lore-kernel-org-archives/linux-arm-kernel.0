@@ -1,120 +1,114 @@
-From: menon.nishanth@gmail.com (Nishanth Menon)
-Date: Wed, 9 Dec 2009 13:30:39 -0600
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 9 Dec 2009 20:33:59 +0100
 Subject: [PATCH 1/6] OMAP4: Fix cpu detection
 In-Reply-To: <1260383350-32681-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1260383350-32681-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <782515bb0912091130r2fabec47v5c48057592edb070@mail.gmail.com>
+Message-ID: <74583B8642AB8841B30447520659FCA9DE4CF096@dnce01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 9, 2009 at 12:29 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> This patch fixes the OMAP4430 cpu detection. Since the omap ID
-> register is not fused in OMAP4430 ES1.0 silicon, identification is
-> done using ARM CPUID register.
+Hi Santosh,
 
-Am I reading the commit message wrong? the code seems to check on
-TAPID instead of checking the arm CPUID...
-
+From: linux-omap-owner@vger.kernel.org [mailto:linux-omap-
+>owner at vger.kernel.org] On Behalf Of Shilimkar, Santosh
 >
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
-> ?arch/arm/mach-omap2/id.c ? ? ? ? ? ? ?| ? 27 ++++++++++++++++++++++++++-
-> ?arch/arm/plat-omap/common.c ? ? ? ? ? | ? ?2 +-
-> ?arch/arm/plat-omap/include/plat/cpu.h | ? ?3 ++-
-> ?3 files changed, 29 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-> index f48a4b2..52c6478 100644
-> --- a/arch/arm/mach-omap2/id.c
-> +++ b/arch/arm/mach-omap2/id.c
-> @@ -246,6 +246,31 @@ void __init omap3_check_revision(void)
-> ? ? ? ?}
-> ?}
->
-> +void __init omap4_check_revision(void)
-> +{
-> + ? ? ? u32 idcode;
-> + ? ? ? u16 hawkeye;
-> + ? ? ? u8 rev;
-> + ? ? ? char *rev_name = "ES1.0";
-> +
-> + ? ? ? /*
-> + ? ? ? ?* The IC rev detection is done with hawkeye and rev.
-> + ? ? ? ?* Note that rev does not map directly to defined processor
-> + ? ? ? ?* revision numbers as ES1.0 uses value 0.
-> + ? ? ? ?*/
-> + ? ? ? idcode = read_tap_reg(OMAP_TAP_IDCODE);
-> + ? ? ? hawkeye = (idcode >> 12) & 0xffff;
-> + ? ? ? rev = (idcode >> 28) & 0xff;
-> +
-> + ? ? ? if ((hawkeye == 0xb852) && (rev == 0x0)) {
-> + ? ? ? ? ? ? ? omap_revision = OMAP4430_REV_ES1_0;
-> + ? ? ? ? ? ? ? pr_info("OMAP%04x %s\n", omap_rev() >> 16, rev_name);
-> + ? ? ? ? ? ? ? return;
-> + ? ? ? }
-> +
-> + ? ? ? printk(KERN_ERR "Unknown OMAP CPU id\n");
-a) Do you want to state unknown OMAP4 CPU id?
-b) why not use pr_err?
+>This patch fixes the OMAP4430 cpu detection. Since the omap ID
+>register is not fused in OMAP4430 ES1.0 silicon, identification is
+>done using ARM CPUID register.
 
-> +}
-> +
-> ?#define OMAP3_SHOW_FEATURE(feat) ? ? ? ? ? ? ? \
-> ? ? ? ?if (omap3_has_ ##feat()) ? ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ?printk(#feat" ");
-> @@ -336,7 +361,7 @@ void __init omap2_check_revision(void)
-> ? ? ? ? ? ? ? ?omap3_check_features();
-> ? ? ? ? ? ? ? ?omap3_cpuinfo();
-> ? ? ? ?} else if (cpu_is_omap44xx()) {
-> - ? ? ? ? ? ? ? printk(KERN_INFO "FIXME: CPU revision = OMAP4430\n");
-> + ? ? ? ? ? ? ? omap4_check_revision();
-> ? ? ? ? ? ? ? ?return;
-> ? ? ? ?} else {
-> ? ? ? ? ? ? ? ?pr_err("OMAP revision unknown, please fix!\n");
-> diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
-> index cc050b3..3473a80 100644
-> --- a/arch/arm/plat-omap/common.c
-> +++ b/arch/arm/plat-omap/common.c
-> @@ -280,7 +280,7 @@ void __init omap2_set_globals_343x(void)
-> ?#if defined(CONFIG_ARCH_OMAP4)
-> ?static struct omap_globals omap4_globals = {
-> ? ? ? ?.class ?= OMAP443X_CLASS,
-> - ? ? ? .tap ? ?= OMAP2_L4_IO_ADDRESS(0x4830a000),
-> + ? ? ? .tap ? ?= OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE),
-
-What does this have to do with the subject of the patch? I agree it is
-a good thing to have, but probably belongs elsewhere.
-
-> ? ? ? ?.ctrl ? = OMAP2_L4_IO_ADDRESS(OMAP443X_CTRL_BASE),
-> ? ? ? ?.prm ? ?= OMAP2_L4_IO_ADDRESS(OMAP4430_PRM_BASE),
-> ? ? ? ?.cm ? ? = OMAP2_L4_IO_ADDRESS(OMAP4430_CM_BASE),
-> diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
-> index 2e17890..2a141ba 100644
-> --- a/arch/arm/plat-omap/include/plat/cpu.h
-> +++ b/arch/arm/plat-omap/include/plat/cpu.h
-> @@ -443,7 +443,8 @@ IS_OMAP_TYPE(3517, 0x3517)
-> ?#define OMAP3505_REV(v) ? ? ? ? ? ? ? ?(OMAP35XX_CLASS | (0x3505 << 16) | (v << 12))
-> ?#define OMAP3517_REV(v) ? ? ? ? ? ? ? ?(OMAP35XX_CLASS | (0x3517 << 16) | (v << 12))
->
-> -#define OMAP443X_CLASS ? ? ? ? 0x44300034
-> +#define OMAP443X_CLASS ? ? ? ? 0x44300044
-> +#define OMAP4430_REV_ES1_0 ? ? 0x44300044
-Errr.. why? I suspect this might be to get the class and subclass right..
-
-Dont we need an cpu_is_omap_4430() to use it correctly? (unless I
-missed a pending patch series as I am checking l-o kernel codebase)..
-do we need the following?
-IS_OMAP_CLASS(44xx, 0x44)
-IS_OMAP_SUBCLASS(443x, 0x443)
-
-then you will have is_omap_443x() and you can now:
-#define cpu_is_omap4430 is_omap443x()
-
-just my 2cents..
->
-> ?/*
-> ?* omap_chip bits
+I think that this description is not reflecting your current patch that does use the DEVICE_ID register.
 
 Regards,
-Nishanth Menon
+Benoit
+
+>Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>---
+> arch/arm/mach-omap2/id.c              |   27 ++++++++++++++++++++++++++-
+> arch/arm/plat-omap/common.c           |    2 +-
+> arch/arm/plat-omap/include/plat/cpu.h |    3 ++-
+> 3 files changed, 29 insertions(+), 3 deletions(-)
+>
+>diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+>index f48a4b2..52c6478 100644
+>--- a/arch/arm/mach-omap2/id.c
+>+++ b/arch/arm/mach-omap2/id.c
+>@@ -246,6 +246,31 @@ void __init omap3_check_revision(void)
+>       }
+> }
+>
+>+void __init omap4_check_revision(void)
+>+{
+>+      u32 idcode;
+>+      u16 hawkeye;
+>+      u8 rev;
+>+      char *rev_name = "ES1.0";
+>+
+>+      /*
+>+       * The IC rev detection is done with hawkeye and rev.
+>+       * Note that rev does not map directly to defined processor
+>+       * revision numbers as ES1.0 uses value 0.
+>+       */
+>+      idcode = read_tap_reg(OMAP_TAP_IDCODE);
+>+      hawkeye = (idcode >> 12) & 0xffff;
+>+      rev = (idcode >> 28) & 0xff;
+>+
+>+      if ((hawkeye == 0xb852) && (rev == 0x0)) {
+>+              omap_revision = OMAP4430_REV_ES1_0;
+>+              pr_info("OMAP%04x %s\n", omap_rev() >> 16, rev_name);
+>+              return;
+>+      }
+>+
+>+      printk(KERN_ERR "Unknown OMAP CPU id\n");
+>+}
+>+
+> #define OMAP3_SHOW_FEATURE(feat)              \
+>       if (omap3_has_ ##feat())                \
+>               printk(#feat" ");
+>@@ -336,7 +361,7 @@ void __init omap2_check_revision(void)
+>               omap3_check_features();
+>               omap3_cpuinfo();
+>       } else if (cpu_is_omap44xx()) {
+>-              printk(KERN_INFO "FIXME: CPU revision = OMAP4430\n");
+>+              omap4_check_revision();
+>               return;
+>       } else {
+>               pr_err("OMAP revision unknown, please fix!\n");
+>diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
+>index cc050b3..3473a80 100644
+>--- a/arch/arm/plat-omap/common.c
+>+++ b/arch/arm/plat-omap/common.c
+>@@ -280,7 +280,7 @@ void __init omap2_set_globals_343x(void)
+> #if defined(CONFIG_ARCH_OMAP4)
+> static struct omap_globals omap4_globals = {
+>       .class  = OMAP443X_CLASS,
+>-      .tap    = OMAP2_L4_IO_ADDRESS(0x4830a000),
+>+      .tap    = OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE),
+>       .ctrl   = OMAP2_L4_IO_ADDRESS(OMAP443X_CTRL_BASE),
+>       .prm    = OMAP2_L4_IO_ADDRESS(OMAP4430_PRM_BASE),
+>       .cm     = OMAP2_L4_IO_ADDRESS(OMAP4430_CM_BASE),
+>diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-
+>omap/include/plat/cpu.h
+>index 2e17890..2a141ba 100644
+>--- a/arch/arm/plat-omap/include/plat/cpu.h
+>+++ b/arch/arm/plat-omap/include/plat/cpu.h
+>@@ -443,7 +443,8 @@ IS_OMAP_TYPE(3517, 0x3517)
+> #define OMAP3505_REV(v)               (OMAP35XX_CLASS | (0x3505 << 16) | (v
+><< 12))
+> #define OMAP3517_REV(v)               (OMAP35XX_CLASS | (0x3517 << 16) | (v
+><< 12))
+>
+>-#define OMAP443X_CLASS                0x44300034
+>+#define OMAP443X_CLASS                0x44300044
+>+#define OMAP4430_REV_ES1_0    0x44300044
+>
+> /*
+>  * omap_chip bits
+>--
+>1.6.0.4
+>
+>--
+>To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>the body of a message to majordomo at vger.kernel.org
+>More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Texas Instruments France SA, 821 Avenue Jack Kilby, 06270 Villeneuve Loubet. 036 420 040 R.C.S Antibes. Capital de EUR 753.920
