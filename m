@@ -1,59 +1,44 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 9 Dec 2009 10:12:44 +0100
-Subject: [PATCH] Driver for the watchdog timer on all Freescale IMX
-	processors.
-In-Reply-To: <1260286752-8796-1-git-send-email-w.sang@pengutronix.de>
-References: <1260286752-8796-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <20091209091244.GA15126@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 09 Dec 2009 10:09:09 +0000
+Subject: [GIT PULL] Patches for 2.6.33-rc1
+Message-ID: <1260353349.13499.4.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2009 at 04:39:12PM +0100, Wolfram Sang wrote:
-> Signed-off-by: Darius Augulis <augulis.darius@gmail.com>
-> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Wim Van Sebroeck <wim@iguana.be>
-> ---
-> 
-> Changes since the last version from Darius:
-> 
-> * removed all #ifdef CONFIG_ARCH_* and handle the differences at runtime
-> * simplified house-keeping of the timeout value and fixed the conversion
->   into the corresponding register value
-> * removed a superfluous static platform-device
-> * removed debug output and comments with (IMHO) little information
-> * cleaned up #includes
-> * fixed some typos & removed unnecessary tabs & added kernel coding style
-> * probably something else...
-> 
->  drivers/watchdog/Kconfig   |   12 ++
->  drivers/watchdog/Makefile  |    1 +
->  drivers/watchdog/imx_wdt.c |  342 ++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 355 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/watchdog/imx_wdt.c
-> 
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+Hi Russell,
 
-[snip]
+There are some patches which were not pulled yet and it would be nice if
+they get in during this merging window. Two of them are bug-fixes and
+the other is the earlyprintk support which many people find useful.
 
-> +
-> +	base = ioremap(res->start, res_size);
-> +	if (!base) {
-> +		dev_err(&pdev->dev, "ioremap failed\n");
-> +		ret = -EIO;
-> +		goto fail0;
-> +	}
-> +
-> +	imx_wdt.clk = clk_get(&pdev->dev, "wdog_clk");
-                                          ^^^^^^^^^^
+My for-rmk branch was rebased to 2.6.32 to check what was already merged
+but I can rebase it something earlier if you want.
 
-should be NULL.
+Thanks.
 
-Sascha
 
+The following changes since commit 22763c5cf3690a681551162c15d34d935308c8d7:
+  Linus Torvalds (1):
+        Linux 2.6.32
+
+are available in the git repository at:
+
+  git://linux-arm.org/linux-2.6.git for-rmk
+
+Catalin Marinas (2):
+      Add an earlyprintk debug console
+      RealView: Fix typo in the Kconfig enabling SPARSEMEM for RealView/PBX
+
+Varun Swara (1):
+      Do not allow the probing of the local timer
+
+ arch/arm/Kconfig.debug         |    8 +++++
+ arch/arm/kernel/Makefile       |    1 +
+ arch/arm/kernel/early_printk.c |   57 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/smp_twd.c      |    1 +
+ arch/arm/mach-realview/Kconfig |    2 +-
+ 5 files changed, 68 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/kernel/early_printk.c
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Catalin
