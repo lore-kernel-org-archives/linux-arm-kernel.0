@@ -1,42 +1,42 @@
 From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 9 Dec 2009 21:57:09 +0800
-Subject: [PATCH] mx31moboard: fix typo
-In-Reply-To: <4B1F9BC2.6010205@epfl.ch>
-References: <20091203193034.GD22533@pengutronix.de>
-	<20091203193321.GE22533@pengutronix.de>
-	<Pine.LNX.4.64.0912041013380.3981@axis700.grange>
-	<4B19473D.7010801@epfl.ch>
-	<20091204174623.GW14091@buzzloop.caiaq.de>
-	<4B1F9BC2.6010205@epfl.ch>
-Message-ID: <20091209135709.GG28375@buzzloop.caiaq.de>
+Date: Wed, 9 Dec 2009 21:59:27 +0800
+Subject: [PATCH 2/3] ARM: MX3: remove duplicated #include
+In-Reply-To: <1260364135-2320-1-git-send-email-weiyi.huang@gmail.com>
+References: <1260364135-2320-1-git-send-email-weiyi.huang@gmail.com>
+Message-ID: <20091209135927.GH28375@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 09, 2009 at 01:44:50PM +0100, Valentin Longchamp wrote:
-> Daniel Mack wrote:
-> >Could you double check whether the clock is running? The only thing I can
-> >think of is differences in the bootloaders. I still have the proprietary
-> >'losh' running here, which I have no sources for.
-> >
+On Wed, Dec 09, 2009 at 09:08:55PM +0800, Huang Weiyi wrote:
+> Remove duplicated #include('s) in
+>   arch/arm/mach-mx3/mx31lite-db.c
 > 
-> The clock is running (well, at least the parent ipg_clk and the
-> gating is configured for the clock running, thanks to
-> clk_enable(&iim_clk);
+> Signed-off-by: Huang Weiyi <weiyi.huang@gmail.com>
+
+Acked-by: Daniel Mack <daniel@caiaq.de>
+
+
+> ---
+>  arch/arm/mach-mx3/mx31lite-db.c |    1 -
+>  1 files changed, 0 insertions(+), 1 deletions(-)
 > 
-> About the bootloader, on our boards we have redboot, adapted from
-> the release Freescale did for the ADS. So it may be a bootloader
-> issue. What could be missing in my bootloader that makes this read
-> fail ?
+> diff --git a/arch/arm/mach-mx3/mx31lite-db.c b/arch/arm/mach-mx3/mx31lite-db.c
+> index 694611d..ccef689 100644
+> --- a/arch/arm/mach-mx3/mx31lite-db.c
+> +++ b/arch/arm/mach-mx3/mx31lite-db.c
+> @@ -30,7 +30,6 @@
+>  #include <linux/gpio.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/leds.h>
+> -#include <linux/platform_device.h>
+>  
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+> -- 
+> 1.6.1.3
 > 
-> I would say that maybe someting the EMI or SPBA configuration is
-> missing so that I can access the addresses in this range. Any ideas
-> ?
-
-I don't, sorry. I was hoping anyone else has more documentation - at
-least the reference manual makes me believe there is more that just that
-2 pages.
-
-In worst case we need to revert that patch, but I would like to avoid
-that.
-
-Daniel
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
