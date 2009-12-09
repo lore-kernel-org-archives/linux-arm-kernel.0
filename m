@@ -1,44 +1,59 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Wed, 9 Dec 2009 09:11:46 +0100
-Subject: [PATCH 1/2 RESEND#2] i2c/pxa: remove unused macro
-In-Reply-To: <20091208220724.GA14696@pengutronix.de>
-References: <1257754721-17325-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258658141-30340-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20091208211810.GB13706@pengutronix.de>
-	<20091208224456.0baf422b@hyperion.delvare>
-	<20091208220724.GA14696@pengutronix.de>
-Message-ID: <20091209091146.78e8d7bb@hyperion.delvare>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 9 Dec 2009 10:12:44 +0100
+Subject: [PATCH] Driver for the watchdog timer on all Freescale IMX
+	processors.
+In-Reply-To: <1260286752-8796-1-git-send-email-w.sang@pengutronix.de>
+References: <1260286752-8796-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <20091209091244.GA15126@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Dec 2009 23:07:24 +0100, Uwe Kleine-K?nig wrote:
-> Hi Jean,
+On Tue, Dec 08, 2009 at 04:39:12PM +0100, Wolfram Sang wrote:
+> Signed-off-by: Darius Augulis <augulis.darius@gmail.com>
+> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Wim Van Sebroeck <wim@iguana.be>
+> ---
 > 
-> On Tue, Dec 08, 2009 at 10:44:56PM +0100, Jean Delvare wrote:
-> > On Tue, 8 Dec 2009 22:18:10 +0100, Uwe Kleine-K?nig wrote:
-> > > Hi Jean,
-> > > 
-> > > On Thu, Nov 19, 2009 at 08:15:40PM +0100, Uwe Kleine-K?nig wrote:
-> > > > Commit
-> > > > 
-> > > > 	beea494 ([ARM] Remove EEPROM slave emulation from i2c-pxa driver.)
-> > > > 
-> > > > removed all uses of eedbg, so the definition can go, too.
-> > > do you have comments to my patches?  I think they should go in via your
-> > > tree.
-> > 
-> > I think you should read MAINTAINERS again.
-> Ah, so the maintainer is Ben Dooks, but the tree seems to be your's.
->
-> So I assume you take it when Ben give's his S-o-b or Ben has write
-> access to the tree?
+> Changes since the last version from Darius:
+> 
+> * removed all #ifdef CONFIG_ARCH_* and handle the differences at runtime
+> * simplified house-keeping of the timeout value and fixed the conversion
+>   into the corresponding register value
+> * removed a superfluous static platform-device
+> * removed debug output and comments with (IMHO) little information
+> * cleaned up #includes
+> * fixed some typos & removed unnecessary tabs & added kernel coding style
+> * probably something else...
+> 
+>  drivers/watchdog/Kconfig   |   12 ++
+>  drivers/watchdog/Makefile  |    1 +
+>  drivers/watchdog/imx_wdt.c |  342 ++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 355 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/watchdog/imx_wdt.c
+> 
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
 
-No. I have my tree, Ben has its own. Ben's isn't listed in MAINTAINERS,
-thus the confusion.
+[snip]
 
-Ben, can you please add your tree to MAINTAINERS to make things clearer
-for contributors?
+> +
+> +	base = ioremap(res->start, res_size);
+> +	if (!base) {
+> +		dev_err(&pdev->dev, "ioremap failed\n");
+> +		ret = -EIO;
+> +		goto fail0;
+> +	}
+> +
+> +	imx_wdt.clk = clk_get(&pdev->dev, "wdog_clk");
+                                          ^^^^^^^^^^
 
-Thanks,
+should be NULL.
+
+Sascha
+
+
 -- 
-Jean Delvare
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
