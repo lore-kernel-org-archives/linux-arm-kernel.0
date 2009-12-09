@@ -1,42 +1,80 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 9 Dec 2009 21:59:27 +0800
-Subject: [PATCH 2/3] ARM: MX3: remove duplicated #include
-In-Reply-To: <1260364135-2320-1-git-send-email-weiyi.huang@gmail.com>
-References: <1260364135-2320-1-git-send-email-weiyi.huang@gmail.com>
-Message-ID: <20091209135927.GH28375@buzzloop.caiaq.de>
+From: paulius.zaleckas@gmail.com (Paulius Zaleckas)
+Date: Wed, 09 Dec 2009 16:09:33 +0200
+Subject: [PATCH] Fix AT91SAM9G20 reset
+In-Reply-To: <20091209135048.GA30670@turtle.localnet>
+References: <20091209135048.GA30670@turtle.localnet>
+Message-ID: <4B1FAF9D.9050506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 09, 2009 at 09:08:55PM +0800, Huang Weiyi wrote:
-> Remove duplicated #include('s) in
->   arch/arm/mach-mx3/mx31lite-db.c
-> 
-> Signed-off-by: Huang Weiyi <weiyi.huang@gmail.com>
+On 12/09/2009 03:50 PM, Peter Horton wrote:
+> Fix AT91SAM9G20 reset as per the errata in the data sheet.
+>
+> If the SDRAM is not cleanly shutdown before reset it can be left driving
+> the bus, which then stops the bootloader booting from NAND.
+>
+> Signed-off-by: Peter Horton<phorton@bitbox.co.uk>
+> --
+>
 
-Acked-by: Daniel Mack <daniel@caiaq.de>
+[...]
 
+> Index: linux-2.6.32/arch/arm/mach-at91/at91sam9g20_reset.S
+> ===================================================================
+> --- /dev/null	1970-01-01 00:00:00.000000000 +0000
+> +++ linux-2.6.32/arch/arm/mach-at91/at91sam9g20_reset.S	2009-12-09 13:33:28.000000000 +0000
+> @@ -0,0 +1,52 @@
+> +/*
+> + * (C) BitBox Ltd 2009
+> + *
+> + * reset AT91SAM9G20 as per errata
+> + *
+> + * unless the SDRAM is cleanly shutdown before we hit the
+> + * reset register it can be left driving the data bus and
+> + * killing the chance of a subsequent boot from NAND
+> + */
+> +
+> +#define CP15_CR_I			(1<<  12)
+> +
+> +#define SYS_VIRT_OFS			(-0x01000000)
+> +
+> +#define SDRAMC_BASE			(SYS_VIRT_OFS + 0xffffea00)
+> +#define  SDRAMC_TR			0x0004
+> +#define  SDRAMC_LPR			0x0010
+> +#define   SDRAMC_LPCB_POWER_DOWN	2
+> +
+> +#define RSTC_BASE			(SYS_VIRT_OFS + 0xfffffd00)
+> +#define  RSTC_CR			0x0000
+> +#define   RSTC_PROCRST			(1<<  0)
+> +#define   RSTC_PERRST			(1<<  2)
+> +#define   RSTC_KEY			(0xa5<<  24)
+> +
+> +			.arm
+> +
+> +			.globl	at91sam9g20_reset
+> +
+> +at91sam9g20_reset:	mov	r0, #0
+> +			mcr	p15, 0, r0, c7, c5, 0	@ flush I-cache
+> +
+> +			mrc	p15, 0, r0, c1, c0, 0
+> +			orr	r0, r0, #CP15_CR_I
+> +			mcr	p15, 0, r0, c1, c0, 0	@ enable I-cache
+> +
+> +			ldr	r0, =SDRAMC_BASE	@ preload constants
+> +			ldr	r1, =RSTC_BASE
+> +
+> +			mov	r2, #1
+> +			mov	r3, #SDRAMC_LPCB_POWER_DOWN
+> +			ldr	r4, =RSTC_KEY | RSTC_PERRST | RSTC_PROCRST
+> +
+> +			.balign	32			@ align to cache line
+> +
+> +			str	r2, [r0, #SDRAMC_TR]	@ disable SDRAM access
+> +			str	r3, [r0, #SDRAMC_LPR]	@ power down SDRAM
+> +			str	r4, [r1, #RSTC_CR]	@ reset processor
+> +
+> +			b	.
+> +
+> +/* vi:set ft=ignore ai: */
 
-> ---
->  arch/arm/mach-mx3/mx31lite-db.c |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx3/mx31lite-db.c b/arch/arm/mach-mx3/mx31lite-db.c
-> index 694611d..ccef689 100644
-> --- a/arch/arm/mach-mx3/mx31lite-db.c
-> +++ b/arch/arm/mach-mx3/mx31lite-db.c
-> @@ -30,7 +30,6 @@
->  #include <linux/gpio.h>
->  #include <linux/platform_device.h>
->  #include <linux/leds.h>
-> -#include <linux/platform_device.h>
->  
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> -- 
-> 1.6.1.3
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Please remove the vi bits.
