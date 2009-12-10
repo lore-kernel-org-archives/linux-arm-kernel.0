@@ -1,57 +1,41 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 10 Dec 2009 09:28:03 +0100
-Subject: [PATCH 1/12] arch/arm: Correct size given to memset
-In-Reply-To: <Pine.LNX.4.64.0912092022040.1870@ask.diku.dk>
-References: <Pine.LNX.4.64.0912092022040.1870@ask.diku.dk>
-Message-ID: <20091210082803.GA6255@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 10 Dec 2009 09:39:15 +0000
+Subject: non barrier versions of dma_map functions
+In-Reply-To: <4B204193.6050004@codeaurora.org>
+References: <4B204193.6050004@codeaurora.org>
+Message-ID: <1260437955.22188.9.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, 2009-12-10 at 00:32 +0000, Abhijeet Dharmapurikar wrote:
+> Russell King - ARM Linux wrote:
+> > On Mon, Dec 07, 2009 at 11:37:21AM -0800, adharmap at codeaurora.org wrote:
+> >> We have a situation where we need to dma map multiple cached buffers for a
+> >> single dma transaction.
+> >>
+> >> The current DMA api suggests the use of dma_map_single for cache
+> >> consistency. On ARMv7 it performs the necessary cache-operations and calls
+> >> data sync barrier instruction (DSB). In our case we would be executing
+> >> multiple DSB instruction before starting the dma operation - we need
+> >> memory to be consistent only after we map the last buffer.
+> >
+> > Is it a problem and do you have numbers to illustrate why it is a
+> > problem, or is this just theory?
+> 
+> 
+> Here are numbers from a test ran on ARMv7 based device
+> It kmallocs N buffers of size 'size', dirties their cache by writing
+> to them and calls dma_map_single that calls the arch specific clean
+> operations with and without dsb. In "without dsb" case a dsb is executed
+> after the last buffer is mapped. The time is in microseconds
 
-On Wed, Dec 09, 2009 at 08:22:26PM +0100, Julia Lawall wrote:
-> From: Julia Lawall <julia@diku.dk>
-> 
-> Memset should be given the size of the structure, not the size of the pointer.
-> 
-> The semantic patch that makes this change is as follows:
-> (http://coccinelle.lip6.fr/)
-> 
-> // <smpl>
-> @@
-> type T;
-> T *x;
-> expression E;
-> @@
-> 
-> memset(x, E, sizeof(
-> + *
->  x))
-> // </smpl>
-> 
-> Signed-off-by: Julia Lawall <julia@diku.dk>
-> 
-> ---
->  arch/arm/plat-mxc/dma-mx1-mx2.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff -u -p a/arch/arm/plat-mxc/dma-mx1-mx2.c b/arch/arm/plat-mxc/dma-mx1-mx2.c
-> --- a/arch/arm/plat-mxc/dma-mx1-mx2.c
-> +++ b/arch/arm/plat-mxc/dma-mx1-mx2.c
-> @@ -694,7 +694,7 @@ int imx_dma_request(int channel, const c
->  		local_irq_restore(flags);
->  		return -EBUSY;
->  	}
-> -	memset(imxdma, 0, sizeof(imxdma));
-> +	memset(imxdma, 0, sizeof(*imxdma));
->  	imxdma->name = name;
->  	local_irq_restore(flags); /* request_irq() can block */
-Patch is OK, Sascha, if you take it you can add my Ack, if not I can
-take care of it in my cleanup series.
+Interesting results but I have some additional questions:
 
-Best regards
-Uwe
+What is the direction given to dma_map_single()?
+
+If the direction is TO_DEVICE, has the buffer been dirtied before
+calling dma_map_single()? The DSB overhead could be smaller compared to
+the actual cache flushing.
 
 -- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Catalin
