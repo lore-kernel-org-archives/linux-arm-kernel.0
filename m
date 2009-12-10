@@ -1,58 +1,72 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 9 Dec 2009 22:44:15 -0500
-Subject: [PATCH v2 09/09] regulator: refresh 88pm8607 driver with updated
-	api
-In-Reply-To: <20091209152026.GD32223@rakim.wolfsonmicro.main>
-References: <771cded00912090518s29c295a9v7f555a543f3bc4e6@mail.gmail.com>
-	<20091209152026.GD32223@rakim.wolfsonmicro.main>
-Message-ID: <771cded00912091944q14be2f94gc7343f232abdbd0f@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 9 Dec 2009 19:57:26 -0800
+Subject: [PATCH v2 08/09] input: enable touch on 88pm860x
+In-Reply-To: <20091210032149.GH10138@core.coreip.homeip.net>
+References: <771cded00912090517l5665e02fj35e90d02932e545a@mail.gmail.com>
+	<20091210032149.GH10138@core.coreip.homeip.net>
+Message-ID: <200912091957.26793.dmitry.torokhov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 9, 2009 at 10:20 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Wed, Dec 09, 2009 at 08:18:18AM -0500, Haojian Zhuang wrote:
->
->> Since i2c API of mfd 88pm860x driver is changed, refresh 88pm8607 driver.
->> Remove the support of 88PM8607 A0/A1 stepping.
->
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
->
-> Might be nice to split the removal of the old devices into a separate
-> patch but that is definitely a win. ?One blocker below, though.
->
->> + ? ? ? ? ? ? ret = (index < 3) ? (index * 50000 + 1800000) :
->> + ? ? ? ? ? ? ? ? ? ? ((index < 7) ? (index * 50000 + 2550000) :
->> + ? ? ? ? ? ? ? ? ? ? 3300000);
->
-> I know the previous code did this but I'm really not loving the multiple
-> ternery operators here for legibility.
->
->> ? ? ? return 0;
->> ?}
->> -subsys_initcall(pm8607_regulator_init);
->> +module_init(pm8607_regulator_init);
->
-> This should be left at subsys_initcall() to try to ensure that the
-> regulators are initialsied before the things that use them, otherwise
-> the handling of init sequencing gets too complex.
->
+On Wednesday 09 December 2009 07:21:49 pm Dmitry Torokhov wrote:
+> > +
+> > +static int __devinit pm860x_touch_probe(struct platform_device *pdev)
+> > +{
+> > +	struct pm860x_chip *chip = dev_get_drvdata(pdev->dev.parent);
+> > +	struct pm860x_platform_data *pm860x_pdata;
+> > +	struct pm860x_touch_pdata *pdata;
+> > +	struct pm860x_touch *touch;
+> > +	int irq, ret;
+> > +
+> > +	irq = platform_get_irq(pdev, 0);
+> > +	if (irq < 0) {
+> > +		dev_err(&pdev->dev, "No IRQ resource!\n");
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	if (pdev->dev.parent->platform_data) {
+> > +		pm860x_pdata = pdev->dev.parent->platform_data;
+> > +		pdata = pm860x_pdata->touch;
+> > +	} else
+> > +		pdata = NULL;
+> > +
+> > +	if (pdata == NULL) {
+> > +		dev_err(&pdev->dev, "platform data isn't assigned to "
+> > +			"touch\n");
+> > +		return -EINVAL;
+> > +	}
+> 
+> This should be written as:
+> 
+> ...
+> 	struct pm860x_platform_data *pm860x_pdata =
+>  pdev->dev.parent->platform_data; ...
+> 
+> 	if (pm860x_pdata) {
+> 		pdata = pm860x_pdata->touch;
+> 		if (!pdata) {
+> 			dev_err(&pdev->dev,
+> 				"touchscreen platform data is missing\n");
+> 			return -EINVAL;
+> 		}
+> 	}
 
-Now split this patch into two. Thanks :)
+Ugh, sorry, it was pure garbage... long day for me...
 
-Best Regards
-Haojian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0009-regulator-refresh-88pm8607-driver-with-updated-api.patch
-Type: text/x-patch
-Size: 5509 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091209/00e76454/attachment-0002.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0010-regulator-unsupport-88pm8607-A0-and-A1.patch
-Type: text/x-patch
-Size: 9843 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091209/00e76454/attachment-0003.bin>
+	if (!pm860x_pdata) {
+		dev_err(&pdev->dev, "platform data is missing\n");
+		return -EINVAL;
+	}
+
+	pdata = pm860x_pdata->touch;
+	if (!pdata) {
+		dev_err(&pdev->dev, "touchscreen data is missing\n");
+		return -EINVAL;
+	}
+ 
+should be better.
+
+Sorry for the confusion.
+
+-- 
+Dmitry
