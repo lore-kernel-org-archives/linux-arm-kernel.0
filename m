@@ -1,111 +1,131 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Fri, 11 Dec 2009 08:49:11 +1300
-Subject: GPIO support for HTC Dream
-In-Reply-To: <20091210172458.GJ19454@elf.ucw.cz>
-References: <20091208102842.GH12264@elf.ucw.cz>
-	<4B1EB57D.6070408@bluewatersys.com>
-	<20091208214658.GC4164@elf.ucw.cz>
-	<4B1ECEEE.3000209@bluewatersys.com>
-	<4B203575.6050407@bluewatersys.com>
-	<20091210172458.GJ19454@elf.ucw.cz>
-Message-ID: <4B2150B7.3040207@bluewatersys.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 10 Dec 2009 14:14:46 -0600
+Subject: [PATCH 1/6 v2] OMAP4: Fix cpu detection
+In-Reply-To: <1260426156-1820-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1260426156-1820-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <4B2156B6.8090403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pavel Machek wrote:
-> Hi!
+Shilimkar, Santosh had written, on 12/10/2009 12:22 AM, the following:
+> This patch fixes the OMAP4430 cpu detection. The IC rev detection is
+> done with hawkeye and rev. Note that rev does not map directly to
+> defined processor revision numbers as ES1.0 uses value 0.It also fixes
+> the SCM base address to read the correct ID_CODE register.
 > 
->>> This is still really screwy. Why are you creating your own version of
->>> struct gpio_chip in addition to the one in include/asm-generic/gpio.h
->>> (which you also appear to include in some places). It makes the code
->>> extremely confusing. Other architectures use wrapper structures. Can you
->>> have something like this instead:
->>>
->>> 	struct dream_gpio_chip {
->>> 		struct gpio_chip chip;
->>>
->>> 		/* Dream specific bits */
->>> 	};
->>>
->>> The name of this function also needs to be changed to something less
->>> generic since it is being exported globally.
->>>
->>> I also think this function is doing way to much work for what it is.
->>> Does it really need to be this complicated?
->> Further to this, I think it is worth doing the work to make this gpiolib
->> now. Most of the other ARM chips now support gpiolib, so it would seem a
->> bit of a step backwards to start adding new chips which don't. I think
->> that adding the gpiolib support will also cleanup the mess that is
->> register_gpio_chip, since this is all already handled by the gpiolib core.
+> Also the cpu_is_omap44xx() and cpu_is_omap443x() correctly populated
+> instead of always being true
 > 
-> I tried going through drivers/gpio/gpiolib.c and it seems to be a lot
-> of code -- mostly sysrq interface to userland. I'm not sure how much
-> code could be shared... 
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/mach-omap2/id.c              |   27 ++++++++++++++++++++++++++-
+>  arch/arm/plat-omap/common.c           |    2 +-
+>  arch/arm/plat-omap/include/plat/cpu.h |    9 ++++++---
+>  3 files changed, 33 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+> index f48a4b2..3641ba0 100644
+> --- a/arch/arm/mach-omap2/id.c
+> +++ b/arch/arm/mach-omap2/id.c
+> @@ -246,6 +246,31 @@ void __init omap3_check_revision(void)
+>  	}
+>  }
+>  
+> +void __init omap4_check_revision(void)
+> +{
+> +	u32 idcode;
+> +	u16 hawkeye;
+> +	u8 rev;
+> +	char *rev_name = "ES1.0";
+should'nt you decide this inside the rev check path?
 
-Its not much work to go from generic gpio (which you have now) to
-gpiolib, and in the end it will make the code simpler, more extensible,
-you get sysfs access for free, etc. You will need to wrap up your
-gpio_chip struct as I suggested:
+> +
+> +	/*
+> +	 * The IC rev detection is done with hawkeye and rev.
+> +	 * Note that rev does not map directly to defined processor
+> +	 * revision numbers as ES1.0 uses value 0.
+> +	 */
+> +	idcode = read_tap_reg(OMAP_TAP_IDCODE);
+> +	hawkeye = (idcode >> 12) & 0xffff;
+> +	rev = (idcode >> 28) & 0xff;
+> +
+> +	if ((hawkeye == 0xb852) && (rev == 0x0)) {
+> +		omap_revision = OMAP4430_REV_ES1_0;
+> +		pr_info("OMAP%04x %s\n", omap_rev() >> 16, rev_name);
+wondering about the >>16 part.
 
-struct msm_gpio_chip {
-	struct gpio_chip;
-	
-	/* MSM/Dream/Trout(?) bits */
-};
-#define to_msm_gpio_chip(c, container_of(c, struct msm_gpio_chip, chip)
-
-As an aside, I don't quite understand the naming conventions here. Is
-the gpio stuff generic to the MSM chip, or specific to the Dream/Trout
-board? It would be good if the gpio implementation could be completely
-generic to the chip, and all the board specific bits be kept in the
-board specific files.
-
-You gpio_set, get, direction, etc functions become static:
-
-static gpio_set_value(struct gpio_chip *chip, unsigned offset, int val)
-{
-	struct msm_gpio_chip *msm_chip = to_msm_gpio_chip(chip);
-	
-	...
-}
-
-and you have a descriptor for your chip (or an array of these if you
-want multiple banks of gpios):
-
-static struct msm_gpios = {
-	.chip = {
-		.label		= "msm_gpio",
-		.set		= gpio_set_value,
-		...
-	},
-	/* MSM specific bits */
-};
-
-void __init msm_init_gpio(void)
-{
-	gpiochip_add(&msm_gpios);
-
-	/* Other setup, gpio irqs, etc */
-}
-
-Your msm_register_gpio_chip function should disappear and your
-gpio_request and gpio_free functions can either be removed, or at least
-become much simpler since gpiolib already handles most of what those
-functions are doing.
-
-Have a look at the other ARM chips which have gpiolib support for a
-guide. The ep93xx and at91 ones which I did are reasonably simple to
-follow, and also demonstrate how to use the debugfs hooks which you may
-find useful. Also look at Documentation/gpio.txt which has some more
-detailed information on gpiolib.
-
-~Ryan
+> +		return;
+> +	}
+> +
+> +	pr_err("Unknown OMAP4 CPU id\n");
+> +}
+> +
+>  #define OMAP3_SHOW_FEATURE(feat)		\
+>  	if (omap3_has_ ##feat())		\
+>  		printk(#feat" ");
+> @@ -336,7 +361,7 @@ void __init omap2_check_revision(void)
+>  		omap3_check_features();
+>  		omap3_cpuinfo();
+>  	} else if (cpu_is_omap44xx()) {
+> -		printk(KERN_INFO "FIXME: CPU revision = OMAP4430\n");
+> +		omap4_check_revision();
+>  		return;
+>  	} else {
+>  		pr_err("OMAP revision unknown, please fix!\n");
+> diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
+> index cc050b3..3473a80 100644
+> --- a/arch/arm/plat-omap/common.c
+> +++ b/arch/arm/plat-omap/common.c
+> @@ -280,7 +280,7 @@ void __init omap2_set_globals_343x(void)
+>  #if defined(CONFIG_ARCH_OMAP4)
+>  static struct omap_globals omap4_globals = {
+>  	.class	= OMAP443X_CLASS,
+> -	.tap	= OMAP2_L4_IO_ADDRESS(0x4830a000),
+> +	.tap	= OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE),
+>  	.ctrl	= OMAP2_L4_IO_ADDRESS(OMAP443X_CTRL_BASE),
+>  	.prm	= OMAP2_L4_IO_ADDRESS(OMAP4430_PRM_BASE),
+>  	.cm	= OMAP2_L4_IO_ADDRESS(OMAP4430_CM_BASE),
+> diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
+> index 2e17890..9359785 100644
+> --- a/arch/arm/plat-omap/include/plat/cpu.h
+> +++ b/arch/arm/plat-omap/include/plat/cpu.h
+> @@ -176,11 +176,13 @@ IS_OMAP_CLASS(15xx, 0x15)
+>  IS_OMAP_CLASS(16xx, 0x16)
+>  IS_OMAP_CLASS(24xx, 0x24)
+>  IS_OMAP_CLASS(34xx, 0x34)
+> +IS_OMAP_CLASS(44xx, 0x44)
+>  
+>  IS_OMAP_SUBCLASS(242x, 0x242)
+>  IS_OMAP_SUBCLASS(243x, 0x243)
+>  IS_OMAP_SUBCLASS(343x, 0x343)
+>  IS_OMAP_SUBCLASS(363x, 0x363)
+> +IS_OMAP_SUBCLASS(443x, 0x443)
+>  
+>  #define cpu_is_omap7xx()		0
+>  #define cpu_is_omap15xx()		0
+> @@ -408,8 +410,8 @@ IS_OMAP_TYPE(3517, 0x3517)
+>  # if defined(CONFIG_ARCH_OMAP4)
+>  # undef cpu_is_omap44xx
+>  # undef cpu_is_omap443x
+> -# define cpu_is_omap44xx()		1
+> -# define cpu_is_omap443x()		1
+> +# define cpu_is_omap44xx()		is_omap44xx()
+> +# define cpu_is_omap443x()		is_omap443x()
+>  # endif
+>  
+>  /* Macros to detect if we have OMAP1 or OMAP2 */
+> @@ -443,7 +445,8 @@ IS_OMAP_TYPE(3517, 0x3517)
+>  #define OMAP3505_REV(v)		(OMAP35XX_CLASS | (0x3505 << 16) | (v << 12))
+>  #define OMAP3517_REV(v)		(OMAP35XX_CLASS | (0x3517 << 16) | (v << 12))
+>  
+> -#define OMAP443X_CLASS		0x44300034
+> +#define OMAP443X_CLASS		0x44300044
+> +#define OMAP4430_REV_ES1_0	0x44300044
+>  
+>  /*
+>   * omap_chip bits
+neat.. thanks..
 
 -- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+Regards,
+Nishanth Menon
