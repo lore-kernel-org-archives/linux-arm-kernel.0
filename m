@@ -1,51 +1,61 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 10 Dec 2009 11:18:35 -0800
-Subject: [GIT PULL] msm updates for v2.6.33
-Message-ID: <1260472715.11877.103.camel@c-dwalke-linux.qualcomm.com>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Thu, 10 Dec 2009 20:27:28 +0100
+Subject: [PATCH 4/4] MXC: imx31pdk: Trying to enabling regulators on
+	mc13783
+In-Reply-To: <20091210191017.GB22554@sirena.org.uk>
+References: <1260470224.2141.37.camel@climbing-alby>
+	<1260470547.2141.42.camel@climbing-alby>
+	<1260470743.2141.45.camel@climbing-alby>
+	<1260471013.2141.49.camel@climbing-alby>
+	<1260471404.2141.56.camel@climbing-alby>
+	<20091210191017.GB22554@sirena.org.uk>
+Message-ID: <1260473248.2141.75.camel@climbing-alby>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Il giorno gio, 10/12/2009 alle 19.10 +0000, Mark Brown ha scritto:
+> On Thu, Dec 10, 2009 at 07:56:44PM +0100, Alberto Panizzo wrote:
+> 
+> > +/* MC13783 */
+> > +#define mV_to_uV(mV) (mV * 1000)
+> 
+> Define this somewhere global, it's generally useful.
 
-Please pull these updates for the arm MSM sub-architecture. The biggest
-change here is support for the HTC Dream/Google G1 phone, and a few
-small Kconfig/compile fixes. There is also the addition of a maintainer
-entry that covers this sub-architecture and it's drivers which are
-currently unmaintained.
+Yes, maybe in include/linux/mfd/mc13783.h 
 
-Daniel
+> 
+> > +
+> > +static struct regulator_consumer_supply gpo_consumers[] = {
+> > +	{
+> > +		.supply = "REGU_GPO1",
+> > +	}
+> 
+> What's this supply for?  Normally a supply should be specific to a
+> device.
 
---
-The following changes since commit 333a07437c31ea8c16a2b82071629a540ae1e50f:
-  Linus Torvalds (1):
-        Merge branch 'release' of git://git.kernel.org/.../aegl/linux-2.6
+Right, it is just a tentative to reproduce the freescale working code.
 
-are available in the git repository at:
+> 
+> > +static struct regulator_init_data gpo1_init = {
+> > +	.constraints = {
+> > +		.boot_on = 1, /* Enable it! */
+> 
+> I suspect you'll want always_on there - otherwise the regulator might
+> get switched off underneath you if the regulator core changes to make
+> regulator_has_full_constraints() the default.
+> 
+> > +static struct regulator_init_data violo_init = {
+> > +	.constraints = {
+> > +		.min_uV = mV_to_uV(1200), /* mc13783 allows min of 1200. */
+> > +		.max_uV = mV_to_uV(1800), /* mc13783 allows max of 1800. */
+> 
+> The constraints would normally be derived from the board - if none of
+> them want to adjust the voltage then there should be at most one voltage
+> specified (the voltage the system should use).
 
-  git://codeaurora.org/quic/kernel/dwalker/linux-msm.git for-linus
+Ok, the definitive patch will embrace those. Could you suggest something
+on the main problem? 
 
-Daniel Walker (1):
-      Add arm msm maintainer entry
-
-Pavel Machek (5):
-      msm: make debugging UART (for DEBUG_LL) configurable
-      msm: add minimal board file for HTC Dream device
-      msm: Add memory map for HTC Dream
-      video: Allow selecting MSM framebuffer in Kconfig
-      HTC Dream: mmc compilation fixes
-
- MAINTAINERS                                  |   13 ++++
- arch/arm/mach-msm/Kconfig                    |   30 ++++++++
- arch/arm/mach-msm/Makefile                   |    1 +
- arch/arm/mach-msm/board-dream.c              |   93 ++++++++++++++++++++++++++
- arch/arm/mach-msm/board-dream.h              |    5 ++
- arch/arm/mach-msm/include/mach/debug-macro.S |   24 +++++--
- arch/arm/mach-msm/include/mach/mmc.h         |   26 +++++++
- arch/arm/mach-msm/include/mach/msm_iomap.h   |   12 +++
- arch/arm/mach-msm/include/mach/uncompress.h  |    7 ++
- arch/arm/mach-msm/io.c                       |    3 +
- drivers/mmc/host/msm_sdcc.c                  |    5 +-
- drivers/video/Kconfig                        |    2 +-
- 12 files changed, 209 insertions(+), 12 deletions(-)
- create mode 100644 arch/arm/mach-msm/board-dream.c
- create mode 100644 arch/arm/mach-msm/board-dream.h
- create mode 100644 arch/arm/mach-msm/include/mach/mmc.h
+This patch is a try, not the really, I decided to post this series because
+I've tried all my options but the system freezes when a mc 13783 GPOn output
+is enabled..
