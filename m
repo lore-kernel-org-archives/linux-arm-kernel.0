@@ -1,261 +1,58 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 9 Dec 2009 22:41:58 -0500
-Subject: [PATCH v2 08/09] input: enable touch on 88pm860x
-In-Reply-To: <20091210032149.GH10138@core.coreip.homeip.net>
-References: <771cded00912090517l5665e02fj35e90d02932e545a@mail.gmail.com>
-	<20091210032149.GH10138@core.coreip.homeip.net>
-Message-ID: <771cded00912091941n1a5a5401wb9332b6d8c3efb75@mail.gmail.com>
+Date: Wed, 9 Dec 2009 22:44:15 -0500
+Subject: [PATCH v2 09/09] regulator: refresh 88pm8607 driver with updated
+	api
+In-Reply-To: <20091209152026.GD32223@rakim.wolfsonmicro.main>
+References: <771cded00912090518s29c295a9v7f555a543f3bc4e6@mail.gmail.com>
+	<20091209152026.GD32223@rakim.wolfsonmicro.main>
+Message-ID: <771cded00912091944q14be2f94gc7343f232abdbd0f@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 9, 2009 at 10:21 PM, Dmitry Torokhov
-<dmitry.torokhov@gmail.com> wrote:
-> Hi Haojian,
+On Wed, Dec 9, 2009 at 10:20 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Wed, Dec 09, 2009 at 08:18:18AM -0500, Haojian Zhuang wrote:
 >
-> On Wed, Dec 09, 2009 at 08:17:20AM -0500, Haojian Zhuang wrote:
->> +
->> + ? ? if (pen_down) {
->> + ? ? ? ? ? ? if ((x != 0) && (z1 != 0) && (touch->res_x != 0)) {
->> + ? ? ? ? ? ? ? ? ? ? rt = z2 / z1 - 1;
->> + ? ? ? ? ? ? ? ? ? ? rt = (rt * touch->res_x * x) >> ACCURATE_BIT;
->> + ? ? ? ? ? ? ? ? ? ? dev_dbg(chip->dev, "z1:%d, z2:%d, rt:%d\n",
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? z1, z2, rt);
->> + ? ? ? ? ? ? }
->> + ? ? ? ? ? ? input_report_abs(touch->idev, ABS_X, x);
->> + ? ? ? ? ? ? input_report_abs(touch->idev, ABS_Y, y);
->> + ? ? ? ? ? ? input_report_abs(touch->idev, ABS_PRESSURE, rt);
->> + ? ? ? ? ? ? input_report_key(touch->idev, BTN_TOUCH, 1);
->> + ? ? } else {
->> + ? ? ? ? ? ? input_report_abs(touch->idev, ABS_PRESSURE, 0);
->> + ? ? ? ? ? ? input_report_key(touch->idev, BTN_TOUCH, 0);
->> + ? ? }
->> + ? ? input_sync(touch->idev);
->> + ? ? pm860x_unmask_irq(chip, irq);
->> +
->> + ? ? if (pen_down)
->> + ? ? ? ? ? ? dev_dbg(chip->dev, "pen down at [%d, %d].\n", x, y);
->> + ? ? else
->> + ? ? ? ? ? ? dev_dbg(chip->dev, "pen release\n");
+>> Since i2c API of mfd 88pm860x driver is changed, refresh 88pm8607 driver.
+>> Remove the support of 88PM8607 A0/A1 stepping.
 >
-> You already do conditon check up a few lines, just fold this one into
-> it. Compiler might do it for you but why can;t we help it?
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 >
->> +out:
->> + ? ? return IRQ_HANDLED;
->> +}
->> +
->> +static int pm860x_touch_open(struct input_dev *dev)
->> +{
->> + ? ? struct pm860x_touch *touch = input_get_drvdata(dev);
->> + ? ? struct pm860x_chip *chip = touch->chip;
->> + ? ? int data, ret;
->> +
->> + ? ? data = MEAS_PD_EN | MEAS_TSIX_EN | MEAS_TSIY_EN
->> + ? ? ? ? ? ? | MEAS_TSIZ1_EN | MEAS_TSIZ2_EN;
->> + ? ? ret = pm860x_set_bits(touch->i2c, MEAS_EN3, data, data);
->> + ? ? if (ret < 0)
->> + ? ? ? ? ? ? goto out;
->> + ? ? pm860x_unmask_irq(chip, touch->irq);
->> + ? ? return 0;
->> +out:
->> + ? ? return ret;
->> +}
->> +
->> +static void pm860x_touch_close(struct input_dev *dev)
->> +{
->> + ? ? struct pm860x_touch *touch = input_get_drvdata(dev);
->> + ? ? struct pm860x_chip *chip = touch->chip;
->> + ? ? int data;
->> +
->> + ? ? data = MEAS_PD_EN | MEAS_TSIX_EN | MEAS_TSIY_EN
->> + ? ? ? ? ? ? | MEAS_TSIZ1_EN | MEAS_TSIZ2_EN;
->> + ? ? pm860x_set_bits(touch->i2c, MEAS_EN3, data, 0);
->> + ? ? pm860x_mask_irq(chip, touch->irq);
->> +}
->> +
->> +static int __devinit pm860x_touch_probe(struct platform_device *pdev)
->> +{
->> + ? ? struct pm860x_chip *chip = dev_get_drvdata(pdev->dev.parent);
->> + ? ? struct pm860x_platform_data *pm860x_pdata;
->> + ? ? struct pm860x_touch_pdata *pdata;
->> + ? ? struct pm860x_touch *touch;
->> + ? ? int irq, ret;
->> +
->> + ? ? irq = platform_get_irq(pdev, 0);
->> + ? ? if (irq < 0) {
->> + ? ? ? ? ? ? dev_err(&pdev->dev, "No IRQ resource!\n");
->> + ? ? ? ? ? ? return -EINVAL;
->> + ? ? }
->> +
->> + ? ? if (pdev->dev.parent->platform_data) {
->> + ? ? ? ? ? ? pm860x_pdata = pdev->dev.parent->platform_data;
->> + ? ? ? ? ? ? pdata = pm860x_pdata->touch;
->> + ? ? } else
->> + ? ? ? ? ? ? pdata = NULL;
->> +
->> + ? ? if (pdata == NULL) {
->> + ? ? ? ? ? ? dev_err(&pdev->dev, "platform data isn't assigned to "
->> + ? ? ? ? ? ? ? ? ? ? "touch\n");
->> + ? ? ? ? ? ? return -EINVAL;
->> + ? ? }
+> Might be nice to split the removal of the old devices into a separate
+> patch but that is definitely a win. ?One blocker below, though.
 >
-> This should be written as:
+>> + ? ? ? ? ? ? ret = (index < 3) ? (index * 50000 + 1800000) :
+>> + ? ? ? ? ? ? ? ? ? ? ((index < 7) ? (index * 50000 + 2550000) :
+>> + ? ? ? ? ? ? ? ? ? ? 3300000);
 >
-> ...
-> ? ? ? ?struct pm860x_platform_data *pm860x_pdata = pdev->dev.parent->platform_data;
-> ...
+> I know the previous code did this but I'm really not loving the multiple
+> ternery operators here for legibility.
 >
-> ? ? ? ?if (pm860x_pdata) {
-> ? ? ? ? ? ? ? ?pdata = pm860x_pdata->touch;
-> ? ? ? ? ? ? ? ?if (!pdata) {
-> ? ? ? ? ? ? ? ? ? ? ? ?dev_err(&pdev->dev,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"touchscreen platform data is missing\n");
-> ? ? ? ? ? ? ? ? ? ? ? ?return -EINVAL;
-> ? ? ? ? ? ? ? ?}
-> ? ? ? ?}
+>> ? ? ? return 0;
+>> ?}
+>> -subsys_initcall(pm8607_regulator_init);
+>> +module_init(pm8607_regulator_init);
 >
->> +
->> + ? ? touch = kzalloc(sizeof(struct pm860x_touch), GFP_KERNEL);
->> + ? ? if (touch == NULL)
->> + ? ? ? ? ? ? return -ENOMEM;
->> + ? ? dev_set_drvdata(&pdev->dev, touch);
->> +
->> + ? ? touch->idev = input_allocate_device();
->> + ? ? if (touch->idev == NULL) {
->> + ? ? ? ? ? ? dev_err(&pdev->dev, "Failed to allocate input device!\n");
->> + ? ? ? ? ? ? ret = -ENOMEM;
->> + ? ? ? ? ? ? goto out;
->> + ? ? }
->> +
->> + ? ? touch->idev->name = "88pm860x-touch";
->> + ? ? touch->idev->phys = "88pm860x/input0";
->> + ? ? touch->idev->id.bustype = BUS_I2C;
->> + ? ? touch->idev->dev.parent = &pdev->dev;
->> + ? ? touch->idev->open = pm860x_touch_open;
->> + ? ? touch->idev->close = pm860x_touch_close;
->> + ? ? touch->chip = chip;
->> + ? ? touch->i2c = (chip->id == CHIP_PM8607) ? chip->client ? \
->> + ? ? ? ? ? ? ? ? ? ? : chip->companion;
->
-> No need to escape newlines.
->
->> + ? ? touch->irq = irq;
->> + ? ? touch->res_x = pdata->res_x;
->> + ? ? input_set_drvdata(touch->idev, touch);
->> +
->> + ? ? ret = pm860x_request_irq(chip, irq, pm860x_touch_handler, touch);
->> + ? ? if (ret < 0)
->> + ? ? ? ? ? ? goto out_irq;
->> +
->> + ? ? __set_bit(EV_ABS, touch->idev->evbit);
->> + ? ? __set_bit(ABS_X, touch->idev->absbit);
->> + ? ? __set_bit(ABS_Y, touch->idev->absbit);
->> + ? ? __set_bit(ABS_PRESSURE, touch->idev->absbit);
->> + ? ? __set_bit(EV_SYN, touch->idev->evbit);
->> + ? ? __set_bit(EV_KEY, touch->idev->evbit);
->> + ? ? __set_bit(BTN_TOUCH, touch->idev->keybit);
->> +
->> + ? ? input_set_abs_params(touch->idev, ABS_X, 0, 1 << ACCURATE_BIT, 0, 0);
->> + ? ? input_set_abs_params(touch->idev, ABS_Y, 0, 1 << ACCURATE_BIT, 0, 0);
->> + ? ? input_set_abs_params(touch->idev, ABS_PRESSURE, 0, 1 << ACCURATE_BIT,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0, 0);
->> +
->> + ? ? ret = input_register_device(touch->idev);
->> + ? ? if (ret < 0) {
->> + ? ? ? ? ? ? dev_err(chip->dev, "Failed to register touch!\n");
->> + ? ? ? ? ? ? goto out_rg;
->> + ? ? }
->> +
->> + ? ? platform_set_drvdata(pdev, touch);
->> + ? ? return 0;
->> +out_rg:
->> + ? ? pm860x_free_irq(chip, irq);
->> +out_irq:
->> + ? ? input_free_device(touch->idev);
->> +out:
->> + ? ? kfree(touch);
->> + ? ? return ret;
->> +}
->> +
->> +static int __devexit pm860x_touch_remove(struct platform_device *pdev)
->> +{
->> + ? ? struct pm860x_touch *touch = platform_get_drvdata(pdev);
->> +
->> + ? ? input_unregister_device(touch->idev);
->> + ? ? pm860x_free_irq(touch->chip, touch->irq);
->
-> You need to kfree(touch) and platform_set_drvdata(pdev, NULL) would also
-> be prudent.
->
->> + ? ? return 0;
->> +}
->> +
->> +static struct platform_driver pm860x_touch_driver = {
->> + ? ? .driver = {
->> + ? ? ? ? ? ? .name ? = "88pm860x-touch",
->> + ? ? ? ? ? ? .owner ?= THIS_MODULE,
->> + ? ? },
->> + ? ? .probe ?= pm860x_touch_probe,
->> + ? ? .remove = __devexit_p(pm860x_touch_remove),
->> +};
->> +
->> +static int __init pm860x_touch_init(void)
->> +{
->> + ? ? return platform_driver_register(&pm860x_touch_driver);
->> +}
->> +module_init(pm860x_touch_init);
->> +
->> +static void __exit pm860x_touch_exit(void)
->> +{
->> + ? ? platform_driver_unregister(&pm860x_touch_driver);
->> +}
->> +module_exit(pm860x_touch_exit);
->> +
->> +MODULE_DESCRIPTION("Touchscreen driver for Marvell Semiconductor 88PM860x");
->> +MODULE_AUTHOR("Haojian Zhuang <haojian.zhuang@marvell.com>");
->> +MODULE_LICENSE("GPL");
->> +MODULE_ALIAS("platform:88pm860x-touch");
->> +
->> diff --git a/drivers/input/touchscreen/Kconfig
->> b/drivers/input/touchscreen/Kconfig
->> index 8cc453c..f4e6fd2 100644
->> --- a/drivers/input/touchscreen/Kconfig
->> +++ b/drivers/input/touchscreen/Kconfig
->> @@ -530,4 +530,16 @@ config TOUCHSCREEN_PCAP
->>
->> ? ? ? ? To compile this driver as a module, choose M here: the
->> ? ? ? ? module will be called pcap_ts.
->> +
->> +config TOUCHSCREEN_88PM860X
->> + ? ? tristate "Marvell 88PM860x touchscreen"
->> + ? ? depends on MFD_88PM860X
->> + ? ? help
->> + ? ? ? Say Y here if you have a 88PM860x PMIC and want to enable
->> + ? ? ? support for the built-in touchscreen.
->> +
->> + ? ? ? If unsure, say N.
->> +
->> + ? ? ? To compile this driver as a module, choose M here: the
->> + ? ? ? module will be called 88pm860x-ts.
->
-> Could you stick it somewhere in the middle of Kconfig file - it will
-> reduce chance of issues with merging. I assume you want to merge the
-> driver with the rest of the patches through MFD tree?
->
-> Other than that - looks good.
->
-> --
-> Dmitry
+> This should be left at subsys_initcall() to try to ensure that the
+> regulators are initialsied before the things that use them, otherwise
+> the handling of init sequencing gets too complex.
 >
 
-Thanks. Update it now. :)
+Now split this patch into two. Thanks :)
 
 Best Regards
 Haojian
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: 0008-input-enable-touch-on-88pm860x.patch
+Name: 0009-regulator-refresh-88pm8607-driver-with-updated-api.patch
 Type: text/x-patch
-Size: 8955 bytes
+Size: 5509 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091209/dd3f4f7e/attachment.bin>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091209/00e76454/attachment-0002.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0010-regulator-unsupport-88pm8607-A0-and-A1.patch
+Type: text/x-patch
+Size: 9843 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091209/00e76454/attachment-0003.bin>
