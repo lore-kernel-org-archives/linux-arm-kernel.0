@@ -1,53 +1,40 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 10 Dec 2009 16:57:18 +0530
-Subject: [PATCH 3/6] OMAP4: Re-arrange the low level debug code
-In-Reply-To: <4B20CF04.8060208@ru.mvista.com>
-References: <1260383350-32681-1-git-send-email-santosh.shilimkar@ti.com>
-	<1260383350-32681-2-git-send-email-santosh.shilimkar@ti.com>
-	<1260383350-32681-3-git-send-email-santosh.shilimkar@ti.com>
-	<4B20CF04.8060208@ru.mvista.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02BC0A8766@dbde02.ent.ti.com>
+From: ramaxlo@gmail.com (Ramax Lo)
+Date: Thu, 10 Dec 2009 21:48:16 +0800
+Subject: [PATCH] s3cmci: Set the number of data segment to 1 for S3C24XX
+	platform
+In-Reply-To: <>
+References: <>
+Message-ID: <1260452896-17268-1-git-send-email-ramaxlo@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Since S3C24XX platform doesn't support scatter-gather DMA, we just set
+the structure members max_phys_segs & max_hw_segs to 1 for DMA mode transfer.
 
+Signed-off-by: Ramax Lo <ramaxlo@gmail.com>
+---
+ drivers/mmc/host/s3cmci.c |    9 +++++++--
+ 1 files changed, 7 insertions(+), 2 deletions(-)
 
-> -----Original Message-----
-> From: Sergei Shtylyov [mailto:sshtylyov at ru.mvista.com]
-> Sent: Thursday, December 10, 2009 4:06 PM
-> To: Shilimkar, Santosh
-> Cc: tony at atomide.com; linux-omap at vger.kernel.org; linux at arm.linux.org.uk; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH 3/6] OMAP4: Re-arrange the low level debug code
-> 
-> Hello.
-> 
-> Santosh Shilimkar wrote:
-> 
-> > On OMAP4430 the UART3 base address is different than that on OMAP3.
-> > Because of this existing code needs additional #ifdef'ry to accommodate
-> > that code. Hence this patch separates it. Also UART3 base address is
-> > fixed for OMAP4430 in this patch.
-> >
-> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >
-> [...]
-> > diff --git a/arch/arm/mach-omap2/include/mach/debug-macro.S b/arch/arm/mach-
-> omap2/include/mach/debug-macro.S
-> > index e9f255d..b2b4b29 100644
-> > --- a/arch/arm/mach-omap2/include/mach/debug-macro.S
-> > +++ b/arch/arm/mach-omap2/include/mach/debug-macro.S
-> > @@ -25,7 +25,7 @@
-> >  		add	\rx, \rx, #0x00004000	@ UART 3
-> >  #endif
-> >
-> > -#elif defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
-> > +#elif CONFIG_ARCH_OMAP3
-> >
-> 
->    Why you've dropped defined()? This doesn't seem right as it should
-> cause error when CONFIG_ARCH_OMAP3=n...
-
-Before omap4 support was added, it was as above. Now when I decided
-to go back and spilt it I changed it. How the ARCH flag will be
-n ? It will be either 0 or 1
+diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
+index 99b74a3..b1e10c1 100644
+--- a/drivers/mmc/host/s3cmci.c
++++ b/drivers/mmc/host/s3cmci.c
+@@ -1735,8 +1735,13 @@ static int __devinit s3cmci_probe(struct platform_device *pdev)
+ 	mmc->max_req_size	= 4095 * 512;
+ 	mmc->max_seg_size	= mmc->max_req_size;
+ 
+-	mmc->max_phys_segs	= 128;
+-	mmc->max_hw_segs	= 128;
++	if (s3cmci_host_usedma(host)) {
++		mmc->max_phys_segs	= 1;
++		mmc->max_hw_segs	= 1;
++	} else {
++		mmc->max_phys_segs	= 128;
++		mmc->max_hw_segs	= 128;
++	}
+ 
+ 	dbg(host, dbg_debug,
+ 	    "probe: mode:%s mapped mci_base:%p irq:%u irq_cd:%u dma:%u.\n",
+-- 
+1.5.4.3
