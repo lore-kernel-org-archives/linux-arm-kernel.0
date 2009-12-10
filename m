@@ -1,34 +1,40 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Thu, 10 Dec 2009 19:39:25 +0000
-Subject: [PATCH 4/4] MXC: imx31pdk: Trying to enabling regulators on
-	mc13783
-In-Reply-To: <1260473248.2141.75.camel@climbing-alby>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 10 Dec 2009 19:42:20 +0000
+Subject: MXC: mx31pdk: mc13783: Trying to full support mc13783 regulators
+In-Reply-To: <1260472292.2141.64.camel@climbing-alby>
 References: <1260470224.2141.37.camel@climbing-alby>
-	<1260470547.2141.42.camel@climbing-alby>
-	<1260470743.2141.45.camel@climbing-alby>
-	<1260471013.2141.49.camel@climbing-alby>
-	<1260471404.2141.56.camel@climbing-alby>
-	<20091210191017.GB22554@sirena.org.uk>
-	<1260473248.2141.75.camel@climbing-alby>
-Message-ID: <1260473965.3625.218.camel@odin>
+	<1260472292.2141.64.camel@climbing-alby>
+Message-ID: <20091210194220.GE13210@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2009-12-10 at 20:27 +0100, Alberto Panizzo wrote:
-> Il giorno gio, 10/12/2009 alle 19.10 +0000, Mark Brown ha scritto:
-> > On Thu, Dec 10, 2009 at 07:56:44PM +0100, Alberto Panizzo wrote:
-> > 
-> > > +/* MC13783 */
-> > > +#define mV_to_uV(mV) (mV * 1000)
-> > 
-> > Define this somewhere global, it's generally useful.
-> 
-> Yes, maybe in include/linux/mfd/mc13783.h 
-> 
+On Thu, Dec 10, 2009 at 08:11:32PM +0100, Alberto Panizzo wrote:
+> ------------[ cut here ]------------
+> WARNING: at kernel/lockdep.c:3154 check_flags+0xc0/0x1d4()
+> Modules linked in:
+> [<c002aa50>] (unwind_backtrace+0x0/0xdc) from [<c003db08>]
+> (warn_slowpath_common+0x4c/0x80)
+> [<c003db08>] (warn_slowpath_common+0x4c/0x80) from [<c005fdbc>]
+> (check_flags+0xc0/0x1d4)
+> [<c005fdbc>] (check_flags+0xc0/0x1d4) from [<c006527c>] (lock_acquire
+> +0x40/0x98)
+> [<c006527c>] (lock_acquire+0x40/0x98) from [<c02b2670>] (_spin_lock
+> +0x40/0x78)
+> [<c02b2670>] (_spin_lock+0x40/0x78) from [<c00a3670>] (set_task_comm
+> +0x18/0x34)
+> [<c00a3670>] (set_task_comm+0x18/0x34) from [<c0052730>] (kthreadd
+> +0x24/0xf4)
+> [<c0052730>] (kthreadd+0x24/0xf4) from [<c0025f78>] (kernel_thread_exit
+> +0x0/0x8)
+> ---[ end trace 1b75b31a2719ed1c ]---
+> possible reason: unannotated irqs-on.
+> irq event stamp: 1
+> hardirqs last  enabled at (0): [<(null)>] (null)
+> hardirqs last disabled at (1): [<c0024fcc>] ret_slow_syscall+0xc/0x1c
+> softirqs last  enabled at (0): [<c003c548>] copy_process+0x35c/0xec4
+> softirqs last disabled at (0): [<(null)>] (null)
 
-This is actually quite useful to other drivers too as most seem to work
-in mV. What about in regulator/driver.h 
-
-Thanks
-
-Liam
+BTW, this warning is created by the hidden irqs-on in the ret_slow_syscall
+path - clearly we can't call lockdep to tell it that IRQs are now on once
+they are because we'll generally be in userspace at that point.  I'm not
+sure what the right answer to this is yet.
