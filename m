@@ -1,32 +1,71 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Thu, 10 Dec 2009 18:04:05 +0200
-Subject: [CFT:PATCH] Remove a seemingly unnecessary cache flush
-In-Reply-To: <20091207221210.GI26821@n2100.arm.linux.org.uk>
-References: <20091207221210.GI26821@n2100.arm.linux.org.uk>
-Message-ID: <4B211BF5.8040306@compulab.co.il>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 10 Dec 2009 17:26:45 +0100
+Subject: GPIO support for HTC Dream
+In-Reply-To: <4B1ECAC2.5090009@bluewatersys.com>
+References: <20091208102842.GH12264@elf.ucw.cz>
+	<4B1EB57D.6070408@bluewatersys.com>
+	<20091208213727.GA4164@elf.ucw.cz>
+	<4B1ECAC2.5090009@bluewatersys.com>
+Message-ID: <20091210162645.GG19454@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+Hi!
 
-I've tested boot and hackbench on PXA270.
+> >>> +#define DREAM_INT_TO_BANK(n) ((n - DREAM_INT_START) / DREAM_INT_BANK0_COUNT)
+> >>> +#define DREAM_INT_TO_MASK(n) (1U << ((n - DREAM_INT_START) & 7))
+> >>> +#define DREAM_BANK_TO_MASK_REG(bank) \
+> >>> +	(bank ? DREAM_GPIO_INT_MASK1_REG : DREAM_GPIO_INT_MASK0_REG)
+> >>> +#define DREAM_BANK_TO_STAT_REG(bank) \
+> >>> +	(bank ? DREAM_GPIO_INT_STAT1_REG : DREAM_GPIO_INT_STAT0_REG)
+> >> Are these needed outside of the gpiolib code? If not, they should be
+> >> moved there. I also think they should have lower case names since they
+> >> act like a function, and make the code where they are used nicer to
+> >> read.
+> > 
+> > I guess these logically belong here.
+> > 
+> > No, macros are macros, that means upcase.
+> 
+> container_of, min, swap, etc are macros too. It is easier to read this
+> if they are lower case because they are typically used for initialising
+> variables, ie:
+> 
+> 	int bank = dream_int_to_bank(irq);
+> 
+> Is easier (IMHO) to read than:
+> 	
+> 	int bank = DREAM_INT_TO_BANK(irq);
 
-cm-debian:~# cat /proc/cpuinfo
-Processor       : XScale-PXA270 rev 7 (v5l)
-BogoMIPS        : 311.29
-Features        : swp half thumb fastmult edsp iwmmxt
-CPU implementer : 0x69
-CPU architecture: 5TE
-CPU variant     : 0x0
-CPU part        : 0x411
-CPU revision    : 7
+I disagree here. I could convert it to inline function, but I guess it
+is okay as it is.
 
-Hardware        : Compulab CM-X2XX
-Revision        : 0000
-Serial          : 0000000000000000
+> >  static void __init dream_init(void)
+> >  {
+> > +	gpio_set_value(DREAM_GPIO_UI_LED_EN, 1);
+> > +        mdelay(300);
+> > +	gpio_set_value(DREAM_GPIO_UI_LED_EN, 0);
+> > +        mdelay(300);
+> > +        gpio_set_value(DREAM_GPIO_UI_LED_EN, 1);
+> > +	mdelay(300);
+> > +        gpio_set_value(DREAM_GPIO_UI_LED_EN, 0);
+> > +	mdelay(300);
+> > +        gpio_set_value(DREAM_GPIO_UI_LED_EN, 1);
+> > +        mdelay(300);
+> > +        gpio_set_value(DREAM_GPIO_UI_LED_EN, 0);
+> > +        mdelay(300);
+> > +	gpio_set_value(DREAM_GPIO_UI_LED_EN, 1);
+> > +        mdelay(300);
+> > +	gpio_set_value(DREAM_GPIO_UI_LED_EN, 0);
+> > +        mdelay(300);
+> > +
+> 
+> Indentation looks screwy here. Also, is this meant to blink the leds?
+> There is a 2.4 second hard delay here, which is horrible.
 
-
-
+Yep, that was my debugging code, not meant for upstream. And yes, its
+blinking.
+									Pavel
 -- 
-Sincerely yours,
-Mike.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
