@@ -1,34 +1,63 @@
 From: jamie.iles@picochip.com (Jamie Iles)
-Date: Fri, 11 Dec 2009 09:44:19 +0000
-Subject: [PATCH 1/4] arm: provide a mechanism to reserve performance counters
-In-Reply-To: <1260524662-30683-1-git-send-email-jamie.iles@picochip.com>
+Date: Fri, 11 Dec 2009 09:44:21 +0000
+Subject: [PATCH 3/4] arm: enable support for software perf events
+In-Reply-To: <1260524662-30683-3-git-send-email-jamie.iles@picochip.com>
 References: <1260524662-30683-1-git-send-email-jamie.iles@picochip.com>
-Message-ID: <1260524662-30683-2-git-send-email-jamie.iles@picochip.com>
+	<1260524662-30683-2-git-send-email-jamie.iles@picochip.com>
+	<1260524662-30683-3-git-send-email-jamie.iles@picochip.com>
+Message-ID: <1260524662-30683-4-git-send-email-jamie.iles@picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To add support for perf events and to allow the hardware
-counters to be shared with oprofile, we need a way to reserve
-access to the pmu (performance monitor unit).
+The perf events subsystem allows counting of both hardware and
+software events. This patch implements the bare minimum for software
+performance events.
 
 Signed-off-by: Jamie Iles <jamie.iles@picochip.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Ingo Molnar <mingo@elte.hu>
 ---
- arch/arm/include/asm/pmu.h |   54 ++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/Makefile   |    1 +
- arch/arm/kernel/pmu.c      |   32 ++++++++++++++++++++++++++
- arch/arm/mm/Kconfig        |    4 +++
- 4 files changed, 91 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/include/asm/pmu.h
- create mode 100644 arch/arm/kernel/pmu.c
+ arch/arm/Kconfig                  |    3 ++
+ arch/arm/include/asm/atomic.h     |    1 +
+ arch/arm/include/asm/perf_event.h |   38 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/fault.c               |    7 ++++++
+ 4 files changed, 49 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/include/asm/perf_event.h
 
-diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index c40efec..1e35f21 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -18,6 +18,9 @@ config ARM
+ 	select HAVE_KRETPROBES if (HAVE_KPROBES)
+ 	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
+ 	select HAVE_GENERIC_DMA_COHERENT
++	select HAVE_PERF_EVENTS
++	select GENERIC_ATOMIC64
++	select PERF_USE_VMALLOC
+ 	help
+ 	  The ARM series is a line of low-power-consumption RISC chip designs
+ 	  licensed by ARM Ltd and targeted at embedded applications and
+diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
+index d0daeab..5861cc4 100644
+--- a/arch/arm/include/asm/atomic.h
++++ b/arch/arm/include/asm/atomic.h
+@@ -14,6 +14,7 @@
+ #include <linux/compiler.h>
+ #include <linux/types.h>
+ #include <asm/system.h>
++#include <asm-generic/atomic64.h>
+ 
+ #define ATOMIC_INIT(i)	{ (i) }
+ 
+diff --git a/arch/arm/include/asm/perf_event.h b/arch/arm/include/asm/perf_event.h
 new file mode 100644
-index 0000000..94d6c67
+index 0000000..32a66ac
 --- /dev/null
-+++ b/arch/arm/include/asm/pmu.h
-@@ -0,0 +1,54 @@
++++ b/arch/arm/include/asm/perf_event.h
+@@ -0,0 +1,38 @@
 +/*
-+ *  linux/arch/arm/include/asm/pmu.h
++ *  linux/arch/arm/include/asm/perf_event.h
 + *
 + *  Copyright (C) 2009 picoChip Designs Ltd, Jamie Iles
 + *
@@ -38,120 +67,57 @@ index 0000000..94d6c67
 + *
 + */
 +
-+#ifndef __ARM_PMU_H__
-+#define __ARM_PMU_H__
++#ifndef __ARM_PERF_EVENT_H__
++#define __ARM_PERF_EVENT_H__
 +
-+#ifdef CONFIG_CPU_HAS_PMU
-+
-+/**
-+ * reserve_pmu() - Reserve the hardware performance counters
-+ *
-+ * Reserve the hardware performance counters in the system for exclusive use.
-+ * Note: success here does not guarantee exclusive access - callers must
-+ * respect the return value.
-+ *
-+ * Returns zero on success, negative error on failure.
++/*
++ * NOP: on *most* (read: all supported) ARM platforms, the performance
++ * counter interrupts are regular interrupts and not an NMI. This
++ * means that when we receive the interrupt we can call
++ * perf_event_do_pending() that handles all of the work with
++ * interrupts enabled.
 + */
-+extern int
-+reserve_pmu(void);
-+
-+/**
-+ * release_pmu() - Relinquish control of the performance counters
-+ *
-+ * Release the performance counters and allow someone else to use them.
-+ * Callers must have disabled the counters and released IRQs before calling
-+ * this.
-+ */
-+extern void
-+release_pmu(void);
-+
-+#else /* CONFIG_CPU_HAS_PMU */
-+
-+static inline int
-+reserve_pmu(void)
-+{
-+	return -ENODEV;
-+}
-+
 +static inline void
-+release_pmu(void)
++set_perf_event_pending(void)
 +{
 +}
 +
-+#endif /* CONFIG_CPU_HAS_PMU */
-+
-+#endif /* __ARM_PMU_H__ */
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index e7ccf7e..286a276 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -46,6 +46,7 @@ obj-$(CONFIG_CPU_XSCALE)	+= xscale-cp0.o
- obj-$(CONFIG_CPU_XSC3)		+= xscale-cp0.o
- obj-$(CONFIG_CPU_MOHAWK)	+= xscale-cp0.o
- obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
-+obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
- AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
- 
- ifneq ($(CONFIG_ARCH_EBSA110),y)
-diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
-new file mode 100644
-index 0000000..a2b1a26
---- /dev/null
-+++ b/arch/arm/kernel/pmu.c
-@@ -0,0 +1,32 @@
-+/*
-+ *  linux/arch/arm/kernel/pmu.c
-+ *
-+ *  Copyright (C) 2009 picoChip Designs Ltd, Jamie Iles
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
++/* Get the PC. Make sure that we have a 64bit value with the upper 32 cleared.
 + */
++#define perf_instruction_pointer(_regs) \
++	((u64)instruction_pointer(regs) & 0xFFFFFFFFLU)
++#define perf_misc_flags(regs)   (user_mode(regs) ? PERF_RECORD_MISC_USER : \
++                                 PERF_RECORD_MISC_KERNEL)
 +
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/semaphore.h>
++/* ARM performance counters start from 1 (in the cp15 accesses) so use the
++ * same indexes here for consistency. */
++#define PERF_EVENT_INDEX_OFFSET 1
 +
-+#include <asm/pmu.h>
-+
-+static DECLARE_MUTEX(pmu_mutex);
-+
-+int
-+reserve_pmu(void)
-+{
-+	return down_trylock(&pmu_mutex) ? -EBUSY : 0;
-+}
-+EXPORT_SYMBOL_GPL(reserve_pmu);
-+
-+void
-+release_pmu(void)
-+{
-+	up(&pmu_mutex);
-+}
-+EXPORT_SYMBOL_GPL(release_pmu);
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index dd4698c..60edbfe 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -398,6 +398,7 @@ config CPU_V6
- 	select CPU_HAS_ASID if MMU
- 	select CPU_COPY_V6 if MMU
- 	select CPU_TLB_V6 if MMU
-+	select CPU_HAS_PMU
++#endif /* __ARM_PERF_EVENT_H__ */
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index 10e0680..9d40c34 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -18,6 +18,7 @@
+ #include <linux/page-flags.h>
+ #include <linux/sched.h>
+ #include <linux/highmem.h>
++#include <linux/perf_event.h>
  
- # ARMv6k
- config CPU_32v6K
-@@ -536,6 +537,9 @@ config CPU_COPY_FA
- config CPU_COPY_V6
- 	bool
+ #include <asm/system.h>
+ #include <asm/pgtable.h>
+@@ -302,6 +303,12 @@ do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 	fault = __do_page_fault(mm, addr, fsr, tsk);
+ 	up_read(&mm->mmap_sem);
  
-+config CPU_HAS_PMU
-+	bool
++	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, 0, regs, addr);
++	if (fault & VM_FAULT_MAJOR)
++		perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS_MAJ, 1, 0, regs, addr);
++	else if (fault & VM_FAULT_MINOR)
++		perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS_MIN, 1, 0, regs, addr);
 +
- # This selects the TLB model
- config CPU_TLB_V3
- 	bool
+ 	/*
+ 	 * Handle the "normal" case first - VM_FAULT_MAJOR / VM_FAULT_MINOR
+ 	 */
 -- 
 1.6.5.4
