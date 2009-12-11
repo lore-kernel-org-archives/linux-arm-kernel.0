@@ -1,44 +1,89 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 11 Dec 2009 14:09:16 +0100
-Subject: [PATCH 3/4] MXC: mc13783: Developing, trying to full support
-	regulators.
-In-Reply-To: <1260471013.2141.49.camel@climbing-alby>
-References: <1260470224.2141.37.camel@climbing-alby>
-	<1260470547.2141.42.camel@climbing-alby>
-	<1260470743.2141.45.camel@climbing-alby>
-	<1260471013.2141.49.camel@climbing-alby>
-Message-ID: <20091211130916.GA16473@pengutronix.de>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 11 Dec 2009 14:29:06 +0100 (CET)
+Subject: [PATCH] mx3: add support for the mt9v022 camera sensor to pcm037
+	platform
+Message-ID: <Pine.LNX.4.64.0912111428290.5084@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+---
+ arch/arm/mach-mx3/pcm037.c |   32 +++++++++++++++++++++++++-------
+ 1 files changed, 25 insertions(+), 7 deletions(-)
 
-On Thu, Dec 10, 2009 at 07:50:13PM +0100, Alberto Panizzo wrote:
-> This patch add the ability to change voltages settings
-> for all possible mc13783 regulators.
-> Pay attention that it is a development patch with many 
-> debug messages enabled.
-
-Can you please develop on top of my rewrite of
-drivers/mfd/mc13783-core.c that currently sits in 
-
-	git://git.kernel.org/pub/scm/linux/kernel/git/sameo/mfd-2.6.git for-next
-
-and waits to hit Linus' tree.
-The same applies to drivers/regulator/mc13783.c (though my update sits
-in 
-
-	git://git.kernel.org/pub/scm/linux/kernel/git/lrg/voltage-2.6.git for-next
-
-And note that I plan to get rid of include/linux/mfd/mc13783-private.h.
-
-> +	printk(KERN_DEBUG "%s frame: 0x%x\n", __func__, frame);
-> +
-if you define DEBUG, you can use pr_debug or better dev_dbg.
-
-Best regards
-Uwe
-
+diff --git a/arch/arm/mach-mx3/pcm037.c b/arch/arm/mach-mx3/pcm037.c
+index 6cbaabe..5be3969 100644
+--- a/arch/arm/mach-mx3/pcm037.c
++++ b/arch/arm/mach-mx3/pcm037.c
+@@ -322,16 +322,25 @@ static int pcm037_camera_power(struct device *dev, int on)
+ 	return 0;
+ }
+ 
+-static struct i2c_board_info pcm037_i2c_2_devices[] = {
++static struct i2c_board_info pcm037_i2c_camera[] = {
+ 	{
+ 		I2C_BOARD_INFO("mt9t031", 0x5d),
++	}, {
++		I2C_BOARD_INFO("mt9v022", 0x48),
+ 	},
+ };
+ 
+-static struct soc_camera_link iclink = {
++static struct soc_camera_link iclink_mt9v022 = {
++	.bus_id		= 0,		/* Must match with the camera ID */
++	.board_info	= &pcm037_i2c_camera[1],
++	.i2c_adapter_id	= 2,
++	.module_name	= "mt9v022",
++};
++
++static struct soc_camera_link iclink_mt9t031 = {
+ 	.bus_id		= 0,		/* Must match with the camera ID */
+ 	.power		= pcm037_camera_power,
+-	.board_info	= &pcm037_i2c_2_devices[0],
++	.board_info	= &pcm037_i2c_camera[0],
+ 	.i2c_adapter_id	= 2,
+ 	.module_name	= "mt9t031",
+ };
+@@ -345,11 +354,19 @@ static struct i2c_board_info pcm037_i2c_devices[] = {
+ 	}
+ };
+ 
+-static struct platform_device pcm037_camera = {
++static struct platform_device pcm037_mt9t031 = {
+ 	.name	= "soc-camera-pdrv",
+ 	.id	= 0,
+ 	.dev	= {
+-		.platform_data = &iclink,
++		.platform_data = &iclink_mt9t031,
++	},
++};
++
++static struct platform_device pcm037_mt9v022 = {
++	.name	= "soc-camera-pdrv",
++	.id	= 1,
++	.dev	= {
++		.platform_data = &iclink_mt9v022,
+ 	},
+ };
+ 
+@@ -449,7 +466,8 @@ static int __init pcm037_camera_alloc_dma(const size_t buf_size)
+ static struct platform_device *devices[] __initdata = {
+ 	&pcm037_flash,
+ 	&pcm037_sram_device,
+-	&pcm037_camera,
++	&pcm037_mt9t031,
++	&pcm037_mt9v022,
+ };
+ 
+ static struct ipu_platform_data mx3_ipu_data = {
+@@ -599,7 +617,7 @@ static void __init mxc_board_init(void)
+ 	if (!ret)
+ 		gpio_direction_output(IOMUX_TO_GPIO(MX31_PIN_CSI_D5), 1);
+ 	else
+-		iclink.power = NULL;
++		iclink_mt9t031.power = NULL;
+ 
+ 	if (!pcm037_camera_alloc_dma(4 * 1024 * 1024))
+ 		mxc_register_device(&mx3_camera, &camera_pdata);
 -- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+1.6.2.4
