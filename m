@@ -1,36 +1,28 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 10 Dec 2009 20:24:55 -0500 (EST)
-Subject: dma_cache_maint_contiguous should be patched as dma_cache_maint do
-In-Reply-To: <20091210221415.GA19752@n2100.arm.linux.org.uk>
-References: <SNT109-W4788A2C238168B3B9086CBA78D0@phx.gbl>
-	<1260459307.23073.41.camel@pc1117.cambridge.arm.com>
-	<20091210163920.GA13210@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0912101529320.31174@xanadu.home>
-	<20091210221415.GA19752@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.0912102024010.31174@xanadu.home>
+Date: Thu, 10 Dec 2009 23:20:39 -0500 (EST)
+Subject: Git pull request: small Kirkwood/Dove updates
+Message-ID: <alpine.LFD.2.00.0912102315240.31174@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Dec 2009, Russell King - ARM Linux wrote:
+Russell, could you please pull:
 
-> On Thu, Dec 10, 2009 at 04:21:29PM -0500, Nicolas Pitre wrote:
-> > On Thu, 10 Dec 2009, Russell King - ARM Linux wrote:
-> > 
-> > > If it is just ARMv6 which is affected by this (note that we can not rely
-> > > upon ID_MMFR3 telling us since this register has a different purpose
-> > > there) then we can solve this by just modifying the ARMv6 DMA cache
-> > > methods - which becomes easier if I get the rearrangement of the DMA
-> > > stuff finally sorted.  The *only* thing that remains in the way of that
-> > > is the stupid flush_ioremap_region() crap for just one MTD driver.
-> > 
-> > My suggestion: kill flush_ioremap_region() and substitute it by an ARMv5 
-> > cache range invalidate loop implementation local to that driver.
-> > 
-> > While at it, here's the patch:
-> 
-> Great, can it end up in the patch system?
+	git://git.marvell.com/orion for-rmk
 
-Patch #5848/1.
+This contains 2 patches as shown below.  Also please include a 
+mach-types update in your next pull request to Linus.
+
+Saeed Bishara (1):
+      ARM: dove: fix the mm mmu flags of the pj4 procinfo
+
+Simon Guinot (1):
+      [ARM] Kirkwood: Add LaCie Network Space v2 support
+
+ arch/arm/mach-kirkwood/Kconfig             |    6 +
+ arch/arm/mach-kirkwood/Makefile            |    1 +
+ arch/arm/mach-kirkwood/netspace_v2-setup.c |  325 ++++++++++++++++++++++
+ arch/arm/mm/proc-v6.S                      |    5 +-
+ 4 files changed, 334 insertions(+), 3 deletions(-)
 
 
 Nicolas
