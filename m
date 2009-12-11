@@ -1,127 +1,120 @@
 From: abhijitpagare@ti.com (Abhijit Pagare)
-Date: Fri, 11 Dec 2009 16:40:25 +0530
-Subject: [PATCH 2/5] ARM: OMAP4: PM: Modify Clock-domain interfaces for OMAP4
-	compatibility.
-In-Reply-To: <1260529828-14862-1-git-send-email-abhijitpagare@ti.com>
+Date: Fri, 11 Dec 2009 16:40:28 +0530
+Subject: [PATCH 5/5] ARM: OMAP4: PM: Refine the APIs to support OMAP4 features.
+In-Reply-To: <1260529828-14862-4-git-send-email-abhijitpagare@ti.com>
 References: <1260529828-14862-1-git-send-email-abhijitpagare@ti.com>
-Message-ID: <1260529828-14862-2-git-send-email-abhijitpagare@ti.com>
+	<1260529828-14862-2-git-send-email-abhijitpagare@ti.com>
+	<1260529828-14862-3-git-send-email-abhijitpagare@ti.com>
+	<1260529828-14862-4-git-send-email-abhijitpagare@ti.com>
+Message-ID: <1260529828-14862-5-git-send-email-abhijitpagare@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here the APIs are modified to use absolute addresses instead of module offsets.
+Port the APIs to support the OMAP4 clockdomain framework.
+Also take care of the compiling requirements for the same.
 
 Signed-off-by: Abhijit Pagare <abhijitpagare@ti.com>
 Cc: Paul Walmsley <paul@pwsan.com>
 Cc: Benoit Cousson <b-cousson@ti.com>
 Cc: Rajendra Nayak <rnayak@ti.com>
 ---
- arch/arm/mach-omap2/clockdomain.c |   44 +++++++++++++++++++++----------------
- 1 files changed, 25 insertions(+), 19 deletions(-)
+ arch/arm/mach-omap2/Makefile      |    2 +-
+ arch/arm/mach-omap2/clockdomain.c |   20 ++++++++++++--------
+ arch/arm/mach-omap2/io.c          |    2 +-
+ 3 files changed, 14 insertions(+), 10 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 8b351e3..7cd3366 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -11,7 +11,7 @@ clock-common				= clock.o clockdomain.o
+ 
+ obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common) $(prcm-common) $(clock-common)
+ obj-$(CONFIG_ARCH_OMAP3) += $(omap-2-3-common) $(prcm-common) $(clock-common)
+-obj-$(CONFIG_ARCH_OMAP4) += $(prcm-common)
++obj-$(CONFIG_ARCH_OMAP4) += $(prcm-common) $(clock-common)
+ 
+ obj-$(CONFIG_OMAP_MCBSP) += mcbsp.o
+ 
 diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
-index 5c695b4..d51350c 100644
+index d51350c..aab11b0 100644
 --- a/arch/arm/mach-omap2/clockdomain.c
 +++ b/arch/arm/mach-omap2/clockdomain.c
-@@ -147,25 +147,29 @@ static void _clkdm_del_autodeps(struct clockdomain *clkdm)
-  */
- static void _omap2_clkdm_set_hwsup(struct clockdomain *clkdm, int enable)
- {
--	u32 v;
-+	u32 bits, v;
- 
- 	if (cpu_is_omap24xx()) {
- 		if (enable)
--			v = OMAP24XX_CLKSTCTRL_ENABLE_AUTO;
-+			bits = OMAP24XX_CLKSTCTRL_ENABLE_AUTO;
+@@ -1,10 +1,12 @@
+ /*
+- * OMAP2/3 clockdomain framework functions
++ * OMAP2/3/4 clockdomain framework functions
+  *
+  * Copyright (C) 2008 Texas Instruments, Inc.
+  * Copyright (C) 2008 Nokia Corporation
+  *
+  * Written by Paul Walmsley and Jouni H????gander
++ * Added OMAP4 specific support by Abhijit Pagare <abhijitpagare@ti.com>
++ *
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -154,7 +156,7 @@ static void _omap2_clkdm_set_hwsup(struct clockdomain *clkdm, int enable)
+ 			bits = OMAP24XX_CLKSTCTRL_ENABLE_AUTO;
  		else
--			v = OMAP24XX_CLKSTCTRL_DISABLE_AUTO;
-+			bits = OMAP24XX_CLKSTCTRL_DISABLE_AUTO;
- 	} else if (cpu_is_omap34xx()) {
+ 			bits = OMAP24XX_CLKSTCTRL_DISABLE_AUTO;
+-	} else if (cpu_is_omap34xx()) {
++	} else if (cpu_is_omap34xx() | cpu_is_omap44xx()) {
  		if (enable)
--			v = OMAP34XX_CLKSTCTRL_ENABLE_AUTO;
-+			bits = OMAP34XX_CLKSTCTRL_ENABLE_AUTO;
+ 			bits = OMAP34XX_CLKSTCTRL_ENABLE_AUTO;
  		else
--			v = OMAP34XX_CLKSTCTRL_DISABLE_AUTO;
-+			bits = OMAP34XX_CLKSTCTRL_DISABLE_AUTO;
- 	} else {
- 		BUG();
- 	}
+@@ -215,10 +217,12 @@ void clkdm_init(struct clockdomain **clkdms,
+ 		for (c = clkdms; *c; c++)
+ 			clkdm_register(*c);
  
--	cm_rmw_mod_reg_bits(clkdm->clktrctrl_mask,
--			    v << __ffs(clkdm->clktrctrl_mask),
--			    clkdm->pwrdm.ptr->prcm_offs, OMAP2_CM_CLKSTCTRL);
-+	bits = bits << __ffs(clkdm->clktrctrl_mask);
-+
-+	v = __raw_readl(clkdm->clkstctrl_reg);
-+	v &= ~(clkdm->clktrctrl_mask);
-+	v |= bits;
-+	__raw_writel(v, clkdm->clkstctrl_reg);
-+
+-	autodeps = init_autodeps;
+-	if (autodeps)
+-		for (autodep = autodeps; autodep->pwrdm.ptr; autodep++)
+-			_autodep_lookup(autodep);
++	if (!cpu_is_omap44xx()) {
++		autodeps = init_autodeps;
++		if (autodeps)
++			for (autodep = autodeps; autodep->pwrdm.ptr; autodep++)
++				_autodep_lookup(autodep);
++	}
  }
  
- static struct clockdomain *_clkdm_lookup(const char *name)
-@@ -383,7 +387,7 @@ static int omap2_clkdm_clktrctrl_read(struct clockdomain *clkdm)
- 	if (!clkdm)
- 		return -EINVAL;
+ /**
+@@ -421,7 +425,7 @@ int omap2_clkdm_sleep(struct clockdomain *clkdm)
+ 		cm_set_mod_reg_bits(OMAP24XX_FORCESTATE,
+ 			    clkdm->pwrdm.ptr->prcm_offs, OMAP2_PM_PWSTCTRL);
  
--	v = cm_read_mod_reg(clkdm->pwrdm.ptr->prcm_offs, OMAP2_CM_CLKSTCTRL);
-+	v = __raw_readl(clkdm->clkstctrl_reg);
- 	v &= clkdm->clktrctrl_mask;
- 	v >>= __ffs(clkdm->clktrctrl_mask);
+-	} else if (cpu_is_omap34xx()) {
++	} else if (cpu_is_omap34xx() | cpu_is_omap44xx()) {
  
-@@ -419,12 +423,13 @@ int omap2_clkdm_sleep(struct clockdomain *clkdm)
- 
- 	} else if (cpu_is_omap34xx()) {
- 
--		u32 v = (OMAP34XX_CLKSTCTRL_FORCE_SLEEP <<
-+		u32 bits = (OMAP34XX_CLKSTCTRL_FORCE_SLEEP <<
+ 		u32 bits = (OMAP34XX_CLKSTCTRL_FORCE_SLEEP <<
  			 __ffs(clkdm->clktrctrl_mask));
+@@ -465,7 +469,7 @@ int omap2_clkdm_wakeup(struct clockdomain *clkdm)
+ 		cm_clear_mod_reg_bits(OMAP24XX_FORCESTATE,
+ 			      clkdm->pwrdm.ptr->prcm_offs, OMAP2_PM_PWSTCTRL);
  
--		cm_rmw_mod_reg_bits(clkdm->clktrctrl_mask, v,
--				    clkdm->pwrdm.ptr->prcm_offs,
--							 OMAP2_CM_CLKSTCTRL);
-+		u32 v = __raw_readl(clkdm->clkstctrl_reg);
-+		v &= ~(clkdm->clktrctrl_mask);
-+		v |= bits;
-+		__raw_writel(v, clkdm->clkstctrl_reg);
+-	} else if (cpu_is_omap34xx()) {
++	} else if (cpu_is_omap34xx() | cpu_is_omap44xx()) {
  
- 	} else {
- 		BUG();
-@@ -462,12 +467,13 @@ int omap2_clkdm_wakeup(struct clockdomain *clkdm)
- 
- 	} else if (cpu_is_omap34xx()) {
- 
--		u32 v = (OMAP34XX_CLKSTCTRL_FORCE_WAKEUP <<
-+		u32 bits = (OMAP34XX_CLKSTCTRL_FORCE_WAKEUP <<
+ 		u32 bits = (OMAP34XX_CLKSTCTRL_FORCE_WAKEUP <<
  			 __ffs(clkdm->clktrctrl_mask));
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index aff5387..1064b23 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -314,12 +314,12 @@ void __init omap2_init_common_hw(struct omap_sdrc_params *sdrc_cs0,
+ 		hwmods = omap34xx_hwmods;
  
--		cm_rmw_mod_reg_bits(clkdm->clktrctrl_mask, v,
--				    clkdm->pwrdm.ptr->prcm_offs,
--						 OMAP2_CM_CLKSTCTRL);
-+		u32 v = __raw_readl(clkdm->clkstctrl_reg);
-+		v &= ~(clkdm->clktrctrl_mask);
-+		v |= bits;
-+		__raw_writel(v, clkdm->clkstctrl_reg);
- 
- 	} else {
- 		BUG();
-@@ -563,7 +569,7 @@ int omap2_clkdm_clk_enable(struct clockdomain *clkdm, struct clk *clk)
- 	 * downstream clocks for debugging purposes?
- 	 */
- 
--	if (!clkdm || !clk || !clkdm->clktrctrl_mask)
-+	if (!clkdm || !clk || !clkdm->clkstctrl_reg)
- 		return -EINVAL;
- 
- 	if (atomic_inc_return(&clkdm->usecount) > 1)
-@@ -614,7 +620,7 @@ int omap2_clkdm_clk_disable(struct clockdomain *clkdm, struct clk *clk)
- 	 * downstream clocks for debugging purposes?
- 	 */
- 
--	if (!clkdm || !clk || !clkdm->clktrctrl_mask)
-+	if (!clkdm || !clk || !clkdm->clkstctrl_reg)
- 		return -EINVAL;
- 
- #ifdef DEBUG
+ 	pwrdm_init(powerdomains_omap);
++	clkdm_init(clockdomains_omap, clkdm_pwrdm_autodeps);
+ #ifndef CONFIG_ARCH_OMAP4 /* FIXME: Remove this once the clkdev is ready */
+ 	/* The OPP tables have to be registered before a clk init */
+ 	omap_hwmod_init(hwmods);
+ 	omap2_mux_init();
+ 	omap_pm_if_early_init(mpu_opps, dsp_opps, l3_opps);
+-	clkdm_init(clockdomains_omap, clkdm_pwrdm_autodeps);
+ 	omap2_clk_init();
+ #endif
+ 	omap_serial_early_init();
 -- 
 1.5.4.7
