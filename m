@@ -1,51 +1,277 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 11 Dec 2009 18:07:02 +0000
-Subject: [PATCH 1/4] arm: provide a mechanism to reserve performance
-	counters
-In-Reply-To: <000401ca7a88$370adc40$a52094c0$@deacon@arm.com>
-References: <20091211154147.GA17176@wear.picochip.com>
-	<20091211173012.GK4164@wear.picochip.com>
-	<000401ca7a88$370adc40$a52094c0$@deacon@arm.com>
-Message-ID: <20091211180702.GL4164@wear.picochip.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 11 Dec 2009 18:13:57 +0000
+Subject: [PATCH] ARM: Add atomic64 routines for ARMv6k and above.
+Message-ID: <1260555237-18825-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2009 at 05:34:38PM -0000, Will Deacon wrote:
-> > From: Jamie Iles [mailto:jamie.iles at picochip.com]
-> > Sent: 11 December 2009 17:30
-> 
-> > I was just looking at that. I've changed all of the oprofile models but I'm
-> > not sure what to do for mpcore as it also has the SCU and the setup. How about
-> > I also add the following calls?
-> > 
-> > /* Reserve the SCU in the same manner as the PMU. */
-> > struct pmu_irqs *reserve_scu(void):
-> > 
-> > /* Release the SCU in the same manner as the PMU. */
-> > void release_scu(struct pmu_irqs *);
-> > 
-> > /* Initialise the PMU. For SMP systems this will be setting the IRQ affinity.
-> >  * For other systems this may be a nop. */
-> > int init_pmu(void);
-> > 
-> > /* Initialise the SCU. For SMP systems this will be setting the IRQ affinity.
-> >  * For other systems this may be a nop. */
-> > int init_scu(void);
-> 
-> I'm not sure I like that as much since the SCU is only explicitly used for v6 profiling.
-> In v7, the SCU events are accessed and programmed via the PMU interface. Additionally, the
-> SCU is parameterised by its base address as well as its interrupts.
-> 
-> Perhaps you could add it with #ifdef CONFIG_CPU_V6 around the SCU functions and then
-> perf and oprofile can use the functions only when they are actually needed.
-Ok, I agree with you on that. Actually, the only v6 SMP system that uses the
-SCU in mainline is realview. My patches for perf events only use the PMU so
-the only user of the SCU is oprofile so lets leave it where it is. If someone
-else adds support for the SCU in the perf events code then we can revisit this
-later.
+In preparation for perf-events support, ARM needs to support atomic64_t
+operations. v6k and above support the ldrexd and strexd instructions to do
+just that.
 
-I'll make the {reserve,release}_pmu() functions take/return const pointers and
-I'll add the init_pmu() call for setting the IRQ affinity as the perf events
-code will need this too. 
+This patch adds atomic64 support to the ARM architecture. v6k and above
+make use of new instructions whilst older cores fall back on the generic
+solution using spinlocks. If and when v7-M cores are supported by Linux, they
+will need to fall back on the spinlock implementation too.
 
-Jamie
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Jamie Iles <jamie.iles@picochip.com>
+---
+ arch/arm/Kconfig              |    1 +
+ arch/arm/include/asm/atomic.h |  228 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 229 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1c4119c..5fdc032 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -18,6 +18,7 @@ config ARM
+ 	select HAVE_KRETPROBES if (HAVE_KPROBES)
+ 	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
+ 	select HAVE_GENERIC_DMA_COHERENT
++	select GENERIC_ATOMIC64 if (!CPU_32v6K)
+ 	help
+ 	  The ARM series is a line of low-power-consumption RISC chip designs
+ 	  licensed by ARM Ltd and targeted at embedded applications and
+diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
+index d0daeab..e8ddec2 100644
+--- a/arch/arm/include/asm/atomic.h
++++ b/arch/arm/include/asm/atomic.h
+@@ -235,6 +235,234 @@ static inline int atomic_add_unless(atomic_t *v, int a, int u)
+ #define smp_mb__before_atomic_inc()	smp_mb()
+ #define smp_mb__after_atomic_inc()	smp_mb()
+ 
++#ifndef CONFIG_GENERIC_ATOMIC64
++typedef struct {
++	u64 __aligned(8) counter;
++} atomic64_t;
++
++#define ATOMIC64_INIT(i) { (i) }
++
++static inline u64 atomic64_read(atomic64_t *v)
++{
++	u64 result;
++
++	__asm__ __volatile__("@ atomic64_read\n"
++"	ldrexd	%0, %H0, [%1]"
++	: "=&r" (result)
++	: "r" (&v->counter)
++	);
++
++	return result;
++}
++
++static inline void atomic64_set(atomic64_t *v, u64 i)
++{
++	u64 tmp;
++
++	__asm__ __volatile__("@ atomic64_set\n"
++"1:	ldrexd	%0, %H0, [%1]\n"
++"	strexd	%0, %2, %H2, [%1]\n"
++"	teq	%0, #0\n"
++"	bne	1b"
++	: "=&r" (tmp)
++	: "r" (&v->counter), "r" (i)
++	: "cc");
++}
++
++static inline void atomic64_add(u64 i, atomic64_t *v)
++{
++	u64 result;
++	unsigned long tmp;
++
++	__asm__ __volatile__("@ atomic64_add\n"
++"1:	ldrexd	%0, %H0, [%2]\n"
++"	adds	%0, %0, %3\n"
++"	adc	%H0, %H0, %H3\n"
++"	strexd	%1, %0, %H0, [%2]\n"
++"	teq	%1, #0\n"
++"	bne	1b"
++	: "=&r" (result), "=&r" (tmp)
++	: "r" (&v->counter), "r" (i)
++	: "cc");
++}
++
++static inline u64 atomic64_add_return(u64 i, atomic64_t *v)
++{
++	u64 result;
++	unsigned long tmp;
++
++	smp_mb();
++
++	__asm__ __volatile__("@ atomic64_add_return\n"
++"1:	ldrexd	%0, %H0, [%2]\n"
++"	adds	%0, %0, %3\n"
++"	adc	%H0, %H0, %H3\n"
++"	strexd	%1, %0, %H0, [%2]\n"
++"	teq	%1, #0\n"
++"	bne	1b"
++	: "=&r" (result), "=&r" (tmp)
++	: "r" (&v->counter), "r" (i)
++	: "cc");
++
++	smp_mb();
++
++	return result;
++}
++
++static inline void atomic64_sub(u64 i, atomic64_t *v)
++{
++	u64 result;
++	unsigned long tmp;
++
++	__asm__ __volatile__("@ atomic64_sub\n"
++"1:	ldrexd	%0, %H0, [%2]\n"
++"	subs	%0, %0, %3\n"
++"	sbc	%H0, %H0, %H3\n"
++"	strexd	%1, %0, %H0, [%2]\n"
++"	teq	%1, #0\n"
++"	bne	1b"
++	: "=&r" (result), "=&r" (tmp)
++	: "r" (&v->counter), "r" (i)
++	: "cc");
++}
++
++static inline u64 atomic64_sub_return(u64 i, atomic64_t *v)
++{
++	u64 result;
++	unsigned long tmp;
++
++	smp_mb();
++
++	__asm__ __volatile__("@ atomic64_sub_return\n"
++"1:	ldrexd	%0, %H0, [%2]\n"
++"	subs	%0, %0, %3\n"
++"	sbc	%H0, %H0, %H3\n"
++"	strexd	%1, %0, %H0, [%2]\n"
++"	teq	%1, #0\n"
++"	bne	1b"
++	: "=&r" (result), "=&r" (tmp)
++	: "r" (&v->counter), "r" (i)
++	: "cc");
++
++	smp_mb();
++
++	return result;
++}
++
++static inline u64 atomic64_cmpxchg(atomic64_t *ptr, u64 old, u64 new)
++{
++	u64 oldval;
++	unsigned long res;
++
++	smp_mb();
++
++	do {
++		__asm__ __volatile__("@ atomic64_cmpxchg\n"
++		"ldrexd		%1, %H1, [%2]\n"
++		"mov		%0, #0\n"
++		"teq		%1, %3\n"
++		"teqeq		%H1, %H3\n"
++		"strexdeq	%0, %4, %H4, [%2]"
++		: "=&r" (res), "=&r" (oldval)
++		: "r" (&ptr->counter), "r" (old), "r" (new)
++		: "cc");
++	} while (res);
++
++	smp_mb();
++
++	return oldval;
++}
++
++static inline u64 atomic64_xchg(atomic64_t *ptr, u64 new)
++{
++	u64 result;
++	unsigned long tmp;
++
++	smp_mb();
++
++	__asm__ __volatile__("@ atomic64_xchg\n"
++"1:	ldrexd	%0, %H0, [%2]\n"
++"	strexd	%1, %3, %H3, [%2]\n"
++"	teq	%1, #0\n"
++"	bne	1b"
++	: "=&r" (result), "=&r" (tmp)
++	: "r" (&ptr->counter), "r" (new)
++	: "cc");
++
++	smp_mb();
++
++	return result;
++}
++
++static inline u64 atomic64_dec_if_positive(atomic64_t *v)
++{
++	u64 result;
++	unsigned long tmp;
++
++	smp_mb();
++
++	__asm__ __volatile__("@ atomic64_dec_if_positive\n"
++"1:	ldrexd	%0, %H0, [%2]\n"
++"	subs	%0, %0, #1\n"
++"	sbc	%H0, %H0, #0\n"
++"	teq	%H0, #0\n"
++"	bmi	2f\n"
++"	strexd	%1, %0, %H0, [%2]\n"
++"	teq	%1, #0\n"
++"	bne	1b\n"
++"2:"
++	: "=&r" (result), "=&r" (tmp)
++	: "r" (&v->counter)
++	: "cc");
++
++	smp_mb();
++
++	return result;
++}
++
++static inline int atomic64_add_unless(atomic64_t *v, u64 a, u64 u)
++{
++	u64 val;
++	unsigned long tmp;
++	int ret = 1;
++
++	smp_mb();
++
++	__asm__ __volatile__("@ atomic64_add_unless\n"
++"1:	ldrexd	%0, %H0, [%3]\n"
++"	teq	%0, %4\n"
++"	teqeq	%H0, %H4\n"
++"	moveq	%1, #0\n"
++"	beq	2f\n"
++"	adds	%0, %0, %5\n"
++"	adc	%H0, %H0, %H5\n"
++"	strexd	%2, %0, %H0, [%3]\n"
++"	teq	%2, #0\n"
++"	bne	1b\n"
++"2:"
++	: "=&r" (val), "=&r" (ret), "=&r" (tmp)
++	: "r" (&v->counter), "r" (u), "r" (a)
++	: "cc");
++
++	if (ret)
++		smp_mb();
++
++	return ret;
++}
++
++#define atomic64_add_negative(a, v)	(atomic64_add_return((a), (v)) < 0)
++#define atomic64_inc(v)			atomic64_add(1LL, (v))
++#define atomic64_inc_return(v)		atomic64_add_return(1LL, (v))
++#define atomic64_inc_and_test(v)	(atomic64_inc_return(v) == 0)
++#define atomic64_sub_and_test(a, v)	(atomic64_sub_return((a), (v)) == 0)
++#define atomic64_dec(v)			atomic64_sub(1LL, (v))
++#define atomic64_dec_return(v)		atomic64_sub_return(1LL, (v))
++#define atomic64_dec_and_test(v)	(atomic64_dec_return((v)) == 0)
++#define atomic64_inc_not_zero(v)	atomic64_add_unless((v), 1LL, 0LL)
++
++#else /* !CONFIG_GENERIC_ATOMIC64 */
++#include <asm-generic/atomic64.h>
++#endif
+ #include <asm-generic/atomic-long.h>
+ #endif
+ #endif
+-- 
+1.6.5.2
