@@ -1,23 +1,29 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 11 Dec 2009 14:01:57 +0000
-Subject: [samsung-soc] CPUfreq Linux clock API question
-In-Reply-To: <000b01ca7a68$6d5f4cb0$481de610$%majewski@samsung.com>
-References: <000b01ca7a68$6d5f4cb0$481de610$%majewski@samsung.com>
-Message-ID: <20091211140156.GC25806@sirena.org.uk>
+From: wd@denx.de (Wolfgang Denk)
+Date: Fri, 11 Dec 2009 15:33:18 +0100
+Subject: "ARM: MX3: fix CPU revision number detection" breaks QONG support
+Message-ID: <20091211143318.1D8B43F6CC@gemini.denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2009 at 02:47:06PM +0100, Lukasz Majewski wrote:
+Dear Daniel,
 
-> The clock API used at S3C64xx seems not to allow for setting rate of two
-> clocks simultaneously (or am I wrong? :-) ). 
+commit v2.6.32-rc6-49-g52939c0 "ARM: MX3: fix CPU revision number
+detection" breaks booting on the QONG board - there is no output on
+the console any more after this commit is added.
 
-Yes, the Linux clock API doesn't support that.
+Do you have any idea in which area I should start looking for the
+cause of this problem?
 
-> If this change would not be possible, then have anyone thought about the way
-> to provide such functionality? 
+Thanks in advance.
 
-Is it really needed?  The clock updates usually need to be serialised
-anyway by virtue of having to update multiple registers.  If it is
-required I could see doing something like have "start updates" and
-"commit updates" calls which would allow updates to be batched.
+Best regards,
+
+Wolfgang Denk
+
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+Steal five dollars and you were a petty  thief.  Steal  thousands  of
+dollars and you are either a government or a hero.
+                                   - Terry Pratchett, _Going_Postal_
