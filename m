@@ -1,49 +1,53 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 11 Dec 2009 10:37:02 -0600
-Subject: [PATCH 1/6 v2] OMAP4: Fix cpu detection
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02BC1415B4@dbde02.ent.ti.com>
-References: <1260426156-1820-1-git-send-email-santosh.shilimkar@ti.com>
-	<4B2156B6.8090403@ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02BC1415B4@dbde02.ent.ti.com>
-Message-ID: <782515bb0912110837i732250f2m4f50246594973b67@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 11 Dec 2009 17:17:59 -0000
+Subject: [PATCH 1/4] arm: provide a mechanism to reserve
+	performance	counters
+In-Reply-To: <20091211154147.GA17176@wear.picochip.com>
+References: <000201ca7a76$fdc9f080$f95dd180$@deacon@arm.com>
+	<20091211154147.GA17176@wear.picochip.com>
+Message-ID: <000301ca7a85$e38e18e0$aaaa4aa0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 10, 2009 at 10:43 PM, Shilimkar, Santosh
-<santosh.shilimkar@ti.com> wrote:
->> >
->> > +void __init omap4_check_revision(void)
->> > +{
->> > + ? u32 idcode;
->> > + ? u16 hawkeye;
->> > + ? u8 rev;
->> > + ? char *rev_name = "ES1.0";
->> should'nt you decide this inside the rev check path?
->
-> This is initialized value by default. Since the chip is ES1.0 additionaly I am not doing it.
-> e.g. for ES2.0, it would be done inside. > > +
-ok, no strong opinions about this, but I think it might be nice if
-ES2.0 addition will modify less code.
+> From: Jamie Iles [mailto:jamie.iles at picochip.com]
+> Sent: 11 December 2009 15:42
 
->> > + ? /*
->> > + ? ?* The IC rev detection is done with hawkeye and rev.
->> > + ? ?* Note that rev does not map directly to defined processor
->> > + ? ?* revision numbers as ES1.0 uses value 0.
->> > + ? ?*/
->> > + ? idcode = read_tap_reg(OMAP_TAP_IDCODE);
->> > + ? hawkeye = (idcode >> 12) & 0xffff;
->> > + ? rev = (idcode >> 28) & 0xff;
->> > +
->> > + ? if ((hawkeye == 0xb852) && (rev == 0x0)) {
->> > + ? ? ? ? ? omap_revision = OMAP4430_REV_ES1_0;
->> > + ? ? ? ? ? pr_info("OMAP%04x %s\n", omap_rev() >> 16, rev_name);
->> wondering about the >>16 part.
-> Why ?
-omap_rev() >>16 means that you are using higher word of this and I
-think we have CLASS() macro for that? if that is not enough, should'nt
-we add adequate macro to do that?
+> > What do you think?
+> That sounds like a good plan. How about something like this?
+> 
+> #define MAX_PMU_IRQS	8   /* Maximum number of IRQs for the PMU(s). */
+> struct pmu_irqs {
+> 	int	    irqs[MAX_PMU_IRQS];
+> 	unsigned    num_irqs;
+> };
+> 
+> /**
+>  * reserve_pmu() - reserve the hardware performance counters
+>  *
+>  * Reserve the hardware performance counters in the system for exclusive use.
+>  * The 'struct pmu_irqs' for the system is returned on success, ERR_PTR()
+>  * encoded error on failure.
+>  */
+> struct pmu_irqs *
+> reserve_pmu(void);
+> 
+> /**
+>  * release_pmu() - Relinquish control of the performance counters
+>  *
+>  * Release the performance counters and allow someone else to use them.
+>  * Callers must have disabled the counters and released IRQs before calling
+>  * this. The 'struct pmu_irqs' returned from reserve_pmu() must be passed as
+>  * a cookie.
+>  */
+> void
+> release_pmu(struct pmu_irqs *irqs);
 
-[...]
+That looks good to me. This allows SMP systems to set the affinity of the PMU
+IRQs too if need be - or should this also be done here? It might also be worth making
+the returned struct const to stop people poking, but I'm not sure.
 
-Regards,
-Nishanth Menon
+I've got some oprofile patches which I hope to post soon - I'll put a note in the
+covering letter to say they should be modified to use these PMU functions when they make
+it in.
+
+Will
