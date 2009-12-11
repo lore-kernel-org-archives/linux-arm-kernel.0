@@ -1,36 +1,32 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 11 Dec 2009 15:53:53 -0800
-Subject: [PATCH 08/14] omap3: zoom2/3: make MMC slot work again
+Date: Fri, 11 Dec 2009 15:54:05 -0800
+Subject: [PATCH 09/14] omap3: rx51: Use wl1251 in SPI mode 3
 In-Reply-To: <20091211234919.3189.95607.stgit@localhost>
 References: <20091211234919.3189.95607.stgit@localhost>
-Message-ID: <20091211235353.3189.99578.stgit@localhost>
+Message-ID: <20091211235405.3189.53868.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Anand Gadiyar <gadiyar@ti.com>
+From: Kalle Valo <kalle.valo@nokia.com>
 
-omap3: zoom2/3: make MMC slot work again
+Otherwise Extreme Lower Power (ELP) wakeup doesn't work properly.
 
-Commit 12f8dfb56 accidentally broke MMC on zoom2/3.
-The .vmmc1 field of zoom_twldata was deleted. Restoring it
-allows the MMC slot to work again
-
-Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
-Acked-by: Madhusudhan Chikkature <madhu.cr@ti.com>
+Signed-off-by: Kalle Valo <kalle.valo@nokia.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/board-zoom-peripherals.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/board-rx51-peripherals.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-zoom-peripherals.c b/arch/arm/mach-omap2/board-zoom-peripherals.c
-index f14baa3..221a8e3 100755
---- a/arch/arm/mach-omap2/board-zoom-peripherals.c
-+++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
-@@ -236,6 +236,7 @@ static struct twl4030_platform_data zoom_twldata = {
- 	.gpio		= &zoom_gpio_data,
- 	.keypad		= &zoom_kp_twl4030_data,
- 	.codec		= &zoom_codec_data,
-+	.vmmc1          = &zoom_vmmc1,
- 	.vmmc2          = &zoom_vmmc2,
- 	.vsim           = &zoom_vsim,
- 
+diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
+index 8144420..bf26ad3 100644
+--- a/arch/arm/mach-omap2/board-rx51-peripherals.c
++++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
+@@ -60,7 +60,7 @@ static struct spi_board_info rx51_peripherals_spi_board_info[] __initdata = {
+ 		.bus_num		= 4,
+ 		.chip_select		= 0,
+ 		.max_speed_hz   	= 48000000,
+-		.mode                   = SPI_MODE_2,
++		.mode                   = SPI_MODE_3,
+ 		.controller_data	= &wl1251_mcspi_config,
+ 		.platform_data		= &wl1251_pdata,
+ 	},
