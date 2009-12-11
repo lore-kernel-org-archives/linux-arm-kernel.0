@@ -1,277 +1,131 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Dec 2009 18:13:57 +0000
-Subject: [PATCH] ARM: Add atomic64 routines for ARMv6k and above.
-Message-ID: <1260555237-18825-1-git-send-email-will.deacon@arm.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 11 Dec 2009 13:32:28 -0500
+Subject: [PATCH] i2c-iop3xx.c: fix memory resource
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190901FB1063@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for perf-events support, ARM needs to support atomic64_t
-operations. v6k and above support the ldrexd and strexd instructions to do
-just that.
+The i2c-iop3xx driver requires a resource region of 0x18 bytes and
+currently uses the magic number IOP3XX_I2C_IO_SIZE (defined in
+i2c-iop3xx.h) to indicate this.  All of the users of this driver
+have a platform memory resource so use resource_size() instead of
+the magic number.  This requires fixing a couple of the memory
+resources since they were either off by 1 or just wrong.
 
-This patch adds atomic64 support to the ARM architecture. v6k and above
-make use of new instructions whilst older cores fall back on the generic
-solution using spinlocks. If and when v7-M cores are supported by Linux, they
-will need to fall back on the spinlock implementation too.
+The private data member ioaddr should be a void __iomem *.  This
+removes a couple unnecessary casts.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Jamie Iles <jamie.iles@picochip.com>
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Jean Delvare <khali@linux-fr.org>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Lennert Buytenhek <kernel@wantstofly.org>
+Cc: Dan Williams <dan.j.williams@intel.com>
+
 ---
- arch/arm/Kconfig              |    1 +
- arch/arm/include/asm/atomic.h |  228 +++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 229 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 1c4119c..5fdc032 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -18,6 +18,7 @@ config ARM
- 	select HAVE_KRETPROBES if (HAVE_KPROBES)
- 	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
- 	select HAVE_GENERIC_DMA_COHERENT
-+	select GENERIC_ATOMIC64 if (!CPU_32v6K)
- 	help
- 	  The ARM series is a line of low-power-consumption RISC chip designs
- 	  licensed by ARM Ltd and targeted at embedded applications and
-diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
-index d0daeab..e8ddec2 100644
---- a/arch/arm/include/asm/atomic.h
-+++ b/arch/arm/include/asm/atomic.h
-@@ -235,6 +235,234 @@ static inline int atomic_add_unless(atomic_t *v, int a, int u)
- #define smp_mb__before_atomic_inc()	smp_mb()
- #define smp_mb__after_atomic_inc()	smp_mb()
+diff --git a/arch/arm/mach-iop13xx/setup.c b/arch/arm/mach-iop13xx/setup.c
+index 5c147fb..e408a9e 100644
+--- a/arch/arm/mach-iop13xx/setup.c
++++ b/arch/arm/mach-iop13xx/setup.c
+@@ -124,7 +124,7 @@ static struct platform_device iop13xx_uart1 = {
+ static struct resource iop13xx_i2c_0_resources[] = {
+ 	[0] = {
+ 		.start = IOP13XX_I2C0_PHYS,
+-		.end = IOP13XX_I2C0_PHYS + 0x18,
++		.end = IOP13XX_I2C0_PHYS + 0x17,
+ 		.flags = IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+@@ -137,7 +137,7 @@ static struct resource iop13xx_i2c_0_resources[] = {
+ static struct resource iop13xx_i2c_1_resources[] = {
+ 	[0] = {
+ 		.start = IOP13XX_I2C1_PHYS,
+-		.end = IOP13XX_I2C1_PHYS + 0x18,
++		.end = IOP13XX_I2C1_PHYS + 0x17,
+ 		.flags = IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+@@ -150,7 +150,7 @@ static struct resource iop13xx_i2c_1_resources[] = {
+ static struct resource iop13xx_i2c_2_resources[] = {
+ 	[0] = {
+ 		.start = IOP13XX_I2C2_PHYS,
+-		.end = IOP13XX_I2C2_PHYS + 0x18,
++		.end = IOP13XX_I2C2_PHYS + 0x17,
+ 		.flags = IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index cfd52fb..068319f 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -347,7 +347,7 @@ static struct platform_device *ixp4xx_devices[] __initdata = {
+ static struct resource ixp46x_i2c_resources[] = {
+ 	[0] = {
+ 		.start 	= 0xc8011000,
+-		.end	= 0xc801101c,
++		.end	= 0xc8011017,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+diff --git a/drivers/i2c/busses/i2c-iop3xx.c b/drivers/i2c/busses/i2c-iop3xx.c
+index 5901707..5378455 100644
+--- a/drivers/i2c/busses/i2c-iop3xx.c
++++ b/drivers/i2c/busses/i2c-iop3xx.c
+@@ -410,8 +410,8 @@ iop3xx_i2c_remove(struct platform_device *pdev)
+ 		IOP3XX_ICR_RXFULL_IE | IOP3XX_ICR_TXEMPTY_IE);
+ 	__raw_writel(cr, adapter_data->ioaddr + CR_OFFSET);
  
-+#ifndef CONFIG_GENERIC_ATOMIC64
-+typedef struct {
-+	u64 __aligned(8) counter;
-+} atomic64_t;
-+
-+#define ATOMIC64_INIT(i) { (i) }
-+
-+static inline u64 atomic64_read(atomic64_t *v)
-+{
-+	u64 result;
-+
-+	__asm__ __volatile__("@ atomic64_read\n"
-+"	ldrexd	%0, %H0, [%1]"
-+	: "=&r" (result)
-+	: "r" (&v->counter)
-+	);
-+
-+	return result;
-+}
-+
-+static inline void atomic64_set(atomic64_t *v, u64 i)
-+{
-+	u64 tmp;
-+
-+	__asm__ __volatile__("@ atomic64_set\n"
-+"1:	ldrexd	%0, %H0, [%1]\n"
-+"	strexd	%0, %2, %H2, [%1]\n"
-+"	teq	%0, #0\n"
-+"	bne	1b"
-+	: "=&r" (tmp)
-+	: "r" (&v->counter), "r" (i)
-+	: "cc");
-+}
-+
-+static inline void atomic64_add(u64 i, atomic64_t *v)
-+{
-+	u64 result;
-+	unsigned long tmp;
-+
-+	__asm__ __volatile__("@ atomic64_add\n"
-+"1:	ldrexd	%0, %H0, [%2]\n"
-+"	adds	%0, %0, %3\n"
-+"	adc	%H0, %H0, %H3\n"
-+"	strexd	%1, %0, %H0, [%2]\n"
-+"	teq	%1, #0\n"
-+"	bne	1b"
-+	: "=&r" (result), "=&r" (tmp)
-+	: "r" (&v->counter), "r" (i)
-+	: "cc");
-+}
-+
-+static inline u64 atomic64_add_return(u64 i, atomic64_t *v)
-+{
-+	u64 result;
-+	unsigned long tmp;
-+
-+	smp_mb();
-+
-+	__asm__ __volatile__("@ atomic64_add_return\n"
-+"1:	ldrexd	%0, %H0, [%2]\n"
-+"	adds	%0, %0, %3\n"
-+"	adc	%H0, %H0, %H3\n"
-+"	strexd	%1, %0, %H0, [%2]\n"
-+"	teq	%1, #0\n"
-+"	bne	1b"
-+	: "=&r" (result), "=&r" (tmp)
-+	: "r" (&v->counter), "r" (i)
-+	: "cc");
-+
-+	smp_mb();
-+
-+	return result;
-+}
-+
-+static inline void atomic64_sub(u64 i, atomic64_t *v)
-+{
-+	u64 result;
-+	unsigned long tmp;
-+
-+	__asm__ __volatile__("@ atomic64_sub\n"
-+"1:	ldrexd	%0, %H0, [%2]\n"
-+"	subs	%0, %0, %3\n"
-+"	sbc	%H0, %H0, %H3\n"
-+"	strexd	%1, %0, %H0, [%2]\n"
-+"	teq	%1, #0\n"
-+"	bne	1b"
-+	: "=&r" (result), "=&r" (tmp)
-+	: "r" (&v->counter), "r" (i)
-+	: "cc");
-+}
-+
-+static inline u64 atomic64_sub_return(u64 i, atomic64_t *v)
-+{
-+	u64 result;
-+	unsigned long tmp;
-+
-+	smp_mb();
-+
-+	__asm__ __volatile__("@ atomic64_sub_return\n"
-+"1:	ldrexd	%0, %H0, [%2]\n"
-+"	subs	%0, %0, %3\n"
-+"	sbc	%H0, %H0, %H3\n"
-+"	strexd	%1, %0, %H0, [%2]\n"
-+"	teq	%1, #0\n"
-+"	bne	1b"
-+	: "=&r" (result), "=&r" (tmp)
-+	: "r" (&v->counter), "r" (i)
-+	: "cc");
-+
-+	smp_mb();
-+
-+	return result;
-+}
-+
-+static inline u64 atomic64_cmpxchg(atomic64_t *ptr, u64 old, u64 new)
-+{
-+	u64 oldval;
-+	unsigned long res;
-+
-+	smp_mb();
-+
-+	do {
-+		__asm__ __volatile__("@ atomic64_cmpxchg\n"
-+		"ldrexd		%1, %H1, [%2]\n"
-+		"mov		%0, #0\n"
-+		"teq		%1, %3\n"
-+		"teqeq		%H1, %H3\n"
-+		"strexdeq	%0, %4, %H4, [%2]"
-+		: "=&r" (res), "=&r" (oldval)
-+		: "r" (&ptr->counter), "r" (old), "r" (new)
-+		: "cc");
-+	} while (res);
-+
-+	smp_mb();
-+
-+	return oldval;
-+}
-+
-+static inline u64 atomic64_xchg(atomic64_t *ptr, u64 new)
-+{
-+	u64 result;
-+	unsigned long tmp;
-+
-+	smp_mb();
-+
-+	__asm__ __volatile__("@ atomic64_xchg\n"
-+"1:	ldrexd	%0, %H0, [%2]\n"
-+"	strexd	%1, %3, %H3, [%2]\n"
-+"	teq	%1, #0\n"
-+"	bne	1b"
-+	: "=&r" (result), "=&r" (tmp)
-+	: "r" (&ptr->counter), "r" (new)
-+	: "cc");
-+
-+	smp_mb();
-+
-+	return result;
-+}
-+
-+static inline u64 atomic64_dec_if_positive(atomic64_t *v)
-+{
-+	u64 result;
-+	unsigned long tmp;
-+
-+	smp_mb();
-+
-+	__asm__ __volatile__("@ atomic64_dec_if_positive\n"
-+"1:	ldrexd	%0, %H0, [%2]\n"
-+"	subs	%0, %0, #1\n"
-+"	sbc	%H0, %H0, #0\n"
-+"	teq	%H0, #0\n"
-+"	bmi	2f\n"
-+"	strexd	%1, %0, %H0, [%2]\n"
-+"	teq	%1, #0\n"
-+"	bne	1b\n"
-+"2:"
-+	: "=&r" (result), "=&r" (tmp)
-+	: "r" (&v->counter)
-+	: "cc");
-+
-+	smp_mb();
-+
-+	return result;
-+}
-+
-+static inline int atomic64_add_unless(atomic64_t *v, u64 a, u64 u)
-+{
-+	u64 val;
-+	unsigned long tmp;
-+	int ret = 1;
-+
-+	smp_mb();
-+
-+	__asm__ __volatile__("@ atomic64_add_unless\n"
-+"1:	ldrexd	%0, %H0, [%3]\n"
-+"	teq	%0, %4\n"
-+"	teqeq	%H0, %H4\n"
-+"	moveq	%1, #0\n"
-+"	beq	2f\n"
-+"	adds	%0, %0, %5\n"
-+"	adc	%H0, %H0, %H5\n"
-+"	strexd	%2, %0, %H0, [%3]\n"
-+"	teq	%2, #0\n"
-+"	bne	1b\n"
-+"2:"
-+	: "=&r" (val), "=&r" (ret), "=&r" (tmp)
-+	: "r" (&v->counter), "r" (u), "r" (a)
-+	: "cc");
-+
-+	if (ret)
-+		smp_mb();
-+
-+	return ret;
-+}
-+
-+#define atomic64_add_negative(a, v)	(atomic64_add_return((a), (v)) < 0)
-+#define atomic64_inc(v)			atomic64_add(1LL, (v))
-+#define atomic64_inc_return(v)		atomic64_add_return(1LL, (v))
-+#define atomic64_inc_and_test(v)	(atomic64_inc_return(v) == 0)
-+#define atomic64_sub_and_test(a, v)	(atomic64_sub_return((a), (v)) == 0)
-+#define atomic64_dec(v)			atomic64_sub(1LL, (v))
-+#define atomic64_dec_return(v)		atomic64_sub_return(1LL, (v))
-+#define atomic64_dec_and_test(v)	(atomic64_dec_return((v)) == 0)
-+#define atomic64_inc_not_zero(v)	atomic64_add_unless((v), 1LL, 0LL)
-+
-+#else /* !CONFIG_GENERIC_ATOMIC64 */
-+#include <asm-generic/atomic64.h>
-+#endif
- #include <asm-generic/atomic-long.h>
- #endif
- #endif
--- 
-1.6.5.2
+-	iounmap((void __iomem*)adapter_data->ioaddr);
+-	release_mem_region(res->start, IOP3XX_I2C_IO_SIZE);
++	iounmap(adapter_data->ioaddr);
++	release_mem_region(res->start, resource_size(res));
+ 	kfree(adapter_data);
+ 	kfree(padapter);
+ 
+@@ -446,7 +446,7 @@ iop3xx_i2c_probe(struct platform_device *pdev)
+ 		goto free_both;
+ 	}
+ 
+-	if (!request_mem_region(res->start, IOP3XX_I2C_IO_SIZE, pdev->name)) {
++	if (!request_mem_region(res->start, resource_size(res), pdev->name)) {
+ 		ret = -EBUSY;
+ 		goto free_both;
+ 	}
+@@ -454,7 +454,7 @@ iop3xx_i2c_probe(struct platform_device *pdev)
+ 	/* set the adapter enumeration # */
+ 	adapter_data->id = i2c_id++;
+ 
+-	adapter_data->ioaddr = (u32)ioremap(res->start, IOP3XX_I2C_IO_SIZE);
++	adapter_data->ioaddr = ioremap(res->start, resource_size(res));
+ 	if (!adapter_data->ioaddr) {
+ 		ret = -ENOMEM;
+ 		goto release_region;
+@@ -499,10 +499,10 @@ iop3xx_i2c_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ unmap:
+-	iounmap((void __iomem*)adapter_data->ioaddr);
++	iounmap(adapter_data->ioaddr);
+ 
+ release_region:
+-	release_mem_region(res->start, IOP3XX_I2C_IO_SIZE);
++	release_mem_region(res->start, resource_size(res));
+ 
+ free_both:
+ 	kfree(adapter_data);
+diff --git a/drivers/i2c/busses/i2c-iop3xx.h b/drivers/i2c/busses/i2c-iop3xx.h
+index 8485861..eeba965 100644
+--- a/drivers/i2c/busses/i2c-iop3xx.h
++++ b/drivers/i2c/busses/i2c-iop3xx.h
+@@ -94,10 +94,8 @@
+ #define	CCR_OFFSET		0x10
+ #define	BMR_OFFSET		0x14
+ 
+-#define	IOP3XX_I2C_IO_SIZE	0x18
+-
+ struct i2c_algo_iop3xx_data {
+-	u32 ioaddr;
++	void __iomem *ioaddr;
+ 	wait_queue_head_t waitq;
+ 	spinlock_t lock;
+ 	u32 SR_enabled, SR_received; 
