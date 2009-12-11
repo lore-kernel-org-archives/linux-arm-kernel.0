@@ -1,69 +1,49 @@
-From: jamie.iles@picochip.com (Jamie Iles)
-Date: Fri, 11 Dec 2009 15:41:47 +0000
-Subject: [PATCH 1/4] arm: provide a mechanism to reserve performance
-	counters
-In-Reply-To: <000201ca7a76$fdc9f080$f95dd180$@deacon@arm.com>
-References: <000201ca7a76$fdc9f080$f95dd180$@deacon@arm.com>
-Message-ID: <20091211154147.GA17176@wear.picochip.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 11 Dec 2009 10:37:02 -0600
+Subject: [PATCH 1/6 v2] OMAP4: Fix cpu detection
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02BC1415B4@dbde02.ent.ti.com>
+References: <1260426156-1820-1-git-send-email-santosh.shilimkar@ti.com>
+	<4B2156B6.8090403@ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02BC1415B4@dbde02.ent.ti.com>
+Message-ID: <782515bb0912110837i732250f2m4f50246594973b67@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2009 at 03:31:21PM -0000, Will Deacon wrote:
-> * Jamie Iles <jamie.iles@picochip.com> wrote:
-> 
-> > To add support for perf events and to allow the hardware
-> > counters to be shared with oprofile, we need a way to reserve
-> > access to the pmu (performance monitor unit).
-> >
-> > Signed-off-by: Jamie Iles <jamie.iles <at> picochip.com>
-> > ---
-> > arch/arm/include/asm/pmu.h |   54 ++++++++++++++++++++++++++++++++++++++++++++
-> > arch/arm/kernel/Makefile   |    1 +
-> > arch/arm/kernel/pmu.c      |   32 ++++++++++++++++++++++++++
-> > arch/arm/mm/Kconfig        |    4 +++
-> > 4 files changed, 91 insertions(+), 0 deletions(-)
-> > create mode 100644 arch/arm/include/asm/pmu.h
-> > create mode 100644 arch/arm/kernel/pmu.c
-> 
-> Hi Jamie,
-> 
-> I like the idea of having a separate file for reserving the PMU across subsystems.
-> I also think it would be neat to extend it to request the relevant IRQs (or at
-> least return the PMU IRQs) once you've got it reserved.
-> 
-> This way, there will be no need to duplicate the inevitable collection of machine 
-> #ifdefs across tools [such as oprofile and perf]. It would also ensure that you can't 
-> reserve the PMU if somebody else has claimed the IRQs [and similarly, you can't
-> release it without giving them up].
-> 
-> What do you think?
-That sounds like a good plan. How about something like this?
+On Thu, Dec 10, 2009 at 10:43 PM, Shilimkar, Santosh
+<santosh.shilimkar@ti.com> wrote:
+>> >
+>> > +void __init omap4_check_revision(void)
+>> > +{
+>> > + ? u32 idcode;
+>> > + ? u16 hawkeye;
+>> > + ? u8 rev;
+>> > + ? char *rev_name = "ES1.0";
+>> should'nt you decide this inside the rev check path?
+>
+> This is initialized value by default. Since the chip is ES1.0 additionaly I am not doing it.
+> e.g. for ES2.0, it would be done inside. > > +
+ok, no strong opinions about this, but I think it might be nice if
+ES2.0 addition will modify less code.
 
-#define MAX_PMU_IRQS	8   /* Maximum number of IRQs for the PMU(s). */
-struct pmu_irqs {
-	int	    irqs[MAX_PMU_IRQS];
-	unsigned    num_irqs;
-};
+>> > + ? /*
+>> > + ? ?* The IC rev detection is done with hawkeye and rev.
+>> > + ? ?* Note that rev does not map directly to defined processor
+>> > + ? ?* revision numbers as ES1.0 uses value 0.
+>> > + ? ?*/
+>> > + ? idcode = read_tap_reg(OMAP_TAP_IDCODE);
+>> > + ? hawkeye = (idcode >> 12) & 0xffff;
+>> > + ? rev = (idcode >> 28) & 0xff;
+>> > +
+>> > + ? if ((hawkeye == 0xb852) && (rev == 0x0)) {
+>> > + ? ? ? ? ? omap_revision = OMAP4430_REV_ES1_0;
+>> > + ? ? ? ? ? pr_info("OMAP%04x %s\n", omap_rev() >> 16, rev_name);
+>> wondering about the >>16 part.
+> Why ?
+omap_rev() >>16 means that you are using higher word of this and I
+think we have CLASS() macro for that? if that is not enough, should'nt
+we add adequate macro to do that?
 
-/**
- * reserve_pmu() - reserve the hardware performance counters
- *
- * Reserve the hardware performance counters in the system for exclusive use.
- * The 'struct pmu_irqs' for the system is returned on success, ERR_PTR()
- * encoded error on failure.
- */
-struct pmu_irqs *
-reserve_pmu(void);
+[...]
 
-/**
- * release_pmu() - Relinquish control of the performance counters
- *
- * Release the performance counters and allow someone else to use them.
- * Callers must have disabled the counters and released IRQs before calling
- * this. The 'struct pmu_irqs' returned from reserve_pmu() must be passed as
- * a cookie.
- */
-void
-release_pmu(struct pmu_irqs *irqs);
-
-Jamie
+Regards,
+Nishanth Menon
