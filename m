@@ -1,21 +1,28 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Dec 2009 20:09:24 +0000
-Subject: Linux on Toradex Colibri PXA320
-In-Reply-To: <52701260536728@webmail34.yandex.ru>
-References: <52701260536728@webmail34.yandex.ru>
-Message-ID: <20091211200924.GA12628@n2100.arm.linux.org.uk>
+Date: Fri, 11 Dec 2009 21:09:15 +0000
+Subject: [PATCH 1/4] arm: provide a mechanism to reserve performance
+	counters
+In-Reply-To: <000301ca7a85$e38e18e0$aaaa4aa0$@deacon@arm.com>
+References: <20091211154147.GA17176@wear.picochip.com>
+	<000301ca7a85$e38e18e0$aaaa4aa0$@deacon@arm.com>
+Message-ID: <20091211210915.GB12628@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2009 at 04:05:28PM +0300, Dennis Semakin wrote:
-> Hello everbody
+On Fri, Dec 11, 2009 at 05:17:59PM -0000, Will Deacon wrote:
+> That looks good to me. This allows SMP systems to set the affinity of the
+> PMU IRQs too if need be - or should this also be done here? It might also
+> be worth making the returned struct const to stop people poking, but I'm
+> not sure.
 > 
-> Excuse me, but I want to ask you a something.
+> I've got some oprofile patches which I hope to post soon - I'll put a
+> note in the covering letter to say they should be modified to use these
+> PMU functions when they make it in.
 
-The very first you need to fix is whatever you're using to get these
-kernel messages out.  It's clearly introducing corruption; there's
-absolutely no need to print "kernel/printk.c" before every message
-for starters, and it looks like that is overwriting some of the
-original message.
+Well, I don't think that it makes sense to change the affinity of PMU
+IRQs that much - if you route the CPUs own PMU interrupts to another
+CPU, then how do you do things such as a backtrace?  You can't because
+you don't know where the owner CPU actually is.
 
-Once you've sorted that problem out, please re-post.
+This is why oprofile ensures that the CPUs own PMU interrupts are routed
+to that CPU - routing them elsewhere makes no sense for oprofile.
