@@ -1,12 +1,12 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 12 Dec 2009 12:17:32 +0100
+Date: Sat, 12 Dec 2009 12:25:36 +0100
 Subject: tree with htc dream support
 In-Reply-To: <d6200be20912112142r7bdf8f18o31edd4457aa64998@mail.gmail.com>
 References: <20091205221100.GA32522@elf.ucw.cz>
 	<1260054737.23633.35.camel@desktop>
 	<a55d774e0912051638u7858878cg7cf62905c3c005c1@mail.gmail.com>
 	<d6200be20912112142r7bdf8f18o31edd4457aa64998@mail.gmail.com>
-Message-ID: <20091212111731.GA24713@elf.ucw.cz>
+Message-ID: <20091212112536.GA2302@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,24 +17,70 @@ On Fri 2009-12-11 21:42:07, Arve Hj?nnev?g wrote:
 > > functional set of patches that android donut and eclair run on, on
 > > production hardware.? We'll make that available as soon as we have something
 > > that's bootable.
+> >
+> > Brian
+> >
+> >
 > 
 > A first pass of this is available in the android-msm-2.6.32-test1
 > branch at git://android.git.kernel.org/kernel/experimental.git.
 
-Thanks!
+According to some docs, i2c_detach can be just removed, so...?
 
-I get 
+Then I got this:
 
-  CC      drivers/i2c/chips/mt9t013.o
-drivers/i2c/chips/mt9t013.c: In function 'mt9t013_remove':
-drivers/i2c/chips/mt9t013.c:1301: error: implicit declaration of
-function 'i2c_detach_client'
-make[3]: *** [drivers/i2c/chips/mt9t013.o] Error 1
-make[2]: *** [drivers/i2c/chips] Error 2
-make[1]: *** [drivers/i2c] Error 2
+  CC      drivers/input/misc/gpio_axis.o
+  CC      drivers/input/misc/keychord.o
+drivers/input/misc/keychord.c: In function 'keychord_event':
+drivers/input/misc/keychord.c:129: error: 'TASK_INTERRUPTIBLE'
+undeclared (first use in this
+function)drivers/input/misc/keychord.c:129: error: (Each undeclared
+identifier is reported only once
+drivers/input/misc/keychord.c:129: error: for each function it appears
+in.)
+drivers/input/misc/keychord.c: In function 'keychord_read':
+drivers/input/misc/keychord.c:205: error: 'TASK_INTERRUPTIBLE'
+undeclared (first use in this
+function)drivers/input/misc/keychord.c:205: error: implicit
+declaration of function 'signal_pending'
+drivers/input/misc/keychord.c:205: error: implicit declaration of
+function 'schedule'
+make[3]: *** [drivers/input/misc/keychord.o] Error 1
+make[2]: *** [drivers/input/misc] Error 2
+make[1]: *** [drivers/input] Error 2
+make: *** [drivers] Error 2
+12.60user 2.53system 16.93 (0m16.939s) elapsed 89.36%CPU
+pavel at amd:/data/l/linux-msm-32$
 
-... I guess mt9t013 should depend on i2c? I'll try to fix the config.
-									Pavel
+I used this to fix the compilation...
+
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
+
+diff --git a/drivers/i2c/chips/mt9t013.c b/drivers/i2c/chips/mt9t013.c
+index e911ece..200a9f8 100755
+--- a/drivers/i2c/chips/mt9t013.c
++++ b/drivers/i2c/chips/mt9t013.c
+@@ -1298,7 +1298,6 @@ static int mt9t013_remove(struct i2c_client *client)
+ 	struct mt9t013_data *mt = i2c_get_clientdata(client);
+ 	free_irq(client->irq, mt);
+ 	deinit_suspend();
+-	i2c_detach_client(client);
+ 	pclient = NULL;
+ 	misc_deregister(&mt9t013_device);
+ 	kfree(mt);
+diff --git a/drivers/input/misc/keychord.c b/drivers/input/misc/keychord.c
+index ea94f26..ca23905 100644
+--- a/drivers/input/misc/keychord.c
++++ b/drivers/input/misc/keychord.c
+@@ -23,6 +23,7 @@
+ #include <linux/fs.h>
+ #include <linux/miscdevice.h>
+ #include <linux/keychord.h>
++#include <linux/sched.h>
+ 
+ #define KEYCHORD_NAME		"keychord"
+ #define BUFFER_SIZE			16
+
 -- 
 (english) http://www.livejournal.com/~pavelmachek
 (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
