@@ -1,46 +1,136 @@
-From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Sat, 12 Dec 2009 18:06:17 +0100
-Subject: [PATCH 4/4] regulator: mc13783 change to platform_driver_register.
-In-Reply-To: <1260636976.2054.36.camel@climbing-alby>
-References: <1260635829.2054.16.camel@climbing-alby>
-	<1260636523.2054.28.camel@climbing-alby>
-	<1260636819.2054.33.camel@climbing-alby>
-	<1260636976.2054.36.camel@climbing-alby>
-Message-ID: <1260637577.2054.43.camel@climbing-alby>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 12 Dec 2009 17:40:07 +0000
+Subject: [RFC PATCH 1/2] ARM: cache-l2x0: avoid taking spinlock for every
+	iteration
+Message-ID: <E1NJVwt-0006uj-11@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the instant when regulator driver is probed. 
-To have a correct regulators initialisation (enable, disable and voltages 
-selection), the driver must have access to mc13783 registers and so 
-mc13783-core must be loaded before this.
+Taking the spinlock for every iteration is very expensive; instead,
+batch iterations up into 4K blocks, releasing and reacquiring the
+spinlock between each block.
 
-With this patch mc13783_regulator_probe is called when mc13783-core
-register the regulator subsystem.
-
-Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/regulator/mc13783-regulator.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mm/cache-l2x0.c |   65 ++++++++++++++++++++++++++++++++++++---------
+ 1 files changed, 52 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/regulator/mc13783-regulator.c b/drivers/regulator/mc13783-regulator.c
-index ed78137..1ae9017 100644
---- a/drivers/regulator/mc13783-regulator.c
-+++ b/drivers/regulator/mc13783-regulator.c
-@@ -545,12 +545,12 @@ static struct platform_driver mc13783_regulator_driver = {
- 		.owner	= THIS_MODULE,
- 	},
- 	.remove		= __devexit_p(mc13783_regulator_remove),
-+	.probe		= mc13783_regulator_probe,
- };
- 
- static int __init mc13783_regulator_init(void)
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index b480f1d..c1b7bff 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -31,14 +31,10 @@ static DEFINE_SPINLOCK(l2x0_lock);
+ static inline void sync_writel(unsigned long val, unsigned long reg,
+ 			       unsigned long complete_mask)
  {
--	return platform_driver_probe(&mc13783_regulator_driver,
--			mc13783_regulator_probe);
-+	return platform_driver_register(&mc13783_regulator_driver);
+-	unsigned long flags;
+-
+-	spin_lock_irqsave(&l2x0_lock, flags);
+ 	writel(val, l2x0_base + reg);
+ 	/* wait for the operation to complete */
+ 	while (readl(l2x0_base + reg) & complete_mask)
+ 		;
+-	spin_unlock_irqrestore(&l2x0_lock, flags);
  }
- subsys_initcall(mc13783_regulator_init);
  
+ static inline void cache_sync(void)
+@@ -48,15 +44,20 @@ static inline void cache_sync(void)
+ 
+ static inline void l2x0_inv_all(void)
+ {
++	unsigned long flags;
++
+ 	/* invalidate all ways */
++	spin_lock_irqsave(&l2x0_lock, flags);
+ 	sync_writel(0xff, L2X0_INV_WAY, 0xff);
+ 	cache_sync();
++	spin_unlock_irqrestore(&l2x0_lock, flags);
+ }
+ 
+ static void l2x0_inv_range(unsigned long start, unsigned long end)
+ {
+-	unsigned long addr;
++	unsigned long flags;
+ 
++	spin_lock_irqsave(&l2x0_lock, flags);
+ 	if (start & (CACHE_LINE_SIZE - 1)) {
+ 		start &= ~(CACHE_LINE_SIZE - 1);
+ 		sync_writel(start, L2X0_CLEAN_INV_LINE_PA, 1);
+@@ -68,29 +69,67 @@ static void l2x0_inv_range(unsigned long start, unsigned long end)
+ 		sync_writel(end, L2X0_CLEAN_INV_LINE_PA, 1);
+ 	}
+ 
+-	for (addr = start; addr < end; addr += CACHE_LINE_SIZE)
+-		sync_writel(addr, L2X0_INV_LINE_PA, 1);
++	while (start < end) {
++		unsigned long blk_end = start + min(end - start, 4096UL);
++
++		while (start < blk_end) {
++			sync_writel(start, L2X0_INV_LINE_PA, 1);
++			start += CACHE_LINE_SIZE;
++		}
++
++		if (blk_end < end) {
++			spin_unlock_irqrestore(&l2x0_lock, flags);
++			spin_lock_irqsave(&l2x0_lock, flags);
++		}
++	}
+ 	cache_sync();
++	spin_unlock_irqrestore(&l2x0_lock, flags);
+ }
+ 
+ static void l2x0_clean_range(unsigned long start, unsigned long end)
+ {
+-	unsigned long addr;
++	unsigned long flags;
+ 
++	spin_lock_irqsave(&l2x0_lock, flags);
+ 	start &= ~(CACHE_LINE_SIZE - 1);
+-	for (addr = start; addr < end; addr += CACHE_LINE_SIZE)
+-		sync_writel(addr, L2X0_CLEAN_LINE_PA, 1);
++	while (start < end) {
++		unsigned long blk_end = start + min(end - start, 4096UL);
++
++		while (start < blk_end) {
++			sync_writel(start, L2X0_CLEAN_LINE_PA, 1);
++			start += CACHE_LINE_SIZE;
++		}
++
++		if (blk_end < end) {
++			spin_unlock_irqrestore(&l2x0_lock, flags);
++			spin_lock_irqsave(&l2x0_lock, flags);
++		}
++	}
+ 	cache_sync();
++	spin_unlock_irqrestore(&l2x0_lock, flags);
+ }
+ 
+ static void l2x0_flush_range(unsigned long start, unsigned long end)
+ {
+-	unsigned long addr;
++	unsigned long flags;
+ 
++	spin_lock_irqsave(&l2x0_lock, flags);
+ 	start &= ~(CACHE_LINE_SIZE - 1);
+-	for (addr = start; addr < end; addr += CACHE_LINE_SIZE)
+-		sync_writel(addr, L2X0_CLEAN_INV_LINE_PA, 1);
++	while (start < end) {
++		unsigned long blk_end = start + min(end - start, 4096UL);
++
++		while (start < blk_end) {
++			sync_writel(start, L2X0_CLEAN_INV_LINE_PA, 1);
++			start += CACHE_LINE_SIZE;
++		}
++
++		if (blk_end < end) {
++			spin_unlock_irqrestore(&l2x0_lock, flags);
++			spin_lock_irqsave(&l2x0_lock, flags);
++		}
++	}
+ 	cache_sync();
++	spin_unlock_irqrestore(&l2x0_lock, flags);
+ }
+ 
+ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
 -- 
-1.6.3.3
+1.6.2.5
