@@ -1,154 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 12 Dec 2009 17:40:20 +0000
-Subject: [RFC PATCH 2/2] ARM: cache-l2x0: make better use of background cache
-	handling
-Message-ID: <E1NJVx6-0006um-Do@rmk-PC.arm.linux.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 12 Dec 2009 18:53:27 +0100
+Subject: tree with htc dream support
+In-Reply-To: <20091212112536.GA2302@elf.ucw.cz>
+References: <20091205221100.GA32522@elf.ucw.cz>
+	<1260054737.23633.35.camel@desktop>
+	<a55d774e0912051638u7858878cg7cf62905c3c005c1@mail.gmail.com>
+	<d6200be20912112142r7bdf8f18o31edd4457aa64998@mail.gmail.com>
+	<20091212112536.GA2302@elf.ucw.cz>
+Message-ID: <20091212175327.GA5819@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no point having the hardware support background operations
-if we issue a cache operation, and then wait for it to complete
-before calculating the address of the next operation.  We gain no
-advantage in the cache controller stalling the bus until completion.
+On Sat 2009-12-12 12:25:36, Pavel Machek wrote:
+> On Fri 2009-12-11 21:42:07, Arve Hj?nnev?g wrote:
+> > On Sat, Dec 5, 2009 at 4:38 PM, Brian Swetland <swetland@google.com> wrote:
+> > > Arve's about to take our common and msm trees and rebase them over the .32,
+> > > which may be useful for reference -- at least as a snapshot of a fully
+> > > functional set of patches that android donut and eclair run on, on
+> > > production hardware.? We'll make that available as soon as we have something
+> > > that's bootable.
+> > >
+> > > Brian
+> > >
+> > >
+> > 
+> > A first pass of this is available in the android-msm-2.6.32-test1
+> > branch at git://android.git.kernel.org/kernel/experimental.git.
+> 
+> According to some docs, i2c_detach can be just removed, so...?
+> 
+> Then I got this:
 
-What we should be doing is using the 'wait' time productively by
-calculating the address of the next operation, and only then waiting
-for the previous operation to complete.  This means that cache
-operations can occur in parallel with the CPU calculating the next
-address.
+And then I got it to boot. Good! (And a bit after that, probably
+watchdog kicked and phone rebooted back into .27.)
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mm/cache-l2x0.c |   34 +++++++++++++++++++++++-----------
- 1 files changed, 23 insertions(+), 11 deletions(-)
+On the second try -- with ramdisk.img -- I got it to boot to GUI, but
+the GUI did not show up. I can hear the background sounds but not see
+anything. I probably need to turn off
+CONFIG_FRAMEBUFFER_CONSOLE... Yes, now it boots to the GUI and I can
+actually see that. (It would be nice to make GUI work with
+FRAMEBUFFER_CONSOLE on; it should not be that hard...).
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index c1b7bff..ec85dda 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -28,18 +28,18 @@
- static void __iomem *l2x0_base;
- static DEFINE_SPINLOCK(l2x0_lock);
- 
--static inline void sync_writel(unsigned long val, unsigned long reg,
--			       unsigned long complete_mask)
-+static inline void cache_wait(void __iomem *reg, unsigned long mask)
- {
--	writel(val, l2x0_base + reg);
- 	/* wait for the operation to complete */
--	while (readl(l2x0_base + reg) & complete_mask)
-+	while (readl(reg) & mask)
- 		;
- }
- 
- static inline void cache_sync(void)
- {
--	sync_writel(0, L2X0_CACHE_SYNC, 1);
-+	void __iomem *base = l2x0_base;
-+	writel(0, base + L2X0_CACHE_SYNC);
-+	cache_wait(base + L2X0_CACHE_SYNC, 1);
- }
- 
- static inline void l2x0_inv_all(void)
-@@ -48,32 +48,37 @@ static inline void l2x0_inv_all(void)
- 
- 	/* invalidate all ways */
- 	spin_lock_irqsave(&l2x0_lock, flags);
--	sync_writel(0xff, L2X0_INV_WAY, 0xff);
-+	writel(0xff, l2x0_base + L2X0_INV_WAY);
-+	cache_wait(l2x0_base + L2X0_INV_WAY, 0xff);
- 	cache_sync();
- 	spin_unlock_irqrestore(&l2x0_lock, flags);
- }
- 
- static void l2x0_inv_range(unsigned long start, unsigned long end)
- {
-+	void __iomem *base = l2x0_base;
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&l2x0_lock, flags);
- 	if (start & (CACHE_LINE_SIZE - 1)) {
- 		start &= ~(CACHE_LINE_SIZE - 1);
--		sync_writel(start, L2X0_CLEAN_INV_LINE_PA, 1);
-+		cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
-+		writel(start, base + L2X0_CLEAN_INV_LINE_PA);
- 		start += CACHE_LINE_SIZE;
- 	}
- 
- 	if (end & (CACHE_LINE_SIZE - 1)) {
- 		end &= ~(CACHE_LINE_SIZE - 1);
--		sync_writel(end, L2X0_CLEAN_INV_LINE_PA, 1);
-+		cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
-+		writel(end, base + L2X0_CLEAN_INV_LINE_PA);
- 	}
- 
- 	while (start < end) {
- 		unsigned long blk_end = start + min(end - start, 4096UL);
- 
- 		while (start < blk_end) {
--			sync_writel(start, L2X0_INV_LINE_PA, 1);
-+			cache_wait(base + L2X0_INV_LINE_PA, 1);
-+			writel(start, base + L2X0_INV_LINE_PA);
- 			start += CACHE_LINE_SIZE;
- 		}
- 
-@@ -82,12 +87,14 @@ static void l2x0_inv_range(unsigned long start, unsigned long end)
- 			spin_lock_irqsave(&l2x0_lock, flags);
- 		}
- 	}
-+	cache_wait(base + L2X0_INV_LINE_PA, 1);
- 	cache_sync();
- 	spin_unlock_irqrestore(&l2x0_lock, flags);
- }
- 
- static void l2x0_clean_range(unsigned long start, unsigned long end)
- {
-+	void __iomem *base = l2x0_base;
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&l2x0_lock, flags);
-@@ -96,7 +103,8 @@ static void l2x0_clean_range(unsigned long start, unsigned long end)
- 		unsigned long blk_end = start + min(end - start, 4096UL);
- 
- 		while (start < blk_end) {
--			sync_writel(start, L2X0_CLEAN_LINE_PA, 1);
-+			cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
-+			writel(start, base + L2X0_CLEAN_LINE_PA);
- 			start += CACHE_LINE_SIZE;
- 		}
- 
-@@ -105,12 +113,14 @@ static void l2x0_clean_range(unsigned long start, unsigned long end)
- 			spin_lock_irqsave(&l2x0_lock, flags);
- 		}
- 	}
-+	cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
- 	cache_sync();
- 	spin_unlock_irqrestore(&l2x0_lock, flags);
- }
- 
- static void l2x0_flush_range(unsigned long start, unsigned long end)
- {
-+	void __iomem *base = l2x0_base;
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&l2x0_lock, flags);
-@@ -119,7 +129,8 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
- 		unsigned long blk_end = start + min(end - start, 4096UL);
- 
- 		while (start < blk_end) {
--			sync_writel(start, L2X0_CLEAN_INV_LINE_PA, 1);
-+			cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
-+			writel(start, base + L2X0_CLEAN_INV_LINE_PA);
- 			start += CACHE_LINE_SIZE;
- 		}
- 
-@@ -128,6 +139,7 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
- 			spin_lock_irqsave(&l2x0_lock, flags);
- 		}
- 	}
-+	cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
- 	cache_sync();
- 	spin_unlock_irqrestore(&l2x0_lock, flags);
- }
+									Pavel
 -- 
-1.6.2.5
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
