@@ -1,47 +1,29 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Sat, 12 Dec 2009 08:58:54 +0800
-Subject: [PATCH] mmc: move regulator handling to core
-In-Reply-To: <20091204115805.GS14091@buzzloop.caiaq.de>
-References: <1259844390-10541-1-git-send-email-daniel@caiaq.de>
-	<4B17CADB.1070406@nokia.com>
-	<20091203192044.GJ14091@buzzloop.caiaq.de>
-	<4B181BB4.1020800@nokia.com>
-	<20091204115805.GS14091@buzzloop.caiaq.de>
-Message-ID: <20091212005854.GV28375@buzzloop.caiaq.de>
+From: arve@android.com (=?ISO-8859-1?Q?Arve_Hj=F8nnev=E5g?=)
+Date: Fri, 11 Dec 2009 21:42:07 -0800
+Subject: tree with htc dream support
+In-Reply-To: <a55d774e0912051638u7858878cg7cf62905c3c005c1@mail.gmail.com>
+References: <20091205221100.GA32522@elf.ucw.cz>
+	<1260054737.23633.35.camel@desktop>
+	<a55d774e0912051638u7858878cg7cf62905c3c005c1@mail.gmail.com>
+Message-ID: <d6200be20912112142r7bdf8f18o31edd4457aa64998@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 04, 2009 at 12:58:05PM +0100, Daniel Mack wrote:
-> > >On Thu, Dec 03, 2009 at 04:27:39PM +0200, Adrian Hunter wrote:
-> 
-> > >>What about arch/arm/mach-omap2/mmc-twl4030.c ?
-> > >
-> > >Argh, missed that one. And this particular case doesn't fit to my
-> > >modifications. I don't know the code well ...  We would need to
-> > >have a struct mmc_host * in all the functions there calling
-> > >mmc_regulator_{set,get}_ocr. Any idea how to resolve that?
-> > >
-> > 
-> > Pass it down from the omap_hsmmc driver.
-> 
-> It's not that easy, unfortunately, because this code does not conform to
-> all the other mmc host drivers in tree.
-> 
-> I don't understand why things are done the way it is currently
-> implemented. Why isn't there a mmc_host for each slot, and why is a
-> regulator reference acquired for each slot, and not once for the whole
-> device?
-> 
-> Even with the default 'vcc' supply factored out to the mmc core, the
-> 'vmmc_aux' regulator would still need some extra attention, but I would
-> also do that from the omap_hsmmc driver rather than in the plaform
-> support code.
-> 
-> Moving the regulator handling to the mmc core would require a major
-> cleanup to all this code, but I don't have such hardware to test my
-> modifications. Can anyone help here?
+On Sat, Dec 5, 2009 at 4:38 PM, Brian Swetland <swetland@google.com> wrote:
+> Arve's about to take our common and msm trees and rebase them over the .32,
+> which may be useful for reference -- at least as a snapshot of a fully
+> functional set of patches that android donut and eclair run on, on
+> production hardware.? We'll make that available as soon as we have something
+> that's bootable.
+>
+> Brian
+>
+>
 
-Can anyone of the OMAP people help sort this out?
+A first pass of this is available in the android-msm-2.6.32-test1
+branch at git://android.git.kernel.org/kernel/experimental.git.
 
-Thanks,
-Daniel
+http://android.git.kernel.org/?p=kernel/experimental.git;a=shortlog;h=refs/heads/android-msm-2.6.32-test1
+
+-- 
+Arve Hj?nnev?g
