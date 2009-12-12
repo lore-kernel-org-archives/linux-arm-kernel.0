@@ -1,54 +1,43 @@
 From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Sat, 12 Dec 2009 17:48:43 +0100
-Subject: [PATCH 1/4] mfd: mc13783: Take care of semantic inversion between
-	read and write value of two bits in POWER_MISCELLANEUS register.
-In-Reply-To: <1260635829.2054.16.camel@climbing-alby>
+Date: Sat, 12 Dec 2009 17:53:39 +0100
+Subject: [PATCH 2/4] mfd: mc13783: When probing, unlock the mc13783 before
+	subsystems initialisation.
+In-Reply-To: <1260636523.2054.28.camel@climbing-alby>
 References: <1260635829.2054.16.camel@climbing-alby>
-Message-ID: <1260636523.2054.28.camel@climbing-alby>
+	<1260636523.2054.28.camel@climbing-alby>
+Message-ID: <1260636819.2054.33.camel@climbing-alby>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MC13783_REGCTRL_PWGTnSPIEN controls the states of the corresponding
-PWGTn_DRV output.
-Reading 1 on the corresponding bit mean that the output is enabled
-Writing 1 on the corresponding bit disable that output!
-
-So, if not asked directly to modify those bits, write the inverted
-value.
+With this, mc13783 subsystems drivers can configure the mc13783 chip
+reading and writing registers.
 
 Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
 ---
- drivers/mfd/mc13783-core.c |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+ drivers/mfd/mc13783-core.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/mfd/mc13783-core.c b/drivers/mfd/mc13783-core.c
-index a1ade23..aa1f79a 100644
+index aa1f79a..35dcc2a 100644
 --- a/drivers/mfd/mc13783-core.c
 +++ b/drivers/mfd/mc13783-core.c
-@@ -207,6 +207,9 @@ int mc13783_reg_write(struct mc13783 *mc13783, unsigned int offset, u32 val)
- }
- EXPORT_SYMBOL(mc13783_reg_write);
+@@ -631,6 +631,8 @@ err_revision:
+ 	}
+ 	/* This should go away (END) */
  
-+#define MC13783_REG_POWER_MISCELLANEOUS	34
-+#define MC13783_REGCTRL_PWGT1SPIEN	(1 << 15)
-+#define MC13783_REGCTRL_PWGT2SPIEN	(1 << 16)
- int mc13783_reg_rmw(struct mc13783 *mc13783, unsigned int offset,
- 		u32 mask, u32 val)
- {
-@@ -221,6 +225,14 @@ int mc13783_reg_rmw(struct mc13783 *mc13783, unsigned int offset,
- 
- 	valread = (valread & ~mask) | val;
- 
-+	if ((offset == MC13783_REG_POWER_MISCELLANEOUS) &&
-+	   !(mask & MC13783_REGCTRL_PWGT1SPIEN))
-+		valread ^= MC13783_REGCTRL_PWGT1SPIEN;
++	mc13783_unlock(mc13783);
 +
-+	if ((offset == MC13783_REG_POWER_MISCELLANEOUS) &&
-+	   !(mask & MC13783_REGCTRL_PWGT2SPIEN))
-+		valread ^= MC13783_REGCTRL_PWGT2SPIEN;
-+
- 	return mc13783_reg_write(mc13783, offset, valread);
+ 	if (pdata->flags & MC13783_USE_ADC)
+ 		mc13783_add_subdevice(mc13783, "mc13783-adc");
+ 
+@@ -653,8 +655,6 @@ err_revision:
+ 	if (pdata->flags & MC13783_USE_TOUCHSCREEN)
+ 		mc13783_add_subdevice(mc13783, "mc13783-ts");
+ 
+-	mc13783_unlock(mc13783);
+-
+ 	return 0;
  }
- EXPORT_SYMBOL(mc13783_reg_rmw);
+ 
 -- 
 1.6.3.3
