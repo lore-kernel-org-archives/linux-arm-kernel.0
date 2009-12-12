@@ -1,29 +1,52 @@
-From: arve@android.com (=?ISO-8859-1?Q?Arve_Hj=F8nnev=E5g?=)
-Date: Fri, 11 Dec 2009 21:42:07 -0800
-Subject: tree with htc dream support
-In-Reply-To: <a55d774e0912051638u7858878cg7cf62905c3c005c1@mail.gmail.com>
-References: <20091205221100.GA32522@elf.ucw.cz>
-	<1260054737.23633.35.camel@desktop>
-	<a55d774e0912051638u7858878cg7cf62905c3c005c1@mail.gmail.com>
-Message-ID: <d6200be20912112142r7bdf8f18o31edd4457aa64998@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 12 Dec 2009 13:05:34 +0530
+Subject: [PATCH 3/6 v2] OMAP4: Re-arrange the low level debug code
+Message-ID: <1260603334-22158-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 5, 2009 at 4:38 PM, Brian Swetland <swetland@google.com> wrote:
-> Arve's about to take our common and msm trees and rebase them over the .32,
-> which may be useful for reference -- at least as a snapshot of a fully
-> functional set of patches that android donut and eclair run on, on
-> production hardware.? We'll make that available as soon as we have something
-> that's bootable.
->
-> Brian
->
->
+On OMAP4430 the UART3 base address is different than that on OMAP3.
+Because of this existing code needs additional #ifdef'ry to accommodate
+that code. Hence this patch separates it. Also UART3 base address is
+fixed for OMAP4430 in this patch.
 
-A first pass of this is available in the android-msm-2.6.32-test1
-branch at git://android.git.kernel.org/kernel/experimental.git.
+Incorporated comment from Sergei Shtylyov [sshtylyov at ru.mvista.com]
 
-http://android.git.kernel.org/?p=kernel/experimental.git;a=shortlog;h=refs/heads/android-msm-2.6.32-test1
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/mach-omap2/include/mach/debug-macro.S |   13 ++++++++++++-
+ 1 files changed, 12 insertions(+), 1 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/include/mach/debug-macro.S b/arch/arm/mach-omap2/include/mach/debug-macro.S
+index e9f255d..791bd73 100644
+--- a/arch/arm/mach-omap2/include/mach/debug-macro.S
++++ b/arch/arm/mach-omap2/include/mach/debug-macro.S
+@@ -25,7 +25,7 @@
+ 		add	\rx, \rx, #0x00004000	@ UART 3
+ #endif
+ 
+-#elif defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
++#elif defined(CONFIG_ARCH_OMAP3)
+ 		moveq	\rx, #0x48000000	@ physical base address
+ 		movne	\rx, #0xfa000000	@ virtual base
+ 		orr	\rx, \rx, #0x0006a000
+@@ -36,6 +36,17 @@
+ 		add	\rx, \rx, #0x00fb0000	@ UART 3
+ 		add	\rx, \rx, #0x00006000
+ #endif
++#elif defined(CONFIG_ARCH_OMAP4)
++		moveq	\rx, #0x48000000	@ physical base address
++		movne	\rx, #0xfa000000	@ virtua base
++		orr	\rx, \rx, #0x0006a000	@ UART 1
++#ifdef CONFIG_OMAP_LL_DEBUG_UART2
++		add	\rx, \rx, #0x00002000	@ UART 2
++#endif
++#ifdef CONFIG_OMAP_LL_DEBUG_UART3
++		and 	\rx, \rx, #0xff000000
++		add	\rx, \rx, #0x00020000	@ UART 3
++#endif
+ #endif
+ 		.endm
+ 
 -- 
-Arve Hj?nnev?g
+1.6.0.4
