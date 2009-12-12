@@ -1,241 +1,115 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 12 Dec 2009 15:13:24 +0100
-Subject: [PATCH] pxa27x_udc: Fix deadlocks on request queueing
-Message-ID: <mailman.90.1260628145.2170.linux-arm-kernel@lists.infradead.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 12 Dec 2009 14:37:48 +0000
+Subject: [PATCH 2/7] ARM: dma-mapping: simplify page_to_dma() and
+	__pfn_to_bus()
+In-Reply-To: <4B23A23B.7070208@netinsight.net>
+References: <20091120182539.GG16920@n2100.arm.linux.org.uk>
+	<E1NBYE2-0005kv-7H@rmk-PC.arm.linux.org.uk>
+	<4B23A23B.7070208@netinsight.net>
+Message-ID: <20091212143748.GC30537@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As reported by Antonio, there are cases where the ep->lock
-can be taken twice, triggering a deadlock.
-The typical sequence is :
- irq_handler
-   \
-    -> gadget.complete()
-       \
-        -> pxa27x_udc.pxa_ep_queue() : ep->lock is taken
-           \
-            -> gadget.complete()
-               \
-                -> pxa27x_udc.pxa_ep_queue() : ep->lock is taken
-                                               ==> *deadlock*
-The patch fixes this by :
- - releasing the lock each time gadget.complete() is called
- - adding a check in handle_ep() to detect a recursive call,
-   in which case the function becomes on no-op.
+On Sat, Dec 12, 2009 at 03:01:31PM +0100, Anders Grafstr?m wrote:
+> Russell King - ARM Linux wrote:
+> > The non-highmem() and the __pfn_to_bus() based page_to_dma() both
+> > compile to the same code, so its pointless having these two different
+> > approaches.  Use the __pfn_to_bus() based version.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > ---
+> >  arch/arm/include/asm/dma-mapping.h |   10 ----------
+> >  arch/arm/include/asm/memory.h      |    3 ++-
+> >  2 files changed, 2 insertions(+), 11 deletions(-)
+> 
+> footbridge doesn't build after this.
+> Could something like the patch below be in order?
 
-Reported-by: Antonio Ospite <ospite@studenti.unina.it>
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- drivers/usb/gadget/pxa27x_udc.c |   51 ++++++++++++++++++++++++++------------
- drivers/usb/gadget/pxa27x_udc.h |    6 ++++
- 2 files changed, 41 insertions(+), 16 deletions(-)
+No, because bus addresses on footbridge are not physical addresses.  This
+should solve the problem:
 
-diff --git a/drivers/usb/gadget/pxa27x_udc.c b/drivers/usb/gadget/pxa27x_udc.c
-index e305799..c104d3e 100644
---- a/drivers/usb/gadget/pxa27x_udc.c
-+++ b/drivers/usb/gadget/pxa27x_udc.c
-@@ -743,7 +743,7 @@ static void ep_del_request(struct pxa_ep *ep, struct pxa27x_request *req)
-  * @req: pxa request
-  * @status: usb request status sent to gadget API
-  *
-- * Context: ep->lock held
-+ * Context: ep->lock released
-  *
-  * Retire a pxa27x usb request. Endpoint must be locked.
-  */
-@@ -768,7 +768,7 @@ static void req_done(struct pxa_ep *ep, struct pxa27x_request *req, int status)
-  * @ep: physical endpoint
-  * @req: pxa request
-  *
-- * Context: ep->lock held
-+ * Context: ep->lock released
-  *
-  * Ends endpoint OUT request (completes usb request).
-  */
-@@ -783,7 +783,7 @@ static void ep_end_out_req(struct pxa_ep *ep, struct pxa27x_request *req)
-  * @ep: physical endpoint
-  * @req: pxa request
-  *
-- * Context: ep->lock held
-+ * Context: ep->lock released
-  *
-  * Ends control endpoint OUT request (completes usb request), and puts
-  * control endpoint into idle state
-@@ -800,7 +800,7 @@ static void ep0_end_out_req(struct pxa_ep *ep, struct pxa27x_request *req)
-  * @ep: physical endpoint
-  * @req: pxa request
-  *
-- * Context: ep->lock held
-+ * Context: ep->lock released
-  *
-  * Ends endpoint IN request (completes usb request).
-  */
-@@ -815,7 +815,7 @@ static void ep_end_in_req(struct pxa_ep *ep, struct pxa27x_request *req)
-  * @ep: physical endpoint
-  * @req: pxa request
-  *
-- * Context: ep->lock held
-+ * Context: ep->lock released
-  *
-  * Ends control endpoint IN request (completes usb request), and puts
-  * control endpoint into status state
-@@ -831,17 +831,21 @@ static void ep0_end_in_req(struct pxa_ep *ep, struct pxa27x_request *req)
-  * @ep: pxa endpoint
-  * @status: usb request status
-  *
-- * Context: ep->lock held
-+ * Context: ep->lock released
-  *
-  * Dequeues all requests on an endpoint. As a side effect, interrupts will be
-  * disabled on that endpoint (because no more requests).
-  */
- static void nuke(struct pxa_ep *ep, int status)
+diff --git a/arch/arm/mach-footbridge/common.c b/arch/arm/mach-footbridge/common.c
+index b97f529..41febc7 100644
+--- a/arch/arm/mach-footbridge/common.c
++++ b/arch/arm/mach-footbridge/common.c
+@@ -201,6 +201,11 @@ void __init footbridge_map_io(void)
+ 
+ #ifdef CONFIG_FOOTBRIDGE_ADDIN
+ 
++static inline unsigned long fb_bus_sdram_offset(void)
++{
++	return *CSR_PCISDRAMBASE & 0xfffffff0;
++}
++
+ /*
+  * These two functions convert virtual addresses to PCI addresses and PCI
+  * addresses to virtual addresses.  Note that it is only legal to use these
+@@ -210,14 +215,13 @@ unsigned long __virt_to_bus(unsigned long res)
  {
--	struct pxa27x_request *req;
-+	struct pxa27x_request	*req;
-+	unsigned long		flags;
+ 	WARN_ON(res < PAGE_OFFSET || res >= (unsigned long)high_memory);
  
- 	while (!list_empty(&ep->queue)) {
-+		spin_lock_irqsave(&ep->lock, flags);
- 		req = list_entry(ep->queue.next, struct pxa27x_request, queue);
-+		spin_unlock_irqrestore(&ep->lock, flags);
-+
- 		req_done(ep, req, status);
- 	}
+-	return (res - PAGE_OFFSET) + (*CSR_PCISDRAMBASE & 0xfffffff0);
++	return res + (fb_bus_sdram_offset() - PAGE_OFFSET);
  }
-@@ -1173,6 +1177,7 @@ static int pxa_ep_queue(struct usb_ep *_ep, struct usb_request *_req,
- 	_req->actual = 0;
+ EXPORT_SYMBOL(__virt_to_bus);
  
- 	ep_add_request(ep, req);
-+	spin_unlock_irqrestore(&ep->lock, flags);
- 
- 	if (is_ep0(ep)) {
- 		switch (dev->ep0state) {
-@@ -1210,7 +1215,6 @@ static int pxa_ep_queue(struct usb_ep *_ep, struct usb_request *_req,
- 	}
- 
- out:
--	spin_unlock_irqrestore(&ep->lock, flags);
- 	return rc;
- }
- 
-@@ -1241,13 +1245,15 @@ static int pxa_ep_dequeue(struct usb_ep *_ep, struct usb_request *_req)
- 	/* make sure it's actually queued on this endpoint */
- 	list_for_each_entry(req, &ep->queue, queue) {
- 		if (&req->req == _req) {
--			req_done(ep, req, -ECONNRESET);
- 			rc = 0;
- 			break;
- 		}
- 	}
- 
- 	spin_unlock_irqrestore(&ep->lock, flags);
-+
-+	if (!rc)
-+		req_done(ep, req, -ECONNRESET);
- 	return rc;
- }
- 
-@@ -1444,7 +1450,6 @@ static int pxa_ep_disable(struct usb_ep *_ep)
+ unsigned long __bus_to_virt(unsigned long res)
  {
- 	struct pxa_ep		*ep;
- 	struct udc_usb_ep	*udc_usb_ep;
--	unsigned long		flags;
+-	res -= (*CSR_PCISDRAMBASE & 0xfffffff0);
+-	res += PAGE_OFFSET;
++	res = res - (fb_bus_sdram_offset() - PAGE_OFFSET);
  
- 	if (!_ep)
- 		return -EINVAL;
-@@ -1454,10 +1459,8 @@ static int pxa_ep_disable(struct usb_ep *_ep)
- 	if (!ep || is_ep0(ep) || !list_empty(&ep->queue))
- 		return -EINVAL;
+ 	WARN_ON(res < PAGE_OFFSET || res >= (unsigned long)high_memory);
  
--	spin_lock_irqsave(&ep->lock, flags);
- 	ep->enabled = 0;
- 	nuke(ep, -ESHUTDOWN);
--	spin_unlock_irqrestore(&ep->lock, flags);
+@@ -225,4 +229,16 @@ unsigned long __bus_to_virt(unsigned long res)
+ }
+ EXPORT_SYMBOL(__bus_to_virt);
  
- 	pxa_ep_fifo_flush(_ep);
- 	udc_usb_ep->pxa_ep = NULL;
-@@ -2090,7 +2093,7 @@ static void handle_ep0(struct pxa_udc *udc, int fifo_irq, int opc_irq)
-  * Tries to transfer all pending request data into the endpoint and/or
-  * transfer all pending data in the endpoint into usb requests.
-  *
-- * Is always called when in_interrupt() or with ep->lock held.
-+ * Is always called when in_interrupt() and with ep->lock released.
++unsigned long __pfn_to_bus(unsigned long pfn)
++{
++	return __pfn_to_phys(pfn) + (fb_bus_sdram_offset() - PHYS_OFFSET));
++}
++EXPORT_SYMBOL(__pfn_to_bus);
++
++unsigned long __bus_to_pfn(unsigned long bus)
++{
++	return __phys_to_pfn(bus - (fb_bus_sdram_offset() - PHYS_OFFSET));
++}
++EXPORT_SYMBOL(__bus_to_pfn);
++
+ #endif
+diff --git a/arch/arm/mach-footbridge/include/mach/memory.h b/arch/arm/mach-footbridge/include/mach/memory.h
+index cb16e59..8d64f45 100644
+--- a/arch/arm/mach-footbridge/include/mach/memory.h
++++ b/arch/arm/mach-footbridge/include/mach/memory.h
+@@ -29,6 +29,8 @@
+ #ifndef __ASSEMBLY__
+ extern unsigned long __virt_to_bus(unsigned long);
+ extern unsigned long __bus_to_virt(unsigned long);
++extern unsigned long __pfn_to_bus(unsigned long);
++extern unsigned long __bus_to_pfn(unsigned long);
+ #endif
+ #define __virt_to_bus	__virt_to_bus
+ #define __bus_to_virt	__bus_to_virt
+@@ -36,14 +38,15 @@ extern unsigned long __bus_to_virt(unsigned long);
+ #elif defined(CONFIG_FOOTBRIDGE_HOST)
+ 
+ /*
+- * The footbridge is programmed to expose the system RAM at the corresponding
+- * address.  So, if PAGE_OFFSET is 0xc0000000, RAM appears at 0xe0000000.
+- * If 0x80000000, then its exposed at 0xa0000000 on the bus. etc.
+- * The only requirement is that the RAM isn't placed at bus address 0 which
++ * The footbridge is programmed to expose the system RAM at 0xe0000000.
++ * The requirement is that the RAM isn't placed at bus address 0, which
+  * would clash with VGA cards.
   */
- static void handle_ep(struct pxa_ep *ep)
- {
-@@ -2099,13 +2102,20 @@ static void handle_ep(struct pxa_ep *ep)
- 	u32 udccsr;
- 	int is_in = ep->dir_in;
- 	int loop = 0;
-+	unsigned long		flags;
+-#define __virt_to_bus(x)	((x) - 0xe0000000)
+-#define __bus_to_virt(x)	((x) + 0xe0000000)
++#define BUS_OFFSET		0xe0000000
++#define __virt_to_bus(x)	((x) + (BUS_OFFSET - PAGE_OFFSET))
++#define __bus_to_virt(x)	((x) - (BUS_OFFSET - PAGE_OFFSET))
++#define __pfn_to_bus(x)		(__pfn_to_phys(x) + (BUS_OFFSET - PHYS_OFFSET))
++#define __bus_to_pfn(x)		__phys_to_pfn((x) - (BUS_OFFSET - PHYS_OFFSET))
  
- 	/* some code below uses registers not available for ep0 */
- 	BUG_ON(is_ep0(ep));
+ #else
  
-+	spin_lock_irqsave(&ep->lock, flags);
-+	if (ep->in_handle_ep)
-+		goto recursion_detected;
-+	ep->in_handle_ep = 1;
-+
- 	do {
- 		completed = 0;
- 		udccsr = udc_ep_readl(ep, UDCCSR);
-+
- 		if (likely(!list_empty(&ep->queue)))
- 			req = list_entry(ep->queue.next,
- 					struct pxa27x_request, queue);
-@@ -2124,15 +2134,24 @@ static void handle_ep(struct pxa_ep *ep)
- 		if (unlikely(is_in)) {
- 			if (likely(!ep_is_full(ep)))
- 				completed = write_fifo(ep, req);
--			if (completed)
--				ep_end_in_req(ep, req);
- 		} else {
- 			if (likely(epout_has_pkt(ep)))
- 				completed = read_fifo(ep, req);
--			if (completed)
-+		}
-+
-+		if (completed) {
-+			spin_unlock_irqrestore(&ep->lock, flags);
-+			if (is_in)
-+				ep_end_in_req(ep, req);
-+			else
- 				ep_end_out_req(ep, req);
-+			spin_lock_irqsave(&ep->lock, flags);
- 		}
- 	} while (completed);
-+
-+	ep->in_handle_ep = 0;
-+recursion_detected:
-+	spin_unlock_irqrestore(&ep->lock, flags);
- }
- 
- /**
-diff --git a/drivers/usb/gadget/pxa27x_udc.h b/drivers/usb/gadget/pxa27x_udc.h
-index e25225e..ff61e48 100644
---- a/drivers/usb/gadget/pxa27x_udc.h
-+++ b/drivers/usb/gadget/pxa27x_udc.h
-@@ -318,6 +318,11 @@ struct udc_usb_ep {
-  * @queue: requests queue
-  * @lock: lock to pxa_ep data (queues and stats)
-  * @enabled: true when endpoint enabled (not stopped by gadget layer)
-+ * @in_handle_ep: number of recursions of handle_ep() function
-+ * 	Prevents deadlocks or infinite recursions of types :
-+ *	  irq->handle_ep()->req_done()->req.complete()->pxa_ep_queue()->handle_ep()
-+ *      or
-+ *        pxa_ep_queue()->handle_ep()->req_done()->req.complete()->pxa_ep_queue()
-  * @idx: endpoint index (1 => epA, 2 => epB, ..., 24 => epX)
-  * @name: endpoint name (for trace/debug purpose)
-  * @dir_in: 1 if IN endpoint, 0 if OUT endpoint
-@@ -346,6 +351,7 @@ struct pxa_ep {
- 	spinlock_t		lock;		/* Protects this structure */
- 						/* (queues, stats) */
- 	unsigned		enabled:1;
-+	unsigned		in_handle_ep:1;
- 
- 	unsigned		idx:5;
- 	char			*name;
--- 
-1.6.3.3
