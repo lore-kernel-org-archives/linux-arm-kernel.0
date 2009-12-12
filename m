@@ -1,69 +1,87 @@
-From: arve@android.com (=?ISO-8859-1?Q?Arve_Hj=F8nnev=E5g?=)
-Date: Sat, 12 Dec 2009 04:11:51 -0800
-Subject: tree with htc dream support
-In-Reply-To: <d6200be20912120351w2cdc328ar9d2fb490593b2a48@mail.gmail.com>
-References: <20091205221100.GA32522@elf.ucw.cz>
-	<1260054737.23633.35.camel@desktop>
-	<a55d774e0912051638u7858878cg7cf62905c3c005c1@mail.gmail.com>
-	<d6200be20912112142r7bdf8f18o31edd4457aa64998@mail.gmail.com>
-	<20091212112536.GA2302@elf.ucw.cz>
-	<d6200be20912120351w2cdc328ar9d2fb490593b2a48@mail.gmail.com>
-Message-ID: <d6200be20912120411s140931e1q3097a7ba7d6667c1@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 12 Dec 2009 12:24:47 +0000
+Subject: [PATCH 3/6] Fix a race in the vfp_notifier() function on SMP
+	systems
+In-Reply-To: <20091207141325.30429.13315.stgit@pc1117.cambridge.arm.com>
+References: <20091207135603.30429.74812.stgit@pc1117.cambridge.arm.com>
+	<20091207141325.30429.13315.stgit@pc1117.cambridge.arm.com>
+Message-ID: <20091212122447.GA30537@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/12/12 Arve Hj?nnev?g <arve@android.com>:
-> On Sat, Dec 12, 2009 at 3:25 AM, Pavel Machek <pavel@ucw.cz> wrote:
->> On Fri 2009-12-11 21:42:07, Arve Hj?nnev?g wrote:
->>> On Sat, Dec 5, 2009 at 4:38 PM, Brian Swetland <swetland@google.com> wrote:
->>> > Arve's about to take our common and msm trees and rebase them over the .32,
->>> > which may be useful for reference -- at least as a snapshot of a fully
->>> > functional set of patches that android donut and eclair run on, on
->>> > production hardware.? We'll make that available as soon as we have something
->>> > that's bootable.
->>> >
->>> > Brian
->>> >
->>> >
->>>
->>> A first pass of this is available in the android-msm-2.6.32-test1
->>> branch at git://android.git.kernel.org/kernel/experimental.git.
->>
->> According to some docs, i2c_detach can be just removed, so...?
->>
->> Then I got this:
->>
->> ?CC ? ? ?drivers/input/misc/gpio_axis.o
->> ?CC ? ? ?drivers/input/misc/keychord.o
->> drivers/input/misc/keychord.c: In function 'keychord_event':
->> drivers/input/misc/keychord.c:129: error: 'TASK_INTERRUPTIBLE'
->> undeclared (first use in this
->> function)drivers/input/misc/keychord.c:129: error: (Each undeclared
->> identifier is reported only once
->> drivers/input/misc/keychord.c:129: error: for each function it appears
->> in.)
->> drivers/input/misc/keychord.c: In function 'keychord_read':
->> drivers/input/misc/keychord.c:205: error: 'TASK_INTERRUPTIBLE'
->> undeclared (first use in this
->> function)drivers/input/misc/keychord.c:205: error: implicit
->> declaration of function 'signal_pending'
->> drivers/input/misc/keychord.c:205: error: implicit declaration of
->> function 'schedule'
->> make[3]: *** [drivers/input/misc/keychord.o] Error 1
->> make[2]: *** [drivers/input/misc] Error 2
->> make[1]: *** [drivers/input] Error 2
->> make: *** [drivers] Error 2
->> 12.60user 2.53system 16.93 (0m16.939s) elapsed 89.36%CPU
->> pavel at amd:/data/l/linux-msm-32$
->>
->
-> I don't know what is different, but this compiles for me without
-> adding sched.h. I did have to add sched.h to some other drivers
-> though.
+On Mon, Dec 07, 2009 at 02:13:34PM +0000, Catalin Marinas wrote:
+> The vfp_notifier(THREAD_NOTIFY_RELEASE) maybe be called with thread->cpu
+> different from the current one, causing a race condition with both the
+> THREAD_NOTIFY_SWITCH path and vfp_support_entry().
 
-It fails to build if I turn off CONFIG_PREEMPT.
+The only call where thread->cpu may not be the current CPU is in the
+THREAD_NOFTIFY_RELEASE case.
 
-For now run "make msm_defconfig" if you want a working configuration.
+When called in the THREAD_NOTIFY_SWITCH case, we are switching to the
+specified thread, and thread->cpu better be smp_processor_id() or else
+we're saving our CPUs VFP state into some other CPUs currently running
+thread.
 
--- 
-Arve Hj?nnev?g
+Not only that, but the thread we're switching away from will still be
+'owned' by the CPU we're running on, and can't be scheduled onto another
+CPU without this function first completing, nor can it be flushed nor
+released.
+
+> @@ -49,14 +50,21 @@ static int vfp_notifier(struct notifier_block *self, unsigned long cmd, void *v)
+>  
+>  #ifdef CONFIG_SMP
+
+		BUG_ON(cpu != smp_processor_id());
+
+since it would be very bad if this was any different.  Note that this is
+also a non-preemptible context - we're called from the scheduler, and the
+scheduler can't be preempted mid-thead switch.
+
+>  		/*
+> +		 * RCU locking is needed in case last_VFP_context[cpu] is
+> +		 * released on a different CPU.
+> +		 */
+> +		rcu_read_lock();
+
+Given that we're modifying our CPUs last_VFP_context here, I don't see
+what the RCU locks give us - the thread we're switching to can _not_
+be being released at this time - we can't be switching to a dead task.
+Not only that, but this notifier is already called under the RCU lock,
+so this is a no-op.
+
+> +		vfp = last_VFP_context[cpu];
+> +		/*
+>  		 * On SMP, if VFP is enabled, save the old state in
+>  		 * case the thread migrates to a different CPU. The
+>  		 * restoring is done lazily.
+>  		 */
+> -		if ((fpexc & FPEXC_EN) && last_VFP_context[cpu]) {
+> -			vfp_save_state(last_VFP_context[cpu], fpexc);
+> -			last_VFP_context[cpu]->hard.cpu = cpu;
+> +		if ((fpexc & FPEXC_EN) && vfp) {
+> +			vfp_save_state(vfp, fpexc);
+> +			vfp->hard.cpu = cpu;
+>  		}
+> +		rcu_read_unlock();
+>  		/*
+>  		 * Thread migration, just force the reloading of the
+>  		 * state on the new CPU in case the VFP registers
+> @@ -91,8 +99,19 @@ static int vfp_notifier(struct notifier_block *self, unsigned long cmd, void *v)
+>  	}
+>  
+>  	/* flush and release case: Per-thread VFP cleanup. */
+> +#ifndef CONFIG_SMP
+>  	if (last_VFP_context[cpu] == vfp)
+>  		last_VFP_context[cpu] = NULL;
+> +#else
+> +	/*
+> +	 * Since release_thread() may be called from a different CPU, we use
+> +	 * cmpxchg() here to avoid a race with the vfp_support_entry() code
+> +	 * which modifies last_VFP_context[cpu]. Note that on SMP systems, a
+> +	 * STR instruction on a different CPU clears the global exclusive
+> +	 * monitor state.
+> +	 */
+> +	(void)cmpxchg(&last_VFP_context[cpu], vfp, NULL);
+> +#endif
+
+I think this hunk is the only part which makes sense.
