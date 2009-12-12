@@ -1,90 +1,39 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Sat, 12 Dec 2009 22:28:25 +0100
-Subject: [PULL REQ] IXP4xx CPU (ARM)
-Message-ID: <m3d42j991i.fsf@intrepid.localdomain>
+From: arve@android.com (=?ISO-8859-1?Q?Arve_Hj=F8nnev=E5g?=)
+Date: Sat, 12 Dec 2009 14:34:45 -0800
+Subject: tree with htc dream support
+In-Reply-To: <1260627482.20913.7.camel@desktop>
+References: <20091205221100.GA32522@elf.ucw.cz>
+	<1260054737.23633.35.camel@desktop>
+	<a55d774e0912051638u7858878cg7cf62905c3c005c1@mail.gmail.com>
+	<d6200be20912112142r7bdf8f18o31edd4457aa64998@mail.gmail.com>
+	<1260627482.20913.7.camel@desktop>
+Message-ID: <d6200be20912121434x1a247837w75c518ba20fe684f@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+2009/12/12 Daniel Walker <dwalker@codeaurora.org>:
+> On Fri, 2009-12-11 at 21:42 -0800, Arve Hj?nnev?g wrote:
+>> On Sat, Dec 5, 2009 at 4:38 PM, Brian Swetland <swetland@google.com> wrote:
+>> > Arve's about to take our common and msm trees and rebase them over the .32,
+>> > which may be useful for reference -- at least as a snapshot of a fully
+>> > functional set of patches that android donut and eclair run on, on
+>> > production hardware. ?We'll make that available as soon as we have something
+>> > that's bootable.
+>> >
+>> > Brian
+>> >
+>> >
+>>
+>> A first pass of this is available in the android-msm-2.6.32-test1
+>> branch at git://android.git.kernel.org/kernel/experimental.git.
+>>
+>> http://android.git.kernel.org/?p=kernel/experimental.git;a=shortlog;h=refs/heads/android-msm-2.6.32-test1
+>
+>
+> Does this have the the newest wakelock code in it? From the all the
+> re-writes that you've done.
 
-can you please pull my IXP4xx tree? TIA.
-
-The following changes since Linux 2.6.32 are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/chris/linux-2.6.git ixp4xx
-
-Krzysztof Ha?asa (18):
-      IXP4xx: change the timer base frequency to 66.666000 MHz.
-      IXP4xx: Fix normally-disabled debugging text in drivers/net/arm/ixp4xx_eth.c.
-      ARM: fix insl() and outsl() endianness on IXP4xx architecture.
-      IXP4xx: Rename indirect MMIO primitives from __ixp4xx_* to __indirect_*.
-      IXP4xx: Drop "__ixp4xx_" prefix from in/out/ioread/iowrite functions for clarity.
-      IXP4xx: Fix compilation failure with CONFIG_IXP4XX_INDIRECT_PCI.
-      IXP4xx: Extend PCI MMIO indirect address space to 1 GB.
-      IXP4xx: move IXDP425 platform macros to the platform code.
-      IXP4xx: move AVILA platform macros to the platform code.
-      IXP4xx: move Coyote platform macros to the platform code.
-      IXP4xx: move NSLU2 platform macros to the platform code.
-      IXP4xx: move NAS100D platform macros to the platform code.
-      IXP4xx: move DSM G600 platform macros to the platform code.
-      IXP4xx: move FSG platform macros to the platform code.
-      IXP4xx: Remove unused Motorola PrPMC1100 platform macros.
-      IXP4xx: move Gemtek GTWX5715 platform macros to the platform code.
-      IXP4xx: Introduce IXP4XX_GPIO_IRQ(n) macro and convert IXP4xx platform files.
-      IXP4xx: GTWX5715 platform only has two PCI IRQ lines, not four.
-
-Roel Kluin (1):
-      IXP4xx: Ensure index is positive in irq_to_gpio() and npe_request().
-
- arch/arm/mach-ixp4xx/Kconfig                  |   22 +-
- arch/arm/mach-ixp4xx/avila-pci.c              |   42 ++--
- arch/arm/mach-ixp4xx/avila-setup.c            |    4 +-
- arch/arm/mach-ixp4xx/common-pci.c             |    6 +-
- arch/arm/mach-ixp4xx/common.c                 |    2 +-
- arch/arm/mach-ixp4xx/coyote-pci.c             |   22 +-
- arch/arm/mach-ixp4xx/coyote-setup.c           |    9 +
- arch/arm/mach-ixp4xx/dsmg600-pci.c            |   46 ++--
- arch/arm/mach-ixp4xx/dsmg600-setup.c          |   17 ++
- arch/arm/mach-ixp4xx/fsg-pci.c                |   31 ++-
- arch/arm/mach-ixp4xx/fsg-setup.c              |    8 +-
- arch/arm/mach-ixp4xx/goramo_mlr.c             |   45 ++--
- arch/arm/mach-ixp4xx/gtwx5715-pci.c           |   40 ++--
- arch/arm/mach-ixp4xx/gtwx5715-setup.c         |   30 +++-
- arch/arm/mach-ixp4xx/include/mach/avila.h     |   39 ---
- arch/arm/mach-ixp4xx/include/mach/coyote.h    |   33 ---
- arch/arm/mach-ixp4xx/include/mach/dsmg600.h   |   52 -----
- arch/arm/mach-ixp4xx/include/mach/fsg.h       |   50 ----
- arch/arm/mach-ixp4xx/include/mach/gpio.h      |    2 +-
- arch/arm/mach-ixp4xx/include/mach/gtwx5715.h  |  116 ----------
- arch/arm/mach-ixp4xx/include/mach/hardware.h  |   18 +-
- arch/arm/mach-ixp4xx/include/mach/io.h        |  307 +++++++++++--------------
- arch/arm/mach-ixp4xx/include/mach/irqs.h      |   69 +------
- arch/arm/mach-ixp4xx/include/mach/ixdp425.h   |   39 ---
- arch/arm/mach-ixp4xx/include/mach/nas100d.h   |   52 -----
- arch/arm/mach-ixp4xx/include/mach/npe.h       |    2 +-
- arch/arm/mach-ixp4xx/include/mach/nslu2.h     |   55 -----
- arch/arm/mach-ixp4xx/include/mach/prpmc1100.h |   33 ---
- arch/arm/mach-ixp4xx/include/mach/timex.h     |    2 +-
- arch/arm/mach-ixp4xx/ixdp425-pci.c            |   43 ++--
- arch/arm/mach-ixp4xx/ixdp425-setup.c          |   12 +-
- arch/arm/mach-ixp4xx/ixp4xx_npe.c             |    2 +-
- arch/arm/mach-ixp4xx/nas100d-pci.c            |   41 ++--
- arch/arm/mach-ixp4xx/nas100d-setup.c          |   16 ++-
- arch/arm/mach-ixp4xx/nslu2-pci.c              |   35 ++--
- arch/arm/mach-ixp4xx/nslu2-setup.c            |   21 ++-
- drivers/leds/leds-fsg.c                       |    7 +
- drivers/net/arm/ixp4xx_eth.c                  |    2 +-
-
- 38 files changed, 461 insertions(+), 911 deletions(-)
- delete mode 100644 arch/arm/mach-ixp4xx/include/mach/avila.h
- delete mode 100644 arch/arm/mach-ixp4xx/include/mach/coyote.h
- delete mode 100644 arch/arm/mach-ixp4xx/include/mach/dsmg600.h
- delete mode 100644 arch/arm/mach-ixp4xx/include/mach/fsg.h
- delete mode 100644 arch/arm/mach-ixp4xx/include/mach/gtwx5715.h
- delete mode 100644 arch/arm/mach-ixp4xx/include/mach/ixdp425.h
- delete mode 100644 arch/arm/mach-ixp4xx/include/mach/nas100d.h
- delete mode 100644 arch/arm/mach-ixp4xx/include/mach/nslu2.h
- delete mode 100644 arch/arm/mach-ixp4xx/include/mach/prpmc1100.h
+No.
 
 -- 
-Krzysztof Halasa
+Arve Hj?nnev?g
