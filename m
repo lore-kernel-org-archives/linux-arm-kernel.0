@@ -1,39 +1,34 @@
-From: anders.grafstrom@netinsight.net (=?ISO-8859-1?Q?Anders_Grafstr=F6m?=)
-Date: Sat, 12 Dec 2009 15:01:31 +0100
-Subject: [PATCH 2/7] ARM: dma-mapping: simplify page_to_dma()
-	and	__pfn_to_bus()
-In-Reply-To: <E1NBYE2-0005kv-7H@rmk-PC.arm.linux.org.uk>
-References: <20091120182539.GG16920@n2100.arm.linux.org.uk>
-	<E1NBYE2-0005kv-7H@rmk-PC.arm.linux.org.uk>
-Message-ID: <4B23A23B.7070208@netinsight.net>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Sat, 12 Dec 2009 06:18:02 -0800
+Subject: tree with htc dream support
+In-Reply-To: <d6200be20912112142r7bdf8f18o31edd4457aa64998@mail.gmail.com>
+References: <20091205221100.GA32522@elf.ucw.cz>
+	<1260054737.23633.35.camel@desktop>
+	<a55d774e0912051638u7858878cg7cf62905c3c005c1@mail.gmail.com>
+	<d6200be20912112142r7bdf8f18o31edd4457aa64998@mail.gmail.com>
+Message-ID: <1260627482.20913.7.camel@desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> The non-highmem() and the __pfn_to_bus() based page_to_dma() both
-> compile to the same code, so its pointless having these two different
-> approaches.  Use the __pfn_to_bus() based version.
+On Fri, 2009-12-11 at 21:42 -0800, Arve Hj?nnev?g wrote:
+> On Sat, Dec 5, 2009 at 4:38 PM, Brian Swetland <swetland@google.com> wrote:
+> > Arve's about to take our common and msm trees and rebase them over the .32,
+> > which may be useful for reference -- at least as a snapshot of a fully
+> > functional set of patches that android donut and eclair run on, on
+> > production hardware.  We'll make that available as soon as we have something
+> > that's bootable.
+> >
+> > Brian
+> >
+> >
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/include/asm/dma-mapping.h |   10 ----------
->  arch/arm/include/asm/memory.h      |    3 ++-
->  2 files changed, 2 insertions(+), 11 deletions(-)
+> A first pass of this is available in the android-msm-2.6.32-test1
+> branch at git://android.git.kernel.org/kernel/experimental.git.
+> 
+> http://android.git.kernel.org/?p=kernel/experimental.git;a=shortlog;h=refs/heads/android-msm-2.6.32-test1
 
-footbridge doesn't build after this.
-Could something like the patch below be in order?
 
-diff --git a/arch/arm/mach-footbridge/include/mach/memory.h b/arch/arm/mach-footbridge/include/mach/memory.h
-index cb16e59..cd23276 100644
---- a/arch/arm/mach-footbridge/include/mach/memory.h
-+++ b/arch/arm/mach-footbridge/include/mach/memory.h
-@@ -51,6 +51,9 @@ extern unsigned long __bus_to_virt(unsigned long);
- 
- #endif
- 
-+#define __pfn_to_bus(x)		__pfn_to_phys(x)
-+#define __bus_to_pfn(x)		__phys_to_pfn(x)
-+
- /*
-  * Cache flushing area.
-  */
+Does this have the the newest wakelock code in it? From the all the
+re-writes that you've done.
+
+Daniel
