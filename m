@@ -1,31 +1,20 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 13 Dec 2009 12:06:15 +0000
-Subject: shared memory problem on ARM v5TE using threads
-In-Reply-To: <20091213120033.GA10698@n2100.arm.linux.org.uk>
-References: <20091207114218.GA19348@n2100.arm.linux.org.uk>
-	<4B1CF3ED.9080307@denx.de>
-	<309002C0DA137042828828FC53D7A9347E212D150D@IL-MB01.marvell.com>
-	<20091207145235.GD19348@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0912071027480.31174@xanadu.home>
-	<20091207170546.GB26821@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0912071219100.31174@xanadu.home>
-	<20091207175608.GE26821@n2100.arm.linux.org.uk>
-	<309002C0DA137042828828FC53D7A9347E2630EEC2@IL-MB01.marvell.com>
-	<20091213120033.GA10698@n2100.arm.linux.org.uk>
-Message-ID: <20091213120615.GB10698@n2100.arm.linux.org.uk>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sun, 13 Dec 2009 21:09:02 +0800
+Subject: [PATCH 0/2] pcmcia: two fixes for the pxa pcmcia code
+Message-ID: <f17812d70912130509i37414557o71a33a66ed047f8e@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 13, 2009 at 12:00:33PM +0000, Russell King - ARM Linux wrote:
-> I'm afraid to say that the only solution I can see to this problem is to
-> disable the L2 cache outright on these CPUs - the choice seems to be
-> between correct system behaviour and lower performance, or performance
-> but buggy system behaviour in certain cases leading to data corruption.
+The two patches below fix the build issue for the pxa part of pcmcia:
 
-BTW, if no one can come up with a solution for this, we need to consider
-making the kernel by default disable L2 cache on Feroceon, and display a
-warning message if L2 is to be enabled.
+Eric Miao (2):
+      pcmcia: export pxa2xx_drv_pcmcia_{add_one, ops} to other modules
+      pcmcia: fix now incorrect reference of skt->irq by using
+skt->socket.pci_irq
 
-We really can not have a known data corrupting issue like this exist
-silently in the system - it's not fair for users nor developers to waste
-time trying to work out why their data is being corrupted.
+ drivers/pcmcia/pxa2xx_base.c      |    2 ++
+ drivers/pcmcia/pxa2xx_palmtc.c    |    2 +-
+ drivers/pcmcia/pxa2xx_stargate2.c |    2 +-
+ 3 files changed, 4 insertions(+), 2 deletions(-)
+
+I will basically push this to Russell together with some other pxa patches.
