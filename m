@@ -1,69 +1,51 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sun, 13 Dec 2009 21:45:25 +0800
-Subject: [GIT PULL] pxa: for 2.6.33 - pcmcia fixes + em-x270 usb fix +
-	zeus support
-In-Reply-To: <20091213132105.GB12645@n2100.arm.linux.org.uk>
-References: <f17812d70912130517v3d2ab1dfud8ff67770ba78f46@mail.gmail.com>
-	<20091213132105.GB12645@n2100.arm.linux.org.uk>
-Message-ID: <f17812d70912130545o183a261dte65466e4ad47fbff@mail.gmail.com>
+From: rshitrit@marvell.com (Ronen Shitrit)
+Date: Sun, 13 Dec 2009 17:42:54 +0200
+Subject: shared memory problem on ARM v5TE using threads
+In-Reply-To: <20091213120615.GB10698@n2100.arm.linux.org.uk>
+References: <20091207114218.GA19348@n2100.arm.linux.org.uk>
+	<4B1CF3ED.9080307@denx.de>
+	<309002C0DA137042828828FC53D7A9347E212D150D@IL-MB01.marvell.com>
+	<20091207145235.GD19348@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.0912071027480.31174@xanadu.home>
+	<20091207170546.GB26821@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.0912071219100.31174@xanadu.home>
+	<20091207175608.GE26821@n2100.arm.linux.org.uk>
+	<309002C0DA137042828828FC53D7A9347E2630EEC2@IL-MB01.marvell.com>
+	<20091213120033.GA10698@n2100.arm.linux.org.uk>
+	<20091213120615.GB10698@n2100.arm.linux.org.uk>
+Message-ID: <309002C0DA137042828828FC53D7A9347E2630EFF3@IL-MB01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 13, 2009 at 9:21 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sun, Dec 13, 2009 at 09:17:14PM +0800, Eric Miao wrote:
->> Russell,
->>
->> The following changes since commit f40542532e96dda5506eb76badea322f2ae4731c:
->> ? Linus Torvalds (1):
->> ? ? ? ? Merge branch 'ixp4xx' of git://git.kernel.org/.../chris/linux-2.6
->>
->> are available in the git repository at:
->>
->> ? git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git devel
->>
->> Eric Miao (2):
->> ? ? ? pcmcia: export pxa2xx_drv_pcmcia_{add_one, ops} to other modules
->> ? ? ? pcmcia: fix now incorrect reference of skt->irq by using
->> skt->socket.pci_irq
->
-> Please drop these two, I already either have them or a similar fix.
->
+There is another possible solution we are looking into:
+1) Force all NC writes to go through L2: 
+If there is a hit in the L2, the write will update the L2 together with the DRAM.
+If there is a miss, the write will continue to the DRAM only.
+2) Force all NC reads to wait till L2 write buffer is drained, to avoid any racing with above...
+3) Set L2 in WT mode.
 
-Dropped, git pull message refreshed as below. I'd expect some latency
-when changes on master.kernel.org hit git.kernel.org.
+I still can't determine if this solution is valid from HW point of view, but I will really appreciate any comment on this.
+Any thoughts? Any pitfalls this solution is missing?
 
-The following changes since commit f40542532e96dda5506eb76badea322f2ae4731c:
-  Linus Torvalds (1):
-        Merge branch 'ixp4xx' of git://git.kernel.org/.../chris/linux-2.6
+Thanks
 
-are available in the git repository at:
+-----Original Message-----
+From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
+Sent: Sunday, December 13, 2009 2:06 PM
+To: Ronen Shitrit
+Cc: hs at denx.de; saeed bishara; linux-arm-kernel at lists.infradead.org; Nicolas Pitre
+Subject: Re: shared memory problem on ARM v5TE using threads
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git devel
+On Sun, Dec 13, 2009 at 12:00:33PM +0000, Russell King - ARM Linux wrote:
+> I'm afraid to say that the only solution I can see to this problem is to
+> disable the L2 cache outright on these CPUs - the choice seems to be
+> between correct system behaviour and lower performance, or performance
+> but buggy system behaviour in certain cases leading to data corruption.
 
-Igor Grinberg (1):
-      [ARM] pxa/em-x270: fix usb hub power up/reset sequence
+BTW, if no one can come up with a solution for this, we need to consider
+making the kernel by default disable L2 cache on Feroceon, and display a
+warning message if L2 is to be enabled.
 
-Marc Zyngier (3):
-      [ARM] pxa/zeus: basic support for Arcom Zeus SBC
-      [ARM] pxa/zeus: make Viper pcmcia support more generic to support Zeus
-      [ARM] pxa/zeus: default configuration for Arcom Zeus SBC.
-
- arch/arm/configs/zeus_defconfig               | 2032 +++++++++++++++++++++++++
- arch/arm/mach-pxa/Kconfig                     |   14 +
- arch/arm/mach-pxa/Makefile                    |    1 +
- arch/arm/mach-pxa/em-x270.c                   |   11 +-
- arch/arm/mach-pxa/include/mach/arcom-pcmcia.h |   11 +
- arch/arm/mach-pxa/include/mach/viper.h        |    2 -
- arch/arm/mach-pxa/include/mach/zeus.h         |   82 +
- arch/arm/mach-pxa/viper.c                     |   20 +-
- arch/arm/mach-pxa/zeus.c                      |  820 ++++++++++
- drivers/pcmcia/Kconfig                        |    2 +-
- drivers/pcmcia/Makefile                       |    2 +-
- drivers/pcmcia/pxa2xx_base.c                  |    3 +-
- drivers/pcmcia/pxa2xx_viper.c                 |  119 ++-
- 13 files changed, 3073 insertions(+), 46 deletions(-)
- create mode 100644 arch/arm/configs/zeus_defconfig
- create mode 100644 arch/arm/mach-pxa/include/mach/arcom-pcmcia.h
- create mode 100644 arch/arm/mach-pxa/include/mach/zeus.h
- create mode 100644 arch/arm/mach-pxa/zeus.c
+We really can not have a known data corrupting issue like this exist
+silently in the system - it's not fair for users nor developers to waste
+time trying to work out why their data is being corrupted.
