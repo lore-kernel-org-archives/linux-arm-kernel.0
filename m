@@ -1,38 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Dec 2009 15:31:21 -0000
-Subject: [PATCH 1/4] arm: provide a mechanism to reserve performance
-	counters
-Message-ID: <000201ca7a76$fdc9f080$f95dd180$@deacon@arm.com>
+From: fanyefeng@gmail.com (Fred Fan)
+Date: Sun, 13 Dec 2009 14:23:28 +0800
+Subject: IOP341 hang up
+In-Reply-To: <2f495dc80912122222j2272c7c6o88e37f44c38b3a16@mail.gmail.com>
+References: <2f495dc80912120111i6e38d5a9udca69032269886e8@mail.gmail.com>
+	<2f495dc80912122219g2dc3cfddm1020a9ba2dd0810@mail.gmail.com>
+	<2f495dc80912122222j2272c7c6o88e37f44c38b3a16@mail.gmail.com>
+Message-ID: <2f495dc80912122223k1abbbd8bkab3f14d746b9b50d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jamie Iles <jamie.iles@picochip.com> wrote:
-
-> To add support for perf events and to allow the hardware
-> counters to be shared with oprofile, we need a way to reserve
-> access to the pmu (performance monitor unit).
 >
-> Signed-off-by: Jamie Iles <jamie.iles <at> picochip.com>
-> ---
-> arch/arm/include/asm/pmu.h |   54 ++++++++++++++++++++++++++++++++++++++++++++
-> arch/arm/kernel/Makefile   |    1 +
-> arch/arm/kernel/pmu.c      |   32 ++++++++++++++++++++++++++
-> arch/arm/mm/Kconfig        |    4 +++
-> 4 files changed, 91 insertions(+), 0 deletions(-)
-> create mode 100644 arch/arm/include/asm/pmu.h
-> create mode 100644 arch/arm/kernel/pmu.c
-
-Hi Jamie,
-
-I like the idea of having a separate file for reserving the PMU across subsystems.
-I also think it would be neat to extend it to request the relevant IRQs (or at
-least return the PMU IRQs) once you've got it reserved.
-
-This way, there will be no need to duplicate the inevitable collection of machine 
-#ifdefs across tools [such as oprofile and perf]. It would also ensure that you can't 
-reserve the PMU if somebody else has claimed the IRQs [and similarly, you can't
-release it without giving them up].
-
-What do you think?
-
-Will
+>    Hi All:
+>        Our customer reports our system will hang up without any log
+> information on IOP341 1.2GHz board. IOP341 800MHz is more stable than it.
+> But both of  them will hang. After sytem hang up, the BDI2000 can not halt
+> arm core. And NMI interrupt never response any more.
+>      It seems xscale core has hang. We have done below test.
+>      1) 800MHZ IOP341 , Linux-2.6.29.1   [Result] hang after runing  over
+> one day
+>      2) 1.2GHZ IOP341 Linux-2.6.29.1      [Result] hang after 30'
+>      3) 800MHZ IOP341 , Linux-2.6.31      [Result] Not hang until now(about
+> over 9 days.
+>      4) 1.2GHZ IOP341 Linux-2.6.31         [Result] about one day.
+>
+> We have review errata of iop341 (September. 2008 version).
+> Just found 2 case will make core hang for special cache operation.
+> And found 2 case for cache locked.
+>
+>     Another question, do IOP341 can use trace buffer to check hange resean.
+> Best Regards
+> Fred
+>
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091213/5a39556e/attachment.htm>
