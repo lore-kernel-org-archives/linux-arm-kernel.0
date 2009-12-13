@@ -1,51 +1,46 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 13 Dec 2009 22:15:02 +0100
-Subject: [PATCH 2/3] staging/dream: add missing include files
-In-Reply-To: <20091212190205.GA16364@kroah.com>
-References: <20091101222717.GB20740@elf.ucw.cz>
-	<20091119225602.GC18710@kroah.com>
-	<20091120105726.GH11212@elf.ucw.cz>
-	<20091120153054.GA23007@kroah.com>
-	<20091206215257.GA14137@elf.ucw.cz>
-	<20091212190205.GA16364@kroah.com>
-Message-ID: <20091213211502.GC5114@elf.ucw.cz>
+Date: Sun, 13 Dec 2009 22:25:05 +0100
+Subject: tree with htc dream support
+In-Reply-To: <d6200be20912121434x1a247837w75c518ba20fe684f@mail.gmail.com>
+References: <20091205221100.GA32522@elf.ucw.cz>
+	<1260054737.23633.35.camel@desktop>
+	<a55d774e0912051638u7858878cg7cf62905c3c005c1@mail.gmail.com>
+	<d6200be20912112142r7bdf8f18o31edd4457aa64998@mail.gmail.com>
+	<1260627482.20913.7.camel@desktop>
+	<d6200be20912121434x1a247837w75c518ba20fe684f@mail.gmail.com>
+Message-ID: <20091213212504.GD5114@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat 2009-12-12 11:02:05, Greg KH wrote:
-> On Sun, Dec 06, 2009 at 10:52:57PM +0100, Pavel Machek wrote:
-> > On Fri 2009-11-20 07:30:54, Greg KH wrote:
-> > > On Fri, Nov 20, 2009 at 11:57:26AM +0100, Pavel Machek wrote:
-> > > > Where can I get the tree to diff against?
-> > > > gregkh-08-staging-2.6.32-rc7-git4.patch just reverts everything.
-> > > > 
-> > > > I guess I can extract it from
-> > > > ://www.kernel.org/pub/linux/kernel/people/gregkh/gregkh-2.6/patches/series ...
-> > > 
-> > > Or grab the linux-next tree and branch from right before the "delete the
-> > > drivers/staging/dream/ directory" patch.
-> > 
-> > What is the status here, BTW? staging/dream is still there in git pull
-> > from today. Would it be possible to avoid pushing that huge revert to
-> > Linus, after all? Fixes are available, and it would be nice to avoid
-> > big churn.... Pretty please...
-> 
-> Sorry for the delay.
-> 
-> I've pushed out the staging patches for .33, and left in the Dream
-> files, as you are trying very hard to get this to work, and to delete
-> them now would just be rude of me.  I'll drop the patch from -next that
-> removes the files as well when I sync up with Linus later today.
-> 
-> I'll also work through the patches you have sent me so far that I
-> haven't applied, I think there are still a few.
-> 
-> Hope this helps,
+Hi!
 
-Yep, thanks!
+> >> > Arve's about to take our common and msm trees and rebase them over the .32,
+> >> > which may be useful for reference -- at least as a snapshot of a fully
+> >> > functional set of patches that android donut and eclair run on, on
+> >> > production hardware. ?We'll make that available as soon as we have something
+> >> > that's bootable.
+> >> >
+> >> > Brian
+> >> >
+> >> >
+> >>
+> >> A first pass of this is available in the android-msm-2.6.32-test1
+> >> branch at git://android.git.kernel.org/kernel/experimental.git.
+> >>
+> >> http://android.git.kernel.org/?p=kernel/experimental.git;a=shortlog;h=refs/heads/android-msm-2.6.32-test1
+> >
+> > Does this have the the newest wakelock code in it? From the all the
+> > re-writes that you've done.
+> 
+> No.
 
-(Things are getting better... slowly. Google now has android/dream
-tree based on 2.6.32, and first bits of dream support are being merged...)
+One more wish list item: many drivers are now available in
+drivers/staging/dream, and are being slowly cleaned up. Would it be
+possible to start using those for android-msm-2.6.32 tree?
+
+You'll need to reapply some stuff I had to remove (like wakelocks),
+but it should be still better/less work long term to patch those back
+in than maintaining separate copy. Diff should get much smaller...
 									Pavel
 -- 
 (english) http://www.livejournal.com/~pavelmachek
