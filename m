@@ -1,48 +1,51 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 9 Dec 2009 18:54:05 +0800
-Subject: [PATCH 2/2] pcmcia: fix now incorrect reference of skt->irq
-Message-ID: <mailman.92.1260709815.2170.linux-arm-kernel@lists.infradead.org>
+Date: Sun, 13 Dec 2009 21:17:14 +0800
+Subject: [GIT PULL] pxa: for 2.6.33 - pcmcia fixes + em-x270 usb fix + zeus
+	support
+Message-ID: <f17812d70912130517v3d2ab1dfud8ff67770ba78f46@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-by using skt->socket.pci_irq
+Russell,
 
-commit 66024db removes all other references of skt->irq by using
-skt->socket.pci_irq, while leaving these two missed. Get them fixed.
+The following changes since commit f40542532e96dda5506eb76badea322f2ae4731c:
+  Linus Torvalds (1):
+        Merge branch 'ixp4xx' of git://git.kernel.org/.../chris/linux-2.6
 
-Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
----
- drivers/pcmcia/pxa2xx_palmtc.c    |    2 +-
- drivers/pcmcia/pxa2xx_stargate2.c |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+are available in the git repository at:
 
-diff --git a/drivers/pcmcia/pxa2xx_palmtc.c b/drivers/pcmcia/pxa2xx_palmtc.c
-index 3a8993e..459a232 100644
---- a/drivers/pcmcia/pxa2xx_palmtc.c
-+++ b/drivers/pcmcia/pxa2xx_palmtc.c
-@@ -67,7 +67,7 @@ static int palmtc_pcmcia_hw_init(struct
-soc_pcmcia_socket *skt)
- 	if (ret)
- 		goto err7;
+  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git devel
 
--	skt->irq = IRQ_GPIO(GPIO_NR_PALMTC_PCMCIA_READY);
-+	skt->socket.pci_irq = IRQ_GPIO(GPIO_NR_PALMTC_PCMCIA_READY);
- 	return 0;
+Eric Miao (2):
+      pcmcia: export pxa2xx_drv_pcmcia_{add_one, ops} to other modules
+      pcmcia: fix now incorrect reference of skt->irq by using
+skt->socket.pci_irq
 
- err7:
-diff --git a/drivers/pcmcia/pxa2xx_stargate2.c
-b/drivers/pcmcia/pxa2xx_stargate2.c
-index 490749e..d08802f 100644
---- a/drivers/pcmcia/pxa2xx_stargate2.c
-+++ b/drivers/pcmcia/pxa2xx_stargate2.c
-@@ -40,7 +40,7 @@ static struct pcmcia_irqs irqs[] = {
+Igor Grinberg (1):
+      [ARM] pxa/em-x270: fix usb hub power up/reset sequence
 
- static int sg2_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
- {
--	skt->irq = IRQ_GPIO(SG2_S0_GPIO_READY);
-+	skt->socket.pci_irq = IRQ_GPIO(SG2_S0_GPIO_READY);
- 	return soc_pcmcia_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
- }
+Marc Zyngier (3):
+      [ARM] pxa/zeus: basic support for Arcom Zeus SBC
+      [ARM] pxa/zeus: make Viper pcmcia support more generic to support Zeus
+      [ARM] pxa/zeus: default configuration for Arcom Zeus SBC.
 
--- 
-1.6.3.3
+ arch/arm/configs/zeus_defconfig               | 2032 +++++++++++++++++++++++++
+ arch/arm/mach-pxa/Kconfig                     |   14 +
+ arch/arm/mach-pxa/Makefile                    |    1 +
+ arch/arm/mach-pxa/em-x270.c                   |   11 +-
+ arch/arm/mach-pxa/include/mach/arcom-pcmcia.h |   11 +
+ arch/arm/mach-pxa/include/mach/viper.h        |    2 -
+ arch/arm/mach-pxa/include/mach/zeus.h         |   82 +
+ arch/arm/mach-pxa/viper.c                     |   20 +-
+ arch/arm/mach-pxa/zeus.c                      |  820 ++++++++++
+ drivers/pcmcia/Kconfig                        |    2 +-
+ drivers/pcmcia/Makefile                       |    2 +-
+ drivers/pcmcia/pxa2xx_base.c                  |    5 +-
+ drivers/pcmcia/pxa2xx_palmtc.c                |    2 +-
+ drivers/pcmcia/pxa2xx_stargate2.c             |    2 +-
+ drivers/pcmcia/pxa2xx_viper.c                 |  119 ++-
+ 15 files changed, 3077 insertions(+), 48 deletions(-)
+ create mode 100644 arch/arm/configs/zeus_defconfig
+ create mode 100644 arch/arm/mach-pxa/include/mach/arcom-pcmcia.h
+ create mode 100644 arch/arm/mach-pxa/include/mach/zeus.h
+ create mode 100644 arch/arm/mach-pxa/zeus.c
