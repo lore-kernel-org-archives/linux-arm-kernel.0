@@ -1,59 +1,97 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Dec 2009 10:28:39 +0000
-Subject: [RFC PATCH 2/2] ARM: cache-l2x0: make better use of background
-	cache handling
-In-Reply-To: <E1NJVx6-0006um-Do@rmk-PC.arm.linux.org.uk>
-References: <E1NJVx6-0006um-Do@rmk-PC.arm.linux.org.uk>
-Message-ID: <1260786519.17159.19.camel@pc1117.cambridge.arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 14 Dec 2009 11:33:48 +0100
+Subject: [PATCH 3/4] fec: add support for Freescale i.MX25 PDK (3DS)
+In-Reply-To: <fb518184b206ec2727deda111cc5364134ace69a.1260785451.git.baruch@tkos.co.il>
+References: <cover.1260785451.git.baruch@tkos.co.il>
+	<fb518184b206ec2727deda111cc5364134ace69a.1260785451.git.baruch@tkos.co.il>
+Message-ID: <20091214103348.GV15126@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2009-12-12 at 17:40 +0000, Russell King - ARM Linux wrote:
-> There's no point having the hardware support background operations
-> if we issue a cache operation, and then wait for it to complete
-> before calculating the address of the next operation.  We gain no
-> advantage in the cache controller stalling the bus until completion.
+On Mon, Dec 14, 2009 at 12:19:41PM +0200, Baruch Siach wrote:
+> The i.MX25 PDK uses RMII to communicate with its PHY. This patch adds the
+> necessary bits to make the i.MX25 talk RMII.
 > 
-> What we should be doing is using the 'wait' time productively by
-> calculating the address of the next operation, and only then waiting
-> for the previous operation to complete.  This means that cache
-> operations can occur in parallel with the CPU calculating the next
-> address.
-[...] 
->  static void l2x0_inv_range(unsigned long start, unsigned long end)
->  {
-> +	void __iomem *base = l2x0_base;
->  	unsigned long flags;
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> ---
+>  drivers/net/fec.c |   22 ++++++++++++++++++++++
+>  drivers/net/fec.h |    2 ++
+>  2 files changed, 24 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/net/fec.c b/drivers/net/fec.c
+> index 16a1d58..65c43d3 100644
+> --- a/drivers/net/fec.c
+> +++ b/drivers/net/fec.c
+> @@ -51,6 +51,7 @@
+>  #include "fec.h"
 >  
->  	spin_lock_irqsave(&l2x0_lock, flags);
->  	if (start & (CACHE_LINE_SIZE - 1)) {
->  		start &= ~(CACHE_LINE_SIZE - 1);
-> -		sync_writel(start, L2X0_CLEAN_INV_LINE_PA, 1);
-> +		cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
-> +		writel(start, base + L2X0_CLEAN_INV_LINE_PA);
->  		start += CACHE_LINE_SIZE;
->  	}
+>  #ifdef CONFIG_ARCH_MXC
+> +#include <asm/mach-types.h>
+>  #include <mach/hardware.h>
+>  #define FEC_ALIGNMENT	0xf
+>  #else
+> @@ -1722,6 +1723,25 @@ static int fec_enet_init(struct net_device *dev, int index)
+>  	return 0;
+>  }
 >  
->  	if (end & (CACHE_LINE_SIZE - 1)) {
->  		end &= ~(CACHE_LINE_SIZE - 1);
-> -		sync_writel(end, L2X0_CLEAN_INV_LINE_PA, 1);
-> +		cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
-> +		writel(end, base + L2X0_CLEAN_INV_LINE_PA);
->  	}
+> +static void fec_localhw_setup(struct net_device *dev)
+> +{
+> +	struct fec_enet_private *fep = netdev_priv(dev);
+> +
+> +	if (!machine_is_mx25_3ds())
+> +		return;
 
-Do we need a cache_wait() on L2X0_CLEAN_INV_LINE_PA here? Actually, do
-we need the cache_wait() before writel()? Can we have it after?
+We should add a flag in platform data for this. Unfortunately the fec
+driver has no platform data at all at the moment, so this requires some
+more work.
 
->  	while (start < end) {
->  		unsigned long blk_end = start + min(end - start, 4096UL);
+Sascha
+
+> +
+> +	/* disable the gasket and wait */
+> +	writel(0, fep->hwp + FEC_MIIGSK_ENR);
+> +	while (readl(fep->hwp + FEC_MIIGSK_ENR) & 4)
+> +		udelay(1);
+> +
+> +	/* configure the gasket for RMII, 50 MHz, no loopback, no echo */
+> +	writel(1, fep->hwp + FEC_MIIGSK_CFGR);
+> +
+> +	/* re-enable the gasket */
+> +	writel(2, fep->hwp + FEC_MIIGSK_ENR);
+> +}
+> +
+>  /* This function is called to start or restart the FEC during a link
+>   * change.  This only happens when switching between half and full
+>   * duplex.
+> @@ -1810,6 +1830,8 @@ fec_restart(struct net_device *dev, int duplex)
+>  	/* Set MII speed */
+>  	writel(fep->phy_speed, fep->hwp + FEC_MII_SPEED);
 >  
->  		while (start < blk_end) {
-> -			sync_writel(start, L2X0_INV_LINE_PA, 1);
-> +			cache_wait(base + L2X0_INV_LINE_PA, 1);
-> +			writel(start, base + L2X0_INV_LINE_PA);
->  			start += CACHE_LINE_SIZE;
-
-This one waits on a different register than the one written above.
+> +	fec_localhw_setup(dev);
+> +
+>  	/* And last, enable the transmit and receive processing */
+>  	writel(2, fep->hwp + FEC_ECNTRL);
+>  	writel(0, fep->hwp + FEC_R_DES_ACTIVE);
+> diff --git a/drivers/net/fec.h b/drivers/net/fec.h
+> index cc47f3f..2c48b25 100644
+> --- a/drivers/net/fec.h
+> +++ b/drivers/net/fec.h
+> @@ -43,6 +43,8 @@
+>  #define FEC_R_DES_START		0x180 /* Receive descriptor ring */
+>  #define FEC_X_DES_START		0x184 /* Transmit descriptor ring */
+>  #define FEC_R_BUFF_SIZE		0x188 /* Maximum receive buff size */
+> +#define FEC_MIIGSK_CFGR		0x300 /* MIIGSK Configuration reg */
+> +#define FEC_MIIGSK_ENR		0x308 /* MIIGSK Enable reg */
+>  
+>  #else
+>  
+> -- 
+> 1.6.5
+> 
+> 
 
 -- 
-Catalin
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
