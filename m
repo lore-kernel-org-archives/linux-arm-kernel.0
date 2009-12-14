@@ -1,78 +1,30 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 14 Dec 2009 14:52:51 -0500 (EST)
-Subject: [PATCH 3/5] arm: use the spinlocked, generic atomic64 support
-In-Reply-To: <001301ca7cf4$c04481a0$40cd84e0$%deacon@arm.com>
-References: <1260799481-29951-1-git-send-email-jamie.iles@picochip.com>
-	<1260799481-29951-2-git-send-email-jamie.iles@picochip.com>
-	<1260799481-29951-3-git-send-email-jamie.iles@picochip.com>
-	<1260799481-29951-4-git-send-email-jamie.iles@picochip.com>
-	<alpine.LFD.2.00.0912141156200.23173@xanadu.home>
-	<001301ca7cf4$c04481a0$40cd84e0$%deacon@arm.com>
-Message-ID: <alpine.LFD.2.00.0912141443010.23173@xanadu.home>
+Date: Mon, 14 Dec 2009 14:59:16 -0500 (EST)
+Subject: shared memory problem on ARM v5TE using threads
+In-Reply-To: <cabda6420912140513k40a998b7k8cf56c35cc535cfb@mail.gmail.com>
+References: <20091207114218.GA19348@n2100.arm.linux.org.uk>
+	<309002C0DA137042828828FC53D7A9347E212D150D@IL-MB01.marvell.com>
+	<20091207145235.GD19348@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.0912071027480.31174@xanadu.home>
+	<20091207170546.GB26821@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.0912071219100.31174@xanadu.home>
+	<20091207175608.GE26821@n2100.arm.linux.org.uk>
+	<309002C0DA137042828828FC53D7A9347E2630EEC2@IL-MB01.marvell.com>
+	<20091213120033.GA10698@n2100.arm.linux.org.uk>
+	<20091213120615.GB10698@n2100.arm.linux.org.uk>
+	<cabda6420912140513k40a998b7k8cf56c35cc535cfb@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.0912141457400.23173@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Dec 2009, Will Deacon wrote:
+On Mon, 14 Dec 2009, christian pellegrin wrote:
 
-> Hi Nicolas,
-> 
-> *Nicolas Pitre wrote:
-> 
-> > Can't a variant of include/linux/cnt32_to_63.h be used here?> 
-> > typedef struct {
-> > 	atomic_t low;
-> > 	u32 high;
-> > } atomic64_t;
-> > 
-> > static inline void atomic64_set(atomic64_t *ptr, u64 new_val)
-> > {
-> > 	u32 low = new_val;
-> > 	u32 high = new_val >> 32;
-> > 	BUG_ON(high & 0x80000000);
-> > 	atomic_set(&ptr->low, low);
-> > 	ptr->high = (high & 0x7fffffff) | (low & 0x80000000);
-> > }
-> 
-> How do you ensure that this is atomic? To me it looks like one CPU
-> could write the lower 32-bits and another could write the upper 32,
-> leaving the memory location in an inconsistent state.
+> Feroceon manuals (unfortunately I found that these are not available
+> *after* buying the hardware).
 
-This one is indeed not exactly atomic.  It isn't the interesting case 
-either though.  Probably a strd could fix that.
+Look at:
 
-> > static inline u64 atomic64_read(atomic64_t *ptr)
-> > {
-> > 	u32 high, low;
-> > 	high = ptr->high;
-> > 	smp_rmb();
-> > 	low = atomic_read(&ptr->low);
-> > 	if (unlikely((s32)(high ^ low) < 0))
-> > 		ptr->high = high = (high ^ 0x80000000) + (high >> 31);
-> > 	return ((u64)(high & 0x7fffffff) << 32) | low;
-> > }
-> > 
-> > static inline u64 atomic64_inc_return(atomic64_t *ptr)
-> > {
-> > 	atomic_inc(&ptr->low);
-> > 	return atomic64_read(ptr);
-> > }
-> > 
-> > The atomic64_add_return() could be implemented the same way, however the
-> > added value would have to be smaller than 31 bits for the algorythm to
-> > work.
-> 
-> I posted a patch to this list on Friday which provides 64-bit atomic
-> operations for ARM using exclusive loads and stores:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2009-December/005934.html
-
-For ARMv7 (or ARMv6K), not for ARM.
-
-> Once this patch has been successfully reviewed, these routines should be used
-> instead. For now it makes sense to use the generic spinlocks version as a
-> placeholder.
-
-On ARMv6 the above is still faster.
+http://www.marvell.com/products/embedded_processors/kirkwood/index.jsp
 
 
 Nicolas
