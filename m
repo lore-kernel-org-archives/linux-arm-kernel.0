@@ -1,54 +1,79 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Dec 2009 10:37:13 +0000
-Subject: [PATCH 3/4] ARM: L2 : Errata 588369: Clean & Invalidate do
-	notinvalidate clean lines
-In-Reply-To: <1260384233-2278-3-git-send-email-santosh.shilimkar@ti.com>
-References: <1260384233-2278-3-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1260787034.17159.24.camel@pc1117.cambridge.arm.com>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Mon, 14 Dec 2009 11:41:38 +0100
+Subject: [PATCH 3/4] regulator: add voltage selection capability to
+	mc13783 regulators.
+In-Reply-To: <20091213200142.GC14024@pengutronix.de>
+References: <1260635829.2054.16.camel@climbing-alby>
+	<1260636523.2054.28.camel@climbing-alby>
+	<1260636819.2054.33.camel@climbing-alby>
+	<1260636976.2054.36.camel@climbing-alby>
+	<20091213200142.GC14024@pengutronix.de>
+Message-ID: <1260787298.2022.55.camel@climbing-alby>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2009-12-09 at 18:43 +0000, Santosh Shilimkar wrote:
-> This patch implements the work-around for the errata 588369. The secure API
-> is used to alter L2 debug regsiter because of trust-zone.
-[...]
-> +config PL310_ERRATA_588369
-> +       bool "Clean & Invalidate maintenance operations do not invalidate clean lines"
-> +       depends on CACHE_L2X0
-> +       default n
-> +       help
-> +          The PL310 L2 cache controller implements three types of Clean &
-> +          Invalidate maintenance operations: by Physical Address
-> +          (offset 0x7F0), by Index/Way (0x7F8) and by Way (0x7FC).
-> +          They are architecturally defined to behave as the execution of a
-> +          clean operation followed immediately by an invalidate operation,
-> +          both performing to the same memory location. This functionality
-> +          is not correctly implemented in PL310 as clean lines are not
-> +          invalidated as a result of these operations
->  endmenu
-
-Could you actually add a comment and a dependence on OMAP4 since this
-requires the secure monitor that only TI has.
+Il giorno dom, 13/12/2009 alle 21.01 +0100, Uwe Kleine-K?nig ha scritto:
+> On Sat, Dec 12, 2009 at 05:56:16PM +0100, Alberto Panizzo wrote:
+> > This patch, complete the mc13783 regulator subsystem driver with 
+> > voltage selecting capability.
+> > Main Switches (SW1AB, SW2AB) are not supported yet.
+> > 
+> > Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
+> > ---
+> >  drivers/regulator/mc13783-regulator.c |  375 ++++++++++++++++++++++++++++++---
+> >  1 files changed, 348 insertions(+), 27 deletions(-)
+> > 
+> > diff --git a/drivers/regulator/mc13783-regulator.c b/drivers/regulator/mc13783-regulator.c
+> > index 9f99862..ed78137 100644
+> > --- a/drivers/regulator/mc13783-regulator.c
+> > +++ b/drivers/regulator/mc13783-regulator.c
+> > @@ -2,6 +2,7 @@
+> >   * Regulator Driver for Freescale MC13783 PMIC
+> >   *
+> >   * Copyright (C) 2008 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
+> > + * Copyright 2009 Alberto Panizzo <maramaopercheseimorto@gmail.com>
+> >   *
+> >   * This program is free software; you can redistribute it and/or modify
+> >   * it under the terms of the GNU General Public License version 2 as
+> > @@ -18,9 +19,47 @@
+> >  
+> >  #define MC13783_REG_SWITCHERS4			28
+> >  #define MC13783_REG_SWITCHERS4_PLLEN			(1 << 18)
+> > +#define MC13783_REG_SWITCHERS4_PLLVSEL			(1 << 19)
+> > +#define MC13783_REG_SWITCHERS4_PLLVSEL_M		(7 << 19)
+> >  
+> >  #define MC13783_REG_SWITCHERS5			29
+> >  #define MC13783_REG_SWITCHERS5_SW3EN			(1 << 20)
+> > +#define MC13783_REG_SWITCHERS5_SW3VSEL			18
+> This looks inconsitent:
+> 	MC13783_REG_SWITCHERS4_PLLVSEL	(1 << 19)
+> 	MC13783_REG_SWITCHERS5_SW3VSEL	18
 > 
-> +#ifdef CONFIG_PL310_ERRATA_588369
-> +       /*
-> +        * Disable Write-Back and Cache Linefill (set bits [1:0] of the Debug
-> +        * Control Register)
-> +        */
-> +       __asm__ __volatile__(
-> +       "stmfd r13!, {r0-r12, r14}\n"
-> +       "mov r0, #3\n"
-> +       "ldr r12, =0x100\n"
-> +       "dsb\n"
-> +       "smc\n"
-> +       "ldmfd r13!, {r0-r12, r14}");
+> I didn't check the rest of the patch though it would be great if you
+> wouldn't need all those arrays as they occupy much memory.
+> 
+> Best regards
+> Uwe
+> 
 
-Could you actually add a function that gets called with a parameter
-rather than having to similar inline asm blocks? You also don't need to
-save/restore the registers if you declare them properly or use local
-variables for that, the compiler does the work for you.
+Yes this is a mistake and.. I'm not sure to embrace SWITCHERS4_PLL in
+the regulators stuff at all.
+The code that I propose can enable/disable and set the multiplication
+factor for the PLL but this is not a voltage regulator!
 
-Is a DSB needed before SMC (I'm not sure)?
+Maybe the PLL must be initialised and controlled via another driver, 
+in the audio codec?
 
--- 
-Catalin
+For the arrays, also for me it is not the better code that I wrote
+but voltages values have no regular stepping and this way is a great 
+self explain way.
+Look at tables 4-18 and 4-19 of the mc13783 information for GPL drivers..
+
+The other ways are:
+- Compress arrays in different phases, with complex initialisation.
+- Write as many function as different regulators there are, increasing
+  the driver complexity and also the text instead of data memory..
+
+Sure, I have to correct all the coding style issues asserted by Mark!
+
+Alberto.
