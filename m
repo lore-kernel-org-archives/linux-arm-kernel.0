@@ -1,55 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Dec 2009 16:13:05 -0000
-Subject: [PATCH 5/5] arm/perfevents: implement perf event support for ARMv6
-In-Reply-To: <1260799481-29951-6-git-send-email-jamie.iles@picochip.com>
-References: <1260799481-29951-1-git-send-email-jamie.iles@picochip.com>	<1260799481-29951-2-git-send-email-jamie.iles@picochip.com>	<1260799481-29951-3-git-send-email-jamie.iles@picochip.com>	<1260799481-29951-4-git-send-email-jamie.iles@picochip.com>	<1260799481-29951-5-git-send-email-jamie.iles@picochip.com>
-	<1260799481-29951-6-git-send-email-jamie.iles@picochip.com>
-Message-ID: <001001ca7cd8$517ce440$f476acc0$@deacon@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 14 Dec 2009 16:16:35 +0000
+Subject: [PATCH 5/6] ARMv7: Improved page table format with TRE and AFE
+In-Reply-To: <20091214161139.GA16953@n2100.arm.linux.org.uk>
+References: <20091207135603.30429.74812.stgit@pc1117.cambridge.arm.com>
+	<20091207141404.30429.85379.stgit@pc1117.cambridge.arm.com>
+	<20091212112829.GB27020@n2100.arm.linux.org.uk>
+	<1260805824.17159.101.camel@pc1117.cambridge.arm.com>
+	<20091214161139.GA16953@n2100.arm.linux.org.uk>
+Message-ID: <1260807395.17159.112.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jamie Iles wrote:
-
-> This patch implements support for ARMv6 performance counters in the
-> Linux performance events subsystem. ARMv6 architectures that have the
-> performance counters should enable HW_PERF_EVENTS and define the
-> interrupts for the counters in arch/arm/kernel/perf_event.c
->
-> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> index 286a276..44ebf36 100644
-> --- a/arch/arm/kernel/Makefile
-> +++ b/arch/arm/kernel/Makefile
-> @@ -47,6 +47,7 @@ obj-$(CONFIG_CPU_XSC3)		+= xscale-cp0.o
->  obj-$(CONFIG_CPU_MOHAWK)	+= xscale-cp0.o
->  obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
->  obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
-> +obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
->  AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
+On Mon, 2009-12-14 at 16:11 +0000, Russell King - ARM Linux wrote:
+> On Mon, Dec 14, 2009 at 03:50:24PM +0000, Catalin Marinas wrote:
+> > > - Kernel reads PTE and modifies it
+> >
+> > B3.3.5 in the ARM ARM describes the requirements for the Hardware
+> > management of the access flag:
+> >
+> >         Any implementation of hardware management of the access flag
+> >         must ensure that any software changes to the translation table
+> >         are not lost. The architecture does not require software that
+> >         performs translation table changes to use interlocked
+> >         operations. The hardware management mechanisms for the access
+> >         flag must prevent any loss of data written to translation table
+> >         entries that might occur when, for example, a write by another
+> >         processor occurs between the read and write phases of a
+> >         translation table walk that updates the
+> >         access flag.
+> >
+> > At the hardware level, it could be implemented similar to a LDREX/STREX
+> > block.
+> >
+> > > - Hardware accesses page
+> > > -  TLB reads PTE, updates, and writes new back
+> > > - Kernel writes PTE back
+> >
+> > Addressed above. The hardware write should fail if there was an STR from
+> > the current or different CPU.
+[...]
+> The case I was talking about is:
 > 
->  ifneq ($(CONFIG_ARCH_EBSA110),y)
+> - Kernel reads PTE
+> - Hardware reads PTE
+> - Hardware writes PTE
+> - Kernel writes PTE
+> 
+> Since there is no STR between the hardware reading and writing the PTE,
+> the hardware can not know that its update has been lost.
+> 
+> Whether it matters or not is a different kettle of fish.
 
-<snip>
+I was expected this follow-up :-), so I already replied to my post. I
+don't think it matters.
 
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index fc5c05b..89a26ea 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -791,3 +791,11 @@ config ARM_L1_CACHE_SHIFT
->  	int
->  	default 6 if ARCH_OMAP3 || ARCH_S5PC1XX
->  	default 5
-> +
-> +config HW_PERF_EVENTS
-> +	bool "Enable hardware performance counter support for perf events"
-> +	depends on PERF_EVENTS && CPU_HAS_PMU && CPU_V6
-> +	default n
-> +	help
-> +	  Enable hardware performance counter support for perf events. If
-> +	  disabled, perf events will use software events only.
-> --
-> 1.6.5.4
-
-Why are you modifying mm/Kconfig? I think it would be better to change the
-Makefile to use CONFIG_HAVE_PERF_EVENTS rather than define a new bool.
-
-Will
+-- 
+Catalin
