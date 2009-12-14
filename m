@@ -1,31 +1,42 @@
-From: jeff@garzik.org (Jeff Garzik)
-Date: Mon, 14 Dec 2009 17:06:34 -0500
-Subject: [PATCH] add PATA host controller support for Cirrus Logic's EP93xx
-	CPUs
-In-Reply-To: <4B26B0D6.4080809@bluewatersys.com>
-References: <200911261651.40928.bzolnier@gmail.com>
-	<4B15BAA1.2010408@bluewatersys.com>
-	<200912020206.59659.bzolnier@gmail.com>
-	<4B26B0D6.4080809@bluewatersys.com>
-Message-ID: <4B26B6EA.8050403@garzik.org>
+From: andy@warmcat.com (Andy Green)
+Date: Mon, 14 Dec 2009 22:42:05 +0000
+Subject: "ARM: MX3: fix CPU revision number detection" breaks QONG support
+In-Reply-To: <20091214224109.20623gout4jbbdo5@webmail.epfl.ch>
+References: <20091211143318.1D8B43F6CC@gemini.denx.de>	<20091211234714.GT28375@buzzloop.caiaq.de>	<20091214135722.CBCBF4C026@gemini.denx.de>	<20091214150420.GE28375@buzzloop.caiaq.de>
+	<20091214224109.20623gout4jbbdo5@webmail.epfl.ch>
+Message-ID: <4B26BF3D.2000000@warmcat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/2009 04:40 PM, Ryan Mallon wrote:
-> I have added some of my own debugging. The problem appears to be that
-> __pata_ep93xx_write gets called from probe (via ata_host_activate), but
-> ap->private_data (ata_timing) is still null. The timing private_data is
-> set by pata_ep93xx_set_piomode, but that needs adev->pio_mode set, but I
-> don't know where this happens. I assume the ATA core handles this. Do I
-> need to call pata_ep93xx_set_piomode from pata_ep93xx_probe before
-> ata_host_activate, or should the private_data timing be set to some
-> default in the probe?
+On 12/14/09 21:41, Somebody in the thread at some point said:
 
+Hi Valentin -
 
-ap->private_data is traditionally initialized in the ->port_start() hook.
+> The iim clock is explicitely enabled in clock.c, just before the call to
+> mx31_read_cpu_rev(), and from what I had checked, the clock effectively
+> seemed enabled for me. I have no clue about the register definition
+> since I have found no real documentation about it, but from my point of
+> view, this would more look like 8 bit registers as Andy pointed out in
+> an earlier mail.
 
-Likely, you should follow other drivers and allocate a useful data 
-structure containing useful default values, which can then be adjusted 
-in other hooks such as ->set_dmamode() or ->set_piomode()
+Some Google-fu last week got me this not very well publicised doucment:
 
-	Jeff
+  http://www.freescale.com/files/dsp/doc/app_note/AN3682.pdf
+
+the fuse "memory map" is specific to iMX25, but it also documents the 
+structure of Freescale's IIM peripheral register mapping, gives sample 
+code (which works on iMX31, so presumably it deploys the same IIM IP).
+
+The sample code is also entirely byte operations.
+
+I don't think the globally unique CPU ID fuses are set by Freescale, 
+because when I dumped the entire fuse space of a few iMX31 devices, 
+there was only a handful of bytes that differed: I assumed these were 
+stuff like die placement X Y.
+
+Unfortunately Freescale did some "security by obscurity" in their main 
+reference manual and while it talks about what kinds of fields are in 
+the fuses, it doesn't give their bank and row indexes.  Annoyingly that 
+information is right there in the iMX25-specific thing linked above.
+
+-Andy
