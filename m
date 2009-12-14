@@ -1,88 +1,73 @@
-From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Mon, 14 Dec 2009 18:59:00 +0100
-Subject: [PATCH 1/4] mfd: mc13783: Take care of semantic inversion
-	between read and write value of two bits in POWER_MISCELLANEUS
-	register.
-In-Reply-To: <4B26799F.1020507@ru.mvista.com>
-References: <1260808880.2022.98.camel@climbing-alby>
-	<1260810776.2022.130.camel@climbing-alby>
-	<4B26799F.1020507@ru.mvista.com>
-Message-ID: <1260813540.2022.174.camel@climbing-alby>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 14 Dec 2009 13:12:30 -0500
+Subject: GPIO support for HTC Dream
+In-Reply-To: <1260813293.13078.15.camel@c-dwalke-linux.qualcomm.com>
+References: <20091208102842.GH12264@elf.ucw.cz>
+	<4B1EB57D.6070408@bluewatersys.com>
+	<20091208214658.GC4164@elf.ucw.cz>
+	<4B1ECEEE.3000209@bluewatersys.com>
+	<4B203575.6050407@bluewatersys.com>
+	<20091210172458.GJ19454@elf.ucw.cz>
+	<4B2150B7.3040207@bluewatersys.com>
+	<BD79186B4FD85F4B8E60E381CAEE190901FB0F92@mi8nycmail19.Mi8.com>
+	<20091211221015.GB24456@elf.ucw.cz>
+	<BD79186B4FD85F4B8E60E381CAEE190901FB10EA@mi8nycmail19.Mi8.com>
+	<20091214064545.GK5114@elf.ucw.cz>
+	<1260813293.13078.15.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE19090200E9C6@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il giorno lun, 14/12/2009 alle 20.45 +0300, Sergei Shtylyov ha scritto:
-> > +     if (offset == MC13783_REG_POWER_MISCELLANEOUS)
-> > +             buf &= !(MC13783_REGCTRL_PWGT1SPIEN |
-> >   
-> 
->    Are you sure ! shouldn't be ~ here?
-> 
-> > +                      MC13783_REGCTRL_PWGT2SPIEN);
-> >   
-> 
->    !(MC13783_REGCTRL_PWGT1SPIEN | MC13783_REGCTRL_PWGT2SPIEN) would 
-> evaluate to 0 which is most probably not what you want.
-> 
-> WBR, Sergei 
+On Monday, December 14, 2009 10:55 AM, Daniel Walker wrote:
+> On Mon, 2009-12-14 at 07:45 +0100, Pavel Machek wrote:
+>> Hi!
+>> 
+>>> This looks MUCH better!
+>> 
+>> Thanks :-).
+>> 
+>>>> arch/arm/Kconfig                     |    1
+>>>> arch/arm/mach-msm/board-dream-gpio.c |  327 +++++++++--------------------------
+>> ...
+>>> Please update (or remove) this diffstat.  It no longer matches the patch.
+>> 
+>> I was just showing differences to _previous_ version, not what I was sending.
+>> 
+>>> Ok.  The hardware still seems a bit strange. Is there any datasheet
+>>> available?
+>> 
+>> I don't think there is one. Daniel, can you help here?
+>
+> I don't know if there is one or not (I'd guess not).. I can't release
+> documents, but I could try to address specific questions or find people
+> to answer specific questions.
 
-For sure, you are right. The correct patch below..
+Hello Daniel,
 
-PWGT1DRV and PWGT1DRV are two digital output controlled by two corresponding
-hardware signals (Pin PWGTnEN) that are meant to be used to control core power
-supplies.
-The register MC13783_REG_POWER_MISCELLANEOUS contain the two control and
-status bit (PWGTnSPIEN) where write and read meaning is summarised by 
-the following table:
+My specific question was about the gpio hardware registers.
 
- Bit PWGTxSPIEN | Pin PWGTxEN | PWGTxDRV |  Read Back
-   0 = default  |             |          | PWGTxSPIEN
- ---------------+-------------+----------+------------
-       1        |      x      |   Low    |     0
-       0        |      0      |   High   |     1
-       0        |      1      |   Low    |     0
+>From Pavel's implementation it appears that the gpio's are organized as a
+number of 8-bit ports.  Each of these ports only have one 8-bit register.
+Writing a '1' to a bit in the register makes the associated pin a high-level
+output.  Writing a '0' makes the pin a low-level output or an input pin.
+Reading the port at this point will return the actual 'input' level of the pin.
 
-Writing a 1 to those bits will turn off the corresponding core
-power supply. As there is no way to read back the value of 
-PWGTnSPIEN, the behaviour chosen is to let always the hardware
-control itself leaving those bits at the default value.
+The hardware seems a bit strange and I just wanted to verify that this is
+correct.  If it is, this would explain the need to keep the 'shadow' contents
+of the port in order to set the 'direction' of a pin.
 
-This patch is especially needed for manipulate the other bits
-in the same register, where the read-modify-write operation
-can produce unwanted power fault.
+I was also wondering if the initial 'shadow' value needs to be written to the
+port at init in order to correctly establish the output value for specific
+pins.
 
-Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
----
- drivers/mfd/mc13783-core.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+One other thing.  Are the gpio's handled by Pavel's driver actually from the
+MSM chip or from an external CPLD?  The registers are all defined as:
 
-diff --git a/drivers/mfd/mc13783-core.c b/drivers/mfd/mc13783-core.c
-index a1ade23..3953297 100644
---- a/drivers/mfd/mc13783-core.c
-+++ b/drivers/mfd/mc13783-core.c
-@@ -171,6 +171,9 @@ int mc13783_reg_read(struct mc13783 *mc13783, unsigned int offset, u32 *val)
- }
- EXPORT_SYMBOL(mc13783_reg_read);
- 
-+#define MC13783_REG_POWER_MISCELLANEOUS        34
-+#define MC13783_REGCTRL_PWGT1SPIEN     (1 << 15)
-+#define MC13783_REGCTRL_PWGT2SPIEN     (1 << 16)
- int mc13783_reg_write(struct mc13783 *mc13783, unsigned int offset, u32 val)
- {
-        u32 buf;
-@@ -187,6 +190,13 @@ int mc13783_reg_write(struct mc13783 *mc13783, unsigned int offset, u32 val)
- 
-        buf = 1 << 31 | offset << MC13783_REGOFFSET_SHIFT | val;
- 
-+       /* Take care of table 4-24 in Freescale MC13783IGPLDRM.pdf making
-+        * the assumption that PWGTnDRV signals controls core power supplies
-+        * that software must not disable. */
-+       if (offset == MC13783_REG_POWER_MISCELLANEOUS)
-+               buf &= ~(MC13783_REGCTRL_PWGT1SPIEN |
-+                        MC13783_REGCTRL_PWGT2SPIEN);
-+
-        memset(&t, 0, sizeof(t));
- 
-        t.tx_buf = &buf;
--- 
-1.6.3.3
++		.reg = reg_num + DREAM_CPLD_BASE,
+
+If they are external from the MSM chip this driver should probably be renamed
+to something more appropriate since it is probably dream specific and not
+generic to the msm architecture.
+
+Thanks for the help,
+Hartley
