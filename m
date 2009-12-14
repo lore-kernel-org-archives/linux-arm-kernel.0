@@ -1,112 +1,115 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Dec 2009 16:28:52 +0000
-Subject: [PATCH 3/6] Fix a race in the vfp_notifier() function on
-	SMPsystems
-In-Reply-To: <1260792913.17159.66.camel@pc1117.cambridge.arm.com>
-References: <20091207135603.30429.74812.stgit@pc1117.cambridge.arm.com>
-	<20091207141325.30429.13315.stgit@pc1117.cambridge.arm.com>
-	<20091212122447.GA30537@n2100.arm.linux.org.uk>
-	<1260792913.17159.66.camel@pc1117.cambridge.arm.com>
-Message-ID: <1260808132.17159.118.camel@pc1117.cambridge.arm.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Mon, 14 Dec 2009 16:33:12 +0000
+Subject: [PATCH 5/5] arm/perfevents: implement perf event support for ARMv6
+In-Reply-To: <1260807177.8106.50.camel@def-laptop>
+References: <1260799481-29951-1-git-send-email-jamie.iles@picochip.com>
+	<1260799481-29951-2-git-send-email-jamie.iles@picochip.com>
+	<1260799481-29951-3-git-send-email-jamie.iles@picochip.com>
+	<1260799481-29951-4-git-send-email-jamie.iles@picochip.com>
+	<1260799481-29951-5-git-send-email-jamie.iles@picochip.com>
+	<1260799481-29951-6-git-send-email-jamie.iles@picochip.com>
+	<1260807177.8106.50.camel@def-laptop>
+Message-ID: <20091214163312.GJ4141@wear.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2009-12-14 at 12:15 +0000, Catalin Marinas wrote:
-> On Sat, 2009-12-12 at 12:24 +0000, Russell King - ARM Linux wrote:
-> > On Mon, Dec 07, 2009 at 02:13:34PM +0000, Catalin Marinas wrote:
-> > >             /*
-> > > +            * RCU locking is needed in case last_VFP_context[cpu] is
-> > > +            * released on a different CPU.
-> > > +            */
-> > > +           rcu_read_lock();
-[...]
-> > Not only that, but this notifier is already called under the RCU lock,
-> > so this is a no-op.
-[...]
-> If the region is RCU locked anyway, we can simply add a comment but
-> unless we change how last_CPU_context is set, we still need this check.
+Hi Jean,
 
-I updated patch below which doesn't take the RCU lock but adds a
-comment.
+On Mon, Dec 14, 2009 at 05:12:57PM +0100, Jean Pihet wrote:
+> I have a question about other ARM implementations. Since all the code is
+> in perf_event.c is it modular enough to allow the addition of other ARM
+> implementations? The remarks are inlined below.
+> 
+> I am interested in supporting perf events for ARMv7. What do you think?
+It should be possible, and not too difficult. The x86 perf events code
+(arch/x86/kernel/cpu/perf_events.c) does exactly this. We would need to define
+an arm_pmu structure that wraps up a 'struct pmu' and provides hooks for the
+architecture specific call.
 
-Apart from the last hunk with which you are OK, the patch makes sure
-that last_VFP_context[cpu] is only read once and stored to a local
-variable otherwise you may have the surprise that it becomes NULL if the
-thread that was using it is released on a different CPU (that's actually
-the failure we were getting under stress testing).
+> > 
+> > diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> > index 286a276..44ebf36 100644
+> > --- a/arch/arm/kernel/Makefile
+> > +++ b/arch/arm/kernel/Makefile
+> > @@ -47,6 +47,7 @@ obj-$(CONFIG_CPU_XSC3)		+= xscale-cp0.o
+> >  obj-$(CONFIG_CPU_MOHAWK)	+= xscale-cp0.o
+> >  obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
+> >  obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
+> > +obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+> >  AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
+> >  
+> >  ifneq ($(CONFIG_ARCH_EBSA110),y)
+> > diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+> > new file mode 100644
+> > index 0000000..358fd31
+> I have a generic question here: will #ifdef be needed to allow other ARM
+> implementations (e.g. ARMv7)? Is it worth to do it that way or to
+> duplicate this file for other ARM implementations?
+We can probably do it without preprocessor magic as long as the coprocessor
+instructions for the v6 counters still assemble under v7. We can do it all at
+runtime like in the x86 code and return the correct pmu from
+hw_perf_event_init().
+> 
+> > --- /dev/null
+> > +++ b/arch/arm/kernel/perf_event.c
+> > @@ -0,0 +1,1034 @@
+> > +#undef DEBUG
+> > +
+> > +/*
+> > + * ARMv6 performance counter support.
+> ARMv6 only?
+Yes, at the moment ;-)
 
+[snip]
+> > +enum arm_perf_types {
+> > +	ARM_PERFCTR_ICACHE_MISS		= 0x0,
+> > +	ARM_PERFCTR_IBUF_STALL		= 0x1,
+> > +	ARM_PERFCTR_DDEP_STALL		= 0x2,
+> > +	ARM_PERFCTR_ITLB_MISS		= 0x3,
+> > +	ARM_PERFCTR_DTLB_MISS		= 0x4,
+> > +	ARM_PERFCTR_BR_EXEC		= 0x5,
+> > +	ARM_PERFCTR_BR_MISPREDICT	= 0x6,
+> > +	ARM_PERFCTR_INSTR_EXEC		= 0x7,
+> > +	ARM_PERFCTR_DCACHE_HIT		= 0x9,
+> > +	ARM_PERFCTR_DCACHE_ACCESS	= 0xA,
+> > +	ARM_PERFCTR_DCACHE_MISS		= 0xB,
+> > +	ARM_PERFCTR_DCACHE_WBACK	= 0xC,
+> > +	ARM_PERFCTR_SW_PC_CHANGE	= 0xD,
+> > +	ARM_PERFCTR_MAIN_TLB_MISS	= 0xF,
+> > +	ARM_PERFCTR_EXPL_D_ACCESS	= 0x10,
+> > +	ARM_PERFCTR_LSU_FULL_STALL	= 0x11,
+> > +	ARM_PERFCTR_WBUF_DRAINED	= 0x12,
+> > +	ARM_PERFCTR_CPU_CYCLES		= 0xFF,
+> > +	ARM_PERFCTR_NOP			= 0x20,
+> > +};
+> This needs an armv6 prefix in the name.
+Agreed.
 
-Fix a race in the vfp_notifier() function on SMP systems
+> > +/* The events for a given CPU. */
+> > +struct cpu_hw_events {
+> > +	/*
+> > +	 * The events that are active on the CPU for the given index. Index 0
+> > +	 * is reserved.
+> > +	 */
+> > +	struct perf_event	*events[ARMV6_MAX_HWEVENTS];
+> > +
+> > +	/*
+> > +	 * A 1 bit for an index indicates that the counter is being used for
+> > +	 * an event. A 0 means that the counter can be used.
+> > +	 */
+> > +	unsigned long		used_mask[BITS_TO_LONGS(ARMV6_MAX_HWEVENTS)];
+> > +
+> > +	/*
+> > +	 * A 1 bit for an index indicates that the counter is actively being
+> > +	 * used.
+> > +	 */
+> > +	unsigned long		active_mask[BITS_TO_LONGS(ARMV6_MAX_HWEVENTS)];
+> > +};
+> Will it need #ifdef for other ARM implementations, or a armv6 prefix?
+We could make the bitmaps large enough to hold the biggest case then store the
+maximum number events for each PMU type in its own structure.
 
-From: Catalin Marinas <catalin.marinas@arm.com>
+As for making everything else implementation specific, if we adopted the same
+method as x86 then we could easily do this.
 
-The vfp_notifier(THREAD_NOTIFY_RELEASE) maybe be called with thread->cpu
-different from the current one, causing a race condition with both the
-THREAD_NOTIFY_SWITCH path and vfp_support_entry().
-
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/vfp/vfpmodule.c |   26 +++++++++++++++++++++++---
- 1 files changed, 23 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index 2d7423a..8d1fe44 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -14,6 +14,7 @@
- #include <linux/signal.h>
- #include <linux/sched.h>
- #include <linux/init.h>
-+#include <linux/rcupdate.h>
- 
- #include <asm/thread_notify.h>
- #include <asm/vfp.h>
-@@ -49,14 +50,22 @@ static int vfp_notifier(struct notifier_block *self, unsigned long cmd, void *v)
- 
- #ifdef CONFIG_SMP
- 		/*
-+		 * The vfpstate structure pointed to by last_VFP_context[cpu]
-+		 * may be released via call_rcu(delayed_put_task_struct) but
-+		 * atomic_notifier_call_chain() already holds the RCU lock.
-+		 */
-+		vfp = last_VFP_context[cpu];
-+
-+		/*
- 		 * On SMP, if VFP is enabled, save the old state in
- 		 * case the thread migrates to a different CPU. The
- 		 * restoring is done lazily.
- 		 */
--		if ((fpexc & FPEXC_EN) && last_VFP_context[cpu]) {
--			vfp_save_state(last_VFP_context[cpu], fpexc);
--			last_VFP_context[cpu]->hard.cpu = cpu;
-+		if ((fpexc & FPEXC_EN) && vfp) {
-+			vfp_save_state(vfp, fpexc);
-+			vfp->hard.cpu = cpu;
- 		}
-+
- 		/*
- 		 * Thread migration, just force the reloading of the
- 		 * state on the new CPU in case the VFP registers
-@@ -91,8 +100,19 @@ static int vfp_notifier(struct notifier_block *self, unsigned long cmd, void *v)
- 	}
- 
- 	/* flush and release case: Per-thread VFP cleanup. */
-+#ifndef CONFIG_SMP
- 	if (last_VFP_context[cpu] == vfp)
- 		last_VFP_context[cpu] = NULL;
-+#else
-+	/*
-+	 * Since release_thread() may be called from a different CPU, we use
-+	 * cmpxchg() here to avoid a race with the vfp_support_entry() code
-+	 * which modifies last_VFP_context[cpu]. Note that on SMP systems, a
-+	 * STR instruction on a different CPU clears the global exclusive
-+	 * monitor state.
-+	 */
-+	(void)cmpxchg(&last_VFP_context[cpu], vfp, NULL);
-+#endif
- 
- 	return NOTIFY_DONE;
- }
-
--- 
-Catalin
+Jamie
