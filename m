@@ -1,51 +1,39 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 14 Dec 2009 15:14:39 -0500 (EST)
-Subject: shared memory problem on ARM v5TE using threads
-In-Reply-To: <cabda6420912140948t23c07676tb5f44eb4febbc584@mail.gmail.com>
-References: <20091207114218.GA19348@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0912071027480.31174@xanadu.home>
-	<20091207170546.GB26821@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0912071219100.31174@xanadu.home>
-	<20091207175608.GE26821@n2100.arm.linux.org.uk>
-	<309002C0DA137042828828FC53D7A9347E2630EEC2@IL-MB01.marvell.com>
-	<20091213120033.GA10698@n2100.arm.linux.org.uk>
-	<20091213120615.GB10698@n2100.arm.linux.org.uk>
-	<cabda6420912140513k40a998b7k8cf56c35cc535cfb@mail.gmail.com>
-	<309002C0DA137042828828FC53D7A9347E2630F364@IL-MB01.marvell.com>
-	<cabda6420912140948t23c07676tb5f44eb4febbc584@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.0912141503360.23173@xanadu.home>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 14 Dec 2009 22:22:57 +0100
+Subject: [POWER] battery calibration parameters from sysfs
+In-Reply-To: <20091214121247.GB22388@rakim.wolfsonmicro.main>
+References: <A6D19A13FE030A409EC4362C172E091F0E0495F6@eseldmw101.eemea.ericsson.se>
+	<20091204104930.GA28625@sirena.org.uk>
+	<A6D19A13FE030A409EC4362C172E091F0E071EB9@eseldmw101.eemea.ericsson.se>
+	<20091207114825.GA26965@rakim.wolfsonmicro.main>
+	<A6D19A13FE030A409EC4362C172E091F0E0A1FA1@eseldmw101.eemea.ericsson.se>
+	<20091207165628.GA24981@rakim.wolfsonmicro.main>
+	<20091213132413.GB1437@ucw.cz>
+	<20091214121247.GB22388@rakim.wolfsonmicro.main>
+Message-ID: <20091214212257.GA9213@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Dec 2009, christian pellegrin wrote:
+Hi!
 
-> On Mon, Dec 14, 2009 at 3:46 PM, Ronen Shitrit <rshitrit@marvell.com> wrote:
+> > > I'm not sure how familiar you are with the issues surrounding trying to
+> > > do a voltage to charge mapping for a battery but it's much more complex
+> > > than a simple table if you want to get it accurate.  There's a lot
+> > > of
 > 
-> > "
-> >
-> > I think your patch doesn't cover the PIO mode...
-> >
+> > Well... current zaurus kernels use _huge_ table that maps voltage to
+> > battery %... and that table is linear function :-(.
 > 
-> Has someone a suggestion on how to write a test-case for this?
+> > Do you have some papers on that?
+> 
+> Something like "Measure Battery Capacity Precisely in Medical Design"
+> by Bernd Krafthoefer in Power Electronics Technology Jan 2005 might be
+> useful here.
 
-I don't think there is any peripheral that runs in PIO mode on 
-Kirkwood... except the NAND flash.
+Well, that would really require extensive hardware modifications: it
+needs _way_ more accurate ADCs on battery for a start, and a way to
+generate huge load.
 
-> I tried various forms of mixing read/write syscalls (or a mmap wit 
-> MAP_PRIVATE) and access via two mmap with MAP_SHARED aliasing the same 
-> address (I checked that adjust_pte was called by them) but didn't get 
-> any problem. I have to admit that I really don't understand how PIO in 
-> kernel mode can refer to mappings that are aliased (and so market 
-> uncacheable) made by user-space programs. Thank you for your patience.
-
-PIO transfer will store data in the kernel direct mapped memory which is 
-always cached.  Normally the cache coherency with user space is handled 
-by flush_dcache_page(), but that deals only with L1 and data can move to 
-L2 where it will be invisible to the uncached user space shared 
-mappings.
-
-I don't know off hand how PIO on a page that is already mapped and 
-shared in user space may be produced though.
-
-
-Nicolas
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
