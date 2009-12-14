@@ -1,94 +1,109 @@
 From: wd@denx.de (Wolfgang Denk)
-Date: Tue, 15 Dec 2009 00:27:42 +0100
-Subject: [PATCH] ARM: MX3: make CPU revision number detection work on all
-	boards
-In-Reply-To: <20091211143318.1D8B43F6CC@gemini.denx.de>
+Date: Tue, 15 Dec 2009 00:28:06 +0100
+Subject: "ARM: MX3: fix CPU revision number detection" breaks QONG support
+In-Reply-To: <20091214224109.20623gout4jbbdo5@webmail.epfl.ch>
 References: <20091211143318.1D8B43F6CC@gemini.denx.de>
-Message-ID: <1260833262-18507-1-git-send-email-wd@denx.de>
+	<20091211234714.GT28375@buzzloop.caiaq.de>
+	<20091214135722.CBCBF4C026@gemini.denx.de>
+	<20091214150420.GE28375@buzzloop.caiaq.de>
+	<20091214224109.20623gout4jbbdo5@webmail.epfl.ch>
+Message-ID: <20091214232806.DC39A4C026@gemini.denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 52939c03 (ARM: MX3: fix CPU revision number detection) started
-using the CPU's SREV register for revision number detection. This
-makes it mandatory to have a valid SPBA0 mapping. Add this to the
-global map_io code instead of adding multiple copies for each board.
+Dear Valentin,
 
-Signed-off-by: Wolfgang Denk <wd@denx.de>
-Cc: Daniel Mack <daniel@caiaq.de>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
+In message <20091214224109.20623gout4jbbdo5@webmail.epfl.ch> you wrote:
+> 
+> >> In Linux, the kernel hangs here:
+> >>
+> >> 	/* read SREV register from IIM module */
+> >> 	srev = __raw_readl(IO_ADDRESS(IIM_BASE_ADDR) + MXC_IIMSREV);
+> >>
+> >> In U-Boot, I can read this register just fine:
+> >>
+> >> 	=> md 5001c024 1
+> >> 	5001c024: 00000028    (...
 
-Tested on Qong (EVB-Lite)
-Tested-by: Wolfgang Denk <wd@denx.de>
----
- arch/arm/mach-mx3/mm.c       |    5 +++++
- arch/arm/mach-mx3/mx31ads.c  |    5 -----
- arch/arm/mach-mx3/mx31lite.c |    5 -----
- arch/arm/mach-mx3/mx31pdk.c  |    5 -----
- 4 files changed, 5 insertions(+), 15 deletions(-)
+0x28 translates into "i.MX31", chip rev. 2.0/2.0.1, mask M91E
 
-diff --git a/arch/arm/mach-mx3/mm.c b/arch/arm/mach-mx3/mm.c
-index bedf5b8..6858a4f 100644
---- a/arch/arm/mach-mx3/mm.c
-+++ b/arch/arm/mach-mx3/mm.c
-@@ -65,6 +65,11 @@ static struct map_desc mxc_io_desc[] __initdata = {
- 		.pfn		= __phys_to_pfn(AIPS2_BASE_ADDR),
- 		.length		= AIPS2_SIZE,
- 		.type		= MT_DEVICE_NONSHARED
-+	}, {
-+		.virtual = SPBA0_BASE_ADDR_VIRT,
-+		.pfn = __phys_to_pfn(SPBA0_BASE_ADDR),
-+		.length = SPBA0_SIZE,
-+		.type = MT_DEVICE_NONSHARED
- 	},
- };
- 
-diff --git a/arch/arm/mach-mx3/mx31ads.c b/arch/arm/mach-mx3/mx31ads.c
-index 0497c15..3e7bafa 100644
---- a/arch/arm/mach-mx3/mx31ads.c
-+++ b/arch/arm/mach-mx3/mx31ads.c
-@@ -494,11 +494,6 @@ static void mxc_init_i2c(void)
-  */
- static struct map_desc mx31ads_io_desc[] __initdata = {
- 	{
--		.virtual	= SPBA0_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(SPBA0_BASE_ADDR),
--		.length		= SPBA0_SIZE,
--		.type		= MT_DEVICE_NONSHARED
--	}, {
- 		.virtual	= CS4_BASE_ADDR_VIRT,
- 		.pfn		= __phys_to_pfn(CS4_BASE_ADDR),
- 		.length		= CS4_SIZE / 2,
-diff --git a/arch/arm/mach-mx3/mx31lite.c b/arch/arm/mach-mx3/mx31lite.c
-index def6b67..4697164 100644
---- a/arch/arm/mach-mx3/mx31lite.c
-+++ b/arch/arm/mach-mx3/mx31lite.c
-@@ -212,11 +212,6 @@ static struct platform_device physmap_flash_device = {
-  */
- static struct map_desc mx31lite_io_desc[] __initdata = {
- 	{
--		.virtual = SPBA0_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(SPBA0_BASE_ADDR),
--		.length = SPBA0_SIZE,
--		.type = MT_DEVICE_NONSHARED
--	}, {
- 		.virtual = CS4_BASE_ADDR_VIRT,
- 		.pfn = __phys_to_pfn(CS4_BASE_ADDR),
- 		.length = CS4_SIZE,
-diff --git a/arch/arm/mach-mx3/mx31pdk.c b/arch/arm/mach-mx3/mx31pdk.c
-index 0f7a2f0..18715f1 100644
---- a/arch/arm/mach-mx3/mx31pdk.c
-+++ b/arch/arm/mach-mx3/mx31pdk.c
-@@ -211,11 +211,6 @@ static int __init mx31pdk_init_expio(void)
-  */
- static struct map_desc mx31pdk_io_desc[] __initdata = {
- 	{
--		.virtual = SPBA0_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(SPBA0_BASE_ADDR),
--		.length = SPBA0_SIZE,
--		.type = MT_DEVICE_NONSHARED,
--	}, {
- 		.virtual = CS5_BASE_ADDR_VIRT,
- 		.pfn = __phys_to_pfn(CS5_BASE_ADDR),
- 		.length = CS5_SIZE,
+> I have looked more carefully at the bootloader code, and it does not  
+> seem to configure anything for SPBA0. Furthermore, Redboot actually  
+> reads this register at boot time to determine the CPU revision just as  
+> Daniel with its patch.
+
+True - U-Boot does not do anything for SPBA0.
+
+> For the IO_ADDRESS stuff, it may be the problem. This macro is  
+
+This is my guess, too.
+
+> supposed to do the physical address -> virtual address translation. If  
+> I have understood correctly (correct if wrong, I don't really know  
+> when whe have to use it or not), it is used when the memory region was  
+> not allocated and then mapped with request_mem_region and ioremap  
+> calls. The 0xFC11C024 is the virtual address defined by the IO_ADDRESS  
+> macro succession for the SPBA0 memory region. Now how was this defined  
+> and may this fail on certain systems/configuration because other  
+> memory definitions ?
+
+The 0xfc100000 offset is from MX3x_SPBA0_BASE_ADDR_VIRT in
+"arch/arm/plat-mxc/include/mach/mx3x.h". And indeed this is the key
+question... See below...
+
+> The iim clock is explicitely enabled in clock.c, just before the call  
+> to mx31_read_cpu_rev(), and from what I had checked, the clock  
+> effectively seemed enabled for me...
+
+I have verified that clk_get(NULL, "iim") succeeds (immediately before
+attempting to read MXC_IIMSREV).
+
+>                                ... I have no clue about the register  
+> definition since I have found no real documentation about it, but from  
+> my point of view, this would more look like 8 bit registers as Andy  
+> pointed out in an earlier mail.
+
+See the reference manual, pages 13-1 (=479) 
+(http://www.freescale.com/files/32bit/doc/ref_manual/MCIMX31RM.pdf):
+
+        "The IIM is accessible using an 8-bit IP bus interface. An
+        8-bit interface is used because it matches the natural width
+        of the fuse arrays."
+
+See especially Table 13-2. SILICON_REV Settings on page 13-4 (=482).
+
+> Let's wait a few more days so that we maybe can find a solution, but  
+> in case no solution is found when -rc1 is approaching, we maybe should  
+> revert it.
+
+I tried changing the __raw_readl() into a __raw_readb(), but this
+doesn't change anything.
+
+
+Now. After realizing that the SPBA0 mapping seems to be an issue I
+found that all boards add a mapping for it in their own, private
+map_io code. Qong did not - because we never accessed any SPBA0 stuff
+so far. Add this, and the problem goes away.
+
+But then, now that the "CPU revision number detection" commit makes
+this mapping mandatory for all boards, this should be moved from board
+specific to SoC specific code. Patch following.
+
+[Note: I still think the __raw_readl() should be changed into a
+__raw_readb(), even though this has no immediately visible effect.]
+
+
+Valentin, thanks again for asking the right questions :-)
+
+
+
+Best regards,
+
+Wolfgang Denk
+
 -- 
-1.6.2.5
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+Business is like a wheelbarrow. Nothing ever happens until you  start
+pushing.
