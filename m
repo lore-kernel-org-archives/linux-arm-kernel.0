@@ -1,48 +1,94 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 14 Dec 2009 16:14:59 -0700 (MST)
-Subject: [PATCH 0/5] OMAP4 Power Domain Framework Support
-In-Reply-To: <20091214230840.GA27612@n2100.arm.linux.org.uk>
-References: <EAF47CD23C76F840A9E7FCE10091EFAB02BC14194C@dbde02.ent.ti.com>
-	<alpine.DEB.2.00.0912141546270.12561@utopia.booyaka.com>
-	<20091214230840.GA27612@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.00.0912141611450.12561@utopia.booyaka.com>
+From: wd@denx.de (Wolfgang Denk)
+Date: Tue, 15 Dec 2009 00:27:42 +0100
+Subject: [PATCH] ARM: MX3: make CPU revision number detection work on all
+	boards
+In-Reply-To: <20091211143318.1D8B43F6CC@gemini.denx.de>
+References: <20091211143318.1D8B43F6CC@gemini.denx.de>
+Message-ID: <1260833262-18507-1-git-send-email-wd@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Dec 2009, Russell King - ARM Linux wrote:
+Commit 52939c03 (ARM: MX3: fix CPU revision number detection) started
+using the CPU's SREV register for revision number detection. This
+makes it mandatory to have a valid SPBA0 mapping. Add this to the
+global map_io code instead of adding multiple copies for each board.
 
-> On Mon, Dec 14, 2009 at 03:47:46PM -0700, Paul Walmsley wrote:
-> > On Fri, 11 Dec 2009, Pagare, Abhijit wrote:
-> > 
-> > > This patch series adds support for OMAP4 power domain framework.
-> > 
-> > ...
-> > 
-> > > Abhijit Pagare (5):
-> > > ARM: OMAP4: PM: OMAP4 essential basic initializations.
-> > > ARM: OMAP4: PM: OMAP4 Power Domain Porting Related Clean-up.
-> > > ARM: OMAP4: PM: Add the Auto-generated OMAP4 specific power domain framework.
-> > > ARM: OMAP4: PM: Adapt the existing OMAP2/3 and common Power Domain Frameworks.
-> > > ARM: OMAP4: PM: Refine the APIs to support OMAP4 features.
-> > 
-> > Looks like these patches didn't make it to the list.  Could you check and 
-> > repost?
-> 
-> They did but they aren't threaded to the description.  They were sent
-> just prior to the message you replied to.
+Signed-off-by: Wolfgang Denk <wd@denx.de>
+Cc: Daniel Mack <daniel@caiaq.de>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
 
-Thanks, looks like they made it to lakml but not linux-omap.  Abhijit, no 
-need to resend.  
+Tested on Qong (EVB-Lite)
+Tested-by: Wolfgang Denk <wd@denx.de>
+---
+ arch/arm/mach-mx3/mm.c       |    5 +++++
+ arch/arm/mach-mx3/mx31ads.c  |    5 -----
+ arch/arm/mach-mx3/mx31lite.c |    5 -----
+ arch/arm/mach-mx3/mx31pdk.c  |    5 -----
+ 4 files changed, 5 insertions(+), 15 deletions(-)
 
-...
-
-For the l-o list readers & archive, they are here:
-
-http://www.spinics.net/lists/arm-kernel/msg78916.html
-http://www.spinics.net/lists/arm-kernel/msg78917.html
-http://www.spinics.net/lists/arm-kernel/msg78919.html
-http://www.spinics.net/lists/arm-kernel/msg78918.html
-http://www.spinics.net/lists/arm-kernel/msg78914.html
-
-
-- Paul
+diff --git a/arch/arm/mach-mx3/mm.c b/arch/arm/mach-mx3/mm.c
+index bedf5b8..6858a4f 100644
+--- a/arch/arm/mach-mx3/mm.c
++++ b/arch/arm/mach-mx3/mm.c
+@@ -65,6 +65,11 @@ static struct map_desc mxc_io_desc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(AIPS2_BASE_ADDR),
+ 		.length		= AIPS2_SIZE,
+ 		.type		= MT_DEVICE_NONSHARED
++	}, {
++		.virtual = SPBA0_BASE_ADDR_VIRT,
++		.pfn = __phys_to_pfn(SPBA0_BASE_ADDR),
++		.length = SPBA0_SIZE,
++		.type = MT_DEVICE_NONSHARED
+ 	},
+ };
+ 
+diff --git a/arch/arm/mach-mx3/mx31ads.c b/arch/arm/mach-mx3/mx31ads.c
+index 0497c15..3e7bafa 100644
+--- a/arch/arm/mach-mx3/mx31ads.c
++++ b/arch/arm/mach-mx3/mx31ads.c
+@@ -494,11 +494,6 @@ static void mxc_init_i2c(void)
+  */
+ static struct map_desc mx31ads_io_desc[] __initdata = {
+ 	{
+-		.virtual	= SPBA0_BASE_ADDR_VIRT,
+-		.pfn		= __phys_to_pfn(SPBA0_BASE_ADDR),
+-		.length		= SPBA0_SIZE,
+-		.type		= MT_DEVICE_NONSHARED
+-	}, {
+ 		.virtual	= CS4_BASE_ADDR_VIRT,
+ 		.pfn		= __phys_to_pfn(CS4_BASE_ADDR),
+ 		.length		= CS4_SIZE / 2,
+diff --git a/arch/arm/mach-mx3/mx31lite.c b/arch/arm/mach-mx3/mx31lite.c
+index def6b67..4697164 100644
+--- a/arch/arm/mach-mx3/mx31lite.c
++++ b/arch/arm/mach-mx3/mx31lite.c
+@@ -212,11 +212,6 @@ static struct platform_device physmap_flash_device = {
+  */
+ static struct map_desc mx31lite_io_desc[] __initdata = {
+ 	{
+-		.virtual = SPBA0_BASE_ADDR_VIRT,
+-		.pfn = __phys_to_pfn(SPBA0_BASE_ADDR),
+-		.length = SPBA0_SIZE,
+-		.type = MT_DEVICE_NONSHARED
+-	}, {
+ 		.virtual = CS4_BASE_ADDR_VIRT,
+ 		.pfn = __phys_to_pfn(CS4_BASE_ADDR),
+ 		.length = CS4_SIZE,
+diff --git a/arch/arm/mach-mx3/mx31pdk.c b/arch/arm/mach-mx3/mx31pdk.c
+index 0f7a2f0..18715f1 100644
+--- a/arch/arm/mach-mx3/mx31pdk.c
++++ b/arch/arm/mach-mx3/mx31pdk.c
+@@ -211,11 +211,6 @@ static int __init mx31pdk_init_expio(void)
+  */
+ static struct map_desc mx31pdk_io_desc[] __initdata = {
+ 	{
+-		.virtual = SPBA0_BASE_ADDR_VIRT,
+-		.pfn = __phys_to_pfn(SPBA0_BASE_ADDR),
+-		.length = SPBA0_SIZE,
+-		.type = MT_DEVICE_NONSHARED,
+-	}, {
+ 		.virtual = CS5_BASE_ADDR_VIRT,
+ 		.pfn = __phys_to_pfn(CS5_BASE_ADDR),
+ 		.length = CS5_SIZE,
+-- 
+1.6.2.5
