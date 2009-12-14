@@ -1,221 +1,950 @@
 From: eltshanli@gmail.com (Li Jie)
-Date: Mon, 14 Dec 2009 15:29:42 +0800
-Subject: [PATCH] ARM: NUC900: Add cpufreq driver for nuc900 CPUs
-Message-ID: <8fb2581d0912132329k1b1a52c8sdabfc4af3266c1e5@mail.gmail.com>
+Date: Mon, 14 Dec 2009 15:48:14 +0800
+Subject: [PATCH] ARM: NUC900: Update nuc910,nuc950 and nuc960 defconfig
+Message-ID: <8fb2581d0912132348s4d68c866n3dd0241efd2f5abd@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Wan ZongShun:
+Hi Wan ZongShun:
 
-This patch add cpufreq support for nuc900 CPUs.
+This patch update the defconfig files to enable cpufreq.
 
 Signed-off-by: lijie <eltshanli@gmail.com>
 ---
- arch/arm/Kconfig                |    1 +
- arch/arm/mach-w90x900/Makefile  |    2 +-
- arch/arm/mach-w90x900/cpu.c     |    4 +-
- arch/arm/mach-w90x900/cpufreq.c |  146 +++++++++++++++++++++++++++++++++++++++
- 4 files changed, 151 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/mach-w90x900/cpufreq.c
+ arch/arm/configs/nuc910_defconfig |  231 ++++++++++++++++++++++++-------------
+ arch/arm/configs/nuc950_defconfig |   73 ++++++++++--
+ arch/arm/configs/nuc960_defconfig |   73 ++++++++++--
+ 3 files changed, 276 insertions(+), 101 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index cf8a99f..60186fe 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -539,6 +539,7 @@ config ARCH_W90X900
- 	select COMMON_CLKDEV
- 	select GENERIC_TIME
- 	select GENERIC_CLOCKEVENTS
-+	select ARCH_HAS_CPUFREQ
- 	help
- 	  Support for Nuvoton (Winbond logic dept.) ARM9 processor,
- 	  At present, the w90x900 has been renamed nuc900, regarding
-diff --git a/arch/arm/mach-w90x900/Makefile b/arch/arm/mach-w90x900/Makefile
-index 828c032..7f114fb 100644
---- a/arch/arm/mach-w90x900/Makefile
-+++ b/arch/arm/mach-w90x900/Makefile
-@@ -5,7 +5,7 @@
- # Object file lists.
+diff --git a/arch/arm/configs/nuc910_defconfig
+b/arch/arm/configs/nuc910_defconfig
+index 5245655..71f0815 100644
+--- a/arch/arm/configs/nuc910_defconfig
++++ b/arch/arm/configs/nuc910_defconfig
+@@ -1,15 +1,13 @@
+ #
+ # Automatically generated make config: don't edit
+-# Linux kernel version: 2.6.30
+-# Wed Jun 10 22:09:25 2009
++# Linux kernel version: 2.6.32
++# Mon Dec 14 15:33:49 2009
+ #
+ CONFIG_ARM=y
+ CONFIG_SYS_SUPPORTS_APM_EMULATION=y
+ CONFIG_GENERIC_GPIO=y
+-# CONFIG_GENERIC_TIME is not set
+-# CONFIG_GENERIC_CLOCKEVENTS is not set
+-CONFIG_MMU=y
+-# CONFIG_NO_IOPORT is not set
++CONFIG_GENERIC_TIME=y
++CONFIG_GENERIC_CLOCKEVENTS=y
+ CONFIG_GENERIC_HARDIRQS=y
+ CONFIG_STACKTRACE_SUPPORT=y
+ CONFIG_HAVE_LATENCYTOP_SUPPORT=y
+@@ -18,13 +16,13 @@ CONFIG_TRACE_IRQFLAGS_SUPPORT=y
+ CONFIG_HARDIRQS_SW_RESEND=y
+ CONFIG_GENERIC_IRQ_PROBE=y
+ CONFIG_RWSEM_GENERIC_SPINLOCK=y
+-# CONFIG_ARCH_HAS_ILOG2_U32 is not set
+-# CONFIG_ARCH_HAS_ILOG2_U64 is not set
++CONFIG_ARCH_HAS_CPUFREQ=y
+ CONFIG_GENERIC_HWEIGHT=y
+ CONFIG_GENERIC_CALIBRATE_DELAY=y
+ CONFIG_GENERIC_HARDIRQS_NO__DO_IRQ=y
+ CONFIG_VECTORS_BASE=0xffff0000
+ CONFIG_DEFCONFIG_LIST="/lib/modules/$UNAME_RELEASE/.config"
++CONFIG_CONSTRUCTORS=y
 
- obj-y				:= irq.o time.o mfp.o gpio.o clock.o
--obj-y				+= clksel.o dev.o cpu.o
-+obj-y				+= clksel.o dev.o cpu.o cpufreq.o
- # W90X900 CPU support files
+ #
+ # General setup
+@@ -44,11 +42,13 @@ CONFIG_BSD_PROCESS_ACCT=y
+ #
+ # RCU Subsystem
+ #
+-CONFIG_CLASSIC_RCU=y
+-# CONFIG_TREE_RCU is not set
+-# CONFIG_PREEMPT_RCU is not set
++CONFIG_TREE_RCU=y
++# CONFIG_TREE_PREEMPT_RCU is not set
++# CONFIG_TINY_RCU is not set
++# CONFIG_RCU_TRACE is not set
++CONFIG_RCU_FANOUT=32
++# CONFIG_RCU_FANOUT_EXACT is not set
+ # CONFIG_TREE_RCU_TRACE is not set
+-# CONFIG_PREEMPT_RCU_TRACE is not set
+ # CONFIG_IKCONFIG is not set
+ CONFIG_LOG_BUF_SHIFT=17
+ # CONFIG_GROUP_SCHED is not set
+@@ -66,10 +66,6 @@ CONFIG_INITRAMFS_SOURCE=""
+ CONFIG_RD_GZIP=y
+ CONFIG_RD_BZIP2=y
+ CONFIG_RD_LZMA=y
+-# CONFIG_INITRAMFS_COMPRESSION_NONE is not set
+-# CONFIG_INITRAMFS_COMPRESSION_GZIP is not set
+-# CONFIG_INITRAMFS_COMPRESSION_BZIP2 is not set
+-# CONFIG_INITRAMFS_COMPRESSION_LZMA is not set
+ CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+ CONFIG_SYSCTL=y
+ CONFIG_ANON_INODES=y
+@@ -78,7 +74,6 @@ CONFIG_UID16=y
+ CONFIG_SYSCTL_SYSCALL=y
+ CONFIG_KALLSYMS=y
+ CONFIG_KALLSYMS_EXTRA_PASS=y
+-# CONFIG_STRIP_ASM_SYMS is not set
+ CONFIG_HOTPLUG=y
+ CONFIG_PRINTK=y
+ CONFIG_BUG=y
+@@ -91,17 +86,25 @@ CONFIG_TIMERFD=y
+ CONFIG_EVENTFD=y
+ CONFIG_SHMEM=y
+ CONFIG_AIO=y
++
++#
++# Kernel Performance Events And Counters
++#
+ CONFIG_VM_EVENT_COUNTERS=y
+ CONFIG_COMPAT_BRK=y
+ CONFIG_SLAB=y
+ # CONFIG_SLUB is not set
+ # CONFIG_SLOB is not set
+ # CONFIG_PROFILING is not set
+-CONFIG_TRACEPOINTS=y
+-# CONFIG_MARKERS is not set
+ CONFIG_HAVE_OPROFILE=y
+ CONFIG_HAVE_KPROBES=y
+ CONFIG_HAVE_KRETPROBES=y
++CONFIG_HAVE_CLK=y
++
++#
++# GCOV-based kernel profiling
++#
++# CONFIG_GCOV_KERNEL is not set
+ # CONFIG_SLOW_WORK is not set
+ CONFIG_HAVE_GENERIC_DMA_COHERENT=y
+ CONFIG_SLABINFO=y
+@@ -109,7 +112,7 @@ CONFIG_RT_MUTEXES=y
+ CONFIG_BASE_SMALL=0
+ # CONFIG_MODULES is not set
+ CONFIG_BLOCK=y
+-CONFIG_LBD=y
++CONFIG_LBDAF=y
+ CONFIG_BLK_DEV_BSG=y
+ # CONFIG_BLK_DEV_INTEGRITY is not set
 
- obj-$(CONFIG_CPU_W90P910)	+= nuc910.o
-diff --git a/arch/arm/mach-w90x900/cpu.c b/arch/arm/mach-w90x900/cpu.c
-index 921cef9..7b608b8 100644
---- a/arch/arm/mach-w90x900/cpu.c
-+++ b/arch/arm/mach-w90x900/cpu.c
-@@ -107,7 +107,7 @@ struct platform_device nuc900_serial_device = {
- };
+@@ -117,32 +120,62 @@ CONFIG_BLK_DEV_BSG=y
+ # IO Schedulers
+ #
+ CONFIG_IOSCHED_NOOP=y
+-CONFIG_IOSCHED_AS=y
+ CONFIG_IOSCHED_DEADLINE=y
+ CONFIG_IOSCHED_CFQ=y
+-# CONFIG_DEFAULT_AS is not set
+ # CONFIG_DEFAULT_DEADLINE is not set
+ CONFIG_DEFAULT_CFQ=y
+ # CONFIG_DEFAULT_NOOP is not set
+ CONFIG_DEFAULT_IOSCHED="cfq"
++# CONFIG_INLINE_SPIN_TRYLOCK is not set
++# CONFIG_INLINE_SPIN_TRYLOCK_BH is not set
++# CONFIG_INLINE_SPIN_LOCK is not set
++# CONFIG_INLINE_SPIN_LOCK_BH is not set
++# CONFIG_INLINE_SPIN_LOCK_IRQ is not set
++# CONFIG_INLINE_SPIN_LOCK_IRQSAVE is not set
++# CONFIG_INLINE_SPIN_UNLOCK is not set
++# CONFIG_INLINE_SPIN_UNLOCK_BH is not set
++# CONFIG_INLINE_SPIN_UNLOCK_IRQ is not set
++# CONFIG_INLINE_SPIN_UNLOCK_IRQRESTORE is not set
++# CONFIG_INLINE_READ_TRYLOCK is not set
++# CONFIG_INLINE_READ_LOCK is not set
++# CONFIG_INLINE_READ_LOCK_BH is not set
++# CONFIG_INLINE_READ_LOCK_IRQ is not set
++# CONFIG_INLINE_READ_LOCK_IRQSAVE is not set
++# CONFIG_INLINE_READ_UNLOCK is not set
++# CONFIG_INLINE_READ_UNLOCK_BH is not set
++# CONFIG_INLINE_READ_UNLOCK_IRQ is not set
++# CONFIG_INLINE_READ_UNLOCK_IRQRESTORE is not set
++# CONFIG_INLINE_WRITE_TRYLOCK is not set
++# CONFIG_INLINE_WRITE_LOCK is not set
++# CONFIG_INLINE_WRITE_LOCK_BH is not set
++# CONFIG_INLINE_WRITE_LOCK_IRQ is not set
++# CONFIG_INLINE_WRITE_LOCK_IRQSAVE is not set
++# CONFIG_INLINE_WRITE_UNLOCK is not set
++# CONFIG_INLINE_WRITE_UNLOCK_BH is not set
++# CONFIG_INLINE_WRITE_UNLOCK_IRQ is not set
++# CONFIG_INLINE_WRITE_UNLOCK_IRQRESTORE is not set
++# CONFIG_MUTEX_SPIN_ON_OWNER is not set
+ # CONFIG_FREEZER is not set
 
- /*Set NUC900 series cpu frequence*/
--static int __init nuc900_set_clkval(unsigned int cpufreq)
-+int nuc900_set_clkval(unsigned int cpufreq)
- {
- 	unsigned int pllclk, ahbclk, apbclk, val;
+ #
+ # System Type
+ #
++CONFIG_MMU=y
+ # CONFIG_ARCH_AAEC2000 is not set
+ # CONFIG_ARCH_INTEGRATOR is not set
+ # CONFIG_ARCH_REALVIEW is not set
+ # CONFIG_ARCH_VERSATILE is not set
+ # CONFIG_ARCH_AT91 is not set
+ # CONFIG_ARCH_CLPS711X is not set
++# CONFIG_ARCH_GEMINI is not set
+ # CONFIG_ARCH_EBSA110 is not set
+ # CONFIG_ARCH_EP93XX is not set
+-# CONFIG_ARCH_GEMINI is not set
+ # CONFIG_ARCH_FOOTBRIDGE is not set
++# CONFIG_ARCH_MXC is not set
++# CONFIG_ARCH_STMP3XXX is not set
+ # CONFIG_ARCH_NETX is not set
+ # CONFIG_ARCH_H720X is not set
+-# CONFIG_ARCH_IMX is not set
++# CONFIG_ARCH_NOMADIK is not set
+ # CONFIG_ARCH_IOP13XX is not set
+ # CONFIG_ARCH_IOP32X is not set
+ # CONFIG_ARCH_IOP33X is not set
+@@ -150,26 +183,30 @@ CONFIG_DEFAULT_IOSCHED="cfq"
+ # CONFIG_ARCH_IXP2000 is not set
+ # CONFIG_ARCH_IXP4XX is not set
+ # CONFIG_ARCH_L7200 is not set
++# CONFIG_ARCH_DOVE is not set
+ # CONFIG_ARCH_KIRKWOOD is not set
+-# CONFIG_ARCH_KS8695 is not set
+-# CONFIG_ARCH_NS9XXX is not set
+ # CONFIG_ARCH_LOKI is not set
+ # CONFIG_ARCH_MV78XX0 is not set
+-# CONFIG_ARCH_MXC is not set
+ # CONFIG_ARCH_ORION5X is not set
++# CONFIG_ARCH_MMP is not set
++# CONFIG_ARCH_KS8695 is not set
++# CONFIG_ARCH_NS9XXX is not set
++CONFIG_ARCH_W90X900=y
+ # CONFIG_ARCH_PNX4008 is not set
+ # CONFIG_ARCH_PXA is not set
+-# CONFIG_ARCH_MMP is not set
++# CONFIG_ARCH_MSM is not set
+ # CONFIG_ARCH_RPC is not set
+ # CONFIG_ARCH_SA1100 is not set
+ # CONFIG_ARCH_S3C2410 is not set
+ # CONFIG_ARCH_S3C64XX is not set
++# CONFIG_ARCH_S5PC1XX is not set
+ # CONFIG_ARCH_SHARK is not set
+ # CONFIG_ARCH_LH7A40X is not set
++# CONFIG_ARCH_U300 is not set
+ # CONFIG_ARCH_DAVINCI is not set
+ # CONFIG_ARCH_OMAP is not set
+-# CONFIG_ARCH_MSM is not set
+-CONFIG_ARCH_W90X900=y
++# CONFIG_ARCH_BCMRING is not set
++# CONFIG_ARCH_U8500 is not set
+ CONFIG_CPU_W90P910=y
 
-@@ -156,6 +156,8 @@ static int __init nuc900_set_clkval(unsigned int cpufreq)
+ #
+@@ -178,13 +215,23 @@ CONFIG_CPU_W90P910=y
+ CONFIG_MACH_W90P910EVB=y
 
- 	return 	0;
- }
-+EXPORT_SYMBOL(nuc900_set_clkval);
+ #
++# NUC950 Machines
++#
++# CONFIG_MACH_W90P950EVB is not set
 +
- static int __init nuc900_set_cpufreq(char *str)
- {
- 	unsigned long cpufreq, val;
-diff --git a/arch/arm/mach-w90x900/cpufreq.c b/arch/arm/mach-w90x900/cpufreq.c
-new file mode 100644
-index 0000000..07b8685
---- /dev/null
-+++ b/arch/arm/mach-w90x900/cpufreq.c
-@@ -0,0 +1,146 @@
-+/* linux/arch/arm/mach-w90x900/cpufreq.c
-+ *
-+ * NUC900 CPUfreq Support
-+ *
-+ * Li Jie <eltshanli@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
++#
++# NUC960 Machines
++#
++# CONFIG_MACH_W90N960EVB is not set
 +
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <linux/init.h>
-+#include <linux/cpufreq.h>
-+#include <linux/clk.h>
-+#include <linux/err.h>
++#
+ # Processor Type
+ #
+ CONFIG_CPU_32=y
+ CONFIG_CPU_ARM926T=y
+ CONFIG_CPU_32v5=y
+ CONFIG_CPU_ABRT_EV5TJ=y
+-CONFIG_CPU_PABRT_NOIFAR=y
++CONFIG_CPU_PABRT_LEGACY=y
+ CONFIG_CPU_CACHE_VIVT=y
+ CONFIG_CPU_COPY_V4WB=y
+ CONFIG_CPU_TLB_V4WBI=y
+@@ -199,7 +246,7 @@ CONFIG_ARM_THUMB=y
+ # CONFIG_CPU_DCACHE_DISABLE is not set
+ # CONFIG_CPU_DCACHE_WRITETHROUGH is not set
+ # CONFIG_CPU_CACHE_ROUND_ROBIN is not set
+-# CONFIG_OUTER_CACHE is not set
++CONFIG_ARM_L1_CACHE_SHIFT=5
+ CONFIG_COMMON_CLKDEV=y
+
+ #
+@@ -212,15 +259,19 @@ CONFIG_COMMON_CLKDEV=y
+ #
+ # Kernel Features
+ #
++# CONFIG_NO_HZ is not set
++# CONFIG_HIGH_RES_TIMERS is not set
++CONFIG_GENERIC_CLOCKEVENTS_BUILD=y
+ CONFIG_VMSPLIT_3G=y
+ # CONFIG_VMSPLIT_2G is not set
+ # CONFIG_VMSPLIT_1G is not set
+ CONFIG_PAGE_OFFSET=0xC0000000
++# CONFIG_PREEMPT_NONE is not set
++# CONFIG_PREEMPT_VOLUNTARY is not set
+ CONFIG_PREEMPT=y
+ CONFIG_HZ=100
+ CONFIG_AEABI=y
+ CONFIG_OABI_COMPAT=y
+-# CONFIG_ARCH_HAS_HOLES_MEMORYMODEL is not set
+ # CONFIG_ARCH_SPARSEMEM_DEFAULT is not set
+ # CONFIG_ARCH_SELECT_MEMORY_MODEL is not set
+ # CONFIG_HIGHMEM is not set
+@@ -235,10 +286,12 @@ CONFIG_SPLIT_PTLOCK_CPUS=4096
+ # CONFIG_PHYS_ADDR_T_64BIT is not set
+ CONFIG_ZONE_DMA_FLAG=0
+ CONFIG_VIRT_TO_BUS=y
+-CONFIG_UNEVICTABLE_LRU=y
+ CONFIG_HAVE_MLOCK=y
+ CONFIG_HAVE_MLOCKED_PAGE_BIT=y
++# CONFIG_KSM is not set
++CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
+ CONFIG_ALIGNMENT_TRAP=y
++# CONFIG_UACCESS_WITH_MEMCPY is not set
+
+ #
+ # Boot options
+@@ -253,6 +306,21 @@ CONFIG_ATAGS_PROC=y
+ #
+ # CPU Power Management
+ #
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_TABLE=y
++# CONFIG_CPU_FREQ_DEBUG is not set
++CONFIG_CPU_FREQ_STAT=y
++# CONFIG_CPU_FREQ_STAT_DETAILS is not set
++CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y
++# CONFIG_CPU_FREQ_DEFAULT_GOV_POWERSAVE is not set
++# CONFIG_CPU_FREQ_DEFAULT_GOV_USERSPACE is not set
++# CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND is not set
++# CONFIG_CPU_FREQ_DEFAULT_GOV_CONSERVATIVE is not set
++CONFIG_CPU_FREQ_GOV_PERFORMANCE=y
++# CONFIG_CPU_FREQ_GOV_POWERSAVE is not set
++CONFIG_CPU_FREQ_GOV_USERSPACE=y
++# CONFIG_CPU_FREQ_GOV_ONDEMAND is not set
++# CONFIG_CPU_FREQ_GOV_CONSERVATIVE is not set
+ # CONFIG_CPU_IDLE is not set
+
+ #
+@@ -291,6 +359,7 @@ CONFIG_ARCH_SUSPEND_POSSIBLE=y
+ # Generic Driver Options
+ #
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++# CONFIG_DEVTMPFS is not set
+ CONFIG_STANDALONE=y
+ CONFIG_PREVENT_FIRMWARE_BUILD=y
+ CONFIG_FW_LOADER=y
+@@ -383,12 +452,17 @@ CONFIG_MTD_PHYSMAP=y
+ CONFIG_BLK_DEV=y
+ # CONFIG_BLK_DEV_COW_COMMON is not set
+ # CONFIG_BLK_DEV_LOOP is not set
 +
-+#include <asm/io.h>
-+#include <mach/hardware.h>
-+#include <mach/regs-clock.h>
++#
++# DRBD disabled because PROC_FS, INET or CONNECTOR not selected
++#
+ # CONFIG_BLK_DEV_UB is not set
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_COUNT=16
+ CONFIG_BLK_DEV_RAM_SIZE=16384
+ # CONFIG_BLK_DEV_XIP is not set
+ # CONFIG_CDROM_PKTCDVD is not set
++# CONFIG_MG_DISK is not set
+ # CONFIG_MISC_DEVICES is not set
+ CONFIG_HAVE_IDE=y
+ # CONFIG_IDE is not set
+@@ -412,10 +486,6 @@ CONFIG_BLK_DEV_SD=y
+ # CONFIG_BLK_DEV_SR is not set
+ # CONFIG_CHR_DEV_SG is not set
+ # CONFIG_CHR_DEV_SCH is not set
+-
+-#
+-# Some SCSI devices (e.g. CD jukebox) support multiple LUNs
+-#
+ # CONFIG_SCSI_MULTI_LUN is not set
+ # CONFIG_SCSI_CONSTANTS is not set
+ # CONFIG_SCSI_LOGGING is not set
+@@ -434,6 +504,7 @@ CONFIG_BLK_DEV_SD=y
+ # CONFIG_SCSI_OSD_INITIATOR is not set
+ # CONFIG_ATA is not set
+ # CONFIG_MD is not set
++# CONFIG_PHONE is not set
+
+ #
+ # Input device support
+@@ -441,6 +512,7 @@ CONFIG_BLK_DEV_SD=y
+ CONFIG_INPUT=y
+ # CONFIG_INPUT_FF_MEMLESS is not set
+ # CONFIG_INPUT_POLLDEV is not set
++# CONFIG_INPUT_SPARSEKMAP is not set
+
+ #
+ # Userland interfaces
+@@ -504,6 +576,11 @@ CONFIG_UNIX98_PTYS=y
+ # CONFIG_TCG_TPM is not set
+ # CONFIG_I2C is not set
+ # CONFIG_SPI is not set
 +
-+extern int nuc900_set_clkval(unsigned int cpufreq);
++#
++# PPS support
++#
++# CONFIG_PPS is not set
+ CONFIG_ARCH_REQUIRE_GPIOLIB=y
+ CONFIG_GPIOLIB=y
+ # CONFIG_GPIO_SYSFS is not set
+@@ -523,11 +600,14 @@ CONFIG_GPIOLIB=y
+ #
+ # SPI GPIO expanders:
+ #
 +
-+static struct cpufreq_frequency_table nuc900_freq_table[] = {
-+	{ 0,  66000 },
-+	{ 1, 100000 },
-+	{ 2, 120000 },
-+	{ 3, 166000 },
-+	{ 4, 200000 },
-+	{ 5, CPUFREQ_TABLE_END },
-+};
++#
++# AC97 GPIO expanders:
++#
+ # CONFIG_W1 is not set
+ # CONFIG_POWER_SUPPLY is not set
+ # CONFIG_HWMON is not set
+ # CONFIG_THERMAL is not set
+-# CONFIG_THERMAL_HWMON is not set
+ # CONFIG_WATCHDOG is not set
+ CONFIG_SSB_POSSIBLE=y
+
+@@ -545,22 +625,11 @@ CONFIG_SSB_POSSIBLE=y
+ # CONFIG_HTC_EGPIO is not set
+ # CONFIG_HTC_PASIC3 is not set
+ # CONFIG_MFD_TMIO is not set
++# CONFIG_MFD_T7L66XB is not set
++# CONFIG_MFD_TC6387XB is not set
+ # CONFIG_MFD_TC6393XB is not set
+-
+-#
+-# Multimedia devices
+-#
+-
+-#
+-# Multimedia core support
+-#
+-# CONFIG_VIDEO_DEV is not set
+-# CONFIG_VIDEO_MEDIA is not set
+-
+-#
+-# Multimedia drivers
+-#
+-# CONFIG_DAB is not set
++# CONFIG_REGULATOR is not set
++# CONFIG_MEDIA_SUPPORT is not set
+
+ #
+ # Graphics support
+@@ -584,8 +653,8 @@ CONFIG_DUMMY_CONSOLE=y
+ # CONFIG_HID_SUPPORT is not set
+ CONFIG_USB_SUPPORT=y
+ CONFIG_USB_ARCH_HAS_HCD=y
+-# CONFIG_USB_ARCH_HAS_OHCI is not set
+-# CONFIG_USB_ARCH_HAS_EHCI is not set
++CONFIG_USB_ARCH_HAS_OHCI=y
++CONFIG_USB_ARCH_HAS_EHCI=y
+ CONFIG_USB=y
+ # CONFIG_USB_DEBUG is not set
+ # CONFIG_USB_ANNOUNCE_NEW_DEVICES is not set
+@@ -605,12 +674,16 @@ CONFIG_USB_MON=y
+ # USB Host Controller Drivers
+ #
+ # CONFIG_USB_C67X00_HCD is not set
++# CONFIG_USB_EHCI_HCD is not set
+ # CONFIG_USB_OXU210HP_HCD is not set
+ # CONFIG_USB_ISP116X_HCD is not set
+ # CONFIG_USB_ISP1760_HCD is not set
++# CONFIG_USB_ISP1362_HCD is not set
++# CONFIG_USB_OHCI_HCD is not set
+ # CONFIG_USB_SL811_HCD is not set
+ # CONFIG_USB_R8A66597_HCD is not set
+ # CONFIG_USB_HWA_HCD is not set
++# CONFIG_USB_MUSB_HDRC is not set
+
+ #
+ # USB Device Class drivers
+@@ -673,6 +746,7 @@ CONFIG_USB_STORAGE=y
+ # CONFIG_USB_LD is not set
+ # CONFIG_USB_TRANCEVIBRATOR is not set
+ # CONFIG_USB_IOWARRIOR is not set
++# CONFIG_USB_TEST is not set
+ # CONFIG_USB_ISIGHTFW is not set
+ # CONFIG_USB_VST is not set
+ # CONFIG_USB_GADGET is not set
+@@ -681,17 +755,21 @@ CONFIG_USB_STORAGE=y
+ # OTG and related infrastructure
+ #
+ # CONFIG_USB_GPIO_VBUS is not set
++# CONFIG_USB_ULPI is not set
+ # CONFIG_NOP_USB_XCEIV is not set
+ # CONFIG_MMC is not set
+ # CONFIG_MEMSTICK is not set
+-# CONFIG_ACCESSIBILITY is not set
+ # CONFIG_NEW_LEDS is not set
++# CONFIG_ACCESSIBILITY is not set
+ CONFIG_RTC_LIB=y
+ # CONFIG_RTC_CLASS is not set
+ # CONFIG_DMADEVICES is not set
+ # CONFIG_AUXDISPLAY is not set
+-# CONFIG_REGULATOR is not set
+ # CONFIG_UIO is not set
 +
-+static int nuc900_cpufreq_verify_speed(struct cpufreq_policy *policy)
-+{
-+	if (policy->cpu != 0)
-+		return -EINVAL;
++#
++# TI VLYNQ
++#
+ # CONFIG_STAGING is not set
+
+ #
+@@ -700,15 +778,19 @@ CONFIG_RTC_LIB=y
+ # CONFIG_EXT2_FS is not set
+ # CONFIG_EXT3_FS is not set
+ # CONFIG_EXT4_FS is not set
++CONFIG_EXT4_USE_FOR_EXT23=y
+ # CONFIG_REISERFS_FS is not set
+ # CONFIG_JFS_FS is not set
+ CONFIG_FS_POSIX_ACL=y
+-CONFIG_FILE_LOCKING=y
+ # CONFIG_XFS_FS is not set
+ # CONFIG_GFS2_FS is not set
+ # CONFIG_BTRFS_FS is not set
++# CONFIG_NILFS2_FS is not set
++CONFIG_FILE_LOCKING=y
++CONFIG_FSNOTIFY=y
+ # CONFIG_DNOTIFY is not set
+ # CONFIG_INOTIFY is not set
++CONFIG_INOTIFY_USER=y
+ # CONFIG_QUOTA is not set
+ # CONFIG_AUTOFS_FS is not set
+ # CONFIG_AUTOFS4_FS is not set
+@@ -767,7 +849,6 @@ CONFIG_ROMFS_BACKED_BY_BLOCK=y
+ CONFIG_ROMFS_ON_BLOCK=y
+ # CONFIG_SYSV_FS is not set
+ # CONFIG_UFS_FS is not set
+-# CONFIG_NILFS2_FS is not set
+
+ #
+ # Partition Types
+@@ -839,41 +920,25 @@ CONFIG_NLS_ISO8859_1=y
+ # CONFIG_ENABLE_MUST_CHECK is not set
+ CONFIG_FRAME_WARN=1024
+ # CONFIG_MAGIC_SYSRQ is not set
++# CONFIG_STRIP_ASM_SYMS is not set
+ # CONFIG_UNUSED_SYMBOLS is not set
+ CONFIG_DEBUG_FS=y
+ # CONFIG_HEADERS_CHECK is not set
+ # CONFIG_DEBUG_KERNEL is not set
+-CONFIG_STACKTRACE=y
+ CONFIG_DEBUG_BUGVERBOSE=y
+ CONFIG_DEBUG_MEMORY_INIT=y
+ # CONFIG_RCU_CPU_STALL_DETECTOR is not set
+ # CONFIG_LATENCYTOP is not set
+ # CONFIG_SYSCTL_SYSCALL_CHECK is not set
+-CONFIG_NOP_TRACER=y
+ CONFIG_HAVE_FUNCTION_TRACER=y
+-CONFIG_RING_BUFFER=y
+-CONFIG_TRACING=y
+ CONFIG_TRACING_SUPPORT=y
+-
+-#
+-# Tracers
+-#
+-# CONFIG_FUNCTION_TRACER is not set
+-# CONFIG_SCHED_TRACER is not set
+-# CONFIG_CONTEXT_SWITCH_TRACER is not set
+-# CONFIG_EVENT_TRACER is not set
+-# CONFIG_BOOT_TRACER is not set
+-# CONFIG_TRACE_BRANCH_PROFILING is not set
+-# CONFIG_STACK_TRACER is not set
+-# CONFIG_KMEMTRACE is not set
+-# CONFIG_WORKQUEUE_TRACER is not set
+-CONFIG_BLK_DEV_IO_TRACE=y
+-# CONFIG_FTRACE_STARTUP_TEST is not set
++# CONFIG_FTRACE is not set
+ # CONFIG_DYNAMIC_DEBUG is not set
+ # CONFIG_SAMPLES is not set
+ CONFIG_HAVE_ARCH_KGDB=y
+ CONFIG_ARM_UNWIND=y
+ # CONFIG_DEBUG_USER is not set
++# CONFIG_OC_ETM is not set
+
+ #
+ # Security options
+@@ -881,9 +946,13 @@ CONFIG_ARM_UNWIND=y
+ # CONFIG_KEYS is not set
+ # CONFIG_SECURITY is not set
+ # CONFIG_SECURITYFS is not set
+-# CONFIG_SECURITY_FILE_CAPABILITIES is not set
++# CONFIG_DEFAULT_SECURITY_SELINUX is not set
++# CONFIG_DEFAULT_SECURITY_SMACK is not set
++# CONFIG_DEFAULT_SECURITY_TOMOYO is not set
++CONFIG_DEFAULT_SECURITY_DAC=y
++CONFIG_DEFAULT_SECURITY=""
+ # CONFIG_CRYPTO is not set
+-CONFIG_BINARY_PRINTF=y
++# CONFIG_BINARY_PRINTF is not set
+
+ #
+ # Library routines
+diff --git a/arch/arm/configs/nuc950_defconfig
+b/arch/arm/configs/nuc950_defconfig
+index df1de9b..5de9b26 100644
+--- a/arch/arm/configs/nuc950_defconfig
++++ b/arch/arm/configs/nuc950_defconfig
+@@ -1,7 +1,7 @@
+ #
+ # Automatically generated make config: don't edit
+-# Linux kernel version: 2.6.32-rc7
+-# Tue Nov 17 12:31:33 2009
++# Linux kernel version: 2.6.32
++# Mon Dec 14 15:42:14 2009
+ #
+ CONFIG_ARM=y
+ CONFIG_SYS_SUPPORTS_APM_EMULATION=y
+@@ -16,6 +16,7 @@ CONFIG_TRACE_IRQFLAGS_SUPPORT=y
+ CONFIG_HARDIRQS_SW_RESEND=y
+ CONFIG_GENERIC_IRQ_PROBE=y
+ CONFIG_RWSEM_GENERIC_SPINLOCK=y
++CONFIG_ARCH_HAS_CPUFREQ=y
+ CONFIG_GENERIC_HWEIGHT=y
+ CONFIG_GENERIC_CALIBRATE_DELAY=y
+ CONFIG_GENERIC_HARDIRQS_NO__DO_IRQ=y
+@@ -43,6 +44,7 @@ CONFIG_BSD_PROCESS_ACCT=y
+ #
+ CONFIG_TREE_RCU=y
+ # CONFIG_TREE_PREEMPT_RCU is not set
++# CONFIG_TINY_RCU is not set
+ # CONFIG_RCU_TRACE is not set
+ CONFIG_RCU_FANOUT=32
+ # CONFIG_RCU_FANOUT_EXACT is not set
+@@ -118,14 +120,41 @@ CONFIG_BLK_DEV_BSG=y
+ # IO Schedulers
+ #
+ CONFIG_IOSCHED_NOOP=y
+-CONFIG_IOSCHED_AS=y
+ CONFIG_IOSCHED_DEADLINE=y
+ CONFIG_IOSCHED_CFQ=y
+-# CONFIG_DEFAULT_AS is not set
+ # CONFIG_DEFAULT_DEADLINE is not set
+ CONFIG_DEFAULT_CFQ=y
+ # CONFIG_DEFAULT_NOOP is not set
+ CONFIG_DEFAULT_IOSCHED="cfq"
++# CONFIG_INLINE_SPIN_TRYLOCK is not set
++# CONFIG_INLINE_SPIN_TRYLOCK_BH is not set
++# CONFIG_INLINE_SPIN_LOCK is not set
++# CONFIG_INLINE_SPIN_LOCK_BH is not set
++# CONFIG_INLINE_SPIN_LOCK_IRQ is not set
++# CONFIG_INLINE_SPIN_LOCK_IRQSAVE is not set
++# CONFIG_INLINE_SPIN_UNLOCK is not set
++# CONFIG_INLINE_SPIN_UNLOCK_BH is not set
++# CONFIG_INLINE_SPIN_UNLOCK_IRQ is not set
++# CONFIG_INLINE_SPIN_UNLOCK_IRQRESTORE is not set
++# CONFIG_INLINE_READ_TRYLOCK is not set
++# CONFIG_INLINE_READ_LOCK is not set
++# CONFIG_INLINE_READ_LOCK_BH is not set
++# CONFIG_INLINE_READ_LOCK_IRQ is not set
++# CONFIG_INLINE_READ_LOCK_IRQSAVE is not set
++# CONFIG_INLINE_READ_UNLOCK is not set
++# CONFIG_INLINE_READ_UNLOCK_BH is not set
++# CONFIG_INLINE_READ_UNLOCK_IRQ is not set
++# CONFIG_INLINE_READ_UNLOCK_IRQRESTORE is not set
++# CONFIG_INLINE_WRITE_TRYLOCK is not set
++# CONFIG_INLINE_WRITE_LOCK is not set
++# CONFIG_INLINE_WRITE_LOCK_BH is not set
++# CONFIG_INLINE_WRITE_LOCK_IRQ is not set
++# CONFIG_INLINE_WRITE_LOCK_IRQSAVE is not set
++# CONFIG_INLINE_WRITE_UNLOCK is not set
++# CONFIG_INLINE_WRITE_UNLOCK_BH is not set
++# CONFIG_INLINE_WRITE_UNLOCK_IRQ is not set
++# CONFIG_INLINE_WRITE_UNLOCK_IRQRESTORE is not set
++# CONFIG_MUTEX_SPIN_ON_OWNER is not set
+ # CONFIG_FREEZER is not set
+
+ #
+@@ -154,6 +183,7 @@ CONFIG_MMU=y
+ # CONFIG_ARCH_IXP2000 is not set
+ # CONFIG_ARCH_IXP4XX is not set
+ # CONFIG_ARCH_L7200 is not set
++# CONFIG_ARCH_DOVE is not set
+ # CONFIG_ARCH_KIRKWOOD is not set
+ # CONFIG_ARCH_LOKI is not set
+ # CONFIG_ARCH_MV78XX0 is not set
+@@ -176,6 +206,7 @@ CONFIG_ARCH_W90X900=y
+ # CONFIG_ARCH_DAVINCI is not set
+ # CONFIG_ARCH_OMAP is not set
+ # CONFIG_ARCH_BCMRING is not set
++# CONFIG_ARCH_U8500 is not set
+ CONFIG_CPU_NUC950=y
+
+ #
+@@ -194,11 +225,6 @@ CONFIG_MACH_W90P950EVB=y
+ # CONFIG_MACH_W90N960EVB is not set
+
+ #
+-# NUC932 Machines
+-#
+-# CONFIG_MACH_NUC932EVB is not set
+-
+-#
+ # Processor Type
+ #
+ CONFIG_CPU_32=y
+@@ -281,6 +307,21 @@ CONFIG_ATAGS_PROC=y
+ #
+ # CPU Power Management
+ #
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_TABLE=y
++# CONFIG_CPU_FREQ_DEBUG is not set
++CONFIG_CPU_FREQ_STAT=y
++# CONFIG_CPU_FREQ_STAT_DETAILS is not set
++CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y
++# CONFIG_CPU_FREQ_DEFAULT_GOV_POWERSAVE is not set
++# CONFIG_CPU_FREQ_DEFAULT_GOV_USERSPACE is not set
++# CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND is not set
++# CONFIG_CPU_FREQ_DEFAULT_GOV_CONSERVATIVE is not set
++CONFIG_CPU_FREQ_GOV_PERFORMANCE=y
++# CONFIG_CPU_FREQ_GOV_POWERSAVE is not set
++CONFIG_CPU_FREQ_GOV_USERSPACE=y
++# CONFIG_CPU_FREQ_GOV_ONDEMAND is not set
++# CONFIG_CPU_FREQ_GOV_CONSERVATIVE is not set
+ # CONFIG_CPU_IDLE is not set
+
+ #
+@@ -412,6 +453,10 @@ CONFIG_MTD_PHYSMAP=y
+ CONFIG_BLK_DEV=y
+ # CONFIG_BLK_DEV_COW_COMMON is not set
+ # CONFIG_BLK_DEV_LOOP is not set
 +
-+	return cpufreq_frequency_table_verify(policy, nuc900_freq_table);
-+}
++#
++# DRBD disabled because PROC_FS, INET or CONNECTOR not selected
++#
+ # CONFIG_BLK_DEV_UB is not set
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_COUNT=16
+@@ -468,6 +513,7 @@ CONFIG_BLK_DEV_SD=y
+ CONFIG_INPUT=y
+ # CONFIG_INPUT_FF_MEMLESS is not set
+ # CONFIG_INPUT_POLLDEV is not set
++# CONFIG_INPUT_SPARSEKMAP is not set
+
+ #
+ # Userland interfaces
+@@ -710,6 +756,7 @@ CONFIG_USB_STORAGE=y
+ # OTG and related infrastructure
+ #
+ # CONFIG_USB_GPIO_VBUS is not set
++# CONFIG_USB_ULPI is not set
+ # CONFIG_NOP_USB_XCEIV is not set
+ # CONFIG_MMC is not set
+ # CONFIG_MEMSTICK is not set
+@@ -732,6 +779,7 @@ CONFIG_RTC_LIB=y
+ # CONFIG_EXT2_FS is not set
+ # CONFIG_EXT3_FS is not set
+ # CONFIG_EXT4_FS is not set
++CONFIG_EXT4_USE_FOR_EXT23=y
+ # CONFIG_REISERFS_FS is not set
+ # CONFIG_JFS_FS is not set
+ CONFIG_FS_POSIX_ACL=y
+@@ -891,6 +939,7 @@ CONFIG_TRACING_SUPPORT=y
+ CONFIG_HAVE_ARCH_KGDB=y
+ CONFIG_ARM_UNWIND=y
+ # CONFIG_DEBUG_USER is not set
++# CONFIG_OC_ETM is not set
+
+ #
+ # Security options
+@@ -898,7 +947,11 @@ CONFIG_ARM_UNWIND=y
+ # CONFIG_KEYS is not set
+ # CONFIG_SECURITY is not set
+ # CONFIG_SECURITYFS is not set
+-# CONFIG_SECURITY_FILE_CAPABILITIES is not set
++# CONFIG_DEFAULT_SECURITY_SELINUX is not set
++# CONFIG_DEFAULT_SECURITY_SMACK is not set
++# CONFIG_DEFAULT_SECURITY_TOMOYO is not set
++CONFIG_DEFAULT_SECURITY_DAC=y
++CONFIG_DEFAULT_SECURITY=""
+ # CONFIG_CRYPTO is not set
+ # CONFIG_BINARY_PRINTF is not set
+
+diff --git a/arch/arm/configs/nuc960_defconfig
+b/arch/arm/configs/nuc960_defconfig
+index 4b2cd9e..553fce5 100644
+--- a/arch/arm/configs/nuc960_defconfig
++++ b/arch/arm/configs/nuc960_defconfig
+@@ -1,7 +1,7 @@
+ #
+ # Automatically generated make config: don't edit
+-# Linux kernel version: 2.6.32-rc7
+-# Tue Nov 17 12:20:11 2009
++# Linux kernel version: 2.6.32
++# Mon Dec 14 15:42:59 2009
+ #
+ CONFIG_ARM=y
+ CONFIG_SYS_SUPPORTS_APM_EMULATION=y
+@@ -16,6 +16,7 @@ CONFIG_TRACE_IRQFLAGS_SUPPORT=y
+ CONFIG_HARDIRQS_SW_RESEND=y
+ CONFIG_GENERIC_IRQ_PROBE=y
+ CONFIG_RWSEM_GENERIC_SPINLOCK=y
++CONFIG_ARCH_HAS_CPUFREQ=y
+ CONFIG_GENERIC_HWEIGHT=y
+ CONFIG_GENERIC_CALIBRATE_DELAY=y
+ CONFIG_GENERIC_HARDIRQS_NO__DO_IRQ=y
+@@ -43,6 +44,7 @@ CONFIG_BSD_PROCESS_ACCT=y
+ #
+ CONFIG_TREE_RCU=y
+ # CONFIG_TREE_PREEMPT_RCU is not set
++# CONFIG_TINY_RCU is not set
+ # CONFIG_RCU_TRACE is not set
+ CONFIG_RCU_FANOUT=32
+ # CONFIG_RCU_FANOUT_EXACT is not set
+@@ -118,14 +120,41 @@ CONFIG_BLK_DEV_BSG=y
+ # IO Schedulers
+ #
+ CONFIG_IOSCHED_NOOP=y
+-CONFIG_IOSCHED_AS=y
+ CONFIG_IOSCHED_DEADLINE=y
+ CONFIG_IOSCHED_CFQ=y
+-# CONFIG_DEFAULT_AS is not set
+ # CONFIG_DEFAULT_DEADLINE is not set
+ CONFIG_DEFAULT_CFQ=y
+ # CONFIG_DEFAULT_NOOP is not set
+ CONFIG_DEFAULT_IOSCHED="cfq"
++# CONFIG_INLINE_SPIN_TRYLOCK is not set
++# CONFIG_INLINE_SPIN_TRYLOCK_BH is not set
++# CONFIG_INLINE_SPIN_LOCK is not set
++# CONFIG_INLINE_SPIN_LOCK_BH is not set
++# CONFIG_INLINE_SPIN_LOCK_IRQ is not set
++# CONFIG_INLINE_SPIN_LOCK_IRQSAVE is not set
++# CONFIG_INLINE_SPIN_UNLOCK is not set
++# CONFIG_INLINE_SPIN_UNLOCK_BH is not set
++# CONFIG_INLINE_SPIN_UNLOCK_IRQ is not set
++# CONFIG_INLINE_SPIN_UNLOCK_IRQRESTORE is not set
++# CONFIG_INLINE_READ_TRYLOCK is not set
++# CONFIG_INLINE_READ_LOCK is not set
++# CONFIG_INLINE_READ_LOCK_BH is not set
++# CONFIG_INLINE_READ_LOCK_IRQ is not set
++# CONFIG_INLINE_READ_LOCK_IRQSAVE is not set
++# CONFIG_INLINE_READ_UNLOCK is not set
++# CONFIG_INLINE_READ_UNLOCK_BH is not set
++# CONFIG_INLINE_READ_UNLOCK_IRQ is not set
++# CONFIG_INLINE_READ_UNLOCK_IRQRESTORE is not set
++# CONFIG_INLINE_WRITE_TRYLOCK is not set
++# CONFIG_INLINE_WRITE_LOCK is not set
++# CONFIG_INLINE_WRITE_LOCK_BH is not set
++# CONFIG_INLINE_WRITE_LOCK_IRQ is not set
++# CONFIG_INLINE_WRITE_LOCK_IRQSAVE is not set
++# CONFIG_INLINE_WRITE_UNLOCK is not set
++# CONFIG_INLINE_WRITE_UNLOCK_BH is not set
++# CONFIG_INLINE_WRITE_UNLOCK_IRQ is not set
++# CONFIG_INLINE_WRITE_UNLOCK_IRQRESTORE is not set
++# CONFIG_MUTEX_SPIN_ON_OWNER is not set
+ # CONFIG_FREEZER is not set
+
+ #
+@@ -154,6 +183,7 @@ CONFIG_MMU=y
+ # CONFIG_ARCH_IXP2000 is not set
+ # CONFIG_ARCH_IXP4XX is not set
+ # CONFIG_ARCH_L7200 is not set
++# CONFIG_ARCH_DOVE is not set
+ # CONFIG_ARCH_KIRKWOOD is not set
+ # CONFIG_ARCH_LOKI is not set
+ # CONFIG_ARCH_MV78XX0 is not set
+@@ -176,6 +206,7 @@ CONFIG_ARCH_W90X900=y
+ # CONFIG_ARCH_DAVINCI is not set
+ # CONFIG_ARCH_OMAP is not set
+ # CONFIG_ARCH_BCMRING is not set
++# CONFIG_ARCH_U8500 is not set
+ CONFIG_CPU_NUC960=y
+
+ #
+@@ -194,11 +225,6 @@ CONFIG_CPU_NUC960=y
+ CONFIG_MACH_W90N960EVB=y
+
+ #
+-# NUC932 Machines
+-#
+-# CONFIG_MACH_NUC932EVB is not set
+-
+-#
+ # Processor Type
+ #
+ CONFIG_CPU_32=y
+@@ -281,6 +307,21 @@ CONFIG_ATAGS_PROC=y
+ #
+ # CPU Power Management
+ #
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_TABLE=y
++# CONFIG_CPU_FREQ_DEBUG is not set
++CONFIG_CPU_FREQ_STAT=y
++# CONFIG_CPU_FREQ_STAT_DETAILS is not set
++CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y
++# CONFIG_CPU_FREQ_DEFAULT_GOV_POWERSAVE is not set
++# CONFIG_CPU_FREQ_DEFAULT_GOV_USERSPACE is not set
++# CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND is not set
++# CONFIG_CPU_FREQ_DEFAULT_GOV_CONSERVATIVE is not set
++CONFIG_CPU_FREQ_GOV_PERFORMANCE=y
++# CONFIG_CPU_FREQ_GOV_POWERSAVE is not set
++CONFIG_CPU_FREQ_GOV_USERSPACE=y
++# CONFIG_CPU_FREQ_GOV_ONDEMAND is not set
++# CONFIG_CPU_FREQ_GOV_CONSERVATIVE is not set
+ # CONFIG_CPU_IDLE is not set
+
+ #
+@@ -412,6 +453,10 @@ CONFIG_MTD_PHYSMAP=y
+ CONFIG_BLK_DEV=y
+ # CONFIG_BLK_DEV_COW_COMMON is not set
+ # CONFIG_BLK_DEV_LOOP is not set
 +
-+static unsigned int nuc900_cpufreq_get_speed(unsigned int cpu)
-+{
-+	int pllclk;
-+
-+	if (cpu != 0)
-+		return 0;
-+
-+	pllclk = __raw_readl(REG_PLLCON0);
-+
-+	switch (pllclk) {
-+	case PLL_66MHZ:
-+		return 66 * 1000;
-+	case PLL_100MHZ:
-+		return 100 * 1000;
-+	case PLL_120MHZ:
-+		return 120 * 1000;
-+	case PLL_166MHZ:
-+		return 166 * 1000;
-+	case PLL_200MHZ:
-+		return 200 * 1000;
-+	}
-+
-+	pr_err("cpufreq: Failed to get frequency: %X\n", pllclk);
-+	return 0;
-+}
-+
-+static int nuc900_cpufreq_set_target(struct cpufreq_policy *policy,
-+				      unsigned int target_freq,
-+				      unsigned int relation)
-+{
-+	int ret;
-+	unsigned int i;
-+	struct cpufreq_freqs freqs;
-+
-+	ret = cpufreq_frequency_table_target(policy, nuc900_freq_table,
-+					     target_freq, relation, &i);
-+	if (ret != 0)
-+		return ret;
-+
-+	freqs.cpu = 0;
-+	freqs.old = nuc900_cpufreq_get_speed(0);
-+	freqs.new = nuc900_freq_table[i].frequency;
-+	freqs.flags = 0;
-+
-+	if (freqs.old == freqs.new)
-+		return 0;
-+
-+	pr_debug("cpufreq: Transition %d-%dkHz\n", freqs.old, freqs.new);
-+
-+	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-+
-+	nuc900_set_clkval(freqs.new / 1000);
-+	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-+
-+	return 0;
-+}
-+
-+static int __init nuc900_cpufreq_driver_init(struct cpufreq_policy *policy)
-+{
-+	int ret;
-+
-+	if (policy->cpu != 0)
-+		return -EINVAL;
-+
-+	policy->cur = nuc900_cpufreq_get_speed(0);
-+
-+	policy->cpuinfo.transition_latency = 2 * 1000; /* FIXME, assumed */
-+	policy->cpuinfo.min_freq = 66000;	       /* khz */
-+	policy->cpuinfo.max_freq = 200000;
-+	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
-+
-+	ret = cpufreq_frequency_table_cpuinfo(policy, nuc900_freq_table);
-+	if (ret != 0)
-+		pr_err("cpufreq: Failed to configure frequency table: %d\n",
-+		       ret);
-+
-+	return ret;
-+}
-+
-+static struct cpufreq_driver nuc900_cpufreq_driver = {
-+	.owner		= THIS_MODULE,
-+	.flags          = 0,
-+	.verify		= nuc900_cpufreq_verify_speed,
-+	.target		= nuc900_cpufreq_set_target,
-+	.get		= nuc900_cpufreq_get_speed,
-+	.init		= nuc900_cpufreq_driver_init,
-+	.name		= "nuc900",
-+};
-+
-+static int __init nuc900_cpufreq_init(void)
-+{
-+	return cpufreq_register_driver(&nuc900_cpufreq_driver);
-+}
-+
-+static void __exit nuc900_cpufreq_exit(void)
-+{
-+	cpufreq_unregister_driver(&nuc900_cpufreq_driver);
-+}
-+
-+MODULE_AUTHOR ("Li Jie <eltshanli@gmail.com>");
-+MODULE_DESCRIPTION ("cpufreq driver for NUC900");
-+MODULE_LICENSE ("GPL");
-+
-+module_init(nuc900_cpufreq_init);
-+module_exit(nuc900_cpufreq_exit);
++#
++# DRBD disabled because PROC_FS, INET or CONNECTOR not selected
++#
+ # CONFIG_BLK_DEV_UB is not set
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_COUNT=16
+@@ -468,6 +513,7 @@ CONFIG_BLK_DEV_SD=y
+ CONFIG_INPUT=y
+ # CONFIG_INPUT_FF_MEMLESS is not set
+ # CONFIG_INPUT_POLLDEV is not set
++# CONFIG_INPUT_SPARSEKMAP is not set
+
+ #
+ # Userland interfaces
+@@ -710,6 +756,7 @@ CONFIG_USB_STORAGE=y
+ # OTG and related infrastructure
+ #
+ # CONFIG_USB_GPIO_VBUS is not set
++# CONFIG_USB_ULPI is not set
+ # CONFIG_NOP_USB_XCEIV is not set
+ # CONFIG_MMC is not set
+ # CONFIG_MEMSTICK is not set
+@@ -732,6 +779,7 @@ CONFIG_RTC_LIB=y
+ # CONFIG_EXT2_FS is not set
+ # CONFIG_EXT3_FS is not set
+ # CONFIG_EXT4_FS is not set
++CONFIG_EXT4_USE_FOR_EXT23=y
+ # CONFIG_REISERFS_FS is not set
+ # CONFIG_JFS_FS is not set
+ CONFIG_FS_POSIX_ACL=y
+@@ -891,6 +939,7 @@ CONFIG_TRACING_SUPPORT=y
+ CONFIG_HAVE_ARCH_KGDB=y
+ CONFIG_ARM_UNWIND=y
+ # CONFIG_DEBUG_USER is not set
++# CONFIG_OC_ETM is not set
+
+ #
+ # Security options
+@@ -898,7 +947,11 @@ CONFIG_ARM_UNWIND=y
+ # CONFIG_KEYS is not set
+ # CONFIG_SECURITY is not set
+ # CONFIG_SECURITYFS is not set
+-# CONFIG_SECURITY_FILE_CAPABILITIES is not set
++# CONFIG_DEFAULT_SECURITY_SELINUX is not set
++# CONFIG_DEFAULT_SECURITY_SMACK is not set
++# CONFIG_DEFAULT_SECURITY_TOMOYO is not set
++CONFIG_DEFAULT_SECURITY_DAC=y
++CONFIG_DEFAULT_SECURITY=""
+ # CONFIG_CRYPTO is not set
+ # CONFIG_BINARY_PRINTF is not set
+
 -- 
 1.6.5.4
