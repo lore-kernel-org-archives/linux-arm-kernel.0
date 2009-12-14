@@ -1,97 +1,54 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 14 Dec 2009 11:33:48 +0100
-Subject: [PATCH 3/4] fec: add support for Freescale i.MX25 PDK (3DS)
-In-Reply-To: <fb518184b206ec2727deda111cc5364134ace69a.1260785451.git.baruch@tkos.co.il>
-References: <cover.1260785451.git.baruch@tkos.co.il>
-	<fb518184b206ec2727deda111cc5364134ace69a.1260785451.git.baruch@tkos.co.il>
-Message-ID: <20091214103348.GV15126@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 14 Dec 2009 10:37:13 +0000
+Subject: [PATCH 3/4] ARM: L2 : Errata 588369: Clean & Invalidate do
+	notinvalidate clean lines
+In-Reply-To: <1260384233-2278-3-git-send-email-santosh.shilimkar@ti.com>
+References: <1260384233-2278-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1260787034.17159.24.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2009 at 12:19:41PM +0200, Baruch Siach wrote:
-> The i.MX25 PDK uses RMII to communicate with its PHY. This patch adds the
-> necessary bits to make the i.MX25 talk RMII.
-> 
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> ---
->  drivers/net/fec.c |   22 ++++++++++++++++++++++
->  drivers/net/fec.h |    2 ++
->  2 files changed, 24 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/net/fec.c b/drivers/net/fec.c
-> index 16a1d58..65c43d3 100644
-> --- a/drivers/net/fec.c
-> +++ b/drivers/net/fec.c
-> @@ -51,6 +51,7 @@
->  #include "fec.h"
->  
->  #ifdef CONFIG_ARCH_MXC
-> +#include <asm/mach-types.h>
->  #include <mach/hardware.h>
->  #define FEC_ALIGNMENT	0xf
->  #else
-> @@ -1722,6 +1723,25 @@ static int fec_enet_init(struct net_device *dev, int index)
->  	return 0;
->  }
->  
-> +static void fec_localhw_setup(struct net_device *dev)
-> +{
-> +	struct fec_enet_private *fep = netdev_priv(dev);
-> +
-> +	if (!machine_is_mx25_3ds())
-> +		return;
+On Wed, 2009-12-09 at 18:43 +0000, Santosh Shilimkar wrote:
+> This patch implements the work-around for the errata 588369. The secure API
+> is used to alter L2 debug regsiter because of trust-zone.
+[...]
+> +config PL310_ERRATA_588369
+> +       bool "Clean & Invalidate maintenance operations do not invalidate clean lines"
+> +       depends on CACHE_L2X0
+> +       default n
+> +       help
+> +          The PL310 L2 cache controller implements three types of Clean &
+> +          Invalidate maintenance operations: by Physical Address
+> +          (offset 0x7F0), by Index/Way (0x7F8) and by Way (0x7FC).
+> +          They are architecturally defined to behave as the execution of a
+> +          clean operation followed immediately by an invalidate operation,
+> +          both performing to the same memory location. This functionality
+> +          is not correctly implemented in PL310 as clean lines are not
+> +          invalidated as a result of these operations
+>  endmenu
 
-We should add a flag in platform data for this. Unfortunately the fec
-driver has no platform data at all at the moment, so this requires some
-more work.
-
-Sascha
-
-> +
-> +	/* disable the gasket and wait */
-> +	writel(0, fep->hwp + FEC_MIIGSK_ENR);
-> +	while (readl(fep->hwp + FEC_MIIGSK_ENR) & 4)
-> +		udelay(1);
-> +
-> +	/* configure the gasket for RMII, 50 MHz, no loopback, no echo */
-> +	writel(1, fep->hwp + FEC_MIIGSK_CFGR);
-> +
-> +	/* re-enable the gasket */
-> +	writel(2, fep->hwp + FEC_MIIGSK_ENR);
-> +}
-> +
->  /* This function is called to start or restart the FEC during a link
->   * change.  This only happens when switching between half and full
->   * duplex.
-> @@ -1810,6 +1830,8 @@ fec_restart(struct net_device *dev, int duplex)
->  	/* Set MII speed */
->  	writel(fep->phy_speed, fep->hwp + FEC_MII_SPEED);
->  
-> +	fec_localhw_setup(dev);
-> +
->  	/* And last, enable the transmit and receive processing */
->  	writel(2, fep->hwp + FEC_ECNTRL);
->  	writel(0, fep->hwp + FEC_R_DES_ACTIVE);
-> diff --git a/drivers/net/fec.h b/drivers/net/fec.h
-> index cc47f3f..2c48b25 100644
-> --- a/drivers/net/fec.h
-> +++ b/drivers/net/fec.h
-> @@ -43,6 +43,8 @@
->  #define FEC_R_DES_START		0x180 /* Receive descriptor ring */
->  #define FEC_X_DES_START		0x184 /* Transmit descriptor ring */
->  #define FEC_R_BUFF_SIZE		0x188 /* Maximum receive buff size */
-> +#define FEC_MIIGSK_CFGR		0x300 /* MIIGSK Configuration reg */
-> +#define FEC_MIIGSK_ENR		0x308 /* MIIGSK Enable reg */
->  
->  #else
->  
-> -- 
-> 1.6.5
+Could you actually add a comment and a dependence on OMAP4 since this
+requires the secure monitor that only TI has.
 > 
-> 
+> +#ifdef CONFIG_PL310_ERRATA_588369
+> +       /*
+> +        * Disable Write-Back and Cache Linefill (set bits [1:0] of the Debug
+> +        * Control Register)
+> +        */
+> +       __asm__ __volatile__(
+> +       "stmfd r13!, {r0-r12, r14}\n"
+> +       "mov r0, #3\n"
+> +       "ldr r12, =0x100\n"
+> +       "dsb\n"
+> +       "smc\n"
+> +       "ldmfd r13!, {r0-r12, r14}");
+
+Could you actually add a function that gets called with a parameter
+rather than having to similar inline asm blocks? You also don't need to
+save/restore the registers if you declare them properly or use local
+variables for that, the compiler does the work for you.
+
+Is a DSB needed before SMC (I'm not sure)?
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Catalin
