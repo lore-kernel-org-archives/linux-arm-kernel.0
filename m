@@ -1,39 +1,107 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 14 Dec 2009 22:22:57 +0100
-Subject: [POWER] battery calibration parameters from sysfs
-In-Reply-To: <20091214121247.GB22388@rakim.wolfsonmicro.main>
-References: <A6D19A13FE030A409EC4362C172E091F0E0495F6@eseldmw101.eemea.ericsson.se>
-	<20091204104930.GA28625@sirena.org.uk>
-	<A6D19A13FE030A409EC4362C172E091F0E071EB9@eseldmw101.eemea.ericsson.se>
-	<20091207114825.GA26965@rakim.wolfsonmicro.main>
-	<A6D19A13FE030A409EC4362C172E091F0E0A1FA1@eseldmw101.eemea.ericsson.se>
-	<20091207165628.GA24981@rakim.wolfsonmicro.main>
-	<20091213132413.GB1437@ucw.cz>
-	<20091214121247.GB22388@rakim.wolfsonmicro.main>
-Message-ID: <20091214212257.GA9213@elf.ucw.cz>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Tue, 15 Dec 2009 10:40:38 +1300
+Subject: [PATCH] add PATA host controller support for Cirrus Logic's EP93xx
+	CPUs
+In-Reply-To: <200912020206.59659.bzolnier@gmail.com>
+References: <200911261651.40928.bzolnier@gmail.com>
+	<4B15BAA1.2010408@bluewatersys.com>
+	<200912020206.59659.bzolnier@gmail.com>
+Message-ID: <4B26B0D6.4080809@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Bartlomiej Zolnierkiewicz wrote:
+> On Wednesday 02 December 2009 01:53:53 am Ryan Mallon wrote:
+>   
+>> Bartlomiej Zolnierkiewicz wrote:
+>>     
+>>> Based on the older IDE host driver by Joao Ramos and review comments
+>>> for it from Sergei Shtylyov.  Not yet tested with the real hardware.
+>>>
+>>>       
+>> Hi Bartlomiej,
+>>
+>> I have got as far as patching this into my kernel and doing a build test
+>> (still need to find a hard-disk to test). I got some build errors, see
+>> below:
+>>     
+>
+> Hi,
+>
+> Many thanks for picking this driver up.
+>   
+Okay, it now patches in cleanly. However, I get the following crash on boot:
 
-> > > I'm not sure how familiar you are with the issues surrounding trying to
-> > > do a voltage to charge mapping for a battery but it's much more complex
-> > > than a simple table if you want to get it accurate.  There's a lot
-> > > of
-> 
-> > Well... current zaurus kernels use _huge_ table that maps voltage to
-> > battery %... and that table is linear function :-(.
-> 
-> > Do you have some papers on that?
-> 
-> Something like "Measure Battery Capacity Precisely in Medical Design"
-> by Bernd Krafthoefer in Power Electronics Technology Jan 2005 might be
-> useful here.
+ep93xx-ide ep93xx-ide: EP93xx PATA host controller driver initialized
+ep93xx-ide: __pata_ep93xx_write - base = ce070000, value = a, addr = 1, t = 0
+Unable to handle kernel NULL pointer dereference at virtual address 00000002
+pgd = c0004000
+[00000002] *pgd=00000000
+Internal error: Oops: 5 [#1]
+last sysfs file: 
+Modules linked in:
+CPU: 0    Not tainted  (2.6.32-06794-g17ded11-dirty #544)
+PC is at __pata_ep93xx_write+0x38/0xc4
+LR is at __pata_ep93xx_write+0x34/0xc4
+pc : [<c0189dac>]    lr : [<c0189da8>]    psr: 60000093
+sp : cd017e70  ip : 00000c3b  fp : 00000000
+r10: cd12a754  r9 : c0351140  r8 : 00000000
+r7 : 00000000  r6 : ce070000  r5 : 0000000a  r4 : 00000061
+r3 : ce070000  r2 : cd017e64  r1 : c0301bda  r0 : 00000054
+Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+Control: c000717f  Table: c0004000  DAC: 00000017
+Process swapper (pid: 1, stack limit = 0xcd016270)
+Stack: (0xcd017e70 to 0xcd018000)
+7e60:                                     00000001 00000000 00000001 cd124000
+7e80: cd124000 00000000 00000000 c018a148 cd124000 c018180c a0000013 c0181918
+7ea0: cd12a750 cd124000 00000000 c01772fc cd12a750 00000028 c0187e6c c0351140
+7ec0: c0344220 cd12a750 00000028 c0187e6c 00000000 c0177edc cd12a750 00000028
+7ee0: c0187e6c 00000000 c0351140 c0344220 c0344218 ce070000 cd12a750 00000028
+7f00: c0344e68 c0014508 c0351140 00000000 c0344220 c0344220 c0351024 cd12a7a0
+7f20: c0350428 00000000 00000000 c0164904 c0344220 c0163a78 c0344220 c0344254
+7f40: c0351024 cd12a7a0 c0350428 c0163b88 00000000 c0163b2c c0351024 c0163330
+7f60: cd0084a8 cd00fb40 c001b3dc c0351024 c0351024 c0162c48 c02e4755 c02e4755
+7f80: ffffffff c001b3dc c0351010 c0351024 c0014354 00000000 00000000 c0163e54
+7fa0: c001b3dc c0351010 00000000 c0014354 00000000 c0164bec c001b3dc 00000000
+7fc0: 00000000 c002038c c0014354 00000000 c035d740 c001b494 c001b3dc 00000000
+7fe0: 00000000 00000000 00000000 c0008578 00000000 c0021ea0 c504c134 c504c136
+[<c0189dac>] (__pata_ep93xx_write+0x38/0xc4) from [<c018a148>] (pata_ep93xx_freeze+0x40/0x6c)
+[<c018a148>] (pata_ep93xx_freeze+0x40/0x6c) from [<c018180c>] (__ata_port_freeze+0x38/0x50)
+[<c018180c>] (__ata_port_freeze+0x38/0x50) from [<c0181918>] (ata_eh_freeze_port+0x2c/0x3c)
+[<c0181918>] (ata_eh_freeze_port+0x2c/0x3c) from [<c01772fc>] (ata_host_start+0x12c/0x1a4)
+[<c01772fc>] (ata_host_start+0x12c/0x1a4) from [<c0177edc>] (ata_host_activate+0x1c/0xe8)
+[<c0177edc>] (ata_host_activate+0x1c/0xe8) from [<c0014508>] (pata_ep93xx_probe+0x1a0/0x1c8)
+[<c0014508>] (pata_ep93xx_probe+0x1a0/0x1c8) from [<c0164904>] (platform_drv_probe+0x18/0x1c)
+[<c0164904>] (platform_drv_probe+0x18/0x1c) from [<c0163a78>] (driver_probe_device+0xa8/0x15c)
+[<c0163a78>] (driver_probe_device+0xa8/0x15c) from [<c0163b88>] (__driver_attach+0x5c/0x7c)
+[<c0163b88>] (__driver_attach+0x5c/0x7c) from [<c0163330>] (bus_for_each_dev+0x48/0x78)
+[<c0163330>] (bus_for_each_dev+0x48/0x78) from [<c0162c48>] (bus_add_driver+0x9c/0x220)
+[<c0162c48>] (bus_add_driver+0x9c/0x220) from [<c0163e54>] (driver_register+0xa4/0x130)
+[<c0163e54>] (driver_register+0xa4/0x130) from [<c0164bec>] (platform_driver_probe+0x18/0x8c)
+[<c0164bec>] (platform_driver_probe+0x18/0x8c) from [<c002038c>] (do_one_initcall+0x5c/0x1b4)
+[<c002038c>] (do_one_initcall+0x5c/0x1b4) from [<c0008578>] (kernel_init+0x94/0x10c)
+[<c0008578>] (kernel_init+0x94/0x10c) from [<c0021ea0>] (kernel_thread_exit+0x0/0x8)
+Code: e58dc000 e58d7004 eb03cb2e e5864000 (e1d700b2) 
+---[ end trace ed0490e29e490c57 ]---
 
-Well, that would really require extensive hardware modifications: it
-needs _way_ more accurate ADCs on battery for a start, and a way to
-generate huge load.
+
+I have added some of my own debugging. The problem appears to be that
+__pata_ep93xx_write gets called from probe (via ata_host_activate), but
+ap->private_data (ata_timing) is still null. The timing private_data is
+set by pata_ep93xx_set_piomode, but that needs adev->pio_mode set, but I
+don't know where this happens. I assume the ATA core handles this. Do I
+need to call pata_ep93xx_set_piomode from pata_ep93xx_probe before
+ata_host_activate, or should the private_data timing be set to some
+default in the probe?
+
+Thanks,
+~Ryan
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751 
+Fax:   +64 3 3779135			  USA 1800 261 2934
