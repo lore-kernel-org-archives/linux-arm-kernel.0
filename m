@@ -1,280 +1,413 @@
 From: jpihet@mvista.com (Jean Pihet)
-Date: Mon, 14 Dec 2009 17:01:20 +0100
-Subject: [PATCH 1/5] arm: provide a mechanism to reserve performance
-	counters
-In-Reply-To: <1260799481-29951-2-git-send-email-jamie.iles@picochip.com>
+Date: Mon, 14 Dec 2009 17:01:45 +0100
+Subject: [PATCH 2/5] arm/oprofile: reserve the PMU when starting
+In-Reply-To: <1260799481-29951-3-git-send-email-jamie.iles@picochip.com>
 References: <1260799481-29951-1-git-send-email-jamie.iles@picochip.com>
 	<1260799481-29951-2-git-send-email-jamie.iles@picochip.com>
-Message-ID: <1260806480.8106.35.camel@def-laptop>
+	<1260799481-29951-3-git-send-email-jamie.iles@picochip.com>
+Message-ID: <1260806505.8106.38.camel@def-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-I am OK with this code. It is good to have such a reservation mechanism.
-
-Regards,
-Jean
-
 On Mon, 2009-12-14 at 14:04 +0000, Jamie Iles wrote:
-> To add support for perf events and to allow the hardware
-> counters to be shared with oprofile, we need a way to reserve
-> access to the pmu (performance monitor unit).
+> Make sure that we have access to the performance counters and
+> that they aren't being used by perf events or anything else.
 > 
 > Cc: Will Deacon <will.deacon@arm.com>
 > Signed-off-by: Jamie Iles <jamie.iles@picochip.com>
 > ---
->  arch/arm/include/asm/pmu.h |   76 +++++++++++++++++++++++++++++++
->  arch/arm/kernel/Makefile   |    1 +
->  arch/arm/kernel/pmu.c      |  108 ++++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mm/Kconfig        |    6 +++
->  4 files changed, 191 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/include/asm/pmu.h
->  create mode 100644 arch/arm/kernel/pmu.c
+>  arch/arm/oprofile/op_model_arm11_core.c |    4 +-
+>  arch/arm/oprofile/op_model_arm11_core.h |    4 +-
+>  arch/arm/oprofile/op_model_mpcore.c     |   42 ++++++++++++++++--------------
+>  arch/arm/oprofile/op_model_v6.c         |   33 ++++++++++++++----------
+>  arch/arm/oprofile/op_model_v7.c         |   30 ++++++++++++++--------
+>  arch/arm/oprofile/op_model_v7.h         |    4 +-
+I am OK with the changes for ARMv7.
+
+Regards,
+Jean
+
+>  arch/arm/oprofile/op_model_xscale.c     |   35 ++++++++++++++-----------
+>  7 files changed, 85 insertions(+), 67 deletions(-)
 > 
-> diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
-> new file mode 100644
-> index 0000000..d66a7cd
-> --- /dev/null
-> +++ b/arch/arm/include/asm/pmu.h
-> @@ -0,0 +1,76 @@
-> +/*
-> + *  linux/arch/arm/include/asm/pmu.h
-> + *
-> + *  Copyright (C) 2009 picoChip Designs Ltd, Jamie Iles
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +#ifndef __ARM_PMU_H__
-> +#define __ARM_PMU_H__
-> +
-> +#ifdef CONFIG_CPU_HAS_PMU
-> +
-> +#define MAX_PMU_IRQS	    8
-> +
-> +struct pmu_irqs {
-> +	int	    irqs[MAX_PMU_IRQS];
-> +	unsigned    num_irqs;
-> +};
-> +
-> +/**
-> + * reserve_pmu() - reserve the hardware performance counters
-> + *
-> + * Reserve the hardware performance counters in the system for exclusive use.
-> + * The 'struct pmu_irqs' for the system is returned on success, ERR_PTR()
-> + * encoded error on failure.
-> + */
-> +extern const struct pmu_irqs *
-> +reserve_pmu(void);
-> +
-> +/**
-> + * release_pmu() - Relinquish control of the performance counters
-> + *
-> + * Release the performance counters and allow someone else to use them.
-> + * Callers must have disabled the counters and released IRQs before calling
-> + * this. The 'struct pmu_irqs' returned from reserve_pmu() must be passed as
-> + * a cookie.
-> + */
-> +extern void
-> +release_pmu(const struct pmu_irqs *irqs);
-> +
-> +/**
-> + * init_pmu() - Initialise the PMU.
-> + *
-> + * Initialise the system ready for PMU enabling. This should typically set the
-> + * IRQ affinity and nothing else. The users (oprofile/perf events etc) will do
-> + * the actual hardware initialisation.
-> + */
-> +extern int
-> +init_pmu(void);
-> +
-> +#else /* CONFIG_CPU_HAS_PMU */
-> +
-> +static inline const struct pmu_irqs *
-> +reserve_pmu(void)
-> +{
-> +	ERR_PTR(-ENODEV);
-> +}
-> +
-> +static inline void
-> +release_pmu(const struct pmu_irqs *irqs)
-> +{
-> +}
-> +
-> +static inline int
-> +init_pmu(void)
-> +{
-> +	return -ENODEV;
-> +}
-> +
-> +#endif /* CONFIG_CPU_HAS_PMU */
-> +
-> +#endif /* __ARM_PMU_H__ */
-> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> index e7ccf7e..286a276 100644
-> --- a/arch/arm/kernel/Makefile
-> +++ b/arch/arm/kernel/Makefile
-> @@ -46,6 +46,7 @@ obj-$(CONFIG_CPU_XSCALE)	+= xscale-cp0.o
->  obj-$(CONFIG_CPU_XSC3)		+= xscale-cp0.o
->  obj-$(CONFIG_CPU_MOHAWK)	+= xscale-cp0.o
->  obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
-> +obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
->  AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
+> diff --git a/arch/arm/oprofile/op_model_arm11_core.c b/arch/arm/oprofile/op_model_arm11_core.c
+> index ad80752..ef3e265 100644
+> --- a/arch/arm/oprofile/op_model_arm11_core.c
+> +++ b/arch/arm/oprofile/op_model_arm11_core.c
+> @@ -132,7 +132,7 @@ static irqreturn_t arm11_pmu_interrupt(int irq, void *arg)
+>  	return IRQ_HANDLED;
+>  }
 >  
->  ifneq ($(CONFIG_ARCH_EBSA110),y)
-> diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
-> new file mode 100644
-> index 0000000..881e526
-> --- /dev/null
-> +++ b/arch/arm/kernel/pmu.c
-> @@ -0,0 +1,108 @@
-> +/*
-> + *  linux/arch/arm/kernel/pmu.c
-> + *
-> + *  Copyright (C) 2009 picoChip Designs Ltd, Jamie Iles
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/semaphore.h>
+> -int arm11_request_interrupts(int *irqs, int nr)
+> +int arm11_request_interrupts(const int *irqs, int nr)
+>  {
+>  	unsigned int i;
+>  	int ret = 0;
+> @@ -153,7 +153,7 @@ int arm11_request_interrupts(int *irqs, int nr)
+>  	return ret;
+>  }
+>  
+> -void arm11_release_interrupts(int *irqs, int nr)
+> +void arm11_release_interrupts(const int *irqs, int nr)
+>  {
+>  	unsigned int i;
+>  
+> diff --git a/arch/arm/oprofile/op_model_arm11_core.h b/arch/arm/oprofile/op_model_arm11_core.h
+> index 6f8538e..1902b99 100644
+> --- a/arch/arm/oprofile/op_model_arm11_core.h
+> +++ b/arch/arm/oprofile/op_model_arm11_core.h
+> @@ -39,7 +39,7 @@
+>  int arm11_setup_pmu(void);
+>  int arm11_start_pmu(void);
+>  int arm11_stop_pmu(void);
+> -int arm11_request_interrupts(int *, int);
+> -void arm11_release_interrupts(int *, int);
+> +int arm11_request_interrupts(const int *, int);
+> +void arm11_release_interrupts(const int *, int);
+>  
+>  #endif
+> diff --git a/arch/arm/oprofile/op_model_mpcore.c b/arch/arm/oprofile/op_model_mpcore.c
+> index 4ce0f98..f73ce87 100644
+> --- a/arch/arm/oprofile/op_model_mpcore.c
+> +++ b/arch/arm/oprofile/op_model_mpcore.c
+> @@ -32,6 +32,7 @@
+>  /* #define DEBUG */
+>  #include <linux/types.h>
+>  #include <linux/errno.h>
 > +#include <linux/err.h>
-> +#include <linux/irq.h>
-> +
+>  #include <linux/sched.h>
+>  #include <linux/oprofile.h>
+>  #include <linux/interrupt.h>
+> @@ -43,6 +44,7 @@
+>  #include <mach/hardware.h>
+>  #include <mach/board-eb.h>
+>  #include <asm/system.h>
 > +#include <asm/pmu.h>
-> +#include <asm/irq.h>
-> +
-> +/*
-> + * Define the IRQs for the system. We could use something like a platform
-> + * device but that seems fairly heavyweight for this. Also, the performance
-> + * counters can't be removed or hotplugged.
-> + *
-> + * Ordering is important: init_pmu() will use the ordering to set the affinity
-> + * to the corresponding core. e.g. the first interrupt will go to cpu 0, the
-> + * second goes to cpu 1 etc.
-> + */
-> +static const struct pmu_irqs pmu_irqs = {
-> +#ifdef CONFIG_ARCH_PC3XX
-> +	.irqs	    = { IRQ_NPMUIRQ },
-> +	.num_irqs   = 1,
-> +#elif defined(CONFIG_ARCH_OMAP2)
-> +	.irqs	    = { 3 },
-> +	.num_irqs   = 1,
-> +#elif defined(CONFIG_ARCH_BCMRING)
-> +	.irqs	    = { IRQ_PMUIRQ },
-> +	.num_irqs   = 1,
-> +#elif defined(CONFIG_MACH_REALVIEW_EB)
-> +	.irqs	    = {
-> +		[0]	= IRQ_EB11MP_PMU_CPU0,
-> +		[1]	= IRQ_EB11MP_PMU_CPU1,
-> +		[2]	= IRQ_EB11MP_PMU_CPU2,
-> +		[3]	= IRQ_EB11MP_PMU_CPU3
-> +	},
-> +	.num_irqs   = 4,
-> +#elif defined(CONFIG_ARCH_OMAP3)
-> +	.irqs	    = { INT_34XX_BENCH_MPU_EMUL },
-> +	.num_irqs   = 1,
-> +#elif defined(CONFIG_ARCH_IOP32X)
-> +	.irqs	    = { IRQ_IOP32X_CORE_PMU },
-> +	.num_irqs   = 1,
-> +#elif defined(CONFIG_ARCH_IOP33X)
-> +	.irqs	    = { IRQ_IOP33X_CORE_PMU },
-> +	.num_irqs   = 1,
-> +#elif defined(CONFIG_ARCH_PXA)
-> +	.irqs	    = { IRQ_PMU },
-> +	.num_irqs   = 1,
-> +#endif
-> +};
-> +
-> +static DECLARE_MUTEX(pmu_mutex);
-> +
-> +const struct pmu_irqs *
-> +reserve_pmu(void)
-> +{
-> +	int ret = down_trylock(&pmu_mutex) ? -EBUSY : 0;
-> +
-> +	return ret ? ERR_PTR(ret) : &pmu_irqs;
-> +}
-> +EXPORT_SYMBOL_GPL(reserve_pmu);
-> +
-> +void
-> +release_pmu(const struct pmu_irqs *irqs)
-> +{
-> +	WARN_ON(irqs != &pmu_irqs);
-> +	up(&pmu_mutex);
-> +}
-> +EXPORT_SYMBOL_GPL(release_pmu);
-> +
-> +static void
-> +set_irq_affinity(int irq,
-> +		 unsigned int cpu)
-> +{
-> +#ifdef CONFIG_SMP
-> +	struct irq_desc *desc = irq_desc + irq;
-> +	const struct cpumask *mask = cpumask_of(cpu);
-> +	unsigned long flags;
-> +
-> +	raw_spin_lock_irqsave(&desc->lock, flags);
-> +	cpumask_copy(desc->affinity, mask);
-> +	desc->chip->set_affinity(irq, mask);
-> +	raw_spin_unlock_irqrestore(&desc->lock, flags);
-> +#endif
-> +}
-> +
-> +int
-> +init_pmu(void)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < pmu_irqs.num_irqs; ++i)
-> +		set_irq_affinity(pmu_irqs.irqs[i], i);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(init_pmu);
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index dd4698c..fc5c05b 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -342,6 +342,7 @@ config CPU_XSCALE
->  	select CPU_PABRT_LEGACY
->  	select CPU_CACHE_VIVT
->  	select CPU_CP15_MMU
-> +	select CPU_HAS_PMU
->  	select CPU_TLB_V4WBI if MMU
 >  
->  # XScale Core Version 3
-> @@ -398,6 +399,7 @@ config CPU_V6
->  	select CPU_HAS_ASID if MMU
->  	select CPU_COPY_V6 if MMU
->  	select CPU_TLB_V6 if MMU
-> +	select CPU_HAS_PMU
+>  #include "op_counter.h"
+>  #include "op_arm_model.h"
+> @@ -58,6 +60,7 @@
+>   * Bitmask of used SCU counters
+>   */
+>  static unsigned int scu_em_used;
+> +static const struct pmu_irqs *pmu_irqs;
 >  
->  # ARMv6k
->  config CPU_32v6K
-> @@ -421,6 +423,7 @@ config CPU_V7
->  	select CPU_CACHE_V7
->  	select CPU_CACHE_VIPT
->  	select CPU_CP15_MMU
-> +	select CPU_HAS_PMU
->  	select CPU_HAS_ASID if MMU
->  	select CPU_COPY_V6 if MMU
->  	select CPU_TLB_V7 if MMU
-> @@ -536,6 +539,9 @@ config CPU_COPY_FA
->  config CPU_COPY_V6
->  	bool
+>  /*
+>   * 2 helper fns take a counter number from 0-7 (not the userspace-visible counter number)
+> @@ -225,33 +228,40 @@ static int em_setup_ctrs(void)
+>  	return 0;
+>  }
 >  
-> +config CPU_HAS_PMU
-> +	bool
+> -static int arm11_irqs[] = {
+> -	[0]	= IRQ_EB11MP_PMU_CPU0,
+> -	[1]	= IRQ_EB11MP_PMU_CPU1,
+> -	[2]	= IRQ_EB11MP_PMU_CPU2,
+> -	[3]	= IRQ_EB11MP_PMU_CPU3
+> -};
+> -
+>  static int em_start(void)
+>  {
+>  	int ret;
+>  
+> -	ret = arm11_request_interrupts(arm11_irqs, ARRAY_SIZE(arm11_irqs));
+> +	pmu_irqs = reserve_pmu();
+> +	if (IS_ERR(pmu_irqs)) {
+> +		ret = PTR_ERR(pmu_irqs);
+> +		goto out;
+> +	}
 > +
->  # This selects the TLB model
->  config CPU_TLB_V3
->  	bool
+> +	ret = arm11_request_interrupts(pmu_irqs->irqs, pmu_irqs->num_irqs);
+>  	if (ret == 0) {
+>  		em_call_function(arm11_start_pmu);
+>  
+>  		ret = scu_start();
+> -		if (ret)
+> -			arm11_release_interrupts(arm11_irqs, ARRAY_SIZE(arm11_irqs));
+> +		if (ret) {
+> +			arm11_release_interrupts(pmu_irqs->irqs,
+> +						 pmu_irqs->num_irqs);
+> +		} else {
+> +			release_pmu(pmu_irqs);
+> +			pmu_irqs = NULL;
+> +		}
+>  	}
+> +
+> +out:
+>  	return ret;
+>  }
+>  
+>  static void em_stop(void)
+>  {
+>  	em_call_function(arm11_stop_pmu);
+> -	arm11_release_interrupts(arm11_irqs, ARRAY_SIZE(arm11_irqs));
+> +	arm11_release_interrupts(pmu_irqs->irqs, pmu_irqs->num_irqs);
+>  	scu_stop();
+> +	release_pmu(pmu_irqs);
+>  }
+>  
+>  /*
+> @@ -283,15 +293,7 @@ static int em_setup(void)
+>  	em_route_irq(IRQ_EB11MP_PMU_SCU6, 3);
+>  	em_route_irq(IRQ_EB11MP_PMU_SCU7, 3);
+>  
+> -	/*
+> -	 * Send CP15 PMU interrupts to the owner CPU.
+> -	 */
+> -	em_route_irq(IRQ_EB11MP_PMU_CPU0, 0);
+> -	em_route_irq(IRQ_EB11MP_PMU_CPU1, 1);
+> -	em_route_irq(IRQ_EB11MP_PMU_CPU2, 2);
+> -	em_route_irq(IRQ_EB11MP_PMU_CPU3, 3);
+> -
+> -	return 0;
+> +	return init_pmu();
+>  }
+>  
+>  struct op_arm_model_spec op_mpcore_spec = {
+> diff --git a/arch/arm/oprofile/op_model_v6.c b/arch/arm/oprofile/op_model_v6.c
+> index e468017..a22357a 100644
+> --- a/arch/arm/oprofile/op_model_v6.c
+> +++ b/arch/arm/oprofile/op_model_v6.c
+> @@ -19,42 +19,47 @@
+>  /* #define DEBUG */
+>  #include <linux/types.h>
+>  #include <linux/errno.h>
+> +#include <linux/err.h>
+>  #include <linux/sched.h>
+>  #include <linux/oprofile.h>
+>  #include <linux/interrupt.h>
+>  #include <asm/irq.h>
+>  #include <asm/system.h>
+> +#include <asm/pmu.h>
+>  
+>  #include "op_counter.h"
+>  #include "op_arm_model.h"
+>  #include "op_model_arm11_core.h"
+>  
+> -static int irqs[] = {
+> -#ifdef CONFIG_ARCH_OMAP2
+> -	3,
+> -#endif
+> -#ifdef CONFIG_ARCH_BCMRING
+> -	IRQ_PMUIRQ, /* for BCMRING, ARM PMU interrupt is 43 */
+> -#endif
+> -#ifdef CONFIG_ARCH_PC3XX
+> -        IRQ_NPMUIRQ,
+> -#endif
+> -};
+> +static const struct pmu_irqs *pmu_irqs;
+>  
+>  static void armv6_pmu_stop(void)
+>  {
+>  	arm11_stop_pmu();
+> -	arm11_release_interrupts(irqs, ARRAY_SIZE(irqs));
+> +	arm11_release_interrupts(pmu_irqs->irqs, pmu_irqs->num_irqs);
+> +	release_pmu(pmu_irqs);
+> +	pmu_irqs = NULL;
+>  }
+>  
+>  static int armv6_pmu_start(void)
+>  {
+>  	int ret;
+>  
+> -	ret = arm11_request_interrupts(irqs, ARRAY_SIZE(irqs));
+> -	if (ret >= 0)
+> +	pmu_irqs = reserve_pmu();
+> +	if (IS_ERR(pmu_irqs)) {
+> +		ret = PTR_ERR(pmu_irqs);
+> +		goto out;
+> +	}
+> +
+> +	ret = arm11_request_interrupts(pmu_irqs->irqs, pmu_irqs->num_irqs);
+> +	if (ret >= 0) {
+>  		ret = arm11_start_pmu();
+> +	} else {
+> +		release_pmu(pmu_irqs);
+> +		pmu_irqs = NULL;
+> +	}
+>  
+> +out:
+>  	return ret;
+>  }
+>  
+> diff --git a/arch/arm/oprofile/op_model_v7.c b/arch/arm/oprofile/op_model_v7.c
+> index f20295f..9258fca 100644
+> --- a/arch/arm/oprofile/op_model_v7.c
+> +++ b/arch/arm/oprofile/op_model_v7.c
+> @@ -11,11 +11,14 @@
+>   */
+>  #include <linux/types.h>
+>  #include <linux/errno.h>
+> +#include <linux/err.h>
+>  #include <linux/oprofile.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/irq.h>
+>  #include <linux/smp.h>
+>  
+> +#include <asm/pmu.h>
+> +
+>  #include "op_counter.h"
+>  #include "op_arm_model.h"
+>  #include "op_model_v7.h"
+> @@ -299,7 +302,7 @@ static irqreturn_t armv7_pmnc_interrupt(int irq, void *arg)
+>  	return IRQ_HANDLED;
+>  }
+>  
+> -int armv7_request_interrupts(int *irqs, int nr)
+> +int armv7_request_interrupts(const int *irqs, int nr)
+>  {
+>  	unsigned int i;
+>  	int ret = 0;
+> @@ -322,7 +325,7 @@ int armv7_request_interrupts(int *irqs, int nr)
+>  	return ret;
+>  }
+>  
+> -void armv7_release_interrupts(int *irqs, int nr)
+> +void armv7_release_interrupts(const int *irqs, int nr)
+>  {
+>  	unsigned int i;
+>  
+> @@ -366,12 +369,7 @@ static void armv7_pmnc_dump_regs(void)
+>  }
+>  #endif
+>  
+> -
+> -static int irqs[] = {
+> -#ifdef CONFIG_ARCH_OMAP3
+> -	INT_34XX_BENCH_MPU_EMUL,
+> -#endif
+> -};
+> +static const struct pmu_irqs *pmu_irqs;
+>  
+>  static void armv7_pmnc_stop(void)
+>  {
+> @@ -379,19 +377,29 @@ static void armv7_pmnc_stop(void)
+>  	armv7_pmnc_dump_regs();
+>  #endif
+>  	armv7_stop_pmnc();
+> -	armv7_release_interrupts(irqs, ARRAY_SIZE(irqs));
+> +	armv7_release_interrupts(pmu_irqs->irqs, pmu_irqs->num_irqs);
+> +	release_pmu(pmu_irqs);
+> +	pmu_irqs = NULL;
+>  }
+>  
+>  static int armv7_pmnc_start(void)
+>  {
+>  	int ret;
+>  
+> +	pmu_irqs = reserve_pmu();
+> +	if (IS_ERR(pmu_irqs))
+> +		return PTR_ERR(pmu_irqs);
+> +
+>  #ifdef DEBUG
+>  	armv7_pmnc_dump_regs();
+>  #endif
+> -	ret = armv7_request_interrupts(irqs, ARRAY_SIZE(irqs));
+> -	if (ret >= 0)
+> +	ret = armv7_request_interrupts(pmu_irqs->irqs, pmu_irqs->num_irqs);
+> +	if (ret >= 0) {
+>  		armv7_start_pmnc();
+> +	} else {
+> +		release_pmu(pmu_irqs);
+> +		pmu_irqs = NULL;
+> +	}
+>  
+>  	return ret;
+>  }
+> diff --git a/arch/arm/oprofile/op_model_v7.h b/arch/arm/oprofile/op_model_v7.h
+> index 0e19bcc..9ca334b 100644
+> --- a/arch/arm/oprofile/op_model_v7.h
+> +++ b/arch/arm/oprofile/op_model_v7.h
+> @@ -97,7 +97,7 @@
+>  int armv7_setup_pmu(void);
+>  int armv7_start_pmu(void);
+>  int armv7_stop_pmu(void);
+> -int armv7_request_interrupts(int *, int);
+> -void armv7_release_interrupts(int *, int);
+> +int armv7_request_interrupts(const int *, int);
+> +void armv7_release_interrupts(const int *, int);
+>  
+>  #endif
+> diff --git a/arch/arm/oprofile/op_model_xscale.c b/arch/arm/oprofile/op_model_xscale.c
+> index 724ab9c..1d34a02 100644
+> --- a/arch/arm/oprofile/op_model_xscale.c
+> +++ b/arch/arm/oprofile/op_model_xscale.c
+> @@ -17,12 +17,14 @@
+>  /* #define DEBUG */
+>  #include <linux/types.h>
+>  #include <linux/errno.h>
+> +#include <linux/err.h>
+>  #include <linux/sched.h>
+>  #include <linux/oprofile.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/irq.h>
+>  
+>  #include <asm/cputype.h>
+> +#include <asm/pmu.h>
+>  
+>  #include "op_counter.h"
+>  #include "op_arm_model.h"
+> @@ -33,17 +35,6 @@
+>  #define	PMU_RESET	(CCNT_RESET | PMN_RESET)
+>  #define PMU_CNT64	0x008	/* Make CCNT count every 64th cycle */
+>  
+> -/* TODO do runtime detection */
+> -#ifdef CONFIG_ARCH_IOP32X
+> -#define XSCALE_PMU_IRQ  IRQ_IOP32X_CORE_PMU
+> -#endif
+> -#ifdef CONFIG_ARCH_IOP33X
+> -#define XSCALE_PMU_IRQ  IRQ_IOP33X_CORE_PMU
+> -#endif
+> -#ifdef CONFIG_ARCH_PXA
+> -#define XSCALE_PMU_IRQ  IRQ_PMU
+> -#endif
+> -
+>  /*
+>   * Different types of events that can be counted by the XScale PMU
+>   * as used by Oprofile userspace. Here primarily for documentation
+> @@ -367,6 +358,8 @@ static irqreturn_t xscale_pmu_interrupt(int irq, void *arg)
+>  	return IRQ_HANDLED;
+>  }
+>  
+> +static const struct pmu_irqs *pmu_irqs;
+> +
+>  static void xscale_pmu_stop(void)
+>  {
+>  	u32 pmnc = read_pmnc();
+> @@ -374,20 +367,30 @@ static void xscale_pmu_stop(void)
+>  	pmnc &= ~PMU_ENABLE;
+>  	write_pmnc(pmnc);
+>  
+> -	free_irq(XSCALE_PMU_IRQ, results);
+> +	free_irq(pmu_irqs->irqs[0], results);
+> +	release_pmu(pmu_irqs);
+> +	pmu_irqs = NULL;
+>  }
+>  
+>  static int xscale_pmu_start(void)
+>  {
+>  	int ret;
+> -	u32 pmnc = read_pmnc();
+> +	u32 pmnc;
+> +
+> +	pmu_irqs = reserve_pmu();
+> +	if (IS_ERR(pmu_irqs))
+> +		return PTR_ERR(pmu_irqs);
+> +
+> +	pmnc = read_pmnc();
+>  
+> -	ret = request_irq(XSCALE_PMU_IRQ, xscale_pmu_interrupt, IRQF_DISABLED,
+> -			"XScale PMU", (void *)results);
+> +	ret = request_irq(pmu_irqs->irqs[0], xscale_pmu_interrupt,
+> +			  IRQF_DISABLED, "XScale PMU", (void *)results);
+>  
+>  	if (ret < 0) {
+>  		printk(KERN_ERR "oprofile: unable to request IRQ%d for XScale PMU\n",
+> -			XSCALE_PMU_IRQ);
+> +		       pmu_irqs->irqs[0]);
+> +		release_pmu(pmu_irqs);
+> +		pmu_irqs = NULL;
+>  		return ret;
+>  	}
+>  
