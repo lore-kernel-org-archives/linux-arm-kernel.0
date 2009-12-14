@@ -1,39 +1,51 @@
-From: chripell@gmail.com (christian pellegrin)
-Date: Mon, 14 Dec 2009 18:48:14 +0100
-Subject: shared memory problem on ARM v5TE using threads
-In-Reply-To: <309002C0DA137042828828FC53D7A9347E2630F364@IL-MB01.marvell.com>
-References: <20091207114218.GA19348@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0912071027480.31174@xanadu.home>
-	<20091207170546.GB26821@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0912071219100.31174@xanadu.home>
-	<20091207175608.GE26821@n2100.arm.linux.org.uk>
-	<309002C0DA137042828828FC53D7A9347E2630EEC2@IL-MB01.marvell.com>
-	<20091213120033.GA10698@n2100.arm.linux.org.uk>
-	<20091213120615.GB10698@n2100.arm.linux.org.uk>
-	<cabda6420912140513k40a998b7k8cf56c35cc535cfb@mail.gmail.com>
-	<309002C0DA137042828828FC53D7A9347E2630F364@IL-MB01.marvell.com>
-Message-ID: <cabda6420912140948t23c07676tb5f44eb4febbc584@mail.gmail.com>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Mon, 14 Dec 2009 18:53:35 +0100
+Subject: [PATCH 4/4] regulator: mc13783-regulator: correct the probing time.
+In-Reply-To: <1260811598.2022.144.camel@climbing-alby>
+References: <1260808880.2022.98.camel@climbing-alby>
+	<1260810776.2022.130.camel@climbing-alby>
+	<1260811085.2022.135.camel@climbing-alby>
+	<1260811598.2022.144.camel@climbing-alby>
+Message-ID: <1260813215.2022.171.camel@climbing-alby>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2009 at 3:46 PM, Ronen Shitrit <rshitrit@marvell.com> wrote:
+When the mc13783-regulator driver is built in kernel, probing it during
+the regulator subsystem initialisation result in a fault.
 
-> "
->
-> I think your patch doesn't cover the PIO mode...
->
+That is because regulator subsystem is planned to be initialised very early
+in the boot process, before the mfd subsystem initialisation.
 
-Has someone a suggestion on how to write a test-case for this? I tried
-various forms of mixing read/write syscalls (or a mmap wit
-MAP_PRIVATE) and access via two mmap with MAP_SHARED aliasing the same
-address (I checked that adjust_pte was called by them) but didn't get
-any problem. I have to admit that I really don't understand how PIO in
-kernel mode can refer to mappings that are aliased (and so market
-uncacheable) made by user-space programs. Thank you for your patience.
+The mc12783-regulator probing process need to access to the mc13783-core
+functionality to read/write mc13783 registers and so must be called after
+the mc13783-core driver initialisation.
 
+The way to do this is to let the kernel probe the mc13783-regulator driver when 
+mc13783-core register his regulator subdevice.
+
+Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
+---
+ drivers/regulator/mc13783-regulator.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/regulator/mc13783-regulator.c b/drivers/regulator/mc13783-regulator.c
+index 3d5d349..a40e35a 100644
+--- a/drivers/regulator/mc13783-regulator.c
++++ b/drivers/regulator/mc13783-regulator.c
+@@ -509,12 +509,12 @@ static struct platform_driver mc13783_regulator_driver = {
+ 		.owner	= THIS_MODULE,
+ 	},
+ 	.remove		= __devexit_p(mc13783_regulator_remove),
++	.probe		= mc13783_regulator_probe,
+ };
+ 
+ static int __init mc13783_regulator_init(void)
+ {
+-	return platform_driver_probe(&mc13783_regulator_driver,
+-			mc13783_regulator_probe);
++	return platform_driver_register(&mc13783_regulator_driver);
+ }
+ subsys_initcall(mc13783_regulator_init);
+ 
 -- 
-Christian Pellegrin, see http://www.evolware.org/chri/
-"Real Programmers don't play tennis, or any other sport which requires
-you to change clothes. Mountain climbing is OK, and Real Programmers
-wear their climbing boots to work in case a mountain should suddenly
-spring up in the middle of the computer room."
+1.6.3.3
