@@ -1,81 +1,31 @@
-From: valentin.longchamp@epfl.ch (valentin.longchamp at epfl.ch)
-Date: Mon, 14 Dec 2009 22:41:09 +0100
-Subject: "ARM: MX3: fix CPU revision number detection" breaks QONG support
-In-Reply-To: <20091214150420.GE28375@buzzloop.caiaq.de>
-References: <20091211143318.1D8B43F6CC@gemini.denx.de>
-	<20091211234714.GT28375@buzzloop.caiaq.de>
-	<20091214135722.CBCBF4C026@gemini.denx.de>
-	<20091214150420.GE28375@buzzloop.caiaq.de>
-Message-ID: <20091214224109.20623gout4jbbdo5@webmail.epfl.ch>
+From: jeff@garzik.org (Jeff Garzik)
+Date: Mon, 14 Dec 2009 17:06:34 -0500
+Subject: [PATCH] add PATA host controller support for Cirrus Logic's EP93xx
+	CPUs
+In-Reply-To: <4B26B0D6.4080809@bluewatersys.com>
+References: <200911261651.40928.bzolnier@gmail.com>
+	<4B15BAA1.2010408@bluewatersys.com>
+	<200912020206.59659.bzolnier@gmail.com>
+	<4B26B0D6.4080809@bluewatersys.com>
+Message-ID: <4B26B6EA.8050403@garzik.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Mack <daniel@caiaq.de> a ?crit?:
+On 12/14/2009 04:40 PM, Ryan Mallon wrote:
+> I have added some of my own debugging. The problem appears to be that
+> __pata_ep93xx_write gets called from probe (via ata_host_activate), but
+> ap->private_data (ata_timing) is still null. The timing private_data is
+> set by pata_ep93xx_set_piomode, but that needs adev->pio_mode set, but I
+> don't know where this happens. I assume the ATA core handles this. Do I
+> need to call pata_ep93xx_set_piomode from pata_ep93xx_probe before
+> ata_host_activate, or should the private_data timing be set to some
+> default in the probe?
 
-> On Mon, Dec 14, 2009 at 02:57:22PM +0100, Wolfgang Denk wrote:
->> I don't think this is a boot loader issue.
->>
->> In Linux, the kernel hangs here:
->>
->> 	/* read SREV register from IIM module */
->> 	srev = __raw_readl(IO_ADDRESS(IIM_BASE_ADDR) + MXC_IIMSREV);
->>
->> In U-Boot, I can read this register just fine:
->>
->> 	=> md 5001c024 1
->> 	5001c024: 00000028    (...
->>
->> In Linux, the IO_ADDRESS() makes this a read from 0xFC11C024, which
->> hangs.
->>
->> So if this is a clock thing, then it must be a clock being disabled by
->> Linux.
 
-I have looked more carefully at the bootloader code, and it does not  
-seem to configure anything for SPBA0. Furthermore, Redboot actually  
-reads this register at boot time to determine the CPU revision just as  
-Daniel with its patch.
+ap->private_data is traditionally initialized in the ->port_start() hook.
 
-As for Wolfgang, when I ask Redboot to dump this memory region, I can  
-read the revision as well (0x28 here too). I would then also rule the  
-bootloader out of the culprits. It would be interesting to see what  
-CPU revisions have the people who experience the problem and the ones  
-who don't (but I don't think it does play a role).
+Likely, you should follow other drivers and allocate a useful data 
+structure containing useful default values, which can then be adjusted 
+in other hooks such as ->set_dmamode() or ->set_piomode()
 
-For the IO_ADDRESS stuff, it may be the problem. This macro is  
-supposed to do the physical address -> virtual address translation. If  
-I have understood correctly (correct if wrong, I don't really know  
-when whe have to use it or not), it is used when the memory region was  
-not allocated and then mapped with request_mem_region and ioremap  
-calls. The 0xFC11C024 is the virtual address defined by the IO_ADDRESS  
-macro succession for the SPBA0 memory region. Now how was this defined  
-and may this fail on certain systems/configuration because other  
-memory definitions ?
-
->
-> Well, clocks are explicitly enabled for that module, so I really don't
-> know. And I can't debug as I'm not at my office where the hardware is I
-> developed this on. Can anyone help check what's the matter? As I said,
-> on my MX31LiteKit, that works as expected and the register definition
-> reads as something that must have been there for a longer time (taking
-> into account that possible values for that register cover ancient
-> variants of that hardware).
-
-The iim clock is explicitely enabled in clock.c, just before the call  
-to mx31_read_cpu_rev(), and from what I had checked, the clock  
-effectively seemed enabled for me. I have no clue about the register  
-definition since I have found no real documentation about it, but from  
-my point of view, this would more look like 8 bit registers as Andy  
-pointed out in an earlier mail.
-
->
-> As I said already, we could also consider reverting this patch - I'll
-> have another look and ask for more testers when I'm back. I would,
-> however, greatly prefer a fixup patch.
->
-
-Let's wait a few more days so that we maybe can find a solution, but  
-in case no solution is found when -rc1 is approaching, we maybe should  
-revert it.
-
-Val
+	Jeff
