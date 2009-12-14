@@ -1,34 +1,80 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Dec 2009 11:09:04 +0000
-Subject: [PATCH 3/4] ARM: L2 : Errata 588369: Clean & Invalidate
-	donotinvalidate clean lines
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02BC142138@dbde02.ent.ti.com>
-References: <EAF47CD23C76F840A9E7FCE10091EFAB02BC142138@dbde02.ent.ti.com>
-Message-ID: <1260788944.17159.40.camel@pc1117.cambridge.arm.com>
+Date: Mon, 14 Dec 2009 11:25:19 +0000
+Subject: [RFC PATCH 2/2] ARM: cache-l2x0: make better use of
+	backgroundcache handling
+In-Reply-To: <20091214105202.GA9939@n2100.arm.linux.org.uk>
+References: <E1NJVx6-0006um-Do@rmk-PC.arm.linux.org.uk>
+	<1260786519.17159.19.camel@pc1117.cambridge.arm.com>
+	<20091214105202.GA9939@n2100.arm.linux.org.uk>
+Message-ID: <1260789919.17159.46.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2009-12-14 at 10:52 +0000, Shilimkar, Santosh wrote:
-> > On Wed, 2009-12-09 at 18:43 +0000, Santosh Shilimkar wrote:
-> > > +#ifdef CONFIG_PL310_ERRATA_588369
-> > > +       /*
-> > > +        * Disable Write-Back and Cache Linefill (set bits [1:0] of the Debug
-> > > +        * Control Register)
-> > > +        */
-> > > +       __asm__ __volatile__(
-> > > +       "stmfd r13!, {r0-r12, r14}\n"
-> > > +       "mov r0, #3\n"
-> > > +       "ldr r12, =0x100\n"
-> > > +       "dsb\n"
-> > > +       "smc\n"
-> > > +       "ldmfd r13!, {r0-r12, r14}");
-[...]
-> > Is a DSB needed before SMC (I'm not sure)?
+On Mon, 2009-12-14 at 10:52 +0000, Russell King - ARM Linux wrote:
+> On Mon, Dec 14, 2009 at 10:28:39AM +0000, Catalin Marinas wrote:
+> > On Sat, 2009-12-12 at 17:40 +0000, Russell King - ARM Linux wrote:
+> > > There's no point having the hardware support background operations
+> > > if we issue a cache operation, and then wait for it to complete
+> > > before calculating the address of the next operation.  We gain no
+> > > advantage in the cache controller stalling the bus until completion.
+> > >
+> > > What we should be doing is using the 'wait' time productively by
+> > > calculating the address of the next operation, and only then waiting
+> > > for the previous operation to complete.  This means that cache
+> > > operations can occur in parallel with the CPU calculating the next
+> > > address.
+> > [...]
+> > >  static void l2x0_inv_range(unsigned long start, unsigned long end)
+> > >  {
+> > > +   void __iomem *base = l2x0_base;
+> > >     unsigned long flags;
+> > > 
+> > >     spin_lock_irqsave(&l2x0_lock, flags);
+> > >     if (start & (CACHE_LINE_SIZE - 1)) {
+> > >             start &= ~(CACHE_LINE_SIZE - 1);
+> > > -           sync_writel(start, L2X0_CLEAN_INV_LINE_PA, 1);
+> > > +           cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
+> > > +           writel(start, base + L2X0_CLEAN_INV_LINE_PA);
+> > >             start += CACHE_LINE_SIZE;
+> > >     }
+> > > 
+> > >     if (end & (CACHE_LINE_SIZE - 1)) {
+> > >             end &= ~(CACHE_LINE_SIZE - 1);
+> > > -           sync_writel(end, L2X0_CLEAN_INV_LINE_PA, 1);
+> > > +           cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
+> > > +           writel(end, base + L2X0_CLEAN_INV_LINE_PA);
+> > >     }
+> >
+> > Do we need a cache_wait() on L2X0_CLEAN_INV_LINE_PA here? Actually, do
+> > we need the cache_wait() before writel()? Can we have it after?
 > 
-> That was a recommendation though not having it, I didn't observer any problems.
+> I'm afraid that you've completely missed the whole point of this patch as
+> you've made that statement.
+> 
+> The point here is that rather than spinning on the L2 controller, waiting
+> for it to say that it's completed, and _then_ calculating the data for
+> the next operation, we do the two operations in parallel - while the L2
+> controller is busy, we can be preparing the next operation.
 
-Maybe it's needed, I'm not sure, but if you found it recommended in some
-errata description, then you probably need it.
+I got this point and it makes sense in the loop but for these two cases
+there was no loop (and all the loops have an additional cache_wait at
+the end).
+
+> Now, as for "do we need a cache_wait() on L2X0_CLEAN_INV_LINE_PA", I've
+> no idea.
+> 
+> The specs are not entirely clear, but from my reading of them, _any_
+> "register 7" read will do.  What I need is for someone to talk to the
+> hardware people to confirm that - for PL210, PL220 and PL310.  You will
+> find further details on this in my email to you on the 19th November
+> with the subject of "cache-l2x0.c".
+
+OK, I think the spec is pretty clear that there is only one C bit for
+background operation in progress and it can be read from several
+registers. I just confirmed with the hardware people and the C bit is
+indeed common to all registers. In this case:
+
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
 -- 
 Catalin
