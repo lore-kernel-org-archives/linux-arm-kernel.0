@@ -1,64 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Dec 2009 10:52:02 +0000
-Subject: [RFC PATCH 2/2] ARM: cache-l2x0: make better use of background
-	cache handling
-In-Reply-To: <1260786519.17159.19.camel@pc1117.cambridge.arm.com>
-References: <E1NJVx6-0006um-Do@rmk-PC.arm.linux.org.uk>
-	<1260786519.17159.19.camel@pc1117.cambridge.arm.com>
-Message-ID: <20091214105202.GA9939@n2100.arm.linux.org.uk>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Mon, 14 Dec 2009 16:22:42 +0530
+Subject: [PATCH 3/4] ARM: L2 : Errata 588369: Clean & Invalidate do
+	notinvalidate clean lines
+In-Reply-To: <1260787034.17159.24.camel@pc1117.cambridge.arm.com>
+References: <1260384233-2278-3-git-send-email-santosh.shilimkar@ti.com>
+	<1260787034.17159.24.camel@pc1117.cambridge.arm.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02BC142138@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2009 at 10:28:39AM +0000, Catalin Marinas wrote:
-> On Sat, 2009-12-12 at 17:40 +0000, Russell King - ARM Linux wrote:
-> > There's no point having the hardware support background operations
-> > if we issue a cache operation, and then wait for it to complete
-> > before calculating the address of the next operation.  We gain no
-> > advantage in the cache controller stalling the bus until completion.
-> > 
-> > What we should be doing is using the 'wait' time productively by
-> > calculating the address of the next operation, and only then waiting
-> > for the previous operation to complete.  This means that cache
-> > operations can occur in parallel with the CPU calculating the next
-> > address.
-> [...] 
-> >  static void l2x0_inv_range(unsigned long start, unsigned long end)
-> >  {
-> > +	void __iomem *base = l2x0_base;
-> >  	unsigned long flags;
-> >  
-> >  	spin_lock_irqsave(&l2x0_lock, flags);
-> >  	if (start & (CACHE_LINE_SIZE - 1)) {
-> >  		start &= ~(CACHE_LINE_SIZE - 1);
-> > -		sync_writel(start, L2X0_CLEAN_INV_LINE_PA, 1);
-> > +		cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
-> > +		writel(start, base + L2X0_CLEAN_INV_LINE_PA);
-> >  		start += CACHE_LINE_SIZE;
-> >  	}
-> >  
-> >  	if (end & (CACHE_LINE_SIZE - 1)) {
-> >  		end &= ~(CACHE_LINE_SIZE - 1);
-> > -		sync_writel(end, L2X0_CLEAN_INV_LINE_PA, 1);
-> > +		cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
-> > +		writel(end, base + L2X0_CLEAN_INV_LINE_PA);
-> >  	}
+Thanks for comments Catalin !!
+> -----Original Message-----
+> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
+> Sent: Monday, December 14, 2009 4:07 PM
+> To: Shilimkar, Santosh
+> Cc: tony at atomide.com; linux-omap at vger.kernel.org; linux at arm.linux.org.uk; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH 3/4] ARM: L2 : Errata 588369: Clean & Invalidate do notinvalidate clean lines
 > 
-> Do we need a cache_wait() on L2X0_CLEAN_INV_LINE_PA here? Actually, do
-> we need the cache_wait() before writel()? Can we have it after?
+> On Wed, 2009-12-09 at 18:43 +0000, Santosh Shilimkar wrote:
+> > This patch implements the work-around for the errata 588369. The secure API
+> > is used to alter L2 debug regsiter because of trust-zone.
+> [...]
+> > +config PL310_ERRATA_588369
+> > +       bool "Clean & Invalidate maintenance operations do not invalidate clean lines"
+> > +       depends on CACHE_L2X0
+> > +       default n
+> > +       help
+> > +          The PL310 L2 cache controller implements three types of Clean &
+> > +          Invalidate maintenance operations: by Physical Address
+> > +          (offset 0x7F0), by Index/Way (0x7F8) and by Way (0x7FC).
+> > +          They are architecturally defined to behave as the execution of a
+> > +          clean operation followed immediately by an invalidate operation,
+> > +          both performing to the same memory location. This functionality
+> > +          is not correctly implemented in PL310 as clean lines are not
+> > +          invalidated as a result of these operations
+> >  endmenu
+> 
+> Could you actually add a comment and a dependence on OMAP4 since this
+> requires the secure monitor that only TI has.
+OK
 
-I'm afraid that you've completely missed the whole point of this patch as
-you've made that statement.
-
-The point here is that rather than spinning on the L2 controller, waiting
-for it to say that it's completed, and _then_ calculating the data for
-the next operation, we do the two operations in parallel - while the L2
-controller is busy, we can be preparing the next operation.
-
-Now, as for "do we need a cache_wait() on L2X0_CLEAN_INV_LINE_PA", I've
-no idea.
-
-The specs are not entirely clear, but from my reading of them, _any_
-"register 7" read will do.  What I need is for someone to talk to the
-hardware people to confirm that - for PL210, PL220 and PL310.  You will
-find further details on this in my email to you on the 19th November
-with the subject of "cache-l2x0.c".
+> > +#ifdef CONFIG_PL310_ERRATA_588369
+> > +       /*
+> > +        * Disable Write-Back and Cache Linefill (set bits [1:0] of the Debug
+> > +        * Control Register)
+> > +        */
+> > +       __asm__ __volatile__(
+> > +       "stmfd r13!, {r0-r12, r14}\n"
+> > +       "mov r0, #3\n"
+> > +       "ldr r12, =0x100\n"
+> > +       "dsb\n"
+> > +       "smc\n"
+> > +       "ldmfd r13!, {r0-r12, r14}");
+> 
+> Could you actually add a function that gets called with a parameter
+> rather than having to similar inline asm blocks? You also don't need to
+> save/restore the registers if you declare them properly or use local
+> variables for that, the compiler does the work for you.
+A function call would be better as you suggested. We will look into this.
+> Is a DSB needed before SMC (I'm not sure)?
+That was a recommendation though not having it, I didn't observer any problems. 
+> --
+> Catalin
