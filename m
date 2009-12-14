@@ -1,52 +1,24 @@
-From: jpihet@mvista.com (Jean Pihet)
-Date: Mon, 14 Dec 2009 12:40:11 +0100
-Subject: [PATCH] ARMv7: fix Oprofile events count
-Message-ID: <1260790811.8106.2.camel@def-laptop>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Mon, 14 Dec 2009 12:50:11 +0100
+Subject: [CFT:PATCH] Remove a seemingly unnecessary cache flush
+In-Reply-To: <20091210104037.GC6207@n2100.arm.linux.org.uk>
+References: <20091207221210.GI26821@n2100.arm.linux.org.uk>
+	<20091210104037.GC6207@n2100.arm.linux.org.uk>
+Message-ID: <19238.9843.212077.875686@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Russell King - ARM Linux writes:
+ > On Mon, Dec 07, 2009 at 10:12:10PM +0000, Russell King - ARM Linux wrote:
+ > > While looking into the possible msync() issue (which turned out to be a
+ > > non-issue - it's covered by clever code), I found that we're flushing
+ > > the same page multiple times.
+ > 
+ > I'm going to queue this patch up today since I believe it is correct,
+ > though it would be nice to have a few more people test it on pre-ARMv6
+ > hardware.
 
-Here is a patch that fixes the oprofile events count.
-If it is OK I will submit it to the patch system.
+Tested here with gcc and glibc builds and testsuite runs on IXP420,
+IOP80219, and Kirkwood (Feroceon?), all ARMv5TE. No signs of problems.
 
-Any thought?
-
-Regards,
-Jean
-
----
-ARMv7: fix Oprofile events count
-    
-    On Oprofile ARMv7 the PMNC_D bit was set to lower the PMU IRQs
-    and so to decrease the risk of errata #628216 from appearing.
-    The effect of setting the PMNC_D bit is that the CCNT counter
-    is divided by 64, making the program counter events count
-    inaccurate.
-    The new OMAP3 r4 cores should have that errata fixed.
-    
-    The PMNC_D bit should not be set, this patch fixes it.
-    
-    Signed-off-by: Jean Pihet <jpihet@mvista.com>
-
-diff --git a/arch/arm/oprofile/op_model_v7.c
-b/arch/arm/oprofile/op_model_v7.c
-index f20295f..2088a6c 100644
---- a/arch/arm/oprofile/op_model_v7.c
-+++ b/arch/arm/oprofile/op_model_v7.c
-@@ -191,12 +191,8 @@ int armv7_setup_pmnc(void)
-                return -EBUSY;
-        }
- 
--       /*
--        * Initialize & Reset PMNC: C bit, D bit and P bit.
--        *  Note: Using a slower count for CCNT (D bit: divide by 64)
-results
--        *   in a more stable system
--        */
--       armv7_pmnc_write(PMNC_P | PMNC_C | PMNC_D);
-+       /* Initialize & Reset PMNC: C bit and P bit */
-+       armv7_pmnc_write(PMNC_P | PMNC_C);
- 
- 
-        for (cnt = CCNT; cnt < CNTMAX; cnt++) {
+/Mikael
