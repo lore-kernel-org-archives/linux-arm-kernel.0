@@ -1,84 +1,53 @@
-From: philipp.zabel@gmail.com (pHilipp Zabel)
-Date: Mon, 14 Dec 2009 10:49:27 +0100
-Subject: [PATCH] pxa: fix gpio_to_irq() for GPIOs on expander chips
-In-Reply-To: <1259148990-10372-1-git-send-email-mad_soft@inbox.ru>
-References: <1259148990-10372-1-git-send-email-mad_soft@inbox.ru>
-Message-ID: <74d0deb30912140149hc20c19dy605a259dc3f6e6e0@mail.gmail.com>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Mon, 14 Dec 2009 11:14:07 +0100
+Subject: [PATCH 1/4] mfd: mc13783: Take care of semantic inversion
+	between read and write value of two bits in POWER_MISCELLANEUS
+	register.
+In-Reply-To: <20091213195606.GA14024@pengutronix.de>
+References: <1260635829.2054.16.camel@climbing-alby>
+	<1260636523.2054.28.camel@climbing-alby>
+	<20091213195606.GA14024@pengutronix.de>
+Message-ID: <1260785647.2022.28.camel@climbing-alby>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2009 at 12:36 PM, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
-> Commit 9db95cb6c430b added support for gpios on PXA93x/950 and
-> increased PXA_GPIO_IRQ_NUM from 128 to 192, but missed to update
-> NR_BUILTIN_GPIO. This led to broken gpio_to_irq() for off-chip GPIOs.
-> Adjust NR_BUILTIN_GPIO accordingly, and also increase ARCH_NR_GPIOS,
-> as there exist platforms (hx4700) with more than 64 off-chip GPIOs,
-> so default value 256 is not enough.
->
-> Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
+Hi Uwe..
 
-Hi, are there any opinions on this one?
+Il giorno dom, 13/12/2009 alle 20.56 +0100, Uwe Kleine-K?nig ha scritto:
+> On Sat, Dec 12, 2009 at 05:48:43PM +0100, Alberto Panizzo wrote:
+> > MC13783_REGCTRL_PWGTnSPIEN controls the states of the corresponding
+> > PWGTn_DRV output.
+> > Reading 1 on the corresponding bit mean that the output is enabled
+> > Writing 1 on the corresponding bit disable that output!
+> > 
+> > So, if not asked directly to modify those bits, write the inverted
+> > value.
+> Hmm, I'm not sure this completely right.  The Spec has:
+> 
+>         Bit PWGTxSPIEN | Pin PWGTxEN | PWGTxDRV |  Read Back
+>           0 = default  |             |          | PWGTxSPIEN
+>         ---------------+-------------+----------+------------
+>               1        |      x      |   Low    |     0
+>               0        |      0      |   High   |     1
+>               0        |      1      |   Low    |     0
+> 
+> So it looks a bit harder than just inverting the read bit.
+> 
+> Best regards
+> Uwe
+> 
 
-Personally, I'd prefer not to increase PXA_GPIO_IRQ_NUM to 196 unless
-PXA9xx support is enabled. But as it is now, we either need to
-increase NR_BUILTIN_GPIO and ARCH_NR_GPIOS too (moving hx4700's 70
-ASIC3 GPIOs to 196..265), or add support for the gpiolib to_irq method
-to the PXA gpio_to_irq macro (which Eric didn't like, see the thread
-at http://www.spinics.net/lists/arm-kernel/msg53803.html) in order to
-keep the ASIC3 GPIOs in the 128...197 range.
+Yes, it is a bit harder, and because we don't have the complete 
+information (we cannot check via software the state of Pin PWGTxEN)
+the problem have no complete solution: if the read back value is 0 what I
+choose is to assign to the software the master part.
 
-regards
-Philipp
+We have to decide what to do, the other option is to write always 0 
+(that's what the freescale code do) to let the hardware control itself.
+This one for my board work as well, but it is the same, it is not a
+complete solution.
 
-> ---
-> ?arch/arm/mach-pxa/include/mach/gpio.h | ? ?4 +++-
-> ?1 files changed, 3 insertions(+), 1 deletions(-)
->
-> This is a fix for 2.6.32 regression.
-> Found this while testing 2.6.32-rc8 on hx4700. Here's errors in log
-> on unpatched kernel (all related to gpios on ASIC3 chip):
-> [ ? 37.369051] gpio-vbus gpio-vbus: can't request irq 286, err: -22
-> [ ? 37.398158] gpio-vbus: probe of gpio-vbus failed with error -22
-> ...
-> [ ? 37.683452] gpio-keys: Unable to claim irq 278; error -22
-> [ ? 37.700759] gpio-keys: probe of gpio-keys failed with error -22
-> ...
-> [ ? 38.025748] pda-power pda-power: request ac irq failed
-> [ ? 38.044569] pda-power: probe of pda-power failed with error -22
->
-> And after increasing NR_BUILTIN_GPIO to 192, I got this:
-> [ ?207.323467] gpiochip_add: gpios 256..263 (htc-egpio) not registered
->
-> With both NR_BUILTIN_GPIO and ARCH_NR_GPIOS increased there's no more
-> gpio-related errors.
->
-> I'm a bit unsure if this patch don't have any side effects on other PXA
-> platforms, and I even don't understand how exactly NR_BUILTIN_GPIO
-> and PXA_GPIO_IRQ_NUM affect gpios on expanders, so please check thoroughly!
->
-> diff --git a/arch/arm/mach-pxa/include/mach/gpio.h b/arch/arm/mach-pxa/include/mach/gpio.h
-> index b024a8b..bf53894 100644
-> --- a/arch/arm/mach-pxa/include/mach/gpio.h
-> +++ b/arch/arm/mach-pxa/include/mach/gpio.h
-> @@ -24,6 +24,8 @@
-> ?#ifndef __ASM_ARCH_PXA_GPIO_H
-> ?#define __ASM_ARCH_PXA_GPIO_H
->
-> +#define ARCH_NR_GPIOS ?320
-> +
-> ?#include <mach/irqs.h>
-> ?#include <mach/hardware.h>
-> ?#include <asm-generic/gpio.h>
-> @@ -99,7 +101,7 @@
-> ?#define GAFR(x) ? ? ? ? ? ? ? ?GPIO_REG(0x54 + (((x) & 0x70) >> 2))
->
->
-> -#define NR_BUILTIN_GPIO 128
-> +#define NR_BUILTIN_GPIO 192
->
-> ?#define gpio_to_bank(gpio) ? ? ((gpio) >> 5)
-> ?#define gpio_to_irq(gpio) ? ? ?IRQ_GPIO(gpio)
-> --
-> 1.6.3.4
->
->
+Maybe we can trace via software the state of those two bits, starting
+from an initial value, 0? (maybe the bootloader wrote 1 on those..)
+
+Alberto.
