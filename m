@@ -1,50 +1,35 @@
 From: jamie.iles@picochip.com (Jamie Iles)
-Date: Mon, 14 Dec 2009 14:04:40 +0000
-Subject: [PATCH 4/5] arm: enable support for software perf events
-In-Reply-To: <1260799481-29951-4-git-send-email-jamie.iles@picochip.com>
+Date: Mon, 14 Dec 2009 14:04:37 +0000
+Subject: [PATCH 1/5] arm: provide a mechanism to reserve performance counters
+In-Reply-To: <1260799481-29951-1-git-send-email-jamie.iles@picochip.com>
 References: <1260799481-29951-1-git-send-email-jamie.iles@picochip.com>
-	<1260799481-29951-2-git-send-email-jamie.iles@picochip.com>
-	<1260799481-29951-3-git-send-email-jamie.iles@picochip.com>
-	<1260799481-29951-4-git-send-email-jamie.iles@picochip.com>
-Message-ID: <1260799481-29951-5-git-send-email-jamie.iles@picochip.com>
+Message-ID: <1260799481-29951-2-git-send-email-jamie.iles@picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The perf events subsystem allows counting of both hardware and
-software events. This patch implements the bare minimum for software
-performance events.
+To add support for perf events and to allow the hardware
+counters to be shared with oprofile, we need a way to reserve
+access to the pmu (performance monitor unit).
 
+Cc: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Jamie Iles <jamie.iles@picochip.com>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Ingo Molnar <mingo@elte.hu>
 ---
- arch/arm/Kconfig                  |    2 +
- arch/arm/include/asm/perf_event.h |   38 +++++++++++++++++++++++++++++++++++++
- arch/arm/mm/fault.c               |    7 ++++++
- 3 files changed, 47 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/include/asm/perf_event.h
+ arch/arm/include/asm/pmu.h |   76 +++++++++++++++++++++++++++++++
+ arch/arm/kernel/Makefile   |    1 +
+ arch/arm/kernel/pmu.c      |  108 ++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/Kconfig        |    6 +++
+ 4 files changed, 191 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/include/asm/pmu.h
+ create mode 100644 arch/arm/kernel/pmu.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index b13cb85..dc4eb0f 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -19,6 +19,8 @@ config ARM
- 	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
- 	select HAVE_GENERIC_DMA_COHERENT
- 	select GENERIC_ATOMIC64
-+	select HAVE_PERF_EVENTS
-+	select PERF_USE_VMALLOC
- 	help
- 	  The ARM series is a line of low-power-consumption RISC chip designs
- 	  licensed by ARM Ltd and targeted at embedded applications and
-diff --git a/arch/arm/include/asm/perf_event.h b/arch/arm/include/asm/perf_event.h
+diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
 new file mode 100644
-index 0000000..32a66ac
+index 0000000..d66a7cd
 --- /dev/null
-+++ b/arch/arm/include/asm/perf_event.h
-@@ -0,0 +1,38 @@
++++ b/arch/arm/include/asm/pmu.h
+@@ -0,0 +1,76 @@
 +/*
-+ *  linux/arch/arm/include/asm/perf_event.h
++ *  linux/arch/arm/include/asm/pmu.h
 + *
 + *  Copyright (C) 2009 picoChip Designs Ltd, Jamie Iles
 + *
@@ -54,57 +39,234 @@ index 0000000..32a66ac
 + *
 + */
 +
-+#ifndef __ARM_PERF_EVENT_H__
-+#define __ARM_PERF_EVENT_H__
++#ifndef __ARM_PMU_H__
++#define __ARM_PMU_H__
 +
-+/*
-+ * NOP: on *most* (read: all supported) ARM platforms, the performance
-+ * counter interrupts are regular interrupts and not an NMI. This
-+ * means that when we receive the interrupt we can call
-+ * perf_event_do_pending() that handles all of the work with
-+ * interrupts enabled.
++#ifdef CONFIG_CPU_HAS_PMU
++
++#define MAX_PMU_IRQS	    8
++
++struct pmu_irqs {
++	int	    irqs[MAX_PMU_IRQS];
++	unsigned    num_irqs;
++};
++
++/**
++ * reserve_pmu() - reserve the hardware performance counters
++ *
++ * Reserve the hardware performance counters in the system for exclusive use.
++ * The 'struct pmu_irqs' for the system is returned on success, ERR_PTR()
++ * encoded error on failure.
 + */
++extern const struct pmu_irqs *
++reserve_pmu(void);
++
++/**
++ * release_pmu() - Relinquish control of the performance counters
++ *
++ * Release the performance counters and allow someone else to use them.
++ * Callers must have disabled the counters and released IRQs before calling
++ * this. The 'struct pmu_irqs' returned from reserve_pmu() must be passed as
++ * a cookie.
++ */
++extern void
++release_pmu(const struct pmu_irqs *irqs);
++
++/**
++ * init_pmu() - Initialise the PMU.
++ *
++ * Initialise the system ready for PMU enabling. This should typically set the
++ * IRQ affinity and nothing else. The users (oprofile/perf events etc) will do
++ * the actual hardware initialisation.
++ */
++extern int
++init_pmu(void);
++
++#else /* CONFIG_CPU_HAS_PMU */
++
++static inline const struct pmu_irqs *
++reserve_pmu(void)
++{
++	ERR_PTR(-ENODEV);
++}
++
 +static inline void
-+set_perf_event_pending(void)
++release_pmu(const struct pmu_irqs *irqs)
 +{
 +}
 +
-+/* Get the PC. Make sure that we have a 64bit value with the upper 32 cleared.
++static inline int
++init_pmu(void)
++{
++	return -ENODEV;
++}
++
++#endif /* CONFIG_CPU_HAS_PMU */
++
++#endif /* __ARM_PMU_H__ */
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index e7ccf7e..286a276 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -46,6 +46,7 @@ obj-$(CONFIG_CPU_XSCALE)	+= xscale-cp0.o
+ obj-$(CONFIG_CPU_XSC3)		+= xscale-cp0.o
+ obj-$(CONFIG_CPU_MOHAWK)	+= xscale-cp0.o
+ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
++obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
+ AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
+ 
+ ifneq ($(CONFIG_ARCH_EBSA110),y)
+diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
+new file mode 100644
+index 0000000..881e526
+--- /dev/null
++++ b/arch/arm/kernel/pmu.c
+@@ -0,0 +1,108 @@
++/*
++ *  linux/arch/arm/kernel/pmu.c
++ *
++ *  Copyright (C) 2009 picoChip Designs Ltd, Jamie Iles
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
 + */
-+#define perf_instruction_pointer(_regs) \
-+	((u64)instruction_pointer(regs) & 0xFFFFFFFFLU)
-+#define perf_misc_flags(regs)   (user_mode(regs) ? PERF_RECORD_MISC_USER : \
-+                                 PERF_RECORD_MISC_KERNEL)
 +
-+/* ARM performance counters start from 1 (in the cp15 accesses) so use the
-+ * same indexes here for consistency. */
-+#define PERF_EVENT_INDEX_OFFSET 1
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/semaphore.h>
++#include <linux/err.h>
++#include <linux/irq.h>
 +
-+#endif /* __ARM_PERF_EVENT_H__ */
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index 10e0680..9d40c34 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -18,6 +18,7 @@
- #include <linux/page-flags.h>
- #include <linux/sched.h>
- #include <linux/highmem.h>
-+#include <linux/perf_event.h>
++#include <asm/pmu.h>
++#include <asm/irq.h>
++
++/*
++ * Define the IRQs for the system. We could use something like a platform
++ * device but that seems fairly heavyweight for this. Also, the performance
++ * counters can't be removed or hotplugged.
++ *
++ * Ordering is important: init_pmu() will use the ordering to set the affinity
++ * to the corresponding core. e.g. the first interrupt will go to cpu 0, the
++ * second goes to cpu 1 etc.
++ */
++static const struct pmu_irqs pmu_irqs = {
++#ifdef CONFIG_ARCH_PC3XX
++	.irqs	    = { IRQ_NPMUIRQ },
++	.num_irqs   = 1,
++#elif defined(CONFIG_ARCH_OMAP2)
++	.irqs	    = { 3 },
++	.num_irqs   = 1,
++#elif defined(CONFIG_ARCH_BCMRING)
++	.irqs	    = { IRQ_PMUIRQ },
++	.num_irqs   = 1,
++#elif defined(CONFIG_MACH_REALVIEW_EB)
++	.irqs	    = {
++		[0]	= IRQ_EB11MP_PMU_CPU0,
++		[1]	= IRQ_EB11MP_PMU_CPU1,
++		[2]	= IRQ_EB11MP_PMU_CPU2,
++		[3]	= IRQ_EB11MP_PMU_CPU3
++	},
++	.num_irqs   = 4,
++#elif defined(CONFIG_ARCH_OMAP3)
++	.irqs	    = { INT_34XX_BENCH_MPU_EMUL },
++	.num_irqs   = 1,
++#elif defined(CONFIG_ARCH_IOP32X)
++	.irqs	    = { IRQ_IOP32X_CORE_PMU },
++	.num_irqs   = 1,
++#elif defined(CONFIG_ARCH_IOP33X)
++	.irqs	    = { IRQ_IOP33X_CORE_PMU },
++	.num_irqs   = 1,
++#elif defined(CONFIG_ARCH_PXA)
++	.irqs	    = { IRQ_PMU },
++	.num_irqs   = 1,
++#endif
++};
++
++static DECLARE_MUTEX(pmu_mutex);
++
++const struct pmu_irqs *
++reserve_pmu(void)
++{
++	int ret = down_trylock(&pmu_mutex) ? -EBUSY : 0;
++
++	return ret ? ERR_PTR(ret) : &pmu_irqs;
++}
++EXPORT_SYMBOL_GPL(reserve_pmu);
++
++void
++release_pmu(const struct pmu_irqs *irqs)
++{
++	WARN_ON(irqs != &pmu_irqs);
++	up(&pmu_mutex);
++}
++EXPORT_SYMBOL_GPL(release_pmu);
++
++static void
++set_irq_affinity(int irq,
++		 unsigned int cpu)
++{
++#ifdef CONFIG_SMP
++	struct irq_desc *desc = irq_desc + irq;
++	const struct cpumask *mask = cpumask_of(cpu);
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&desc->lock, flags);
++	cpumask_copy(desc->affinity, mask);
++	desc->chip->set_affinity(irq, mask);
++	raw_spin_unlock_irqrestore(&desc->lock, flags);
++#endif
++}
++
++int
++init_pmu(void)
++{
++	int i;
++
++	for (i = 0; i < pmu_irqs.num_irqs; ++i)
++		set_irq_affinity(pmu_irqs.irqs[i], i);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(init_pmu);
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index dd4698c..fc5c05b 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -342,6 +342,7 @@ config CPU_XSCALE
+ 	select CPU_PABRT_LEGACY
+ 	select CPU_CACHE_VIVT
+ 	select CPU_CP15_MMU
++	select CPU_HAS_PMU
+ 	select CPU_TLB_V4WBI if MMU
  
- #include <asm/system.h>
- #include <asm/pgtable.h>
-@@ -302,6 +303,12 @@ do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
- 	fault = __do_page_fault(mm, addr, fsr, tsk);
- 	up_read(&mm->mmap_sem);
+ # XScale Core Version 3
+@@ -398,6 +399,7 @@ config CPU_V6
+ 	select CPU_HAS_ASID if MMU
+ 	select CPU_COPY_V6 if MMU
+ 	select CPU_TLB_V6 if MMU
++	select CPU_HAS_PMU
  
-+	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, 0, regs, addr);
-+	if (fault & VM_FAULT_MAJOR)
-+		perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS_MAJ, 1, 0, regs, addr);
-+	else if (fault & VM_FAULT_MINOR)
-+		perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS_MIN, 1, 0, regs, addr);
+ # ARMv6k
+ config CPU_32v6K
+@@ -421,6 +423,7 @@ config CPU_V7
+ 	select CPU_CACHE_V7
+ 	select CPU_CACHE_VIPT
+ 	select CPU_CP15_MMU
++	select CPU_HAS_PMU
+ 	select CPU_HAS_ASID if MMU
+ 	select CPU_COPY_V6 if MMU
+ 	select CPU_TLB_V7 if MMU
+@@ -536,6 +539,9 @@ config CPU_COPY_FA
+ config CPU_COPY_V6
+ 	bool
+ 
++config CPU_HAS_PMU
++	bool
 +
- 	/*
- 	 * Handle the "normal" case first - VM_FAULT_MAJOR / VM_FAULT_MINOR
- 	 */
+ # This selects the TLB model
+ config CPU_TLB_V3
+ 	bool
 -- 
 1.6.5.4
