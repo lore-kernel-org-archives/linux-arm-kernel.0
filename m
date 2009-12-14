@@ -1,51 +1,39 @@
-From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Mon, 14 Dec 2009 18:53:35 +0100
-Subject: [PATCH 4/4] regulator: mc13783-regulator: correct the probing time.
-In-Reply-To: <1260811598.2022.144.camel@climbing-alby>
-References: <1260808880.2022.98.camel@climbing-alby>
-	<1260810776.2022.130.camel@climbing-alby>
-	<1260811085.2022.135.camel@climbing-alby>
-	<1260811598.2022.144.camel@climbing-alby>
-Message-ID: <1260813215.2022.171.camel@climbing-alby>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Mon, 14 Dec 2009 09:40:55 -0800
+Subject: GPIO support for HTC Dream
+In-Reply-To: <20091213212918.GE5114@elf.ucw.cz>
+References: <20091208102842.GH12264@elf.ucw.cz>
+	<20091208224550.GA26915@n2100.arm.linux.org.uk>
+	<d6200be20912081639mdd853bg4080f415116d018c@mail.gmail.com>
+	<20091209113739.GC22752@elf.ucw.cz>
+	<1260375495.23633.175.camel@desktop>
+	<20091213212918.GE5114@elf.ucw.cz>
+Message-ID: <1260812455.13078.3.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the mc13783-regulator driver is built in kernel, probing it during
-the regulator subsystem initialisation result in a fault.
+On Sun, 2009-12-13 at 22:29 +0100, Pavel Machek wrote:
 
-That is because regulator subsystem is planned to be initialised very early
-in the boot process, before the mfd subsystem initialisation.
+> > I'm going to end up pulling a lot of these git commit into my git tree.
+> > It would be pretty easy for me to just pull this GPIO change directly ..
+> > I assume you haven't found a way to work with git that suites you? It
+> > would be best if you used git, but I could try to do some sort of quilt
+> > export if that works better for you.
+> 
+> I can easily "pull" git trees. I do my own work in git, but usually
+> not in a way that would be useful for pushing upstream (see my trees
+> at git.kernel.org). 
+> 
+> I *could* add my dream trees to those that are mirrored at kernel.org,
+> when things settle a bit. (Should I?)
 
-The mc12783-regulator probing process need to access to the mc13783-core
-functionality to read/write mc13783 registers and so must be called after
-the mc13783-core driver initialisation.
+I'm not sure I know what you mean .. What benefit would that have?
 
-The way to do this is to let the kernel probe the mc13783-regulator driver when 
-mc13783-core register his regulator subdevice.
+> But I'd really prefer to push my stuff using plain old patches in
+> emails.
 
-Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
----
- drivers/regulator/mc13783-regulator.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+What I was meaning is you need to keep track of my tree via git, just so
+you know what's going into it and can work off it. If your already doing
+that, then no problem ..
 
-diff --git a/drivers/regulator/mc13783-regulator.c b/drivers/regulator/mc13783-regulator.c
-index 3d5d349..a40e35a 100644
---- a/drivers/regulator/mc13783-regulator.c
-+++ b/drivers/regulator/mc13783-regulator.c
-@@ -509,12 +509,12 @@ static struct platform_driver mc13783_regulator_driver = {
- 		.owner	= THIS_MODULE,
- 	},
- 	.remove		= __devexit_p(mc13783_regulator_remove),
-+	.probe		= mc13783_regulator_probe,
- };
- 
- static int __init mc13783_regulator_init(void)
- {
--	return platform_driver_probe(&mc13783_regulator_driver,
--			mc13783_regulator_probe);
-+	return platform_driver_register(&mc13783_regulator_driver);
- }
- subsys_initcall(mc13783_regulator_init);
- 
--- 
-1.6.3.3
+Daniel
