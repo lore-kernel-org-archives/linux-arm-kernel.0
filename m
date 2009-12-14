@@ -1,68 +1,44 @@
 From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Mon, 14 Dec 2009 18:12:56 +0100
-Subject: [PATCH 1/4] mfd: mc13783: Take care of semantic inversion between
-	read and write value of two bits in POWER_MISCELLANEUS register.
-In-Reply-To: <1260808880.2022.98.camel@climbing-alby>
+Date: Mon, 14 Dec 2009 18:18:05 +0100
+Subject: [PATCH 2/4] mfd: mc13783: When probing, unlock the mc13783 before
+	subsystems initialisation.
+In-Reply-To: <1260810776.2022.130.camel@climbing-alby>
 References: <1260808880.2022.98.camel@climbing-alby>
-Message-ID: <1260810776.2022.130.camel@climbing-alby>
+	<1260810776.2022.130.camel@climbing-alby>
+Message-ID: <1260811085.2022.135.camel@climbing-alby>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PWGT1DRV and PWGT1DRV are two digital output controlled by two corresponding
-hardware signals (Pin PWGTnEN) that are meant to be used to control core power
-supplies.
-The register MC13783_REG_POWER_MISCELLANEOUS contain the two control and
-status bit (PWGTnSPIEN) where write and read meaning is summarised by 
-the following table:
-
- Bit PWGTxSPIEN | Pin PWGTxEN | PWGTxDRV |  Read Back
-   0 = default  |             |          | PWGTxSPIEN
- ---------------+-------------+----------+------------
-       1        |      x      |   Low    |     0
-       0        |      0      |   High   |     1
-       0        |      1      |   Low    |     0
-
-Writing a 1 to those bits will turn off the corresponding core
-power supply. As there is no way to read back the value of 
-PWGTnSPIEN, the behaviour chosen is to let always the hardware
-control itself leaving those bits at the default value.
-
-This patch is especially needed for manipulate the other bits
-in the same register, where the read-modify-write operation
-can produce unwanted power fault.
+With this, mc13783 subsystems drivers can configure the mc13783 chip
+reading and writing registers.
 
 Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- drivers/mfd/mc13783-core.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ drivers/mfd/mc13783-core.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/mfd/mc13783-core.c b/drivers/mfd/mc13783-core.c
-index a1ade23..3953297 100644
+index 3953297..185139e 100644
 --- a/drivers/mfd/mc13783-core.c
 +++ b/drivers/mfd/mc13783-core.c
-@@ -171,6 +171,9 @@ int mc13783_reg_read(struct mc13783 *mc13783, unsigned int offset, u32 *val)
- }
- EXPORT_SYMBOL(mc13783_reg_read);
+@@ -629,6 +629,8 @@ err_revision:
+ 	}
+ 	/* This should go away (END) */
  
-+#define MC13783_REG_POWER_MISCELLANEOUS	34
-+#define MC13783_REGCTRL_PWGT1SPIEN	(1 << 15)
-+#define MC13783_REGCTRL_PWGT2SPIEN	(1 << 16)
- int mc13783_reg_write(struct mc13783 *mc13783, unsigned int offset, u32 val)
- {
- 	u32 buf;
-@@ -187,6 +190,13 @@ int mc13783_reg_write(struct mc13783 *mc13783, unsigned int offset, u32 val)
- 
- 	buf = 1 << 31 | offset << MC13783_REGOFFSET_SHIFT | val;
- 
-+	/* Take care of table 4-24 in Freescale MC13783IGPLDRM.pdf making
-+	 * the assumption that PWGTnDRV signals controls core power supplies
-+	 * that software must not disable. */
-+	if (offset == MC13783_REG_POWER_MISCELLANEOUS)
-+		buf &= !(MC13783_REGCTRL_PWGT1SPIEN |
-+			 MC13783_REGCTRL_PWGT2SPIEN);
++	mc13783_unlock(mc13783);
 +
- 	memset(&t, 0, sizeof(t));
+ 	if (pdata->flags & MC13783_USE_ADC)
+ 		mc13783_add_subdevice(mc13783, "mc13783-adc");
  
- 	t.tx_buf = &buf;
+@@ -651,8 +653,6 @@ err_revision:
+ 	if (pdata->flags & MC13783_USE_TOUCHSCREEN)
+ 		mc13783_add_subdevice(mc13783, "mc13783-ts");
+ 
+-	mc13783_unlock(mc13783);
+-
+ 	return 0;
+ }
+ 
 -- 
 1.6.3.3
