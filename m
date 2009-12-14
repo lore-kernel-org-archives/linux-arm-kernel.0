@@ -1,27 +1,68 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Dec 2009 17:09:48 -0000
-Subject: [PATCH 5/5] arm/perfevents: implement perf event support for ARMv6
-In-Reply-To: <1260807177.8106.50.camel@def-laptop>
-References: <1260799481-29951-1-git-send-email-jamie.iles@picochip.com>	<1260799481-29951-2-git-send-email-jamie.iles@picochip.com>	<1260799481-29951-3-git-send-email-jamie.iles@picochip.com>	<1260799481-29951-4-git-send-email-jamie.iles@picochip.com>	<1260799481-29951-5-git-send-email-jamie.iles@picochip.com>	<1260799481-29951-6-git-send-email-jamie.iles@picochip.com>
-	<1260807177.8106.50.camel@def-laptop>
-Message-ID: <001201ca7ce0$3e58b580$bb0a2080$@deacon@arm.com>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Mon, 14 Dec 2009 18:12:56 +0100
+Subject: [PATCH 1/4] mfd: mc13783: Take care of semantic inversion between
+	read and write value of two bits in POWER_MISCELLANEUS register.
+In-Reply-To: <1260808880.2022.98.camel@climbing-alby>
+References: <1260808880.2022.98.camel@climbing-alby>
+Message-ID: <1260810776.2022.130.camel@climbing-alby>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
+PWGT1DRV and PWGT1DRV are two digital output controlled by two corresponding
+hardware signals (Pin PWGTnEN) that are meant to be used to control core power
+supplies.
+The register MC13783_REG_POWER_MISCELLANEOUS contain the two control and
+status bit (PWGTnSPIEN) where write and read meaning is summarised by 
+the following table:
 
-* Jean Pihet wrote:
-> 
-> I am interested in supporting perf events for ARMv7. What do you think?
-> 
+ Bit PWGTxSPIEN | Pin PWGTxEN | PWGTxDRV |  Read Back
+   0 = default  |             |          | PWGTxSPIEN
+ ---------------+-------------+----------+------------
+       1        |      x      |   Low    |     0
+       0        |      0      |   High   |     1
+       0        |      1      |   Low    |     0
 
-I'm also interested in this. My plan was to add an initialisation function
-as an arch_initcall which would switch on the cpuid and setup a static PMU
-struct that could be later returned by hw_perf_event_init.
-This struct could also contain another struct encoding the event numbers for
-that particular core.
+Writing a 1 to those bits will turn off the corresponding core
+power supply. As there is no way to read back the value of 
+PWGTnSPIEN, the behaviour chosen is to let always the hardware
+control itself leaving those bits at the default value.
 
-Is this what you had in mind? Either way, we should get Jamie's code sorted
-and then build on top of that to avoid divergence.
+This patch is especially needed for manipulate the other bits
+in the same register, where the read-modify-write operation
+can produce unwanted power fault.
 
-Will
+Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
+---
+ drivers/mfd/mc13783-core.c |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/mfd/mc13783-core.c b/drivers/mfd/mc13783-core.c
+index a1ade23..3953297 100644
+--- a/drivers/mfd/mc13783-core.c
++++ b/drivers/mfd/mc13783-core.c
+@@ -171,6 +171,9 @@ int mc13783_reg_read(struct mc13783 *mc13783, unsigned int offset, u32 *val)
+ }
+ EXPORT_SYMBOL(mc13783_reg_read);
+ 
++#define MC13783_REG_POWER_MISCELLANEOUS	34
++#define MC13783_REGCTRL_PWGT1SPIEN	(1 << 15)
++#define MC13783_REGCTRL_PWGT2SPIEN	(1 << 16)
+ int mc13783_reg_write(struct mc13783 *mc13783, unsigned int offset, u32 val)
+ {
+ 	u32 buf;
+@@ -187,6 +190,13 @@ int mc13783_reg_write(struct mc13783 *mc13783, unsigned int offset, u32 val)
+ 
+ 	buf = 1 << 31 | offset << MC13783_REGOFFSET_SHIFT | val;
+ 
++	/* Take care of table 4-24 in Freescale MC13783IGPLDRM.pdf making
++	 * the assumption that PWGTnDRV signals controls core power supplies
++	 * that software must not disable. */
++	if (offset == MC13783_REG_POWER_MISCELLANEOUS)
++		buf &= !(MC13783_REGCTRL_PWGT1SPIEN |
++			 MC13783_REGCTRL_PWGT2SPIEN);
++
+ 	memset(&t, 0, sizeof(t));
+ 
+ 	t.tx_buf = &buf;
+-- 
+1.6.3.3
