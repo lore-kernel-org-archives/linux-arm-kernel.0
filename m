@@ -1,45 +1,63 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 15 Dec 2009 14:59:03 +0100
-Subject: [PATCH V2] Driver for the watchdog timer on all Freescale IMX
-	processors.
-In-Reply-To: <20091215120229.GJ4291@infomag.iguana.be>
-References: <20091209091244.GA15126@pengutronix.de>
-	<1260786235-32629-1-git-send-email-w.sang@pengutronix.de>
-	<20091215120229.GJ4291@infomag.iguana.be>
-Message-ID: <20091215135903.GB3120@pengutronix.de>
+From: abhijitpagare@ti.com (Pagare, Abhijit)
+Date: Tue, 15 Dec 2009 19:31:14 +0530
+Subject: [PATCH 0/5] OMAP4 Power Domain Framework Support
+References: <EAF47CD23C76F840A9E7FCE10091EFAB02BC14194C@dbde02.ent.ti.com>
+	<alpine.DEB.2.00.0912141628300.12561@utopia.booyaka.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02BC240747@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wim,
+Paul,
 
-> Some general feedback first:
-> * The MX2 and MX3 series have a watchdog device that cannot be stopped once
-> started. Since we use /dev/watchdog to start and stop the hardware, we
-> normally introduce a timer to keep the watchdog alive when /dev/watchdog
-> is closed. This is missing in this driver.
-> (See drivers/watchdog/at91sam9_wdt.c as an example).
+> thanks.  One other thing that I noticed: in the first powerdomain patch,in > arch/arm/plat-omap/include/plat/cpu.h, in struct omap_chip_id, the 'oc' 
+> field needs to be a u16, rather than a u8.
 
-Will do. Thanks for the pointer!
+Thanks, it has been taken care of.
 
-> * The MX1 platform is 32 bit instead of 16 bit and can be stopped and started.
-> Maybe it would make sense to split this in 2 drivers (one for MX1 and one for
-> the others).
 
-Hmm, originally I'd prefer to keep the two sticked together. But as we seem to
-need a seperate timer now for MX2/3, it might probably pay off to seperate
-them. I will have a look.
+> -----Original Message-----
+> From: Pagare, Abhijit
+> Sent: Tuesday, December 15, 2009 11:06 AM
+> To: 'Paul Walmsley'
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> Cousson, Benoit; Nayak, Rajendra
+> Subject: RE: [PATCH 0/5] OMAP4 Power Domain Framework Support
+> 
+> Paul,
+> 	There is one Fix patch for OMAP3 on top of which these patches
+> should go in cleanly. I will post the fix patch and the rebased and tested
+> patch-set soon.
+> 
+> Best Regards,
+> Abhijit Pagare
+> 
+> > -----Original Message-----
+> > From: Paul Walmsley [mailto:paul at pwsan.com]
+> > Sent: Tuesday, December 15, 2009 5:00 AM
+> > To: Pagare, Abhijit
+> > Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> > Cousson, Benoit; Nayak, Rajendra
+> > Subject: Re: [PATCH 0/5] OMAP4 Power Domain Framework Support
+> >
+> > Hello Abhijit,
+> >
+> > On Fri, 11 Dec 2009, Pagare, Abhijit wrote:
+> >
+> > > This patch series adds support for OMAP4 power domain framework.
+> >
+> > Just tried applying these -- looks like this series (and probably the
+> > clockdomain series also) needs to be refreshed to apply cleanly against
+> > the current linux-omap head.  Could you please rebase, retest if needed,
+> > and repost?
+
+I have posted the patches rebased against the linux-omap head. Keep me updated with your inputs.
+
+> >
+> >
+> > thanks,
+> >
+> > - Paul
+
 
 Regards,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091215/df7ad9a1/attachment.sig>
+Abhijit
