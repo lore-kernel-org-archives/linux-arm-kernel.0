@@ -1,79 +1,80 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Dec 2009 14:13:25 -0000
-Subject: [PATCH 1/5] arm: provide a mechanism to reserve performance
-	counters
-In-Reply-To: <1260875712-29712-2-git-send-email-jamie.iles@picochip.com>
-References: <1260875712-29712-1-git-send-email-jamie.iles@picochip.com>
-	<1260875712-29712-2-git-send-email-jamie.iles@picochip.com>
-Message-ID: <000001ca7d90$c4a15330$4de3f990$@deacon@arm.com>
+Date: Tue, 15 Dec 2009 14:29:21 -0000
+Subject: [PATCH 5/5] arm/perfevents: implement perf event support for ARMv6
+In-Reply-To: <1260875712-29712-6-git-send-email-jamie.iles@picochip.com>
+References: <1260875712-29712-1-git-send-email-jamie.iles@picochip.com>	<1260875712-29712-2-git-send-email-jamie.iles@picochip.com>	<1260875712-29712-3-git-send-email-jamie.iles@picochip.com>	<1260875712-29712-4-git-send-email-jamie.iles@picochip.com>	<1260875712-29712-5-git-send-email-jamie.iles@picochip.com>
+	<1260875712-29712-6-git-send-email-jamie.iles@picochip.com>
+Message-ID: <000101ca7d92$fe903000$fbb09000$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Jamie,
 
-It's getting there! Minor stylistic suggestions inline.
+I've not looked at the entire patch in depth, but I did spot a couple
+of things:
 
-* Jamie Iles wrote:
-
-> To add support for perf events and to allow the hardware
-> counters to be shared with oprofile, we need a way to reserve
-> access to the pmu (performance monitor unit).
+> This patch implements support for ARMv6 performance counters in the
+> Linux performance events subsystem. ARMv6 architectures that have the
+> performance counters should enable HW_PERF_EVENTS and define the
+> interrupts for the counters in arch/arm/kernel/perf_event.c
 > 
-> diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
-> new file mode 100644
-> index 0000000..e7cc264
-> --- /dev/null
-> +++ b/arch/arm/include/asm/pmu.h
-> @@ -0,0 +1,74 @@
-> +/*
-> + *  linux/arch/arm/include/asm/pmu.h
-> + *
-> + *  Copyright (C) 2009 picoChip Designs Ltd, Jamie Iles
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +#ifndef __ARM_PMU_H__
-> +#define __ARM_PMU_H__
-> +
-> +#ifdef CONFIG_CPU_HAS_PMU
-> +
-> +struct pmu_irqs {
-> +	const int   *irqs;
-> +	unsigned    num_irqs;
+> This implementation also provides an ARM PMU abstraction layer to allow
+> ARMv7 and others to be supported in the future by adding new a
+> 'struct arm_pmu'.
+
+<snip>
+
+> +static struct arm_pmu armv6pmu = {
+> +	.name			= "v6",
+> +	.handle_irq		= armv6pmu_handle_irq,
+> +	.enable			= armv6pmu_enable_event,
+> +	.disable		= armv6pmu_disable_event,
+> +	.event_map		= armv6pmu_event_map,
+> +	.raw_event		= armv6pmu_raw_event,
+> +        .read_counter           = armv6pmu_read_counter,
+> +        .write_counter          = armv6pmu_write_counter,
+> +	.get_event_idx		= armv6pmu_get_event_idx,
+> +        .start                  = armv6pmu_start,
+> +	.stop		        = armv6pmu_stop,
+> +	.num_events		= 3,
+> +	.max_period		= (1LLU << 32) - 1,
 > +};
+
+Your indentation seems to have gone awry here, I think I saw it somewhere
+else in the file too.
+
+> +static int __init
+> +init_hw_perf_events(void)
+> +{
+> +#define CPUID_V6_MASK   0x7F000
+> +#define CPUID_V6_BITS   0x7B000
+> +        unsigned long cpuid = read_cpuid_id();
 > +
-> +/**
-> + * reserve_pmu() - reserve the hardware performance counters
-> + *
-> + * Reserve the hardware performance counters in the system for exclusive use.
-> + * The 'struct pmu_irqs' for the system is returned on success, ERR_PTR()
-> + * encoded error on failure.
-> + */
-> +extern const struct pmu_irqs *
-> +reserve_pmu(void);
+> +        if (CPUID_V6_BITS == (cpuid & CPUID_V6_MASK)) {
+> +                armpmu = &armv6pmu;
+> +                memcpy(armpmu_perf_cache_map, armv6_perf_cache_map,
+> +                       sizeof(armv6_perf_cache_map));
+> +                perf_max_events	= armv6pmu.num_events;
+> +        } else {
+> +                pr_info("no hardware support available\n");
+> +                perf_max_events = -1;
+> +        }
+> +
+> +        if (armpmu)
+> +                pr_info("enabled with %s PMU driver\n",
+> +                        armpmu->name);
+> +
+> +        return 0;
+> +}
+> +arch_initcall(init_hw_perf_events);
 
-I think it's standard Kernel coding style to put the declaration of a function
-all on one line if it fits. The same goes elsewhere in the patch.
-
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index dd4698c..5cd0ec4 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -536,6 +536,11 @@ config CPU_COPY_FA
->  config CPU_COPY_V6
->  	bool
-> 
-> +config CPU_HAS_PMU
-> +	depends on CPU_V6 || CPU_V7 || CPU_XSCALE
-> +	default y
-> +	bool
-
-I think you should use XSCALE_PMU instead of CPU_XSCALE. Also, this should
-probably be in the top-level ARM Kconfig instead of the mm/ one.
+Watch out for the 11MPCore CPU. The event numbers are defined *slightly*
+differently (1136,1156 and 1176 don't have any conflicts with each other,
+but the 11MPCore does). If you look at the TRM the first 6 events are the
+same as for other v6 cores, but then event 0x06 becomes a new event: `branch
+not predicted' which offsets the others by one. Other than that, the PMUs
+are accessed the same way on each core, so you just need to make sure you
+select the correct event mappings.
 
 Cheers,
 
