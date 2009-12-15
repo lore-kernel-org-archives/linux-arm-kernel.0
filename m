@@ -1,25 +1,41 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 14 Dec 2009 22:43:16 -0700 (MST)
-Subject: [PATCH 0/5] OMAP4 Power Domain Framework Support
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02BC2402B9@dbde02.ent.ti.com>
-References: <EAF47CD23C76F840A9E7FCE10091EFAB02BC14194C@dbde02.ent.ti.com>
-	<alpine.DEB.2.00.0912141628300.12561@utopia.booyaka.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02BC2402B9@dbde02.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.0912142240260.12561@utopia.booyaka.com>
+From: david-b@pacbell.net (David Brownell)
+Date: Mon, 14 Dec 2009 21:44:08 -0800
+Subject: [PATCH] mmc: move regulator handling to core
+In-Reply-To: <20091204115805.GS14091@buzzloop.caiaq.de>
+References: <1259844390-10541-1-git-send-email-daniel@caiaq.de>
+	<4B181BB4.1020800@nokia.com>
+	<20091204115805.GS14091@buzzloop.caiaq.de>
+Message-ID: <200912142144.08591.david-b@pacbell.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Abhijit,
+On Friday 04 December 2009, Daniel Mack wrote:
+> On Thu, Dec 03, 2009 at 10:12:36PM +0200, Adrian Hunter wrote:
+> > Daniel Mack wrote:
+> > >On Thu, Dec 03, 2009 at 04:27:39PM +0200, Adrian Hunter wrote:
+> 
+> > >>What about arch/arm/mach-omap2/mmc-twl4030.c ?
+> > >
+> > >Argh, missed that one. And this particular case doesn't fit to my
+> > >modifications. I don't know the code well ...  We would need to
+> > >have a struct mmc_host * in all the functions there calling
+> > >mmc_regulator_{set,get}_ocr. Any idea how to resolve that?
 
-On Tue, 15 Dec 2009, Pagare, Abhijit wrote:
+Finish separating the HSMMC setup from the OMAP2 setup, then the
+HSMMC stuff will be a lot easier to cope with.  The HSMMC stuff
+is never used with the mfd/menelaus transceiver/slot switch stuff;
+including those data structures caused lots of hassles.
 
-> 	There is one Fix patch for OMAP3 on top of which these patches 
-> should go in cleanly. I will post the fix patch and the rebased and 
-> tested patch-set soon.
-
-thanks.  One other thing that I noticed: in the first powerdomain patch, 
-in arch/arm/plat-omap/include/plat/cpu.h, in struct omap_chip_id, the 'oc' 
-field needs to be a u16, rather than a u8.
+The only real issue with the HSMMC stuff is that it's got to continue
+working with the many wiring options now in use.
 
 
-- Paul
+> Moving the regulator handling to the mmc core would require a major
+> cleanup to all this code, but I don't have such hardware to test my
+> modifications. Can anyone help here?
+
+Simplest to borrow a Beagle.  Make sure whatever you do
+can handle both standard SDHC cards, and also 8-bit HSMMC.
+Once that works, the rest will fall out pretty easily.
+
+- Dave
