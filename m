@@ -1,33 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Dec 2009 17:23:26 +0000
-Subject: [PATCH] [ARM] pxa/cm-x300: fix build breakage caused by
-	missing 'select CPU_PXA310'
-In-Reply-To: <4B27B92B.9020306@compulab.co.il>
-References: <4B27B92B.9020306@compulab.co.il>
-Message-ID: <20091215172326.GC15855@n2100.arm.linux.org.uk>
+From: andy@warmcat.com (Andy Green)
+Date: Tue, 15 Dec 2009 17:31:52 +0000
+Subject: Using SD cards on Samsung S3C2410/S3C2440 based systems
+In-Reply-To: <200912151443.59761.jbe@pengutronix.de>
+References: <200912151443.59761.jbe@pengutronix.de>
+Message-ID: <4B27C808.7080800@warmcat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2009 at 06:28:27PM +0200, Mike Rapoport wrote:
-> Eric,
-> Apparently Igor's patches for CM-X300 were not applied properly. Somehow
-> commit db205463fd24c0972ad2c4e4fafb1c76e51b4380
-> ([ARM] pxa/cm-x300: add PWM backlight support) introduced 'select HAVE_PWM'
-> to MACH_COLIBRY300 rather than CM-X300. I suspect that the same happened with
-> the patch that added 'select CPU_PXA310' to MACH_CM_X300. I'm not certain about
-> removing PWM support in Colibri, but MACH_CM_X300 need to get fixed.
+On 12/15/09 13:43, Somebody in the thread at some point said:
 
-You need to look at the original commit you mention above, and check
-whether it has been applied correctly.  If not, it needs to be reverted
-and the correct change applied.
+Hi Juergen -
 
-This is one of the problems of patching Kconfig files that grow over
-time - diff only gives at most six lines of context (three lines either
-side), and it is possible to have those same six lines of context
-repeated several times in Kconfig files.  Now add an additional set of
-lines towards the start of the Kconfig file, and such a diff will get
-incorrectly applied.
+> s3c2440-sdi s3c2440-sdi: running at 0kHz (requested: 0kHz).
+> s3c2440-sdi s3c2440-sdi: running at 399kHz (requested: 400kHz).
 
-Unfortunately, this is one of the down sides to using git apply over
-GNU patch - GNU patch will tell you if it applied a patch with an offset.
-git tools won't, so it's not obvious if a patch has been mis-applied.
+> mmc0: new SD card at address 8d7e
+> mmcblk0: mmc0:8d7e SD02G 1.83 GiB
+>   mmcblk0: p1 p2
+>
+> Any idea why most of the cards do not work?
+
+-110 is timeout... it might be worth setting CONFIG_PRINTK_TIME and 
+looking to see what the real time looks like in both cases.
+
+I guess you have the pullups on your PCB OK for the MMC bus (everything 
+except CLK), and you looked with your scope that power is OK there from 
+early boot and the signals look well-formed.  (And the clock is 400kHz).
+
+I noticed that at 115kbps console set on the kernel commandline on an 
+iMX31, I can cause SD Card boot we use to fail like you describe at the 
+moment just by setting loglevel=8 on the commandline.  So try one of the 
+"bad" cards at loglevel=4 and see if that changes anything.
+
+-Andy
