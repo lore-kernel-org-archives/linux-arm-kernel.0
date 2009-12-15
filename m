@@ -1,36 +1,111 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 15 Dec 2009 11:36:08 +0100
-Subject: [PATCH 1/1] Remove suspend/resume functionality, add dynamic
-	clocking
-In-Reply-To: <083DF309106F364B939360100EC290F804F57A69FA@eu1rdcrdc1wx030.exi.nxp.com>
-References: <083DF309106F364B939360100EC290F804F55C9225@eu1rdcrdc1wx030.exi.nxp.com>
-	<20091126090252.GB12179@pengutronix.de>
-	<083DF309106F364B939360100EC290F804F5659CFF@eu1rdcrdc1wx030.exi.nxp.com>
-	<20091206084731.GE2766@ucw.cz>
-	<20091206210225.GA20887@pengutronix.de>
-	<20091206210739.GE10184@elf.ucw.cz>
-	<083DF309106F364B939360100EC290F804F57A69FA@eu1rdcrdc1wx030.exi.nxp.com>
-Message-ID: <20091215103608.GE17930@elf.ucw.cz>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 15 Dec 2009 11:37:24 +0100
+Subject: [PATCH] ARM: MX3: make CPU revision number detection work on
+	all boards
+In-Reply-To: <1260833262-18507-1-git-send-email-wd@denx.de>
+References: <20091211143318.1D8B43F6CC@gemini.denx.de>
+	<1260833262-18507-1-git-send-email-wd@denx.de>
+Message-ID: <20091215103724.GA15126@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > > Are you sure its unneeded? What if someone attempts to suspend the
-> > > > system when a transaction is running?
-> > > That's exactly my question.  I think the machine will suspend and the
-> > > transaction fail.  So no suspend callback isn't optimal, but maybe OK?!
-> > 
-> > Having failures just because suspend happened at wrong time is
-> > bad. .suspend() should just wait for end of transaction.
-> 
-> I'm not sure what situation could actually occur that would suspend the
-> system in the middle of an I2C transaction. If an I2C transaction was
-> started and the CPU was suspended, this would appear to be a problem
-> outside the I2C driver itself. Would other I2C drivers have this similar
-> problem?
+Hi Wolfgang,
 
-Well, can the i2c transaction sleep? If so, suspend probably can come
-in the middle.
-									Pavel
+On Tue, Dec 15, 2009 at 12:27:42AM +0100, Wolfgang Denk wrote:
+> Commit 52939c03 (ARM: MX3: fix CPU revision number detection) started
+> using the CPU's SREV register for revision number detection. This
+> makes it mandatory to have a valid SPBA0 mapping. Add this to the
+> global map_io code instead of adding multiple copies for each board.
+> 
+> Signed-off-by: Wolfgang Denk <wd@denx.de>
+> Cc: Daniel Mack <daniel@caiaq.de>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+
+ok for -rc.
+
+Sascha
+
+> 
+> Tested on Qong (EVB-Lite)
+> Tested-by: Wolfgang Denk <wd@denx.de>
+> ---
+>  arch/arm/mach-mx3/mm.c       |    5 +++++
+>  arch/arm/mach-mx3/mx31ads.c  |    5 -----
+>  arch/arm/mach-mx3/mx31lite.c |    5 -----
+>  arch/arm/mach-mx3/mx31pdk.c  |    5 -----
+>  4 files changed, 5 insertions(+), 15 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx3/mm.c b/arch/arm/mach-mx3/mm.c
+> index bedf5b8..6858a4f 100644
+> --- a/arch/arm/mach-mx3/mm.c
+> +++ b/arch/arm/mach-mx3/mm.c
+> @@ -65,6 +65,11 @@ static struct map_desc mxc_io_desc[] __initdata = {
+>  		.pfn		= __phys_to_pfn(AIPS2_BASE_ADDR),
+>  		.length		= AIPS2_SIZE,
+>  		.type		= MT_DEVICE_NONSHARED
+> +	}, {
+> +		.virtual = SPBA0_BASE_ADDR_VIRT,
+> +		.pfn = __phys_to_pfn(SPBA0_BASE_ADDR),
+> +		.length = SPBA0_SIZE,
+> +		.type = MT_DEVICE_NONSHARED
+>  	},
+>  };
+>  
+> diff --git a/arch/arm/mach-mx3/mx31ads.c b/arch/arm/mach-mx3/mx31ads.c
+> index 0497c15..3e7bafa 100644
+> --- a/arch/arm/mach-mx3/mx31ads.c
+> +++ b/arch/arm/mach-mx3/mx31ads.c
+> @@ -494,11 +494,6 @@ static void mxc_init_i2c(void)
+>   */
+>  static struct map_desc mx31ads_io_desc[] __initdata = {
+>  	{
+> -		.virtual	= SPBA0_BASE_ADDR_VIRT,
+> -		.pfn		= __phys_to_pfn(SPBA0_BASE_ADDR),
+> -		.length		= SPBA0_SIZE,
+> -		.type		= MT_DEVICE_NONSHARED
+> -	}, {
+>  		.virtual	= CS4_BASE_ADDR_VIRT,
+>  		.pfn		= __phys_to_pfn(CS4_BASE_ADDR),
+>  		.length		= CS4_SIZE / 2,
+> diff --git a/arch/arm/mach-mx3/mx31lite.c b/arch/arm/mach-mx3/mx31lite.c
+> index def6b67..4697164 100644
+> --- a/arch/arm/mach-mx3/mx31lite.c
+> +++ b/arch/arm/mach-mx3/mx31lite.c
+> @@ -212,11 +212,6 @@ static struct platform_device physmap_flash_device = {
+>   */
+>  static struct map_desc mx31lite_io_desc[] __initdata = {
+>  	{
+> -		.virtual = SPBA0_BASE_ADDR_VIRT,
+> -		.pfn = __phys_to_pfn(SPBA0_BASE_ADDR),
+> -		.length = SPBA0_SIZE,
+> -		.type = MT_DEVICE_NONSHARED
+> -	}, {
+>  		.virtual = CS4_BASE_ADDR_VIRT,
+>  		.pfn = __phys_to_pfn(CS4_BASE_ADDR),
+>  		.length = CS4_SIZE,
+> diff --git a/arch/arm/mach-mx3/mx31pdk.c b/arch/arm/mach-mx3/mx31pdk.c
+> index 0f7a2f0..18715f1 100644
+> --- a/arch/arm/mach-mx3/mx31pdk.c
+> +++ b/arch/arm/mach-mx3/mx31pdk.c
+> @@ -211,11 +211,6 @@ static int __init mx31pdk_init_expio(void)
+>   */
+>  static struct map_desc mx31pdk_io_desc[] __initdata = {
+>  	{
+> -		.virtual = SPBA0_BASE_ADDR_VIRT,
+> -		.pfn = __phys_to_pfn(SPBA0_BASE_ADDR),
+> -		.length = SPBA0_SIZE,
+> -		.type = MT_DEVICE_NONSHARED,
+> -	}, {
+>  		.virtual = CS5_BASE_ADDR_VIRT,
+>  		.pfn = __phys_to_pfn(CS5_BASE_ADDR),
+>  		.length = CS5_SIZE,
+> -- 
+> 1.6.2.5
+> 
+> 
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
