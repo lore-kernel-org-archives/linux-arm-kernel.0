@@ -1,50 +1,19 @@
-From: rafiuddin.syed@ti.com (Syed Rafiuddin)
-Date: Tue, 15 Dec 2009 17:48:31 +0530 (IST)
-Subject: [RESUBMIT][PATCH-v2][RFC] OMAP4: I2C Support for OMAP4430
-In-Reply-To: <44891.192.168.10.89.1260254659.squirrel@dbdmail.itg.ti.com>
-References: <44891.192.168.10.89.1260254659.squirrel@dbdmail.itg.ti.com>
-Message-ID: <61140.192.168.10.88.1260879511.squirrel@dbdmail.itg.ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 15 Dec 2009 13:14:18 +0000
+Subject: NEON support
+In-Reply-To: <000401ca7d70$0122afa0$03680ee0$%yang@samsung.com>
+References: <000401ca7d70$0122afa0$03680ee0$%yang@samsung.com>
+Message-ID: <1260882858.1569.21.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben,
+On Tue, 2009-12-15 at 10:18 +0000, Jinsung Yang wrote:
+> Does the latest Linux ARM kernel support full NEON features?
+> Regarding this, as I know, it is necessary to backup and restore the
+> NEON registers to run NEON instructions.
 
->>
->> Thu, 20 Aug 2009 14:19:04 -0700
->>
->> On Tue, Aug 18, 2009 at 03:35:31PM +0530, Syed Rafiuddin wrote:
->> > Ben,
->> >
->> > > On Fri, Jul 24, 2009 at 04:40:02PM +0530, Syed Rafiuddin wrote:
->> > >> Hi Ben,
->> > >>
->> > >> > This patch adds OMAP4 support to the I2C driver. All I2C register
->> > >> > addresses  are different
->> > >> between
->> > >> > OMAP1/2/3 and OMAP4. In order to not have #ifdef's at  various places in
->> > >> > code, as well as to
->> > >> > support multi-OMAP build, Array's are  created to hold the register
->> > >> > addresses.
->> > >> >
->> > >> > Signed-off-by: Syed Rafiuddin <rafiuddin.s...@ti.com>
->> > >> > ---
->> > >>
->> > >> No comment received on this patch,
->> > >> Is there anything that I need to resolve?
->> > >> Else can this patch get merged.
->> > >
->> > > sorry, been busy, will look at this in the next few days.
->> >
->> > Seems like no issues with the patch since no comments received from long time.
->> > Did you get a chance to look at the patch.Could you please merge this.
->>
->> I can't currently think of any neater way of doing this, so i'll
->> probably merge this.
->
-> I do not see this patch merged. Is there some thing that needs to be resolved in this patch.
-> Else can you please merge this patch.
->
-Did you get a chance to look into the patch ? If patch is fine please merge this.
+Yes, it supports (but you need to enable it in the kernel -
+CONFIG_NEON).
 
-Regards,
-Syed Rafiuddin
+-- 
+Catalin
