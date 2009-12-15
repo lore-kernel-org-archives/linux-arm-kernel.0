@@ -1,40 +1,59 @@
-From: arve@android.com (=?ISO-8859-1?Q?Arve_Hj=F8nnev=E5g?=)
-Date: Mon, 14 Dec 2009 22:48:01 -0800
-Subject: GPIO support for HTC Dream
-In-Reply-To: <20091214064545.GK5114@elf.ucw.cz>
-References: <20091208102842.GH12264@elf.ucw.cz>
-	<20091208214658.GC4164@elf.ucw.cz> <4B1ECEEE.3000209@bluewatersys.com>
-	<4B203575.6050407@bluewatersys.com>
-	<20091210172458.GJ19454@elf.ucw.cz>
-	<4B2150B7.3040207@bluewatersys.com>
-	<BD79186B4FD85F4B8E60E381CAEE190901FB0F92@mi8nycmail19.Mi8.com>
-	<20091211221015.GB24456@elf.ucw.cz>
-	<BD79186B4FD85F4B8E60E381CAEE190901FB10EA@mi8nycmail19.Mi8.com>
-	<20091214064545.GK5114@elf.ucw.cz>
-Message-ID: <d6200be20912142248n67cf020fw2bda313febe90fb9@mail.gmail.com>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Tue, 15 Dec 2009 09:50:53 +0200
+Subject: shared memory problem on ARM v5TE using threads
+In-Reply-To: <alpine.LFD.2.00.0912141503360.23173@xanadu.home>
+References: <20091207114218.GA19348@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.0912071219100.31174@xanadu.home>
+	<20091207175608.GE26821@n2100.arm.linux.org.uk>
+	<309002C0DA137042828828FC53D7A9347E2630EEC2@IL-MB01.marvell.com>
+	<20091213120033.GA10698@n2100.arm.linux.org.uk>
+	<20091213120615.GB10698@n2100.arm.linux.org.uk>
+	<cabda6420912140513k40a998b7k8cf56c35cc535cfb@mail.gmail.com>
+	<309002C0DA137042828828FC53D7A9347E2630F364@IL-MB01.marvell.com>
+	<cabda6420912140948t23c07676tb5f44eb4febbc584@mail.gmail.com>
+	<alpine.LFD.2.00.0912141503360.23173@xanadu.home>
+Message-ID: <c70ff3ad0912142350v2231938dqc9c0aedc214120bd@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 13, 2009 at 10:45 PM, Pavel Machek <pavel@ucw.cz> wrote:
->> > +int __init dream_init_gpio(void)
->> > +{
->> > + ? ? ? ?int i;
->> > +
->> > + ? ? ? ?for (i = 0; i < ARRAY_SIZE(msm_gpio_banks); i++)
->> > + ? ? ? ? ? ? ? ?gpiochip_add(&msm_gpio_banks[i].chip);
->> > +
->> > + ? return 0;
->> > +}
->>
->> Your original patch was initially writing the shadow values to the registers.
->> Do you still need to do that?
+On Mon, Dec 14, 2009 at 10:14 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Mon, 14 Dec 2009, christian pellegrin wrote:
 >
-> It seems to boot this way :-). If writing the shadow values is not
-> needed, lets try getting away without it...
-
-I may boot this way, but unless you know that the bootloader
-initialized all the registers to the same value, some outputs will be
-in the wrong state until someone writes to a gpio in the same bank.
-
--- 
-Arve Hj?nnev?g
+>> On Mon, Dec 14, 2009 at 3:46 PM, Ronen Shitrit <rshitrit@marvell.com> wrote:
+>>
+>> > "
+>> >
+>> > I think your patch doesn't cover the PIO mode...
+>> >
+>>
+>> Has someone a suggestion on how to write a test-case for this?
+>
+> I don't think there is any peripheral that runs in PIO mode on
+> Kirkwood... except the NAND flash.
+the sata can be configured to use pio instead of dma, this can be done
+by adding libata.force=pio to the command line.
+>
+>> I tried various forms of mixing read/write syscalls (or a mmap wit
+>> MAP_PRIVATE) and access via two mmap with MAP_SHARED aliasing the same
+>> address (I checked that adjust_pte was called by them) but didn't get
+>> any problem. I have to admit that I really don't understand how PIO in
+>> kernel mode can refer to mappings that are aliased (and so market
+>> uncacheable) made by user-space programs. Thank you for your patience.
+>
+> PIO transfer will store data in the kernel direct mapped memory which is
+> always cached. ?Normally the cache coherency with user space is handled
+> by flush_dcache_page(), but that deals only with L1 and data can move to
+> L2 where it will be invisible to the uncached user space shared
+> mappings.
+>
+> I don't know off hand how PIO on a page that is already mapped and
+> shared in user space may be produced though.
+>
+>
+> Nicolas
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
