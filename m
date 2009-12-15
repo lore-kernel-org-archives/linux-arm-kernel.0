@@ -1,59 +1,49 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Tue, 15 Dec 2009 09:50:53 +0200
-Subject: shared memory problem on ARM v5TE using threads
-In-Reply-To: <alpine.LFD.2.00.0912141503360.23173@xanadu.home>
-References: <20091207114218.GA19348@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0912071219100.31174@xanadu.home>
-	<20091207175608.GE26821@n2100.arm.linux.org.uk>
-	<309002C0DA137042828828FC53D7A9347E2630EEC2@IL-MB01.marvell.com>
-	<20091213120033.GA10698@n2100.arm.linux.org.uk>
-	<20091213120615.GB10698@n2100.arm.linux.org.uk>
-	<cabda6420912140513k40a998b7k8cf56c35cc535cfb@mail.gmail.com>
-	<309002C0DA137042828828FC53D7A9347E2630F364@IL-MB01.marvell.com>
-	<cabda6420912140948t23c07676tb5f44eb4febbc584@mail.gmail.com>
-	<alpine.LFD.2.00.0912141503360.23173@xanadu.home>
-Message-ID: <c70ff3ad0912142350v2231938dqc9c0aedc214120bd@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 15 Dec 2009 09:24:24 +0100
+Subject: [PATCH] ARM: Add atomic64 routines for ARMv6k and above.
+In-Reply-To: <1260555237-18825-1-git-send-email-will.deacon@arm.com>
+References: <1260555237-18825-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20091215082424.GB20571@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2009 at 10:14 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Mon, 14 Dec 2009, christian pellegrin wrote:
->
->> On Mon, Dec 14, 2009 at 3:46 PM, Ronen Shitrit <rshitrit@marvell.com> wrote:
->>
->> > "
->> >
->> > I think your patch doesn't cover the PIO mode...
->> >
->>
->> Has someone a suggestion on how to write a test-case for this?
->
-> I don't think there is any peripheral that runs in PIO mode on
-> Kirkwood... except the NAND flash.
-the sata can be configured to use pio instead of dma, this can be done
-by adding libata.force=pio to the command line.
->
->> I tried various forms of mixing read/write syscalls (or a mmap wit
->> MAP_PRIVATE) and access via two mmap with MAP_SHARED aliasing the same
->> address (I checked that adjust_pte was called by them) but didn't get
->> any problem. I have to admit that I really don't understand how PIO in
->> kernel mode can refer to mappings that are aliased (and so market
->> uncacheable) made by user-space programs. Thank you for your patience.
->
-> PIO transfer will store data in the kernel direct mapped memory which is
-> always cached. ?Normally the cache coherency with user space is handled
-> by flush_dcache_page(), but that deals only with L1 and data can move to
-> L2 where it will be invisible to the uncached user space shared
-> mappings.
->
-> I don't know off hand how PIO on a page that is already mapped and
-> shared in user space may be produced though.
->
->
-> Nicolas
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Hello,
+
+On Fri, Dec 11, 2009 at 06:13:57PM +0000, Will Deacon wrote:
+> In preparation for perf-events support, ARM needs to support atomic64_t
+> operations. v6k and above support the ldrexd and strexd instructions to do
+> just that.
+> 
+> This patch adds atomic64 support to the ARM architecture. v6k and above
+> make use of new instructions whilst older cores fall back on the generic
+> solution using spinlocks. If and when v7-M cores are supported by Linux, they
+> will need to fall back on the spinlock implementation too.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Jamie Iles <jamie.iles@picochip.com>
+> ---
+>  arch/arm/Kconfig              |    1 +
+>  arch/arm/include/asm/atomic.h |  228 +++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 229 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 1c4119c..5fdc032 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -18,6 +18,7 @@ config ARM
+>  	select HAVE_KRETPROBES if (HAVE_KPROBES)
+>  	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
+>  	select HAVE_GENERIC_DMA_COHERENT
+> +	select GENERIC_ATOMIC64 if (!CPU_32v6K)
+If a kernel supports say a v5 and a v6 then IIRC CPU_32v6K is enabled,
+but GENERIC_ATOMIC64 is needed, too.
+
+Maybe I missed something.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
