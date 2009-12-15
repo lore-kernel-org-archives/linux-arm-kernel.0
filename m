@@ -1,40 +1,36 @@
-From: chripell@gmail.com (christian pellegrin)
-Date: Tue, 15 Dec 2009 11:33:07 +0100
-Subject: shared memory problem on ARM v5TE using threads
-In-Reply-To: <alpine.LFD.2.00.0912141457400.23173@xanadu.home>
-References: <20091207114218.GA19348@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0912071027480.31174@xanadu.home>
-	<20091207170546.GB26821@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0912071219100.31174@xanadu.home>
-	<20091207175608.GE26821@n2100.arm.linux.org.uk>
-	<309002C0DA137042828828FC53D7A9347E2630EEC2@IL-MB01.marvell.com>
-	<20091213120033.GA10698@n2100.arm.linux.org.uk>
-	<20091213120615.GB10698@n2100.arm.linux.org.uk>
-	<cabda6420912140513k40a998b7k8cf56c35cc535cfb@mail.gmail.com>
-	<alpine.LFD.2.00.0912141457400.23173@xanadu.home>
-Message-ID: <cabda6420912150233x23149a36gecb85e1191f4bdbd@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 15 Dec 2009 11:36:08 +0100
+Subject: [PATCH 1/1] Remove suspend/resume functionality, add dynamic
+	clocking
+In-Reply-To: <083DF309106F364B939360100EC290F804F57A69FA@eu1rdcrdc1wx030.exi.nxp.com>
+References: <083DF309106F364B939360100EC290F804F55C9225@eu1rdcrdc1wx030.exi.nxp.com>
+	<20091126090252.GB12179@pengutronix.de>
+	<083DF309106F364B939360100EC290F804F5659CFF@eu1rdcrdc1wx030.exi.nxp.com>
+	<20091206084731.GE2766@ucw.cz>
+	<20091206210225.GA20887@pengutronix.de>
+	<20091206210739.GE10184@elf.ucw.cz>
+	<083DF309106F364B939360100EC290F804F57A69FA@eu1rdcrdc1wx030.exi.nxp.com>
+Message-ID: <20091215103608.GE17930@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2009 at 8:59 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Mon, 14 Dec 2009, christian pellegrin wrote:
->
->> Feroceon manuals (unfortunately I found that these are not available
->> *after* buying the hardware).
->
-> Look at:
->
-> http://www.marvell.com/products/embedded_processors/kirkwood/index.jsp
->
+> > > > Are you sure its unneeded? What if someone attempts to suspend the
+> > > > system when a transaction is running?
+> > > That's exactly my question.  I think the machine will suspend and the
+> > > transaction fail.  So no suspend callback isn't optimal, but maybe OK?!
+> > 
+> > Having failures just because suspend happened at wrong time is
+> > bad. .suspend() should just wait for end of transaction.
+> 
+> I'm not sure what situation could actually occur that would suspend the
+> system in the middle of an I2C transaction. If an I2C transaction was
+> started and the CPU was suspended, this would appear to be a problem
+> outside the I2C driver itself. Would other I2C drivers have this similar
+> problem?
 
-Unfortunately the chapaters about the core and the L2 cache are
-missing. I gugled and found confirmation from openrd forum that they
-are available only with a NDA.
-
-
+Well, can the i2c transaction sleep? If so, suspend probably can come
+in the middle.
+									Pavel
 -- 
-Christian Pellegrin, see http://www.evolware.org/chri/
-"Real Programmers don't play tennis, or any other sport which requires
-you to change clothes. Mountain climbing is OK, and Real Programmers
-wear their climbing boots to work in case a mountain should suddenly
-spring up in the middle of the computer room."
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
