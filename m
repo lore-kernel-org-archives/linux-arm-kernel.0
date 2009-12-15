@@ -1,13 +1,50 @@
 From: jamie.iles@picochip.com (Jamie Iles)
-Date: Tue, 15 Dec 2009 11:15:07 +0000
-Subject: ARMv6 performance counters v3
-Message-ID: <1260875712-29712-1-git-send-email-jamie.iles@picochip.com>
+Date: Tue, 15 Dec 2009 11:15:10 +0000
+Subject: [PATCH 3/5] arm: use the spinlocked, generic atomic64 support
+In-Reply-To: <1260875712-29712-3-git-send-email-jamie.iles@picochip.com>
+References: <1260875712-29712-1-git-send-email-jamie.iles@picochip.com>
+	<1260875712-29712-2-git-send-email-jamie.iles@picochip.com>
+	<1260875712-29712-3-git-send-email-jamie.iles@picochip.com>
+Message-ID: <1260875712-29712-4-git-send-email-jamie.iles@picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Okay, here's the 3rd attempt at support for hardware perf events support
-on ARMv6. After feedback from Jean and Will, I've added an arm_pmu
-structure that allows other CPU versions to be supported in the future.
-At the moment only ARMv6 is supported in hardware.
+perf events require that we can support atomic64's. There is a generic,
+spinlocked version that we can use until we have proper hardware
+support.
 
-Thanks to Will and Jean for their comments.
+Signed-off-by: Jamie Iles <jamie.iles@picochip.com>
+---
+ arch/arm/Kconfig              |    1 +
+ arch/arm/include/asm/atomic.h |    4 ++++
+ 2 files changed, 5 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 233a222..9580418 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -18,6 +18,7 @@ config ARM
+ 	select HAVE_KRETPROBES if (HAVE_KPROBES)
+ 	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
+ 	select HAVE_GENERIC_DMA_COHERENT
++	select GENERIC_ATOMIC64
+ 	help
+ 	  The ARM series is a line of low-power-consumption RISC chip designs
+ 	  licensed by ARM Ltd and targeted at embedded applications and
+diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
+index d0daeab..ff286a8 100644
+--- a/arch/arm/include/asm/atomic.h
++++ b/arch/arm/include/asm/atomic.h
+@@ -15,6 +15,10 @@
+ #include <linux/types.h>
+ #include <asm/system.h>
+ 
++#ifdef CONFIG_GENERIC_ATOMIC64
++#include <asm-generic/atomic64.h>
++#endif
++
+ #define ATOMIC_INIT(i)	{ (i) }
+ 
+ #ifdef __KERNEL__
+-- 
+1.6.5.4
