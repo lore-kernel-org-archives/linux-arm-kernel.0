@@ -1,55 +1,57 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 15 Dec 2009 08:08:45 +0200
-Subject: [PATCH 3/4] fec: add support for Freescale i.MX25 PDK (3DS)
-In-Reply-To: <4B26E61F.7030709@snapgear.com>
-References: <cover.1260785451.git.baruch@tkos.co.il>
-	<fb518184b206ec2727deda111cc5364134ace69a.1260785451.git.baruch@tkos.co.il>
-	<4B26E61F.7030709@snapgear.com>
-Message-ID: <20091215060844.GA18290@jasper.tkos.co.il>
+From: arve@android.com (=?ISO-8859-1?Q?Arve_Hj=F8nnev=E5g?=)
+Date: Mon, 14 Dec 2009 22:30:49 -0800
+Subject: tree with htc dream support
+In-Reply-To: <d6200be20912121441w7086f09fv47e8119e55345be2@mail.gmail.com>
+References: <20091205221100.GA32522@elf.ucw.cz>
+	<1260054737.23633.35.camel@desktop>
+	<a55d774e0912051638u7858878cg7cf62905c3c005c1@mail.gmail.com>
+	<d6200be20912112142r7bdf8f18o31edd4457aa64998@mail.gmail.com>
+	<20091212112536.GA2302@elf.ucw.cz> <20091212175327.GA5819@elf.ucw.cz>
+	<d6200be20912121441w7086f09fv47e8119e55345be2@mail.gmail.com>
+Message-ID: <d6200be20912142230p70bffde9m9ae440f446b87854@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+2009/12/12 Arve Hj?nnev?g <arve@android.com>:
+> On Sat, Dec 12, 2009 at 9:53 AM, Pavel Machek <pavel@ucw.cz> wrote:
+>> On Sat 2009-12-12 12:25:36, Pavel Machek wrote:
+>>> On Fri 2009-12-11 21:42:07, Arve Hj?nnev?g wrote:
+>>> > On Sat, Dec 5, 2009 at 4:38 PM, Brian Swetland <swetland@google.com> wrote:
+>>> > > Arve's about to take our common and msm trees and rebase them over the .32,
+>>> > > which may be useful for reference -- at least as a snapshot of a fully
+>>> > > functional set of patches that android donut and eclair run on, on
+>>> > > production hardware.? We'll make that available as soon as we have something
+>>> > > that's bootable.
+>>> > >
+>>> > > Brian
+>>> > >
+>>> > >
+>>> >
+>>> > A first pass of this is available in the android-msm-2.6.32-test1
+>>> > branch at git://android.git.kernel.org/kernel/experimental.git.
+>>>
+>>> According to some docs, i2c_detach can be just removed, so...?
+>>>
+>>> Then I got this:
+>>
+>> And then I got it to boot. Good! (And a bit after that, probably
+>> watchdog kicked and phone rebooted back into .27.)
+>>
+>> On the second try -- with ramdisk.img -- I got it to boot to GUI, but
+>> the GUI did not show up. I can hear the background sounds but not see
+>> anything. I probably need to turn off
+>> CONFIG_FRAMEBUFFER_CONSOLE... Yes, now it boots to the GUI and I can
+>> actually see that. (It would be nice to make GUI work with
+>> FRAMEBUFFER_CONSOLE on; it should not be that hard...).
+>>
+>
+> It used to work, but I have not tested it recently. Make sure you turn
+> CONFIG_FB_EARLYSUSPEND off and CONFIG_CONSOLE_EARLYSUSPEND on since
+> userspace will not switch consoles if it finds the sysfs interface
+> that CONFIG_FB_EARLYSUSPEND adds.
 
-On Tue, Dec 15, 2009 at 11:27:59AM +1000, Greg Ungerer wrote:
-> Hi Baruch,
-> 
-> Baruch Siach wrote:
-> >The i.MX25 PDK uses RMII to communicate with its PHY. This patch adds the
-> >necessary bits to make the i.MX25 talk RMII.
-> >
-> >Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> >---
-
-[snip]
-
-> >+	/* re-enable the gasket */
-> >+	writel(2, fep->hwp + FEC_MIIGSK_ENR);
->                              ^^^^^^^^^^^^^^
-> 
-> This will not compile for some CPU types that use this driver.
-> 
-
-[snip]
-
-> >--- a/drivers/net/fec.h
-> >+++ b/drivers/net/fec.h
-> >@@ -43,6 +43,8 @@
-> > #define FEC_R_DES_START		0x180 /* Receive descriptor ring */
-> > #define FEC_X_DES_START		0x184 /* Transmit descriptor ring */
-> > #define FEC_R_BUFF_SIZE		0x188 /* Maximum receive buff size */
-> >+#define FEC_MIIGSK_CFGR		0x300 /* MIIGSK Configuration reg */
-> >+#define FEC_MIIGSK_ENR		0x308 /* MIIGSK Enable reg */
-> 
-> These are defined in a conditional section for certain CPU types.
-> There is no definitions for the other "#else" section here.
-
-So, should I put a bogus #define in the other #else section, or put the 
-FEC_MIIGSK_* code in an #ifdef section? I guess the latter is the way to go.
-
-baruch
+I fixed a bug in the framebuffer driver. If you pull the same branch
+again it should work.
 
 -- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Arve Hj?nnev?g
