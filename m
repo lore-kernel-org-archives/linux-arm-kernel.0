@@ -1,9 +1,8 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Tue, 15 Dec 2009 20:48:03 +0000
+From: swetland@google.com (Brian Swetland)
+Date: Tue, 15 Dec 2009 13:07:13 -0800
 Subject: GPIO support for HTC Dream
-In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE19090200E9C6@mi8nycmail19.Mi8.com>
+In-Reply-To: <20091215204803.GA26319@shareable.org>
 References: <4B1ECEEE.3000209@bluewatersys.com>
-	<4B203575.6050407@bluewatersys.com>
 	<20091210172458.GJ19454@elf.ucw.cz>
 	<4B2150B7.3040207@bluewatersys.com>
 	<BD79186B4FD85F4B8E60E381CAEE190901FB0F92@mi8nycmail19.Mi8.com>
@@ -12,56 +11,24 @@ References: <4B1ECEEE.3000209@bluewatersys.com>
 	<20091214064545.GK5114@elf.ucw.cz>
 	<1260813293.13078.15.camel@c-dwalke-linux.qualcomm.com>
 	<BD79186B4FD85F4B8E60E381CAEE19090200E9C6@mi8nycmail19.Mi8.com>
-Message-ID: <20091215204803.GA26319@shareable.org>
+	<20091215204803.GA26319@shareable.org>
+Message-ID: <a55d774e0912151307i12777a67jabf190742be3883e@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-H Hartley Sweeten wrote:
-> From Pavel's implementation it appears that the gpio's are organized
-> as a number of 8-bit ports.  Each of these ports only have one 8-bit
-> register.  Writing a '1' to a bit in the register makes the
-> associated pin a high-level output.  Writing a '0' makes the pin a
-> low-level output or an input pin.  Reading the port at this point
-> will return the actual 'input' level of the pin.
-> 
-> The hardware seems a bit strange and I just wanted to verify that this is
-> correct.  If it is, this would explain the need to keep the 'shadow' contents
-> of the port in order to set the 'direction' of a pin.
+On Tue, Dec 15, 2009 at 12:48 PM, Jamie Lokier <jamie@shareable.org> wrote:
+>
+> Perhaps the Dream's GPIOs are similar, but with opposite polarity.
+> If it also has the same transition driving spike, writing a 1->0
+> transition would be bad for the hardware making the shadow variable
+> even more important.
 
-It sounds similar to the PCF8575 (except polarity is reversed), which
-is an I2C-driven GPIO chip with "quasi-bidirectional I/O pins", so not
-completely weird.
+Arve will certainly step in if I'm wrong here, but I believe the issue
+is that the dream CPLD GPIOs (which is what we're talking about, not
+the MSM7K's onboard GPIOs which are more flexible) have no way to read
+the set output state back.  So, you can't read-modify-write to change
+just one of the 8 bits in a given bank.  The default mask values in
+the android msm tree's trout gpio board files are based on what he
+shipping HTC bootloader initializes things to.
 
-The PCF8575 is more or less an open collector output - it drives a pin
-low when 0 is written, and lets it be pulled high by an external
-resistor when 1 is written, and reads return the current measured
-level.  So by writing 1, you can use the pin as an input, or you can
-use it as an output by using a pull-up resistor.
-
-However, to complicate matters, when transitioning from 0 to 1, the
-PCF8575 briefly drives the output high, to ensure that a pulled up
-output has a rapid transition.
-
-Because of that, you *must not* write 0->1 transitions to the PCF8575
-for a GPIO that is driven low by something else, unless you want a
-current spike.  So you can't use it as an open collector bus, for
-example, and it's important to maintain a shadow variable so that you
-don't write back bit values read from the chip.
-
-(I don't know why they don't just use separate enable and value bits
-like everything else, but there you go).
-
-Perhaps the Dream's GPIOs are similar, but with opposite polarity.
-If it also has the same transition driving spike, writing a 1->0
-transition would be bad for the hardware making the shadow variable
-even more important.
-
-> I was also wondering if the initial 'shadow' value needs to be written to the
-> port at init in order to correctly establish the output value for specific
-> pins.
-
-If it's like the PCF8575, after hard reset the bits will all be
-configured in the input state, and rely on external pull-downs to set
-bootup values.
-
--- Jamie
+Brian
