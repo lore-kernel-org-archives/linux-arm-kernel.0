@@ -1,40 +1,50 @@
-From: wim@iguana.be (Wim Van Sebroeck)
-Date: Tue, 15 Dec 2009 13:02:29 +0100
-Subject: [PATCH V2] Driver for the watchdog timer on all Freescale IMX
-	processors.
-In-Reply-To: <1260786235-32629-1-git-send-email-w.sang@pengutronix.de>
-References: <20091209091244.GA15126@pengutronix.de>
-	<1260786235-32629-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <20091215120229.GJ4291@infomag.iguana.be>
+From: rafiuddin.syed@ti.com (Syed Rafiuddin)
+Date: Tue, 15 Dec 2009 17:48:31 +0530 (IST)
+Subject: [RESUBMIT][PATCH-v2][RFC] OMAP4: I2C Support for OMAP4430
+In-Reply-To: <44891.192.168.10.89.1260254659.squirrel@dbdmail.itg.ti.com>
+References: <44891.192.168.10.89.1260254659.squirrel@dbdmail.itg.ti.com>
+Message-ID: <61140.192.168.10.88.1260879511.squirrel@dbdmail.itg.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Ben,
 
-> Changes since my V1:
-> 
-> * Use NULL instead of string in clk_get
-> 
-> Changes since the last version from Darius:
-> 
-> * removed all #ifdef CONFIG_ARCH_* and handle the differences at runtime
-> * simplified house-keeping of the timeout value and fixed the conversion
->   into the corresponding register value
-> * removed a superfluous static platform-device
-> * removed debug output and comments with (IMHO) little information
-> * cleaned up #includes
-> * fixed some typos & removed unnecessary tabs & added kernel coding style
-> * probably something else...
+>>
+>> Thu, 20 Aug 2009 14:19:04 -0700
+>>
+>> On Tue, Aug 18, 2009 at 03:35:31PM +0530, Syed Rafiuddin wrote:
+>> > Ben,
+>> >
+>> > > On Fri, Jul 24, 2009 at 04:40:02PM +0530, Syed Rafiuddin wrote:
+>> > >> Hi Ben,
+>> > >>
+>> > >> > This patch adds OMAP4 support to the I2C driver. All I2C register
+>> > >> > addresses  are different
+>> > >> between
+>> > >> > OMAP1/2/3 and OMAP4. In order to not have #ifdef's at  various places in
+>> > >> > code, as well as to
+>> > >> > support multi-OMAP build, Array's are  created to hold the register
+>> > >> > addresses.
+>> > >> >
+>> > >> > Signed-off-by: Syed Rafiuddin <rafiuddin.s...@ti.com>
+>> > >> > ---
+>> > >>
+>> > >> No comment received on this patch,
+>> > >> Is there anything that I need to resolve?
+>> > >> Else can this patch get merged.
+>> > >
+>> > > sorry, been busy, will look at this in the next few days.
+>> >
+>> > Seems like no issues with the patch since no comments received from long time.
+>> > Did you get a chance to look at the patch.Could you please merge this.
+>>
+>> I can't currently think of any neater way of doing this, so i'll
+>> probably merge this.
+>
+> I do not see this patch merged. Is there some thing that needs to be resolved in this patch.
+> Else can you please merge this patch.
+>
+Did you get a chance to look into the patch ? If patch is fine please merge this.
 
-Some general feedback first:
-* The MX2 and MX3 series have a watchdog device that cannot be stopped once
-started. Since we use /dev/watchdog to start and stop the hardware, we
-normally introduce a timer to keep the watchdog alive when /dev/watchdog
-is closed. This is missing in this driver.
-(See drivers/watchdog/at91sam9_wdt.c as an example).
-* The MX1 platform is 32 bit instead of 16 bit and can be stopped and started.
-Maybe it would make sense to split this in 2 drivers (one for MX1 and one for
-the others).
-
-Kind regards,
-Wim.
+Regards,
+Syed Rafiuddin
