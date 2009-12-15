@@ -1,41 +1,55 @@
-From: david-b@pacbell.net (David Brownell)
-Date: Mon, 14 Dec 2009 21:44:08 -0800
-Subject: [PATCH] mmc: move regulator handling to core
-In-Reply-To: <20091204115805.GS14091@buzzloop.caiaq.de>
-References: <1259844390-10541-1-git-send-email-daniel@caiaq.de>
-	<4B181BB4.1020800@nokia.com>
-	<20091204115805.GS14091@buzzloop.caiaq.de>
-Message-ID: <200912142144.08591.david-b@pacbell.net>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 15 Dec 2009 08:08:45 +0200
+Subject: [PATCH 3/4] fec: add support for Freescale i.MX25 PDK (3DS)
+In-Reply-To: <4B26E61F.7030709@snapgear.com>
+References: <cover.1260785451.git.baruch@tkos.co.il>
+	<fb518184b206ec2727deda111cc5364134ace69a.1260785451.git.baruch@tkos.co.il>
+	<4B26E61F.7030709@snapgear.com>
+Message-ID: <20091215060844.GA18290@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 December 2009, Daniel Mack wrote:
-> On Thu, Dec 03, 2009 at 10:12:36PM +0200, Adrian Hunter wrote:
-> > Daniel Mack wrote:
-> > >On Thu, Dec 03, 2009 at 04:27:39PM +0200, Adrian Hunter wrote:
+Hi Greg,
+
+On Tue, Dec 15, 2009 at 11:27:59AM +1000, Greg Ungerer wrote:
+> Hi Baruch,
 > 
-> > >>What about arch/arm/mach-omap2/mmc-twl4030.c ?
-> > >
-> > >Argh, missed that one. And this particular case doesn't fit to my
-> > >modifications. I don't know the code well ...  We would need to
-> > >have a struct mmc_host * in all the functions there calling
-> > >mmc_regulator_{set,get}_ocr. Any idea how to resolve that?
+> Baruch Siach wrote:
+> >The i.MX25 PDK uses RMII to communicate with its PHY. This patch adds the
+> >necessary bits to make the i.MX25 talk RMII.
+> >
+> >Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> >---
 
-Finish separating the HSMMC setup from the OMAP2 setup, then the
-HSMMC stuff will be a lot easier to cope with.  The HSMMC stuff
-is never used with the mfd/menelaus transceiver/slot switch stuff;
-including those data structures caused lots of hassles.
+[snip]
 
-The only real issue with the HSMMC stuff is that it's got to continue
-working with the many wiring options now in use.
+> >+	/* re-enable the gasket */
+> >+	writel(2, fep->hwp + FEC_MIIGSK_ENR);
+>                              ^^^^^^^^^^^^^^
+> 
+> This will not compile for some CPU types that use this driver.
+> 
 
+[snip]
 
-> Moving the regulator handling to the mmc core would require a major
-> cleanup to all this code, but I don't have such hardware to test my
-> modifications. Can anyone help here?
+> >--- a/drivers/net/fec.h
+> >+++ b/drivers/net/fec.h
+> >@@ -43,6 +43,8 @@
+> > #define FEC_R_DES_START		0x180 /* Receive descriptor ring */
+> > #define FEC_X_DES_START		0x184 /* Transmit descriptor ring */
+> > #define FEC_R_BUFF_SIZE		0x188 /* Maximum receive buff size */
+> >+#define FEC_MIIGSK_CFGR		0x300 /* MIIGSK Configuration reg */
+> >+#define FEC_MIIGSK_ENR		0x308 /* MIIGSK Enable reg */
+> 
+> These are defined in a conditional section for certain CPU types.
+> There is no definitions for the other "#else" section here.
 
-Simplest to borrow a Beagle.  Make sure whatever you do
-can handle both standard SDHC cards, and also 8-bit HSMMC.
-Once that works, the rest will fall out pretty easily.
+So, should I put a bogus #define in the other #else section, or put the 
+FEC_MIIGSK_* code in an #ifdef section? I guess the latter is the way to go.
 
-- Dave
+baruch
+
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
