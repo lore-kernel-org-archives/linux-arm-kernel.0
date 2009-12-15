@@ -1,50 +1,47 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 15 Dec 2009 23:20:57 +0100
-Subject: tree with htc dream support
-In-Reply-To: <d6200be20912142234ia050c67p34fd2672e7248170@mail.gmail.com>
-References: <20091205221100.GA32522@elf.ucw.cz>
-	<1260054737.23633.35.camel@desktop>
-	<a55d774e0912051638u7858878cg7cf62905c3c005c1@mail.gmail.com>
-	<d6200be20912112142r7bdf8f18o31edd4457aa64998@mail.gmail.com>
-	<1260627482.20913.7.camel@desktop>
-	<d6200be20912121434x1a247837w75c518ba20fe684f@mail.gmail.com>
-	<20091213212504.GD5114@elf.ucw.cz>
-	<d6200be20912142234ia050c67p34fd2672e7248170@mail.gmail.com>
-Message-ID: <20091215222057.GT24406@elf.ucw.cz>
+From: arasv@magellan-technology.com (Aras Vaichas)
+Date: Wed, 16 Dec 2009 09:58:16 +1100
+Subject: [POWER] battery calibration parameters from sysfs
+In-Reply-To: <4B26FC52.6060307@billgatliff.com>
+References: <A6D19A13FE030A409EC4362C172E091F0E0495F6@eseldmw101.eemea.ericsson.se>
+	<A6D19A13FE030A409EC4362C172E091F0E071EB9@eseldmw101.eemea.ericsson.se>
+	<20091207114825.GA26965@rakim.wolfsonmicro.main>
+	<A6D19A13FE030A409EC4362C172E091F0E0A1FA1@eseldmw101.eemea.ericsson.se>
+	<20091207165628.GA24981@rakim.wolfsonmicro.main>
+	<20091213132413.GB1437@ucw.cz>
+	<20091214121247.GB22388@rakim.wolfsonmicro.main>
+	<20091214212257.GA9213@elf.ucw.cz>
+	<ed62800912141543v2ab7ef63v4b6b2c33018b3296@mail.gmail.com>
+	<4B26FC52.6060307@billgatliff.com>
+Message-ID: <ed62800912151458p6bc1e551g54960af40c54facd@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> >> A first pass of this is available in the android-msm-2.6.32-test1
-> >> >> branch at git://android.git.kernel.org/kernel/experimental.git.
-> >> >>
-> >> >> http://android.git.kernel.org/?p=kernel/experimental.git;a=shortlog;h=refs/heads/android-msm-2.6.32-test1
-> >> >
-> >> > Does this have the the newest wakelock code in it? From the all the
-> >> > re-writes that you've done.
-> >>
-> >> No.
-> >
-> > One more wish list item: many drivers are now available in
-> > drivers/staging/dream, and are being slowly cleaned up. Would it be
-> > possible to start using those for android-msm-2.6.32 tree?
-> >
-> > You'll need to reapply some stuff I had to remove (like wakelocks),
-> > but it should be still better/less work long term to patch those back
-> > in than maintaining separate copy. Diff should get much smaller...
+2009/12/15 Bill Gatliff <bgat@billgatliff.com>:
+> Aras Vaichas wrote:
+>> Unfortunately the simple coulomb counting chips have the disadvantage
+>> that the CPU has to be running to accumulate the pulses. Of course,
+>> the pulses could wake the CPU from a suspend mode, but I'd rather not
+>> do that just to add "one" to a counter ...
+>>
+>
+> Could you have the coulomb-counting chip connected to a tiny
+> microcontroller, or even a dedicated hardware counter? ?Then the main
+> CPU wouldn't need to wake as often, it could just ask the
+> microcontroller over I2C, or read/reset the hardware counter.
+>
+> b.g.
 
-> 
-> I do plan to look at these, but I don't know when I'll get to it.
+Yes, but in that case you might as well just purchase a coulomb
+counter with a built-in accumulator and an I2C/SPI/microwire interface
+save yourself some PCB space and cost (maybe)
 
-Thanks.
+Google for, say,  "coulomb counter i2c" and you'll get something like
+this: http://eu.st.com/stonline/products/literature/ds/15269.pdf as an
+example
 
-Actually... a question. How do I generate diff against mainline from
-the tree?
+The only time we used a pulse-and-polarity-output coulomb counter was
+with an ATmega128. The CPU had to run all the time in order to
+maintain its RTC so we could use it to accumulate pulses as well. It
+wasn't a Linux project though.
 
-Stuff like 'git diff -r v2.6.11' works, but I need 'git diff -r
-v2.6.32', and that fails because tag is just not there :-(. Well, 'git
-diff -r 22763c5cf3690a681551162c15d34d935308c8d7' works, but...
-
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Aras
