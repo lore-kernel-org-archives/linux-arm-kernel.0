@@ -1,44 +1,48 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 15 Dec 2009 22:21:26 +0100
-Subject: GPIO support for HTC Dream
-In-Reply-To: <1260907626.32296.16.camel@c-dwalke-linux.qualcomm.com>
-References: <4B2150B7.3040207@bluewatersys.com>
-	<BD79186B4FD85F4B8E60E381CAEE190901FB0F92@mi8nycmail19.Mi8.com>
-	<20091211221015.GB24456@elf.ucw.cz>
-	<BD79186B4FD85F4B8E60E381CAEE190901FB10EA@mi8nycmail19.Mi8.com>
-	<20091214064545.GK5114@elf.ucw.cz>
-	<1260813293.13078.15.camel@c-dwalke-linux.qualcomm.com>
-	<BD79186B4FD85F4B8E60E381CAEE19090200E9C6@mi8nycmail19.Mi8.com>
-	<d6200be20912142240q5e7785e6h57fae538a5f4ea4e@mail.gmail.com>
-	<20091215191229.GC26422@elf.ucw.cz>
-	<1260907626.32296.16.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <20091215212125.GQ24406@elf.ucw.cz>
+Date: Tue, 15 Dec 2009 23:20:57 +0100
+Subject: tree with htc dream support
+In-Reply-To: <d6200be20912142234ia050c67p34fd2672e7248170@mail.gmail.com>
+References: <20091205221100.GA32522@elf.ucw.cz>
+	<1260054737.23633.35.camel@desktop>
+	<a55d774e0912051638u7858878cg7cf62905c3c005c1@mail.gmail.com>
+	<d6200be20912112142r7bdf8f18o31edd4457aa64998@mail.gmail.com>
+	<1260627482.20913.7.camel@desktop>
+	<d6200be20912121434x1a247837w75c518ba20fe684f@mail.gmail.com>
+	<20091213212504.GD5114@elf.ucw.cz>
+	<d6200be20912142234ia050c67p34fd2672e7248170@mail.gmail.com>
+Message-ID: <20091215222057.GT24406@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2009-12-15 12:07:06, Daniel Walker wrote:
-> On Tue, 2009-12-15 at 20:12 +0100, Pavel Machek wrote:
-> > > > One other thing.  Are the gpio's handled by Pavel's driver actually from the
-> > > > MSM chip or from an external CPLD?  The registers are all defined as:
-> > > >
-> > > > +               .reg = reg_num + DREAM_CPLD_BASE,
-> > > >
-> > > > If they are external from the MSM chip this driver should probably be renamed
-> > > > to something more appropriate since it is probably dream specific and not
-> > > > generic to the msm architecture.
-> > > 
-> > > These are board specific gpios. I think it would be less confusing if
-> > > the msm gpio support was added first.
-> > 
-> > I did not see msm-generic gpios in the trees, where are they? What is
-> > connected over them?
-> 
-> Did you look at arch/arm/mach-msm/gpio.[ch] ? It looks like there some
-> idle related code in there, and "SMEM" is connected through that code.
-> (unless I'm looking at an older tree.)
+> >> >> A first pass of this is available in the android-msm-2.6.32-test1
+> >> >> branch at git://android.git.kernel.org/kernel/experimental.git.
+> >> >>
+> >> >> http://android.git.kernel.org/?p=kernel/experimental.git;a=shortlog;h=refs/heads/android-msm-2.6.32-test1
+> >> >
+> >> > Does this have the the newest wakelock code in it? From the all the
+> >> > re-writes that you've done.
+> >>
+> >> No.
+> >
+> > One more wish list item: many drivers are now available in
+> > drivers/staging/dream, and are being slowly cleaned up. Would it be
+> > possible to start using those for android-msm-2.6.32 tree?
+> >
+> > You'll need to reapply some stuff I had to remove (like wakelocks),
+> > but it should be still better/less work long term to patch those back
+> > in than maintaining separate copy. Diff should get much smaller...
 
-Aha, I see... more gpios. No wonder I had problems with MMC and
-framebuffer....
+> 
+> I do plan to look at these, but I don't know when I'll get to it.
+
+Thanks.
+
+Actually... a question. How do I generate diff against mainline from
+the tree?
+
+Stuff like 'git diff -r v2.6.11' works, but I need 'git diff -r
+v2.6.32', and that fails because tag is just not there :-(. Well, 'git
+diff -r 22763c5cf3690a681551162c15d34d935308c8d7' works, but...
 
 									Pavel
 -- 
