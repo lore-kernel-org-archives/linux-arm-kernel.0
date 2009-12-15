@@ -1,36 +1,47 @@
-From: bgat@billgatliff.com (Bill Gatliff)
-Date: Mon, 14 Dec 2009 21:02:42 -0600
-Subject: [POWER] battery calibration parameters from sysfs
-In-Reply-To: <ed62800912141543v2ab7ef63v4b6b2c33018b3296@mail.gmail.com>
-References: <A6D19A13FE030A409EC4362C172E091F0E0495F6@eseldmw101.eemea.ericsson.se>	
-	<20091204104930.GA28625@sirena.org.uk>	
-	<A6D19A13FE030A409EC4362C172E091F0E071EB9@eseldmw101.eemea.ericsson.se>	
-	<20091207114825.GA26965@rakim.wolfsonmicro.main>	
-	<A6D19A13FE030A409EC4362C172E091F0E0A1FA1@eseldmw101.eemea.ericsson.se>	
-	<20091207165628.GA24981@rakim.wolfsonmicro.main>	
-	<20091213132413.GB1437@ucw.cz>	
-	<20091214121247.GB22388@rakim.wolfsonmicro.main>	
-	<20091214212257.GA9213@elf.ucw.cz>
-	<ed62800912141543v2ab7ef63v4b6b2c33018b3296@mail.gmail.com>
-Message-ID: <4B26FC52.6060307@billgatliff.com>
+From: abhijitpagare@ti.com (Pagare, Abhijit)
+Date: Tue, 15 Dec 2009 11:02:47 +0530
+Subject: [PATCH 0/5] OMAP4 Power Domain Framework Support
+In-Reply-To: <alpine.DEB.2.00.0912141546270.12561@utopia.booyaka.com>
+References: <EAF47CD23C76F840A9E7FCE10091EFAB02BC14194C@dbde02.ent.ti.com>
+	<alpine.DEB.2.00.0912141546270.12561@utopia.booyaka.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02BC2402B1@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Aras Vaichas wrote:
-> Unfortunately the simple coulomb counting chips have the disadvantage
-> that the CPU has to be running to accumulate the pulses. Of course,
-> the pulses could wake the CPU from a suspend mode, but I'd rather not
-> do that just to add "one" to a counter ...
->   
+Paul,
 
-Could you have the coulomb-counting chip connected to a tiny
-microcontroller, or even a dedicated hardware counter?  Then the main
-CPU wouldn't need to wake as often, it could just ask the
-microcontroller over I2C, or read/reset the hardware counter.
+I will check that and repost them soon.
 
+Best Regards,
+Abhijit Pagare
 
-b.g.
-
--- 
-Bill Gatliff
-bgat at billgatliff.com
+> -----Original Message-----
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Tuesday, December 15, 2009 4:18 AM
+> To: Pagare, Abhijit
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> Cousson, Benoit; Nayak, Rajendra
+> Subject: Re: [PATCH 0/5] OMAP4 Power Domain Framework Support
+> 
+> Hello Abhijit,
+> 
+> On Fri, 11 Dec 2009, Pagare, Abhijit wrote:
+> 
+> > This patch series adds support for OMAP4 power domain framework.
+> 
+> ...
+> 
+> > Abhijit Pagare (5):
+> > ARM: OMAP4: PM: OMAP4 essential basic initializations.
+> > ARM: OMAP4: PM: OMAP4 Power Domain Porting Related Clean-up.
+> > ARM: OMAP4: PM: Add the Auto-generated OMAP4 specific power domain
+> framework.
+> > ARM: OMAP4: PM: Adapt the existing OMAP2/3 and common Power Domain
+> Frameworks.
+> > ARM: OMAP4: PM: Refine the APIs to support OMAP4 features.
+> 
+> Looks like these patches didn't make it to the list.  Could you check and
+> repost?
+> 
+> 
+> - Paul
