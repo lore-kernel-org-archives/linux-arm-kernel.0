@@ -1,34 +1,28 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 15 Dec 2009 15:36:27 +0000
-Subject: [PATCH 5/5] arm/perfevents: implement perf event support for ARMv6
-In-Reply-To: <1260891013.4165.466.camel@twins>
-References: <1260875712-29712-1-git-send-email-jamie.iles@picochip.com>
-	<1260875712-29712-2-git-send-email-jamie.iles@picochip.com>
-	<1260875712-29712-3-git-send-email-jamie.iles@picochip.com>
-	<1260875712-29712-4-git-send-email-jamie.iles@picochip.com>
-	<1260875712-29712-5-git-send-email-jamie.iles@picochip.com>
-	<1260875712-29712-6-git-send-email-jamie.iles@picochip.com>
-	<20091215150205.GO4141@wear.picochip.com>
-	<20091215151903.GP4141@wear.picochip.com>
-	<1260891013.4165.466.camel@twins>
-Message-ID: <20091215153627.GQ4141@wear.picochip.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 15 Dec 2009 09:08:02 -0700 (MST)
+Subject: [PATCH 1/1] ARM: OMAP3: PM: Fix the Invalid CM_CLKSTCTRL reg
+	access.
+In-Reply-To: <1260883872-22299-1-git-send-email-abhijitpagare@ti.com>
+References: <1260883872-22299-1-git-send-email-abhijitpagare@ti.com>
+Message-ID: <alpine.DEB.2.00.0912150906550.12561@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2009 at 04:30:13PM +0100, Peter Zijlstra wrote:
-> On Tue, 2009-12-15 at 15:19 +0000, Jamie Iles wrote:
-> > Another problem with mpcore support is that
-> > with the v6 performance counters, you can't disable a single event
-> > counter. 
-> 
-> Can you program them with a non-counting event?
-> 
-> On x86 there's various ways of doing that, either by selecting an event
-> that simply doesn't count (cache-misses with 0 MESI mask), or by telling
-> it to mask both user and kernel event.
-That's exactly what I do for single core ARMv6. However, in the list of events
-for mpcore I can't see any that wouldn't count. There's plenty of reserved
-identifiers though so hopefully one of those will do the job. Also, ARM
-counters can't be set to exclude any modes.
+Hi Abhijit,
 
-Jamie
+On Tue, 15 Dec 2009, Abhijit Pagare wrote:
+
+> In OMAP2/3 some of the clock-domains which did not have control
+> facility were being falsely written to and read using the CM_CLKSTCTRL
+> register though it did not exist for them. One check is added to remove
+> this flaw.
+> 
+> Signed-off-by: Abhijit Pagare <abhijitpagare@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+
+Thanks Abhijit, queueing for .33-rcX.
+
+
+- Paul
