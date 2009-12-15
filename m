@@ -1,51 +1,53 @@
-From: maz@misterjones.org (Marc Zyngier)
-Date: Tue, 15 Dec 2009 21:11:21 +0100
-Subject: [PATCH] pxa/pcmcia: Fix pxa2xx PCMCIA oops
-Message-ID: <20091215211121.2cb4f5ac@taxman.wild-wind.fr.eu.org>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 15 Dec 2009 22:11:10 +0200
+Subject: [PATCH 3/4] fec: add support for Freescale i.MX25 PDK (3DS)
+In-Reply-To: <4B277878.1050804@snapgear.com>
+References: <cover.1260785451.git.baruch@tkos.co.il>
+	<fb518184b206ec2727deda111cc5364134ace69a.1260785451.git.baruch@tkos.co.il>
+	<20091214103348.GV15126@pengutronix.de>
+	<20091215083142.GB18290@jasper.tkos.co.il>
+	<4B277878.1050804@snapgear.com>
+Message-ID: <20091215201109.GA2621@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit d0d26c33b63c7ec10c3fdf9c7ce0aa035f0b3200:
+Hi Greg,
 
-PCMCIA: fix pxa2xx_lubbock modular build error
+On Tue, Dec 15, 2009 at 09:52:24PM +1000, Greg Ungerer wrote:
+> On 12/15/2009 06:31 PM, Baruch Siach wrote:
 
-broke the driver by propagating a pointer to the platform_device
-where a pointer to the generic device was expected, leading to a
-spectacular crash...
+[snip]
 
-Signed-off-by: Marc Zyngier <maz@misterjones.org>
----
- drivers/pcmcia/pxa2xx_base.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+> >+#ifndef CONFIG_M5272
+> 
+> I would suggest making this conditional on FEC_MIIGSK_ENR.
+> Although the CONFIG_M5272 is the only case here currently,
+> that may change over the years. And using this here may not
+> be obvious to the causual code reader, since the register
+> offset definitions don't explicitly key on CONFIG_M5272.
 
-diff --git a/drivers/pcmcia/pxa2xx_base.c b/drivers/pcmcia/pxa2xx_base.c
-index 3aabf1e..76e640b 100644
---- a/drivers/pcmcia/pxa2xx_base.c
-+++ b/drivers/pcmcia/pxa2xx_base.c
-@@ -291,7 +291,7 @@ static int pxa2xx_drv_pcmcia_probe(struct platform_device *dev)
- 		skt->nr = ops->first + i;
- 		skt->ops = ops;
- 		skt->socket.owner = ops->owner;
--		skt->socket.dev.parent = dev;
-+		skt->socket.dev.parent = &dev->dev;
- 		skt->socket.pci_irq = NO_IRQ;
- 
- 		ret = pxa2xx_drv_pcmcia_add_one(skt);
-@@ -304,8 +304,8 @@ static int pxa2xx_drv_pcmcia_probe(struct platform_device *dev)
- 			soc_pcmcia_remove_one(&sinfo->skt[i]);
- 		kfree(sinfo);
- 	} else {
--		pxa2xx_configure_sockets(dev);
--		dev_set_drvdata(dev, sinfo);
-+		pxa2xx_configure_sockets(&dev->dev);
-+		dev_set_drvdata(&dev->dev, sinfo);
- 	}
- 
- 	return ret;
--- 
-1.6.0.4
+OK, I'll change this conditional.
 
+Can I take this as an Ack from you?
 
+baruch
+
+> 
+> >+	if (fep->phy_interface == PHY_INTERFACE_MODE_RMII) {
+> >+		/* disable the gasket and wait */
+> >+		writel(0, fep->hwp + FEC_MIIGSK_ENR);
+> >+		while (readl(fep->hwp + FEC_MIIGSK_ENR)&  4)
+> >+			udelay(1);
+> >+
+> >+		/* configure the gasket: RMII, 50 MHz, no loopback, no echo */
+> >+		writel(1, fep->hwp + FEC_MIIGSK_CFGR);
+> >+
+> >+		/* re-enable the gasket */
+> >+		writel(2, fep->hwp + FEC_MIIGSK_ENR);
+> >+	}
+> >+#endif
 
 -- 
-I'm the slime oozin' out from your TV set...
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
