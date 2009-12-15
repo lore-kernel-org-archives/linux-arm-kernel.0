@@ -1,30 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Dec 2009 15:05:13 -0000
-Subject: [PATCH 5/5] arm/perfevents: implement perf event support for	ARMv6
-In-Reply-To: <20091215150205.GO4141@wear.picochip.com>
-References: <1260875712-29712-1-git-send-email-jamie.iles@picochip.com>
-	<1260875712-29712-2-git-send-email-jamie.iles@picochip.com>
-	<1260875712-29712-3-git-send-email-jamie.iles@picochip.com>
-	<1260875712-29712-4-git-send-email-jamie.iles@picochip.com>
-	<1260875712-29712-5-git-send-email-jamie.iles@picochip.com>
-	<1260875712-29712-6-git-send-email-jamie.iles@picochip.com>
-	<000101ca7d92$fe903000$fbb09000$@deacon@arm.com>
-	<20091215150205.GO4141@wear.picochip.com>
-Message-ID: <000201ca7d98$012826b0$03787410$@deacon@arm.com>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Tue, 15 Dec 2009 15:07:36 +0000
+Subject: [PATCH v2 09/09] regulator: refresh 88pm8607 driver with
+	updated api
+In-Reply-To: <771cded00912091944q14be2f94gc7343f232abdbd0f@mail.gmail.com>
+References: <771cded00912090518s29c295a9v7f555a543f3bc4e6@mail.gmail.com>
+	<20091209152026.GD32223@rakim.wolfsonmicro.main>
+	<771cded00912091944q14be2f94gc7343f232abdbd0f@mail.gmail.com>
+Message-ID: <1260889656.3591.584.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 2009-12-09 at 22:44 -0500, Haojian Zhuang wrote:
+> On Wed, Dec 9, 2009 at 10:20 AM, Mark Brown
+> <broonie@opensource.wolfsonmicro.com> wrote:
+> > On Wed, Dec 09, 2009 at 08:18:18AM -0500, Haojian Zhuang wrote:
+> >
+> >> Since i2c API of mfd 88pm860x driver is changed, refresh 88pm8607 driver.
+> >> Remove the support of 88PM8607 A0/A1 stepping.
+> >
+> >> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> >
+> > Might be nice to split the removal of the old devices into a separate
+> > patch but that is definitely a win.  One blocker below, though.
+> >
+> >> +             ret = (index < 3) ? (index * 50000 + 1800000) :
+> >> +                     ((index < 7) ? (index * 50000 + 2550000) :
+> >> +                     3300000);
+> >
+> > I know the previous code did this but I'm really not loving the multiple
+> > ternery operators here for legibility.
+> >
+> >>       return 0;
+> >>  }
+> >> -subsys_initcall(pm8607_regulator_init);
+> >> +module_init(pm8607_regulator_init);
+> >
+> > This should be left at subsys_initcall() to try to ensure that the
+> > regulators are initialsied before the things that use them, otherwise
+> > the handling of init sequencing gets too complex.
+> >
+> 
+> Now split this patch into two. Thanks :)
 
-* Jamie Iles wrote:
 
-> Ok, is it a safe assumption that for ARMv6 if num_possible_cpus() returns >1
-> we are mpcore and need to use different ID's or is there a better way to test
-> for mpcore?
+Applied both.
 
-The bottom 16 bits of the cpuid field will read 0xB020 on an 11MPCore as it's a
-different chip to the other v6 cores.
+Thanks
 
-You could cast the cpuid to a u16 and switch on that: 0xB360, 0xB560 and 0xB760
-are the single core ARM11s.
-
-Will
+Liam
