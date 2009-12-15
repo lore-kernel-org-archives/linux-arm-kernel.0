@@ -1,151 +1,248 @@
-From: chripell@gmail.com (christian pellegrin)
-Date: Tue, 15 Dec 2009 12:01:56 +0100
-Subject: shared memory problem on ARM v5TE using threads
-In-Reply-To: <c70ff3ad0912142350v2231938dqc9c0aedc214120bd@mail.gmail.com>
-References: <20091207114218.GA19348@n2100.arm.linux.org.uk>
-	<20091207175608.GE26821@n2100.arm.linux.org.uk>
-	<309002C0DA137042828828FC53D7A9347E2630EEC2@IL-MB01.marvell.com>
-	<20091213120033.GA10698@n2100.arm.linux.org.uk>
-	<20091213120615.GB10698@n2100.arm.linux.org.uk>
-	<cabda6420912140513k40a998b7k8cf56c35cc535cfb@mail.gmail.com>
-	<309002C0DA137042828828FC53D7A9347E2630F364@IL-MB01.marvell.com>
-	<cabda6420912140948t23c07676tb5f44eb4febbc584@mail.gmail.com>
-	<alpine.LFD.2.00.0912141503360.23173@xanadu.home>
-	<c70ff3ad0912142350v2231938dqc9c0aedc214120bd@mail.gmail.com>
-Message-ID: <cabda6420912150301n2c1a54d6ta7407d89f4d0f9cf@mail.gmail.com>
+From: jamie.iles@picochip.com (Jamie Iles)
+Date: Tue, 15 Dec 2009 11:15:08 +0000
+Subject: [PATCH 1/5] arm: provide a mechanism to reserve performance counters
+In-Reply-To: <1260875712-29712-1-git-send-email-jamie.iles@picochip.com>
+References: <1260875712-29712-1-git-send-email-jamie.iles@picochip.com>
+Message-ID: <1260875712-29712-2-git-send-email-jamie.iles@picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2009 at 8:50 AM, saeed bishara <saeed.bishara@gmail.com> wrote:
-> On Mon, Dec 14, 2009 at 10:14 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
->> On Mon, 14 Dec 2009, christian pellegrin wrote:
->>>
->>> Has someone a suggestion on how to write a test-case for this?
->>
->> I don't think there is any peripheral that runs in PIO mode on
->> Kirkwood... except the NAND flash.
-> the sata can be configured to use pio instead of dma, this can be done
-> by adding libata.force=pio to the command line.
->>
+To add support for perf events and to allow the hardware
+counters to be shared with oprofile, we need a way to reserve
+access to the pmu (performance monitor unit).
 
-Thanks for your answers, unfortunately it turned out to be quite easy
-to write a program [0] that shows exactly what Russell described. :-(
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Jamie Iles <jamie.iles@picochip.com>
+---
+ arch/arm/include/asm/pmu.h |   74 ++++++++++++++++++++++++++++++
+ arch/arm/kernel/Makefile   |    1 +
+ arch/arm/kernel/pmu.c      |  108 ++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/Kconfig        |    5 ++
+ 4 files changed, 188 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/include/asm/pmu.h
+ create mode 100644 arch/arm/kernel/pmu.c
 
-On the Ferocecon [1] sometimes *both* the read via private mapping and
-via simple lseek/read give the wrong result. On another arm without L2
-cache [2] it happens sometimes that private mapping gives the wrong
-result (I'm not sure it's ok, but it seems reasonable because the
-mapping is private) but the read via lseek/read is always ok.
-
-[0]:
-/*
-  dd if=/dev/zero of=prova count=1 bs=1k
-  before running this
- */
-
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <assert.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <string.h>
-
-int main(int argc, char *argv[])
-{
-  int fd, fd1;
-  char *s1, *s2, *p;
-  volatile char x;
-
-  fd = open("prova", O_RDWR);
-  assert(fd);
-
-  fd1 = open("prova", O_RDWR);
-  assert(fd1);
-
-  p = mmap(NULL, 1024, PROT_WRITE|PROT_READ, MAP_PRIVATE,
-	   fd1, 0);
-  assert((long) p != -1);
-
-  x = *p;
-
-  s1 = mmap(NULL, 1024, PROT_WRITE|PROT_READ, MAP_SHARED,
-	     fd, 0);
-  assert((long) s1 != -1);
-  s2 = mmap(NULL, 1024, PROT_WRITE|PROT_READ, MAP_SHARED,
-	     fd, 0);
-  assert((long) s2 != -1);
-
-  fprintf(stderr,"s1 %p s2 %p p %p\n", s1, s2, p);
-  fprintf(stderr, "1: s1 %d s2 %d p %d\n", s1[0], s2[0], p[0]);
-
-  s1[0] = 'a';
-  s2[0] = 'b';
-
-  msync(s1, 1024, MS_SYNC);
-  msync(s2, 1024, MS_SYNC);
-
-  assert(lseek(fd1, SEEK_SET, 0) == 0);
-  assert(read(fd1, &x, 1) == 1);
-  fprintf(stderr, "2: s1 %d s2 %d p %d x %d\n", s1[0], s2[0], p[0], x);
-
-  return 0;
-}
-
-[1]:
-debian-armel:~/cachep# uname -a
-Linux debian-armel 2.6.32-rc7-openrd #36 PREEMPT Tue Dec 15 11:07:00
-CET 2009 armv5tel GNU/Linux
-debian-armel:~/cachep# cat /proc/cpuinfo
-Processor	: Feroceon 88FR131 rev 1 (v5l)
-BogoMIPS	: 1196.03
-Features	: swp half thumb fastmult edsp
-CPU implementer	: 0x56
-CPU architecture: 5TE
-CPU variant	: 0x2
-CPU part	: 0x131
-CPU revision	: 1
-
-Hardware	: Marvell OpenRD Base Board
-Revision	: 0000
-Serial		: 0000000000000000
-
-[2]:
-root at familiar:/var/tmp# uname -a
-Linux familiar 2.6.23-dixe #58 PREEMPT Fri Dec 4 11:33:26 CET 2009
-armv4tl unknown
-root at familiar:/var/tmp# cat /proc/cpuinfo
-Processor       : ARM920T rev 0 (v4l)
-BogoMIPS        : 88.84
-Features        : swp half thumb
-CPU implementer : 0x41
-CPU architecture: 4T
-CPU variant     : 0x1
-CPU part        : 0x920
-CPU revision    : 0
-Cache type      : write-back
-Cache clean     : cp15 c7 ops
-Cache lockdown  : format A
-Cache format    : Harvard
-I size          : 16384
-I assoc         : 64
-I line length   : 32
-I sets          : 8
-D size          : 16384
-D assoc         : 64
-D line length   : 32
-D sets          : 8
-
-Hardware        : Atmel AT91RM9200-DK
-Revision        : 0000
-Serial          : 0000000000000000
-
-
+diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+new file mode 100644
+index 0000000..e7cc264
+--- /dev/null
++++ b/arch/arm/include/asm/pmu.h
+@@ -0,0 +1,74 @@
++/*
++ *  linux/arch/arm/include/asm/pmu.h
++ *
++ *  Copyright (C) 2009 picoChip Designs Ltd, Jamie Iles
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#ifndef __ARM_PMU_H__
++#define __ARM_PMU_H__
++
++#ifdef CONFIG_CPU_HAS_PMU
++
++struct pmu_irqs {
++	const int   *irqs;
++	unsigned    num_irqs;
++};
++
++/**
++ * reserve_pmu() - reserve the hardware performance counters
++ *
++ * Reserve the hardware performance counters in the system for exclusive use.
++ * The 'struct pmu_irqs' for the system is returned on success, ERR_PTR()
++ * encoded error on failure.
++ */
++extern const struct pmu_irqs *
++reserve_pmu(void);
++
++/**
++ * release_pmu() - Relinquish control of the performance counters
++ *
++ * Release the performance counters and allow someone else to use them.
++ * Callers must have disabled the counters and released IRQs before calling
++ * this. The 'struct pmu_irqs' returned from reserve_pmu() must be passed as
++ * a cookie.
++ */
++extern int
++release_pmu(const struct pmu_irqs *irqs);
++
++/**
++ * init_pmu() - Initialise the PMU.
++ *
++ * Initialise the system ready for PMU enabling. This should typically set the
++ * IRQ affinity and nothing else. The users (oprofile/perf events etc) will do
++ * the actual hardware initialisation.
++ */
++extern int
++init_pmu(void);
++
++#else /* CONFIG_CPU_HAS_PMU */
++
++static inline const struct pmu_irqs *
++reserve_pmu(void)
++{
++	ERR_PTR(-ENODEV);
++}
++
++static inline int
++release_pmu(const struct pmu_irqs *irqs)
++{
++}
++
++static inline int
++init_pmu(void)
++{
++	return -ENODEV;
++}
++
++#endif /* CONFIG_CPU_HAS_PMU */
++
++#endif /* __ARM_PMU_H__ */
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index dd00f74..216890d 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -46,6 +46,7 @@ obj-$(CONFIG_CPU_XSCALE)	+= xscale-cp0.o
+ obj-$(CONFIG_CPU_XSC3)		+= xscale-cp0.o
+ obj-$(CONFIG_CPU_MOHAWK)	+= xscale-cp0.o
+ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
++obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
+ AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
+ 
+ ifneq ($(CONFIG_ARCH_EBSA110),y)
+diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
+new file mode 100644
+index 0000000..3a178bb
+--- /dev/null
++++ b/arch/arm/kernel/pmu.c
+@@ -0,0 +1,108 @@
++/*
++ *  linux/arch/arm/kernel/pmu.c
++ *
++ *  Copyright (C) 2009 picoChip Designs Ltd, Jamie Iles
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#include <linux/cpumask.h>
++#include <linux/err.h>
++#include <linux/interrupt.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/semaphore.h>
++
++#include <asm/pmu.h>
++
++/*
++ * Define the IRQs for the system. We could use something like a platform
++ * device but that seems fairly heavyweight for this. Also, the performance
++ * counters can't be removed or hotplugged.
++ *
++ * Ordering is important: init_pmu() will use the ordering to set the affinity
++ * to the corresponding core. e.g. the first interrupt will go to cpu 0, the
++ * second goes to cpu 1 etc.
++ */
++static const int irqs[] = {
++#ifdef CONFIG_ARCH_PC3XX
++	IRQ_NPMUIRQ,
++#elif defined(CONFIG_ARCH_OMAP2)
++	3,
++#elif defined(CONFIG_ARCH_BCMRING)
++	IRQ_PMUIRQ,
++#elif defined(CONFIG_MACH_REALVIEW_EB)
++	IRQ_EB11MP_PMU_CPU0,
++	IRQ_EB11MP_PMU_CPU1,
++	IRQ_EB11MP_PMU_CPU2,
++	IRQ_EB11MP_PMU_CPU3,
++#elif defined(CONFIG_ARCH_OMAP3)
++	INT_34XX_BENCH_MPU_EMUL,
++#elif defined(CONFIG_ARCH_IOP32X)
++	IRQ_IOP32X_CORE_PMU,
++#elif defined(CONFIG_ARCH_IOP33X)
++	IRQ_IOP33X_CORE_PMU,
++#elif defined(CONFIG_ARCH_PXA)
++	IRQ_PMU,
++#endif
++};
++
++static const struct pmu_irqs pmu_irqs = {
++	.irqs	    = irqs,
++	.num_irqs   = ARRAY_SIZE(irqs),
++};
++
++static DECLARE_MUTEX(pmu_mutex);
++
++const struct pmu_irqs *
++reserve_pmu(void)
++{
++	int ret = down_trylock(&pmu_mutex) ? -EBUSY : 0;
++
++	return ret ? ERR_PTR(ret) : &pmu_irqs;
++}
++EXPORT_SYMBOL_GPL(reserve_pmu);
++
++int
++release_pmu(const struct pmu_irqs *irqs)
++{
++	if (WARN_ON(irqs != &pmu_irqs))
++		return -EINVAL;
++	up(&pmu_mutex);
++	return 0;
++}
++EXPORT_SYMBOL_GPL(release_pmu);
++
++static int
++set_irq_affinity(int irq,
++		 unsigned int cpu)
++{
++#ifdef CONFIG_SMP
++	int err = irq_set_affinity(irq, cpumask_of(cpu));
++	if (err)
++		pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
++			   irq, cpu);
++	return err;
++#else
++	return 0;
++#endif
++}
++
++int
++init_pmu(void)
++{
++	int i;
++	int err = 0;
++
++	for (i = 0; i < pmu_irqs.num_irqs; ++i) {
++		err = set_irq_affinity(pmu_irqs.irqs[i], i);
++		if (err)
++			break;
++	}
++
++	return err;
++}
++EXPORT_SYMBOL_GPL(init_pmu);
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index dd4698c..5cd0ec4 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -536,6 +536,11 @@ config CPU_COPY_FA
+ config CPU_COPY_V6
+ 	bool
+ 
++config CPU_HAS_PMU
++	depends on CPU_V6 || CPU_V7 || CPU_XSCALE
++	default y
++	bool
++
+ # This selects the TLB model
+ config CPU_TLB_V3
+ 	bool
 -- 
-Christian Pellegrin, see http://www.evolware.org/chri/
-"Real Programmers don't play tennis, or any other sport which requires
-you to change clothes. Mountain climbing is OK, and Real Programmers
-wear their climbing boots to work in case a mountain should suddenly
-spring up in the middle of the computer room."
+1.6.5.4
