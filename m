@@ -1,72 +1,99 @@
-From: kevin.wells@nxp.com (Kevin Wells)
-Date: Tue, 15 Dec 2009 01:16:32 +0100
-Subject: [PATCH 07/10] ARM: PNX4008: move i2c suspend/resume callbacks
-	into driver
-In-Reply-To: <20091214230655.GB16953@n2100.arm.linux.org.uk>
-References: <20091120144422.GA18223@n2100.arm.linux.org.uk>
-	<E1NBUkU-0004Pm-Nv@rmk-PC.arm.linux.org.uk>
-	<63386a3d0911210927u47c7d6d6i65fc7d60563f8db2@mail.gmail.com>
-	<20091121185947.GD13956@n2100.arm.linux.org.uk>
-	<083DF309106F364B939360100EC290F804F55C9221@eu1rdcrdc1wx030.exi.nxp.com>
-	<20091214230655.GB16953@n2100.arm.linux.org.uk>
-Message-ID: <083DF309106F364B939360100EC290F804F586B9C1@eu1rdcrdc1wx030.exi.nxp.com>
+From: gerg@snapgear.com (Greg Ungerer)
+Date: Tue, 15 Dec 2009 11:27:59 +1000
+Subject: [PATCH 3/4] fec: add support for Freescale i.MX25 PDK (3DS)
+In-Reply-To: <fb518184b206ec2727deda111cc5364134ace69a.1260785451.git.baruch@tkos.co.il>
+References: <cover.1260785451.git.baruch@tkos.co.il>
+	<fb518184b206ec2727deda111cc5364134ace69a.1260785451.git.baruch@tkos.co.il>
+Message-ID: <4B26E61F.7030709@snapgear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: [PATCH 07/10] ARM: PNX4008: move i2c suspend/resume callbacks
-> into driver
-> 
-> On Wed, Nov 25, 2009 at 10:19:26PM +0100, Kevin Wells wrote:
-> > > Subject: Re: [PATCH 07/10] ARM: PNX4008: move i2c suspend/resume
-> callbacks
-> > > into driver
-> > >
-> > > On Sat, Nov 21, 2009 at 06:27:54PM +0100, Linus Walleij wrote:
-> > > > If you have this up for testing anyway, would it be advisable to
-> take
-> > > this
-> > > > opportunity to also switch i2c-pnx over to using struct dev_pm_ops?
-> > >
-> >
-> > With the clock change below, suspend and resume won't be needed anymore.
-> >
-> > > These patches are only compile-tested, and that's partly why there's
-> soo
-> > > many of them - each one does one transformation, which makes it easy
-> to
-> > > review for correctness.
-> > >
-> > > I'm also hoping that Kevin will test them on later PNX hardware so
-> that
-> > > they can be submitted.
-> >
-> > All the I2C patches work fine. In regards to the clock being enabled on
-> > suspend, I think that's a bug - it should be disabled. It only uses
-> extra
-> > power keeping the clock gated on when an I2C transaction isn't in
-> progress.
-> > The clock can be gated on prior to an I2C transaction starting and
-> > then gated off at the end of it. This will save a small trickle of
-> power.
-> >
-> > I'll send over patch with these changes.
-> 
-> I didn't hear any response, so the PNX4008 patches are still hanging
-> around unmerged, and now have rejects.
-> 
-I tested the patches and they worked fine. I thought I sent another
-message saying that...
+Hi Baruch,
 
-> I'm not attached to these patches so I'm not going to be putting any
-> additional effort into them (which means I'm not going to be putting
-> any effort into fixing those rejects or trying to get them merged)
-> especially as it means that they're now going to have to be maintained
-> by someone for three months...
+Baruch Siach wrote:
+> The i.MX25 PDK uses RMII to communicate with its PHY. This patch adds the
+> necessary bits to make the i.MX25 talk RMII.
+> 
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> ---
+>  drivers/net/fec.c |   22 ++++++++++++++++++++++
+>  drivers/net/fec.h |    2 ++
+>  2 files changed, 24 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/net/fec.c b/drivers/net/fec.c
+> index 16a1d58..65c43d3 100644
+> --- a/drivers/net/fec.c
+> +++ b/drivers/net/fec.c
+> @@ -51,6 +51,7 @@
+>  #include "fec.h"
+>  
+>  #ifdef CONFIG_ARCH_MXC
+> +#include <asm/mach-types.h>
+>  #include <mach/hardware.h>
+>  #define FEC_ALIGNMENT	0xf
+>  #else
+> @@ -1722,6 +1723,25 @@ static int fec_enet_init(struct net_device *dev, int index)
+>  	return 0;
+>  }
+>  
+> +static void fec_localhw_setup(struct net_device *dev)
+> +{
+> +	struct fec_enet_private *fep = netdev_priv(dev);
+> +
+> +	if (!machine_is_mx25_3ds())
+> +		return;
+> +
+> +	/* disable the gasket and wait */
+> +	writel(0, fep->hwp + FEC_MIIGSK_ENR);
+> +	while (readl(fep->hwp + FEC_MIIGSK_ENR) & 4)
+> +		udelay(1);
+> +
+> +	/* configure the gasket for RMII, 50 MHz, no loopback, no echo */
+> +	writel(1, fep->hwp + FEC_MIIGSK_CFGR);
+> +
+> +	/* re-enable the gasket */
+> +	writel(2, fep->hwp + FEC_MIIGSK_ENR);
+                              ^^^^^^^^^^^^^^
 
-We use these drivers on several other devices and many variants, I'll
-work on getting the code into mainline and getting everything cleaned up.
-I think the changes made the driver better and made our clock support in
-the mach- area less complex (and much more generic). I've actually
-updated and tested my local 32xx arch files with these changes and would
-like to submit those initial files based on those changes, so I do have
-a very strong interest to get them included....
+> +}
+
+This will not compile for some CPU types that use this driver.
+
+
+> +
+>  /* This function is called to start or restart the FEC during a link
+>   * change.  This only happens when switching between half and full
+>   * duplex.
+> @@ -1810,6 +1830,8 @@ fec_restart(struct net_device *dev, int duplex)
+>  	/* Set MII speed */
+>  	writel(fep->phy_speed, fep->hwp + FEC_MII_SPEED);
+>  
+> +	fec_localhw_setup(dev);
+> +
+>  	/* And last, enable the transmit and receive processing */
+>  	writel(2, fep->hwp + FEC_ECNTRL);
+>  	writel(0, fep->hwp + FEC_R_DES_ACTIVE);
+> diff --git a/drivers/net/fec.h b/drivers/net/fec.h
+> index cc47f3f..2c48b25 100644
+> --- a/drivers/net/fec.h
+> +++ b/drivers/net/fec.h
+> @@ -43,6 +43,8 @@
+>  #define FEC_R_DES_START		0x180 /* Receive descriptor ring */
+>  #define FEC_X_DES_START		0x184 /* Transmit descriptor ring */
+>  #define FEC_R_BUFF_SIZE		0x188 /* Maximum receive buff size */
+> +#define FEC_MIIGSK_CFGR		0x300 /* MIIGSK Configuration reg */
+> +#define FEC_MIIGSK_ENR		0x308 /* MIIGSK Enable reg */
+
+These are defined in a conditional section for certain CPU types.
+There is no definitions for the other "#else" section here.
+
+Regards
+Greg
+
+
+-- 
+------------------------------------------------------------------------
+Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
+SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
+8 Gardner Close                             FAX:         +61 7 3217 5323
+Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
