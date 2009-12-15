@@ -1,40 +1,28 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Dec 2009 17:06:55 -0000
-Subject: [PATCH 1/5] arm: provide a mechanism to reserve
-	performance	counters
-In-Reply-To: <20091215143652.GN4141@wear.picochip.com>
-References: <1260875712-29712-1-git-send-email-jamie.iles@picochip.com>
-	<1260875712-29712-2-git-send-email-jamie.iles@picochip.com>
-	<000001ca7d90$c4a15330$4de3f990$@deacon@arm.com>
-	<20091215143652.GN4141@wear.picochip.com>
-Message-ID: <000401ca7da9$0142cae0$03c860a0$@deacon@arm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 15 Dec 2009 10:12:45 -0700 (MST)
+Subject: [v2 PATCH 0/5] OMAP4 Power Domain Framework Support
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02BC240726@dbde02.ent.ti.com>
+References: <EAF47CD23C76F840A9E7FCE10091EFAB02BC240726@dbde02.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.0912151011270.12561@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jamie Iles wrote:
+Hi Abhijit,
 
-> > I think it's standard Kernel coding style to put the declaration of a function
-> > all on one line if it fits. The same goes elsewhere in the patch.
-> I couldn't find anything that has this written down and there are plenty of
-> other places in the perf code that do this. I personally like it because you
-> can grep for "^foo" to find the definition. Unless people have strong
-> objections to this I'll leave it as is.
+On Tue, 15 Dec 2009, Pagare, Abhijit wrote:
 
-I'm just going by the examples in Documentation/CodingStyle.
+> This is version 2 of the patch series which adds support for OMAP4 power domain framework.
 
-> > > +config CPU_HAS_PMU
-> > > +	depends on CPU_V6 || CPU_V7 || CPU_XSCALE
-> > > +	default y
-> > > +	bool
-> >
-> > I think you should use XSCALE_PMU instead of CPU_XSCALE. Also, this should
-> > probably be in the top-level ARM Kconfig instead of the mm/ one.
-> Ok, I agree with you about using XSCALE_PMU, but why isn't mm/Kconfig the
-> correct one? It's describing what features the CPU has and the PMU *is* a
-> feature.
+...
 
-I'd say move it out of mm/Kconfig because the PMU is not related to memory
-management and almost everything under mm/ is. oprofile may also want to use
-these bools and that is based in the top-level ARM Kconfig.
+> Abhijit Pagare (5):
+> ARM: OMAP4: PM: OMAP4 essential basic initializations.
+> ARM: OMAP4: PM: OMAP4 Power Domain Porting Related Clean-up.
+> ARM: OMAP4: PM: Add the Auto-generated OMAP4 specific power domain framework.
+> ARM: OMAP4: PM: Adapt the existing OMAP2/3 and common Power Domain Frameworks.
+> ARM: OMAP4: PM: Refine the APIs to support OMAP4 features.
 
-Will
+thanks, queued for .34.
+
+
+- Paul
