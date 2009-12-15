@@ -1,41 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 15 Dec 2009 10:24:48 +0000
-Subject: [PATCH 3/5] arm: use the spinlocked, generic atomic64 support
-In-Reply-To: <alpine.LFD.2.00.0912141443010.23173@xanadu.home>
-References: <alpine.LFD.2.00.0912141443010.23173@xanadu.home>
-Message-ID: <1260872688.1569.19.camel@pc1117.cambridge.arm.com>
+From: chripell@gmail.com (christian pellegrin)
+Date: Tue, 15 Dec 2009 11:33:07 +0100
+Subject: shared memory problem on ARM v5TE using threads
+In-Reply-To: <alpine.LFD.2.00.0912141457400.23173@xanadu.home>
+References: <20091207114218.GA19348@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.0912071027480.31174@xanadu.home>
+	<20091207170546.GB26821@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.0912071219100.31174@xanadu.home>
+	<20091207175608.GE26821@n2100.arm.linux.org.uk>
+	<309002C0DA137042828828FC53D7A9347E2630EEC2@IL-MB01.marvell.com>
+	<20091213120033.GA10698@n2100.arm.linux.org.uk>
+	<20091213120615.GB10698@n2100.arm.linux.org.uk>
+	<cabda6420912140513k40a998b7k8cf56c35cc535cfb@mail.gmail.com>
+	<alpine.LFD.2.00.0912141457400.23173@xanadu.home>
+Message-ID: <cabda6420912150233x23149a36gecb85e1191f4bdbd@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2009-12-14 at 19:52 +0000, Nicolas Pitre wrote:
-> On Mon, 14 Dec 2009, Will Deacon wrote:
-> > *Nicolas Pitre wrote:
-> >
-> > > Can't a variant of include/linux/cnt32_to_63.h be used here?>
-> > > typedef struct {
-> > >     atomic_t low;
-> > >     u32 high;
-> > > } atomic64_t;
-> > >
-> > > static inline void atomic64_set(atomic64_t *ptr, u64 new_val)
-> > > {
-> > >     u32 low = new_val;
-> > >     u32 high = new_val >> 32;
-> > >     BUG_ON(high & 0x80000000);
-> > >     atomic_set(&ptr->low, low);
-> > >     ptr->high = (high & 0x7fffffff) | (low & 0x80000000);
-> > > }
-> >
-> > How do you ensure that this is atomic? To me it looks like one CPU
-> > could write the lower 32-bits and another could write the upper 32,
-> > leaving the memory location in an inconsistent state.
-> 
-> This one is indeed not exactly atomic.  It isn't the interesting case
-> either though.  Probably a strd could fix that.
+On Mon, Dec 14, 2009 at 8:59 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Mon, 14 Dec 2009, christian pellegrin wrote:
+>
+>> Feroceon manuals (unfortunately I found that these are not available
+>> *after* buying the hardware).
+>
+> Look at:
+>
+> http://www.marvell.com/products/embedded_processors/kirkwood/index.jsp
+>
 
-STRD is not guaranteed to be atomic either (it may be implemented as a
-succession of two word stores like an STM), especially when the low
-latency interrupt mode is enabled.
+Unfortunately the chapaters about the core and the L2 cache are
+missing. I gugled and found confirmation from openrd forum that they
+are available only with a NDA.
+
 
 -- 
-Catalin
+Christian Pellegrin, see http://www.evolware.org/chri/
+"Real Programmers don't play tennis, or any other sport which requires
+you to change clothes. Mountain climbing is OK, and Real Programmers
+wear their climbing boots to work in case a mountain should suddenly
+spring up in the middle of the computer room."
