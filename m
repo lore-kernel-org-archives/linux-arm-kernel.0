@@ -1,24 +1,42 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 16 Dec 2009 21:38:35 +0800
-Subject: [PATCH] ARM: pxa/raumfeld: board support cleanups
-In-Reply-To: <f17812d70912092008k67d37bcak73b774620fa3433a@mail.gmail.com>
-References: <1260095301-29363-1-git-send-email-daniel@caiaq.de>
-	<f17812d70912092008k67d37bcak73b774620fa3433a@mail.gmail.com>
-Message-ID: <f17812d70912160538m448fdcco238c3fc959c16a09@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 16 Dec 2009 14:46:43 +0100
+Subject: [PATCH 1/2 RESEND#2] i2c/pxa: remove unused macro
+In-Reply-To: <20091209091146.78e8d7bb@hyperion.delvare>
+References: <1257754721-17325-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1258658141-30340-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20091208211810.GB13706@pengutronix.de>
+	<20091208224456.0baf422b@hyperion.delvare>
+	<20091208220724.GA14696@pengutronix.de>
+	<20091209091146.78e8d7bb@hyperion.delvare>
+Message-ID: <20091216134643.GB3674@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 10, 2009 at 12:08 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Sun, Dec 6, 2009 at 6:28 PM, Daniel Mack <daniel@caiaq.de> wrote:
->> Some minor things that I didn't notice in the original post.
->>
->> Signed-off-by: Daniel Mack <daniel@caiaq.de>
->> Cc: Eric Miao <eric.y.miao@gmail.com>
->
-> Merged into 'pending'. Will be pushed out til max8660 stuffs are merged.
->
+Hi Ben,
 
-Daniel,
+On Wed, Dec 09, 2009 at 09:11:46AM +0100, Jean Delvare wrote:
+> On Tue, 8 Dec 2009 23:07:24 +0100, Uwe Kleine-K?nig wrote:
+> > On Tue, Dec 08, 2009 at 10:44:56PM +0100, Jean Delvare wrote:
+> > > On Tue, 8 Dec 2009 22:18:10 +0100, Uwe Kleine-K?nig wrote:
+> > > > do you have comments to my patches?  I think they should go in via your
+> > > > tree.
+> > > 
+> > > I think you should read MAINTAINERS again.
+> > Ah, so the maintainer is Ben Dooks, but the tree seems to be your's.
+> >
+> > So I assume you take it when Ben give's his S-o-b or Ben has write
+> > access to the tree?
+> 
+> No. I have my tree, Ben has its own. Ben's isn't listed in MAINTAINERS,
+> thus the confusion.
+> 
+> Ben, can you please add your tree to MAINTAINERS to make things clearer
+> for contributors?
+any updates here?  comments for my patches?
 
-Do you know when will max8660 be merged? The window is about to
-close, but nothing appear to be there about this max8660?
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
