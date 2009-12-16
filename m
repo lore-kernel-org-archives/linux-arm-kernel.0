@@ -1,7 +1,7 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 16 Dec 2009 19:59:53 +0100
-Subject: [PATCH 12/20] imx/mx2: rename files defining a machine to mach-$mach.c
-In-Reply-To: <1260990002-24168-11-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Wed, 16 Dec 2009 19:59:54 +0100
+Subject: [PATCH 13/20] imx/mx3: rename files defining a machine to mach-$mach.c
+In-Reply-To: <1260990002-24168-12-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <20091216185046.GA16984@pengutronix.de>
 	<1260990002-24168-1-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1260990002-24168-2-git-send-email-u.kleine-koenig@pengutronix.de>
@@ -14,94 +14,117 @@ References: <20091216185046.GA16984@pengutronix.de>
 	<1260990002-24168-9-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1260990002-24168-10-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1260990002-24168-11-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1260990002-24168-12-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-12-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1260990002-24168-13-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Eric Benard <eric@eukrea.com>
+Cc: Daniel Mack <daniel@caiaq.de>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Valentin Longchamp <valentin.longchamp@epfl.ch>
 ---
- arch/arm/mach-mx2/Makefile          |   17 +-
- arch/arm/mach-mx2/eukrea_cpuimx27.c |  234 ------------------------
- arch/arm/mach-mx2/mach-cpuimx27.c   |  234 ++++++++++++++++++++++++
- arch/arm/mach-mx2/mach-imx27lite.c  |   95 ++++++++++
- arch/arm/mach-mx2/mach-mx21ads.c    |  294 +++++++++++++++++++++++++++++
- arch/arm/mach-mx2/mach-mx27_3ds.c   |   95 ++++++++++
- arch/arm/mach-mx2/mach-mx27ads.c    |  345 +++++++++++++++++++++++++++++++++++
- arch/arm/mach-mx2/mach-mxt_td60.c   |  319 ++++++++++++++++++++++++++++++++
- arch/arm/mach-mx2/mach-pca100.c     |  244 +++++++++++++++++++++++++
- arch/arm/mach-mx2/mach-pcm038.c     |  338 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-mx2/mx21ads.c         |  294 -----------------------------
- arch/arm/mach-mx2/mx27ads.c         |  345 -----------------------------------
- arch/arm/mach-mx2/mx27lite.c        |   95 ----------
- arch/arm/mach-mx2/mx27pdk.c         |   95 ----------
- arch/arm/mach-mx2/mxt_td60.c        |  319 --------------------------------
- arch/arm/mach-mx2/pca100.c          |  244 -------------------------
- arch/arm/mach-mx2/pcm038.c          |  338 ----------------------------------
- 17 files changed, 1972 insertions(+), 1973 deletions(-)
- delete mode 100644 arch/arm/mach-mx2/eukrea_cpuimx27.c
- create mode 100644 arch/arm/mach-mx2/mach-cpuimx27.c
- create mode 100644 arch/arm/mach-mx2/mach-imx27lite.c
- create mode 100644 arch/arm/mach-mx2/mach-mx21ads.c
- create mode 100644 arch/arm/mach-mx2/mach-mx27_3ds.c
- create mode 100644 arch/arm/mach-mx2/mach-mx27ads.c
- create mode 100644 arch/arm/mach-mx2/mach-mxt_td60.c
- create mode 100644 arch/arm/mach-mx2/mach-pca100.c
- create mode 100644 arch/arm/mach-mx2/mach-pcm038.c
- delete mode 100644 arch/arm/mach-mx2/mx21ads.c
- delete mode 100644 arch/arm/mach-mx2/mx27ads.c
- delete mode 100644 arch/arm/mach-mx2/mx27lite.c
- delete mode 100644 arch/arm/mach-mx2/mx27pdk.c
- delete mode 100644 arch/arm/mach-mx2/mxt_td60.c
- delete mode 100644 arch/arm/mach-mx2/pca100.c
- delete mode 100644 arch/arm/mach-mx2/pcm038.c
+ arch/arm/mach-mx3/Makefile            |   22 +-
+ arch/arm/mach-mx3/armadillo5x0.c      |  416 ----------------------
+ arch/arm/mach-mx3/kzmarm11.c          |  268 --------------
+ arch/arm/mach-mx3/mach-armadillo5x0.c |  416 ++++++++++++++++++++++
+ arch/arm/mach-mx3/mach-kzm_arm11_01.c |  268 ++++++++++++++
+ arch/arm/mach-mx3/mach-mx31_3ds.c     |  266 ++++++++++++++
+ arch/arm/mach-mx3/mach-mx31ads.c      |  551 +++++++++++++++++++++++++++++
+ arch/arm/mach-mx3/mach-mx31lilly.c    |  206 +++++++++++
+ arch/arm/mach-mx3/mach-mx31lite.c     |  293 +++++++++++++++
+ arch/arm/mach-mx3/mach-mx31moboard.c  |  575 ++++++++++++++++++++++++++++++
+ arch/arm/mach-mx3/mach-mx35pdk.c      |  116 ++++++
+ arch/arm/mach-mx3/mach-pcm037.c       |  628 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-mx3/mach-pcm043.c       |  259 ++++++++++++++
+ arch/arm/mach-mx3/mach-qong.c         |  285 +++++++++++++++
+ arch/arm/mach-mx3/mx31ads.c           |  551 -----------------------------
+ arch/arm/mach-mx3/mx31lilly.c         |  206 -----------
+ arch/arm/mach-mx3/mx31lite.c          |  293 ---------------
+ arch/arm/mach-mx3/mx31moboard.c       |  575 ------------------------------
+ arch/arm/mach-mx3/mx31pdk.c           |  266 --------------
+ arch/arm/mach-mx3/mx35pdk.c           |  116 ------
+ arch/arm/mach-mx3/pcm037.c            |  628 ---------------------------------
+ arch/arm/mach-mx3/pcm043.c            |  259 --------------
+ arch/arm/mach-mx3/qong.c              |  285 ---------------
+ 23 files changed, 3874 insertions(+), 3874 deletions(-)
+ delete mode 100644 arch/arm/mach-mx3/armadillo5x0.c
+ delete mode 100644 arch/arm/mach-mx3/kzmarm11.c
+ create mode 100644 arch/arm/mach-mx3/mach-armadillo5x0.c
+ create mode 100644 arch/arm/mach-mx3/mach-kzm_arm11_01.c
+ create mode 100644 arch/arm/mach-mx3/mach-mx31_3ds.c
+ create mode 100644 arch/arm/mach-mx3/mach-mx31ads.c
+ create mode 100644 arch/arm/mach-mx3/mach-mx31lilly.c
+ create mode 100644 arch/arm/mach-mx3/mach-mx31lite.c
+ create mode 100644 arch/arm/mach-mx3/mach-mx31moboard.c
+ create mode 100644 arch/arm/mach-mx3/mach-mx35pdk.c
+ create mode 100644 arch/arm/mach-mx3/mach-pcm037.c
+ create mode 100644 arch/arm/mach-mx3/mach-pcm043.c
+ create mode 100644 arch/arm/mach-mx3/mach-qong.c
+ delete mode 100644 arch/arm/mach-mx3/mx31ads.c
+ delete mode 100644 arch/arm/mach-mx3/mx31lilly.c
+ delete mode 100644 arch/arm/mach-mx3/mx31lite.c
+ delete mode 100644 arch/arm/mach-mx3/mx31moboard.c
+ delete mode 100644 arch/arm/mach-mx3/mx31pdk.c
+ delete mode 100644 arch/arm/mach-mx3/mx35pdk.c
+ delete mode 100644 arch/arm/mach-mx3/pcm037.c
+ delete mode 100644 arch/arm/mach-mx3/pcm043.c
+ delete mode 100644 arch/arm/mach-mx3/qong.c
 
-diff --git a/arch/arm/mach-mx2/Makefile b/arch/arm/mach-mx2/Makefile
-index a340698..3710893 100644
---- a/arch/arm/mach-mx2/Makefile
-+++ b/arch/arm/mach-mx2/Makefile
-@@ -11,14 +11,13 @@ obj-$(CONFIG_MACH_MX21) += clock_imx21.o
- obj-$(CONFIG_MACH_MX27) += cpu_imx27.o
- obj-$(CONFIG_MACH_MX27) += clock_imx27.o
- 
--obj-$(CONFIG_MACH_MX21ADS) += mx21ads.o
--obj-$(CONFIG_MACH_MX27ADS) += mx27ads.o
--obj-$(CONFIG_MACH_PCM038) += pcm038.o
-+obj-$(CONFIG_MACH_MX21ADS) += mach-mx21ads.o
-+obj-$(CONFIG_MACH_MX27ADS) += mach-mx27ads.o
-+obj-$(CONFIG_MACH_PCM038) += mach-pcm038.o
- obj-$(CONFIG_MACH_PCM970_BASEBOARD) += pcm970-baseboard.o
--obj-$(CONFIG_MACH_MX27_3DS) += mx27pdk.o
--obj-$(CONFIG_MACH_IMX27LITE) += mx27lite.o
--obj-$(CONFIG_MACH_CPUIMX27) += eukrea_cpuimx27.o
-+obj-$(CONFIG_MACH_MX27_3DS) += mach-mx27_3ds.o
-+obj-$(CONFIG_MACH_IMX27LITE) += mach-imx27lite.o
-+obj-$(CONFIG_MACH_CPUIMX27) += mach-cpuimx27.o
- obj-$(CONFIG_MACH_EUKREA_MBIMX27_BASEBOARD) += eukrea_mbimx27-baseboard.o
--obj-$(CONFIG_MACH_PCA100) += pca100.o
--obj-$(CONFIG_MACH_MXT_TD60) += mxt_td60.o
--
-+obj-$(CONFIG_MACH_PCA100) += mach-pca100.o
-+obj-$(CONFIG_MACH_MXT_TD60) += mach-mxt_td60.o
-diff --git a/arch/arm/mach-mx2/eukrea_cpuimx27.c b/arch/arm/mach-mx2/eukrea_cpuimx27.c
+diff --git a/arch/arm/mach-mx3/Makefile b/arch/arm/mach-mx3/Makefile
+index 03e25d6..30b76ba 100644
+--- a/arch/arm/mach-mx3/Makefile
++++ b/arch/arm/mach-mx3/Makefile
+@@ -7,16 +7,16 @@
+ obj-y				:= mm.o devices.o cpu.o
+ obj-$(CONFIG_ARCH_MX31)		+= clock-imx31.o iomux-imx31.o
+ obj-$(CONFIG_ARCH_MX35)		+= clock-imx35.o
+-obj-$(CONFIG_MACH_MX31ADS)	+= mx31ads.o
++obj-$(CONFIG_MACH_MX31ADS)	+= mach-mx31ads.o
+ obj-$(CONFIG_MACH_MX31LILLY)	+= mx31lilly.o mx31lilly-db.o
+-obj-$(CONFIG_MACH_MX31LITE)	+= mx31lite.o mx31lite-db.o
+-obj-$(CONFIG_MACH_PCM037)	+= pcm037.o
+-obj-$(CONFIG_MACH_PCM037_EET)	+= pcm037_eet.o
+-obj-$(CONFIG_MACH_MX31_3DS)	+= mx31pdk.o
+-obj-$(CONFIG_MACH_MX31MOBOARD)	+= mx31moboard.o mx31moboard-devboard.o \
++obj-$(CONFIG_MACH_MX31LITE)	+= mach-mx31lite.o mx31lite-db.o
++obj-$(CONFIG_MACH_PCM037)	+= mach-pcm037.o
++obj-$(CONFIG_MACH_PCM037_EET)	+= mach-pcm037_eet.o
++obj-$(CONFIG_MACH_MX31_3DS)	+= mach-mx31pdk.o
++obj-$(CONFIG_MACH_MX31MOBOARD)	+= mach-mx31moboard.o mx31moboard-devboard.o \
+ 				   mx31moboard-marxbot.o
+-obj-$(CONFIG_MACH_QONG)		+= qong.o
+-obj-$(CONFIG_MACH_PCM043)	+= pcm043.o
+-obj-$(CONFIG_MACH_ARMADILLO5X0) += armadillo5x0.o
+-obj-$(CONFIG_MACH_MX35_3DS)	+= mx35pdk.o
+-obj-$(CONFIG_MACH_KZM_ARM11_01)	+= kzmarm11.o
++obj-$(CONFIG_MACH_QONG)		+= mach-qong.o
++obj-$(CONFIG_MACH_PCM043)	+= mach-pcm043.o
++obj-$(CONFIG_MACH_ARMADILLO5X0) += mach-armadillo5x0.o
++obj-$(CONFIG_MACH_MX35_3DS)	+= mach-mx35pdk.o
++obj-$(CONFIG_MACH_KZM_ARM11_01)	+= mach-kzmarm11.o
+diff --git a/arch/arm/mach-mx3/armadillo5x0.c b/arch/arm/mach-mx3/armadillo5x0.c
 deleted file mode 100644
-index 8e4f3d0..0000000
---- a/arch/arm/mach-mx2/eukrea_cpuimx27.c
+index aac5f81..0000000
+--- a/arch/arm/mach-mx3/armadillo5x0.c
 +++ /dev/null
-@@ -1,234 +0,0 @@
+@@ -1,416 +0,0 @@
 -/*
-- * Copyright (C) 2009 Eric Benard - eric at eukrea.com
+- * armadillo5x0.c
 - *
-- * Based on pcm038.c which is :
-- * Copyright 2007 Robert Schwebel <r.schwebel@pengutronix.de>, Pengutronix
-- * Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
+- * Copyright 2009 Alberto Panizzo <maramaopercheseimorto@gmail.com>
+- * updates in http://alberdroid.blogspot.com/
 - *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version 2
-- * of the License, or (at your option) any later version.
+- * Based on Atmark Techno, Inc. armadillo 500 BSP 2008
+- * Based on mx31ads.c and pcm037.c Great Work!
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
 - * This program is distributed in the hope that it will be useful,
 - * but WITHOUT ANY WARRANTY; without even the implied warranty of
 - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -113,235 +136,691 @@ index 8e4f3d0..0000000
 - * MA 02110-1301, USA.
 - */
 -
--#include <linux/i2c.h>
--#include <linux/io.h>
--#include <linux/mtd/plat-ram.h>
--#include <linux/mtd/physmap.h>
+-#include <linux/types.h>
+-#include <linux/init.h>
+-#include <linux/clk.h>
 -#include <linux/platform_device.h>
--#include <linux/serial_8250.h>
+-#include <linux/gpio.h>
+-#include <linux/smsc911x.h>
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+-#include <linux/mtd/physmap.h>
+-#include <linux/io.h>
+-#include <linux/input.h>
+-#include <linux/gpio_keys.h>
+-#include <linux/i2c.h>
 -
+-#include <mach/hardware.h>
 -#include <asm/mach-types.h>
 -#include <asm/mach/arch.h>
 -#include <asm/mach/time.h>
+-#include <asm/memory.h>
 -#include <asm/mach/map.h>
 -
--#include <mach/board-eukrea_cpuimx27.h>
 -#include <mach/common.h>
--#include <mach/hardware.h>
--#include <mach/i2c.h>
--#include <mach/iomux.h>
 -#include <mach/imx-uart.h>
+-#include <mach/iomux-mx3.h>
+-#include <mach/board-armadillo5x0.h>
+-#include <mach/mmc.h>
+-#include <mach/ipu.h>
+-#include <mach/mx3fb.h>
 -#include <mach/mxc_nand.h>
 -
 -#include "devices.h"
+-#include "crm_regs.h"
 -
--static int eukrea_cpuimx27_pins[] = {
+-static int armadillo5x0_pins[] = {
 -	/* UART1 */
--	PE12_PF_UART1_TXD,
--	PE13_PF_UART1_RXD,
--	PE14_PF_UART1_CTS,
--	PE15_PF_UART1_RTS,
--	/* UART4 */
--	PB26_AF_UART4_RTS,
--	PB28_AF_UART4_TXD,
--	PB29_AF_UART4_CTS,
--	PB31_AF_UART4_RXD,
--	/* FEC */
--	PD0_AIN_FEC_TXD0,
--	PD1_AIN_FEC_TXD1,
--	PD2_AIN_FEC_TXD2,
--	PD3_AIN_FEC_TXD3,
--	PD4_AOUT_FEC_RX_ER,
--	PD5_AOUT_FEC_RXD1,
--	PD6_AOUT_FEC_RXD2,
--	PD7_AOUT_FEC_RXD3,
--	PD8_AF_FEC_MDIO,
--	PD9_AIN_FEC_MDC,
--	PD10_AOUT_FEC_CRS,
--	PD11_AOUT_FEC_TX_CLK,
--	PD12_AOUT_FEC_RXD0,
--	PD13_AOUT_FEC_RX_DV,
--	PD14_AOUT_FEC_RX_CLK,
--	PD15_AOUT_FEC_COL,
--	PD16_AIN_FEC_TX_ER,
--	PF23_AIN_FEC_TX_EN,
--	/* I2C1 */
--	PD17_PF_I2C_DATA,
--	PD18_PF_I2C_CLK,
--	/* SDHC2 */
--	PB4_PF_SD2_D0,
--	PB5_PF_SD2_D1,
--	PB6_PF_SD2_D2,
--	PB7_PF_SD2_D3,
--	PB8_PF_SD2_CMD,
--	PB9_PF_SD2_CLK,
--#if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
--	/* Quad UART's IRQ */
--	GPIO_PORTD | 22 | GPIO_GPIO | GPIO_IN,
--	GPIO_PORTD | 23 | GPIO_GPIO | GPIO_IN,
--	GPIO_PORTD | 27 | GPIO_GPIO | GPIO_IN,
--	GPIO_PORTD | 30 | GPIO_GPIO | GPIO_IN,
--#endif
+-	MX31_PIN_CTS1__CTS1,
+-	MX31_PIN_RTS1__RTS1,
+-	MX31_PIN_TXD1__TXD1,
+-	MX31_PIN_RXD1__RXD1,
+-	/* UART2 */
+-	MX31_PIN_CTS2__CTS2,
+-	MX31_PIN_RTS2__RTS2,
+-	MX31_PIN_TXD2__TXD2,
+-	MX31_PIN_RXD2__RXD2,
+-	/* LAN9118_IRQ */
+-	IOMUX_MODE(MX31_PIN_GPIO1_0, IOMUX_CONFIG_GPIO),
+-	/* SDHC1 */
+-	MX31_PIN_SD1_DATA3__SD1_DATA3,
+-	MX31_PIN_SD1_DATA2__SD1_DATA2,
+-	MX31_PIN_SD1_DATA1__SD1_DATA1,
+-	MX31_PIN_SD1_DATA0__SD1_DATA0,
+-	MX31_PIN_SD1_CLK__SD1_CLK,
+-	MX31_PIN_SD1_CMD__SD1_CMD,
+-	/* Framebuffer */
+-	MX31_PIN_LD0__LD0,
+-	MX31_PIN_LD1__LD1,
+-	MX31_PIN_LD2__LD2,
+-	MX31_PIN_LD3__LD3,
+-	MX31_PIN_LD4__LD4,
+-	MX31_PIN_LD5__LD5,
+-	MX31_PIN_LD6__LD6,
+-	MX31_PIN_LD7__LD7,
+-	MX31_PIN_LD8__LD8,
+-	MX31_PIN_LD9__LD9,
+-	MX31_PIN_LD10__LD10,
+-	MX31_PIN_LD11__LD11,
+-	MX31_PIN_LD12__LD12,
+-	MX31_PIN_LD13__LD13,
+-	MX31_PIN_LD14__LD14,
+-	MX31_PIN_LD15__LD15,
+-	MX31_PIN_LD16__LD16,
+-	MX31_PIN_LD17__LD17,
+-	MX31_PIN_VSYNC3__VSYNC3,
+-	MX31_PIN_HSYNC__HSYNC,
+-	MX31_PIN_FPSHIFT__FPSHIFT,
+-	MX31_PIN_DRDY0__DRDY0,
+-	IOMUX_MODE(MX31_PIN_LCS1, IOMUX_CONFIG_GPIO), /*ADV7125_PSAVE*/
+-	/* I2C2 */
+-	MX31_PIN_CSPI2_MOSI__SCL,
+-	MX31_PIN_CSPI2_MISO__SDA,
 -};
 -
--static struct physmap_flash_data eukrea_cpuimx27_flash_data = {
--	.width = 2,
+-/* RTC over I2C*/
+-#define ARMADILLO5X0_RTC_GPIO	IOMUX_TO_GPIO(MX31_PIN_SRXD4)
+-
+-static struct i2c_board_info armadillo5x0_i2c_rtc = {
+-	I2C_BOARD_INFO("s35390a", 0x30),
 -};
 -
--static struct resource eukrea_cpuimx27_flash_resource = {
--	.start = 0xc0000000,
--	.end   = 0xc3ffffff,
--	.flags = IORESOURCE_MEM,
--};
--
--static struct platform_device eukrea_cpuimx27_nor_mtd_device = {
--	.name = "physmap-flash",
--	.id = 0,
--	.dev = {
--		.platform_data = &eukrea_cpuimx27_flash_data,
--	},
--	.num_resources = 1,
--	.resource = &eukrea_cpuimx27_flash_resource,
--};
--
--static struct imxuart_platform_data uart_pdata[] = {
+-/* GPIO BUTTONS */
+-static struct gpio_keys_button armadillo5x0_buttons[] = {
 -	{
--		.flags = IMXUART_HAVE_RTSCTS,
+-		.code		= KEY_ENTER, /*28*/
+-		.gpio		= IOMUX_TO_GPIO(MX31_PIN_SCLK0),
+-		.active_low	= 1,
+-		.desc		= "menu",
+-		.wakeup		= 1,
 -	}, {
--		.flags = IMXUART_HAVE_RTSCTS,
--	},
--};
--
--static struct mxc_nand_platform_data eukrea_cpuimx27_nand_board_info = {
--	.width = 1,
--	.hw_ecc = 1,
--};
--
--static struct platform_device *platform_devices[] __initdata = {
--	&eukrea_cpuimx27_nor_mtd_device,
--	&mxc_fec_device,
--};
--
--static struct imxi2c_platform_data eukrea_cpuimx27_i2c_1_data = {
--	.bitrate = 100000,
--};
--
--static struct i2c_board_info eukrea_cpuimx27_i2c_devices[] = {
--	{
--		I2C_BOARD_INFO("pcf8563", 0x51),
--	},
--};
--
--#if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
--static struct plat_serial8250_port serial_platform_data[] = {
--	{
--		.mapbase = (unsigned long)(MX27_CS3_BASE_ADDR + 0x200000),
--		.irq = IRQ_GPIOB(23),
--		.uartclk = 14745600,
--		.regshift = 1,
--		.iotype = UPIO_MEM,
--		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
--	}, {
--		.mapbase = (unsigned long)(MX27_CS3_BASE_ADDR + 0x400000),
--		.irq = IRQ_GPIOB(22),
--		.uartclk = 14745600,
--		.regshift = 1,
--		.iotype = UPIO_MEM,
--		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
--	}, {
--		.mapbase = (unsigned long)(MX27_CS3_BASE_ADDR + 0x800000),
--		.irq = IRQ_GPIOB(27),
--		.uartclk = 14745600,
--		.regshift = 1,
--		.iotype = UPIO_MEM,
--		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
--	}, {
--		.mapbase = (unsigned long)(MX27_CS3_BASE_ADDR + 0x1000000),
--		.irq = IRQ_GPIOB(30),
--		.uartclk = 14745600,
--		.regshift = 1,
--		.iotype = UPIO_MEM,
--		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
--	}, {
+-		.code		= KEY_BACK, /*158*/
+-		.gpio		= IOMUX_TO_GPIO(MX31_PIN_SRST0),
+-		.active_low	= 1,
+-		.desc		= "back",
+-		.wakeup		= 1,
 -	}
 -};
 -
--static struct platform_device serial_device = {
--	.name = "serial8250",
--	.id = 0,
--	.dev = {
--		.platform_data = serial_platform_data,
+-static struct gpio_keys_platform_data armadillo5x0_button_data = {
+-	.buttons	= armadillo5x0_buttons,
+-	.nbuttons	= ARRAY_SIZE(armadillo5x0_buttons),
+-};
+-
+-static struct platform_device armadillo5x0_button_device = {
+-	.name		= "gpio-keys",
+-	.id		= -1,
+-	.num_resources	= 0,
+-	.dev		= {
+-		.platform_data	= &armadillo5x0_button_data,
+-	}
+-};
+-
+-/*
+- * NAND Flash
+- */
+-static struct mxc_nand_platform_data armadillo5x0_nand_flash_pdata = {
+-	.width		= 1,
+-	.hw_ecc		= 1,
+-};
+-
+-/*
+- * MTD NOR Flash
+- */
+-static struct mtd_partition armadillo5x0_nor_flash_partitions[] = {
+-	{
+-		.name		= "nor.bootloader",
+-		.offset		= 0x00000000,
+-		.size		= 4*32*1024,
+-	}, {
+-		.name		= "nor.kernel",
+-		.offset		= MTDPART_OFS_APPEND,
+-		.size		= 16*128*1024,
+-	}, {
+-		.name		= "nor.userland",
+-		.offset		= MTDPART_OFS_APPEND,
+-		.size		= 110*128*1024,
+-	}, {
+-		.name		= "nor.config",
+-		.offset		= MTDPART_OFS_APPEND,
+-		.size		= 1*128*1024,
 -	},
 -};
--#endif
 -
--static void __init eukrea_cpuimx27_init(void)
--{
--	mxc_gpio_setup_multiple_pins(eukrea_cpuimx27_pins,
--		ARRAY_SIZE(eukrea_cpuimx27_pins), "CPUIMX27");
--
--	mxc_register_device(&mxc_uart_device0, &uart_pdata[0]);
--
--	mxc_register_device(&mxc_nand_device, &eukrea_cpuimx27_nand_board_info);
--
--	i2c_register_board_info(0, eukrea_cpuimx27_i2c_devices,
--				ARRAY_SIZE(eukrea_cpuimx27_i2c_devices));
--
--	mxc_register_device(&mxc_i2c_device0, &eukrea_cpuimx27_i2c_1_data);
--
--	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
--
--#if defined(CONFIG_MACH_EUKREA_CPUIMX27_USESDHC2)
--	/* SDHC2 can be used for Wifi */
--	mxc_register_device(&mxc_sdhc_device1, NULL);
--	/* in which case UART4 is also used for Bluetooth */
--	mxc_register_device(&mxc_uart_device3, &uart_pdata[1]);
--#endif
--
--#if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
--	platform_device_register(&serial_device);
--#endif
--
--#ifdef CONFIG_MACH_EUKREA_MBIMX27_BASEBOARD
--	eukrea_mbimx27_baseboard_init();
--#endif
--}
--
--static void __init eukrea_cpuimx27_timer_init(void)
--{
--	mx27_clocks_init(26000000);
--}
--
--static struct sys_timer eukrea_cpuimx27_timer = {
--	.init = eukrea_cpuimx27_timer_init,
+-static struct physmap_flash_data armadillo5x0_nor_flash_pdata = {
+-	.width		= 2,
+-	.parts		= armadillo5x0_nor_flash_partitions,
+-	.nr_parts	= ARRAY_SIZE(armadillo5x0_nor_flash_partitions),
 -};
 -
--MACHINE_START(CPUIMX27, "EUKREA CPUIMX27")
--	.phys_io        = MX27_AIPI_BASE_ADDR,
--	.io_pg_offst    = ((MX27_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
--	.boot_params    = PHYS_OFFSET + 0x100,
--	.map_io         = mx27_map_io,
--	.init_irq       = mx27_init_irq,
--	.init_machine   = eukrea_cpuimx27_init,
--	.timer          = &eukrea_cpuimx27_timer,
+-static struct resource armadillo5x0_nor_flash_resource = {
+-	.flags		= IORESOURCE_MEM,
+-	.start		= MX31_CS0_BASE_ADDR,
+-	.end		= MX31_CS0_BASE_ADDR + SZ_64M - 1,
+-};
+-
+-static struct platform_device armadillo5x0_nor_flash = {
+-	.name			= "physmap-flash",
+-	.id			= -1,
+-	.num_resources		= 1,
+-	.resource		= &armadillo5x0_nor_flash_resource,
+-};
+-
+-/*
+- * FB support
+- */
+-static const struct fb_videomode fb_modedb[] = {
+-	{	/* 640x480 @ 60 Hz */
+-		.name		= "CRT-VGA",
+-		.refresh	= 60,
+-		.xres		= 640,
+-		.yres		= 480,
+-		.pixclock	= 39721,
+-		.left_margin	= 35,
+-		.right_margin	= 115,
+-		.upper_margin	= 43,
+-		.lower_margin	= 1,
+-		.hsync_len	= 10,
+-		.vsync_len	= 1,
+-		.sync		= FB_SYNC_OE_ACT_HIGH,
+-		.vmode		= FB_VMODE_NONINTERLACED,
+-		.flag		= 0,
+-	}, {/* 800x600 @ 56 Hz */
+-		.name		= "CRT-SVGA",
+-		.refresh	= 56,
+-		.xres		= 800,
+-		.yres		= 600,
+-		.pixclock	= 30000,
+-		.left_margin	= 30,
+-		.right_margin	= 108,
+-		.upper_margin	= 13,
+-		.lower_margin	= 10,
+-		.hsync_len	= 10,
+-		.vsync_len	= 1,
+-		.sync		= FB_SYNC_OE_ACT_HIGH | FB_SYNC_HOR_HIGH_ACT |
+-				  FB_SYNC_VERT_HIGH_ACT,
+-		.vmode		= FB_VMODE_NONINTERLACED,
+-		.flag		= 0,
+-	},
+-};
+-
+-static struct ipu_platform_data mx3_ipu_data = {
+-	.irq_base = MXC_IPU_IRQ_START,
+-};
+-
+-static struct mx3fb_platform_data mx3fb_pdata = {
+-	.dma_dev	= &mx3_ipu.dev,
+-	.name		= "CRT-VGA",
+-	.mode		= fb_modedb,
+-	.num_modes	= ARRAY_SIZE(fb_modedb),
+-};
+-
+-/*
+- * SDHC 1
+- * MMC support
+- */
+-static int armadillo5x0_sdhc1_get_ro(struct device *dev)
+-{
+-	return gpio_get_value(IOMUX_TO_GPIO(MX31_PIN_ATA_RESET_B));
+-}
+-
+-static int armadillo5x0_sdhc1_init(struct device *dev,
+-				   irq_handler_t detect_irq, void *data)
+-{
+-	int ret;
+-	int gpio_det, gpio_wp;
+-
+-	gpio_det = IOMUX_TO_GPIO(MX31_PIN_ATA_DMACK);
+-	gpio_wp = IOMUX_TO_GPIO(MX31_PIN_ATA_RESET_B);
+-
+-	ret = gpio_request(gpio_det, "sdhc-card-detect");
+-	if (ret)
+-		return ret;
+-
+-	gpio_direction_input(gpio_det);
+-
+-	ret = gpio_request(gpio_wp, "sdhc-write-protect");
+-	if (ret)
+-		goto err_gpio_free;
+-
+-	gpio_direction_input(gpio_wp);
+-
+-	/* When supported the trigger type have to be BOTH */
+-	ret = request_irq(IOMUX_TO_IRQ(MX31_PIN_ATA_DMACK), detect_irq,
+-			  IRQF_DISABLED | IRQF_TRIGGER_FALLING,
+-			  "sdhc-detect", data);
+-
+-	if (ret)
+-		goto err_gpio_free_2;
+-
+-	return 0;
+-
+-err_gpio_free_2:
+-	gpio_free(gpio_wp);
+-
+-err_gpio_free:
+-	gpio_free(gpio_det);
+-
+-	return ret;
+-
+-}
+-
+-static void armadillo5x0_sdhc1_exit(struct device *dev, void *data)
+-{
+-	free_irq(IOMUX_TO_IRQ(MX31_PIN_ATA_DMACK), data);
+-	gpio_free(IOMUX_TO_GPIO(MX31_PIN_ATA_DMACK));
+-	gpio_free(IOMUX_TO_GPIO(MX31_PIN_ATA_RESET_B));
+-}
+-
+-static struct imxmmc_platform_data sdhc_pdata = {
+-	.get_ro = armadillo5x0_sdhc1_get_ro,
+-	.init = armadillo5x0_sdhc1_init,
+-	.exit = armadillo5x0_sdhc1_exit,
+-};
+-
+-/*
+- * SMSC 9118
+- * Network support
+- */
+-static struct resource armadillo5x0_smc911x_resources[] = {
+-	{
+-		.start	= MX31_CS3_BASE_ADDR,
+-		.end	= MX31_CS3_BASE_ADDR + SZ_32M - 1,
+-		.flags	= IORESOURCE_MEM,
+-	}, {
+-		.start	= IOMUX_TO_IRQ(MX31_PIN_GPIO1_0),
+-		.end	= IOMUX_TO_IRQ(MX31_PIN_GPIO1_0),
+-		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL,
+-	},
+-};
+-
+-static struct smsc911x_platform_config smsc911x_info = {
+-	.flags		= SMSC911X_USE_16BIT,
+-	.irq_polarity   = SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
+-	.irq_type       = SMSC911X_IRQ_TYPE_PUSH_PULL,
+-};
+-
+-static struct platform_device armadillo5x0_smc911x_device = {
+-	.name           = "smsc911x",
+-	.id             = -1,
+-	.num_resources  = ARRAY_SIZE(armadillo5x0_smc911x_resources),
+-	.resource       = armadillo5x0_smc911x_resources,
+-	.dev            = {
+-		.platform_data = &smsc911x_info,
+-	},
+-};
+-
+-/* UART device data */
+-static struct imxuart_platform_data uart_pdata = {
+-	.flags = IMXUART_HAVE_RTSCTS,
+-};
+-
+-static struct platform_device *devices[] __initdata = {
+-	&armadillo5x0_smc911x_device,
+-	&mxc_i2c_device1,
+-	&armadillo5x0_button_device,
+-};
+-
+-/*
+- * Perform board specific initializations
+- */
+-static void __init armadillo5x0_init(void)
+-{
+-	mxc_iomux_setup_multiple_pins(armadillo5x0_pins,
+-			ARRAY_SIZE(armadillo5x0_pins), "armadillo5x0");
+-
+-	platform_add_devices(devices, ARRAY_SIZE(devices));
+-
+-	/* Register UART */
+-	mxc_register_device(&mxc_uart_device0, &uart_pdata);
+-	mxc_register_device(&mxc_uart_device1, &uart_pdata);
+-
+-	/* SMSC9118 IRQ pin */
+-	gpio_direction_input(MX31_PIN_GPIO1_0);
+-
+-	/* Register SDHC */
+-	mxc_register_device(&mxcsdhc_device0, &sdhc_pdata);
+-
+-	/* Register FB */
+-	mxc_register_device(&mx3_ipu, &mx3_ipu_data);
+-	mxc_register_device(&mx3_fb, &mx3fb_pdata);
+-
+-	/* Register NOR Flash */
+-	mxc_register_device(&armadillo5x0_nor_flash,
+-			    &armadillo5x0_nor_flash_pdata);
+-
+-	/* Register NAND Flash */
+-	mxc_register_device(&mxc_nand_device, &armadillo5x0_nand_flash_pdata);
+-
+-	/* set NAND page size to 2k if not configured via boot mode pins */
+-	__raw_writel(__raw_readl(MXC_CCM_RCSR) | (1 << 30), MXC_CCM_RCSR);
+-
+-	/* RTC */
+-	/* Get RTC IRQ and register the chip */
+-	if (gpio_request(ARMADILLO5X0_RTC_GPIO, "rtc") == 0) {
+-		if (gpio_direction_input(ARMADILLO5X0_RTC_GPIO) == 0)
+-			armadillo5x0_i2c_rtc.irq = gpio_to_irq(ARMADILLO5X0_RTC_GPIO);
+-		else
+-			gpio_free(ARMADILLO5X0_RTC_GPIO);
+-	}
+-	if (armadillo5x0_i2c_rtc.irq == 0)
+-		pr_warning("armadillo5x0_init: failed to get RTC IRQ\n");
+-	i2c_register_board_info(1, &armadillo5x0_i2c_rtc, 1);
+-}
+-
+-static void __init armadillo5x0_timer_init(void)
+-{
+-	mx31_clocks_init(26000000);
+-}
+-
+-static struct sys_timer armadillo5x0_timer = {
+-	.init	= armadillo5x0_timer_init,
+-};
+-
+-MACHINE_START(ARMADILLO5X0, "Armadillo-500")
+-	/* Maintainer: Alberto Panizzo  */
+-	.phys_io	= MX31_AIPS1_BASE_ADDR,
+-	.io_pg_offst	= ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
+-	.boot_params	= PHYS_OFFSET + 0x00000100,
+-	.map_io		= mx31_map_io,
+-	.init_irq	= mx31_init_irq,
+-	.timer		= &armadillo5x0_timer,
+-	.init_machine	= armadillo5x0_init,
 -MACHINE_END
-diff --git a/arch/arm/mach-mx2/mach-cpuimx27.c b/arch/arm/mach-mx2/mach-cpuimx27.c
+diff --git a/arch/arm/mach-mx3/kzmarm11.c b/arch/arm/mach-mx3/kzmarm11.c
+deleted file mode 100644
+index 849631e..0000000
+--- a/arch/arm/mach-mx3/kzmarm11.c
++++ /dev/null
+@@ -1,268 +0,0 @@
+-/*
+- * KZM-ARM11-01 support
+- *  Copyright (C) 2009  Yoichi Yuasa <yuasa@linux-mips.org>
+- *
+- * based on code for MX31ADS,
+- *  Copyright (C) 2000 Deep Blue Solutions Ltd
+- *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
+- *  Copyright 2005-2007 Freescale Semiconductor, Inc. All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-
+-#include <linux/gpio.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/serial_8250.h>
+-#include <linux/smsc911x.h>
+-#include <linux/types.h>
+-
+-#include <asm/irq.h>
+-#include <asm/mach-types.h>
+-#include <asm/setup.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/irq.h>
+-#include <asm/mach/map.h>
+-#include <asm/mach/time.h>
+-
+-#include <mach/board-kzmarm11.h>
+-#include <mach/clock.h>
+-#include <mach/common.h>
+-#include <mach/imx-uart.h>
+-#include <mach/iomux-mx3.h>
+-#include <mach/memory.h>
+-
+-#include "devices.h"
+-
+-#if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
+-/*
+- * KZM-ARM11-01 has an external UART on FPGA
+- */
+-static struct plat_serial8250_port serial_platform_data[] = {
+-	{
+-		.membase	= IO_ADDRESS(KZM_ARM11_16550),
+-		.mapbase	= KZM_ARM11_16550,
+-		.irq		= IOMUX_TO_IRQ(MX31_PIN_GPIO1_1),
+-		.irqflags	= IRQ_TYPE_EDGE_RISING,
+-		.uartclk	= 14745600,
+-		.regshift	= 0,
+-		.iotype		= UPIO_MEM,
+-		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST |
+-				  UPF_BUGGY_UART,
+-	},
+-	{},
+-};
+-
+-static struct resource serial8250_resources[] = {
+-	{
+-		.start	= KZM_ARM11_16550,
+-		.end	= KZM_ARM11_16550 + 0x10,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	{
+-		.start	= IOMUX_TO_IRQ(MX31_PIN_GPIO1_1),
+-		.end	= IOMUX_TO_IRQ(MX31_PIN_GPIO1_1),
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device serial_device = {
+-	.name		= "serial8250",
+-	.id		= PLAT8250_DEV_PLATFORM,
+-	.dev		= {
+-				.platform_data = serial_platform_data,
+-			  },
+-	.num_resources	= ARRAY_SIZE(serial8250_resources),
+-	.resource	= serial8250_resources,
+-};
+-
+-static int __init kzm_init_ext_uart(void)
+-{
+-	u8 tmp;
+-
+-	/*
+-	 * GPIO 1-1: external UART interrupt line
+-	 */
+-	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_GPIO1_1, IOMUX_CONFIG_GPIO));
+-	gpio_request(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1), "ext-uart-int");
+-	gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1));
+-
+-	/*
+-	 * Unmask UART interrupt
+-	 */
+-	tmp = __raw_readb(IO_ADDRESS(KZM_ARM11_CTL1));
+-	tmp |= 0x2;
+-	__raw_writeb(tmp, IO_ADDRESS(KZM_ARM11_CTL1));
+-
+-	return platform_device_register(&serial_device);
+-}
+-#else
+-static inline int kzm_init_ext_uart(void)
+-{
+-	return 0;
+-}
+-#endif
+-
+-/*
+- * SMSC LAN9118
+- */
+-#if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)
+-static struct smsc911x_platform_config kzm_smsc9118_config = {
+-	.phy_interface	= PHY_INTERFACE_MODE_MII,
+-	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_HIGH,
+-	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
+-	.flags		= SMSC911X_USE_32BIT | SMSC911X_SAVE_MAC_ADDRESS,
+-};
+-
+-static struct resource kzm_smsc9118_resources[] = {
+-	{
+-		.start	= MX31_CS5_BASE_ADDR,
+-		.end	= MX31_CS5_BASE_ADDR + SZ_128K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	{
+-		.start	= IOMUX_TO_IRQ(MX31_PIN_GPIO1_2),
+-		.end	= IOMUX_TO_IRQ(MX31_PIN_GPIO1_2),
+-		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE,
+-	},
+-};
+-
+-static struct platform_device kzm_smsc9118_device = {
+-	.name		= "smsc911x",
+-	.id		= -1,
+-	.num_resources	= ARRAY_SIZE(kzm_smsc9118_resources),
+-	.resource	= kzm_smsc9118_resources,
+-	.dev		= {
+-				.platform_data = &kzm_smsc9118_config,
+-			  },
+-};
+-
+-static int __init kzm_init_smsc9118(void)
+-{
+-	/*
+-	 * GPIO 1-2: SMSC9118 interrupt line
+-	 */
+-	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_GPIO1_2, IOMUX_CONFIG_GPIO));
+-	gpio_request(IOMUX_TO_GPIO(MX31_PIN_GPIO1_2), "smsc9118-int");
+-	gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_GPIO1_2));
+-
+-	return platform_device_register(&kzm_smsc9118_device);
+-}
+-#else
+-static inline int kzm_init_smsc9118(void)
+-{
+-	return 0;
+-}
+-#endif
+-
+-#if defined(CONFIG_SERIAL_IMX) || defined(CONFIG_SERIAL_IMX_MODULE)
+-static struct imxuart_platform_data uart_pdata = {
+-	.flags = IMXUART_HAVE_RTSCTS,
+-};
+-
+-static void __init kzm_init_imx_uart(void)
+-{
+-	mxc_register_device(&mxc_uart_device0, &uart_pdata);
+-
+-	mxc_register_device(&mxc_uart_device1, &uart_pdata);
+-}
+-#else
+-static inline void kzm_init_imx_uart(void)
+-{
+-}
+-#endif
+-
+-static int kzm_pins[] __initdata = {
+-	MX31_PIN_CTS1__CTS1,
+-	MX31_PIN_RTS1__RTS1,
+-	MX31_PIN_TXD1__TXD1,
+-	MX31_PIN_RXD1__RXD1,
+-	MX31_PIN_DCD_DCE1__DCD_DCE1,
+-	MX31_PIN_RI_DCE1__RI_DCE1,
+-	MX31_PIN_DSR_DCE1__DSR_DCE1,
+-	MX31_PIN_DTR_DCE1__DTR_DCE1,
+-	MX31_PIN_CTS2__CTS2,
+-	MX31_PIN_RTS2__RTS2,
+-	MX31_PIN_TXD2__TXD2,
+-	MX31_PIN_RXD2__RXD2,
+-	MX31_PIN_DCD_DTE1__DCD_DTE2,
+-	MX31_PIN_RI_DTE1__RI_DTE2,
+-	MX31_PIN_DSR_DTE1__DSR_DTE2,
+-	MX31_PIN_DTR_DTE1__DTR_DTE2,
+-};
+-
+-/*
+- * Board specific initialization.
+- */
+-static void __init kzm_board_init(void)
+-{
+-	mxc_iomux_setup_multiple_pins(kzm_pins,
+-				      ARRAY_SIZE(kzm_pins), "kzm");
+-	kzm_init_ext_uart();
+-	kzm_init_smsc9118();
+-	kzm_init_imx_uart();
+-
+-	pr_info("Clock input source is 26MHz\n");
+-}
+-
+-/*
+- * This structure defines static mappings for the kzm-arm11-01 board.
+- */
+-static struct map_desc kzm_io_desc[] __initdata = {
+-	{
+-		.virtual	= MX31_CS4_BASE_ADDR_VIRT,
+-		.pfn		= __phys_to_pfn(MX31_CS4_BASE_ADDR),
+-		.length		= MX31_CS4_SIZE,
+-		.type		= MT_DEVICE
+-	},
+-	{
+-		.virtual	= MX31_CS5_BASE_ADDR_VIRT,
+-		.pfn		= __phys_to_pfn(MX31_CS5_BASE_ADDR),
+-		.length		= MX31_CS5_SIZE,
+-		.type		= MT_DEVICE
+-	},
+-};
+-
+-/*
+- * Set up static virtual mappings.
+- */
+-static void __init kzm_map_io(void)
+-{
+-	mx31_map_io();
+-	iotable_init(kzm_io_desc, ARRAY_SIZE(kzm_io_desc));
+-}
+-
+-static void __init kzm_timer_init(void)
+-{
+-	mx31_clocks_init(26000000);
+-}
+-
+-static struct sys_timer kzm_timer = {
+-	.init   = kzm_timer_init,
+-};
+-
+-/*
+- * The following uses standard kernel macros define in arch.h in order to
+- * initialize __mach_desc_KZM_ARM11_01 data structure.
+- */
+-MACHINE_START(KZM_ARM11_01, "Kyoto Microcomputer Co., Ltd. KZM-ARM11-01")
+-	.phys_io        = MX31_AIPS1_BASE_ADDR,
+-	.io_pg_offst    = ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
+-	.boot_params    = PHYS_OFFSET + 0x100,
+-	.map_io         = kzm_map_io,
+-	.init_irq       = mx31_init_irq,
+-	.init_machine   = kzm_board_init,
+-	.timer          = &kzm_timer,
+-MACHINE_END
+diff --git a/arch/arm/mach-mx3/mach-armadillo5x0.c b/arch/arm/mach-mx3/mach-armadillo5x0.c
 new file mode 100644
-index 0000000..8e4f3d0
+index 0000000..aac5f81
 --- /dev/null
-+++ b/arch/arm/mach-mx2/mach-cpuimx27.c
-@@ -0,0 +1,234 @@
++++ b/arch/arm/mach-mx3/mach-armadillo5x0.c
+@@ -0,0 +1,416 @@
 +/*
-+ * Copyright (C) 2009 Eric Benard - eric at eukrea.com
++ * armadillo5x0.c
 + *
-+ * Based on pcm038.c which is :
-+ * Copyright 2007 Robert Schwebel <r.schwebel@pengutronix.de>, Pengutronix
-+ * Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
++ * Copyright 2009 Alberto Panizzo <maramaopercheseimorto@gmail.com>
++ * updates in http://alberdroid.blogspot.com/
 + *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
++ * Based on Atmark Techno, Inc. armadillo 500 BSP 2008
++ * Based on mx31ads.c and pcm037.c Great Work!
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
 + * This program is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -353,625 +832,2598 @@ index 0000000..8e4f3d0
 + * MA 02110-1301, USA.
 + */
 +
-+#include <linux/i2c.h>
-+#include <linux/io.h>
-+#include <linux/mtd/plat-ram.h>
-+#include <linux/mtd/physmap.h>
++#include <linux/types.h>
++#include <linux/init.h>
++#include <linux/clk.h>
 +#include <linux/platform_device.h>
-+#include <linux/serial_8250.h>
++#include <linux/gpio.h>
++#include <linux/smsc911x.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/mtd/physmap.h>
++#include <linux/io.h>
++#include <linux/input.h>
++#include <linux/gpio_keys.h>
++#include <linux/i2c.h>
 +
++#include <mach/hardware.h>
 +#include <asm/mach-types.h>
 +#include <asm/mach/arch.h>
 +#include <asm/mach/time.h>
++#include <asm/memory.h>
 +#include <asm/mach/map.h>
 +
-+#include <mach/board-eukrea_cpuimx27.h>
 +#include <mach/common.h>
-+#include <mach/hardware.h>
-+#include <mach/i2c.h>
-+#include <mach/iomux.h>
 +#include <mach/imx-uart.h>
++#include <mach/iomux-mx3.h>
++#include <mach/board-armadillo5x0.h>
++#include <mach/mmc.h>
++#include <mach/ipu.h>
++#include <mach/mx3fb.h>
 +#include <mach/mxc_nand.h>
 +
 +#include "devices.h"
++#include "crm_regs.h"
 +
-+static int eukrea_cpuimx27_pins[] = {
++static int armadillo5x0_pins[] = {
 +	/* UART1 */
-+	PE12_PF_UART1_TXD,
-+	PE13_PF_UART1_RXD,
-+	PE14_PF_UART1_CTS,
-+	PE15_PF_UART1_RTS,
-+	/* UART4 */
-+	PB26_AF_UART4_RTS,
-+	PB28_AF_UART4_TXD,
-+	PB29_AF_UART4_CTS,
-+	PB31_AF_UART4_RXD,
-+	/* FEC */
-+	PD0_AIN_FEC_TXD0,
-+	PD1_AIN_FEC_TXD1,
-+	PD2_AIN_FEC_TXD2,
-+	PD3_AIN_FEC_TXD3,
-+	PD4_AOUT_FEC_RX_ER,
-+	PD5_AOUT_FEC_RXD1,
-+	PD6_AOUT_FEC_RXD2,
-+	PD7_AOUT_FEC_RXD3,
-+	PD8_AF_FEC_MDIO,
-+	PD9_AIN_FEC_MDC,
-+	PD10_AOUT_FEC_CRS,
-+	PD11_AOUT_FEC_TX_CLK,
-+	PD12_AOUT_FEC_RXD0,
-+	PD13_AOUT_FEC_RX_DV,
-+	PD14_AOUT_FEC_RX_CLK,
-+	PD15_AOUT_FEC_COL,
-+	PD16_AIN_FEC_TX_ER,
-+	PF23_AIN_FEC_TX_EN,
-+	/* I2C1 */
-+	PD17_PF_I2C_DATA,
-+	PD18_PF_I2C_CLK,
-+	/* SDHC2 */
-+	PB4_PF_SD2_D0,
-+	PB5_PF_SD2_D1,
-+	PB6_PF_SD2_D2,
-+	PB7_PF_SD2_D3,
-+	PB8_PF_SD2_CMD,
-+	PB9_PF_SD2_CLK,
-+#if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
-+	/* Quad UART's IRQ */
-+	GPIO_PORTD | 22 | GPIO_GPIO | GPIO_IN,
-+	GPIO_PORTD | 23 | GPIO_GPIO | GPIO_IN,
-+	GPIO_PORTD | 27 | GPIO_GPIO | GPIO_IN,
-+	GPIO_PORTD | 30 | GPIO_GPIO | GPIO_IN,
-+#endif
++	MX31_PIN_CTS1__CTS1,
++	MX31_PIN_RTS1__RTS1,
++	MX31_PIN_TXD1__TXD1,
++	MX31_PIN_RXD1__RXD1,
++	/* UART2 */
++	MX31_PIN_CTS2__CTS2,
++	MX31_PIN_RTS2__RTS2,
++	MX31_PIN_TXD2__TXD2,
++	MX31_PIN_RXD2__RXD2,
++	/* LAN9118_IRQ */
++	IOMUX_MODE(MX31_PIN_GPIO1_0, IOMUX_CONFIG_GPIO),
++	/* SDHC1 */
++	MX31_PIN_SD1_DATA3__SD1_DATA3,
++	MX31_PIN_SD1_DATA2__SD1_DATA2,
++	MX31_PIN_SD1_DATA1__SD1_DATA1,
++	MX31_PIN_SD1_DATA0__SD1_DATA0,
++	MX31_PIN_SD1_CLK__SD1_CLK,
++	MX31_PIN_SD1_CMD__SD1_CMD,
++	/* Framebuffer */
++	MX31_PIN_LD0__LD0,
++	MX31_PIN_LD1__LD1,
++	MX31_PIN_LD2__LD2,
++	MX31_PIN_LD3__LD3,
++	MX31_PIN_LD4__LD4,
++	MX31_PIN_LD5__LD5,
++	MX31_PIN_LD6__LD6,
++	MX31_PIN_LD7__LD7,
++	MX31_PIN_LD8__LD8,
++	MX31_PIN_LD9__LD9,
++	MX31_PIN_LD10__LD10,
++	MX31_PIN_LD11__LD11,
++	MX31_PIN_LD12__LD12,
++	MX31_PIN_LD13__LD13,
++	MX31_PIN_LD14__LD14,
++	MX31_PIN_LD15__LD15,
++	MX31_PIN_LD16__LD16,
++	MX31_PIN_LD17__LD17,
++	MX31_PIN_VSYNC3__VSYNC3,
++	MX31_PIN_HSYNC__HSYNC,
++	MX31_PIN_FPSHIFT__FPSHIFT,
++	MX31_PIN_DRDY0__DRDY0,
++	IOMUX_MODE(MX31_PIN_LCS1, IOMUX_CONFIG_GPIO), /*ADV7125_PSAVE*/
++	/* I2C2 */
++	MX31_PIN_CSPI2_MOSI__SCL,
++	MX31_PIN_CSPI2_MISO__SDA,
 +};
 +
-+static struct physmap_flash_data eukrea_cpuimx27_flash_data = {
-+	.width = 2,
++/* RTC over I2C*/
++#define ARMADILLO5X0_RTC_GPIO	IOMUX_TO_GPIO(MX31_PIN_SRXD4)
++
++static struct i2c_board_info armadillo5x0_i2c_rtc = {
++	I2C_BOARD_INFO("s35390a", 0x30),
 +};
 +
-+static struct resource eukrea_cpuimx27_flash_resource = {
-+	.start = 0xc0000000,
-+	.end   = 0xc3ffffff,
-+	.flags = IORESOURCE_MEM,
-+};
-+
-+static struct platform_device eukrea_cpuimx27_nor_mtd_device = {
-+	.name = "physmap-flash",
-+	.id = 0,
-+	.dev = {
-+		.platform_data = &eukrea_cpuimx27_flash_data,
-+	},
-+	.num_resources = 1,
-+	.resource = &eukrea_cpuimx27_flash_resource,
-+};
-+
-+static struct imxuart_platform_data uart_pdata[] = {
++/* GPIO BUTTONS */
++static struct gpio_keys_button armadillo5x0_buttons[] = {
 +	{
-+		.flags = IMXUART_HAVE_RTSCTS,
++		.code		= KEY_ENTER, /*28*/
++		.gpio		= IOMUX_TO_GPIO(MX31_PIN_SCLK0),
++		.active_low	= 1,
++		.desc		= "menu",
++		.wakeup		= 1,
 +	}, {
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	},
-+};
-+
-+static struct mxc_nand_platform_data eukrea_cpuimx27_nand_board_info = {
-+	.width = 1,
-+	.hw_ecc = 1,
-+};
-+
-+static struct platform_device *platform_devices[] __initdata = {
-+	&eukrea_cpuimx27_nor_mtd_device,
-+	&mxc_fec_device,
-+};
-+
-+static struct imxi2c_platform_data eukrea_cpuimx27_i2c_1_data = {
-+	.bitrate = 100000,
-+};
-+
-+static struct i2c_board_info eukrea_cpuimx27_i2c_devices[] = {
-+	{
-+		I2C_BOARD_INFO("pcf8563", 0x51),
-+	},
-+};
-+
-+#if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
-+static struct plat_serial8250_port serial_platform_data[] = {
-+	{
-+		.mapbase = (unsigned long)(MX27_CS3_BASE_ADDR + 0x200000),
-+		.irq = IRQ_GPIOB(23),
-+		.uartclk = 14745600,
-+		.regshift = 1,
-+		.iotype = UPIO_MEM,
-+		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
-+	}, {
-+		.mapbase = (unsigned long)(MX27_CS3_BASE_ADDR + 0x400000),
-+		.irq = IRQ_GPIOB(22),
-+		.uartclk = 14745600,
-+		.regshift = 1,
-+		.iotype = UPIO_MEM,
-+		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
-+	}, {
-+		.mapbase = (unsigned long)(MX27_CS3_BASE_ADDR + 0x800000),
-+		.irq = IRQ_GPIOB(27),
-+		.uartclk = 14745600,
-+		.regshift = 1,
-+		.iotype = UPIO_MEM,
-+		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
-+	}, {
-+		.mapbase = (unsigned long)(MX27_CS3_BASE_ADDR + 0x1000000),
-+		.irq = IRQ_GPIOB(30),
-+		.uartclk = 14745600,
-+		.regshift = 1,
-+		.iotype = UPIO_MEM,
-+		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
-+	}, {
++		.code		= KEY_BACK, /*158*/
++		.gpio		= IOMUX_TO_GPIO(MX31_PIN_SRST0),
++		.active_low	= 1,
++		.desc		= "back",
++		.wakeup		= 1,
 +	}
 +};
 +
-+static struct platform_device serial_device = {
-+	.name = "serial8250",
-+	.id = 0,
-+	.dev = {
-+		.platform_data = serial_platform_data,
-+	},
-+};
-+#endif
-+
-+static void __init eukrea_cpuimx27_init(void)
-+{
-+	mxc_gpio_setup_multiple_pins(eukrea_cpuimx27_pins,
-+		ARRAY_SIZE(eukrea_cpuimx27_pins), "CPUIMX27");
-+
-+	mxc_register_device(&mxc_uart_device0, &uart_pdata[0]);
-+
-+	mxc_register_device(&mxc_nand_device, &eukrea_cpuimx27_nand_board_info);
-+
-+	i2c_register_board_info(0, eukrea_cpuimx27_i2c_devices,
-+				ARRAY_SIZE(eukrea_cpuimx27_i2c_devices));
-+
-+	mxc_register_device(&mxc_i2c_device0, &eukrea_cpuimx27_i2c_1_data);
-+
-+	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
-+
-+#if defined(CONFIG_MACH_EUKREA_CPUIMX27_USESDHC2)
-+	/* SDHC2 can be used for Wifi */
-+	mxc_register_device(&mxc_sdhc_device1, NULL);
-+	/* in which case UART4 is also used for Bluetooth */
-+	mxc_register_device(&mxc_uart_device3, &uart_pdata[1]);
-+#endif
-+
-+#if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
-+	platform_device_register(&serial_device);
-+#endif
-+
-+#ifdef CONFIG_MACH_EUKREA_MBIMX27_BASEBOARD
-+	eukrea_mbimx27_baseboard_init();
-+#endif
-+}
-+
-+static void __init eukrea_cpuimx27_timer_init(void)
-+{
-+	mx27_clocks_init(26000000);
-+}
-+
-+static struct sys_timer eukrea_cpuimx27_timer = {
-+	.init = eukrea_cpuimx27_timer_init,
++static struct gpio_keys_platform_data armadillo5x0_button_data = {
++	.buttons	= armadillo5x0_buttons,
++	.nbuttons	= ARRAY_SIZE(armadillo5x0_buttons),
 +};
 +
-+MACHINE_START(CPUIMX27, "EUKREA CPUIMX27")
-+	.phys_io        = MX27_AIPI_BASE_ADDR,
-+	.io_pg_offst    = ((MX27_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
-+	.boot_params    = PHYS_OFFSET + 0x100,
-+	.map_io         = mx27_map_io,
-+	.init_irq       = mx27_init_irq,
-+	.init_machine   = eukrea_cpuimx27_init,
-+	.timer          = &eukrea_cpuimx27_timer,
-+MACHINE_END
-diff --git a/arch/arm/mach-mx2/mach-imx27lite.c b/arch/arm/mach-mx2/mach-imx27lite.c
-new file mode 100644
-index 0000000..ca6ab12
---- /dev/null
-+++ b/arch/arm/mach-mx2/mach-imx27lite.c
-@@ -0,0 +1,95 @@
-+/*
-+ * Copyright 2007 Robert Schwebel <r.schwebel@pengutronix.de>, Pengutronix
-+ * Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
-+ * Copyright 2009 Daniel Schaeffer (daniel.schaeffer at timesys.com)
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+
-+#include <linux/platform_device.h>
-+#include <linux/gpio.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/time.h>
-+#include <asm/mach/map.h>
-+#include <mach/hardware.h>
-+#include <mach/common.h>
-+#include <mach/imx-uart.h>
-+#include <mach/iomux.h>
-+#include <mach/board-mx27lite.h>
-+
-+#include "devices.h"
-+
-+static unsigned int mx27lite_pins[] = {
-+	/* UART1 */
-+	PE12_PF_UART1_TXD,
-+	PE13_PF_UART1_RXD,
-+	PE14_PF_UART1_CTS,
-+	PE15_PF_UART1_RTS,
-+	/* FEC */
-+	PD0_AIN_FEC_TXD0,
-+	PD1_AIN_FEC_TXD1,
-+	PD2_AIN_FEC_TXD2,
-+	PD3_AIN_FEC_TXD3,
-+	PD4_AOUT_FEC_RX_ER,
-+	PD5_AOUT_FEC_RXD1,
-+	PD6_AOUT_FEC_RXD2,
-+	PD7_AOUT_FEC_RXD3,
-+	PD8_AF_FEC_MDIO,
-+	PD9_AIN_FEC_MDC,
-+	PD10_AOUT_FEC_CRS,
-+	PD11_AOUT_FEC_TX_CLK,
-+	PD12_AOUT_FEC_RXD0,
-+	PD13_AOUT_FEC_RX_DV,
-+	PD14_AOUT_FEC_RX_CLK,
-+	PD15_AOUT_FEC_COL,
-+	PD16_AIN_FEC_TX_ER,
-+	PF23_AIN_FEC_TX_EN,
++static struct platform_device armadillo5x0_button_device = {
++	.name		= "gpio-keys",
++	.id		= -1,
++	.num_resources	= 0,
++	.dev		= {
++		.platform_data	= &armadillo5x0_button_data,
++	}
 +};
-+
-+static struct imxuart_platform_data uart_pdata = {
-+	.flags = IMXUART_HAVE_RTSCTS,
-+};
-+
-+static struct platform_device *platform_devices[] __initdata = {
-+	&mxc_fec_device,
-+};
-+
-+static void __init mx27lite_init(void)
-+{
-+	mxc_gpio_setup_multiple_pins(mx27lite_pins, ARRAY_SIZE(mx27lite_pins),
-+		"imx27lite");
-+	mxc_register_device(&mxc_uart_device0, &uart_pdata);
-+	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
-+}
-+
-+static void __init mx27lite_timer_init(void)
-+{
-+	mx27_clocks_init(26000000);
-+}
-+
-+static struct sys_timer mx27lite_timer = {
-+	.init	= mx27lite_timer_init,
-+};
-+
-+MACHINE_START(IMX27LITE, "LogicPD i.MX27LITE")
-+	.phys_io        = MX27_AIPI_BASE_ADDR,
-+	.io_pg_offst    = ((MX27_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
-+	.boot_params    = PHYS_OFFSET + 0x100,
-+	.map_io         = mx27_map_io,
-+	.init_irq       = mx27_init_irq,
-+	.init_machine   = mx27lite_init,
-+	.timer          = &mx27lite_timer,
-+MACHINE_END
-diff --git a/arch/arm/mach-mx2/mach-mx21ads.c b/arch/arm/mach-mx2/mach-mx21ads.c
-new file mode 100644
-index 0000000..eb4a6e8
---- /dev/null
-+++ b/arch/arm/mach-mx2/mach-mx21ads.c
-@@ -0,0 +1,294 @@
-+/*
-+ *  Copyright (C) 2000 Deep Blue Solutions Ltd
-+ *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
-+ *  Copyright 2006-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+
-+#include <linux/platform_device.h>
-+#include <linux/mtd/mtd.h>
-+#include <linux/mtd/physmap.h>
-+#include <linux/gpio.h>
-+#include <mach/common.h>
-+#include <mach/hardware.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/time.h>
-+#include <asm/mach/map.h>
-+#include <mach/imx-uart.h>
-+#include <mach/imxfb.h>
-+#include <mach/iomux.h>
-+#include <mach/mxc_nand.h>
-+#include <mach/mmc.h>
-+#include <mach/board-mx21ads.h>
-+
-+#include "devices.h"
-+
-+static unsigned int mx21ads_pins[] = {
-+
-+	/* CS8900A */
-+	(GPIO_PORTE | GPIO_GPIO | GPIO_IN | 11),
-+
-+	/* UART1 */
-+	PE12_PF_UART1_TXD,
-+	PE13_PF_UART1_RXD,
-+	PE14_PF_UART1_CTS,
-+	PE15_PF_UART1_RTS,
-+
-+	/* UART3 (IrDA) - only TXD and RXD */
-+	PE8_PF_UART3_TXD,
-+	PE9_PF_UART3_RXD,
-+
-+	/* UART4 */
-+	PB26_AF_UART4_RTS,
-+	PB28_AF_UART4_TXD,
-+	PB29_AF_UART4_CTS,
-+	PB31_AF_UART4_RXD,
-+
-+	/* LCDC */
-+	PA5_PF_LSCLK,
-+	PA6_PF_LD0,
-+	PA7_PF_LD1,
-+	PA8_PF_LD2,
-+	PA9_PF_LD3,
-+	PA10_PF_LD4,
-+	PA11_PF_LD5,
-+	PA12_PF_LD6,
-+	PA13_PF_LD7,
-+	PA14_PF_LD8,
-+	PA15_PF_LD9,
-+	PA16_PF_LD10,
-+	PA17_PF_LD11,
-+	PA18_PF_LD12,
-+	PA19_PF_LD13,
-+	PA20_PF_LD14,
-+	PA21_PF_LD15,
-+	PA22_PF_LD16,
-+	PA24_PF_REV,     /* Sharp panel dedicated signal */
-+	PA25_PF_CLS,     /* Sharp panel dedicated signal */
-+	PA26_PF_PS,      /* Sharp panel dedicated signal */
-+	PA27_PF_SPL_SPR, /* Sharp panel dedicated signal */
-+	PA28_PF_HSYNC,
-+	PA29_PF_VSYNC,
-+	PA30_PF_CONTRAST,
-+	PA31_PF_OE_ACD,
-+
-+	/* MMC/SDHC */
-+	PE18_PF_SD1_D0,
-+	PE19_PF_SD1_D1,
-+	PE20_PF_SD1_D2,
-+	PE21_PF_SD1_D3,
-+	PE22_PF_SD1_CMD,
-+	PE23_PF_SD1_CLK,
-+
-+	/* NFC */
-+	PF0_PF_NRFB,
-+	PF1_PF_NFCE,
-+	PF2_PF_NFWP,
-+	PF3_PF_NFCLE,
-+	PF4_PF_NFALE,
-+	PF5_PF_NFRE,
-+	PF6_PF_NFWE,
-+	PF7_PF_NFIO0,
-+	PF8_PF_NFIO1,
-+	PF9_PF_NFIO2,
-+	PF10_PF_NFIO3,
-+	PF11_PF_NFIO4,
-+	PF12_PF_NFIO5,
-+	PF13_PF_NFIO6,
-+	PF14_PF_NFIO7,
-+};
-+
-+/* ADS's NOR flash: 2x AM29BDS128HE9VKI on 32-bit bus */
-+static struct physmap_flash_data mx21ads_flash_data = {
-+	.width = 4,
-+};
-+
-+static struct resource mx21ads_flash_resource = {
-+	.start = MX21_CS0_BASE_ADDR,
-+	.end = MX21_CS0_BASE_ADDR + 0x02000000 - 1,
-+	.flags = IORESOURCE_MEM,
-+};
-+
-+static struct platform_device mx21ads_nor_mtd_device = {
-+	.name = "physmap-flash",
-+	.id = 0,
-+	.dev = {
-+		.platform_data = &mx21ads_flash_data,
-+	},
-+	.num_resources = 1,
-+	.resource = &mx21ads_flash_resource,
-+};
-+
-+static struct imxuart_platform_data uart_pdata = {
-+	.flags = IMXUART_HAVE_RTSCTS,
-+};
-+
-+static struct imxuart_platform_data uart_norts_pdata = {
-+};
-+
-+
-+static int mx21ads_fb_init(struct platform_device *pdev)
-+{
-+	u16 tmp;
-+
-+	tmp = __raw_readw(MX21ADS_IO_REG);
-+	tmp |= MX21ADS_IO_LCDON;
-+	__raw_writew(tmp, MX21ADS_IO_REG);
-+	return 0;
-+}
-+
-+static void mx21ads_fb_exit(struct platform_device *pdev)
-+{
-+	u16 tmp;
-+
-+	tmp = __raw_readw(MX21ADS_IO_REG);
-+	tmp &= ~MX21ADS_IO_LCDON;
-+	__raw_writew(tmp, MX21ADS_IO_REG);
-+}
 +
 +/*
-+ * Connected is a portrait Sharp-QVGA display
-+ * of type: LQ035Q7DB02
++ * NAND Flash
 + */
-+static struct imx_fb_videomode mx21ads_modes[] = {
++static struct mxc_nand_platform_data armadillo5x0_nand_flash_pdata = {
++	.width		= 1,
++	.hw_ecc		= 1,
++};
++
++/*
++ * MTD NOR Flash
++ */
++static struct mtd_partition armadillo5x0_nor_flash_partitions[] = {
 +	{
-+		.mode = {
-+			.name		= "Sharp-LQ035Q7",
-+			.refresh	= 60,
-+			.xres		= 240,
-+			.yres		= 320,
-+			.pixclock	= 188679, /* in ps (5.3MHz) */
-+			.hsync_len	= 2,
-+			.left_margin	= 6,
-+			.right_margin	= 16,
-+			.vsync_len	= 1,
-+			.upper_margin	= 8,
-+			.lower_margin	= 10,
-+		},
-+		.pcr		= 0xfb108bc7,
-+		.bpp		= 16,
++		.name		= "nor.bootloader",
++		.offset		= 0x00000000,
++		.size		= 4*32*1024,
++	}, {
++		.name		= "nor.kernel",
++		.offset		= MTDPART_OFS_APPEND,
++		.size		= 16*128*1024,
++	}, {
++		.name		= "nor.userland",
++		.offset		= MTDPART_OFS_APPEND,
++		.size		= 110*128*1024,
++	}, {
++		.name		= "nor.config",
++		.offset		= MTDPART_OFS_APPEND,
++		.size		= 1*128*1024,
 +	},
 +};
 +
-+static struct imx_fb_platform_data mx21ads_fb_data = {
-+	.mode = mx21ads_modes,
-+	.num_modes = ARRAY_SIZE(mx21ads_modes),
-+
-+	.pwmr		= 0x00a903ff,
-+	.lscr1		= 0x00120300,
-+	.dmacr		= 0x00020008,
-+
-+	.init = mx21ads_fb_init,
-+	.exit = mx21ads_fb_exit,
++static struct physmap_flash_data armadillo5x0_nor_flash_pdata = {
++	.width		= 2,
++	.parts		= armadillo5x0_nor_flash_partitions,
++	.nr_parts	= ARRAY_SIZE(armadillo5x0_nor_flash_partitions),
 +};
 +
-+static int mx21ads_sdhc_get_ro(struct device *dev)
++static struct resource armadillo5x0_nor_flash_resource = {
++	.flags		= IORESOURCE_MEM,
++	.start		= MX31_CS0_BASE_ADDR,
++	.end		= MX31_CS0_BASE_ADDR + SZ_64M - 1,
++};
++
++static struct platform_device armadillo5x0_nor_flash = {
++	.name			= "physmap-flash",
++	.id			= -1,
++	.num_resources		= 1,
++	.resource		= &armadillo5x0_nor_flash_resource,
++};
++
++/*
++ * FB support
++ */
++static const struct fb_videomode fb_modedb[] = {
++	{	/* 640x480 @ 60 Hz */
++		.name		= "CRT-VGA",
++		.refresh	= 60,
++		.xres		= 640,
++		.yres		= 480,
++		.pixclock	= 39721,
++		.left_margin	= 35,
++		.right_margin	= 115,
++		.upper_margin	= 43,
++		.lower_margin	= 1,
++		.hsync_len	= 10,
++		.vsync_len	= 1,
++		.sync		= FB_SYNC_OE_ACT_HIGH,
++		.vmode		= FB_VMODE_NONINTERLACED,
++		.flag		= 0,
++	}, {/* 800x600 @ 56 Hz */
++		.name		= "CRT-SVGA",
++		.refresh	= 56,
++		.xres		= 800,
++		.yres		= 600,
++		.pixclock	= 30000,
++		.left_margin	= 30,
++		.right_margin	= 108,
++		.upper_margin	= 13,
++		.lower_margin	= 10,
++		.hsync_len	= 10,
++		.vsync_len	= 1,
++		.sync		= FB_SYNC_OE_ACT_HIGH | FB_SYNC_HOR_HIGH_ACT |
++				  FB_SYNC_VERT_HIGH_ACT,
++		.vmode		= FB_VMODE_NONINTERLACED,
++		.flag		= 0,
++	},
++};
++
++static struct ipu_platform_data mx3_ipu_data = {
++	.irq_base = MXC_IPU_IRQ_START,
++};
++
++static struct mx3fb_platform_data mx3fb_pdata = {
++	.dma_dev	= &mx3_ipu.dev,
++	.name		= "CRT-VGA",
++	.mode		= fb_modedb,
++	.num_modes	= ARRAY_SIZE(fb_modedb),
++};
++
++/*
++ * SDHC 1
++ * MMC support
++ */
++static int armadillo5x0_sdhc1_get_ro(struct device *dev)
 +{
-+	return (__raw_readw(MX21ADS_IO_REG) & MX21ADS_IO_SD_WP) ? 1 : 0;
++	return gpio_get_value(IOMUX_TO_GPIO(MX31_PIN_ATA_RESET_B));
 +}
 +
-+static int mx21ads_sdhc_init(struct device *dev, irq_handler_t detect_irq,
-+	void *data)
++static int armadillo5x0_sdhc1_init(struct device *dev,
++				   irq_handler_t detect_irq, void *data)
 +{
 +	int ret;
++	int gpio_det, gpio_wp;
 +
-+	ret = request_irq(IRQ_GPIOD(25), detect_irq,
-+		IRQF_TRIGGER_FALLING, "mmc-detect", data);
++	gpio_det = IOMUX_TO_GPIO(MX31_PIN_ATA_DMACK);
++	gpio_wp = IOMUX_TO_GPIO(MX31_PIN_ATA_RESET_B);
++
++	ret = gpio_request(gpio_det, "sdhc-card-detect");
 +	if (ret)
-+		goto out;
++		return ret;
++
++	gpio_direction_input(gpio_det);
++
++	ret = gpio_request(gpio_wp, "sdhc-write-protect");
++	if (ret)
++		goto err_gpio_free;
++
++	gpio_direction_input(gpio_wp);
++
++	/* When supported the trigger type have to be BOTH */
++	ret = request_irq(IOMUX_TO_IRQ(MX31_PIN_ATA_DMACK), detect_irq,
++			  IRQF_DISABLED | IRQF_TRIGGER_FALLING,
++			  "sdhc-detect", data);
++
++	if (ret)
++		goto err_gpio_free_2;
++
 +	return 0;
-+out:
++
++err_gpio_free_2:
++	gpio_free(gpio_wp);
++
++err_gpio_free:
++	gpio_free(gpio_det);
++
 +	return ret;
++
 +}
 +
-+static void mx21ads_sdhc_exit(struct device *dev, void *data)
++static void armadillo5x0_sdhc1_exit(struct device *dev, void *data)
 +{
-+	free_irq(IRQ_GPIOD(25), data);
++	free_irq(IOMUX_TO_IRQ(MX31_PIN_ATA_DMACK), data);
++	gpio_free(IOMUX_TO_GPIO(MX31_PIN_ATA_DMACK));
++	gpio_free(IOMUX_TO_GPIO(MX31_PIN_ATA_RESET_B));
 +}
 +
-+static struct imxmmc_platform_data mx21ads_sdhc_pdata = {
-+	.ocr_avail = MMC_VDD_29_30 | MMC_VDD_30_31, /* 3.0V */
-+	.get_ro = mx21ads_sdhc_get_ro,
-+	.init = mx21ads_sdhc_init,
-+	.exit = mx21ads_sdhc_exit,
++static struct imxmmc_platform_data sdhc_pdata = {
++	.get_ro = armadillo5x0_sdhc1_get_ro,
++	.init = armadillo5x0_sdhc1_init,
++	.exit = armadillo5x0_sdhc1_exit,
 +};
 +
-+static struct mxc_nand_platform_data mx21ads_nand_board_info = {
-+	.width = 1,
-+	.hw_ecc = 1,
-+};
-+
-+static struct map_desc mx21ads_io_desc[] __initdata = {
-+	/*
-+	 * Memory-mapped I/O on MX21ADS Base board:
-+	 *   - CS8900A Ethernet controller
-+	 *   - ST16C2552CJ UART
-+	 *   - CPU and Base board version
-+	 *   - Base board I/O register
-+	 */
++/*
++ * SMSC 9118
++ * Network support
++ */
++static struct resource armadillo5x0_smc911x_resources[] = {
 +	{
-+		.virtual = MX21ADS_MMIO_BASE_ADDR,
-+		.pfn = __phys_to_pfn(MX21_CS1_BASE_ADDR),
-+		.length = MX21ADS_MMIO_SIZE,
++		.start	= MX31_CS3_BASE_ADDR,
++		.end	= MX31_CS3_BASE_ADDR + SZ_32M - 1,
++		.flags	= IORESOURCE_MEM,
++	}, {
++		.start	= IOMUX_TO_IRQ(MX31_PIN_GPIO1_0),
++		.end	= IOMUX_TO_IRQ(MX31_PIN_GPIO1_0),
++		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL,
++	},
++};
++
++static struct smsc911x_platform_config smsc911x_info = {
++	.flags		= SMSC911X_USE_16BIT,
++	.irq_polarity   = SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
++	.irq_type       = SMSC911X_IRQ_TYPE_PUSH_PULL,
++};
++
++static struct platform_device armadillo5x0_smc911x_device = {
++	.name           = "smsc911x",
++	.id             = -1,
++	.num_resources  = ARRAY_SIZE(armadillo5x0_smc911x_resources),
++	.resource       = armadillo5x0_smc911x_resources,
++	.dev            = {
++		.platform_data = &smsc911x_info,
++	},
++};
++
++/* UART device data */
++static struct imxuart_platform_data uart_pdata = {
++	.flags = IMXUART_HAVE_RTSCTS,
++};
++
++static struct platform_device *devices[] __initdata = {
++	&armadillo5x0_smc911x_device,
++	&mxc_i2c_device1,
++	&armadillo5x0_button_device,
++};
++
++/*
++ * Perform board specific initializations
++ */
++static void __init armadillo5x0_init(void)
++{
++	mxc_iomux_setup_multiple_pins(armadillo5x0_pins,
++			ARRAY_SIZE(armadillo5x0_pins), "armadillo5x0");
++
++	platform_add_devices(devices, ARRAY_SIZE(devices));
++
++	/* Register UART */
++	mxc_register_device(&mxc_uart_device0, &uart_pdata);
++	mxc_register_device(&mxc_uart_device1, &uart_pdata);
++
++	/* SMSC9118 IRQ pin */
++	gpio_direction_input(MX31_PIN_GPIO1_0);
++
++	/* Register SDHC */
++	mxc_register_device(&mxcsdhc_device0, &sdhc_pdata);
++
++	/* Register FB */
++	mxc_register_device(&mx3_ipu, &mx3_ipu_data);
++	mxc_register_device(&mx3_fb, &mx3fb_pdata);
++
++	/* Register NOR Flash */
++	mxc_register_device(&armadillo5x0_nor_flash,
++			    &armadillo5x0_nor_flash_pdata);
++
++	/* Register NAND Flash */
++	mxc_register_device(&mxc_nand_device, &armadillo5x0_nand_flash_pdata);
++
++	/* set NAND page size to 2k if not configured via boot mode pins */
++	__raw_writel(__raw_readl(MXC_CCM_RCSR) | (1 << 30), MXC_CCM_RCSR);
++
++	/* RTC */
++	/* Get RTC IRQ and register the chip */
++	if (gpio_request(ARMADILLO5X0_RTC_GPIO, "rtc") == 0) {
++		if (gpio_direction_input(ARMADILLO5X0_RTC_GPIO) == 0)
++			armadillo5x0_i2c_rtc.irq = gpio_to_irq(ARMADILLO5X0_RTC_GPIO);
++		else
++			gpio_free(ARMADILLO5X0_RTC_GPIO);
++	}
++	if (armadillo5x0_i2c_rtc.irq == 0)
++		pr_warning("armadillo5x0_init: failed to get RTC IRQ\n");
++	i2c_register_board_info(1, &armadillo5x0_i2c_rtc, 1);
++}
++
++static void __init armadillo5x0_timer_init(void)
++{
++	mx31_clocks_init(26000000);
++}
++
++static struct sys_timer armadillo5x0_timer = {
++	.init	= armadillo5x0_timer_init,
++};
++
++MACHINE_START(ARMADILLO5X0, "Armadillo-500")
++	/* Maintainer: Alberto Panizzo  */
++	.phys_io	= MX31_AIPS1_BASE_ADDR,
++	.io_pg_offst	= ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
++	.boot_params	= PHYS_OFFSET + 0x00000100,
++	.map_io		= mx31_map_io,
++	.init_irq	= mx31_init_irq,
++	.timer		= &armadillo5x0_timer,
++	.init_machine	= armadillo5x0_init,
++MACHINE_END
+diff --git a/arch/arm/mach-mx3/mach-kzm_arm11_01.c b/arch/arm/mach-mx3/mach-kzm_arm11_01.c
+new file mode 100644
+index 0000000..849631e
+--- /dev/null
++++ b/arch/arm/mach-mx3/mach-kzm_arm11_01.c
+@@ -0,0 +1,268 @@
++/*
++ * KZM-ARM11-01 support
++ *  Copyright (C) 2009  Yoichi Yuasa <yuasa@linux-mips.org>
++ *
++ * based on code for MX31ADS,
++ *  Copyright (C) 2000 Deep Blue Solutions Ltd
++ *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
++ *  Copyright 2005-2007 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#include <linux/gpio.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/serial_8250.h>
++#include <linux/smsc911x.h>
++#include <linux/types.h>
++
++#include <asm/irq.h>
++#include <asm/mach-types.h>
++#include <asm/setup.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/irq.h>
++#include <asm/mach/map.h>
++#include <asm/mach/time.h>
++
++#include <mach/board-kzmarm11.h>
++#include <mach/clock.h>
++#include <mach/common.h>
++#include <mach/imx-uart.h>
++#include <mach/iomux-mx3.h>
++#include <mach/memory.h>
++
++#include "devices.h"
++
++#if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
++/*
++ * KZM-ARM11-01 has an external UART on FPGA
++ */
++static struct plat_serial8250_port serial_platform_data[] = {
++	{
++		.membase	= IO_ADDRESS(KZM_ARM11_16550),
++		.mapbase	= KZM_ARM11_16550,
++		.irq		= IOMUX_TO_IRQ(MX31_PIN_GPIO1_1),
++		.irqflags	= IRQ_TYPE_EDGE_RISING,
++		.uartclk	= 14745600,
++		.regshift	= 0,
++		.iotype		= UPIO_MEM,
++		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST |
++				  UPF_BUGGY_UART,
++	},
++	{},
++};
++
++static struct resource serial8250_resources[] = {
++	{
++		.start	= KZM_ARM11_16550,
++		.end	= KZM_ARM11_16550 + 0x10,
++		.flags	= IORESOURCE_MEM,
++	},
++	{
++		.start	= IOMUX_TO_IRQ(MX31_PIN_GPIO1_1),
++		.end	= IOMUX_TO_IRQ(MX31_PIN_GPIO1_1),
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device serial_device = {
++	.name		= "serial8250",
++	.id		= PLAT8250_DEV_PLATFORM,
++	.dev		= {
++				.platform_data = serial_platform_data,
++			  },
++	.num_resources	= ARRAY_SIZE(serial8250_resources),
++	.resource	= serial8250_resources,
++};
++
++static int __init kzm_init_ext_uart(void)
++{
++	u8 tmp;
++
++	/*
++	 * GPIO 1-1: external UART interrupt line
++	 */
++	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_GPIO1_1, IOMUX_CONFIG_GPIO));
++	gpio_request(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1), "ext-uart-int");
++	gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1));
++
++	/*
++	 * Unmask UART interrupt
++	 */
++	tmp = __raw_readb(IO_ADDRESS(KZM_ARM11_CTL1));
++	tmp |= 0x2;
++	__raw_writeb(tmp, IO_ADDRESS(KZM_ARM11_CTL1));
++
++	return platform_device_register(&serial_device);
++}
++#else
++static inline int kzm_init_ext_uart(void)
++{
++	return 0;
++}
++#endif
++
++/*
++ * SMSC LAN9118
++ */
++#if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)
++static struct smsc911x_platform_config kzm_smsc9118_config = {
++	.phy_interface	= PHY_INTERFACE_MODE_MII,
++	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_HIGH,
++	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
++	.flags		= SMSC911X_USE_32BIT | SMSC911X_SAVE_MAC_ADDRESS,
++};
++
++static struct resource kzm_smsc9118_resources[] = {
++	{
++		.start	= MX31_CS5_BASE_ADDR,
++		.end	= MX31_CS5_BASE_ADDR + SZ_128K - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	{
++		.start	= IOMUX_TO_IRQ(MX31_PIN_GPIO1_2),
++		.end	= IOMUX_TO_IRQ(MX31_PIN_GPIO1_2),
++		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE,
++	},
++};
++
++static struct platform_device kzm_smsc9118_device = {
++	.name		= "smsc911x",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(kzm_smsc9118_resources),
++	.resource	= kzm_smsc9118_resources,
++	.dev		= {
++				.platform_data = &kzm_smsc9118_config,
++			  },
++};
++
++static int __init kzm_init_smsc9118(void)
++{
++	/*
++	 * GPIO 1-2: SMSC9118 interrupt line
++	 */
++	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_GPIO1_2, IOMUX_CONFIG_GPIO));
++	gpio_request(IOMUX_TO_GPIO(MX31_PIN_GPIO1_2), "smsc9118-int");
++	gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_GPIO1_2));
++
++	return platform_device_register(&kzm_smsc9118_device);
++}
++#else
++static inline int kzm_init_smsc9118(void)
++{
++	return 0;
++}
++#endif
++
++#if defined(CONFIG_SERIAL_IMX) || defined(CONFIG_SERIAL_IMX_MODULE)
++static struct imxuart_platform_data uart_pdata = {
++	.flags = IMXUART_HAVE_RTSCTS,
++};
++
++static void __init kzm_init_imx_uart(void)
++{
++	mxc_register_device(&mxc_uart_device0, &uart_pdata);
++
++	mxc_register_device(&mxc_uart_device1, &uart_pdata);
++}
++#else
++static inline void kzm_init_imx_uart(void)
++{
++}
++#endif
++
++static int kzm_pins[] __initdata = {
++	MX31_PIN_CTS1__CTS1,
++	MX31_PIN_RTS1__RTS1,
++	MX31_PIN_TXD1__TXD1,
++	MX31_PIN_RXD1__RXD1,
++	MX31_PIN_DCD_DCE1__DCD_DCE1,
++	MX31_PIN_RI_DCE1__RI_DCE1,
++	MX31_PIN_DSR_DCE1__DSR_DCE1,
++	MX31_PIN_DTR_DCE1__DTR_DCE1,
++	MX31_PIN_CTS2__CTS2,
++	MX31_PIN_RTS2__RTS2,
++	MX31_PIN_TXD2__TXD2,
++	MX31_PIN_RXD2__RXD2,
++	MX31_PIN_DCD_DTE1__DCD_DTE2,
++	MX31_PIN_RI_DTE1__RI_DTE2,
++	MX31_PIN_DSR_DTE1__DSR_DTE2,
++	MX31_PIN_DTR_DTE1__DTR_DTE2,
++};
++
++/*
++ * Board specific initialization.
++ */
++static void __init kzm_board_init(void)
++{
++	mxc_iomux_setup_multiple_pins(kzm_pins,
++				      ARRAY_SIZE(kzm_pins), "kzm");
++	kzm_init_ext_uart();
++	kzm_init_smsc9118();
++	kzm_init_imx_uart();
++
++	pr_info("Clock input source is 26MHz\n");
++}
++
++/*
++ * This structure defines static mappings for the kzm-arm11-01 board.
++ */
++static struct map_desc kzm_io_desc[] __initdata = {
++	{
++		.virtual	= MX31_CS4_BASE_ADDR_VIRT,
++		.pfn		= __phys_to_pfn(MX31_CS4_BASE_ADDR),
++		.length		= MX31_CS4_SIZE,
++		.type		= MT_DEVICE
++	},
++	{
++		.virtual	= MX31_CS5_BASE_ADDR_VIRT,
++		.pfn		= __phys_to_pfn(MX31_CS5_BASE_ADDR),
++		.length		= MX31_CS5_SIZE,
++		.type		= MT_DEVICE
++	},
++};
++
++/*
++ * Set up static virtual mappings.
++ */
++static void __init kzm_map_io(void)
++{
++	mx31_map_io();
++	iotable_init(kzm_io_desc, ARRAY_SIZE(kzm_io_desc));
++}
++
++static void __init kzm_timer_init(void)
++{
++	mx31_clocks_init(26000000);
++}
++
++static struct sys_timer kzm_timer = {
++	.init   = kzm_timer_init,
++};
++
++/*
++ * The following uses standard kernel macros define in arch.h in order to
++ * initialize __mach_desc_KZM_ARM11_01 data structure.
++ */
++MACHINE_START(KZM_ARM11_01, "Kyoto Microcomputer Co., Ltd. KZM-ARM11-01")
++	.phys_io        = MX31_AIPS1_BASE_ADDR,
++	.io_pg_offst    = ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
++	.boot_params    = PHYS_OFFSET + 0x100,
++	.map_io         = kzm_map_io,
++	.init_irq       = mx31_init_irq,
++	.init_machine   = kzm_board_init,
++	.timer          = &kzm_timer,
++MACHINE_END
+diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
+new file mode 100644
+index 0000000..e71e3b4
+--- /dev/null
++++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
+@@ -0,0 +1,266 @@
++/*
++ *  Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#include <linux/types.h>
++#include <linux/init.h>
++#include <linux/clk.h>
++#include <linux/irq.h>
++#include <linux/gpio.h>
++#include <linux/smsc911x.h>
++#include <linux/platform_device.h>
++
++#include <mach/hardware.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/time.h>
++#include <asm/memory.h>
++#include <asm/mach/map.h>
++#include <mach/common.h>
++#include <mach/board-mx31pdk.h>
++#include <mach/imx-uart.h>
++#include <mach/iomux-mx3.h>
++#include "devices.h"
++
++/*!
++ * @file mx31pdk.c
++ *
++ * @brief This file contains the board-specific initialization routines.
++ *
++ * @ingroup System
++ */
++
++static int mx31pdk_pins[] = {
++	/* UART1 */
++	MX31_PIN_CTS1__CTS1,
++	MX31_PIN_RTS1__RTS1,
++	MX31_PIN_TXD1__TXD1,
++	MX31_PIN_RXD1__RXD1,
++	IOMUX_MODE(MX31_PIN_GPIO1_1, IOMUX_CONFIG_GPIO),
++};
++
++static struct imxuart_platform_data uart_pdata = {
++	.flags = IMXUART_HAVE_RTSCTS,
++};
++
++/*
++ * Support for the SMSC9217 on the Debug board.
++ */
++
++static struct smsc911x_platform_config smsc911x_config = {
++	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
++	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
++	.flags		= SMSC911X_USE_16BIT | SMSC911X_FORCE_INTERNAL_PHY,
++	.phy_interface	= PHY_INTERFACE_MODE_MII,
++};
++
++static struct resource smsc911x_resources[] = {
++	{
++		.start		= LAN9217_BASE_ADDR,
++		.end		= LAN9217_BASE_ADDR + 0xff,
++		.flags		= IORESOURCE_MEM,
++	}, {
++		.start		= EXPIO_INT_ENET,
++		.end		= EXPIO_INT_ENET,
++		.flags		= IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device smsc911x_device = {
++	.name		= "smsc911x",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(smsc911x_resources),
++	.resource	= smsc911x_resources,
++	.dev		= {
++		.platform_data = &smsc911x_config,
++	},
++};
++
++/*
++ * Routines for the CPLD on the debug board. It contains a CPLD handling
++ * LEDs, switches, interrupts for Ethernet.
++ */
++
++static void mx31pdk_expio_irq_handler(uint32_t irq, struct irq_desc *desc)
++{
++	uint32_t imr_val;
++	uint32_t int_valid;
++	uint32_t expio_irq;
++
++	imr_val = __raw_readw(CPLD_INT_MASK_REG);
++	int_valid = __raw_readw(CPLD_INT_STATUS_REG) & ~imr_val;
++
++	expio_irq = MXC_EXP_IO_BASE;
++	for (; int_valid != 0; int_valid >>= 1, expio_irq++) {
++		if ((int_valid & 1) == 0)
++			continue;
++		generic_handle_irq(expio_irq);
++	}
++}
++
++/*
++ * Disable an expio pin's interrupt by setting the bit in the imr.
++ * @param irq           an expio virtual irq number
++ */
++static void expio_mask_irq(uint32_t irq)
++{
++	uint16_t reg;
++	uint32_t expio = MXC_IRQ_TO_EXPIO(irq);
++
++	/* mask the interrupt */
++	reg = __raw_readw(CPLD_INT_MASK_REG);
++	reg |= 1 << expio;
++	__raw_writew(reg, CPLD_INT_MASK_REG);
++}
++
++/*
++ * Acknowledge an expanded io pin's interrupt by clearing the bit in the isr.
++ * @param irq           an expanded io virtual irq number
++ */
++static void expio_ack_irq(uint32_t irq)
++{
++	uint32_t expio = MXC_IRQ_TO_EXPIO(irq);
++
++	/* clear the interrupt status */
++	__raw_writew(1 << expio, CPLD_INT_RESET_REG);
++	__raw_writew(0, CPLD_INT_RESET_REG);
++	/* mask the interrupt */
++	expio_mask_irq(irq);
++}
++
++/*
++ * Enable a expio pin's interrupt by clearing the bit in the imr.
++ * @param irq           a expio virtual irq number
++ */
++static void expio_unmask_irq(uint32_t irq)
++{
++	uint16_t reg;
++	uint32_t expio = MXC_IRQ_TO_EXPIO(irq);
++
++	/* unmask the interrupt */
++	reg = __raw_readw(CPLD_INT_MASK_REG);
++	reg &= ~(1 << expio);
++	__raw_writew(reg, CPLD_INT_MASK_REG);
++}
++
++static struct irq_chip expio_irq_chip = {
++	.ack = expio_ack_irq,
++	.mask = expio_mask_irq,
++	.unmask = expio_unmask_irq,
++};
++
++static int __init mx31pdk_init_expio(void)
++{
++	int i;
++	int ret;
++
++	/* Check if there's a debug board connected */
++	if ((__raw_readw(CPLD_MAGIC_NUMBER1_REG) != 0xAAAA) ||
++	    (__raw_readw(CPLD_MAGIC_NUMBER2_REG) != 0x5555) ||
++	    (__raw_readw(CPLD_MAGIC_NUMBER3_REG) != 0xCAFE)) {
++		/* No Debug board found */
++		return -ENODEV;
++	}
++
++	pr_info("i.MX31PDK Debug board detected, rev = 0x%04X\n",
++		__raw_readw(CPLD_CODE_VER_REG));
++
++	/*
++	 * Configure INT line as GPIO input
++	 */
++	ret = gpio_request(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1), "sms9217-irq");
++	if (ret)
++		pr_warning("could not get LAN irq gpio\n");
++	else
++		gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1));
++
++	/* Disable the interrupts and clear the status */
++	__raw_writew(0, CPLD_INT_MASK_REG);
++	__raw_writew(0xFFFF, CPLD_INT_RESET_REG);
++	__raw_writew(0, CPLD_INT_RESET_REG);
++	__raw_writew(0x1F, CPLD_INT_MASK_REG);
++	for (i = MXC_EXP_IO_BASE;
++	     i < (MXC_EXP_IO_BASE + MXC_MAX_EXP_IO_LINES);
++	     i++) {
++		set_irq_chip(i, &expio_irq_chip);
++		set_irq_handler(i, handle_level_irq);
++		set_irq_flags(i, IRQF_VALID);
++	}
++	set_irq_type(EXPIO_PARENT_INT, IRQ_TYPE_LEVEL_LOW);
++	set_irq_chained_handler(EXPIO_PARENT_INT, mx31pdk_expio_irq_handler);
++
++	return 0;
++}
++
++/*
++ * This structure defines the MX31 memory map.
++ */
++static struct map_desc mx31pdk_io_desc[] __initdata = {
++	{
++		.virtual = MX31_CS5_BASE_ADDR_VIRT,
++		.pfn = __phys_to_pfn(MX31_CS5_BASE_ADDR),
++		.length = MX31_CS5_SIZE,
 +		.type = MT_DEVICE,
 +	},
 +};
 +
-+static void __init mx21ads_map_io(void)
++/*
++ * Set up static virtual mappings.
++ */
++static void __init mx31pdk_map_io(void)
 +{
-+	mx21_map_io();
-+	iotable_init(mx21ads_io_desc, ARRAY_SIZE(mx21ads_io_desc));
++	mx31_map_io();
++	iotable_init(mx31pdk_io_desc, ARRAY_SIZE(mx31pdk_io_desc));
 +}
 +
-+static struct platform_device *platform_devices[] __initdata = {
-+	&mx21ads_nor_mtd_device,
-+};
-+
-+static void __init mx21ads_board_init(void)
++/*!
++ * Board specific initialization.
++ */
++static void __init mxc_board_init(void)
 +{
-+	mxc_gpio_setup_multiple_pins(mx21ads_pins, ARRAY_SIZE(mx21ads_pins),
-+			"mx21ads");
++	mxc_iomux_setup_multiple_pins(mx31pdk_pins, ARRAY_SIZE(mx31pdk_pins),
++				      "mx31pdk");
 +
 +	mxc_register_device(&mxc_uart_device0, &uart_pdata);
-+	mxc_register_device(&mxc_uart_device2, &uart_norts_pdata);
-+	mxc_register_device(&mxc_uart_device3, &uart_pdata);
-+	mxc_register_device(&mxc_fb_device, &mx21ads_fb_data);
-+	mxc_register_device(&mxc_sdhc_device0, &mx21ads_sdhc_pdata);
-+	mxc_register_device(&mxc_nand_device, &mx21ads_nand_board_info);
 +
-+	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
++	if (!mx31pdk_init_expio())
++		platform_device_register(&smsc911x_device);
 +}
 +
-+static void __init mx21ads_timer_init(void)
++static void __init mx31pdk_timer_init(void)
 +{
-+	mx21_clocks_init(32768, 26000000);
++	mx31_clocks_init(26000000);
 +}
 +
-+static struct sys_timer mx21ads_timer = {
-+	.init	= mx21ads_timer_init,
++static struct sys_timer mx31pdk_timer = {
++	.init	= mx31pdk_timer_init,
 +};
 +
-+MACHINE_START(MX21ADS, "Freescale i.MX21ADS")
-+	/* maintainer: Freescale Semiconductor, Inc. */
-+	.phys_io        = MX21_AIPI_BASE_ADDR,
-+	.io_pg_offst    = ((MX21_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
++/*
++ * The following uses standard kernel macros defined in arch.h in order to
++ * initialize __mach_desc_MX31PDK data structure.
++ */
++MACHINE_START(MX31_3DS, "Freescale MX31PDK (3DS)")
++	/* Maintainer: Freescale Semiconductor, Inc. */
++	.phys_io	= MX31_AIPS1_BASE_ADDR,
++	.io_pg_offst	= ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
 +	.boot_params    = PHYS_OFFSET + 0x100,
-+	.map_io         = mx21ads_map_io,
-+	.init_irq       = mx21_init_irq,
-+	.init_machine   = mx21ads_board_init,
-+	.timer          = &mx21ads_timer,
++	.map_io         = mx31pdk_map_io,
++	.init_irq       = mx31_init_irq,
++	.init_machine   = mxc_board_init,
++	.timer          = &mx31pdk_timer,
 +MACHINE_END
-diff --git a/arch/arm/mach-mx2/mach-mx27_3ds.c b/arch/arm/mach-mx2/mach-mx27_3ds.c
+diff --git a/arch/arm/mach-mx3/mach-mx31ads.c b/arch/arm/mach-mx3/mach-mx31ads.c
 new file mode 100644
-index 0000000..595fea4
+index 0000000..6699116
 --- /dev/null
-+++ b/arch/arm/mach-mx2/mach-mx27_3ds.c
-@@ -0,0 +1,95 @@
++++ b/arch/arm/mach-mx3/mach-mx31ads.c
+@@ -0,0 +1,551 @@
++/*
++ *  Copyright (C) 2000 Deep Blue Solutions Ltd
++ *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
++ *  Copyright 2005-2007 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#include <linux/types.h>
++#include <linux/init.h>
++#include <linux/clk.h>
++#include <linux/serial_8250.h>
++#include <linux/gpio.h>
++#include <linux/i2c.h>
++#include <linux/irq.h>
++
++#include <mach/hardware.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/time.h>
++#include <asm/memory.h>
++#include <asm/mach/map.h>
++#include <mach/common.h>
++#include <mach/board-mx31ads.h>
++#include <mach/imx-uart.h>
++#include <mach/iomux-mx3.h>
++
++#ifdef CONFIG_MACH_MX31ADS_WM1133_EV1
++#include <linux/mfd/wm8350/audio.h>
++#include <linux/mfd/wm8350/core.h>
++#include <linux/mfd/wm8350/pmic.h>
++#endif
++
++#include "devices.h"
++
++/*!
++ * @file mx31ads.c
++ *
++ * @brief This file contains the board-specific initialization routines.
++ *
++ * @ingroup System
++ */
++
++#if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
++/*!
++ * The serial port definition structure.
++ */
++static struct plat_serial8250_port serial_platform_data[] = {
++	{
++		.membase  = (void *)(PBC_BASE_ADDRESS + PBC_SC16C652_UARTA),
++		.mapbase  = (unsigned long)(MX31_CS4_BASE_ADDR + PBC_SC16C652_UARTA),
++		.irq      = EXPIO_INT_XUART_INTA,
++		.uartclk  = 14745600,
++		.regshift = 0,
++		.iotype   = UPIO_MEM,
++		.flags    = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_AUTO_IRQ,
++	}, {
++		.membase  = (void *)(PBC_BASE_ADDRESS + PBC_SC16C652_UARTB),
++		.mapbase  = (unsigned long)(MX31_CS4_BASE_ADDR + PBC_SC16C652_UARTB),
++		.irq      = EXPIO_INT_XUART_INTB,
++		.uartclk  = 14745600,
++		.regshift = 0,
++		.iotype   = UPIO_MEM,
++		.flags    = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_AUTO_IRQ,
++	},
++	{},
++};
++
++static struct platform_device serial_device = {
++	.name	= "serial8250",
++	.id	= 0,
++	.dev	= {
++		.platform_data = serial_platform_data,
++	},
++};
++
++static int __init mxc_init_extuart(void)
++{
++	return platform_device_register(&serial_device);
++}
++#else
++static inline int mxc_init_extuart(void)
++{
++	return 0;
++}
++#endif
++
++#if defined(CONFIG_SERIAL_IMX) || defined(CONFIG_SERIAL_IMX_MODULE)
++static struct imxuart_platform_data uart_pdata = {
++	.flags = IMXUART_HAVE_RTSCTS,
++};
++
++static unsigned int uart_pins[] = {
++	MX31_PIN_CTS1__CTS1,
++	MX31_PIN_RTS1__RTS1,
++	MX31_PIN_TXD1__TXD1,
++	MX31_PIN_RXD1__RXD1
++};
++
++static inline void mxc_init_imx_uart(void)
++{
++	mxc_iomux_setup_multiple_pins(uart_pins, ARRAY_SIZE(uart_pins), "uart-0");
++	mxc_register_device(&mxc_uart_device0, &uart_pdata);
++}
++#else /* !SERIAL_IMX */
++static inline void mxc_init_imx_uart(void)
++{
++}
++#endif /* !SERIAL_IMX */
++
++static void mx31ads_expio_irq_handler(u32 irq, struct irq_desc *desc)
++{
++	u32 imr_val;
++	u32 int_valid;
++	u32 expio_irq;
++
++	imr_val = __raw_readw(PBC_INTMASK_SET_REG);
++	int_valid = __raw_readw(PBC_INTSTATUS_REG) & imr_val;
++
++	expio_irq = MXC_EXP_IO_BASE;
++	for (; int_valid != 0; int_valid >>= 1, expio_irq++) {
++		if ((int_valid & 1) == 0)
++			continue;
++
++		generic_handle_irq(expio_irq);
++	}
++}
++
++/*
++ * Disable an expio pin's interrupt by setting the bit in the imr.
++ * @param irq           an expio virtual irq number
++ */
++static void expio_mask_irq(u32 irq)
++{
++	u32 expio = MXC_IRQ_TO_EXPIO(irq);
++	/* mask the interrupt */
++	__raw_writew(1 << expio, PBC_INTMASK_CLEAR_REG);
++	__raw_readw(PBC_INTMASK_CLEAR_REG);
++}
++
++/*
++ * Acknowledge an expanded io pin's interrupt by clearing the bit in the isr.
++ * @param irq           an expanded io virtual irq number
++ */
++static void expio_ack_irq(u32 irq)
++{
++	u32 expio = MXC_IRQ_TO_EXPIO(irq);
++	/* clear the interrupt status */
++	__raw_writew(1 << expio, PBC_INTSTATUS_REG);
++}
++
++/*
++ * Enable a expio pin's interrupt by clearing the bit in the imr.
++ * @param irq           a expio virtual irq number
++ */
++static void expio_unmask_irq(u32 irq)
++{
++	u32 expio = MXC_IRQ_TO_EXPIO(irq);
++	/* unmask the interrupt */
++	__raw_writew(1 << expio, PBC_INTMASK_SET_REG);
++}
++
++static struct irq_chip expio_irq_chip = {
++	.ack = expio_ack_irq,
++	.mask = expio_mask_irq,
++	.unmask = expio_unmask_irq,
++};
++
++static void __init mx31ads_init_expio(void)
++{
++	int i;
++
++	printk(KERN_INFO "MX31ADS EXPIO(CPLD) hardware\n");
++
++	/*
++	 * Configure INT line as GPIO input
++	 */
++	mxc_iomux_alloc_pin(IOMUX_MODE(MX31_PIN_GPIO1_4, IOMUX_CONFIG_GPIO), "expio");
++
++	/* disable the interrupt and clear the status */
++	__raw_writew(0xFFFF, PBC_INTMASK_CLEAR_REG);
++	__raw_writew(0xFFFF, PBC_INTSTATUS_REG);
++	for (i = MXC_EXP_IO_BASE; i < (MXC_EXP_IO_BASE + MXC_MAX_EXP_IO_LINES);
++	     i++) {
++		set_irq_chip(i, &expio_irq_chip);
++		set_irq_handler(i, handle_level_irq);
++		set_irq_flags(i, IRQF_VALID);
++	}
++	set_irq_type(EXPIO_PARENT_INT, IRQ_TYPE_LEVEL_HIGH);
++	set_irq_chained_handler(EXPIO_PARENT_INT, mx31ads_expio_irq_handler);
++}
++
++#ifdef CONFIG_MACH_MX31ADS_WM1133_EV1
++/* This section defines setup for the Wolfson Microelectronics
++ * 1133-EV1 PMU/audio board.  When other PMU boards are supported the
++ * regulator definitions may be shared with them, but for now they can
++ * only be used with this board so would generate warnings about
++ * unused statics and some of the configuration is specific to this
++ * module.
++ */
++
++/* CPU */
++static struct regulator_consumer_supply sw1a_consumers[] = {
++	{
++		.supply = "cpu_vcc",
++	}
++};
++
++static struct regulator_init_data sw1a_data = {
++	.constraints = {
++		.name = "SW1A",
++		.min_uV = 1275000,
++		.max_uV = 1600000,
++		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
++				  REGULATOR_CHANGE_MODE,
++		.valid_modes_mask = REGULATOR_MODE_NORMAL |
++				    REGULATOR_MODE_FAST,
++		.state_mem = {
++			 .uV = 1400000,
++			 .mode = REGULATOR_MODE_NORMAL,
++			 .enabled = 1,
++		 },
++		.initial_state = PM_SUSPEND_MEM,
++		.always_on = 1,
++		.boot_on = 1,
++	},
++	.num_consumer_supplies = ARRAY_SIZE(sw1a_consumers),
++	.consumer_supplies = sw1a_consumers,
++};
++
++/* System IO - High */
++static struct regulator_init_data viohi_data = {
++	.constraints = {
++		.name = "VIOHO",
++		.min_uV = 2800000,
++		.max_uV = 2800000,
++		.state_mem = {
++			 .uV = 2800000,
++			 .mode = REGULATOR_MODE_NORMAL,
++			 .enabled = 1,
++		 },
++		.initial_state = PM_SUSPEND_MEM,
++		.always_on = 1,
++		.boot_on = 1,
++	},
++};
++
++/* System IO - Low */
++static struct regulator_init_data violo_data = {
++	.constraints = {
++		.name = "VIOLO",
++		.min_uV = 1800000,
++		.max_uV = 1800000,
++		.state_mem = {
++			 .uV = 1800000,
++			 .mode = REGULATOR_MODE_NORMAL,
++			 .enabled = 1,
++		 },
++		.initial_state = PM_SUSPEND_MEM,
++		.always_on = 1,
++		.boot_on = 1,
++	},
++};
++
++/* DDR RAM */
++static struct regulator_init_data sw2a_data = {
++	.constraints = {
++		.name = "SW2A",
++		.min_uV = 1800000,
++		.max_uV = 1800000,
++		.valid_modes_mask = REGULATOR_MODE_NORMAL,
++		.state_mem = {
++			 .uV = 1800000,
++			 .mode = REGULATOR_MODE_NORMAL,
++			 .enabled = 1,
++		 },
++		.state_disk = {
++			 .mode = REGULATOR_MODE_NORMAL,
++			 .enabled = 0,
++		 },
++		.always_on = 1,
++		.boot_on = 1,
++		.initial_state = PM_SUSPEND_MEM,
++	},
++};
++
++static struct regulator_init_data ldo1_data = {
++	.constraints = {
++		.name = "VCAM/VMMC1/VMMC2",
++		.min_uV = 2800000,
++		.max_uV = 2800000,
++		.valid_modes_mask = REGULATOR_MODE_NORMAL,
++		.apply_uV = 1,
++	},
++};
++
++static struct regulator_consumer_supply ldo2_consumers[] = {
++	{
++		.supply = "AVDD",
++	},
++	{
++		.supply = "HPVDD",
++	},
++};
++
++/* CODEC and SIM */
++static struct regulator_init_data ldo2_data = {
++	.constraints = {
++		.name = "VESIM/VSIM/AVDD",
++		.min_uV = 3300000,
++		.max_uV = 3300000,
++		.valid_modes_mask = REGULATOR_MODE_NORMAL,
++		.apply_uV = 1,
++	},
++	.num_consumer_supplies = ARRAY_SIZE(ldo2_consumers),
++	.consumer_supplies = ldo2_consumers,
++};
++
++/* General */
++static struct regulator_init_data vdig_data = {
++	.constraints = {
++		.name = "VDIG",
++		.min_uV = 1500000,
++		.max_uV = 1500000,
++		.valid_modes_mask = REGULATOR_MODE_NORMAL,
++		.apply_uV = 1,
++		.always_on = 1,
++		.boot_on = 1,
++	},
++};
++
++/* Tranceivers */
++static struct regulator_init_data ldo4_data = {
++	.constraints = {
++		.name = "VRF1/CVDD_2.775",
++		.min_uV = 2500000,
++		.max_uV = 2500000,
++		.valid_modes_mask = REGULATOR_MODE_NORMAL,
++		.apply_uV = 1,
++		.always_on = 1,
++		.boot_on = 1,
++	},
++};
++
++static struct wm8350_led_platform_data wm8350_led_data = {
++	.name            = "wm8350:white",
++	.default_trigger = "heartbeat",
++	.max_uA          = 27899,
++};
++
++static struct wm8350_audio_platform_data imx32ads_wm8350_setup = {
++	.vmid_discharge_msecs = 1000,
++	.drain_msecs = 30,
++	.cap_discharge_msecs = 700,
++	.vmid_charge_msecs = 700,
++	.vmid_s_curve = WM8350_S_CURVE_SLOW,
++	.dis_out4 = WM8350_DISCHARGE_SLOW,
++	.dis_out3 = WM8350_DISCHARGE_SLOW,
++	.dis_out2 = WM8350_DISCHARGE_SLOW,
++	.dis_out1 = WM8350_DISCHARGE_SLOW,
++	.vroi_out4 = WM8350_TIE_OFF_500R,
++	.vroi_out3 = WM8350_TIE_OFF_500R,
++	.vroi_out2 = WM8350_TIE_OFF_500R,
++	.vroi_out1 = WM8350_TIE_OFF_500R,
++	.vroi_enable = 0,
++	.codec_current_on = WM8350_CODEC_ISEL_1_0,
++	.codec_current_standby = WM8350_CODEC_ISEL_0_5,
++	.codec_current_charge = WM8350_CODEC_ISEL_1_5,
++};
++
++static int mx31_wm8350_init(struct wm8350 *wm8350)
++{
++	int i;
++
++	wm8350_gpio_config(wm8350, 0, WM8350_GPIO_DIR_IN,
++			   WM8350_GPIO0_PWR_ON_IN, WM8350_GPIO_ACTIVE_LOW,
++			   WM8350_GPIO_PULL_UP, WM8350_GPIO_INVERT_OFF,
++			   WM8350_GPIO_DEBOUNCE_ON);
++
++	wm8350_gpio_config(wm8350, 3, WM8350_GPIO_DIR_IN,
++			   WM8350_GPIO3_PWR_OFF_IN, WM8350_GPIO_ACTIVE_HIGH,
++			   WM8350_GPIO_PULL_DOWN, WM8350_GPIO_INVERT_OFF,
++			   WM8350_GPIO_DEBOUNCE_ON);
++
++	wm8350_gpio_config(wm8350, 4, WM8350_GPIO_DIR_IN,
++			   WM8350_GPIO4_MR_IN, WM8350_GPIO_ACTIVE_HIGH,
++			   WM8350_GPIO_PULL_DOWN, WM8350_GPIO_INVERT_OFF,
++			   WM8350_GPIO_DEBOUNCE_OFF);
++
++	wm8350_gpio_config(wm8350, 7, WM8350_GPIO_DIR_IN,
++			   WM8350_GPIO7_HIBERNATE_IN, WM8350_GPIO_ACTIVE_HIGH,
++			   WM8350_GPIO_PULL_DOWN, WM8350_GPIO_INVERT_OFF,
++			   WM8350_GPIO_DEBOUNCE_OFF);
++
++	wm8350_gpio_config(wm8350, 6, WM8350_GPIO_DIR_OUT,
++			   WM8350_GPIO6_SDOUT_OUT, WM8350_GPIO_ACTIVE_HIGH,
++			   WM8350_GPIO_PULL_NONE, WM8350_GPIO_INVERT_OFF,
++			   WM8350_GPIO_DEBOUNCE_OFF);
++
++	wm8350_gpio_config(wm8350, 8, WM8350_GPIO_DIR_OUT,
++			   WM8350_GPIO8_VCC_FAULT_OUT, WM8350_GPIO_ACTIVE_LOW,
++			   WM8350_GPIO_PULL_NONE, WM8350_GPIO_INVERT_OFF,
++			   WM8350_GPIO_DEBOUNCE_OFF);
++
++	wm8350_gpio_config(wm8350, 9, WM8350_GPIO_DIR_OUT,
++			   WM8350_GPIO9_BATT_FAULT_OUT, WM8350_GPIO_ACTIVE_LOW,
++			   WM8350_GPIO_PULL_NONE, WM8350_GPIO_INVERT_OFF,
++			   WM8350_GPIO_DEBOUNCE_OFF);
++
++	/* Fix up for our own supplies. */
++	for (i = 0; i < ARRAY_SIZE(ldo2_consumers); i++)
++		ldo2_consumers[i].dev = wm8350->dev;
++
++	wm8350_register_regulator(wm8350, WM8350_DCDC_1, &sw1a_data);
++	wm8350_register_regulator(wm8350, WM8350_DCDC_3, &viohi_data);
++	wm8350_register_regulator(wm8350, WM8350_DCDC_4, &violo_data);
++	wm8350_register_regulator(wm8350, WM8350_DCDC_6, &sw2a_data);
++	wm8350_register_regulator(wm8350, WM8350_LDO_1, &ldo1_data);
++	wm8350_register_regulator(wm8350, WM8350_LDO_2, &ldo2_data);
++	wm8350_register_regulator(wm8350, WM8350_LDO_3, &vdig_data);
++	wm8350_register_regulator(wm8350, WM8350_LDO_4, &ldo4_data);
++
++	/* LEDs */
++	wm8350_dcdc_set_slot(wm8350, WM8350_DCDC_5, 1, 1,
++			     WM8350_DC5_ERRACT_SHUTDOWN_CONV);
++	wm8350_isink_set_flash(wm8350, WM8350_ISINK_A,
++			       WM8350_ISINK_FLASH_DISABLE,
++			       WM8350_ISINK_FLASH_TRIG_BIT,
++			       WM8350_ISINK_FLASH_DUR_32MS,
++			       WM8350_ISINK_FLASH_ON_INSTANT,
++			       WM8350_ISINK_FLASH_OFF_INSTANT,
++			       WM8350_ISINK_FLASH_MODE_EN);
++	wm8350_dcdc25_set_mode(wm8350, WM8350_DCDC_5,
++			       WM8350_ISINK_MODE_BOOST,
++			       WM8350_ISINK_ILIM_NORMAL,
++			       WM8350_DC5_RMP_20V,
++			       WM8350_DC5_FBSRC_ISINKA);
++	wm8350_register_led(wm8350, 0, WM8350_DCDC_5, WM8350_ISINK_A,
++			    &wm8350_led_data);
++
++	wm8350->codec.platform_data = &imx32ads_wm8350_setup;
++
++	regulator_has_full_constraints();
++
++	return 0;
++}
++
++static struct wm8350_platform_data __initdata mx31_wm8350_pdata = {
++	.init = mx31_wm8350_init,
++};
++#endif
++
++#if defined(CONFIG_I2C_IMX) || defined(CONFIG_I2C_IMX_MODULE)
++static struct i2c_board_info __initdata mx31ads_i2c1_devices[] = {
++#ifdef CONFIG_MACH_MX31ADS_WM1133_EV1
++	{
++		I2C_BOARD_INFO("wm8350", 0x1a),
++		.platform_data = &mx31_wm8350_pdata,
++		.irq = IOMUX_TO_IRQ(MX31_PIN_GPIO1_3),
++	},
++#endif
++};
++
++static void mxc_init_i2c(void)
++{
++	i2c_register_board_info(1, mx31ads_i2c1_devices,
++				ARRAY_SIZE(mx31ads_i2c1_devices));
++
++	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_CSPI2_MOSI, IOMUX_CONFIG_ALT1));
++	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_CSPI2_MISO, IOMUX_CONFIG_ALT1));
++
++	mxc_register_device(&mxc_i2c_device1, NULL);
++}
++#else
++static void mxc_init_i2c(void)
++{
++}
++#endif
++
++/*!
++ * This structure defines static mappings for the i.MX31ADS board.
++ */
++static struct map_desc mx31ads_io_desc[] __initdata = {
++	{
++		.virtual	= MX31_CS4_BASE_ADDR_VIRT,
++		.pfn		= __phys_to_pfn(MX31_CS4_BASE_ADDR),
++		.length		= MX31_CS4_SIZE / 2,
++		.type		= MT_DEVICE
++	},
++};
++
++/*!
++ * Set up static virtual mappings.
++ */
++static void __init mx31ads_map_io(void)
++{
++	mx31_map_io();
++	iotable_init(mx31ads_io_desc, ARRAY_SIZE(mx31ads_io_desc));
++}
++
++static void __init mx31ads_init_irq(void)
++{
++	mx31_init_irq();
++	mx31ads_init_expio();
++}
++
++/*!
++ * Board specific initialization.
++ */
++static void __init mxc_board_init(void)
++{
++	mxc_init_extuart();
++	mxc_init_imx_uart();
++	mxc_init_i2c();
++}
++
++static void __init mx31ads_timer_init(void)
++{
++	mx31_clocks_init(26000000);
++}
++
++static struct sys_timer mx31ads_timer = {
++	.init	= mx31ads_timer_init,
++};
++
++/*
++ * The following uses standard kernel macros defined in arch.h in order to
++ * initialize __mach_desc_MX31ADS data structure.
++ */
++MACHINE_START(MX31ADS, "Freescale MX31ADS")
++	/* Maintainer: Freescale Semiconductor, Inc. */
++	.phys_io	= MX31_AIPS1_BASE_ADDR,
++	.io_pg_offst	= ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
++	.boot_params    = PHYS_OFFSET + 0x100,
++	.map_io         = mx31ads_map_io,
++	.init_irq       = mx31ads_init_irq,
++	.init_machine   = mxc_board_init,
++	.timer          = &mx31ads_timer,
++MACHINE_END
+diff --git a/arch/arm/mach-mx3/mach-mx31lilly.c b/arch/arm/mach-mx3/mach-mx31lilly.c
+new file mode 100644
+index 0000000..ffccea9
+--- /dev/null
++++ b/arch/arm/mach-mx3/mach-mx31lilly.c
+@@ -0,0 +1,206 @@
++/*
++ *  LILLY-1131 module support
++ *
++ *    Copyright (c) 2009 Daniel Mack <daniel@caiaq.de>
++ *
++ *  based on code for other MX31 boards,
++ *
++ *    Copyright 2005-2007 Freescale Semiconductor
++ *    Copyright (c) 2009 Alberto Panizzo <maramaopercheseimorto@gmail.com>
++ *    Copyright (C) 2009 Valentin Longchamp, EPFL Mobots group
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#include <linux/types.h>
++#include <linux/init.h>
++#include <linux/clk.h>
++#include <linux/platform_device.h>
++#include <linux/interrupt.h>
++#include <linux/smsc911x.h>
++#include <linux/mtd/physmap.h>
++#include <linux/spi/spi.h>
++#include <linux/mfd/mc13783.h>
++
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/time.h>
++#include <asm/mach/map.h>
++
++#include <mach/hardware.h>
++#include <mach/common.h>
++#include <mach/iomux-mx3.h>
++#include <mach/board-mx31lilly.h>
++#include <mach/spi.h>
++
++#include "devices.h"
++
++/*
++ * This file contains module-specific initialization routines for LILLY-1131.
++ * Initialization of peripherals found on the baseboard is implemented in the
++ * appropriate baseboard support code.
++ */
++
++/* SMSC ethernet support */
++
++static struct resource smsc91x_resources[] = {
++	{
++		.start	= MX31_CS4_BASE_ADDR,
++		.end	= MX31_CS4_BASE_ADDR + 0xffff,
++		.flags	= IORESOURCE_MEM,
++	},
++	{
++		.start	= IOMUX_TO_IRQ(MX31_PIN_GPIO1_0),
++		.end	= IOMUX_TO_IRQ(MX31_PIN_GPIO1_0),
++		.flags	= IORESOURCE_IRQ | IRQF_TRIGGER_FALLING,
++	}
++};
++
++static struct smsc911x_platform_config smsc911x_config = {
++	.phy_interface	= PHY_INTERFACE_MODE_MII,
++	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
++	.irq_type	= SMSC911X_IRQ_TYPE_OPEN_DRAIN,
++	.flags		= SMSC911X_USE_32BIT |
++			  SMSC911X_SAVE_MAC_ADDRESS |
++			  SMSC911X_FORCE_INTERNAL_PHY,
++};
++
++static struct platform_device smsc91x_device = {
++	.name		= "smsc911x",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(smsc91x_resources),
++	.resource	= smsc91x_resources,
++	.dev		= {
++		.platform_data = &smsc911x_config,
++	}
++};
++
++/* NOR flash */
++static struct physmap_flash_data nor_flash_data = {
++	.width  = 2,
++};
++
++static struct resource nor_flash_resource = {
++	.start	= 0xa0000000,
++	.end	= 0xa1ffffff,
++	.flags	= IORESOURCE_MEM,
++};
++
++static struct platform_device physmap_flash_device = {
++	.name	= "physmap-flash",
++	.id	= 0,
++	.dev	= {
++		.platform_data  = &nor_flash_data,
++	},
++	.resource = &nor_flash_resource,
++	.num_resources = 1,
++};
++
++static struct platform_device *devices[] __initdata = {
++	&smsc91x_device,
++	&physmap_flash_device,
++};
++
++/* SPI */
++
++static int spi_internal_chipselect[] = {
++	MXC_SPI_CS(0),
++	MXC_SPI_CS(1),
++	MXC_SPI_CS(2),
++};
++
++static struct spi_imx_master spi0_pdata = {
++	.chipselect = spi_internal_chipselect,
++	.num_chipselect = ARRAY_SIZE(spi_internal_chipselect),
++};
++
++static struct spi_imx_master spi1_pdata = {
++	.chipselect = spi_internal_chipselect,
++	.num_chipselect = ARRAY_SIZE(spi_internal_chipselect),
++};
++
++static struct mc13783_platform_data mc13783_pdata __initdata = {
++	.flags = MC13783_USE_RTC | MC13783_USE_TOUCHSCREEN,
++};
++
++static struct spi_board_info mc13783_dev __initdata = {
++	.modalias	= "mc13783",
++	.max_speed_hz	= 1000000,
++	.bus_num	= 1,
++	.chip_select	= 0,
++	.platform_data	= &mc13783_pdata,
++};
++
++static int mx31lilly_baseboard;
++core_param(mx31lilly_baseboard, mx31lilly_baseboard, int, 0444);
++
++static void __init mx31lilly_board_init(void)
++{
++	switch (mx31lilly_baseboard) {
++	case MX31LILLY_NOBOARD:
++		break;
++	case MX31LILLY_DB:
++		mx31lilly_db_init();
++		break;
++	default:
++		printk(KERN_ERR "Illegal mx31lilly_baseboard type %d\n",
++			mx31lilly_baseboard);
++	}
++
++	mxc_iomux_alloc_pin(MX31_PIN_CS4__CS4, "Ethernet CS");
++
++	/* SPI */
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_SCLK__SCLK, "SPI1_CLK");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_MOSI__MOSI, "SPI1_TX");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_MISO__MISO, "SPI1_RX");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_SPI_RDY__SPI_RDY, "SPI1_RDY");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_SS0__SS0, "SPI1_SS0");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_SS1__SS1, "SPI1_SS1");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_SS2__SS2, "SPI1_SS2");
++
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_SCLK__SCLK, "SPI2_CLK");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_MOSI__MOSI, "SPI2_TX");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_MISO__MISO, "SPI2_RX");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_SPI_RDY__SPI_RDY, "SPI2_RDY");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_SS0__SS0, "SPI2_SS0");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_SS1__SS1, "SPI2_SS1");
++	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_SS2__SS2, "SPI2_SS2");
++
++	mxc_register_device(&mxc_spi_device0, &spi0_pdata);
++	mxc_register_device(&mxc_spi_device1, &spi1_pdata);
++	spi_register_board_info(&mc13783_dev, 1);
++
++	platform_add_devices(devices, ARRAY_SIZE(devices));
++}
++
++static void __init mx31lilly_timer_init(void)
++{
++	mx31_clocks_init(26000000);
++}
++
++static struct sys_timer mx31lilly_timer = {
++	.init	= mx31lilly_timer_init,
++};
++
++MACHINE_START(LILLY1131, "INCO startec LILLY-1131")
++	.phys_io	= MX31_AIPS1_BASE_ADDR,
++	.io_pg_offst	= ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
++	.boot_params	= PHYS_OFFSET + 0x100,
++	.map_io		= mx31_map_io,
++	.init_irq	= mx31_init_irq,
++	.init_machine	= mx31lilly_board_init,
++	.timer		= &mx31lilly_timer,
++MACHINE_END
++
+diff --git a/arch/arm/mach-mx3/mach-mx31lite.c b/arch/arm/mach-mx3/mach-mx31lite.c
+new file mode 100644
+index 0000000..db741be
+--- /dev/null
++++ b/arch/arm/mach-mx3/mach-mx31lite.c
+@@ -0,0 +1,293 @@
++/*
++ *  Copyright (C) 2000 Deep Blue Solutions Ltd
++ *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
++ *  Copyright 2005-2007 Freescale Semiconductor, Inc. All Rights Reserved.
++ *  Copyright (C) 2009 Daniel Mack <daniel@caiaq.de>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#include <linux/types.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/memory.h>
++#include <linux/platform_device.h>
++#include <linux/gpio.h>
++#include <linux/smsc911x.h>
++#include <linux/mfd/mc13783.h>
++#include <linux/spi/spi.h>
++#include <linux/usb/otg.h>
++#include <linux/usb/ulpi.h>
++#include <linux/mtd/physmap.h>
++
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/time.h>
++#include <asm/mach/map.h>
++#include <asm/page.h>
++#include <asm/setup.h>
++
++#include <mach/hardware.h>
++#include <mach/common.h>
++#include <mach/board-mx31lite.h>
++#include <mach/imx-uart.h>
++#include <mach/iomux-mx3.h>
++#include <mach/irqs.h>
++#include <mach/mxc_nand.h>
++#include <mach/spi.h>
++#include <mach/mxc_ehci.h>
++#include <mach/ulpi.h>
++
++#include "devices.h"
++
++/*
++ * This file contains the module-specific initialization routines.
++ */
++
++static unsigned int mx31lite_pins[] = {
++	/* LAN9117 IRQ pin */
++	IOMUX_MODE(MX31_PIN_SFS6, IOMUX_CONFIG_GPIO),
++	/* SPI 1 */
++	MX31_PIN_CSPI2_SCLK__SCLK,
++	MX31_PIN_CSPI2_MOSI__MOSI,
++	MX31_PIN_CSPI2_MISO__MISO,
++	MX31_PIN_CSPI2_SPI_RDY__SPI_RDY,
++	MX31_PIN_CSPI2_SS0__SS0,
++	MX31_PIN_CSPI2_SS1__SS1,
++	MX31_PIN_CSPI2_SS2__SS2,
++};
++
++static struct mxc_nand_platform_data mx31lite_nand_board_info = {
++	.width = 1,
++	.hw_ecc = 1,
++};
++
++static struct smsc911x_platform_config smsc911x_config = {
++	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
++	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
++	.flags		= SMSC911X_USE_16BIT,
++};
++
++static struct resource smsc911x_resources[] = {
++	{
++		.start		= MX31_CS4_BASE_ADDR,
++		.end		= MX31_CS4_BASE_ADDR + 0x100,
++		.flags		= IORESOURCE_MEM,
++	}, {
++		.start		= IOMUX_TO_IRQ(MX31_PIN_SFS6),
++		.end		= IOMUX_TO_IRQ(MX31_PIN_SFS6),
++		.flags		= IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device smsc911x_device = {
++	.name		= "smsc911x",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(smsc911x_resources),
++	.resource	= smsc911x_resources,
++	.dev		= {
++		.platform_data = &smsc911x_config,
++	},
++};
++
++/*
++ * SPI
++ *
++ * The MC13783 is the only hard-wired SPI device on the module.
++ */
++
++static int spi_internal_chipselect[] = {
++	MXC_SPI_CS(0),
++};
++
++static struct spi_imx_master spi1_pdata = {
++	.chipselect	= spi_internal_chipselect,
++	.num_chipselect	= ARRAY_SIZE(spi_internal_chipselect),
++};
++
++static struct mc13783_platform_data mc13783_pdata __initdata = {
++	.flags  = MC13783_USE_RTC |
++		  MC13783_USE_REGULATOR,
++};
++
++static struct spi_board_info mc13783_spi_dev __initdata = {
++	.modalias       = "mc13783",
++	.max_speed_hz   = 1000000,
++	.bus_num	= 1,
++	.chip_select    = 0,
++	.platform_data  = &mc13783_pdata,
++	.irq		= IOMUX_TO_IRQ(MX31_PIN_GPIO1_3),
++};
++
++/*
++ * USB
++ */
++
++#define USB_PAD_CFG (PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST | PAD_CTL_HYS_CMOS | \
++			PAD_CTL_ODE_CMOS | PAD_CTL_100K_PU)
++
++static int usbh2_init(struct platform_device *pdev)
++{
++	int pins[] = {
++		MX31_PIN_USBH2_DATA0__USBH2_DATA0,
++		MX31_PIN_USBH2_DATA1__USBH2_DATA1,
++		MX31_PIN_USBH2_CLK__USBH2_CLK,
++		MX31_PIN_USBH2_DIR__USBH2_DIR,
++		MX31_PIN_USBH2_NXT__USBH2_NXT,
++		MX31_PIN_USBH2_STP__USBH2_STP,
++	};
++
++	mxc_iomux_setup_multiple_pins(pins, ARRAY_SIZE(pins), "USB H2");
++
++	mxc_iomux_set_pad(MX31_PIN_USBH2_CLK, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBH2_DIR, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBH2_NXT, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBH2_STP, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA0, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA1, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_SRXD6, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_STXD6, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_SFS3, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_SCK3, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_SRXD3, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_STXD3, USB_PAD_CFG);
++
++	mxc_iomux_set_gpr(MUX_PGP_UH2, true);
++
++	/* chip select */
++	mxc_iomux_alloc_pin(IOMUX_MODE(MX31_PIN_DTR_DCE1, IOMUX_CONFIG_GPIO),
++				"USBH2_CS");
++	gpio_request(IOMUX_TO_GPIO(MX31_PIN_DTR_DCE1), "USBH2 CS");
++	gpio_direction_output(IOMUX_TO_GPIO(MX31_PIN_DTR_DCE1), 0);
++
++	return 0;
++}
++
++static struct mxc_usbh_platform_data usbh2_pdata = {
++	.init   = usbh2_init,
++	.portsc = MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
++	.flags  = MXC_EHCI_POWER_PINS_ENABLED,
++};
++
++/*
++ * NOR flash
++ */
++
++static struct physmap_flash_data nor_flash_data = {
++	.width  = 2,
++};
++
++static struct resource nor_flash_resource = {
++	.start  = 0xa0000000,
++	.end    = 0xa1ffffff,
++	.flags  = IORESOURCE_MEM,
++};
++
++static struct platform_device physmap_flash_device = {
++	.name   = "physmap-flash",
++	.id     = 0,
++	.dev    = {
++		.platform_data  = &nor_flash_data,
++	},
++	.resource = &nor_flash_resource,
++	.num_resources = 1,
++};
++
++
++
++/*
++ * This structure defines the MX31 memory map.
++ */
++static struct map_desc mx31lite_io_desc[] __initdata = {
++	{
++		.virtual = MX31_CS4_BASE_ADDR_VIRT,
++		.pfn = __phys_to_pfn(MX31_CS4_BASE_ADDR),
++		.length = MX31_CS4_SIZE,
++		.type = MT_DEVICE
++	}
++};
++
++/*
++ * Set up static virtual mappings.
++ */
++void __init mx31lite_map_io(void)
++{
++	mx31_map_io();
++	iotable_init(mx31lite_io_desc, ARRAY_SIZE(mx31lite_io_desc));
++}
++
++static int mx31lite_baseboard;
++core_param(mx31lite_baseboard, mx31lite_baseboard, int, 0444);
++
++static void __init mxc_board_init(void)
++{
++	int ret;
++
++	switch (mx31lite_baseboard) {
++	case MX31LITE_NOBOARD:
++		break;
++	case MX31LITE_DB:
++		mx31lite_db_init();
++		break;
++	default:
++		printk(KERN_ERR "Illegal mx31lite_baseboard type %d\n",
++				mx31lite_baseboard);
++	}
++
++	mxc_iomux_setup_multiple_pins(mx31lite_pins, ARRAY_SIZE(mx31lite_pins),
++				      "mx31lite");
++
++	/* NOR and NAND flash */
++	platform_device_register(&physmap_flash_device);
++	mxc_register_device(&mxc_nand_device, &mx31lite_nand_board_info);
++
++	mxc_register_device(&mxc_spi_device1, &spi1_pdata);
++	spi_register_board_info(&mc13783_spi_dev, 1);
++
++	/* USB */
++	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
++				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
++
++	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
++
++	/* SMSC9117 IRQ pin */
++	ret = gpio_request(IOMUX_TO_GPIO(MX31_PIN_SFS6), "sms9117-irq");
++	if (ret)
++		pr_warning("could not get LAN irq gpio\n");
++	else {
++		gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_SFS6));
++		platform_device_register(&smsc911x_device);
++	}
++}
++
++static void __init mx31lite_timer_init(void)
++{
++	mx31_clocks_init(26000000);
++}
++
++struct sys_timer mx31lite_timer = {
++	.init	= mx31lite_timer_init,
++};
++
++MACHINE_START(MX31LITE, "LogicPD i.MX31 SOM")
++	/* Maintainer: Freescale Semiconductor, Inc. */
++	.phys_io        = MX31_AIPS1_BASE_ADDR,
++	.io_pg_offst    = ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
++	.boot_params    = PHYS_OFFSET + 0x100,
++	.map_io         = mx31lite_map_io,
++	.init_irq       = mx31_init_irq,
++	.init_machine   = mxc_board_init,
++	.timer          = &mx31lite_timer,
++MACHINE_END
+diff --git a/arch/arm/mach-mx3/mach-mx31moboard.c b/arch/arm/mach-mx3/mach-mx31moboard.c
+new file mode 100644
+index 0000000..be7d277
+--- /dev/null
++++ b/arch/arm/mach-mx3/mach-mx31moboard.c
+@@ -0,0 +1,575 @@
++/*
++ *  Copyright (C) 2008 Valentin Longchamp, EPFL Mobots group
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#include <linux/delay.h>
++#include <linux/dma-mapping.h>
++#include <linux/fsl_devices.h>
++#include <linux/gpio.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/leds.h>
++#include <linux/memory.h>
++#include <linux/mtd/physmap.h>
++#include <linux/mtd/partitions.h>
++#include <linux/platform_device.h>
++#include <linux/regulator/machine.h>
++#include <linux/mfd/mc13783.h>
++#include <linux/spi/spi.h>
++#include <linux/types.h>
++
++#include <linux/usb/otg.h>
++#include <linux/usb/ulpi.h>
++
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/time.h>
++#include <asm/mach/map.h>
++#include <mach/board-mx31moboard.h>
++#include <mach/common.h>
++#include <mach/hardware.h>
++#include <mach/imx-uart.h>
++#include <mach/iomux-mx3.h>
++#include <mach/ipu.h>
++#include <mach/i2c.h>
++#include <mach/mmc.h>
++#include <mach/mxc_ehci.h>
++#include <mach/mx3_camera.h>
++#include <mach/spi.h>
++#include <mach/ulpi.h>
++
++#include "devices.h"
++
++static unsigned int moboard_pins[] = {
++	/* UART0 */
++	MX31_PIN_TXD1__TXD1, MX31_PIN_RXD1__RXD1,
++	MX31_PIN_CTS1__GPIO2_7,
++	/* UART4 */
++	MX31_PIN_PC_RST__CTS5, MX31_PIN_PC_VS2__RTS5,
++	MX31_PIN_PC_BVD2__TXD5, MX31_PIN_PC_BVD1__RXD5,
++	/* I2C0 */
++	MX31_PIN_I2C_DAT__I2C1_SDA, MX31_PIN_I2C_CLK__I2C1_SCL,
++	/* I2C1 */
++	MX31_PIN_DCD_DTE1__I2C2_SDA, MX31_PIN_RI_DTE1__I2C2_SCL,
++	/* SDHC1 */
++	MX31_PIN_SD1_DATA3__SD1_DATA3, MX31_PIN_SD1_DATA2__SD1_DATA2,
++	MX31_PIN_SD1_DATA1__SD1_DATA1, MX31_PIN_SD1_DATA0__SD1_DATA0,
++	MX31_PIN_SD1_CLK__SD1_CLK, MX31_PIN_SD1_CMD__SD1_CMD,
++	MX31_PIN_ATA_CS0__GPIO3_26, MX31_PIN_ATA_CS1__GPIO3_27,
++	/* USB reset */
++	MX31_PIN_GPIO1_0__GPIO1_0,
++	/* USB OTG */
++	MX31_PIN_USBOTG_DATA0__USBOTG_DATA0,
++	MX31_PIN_USBOTG_DATA1__USBOTG_DATA1,
++	MX31_PIN_USBOTG_DATA2__USBOTG_DATA2,
++	MX31_PIN_USBOTG_DATA3__USBOTG_DATA3,
++	MX31_PIN_USBOTG_DATA4__USBOTG_DATA4,
++	MX31_PIN_USBOTG_DATA5__USBOTG_DATA5,
++	MX31_PIN_USBOTG_DATA6__USBOTG_DATA6,
++	MX31_PIN_USBOTG_DATA7__USBOTG_DATA7,
++	MX31_PIN_USBOTG_CLK__USBOTG_CLK, MX31_PIN_USBOTG_DIR__USBOTG_DIR,
++	MX31_PIN_USBOTG_NXT__USBOTG_NXT, MX31_PIN_USBOTG_STP__USBOTG_STP,
++	MX31_PIN_USB_OC__GPIO1_30,
++	/* USB H2 */
++	MX31_PIN_USBH2_DATA0__USBH2_DATA0,
++	MX31_PIN_USBH2_DATA1__USBH2_DATA1,
++	MX31_PIN_STXD3__USBH2_DATA2, MX31_PIN_SRXD3__USBH2_DATA3,
++	MX31_PIN_SCK3__USBH2_DATA4, MX31_PIN_SFS3__USBH2_DATA5,
++	MX31_PIN_STXD6__USBH2_DATA6, MX31_PIN_SRXD6__USBH2_DATA7,
++	MX31_PIN_USBH2_CLK__USBH2_CLK, MX31_PIN_USBH2_DIR__USBH2_DIR,
++	MX31_PIN_USBH2_NXT__USBH2_NXT, MX31_PIN_USBH2_STP__USBH2_STP,
++	MX31_PIN_SCK6__GPIO1_25,
++	/* LEDs */
++	MX31_PIN_SVEN0__GPIO2_0, MX31_PIN_STX0__GPIO2_1,
++	MX31_PIN_SRX0__GPIO2_2, MX31_PIN_SIMPD0__GPIO2_3,
++	/* SEL */
++	MX31_PIN_DTR_DCE1__GPIO2_8, MX31_PIN_DSR_DCE1__GPIO2_9,
++	MX31_PIN_RI_DCE1__GPIO2_10, MX31_PIN_DCD_DCE1__GPIO2_11,
++	/* SPI1 */
++	MX31_PIN_CSPI2_MOSI__MOSI, MX31_PIN_CSPI2_MISO__MISO,
++	MX31_PIN_CSPI2_SCLK__SCLK, MX31_PIN_CSPI2_SPI_RDY__SPI_RDY,
++	MX31_PIN_CSPI2_SS0__SS0, MX31_PIN_CSPI2_SS2__SS2,
++	/* Atlas IRQ */
++	MX31_PIN_GPIO1_3__GPIO1_3,
++	/* SPI2 */
++	MX31_PIN_CSPI3_MOSI__MOSI, MX31_PIN_CSPI3_MISO__MISO,
++	MX31_PIN_CSPI3_SCLK__SCLK, MX31_PIN_CSPI3_SPI_RDY__SPI_RDY,
++	MX31_PIN_CSPI2_SS1__CSPI3_SS1,
++};
++
++static struct physmap_flash_data mx31moboard_flash_data = {
++	.width  	= 2,
++};
++
++static struct resource mx31moboard_flash_resource = {
++	.start	= 0xa0000000,
++	.end	= 0xa1ffffff,
++	.flags	= IORESOURCE_MEM,
++};
++
++static struct platform_device mx31moboard_flash = {
++	.name	= "physmap-flash",
++	.id	= 0,
++	.dev	= {
++		.platform_data  = &mx31moboard_flash_data,
++	},
++	.resource = &mx31moboard_flash_resource,
++	.num_resources = 1,
++};
++
++static int moboard_uart0_init(struct platform_device *pdev)
++{
++	gpio_request(IOMUX_TO_GPIO(MX31_PIN_CTS1), "uart0-cts-hack");
++	gpio_direction_output(IOMUX_TO_GPIO(MX31_PIN_CTS1), 0);
++	return 0;
++}
++
++static struct imxuart_platform_data uart0_pdata = {
++	.init = moboard_uart0_init,
++};
++
++static struct imxuart_platform_data uart4_pdata = {
++	.flags = IMXUART_HAVE_RTSCTS,
++};
++
++static struct imxi2c_platform_data moboard_i2c0_pdata = {
++	.bitrate = 400000,
++};
++
++static struct imxi2c_platform_data moboard_i2c1_pdata = {
++	.bitrate = 100000,
++};
++
++static int moboard_spi1_cs[] = {
++	MXC_SPI_CS(0),
++	MXC_SPI_CS(2),
++};
++
++static struct spi_imx_master moboard_spi1_master = {
++	.chipselect	= moboard_spi1_cs,
++	.num_chipselect	= ARRAY_SIZE(moboard_spi1_cs),
++};
++
++static struct regulator_consumer_supply sdhc_consumers[] = {
++	{
++		.dev	= &mxcsdhc_device0.dev,
++		.supply	= "sdhc0_vcc",
++	},
++	{
++		.dev	= &mxcsdhc_device1.dev,
++		.supply	= "sdhc1_vcc",
++	},
++};
++
++static struct regulator_init_data sdhc_vreg_data = {
++	.constraints = {
++		.min_uV = 2700000,
++		.max_uV = 3000000,
++		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
++			REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
++		.valid_modes_mask = REGULATOR_MODE_NORMAL |
++			REGULATOR_MODE_FAST,
++		.always_on = 0,
++		.boot_on = 1,
++	},
++	.num_consumer_supplies = ARRAY_SIZE(sdhc_consumers),
++	.consumer_supplies = sdhc_consumers,
++};
++
++static struct regulator_consumer_supply cam_consumers[] = {
++	{
++		.dev	= &mx3_camera.dev,
++		.supply	= "cam_vcc",
++	},
++};
++
++static struct regulator_init_data cam_vreg_data = {
++	.constraints = {
++		.min_uV = 2700000,
++		.max_uV = 3000000,
++		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
++			REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
++		.valid_modes_mask = REGULATOR_MODE_NORMAL |
++			REGULATOR_MODE_FAST,
++		.always_on = 0,
++		.boot_on = 1,
++	},
++	.num_consumer_supplies = ARRAY_SIZE(cam_consumers),
++	.consumer_supplies = cam_consumers,
++};
++
++static struct mc13783_regulator_init_data moboard_regulators[] = {
++	{
++		.id = MC13783_REGU_VMMC1,
++		.init_data = &sdhc_vreg_data,
++	},
++	{
++		.id = MC13783_REGU_VCAM,
++		.init_data = &cam_vreg_data,
++	},
++};
++
++static struct mc13783_platform_data moboard_pmic = {
++	.regulators = moboard_regulators,
++	.num_regulators = ARRAY_SIZE(moboard_regulators),
++	.flags = MC13783_USE_REGULATOR | MC13783_USE_RTC |
++		MC13783_USE_ADC,
++};
++
++static struct spi_board_info moboard_spi_board_info[] __initdata = {
++	{
++		.modalias = "mc13783",
++		.irq = IOMUX_TO_IRQ(MX31_PIN_GPIO1_3),
++		.max_speed_hz = 300000,
++		.bus_num = 1,
++		.chip_select = 0,
++		.platform_data = &moboard_pmic,
++		.mode = SPI_CS_HIGH,
++	},
++};
++
++static int moboard_spi2_cs[] = {
++	MXC_SPI_CS(1),
++};
++
++static struct spi_imx_master moboard_spi2_master = {
++	.chipselect	= moboard_spi2_cs,
++	.num_chipselect	= ARRAY_SIZE(moboard_spi2_cs),
++};
++
++#define SDHC1_CD IOMUX_TO_GPIO(MX31_PIN_ATA_CS0)
++#define SDHC1_WP IOMUX_TO_GPIO(MX31_PIN_ATA_CS1)
++
++static int moboard_sdhc1_get_ro(struct device *dev)
++{
++	return !gpio_get_value(SDHC1_WP);
++}
++
++static int moboard_sdhc1_init(struct device *dev, irq_handler_t detect_irq,
++		void *data)
++{
++	int ret;
++
++	ret = gpio_request(SDHC1_CD, "sdhc-detect");
++	if (ret)
++		return ret;
++
++	gpio_direction_input(SDHC1_CD);
++
++	ret = gpio_request(SDHC1_WP, "sdhc-wp");
++	if (ret)
++		goto err_gpio_free;
++	gpio_direction_input(SDHC1_WP);
++
++	ret = request_irq(gpio_to_irq(SDHC1_CD), detect_irq,
++		IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
++		"sdhc1-card-detect", data);
++	if (ret)
++		goto err_gpio_free_2;
++
++	return 0;
++
++err_gpio_free_2:
++	gpio_free(SDHC1_WP);
++err_gpio_free:
++	gpio_free(SDHC1_CD);
++
++	return ret;
++}
++
++static void moboard_sdhc1_exit(struct device *dev, void *data)
++{
++	free_irq(gpio_to_irq(SDHC1_CD), data);
++	gpio_free(SDHC1_WP);
++	gpio_free(SDHC1_CD);
++}
++
++static struct imxmmc_platform_data sdhc1_pdata = {
++	.get_ro	= moboard_sdhc1_get_ro,
++	.init	= moboard_sdhc1_init,
++	.exit	= moboard_sdhc1_exit,
++};
++
++/*
++ * this pin is dedicated for all mx31moboard systems, so we do it here
++ */
++#define USB_RESET_B	IOMUX_TO_GPIO(MX31_PIN_GPIO1_0)
++
++static void usb_xcvr_reset(void)
++{
++	gpio_request(USB_RESET_B, "usb-reset");
++	gpio_direction_output(USB_RESET_B, 0);
++	mdelay(1);
++	gpio_set_value(USB_RESET_B, 1);
++}
++
++#define USB_PAD_CFG (PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST | PAD_CTL_HYS_CMOS | \
++			PAD_CTL_ODE_CMOS | PAD_CTL_100K_PU)
++
++#define OTG_EN_B IOMUX_TO_GPIO(MX31_PIN_USB_OC)
++
++static void moboard_usbotg_init(void)
++{
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA0, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA1, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA2, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA3, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA4, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA5, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA6, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA7, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_CLK, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DIR, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_NXT, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_STP, USB_PAD_CFG);
++
++	gpio_request(OTG_EN_B, "usb-udc-en");
++	gpio_direction_output(OTG_EN_B, 0);
++}
++
++static struct fsl_usb2_platform_data usb_pdata = {
++	.operating_mode	= FSL_USB2_DR_DEVICE,
++	.phy_mode	= FSL_USB2_PHY_ULPI,
++};
++
++#define USBH2_EN_B IOMUX_TO_GPIO(MX31_PIN_SCK6)
++
++static int moboard_usbh2_hw_init(struct platform_device *pdev)
++{
++	int ret = gpio_request(USBH2_EN_B, "usbh2-en");
++	if (ret)
++		return ret;
++
++	mxc_iomux_set_gpr(MUX_PGP_UH2, true);
++
++	mxc_iomux_set_pad(MX31_PIN_USBH2_CLK, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBH2_DIR, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBH2_NXT, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBH2_STP, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA0, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA1, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_SRXD6, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_STXD6, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_SFS3, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_SCK3, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_SRXD3, USB_PAD_CFG);
++	mxc_iomux_set_pad(MX31_PIN_STXD3, USB_PAD_CFG);
++
++	gpio_direction_output(USBH2_EN_B, 0);
++
++	return 0;
++}
++
++static int moboard_usbh2_hw_exit(struct platform_device *pdev)
++{
++	gpio_free(USBH2_EN_B);
++	return 0;
++}
++
++static struct mxc_usbh_platform_data usbh2_pdata = {
++	.init	= moboard_usbh2_hw_init,
++	.exit	= moboard_usbh2_hw_exit,
++	.portsc	= MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
++	.flags	= MXC_EHCI_POWER_PINS_ENABLED,
++};
++
++static int __init moboard_usbh2_init(void)
++{
++	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
++			USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
++
++	return mxc_register_device(&mx31_usbh2, &usbh2_pdata);
++}
++
++
++static struct gpio_led mx31moboard_leds[] = {
++	{
++		.name 	= "coreboard-led-0:red:running",
++		.default_trigger = "heartbeat",
++		.gpio 	= IOMUX_TO_GPIO(MX31_PIN_SVEN0),
++	}, {
++		.name	= "coreboard-led-1:red",
++		.gpio	= IOMUX_TO_GPIO(MX31_PIN_STX0),
++	}, {
++		.name	= "coreboard-led-2:red",
++		.gpio	= IOMUX_TO_GPIO(MX31_PIN_SRX0),
++	}, {
++		.name	= "coreboard-led-3:red",
++		.gpio	= IOMUX_TO_GPIO(MX31_PIN_SIMPD0),
++	},
++};
++
++static struct gpio_led_platform_data mx31moboard_led_pdata = {
++	.num_leds 	= ARRAY_SIZE(mx31moboard_leds),
++	.leds		= mx31moboard_leds,
++};
++
++static struct platform_device mx31moboard_leds_device = {
++	.name	= "leds-gpio",
++	.id	= -1,
++	.dev	= {
++		.platform_data = &mx31moboard_led_pdata,
++	},
++};
++
++#define SEL0 IOMUX_TO_GPIO(MX31_PIN_DTR_DCE1)
++#define SEL1 IOMUX_TO_GPIO(MX31_PIN_DSR_DCE1)
++#define SEL2 IOMUX_TO_GPIO(MX31_PIN_RI_DCE1)
++#define SEL3 IOMUX_TO_GPIO(MX31_PIN_DCD_DCE1)
++
++static void mx31moboard_init_sel_gpios(void)
++{
++	if (!gpio_request(SEL0, "sel0")) {
++		gpio_direction_input(SEL0);
++		gpio_export(SEL0, true);
++	}
++
++	if (!gpio_request(SEL1, "sel1")) {
++		gpio_direction_input(SEL1);
++		gpio_export(SEL1, true);
++	}
++
++	if (!gpio_request(SEL2, "sel2")) {
++		gpio_direction_input(SEL2);
++		gpio_export(SEL2, true);
++	}
++
++	if (!gpio_request(SEL3, "sel3")) {
++		gpio_direction_input(SEL3);
++		gpio_export(SEL3, true);
++	}
++}
++
++static struct ipu_platform_data mx3_ipu_data = {
++	.irq_base = MXC_IPU_IRQ_START,
++};
++
++static struct platform_device *devices[] __initdata = {
++	&mx31moboard_flash,
++	&mx31moboard_leds_device,
++};
++
++static struct mx3_camera_pdata camera_pdata = {
++	.dma_dev	= &mx3_ipu.dev,
++	.flags		= MX3_CAMERA_DATAWIDTH_8 | MX3_CAMERA_DATAWIDTH_10,
++	.mclk_10khz	= 4800,
++};
++
++#define CAMERA_BUF_SIZE	(4*1024*1024)
++
++static int __init mx31moboard_cam_alloc_dma(const size_t buf_size)
++{
++	dma_addr_t dma_handle;
++	void *buf;
++	int dma;
++
++	if (buf_size < 2 * 1024 * 1024)
++		return -EINVAL;
++
++	buf = dma_alloc_coherent(NULL, buf_size, &dma_handle, GFP_KERNEL);
++	if (!buf) {
++		pr_err("%s: cannot allocate camera buffer-memory\n", __func__);
++		return -ENOMEM;
++	}
++
++	memset(buf, 0, buf_size);
++
++	dma = dma_declare_coherent_memory(&mx3_camera.dev,
++					dma_handle, dma_handle, buf_size,
++					DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
++
++	/* The way we call dma_declare_coherent_memory only a malloc can fail */
++	return dma & DMA_MEMORY_MAP ? 0 : -ENOMEM;
++}
++
++static int mx31moboard_baseboard;
++core_param(mx31moboard_baseboard, mx31moboard_baseboard, int, 0444);
++
++/*
++ * Board specific initialization.
++ */
++static void __init mxc_board_init(void)
++{
++	mxc_iomux_setup_multiple_pins(moboard_pins, ARRAY_SIZE(moboard_pins),
++		"moboard");
++
++	platform_add_devices(devices, ARRAY_SIZE(devices));
++
++	mxc_register_device(&mxc_uart_device0, &uart0_pdata);
++
++	mxc_register_device(&mxc_uart_device4, &uart4_pdata);
++
++	mx31moboard_init_sel_gpios();
++
++	mxc_register_device(&mxc_i2c_device0, &moboard_i2c0_pdata);
++	mxc_register_device(&mxc_i2c_device1, &moboard_i2c1_pdata);
++
++	mxc_register_device(&mxc_spi_device1, &moboard_spi1_master);
++	mxc_register_device(&mxc_spi_device2, &moboard_spi2_master);
++
++	gpio_request(IOMUX_TO_GPIO(MX31_PIN_GPIO1_3), "pmic-irq");
++	gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_GPIO1_3));
++	spi_register_board_info(moboard_spi_board_info,
++		ARRAY_SIZE(moboard_spi_board_info));
++
++	mxc_register_device(&mxcsdhc_device0, &sdhc1_pdata);
++
++	mxc_register_device(&mx3_ipu, &mx3_ipu_data);
++	if (!mx31moboard_cam_alloc_dma(CAMERA_BUF_SIZE))
++		mxc_register_device(&mx3_camera, &camera_pdata);
++
++	usb_xcvr_reset();
++
++	moboard_usbotg_init();
++	mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
++	moboard_usbh2_init();
++
++	switch (mx31moboard_baseboard) {
++	case MX31NOBOARD:
++		break;
++	case MX31DEVBOARD:
++		mx31moboard_devboard_init();
++		break;
++	case MX31MARXBOT:
++		mx31moboard_marxbot_init();
++		break;
++	default:
++		printk(KERN_ERR "Illegal mx31moboard_baseboard type %d\n",
++			mx31moboard_baseboard);
++	}
++}
++
++static void __init mx31moboard_timer_init(void)
++{
++	mx31_clocks_init(26000000);
++}
++
++struct sys_timer mx31moboard_timer = {
++	.init	= mx31moboard_timer_init,
++};
++
++MACHINE_START(MX31MOBOARD, "EPFL Mobots mx31moboard")
++	/* Maintainer: Valentin Longchamp, EPFL Mobots group */
++	.phys_io	= MX31_AIPS1_BASE_ADDR,
++	.io_pg_offst	= ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
++	.boot_params    = PHYS_OFFSET + 0x100,
++	.map_io         = mx31_map_io,
++	.init_irq       = mx31_init_irq,
++	.init_machine   = mxc_board_init,
++	.timer          = &mx31moboard_timer,
++MACHINE_END
++
+diff --git a/arch/arm/mach-mx3/mach-mx35pdk.c b/arch/arm/mach-mx3/mach-mx35pdk.c
+new file mode 100644
+index 0000000..2d11bf0
+--- /dev/null
++++ b/arch/arm/mach-mx3/mach-mx35pdk.c
+@@ -0,0 +1,116 @@
 +/*
 + * Copyright 2009 Freescale Semiconductor, Inc. All Rights Reserved.
 + *
@@ -992,91 +3444,110 @@ index 0000000..595fea4
 + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 + */
 +
++#include <linux/types.h>
++#include <linux/init.h>
 +#include <linux/platform_device.h>
++#include <linux/memory.h>
 +#include <linux/gpio.h>
++#include <linux/fsl_devices.h>
++
 +#include <asm/mach-types.h>
 +#include <asm/mach/arch.h>
 +#include <asm/mach/time.h>
++#include <asm/mach/map.h>
++
 +#include <mach/hardware.h>
 +#include <mach/common.h>
 +#include <mach/imx-uart.h>
-+#include <mach/iomux.h>
-+#include <mach/board-mx27pdk.h>
++#include <mach/iomux-mx35.h>
 +
 +#include "devices.h"
-+
-+static unsigned int mx27pdk_pins[] = {
-+	/* UART1 */
-+	PE12_PF_UART1_TXD,
-+	PE13_PF_UART1_RXD,
-+	PE14_PF_UART1_CTS,
-+	PE15_PF_UART1_RTS,
-+	/* FEC */
-+	PD0_AIN_FEC_TXD0,
-+	PD1_AIN_FEC_TXD1,
-+	PD2_AIN_FEC_TXD2,
-+	PD3_AIN_FEC_TXD3,
-+	PD4_AOUT_FEC_RX_ER,
-+	PD5_AOUT_FEC_RXD1,
-+	PD6_AOUT_FEC_RXD2,
-+	PD7_AOUT_FEC_RXD3,
-+	PD8_AF_FEC_MDIO,
-+	PD9_AIN_FEC_MDC,
-+	PD10_AOUT_FEC_CRS,
-+	PD11_AOUT_FEC_TX_CLK,
-+	PD12_AOUT_FEC_RXD0,
-+	PD13_AOUT_FEC_RX_DV,
-+	PD14_AOUT_FEC_RX_CLK,
-+	PD15_AOUT_FEC_COL,
-+	PD16_AIN_FEC_TX_ER,
-+	PF23_AIN_FEC_TX_EN,
-+};
 +
 +static struct imxuart_platform_data uart_pdata = {
 +	.flags = IMXUART_HAVE_RTSCTS,
 +};
 +
-+static struct platform_device *platform_devices[] __initdata = {
++static struct platform_device *devices[] __initdata = {
 +	&mxc_fec_device,
 +};
 +
-+static void __init mx27pdk_init(void)
++static struct pad_desc mx35pdk_pads[] = {
++	/* UART1 */
++	MX35_PAD_CTS1__UART1_CTS,
++	MX35_PAD_RTS1__UART1_RTS,
++	MX35_PAD_TXD1__UART1_TXD_MUX,
++	MX35_PAD_RXD1__UART1_RXD_MUX,
++	/* FEC */
++	MX35_PAD_FEC_TX_CLK__FEC_TX_CLK,
++	MX35_PAD_FEC_RX_CLK__FEC_RX_CLK,
++	MX35_PAD_FEC_RX_DV__FEC_RX_DV,
++	MX35_PAD_FEC_COL__FEC_COL,
++	MX35_PAD_FEC_RDATA0__FEC_RDATA_0,
++	MX35_PAD_FEC_TDATA0__FEC_TDATA_0,
++	MX35_PAD_FEC_TX_EN__FEC_TX_EN,
++	MX35_PAD_FEC_MDC__FEC_MDC,
++	MX35_PAD_FEC_MDIO__FEC_MDIO,
++	MX35_PAD_FEC_TX_ERR__FEC_TX_ERR,
++	MX35_PAD_FEC_RX_ERR__FEC_RX_ERR,
++	MX35_PAD_FEC_CRS__FEC_CRS,
++	MX35_PAD_FEC_RDATA1__FEC_RDATA_1,
++	MX35_PAD_FEC_TDATA1__FEC_TDATA_1,
++	MX35_PAD_FEC_RDATA2__FEC_RDATA_2,
++	MX35_PAD_FEC_TDATA2__FEC_TDATA_2,
++	MX35_PAD_FEC_RDATA3__FEC_RDATA_3,
++	MX35_PAD_FEC_TDATA3__FEC_TDATA_3,
++	/* USBOTG */
++	MX35_PAD_USBOTG_PWR__USB_TOP_USBOTG_PWR,
++	MX35_PAD_USBOTG_OC__USB_TOP_USBOTG_OC,
++};
++
++/* OTG config */
++static struct fsl_usb2_platform_data usb_pdata = {
++	.operating_mode	= FSL_USB2_DR_DEVICE,
++	.phy_mode	= FSL_USB2_PHY_UTMI_WIDE,
++};
++
++/*
++ * Board specific initialization.
++ */
++static void __init mxc_board_init(void)
 +{
-+	mxc_gpio_setup_multiple_pins(mx27pdk_pins, ARRAY_SIZE(mx27pdk_pins),
-+		"mx27pdk");
++	mxc_iomux_v3_setup_multiple_pads(mx35pdk_pads, ARRAY_SIZE(mx35pdk_pads));
++
++	platform_add_devices(devices, ARRAY_SIZE(devices));
++
 +	mxc_register_device(&mxc_uart_device0, &uart_pdata);
-+	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
++
++	mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
 +}
 +
-+static void __init mx27pdk_timer_init(void)
++static void __init mx35pdk_timer_init(void)
 +{
-+	mx27_clocks_init(26000000);
++	mx35_clocks_init();
 +}
 +
-+static struct sys_timer mx27pdk_timer = {
-+	.init	= mx27pdk_timer_init,
++struct sys_timer mx35pdk_timer = {
++	.init	= mx35pdk_timer_init,
 +};
 +
-+MACHINE_START(MX27_3DS, "Freescale MX27PDK")
-+	/* maintainer: Freescale Semiconductor, Inc. */
-+	.phys_io        = MX27_AIPI_BASE_ADDR,
-+	.io_pg_offst    = ((MX27_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
++MACHINE_START(MX35_3DS, "Freescale MX35PDK")
++	/* Maintainer: Freescale Semiconductor, Inc */
++	.phys_io	= MX35_AIPS1_BASE_ADDR,
++	.io_pg_offst	= ((MX35_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
 +	.boot_params    = PHYS_OFFSET + 0x100,
-+	.map_io         = mx27_map_io,
-+	.init_irq       = mx27_init_irq,
-+	.init_machine   = mx27pdk_init,
-+	.timer          = &mx27pdk_timer,
++	.map_io         = mx35_map_io,
++	.init_irq       = mx35_init_irq,
++	.init_machine   = mxc_board_init,
++	.timer          = &mx35pdk_timer,
 +MACHINE_END
-diff --git a/arch/arm/mach-mx2/mach-mx27ads.c b/arch/arm/mach-mx2/mach-mx27ads.c
+diff --git a/arch/arm/mach-mx3/mach-pcm037.c b/arch/arm/mach-mx3/mach-pcm037.c
 new file mode 100644
-index 0000000..385fc1c
+index 0000000..24183aa
 --- /dev/null
-+++ b/arch/arm/mach-mx2/mach-mx27ads.c
-@@ -0,0 +1,345 @@
++++ b/arch/arm/mach-mx3/mach-pcm037.c
+@@ -0,0 +1,628 @@
 +/*
-+ *  Copyright (C) 2000 Deep Blue Solutions Ltd
-+ *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
-+ *  Copyright 2006-2007 Freescale Semiconductor, Inc. All Rights Reserved.
++ *  Copyright (C) 2008 Sascha Hauer, Pengutronix
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -1093,1028 +3564,277 @@ index 0000000..385fc1c
 + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 + */
 +
++#include <linux/types.h>
++#include <linux/init.h>
++#include <linux/dma-mapping.h>
 +#include <linux/platform_device.h>
-+#include <linux/mtd/mtd.h>
-+#include <linux/mtd/map.h>
-+#include <linux/mtd/partitions.h>
 +#include <linux/mtd/physmap.h>
-+#include <linux/i2c.h>
-+#include <linux/irq.h>
-+#include <mach/common.h>
-+#include <mach/hardware.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/time.h>
-+#include <asm/mach/map.h>
-+#include <mach/gpio.h>
-+#include <mach/imx-uart.h>
-+#include <mach/iomux.h>
-+#include <mach/board-mx27ads.h>
-+#include <mach/mxc_nand.h>
-+#include <mach/i2c.h>
-+#include <mach/imxfb.h>
-+#include <mach/mmc.h>
-+
-+#include "devices.h"
-+
-+static unsigned int mx27ads_pins[] = {
-+	/* UART0 */
-+	PE12_PF_UART1_TXD,
-+	PE13_PF_UART1_RXD,
-+	PE14_PF_UART1_CTS,
-+	PE15_PF_UART1_RTS,
-+	/* UART1 */
-+	PE3_PF_UART2_CTS,
-+	PE4_PF_UART2_RTS,
-+	PE6_PF_UART2_TXD,
-+	PE7_PF_UART2_RXD,
-+	/* UART2 */
-+	PE8_PF_UART3_TXD,
-+	PE9_PF_UART3_RXD,
-+	PE10_PF_UART3_CTS,
-+	PE11_PF_UART3_RTS,
-+	/* UART3 */
-+	PB26_AF_UART4_RTS,
-+	PB28_AF_UART4_TXD,
-+	PB29_AF_UART4_CTS,
-+	PB31_AF_UART4_RXD,
-+	/* UART4 */
-+	PB18_AF_UART5_TXD,
-+	PB19_AF_UART5_RXD,
-+	PB20_AF_UART5_CTS,
-+	PB21_AF_UART5_RTS,
-+	/* UART5 */
-+	PB10_AF_UART6_TXD,
-+	PB12_AF_UART6_CTS,
-+	PB11_AF_UART6_RXD,
-+	PB13_AF_UART6_RTS,
-+	/* FEC */
-+	PD0_AIN_FEC_TXD0,
-+	PD1_AIN_FEC_TXD1,
-+	PD2_AIN_FEC_TXD2,
-+	PD3_AIN_FEC_TXD3,
-+	PD4_AOUT_FEC_RX_ER,
-+	PD5_AOUT_FEC_RXD1,
-+	PD6_AOUT_FEC_RXD2,
-+	PD7_AOUT_FEC_RXD3,
-+	PD8_AF_FEC_MDIO,
-+	PD9_AIN_FEC_MDC,
-+	PD10_AOUT_FEC_CRS,
-+	PD11_AOUT_FEC_TX_CLK,
-+	PD12_AOUT_FEC_RXD0,
-+	PD13_AOUT_FEC_RX_DV,
-+	PD14_AOUT_FEC_RX_CLK,
-+	PD15_AOUT_FEC_COL,
-+	PD16_AIN_FEC_TX_ER,
-+	PF23_AIN_FEC_TX_EN,
-+	/* I2C2 */
-+	PC5_PF_I2C2_SDA,
-+	PC6_PF_I2C2_SCL,
-+	/* FB */
-+	PA5_PF_LSCLK,
-+	PA6_PF_LD0,
-+	PA7_PF_LD1,
-+	PA8_PF_LD2,
-+	PA9_PF_LD3,
-+	PA10_PF_LD4,
-+	PA11_PF_LD5,
-+	PA12_PF_LD6,
-+	PA13_PF_LD7,
-+	PA14_PF_LD8,
-+	PA15_PF_LD9,
-+	PA16_PF_LD10,
-+	PA17_PF_LD11,
-+	PA18_PF_LD12,
-+	PA19_PF_LD13,
-+	PA20_PF_LD14,
-+	PA21_PF_LD15,
-+	PA22_PF_LD16,
-+	PA23_PF_LD17,
-+	PA24_PF_REV,
-+	PA25_PF_CLS,
-+	PA26_PF_PS,
-+	PA27_PF_SPL_SPR,
-+	PA28_PF_HSYNC,
-+	PA29_PF_VSYNC,
-+	PA30_PF_CONTRAST,
-+	PA31_PF_OE_ACD,
-+	/* OWIRE */
-+	PE16_AF_OWIRE,
-+	/* SDHC1*/
-+	PE18_PF_SD1_D0,
-+	PE19_PF_SD1_D1,
-+	PE20_PF_SD1_D2,
-+	PE21_PF_SD1_D3,
-+	PE22_PF_SD1_CMD,
-+	PE23_PF_SD1_CLK,
-+	/* SDHC2*/
-+	PB4_PF_SD2_D0,
-+	PB5_PF_SD2_D1,
-+	PB6_PF_SD2_D2,
-+	PB7_PF_SD2_D3,
-+	PB8_PF_SD2_CMD,
-+	PB9_PF_SD2_CLK,
-+};
-+
-+static struct mxc_nand_platform_data mx27ads_nand_board_info = {
-+	.width = 1,
-+	.hw_ecc = 1,
-+};
-+
-+/* ADS's NOR flash */
-+static struct physmap_flash_data mx27ads_flash_data = {
-+	.width = 2,
-+};
-+
-+static struct resource mx27ads_flash_resource = {
-+	.start = 0xc0000000,
-+	.end = 0xc0000000 + 0x02000000 - 1,
-+	.flags = IORESOURCE_MEM,
-+
-+};
-+
-+static struct platform_device mx27ads_nor_mtd_device = {
-+	.name = "physmap-flash",
-+	.id = 0,
-+	.dev = {
-+		.platform_data = &mx27ads_flash_data,
-+	},
-+	.num_resources = 1,
-+	.resource = &mx27ads_flash_resource,
-+};
-+
-+static struct imxi2c_platform_data mx27ads_i2c_data = {
-+	.bitrate = 100000,
-+};
-+
-+static struct i2c_board_info mx27ads_i2c_devices[] = {
-+};
-+
-+void lcd_power(int on)
-+{
-+	if (on)
-+		__raw_writew(PBC_BCTRL1_LCDON, PBC_BCTRL1_SET_REG);
-+	else
-+		__raw_writew(PBC_BCTRL1_LCDON, PBC_BCTRL1_CLEAR_REG);
-+}
-+
-+static struct imx_fb_videomode mx27ads_modes[] = {
-+	{
-+		.mode = {
-+			.name		= "Sharp-LQ035Q7",
-+			.refresh	= 60,
-+			.xres		= 240,
-+			.yres		= 320,
-+			.pixclock	= 188679, /* in ps (5.3MHz) */
-+			.hsync_len	= 1,
-+			.left_margin	= 9,
-+			.right_margin	= 16,
-+			.vsync_len	= 1,
-+			.upper_margin	= 7,
-+			.lower_margin	= 9,
-+		},
-+		.bpp		= 16,
-+		.pcr		= 0xFB008BC0,
-+	},
-+};
-+
-+static struct imx_fb_platform_data mx27ads_fb_data = {
-+	.mode = mx27ads_modes,
-+	.num_modes = ARRAY_SIZE(mx27ads_modes),
-+
-+	/*
-+	 * - HSYNC active high
-+	 * - VSYNC active high
-+	 * - clk notenabled while idle
-+	 * - clock inverted
-+	 * - data not inverted
-+	 * - data enable low active
-+	 * - enable sharp mode
-+	 */
-+	.pwmr		= 0x00A903FF,
-+	.lscr1		= 0x00120300,
-+	.dmacr		= 0x00020010,
-+
-+	.lcd_power	= lcd_power,
-+};
-+
-+static int mx27ads_sdhc1_init(struct device *dev, irq_handler_t detect_irq,
-+			      void *data)
-+{
-+	return request_irq(IRQ_GPIOE(21), detect_irq, IRQF_TRIGGER_RISING,
-+			   "sdhc1-card-detect", data);
-+}
-+
-+static int mx27ads_sdhc2_init(struct device *dev, irq_handler_t detect_irq,
-+			      void *data)
-+{
-+	return request_irq(IRQ_GPIOB(7), detect_irq, IRQF_TRIGGER_RISING,
-+			   "sdhc2-card-detect", data);
-+}
-+
-+static void mx27ads_sdhc1_exit(struct device *dev, void *data)
-+{
-+	free_irq(IRQ_GPIOE(21), data);
-+}
-+
-+static void mx27ads_sdhc2_exit(struct device *dev, void *data)
-+{
-+	free_irq(IRQ_GPIOB(7), data);
-+}
-+
-+static struct imxmmc_platform_data sdhc1_pdata = {
-+	.init = mx27ads_sdhc1_init,
-+	.exit = mx27ads_sdhc1_exit,
-+};
-+
-+static struct imxmmc_platform_data sdhc2_pdata = {
-+	.init = mx27ads_sdhc2_init,
-+	.exit = mx27ads_sdhc2_exit,
-+};
-+
-+static struct platform_device *platform_devices[] __initdata = {
-+	&mx27ads_nor_mtd_device,
-+	&mxc_fec_device,
-+	&mxc_w1_master_device,
-+};
-+
-+static struct imxuart_platform_data uart_pdata[] = {
-+	{
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	}, {
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	}, {
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	}, {
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	}, {
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	}, {
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	},
-+};
-+
-+static void __init mx27ads_board_init(void)
-+{
-+	mxc_gpio_setup_multiple_pins(mx27ads_pins, ARRAY_SIZE(mx27ads_pins),
-+			"mx27ads");
-+
-+	mxc_register_device(&mxc_uart_device0, &uart_pdata[0]);
-+	mxc_register_device(&mxc_uart_device1, &uart_pdata[1]);
-+	mxc_register_device(&mxc_uart_device2, &uart_pdata[2]);
-+	mxc_register_device(&mxc_uart_device3, &uart_pdata[3]);
-+	mxc_register_device(&mxc_uart_device4, &uart_pdata[4]);
-+	mxc_register_device(&mxc_uart_device5, &uart_pdata[5]);
-+	mxc_register_device(&mxc_nand_device, &mx27ads_nand_board_info);
-+
-+	/* only the i2c master 1 is used on this CPU card */
-+	i2c_register_board_info(1, mx27ads_i2c_devices,
-+				ARRAY_SIZE(mx27ads_i2c_devices));
-+	mxc_register_device(&mxc_i2c_device1, &mx27ads_i2c_data);
-+	mxc_register_device(&mxc_fb_device, &mx27ads_fb_data);
-+	mxc_register_device(&mxc_sdhc_device0, &sdhc1_pdata);
-+	mxc_register_device(&mxc_sdhc_device1, &sdhc2_pdata);
-+
-+	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
-+}
-+
-+static void __init mx27ads_timer_init(void)
-+{
-+	unsigned long fref = 26000000;
-+
-+	if ((__raw_readw(PBC_VERSION_REG) & CKIH_27MHZ_BIT_SET) == 0)
-+		fref = 27000000;
-+
-+	mx27_clocks_init(fref);
-+}
-+
-+static struct sys_timer mx27ads_timer = {
-+	.init	= mx27ads_timer_init,
-+};
-+
-+static struct map_desc mx27ads_io_desc[] __initdata = {
-+	{
-+		.virtual = PBC_BASE_ADDRESS,
-+		.pfn = __phys_to_pfn(MX27_CS4_BASE_ADDR),
-+		.length = SZ_1M,
-+		.type = MT_DEVICE,
-+	},
-+};
-+
-+static void __init mx27ads_map_io(void)
-+{
-+	mx27_map_io();
-+	iotable_init(mx27ads_io_desc, ARRAY_SIZE(mx27ads_io_desc));
-+}
-+
-+MACHINE_START(MX27ADS, "Freescale i.MX27ADS")
-+	/* maintainer: Freescale Semiconductor, Inc. */
-+	.phys_io        = MX27_AIPI_BASE_ADDR,
-+	.io_pg_offst    = ((MX27_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
-+	.boot_params    = PHYS_OFFSET + 0x100,
-+	.map_io         = mx27ads_map_io,
-+	.init_irq       = mx27_init_irq,
-+	.init_machine   = mx27ads_board_init,
-+	.timer          = &mx27ads_timer,
-+MACHINE_END
-+
-diff --git a/arch/arm/mach-mx2/mach-mxt_td60.c b/arch/arm/mach-mx2/mach-mxt_td60.c
-new file mode 100644
-index 0000000..3a32b3e
---- /dev/null
-+++ b/arch/arm/mach-mx2/mach-mxt_td60.c
-@@ -0,0 +1,319 @@
-+/*
-+ *  Copyright (C) 2000 Deep Blue Solutions Ltd
-+ *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
-+ *  Copyright 2006-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+
-+#include <linux/platform_device.h>
-+#include <linux/mtd/mtd.h>
-+#include <linux/mtd/map.h>
-+#include <linux/mtd/partitions.h>
-+#include <linux/mtd/physmap.h>
-+#include <linux/i2c.h>
-+#include <linux/irq.h>
-+#include <mach/common.h>
-+#include <mach/hardware.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/time.h>
-+#include <asm/mach/map.h>
++#include <linux/mtd/plat-ram.h>
++#include <linux/memory.h>
 +#include <linux/gpio.h>
-+#include <mach/imx-uart.h>
-+#include <mach/iomux.h>
-+#include <mach/mxc_nand.h>
++#include <linux/smsc911x.h>
++#include <linux/interrupt.h>
++#include <linux/i2c.h>
++#include <linux/i2c/at24.h>
++#include <linux/delay.h>
++#include <linux/spi/spi.h>
++#include <linux/irq.h>
++#include <linux/fsl_devices.h>
++#include <linux/can/platform/sja1000.h>
++
++#include <media/soc_camera.h>
++
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/time.h>
++#include <asm/mach/map.h>
++#include <mach/board-pcm037.h>
++#include <mach/common.h>
++#include <mach/hardware.h>
 +#include <mach/i2c.h>
-+#include <linux/i2c/pca953x.h>
-+#include <mach/imxfb.h>
++#include <mach/imx-uart.h>
++#include <mach/iomux-mx3.h>
++#include <mach/ipu.h>
 +#include <mach/mmc.h>
++#include <mach/mx3_camera.h>
++#include <mach/mx3fb.h>
++#include <mach/mxc_nand.h>
 +
 +#include "devices.h"
++#include "pcm037.h"
 +
-+static unsigned int mxt_td60_pins[] __initdata = {
-+	/* UART0 */
-+	PE12_PF_UART1_TXD,
-+	PE13_PF_UART1_RXD,
-+	PE14_PF_UART1_CTS,
-+	PE15_PF_UART1_RTS,
-+	/* UART1 */
-+	PE3_PF_UART2_CTS,
-+	PE4_PF_UART2_RTS,
-+	PE6_PF_UART2_TXD,
-+	PE7_PF_UART2_RXD,
-+	/* UART2 */
-+	PE8_PF_UART3_TXD,
-+	PE9_PF_UART3_RXD,
-+	PE10_PF_UART3_CTS,
-+	PE11_PF_UART3_RTS,
-+	/* UART3 */
-+	PB26_AF_UART4_RTS,
-+	PB28_AF_UART4_TXD,
-+	PB29_AF_UART4_CTS,
-+	PB31_AF_UART4_RXD,
-+	/* UART4 */
-+	PB18_AF_UART5_TXD,
-+	PB19_AF_UART5_RXD,
-+	PB20_AF_UART5_CTS,
-+	PB21_AF_UART5_RTS,
-+	/* UART5 */
-+	PB10_AF_UART6_TXD,
-+	PB12_AF_UART6_CTS,
-+	PB11_AF_UART6_RXD,
-+	PB13_AF_UART6_RTS,
-+	/* FEC */
-+	PD0_AIN_FEC_TXD0,
-+	PD1_AIN_FEC_TXD1,
-+	PD2_AIN_FEC_TXD2,
-+	PD3_AIN_FEC_TXD3,
-+	PD4_AOUT_FEC_RX_ER,
-+	PD5_AOUT_FEC_RXD1,
-+	PD6_AOUT_FEC_RXD2,
-+	PD7_AOUT_FEC_RXD3,
-+	PD8_AF_FEC_MDIO,
-+	PD9_AIN_FEC_MDC,
-+	PD10_AOUT_FEC_CRS,
-+	PD11_AOUT_FEC_TX_CLK,
-+	PD12_AOUT_FEC_RXD0,
-+	PD13_AOUT_FEC_RX_DV,
-+	PD14_AOUT_FEC_RX_CLK,
-+	PD15_AOUT_FEC_COL,
-+	PD16_AIN_FEC_TX_ER,
-+	PF23_AIN_FEC_TX_EN,
-+	/* I2C1 */
-+	PD17_PF_I2C_DATA,
-+	PD18_PF_I2C_CLK,
-+	/* I2C2 */
-+	PC5_PF_I2C2_SDA,
-+	PC6_PF_I2C2_SCL,
-+	/* FB */
-+	PA5_PF_LSCLK,
-+	PA6_PF_LD0,
-+	PA7_PF_LD1,
-+	PA8_PF_LD2,
-+	PA9_PF_LD3,
-+	PA10_PF_LD4,
-+	PA11_PF_LD5,
-+	PA12_PF_LD6,
-+	PA13_PF_LD7,
-+	PA14_PF_LD8,
-+	PA15_PF_LD9,
-+	PA16_PF_LD10,
-+	PA17_PF_LD11,
-+	PA18_PF_LD12,
-+	PA19_PF_LD13,
-+	PA20_PF_LD14,
-+	PA21_PF_LD15,
-+	PA22_PF_LD16,
-+	PA23_PF_LD17,
-+	PA25_PF_CLS,
-+	PA27_PF_SPL_SPR,
-+	PA28_PF_HSYNC,
-+	PA29_PF_VSYNC,
-+	PA30_PF_CONTRAST,
-+	PA31_PF_OE_ACD,
-+	/* OWIRE */
-+	PE16_AF_OWIRE,
-+	/* SDHC1*/
-+	PE18_PF_SD1_D0,
-+	PE19_PF_SD1_D1,
-+	PE20_PF_SD1_D2,
-+	PE21_PF_SD1_D3,
-+	PE22_PF_SD1_CMD,
-+	PE23_PF_SD1_CLK,
-+	PF8_AF_ATA_IORDY,
-+	/* SDHC2*/
-+	PB4_PF_SD2_D0,
-+	PB5_PF_SD2_D1,
-+	PB6_PF_SD2_D2,
-+	PB7_PF_SD2_D3,
-+	PB8_PF_SD2_CMD,
-+	PB9_PF_SD2_CLK,
-+};
++static enum pcm037_board_variant pcm037_instance = PCM037_PCM970;
 +
-+static struct mxc_nand_platform_data mxt_td60_nand_board_info = {
-+	.width = 1,
-+	.hw_ecc = 1,
-+};
-+
-+static struct imxi2c_platform_data mxt_td60_i2c_data = {
-+	.bitrate = 100000,
-+};
-+
-+/* PCA9557 */
-+static int mxt_td60_pca9557_setup(struct i2c_client *client,
-+				unsigned gpio_base, unsigned ngpio,
-+				void *context)
++static int __init pcm037_variant_setup(char *str)
 +{
-+	static int mxt_td60_gpio_value[] = {
-+		-1, -1, -1, -1, -1, -1, -1, 1
-+	};
-+	int n;
++	if (!strcmp("eet", str))
++		pcm037_instance = PCM037_EET;
++	else if (strcmp("pcm970", str))
++		pr_warning("Unknown pcm037 baseboard variant %s\n", str);
 +
-+	for (n = 0; n < ARRAY_SIZE(mxt_td60_gpio_value); ++n) {
-+		gpio_request(gpio_base + n, "MXT_TD60 GPIO Exp");
-+		if (mxt_td60_gpio_value[n] < 0)
-+			gpio_direction_input(gpio_base + n);
-+		else
-+			gpio_direction_output(gpio_base + n,
-+						mxt_td60_gpio_value[n]);
-+		gpio_export(gpio_base + n, 0);
++	return 1;
++}
++
++/* Supported values: "pcm970" (default) and "eet" */
++__setup("pcm037_variant=", pcm037_variant_setup);
++
++enum pcm037_board_variant pcm037_variant(void)
++{
++	return pcm037_instance;
++}
++
++/* UART1 with RTS/CTS handshake signals */
++static unsigned int pcm037_uart1_handshake_pins[] = {
++	MX31_PIN_CTS1__CTS1,
++	MX31_PIN_RTS1__RTS1,
++	MX31_PIN_TXD1__TXD1,
++	MX31_PIN_RXD1__RXD1,
++};
++
++/* UART1 without RTS/CTS handshake signals */
++static unsigned int pcm037_uart1_pins[] = {
++	MX31_PIN_TXD1__TXD1,
++	MX31_PIN_RXD1__RXD1,
++};
++
++static unsigned int pcm037_pins[] = {
++	/* I2C */
++	MX31_PIN_CSPI2_MOSI__SCL,
++	MX31_PIN_CSPI2_MISO__SDA,
++	MX31_PIN_CSPI2_SS2__I2C3_SDA,
++	MX31_PIN_CSPI2_SCLK__I2C3_SCL,
++	/* SDHC1 */
++	MX31_PIN_SD1_DATA3__SD1_DATA3,
++	MX31_PIN_SD1_DATA2__SD1_DATA2,
++	MX31_PIN_SD1_DATA1__SD1_DATA1,
++	MX31_PIN_SD1_DATA0__SD1_DATA0,
++	MX31_PIN_SD1_CLK__SD1_CLK,
++	MX31_PIN_SD1_CMD__SD1_CMD,
++	IOMUX_MODE(MX31_PIN_SCK6, IOMUX_CONFIG_GPIO), /* card detect */
++	IOMUX_MODE(MX31_PIN_SFS6, IOMUX_CONFIG_GPIO), /* write protect */
++	/* SPI1 */
++	MX31_PIN_CSPI1_MOSI__MOSI,
++	MX31_PIN_CSPI1_MISO__MISO,
++	MX31_PIN_CSPI1_SCLK__SCLK,
++	MX31_PIN_CSPI1_SPI_RDY__SPI_RDY,
++	MX31_PIN_CSPI1_SS0__SS0,
++	MX31_PIN_CSPI1_SS1__SS1,
++	MX31_PIN_CSPI1_SS2__SS2,
++	/* UART2 */
++	MX31_PIN_TXD2__TXD2,
++	MX31_PIN_RXD2__RXD2,
++	MX31_PIN_CTS2__CTS2,
++	MX31_PIN_RTS2__RTS2,
++	/* UART3 */
++	MX31_PIN_CSPI3_MOSI__RXD3,
++	MX31_PIN_CSPI3_MISO__TXD3,
++	MX31_PIN_CSPI3_SCLK__RTS3,
++	MX31_PIN_CSPI3_SPI_RDY__CTS3,
++	/* LAN9217 irq pin */
++	IOMUX_MODE(MX31_PIN_GPIO3_1, IOMUX_CONFIG_GPIO),
++	/* Onewire */
++	MX31_PIN_BATT_LINE__OWIRE,
++	/* Framebuffer */
++	MX31_PIN_LD0__LD0,
++	MX31_PIN_LD1__LD1,
++	MX31_PIN_LD2__LD2,
++	MX31_PIN_LD3__LD3,
++	MX31_PIN_LD4__LD4,
++	MX31_PIN_LD5__LD5,
++	MX31_PIN_LD6__LD6,
++	MX31_PIN_LD7__LD7,
++	MX31_PIN_LD8__LD8,
++	MX31_PIN_LD9__LD9,
++	MX31_PIN_LD10__LD10,
++	MX31_PIN_LD11__LD11,
++	MX31_PIN_LD12__LD12,
++	MX31_PIN_LD13__LD13,
++	MX31_PIN_LD14__LD14,
++	MX31_PIN_LD15__LD15,
++	MX31_PIN_LD16__LD16,
++	MX31_PIN_LD17__LD17,
++	MX31_PIN_VSYNC3__VSYNC3,
++	MX31_PIN_HSYNC__HSYNC,
++	MX31_PIN_FPSHIFT__FPSHIFT,
++	MX31_PIN_DRDY0__DRDY0,
++	MX31_PIN_D3_REV__D3_REV,
++	MX31_PIN_CONTRAST__CONTRAST,
++	MX31_PIN_D3_SPL__D3_SPL,
++	MX31_PIN_D3_CLS__D3_CLS,
++	MX31_PIN_LCS0__GPI03_23,
++	/* CSI */
++	IOMUX_MODE(MX31_PIN_CSI_D5, IOMUX_CONFIG_GPIO),
++	MX31_PIN_CSI_D6__CSI_D6,
++	MX31_PIN_CSI_D7__CSI_D7,
++	MX31_PIN_CSI_D8__CSI_D8,
++	MX31_PIN_CSI_D9__CSI_D9,
++	MX31_PIN_CSI_D10__CSI_D10,
++	MX31_PIN_CSI_D11__CSI_D11,
++	MX31_PIN_CSI_D12__CSI_D12,
++	MX31_PIN_CSI_D13__CSI_D13,
++	MX31_PIN_CSI_D14__CSI_D14,
++	MX31_PIN_CSI_D15__CSI_D15,
++	MX31_PIN_CSI_HSYNC__CSI_HSYNC,
++	MX31_PIN_CSI_MCLK__CSI_MCLK,
++	MX31_PIN_CSI_PIXCLK__CSI_PIXCLK,
++	MX31_PIN_CSI_VSYNC__CSI_VSYNC,
++	/* GPIO */
++	IOMUX_MODE(MX31_PIN_ATA_DMACK, IOMUX_CONFIG_GPIO),
++};
++
++static struct physmap_flash_data pcm037_flash_data = {
++	.width  = 2,
++};
++
++static struct resource pcm037_flash_resource = {
++	.start	= 0xa0000000,
++	.end	= 0xa1ffffff,
++	.flags	= IORESOURCE_MEM,
++};
++
++static int usbotg_pins[] = {
++	MX31_PIN_USBOTG_DATA0__USBOTG_DATA0,
++	MX31_PIN_USBOTG_DATA1__USBOTG_DATA1,
++	MX31_PIN_USBOTG_DATA2__USBOTG_DATA2,
++	MX31_PIN_USBOTG_DATA3__USBOTG_DATA3,
++	MX31_PIN_USBOTG_DATA4__USBOTG_DATA4,
++	MX31_PIN_USBOTG_DATA5__USBOTG_DATA5,
++	MX31_PIN_USBOTG_DATA6__USBOTG_DATA6,
++	MX31_PIN_USBOTG_DATA7__USBOTG_DATA7,
++	MX31_PIN_USBOTG_CLK__USBOTG_CLK,
++	MX31_PIN_USBOTG_DIR__USBOTG_DIR,
++	MX31_PIN_USBOTG_NXT__USBOTG_NXT,
++	MX31_PIN_USBOTG_STP__USBOTG_STP,
++};
++
++/* USB OTG HS port */
++static int __init gpio_usbotg_hs_activate(void)
++{
++	int ret = mxc_iomux_setup_multiple_pins(usbotg_pins,
++					ARRAY_SIZE(usbotg_pins), "usbotg");
++
++	if (ret < 0) {
++		printk(KERN_ERR "Cannot set up OTG pins\n");
++		return ret;
 +	}
++
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA0, PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA1, PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA2, PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA3, PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA4, PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA5, PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA6, PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA7, PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_CLK,   PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_DIR,   PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_NXT,   PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
++	mxc_iomux_set_pad(MX31_PIN_USBOTG_STP,   PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
 +
 +	return 0;
 +}
 +
-+static struct pca953x_platform_data mxt_td60_pca9557_pdata = {
-+	.gpio_base	= 240, /* place PCA9557 after all MX27 gpio pins */
-+	.invert		= 0, /* Do not invert */
-+	.setup		= mxt_td60_pca9557_setup,
++/* OTG config */
++static struct fsl_usb2_platform_data usb_pdata = {
++	.operating_mode	= FSL_USB2_DR_DEVICE,
++	.phy_mode	= FSL_USB2_PHY_ULPI,
 +};
 +
-+static struct i2c_board_info mxt_td60_i2c_devices[] = {
-+	{
-+		I2C_BOARD_INFO("pca9557", 0x18),
-+		.platform_data = &mxt_td60_pca9557_pdata,
++static struct platform_device pcm037_flash = {
++	.name	= "physmap-flash",
++	.id	= 0,
++	.dev	= {
++		.platform_data  = &pcm037_flash_data,
 +	},
-+};
-+
-+static struct imxi2c_platform_data mxt_td60_i2c2_data = {
-+	.bitrate = 100000,
-+};
-+
-+static struct i2c_board_info mxt_td60_i2c2_devices[] = {
-+};
-+
-+static struct imx_fb_videomode mxt_td60_modes[] = {
-+	{
-+		.mode = {
-+			.name		= "Chimei LW700AT9003",
-+			.refresh	= 60,
-+			.xres		= 800,
-+			.yres		= 480,
-+			.pixclock	= 30303,
-+			.hsync_len	= 64,
-+			.left_margin	= 0x67,
-+			.right_margin	= 0x68,
-+			.vsync_len	= 16,
-+			.upper_margin	= 0x0f,
-+			.lower_margin	= 0x0f,
-+		},
-+		.bpp		= 16,
-+		.pcr		= 0xFA208B83,
-+	},
-+};
-+
-+static struct imx_fb_platform_data mxt_td60_fb_data = {
-+	.mode = mxt_td60_modes,
-+	.num_modes = ARRAY_SIZE(mxt_td60_modes),
-+
-+	/*
-+	 * - HSYNC active high
-+	 * - VSYNC active high
-+	 * - clk notenabled while idle
-+	 * - clock inverted
-+	 * - data not inverted
-+	 * - data enable low active
-+	 * - enable sharp mode
-+	 */
-+	.pwmr		= 0x00A903FF,
-+	.lscr1		= 0x00120300,
-+	.dmacr		= 0x00020010,
-+};
-+
-+static int mxt_td60_sdhc1_init(struct device *dev, irq_handler_t detect_irq,
-+				void *data)
-+{
-+	return request_irq(IRQ_GPIOF(8), detect_irq, IRQF_TRIGGER_FALLING,
-+				"sdhc1-card-detect", data);
-+}
-+
-+static void mxt_td60_sdhc1_exit(struct device *dev, void *data)
-+{
-+	free_irq(IRQ_GPIOF(8), data);
-+}
-+
-+static struct imxmmc_platform_data sdhc1_pdata = {
-+	.init = mxt_td60_sdhc1_init,
-+	.exit = mxt_td60_sdhc1_exit,
-+};
-+
-+static struct platform_device *platform_devices[] __initdata = {
-+	&mxc_fec_device,
-+};
-+
-+static struct imxuart_platform_data uart_pdata[] = {
-+	{
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	}, {
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	}, {
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	}, {
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	}, {
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	}, {
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	},
-+};
-+
-+static void __init mxt_td60_board_init(void)
-+{
-+	mxc_gpio_setup_multiple_pins(mxt_td60_pins, ARRAY_SIZE(mxt_td60_pins),
-+			"MXT_TD60");
-+
-+	mxc_register_device(&mxc_uart_device0, &uart_pdata[0]);
-+	mxc_register_device(&mxc_uart_device1, &uart_pdata[1]);
-+	mxc_register_device(&mxc_uart_device2, &uart_pdata[2]);
-+	mxc_register_device(&mxc_uart_device3, &uart_pdata[3]);
-+	mxc_register_device(&mxc_uart_device4, &uart_pdata[4]);
-+	mxc_register_device(&mxc_uart_device5, &uart_pdata[5]);
-+	mxc_register_device(&mxc_nand_device, &mxt_td60_nand_board_info);
-+
-+	i2c_register_board_info(0, mxt_td60_i2c_devices,
-+				ARRAY_SIZE(mxt_td60_i2c_devices));
-+
-+	i2c_register_board_info(1, mxt_td60_i2c2_devices,
-+				ARRAY_SIZE(mxt_td60_i2c2_devices));
-+
-+	mxc_register_device(&mxc_i2c_device0, &mxt_td60_i2c_data);
-+	mxc_register_device(&mxc_i2c_device1, &mxt_td60_i2c2_data);
-+	mxc_register_device(&mxc_fb_device, &mxt_td60_fb_data);
-+	mxc_register_device(&mxc_sdhc_device0, &sdhc1_pdata);
-+
-+	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
-+}
-+
-+static void __init mxt_td60_timer_init(void)
-+{
-+	mx27_clocks_init(26000000);
-+}
-+
-+static struct sys_timer mxt_td60_timer = {
-+	.init	= mxt_td60_timer_init,
-+};
-+
-+MACHINE_START(MXT_TD60, "Maxtrack i-MXT TD60")
-+	/* maintainer: Maxtrack Industrial */
-+	.phys_io	= MX27_AIPI_BASE_ADDR,
-+	.io_pg_offst	= ((MX27_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
-+	.boot_params	= PHYS_OFFSET + 0x100,
-+	.map_io		= mx27_map_io,
-+	.init_irq	= mx27_init_irq,
-+	.init_machine	= mxt_td60_board_init,
-+	.timer		= &mxt_td60_timer,
-+MACHINE_END
-+
-diff --git a/arch/arm/mach-mx2/mach-pca100.c b/arch/arm/mach-mx2/mach-pca100.c
-new file mode 100644
-index 0000000..55dbf5a
---- /dev/null
-+++ b/arch/arm/mach-mx2/mach-pca100.c
-@@ -0,0 +1,244 @@
-+/*
-+ * Copyright 2007 Robert Schwebel <r.schwebel@pengutronix.de>, Pengutronix
-+ * Copyright (C) 2009 Sascha Hauer (kernel at pengutronix.de)
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
-+ */
-+
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
-+#include <linux/i2c.h>
-+#include <linux/i2c/at24.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/spi/spi.h>
-+#include <linux/spi/eeprom.h>
-+#include <linux/irq.h>
-+#include <linux/gpio.h>
-+
-+#include <asm/mach/arch.h>
-+#include <asm/mach-types.h>
-+#include <mach/common.h>
-+#include <mach/hardware.h>
-+#include <mach/iomux.h>
-+#include <mach/i2c.h>
-+#include <asm/mach/time.h>
-+#if defined(CONFIG_SPI_IMX) || defined(CONFIG_SPI_IMX_MODULE)
-+#include <mach/spi.h>
-+#endif
-+#include <mach/imx-uart.h>
-+#include <mach/mxc_nand.h>
-+#include <mach/irqs.h>
-+#include <mach/mmc.h>
-+
-+#include "devices.h"
-+
-+static int pca100_pins[] = {
-+	/* UART1 */
-+	PE12_PF_UART1_TXD,
-+	PE13_PF_UART1_RXD,
-+	PE14_PF_UART1_CTS,
-+	PE15_PF_UART1_RTS,
-+	/* SDHC */
-+	PB4_PF_SD2_D0,
-+	PB5_PF_SD2_D1,
-+	PB6_PF_SD2_D2,
-+	PB7_PF_SD2_D3,
-+	PB8_PF_SD2_CMD,
-+	PB9_PF_SD2_CLK,
-+	/* FEC */
-+	PD0_AIN_FEC_TXD0,
-+	PD1_AIN_FEC_TXD1,
-+	PD2_AIN_FEC_TXD2,
-+	PD3_AIN_FEC_TXD3,
-+	PD4_AOUT_FEC_RX_ER,
-+	PD5_AOUT_FEC_RXD1,
-+	PD6_AOUT_FEC_RXD2,
-+	PD7_AOUT_FEC_RXD3,
-+	PD8_AF_FEC_MDIO,
-+	PD9_AIN_FEC_MDC,
-+	PD10_AOUT_FEC_CRS,
-+	PD11_AOUT_FEC_TX_CLK,
-+	PD12_AOUT_FEC_RXD0,
-+	PD13_AOUT_FEC_RX_DV,
-+	PD14_AOUT_FEC_RX_CLK,
-+	PD15_AOUT_FEC_COL,
-+	PD16_AIN_FEC_TX_ER,
-+	PF23_AIN_FEC_TX_EN,
-+	/* SSI1 */
-+	PC20_PF_SSI1_FS,
-+	PC21_PF_SSI1_RXD,
-+	PC22_PF_SSI1_TXD,
-+	PC23_PF_SSI1_CLK,
-+	/* onboard I2C */
-+	PC5_PF_I2C2_SDA,
-+	PC6_PF_I2C2_SCL,
-+	/* external I2C */
-+	PD17_PF_I2C_DATA,
-+	PD18_PF_I2C_CLK,
-+	/* SPI1 */
-+	PD25_PF_CSPI1_RDY,
-+	PD29_PF_CSPI1_SCLK,
-+	PD30_PF_CSPI1_MISO,
-+	PD31_PF_CSPI1_MOSI,
++	.resource = &pcm037_flash_resource,
++	.num_resources = 1,
 +};
 +
 +static struct imxuart_platform_data uart_pdata = {
 +	.flags = IMXUART_HAVE_RTSCTS,
 +};
 +
-+static struct mxc_nand_platform_data pca100_nand_board_info = {
-+	.width = 1,
-+	.hw_ecc = 1,
-+};
-+
-+static struct platform_device *platform_devices[] __initdata = {
-+	&mxc_w1_master_device,
-+	&mxc_fec_device,
-+};
-+
-+static struct imxi2c_platform_data pca100_i2c_1_data = {
-+	.bitrate = 100000,
-+};
-+
-+static struct at24_platform_data board_eeprom = {
-+	.byte_len = 4096,
-+	.page_size = 32,
-+	.flags = AT24_FLAG_ADDR16,
-+};
-+
-+static struct i2c_board_info pca100_i2c_devices[] = {
++static struct resource smsc911x_resources[] = {
 +	{
-+		I2C_BOARD_INFO("at24", 0x52), /* E0=0, E1=1, E2=0 */
-+		.platform_data = &board_eeprom,
++		.start		= MX31_CS1_BASE_ADDR + 0x300,
++		.end		= MX31_CS1_BASE_ADDR + 0x300 + SZ_64K - 1,
++		.flags		= IORESOURCE_MEM,
 +	}, {
-+		I2C_BOARD_INFO("rtc-pcf8563", 0x51),
-+		.type = "pcf8563"
-+	}, {
-+		I2C_BOARD_INFO("lm75", 0x4a),
-+		.type = "lm75"
-+	}
-+};
-+
-+#if defined(CONFIG_SPI_IMX) || defined(CONFIG_SPI_IMX_MODULE)
-+static struct spi_eeprom at25320 = {
-+	.name		= "at25320an",
-+	.byte_len	= 4096,
-+	.page_size	= 32,
-+	.flags		= EE_ADDR2,
-+};
-+
-+static struct spi_board_info pca100_spi_board_info[] __initdata = {
-+	{
-+		.modalias = "at25",
-+		.max_speed_hz = 30000,
-+		.bus_num = 0,
-+		.chip_select = 1,
-+		.platform_data = &at25320,
++		.start		= IOMUX_TO_IRQ(MX31_PIN_GPIO3_1),
++		.end		= IOMUX_TO_IRQ(MX31_PIN_GPIO3_1),
++		.flags		= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL,
 +	},
 +};
 +
-+static int pca100_spi_cs[] = {GPIO_PORTD + 28, GPIO_PORTD + 27};
-+
-+static struct spi_imx_master pca100_spi_0_data = {
-+	.chipselect	= pca100_spi_cs,
-+	.num_chipselect = ARRAY_SIZE(pca100_spi_cs),
-+};
-+#endif
-+
-+static int pca100_sdhc2_init(struct device *dev, irq_handler_t detect_irq,
-+		void *data)
-+{
-+	int ret;
-+
-+	ret = request_irq(IRQ_GPIOC(29), detect_irq,
-+			  IRQF_DISABLED | IRQF_TRIGGER_FALLING,
-+			  "imx-mmc-detect", data);
-+	if (ret)
-+		printk(KERN_ERR
-+			"pca100: Failed to reuest irq for sd/mmc detection\n");
-+
-+	return ret;
-+}
-+
-+static void pca100_sdhc2_exit(struct device *dev, void *data)
-+{
-+	free_irq(IRQ_GPIOC(29), data);
-+}
-+
-+static struct imxmmc_platform_data sdhc_pdata = {
-+	.init = pca100_sdhc2_init,
-+	.exit = pca100_sdhc2_exit,
++static struct smsc911x_platform_config smsc911x_info = {
++	.flags		= SMSC911X_USE_32BIT | SMSC911X_FORCE_INTERNAL_PHY |
++			  SMSC911X_SAVE_MAC_ADDRESS,
++	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
++	.irq_type	= SMSC911X_IRQ_TYPE_OPEN_DRAIN,
++	.phy_interface	= PHY_INTERFACE_MODE_MII,
 +};
 +
-+static void __init pca100_init(void)
-+{
-+	int ret;
-+
-+	ret = mxc_gpio_setup_multiple_pins(pca100_pins,
-+			ARRAY_SIZE(pca100_pins), "PCA100");
-+	if (ret)
-+		printk(KERN_ERR "pca100: Failed to setup pins (%d)\n", ret);
-+
-+	mxc_register_device(&mxc_uart_device0, &uart_pdata);
-+
-+	mxc_gpio_mode(GPIO_PORTC | 29 | GPIO_GPIO | GPIO_IN);
-+	mxc_register_device(&mxc_sdhc_device1, &sdhc_pdata);
-+
-+	mxc_register_device(&mxc_nand_device, &pca100_nand_board_info);
-+
-+	/* only the i2c master 1 is used on this CPU card */
-+	i2c_register_board_info(1, pca100_i2c_devices,
-+				ARRAY_SIZE(pca100_i2c_devices));
-+
-+	mxc_register_device(&mxc_i2c_device1, &pca100_i2c_1_data);
-+
-+	mxc_gpio_mode(GPIO_PORTD | 28 | GPIO_GPIO | GPIO_OUT);
-+	mxc_gpio_mode(GPIO_PORTD | 27 | GPIO_GPIO | GPIO_OUT);
-+
-+	/* GPIO0_IRQ */
-+	mxc_gpio_mode(GPIO_PORTC | 31 | GPIO_GPIO | GPIO_IN);
-+	/* GPIO1_IRQ */
-+	mxc_gpio_mode(GPIO_PORTC | 25 | GPIO_GPIO | GPIO_IN);
-+	/* GPIO2_IRQ */
-+	mxc_gpio_mode(GPIO_PORTE | 5 | GPIO_GPIO | GPIO_IN);
-+
-+#if defined(CONFIG_SPI_IMX) || defined(CONFIG_SPI_IMX_MODULE)
-+	spi_register_board_info(pca100_spi_board_info,
-+				ARRAY_SIZE(pca100_spi_board_info));
-+	mxc_register_device(&mxc_spi_device0, &pca100_spi_0_data);
-+#endif
-+
-+	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
-+}
-+
-+static void __init pca100_timer_init(void)
-+{
-+	mx27_clocks_init(26000000);
-+}
-+
-+static struct sys_timer pca100_timer = {
-+	.init = pca100_timer_init,
++static struct platform_device pcm037_eth = {
++	.name		= "smsc911x",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(smsc911x_resources),
++	.resource	= smsc911x_resources,
++	.dev		= {
++		.platform_data = &smsc911x_info,
++	},
 +};
-+
-+MACHINE_START(PCA100, "phyCARD-i.MX27")
-+	.phys_io        = MX27_AIPI_BASE_ADDR,
-+	.io_pg_offst    = ((MX27_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
-+	.boot_params    = PHYS_OFFSET + 0x100,
-+	.map_io         = mx27_map_io,
-+	.init_irq       = mx27_init_irq,
-+	.init_machine   = pca100_init,
-+	.timer          = &pca100_timer,
-+MACHINE_END
-+
-diff --git a/arch/arm/mach-mx2/mach-pcm038.c b/arch/arm/mach-mx2/mach-pcm038.c
-new file mode 100644
-index 0000000..a2e2ea1
---- /dev/null
-+++ b/arch/arm/mach-mx2/mach-pcm038.c
-@@ -0,0 +1,338 @@
-+/*
-+ * Copyright 2007 Robert Schwebel <r.schwebel@pengutronix.de>, Pengutronix
-+ * Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
-+ */
-+
-+#include <linux/i2c.h>
-+#include <linux/i2c/at24.h>
-+#include <linux/io.h>
-+#include <linux/mtd/plat-ram.h>
-+#include <linux/mtd/physmap.h>
-+#include <linux/platform_device.h>
-+#include <linux/regulator/machine.h>
-+#include <linux/mfd/mc13783.h>
-+#include <linux/spi/spi.h>
-+#include <linux/irq.h>
-+
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/time.h>
-+
-+#include <mach/board-pcm038.h>
-+#include <mach/common.h>
-+#include <mach/hardware.h>
-+#include <mach/i2c.h>
-+#include <mach/iomux.h>
-+#include <mach/imx-uart.h>
-+#include <mach/mxc_nand.h>
-+#include <mach/spi.h>
-+
-+#include "devices.h"
-+
-+static int pcm038_pins[] = {
-+	/* UART1 */
-+	PE12_PF_UART1_TXD,
-+	PE13_PF_UART1_RXD,
-+	PE14_PF_UART1_CTS,
-+	PE15_PF_UART1_RTS,
-+	/* UART2 */
-+	PE3_PF_UART2_CTS,
-+	PE4_PF_UART2_RTS,
-+	PE6_PF_UART2_TXD,
-+	PE7_PF_UART2_RXD,
-+	/* UART3 */
-+	PE8_PF_UART3_TXD,
-+	PE9_PF_UART3_RXD,
-+	PE10_PF_UART3_CTS,
-+	PE11_PF_UART3_RTS,
-+	/* FEC */
-+	PD0_AIN_FEC_TXD0,
-+	PD1_AIN_FEC_TXD1,
-+	PD2_AIN_FEC_TXD2,
-+	PD3_AIN_FEC_TXD3,
-+	PD4_AOUT_FEC_RX_ER,
-+	PD5_AOUT_FEC_RXD1,
-+	PD6_AOUT_FEC_RXD2,
-+	PD7_AOUT_FEC_RXD3,
-+	PD8_AF_FEC_MDIO,
-+	PD9_AIN_FEC_MDC,
-+	PD10_AOUT_FEC_CRS,
-+	PD11_AOUT_FEC_TX_CLK,
-+	PD12_AOUT_FEC_RXD0,
-+	PD13_AOUT_FEC_RX_DV,
-+	PD14_AOUT_FEC_RX_CLK,
-+	PD15_AOUT_FEC_COL,
-+	PD16_AIN_FEC_TX_ER,
-+	PF23_AIN_FEC_TX_EN,
-+	/* I2C2 */
-+	PC5_PF_I2C2_SDA,
-+	PC6_PF_I2C2_SCL,
-+	/* SPI1 */
-+	PD25_PF_CSPI1_RDY,
-+	PD29_PF_CSPI1_SCLK,
-+	PD30_PF_CSPI1_MISO,
-+	PD31_PF_CSPI1_MOSI,
-+	/* SSI1 */
-+	PC20_PF_SSI1_FS,
-+	PC21_PF_SSI1_RXD,
-+	PC22_PF_SSI1_TXD,
-+	PC23_PF_SSI1_CLK,
-+	/* SSI4 */
-+	PC16_PF_SSI4_FS,
-+	PC17_PF_SSI4_RXD,
-+	PC18_PF_SSI4_TXD,
-+	PC19_PF_SSI4_CLK,
-+};
-+
-+/*
-+ * Phytec's PCM038 comes with 2MiB battery buffered SRAM,
-+ * 16 bit width
-+ */
 +
 +static struct platdata_mtd_ram pcm038_sram_data = {
 +	.bankwidth = 2,
 +};
 +
 +static struct resource pcm038_sram_resource = {
-+	.start = MX27_CS1_BASE_ADDR,
-+	.end   = MX27_CS1_BASE_ADDR + 512 * 1024 - 1,
++	.start = MX31_CS4_BASE_ADDR,
++	.end   = MX31_CS4_BASE_ADDR + 512 * 1024 - 1,
 +	.flags = IORESOURCE_MEM,
 +};
 +
-+static struct platform_device pcm038_sram_mtd_device = {
++static struct platform_device pcm037_sram_device = {
 +	.name = "mtd-ram",
 +	.id = 0,
 +	.dev = {
@@ -2124,63 +3844,17 @@ index 0000000..a2e2ea1
 +	.resource = &pcm038_sram_resource,
 +};
 +
-+/*
-+ * Phytec's phyCORE-i.MX27 comes with 32MiB flash,
-+ * 16 bit width
-+ */
-+static struct physmap_flash_data pcm038_flash_data = {
-+	.width = 2,
-+};
-+
-+static struct resource pcm038_flash_resource = {
-+	.start = 0xc0000000,
-+	.end   = 0xc1ffffff,
-+	.flags = IORESOURCE_MEM,
-+};
-+
-+static struct platform_device pcm038_nor_mtd_device = {
-+	.name = "physmap-flash",
-+	.id = 0,
-+	.dev = {
-+		.platform_data = &pcm038_flash_data,
-+	},
-+	.num_resources = 1,
-+	.resource = &pcm038_flash_resource,
-+};
-+
-+static struct imxuart_platform_data uart_pdata[] = {
-+	{
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	}, {
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	}, {
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	},
-+};
-+
-+static struct mxc_nand_platform_data pcm038_nand_board_info = {
++static struct mxc_nand_platform_data pcm037_nand_board_info = {
 +	.width = 1,
 +	.hw_ecc = 1,
 +};
 +
-+static struct platform_device *platform_devices[] __initdata = {
-+	&pcm038_nor_mtd_device,
-+	&mxc_w1_master_device,
-+	&mxc_fec_device,
-+	&pcm038_sram_mtd_device,
++static struct imxi2c_platform_data pcm037_i2c_1_data = {
++	.bitrate = 100000,
 +};
 +
-+/* On pcm038 there's a sram attached to CS1, we enable the chipselect here and
-+ * setup other stuffs to access the sram. */
-+static void __init pcm038_init_sram(void)
-+{
-+	__raw_writel(0x0000d843, CSCR_U(1));
-+	__raw_writel(0x22252521, CSCR_L(1));
-+	__raw_writel(0x22220a00, CSCR_A(1));
-+}
-+
-+static struct imxi2c_platform_data pcm038_i2c_1_data = {
-+	.bitrate = 100000,
++static struct imxi2c_platform_data pcm037_i2c_2_data = {
++	.bitrate = 20000,
 +};
 +
 +static struct at24_platform_data board_eeprom = {
@@ -2189,164 +3863,883 @@ index 0000000..a2e2ea1
 +	.flags = AT24_FLAG_ADDR16,
 +};
 +
-+static struct i2c_board_info pcm038_i2c_devices[] = {
++static int pcm037_camera_power(struct device *dev, int on)
++{
++	/* disable or enable the camera in X7 or X8 PCM970 connector */
++	gpio_set_value(IOMUX_TO_GPIO(MX31_PIN_CSI_D5), !on);
++	return 0;
++}
++
++static struct i2c_board_info pcm037_i2c_2_devices[] = {
++	{
++		I2C_BOARD_INFO("mt9t031", 0x5d),
++	},
++};
++
++static struct soc_camera_link iclink = {
++	.bus_id		= 0,		/* Must match with the camera ID */
++	.power		= pcm037_camera_power,
++	.board_info	= &pcm037_i2c_2_devices[0],
++	.i2c_adapter_id	= 2,
++	.module_name	= "mt9t031",
++};
++
++static struct i2c_board_info pcm037_i2c_devices[] = {
 +	{
 +		I2C_BOARD_INFO("at24", 0x52), /* E0=0, E1=1, E2=0 */
 +		.platform_data = &board_eeprom,
 +	}, {
 +		I2C_BOARD_INFO("pcf8563", 0x51),
-+	}, {
-+		I2C_BOARD_INFO("lm75", 0x4a),
 +	}
 +};
 +
-+static int pcm038_spi_cs[] = {GPIO_PORTD + 28};
-+
-+static struct spi_imx_master pcm038_spi_0_data = {
-+	.chipselect = pcm038_spi_cs,
-+	.num_chipselect = ARRAY_SIZE(pcm038_spi_cs),
-+};
-+
-+static struct regulator_consumer_supply sdhc1_consumers[] = {
-+	{
-+		.dev	= &mxc_sdhc_device1.dev,
-+		.supply	= "sdhc_vcc",
++static struct platform_device pcm037_camera = {
++	.name	= "soc-camera-pdrv",
++	.id	= 0,
++	.dev	= {
++		.platform_data = &iclink,
 +	},
 +};
 +
-+static struct regulator_init_data sdhc1_data = {
-+	.constraints = {
-+		.min_uV = 3000000,
-+		.max_uV = 3400000,
-+		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
-+			REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
-+		.valid_modes_mask = REGULATOR_MODE_NORMAL |
-+			REGULATOR_MODE_FAST,
-+		.always_on = 0,
-+		.boot_on = 0,
-+	},
-+	.num_consumer_supplies = ARRAY_SIZE(sdhc1_consumers),
-+	.consumer_supplies = sdhc1_consumers,
-+};
-+
-+static struct regulator_consumer_supply cam_consumers[] = {
-+	{
-+		.dev	= NULL,
-+		.supply	= "imx_cam_vcc",
-+	},
-+};
-+
-+static struct regulator_init_data cam_data = {
-+	.constraints = {
-+		.min_uV = 3000000,
-+		.max_uV = 3400000,
-+		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
-+			REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
-+		.valid_modes_mask = REGULATOR_MODE_NORMAL |
-+			REGULATOR_MODE_FAST,
-+		.always_on = 0,
-+		.boot_on = 0,
-+	},
-+	.num_consumer_supplies = ARRAY_SIZE(cam_consumers),
-+	.consumer_supplies = cam_consumers,
-+};
-+
-+struct mc13783_regulator_init_data pcm038_regulators[] = {
-+	{
-+		.id = MC13783_REGU_VCAM,
-+		.init_data = &cam_data,
-+	}, {
-+		.id = MC13783_REGU_VMMC1,
-+		.init_data = &sdhc1_data,
-+	},
-+};
-+
-+static struct mc13783_platform_data pcm038_pmic = {
-+	.regulators = pcm038_regulators,
-+	.num_regulators = ARRAY_SIZE(pcm038_regulators),
-+	.flags = MC13783_USE_ADC | MC13783_USE_REGULATOR |
-+		 MC13783_USE_TOUCHSCREEN,
-+};
-+
-+static struct spi_board_info pcm038_spi_board_info[] __initdata = {
-+	{
-+		.modalias = "mc13783",
-+		.irq = IRQ_GPIOB(23),
-+		.max_speed_hz = 300000,
-+		.bus_num = 0,
-+		.chip_select = 0,
-+		.platform_data = &pcm038_pmic,
-+		.mode = SPI_CS_HIGH,
-+	}
-+};
-+
-+static void __init pcm038_init(void)
++/* Not connected by default */
++#ifdef PCM970_SDHC_RW_SWITCH
++static int pcm970_sdhc1_get_ro(struct device *dev)
 +{
-+	mxc_gpio_setup_multiple_pins(pcm038_pins, ARRAY_SIZE(pcm038_pins),
-+			"PCM038");
-+
-+	pcm038_init_sram();
-+
-+	mxc_register_device(&mxc_uart_device0, &uart_pdata[0]);
-+	mxc_register_device(&mxc_uart_device1, &uart_pdata[1]);
-+	mxc_register_device(&mxc_uart_device2, &uart_pdata[2]);
-+
-+	mxc_gpio_mode(PE16_AF_OWIRE);
-+	mxc_register_device(&mxc_nand_device, &pcm038_nand_board_info);
-+
-+	/* only the i2c master 1 is used on this CPU card */
-+	i2c_register_board_info(1, pcm038_i2c_devices,
-+				ARRAY_SIZE(pcm038_i2c_devices));
-+
-+	mxc_register_device(&mxc_i2c_device1, &pcm038_i2c_1_data);
-+
-+	/* PE18 for user-LED D40 */
-+	mxc_gpio_mode(GPIO_PORTE | 18 | GPIO_GPIO | GPIO_OUT);
-+
-+	mxc_gpio_mode(GPIO_PORTD | 28 | GPIO_GPIO | GPIO_OUT);
-+
-+	/* MC13783 IRQ */
-+	mxc_gpio_mode(GPIO_PORTB | 23 | GPIO_GPIO | GPIO_IN);
-+
-+	mxc_register_device(&mxc_spi_device0, &pcm038_spi_0_data);
-+	spi_register_board_info(pcm038_spi_board_info,
-+				ARRAY_SIZE(pcm038_spi_board_info));
-+
-+	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
-+
-+#ifdef CONFIG_MACH_PCM970_BASEBOARD
-+	pcm970_baseboard_init();
++	return gpio_get_value(IOMUX_TO_GPIO(MX31_PIN_SFS6));
++}
 +#endif
-+}
 +
-+static void __init pcm038_timer_init(void)
++#define SDHC1_GPIO_WP	IOMUX_TO_GPIO(MX31_PIN_SFS6)
++#define SDHC1_GPIO_DET	IOMUX_TO_GPIO(MX31_PIN_SCK6)
++
++static int pcm970_sdhc1_init(struct device *dev, irq_handler_t detect_irq,
++		void *data)
 +{
-+	mx27_clocks_init(26000000);
++	int ret;
++
++	ret = gpio_request(SDHC1_GPIO_DET, "sdhc-detect");
++	if (ret)
++		return ret;
++
++	gpio_direction_input(SDHC1_GPIO_DET);
++
++#ifdef PCM970_SDHC_RW_SWITCH
++	ret = gpio_request(SDHC1_GPIO_WP, "sdhc-wp");
++	if (ret)
++		goto err_gpio_free;
++	gpio_direction_input(SDHC1_GPIO_WP);
++#endif
++
++	ret = request_irq(IOMUX_TO_IRQ(MX31_PIN_SCK6), detect_irq,
++			IRQF_DISABLED | IRQF_TRIGGER_FALLING,
++				"sdhc-detect", data);
++	if (ret)
++		goto err_gpio_free_2;
++
++	return 0;
++
++err_gpio_free_2:
++#ifdef PCM970_SDHC_RW_SWITCH
++	gpio_free(SDHC1_GPIO_WP);
++err_gpio_free:
++#endif
++	gpio_free(SDHC1_GPIO_DET);
++
++	return ret;
 +}
 +
-+static struct sys_timer pcm038_timer = {
-+	.init = pcm038_timer_init,
++static void pcm970_sdhc1_exit(struct device *dev, void *data)
++{
++	free_irq(IOMUX_TO_IRQ(MX31_PIN_SCK6), data);
++	gpio_free(SDHC1_GPIO_DET);
++	gpio_free(SDHC1_GPIO_WP);
++}
++
++static struct imxmmc_platform_data sdhc_pdata = {
++#ifdef PCM970_SDHC_RW_SWITCH
++	.get_ro = pcm970_sdhc1_get_ro,
++#endif
++	.init = pcm970_sdhc1_init,
++	.exit = pcm970_sdhc1_exit,
 +};
 +
-+MACHINE_START(PCM038, "phyCORE-i.MX27")
-+	.phys_io        = MX27_AIPI_BASE_ADDR,
-+	.io_pg_offst    = ((MX27_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
++struct mx3_camera_pdata camera_pdata = {
++	.dma_dev	= &mx3_ipu.dev,
++	.flags		= MX3_CAMERA_DATAWIDTH_8 | MX3_CAMERA_DATAWIDTH_10,
++	.mclk_10khz	= 2000,
++};
++
++static int __init pcm037_camera_alloc_dma(const size_t buf_size)
++{
++	dma_addr_t dma_handle;
++	void *buf;
++	int dma;
++
++	if (buf_size < 2 * 1024 * 1024)
++		return -EINVAL;
++
++	buf = dma_alloc_coherent(NULL, buf_size, &dma_handle, GFP_KERNEL);
++	if (!buf) {
++		pr_err("%s: cannot allocate camera buffer-memory\n", __func__);
++		return -ENOMEM;
++	}
++
++	memset(buf, 0, buf_size);
++
++	dma = dma_declare_coherent_memory(&mx3_camera.dev,
++					dma_handle, dma_handle, buf_size,
++					DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
++
++	/* The way we call dma_declare_coherent_memory only a malloc can fail */
++	return dma & DMA_MEMORY_MAP ? 0 : -ENOMEM;
++}
++
++static struct platform_device *devices[] __initdata = {
++	&pcm037_flash,
++	&pcm037_sram_device,
++	&pcm037_camera,
++};
++
++static struct ipu_platform_data mx3_ipu_data = {
++	.irq_base = MXC_IPU_IRQ_START,
++};
++
++static const struct fb_videomode fb_modedb[] = {
++	{
++		/* 240x320 @ 60 Hz Sharp */
++		.name		= "Sharp-LQ035Q7DH06-QVGA",
++		.refresh	= 60,
++		.xres		= 240,
++		.yres		= 320,
++		.pixclock	= 185925,
++		.left_margin	= 9,
++		.right_margin	= 16,
++		.upper_margin	= 7,
++		.lower_margin	= 9,
++		.hsync_len	= 1,
++		.vsync_len	= 1,
++		.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_SHARP_MODE |
++				  FB_SYNC_CLK_INVERT | FB_SYNC_CLK_IDLE_EN,
++		.vmode		= FB_VMODE_NONINTERLACED,
++		.flag		= 0,
++	}, {
++		/* 240x320 @ 60 Hz */
++		.name		= "TX090",
++		.refresh	= 60,
++		.xres		= 240,
++		.yres		= 320,
++		.pixclock	= 38255,
++		.left_margin	= 144,
++		.right_margin	= 0,
++		.upper_margin	= 7,
++		.lower_margin	= 40,
++		.hsync_len	= 96,
++		.vsync_len	= 1,
++		.sync		= FB_SYNC_VERT_HIGH_ACT | FB_SYNC_OE_ACT_HIGH,
++		.vmode		= FB_VMODE_NONINTERLACED,
++		.flag		= 0,
++	}, {
++		/* 240x320 @ 60 Hz */
++		.name		= "CMEL-OLED",
++		.refresh	= 60,
++		.xres		= 240,
++		.yres		= 320,
++		.pixclock	= 185925,
++		.left_margin	= 9,
++		.right_margin	= 16,
++		.upper_margin	= 7,
++		.lower_margin	= 9,
++		.hsync_len	= 1,
++		.vsync_len	= 1,
++		.sync		= FB_SYNC_OE_ACT_HIGH | FB_SYNC_CLK_INVERT,
++		.vmode		= FB_VMODE_NONINTERLACED,
++		.flag		= 0,
++	},
++};
++
++static struct mx3fb_platform_data mx3fb_pdata = {
++	.dma_dev	= &mx3_ipu.dev,
++	.name		= "Sharp-LQ035Q7DH06-QVGA",
++	.mode		= fb_modedb,
++	.num_modes	= ARRAY_SIZE(fb_modedb),
++};
++
++static struct resource pcm970_sja1000_resources[] = {
++	{
++		.start   = MX31_CS5_BASE_ADDR,
++		.end     = MX31_CS5_BASE_ADDR + 0x100 - 1,
++		.flags   = IORESOURCE_MEM,
++	}, {
++		.start   = IOMUX_TO_IRQ(IOMUX_PIN(48, 105)),
++		.end     = IOMUX_TO_IRQ(IOMUX_PIN(48, 105)),
++		.flags   = IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE,
++	},
++};
++
++struct sja1000_platform_data pcm970_sja1000_platform_data = {
++	.clock		= 16000000 / 2,
++	.ocr		= 0x40 | 0x18,
++	.cdr		= 0x40,
++};
++
++static struct platform_device pcm970_sja1000 = {
++	.name = "sja1000_platform",
++	.dev = {
++		.platform_data = &pcm970_sja1000_platform_data,
++	},
++	.resource = pcm970_sja1000_resources,
++	.num_resources = ARRAY_SIZE(pcm970_sja1000_resources),
++};
++
++/*
++ * Board specific initialization.
++ */
++static void __init mxc_board_init(void)
++{
++	int ret;
++
++	mxc_iomux_setup_multiple_pins(pcm037_pins, ARRAY_SIZE(pcm037_pins),
++			"pcm037");
++
++	if (pcm037_variant() == PCM037_EET)
++		mxc_iomux_setup_multiple_pins(pcm037_uart1_pins,
++			ARRAY_SIZE(pcm037_uart1_pins), "pcm037_uart1");
++	else
++		mxc_iomux_setup_multiple_pins(pcm037_uart1_handshake_pins,
++			ARRAY_SIZE(pcm037_uart1_handshake_pins),
++			"pcm037_uart1");
++
++	platform_add_devices(devices, ARRAY_SIZE(devices));
++
++	mxc_register_device(&mxc_uart_device0, &uart_pdata);
++	mxc_register_device(&mxc_uart_device1, &uart_pdata);
++	mxc_register_device(&mxc_uart_device2, &uart_pdata);
++
++	mxc_register_device(&mxc_w1_master_device, NULL);
++
++	/* LAN9217 IRQ pin */
++	ret = gpio_request(IOMUX_TO_GPIO(MX31_PIN_GPIO3_1), "lan9217-irq");
++	if (ret)
++		pr_warning("could not get LAN irq gpio\n");
++	else {
++		gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_GPIO3_1));
++		platform_device_register(&pcm037_eth);
++	}
++
++
++	/* I2C adapters and devices */
++	i2c_register_board_info(1, pcm037_i2c_devices,
++			ARRAY_SIZE(pcm037_i2c_devices));
++
++	mxc_register_device(&mxc_i2c_device1, &pcm037_i2c_1_data);
++	mxc_register_device(&mxc_i2c_device2, &pcm037_i2c_2_data);
++
++	mxc_register_device(&mxc_nand_device, &pcm037_nand_board_info);
++	mxc_register_device(&mxcsdhc_device0, &sdhc_pdata);
++	mxc_register_device(&mx3_ipu, &mx3_ipu_data);
++	mxc_register_device(&mx3_fb, &mx3fb_pdata);
++	if (!gpio_usbotg_hs_activate())
++		mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
++
++	/* CSI */
++	/* Camera power: default - off */
++	ret = gpio_request(IOMUX_TO_GPIO(MX31_PIN_CSI_D5), "mt9t031-power");
++	if (!ret)
++		gpio_direction_output(IOMUX_TO_GPIO(MX31_PIN_CSI_D5), 1);
++	else
++		iclink.power = NULL;
++
++	if (!pcm037_camera_alloc_dma(4 * 1024 * 1024))
++		mxc_register_device(&mx3_camera, &camera_pdata);
++
++	platform_device_register(&pcm970_sja1000);
++}
++
++static void __init pcm037_timer_init(void)
++{
++	mx31_clocks_init(26000000);
++}
++
++struct sys_timer pcm037_timer = {
++	.init	= pcm037_timer_init,
++};
++
++MACHINE_START(PCM037, "Phytec Phycore pcm037")
++	/* Maintainer: Pengutronix */
++	.phys_io	= MX31_AIPS1_BASE_ADDR,
++	.io_pg_offst	= ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
 +	.boot_params    = PHYS_OFFSET + 0x100,
-+	.map_io         = mx27_map_io,
-+	.init_irq       = mx27_init_irq,
-+	.init_machine   = pcm038_init,
-+	.timer          = &pcm038_timer,
++	.map_io         = mx31_map_io,
++	.init_irq       = mx31_init_irq,
++	.init_machine   = mxc_board_init,
++	.timer          = &pcm037_timer,
 +MACHINE_END
-diff --git a/arch/arm/mach-mx2/mx21ads.c b/arch/arm/mach-mx2/mx21ads.c
+diff --git a/arch/arm/mach-mx3/mach-pcm043.c b/arch/arm/mach-mx3/mach-pcm043.c
+new file mode 100644
+index 0000000..1212194
+--- /dev/null
++++ b/arch/arm/mach-mx3/mach-pcm043.c
+@@ -0,0 +1,259 @@
++/*
++ *  Copyright (C) 2009 Sascha Hauer, Pengutronix
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#include <linux/types.h>
++#include <linux/init.h>
++
++#include <linux/platform_device.h>
++#include <linux/mtd/physmap.h>
++#include <linux/mtd/plat-ram.h>
++#include <linux/memory.h>
++#include <linux/gpio.h>
++#include <linux/smc911x.h>
++#include <linux/interrupt.h>
++#include <linux/i2c.h>
++#include <linux/i2c/at24.h>
++
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/time.h>
++#include <asm/mach/map.h>
++
++#include <mach/hardware.h>
++#include <mach/common.h>
++#include <mach/imx-uart.h>
++#if defined CONFIG_I2C_IMX || defined CONFIG_I2C_IMX_MODULE
++#include <mach/i2c.h>
++#endif
++#include <mach/iomux-mx35.h>
++#include <mach/ipu.h>
++#include <mach/mx3fb.h>
++#include <mach/mxc_nand.h>
++
++#include "devices.h"
++
++static const struct fb_videomode fb_modedb[] = {
++	{
++		/* 240x320 @ 60 Hz */
++		.name		= "Sharp-LQ035Q7",
++		.refresh	= 60,
++		.xres		= 240,
++		.yres		= 320,
++		.pixclock	= 185925,
++		.left_margin	= 9,
++		.right_margin	= 16,
++		.upper_margin	= 7,
++		.lower_margin	= 9,
++		.hsync_len	= 1,
++		.vsync_len	= 1,
++		.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_SHARP_MODE | FB_SYNC_CLK_INVERT | FB_SYNC_CLK_IDLE_EN,
++		.vmode		= FB_VMODE_NONINTERLACED,
++		.flag		= 0,
++	}, {
++		/* 240x320 @ 60 Hz */
++		.name		= "TX090",
++		.refresh	= 60,
++		.xres		= 240,
++		.yres		= 320,
++		.pixclock	= 38255,
++		.left_margin	= 144,
++		.right_margin	= 0,
++		.upper_margin	= 7,
++		.lower_margin	= 40,
++		.hsync_len	= 96,
++		.vsync_len	= 1,
++		.sync		= FB_SYNC_VERT_HIGH_ACT | FB_SYNC_OE_ACT_HIGH,
++		.vmode		= FB_VMODE_NONINTERLACED,
++		.flag		= 0,
++	},
++};
++
++static struct ipu_platform_data mx3_ipu_data = {
++	.irq_base = MXC_IPU_IRQ_START,
++};
++
++static struct mx3fb_platform_data mx3fb_pdata = {
++	.dma_dev	= &mx3_ipu.dev,
++	.name		= "Sharp-LQ035Q7",
++	.mode		= fb_modedb,
++	.num_modes	= ARRAY_SIZE(fb_modedb),
++};
++
++static struct physmap_flash_data pcm043_flash_data = {
++	.width  = 2,
++};
++
++static struct resource pcm043_flash_resource = {
++	.start	= 0xa0000000,
++	.end	= 0xa1ffffff,
++	.flags	= IORESOURCE_MEM,
++};
++
++static struct platform_device pcm043_flash = {
++	.name	= "physmap-flash",
++	.id	= 0,
++	.dev	= {
++		.platform_data  = &pcm043_flash_data,
++	},
++	.resource = &pcm043_flash_resource,
++	.num_resources = 1,
++};
++
++static struct imxuart_platform_data uart_pdata = {
++	.flags = IMXUART_HAVE_RTSCTS,
++};
++
++#if defined CONFIG_I2C_IMX || defined CONFIG_I2C_IMX_MODULE
++static struct imxi2c_platform_data pcm043_i2c_1_data = {
++	.bitrate = 50000,
++};
++
++static struct at24_platform_data board_eeprom = {
++	.byte_len = 4096,
++	.page_size = 32,
++	.flags = AT24_FLAG_ADDR16,
++};
++
++static struct i2c_board_info pcm043_i2c_devices[] = {
++       {
++		I2C_BOARD_INFO("at24", 0x52), /* E0=0, E1=1, E2=0 */
++		.platform_data = &board_eeprom,
++	}, {
++		I2C_BOARD_INFO("pcf8563", 0x51),
++	}
++};
++#endif
++
++static struct platform_device *devices[] __initdata = {
++	&pcm043_flash,
++	&mxc_fec_device,
++};
++
++static struct pad_desc pcm043_pads[] = {
++	/* UART1 */
++	MX35_PAD_CTS1__UART1_CTS,
++	MX35_PAD_RTS1__UART1_RTS,
++	MX35_PAD_TXD1__UART1_TXD_MUX,
++	MX35_PAD_RXD1__UART1_RXD_MUX,
++	/* UART2 */
++	MX35_PAD_CTS2__UART2_CTS,
++	MX35_PAD_RTS2__UART2_RTS,
++	MX35_PAD_TXD2__UART2_TXD_MUX,
++	MX35_PAD_RXD2__UART2_RXD_MUX,
++	/* FEC */
++	MX35_PAD_FEC_TX_CLK__FEC_TX_CLK,
++	MX35_PAD_FEC_RX_CLK__FEC_RX_CLK,
++	MX35_PAD_FEC_RX_DV__FEC_RX_DV,
++	MX35_PAD_FEC_COL__FEC_COL,
++	MX35_PAD_FEC_RDATA0__FEC_RDATA_0,
++	MX35_PAD_FEC_TDATA0__FEC_TDATA_0,
++	MX35_PAD_FEC_TX_EN__FEC_TX_EN,
++	MX35_PAD_FEC_MDC__FEC_MDC,
++	MX35_PAD_FEC_MDIO__FEC_MDIO,
++	MX35_PAD_FEC_TX_ERR__FEC_TX_ERR,
++	MX35_PAD_FEC_RX_ERR__FEC_RX_ERR,
++	MX35_PAD_FEC_CRS__FEC_CRS,
++	MX35_PAD_FEC_RDATA1__FEC_RDATA_1,
++	MX35_PAD_FEC_TDATA1__FEC_TDATA_1,
++	MX35_PAD_FEC_RDATA2__FEC_RDATA_2,
++	MX35_PAD_FEC_TDATA2__FEC_TDATA_2,
++	MX35_PAD_FEC_RDATA3__FEC_RDATA_3,
++	MX35_PAD_FEC_TDATA3__FEC_TDATA_3,
++	/* I2C1 */
++	MX35_PAD_I2C1_CLK__I2C1_SCL,
++	MX35_PAD_I2C1_DAT__I2C1_SDA,
++	/* Display */
++	MX35_PAD_LD0__IPU_DISPB_DAT_0,
++	MX35_PAD_LD1__IPU_DISPB_DAT_1,
++	MX35_PAD_LD2__IPU_DISPB_DAT_2,
++	MX35_PAD_LD3__IPU_DISPB_DAT_3,
++	MX35_PAD_LD4__IPU_DISPB_DAT_4,
++	MX35_PAD_LD5__IPU_DISPB_DAT_5,
++	MX35_PAD_LD6__IPU_DISPB_DAT_6,
++	MX35_PAD_LD7__IPU_DISPB_DAT_7,
++	MX35_PAD_LD8__IPU_DISPB_DAT_8,
++	MX35_PAD_LD9__IPU_DISPB_DAT_9,
++	MX35_PAD_LD10__IPU_DISPB_DAT_10,
++	MX35_PAD_LD11__IPU_DISPB_DAT_11,
++	MX35_PAD_LD12__IPU_DISPB_DAT_12,
++	MX35_PAD_LD13__IPU_DISPB_DAT_13,
++	MX35_PAD_LD14__IPU_DISPB_DAT_14,
++	MX35_PAD_LD15__IPU_DISPB_DAT_15,
++	MX35_PAD_LD16__IPU_DISPB_DAT_16,
++	MX35_PAD_LD17__IPU_DISPB_DAT_17,
++	MX35_PAD_D3_HSYNC__IPU_DISPB_D3_HSYNC,
++	MX35_PAD_D3_FPSHIFT__IPU_DISPB_D3_CLK,
++	MX35_PAD_D3_DRDY__IPU_DISPB_D3_DRDY,
++	MX35_PAD_CONTRAST__IPU_DISPB_CONTR,
++	MX35_PAD_D3_VSYNC__IPU_DISPB_D3_VSYNC,
++	MX35_PAD_D3_REV__IPU_DISPB_D3_REV,
++	MX35_PAD_D3_CLS__IPU_DISPB_D3_CLS,
++	/* gpio */
++	MX35_PAD_ATA_CS0__GPIO2_6,
++};
++
++static struct mxc_nand_platform_data pcm037_nand_board_info = {
++	.width = 1,
++	.hw_ecc = 1,
++};
++
++/*
++ * Board specific initialization.
++ */
++static void __init mxc_board_init(void)
++{
++	mxc_iomux_v3_setup_multiple_pads(pcm043_pads, ARRAY_SIZE(pcm043_pads));
++
++	platform_add_devices(devices, ARRAY_SIZE(devices));
++
++	mxc_register_device(&mxc_uart_device0, &uart_pdata);
++	mxc_register_device(&mxc_nand_device, &pcm037_nand_board_info);
++
++	mxc_register_device(&mxc_uart_device1, &uart_pdata);
++
++#if defined CONFIG_I2C_IMX || defined CONFIG_I2C_IMX_MODULE
++	i2c_register_board_info(0, pcm043_i2c_devices,
++			ARRAY_SIZE(pcm043_i2c_devices));
++
++	mxc_register_device(&mxc_i2c_device0, &pcm043_i2c_1_data);
++#endif
++
++	mxc_register_device(&mx3_ipu, &mx3_ipu_data);
++	mxc_register_device(&mx3_fb, &mx3fb_pdata);
++}
++
++static void __init pcm043_timer_init(void)
++{
++	mx35_clocks_init();
++}
++
++struct sys_timer pcm043_timer = {
++	.init	= pcm043_timer_init,
++};
++
++MACHINE_START(PCM043, "Phytec Phycore pcm043")
++	/* Maintainer: Pengutronix */
++	.phys_io	= MX35_AIPS1_BASE_ADDR,
++	.io_pg_offst	= ((MX35_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
++	.boot_params    = PHYS_OFFSET + 0x100,
++	.map_io         = mx35_map_io,
++	.init_irq       = mx35_init_irq,
++	.init_machine   = mxc_board_init,
++	.timer          = &pcm043_timer,
++MACHINE_END
++
+diff --git a/arch/arm/mach-mx3/mach-qong.c b/arch/arm/mach-mx3/mach-qong.c
+new file mode 100644
+index 0000000..3c1e736
+--- /dev/null
++++ b/arch/arm/mach-mx3/mach-qong.c
+@@ -0,0 +1,285 @@
++/*
++ *  Copyright (C) 2009 Ilya Yanok, Emcraft Systems Ltd, <yanok@emcraft.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#include <linux/types.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/memory.h>
++#include <linux/platform_device.h>
++#include <linux/mtd/physmap.h>
++#include <linux/mtd/nand.h>
++#include <linux/gpio.h>
++
++#include <mach/hardware.h>
++#include <mach/irqs.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/time.h>
++#include <asm/mach/map.h>
++#include <mach/common.h>
++#include <asm/page.h>
++#include <asm/setup.h>
++#include <mach/board-qong.h>
++#include <mach/imx-uart.h>
++#include <mach/iomux-mx3.h>
++#include "devices.h"
++
++/* FPGA defines */
++#define QONG_FPGA_VERSION(major, minor, rev)	\
++	(((major & 0xF) << 12) | ((minor & 0xF) << 8) | (rev & 0xFF))
++
++#define QONG_FPGA_BASEADDR 		MX31_CS1_BASE_ADDR
++#define QONG_FPGA_PERIPH_SIZE 		(1 << 24)
++
++#define QONG_FPGA_CTRL_BASEADDR		QONG_FPGA_BASEADDR
++#define QONG_FPGA_CTRL_SIZE 		0x10
++/* FPGA control registers */
++#define QONG_FPGA_CTRL_VERSION		0x00
++
++#define QONG_DNET_ID		1
++#define QONG_DNET_BASEADDR	\
++	(QONG_FPGA_BASEADDR + QONG_DNET_ID * QONG_FPGA_PERIPH_SIZE)
++#define QONG_DNET_SIZE 		0x00001000
++
++#define QONG_FPGA_IRQ		IOMUX_TO_IRQ(MX31_PIN_DTR_DCE1)
++
++/*
++ * This file contains the board-specific initialization routines.
++ */
++
++static struct imxuart_platform_data uart_pdata = {
++	.flags = IMXUART_HAVE_RTSCTS,
++};
++
++static int uart_pins[] = {
++	MX31_PIN_CTS1__CTS1,
++	MX31_PIN_RTS1__RTS1,
++	MX31_PIN_TXD1__TXD1,
++	MX31_PIN_RXD1__RXD1
++};
++
++static inline void mxc_init_imx_uart(void)
++{
++	mxc_iomux_setup_multiple_pins(uart_pins, ARRAY_SIZE(uart_pins),
++			"uart-0");
++	mxc_register_device(&mxc_uart_device0, &uart_pdata);
++}
++
++static struct resource dnet_resources[] = {
++	{
++		.name	= "dnet-memory",
++		.start	= QONG_DNET_BASEADDR,
++		.end	= QONG_DNET_BASEADDR + QONG_DNET_SIZE - 1,
++		.flags	= IORESOURCE_MEM,
++	}, {
++		.start	= QONG_FPGA_IRQ,
++		.end	= QONG_FPGA_IRQ,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device dnet_device = {
++	.name			= "dnet",
++	.id			= -1,
++	.num_resources		= ARRAY_SIZE(dnet_resources),
++	.resource		= dnet_resources,
++};
++
++static int __init qong_init_dnet(void)
++{
++	int ret;
++
++	ret = platform_device_register(&dnet_device);
++	return ret;
++}
++
++/* MTD NOR flash */
++
++static struct physmap_flash_data qong_flash_data = {
++	.width = 2,
++};
++
++static struct resource qong_flash_resource = {
++	.start = MX31_CS0_BASE_ADDR,
++	.end = MX31_CS0_BASE_ADDR + QONG_NOR_SIZE - 1,
++	.flags = IORESOURCE_MEM,
++};
++
++static struct platform_device qong_nor_mtd_device = {
++	.name = "physmap-flash",
++	.id = 0,
++	.dev = {
++		.platform_data = &qong_flash_data,
++		},
++	.resource = &qong_flash_resource,
++	.num_resources = 1,
++};
++
++static void qong_init_nor_mtd(void)
++{
++	(void)platform_device_register(&qong_nor_mtd_device);
++}
++
++/*
++ * Hardware specific access to control-lines
++ */
++static void qong_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
++{
++	struct nand_chip *nand_chip = mtd->priv;
++
++	if (cmd == NAND_CMD_NONE)
++		return;
++
++	if (ctrl & NAND_CLE)
++		writeb(cmd, nand_chip->IO_ADDR_W + (1 << 24));
++	else
++		writeb(cmd, nand_chip->IO_ADDR_W + (1 << 23));
++}
++
++/*
++ * Read the Device Ready pin.
++ */
++static int qong_nand_device_ready(struct mtd_info *mtd)
++{
++	return gpio_get_value(IOMUX_TO_GPIO(MX31_PIN_NFRB));
++}
++
++static void qong_nand_select_chip(struct mtd_info *mtd, int chip)
++{
++	if (chip >= 0)
++		gpio_set_value(IOMUX_TO_GPIO(MX31_PIN_NFCE_B), 0);
++	else
++		gpio_set_value(IOMUX_TO_GPIO(MX31_PIN_NFCE_B), 1);
++}
++
++static struct platform_nand_data qong_nand_data = {
++	.chip = {
++		.chip_delay		= 20,
++		.options		= 0,
++	},
++	.ctrl = {
++		.cmd_ctrl 		= qong_nand_cmd_ctrl,
++		.dev_ready		= qong_nand_device_ready,
++		.select_chip		= qong_nand_select_chip,
++	}
++};
++
++static struct resource qong_nand_resource = {
++	.start  	= MX31_CS3_BASE_ADDR,
++	.end    	= MX31_CS3_BASE_ADDR + SZ_32M - 1,
++	.flags		= IORESOURCE_MEM,
++};
++
++static struct platform_device qong_nand_device = {
++	.name		= "gen_nand",
++	.id		= -1,
++	.dev		= {
++		.platform_data = &qong_nand_data,
++	},
++	.num_resources	= 1,
++	.resource	= &qong_nand_resource,
++};
++
++static void __init qong_init_nand_mtd(void)
++{
++	/* init CS */
++	__raw_writel(0x00004f00, CSCR_U(3));
++	__raw_writel(0x20013b31, CSCR_L(3));
++	__raw_writel(0x00020800, CSCR_A(3));
++	mxc_iomux_set_gpr(MUX_SDCTL_CSD1_SEL, true);
++
++	/* enable pin */
++	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_NFCE_B, IOMUX_CONFIG_GPIO));
++	if (!gpio_request(IOMUX_TO_GPIO(MX31_PIN_NFCE_B), "nand_enable"))
++		gpio_direction_output(IOMUX_TO_GPIO(MX31_PIN_NFCE_B), 0);
++
++	/* ready/busy pin */
++	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_NFRB, IOMUX_CONFIG_GPIO));
++	if (!gpio_request(IOMUX_TO_GPIO(MX31_PIN_NFRB), "nand_rdy"))
++		gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_NFRB));
++
++	/* write protect pin */
++	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_NFWP_B, IOMUX_CONFIG_GPIO));
++	if (!gpio_request(IOMUX_TO_GPIO(MX31_PIN_NFWP_B), "nand_wp"))
++		gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_NFWP_B));
++
++	platform_device_register(&qong_nand_device);
++}
++
++static void __init qong_init_fpga(void)
++{
++	void __iomem *regs;
++	u32 fpga_ver;
++
++	regs = ioremap(QONG_FPGA_CTRL_BASEADDR, QONG_FPGA_CTRL_SIZE);
++	if (!regs) {
++		printk(KERN_ERR "%s: failed to map registers, aborting.\n",
++				__func__);
++		return;
++	}
++
++	fpga_ver = readl(regs + QONG_FPGA_CTRL_VERSION);
++	iounmap(regs);
++	printk(KERN_INFO "Qong FPGA version %d.%d.%d\n",
++			(fpga_ver & 0xF000) >> 12,
++			(fpga_ver & 0x0F00) >> 8, fpga_ver & 0x00FF);
++	if (fpga_ver < QONG_FPGA_VERSION(0, 8, 7)) {
++		printk(KERN_ERR "qong: Unexpected FPGA version, FPGA-based "
++				"devices won't be registered!\n");
++		return;
++	}
++
++	/* register FPGA-based devices */
++	qong_init_nand_mtd();
++	qong_init_dnet();
++}
++
++/*
++ * Board specific initialization.
++ */
++static void __init mxc_board_init(void)
++{
++	mxc_init_imx_uart();
++	qong_init_nor_mtd();
++	qong_init_fpga();
++}
++
++static void __init qong_timer_init(void)
++{
++	mx31_clocks_init(26000000);
++}
++
++static struct sys_timer qong_timer = {
++	.init	= qong_timer_init,
++};
++
++/*
++ * The following uses standard kernel macros defined in arch.h in order to
++ * initialize __mach_desc_QONG data structure.
++ */
++
++MACHINE_START(QONG, "Dave/DENX QongEVB-LITE")
++	/* Maintainer: DENX Software Engineering GmbH */
++	.phys_io        = MX31_AIPS1_BASE_ADDR,
++	.io_pg_offst    = ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
++	.boot_params    = PHYS_OFFSET + 0x100,
++	.map_io         = mx31_map_io,
++	.init_irq       = mx31_init_irq,
++	.init_machine   = mxc_board_init,
++	.timer          = &qong_timer,
++MACHINE_END
+diff --git a/arch/arm/mach-mx3/mx31ads.c b/arch/arm/mach-mx3/mx31ads.c
 deleted file mode 100644
-index eb4a6e8..0000000
---- a/arch/arm/mach-mx2/mx21ads.c
+index 6699116..0000000
+--- a/arch/arm/mach-mx3/mx31ads.c
 +++ /dev/null
-@@ -1,294 +0,0 @@
+@@ -1,551 +0,0 @@
 -/*
 - *  Copyright (C) 2000 Deep Blue Solutions Ltd
 - *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
-- *  Copyright 2006-2007 Freescale Semiconductor, Inc. All Rights Reserved.
+- *  Copyright 2005-2007 Freescale Semiconductor, Inc. All Rights Reserved.
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License as published by
@@ -2363,290 +4756,1056 @@ index eb4a6e8..0000000
 - * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 - */
 -
--#include <linux/platform_device.h>
--#include <linux/mtd/mtd.h>
--#include <linux/mtd/physmap.h>
+-#include <linux/types.h>
+-#include <linux/init.h>
+-#include <linux/clk.h>
+-#include <linux/serial_8250.h>
 -#include <linux/gpio.h>
--#include <mach/common.h>
+-#include <linux/i2c.h>
+-#include <linux/irq.h>
+-
 -#include <mach/hardware.h>
 -#include <asm/mach-types.h>
 -#include <asm/mach/arch.h>
 -#include <asm/mach/time.h>
+-#include <asm/memory.h>
 -#include <asm/mach/map.h>
+-#include <mach/common.h>
+-#include <mach/board-mx31ads.h>
 -#include <mach/imx-uart.h>
--#include <mach/imxfb.h>
--#include <mach/iomux.h>
--#include <mach/mxc_nand.h>
--#include <mach/mmc.h>
--#include <mach/board-mx21ads.h>
+-#include <mach/iomux-mx3.h>
+-
+-#ifdef CONFIG_MACH_MX31ADS_WM1133_EV1
+-#include <linux/mfd/wm8350/audio.h>
+-#include <linux/mfd/wm8350/core.h>
+-#include <linux/mfd/wm8350/pmic.h>
+-#endif
 -
 -#include "devices.h"
 -
--static unsigned int mx21ads_pins[] = {
+-/*!
+- * @file mx31ads.c
+- *
+- * @brief This file contains the board-specific initialization routines.
+- *
+- * @ingroup System
+- */
 -
--	/* CS8900A */
--	(GPIO_PORTE | GPIO_GPIO | GPIO_IN | 11),
--
--	/* UART1 */
--	PE12_PF_UART1_TXD,
--	PE13_PF_UART1_RXD,
--	PE14_PF_UART1_CTS,
--	PE15_PF_UART1_RTS,
--
--	/* UART3 (IrDA) - only TXD and RXD */
--	PE8_PF_UART3_TXD,
--	PE9_PF_UART3_RXD,
--
--	/* UART4 */
--	PB26_AF_UART4_RTS,
--	PB28_AF_UART4_TXD,
--	PB29_AF_UART4_CTS,
--	PB31_AF_UART4_RXD,
--
--	/* LCDC */
--	PA5_PF_LSCLK,
--	PA6_PF_LD0,
--	PA7_PF_LD1,
--	PA8_PF_LD2,
--	PA9_PF_LD3,
--	PA10_PF_LD4,
--	PA11_PF_LD5,
--	PA12_PF_LD6,
--	PA13_PF_LD7,
--	PA14_PF_LD8,
--	PA15_PF_LD9,
--	PA16_PF_LD10,
--	PA17_PF_LD11,
--	PA18_PF_LD12,
--	PA19_PF_LD13,
--	PA20_PF_LD14,
--	PA21_PF_LD15,
--	PA22_PF_LD16,
--	PA24_PF_REV,     /* Sharp panel dedicated signal */
--	PA25_PF_CLS,     /* Sharp panel dedicated signal */
--	PA26_PF_PS,      /* Sharp panel dedicated signal */
--	PA27_PF_SPL_SPR, /* Sharp panel dedicated signal */
--	PA28_PF_HSYNC,
--	PA29_PF_VSYNC,
--	PA30_PF_CONTRAST,
--	PA31_PF_OE_ACD,
--
--	/* MMC/SDHC */
--	PE18_PF_SD1_D0,
--	PE19_PF_SD1_D1,
--	PE20_PF_SD1_D2,
--	PE21_PF_SD1_D3,
--	PE22_PF_SD1_CMD,
--	PE23_PF_SD1_CLK,
--
--	/* NFC */
--	PF0_PF_NRFB,
--	PF1_PF_NFCE,
--	PF2_PF_NFWP,
--	PF3_PF_NFCLE,
--	PF4_PF_NFALE,
--	PF5_PF_NFRE,
--	PF6_PF_NFWE,
--	PF7_PF_NFIO0,
--	PF8_PF_NFIO1,
--	PF9_PF_NFIO2,
--	PF10_PF_NFIO3,
--	PF11_PF_NFIO4,
--	PF12_PF_NFIO5,
--	PF13_PF_NFIO6,
--	PF14_PF_NFIO7,
--};
--
--/* ADS's NOR flash: 2x AM29BDS128HE9VKI on 32-bit bus */
--static struct physmap_flash_data mx21ads_flash_data = {
--	.width = 4,
--};
--
--static struct resource mx21ads_flash_resource = {
--	.start = MX21_CS0_BASE_ADDR,
--	.end = MX21_CS0_BASE_ADDR + 0x02000000 - 1,
--	.flags = IORESOURCE_MEM,
--};
--
--static struct platform_device mx21ads_nor_mtd_device = {
--	.name = "physmap-flash",
--	.id = 0,
--	.dev = {
--		.platform_data = &mx21ads_flash_data,
+-#if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
+-/*!
+- * The serial port definition structure.
+- */
+-static struct plat_serial8250_port serial_platform_data[] = {
+-	{
+-		.membase  = (void *)(PBC_BASE_ADDRESS + PBC_SC16C652_UARTA),
+-		.mapbase  = (unsigned long)(MX31_CS4_BASE_ADDR + PBC_SC16C652_UARTA),
+-		.irq      = EXPIO_INT_XUART_INTA,
+-		.uartclk  = 14745600,
+-		.regshift = 0,
+-		.iotype   = UPIO_MEM,
+-		.flags    = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_AUTO_IRQ,
+-	}, {
+-		.membase  = (void *)(PBC_BASE_ADDRESS + PBC_SC16C652_UARTB),
+-		.mapbase  = (unsigned long)(MX31_CS4_BASE_ADDR + PBC_SC16C652_UARTB),
+-		.irq      = EXPIO_INT_XUART_INTB,
+-		.uartclk  = 14745600,
+-		.regshift = 0,
+-		.iotype   = UPIO_MEM,
+-		.flags    = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_AUTO_IRQ,
 -	},
--	.num_resources = 1,
--	.resource = &mx21ads_flash_resource,
+-	{},
 -};
 -
+-static struct platform_device serial_device = {
+-	.name	= "serial8250",
+-	.id	= 0,
+-	.dev	= {
+-		.platform_data = serial_platform_data,
+-	},
+-};
+-
+-static int __init mxc_init_extuart(void)
+-{
+-	return platform_device_register(&serial_device);
+-}
+-#else
+-static inline int mxc_init_extuart(void)
+-{
+-	return 0;
+-}
+-#endif
+-
+-#if defined(CONFIG_SERIAL_IMX) || defined(CONFIG_SERIAL_IMX_MODULE)
 -static struct imxuart_platform_data uart_pdata = {
 -	.flags = IMXUART_HAVE_RTSCTS,
 -};
 -
--static struct imxuart_platform_data uart_norts_pdata = {
+-static unsigned int uart_pins[] = {
+-	MX31_PIN_CTS1__CTS1,
+-	MX31_PIN_RTS1__RTS1,
+-	MX31_PIN_TXD1__TXD1,
+-	MX31_PIN_RXD1__RXD1
 -};
 -
--
--static int mx21ads_fb_init(struct platform_device *pdev)
+-static inline void mxc_init_imx_uart(void)
 -{
--	u16 tmp;
--
--	tmp = __raw_readw(MX21ADS_IO_REG);
--	tmp |= MX21ADS_IO_LCDON;
--	__raw_writew(tmp, MX21ADS_IO_REG);
--	return 0;
+-	mxc_iomux_setup_multiple_pins(uart_pins, ARRAY_SIZE(uart_pins), "uart-0");
+-	mxc_register_device(&mxc_uart_device0, &uart_pdata);
 -}
--
--static void mx21ads_fb_exit(struct platform_device *pdev)
+-#else /* !SERIAL_IMX */
+-static inline void mxc_init_imx_uart(void)
 -{
--	u16 tmp;
+-}
+-#endif /* !SERIAL_IMX */
 -
--	tmp = __raw_readw(MX21ADS_IO_REG);
--	tmp &= ~MX21ADS_IO_LCDON;
--	__raw_writew(tmp, MX21ADS_IO_REG);
+-static void mx31ads_expio_irq_handler(u32 irq, struct irq_desc *desc)
+-{
+-	u32 imr_val;
+-	u32 int_valid;
+-	u32 expio_irq;
+-
+-	imr_val = __raw_readw(PBC_INTMASK_SET_REG);
+-	int_valid = __raw_readw(PBC_INTSTATUS_REG) & imr_val;
+-
+-	expio_irq = MXC_EXP_IO_BASE;
+-	for (; int_valid != 0; int_valid >>= 1, expio_irq++) {
+-		if ((int_valid & 1) == 0)
+-			continue;
+-
+-		generic_handle_irq(expio_irq);
+-	}
 -}
 -
 -/*
-- * Connected is a portrait Sharp-QVGA display
-- * of type: LQ035Q7DB02
+- * Disable an expio pin's interrupt by setting the bit in the imr.
+- * @param irq           an expio virtual irq number
 - */
--static struct imx_fb_videomode mx21ads_modes[] = {
+-static void expio_mask_irq(u32 irq)
+-{
+-	u32 expio = MXC_IRQ_TO_EXPIO(irq);
+-	/* mask the interrupt */
+-	__raw_writew(1 << expio, PBC_INTMASK_CLEAR_REG);
+-	__raw_readw(PBC_INTMASK_CLEAR_REG);
+-}
+-
+-/*
+- * Acknowledge an expanded io pin's interrupt by clearing the bit in the isr.
+- * @param irq           an expanded io virtual irq number
+- */
+-static void expio_ack_irq(u32 irq)
+-{
+-	u32 expio = MXC_IRQ_TO_EXPIO(irq);
+-	/* clear the interrupt status */
+-	__raw_writew(1 << expio, PBC_INTSTATUS_REG);
+-}
+-
+-/*
+- * Enable a expio pin's interrupt by clearing the bit in the imr.
+- * @param irq           a expio virtual irq number
+- */
+-static void expio_unmask_irq(u32 irq)
+-{
+-	u32 expio = MXC_IRQ_TO_EXPIO(irq);
+-	/* unmask the interrupt */
+-	__raw_writew(1 << expio, PBC_INTMASK_SET_REG);
+-}
+-
+-static struct irq_chip expio_irq_chip = {
+-	.ack = expio_ack_irq,
+-	.mask = expio_mask_irq,
+-	.unmask = expio_unmask_irq,
+-};
+-
+-static void __init mx31ads_init_expio(void)
+-{
+-	int i;
+-
+-	printk(KERN_INFO "MX31ADS EXPIO(CPLD) hardware\n");
+-
+-	/*
+-	 * Configure INT line as GPIO input
+-	 */
+-	mxc_iomux_alloc_pin(IOMUX_MODE(MX31_PIN_GPIO1_4, IOMUX_CONFIG_GPIO), "expio");
+-
+-	/* disable the interrupt and clear the status */
+-	__raw_writew(0xFFFF, PBC_INTMASK_CLEAR_REG);
+-	__raw_writew(0xFFFF, PBC_INTSTATUS_REG);
+-	for (i = MXC_EXP_IO_BASE; i < (MXC_EXP_IO_BASE + MXC_MAX_EXP_IO_LINES);
+-	     i++) {
+-		set_irq_chip(i, &expio_irq_chip);
+-		set_irq_handler(i, handle_level_irq);
+-		set_irq_flags(i, IRQF_VALID);
+-	}
+-	set_irq_type(EXPIO_PARENT_INT, IRQ_TYPE_LEVEL_HIGH);
+-	set_irq_chained_handler(EXPIO_PARENT_INT, mx31ads_expio_irq_handler);
+-}
+-
+-#ifdef CONFIG_MACH_MX31ADS_WM1133_EV1
+-/* This section defines setup for the Wolfson Microelectronics
+- * 1133-EV1 PMU/audio board.  When other PMU boards are supported the
+- * regulator definitions may be shared with them, but for now they can
+- * only be used with this board so would generate warnings about
+- * unused statics and some of the configuration is specific to this
+- * module.
+- */
+-
+-/* CPU */
+-static struct regulator_consumer_supply sw1a_consumers[] = {
 -	{
--		.mode = {
--			.name		= "Sharp-LQ035Q7",
--			.refresh	= 60,
--			.xres		= 240,
--			.yres		= 320,
--			.pixclock	= 188679, /* in ps (5.3MHz) */
--			.hsync_len	= 2,
--			.left_margin	= 6,
--			.right_margin	= 16,
--			.vsync_len	= 1,
--			.upper_margin	= 8,
--			.lower_margin	= 10,
--		},
--		.pcr		= 0xfb108bc7,
--		.bpp		= 16,
+-		.supply = "cpu_vcc",
+-	}
+-};
+-
+-static struct regulator_init_data sw1a_data = {
+-	.constraints = {
+-		.name = "SW1A",
+-		.min_uV = 1275000,
+-		.max_uV = 1600000,
+-		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
+-				  REGULATOR_CHANGE_MODE,
+-		.valid_modes_mask = REGULATOR_MODE_NORMAL |
+-				    REGULATOR_MODE_FAST,
+-		.state_mem = {
+-			 .uV = 1400000,
+-			 .mode = REGULATOR_MODE_NORMAL,
+-			 .enabled = 1,
+-		 },
+-		.initial_state = PM_SUSPEND_MEM,
+-		.always_on = 1,
+-		.boot_on = 1,
+-	},
+-	.num_consumer_supplies = ARRAY_SIZE(sw1a_consumers),
+-	.consumer_supplies = sw1a_consumers,
+-};
+-
+-/* System IO - High */
+-static struct regulator_init_data viohi_data = {
+-	.constraints = {
+-		.name = "VIOHO",
+-		.min_uV = 2800000,
+-		.max_uV = 2800000,
+-		.state_mem = {
+-			 .uV = 2800000,
+-			 .mode = REGULATOR_MODE_NORMAL,
+-			 .enabled = 1,
+-		 },
+-		.initial_state = PM_SUSPEND_MEM,
+-		.always_on = 1,
+-		.boot_on = 1,
 -	},
 -};
 -
--static struct imx_fb_platform_data mx21ads_fb_data = {
--	.mode = mx21ads_modes,
--	.num_modes = ARRAY_SIZE(mx21ads_modes),
--
--	.pwmr		= 0x00a903ff,
--	.lscr1		= 0x00120300,
--	.dmacr		= 0x00020008,
--
--	.init = mx21ads_fb_init,
--	.exit = mx21ads_fb_exit,
+-/* System IO - Low */
+-static struct regulator_init_data violo_data = {
+-	.constraints = {
+-		.name = "VIOLO",
+-		.min_uV = 1800000,
+-		.max_uV = 1800000,
+-		.state_mem = {
+-			 .uV = 1800000,
+-			 .mode = REGULATOR_MODE_NORMAL,
+-			 .enabled = 1,
+-		 },
+-		.initial_state = PM_SUSPEND_MEM,
+-		.always_on = 1,
+-		.boot_on = 1,
+-	},
 -};
 -
--static int mx21ads_sdhc_get_ro(struct device *dev)
+-/* DDR RAM */
+-static struct regulator_init_data sw2a_data = {
+-	.constraints = {
+-		.name = "SW2A",
+-		.min_uV = 1800000,
+-		.max_uV = 1800000,
+-		.valid_modes_mask = REGULATOR_MODE_NORMAL,
+-		.state_mem = {
+-			 .uV = 1800000,
+-			 .mode = REGULATOR_MODE_NORMAL,
+-			 .enabled = 1,
+-		 },
+-		.state_disk = {
+-			 .mode = REGULATOR_MODE_NORMAL,
+-			 .enabled = 0,
+-		 },
+-		.always_on = 1,
+-		.boot_on = 1,
+-		.initial_state = PM_SUSPEND_MEM,
+-	},
+-};
+-
+-static struct regulator_init_data ldo1_data = {
+-	.constraints = {
+-		.name = "VCAM/VMMC1/VMMC2",
+-		.min_uV = 2800000,
+-		.max_uV = 2800000,
+-		.valid_modes_mask = REGULATOR_MODE_NORMAL,
+-		.apply_uV = 1,
+-	},
+-};
+-
+-static struct regulator_consumer_supply ldo2_consumers[] = {
+-	{
+-		.supply = "AVDD",
+-	},
+-	{
+-		.supply = "HPVDD",
+-	},
+-};
+-
+-/* CODEC and SIM */
+-static struct regulator_init_data ldo2_data = {
+-	.constraints = {
+-		.name = "VESIM/VSIM/AVDD",
+-		.min_uV = 3300000,
+-		.max_uV = 3300000,
+-		.valid_modes_mask = REGULATOR_MODE_NORMAL,
+-		.apply_uV = 1,
+-	},
+-	.num_consumer_supplies = ARRAY_SIZE(ldo2_consumers),
+-	.consumer_supplies = ldo2_consumers,
+-};
+-
+-/* General */
+-static struct regulator_init_data vdig_data = {
+-	.constraints = {
+-		.name = "VDIG",
+-		.min_uV = 1500000,
+-		.max_uV = 1500000,
+-		.valid_modes_mask = REGULATOR_MODE_NORMAL,
+-		.apply_uV = 1,
+-		.always_on = 1,
+-		.boot_on = 1,
+-	},
+-};
+-
+-/* Tranceivers */
+-static struct regulator_init_data ldo4_data = {
+-	.constraints = {
+-		.name = "VRF1/CVDD_2.775",
+-		.min_uV = 2500000,
+-		.max_uV = 2500000,
+-		.valid_modes_mask = REGULATOR_MODE_NORMAL,
+-		.apply_uV = 1,
+-		.always_on = 1,
+-		.boot_on = 1,
+-	},
+-};
+-
+-static struct wm8350_led_platform_data wm8350_led_data = {
+-	.name            = "wm8350:white",
+-	.default_trigger = "heartbeat",
+-	.max_uA          = 27899,
+-};
+-
+-static struct wm8350_audio_platform_data imx32ads_wm8350_setup = {
+-	.vmid_discharge_msecs = 1000,
+-	.drain_msecs = 30,
+-	.cap_discharge_msecs = 700,
+-	.vmid_charge_msecs = 700,
+-	.vmid_s_curve = WM8350_S_CURVE_SLOW,
+-	.dis_out4 = WM8350_DISCHARGE_SLOW,
+-	.dis_out3 = WM8350_DISCHARGE_SLOW,
+-	.dis_out2 = WM8350_DISCHARGE_SLOW,
+-	.dis_out1 = WM8350_DISCHARGE_SLOW,
+-	.vroi_out4 = WM8350_TIE_OFF_500R,
+-	.vroi_out3 = WM8350_TIE_OFF_500R,
+-	.vroi_out2 = WM8350_TIE_OFF_500R,
+-	.vroi_out1 = WM8350_TIE_OFF_500R,
+-	.vroi_enable = 0,
+-	.codec_current_on = WM8350_CODEC_ISEL_1_0,
+-	.codec_current_standby = WM8350_CODEC_ISEL_0_5,
+-	.codec_current_charge = WM8350_CODEC_ISEL_1_5,
+-};
+-
+-static int mx31_wm8350_init(struct wm8350 *wm8350)
 -{
--	return (__raw_readw(MX21ADS_IO_REG) & MX21ADS_IO_SD_WP) ? 1 : 0;
+-	int i;
+-
+-	wm8350_gpio_config(wm8350, 0, WM8350_GPIO_DIR_IN,
+-			   WM8350_GPIO0_PWR_ON_IN, WM8350_GPIO_ACTIVE_LOW,
+-			   WM8350_GPIO_PULL_UP, WM8350_GPIO_INVERT_OFF,
+-			   WM8350_GPIO_DEBOUNCE_ON);
+-
+-	wm8350_gpio_config(wm8350, 3, WM8350_GPIO_DIR_IN,
+-			   WM8350_GPIO3_PWR_OFF_IN, WM8350_GPIO_ACTIVE_HIGH,
+-			   WM8350_GPIO_PULL_DOWN, WM8350_GPIO_INVERT_OFF,
+-			   WM8350_GPIO_DEBOUNCE_ON);
+-
+-	wm8350_gpio_config(wm8350, 4, WM8350_GPIO_DIR_IN,
+-			   WM8350_GPIO4_MR_IN, WM8350_GPIO_ACTIVE_HIGH,
+-			   WM8350_GPIO_PULL_DOWN, WM8350_GPIO_INVERT_OFF,
+-			   WM8350_GPIO_DEBOUNCE_OFF);
+-
+-	wm8350_gpio_config(wm8350, 7, WM8350_GPIO_DIR_IN,
+-			   WM8350_GPIO7_HIBERNATE_IN, WM8350_GPIO_ACTIVE_HIGH,
+-			   WM8350_GPIO_PULL_DOWN, WM8350_GPIO_INVERT_OFF,
+-			   WM8350_GPIO_DEBOUNCE_OFF);
+-
+-	wm8350_gpio_config(wm8350, 6, WM8350_GPIO_DIR_OUT,
+-			   WM8350_GPIO6_SDOUT_OUT, WM8350_GPIO_ACTIVE_HIGH,
+-			   WM8350_GPIO_PULL_NONE, WM8350_GPIO_INVERT_OFF,
+-			   WM8350_GPIO_DEBOUNCE_OFF);
+-
+-	wm8350_gpio_config(wm8350, 8, WM8350_GPIO_DIR_OUT,
+-			   WM8350_GPIO8_VCC_FAULT_OUT, WM8350_GPIO_ACTIVE_LOW,
+-			   WM8350_GPIO_PULL_NONE, WM8350_GPIO_INVERT_OFF,
+-			   WM8350_GPIO_DEBOUNCE_OFF);
+-
+-	wm8350_gpio_config(wm8350, 9, WM8350_GPIO_DIR_OUT,
+-			   WM8350_GPIO9_BATT_FAULT_OUT, WM8350_GPIO_ACTIVE_LOW,
+-			   WM8350_GPIO_PULL_NONE, WM8350_GPIO_INVERT_OFF,
+-			   WM8350_GPIO_DEBOUNCE_OFF);
+-
+-	/* Fix up for our own supplies. */
+-	for (i = 0; i < ARRAY_SIZE(ldo2_consumers); i++)
+-		ldo2_consumers[i].dev = wm8350->dev;
+-
+-	wm8350_register_regulator(wm8350, WM8350_DCDC_1, &sw1a_data);
+-	wm8350_register_regulator(wm8350, WM8350_DCDC_3, &viohi_data);
+-	wm8350_register_regulator(wm8350, WM8350_DCDC_4, &violo_data);
+-	wm8350_register_regulator(wm8350, WM8350_DCDC_6, &sw2a_data);
+-	wm8350_register_regulator(wm8350, WM8350_LDO_1, &ldo1_data);
+-	wm8350_register_regulator(wm8350, WM8350_LDO_2, &ldo2_data);
+-	wm8350_register_regulator(wm8350, WM8350_LDO_3, &vdig_data);
+-	wm8350_register_regulator(wm8350, WM8350_LDO_4, &ldo4_data);
+-
+-	/* LEDs */
+-	wm8350_dcdc_set_slot(wm8350, WM8350_DCDC_5, 1, 1,
+-			     WM8350_DC5_ERRACT_SHUTDOWN_CONV);
+-	wm8350_isink_set_flash(wm8350, WM8350_ISINK_A,
+-			       WM8350_ISINK_FLASH_DISABLE,
+-			       WM8350_ISINK_FLASH_TRIG_BIT,
+-			       WM8350_ISINK_FLASH_DUR_32MS,
+-			       WM8350_ISINK_FLASH_ON_INSTANT,
+-			       WM8350_ISINK_FLASH_OFF_INSTANT,
+-			       WM8350_ISINK_FLASH_MODE_EN);
+-	wm8350_dcdc25_set_mode(wm8350, WM8350_DCDC_5,
+-			       WM8350_ISINK_MODE_BOOST,
+-			       WM8350_ISINK_ILIM_NORMAL,
+-			       WM8350_DC5_RMP_20V,
+-			       WM8350_DC5_FBSRC_ISINKA);
+-	wm8350_register_led(wm8350, 0, WM8350_DCDC_5, WM8350_ISINK_A,
+-			    &wm8350_led_data);
+-
+-	wm8350->codec.platform_data = &imx32ads_wm8350_setup;
+-
+-	regulator_has_full_constraints();
+-
+-	return 0;
 -}
 -
--static int mx21ads_sdhc_init(struct device *dev, irq_handler_t detect_irq,
--	void *data)
+-static struct wm8350_platform_data __initdata mx31_wm8350_pdata = {
+-	.init = mx31_wm8350_init,
+-};
+-#endif
+-
+-#if defined(CONFIG_I2C_IMX) || defined(CONFIG_I2C_IMX_MODULE)
+-static struct i2c_board_info __initdata mx31ads_i2c1_devices[] = {
+-#ifdef CONFIG_MACH_MX31ADS_WM1133_EV1
+-	{
+-		I2C_BOARD_INFO("wm8350", 0x1a),
+-		.platform_data = &mx31_wm8350_pdata,
+-		.irq = IOMUX_TO_IRQ(MX31_PIN_GPIO1_3),
+-	},
+-#endif
+-};
+-
+-static void mxc_init_i2c(void)
+-{
+-	i2c_register_board_info(1, mx31ads_i2c1_devices,
+-				ARRAY_SIZE(mx31ads_i2c1_devices));
+-
+-	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_CSPI2_MOSI, IOMUX_CONFIG_ALT1));
+-	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_CSPI2_MISO, IOMUX_CONFIG_ALT1));
+-
+-	mxc_register_device(&mxc_i2c_device1, NULL);
+-}
+-#else
+-static void mxc_init_i2c(void)
+-{
+-}
+-#endif
+-
+-/*!
+- * This structure defines static mappings for the i.MX31ADS board.
+- */
+-static struct map_desc mx31ads_io_desc[] __initdata = {
+-	{
+-		.virtual	= MX31_CS4_BASE_ADDR_VIRT,
+-		.pfn		= __phys_to_pfn(MX31_CS4_BASE_ADDR),
+-		.length		= MX31_CS4_SIZE / 2,
+-		.type		= MT_DEVICE
+-	},
+-};
+-
+-/*!
+- * Set up static virtual mappings.
+- */
+-static void __init mx31ads_map_io(void)
+-{
+-	mx31_map_io();
+-	iotable_init(mx31ads_io_desc, ARRAY_SIZE(mx31ads_io_desc));
+-}
+-
+-static void __init mx31ads_init_irq(void)
+-{
+-	mx31_init_irq();
+-	mx31ads_init_expio();
+-}
+-
+-/*!
+- * Board specific initialization.
+- */
+-static void __init mxc_board_init(void)
+-{
+-	mxc_init_extuart();
+-	mxc_init_imx_uart();
+-	mxc_init_i2c();
+-}
+-
+-static void __init mx31ads_timer_init(void)
+-{
+-	mx31_clocks_init(26000000);
+-}
+-
+-static struct sys_timer mx31ads_timer = {
+-	.init	= mx31ads_timer_init,
+-};
+-
+-/*
+- * The following uses standard kernel macros defined in arch.h in order to
+- * initialize __mach_desc_MX31ADS data structure.
+- */
+-MACHINE_START(MX31ADS, "Freescale MX31ADS")
+-	/* Maintainer: Freescale Semiconductor, Inc. */
+-	.phys_io	= MX31_AIPS1_BASE_ADDR,
+-	.io_pg_offst	= ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
+-	.boot_params    = PHYS_OFFSET + 0x100,
+-	.map_io         = mx31ads_map_io,
+-	.init_irq       = mx31ads_init_irq,
+-	.init_machine   = mxc_board_init,
+-	.timer          = &mx31ads_timer,
+-MACHINE_END
+diff --git a/arch/arm/mach-mx3/mx31lilly.c b/arch/arm/mach-mx3/mx31lilly.c
+deleted file mode 100644
+index ffccea9..0000000
+--- a/arch/arm/mach-mx3/mx31lilly.c
++++ /dev/null
+@@ -1,206 +0,0 @@
+-/*
+- *  LILLY-1131 module support
+- *
+- *    Copyright (c) 2009 Daniel Mack <daniel@caiaq.de>
+- *
+- *  based on code for other MX31 boards,
+- *
+- *    Copyright 2005-2007 Freescale Semiconductor
+- *    Copyright (c) 2009 Alberto Panizzo <maramaopercheseimorto@gmail.com>
+- *    Copyright (C) 2009 Valentin Longchamp, EPFL Mobots group
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-
+-#include <linux/types.h>
+-#include <linux/init.h>
+-#include <linux/clk.h>
+-#include <linux/platform_device.h>
+-#include <linux/interrupt.h>
+-#include <linux/smsc911x.h>
+-#include <linux/mtd/physmap.h>
+-#include <linux/spi/spi.h>
+-#include <linux/mfd/mc13783.h>
+-
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/time.h>
+-#include <asm/mach/map.h>
+-
+-#include <mach/hardware.h>
+-#include <mach/common.h>
+-#include <mach/iomux-mx3.h>
+-#include <mach/board-mx31lilly.h>
+-#include <mach/spi.h>
+-
+-#include "devices.h"
+-
+-/*
+- * This file contains module-specific initialization routines for LILLY-1131.
+- * Initialization of peripherals found on the baseboard is implemented in the
+- * appropriate baseboard support code.
+- */
+-
+-/* SMSC ethernet support */
+-
+-static struct resource smsc91x_resources[] = {
+-	{
+-		.start	= MX31_CS4_BASE_ADDR,
+-		.end	= MX31_CS4_BASE_ADDR + 0xffff,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	{
+-		.start	= IOMUX_TO_IRQ(MX31_PIN_GPIO1_0),
+-		.end	= IOMUX_TO_IRQ(MX31_PIN_GPIO1_0),
+-		.flags	= IORESOURCE_IRQ | IRQF_TRIGGER_FALLING,
+-	}
+-};
+-
+-static struct smsc911x_platform_config smsc911x_config = {
+-	.phy_interface	= PHY_INTERFACE_MODE_MII,
+-	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
+-	.irq_type	= SMSC911X_IRQ_TYPE_OPEN_DRAIN,
+-	.flags		= SMSC911X_USE_32BIT |
+-			  SMSC911X_SAVE_MAC_ADDRESS |
+-			  SMSC911X_FORCE_INTERNAL_PHY,
+-};
+-
+-static struct platform_device smsc91x_device = {
+-	.name		= "smsc911x",
+-	.id		= -1,
+-	.num_resources	= ARRAY_SIZE(smsc91x_resources),
+-	.resource	= smsc91x_resources,
+-	.dev		= {
+-		.platform_data = &smsc911x_config,
+-	}
+-};
+-
+-/* NOR flash */
+-static struct physmap_flash_data nor_flash_data = {
+-	.width  = 2,
+-};
+-
+-static struct resource nor_flash_resource = {
+-	.start	= 0xa0000000,
+-	.end	= 0xa1ffffff,
+-	.flags	= IORESOURCE_MEM,
+-};
+-
+-static struct platform_device physmap_flash_device = {
+-	.name	= "physmap-flash",
+-	.id	= 0,
+-	.dev	= {
+-		.platform_data  = &nor_flash_data,
+-	},
+-	.resource = &nor_flash_resource,
+-	.num_resources = 1,
+-};
+-
+-static struct platform_device *devices[] __initdata = {
+-	&smsc91x_device,
+-	&physmap_flash_device,
+-};
+-
+-/* SPI */
+-
+-static int spi_internal_chipselect[] = {
+-	MXC_SPI_CS(0),
+-	MXC_SPI_CS(1),
+-	MXC_SPI_CS(2),
+-};
+-
+-static struct spi_imx_master spi0_pdata = {
+-	.chipselect = spi_internal_chipselect,
+-	.num_chipselect = ARRAY_SIZE(spi_internal_chipselect),
+-};
+-
+-static struct spi_imx_master spi1_pdata = {
+-	.chipselect = spi_internal_chipselect,
+-	.num_chipselect = ARRAY_SIZE(spi_internal_chipselect),
+-};
+-
+-static struct mc13783_platform_data mc13783_pdata __initdata = {
+-	.flags = MC13783_USE_RTC | MC13783_USE_TOUCHSCREEN,
+-};
+-
+-static struct spi_board_info mc13783_dev __initdata = {
+-	.modalias	= "mc13783",
+-	.max_speed_hz	= 1000000,
+-	.bus_num	= 1,
+-	.chip_select	= 0,
+-	.platform_data	= &mc13783_pdata,
+-};
+-
+-static int mx31lilly_baseboard;
+-core_param(mx31lilly_baseboard, mx31lilly_baseboard, int, 0444);
+-
+-static void __init mx31lilly_board_init(void)
+-{
+-	switch (mx31lilly_baseboard) {
+-	case MX31LILLY_NOBOARD:
+-		break;
+-	case MX31LILLY_DB:
+-		mx31lilly_db_init();
+-		break;
+-	default:
+-		printk(KERN_ERR "Illegal mx31lilly_baseboard type %d\n",
+-			mx31lilly_baseboard);
+-	}
+-
+-	mxc_iomux_alloc_pin(MX31_PIN_CS4__CS4, "Ethernet CS");
+-
+-	/* SPI */
+-	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_SCLK__SCLK, "SPI1_CLK");
+-	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_MOSI__MOSI, "SPI1_TX");
+-	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_MISO__MISO, "SPI1_RX");
+-	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_SPI_RDY__SPI_RDY, "SPI1_RDY");
+-	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_SS0__SS0, "SPI1_SS0");
+-	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_SS1__SS1, "SPI1_SS1");
+-	mxc_iomux_alloc_pin(MX31_PIN_CSPI1_SS2__SS2, "SPI1_SS2");
+-
+-	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_SCLK__SCLK, "SPI2_CLK");
+-	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_MOSI__MOSI, "SPI2_TX");
+-	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_MISO__MISO, "SPI2_RX");
+-	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_SPI_RDY__SPI_RDY, "SPI2_RDY");
+-	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_SS0__SS0, "SPI2_SS0");
+-	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_SS1__SS1, "SPI2_SS1");
+-	mxc_iomux_alloc_pin(MX31_PIN_CSPI2_SS2__SS2, "SPI2_SS2");
+-
+-	mxc_register_device(&mxc_spi_device0, &spi0_pdata);
+-	mxc_register_device(&mxc_spi_device1, &spi1_pdata);
+-	spi_register_board_info(&mc13783_dev, 1);
+-
+-	platform_add_devices(devices, ARRAY_SIZE(devices));
+-}
+-
+-static void __init mx31lilly_timer_init(void)
+-{
+-	mx31_clocks_init(26000000);
+-}
+-
+-static struct sys_timer mx31lilly_timer = {
+-	.init	= mx31lilly_timer_init,
+-};
+-
+-MACHINE_START(LILLY1131, "INCO startec LILLY-1131")
+-	.phys_io	= MX31_AIPS1_BASE_ADDR,
+-	.io_pg_offst	= ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
+-	.boot_params	= PHYS_OFFSET + 0x100,
+-	.map_io		= mx31_map_io,
+-	.init_irq	= mx31_init_irq,
+-	.init_machine	= mx31lilly_board_init,
+-	.timer		= &mx31lilly_timer,
+-MACHINE_END
+-
+diff --git a/arch/arm/mach-mx3/mx31lite.c b/arch/arm/mach-mx3/mx31lite.c
+deleted file mode 100644
+index db741be..0000000
+--- a/arch/arm/mach-mx3/mx31lite.c
++++ /dev/null
+@@ -1,293 +0,0 @@
+-/*
+- *  Copyright (C) 2000 Deep Blue Solutions Ltd
+- *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
+- *  Copyright 2005-2007 Freescale Semiconductor, Inc. All Rights Reserved.
+- *  Copyright (C) 2009 Daniel Mack <daniel@caiaq.de>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-
+-#include <linux/types.h>
+-#include <linux/init.h>
+-#include <linux/kernel.h>
+-#include <linux/memory.h>
+-#include <linux/platform_device.h>
+-#include <linux/gpio.h>
+-#include <linux/smsc911x.h>
+-#include <linux/mfd/mc13783.h>
+-#include <linux/spi/spi.h>
+-#include <linux/usb/otg.h>
+-#include <linux/usb/ulpi.h>
+-#include <linux/mtd/physmap.h>
+-
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/time.h>
+-#include <asm/mach/map.h>
+-#include <asm/page.h>
+-#include <asm/setup.h>
+-
+-#include <mach/hardware.h>
+-#include <mach/common.h>
+-#include <mach/board-mx31lite.h>
+-#include <mach/imx-uart.h>
+-#include <mach/iomux-mx3.h>
+-#include <mach/irqs.h>
+-#include <mach/mxc_nand.h>
+-#include <mach/spi.h>
+-#include <mach/mxc_ehci.h>
+-#include <mach/ulpi.h>
+-
+-#include "devices.h"
+-
+-/*
+- * This file contains the module-specific initialization routines.
+- */
+-
+-static unsigned int mx31lite_pins[] = {
+-	/* LAN9117 IRQ pin */
+-	IOMUX_MODE(MX31_PIN_SFS6, IOMUX_CONFIG_GPIO),
+-	/* SPI 1 */
+-	MX31_PIN_CSPI2_SCLK__SCLK,
+-	MX31_PIN_CSPI2_MOSI__MOSI,
+-	MX31_PIN_CSPI2_MISO__MISO,
+-	MX31_PIN_CSPI2_SPI_RDY__SPI_RDY,
+-	MX31_PIN_CSPI2_SS0__SS0,
+-	MX31_PIN_CSPI2_SS1__SS1,
+-	MX31_PIN_CSPI2_SS2__SS2,
+-};
+-
+-static struct mxc_nand_platform_data mx31lite_nand_board_info = {
+-	.width = 1,
+-	.hw_ecc = 1,
+-};
+-
+-static struct smsc911x_platform_config smsc911x_config = {
+-	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
+-	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
+-	.flags		= SMSC911X_USE_16BIT,
+-};
+-
+-static struct resource smsc911x_resources[] = {
+-	{
+-		.start		= MX31_CS4_BASE_ADDR,
+-		.end		= MX31_CS4_BASE_ADDR + 0x100,
+-		.flags		= IORESOURCE_MEM,
+-	}, {
+-		.start		= IOMUX_TO_IRQ(MX31_PIN_SFS6),
+-		.end		= IOMUX_TO_IRQ(MX31_PIN_SFS6),
+-		.flags		= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device smsc911x_device = {
+-	.name		= "smsc911x",
+-	.id		= -1,
+-	.num_resources	= ARRAY_SIZE(smsc911x_resources),
+-	.resource	= smsc911x_resources,
+-	.dev		= {
+-		.platform_data = &smsc911x_config,
+-	},
+-};
+-
+-/*
+- * SPI
+- *
+- * The MC13783 is the only hard-wired SPI device on the module.
+- */
+-
+-static int spi_internal_chipselect[] = {
+-	MXC_SPI_CS(0),
+-};
+-
+-static struct spi_imx_master spi1_pdata = {
+-	.chipselect	= spi_internal_chipselect,
+-	.num_chipselect	= ARRAY_SIZE(spi_internal_chipselect),
+-};
+-
+-static struct mc13783_platform_data mc13783_pdata __initdata = {
+-	.flags  = MC13783_USE_RTC |
+-		  MC13783_USE_REGULATOR,
+-};
+-
+-static struct spi_board_info mc13783_spi_dev __initdata = {
+-	.modalias       = "mc13783",
+-	.max_speed_hz   = 1000000,
+-	.bus_num	= 1,
+-	.chip_select    = 0,
+-	.platform_data  = &mc13783_pdata,
+-	.irq		= IOMUX_TO_IRQ(MX31_PIN_GPIO1_3),
+-};
+-
+-/*
+- * USB
+- */
+-
+-#define USB_PAD_CFG (PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST | PAD_CTL_HYS_CMOS | \
+-			PAD_CTL_ODE_CMOS | PAD_CTL_100K_PU)
+-
+-static int usbh2_init(struct platform_device *pdev)
+-{
+-	int pins[] = {
+-		MX31_PIN_USBH2_DATA0__USBH2_DATA0,
+-		MX31_PIN_USBH2_DATA1__USBH2_DATA1,
+-		MX31_PIN_USBH2_CLK__USBH2_CLK,
+-		MX31_PIN_USBH2_DIR__USBH2_DIR,
+-		MX31_PIN_USBH2_NXT__USBH2_NXT,
+-		MX31_PIN_USBH2_STP__USBH2_STP,
+-	};
+-
+-	mxc_iomux_setup_multiple_pins(pins, ARRAY_SIZE(pins), "USB H2");
+-
+-	mxc_iomux_set_pad(MX31_PIN_USBH2_CLK, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_USBH2_DIR, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_USBH2_NXT, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_USBH2_STP, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA0, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA1, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_SRXD6, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_STXD6, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_SFS3, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_SCK3, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_SRXD3, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_STXD3, USB_PAD_CFG);
+-
+-	mxc_iomux_set_gpr(MUX_PGP_UH2, true);
+-
+-	/* chip select */
+-	mxc_iomux_alloc_pin(IOMUX_MODE(MX31_PIN_DTR_DCE1, IOMUX_CONFIG_GPIO),
+-				"USBH2_CS");
+-	gpio_request(IOMUX_TO_GPIO(MX31_PIN_DTR_DCE1), "USBH2 CS");
+-	gpio_direction_output(IOMUX_TO_GPIO(MX31_PIN_DTR_DCE1), 0);
+-
+-	return 0;
+-}
+-
+-static struct mxc_usbh_platform_data usbh2_pdata = {
+-	.init   = usbh2_init,
+-	.portsc = MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
+-	.flags  = MXC_EHCI_POWER_PINS_ENABLED,
+-};
+-
+-/*
+- * NOR flash
+- */
+-
+-static struct physmap_flash_data nor_flash_data = {
+-	.width  = 2,
+-};
+-
+-static struct resource nor_flash_resource = {
+-	.start  = 0xa0000000,
+-	.end    = 0xa1ffffff,
+-	.flags  = IORESOURCE_MEM,
+-};
+-
+-static struct platform_device physmap_flash_device = {
+-	.name   = "physmap-flash",
+-	.id     = 0,
+-	.dev    = {
+-		.platform_data  = &nor_flash_data,
+-	},
+-	.resource = &nor_flash_resource,
+-	.num_resources = 1,
+-};
+-
+-
+-
+-/*
+- * This structure defines the MX31 memory map.
+- */
+-static struct map_desc mx31lite_io_desc[] __initdata = {
+-	{
+-		.virtual = MX31_CS4_BASE_ADDR_VIRT,
+-		.pfn = __phys_to_pfn(MX31_CS4_BASE_ADDR),
+-		.length = MX31_CS4_SIZE,
+-		.type = MT_DEVICE
+-	}
+-};
+-
+-/*
+- * Set up static virtual mappings.
+- */
+-void __init mx31lite_map_io(void)
+-{
+-	mx31_map_io();
+-	iotable_init(mx31lite_io_desc, ARRAY_SIZE(mx31lite_io_desc));
+-}
+-
+-static int mx31lite_baseboard;
+-core_param(mx31lite_baseboard, mx31lite_baseboard, int, 0444);
+-
+-static void __init mxc_board_init(void)
 -{
 -	int ret;
 -
--	ret = request_irq(IRQ_GPIOD(25), detect_irq,
--		IRQF_TRIGGER_FALLING, "mmc-detect", data);
+-	switch (mx31lite_baseboard) {
+-	case MX31LITE_NOBOARD:
+-		break;
+-	case MX31LITE_DB:
+-		mx31lite_db_init();
+-		break;
+-	default:
+-		printk(KERN_ERR "Illegal mx31lite_baseboard type %d\n",
+-				mx31lite_baseboard);
+-	}
+-
+-	mxc_iomux_setup_multiple_pins(mx31lite_pins, ARRAY_SIZE(mx31lite_pins),
+-				      "mx31lite");
+-
+-	/* NOR and NAND flash */
+-	platform_device_register(&physmap_flash_device);
+-	mxc_register_device(&mxc_nand_device, &mx31lite_nand_board_info);
+-
+-	mxc_register_device(&mxc_spi_device1, &spi1_pdata);
+-	spi_register_board_info(&mc13783_spi_dev, 1);
+-
+-	/* USB */
+-	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
+-				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
+-
+-	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
+-
+-	/* SMSC9117 IRQ pin */
+-	ret = gpio_request(IOMUX_TO_GPIO(MX31_PIN_SFS6), "sms9117-irq");
 -	if (ret)
--		goto out;
--	return 0;
--out:
--	return ret;
+-		pr_warning("could not get LAN irq gpio\n");
+-	else {
+-		gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_SFS6));
+-		platform_device_register(&smsc911x_device);
+-	}
 -}
 -
--static void mx21ads_sdhc_exit(struct device *dev, void *data)
+-static void __init mx31lite_timer_init(void)
 -{
--	free_irq(IRQ_GPIOD(25), data);
+-	mx31_clocks_init(26000000);
 -}
 -
--static struct imxmmc_platform_data mx21ads_sdhc_pdata = {
--	.ocr_avail = MMC_VDD_29_30 | MMC_VDD_30_31, /* 3.0V */
--	.get_ro = mx21ads_sdhc_get_ro,
--	.init = mx21ads_sdhc_init,
--	.exit = mx21ads_sdhc_exit,
+-struct sys_timer mx31lite_timer = {
+-	.init	= mx31lite_timer_init,
 -};
 -
--static struct mxc_nand_platform_data mx21ads_nand_board_info = {
--	.width = 1,
--	.hw_ecc = 1,
--};
--
--static struct map_desc mx21ads_io_desc[] __initdata = {
--	/*
--	 * Memory-mapped I/O on MX21ADS Base board:
--	 *   - CS8900A Ethernet controller
--	 *   - ST16C2552CJ UART
--	 *   - CPU and Base board version
--	 *   - Base board I/O register
--	 */
--	{
--		.virtual = MX21ADS_MMIO_BASE_ADDR,
--		.pfn = __phys_to_pfn(MX21_CS1_BASE_ADDR),
--		.length = MX21ADS_MMIO_SIZE,
--		.type = MT_DEVICE,
--	},
--};
--
--static void __init mx21ads_map_io(void)
--{
--	mx21_map_io();
--	iotable_init(mx21ads_io_desc, ARRAY_SIZE(mx21ads_io_desc));
--}
--
--static struct platform_device *platform_devices[] __initdata = {
--	&mx21ads_nor_mtd_device,
--};
--
--static void __init mx21ads_board_init(void)
--{
--	mxc_gpio_setup_multiple_pins(mx21ads_pins, ARRAY_SIZE(mx21ads_pins),
--			"mx21ads");
--
--	mxc_register_device(&mxc_uart_device0, &uart_pdata);
--	mxc_register_device(&mxc_uart_device2, &uart_norts_pdata);
--	mxc_register_device(&mxc_uart_device3, &uart_pdata);
--	mxc_register_device(&mxc_fb_device, &mx21ads_fb_data);
--	mxc_register_device(&mxc_sdhc_device0, &mx21ads_sdhc_pdata);
--	mxc_register_device(&mxc_nand_device, &mx21ads_nand_board_info);
--
--	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
--}
--
--static void __init mx21ads_timer_init(void)
--{
--	mx21_clocks_init(32768, 26000000);
--}
--
--static struct sys_timer mx21ads_timer = {
--	.init	= mx21ads_timer_init,
--};
--
--MACHINE_START(MX21ADS, "Freescale i.MX21ADS")
--	/* maintainer: Freescale Semiconductor, Inc. */
--	.phys_io        = MX21_AIPI_BASE_ADDR,
--	.io_pg_offst    = ((MX21_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
+-MACHINE_START(MX31LITE, "LogicPD i.MX31 SOM")
+-	/* Maintainer: Freescale Semiconductor, Inc. */
+-	.phys_io        = MX31_AIPS1_BASE_ADDR,
+-	.io_pg_offst    = ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
 -	.boot_params    = PHYS_OFFSET + 0x100,
--	.map_io         = mx21ads_map_io,
--	.init_irq       = mx21_init_irq,
--	.init_machine   = mx21ads_board_init,
--	.timer          = &mx21ads_timer,
+-	.map_io         = mx31lite_map_io,
+-	.init_irq       = mx31_init_irq,
+-	.init_machine   = mxc_board_init,
+-	.timer          = &mx31lite_timer,
 -MACHINE_END
-diff --git a/arch/arm/mach-mx2/mx27ads.c b/arch/arm/mach-mx2/mx27ads.c
+diff --git a/arch/arm/mach-mx3/mx31moboard.c b/arch/arm/mach-mx3/mx31moboard.c
 deleted file mode 100644
-index 385fc1c..0000000
---- a/arch/arm/mach-mx2/mx27ads.c
+index be7d277..0000000
+--- a/arch/arm/mach-mx3/mx31moboard.c
 +++ /dev/null
-@@ -1,345 +0,0 @@
+@@ -1,575 +0,0 @@
 -/*
-- *  Copyright (C) 2000 Deep Blue Solutions Ltd
-- *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
-- *  Copyright 2006-2007 Freescale Semiconductor, Inc. All Rights Reserved.
+- *  Copyright (C) 2008 Valentin Longchamp, EPFL Mobots group
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License as published by
@@ -2663,341 +5822,571 @@ index 385fc1c..0000000
 - * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 - */
 -
--#include <linux/platform_device.h>
--#include <linux/mtd/mtd.h>
--#include <linux/mtd/map.h>
--#include <linux/mtd/partitions.h>
+-#include <linux/delay.h>
+-#include <linux/dma-mapping.h>
+-#include <linux/fsl_devices.h>
+-#include <linux/gpio.h>
+-#include <linux/init.h>
+-#include <linux/interrupt.h>
+-#include <linux/leds.h>
+-#include <linux/memory.h>
 -#include <linux/mtd/physmap.h>
--#include <linux/i2c.h>
--#include <linux/irq.h>
--#include <mach/common.h>
--#include <mach/hardware.h>
+-#include <linux/mtd/partitions.h>
+-#include <linux/platform_device.h>
+-#include <linux/regulator/machine.h>
+-#include <linux/mfd/mc13783.h>
+-#include <linux/spi/spi.h>
+-#include <linux/types.h>
+-
+-#include <linux/usb/otg.h>
+-#include <linux/usb/ulpi.h>
+-
 -#include <asm/mach-types.h>
 -#include <asm/mach/arch.h>
 -#include <asm/mach/time.h>
 -#include <asm/mach/map.h>
--#include <mach/gpio.h>
+-#include <mach/board-mx31moboard.h>
+-#include <mach/common.h>
+-#include <mach/hardware.h>
 -#include <mach/imx-uart.h>
--#include <mach/iomux.h>
--#include <mach/board-mx27ads.h>
--#include <mach/mxc_nand.h>
+-#include <mach/iomux-mx3.h>
+-#include <mach/ipu.h>
 -#include <mach/i2c.h>
--#include <mach/imxfb.h>
 -#include <mach/mmc.h>
+-#include <mach/mxc_ehci.h>
+-#include <mach/mx3_camera.h>
+-#include <mach/spi.h>
+-#include <mach/ulpi.h>
 -
 -#include "devices.h"
 -
--static unsigned int mx27ads_pins[] = {
+-static unsigned int moboard_pins[] = {
 -	/* UART0 */
--	PE12_PF_UART1_TXD,
--	PE13_PF_UART1_RXD,
--	PE14_PF_UART1_CTS,
--	PE15_PF_UART1_RTS,
--	/* UART1 */
--	PE3_PF_UART2_CTS,
--	PE4_PF_UART2_RTS,
--	PE6_PF_UART2_TXD,
--	PE7_PF_UART2_RXD,
--	/* UART2 */
--	PE8_PF_UART3_TXD,
--	PE9_PF_UART3_RXD,
--	PE10_PF_UART3_CTS,
--	PE11_PF_UART3_RTS,
--	/* UART3 */
--	PB26_AF_UART4_RTS,
--	PB28_AF_UART4_TXD,
--	PB29_AF_UART4_CTS,
--	PB31_AF_UART4_RXD,
+-	MX31_PIN_TXD1__TXD1, MX31_PIN_RXD1__RXD1,
+-	MX31_PIN_CTS1__GPIO2_7,
 -	/* UART4 */
--	PB18_AF_UART5_TXD,
--	PB19_AF_UART5_RXD,
--	PB20_AF_UART5_CTS,
--	PB21_AF_UART5_RTS,
--	/* UART5 */
--	PB10_AF_UART6_TXD,
--	PB12_AF_UART6_CTS,
--	PB11_AF_UART6_RXD,
--	PB13_AF_UART6_RTS,
--	/* FEC */
--	PD0_AIN_FEC_TXD0,
--	PD1_AIN_FEC_TXD1,
--	PD2_AIN_FEC_TXD2,
--	PD3_AIN_FEC_TXD3,
--	PD4_AOUT_FEC_RX_ER,
--	PD5_AOUT_FEC_RXD1,
--	PD6_AOUT_FEC_RXD2,
--	PD7_AOUT_FEC_RXD3,
--	PD8_AF_FEC_MDIO,
--	PD9_AIN_FEC_MDC,
--	PD10_AOUT_FEC_CRS,
--	PD11_AOUT_FEC_TX_CLK,
--	PD12_AOUT_FEC_RXD0,
--	PD13_AOUT_FEC_RX_DV,
--	PD14_AOUT_FEC_RX_CLK,
--	PD15_AOUT_FEC_COL,
--	PD16_AIN_FEC_TX_ER,
--	PF23_AIN_FEC_TX_EN,
--	/* I2C2 */
--	PC5_PF_I2C2_SDA,
--	PC6_PF_I2C2_SCL,
--	/* FB */
--	PA5_PF_LSCLK,
--	PA6_PF_LD0,
--	PA7_PF_LD1,
--	PA8_PF_LD2,
--	PA9_PF_LD3,
--	PA10_PF_LD4,
--	PA11_PF_LD5,
--	PA12_PF_LD6,
--	PA13_PF_LD7,
--	PA14_PF_LD8,
--	PA15_PF_LD9,
--	PA16_PF_LD10,
--	PA17_PF_LD11,
--	PA18_PF_LD12,
--	PA19_PF_LD13,
--	PA20_PF_LD14,
--	PA21_PF_LD15,
--	PA22_PF_LD16,
--	PA23_PF_LD17,
--	PA24_PF_REV,
--	PA25_PF_CLS,
--	PA26_PF_PS,
--	PA27_PF_SPL_SPR,
--	PA28_PF_HSYNC,
--	PA29_PF_VSYNC,
--	PA30_PF_CONTRAST,
--	PA31_PF_OE_ACD,
--	/* OWIRE */
--	PE16_AF_OWIRE,
--	/* SDHC1*/
--	PE18_PF_SD1_D0,
--	PE19_PF_SD1_D1,
--	PE20_PF_SD1_D2,
--	PE21_PF_SD1_D3,
--	PE22_PF_SD1_CMD,
--	PE23_PF_SD1_CLK,
--	/* SDHC2*/
--	PB4_PF_SD2_D0,
--	PB5_PF_SD2_D1,
--	PB6_PF_SD2_D2,
--	PB7_PF_SD2_D3,
--	PB8_PF_SD2_CMD,
--	PB9_PF_SD2_CLK,
+-	MX31_PIN_PC_RST__CTS5, MX31_PIN_PC_VS2__RTS5,
+-	MX31_PIN_PC_BVD2__TXD5, MX31_PIN_PC_BVD1__RXD5,
+-	/* I2C0 */
+-	MX31_PIN_I2C_DAT__I2C1_SDA, MX31_PIN_I2C_CLK__I2C1_SCL,
+-	/* I2C1 */
+-	MX31_PIN_DCD_DTE1__I2C2_SDA, MX31_PIN_RI_DTE1__I2C2_SCL,
+-	/* SDHC1 */
+-	MX31_PIN_SD1_DATA3__SD1_DATA3, MX31_PIN_SD1_DATA2__SD1_DATA2,
+-	MX31_PIN_SD1_DATA1__SD1_DATA1, MX31_PIN_SD1_DATA0__SD1_DATA0,
+-	MX31_PIN_SD1_CLK__SD1_CLK, MX31_PIN_SD1_CMD__SD1_CMD,
+-	MX31_PIN_ATA_CS0__GPIO3_26, MX31_PIN_ATA_CS1__GPIO3_27,
+-	/* USB reset */
+-	MX31_PIN_GPIO1_0__GPIO1_0,
+-	/* USB OTG */
+-	MX31_PIN_USBOTG_DATA0__USBOTG_DATA0,
+-	MX31_PIN_USBOTG_DATA1__USBOTG_DATA1,
+-	MX31_PIN_USBOTG_DATA2__USBOTG_DATA2,
+-	MX31_PIN_USBOTG_DATA3__USBOTG_DATA3,
+-	MX31_PIN_USBOTG_DATA4__USBOTG_DATA4,
+-	MX31_PIN_USBOTG_DATA5__USBOTG_DATA5,
+-	MX31_PIN_USBOTG_DATA6__USBOTG_DATA6,
+-	MX31_PIN_USBOTG_DATA7__USBOTG_DATA7,
+-	MX31_PIN_USBOTG_CLK__USBOTG_CLK, MX31_PIN_USBOTG_DIR__USBOTG_DIR,
+-	MX31_PIN_USBOTG_NXT__USBOTG_NXT, MX31_PIN_USBOTG_STP__USBOTG_STP,
+-	MX31_PIN_USB_OC__GPIO1_30,
+-	/* USB H2 */
+-	MX31_PIN_USBH2_DATA0__USBH2_DATA0,
+-	MX31_PIN_USBH2_DATA1__USBH2_DATA1,
+-	MX31_PIN_STXD3__USBH2_DATA2, MX31_PIN_SRXD3__USBH2_DATA3,
+-	MX31_PIN_SCK3__USBH2_DATA4, MX31_PIN_SFS3__USBH2_DATA5,
+-	MX31_PIN_STXD6__USBH2_DATA6, MX31_PIN_SRXD6__USBH2_DATA7,
+-	MX31_PIN_USBH2_CLK__USBH2_CLK, MX31_PIN_USBH2_DIR__USBH2_DIR,
+-	MX31_PIN_USBH2_NXT__USBH2_NXT, MX31_PIN_USBH2_STP__USBH2_STP,
+-	MX31_PIN_SCK6__GPIO1_25,
+-	/* LEDs */
+-	MX31_PIN_SVEN0__GPIO2_0, MX31_PIN_STX0__GPIO2_1,
+-	MX31_PIN_SRX0__GPIO2_2, MX31_PIN_SIMPD0__GPIO2_3,
+-	/* SEL */
+-	MX31_PIN_DTR_DCE1__GPIO2_8, MX31_PIN_DSR_DCE1__GPIO2_9,
+-	MX31_PIN_RI_DCE1__GPIO2_10, MX31_PIN_DCD_DCE1__GPIO2_11,
+-	/* SPI1 */
+-	MX31_PIN_CSPI2_MOSI__MOSI, MX31_PIN_CSPI2_MISO__MISO,
+-	MX31_PIN_CSPI2_SCLK__SCLK, MX31_PIN_CSPI2_SPI_RDY__SPI_RDY,
+-	MX31_PIN_CSPI2_SS0__SS0, MX31_PIN_CSPI2_SS2__SS2,
+-	/* Atlas IRQ */
+-	MX31_PIN_GPIO1_3__GPIO1_3,
+-	/* SPI2 */
+-	MX31_PIN_CSPI3_MOSI__MOSI, MX31_PIN_CSPI3_MISO__MISO,
+-	MX31_PIN_CSPI3_SCLK__SCLK, MX31_PIN_CSPI3_SPI_RDY__SPI_RDY,
+-	MX31_PIN_CSPI2_SS1__CSPI3_SS1,
 -};
 -
--static struct mxc_nand_platform_data mx27ads_nand_board_info = {
--	.width = 1,
--	.hw_ecc = 1,
+-static struct physmap_flash_data mx31moboard_flash_data = {
+-	.width  	= 2,
 -};
 -
--/* ADS's NOR flash */
--static struct physmap_flash_data mx27ads_flash_data = {
--	.width = 2,
+-static struct resource mx31moboard_flash_resource = {
+-	.start	= 0xa0000000,
+-	.end	= 0xa1ffffff,
+-	.flags	= IORESOURCE_MEM,
 -};
 -
--static struct resource mx27ads_flash_resource = {
--	.start = 0xc0000000,
--	.end = 0xc0000000 + 0x02000000 - 1,
--	.flags = IORESOURCE_MEM,
--
--};
--
--static struct platform_device mx27ads_nor_mtd_device = {
--	.name = "physmap-flash",
--	.id = 0,
--	.dev = {
--		.platform_data = &mx27ads_flash_data,
+-static struct platform_device mx31moboard_flash = {
+-	.name	= "physmap-flash",
+-	.id	= 0,
+-	.dev	= {
+-		.platform_data  = &mx31moboard_flash_data,
 -	},
+-	.resource = &mx31moboard_flash_resource,
 -	.num_resources = 1,
--	.resource = &mx27ads_flash_resource,
 -};
 -
--static struct imxi2c_platform_data mx27ads_i2c_data = {
+-static int moboard_uart0_init(struct platform_device *pdev)
+-{
+-	gpio_request(IOMUX_TO_GPIO(MX31_PIN_CTS1), "uart0-cts-hack");
+-	gpio_direction_output(IOMUX_TO_GPIO(MX31_PIN_CTS1), 0);
+-	return 0;
+-}
+-
+-static struct imxuart_platform_data uart0_pdata = {
+-	.init = moboard_uart0_init,
+-};
+-
+-static struct imxuart_platform_data uart4_pdata = {
+-	.flags = IMXUART_HAVE_RTSCTS,
+-};
+-
+-static struct imxi2c_platform_data moboard_i2c0_pdata = {
+-	.bitrate = 400000,
+-};
+-
+-static struct imxi2c_platform_data moboard_i2c1_pdata = {
 -	.bitrate = 100000,
 -};
 -
--static struct i2c_board_info mx27ads_i2c_devices[] = {
+-static int moboard_spi1_cs[] = {
+-	MXC_SPI_CS(0),
+-	MXC_SPI_CS(2),
 -};
 -
--void lcd_power(int on)
--{
--	if (on)
--		__raw_writew(PBC_BCTRL1_LCDON, PBC_BCTRL1_SET_REG);
--	else
--		__raw_writew(PBC_BCTRL1_LCDON, PBC_BCTRL1_CLEAR_REG);
--}
+-static struct spi_imx_master moboard_spi1_master = {
+-	.chipselect	= moboard_spi1_cs,
+-	.num_chipselect	= ARRAY_SIZE(moboard_spi1_cs),
+-};
 -
--static struct imx_fb_videomode mx27ads_modes[] = {
+-static struct regulator_consumer_supply sdhc_consumers[] = {
 -	{
--		.mode = {
--			.name		= "Sharp-LQ035Q7",
--			.refresh	= 60,
--			.xres		= 240,
--			.yres		= 320,
--			.pixclock	= 188679, /* in ps (5.3MHz) */
--			.hsync_len	= 1,
--			.left_margin	= 9,
--			.right_margin	= 16,
--			.vsync_len	= 1,
--			.upper_margin	= 7,
--			.lower_margin	= 9,
--		},
--		.bpp		= 16,
--		.pcr		= 0xFB008BC0,
+-		.dev	= &mxcsdhc_device0.dev,
+-		.supply	= "sdhc0_vcc",
+-	},
+-	{
+-		.dev	= &mxcsdhc_device1.dev,
+-		.supply	= "sdhc1_vcc",
 -	},
 -};
 -
--static struct imx_fb_platform_data mx27ads_fb_data = {
--	.mode = mx27ads_modes,
--	.num_modes = ARRAY_SIZE(mx27ads_modes),
--
--	/*
--	 * - HSYNC active high
--	 * - VSYNC active high
--	 * - clk notenabled while idle
--	 * - clock inverted
--	 * - data not inverted
--	 * - data enable low active
--	 * - enable sharp mode
--	 */
--	.pwmr		= 0x00A903FF,
--	.lscr1		= 0x00120300,
--	.dmacr		= 0x00020010,
--
--	.lcd_power	= lcd_power,
+-static struct regulator_init_data sdhc_vreg_data = {
+-	.constraints = {
+-		.min_uV = 2700000,
+-		.max_uV = 3000000,
+-		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
+-			REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
+-		.valid_modes_mask = REGULATOR_MODE_NORMAL |
+-			REGULATOR_MODE_FAST,
+-		.always_on = 0,
+-		.boot_on = 1,
+-	},
+-	.num_consumer_supplies = ARRAY_SIZE(sdhc_consumers),
+-	.consumer_supplies = sdhc_consumers,
 -};
 -
--static int mx27ads_sdhc1_init(struct device *dev, irq_handler_t detect_irq,
--			      void *data)
+-static struct regulator_consumer_supply cam_consumers[] = {
+-	{
+-		.dev	= &mx3_camera.dev,
+-		.supply	= "cam_vcc",
+-	},
+-};
+-
+-static struct regulator_init_data cam_vreg_data = {
+-	.constraints = {
+-		.min_uV = 2700000,
+-		.max_uV = 3000000,
+-		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
+-			REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
+-		.valid_modes_mask = REGULATOR_MODE_NORMAL |
+-			REGULATOR_MODE_FAST,
+-		.always_on = 0,
+-		.boot_on = 1,
+-	},
+-	.num_consumer_supplies = ARRAY_SIZE(cam_consumers),
+-	.consumer_supplies = cam_consumers,
+-};
+-
+-static struct mc13783_regulator_init_data moboard_regulators[] = {
+-	{
+-		.id = MC13783_REGU_VMMC1,
+-		.init_data = &sdhc_vreg_data,
+-	},
+-	{
+-		.id = MC13783_REGU_VCAM,
+-		.init_data = &cam_vreg_data,
+-	},
+-};
+-
+-static struct mc13783_platform_data moboard_pmic = {
+-	.regulators = moboard_regulators,
+-	.num_regulators = ARRAY_SIZE(moboard_regulators),
+-	.flags = MC13783_USE_REGULATOR | MC13783_USE_RTC |
+-		MC13783_USE_ADC,
+-};
+-
+-static struct spi_board_info moboard_spi_board_info[] __initdata = {
+-	{
+-		.modalias = "mc13783",
+-		.irq = IOMUX_TO_IRQ(MX31_PIN_GPIO1_3),
+-		.max_speed_hz = 300000,
+-		.bus_num = 1,
+-		.chip_select = 0,
+-		.platform_data = &moboard_pmic,
+-		.mode = SPI_CS_HIGH,
+-	},
+-};
+-
+-static int moboard_spi2_cs[] = {
+-	MXC_SPI_CS(1),
+-};
+-
+-static struct spi_imx_master moboard_spi2_master = {
+-	.chipselect	= moboard_spi2_cs,
+-	.num_chipselect	= ARRAY_SIZE(moboard_spi2_cs),
+-};
+-
+-#define SDHC1_CD IOMUX_TO_GPIO(MX31_PIN_ATA_CS0)
+-#define SDHC1_WP IOMUX_TO_GPIO(MX31_PIN_ATA_CS1)
+-
+-static int moboard_sdhc1_get_ro(struct device *dev)
 -{
--	return request_irq(IRQ_GPIOE(21), detect_irq, IRQF_TRIGGER_RISING,
--			   "sdhc1-card-detect", data);
+-	return !gpio_get_value(SDHC1_WP);
 -}
 -
--static int mx27ads_sdhc2_init(struct device *dev, irq_handler_t detect_irq,
--			      void *data)
+-static int moboard_sdhc1_init(struct device *dev, irq_handler_t detect_irq,
+-		void *data)
 -{
--	return request_irq(IRQ_GPIOB(7), detect_irq, IRQF_TRIGGER_RISING,
--			   "sdhc2-card-detect", data);
+-	int ret;
+-
+-	ret = gpio_request(SDHC1_CD, "sdhc-detect");
+-	if (ret)
+-		return ret;
+-
+-	gpio_direction_input(SDHC1_CD);
+-
+-	ret = gpio_request(SDHC1_WP, "sdhc-wp");
+-	if (ret)
+-		goto err_gpio_free;
+-	gpio_direction_input(SDHC1_WP);
+-
+-	ret = request_irq(gpio_to_irq(SDHC1_CD), detect_irq,
+-		IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+-		"sdhc1-card-detect", data);
+-	if (ret)
+-		goto err_gpio_free_2;
+-
+-	return 0;
+-
+-err_gpio_free_2:
+-	gpio_free(SDHC1_WP);
+-err_gpio_free:
+-	gpio_free(SDHC1_CD);
+-
+-	return ret;
 -}
 -
--static void mx27ads_sdhc1_exit(struct device *dev, void *data)
+-static void moboard_sdhc1_exit(struct device *dev, void *data)
 -{
--	free_irq(IRQ_GPIOE(21), data);
--}
--
--static void mx27ads_sdhc2_exit(struct device *dev, void *data)
--{
--	free_irq(IRQ_GPIOB(7), data);
+-	free_irq(gpio_to_irq(SDHC1_CD), data);
+-	gpio_free(SDHC1_WP);
+-	gpio_free(SDHC1_CD);
 -}
 -
 -static struct imxmmc_platform_data sdhc1_pdata = {
--	.init = mx27ads_sdhc1_init,
--	.exit = mx27ads_sdhc1_exit,
+-	.get_ro	= moboard_sdhc1_get_ro,
+-	.init	= moboard_sdhc1_init,
+-	.exit	= moboard_sdhc1_exit,
 -};
 -
--static struct imxmmc_platform_data sdhc2_pdata = {
--	.init = mx27ads_sdhc2_init,
--	.exit = mx27ads_sdhc2_exit,
+-/*
+- * this pin is dedicated for all mx31moboard systems, so we do it here
+- */
+-#define USB_RESET_B	IOMUX_TO_GPIO(MX31_PIN_GPIO1_0)
+-
+-static void usb_xcvr_reset(void)
+-{
+-	gpio_request(USB_RESET_B, "usb-reset");
+-	gpio_direction_output(USB_RESET_B, 0);
+-	mdelay(1);
+-	gpio_set_value(USB_RESET_B, 1);
+-}
+-
+-#define USB_PAD_CFG (PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST | PAD_CTL_HYS_CMOS | \
+-			PAD_CTL_ODE_CMOS | PAD_CTL_100K_PU)
+-
+-#define OTG_EN_B IOMUX_TO_GPIO(MX31_PIN_USB_OC)
+-
+-static void moboard_usbotg_init(void)
+-{
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA0, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA1, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA2, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA3, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA4, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA5, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA6, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA7, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_CLK, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_DIR, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_NXT, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_STP, USB_PAD_CFG);
+-
+-	gpio_request(OTG_EN_B, "usb-udc-en");
+-	gpio_direction_output(OTG_EN_B, 0);
+-}
+-
+-static struct fsl_usb2_platform_data usb_pdata = {
+-	.operating_mode	= FSL_USB2_DR_DEVICE,
+-	.phy_mode	= FSL_USB2_PHY_ULPI,
 -};
 -
--static struct platform_device *platform_devices[] __initdata = {
--	&mx27ads_nor_mtd_device,
--	&mxc_fec_device,
--	&mxc_w1_master_device,
+-#define USBH2_EN_B IOMUX_TO_GPIO(MX31_PIN_SCK6)
+-
+-static int moboard_usbh2_hw_init(struct platform_device *pdev)
+-{
+-	int ret = gpio_request(USBH2_EN_B, "usbh2-en");
+-	if (ret)
+-		return ret;
+-
+-	mxc_iomux_set_gpr(MUX_PGP_UH2, true);
+-
+-	mxc_iomux_set_pad(MX31_PIN_USBH2_CLK, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_USBH2_DIR, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_USBH2_NXT, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_USBH2_STP, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA0, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_USBH2_DATA1, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_SRXD6, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_STXD6, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_SFS3, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_SCK3, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_SRXD3, USB_PAD_CFG);
+-	mxc_iomux_set_pad(MX31_PIN_STXD3, USB_PAD_CFG);
+-
+-	gpio_direction_output(USBH2_EN_B, 0);
+-
+-	return 0;
+-}
+-
+-static int moboard_usbh2_hw_exit(struct platform_device *pdev)
+-{
+-	gpio_free(USBH2_EN_B);
+-	return 0;
+-}
+-
+-static struct mxc_usbh_platform_data usbh2_pdata = {
+-	.init	= moboard_usbh2_hw_init,
+-	.exit	= moboard_usbh2_hw_exit,
+-	.portsc	= MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
+-	.flags	= MXC_EHCI_POWER_PINS_ENABLED,
 -};
 -
--static struct imxuart_platform_data uart_pdata[] = {
+-static int __init moboard_usbh2_init(void)
+-{
+-	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
+-			USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
+-
+-	return mxc_register_device(&mx31_usbh2, &usbh2_pdata);
+-}
+-
+-
+-static struct gpio_led mx31moboard_leds[] = {
 -	{
--		.flags = IMXUART_HAVE_RTSCTS,
+-		.name 	= "coreboard-led-0:red:running",
+-		.default_trigger = "heartbeat",
+-		.gpio 	= IOMUX_TO_GPIO(MX31_PIN_SVEN0),
 -	}, {
--		.flags = IMXUART_HAVE_RTSCTS,
+-		.name	= "coreboard-led-1:red",
+-		.gpio	= IOMUX_TO_GPIO(MX31_PIN_STX0),
 -	}, {
--		.flags = IMXUART_HAVE_RTSCTS,
+-		.name	= "coreboard-led-2:red",
+-		.gpio	= IOMUX_TO_GPIO(MX31_PIN_SRX0),
 -	}, {
--		.flags = IMXUART_HAVE_RTSCTS,
--	}, {
--		.flags = IMXUART_HAVE_RTSCTS,
--	}, {
--		.flags = IMXUART_HAVE_RTSCTS,
+-		.name	= "coreboard-led-3:red",
+-		.gpio	= IOMUX_TO_GPIO(MX31_PIN_SIMPD0),
 -	},
 -};
 -
--static void __init mx27ads_board_init(void)
--{
--	mxc_gpio_setup_multiple_pins(mx27ads_pins, ARRAY_SIZE(mx27ads_pins),
--			"mx27ads");
--
--	mxc_register_device(&mxc_uart_device0, &uart_pdata[0]);
--	mxc_register_device(&mxc_uart_device1, &uart_pdata[1]);
--	mxc_register_device(&mxc_uart_device2, &uart_pdata[2]);
--	mxc_register_device(&mxc_uart_device3, &uart_pdata[3]);
--	mxc_register_device(&mxc_uart_device4, &uart_pdata[4]);
--	mxc_register_device(&mxc_uart_device5, &uart_pdata[5]);
--	mxc_register_device(&mxc_nand_device, &mx27ads_nand_board_info);
--
--	/* only the i2c master 1 is used on this CPU card */
--	i2c_register_board_info(1, mx27ads_i2c_devices,
--				ARRAY_SIZE(mx27ads_i2c_devices));
--	mxc_register_device(&mxc_i2c_device1, &mx27ads_i2c_data);
--	mxc_register_device(&mxc_fb_device, &mx27ads_fb_data);
--	mxc_register_device(&mxc_sdhc_device0, &sdhc1_pdata);
--	mxc_register_device(&mxc_sdhc_device1, &sdhc2_pdata);
--
--	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
--}
--
--static void __init mx27ads_timer_init(void)
--{
--	unsigned long fref = 26000000;
--
--	if ((__raw_readw(PBC_VERSION_REG) & CKIH_27MHZ_BIT_SET) == 0)
--		fref = 27000000;
--
--	mx27_clocks_init(fref);
--}
--
--static struct sys_timer mx27ads_timer = {
--	.init	= mx27ads_timer_init,
+-static struct gpio_led_platform_data mx31moboard_led_pdata = {
+-	.num_leds 	= ARRAY_SIZE(mx31moboard_leds),
+-	.leds		= mx31moboard_leds,
 -};
 -
--static struct map_desc mx27ads_io_desc[] __initdata = {
--	{
--		.virtual = PBC_BASE_ADDRESS,
--		.pfn = __phys_to_pfn(MX27_CS4_BASE_ADDR),
--		.length = SZ_1M,
--		.type = MT_DEVICE,
+-static struct platform_device mx31moboard_leds_device = {
+-	.name	= "leds-gpio",
+-	.id	= -1,
+-	.dev	= {
+-		.platform_data = &mx31moboard_led_pdata,
 -	},
 -};
 -
--static void __init mx27ads_map_io(void)
+-#define SEL0 IOMUX_TO_GPIO(MX31_PIN_DTR_DCE1)
+-#define SEL1 IOMUX_TO_GPIO(MX31_PIN_DSR_DCE1)
+-#define SEL2 IOMUX_TO_GPIO(MX31_PIN_RI_DCE1)
+-#define SEL3 IOMUX_TO_GPIO(MX31_PIN_DCD_DCE1)
+-
+-static void mx31moboard_init_sel_gpios(void)
 -{
--	mx27_map_io();
--	iotable_init(mx27ads_io_desc, ARRAY_SIZE(mx27ads_io_desc));
+-	if (!gpio_request(SEL0, "sel0")) {
+-		gpio_direction_input(SEL0);
+-		gpio_export(SEL0, true);
+-	}
+-
+-	if (!gpio_request(SEL1, "sel1")) {
+-		gpio_direction_input(SEL1);
+-		gpio_export(SEL1, true);
+-	}
+-
+-	if (!gpio_request(SEL2, "sel2")) {
+-		gpio_direction_input(SEL2);
+-		gpio_export(SEL2, true);
+-	}
+-
+-	if (!gpio_request(SEL3, "sel3")) {
+-		gpio_direction_input(SEL3);
+-		gpio_export(SEL3, true);
+-	}
 -}
 -
--MACHINE_START(MX27ADS, "Freescale i.MX27ADS")
--	/* maintainer: Freescale Semiconductor, Inc. */
--	.phys_io        = MX27_AIPI_BASE_ADDR,
--	.io_pg_offst    = ((MX27_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
+-static struct ipu_platform_data mx3_ipu_data = {
+-	.irq_base = MXC_IPU_IRQ_START,
+-};
+-
+-static struct platform_device *devices[] __initdata = {
+-	&mx31moboard_flash,
+-	&mx31moboard_leds_device,
+-};
+-
+-static struct mx3_camera_pdata camera_pdata = {
+-	.dma_dev	= &mx3_ipu.dev,
+-	.flags		= MX3_CAMERA_DATAWIDTH_8 | MX3_CAMERA_DATAWIDTH_10,
+-	.mclk_10khz	= 4800,
+-};
+-
+-#define CAMERA_BUF_SIZE	(4*1024*1024)
+-
+-static int __init mx31moboard_cam_alloc_dma(const size_t buf_size)
+-{
+-	dma_addr_t dma_handle;
+-	void *buf;
+-	int dma;
+-
+-	if (buf_size < 2 * 1024 * 1024)
+-		return -EINVAL;
+-
+-	buf = dma_alloc_coherent(NULL, buf_size, &dma_handle, GFP_KERNEL);
+-	if (!buf) {
+-		pr_err("%s: cannot allocate camera buffer-memory\n", __func__);
+-		return -ENOMEM;
+-	}
+-
+-	memset(buf, 0, buf_size);
+-
+-	dma = dma_declare_coherent_memory(&mx3_camera.dev,
+-					dma_handle, dma_handle, buf_size,
+-					DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
+-
+-	/* The way we call dma_declare_coherent_memory only a malloc can fail */
+-	return dma & DMA_MEMORY_MAP ? 0 : -ENOMEM;
+-}
+-
+-static int mx31moboard_baseboard;
+-core_param(mx31moboard_baseboard, mx31moboard_baseboard, int, 0444);
+-
+-/*
+- * Board specific initialization.
+- */
+-static void __init mxc_board_init(void)
+-{
+-	mxc_iomux_setup_multiple_pins(moboard_pins, ARRAY_SIZE(moboard_pins),
+-		"moboard");
+-
+-	platform_add_devices(devices, ARRAY_SIZE(devices));
+-
+-	mxc_register_device(&mxc_uart_device0, &uart0_pdata);
+-
+-	mxc_register_device(&mxc_uart_device4, &uart4_pdata);
+-
+-	mx31moboard_init_sel_gpios();
+-
+-	mxc_register_device(&mxc_i2c_device0, &moboard_i2c0_pdata);
+-	mxc_register_device(&mxc_i2c_device1, &moboard_i2c1_pdata);
+-
+-	mxc_register_device(&mxc_spi_device1, &moboard_spi1_master);
+-	mxc_register_device(&mxc_spi_device2, &moboard_spi2_master);
+-
+-	gpio_request(IOMUX_TO_GPIO(MX31_PIN_GPIO1_3), "pmic-irq");
+-	gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_GPIO1_3));
+-	spi_register_board_info(moboard_spi_board_info,
+-		ARRAY_SIZE(moboard_spi_board_info));
+-
+-	mxc_register_device(&mxcsdhc_device0, &sdhc1_pdata);
+-
+-	mxc_register_device(&mx3_ipu, &mx3_ipu_data);
+-	if (!mx31moboard_cam_alloc_dma(CAMERA_BUF_SIZE))
+-		mxc_register_device(&mx3_camera, &camera_pdata);
+-
+-	usb_xcvr_reset();
+-
+-	moboard_usbotg_init();
+-	mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
+-	moboard_usbh2_init();
+-
+-	switch (mx31moboard_baseboard) {
+-	case MX31NOBOARD:
+-		break;
+-	case MX31DEVBOARD:
+-		mx31moboard_devboard_init();
+-		break;
+-	case MX31MARXBOT:
+-		mx31moboard_marxbot_init();
+-		break;
+-	default:
+-		printk(KERN_ERR "Illegal mx31moboard_baseboard type %d\n",
+-			mx31moboard_baseboard);
+-	}
+-}
+-
+-static void __init mx31moboard_timer_init(void)
+-{
+-	mx31_clocks_init(26000000);
+-}
+-
+-struct sys_timer mx31moboard_timer = {
+-	.init	= mx31moboard_timer_init,
+-};
+-
+-MACHINE_START(MX31MOBOARD, "EPFL Mobots mx31moboard")
+-	/* Maintainer: Valentin Longchamp, EPFL Mobots group */
+-	.phys_io	= MX31_AIPS1_BASE_ADDR,
+-	.io_pg_offst	= ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
 -	.boot_params    = PHYS_OFFSET + 0x100,
--	.map_io         = mx27ads_map_io,
--	.init_irq       = mx27_init_irq,
--	.init_machine   = mx27ads_board_init,
--	.timer          = &mx27ads_timer,
+-	.map_io         = mx31_map_io,
+-	.init_irq       = mx31_init_irq,
+-	.init_machine   = mxc_board_init,
+-	.timer          = &mx31moboard_timer,
 -MACHINE_END
 -
-diff --git a/arch/arm/mach-mx2/mx27lite.c b/arch/arm/mach-mx2/mx27lite.c
+diff --git a/arch/arm/mach-mx3/mx31pdk.c b/arch/arm/mach-mx3/mx31pdk.c
 deleted file mode 100644
-index ca6ab12..0000000
---- a/arch/arm/mach-mx2/mx27lite.c
+index e71e3b4..0000000
+--- a/arch/arm/mach-mx3/mx31pdk.c
 +++ /dev/null
-@@ -1,95 +0,0 @@
+@@ -1,266 +0,0 @@
 -/*
-- * Copyright 2007 Robert Schwebel <r.schwebel@pengutronix.de>, Pengutronix
-- * Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
-- * Copyright 2009 Daniel Schaeffer (daniel.schaeffer at timesys.com)
+- *  Copyright 2008 Freescale Semiconductor, Inc. All Rights Reserved.
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License as published by
@@ -3014,87 +6403,260 @@ index ca6ab12..0000000
 - * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 - */
 -
--#include <linux/platform_device.h>
+-#include <linux/types.h>
+-#include <linux/init.h>
+-#include <linux/clk.h>
+-#include <linux/irq.h>
 -#include <linux/gpio.h>
+-#include <linux/smsc911x.h>
+-#include <linux/platform_device.h>
+-
+-#include <mach/hardware.h>
 -#include <asm/mach-types.h>
 -#include <asm/mach/arch.h>
 -#include <asm/mach/time.h>
+-#include <asm/memory.h>
 -#include <asm/mach/map.h>
--#include <mach/hardware.h>
 -#include <mach/common.h>
+-#include <mach/board-mx31pdk.h>
 -#include <mach/imx-uart.h>
--#include <mach/iomux.h>
--#include <mach/board-mx27lite.h>
--
+-#include <mach/iomux-mx3.h>
 -#include "devices.h"
 -
--static unsigned int mx27lite_pins[] = {
+-/*!
+- * @file mx31pdk.c
+- *
+- * @brief This file contains the board-specific initialization routines.
+- *
+- * @ingroup System
+- */
+-
+-static int mx31pdk_pins[] = {
 -	/* UART1 */
--	PE12_PF_UART1_TXD,
--	PE13_PF_UART1_RXD,
--	PE14_PF_UART1_CTS,
--	PE15_PF_UART1_RTS,
--	/* FEC */
--	PD0_AIN_FEC_TXD0,
--	PD1_AIN_FEC_TXD1,
--	PD2_AIN_FEC_TXD2,
--	PD3_AIN_FEC_TXD3,
--	PD4_AOUT_FEC_RX_ER,
--	PD5_AOUT_FEC_RXD1,
--	PD6_AOUT_FEC_RXD2,
--	PD7_AOUT_FEC_RXD3,
--	PD8_AF_FEC_MDIO,
--	PD9_AIN_FEC_MDC,
--	PD10_AOUT_FEC_CRS,
--	PD11_AOUT_FEC_TX_CLK,
--	PD12_AOUT_FEC_RXD0,
--	PD13_AOUT_FEC_RX_DV,
--	PD14_AOUT_FEC_RX_CLK,
--	PD15_AOUT_FEC_COL,
--	PD16_AIN_FEC_TX_ER,
--	PF23_AIN_FEC_TX_EN,
+-	MX31_PIN_CTS1__CTS1,
+-	MX31_PIN_RTS1__RTS1,
+-	MX31_PIN_TXD1__TXD1,
+-	MX31_PIN_RXD1__RXD1,
+-	IOMUX_MODE(MX31_PIN_GPIO1_1, IOMUX_CONFIG_GPIO),
 -};
 -
 -static struct imxuart_platform_data uart_pdata = {
 -	.flags = IMXUART_HAVE_RTSCTS,
 -};
 -
--static struct platform_device *platform_devices[] __initdata = {
--	&mxc_fec_device,
+-/*
+- * Support for the SMSC9217 on the Debug board.
+- */
+-
+-static struct smsc911x_platform_config smsc911x_config = {
+-	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
+-	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
+-	.flags		= SMSC911X_USE_16BIT | SMSC911X_FORCE_INTERNAL_PHY,
+-	.phy_interface	= PHY_INTERFACE_MODE_MII,
 -};
 -
--static void __init mx27lite_init(void)
+-static struct resource smsc911x_resources[] = {
+-	{
+-		.start		= LAN9217_BASE_ADDR,
+-		.end		= LAN9217_BASE_ADDR + 0xff,
+-		.flags		= IORESOURCE_MEM,
+-	}, {
+-		.start		= EXPIO_INT_ENET,
+-		.end		= EXPIO_INT_ENET,
+-		.flags		= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device smsc911x_device = {
+-	.name		= "smsc911x",
+-	.id		= -1,
+-	.num_resources	= ARRAY_SIZE(smsc911x_resources),
+-	.resource	= smsc911x_resources,
+-	.dev		= {
+-		.platform_data = &smsc911x_config,
+-	},
+-};
+-
+-/*
+- * Routines for the CPLD on the debug board. It contains a CPLD handling
+- * LEDs, switches, interrupts for Ethernet.
+- */
+-
+-static void mx31pdk_expio_irq_handler(uint32_t irq, struct irq_desc *desc)
 -{
--	mxc_gpio_setup_multiple_pins(mx27lite_pins, ARRAY_SIZE(mx27lite_pins),
--		"imx27lite");
+-	uint32_t imr_val;
+-	uint32_t int_valid;
+-	uint32_t expio_irq;
+-
+-	imr_val = __raw_readw(CPLD_INT_MASK_REG);
+-	int_valid = __raw_readw(CPLD_INT_STATUS_REG) & ~imr_val;
+-
+-	expio_irq = MXC_EXP_IO_BASE;
+-	for (; int_valid != 0; int_valid >>= 1, expio_irq++) {
+-		if ((int_valid & 1) == 0)
+-			continue;
+-		generic_handle_irq(expio_irq);
+-	}
+-}
+-
+-/*
+- * Disable an expio pin's interrupt by setting the bit in the imr.
+- * @param irq           an expio virtual irq number
+- */
+-static void expio_mask_irq(uint32_t irq)
+-{
+-	uint16_t reg;
+-	uint32_t expio = MXC_IRQ_TO_EXPIO(irq);
+-
+-	/* mask the interrupt */
+-	reg = __raw_readw(CPLD_INT_MASK_REG);
+-	reg |= 1 << expio;
+-	__raw_writew(reg, CPLD_INT_MASK_REG);
+-}
+-
+-/*
+- * Acknowledge an expanded io pin's interrupt by clearing the bit in the isr.
+- * @param irq           an expanded io virtual irq number
+- */
+-static void expio_ack_irq(uint32_t irq)
+-{
+-	uint32_t expio = MXC_IRQ_TO_EXPIO(irq);
+-
+-	/* clear the interrupt status */
+-	__raw_writew(1 << expio, CPLD_INT_RESET_REG);
+-	__raw_writew(0, CPLD_INT_RESET_REG);
+-	/* mask the interrupt */
+-	expio_mask_irq(irq);
+-}
+-
+-/*
+- * Enable a expio pin's interrupt by clearing the bit in the imr.
+- * @param irq           a expio virtual irq number
+- */
+-static void expio_unmask_irq(uint32_t irq)
+-{
+-	uint16_t reg;
+-	uint32_t expio = MXC_IRQ_TO_EXPIO(irq);
+-
+-	/* unmask the interrupt */
+-	reg = __raw_readw(CPLD_INT_MASK_REG);
+-	reg &= ~(1 << expio);
+-	__raw_writew(reg, CPLD_INT_MASK_REG);
+-}
+-
+-static struct irq_chip expio_irq_chip = {
+-	.ack = expio_ack_irq,
+-	.mask = expio_mask_irq,
+-	.unmask = expio_unmask_irq,
+-};
+-
+-static int __init mx31pdk_init_expio(void)
+-{
+-	int i;
+-	int ret;
+-
+-	/* Check if there's a debug board connected */
+-	if ((__raw_readw(CPLD_MAGIC_NUMBER1_REG) != 0xAAAA) ||
+-	    (__raw_readw(CPLD_MAGIC_NUMBER2_REG) != 0x5555) ||
+-	    (__raw_readw(CPLD_MAGIC_NUMBER3_REG) != 0xCAFE)) {
+-		/* No Debug board found */
+-		return -ENODEV;
+-	}
+-
+-	pr_info("i.MX31PDK Debug board detected, rev = 0x%04X\n",
+-		__raw_readw(CPLD_CODE_VER_REG));
+-
+-	/*
+-	 * Configure INT line as GPIO input
+-	 */
+-	ret = gpio_request(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1), "sms9217-irq");
+-	if (ret)
+-		pr_warning("could not get LAN irq gpio\n");
+-	else
+-		gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1));
+-
+-	/* Disable the interrupts and clear the status */
+-	__raw_writew(0, CPLD_INT_MASK_REG);
+-	__raw_writew(0xFFFF, CPLD_INT_RESET_REG);
+-	__raw_writew(0, CPLD_INT_RESET_REG);
+-	__raw_writew(0x1F, CPLD_INT_MASK_REG);
+-	for (i = MXC_EXP_IO_BASE;
+-	     i < (MXC_EXP_IO_BASE + MXC_MAX_EXP_IO_LINES);
+-	     i++) {
+-		set_irq_chip(i, &expio_irq_chip);
+-		set_irq_handler(i, handle_level_irq);
+-		set_irq_flags(i, IRQF_VALID);
+-	}
+-	set_irq_type(EXPIO_PARENT_INT, IRQ_TYPE_LEVEL_LOW);
+-	set_irq_chained_handler(EXPIO_PARENT_INT, mx31pdk_expio_irq_handler);
+-
+-	return 0;
+-}
+-
+-/*
+- * This structure defines the MX31 memory map.
+- */
+-static struct map_desc mx31pdk_io_desc[] __initdata = {
+-	{
+-		.virtual = MX31_CS5_BASE_ADDR_VIRT,
+-		.pfn = __phys_to_pfn(MX31_CS5_BASE_ADDR),
+-		.length = MX31_CS5_SIZE,
+-		.type = MT_DEVICE,
+-	},
+-};
+-
+-/*
+- * Set up static virtual mappings.
+- */
+-static void __init mx31pdk_map_io(void)
+-{
+-	mx31_map_io();
+-	iotable_init(mx31pdk_io_desc, ARRAY_SIZE(mx31pdk_io_desc));
+-}
+-
+-/*!
+- * Board specific initialization.
+- */
+-static void __init mxc_board_init(void)
+-{
+-	mxc_iomux_setup_multiple_pins(mx31pdk_pins, ARRAY_SIZE(mx31pdk_pins),
+-				      "mx31pdk");
+-
 -	mxc_register_device(&mxc_uart_device0, &uart_pdata);
--	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
+-
+-	if (!mx31pdk_init_expio())
+-		platform_device_register(&smsc911x_device);
 -}
 -
--static void __init mx27lite_timer_init(void)
+-static void __init mx31pdk_timer_init(void)
 -{
--	mx27_clocks_init(26000000);
+-	mx31_clocks_init(26000000);
 -}
 -
--static struct sys_timer mx27lite_timer = {
--	.init	= mx27lite_timer_init,
+-static struct sys_timer mx31pdk_timer = {
+-	.init	= mx31pdk_timer_init,
 -};
 -
--MACHINE_START(IMX27LITE, "LogicPD i.MX27LITE")
--	.phys_io        = MX27_AIPI_BASE_ADDR,
--	.io_pg_offst    = ((MX27_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
+-/*
+- * The following uses standard kernel macros defined in arch.h in order to
+- * initialize __mach_desc_MX31PDK data structure.
+- */
+-MACHINE_START(MX31_3DS, "Freescale MX31PDK (3DS)")
+-	/* Maintainer: Freescale Semiconductor, Inc. */
+-	.phys_io	= MX31_AIPS1_BASE_ADDR,
+-	.io_pg_offst	= ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
 -	.boot_params    = PHYS_OFFSET + 0x100,
--	.map_io         = mx27_map_io,
--	.init_irq       = mx27_init_irq,
--	.init_machine   = mx27lite_init,
--	.timer          = &mx27lite_timer,
+-	.map_io         = mx31pdk_map_io,
+-	.init_irq       = mx31_init_irq,
+-	.init_machine   = mxc_board_init,
+-	.timer          = &mx31pdk_timer,
 -MACHINE_END
-diff --git a/arch/arm/mach-mx2/mx27pdk.c b/arch/arm/mach-mx2/mx27pdk.c
+diff --git a/arch/arm/mach-mx3/mx35pdk.c b/arch/arm/mach-mx3/mx35pdk.c
 deleted file mode 100644
-index 595fea4..0000000
---- a/arch/arm/mach-mx2/mx27pdk.c
+index 2d11bf0..0000000
+--- a/arch/arm/mach-mx3/mx35pdk.c
 +++ /dev/null
-@@ -1,95 +0,0 @@
+@@ -1,116 +0,0 @@
 -/*
 - * Copyright 2009 Freescale Semiconductor, Inc. All Rights Reserved.
 - *
@@ -3115,91 +6677,110 @@ index 595fea4..0000000
 - * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 - */
 -
+-#include <linux/types.h>
+-#include <linux/init.h>
 -#include <linux/platform_device.h>
+-#include <linux/memory.h>
 -#include <linux/gpio.h>
+-#include <linux/fsl_devices.h>
+-
 -#include <asm/mach-types.h>
 -#include <asm/mach/arch.h>
 -#include <asm/mach/time.h>
+-#include <asm/mach/map.h>
+-
 -#include <mach/hardware.h>
 -#include <mach/common.h>
 -#include <mach/imx-uart.h>
--#include <mach/iomux.h>
--#include <mach/board-mx27pdk.h>
+-#include <mach/iomux-mx35.h>
 -
 -#include "devices.h"
--
--static unsigned int mx27pdk_pins[] = {
--	/* UART1 */
--	PE12_PF_UART1_TXD,
--	PE13_PF_UART1_RXD,
--	PE14_PF_UART1_CTS,
--	PE15_PF_UART1_RTS,
--	/* FEC */
--	PD0_AIN_FEC_TXD0,
--	PD1_AIN_FEC_TXD1,
--	PD2_AIN_FEC_TXD2,
--	PD3_AIN_FEC_TXD3,
--	PD4_AOUT_FEC_RX_ER,
--	PD5_AOUT_FEC_RXD1,
--	PD6_AOUT_FEC_RXD2,
--	PD7_AOUT_FEC_RXD3,
--	PD8_AF_FEC_MDIO,
--	PD9_AIN_FEC_MDC,
--	PD10_AOUT_FEC_CRS,
--	PD11_AOUT_FEC_TX_CLK,
--	PD12_AOUT_FEC_RXD0,
--	PD13_AOUT_FEC_RX_DV,
--	PD14_AOUT_FEC_RX_CLK,
--	PD15_AOUT_FEC_COL,
--	PD16_AIN_FEC_TX_ER,
--	PF23_AIN_FEC_TX_EN,
--};
 -
 -static struct imxuart_platform_data uart_pdata = {
 -	.flags = IMXUART_HAVE_RTSCTS,
 -};
 -
--static struct platform_device *platform_devices[] __initdata = {
+-static struct platform_device *devices[] __initdata = {
 -	&mxc_fec_device,
 -};
 -
--static void __init mx27pdk_init(void)
--{
--	mxc_gpio_setup_multiple_pins(mx27pdk_pins, ARRAY_SIZE(mx27pdk_pins),
--		"mx27pdk");
--	mxc_register_device(&mxc_uart_device0, &uart_pdata);
--	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
--}
--
--static void __init mx27pdk_timer_init(void)
--{
--	mx27_clocks_init(26000000);
--}
--
--static struct sys_timer mx27pdk_timer = {
--	.init	= mx27pdk_timer_init,
+-static struct pad_desc mx35pdk_pads[] = {
+-	/* UART1 */
+-	MX35_PAD_CTS1__UART1_CTS,
+-	MX35_PAD_RTS1__UART1_RTS,
+-	MX35_PAD_TXD1__UART1_TXD_MUX,
+-	MX35_PAD_RXD1__UART1_RXD_MUX,
+-	/* FEC */
+-	MX35_PAD_FEC_TX_CLK__FEC_TX_CLK,
+-	MX35_PAD_FEC_RX_CLK__FEC_RX_CLK,
+-	MX35_PAD_FEC_RX_DV__FEC_RX_DV,
+-	MX35_PAD_FEC_COL__FEC_COL,
+-	MX35_PAD_FEC_RDATA0__FEC_RDATA_0,
+-	MX35_PAD_FEC_TDATA0__FEC_TDATA_0,
+-	MX35_PAD_FEC_TX_EN__FEC_TX_EN,
+-	MX35_PAD_FEC_MDC__FEC_MDC,
+-	MX35_PAD_FEC_MDIO__FEC_MDIO,
+-	MX35_PAD_FEC_TX_ERR__FEC_TX_ERR,
+-	MX35_PAD_FEC_RX_ERR__FEC_RX_ERR,
+-	MX35_PAD_FEC_CRS__FEC_CRS,
+-	MX35_PAD_FEC_RDATA1__FEC_RDATA_1,
+-	MX35_PAD_FEC_TDATA1__FEC_TDATA_1,
+-	MX35_PAD_FEC_RDATA2__FEC_RDATA_2,
+-	MX35_PAD_FEC_TDATA2__FEC_TDATA_2,
+-	MX35_PAD_FEC_RDATA3__FEC_RDATA_3,
+-	MX35_PAD_FEC_TDATA3__FEC_TDATA_3,
+-	/* USBOTG */
+-	MX35_PAD_USBOTG_PWR__USB_TOP_USBOTG_PWR,
+-	MX35_PAD_USBOTG_OC__USB_TOP_USBOTG_OC,
 -};
 -
--MACHINE_START(MX27_3DS, "Freescale MX27PDK")
--	/* maintainer: Freescale Semiconductor, Inc. */
--	.phys_io        = MX27_AIPI_BASE_ADDR,
--	.io_pg_offst    = ((MX27_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
--	.boot_params    = PHYS_OFFSET + 0x100,
--	.map_io         = mx27_map_io,
--	.init_irq       = mx27_init_irq,
--	.init_machine   = mx27pdk_init,
--	.timer          = &mx27pdk_timer,
--MACHINE_END
-diff --git a/arch/arm/mach-mx2/mxt_td60.c b/arch/arm/mach-mx2/mxt_td60.c
-deleted file mode 100644
-index 3a32b3e..0000000
---- a/arch/arm/mach-mx2/mxt_td60.c
-+++ /dev/null
-@@ -1,319 +0,0 @@
+-/* OTG config */
+-static struct fsl_usb2_platform_data usb_pdata = {
+-	.operating_mode	= FSL_USB2_DR_DEVICE,
+-	.phy_mode	= FSL_USB2_PHY_UTMI_WIDE,
+-};
+-
 -/*
-- *  Copyright (C) 2000 Deep Blue Solutions Ltd
-- *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
-- *  Copyright 2006-2007 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Board specific initialization.
+- */
+-static void __init mxc_board_init(void)
+-{
+-	mxc_iomux_v3_setup_multiple_pads(mx35pdk_pads, ARRAY_SIZE(mx35pdk_pads));
+-
+-	platform_add_devices(devices, ARRAY_SIZE(devices));
+-
+-	mxc_register_device(&mxc_uart_device0, &uart_pdata);
+-
+-	mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
+-}
+-
+-static void __init mx35pdk_timer_init(void)
+-{
+-	mx35_clocks_init();
+-}
+-
+-struct sys_timer mx35pdk_timer = {
+-	.init	= mx35pdk_timer_init,
+-};
+-
+-MACHINE_START(MX35_3DS, "Freescale MX35PDK")
+-	/* Maintainer: Freescale Semiconductor, Inc */
+-	.phys_io	= MX35_AIPS1_BASE_ADDR,
+-	.io_pg_offst	= ((MX35_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
+-	.boot_params    = PHYS_OFFSET + 0x100,
+-	.map_io         = mx35_map_io,
+-	.init_irq       = mx35_init_irq,
+-	.init_machine   = mxc_board_init,
+-	.timer          = &mx35pdk_timer,
+-MACHINE_END
+diff --git a/arch/arm/mach-mx3/pcm037.c b/arch/arm/mach-mx3/pcm037.c
+deleted file mode 100644
+index 24183aa..0000000
+--- a/arch/arm/mach-mx3/pcm037.c
++++ /dev/null
+@@ -1,628 +0,0 @@
+-/*
+- *  Copyright (C) 2008 Sascha Hauer, Pengutronix
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License as published by
@@ -3216,677 +6797,277 @@ index 3a32b3e..0000000
 - * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 - */
 -
+-#include <linux/types.h>
+-#include <linux/init.h>
+-#include <linux/dma-mapping.h>
 -#include <linux/platform_device.h>
--#include <linux/mtd/mtd.h>
--#include <linux/mtd/map.h>
--#include <linux/mtd/partitions.h>
 -#include <linux/mtd/physmap.h>
+-#include <linux/mtd/plat-ram.h>
+-#include <linux/memory.h>
+-#include <linux/gpio.h>
+-#include <linux/smsc911x.h>
+-#include <linux/interrupt.h>
 -#include <linux/i2c.h>
+-#include <linux/i2c/at24.h>
+-#include <linux/delay.h>
+-#include <linux/spi/spi.h>
 -#include <linux/irq.h>
--#include <mach/common.h>
--#include <mach/hardware.h>
+-#include <linux/fsl_devices.h>
+-#include <linux/can/platform/sja1000.h>
+-
+-#include <media/soc_camera.h>
+-
 -#include <asm/mach-types.h>
 -#include <asm/mach/arch.h>
 -#include <asm/mach/time.h>
 -#include <asm/mach/map.h>
--#include <linux/gpio.h>
--#include <mach/imx-uart.h>
--#include <mach/iomux.h>
--#include <mach/mxc_nand.h>
+-#include <mach/board-pcm037.h>
+-#include <mach/common.h>
+-#include <mach/hardware.h>
 -#include <mach/i2c.h>
--#include <linux/i2c/pca953x.h>
--#include <mach/imxfb.h>
+-#include <mach/imx-uart.h>
+-#include <mach/iomux-mx3.h>
+-#include <mach/ipu.h>
 -#include <mach/mmc.h>
+-#include <mach/mx3_camera.h>
+-#include <mach/mx3fb.h>
+-#include <mach/mxc_nand.h>
 -
 -#include "devices.h"
+-#include "pcm037.h"
 -
--static unsigned int mxt_td60_pins[] __initdata = {
--	/* UART0 */
--	PE12_PF_UART1_TXD,
--	PE13_PF_UART1_RXD,
--	PE14_PF_UART1_CTS,
--	PE15_PF_UART1_RTS,
--	/* UART1 */
--	PE3_PF_UART2_CTS,
--	PE4_PF_UART2_RTS,
--	PE6_PF_UART2_TXD,
--	PE7_PF_UART2_RXD,
--	/* UART2 */
--	PE8_PF_UART3_TXD,
--	PE9_PF_UART3_RXD,
--	PE10_PF_UART3_CTS,
--	PE11_PF_UART3_RTS,
--	/* UART3 */
--	PB26_AF_UART4_RTS,
--	PB28_AF_UART4_TXD,
--	PB29_AF_UART4_CTS,
--	PB31_AF_UART4_RXD,
--	/* UART4 */
--	PB18_AF_UART5_TXD,
--	PB19_AF_UART5_RXD,
--	PB20_AF_UART5_CTS,
--	PB21_AF_UART5_RTS,
--	/* UART5 */
--	PB10_AF_UART6_TXD,
--	PB12_AF_UART6_CTS,
--	PB11_AF_UART6_RXD,
--	PB13_AF_UART6_RTS,
--	/* FEC */
--	PD0_AIN_FEC_TXD0,
--	PD1_AIN_FEC_TXD1,
--	PD2_AIN_FEC_TXD2,
--	PD3_AIN_FEC_TXD3,
--	PD4_AOUT_FEC_RX_ER,
--	PD5_AOUT_FEC_RXD1,
--	PD6_AOUT_FEC_RXD2,
--	PD7_AOUT_FEC_RXD3,
--	PD8_AF_FEC_MDIO,
--	PD9_AIN_FEC_MDC,
--	PD10_AOUT_FEC_CRS,
--	PD11_AOUT_FEC_TX_CLK,
--	PD12_AOUT_FEC_RXD0,
--	PD13_AOUT_FEC_RX_DV,
--	PD14_AOUT_FEC_RX_CLK,
--	PD15_AOUT_FEC_COL,
--	PD16_AIN_FEC_TX_ER,
--	PF23_AIN_FEC_TX_EN,
--	/* I2C1 */
--	PD17_PF_I2C_DATA,
--	PD18_PF_I2C_CLK,
--	/* I2C2 */
--	PC5_PF_I2C2_SDA,
--	PC6_PF_I2C2_SCL,
--	/* FB */
--	PA5_PF_LSCLK,
--	PA6_PF_LD0,
--	PA7_PF_LD1,
--	PA8_PF_LD2,
--	PA9_PF_LD3,
--	PA10_PF_LD4,
--	PA11_PF_LD5,
--	PA12_PF_LD6,
--	PA13_PF_LD7,
--	PA14_PF_LD8,
--	PA15_PF_LD9,
--	PA16_PF_LD10,
--	PA17_PF_LD11,
--	PA18_PF_LD12,
--	PA19_PF_LD13,
--	PA20_PF_LD14,
--	PA21_PF_LD15,
--	PA22_PF_LD16,
--	PA23_PF_LD17,
--	PA25_PF_CLS,
--	PA27_PF_SPL_SPR,
--	PA28_PF_HSYNC,
--	PA29_PF_VSYNC,
--	PA30_PF_CONTRAST,
--	PA31_PF_OE_ACD,
--	/* OWIRE */
--	PE16_AF_OWIRE,
--	/* SDHC1*/
--	PE18_PF_SD1_D0,
--	PE19_PF_SD1_D1,
--	PE20_PF_SD1_D2,
--	PE21_PF_SD1_D3,
--	PE22_PF_SD1_CMD,
--	PE23_PF_SD1_CLK,
--	PF8_AF_ATA_IORDY,
--	/* SDHC2*/
--	PB4_PF_SD2_D0,
--	PB5_PF_SD2_D1,
--	PB6_PF_SD2_D2,
--	PB7_PF_SD2_D3,
--	PB8_PF_SD2_CMD,
--	PB9_PF_SD2_CLK,
--};
+-static enum pcm037_board_variant pcm037_instance = PCM037_PCM970;
 -
--static struct mxc_nand_platform_data mxt_td60_nand_board_info = {
--	.width = 1,
--	.hw_ecc = 1,
--};
--
--static struct imxi2c_platform_data mxt_td60_i2c_data = {
--	.bitrate = 100000,
--};
--
--/* PCA9557 */
--static int mxt_td60_pca9557_setup(struct i2c_client *client,
--				unsigned gpio_base, unsigned ngpio,
--				void *context)
+-static int __init pcm037_variant_setup(char *str)
 -{
--	static int mxt_td60_gpio_value[] = {
--		-1, -1, -1, -1, -1, -1, -1, 1
--	};
--	int n;
+-	if (!strcmp("eet", str))
+-		pcm037_instance = PCM037_EET;
+-	else if (strcmp("pcm970", str))
+-		pr_warning("Unknown pcm037 baseboard variant %s\n", str);
 -
--	for (n = 0; n < ARRAY_SIZE(mxt_td60_gpio_value); ++n) {
--		gpio_request(gpio_base + n, "MXT_TD60 GPIO Exp");
--		if (mxt_td60_gpio_value[n] < 0)
--			gpio_direction_input(gpio_base + n);
--		else
--			gpio_direction_output(gpio_base + n,
--						mxt_td60_gpio_value[n]);
--		gpio_export(gpio_base + n, 0);
+-	return 1;
+-}
+-
+-/* Supported values: "pcm970" (default) and "eet" */
+-__setup("pcm037_variant=", pcm037_variant_setup);
+-
+-enum pcm037_board_variant pcm037_variant(void)
+-{
+-	return pcm037_instance;
+-}
+-
+-/* UART1 with RTS/CTS handshake signals */
+-static unsigned int pcm037_uart1_handshake_pins[] = {
+-	MX31_PIN_CTS1__CTS1,
+-	MX31_PIN_RTS1__RTS1,
+-	MX31_PIN_TXD1__TXD1,
+-	MX31_PIN_RXD1__RXD1,
+-};
+-
+-/* UART1 without RTS/CTS handshake signals */
+-static unsigned int pcm037_uart1_pins[] = {
+-	MX31_PIN_TXD1__TXD1,
+-	MX31_PIN_RXD1__RXD1,
+-};
+-
+-static unsigned int pcm037_pins[] = {
+-	/* I2C */
+-	MX31_PIN_CSPI2_MOSI__SCL,
+-	MX31_PIN_CSPI2_MISO__SDA,
+-	MX31_PIN_CSPI2_SS2__I2C3_SDA,
+-	MX31_PIN_CSPI2_SCLK__I2C3_SCL,
+-	/* SDHC1 */
+-	MX31_PIN_SD1_DATA3__SD1_DATA3,
+-	MX31_PIN_SD1_DATA2__SD1_DATA2,
+-	MX31_PIN_SD1_DATA1__SD1_DATA1,
+-	MX31_PIN_SD1_DATA0__SD1_DATA0,
+-	MX31_PIN_SD1_CLK__SD1_CLK,
+-	MX31_PIN_SD1_CMD__SD1_CMD,
+-	IOMUX_MODE(MX31_PIN_SCK6, IOMUX_CONFIG_GPIO), /* card detect */
+-	IOMUX_MODE(MX31_PIN_SFS6, IOMUX_CONFIG_GPIO), /* write protect */
+-	/* SPI1 */
+-	MX31_PIN_CSPI1_MOSI__MOSI,
+-	MX31_PIN_CSPI1_MISO__MISO,
+-	MX31_PIN_CSPI1_SCLK__SCLK,
+-	MX31_PIN_CSPI1_SPI_RDY__SPI_RDY,
+-	MX31_PIN_CSPI1_SS0__SS0,
+-	MX31_PIN_CSPI1_SS1__SS1,
+-	MX31_PIN_CSPI1_SS2__SS2,
+-	/* UART2 */
+-	MX31_PIN_TXD2__TXD2,
+-	MX31_PIN_RXD2__RXD2,
+-	MX31_PIN_CTS2__CTS2,
+-	MX31_PIN_RTS2__RTS2,
+-	/* UART3 */
+-	MX31_PIN_CSPI3_MOSI__RXD3,
+-	MX31_PIN_CSPI3_MISO__TXD3,
+-	MX31_PIN_CSPI3_SCLK__RTS3,
+-	MX31_PIN_CSPI3_SPI_RDY__CTS3,
+-	/* LAN9217 irq pin */
+-	IOMUX_MODE(MX31_PIN_GPIO3_1, IOMUX_CONFIG_GPIO),
+-	/* Onewire */
+-	MX31_PIN_BATT_LINE__OWIRE,
+-	/* Framebuffer */
+-	MX31_PIN_LD0__LD0,
+-	MX31_PIN_LD1__LD1,
+-	MX31_PIN_LD2__LD2,
+-	MX31_PIN_LD3__LD3,
+-	MX31_PIN_LD4__LD4,
+-	MX31_PIN_LD5__LD5,
+-	MX31_PIN_LD6__LD6,
+-	MX31_PIN_LD7__LD7,
+-	MX31_PIN_LD8__LD8,
+-	MX31_PIN_LD9__LD9,
+-	MX31_PIN_LD10__LD10,
+-	MX31_PIN_LD11__LD11,
+-	MX31_PIN_LD12__LD12,
+-	MX31_PIN_LD13__LD13,
+-	MX31_PIN_LD14__LD14,
+-	MX31_PIN_LD15__LD15,
+-	MX31_PIN_LD16__LD16,
+-	MX31_PIN_LD17__LD17,
+-	MX31_PIN_VSYNC3__VSYNC3,
+-	MX31_PIN_HSYNC__HSYNC,
+-	MX31_PIN_FPSHIFT__FPSHIFT,
+-	MX31_PIN_DRDY0__DRDY0,
+-	MX31_PIN_D3_REV__D3_REV,
+-	MX31_PIN_CONTRAST__CONTRAST,
+-	MX31_PIN_D3_SPL__D3_SPL,
+-	MX31_PIN_D3_CLS__D3_CLS,
+-	MX31_PIN_LCS0__GPI03_23,
+-	/* CSI */
+-	IOMUX_MODE(MX31_PIN_CSI_D5, IOMUX_CONFIG_GPIO),
+-	MX31_PIN_CSI_D6__CSI_D6,
+-	MX31_PIN_CSI_D7__CSI_D7,
+-	MX31_PIN_CSI_D8__CSI_D8,
+-	MX31_PIN_CSI_D9__CSI_D9,
+-	MX31_PIN_CSI_D10__CSI_D10,
+-	MX31_PIN_CSI_D11__CSI_D11,
+-	MX31_PIN_CSI_D12__CSI_D12,
+-	MX31_PIN_CSI_D13__CSI_D13,
+-	MX31_PIN_CSI_D14__CSI_D14,
+-	MX31_PIN_CSI_D15__CSI_D15,
+-	MX31_PIN_CSI_HSYNC__CSI_HSYNC,
+-	MX31_PIN_CSI_MCLK__CSI_MCLK,
+-	MX31_PIN_CSI_PIXCLK__CSI_PIXCLK,
+-	MX31_PIN_CSI_VSYNC__CSI_VSYNC,
+-	/* GPIO */
+-	IOMUX_MODE(MX31_PIN_ATA_DMACK, IOMUX_CONFIG_GPIO),
+-};
+-
+-static struct physmap_flash_data pcm037_flash_data = {
+-	.width  = 2,
+-};
+-
+-static struct resource pcm037_flash_resource = {
+-	.start	= 0xa0000000,
+-	.end	= 0xa1ffffff,
+-	.flags	= IORESOURCE_MEM,
+-};
+-
+-static int usbotg_pins[] = {
+-	MX31_PIN_USBOTG_DATA0__USBOTG_DATA0,
+-	MX31_PIN_USBOTG_DATA1__USBOTG_DATA1,
+-	MX31_PIN_USBOTG_DATA2__USBOTG_DATA2,
+-	MX31_PIN_USBOTG_DATA3__USBOTG_DATA3,
+-	MX31_PIN_USBOTG_DATA4__USBOTG_DATA4,
+-	MX31_PIN_USBOTG_DATA5__USBOTG_DATA5,
+-	MX31_PIN_USBOTG_DATA6__USBOTG_DATA6,
+-	MX31_PIN_USBOTG_DATA7__USBOTG_DATA7,
+-	MX31_PIN_USBOTG_CLK__USBOTG_CLK,
+-	MX31_PIN_USBOTG_DIR__USBOTG_DIR,
+-	MX31_PIN_USBOTG_NXT__USBOTG_NXT,
+-	MX31_PIN_USBOTG_STP__USBOTG_STP,
+-};
+-
+-/* USB OTG HS port */
+-static int __init gpio_usbotg_hs_activate(void)
+-{
+-	int ret = mxc_iomux_setup_multiple_pins(usbotg_pins,
+-					ARRAY_SIZE(usbotg_pins), "usbotg");
+-
+-	if (ret < 0) {
+-		printk(KERN_ERR "Cannot set up OTG pins\n");
+-		return ret;
 -	}
+-
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA0, PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA1, PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA2, PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA3, PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA4, PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA5, PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA6, PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_DATA7, PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_CLK,   PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_DIR,   PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_NXT,   PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
+-	mxc_iomux_set_pad(MX31_PIN_USBOTG_STP,   PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST);
 -
 -	return 0;
 -}
 -
--static struct pca953x_platform_data mxt_td60_pca9557_pdata = {
--	.gpio_base	= 240, /* place PCA9557 after all MX27 gpio pins */
--	.invert		= 0, /* Do not invert */
--	.setup		= mxt_td60_pca9557_setup,
+-/* OTG config */
+-static struct fsl_usb2_platform_data usb_pdata = {
+-	.operating_mode	= FSL_USB2_DR_DEVICE,
+-	.phy_mode	= FSL_USB2_PHY_ULPI,
 -};
 -
--static struct i2c_board_info mxt_td60_i2c_devices[] = {
--	{
--		I2C_BOARD_INFO("pca9557", 0x18),
--		.platform_data = &mxt_td60_pca9557_pdata,
+-static struct platform_device pcm037_flash = {
+-	.name	= "physmap-flash",
+-	.id	= 0,
+-	.dev	= {
+-		.platform_data  = &pcm037_flash_data,
 -	},
--};
--
--static struct imxi2c_platform_data mxt_td60_i2c2_data = {
--	.bitrate = 100000,
--};
--
--static struct i2c_board_info mxt_td60_i2c2_devices[] = {
--};
--
--static struct imx_fb_videomode mxt_td60_modes[] = {
--	{
--		.mode = {
--			.name		= "Chimei LW700AT9003",
--			.refresh	= 60,
--			.xres		= 800,
--			.yres		= 480,
--			.pixclock	= 30303,
--			.hsync_len	= 64,
--			.left_margin	= 0x67,
--			.right_margin	= 0x68,
--			.vsync_len	= 16,
--			.upper_margin	= 0x0f,
--			.lower_margin	= 0x0f,
--		},
--		.bpp		= 16,
--		.pcr		= 0xFA208B83,
--	},
--};
--
--static struct imx_fb_platform_data mxt_td60_fb_data = {
--	.mode = mxt_td60_modes,
--	.num_modes = ARRAY_SIZE(mxt_td60_modes),
--
--	/*
--	 * - HSYNC active high
--	 * - VSYNC active high
--	 * - clk notenabled while idle
--	 * - clock inverted
--	 * - data not inverted
--	 * - data enable low active
--	 * - enable sharp mode
--	 */
--	.pwmr		= 0x00A903FF,
--	.lscr1		= 0x00120300,
--	.dmacr		= 0x00020010,
--};
--
--static int mxt_td60_sdhc1_init(struct device *dev, irq_handler_t detect_irq,
--				void *data)
--{
--	return request_irq(IRQ_GPIOF(8), detect_irq, IRQF_TRIGGER_FALLING,
--				"sdhc1-card-detect", data);
--}
--
--static void mxt_td60_sdhc1_exit(struct device *dev, void *data)
--{
--	free_irq(IRQ_GPIOF(8), data);
--}
--
--static struct imxmmc_platform_data sdhc1_pdata = {
--	.init = mxt_td60_sdhc1_init,
--	.exit = mxt_td60_sdhc1_exit,
--};
--
--static struct platform_device *platform_devices[] __initdata = {
--	&mxc_fec_device,
--};
--
--static struct imxuart_platform_data uart_pdata[] = {
--	{
--		.flags = IMXUART_HAVE_RTSCTS,
--	}, {
--		.flags = IMXUART_HAVE_RTSCTS,
--	}, {
--		.flags = IMXUART_HAVE_RTSCTS,
--	}, {
--		.flags = IMXUART_HAVE_RTSCTS,
--	}, {
--		.flags = IMXUART_HAVE_RTSCTS,
--	}, {
--		.flags = IMXUART_HAVE_RTSCTS,
--	},
--};
--
--static void __init mxt_td60_board_init(void)
--{
--	mxc_gpio_setup_multiple_pins(mxt_td60_pins, ARRAY_SIZE(mxt_td60_pins),
--			"MXT_TD60");
--
--	mxc_register_device(&mxc_uart_device0, &uart_pdata[0]);
--	mxc_register_device(&mxc_uart_device1, &uart_pdata[1]);
--	mxc_register_device(&mxc_uart_device2, &uart_pdata[2]);
--	mxc_register_device(&mxc_uart_device3, &uart_pdata[3]);
--	mxc_register_device(&mxc_uart_device4, &uart_pdata[4]);
--	mxc_register_device(&mxc_uart_device5, &uart_pdata[5]);
--	mxc_register_device(&mxc_nand_device, &mxt_td60_nand_board_info);
--
--	i2c_register_board_info(0, mxt_td60_i2c_devices,
--				ARRAY_SIZE(mxt_td60_i2c_devices));
--
--	i2c_register_board_info(1, mxt_td60_i2c2_devices,
--				ARRAY_SIZE(mxt_td60_i2c2_devices));
--
--	mxc_register_device(&mxc_i2c_device0, &mxt_td60_i2c_data);
--	mxc_register_device(&mxc_i2c_device1, &mxt_td60_i2c2_data);
--	mxc_register_device(&mxc_fb_device, &mxt_td60_fb_data);
--	mxc_register_device(&mxc_sdhc_device0, &sdhc1_pdata);
--
--	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
--}
--
--static void __init mxt_td60_timer_init(void)
--{
--	mx27_clocks_init(26000000);
--}
--
--static struct sys_timer mxt_td60_timer = {
--	.init	= mxt_td60_timer_init,
--};
--
--MACHINE_START(MXT_TD60, "Maxtrack i-MXT TD60")
--	/* maintainer: Maxtrack Industrial */
--	.phys_io	= MX27_AIPI_BASE_ADDR,
--	.io_pg_offst	= ((MX27_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
--	.boot_params	= PHYS_OFFSET + 0x100,
--	.map_io		= mx27_map_io,
--	.init_irq	= mx27_init_irq,
--	.init_machine	= mxt_td60_board_init,
--	.timer		= &mxt_td60_timer,
--MACHINE_END
--
-diff --git a/arch/arm/mach-mx2/pca100.c b/arch/arm/mach-mx2/pca100.c
-deleted file mode 100644
-index 55dbf5a..0000000
---- a/arch/arm/mach-mx2/pca100.c
-+++ /dev/null
-@@ -1,244 +0,0 @@
--/*
-- * Copyright 2007 Robert Schwebel <r.schwebel@pengutronix.de>, Pengutronix
-- * Copyright (C) 2009 Sascha Hauer (kernel at pengutronix.de)
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version 2
-- * of the License, or (at your option) any later version.
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-- * MA 02110-1301, USA.
-- */
--
--#include <linux/platform_device.h>
--#include <linux/io.h>
--#include <linux/i2c.h>
--#include <linux/i2c/at24.h>
--#include <linux/dma-mapping.h>
--#include <linux/spi/spi.h>
--#include <linux/spi/eeprom.h>
--#include <linux/irq.h>
--#include <linux/gpio.h>
--
--#include <asm/mach/arch.h>
--#include <asm/mach-types.h>
--#include <mach/common.h>
--#include <mach/hardware.h>
--#include <mach/iomux.h>
--#include <mach/i2c.h>
--#include <asm/mach/time.h>
--#if defined(CONFIG_SPI_IMX) || defined(CONFIG_SPI_IMX_MODULE)
--#include <mach/spi.h>
--#endif
--#include <mach/imx-uart.h>
--#include <mach/mxc_nand.h>
--#include <mach/irqs.h>
--#include <mach/mmc.h>
--
--#include "devices.h"
--
--static int pca100_pins[] = {
--	/* UART1 */
--	PE12_PF_UART1_TXD,
--	PE13_PF_UART1_RXD,
--	PE14_PF_UART1_CTS,
--	PE15_PF_UART1_RTS,
--	/* SDHC */
--	PB4_PF_SD2_D0,
--	PB5_PF_SD2_D1,
--	PB6_PF_SD2_D2,
--	PB7_PF_SD2_D3,
--	PB8_PF_SD2_CMD,
--	PB9_PF_SD2_CLK,
--	/* FEC */
--	PD0_AIN_FEC_TXD0,
--	PD1_AIN_FEC_TXD1,
--	PD2_AIN_FEC_TXD2,
--	PD3_AIN_FEC_TXD3,
--	PD4_AOUT_FEC_RX_ER,
--	PD5_AOUT_FEC_RXD1,
--	PD6_AOUT_FEC_RXD2,
--	PD7_AOUT_FEC_RXD3,
--	PD8_AF_FEC_MDIO,
--	PD9_AIN_FEC_MDC,
--	PD10_AOUT_FEC_CRS,
--	PD11_AOUT_FEC_TX_CLK,
--	PD12_AOUT_FEC_RXD0,
--	PD13_AOUT_FEC_RX_DV,
--	PD14_AOUT_FEC_RX_CLK,
--	PD15_AOUT_FEC_COL,
--	PD16_AIN_FEC_TX_ER,
--	PF23_AIN_FEC_TX_EN,
--	/* SSI1 */
--	PC20_PF_SSI1_FS,
--	PC21_PF_SSI1_RXD,
--	PC22_PF_SSI1_TXD,
--	PC23_PF_SSI1_CLK,
--	/* onboard I2C */
--	PC5_PF_I2C2_SDA,
--	PC6_PF_I2C2_SCL,
--	/* external I2C */
--	PD17_PF_I2C_DATA,
--	PD18_PF_I2C_CLK,
--	/* SPI1 */
--	PD25_PF_CSPI1_RDY,
--	PD29_PF_CSPI1_SCLK,
--	PD30_PF_CSPI1_MISO,
--	PD31_PF_CSPI1_MOSI,
+-	.resource = &pcm037_flash_resource,
+-	.num_resources = 1,
 -};
 -
 -static struct imxuart_platform_data uart_pdata = {
 -	.flags = IMXUART_HAVE_RTSCTS,
 -};
 -
--static struct mxc_nand_platform_data pca100_nand_board_info = {
--	.width = 1,
--	.hw_ecc = 1,
--};
--
--static struct platform_device *platform_devices[] __initdata = {
--	&mxc_w1_master_device,
--	&mxc_fec_device,
--};
--
--static struct imxi2c_platform_data pca100_i2c_1_data = {
--	.bitrate = 100000,
--};
--
--static struct at24_platform_data board_eeprom = {
--	.byte_len = 4096,
--	.page_size = 32,
--	.flags = AT24_FLAG_ADDR16,
--};
--
--static struct i2c_board_info pca100_i2c_devices[] = {
+-static struct resource smsc911x_resources[] = {
 -	{
--		I2C_BOARD_INFO("at24", 0x52), /* E0=0, E1=1, E2=0 */
--		.platform_data = &board_eeprom,
+-		.start		= MX31_CS1_BASE_ADDR + 0x300,
+-		.end		= MX31_CS1_BASE_ADDR + 0x300 + SZ_64K - 1,
+-		.flags		= IORESOURCE_MEM,
 -	}, {
--		I2C_BOARD_INFO("rtc-pcf8563", 0x51),
--		.type = "pcf8563"
--	}, {
--		I2C_BOARD_INFO("lm75", 0x4a),
--		.type = "lm75"
--	}
--};
--
--#if defined(CONFIG_SPI_IMX) || defined(CONFIG_SPI_IMX_MODULE)
--static struct spi_eeprom at25320 = {
--	.name		= "at25320an",
--	.byte_len	= 4096,
--	.page_size	= 32,
--	.flags		= EE_ADDR2,
--};
--
--static struct spi_board_info pca100_spi_board_info[] __initdata = {
--	{
--		.modalias = "at25",
--		.max_speed_hz = 30000,
--		.bus_num = 0,
--		.chip_select = 1,
--		.platform_data = &at25320,
+-		.start		= IOMUX_TO_IRQ(MX31_PIN_GPIO3_1),
+-		.end		= IOMUX_TO_IRQ(MX31_PIN_GPIO3_1),
+-		.flags		= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL,
 -	},
 -};
 -
--static int pca100_spi_cs[] = {GPIO_PORTD + 28, GPIO_PORTD + 27};
--
--static struct spi_imx_master pca100_spi_0_data = {
--	.chipselect	= pca100_spi_cs,
--	.num_chipselect = ARRAY_SIZE(pca100_spi_cs),
--};
--#endif
--
--static int pca100_sdhc2_init(struct device *dev, irq_handler_t detect_irq,
--		void *data)
--{
--	int ret;
--
--	ret = request_irq(IRQ_GPIOC(29), detect_irq,
--			  IRQF_DISABLED | IRQF_TRIGGER_FALLING,
--			  "imx-mmc-detect", data);
--	if (ret)
--		printk(KERN_ERR
--			"pca100: Failed to reuest irq for sd/mmc detection\n");
--
--	return ret;
--}
--
--static void pca100_sdhc2_exit(struct device *dev, void *data)
--{
--	free_irq(IRQ_GPIOC(29), data);
--}
--
--static struct imxmmc_platform_data sdhc_pdata = {
--	.init = pca100_sdhc2_init,
--	.exit = pca100_sdhc2_exit,
+-static struct smsc911x_platform_config smsc911x_info = {
+-	.flags		= SMSC911X_USE_32BIT | SMSC911X_FORCE_INTERNAL_PHY |
+-			  SMSC911X_SAVE_MAC_ADDRESS,
+-	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
+-	.irq_type	= SMSC911X_IRQ_TYPE_OPEN_DRAIN,
+-	.phy_interface	= PHY_INTERFACE_MODE_MII,
 -};
 -
--static void __init pca100_init(void)
--{
--	int ret;
--
--	ret = mxc_gpio_setup_multiple_pins(pca100_pins,
--			ARRAY_SIZE(pca100_pins), "PCA100");
--	if (ret)
--		printk(KERN_ERR "pca100: Failed to setup pins (%d)\n", ret);
--
--	mxc_register_device(&mxc_uart_device0, &uart_pdata);
--
--	mxc_gpio_mode(GPIO_PORTC | 29 | GPIO_GPIO | GPIO_IN);
--	mxc_register_device(&mxc_sdhc_device1, &sdhc_pdata);
--
--	mxc_register_device(&mxc_nand_device, &pca100_nand_board_info);
--
--	/* only the i2c master 1 is used on this CPU card */
--	i2c_register_board_info(1, pca100_i2c_devices,
--				ARRAY_SIZE(pca100_i2c_devices));
--
--	mxc_register_device(&mxc_i2c_device1, &pca100_i2c_1_data);
--
--	mxc_gpio_mode(GPIO_PORTD | 28 | GPIO_GPIO | GPIO_OUT);
--	mxc_gpio_mode(GPIO_PORTD | 27 | GPIO_GPIO | GPIO_OUT);
--
--	/* GPIO0_IRQ */
--	mxc_gpio_mode(GPIO_PORTC | 31 | GPIO_GPIO | GPIO_IN);
--	/* GPIO1_IRQ */
--	mxc_gpio_mode(GPIO_PORTC | 25 | GPIO_GPIO | GPIO_IN);
--	/* GPIO2_IRQ */
--	mxc_gpio_mode(GPIO_PORTE | 5 | GPIO_GPIO | GPIO_IN);
--
--#if defined(CONFIG_SPI_IMX) || defined(CONFIG_SPI_IMX_MODULE)
--	spi_register_board_info(pca100_spi_board_info,
--				ARRAY_SIZE(pca100_spi_board_info));
--	mxc_register_device(&mxc_spi_device0, &pca100_spi_0_data);
--#endif
--
--	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
--}
--
--static void __init pca100_timer_init(void)
--{
--	mx27_clocks_init(26000000);
--}
--
--static struct sys_timer pca100_timer = {
--	.init = pca100_timer_init,
+-static struct platform_device pcm037_eth = {
+-	.name		= "smsc911x",
+-	.id		= -1,
+-	.num_resources	= ARRAY_SIZE(smsc911x_resources),
+-	.resource	= smsc911x_resources,
+-	.dev		= {
+-		.platform_data = &smsc911x_info,
+-	},
 -};
--
--MACHINE_START(PCA100, "phyCARD-i.MX27")
--	.phys_io        = MX27_AIPI_BASE_ADDR,
--	.io_pg_offst    = ((MX27_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
--	.boot_params    = PHYS_OFFSET + 0x100,
--	.map_io         = mx27_map_io,
--	.init_irq       = mx27_init_irq,
--	.init_machine   = pca100_init,
--	.timer          = &pca100_timer,
--MACHINE_END
--
-diff --git a/arch/arm/mach-mx2/pcm038.c b/arch/arm/mach-mx2/pcm038.c
-deleted file mode 100644
-index a2e2ea1..0000000
---- a/arch/arm/mach-mx2/pcm038.c
-+++ /dev/null
-@@ -1,338 +0,0 @@
--/*
-- * Copyright 2007 Robert Schwebel <r.schwebel@pengutronix.de>, Pengutronix
-- * Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version 2
-- * of the License, or (at your option) any later version.
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-- * MA 02110-1301, USA.
-- */
--
--#include <linux/i2c.h>
--#include <linux/i2c/at24.h>
--#include <linux/io.h>
--#include <linux/mtd/plat-ram.h>
--#include <linux/mtd/physmap.h>
--#include <linux/platform_device.h>
--#include <linux/regulator/machine.h>
--#include <linux/mfd/mc13783.h>
--#include <linux/spi/spi.h>
--#include <linux/irq.h>
--
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/time.h>
--
--#include <mach/board-pcm038.h>
--#include <mach/common.h>
--#include <mach/hardware.h>
--#include <mach/i2c.h>
--#include <mach/iomux.h>
--#include <mach/imx-uart.h>
--#include <mach/mxc_nand.h>
--#include <mach/spi.h>
--
--#include "devices.h"
--
--static int pcm038_pins[] = {
--	/* UART1 */
--	PE12_PF_UART1_TXD,
--	PE13_PF_UART1_RXD,
--	PE14_PF_UART1_CTS,
--	PE15_PF_UART1_RTS,
--	/* UART2 */
--	PE3_PF_UART2_CTS,
--	PE4_PF_UART2_RTS,
--	PE6_PF_UART2_TXD,
--	PE7_PF_UART2_RXD,
--	/* UART3 */
--	PE8_PF_UART3_TXD,
--	PE9_PF_UART3_RXD,
--	PE10_PF_UART3_CTS,
--	PE11_PF_UART3_RTS,
--	/* FEC */
--	PD0_AIN_FEC_TXD0,
--	PD1_AIN_FEC_TXD1,
--	PD2_AIN_FEC_TXD2,
--	PD3_AIN_FEC_TXD3,
--	PD4_AOUT_FEC_RX_ER,
--	PD5_AOUT_FEC_RXD1,
--	PD6_AOUT_FEC_RXD2,
--	PD7_AOUT_FEC_RXD3,
--	PD8_AF_FEC_MDIO,
--	PD9_AIN_FEC_MDC,
--	PD10_AOUT_FEC_CRS,
--	PD11_AOUT_FEC_TX_CLK,
--	PD12_AOUT_FEC_RXD0,
--	PD13_AOUT_FEC_RX_DV,
--	PD14_AOUT_FEC_RX_CLK,
--	PD15_AOUT_FEC_COL,
--	PD16_AIN_FEC_TX_ER,
--	PF23_AIN_FEC_TX_EN,
--	/* I2C2 */
--	PC5_PF_I2C2_SDA,
--	PC6_PF_I2C2_SCL,
--	/* SPI1 */
--	PD25_PF_CSPI1_RDY,
--	PD29_PF_CSPI1_SCLK,
--	PD30_PF_CSPI1_MISO,
--	PD31_PF_CSPI1_MOSI,
--	/* SSI1 */
--	PC20_PF_SSI1_FS,
--	PC21_PF_SSI1_RXD,
--	PC22_PF_SSI1_TXD,
--	PC23_PF_SSI1_CLK,
--	/* SSI4 */
--	PC16_PF_SSI4_FS,
--	PC17_PF_SSI4_RXD,
--	PC18_PF_SSI4_TXD,
--	PC19_PF_SSI4_CLK,
--};
--
--/*
-- * Phytec's PCM038 comes with 2MiB battery buffered SRAM,
-- * 16 bit width
-- */
 -
 -static struct platdata_mtd_ram pcm038_sram_data = {
 -	.bankwidth = 2,
 -};
 -
 -static struct resource pcm038_sram_resource = {
--	.start = MX27_CS1_BASE_ADDR,
--	.end   = MX27_CS1_BASE_ADDR + 512 * 1024 - 1,
+-	.start = MX31_CS4_BASE_ADDR,
+-	.end   = MX31_CS4_BASE_ADDR + 512 * 1024 - 1,
 -	.flags = IORESOURCE_MEM,
 -};
 -
--static struct platform_device pcm038_sram_mtd_device = {
+-static struct platform_device pcm037_sram_device = {
 -	.name = "mtd-ram",
 -	.id = 0,
 -	.dev = {
@@ -3896,63 +7077,17 @@ index a2e2ea1..0000000
 -	.resource = &pcm038_sram_resource,
 -};
 -
--/*
-- * Phytec's phyCORE-i.MX27 comes with 32MiB flash,
-- * 16 bit width
-- */
--static struct physmap_flash_data pcm038_flash_data = {
--	.width = 2,
--};
--
--static struct resource pcm038_flash_resource = {
--	.start = 0xc0000000,
--	.end   = 0xc1ffffff,
--	.flags = IORESOURCE_MEM,
--};
--
--static struct platform_device pcm038_nor_mtd_device = {
--	.name = "physmap-flash",
--	.id = 0,
--	.dev = {
--		.platform_data = &pcm038_flash_data,
--	},
--	.num_resources = 1,
--	.resource = &pcm038_flash_resource,
--};
--
--static struct imxuart_platform_data uart_pdata[] = {
--	{
--		.flags = IMXUART_HAVE_RTSCTS,
--	}, {
--		.flags = IMXUART_HAVE_RTSCTS,
--	}, {
--		.flags = IMXUART_HAVE_RTSCTS,
--	},
--};
--
--static struct mxc_nand_platform_data pcm038_nand_board_info = {
+-static struct mxc_nand_platform_data pcm037_nand_board_info = {
 -	.width = 1,
 -	.hw_ecc = 1,
 -};
 -
--static struct platform_device *platform_devices[] __initdata = {
--	&pcm038_nor_mtd_device,
--	&mxc_w1_master_device,
--	&mxc_fec_device,
--	&pcm038_sram_mtd_device,
+-static struct imxi2c_platform_data pcm037_i2c_1_data = {
+-	.bitrate = 100000,
 -};
 -
--/* On pcm038 there's a sram attached to CS1, we enable the chipselect here and
-- * setup other stuffs to access the sram. */
--static void __init pcm038_init_sram(void)
--{
--	__raw_writel(0x0000d843, CSCR_U(1));
--	__raw_writel(0x22252521, CSCR_L(1));
--	__raw_writel(0x22220a00, CSCR_A(1));
--}
--
--static struct imxi2c_platform_data pcm038_i2c_1_data = {
--	.bitrate = 100000,
+-static struct imxi2c_platform_data pcm037_i2c_2_data = {
+-	.bitrate = 20000,
 -};
 -
 -static struct at24_platform_data board_eeprom = {
@@ -3961,153 +7096,872 @@ index a2e2ea1..0000000
 -	.flags = AT24_FLAG_ADDR16,
 -};
 -
--static struct i2c_board_info pcm038_i2c_devices[] = {
+-static int pcm037_camera_power(struct device *dev, int on)
+-{
+-	/* disable or enable the camera in X7 or X8 PCM970 connector */
+-	gpio_set_value(IOMUX_TO_GPIO(MX31_PIN_CSI_D5), !on);
+-	return 0;
+-}
+-
+-static struct i2c_board_info pcm037_i2c_2_devices[] = {
+-	{
+-		I2C_BOARD_INFO("mt9t031", 0x5d),
+-	},
+-};
+-
+-static struct soc_camera_link iclink = {
+-	.bus_id		= 0,		/* Must match with the camera ID */
+-	.power		= pcm037_camera_power,
+-	.board_info	= &pcm037_i2c_2_devices[0],
+-	.i2c_adapter_id	= 2,
+-	.module_name	= "mt9t031",
+-};
+-
+-static struct i2c_board_info pcm037_i2c_devices[] = {
 -	{
 -		I2C_BOARD_INFO("at24", 0x52), /* E0=0, E1=1, E2=0 */
 -		.platform_data = &board_eeprom,
 -	}, {
 -		I2C_BOARD_INFO("pcf8563", 0x51),
--	}, {
--		I2C_BOARD_INFO("lm75", 0x4a),
 -	}
 -};
 -
--static int pcm038_spi_cs[] = {GPIO_PORTD + 28};
--
--static struct spi_imx_master pcm038_spi_0_data = {
--	.chipselect = pcm038_spi_cs,
--	.num_chipselect = ARRAY_SIZE(pcm038_spi_cs),
--};
--
--static struct regulator_consumer_supply sdhc1_consumers[] = {
--	{
--		.dev	= &mxc_sdhc_device1.dev,
--		.supply	= "sdhc_vcc",
+-static struct platform_device pcm037_camera = {
+-	.name	= "soc-camera-pdrv",
+-	.id	= 0,
+-	.dev	= {
+-		.platform_data = &iclink,
 -	},
 -};
 -
--static struct regulator_init_data sdhc1_data = {
--	.constraints = {
--		.min_uV = 3000000,
--		.max_uV = 3400000,
--		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
--			REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
--		.valid_modes_mask = REGULATOR_MODE_NORMAL |
--			REGULATOR_MODE_FAST,
--		.always_on = 0,
--		.boot_on = 0,
--	},
--	.num_consumer_supplies = ARRAY_SIZE(sdhc1_consumers),
--	.consumer_supplies = sdhc1_consumers,
--};
--
--static struct regulator_consumer_supply cam_consumers[] = {
--	{
--		.dev	= NULL,
--		.supply	= "imx_cam_vcc",
--	},
--};
--
--static struct regulator_init_data cam_data = {
--	.constraints = {
--		.min_uV = 3000000,
--		.max_uV = 3400000,
--		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
--			REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
--		.valid_modes_mask = REGULATOR_MODE_NORMAL |
--			REGULATOR_MODE_FAST,
--		.always_on = 0,
--		.boot_on = 0,
--	},
--	.num_consumer_supplies = ARRAY_SIZE(cam_consumers),
--	.consumer_supplies = cam_consumers,
--};
--
--struct mc13783_regulator_init_data pcm038_regulators[] = {
--	{
--		.id = MC13783_REGU_VCAM,
--		.init_data = &cam_data,
--	}, {
--		.id = MC13783_REGU_VMMC1,
--		.init_data = &sdhc1_data,
--	},
--};
--
--static struct mc13783_platform_data pcm038_pmic = {
--	.regulators = pcm038_regulators,
--	.num_regulators = ARRAY_SIZE(pcm038_regulators),
--	.flags = MC13783_USE_ADC | MC13783_USE_REGULATOR |
--		 MC13783_USE_TOUCHSCREEN,
--};
--
--static struct spi_board_info pcm038_spi_board_info[] __initdata = {
--	{
--		.modalias = "mc13783",
--		.irq = IRQ_GPIOB(23),
--		.max_speed_hz = 300000,
--		.bus_num = 0,
--		.chip_select = 0,
--		.platform_data = &pcm038_pmic,
--		.mode = SPI_CS_HIGH,
--	}
--};
--
--static void __init pcm038_init(void)
+-/* Not connected by default */
+-#ifdef PCM970_SDHC_RW_SWITCH
+-static int pcm970_sdhc1_get_ro(struct device *dev)
 -{
--	mxc_gpio_setup_multiple_pins(pcm038_pins, ARRAY_SIZE(pcm038_pins),
--			"PCM038");
--
--	pcm038_init_sram();
--
--	mxc_register_device(&mxc_uart_device0, &uart_pdata[0]);
--	mxc_register_device(&mxc_uart_device1, &uart_pdata[1]);
--	mxc_register_device(&mxc_uart_device2, &uart_pdata[2]);
--
--	mxc_gpio_mode(PE16_AF_OWIRE);
--	mxc_register_device(&mxc_nand_device, &pcm038_nand_board_info);
--
--	/* only the i2c master 1 is used on this CPU card */
--	i2c_register_board_info(1, pcm038_i2c_devices,
--				ARRAY_SIZE(pcm038_i2c_devices));
--
--	mxc_register_device(&mxc_i2c_device1, &pcm038_i2c_1_data);
--
--	/* PE18 for user-LED D40 */
--	mxc_gpio_mode(GPIO_PORTE | 18 | GPIO_GPIO | GPIO_OUT);
--
--	mxc_gpio_mode(GPIO_PORTD | 28 | GPIO_GPIO | GPIO_OUT);
--
--	/* MC13783 IRQ */
--	mxc_gpio_mode(GPIO_PORTB | 23 | GPIO_GPIO | GPIO_IN);
--
--	mxc_register_device(&mxc_spi_device0, &pcm038_spi_0_data);
--	spi_register_board_info(pcm038_spi_board_info,
--				ARRAY_SIZE(pcm038_spi_board_info));
--
--	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
--
--#ifdef CONFIG_MACH_PCM970_BASEBOARD
--	pcm970_baseboard_init();
+-	return gpio_get_value(IOMUX_TO_GPIO(MX31_PIN_SFS6));
+-}
 -#endif
--}
 -
--static void __init pcm038_timer_init(void)
+-#define SDHC1_GPIO_WP	IOMUX_TO_GPIO(MX31_PIN_SFS6)
+-#define SDHC1_GPIO_DET	IOMUX_TO_GPIO(MX31_PIN_SCK6)
+-
+-static int pcm970_sdhc1_init(struct device *dev, irq_handler_t detect_irq,
+-		void *data)
 -{
--	mx27_clocks_init(26000000);
+-	int ret;
+-
+-	ret = gpio_request(SDHC1_GPIO_DET, "sdhc-detect");
+-	if (ret)
+-		return ret;
+-
+-	gpio_direction_input(SDHC1_GPIO_DET);
+-
+-#ifdef PCM970_SDHC_RW_SWITCH
+-	ret = gpio_request(SDHC1_GPIO_WP, "sdhc-wp");
+-	if (ret)
+-		goto err_gpio_free;
+-	gpio_direction_input(SDHC1_GPIO_WP);
+-#endif
+-
+-	ret = request_irq(IOMUX_TO_IRQ(MX31_PIN_SCK6), detect_irq,
+-			IRQF_DISABLED | IRQF_TRIGGER_FALLING,
+-				"sdhc-detect", data);
+-	if (ret)
+-		goto err_gpio_free_2;
+-
+-	return 0;
+-
+-err_gpio_free_2:
+-#ifdef PCM970_SDHC_RW_SWITCH
+-	gpio_free(SDHC1_GPIO_WP);
+-err_gpio_free:
+-#endif
+-	gpio_free(SDHC1_GPIO_DET);
+-
+-	return ret;
 -}
 -
--static struct sys_timer pcm038_timer = {
--	.init = pcm038_timer_init,
+-static void pcm970_sdhc1_exit(struct device *dev, void *data)
+-{
+-	free_irq(IOMUX_TO_IRQ(MX31_PIN_SCK6), data);
+-	gpio_free(SDHC1_GPIO_DET);
+-	gpio_free(SDHC1_GPIO_WP);
+-}
+-
+-static struct imxmmc_platform_data sdhc_pdata = {
+-#ifdef PCM970_SDHC_RW_SWITCH
+-	.get_ro = pcm970_sdhc1_get_ro,
+-#endif
+-	.init = pcm970_sdhc1_init,
+-	.exit = pcm970_sdhc1_exit,
 -};
 -
--MACHINE_START(PCM038, "phyCORE-i.MX27")
--	.phys_io        = MX27_AIPI_BASE_ADDR,
--	.io_pg_offst    = ((MX27_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
+-struct mx3_camera_pdata camera_pdata = {
+-	.dma_dev	= &mx3_ipu.dev,
+-	.flags		= MX3_CAMERA_DATAWIDTH_8 | MX3_CAMERA_DATAWIDTH_10,
+-	.mclk_10khz	= 2000,
+-};
+-
+-static int __init pcm037_camera_alloc_dma(const size_t buf_size)
+-{
+-	dma_addr_t dma_handle;
+-	void *buf;
+-	int dma;
+-
+-	if (buf_size < 2 * 1024 * 1024)
+-		return -EINVAL;
+-
+-	buf = dma_alloc_coherent(NULL, buf_size, &dma_handle, GFP_KERNEL);
+-	if (!buf) {
+-		pr_err("%s: cannot allocate camera buffer-memory\n", __func__);
+-		return -ENOMEM;
+-	}
+-
+-	memset(buf, 0, buf_size);
+-
+-	dma = dma_declare_coherent_memory(&mx3_camera.dev,
+-					dma_handle, dma_handle, buf_size,
+-					DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
+-
+-	/* The way we call dma_declare_coherent_memory only a malloc can fail */
+-	return dma & DMA_MEMORY_MAP ? 0 : -ENOMEM;
+-}
+-
+-static struct platform_device *devices[] __initdata = {
+-	&pcm037_flash,
+-	&pcm037_sram_device,
+-	&pcm037_camera,
+-};
+-
+-static struct ipu_platform_data mx3_ipu_data = {
+-	.irq_base = MXC_IPU_IRQ_START,
+-};
+-
+-static const struct fb_videomode fb_modedb[] = {
+-	{
+-		/* 240x320 @ 60 Hz Sharp */
+-		.name		= "Sharp-LQ035Q7DH06-QVGA",
+-		.refresh	= 60,
+-		.xres		= 240,
+-		.yres		= 320,
+-		.pixclock	= 185925,
+-		.left_margin	= 9,
+-		.right_margin	= 16,
+-		.upper_margin	= 7,
+-		.lower_margin	= 9,
+-		.hsync_len	= 1,
+-		.vsync_len	= 1,
+-		.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_SHARP_MODE |
+-				  FB_SYNC_CLK_INVERT | FB_SYNC_CLK_IDLE_EN,
+-		.vmode		= FB_VMODE_NONINTERLACED,
+-		.flag		= 0,
+-	}, {
+-		/* 240x320 @ 60 Hz */
+-		.name		= "TX090",
+-		.refresh	= 60,
+-		.xres		= 240,
+-		.yres		= 320,
+-		.pixclock	= 38255,
+-		.left_margin	= 144,
+-		.right_margin	= 0,
+-		.upper_margin	= 7,
+-		.lower_margin	= 40,
+-		.hsync_len	= 96,
+-		.vsync_len	= 1,
+-		.sync		= FB_SYNC_VERT_HIGH_ACT | FB_SYNC_OE_ACT_HIGH,
+-		.vmode		= FB_VMODE_NONINTERLACED,
+-		.flag		= 0,
+-	}, {
+-		/* 240x320 @ 60 Hz */
+-		.name		= "CMEL-OLED",
+-		.refresh	= 60,
+-		.xres		= 240,
+-		.yres		= 320,
+-		.pixclock	= 185925,
+-		.left_margin	= 9,
+-		.right_margin	= 16,
+-		.upper_margin	= 7,
+-		.lower_margin	= 9,
+-		.hsync_len	= 1,
+-		.vsync_len	= 1,
+-		.sync		= FB_SYNC_OE_ACT_HIGH | FB_SYNC_CLK_INVERT,
+-		.vmode		= FB_VMODE_NONINTERLACED,
+-		.flag		= 0,
+-	},
+-};
+-
+-static struct mx3fb_platform_data mx3fb_pdata = {
+-	.dma_dev	= &mx3_ipu.dev,
+-	.name		= "Sharp-LQ035Q7DH06-QVGA",
+-	.mode		= fb_modedb,
+-	.num_modes	= ARRAY_SIZE(fb_modedb),
+-};
+-
+-static struct resource pcm970_sja1000_resources[] = {
+-	{
+-		.start   = MX31_CS5_BASE_ADDR,
+-		.end     = MX31_CS5_BASE_ADDR + 0x100 - 1,
+-		.flags   = IORESOURCE_MEM,
+-	}, {
+-		.start   = IOMUX_TO_IRQ(IOMUX_PIN(48, 105)),
+-		.end     = IOMUX_TO_IRQ(IOMUX_PIN(48, 105)),
+-		.flags   = IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE,
+-	},
+-};
+-
+-struct sja1000_platform_data pcm970_sja1000_platform_data = {
+-	.clock		= 16000000 / 2,
+-	.ocr		= 0x40 | 0x18,
+-	.cdr		= 0x40,
+-};
+-
+-static struct platform_device pcm970_sja1000 = {
+-	.name = "sja1000_platform",
+-	.dev = {
+-		.platform_data = &pcm970_sja1000_platform_data,
+-	},
+-	.resource = pcm970_sja1000_resources,
+-	.num_resources = ARRAY_SIZE(pcm970_sja1000_resources),
+-};
+-
+-/*
+- * Board specific initialization.
+- */
+-static void __init mxc_board_init(void)
+-{
+-	int ret;
+-
+-	mxc_iomux_setup_multiple_pins(pcm037_pins, ARRAY_SIZE(pcm037_pins),
+-			"pcm037");
+-
+-	if (pcm037_variant() == PCM037_EET)
+-		mxc_iomux_setup_multiple_pins(pcm037_uart1_pins,
+-			ARRAY_SIZE(pcm037_uart1_pins), "pcm037_uart1");
+-	else
+-		mxc_iomux_setup_multiple_pins(pcm037_uart1_handshake_pins,
+-			ARRAY_SIZE(pcm037_uart1_handshake_pins),
+-			"pcm037_uart1");
+-
+-	platform_add_devices(devices, ARRAY_SIZE(devices));
+-
+-	mxc_register_device(&mxc_uart_device0, &uart_pdata);
+-	mxc_register_device(&mxc_uart_device1, &uart_pdata);
+-	mxc_register_device(&mxc_uart_device2, &uart_pdata);
+-
+-	mxc_register_device(&mxc_w1_master_device, NULL);
+-
+-	/* LAN9217 IRQ pin */
+-	ret = gpio_request(IOMUX_TO_GPIO(MX31_PIN_GPIO3_1), "lan9217-irq");
+-	if (ret)
+-		pr_warning("could not get LAN irq gpio\n");
+-	else {
+-		gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_GPIO3_1));
+-		platform_device_register(&pcm037_eth);
+-	}
+-
+-
+-	/* I2C adapters and devices */
+-	i2c_register_board_info(1, pcm037_i2c_devices,
+-			ARRAY_SIZE(pcm037_i2c_devices));
+-
+-	mxc_register_device(&mxc_i2c_device1, &pcm037_i2c_1_data);
+-	mxc_register_device(&mxc_i2c_device2, &pcm037_i2c_2_data);
+-
+-	mxc_register_device(&mxc_nand_device, &pcm037_nand_board_info);
+-	mxc_register_device(&mxcsdhc_device0, &sdhc_pdata);
+-	mxc_register_device(&mx3_ipu, &mx3_ipu_data);
+-	mxc_register_device(&mx3_fb, &mx3fb_pdata);
+-	if (!gpio_usbotg_hs_activate())
+-		mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
+-
+-	/* CSI */
+-	/* Camera power: default - off */
+-	ret = gpio_request(IOMUX_TO_GPIO(MX31_PIN_CSI_D5), "mt9t031-power");
+-	if (!ret)
+-		gpio_direction_output(IOMUX_TO_GPIO(MX31_PIN_CSI_D5), 1);
+-	else
+-		iclink.power = NULL;
+-
+-	if (!pcm037_camera_alloc_dma(4 * 1024 * 1024))
+-		mxc_register_device(&mx3_camera, &camera_pdata);
+-
+-	platform_device_register(&pcm970_sja1000);
+-}
+-
+-static void __init pcm037_timer_init(void)
+-{
+-	mx31_clocks_init(26000000);
+-}
+-
+-struct sys_timer pcm037_timer = {
+-	.init	= pcm037_timer_init,
+-};
+-
+-MACHINE_START(PCM037, "Phytec Phycore pcm037")
+-	/* Maintainer: Pengutronix */
+-	.phys_io	= MX31_AIPS1_BASE_ADDR,
+-	.io_pg_offst	= ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
 -	.boot_params    = PHYS_OFFSET + 0x100,
--	.map_io         = mx27_map_io,
--	.init_irq       = mx27_init_irq,
--	.init_machine   = pcm038_init,
--	.timer          = &pcm038_timer,
+-	.map_io         = mx31_map_io,
+-	.init_irq       = mx31_init_irq,
+-	.init_machine   = mxc_board_init,
+-	.timer          = &pcm037_timer,
+-MACHINE_END
+diff --git a/arch/arm/mach-mx3/pcm043.c b/arch/arm/mach-mx3/pcm043.c
+deleted file mode 100644
+index 1212194..0000000
+--- a/arch/arm/mach-mx3/pcm043.c
++++ /dev/null
+@@ -1,259 +0,0 @@
+-/*
+- *  Copyright (C) 2009 Sascha Hauer, Pengutronix
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-
+-#include <linux/types.h>
+-#include <linux/init.h>
+-
+-#include <linux/platform_device.h>
+-#include <linux/mtd/physmap.h>
+-#include <linux/mtd/plat-ram.h>
+-#include <linux/memory.h>
+-#include <linux/gpio.h>
+-#include <linux/smc911x.h>
+-#include <linux/interrupt.h>
+-#include <linux/i2c.h>
+-#include <linux/i2c/at24.h>
+-
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/time.h>
+-#include <asm/mach/map.h>
+-
+-#include <mach/hardware.h>
+-#include <mach/common.h>
+-#include <mach/imx-uart.h>
+-#if defined CONFIG_I2C_IMX || defined CONFIG_I2C_IMX_MODULE
+-#include <mach/i2c.h>
+-#endif
+-#include <mach/iomux-mx35.h>
+-#include <mach/ipu.h>
+-#include <mach/mx3fb.h>
+-#include <mach/mxc_nand.h>
+-
+-#include "devices.h"
+-
+-static const struct fb_videomode fb_modedb[] = {
+-	{
+-		/* 240x320 @ 60 Hz */
+-		.name		= "Sharp-LQ035Q7",
+-		.refresh	= 60,
+-		.xres		= 240,
+-		.yres		= 320,
+-		.pixclock	= 185925,
+-		.left_margin	= 9,
+-		.right_margin	= 16,
+-		.upper_margin	= 7,
+-		.lower_margin	= 9,
+-		.hsync_len	= 1,
+-		.vsync_len	= 1,
+-		.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_SHARP_MODE | FB_SYNC_CLK_INVERT | FB_SYNC_CLK_IDLE_EN,
+-		.vmode		= FB_VMODE_NONINTERLACED,
+-		.flag		= 0,
+-	}, {
+-		/* 240x320 @ 60 Hz */
+-		.name		= "TX090",
+-		.refresh	= 60,
+-		.xres		= 240,
+-		.yres		= 320,
+-		.pixclock	= 38255,
+-		.left_margin	= 144,
+-		.right_margin	= 0,
+-		.upper_margin	= 7,
+-		.lower_margin	= 40,
+-		.hsync_len	= 96,
+-		.vsync_len	= 1,
+-		.sync		= FB_SYNC_VERT_HIGH_ACT | FB_SYNC_OE_ACT_HIGH,
+-		.vmode		= FB_VMODE_NONINTERLACED,
+-		.flag		= 0,
+-	},
+-};
+-
+-static struct ipu_platform_data mx3_ipu_data = {
+-	.irq_base = MXC_IPU_IRQ_START,
+-};
+-
+-static struct mx3fb_platform_data mx3fb_pdata = {
+-	.dma_dev	= &mx3_ipu.dev,
+-	.name		= "Sharp-LQ035Q7",
+-	.mode		= fb_modedb,
+-	.num_modes	= ARRAY_SIZE(fb_modedb),
+-};
+-
+-static struct physmap_flash_data pcm043_flash_data = {
+-	.width  = 2,
+-};
+-
+-static struct resource pcm043_flash_resource = {
+-	.start	= 0xa0000000,
+-	.end	= 0xa1ffffff,
+-	.flags	= IORESOURCE_MEM,
+-};
+-
+-static struct platform_device pcm043_flash = {
+-	.name	= "physmap-flash",
+-	.id	= 0,
+-	.dev	= {
+-		.platform_data  = &pcm043_flash_data,
+-	},
+-	.resource = &pcm043_flash_resource,
+-	.num_resources = 1,
+-};
+-
+-static struct imxuart_platform_data uart_pdata = {
+-	.flags = IMXUART_HAVE_RTSCTS,
+-};
+-
+-#if defined CONFIG_I2C_IMX || defined CONFIG_I2C_IMX_MODULE
+-static struct imxi2c_platform_data pcm043_i2c_1_data = {
+-	.bitrate = 50000,
+-};
+-
+-static struct at24_platform_data board_eeprom = {
+-	.byte_len = 4096,
+-	.page_size = 32,
+-	.flags = AT24_FLAG_ADDR16,
+-};
+-
+-static struct i2c_board_info pcm043_i2c_devices[] = {
+-       {
+-		I2C_BOARD_INFO("at24", 0x52), /* E0=0, E1=1, E2=0 */
+-		.platform_data = &board_eeprom,
+-	}, {
+-		I2C_BOARD_INFO("pcf8563", 0x51),
+-	}
+-};
+-#endif
+-
+-static struct platform_device *devices[] __initdata = {
+-	&pcm043_flash,
+-	&mxc_fec_device,
+-};
+-
+-static struct pad_desc pcm043_pads[] = {
+-	/* UART1 */
+-	MX35_PAD_CTS1__UART1_CTS,
+-	MX35_PAD_RTS1__UART1_RTS,
+-	MX35_PAD_TXD1__UART1_TXD_MUX,
+-	MX35_PAD_RXD1__UART1_RXD_MUX,
+-	/* UART2 */
+-	MX35_PAD_CTS2__UART2_CTS,
+-	MX35_PAD_RTS2__UART2_RTS,
+-	MX35_PAD_TXD2__UART2_TXD_MUX,
+-	MX35_PAD_RXD2__UART2_RXD_MUX,
+-	/* FEC */
+-	MX35_PAD_FEC_TX_CLK__FEC_TX_CLK,
+-	MX35_PAD_FEC_RX_CLK__FEC_RX_CLK,
+-	MX35_PAD_FEC_RX_DV__FEC_RX_DV,
+-	MX35_PAD_FEC_COL__FEC_COL,
+-	MX35_PAD_FEC_RDATA0__FEC_RDATA_0,
+-	MX35_PAD_FEC_TDATA0__FEC_TDATA_0,
+-	MX35_PAD_FEC_TX_EN__FEC_TX_EN,
+-	MX35_PAD_FEC_MDC__FEC_MDC,
+-	MX35_PAD_FEC_MDIO__FEC_MDIO,
+-	MX35_PAD_FEC_TX_ERR__FEC_TX_ERR,
+-	MX35_PAD_FEC_RX_ERR__FEC_RX_ERR,
+-	MX35_PAD_FEC_CRS__FEC_CRS,
+-	MX35_PAD_FEC_RDATA1__FEC_RDATA_1,
+-	MX35_PAD_FEC_TDATA1__FEC_TDATA_1,
+-	MX35_PAD_FEC_RDATA2__FEC_RDATA_2,
+-	MX35_PAD_FEC_TDATA2__FEC_TDATA_2,
+-	MX35_PAD_FEC_RDATA3__FEC_RDATA_3,
+-	MX35_PAD_FEC_TDATA3__FEC_TDATA_3,
+-	/* I2C1 */
+-	MX35_PAD_I2C1_CLK__I2C1_SCL,
+-	MX35_PAD_I2C1_DAT__I2C1_SDA,
+-	/* Display */
+-	MX35_PAD_LD0__IPU_DISPB_DAT_0,
+-	MX35_PAD_LD1__IPU_DISPB_DAT_1,
+-	MX35_PAD_LD2__IPU_DISPB_DAT_2,
+-	MX35_PAD_LD3__IPU_DISPB_DAT_3,
+-	MX35_PAD_LD4__IPU_DISPB_DAT_4,
+-	MX35_PAD_LD5__IPU_DISPB_DAT_5,
+-	MX35_PAD_LD6__IPU_DISPB_DAT_6,
+-	MX35_PAD_LD7__IPU_DISPB_DAT_7,
+-	MX35_PAD_LD8__IPU_DISPB_DAT_8,
+-	MX35_PAD_LD9__IPU_DISPB_DAT_9,
+-	MX35_PAD_LD10__IPU_DISPB_DAT_10,
+-	MX35_PAD_LD11__IPU_DISPB_DAT_11,
+-	MX35_PAD_LD12__IPU_DISPB_DAT_12,
+-	MX35_PAD_LD13__IPU_DISPB_DAT_13,
+-	MX35_PAD_LD14__IPU_DISPB_DAT_14,
+-	MX35_PAD_LD15__IPU_DISPB_DAT_15,
+-	MX35_PAD_LD16__IPU_DISPB_DAT_16,
+-	MX35_PAD_LD17__IPU_DISPB_DAT_17,
+-	MX35_PAD_D3_HSYNC__IPU_DISPB_D3_HSYNC,
+-	MX35_PAD_D3_FPSHIFT__IPU_DISPB_D3_CLK,
+-	MX35_PAD_D3_DRDY__IPU_DISPB_D3_DRDY,
+-	MX35_PAD_CONTRAST__IPU_DISPB_CONTR,
+-	MX35_PAD_D3_VSYNC__IPU_DISPB_D3_VSYNC,
+-	MX35_PAD_D3_REV__IPU_DISPB_D3_REV,
+-	MX35_PAD_D3_CLS__IPU_DISPB_D3_CLS,
+-	/* gpio */
+-	MX35_PAD_ATA_CS0__GPIO2_6,
+-};
+-
+-static struct mxc_nand_platform_data pcm037_nand_board_info = {
+-	.width = 1,
+-	.hw_ecc = 1,
+-};
+-
+-/*
+- * Board specific initialization.
+- */
+-static void __init mxc_board_init(void)
+-{
+-	mxc_iomux_v3_setup_multiple_pads(pcm043_pads, ARRAY_SIZE(pcm043_pads));
+-
+-	platform_add_devices(devices, ARRAY_SIZE(devices));
+-
+-	mxc_register_device(&mxc_uart_device0, &uart_pdata);
+-	mxc_register_device(&mxc_nand_device, &pcm037_nand_board_info);
+-
+-	mxc_register_device(&mxc_uart_device1, &uart_pdata);
+-
+-#if defined CONFIG_I2C_IMX || defined CONFIG_I2C_IMX_MODULE
+-	i2c_register_board_info(0, pcm043_i2c_devices,
+-			ARRAY_SIZE(pcm043_i2c_devices));
+-
+-	mxc_register_device(&mxc_i2c_device0, &pcm043_i2c_1_data);
+-#endif
+-
+-	mxc_register_device(&mx3_ipu, &mx3_ipu_data);
+-	mxc_register_device(&mx3_fb, &mx3fb_pdata);
+-}
+-
+-static void __init pcm043_timer_init(void)
+-{
+-	mx35_clocks_init();
+-}
+-
+-struct sys_timer pcm043_timer = {
+-	.init	= pcm043_timer_init,
+-};
+-
+-MACHINE_START(PCM043, "Phytec Phycore pcm043")
+-	/* Maintainer: Pengutronix */
+-	.phys_io	= MX35_AIPS1_BASE_ADDR,
+-	.io_pg_offst	= ((MX35_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
+-	.boot_params    = PHYS_OFFSET + 0x100,
+-	.map_io         = mx35_map_io,
+-	.init_irq       = mx35_init_irq,
+-	.init_machine   = mxc_board_init,
+-	.timer          = &pcm043_timer,
+-MACHINE_END
+-
+diff --git a/arch/arm/mach-mx3/qong.c b/arch/arm/mach-mx3/qong.c
+deleted file mode 100644
+index 3c1e736..0000000
+--- a/arch/arm/mach-mx3/qong.c
++++ /dev/null
+@@ -1,285 +0,0 @@
+-/*
+- *  Copyright (C) 2009 Ilya Yanok, Emcraft Systems Ltd, <yanok@emcraft.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-
+-#include <linux/types.h>
+-#include <linux/init.h>
+-#include <linux/kernel.h>
+-#include <linux/memory.h>
+-#include <linux/platform_device.h>
+-#include <linux/mtd/physmap.h>
+-#include <linux/mtd/nand.h>
+-#include <linux/gpio.h>
+-
+-#include <mach/hardware.h>
+-#include <mach/irqs.h>
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/time.h>
+-#include <asm/mach/map.h>
+-#include <mach/common.h>
+-#include <asm/page.h>
+-#include <asm/setup.h>
+-#include <mach/board-qong.h>
+-#include <mach/imx-uart.h>
+-#include <mach/iomux-mx3.h>
+-#include "devices.h"
+-
+-/* FPGA defines */
+-#define QONG_FPGA_VERSION(major, minor, rev)	\
+-	(((major & 0xF) << 12) | ((minor & 0xF) << 8) | (rev & 0xFF))
+-
+-#define QONG_FPGA_BASEADDR 		MX31_CS1_BASE_ADDR
+-#define QONG_FPGA_PERIPH_SIZE 		(1 << 24)
+-
+-#define QONG_FPGA_CTRL_BASEADDR		QONG_FPGA_BASEADDR
+-#define QONG_FPGA_CTRL_SIZE 		0x10
+-/* FPGA control registers */
+-#define QONG_FPGA_CTRL_VERSION		0x00
+-
+-#define QONG_DNET_ID		1
+-#define QONG_DNET_BASEADDR	\
+-	(QONG_FPGA_BASEADDR + QONG_DNET_ID * QONG_FPGA_PERIPH_SIZE)
+-#define QONG_DNET_SIZE 		0x00001000
+-
+-#define QONG_FPGA_IRQ		IOMUX_TO_IRQ(MX31_PIN_DTR_DCE1)
+-
+-/*
+- * This file contains the board-specific initialization routines.
+- */
+-
+-static struct imxuart_platform_data uart_pdata = {
+-	.flags = IMXUART_HAVE_RTSCTS,
+-};
+-
+-static int uart_pins[] = {
+-	MX31_PIN_CTS1__CTS1,
+-	MX31_PIN_RTS1__RTS1,
+-	MX31_PIN_TXD1__TXD1,
+-	MX31_PIN_RXD1__RXD1
+-};
+-
+-static inline void mxc_init_imx_uart(void)
+-{
+-	mxc_iomux_setup_multiple_pins(uart_pins, ARRAY_SIZE(uart_pins),
+-			"uart-0");
+-	mxc_register_device(&mxc_uart_device0, &uart_pdata);
+-}
+-
+-static struct resource dnet_resources[] = {
+-	{
+-		.name	= "dnet-memory",
+-		.start	= QONG_DNET_BASEADDR,
+-		.end	= QONG_DNET_BASEADDR + QONG_DNET_SIZE - 1,
+-		.flags	= IORESOURCE_MEM,
+-	}, {
+-		.start	= QONG_FPGA_IRQ,
+-		.end	= QONG_FPGA_IRQ,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device dnet_device = {
+-	.name			= "dnet",
+-	.id			= -1,
+-	.num_resources		= ARRAY_SIZE(dnet_resources),
+-	.resource		= dnet_resources,
+-};
+-
+-static int __init qong_init_dnet(void)
+-{
+-	int ret;
+-
+-	ret = platform_device_register(&dnet_device);
+-	return ret;
+-}
+-
+-/* MTD NOR flash */
+-
+-static struct physmap_flash_data qong_flash_data = {
+-	.width = 2,
+-};
+-
+-static struct resource qong_flash_resource = {
+-	.start = MX31_CS0_BASE_ADDR,
+-	.end = MX31_CS0_BASE_ADDR + QONG_NOR_SIZE - 1,
+-	.flags = IORESOURCE_MEM,
+-};
+-
+-static struct platform_device qong_nor_mtd_device = {
+-	.name = "physmap-flash",
+-	.id = 0,
+-	.dev = {
+-		.platform_data = &qong_flash_data,
+-		},
+-	.resource = &qong_flash_resource,
+-	.num_resources = 1,
+-};
+-
+-static void qong_init_nor_mtd(void)
+-{
+-	(void)platform_device_register(&qong_nor_mtd_device);
+-}
+-
+-/*
+- * Hardware specific access to control-lines
+- */
+-static void qong_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
+-{
+-	struct nand_chip *nand_chip = mtd->priv;
+-
+-	if (cmd == NAND_CMD_NONE)
+-		return;
+-
+-	if (ctrl & NAND_CLE)
+-		writeb(cmd, nand_chip->IO_ADDR_W + (1 << 24));
+-	else
+-		writeb(cmd, nand_chip->IO_ADDR_W + (1 << 23));
+-}
+-
+-/*
+- * Read the Device Ready pin.
+- */
+-static int qong_nand_device_ready(struct mtd_info *mtd)
+-{
+-	return gpio_get_value(IOMUX_TO_GPIO(MX31_PIN_NFRB));
+-}
+-
+-static void qong_nand_select_chip(struct mtd_info *mtd, int chip)
+-{
+-	if (chip >= 0)
+-		gpio_set_value(IOMUX_TO_GPIO(MX31_PIN_NFCE_B), 0);
+-	else
+-		gpio_set_value(IOMUX_TO_GPIO(MX31_PIN_NFCE_B), 1);
+-}
+-
+-static struct platform_nand_data qong_nand_data = {
+-	.chip = {
+-		.chip_delay		= 20,
+-		.options		= 0,
+-	},
+-	.ctrl = {
+-		.cmd_ctrl 		= qong_nand_cmd_ctrl,
+-		.dev_ready		= qong_nand_device_ready,
+-		.select_chip		= qong_nand_select_chip,
+-	}
+-};
+-
+-static struct resource qong_nand_resource = {
+-	.start  	= MX31_CS3_BASE_ADDR,
+-	.end    	= MX31_CS3_BASE_ADDR + SZ_32M - 1,
+-	.flags		= IORESOURCE_MEM,
+-};
+-
+-static struct platform_device qong_nand_device = {
+-	.name		= "gen_nand",
+-	.id		= -1,
+-	.dev		= {
+-		.platform_data = &qong_nand_data,
+-	},
+-	.num_resources	= 1,
+-	.resource	= &qong_nand_resource,
+-};
+-
+-static void __init qong_init_nand_mtd(void)
+-{
+-	/* init CS */
+-	__raw_writel(0x00004f00, CSCR_U(3));
+-	__raw_writel(0x20013b31, CSCR_L(3));
+-	__raw_writel(0x00020800, CSCR_A(3));
+-	mxc_iomux_set_gpr(MUX_SDCTL_CSD1_SEL, true);
+-
+-	/* enable pin */
+-	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_NFCE_B, IOMUX_CONFIG_GPIO));
+-	if (!gpio_request(IOMUX_TO_GPIO(MX31_PIN_NFCE_B), "nand_enable"))
+-		gpio_direction_output(IOMUX_TO_GPIO(MX31_PIN_NFCE_B), 0);
+-
+-	/* ready/busy pin */
+-	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_NFRB, IOMUX_CONFIG_GPIO));
+-	if (!gpio_request(IOMUX_TO_GPIO(MX31_PIN_NFRB), "nand_rdy"))
+-		gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_NFRB));
+-
+-	/* write protect pin */
+-	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_NFWP_B, IOMUX_CONFIG_GPIO));
+-	if (!gpio_request(IOMUX_TO_GPIO(MX31_PIN_NFWP_B), "nand_wp"))
+-		gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_NFWP_B));
+-
+-	platform_device_register(&qong_nand_device);
+-}
+-
+-static void __init qong_init_fpga(void)
+-{
+-	void __iomem *regs;
+-	u32 fpga_ver;
+-
+-	regs = ioremap(QONG_FPGA_CTRL_BASEADDR, QONG_FPGA_CTRL_SIZE);
+-	if (!regs) {
+-		printk(KERN_ERR "%s: failed to map registers, aborting.\n",
+-				__func__);
+-		return;
+-	}
+-
+-	fpga_ver = readl(regs + QONG_FPGA_CTRL_VERSION);
+-	iounmap(regs);
+-	printk(KERN_INFO "Qong FPGA version %d.%d.%d\n",
+-			(fpga_ver & 0xF000) >> 12,
+-			(fpga_ver & 0x0F00) >> 8, fpga_ver & 0x00FF);
+-	if (fpga_ver < QONG_FPGA_VERSION(0, 8, 7)) {
+-		printk(KERN_ERR "qong: Unexpected FPGA version, FPGA-based "
+-				"devices won't be registered!\n");
+-		return;
+-	}
+-
+-	/* register FPGA-based devices */
+-	qong_init_nand_mtd();
+-	qong_init_dnet();
+-}
+-
+-/*
+- * Board specific initialization.
+- */
+-static void __init mxc_board_init(void)
+-{
+-	mxc_init_imx_uart();
+-	qong_init_nor_mtd();
+-	qong_init_fpga();
+-}
+-
+-static void __init qong_timer_init(void)
+-{
+-	mx31_clocks_init(26000000);
+-}
+-
+-static struct sys_timer qong_timer = {
+-	.init	= qong_timer_init,
+-};
+-
+-/*
+- * The following uses standard kernel macros defined in arch.h in order to
+- * initialize __mach_desc_QONG data structure.
+- */
+-
+-MACHINE_START(QONG, "Dave/DENX QongEVB-LITE")
+-	/* Maintainer: DENX Software Engineering GmbH */
+-	.phys_io        = MX31_AIPS1_BASE_ADDR,
+-	.io_pg_offst    = ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
+-	.boot_params    = PHYS_OFFSET + 0x100,
+-	.map_io         = mx31_map_io,
+-	.init_irq       = mx31_init_irq,
+-	.init_machine   = mxc_board_init,
+-	.timer          = &qong_timer,
 -MACHINE_END
 -- 
 1.6.5.2
