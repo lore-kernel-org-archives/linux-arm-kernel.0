@@ -1,7 +1,8 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 16 Dec 2009 20:00:00 +0100
-Subject: [PATCH 19/20] imx35: define and use MX35_IO_ADDRESS
-In-Reply-To: <1260990002-24168-18-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Wed, 16 Dec 2009 20:00:01 +0100
+Subject: [PATCH 20/20] mx3/kzm_arm11_01: define and use board specific
+	IO_ADDRESS macro
+In-Reply-To: <1260990002-24168-19-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <20091216185046.GA16984@pengutronix.de>
 	<1260990002-24168-1-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1260990002-24168-2-git-send-email-u.kleine-koenig@pengutronix.de>
@@ -21,47 +22,52 @@ References: <20091216185046.GA16984@pengutronix.de>
 	<1260990002-24168-16-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1260990002-24168-17-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1260990002-24168-18-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1260990002-24168-19-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-19-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1260990002-24168-20-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-mx3/clock-imx35.c       |    2 +-
- arch/arm/plat-mxc/include/mach/mx35.h |    8 ++++++++
- 2 files changed, 9 insertions(+), 1 deletions(-)
+ arch/arm/mach-mx3/mach-kzm_arm11_01.c |   12 +++++++++---
+ 1 files changed, 9 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
-index e65e862..13a2b86 100644
---- a/arch/arm/mach-mx3/clock-imx35.c
-+++ b/arch/arm/mach-mx3/clock-imx35.c
-@@ -28,7 +28,7 @@
- #include <mach/hardware.h>
- #include <mach/common.h>
+diff --git a/arch/arm/mach-mx3/mach-kzm_arm11_01.c b/arch/arm/mach-mx3/mach-kzm_arm11_01.c
+index 849631e..f29304f 100644
+--- a/arch/arm/mach-mx3/mach-kzm_arm11_01.c
++++ b/arch/arm/mach-mx3/mach-kzm_arm11_01.c
+@@ -46,13 +46,19 @@
  
--#define CCM_BASE	IO_ADDRESS(MX35_CCM_BASE_ADDR)
-+#define CCM_BASE	MX35_IO_ADDRESS(MX35_CCM_BASE_ADDR)
+ #include "devices.h"
  
- #define CCM_CCMR        0x00
- #define CCM_PDR0        0x04
-diff --git a/arch/arm/plat-mxc/include/mach/mx35.h b/arch/arm/plat-mxc/include/mach/mx35.h
-index af871bc..cc5deef 100644
---- a/arch/arm/plat-mxc/include/mach/mx35.h
-+++ b/arch/arm/plat-mxc/include/mach/mx35.h
-@@ -104,6 +104,14 @@
- #define MX35_NFC_BASE_ADDR		0xbb000000
- #define MX35_PCMCIA_MEM_BASE_ADDR	0xbc000000
- 
-+#define MX35_IO_ADDRESS(x)						\
++#define KZM_ARM11_IO_ADDRESS(x)						\
 +	(void __force __iomem *) (					\
-+	IMX_IO_ADDRESS(x, MX35_AIPS1) ?:				\
-+	IMX_IO_ADDRESS(x, MX35_AIPS2) ?:				\
-+	IMX_IO_ADDRESS(x, MX35_AVIC) ?:					\
-+	IMX_IO_ADDRESS(x, MX35_X_MEMC) ?:				\
-+	IMX_IO_ADDRESS(x, MX35_SPBA0) ?:				\
++	IMX_IO_ADDRESS(x, MX31_CS4) ?:					\
++	IMX_IO_ADDRESS(x, MX31_CS5) ?:					\
 +	0xdeadbeef)
++
+ #if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
  /*
-  * Interrupt numbers
+  * KZM-ARM11-01 has an external UART on FPGA
   */
+ static struct plat_serial8250_port serial_platform_data[] = {
+ 	{
+-		.membase	= IO_ADDRESS(KZM_ARM11_16550),
++		.membase	= KZM_ARM11_IO_ADDRESS(KZM_ARM11_16550),
+ 		.mapbase	= KZM_ARM11_16550,
+ 		.irq		= IOMUX_TO_IRQ(MX31_PIN_GPIO1_1),
+ 		.irqflags	= IRQ_TYPE_EDGE_RISING,
+@@ -102,9 +108,9 @@ static int __init kzm_init_ext_uart(void)
+ 	/*
+ 	 * Unmask UART interrupt
+ 	 */
+-	tmp = __raw_readb(IO_ADDRESS(KZM_ARM11_CTL1));
++	tmp = __raw_readb(KZM_ARM11_IO_ADDRESS(KZM_ARM11_CTL1));
+ 	tmp |= 0x2;
+-	__raw_writeb(tmp, IO_ADDRESS(KZM_ARM11_CTL1));
++	__raw_writeb(tmp, KZM_ARM11_IO_ADDRESS(KZM_ARM11_CTL1));
+ 
+ 	return platform_device_register(&serial_device);
+ }
 -- 
 1.6.5.2
