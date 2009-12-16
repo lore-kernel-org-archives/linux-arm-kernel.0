@@ -1,55 +1,51 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 16 Dec 2009 11:19:44 +0000
-Subject: [PATCH 5/5] arm/perfevents: implement perf event support for ARMv6
-In-Reply-To: <000501ca7e3f$7e376740$7aa635c0$@deacon@arm.com>
-References: <1260875712-29712-3-git-send-email-jamie.iles@picochip.com>
-	<1260875712-29712-4-git-send-email-jamie.iles@picochip.com>
-	<1260875712-29712-5-git-send-email-jamie.iles@picochip.com>
-	<1260875712-29712-6-git-send-email-jamie.iles@picochip.com>
-	<20091215150205.GO4141@wear.picochip.com>
-	<20091215151903.GP4141@wear.picochip.com>
-	<1260891013.4165.466.camel@twins>
-	<20091215153627.GQ4141@wear.picochip.com>
-	<20091216105403.GX4141@wear.picochip.com>
-	<000501ca7e3f$7e376740$7aa635c0$@deacon@arm.com>
-Message-ID: <20091216111944.GA4141@wear.picochip.com>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Wed, 16 Dec 2009 15:24:35 +0200
+Subject: [PATCH] [ARM] pxa/cm-x300: fix build breakage caused by	missing
+	'select CPU_PXA310'
+In-Reply-To: <20091215172326.GC15855@n2100.arm.linux.org.uk>
+References: <4B27B92B.9020306@compulab.co.il>
+	<20091215172326.GC15855@n2100.arm.linux.org.uk>
+Message-ID: <4B28DF93.3070701@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 16, 2009 at 11:04:09AM -0000, Will Deacon wrote:
-> *Jamie Iles wrote:
+Russell King - ARM Linux wrote:
+> On Tue, Dec 15, 2009 at 06:28:27PM +0200, Mike Rapoport wrote:
+>> Eric,
+>> Apparently Igor's patches for CM-X300 were not applied properly. Somehow
+>> commit db205463fd24c0972ad2c4e4fafb1c76e51b4380
+>> ([ARM] pxa/cm-x300: add PWM backlight support) introduced 'select HAVE_PWM'
+>> to MACH_COLIBRY300 rather than CM-X300. I suspect that the same happened with
+>> the patch that added 'select CPU_PXA310' to MACH_CM_X300. I'm not certain about
+>> removing PWM support in Colibri, but MACH_CM_X300 need to get fixed.
 > 
-> > > That's exactly what I do for single core ARMv6. However, in the list of events
-> > > for mpcore I can't see any that wouldn't count. There's plenty of reserved
-> > > identifiers though so hopefully one of those will do the job. Also, ARM
-> > > counters can't be set to exclude any modes.
-> >
-> > Thinking about this a bit more, although we can't disable the counters, we can
-> > disable their interrupt reporting. So, when the generic perf events layer
-> > calls pmu->disable(event), we do the update of the event then turn off the
-> > IRQ. When we come to unthrottling, the counter will have carried on counting,
-> > but if we set the period again, the counter gets set with the correct restart
-> > value and then reenabled.
+> You need to look at the original commit you mention above, and check
+> whether it has been applied correctly.  If not, it needs to be reverted
+> and the correct change applied.
+
+I've checked the commit and the original patch, and it seems we've screwed it up
+from the beginning while cherry-picking commits between branches...
+However, the patch that adds 'select CPU_PXA310' ([1]) is correct and apparently
+was not applied properly (commit def8252ddb9bc52434b2ac1d560a609c61849638,
+[ARM] pxa/cm-x300: add support for PXA310 cpu).
+
+How shall we continue? Eric, will you revert commit db205463f and I will resend
+corrected PWM patch?
+
+> This is one of the problems of patching Kconfig files that grow over
+> time - diff only gives at most six lines of context (three lines either
+> side), and it is possible to have those same six lines of context
+> repeated several times in Kconfig files.  Now add an additional set of
+> lines towards the start of the Kconfig file, and such a diff will get
+> incorrectly applied.
 > 
-> This was my first thought, but I was concerned about how it would play out
-> with the armpmu_read function. Now that I see we don't read disabled counters,
-> I can't see any reason not to simply disable the interrupt and stash the count
-> value.
-We shouldn't even need to stash the value. When the higher layer disables the
-event we sample it to record the value so the stashing happens already.
-
-> > I think this should work for mpcore and is also required for the cycle counter
-> > on all v6 cores. I've given this a go using an artificially low period on a
-> > cycle counter and it does appear to do the job.
+> Unfortunately, this is one of the down sides to using git apply over
+> GNU patch - GNU patch will tell you if it applied a patch with an offset.
+> git tools won't, so it's not obvious if a patch has been mis-applied.
 > 
-> If we do this for mpcore, is it worth doing the same thing for the other v6 cores
-> too [and removing the ETM `hack']?
-We do need to do this on UP v6 for the cycle counter as that keeps on running,
-but imho the ETM hack is worth keeping as it really does stop the counter. It
-doesn't hurt and we're guaranteed not to lose any events.
 
-If I make the change to the unthrottling and the Kconfig and tab changes, and
-add the mpcore events does anyone have an objection to making a final version
-of this patch series and merging it?
+[1] http://article.gmane.org/gmane.linux.ports.arm.kernel/67022/match=igor+grinberg
 
-Jamie
+-- 
+Sincerely yours,
+Mike.
