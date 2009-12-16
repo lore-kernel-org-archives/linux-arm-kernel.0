@@ -1,97 +1,66 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 16 Dec 2009 19:59:42 +0100
-Subject: [PATCH 01/20] ARM: MX3: make CPU revision number detection work on
-	all boards
-In-Reply-To: <20091216185046.GA16984@pengutronix.de>
+Date: Wed, 16 Dec 2009 19:59:44 +0100
+Subject: [PATCH 03/20] imx/clock-imx21: use a macro to define registers
+In-Reply-To: <1260990002-24168-2-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <20091216185046.GA16984@pengutronix.de>
-Message-ID: <1260990002-24168-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-2-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1260990002-24168-3-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfgang Denk <wd@denx.de>
+This way the base address isn't hard coded in each register definition
 
-Commit 52939c03 (ARM: MX3: fix CPU revision number detection) started
-using the CPU's SREV register for revision number detection. This
-makes it mandatory to have a valid SPBA0 mapping. Add this to the
-global map_io code instead of adding multiple copies for each board.
-
-Signed-off-by: Wolfgang Denk <wd@denx.de>
-Cc: Daniel Mack <daniel@caiaq.de>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-
-Tested on Qong (EVB-Lite)
-Tested-by: Wolfgang Denk <wd@denx.de>
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Holger Schurig <hs4233@mail.mn-solutions.de>
+Cc: Rabin Vincent <rabin@rab.in>
 ---
- arch/arm/mach-mx3/mm.c       |    5 +++++
- arch/arm/mach-mx3/mx31ads.c  |    5 -----
- arch/arm/mach-mx3/mx31lite.c |    5 -----
- arch/arm/mach-mx3/mx31pdk.c  |    5 -----
- 4 files changed, 5 insertions(+), 15 deletions(-)
+ arch/arm/mach-mx2/clock_imx21.c |   30 ++++++++++++++++--------------
+ 1 files changed, 16 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/mach-mx3/mm.c b/arch/arm/mach-mx3/mm.c
-index bedf5b8..6858a4f 100644
---- a/arch/arm/mach-mx3/mm.c
-+++ b/arch/arm/mach-mx3/mm.c
-@@ -65,6 +65,11 @@ static struct map_desc mxc_io_desc[] __initdata = {
- 		.pfn		= __phys_to_pfn(AIPS2_BASE_ADDR),
- 		.length		= AIPS2_SIZE,
- 		.type		= MT_DEVICE_NONSHARED
-+	}, {
-+		.virtual = SPBA0_BASE_ADDR_VIRT,
-+		.pfn = __phys_to_pfn(SPBA0_BASE_ADDR),
-+		.length = SPBA0_SIZE,
-+		.type = MT_DEVICE_NONSHARED
- 	},
- };
+diff --git a/arch/arm/mach-mx2/clock_imx21.c b/arch/arm/mach-mx2/clock_imx21.c
+index df3ad38..1922e53 100644
+--- a/arch/arm/mach-mx2/clock_imx21.c
++++ b/arch/arm/mach-mx2/clock_imx21.c
+@@ -28,21 +28,23 @@
+ #include <asm/clkdev.h>
+ #include <asm/div64.h>
  
-diff --git a/arch/arm/mach-mx3/mx31ads.c b/arch/arm/mach-mx3/mx31ads.c
-index 0497c15..3e7bafa 100644
---- a/arch/arm/mach-mx3/mx31ads.c
-+++ b/arch/arm/mach-mx3/mx31ads.c
-@@ -494,11 +494,6 @@ static void mxc_init_i2c(void)
-  */
- static struct map_desc mx31ads_io_desc[] __initdata = {
- 	{
--		.virtual	= SPBA0_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(SPBA0_BASE_ADDR),
--		.length		= SPBA0_SIZE,
--		.type		= MT_DEVICE_NONSHARED
--	}, {
- 		.virtual	= CS4_BASE_ADDR_VIRT,
- 		.pfn		= __phys_to_pfn(CS4_BASE_ADDR),
- 		.length		= CS4_SIZE / 2,
-diff --git a/arch/arm/mach-mx3/mx31lite.c b/arch/arm/mach-mx3/mx31lite.c
-index def6b67..4697164 100644
---- a/arch/arm/mach-mx3/mx31lite.c
-+++ b/arch/arm/mach-mx3/mx31lite.c
-@@ -212,11 +212,6 @@ static struct platform_device physmap_flash_device = {
-  */
- static struct map_desc mx31lite_io_desc[] __initdata = {
- 	{
--		.virtual = SPBA0_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(SPBA0_BASE_ADDR),
--		.length = SPBA0_SIZE,
--		.type = MT_DEVICE_NONSHARED
--	}, {
- 		.virtual = CS4_BASE_ADDR_VIRT,
- 		.pfn = __phys_to_pfn(CS4_BASE_ADDR),
- 		.length = CS4_SIZE,
-diff --git a/arch/arm/mach-mx3/mx31pdk.c b/arch/arm/mach-mx3/mx31pdk.c
-index 0f7a2f0..18715f1 100644
---- a/arch/arm/mach-mx3/mx31pdk.c
-+++ b/arch/arm/mach-mx3/mx31pdk.c
-@@ -211,11 +211,6 @@ static int __init mx31pdk_init_expio(void)
-  */
- static struct map_desc mx31pdk_io_desc[] __initdata = {
- 	{
--		.virtual = SPBA0_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(SPBA0_BASE_ADDR),
--		.length = SPBA0_SIZE,
--		.type = MT_DEVICE_NONSHARED,
--	}, {
- 		.virtual = CS5_BASE_ADDR_VIRT,
- 		.pfn = __phys_to_pfn(CS5_BASE_ADDR),
- 		.length = CS5_SIZE,
++#define IO_ADDR_CCM(off)	(IO_ADDRESS(CCM_BASE_ADDR) + (off))
++
+ /* Register offsets */
+-#define CCM_CSCR		(IO_ADDRESS(CCM_BASE_ADDR) + 0x0)
+-#define CCM_MPCTL0		(IO_ADDRESS(CCM_BASE_ADDR) + 0x4)
+-#define CCM_MPCTL1		(IO_ADDRESS(CCM_BASE_ADDR) + 0x8)
+-#define CCM_SPCTL0		(IO_ADDRESS(CCM_BASE_ADDR) + 0xC)
+-#define CCM_SPCTL1		(IO_ADDRESS(CCM_BASE_ADDR) + 0x10)
+-#define CCM_OSC26MCTL		(IO_ADDRESS(CCM_BASE_ADDR) + 0x14)
+-#define CCM_PCDR0		(IO_ADDRESS(CCM_BASE_ADDR) + 0x18)
+-#define CCM_PCDR1		(IO_ADDRESS(CCM_BASE_ADDR) + 0x1c)
+-#define CCM_PCCR0		(IO_ADDRESS(CCM_BASE_ADDR) + 0x20)
+-#define CCM_PCCR1		(IO_ADDRESS(CCM_BASE_ADDR) + 0x24)
+-#define CCM_CCSR		(IO_ADDRESS(CCM_BASE_ADDR) + 0x28)
+-#define CCM_PMCTL		(IO_ADDRESS(CCM_BASE_ADDR) + 0x2c)
+-#define CCM_PMCOUNT		(IO_ADDRESS(CCM_BASE_ADDR) + 0x30)
+-#define CCM_WKGDCTL		(IO_ADDRESS(CCM_BASE_ADDR) + 0x34)
++#define CCM_CSCR		IO_ADDR_CCM(0x0)
++#define CCM_MPCTL0		IO_ADDR_CCM(0x4)
++#define CCM_MPCTL1		IO_ADDR_CCM(0x8)
++#define CCM_SPCTL0		IO_ADDR_CCM(0xc)
++#define CCM_SPCTL1		IO_ADDR_CCM(0x10)
++#define CCM_OSC26MCTL		IO_ADDR_CCM(0x14)
++#define CCM_PCDR0		IO_ADDR_CCM(0x18)
++#define CCM_PCDR1		IO_ADDR_CCM(0x1c)
++#define CCM_PCCR0		IO_ADDR_CCM(0x20)
++#define CCM_PCCR1		IO_ADDR_CCM(0x24)
++#define CCM_CCSR		IO_ADDR_CCM(0x28)
++#define CCM_PMCTL		IO_ADDR_CCM(0x2c)
++#define CCM_PMCOUNT		IO_ADDR_CCM(0x30)
++#define CCM_WKGDCTL		IO_ADDR_CCM(0x34)
+ 
+ #define CCM_CSCR_PRESC_OFFSET	29
+ #define CCM_CSCR_PRESC_MASK	(0x7 << CCM_CSCR_PRESC_OFFSET)
 -- 
 1.6.5.2
