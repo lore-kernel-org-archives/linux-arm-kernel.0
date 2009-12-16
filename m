@@ -1,7 +1,8 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 16 Dec 2009 19:59:50 +0100
-Subject: [PATCH 09/20] imx/mx1: rename files defining a machine to mach-$mach.c
-In-Reply-To: <1260990002-24168-8-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Wed, 16 Dec 2009 19:59:48 +0100
+Subject: [PATCH 07/20] imx/mx3: rename clock.c and iomux.c to {clock,
+	iomux}-imx31.c
+In-Reply-To: <1260990002-24168-6-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <20091216185046.GA16984@pengutronix.de>
 	<1260990002-24168-1-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1260990002-24168-2-git-send-email-u.kleine-koenig@pengutronix.de>
@@ -9,711 +10,1693 @@ References: <20091216185046.GA16984@pengutronix.de>
 	<1260990002-24168-4-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1260990002-24168-5-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1260990002-24168-6-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1260990002-24168-7-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1260990002-24168-8-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1260990002-24168-9-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1260990002-24168-7-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+These files are only used on imx31.  This makes the name consistent with
+the imx35 files.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
-Cc: Darius Augulis <augulis.darius@gmail.com>
-Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+Cc: Daniel Mack <daniel@caiaq.de>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Valentin Longchamp <valentin.longchamp@epfl.ch>
 ---
- arch/arm/mach-mx1/Makefile       |    4 +-
- arch/arm/mach-mx1/mach-mx1ads.c  |  165 ++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-mx1/mach-scb9328.c |  158 ++++++++++++++++++++++++++++++++++++
- arch/arm/mach-mx1/mx1ads.c       |  165 --------------------------------------
- arch/arm/mach-mx1/scb9328.c      |  158 ------------------------------------
- 5 files changed, 325 insertions(+), 325 deletions(-)
- create mode 100644 arch/arm/mach-mx1/mach-mx1ads.c
- create mode 100644 arch/arm/mach-mx1/mach-scb9328.c
- delete mode 100644 arch/arm/mach-mx1/mx1ads.c
- delete mode 100644 arch/arm/mach-mx1/scb9328.c
+ arch/arm/mach-mx3/Makefile      |    2 +-
+ arch/arm/mach-mx3/clock-imx31.c |  632 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mx3/clock.c       |  632 ---------------------------------------
+ arch/arm/mach-mx3/iomux-imx31.c |  181 +++++++++++
+ arch/arm/mach-mx3/iomux.c       |  181 -----------
+ 5 files changed, 814 insertions(+), 814 deletions(-)
+ create mode 100644 arch/arm/mach-mx3/clock-imx31.c
+ delete mode 100644 arch/arm/mach-mx3/clock.c
+ create mode 100644 arch/arm/mach-mx3/iomux-imx31.c
+ delete mode 100644 arch/arm/mach-mx3/iomux.c
 
-diff --git a/arch/arm/mach-mx1/Makefile b/arch/arm/mach-mx1/Makefile
-index b72f536..297d172 100644
---- a/arch/arm/mach-mx1/Makefile
-+++ b/arch/arm/mach-mx1/Makefile
-@@ -10,5 +10,5 @@ obj-y			+= generic.o clock.o devices.o
- obj-$(CONFIG_MX1_VIDEO)	+= ksym_mx1.o mx1_camera_fiq.o
+diff --git a/arch/arm/mach-mx3/Makefile b/arch/arm/mach-mx3/Makefile
+index 93c7b29..03e25d6 100644
+--- a/arch/arm/mach-mx3/Makefile
++++ b/arch/arm/mach-mx3/Makefile
+@@ -5,7 +5,7 @@
+ # Object file lists.
  
- # Specific board support
--obj-$(CONFIG_ARCH_MX1ADS) += mx1ads.o
--obj-$(CONFIG_MACH_SCB9328) += scb9328.o
-+obj-$(CONFIG_ARCH_MX1ADS) += mach-mx1ads.o
-+obj-$(CONFIG_MACH_SCB9328) += mach-scb9328.o
-diff --git a/arch/arm/mach-mx1/mach-mx1ads.c b/arch/arm/mach-mx1/mach-mx1ads.c
+ obj-y				:= mm.o devices.o cpu.o
+-obj-$(CONFIG_ARCH_MX31)		+= clock.o iomux.o
++obj-$(CONFIG_ARCH_MX31)		+= clock-imx31.o iomux-imx31.o
+ obj-$(CONFIG_ARCH_MX35)		+= clock-imx35.o
+ obj-$(CONFIG_MACH_MX31ADS)	+= mx31ads.o
+ obj-$(CONFIG_MACH_MX31LILLY)	+= mx31lilly.o mx31lilly-db.o
+diff --git a/arch/arm/mach-mx3/clock-imx31.c b/arch/arm/mach-mx3/clock-imx31.c
 new file mode 100644
-index 0000000..a39433a
+index 0000000..cc03a61
 --- /dev/null
-+++ b/arch/arm/mach-mx1/mach-mx1ads.c
-@@ -0,0 +1,165 @@
++++ b/arch/arm/mach-mx3/clock-imx31.c
+@@ -0,0 +1,632 @@
 +/*
-+ * arch/arm/mach-imx/mach-mx1ads.c
++ * Copyright 2005-2007 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright (C) 2008 by Sascha Hauer <kernel@pengutronix.de>
 + *
-+ * Initially based on:
-+ *	linux-2.6.7-imx/arch/arm/mach-imx/scb9328.c
-+ *	Copyright (c) 2004 Sascha Hauer <sascha@saschahauer.de>
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + *
-+ * 2004 (c) MontaVista Software, Inc.
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
 + */
 +
-+#include <linux/i2c.h>
-+#include <linux/i2c/pcf857x.h>
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+#include <linux/mtd/physmap.h>
++#include <linux/module.h>
++#include <linux/spinlock.h>
++#include <linux/delay.h>
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <linux/io.h>
 +
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/time.h>
++#include <asm/clkdev.h>
++#include <asm/div64.h>
 +
-+#include <mach/common.h>
++#include <mach/clock.h>
 +#include <mach/hardware.h>
-+#include <mach/i2c.h>
-+#include <mach/imx-uart.h>
-+#include <mach/iomux.h>
-+#include <mach/irqs.h>
-+
-+#include "devices.h"
-+
-+static int mx1ads_pins[] = {
-+	/* UART1 */
-+	PC9_PF_UART1_CTS,
-+	PC10_PF_UART1_RTS,
-+	PC11_PF_UART1_TXD,
-+	PC12_PF_UART1_RXD,
-+	/* UART2 */
-+	PB28_PF_UART2_CTS,
-+	PB29_PF_UART2_RTS,
-+	PB30_PF_UART2_TXD,
-+	PB31_PF_UART2_RXD,
-+	/* I2C */
-+	PA15_PF_I2C_SDA,
-+	PA16_PF_I2C_SCL,
-+	/* SPI */
-+	PC13_PF_SPI1_SPI_RDY,
-+	PC14_PF_SPI1_SCLK,
-+	PC15_PF_SPI1_SS,
-+	PC16_PF_SPI1_MISO,
-+	PC17_PF_SPI1_MOSI,
-+};
-+
-+/*
-+ * UARTs platform data
-+ */
-+
-+static struct imxuart_platform_data uart_pdata[] = {
-+	{
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	}, {
-+		.flags = IMXUART_HAVE_RTSCTS,
-+	},
-+};
-+
-+/*
-+ * Physmap flash
-+ */
-+
-+static struct physmap_flash_data mx1ads_flash_data = {
-+	.width		= 4,		/* bankwidth in bytes */
-+};
-+
-+static struct resource flash_resource = {
-+	.start	= IMX_CS0_PHYS,
-+	.end	= IMX_CS0_PHYS + SZ_32M - 1,
-+	.flags	= IORESOURCE_MEM,
-+};
-+
-+static struct platform_device flash_device = {
-+	.name	= "physmap-flash",
-+	.id	= 0,
-+	.resource = &flash_resource,
-+	.num_resources = 1,
-+};
-+
-+/*
-+ * I2C
-+ */
-+static struct pcf857x_platform_data pcf857x_data[] = {
-+	{
-+		.gpio_base = 4 * 32,
-+	}, {
-+		.gpio_base = 4 * 32 + 16,
-+	}
-+};
-+
-+static struct imxi2c_platform_data mx1ads_i2c_data = {
-+	.bitrate = 100000,
-+};
-+
-+static struct i2c_board_info mx1ads_i2c_devices[] = {
-+	{
-+		I2C_BOARD_INFO("pcf8575", 0x22),
-+		.platform_data = &pcf857x_data[0],
-+	}, {
-+		I2C_BOARD_INFO("pcf8575", 0x24),
-+		.platform_data = &pcf857x_data[1],
-+	},
-+};
-+
-+/*
-+ * Board init
-+ */
-+static void __init mx1ads_init(void)
-+{
-+	mxc_gpio_setup_multiple_pins(mx1ads_pins,
-+		ARRAY_SIZE(mx1ads_pins), "mx1ads");
-+
-+	/* UART */
-+	mxc_register_device(&imx_uart1_device, &uart_pdata[0]);
-+	mxc_register_device(&imx_uart2_device, &uart_pdata[1]);
-+
-+	/* Physmap flash */
-+	mxc_register_device(&flash_device, &mx1ads_flash_data);
-+
-+	/* I2C */
-+	i2c_register_board_info(0, mx1ads_i2c_devices,
-+				ARRAY_SIZE(mx1ads_i2c_devices));
-+
-+	mxc_register_device(&imx_i2c_device, &mx1ads_i2c_data);
-+}
-+
-+static void __init mx1ads_timer_init(void)
-+{
-+	mx1_clocks_init(32000);
-+}
-+
-+struct sys_timer mx1ads_timer = {
-+	.init	= mx1ads_timer_init,
-+};
-+
-+MACHINE_START(MX1ADS, "Freescale MX1ADS")
-+	/* Maintainer: Sascha Hauer, Pengutronix */
-+	.phys_io	= IMX_IO_PHYS,
-+	.io_pg_offst	= (IMX_IO_BASE >> 18) & 0xfffc,
-+	.boot_params	= PHYS_OFFSET + 0x100,
-+	.map_io		= mx1_map_io,
-+	.init_irq	= mx1_init_irq,
-+	.timer		= &mx1ads_timer,
-+	.init_machine	= mx1ads_init,
-+MACHINE_END
-+
-+MACHINE_START(MXLADS, "Freescale MXLADS")
-+	.phys_io	= IMX_IO_PHYS,
-+	.io_pg_offst	= (IMX_IO_BASE >> 18) & 0xfffc,
-+	.boot_params	= PHYS_OFFSET + 0x100,
-+	.map_io		= mx1_map_io,
-+	.init_irq	= mx1_init_irq,
-+	.timer		= &mx1ads_timer,
-+	.init_machine	= mx1ads_init,
-+MACHINE_END
-diff --git a/arch/arm/mach-mx1/mach-scb9328.c b/arch/arm/mach-mx1/mach-scb9328.c
-new file mode 100644
-index 0000000..b9530d7
---- /dev/null
-+++ b/arch/arm/mach-mx1/mach-scb9328.c
-@@ -0,0 +1,158 @@
-+/*
-+ * linux/arch/arm/mach-mx1/mach-scb9328.c
-+ *
-+ * Copyright (c) 2004 Sascha Hauer <saschahauer@web.de>
-+ * Copyright (c) 2006-2008 Juergen Beisert <jbeisert@netscape.net>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#include <linux/platform_device.h>
-+#include <linux/mtd/physmap.h>
-+#include <linux/interrupt.h>
-+#include <linux/dm9000.h>
-+
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/time.h>
-+
++#include <mach/mx31.h>
 +#include <mach/common.h>
-+#include <mach/hardware.h>
-+#include <mach/irqs.h>
-+#include <mach/imx-uart.h>
-+#include <mach/iomux.h>
 +
-+#include "devices.h"
++#include "crm_regs.h"
 +
-+/*
-+ * This scb9328 has a 32MiB flash
-+ */
-+static struct resource flash_resource = {
-+	.start	= IMX_CS0_PHYS,
-+	.end	= IMX_CS0_PHYS + (32 * 1024 * 1024) - 1,
-+	.flags	= IORESOURCE_MEM,
-+};
++#define PRE_DIV_MIN_FREQ    10000000 /* Minimum Frequency after Predivider */
 +
-+static struct physmap_flash_data scb_flash_data = {
-+	.width  = 2,
-+};
-+
-+static struct platform_device scb_flash_device = {
-+	.name		= "physmap-flash",
-+	.id		= 0,
-+	.dev = {
-+		.platform_data = &scb_flash_data,
-+	},
-+	.resource = &flash_resource,
-+	.num_resources = 1,
-+};
-+
-+/*
-+ * scb9328 has a DM9000 network controller
-+ * connected to CS5, with 16 bit data path
-+ * and interrupt connected to GPIO 3
-+ */
-+
-+/*
-+ * internal datapath is fixed 16 bit
-+ */
-+static struct dm9000_plat_data dm9000_platdata = {
-+	.flags	= DM9000_PLATF_16BITONLY,
-+};
-+
-+/*
-+ * the DM9000 drivers wants two defined address spaces
-+ * to gain access to address latch registers and the data path.
-+ */
-+static struct resource dm9000x_resources[] = {
-+	{
-+		.name	= "address area",
-+		.start	= IMX_CS5_PHYS,
-+		.end	= IMX_CS5_PHYS + 1,
-+		.flags	= IORESOURCE_MEM,	/* address access */
-+	}, {
-+		.name	= "data area",
-+		.start	= IMX_CS5_PHYS + 4,
-+		.end	= IMX_CS5_PHYS + 5,
-+		.flags	= IORESOURCE_MEM,	/* data access */
-+	}, {
-+		.start	= IRQ_GPIOC(3),
-+		.end	= IRQ_GPIOC(3),
-+		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL,
-+	},
-+};
-+
-+static struct platform_device dm9000x_device = {
-+	.name		= "dm9000",
-+	.id		= 0,
-+	.num_resources	= ARRAY_SIZE(dm9000x_resources),
-+	.resource	= dm9000x_resources,
-+	.dev		= {
-+		.platform_data = &dm9000_platdata,
-+	}
-+};
-+
-+static int mxc_uart1_pins[] = {
-+	PC9_PF_UART1_CTS,
-+	PC10_PF_UART1_RTS,
-+	PC11_PF_UART1_TXD,
-+	PC12_PF_UART1_RXD,
-+};
-+
-+static int uart1_mxc_init(struct platform_device *pdev)
++static void __calc_pre_post_dividers(u32 div, u32 *pre, u32 *post)
 +{
-+	return mxc_gpio_setup_multiple_pins(mxc_uart1_pins,
-+			ARRAY_SIZE(mxc_uart1_pins), "UART1");
++	u32 min_pre, temp_pre, old_err, err;
++
++	if (div >= 512) {
++		*pre = 8;
++		*post = 64;
++	} else if (div >= 64) {
++		min_pre = (div - 1) / 64 + 1;
++		old_err = 8;
++		for (temp_pre = 8; temp_pre >= min_pre; temp_pre--) {
++			err = div % temp_pre;
++			if (err == 0) {
++				*pre = temp_pre;
++				break;
++			}
++			err = temp_pre - err;
++			if (err < old_err) {
++				old_err = err;
++				*pre = temp_pre;
++			}
++		}
++		*post = (div + *pre - 1) / *pre;
++	} else if (div <= 8) {
++		*pre = div;
++		*post = 1;
++	} else {
++		*pre = 1;
++		*post = div;
++	}
 +}
 +
-+static int uart1_mxc_exit(struct platform_device *pdev)
++static struct clk mcu_pll_clk;
++static struct clk serial_pll_clk;
++static struct clk ipg_clk;
++static struct clk ckih_clk;
++
++static int cgr_enable(struct clk *clk)
 +{
-+	mxc_gpio_release_multiple_pins(mxc_uart1_pins,
-+			ARRAY_SIZE(mxc_uart1_pins));
++	u32 reg;
++
++	if (!clk->enable_reg)
++		return 0;
++
++	reg = __raw_readl(clk->enable_reg);
++	reg |= 3 << clk->enable_shift;
++	__raw_writel(reg, clk->enable_reg);
++
 +	return 0;
 +}
 +
-+static struct imxuart_platform_data uart_pdata = {
-+	.init = uart1_mxc_init,
-+	.exit = uart1_mxc_exit,
-+	.flags = IMXUART_HAVE_RTSCTS,
-+};
-+
-+static struct platform_device *devices[] __initdata = {
-+	&scb_flash_device,
-+	&dm9000x_device,
-+};
-+
-+/*
-+ * scb9328_init - Init the CPU card itself
-+ */
-+static void __init scb9328_init(void)
++static void cgr_disable(struct clk *clk)
 +{
-+	mxc_register_device(&imx_uart1_device, &uart_pdata);
++	u32 reg;
 +
-+	printk(KERN_INFO"Scb9328: Adding devices\n");
-+	platform_add_devices(devices, ARRAY_SIZE(devices));
++	if (!clk->enable_reg)
++		return;
++
++	reg = __raw_readl(clk->enable_reg);
++	reg &= ~(3 << clk->enable_shift);
++
++	/* special case for EMI clock */
++	if (clk->enable_reg == MXC_CCM_CGR2 && clk->enable_shift == 8)
++		reg |= (1 << clk->enable_shift);
++
++	__raw_writel(reg, clk->enable_reg);
 +}
 +
-+static void __init scb9328_timer_init(void)
++static unsigned long pll_ref_get_rate(void)
 +{
-+	mx1_clocks_init(32000);
++	unsigned long ccmr;
++	unsigned int prcs;
++
++	ccmr = __raw_readl(MXC_CCM_CCMR);
++	prcs = (ccmr & MXC_CCM_CCMR_PRCS_MASK) >> MXC_CCM_CCMR_PRCS_OFFSET;
++	if (prcs == 0x1)
++		return CKIL_CLK_FREQ * 1024;
++	else
++		return clk_get_rate(&ckih_clk);
 +}
 +
-+static struct sys_timer scb9328_timer = {
-+	.init	= scb9328_timer_init,
++static unsigned long usb_pll_get_rate(struct clk *clk)
++{
++	unsigned long reg;
++
++	reg = __raw_readl(MXC_CCM_UPCTL);
++
++	return mxc_decode_pll(reg, pll_ref_get_rate());
++}
++
++static unsigned long serial_pll_get_rate(struct clk *clk)
++{
++	unsigned long reg;
++
++	reg = __raw_readl(MXC_CCM_SRPCTL);
++
++	return mxc_decode_pll(reg, pll_ref_get_rate());
++}
++
++static unsigned long mcu_pll_get_rate(struct clk *clk)
++{
++	unsigned long reg, ccmr;
++
++	ccmr = __raw_readl(MXC_CCM_CCMR);
++
++	if (!(ccmr & MXC_CCM_CCMR_MPE) || (ccmr & MXC_CCM_CCMR_MDS))
++		return clk_get_rate(&ckih_clk);
++
++	reg = __raw_readl(MXC_CCM_MPCTL);
++
++	return mxc_decode_pll(reg, pll_ref_get_rate());
++}
++
++static int usb_pll_enable(struct clk *clk)
++{
++	u32 reg;
++
++	reg = __raw_readl(MXC_CCM_CCMR);
++	reg |= MXC_CCM_CCMR_UPE;
++	__raw_writel(reg, MXC_CCM_CCMR);
++
++	/* No lock bit on MX31, so using max time from spec */
++	udelay(80);
++
++	return 0;
++}
++
++static void usb_pll_disable(struct clk *clk)
++{
++	u32 reg;
++
++	reg = __raw_readl(MXC_CCM_CCMR);
++	reg &= ~MXC_CCM_CCMR_UPE;
++	__raw_writel(reg, MXC_CCM_CCMR);
++}
++
++static int serial_pll_enable(struct clk *clk)
++{
++	u32 reg;
++
++	reg = __raw_readl(MXC_CCM_CCMR);
++	reg |= MXC_CCM_CCMR_SPE;
++	__raw_writel(reg, MXC_CCM_CCMR);
++
++	/* No lock bit on MX31, so using max time from spec */
++	udelay(80);
++
++	return 0;
++}
++
++static void serial_pll_disable(struct clk *clk)
++{
++	u32 reg;
++
++	reg = __raw_readl(MXC_CCM_CCMR);
++	reg &= ~MXC_CCM_CCMR_SPE;
++	__raw_writel(reg, MXC_CCM_CCMR);
++}
++
++#define PDR0(mask, off) ((__raw_readl(MXC_CCM_PDR0) & mask) >> off)
++#define PDR1(mask, off) ((__raw_readl(MXC_CCM_PDR1) & mask) >> off)
++#define PDR2(mask, off) ((__raw_readl(MXC_CCM_PDR2) & mask) >> off)
++
++static unsigned long mcu_main_get_rate(struct clk *clk)
++{
++	u32 pmcr0 = __raw_readl(MXC_CCM_PMCR0);
++
++	if ((pmcr0 & MXC_CCM_PMCR0_DFSUP1) == MXC_CCM_PMCR0_DFSUP1_SPLL)
++		return clk_get_rate(&serial_pll_clk);
++	else
++		return clk_get_rate(&mcu_pll_clk);
++}
++
++static unsigned long ahb_get_rate(struct clk *clk)
++{
++	unsigned long max_pdf;
++
++	max_pdf = PDR0(MXC_CCM_PDR0_MAX_PODF_MASK,
++		       MXC_CCM_PDR0_MAX_PODF_OFFSET);
++	return clk_get_rate(clk->parent) / (max_pdf + 1);
++}
++
++static unsigned long ipg_get_rate(struct clk *clk)
++{
++	unsigned long ipg_pdf;
++
++	ipg_pdf = PDR0(MXC_CCM_PDR0_IPG_PODF_MASK,
++		       MXC_CCM_PDR0_IPG_PODF_OFFSET);
++	return clk_get_rate(clk->parent) / (ipg_pdf + 1);
++}
++
++static unsigned long nfc_get_rate(struct clk *clk)
++{
++	unsigned long nfc_pdf;
++
++	nfc_pdf = PDR0(MXC_CCM_PDR0_NFC_PODF_MASK,
++		       MXC_CCM_PDR0_NFC_PODF_OFFSET);
++	return clk_get_rate(clk->parent) / (nfc_pdf + 1);
++}
++
++static unsigned long hsp_get_rate(struct clk *clk)
++{
++	unsigned long hsp_pdf;
++
++	hsp_pdf = PDR0(MXC_CCM_PDR0_HSP_PODF_MASK,
++		       MXC_CCM_PDR0_HSP_PODF_OFFSET);
++	return clk_get_rate(clk->parent) / (hsp_pdf + 1);
++}
++
++static unsigned long usb_get_rate(struct clk *clk)
++{
++	unsigned long usb_pdf, usb_prepdf;
++
++	usb_pdf = PDR1(MXC_CCM_PDR1_USB_PODF_MASK,
++		       MXC_CCM_PDR1_USB_PODF_OFFSET);
++	usb_prepdf = PDR1(MXC_CCM_PDR1_USB_PRDF_MASK,
++			  MXC_CCM_PDR1_USB_PRDF_OFFSET);
++	return clk_get_rate(clk->parent) / (usb_prepdf + 1) / (usb_pdf + 1);
++}
++
++static unsigned long csi_get_rate(struct clk *clk)
++{
++	u32 reg, pre, post;
++
++	reg = __raw_readl(MXC_CCM_PDR0);
++	pre = (reg & MXC_CCM_PDR0_CSI_PRDF_MASK) >>
++	    MXC_CCM_PDR0_CSI_PRDF_OFFSET;
++	pre++;
++	post = (reg & MXC_CCM_PDR0_CSI_PODF_MASK) >>
++	    MXC_CCM_PDR0_CSI_PODF_OFFSET;
++	post++;
++	return clk_get_rate(clk->parent) / (pre * post);
++}
++
++static unsigned long csi_round_rate(struct clk *clk, unsigned long rate)
++{
++	u32 pre, post, parent = clk_get_rate(clk->parent);
++	u32 div = parent / rate;
++
++	if (parent % rate)
++		div++;
++
++	__calc_pre_post_dividers(div, &pre, &post);
++
++	return parent / (pre * post);
++}
++
++static int csi_set_rate(struct clk *clk, unsigned long rate)
++{
++	u32 reg, div, pre, post, parent = clk_get_rate(clk->parent);
++
++	div = parent / rate;
++
++	if ((parent / div) != rate)
++		return -EINVAL;
++
++	__calc_pre_post_dividers(div, &pre, &post);
++
++	/* Set CSI clock divider */
++	reg = __raw_readl(MXC_CCM_PDR0) &
++	    ~(MXC_CCM_PDR0_CSI_PODF_MASK | MXC_CCM_PDR0_CSI_PRDF_MASK);
++	reg |= (post - 1) << MXC_CCM_PDR0_CSI_PODF_OFFSET;
++	reg |= (pre - 1) << MXC_CCM_PDR0_CSI_PRDF_OFFSET;
++	__raw_writel(reg, MXC_CCM_PDR0);
++
++	return 0;
++}
++
++static unsigned long ssi1_get_rate(struct clk *clk)
++{
++	unsigned long ssi1_pdf, ssi1_prepdf;
++
++	ssi1_pdf = PDR1(MXC_CCM_PDR1_SSI1_PODF_MASK,
++			MXC_CCM_PDR1_SSI1_PODF_OFFSET);
++	ssi1_prepdf = PDR1(MXC_CCM_PDR1_SSI1_PRE_PODF_MASK,
++			   MXC_CCM_PDR1_SSI1_PRE_PODF_OFFSET);
++	return clk_get_rate(clk->parent) / (ssi1_prepdf + 1) / (ssi1_pdf + 1);
++}
++
++static unsigned long ssi2_get_rate(struct clk *clk)
++{
++	unsigned long ssi2_pdf, ssi2_prepdf;
++
++	ssi2_pdf = PDR1(MXC_CCM_PDR1_SSI2_PODF_MASK,
++			MXC_CCM_PDR1_SSI2_PODF_OFFSET);
++	ssi2_prepdf = PDR1(MXC_CCM_PDR1_SSI2_PRE_PODF_MASK,
++			   MXC_CCM_PDR1_SSI2_PRE_PODF_OFFSET);
++	return clk_get_rate(clk->parent) / (ssi2_prepdf + 1) / (ssi2_pdf + 1);
++}
++
++static unsigned long firi_get_rate(struct clk *clk)
++{
++	unsigned long firi_pdf, firi_prepdf;
++
++	firi_pdf = PDR1(MXC_CCM_PDR1_FIRI_PODF_MASK,
++			MXC_CCM_PDR1_FIRI_PODF_OFFSET);
++	firi_prepdf = PDR1(MXC_CCM_PDR1_FIRI_PRE_PODF_MASK,
++			   MXC_CCM_PDR1_FIRI_PRE_PODF_OFFSET);
++	return clk_get_rate(clk->parent) / (firi_prepdf + 1) / (firi_pdf + 1);
++}
++
++static unsigned long firi_round_rate(struct clk *clk, unsigned long rate)
++{
++	u32 pre, post;
++	u32 parent = clk_get_rate(clk->parent);
++	u32 div = parent / rate;
++
++	if (parent % rate)
++		div++;
++
++	__calc_pre_post_dividers(div, &pre, &post);
++
++	return parent / (pre * post);
++
++}
++
++static int firi_set_rate(struct clk *clk, unsigned long rate)
++{
++	u32 reg, div, pre, post, parent = clk_get_rate(clk->parent);
++
++	div = parent / rate;
++
++	if ((parent / div) != rate)
++		return -EINVAL;
++
++	__calc_pre_post_dividers(div, &pre, &post);
++
++	/* Set FIRI clock divider */
++	reg = __raw_readl(MXC_CCM_PDR1) &
++	    ~(MXC_CCM_PDR1_FIRI_PODF_MASK | MXC_CCM_PDR1_FIRI_PRE_PODF_MASK);
++	reg |= (pre - 1) << MXC_CCM_PDR1_FIRI_PRE_PODF_OFFSET;
++	reg |= (post - 1) << MXC_CCM_PDR1_FIRI_PODF_OFFSET;
++	__raw_writel(reg, MXC_CCM_PDR1);
++
++	return 0;
++}
++
++static unsigned long mbx_get_rate(struct clk *clk)
++{
++	return clk_get_rate(clk->parent) / 2;
++}
++
++static unsigned long mstick1_get_rate(struct clk *clk)
++{
++	unsigned long msti_pdf;
++
++	msti_pdf = PDR2(MXC_CCM_PDR2_MST1_PDF_MASK,
++			MXC_CCM_PDR2_MST1_PDF_OFFSET);
++	return clk_get_rate(clk->parent) / (msti_pdf + 1);
++}
++
++static unsigned long mstick2_get_rate(struct clk *clk)
++{
++	unsigned long msti_pdf;
++
++	msti_pdf = PDR2(MXC_CCM_PDR2_MST2_PDF_MASK,
++			MXC_CCM_PDR2_MST2_PDF_OFFSET);
++	return clk_get_rate(clk->parent) / (msti_pdf + 1);
++}
++
++static unsigned long ckih_rate;
++
++static unsigned long clk_ckih_get_rate(struct clk *clk)
++{
++	return ckih_rate;
++}
++
++static unsigned long clk_ckil_get_rate(struct clk *clk)
++{
++	return CKIL_CLK_FREQ;
++}
++
++static struct clk ckih_clk = {
++	.get_rate = clk_ckih_get_rate,
 +};
 +
-+MACHINE_START(SCB9328, "Synertronixx scb9328")
-+    /* Sascha Hauer */
-+	.phys_io	= 0x00200000,
-+	.io_pg_offst	= ((0xe0200000) >> 18) & 0xfffc,
-+	.boot_params	= 0x08000100,
-+	.map_io		= mx1_map_io,
-+	.init_irq	= mx1_init_irq,
-+	.timer		= &scb9328_timer,
-+	.init_machine	= scb9328_init,
-+MACHINE_END
-diff --git a/arch/arm/mach-mx1/mx1ads.c b/arch/arm/mach-mx1/mx1ads.c
++static struct clk mcu_pll_clk = {
++	.parent = &ckih_clk,
++	.get_rate = mcu_pll_get_rate,
++};
++
++static struct clk mcu_main_clk = {
++	.parent = &mcu_pll_clk,
++	.get_rate = mcu_main_get_rate,
++};
++
++static struct clk serial_pll_clk = {
++	.parent = &ckih_clk,
++	.get_rate = serial_pll_get_rate,
++	.enable = serial_pll_enable,
++	.disable = serial_pll_disable,
++};
++
++static struct clk usb_pll_clk = {
++	.parent = &ckih_clk,
++	.get_rate = usb_pll_get_rate,
++	.enable = usb_pll_enable,
++	.disable = usb_pll_disable,
++};
++
++static struct clk ahb_clk = {
++	.parent = &mcu_main_clk,
++	.get_rate = ahb_get_rate,
++};
++
++#define DEFINE_CLOCK(name, i, er, es, gr, s, p)		\
++	static struct clk name = {			\
++		.id		= i,			\
++		.enable_reg	= er,			\
++		.enable_shift	= es,			\
++		.get_rate	= gr,			\
++		.enable		= cgr_enable,		\
++		.disable	= cgr_disable,		\
++		.secondary	= s,			\
++		.parent		= p,			\
++	}
++
++#define DEFINE_CLOCK1(name, i, er, es, getsetround, s, p)	\
++	static struct clk name = {				\
++		.id		= i,				\
++		.enable_reg	= er,				\
++		.enable_shift	= es,				\
++		.get_rate	= getsetround##_get_rate,	\
++		.set_rate	= getsetround##_set_rate,	\
++		.round_rate	= getsetround##_round_rate,	\
++		.enable		= cgr_enable,			\
++		.disable	= cgr_disable,			\
++		.secondary	= s,				\
++		.parent		= p,				\
++	}
++
++DEFINE_CLOCK(perclk_clk,  0, NULL,          0, NULL, NULL, &ipg_clk);
++
++DEFINE_CLOCK(sdhc1_clk,   0, MXC_CCM_CGR0,  0, NULL, NULL, &perclk_clk);
++DEFINE_CLOCK(sdhc2_clk,   1, MXC_CCM_CGR0,  2, NULL, NULL, &perclk_clk);
++DEFINE_CLOCK(gpt_clk,     0, MXC_CCM_CGR0,  4, NULL, NULL, &perclk_clk);
++DEFINE_CLOCK(epit1_clk,   0, MXC_CCM_CGR0,  6, NULL, NULL, &perclk_clk);
++DEFINE_CLOCK(epit2_clk,   1, MXC_CCM_CGR0,  8, NULL, NULL, &perclk_clk);
++DEFINE_CLOCK(iim_clk,     0, MXC_CCM_CGR0, 10, NULL, NULL, &ipg_clk);
++DEFINE_CLOCK(ata_clk,     0, MXC_CCM_CGR0, 12, NULL, NULL, &ipg_clk);
++DEFINE_CLOCK(sdma_clk1,   0, MXC_CCM_CGR0, 14, NULL, &sdma_clk1, &ahb_clk);
++DEFINE_CLOCK(cspi3_clk,   2, MXC_CCM_CGR0, 16, NULL, NULL, &ipg_clk);
++DEFINE_CLOCK(rng_clk,     0, MXC_CCM_CGR0, 18, NULL, NULL, &ipg_clk);
++DEFINE_CLOCK(uart1_clk,   0, MXC_CCM_CGR0, 20, NULL, NULL, &perclk_clk);
++DEFINE_CLOCK(uart2_clk,   1, MXC_CCM_CGR0, 22, NULL, NULL, &perclk_clk);
++DEFINE_CLOCK(ssi1_clk,    0, MXC_CCM_CGR0, 24, ssi1_get_rate, NULL, &serial_pll_clk);
++DEFINE_CLOCK(i2c1_clk,    0, MXC_CCM_CGR0, 26, NULL, NULL, &perclk_clk);
++DEFINE_CLOCK(i2c2_clk,    1, MXC_CCM_CGR0, 28, NULL, NULL, &perclk_clk);
++DEFINE_CLOCK(i2c3_clk,    2, MXC_CCM_CGR0, 30, NULL, NULL, &perclk_clk);
++
++DEFINE_CLOCK(mpeg4_clk,   0, MXC_CCM_CGR1,  0, NULL, NULL, &ahb_clk);
++DEFINE_CLOCK(mstick1_clk, 0, MXC_CCM_CGR1,  2, mstick1_get_rate, NULL, &usb_pll_clk);
++DEFINE_CLOCK(mstick2_clk, 1, MXC_CCM_CGR1,  4, mstick2_get_rate, NULL, &usb_pll_clk);
++DEFINE_CLOCK1(csi_clk,    0, MXC_CCM_CGR1,  6, csi, NULL, &serial_pll_clk);
++DEFINE_CLOCK(rtc_clk,     0, MXC_CCM_CGR1,  8, NULL, NULL, &ipg_clk);
++DEFINE_CLOCK(wdog_clk,    0, MXC_CCM_CGR1, 10, NULL, NULL, &ipg_clk);
++DEFINE_CLOCK(pwm_clk,     0, MXC_CCM_CGR1, 12, NULL, NULL, &perclk_clk);
++DEFINE_CLOCK(usb_clk2,    0, MXC_CCM_CGR1, 18, usb_get_rate, NULL, &ahb_clk);
++DEFINE_CLOCK(kpp_clk,     0, MXC_CCM_CGR1, 20, NULL, NULL, &ipg_clk);
++DEFINE_CLOCK(ipu_clk,     0, MXC_CCM_CGR1, 22, hsp_get_rate, NULL, &mcu_main_clk);
++DEFINE_CLOCK(uart3_clk,   2, MXC_CCM_CGR1, 24, NULL, NULL, &perclk_clk);
++DEFINE_CLOCK(uart4_clk,   3, MXC_CCM_CGR1, 26, NULL, NULL, &perclk_clk);
++DEFINE_CLOCK(uart5_clk,   4, MXC_CCM_CGR1, 28, NULL, NULL, &perclk_clk);
++DEFINE_CLOCK(owire_clk,   0, MXC_CCM_CGR1, 30, NULL, NULL, &perclk_clk);
++
++DEFINE_CLOCK(ssi2_clk,    1, MXC_CCM_CGR2,  0, ssi2_get_rate, NULL, &serial_pll_clk);
++DEFINE_CLOCK(cspi1_clk,   0, MXC_CCM_CGR2,  2, NULL, NULL, &ipg_clk);
++DEFINE_CLOCK(cspi2_clk,   1, MXC_CCM_CGR2,  4, NULL, NULL, &ipg_clk);
++DEFINE_CLOCK(mbx_clk,     0, MXC_CCM_CGR2,  6, mbx_get_rate, NULL, &ahb_clk);
++DEFINE_CLOCK(emi_clk,     0, MXC_CCM_CGR2,  8, NULL, NULL, &ahb_clk);
++DEFINE_CLOCK(rtic_clk,    0, MXC_CCM_CGR2, 10, NULL, NULL, &ahb_clk);
++DEFINE_CLOCK1(firi_clk,   0, MXC_CCM_CGR2, 12, firi, NULL, &usb_pll_clk);
++
++DEFINE_CLOCK(sdma_clk2,   0, NULL,          0, NULL, NULL, &ipg_clk);
++DEFINE_CLOCK(usb_clk1,    0, NULL,          0, usb_get_rate, NULL, &usb_pll_clk);
++DEFINE_CLOCK(nfc_clk,     0, NULL,          0, nfc_get_rate, NULL, &ahb_clk);
++DEFINE_CLOCK(scc_clk,     0, NULL,          0, NULL, NULL, &ipg_clk);
++DEFINE_CLOCK(ipg_clk,     0, NULL,          0, ipg_get_rate, NULL, &ahb_clk);
++DEFINE_CLOCK(ckil_clk,    0, NULL,          0, clk_ckil_get_rate, NULL, NULL);
++
++#define _REGISTER_CLOCK(d, n, c) \
++	{ \
++		.dev_id = d, \
++		.con_id = n, \
++		.clk = &c, \
++	},
++
++static struct clk_lookup lookups[] = {
++	_REGISTER_CLOCK(NULL, "emi", emi_clk)
++	_REGISTER_CLOCK("spi_imx.0", NULL, cspi1_clk)
++	_REGISTER_CLOCK("spi_imx.1", NULL, cspi2_clk)
++	_REGISTER_CLOCK("spi_imx.2", NULL, cspi3_clk)
++	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
++	_REGISTER_CLOCK(NULL, "pwm", pwm_clk)
++	_REGISTER_CLOCK("imx-wdt.0", NULL, wdog_clk)
++	_REGISTER_CLOCK(NULL, "rtc", rtc_clk)
++	_REGISTER_CLOCK(NULL, "epit", epit1_clk)
++	_REGISTER_CLOCK(NULL, "epit", epit2_clk)
++	_REGISTER_CLOCK("mxc_nand.0", NULL, nfc_clk)
++	_REGISTER_CLOCK("ipu-core", NULL, ipu_clk)
++	_REGISTER_CLOCK("mx3_sdc_fb", NULL, ipu_clk)
++	_REGISTER_CLOCK(NULL, "kpp", kpp_clk)
++	_REGISTER_CLOCK("mxc-ehci.0", "usb", usb_clk1)
++	_REGISTER_CLOCK("mxc-ehci.0", "usb_ahb", usb_clk2)
++	_REGISTER_CLOCK("mxc-ehci.1", "usb", usb_clk1)
++	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", usb_clk2)
++	_REGISTER_CLOCK("mxc-ehci.2", "usb", usb_clk1)
++	_REGISTER_CLOCK("mxc-ehci.2", "usb_ahb", usb_clk2)
++	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usb_clk1)
++	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", usb_clk2)
++	_REGISTER_CLOCK("mx3-camera.0", NULL, csi_clk)
++	_REGISTER_CLOCK("imx-uart.0", NULL, uart1_clk)
++	_REGISTER_CLOCK("imx-uart.1", NULL, uart2_clk)
++	_REGISTER_CLOCK("imx-uart.2", NULL, uart3_clk)
++	_REGISTER_CLOCK("imx-uart.3", NULL, uart4_clk)
++	_REGISTER_CLOCK("imx-uart.4", NULL, uart5_clk)
++	_REGISTER_CLOCK("imx-i2c.0", NULL, i2c1_clk)
++	_REGISTER_CLOCK("imx-i2c.1", NULL, i2c2_clk)
++	_REGISTER_CLOCK("imx-i2c.2", NULL, i2c3_clk)
++	_REGISTER_CLOCK("mxc_w1.0", NULL, owire_clk)
++	_REGISTER_CLOCK("mxc-mmc.0", NULL, sdhc1_clk)
++	_REGISTER_CLOCK("mxc-mmc.1", NULL, sdhc2_clk)
++	_REGISTER_CLOCK("imx-ssi.0", NULL, ssi1_clk)
++	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
++	_REGISTER_CLOCK(NULL, "firi", firi_clk)
++	_REGISTER_CLOCK(NULL, "ata", ata_clk)
++	_REGISTER_CLOCK(NULL, "rtic", rtic_clk)
++	_REGISTER_CLOCK(NULL, "rng", rng_clk)
++	_REGISTER_CLOCK(NULL, "sdma_ahb", sdma_clk1)
++	_REGISTER_CLOCK(NULL, "sdma_ipg", sdma_clk2)
++	_REGISTER_CLOCK(NULL, "mstick", mstick1_clk)
++	_REGISTER_CLOCK(NULL, "mstick", mstick2_clk)
++	_REGISTER_CLOCK(NULL, "scc", scc_clk)
++	_REGISTER_CLOCK(NULL, "iim", iim_clk)
++	_REGISTER_CLOCK(NULL, "mpeg4", mpeg4_clk)
++	_REGISTER_CLOCK(NULL, "mbx", mbx_clk)
++	_REGISTER_CLOCK("mxc_rtc", NULL, ckil_clk)
++};
++
++int __init mx31_clocks_init(unsigned long fref)
++{
++	u32 reg;
++	int i;
++
++	ckih_rate = fref;
++
++	for (i = 0; i < ARRAY_SIZE(lookups); i++)
++		clkdev_add(&lookups[i]);
++
++	/* change the csi_clk parent if necessary */
++	reg = __raw_readl(MXC_CCM_CCMR);
++	if (!(reg & MXC_CCM_CCMR_CSCS))
++		if (clk_set_parent(&csi_clk, &usb_pll_clk))
++			pr_err("%s: error changing csi_clk parent\n", __func__);
++
++
++	/* Turn off all possible clocks */
++	__raw_writel((3 << 4), MXC_CCM_CGR0);
++	__raw_writel(0, MXC_CCM_CGR1);
++	__raw_writel((3 << 8) | (3 << 14) | (3 << 16)|
++		     1 << 27 | 1 << 28, /* Bit 27 and 28 are not defined for
++					   MX32, but still required to be set */
++		     MXC_CCM_CGR2);
++
++	/*
++	 * Before turning off usb_pll make sure ipg_per_clk is generated
++	 * by ipg_clk and not usb_pll.
++	 */
++	__raw_writel(__raw_readl(MXC_CCM_CCMR) | (1 << 24), MXC_CCM_CCMR);
++
++	usb_pll_disable(&usb_pll_clk);
++
++	pr_info("Clock input source is %ld\n", clk_get_rate(&ckih_clk));
++
++	clk_enable(&gpt_clk);
++	clk_enable(&emi_clk);
++	clk_enable(&iim_clk);
++
++	clk_enable(&serial_pll_clk);
++
++	mx31_read_cpu_rev();
++
++	if (mx31_revision() >= MX31_CHIP_REV_2_0) {
++		reg = __raw_readl(MXC_CCM_PMCR1);
++		/* No PLL restart on DVFS switch; enable auto EMI handshake */
++		reg |= MXC_CCM_PMCR1_PLLRDIS | MXC_CCM_PMCR1_EMIRQ_EN;
++		__raw_writel(reg, MXC_CCM_PMCR1);
++	}
++
++	mxc_timer_init(&ipg_clk, IO_ADDRESS(MX31_GPT1_BASE_ADDR), MX31_INT_GPT);
++
++	return 0;
++}
++
+diff --git a/arch/arm/mach-mx3/clock.c b/arch/arm/mach-mx3/clock.c
 deleted file mode 100644
-index 30f04e5..0000000
---- a/arch/arm/mach-mx1/mx1ads.c
+index cc03a61..0000000
+--- a/arch/arm/mach-mx3/clock.c
 +++ /dev/null
-@@ -1,165 +0,0 @@
+@@ -1,632 +0,0 @@
 -/*
-- * arch/arm/mach-imx/mx1ads.c
+- * Copyright 2005-2007 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright (C) 2008 by Sascha Hauer <kernel@pengutronix.de>
 - *
-- * Initially based on:
-- *	linux-2.6.7-imx/arch/arm/mach-imx/scb9328.c
-- *	Copyright (c) 2004 Sascha Hauer <sascha@saschahauer.de>
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
 - *
-- * 2004 (c) MontaVista Software, Inc.
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2. This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+- * MA 02110-1301, USA.
 - */
 -
--#include <linux/i2c.h>
--#include <linux/i2c/pcf857x.h>
--#include <linux/init.h>
--#include <linux/kernel.h>
--#include <linux/platform_device.h>
--#include <linux/mtd/physmap.h>
+-#include <linux/module.h>
+-#include <linux/spinlock.h>
+-#include <linux/delay.h>
+-#include <linux/clk.h>
+-#include <linux/err.h>
+-#include <linux/io.h>
 -
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/time.h>
+-#include <asm/clkdev.h>
+-#include <asm/div64.h>
 -
--#include <mach/common.h>
+-#include <mach/clock.h>
 -#include <mach/hardware.h>
--#include <mach/i2c.h>
--#include <mach/imx-uart.h>
--#include <mach/iomux.h>
--#include <mach/irqs.h>
--
--#include "devices.h"
--
--static int mx1ads_pins[] = {
--	/* UART1 */
--	PC9_PF_UART1_CTS,
--	PC10_PF_UART1_RTS,
--	PC11_PF_UART1_TXD,
--	PC12_PF_UART1_RXD,
--	/* UART2 */
--	PB28_PF_UART2_CTS,
--	PB29_PF_UART2_RTS,
--	PB30_PF_UART2_TXD,
--	PB31_PF_UART2_RXD,
--	/* I2C */
--	PA15_PF_I2C_SDA,
--	PA16_PF_I2C_SCL,
--	/* SPI */
--	PC13_PF_SPI1_SPI_RDY,
--	PC14_PF_SPI1_SCLK,
--	PC15_PF_SPI1_SS,
--	PC16_PF_SPI1_MISO,
--	PC17_PF_SPI1_MOSI,
--};
--
--/*
-- * UARTs platform data
-- */
--
--static struct imxuart_platform_data uart_pdata[] = {
--	{
--		.flags = IMXUART_HAVE_RTSCTS,
--	}, {
--		.flags = IMXUART_HAVE_RTSCTS,
--	},
--};
--
--/*
-- * Physmap flash
-- */
--
--static struct physmap_flash_data mx1ads_flash_data = {
--	.width		= 4,		/* bankwidth in bytes */
--};
--
--static struct resource flash_resource = {
--	.start	= IMX_CS0_PHYS,
--	.end	= IMX_CS0_PHYS + SZ_32M - 1,
--	.flags	= IORESOURCE_MEM,
--};
--
--static struct platform_device flash_device = {
--	.name	= "physmap-flash",
--	.id	= 0,
--	.resource = &flash_resource,
--	.num_resources = 1,
--};
--
--/*
-- * I2C
-- */
--static struct pcf857x_platform_data pcf857x_data[] = {
--	{
--		.gpio_base = 4 * 32,
--	}, {
--		.gpio_base = 4 * 32 + 16,
--	}
--};
--
--static struct imxi2c_platform_data mx1ads_i2c_data = {
--	.bitrate = 100000,
--};
--
--static struct i2c_board_info mx1ads_i2c_devices[] = {
--	{
--		I2C_BOARD_INFO("pcf8575", 0x22),
--		.platform_data = &pcf857x_data[0],
--	}, {
--		I2C_BOARD_INFO("pcf8575", 0x24),
--		.platform_data = &pcf857x_data[1],
--	},
--};
--
--/*
-- * Board init
-- */
--static void __init mx1ads_init(void)
--{
--	mxc_gpio_setup_multiple_pins(mx1ads_pins,
--		ARRAY_SIZE(mx1ads_pins), "mx1ads");
--
--	/* UART */
--	mxc_register_device(&imx_uart1_device, &uart_pdata[0]);
--	mxc_register_device(&imx_uart2_device, &uart_pdata[1]);
--
--	/* Physmap flash */
--	mxc_register_device(&flash_device, &mx1ads_flash_data);
--
--	/* I2C */
--	i2c_register_board_info(0, mx1ads_i2c_devices,
--				ARRAY_SIZE(mx1ads_i2c_devices));
--
--	mxc_register_device(&imx_i2c_device, &mx1ads_i2c_data);
--}
--
--static void __init mx1ads_timer_init(void)
--{
--	mx1_clocks_init(32000);
--}
--
--struct sys_timer mx1ads_timer = {
--	.init	= mx1ads_timer_init,
--};
--
--MACHINE_START(MX1ADS, "Freescale MX1ADS")
--	/* Maintainer: Sascha Hauer, Pengutronix */
--	.phys_io	= IMX_IO_PHYS,
--	.io_pg_offst	= (IMX_IO_BASE >> 18) & 0xfffc,
--	.boot_params	= PHYS_OFFSET + 0x100,
--	.map_io		= mx1_map_io,
--	.init_irq	= mx1_init_irq,
--	.timer		= &mx1ads_timer,
--	.init_machine	= mx1ads_init,
--MACHINE_END
--
--MACHINE_START(MXLADS, "Freescale MXLADS")
--	.phys_io	= IMX_IO_PHYS,
--	.io_pg_offst	= (IMX_IO_BASE >> 18) & 0xfffc,
--	.boot_params	= PHYS_OFFSET + 0x100,
--	.map_io		= mx1_map_io,
--	.init_irq	= mx1_init_irq,
--	.timer		= &mx1ads_timer,
--	.init_machine	= mx1ads_init,
--MACHINE_END
-diff --git a/arch/arm/mach-mx1/scb9328.c b/arch/arm/mach-mx1/scb9328.c
-deleted file mode 100644
-index 325d98d..0000000
---- a/arch/arm/mach-mx1/scb9328.c
-+++ /dev/null
-@@ -1,158 +0,0 @@
--/*
-- * linux/arch/arm/mach-mx1/scb9328.c
-- *
-- * Copyright (c) 2004 Sascha Hauer <saschahauer@web.de>
-- * Copyright (c) 2006-2008 Juergen Beisert <jbeisert@netscape.net>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- */
--
--#include <linux/platform_device.h>
--#include <linux/mtd/physmap.h>
--#include <linux/interrupt.h>
--#include <linux/dm9000.h>
--
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/time.h>
--
+-#include <mach/mx31.h>
 -#include <mach/common.h>
--#include <mach/hardware.h>
--#include <mach/irqs.h>
--#include <mach/imx-uart.h>
--#include <mach/iomux.h>
 -
--#include "devices.h"
+-#include "crm_regs.h"
 -
--/*
-- * This scb9328 has a 32MiB flash
-- */
--static struct resource flash_resource = {
--	.start	= IMX_CS0_PHYS,
--	.end	= IMX_CS0_PHYS + (32 * 1024 * 1024) - 1,
--	.flags	= IORESOURCE_MEM,
--};
+-#define PRE_DIV_MIN_FREQ    10000000 /* Minimum Frequency after Predivider */
 -
--static struct physmap_flash_data scb_flash_data = {
--	.width  = 2,
--};
--
--static struct platform_device scb_flash_device = {
--	.name		= "physmap-flash",
--	.id		= 0,
--	.dev = {
--		.platform_data = &scb_flash_data,
--	},
--	.resource = &flash_resource,
--	.num_resources = 1,
--};
--
--/*
-- * scb9328 has a DM9000 network controller
-- * connected to CS5, with 16 bit data path
-- * and interrupt connected to GPIO 3
-- */
--
--/*
-- * internal datapath is fixed 16 bit
-- */
--static struct dm9000_plat_data dm9000_platdata = {
--	.flags	= DM9000_PLATF_16BITONLY,
--};
--
--/*
-- * the DM9000 drivers wants two defined address spaces
-- * to gain access to address latch registers and the data path.
-- */
--static struct resource dm9000x_resources[] = {
--	{
--		.name	= "address area",
--		.start	= IMX_CS5_PHYS,
--		.end	= IMX_CS5_PHYS + 1,
--		.flags	= IORESOURCE_MEM,	/* address access */
--	}, {
--		.name	= "data area",
--		.start	= IMX_CS5_PHYS + 4,
--		.end	= IMX_CS5_PHYS + 5,
--		.flags	= IORESOURCE_MEM,	/* data access */
--	}, {
--		.start	= IRQ_GPIOC(3),
--		.end	= IRQ_GPIOC(3),
--		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL,
--	},
--};
--
--static struct platform_device dm9000x_device = {
--	.name		= "dm9000",
--	.id		= 0,
--	.num_resources	= ARRAY_SIZE(dm9000x_resources),
--	.resource	= dm9000x_resources,
--	.dev		= {
--		.platform_data = &dm9000_platdata,
--	}
--};
--
--static int mxc_uart1_pins[] = {
--	PC9_PF_UART1_CTS,
--	PC10_PF_UART1_RTS,
--	PC11_PF_UART1_TXD,
--	PC12_PF_UART1_RXD,
--};
--
--static int uart1_mxc_init(struct platform_device *pdev)
+-static void __calc_pre_post_dividers(u32 div, u32 *pre, u32 *post)
 -{
--	return mxc_gpio_setup_multiple_pins(mxc_uart1_pins,
--			ARRAY_SIZE(mxc_uart1_pins), "UART1");
+-	u32 min_pre, temp_pre, old_err, err;
+-
+-	if (div >= 512) {
+-		*pre = 8;
+-		*post = 64;
+-	} else if (div >= 64) {
+-		min_pre = (div - 1) / 64 + 1;
+-		old_err = 8;
+-		for (temp_pre = 8; temp_pre >= min_pre; temp_pre--) {
+-			err = div % temp_pre;
+-			if (err == 0) {
+-				*pre = temp_pre;
+-				break;
+-			}
+-			err = temp_pre - err;
+-			if (err < old_err) {
+-				old_err = err;
+-				*pre = temp_pre;
+-			}
+-		}
+-		*post = (div + *pre - 1) / *pre;
+-	} else if (div <= 8) {
+-		*pre = div;
+-		*post = 1;
+-	} else {
+-		*pre = 1;
+-		*post = div;
+-	}
 -}
 -
--static int uart1_mxc_exit(struct platform_device *pdev)
+-static struct clk mcu_pll_clk;
+-static struct clk serial_pll_clk;
+-static struct clk ipg_clk;
+-static struct clk ckih_clk;
+-
+-static int cgr_enable(struct clk *clk)
 -{
--	mxc_gpio_release_multiple_pins(mxc_uart1_pins,
--			ARRAY_SIZE(mxc_uart1_pins));
+-	u32 reg;
+-
+-	if (!clk->enable_reg)
+-		return 0;
+-
+-	reg = __raw_readl(clk->enable_reg);
+-	reg |= 3 << clk->enable_shift;
+-	__raw_writel(reg, clk->enable_reg);
+-
 -	return 0;
 -}
 -
--static struct imxuart_platform_data uart_pdata = {
--	.init = uart1_mxc_init,
--	.exit = uart1_mxc_exit,
--	.flags = IMXUART_HAVE_RTSCTS,
+-static void cgr_disable(struct clk *clk)
+-{
+-	u32 reg;
+-
+-	if (!clk->enable_reg)
+-		return;
+-
+-	reg = __raw_readl(clk->enable_reg);
+-	reg &= ~(3 << clk->enable_shift);
+-
+-	/* special case for EMI clock */
+-	if (clk->enable_reg == MXC_CCM_CGR2 && clk->enable_shift == 8)
+-		reg |= (1 << clk->enable_shift);
+-
+-	__raw_writel(reg, clk->enable_reg);
+-}
+-
+-static unsigned long pll_ref_get_rate(void)
+-{
+-	unsigned long ccmr;
+-	unsigned int prcs;
+-
+-	ccmr = __raw_readl(MXC_CCM_CCMR);
+-	prcs = (ccmr & MXC_CCM_CCMR_PRCS_MASK) >> MXC_CCM_CCMR_PRCS_OFFSET;
+-	if (prcs == 0x1)
+-		return CKIL_CLK_FREQ * 1024;
+-	else
+-		return clk_get_rate(&ckih_clk);
+-}
+-
+-static unsigned long usb_pll_get_rate(struct clk *clk)
+-{
+-	unsigned long reg;
+-
+-	reg = __raw_readl(MXC_CCM_UPCTL);
+-
+-	return mxc_decode_pll(reg, pll_ref_get_rate());
+-}
+-
+-static unsigned long serial_pll_get_rate(struct clk *clk)
+-{
+-	unsigned long reg;
+-
+-	reg = __raw_readl(MXC_CCM_SRPCTL);
+-
+-	return mxc_decode_pll(reg, pll_ref_get_rate());
+-}
+-
+-static unsigned long mcu_pll_get_rate(struct clk *clk)
+-{
+-	unsigned long reg, ccmr;
+-
+-	ccmr = __raw_readl(MXC_CCM_CCMR);
+-
+-	if (!(ccmr & MXC_CCM_CCMR_MPE) || (ccmr & MXC_CCM_CCMR_MDS))
+-		return clk_get_rate(&ckih_clk);
+-
+-	reg = __raw_readl(MXC_CCM_MPCTL);
+-
+-	return mxc_decode_pll(reg, pll_ref_get_rate());
+-}
+-
+-static int usb_pll_enable(struct clk *clk)
+-{
+-	u32 reg;
+-
+-	reg = __raw_readl(MXC_CCM_CCMR);
+-	reg |= MXC_CCM_CCMR_UPE;
+-	__raw_writel(reg, MXC_CCM_CCMR);
+-
+-	/* No lock bit on MX31, so using max time from spec */
+-	udelay(80);
+-
+-	return 0;
+-}
+-
+-static void usb_pll_disable(struct clk *clk)
+-{
+-	u32 reg;
+-
+-	reg = __raw_readl(MXC_CCM_CCMR);
+-	reg &= ~MXC_CCM_CCMR_UPE;
+-	__raw_writel(reg, MXC_CCM_CCMR);
+-}
+-
+-static int serial_pll_enable(struct clk *clk)
+-{
+-	u32 reg;
+-
+-	reg = __raw_readl(MXC_CCM_CCMR);
+-	reg |= MXC_CCM_CCMR_SPE;
+-	__raw_writel(reg, MXC_CCM_CCMR);
+-
+-	/* No lock bit on MX31, so using max time from spec */
+-	udelay(80);
+-
+-	return 0;
+-}
+-
+-static void serial_pll_disable(struct clk *clk)
+-{
+-	u32 reg;
+-
+-	reg = __raw_readl(MXC_CCM_CCMR);
+-	reg &= ~MXC_CCM_CCMR_SPE;
+-	__raw_writel(reg, MXC_CCM_CCMR);
+-}
+-
+-#define PDR0(mask, off) ((__raw_readl(MXC_CCM_PDR0) & mask) >> off)
+-#define PDR1(mask, off) ((__raw_readl(MXC_CCM_PDR1) & mask) >> off)
+-#define PDR2(mask, off) ((__raw_readl(MXC_CCM_PDR2) & mask) >> off)
+-
+-static unsigned long mcu_main_get_rate(struct clk *clk)
+-{
+-	u32 pmcr0 = __raw_readl(MXC_CCM_PMCR0);
+-
+-	if ((pmcr0 & MXC_CCM_PMCR0_DFSUP1) == MXC_CCM_PMCR0_DFSUP1_SPLL)
+-		return clk_get_rate(&serial_pll_clk);
+-	else
+-		return clk_get_rate(&mcu_pll_clk);
+-}
+-
+-static unsigned long ahb_get_rate(struct clk *clk)
+-{
+-	unsigned long max_pdf;
+-
+-	max_pdf = PDR0(MXC_CCM_PDR0_MAX_PODF_MASK,
+-		       MXC_CCM_PDR0_MAX_PODF_OFFSET);
+-	return clk_get_rate(clk->parent) / (max_pdf + 1);
+-}
+-
+-static unsigned long ipg_get_rate(struct clk *clk)
+-{
+-	unsigned long ipg_pdf;
+-
+-	ipg_pdf = PDR0(MXC_CCM_PDR0_IPG_PODF_MASK,
+-		       MXC_CCM_PDR0_IPG_PODF_OFFSET);
+-	return clk_get_rate(clk->parent) / (ipg_pdf + 1);
+-}
+-
+-static unsigned long nfc_get_rate(struct clk *clk)
+-{
+-	unsigned long nfc_pdf;
+-
+-	nfc_pdf = PDR0(MXC_CCM_PDR0_NFC_PODF_MASK,
+-		       MXC_CCM_PDR0_NFC_PODF_OFFSET);
+-	return clk_get_rate(clk->parent) / (nfc_pdf + 1);
+-}
+-
+-static unsigned long hsp_get_rate(struct clk *clk)
+-{
+-	unsigned long hsp_pdf;
+-
+-	hsp_pdf = PDR0(MXC_CCM_PDR0_HSP_PODF_MASK,
+-		       MXC_CCM_PDR0_HSP_PODF_OFFSET);
+-	return clk_get_rate(clk->parent) / (hsp_pdf + 1);
+-}
+-
+-static unsigned long usb_get_rate(struct clk *clk)
+-{
+-	unsigned long usb_pdf, usb_prepdf;
+-
+-	usb_pdf = PDR1(MXC_CCM_PDR1_USB_PODF_MASK,
+-		       MXC_CCM_PDR1_USB_PODF_OFFSET);
+-	usb_prepdf = PDR1(MXC_CCM_PDR1_USB_PRDF_MASK,
+-			  MXC_CCM_PDR1_USB_PRDF_OFFSET);
+-	return clk_get_rate(clk->parent) / (usb_prepdf + 1) / (usb_pdf + 1);
+-}
+-
+-static unsigned long csi_get_rate(struct clk *clk)
+-{
+-	u32 reg, pre, post;
+-
+-	reg = __raw_readl(MXC_CCM_PDR0);
+-	pre = (reg & MXC_CCM_PDR0_CSI_PRDF_MASK) >>
+-	    MXC_CCM_PDR0_CSI_PRDF_OFFSET;
+-	pre++;
+-	post = (reg & MXC_CCM_PDR0_CSI_PODF_MASK) >>
+-	    MXC_CCM_PDR0_CSI_PODF_OFFSET;
+-	post++;
+-	return clk_get_rate(clk->parent) / (pre * post);
+-}
+-
+-static unsigned long csi_round_rate(struct clk *clk, unsigned long rate)
+-{
+-	u32 pre, post, parent = clk_get_rate(clk->parent);
+-	u32 div = parent / rate;
+-
+-	if (parent % rate)
+-		div++;
+-
+-	__calc_pre_post_dividers(div, &pre, &post);
+-
+-	return parent / (pre * post);
+-}
+-
+-static int csi_set_rate(struct clk *clk, unsigned long rate)
+-{
+-	u32 reg, div, pre, post, parent = clk_get_rate(clk->parent);
+-
+-	div = parent / rate;
+-
+-	if ((parent / div) != rate)
+-		return -EINVAL;
+-
+-	__calc_pre_post_dividers(div, &pre, &post);
+-
+-	/* Set CSI clock divider */
+-	reg = __raw_readl(MXC_CCM_PDR0) &
+-	    ~(MXC_CCM_PDR0_CSI_PODF_MASK | MXC_CCM_PDR0_CSI_PRDF_MASK);
+-	reg |= (post - 1) << MXC_CCM_PDR0_CSI_PODF_OFFSET;
+-	reg |= (pre - 1) << MXC_CCM_PDR0_CSI_PRDF_OFFSET;
+-	__raw_writel(reg, MXC_CCM_PDR0);
+-
+-	return 0;
+-}
+-
+-static unsigned long ssi1_get_rate(struct clk *clk)
+-{
+-	unsigned long ssi1_pdf, ssi1_prepdf;
+-
+-	ssi1_pdf = PDR1(MXC_CCM_PDR1_SSI1_PODF_MASK,
+-			MXC_CCM_PDR1_SSI1_PODF_OFFSET);
+-	ssi1_prepdf = PDR1(MXC_CCM_PDR1_SSI1_PRE_PODF_MASK,
+-			   MXC_CCM_PDR1_SSI1_PRE_PODF_OFFSET);
+-	return clk_get_rate(clk->parent) / (ssi1_prepdf + 1) / (ssi1_pdf + 1);
+-}
+-
+-static unsigned long ssi2_get_rate(struct clk *clk)
+-{
+-	unsigned long ssi2_pdf, ssi2_prepdf;
+-
+-	ssi2_pdf = PDR1(MXC_CCM_PDR1_SSI2_PODF_MASK,
+-			MXC_CCM_PDR1_SSI2_PODF_OFFSET);
+-	ssi2_prepdf = PDR1(MXC_CCM_PDR1_SSI2_PRE_PODF_MASK,
+-			   MXC_CCM_PDR1_SSI2_PRE_PODF_OFFSET);
+-	return clk_get_rate(clk->parent) / (ssi2_prepdf + 1) / (ssi2_pdf + 1);
+-}
+-
+-static unsigned long firi_get_rate(struct clk *clk)
+-{
+-	unsigned long firi_pdf, firi_prepdf;
+-
+-	firi_pdf = PDR1(MXC_CCM_PDR1_FIRI_PODF_MASK,
+-			MXC_CCM_PDR1_FIRI_PODF_OFFSET);
+-	firi_prepdf = PDR1(MXC_CCM_PDR1_FIRI_PRE_PODF_MASK,
+-			   MXC_CCM_PDR1_FIRI_PRE_PODF_OFFSET);
+-	return clk_get_rate(clk->parent) / (firi_prepdf + 1) / (firi_pdf + 1);
+-}
+-
+-static unsigned long firi_round_rate(struct clk *clk, unsigned long rate)
+-{
+-	u32 pre, post;
+-	u32 parent = clk_get_rate(clk->parent);
+-	u32 div = parent / rate;
+-
+-	if (parent % rate)
+-		div++;
+-
+-	__calc_pre_post_dividers(div, &pre, &post);
+-
+-	return parent / (pre * post);
+-
+-}
+-
+-static int firi_set_rate(struct clk *clk, unsigned long rate)
+-{
+-	u32 reg, div, pre, post, parent = clk_get_rate(clk->parent);
+-
+-	div = parent / rate;
+-
+-	if ((parent / div) != rate)
+-		return -EINVAL;
+-
+-	__calc_pre_post_dividers(div, &pre, &post);
+-
+-	/* Set FIRI clock divider */
+-	reg = __raw_readl(MXC_CCM_PDR1) &
+-	    ~(MXC_CCM_PDR1_FIRI_PODF_MASK | MXC_CCM_PDR1_FIRI_PRE_PODF_MASK);
+-	reg |= (pre - 1) << MXC_CCM_PDR1_FIRI_PRE_PODF_OFFSET;
+-	reg |= (post - 1) << MXC_CCM_PDR1_FIRI_PODF_OFFSET;
+-	__raw_writel(reg, MXC_CCM_PDR1);
+-
+-	return 0;
+-}
+-
+-static unsigned long mbx_get_rate(struct clk *clk)
+-{
+-	return clk_get_rate(clk->parent) / 2;
+-}
+-
+-static unsigned long mstick1_get_rate(struct clk *clk)
+-{
+-	unsigned long msti_pdf;
+-
+-	msti_pdf = PDR2(MXC_CCM_PDR2_MST1_PDF_MASK,
+-			MXC_CCM_PDR2_MST1_PDF_OFFSET);
+-	return clk_get_rate(clk->parent) / (msti_pdf + 1);
+-}
+-
+-static unsigned long mstick2_get_rate(struct clk *clk)
+-{
+-	unsigned long msti_pdf;
+-
+-	msti_pdf = PDR2(MXC_CCM_PDR2_MST2_PDF_MASK,
+-			MXC_CCM_PDR2_MST2_PDF_OFFSET);
+-	return clk_get_rate(clk->parent) / (msti_pdf + 1);
+-}
+-
+-static unsigned long ckih_rate;
+-
+-static unsigned long clk_ckih_get_rate(struct clk *clk)
+-{
+-	return ckih_rate;
+-}
+-
+-static unsigned long clk_ckil_get_rate(struct clk *clk)
+-{
+-	return CKIL_CLK_FREQ;
+-}
+-
+-static struct clk ckih_clk = {
+-	.get_rate = clk_ckih_get_rate,
 -};
 -
--static struct platform_device *devices[] __initdata = {
--	&scb_flash_device,
--	&dm9000x_device,
+-static struct clk mcu_pll_clk = {
+-	.parent = &ckih_clk,
+-	.get_rate = mcu_pll_get_rate,
 -};
+-
+-static struct clk mcu_main_clk = {
+-	.parent = &mcu_pll_clk,
+-	.get_rate = mcu_main_get_rate,
+-};
+-
+-static struct clk serial_pll_clk = {
+-	.parent = &ckih_clk,
+-	.get_rate = serial_pll_get_rate,
+-	.enable = serial_pll_enable,
+-	.disable = serial_pll_disable,
+-};
+-
+-static struct clk usb_pll_clk = {
+-	.parent = &ckih_clk,
+-	.get_rate = usb_pll_get_rate,
+-	.enable = usb_pll_enable,
+-	.disable = usb_pll_disable,
+-};
+-
+-static struct clk ahb_clk = {
+-	.parent = &mcu_main_clk,
+-	.get_rate = ahb_get_rate,
+-};
+-
+-#define DEFINE_CLOCK(name, i, er, es, gr, s, p)		\
+-	static struct clk name = {			\
+-		.id		= i,			\
+-		.enable_reg	= er,			\
+-		.enable_shift	= es,			\
+-		.get_rate	= gr,			\
+-		.enable		= cgr_enable,		\
+-		.disable	= cgr_disable,		\
+-		.secondary	= s,			\
+-		.parent		= p,			\
+-	}
+-
+-#define DEFINE_CLOCK1(name, i, er, es, getsetround, s, p)	\
+-	static struct clk name = {				\
+-		.id		= i,				\
+-		.enable_reg	= er,				\
+-		.enable_shift	= es,				\
+-		.get_rate	= getsetround##_get_rate,	\
+-		.set_rate	= getsetround##_set_rate,	\
+-		.round_rate	= getsetround##_round_rate,	\
+-		.enable		= cgr_enable,			\
+-		.disable	= cgr_disable,			\
+-		.secondary	= s,				\
+-		.parent		= p,				\
+-	}
+-
+-DEFINE_CLOCK(perclk_clk,  0, NULL,          0, NULL, NULL, &ipg_clk);
+-
+-DEFINE_CLOCK(sdhc1_clk,   0, MXC_CCM_CGR0,  0, NULL, NULL, &perclk_clk);
+-DEFINE_CLOCK(sdhc2_clk,   1, MXC_CCM_CGR0,  2, NULL, NULL, &perclk_clk);
+-DEFINE_CLOCK(gpt_clk,     0, MXC_CCM_CGR0,  4, NULL, NULL, &perclk_clk);
+-DEFINE_CLOCK(epit1_clk,   0, MXC_CCM_CGR0,  6, NULL, NULL, &perclk_clk);
+-DEFINE_CLOCK(epit2_clk,   1, MXC_CCM_CGR0,  8, NULL, NULL, &perclk_clk);
+-DEFINE_CLOCK(iim_clk,     0, MXC_CCM_CGR0, 10, NULL, NULL, &ipg_clk);
+-DEFINE_CLOCK(ata_clk,     0, MXC_CCM_CGR0, 12, NULL, NULL, &ipg_clk);
+-DEFINE_CLOCK(sdma_clk1,   0, MXC_CCM_CGR0, 14, NULL, &sdma_clk1, &ahb_clk);
+-DEFINE_CLOCK(cspi3_clk,   2, MXC_CCM_CGR0, 16, NULL, NULL, &ipg_clk);
+-DEFINE_CLOCK(rng_clk,     0, MXC_CCM_CGR0, 18, NULL, NULL, &ipg_clk);
+-DEFINE_CLOCK(uart1_clk,   0, MXC_CCM_CGR0, 20, NULL, NULL, &perclk_clk);
+-DEFINE_CLOCK(uart2_clk,   1, MXC_CCM_CGR0, 22, NULL, NULL, &perclk_clk);
+-DEFINE_CLOCK(ssi1_clk,    0, MXC_CCM_CGR0, 24, ssi1_get_rate, NULL, &serial_pll_clk);
+-DEFINE_CLOCK(i2c1_clk,    0, MXC_CCM_CGR0, 26, NULL, NULL, &perclk_clk);
+-DEFINE_CLOCK(i2c2_clk,    1, MXC_CCM_CGR0, 28, NULL, NULL, &perclk_clk);
+-DEFINE_CLOCK(i2c3_clk,    2, MXC_CCM_CGR0, 30, NULL, NULL, &perclk_clk);
+-
+-DEFINE_CLOCK(mpeg4_clk,   0, MXC_CCM_CGR1,  0, NULL, NULL, &ahb_clk);
+-DEFINE_CLOCK(mstick1_clk, 0, MXC_CCM_CGR1,  2, mstick1_get_rate, NULL, &usb_pll_clk);
+-DEFINE_CLOCK(mstick2_clk, 1, MXC_CCM_CGR1,  4, mstick2_get_rate, NULL, &usb_pll_clk);
+-DEFINE_CLOCK1(csi_clk,    0, MXC_CCM_CGR1,  6, csi, NULL, &serial_pll_clk);
+-DEFINE_CLOCK(rtc_clk,     0, MXC_CCM_CGR1,  8, NULL, NULL, &ipg_clk);
+-DEFINE_CLOCK(wdog_clk,    0, MXC_CCM_CGR1, 10, NULL, NULL, &ipg_clk);
+-DEFINE_CLOCK(pwm_clk,     0, MXC_CCM_CGR1, 12, NULL, NULL, &perclk_clk);
+-DEFINE_CLOCK(usb_clk2,    0, MXC_CCM_CGR1, 18, usb_get_rate, NULL, &ahb_clk);
+-DEFINE_CLOCK(kpp_clk,     0, MXC_CCM_CGR1, 20, NULL, NULL, &ipg_clk);
+-DEFINE_CLOCK(ipu_clk,     0, MXC_CCM_CGR1, 22, hsp_get_rate, NULL, &mcu_main_clk);
+-DEFINE_CLOCK(uart3_clk,   2, MXC_CCM_CGR1, 24, NULL, NULL, &perclk_clk);
+-DEFINE_CLOCK(uart4_clk,   3, MXC_CCM_CGR1, 26, NULL, NULL, &perclk_clk);
+-DEFINE_CLOCK(uart5_clk,   4, MXC_CCM_CGR1, 28, NULL, NULL, &perclk_clk);
+-DEFINE_CLOCK(owire_clk,   0, MXC_CCM_CGR1, 30, NULL, NULL, &perclk_clk);
+-
+-DEFINE_CLOCK(ssi2_clk,    1, MXC_CCM_CGR2,  0, ssi2_get_rate, NULL, &serial_pll_clk);
+-DEFINE_CLOCK(cspi1_clk,   0, MXC_CCM_CGR2,  2, NULL, NULL, &ipg_clk);
+-DEFINE_CLOCK(cspi2_clk,   1, MXC_CCM_CGR2,  4, NULL, NULL, &ipg_clk);
+-DEFINE_CLOCK(mbx_clk,     0, MXC_CCM_CGR2,  6, mbx_get_rate, NULL, &ahb_clk);
+-DEFINE_CLOCK(emi_clk,     0, MXC_CCM_CGR2,  8, NULL, NULL, &ahb_clk);
+-DEFINE_CLOCK(rtic_clk,    0, MXC_CCM_CGR2, 10, NULL, NULL, &ahb_clk);
+-DEFINE_CLOCK1(firi_clk,   0, MXC_CCM_CGR2, 12, firi, NULL, &usb_pll_clk);
+-
+-DEFINE_CLOCK(sdma_clk2,   0, NULL,          0, NULL, NULL, &ipg_clk);
+-DEFINE_CLOCK(usb_clk1,    0, NULL,          0, usb_get_rate, NULL, &usb_pll_clk);
+-DEFINE_CLOCK(nfc_clk,     0, NULL,          0, nfc_get_rate, NULL, &ahb_clk);
+-DEFINE_CLOCK(scc_clk,     0, NULL,          0, NULL, NULL, &ipg_clk);
+-DEFINE_CLOCK(ipg_clk,     0, NULL,          0, ipg_get_rate, NULL, &ahb_clk);
+-DEFINE_CLOCK(ckil_clk,    0, NULL,          0, clk_ckil_get_rate, NULL, NULL);
+-
+-#define _REGISTER_CLOCK(d, n, c) \
+-	{ \
+-		.dev_id = d, \
+-		.con_id = n, \
+-		.clk = &c, \
+-	},
+-
+-static struct clk_lookup lookups[] = {
+-	_REGISTER_CLOCK(NULL, "emi", emi_clk)
+-	_REGISTER_CLOCK("spi_imx.0", NULL, cspi1_clk)
+-	_REGISTER_CLOCK("spi_imx.1", NULL, cspi2_clk)
+-	_REGISTER_CLOCK("spi_imx.2", NULL, cspi3_clk)
+-	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
+-	_REGISTER_CLOCK(NULL, "pwm", pwm_clk)
+-	_REGISTER_CLOCK("imx-wdt.0", NULL, wdog_clk)
+-	_REGISTER_CLOCK(NULL, "rtc", rtc_clk)
+-	_REGISTER_CLOCK(NULL, "epit", epit1_clk)
+-	_REGISTER_CLOCK(NULL, "epit", epit2_clk)
+-	_REGISTER_CLOCK("mxc_nand.0", NULL, nfc_clk)
+-	_REGISTER_CLOCK("ipu-core", NULL, ipu_clk)
+-	_REGISTER_CLOCK("mx3_sdc_fb", NULL, ipu_clk)
+-	_REGISTER_CLOCK(NULL, "kpp", kpp_clk)
+-	_REGISTER_CLOCK("mxc-ehci.0", "usb", usb_clk1)
+-	_REGISTER_CLOCK("mxc-ehci.0", "usb_ahb", usb_clk2)
+-	_REGISTER_CLOCK("mxc-ehci.1", "usb", usb_clk1)
+-	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", usb_clk2)
+-	_REGISTER_CLOCK("mxc-ehci.2", "usb", usb_clk1)
+-	_REGISTER_CLOCK("mxc-ehci.2", "usb_ahb", usb_clk2)
+-	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usb_clk1)
+-	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", usb_clk2)
+-	_REGISTER_CLOCK("mx3-camera.0", NULL, csi_clk)
+-	_REGISTER_CLOCK("imx-uart.0", NULL, uart1_clk)
+-	_REGISTER_CLOCK("imx-uart.1", NULL, uart2_clk)
+-	_REGISTER_CLOCK("imx-uart.2", NULL, uart3_clk)
+-	_REGISTER_CLOCK("imx-uart.3", NULL, uart4_clk)
+-	_REGISTER_CLOCK("imx-uart.4", NULL, uart5_clk)
+-	_REGISTER_CLOCK("imx-i2c.0", NULL, i2c1_clk)
+-	_REGISTER_CLOCK("imx-i2c.1", NULL, i2c2_clk)
+-	_REGISTER_CLOCK("imx-i2c.2", NULL, i2c3_clk)
+-	_REGISTER_CLOCK("mxc_w1.0", NULL, owire_clk)
+-	_REGISTER_CLOCK("mxc-mmc.0", NULL, sdhc1_clk)
+-	_REGISTER_CLOCK("mxc-mmc.1", NULL, sdhc2_clk)
+-	_REGISTER_CLOCK("imx-ssi.0", NULL, ssi1_clk)
+-	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
+-	_REGISTER_CLOCK(NULL, "firi", firi_clk)
+-	_REGISTER_CLOCK(NULL, "ata", ata_clk)
+-	_REGISTER_CLOCK(NULL, "rtic", rtic_clk)
+-	_REGISTER_CLOCK(NULL, "rng", rng_clk)
+-	_REGISTER_CLOCK(NULL, "sdma_ahb", sdma_clk1)
+-	_REGISTER_CLOCK(NULL, "sdma_ipg", sdma_clk2)
+-	_REGISTER_CLOCK(NULL, "mstick", mstick1_clk)
+-	_REGISTER_CLOCK(NULL, "mstick", mstick2_clk)
+-	_REGISTER_CLOCK(NULL, "scc", scc_clk)
+-	_REGISTER_CLOCK(NULL, "iim", iim_clk)
+-	_REGISTER_CLOCK(NULL, "mpeg4", mpeg4_clk)
+-	_REGISTER_CLOCK(NULL, "mbx", mbx_clk)
+-	_REGISTER_CLOCK("mxc_rtc", NULL, ckil_clk)
+-};
+-
+-int __init mx31_clocks_init(unsigned long fref)
+-{
+-	u32 reg;
+-	int i;
+-
+-	ckih_rate = fref;
+-
+-	for (i = 0; i < ARRAY_SIZE(lookups); i++)
+-		clkdev_add(&lookups[i]);
+-
+-	/* change the csi_clk parent if necessary */
+-	reg = __raw_readl(MXC_CCM_CCMR);
+-	if (!(reg & MXC_CCM_CCMR_CSCS))
+-		if (clk_set_parent(&csi_clk, &usb_pll_clk))
+-			pr_err("%s: error changing csi_clk parent\n", __func__);
+-
+-
+-	/* Turn off all possible clocks */
+-	__raw_writel((3 << 4), MXC_CCM_CGR0);
+-	__raw_writel(0, MXC_CCM_CGR1);
+-	__raw_writel((3 << 8) | (3 << 14) | (3 << 16)|
+-		     1 << 27 | 1 << 28, /* Bit 27 and 28 are not defined for
+-					   MX32, but still required to be set */
+-		     MXC_CCM_CGR2);
+-
+-	/*
+-	 * Before turning off usb_pll make sure ipg_per_clk is generated
+-	 * by ipg_clk and not usb_pll.
+-	 */
+-	__raw_writel(__raw_readl(MXC_CCM_CCMR) | (1 << 24), MXC_CCM_CCMR);
+-
+-	usb_pll_disable(&usb_pll_clk);
+-
+-	pr_info("Clock input source is %ld\n", clk_get_rate(&ckih_clk));
+-
+-	clk_enable(&gpt_clk);
+-	clk_enable(&emi_clk);
+-	clk_enable(&iim_clk);
+-
+-	clk_enable(&serial_pll_clk);
+-
+-	mx31_read_cpu_rev();
+-
+-	if (mx31_revision() >= MX31_CHIP_REV_2_0) {
+-		reg = __raw_readl(MXC_CCM_PMCR1);
+-		/* No PLL restart on DVFS switch; enable auto EMI handshake */
+-		reg |= MXC_CCM_PMCR1_PLLRDIS | MXC_CCM_PMCR1_EMIRQ_EN;
+-		__raw_writel(reg, MXC_CCM_PMCR1);
+-	}
+-
+-	mxc_timer_init(&ipg_clk, IO_ADDRESS(MX31_GPT1_BASE_ADDR), MX31_INT_GPT);
+-
+-	return 0;
+-}
+-
+diff --git a/arch/arm/mach-mx3/iomux-imx31.c b/arch/arm/mach-mx3/iomux-imx31.c
+new file mode 100644
+index 0000000..6381e56
+--- /dev/null
++++ b/arch/arm/mach-mx3/iomux-imx31.c
+@@ -0,0 +1,181 @@
++/*
++ * Copyright 2004-2006 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright (C) 2008 by Sascha Hauer <kernel@pengutronix.de>
++ * Copyright (C) 2009 by Valentin Longchamp <valentin.longchamp@epfl.ch>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
++ */
++
++#include <linux/module.h>
++#include <linux/spinlock.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <mach/hardware.h>
++#include <mach/gpio.h>
++#include <mach/iomux-mx3.h>
++
++/*
++ * IOMUX register (base) addresses
++ */
++#define IOMUX_BASE	IO_ADDRESS(MX31_IOMUXC_BASE_ADDR)
++#define IOMUXINT_OBS1	(IOMUX_BASE + 0x000)
++#define IOMUXINT_OBS2	(IOMUX_BASE + 0x004)
++#define IOMUXGPR	(IOMUX_BASE + 0x008)
++#define IOMUXSW_MUX_CTL	(IOMUX_BASE + 0x00C)
++#define IOMUXSW_PAD_CTL	(IOMUX_BASE + 0x154)
++
++static DEFINE_SPINLOCK(gpio_mux_lock);
++
++#define IOMUX_REG_MASK (IOMUX_PADNUM_MASK & ~0x3)
++
++unsigned long mxc_pin_alloc_map[NB_PORTS * 32 / BITS_PER_LONG];
++/*
++ * set the mode for a IOMUX pin.
++ */
++int mxc_iomux_mode(unsigned int pin_mode)
++{
++	u32 field, l, mode, ret = 0;
++	void __iomem *reg;
++
++	reg = IOMUXSW_MUX_CTL + (pin_mode & IOMUX_REG_MASK);
++	field = pin_mode & 0x3;
++	mode = (pin_mode & IOMUX_MODE_MASK) >> IOMUX_MODE_SHIFT;
++
++	spin_lock(&gpio_mux_lock);
++
++	l = __raw_readl(reg);
++	l &= ~(0xff << (field * 8));
++	l |= mode << (field * 8);
++	__raw_writel(l, reg);
++
++	spin_unlock(&gpio_mux_lock);
++
++	return ret;
++}
++EXPORT_SYMBOL(mxc_iomux_mode);
++
++/*
++ * This function configures the pad value for a IOMUX pin.
++ */
++void mxc_iomux_set_pad(enum iomux_pins pin, u32 config)
++{
++	u32 field, l;
++	void __iomem *reg;
++
++	pin &= IOMUX_PADNUM_MASK;
++	reg = IOMUXSW_PAD_CTL + (pin + 2) / 3 * 4;
++	field = (pin + 2) % 3;
++
++	pr_debug("%s: reg offset = 0x%x, field = %d\n",
++			__func__, (pin + 2) / 3, field);
++
++	spin_lock(&gpio_mux_lock);
++
++	l = __raw_readl(reg);
++	l &= ~(0x1ff << (field * 10));
++	l |= config << (field * 10);
++	__raw_writel(l, reg);
++
++	spin_unlock(&gpio_mux_lock);
++}
++EXPORT_SYMBOL(mxc_iomux_set_pad);
++
++/*
++ * allocs a single pin:
++ * 	- reserves the pin so that it is not claimed by another driver
++ * 	- setups the iomux according to the configuration
++ */
++int mxc_iomux_alloc_pin(const unsigned int pin, const char *label)
++{
++	unsigned pad = pin & IOMUX_PADNUM_MASK;
++
++	if (pad >= (PIN_MAX + 1)) {
++		printk(KERN_ERR "mxc_iomux: Attempt to request nonexistant pin %u for \"%s\"\n",
++			pad, label ? label : "?");
++		return -EINVAL;
++	}
++
++	if (test_and_set_bit(pad, mxc_pin_alloc_map)) {
++		printk(KERN_ERR "mxc_iomux: pin %u already used. Allocation for \"%s\" failed\n",
++			pad, label ? label : "?");
++		return -EBUSY;
++	}
++	mxc_iomux_mode(pin);
++
++	return 0;
++}
++EXPORT_SYMBOL(mxc_iomux_alloc_pin);
++
++int mxc_iomux_setup_multiple_pins(unsigned int *pin_list, unsigned count,
++		const char *label)
++{
++	unsigned int *p = pin_list;
++	int i;
++	int ret = -EINVAL;
++
++	for (i = 0; i < count; i++) {
++		ret = mxc_iomux_alloc_pin(*p, label);
++		if (ret)
++			goto setup_error;
++		p++;
++	}
++	return 0;
++
++setup_error:
++	mxc_iomux_release_multiple_pins(pin_list, i);
++	return ret;
++}
++EXPORT_SYMBOL(mxc_iomux_setup_multiple_pins);
++
++void mxc_iomux_release_pin(const unsigned int pin)
++{
++	unsigned pad = pin & IOMUX_PADNUM_MASK;
++
++	if (pad < (PIN_MAX + 1))
++		clear_bit(pad, mxc_pin_alloc_map);
++}
++EXPORT_SYMBOL(mxc_iomux_release_pin);
++
++void mxc_iomux_release_multiple_pins(unsigned int *pin_list, int count)
++{
++	unsigned int *p = pin_list;
++	int i;
++
++	for (i = 0; i < count; i++) {
++		mxc_iomux_release_pin(*p);
++		p++;
++	}
++}
++EXPORT_SYMBOL(mxc_iomux_release_multiple_pins);
++
++/*
++ * This function enables/disables the general purpose function for a particular
++ * signal.
++ */
++void mxc_iomux_set_gpr(enum iomux_gp_func gp, bool en)
++{
++	u32 l;
++
++	spin_lock(&gpio_mux_lock);
++	l = __raw_readl(IOMUXGPR);
++	if (en)
++		l |= gp;
++	else
++		l &= ~gp;
++
++	__raw_writel(l, IOMUXGPR);
++	spin_unlock(&gpio_mux_lock);
++}
++EXPORT_SYMBOL(mxc_iomux_set_gpr);
+diff --git a/arch/arm/mach-mx3/iomux.c b/arch/arm/mach-mx3/iomux.c
+deleted file mode 100644
+index 6381e56..0000000
+--- a/arch/arm/mach-mx3/iomux.c
++++ /dev/null
+@@ -1,181 +0,0 @@
+-/*
+- * Copyright 2004-2006 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright (C) 2008 by Sascha Hauer <kernel@pengutronix.de>
+- * Copyright (C) 2009 by Valentin Longchamp <valentin.longchamp@epfl.ch>
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+- * MA 02110-1301, USA.
+- */
+-
+-#include <linux/module.h>
+-#include <linux/spinlock.h>
+-#include <linux/io.h>
+-#include <linux/kernel.h>
+-#include <mach/hardware.h>
+-#include <mach/gpio.h>
+-#include <mach/iomux-mx3.h>
 -
 -/*
-- * scb9328_init - Init the CPU card itself
+- * IOMUX register (base) addresses
 - */
--static void __init scb9328_init(void)
+-#define IOMUX_BASE	IO_ADDRESS(MX31_IOMUXC_BASE_ADDR)
+-#define IOMUXINT_OBS1	(IOMUX_BASE + 0x000)
+-#define IOMUXINT_OBS2	(IOMUX_BASE + 0x004)
+-#define IOMUXGPR	(IOMUX_BASE + 0x008)
+-#define IOMUXSW_MUX_CTL	(IOMUX_BASE + 0x00C)
+-#define IOMUXSW_PAD_CTL	(IOMUX_BASE + 0x154)
+-
+-static DEFINE_SPINLOCK(gpio_mux_lock);
+-
+-#define IOMUX_REG_MASK (IOMUX_PADNUM_MASK & ~0x3)
+-
+-unsigned long mxc_pin_alloc_map[NB_PORTS * 32 / BITS_PER_LONG];
+-/*
+- * set the mode for a IOMUX pin.
+- */
+-int mxc_iomux_mode(unsigned int pin_mode)
 -{
--	mxc_register_device(&imx_uart1_device, &uart_pdata);
+-	u32 field, l, mode, ret = 0;
+-	void __iomem *reg;
 -
--	printk(KERN_INFO"Scb9328: Adding devices\n");
--	platform_add_devices(devices, ARRAY_SIZE(devices));
+-	reg = IOMUXSW_MUX_CTL + (pin_mode & IOMUX_REG_MASK);
+-	field = pin_mode & 0x3;
+-	mode = (pin_mode & IOMUX_MODE_MASK) >> IOMUX_MODE_SHIFT;
+-
+-	spin_lock(&gpio_mux_lock);
+-
+-	l = __raw_readl(reg);
+-	l &= ~(0xff << (field * 8));
+-	l |= mode << (field * 8);
+-	__raw_writel(l, reg);
+-
+-	spin_unlock(&gpio_mux_lock);
+-
+-	return ret;
 -}
+-EXPORT_SYMBOL(mxc_iomux_mode);
 -
--static void __init scb9328_timer_init(void)
+-/*
+- * This function configures the pad value for a IOMUX pin.
+- */
+-void mxc_iomux_set_pad(enum iomux_pins pin, u32 config)
 -{
--	mx1_clocks_init(32000);
+-	u32 field, l;
+-	void __iomem *reg;
+-
+-	pin &= IOMUX_PADNUM_MASK;
+-	reg = IOMUXSW_PAD_CTL + (pin + 2) / 3 * 4;
+-	field = (pin + 2) % 3;
+-
+-	pr_debug("%s: reg offset = 0x%x, field = %d\n",
+-			__func__, (pin + 2) / 3, field);
+-
+-	spin_lock(&gpio_mux_lock);
+-
+-	l = __raw_readl(reg);
+-	l &= ~(0x1ff << (field * 10));
+-	l |= config << (field * 10);
+-	__raw_writel(l, reg);
+-
+-	spin_unlock(&gpio_mux_lock);
 -}
+-EXPORT_SYMBOL(mxc_iomux_set_pad);
 -
--static struct sys_timer scb9328_timer = {
--	.init	= scb9328_timer_init,
--};
+-/*
+- * allocs a single pin:
+- * 	- reserves the pin so that it is not claimed by another driver
+- * 	- setups the iomux according to the configuration
+- */
+-int mxc_iomux_alloc_pin(const unsigned int pin, const char *label)
+-{
+-	unsigned pad = pin & IOMUX_PADNUM_MASK;
 -
--MACHINE_START(SCB9328, "Synertronixx scb9328")
--    /* Sascha Hauer */
--	.phys_io	= 0x00200000,
--	.io_pg_offst	= ((0xe0200000) >> 18) & 0xfffc,
--	.boot_params	= 0x08000100,
--	.map_io		= mx1_map_io,
--	.init_irq	= mx1_init_irq,
--	.timer		= &scb9328_timer,
--	.init_machine	= scb9328_init,
--MACHINE_END
+-	if (pad >= (PIN_MAX + 1)) {
+-		printk(KERN_ERR "mxc_iomux: Attempt to request nonexistant pin %u for \"%s\"\n",
+-			pad, label ? label : "?");
+-		return -EINVAL;
+-	}
+-
+-	if (test_and_set_bit(pad, mxc_pin_alloc_map)) {
+-		printk(KERN_ERR "mxc_iomux: pin %u already used. Allocation for \"%s\" failed\n",
+-			pad, label ? label : "?");
+-		return -EBUSY;
+-	}
+-	mxc_iomux_mode(pin);
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL(mxc_iomux_alloc_pin);
+-
+-int mxc_iomux_setup_multiple_pins(unsigned int *pin_list, unsigned count,
+-		const char *label)
+-{
+-	unsigned int *p = pin_list;
+-	int i;
+-	int ret = -EINVAL;
+-
+-	for (i = 0; i < count; i++) {
+-		ret = mxc_iomux_alloc_pin(*p, label);
+-		if (ret)
+-			goto setup_error;
+-		p++;
+-	}
+-	return 0;
+-
+-setup_error:
+-	mxc_iomux_release_multiple_pins(pin_list, i);
+-	return ret;
+-}
+-EXPORT_SYMBOL(mxc_iomux_setup_multiple_pins);
+-
+-void mxc_iomux_release_pin(const unsigned int pin)
+-{
+-	unsigned pad = pin & IOMUX_PADNUM_MASK;
+-
+-	if (pad < (PIN_MAX + 1))
+-		clear_bit(pad, mxc_pin_alloc_map);
+-}
+-EXPORT_SYMBOL(mxc_iomux_release_pin);
+-
+-void mxc_iomux_release_multiple_pins(unsigned int *pin_list, int count)
+-{
+-	unsigned int *p = pin_list;
+-	int i;
+-
+-	for (i = 0; i < count; i++) {
+-		mxc_iomux_release_pin(*p);
+-		p++;
+-	}
+-}
+-EXPORT_SYMBOL(mxc_iomux_release_multiple_pins);
+-
+-/*
+- * This function enables/disables the general purpose function for a particular
+- * signal.
+- */
+-void mxc_iomux_set_gpr(enum iomux_gp_func gp, bool en)
+-{
+-	u32 l;
+-
+-	spin_lock(&gpio_mux_lock);
+-	l = __raw_readl(IOMUXGPR);
+-	if (en)
+-		l |= gp;
+-	else
+-		l &= ~gp;
+-
+-	__raw_writel(l, IOMUXGPR);
+-	spin_unlock(&gpio_mux_lock);
+-}
+-EXPORT_SYMBOL(mxc_iomux_set_gpr);
 -- 
 1.6.5.2
