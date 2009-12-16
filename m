@@ -1,26 +1,739 @@
-From: me@felipebalbi.com (Felipe Balbi)
-Date: Wed, 16 Dec 2009 22:29:38 +0200
-Subject: [PATCH 1/4] omap3: Allow EHCI to be built on OMAP3
-In-Reply-To: <20091216190951.30032.47819.stgit@localhost>
-References: <20091216190601.30032.91535.stgit@localhost>
-	<20091216190951.30032.47819.stgit@localhost>
-Message-ID: <1260995378.584.0.camel@gandalf>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 16 Dec 2009 21:58:41 +0100 (CET)
+Subject: [PATCH 09/20] imx/mx1: rename files defining a machine to
+	mach-$mach.c
+In-Reply-To: <1260990002-24168-9-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20091216185046.GA16984@pengutronix.de>
+	<1260990002-24168-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-2-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-3-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-4-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-5-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-6-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-7-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-8-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-9-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <Pine.LNX.4.64.0912162151260.5283@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2009-12-16 at 11:09 -0800, Tony Lindgren wrote:
-> From: Olof Johansson <olof@lixom.net>
+On Wed, 16 Dec 2009, Uwe Kleine-K?nig wrote:
+
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+> Cc: Darius Augulis <augulis.darius@gmail.com>
+> Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+> ---
+>  arch/arm/mach-mx1/Makefile       |    4 +-
+>  arch/arm/mach-mx1/mach-mx1ads.c  |  165 ++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mx1/mach-scb9328.c |  158 ++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mx1/mx1ads.c       |  165 --------------------------------------
+>  arch/arm/mach-mx1/scb9328.c      |  158 ------------------------------------
+>  5 files changed, 325 insertions(+), 325 deletions(-)
+>  create mode 100644 arch/arm/mach-mx1/mach-mx1ads.c
+>  create mode 100644 arch/arm/mach-mx1/mach-scb9328.c
+>  delete mode 100644 arch/arm/mach-mx1/mx1ads.c
+>  delete mode 100644 arch/arm/mach-mx1/scb9328.c
+
+TBH, I don't understand why I was cc'ed on this one, and in general your 
+CC lists seem to be a bit over-populated, but if you do like such rename 
+patches to be reviewed, it is better to use the "-M" option to "git 
+format-patch" (maybe also "-C" and even "--find-copies-harder") to save 
+reviewers the work of comparing the deleted and the new files.
+
+Thanks
+Guennadi
+
 > 
-> OMAP34XX has EHCI, so select USB_ARCH_HAS_EHCI.
+> diff --git a/arch/arm/mach-mx1/Makefile b/arch/arm/mach-mx1/Makefile
+> index b72f536..297d172 100644
+> --- a/arch/arm/mach-mx1/Makefile
+> +++ b/arch/arm/mach-mx1/Makefile
+> @@ -10,5 +10,5 @@ obj-y			+= generic.o clock.o devices.o
+>  obj-$(CONFIG_MX1_VIDEO)	+= ksym_mx1.o mx1_camera_fiq.o
+>  
+>  # Specific board support
+> -obj-$(CONFIG_ARCH_MX1ADS) += mx1ads.o
+> -obj-$(CONFIG_MACH_SCB9328) += scb9328.o
+> +obj-$(CONFIG_ARCH_MX1ADS) += mach-mx1ads.o
+> +obj-$(CONFIG_MACH_SCB9328) += mach-scb9328.o
+> diff --git a/arch/arm/mach-mx1/mach-mx1ads.c b/arch/arm/mach-mx1/mach-mx1ads.c
+> new file mode 100644
+> index 0000000..a39433a
+> --- /dev/null
+> +++ b/arch/arm/mach-mx1/mach-mx1ads.c
+> @@ -0,0 +1,165 @@
+> +/*
+> + * arch/arm/mach-imx/mach-mx1ads.c
+> + *
+> + * Initially based on:
+> + *	linux-2.6.7-imx/arch/arm/mach-imx/scb9328.c
+> + *	Copyright (c) 2004 Sascha Hauer <sascha@saschahauer.de>
+> + *
+> + * 2004 (c) MontaVista Software, Inc.
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/i2c.h>
+> +#include <linux/i2c/pcf857x.h>
+> +#include <linux/init.h>
+> +#include <linux/kernel.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/mtd/physmap.h>
+> +
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/time.h>
+> +
+> +#include <mach/common.h>
+> +#include <mach/hardware.h>
+> +#include <mach/i2c.h>
+> +#include <mach/imx-uart.h>
+> +#include <mach/iomux.h>
+> +#include <mach/irqs.h>
+> +
+> +#include "devices.h"
+> +
+> +static int mx1ads_pins[] = {
+> +	/* UART1 */
+> +	PC9_PF_UART1_CTS,
+> +	PC10_PF_UART1_RTS,
+> +	PC11_PF_UART1_TXD,
+> +	PC12_PF_UART1_RXD,
+> +	/* UART2 */
+> +	PB28_PF_UART2_CTS,
+> +	PB29_PF_UART2_RTS,
+> +	PB30_PF_UART2_TXD,
+> +	PB31_PF_UART2_RXD,
+> +	/* I2C */
+> +	PA15_PF_I2C_SDA,
+> +	PA16_PF_I2C_SCL,
+> +	/* SPI */
+> +	PC13_PF_SPI1_SPI_RDY,
+> +	PC14_PF_SPI1_SCLK,
+> +	PC15_PF_SPI1_SS,
+> +	PC16_PF_SPI1_MISO,
+> +	PC17_PF_SPI1_MOSI,
+> +};
+> +
+> +/*
+> + * UARTs platform data
+> + */
+> +
+> +static struct imxuart_platform_data uart_pdata[] = {
+> +	{
+> +		.flags = IMXUART_HAVE_RTSCTS,
+> +	}, {
+> +		.flags = IMXUART_HAVE_RTSCTS,
+> +	},
+> +};
+> +
+> +/*
+> + * Physmap flash
+> + */
+> +
+> +static struct physmap_flash_data mx1ads_flash_data = {
+> +	.width		= 4,		/* bankwidth in bytes */
+> +};
+> +
+> +static struct resource flash_resource = {
+> +	.start	= IMX_CS0_PHYS,
+> +	.end	= IMX_CS0_PHYS + SZ_32M - 1,
+> +	.flags	= IORESOURCE_MEM,
+> +};
+> +
+> +static struct platform_device flash_device = {
+> +	.name	= "physmap-flash",
+> +	.id	= 0,
+> +	.resource = &flash_resource,
+> +	.num_resources = 1,
+> +};
+> +
+> +/*
+> + * I2C
+> + */
+> +static struct pcf857x_platform_data pcf857x_data[] = {
+> +	{
+> +		.gpio_base = 4 * 32,
+> +	}, {
+> +		.gpio_base = 4 * 32 + 16,
+> +	}
+> +};
+> +
+> +static struct imxi2c_platform_data mx1ads_i2c_data = {
+> +	.bitrate = 100000,
+> +};
+> +
+> +static struct i2c_board_info mx1ads_i2c_devices[] = {
+> +	{
+> +		I2C_BOARD_INFO("pcf8575", 0x22),
+> +		.platform_data = &pcf857x_data[0],
+> +	}, {
+> +		I2C_BOARD_INFO("pcf8575", 0x24),
+> +		.platform_data = &pcf857x_data[1],
+> +	},
+> +};
+> +
+> +/*
+> + * Board init
+> + */
+> +static void __init mx1ads_init(void)
+> +{
+> +	mxc_gpio_setup_multiple_pins(mx1ads_pins,
+> +		ARRAY_SIZE(mx1ads_pins), "mx1ads");
+> +
+> +	/* UART */
+> +	mxc_register_device(&imx_uart1_device, &uart_pdata[0]);
+> +	mxc_register_device(&imx_uart2_device, &uart_pdata[1]);
+> +
+> +	/* Physmap flash */
+> +	mxc_register_device(&flash_device, &mx1ads_flash_data);
+> +
+> +	/* I2C */
+> +	i2c_register_board_info(0, mx1ads_i2c_devices,
+> +				ARRAY_SIZE(mx1ads_i2c_devices));
+> +
+> +	mxc_register_device(&imx_i2c_device, &mx1ads_i2c_data);
+> +}
+> +
+> +static void __init mx1ads_timer_init(void)
+> +{
+> +	mx1_clocks_init(32000);
+> +}
+> +
+> +struct sys_timer mx1ads_timer = {
+> +	.init	= mx1ads_timer_init,
+> +};
+> +
+> +MACHINE_START(MX1ADS, "Freescale MX1ADS")
+> +	/* Maintainer: Sascha Hauer, Pengutronix */
+> +	.phys_io	= IMX_IO_PHYS,
+> +	.io_pg_offst	= (IMX_IO_BASE >> 18) & 0xfffc,
+> +	.boot_params	= PHYS_OFFSET + 0x100,
+> +	.map_io		= mx1_map_io,
+> +	.init_irq	= mx1_init_irq,
+> +	.timer		= &mx1ads_timer,
+> +	.init_machine	= mx1ads_init,
+> +MACHINE_END
+> +
+> +MACHINE_START(MXLADS, "Freescale MXLADS")
+> +	.phys_io	= IMX_IO_PHYS,
+> +	.io_pg_offst	= (IMX_IO_BASE >> 18) & 0xfffc,
+> +	.boot_params	= PHYS_OFFSET + 0x100,
+> +	.map_io		= mx1_map_io,
+> +	.init_irq	= mx1_init_irq,
+> +	.timer		= &mx1ads_timer,
+> +	.init_machine	= mx1ads_init,
+> +MACHINE_END
+> diff --git a/arch/arm/mach-mx1/mach-scb9328.c b/arch/arm/mach-mx1/mach-scb9328.c
+> new file mode 100644
+> index 0000000..b9530d7
+> --- /dev/null
+> +++ b/arch/arm/mach-mx1/mach-scb9328.c
+> @@ -0,0 +1,158 @@
+> +/*
+> + * linux/arch/arm/mach-mx1/mach-scb9328.c
+> + *
+> + * Copyright (c) 2004 Sascha Hauer <saschahauer@web.de>
+> + * Copyright (c) 2006-2008 Juergen Beisert <jbeisert@netscape.net>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +#include <linux/platform_device.h>
+> +#include <linux/mtd/physmap.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/dm9000.h>
+> +
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/time.h>
+> +
+> +#include <mach/common.h>
+> +#include <mach/hardware.h>
+> +#include <mach/irqs.h>
+> +#include <mach/imx-uart.h>
+> +#include <mach/iomux.h>
+> +
+> +#include "devices.h"
+> +
+> +/*
+> + * This scb9328 has a 32MiB flash
+> + */
+> +static struct resource flash_resource = {
+> +	.start	= IMX_CS0_PHYS,
+> +	.end	= IMX_CS0_PHYS + (32 * 1024 * 1024) - 1,
+> +	.flags	= IORESOURCE_MEM,
+> +};
+> +
+> +static struct physmap_flash_data scb_flash_data = {
+> +	.width  = 2,
+> +};
+> +
+> +static struct platform_device scb_flash_device = {
+> +	.name		= "physmap-flash",
+> +	.id		= 0,
+> +	.dev = {
+> +		.platform_data = &scb_flash_data,
+> +	},
+> +	.resource = &flash_resource,
+> +	.num_resources = 1,
+> +};
+> +
+> +/*
+> + * scb9328 has a DM9000 network controller
+> + * connected to CS5, with 16 bit data path
+> + * and interrupt connected to GPIO 3
+> + */
+> +
+> +/*
+> + * internal datapath is fixed 16 bit
+> + */
+> +static struct dm9000_plat_data dm9000_platdata = {
+> +	.flags	= DM9000_PLATF_16BITONLY,
+> +};
+> +
+> +/*
+> + * the DM9000 drivers wants two defined address spaces
+> + * to gain access to address latch registers and the data path.
+> + */
+> +static struct resource dm9000x_resources[] = {
+> +	{
+> +		.name	= "address area",
+> +		.start	= IMX_CS5_PHYS,
+> +		.end	= IMX_CS5_PHYS + 1,
+> +		.flags	= IORESOURCE_MEM,	/* address access */
+> +	}, {
+> +		.name	= "data area",
+> +		.start	= IMX_CS5_PHYS + 4,
+> +		.end	= IMX_CS5_PHYS + 5,
+> +		.flags	= IORESOURCE_MEM,	/* data access */
+> +	}, {
+> +		.start	= IRQ_GPIOC(3),
+> +		.end	= IRQ_GPIOC(3),
+> +		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL,
+> +	},
+> +};
+> +
+> +static struct platform_device dm9000x_device = {
+> +	.name		= "dm9000",
+> +	.id		= 0,
+> +	.num_resources	= ARRAY_SIZE(dm9000x_resources),
+> +	.resource	= dm9000x_resources,
+> +	.dev		= {
+> +		.platform_data = &dm9000_platdata,
+> +	}
+> +};
+> +
+> +static int mxc_uart1_pins[] = {
+> +	PC9_PF_UART1_CTS,
+> +	PC10_PF_UART1_RTS,
+> +	PC11_PF_UART1_TXD,
+> +	PC12_PF_UART1_RXD,
+> +};
+> +
+> +static int uart1_mxc_init(struct platform_device *pdev)
+> +{
+> +	return mxc_gpio_setup_multiple_pins(mxc_uart1_pins,
+> +			ARRAY_SIZE(mxc_uart1_pins), "UART1");
+> +}
+> +
+> +static int uart1_mxc_exit(struct platform_device *pdev)
+> +{
+> +	mxc_gpio_release_multiple_pins(mxc_uart1_pins,
+> +			ARRAY_SIZE(mxc_uart1_pins));
+> +	return 0;
+> +}
+> +
+> +static struct imxuart_platform_data uart_pdata = {
+> +	.init = uart1_mxc_init,
+> +	.exit = uart1_mxc_exit,
+> +	.flags = IMXUART_HAVE_RTSCTS,
+> +};
+> +
+> +static struct platform_device *devices[] __initdata = {
+> +	&scb_flash_device,
+> +	&dm9000x_device,
+> +};
+> +
+> +/*
+> + * scb9328_init - Init the CPU card itself
+> + */
+> +static void __init scb9328_init(void)
+> +{
+> +	mxc_register_device(&imx_uart1_device, &uart_pdata);
+> +
+> +	printk(KERN_INFO"Scb9328: Adding devices\n");
+> +	platform_add_devices(devices, ARRAY_SIZE(devices));
+> +}
+> +
+> +static void __init scb9328_timer_init(void)
+> +{
+> +	mx1_clocks_init(32000);
+> +}
+> +
+> +static struct sys_timer scb9328_timer = {
+> +	.init	= scb9328_timer_init,
+> +};
+> +
+> +MACHINE_START(SCB9328, "Synertronixx scb9328")
+> +    /* Sascha Hauer */
+> +	.phys_io	= 0x00200000,
+> +	.io_pg_offst	= ((0xe0200000) >> 18) & 0xfffc,
+> +	.boot_params	= 0x08000100,
+> +	.map_io		= mx1_map_io,
+> +	.init_irq	= mx1_init_irq,
+> +	.timer		= &scb9328_timer,
+> +	.init_machine	= scb9328_init,
+> +MACHINE_END
+> diff --git a/arch/arm/mach-mx1/mx1ads.c b/arch/arm/mach-mx1/mx1ads.c
+> deleted file mode 100644
+> index 30f04e5..0000000
+> --- a/arch/arm/mach-mx1/mx1ads.c
+> +++ /dev/null
+> @@ -1,165 +0,0 @@
+> -/*
+> - * arch/arm/mach-imx/mx1ads.c
+> - *
+> - * Initially based on:
+> - *	linux-2.6.7-imx/arch/arm/mach-imx/scb9328.c
+> - *	Copyright (c) 2004 Sascha Hauer <sascha@saschahauer.de>
+> - *
+> - * 2004 (c) MontaVista Software, Inc.
+> - *
+> - * This file is licensed under the terms of the GNU General Public
+> - * License version 2. This program is licensed "as is" without any
+> - * warranty of any kind, whether express or implied.
+> - */
+> -
+> -#include <linux/i2c.h>
+> -#include <linux/i2c/pcf857x.h>
+> -#include <linux/init.h>
+> -#include <linux/kernel.h>
+> -#include <linux/platform_device.h>
+> -#include <linux/mtd/physmap.h>
+> -
+> -#include <asm/mach-types.h>
+> -#include <asm/mach/arch.h>
+> -#include <asm/mach/time.h>
+> -
+> -#include <mach/common.h>
+> -#include <mach/hardware.h>
+> -#include <mach/i2c.h>
+> -#include <mach/imx-uart.h>
+> -#include <mach/iomux.h>
+> -#include <mach/irqs.h>
+> -
+> -#include "devices.h"
+> -
+> -static int mx1ads_pins[] = {
+> -	/* UART1 */
+> -	PC9_PF_UART1_CTS,
+> -	PC10_PF_UART1_RTS,
+> -	PC11_PF_UART1_TXD,
+> -	PC12_PF_UART1_RXD,
+> -	/* UART2 */
+> -	PB28_PF_UART2_CTS,
+> -	PB29_PF_UART2_RTS,
+> -	PB30_PF_UART2_TXD,
+> -	PB31_PF_UART2_RXD,
+> -	/* I2C */
+> -	PA15_PF_I2C_SDA,
+> -	PA16_PF_I2C_SCL,
+> -	/* SPI */
+> -	PC13_PF_SPI1_SPI_RDY,
+> -	PC14_PF_SPI1_SCLK,
+> -	PC15_PF_SPI1_SS,
+> -	PC16_PF_SPI1_MISO,
+> -	PC17_PF_SPI1_MOSI,
+> -};
+> -
+> -/*
+> - * UARTs platform data
+> - */
+> -
+> -static struct imxuart_platform_data uart_pdata[] = {
+> -	{
+> -		.flags = IMXUART_HAVE_RTSCTS,
+> -	}, {
+> -		.flags = IMXUART_HAVE_RTSCTS,
+> -	},
+> -};
+> -
+> -/*
+> - * Physmap flash
+> - */
+> -
+> -static struct physmap_flash_data mx1ads_flash_data = {
+> -	.width		= 4,		/* bankwidth in bytes */
+> -};
+> -
+> -static struct resource flash_resource = {
+> -	.start	= IMX_CS0_PHYS,
+> -	.end	= IMX_CS0_PHYS + SZ_32M - 1,
+> -	.flags	= IORESOURCE_MEM,
+> -};
+> -
+> -static struct platform_device flash_device = {
+> -	.name	= "physmap-flash",
+> -	.id	= 0,
+> -	.resource = &flash_resource,
+> -	.num_resources = 1,
+> -};
+> -
+> -/*
+> - * I2C
+> - */
+> -static struct pcf857x_platform_data pcf857x_data[] = {
+> -	{
+> -		.gpio_base = 4 * 32,
+> -	}, {
+> -		.gpio_base = 4 * 32 + 16,
+> -	}
+> -};
+> -
+> -static struct imxi2c_platform_data mx1ads_i2c_data = {
+> -	.bitrate = 100000,
+> -};
+> -
+> -static struct i2c_board_info mx1ads_i2c_devices[] = {
+> -	{
+> -		I2C_BOARD_INFO("pcf8575", 0x22),
+> -		.platform_data = &pcf857x_data[0],
+> -	}, {
+> -		I2C_BOARD_INFO("pcf8575", 0x24),
+> -		.platform_data = &pcf857x_data[1],
+> -	},
+> -};
+> -
+> -/*
+> - * Board init
+> - */
+> -static void __init mx1ads_init(void)
+> -{
+> -	mxc_gpio_setup_multiple_pins(mx1ads_pins,
+> -		ARRAY_SIZE(mx1ads_pins), "mx1ads");
+> -
+> -	/* UART */
+> -	mxc_register_device(&imx_uart1_device, &uart_pdata[0]);
+> -	mxc_register_device(&imx_uart2_device, &uart_pdata[1]);
+> -
+> -	/* Physmap flash */
+> -	mxc_register_device(&flash_device, &mx1ads_flash_data);
+> -
+> -	/* I2C */
+> -	i2c_register_board_info(0, mx1ads_i2c_devices,
+> -				ARRAY_SIZE(mx1ads_i2c_devices));
+> -
+> -	mxc_register_device(&imx_i2c_device, &mx1ads_i2c_data);
+> -}
+> -
+> -static void __init mx1ads_timer_init(void)
+> -{
+> -	mx1_clocks_init(32000);
+> -}
+> -
+> -struct sys_timer mx1ads_timer = {
+> -	.init	= mx1ads_timer_init,
+> -};
+> -
+> -MACHINE_START(MX1ADS, "Freescale MX1ADS")
+> -	/* Maintainer: Sascha Hauer, Pengutronix */
+> -	.phys_io	= IMX_IO_PHYS,
+> -	.io_pg_offst	= (IMX_IO_BASE >> 18) & 0xfffc,
+> -	.boot_params	= PHYS_OFFSET + 0x100,
+> -	.map_io		= mx1_map_io,
+> -	.init_irq	= mx1_init_irq,
+> -	.timer		= &mx1ads_timer,
+> -	.init_machine	= mx1ads_init,
+> -MACHINE_END
+> -
+> -MACHINE_START(MXLADS, "Freescale MXLADS")
+> -	.phys_io	= IMX_IO_PHYS,
+> -	.io_pg_offst	= (IMX_IO_BASE >> 18) & 0xfffc,
+> -	.boot_params	= PHYS_OFFSET + 0x100,
+> -	.map_io		= mx1_map_io,
+> -	.init_irq	= mx1_init_irq,
+> -	.timer		= &mx1ads_timer,
+> -	.init_machine	= mx1ads_init,
+> -MACHINE_END
+> diff --git a/arch/arm/mach-mx1/scb9328.c b/arch/arm/mach-mx1/scb9328.c
+> deleted file mode 100644
+> index 325d98d..0000000
+> --- a/arch/arm/mach-mx1/scb9328.c
+> +++ /dev/null
+> @@ -1,158 +0,0 @@
+> -/*
+> - * linux/arch/arm/mach-mx1/scb9328.c
+> - *
+> - * Copyright (c) 2004 Sascha Hauer <saschahauer@web.de>
+> - * Copyright (c) 2006-2008 Juergen Beisert <jbeisert@netscape.net>
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - *
+> - */
+> -
+> -#include <linux/platform_device.h>
+> -#include <linux/mtd/physmap.h>
+> -#include <linux/interrupt.h>
+> -#include <linux/dm9000.h>
+> -
+> -#include <asm/mach-types.h>
+> -#include <asm/mach/arch.h>
+> -#include <asm/mach/time.h>
+> -
+> -#include <mach/common.h>
+> -#include <mach/hardware.h>
+> -#include <mach/irqs.h>
+> -#include <mach/imx-uart.h>
+> -#include <mach/iomux.h>
+> -
+> -#include "devices.h"
+> -
+> -/*
+> - * This scb9328 has a 32MiB flash
+> - */
+> -static struct resource flash_resource = {
+> -	.start	= IMX_CS0_PHYS,
+> -	.end	= IMX_CS0_PHYS + (32 * 1024 * 1024) - 1,
+> -	.flags	= IORESOURCE_MEM,
+> -};
+> -
+> -static struct physmap_flash_data scb_flash_data = {
+> -	.width  = 2,
+> -};
+> -
+> -static struct platform_device scb_flash_device = {
+> -	.name		= "physmap-flash",
+> -	.id		= 0,
+> -	.dev = {
+> -		.platform_data = &scb_flash_data,
+> -	},
+> -	.resource = &flash_resource,
+> -	.num_resources = 1,
+> -};
+> -
+> -/*
+> - * scb9328 has a DM9000 network controller
+> - * connected to CS5, with 16 bit data path
+> - * and interrupt connected to GPIO 3
+> - */
+> -
+> -/*
+> - * internal datapath is fixed 16 bit
+> - */
+> -static struct dm9000_plat_data dm9000_platdata = {
+> -	.flags	= DM9000_PLATF_16BITONLY,
+> -};
+> -
+> -/*
+> - * the DM9000 drivers wants two defined address spaces
+> - * to gain access to address latch registers and the data path.
+> - */
+> -static struct resource dm9000x_resources[] = {
+> -	{
+> -		.name	= "address area",
+> -		.start	= IMX_CS5_PHYS,
+> -		.end	= IMX_CS5_PHYS + 1,
+> -		.flags	= IORESOURCE_MEM,	/* address access */
+> -	}, {
+> -		.name	= "data area",
+> -		.start	= IMX_CS5_PHYS + 4,
+> -		.end	= IMX_CS5_PHYS + 5,
+> -		.flags	= IORESOURCE_MEM,	/* data access */
+> -	}, {
+> -		.start	= IRQ_GPIOC(3),
+> -		.end	= IRQ_GPIOC(3),
+> -		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL,
+> -	},
+> -};
+> -
+> -static struct platform_device dm9000x_device = {
+> -	.name		= "dm9000",
+> -	.id		= 0,
+> -	.num_resources	= ARRAY_SIZE(dm9000x_resources),
+> -	.resource	= dm9000x_resources,
+> -	.dev		= {
+> -		.platform_data = &dm9000_platdata,
+> -	}
+> -};
+> -
+> -static int mxc_uart1_pins[] = {
+> -	PC9_PF_UART1_CTS,
+> -	PC10_PF_UART1_RTS,
+> -	PC11_PF_UART1_TXD,
+> -	PC12_PF_UART1_RXD,
+> -};
+> -
+> -static int uart1_mxc_init(struct platform_device *pdev)
+> -{
+> -	return mxc_gpio_setup_multiple_pins(mxc_uart1_pins,
+> -			ARRAY_SIZE(mxc_uart1_pins), "UART1");
+> -}
+> -
+> -static int uart1_mxc_exit(struct platform_device *pdev)
+> -{
+> -	mxc_gpio_release_multiple_pins(mxc_uart1_pins,
+> -			ARRAY_SIZE(mxc_uart1_pins));
+> -	return 0;
+> -}
+> -
+> -static struct imxuart_platform_data uart_pdata = {
+> -	.init = uart1_mxc_init,
+> -	.exit = uart1_mxc_exit,
+> -	.flags = IMXUART_HAVE_RTSCTS,
+> -};
+> -
+> -static struct platform_device *devices[] __initdata = {
+> -	&scb_flash_device,
+> -	&dm9000x_device,
+> -};
+> -
+> -/*
+> - * scb9328_init - Init the CPU card itself
+> - */
+> -static void __init scb9328_init(void)
+> -{
+> -	mxc_register_device(&imx_uart1_device, &uart_pdata);
+> -
+> -	printk(KERN_INFO"Scb9328: Adding devices\n");
+> -	platform_add_devices(devices, ARRAY_SIZE(devices));
+> -}
+> -
+> -static void __init scb9328_timer_init(void)
+> -{
+> -	mx1_clocks_init(32000);
+> -}
+> -
+> -static struct sys_timer scb9328_timer = {
+> -	.init	= scb9328_timer_init,
+> -};
+> -
+> -MACHINE_START(SCB9328, "Synertronixx scb9328")
+> -    /* Sascha Hauer */
+> -	.phys_io	= 0x00200000,
+> -	.io_pg_offst	= ((0xe0200000) >> 18) & 0xfffc,
+> -	.boot_params	= 0x08000100,
+> -	.map_io		= mx1_map_io,
+> -	.init_irq	= mx1_init_irq,
+> -	.timer		= &scb9328_timer,
+> -	.init_machine	= scb9328_init,
+> -MACHINE_END
+> -- 
+> 1.6.5.2
 > 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> Acked-by: Anand Gadiyar <gadiyar@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-fwiw:
-
-Acked-by: Felipe Balbi <felipe.balbi@nokia.com>
-
-
--- 
-balbi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
