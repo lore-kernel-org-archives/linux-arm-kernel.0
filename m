@@ -1,534 +1,314 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 16 Dec 2009 19:59:43 +0100
-Subject: [PATCH 02/20] imx/mx2: fold crm_regs.h into its only consumer
-In-Reply-To: <1260990002-24168-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Wed, 16 Dec 2009 19:59:46 +0100
+Subject: [PATCH 05/20] imx/mach-mx2: use constants namespaced by the
+	corresponding SOC (easy part)
+In-Reply-To: <1260990002-24168-4-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <20091216185046.GA16984@pengutronix.de>
 	<1260990002-24168-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1260990002-24168-2-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-2-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-3-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-4-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1260990002-24168-5-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This just leaves devices.c, generic.c and serial.c to clean up.  As
+these files are used on more than one SOC they need some more work.
+
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Holger Schurig <hs4233@mail.mn-solutions.de>
 Cc: Rabin Vincent <rabin@rab.in>
-Cc: Agust?n Ferr?n Pozuelo <gatoguan-os@yahoo.com>
+Cc: Javier Martin <javier.martin@vista-silicon.com>
+Cc: Valentin Longchamp <valentin.longchamp@epfl.ch>
+Cc: Jean Delvare <khali@linux-fr.org>
+Cc: Eric Benard <eric@eukrea.com>
+Cc: Ivo Clarysse <ivo.clarysse@gmail.com>
+Cc: Vladimir Barinov <vbarinov@embeddedalley.com>
+Cc: Daniel Schaeffer <daniel.schaeffer@timesys.com>
+Cc: Simon POLETTE <spolette@adnlysd018.(none)>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Alan Carvalho de Assis <acassis@gmail.com>
+Cc: Luotao Fu <l.fu@pengutronix.de>
 ---
- arch/arm/mach-mx2/clock_imx21.c |  231 ++++++++++++++++++++++++++++++++++-
- arch/arm/mach-mx2/crm_regs.h    |  258 ---------------------------------------
- 2 files changed, 230 insertions(+), 259 deletions(-)
- delete mode 100644 arch/arm/mach-mx2/crm_regs.h
+ arch/arm/mach-mx2/clock_imx21.c      |    5 +++--
+ arch/arm/mach-mx2/clock_imx27.c      |    5 +++--
+ arch/arm/mach-mx2/cpu_imx27.c        |    2 +-
+ arch/arm/mach-mx2/eukrea_cpuimx27.c  |   12 ++++++------
+ arch/arm/mach-mx2/mx21ads.c          |   10 +++++-----
+ arch/arm/mach-mx2/mx27ads.c          |    6 +++---
+ arch/arm/mach-mx2/mx27lite.c         |    4 ++--
+ arch/arm/mach-mx2/mx27pdk.c          |    4 ++--
+ arch/arm/mach-mx2/mxt_td60.c         |    4 ++--
+ arch/arm/mach-mx2/pca100.c           |    4 ++--
+ arch/arm/mach-mx2/pcm038.c           |    8 ++++----
+ arch/arm/mach-mx2/pcm970-baseboard.c |    4 ++--
+ 12 files changed, 35 insertions(+), 33 deletions(-)
 
 diff --git a/arch/arm/mach-mx2/clock_imx21.c b/arch/arm/mach-mx2/clock_imx21.c
-index 91901b5..df3ad38 100644
+index 1922e53..a6e12ce 100644
 --- a/arch/arm/mach-mx2/clock_imx21.c
 +++ b/arch/arm/mach-mx2/clock_imx21.c
-@@ -23,11 +23,240 @@
- #include <linux/module.h>
- 
- #include <mach/clock.h>
-+#include <mach/hardware.h>
- #include <mach/common.h>
+@@ -28,7 +28,7 @@
  #include <asm/clkdev.h>
  #include <asm/div64.h>
  
--#include "crm_regs.h"
-+/* Register offsets */
-+#define CCM_CSCR		(IO_ADDRESS(CCM_BASE_ADDR) + 0x0)
-+#define CCM_MPCTL0		(IO_ADDRESS(CCM_BASE_ADDR) + 0x4)
-+#define CCM_MPCTL1		(IO_ADDRESS(CCM_BASE_ADDR) + 0x8)
-+#define CCM_SPCTL0		(IO_ADDRESS(CCM_BASE_ADDR) + 0xC)
-+#define CCM_SPCTL1		(IO_ADDRESS(CCM_BASE_ADDR) + 0x10)
-+#define CCM_OSC26MCTL		(IO_ADDRESS(CCM_BASE_ADDR) + 0x14)
-+#define CCM_PCDR0		(IO_ADDRESS(CCM_BASE_ADDR) + 0x18)
-+#define CCM_PCDR1		(IO_ADDRESS(CCM_BASE_ADDR) + 0x1c)
-+#define CCM_PCCR0		(IO_ADDRESS(CCM_BASE_ADDR) + 0x20)
-+#define CCM_PCCR1		(IO_ADDRESS(CCM_BASE_ADDR) + 0x24)
-+#define CCM_CCSR		(IO_ADDRESS(CCM_BASE_ADDR) + 0x28)
-+#define CCM_PMCTL		(IO_ADDRESS(CCM_BASE_ADDR) + 0x2c)
-+#define CCM_PMCOUNT		(IO_ADDRESS(CCM_BASE_ADDR) + 0x30)
-+#define CCM_WKGDCTL		(IO_ADDRESS(CCM_BASE_ADDR) + 0x34)
-+
-+#define CCM_CSCR_PRESC_OFFSET	29
-+#define CCM_CSCR_PRESC_MASK	(0x7 << CCM_CSCR_PRESC_OFFSET)
-+
-+#define CCM_CSCR_USB_OFFSET	26
-+#define CCM_CSCR_USB_MASK	(0x7 << CCM_CSCR_USB_OFFSET)
-+#define CCM_CSCR_SD_OFFSET	24
-+#define CCM_CSCR_SD_MASK	(0x3 << CCM_CSCR_SD_OFFSET)
-+#define CCM_CSCR_SPLLRES	(1 << 22)
-+#define CCM_CSCR_MPLLRES	(1 << 21)
-+#define CCM_CSCR_SSI2_OFFSET	20
-+#define CCM_CSCR_SSI2		(1 << CCM_CSCR_SSI2_OFFSET)
-+#define CCM_CSCR_SSI1_OFFSET	19
-+#define CCM_CSCR_SSI1		(1 << CCM_CSCR_SSI1_OFFSET)
-+#define CCM_CSCR_FIR_OFFSET	18
-+#define CCM_CSCR_FIR		(1 << CCM_CSCR_FIR_OFFSET)
-+#define CCM_CSCR_SP		(1 << 17)
-+#define CCM_CSCR_MCU		(1 << 16)
-+#define CCM_CSCR_BCLK_OFFSET	10
-+#define CCM_CSCR_BCLK_MASK	(0xf << CCM_CSCR_BCLK_OFFSET)
-+#define CCM_CSCR_IPDIV_OFFSET	9
-+#define CCM_CSCR_IPDIV		(1 << CCM_CSCR_IPDIV_OFFSET)
-+
-+#define CCM_CSCR_OSC26MDIV	(1 << 4)
-+#define CCM_CSCR_OSC26M		(1 << 3)
-+#define CCM_CSCR_FPM		(1 << 2)
-+#define CCM_CSCR_SPEN		(1 << 1)
-+#define CCM_CSCR_MPEN		1
-+
-+#define CCM_MPCTL0_CPLM		(1 << 31)
-+#define CCM_MPCTL0_PD_OFFSET	26
-+#define CCM_MPCTL0_PD_MASK	(0xf << 26)
-+#define CCM_MPCTL0_MFD_OFFSET	16
-+#define CCM_MPCTL0_MFD_MASK	(0x3ff << 16)
-+#define CCM_MPCTL0_MFI_OFFSET	10
-+#define CCM_MPCTL0_MFI_MASK	(0xf << 10)
-+#define CCM_MPCTL0_MFN_OFFSET	0
-+#define CCM_MPCTL0_MFN_MASK	0x3ff
-+
-+#define CCM_MPCTL1_LF		(1 << 15)
-+#define CCM_MPCTL1_BRMO		(1 << 6)
-+
-+#define CCM_SPCTL0_CPLM		(1 << 31)
-+#define CCM_SPCTL0_PD_OFFSET	26
-+#define CCM_SPCTL0_PD_MASK	(0xf << 26)
-+#define CCM_SPCTL0_MFD_OFFSET	16
-+#define CCM_SPCTL0_MFD_MASK	(0x3ff << 16)
-+#define CCM_SPCTL0_MFI_OFFSET	10
-+#define CCM_SPCTL0_MFI_MASK	(0xf << 10)
-+#define CCM_SPCTL0_MFN_OFFSET	0
-+#define CCM_SPCTL0_MFN_MASK	0x3ff
-+
-+#define CCM_SPCTL1_LF		(1 << 15)
-+#define CCM_SPCTL1_BRMO		(1 << 6)
-+
-+#define CCM_OSC26MCTL_PEAK_OFFSET	16
-+#define CCM_OSC26MCTL_PEAK_MASK		(0x3 << 16)
-+#define CCM_OSC26MCTL_AGC_OFFSET	8
-+#define CCM_OSC26MCTL_AGC_MASK		(0x3f << 8)
-+#define CCM_OSC26MCTL_ANATEST_OFFSET	0
-+#define CCM_OSC26MCTL_ANATEST_MASK	0x3f
-+
-+#define CCM_PCDR0_SSI2BAUDDIV_OFFSET	26
-+#define CCM_PCDR0_SSI2BAUDDIV_MASK	(0x3f << 26)
-+#define CCM_PCDR0_SSI1BAUDDIV_OFFSET	16
-+#define CCM_PCDR0_SSI1BAUDDIV_MASK	(0x3f << 16)
-+#define CCM_PCDR0_NFCDIV_OFFSET		12
-+#define CCM_PCDR0_NFCDIV_MASK		(0xf << 12)
-+#define CCM_PCDR0_48MDIV_OFFSET		5
-+#define CCM_PCDR0_48MDIV_MASK		(0x7 << CCM_PCDR0_48MDIV_OFFSET)
-+#define CCM_PCDR0_FIRIDIV_OFFSET	0
-+#define CCM_PCDR0_FIRIDIV_MASK		0x1f
-+#define CCM_PCDR1_PERDIV4_OFFSET	24
-+#define CCM_PCDR1_PERDIV4_MASK		(0x3f << 24)
-+#define CCM_PCDR1_PERDIV3_OFFSET	16
-+#define CCM_PCDR1_PERDIV3_MASK		(0x3f << 16)
-+#define CCM_PCDR1_PERDIV2_OFFSET	8
-+#define CCM_PCDR1_PERDIV2_MASK		(0x3f << 8)
-+#define CCM_PCDR1_PERDIV1_OFFSET	0
-+#define CCM_PCDR1_PERDIV1_MASK		0x3f
-+
-+#define CCM_PCCR_HCLK_CSI_OFFSET	31
-+#define CCM_PCCR_HCLK_CSI_REG		CCM_PCCR0
-+#define CCM_PCCR_HCLK_DMA_OFFSET	30
-+#define CCM_PCCR_HCLK_DMA_REG		CCM_PCCR0
-+#define CCM_PCCR_HCLK_BROM_OFFSET	28
-+#define CCM_PCCR_HCLK_BROM_REG		CCM_PCCR0
-+#define CCM_PCCR_HCLK_EMMA_OFFSET	27
-+#define CCM_PCCR_HCLK_EMMA_REG		CCM_PCCR0
-+#define CCM_PCCR_HCLK_LCDC_OFFSET	26
-+#define CCM_PCCR_HCLK_LCDC_REG		CCM_PCCR0
-+#define CCM_PCCR_HCLK_SLCDC_OFFSET	25
-+#define CCM_PCCR_HCLK_SLCDC_REG		CCM_PCCR0
-+#define CCM_PCCR_HCLK_USBOTG_OFFSET	24
-+#define CCM_PCCR_HCLK_USBOTG_REG	CCM_PCCR0
-+#define CCM_PCCR_HCLK_BMI_OFFSET	23
-+#define CCM_PCCR_BMI_MASK		(1 << CCM_PCCR_BMI_MASK)
-+#define CCM_PCCR_HCLK_BMI_REG		CCM_PCCR0
-+#define CCM_PCCR_PERCLK4_OFFSET		22
-+#define CCM_PCCR_PERCLK4_REG		CCM_PCCR0
-+#define CCM_PCCR_SLCDC_OFFSET		21
-+#define CCM_PCCR_SLCDC_REG		CCM_PCCR0
-+#define CCM_PCCR_FIRI_BAUD_OFFSET	20
-+#define CCM_PCCR_FIRI_BAUD_MASK		(1 << CCM_PCCR_FIRI_BAUD_MASK)
-+#define CCM_PCCR_FIRI_BAUD_REG		CCM_PCCR0
-+#define CCM_PCCR_NFC_OFFSET		19
-+#define CCM_PCCR_NFC_REG		CCM_PCCR0
-+#define CCM_PCCR_LCDC_OFFSET		18
-+#define CCM_PCCR_LCDC_REG		CCM_PCCR0
-+#define CCM_PCCR_SSI1_BAUD_OFFSET	17
-+#define CCM_PCCR_SSI1_BAUD_REG		CCM_PCCR0
-+#define CCM_PCCR_SSI2_BAUD_OFFSET	16
-+#define CCM_PCCR_SSI2_BAUD_REG		CCM_PCCR0
-+#define CCM_PCCR_EMMA_OFFSET		15
-+#define CCM_PCCR_EMMA_REG		CCM_PCCR0
-+#define CCM_PCCR_USBOTG_OFFSET		14
-+#define CCM_PCCR_USBOTG_REG		CCM_PCCR0
-+#define CCM_PCCR_DMA_OFFSET		13
-+#define CCM_PCCR_DMA_REG		CCM_PCCR0
-+#define CCM_PCCR_I2C1_OFFSET		12
-+#define CCM_PCCR_I2C1_REG		CCM_PCCR0
-+#define CCM_PCCR_GPIO_OFFSET		11
-+#define CCM_PCCR_GPIO_REG		CCM_PCCR0
-+#define CCM_PCCR_SDHC2_OFFSET		10
-+#define CCM_PCCR_SDHC2_REG		CCM_PCCR0
-+#define CCM_PCCR_SDHC1_OFFSET		9
-+#define CCM_PCCR_SDHC1_REG		CCM_PCCR0
-+#define CCM_PCCR_FIRI_OFFSET		8
-+#define CCM_PCCR_FIRI_MASK		(1 << CCM_PCCR_BAUD_MASK)
-+#define CCM_PCCR_FIRI_REG		CCM_PCCR0
-+#define CCM_PCCR_SSI2_IPG_OFFSET	7
-+#define CCM_PCCR_SSI2_REG		CCM_PCCR0
-+#define CCM_PCCR_SSI1_IPG_OFFSET	6
-+#define CCM_PCCR_SSI1_REG		CCM_PCCR0
-+#define CCM_PCCR_CSPI2_OFFSET		5
-+#define	CCM_PCCR_CSPI2_REG		CCM_PCCR0
-+#define CCM_PCCR_CSPI1_OFFSET		4
-+#define	CCM_PCCR_CSPI1_REG		CCM_PCCR0
-+#define CCM_PCCR_UART4_OFFSET		3
-+#define CCM_PCCR_UART4_REG		CCM_PCCR0
-+#define CCM_PCCR_UART3_OFFSET		2
-+#define CCM_PCCR_UART3_REG		CCM_PCCR0
-+#define CCM_PCCR_UART2_OFFSET		1
-+#define CCM_PCCR_UART2_REG		CCM_PCCR0
-+#define CCM_PCCR_UART1_OFFSET		0
-+#define CCM_PCCR_UART1_REG		CCM_PCCR0
-+
-+#define CCM_PCCR_OWIRE_OFFSET		31
-+#define CCM_PCCR_OWIRE_REG		CCM_PCCR1
-+#define CCM_PCCR_KPP_OFFSET		30
-+#define CCM_PCCR_KPP_REG		CCM_PCCR1
-+#define CCM_PCCR_RTC_OFFSET		29
-+#define CCM_PCCR_RTC_REG		CCM_PCCR1
-+#define CCM_PCCR_PWM_OFFSET		28
-+#define CCM_PCCR_PWM_REG		CCM_PCCR1
-+#define CCM_PCCR_GPT3_OFFSET		27
-+#define CCM_PCCR_GPT3_REG		CCM_PCCR1
-+#define CCM_PCCR_GPT2_OFFSET		26
-+#define CCM_PCCR_GPT2_REG		CCM_PCCR1
-+#define CCM_PCCR_GPT1_OFFSET		25
-+#define CCM_PCCR_GPT1_REG		CCM_PCCR1
-+#define CCM_PCCR_WDT_OFFSET		24
-+#define CCM_PCCR_WDT_REG		CCM_PCCR1
-+#define CCM_PCCR_CSPI3_OFFSET		23
-+#define	CCM_PCCR_CSPI3_REG		CCM_PCCR1
-+
-+#define CCM_PCCR_CSPI1_MASK		(1 << CCM_PCCR_CSPI1_OFFSET)
-+#define CCM_PCCR_CSPI2_MASK		(1 << CCM_PCCR_CSPI2_OFFSET)
-+#define CCM_PCCR_CSPI3_MASK		(1 << CCM_PCCR_CSPI3_OFFSET)
-+#define CCM_PCCR_DMA_MASK		(1 << CCM_PCCR_DMA_OFFSET)
-+#define CCM_PCCR_EMMA_MASK		(1 << CCM_PCCR_EMMA_OFFSET)
-+#define CCM_PCCR_GPIO_MASK		(1 << CCM_PCCR_GPIO_OFFSET)
-+#define CCM_PCCR_GPT1_MASK		(1 << CCM_PCCR_GPT1_OFFSET)
-+#define CCM_PCCR_GPT2_MASK		(1 << CCM_PCCR_GPT2_OFFSET)
-+#define CCM_PCCR_GPT3_MASK		(1 << CCM_PCCR_GPT3_OFFSET)
-+#define CCM_PCCR_HCLK_BROM_MASK		(1 << CCM_PCCR_HCLK_BROM_OFFSET)
-+#define CCM_PCCR_HCLK_CSI_MASK		(1 << CCM_PCCR_HCLK_CSI_OFFSET)
-+#define CCM_PCCR_HCLK_DMA_MASK		(1 << CCM_PCCR_HCLK_DMA_OFFSET)
-+#define CCM_PCCR_HCLK_EMMA_MASK		(1 << CCM_PCCR_HCLK_EMMA_OFFSET)
-+#define CCM_PCCR_HCLK_LCDC_MASK		(1 << CCM_PCCR_HCLK_LCDC_OFFSET)
-+#define CCM_PCCR_HCLK_SLCDC_MASK	(1 << CCM_PCCR_HCLK_SLCDC_OFFSET)
-+#define CCM_PCCR_HCLK_USBOTG_MASK	(1 << CCM_PCCR_HCLK_USBOTG_OFFSET)
-+#define CCM_PCCR_I2C1_MASK		(1 << CCM_PCCR_I2C1_OFFSET)
-+#define CCM_PCCR_KPP_MASK		(1 << CCM_PCCR_KPP_OFFSET)
-+#define CCM_PCCR_LCDC_MASK		(1 << CCM_PCCR_LCDC_OFFSET)
-+#define CCM_PCCR_NFC_MASK		(1 << CCM_PCCR_NFC_OFFSET)
-+#define CCM_PCCR_OWIRE_MASK		(1 << CCM_PCCR_OWIRE_OFFSET)
-+#define CCM_PCCR_PERCLK4_MASK		(1 << CCM_PCCR_PERCLK4_OFFSET)
-+#define CCM_PCCR_PWM_MASK		(1 << CCM_PCCR_PWM_OFFSET)
-+#define CCM_PCCR_RTC_MASK		(1 << CCM_PCCR_RTC_OFFSET)
-+#define CCM_PCCR_SDHC1_MASK		(1 << CCM_PCCR_SDHC1_OFFSET)
-+#define CCM_PCCR_SDHC2_MASK		(1 << CCM_PCCR_SDHC2_OFFSET)
-+#define CCM_PCCR_SLCDC_MASK		(1 << CCM_PCCR_SLCDC_OFFSET)
-+#define CCM_PCCR_SSI1_BAUD_MASK		(1 << CCM_PCCR_SSI1_BAUD_OFFSET)
-+#define CCM_PCCR_SSI1_IPG_MASK		(1 << CCM_PCCR_SSI1_IPG_OFFSET)
-+#define CCM_PCCR_SSI2_BAUD_MASK		(1 << CCM_PCCR_SSI2_BAUD_OFFSET)
-+#define CCM_PCCR_SSI2_IPG_MASK		(1 << CCM_PCCR_SSI2_IPG_OFFSET)
-+#define CCM_PCCR_UART1_MASK		(1 << CCM_PCCR_UART1_OFFSET)
-+#define CCM_PCCR_UART2_MASK		(1 << CCM_PCCR_UART2_OFFSET)
-+#define CCM_PCCR_UART3_MASK		(1 << CCM_PCCR_UART3_OFFSET)
-+#define CCM_PCCR_UART4_MASK		(1 << CCM_PCCR_UART4_OFFSET)
-+#define CCM_PCCR_USBOTG_MASK		(1 << CCM_PCCR_USBOTG_OFFSET)
-+#define CCM_PCCR_WDT_MASK		(1 << CCM_PCCR_WDT_OFFSET)
-+
-+#define CCM_CCSR_32KSR		(1 << 15)
-+
-+#define CCM_CCSR_CLKMODE1	(1 << 9)
-+#define CCM_CCSR_CLKMODE0	(1 << 8)
-+
-+#define CCM_CCSR_CLKOSEL_OFFSET 0
-+#define CCM_CCSR_CLKOSEL_MASK	0x1f
-+
-+#define SYS_FMCR		0x14	/* Functional Muxing Control Reg */
-+#define SYS_CHIP_ID		0x00	/* The offset of CHIP ID register */
+-#define IO_ADDR_CCM(off)	(IO_ADDRESS(CCM_BASE_ADDR) + (off))
++#define IO_ADDR_CCM(off)	(IO_ADDRESS(IMX21_CCM_BASE_ADDR) + (off))
  
- static int _clk_enable(struct clk *clk)
- {
-diff --git a/arch/arm/mach-mx2/crm_regs.h b/arch/arm/mach-mx2/crm_regs.h
-deleted file mode 100644
-index 749de76..0000000
---- a/arch/arm/mach-mx2/crm_regs.h
-+++ /dev/null
-@@ -1,258 +0,0 @@
--/*
-- * Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-- * Copyright 2008 Juergen Beisert, kernel@pengutronix.de
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version 2
-- * of the License, or (at your option) any later version.
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-- * MA 02110-1301, USA.
-- */
--
--#ifndef __ARCH_ARM_MACH_MX2_CRM_REGS_H__
--#define __ARCH_ARM_MACH_MX2_CRM_REGS_H__
--
--#include <mach/hardware.h>
--
--/* Register offsets */
--#define CCM_CSCR                (IO_ADDRESS(CCM_BASE_ADDR) + 0x0)
--#define CCM_MPCTL0              (IO_ADDRESS(CCM_BASE_ADDR) + 0x4)
--#define CCM_MPCTL1              (IO_ADDRESS(CCM_BASE_ADDR) + 0x8)
--#define CCM_SPCTL0              (IO_ADDRESS(CCM_BASE_ADDR) + 0xC)
--#define CCM_SPCTL1              (IO_ADDRESS(CCM_BASE_ADDR) + 0x10)
--#define CCM_OSC26MCTL           (IO_ADDRESS(CCM_BASE_ADDR) + 0x14)
--#define CCM_PCDR0               (IO_ADDRESS(CCM_BASE_ADDR) + 0x18)
--#define CCM_PCDR1               (IO_ADDRESS(CCM_BASE_ADDR) + 0x1c)
--#define CCM_PCCR0               (IO_ADDRESS(CCM_BASE_ADDR) + 0x20)
--#define CCM_PCCR1               (IO_ADDRESS(CCM_BASE_ADDR) + 0x24)
--#define CCM_CCSR                (IO_ADDRESS(CCM_BASE_ADDR) + 0x28)
--#define CCM_PMCTL               (IO_ADDRESS(CCM_BASE_ADDR) + 0x2c)
--#define CCM_PMCOUNT             (IO_ADDRESS(CCM_BASE_ADDR) + 0x30)
--#define CCM_WKGDCTL             (IO_ADDRESS(CCM_BASE_ADDR) + 0x34)
--
--#define CCM_CSCR_PRESC_OFFSET   29
--#define CCM_CSCR_PRESC_MASK     (0x7 << CCM_CSCR_PRESC_OFFSET)
--
--#define CCM_CSCR_USB_OFFSET     26
--#define CCM_CSCR_USB_MASK       (0x7 << CCM_CSCR_USB_OFFSET)
--#define CCM_CSCR_SD_OFFSET      24
--#define CCM_CSCR_SD_MASK        (0x3 << CCM_CSCR_SD_OFFSET)
--#define CCM_CSCR_SPLLRES        (1 << 22)
--#define CCM_CSCR_MPLLRES        (1 << 21)
--#define CCM_CSCR_SSI2_OFFSET    20
--#define CCM_CSCR_SSI2           (1 << CCM_CSCR_SSI2_OFFSET)
--#define CCM_CSCR_SSI1_OFFSET    19
--#define CCM_CSCR_SSI1           (1 << CCM_CSCR_SSI1_OFFSET)
--#define CCM_CSCR_FIR_OFFSET    	18
--#define CCM_CSCR_FIR		(1 << CCM_CSCR_FIR_OFFSET)
--#define CCM_CSCR_SP             (1 << 17)
--#define CCM_CSCR_MCU            (1 << 16)
--#define CCM_CSCR_BCLK_OFFSET	10
--#define CCM_CSCR_BCLK_MASK      (0xf << CCM_CSCR_BCLK_OFFSET)
--#define CCM_CSCR_IPDIV_OFFSET   9
--#define CCM_CSCR_IPDIV          (1 << CCM_CSCR_IPDIV_OFFSET)
--
--#define CCM_CSCR_OSC26MDIV      (1 << 4)
--#define CCM_CSCR_OSC26M         (1 << 3)
--#define CCM_CSCR_FPM            (1 << 2)
--#define CCM_CSCR_SPEN           (1 << 1)
--#define CCM_CSCR_MPEN           1
--
--
--
--#define CCM_MPCTL0_CPLM         (1 << 31)
--#define CCM_MPCTL0_PD_OFFSET    26
--#define CCM_MPCTL0_PD_MASK      (0xf << 26)
--#define CCM_MPCTL0_MFD_OFFSET   16
--#define CCM_MPCTL0_MFD_MASK     (0x3ff << 16)
--#define CCM_MPCTL0_MFI_OFFSET   10
--#define CCM_MPCTL0_MFI_MASK     (0xf << 10)
--#define CCM_MPCTL0_MFN_OFFSET   0
--#define CCM_MPCTL0_MFN_MASK     0x3ff
--
--#define CCM_MPCTL1_LF           (1 << 15)
--#define CCM_MPCTL1_BRMO         (1 << 6)
--
--#define CCM_SPCTL0_CPLM         (1 << 31)
--#define CCM_SPCTL0_PD_OFFSET    26
--#define CCM_SPCTL0_PD_MASK      (0xf << 26)
--#define CCM_SPCTL0_MFD_OFFSET   16
--#define CCM_SPCTL0_MFD_MASK     (0x3ff << 16)
--#define CCM_SPCTL0_MFI_OFFSET   10
--#define CCM_SPCTL0_MFI_MASK     (0xf << 10)
--#define CCM_SPCTL0_MFN_OFFSET   0
--#define CCM_SPCTL0_MFN_MASK     0x3ff
--
--#define CCM_SPCTL1_LF           (1 << 15)
--#define CCM_SPCTL1_BRMO         (1 << 6)
--
--#define CCM_OSC26MCTL_PEAK_OFFSET       16
--#define CCM_OSC26MCTL_PEAK_MASK         (0x3 << 16)
--#define CCM_OSC26MCTL_AGC_OFFSET        8
--#define CCM_OSC26MCTL_AGC_MASK          (0x3f << 8)
--#define CCM_OSC26MCTL_ANATEST_OFFSET    0
--#define CCM_OSC26MCTL_ANATEST_MASK      0x3f
--
--#define CCM_PCDR0_SSI2BAUDDIV_OFFSET    26
--#define CCM_PCDR0_SSI2BAUDDIV_MASK      (0x3f << 26)
--#define CCM_PCDR0_SSI1BAUDDIV_OFFSET    16
--#define CCM_PCDR0_SSI1BAUDDIV_MASK      (0x3f << 16)
--#define CCM_PCDR0_NFCDIV_OFFSET         12
--#define CCM_PCDR0_NFCDIV_MASK           (0xf << 12)
--#define CCM_PCDR0_48MDIV_OFFSET		5
--#define CCM_PCDR0_48MDIV_MASK		(0x7 << CCM_PCDR0_48MDIV_OFFSET)
--#define CCM_PCDR0_FIRIDIV_OFFSET	0
--#define CCM_PCDR0_FIRIDIV_MASK		0x1f
--#define CCM_PCDR1_PERDIV4_OFFSET        24
--#define CCM_PCDR1_PERDIV4_MASK          (0x3f << 24)
--#define CCM_PCDR1_PERDIV3_OFFSET        16
--#define CCM_PCDR1_PERDIV3_MASK          (0x3f << 16)
--#define CCM_PCDR1_PERDIV2_OFFSET        8
--#define CCM_PCDR1_PERDIV2_MASK          (0x3f << 8)
--#define CCM_PCDR1_PERDIV1_OFFSET        0
--#define CCM_PCDR1_PERDIV1_MASK          0x3f
--
--#define CCM_PCCR_HCLK_CSI_OFFSET       	31
--#define CCM_PCCR_HCLK_CSI_REG	        CCM_PCCR0
--#define CCM_PCCR_HCLK_DMA_OFFSET       	30
--#define CCM_PCCR_HCLK_DMA_REG	        CCM_PCCR0
--#define CCM_PCCR_HCLK_BROM_OFFSET      	28
--#define CCM_PCCR_HCLK_BROM_REG	        CCM_PCCR0
--#define CCM_PCCR_HCLK_EMMA_OFFSET      	27
--#define CCM_PCCR_HCLK_EMMA_REG	        CCM_PCCR0
--#define CCM_PCCR_HCLK_LCDC_OFFSET      	26
--#define CCM_PCCR_HCLK_LCDC_REG	        CCM_PCCR0
--#define CCM_PCCR_HCLK_SLCDC_OFFSET     	25
--#define CCM_PCCR_HCLK_SLCDC_REG	        CCM_PCCR0
--#define CCM_PCCR_HCLK_USBOTG_OFFSET    	24
--#define CCM_PCCR_HCLK_USBOTG_REG	CCM_PCCR0
--#define CCM_PCCR_HCLK_BMI_OFFSET    	23
--#define CCM_PCCR_BMI_MASK          	(1 << CCM_PCCR_BMI_MASK)
--#define CCM_PCCR_HCLK_BMI_REG	    	CCM_PCCR0
--#define CCM_PCCR_PERCLK4_OFFSET        	22
--#define CCM_PCCR_PERCLK4_REG	    	CCM_PCCR0
--#define CCM_PCCR_SLCDC_OFFSET          	21
--#define CCM_PCCR_SLCDC_REG		CCM_PCCR0
--#define CCM_PCCR_FIRI_BAUD_OFFSET       20
--#define CCM_PCCR_FIRI_BAUD_MASK         (1 << CCM_PCCR_FIRI_BAUD_MASK)
--#define CCM_PCCR_FIRI_BAUD_REG	        CCM_PCCR0
--#define CCM_PCCR_NFC_OFFSET		19
--#define CCM_PCCR_NFC_REG		CCM_PCCR0
--#define CCM_PCCR_LCDC_OFFSET           	18
--#define CCM_PCCR_LCDC_REG		CCM_PCCR0
--#define CCM_PCCR_SSI1_BAUD_OFFSET      	17
--#define CCM_PCCR_SSI1_BAUD_REG	    	CCM_PCCR0
--#define CCM_PCCR_SSI2_BAUD_OFFSET      	16
--#define CCM_PCCR_SSI2_BAUD_REG	    	CCM_PCCR0
--#define CCM_PCCR_EMMA_OFFSET           	15
--#define CCM_PCCR_EMMA_REG		CCM_PCCR0
--#define CCM_PCCR_USBOTG_OFFSET         	14
--#define CCM_PCCR_USBOTG_REG		CCM_PCCR0
--#define CCM_PCCR_DMA_OFFSET            	13
--#define CCM_PCCR_DMA_REG            	CCM_PCCR0
--#define CCM_PCCR_I2C1_OFFSET           	12
--#define CCM_PCCR_I2C1_REG		CCM_PCCR0
--#define CCM_PCCR_GPIO_OFFSET           	11
--#define CCM_PCCR_GPIO_REG		CCM_PCCR0
--#define CCM_PCCR_SDHC2_OFFSET          	10
--#define CCM_PCCR_SDHC2_REG		CCM_PCCR0
--#define CCM_PCCR_SDHC1_OFFSET          	9
--#define CCM_PCCR_SDHC1_REG		CCM_PCCR0
--#define CCM_PCCR_FIRI_OFFSET		8
--#define CCM_PCCR_FIRI_MASK		(1 << CCM_PCCR_BAUD_MASK)
--#define CCM_PCCR_FIRI_REG		CCM_PCCR0
--#define CCM_PCCR_SSI2_IPG_OFFSET       	7
--#define CCM_PCCR_SSI2_REG		CCM_PCCR0
--#define CCM_PCCR_SSI1_IPG_OFFSET       	6
--#define CCM_PCCR_SSI1_REG		CCM_PCCR0
--#define CCM_PCCR_CSPI2_OFFSET		5
--#define	CCM_PCCR_CSPI2_REG		CCM_PCCR0
--#define CCM_PCCR_CSPI1_OFFSET		4
--#define	CCM_PCCR_CSPI1_REG		CCM_PCCR0
--#define CCM_PCCR_UART4_OFFSET          	3
--#define CCM_PCCR_UART4_REG		CCM_PCCR0
--#define CCM_PCCR_UART3_OFFSET          	2
--#define CCM_PCCR_UART3_REG		CCM_PCCR0
--#define CCM_PCCR_UART2_OFFSET          	1
--#define CCM_PCCR_UART2_REG		CCM_PCCR0
--#define CCM_PCCR_UART1_OFFSET          	0
--#define CCM_PCCR_UART1_REG		CCM_PCCR0
--
--#define CCM_PCCR_OWIRE_OFFSET          	31
--#define CCM_PCCR_OWIRE_REG		CCM_PCCR1
--#define CCM_PCCR_KPP_OFFSET            	30
--#define CCM_PCCR_KPP_REG		CCM_PCCR1
--#define CCM_PCCR_RTC_OFFSET            	29
--#define CCM_PCCR_RTC_REG		CCM_PCCR1
--#define CCM_PCCR_PWM_OFFSET            	28
--#define CCM_PCCR_PWM_REG		CCM_PCCR1
--#define CCM_PCCR_GPT3_OFFSET           	27
--#define CCM_PCCR_GPT3_REG		CCM_PCCR1
--#define CCM_PCCR_GPT2_OFFSET           	26
--#define CCM_PCCR_GPT2_REG		CCM_PCCR1
--#define CCM_PCCR_GPT1_OFFSET           	25
--#define CCM_PCCR_GPT1_REG		CCM_PCCR1
--#define CCM_PCCR_WDT_OFFSET            	24
--#define CCM_PCCR_WDT_REG		CCM_PCCR1
--#define CCM_PCCR_CSPI3_OFFSET		23
--#define	CCM_PCCR_CSPI3_REG		CCM_PCCR1
--
--#define CCM_PCCR_CSPI1_MASK            	(1 << CCM_PCCR_CSPI1_OFFSET)
--#define CCM_PCCR_CSPI2_MASK            	(1 << CCM_PCCR_CSPI2_OFFSET)
--#define CCM_PCCR_CSPI3_MASK            	(1 << CCM_PCCR_CSPI3_OFFSET)
--#define CCM_PCCR_DMA_MASK              	(1 << CCM_PCCR_DMA_OFFSET)
--#define CCM_PCCR_EMMA_MASK             	(1 << CCM_PCCR_EMMA_OFFSET)
--#define CCM_PCCR_GPIO_MASK             	(1 << CCM_PCCR_GPIO_OFFSET)
--#define CCM_PCCR_GPT1_MASK             	(1 << CCM_PCCR_GPT1_OFFSET)
--#define CCM_PCCR_GPT2_MASK             	(1 << CCM_PCCR_GPT2_OFFSET)
--#define CCM_PCCR_GPT3_MASK             	(1 << CCM_PCCR_GPT3_OFFSET)
--#define CCM_PCCR_HCLK_BROM_MASK		(1 << CCM_PCCR_HCLK_BROM_OFFSET)
--#define CCM_PCCR_HCLK_CSI_MASK         	(1 << CCM_PCCR_HCLK_CSI_OFFSET)
--#define CCM_PCCR_HCLK_DMA_MASK         	(1 << CCM_PCCR_HCLK_DMA_OFFSET)
--#define CCM_PCCR_HCLK_EMMA_MASK        	(1 << CCM_PCCR_HCLK_EMMA_OFFSET)
--#define CCM_PCCR_HCLK_LCDC_MASK        	(1 << CCM_PCCR_HCLK_LCDC_OFFSET)
--#define CCM_PCCR_HCLK_SLCDC_MASK       	(1 << CCM_PCCR_HCLK_SLCDC_OFFSET)
--#define CCM_PCCR_HCLK_USBOTG_MASK      	(1 << CCM_PCCR_HCLK_USBOTG_OFFSET)
--#define CCM_PCCR_I2C1_MASK             	(1 << CCM_PCCR_I2C1_OFFSET)
--#define CCM_PCCR_KPP_MASK              	(1 << CCM_PCCR_KPP_OFFSET)
--#define CCM_PCCR_LCDC_MASK             	(1 << CCM_PCCR_LCDC_OFFSET)
--#define CCM_PCCR_NFC_MASK		(1 << CCM_PCCR_NFC_OFFSET)
--#define CCM_PCCR_OWIRE_MASK            	(1 << CCM_PCCR_OWIRE_OFFSET)
--#define CCM_PCCR_PERCLK4_MASK          	(1 << CCM_PCCR_PERCLK4_OFFSET)
--#define CCM_PCCR_PWM_MASK              	(1 << CCM_PCCR_PWM_OFFSET)
--#define CCM_PCCR_RTC_MASK              	(1 << CCM_PCCR_RTC_OFFSET)
--#define CCM_PCCR_SDHC1_MASK            	(1 << CCM_PCCR_SDHC1_OFFSET)
--#define CCM_PCCR_SDHC2_MASK            	(1 << CCM_PCCR_SDHC2_OFFSET)
--#define CCM_PCCR_SLCDC_MASK            	(1 << CCM_PCCR_SLCDC_OFFSET)
--#define CCM_PCCR_SSI1_BAUD_MASK        	(1 << CCM_PCCR_SSI1_BAUD_OFFSET)
--#define CCM_PCCR_SSI1_IPG_MASK         	(1 << CCM_PCCR_SSI1_IPG_OFFSET)
--#define CCM_PCCR_SSI2_BAUD_MASK        	(1 << CCM_PCCR_SSI2_BAUD_OFFSET)
--#define CCM_PCCR_SSI2_IPG_MASK         	(1 << CCM_PCCR_SSI2_IPG_OFFSET)
--#define CCM_PCCR_UART1_MASK            	(1 << CCM_PCCR_UART1_OFFSET)
--#define CCM_PCCR_UART2_MASK            	(1 << CCM_PCCR_UART2_OFFSET)
--#define CCM_PCCR_UART3_MASK            	(1 << CCM_PCCR_UART3_OFFSET)
--#define CCM_PCCR_UART4_MASK            	(1 << CCM_PCCR_UART4_OFFSET)
--#define CCM_PCCR_USBOTG_MASK           	(1 << CCM_PCCR_USBOTG_OFFSET)
--#define CCM_PCCR_WDT_MASK              	(1 << CCM_PCCR_WDT_OFFSET)
--
--
--#define CCM_CCSR_32KSR          (1 << 15)
--
--#define CCM_CCSR_CLKMODE1       (1 << 9)
--#define CCM_CCSR_CLKMODE0       (1 << 8)
--
--#define CCM_CCSR_CLKOSEL_OFFSET 0
--#define CCM_CCSR_CLKOSEL_MASK   0x1f
--
--#define SYS_FMCR                0x14	/*  Functional Muxing Control Reg */
--#define SYS_CHIP_ID             0x00	/* The offset of CHIP ID register */
--
--#endif /* __ARCH_ARM_MACH_MX2_CRM_REGS_H__ */
+ /* Register offsets */
+ #define CCM_CSCR		IO_ADDR_CCM(0x0)
+@@ -1235,6 +1235,7 @@ int __init mx21_clocks_init(unsigned long lref, unsigned long href)
+ 	clk_enable(&uart_clk[0]);
+ #endif
+ 
+-	mxc_timer_init(&gpt_clk[0], IO_ADDRESS(GPT1_BASE_ADDR), MXC_INT_GPT1);
++	mxc_timer_init(&gpt_clk[0], IO_ADDRESS(MX21_GPT1_BASE_ADDR),
++			MX21_INT_GPT1);
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-mx2/clock_imx27.c b/arch/arm/mach-mx2/clock_imx27.c
+index a533208..6db9856 100644
+--- a/arch/arm/mach-mx2/clock_imx27.c
++++ b/arch/arm/mach-mx2/clock_imx27.c
+@@ -29,7 +29,7 @@
+ #include <mach/common.h>
+ #include <mach/hardware.h>
+ 
+-#define IO_ADDR_CCM(off)	(IO_ADDRESS(CCM_BASE_ADDR) + (off))
++#define IO_ADDR_CCM(off)	(IO_ADDRESS(MX27_CCM_BASE_ADDR) + (off))
+ 
+ /* Register offsets */
+ #define CCM_CSCR		IO_ADDR_CCM(0x0)
+@@ -757,7 +757,8 @@ int __init mx27_clocks_init(unsigned long fref)
+ 	clk_enable(&uart1_clk);
+ #endif
+ 
+-	mxc_timer_init(&gpt1_clk, IO_ADDRESS(GPT1_BASE_ADDR), MXC_INT_GPT1);
++	mxc_timer_init(&gpt1_clk, IO_ADDRESS(MX27_GPT1_BASE_ADDR),
++			MX27_INT_GPT1);
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-mx2/cpu_imx27.c b/arch/arm/mach-mx2/cpu_imx27.c
+index d9e3bf9..8c50c5e 100644
+--- a/arch/arm/mach-mx2/cpu_imx27.c
++++ b/arch/arm/mach-mx2/cpu_imx27.c
+@@ -39,7 +39,7 @@ static void query_silicon_parameter(void)
+ 	 * the silicon revision very early we read it here to
+ 	 * avoid any further hooks
+ 	*/
+-	val = __raw_readl(IO_ADDRESS(SYSCTRL_BASE_ADDR) + SYS_CHIP_ID);
++	val = __raw_readl(IO_ADDRESS(MX27_SYSCTRL_BASE_ADDR) + SYS_CHIP_ID);
+ 
+ 	cpu_silicon_rev = (int)(val >> 28);
+ 	cpu_partnumber = (int)((val >> 12) & 0xFFFF);
+diff --git a/arch/arm/mach-mx2/eukrea_cpuimx27.c b/arch/arm/mach-mx2/eukrea_cpuimx27.c
+index 7b18760..8e4f3d0 100644
+--- a/arch/arm/mach-mx2/eukrea_cpuimx27.c
++++ b/arch/arm/mach-mx2/eukrea_cpuimx27.c
+@@ -142,28 +142,28 @@ static struct i2c_board_info eukrea_cpuimx27_i2c_devices[] = {
+ #if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
+ static struct plat_serial8250_port serial_platform_data[] = {
+ 	{
+-		.mapbase = (unsigned long)(CS3_BASE_ADDR + 0x200000),
++		.mapbase = (unsigned long)(MX27_CS3_BASE_ADDR + 0x200000),
+ 		.irq = IRQ_GPIOB(23),
+ 		.uartclk = 14745600,
+ 		.regshift = 1,
+ 		.iotype = UPIO_MEM,
+ 		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
+ 	}, {
+-		.mapbase = (unsigned long)(CS3_BASE_ADDR + 0x400000),
++		.mapbase = (unsigned long)(MX27_CS3_BASE_ADDR + 0x400000),
+ 		.irq = IRQ_GPIOB(22),
+ 		.uartclk = 14745600,
+ 		.regshift = 1,
+ 		.iotype = UPIO_MEM,
+ 		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
+ 	}, {
+-		.mapbase = (unsigned long)(CS3_BASE_ADDR + 0x800000),
++		.mapbase = (unsigned long)(MX27_CS3_BASE_ADDR + 0x800000),
+ 		.irq = IRQ_GPIOB(27),
+ 		.uartclk = 14745600,
+ 		.regshift = 1,
+ 		.iotype = UPIO_MEM,
+ 		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
+ 	}, {
+-		.mapbase = (unsigned long)(CS3_BASE_ADDR + 0x1000000),
++		.mapbase = (unsigned long)(MX27_CS3_BASE_ADDR + 0x1000000),
+ 		.irq = IRQ_GPIOB(30),
+ 		.uartclk = 14745600,
+ 		.regshift = 1,
+@@ -224,8 +224,8 @@ static struct sys_timer eukrea_cpuimx27_timer = {
+ };
+ 
+ MACHINE_START(CPUIMX27, "EUKREA CPUIMX27")
+-	.phys_io        = AIPI_BASE_ADDR,
+-	.io_pg_offst    = ((AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
++	.phys_io        = MX27_AIPI_BASE_ADDR,
++	.io_pg_offst    = ((MX27_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
+ 	.boot_params    = PHYS_OFFSET + 0x100,
+ 	.map_io         = mx27_map_io,
+ 	.init_irq       = mx27_init_irq,
+diff --git a/arch/arm/mach-mx2/mx21ads.c b/arch/arm/mach-mx2/mx21ads.c
+index cf5f77c..eb4a6e8 100644
+--- a/arch/arm/mach-mx2/mx21ads.c
++++ b/arch/arm/mach-mx2/mx21ads.c
+@@ -118,8 +118,8 @@ static struct physmap_flash_data mx21ads_flash_data = {
+ };
+ 
+ static struct resource mx21ads_flash_resource = {
+-	.start = CS0_BASE_ADDR,
+-	.end = CS0_BASE_ADDR + 0x02000000 - 1,
++	.start = MX21_CS0_BASE_ADDR,
++	.end = MX21_CS0_BASE_ADDR + 0x02000000 - 1,
+ 	.flags = IORESOURCE_MEM,
+ };
+ 
+@@ -242,7 +242,7 @@ static struct map_desc mx21ads_io_desc[] __initdata = {
+ 	 */
+ 	{
+ 		.virtual = MX21ADS_MMIO_BASE_ADDR,
+-		.pfn = __phys_to_pfn(CS1_BASE_ADDR),
++		.pfn = __phys_to_pfn(MX21_CS1_BASE_ADDR),
+ 		.length = MX21ADS_MMIO_SIZE,
+ 		.type = MT_DEVICE,
+ 	},
+@@ -284,8 +284,8 @@ static struct sys_timer mx21ads_timer = {
+ 
+ MACHINE_START(MX21ADS, "Freescale i.MX21ADS")
+ 	/* maintainer: Freescale Semiconductor, Inc. */
+-	.phys_io        = AIPI_BASE_ADDR,
+-	.io_pg_offst    = ((AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
++	.phys_io        = MX21_AIPI_BASE_ADDR,
++	.io_pg_offst    = ((MX21_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
+ 	.boot_params    = PHYS_OFFSET + 0x100,
+ 	.map_io         = mx21ads_map_io,
+ 	.init_irq       = mx21_init_irq,
+diff --git a/arch/arm/mach-mx2/mx27ads.c b/arch/arm/mach-mx2/mx27ads.c
+index 83e412b..385fc1c 100644
+--- a/arch/arm/mach-mx2/mx27ads.c
++++ b/arch/arm/mach-mx2/mx27ads.c
+@@ -320,7 +320,7 @@ static struct sys_timer mx27ads_timer = {
+ static struct map_desc mx27ads_io_desc[] __initdata = {
+ 	{
+ 		.virtual = PBC_BASE_ADDRESS,
+-		.pfn = __phys_to_pfn(CS4_BASE_ADDR),
++		.pfn = __phys_to_pfn(MX27_CS4_BASE_ADDR),
+ 		.length = SZ_1M,
+ 		.type = MT_DEVICE,
+ 	},
+@@ -334,8 +334,8 @@ static void __init mx27ads_map_io(void)
+ 
+ MACHINE_START(MX27ADS, "Freescale i.MX27ADS")
+ 	/* maintainer: Freescale Semiconductor, Inc. */
+-	.phys_io        = AIPI_BASE_ADDR,
+-	.io_pg_offst    = ((AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
++	.phys_io        = MX27_AIPI_BASE_ADDR,
++	.io_pg_offst    = ((MX27_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
+ 	.boot_params    = PHYS_OFFSET + 0x100,
+ 	.map_io         = mx27ads_map_io,
+ 	.init_irq       = mx27_init_irq,
+diff --git a/arch/arm/mach-mx2/mx27lite.c b/arch/arm/mach-mx2/mx27lite.c
+index 82ea227..ca6ab12 100644
+--- a/arch/arm/mach-mx2/mx27lite.c
++++ b/arch/arm/mach-mx2/mx27lite.c
+@@ -85,8 +85,8 @@ static struct sys_timer mx27lite_timer = {
+ };
+ 
+ MACHINE_START(IMX27LITE, "LogicPD i.MX27LITE")
+-	.phys_io        = AIPI_BASE_ADDR,
+-	.io_pg_offst    = ((AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
++	.phys_io        = MX27_AIPI_BASE_ADDR,
++	.io_pg_offst    = ((MX27_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
+ 	.boot_params    = PHYS_OFFSET + 0x100,
+ 	.map_io         = mx27_map_io,
+ 	.init_irq       = mx27_init_irq,
+diff --git a/arch/arm/mach-mx2/mx27pdk.c b/arch/arm/mach-mx2/mx27pdk.c
+index 6761d1b..595fea4 100644
+--- a/arch/arm/mach-mx2/mx27pdk.c
++++ b/arch/arm/mach-mx2/mx27pdk.c
+@@ -85,8 +85,8 @@ static struct sys_timer mx27pdk_timer = {
+ 
+ MACHINE_START(MX27_3DS, "Freescale MX27PDK")
+ 	/* maintainer: Freescale Semiconductor, Inc. */
+-	.phys_io        = AIPI_BASE_ADDR,
+-	.io_pg_offst    = ((AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
++	.phys_io        = MX27_AIPI_BASE_ADDR,
++	.io_pg_offst    = ((MX27_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
+ 	.boot_params    = PHYS_OFFSET + 0x100,
+ 	.map_io         = mx27_map_io,
+ 	.init_irq       = mx27_init_irq,
+diff --git a/arch/arm/mach-mx2/mxt_td60.c b/arch/arm/mach-mx2/mxt_td60.c
+index 03dbbdc..3a32b3e 100644
+--- a/arch/arm/mach-mx2/mxt_td60.c
++++ b/arch/arm/mach-mx2/mxt_td60.c
+@@ -308,8 +308,8 @@ static struct sys_timer mxt_td60_timer = {
+ 
+ MACHINE_START(MXT_TD60, "Maxtrack i-MXT TD60")
+ 	/* maintainer: Maxtrack Industrial */
+-	.phys_io	= AIPI_BASE_ADDR,
+-	.io_pg_offst	= ((AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
++	.phys_io	= MX27_AIPI_BASE_ADDR,
++	.io_pg_offst	= ((MX27_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
+ 	.boot_params	= PHYS_OFFSET + 0x100,
+ 	.map_io		= mx27_map_io,
+ 	.init_irq	= mx27_init_irq,
+diff --git a/arch/arm/mach-mx2/pca100.c b/arch/arm/mach-mx2/pca100.c
+index aea3d34..55dbf5a 100644
+--- a/arch/arm/mach-mx2/pca100.c
++++ b/arch/arm/mach-mx2/pca100.c
+@@ -233,8 +233,8 @@ static struct sys_timer pca100_timer = {
+ };
+ 
+ MACHINE_START(PCA100, "phyCARD-i.MX27")
+-	.phys_io        = AIPI_BASE_ADDR,
+-	.io_pg_offst    = ((AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
++	.phys_io        = MX27_AIPI_BASE_ADDR,
++	.io_pg_offst    = ((MX27_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
+ 	.boot_params    = PHYS_OFFSET + 0x100,
+ 	.map_io         = mx27_map_io,
+ 	.init_irq       = mx27_init_irq,
+diff --git a/arch/arm/mach-mx2/pcm038.c b/arch/arm/mach-mx2/pcm038.c
+index 906d59b..a2e2ea1 100644
+--- a/arch/arm/mach-mx2/pcm038.c
++++ b/arch/arm/mach-mx2/pcm038.c
+@@ -108,8 +108,8 @@ static struct platdata_mtd_ram pcm038_sram_data = {
+ };
+ 
+ static struct resource pcm038_sram_resource = {
+-	.start = CS1_BASE_ADDR,
+-	.end   = CS1_BASE_ADDR + 512 * 1024 - 1,
++	.start = MX27_CS1_BASE_ADDR,
++	.end   = MX27_CS1_BASE_ADDR + 512 * 1024 - 1,
+ 	.flags = IORESOURCE_MEM,
+ };
+ 
+@@ -328,8 +328,8 @@ static struct sys_timer pcm038_timer = {
+ };
+ 
+ MACHINE_START(PCM038, "phyCORE-i.MX27")
+-	.phys_io        = AIPI_BASE_ADDR,
+-	.io_pg_offst    = ((AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
++	.phys_io        = MX27_AIPI_BASE_ADDR,
++	.io_pg_offst    = ((MX27_AIPI_BASE_ADDR_VIRT) >> 18) & 0xfffc,
+ 	.boot_params    = PHYS_OFFSET + 0x100,
+ 	.map_io         = mx27_map_io,
+ 	.init_irq       = mx27_init_irq,
+diff --git a/arch/arm/mach-mx2/pcm970-baseboard.c b/arch/arm/mach-mx2/pcm970-baseboard.c
+index 3cb7f45..60d5446 100644
+--- a/arch/arm/mach-mx2/pcm970-baseboard.c
++++ b/arch/arm/mach-mx2/pcm970-baseboard.c
+@@ -190,8 +190,8 @@ static struct imx_fb_platform_data pcm038_fb_data = {
+ 
+ static struct resource pcm970_sja1000_resources[] = {
+ 	{
+-		.start   = CS4_BASE_ADDR,
+-		.end     = CS4_BASE_ADDR + 0x100 - 1,
++		.start   = MX27_CS4_BASE_ADDR,
++		.end     = MX27_CS4_BASE_ADDR + 0x100 - 1,
+ 		.flags   = IORESOURCE_MEM,
+ 	}, {
+ 		.start   = IRQ_GPIOE(19),
 -- 
 1.6.5.2
