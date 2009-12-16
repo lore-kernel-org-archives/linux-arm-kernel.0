@@ -1,41 +1,39 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Wed, 16 Dec 2009 15:01:49 +0000
-Subject: [PATCH] ARM: pxa/raumfeld: board support cleanups
-In-Reply-To: <20091216144921.GT28375@buzzloop.caiaq.de>
-References: <1260095301-29363-1-git-send-email-daniel@caiaq.de>
-	<f17812d70912092008k67d37bcak73b774620fa3433a@mail.gmail.com>
-	<f17812d70912160538m448fdcco238c3fc959c16a09@mail.gmail.com>
-	<20091216144921.GT28375@buzzloop.caiaq.de>
-Message-ID: <1260975709.3525.304.camel@odin>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 16 Dec 2009 17:28:03 +0100
+Subject: [PATCH] dma: at_hdmac: correct incompatible type for argument 1 of
+	'spin_lock_bh'
+Message-ID: <1260980883-30030-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2009-12-16 at 22:49 +0800, Daniel Mack wrote:
-> On Wed, Dec 16, 2009 at 09:38:35PM +0800, Eric Miao wrote:
-> > On Thu, Dec 10, 2009 at 12:08 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> > > On Sun, Dec 6, 2009 at 6:28 PM, Daniel Mack <daniel@caiaq.de> wrote:
-> > >> Some minor things that I didn't notice in the original post.
-> > >>
-> > >> Signed-off-by: Daniel Mack <daniel@caiaq.de>
-> > >> Cc: Eric Miao <eric.y.miao@gmail.com>
-> > >
-> > > Merged into 'pending'. Will be pushed out til max8660 stuffs are merged.
-> > >
-> > 
-> > Daniel,
-> > 
-> > Do you know when will max8660 be merged? The window is about to
-> > close, but nothing appear to be there about this max8660?
-> 
-> I don't know. The driver has been queued in regulator-2.6.git:
-> 
->   http://git.kernel.org/?p=linux/kernel/git/broonie/regulator-2.6.git;a=commit;h=9c4d460f13b7d81abb26449a3920638889a3e5ed
-> 
-> Mark, Liam, any idea when things will hit the tree?
+Correct a typo error in locking calls.
 
-I'll be issuing a pull request tomorrow am.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/dma/at_hdmac.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Sorry about all this, there have been some "issues" lately with the twl
-pmic rename that have slowed things down with regulator and mfd.
-
-Liam
+diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+index f151125..efc1a61 100644
+--- a/drivers/dma/at_hdmac.c
++++ b/drivers/dma/at_hdmac.c
+@@ -815,7 +815,7 @@ atc_is_tx_complete(struct dma_chan *chan,
+ 	dev_vdbg(chan2dev(chan), "is_tx_complete: %d (d%d, u%d)\n",
+ 			cookie, done ? *done : 0, used ? *used : 0);
+ 
+-	spin_lock_bh(atchan->lock);
++	spin_lock_bh(&atchan->lock);
+ 
+ 	last_complete = atchan->completed_cookie;
+ 	last_used = chan->cookie;
+@@ -830,7 +830,7 @@ atc_is_tx_complete(struct dma_chan *chan,
+ 		ret = dma_async_is_complete(cookie, last_complete, last_used);
+ 	}
+ 
+-	spin_unlock_bh(atchan->lock);
++	spin_unlock_bh(&atchan->lock);
+ 
+ 	if (done)
+ 		*done = last_complete;
+-- 
+1.5.6.5
