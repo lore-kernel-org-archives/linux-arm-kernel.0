@@ -1,36 +1,63 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 15 Dec 2009 22:55:39 -0500 (EST)
-Subject: Git pull request: small Kirkwood/Dove updates
-In-Reply-To: <alpine.LFD.2.00.0912102315240.31174@xanadu.home>
-References: <alpine.LFD.2.00.0912102315240.31174@xanadu.home>
-Message-ID: <alpine.LFD.2.00.0912152254580.23173@xanadu.home>
+From: abhijitpagare@ti.com (Pagare, Abhijit)
+Date: Wed, 16 Dec 2009 10:41:19 +0530
+Subject: [v2 PATCH 5/5] ARM: OMAP4: PM: Refine the APIs to support OMAP4
+	features.
+In-Reply-To: <alpine.DEB.2.00.0912150950050.12561@utopia.booyaka.com>
+References: <1260885177-25665-1-git-send-email-abhijitpagare@ti.com>
+	<1260885177-25665-2-git-send-email-abhijitpagare@ti.com>
+	<1260885177-25665-3-git-send-email-abhijitpagare@ti.com>
+	<1260885177-25665-4-git-send-email-abhijitpagare@ti.com>
+	<1260885177-25665-5-git-send-email-abhijitpagare@ti.com>
+	<alpine.DEB.2.00.0912150950050.12561@utopia.booyaka.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02BFB57DB8@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Paul,
 
-Ping.
+> -----Original Message-----
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Tuesday, December 15, 2009 10:23 PM
+> To: Pagare, Abhijit
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> Cousson, Benoit; Nayak, Rajendra
+> Subject: Re: [v2 PATCH 5/5] ARM: OMAP4: PM: Refine the APIs to support
+> OMAP4 features.
+> 
+> Hi Abhijit,
+> 
+> just FYI, on this patch:
+> 
+> On Tue, 15 Dec 2009, Abhijit Pagare wrote:
+> 
+> > Port the APIs to support the OMAP4 clockdomain framework.
+> > Also take care of the compiling requirements for the same.
+> 
+> ...
+> 
+> > diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-
+> omap2/clockdomain.c
+> > index 5366a10..f768d37 100644
+> > --- a/arch/arm/mach-omap2/clockdomain.c
+> > +++ b/arch/arm/mach-omap2/clockdomain.c
+> > @@ -1,10 +1,11 @@
+> >  /*
+> > - * OMAP2/3 clockdomain framework functions
+> > + * OMAP2/3/4 clockdomain framework functions
+> >   *
+> >   * Copyright (C) 2008 Texas Instruments, Inc.
+> >   * Copyright (C) 2008-2009 Nokia Corporation
+> >   *
+> >   * Written by Paul Walmsley and Jouni H????gander
+> 
+> ... looks like something mangled the UTF-8 which causes this patch to
+> not apply cleanly.  Fixed this up by hand.
 
-On Thu, 10 Dec 2009, Nicolas Pitre wrote:
+It's fine. Thanks..!
 
-> Russell, could you please pull:
-> 
-> 	git://git.marvell.com/orion for-rmk
-> 
-> This contains 2 patches as shown below.  Also please include a 
-> mach-types update in your next pull request to Linus.
-> 
-> Saeed Bishara (1):
->       ARM: dove: fix the mm mmu flags of the pj4 procinfo
-> 
-> Simon Guinot (1):
->       [ARM] Kirkwood: Add LaCie Network Space v2 support
-> 
->  arch/arm/mach-kirkwood/Kconfig             |    6 +
->  arch/arm/mach-kirkwood/Makefile            |    1 +
->  arch/arm/mach-kirkwood/netspace_v2-setup.c |  325 ++++++++++++++++++++++
->  arch/arm/mm/proc-v6.S                      |    5 +-
->  4 files changed, 334 insertions(+), 3 deletions(-)
 > 
 > 
-> Nicolas
-> 
+> - Paul
+
+Regards,
+Abhijit
