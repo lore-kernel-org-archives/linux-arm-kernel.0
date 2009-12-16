@@ -1,8 +1,7 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 16 Dec 2009 19:59:52 +0100
-Subject: [PATCH 11/20] imx: rename Kconfig symbol for "LogicPD MX27 LITEKIT
-	platform"
-In-Reply-To: <1260990002-24168-10-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Wed, 16 Dec 2009 19:59:55 +0100
+Subject: [PATCH 14/20] imx: provide helper macro to define IO_ADDRESS
+In-Reply-To: <1260990002-24168-13-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <20091216185046.GA16984@pengutronix.de>
 	<1260990002-24168-1-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1260990002-24168-2-git-send-email-u.kleine-koenig@pengutronix.de>
@@ -14,61 +13,32 @@ References: <20091216185046.GA16984@pengutronix.de>
 	<1260990002-24168-8-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1260990002-24168-9-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1260990002-24168-10-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1260990002-24168-11-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-11-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-12-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-13-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1260990002-24168-14-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not using MACH_IMX27LITE makes machine_is_imx27lite always return 0
-independent of building support for this machine.
-
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Daniel Schaeffer <daniel.schaeffer@timesys.com>
 ---
- arch/arm/configs/mx27_defconfig |    2 +-
- arch/arm/mach-mx2/Kconfig       |    2 +-
- arch/arm/mach-mx2/Makefile      |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/plat-mxc/include/mach/hardware.h |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/configs/mx27_defconfig b/arch/arm/configs/mx27_defconfig
-index 75263a8..b207249 100644
---- a/arch/arm/configs/mx27_defconfig
-+++ b/arch/arm/configs/mx27_defconfig
-@@ -200,7 +200,7 @@ CONFIG_MACH_MX27ADS=y
- CONFIG_MACH_PCM038=y
- CONFIG_MACH_PCM970_BASEBOARD=y
- CONFIG_MACH_MX27_3DS=y
--CONFIG_MACH_MX27LITE=y
-+CONFIG_MACH_IMX27LITE=y
- CONFIG_MXC_IRQ_PRIOR=y
- CONFIG_MXC_PWM=y
+diff --git a/arch/arm/plat-mxc/include/mach/hardware.h b/arch/arm/plat-mxc/include/mach/hardware.h
+index 78db754..51a5435 100644
+--- a/arch/arm/plat-mxc/include/mach/hardware.h
++++ b/arch/arm/plat-mxc/include/mach/hardware.h
+@@ -22,6 +22,10 @@
  
-diff --git a/arch/arm/mach-mx2/Kconfig b/arch/arm/mach-mx2/Kconfig
-index a8bc337..7bc797c 100644
---- a/arch/arm/mach-mx2/Kconfig
-+++ b/arch/arm/mach-mx2/Kconfig
-@@ -90,7 +90,7 @@ config MACH_MX27_3DS
- 	  Include support for MX27PDK platform. This includes specific
- 	  configurations for the board and its peripherals.
+ #include <asm/sizes.h>
  
--config MACH_MX27LITE
-+config MACH_IMX27LITE
- 	bool "LogicPD MX27 LITEKIT platform"
- 	depends on MACH_MX27
- 	help
-diff --git a/arch/arm/mach-mx2/Makefile b/arch/arm/mach-mx2/Makefile
-index 2ba9997..a340698 100644
---- a/arch/arm/mach-mx2/Makefile
-+++ b/arch/arm/mach-mx2/Makefile
-@@ -16,7 +16,7 @@ obj-$(CONFIG_MACH_MX27ADS) += mx27ads.o
- obj-$(CONFIG_MACH_PCM038) += pcm038.o
- obj-$(CONFIG_MACH_PCM970_BASEBOARD) += pcm970-baseboard.o
- obj-$(CONFIG_MACH_MX27_3DS) += mx27pdk.o
--obj-$(CONFIG_MACH_MX27LITE) += mx27lite.o
-+obj-$(CONFIG_MACH_IMX27LITE) += mx27lite.o
- obj-$(CONFIG_MACH_CPUIMX27) += eukrea_cpuimx27.o
- obj-$(CONFIG_MACH_EUKREA_MBIMX27_BASEBOARD) += eukrea_mbimx27-baseboard.o
- obj-$(CONFIG_MACH_PCA100) += pca100.o
++#define IMX_IO_ADDRESS(addr, module)\
++	(((unsigned long)((addr) - (module ## _BASE_ADDR)) < module ## _SIZE) ?\
++	(addr) - (module ## _BASE_ADDR) + (module ## _BASE_ADDR_VIRT) : 0)
++
+ #ifdef CONFIG_ARCH_MX3
+ #include <mach/mx3x.h>
+ #include <mach/mx31.h>
 -- 
 1.6.5.2
