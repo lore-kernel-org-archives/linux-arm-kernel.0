@@ -1,57 +1,65 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 16 Dec 2009 14:35:20 -0800
-Subject: [GIT PULL] omap build fixes
-Message-ID: <20091216223520.GV4575@atomide.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 16 Dec 2009 23:53:28 +0100
+Subject: [POWER] battery calibration parameters from sysfs
+In-Reply-To: <20091214121247.GB22388@rakim.wolfsonmicro.main>
+References: <A6D19A13FE030A409EC4362C172E091F0E0495F6@eseldmw101.eemea.ericsson.se>
+	<20091204104930.GA28625@sirena.org.uk>
+	<A6D19A13FE030A409EC4362C172E091F0E071EB9@eseldmw101.eemea.ericsson.se>
+	<20091207114825.GA26965@rakim.wolfsonmicro.main>
+	<A6D19A13FE030A409EC4362C172E091F0E0A1FA1@eseldmw101.eemea.ericsson.se>
+	<20091207165628.GA24981@rakim.wolfsonmicro.main>
+	<20091213132413.GB1437@ucw.cz>
+	<20091214121247.GB22388@rakim.wolfsonmicro.main>
+Message-ID: <20091216225328.GG21102@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Mon 2009-12-14 12:12:47, Mark Brown wrote:
+> On Sun, Dec 13, 2009 at 02:24:14PM +0100, Pavel Machek wrote:
+> 
+> > > actual charger hardware.  My main concern here is that battery
+> > > performance monitoring has no pressing need to be in kernel and that
+> > > pushing it into the kernel creates a barrier to implementing more
+> > > advanced schemes in userspace, which is especially serious given how
+> > > involved this needs to be in order to be accurate.  
+> 
+> > Well, kernel provides /proc/apm emulation and many systems still rely
+> > on it. So it would be nice to provide something halfway-decent there.
+> 
+> Unfortunately that's really painful in kernel since you really need to
+> do state tracking over reboots, and even if you do that it's really
+> not trivial.
 
-Please pull omap build fixes from:
+No, I do not want to get _that_ advanced. But I'd really like to get
+beyond "battery %age is linear function of measured battery voltage".
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+> > Plus you need to shutdown/suspend machine on battery critical. That
+> > has to be in kernel and already needs those tricky parts.
+> 
+> Power failure detection based on voltage drop is much more reasonable
+> but it's a very different thing to general battery capacity
+> estimation.
 
-In addition to the three build fixes, there's also a suspend fix
-for omap serial init.
+Not sure...
 
-Regards,
+> Normally you'd want to do the power failure detection separately anyway,
+> monitoring the system supply voltage rather than the battery voltage.
 
-Tony
+Well, that way you'll discharge batteries too much and kill them
+rather quickly, no? What is "system supply voltage" for PDA class
+system, anyway? I don't think zaurus has ADCs on anything else than
+thermistor, AC in voltage, battery voltage...
 
+> Something like "Measure Battery Capacity Precisely in Medical Design"
+> by Bernd Krafthoefer in Power Electronics Technology Jan 2005 might be
+> useful here.
 
-The following changes since commit 8bea8672edfca7ec5f661cafb218f1205863b343:
-  Stephen Rothwell (1):
-        mfd: compile fix for twl4030 renaming
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-
-Balaji T K (1):
-      mfd: twl: fix twl4030 rename for remaining driver, board files
-
-Mika Westerberg (1):
-      OMAP3: serial - fix bug introduced in
-
-Olof Johansson (1):
-      omap3: Allow EHCI to be built on OMAP3
-
-Thomas Weber (1):
-      USB ehci: replace mach header with plat
-
- arch/arm/mach-omap2/Kconfig                  |    1 +
- arch/arm/mach-omap2/board-cm-t35.c           |    2 +-
- arch/arm/mach-omap2/board-igep0020.c         |    2 +-
- arch/arm/mach-omap2/board-omap3evm.c         |    2 +-
- arch/arm/mach-omap2/board-omap3touchbook.c   |    2 +-
- arch/arm/mach-omap2/board-rx51-peripherals.c |    2 +-
- arch/arm/mach-omap2/board-zoom-peripherals.c |    2 +-
- arch/arm/mach-omap2/serial.c                 |    7 ++++---
- drivers/usb/host/ehci-omap.c                 |    2 +-
- drivers/video/omap/lcd_ldp.c                 |    4 ++--
- drivers/video/omap/lcd_omap2evm.c            |   10 +++++-----
- drivers/video/omap/lcd_omap3beagle.c         |    2 +-
- drivers/video/omap/lcd_omap3evm.c            |   10 +++++-----
- drivers/video/omap/lcd_overo.c               |    2 +-
- sound/soc/omap/sdp3430.c                     |    6 +++---
- 15 files changed, 29 insertions(+), 27 deletions(-)
+Thanks, it looks interesting. I'm not sure if it will be possible to
+apply on zaurus, but... (While measuring voltage my underestimate the
+old battery, I'm afraid they may overestimate it in bad conditions;
+energy left is battery is useless if battery can't supply enough
+current to keep CPU happy, because its too cold).
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
