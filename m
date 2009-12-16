@@ -1,47 +1,65 @@
-From: utx@penguin.cz (Stanislav Brabec)
-Date: Wed, 16 Dec 2009 00:32:18 +0100
-Subject: [POWER] battery calibration parameters from sysfs
-In-Reply-To: <ed62800912151458p6bc1e551g54960af40c54facd@mail.gmail.com>
-References: <A6D19A13FE030A409EC4362C172E091F0E0495F6@eseldmw101.eemea.ericsson.se>
-	<A6D19A13FE030A409EC4362C172E091F0E071EB9@eseldmw101.eemea.ericsson.se>
-	<20091207114825.GA26965@rakim.wolfsonmicro.main>
-	<A6D19A13FE030A409EC4362C172E091F0E0A1FA1@eseldmw101.eemea.ericsson.se>
-	<20091207165628.GA24981@rakim.wolfsonmicro.main>
-	<20091213132413.GB1437@ucw.cz>
-	<20091214121247.GB22388@rakim.wolfsonmicro.main>
-	<20091214212257.GA9213@elf.ucw.cz>
-	<ed62800912141543v2ab7ef63v4b6b2c33018b3296@mail.gmail.com>
-	<4B26FC52.6060307@billgatliff.com>
-	<ed62800912151458p6bc1e551g54960af40c54facd@mail.gmail.com>
-Message-ID: <1260919938.10441.18.camel@utx.utx.cz>
+From: gerg@snapgear.com (Greg Ungerer)
+Date: Wed, 16 Dec 2009 10:13:56 +1000
+Subject: [PATCH 3/4] fec: add support for Freescale i.MX25 PDK (3DS)
+In-Reply-To: <20091215201109.GA2621@tarshish>
+References: <cover.1260785451.git.baruch@tkos.co.il>
+	<fb518184b206ec2727deda111cc5364134ace69a.1260785451.git.baruch@tkos.co.il>
+	<20091214103348.GV15126@pengutronix.de>
+	<20091215083142.GB18290@jasper.tkos.co.il>
+	<4B277878.1050804@snapgear.com> <20091215201109.GA2621@tarshish>
+Message-ID: <4B282644.8030104@snapgear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Aras Vaichas wrote:
+Hi Baruch,
 
-> Yes, but in that case you might as well just purchase a coulomb
-> counter with a built-in accumulator and an I2C/SPI/microwire interface
-> save yourself some PCB space and cost (maybe)
+Baruch Siach wrote:
+> Hi Greg,
+> 
+> On Tue, Dec 15, 2009 at 09:52:24PM +1000, Greg Ungerer wrote:
+>> On 12/15/2009 06:31 PM, Baruch Siach wrote:
+> 
+> [snip]
+> 
+>>> +#ifndef CONFIG_M5272
+>> I would suggest making this conditional on FEC_MIIGSK_ENR.
+>> Although the CONFIG_M5272 is the only case here currently,
+>> that may change over the years. And using this here may not
+>> be obvious to the causual code reader, since the register
+>> offset definitions don't explicitly key on CONFIG_M5272.
+> 
+> OK, I'll change this conditional.
+> 
+> Can I take this as an Ack from you?
 
-Well, Pavel attempts to implement a "poor man's Coulomb counter" or at
-least "poor man's Ampere meter" for devices that are not equipped with
-any of it.
+With that conditional check changed, sure:
 
-- We know the time.
-- We know the backlight power consumption, it's dependent only on
-  brightness.
-- We know how much eats the HDD and how long it is on.
-- We know how much eats the CPU and companion chips (it is not as
-  stable, but it eats less).
-- We don't know, how much USB host eats, but we know how much USB
-  clients claim to eat.
-- Well, and we don't know how much eats CF and SD.
+Acked-by:  Greg Ungerer <gerg@uclinux.org>
 
-=> We can guess how many Coulombs the device already consumed. If the
-Coulomb counting would be inaccurate, we can at least correct voltage ->
-remaining energy table using current power consumption guess.
+Regards
+Greg
 
 
-________________________________________________________________________
-Stanislav Brabec
-http://www.penguin.cz/~utx/zaurus
+
+>>> +	if (fep->phy_interface == PHY_INTERFACE_MODE_RMII) {
+>>> +		/* disable the gasket and wait */
+>>> +		writel(0, fep->hwp + FEC_MIIGSK_ENR);
+>>> +		while (readl(fep->hwp + FEC_MIIGSK_ENR)&  4)
+>>> +			udelay(1);
+>>> +
+>>> +		/* configure the gasket: RMII, 50 MHz, no loopback, no echo */
+>>> +		writel(1, fep->hwp + FEC_MIIGSK_CFGR);
+>>> +
+>>> +		/* re-enable the gasket */
+>>> +		writel(2, fep->hwp + FEC_MIIGSK_ENR);
+>>> +	}
+>>> +#endif
+> 
+
+
+-- 
+------------------------------------------------------------------------
+Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
+SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
+8 Gardner Close                             FAX:         +61 7 3217 5323
+Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
