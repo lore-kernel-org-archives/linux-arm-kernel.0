@@ -1,60 +1,48 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 16 Dec 2009 14:58:49 +0100
-Subject: [PATCH] ARM: Convert BUG() to use unreachable()
-In-Reply-To: <4B213627.5000007@caviumnetworks.com>
-References: <1260266138-17684-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20091210175007.GC13210@n2100.arm.linux.org.uk>
-	<4B213627.5000007@caviumnetworks.com>
-Message-ID: <20091216135849.GC3674@pengutronix.de>
+From: rshitrit@marvell.com (Ronen Shitrit)
+Date: Wed, 16 Dec 2009 16:08:32 +0200
+Subject: shared memory problem on ARM v5TE using threads
+In-Reply-To: <20091215171855.GB15855@n2100.arm.linux.org.uk>
+References: <309002C0DA137042828828FC53D7A9347E2630EEC2@IL-MB01.marvell.com>
+	<20091213120033.GA10698@n2100.arm.linux.org.uk>
+	<20091213120615.GB10698@n2100.arm.linux.org.uk>
+	<cabda6420912140513k40a998b7k8cf56c35cc535cfb@mail.gmail.com>
+	<309002C0DA137042828828FC53D7A9347E2630F364@IL-MB01.marvell.com>
+	<cabda6420912140948t23c07676tb5f44eb4febbc584@mail.gmail.com>
+	<alpine.LFD.2.00.0912141503360.23173@xanadu.home>
+	<c70ff3ad0912142350v2231938dqc9c0aedc214120bd@mail.gmail.com>
+	<cabda6420912150301n2c1a54d6ta7407d89f4d0f9cf@mail.gmail.com>
+	<cabda6420912150731s1570aa04w4eaff03bc93ee6a6@mail.gmail.com>
+	<20091215171855.GB15855@n2100.arm.linux.org.uk>
+Message-ID: <309002C0DA137042828828FC53D7A9347E2630FB4D@IL-MB01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hallo,
 
-On Thu, Dec 10, 2009 at 09:55:51AM -0800, David Daney wrote:
-> Russell King - ARM Linux wrote:
->> On Tue, Dec 08, 2009 at 10:55:38AM +0100, Uwe Kleine-K?nig wrote:
->>> Use the new unreachable() macro instead of for(;;);
->>
->> Have you investigated what effect this has on generated code?
->
-> Yes.
->
-> Pre GCC-4.5 the generated code should be identical as 'unreachable()'  
-> just expands to 'for(;;);' in this case.
->
-> Post GCC-4.5 the generated code should be smaller.
-I don't have a toolchain using gcc 4.5.
 
-What should we do with this patch?  I think in theory the patch is OK.
-And for pre gcc-4.5 it should not make any difference as we have in
-include/linux/compiler-gcc4.h:
+-----Original Message-----
+From: linux-arm-kernel-bounces@lists.infradead.org [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Russell King - ARM Linux
+Sent: Tuesday, December 15, 2009 7:19 PM
+To: christian pellegrin
+Cc: linux-arm-kernel at lists.infradead.org
+Subject: Re: shared memory problem on ARM v5TE using threads
 
-#if __GNUC_MINOR__ >= 5
-...
-#define unreachable() __builtin_unreachable()
-#endif
+On Tue, Dec 15, 2009 at 04:31:35PM +0100, christian pellegrin wrote:
+> The patch here does what was described by Russell and seems to solve
+> the read/write and the MAP_PRIVATE in test cases like the one I
+> posted. As noted it may not be enough.
 
-and in include/linux/compiler.h:
+This might be enough (but needs thorough testing).  However, adding
+the requirement for L2 cache flushing in flush_dcache_page() because
+you have an L2 cache is unfair on those L2's which don't suffer from
+this problem.
 
-#ifndef unreachable
-# define unreachable() do { } while (1)
-#endif
+I think we need to have a little more information about the behaviour
+of the L2 cache so that we can decide how much flushing is required,
+and where.
+[Ronen Shitrit] What information do you need?
 
-So the only impact if that
 
-	do { } while (1)
-
-is used instead of
-
-	for(;;)
-
-.  My toolchain (based on 4.3.2) produces the same object files with and
-without the patch.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
