@@ -1,48 +1,141 @@
-From: rshitrit@marvell.com (Ronen Shitrit)
-Date: Wed, 16 Dec 2009 16:08:32 +0200
-Subject: shared memory problem on ARM v5TE using threads
-In-Reply-To: <20091215171855.GB15855@n2100.arm.linux.org.uk>
-References: <309002C0DA137042828828FC53D7A9347E2630EEC2@IL-MB01.marvell.com>
-	<20091213120033.GA10698@n2100.arm.linux.org.uk>
-	<20091213120615.GB10698@n2100.arm.linux.org.uk>
-	<cabda6420912140513k40a998b7k8cf56c35cc535cfb@mail.gmail.com>
-	<309002C0DA137042828828FC53D7A9347E2630F364@IL-MB01.marvell.com>
-	<cabda6420912140948t23c07676tb5f44eb4febbc584@mail.gmail.com>
-	<alpine.LFD.2.00.0912141503360.23173@xanadu.home>
-	<c70ff3ad0912142350v2231938dqc9c0aedc214120bd@mail.gmail.com>
-	<cabda6420912150301n2c1a54d6ta7407d89f4d0f9cf@mail.gmail.com>
-	<cabda6420912150731s1570aa04w4eaff03bc93ee6a6@mail.gmail.com>
-	<20091215171855.GB15855@n2100.arm.linux.org.uk>
-Message-ID: <309002C0DA137042828828FC53D7A9347E2630FB4D@IL-MB01.marvell.com>
+From: richardliu@ms1.techarea.org (Richard Liu)
+Date: Wed, 16 Dec 2009 22:13:35 +0800
+Subject: [Fwd: [PATCH] PCI Domains Support]
+Message-ID: <4B28EB0F.3070409@ms1.techarea.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi, all:
+
+    Seems ARM don's support PCI Domains function now.
+Here is a tiny patch for PCI Domains support
+
+    It's work on my platform,
+There are two PCIe host controller on my platform, and both bus number
+should be 0
+So, use PCI Domain to control both PCIe host controller is better choice.
+
+Here is platform PCIe sample code,
+static struct hw_pci cxxxxxx_pcie0 __initdata = {
+        .swizzle = pci_std_swizzle,
+        .map_irq = cxxxxxx_pcie0_map_irq,
+        .nr_controllers = 1,
+        .nr_domains = 0,
+        .setup = cxxxxxx_pci_setup,
+        .scan = cxxxxxx_pci_scan_bus,
+        .preinit = cxxxxxx_pci_preinit,
+        .postinit = cxxxxxx_pcie0_postinit,
+};
+static struct hw_pci cxxxxxx_pcie1 __initdata = {
+        .swizzle = pci_std_swizzle,
+        .map_irq = cxxxxxx_pcie1_map_irq,
+        .nr_controllers = 1,
+        .nr_domains = 1,
+        .setup = cxxxxxx_pci_setup,
+        .scan = cxxxxxx_pci_scan_bus,
+        .postinit = cxxxxxx_pcie1_postinit,
+};
+
+static int __init cxxxxxx_pci_init(void)
+{
+        pci_common_init(&cxxxxxx_pcie0);
+        pci_common_init(&cxxxxxx_pcie1);
+        return 0;
+}
 
 
------Original Message-----
-From: linux-arm-kernel-bounces@lists.infradead.org [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Russell King - ARM Linux
-Sent: Tuesday, December 15, 2009 7:19 PM
-To: christian pellegrin
-Cc: linux-arm-kernel at lists.infradead.org
-Subject: Re: shared memory problem on ARM v5TE using threads
-
-On Tue, Dec 15, 2009 at 04:31:35PM +0100, christian pellegrin wrote:
-> The patch here does what was described by Russell and seems to solve
-> the read/write and the MAP_PRIVATE in test cases like the one I
-> posted. As noted it may not be enough.
-
-This might be enough (but needs thorough testing).  However, adding
-the requirement for L2 cache flushing in flush_dcache_page() because
-you have an L2 cache is unfair on those L2's which don't suffer from
-this problem.
-
-I think we need to have a little more information about the behaviour
-of the L2 cache so that we can decide how much flushing is required,
-and where.
-[Ronen Shitrit] What information do you need?
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+--
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 79a3074..33a49ba 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -865,6 +865,10 @@ config PCI
+       your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
+       VESA. If you have PCI, say Y, otherwise N.
+ 
++config PCI_DOMAINS
++        def_bool y
++        depends on PCI
++
+ config PCI_SYSCALL
+     def_bool PCI
+ 
+diff --git a/arch/arm/include/asm/mach/pci.h
+b/arch/arm/include/asm/mach/pci.h
+index a38bdc7..f099067 100644
+--- a/arch/arm/include/asm/mach/pci.h
++++ b/arch/arm/include/asm/mach/pci.h
+@@ -20,6 +20,9 @@ struct hw_pci {
+     void        (*postinit)(void);
+     u8        (*swizzle)(struct pci_dev *dev, u8 *pin);
+     int        (*map_irq)(struct pci_dev *dev, u8 slot, u8 pin);
++#ifdef CONFIG_PCI_DOMAINS
++    int        nr_domains;
++#endif
+ };
+ 
+ /*
+@@ -37,8 +40,12 @@ struct pci_sys_data {
+                     /* IRQ mapping                */
+     int        (*map_irq)(struct pci_dev *, u8, u8);
+     struct hw_pci    *hw;
++#ifdef CONFIG_PCI_DOMAINS
++    int        domain;
++#endif
+ };
+ 
++
+ /*
+  * This is the standard PCI-PCI bridge swizzling algorithm.
+  */
+diff --git a/arch/arm/include/asm/pci.h b/arch/arm/include/asm/pci.h
+index 0abf386..57ce5bd 100644
+--- a/arch/arm/include/asm/pci.h
++++ b/arch/arm/include/asm/pci.h
+@@ -25,6 +25,11 @@ static inline void pcibios_penalize_isa_irq(int irq,
+int active)
+     /* We don't do dynamic PCI IRQ allocation */
+ }
+ 
++#ifdef CONFIG_PCI_DOMAINS
++int pci_domain_nr(struct pci_bus *bus);
++int pci_proc_domain(struct pci_bus *bus);
++#endif
++
+ /*
+  * The PCI address space does equal the physical memory address space.
+  * The networking and block device layers use this boolean for bounce
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 8096819..b364ca8 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -531,6 +531,7 @@ static void __init pcibios_init_hw(struct hw_pci *hw)
+         sys->busnr   = busnr;
+         sys->swizzle = hw->swizzle;
+         sys->map_irq = hw->map_irq;
++        sys->domain  = hw->nr_domains;
+         sys->resource[0] = &ioport_resource;
+         sys->resource[1] = &iomem_resource;
+ 
+@@ -694,3 +695,20 @@ int pci_mmap_page_range(struct pci_dev *dev, struct
+vm_area_struct *vma,
+ 
+     return 0;
+ }
++#ifdef CONFIG_PCI_DOMAINS
++int pci_domain_nr(struct pci_bus *bus)
++{
++
++        //struct pci_sysdata *sd = bus->sysdata;
++        struct pci_sys_data *sd = bus->sysdata;
++        return sd->domain;
++
++}
++EXPORT_SYMBOL(pci_domain_nr);
++
++int pci_proc_domain(struct pci_bus *bus)
++{
++        return pci_domain_nr(bus);
++}
++EXPORT_SYMBOL(pci_proc_domain);
++#endif
