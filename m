@@ -1,124 +1,74 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 17 Dec 2009 18:30:32 +0530
-Subject: [PATCH 3/4 v2] ARM: L2 : Errata 588369: Clean & Invalidate do not
-	invalidate clean lines
-Message-ID: <1261054832-14995-1-git-send-email-santosh.shilimkar@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 17 Dec 2009 14:17:09 +0100
+Subject: [PATCH 16/20] imx27: define and use MX27_IO_ADDRESS
+In-Reply-To: <19242.6870.193432.23163@ipc1.ka-ro>
+References: <1260990002-24168-10-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-11-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-12-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-13-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-14-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-15-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1260990002-24168-16-git-send-email-u.kleine-koenig@pengutronix.de>
+	<19241.55420.124271.517259@ipc1.ka-ro>
+	<20091217100526.GD19548@pengutronix.de>
+	<19242.6870.193432.23163@ipc1.ka-ro>
+Message-ID: <20091217131709.GB9032@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements the work-around for the errata 588369. The secure API
-is used to alter L2 debug regsiter because of trust-zone.
+Hello Lothar,
 
-Signed-off-by: Woodruff Richard <r-woodruff2@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-cc: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/Kconfig         |   14 ++++++++++++++
- arch/arm/mm/cache-l2x0.c |   44 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 58 insertions(+), 0 deletions(-)
+On Thu, Dec 17, 2009 at 12:49:42PM +0100, Lothar Wa?mann wrote:
+> Hi,
+> 
+> Uwe Kleine-K?nig writes:
+> > Hello Lother,
+> > 
+> Lothar
+>     ^
+oops, sorry.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 233a222..daae2d0 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -917,6 +917,20 @@ config ARM_ERRATA_460075
- 	  ACTLR register. Note that setting specific bits in the ACTLR register
- 	  may not be available in non-secure mode.
+> > On Thu, Dec 17, 2009 at 08:06:36AM +0100, Lothar Wa?mann wrote:
+> > > > +#define MX27_IO_ADDRESS(x)						\
+> > > > +	(void __force __iomem *) ( 					\
+> > > > +	IMX_IO_ADDRESS(x, MX27_AIPI) ?:					\
+> > > > +	IMX_IO_ADDRESS(x, MX27_SAHB1) ?:				\
+> > > > +	IMX_IO_ADDRESS(x, MX27_X_MEMC) ?:				\
+> > > > +	0xdeadbeef)
+> > >         ^^^^^^^^^^
+> > > I prefer to have a plain '0' here. Otherwise an invocation of this
+> > > macro with an illegal address could lead to silent corruption of
+> > > memory that happens to be mapped at that virtual address instead of a
+> > > kernel oops due to a null pointer dereference!
+> > > 
+> > > Same for the other processors.
+> > I'm a bit undecided here.  I choosed 0xdeadbeef because it is used in
+> >
+> 0xdeadbeef by itself may look suspicious if you find it in some crash
+> dump. But if some offset is added to it, you cannot distinguish it
+> from any other legal virtual address.
+Together with the discussion that it's better to do
+
+	MX27_IO_ADDRESS(BASE + offset)
+
+instead of
+
+	MX27_IO_ADDRESS(BASE) + offset
+
+there is no offset added to 0xdeadbeef.  Anyhow, 0 looks cleaner and as
+all imx machines have a mmu there should be nothing at address 0.
  
-+config PL310_ERRATA_588369
-+	bool "Clean & Invalidate maintenance operations do not invalidate clean lines"
-+	depends on CACHE_L2X0 && ARCH_OMAP4
-+	default n
-+	help
-+	   The PL310 L2 cache controller implements three types of Clean &
-+	   Invalidate maintenance operations: by Physical Address
-+	   (offset 0x7F0), by Index/Way (0x7F8) and by Way (0x7FC).
-+	   They are architecturally defined to behave as the execution of a
-+	   clean operation followed immediately by an invalidate operation,
-+	   both performing to the same memory location. This functionality
-+	   is not correctly implemented in PL310 as clean lines are not
-+	   invalidated as a result of these operations. Note that this errata
-+	   uses Texas Instrument's secure monitor api.
- endmenu
- 
- source "arch/arm/common/Kconfig"
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 747f9a9..4d33dc9 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -28,6 +28,21 @@
- static void __iomem *l2x0_base;
- static DEFINE_SPINLOCK(l2x0_lock);
- 
-+#ifdef CONFIG_PL310_ERRATA_588369
-+static void debug_writel(unsigned long val)
-+{
-+	/*
-+	 * Texas Instrument secure monitor api to modify the PL310
-+	 * Debug Control Register. R0 = val
-+	 */
-+	__asm__ __volatile__(
-+	"stmfd r13!, {r4-r8}\n"
-+	"ldr r12, =0x100\n"
-+	"dsb\n"
-+	"smc\n"
-+	"ldmfd r13!, {r4-r8}");
-+}
-+#endif
- static inline void sync_writel(unsigned long val, unsigned long reg,
- 			       unsigned long complete_mask)
- {
-@@ -59,13 +74,27 @@ static void l2x0_inv_range(unsigned long start, unsigned long end)
- 
- 	if (start & (CACHE_LINE_SIZE - 1)) {
- 		start &= ~(CACHE_LINE_SIZE - 1);
-+#ifdef CONFIG_PL310_ERRATA_588369
-+		debug_writel(0x03);
-+		sync_writel(start, L2X0_CLEAN_LINE_PA, 1);
-+		sync_writel(start, L2X0_INV_LINE_PA, 1);
-+		debug_writel(0x00);
-+#else
- 		sync_writel(start, L2X0_CLEAN_INV_LINE_PA, 1);
-+#endif
- 		start += CACHE_LINE_SIZE;
- 	}
- 
- 	if (end & (CACHE_LINE_SIZE - 1)) {
- 		end &= ~(CACHE_LINE_SIZE - 1);
-+#ifdef CONFIG_PL310_ERRATA_588369
-+		debug_writel(0x03);
-+		sync_writel(end, L2X0_CLEAN_LINE_PA, 1);
-+		sync_writel(end, L2X0_INV_LINE_PA, 1);
-+		debug_writel(0x00);
-+#else
- 		sync_writel(end, L2X0_CLEAN_INV_LINE_PA, 1);
-+#endif
- 	}
- 
- 	for (addr = start; addr < end; addr += CACHE_LINE_SIZE)
-@@ -88,8 +117,23 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
- 	unsigned long addr;
- 
- 	start &= ~(CACHE_LINE_SIZE - 1);
-+#ifdef CONFIG_PL310_ERRATA_588369
-+
-+	/* Disbale Write-Back and Cache Linefill */
-+	debug_writel(0x03);
-+
-+	/* Clean by PA followed by Invalidate by PA */
-+	for (addr = start; addr < end; addr += CACHE_LINE_SIZE) {
-+		sync_writel(addr, L2X0_CLEAN_LINE_PA, 1);
-+		sync_writel(addr, L2X0_INV_LINE_PA, 1);
-+	}
-+
-+	/* Enable Write-Back and Cache Linefill */
-+	debug_writel(0x00);
-+#else
- 	for (addr = start; addr < end; addr += CACHE_LINE_SIZE)
- 		sync_writel(addr, L2X0_CLEAN_INV_LINE_PA, 1);
-+#endif
- 	cache_sync();
- }
- 
+> > IO_ADDRESS, too.  It's not aligned, so probably nothing happens.  As
+> >
+> Then, that macro should be changed also. And for the alignment
+> argument, memory can also be accessed bytewise.
+The longtime plan for IO_ADDRESS is to go away, so I don't care much.
+0xdeadbeaf goes back to (at least)
+52c543f90c4095dff71dc125017594b61a753069.  That was 2 years ago.
+
+Best regards
+Uwe
+
 -- 
-1.6.0.4
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
