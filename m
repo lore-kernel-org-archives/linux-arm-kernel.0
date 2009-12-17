@@ -1,39 +1,63 @@
-From: rubini-list@gnudd.com (Alessandro Rubini)
-Date: Thu, 17 Dec 2009 10:34:34 +0100
-Subject: [PATCH] nhk8815: fix i2c-gpio initialization
-Message-ID: <20091217093434.GA17336@morgana.gnudd.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Dec 2009 09:56:41 +0000
+Subject: CPU consumption is going as high as 95% on ARM Cortex A8
+In-Reply-To: <19F8576C6E063C45BE387C64729E73940449F43857@dbde02.ent.ti.com>
+References: <19F8576C6E063C45BE387C64729E73940449F43857@dbde02.ent.ti.com>
+Message-ID: <20091217095641.GA399@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alessandro Rubini <rubini@unipv.it>
+On Thu, Dec 17, 2009 at 11:08:31AM +0530, Hiremath, Vaibhav wrote:
+> Issue/Usage :- 
+> -------------
+> The V4l2-Capture driver captures the data from video decoder into buffer
+> and the application does some processing on this buffer. The mmap
+> implementation can be found at drivers/media/video/videobuf-dma-contig.c,
+> function__videobuf_mmap_mapper().
 
-Signed-off-by: Alessandro Rubini <rubini@unipv.it>
-Acked-by: Andrea Gallo <andrea.gallo@stericsson.com>
----
- arch/arm/mach-nomadik/i2c-8815nhk.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+        vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
-diff --git a/arch/arm/mach-nomadik/i2c-8815nhk.c b/arch/arm/mach-nomadik/i2c-8815nhk.c
-index abfe25a..7045ec1 100644
---- a/arch/arm/mach-nomadik/i2c-8815nhk.c
-+++ b/arch/arm/mach-nomadik/i2c-8815nhk.c
-@@ -43,12 +43,17 @@ static struct platform_device nhk8815_i2c_dev1 = {
- 
- static int __init nhk8815_i2c_init(void)
- {
-+	/* i2c-gpio switches from out to in and back, so force out data to 0 */
- 	nmk_gpio_set_mode(nhk8815_i2c_data0.scl_pin, NMK_GPIO_ALT_GPIO);
- 	nmk_gpio_set_mode(nhk8815_i2c_data0.sda_pin, NMK_GPIO_ALT_GPIO);
-+	gpio_set_value(nhk8815_i2c_data0.sda_pin, 0);
-+	gpio_set_value(nhk8815_i2c_data0.scl_pin, 0);
- 	platform_device_register(&nhk8815_i2c_dev0);
- 
- 	nmk_gpio_set_mode(nhk8815_i2c_data1.scl_pin, NMK_GPIO_ALT_GPIO);
- 	nmk_gpio_set_mode(nhk8815_i2c_data1.sda_pin, NMK_GPIO_ALT_GPIO);
-+	gpio_set_value(nhk8815_i2c_data1.sda_pin, 0);
-+	gpio_set_value(nhk8815_i2c_data1.scl_pin, 0);
- 	platform_device_register(&nhk8815_i2c_dev1);
- 
- 	return 0;
--- 
-1.6.0.2
+will result in the memory being mapped as 'Strongly Ordered', resulting
+in there being multiple mappings with differing types.  In later
+kernels, we have pgprot_dmacoherent() and I'd suggest changing the above
+macro for that.
+
+> Without PAGE_READONLY/PAGE_SHARED
+> 
+> Important bits are [0-9] - 0x383
+> 
+> With PAGE_READONLY/PAGE_SHARED set
+> 
+> Important bits are [0-9] - 0x38F
+
+So the difference is the C and B bits, which is more or less expected
+with the change you've made.
+
+> 
+> The lines inside function "cpu_v7_set_pte_ext", is using the flag as shown below -
+> 
+>    tst     r1, #L_PTE_USER
+>    orrne   r3, r3, #PTE_EXT_AP1
+>    tstne   r3, #PTE_EXT_APX
+>    bicne   r3, r3, #PTE_EXT_APX | PTE_EXT_AP0
+> 
+> Without PAGE_READONLY/PAGE_SHARED		With flags set
+> 
+> Access perm = reserved				Access Perm = Read Only
+
+The bits you quote above are L_PTE_* bits, so you need to be careful
+decoding them.  0x383 gives
+
+	L_PTE_EXEC|L_PTE_USER|L_PTE_WRITE|L_PTE_YOUNG|L_PTE_PRESENT
+
+which is as expected, and will be translated into: APX=0 AP1=1 AP0=0
+which is user r/o, system r/w.  The same will be true of 0x38f.
+
+> - I tried the same thing with another platform (ARM9) and it works fine there.
+> 
+> Can somebody help me to understand the flag PAGE_SHARED/PAGE_READONLY
+> and access permissions? Am I debugging this into right path? Does
+> anybody have seen/observed similar issue before?
+
+I think you're just seeing the effects of 'strongly ordered' memory
+rather than anything actually wrong.
