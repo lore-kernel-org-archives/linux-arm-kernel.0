@@ -1,35 +1,59 @@
-From: jamie.iles@picochip.com (Jamie Iles)
-Date: Thu, 17 Dec 2009 16:27:10 +0000
-Subject: [PATCH 1/5] arm: provide a mechanism to reserve performance
-	counters
-In-Reply-To: <001101ca7f33$fe8ddc90$fba995b0$@deacon@arm.com>
-References: <1260875712-29712-1-git-send-email-jamie.iles@picochip.com>
-	<1260875712-29712-2-git-send-email-jamie.iles@picochip.com>
-	<001101ca7f33$fe8ddc90$fba995b0$@deacon@arm.com>
-Message-ID: <20091217162710.GC32483@wear.picochip.com>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Thu, 17 Dec 2009 17:54:21 +0100
+Subject: Regulator framework usage in suspend/resume contex.
+Message-ID: <000301ca7f39$96047b60$c20d7220$%majewski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2009 at 04:14:22PM -0000, Will Deacon wrote:
-> > +const struct pmu_irqs *
-> > +reserve_pmu(void)
-> > +{
-> > +	int ret = down_trylock(&pmu_mutex) ? -EBUSY : 0;
-> > +
-> > +	return ret ? ERR_PTR(ret) : &pmu_irqs;
-> > +}
-> 
-> I think it would be sensible to return an error (-ENODEV) if
-> pmu_irqs.num_irqs == 0. Not doing so can cause applications
-> to fail silently when they are running on unsupported boards.
-I did think about that, but when the interrupts were in oprofile, it
-didn't regard this as an error so I kept this the same.
+Hello all,
 
-In the perf events code, we check that num_irqs is >= 1. You _could_ use
-the pmu as free running counters that you just periodically sample and
-wouldn't need an interrupt so I thought it best to leave this error
-checking to the user.
+I'm trying to use the regulator framework in conjunction with suspend/resume
+(code based on a s3c Samsung SoC platform).
+My goal is to change values of regulators output before going to sleep and
+restore their values after resume.
 
-Cheers,
+I use echo mem > /sys/power/state to suspend to RAM.
+I've implemented platform_suspend_ops' .begin method and from it I'm calling
+the regulator_suspend_prepare(state) function from regulator framework
+(declared at include/linux/regulator/machine.h, defined at core.c).
+After this step I'm going to sleep. And it seems that voltage values are
+changed/disabled as they should (according to .constraints->.state_mem
+struct fields).
 
-Jamie
+The problem is when I disable normally enabled source or change its voltage
+value to new_value when entering the suspend to RAM state.
+
+.state_mem      = {
+	.enabled= 0,
+},
+
+Or
+
+.state_mem      = {
+	.uV= new_value,
+	.enabled= 1,
+},
+
+I don't know how to enable this source again after resume or restore source
+microvolts setting as before suspend?
+
+As I suppose, the preferred place for performing this would be a .finish
+method from platform_suspend_ops' structure (declared in
+include/linux/suspend.h).
+
+It looks like some relevant method is missing in the framework, or I haven't
+look deep enough to spot one :-).
+
+One possible workaround would be to reinitialize all regulators with
+regulator_init_complete(void) function, but I'm not sure if then old
+microvolt settings would be restored. Probably not...
+Does anybody have any idea how to solve this problem?
+
+I was grepping a little and it looks, that regulator_suspend_prepare()
+method is not used by any suspend/resume driver in the kernel linux tree (at
+least up to kernel version 2.6.32-rc8), so there is no reference code.
+
+
+
+Thanks in advance,
+Lukasz Majewski
