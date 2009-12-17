@@ -1,59 +1,68 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Thu, 17 Dec 2009 17:54:21 +0100
-Subject: Regulator framework usage in suspend/resume contex.
-Message-ID: <000301ca7f39$96047b60$c20d7220$%majewski@samsung.com>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Fri, 18 Dec 2009 01:01:29 +0800
+Subject: [PATCH] ARM: NUC900: Fix type error
+In-Reply-To: <e68bb3470912162315t72f32a30h857778e66e4044c1@mail.gmail.com>
+References: <8fb2581d0912162305l782a4fd6qb4641dc11b2d463d@mail.gmail.com>
+	<e68bb3470912162315t72f32a30h857778e66e4044c1@mail.gmail.com>
+Message-ID: <e68bb3470912170901l6a89a194x8a0a6ad656485f32@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+hi,
 
-I'm trying to use the regulator framework in conjunction with suspend/resume
-(code based on a s3c Samsung SoC platform).
-My goal is to change values of regulators output before going to sleep and
-restore their values after resume.
+Would you please sent all your patches to my this mail address as
+attached files?
+I am going to do the integration.
 
-I use echo mem > /sys/power/state to suspend to RAM.
-I've implemented platform_suspend_ops' .begin method and from it I'm calling
-the regulator_suspend_prepare(state) function from regulator framework
-(declared at include/linux/regulator/machine.h, defined at core.c).
-After this step I'm going to sleep. And it seems that voltage values are
-changed/disabled as they should (according to .constraints->.state_mem
-struct fields).
+2009/12/17 Wan ZongShun <mcuos.com@gmail.com>:
+> 2009/12/17 Li Jie <eltshanli@gmail.com>:
+>> Hi, Wan:
+>>
+>> When I compiling latest kernel code, I met following error:
+>> ?CC ? ? ?arch/arm/mach-w90x900/dev.o
+>> arch/arm/mach-w90x900/dev.c:200: error: variable
+>> ?nuc900_spiflash_data? has initializer but incomplete type
+>>
+>
+> Really? I think that I submitted it after building.
+>
+>> We should use nuc900_spi_info instead of w90p910_spi_info, right ?
+>
+> Okay, wait for me to check this later, if so, I am sorry for this mistake.
+>
+>> Signed-off-by: lijie <eltshanli@gmail.com>
+>> ---
+>> ?arch/arm/mach-w90x900/dev.c | ? ?2 +-
+>> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-w90x900/dev.c b/arch/arm/mach-w90x900/dev.c
+>> index 51f17b7..ec711f4 100644
+>> --- a/arch/arm/mach-w90x900/dev.c
+>> +++ b/arch/arm/mach-w90x900/dev.c
+>> @@ -197,7 +197,7 @@ static struct platform_device nuc900_device_emc = {
+>>
+>> ?/* SPI device */
+>>
+>> -static struct w90p910_spi_info nuc900_spiflash_data = {
+>> +static struct nuc900_spi_info nuc900_spiflash_data = {
+>> ? ? ? ?.num_cs ? ? ? ? = 1,
+>> ? ? ? ?.lsb ? ? ? ? ? ?= 0,
+>> ? ? ? ?.txneg ? ? ? ? ?= 1,
+>> --
+>> 1.6.5.4
+>>
+>
+>
+>
+> --
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
 
-The problem is when I disable normally enabled source or change its voltage
-value to new_value when entering the suspend to RAM state.
-
-.state_mem      = {
-	.enabled= 0,
-},
-
-Or
-
-.state_mem      = {
-	.uV= new_value,
-	.enabled= 1,
-},
-
-I don't know how to enable this source again after resume or restore source
-microvolts setting as before suspend?
-
-As I suppose, the preferred place for performing this would be a .finish
-method from platform_suspend_ops' structure (declared in
-include/linux/suspend.h).
-
-It looks like some relevant method is missing in the framework, or I haven't
-look deep enough to spot one :-).
-
-One possible workaround would be to reinitialize all regulators with
-regulator_init_complete(void) function, but I'm not sure if then old
-microvolt settings would be restored. Probably not...
-Does anybody have any idea how to solve this problem?
-
-I was grepping a little and it looks, that regulator_suspend_prepare()
-method is not used by any suspend/resume driver in the kernel linux tree (at
-least up to kernel version 2.6.32-rc8), so there is no reference code.
 
 
-
-Thanks in advance,
-Lukasz Majewski
+-- 
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
