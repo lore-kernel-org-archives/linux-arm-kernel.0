@@ -1,184 +1,187 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 16 Dec 2009 00:29:20 -0500
-Subject: [PATCH v2 02/09] mfd: support 88pm8606 in 860x driver
-In-Reply-To: <20091210103557.GA6873@sortiz.org>
-References: <771cded00912090511s3f28dd7tf0dcbc54c0c50970@mail.gmail.com>
-	<20091210103557.GA6873@sortiz.org>
-Message-ID: <771cded00912152129u33ed2131x148e8fbecb898165@mail.gmail.com>
+From: richardliu@ms1.techarea.org (Richard Liu)
+Date: Thu, 17 Dec 2009 21:01:06 +0800
+Subject: [PATCH] PCI Domains Support
+In-Reply-To: <20091217000620.GC22449@verge.net.au>
+References: <4B28EB0F.3070409@ms1.techarea.org>
+	<20091217000620.GC22449@verge.net.au>
+Message-ID: <4B2A2B92.6020809@ms1.techarea.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 10, 2009 at 5:35 AM, Samuel Ortiz <sameo@linux.intel.com> wrote:
-> Hi Haojian,
->
-> On Wed, Dec 09, 2009 at 08:11:22AM -0500, Haojian Zhuang wrote:
+Dear Simon:
+
+Simon Horman wrote:
+> On Wed, Dec 16, 2009 at 10:13:35PM +0800, Richard Liu wrote:
+>   
+>> Hi, all:
 >>
->> Now share one driver to these two devices. Only one I2C client is identified
->> in platform init data. If another chip is also used, user should mark it in
->> companion_addr field of platform init data. Then driver could create another
->> I2C client for the companion chip.
+>>     Seems ARM don's support PCI Domains function now.
+>> Here is a tiny patch for PCI Domains support
 >>
->> All I2C operations are accessed by 860x-i2c driver. In order to support both
->> I2C client address, the read/write API is changed in below.
-> The code looks better now. I still have a few comments though:
->
->> -static inline int pm8607_read_device(struct pm8607_chip *chip,
->> +static struct mutex io_lock;
-> Why do we need a static lock here ?
-
-OK, removed it now.
->
->> - ? ? mutex_lock(&chip->io_lock);
->> + ? ? mutex_lock(&io_lock);
-> Why not keep mutex_unlock(&chip->io_lock); where chip is
-> i2c_get_clientdata(i2c) ?
-
-Done.
->
->> ?static int __devinit pm860x_probe(struct i2c_client *client,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? const struct i2c_device_id *id)
->> ?{
->> - ? ? struct pm8607_platform_data *pdata = client->dev.platform_data;
->> - ? ? struct pm8607_chip *chip;
->> + ? ? struct pm860x_platform_data *pdata = client->dev.platform_data;
->> + ? ? struct pm860x_chip *chip;
->> + ? ? struct i2c_board_info i2c_info = {
->> + ? ? ? ? ? ? .type ? ? ? ? ? = "88PM860x",
->> + ? ? ? ? ? ? .platform_data ?= client->dev.platform_data,
-> I dont think you want to use the same platform_data. At least you want to
-> reset the companion_addr field.
-
-Actually I used the same platform data for both of these two devices.
-Since I only assign companion_addr once in platform_data. If
-client->addr equals to companion_addr, there's two 860x chips and
-current client isn't companion one. If companion_addr is zero, there's
-only one 860x chip. If client->addr equals to companion_addr, current
-client is companion one.
-
-So I needn't to reset the companion_addr field.
->
->
+>>     It's work on my platform,
+>> There are two PCIe host controller on my platform, and both bus number
+>> should be 0
+>> So, use PCI Domain to control both PCIe host controller is better choice.
+>>
+>> Here is platform PCIe sample code,
+>> static struct hw_pci cxxxxxx_pcie0 __initdata = {
+>>         .swizzle = pci_std_swizzle,
+>>         .map_irq = cxxxxxx_pcie0_map_irq,
+>>         .nr_controllers = 1,
+>>         .nr_domains = 0,
+>>         .setup = cxxxxxx_pci_setup,
+>>         .scan = cxxxxxx_pci_scan_bus,
+>>         .preinit = cxxxxxx_pci_preinit,
+>>         .postinit = cxxxxxx_pcie0_postinit,
+>> };
+>> static struct hw_pci cxxxxxx_pcie1 __initdata = {
+>>         .swizzle = pci_std_swizzle,
+>>         .map_irq = cxxxxxx_pcie1_map_irq,
+>>         .nr_controllers = 1,
+>>         .nr_domains = 1,
+>>         .setup = cxxxxxx_pci_setup,
+>>         .scan = cxxxxxx_pci_scan_bus,
+>>         .postinit = cxxxxxx_pcie1_postinit,
+>> };
+>>
+>> static int __init cxxxxxx_pci_init(void)
+>> {
+>>         pci_common_init(&cxxxxxx_pcie0);
+>>         pci_common_init(&cxxxxxx_pcie1);
+>>         return 0;
+>> }
+>>
+>>
+>> --
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 79a3074..33a49ba 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -865,6 +865,10 @@ config PCI
+>>        your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
+>>        VESA. If you have PCI, say Y, otherwise N.
+>>  
+>> +config PCI_DOMAINS
+>> +        def_bool y
+>> +        depends on PCI
 >> +
->> + ? ? if (found_companion || (addr_c == 0)) {
-> You probably dont need that check here.
-
-Since I'm share the same platform data to two devices, I have to check
-the companion_addr.
+>>     
 >
->
->> + ? ? ? ? ? ? chip = kzalloc(sizeof(struct pm860x_chip), GFP_KERNEL);
->> + ? ? ? ? ? ? if (chip == NULL)
->> + ? ? ? ? ? ? ? ? ? ? return -ENOMEM;
+> The PCI_DOMAINS config variable seems unnecessary to me.
+>   
+ARM is a highly custom platform, just reverse for other platform add
+their code,
+Some platforms might need PCI domains, but some platforms not.
+>   
+>>  config PCI_SYSCALL
+>>      def_bool PCI
+>>  
+>> diff --git a/arch/arm/include/asm/mach/pci.h
+>> b/arch/arm/include/asm/mach/pci.h
+>> index a38bdc7..f099067 100644
+>> --- a/arch/arm/include/asm/mach/pci.h
+>> +++ b/arch/arm/include/asm/mach/pci.h
+>> @@ -20,6 +20,9 @@ struct hw_pci {
+>>      void        (*postinit)(void);
+>>      u8        (*swizzle)(struct pci_dev *dev, u8 *pin);
+>>      int        (*map_irq)(struct pci_dev *dev, u8 slot, u8 pin);
+>> +#ifdef CONFIG_PCI_DOMAINS
+>> +    int        nr_domains;
+>> +#endif
+>>  };
+>>  
+>>  /*
+>> @@ -37,8 +40,12 @@ struct pci_sys_data {
+>>                      /* IRQ mapping                */
+>>      int        (*map_irq)(struct pci_dev *, u8, u8);
+>>      struct hw_pci    *hw;
+>> +#ifdef CONFIG_PCI_DOMAINS
+>> +    int        domain;
+>> +#endif
+>>  };
+>>  
 >> +
->> + ? ? ? ? ? ? chip->id = verify_addr(client);
->> + ? ? ? ? ? ? chip->client = client;
->> + ? ? ? ? ? ? i2c_set_clientdata(client, chip);
->> + ? ? ? ? ? ? chip->dev = &client->dev;
->> + ? ? ? ? ? ? mutex_init(&io_lock);
->> + ? ? ? ? ? ? dev_set_drvdata(chip->dev, chip);
+>>  /*
+>>   * This is the standard PCI-PCI bridge swizzling algorithm.
+>>   */
+>> diff --git a/arch/arm/include/asm/pci.h b/arch/arm/include/asm/pci.h
+>> index 0abf386..57ce5bd 100644
+>> --- a/arch/arm/include/asm/pci.h
+>> +++ b/arch/arm/include/asm/pci.h
+>> @@ -25,6 +25,11 @@ static inline void pcibios_penalize_isa_irq(int irq,
+>> int active)
+>>      /* We don't do dynamic PCI IRQ allocation */
+>>  }
+>>  
+>> +#ifdef CONFIG_PCI_DOMAINS
+>> +int pci_domain_nr(struct pci_bus *bus);
+>> +int pci_proc_domain(struct pci_bus *bus);
+>> +#endif
 >> +
->> + ? ? ? ? ? ? if (found_companion) {
->> + ? ? ? ? ? ? ? ? ? ? chip->companion = i2c_new_device(client->adapter,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?&i2c_info);
->> + ? ? ? ? ? ? ? ? ? ? i2c_set_clientdata(chip->companion, chip);
->> + ? ? ? ? ? ? }
-> I guess you've tested that code. I have a question: After returning from
-> i2c_new_device(), I'd expect pm860x_probe() to be called as the companion chip
-> is bound. Isnt that that the case ?
-
-Yes, it past the test. The sequence is in below
-1) Driver is built in. First chip is probed, and launch
-i2c_new_device(). Second chip is probed while the first one isn't
-finished yet. The probing process is recursive.
-2) Driver is built as module. First chip is probed, and launch
-i2c_new_device(). Then the first chip probing is finished. At last the
-second chip is probed. The probing process is sequential.
-
+>>  /*
+>>   * The PCI address space does equal the physical memory address space.
+>>   * The networking and block device layers use this boolean for bounce
+>> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+>> index 8096819..b364ca8 100644
+>> --- a/arch/arm/kernel/bios32.c
+>> +++ b/arch/arm/kernel/bios32.c
+>> @@ -531,6 +531,7 @@ static void __init pcibios_init_hw(struct hw_pci *hw)
+>>          sys->busnr   = busnr;
+>>          sys->swizzle = hw->swizzle;
+>>          sys->map_irq = hw->map_irq;
+>> +        sys->domain  = hw->nr_domains;
+>>          sys->resource[0] = &ioport_resource;
+>>          sys->resource[1] = &iomem_resource;
+>>  
+>> @@ -694,3 +695,20 @@ int pci_mmap_page_range(struct pci_dev *dev, struct
+>> vm_area_struct *vma,
+>>  
+>>      return 0;
+>>  }
+>> +#ifdef CONFIG_PCI_DOMAINS
+>> +int pci_domain_nr(struct pci_bus *bus)
+>> +{
+>> +
+>> +        //struct pci_sysdata *sd = bus->sysdata;
+>>     
 >
-> Cheers,
-> Samuel.
-> --
+> 	Should the line above should be removed?
+> 	It seems to be noise.
+>   
+Yes,
+I am sorry that I forget remove it when I review it.
 
-Hi Samuel,
+>   
+>> +        struct pci_sys_data *sd = bus->sysdata;
+>> +        return sd->domain;
+>> +
+>> +}
+>> +EXPORT_SYMBOL(pci_domain_nr);
+>> +
+>> +int pci_proc_domain(struct pci_bus *bus)
+>> +{
+>> +        return pci_domain_nr(bus);
+>> +}
+>> +EXPORT_SYMBOL(pci_proc_domain);
+>> +#endif
+>>
+>>
+>>
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>     
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>   
 
-I fixed the patches and pasted all into this mail. Since I fixed some
-issues in below.
-1. remove static io_lock. Use chip->io_lock instead.
-2. fix the load/unload module issue in 88pm860x driver.
-3. fix the chip->chip_irq assignment in 88pm860x driver.
-4. fix led driver since mutex shouldn't be used in timer handler function.
-
-Please review all of them.
-
-Best Regards
-Haojian
 -------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-mfd-split-88pm8607-driver.patch
-Type: text/x-patch
-Size: 18314 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091216/dc27e024/attachment-0010.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0002-mfd-support-88pm8606-in-860x-driver.patch
-Type: text/x-patch
-Size: 25509 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091216/dc27e024/attachment-0011.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0003-mfd-rename-88pm8607-to-88pm860x-in-mfd.patch
-Type: text/x-patch
-Size: 1924 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091216/dc27e024/attachment-0012.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0004-mfd-add-irq-support-in-88pm860x.patch
-Type: text/x-patch
-Size: 11708 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091216/dc27e024/attachment-0013.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0005-mfd-append-subdev-into-88pm860x-driver.patch
-Type: text/x-patch
-Size: 12957 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091216/dc27e024/attachment-0014.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0006-backlight-enable-backlight-in-88pm860x.patch
-Type: text/x-patch
-Size: 9496 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091216/dc27e024/attachment-0015.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0007-led-enable-led-in-88pm860x.patch
-Type: text/x-patch
-Size: 9715 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091216/dc27e024/attachment-0016.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0008-input-enable-touch-on-88pm860x.patch
-Type: text/x-patch
-Size: 9020 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091216/dc27e024/attachment-0017.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0009-regulator-refresh-88pm8607-driver-with-updated-api.patch
-Type: text/x-patch
-Size: 5509 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091216/dc27e024/attachment-0018.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0010-regulator-unsupport-88pm8607-A0-and-A1.patch
-Type: text/x-patch
-Size: 9843 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091216/dc27e024/attachment-0019.bin>
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091217/4c5d4bf4/attachment-0001.htm>
