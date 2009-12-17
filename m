@@ -1,5 +1,5 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Dec 2009 19:33:17 +0000
+From: jamie@shareable.org (Jamie Lokier)
+Date: Thu, 17 Dec 2009 19:38:26 +0000
 Subject: [PATCH] ARM: Convert BUG() to use unreachable()
 In-Reply-To: <20091217191401.GD10707@synopsys.com>
 References: <1260266138-17684-1-git-send-email-u.kleine-koenig@pengutronix.de>
@@ -10,11 +10,11 @@ References: <1260266138-17684-1-git-send-email-u.kleine-koenig@pengutronix.de>
 	<20091217183517.GC10707@synopsys.com>
 	<20091217190613.GB4440@n2100.arm.linux.org.uk>
 	<20091217191401.GD10707@synopsys.com>
-Message-ID: <20091217193317.GC4440@n2100.arm.linux.org.uk>
+Message-ID: <20091217193826.GE362@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2009 at 11:14:01AM -0800, Joe Buck wrote:
+Joe Buck wrote:
 > On Thu, Dec 17, 2009 at 11:06:13AM -0800, Russell King - ARM Linux wrote:
 > > On Thu, Dec 17, 2009 at 10:35:17AM -0800, Joe Buck wrote:
 > > > Besides, didn't I see a whole bunch of kernel security patches related
@@ -25,12 +25,19 @@ On Thu, Dec 17, 2009 at 11:14:01AM -0800, Joe Buck wrote:
 > > protection is independent of the generic kernel.
 > > 
 > > Milage may vary on other architectures, but that's not a concern here.
-> 
+
+It does not trap on at least one ARM-nommu kernel...
+
 > I don't understand, though, why you would want to implement a generally
 > useful facility (make the kernel trap so you can do a post-mortem
 > analysis) in a way that's only safe for the ARM port.
 
-The discussion at hand is about code contained in the ARM supporting
-files (arch/arm/kernel/traps.c), rather than the generic kernel.
+The patch under discussion, which led to these questions and Cc
+gcc at gcc.gnu.org, is specific to the ARM architecture and that is
+Russell's focus, as ARM kernel maintainer.
 
-As such, it is not relevant to any architecture other than ARM.
+But yes, the whole principle of how to trap and whether it's safe to
+follow a null pointer dereference with __builtin_unreachable() applies
+to all the other architectures too.
+
+-- Jamie
