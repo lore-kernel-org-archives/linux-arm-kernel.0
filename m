@@ -1,74 +1,151 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 17 Dec 2009 14:17:09 +0100
-Subject: [PATCH 16/20] imx27: define and use MX27_IO_ADDRESS
-In-Reply-To: <19242.6870.193432.23163@ipc1.ka-ro>
-References: <1260990002-24168-10-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1260990002-24168-11-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1260990002-24168-12-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1260990002-24168-13-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1260990002-24168-14-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1260990002-24168-15-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1260990002-24168-16-git-send-email-u.kleine-koenig@pengutronix.de>
-	<19241.55420.124271.517259@ipc1.ka-ro>
-	<20091217100526.GD19548@pengutronix.de>
-	<19242.6870.193432.23163@ipc1.ka-ro>
-Message-ID: <20091217131709.GB9032@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 17 Dec 2009 14:33:41 +0100
+Subject: [PATCH 2/2] arm/{pxa, sa1100,
+	nomadik}: Don't disable irqs in set_next_event and set_mode
+In-Reply-To: <1261056821-28521-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1259231164-21242-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1261056821-28521-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1261056821-28521-2-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lothar,
+These functions are called with irqs already off.  This commit removes
+the calls to raw_local_irq_save and raw_local_irq_restore on platforms
+that don't have to use a shared interrupt for their timekeeping.
 
-On Thu, Dec 17, 2009 at 12:49:42PM +0100, Lothar Wa?mann wrote:
-> Hi,
-> 
-> Uwe Kleine-K?nig writes:
-> > Hello Lother,
-> > 
-> Lothar
->     ^
-oops, sorry.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Nicolas Pitre <nico@marvell.com>
+Cc: Magnus Damm <damm@opensource.se>
+Cc: Alessandro Rubini <rubini@unipv.it>
+Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
+Cc: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+---
+Hello,
 
-> > On Thu, Dec 17, 2009 at 08:06:36AM +0100, Lothar Wa?mann wrote:
-> > > > +#define MX27_IO_ADDRESS(x)						\
-> > > > +	(void __force __iomem *) ( 					\
-> > > > +	IMX_IO_ADDRESS(x, MX27_AIPI) ?:					\
-> > > > +	IMX_IO_ADDRESS(x, MX27_SAHB1) ?:				\
-> > > > +	IMX_IO_ADDRESS(x, MX27_X_MEMC) ?:				\
-> > > > +	0xdeadbeef)
-> > >         ^^^^^^^^^^
-> > > I prefer to have a plain '0' here. Otherwise an invocation of this
-> > > macro with an illegal address could lead to silent corruption of
-> > > memory that happens to be mapped at that virtual address instead of a
-> > > kernel oops due to a null pointer dereference!
-> > > 
-> > > Same for the other processors.
-> > I'm a bit undecided here.  I choosed 0xdeadbeef because it is used in
-> >
-> 0xdeadbeef by itself may look suspicious if you find it in some crash
-> dump. But if some offset is added to it, you cannot distinguish it
-> from any other legal virtual address.
-Together with the discussion that it's better to do
-
-	MX27_IO_ADDRESS(BASE + offset)
-
-instead of
-
-	MX27_IO_ADDRESS(BASE) + offset
-
-there is no offset added to 0xdeadbeef.  Anyhow, 0 looks cleaner and as
-all imx machines have a mmu there should be nothing at address 0.
- 
-> > IO_ADDRESS, too.  It's not aligned, so probably nothing happens.  As
-> >
-> Then, that macro should be changed also. And for the alignment
-> argument, memory can also be accessed bytewise.
-The longtime plan for IO_ADDRESS is to go away, so I don't care much.
-0xdeadbeaf goes back to (at least)
-52c543f90c4095dff71dc125017594b61a753069.  That was 2 years ago.
+@Eric, IIRC you stoped objecting to just remove the irq saving after
+Russell's analysis, but I cannot find your mail.  Do I remember right?
 
 Best regards
 Uwe
 
+ arch/arm/mach-pxa/time.c      |   10 +---------
+ arch/arm/mach-sa1100/time.c   |    8 +-------
+ arch/arm/plat-nomadik/timer.c |    9 +--------
+ 3 files changed, 3 insertions(+), 24 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/time.c b/arch/arm/mach-pxa/time.c
+index 750c448..293e40a 100644
+--- a/arch/arm/mach-pxa/time.c
++++ b/arch/arm/mach-pxa/time.c
+@@ -76,14 +76,12 @@ pxa_ost0_interrupt(int irq, void *dev_id)
+ static int
+ pxa_osmr0_set_next_event(unsigned long delta, struct clock_event_device *dev)
+ {
+-	unsigned long flags, next, oscr;
++	unsigned long next, oscr;
+ 
+-	raw_local_irq_save(flags);
+ 	OIER |= OIER_E0;
+ 	next = OSCR + delta;
+ 	OSMR0 = next;
+ 	oscr = OSCR;
+-	raw_local_irq_restore(flags);
+ 
+ 	return (signed)(next - oscr) <= MIN_OSCR_DELTA ? -ETIME : 0;
+ }
+@@ -91,23 +89,17 @@ pxa_osmr0_set_next_event(unsigned long delta, struct clock_event_device *dev)
+ static void
+ pxa_osmr0_set_mode(enum clock_event_mode mode, struct clock_event_device *dev)
+ {
+-	unsigned long irqflags;
+-
+ 	switch (mode) {
+ 	case CLOCK_EVT_MODE_ONESHOT:
+-		raw_local_irq_save(irqflags);
+ 		OIER &= ~OIER_E0;
+ 		OSSR = OSSR_M0;
+-		raw_local_irq_restore(irqflags);
+ 		break;
+ 
+ 	case CLOCK_EVT_MODE_UNUSED:
+ 	case CLOCK_EVT_MODE_SHUTDOWN:
+ 		/* initializing, released, or preparing for suspend */
+-		raw_local_irq_save(irqflags);
+ 		OIER &= ~OIER_E0;
+ 		OSSR = OSSR_M0;
+-		raw_local_irq_restore(irqflags);
+ 		break;
+ 
+ 	case CLOCK_EVT_MODE_RESUME:
+diff --git a/arch/arm/mach-sa1100/time.c b/arch/arm/mach-sa1100/time.c
+index b9cbb56..74b6e0e 100644
+--- a/arch/arm/mach-sa1100/time.c
++++ b/arch/arm/mach-sa1100/time.c
+@@ -35,14 +35,12 @@ static irqreturn_t sa1100_ost0_interrupt(int irq, void *dev_id)
+ static int
+ sa1100_osmr0_set_next_event(unsigned long delta, struct clock_event_device *c)
+ {
+-	unsigned long flags, next, oscr;
++	unsigned long next, oscr;
+ 
+-	raw_local_irq_save(flags);
+ 	OIER |= OIER_E0;
+ 	next = OSCR + delta;
+ 	OSMR0 = next;
+ 	oscr = OSCR;
+-	raw_local_irq_restore(flags);
+ 
+ 	return (signed)(next - oscr) <= MIN_OSCR_DELTA ? -ETIME : 0;
+ }
+@@ -50,16 +48,12 @@ sa1100_osmr0_set_next_event(unsigned long delta, struct clock_event_device *c)
+ static void
+ sa1100_osmr0_set_mode(enum clock_event_mode mode, struct clock_event_device *c)
+ {
+-	unsigned long flags;
+-
+ 	switch (mode) {
+ 	case CLOCK_EVT_MODE_ONESHOT:
+ 	case CLOCK_EVT_MODE_UNUSED:
+ 	case CLOCK_EVT_MODE_SHUTDOWN:
+-		raw_local_irq_save(flags);
+ 		OIER &= ~OIER_E0;
+ 		OSSR = OSSR_M0;
+-		raw_local_irq_restore(flags);
+ 		break;
+ 
+ 	case CLOCK_EVT_MODE_RESUME:
+diff --git a/arch/arm/plat-nomadik/timer.c b/arch/arm/plat-nomadik/timer.c
+index 62f18ad..fa7cb3a 100644
+--- a/arch/arm/plat-nomadik/timer.c
++++ b/arch/arm/plat-nomadik/timer.c
+@@ -49,24 +49,17 @@ static struct clocksource nmdk_clksrc = {
+ static void nmdk_clkevt_mode(enum clock_event_mode mode,
+ 			     struct clock_event_device *dev)
+ {
+-	unsigned long flags;
+-
+ 	switch (mode) {
+ 	case CLOCK_EVT_MODE_PERIODIC:
+-		/* enable interrupts -- and count current value? */
+-		raw_local_irq_save(flags);
++		/* count current value? */
+ 		writel(readl(mtu_base + MTU_IMSC) | 1, mtu_base + MTU_IMSC);
+-		raw_local_irq_restore(flags);
+ 		break;
+ 	case CLOCK_EVT_MODE_ONESHOT:
+ 		BUG(); /* Not supported, yet */
+ 		/* FALLTHROUGH */
+ 	case CLOCK_EVT_MODE_SHUTDOWN:
+ 	case CLOCK_EVT_MODE_UNUSED:
+-		/* disable irq */
+-		raw_local_irq_save(flags);
+ 		writel(readl(mtu_base + MTU_IMSC) & ~1, mtu_base + MTU_IMSC);
+-		raw_local_irq_restore(flags);
+ 		break;
+ 	case CLOCK_EVT_MODE_RESUME:
+ 		break;
 -- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+1.6.5.2
