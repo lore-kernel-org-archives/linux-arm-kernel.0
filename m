@@ -1,29 +1,30 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 17 Dec 2009 16:42:56 +0800
-Subject: [PATCH V2 1/2] arm nomadik: add hardware RNG driver
-In-Reply-To: <20091217083623.GA16218@morgana.gnudd.com>
-References: <20091211061526.GA28849@gondor.apana.org.au>
-	<376a2243795aadfb87c8a7f5ea039.1260011962.git.rubini@unipv.it>
-	<20091205185646.GQ8789@waste.org>
-	<20091217083623.GA16218@morgana.gnudd.com>
-Message-ID: <20091217084256.GB28801@gondor.apana.org.au>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 17 Dec 2009 16:51:33 +0800
+Subject: [GIT PULL] pxa: minor fixes for building issues
+Message-ID: <f17812d70912170051l7153dfefhc7265b90cac1ce01@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2009 at 09:36:24AM +0100, Alessandro Rubini wrote:
-> >> Acked-by: Matt Mackall <mpm@selenic.com>
-> > Acked-by: Herbert Xu <herbert@gondor.apana.org.au>
-> 
-> So, what should my next step? I don't find the patch in any tree.
-> Russell, should I put those two in your patch system?
+Russell,
 
-Well I'm happy to pick these up as long as Russell is OK with
-them.  I wanted to hear from him as the second patch touches
-the ARM tree.
+Actually two fixes in this pull request, resolving two building issues, so would
+like this to go in soon.
 
-Thanks,
--- 
-Visit Openswan at http://www.openswan.org/
-Email: Herbert Xu ~{PmV>HI~} <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+The following changes since commit 3ea6b3d0e6d0ffd91c0f8cadeb69b7133c038b32:
+  Linus Torvalds (1):
+        Merge branch 'for_linus' of git://git.kernel.org/.../jack/linux-udf-2.6
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git devel
+
+Eric Miao (2):
+      revert "[ARM] pxa/cm-x300: add PWM backlight support"
+      [ARM] pxa: fix no reference of cpu_is_pxa25x() in devices.c
+
+Igor Grinberg (1):
+      [ARM] pxa/cm-x300: add PWM backlight support
+
+ arch/arm/mach-pxa/Kconfig   |    3 ++-
+ arch/arm/mach-pxa/devices.c |    2 +-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
