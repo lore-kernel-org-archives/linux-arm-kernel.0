@@ -1,29 +1,21 @@
-From: Joe.Buck@synopsys.COM (Joe Buck)
-Date: Thu, 17 Dec 2009 11:14:01 -0800
-Subject: [PATCH] ARM: Convert BUG() to use unreachable()
-In-Reply-To: <20091217190613.GB4440@n2100.arm.linux.org.uk>
-References: <1260266138-17684-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20091217150120.GD24967@shareable.org>
-	<4B2A65C6.7080009@caviumnetworks.com>
-	<84fc9c000912170917y4b2772d0n47bb4dabc74b91ef@mail.gmail.com>
-	<20091217181718.GA4440@n2100.arm.linux.org.uk>
-	<20091217183517.GC10707@synopsys.com>
-	<20091217190613.GB4440@n2100.arm.linux.org.uk>
-Message-ID: <20091217191401.GD10707@synopsys.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Thu, 17 Dec 2009 19:16:02 +0000
+Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors
+In-Reply-To: <13B9B4C6EF24D648824FF11BE896716203A7FA69CC@dlee02.ent.ti.com>
+References: <20091217175416.9317.66257.stgit@e101986-lin>
+	<13B9B4C6EF24D648824FF11BE896716203A7FA69CC@dlee02.ent.ti.com>
+Message-ID: <20091217191602.GC362@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2009 at 11:06:13AM -0800, Russell King - ARM Linux wrote:
-> On Thu, Dec 17, 2009 at 10:35:17AM -0800, Joe Buck wrote:
-> > Besides, didn't I see a whole bunch of kernel security patches related
-> > to null pointer dereferences lately?  If page 0 can be mapped, you
-> > suddenly won't get your trap.
-> 
-> Page 0 can not be mapped on ARM kernels since the late 1990s, and this
-> protection is independent of the generic kernel.
-> 
-> Milage may vary on other architectures, but that's not a concern here.
+Woodruff, Richard wrote:
+> Exclusive operations are more certainly more efficient than the full
+> bus lock behavior of SWP.  Finding and killing SWP where possible
+> seems positive.
 
-I don't understand, though, why you would want to implement a generally
-useful facility (make the kernel trap so you can do a post-mortem
-analysis) in a way that's only safe for the ARM port.
+Are they really more efficient for cached accesses in L1?  In
+principle, external bus lock is not needed when doing an
+read-modify-write on words in MESI cache, just the ability to
+internally block it's eviction during the sequence.
+
+-- Jamie
