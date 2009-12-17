@@ -1,52 +1,66 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Thu, 17 Dec 2009 15:01:20 +0000
-Subject: [PATCH] ARM: Convert BUG() to use unreachable()
-In-Reply-To: <1260266138-17684-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1260266138-17684-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20091217150120.GD24967@shareable.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Dec 2009 16:14:22 -0000
+Subject: [PATCH 1/5] arm: provide a mechanism to reserve performance
+	counters
+In-Reply-To: <1260875712-29712-2-git-send-email-jamie.iles@picochip.com>
+References: <1260875712-29712-1-git-send-email-jamie.iles@picochip.com>
+	<1260875712-29712-2-git-send-email-jamie.iles@picochip.com>
+Message-ID: <001101ca7f33$fe8ddc90$fba995b0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe Kleine-K?nig wrote:
-> Use the new unreachable() macro instead of for(;;);
->  	*(int *)0 = 0;
->  
->  	/* Avoid "noreturn function does return" */
-> -	for (;;);
-> +	unreachable();
+Hi Jamie,
 
-Will GCC-4.5 remove ("optimise away") the *(int *)0 = 0 because it
-knows the branch of the code leading to unreachable can never be reached?
+Just a small thing I noticed with the PMU reservation:
 
-If GCC-4.5 does not, are you sure a future version of GCC will never
-remove it?  In other words, is __builtin_unreachable() _defined_ in
-such a way that it cannot remove the previous assignment?
+*Jamie Iles wrote:
 
-We have seen problems with GCC optimising away important tests for
-NULL pointers in the kernel, due to similar propagation of "impossible
-to occur" conditions, so it's worth checking with GCC people what the
-effect of this one would be.
+> diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
+> new file mode 100644
+> index 0000000..3a178bb
+> --- /dev/null
+> +++ b/arch/arm/kernel/pmu.c
+<snip>
+> +static const int irqs[] = {
+> +#ifdef CONFIG_ARCH_PC3XX
+> +	IRQ_NPMUIRQ,
+> +#elif defined(CONFIG_ARCH_OMAP2)
+> +	3,
+> +#elif defined(CONFIG_ARCH_BCMRING)
+> +	IRQ_PMUIRQ,
+> +#elif defined(CONFIG_MACH_REALVIEW_EB)
+> +	IRQ_EB11MP_PMU_CPU0,
+> +	IRQ_EB11MP_PMU_CPU1,
+> +	IRQ_EB11MP_PMU_CPU2,
+> +	IRQ_EB11MP_PMU_CPU3,
+> +#elif defined(CONFIG_ARCH_OMAP3)
+> +	INT_34XX_BENCH_MPU_EMUL,
+> +#elif defined(CONFIG_ARCH_IOP32X)
+> +	IRQ_IOP32X_CORE_PMU,
+> +#elif defined(CONFIG_ARCH_IOP33X)
+> +	IRQ_IOP33X_CORE_PMU,
+> +#elif defined(CONFIG_ARCH_PXA)
+> +	IRQ_PMU,
+> +#endif
+> +};
+> +
+> +static const struct pmu_irqs pmu_irqs = {
+> +	.irqs	    = irqs,
+> +	.num_irqs   = ARRAY_SIZE(irqs),
+> +};
+> +
+> +static DECLARE_MUTEX(pmu_mutex);
+> +
+> +const struct pmu_irqs *
+> +reserve_pmu(void)
+> +{
+> +	int ret = down_trylock(&pmu_mutex) ? -EBUSY : 0;
+> +
+> +	return ret ? ERR_PTR(ret) : &pmu_irqs;
+> +}
 
-In C, there is a general theoretical problem with back-propagation of
-optimisations from code with undefined behaviour.  In the case of
-__builtin_unreachable(), it would depend on all sorts of unclearly
-defined semantics whether it can remove a preceding *(int *)0 = 0.
+I think it would be sensible to return an error (-ENODEV) if
+pmu_irqs.num_irqs == 0. Not doing so can cause applications
+to fail silently when they are running on unsupported boards.
 
-I'd strongly suggest asking on the GCC list.  (I'd have mentioned this
-earlier, if I'd known about the patch for other architectures).
-
-The documentation for __builtin_unreachable() only says the program is
-undefined if control flow reaches it.  In other words, it does not say
-what effect it can have on previous instructions, and I think it's
-quite likely that it has not been analysed in a case like this.
-
-One thing that would give me a lot more confidence, because the GCC
-documentation does mention asm(), is this:
-
->       *(int *)0 = 0;
->       /* Ensure unreachableness optimisations cannot propagate back. *I/
->       __asm__ volatile("");
->       /* Avoid "noreturn function does return" */
->       unreachable();
-
--- Jamie
+Will
