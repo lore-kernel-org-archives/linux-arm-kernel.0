@@ -1,63 +1,27 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Thu, 17 Dec 2009 12:49:42 +0100
-Subject: [PATCH 16/20] imx27: define and use MX27_IO_ADDRESS
-In-Reply-To: <20091217100526.GD19548@pengutronix.de>
-References: <1260990002-24168-8-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1260990002-24168-9-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1260990002-24168-10-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1260990002-24168-11-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1260990002-24168-12-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1260990002-24168-13-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1260990002-24168-14-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1260990002-24168-15-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1260990002-24168-16-git-send-email-u.kleine-koenig@pengutronix.de>
-	<19241.55420.124271.517259@ipc1.ka-ro>
-	<20091217100526.GD19548@pengutronix.de>
-Message-ID: <19242.6870.193432.23163@ipc1.ka-ro>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Thu, 17 Dec 2009 20:13:11 +0800
+Subject: [PATCH V2 1/2] arm nomadik: add hardware RNG driver
+In-Reply-To: <20091217105136.GA1959@n2100.arm.linux.org.uk>
+References: <20091211061526.GA28849@gondor.apana.org.au>
+	<376a2243795aadfb87c8a7f5ea039.1260011962.git.rubini@unipv.it>
+	<20091205185646.GQ8789@waste.org>
+	<20091217083623.GA16218@morgana.gnudd.com>
+	<20091217084256.GB28801@gondor.apana.org.au>
+	<20091217105136.GA1959@n2100.arm.linux.org.uk>
+Message-ID: <20091217121311.GB30952@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Uwe Kleine-K?nig writes:
-> Hello Lother,
-> 
-Lothar
-    ^
-> On Thu, Dec 17, 2009 at 08:06:36AM +0100, Lothar Wa?mann wrote:
-> > > +#define MX27_IO_ADDRESS(x)						\
-> > > +	(void __force __iomem *) ( 					\
-> > > +	IMX_IO_ADDRESS(x, MX27_AIPI) ?:					\
-> > > +	IMX_IO_ADDRESS(x, MX27_SAHB1) ?:				\
-> > > +	IMX_IO_ADDRESS(x, MX27_X_MEMC) ?:				\
-> > > +	0xdeadbeef)
-> >         ^^^^^^^^^^
-> > I prefer to have a plain '0' here. Otherwise an invocation of this
-> > macro with an illegal address could lead to silent corruption of
-> > memory that happens to be mapped at that virtual address instead of a
-> > kernel oops due to a null pointer dereference!
-> > 
-> > Same for the other processors.
-> I'm a bit undecided here.  I choosed 0xdeadbeef because it is used in
+On Thu, Dec 17, 2009 at 10:51:36AM +0000, Russell King - ARM Linux wrote:
 >
-0xdeadbeef by itself may look suspicious if you find it in some crash
-dump. But if some offset is added to it, you cannot distinguish it
-from any other legal virtual address.
+> It shouldn't be a problem unless there ends up being conflicting changes
+> in that file.  Currently there are none.
 
-> IO_ADDRESS, too.  It's not aligned, so probably nothing happens.  As
->
-Then, that macro should be changed also. And for the alignment
-argument, memory can also be accessed bytewise.
+OK, I'll throw them into my tree then.
 
-
-Lothar Wa?mann
+Thanks!
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Visit Openswan at http://www.openswan.org/
+Email: Herbert Xu ~{PmV>HI~} <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
