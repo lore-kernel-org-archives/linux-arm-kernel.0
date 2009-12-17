@@ -1,48 +1,30 @@
-From: rshitrit@marvell.com (Ronen Shitrit)
-Date: Thu, 17 Dec 2009 09:35:53 +0200
-Subject: shared memory problem on ARM v5TE using threads
-In-Reply-To: <cabda6420912160938m6ea11da5t947c2bf082c430b7@mail.gmail.com>
-References: <20091207175608.GE26821@n2100.arm.linux.org.uk>
-	<20091213120615.GB10698@n2100.arm.linux.org.uk>
-	<cabda6420912140513k40a998b7k8cf56c35cc535cfb@mail.gmail.com>
-	<309002C0DA137042828828FC53D7A9347E2630F364@IL-MB01.marvell.com>
-	<cabda6420912140948t23c07676tb5f44eb4febbc584@mail.gmail.com>
-	<alpine.LFD.2.00.0912141503360.23173@xanadu.home>
-	<c70ff3ad0912142350v2231938dqc9c0aedc214120bd@mail.gmail.com>
-	<cabda6420912150301n2c1a54d6ta7407d89f4d0f9cf@mail.gmail.com>
-	<20091215171440.GA15855@n2100.arm.linux.org.uk>
-	<cabda6420912160835k714b9de4m7c647da97055f91b@mail.gmail.com>
-	<cabda6420912160938m6ea11da5t947c2bf082c430b7@mail.gmail.com>
-Message-ID: <309002C0DA137042828828FC53D7A9347E264E7B4D@IL-MB01.marvell.com>
+From: simon.kagstrom@netinsight.net (Simon Kagstrom)
+Date: Thu, 17 Dec 2009 08:51:42 +0100
+Subject: [PATCH] serial21285: fix disable_irq-from-interrupt-handler
+	deadlock
+In-Reply-To: <20091113095937.GA25995@n2100.arm.linux.org.uk>
+References: <20091113090234.7d028820@marrow.netinsight.se>
+	<20091113095937.GA25995@n2100.arm.linux.org.uk>
+Message-ID: <20091217085142.18e95993@marrow.netinsight.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi again Russell!
 
+On Fri, 13 Nov 2009 09:59:37 +0000
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
------Original Message-----
-From: christian pellegrin [mailto:chripell at gmail.com] 
-Sent: Wednesday, December 16, 2009 7:39 PM
-To: Russell King - ARM Linux
-Cc: saeed bishara; Ronen Shitrit; linux-arm-kernel at lists.infradead.org; Nicolas Pitre
-Subject: Re: shared memory problem on ARM v5TE using threads
+> On Fri, Nov 13, 2009 at 09:02:34AM +0100, Simon Kagstrom wrote:
+> > Russell: This patch is a bit of RFC since I'm not quite sure that it's
+> > the correct solution. It unbreaks booting on our footbridge-based
+> > platform. Let me know if I should look at other solutions!
+> 
+> It does look like the right thing to do - the original code will hang
+> now that we're using genirq stuff.
 
-On Wed, Dec 16, 2009 at 5:35 PM, christian pellegrin <chripell@gmail.com> wrote:
+I haven't see this patch in 2.6.33 yet, was it forgotten or is it still
+in the queue somewhere?
 
->
-> I'm trying some more elaborate tests where just one case of
-> inconsistency will stop the counting.
->
+(Ping!)
 
-Here is the program that implements Russell's ideas (at least I think
-so) but is easier to use. By giving the parameter 1 or -1 you can test
-different kind of consistency issues (missing flush in r/w or
-inconsistent mapping's cacheness). It is also quite fun to watch at
-with the buggy kernel on an idle system: it looks like that every
-couple of seconds the 256kb L2 cache get flushed anyway
-[Ronen Shitrit] The L2 dirty line eviction is always a result of L1 line fill request, or a specific CP15 flush command.
-
-(so even on
-the kernel without the patch every now and then you get some
-progress). I had it running for tens of minutes on a patched kernel
-without stops.
-[Ronen Shitrit] Nice :)
+// Simon
