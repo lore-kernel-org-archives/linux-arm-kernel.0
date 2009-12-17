@@ -1,65 +1,52 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 17 Dec 2009 19:22:52 +0530
-Subject: [PATCH 3/4 v2] ARM: L2 : Errata 588369: Clean & Invalidate do
-	not invalidate clean lines
-In-Reply-To: <20091217133508.GA5813@n2100.arm.linux.org.uk>
-References: <1261054832-14995-1-git-send-email-santosh.shilimkar@ti.com>
-	<20091217133508.GA5813@n2100.arm.linux.org.uk>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02BFB58916@dbde02.ent.ti.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Thu, 17 Dec 2009 15:01:20 +0000
+Subject: [PATCH] ARM: Convert BUG() to use unreachable()
+In-Reply-To: <1260266138-17684-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1260266138-17684-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20091217150120.GD24967@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Russell,
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Thursday, December 17, 2009 7:05 PM
-> To: Shilimkar, Santosh
-> Cc: linux-arm-kernel at lists.infradead.org; tony at atomide.com; linux-omap at vger.kernel.org; Woodruff,
-> Richard; Catalin Marinas
-> Subject: Re: [PATCH 3/4 v2] ARM: L2 : Errata 588369: Clean & Invalidate do not invalidate clean lines
-> 
-> On Thu, Dec 17, 2009 at 06:30:32PM +0530, Santosh Shilimkar wrote:
-> > +config PL310_ERRATA_588369
-> > +	bool "Clean & Invalidate maintenance operations do not invalidate clean lines"
-> > +	depends on CACHE_L2X0 && ARCH_OMAP4
-> > +	default n
-> 
-> default n is the default anyway, so its redundant to specify it.
-ok
-> 
-> > +#ifdef CONFIG_PL310_ERRATA_588369
-> > +static void debug_writel(unsigned long val)
-> > +{
-> > +	/*
-> > +	 * Texas Instrument secure monitor api to modify the PL310
-> > +	 * Debug Control Register. R0 = val
-> > +	 */
-> > +	__asm__ __volatile__(
-> > +	"stmfd r13!, {r4-r8}\n"
-> > +	"ldr r12, =0x100\n"
-> > +	"dsb\n"
-> > +	"smc\n"
-> > +	"ldmfd r13!, {r4-r8}");
-> 
-> Just tell the compiler that r4 to r8 are clobbered - then it'll save and
-> restore them itself.  Also, you can't guarantee that r0 will contain the
-> value unless you explicitly pass it in.  IOW:
-Perfect. I was looking for something like this.
-> 	register unsigned long r0 asm("r0") = val;
-> 
-> 	asm volatile(
-> 	__asmeq(%0, r0)
-> 	"..."
-> 	: : "r" (r0)
-> 	: "r4", "r5", "r6", "r7", "r8");
-> 
-> The use of asmeq will also ensure that '%0' is indeed r0 - some gcc
-> versions are buggy.
-OK
-> As I've said before, your patch is fine for the current version, but
-> not for the other cache-l2x0 changes.
-I can rebase this on top of your changes. I have that version also functional.
-Just need to rebase on top of your 2 patched.
+Uwe Kleine-K?nig wrote:
+> Use the new unreachable() macro instead of for(;;);
+>  	*(int *)0 = 0;
+>  
+>  	/* Avoid "noreturn function does return" */
+> -	for (;;);
+> +	unreachable();
 
-Regards,
-Santosh
+Will GCC-4.5 remove ("optimise away") the *(int *)0 = 0 because it
+knows the branch of the code leading to unreachable can never be reached?
+
+If GCC-4.5 does not, are you sure a future version of GCC will never
+remove it?  In other words, is __builtin_unreachable() _defined_ in
+such a way that it cannot remove the previous assignment?
+
+We have seen problems with GCC optimising away important tests for
+NULL pointers in the kernel, due to similar propagation of "impossible
+to occur" conditions, so it's worth checking with GCC people what the
+effect of this one would be.
+
+In C, there is a general theoretical problem with back-propagation of
+optimisations from code with undefined behaviour.  In the case of
+__builtin_unreachable(), it would depend on all sorts of unclearly
+defined semantics whether it can remove a preceding *(int *)0 = 0.
+
+I'd strongly suggest asking on the GCC list.  (I'd have mentioned this
+earlier, if I'd known about the patch for other architectures).
+
+The documentation for __builtin_unreachable() only says the program is
+undefined if control flow reaches it.  In other words, it does not say
+what effect it can have on previous instructions, and I think it's
+quite likely that it has not been analysed in a case like this.
+
+One thing that would give me a lot more confidence, because the GCC
+documentation does mention asm(), is this:
+
+>       *(int *)0 = 0;
+>       /* Ensure unreachableness optimisations cannot propagate back. *I/
+>       __asm__ volatile("");
+>       /* Avoid "noreturn function does return" */
+>       unreachable();
+
+-- Jamie
