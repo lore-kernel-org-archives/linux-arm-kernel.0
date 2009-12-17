@@ -1,37 +1,48 @@
-From: r-woodruff2@ti.com (Woodruff, Richard)
-Date: Thu, 17 Dec 2009 12:19:57 -0600
-Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors
-In-Reply-To: <20091217175416.9317.66257.stgit@e101986-lin>
-References: <20091217175416.9317.66257.stgit@e101986-lin>
-Message-ID: <13B9B4C6EF24D648824FF11BE896716203A7FA69CC@dlee02.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Dec 2009 18:17:18 +0000
+Subject: [PATCH] ARM: Convert BUG() to use unreachable()
+In-Reply-To: <84fc9c000912170917y4b2772d0n47bb4dabc74b91ef@mail.gmail.com>
+References: <1260266138-17684-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20091217150120.GD24967@shareable.org>
+	<4B2A65C6.7080009@caviumnetworks.com>
+	<84fc9c000912170917y4b2772d0n47bb4dabc74b91ef@mail.gmail.com>
+Message-ID: <20091217181718.GA4440@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Dec 17, 2009 at 06:17:11PM +0100, Richard Guenther wrote:
+> On Thu, Dec 17, 2009 at 6:09 PM, David Daney <ddaney@caviumnetworks.com> wrote:
+> > Jamie Lokier wrote:
+> >>
+> >> Uwe Kleine-K?nig wrote:
+> >>>
+> >>> Use the new unreachable() macro instead of for(;;);
+> >>> ? ? ? ?*(int *)0 = 0;
+> >>> ? ? ? ? ?/* Avoid "noreturn function does return" */
+> >>> - ? ? ? for (;;);
+> >>> + ? ? ? unreachable();
+> >>
+> >> Will GCC-4.5 remove ("optimise away") the *(int *)0 = 0 because it
+> >> knows the branch of the code leading to unreachable can never be reached?
+> >>
+> >
+> > I don't know the definitive answer, so I am sending to gcc at ...
+> >
+> > FYI: #define unreachable() __builtin_unreachable()
+> 
+> It shouldn't as *(int *)0 = 0; might trap.  But if you want to be sure
+> use
+>    __builtin_trap ();
+> instead for the whole sequence (the unreachable is implied then).
+> GCC choses a size-optimal trap representation for your target then.
 
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Leif Lindholm
-> Sent: Thursday, December 17, 2009 11:54 AM
+How is "size-optimal trap" defined?  The point of "*(int *)0 = 0;" is
+to cause a NULL pointer dereference which is trapped by the kernel to
+produce a full post mortem and backtrace which is easily recognised
+as a result of this code.
 
-> The SWP instruction was deprecated in the ARMv6 architecture, superseded
-> by the LDREX/STREX family of instructions for
-> load-linked/store-conditional operations. The ARMv7 multiprocessing
-> extensions mandate that SWP/SWPB instructions are treated as undefined
-> from reset, with the ability to enable them through the System Control
-> Register SW bit.
->
-> This patch adds the alternative solution to emulate the SWP and SWPB
-> instructions using LDREX/STREX sequences, and log statistics to
-> /proc/cpu/swp_emulation. To correctly deal with copy-on-write, it also
-> modifies cpu_v7_set_pte_ext to change the mappings to priviliged RO when
-> user RO.
+Having gcc decide on, maybe, an undefined instruction instead would be
+confusing.
 
-Exclusive operations are more certainly more efficient than the full bus lock behavior of SWP.  Finding and killing SWP where possible seems positive.
-
-Still, the exclusive operations for some systems don't extend beyond an ARM smp-cluster. Not all cores and interconnect implementations support the range lock.  As such from a SOC point of view SWP still has value as it may exist where lwrex/swrex would fail. It is also much lighter than using some kind of mailbox alternative.
-
-While the ARM is important to many SOCs its not the whole thing.  I've seen some side threads where people are busy blindly removing SWP and quoting half information.
-
-My main comment on patch in this regard is to make the point you won't be able to fully emulate a SWP with the sequence you posted if you consider other cores outside the ARM cluster. Some note to that effect would be positive in the description.
-
-Regards,
-Richard W.
+Let me put it another way: I want this function to terminate with an
+explicit NULL pointer dereference in every case.
