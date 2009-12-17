@@ -1,36 +1,73 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 17 Dec 2009 10:07:27 -0700
-Subject: [RFC PATCH] arm: add big-endian versions of io{read, write}{16,
-	32}be() macros
-Message-ID: <20091217170324.24211.92910.stgit@angua>
+From: richard.guenther@gmail.com (Richard Guenther)
+Date: Thu, 17 Dec 2009 18:17:11 +0100
+Subject: [PATCH] ARM: Convert BUG() to use unreachable()
+In-Reply-To: <4B2A65C6.7080009@caviumnetworks.com>
+References: <1260266138-17684-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20091217150120.GD24967@shareable.org>
+	<4B2A65C6.7080009@caviumnetworks.com>
+Message-ID: <84fc9c000912170917y4b2772d0n47bb4dabc74b91ef@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added so that existing drivers already using the io*be() macros will
-compile.  A specific example is the xilinx_spi.c driver.
+On Thu, Dec 17, 2009 at 6:09 PM, David Daney <ddaney@caviumnetworks.com> wrote:
+> Jamie Lokier wrote:
+>>
+>> Uwe Kleine-K?nig wrote:
+>>>
+>>> Use the new unreachable() macro instead of for(;;);
+>>> ? ? ? ?*(int *)0 = 0;
+>>> ? ? ? ? ?/* Avoid "noreturn function does return" */
+>>> - ? ? ? for (;;);
+>>> + ? ? ? unreachable();
+>>
+>> Will GCC-4.5 remove ("optimise away") the *(int *)0 = 0 because it
+>> knows the branch of the code leading to unreachable can never be reached?
+>>
+>
+> I don't know the definitive answer, so I am sending to gcc at ...
+>
+> FYI: #define unreachable() __builtin_unreachable()
 
-Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
----
+It shouldn't as *(int *)0 = 0; might trap.  But if you want to be sure
+use
+   __builtin_trap ();
+instead for the whole sequence (the unreachable is implied then).
+GCC choses a size-optimal trap representation for your target then.
 
- arch/arm/include/asm/io.h |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+Richard.
 
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index d2a59cf..1fb772a 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -240,10 +240,14 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
- #define ioread8(p)	({ unsigned int __v = __raw_readb(p); __v; })
- #define ioread16(p)	({ unsigned int __v = le16_to_cpu((__force __le16)__raw_readw(p)); __v; })
- #define ioread32(p)	({ unsigned int __v = le32_to_cpu((__force __le32)__raw_readl(p)); __v; })
-+#define ioread16be(p)	({ unsigned int __v = be16_to_cpu((__force __be16)__raw_readw(p)); __v; })
-+#define ioread32be(p)	({ unsigned int __v = be32_to_cpu((__force __be32)__raw_readl(p)); __v; })
- 
- #define iowrite8(v,p)	__raw_writeb(v, p)
- #define iowrite16(v,p)	__raw_writew((__force __u16)cpu_to_le16(v), p)
- #define iowrite32(v,p)	__raw_writel((__force __u32)cpu_to_le32(v), p)
-+#define iowrite16be(v,p)	__raw_writew((__force __u16)cpu_to_be16(v), p)
-+#define iowrite32be(v,p)	__raw_writel((__force __u32)cpu_to_be32(v), p)
- 
- #define ioread8_rep(p,d,c)	__raw_readsb(p,d,c)
- #define ioread16_rep(p,d,c)	__raw_readsw(p,d,c)
+>
+>> If GCC-4.5 does not, are you sure a future version of GCC will never
+>> remove it? ?In other words, is __builtin_unreachable() _defined_ in
+>> such a way that it cannot remove the previous assignment?
+>>
+>> We have seen problems with GCC optimising away important tests for
+>> NULL pointers in the kernel, due to similar propagation of "impossible
+>> to occur" conditions, so it's worth checking with GCC people what the
+>> effect of this one would be.
+>>
+>> In C, there is a general theoretical problem with back-propagation of
+>> optimisations from code with undefined behaviour. ?In the case of
+>> __builtin_unreachable(), it would depend on all sorts of unclearly
+>> defined semantics whether it can remove a preceding *(int *)0 = 0.
+>>
+>> I'd strongly suggest asking on the GCC list. ?(I'd have mentioned this
+>> earlier, if I'd known about the patch for other architectures).
+>>
+>> The documentation for __builtin_unreachable() only says the program is
+>> undefined if control flow reaches it. ?In other words, it does not say
+>> what effect it can have on previous instructions, and I think it's
+>> quite likely that it has not been analysed in a case like this.
+>>
+>> One thing that would give me a lot more confidence, because the GCC
+>> documentation does mention asm(), is this:
+>>
+>>> ? ? ?*(int *)0 = 0;
+>>> ? ? ?/* Ensure unreachableness optimisations cannot propagate back. *I/
+>>> ? ? ?__asm__ volatile("");
+>>> ? ? ?/* Avoid "noreturn function does return" */
+>>> ? ? ?unreachable();
+>>
+>> -- Jamie
+>
+>
