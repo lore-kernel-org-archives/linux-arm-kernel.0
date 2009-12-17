@@ -1,59 +1,31 @@
-From: kristoffer.ericson@gmail.com (Kristoffer Ericson)
-Date: Thu, 17 Dec 2009 21:26:36 +0100
-Subject: USB Host on a SA1111
-In-Reply-To: <de2dcbb80912160851g9def9d0p77e46ba0f572fea4@mail.gmail.com>
-References: <de2dcbb80912160851g9def9d0p77e46ba0f572fea4@mail.gmail.com>
-Message-ID: <20091217212636.22bea701.kristoffer.ericson@gmail.com>
+From: r-woodruff2@ti.com (Woodruff, Richard)
+Date: Thu, 17 Dec 2009 14:43:22 -0600
+Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors
+In-Reply-To: <20091217191602.GC362@shareable.org>
+References: <20091217175416.9317.66257.stgit@e101986-lin>
+	<13B9B4C6EF24D648824FF11BE896716203A7FA69CC@dlee02.ent.ti.com>
+	<20091217191602.GC362@shareable.org>
+Message-ID: <13B9B4C6EF24D648824FF11BE896716203A7FA6BF4@dlee02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 Dec 2009 17:51:08 +0100
-Filip Zyzniewski <filip.zyzniewski@gmail.com> wrote:
 
-> Hi,
-> 
-> I have found out a way to connect an USB receptacle to USB host pins on
-> SA1111 inside a HP Jornada 720. The modification is described at
-> http://jlime.com/mw4/index.php/Hardware_documentation_jornada700_usbhost .
-> 
-> Unfortunately it still doesn't work as expected - I have dumped some dmesgs
-> here: http://filip.math.uni.lodz.pl/jornada/usb_host/ .
-> The most interesting ones are these where kernel can retrieve proper
-> identification numbers (optical mouse, card driver). But communication fails
-> afterwards. Devices aren't usable.
+> From: Jamie Lokier [mailto:jamie at shareable.org]
+> Sent: Thursday, December 17, 2009 1:16 PM
 
-Russell you got any clues on this? From my point of view it really should
-just work. But Ive never done this myself.
+> Woodruff, Richard wrote:
+> > Exclusive operations are more certainly more efficient than the full
+> > bus lock behavior of SWP.  Finding and killing SWP where possible
+> > seems positive.
+>
+> Are they really more efficient for cached accesses in L1?  In
+> principle, external bus lock is not needed when doing an
+> read-modify-write on words in MESI cache, just the ability to
+> internally block it's eviction during the sequence.
 
-> 
-> Things that surprise me in these logs:
-> 
-> [ 1126.593375] sa1111-ohci 0400: OHCI 1.0, NO legacy support registers
-> 
-> I've googled dmesg dumps and usually it says "with legacy support registers".
-> OHCI 1.0 seems strange (SA1111 is 1.1 compatible), but i've seen that people
-> have it in their logs.
-> 
-> [ 1127.025533] hub 1-0:1.0: no power switching (usb 1.0)
-> 
-> SA1111 is able to control power switching (and I have implemented the circuitry
-> doing this with a TPS2043). This probably results from detecting it as
-> a 1.0 host.
-> 
-> 
-> 
-> I am posting this in hope that somebody could give me pointers about where
-> to begin digging to fix this. I think hardware part is ok, because id
-> numbers ARE somehow transferred. What do you think about it?
-> 
-> regards,
-> Filip Zyzniewski
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Performance point was mainly about coordination with non-coherent external masters (outside of cluster).  Blocking all external people for a small range is not optimal.
 
+Within the cluster and in cache as you point out... I'm not sure of implementation reality. The outside world past A9 may or may not export some form of mesi.
 
--- 
-Kristoffer Ericson <kristoffer.ericson@gmail.com>
+Regards,
+Richard W.
