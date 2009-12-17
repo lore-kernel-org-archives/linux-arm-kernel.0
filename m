@@ -1,5 +1,5 @@
-From: Joe.Buck@synopsys.COM (Joe Buck)
-Date: Thu, 17 Dec 2009 10:35:17 -0800
+From: jamie@shareable.org (Jamie Lokier)
+Date: Thu, 17 Dec 2009 19:04:53 +0000
 Subject: [PATCH] ARM: Convert BUG() to use unreachable()
 In-Reply-To: <20091217181718.GA4440@n2100.arm.linux.org.uk>
 References: <1260266138-17684-1-git-send-email-u.kleine-koenig@pengutronix.de>
@@ -7,29 +7,54 @@ References: <1260266138-17684-1-git-send-email-u.kleine-koenig@pengutronix.de>
 	<4B2A65C6.7080009@caviumnetworks.com>
 	<84fc9c000912170917y4b2772d0n47bb4dabc74b91ef@mail.gmail.com>
 	<20091217181718.GA4440@n2100.arm.linux.org.uk>
-Message-ID: <20091217183517.GC10707@synopsys.com>
+Message-ID: <20091217190453.GA362@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2009 at 10:17:18AM -0800, Russell King - ARM Linux wrote:
-> > It shouldn't as *(int *)0 = 0; might trap.  But if you want to be sure
-> > use
-> >    __builtin_trap ();
-> > instead for the whole sequence (the unreachable is implied then).
-> > GCC choses a size-optimal trap representation for your target then.
-> 
-> How is "size-optimal trap" defined?  The point of "*(int *)0 = 0;" is
-> to cause a NULL pointer dereference which is trapped by the kernel to
-> produce a full post mortem and backtrace which is easily recognised
-> as a result of this code.
+Russell King - ARM Linux wrote:
+> Let me put it another way: I want this function to terminate with an
+> explicit NULL pointer dereference in every case.
 
-With something like __builtin_trap, the compiler knows that your intent
-is to cause a trap.  But it's asking for trouble, and for future
-flame wars between kernel developers and gcc developers, to put in
-sequences that happen to do the right thing if the compiler does
-no optimizations whatsoever, but that might be messed up by optimizations
-because they are code sequences whose behavior is undefined.
+__builtin_trap cannot be used because the GCC manual says "The
+mechanism used may vary from release to release so you should not rely
+on any particular implementation".  It includes calling abort() as a
+possible implementation - not ideal.
 
-Besides, didn't I see a whole bunch of kernel security patches related
-to null pointer dereferences lately?  If page 0 can be mapped, you
-suddenly won't get your trap.
+This is not related to GCC, but I have an ARM system here where
+dereferencing NULL does not trap.  You guessed it, it doesn't have a
+regular MMU.  But there are other addresses which do trap.  They would
+be a much better choice for BUG().
+
+(Aha!  Maybe that's why the kernel just behaves weirdly when it runs
+out of memory and eventually triggers a watchdog reboot, with no panic
+message.  I'd better try changing BUG() :-)
+
+Even with an MMU, sometimes userspace maps page zero.  For example,
+Wine on x86 does that.  (It might be possible to change Wine and
+kernel vm86 to avoid it, but it has not happened).
+
+Bug-free userspace behaviour should not stop kernel's BUG() from doing
+it's basic job of trapping in the kernel!
+
+It would be quite messy if userspace maps page zero, and then a kernel
+BUG() ploughs ahead into __builtin_unreachable() and completely
+undefined behaviour, possibly leading to worse behaviour than omitting
+the check which called BUG().
+
+Under those circumstances I'd rather see it use __builtin_trap() if
+that really does trap :-)
+
+The point of the exercise with __builtin_unreachable() is to reduce
+the kernel size by removing the for(;;) loop.  *(int *)0 = 0 isn't the
+smallest trapping sequence.  (When it works :-)
+
+So the most compact _and_ reliable sequence for the kernel, on all
+architectures, is probably:
+
+    __asm__ volatile("smallest undefined or always-trapping instruction")
+
+followed by __builtin_unreachable(), because GCC documentation _does_
+say that asm followed by that will execute the asm and assume the asm
+doesn't return.
+
+-- Jamie
