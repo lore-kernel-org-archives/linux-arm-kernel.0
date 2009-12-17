@@ -1,38 +1,81 @@
-From: mkl0301@hotmail.com (mkl lin)
-Date: Thu, 17 Dec 2009 05:08:38 +0000
-Subject: dma_cache_maint_contiguous should be patched asdma_cache_maint do
-In-Reply-To: <20091216203319.GB17935@n2100.arm.linux.org.uk>
-References: <1260524165.3109.3.camel@pc1117.cambridge.arm.com>,
-	<SNT109-W606545835EAEDC6CE7A542A78C0@phx.gbl>,
-	<20091216203319.GB17935@n2100.arm.linux.org.uk>
-Message-ID: <SNT109-W571829762ECCA799EA0B3DA7860@phx.gbl>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 17 Dec 2009 11:08:31 +0530
+Subject: CPU consumption is going as high as 95% on ARM Cortex A8
+Message-ID: <19F8576C6E063C45BE387C64729E73940449F43857@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
->> Linux 2.6.31.1
->> pcie sata adapter, ahci.c
->> read 1GB file
->>
->> 1CPU:13.56/13.56/13.60 (sec) ~ 75.5MBps
->> SMP+IPI:16.29/16.14/16.05 (sec) ~ 63.8MBps
->> SMP+RFO/WFO:21.71/21.72/21.70 (sec) ~ 47.18MBps
->> SMP+RFO/WFO/pld:21.63/21.46/21.41 (sec) ~ 47.82MBps
->
-> Out of interest, how does the 1CPU version perform when you boot with
-> 'libata.force=pio' specified to the kernel?
+I am seeing some strange behavior while accessing buffers through User Space (mapped using mmap call)
 
-Due to my environment changed, those data is not comparable to previous. And AHCI only support DMA, force it to pio doen't make difference.
+Background :- 
+------------
+Platform - TI AM3517
+CPU - ARM Cortex A8
 
-1CPU:17.15/17.07/17.10 ~ 59.98MBps
-1CPU,with libata.force=pio: 17.02/16.86/17.03 ~ 60.73MBps
-SMP+IPI: 21.20/21.36/21.88 ~ 48.30MBps
-SMP+IPI,with libata.force=pio: 21.36/21.22/21.59 ~ 48.24MBps
+root at am3517-evm:~#
+root at am3517-evm:~# cat /proc/cpuinfo
+Processor       : ARMv7 Processor rev 7 (v7l)
+BogoMIPS        : 499.92
+Features        : swp half thumb fastmult vfp edsp neon vfpv3
+CPU implementer : 0x41
+CPU architecture: 7
+CPU variant     : 0x1
+CPU part        : 0xc08
+CPU revision    : 7
+Hardware        : OMAP3517/AM3517 EVM
+Revision        : 0020
+Serial          : 0000000000000000
+root at omap3517-evm:~#
 
-Best Regard,
-Mac Lin
 
- 		 	   		  
-_________________________________________________________________
-Windows Live: Friends get your Flickr, Yelp, and Digg updates when they e-mail you.
-http://www.microsoft.com/middleeast/windows/windowslive/see-it-in-action/social-network-basics.aspx?ocid=PID23461::T:WLMTAGL:ON:WL:en-xm:SI_SB_3:092010
+Issue/Usage :- 
+-------------
+The V4l2-Capture driver captures the data from video decoder into buffer and the application does some processing on this buffer. The mmap implementation can be found at drivers/media/video/videobuf-dma-contig.c, function__videobuf_mmap_mapper().
+
+Observation - 
+The CPU consumption goes as high as 95% on read buffer operation, please note that write operation on these buffers also gives 60-70% CPU consumption. (Using memcpy/memset API's for read and write operation).
+
+Some more inputs :- 
+------------------
+- If I specify PAGE_READONLY or PAGE_SHARED (actual flag is L_PTE_USER) while mapping the buffer to UserSpace in mmap system call, the CPU consumption goes down to expected value (20-27%). 
+Then I reached till the function cpu_v7_set_pte_ext, where we are configuring level 2 translation table entries, which makes use of these flags.
+
+- Below is the value of r0, r1 and r2 register (ptep, pteval, ext) in both the cases -
+
+
+Without PAGE_READONLY/PAGE_SHARED
+
+ptep - cfb5de10, pte - 8d200383, ext - 800
+ptep - cfb5de14, pte - 8d201383, ext - 800
+
+Important bits are [0-9] - 0x383
+
+With PAGE_READONLY/PAGE_SHARED set
+
+ptep - cfb30e10, pte - 8d10038f, ext - 800
+ptep - cfb30e14, pte - 8d10138f, ext - 800
+
+Important bits are [0-9] - 0x38F
+
+The lines inside function "cpu_v7_set_pte_ext", is using the flag as shown below -
+
+   tst     r1, #L_PTE_USER
+   orrne   r3, r3, #PTE_EXT_AP1
+   tstne   r3, #PTE_EXT_APX
+   bicne   r3, r3, #PTE_EXT_APX | PTE_EXT_AP0
+
+Without PAGE_READONLY/PAGE_SHARED		With flags set
+
+Access perm = reserved				Access Perm = Read Only
+
+- I tried the same thing with another platform (ARM9) and it works fine there.
+
+Can somebody help me to understand the flag PAGE_SHARED/PAGE_READONLY and access permissions? Am I debugging this into right path? Does anybody have seen/observed similar issue before?
+
+
+Thanks in advance.
+
+Thanks,
+Vaibhav Hiremath
