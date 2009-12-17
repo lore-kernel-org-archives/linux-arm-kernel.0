@@ -1,31 +1,31 @@
-From: r-woodruff2@ti.com (Woodruff, Richard)
-Date: Thu, 17 Dec 2009 14:43:22 -0600
-Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors
-In-Reply-To: <20091217191602.GC362@shareable.org>
-References: <20091217175416.9317.66257.stgit@e101986-lin>
-	<13B9B4C6EF24D648824FF11BE896716203A7FA69CC@dlee02.ent.ti.com>
-	<20091217191602.GC362@shareable.org>
-Message-ID: <13B9B4C6EF24D648824FF11BE896716203A7FA6BF4@dlee02.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Dec 2009 21:13:13 +0000
+Subject: USB Host on a SA1111
+In-Reply-To: <20091217212636.22bea701.kristoffer.ericson@gmail.com>
+References: <de2dcbb80912160851g9def9d0p77e46ba0f572fea4@mail.gmail.com>
+	<20091217212636.22bea701.kristoffer.ericson@gmail.com>
+Message-ID: <20091217211313.GA16520@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Dec 17, 2009 at 09:26:36PM +0100, Kristoffer Ericson wrote:
+> On Wed, 16 Dec 2009 17:51:08 +0100
+> Filip Zyzniewski <filip.zyzniewski@gmail.com> wrote:
+> 
+> > Hi,
+> > 
+> > I have found out a way to connect an USB receptacle to USB host pins on
+> > SA1111 inside a HP Jornada 720. The modification is described at
+> > http://jlime.com/mw4/index.php/Hardware_documentation_jornada700_usbhost .
+> > 
+> > Unfortunately it still doesn't work as expected - I have dumped some dmesgs
+> > here: http://filip.math.uni.lodz.pl/jornada/usb_host/ .
+> > The most interesting ones are these where kernel can retrieve proper
+> > identification numbers (optical mouse, card driver). But communication fails
+> > afterwards. Devices aren't usable.
+> 
+> Russell you got any clues on this? From my point of view it really should
+> just work. But Ive never done this myself.
 
-> From: Jamie Lokier [mailto:jamie at shareable.org]
-> Sent: Thursday, December 17, 2009 1:16 PM
-
-> Woodruff, Richard wrote:
-> > Exclusive operations are more certainly more efficient than the full
-> > bus lock behavior of SWP.  Finding and killing SWP where possible
-> > seems positive.
->
-> Are they really more efficient for cached accesses in L1?  In
-> principle, external bus lock is not needed when doing an
-> read-modify-write on words in MESI cache, just the ability to
-> internally block it's eviction during the sequence.
-
-Performance point was mainly about coordination with non-coherent external masters (outside of cluster).  Blocking all external people for a small range is not optimal.
-
-Within the cluster and in cache as you point out... I'm not sure of implementation reality. The outside world past A9 may or may not export some form of mesi.
-
-Regards,
-Richard W.
+I've never really been that much involved with USB stuff, so can't really
+comment.
