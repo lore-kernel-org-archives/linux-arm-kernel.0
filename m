@@ -1,23 +1,37 @@
-From: kpa_info@yahoo.fr (Patrick)
-Date: Fri, 18 Dec 2009 09:00:15 +0000 (GMT)
-Subject: [PXA320] dmac_flush_range and burst on SMEMC
-Message-ID: <354684.99618.qm@web23301.mail.ird.yahoo.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 18 Dec 2009 18:15:36 +0900
+Subject: [PATCH 0/7] ARM: S5P6440: Add support for Samsung's S5P6440 SoC
+Message-ID: <000601ca7fc2$a9484830$fbd8d890$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+Hi all,
 
-I am using a PXA320 with a FPGA connected on the VLIO memory bus. For faster transfer between the PXA and the FPGA I would like to use burst (supported by the SMEMC in VLIO).
+This patches add basic support for Samsung's S5P6440 SoC.
+The feature set that is added are clock, timer, uart and interrupts.
 
-I was using a 2.6.26 kernel and burst was working very fine. I was using ioremap_cached and after a loop of iowrite32 and a call to dmac_flush_range to start the burst. It was working fine.
+The clock changes are based on Harald Welte's patch. This patch is
+also based on Ben's plat-samsung patch.
 
-I have migrated to a 2.6.28 kernel with the same driver code. All the data writed by the loop of iowrite32 is lost and only the last burst is writed using PIO and no burst. It's like if dmac_flush_range is not working and flush no cash at all.
+This patch set includes the following patches.
 
-Do you have any idea ? Should I use another function than dmac_flush_range ?
+[PATCH v2 1/7] ARM: S5P6440: Add new CPU initialization support
+[PATCH v2 2/7] ARM: S5P6440: Add Clock and PLL support
+[PATCH v2 3/7] ARM: S5P6440: Add IRQ support
+[PATCH v2 4/7] ARM: S5P6440: Add Timer support
+[PATCH v2 5/7] ARM: S5P6440: Add new Kconfig and Makefiles
+[PATCH v2 6/7] ARM: S5P6440: Add Board and configuration file
+[PATCH v2 7/7] ARM: S5P6440: Add serial port support
 
-Thanks in advance for any help
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Adityapratap Sharma <aditya.ps@samsung.com>
+Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+Signed-off-by: Atul Dahiya <atul.dahiya@samsung.com>
 
-Patrick
+Thanks.
 
-
-      
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+System LSI Division, SAMSUNG ELECTRONICS CO., LTD.
