@@ -1,35 +1,44 @@
-From: gadiyar@ti.com (Gadiyar, Anand)
-Date: Fri, 18 Dec 2009 13:49:22 +0530
-Subject: ARMv6 build error in v2.6.33-rc1
-In-Reply-To: <005801ca7fb5$787b11e0$697135a0$%yang@samsung.com>
-References: <005801ca7fb5$787b11e0$697135a0$%yang@samsung.com>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB031DB9AA68@dbde02.ent.ti.com>
+From: gadiyar@ti.com (Anand Gadiyar)
+Date: Fri, 18 Dec 2009 14:07:07 +0530
+Subject: [PATCH] ARM: Fix build break on ARM v6 and v7
+Message-ID: <1261125427-17517-1-git-send-email-gadiyar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jinsung Yang wrote:
-> 
-> Hi,
-> I've been facing a build problem with ARMv6 architecture such 
-> as s3c64xx series.
-> The logs are shown as below:
+Commit 2c9b9c849 added an argument to __cpuc_flush_dcache_page
+and renamed it.
 
-I see the same failure with the omap3_defconfig (that builds
-one kernel image that can boot on multiple omap3 boards).
+Update a caller of the old function to fix this build error:
+
+  CC      arch/arm/mm/copypage-v6.o
+arch/arm/mm/copypage-v6.c: In function 'v6_copy_user_highpage_nonaliasing':
+arch/arm/mm/copypage-v6.c:51: error: implicit declaration of function '__cpuc_flush_dcache_page'
+make[1]: *** [arch/arm/mm/copypage-v6.o] Error 1
+make: *** [arch/arm/mm] Error 2
+
+
+Reported-by: Jinsung Yang <jsgood.yang@samsung.com>
+NYET-Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
+---
+Russell,
+
+I fixed this almost independently at roughly the same time as your
+mail on the list. Do I still get credit for the patch?
+
+Either way, it's okay with me. I'm just asking.
 
 - Anand
 
-> --
->   CHK     include/linux/version.h
->   CHK     include/generated/utsrelease.h
-> make[1]: `include/generated/mach-types.h' is up to date.
->   CALL    scripts/checksyscalls.sh
-> <stdin>:1523: warning: #warning syscall recvmmsg not implemented
->   CHK     include/generated/compile.h
->   CC      arch/arm/mm/copypage-v6.o
-> arch/arm/mm/copypage-v6.c: In function 'v6_copy_user_highpage_nonaliasing':
-> arch/arm/mm/copypage-v6.c:51: error: implicit declaration of function '__cpuc_flush_dcache_page'
-> make[1]: *** [arch/arm/mm/copypage-v6.o] Error 1
-> make: *** [arch/arm/mm] Error 2
-> 
-> 
+diff --git a/arch/arm/mm/copypage-v6.c b/arch/arm/mm/copypage-v6.c
+index 841f355..0fa1319 100644
+--- a/arch/arm/mm/copypage-v6.c
++++ b/arch/arm/mm/copypage-v6.c
+@@ -48,7 +48,7 @@ static void v6_copy_user_highpage_nonaliasing(struct page *to,
+ 	 */
+ 	if (page_address(to) != NULL)
+ #endif
+-		__cpuc_flush_dcache_page(kto);
++		__cpuc_flush_dcache_area(kto, PAGE_SIZE);
+ 	kunmap_atomic(kto, KM_USER1);
+ 	kunmap_atomic(kfrom, KM_USER0);
+ }
