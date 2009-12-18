@@ -1,55 +1,130 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 17 Dec 2009 21:20:19 -0700
-Subject: [PATCH 4/8] OMAP2420 IO mapping: move IVA mapping virtual address out
-	of vmalloc space
+Date: Thu, 17 Dec 2009 21:20:18 -0700
+Subject: [PATCH 3/8] OMAP2xxx IO mapping: mark DSP mappings as being 2420-only
 In-Reply-To: <20091218041912.27280.92152.stgit@localhost.localdomain>
 References: <20091218041912.27280.92152.stgit@localhost.localdomain>
-Message-ID: <20091218042018.27280.57238.stgit@localhost.localdomain>
+Message-ID: <20091218042017.27280.19211.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 10db25fea4c11661070b97832b8cc3d2af495092 causes the following
-kernel messages during N800 boot (and presumably all other 2420
-boards):
-
-[    0.000000] BUG: mapping for 0x58000000 at 0xe0000000 overlaps vmalloc space
-[    0.000000] BUG: mapping for 0x59000000 at 0xe1000000 overlaps vmalloc space
-[    0.000000] BUG: mapping for 0x5a000000 at 0xe2000000 overlaps vmalloc space
-
-Fix by remapping the IVA memory areas somewhere outside vmalloc space.
+Out of the three major OMAP2 chip types, OMAP2420, OMAP2430, and OMAP3430,
+we only map the IVA on OMAP2420.  The memory mapping is not shared between
+OMAP2420 and OMAP2430, so it is inappropriate to label those macros as
+'24XX'; this patch changes them to '2420'.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/plat-omap/include/plat/io.h |   15 +++++++++------
- 1 files changed, 9 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/io.c             |   18 +++++++++---------
+ arch/arm/plat-omap/include/plat/io.h |   33 +++++++++++++--------------------
+ arch/arm/plat-omap/io.c              |   12 ++++++------
+ 3 files changed, 28 insertions(+), 35 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index ac9ea60..5a79964 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -72,21 +72,21 @@ static struct map_desc omap24xx_io_desc[] __initdata = {
+ #ifdef CONFIG_ARCH_OMAP2420
+ static struct map_desc omap242x_io_desc[] __initdata = {
+ 	{
+-		.virtual	= DSP_MEM_24XX_VIRT,
+-		.pfn		= __phys_to_pfn(DSP_MEM_24XX_PHYS),
+-		.length		= DSP_MEM_24XX_SIZE,
++		.virtual	= DSP_MEM_2420_VIRT,
++		.pfn		= __phys_to_pfn(DSP_MEM_2420_PHYS),
++		.length		= DSP_MEM_2420_SIZE,
+ 		.type		= MT_DEVICE
+ 	},
+ 	{
+-		.virtual	= DSP_IPI_24XX_VIRT,
+-		.pfn		= __phys_to_pfn(DSP_IPI_24XX_PHYS),
+-		.length		= DSP_IPI_24XX_SIZE,
++		.virtual	= DSP_IPI_2420_VIRT,
++		.pfn		= __phys_to_pfn(DSP_IPI_2420_PHYS),
++		.length		= DSP_IPI_2420_SIZE,
+ 		.type		= MT_DEVICE
+ 	},
+ 	{
+-		.virtual	= DSP_MMU_24XX_VIRT,
+-		.pfn		= __phys_to_pfn(DSP_MMU_24XX_PHYS),
+-		.length		= DSP_MMU_24XX_SIZE,
++		.virtual	= DSP_MMU_2420_VIRT,
++		.pfn		= __phys_to_pfn(DSP_MMU_2420_PHYS),
++		.length		= DSP_MMU_2420_SIZE,
+ 		.type		= MT_DEVICE
+ 	},
+ };
 diff --git a/arch/arm/plat-omap/include/plat/io.h b/arch/arm/plat-omap/include/plat/io.h
-index 7d6f45f..a3e7b47 100644
+index 7e5319f..7d6f45f 100644
 --- a/arch/arm/plat-omap/include/plat/io.h
 +++ b/arch/arm/plat-omap/include/plat/io.h
-@@ -123,14 +123,17 @@
+@@ -122,16 +122,18 @@
+ #define OMAP243X_SMS_VIRT	(OMAP243X_SMS_PHYS + OMAP2_L3_IO_OFFSET)
  #define OMAP243X_SMS_SIZE	SZ_1M
  
- /* 2420 IVA */
--#define DSP_MEM_2420_PHYS	OMAP2420_DSP_MEM_BASE	/* 0x58000000 */
--#define DSP_MEM_2420_VIRT	0xe0000000
-+#define DSP_MEM_2420_PHYS	OMAP2420_DSP_MEM_BASE
-+						/* 0x58000000 --> 0xfc100000 */
-+#define DSP_MEM_2420_VIRT	0xfc100000
- #define DSP_MEM_2420_SIZE	0x28000
--#define DSP_IPI_2420_PHYS	OMAP2420_DSP_IPI_BASE	/* 0x59000000 */
--#define DSP_IPI_2420_VIRT	0xe1000000
-+#define DSP_IPI_2420_PHYS	OMAP2420_DSP_IPI_BASE
-+						/* 0x59000000 --> 0xfc128000 */
-+#define DSP_IPI_2420_VIRT	0xfc128000
- #define DSP_IPI_2420_SIZE	SZ_4K
--#define DSP_MMU_2420_PHYS	OMAP2420_DSP_MMU_BASE	/* 0x5a000000 */
--#define DSP_MMU_2420_VIRT	0xe2000000
-+#define DSP_MMU_2420_PHYS	OMAP2420_DSP_MMU_BASE
-+						/* 0x5a000000 --> 0xfc129000 */
-+#define DSP_MMU_2420_VIRT	0xfc129000
- #define DSP_MMU_2420_SIZE	SZ_4K
+-/* DSP */
+-#define DSP_MEM_24XX_PHYS	OMAP2420_DSP_MEM_BASE	/* 0x58000000 */
+-#define DSP_MEM_24XX_VIRT	0xe0000000
+-#define DSP_MEM_24XX_SIZE	0x28000
+-#define DSP_IPI_24XX_PHYS	OMAP2420_DSP_IPI_BASE	/* 0x59000000 */
+-#define DSP_IPI_24XX_VIRT	0xe1000000
+-#define DSP_IPI_24XX_SIZE	SZ_4K
+-#define DSP_MMU_24XX_PHYS	OMAP2420_DSP_MMU_BASE	/* 0x5a000000 */
+-#define DSP_MMU_24XX_VIRT	0xe2000000
+-#define DSP_MMU_24XX_SIZE	SZ_4K
++/* 2420 IVA */
++#define DSP_MEM_2420_PHYS	OMAP2420_DSP_MEM_BASE	/* 0x58000000 */
++#define DSP_MEM_2420_VIRT	0xe0000000
++#define DSP_MEM_2420_SIZE	0x28000
++#define DSP_IPI_2420_PHYS	OMAP2420_DSP_IPI_BASE	/* 0x59000000 */
++#define DSP_IPI_2420_VIRT	0xe1000000
++#define DSP_IPI_2420_SIZE	SZ_4K
++#define DSP_MMU_2420_PHYS	OMAP2420_DSP_MMU_BASE	/* 0x5a000000 */
++#define DSP_MMU_2420_VIRT	0xe2000000
++#define DSP_MMU_2420_SIZE	SZ_4K
++
++/* 2430 IVA2.1 - currently unmapped */
  
- /* 2430 IVA2.1 - currently unmapped */
+ /*
+  * ----------------------------------------------------------------------------
+@@ -182,16 +184,7 @@
+ #define OMAP343X_SDRC_VIRT	(OMAP343X_SDRC_PHYS + OMAP2_L3_IO_OFFSET)
+ #define OMAP343X_SDRC_SIZE	SZ_1M
+ 
+-/* DSP */
+-#define DSP_MEM_34XX_PHYS	OMAP34XX_DSP_MEM_BASE	/* 0x58000000 */
+-#define DSP_MEM_34XX_VIRT	0xe0000000
+-#define DSP_MEM_34XX_SIZE	0x28000
+-#define DSP_IPI_34XX_PHYS	OMAP34XX_DSP_IPI_BASE	/* 0x59000000 */
+-#define DSP_IPI_34XX_VIRT	0xe1000000
+-#define DSP_IPI_34XX_SIZE	SZ_4K
+-#define DSP_MMU_34XX_PHYS	OMAP34XX_DSP_MMU_BASE	/* 0x5a000000 */
+-#define DSP_MMU_34XX_VIRT	0xe2000000
+-#define DSP_MMU_34XX_SIZE	SZ_4K
++/* 3430 IVA - currently unmapped */
+ 
+ /*
+  * ----------------------------------------------------------------------------
+diff --git a/arch/arm/plat-omap/io.c b/arch/arm/plat-omap/io.c
+index 11f5d79..0cfd54f 100644
+--- a/arch/arm/plat-omap/io.c
++++ b/arch/arm/plat-omap/io.c
+@@ -66,12 +66,12 @@ void __iomem *omap_ioremap(unsigned long p, size_t size, unsigned int type)
+ 			return XLATE(p, L4_24XX_PHYS, L4_24XX_VIRT);
+ 	}
+ 	if (cpu_is_omap2420()) {
+-		if (BETWEEN(p, DSP_MEM_24XX_PHYS, DSP_MEM_24XX_SIZE))
+-			return XLATE(p, DSP_MEM_24XX_PHYS, DSP_MEM_24XX_VIRT);
+-		if (BETWEEN(p, DSP_IPI_24XX_PHYS, DSP_IPI_24XX_SIZE))
+-			return XLATE(p, DSP_IPI_24XX_PHYS, DSP_IPI_24XX_SIZE);
+-		if (BETWEEN(p, DSP_MMU_24XX_PHYS, DSP_MMU_24XX_SIZE))
+-			return XLATE(p, DSP_MMU_24XX_PHYS, DSP_MMU_24XX_VIRT);
++		if (BETWEEN(p, DSP_MEM_2420_PHYS, DSP_MEM_2420_SIZE))
++			return XLATE(p, DSP_MEM_2420_PHYS, DSP_MEM_2420_VIRT);
++		if (BETWEEN(p, DSP_IPI_2420_PHYS, DSP_IPI_2420_SIZE))
++			return XLATE(p, DSP_IPI_2420_PHYS, DSP_IPI_2420_SIZE);
++		if (BETWEEN(p, DSP_MMU_2420_PHYS, DSP_MMU_2420_SIZE))
++			return XLATE(p, DSP_MMU_2420_PHYS, DSP_MMU_2420_VIRT);
+ 	}
+ 	if (cpu_is_omap2430()) {
+ 		if (BETWEEN(p, L4_WK_243X_PHYS, L4_WK_243X_SIZE))
