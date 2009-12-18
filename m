@@ -1,33 +1,46 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 17 Dec 2009 21:20:21 -0700
-Subject: [PATCH 6/8] OMAP3 clock: McBSP 2, 3,
-	4 functional clock parent is PER_96M_FCLK, not CORE_96M_FCLK
+Date: Thu, 17 Dec 2009 21:20:15 -0700
+Subject: [PATCH 1/8] OMAP2: remove duplicated #include
 In-Reply-To: <20091218041912.27280.92152.stgit@localhost.localdomain>
 References: <20091218041912.27280.92152.stgit@localhost.localdomain>
-Message-ID: <20091218042020.27280.77746.stgit@localhost.localdomain>
+Message-ID: <20091218042014.27280.91017.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The correct parent of the McBSP 2, 3, and 4 functional clocks is
-PER_96M_FCLK, not CORE_96M_FCLK.  Fix this in the OMAP clock tree.
-Reported by Nicole Chalhoub <n-chalhoub@ti.com>.
+From: Huang Weiyi <weiyi.huang@gmail.com>
 
+Remove duplicated #include('s) in
+  arch/arm/mach-omap2/clock34xx.c
+  arch/arm/mach-omap2/io.c
+
+Signed-off-by: Huang Weiyi <weiyi.huang@gmail.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Nicole Chalhoub <n-chalhoub@ti.com>
 ---
- arch/arm/mach-omap2/clock34xx_data.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/clock34xx.c |    1 -
+ arch/arm/mach-omap2/io.c        |    1 -
+ 2 files changed, 0 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clock34xx_data.c b/arch/arm/mach-omap2/clock34xx_data.c
-index c60b19a..7eea9fb 100644
---- a/arch/arm/mach-omap2/clock34xx_data.c
-+++ b/arch/arm/mach-omap2/clock34xx_data.c
-@@ -2747,7 +2747,7 @@ static struct clk mcbsp4_ick = {
- };
+diff --git a/arch/arm/mach-omap2/clock34xx.c b/arch/arm/mach-omap2/clock34xx.c
+index ded3236..d4217b9 100644
+--- a/arch/arm/mach-omap2/clock34xx.c
++++ b/arch/arm/mach-omap2/clock34xx.c
+@@ -34,7 +34,6 @@
+ #include <asm/div64.h>
+ #include <asm/clkdev.h>
  
- static const struct clksel mcbsp_234_clksel[] = {
--	{ .parent = &core_96m_fck, .rates = common_mcbsp_96m_rates },
-+	{ .parent = &per_96m_fck,  .rates = common_mcbsp_96m_rates },
- 	{ .parent = &mcbsp_clks,   .rates = common_mcbsp_mcbsp_rates },
- 	{ .parent = NULL }
- };
+-#include <plat/sdrc.h>
+ #include "clock.h"
+ #include "clock34xx.h"
+ #include "sdrc.h"
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index a8749e8..ac9ea60 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -33,7 +33,6 @@
+ #include <plat/sdrc.h>
+ #include <plat/gpmc.h>
+ #include <plat/serial.h>
+-#include <plat/mux.h>
+ #include <plat/vram.h>
+ 
+ #include "clock.h"
