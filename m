@@ -1,66 +1,61 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 18 Dec 2009 11:13:37 +0000
-Subject: Regulator framework usage in suspend/resume contex.
-In-Reply-To: <000301ca7f39$96047b60$c20d7220$%majewski@samsung.com>
-References: <000301ca7f39$96047b60$c20d7220$%majewski@samsung.com>
-Message-ID: <20091218111337.GB21706@rakim.wolfsonmicro.main>
+From: kpa_info@yahoo.fr (Patrick)
+Date: Fri, 18 Dec 2009 04:24:57 -0800 (PST)
+Subject: [PXA320] dmac_flush_range and burst on SMEMC
+In-Reply-To: <f17812d70912180139k7e6a7cbas48f025abc6f82ea5@mail.gmail.com>
+Message-ID: <675299.63543.qm@web23307.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2009 at 05:54:21PM +0100, Lukasz Majewski wrote:
+Hello,
 
-In general if you want advice on a kernel subsystem it's best to CC the
-maintainers of the relevant subsystem - messages posted only to mailing
-lists (particularly high volume ones such as this) can easily get lost
-in the flow.
+Yes PXA320 L2 cache is enabled.
 
-> I'm trying to use the regulator framework in conjunction with suspend/resume
-> (code based on a s3c Samsung SoC platform).
-> My goal is to change values of regulators output before going to sleep and
-> restore their values after resume.
+I do a request_mem_region and after a ioremap_cached.
+After I use iowrite32 with the address returned by ioremap_cached.
 
-Which PMIC are you using for this?
+Actually I simply write 8 times with iowrite32 with incremental address. After, 8 write i use dmac_flush_range to flush the cash (and start a burst).
 
-> The problem is when I disable normally enabled source or change its voltage
-> value to new_value when entering the suspend to RAM state.
+I do not use DMA API. Should I use it ? 
 
-It'd be useful to see the driver here...
+Patrick
 
-> I don't know how to enable this source again after resume or restore source
-> microvolts setting as before suspend?
+--- En date de?: Ven 18.12.09, Eric Miao <eric.y.miao@gmail.com> a ?crit?:
 
-The expecation of the API is that your suspend state configuration will
-not impact the state used for the running system so no work should be
-required by software to restore the state.  Hardware tends to want this
-since the suspend mode will normally involve powering down the CPU and
-therefore needs some hardware handshake between the CPU and the PMIC.
-If the regulator driver is doing something too different to this then it
-probably shouldn't be implementing the suspend mode APIs at all.
+> De: Eric Miao <eric.y.miao@gmail.com>
+> Objet: Re: [PXA320] dmac_flush_range and burst on SMEMC
+> ?: "Patrick" <kpa_info@yahoo.fr>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Date: Vendredi 18 D?cembre 2009, 10h39
+> On Fri, Dec 18, 2009 at 5:00 PM,
+> Patrick <kpa_info@yahoo.fr>
+> wrote:
+> > Hello all,
+> >
+> > I am using a PXA320 with a FPGA connected on the VLIO
+> memory bus. For faster transfer between the PXA and the FPGA
+> I would like to use burst (supported by the SMEMC in VLIO).
+> >
+> > I was using a 2.6.26 kernel and burst was working very
+> fine. I was using ioremap_cached and after a loop of
+> iowrite32 and a call to dmac_flush_range to start the burst.
+> It was working fine.
+> >
+> > I have migrated to a 2.6.28 kernel with the same
+> driver code. All the data writed by the loop of iowrite32 is
+> lost and only the last burst is writed using PIO and no
+> burst. It's like if dmac_flush_range is not working and
+> flush no cash at all.
+> >
+> > Do you have any idea ? Should I use another function
+> than dmac_flush_range ?
+> 
+> Did you enable L2 cache and how your memory region is
+> mapped?
+> 
+> PS: using dmac_* is not recommended, use dma API instead,
+> or
+> at least dma_cache_maint().
+> 
 
-There's also a general idea that consumer drivers should be turning off
-their supplies when they suspend, if only to allow them to better take
-advantage of runtime PM schemes as they come along (though currently
-they all use different callbacks).
 
-There's currently no support for restoring the state of regulators that
-don't have the hardware handshaking for entering and exiting suspend,
-mostly due to lack of demand.  That may be best handled by the
-individual regulators from their suspend and resume methods, probably
-using a core helper, but I've not fully thought that through.
-
-> It looks like some relevant method is missing in the framework, or I haven't
-> look deep enough to spot one :-).
-
-It's a bit academic anyway for ARM platforms since suspend to disk isn't
-supported by the architecture at present so most systems will never do
-anything except suspend to RAM so there's no real need to select which
-mode to use at runtime.
-
-> I was grepping a little and it looks, that regulator_suspend_prepare()
-> method is not used by any suspend/resume driver in the kernel linux tree (at
-> least up to kernel version 2.6.32-rc8), so there is no reference code.
-
-That's correct, it should probably be hooked in for the 1133-EV1 i.MX
-support but IIRC that was merged prior to the platform supporting
-suspend and like I say the suspend mode configuration for ARM is a bit
-academic.
+      
