@@ -1,52 +1,30 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 17 Dec 2009 21:20:24 -0700
-Subject: [PATCH 8/8] OMAP clock: remove incorrect EXPORT_SYMBOL()s
-In-Reply-To: <20091218041912.27280.92152.stgit@localhost.localdomain>
-References: <20091218041912.27280.92152.stgit@localhost.localdomain>
-Message-ID: <20091218042022.27280.12285.stgit@localhost.localdomain>
+From: jsgood.yang@samsung.com (Jinsung Yang)
+Date: Fri, 18 Dec 2009 16:41:11 +0900
+Subject: ARMv6 build error in v2.6.33-rc1
+Message-ID: <005801ca7fb5$787b11e0$697135a0$%yang@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only symbols that should be exported are symbols that are to be
-called from loadable kernel modules, e.g., device drivers.  In the
-context of plat-omap/clock.c, these should only be the Linux clock
-interface symbols as defined by include/linux/clk.h.  Core code
-doesn't need these symbols to be exported.  Also, clean up an old
-comment while here.
+Hi,
+I've been facing a build problem with ARMv6 architecture such as s3c64xx series.
+The logs are shown as below:
+--
+  CHK     include/linux/version.h
+  CHK     include/generated/utsrelease.h
+make[1]: `include/generated/mach-types.h' is up to date.
+  CALL    scripts/checksyscalls.sh
+<stdin>:1523: warning: #warning syscall recvmmsg not implemented
+  CHK     include/generated/compile.h
+  CC      arch/arm/mm/copypage-v6.o
+arch/arm/mm/copypage-v6.c: In function 'v6_copy_user_highpage_nonaliasing':
+arch/arm/mm/copypage-v6.c:51: error: implicit declaration of function '__cpuc_flush_dcache_page'
+make[1]: *** [arch/arm/mm/copypage-v6.o] Error 1
+make: *** [arch/arm/mm] Error 2
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/plat-omap/clock.c |    6 ------
- 1 files changed, 0 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
-index 89cafc9..a64d84c 100644
---- a/arch/arm/plat-omap/clock.c
-+++ b/arch/arm/plat-omap/clock.c
-@@ -36,10 +36,6 @@ static struct clk_functions *arch_clock;
-  * Standard clock functions defined in include/linux/clk.h
-  *-------------------------------------------------------------------------*/
- 
--/* This functions is moved to arch/arm/common/clkdev.c. For OMAP4 since
-- * clock framework is not up , it is defined here to avoid rework in
-- * every driver. Also dummy prcm reset function is added */
--
- int clk_enable(struct clk *clk)
- {
- 	unsigned long flags;
-@@ -305,7 +301,6 @@ void clk_enable_init_clocks(void)
- 			clk_enable(clkp);
- 	}
- }
--EXPORT_SYMBOL(clk_enable_init_clocks);
- 
- /*
-  * Low level helpers
-@@ -334,7 +329,6 @@ void clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
- 		arch_clock->clk_init_cpufreq_table(table);
- 	spin_unlock_irqrestore(&clockfw_lock, flags);
- }
--EXPORT_SYMBOL(clk_init_cpufreq_table);
- #endif
- 
- /*-------------------------------------------------------------------------*/
+How we handle this?
+
+Best Regards,
+--
+Jinsung Yang <jsgood.yang@samsung.com>
+SAMSUNG Electronics
