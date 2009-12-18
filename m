@@ -1,37 +1,46 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Fri, 18 Dec 2009 19:54:32 +0000
-Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors (v2)
-In-Reply-To: <20091218182007.GF5527@n2100.arm.linux.org.uk>
-References: <20091218180406.32211.72790.stgit@e101986-lin>
-	<20091218182007.GF5527@n2100.arm.linux.org.uk>
-Message-ID: <20091218195432.GC1205@shareable.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 18 Dec 2009 15:22:34 -0500 (EST)
+Subject: shared memory problem on ARM v5TE using threads
+In-Reply-To: <cabda6420912160938m6ea11da5t947c2bf082c430b7@mail.gmail.com>
+References: <20091207175608.GE26821@n2100.arm.linux.org.uk>
+	<20091213120615.GB10698@n2100.arm.linux.org.uk>
+	<cabda6420912140513k40a998b7k8cf56c35cc535cfb@mail.gmail.com>
+	<309002C0DA137042828828FC53D7A9347E2630F364@IL-MB01.marvell.com>
+	<cabda6420912140948t23c07676tb5f44eb4febbc584@mail.gmail.com>
+	<alpine.LFD.2.00.0912141503360.23173@xanadu.home>
+	<c70ff3ad0912142350v2231938dqc9c0aedc214120bd@mail.gmail.com>
+	<cabda6420912150301n2c1a54d6ta7407d89f4d0f9cf@mail.gmail.com>
+	<20091215171440.GA15855@n2100.arm.linux.org.uk>
+	<cabda6420912160835k714b9de4m7c647da97055f91b@mail.gmail.com>
+	<cabda6420912160938m6ea11da5t947c2bf082c430b7@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.0912181517120.28241@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> > +	  NOTE: when accessing uncached shared regions, LDREX/STREX rely
-> > +	  on an external transaction monitoring block called a global
-> > +	  monitor to maintain update atomicity. If your system does not
-> > +	  implement a global monitor, this option is not safe for programs
-> > +	  that are permitted to map uncached memory (CAP_SYS_RAWIO).
+On Wed, 16 Dec 2009, christian pellegrin wrote:
+
+> On Wed, Dec 16, 2009 at 5:35 PM, christian pellegrin <chripell@gmail.com> wrote:
 > 
-> We can trap this case by looking at the L_PTE_MT_* bits in the pte
-> for the page we're going to be accessing - that's probably a good
-> idea to ensure that such accesses are trapped, rather than going
-> head and possibly risking silent corruption.
+> >
+> > I'm trying some more elaborate tests where just one case of
+> > inconsistency will stop the counting.
+> >
+> 
+> Here is the program that implements Russell's ideas (at least I think
+> so) but is easier to use. By giving the parameter 1 or -1 you can test
+> different kind of consistency issues (missing flush in r/w or
+> inconsistent mapping's cacheness). It is also quite fun to watch at
+> with the buggy kernel on an idle system: it looks like that every
+> couple of seconds the 256kb L2 cache get flushed anyway (so even on
+> the kernel without the patch every now and then you get some
+> progress). I had it running for tens of minutes on a patched kernel
+> without stops.
 
-After that test, the kernel could even use the SWP/SWPB instructions
-if necessary for correct behaviour :-)
+Could you please repost your patch, adding CONFIG_CPU_CACHE_VIVT to the 
+conditional code flushing the L2 cache in flush_dcache_page()?
 
-Trapping and sending the process a signal would be
-a good way to ensure code doing that is fixed.
+I think this would be a good thing to have merged.  If I'm not mistaken, 
+this patch appears to fix all identified coherency cases so far.
 
-There might be thread synchronisation code using SWP/SWPB on shared
-memory which gets mapped uncached to prevent aliasing.
 
-So would it be more appropriate to trap when the access is to a
-non-RAM mapping?  Or are there devices which depend on the SWP bus
-cycle on RAM too, for example a PCI device updating RAM by DMA and
-using locked cycles?
-
--- Jamie
+Nicolas
