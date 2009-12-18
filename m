@@ -1,54 +1,40 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 17 Dec 2009 21:20:14 -0700
-Subject: [PATCH 0/8] OMAP clock & IO mapping fixes for 2.6.33-rc2
-Message-ID: <20091218041912.27280.92152.stgit@localhost.localdomain>
+Date: Thu, 17 Dec 2009 21:20:20 -0700
+Subject: [PATCH 5/8] OMAP3: clock: add clockdomains for UART1 & 2
+In-Reply-To: <20091218041912.27280.92152.stgit@localhost.localdomain>
+References: <20091218041912.27280.92152.stgit@localhost.localdomain>
+Message-ID: <20091218042019.27280.13461.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Kevin Hilman <khilman@deeprootsystems.com>
 
-Here are some relatively minor OMAP fixes for 2.6.33-rc2.  The most
-significant one is:
+UART1 & 2 were missing clockdomains resulting in broken omap_hwmod
+init for these devices.
 
-    OMAP2420 IO mapping: move IVA mapping virtual address out of vmalloc space
-
-Without it, OMAP2420 systems with lots of vmalloc() usage could crash or
-memory could be corrupted.
-
-
-- Paul
-
+Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
+ arch/arm/mach-omap2/clock34xx_data.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-Abhijit Pagare (1):
-      ARM: OMAP3: PM: Fix the Invalid CM_CLKSTCTRL reg access.
-
-Huang Weiyi (1):
-      OMAP2: remove duplicated #include
-
-Kevin Hilman (1):
-      OMAP3: clock: add clockdomains for UART1 & 2
-
-Paul Walmsley (4):
-      OMAP2xxx IO mapping: mark DSP mappings as being 2420-only
-      OMAP2420 IO mapping: move IVA mapping virtual address out of vmalloc space
-      OMAP3 clock: McBSP 2, 3, 4 functional clock parent is PER_96M_FCLK, not CORE_96M_FCLK
-      OMAP clock: remove incorrect EXPORT_SYMBOL()s
-
-Tuukka Toivonen (1):
-      OMAP3 clock: Add capability to change rate of dpll4_m5_ck
-
-
- arch/arm/mach-omap2/clock34xx.c      |    1 -
- arch/arm/mach-omap2/clock34xx_data.c |    6 +++++-
- arch/arm/mach-omap2/clockdomain.c    |    4 ++--
- arch/arm/mach-omap2/io.c             |   19 +++++++++---------
- arch/arm/plat-omap/clock.c           |    6 ------
- arch/arm/plat-omap/include/plat/io.h |   36 +++++++++++++++-------------------
- arch/arm/plat-omap/io.c              |   12 ++++++-----
- 7 files changed, 38 insertions(+), 46 deletions(-)
-
-
-   text	   data	    bss	    dec	    hex	filename
-3628182	 197984	 102920	3929086	 3bf3fe	vmlinux.beagle.orig
-3628135	 197984	 102920	3929039	 3bf3cf	vmlinux.beagle
+diff --git a/arch/arm/mach-omap2/clock34xx_data.c b/arch/arm/mach-omap2/clock34xx_data.c
+index 8bdcc9c..c60b19a 100644
+--- a/arch/arm/mach-omap2/clock34xx_data.c
++++ b/arch/arm/mach-omap2/clock34xx_data.c
+@@ -1500,6 +1500,7 @@ static struct clk uart2_fck = {
+ 	.parent		= &core_48m_fck,
+ 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+ 	.enable_bit	= OMAP3430_EN_UART2_SHIFT,
++	.clkdm_name	= "core_l4_clkdm",
+ 	.recalc		= &followparent_recalc,
+ };
+ 
+@@ -1509,6 +1510,7 @@ static struct clk uart1_fck = {
+ 	.parent		= &core_48m_fck,
+ 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+ 	.enable_bit	= OMAP3430_EN_UART1_SHIFT,
++	.clkdm_name	= "core_l4_clkdm",
+ 	.recalc		= &followparent_recalc,
+ };
+ 
