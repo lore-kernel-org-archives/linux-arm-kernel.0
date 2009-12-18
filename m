@@ -1,32 +1,37 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Fri, 18 Dec 2009 19:48:14 +0000
-Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors (v2)
-In-Reply-To: <20091218182007.GF5527@n2100.arm.linux.org.uk>
-References: <20091218180406.32211.72790.stgit@e101986-lin>
-	<20091218182007.GF5527@n2100.arm.linux.org.uk>
-Message-ID: <20091218194814.GB1205@shareable.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 18 Dec 2009 14:50:22 -0500 (EST)
+Subject: "Flush the D-cache during copy_user_highpage" breaks compile for
+	v7 on -rc1
+In-Reply-To: <20091218081851.GB28704@n2100.arm.linux.org.uk>
+References: <20091218031923.GA4575@atomide.com>
+	<20091218081851.GB28704@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.0912181448120.28241@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Fri, Dec 18, 2009 at 06:04:06PM +0000, Leif Lindholm wrote:
-> > +static int swp_handler(struct pt_regs *regs, unsigned int instr)
-> > +{
-> > +	unsigned int address, destreg, data;
-> > +	unsigned int res = 0;
-> > +	long current_pid = sys_getpid();
+On Fri, 18 Dec 2009, Russell King - ARM Linux wrote:
+
+> On Thu, Dec 17, 2009 at 07:19:24PM -0800, Tony Lindgren wrote:
+> > Hi Catalin,
+> > 
+> > You may have already run into this, but if not, looks like commit
+> > 115b22474eb1905da2f606a057da3455833333d3 breaks compile for v7:
+> > 
+> > arch/arm/mm/copypage-v6.c: In function 'v6_copy_user_highpage_nonaliasing':
+> > arch/arm/mm/copypage-v6.c:51: error: implicit declaration of function '__cpuc_flush_dcache_page'
+> > 
+> > Undoing that makes it work again.
 > 
-> Kernel functions calling system calls like this is frowned upon.  We
-> know what the current PID is - it's available from current->pid.  No
-> function call required.
+> It's a combination of changes - my initial changes for fixing the ARMv7
+> DMA support went in last night, but were based on a tree older than
+> Catalin's changes, which had already been committed.
+> 
+> My test build didn't catch any of these - it's the usual problem that
+> there is no way to adequately build-test the ARM kernel in a reasonable
+> time anymore.
 
-Quick nitpick in case Leif follows that advice :-)
+This is why we have a community of people reporting such issues, and a 
+long -rc period to fix them.
 
-sys_getpid returns task_tgid_vnr(current).
 
-It is neither ->pid (gettid returns that), nor directly dereferenced
-because of the vnr part.  You'll have to decide whether current->tgid
-or task_tgid_vnr(current), or current->pid after all are the
-appropriate value in this situation.
-
--- Jamie
+Nicolas
