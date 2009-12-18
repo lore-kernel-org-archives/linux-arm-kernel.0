@@ -1,29 +1,63 @@
 From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Fri, 18 Dec 2009 16:52:04 +0100
-Subject: [PATCH] spi: spi_imx: add device information to debug.
-Message-ID: <1261151524.3356.57.camel@climbing-alby>
+Date: Fri, 18 Dec 2009 17:04:22 +0100
+Subject: [PATCH] mx3fb: some debug and initialisation fixes.
+Message-ID: <1261152262.3356.69.camel@climbing-alby>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not an heavy fix, but good when debugging multiple spi channels.
+Fix the kernel oops when dev_dbg is called with mx3_fbi->txd == NULL
+
+Fix the late initialisation of mx3fb->backlight_level.
+If not, in the chain of function started by init_fb_chan(), in __blank() call 
+sdc_set_brightness(mx3fb, mx3fb->backlight_level) that will shut down
+the CONTRAST PWM output. 
+
 
 Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
 ---
- drivers/spi/spi_imx.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/video/mx3fb.c |   12 ++++++++----
+ 1 files changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
-index 89c22ef..18bbfa3 100644
---- a/drivers/spi/spi_imx.c
-+++ b/drivers/spi/spi_imx.c
-@@ -466,7 +466,7 @@ static int spi_imx_setup(struct spi_device *spi)
- 	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
- 	int gpio = spi_imx->chipselect[spi->chip_select];
+diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
+index 054ef29..772ba3f 100644
+--- a/drivers/video/mx3fb.c
++++ b/drivers/video/mx3fb.c
+@@ -324,8 +324,11 @@ static void sdc_enable_channel(struct mx3fb_info *mx3_fbi)
+ 	unsigned long flags;
+ 	dma_cookie_t cookie;
  
--	pr_debug("%s: mode %d, %u bpw, %d hz\n", __func__,
-+	dev_dbg(&spi->dev, "%s: mode %d, %u bpw, %d hz\n", __func__,
- 		 spi->mode, spi->bits_per_word, spi->max_speed_hz);
+-	dev_dbg(mx3fb->dev, "mx3fbi %p, desc %p, sg %p\n", mx3_fbi,
+-		to_tx_desc(mx3_fbi->txd), to_tx_desc(mx3_fbi->txd)->sg);
++	if (mx3_fbi->txd)
++		dev_dbg(mx3fb->dev, "mx3fbi %p, desc %p, sg %p\n", mx3_fbi,
++			to_tx_desc(mx3_fbi->txd), to_tx_desc(mx3_fbi->txd)->sg);
++	else
++		dev_dbg(mx3fb->dev, "mx3fbi %p, txd = NULL\n", mx3_fbi);
  
- 	if (gpio >= 0)
+ 	/* This enables the channel */
+ 	if (mx3_fbi->cookie < 0) {
+@@ -646,6 +649,7 @@ static int sdc_set_global_alpha(struct mx3fb_data *mx3fb, bool enable, uint8_t a
+ 
+ static void sdc_set_brightness(struct mx3fb_data *mx3fb, uint8_t value)
+ {
++	dev_dbg(mx3fb->dev, "%s: value = %d\n", __func__, value);
+ 	/* This might be board-specific */
+ 	mx3fb_write_reg(mx3fb, 0x03000000UL | value << 16, SDC_PWM_CTRL);
+ 	return;
+@@ -1486,12 +1490,12 @@ static int mx3fb_probe(struct platform_device *pdev)
+ 		goto ersdc0;
+ 	}
+ 
++	mx3fb->backlight_level = 255;
++
+ 	ret = init_fb_chan(mx3fb, to_idmac_chan(chan));
+ 	if (ret < 0)
+ 		goto eisdc0;
+ 
+-	mx3fb->backlight_level = 255;
+-
+ 	return 0;
+ 
+ eisdc0:
 -- 
 1.6.3.3
