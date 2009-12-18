@@ -1,51 +1,45 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Sat, 19 Dec 2009 00:28:22 +0800
-Subject: [PATCH] ARM: NUC900: Fix type error
-In-Reply-To: <8fb2581d0912162305l782a4fd6qb4641dc11b2d463d@mail.gmail.com>
-References: <8fb2581d0912162305l782a4fd6qb4641dc11b2d463d@mail.gmail.com>
-Message-ID: <e68bb3470912180828s50c5a0f5t6f199231385c8719@mail.gmail.com>
+From: leif.lindholm@arm.com (Leif Lindholm)
+Date: Fri, 18 Dec 2009 17:01:29 -0000
+Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors
+In-Reply-To: <20091217193210.GD362@shareable.org>
+References: <20091217175416.9317.66257.stgit@e101986-lin>
+	<20091217193210.GD362@shareable.org>
+Message-ID: <000101ca8003$be6de210$3b49a630$@lindholm@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/12/17 Li Jie <eltshanli@gmail.com>:
-> Hi, Wan:
->
-> When I compiling latest kernel code, I met following error:
-> ?CC ? ? ?arch/arm/mach-w90x900/dev.o
-> arch/arm/mach-w90x900/dev.c:200: error: variable
-> ?nuc900_spiflash_data? has initializer but incomplete type
+> -----Original Message-----
+> From: Jamie Lokier [mailto:jamie at shareable.org]
+> Sent: 17 December 2009 19:32
 
-Okay, tested by me, error occurs!
+> > To correctly deal with copy-on-write, it also modifies
+> > cpu_v7_set_pte_ext to change the mappings to priviliged RO when
+> > user RO.
+> 
+> Does this break ptrace writing to RO pages or anything else?
 
-Russell, could you apply this patch to v2.6.33?
+I believe Catalin has answered this question.
 
-> We should use nuc900_spi_info instead of w90p910_spi_info, right ?
->
-> Signed-off-by: lijie <eltshanli@gmail.com>
-> ---
-> ?arch/arm/mach-w90x900/dev.c | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-w90x900/dev.c b/arch/arm/mach-w90x900/dev.c
-> index 51f17b7..ec711f4 100644
-> --- a/arch/arm/mach-w90x900/dev.c
-> +++ b/arch/arm/mach-w90x900/dev.c
-> @@ -197,7 +197,7 @@ static struct platform_device nuc900_device_emc = {
->
-> ?/* SPI device */
->
-> -static struct w90p910_spi_info nuc900_spiflash_data = {
-> +static struct nuc900_spi_info nuc900_spiflash_data = {
-> ? ? ? ?.num_cs ? ? ? ? = 1,
-> ? ? ? ?.lsb ? ? ? ? ? ?= 0,
-> ? ? ? ?.txneg ? ? ? ? ?= 1,
-> --
-> 1.6.5.4
->
+> If it doesn't break anything, seems to me it should always be done
+> like that, not conditional on CONFIG_SWP_EMULATE.
 
+I agree this should not really be conditional on CONFIG_SWP_EMULATE, but
+since Catalin's revised page table format patches have not been merged,
+it felt less contentious to leave that behaviour in place unless real
+need to change it existed. I'd be happy to drop the ifndef if that
+was preferred.
 
+> Ideally it would report the same errors as userspace accesses, as
+> calculated in do_page_fault() and passed to __do_user_fault(), for the
+> benefit of programs which distinguish SEGV_MAPERR from SEGV_ACCERR.
 
--- 
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Good point - I'm adding this and will be submitting an updated patch
+shortly.
+
+> These printks look like an easy local denial of service.  They should
+> be rate limited.
+
+Ok, I'll replace them with pr_debug().
+
+/
+	Leif
