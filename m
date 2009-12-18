@@ -1,19 +1,51 @@
-From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Fri, 18 Dec 2009 17:12:26 +0100
-Subject: [PATCH 2/4] mfd: mc13783: When probing, unlock the mc13783
-	before subsystems initialisation.
-In-Reply-To: <1260811085.2022.135.camel@climbing-alby>
-References: <1260808880.2022.98.camel@climbing-alby>
-	<1260810776.2022.130.camel@climbing-alby>
-	<1260811085.2022.135.camel@climbing-alby>
-Message-ID: <1261152746.3356.72.camel@climbing-alby>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Sat, 19 Dec 2009 00:28:22 +0800
+Subject: [PATCH] ARM: NUC900: Fix type error
+In-Reply-To: <8fb2581d0912162305l782a4fd6qb4641dc11b2d463d@mail.gmail.com>
+References: <8fb2581d0912162305l782a4fd6qb4641dc11b2d463d@mail.gmail.com>
+Message-ID: <e68bb3470912180828s50c5a0f5t6f199231385c8719@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping :)
+2009/12/17 Li Jie <eltshanli@gmail.com>:
+> Hi, Wan:
+>
+> When I compiling latest kernel code, I met following error:
+> ?CC ? ? ?arch/arm/mach-w90x900/dev.o
+> arch/arm/mach-w90x900/dev.c:200: error: variable
+> ?nuc900_spiflash_data? has initializer but incomplete type
 
-PATCH 1 & 2 are fixes that can go to .33
+Okay, tested by me, error occurs!
 
-Thanks for the time giving to this.
+Russell, could you apply this patch to v2.6.33?
 
-Alberto!
+> We should use nuc900_spi_info instead of w90p910_spi_info, right ?
+>
+> Signed-off-by: lijie <eltshanli@gmail.com>
+> ---
+> ?arch/arm/mach-w90x900/dev.c | ? ?2 +-
+> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-w90x900/dev.c b/arch/arm/mach-w90x900/dev.c
+> index 51f17b7..ec711f4 100644
+> --- a/arch/arm/mach-w90x900/dev.c
+> +++ b/arch/arm/mach-w90x900/dev.c
+> @@ -197,7 +197,7 @@ static struct platform_device nuc900_device_emc = {
+>
+> ?/* SPI device */
+>
+> -static struct w90p910_spi_info nuc900_spiflash_data = {
+> +static struct nuc900_spi_info nuc900_spiflash_data = {
+> ? ? ? ?.num_cs ? ? ? ? = 1,
+> ? ? ? ?.lsb ? ? ? ? ? ?= 0,
+> ? ? ? ?.txneg ? ? ? ? ?= 1,
+> --
+> 1.6.5.4
+>
+
+
+
+-- 
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
