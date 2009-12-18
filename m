@@ -1,943 +1,276 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 18 Dec 2009 18:19:53 +0900
-Subject: [PATCH 6/7] ARM: S5P6440: Add Board and configuration file
-In-Reply-To: <1261127996-30253-1-git-send-email-kgene.kim@samsung.com>
+Date: Fri, 18 Dec 2009 18:19:56 +0900
+Subject: [PATCH 3/7] ARM: S5P6440: Add IRQ support
+In-Reply-To: <1261127996-30253-4-git-send-email-kgene.kim@samsung.com>
 References: <1261127996-30253-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1261127996-30253-2-git-send-email-kgene.kim@samsung.com>
+	<1261127996-30253-2-git-send-email-kgene.kim@samsung.com>
+	<1261127996-30253-3-git-send-email-kgene.kim@samsung.com>
+	<1261127996-30253-4-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1261127996-30253-5-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds Samsung's SMDK6440 board support and default configuration file.
+This patch adds IRQ support for S5P6440 CPU.
 
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Adityapratap Sharma <aditya.ps@samsung.com>
 Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
 Signed-off-by: Atul Dahiya <atul.dahiya@samsung.com>
 ---
- arch/arm/configs/s5p6440_defconfig    |  902 +++++++++++++++++++++++++++++++++
- arch/arm/mach-s5p6440/mach-smdk6440.c |  135 +++++
- 2 files changed, 1037 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/configs/s5p6440_defconfig
- create mode 100644 arch/arm/mach-s5p6440/mach-smdk6440.c
+ arch/arm/mach-s5p6440/include/mach/irqs.h     |  111 +++++++++++
+ arch/arm/mach-s5p6440/include/mach/regs-irq.h |   23 +++
+ arch/arm/plat-s5p/include/plat/irqs.h         |   80 ++++++++
+ arch/arm/plat-s5p/irq.c                       |  251 +++++++++++++++++++++++++
+ 4 files changed, 465 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-s5p6440/include/mach/irqs.h
+ create mode 100644 arch/arm/mach-s5p6440/include/mach/regs-irq.h
+ create mode 100644 arch/arm/plat-s5p/include/plat/irqs.h
+ create mode 100644 arch/arm/plat-s5p/irq.c
 
-diff --git a/arch/arm/configs/s5p6440_defconfig b/arch/arm/configs/s5p6440_defconfig
+diff --git a/arch/arm/mach-s5p6440/include/mach/irqs.h b/arch/arm/mach-s5p6440/include/mach/irqs.h
 new file mode 100644
-index 0000000..1e0141e
+index 0000000..dd1b50b
 --- /dev/null
-+++ b/arch/arm/configs/s5p6440_defconfig
-@@ -0,0 +1,902 @@
-+#
-+# Automatically generated make config: don't edit
-+# Linux kernel version: 2.6.31
-+# Thu Dec  3 09:57:07 2009
-+#
-+CONFIG_ARM=y
-+CONFIG_SYS_SUPPORTS_APM_EMULATION=y
-+CONFIG_GENERIC_GPIO=y
-+CONFIG_MMU=y
-+CONFIG_NO_IOPORT=y
-+CONFIG_GENERIC_HARDIRQS=y
-+CONFIG_STACKTRACE_SUPPORT=y
-+CONFIG_HAVE_LATENCYTOP_SUPPORT=y
-+CONFIG_LOCKDEP_SUPPORT=y
-+CONFIG_TRACE_IRQFLAGS_SUPPORT=y
-+CONFIG_HARDIRQS_SW_RESEND=y
-+CONFIG_GENERIC_IRQ_PROBE=y
-+CONFIG_RWSEM_GENERIC_SPINLOCK=y
-+CONFIG_GENERIC_HWEIGHT=y
-+CONFIG_GENERIC_CALIBRATE_DELAY=y
-+CONFIG_GENERIC_HARDIRQS_NO__DO_IRQ=y
-+CONFIG_VECTORS_BASE=0xffff0000
-+CONFIG_DEFCONFIG_LIST="/lib/modules/$UNAME_RELEASE/.config"
-+CONFIG_CONSTRUCTORS=y
++++ b/arch/arm/mach-s5p6440/include/mach/irqs.h
+@@ -0,0 +1,111 @@
++/* linux/arch/arm/mach-s5p6440/include/mach/irqs.h
++ *
++ * Copyright 2009 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
++ * S5P6440 - IRQ definitions
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
 +
-+#
-+# General setup
-+#
-+CONFIG_EXPERIMENTAL=y
-+CONFIG_BROKEN_ON_SMP=y
-+CONFIG_INIT_ENV_ARG_LIMIT=32
-+CONFIG_LOCALVERSION=""
-+CONFIG_LOCALVERSION_AUTO=y
-+CONFIG_SWAP=y
-+# CONFIG_SYSVIPC is not set
-+# CONFIG_BSD_PROCESS_ACCT is not set
++#ifndef __ASM_ARCH_S5P_IRQS_H
++#define __ASM_ARCH_S5P_IRQS_H __FILE__
 +
-+#
-+# RCU Subsystem
-+#
-+CONFIG_CLASSIC_RCU=y
-+# CONFIG_TREE_RCU is not set
-+# CONFIG_PREEMPT_RCU is not set
-+# CONFIG_TREE_RCU_TRACE is not set
-+# CONFIG_PREEMPT_RCU_TRACE is not set
-+# CONFIG_IKCONFIG is not set
-+CONFIG_LOG_BUF_SHIFT=17
-+# CONFIG_GROUP_SCHED is not set
-+# CONFIG_CGROUPS is not set
-+CONFIG_SYSFS_DEPRECATED=y
-+CONFIG_SYSFS_DEPRECATED_V2=y
-+# CONFIG_RELAY is not set
-+CONFIG_NAMESPACES=y
-+# CONFIG_UTS_NS is not set
-+# CONFIG_USER_NS is not set
-+# CONFIG_PID_NS is not set
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_INITRAMFS_SOURCE=""
-+CONFIG_RD_GZIP=y
-+CONFIG_RD_BZIP2=y
-+CONFIG_RD_LZMA=y
-+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-+CONFIG_SYSCTL=y
-+CONFIG_ANON_INODES=y
-+# CONFIG_EMBEDDED is not set
-+CONFIG_UID16=y
-+CONFIG_SYSCTL_SYSCALL=y
-+CONFIG_KALLSYMS=y
-+CONFIG_KALLSYMS_ALL=y
-+# CONFIG_KALLSYMS_EXTRA_PASS is not set
-+CONFIG_HOTPLUG=y
-+CONFIG_PRINTK=y
-+CONFIG_BUG=y
-+CONFIG_ELF_CORE=y
-+CONFIG_BASE_FULL=y
-+CONFIG_FUTEX=y
-+CONFIG_EPOLL=y
-+CONFIG_SIGNALFD=y
-+CONFIG_TIMERFD=y
-+CONFIG_EVENTFD=y
-+CONFIG_SHMEM=y
-+CONFIG_AIO=y
++#include <plat/irqs.h>
 +
-+#
-+# Performance Counters
-+#
-+CONFIG_VM_EVENT_COUNTERS=y
-+CONFIG_SLUB_DEBUG=y
-+# CONFIG_STRIP_ASM_SYMS is not set
-+CONFIG_COMPAT_BRK=y
-+# CONFIG_SLAB is not set
-+CONFIG_SLUB=y
-+# CONFIG_SLOB is not set
-+# CONFIG_PROFILING is not set
-+# CONFIG_MARKERS is not set
-+CONFIG_HAVE_OPROFILE=y
-+# CONFIG_KPROBES is not set
-+CONFIG_HAVE_KPROBES=y
-+CONFIG_HAVE_KRETPROBES=y
-+CONFIG_HAVE_CLK=y
++/* VIC0 */
 +
-+#
-+# GCOV-based kernel profiling
-+#
-+# CONFIG_SLOW_WORK is not set
-+CONFIG_HAVE_GENERIC_DMA_COHERENT=y
-+CONFIG_SLABINFO=y
-+CONFIG_RT_MUTEXES=y
-+CONFIG_BASE_SMALL=0
-+CONFIG_MODULES=y
-+# CONFIG_MODULE_FORCE_LOAD is not set
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_MODULE_FORCE_UNLOAD is not set
-+# CONFIG_MODVERSIONS is not set
-+# CONFIG_MODULE_SRCVERSION_ALL is not set
-+CONFIG_BLOCK=y
-+CONFIG_LBDAF=y
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_BLK_DEV_INTEGRITY is not set
++#define IRQ_EINT0_3		S5P_IRQ_VIC0(0)
++#define IRQ_EINT4_11		S5P_IRQ_VIC0(1)
++#define IRQ_RTC_TIC		S5P_IRQ_VIC0(2)
++#define IRQ_IIC1		S5P_IRQ_VIC0(5)
++#define IRQ_I2SV40		S5P_IRQ_VIC0(6)
++#define IRQ_GPS			S5P_IRQ_VIC0(7)
++#define IRQ_POST0		S5P_IRQ_VIC0(9)
++#define IRQ_2D			S5P_IRQ_VIC0(11)
++#define IRQ_TIMER0_VIC		S5P_IRQ_VIC0(23)
++#define IRQ_TIMER1_VIC		S5P_IRQ_VIC0(24)
++#define IRQ_TIMER2_VIC		S5P_IRQ_VIC0(25)
++#define IRQ_WDT			S5P_IRQ_VIC0(26)
++#define IRQ_TIMER3_VIC		S5P_IRQ_VIC0(27)
++#define IRQ_TIMER4_VIC		S5P_IRQ_VIC0(28)
++#define IRQ_DISPCON0		S5P_IRQ_VIC0(29)
++#define IRQ_DISPCON1		S5P_IRQ_VIC0(30)
++#define IRQ_DISPCON2		S5P_IRQ_VIC0(31)
 +
-+#
-+# IO Schedulers
-+#
-+CONFIG_IOSCHED_NOOP=y
-+CONFIG_IOSCHED_AS=y
-+CONFIG_IOSCHED_DEADLINE=y
-+CONFIG_IOSCHED_CFQ=y
-+# CONFIG_DEFAULT_AS is not set
-+# CONFIG_DEFAULT_DEADLINE is not set
-+CONFIG_DEFAULT_CFQ=y
-+# CONFIG_DEFAULT_NOOP is not set
-+CONFIG_DEFAULT_IOSCHED="cfq"
-+# CONFIG_FREEZER is not set
++/* VIC1 */
 +
-+#
-+# System Type
-+#
-+# CONFIG_ARCH_AAEC2000 is not set
-+# CONFIG_ARCH_INTEGRATOR is not set
-+# CONFIG_ARCH_REALVIEW is not set
-+# CONFIG_ARCH_VERSATILE is not set
-+# CONFIG_ARCH_AT91 is not set
-+# CONFIG_ARCH_CLPS711X is not set
-+# CONFIG_ARCH_GEMINI is not set
-+# CONFIG_ARCH_EBSA110 is not set
-+# CONFIG_ARCH_EP93XX is not set
-+# CONFIG_ARCH_FOOTBRIDGE is not set
-+# CONFIG_ARCH_MXC is not set
-+# CONFIG_ARCH_STMP3XXX is not set
-+# CONFIG_ARCH_NETX is not set
-+# CONFIG_ARCH_H720X is not set
-+# CONFIG_ARCH_IOP13XX is not set
-+# CONFIG_ARCH_IOP32X is not set
-+# CONFIG_ARCH_IOP33X is not set
-+# CONFIG_ARCH_IXP23XX is not set
-+# CONFIG_ARCH_IXP2000 is not set
-+# CONFIG_ARCH_IXP4XX is not set
-+# CONFIG_ARCH_L7200 is not set
-+# CONFIG_ARCH_KIRKWOOD is not set
-+# CONFIG_ARCH_LOKI is not set
-+# CONFIG_ARCH_MV78XX0 is not set
-+# CONFIG_ARCH_ORION5X is not set
-+# CONFIG_ARCH_MMP is not set
-+# CONFIG_ARCH_KS8695 is not set
-+# CONFIG_ARCH_NS9XXX is not set
-+# CONFIG_ARCH_W90X900 is not set
-+# CONFIG_ARCH_PNX4008 is not set
-+# CONFIG_ARCH_PXA is not set
-+# CONFIG_ARCH_MSM is not set
-+# CONFIG_ARCH_RPC is not set
-+# CONFIG_ARCH_SA1100 is not set
-+# CONFIG_ARCH_S3C2410 is not set
-+# CONFIG_ARCH_S3C64XX is not set
-+CONFIG_ARCH_S5P6440=y
-+# CONFIG_ARCH_S5PC1XX is not set
-+# CONFIG_ARCH_SHARK is not set
-+# CONFIG_ARCH_LH7A40X is not set
-+# CONFIG_ARCH_U300 is not set
-+# CONFIG_ARCH_DAVINCI is not set
-+# CONFIG_ARCH_OMAP is not set
-+CONFIG_PLAT_SAMSUNG=y
-+CONFIG_SAMSUNG_CLKSRC=y
-+CONFIG_PLAT_S3C=y
++#define IRQ_EINT12_15		S5P_IRQ_VIC1(0)
++#define IRQ_PCM0		S5P_IRQ_VIC1(2)
++#define IRQ_UART0		S5P_IRQ_VIC1(5)
++#define IRQ_UART1		S5P_IRQ_VIC1(6)
++#define IRQ_UART2		S5P_IRQ_VIC1(7)
++#define IRQ_UART3		S5P_IRQ_VIC1(8)
++#define IRQ_DMA0		S5P_IRQ_VIC1(9)
++#define IRQ_NFC			S5P_IRQ_VIC1(13)
++#define IRQ_SPI0		S5P_IRQ_VIC1(16)
++#define IRQ_SPI1		S5P_IRQ_VIC1(17)
++#define IRQ_IIC			S5P_IRQ_VIC1(18)
++#define IRQ_DISPCON3		S5P_IRQ_VIC1(19)
++#define IRQ_FIMGVG		S5P_IRQ_VIC1(20)
++#define IRQ_EINTG1_G9		S5P_IRQ_VIC1(21)
++#define IRQ_PMUIRQ		S5P_IRQ_VIC1(23)
++#define IRQ_HSMMC0		S5P_IRQ_VIC1(24)
++#define IRQ_HSMMC1		S5P_IRQ_VIC1(25)
++#define IRQ_HSMMC2		IRQ_SPI1	/* shared with SPI1 */
++#define IRQ_OTG			S5P_IRQ_VIC1(26)
++#define IRQ_DSI			S5P_IRQ_VIC1(27)
++#define IRQ_RTC_ALARM		S5P_IRQ_VIC1(28)
++#define IRQ_TSI			S5P_IRQ_VIC1(29)
++#define IRQ_PENDN		S5P_IRQ_VIC1(30)
++#define IRQ_TC			IRQ_PENDN
++#define IRQ_ADC			S5P_IRQ_VIC1(31)
 +
-+#
-+# Boot options
-+#
-+CONFIG_S3C_BOOT_ERROR_RESET=y
-+CONFIG_S3C_BOOT_UART_FORCE_FIFO=y
++/*
++ * Since the IRQ_EINT(x) are a linear mapping on s5p6440 we just defined
++ * them as an IRQ_EINT(x) macro from S5P_IRQ_EINT_BASE which we place
++ * after the pair of VICs.
++ */
 +
-+#
-+# Power management
-+#
-+CONFIG_S3C_LOWLEVEL_UART_PORT=1
-+CONFIG_S3C_GPIO_SPACE=0
-+CONFIG_S3C_GPIO_TRACK=y
-+CONFIG_PLAT_S5P=y
-+CONFIG_CPU_S5P6440_INIT=y
-+CONFIG_CPU_S5P6440_CLOCK=y
-+CONFIG_S5P_GPIO_EXTRA=0
-+CONFIG_CPU_S5P6440=y
-+CONFIG_MACH_SMDK6440=y
++#define S5P_IRQ_EINT_BASE	(S5P_IRQ_VIC1(31) + 6)
 +
-+#
-+# Processor Type
-+#
-+CONFIG_CPU_32=y
-+CONFIG_CPU_V6=y
-+CONFIG_CPU_32v6K=y
-+CONFIG_CPU_32v6=y
-+CONFIG_CPU_ABRT_EV6=y
-+CONFIG_CPU_PABRT_NOIFAR=y
-+CONFIG_CPU_CACHE_V6=y
-+CONFIG_CPU_CACHE_VIPT=y
-+CONFIG_CPU_COPY_V6=y
-+CONFIG_CPU_TLB_V6=y
-+CONFIG_CPU_HAS_ASID=y
-+CONFIG_CPU_CP15=y
-+CONFIG_CPU_CP15_MMU=y
++#define S5P_EINT(x)		((x) + S5P_IRQ_EINT_BASE)
++#define IRQ_EINT(x)		S5P_EINT(x)
 +
-+#
-+# Processor Features
-+#
-+CONFIG_ARM_THUMB=y
-+# CONFIG_CPU_ICACHE_DISABLE is not set
-+# CONFIG_CPU_DCACHE_DISABLE is not set
-+# CONFIG_CPU_BPREDICT_DISABLE is not set
-+# CONFIG_ARM_ERRATA_411920 is not set
-+CONFIG_ARM_VIC=y
-+CONFIG_ARM_VIC_NR=2
++/*
++ * Next the external interrupt groups. These are similar to the IRQ_EINT(x)
++ * that they are sourced from the GPIO pins but with a different scheme for
++ * priority and source indication.
++ *
++ * The IRQ_EINT(x) can be thought of as 'group 0' of the available GPIO
++ * interrupts, but for historical reasons they are kept apart from these
++ * next interrupts.
++ *
++ * Use IRQ_EINT_GROUP(group, offset) to get the number for use in the
++ * machine specific support files.
++ */
 +
-+#
-+# Bus support
-+#
-+# CONFIG_PCI_SYSCALL is not set
-+# CONFIG_ARCH_SUPPORTS_MSI is not set
-+# CONFIG_PCCARD is not set
++/* Actually, #6 and #7 are missing in the EINT_GROUP1 */
++#define IRQ_EINT_GROUP1_NR	(15)
++#define IRQ_EINT_GROUP2_NR	(8)
++#define IRQ_EINT_GROUP5_NR	(7)
++#define IRQ_EINT_GROUP6_NR	(10)
++/* Actually, #0, #1 and #2 are missing in the EINT_GROUP8 */
++#define IRQ_EINT_GROUP8_NR	(11)
 +
-+#
-+# Kernel Features
-+#
-+CONFIG_VMSPLIT_3G=y
-+# CONFIG_VMSPLIT_2G is not set
-+# CONFIG_VMSPLIT_1G is not set
-+CONFIG_PAGE_OFFSET=0xC0000000
-+# CONFIG_PREEMPT is not set
-+CONFIG_HZ=200
-+CONFIG_AEABI=y
-+CONFIG_OABI_COMPAT=y
-+# CONFIG_ARCH_SPARSEMEM_DEFAULT is not set
-+# CONFIG_ARCH_SELECT_MEMORY_MODEL is not set
-+# CONFIG_HIGHMEM is not set
-+CONFIG_SELECT_MEMORY_MODEL=y
-+CONFIG_FLATMEM_MANUAL=y
-+# CONFIG_DISCONTIGMEM_MANUAL is not set
-+# CONFIG_SPARSEMEM_MANUAL is not set
-+CONFIG_FLATMEM=y
-+CONFIG_FLAT_NODE_MEM_MAP=y
-+CONFIG_PAGEFLAGS_EXTENDED=y
-+CONFIG_SPLIT_PTLOCK_CPUS=4
-+# CONFIG_PHYS_ADDR_T_64BIT is not set
-+CONFIG_ZONE_DMA_FLAG=0
-+CONFIG_VIRT_TO_BUS=y
-+CONFIG_HAVE_MLOCK=y
-+CONFIG_HAVE_MLOCKED_PAGE_BIT=y
-+CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
-+CONFIG_ALIGNMENT_TRAP=y
-+# CONFIG_UACCESS_WITH_MEMCPY is not set
++#define IRQ_EINT_GROUP_BASE	S5P_EINT(16)
++#define IRQ_EINT_GROUP1_BASE	(IRQ_EINT_GROUP_BASE + 0)
++#define IRQ_EINT_GROUP2_BASE	(IRQ_EINT_GROUP1_BASE + IRQ_EINT_GROUP1_NR)
++#define IRQ_EINT_GROUP5_BASE	(IRQ_EINT_GROUP2_BASE + IRQ_EINT_GROUP2_NR)
++#define IRQ_EINT_GROUP6_BASE	(IRQ_EINT_GROUP5_BASE + IRQ_EINT_GROUP5_NR)
++#define IRQ_EINT_GROUP8_BASE	(IRQ_EINT_GROUP6_BASE + IRQ_EINT_GROUP6_NR)
 +
-+#
-+# Boot options
-+#
-+CONFIG_ZBOOT_ROM_TEXT=0
-+CONFIG_ZBOOT_ROM_BSS=0
-+CONFIG_CMDLINE="root=/dev/ram0 rw ramdisk=8192 initrd=0x20800000,8M console=ttySAC1,115200 init=/linuxrc"
-+# CONFIG_XIP_KERNEL is not set
-+# CONFIG_KEXEC is not set
++#define IRQ_EINT_GROUP(grp, x)	(IRQ_EINT_GROUP##grp##__BASE + (x))
 +
-+#
-+# CPU Power Management
-+#
-+# CONFIG_CPU_IDLE is not set
++/* Set the default NR_IRQS */
 +
-+#
-+# Floating point emulation
-+#
++#define NR_IRQS			(IRQ_EINT_GROUP8_BASE + IRQ_EINT_GROUP8_NR + 1)
 +
-+#
-+# At least one emulation must be selected
-+#
-+CONFIG_FPE_NWFPE=y
-+# CONFIG_FPE_NWFPE_XP is not set
-+# CONFIG_FPE_FASTFPE is not set
-+# CONFIG_VFP is not set
-+
-+#
-+# Userspace binary formats
-+#
-+CONFIG_BINFMT_ELF=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_HAVE_AOUT=y
-+# CONFIG_BINFMT_AOUT is not set
-+# CONFIG_BINFMT_MISC is not set
-+
-+#
-+# Power management options
-+#
-+# CONFIG_PM is not set
-+CONFIG_ARCH_SUSPEND_POSSIBLE=y
-+# CONFIG_NET is not set
-+
-+#
-+# Device Drivers
-+#
-+
-+#
-+# Generic Driver Options
-+#
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_STANDALONE=y
-+# CONFIG_PREVENT_FIRMWARE_BUILD is not set
-+CONFIG_FW_LOADER=y
-+CONFIG_FIRMWARE_IN_KERNEL=y
-+CONFIG_EXTRA_FIRMWARE=""
-+# CONFIG_DEBUG_DRIVER is not set
-+# CONFIG_DEBUG_DEVRES is not set
-+# CONFIG_SYS_HYPERVISOR is not set
-+# CONFIG_MTD is not set
-+# CONFIG_PARPORT is not set
-+CONFIG_BLK_DEV=y
-+# CONFIG_BLK_DEV_COW_COMMON is not set
-+# CONFIG_BLK_DEV_LOOP is not set
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_COUNT=16
-+CONFIG_BLK_DEV_RAM_SIZE=8192
-+# CONFIG_BLK_DEV_XIP is not set
-+# CONFIG_CDROM_PKTCDVD is not set
-+# CONFIG_MG_DISK is not set
-+# CONFIG_MISC_DEVICES is not set
-+CONFIG_HAVE_IDE=y
-+# CONFIG_IDE is not set
-+
-+#
-+# SCSI device support
-+#
-+# CONFIG_RAID_ATTRS is not set
-+CONFIG_SCSI=y
-+CONFIG_SCSI_DMA=y
-+# CONFIG_SCSI_TGT is not set
-+# CONFIG_SCSI_NETLINK is not set
-+CONFIG_SCSI_PROC_FS=y
-+
-+#
-+# SCSI support type (disk, tape, CD-ROM)
-+#
-+CONFIG_BLK_DEV_SD=y
-+# CONFIG_CHR_DEV_ST is not set
-+# CONFIG_CHR_DEV_OSST is not set
-+# CONFIG_BLK_DEV_SR is not set
-+CONFIG_CHR_DEV_SG=y
-+# CONFIG_CHR_DEV_SCH is not set
-+# CONFIG_SCSI_MULTI_LUN is not set
-+# CONFIG_SCSI_CONSTANTS is not set
-+# CONFIG_SCSI_LOGGING is not set
-+# CONFIG_SCSI_SCAN_ASYNC is not set
-+CONFIG_SCSI_WAIT_SCAN=m
-+
-+#
-+# SCSI Transports
-+#
-+# CONFIG_SCSI_SPI_ATTRS is not set
-+# CONFIG_SCSI_FC_ATTRS is not set
-+# CONFIG_SCSI_SAS_LIBSAS is not set
-+# CONFIG_SCSI_SRP_ATTRS is not set
-+CONFIG_SCSI_LOWLEVEL=y
-+# CONFIG_LIBFC is not set
-+# CONFIG_LIBFCOE is not set
-+# CONFIG_SCSI_DEBUG is not set
-+# CONFIG_SCSI_DH is not set
-+# CONFIG_SCSI_OSD_INITIATOR is not set
-+# CONFIG_ATA is not set
-+# CONFIG_MD is not set
-+
-+#
-+# Input device support
-+#
-+CONFIG_INPUT=y
-+# CONFIG_INPUT_FF_MEMLESS is not set
-+# CONFIG_INPUT_POLLDEV is not set
-+
-+#
-+# Userland interfaces
-+#
-+CONFIG_INPUT_MOUSEDEV=y
-+CONFIG_INPUT_MOUSEDEV_PSAUX=y
-+CONFIG_INPUT_MOUSEDEV_SCREEN_X=1024
-+CONFIG_INPUT_MOUSEDEV_SCREEN_Y=768
-+# CONFIG_INPUT_JOYDEV is not set
-+CONFIG_INPUT_EVDEV=y
-+# CONFIG_INPUT_EVBUG is not set
-+
-+#
-+# Input Device Drivers
-+#
-+CONFIG_INPUT_KEYBOARD=y
-+CONFIG_KEYBOARD_ATKBD=y
-+# CONFIG_KEYBOARD_LKKBD is not set
-+# CONFIG_KEYBOARD_GPIO is not set
-+# CONFIG_KEYBOARD_MATRIX is not set
-+# CONFIG_KEYBOARD_NEWTON is not set
-+# CONFIG_KEYBOARD_STOWAWAY is not set
-+# CONFIG_KEYBOARD_SUNKBD is not set
-+# CONFIG_KEYBOARD_XTKBD is not set
-+CONFIG_INPUT_MOUSE=y
-+CONFIG_MOUSE_PS2=y
-+CONFIG_MOUSE_PS2_ALPS=y
-+CONFIG_MOUSE_PS2_LOGIPS2PP=y
-+CONFIG_MOUSE_PS2_SYNAPTICS=y
-+CONFIG_MOUSE_PS2_TRACKPOINT=y
-+# CONFIG_MOUSE_PS2_ELANTECH is not set
-+# CONFIG_MOUSE_PS2_TOUCHKIT is not set
-+# CONFIG_MOUSE_SERIAL is not set
-+# CONFIG_MOUSE_VSXXXAA is not set
-+# CONFIG_MOUSE_GPIO is not set
-+# CONFIG_INPUT_JOYSTICK is not set
-+# CONFIG_INPUT_TABLET is not set
-+CONFIG_INPUT_TOUCHSCREEN=y
-+# CONFIG_TOUCHSCREEN_AD7879 is not set
-+# CONFIG_TOUCHSCREEN_FUJITSU is not set
-+# CONFIG_TOUCHSCREEN_GUNZE is not set
-+# CONFIG_TOUCHSCREEN_ELO is not set
-+# CONFIG_TOUCHSCREEN_WACOM_W8001 is not set
-+# CONFIG_TOUCHSCREEN_MTOUCH is not set
-+# CONFIG_TOUCHSCREEN_INEXIO is not set
-+# CONFIG_TOUCHSCREEN_MK712 is not set
-+# CONFIG_TOUCHSCREEN_PENMOUNT is not set
-+# CONFIG_TOUCHSCREEN_TOUCHRIGHT is not set
-+# CONFIG_TOUCHSCREEN_TOUCHWIN is not set
-+# CONFIG_TOUCHSCREEN_TOUCHIT213 is not set
-+# CONFIG_TOUCHSCREEN_W90X900 is not set
-+# CONFIG_INPUT_MISC is not set
-+
-+#
-+# Hardware I/O ports
-+#
-+CONFIG_SERIO=y
-+CONFIG_SERIO_SERPORT=y
-+CONFIG_SERIO_LIBPS2=y
-+# CONFIG_SERIO_RAW is not set
-+# CONFIG_GAMEPORT is not set
-+
-+#
-+# Character devices
-+#
-+CONFIG_VT=y
-+CONFIG_CONSOLE_TRANSLATIONS=y
-+CONFIG_VT_CONSOLE=y
-+CONFIG_HW_CONSOLE=y
-+# CONFIG_VT_HW_CONSOLE_BINDING is not set
-+CONFIG_DEVKMEM=y
-+# CONFIG_SERIAL_NONSTANDARD is not set
-+
-+#
-+# Serial drivers
-+#
-+CONFIG_SERIAL_8250=y
-+# CONFIG_SERIAL_8250_CONSOLE is not set
-+CONFIG_SERIAL_8250_NR_UARTS=3
-+CONFIG_SERIAL_8250_RUNTIME_UARTS=3
-+# CONFIG_SERIAL_8250_EXTENDED is not set
-+
-+#
-+# Non-8250 serial port support
-+#
-+CONFIG_SERIAL_SAMSUNG=y
-+CONFIG_SERIAL_SAMSUNG_UARTS=4
-+# CONFIG_SERIAL_SAMSUNG_DEBUG is not set
-+CONFIG_SERIAL_SAMSUNG_CONSOLE=y
-+CONFIG_SERIAL_S5P=y
-+CONFIG_SERIAL_CORE=y
-+CONFIG_SERIAL_CORE_CONSOLE=y
-+CONFIG_UNIX98_PTYS=y
-+# CONFIG_DEVPTS_MULTIPLE_INSTANCES is not set
-+CONFIG_LEGACY_PTYS=y
-+CONFIG_LEGACY_PTY_COUNT=256
-+# CONFIG_IPMI_HANDLER is not set
-+CONFIG_HW_RANDOM=y
-+# CONFIG_HW_RANDOM_TIMERIOMEM is not set
-+# CONFIG_R3964 is not set
-+# CONFIG_RAW_DRIVER is not set
-+# CONFIG_TCG_TPM is not set
-+# CONFIG_I2C is not set
-+# CONFIG_SPI is not set
-+CONFIG_ARCH_REQUIRE_GPIOLIB=y
-+CONFIG_GPIOLIB=y
-+# CONFIG_DEBUG_GPIO is not set
-+# CONFIG_GPIO_SYSFS is not set
-+
-+#
-+# Memory mapped GPIO expanders:
-+#
-+
-+#
-+# I2C GPIO expanders:
-+#
-+
-+#
-+# PCI GPIO expanders:
-+#
-+
-+#
-+# SPI GPIO expanders:
-+#
-+# CONFIG_W1 is not set
-+# CONFIG_POWER_SUPPLY is not set
-+# CONFIG_HWMON is not set
-+# CONFIG_THERMAL is not set
-+# CONFIG_THERMAL_HWMON is not set
-+# CONFIG_WATCHDOG is not set
-+CONFIG_SSB_POSSIBLE=y
-+
-+#
-+# Sonics Silicon Backplane
-+#
-+# CONFIG_SSB is not set
-+
-+#
-+# Multifunction device drivers
-+#
-+# CONFIG_MFD_CORE is not set
-+# CONFIG_MFD_SM501 is not set
-+# CONFIG_MFD_ASIC3 is not set
-+# CONFIG_HTC_EGPIO is not set
-+# CONFIG_HTC_PASIC3 is not set
-+# CONFIG_MFD_TMIO is not set
-+# CONFIG_MFD_T7L66XB is not set
-+# CONFIG_MFD_TC6387XB is not set
-+# CONFIG_MFD_TC6393XB is not set
-+# CONFIG_MEDIA_SUPPORT is not set
-+
-+#
-+# Graphics support
-+#
-+# CONFIG_VGASTATE is not set
-+# CONFIG_VIDEO_OUTPUT_CONTROL is not set
-+# CONFIG_FB is not set
-+# CONFIG_BACKLIGHT_LCD_SUPPORT is not set
-+
-+#
-+# Display device support
-+#
-+CONFIG_DISPLAY_SUPPORT=y
-+
-+#
-+# Display hardware drivers
-+#
-+
-+#
-+# Console display driver support
-+#
-+# CONFIG_VGA_CONSOLE is not set
-+CONFIG_DUMMY_CONSOLE=y
-+# CONFIG_SOUND is not set
-+# CONFIG_HID_SUPPORT is not set
-+# CONFIG_USB_SUPPORT is not set
-+# CONFIG_MMC is not set
-+# CONFIG_MEMSTICK is not set
-+# CONFIG_ACCESSIBILITY is not set
-+# CONFIG_NEW_LEDS is not set
-+CONFIG_RTC_LIB=y
-+# CONFIG_RTC_CLASS is not set
-+# CONFIG_DMADEVICES is not set
-+# CONFIG_AUXDISPLAY is not set
-+# CONFIG_REGULATOR is not set
-+# CONFIG_UIO is not set
-+# CONFIG_STAGING is not set
-+
-+#
-+# File systems
-+#
-+CONFIG_EXT2_FS=y
-+# CONFIG_EXT2_FS_XATTR is not set
-+# CONFIG_EXT2_FS_XIP is not set
-+CONFIG_EXT3_FS=y
-+# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
-+CONFIG_EXT3_FS_XATTR=y
-+CONFIG_EXT3_FS_POSIX_ACL=y
-+CONFIG_EXT3_FS_SECURITY=y
-+# CONFIG_EXT4_FS is not set
-+CONFIG_JBD=y
-+CONFIG_FS_MBCACHE=y
-+# CONFIG_REISERFS_FS is not set
-+# CONFIG_JFS_FS is not set
-+CONFIG_FS_POSIX_ACL=y
-+# CONFIG_XFS_FS is not set
-+# CONFIG_GFS2_FS is not set
-+# CONFIG_BTRFS_FS is not set
-+CONFIG_FILE_LOCKING=y
-+CONFIG_FSNOTIFY=y
-+CONFIG_DNOTIFY=y
-+CONFIG_INOTIFY=y
-+CONFIG_INOTIFY_USER=y
-+# CONFIG_QUOTA is not set
-+# CONFIG_AUTOFS_FS is not set
-+# CONFIG_AUTOFS4_FS is not set
-+# CONFIG_FUSE_FS is not set
-+CONFIG_GENERIC_ACL=y
-+
-+#
-+# Caches
-+#
-+# CONFIG_FSCACHE is not set
-+
-+#
-+# CD-ROM/DVD Filesystems
-+#
-+# CONFIG_ISO9660_FS is not set
-+# CONFIG_UDF_FS is not set
-+
-+#
-+# DOS/FAT/NT Filesystems
-+#
-+CONFIG_FAT_FS=y
-+CONFIG_MSDOS_FS=y
-+CONFIG_VFAT_FS=y
-+CONFIG_FAT_DEFAULT_CODEPAGE=437
-+CONFIG_FAT_DEFAULT_IOCHARSET="iso8859-1"
-+# CONFIG_NTFS_FS is not set
-+
-+#
-+# Pseudo filesystems
-+#
-+CONFIG_PROC_FS=y
-+CONFIG_PROC_SYSCTL=y
-+CONFIG_PROC_PAGE_MONITOR=y
-+CONFIG_SYSFS=y
-+CONFIG_TMPFS=y
-+CONFIG_TMPFS_POSIX_ACL=y
-+# CONFIG_HUGETLB_PAGE is not set
-+# CONFIG_CONFIGFS_FS is not set
-+CONFIG_MISC_FILESYSTEMS=y
-+# CONFIG_ADFS_FS is not set
-+# CONFIG_AFFS_FS is not set
-+# CONFIG_HFS_FS is not set
-+# CONFIG_HFSPLUS_FS is not set
-+# CONFIG_BEFS_FS is not set
-+# CONFIG_BFS_FS is not set
-+# CONFIG_EFS_FS is not set
-+CONFIG_CRAMFS=y
-+# CONFIG_SQUASHFS is not set
-+# CONFIG_VXFS_FS is not set
-+# CONFIG_MINIX_FS is not set
-+# CONFIG_OMFS_FS is not set
-+# CONFIG_HPFS_FS is not set
-+# CONFIG_QNX4FS_FS is not set
-+CONFIG_ROMFS_FS=y
-+CONFIG_ROMFS_BACKED_BY_BLOCK=y
-+# CONFIG_ROMFS_BACKED_BY_MTD is not set
-+# CONFIG_ROMFS_BACKED_BY_BOTH is not set
-+CONFIG_ROMFS_ON_BLOCK=y
-+# CONFIG_SYSV_FS is not set
-+# CONFIG_UFS_FS is not set
-+# CONFIG_NILFS2_FS is not set
-+
-+#
-+# Partition Types
-+#
-+# CONFIG_PARTITION_ADVANCED is not set
-+CONFIG_MSDOS_PARTITION=y
-+CONFIG_NLS=y
-+CONFIG_NLS_DEFAULT="iso8859-1"
-+CONFIG_NLS_CODEPAGE_437=y
-+# CONFIG_NLS_CODEPAGE_737 is not set
-+# CONFIG_NLS_CODEPAGE_775 is not set
-+# CONFIG_NLS_CODEPAGE_850 is not set
-+# CONFIG_NLS_CODEPAGE_852 is not set
-+# CONFIG_NLS_CODEPAGE_855 is not set
-+# CONFIG_NLS_CODEPAGE_857 is not set
-+# CONFIG_NLS_CODEPAGE_860 is not set
-+# CONFIG_NLS_CODEPAGE_861 is not set
-+# CONFIG_NLS_CODEPAGE_862 is not set
-+# CONFIG_NLS_CODEPAGE_863 is not set
-+# CONFIG_NLS_CODEPAGE_864 is not set
-+# CONFIG_NLS_CODEPAGE_865 is not set
-+# CONFIG_NLS_CODEPAGE_866 is not set
-+# CONFIG_NLS_CODEPAGE_869 is not set
-+# CONFIG_NLS_CODEPAGE_936 is not set
-+# CONFIG_NLS_CODEPAGE_950 is not set
-+# CONFIG_NLS_CODEPAGE_932 is not set
-+# CONFIG_NLS_CODEPAGE_949 is not set
-+# CONFIG_NLS_CODEPAGE_874 is not set
-+# CONFIG_NLS_ISO8859_8 is not set
-+# CONFIG_NLS_CODEPAGE_1250 is not set
-+# CONFIG_NLS_CODEPAGE_1251 is not set
-+CONFIG_NLS_ASCII=y
-+CONFIG_NLS_ISO8859_1=y
-+# CONFIG_NLS_ISO8859_2 is not set
-+# CONFIG_NLS_ISO8859_3 is not set
-+# CONFIG_NLS_ISO8859_4 is not set
-+# CONFIG_NLS_ISO8859_5 is not set
-+# CONFIG_NLS_ISO8859_6 is not set
-+# CONFIG_NLS_ISO8859_7 is not set
-+# CONFIG_NLS_ISO8859_9 is not set
-+# CONFIG_NLS_ISO8859_13 is not set
-+# CONFIG_NLS_ISO8859_14 is not set
-+# CONFIG_NLS_ISO8859_15 is not set
-+# CONFIG_NLS_KOI8_R is not set
-+# CONFIG_NLS_KOI8_U is not set
-+# CONFIG_NLS_UTF8 is not set
-+
-+#
-+# Kernel hacking
-+#
-+# CONFIG_PRINTK_TIME is not set
-+CONFIG_ENABLE_WARN_DEPRECATED=y
-+CONFIG_ENABLE_MUST_CHECK=y
-+CONFIG_FRAME_WARN=1024
-+CONFIG_MAGIC_SYSRQ=y
-+# CONFIG_UNUSED_SYMBOLS is not set
-+# CONFIG_DEBUG_FS is not set
-+# CONFIG_HEADERS_CHECK is not set
-+CONFIG_DEBUG_KERNEL=y
-+# CONFIG_DEBUG_SHIRQ is not set
-+CONFIG_DETECT_SOFTLOCKUP=y
-+# CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC is not set
-+CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC_VALUE=0
-+CONFIG_DETECT_HUNG_TASK=y
-+# CONFIG_BOOTPARAM_HUNG_TASK_PANIC is not set
-+CONFIG_BOOTPARAM_HUNG_TASK_PANIC_VALUE=0
-+CONFIG_SCHED_DEBUG=y
-+# CONFIG_SCHEDSTATS is not set
-+# CONFIG_TIMER_STATS is not set
-+# CONFIG_DEBUG_OBJECTS is not set
-+# CONFIG_SLUB_DEBUG_ON is not set
-+# CONFIG_SLUB_STATS is not set
-+# CONFIG_DEBUG_KMEMLEAK is not set
-+CONFIG_DEBUG_RT_MUTEXES=y
-+CONFIG_DEBUG_PI_LIST=y
-+# CONFIG_RT_MUTEX_TESTER is not set
-+CONFIG_DEBUG_SPINLOCK=y
-+CONFIG_DEBUG_MUTEXES=y
-+# CONFIG_DEBUG_LOCK_ALLOC is not set
-+# CONFIG_PROVE_LOCKING is not set
-+# CONFIG_LOCK_STAT is not set
-+CONFIG_DEBUG_SPINLOCK_SLEEP=y
-+# CONFIG_DEBUG_LOCKING_API_SELFTESTS is not set
-+# CONFIG_DEBUG_KOBJECT is not set
-+CONFIG_DEBUG_BUGVERBOSE=y
-+CONFIG_DEBUG_INFO=y
-+# CONFIG_DEBUG_VM is not set
-+# CONFIG_DEBUG_WRITECOUNT is not set
-+CONFIG_DEBUG_MEMORY_INIT=y
-+# CONFIG_DEBUG_LIST is not set
-+# CONFIG_DEBUG_SG is not set
-+# CONFIG_DEBUG_NOTIFIERS is not set
-+# CONFIG_BOOT_PRINTK_DELAY is not set
-+# CONFIG_RCU_TORTURE_TEST is not set
-+# CONFIG_RCU_CPU_STALL_DETECTOR is not set
-+# CONFIG_BACKTRACE_SELF_TEST is not set
-+# CONFIG_DEBUG_BLOCK_EXT_DEVT is not set
-+# CONFIG_FAULT_INJECTION is not set
-+# CONFIG_LATENCYTOP is not set
-+CONFIG_SYSCTL_SYSCALL_CHECK=y
-+# CONFIG_PAGE_POISONING is not set
-+CONFIG_HAVE_FUNCTION_TRACER=y
-+CONFIG_TRACING_SUPPORT=y
-+CONFIG_FTRACE=y
-+# CONFIG_FUNCTION_TRACER is not set
-+# CONFIG_SCHED_TRACER is not set
-+# CONFIG_ENABLE_DEFAULT_TRACERS is not set
-+# CONFIG_BOOT_TRACER is not set
-+CONFIG_BRANCH_PROFILE_NONE=y
-+# CONFIG_PROFILE_ANNOTATED_BRANCHES is not set
-+# CONFIG_PROFILE_ALL_BRANCHES is not set
-+# CONFIG_STACK_TRACER is not set
-+# CONFIG_KMEMTRACE is not set
-+# CONFIG_WORKQUEUE_TRACER is not set
-+# CONFIG_BLK_DEV_IO_TRACE is not set
-+# CONFIG_SAMPLES is not set
-+CONFIG_HAVE_ARCH_KGDB=y
-+# CONFIG_KGDB is not set
-+CONFIG_ARM_UNWIND=y
-+CONFIG_DEBUG_USER=y
-+CONFIG_DEBUG_ERRORS=y
-+# CONFIG_DEBUG_STACK_USAGE is not set
-+CONFIG_DEBUG_LL=y
-+# CONFIG_DEBUG_ICEDCC is not set
-+CONFIG_DEBUG_S3C_UART=1
-+
-+#
-+# Security options
-+#
-+# CONFIG_KEYS is not set
-+# CONFIG_SECURITY is not set
-+# CONFIG_SECURITYFS is not set
-+# CONFIG_SECURITY_FILE_CAPABILITIES is not set
-+CONFIG_CRYPTO=y
-+
-+#
-+# Crypto core or helper
-+#
-+# CONFIG_CRYPTO_FIPS is not set
-+# CONFIG_CRYPTO_MANAGER is not set
-+# CONFIG_CRYPTO_MANAGER2 is not set
-+# CONFIG_CRYPTO_GF128MUL is not set
-+# CONFIG_CRYPTO_NULL is not set
-+# CONFIG_CRYPTO_CRYPTD is not set
-+# CONFIG_CRYPTO_AUTHENC is not set
-+# CONFIG_CRYPTO_TEST is not set
-+
-+#
-+# Authenticated Encryption with Associated Data
-+#
-+# CONFIG_CRYPTO_CCM is not set
-+# CONFIG_CRYPTO_GCM is not set
-+# CONFIG_CRYPTO_SEQIV is not set
-+
-+#
-+# Block modes
-+#
-+# CONFIG_CRYPTO_CBC is not set
-+# CONFIG_CRYPTO_CTR is not set
-+# CONFIG_CRYPTO_CTS is not set
-+# CONFIG_CRYPTO_ECB is not set
-+# CONFIG_CRYPTO_LRW is not set
-+# CONFIG_CRYPTO_PCBC is not set
-+# CONFIG_CRYPTO_XTS is not set
-+
-+#
-+# Hash modes
-+#
-+# CONFIG_CRYPTO_HMAC is not set
-+# CONFIG_CRYPTO_XCBC is not set
-+
-+#
-+# Digest
-+#
-+# CONFIG_CRYPTO_CRC32C is not set
-+# CONFIG_CRYPTO_MD4 is not set
-+# CONFIG_CRYPTO_MD5 is not set
-+# CONFIG_CRYPTO_MICHAEL_MIC is not set
-+# CONFIG_CRYPTO_RMD128 is not set
-+# CONFIG_CRYPTO_RMD160 is not set
-+# CONFIG_CRYPTO_RMD256 is not set
-+# CONFIG_CRYPTO_RMD320 is not set
-+# CONFIG_CRYPTO_SHA1 is not set
-+# CONFIG_CRYPTO_SHA256 is not set
-+# CONFIG_CRYPTO_SHA512 is not set
-+# CONFIG_CRYPTO_TGR192 is not set
-+# CONFIG_CRYPTO_WP512 is not set
-+
-+#
-+# Ciphers
-+#
-+# CONFIG_CRYPTO_AES is not set
-+# CONFIG_CRYPTO_ANUBIS is not set
-+# CONFIG_CRYPTO_ARC4 is not set
-+# CONFIG_CRYPTO_BLOWFISH is not set
-+# CONFIG_CRYPTO_CAMELLIA is not set
-+# CONFIG_CRYPTO_CAST5 is not set
-+# CONFIG_CRYPTO_CAST6 is not set
-+# CONFIG_CRYPTO_DES is not set
-+# CONFIG_CRYPTO_FCRYPT is not set
-+# CONFIG_CRYPTO_KHAZAD is not set
-+# CONFIG_CRYPTO_SALSA20 is not set
-+# CONFIG_CRYPTO_SEED is not set
-+# CONFIG_CRYPTO_SERPENT is not set
-+# CONFIG_CRYPTO_TEA is not set
-+# CONFIG_CRYPTO_TWOFISH is not set
-+
-+#
-+# Compression
-+#
-+# CONFIG_CRYPTO_DEFLATE is not set
-+# CONFIG_CRYPTO_ZLIB is not set
-+# CONFIG_CRYPTO_LZO is not set
-+
-+#
-+# Random Number Generation
-+#
-+# CONFIG_CRYPTO_ANSI_CPRNG is not set
-+CONFIG_CRYPTO_HW=y
-+# CONFIG_BINARY_PRINTF is not set
-+
-+#
-+# Library routines
-+#
-+CONFIG_BITREVERSE=y
-+CONFIG_GENERIC_FIND_LAST_BIT=y
-+CONFIG_CRC_CCITT=y
-+# CONFIG_CRC16 is not set
-+# CONFIG_CRC_T10DIF is not set
-+# CONFIG_CRC_ITU_T is not set
-+CONFIG_CRC32=y
-+# CONFIG_CRC7 is not set
-+# CONFIG_LIBCRC32C is not set
-+CONFIG_ZLIB_INFLATE=y
-+CONFIG_DECOMPRESS_GZIP=y
-+CONFIG_DECOMPRESS_BZIP2=y
-+CONFIG_DECOMPRESS_LZMA=y
-+CONFIG_HAS_IOMEM=y
-+CONFIG_HAS_DMA=y
-diff --git a/arch/arm/mach-s5p6440/mach-smdk6440.c b/arch/arm/mach-s5p6440/mach-smdk6440.c
++#endif /* __ASM_ARCH_S5P_IRQS_H */
+diff --git a/arch/arm/mach-s5p6440/include/mach/regs-irq.h b/arch/arm/mach-s5p6440/include/mach/regs-irq.h
 new file mode 100644
-index 0000000..e5c560e
+index 0000000..b37af72
 --- /dev/null
-+++ b/arch/arm/mach-s5p6440/mach-smdk6440.c
-@@ -0,0 +1,135 @@
-+/* linux/arch/arm/mach-s5p6440/mach-smdk6440.c
++++ b/arch/arm/mach-s5p6440/include/mach/regs-irq.h
+@@ -0,0 +1,23 @@
++/* linux/arch/arm/mach-s5p6440/include/mach/regs-irq.h
 + *
 + * Copyright (c) 2009 Samsung Electronics Co., Ltd.
 + *		http://www.samsung.com/
++ *
++ * S5P6440 - IRQ register definitions
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#ifndef __ASM_ARCH_REGS_IRQ_H
++#define __ASM_ARCH_REGS_IRQ_H __FILE__
++
++#include <asm/hardware/vic.h>
++#include <mach/map.h>
++
++/* interrupt controller */
++#define S5P_VIC0REG(x)		(S5P_VA_VIC0 + (x))
++#define S5P_VIC1REG(x)		(S5P_VA_VIC1 + (x))
++
++#endif /* __ASM_ARCH_REGS_IRQ_H */
+diff --git a/arch/arm/plat-s5p/include/plat/irqs.h b/arch/arm/plat-s5p/include/plat/irqs.h
+new file mode 100644
+index 0000000..1bc4bac
+--- /dev/null
++++ b/arch/arm/plat-s5p/include/plat/irqs.h
+@@ -0,0 +1,80 @@
++/* linux/arch/arm/plat-s5p/include/plat/irqs.h
++ *
++ * Copyright (c) 2009 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
++ * S5P Common IRQ support
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#ifndef __ASM_PLAT_S5P_IRQS_H
++#define __ASM_PLAT_S5P_IRQS_H __FILE__
++
++/* we keep the first set of CPU IRQs out of the range of
++ * the ISA space, so that the PC104 has them to itself
++ * and we don't end up having to do horrible things to the
++ * standard ISA drivers....
++ *
++ * note, since we're using the VICs, our start must be a
++ * mulitple of 32 to allow the common code to work
++ */
++
++#define S5P_IRQ_OFFSET		(32)
++
++#define S5P_IRQ(x)		((x) + S5P_IRQ_OFFSET)
++
++#define S5P_VIC0_BASE		S5P_IRQ(0)
++#define S5P_VIC1_BASE		S5P_IRQ(32)
++
++/* UART interrupts, each UART has 4 intterupts per channel so
++ * use the space between the ISA and S3C main interrupts. Note, these
++ * are not in the same order as the S3C24XX series! */
++
++#define IRQ_S5P_UART_BASE0	(16)
++#define IRQ_S5P_UART_BASE1	(20)
++#define IRQ_S5P_UART_BASE2	(24)
++#define IRQ_S5P_UART_BASE3	(28)
++
++#define UART_IRQ_RXD		(0)
++#define UART_IRQ_ERR		(1)
++#define UART_IRQ_TXD		(2)
++
++#define IRQ_S5P_UART_RX0	(IRQ_S5P_UART_BASE0 + UART_IRQ_RXD)
++#define IRQ_S5P_UART_TX0	(IRQ_S5P_UART_BASE0 + UART_IRQ_TXD)
++#define IRQ_S5P_UART_ERR0	(IRQ_S5P_UART_BASE0 + UART_IRQ_ERR)
++
++#define IRQ_S5P_UART_RX1	(IRQ_S5P_UART_BASE1 + UART_IRQ_RXD)
++#define IRQ_S5P_UART_TX1	(IRQ_S5P_UART_BASE1 + UART_IRQ_TXD)
++#define IRQ_S5P_UART_ERR1	(IRQ_S5P_UART_BASE1 + UART_IRQ_ERR)
++
++#define IRQ_S5P_UART_RX2	(IRQ_S5P_UART_BASE2 + UART_IRQ_RXD)
++#define IRQ_S5P_UART_TX2	(IRQ_S5P_UART_BASE2 + UART_IRQ_TXD)
++#define IRQ_S5P_UART_ERR2	(IRQ_S5P_UART_BASE2 + UART_IRQ_ERR)
++
++#define IRQ_S5P_UART_RX3	(IRQ_S5P_UART_BASE3 + UART_IRQ_RXD)
++#define IRQ_S5P_UART_TX3	(IRQ_S5P_UART_BASE3 + UART_IRQ_TXD)
++#define IRQ_S5P_UART_ERR3	(IRQ_S5P_UART_BASE3 + UART_IRQ_ERR)
++
++/* S3C compatibilty defines */
++#define IRQ_S3CUART_RX0		IRQ_S5P_UART_RX0
++#define IRQ_S3CUART_RX1		IRQ_S5P_UART_RX1
++#define IRQ_S3CUART_RX2		IRQ_S5P_UART_RX2
++#define IRQ_S3CUART_RX3		IRQ_S5P_UART_RX3
++
++/* VIC based IRQs */
++
++#define S5P_IRQ_VIC0(x)		(S5P_VIC0_BASE + (x))
++#define S5P_IRQ_VIC1(x)		(S5P_VIC1_BASE + (x))
++
++#define S5P_TIMER_IRQ(x)	S5P_IRQ(64 + (x))
++
++#define IRQ_TIMER0		S5P_TIMER_IRQ(0)
++#define IRQ_TIMER1		S5P_TIMER_IRQ(1)
++#define IRQ_TIMER2		S5P_TIMER_IRQ(2)
++#define IRQ_TIMER3		S5P_TIMER_IRQ(3)
++#define IRQ_TIMER4		S5P_TIMER_IRQ(4)
++
++#endif /* __ASM_PLAT_S5P_IRQS_H */
+diff --git a/arch/arm/plat-s5p/irq.c b/arch/arm/plat-s5p/irq.c
+new file mode 100644
+index 0000000..00f0e0c
+--- /dev/null
++++ b/arch/arm/plat-s5p/irq.c
+@@ -0,0 +1,251 @@
++/* arch/arm/plat-s5p/irq.c
++ *
++ * Copyright (c) 2009 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
++ * S5P - Interrupt handling
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -945,129 +278,243 @@ index 0000000..e5c560e
 +*/
 +
 +#include <linux/kernel.h>
-+#include <linux/types.h>
 +#include <linux/interrupt.h>
-+#include <linux/list.h>
-+#include <linux/timer.h>
-+#include <linux/delay.h>
-+#include <linux/init.h>
-+#include <linux/serial_core.h>
-+#include <linux/platform_device.h>
++#include <linux/irq.h>
 +#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/clk.h>
 +
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+#include <asm/mach/irq.h>
++#include <asm/hardware/vic.h>
 +
-+#include <mach/hardware.h>
++#include <linux/serial_core.h>
 +#include <mach/map.h>
-+
-+#include <asm/irq.h>
-+#include <asm/mach-types.h>
-+
++#include <plat/regs-timer.h>
 +#include <plat/regs-serial.h>
-+
-+#include <plat/s5p6440.h>
-+#include <plat/clock.h>
-+#include <mach/regs-clock.h>
-+#include <plat/devs.h>
 +#include <plat/cpu.h>
-+#include <plat/pll.h>
 +
-+#define S5P6440_UCON_DEFAULT    (S3C2410_UCON_TXILEVEL | S3C2410_UCON_RXILEVEL |	\
-+				  S3C2410_UCON_TXIRQMODE | S3C2410_UCON_RXIRQMODE |	\
-+				  S3C2410_UCON_RXFIFO_TOI | S3C2443_UCON_RXERR_IRQEN)
++#define VIC_VAADDR(no)	(S5P_VA_VIC0   + ((no)*0x10000))
++#define VIC_BASE(no)	(S5P_VIC0_BASE + ((no)*32))
 +
-+#define S5P6440_ULCON_DEFAULT   S3C64XX_ULCON_WORD_8BIT
++/* Timer interrupt handling */
 +
-+#define S5P6440_UFCON_DEFAULT   (S3C2410_UFCON_FIFOMODE | S3C2440_UFCON_TXTRIG16 |	\
-+				  S3C2410_UFCON_RXTRIG8)
++static void s5p_irq_demux_timer(unsigned int base_irq, unsigned int sub_irq)
++{
++	generic_handle_irq(sub_irq);
++}
 +
-+static struct s3c24xx_uart_clksrc smdk6440_serial_clocks[] = {
-+	[0] = {
-+		.name		= "pclk_low",
-+		.divisor	= 1,
-+		.min_baud	= 0,
-+		.max_baud	= 0,
-+	},
-+	[1] = {
-+		.name		= "uclk1",
-+		.divisor	= 1,
-+		.min_baud	= 0,
-+		.max_baud	= 0,
-+	},
++static void s5p_irq_demux_timer0(unsigned int irq, struct irq_desc *desc)
++{
++	s5p_irq_demux_timer(irq, IRQ_TIMER0);
++}
++
++static void s5p_irq_demux_timer1(unsigned int irq, struct irq_desc *desc)
++{
++	s5p_irq_demux_timer(irq, IRQ_TIMER1);
++}
++
++static void s5p_irq_demux_timer2(unsigned int irq, struct irq_desc *desc)
++{
++	s5p_irq_demux_timer(irq, IRQ_TIMER2);
++}
++
++static void s5p_irq_demux_timer3(unsigned int irq, struct irq_desc *desc)
++{
++	s5p_irq_demux_timer(irq, IRQ_TIMER3);
++}
++
++static void s5p_irq_demux_timer4(unsigned int irq, struct irq_desc *desc)
++{
++	s5p_irq_demux_timer(irq, IRQ_TIMER4);
++}
++
++/* We assume the IRQ_TIMER0..IRQ_TIMER4 range is continuous. */
++
++static void s5p_irq_timer_mask(unsigned int irq)
++{
++	u32 reg = __raw_readl(S3C64XX_TINT_CSTAT);
++
++	reg &= 0x1f;  /* mask out pending interrupts */
++	reg &= ~(1 << (irq - IRQ_TIMER0));
++	__raw_writel(reg, S3C64XX_TINT_CSTAT);
++}
++
++static void s5p_irq_timer_unmask(unsigned int irq)
++{
++	u32 reg = __raw_readl(S3C64XX_TINT_CSTAT);
++
++	reg &= 0x1f;  /* mask out pending interrupts */
++	reg |= 1 << (irq - IRQ_TIMER0);
++	__raw_writel(reg, S3C64XX_TINT_CSTAT);
++}
++
++static void s5p_irq_timer_ack(unsigned int irq)
++{
++	u32 reg = __raw_readl(S3C64XX_TINT_CSTAT);
++
++	reg &= 0x1f;
++	reg |= (1 << 5) << (irq - IRQ_TIMER0);
++	__raw_writel(reg, S3C64XX_TINT_CSTAT);
++}
++
++static struct irq_chip s5p_irq_timer = {
++	.name		= "s5p-timer",
++	.mask		= s5p_irq_timer_mask,
++	.unmask		= s5p_irq_timer_unmask,
++	.ack		= s5p_irq_timer_ack,
 +};
 +
++struct uart_irq {
++	void __iomem	*regs;
++	unsigned int	 base_irq;
++	unsigned int	 parent_irq;
++};
 +
-+static struct s3c2410_uartcfg smdk6440_uartcfgs[] __initdata = {
++/*
++ * Note, we make use of the fact that the parent IRQs, IRQ_UART[0..3]
++ * are consecutive when looking up the interrupt in the demux routines.
++ */
++static struct uart_irq uart_irqs[] = {
 +	[0] = {
-+		.hwport	     = 0,
-+		.flags	     = 0,
-+		.ucon	     = S5P6440_UCON_DEFAULT,
-+		.ulcon	     = S5P6440_ULCON_DEFAULT,
-+		.ufcon	     = S5P6440_UFCON_DEFAULT,
-+		.clocks      = smdk6440_serial_clocks,
-+		.clocks_size = ARRAY_SIZE(smdk6440_serial_clocks),
++		.regs		= S5P_VA_UART0,
++		.base_irq	= IRQ_S5P_UART_BASE0,
++		.parent_irq	= IRQ_UART0,
 +	},
 +	[1] = {
-+		.hwport	     = 1,
-+		.flags	     = 0,
-+		.ucon	     = S5P6440_UCON_DEFAULT,
-+		.ulcon	     = S5P6440_ULCON_DEFAULT,
-+		.ufcon	     = S5P6440_UFCON_DEFAULT,
-+		.clocks      = smdk6440_serial_clocks,
-+		.clocks_size = ARRAY_SIZE(smdk6440_serial_clocks),
++		.regs		= S5P_VA_UART1,
++		.base_irq	= IRQ_S5P_UART_BASE1,
++		.parent_irq	= IRQ_UART1,
 +	},
 +	[2] = {
-+		.hwport	     = 2,
-+		.flags	     = 0,
-+		.ucon	     = S5P6440_UCON_DEFAULT,
-+		.ulcon	     = S5P6440_ULCON_DEFAULT,
-+		.ufcon	     = S5P6440_UFCON_DEFAULT,
-+		.clocks      = smdk6440_serial_clocks,
-+		.clocks_size = ARRAY_SIZE(smdk6440_serial_clocks),
++		.regs		= S5P_VA_UART2,
++		.base_irq	= IRQ_S5P_UART_BASE2,
++		.parent_irq	= IRQ_UART2,
 +	},
 +	[3] = {
-+		.hwport	     = 3,
-+		.flags	     = 0,
-+		.ucon	     = S5P6440_UCON_DEFAULT,
-+		.ulcon	     = S5P6440_ULCON_DEFAULT,
-+		.ufcon	     = S5P6440_UFCON_DEFAULT,
-+		.clocks      = smdk6440_serial_clocks,
-+		.clocks_size = ARRAY_SIZE(smdk6440_serial_clocks),
++		.regs		= S5P_VA_UART3,
++		.base_irq	= IRQ_S5P_UART_BASE3,
++		.parent_irq	= IRQ_UART3,
 +	},
 +};
 +
-+static struct map_desc smdk6440_iodesc[] = {
-+};
-+
-+static struct platform_device *smdk6440_devices[] __initdata = {
-+};
-+
-+static void __init smdk6440_map_io(void)
++static inline void __iomem *s5p_irq_uart_base(unsigned int irq)
 +{
-+	s5p_init_io(smdk6440_iodesc, ARRAY_SIZE(smdk6440_iodesc));
-+	s3c24xx_init_clocks(12000000);
-+	s3c24xx_init_uarts(smdk6440_uartcfgs, ARRAY_SIZE(smdk6440_uartcfgs));
++	struct uart_irq *uirq = get_irq_chip_data(irq);
++	return uirq->regs;
 +}
 +
-+static void __init smdk6440_machine_init(void)
++static inline unsigned int s5p_irq_uart_bit(unsigned int irq)
 +{
-+	platform_add_devices(smdk6440_devices, ARRAY_SIZE(smdk6440_devices));
++	return irq & 3;
 +}
 +
-+MACHINE_START(SMDK6440, "SMDK6440")
-+	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
-+	.phys_io	= S5P_PA_UART & 0xfff00000,
-+	.io_pg_offst	= (((u32)S5P_VA_UART) >> 18) & 0xfffc,
-+	.boot_params	= S5P_PA_SDRAM + 0x100,
++static void s5p_irq_uart_mask(unsigned int irq)
++{
++	void __iomem *regs = s5p_irq_uart_base(irq);
++	unsigned int bit = s5p_irq_uart_bit(irq);
++	u32 reg;
 +
-+	.init_irq	= s5p6440_init_irq,
-+	.map_io		= smdk6440_map_io,
-+	.init_machine	= smdk6440_machine_init,
-+	.timer		= &s5p6440_timer,
-+MACHINE_END
++	reg = __raw_readl(regs + S3C64XX_UINTM);
++	reg |= (1 << bit);
++	__raw_writel(reg, regs + S3C64XX_UINTM);
++}
++
++static void s5p_irq_uart_maskack(unsigned int irq)
++{
++	void __iomem *regs = s5p_irq_uart_base(irq);
++	unsigned int bit = s5p_irq_uart_bit(irq);
++	u32 reg;
++
++	reg = __raw_readl(regs + S3C64XX_UINTM);
++	reg |= (1 << bit);
++	__raw_writel(reg, regs + S3C64XX_UINTM);
++	__raw_writel(1 << bit, regs + S3C64XX_UINTP);
++}
++
++static void s5p_irq_uart_unmask(unsigned int irq)
++{
++	void __iomem *regs = s5p_irq_uart_base(irq);
++	unsigned int bit = s5p_irq_uart_bit(irq);
++	u32 reg;
++
++	reg = __raw_readl(regs + S3C64XX_UINTM);
++	reg &= ~(1 << bit);
++	__raw_writel(reg, regs + S3C64XX_UINTM);
++}
++
++static void s5p_irq_uart_ack(unsigned int irq)
++{
++	void __iomem *regs = s5p_irq_uart_base(irq);
++	unsigned int bit = s5p_irq_uart_bit(irq);
++
++	__raw_writel(1 << bit, regs + S3C64XX_UINTP);
++}
++
++static void s5p_irq_demux_uart(unsigned int irq, struct irq_desc *desc)
++{
++	struct uart_irq *uirq = &uart_irqs[irq - IRQ_UART0];
++	u32 pend = __raw_readl(uirq->regs + S3C64XX_UINTP);
++	int base = uirq->base_irq;
++
++	if (pend & (1 << 0))
++		generic_handle_irq(base);
++	if (pend & (1 << 1))
++		generic_handle_irq(base + 1);
++	if (pend & (1 << 2))
++		generic_handle_irq(base + 2);
++	if (pend & (1 << 3))
++		generic_handle_irq(base + 3);
++}
++
++static struct irq_chip s5p_irq_uart = {
++	.name		= "s5p-uart",
++	.mask		= s5p_irq_uart_mask,
++	.unmask		= s5p_irq_uart_unmask,
++	.mask_ack	= s5p_irq_uart_maskack,
++	.ack		= s5p_irq_uart_ack,
++};
++
++static void __init s5p_uart_irq(struct uart_irq *uirq)
++{
++	void __iomem *reg_base = uirq->regs;
++	unsigned int irq;
++	int offs;
++
++	/* mask all interrupts at the start. */
++	__raw_writel(0xf, reg_base + S3C64XX_UINTM);
++
++	for (offs = 0; offs < 3; offs++) {
++		irq = uirq->base_irq + offs;
++
++		set_irq_chip(irq, &s5p_irq_uart);
++		set_irq_chip_data(irq, uirq);
++		set_irq_handler(irq, handle_level_irq);
++		set_irq_flags(irq, IRQF_VALID);
++	}
++
++	set_irq_chained_handler(uirq->parent_irq, s5p_irq_demux_uart);
++}
++
++void __init s5p_init_irq(u32 *vic, u32 num_vic)
++{
++	int uart, irq;
++
++	/* initialize the VICs */
++	for (irq = 0; irq < num_vic; irq++)
++		vic_init(VIC_VAADDR(irq), VIC_BASE(irq), vic[irq], 0);
++
++	/* add the timer sub-irqs */
++	set_irq_chained_handler(IRQ_TIMER0_VIC, s5p_irq_demux_timer0);
++	set_irq_chained_handler(IRQ_TIMER1_VIC, s5p_irq_demux_timer1);
++	set_irq_chained_handler(IRQ_TIMER2_VIC, s5p_irq_demux_timer2);
++	set_irq_chained_handler(IRQ_TIMER3_VIC, s5p_irq_demux_timer3);
++	set_irq_chained_handler(IRQ_TIMER4_VIC, s5p_irq_demux_timer4);
++
++	for (irq = IRQ_TIMER0; irq <= IRQ_TIMER4; irq++) {
++		set_irq_chip(irq, &s5p_irq_timer);
++		set_irq_handler(irq, handle_level_irq);
++		set_irq_flags(irq, IRQF_VALID);
++	}
++
++	for (uart = 0; uart < ARRAY_SIZE(uart_irqs); uart++)
++		s5p_uart_irq(&uart_irqs[uart]);
++}
 -- 
 1.6.2.5
