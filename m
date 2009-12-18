@@ -1,32 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Dec 2009 10:02:45 +0000
-Subject: [PATCH] ARM: Fix build break on ARM v6 and v7
-In-Reply-To: <1261125427-17517-1-git-send-email-gadiyar@ti.com>
-References: <1261125427-17517-1-git-send-email-gadiyar@ti.com>
-Message-ID: <20091218100245.GA29296@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 18 Dec 2009 10:06:23 +0000
+Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors
+In-Reply-To: <20091217193210.GD362@shareable.org>
+References: <20091217193210.GD362@shareable.org>
+Message-ID: <1261130783.13520.5.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2009 at 02:07:07PM +0530, Anand Gadiyar wrote:
-> Commit 2c9b9c849 added an argument to __cpuc_flush_dcache_page
-> and renamed it.
+On Thu, 2009-12-17 at 19:32 +0000, Jamie Lokier wrote:
+> Leif Lindholm wrote:
+> > To correctly deal with copy-on-write, it also modifies
+> > cpu_v7_set_pte_ext to change the mappings to priviliged RO when user RO.
 > 
-> Update a caller of the old function to fix this build error:
-> 
->   CC      arch/arm/mm/copypage-v6.o
-> arch/arm/mm/copypage-v6.c: In function 'v6_copy_user_highpage_nonaliasing':
-> arch/arm/mm/copypage-v6.c:51: error: implicit declaration of function '__cpuc_flush_dcache_page'
-> make[1]: *** [arch/arm/mm/copypage-v6.o] Error 1
-> make: *** [arch/arm/mm] Error 2
-> 
-> 
-> Reported-by: Jinsung Yang <jsgood.yang@samsung.com>
-> NYET-Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
-> ---
-> Russell,
-> 
-> I fixed this almost independently at roughly the same time as your
-> mail on the list. Do I still get credit for the patch?
+> Does this break ptrace writing to RO pages or anything else?
+> If it doesn't break anything, seems to me it should always be done
+> like that, not conditional on CONFIG_SWP_EMULATE.
 
-Patch is good.  If you want to convert the NYET-sob to a proper
-signed-off-by, and throw it at the patch system...
+ptrace does COW otherwise it would affect other tasks sharing the RO
+pages. The only thing  user RO, kernel RW is needed in the kernel is for
+the vectors page when a TLS register is not available. This is not the
+case for ARMv7, so we can make it unconditional.
+
+BTW, the patches I posted for the revised page table format with
+SCTLR.AFE do this already (but I'm not sure when/if they'll go in).
+
+-- 
+Catalin
