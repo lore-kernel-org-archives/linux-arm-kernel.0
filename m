@@ -1,44 +1,53 @@
-From: gadiyar@ti.com (Anand Gadiyar)
-Date: Fri, 18 Dec 2009 14:07:07 +0530
-Subject: [PATCH] ARM: Fix build break on ARM v6 and v7
-Message-ID: <1261125427-17517-1-git-send-email-gadiyar@ti.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 18 Dec 2009 09:48:50 +0100
+Subject: [POWER] battery calibration parameters from sysfs
+In-Reply-To: <4B28AAFC.5010108@warmcat.com>
+References: <A6D19A13FE030A409EC4362C172E091F0E0A1FA1@eseldmw101.eemea.ericsson.se>
+	<20091207165628.GA24981@rakim.wolfsonmicro.main>
+	<20091213132413.GB1437@ucw.cz>
+	<20091214121247.GB22388@rakim.wolfsonmicro.main>
+	<20091214212257.GA9213@elf.ucw.cz>
+	<ed62800912141543v2ab7ef63v4b6b2c33018b3296@mail.gmail.com>
+	<4B26FC52.6060307@billgatliff.com>
+	<ed62800912151458p6bc1e551g54960af40c54facd@mail.gmail.com>
+	<1260919938.10441.18.camel@utx.utx.cz>
+	<4B28AAFC.5010108@warmcat.com>
+Message-ID: <20091218084850.GA1513@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 2c9b9c849 added an argument to __cpuc_flush_dcache_page
-and renamed it.
-
-Update a caller of the old function to fix this build error:
-
-  CC      arch/arm/mm/copypage-v6.o
-arch/arm/mm/copypage-v6.c: In function 'v6_copy_user_highpage_nonaliasing':
-arch/arm/mm/copypage-v6.c:51: error: implicit declaration of function '__cpuc_flush_dcache_page'
-make[1]: *** [arch/arm/mm/copypage-v6.o] Error 1
-make: *** [arch/arm/mm] Error 2
+Hi!1
 
 
-Reported-by: Jinsung Yang <jsgood.yang@samsung.com>
-NYET-Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
----
-Russell,
+>>> Yes, but in that case you might as well just purchase a coulomb
+>>> counter with a built-in accumulator and an I2C/SPI/microwire interface
+>>> save yourself some PCB space and cost (maybe)
 
-I fixed this almost independently at roughly the same time as your
-mail on the list. Do I still get credit for the patch?
+Hardware is already given.
 
-Either way, it's okay with me. I'm just asking.
+>> Well, Pavel attempts to implement a "poor man's Coulomb counter" or at
+>> least "poor man's Ampere meter" for devices that are not equipped with
+>> any of it.
+>
+> I think the "poor man's Coulomb counter" is a loser, the errors will  
+> overwhelm you too rapidly.  The estimated rate of discharge could
+>> work,  
 
-- Anand
+Actually android phones do "poor man's Coulomb counter", and it seems
+to mostly work.
 
-diff --git a/arch/arm/mm/copypage-v6.c b/arch/arm/mm/copypage-v6.c
-index 841f355..0fa1319 100644
---- a/arch/arm/mm/copypage-v6.c
-+++ b/arch/arm/mm/copypage-v6.c
-@@ -48,7 +48,7 @@ static void v6_copy_user_highpage_nonaliasing(struct page *to,
- 	 */
- 	if (page_address(to) != NULL)
- #endif
--		__cpuc_flush_dcache_page(kto);
-+		__cpuc_flush_dcache_area(kto, PAGE_SIZE);
- 	kunmap_atomic(kto, KM_USER1);
- 	kunmap_atomic(kfrom, KM_USER0);
- }
+> based on what clocks, regulators and so on are running, but I am not  
+> sure how useful that number is really given you can't realistically  
+> integrate it due to the big error it is bound to have.
+...
+> Otherwise for L-ion batteries, looking at the voltage level alone,  
+> filtered to remove GSM transmit slots etc, is really quite workable for  
+> estimating charge status.
+
+Well, you have to compensate for backlight power; and yes, that's what
+I'm trying to do.
+								Pavel 
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
