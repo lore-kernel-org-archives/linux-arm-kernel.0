@@ -1,28 +1,36 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 18 Dec 2009 10:06:23 +0000
-Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors
-In-Reply-To: <20091217193210.GD362@shareable.org>
-References: <20091217193210.GD362@shareable.org>
-Message-ID: <1261130783.13520.5.camel@pc1117.cambridge.arm.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 18 Dec 2009 18:32:03 +0800
+Subject: [GIT PULL] pxa: raumfeld support and ttc_dkb fix
+Message-ID: <f17812d70912180232m54d59be7l5da1e46c0d84e501@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2009-12-17 at 19:32 +0000, Jamie Lokier wrote:
-> Leif Lindholm wrote:
-> > To correctly deal with copy-on-write, it also modifies
-> > cpu_v7_set_pte_ext to change the mappings to priviliged RO when user RO.
-> 
-> Does this break ptrace writing to RO pages or anything else?
-> If it doesn't break anything, seems to me it should always be done
-> like that, not conditional on CONFIG_SWP_EMULATE.
+Russell,
 
-ptrace does COW otherwise it would affect other tasks sharing the RO
-pages. The only thing  user RO, kernel RW is needed in the kernel is for
-the vectors page when a TLS register is not available. This is not the
-case for ARMv7, so we can make it unconditional.
+This is late due to some dependency issue, actually the raumfeld patches
+have been sitting in my pending branch for a very long time. I think it
+should be still OK to get this upstreamed.
 
-BTW, the patches I posted for the revised page table format with
-SCTLR.AFE do this already (but I'm not sure when/if they'll go in).
+The following changes since commit 55639353a0035052d9ea6cfe4dde0ac7fcbb2c9f:
+  Linus Torvalds (1):
+        Linux 2.6.33-rc1
 
--- 
-Catalin
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git devel
+
+Daniel Mack (2):
+      [ARM] pxa/raumfeld: add platform support
+      [ARM] pxa/raumfeld: add defconfig
+
+Uwe Kleine-K?nig (1):
+      [ARM] pxa/ttc_dkb: remove duplicate macro definition
+
+ arch/arm/configs/raumfeld_defconfig | 1898 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mmp/ttc_dkb.c         |    2 -
+ arch/arm/mach-pxa/Kconfig           |   18 +
+ arch/arm/mach-pxa/Makefile          |    3 +
+ arch/arm/mach-pxa/raumfeld.c        | 1100 ++++++++++++++++++++
+ 5 files changed, 3019 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/configs/raumfeld_defconfig
+ create mode 100644 arch/arm/mach-pxa/raumfeld.c
