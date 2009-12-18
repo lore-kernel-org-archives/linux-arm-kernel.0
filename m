@@ -1,25 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Dec 2009 14:11:00 +0000
-Subject: [PATCH] ARM: Fix a race in the vfp_notifier() function on SMP
-	systems
-In-Reply-To: <20091218134423.21279.93962.stgit@pc1117.cambridge.arm.com>
-References: <20091218134423.21279.93962.stgit@pc1117.cambridge.arm.com>
-Message-ID: <20091218141100.GA32481@n2100.arm.linux.org.uk>
+From: leif.lindholm@arm.com (Leif Lindholm)
+Date: Fri, 18 Dec 2009 14:15:24 -0000
+Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors
+In-Reply-To: <13B9B4C6EF24D648824FF11BE896716203A7FA69CC@dlee02.ent.ti.com>
+References: <20091217175416.9317.66257.stgit@e101986-lin>
+	<13B9B4C6EF24D648824FF11BE896716203A7FA69CC@dlee02.ent.ti.com>
+Message-ID: <000001ca7fec$8aca3ec0$a05ebc40$@lindholm@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2009 at 01:45:09PM +0000, Catalin Marinas wrote:
-> 	(patch updated following Russell's changes to vfpmodule.c)
-> 
-> The vfp_notifier(THREAD_NOTIFY_RELEASE) maybe be called with thread->cpu
-> different from the current one, causing a race condition with both the
-> THREAD_NOTIFY_SWITCH path and vfp_support_entry().
+Thanks for the feedback.
 
-How about we provide THREAD_NOTIFY_EXIT and call these hooks from
-exit_thread() - we'll be calling the notifier when the thread is
-still running, and so thread->cpu will be the local CPU.
+> From: Woodruff, Richard [mailto:r-woodruff2 at ti.com]
+> Sent: 17 December 2009 18:20
+ 
+> Still, the exclusive operations for some systems don't extend beyond an
+> ARM smp-cluster. Not all cores and interconnect implementations support
+> the range lock.  As such from a SOC point of view SWP still has value
+> as it may exist where lwrex/swrex would fail. It is also much lighter
+> than using some kind of mailbox alternative.
+>
+> While the ARM is important to many SOCs its not the whole thing. I've
+> seen some side threads where people are busy blindly removing SWP and
+> quoting half information.
 
-This should be much safer all round, and give much simpler semantics
-if we NULL out the current CPU's last_VFP_context pointer.  It also
-means that each CPUs last_VFP_context pointer is only ever accessed
-from the local CPU, which can only be a good thing.
+There is nothing half about SWP/SWPB being deprecated from ARMv6 onwards.
+Also, not all systems properly implement the bus locking support required
+for SWP to be properly atomic externally.
+
+> My main comment on patch in this regard is to make the point you won't
+> be able to fully emulate a SWP with the sequence you posted if you
+> consider other cores outside the ARM cluster. Some note to that effect
+> would be positive in the description.
+
+I would argue that this is not a property of the patch, but rather the
+architectural deprecation of the instruction(s).
+
+However, I take your point. What if I add a comment that this emulation
+will not work on uncached memory regions where no global exclusive
+monitor is implemented?
+
+Regards
+	/
+		Leif
