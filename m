@@ -1,135 +1,943 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 18 Dec 2009 18:19:55 +0900
-Subject: [PATCH 4/7] ARM: S5P6440: Add Timer support
-In-Reply-To: <1261127996-30253-3-git-send-email-kgene.kim@samsung.com>
+Date: Fri, 18 Dec 2009 18:19:53 +0900
+Subject: [PATCH 6/7] ARM: S5P6440: Add Board and configuration file
+In-Reply-To: <1261127996-30253-1-git-send-email-kgene.kim@samsung.com>
 References: <1261127996-30253-1-git-send-email-kgene.kim@samsung.com>
-	<1261127996-30253-2-git-send-email-kgene.kim@samsung.com>
-	<1261127996-30253-3-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1261127996-30253-4-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1261127996-30253-2-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds timer support for S5P6440 CPU.
+This patch adds Samsung's SMDK6440 board support and default configuration file.
 
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Adityapratap Sharma <aditya.ps@samsung.com>
 Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
 Signed-off-by: Atul Dahiya <atul.dahiya@samsung.com>
 ---
- arch/arm/mach-s5p6440/include/mach/pwm-clock.h |   58 ++++++
- arch/arm/mach-s5p6440/include/mach/tick.h      |   24 +++
- arch/arm/plat-s5p/time.c                       |  227 ++++++++++++++++++++++++
- 3 files changed, 309 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5p6440/include/mach/pwm-clock.h
- create mode 100644 arch/arm/mach-s5p6440/include/mach/tick.h
- create mode 100644 arch/arm/plat-s5p/time.c
+ arch/arm/configs/s5p6440_defconfig    |  902 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-s5p6440/mach-smdk6440.c |  135 +++++
+ 2 files changed, 1037 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/configs/s5p6440_defconfig
+ create mode 100644 arch/arm/mach-s5p6440/mach-smdk6440.c
 
-diff --git a/arch/arm/mach-s5p6440/include/mach/pwm-clock.h b/arch/arm/mach-s5p6440/include/mach/pwm-clock.h
+diff --git a/arch/arm/configs/s5p6440_defconfig b/arch/arm/configs/s5p6440_defconfig
 new file mode 100644
-index 0000000..f6a6c30
+index 0000000..1e0141e
 --- /dev/null
-+++ b/arch/arm/mach-s5p6440/include/mach/pwm-clock.h
-@@ -0,0 +1,58 @@
-+/* linux/arch/arm/mach-s5p6440/include/mach/pwm-clock.h
-+ *
-+ * Copyright 2009 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * S5P6440 - pwm clock and timer support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
++++ b/arch/arm/configs/s5p6440_defconfig
+@@ -0,0 +1,902 @@
++#
++# Automatically generated make config: don't edit
++# Linux kernel version: 2.6.31
++# Thu Dec  3 09:57:07 2009
++#
++CONFIG_ARM=y
++CONFIG_SYS_SUPPORTS_APM_EMULATION=y
++CONFIG_GENERIC_GPIO=y
++CONFIG_MMU=y
++CONFIG_NO_IOPORT=y
++CONFIG_GENERIC_HARDIRQS=y
++CONFIG_STACKTRACE_SUPPORT=y
++CONFIG_HAVE_LATENCYTOP_SUPPORT=y
++CONFIG_LOCKDEP_SUPPORT=y
++CONFIG_TRACE_IRQFLAGS_SUPPORT=y
++CONFIG_HARDIRQS_SW_RESEND=y
++CONFIG_GENERIC_IRQ_PROBE=y
++CONFIG_RWSEM_GENERIC_SPINLOCK=y
++CONFIG_GENERIC_HWEIGHT=y
++CONFIG_GENERIC_CALIBRATE_DELAY=y
++CONFIG_GENERIC_HARDIRQS_NO__DO_IRQ=y
++CONFIG_VECTORS_BASE=0xffff0000
++CONFIG_DEFCONFIG_LIST="/lib/modules/$UNAME_RELEASE/.config"
++CONFIG_CONSTRUCTORS=y
 +
-+/**
-+ * pwm_cfg_src_is_tclk() - return whether the given mux config is a tclk
-+ * @cfg: The timer TCFG1 register bits shifted down to 0.
-+ *
-+ * Return true if the given configuration from TCFG1 is a TCLK instead
-+ * any of the TDIV clocks.
-+ */
-+static inline int pwm_cfg_src_is_tclk(unsigned long tcfg)
-+{
-+	return tcfg == S3C2410_TCFG1_MUX_TCLK;
-+}
++#
++# General setup
++#
++CONFIG_EXPERIMENTAL=y
++CONFIG_BROKEN_ON_SMP=y
++CONFIG_INIT_ENV_ARG_LIMIT=32
++CONFIG_LOCALVERSION=""
++CONFIG_LOCALVERSION_AUTO=y
++CONFIG_SWAP=y
++# CONFIG_SYSVIPC is not set
++# CONFIG_BSD_PROCESS_ACCT is not set
 +
-+/**
-+ * tcfg_to_divisor() - convert tcfg1 setting to a divisor
-+ * @tcfg1: The tcfg1 setting, shifted down.
-+ *
-+ * Get the divisor value for the given tcfg1 setting. We assume the
-+ * caller has already checked to see if this is not a TCLK source.
-+ */
-+static inline unsigned long tcfg_to_divisor(unsigned long tcfg1)
-+{
-+	return 1 << (1 + tcfg1);
-+}
++#
++# RCU Subsystem
++#
++CONFIG_CLASSIC_RCU=y
++# CONFIG_TREE_RCU is not set
++# CONFIG_PREEMPT_RCU is not set
++# CONFIG_TREE_RCU_TRACE is not set
++# CONFIG_PREEMPT_RCU_TRACE is not set
++# CONFIG_IKCONFIG is not set
++CONFIG_LOG_BUF_SHIFT=17
++# CONFIG_GROUP_SCHED is not set
++# CONFIG_CGROUPS is not set
++CONFIG_SYSFS_DEPRECATED=y
++CONFIG_SYSFS_DEPRECATED_V2=y
++# CONFIG_RELAY is not set
++CONFIG_NAMESPACES=y
++# CONFIG_UTS_NS is not set
++# CONFIG_USER_NS is not set
++# CONFIG_PID_NS is not set
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_INITRAMFS_SOURCE=""
++CONFIG_RD_GZIP=y
++CONFIG_RD_BZIP2=y
++CONFIG_RD_LZMA=y
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_SYSCTL=y
++CONFIG_ANON_INODES=y
++# CONFIG_EMBEDDED is not set
++CONFIG_UID16=y
++CONFIG_SYSCTL_SYSCALL=y
++CONFIG_KALLSYMS=y
++CONFIG_KALLSYMS_ALL=y
++# CONFIG_KALLSYMS_EXTRA_PASS is not set
++CONFIG_HOTPLUG=y
++CONFIG_PRINTK=y
++CONFIG_BUG=y
++CONFIG_ELF_CORE=y
++CONFIG_BASE_FULL=y
++CONFIG_FUTEX=y
++CONFIG_EPOLL=y
++CONFIG_SIGNALFD=y
++CONFIG_TIMERFD=y
++CONFIG_EVENTFD=y
++CONFIG_SHMEM=y
++CONFIG_AIO=y
 +
-+/**
-+ * pwm_tdiv_has_div1() - does the tdiv setting have a /1
-+ *
-+ * Return true if we have a /1 in the tdiv setting.
-+ */
-+static inline unsigned int pwm_tdiv_has_div1(void)
-+{
-+	return 0;
-+}
++#
++# Performance Counters
++#
++CONFIG_VM_EVENT_COUNTERS=y
++CONFIG_SLUB_DEBUG=y
++# CONFIG_STRIP_ASM_SYMS is not set
++CONFIG_COMPAT_BRK=y
++# CONFIG_SLAB is not set
++CONFIG_SLUB=y
++# CONFIG_SLOB is not set
++# CONFIG_PROFILING is not set
++# CONFIG_MARKERS is not set
++CONFIG_HAVE_OPROFILE=y
++# CONFIG_KPROBES is not set
++CONFIG_HAVE_KPROBES=y
++CONFIG_HAVE_KRETPROBES=y
++CONFIG_HAVE_CLK=y
 +
-+/**
-+ * pwm_tdiv_div_bits() - calculate TCFG1 divisor value.
-+ * @div: The divisor to calculate the bit information for.
-+ *
-+ * Turn a divisor into the necessary bit field for TCFG1.
-+ */
-+static inline unsigned long pwm_tdiv_div_bits(unsigned int div)
-+{
-+	return ilog2(div) - 1;
-+}
++#
++# GCOV-based kernel profiling
++#
++# CONFIG_SLOW_WORK is not set
++CONFIG_HAVE_GENERIC_DMA_COHERENT=y
++CONFIG_SLABINFO=y
++CONFIG_RT_MUTEXES=y
++CONFIG_BASE_SMALL=0
++CONFIG_MODULES=y
++# CONFIG_MODULE_FORCE_LOAD is not set
++CONFIG_MODULE_UNLOAD=y
++# CONFIG_MODULE_FORCE_UNLOAD is not set
++# CONFIG_MODVERSIONS is not set
++# CONFIG_MODULE_SRCVERSION_ALL is not set
++CONFIG_BLOCK=y
++CONFIG_LBDAF=y
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_BLK_DEV_INTEGRITY is not set
 +
-+#define S3C_TCFG1_MUX_TCLK S3C2410_TCFG1_MUX_TCLK
-diff --git a/arch/arm/mach-s5p6440/include/mach/tick.h b/arch/arm/mach-s5p6440/include/mach/tick.h
++#
++# IO Schedulers
++#
++CONFIG_IOSCHED_NOOP=y
++CONFIG_IOSCHED_AS=y
++CONFIG_IOSCHED_DEADLINE=y
++CONFIG_IOSCHED_CFQ=y
++# CONFIG_DEFAULT_AS is not set
++# CONFIG_DEFAULT_DEADLINE is not set
++CONFIG_DEFAULT_CFQ=y
++# CONFIG_DEFAULT_NOOP is not set
++CONFIG_DEFAULT_IOSCHED="cfq"
++# CONFIG_FREEZER is not set
++
++#
++# System Type
++#
++# CONFIG_ARCH_AAEC2000 is not set
++# CONFIG_ARCH_INTEGRATOR is not set
++# CONFIG_ARCH_REALVIEW is not set
++# CONFIG_ARCH_VERSATILE is not set
++# CONFIG_ARCH_AT91 is not set
++# CONFIG_ARCH_CLPS711X is not set
++# CONFIG_ARCH_GEMINI is not set
++# CONFIG_ARCH_EBSA110 is not set
++# CONFIG_ARCH_EP93XX is not set
++# CONFIG_ARCH_FOOTBRIDGE is not set
++# CONFIG_ARCH_MXC is not set
++# CONFIG_ARCH_STMP3XXX is not set
++# CONFIG_ARCH_NETX is not set
++# CONFIG_ARCH_H720X is not set
++# CONFIG_ARCH_IOP13XX is not set
++# CONFIG_ARCH_IOP32X is not set
++# CONFIG_ARCH_IOP33X is not set
++# CONFIG_ARCH_IXP23XX is not set
++# CONFIG_ARCH_IXP2000 is not set
++# CONFIG_ARCH_IXP4XX is not set
++# CONFIG_ARCH_L7200 is not set
++# CONFIG_ARCH_KIRKWOOD is not set
++# CONFIG_ARCH_LOKI is not set
++# CONFIG_ARCH_MV78XX0 is not set
++# CONFIG_ARCH_ORION5X is not set
++# CONFIG_ARCH_MMP is not set
++# CONFIG_ARCH_KS8695 is not set
++# CONFIG_ARCH_NS9XXX is not set
++# CONFIG_ARCH_W90X900 is not set
++# CONFIG_ARCH_PNX4008 is not set
++# CONFIG_ARCH_PXA is not set
++# CONFIG_ARCH_MSM is not set
++# CONFIG_ARCH_RPC is not set
++# CONFIG_ARCH_SA1100 is not set
++# CONFIG_ARCH_S3C2410 is not set
++# CONFIG_ARCH_S3C64XX is not set
++CONFIG_ARCH_S5P6440=y
++# CONFIG_ARCH_S5PC1XX is not set
++# CONFIG_ARCH_SHARK is not set
++# CONFIG_ARCH_LH7A40X is not set
++# CONFIG_ARCH_U300 is not set
++# CONFIG_ARCH_DAVINCI is not set
++# CONFIG_ARCH_OMAP is not set
++CONFIG_PLAT_SAMSUNG=y
++CONFIG_SAMSUNG_CLKSRC=y
++CONFIG_PLAT_S3C=y
++
++#
++# Boot options
++#
++CONFIG_S3C_BOOT_ERROR_RESET=y
++CONFIG_S3C_BOOT_UART_FORCE_FIFO=y
++
++#
++# Power management
++#
++CONFIG_S3C_LOWLEVEL_UART_PORT=1
++CONFIG_S3C_GPIO_SPACE=0
++CONFIG_S3C_GPIO_TRACK=y
++CONFIG_PLAT_S5P=y
++CONFIG_CPU_S5P6440_INIT=y
++CONFIG_CPU_S5P6440_CLOCK=y
++CONFIG_S5P_GPIO_EXTRA=0
++CONFIG_CPU_S5P6440=y
++CONFIG_MACH_SMDK6440=y
++
++#
++# Processor Type
++#
++CONFIG_CPU_32=y
++CONFIG_CPU_V6=y
++CONFIG_CPU_32v6K=y
++CONFIG_CPU_32v6=y
++CONFIG_CPU_ABRT_EV6=y
++CONFIG_CPU_PABRT_NOIFAR=y
++CONFIG_CPU_CACHE_V6=y
++CONFIG_CPU_CACHE_VIPT=y
++CONFIG_CPU_COPY_V6=y
++CONFIG_CPU_TLB_V6=y
++CONFIG_CPU_HAS_ASID=y
++CONFIG_CPU_CP15=y
++CONFIG_CPU_CP15_MMU=y
++
++#
++# Processor Features
++#
++CONFIG_ARM_THUMB=y
++# CONFIG_CPU_ICACHE_DISABLE is not set
++# CONFIG_CPU_DCACHE_DISABLE is not set
++# CONFIG_CPU_BPREDICT_DISABLE is not set
++# CONFIG_ARM_ERRATA_411920 is not set
++CONFIG_ARM_VIC=y
++CONFIG_ARM_VIC_NR=2
++
++#
++# Bus support
++#
++# CONFIG_PCI_SYSCALL is not set
++# CONFIG_ARCH_SUPPORTS_MSI is not set
++# CONFIG_PCCARD is not set
++
++#
++# Kernel Features
++#
++CONFIG_VMSPLIT_3G=y
++# CONFIG_VMSPLIT_2G is not set
++# CONFIG_VMSPLIT_1G is not set
++CONFIG_PAGE_OFFSET=0xC0000000
++# CONFIG_PREEMPT is not set
++CONFIG_HZ=200
++CONFIG_AEABI=y
++CONFIG_OABI_COMPAT=y
++# CONFIG_ARCH_SPARSEMEM_DEFAULT is not set
++# CONFIG_ARCH_SELECT_MEMORY_MODEL is not set
++# CONFIG_HIGHMEM is not set
++CONFIG_SELECT_MEMORY_MODEL=y
++CONFIG_FLATMEM_MANUAL=y
++# CONFIG_DISCONTIGMEM_MANUAL is not set
++# CONFIG_SPARSEMEM_MANUAL is not set
++CONFIG_FLATMEM=y
++CONFIG_FLAT_NODE_MEM_MAP=y
++CONFIG_PAGEFLAGS_EXTENDED=y
++CONFIG_SPLIT_PTLOCK_CPUS=4
++# CONFIG_PHYS_ADDR_T_64BIT is not set
++CONFIG_ZONE_DMA_FLAG=0
++CONFIG_VIRT_TO_BUS=y
++CONFIG_HAVE_MLOCK=y
++CONFIG_HAVE_MLOCKED_PAGE_BIT=y
++CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
++CONFIG_ALIGNMENT_TRAP=y
++# CONFIG_UACCESS_WITH_MEMCPY is not set
++
++#
++# Boot options
++#
++CONFIG_ZBOOT_ROM_TEXT=0
++CONFIG_ZBOOT_ROM_BSS=0
++CONFIG_CMDLINE="root=/dev/ram0 rw ramdisk=8192 initrd=0x20800000,8M console=ttySAC1,115200 init=/linuxrc"
++# CONFIG_XIP_KERNEL is not set
++# CONFIG_KEXEC is not set
++
++#
++# CPU Power Management
++#
++# CONFIG_CPU_IDLE is not set
++
++#
++# Floating point emulation
++#
++
++#
++# At least one emulation must be selected
++#
++CONFIG_FPE_NWFPE=y
++# CONFIG_FPE_NWFPE_XP is not set
++# CONFIG_FPE_FASTFPE is not set
++# CONFIG_VFP is not set
++
++#
++# Userspace binary formats
++#
++CONFIG_BINFMT_ELF=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_HAVE_AOUT=y
++# CONFIG_BINFMT_AOUT is not set
++# CONFIG_BINFMT_MISC is not set
++
++#
++# Power management options
++#
++# CONFIG_PM is not set
++CONFIG_ARCH_SUSPEND_POSSIBLE=y
++# CONFIG_NET is not set
++
++#
++# Device Drivers
++#
++
++#
++# Generic Driver Options
++#
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_STANDALONE=y
++# CONFIG_PREVENT_FIRMWARE_BUILD is not set
++CONFIG_FW_LOADER=y
++CONFIG_FIRMWARE_IN_KERNEL=y
++CONFIG_EXTRA_FIRMWARE=""
++# CONFIG_DEBUG_DRIVER is not set
++# CONFIG_DEBUG_DEVRES is not set
++# CONFIG_SYS_HYPERVISOR is not set
++# CONFIG_MTD is not set
++# CONFIG_PARPORT is not set
++CONFIG_BLK_DEV=y
++# CONFIG_BLK_DEV_COW_COMMON is not set
++# CONFIG_BLK_DEV_LOOP is not set
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_COUNT=16
++CONFIG_BLK_DEV_RAM_SIZE=8192
++# CONFIG_BLK_DEV_XIP is not set
++# CONFIG_CDROM_PKTCDVD is not set
++# CONFIG_MG_DISK is not set
++# CONFIG_MISC_DEVICES is not set
++CONFIG_HAVE_IDE=y
++# CONFIG_IDE is not set
++
++#
++# SCSI device support
++#
++# CONFIG_RAID_ATTRS is not set
++CONFIG_SCSI=y
++CONFIG_SCSI_DMA=y
++# CONFIG_SCSI_TGT is not set
++# CONFIG_SCSI_NETLINK is not set
++CONFIG_SCSI_PROC_FS=y
++
++#
++# SCSI support type (disk, tape, CD-ROM)
++#
++CONFIG_BLK_DEV_SD=y
++# CONFIG_CHR_DEV_ST is not set
++# CONFIG_CHR_DEV_OSST is not set
++# CONFIG_BLK_DEV_SR is not set
++CONFIG_CHR_DEV_SG=y
++# CONFIG_CHR_DEV_SCH is not set
++# CONFIG_SCSI_MULTI_LUN is not set
++# CONFIG_SCSI_CONSTANTS is not set
++# CONFIG_SCSI_LOGGING is not set
++# CONFIG_SCSI_SCAN_ASYNC is not set
++CONFIG_SCSI_WAIT_SCAN=m
++
++#
++# SCSI Transports
++#
++# CONFIG_SCSI_SPI_ATTRS is not set
++# CONFIG_SCSI_FC_ATTRS is not set
++# CONFIG_SCSI_SAS_LIBSAS is not set
++# CONFIG_SCSI_SRP_ATTRS is not set
++CONFIG_SCSI_LOWLEVEL=y
++# CONFIG_LIBFC is not set
++# CONFIG_LIBFCOE is not set
++# CONFIG_SCSI_DEBUG is not set
++# CONFIG_SCSI_DH is not set
++# CONFIG_SCSI_OSD_INITIATOR is not set
++# CONFIG_ATA is not set
++# CONFIG_MD is not set
++
++#
++# Input device support
++#
++CONFIG_INPUT=y
++# CONFIG_INPUT_FF_MEMLESS is not set
++# CONFIG_INPUT_POLLDEV is not set
++
++#
++# Userland interfaces
++#
++CONFIG_INPUT_MOUSEDEV=y
++CONFIG_INPUT_MOUSEDEV_PSAUX=y
++CONFIG_INPUT_MOUSEDEV_SCREEN_X=1024
++CONFIG_INPUT_MOUSEDEV_SCREEN_Y=768
++# CONFIG_INPUT_JOYDEV is not set
++CONFIG_INPUT_EVDEV=y
++# CONFIG_INPUT_EVBUG is not set
++
++#
++# Input Device Drivers
++#
++CONFIG_INPUT_KEYBOARD=y
++CONFIG_KEYBOARD_ATKBD=y
++# CONFIG_KEYBOARD_LKKBD is not set
++# CONFIG_KEYBOARD_GPIO is not set
++# CONFIG_KEYBOARD_MATRIX is not set
++# CONFIG_KEYBOARD_NEWTON is not set
++# CONFIG_KEYBOARD_STOWAWAY is not set
++# CONFIG_KEYBOARD_SUNKBD is not set
++# CONFIG_KEYBOARD_XTKBD is not set
++CONFIG_INPUT_MOUSE=y
++CONFIG_MOUSE_PS2=y
++CONFIG_MOUSE_PS2_ALPS=y
++CONFIG_MOUSE_PS2_LOGIPS2PP=y
++CONFIG_MOUSE_PS2_SYNAPTICS=y
++CONFIG_MOUSE_PS2_TRACKPOINT=y
++# CONFIG_MOUSE_PS2_ELANTECH is not set
++# CONFIG_MOUSE_PS2_TOUCHKIT is not set
++# CONFIG_MOUSE_SERIAL is not set
++# CONFIG_MOUSE_VSXXXAA is not set
++# CONFIG_MOUSE_GPIO is not set
++# CONFIG_INPUT_JOYSTICK is not set
++# CONFIG_INPUT_TABLET is not set
++CONFIG_INPUT_TOUCHSCREEN=y
++# CONFIG_TOUCHSCREEN_AD7879 is not set
++# CONFIG_TOUCHSCREEN_FUJITSU is not set
++# CONFIG_TOUCHSCREEN_GUNZE is not set
++# CONFIG_TOUCHSCREEN_ELO is not set
++# CONFIG_TOUCHSCREEN_WACOM_W8001 is not set
++# CONFIG_TOUCHSCREEN_MTOUCH is not set
++# CONFIG_TOUCHSCREEN_INEXIO is not set
++# CONFIG_TOUCHSCREEN_MK712 is not set
++# CONFIG_TOUCHSCREEN_PENMOUNT is not set
++# CONFIG_TOUCHSCREEN_TOUCHRIGHT is not set
++# CONFIG_TOUCHSCREEN_TOUCHWIN is not set
++# CONFIG_TOUCHSCREEN_TOUCHIT213 is not set
++# CONFIG_TOUCHSCREEN_W90X900 is not set
++# CONFIG_INPUT_MISC is not set
++
++#
++# Hardware I/O ports
++#
++CONFIG_SERIO=y
++CONFIG_SERIO_SERPORT=y
++CONFIG_SERIO_LIBPS2=y
++# CONFIG_SERIO_RAW is not set
++# CONFIG_GAMEPORT is not set
++
++#
++# Character devices
++#
++CONFIG_VT=y
++CONFIG_CONSOLE_TRANSLATIONS=y
++CONFIG_VT_CONSOLE=y
++CONFIG_HW_CONSOLE=y
++# CONFIG_VT_HW_CONSOLE_BINDING is not set
++CONFIG_DEVKMEM=y
++# CONFIG_SERIAL_NONSTANDARD is not set
++
++#
++# Serial drivers
++#
++CONFIG_SERIAL_8250=y
++# CONFIG_SERIAL_8250_CONSOLE is not set
++CONFIG_SERIAL_8250_NR_UARTS=3
++CONFIG_SERIAL_8250_RUNTIME_UARTS=3
++# CONFIG_SERIAL_8250_EXTENDED is not set
++
++#
++# Non-8250 serial port support
++#
++CONFIG_SERIAL_SAMSUNG=y
++CONFIG_SERIAL_SAMSUNG_UARTS=4
++# CONFIG_SERIAL_SAMSUNG_DEBUG is not set
++CONFIG_SERIAL_SAMSUNG_CONSOLE=y
++CONFIG_SERIAL_S5P=y
++CONFIG_SERIAL_CORE=y
++CONFIG_SERIAL_CORE_CONSOLE=y
++CONFIG_UNIX98_PTYS=y
++# CONFIG_DEVPTS_MULTIPLE_INSTANCES is not set
++CONFIG_LEGACY_PTYS=y
++CONFIG_LEGACY_PTY_COUNT=256
++# CONFIG_IPMI_HANDLER is not set
++CONFIG_HW_RANDOM=y
++# CONFIG_HW_RANDOM_TIMERIOMEM is not set
++# CONFIG_R3964 is not set
++# CONFIG_RAW_DRIVER is not set
++# CONFIG_TCG_TPM is not set
++# CONFIG_I2C is not set
++# CONFIG_SPI is not set
++CONFIG_ARCH_REQUIRE_GPIOLIB=y
++CONFIG_GPIOLIB=y
++# CONFIG_DEBUG_GPIO is not set
++# CONFIG_GPIO_SYSFS is not set
++
++#
++# Memory mapped GPIO expanders:
++#
++
++#
++# I2C GPIO expanders:
++#
++
++#
++# PCI GPIO expanders:
++#
++
++#
++# SPI GPIO expanders:
++#
++# CONFIG_W1 is not set
++# CONFIG_POWER_SUPPLY is not set
++# CONFIG_HWMON is not set
++# CONFIG_THERMAL is not set
++# CONFIG_THERMAL_HWMON is not set
++# CONFIG_WATCHDOG is not set
++CONFIG_SSB_POSSIBLE=y
++
++#
++# Sonics Silicon Backplane
++#
++# CONFIG_SSB is not set
++
++#
++# Multifunction device drivers
++#
++# CONFIG_MFD_CORE is not set
++# CONFIG_MFD_SM501 is not set
++# CONFIG_MFD_ASIC3 is not set
++# CONFIG_HTC_EGPIO is not set
++# CONFIG_HTC_PASIC3 is not set
++# CONFIG_MFD_TMIO is not set
++# CONFIG_MFD_T7L66XB is not set
++# CONFIG_MFD_TC6387XB is not set
++# CONFIG_MFD_TC6393XB is not set
++# CONFIG_MEDIA_SUPPORT is not set
++
++#
++# Graphics support
++#
++# CONFIG_VGASTATE is not set
++# CONFIG_VIDEO_OUTPUT_CONTROL is not set
++# CONFIG_FB is not set
++# CONFIG_BACKLIGHT_LCD_SUPPORT is not set
++
++#
++# Display device support
++#
++CONFIG_DISPLAY_SUPPORT=y
++
++#
++# Display hardware drivers
++#
++
++#
++# Console display driver support
++#
++# CONFIG_VGA_CONSOLE is not set
++CONFIG_DUMMY_CONSOLE=y
++# CONFIG_SOUND is not set
++# CONFIG_HID_SUPPORT is not set
++# CONFIG_USB_SUPPORT is not set
++# CONFIG_MMC is not set
++# CONFIG_MEMSTICK is not set
++# CONFIG_ACCESSIBILITY is not set
++# CONFIG_NEW_LEDS is not set
++CONFIG_RTC_LIB=y
++# CONFIG_RTC_CLASS is not set
++# CONFIG_DMADEVICES is not set
++# CONFIG_AUXDISPLAY is not set
++# CONFIG_REGULATOR is not set
++# CONFIG_UIO is not set
++# CONFIG_STAGING is not set
++
++#
++# File systems
++#
++CONFIG_EXT2_FS=y
++# CONFIG_EXT2_FS_XATTR is not set
++# CONFIG_EXT2_FS_XIP is not set
++CONFIG_EXT3_FS=y
++# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
++CONFIG_EXT3_FS_XATTR=y
++CONFIG_EXT3_FS_POSIX_ACL=y
++CONFIG_EXT3_FS_SECURITY=y
++# CONFIG_EXT4_FS is not set
++CONFIG_JBD=y
++CONFIG_FS_MBCACHE=y
++# CONFIG_REISERFS_FS is not set
++# CONFIG_JFS_FS is not set
++CONFIG_FS_POSIX_ACL=y
++# CONFIG_XFS_FS is not set
++# CONFIG_GFS2_FS is not set
++# CONFIG_BTRFS_FS is not set
++CONFIG_FILE_LOCKING=y
++CONFIG_FSNOTIFY=y
++CONFIG_DNOTIFY=y
++CONFIG_INOTIFY=y
++CONFIG_INOTIFY_USER=y
++# CONFIG_QUOTA is not set
++# CONFIG_AUTOFS_FS is not set
++# CONFIG_AUTOFS4_FS is not set
++# CONFIG_FUSE_FS is not set
++CONFIG_GENERIC_ACL=y
++
++#
++# Caches
++#
++# CONFIG_FSCACHE is not set
++
++#
++# CD-ROM/DVD Filesystems
++#
++# CONFIG_ISO9660_FS is not set
++# CONFIG_UDF_FS is not set
++
++#
++# DOS/FAT/NT Filesystems
++#
++CONFIG_FAT_FS=y
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_FAT_DEFAULT_CODEPAGE=437
++CONFIG_FAT_DEFAULT_IOCHARSET="iso8859-1"
++# CONFIG_NTFS_FS is not set
++
++#
++# Pseudo filesystems
++#
++CONFIG_PROC_FS=y
++CONFIG_PROC_SYSCTL=y
++CONFIG_PROC_PAGE_MONITOR=y
++CONFIG_SYSFS=y
++CONFIG_TMPFS=y
++CONFIG_TMPFS_POSIX_ACL=y
++# CONFIG_HUGETLB_PAGE is not set
++# CONFIG_CONFIGFS_FS is not set
++CONFIG_MISC_FILESYSTEMS=y
++# CONFIG_ADFS_FS is not set
++# CONFIG_AFFS_FS is not set
++# CONFIG_HFS_FS is not set
++# CONFIG_HFSPLUS_FS is not set
++# CONFIG_BEFS_FS is not set
++# CONFIG_BFS_FS is not set
++# CONFIG_EFS_FS is not set
++CONFIG_CRAMFS=y
++# CONFIG_SQUASHFS is not set
++# CONFIG_VXFS_FS is not set
++# CONFIG_MINIX_FS is not set
++# CONFIG_OMFS_FS is not set
++# CONFIG_HPFS_FS is not set
++# CONFIG_QNX4FS_FS is not set
++CONFIG_ROMFS_FS=y
++CONFIG_ROMFS_BACKED_BY_BLOCK=y
++# CONFIG_ROMFS_BACKED_BY_MTD is not set
++# CONFIG_ROMFS_BACKED_BY_BOTH is not set
++CONFIG_ROMFS_ON_BLOCK=y
++# CONFIG_SYSV_FS is not set
++# CONFIG_UFS_FS is not set
++# CONFIG_NILFS2_FS is not set
++
++#
++# Partition Types
++#
++# CONFIG_PARTITION_ADVANCED is not set
++CONFIG_MSDOS_PARTITION=y
++CONFIG_NLS=y
++CONFIG_NLS_DEFAULT="iso8859-1"
++CONFIG_NLS_CODEPAGE_437=y
++# CONFIG_NLS_CODEPAGE_737 is not set
++# CONFIG_NLS_CODEPAGE_775 is not set
++# CONFIG_NLS_CODEPAGE_850 is not set
++# CONFIG_NLS_CODEPAGE_852 is not set
++# CONFIG_NLS_CODEPAGE_855 is not set
++# CONFIG_NLS_CODEPAGE_857 is not set
++# CONFIG_NLS_CODEPAGE_860 is not set
++# CONFIG_NLS_CODEPAGE_861 is not set
++# CONFIG_NLS_CODEPAGE_862 is not set
++# CONFIG_NLS_CODEPAGE_863 is not set
++# CONFIG_NLS_CODEPAGE_864 is not set
++# CONFIG_NLS_CODEPAGE_865 is not set
++# CONFIG_NLS_CODEPAGE_866 is not set
++# CONFIG_NLS_CODEPAGE_869 is not set
++# CONFIG_NLS_CODEPAGE_936 is not set
++# CONFIG_NLS_CODEPAGE_950 is not set
++# CONFIG_NLS_CODEPAGE_932 is not set
++# CONFIG_NLS_CODEPAGE_949 is not set
++# CONFIG_NLS_CODEPAGE_874 is not set
++# CONFIG_NLS_ISO8859_8 is not set
++# CONFIG_NLS_CODEPAGE_1250 is not set
++# CONFIG_NLS_CODEPAGE_1251 is not set
++CONFIG_NLS_ASCII=y
++CONFIG_NLS_ISO8859_1=y
++# CONFIG_NLS_ISO8859_2 is not set
++# CONFIG_NLS_ISO8859_3 is not set
++# CONFIG_NLS_ISO8859_4 is not set
++# CONFIG_NLS_ISO8859_5 is not set
++# CONFIG_NLS_ISO8859_6 is not set
++# CONFIG_NLS_ISO8859_7 is not set
++# CONFIG_NLS_ISO8859_9 is not set
++# CONFIG_NLS_ISO8859_13 is not set
++# CONFIG_NLS_ISO8859_14 is not set
++# CONFIG_NLS_ISO8859_15 is not set
++# CONFIG_NLS_KOI8_R is not set
++# CONFIG_NLS_KOI8_U is not set
++# CONFIG_NLS_UTF8 is not set
++
++#
++# Kernel hacking
++#
++# CONFIG_PRINTK_TIME is not set
++CONFIG_ENABLE_WARN_DEPRECATED=y
++CONFIG_ENABLE_MUST_CHECK=y
++CONFIG_FRAME_WARN=1024
++CONFIG_MAGIC_SYSRQ=y
++# CONFIG_UNUSED_SYMBOLS is not set
++# CONFIG_DEBUG_FS is not set
++# CONFIG_HEADERS_CHECK is not set
++CONFIG_DEBUG_KERNEL=y
++# CONFIG_DEBUG_SHIRQ is not set
++CONFIG_DETECT_SOFTLOCKUP=y
++# CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC is not set
++CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC_VALUE=0
++CONFIG_DETECT_HUNG_TASK=y
++# CONFIG_BOOTPARAM_HUNG_TASK_PANIC is not set
++CONFIG_BOOTPARAM_HUNG_TASK_PANIC_VALUE=0
++CONFIG_SCHED_DEBUG=y
++# CONFIG_SCHEDSTATS is not set
++# CONFIG_TIMER_STATS is not set
++# CONFIG_DEBUG_OBJECTS is not set
++# CONFIG_SLUB_DEBUG_ON is not set
++# CONFIG_SLUB_STATS is not set
++# CONFIG_DEBUG_KMEMLEAK is not set
++CONFIG_DEBUG_RT_MUTEXES=y
++CONFIG_DEBUG_PI_LIST=y
++# CONFIG_RT_MUTEX_TESTER is not set
++CONFIG_DEBUG_SPINLOCK=y
++CONFIG_DEBUG_MUTEXES=y
++# CONFIG_DEBUG_LOCK_ALLOC is not set
++# CONFIG_PROVE_LOCKING is not set
++# CONFIG_LOCK_STAT is not set
++CONFIG_DEBUG_SPINLOCK_SLEEP=y
++# CONFIG_DEBUG_LOCKING_API_SELFTESTS is not set
++# CONFIG_DEBUG_KOBJECT is not set
++CONFIG_DEBUG_BUGVERBOSE=y
++CONFIG_DEBUG_INFO=y
++# CONFIG_DEBUG_VM is not set
++# CONFIG_DEBUG_WRITECOUNT is not set
++CONFIG_DEBUG_MEMORY_INIT=y
++# CONFIG_DEBUG_LIST is not set
++# CONFIG_DEBUG_SG is not set
++# CONFIG_DEBUG_NOTIFIERS is not set
++# CONFIG_BOOT_PRINTK_DELAY is not set
++# CONFIG_RCU_TORTURE_TEST is not set
++# CONFIG_RCU_CPU_STALL_DETECTOR is not set
++# CONFIG_BACKTRACE_SELF_TEST is not set
++# CONFIG_DEBUG_BLOCK_EXT_DEVT is not set
++# CONFIG_FAULT_INJECTION is not set
++# CONFIG_LATENCYTOP is not set
++CONFIG_SYSCTL_SYSCALL_CHECK=y
++# CONFIG_PAGE_POISONING is not set
++CONFIG_HAVE_FUNCTION_TRACER=y
++CONFIG_TRACING_SUPPORT=y
++CONFIG_FTRACE=y
++# CONFIG_FUNCTION_TRACER is not set
++# CONFIG_SCHED_TRACER is not set
++# CONFIG_ENABLE_DEFAULT_TRACERS is not set
++# CONFIG_BOOT_TRACER is not set
++CONFIG_BRANCH_PROFILE_NONE=y
++# CONFIG_PROFILE_ANNOTATED_BRANCHES is not set
++# CONFIG_PROFILE_ALL_BRANCHES is not set
++# CONFIG_STACK_TRACER is not set
++# CONFIG_KMEMTRACE is not set
++# CONFIG_WORKQUEUE_TRACER is not set
++# CONFIG_BLK_DEV_IO_TRACE is not set
++# CONFIG_SAMPLES is not set
++CONFIG_HAVE_ARCH_KGDB=y
++# CONFIG_KGDB is not set
++CONFIG_ARM_UNWIND=y
++CONFIG_DEBUG_USER=y
++CONFIG_DEBUG_ERRORS=y
++# CONFIG_DEBUG_STACK_USAGE is not set
++CONFIG_DEBUG_LL=y
++# CONFIG_DEBUG_ICEDCC is not set
++CONFIG_DEBUG_S3C_UART=1
++
++#
++# Security options
++#
++# CONFIG_KEYS is not set
++# CONFIG_SECURITY is not set
++# CONFIG_SECURITYFS is not set
++# CONFIG_SECURITY_FILE_CAPABILITIES is not set
++CONFIG_CRYPTO=y
++
++#
++# Crypto core or helper
++#
++# CONFIG_CRYPTO_FIPS is not set
++# CONFIG_CRYPTO_MANAGER is not set
++# CONFIG_CRYPTO_MANAGER2 is not set
++# CONFIG_CRYPTO_GF128MUL is not set
++# CONFIG_CRYPTO_NULL is not set
++# CONFIG_CRYPTO_CRYPTD is not set
++# CONFIG_CRYPTO_AUTHENC is not set
++# CONFIG_CRYPTO_TEST is not set
++
++#
++# Authenticated Encryption with Associated Data
++#
++# CONFIG_CRYPTO_CCM is not set
++# CONFIG_CRYPTO_GCM is not set
++# CONFIG_CRYPTO_SEQIV is not set
++
++#
++# Block modes
++#
++# CONFIG_CRYPTO_CBC is not set
++# CONFIG_CRYPTO_CTR is not set
++# CONFIG_CRYPTO_CTS is not set
++# CONFIG_CRYPTO_ECB is not set
++# CONFIG_CRYPTO_LRW is not set
++# CONFIG_CRYPTO_PCBC is not set
++# CONFIG_CRYPTO_XTS is not set
++
++#
++# Hash modes
++#
++# CONFIG_CRYPTO_HMAC is not set
++# CONFIG_CRYPTO_XCBC is not set
++
++#
++# Digest
++#
++# CONFIG_CRYPTO_CRC32C is not set
++# CONFIG_CRYPTO_MD4 is not set
++# CONFIG_CRYPTO_MD5 is not set
++# CONFIG_CRYPTO_MICHAEL_MIC is not set
++# CONFIG_CRYPTO_RMD128 is not set
++# CONFIG_CRYPTO_RMD160 is not set
++# CONFIG_CRYPTO_RMD256 is not set
++# CONFIG_CRYPTO_RMD320 is not set
++# CONFIG_CRYPTO_SHA1 is not set
++# CONFIG_CRYPTO_SHA256 is not set
++# CONFIG_CRYPTO_SHA512 is not set
++# CONFIG_CRYPTO_TGR192 is not set
++# CONFIG_CRYPTO_WP512 is not set
++
++#
++# Ciphers
++#
++# CONFIG_CRYPTO_AES is not set
++# CONFIG_CRYPTO_ANUBIS is not set
++# CONFIG_CRYPTO_ARC4 is not set
++# CONFIG_CRYPTO_BLOWFISH is not set
++# CONFIG_CRYPTO_CAMELLIA is not set
++# CONFIG_CRYPTO_CAST5 is not set
++# CONFIG_CRYPTO_CAST6 is not set
++# CONFIG_CRYPTO_DES is not set
++# CONFIG_CRYPTO_FCRYPT is not set
++# CONFIG_CRYPTO_KHAZAD is not set
++# CONFIG_CRYPTO_SALSA20 is not set
++# CONFIG_CRYPTO_SEED is not set
++# CONFIG_CRYPTO_SERPENT is not set
++# CONFIG_CRYPTO_TEA is not set
++# CONFIG_CRYPTO_TWOFISH is not set
++
++#
++# Compression
++#
++# CONFIG_CRYPTO_DEFLATE is not set
++# CONFIG_CRYPTO_ZLIB is not set
++# CONFIG_CRYPTO_LZO is not set
++
++#
++# Random Number Generation
++#
++# CONFIG_CRYPTO_ANSI_CPRNG is not set
++CONFIG_CRYPTO_HW=y
++# CONFIG_BINARY_PRINTF is not set
++
++#
++# Library routines
++#
++CONFIG_BITREVERSE=y
++CONFIG_GENERIC_FIND_LAST_BIT=y
++CONFIG_CRC_CCITT=y
++# CONFIG_CRC16 is not set
++# CONFIG_CRC_T10DIF is not set
++# CONFIG_CRC_ITU_T is not set
++CONFIG_CRC32=y
++# CONFIG_CRC7 is not set
++# CONFIG_LIBCRC32C is not set
++CONFIG_ZLIB_INFLATE=y
++CONFIG_DECOMPRESS_GZIP=y
++CONFIG_DECOMPRESS_BZIP2=y
++CONFIG_DECOMPRESS_LZMA=y
++CONFIG_HAS_IOMEM=y
++CONFIG_HAS_DMA=y
+diff --git a/arch/arm/mach-s5p6440/mach-smdk6440.c b/arch/arm/mach-s5p6440/mach-smdk6440.c
 new file mode 100644
-index 0000000..70d1f37
+index 0000000..e5c560e
 --- /dev/null
-+++ b/arch/arm/mach-s5p6440/include/mach/tick.h
-@@ -0,0 +1,24 @@
-+/* linux/arch/arm/mach-s5p6440/include/mach/tick.h
++++ b/arch/arm/mach-s5p6440/mach-smdk6440.c
+@@ -0,0 +1,135 @@
++/* linux/arch/arm/mach-s5p6440/mach-smdk6440.c
 + *
 + * Copyright (c) 2009 Samsung Electronics Co., Ltd.
 + *		http://www.samsung.com/
-+ *
-+ * S5P6440 - Timer tick support definitions
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#ifndef __ASM_ARCH_TICK_H
-+#define __ASM_ARCH_TICK_H __FILE__
-+
-+/* s3c compatibility definition */
-+static inline u32 s3c24xx_ostimer_pending(void)
-+{
-+	return 0;
-+}
-+
-+#define TICK_MAX	(0xffffffff)
-+
-+#endif /* __ASM_ARCH_TICK_H */
-diff --git a/arch/arm/plat-s5p/time.c b/arch/arm/plat-s5p/time.c
-new file mode 100644
-index 0000000..a5aca07
---- /dev/null
-+++ b/arch/arm/plat-s5p/time.c
-@@ -0,0 +1,227 @@
-+/* linux/arch/arm/plat-s5p/time.c
-+ *
-+ * Copyright (c) 2009 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * S5P Timer support
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -137,219 +945,129 @@ index 0000000..a5aca07
 +*/
 +
 +#include <linux/kernel.h>
-+#include <linux/sched.h>
-+#include <linux/init.h>
++#include <linux/types.h>
 +#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/err.h>
-+#include <linux/clk.h>
-+#include <linux/io.h>
++#include <linux/list.h>
++#include <linux/timer.h>
++#include <linux/delay.h>
++#include <linux/init.h>
++#include <linux/serial_core.h>
 +#include <linux/platform_device.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/clk.h>
 +
-+#include <asm/system.h>
-+#include <asm/leds.h>
-+#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++#include <asm/mach/irq.h>
++
++#include <mach/hardware.h>
++#include <mach/map.h>
 +
 +#include <asm/irq.h>
-+#include <mach/map.h>
-+#include <plat/regs-timer.h>
-+#include <mach/regs-irq.h>
-+#include <asm/mach/time.h>
-+#include <mach/tick.h>
++#include <asm/mach-types.h>
 +
++#include <plat/regs-serial.h>
++
++#include <plat/s5p6440.h>
 +#include <plat/clock.h>
++#include <mach/regs-clock.h>
++#include <plat/devs.h>
 +#include <plat/cpu.h>
++#include <plat/pll.h>
 +
-+static unsigned long timer_startval;
-+static unsigned long timer_usec_ticks;
++#define S5P6440_UCON_DEFAULT    (S3C2410_UCON_TXILEVEL | S3C2410_UCON_RXILEVEL |	\
++				  S3C2410_UCON_TXIRQMODE | S3C2410_UCON_RXIRQMODE |	\
++				  S3C2410_UCON_RXFIFO_TOI | S3C2443_UCON_RXERR_IRQEN)
 +
-+#ifndef TICK_MAX
-+#define TICK_MAX (0xffff)
-+#endif
++#define S5P6440_ULCON_DEFAULT   S3C64XX_ULCON_WORD_8BIT
 +
-+#define TIMER_USEC_SHIFT		16
++#define S5P6440_UFCON_DEFAULT   (S3C2410_UFCON_FIFOMODE | S3C2440_UFCON_TXTRIG16 |	\
++				  S3C2410_UFCON_RXTRIG8)
 +
-+#define S5P6440_TCFG1_MUX4_DIV1	(0<<16)
-+#define S5P6440_TCFG1_MUX4_DIV2	(1<<16)
-+#define S5P6440_TCFG1_MUX4_DIV4	(2<<16)
-+#define S5P6440_TCFG1_MUX4_DIV8	(3<<16)
-+#define S5P6440_TCFG1_MUX4_DIV16	(4<<16)
-+
-+/* we use the shifted arithmetic to work out the ratio of timer ticks
-+ * to usecs, as often the peripheral clock is not a nice even multiple
-+ * of 1MHz.
-+ *
-+ * shift of 14 and 15 are too low for the 12MHz, 16 seems to be ok
-+ * for the current HZ value of 200 without producing overflows.
-+ *
-+ * Original patch by Dimitry Andric, updated by Ben Dooks
-+*/
-+
-+/* timer_mask_usec_ticks
-+ *
-+ * given a clock and divisor, make the value to pass into timer_ticks_to_usec
-+ * to scale the ticks into usecs
-+*/
-+
-+static inline unsigned long
-+timer_mask_usec_ticks(unsigned long scaler, unsigned long pclk)
-+{
-+	unsigned long den = pclk / 1000;
-+
-+	return ((1000 << TIMER_USEC_SHIFT) * scaler + (den >> 1)) / den;
-+}
-+
-+/* timer_ticks_to_usec
-+ *
-+ * convert timer ticks to usec.
-+*/
-+
-+static inline unsigned long timer_ticks_to_usec(unsigned long ticks)
-+{
-+	unsigned long res;
-+
-+	res = ticks * timer_usec_ticks;
-+	res += 1 << (TIMER_USEC_SHIFT - 4);	/* round up slightly */
-+
-+	return res >> TIMER_USEC_SHIFT;
-+}
-+
-+/* note, the timer interrutps turn up in 2 places, the vic and then
-+ * the timer block. We take the VIC as the base at the moment.
-+*/
-+
-+static inline u32 s5p_ostimer_pending(void)
-+{
-+	u32 pend = __raw_readl(S5P_VA_VIC0 + VIC_RAW_STATUS);
-+	return pend & (1 << (IRQ_TIMER4_VIC - S5P_IRQ_VIC0(0)));
-+}
-+
-+/* Returns microsecond  since last clock interrupt.  Note that interrupts
-+ * will have been disabled by do_gettimeoffset()
-+ * IRQs are disabled before entering here from do_gettimeofday()
-+*/
-+
-+static unsigned long s5p6440_gettimeoffset(void)
-+{
-+	unsigned long tdone;
-+	unsigned long tval;
-+
-+	/* work out how many ticks have gone since last timer interrupt */
-+
-+	tval =  __raw_readl(S3C2410_TCNTO(4));
-+	tdone = timer_startval - tval;
-+
-+	/* check to see if there is an interrupt pending */
-+
-+	if (s5p_ostimer_pending()) {
-+
-+		/* re-read the timer, and try and fix up for the missed
-+		 * interrupt. Note, the interrupt may go off before the
-+		 * timer has re-loaded from wrapping.
-+		 */
-+
-+		tval =  __raw_readl(S3C2410_TCNTO(4));
-+		tdone = timer_startval - tval;
-+
-+		if (tval != 0)
-+			tdone += timer_startval;
-+	}
-+
-+	return timer_ticks_to_usec(tdone);
-+}
-+
-+/* IRQ handler for the timer */
-+
-+static irqreturn_t s5p6440_timer_interrupt(int irq, void *dev_id)
-+{
-+	timer_tick();
-+	return IRQ_HANDLED;
-+}
-+
-+static struct irqaction s5p6440_timer_irq = {
-+	.name		= "S5P6440 Timer Tick",
-+	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.handler	= s5p6440_timer_interrupt,
++static struct s3c24xx_uart_clksrc smdk6440_serial_clocks[] = {
++	[0] = {
++		.name		= "pclk_low",
++		.divisor	= 1,
++		.min_baud	= 0,
++		.max_baud	= 0,
++	},
++	[1] = {
++		.name		= "uclk1",
++		.divisor	= 1,
++		.min_baud	= 0,
++		.max_baud	= 0,
++	},
 +};
 +
-+static void s5p6440_timer_setup(void)
-+{
-+	unsigned long tcon;
-+	unsigned long tcnt;
-+	unsigned long tcfg1;
-+	unsigned long tcfg0;
-+	unsigned long pclk;
-+	struct clk *clk;
 +
-+	tcnt = TICK_MAX;  /* default value for tcnt */
-+
-+	/* read the current timer configuration bits */
-+
-+	tcon = __raw_readl(S3C2410_TCON);
-+	tcfg1 = __raw_readl(S3C2410_TCFG1);
-+	tcfg0 = __raw_readl(S3C2410_TCFG0);
-+
-+	clk = clk_get(NULL, "timers");
-+	if (IS_ERR(clk))
-+		panic("failed to get clock for system timer");
-+
-+	clk_enable(clk);
-+	pclk = clk_get_rate(clk);
-+
-+	/* configure clock tick */
-+
-+	timer_usec_ticks = timer_mask_usec_ticks(6, pclk);
-+
-+	tcfg1 &= ~S3C2410_TCFG1_MUX4_MASK;
-+	tcfg1 |= S5P6440_TCFG1_MUX4_DIV1;
-+	tcfg0 &= ~S3C2410_TCFG_PRESCALER1_MASK;
-+	tcfg0 |= (6) << S3C2410_TCFG_PRESCALER1_SHIFT;
-+	tcnt = (pclk / 7) / HZ;
-+
-+	/* timers reload after counting zero, so reduce the count by 1 */
-+
-+	tcnt--;
-+
-+	/* check to see if timer is within 16bit range... */
-+
-+	if (tcnt > TICK_MAX) {
-+		panic("setup_timer: HZ is too small, cannot configure timer!");
-+		return;
-+	}
-+
-+	__raw_writel(tcfg1, S3C2410_TCFG1);
-+	__raw_writel(tcfg0, S3C2410_TCFG0);
-+
-+	timer_startval = tcnt;
-+	__raw_writel(tcnt, S3C2410_TCNTB(4));
-+
-+	/* ensure timer is stopped... */
-+
-+	tcon &= ~(7<<20);
-+	tcon |= S3C2410_TCON_T4RELOAD;
-+	tcon |= S3C2410_TCON_T4MANUALUPD;
-+
-+	__raw_writel(tcon, S3C2410_TCON);
-+	__raw_writel(tcnt, S3C2410_TCNTB(4));
-+	__raw_writel(tcnt, S3C2410_TCMPB(4));
-+
-+	/* start the timer running */
-+
-+	tcon |= S3C2410_TCON_T4START;
-+	tcon &= ~S3C2410_TCON_T4MANUALUPD;
-+	__raw_writel(tcon, S3C2410_TCON);
-+}
-+
-+static void __init s5p6440_timer_init(void)
-+{
-+	s5p6440_timer_setup();
-+	setup_irq(IRQ_TIMER4, &s5p6440_timer_irq);
-+}
-+
-+struct sys_timer s5p6440_timer = {
-+	.init		= s5p6440_timer_init,
-+	.offset		= s5p6440_gettimeoffset,
-+	.resume		= s5p6440_timer_setup
++static struct s3c2410_uartcfg smdk6440_uartcfgs[] __initdata = {
++	[0] = {
++		.hwport	     = 0,
++		.flags	     = 0,
++		.ucon	     = S5P6440_UCON_DEFAULT,
++		.ulcon	     = S5P6440_ULCON_DEFAULT,
++		.ufcon	     = S5P6440_UFCON_DEFAULT,
++		.clocks      = smdk6440_serial_clocks,
++		.clocks_size = ARRAY_SIZE(smdk6440_serial_clocks),
++	},
++	[1] = {
++		.hwport	     = 1,
++		.flags	     = 0,
++		.ucon	     = S5P6440_UCON_DEFAULT,
++		.ulcon	     = S5P6440_ULCON_DEFAULT,
++		.ufcon	     = S5P6440_UFCON_DEFAULT,
++		.clocks      = smdk6440_serial_clocks,
++		.clocks_size = ARRAY_SIZE(smdk6440_serial_clocks),
++	},
++	[2] = {
++		.hwport	     = 2,
++		.flags	     = 0,
++		.ucon	     = S5P6440_UCON_DEFAULT,
++		.ulcon	     = S5P6440_ULCON_DEFAULT,
++		.ufcon	     = S5P6440_UFCON_DEFAULT,
++		.clocks      = smdk6440_serial_clocks,
++		.clocks_size = ARRAY_SIZE(smdk6440_serial_clocks),
++	},
++	[3] = {
++		.hwport	     = 3,
++		.flags	     = 0,
++		.ucon	     = S5P6440_UCON_DEFAULT,
++		.ulcon	     = S5P6440_ULCON_DEFAULT,
++		.ufcon	     = S5P6440_UFCON_DEFAULT,
++		.clocks      = smdk6440_serial_clocks,
++		.clocks_size = ARRAY_SIZE(smdk6440_serial_clocks),
++	},
 +};
++
++static struct map_desc smdk6440_iodesc[] = {
++};
++
++static struct platform_device *smdk6440_devices[] __initdata = {
++};
++
++static void __init smdk6440_map_io(void)
++{
++	s5p_init_io(smdk6440_iodesc, ARRAY_SIZE(smdk6440_iodesc));
++	s3c24xx_init_clocks(12000000);
++	s3c24xx_init_uarts(smdk6440_uartcfgs, ARRAY_SIZE(smdk6440_uartcfgs));
++}
++
++static void __init smdk6440_machine_init(void)
++{
++	platform_add_devices(smdk6440_devices, ARRAY_SIZE(smdk6440_devices));
++}
++
++MACHINE_START(SMDK6440, "SMDK6440")
++	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
++	.phys_io	= S5P_PA_UART & 0xfff00000,
++	.io_pg_offst	= (((u32)S5P_VA_UART) >> 18) & 0xfffc,
++	.boot_params	= S5P_PA_SDRAM + 0x100,
++
++	.init_irq	= s5p6440_init_irq,
++	.map_io		= smdk6440_map_io,
++	.init_machine	= smdk6440_machine_init,
++	.timer		= &s5p6440_timer,
++MACHINE_END
 -- 
 1.6.2.5
