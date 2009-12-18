@@ -1,30 +1,42 @@
-From: jsgood.yang@samsung.com (Jinsung Yang)
-Date: Fri, 18 Dec 2009 16:41:11 +0900
-Subject: ARMv6 build error in v2.6.33-rc1
-Message-ID: <005801ca7fb5$787b11e0$697135a0$%yang@samsung.com>
+From: chripell@gmail.com (christian pellegrin)
+Date: Fri, 18 Dec 2009 09:08:41 +0100
+Subject: shared memory problem on ARM v5TE using threads
+In-Reply-To: <4B2A1693.6020000@denx.de>
+References: <309002C0DA137042828828FC53D7A9347E212D1152@IL-MB01.marvell.com>
+	<4B1CF3ED.9080307@denx.de>
+	<309002C0DA137042828828FC53D7A9347E212D150D@IL-MB01.marvell.com>
+	<20091207145235.GD19348@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.0912071027480.31174@xanadu.home>
+	<20091207170546.GB26821@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.0912071219100.31174@xanadu.home>
+	<20091207175608.GE26821@n2100.arm.linux.org.uk>
+	<309002C0DA137042828828FC53D7A9347E2630EEC2@IL-MB01.marvell.com>
+	<4B2A1693.6020000@denx.de>
+Message-ID: <cabda6420912180008l27349a9bs3a13460d3a6454d6@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-I've been facing a build problem with ARMv6 architecture such as s3c64xx series.
-The logs are shown as below:
---
-  CHK     include/linux/version.h
-  CHK     include/generated/utsrelease.h
-make[1]: `include/generated/mach-types.h' is up to date.
-  CALL    scripts/checksyscalls.sh
-<stdin>:1523: warning: #warning syscall recvmmsg not implemented
-  CHK     include/generated/compile.h
-  CC      arch/arm/mm/copypage-v6.o
-arch/arm/mm/copypage-v6.c: In function 'v6_copy_user_highpage_nonaliasing':
-arch/arm/mm/copypage-v6.c:51: error: implicit declaration of function '__cpuc_flush_dcache_page'
-make[1]: *** [arch/arm/mm/copypage-v6.o] Error 1
-make: *** [arch/arm/mm] Error 2
+On Thu, Dec 17, 2009 at 12:31 PM, Heiko Schocher <hs@denx.de> wrote:
+> Hello Christian,
+>
 
+Hi
 
-How we handle this?
+> As we have problems with shared memory, if using more than one
+> mapping, do we have this problems also when using other "standard"
+> Linux IPC, like for example semaphores, queues, ... ?
+>
 
-Best Regards,
---
-Jinsung Yang <jsgood.yang@samsung.com>
-SAMSUNG Electronics
+AFAIK no. The problem you discovered is caused by the access of the
+same physical memory area via a cached and an uncached mapping without
+proper L2 cache flushing. The only way that I know about how to create
+an uncached one in user space is by mapping the same physical memory
+to different virtual address (so triggering the L1 VIVT cache aliasing
+avoidance mechanism).
+
+-- 
+Christian Pellegrin, see http://www.evolware.org/chri/
+"Real Programmers don't play tennis, or any other sport which requires
+you to change clothes. Mountain climbing is OK, and Real Programmers
+wear their climbing boots to work in case a mountain should suddenly
+spring up in the middle of the computer room."
