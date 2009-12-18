@@ -1,27 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 18 Dec 2009 10:00:02 +0000
-Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors
-In-Reply-To: <20091217193210.GD362@shareable.org>
-References: <20091217193210.GD362@shareable.org>
-Message-ID: <1261130402.13520.1.camel@pc1117.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Dec 2009 10:02:45 +0000
+Subject: [PATCH] ARM: Fix build break on ARM v6 and v7
+In-Reply-To: <1261125427-17517-1-git-send-email-gadiyar@ti.com>
+References: <1261125427-17517-1-git-send-email-gadiyar@ti.com>
+Message-ID: <20091218100245.GA29296@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2009-12-17 at 19:32 +0000, Jamie Lokier wrote:
-> Leif Lindholm wrote:
-> > +     printk(KERN_INFO "SWP{B} emulation: access caused memory abort!\n");
-> > +     arm_notify_die("Illegal memory access", regs, &info, 0, 0);
+On Fri, Dec 18, 2009 at 02:07:07PM +0530, Anand Gadiyar wrote:
+> Commit 2c9b9c849 added an argument to __cpuc_flush_dcache_page
+> and renamed it.
 > 
-> > +     if (address & 0x3) {
-> > +             /* SWP to unaligned address not permitted */
-> > +             printk(KERN_INFO "SWP instruction on unaligned pointer!\n");
-> > +             return -EFAULT;
-> > +     }
+> Update a caller of the old function to fix this build error:
 > 
-> These printks look like an easy local denial of service.  They should
-> be rate limited.
+>   CC      arch/arm/mm/copypage-v6.o
+> arch/arm/mm/copypage-v6.c: In function 'v6_copy_user_highpage_nonaliasing':
+> arch/arm/mm/copypage-v6.c:51: error: implicit declaration of function '__cpuc_flush_dcache_page'
+> make[1]: *** [arch/arm/mm/copypage-v6.o] Error 1
+> make: *** [arch/arm/mm] Error 2
+> 
+> 
+> Reported-by: Jinsung Yang <jsgood.yang@samsung.com>
+> NYET-Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
+> ---
+> Russell,
+> 
+> I fixed this almost independently at roughly the same time as your
+> mail on the list. Do I still get credit for the patch?
 
-pr_debug() may be a better choice.
-
--- 
-Catalin
+Patch is good.  If you want to convert the NYET-sob to a proper
+signed-off-by, and throw it at the patch system...
