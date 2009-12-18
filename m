@@ -1,63 +1,76 @@
-From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Fri, 18 Dec 2009 17:04:22 +0100
-Subject: [PATCH] mx3fb: some debug and initialisation fixes.
-Message-ID: <1261152262.3356.69.camel@climbing-alby>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Dec 2009 16:09:24 +0000
+Subject: [CFT:PATCH] Remove a seemingly unnecessary cache flush
+In-Reply-To: <20091207221210.GI26821@n2100.arm.linux.org.uk>
+References: <20091207221210.GI26821@n2100.arm.linux.org.uk>
+Message-ID: <20091218160924.GB5527@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the kernel oops when dev_dbg is called with mx3_fbi->txd == NULL
+Could I have some Tested-by: lines for this patch please?
 
-Fix the late initialisation of mx3fb->backlight_level.
-If not, in the chain of function started by init_fb_chan(), in __blank() call 
-sdc_set_brightness(mx3fb, mx3fb->backlight_level) that will shut down
-the CONTRAST PWM output. 
-
-
-Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
----
- drivers/video/mx3fb.c |   12 ++++++++----
- 1 files changed, 8 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
-index 054ef29..772ba3f 100644
---- a/drivers/video/mx3fb.c
-+++ b/drivers/video/mx3fb.c
-@@ -324,8 +324,11 @@ static void sdc_enable_channel(struct mx3fb_info *mx3_fbi)
- 	unsigned long flags;
- 	dma_cookie_t cookie;
- 
--	dev_dbg(mx3fb->dev, "mx3fbi %p, desc %p, sg %p\n", mx3_fbi,
--		to_tx_desc(mx3_fbi->txd), to_tx_desc(mx3_fbi->txd)->sg);
-+	if (mx3_fbi->txd)
-+		dev_dbg(mx3fb->dev, "mx3fbi %p, desc %p, sg %p\n", mx3_fbi,
-+			to_tx_desc(mx3_fbi->txd), to_tx_desc(mx3_fbi->txd)->sg);
-+	else
-+		dev_dbg(mx3fb->dev, "mx3fbi %p, txd = NULL\n", mx3_fbi);
- 
- 	/* This enables the channel */
- 	if (mx3_fbi->cookie < 0) {
-@@ -646,6 +649,7 @@ static int sdc_set_global_alpha(struct mx3fb_data *mx3fb, bool enable, uint8_t a
- 
- static void sdc_set_brightness(struct mx3fb_data *mx3fb, uint8_t value)
- {
-+	dev_dbg(mx3fb->dev, "%s: value = %d\n", __func__, value);
- 	/* This might be board-specific */
- 	mx3fb_write_reg(mx3fb, 0x03000000UL | value << 16, SDC_PWM_CTRL);
- 	return;
-@@ -1486,12 +1490,12 @@ static int mx3fb_probe(struct platform_device *pdev)
- 		goto ersdc0;
- 	}
- 
-+	mx3fb->backlight_level = 255;
-+
- 	ret = init_fb_chan(mx3fb, to_idmac_chan(chan));
- 	if (ret < 0)
- 		goto eisdc0;
- 
--	mx3fb->backlight_level = 255;
--
- 	return 0;
- 
- eisdc0:
--- 
-1.6.3.3
+On Mon, Dec 07, 2009 at 10:12:10PM +0000, Russell King - ARM Linux wrote:
+> While looking into the possible msync() issue (which turned out to be a
+> non-issue - it's covered by clever code), I found that we're flushing
+> the same page multiple times.
+> 
+> Normally, update_mmu_cache() would not be doing anything on architectures
+> which don't have a software-loaded TLB.  However, we use this hook for
+> two things:
+> 
+> 1. for our delayed flush_dcache_page().
+> 2. to fix up multiple shared write-able mappings of the same page.
+> 
+> However, as of 8 years ago, I committed this patch (sorry for the
+> bkbits URL):
+> 
+> http://linux.bkbits.net:8080/linux-2.6/?PAGE=patch&REV=3dd7c1f9DypjNd1HyQFAOsA3p7mYig
+> 
+> What the majority of that patch is doing is adding the user-mapping
+> flushing to __flush_dcache_page() - that's fine, and it's explained in
+> the changeset comments.
+> 
+> It also tries to merge the new __flush_dcache_page() code inside
+> make_coherent() - make_coherent() is sort-of already doing most of what
+> __flush_dcache_page() does, and for good measure it does a final
+> flush_cache_page().
+> 
+> The unused addition of 'dirty' seems to suggest that this extra
+> flush_cache_page should have been conditional on that.
+> 
+> Moreover, this final flush_cache_page() should not be needed - the whole
+> "delayed flush_dcache_page" thing only happens when there are no pre-
+> existing mappings of the page, and so there should be no user mappings
+> to worry about.
+> 
+> Hence, I believe it is safe to get rid of this - but this patch will
+> need some rigorous testing.  My ARM VersatilePB926 still boots without
+> this additional patch - but that's not a very good test.  I can't say
+> much more than that for the time being.
+> 
+> Note: for ARMv6 and later, flush_cache_page() is a no-op, so please
+> don't bother testing this patch there.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/mm/fault-armv.c |    2 --
+>  1 files changed, 0 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mm/fault-armv.c b/arch/arm/mm/fault-armv.c
+> index 7296022..666a871 100644
+> --- a/arch/arm/mm/fault-armv.c
+> +++ b/arch/arm/mm/fault-armv.c
+> @@ -127,8 +127,6 @@ make_coherent(struct address_space *mapping, struct vm_area_struct *vma, unsigne
+>  	flush_dcache_mmap_unlock(mapping);
+>  	if (aliases)
+>  		adjust_pte(vma, addr);
+> -	else
+> -		flush_cache_page(vma, addr, pfn);
+>  }
+>  
+>  /*
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
