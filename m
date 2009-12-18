@@ -1,26 +1,21 @@
-From: roel.kluin@gmail.com (roel kluin)
-Date: Thu, 17 Dec 2009 22:20:18 +0100
-Subject: [PATCH] ARM: Wrong size used in dump_mem()
-In-Reply-To: <20091217211759.GB16520@n2100.arm.linux.org.uk>
-References: <4B2A9F8E.5080508@gmail.com>
-	<20091217211759.GB16520@n2100.arm.linux.org.uk>
-Message-ID: <25e057c00912171320m3c596ecancafc568cedfd70b8@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 17 Dec 2009 19:19:24 -0800
+Subject: "Flush the D-cache during copy_user_highpage" breaks compile for
+	v7 on -rc1
+Message-ID: <20091218031923.GA4575@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2009 at 10:17 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Dec 17, 2009 at 10:15:58PM +0100, Roel Kluin wrote:
->> The sizeof the pointed to should be used rather than of the pointer
->>
->> Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
->> ---
->> Unless I am mistaken?
->
-> You are mistaken. ?sizeof(array) is the byte size of the array.
-> sizeof(*array) is the size of one individual object of the array.
->
-> The code is correct as is - which is to fill ?the entire array with
-> space characters and then zero the last one.
+Hi Catalin,
 
-hmm, I see. sorry for the noise
+You may have already run into this, but if not, looks like commit
+115b22474eb1905da2f606a057da3455833333d3 breaks compile for v7:
+
+arch/arm/mm/copypage-v6.c: In function 'v6_copy_user_highpage_nonaliasing':
+arch/arm/mm/copypage-v6.c:51: error: implicit declaration of function '__cpuc_flush_dcache_page'
+
+Undoing that makes it work again.
+
+Regards,
+
+Tony
