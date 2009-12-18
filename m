@@ -1,70 +1,57 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 18 Dec 2009 14:51:41 +0000
-Subject: [PATCH] ARM: Fix a race in the vfp_notifier() function on
-	SMPsystems
-In-Reply-To: <20091218144728.GC32481@n2100.arm.linux.org.uk>
-References: <20091218134423.21279.93962.stgit@pc1117.cambridge.arm.com>
-	<20091218141100.GA32481@n2100.arm.linux.org.uk>
-	<20091218142503.GB32481@n2100.arm.linux.org.uk>
-	<20091218144728.GC32481@n2100.arm.linux.org.uk>
-Message-ID: <1261147901.13520.73.camel@pc1117.cambridge.arm.com>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Fri, 18 Dec 2009 15:57:11 +0100
+Subject: [PATCH 6/7] ARM: S5P6440: Add Board and configuration file
+In-Reply-To: <1261127996-30253-2-git-send-email-kgene.kim@samsung.com>
+References: <1261127996-30253-1-git-send-email-kgene.kim@samsung.com>
+	<1261127996-30253-2-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20091218155711.5a3efd99@life-in-the-fast-lane>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2009-12-18 at 14:47 +0000, Russell King - ARM Linux wrote:
-> On Fri, Dec 18, 2009 at 02:25:03PM +0000, Russell King - ARM Linux wrote:
-> > On Fri, Dec 18, 2009 at 02:11:00PM +0000, Russell King - ARM Linux wrote:
-> > > On Fri, Dec 18, 2009 at 01:45:09PM +0000, Catalin Marinas wrote:
-> > > >   (patch updated following Russell's changes to vfpmodule.c)
-> > > >
-> > > > The vfp_notifier(THREAD_NOTIFY_RELEASE) maybe be called with thread->cpu
-> > > > different from the current one, causing a race condition with both the
-> > > > THREAD_NOTIFY_SWITCH path and vfp_support_entry().
-> > >
-> > > How about we provide THREAD_NOTIFY_EXIT and call these hooks from
-> > > exit_thread() - we'll be calling the notifier when the thread is
-> > > still running, and so thread->cpu will be the local CPU.
-> > >
-> > > This should be much safer all round, and give much simpler semantics
-> > > if we NULL out the current CPU's last_VFP_context pointer.  It also
-> > > means that each CPUs last_VFP_context pointer is only ever accessed
-> > > from the local CPU, which can only be a good thing.
-> >
-> > Something like this:
-> 
-> Actually, I think we should go further and kill off THREAD_NOTIFY_RELEASE
-> completely.  Added a few more people because EP93xx and PXA (well,
-> Xscale) is now impacted by this change.
-> 
-> [PATCH] ARM: Convert VFP/Crunch/XscaleCP thread_release() to exit_thread()
-> 
-> This avoids races in the VFP code where the dead thread may have
-> state on another CPU.  By moving this code to exit_thread(), we
-> will be running as the thread, and therefore be running on the
-> current CPU.
-> 
-> This means that we can ensure that the only local state is accessed
-> in the thread notifiers.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-[...]
->  static int vfp_notifier(struct notifier_block *self, unsigned long cmd, void *v)
->  {
-> @@ -132,8 +135,8 @@ static int vfp_notifier(struct notifier_block *self, unsigned long cmd, void *v)
-> 
->         if (cmd == THREAD_NOTIFY_FLUSH)
->                 vfp_thread_flush(thread);
-> -       else
-> -               vfp_thread_release(thread);
-> +       else if (cmd == THREAD_NOTIFY_EXIT)
-> +               vfp_thread_exit(thread);
+On Fri, 18 Dec 2009 18:19:53 +0900
+Kukjin Kim <kgene.kim@samsung.com> wrote:
 
-Do we still need the second "if" or "else" will do (though it's safer if
-anyone adds some extra THREAD_NOTIFY_* in the future.
+> diff --git a/arch/arm/mach-s5p6440/mach-smdk6440.c b/arch/arm/mach-s5p6440/mach-smdk6440.c
+> new file mode 100644
+> index 0000000..e5c560e
+> --- /dev/null
+> +++ b/arch/arm/mach-s5p6440/mach-smdk6440.c
+> @@ -0,0 +1,135 @@
+> +/* linux/arch/arm/mach-s5p6440/mach-smdk6440.c
+> + *
+> + * Copyright (c) 2009 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/types.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/list.h>
+> +#include <linux/timer.h>
+> +#include <linux/delay.h>
+> +#include <linux/init.h>
+> +#include <linux/serial_core.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/clk.h>
+> +
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/map.h>
+> +#include <asm/mach/irq.h>
 
-In any case (for the VFP code):
+asm/mach/irq.h doesn't seem to contain anything useful.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> +
+> +#include <mach/hardware.h>
+> +#include <mach/map.h>
+> +
+> +#include <asm/irq.h>
 
+Please don't directly include asm/irq.h. Use linux/irq.h instead.
 -- 
-Catalin
+Fast. Cheap. Reliable. Pick two.
