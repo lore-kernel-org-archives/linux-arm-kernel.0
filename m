@@ -1,46 +1,33 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 17 Dec 2009 21:20:17 -0700
-Subject: [PATCH 2/8] ARM: OMAP3: PM: Fix the Invalid CM_CLKSTCTRL reg access.
+Date: Thu, 17 Dec 2009 21:20:21 -0700
+Subject: [PATCH 6/8] OMAP3 clock: McBSP 2, 3,
+	4 functional clock parent is PER_96M_FCLK, not CORE_96M_FCLK
 In-Reply-To: <20091218041912.27280.92152.stgit@localhost.localdomain>
 References: <20091218041912.27280.92152.stgit@localhost.localdomain>
-Message-ID: <20091218042015.27280.14688.stgit@localhost.localdomain>
+Message-ID: <20091218042020.27280.77746.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Abhijit Pagare <abhijitpagare@ti.com>
+The correct parent of the McBSP 2, 3, and 4 functional clocks is
+PER_96M_FCLK, not CORE_96M_FCLK.  Fix this in the OMAP clock tree.
+Reported by Nicole Chalhoub <n-chalhoub@ti.com>.
 
-In OMAP2/3 some of the clock-domains which did not have control
-facility were being falsely written to and read using the CM_CLKSTCTRL
-register though it did not exist for them. One check is added to remove
-this flaw.
-
-Signed-off-by: Abhijit Pagare <abhijitpagare@ti.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Nicole Chalhoub <n-chalhoub@ti.com>
 ---
- arch/arm/mach-omap2/clockdomain.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/clock34xx_data.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
-index 1a45ed1..dd285f0 100644
---- a/arch/arm/mach-omap2/clockdomain.c
-+++ b/arch/arm/mach-omap2/clockdomain.c
-@@ -559,7 +559,7 @@ int omap2_clkdm_clk_enable(struct clockdomain *clkdm, struct clk *clk)
- 	 * downstream clocks for debugging purposes?
- 	 */
+diff --git a/arch/arm/mach-omap2/clock34xx_data.c b/arch/arm/mach-omap2/clock34xx_data.c
+index c60b19a..7eea9fb 100644
+--- a/arch/arm/mach-omap2/clock34xx_data.c
++++ b/arch/arm/mach-omap2/clock34xx_data.c
+@@ -2747,7 +2747,7 @@ static struct clk mcbsp4_ick = {
+ };
  
--	if (!clkdm || !clk)
-+	if (!clkdm || !clk || !clkdm->clktrctrl_mask)
- 		return -EINVAL;
- 
- 	if (atomic_inc_return(&clkdm->usecount) > 1)
-@@ -610,7 +610,7 @@ int omap2_clkdm_clk_disable(struct clockdomain *clkdm, struct clk *clk)
- 	 * downstream clocks for debugging purposes?
- 	 */
- 
--	if (!clkdm || !clk)
-+	if (!clkdm || !clk || !clkdm->clktrctrl_mask)
- 		return -EINVAL;
- 
- #ifdef DEBUG
+ static const struct clksel mcbsp_234_clksel[] = {
+-	{ .parent = &core_96m_fck, .rates = common_mcbsp_96m_rates },
++	{ .parent = &per_96m_fck,  .rates = common_mcbsp_96m_rates },
+ 	{ .parent = &mcbsp_clks,   .rates = common_mcbsp_mcbsp_rates },
+ 	{ .parent = NULL }
+ };
