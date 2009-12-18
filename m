@@ -1,63 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Dec 2009 15:43:59 +0000
-Subject: "Flush the D-cache during copy_user_highpage" breaks compile
-	for v7 on -rc1
-In-Reply-To: <20091218153512.GA30512@lixom.net>
-References: <20091218031923.GA4575@atomide.com>
-	<20091218081851.GB28704@n2100.arm.linux.org.uk>
-	<20091218153512.GA30512@lixom.net>
-Message-ID: <20091218154359.GA5527@n2100.arm.linux.org.uk>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Fri, 18 Dec 2009 16:52:04 +0100
+Subject: [PATCH] spi: spi_imx: add device information to debug.
+Message-ID: <1261151524.3356.57.camel@climbing-alby>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2009 at 09:35:12AM -0600, Olof Johansson wrote:
-> Hi,
-> 
-> On Fri, Dec 18, 2009 at 08:18:52AM +0000, Russell King - ARM Linux wrote:
-> > On Thu, Dec 17, 2009 at 07:19:24PM -0800, Tony Lindgren wrote:
-> > > Hi Catalin,
-> > > 
-> > > You may have already run into this, but if not, looks like commit
-> > > 115b22474eb1905da2f606a057da3455833333d3 breaks compile for v7:
-> > > 
-> > > arch/arm/mm/copypage-v6.c: In function 'v6_copy_user_highpage_nonaliasing':
-> > > arch/arm/mm/copypage-v6.c:51: error: implicit declaration of function '__cpuc_flush_dcache_page'
-> > > 
-> > > Undoing that makes it work again.
-> > 
-> > It's a combination of changes - my initial changes for fixing the ARMv7
-> > DMA support went in last night, but were based on a tree older than
-> > Catalin's changes, which had already been committed.
-> > 
-> > My test build didn't catch any of these - it's the usual problem that
-> > there is no way to adequately build-test the ARM kernel in a reasonable
-> > time anymore.
-> 
-> FWIW: I've added an omap3_defconfig, that should be a superset of the
-> configs used on the OMAP3 boards, to catch as much as possible affecting
-> those boards with one single build. Takes about 90 seconds for me to
-> build on a $600 PC, and Stephen builds it for every linux-next too.
+Not an heavy fix, but good when debugging multiple spi channels.
 
-linux-next is fine if you're prepared to wait a minimum of 36-48 hours
-between committing and seeing the results - that's unfortunately how
-it works out if you're in the UK due to time zone differences.
+Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
+---
+ drivers/spi/spi_imx.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-The big problem is not so much how long a single build takes, but
-all builds to get the required converage.  We have soo many combinations
-and configurations that its now impossible to properly build-test changes.
-It's become soo bad that for most of the changes I do, I hardly ever
-bother doing in-depth build tests anymore.  And that applies inspite of
-having a nice new Lenovo T500.
-
-That's something I've repeatedly warned about, and been faced "but why
-do we want to support a single kernel running on multiple platforms"
-arguments...
-
-My method of working now is based around doing my own build tests,
-merging them into mainline and checking (next morning) the results from
-kautobuild.  I really don't bother checking linux-next, because 36-48
-hours is just far too long - by the time the results become available
-I've moved already on.
-
-Plus, lets not forget that kautobuild runs through every single ARM
-configuration.  linux-next only does a subset.
+diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
+index 89c22ef..18bbfa3 100644
+--- a/drivers/spi/spi_imx.c
++++ b/drivers/spi/spi_imx.c
+@@ -466,7 +466,7 @@ static int spi_imx_setup(struct spi_device *spi)
+ 	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
+ 	int gpio = spi_imx->chipselect[spi->chip_select];
+ 
+-	pr_debug("%s: mode %d, %u bpw, %d hz\n", __func__,
++	dev_dbg(&spi->dev, "%s: mode %d, %u bpw, %d hz\n", __func__,
+ 		 spi->mode, spi->bits_per_word, spi->max_speed_hz);
+ 
+ 	if (gpio >= 0)
+-- 
+1.6.3.3
