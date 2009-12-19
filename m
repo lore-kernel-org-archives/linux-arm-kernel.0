@@ -1,31 +1,20 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Sat, 19 Dec 2009 19:47:17 +0800
-Subject: [PATCH V2 1/2] arm nomadik: add hardware RNG driver
-In-Reply-To: <20091205185646.GQ8789@waste.org>
-References: <376a2243795aadfb87c8a7f5ea039.1260011962.git.rubini@unipv.it>
-	<20091205185646.GQ8789@waste.org>
-Message-ID: <20091219114717.GA23282@gondor.apana.org.au>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 19 Dec 2009 13:07:29 +0000
+Subject: [PATCH] ARM: NUC900: Add cpufreq driver for nuc900 CPUs
+In-Reply-To: <8fb2581d0912132329k1b1a52c8sdabfc4af3266c1e5@mail.gmail.com>
+References: <8fb2581d0912132329k1b1a52c8sdabfc4af3266c1e5@mail.gmail.com>
+Message-ID: <20091219130729.GA1699@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 05, 2009 at 12:56:46PM -0600, Matt Mackall wrote:
-> On Sat, Dec 05, 2009 at 12:31:28PM +0100, Alessandro Rubini wrote:
-> > From: Alessandro Rubini <rubini@unipv.it>
-> > 
-> > The hardware random number generator by ST is used in both the Nomadik
-> > 8815 SoC and the U8500. It returns 16 bits every 400ns with automatic
-> > delay if a read is issued too early. It depends on PLAT_NOMADIK.
-> > 
-> > Signed-off-by: Alessandro Rubini <rubini@unipv.it>
-> > Acked-by: Andrea Gallo <andrea.gallo@stericsson.com>
-> 
-> Looks good to me.
-> 
-> Acked-by: Matt Mackall <mpm@selenic.com>
+On Mon, Dec 14, 2009 at 03:29:42PM +0800, Li Jie wrote:
+> +#include <linux/kernel.h>
+> +#include <linux/types.h>
+> +#include <linux/init.h>
+> +#include <linux/cpufreq.h>
+> +#include <linux/clk.h>
+> +#include <linux/err.h>
+> +
+> +#include <asm/io.h>
 
-Both patches applied to cryptodev.  Thanks a lot!
--- 
-Visit Openswan at http://www.openswan.org/
-Email: Herbert Xu ~{PmV>HI~} <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+I'm still on my crusade against this.  linux/io.h please.
