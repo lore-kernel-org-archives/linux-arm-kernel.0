@@ -1,42 +1,43 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Sat, 19 Dec 2009 11:17:31 +1300
-Subject: [PATCH] ARM: Fix a race in the vfp_notifier() function on SMP
-	systems
-In-Reply-To: <20091218144728.GC32481@n2100.arm.linux.org.uk>
-References: <20091218134423.21279.93962.stgit@pc1117.cambridge.arm.com>
-	<20091218141100.GA32481@n2100.arm.linux.org.uk>
-	<20091218142503.GB32481@n2100.arm.linux.org.uk>
-	<20091218144728.GC32481@n2100.arm.linux.org.uk>
-Message-ID: <4B2BFF7B.7070808@bluewatersys.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 18 Dec 2009 19:46:06 -0800
+Subject: [PATCH 2/5] arm: Fix cpu_proc_fin() for proc-v7.S and make kexec work
+In-Reply-To: <20091219034151.26198.26570.stgit@localhost>
+References: <20091219034151.26198.26570.stgit@localhost>
+Message-ID: <20091219034606.26198.9336.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Fri, Dec 18, 2009 at 02:25:03PM +0000, Russell King - ARM Linux wrote:
->> On Fri, Dec 18, 2009 at 02:11:00PM +0000, Russell King - ARM Linux wrote:
->>> On Fri, Dec 18, 2009 at 01:45:09PM +0000, Catalin Marinas wrote:
->>>> 	(patch updated following Russell's changes to vfpmodule.c)
->>>>
->>>> The vfp_notifier(THREAD_NOTIFY_RELEASE) maybe be called with thread->cpu
->>>> different from the current one, causing a race condition with both the
->>>> THREAD_NOTIFY_SWITCH path and vfp_support_entry().
->>> How about we provide THREAD_NOTIFY_EXIT and call these hooks from
->>> exit_thread() - we'll be calling the notifier when the thread is
->>> still running, and so thread->cpu will be the local CPU.
->>>
->>> This should be much safer all round, and give much simpler semantics
->>> if we NULL out the current CPU's last_VFP_context pointer.  It also
->>> means that each CPUs last_VFP_context pointer is only ever accessed
->>> from the local CPU, which can only be a good thing.
->> Something like this:
-> 
-> Actually, I think we should go further and kill off THREAD_NOTIFY_RELEASE
-> completely.  Added a few more people because EP93xx and PXA (well,
-> Xscale) is now impacted by this change.
+The comments in arm_machine_restart() suggest that cpu_proc_fin()
+will clean and disable cache and turn off interrupts. This does
+not seem to be implemented for proc-v7.S, implement it the same
+way as for proc-v6.S.
 
-Hi Russell,
+This also makes kexec work for v7. Note that a related TLB and
+branch traget flush patch is also needed to avoid kexec
+"crc error".
 
-I haven't been following this discussion. Can you explain how I can test
-to see if this works correctly, and I'll try and find some time to run it.
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mm/proc-v7.S |    9 ++++++++-
+ 1 files changed, 8 insertions(+), 1 deletions(-)
 
-~Ryan
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 3a28521..d2a8074 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -45,7 +45,14 @@ ENTRY(cpu_v7_proc_init)
+ ENDPROC(cpu_v7_proc_init)
+ 
+ ENTRY(cpu_v7_proc_fin)
+-	mov	pc, lr
++	stmfd	sp!, {lr}
++	cpsid	if				@ disable interrupts
++	bl	v7_flush_kern_cache_all
++	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
++	bic	r0, r0, #0x1000			@ ...i............
++	bic	r0, r0, #0x0006			@ .............ca.
++	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
++	ldmfd	sp!, {pc}
+ ENDPROC(cpu_v7_proc_fin)
+ 
+ /*
