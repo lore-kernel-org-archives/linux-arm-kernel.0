@@ -1,36 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 19 Dec 2009 10:44:18 -0800
-Subject: [PATCH 4/5] arm: Fix init_atags_procfs() to check tag->hdr.size
-In-Reply-To: <20091219174428.GA11397@atomide.com>
-References: <20091219034151.26198.26570.stgit@localhost>
-	<20091219034630.26198.35713.stgit@localhost>
-	<20091219090332.GA28047@n2100.arm.linux.org.uk>
-	<20091219174428.GA11397@atomide.com>
-Message-ID: <20091219184418.GD11397@atomide.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 19 Dec 2009 21:18:17 +0100
+Subject: [PATCH 2/4] mfd: mc13783: When probing, unlock the mc13783
+	before subsystems initialisation.
+In-Reply-To: <1261152746.3356.72.camel@climbing-alby>
+References: <1260808880.2022.98.camel@climbing-alby>
+	<1260810776.2022.130.camel@climbing-alby>
+	<1260811085.2022.135.camel@climbing-alby>
+	<1261152746.3356.72.camel@climbing-alby>
+Message-ID: <20091219201816.GA28742@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [091219 09:43]:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [091219 01:02]:
-> > On Fri, Dec 18, 2009 at 07:46:30PM -0800, Tony Lindgren wrote:
-> > > The tag->hdr.size cannot be larger than XXX.
-> > > Otherwise we can getsomething similar during boot:
-> > > 
-> > > Unable to handle kernel paging request at virtual address 61a05020
-> > > ...
-> > 
-> > NAK.
-> > 
-> > Why can't people get the simple ATAG setup right?  Fix the boot loader.
-> 
-> In this case why can't the kernel get ATAG setup right?
-> 
-> This only happens when kexec rebooting multiple times in a row.
-> 
-> Sounds like something is not memset/kzalloc'd somewhere?
+Hello,
 
-Heh. I can't reproduce this any longer. I bet it was caused by
-the bug in my earlier reboot script that kept appending another
-root= to the cmdline every reboot :)
+On Fri, Dec 18, 2009 at 05:12:26PM +0100, Alberto Panizzo wrote:
+> Ping :)
+> 
+> PATCH 1 & 2 are fixes that can go to .33
+I don't like patch 1.  I'd prefer that drivers touching
+MC13783_REG_POWER_MISCELLANEOUS are aware of the bit in question and
+wouldn't rely on mc13783-core.
 
-Tony
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
