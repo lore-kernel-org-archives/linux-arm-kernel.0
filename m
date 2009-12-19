@@ -1,29 +1,65 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 19 Dec 2009 21:18:17 +0100
-Subject: [PATCH 2/4] mfd: mc13783: When probing, unlock the mc13783
-	before subsystems initialisation.
-In-Reply-To: <1261152746.3356.72.camel@climbing-alby>
-References: <1260808880.2022.98.camel@climbing-alby>
-	<1260810776.2022.130.camel@climbing-alby>
-	<1260811085.2022.135.camel@climbing-alby>
-	<1261152746.3356.72.camel@climbing-alby>
-Message-ID: <20091219201816.GA28742@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Sat, 19 Dec 2009 21:18:40 +0100
+Subject: [PATCH 1/2] imx/mx3: fix FTBFS for undefined symbols mx31_usbh1 and
+	mx31_usbh2
+Message-ID: <1261253921-29125-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Use the symbols mxc_usbh1 and mxc_usbh2 introduced in
 
-On Fri, Dec 18, 2009 at 05:12:26PM +0100, Alberto Panizzo wrote:
-> Ping :)
-> 
-> PATCH 1 & 2 are fixes that can go to .33
-I don't like patch 1.  I'd prefer that drivers touching
-MC13783_REG_POWER_MISCELLANEOUS are aware of the bit in question and
-wouldn't rely on mc13783-core.
+	c13a482 (MX3: Add USB platform devices and resources)
 
-Best regards
-Uwe
+instead.
 
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Valentin Longchamp <valentin.longchamp@epfl.ch>
+Cc: Daniel Mack <daniel@caiaq.de>
+---
+ arch/arm/mach-mx3/mach-mx31moboard.c     |    2 +-
+ arch/arm/mach-mx3/mx31moboard-devboard.c |    2 +-
+ arch/arm/mach-mx3/mx31moboard-marxbot.c  |    2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-mx3/mach-mx31moboard.c b/arch/arm/mach-mx3/mach-mx31moboard.c
+index be7d277..949b4de 100644
+--- a/arch/arm/mach-mx3/mach-mx31moboard.c
++++ b/arch/arm/mach-mx3/mach-mx31moboard.c
+@@ -392,7 +392,7 @@ static int __init moboard_usbh2_init(void)
+ 	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
+ 			USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
+ 
+-	return mxc_register_device(&mx31_usbh2, &usbh2_pdata);
++	return mxc_register_device(&mxc_usbh2, &usbh2_pdata);
+ }
+ 
+ 
+diff --git a/arch/arm/mach-mx3/mx31moboard-devboard.c b/arch/arm/mach-mx3/mx31moboard-devboard.c
+index 8fc624f..438428e 100644
+--- a/arch/arm/mach-mx3/mx31moboard-devboard.c
++++ b/arch/arm/mach-mx3/mx31moboard-devboard.c
+@@ -179,7 +179,7 @@ static int __init devboard_usbh1_init(void)
+ 
+ 	usbh1_pdata.otg = otg;
+ 
+-	return mxc_register_device(&mx31_usbh1, &usbh1_pdata);
++	return mxc_register_device(&mxc_usbh1, &usbh1_pdata);
+ }
+ 
+ /*
+diff --git a/arch/arm/mach-mx3/mx31moboard-marxbot.c b/arch/arm/mach-mx3/mx31moboard-marxbot.c
+index 85184a3..1f44b9c 100644
+--- a/arch/arm/mach-mx3/mx31moboard-marxbot.c
++++ b/arch/arm/mach-mx3/mx31moboard-marxbot.c
+@@ -294,7 +294,7 @@ static int __init marxbot_usbh1_init(void)
+ 
+ 	usbh1_pdata.otg = otg;
+ 
+-	return mxc_register_device(&mx31_usbh1, &usbh1_pdata);
++	return mxc_register_device(&mxc_usbh1, &usbh1_pdata);
+ }
+ 
+ /*
 -- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+1.6.5.2
