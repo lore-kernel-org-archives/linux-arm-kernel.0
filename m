@@ -1,20 +1,24 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 19 Dec 2009 09:03:32 +0000
-Subject: [PATCH 4/5] arm: Fix init_atags_procfs() to check tag->hdr.size
-In-Reply-To: <20091219034630.26198.35713.stgit@localhost>
+Date: Sat, 19 Dec 2009 09:06:07 +0000
+Subject: [PATCH 3/5] arm: Flush TLB entries in setup_mm_for_reboot()
+In-Reply-To: <20091219034619.26198.58992.stgit@localhost>
 References: <20091219034151.26198.26570.stgit@localhost>
-	<20091219034630.26198.35713.stgit@localhost>
-Message-ID: <20091219090332.GA28047@n2100.arm.linux.org.uk>
+	<20091219034619.26198.58992.stgit@localhost>
+Message-ID: <20091219090607.GB28047@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2009 at 07:46:30PM -0800, Tony Lindgren wrote:
-> The tag->hdr.size cannot be larger than XXX.
-> Otherwise we can getsomething similar during boot:
-> 
-> Unable to handle kernel paging request at virtual address 61a05020
-> ...
+On Fri, Dec 18, 2009 at 07:46:19PM -0800, Tony Lindgren wrote:
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index 8c7fbd1..a2802ea 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -1068,4 +1068,7 @@ void setup_mm_for_reboot(char mode)
+>  		pmd[1] = __pmd(pmdval + (1 << (PGDIR_SHIFT - 1)));
+>  		flush_pmd_entry(pmd);
+>  	}
+> +
+> +	local_flush_tlb_all();
+> +	flush_cache_all();
 
-NAK.
-
-Why can't people get the simple ATAG setup right?  Fix the boot loader.
+The cache flush is unnecessary.  The caches should be off at this point.
