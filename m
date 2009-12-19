@@ -1,58 +1,58 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Dec 2009 19:46:44 -0800
-Subject: [PATCH 5/5] arm: Fix typo in cacheflush.h and remove unnecessary
-	comments
-In-Reply-To: <20091219034151.26198.26570.stgit@localhost>
-References: <20091219034151.26198.26570.stgit@localhost>
-Message-ID: <20091219034644.26198.28856.stgit@localhost>
+Date: Fri, 18 Dec 2009 19:45:41 -0800
+Subject: [PATCH 0/5] V7/Cortex/omap34xx fixes for 2.6.33-rc1: DCC, kexec, atags
+Message-ID: <20091219034151.26198.26570.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While dealing with the kexec fixes, I noticed these.
+Hi all,
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+Here are some v7 fixes, mostly to make kexec work.
+
+Using 2.6.33-rc1, these fixes, and kexec from kexec-tools
+git repo, I can reboot my n900 in a loop reliably.
+
+To clarify, this works booting 2.6.33-rc1 in a loop, booting
+the Maemo kernel with kexec does not seem to boot very far
+at all for some reason. I'll look into that next.
+
+FYI, if anybody wants to play with it, I used something
+like this for kexec:
+
+#!/bin/sh
+
+./kexec -l zImage --command-line="$(cat /proc/cmdline)"
+sync
+kexec -e
+
+Regards,
+
+Tony
+
+
 ---
- arch/arm/include/asm/cacheflush.h |    2 +-
- arch/arm/mm/proc-v6.S             |    2 --
- arch/arm/mm/proc-v7.S             |    2 --
- 3 files changed, 1 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index 730aefc..e9fb1d3 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -154,7 +154,7 @@
-  *	Please note that the implementation of these, and the required
-  *	effects are cache-type (VIVT/VIPT/PIPT) specific.
-  *
-- *	flush_cache_kern_all()
-+ *	flush_cache_all()
-  *
-  *		Unconditionally clean and invalidate the entire cache.
-  *
-diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
-index 395cc90..7a5337e 100644
---- a/arch/arm/mm/proc-v6.S
-+++ b/arch/arm/mm/proc-v6.S
-@@ -59,8 +59,6 @@ ENTRY(cpu_v6_proc_fin)
-  *	to what would be the reset vector.
-  *
-  *	- loc   - location to jump to for soft reset
-- *
-- *	It is assumed that:
-  */
- 	.align	5
- ENTRY(cpu_v6_reset)
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index d2a8074..7aaf88a 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -63,8 +63,6 @@ ENDPROC(cpu_v7_proc_fin)
-  *	to what would be the reset vector.
-  *
-  *	- loc   - location to jump to for soft reset
-- *
-- *	It is assumed that:
-  */
- 	.align	5
- ENTRY(cpu_v7_reset)
+Tony Lindgren (5):
+      arm: Fix DCC console for v7
+      arm: Fix cpu_proc_fin() for proc-v7.S and make kexec work
+      arm: Flush TLB entries in setup_mm_for_reboot()
+      arm: Fix init_atags_procfs() to check tag->hdr.size
+      arm: Fix typo in cacheflush.h and remove unnecessary comments
+
+
+ arch/arm/boot/compressed/head.S   |    8 ++++++++
+ arch/arm/boot/compressed/misc.c   |   12 ++++++++++++
+ arch/arm/include/asm/cacheflush.h |    2 +-
+ arch/arm/include/asm/setup.h      |   12 +++++++++---
+ arch/arm/kernel/atags.c           |    2 +-
+ arch/arm/kernel/compat.c          |    2 +-
+ arch/arm/kernel/debug.S           |   20 ++++++++++++++++++++
+ arch/arm/kernel/setup.c           |    4 ++--
+ arch/arm/mach-orion5x/common.c    |    2 +-
+ arch/arm/mm/mmu.c                 |    3 +++
+ arch/arm/mm/proc-v6.S             |    2 --
+ arch/arm/mm/proc-v7.S             |   11 ++++++++---
+ 12 files changed, 66 insertions(+), 14 deletions(-)
+
+-- 
+Signature
