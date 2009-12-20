@@ -1,58 +1,41 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 20 Dec 2009 20:51:44 +0100
-Subject: shared memory problem on ARM v5TE using threads
-In-Reply-To: <alpine.LFD.2.00.0912181358580.28241@xanadu.home>
-References: <309002C0DA137042828828FC53D7A9347E212D150D@IL-MB01.marvell.com>
-	<20091207145235.GD19348@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0912071027480.31174@xanadu.home>
-	<20091207170546.GB26821@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0912071219100.31174@xanadu.home>
-	<20091207175608.GE26821@n2100.arm.linux.org.uk>
-	<309002C0DA137042828828FC53D7A9347E2630EEC2@IL-MB01.marvell.com>
-	<20091213120033.GA10698@n2100.arm.linux.org.uk>
-	<20091218184518.GE1470@ucw.cz>
-	<alpine.LFD.2.00.0912181358580.28241@xanadu.home>
-Message-ID: <20091220195143.GE23917@elf.ucw.cz>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Sun, 20 Dec 2009 20:32:27 +0100
+Subject: [CFT:PATCH] Remove a seemingly unnecessary cache flush
+In-Reply-To: <19238.11361.430323.182240@pilspetsen.it.uu.se>
+References: <20091207221210.GI26821@n2100.arm.linux.org.uk>
+	<20091210104037.GC6207@n2100.arm.linux.org.uk>
+	<19238.9843.212077.875686@pilspetsen.it.uu.se>
+	<20091214115318.GA12207@n2100.arm.linux.org.uk>
+	<19238.11361.430323.182240@pilspetsen.it.uu.se>
+Message-ID: <19246.31691.590625.218114@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2009-12-18 14:00:13, Nicolas Pitre wrote:
-> On Fri, 18 Dec 2009, Pavel Machek wrote:
-> 
-> > On Sun 2009-12-13 12:00:33, Russell King - ARM Linux wrote:
-> > > On Sun, Dec 13, 2009 at 01:48:48PM +0200, Ronen Shitrit wrote:
-> > > > Another idea is to change the shared mapping handling, in case of vivt with pipt L2, so it won't remap the shared area as non-cacheable:
-> > > > - make_coherent won't use adjust_pte and leave only the regular flush.
-> > > > - Flush L1 for all context switches, also for the case that the new process is using same mm (thread context switch).
-> > > 
-> > > That doesn't work.
-> > > 
-> > > Well, with a VIVT L1, we flush the L1 on all MM switches anyway.
-> > > Flushing it on any thread switch is not going to help that much.
-> > > 
-> > > The problem with shared mmaps is that if you have multiple within the
-> > > same thread, it is required that they are _all_ coherent with respect
-> > > to each other, whether or not a context switch has occurred.
-> > 
-> > But that's pretty unusual situation, right?
-> > 
-> > So what about...
-> > 
-> > a) flush L2 on context switch
-> 
-> No.  This is too big a performance killer.
+Mikael Pettersson writes:
+ > Russell King - ARM Linux writes:
+ >  > On Mon, Dec 14, 2009 at 12:50:11PM +0100, Mikael Pettersson wrote:
+ >  > > Russell King - ARM Linux writes:
+ >  > >  > On Mon, Dec 07, 2009 at 10:12:10PM +0000, Russell King - ARM Linux wrote:
+ >  > >  > > While looking into the possible msync() issue (which turned out to be a
+ >  > >  > > non-issue - it's covered by clever code), I found that we're flushing
+ >  > >  > > the same page multiple times.
+ >  > >  > 
+ >  > >  > I'm going to queue this patch up today since I believe it is correct,
+ >  > >  > though it would be nice to have a few more people test it on pre-ARMv6
+ >  > >  > hardware.
+ >  > > 
+ >  > > Tested here with gcc and glibc builds and testsuite runs on IXP420,
+ >  > > IOP80219, and Kirkwood (Feroceon?), all ARMv5TE. No signs of problems.
+ >  > 
+ >  > Do the builds appear to be any faster?
+ > 
+ > I didn't record how long it took because I was mainly interested in
+ > the correctness aspect. I can do a pair of properly measured gcc
+ > builds on the fastest machine next weekend.
 
-Eek?
+On my Kirkwood (1.2GHz QNAP TS-119) the time to do a gcc-4.4 bootstrap
+(all default languages) and testsuite run is 87561 seconds with a
+vanilla 2.6.32 kernel and 86719 seconds when this patch is applied.
+That's a 1% improvement.
 
-Alternative is "disable L2". I guess "use L2, but flush it
-occasionally" is still better than "disable L2".
-
-Of course, it should be measured. It looks like hardware already is
-braindead, so maybe logic does not work there.
-
-(And it may depend if you want max throughput or min latency).
-									Pavel
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Tested-by: Mikael Pettersson <mikpe@it.uu.se>
