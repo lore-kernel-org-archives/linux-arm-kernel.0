@@ -1,40 +1,41 @@
 From: mike@compulab.co.il (Mike Rapoport)
-Date: Sun, 20 Dec 2009 10:18:31 +0200
-Subject: [PATCH] ARM: dmabounce: fix build
-Message-ID: <4B2DDDD7.9030500@compulab.co.il>
+Date: Sun, 20 Dec 2009 10:33:50 +0200
+Subject: [PATCH] ARM: fix arch/arm/mm/copypage-v6.c build
+Message-ID: <4B2DE16E.4050708@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit f74f7e57ae9fa12b2951ae62ce3557799b318399 (ARM: use
-flush_kernel_dcache_area() for dmabounce) has broken dmabounce build:
+Commit 115b22474eb1905da2f606a057da3455833333d3 (ARM: 5794/1: Flush the
+D-cache during copy_user_highpage()) breaks build for ARM v7:
 
-  CC      arch/arm/common/dmabounce.o
-arch/arm/common/dmabounce.c: In function 'unmap_single':
-arch/arm/common/dmabounce.c:315: error: implicit declaration of function '__cpuc_flush_kernel_dcache_area'
-make[2]: *** [arch/arm/common/dmabounce.o] Error 1
+  CC      arch/arm/mm/copypage-v6.o
+arch/arm/mm/copypage-v6.c: In function'v6_copy_user_highpage_nonaliasing':
+arch/arm/mm/copypage-v6.c:51: error: implicit declaration of function '__cpuc_flush_dcache_page'
+make[2]: *** [arch/arm/mm/copypage-v6.o] Error 1
 
 Fix it.
 
 Signed-off-by: Mike Rapoport <mike@compulab.co.il>
 ---
- arch/arm/common/dmabounce.c |    2 +-
+ arch/arm/mm/copypage-v6.c |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
-index bc90364..cc32c1e 100644
---- a/arch/arm/common/dmabounce.c
-+++ b/arch/arm/common/dmabounce.c
-@@ -312,7 +312,7 @@ static inline void unmap_single(struct device *dev, dma_addr_t dma_addr,
- 			 * we need to ensure that the data will be coherent
- 			 * with user mappings.
- 			 */
--			__cpuc_flush_kernel_dcache_area(ptr, size);
-+			__cpuc_flush_dcache_area(ptr, size);
- 		}
- 		free_safe_buffer(dev->archdata.dmabounce, buf);
- 	}
+diff --git a/arch/arm/mm/copypage-v6.c b/arch/arm/mm/copypage-v6.c
+index 841f355..0fa1319 100644
+--- a/arch/arm/mm/copypage-v6.c
++++ b/arch/arm/mm/copypage-v6.c
+@@ -48,7 +48,7 @@ static void v6_copy_user_highpage_nonaliasing(struct page *to,
+ 	 */
+ 	if (page_address(to) != NULL)
+ #endif
+-		__cpuc_flush_dcache_page(kto);
++		__cpuc_flush_dcache_area(kto, PAGE_SIZE);
+ 	kunmap_atomic(kto, KM_USER1);
+ 	kunmap_atomic(kfrom, KM_USER0);
+ }
 -- 
-1.6.0.6
+1.6.4.4
+
 
 
 -- 
