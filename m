@@ -1,71 +1,97 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sun, 20 Dec 2009 17:32:08 -0500 (EST)
-Subject: shared memory problem on ARM v5TE using threads
-In-Reply-To: <20091220195143.GE23917@elf.ucw.cz>
-References: <309002C0DA137042828828FC53D7A9347E212D150D@IL-MB01.marvell.com>
-	<20091207145235.GD19348@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0912071027480.31174@xanadu.home>
-	<20091207170546.GB26821@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.0912071219100.31174@xanadu.home>
-	<20091207175608.GE26821@n2100.arm.linux.org.uk>
-	<309002C0DA137042828828FC53D7A9347E2630EEC2@IL-MB01.marvell.com>
-	<20091213120033.GA10698@n2100.arm.linux.org.uk>
-	<20091218184518.GE1470@ucw.cz>
-	<alpine.LFD.2.00.0912181358580.28241@xanadu.home>
-	<20091220195143.GE23917@elf.ucw.cz>
-Message-ID: <alpine.LFD.2.00.0912201727210.28241@xanadu.home>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Sun, 20 Dec 2009 23:50:01 +0100
+Subject: [PATCH 2/4] mfd: mc13783: When probing, unlock the mc13783
+	before subsystems initialisation.
+In-Reply-To: <20091220184941.GA13294@pengutronix.de>
+References: <1260808880.2022.98.camel@climbing-alby>
+	<1260810776.2022.130.camel@climbing-alby>
+	<1260811085.2022.135.camel@climbing-alby>
+	<1261152746.3356.72.camel@climbing-alby>
+	<20091219201816.GA28742@pengutronix.de>
+	<1261316918.5224.15.camel@climbing-alby>
+	<20091220184941.GA13294@pengutronix.de>
+Message-ID: <1261349401.5224.154.camel@climbing-alby>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 20 Dec 2009, Pavel Machek wrote:
+Hi Uwe,
 
-> On Fri 2009-12-18 14:00:13, Nicolas Pitre wrote:
-> > On Fri, 18 Dec 2009, Pavel Machek wrote:
+Il giorno dom, 20/12/2009 alle 19.49 +0100, Uwe Kleine-K?nig ha scritto:
+> Hi Alberto,
+> 
+> On Sun, Dec 20, 2009 at 02:48:38PM +0100, Alberto Panizzo wrote:
+> > > > PATCH 1 & 2 are fixes that can go to .33
+> > > I don't like patch 1.  I'd prefer that drivers touching
+> > > MC13783_REG_POWER_MISCELLANEOUS are aware of the bit in question and
+> > > wouldn't rely on mc13783-core.
 > > 
-> > > On Sun 2009-12-13 12:00:33, Russell King - ARM Linux wrote:
-> > > > On Sun, Dec 13, 2009 at 01:48:48PM +0200, Ronen Shitrit wrote:
-> > > > > Another idea is to change the shared mapping handling, in case of vivt with pipt L2, so it won't remap the shared area as non-cacheable:
-> > > > > - make_coherent won't use adjust_pte and leave only the regular flush.
-> > > > > - Flush L1 for all context switches, also for the case that the new process is using same mm (thread context switch).
-> > > > 
-> > > > That doesn't work.
-> > > > 
-> > > > Well, with a VIVT L1, we flush the L1 on all MM switches anyway.
-> > > > Flushing it on any thread switch is not going to help that much.
-> > > > 
-> > > > The problem with shared mmaps is that if you have multiple within the
-> > > > same thread, it is required that they are _all_ coherent with respect
-> > > > to each other, whether or not a context switch has occurred.
-> > > 
-> > > But that's pretty unusual situation, right?
-> > > 
-> > > So what about...
-> > > 
-> > > a) flush L2 on context switch
-> > 
-> > No.  This is too big a performance killer.
+> > Yes, but MC13783_REG_POWER_MISCELLANEOUS contains bit that control
+> > different aspect of mc13783 chip.
+> > GPO are regulator related, but those two bits in question maybe 
+> > apply to a power management driver, so this problem is a matter
+> > of mc13783-core.
+> maybe?
+>  
+> > Another possible solution, is to trace the writings to those two bits
+> > in mc13783_reg_rmw storing the value written an reproducing it in next
+> > mc13783_reg_rmw calls.
+> > But the problem for this is that we don't know if the bootloader 
+> > had initialised those with another non default value.
+> > Another problem is that if another driver make use of 
+> > mc13783_reg_write for modifying those bits, the state stored will
+> > be inconsistent.
+> The next best thing I would consider acceptable are dedicated functions
+> for MC13783_REG_POWER_MISCELLANEOUS.  I havn't checked what the register
+> in question is used for, but I think the bootloader isn't generally a
+> problem as Linux shouldn't rely on things setup by the bootloader (apart
+> from the things described in
+> http://www.arm.linux.org.uk/developer/booting.php of course).  And I
+> don't see a problem for in-kernel users of mc13783_reg_write to modify
+> the register.  If the mc13783-API is changed that
+> MC13783_REG_POWER_MISCELLANEOUS must only be modified by using (say)
+> mc13783_powermisc_rmw() it's a (probably uncatched) bug to use
+> mc13783_reg_write.
+
+Thanks for your point of view. What I proposed is a functionality cut
+for mc13783 and I understand this.
+
+MC13783_REG_POWER_MISCELLANEOUS contain configuration bits for GPO's
+(two bits for everyone: "Enable" and "Controlled by Standby")
+those two Power Gates Enable and VIBPINCTRL that behave the same as the
+two Power Gates Enable.
+
+GPO's are considered as regulators by the present driver in the term 
+that they are thought to be used as external power supplies controllers.
+
+Power Gates behave light different: PWGTnDRV are digital output 
+controlled by hardware pins (PWGTnEN) and enabled (the hardware control)
+by those two bits.
+
+In this sense, can they be considered digital regulators too?
+
+If yes, they can be controlled in the regulator driver and there can
+be written a new mc13783_regulator_powermisc_rmw() function.
+
+In the i.MX31 PDK board PWGT1DRV controls the MCU power supply and
+PWGT2DRV control the L2 cache power supply. PWGTnEN are connected
+to the corresponding i.MX31 Power Management interface outputs
+in this way, in power saving mode, voltage for MCU is lowered at the
+minimum and L2 cache is turned off.
+
 > 
-> Eek?
+> And patch 1 is definitly *not* material for .33, as there is currently
+> no user of MC13783_REG_POWER_MISCELLANEOUS in .33-rc1, so there is
+> nothing to fix.
 > 
-> Alternative is "disable L2". I guess "use L2, but flush it
-> occasionally" is still better than "disable L2".
-> 
-> Of course, it should be measured. It looks like hardware already is
-> braindead, so maybe logic does not work there.
-> 
-> (And it may depend if you want max throughput or min latency).
+> Best regards
+> Uwe
 
-Do you own such hardware?
+You are right, there is no directly user, what I thought to fix is
+the capability to enable / disable GPOs in the mc13783 that is a 
+existent functionality for the present .33 regulator driver.
 
-If no, why do you care?
+I must make much familiarity with the kernel developing process.
 
-Do you really have something constructive to add to this thread besides 
-"hardware is braindead" or other worthless speculations about some issue 
-for which you apparently don't know whit about?
-
-For your information, a patch has been proposed already which does not 
-imply disabling L2 nor flushing it on every context switches.  Would you 
-care to familiarize yourself with it before commenting further please?
-
-
-Nicolas
+Thanks a lot!
+Best regards
+Alberto!
