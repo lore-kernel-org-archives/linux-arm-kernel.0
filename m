@@ -1,39 +1,42 @@
-From: cd2436@columbia.edu (Christoffer Dall)
-Date: Sun, 20 Dec 2009 01:00:43 -0500
-Subject: Early pl011 console for debugging KVM for ARM port
-In-Reply-To: <20091217040232.GB2621@tarshish>
-References: <7d08b87d0912161725h424dc1c3s3c219f7138d61208@mail.gmail.com>
-	<20091217040232.GB2621@tarshish>
-Message-ID: <7d08b87d0912192200p17d319cbia2256db906acb210@mail.gmail.com>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Sun, 20 Dec 2009 10:18:31 +0200
+Subject: [PATCH] ARM: dmabounce: fix build
+Message-ID: <4B2DDDD7.9030500@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch.
+Commit f74f7e57ae9fa12b2951ae62ce3557799b318399 (ARM: use
+flush_kernel_dcache_area() for dmabounce) has broken dmabounce build:
 
-Got side tracked for a few days.
+  CC      arch/arm/common/dmabounce.o
+arch/arm/common/dmabounce.c: In function 'unmap_single':
+arch/arm/common/dmabounce.c:315: error: implicit declaration of function '__cpuc_flush_kernel_dcache_area'
+make[2]: *** [arch/arm/common/dmabounce.o] Error 1
 
-Thanks a lot. It works like a charm. I now know that the error happens
-in different places on each execution, and I'm debugging that now.
+Fix it.
 
-Best,
-Christoffer
+Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+---
+ arch/arm/common/dmabounce.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-On Wed, Dec 16, 2009 at 11:02 PM, Baruch Siach <baruch@tkos.co.il> wrote:
-> Hi Christoffer,
->
-> On Wed, Dec 16, 2009 at 08:25:29PM -0500, Christoffer Dall wrote:
->> Does anyone know how to enable such a console earlier?
->
-> The early_printk commit, which has recently been merged to the mainline, may
-> help you. See commit 93fd03a8c6728b58879f8af20ffd55d9c32a778b and the link
-> below.
->
-> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commitdiff;h=93fd03a8c6728b58879f8af20ffd55d9c32a778b
->
-> baruch
->
-> --
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ~. .~ ? Tk Open Systems
-> =}------------------------------------------------ooO--U--Ooo------------{=
-> ? - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
->
+diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
+index bc90364..cc32c1e 100644
+--- a/arch/arm/common/dmabounce.c
++++ b/arch/arm/common/dmabounce.c
+@@ -312,7 +312,7 @@ static inline void unmap_single(struct device *dev, dma_addr_t dma_addr,
+ 			 * we need to ensure that the data will be coherent
+ 			 * with user mappings.
+ 			 */
+-			__cpuc_flush_kernel_dcache_area(ptr, size);
++			__cpuc_flush_dcache_area(ptr, size);
+ 		}
+ 		free_safe_buffer(dev->archdata.dmabounce, buf);
+ 	}
+-- 
+1.6.0.6
+
+
+-- 
+Sincerely yours,
+Mike.
