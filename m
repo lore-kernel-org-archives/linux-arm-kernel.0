@@ -1,37 +1,71 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Sun, 20 Dec 2009 22:10:34 +0100
-Subject: [PATCH] pcmcia/at91_cf: don't redefine SZ_2K
-Message-ID: <1261343434-3920-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sun, 20 Dec 2009 17:32:08 -0500 (EST)
+Subject: shared memory problem on ARM v5TE using threads
+In-Reply-To: <20091220195143.GE23917@elf.ucw.cz>
+References: <309002C0DA137042828828FC53D7A9347E212D150D@IL-MB01.marvell.com>
+	<20091207145235.GD19348@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.0912071027480.31174@xanadu.home>
+	<20091207170546.GB26821@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.0912071219100.31174@xanadu.home>
+	<20091207175608.GE26821@n2100.arm.linux.org.uk>
+	<309002C0DA137042828828FC53D7A9347E2630EEC2@IL-MB01.marvell.com>
+	<20091213120033.GA10698@n2100.arm.linux.org.uk>
+	<20091218184518.GE1470@ucw.cz>
+	<alpine.LFD.2.00.0912181358580.28241@xanadu.home>
+	<20091220195143.GE23917@elf.ucw.cz>
+Message-ID: <alpine.LFD.2.00.0912201727210.28241@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes:
+On Sun, 20 Dec 2009, Pavel Machek wrote:
 
-	drivers/pcmcia/at91_cf.c:55:1: warning: "SZ_2K" redefined
+> On Fri 2009-12-18 14:00:13, Nicolas Pitre wrote:
+> > On Fri, 18 Dec 2009, Pavel Machek wrote:
+> > 
+> > > On Sun 2009-12-13 12:00:33, Russell King - ARM Linux wrote:
+> > > > On Sun, Dec 13, 2009 at 01:48:48PM +0200, Ronen Shitrit wrote:
+> > > > > Another idea is to change the shared mapping handling, in case of vivt with pipt L2, so it won't remap the shared area as non-cacheable:
+> > > > > - make_coherent won't use adjust_pte and leave only the regular flush.
+> > > > > - Flush L1 for all context switches, also for the case that the new process is using same mm (thread context switch).
+> > > > 
+> > > > That doesn't work.
+> > > > 
+> > > > Well, with a VIVT L1, we flush the L1 on all MM switches anyway.
+> > > > Flushing it on any thread switch is not going to help that much.
+> > > > 
+> > > > The problem with shared mmaps is that if you have multiple within the
+> > > > same thread, it is required that they are _all_ coherent with respect
+> > > > to each other, whether or not a context switch has occurred.
+> > > 
+> > > But that's pretty unusual situation, right?
+> > > 
+> > > So what about...
+> > > 
+> > > a) flush L2 on context switch
+> > 
+> > No.  This is too big a performance killer.
+> 
+> Eek?
+> 
+> Alternative is "disable L2". I guess "use L2, but flush it
+> occasionally" is still better than "disable L2".
+> 
+> Of course, it should be measured. It looks like hardware already is
+> braindead, so maybe logic does not work there.
+> 
+> (And it may depend if you want max throughput or min latency).
 
-Since
+Do you own such hardware?
 
-	c1191b0 ([ARM] Kirkwood: create a mapping for the Security Accelerator SRAM)
+If no, why do you care?
 
-SZ_2K is defined in arch/arm/include/asm/sizes.h.
+Do you really have something constructive to add to this thread besides 
+"hardware is braindead" or other worthless speculations about some issue 
+for which you apparently don't know whit about?
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/pcmcia/at91_cf.c |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
+For your information, a patch has been proposed already which does not 
+imply disabling L2 nor flushing it on every context switches.  Would you 
+care to familiarize yourself with it before commenting further please?
 
-diff --git a/drivers/pcmcia/at91_cf.c b/drivers/pcmcia/at91_cf.c
-index e1dcced..5d22807 100644
---- a/drivers/pcmcia/at91_cf.c
-+++ b/drivers/pcmcia/at91_cf.c
-@@ -52,8 +52,6 @@ struct at91_cf_socket {
- 	unsigned long		phys_baseaddr;
- };
- 
--#define	SZ_2K			(2 * SZ_1K)
--
- static inline int at91_cf_present(struct at91_cf_socket *cf)
- {
- 	return !gpio_get_value(cf->board->det_pin);
--- 
-1.6.5.2
+
+Nicolas
