@@ -1,33 +1,51 @@
-From: jbe@pengutronix.de (Juergen Beisert)
-Date: Sun, 20 Dec 2009 14:14:22 +0100
-Subject: Using SD cards on Samsung S3C2410/S3C2440 based systems
-In-Reply-To: <4B2E2058.5070604@warmcat.com>
-References: <200912151443.59761.jbe@pengutronix.de>
-	<200912201322.23013.jbe@pengutronix.de>
-	<4B2E2058.5070604@warmcat.com>
-Message-ID: <200912201414.23560.jbe@pengutronix.de>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Sun, 20 Dec 2009 14:48:38 +0100
+Subject: [PATCH 2/4] mfd: mc13783: When probing, unlock the mc13783
+	before subsystems initialisation.
+In-Reply-To: <20091219201816.GA28742@pengutronix.de>
+References: <1260808880.2022.98.camel@climbing-alby>
+	<1260810776.2022.130.camel@climbing-alby>
+	<1260811085.2022.135.camel@climbing-alby>
+	<1261152746.3356.72.camel@climbing-alby>
+	<20091219201816.GA28742@pengutronix.de>
+Message-ID: <1261316918.5224.15.camel@climbing-alby>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+Il giorno sab, 19/12/2009 alle 21.18 +0100, Uwe Kleine-K?nig ha
+scritto: 
+> Hello,
+> 
+> On Fri, Dec 18, 2009 at 05:12:26PM +0100, Alberto Panizzo wrote:
+> > Ping :)
+> > 
+> > PATCH 1 & 2 are fixes that can go to .33
+> I don't like patch 1.  I'd prefer that drivers touching
+> MC13783_REG_POWER_MISCELLANEOUS are aware of the bit in question and
+> wouldn't rely on mc13783-core.
+> 
+> Best regards
+> Uwe
+> 
 
-On Sonntag, 20. Dezember 2009, Andy Green wrote:
-> > Yes, all signals except the clock are pulled up to +5V (10K), and a small
-> > cap to ground (don't know their values yet).
->
-> Actually, they shouldn't be pulled up to your SD Card power rail.
->
-> If 5V IS your SD Card power rail, I have some bad news for you...
+Yes, but MC13783_REG_POWER_MISCELLANEOUS contains bit that control
+different aspect of mc13783 chip.
+GPO are regulator related, but those two bits in question maybe 
+apply to a power management driver, so this problem is a matter
+of mc13783-core.
 
-Ups, sorry, my fault. The pullups are connected to 3.3V. The SD card power is 
-also 3.3V (I was confused, because there is also 5V at the main board 
-connector, but not connected to the any SD related parts).
+Another possible solution, is to trace the writings to those two bits
+in mc13783_reg_rmw storing the value written an reproducing it in next
+mc13783_reg_rmw calls.
+But the problem for this is that we don't know if the bootloader 
+had initialised those with another non default value.
+Another problem is that if another driver make use of 
+mc13783_reg_write for modifying those bits, the state stored will
+be inconsistent.
 
-Regards,
-Juergen
+And so? what kind of solution can you suggest?
 
--- 
-Pengutronix e.K.                              | Juergen Beisert             |
-Linux Solutions for Science and Industry      | Phone: +49-8766-939 228     |
-Vertretung Sued/Muenchen, Germany             | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686              | http://www.pengutronix.de/  |
+I am working to support i.MX31 PDK board that make a strong use of mc13783
+and GPO's controls important power supplies.
+
+Alberto!
