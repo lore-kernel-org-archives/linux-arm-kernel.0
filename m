@@ -1,86 +1,46 @@
-From: valentin.longchamp@epfl.ch (Valentin Longchamp)
-Date: Mon, 21 Dec 2009 15:59:28 +0100
-Subject: [PATCH 1/2] imx/mx3: fix FTBFS for undefined symbols mx31_usbh1
-	and mx31_usbh2
-In-Reply-To: <1261253921-29125-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1261253921-29125-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <4B2F8D50.60902@epfl.ch>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Mon, 21 Dec 2009 16:00:04 +0100
+Subject: [PATCH 0/2] mx31moboard for 2.6.33-rc1
+In-Reply-To: <20091221111726.GF15126@pengutronix.de>
+References: <1261156293-13981-1-git-send-email-valentin.longchamp@epfl.ch>
+	<20091221111726.GF15126@pengutronix.de>
+Message-ID: <1261407604.2144.16.camel@climbing-alby>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hallo Uwe,
-
-Uwe Kleine-K?nig wrote:
-> Use the symbols mxc_usbh1 and mxc_usbh2 introduced in
+Il giorno lun, 21/12/2009 alle 12.17 +0100, Sascha Hauer ha scritto:
+> On Fri, Dec 18, 2009 at 06:11:31PM +0100, Valentin Longchamp wrote:
+> > I have tested mx31moboard with the first -rc. Here are two patches correcting the current problems. They should go to a next -rc.
+> > 
+> > 1) The patches for usbh support were based on the bad branch, where
+> > the platform_devices had been renamed. Now this prevents the mx3
+> > config to build. The first patch reverts to the correct names.
+> > 
+> > 2) The MC13783 voltage regulators with boot_on or always_on enabled
+> > hang the kernel at boot. Remove these options from mx31moboard
+> > configuration. Sascha, is this a correct behavior or is it a bug ?
 > 
-> 	c13a482 (MX3: Add USB platform devices and resources)
+> AFAIK the boot_on indicate the regulator framework that this regulator
+> is already enabled when the kernel starts. I don't see why this makes
+> the kernel hang. Can you do a bit more debugging please?
 > 
-> instead.
-
-I have sent a patch to fix this. It was first sent on December, 4th and 
-again on December, 18th 
-(http://article.gmane.org/gmane.linux.ports.arm.kernel/71126)
-
-I hope it will be picked for next -rc.
-
-Best Regards
-
-Val
-
+> Sascha
 > 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Valentin Longchamp <valentin.longchamp@epfl.ch>
-> Cc: Daniel Mack <daniel@caiaq.de>
-> ---
->  arch/arm/mach-mx3/mach-mx31moboard.c     |    2 +-
->  arch/arm/mach-mx3/mx31moboard-devboard.c |    2 +-
->  arch/arm/mach-mx3/mx31moboard-marxbot.c  |    2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx3/mach-mx31moboard.c b/arch/arm/mach-mx3/mach-mx31moboard.c
-> index be7d277..949b4de 100644
-> --- a/arch/arm/mach-mx3/mach-mx31moboard.c
-> +++ b/arch/arm/mach-mx3/mach-mx31moboard.c
-> @@ -392,7 +392,7 @@ static int __init moboard_usbh2_init(void)
->  	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
->  			USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
->  
-> -	return mxc_register_device(&mx31_usbh2, &usbh2_pdata);
-> +	return mxc_register_device(&mxc_usbh2, &usbh2_pdata);
->  }
->  
->  
-> diff --git a/arch/arm/mach-mx3/mx31moboard-devboard.c b/arch/arm/mach-mx3/mx31moboard-devboard.c
-> index 8fc624f..438428e 100644
-> --- a/arch/arm/mach-mx3/mx31moboard-devboard.c
-> +++ b/arch/arm/mach-mx3/mx31moboard-devboard.c
-> @@ -179,7 +179,7 @@ static int __init devboard_usbh1_init(void)
->  
->  	usbh1_pdata.otg = otg;
->  
-> -	return mxc_register_device(&mx31_usbh1, &usbh1_pdata);
-> +	return mxc_register_device(&mxc_usbh1, &usbh1_pdata);
->  }
->  
->  /*
-> diff --git a/arch/arm/mach-mx3/mx31moboard-marxbot.c b/arch/arm/mach-mx3/mx31moboard-marxbot.c
-> index 85184a3..1f44b9c 100644
-> --- a/arch/arm/mach-mx3/mx31moboard-marxbot.c
-> +++ b/arch/arm/mach-mx3/mx31moboard-marxbot.c
-> @@ -294,7 +294,7 @@ static int __init marxbot_usbh1_init(void)
->  
->  	usbh1_pdata.otg = otg;
->  
-> -	return mxc_register_device(&mx31_usbh1, &usbh1_pdata);
-> +	return mxc_register_device(&mxc_usbh1, &usbh1_pdata);
->  }
->  
->  /*
 
+The patch that I proposed:
+[PATCH 2/4] mfd: mc13783: When probing, unlock the mc13783 before subsystems initialisation.
+solve the problem I think.
 
--- 
-Valentin Longchamp, PhD Student, EPFL-STI-LSRO1
-valentin.longchamp at epfl.ch, Phone: +41216937827
-http://people.epfl.ch/valentin.longchamp
-MEA3485, Station 9, CH-1015 Lausanne
+If you enable the debug output on drivers/mfd/mc13783-core and you see that the
+kernel hang on the mc13783 waiting queue, than my patch is for you.
+
+With boot_on = 1 the regulator core ensure also that the regulator is
+enabled during probe, so it call the corresponding enable function.
+That function utilise the mc13783-API that are still locked.
+
+mc13783-regulator now is probed when mc13783-core register it's regulator
+subsystem.
+
+For now that patch (acked by Uwe Kleine-K?nig) is not applied to the mfd tree.
+
+Alberto!
