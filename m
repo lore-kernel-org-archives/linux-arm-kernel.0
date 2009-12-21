@@ -1,48 +1,30 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 21 Dec 2009 08:04:30 +0200
-Subject: [PATCH 0/4] mx25: add support for FEC on i.MX25 PDK
-In-Reply-To: <cover.1260785451.git.baruch@tkos.co.il>
-References: <cover.1260785451.git.baruch@tkos.co.il>
-Message-ID: <20091221060429.GA3569@jasper.tkos.co.il>
+From: eltshanli@gmail.com (Li Jie)
+Date: Mon, 21 Dec 2009 14:19:31 +0800
+Subject: [PATCH] ARM: NUC900: Add cpufreq driver for nuc900 CPUs
+In-Reply-To: <20091219130729.GA1699@n2100.arm.linux.org.uk>
+References: <8fb2581d0912132329k1b1a52c8sdabfc4af3266c1e5@mail.gmail.com>
+	<20091219130729.GA1699@n2100.arm.linux.org.uk>
+Message-ID: <8fb2581d0912202219m10af202asdcee8658be63fc4c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Sat, Dec 19, 2009 at 9:07 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Dec 14, 2009 at 03:29:42PM +0800, Li Jie wrote:
+>> +#include <linux/kernel.h>
+>> +#include <linux/types.h>
+>> +#include <linux/init.h>
+>> +#include <linux/cpufreq.h>
+>> +#include <linux/clk.h>
+>> +#include <linux/err.h>
+>> +
+>> +#include <asm/io.h>
+>
+> I'm still on my crusade against this. ?linux/io.h please.
+>
 
-Ping.
-
-Ack/NACK?
-
-baruch
-
-On Mon, Dec 14, 2009 at 12:19:38PM +0200, Baruch Siach wrote:
-> This patch series adds support for the FEC peripheral of the i.MX25 on the 
-> i.MX25 PDK board.
-> 
-> The first two patches are fixes for compilation and run failures. The third 
-> patch enables RMII if the FEC driver. Finally, the last patch adds the 
-> necessary board support code (pads, clock, etc.)
-> 
-> The FEC fix seems like an ugly hack to me. Suggestions for a better solution 
-> are welcome.
-> 
-> Baruch Siach (4):
->   mx25: s/NO_PAD_CTL/NO_PAD_CTRL/
->   mx25: don't force input on FEC pins
->   fec: add support for Freescale i.MX25 PDK (3DS)
->   mx25: add support for FEC on i.MX25 PDK
-> 
->  arch/arm/mach-mx25/clock.c                  |    2 +
->  arch/arm/mach-mx25/devices.c                |   19 ++++++++
->  arch/arm/mach-mx25/devices.h                |    1 +
->  arch/arm/mach-mx25/mx25pdk.c                |   40 ++++++++++++++++-
->  arch/arm/plat-mxc/include/mach/iomux-mx25.h |   64 +++++++++++++-------------
->  arch/arm/plat-mxc/include/mach/mx25.h       |    4 ++
->  drivers/net/fec.c                           |   22 +++++++++
->  drivers/net/fec.h                           |    2 +
->  8 files changed, 121 insertions(+), 33 deletions(-)
+OK, thank you for the comment.
 
 -- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Regards
+Li Jie
