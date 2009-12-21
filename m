@@ -1,142 +1,75 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 21 Dec 2009 15:39:21 +0530
-Subject: [PATCH v3] ARM: L2 : Errata 588369: Clean & Invalidate do not
-	invalidate clean lines
-Message-ID: <1261390161-20196-1-git-send-email-santosh.shilimkar@ti.com>
+From: abhijitpagare@ti.com (Abhijit Pagare)
+Date: Mon, 21 Dec 2009 16:05:47 +0530
+Subject: [PATCH 1/1] ARM: OMAP4: PM: Remove the checks preventing OMAP4
+	clockdomain validation
+Message-ID: <1261391747-24066-1-git-send-email-abhijitpagare@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements the work-around for the errata 588369. The secure API
-is used to alter L2 debug regsiter because of trust-zone.
+The clockdomain related code beng in place it is now not necessary to have
+some of the clock code commented out. This would help the validation of the
+clockdomain functions using the clock level interfaces.
 
-v3 is rebased on the latest 2.6.33-rc1 which has Russell's "pending-l2x0"
-changes merged. The patch is tested on OMAP4430 SDP.
-
-Signed-off-by: Woodruff Richard <r-woodruff2@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Abhijit Pagare <abhijitpagare@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
 ---
- arch/arm/Kconfig         |   13 ++++++++++++
- arch/arm/mm/cache-l2x0.c |   50 ++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 63 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/clock.c |    8 --------
+ 1 files changed, 0 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 233a222..3891b77 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -917,6 +917,19 @@ config ARM_ERRATA_460075
- 	  ACTLR register. Note that setting specific bits in the ACTLR register
- 	  may not be available in non-secure mode.
- 
-+config PL310_ERRATA_588369
-+	bool "Clean & Invalidate maintenance operations do not invalidate clean lines"
-+	depends on CACHE_L2X0 && ARCH_OMAP4
-+	help
-+	   The PL310 L2 cache controller implements three types of Clean &
-+	   Invalidate maintenance operations: by Physical Address
-+	   (offset 0x7F0), by Index/Way (0x7F8) and by Way (0x7FC).
-+	   They are architecturally defined to behave as the execution of a
-+	   clean operation followed immediately by an invalidate operation,
-+	   both performing to the same memory location. This functionality
-+	   is not correctly implemented in PL310 as clean lines are not
-+	   invalidated as a result of these operations. Note that this errata
-+	   uses Texas Instrument's secure monitor api.
- endmenu
- 
- source "arch/arm/common/Kconfig"
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index cb8fc65..5443c0d 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -28,6 +28,24 @@
- static void __iomem *l2x0_base;
- static DEFINE_SPINLOCK(l2x0_lock);
- 
-+#ifdef CONFIG_PL310_ERRATA_588369
-+static void debug_writel(unsigned long val)
-+{
-+	register unsigned long r0 asm("r0") = val;
-+	/*
-+	 * Texas Instrument secure monitor api to modify the PL310
-+	 * Debug Control Register.
-+	 */
-+	__asm__ __volatile__(
-+		__asmeq("%0", "r0")
-+		"ldr r12, =0x100\n"
-+		"dsb\n"
-+		"smc\n"
-+		: : "r" (r0)
-+		: "r4", "r5", "r6", "r7", "r8");
-+}
-+#endif
-+
- static inline void cache_wait(void __iomem *reg, unsigned long mask)
+diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+index 759c72a..a6d570a 100644
+--- a/arch/arm/mach-omap2/clock.c
++++ b/arch/arm/mach-omap2/clock.c
+@@ -181,7 +181,6 @@ static int _dpll_test_fint(struct clk *clk, u8 n)
+  * clockdomain pointer, and save it into the struct clk.  Intended to be
+  * called during clk_register().  No return value.
+  */
+-#ifndef CONFIG_ARCH_OMAP4 /* FIXME: Remove this once clkdm f/w is in place */
+ void omap2_init_clk_clkdm(struct clk *clk)
  {
- 	/* wait for the operation to complete */
-@@ -62,15 +80,33 @@ static void l2x0_inv_range(unsigned long start, unsigned long end)
- 	spin_lock_irqsave(&l2x0_lock, flags);
- 	if (start & (CACHE_LINE_SIZE - 1)) {
- 		start &= ~(CACHE_LINE_SIZE - 1);
-+#ifdef CONFIG_PL310_ERRATA_588369
-+		debug_writel(0x03);
-+		cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
-+		writel(start, base + L2X0_CLEAN_LINE_PA);
-+		cache_wait(base + L2X0_INV_LINE_PA, 1);
-+		writel(start, base + L2X0_INV_LINE_PA);
-+		debug_writel(0x00);
-+#else
- 		cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
- 		writel(start, base + L2X0_CLEAN_INV_LINE_PA);
-+#endif
- 		start += CACHE_LINE_SIZE;
+ 	struct clockdomain *clkdm;
+@@ -199,7 +198,6 @@ void omap2_init_clk_clkdm(struct clk *clk)
+ 			 "clkdm %s\n", clk->name, clk->clkdm_name);
  	}
+ }
+-#endif
  
- 	if (end & (CACHE_LINE_SIZE - 1)) {
- 		end &= ~(CACHE_LINE_SIZE - 1);
-+#ifdef CONFIG_PL310_ERRATA_588369
-+		debug_writel(0x03);
-+		cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
-+		writel(end, base + L2X0_CLEAN_LINE_PA);
-+		cache_wait(base + L2X0_INV_LINE_PA, 1);
-+		writel(end, base + L2X0_INV_LINE_PA);
-+			debug_writel(0x00);
-+#else
- 		cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
- 		writel(end, base + L2X0_CLEAN_INV_LINE_PA);
-+#endif
+ /**
+  * omap2_init_clksel_parent - set a clksel clk's parent field from the hardware
+@@ -476,10 +474,8 @@ void omap2_clk_disable(struct clk *clk)
+ 		_omap2_clk_disable(clk);
+ 		if (clk->parent)
+ 			omap2_clk_disable(clk->parent);
+-#ifndef CONFIG_ARCH_OMAP4 /* FIXME: Remove this once clkdm f/w is in place */
+ 		if (clk->clkdm)
+ 			omap2_clkdm_clk_disable(clk->clkdm, clk);
+-#endif
+ 
  	}
+ }
+@@ -489,10 +485,8 @@ int omap2_clk_enable(struct clk *clk)
+ 	int ret = 0;
  
- 	while (start < end) {
-@@ -129,8 +165,17 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
- 		unsigned long blk_end = start + min(end - start, 4096UL);
+ 	if (clk->usecount++ == 0) {
+-#ifndef CONFIG_ARCH_OMAP4 /* FIXME: Remove this once clkdm f/w is in place */
+ 		if (clk->clkdm)
+ 			omap2_clkdm_clk_enable(clk->clkdm, clk);
+-#endif
  
- 		while (start < blk_end) {
-+#ifdef CONFIG_PL310_ERRATA_588369
-+			debug_writel(0x03);
-+			/* Clean by PA followed by Invalidate by PA */
-+			cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
-+			writel(start, base + L2X0_CLEAN_LINE_PA);
-+			cache_wait(base + L2X0_INV_LINE_PA, 1);
-+			writel(start, base + L2X0_INV_LINE_PA);
-+#else
- 			cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
- 			writel(start, base + L2X0_CLEAN_INV_LINE_PA);
-+#endif
- 			start += CACHE_LINE_SIZE;
- 		}
+ 		if (clk->parent) {
+ 			ret = omap2_clk_enable(clk->parent);
+@@ -511,10 +505,8 @@ int omap2_clk_enable(struct clk *clk)
+ 	return ret;
  
-@@ -139,7 +184,12 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
- 			spin_lock_irqsave(&l2x0_lock, flags);
- 		}
- 	}
-+#ifdef CONFIG_PL310_ERRATA_588369
-+	cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
-+	cache_wait(base + L2X0_INV_LINE_PA, 1);
-+#else
- 	cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
-+#endif
- 	cache_sync();
- 	spin_unlock_irqrestore(&l2x0_lock, flags);
+ err:
+-#ifndef CONFIG_ARCH_OMAP4 /* FIXME: Remove this once clkdm f/w is in place */
+ 	if (clk->clkdm)
+ 		omap2_clkdm_clk_disable(clk->clkdm, clk);
+-#endif
+ 	clk->usecount--;
+ 	return ret;
  }
 -- 
-1.6.0.4
+1.5.4.7
