@@ -1,36 +1,48 @@
-From: jamie.iles@picochip.com (Jamie Iles)
-Date: Mon, 21 Dec 2009 01:00:22 +0000
-Subject: [PATCH] armv6: invalidate cache on DMA_FROM_DEVICE/DMA_BIDIRECTIONAL
-Message-ID: <1261357222-18470-1-git-send-email-jamie.iles@picochip.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 21 Dec 2009 08:04:30 +0200
+Subject: [PATCH 0/4] mx25: add support for FEC on i.MX25 PDK
+In-Reply-To: <cover.1260785451.git.baruch@tkos.co.il>
+References: <cover.1260785451.git.baruch@tkos.co.il>
+Message-ID: <20091221060429.GA3569@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some ARMv6 cores will use speculative prefetching. This can be a problem
-when devices DMA to memory and the core prefetches data before the
-device has written it. This can result in stale data being stored in
-the cache. The DMA API will request the invalidation but this is
-currently a no-op on v6. Use the same dma_unmap_area implementation as
-for v7.
+Hi Sascha,
 
-Signed-off-by: Jamie Iles <jamie.iles@picochip.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mm/cache-v6.S |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+Ping.
 
-diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
-index a11934e..a4da9d2 100644
---- a/arch/arm/mm/cache-v6.S
-+++ b/arch/arm/mm/cache-v6.S
-@@ -284,6 +284,9 @@ ENDPROC(v6_dma_map_area)
-  *	- dir	- DMA direction
-  */
- ENTRY(v6_dma_unmap_area)
-+	add	r1, r1, r0
-+	teq	r2, #DMA_TO_DEVICE
-+	bne	v6_dma_inv_range
- 	mov	pc, lr
- ENDPROC(v6_dma_unmap_area)
- 
+Ack/NACK?
+
+baruch
+
+On Mon, Dec 14, 2009 at 12:19:38PM +0200, Baruch Siach wrote:
+> This patch series adds support for the FEC peripheral of the i.MX25 on the 
+> i.MX25 PDK board.
+> 
+> The first two patches are fixes for compilation and run failures. The third 
+> patch enables RMII if the FEC driver. Finally, the last patch adds the 
+> necessary board support code (pads, clock, etc.)
+> 
+> The FEC fix seems like an ugly hack to me. Suggestions for a better solution 
+> are welcome.
+> 
+> Baruch Siach (4):
+>   mx25: s/NO_PAD_CTL/NO_PAD_CTRL/
+>   mx25: don't force input on FEC pins
+>   fec: add support for Freescale i.MX25 PDK (3DS)
+>   mx25: add support for FEC on i.MX25 PDK
+> 
+>  arch/arm/mach-mx25/clock.c                  |    2 +
+>  arch/arm/mach-mx25/devices.c                |   19 ++++++++
+>  arch/arm/mach-mx25/devices.h                |    1 +
+>  arch/arm/mach-mx25/mx25pdk.c                |   40 ++++++++++++++++-
+>  arch/arm/plat-mxc/include/mach/iomux-mx25.h |   64 +++++++++++++-------------
+>  arch/arm/plat-mxc/include/mach/mx25.h       |    4 ++
+>  drivers/net/fec.c                           |   22 +++++++++
+>  drivers/net/fec.h                           |    2 +
+>  8 files changed, 121 insertions(+), 33 deletions(-)
+
 -- 
-1.6.5.4
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
