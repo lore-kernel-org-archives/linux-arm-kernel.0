@@ -1,128 +1,378 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 21 Dec 2009 16:41:56 +0100
-Subject: [PATCH v2] imx/mx3: depend on USB_ULPI for otg_ulpi_create
-In-Reply-To: <4B2F9358.1090705@epfl.ch>
-References: <4B2F9358.1090705@epfl.ch>
-Message-ID: <1261410116-10382-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 21 Dec 2009 11:05:03 -0500
+Subject: [PATCH] arch/arm/common/vic.c: code reorganization
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190901DB7EFD@mi8nycmail19.Mi8.com>
+References: <BD79186B4FD85F4B8E60E381CAEE190901CBF46D@mi8nycmail19.Mi8.com><63386a3d0909180155s3032d6e7jc18b36e1b62a288f@mail.gmail.com><BD79186B4FD85F4B8E60E381CAEE190901D41EF4@mi8nycmail19.Mi8.com><20090918163111.GA2284@n2100.arm.linux.org.uk><BD79186B4FD85F4B8E60E381CAEE190901D42615@mi8nycmail19.Mi8.com><BD79186B4FD85F4B8E60E381CAEE190901DB7709@mi8nycmail19.Mi8.com><BD79186B4FD85F4B8E60E381CAEE190901DB7D84@mi8nycmail19.Mi8.com><63386a3d0910120202u5144bc7ep6b2008a71089369e@mail.gmail.com>
+	<BD79186B4FD85F4B8E60E381CAEE190901DB7EFD@mi8nycmail19.Mi8.com>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE19090200F124@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-otg_ulpi_create is defined in drivers/usb/otg/ulpi.c which depends on
-CONFIG_USB_ULPI.  So protect its usage by the same symbol.  Moreover
-mxc_ulpi_access_ops needs CONFIG_MXC_ULPI.
+[ARM] vic.c: reorganize code
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Valentin Longchamp <valentin.longchamp@epfl.ch>
-Cc: Daniel Mack <daniel@caiaq.de>
+This reorganizes the vic.c code in anticipation of a second patch
+to use struct vic_device as the data stored in set_irq_chip_data().
+
+The code now has the following flow:
+
+1) struct vic_device definition, static variables, and to_vic()
+   moved to the start of the code.
+2) common code (vic_init2)
+3) vic power management callbacks
+4) vic power management initialization/registration
+5) irq_chip callbacks
+6) vendor specific vic initialization
+7) vic initialization
+
+In addition the typo vik_init_st is fixed (vic_init_st).
+
+There is no functional change with this patch.
+
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Alessandro Rubini <rubini-list@gnudd.com>
+Cc: Linus Walleij <linus.ml.walleij@gmail.com>
+
 ---
-Hello,
 
-compared to the previous version moboard_usbotg_init and
-mxc_register_device(&mxc_otg_udc_device, ...) isn't protected by
+This patch had merge issues last time I posted it.  Hopefully it works now.
+Rebased on 2.6.33-rc1.
 
-The old comment about not building drivers/usb/otg/ulpi.o into vmlinux
-still applies, so I reproduce the old text again:
-
-This is still not a complete fix, as with
-CONFIG_USB=m, CONFIG_PCI=n, CONFIG_USB_OTG_UTILS=n
-drivers/usb/otg/ulpi.o isn't included in drivers/builtin.o and so the
-linker still errors out.  Maybe USB_ULPI needs to select USB_OTG_UTILS?
-Then the line
-
-	obj-$(CONFIG_USB_ULPI)          += otg/
-
-in drivers/usb/Makefile becomes superflous as drivers/Makefile has
-
-	obj-$(CONFIG_USB_OTG_UTILS)     += usb/otg/
-
-.  OTOH drivers/usb/otg/ulpi.c doesn't seem to make use of anything
-defined in drivers/usb/otg/otg.c.
-
-Best regards
-Uwe
----
- arch/arm/mach-mx3/Kconfig            |    3 ++-
- arch/arm/mach-mx3/mach-mx31lite.c    |    4 ++++
- arch/arm/mach-mx3/mach-mx31moboard.c |    4 ++++
- 3 files changed, 10 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
-index ea8ed10..2829441 100644
---- a/arch/arm/mach-mx3/Kconfig
-+++ b/arch/arm/mach-mx3/Kconfig
-@@ -49,6 +49,7 @@ config MACH_PCM037_EET
- config MACH_MX31LITE
- 	bool "Support MX31 LITEKIT (LogicPD)"
- 	select ARCH_MX31
-+	select MXC_ULPI if USB_ULPI
- 	help
- 	  Include support for MX31 LITEKIT platform. This includes specific
- 	  configurations for the board and its peripherals.
-@@ -63,7 +64,7 @@ config MACH_MX31_3DS
- config MACH_MX31MOBOARD
- 	bool "Support mx31moboard platforms (EPFL Mobots group)"
- 	select ARCH_MX31
--	select MXC_ULPI
-+	select MXC_ULPI if USB_ULPI
- 	help
- 	  Include support for mx31moboard platform. This includes specific
- 	  configurations for the board and its peripherals.
-diff --git a/arch/arm/mach-mx3/mach-mx31lite.c b/arch/arm/mach-mx3/mach-mx31lite.c
-index db741be..1e26397 100644
---- a/arch/arm/mach-mx3/mach-mx31lite.c
-+++ b/arch/arm/mach-mx3/mach-mx31lite.c
-@@ -135,6 +135,7 @@ static struct spi_board_info mc13783_spi_dev __initdata = {
-  * USB
+diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
+index f232941..1cf999a 100644
+--- a/arch/arm/common/vic.c
++++ b/arch/arm/common/vic.c
+@@ -18,6 +18,7 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
   */
++
+ #include <linux/init.h>
+ #include <linux/list.h>
+ #include <linux/io.h>
+@@ -28,48 +29,6 @@
+ #include <asm/mach/irq.h>
+ #include <asm/hardware/vic.h>
  
-+#if defined(CONFIG_USB_ULPI)
- #define USB_PAD_CFG (PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST | PAD_CTL_HYS_CMOS | \
- 			PAD_CTL_ODE_CMOS | PAD_CTL_100K_PU)
+-static void vic_ack_irq(unsigned int irq)
+-{
+-	void __iomem *base = get_irq_chip_data(irq);
+-	irq &= 31;
+-	writel(1 << irq, base + VIC_INT_ENABLE_CLEAR);
+-	/* moreover, clear the soft-triggered, in case it was the reason */
+-	writel(1 << irq, base + VIC_INT_SOFT_CLEAR);
+-}
+-
+-static void vic_mask_irq(unsigned int irq)
+-{
+-	void __iomem *base = get_irq_chip_data(irq);
+-	irq &= 31;
+-	writel(1 << irq, base + VIC_INT_ENABLE_CLEAR);
+-}
+-
+-static void vic_unmask_irq(unsigned int irq)
+-{
+-	void __iomem *base = get_irq_chip_data(irq);
+-	irq &= 31;
+-	writel(1 << irq, base + VIC_INT_ENABLE);
+-}
+-
+-/**
+- * vic_init2 - common initialisation code
+- * @base: Base of the VIC.
+- *
+- * Common initialisation code for registeration
+- * and resume.
+-*/
+-static void vic_init2(void __iomem *base)
+-{
+-	int i;
+-
+-	for (i = 0; i < 16; i++) {
+-		void __iomem *reg = base + VIC_VECT_CNTL0 + (i * 4);
+-		writel(VIC_VECT_CNTL_ENABLE | i, reg);
+-	}
+-
+-	writel(32, base + VIC_PL190_DEF_VECT_ADDR);
+-}
+-
+ #if defined(CONFIG_PM)
+ /**
+  * struct vic_device - VIC PM device
+@@ -99,13 +58,34 @@ struct vic_device {
+ /* we cannot allocate memory when VICs are initially registered */
+ static struct vic_device vic_devices[CONFIG_ARM_VIC_NR];
  
-@@ -180,6 +181,7 @@ static struct mxc_usbh_platform_data usbh2_pdata = {
- 	.portsc = MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
- 	.flags  = MXC_EHCI_POWER_PINS_ENABLED,
++static int vic_id;
++
+ static inline struct vic_device *to_vic(struct sys_device *sys)
+ {
+ 	return container_of(sys, struct vic_device, sysdev);
+ }
++#endif /* CONFIG_PM */
+ 
+-static int vic_id;
++/**
++ * vic_init2 - common initialisation code
++ * @base: Base of the VIC.
++ *
++ * Common initialisation code for registeration
++ * and resume.
++*/
++static void vic_init2(void __iomem *base)
++{
++	int i;
++
++	for (i = 0; i < 16; i++) {
++		void __iomem *reg = base + VIC_VECT_CNTL0 + (i * 4);
++		writel(VIC_VECT_CNTL_ENABLE | i, reg);
++	}
++
++	writel(32, base + VIC_PL190_DEF_VECT_ADDR);
++}
+ 
++#if defined(CONFIG_PM)
+ static int vic_class_resume(struct sys_device *dev)
+ {
+ 	struct vic_device *vic = to_vic(dev);
+@@ -159,31 +139,6 @@ struct sysdev_class vic_class = {
  };
-+#endif
  
- /*
-  * NOR flash
-@@ -256,11 +258,13 @@ static void __init mxc_board_init(void)
- 	mxc_register_device(&mxc_spi_device1, &spi1_pdata);
- 	spi_register_board_info(&mc13783_spi_dev, 1);
+ /**
+- * vic_pm_register - Register a VIC for later power management control
+- * @base: The base address of the VIC.
+- * @irq: The base IRQ for the VIC.
+- * @resume_sources: bitmask of interrupts allowed for resume sources.
+- *
+- * Register the VIC with the system device tree so that it can be notified
+- * of suspend and resume requests and ensure that the correct actions are
+- * taken to re-instate the settings on resume.
+- */
+-static void __init vic_pm_register(void __iomem *base, unsigned int irq, u32 resume_sources)
+-{
+-	struct vic_device *v;
+-
+-	if (vic_id >= ARRAY_SIZE(vic_devices))
+-		printk(KERN_ERR "%s: too few VICs, increase CONFIG_ARM_VIC_NR\n", __func__);
+-	else {
+-		v = &vic_devices[vic_id];
+-		v->base = base;
+-		v->resume_sources = resume_sources;
+-		v->irq = irq;
+-		vic_id++;
+-	}
+-}
+-
+-/**
+  * vic_pm_init - initicall to register VIC pm
+  *
+  * This is called via late_initcall() to register
+@@ -219,9 +174,60 @@ static int __init vic_pm_init(void)
  
-+#if defined(CONFIG_USB_ULPI)
- 	/* USB */
- 	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
- 				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
- 
- 	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
-+#endif
- 
- 	/* SMSC9117 IRQ pin */
- 	ret = gpio_request(IOMUX_TO_GPIO(MX31_PIN_SFS6), "sms9117-irq");
-diff --git a/arch/arm/mach-mx3/mach-mx31moboard.c b/arch/arm/mach-mx3/mach-mx31moboard.c
-index 949b4de..ac4c815 100644
---- a/arch/arm/mach-mx3/mach-mx31moboard.c
-+++ b/arch/arm/mach-mx3/mach-mx31moboard.c
-@@ -341,6 +341,7 @@ static void moboard_usbotg_init(void)
- 	gpio_direction_output(OTG_EN_B, 0);
+ 	return 0;
  }
+-
+ late_initcall(vic_pm_init);
  
-+#if defined(CONFIG_USB_ULPI)
- static struct fsl_usb2_platform_data usb_pdata = {
- 	.operating_mode	= FSL_USB2_DR_DEVICE,
- 	.phy_mode	= FSL_USB2_PHY_ULPI,
-@@ -394,6 +395,9 @@ static int __init moboard_usbh2_init(void)
- 
- 	return mxc_register_device(&mxc_usbh2, &usbh2_pdata);
- }
++/**
++ * vic_pm_register - Register a VIC for later power management control
++ * @base: The base address of the VIC.
++ * @irq: The base IRQ for the VIC.
++ * @resume_sources: bitmask of interrupts allowed for resume sources.
++ *
++ * Register the VIC with the system device tree so that it can be notified
++ * of suspend and resume requests and ensure that the correct actions are
++ * taken to re-instate the settings on resume.
++ */
++static void __init vic_pm_register(void __iomem *base, unsigned int irq, u32 resume_sources)
++{
++	struct vic_device *v;
++
++	if (vic_id >= ARRAY_SIZE(vic_devices))
++		printk(KERN_ERR "%s: too few VICs, increase CONFIG_ARM_VIC_NR\n", __func__);
++	else {
++		v = &vic_devices[vic_id];
++		v->base = base;
++		v->resume_sources = resume_sources;
++		v->irq = irq;
++		vic_id++;
++	}
++}
 +#else
-+static inline int moboard_usbh2_init(void) {}
-+#endif
++static inline void vic_pm_register(void __iomem *base, unsigned int irq, u32 arg1) { }
++#endif /* CONFIG_PM */
++
++static void vic_ack_irq(unsigned int irq)
++{
++	void __iomem *base = get_irq_chip_data(irq);
++	irq &= 31;
++	writel(1 << irq, base + VIC_INT_ENABLE_CLEAR);
++	/* moreover, clear the soft-triggered, in case it was the reason */
++	writel(1 << irq, base + VIC_INT_SOFT_CLEAR);
++}
++
++static void vic_mask_irq(unsigned int irq)
++{
++	void __iomem *base = get_irq_chip_data(irq);
++	irq &= 31;
++	writel(1 << irq, base + VIC_INT_ENABLE_CLEAR);
++}
++
++static void vic_unmask_irq(unsigned int irq)
++{
++	void __iomem *base = get_irq_chip_data(irq);
++	irq &= 31;
++	writel(1 << irq, base + VIC_INT_ENABLE);
++}
++
++#if defined(CONFIG_PM)
+ static struct vic_device *vic_from_irq(unsigned int irq)
+ {
+         struct vic_device *v = vic_devices;
+@@ -255,10 +261,7 @@ static int vic_set_wake(unsigned int irq, unsigned int on)
  
+ 	return 0;
+ }
+-
+ #else
+-static inline void vic_pm_register(void __iomem *base, unsigned int irq, u32 arg1) { }
+-
+ #define vic_set_wake NULL
+ #endif /* CONFIG_PM */
  
- static struct gpio_led mx31moboard_leds[] = {
--- 
-1.6.5.2
+@@ -270,9 +273,62 @@ static struct irq_chip vic_chip = {
+ 	.set_wake = vic_set_wake,
+ };
+ 
+-/* The PL190 cell from ARM has been modified by ST, so handle both here */
+-static void vik_init_st(void __iomem *base, unsigned int irq_start,
+-			 u32 vic_sources);
++/*
++ * The PL190 cell from ARM has been modified by ST to handle 64 interrupts.
++ * The original cell has 32 interrupts, while the modified one has 64,
++ * replocating two blocks 0x00..0x1f in 0x20..0x3f. In that case
++ * the probe function is called twice, with base set to offset 000
++ *  and 020 within the page. We call this "second block".
++ */
++static void __init vic_init_st(void __iomem *base, unsigned int irq_start,
++				u32 vic_sources)
++{
++	unsigned int i;
++	int vic_2nd_block = ((unsigned long)base & ~PAGE_MASK) != 0;
++
++	/* Disable all interrupts initially. */
++
++	writel(0, base + VIC_INT_SELECT);
++	writel(0, base + VIC_INT_ENABLE);
++	writel(~0, base + VIC_INT_ENABLE_CLEAR);
++	writel(0, base + VIC_IRQ_STATUS);
++	writel(0, base + VIC_ITCR);
++	writel(~0, base + VIC_INT_SOFT_CLEAR);
++
++	/*
++	 * Make sure we clear all existing interrupts. The vector registers
++	 * in this cell are after the second block of general registers,
++	 * so we can address them using standard offsets, but only from
++	 * the second base address, which is 0x20 in the page
++	 */
++	if (vic_2nd_block) {
++		writel(0, base + VIC_PL190_VECT_ADDR);
++		for (i = 0; i < 19; i++) {
++			unsigned int value;
++
++			value = readl(base + VIC_PL190_VECT_ADDR);
++			writel(value, base + VIC_PL190_VECT_ADDR);
++		}
++		/* ST has 16 vectors as well, but we don't enable them by now */
++		for (i = 0; i < 16; i++) {
++			void __iomem *reg = base + VIC_VECT_CNTL0 + (i * 4);
++			writel(0, reg);
++		}
++
++		writel(32, base + VIC_PL190_DEF_VECT_ADDR);
++	}
++
++	for (i = 0; i < 32; i++) {
++		if (vic_sources & (1 << i)) {
++			unsigned int irq = irq_start + i;
++
++			set_irq_chip(irq, &vic_chip);
++			set_irq_chip_data(irq, base);
++			set_irq_handler(irq, handle_level_irq);
++			set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
++		}
++	}
++}
+ 
+ /**
+  * vic_init - initialise a vectored interrupt controller
+@@ -299,7 +355,7 @@ void __init vic_init(void __iomem *base, unsigned int irq_start,
+ 
+ 	switch(vendor) {
+ 	case AMBA_VENDOR_ST:
+-		vik_init_st(base, irq_start, vic_sources);
++		vic_init_st(base, irq_start, vic_sources);
+ 		return;
+ 	default:
+ 		printk(KERN_WARNING "VIC: unknown vendor, continuing anyways\n");
+@@ -343,60 +399,3 @@ void __init vic_init(void __iomem *base, unsigned int irq_start,
+ 
+ 	vic_pm_register(base, irq_start, resume_sources);
+ }
+-
+-/*
+- * The PL190 cell from ARM has been modified by ST to handle 64 interrupts.
+- * The original cell has 32 interrupts, while the modified one has 64,
+- * replocating two blocks 0x00..0x1f in 0x20..0x3f. In that case
+- * the probe function is called twice, with base set to offset 000
+- *  and 020 within the page. We call this "second block".
+- */
+-static void __init vik_init_st(void __iomem *base, unsigned int irq_start,
+-				u32 vic_sources)
+-{
+-	unsigned int i;
+-	int vic_2nd_block = ((unsigned long)base & ~PAGE_MASK) != 0;
+-
+-	/* Disable all interrupts initially. */
+-
+-	writel(0, base + VIC_INT_SELECT);
+-	writel(0, base + VIC_INT_ENABLE);
+-	writel(~0, base + VIC_INT_ENABLE_CLEAR);
+-	writel(0, base + VIC_IRQ_STATUS);
+-	writel(0, base + VIC_ITCR);
+-	writel(~0, base + VIC_INT_SOFT_CLEAR);
+-
+-	/*
+-	 * Make sure we clear all existing interrupts. The vector registers
+-	 * in this cell are after the second block of general registers,
+-	 * so we can address them using standard offsets, but only from
+-	 * the second base address, which is 0x20 in the page
+-	 */
+-	if (vic_2nd_block) {
+-		writel(0, base + VIC_PL190_VECT_ADDR);
+-		for (i = 0; i < 19; i++) {
+-			unsigned int value;
+-
+-			value = readl(base + VIC_PL190_VECT_ADDR);
+-			writel(value, base + VIC_PL190_VECT_ADDR);
+-		}
+-		/* ST has 16 vectors as well, but we don't enable them by now */
+-		for (i = 0; i < 16; i++) {
+-			void __iomem *reg = base + VIC_VECT_CNTL0 + (i * 4);
+-			writel(0, reg);
+-		}
+-
+-		writel(32, base + VIC_PL190_DEF_VECT_ADDR);
+-	}
+-
+-	for (i = 0; i < 32; i++) {
+-		if (vic_sources & (1 << i)) {
+-			unsigned int irq = irq_start + i;
+-
+-			set_irq_chip(irq, &vic_chip);
+-			set_irq_chip_data(irq, base);
+-			set_irq_handler(irq, handle_level_irq);
+-			set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+-		}
+-	}
+-} 
