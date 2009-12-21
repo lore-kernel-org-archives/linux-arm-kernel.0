@@ -1,238 +1,142 @@
-From: eltshanli@gmail.com (Li Jie)
-Date: Mon, 21 Dec 2009 17:51:05 +0800
-Subject: [PATCH v2 RESEND] ARM: NUC900: Add cpufreq driver for nuc900 CPUs
-Message-ID: <8fb2581d0912210151s6402b33ci6415b75fb73df95a@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 21 Dec 2009 15:39:21 +0530
+Subject: [PATCH v3] ARM: L2 : Errata 588369: Clean & Invalidate do not
+	invalidate clean lines
+Message-ID: <1261390161-20196-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Wan:
+This patch implements the work-around for the errata 588369. The secure API
+is used to alter L2 debug regsiter because of trust-zone.
 
-This this the cpufreq_driver for NUC900 v2
-Problems which you and Russell mentioned in v1 have been fixed:
+v3 is rebased on the latest 2.6.33-rc1 which has Russell's "pending-l2x0"
+changes merged. The patch is tested on OMAP4430 SDP.
 
-1. declare nuc900_set_clkval() in cpu.h
-2. use macros instead of numbers
-3. rename module, nuc900 -> nuc900-cpufreq
-4. include linux/io.h, not asm/io.h
-....and so on
+Signed-off-by: Woodruff Richard <r-woodruff2@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+cc: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/Kconfig         |   13 ++++++++++++
+ arch/arm/mm/cache-l2x0.c |   50 ++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 63 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 233a222..600b313 100644
+index 233a222..3891b77 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -539,6 +539,7 @@ config ARCH_W90X900
- 	select COMMON_CLKDEV
- 	select GENERIC_TIME
- 	select GENERIC_CLOCKEVENTS
-+	select ARCH_HAS_CPUFREQ
- 	help
- 	  Support for Nuvoton (Winbond logic dept.) ARM9 processor,
- 	  At present, the w90x900 has been renamed nuc900, regarding
-diff --git a/arch/arm/mach-w90x900/Makefile b/arch/arm/mach-w90x900/Makefile
-index 828c032..7f114fb 100644
---- a/arch/arm/mach-w90x900/Makefile
-+++ b/arch/arm/mach-w90x900/Makefile
-@@ -5,7 +5,7 @@
- # Object file lists.
-
- obj-y				:= irq.o time.o mfp.o gpio.o clock.o
--obj-y				+= clksel.o dev.o cpu.o
-+obj-y				+= clksel.o dev.o cpu.o cpufreq.o
- # W90X900 CPU support files
-
- obj-$(CONFIG_CPU_W90P910)	+= nuc910.o
-diff --git a/arch/arm/mach-w90x900/cpu.c b/arch/arm/mach-w90x900/cpu.c
-index 921cef9..7b608b8 100644
---- a/arch/arm/mach-w90x900/cpu.c
-+++ b/arch/arm/mach-w90x900/cpu.c
-@@ -107,7 +107,7 @@ struct platform_device nuc900_serial_device = {
- };
-
- /*Set NUC900 series cpu frequence*/
--static int __init nuc900_set_clkval(unsigned int cpufreq)
-+int nuc900_set_clkval(unsigned int cpufreq)
+@@ -917,6 +917,19 @@ config ARM_ERRATA_460075
+ 	  ACTLR register. Note that setting specific bits in the ACTLR register
+ 	  may not be available in non-secure mode.
+ 
++config PL310_ERRATA_588369
++	bool "Clean & Invalidate maintenance operations do not invalidate clean lines"
++	depends on CACHE_L2X0 && ARCH_OMAP4
++	help
++	   The PL310 L2 cache controller implements three types of Clean &
++	   Invalidate maintenance operations: by Physical Address
++	   (offset 0x7F0), by Index/Way (0x7F8) and by Way (0x7FC).
++	   They are architecturally defined to behave as the execution of a
++	   clean operation followed immediately by an invalidate operation,
++	   both performing to the same memory location. This functionality
++	   is not correctly implemented in PL310 as clean lines are not
++	   invalidated as a result of these operations. Note that this errata
++	   uses Texas Instrument's secure monitor api.
+ endmenu
+ 
+ source "arch/arm/common/Kconfig"
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index cb8fc65..5443c0d 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -28,6 +28,24 @@
+ static void __iomem *l2x0_base;
+ static DEFINE_SPINLOCK(l2x0_lock);
+ 
++#ifdef CONFIG_PL310_ERRATA_588369
++static void debug_writel(unsigned long val)
++{
++	register unsigned long r0 asm("r0") = val;
++	/*
++	 * Texas Instrument secure monitor api to modify the PL310
++	 * Debug Control Register.
++	 */
++	__asm__ __volatile__(
++		__asmeq("%0", "r0")
++		"ldr r12, =0x100\n"
++		"dsb\n"
++		"smc\n"
++		: : "r" (r0)
++		: "r4", "r5", "r6", "r7", "r8");
++}
++#endif
++
+ static inline void cache_wait(void __iomem *reg, unsigned long mask)
  {
- 	unsigned int pllclk, ahbclk, apbclk, val;
-
-@@ -156,6 +156,8 @@ static int __init nuc900_set_clkval(unsigned int cpufreq)
-
- 	return 	0;
+ 	/* wait for the operation to complete */
+@@ -62,15 +80,33 @@ static void l2x0_inv_range(unsigned long start, unsigned long end)
+ 	spin_lock_irqsave(&l2x0_lock, flags);
+ 	if (start & (CACHE_LINE_SIZE - 1)) {
+ 		start &= ~(CACHE_LINE_SIZE - 1);
++#ifdef CONFIG_PL310_ERRATA_588369
++		debug_writel(0x03);
++		cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
++		writel(start, base + L2X0_CLEAN_LINE_PA);
++		cache_wait(base + L2X0_INV_LINE_PA, 1);
++		writel(start, base + L2X0_INV_LINE_PA);
++		debug_writel(0x00);
++#else
+ 		cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
+ 		writel(start, base + L2X0_CLEAN_INV_LINE_PA);
++#endif
+ 		start += CACHE_LINE_SIZE;
+ 	}
+ 
+ 	if (end & (CACHE_LINE_SIZE - 1)) {
+ 		end &= ~(CACHE_LINE_SIZE - 1);
++#ifdef CONFIG_PL310_ERRATA_588369
++		debug_writel(0x03);
++		cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
++		writel(end, base + L2X0_CLEAN_LINE_PA);
++		cache_wait(base + L2X0_INV_LINE_PA, 1);
++		writel(end, base + L2X0_INV_LINE_PA);
++			debug_writel(0x00);
++#else
+ 		cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
+ 		writel(end, base + L2X0_CLEAN_INV_LINE_PA);
++#endif
+ 	}
+ 
+ 	while (start < end) {
+@@ -129,8 +165,17 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
+ 		unsigned long blk_end = start + min(end - start, 4096UL);
+ 
+ 		while (start < blk_end) {
++#ifdef CONFIG_PL310_ERRATA_588369
++			debug_writel(0x03);
++			/* Clean by PA followed by Invalidate by PA */
++			cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
++			writel(start, base + L2X0_CLEAN_LINE_PA);
++			cache_wait(base + L2X0_INV_LINE_PA, 1);
++			writel(start, base + L2X0_INV_LINE_PA);
++#else
+ 			cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
+ 			writel(start, base + L2X0_CLEAN_INV_LINE_PA);
++#endif
+ 			start += CACHE_LINE_SIZE;
+ 		}
+ 
+@@ -139,7 +184,12 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
+ 			spin_lock_irqsave(&l2x0_lock, flags);
+ 		}
+ 	}
++#ifdef CONFIG_PL310_ERRATA_588369
++	cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
++	cache_wait(base + L2X0_INV_LINE_PA, 1);
++#else
+ 	cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
++#endif
+ 	cache_sync();
+ 	spin_unlock_irqrestore(&l2x0_lock, flags);
  }
-+EXPORT_SYMBOL(nuc900_set_clkval);
-+
- static int __init nuc900_set_cpufreq(char *str)
- {
- 	unsigned long cpufreq, val;
-diff --git a/arch/arm/mach-w90x900/cpu.h b/arch/arm/mach-w90x900/cpu.h
-index 4d58ba1..ca0bce5 100644
---- a/arch/arm/mach-w90x900/cpu.h
-+++ b/arch/arm/mach-w90x900/cpu.h
-@@ -49,6 +49,7 @@ extern void nuc900_clock_source(struct device *dev,
-unsigned char *src);
- extern void nuc900_init_clocks(void);
- extern void nuc900_map_io(struct map_desc *mach_desc, int mach_size);
- extern void nuc900_board_init(struct platform_device **device, int size);
-+extern int nuc900_set_clkval(unsigned int cpufreq);
-
- /* for either public between 910 and 920, or between 920 and 950 */
-
-diff --git a/arch/arm/mach-w90x900/cpufreq.c b/arch/arm/mach-w90x900/cpufreq.c
-new file mode 100644
-index 0000000..467fc26
---- /dev/null
-+++ b/arch/arm/mach-w90x900/cpufreq.c
-@@ -0,0 +1,154 @@
-+/* linux/arch/arm/mach-w90x900/cpufreq.c
-+ *
-+ * NUC900 CPUfreq Support
-+ *
-+ * Li Jie <eltshanli@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <linux/init.h>
-+#include <linux/cpufreq.h>
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/platform_device.h>
-+
-+#include <asm/mach/map.h>
-+#include <mach/hardware.h>
-+#include <mach/regs-clock.h>
-+
-+#include "cpu.h"
-+
-+#define	CPUFREQ_66M	66000
-+#define	CPUFREQ_100M	100000
-+#define	CPUFREQ_120M	120000
-+#define	CPUFREQ_166M	166000
-+#define	CPUFREQ_200M	200000
-+
-+static struct cpufreq_frequency_table nuc900_freq_table[] = {
-+	{ 0, CPUFREQ_66M  },
-+	{ 1, CPUFREQ_100M },
-+	{ 2, CPUFREQ_120M },
-+	{ 3, CPUFREQ_166M },
-+	{ 4, CPUFREQ_200M },
-+	{ 5, CPUFREQ_TABLE_END },
-+};
-+
-+static int nuc900_cpufreq_verify_speed(struct cpufreq_policy *policy)
-+{
-+	if (policy->cpu != 0)
-+		return -EINVAL;
-+
-+	return cpufreq_frequency_table_verify(policy, nuc900_freq_table);
-+}
-+
-+static unsigned int nuc900_cpufreq_get_speed(unsigned int cpu)
-+{
-+	int pllclk;
-+
-+	if (cpu != 0)
-+		return 0;
-+
-+	pllclk = __raw_readl(REG_PLLCON0);
-+
-+	switch (pllclk) {
-+	case PLL_66MHZ:
-+		return CPUFREQ_66M;
-+	case PLL_100MHZ:
-+		return CPUFREQ_100M;
-+	case PLL_120MHZ:
-+		return CPUFREQ_120M;
-+	case PLL_166MHZ:
-+		return CPUFREQ_166M;
-+	case PLL_200MHZ:
-+		return CPUFREQ_200M;
-+	}
-+
-+	pr_err("cpufreq: Failed to get frequency: %x\n", pllclk);
-+	return 0;
-+}
-+
-+static int nuc900_cpufreq_set_target(struct cpufreq_policy *policy,
-+				      unsigned int target_freq,
-+				      unsigned int relation)
-+{
-+	int ret;
-+	unsigned int i;
-+	struct cpufreq_freqs freqs;
-+
-+	ret = cpufreq_frequency_table_target(policy, nuc900_freq_table,
-+					     target_freq, relation, &i);
-+	if (ret != 0)
-+		return ret;
-+
-+	freqs.cpu = 0;
-+	freqs.old = nuc900_cpufreq_get_speed(0);
-+	freqs.new = nuc900_freq_table[i].frequency;
-+	freqs.flags = 0;
-+
-+	if (freqs.old == freqs.new)
-+		return 0;
-+
-+	pr_debug("cpufreq: Transition %d-%dkHz\n", freqs.old, freqs.new);
-+
-+	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-+
-+	nuc900_set_clkval(freqs.new / 1000);
-+	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-+
-+	return 0;
-+}
-+
-+static int __init nuc900_cpufreq_driver_init(struct cpufreq_policy *policy)
-+{
-+	int ret;
-+
-+	if (policy->cpu != 0)
-+		return -EINVAL;
-+
-+	policy->cur = nuc900_cpufreq_get_speed(0);
-+
-+	policy->cpuinfo.transition_latency = 2 * 1000; /* FIXME, assumed */
-+	policy->cpuinfo.min_freq = 66000;	       /* khz */
-+	policy->cpuinfo.max_freq = 200000;
-+	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
-+
-+	ret = cpufreq_frequency_table_cpuinfo(policy, nuc900_freq_table);
-+	if (ret != 0)
-+		pr_err("cpufreq: Failed to configure frequency table: %d\n",
-+		       ret);
-+
-+	return ret;
-+}
-+
-+static struct cpufreq_driver nuc900_cpufreq_driver = {
-+	.owner		= THIS_MODULE,
-+	.flags          = 0,
-+	.verify		= nuc900_cpufreq_verify_speed,
-+	.target		= nuc900_cpufreq_set_target,
-+	.get		= nuc900_cpufreq_get_speed,
-+	.init		= nuc900_cpufreq_driver_init,
-+	.name		= "nuc900-cpufreq",
-+};
-+
-+static int __init nuc900_cpufreq_init(void)
-+{
-+	return cpufreq_register_driver(&nuc900_cpufreq_driver);
-+}
-+
-+static void __exit nuc900_cpufreq_exit(void)
-+{
-+	cpufreq_unregister_driver(&nuc900_cpufreq_driver);
-+}
-+
-+MODULE_AUTHOR ("Li Jie <eltshanli@gmail.com>");
-+MODULE_DESCRIPTION ("cpufreq driver for NUC900");
-+MODULE_LICENSE ("GPL");
-+
-+module_init(nuc900_cpufreq_init);
-+module_exit(nuc900_cpufreq_exit);
+-- 
+1.6.0.4
