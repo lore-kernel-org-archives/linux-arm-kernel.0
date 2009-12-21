@@ -1,42 +1,49 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Fri, 18 Dec 2009 15:18:50 +0100
-Subject: [PATCH 1/3] ASoC: Add a new imx-ssi sound driver
-In-Reply-To: <20091201154920.GW27548@pengutronix.de>
-References: <1259163666-30344-1-git-send-email-s.hauer@pengutronix.de>
-	<1259163666-30344-2-git-send-email-s.hauer@pengutronix.de>
-	<20091125155807.GD12750@rakim.wolfsonmicro.main>
-	<eedb5540911300840p230fc57fh3fd5c8453b0e1f73@mail.gmail.com>
-	<eedb5540911300909vf042b39l44e06b432351b@mail.gmail.com>
-	<20091201154920.GW27548@pengutronix.de>
-Message-ID: <eedb5540912180618w53e24c6ahe1d47d410e1a91e8@mail.gmail.com>
+From: richardliu@ms1.techarea.org (Richard Liu)
+Date: Mon, 21 Dec 2009 14:00:25 +0800
+Subject: [PATCH] PCI Domains Support
+In-Reply-To: <20091220012728.GD12578@verge.net.au>
+References: <4B28EB0F.3070409@ms1.techarea.org>	<20091217000620.GC22449@verge.net.au>	<4B2A2B92.6020809@ms1.techarea.org>
+	<20091220012728.GD12578@verge.net.au>
+Message-ID: <4B2F0EF9.101@ms1.techarea.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Simon Horman wrote:
+> On Thu, Dec 17, 2009 at 09:01:06PM +0800, Richard Liu wrote:
+>   
+>> Dear Simon:
+>>
+>> Simon Horman wrote:  
+>>     
+>> ARM is a highly custom platform, just reverse for other platform add
+>> their code,
+>> Some platforms might need PCI domains, but some platforms not.
+>>     
 >
-> Ok, will do. I myself use the asynchronous mode. The MC13783 I use has
-> two SSI ports, one for capture and one for playback. I route both ports
-> to the same SSI unit using the audio muxer.
->
-> Sascha
->
+> Understood. Do you have any platforms in mind that wouldn't want
+> PCI domains? I was just thinking that perhaps PCI_DOMAINS could be added
+> later as needed, reducing noise in the code until the need arises.
+> But perhaps I'm reading the situation incorrectly.
+>   
+Actually, most ARM platforms didn't need PCI domains.
 
-Dear Sascha,
-I don't wanna delay the entering of this driver to mainline. It is clear
-that it is cleaner and more generic than mine. And, what we really care, it
-works for our board.
+So, original patch is
 
-If you have any inconvenience with my requirement I could just ack the patch
-and maybe we could add support for it later.
++config PCI_DOMAINS
++        def_bool y
++        depends on PCI && ARCH_CXXXXXX
++
 
-Thank you.
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+But I removed the "&& ARCH_CXXXXXXX" before I provided the patch.
+Because ARCH_CXXXXXXX is not exist in ARM Linux kernel now (maybe it
+would be committed at someday)
+
+I traced other ARM platforms,
+some platforms like Marvell Orion5x seems has both PCI and PCIe host
+controller,
+Maybe they can use PCI domain to control their PCI/PCIe host controller.
+
+
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091218/2dbf9c0e/attachment-0001.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091221/2622c2af/attachment-0001.htm>
