@@ -1,17 +1,23 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Dec 2009 23:33:59 +0000
-Subject: [PATCH 0/10] ARM-PNX4008-clocking update patches (repost)
-In-Reply-To: <083DF309106F364B939360100EC290F804F592E900@eu1rdcrdc1wx030.exi.nxp.com>
-References: <083DF309106F364B939360100EC290F804F592E900@eu1rdcrdc1wx030.exi.nxp.com>
-Message-ID: <20091221233359.GA28541@n2100.arm.linux.org.uk>
+Date: Mon, 21 Dec 2009 23:35:08 +0000
+Subject: [PATCH] ARM: dmabounce: fix build
+In-Reply-To: <4B2DDDD7.9030500@compulab.co.il>
+References: <4B2DDDD7.9030500@compulab.co.il>
+Message-ID: <20091221233508.GB28541@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 22, 2009 at 12:21:12AM +0100, Kevin Wells wrote:
-> These patches were originally submitted by Russell King to
-> update the PNX4008 platform clock functions. These add
-> better support for CLKDEV and I2C and WDT clocking updates
-> needed for other platforms with this same IP.
+On Sun, Dec 20, 2009 at 10:18:31AM +0200, Mike Rapoport wrote:
+> Commit f74f7e57ae9fa12b2951ae62ce3557799b318399 (ARM: use
+> flush_kernel_dcache_area() for dmabounce) has broken dmabounce build:
+> 
+>   CC      arch/arm/common/dmabounce.o
+> arch/arm/common/dmabounce.c: In function 'unmap_single':
+> arch/arm/common/dmabounce.c:315: error: implicit declaration of function '__cpuc_flush_kernel_dcache_area'
+> make[2]: *** [arch/arm/common/dmabounce.o] Error 1
+> 
+> Fix it.
+> 
+> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
 
-Err, you're supposed to keep the signed-off-by's from people down-stream
-of you if you're passing the patches through for merging.
+Ok, can you submit this to the patch system please?  Thanks.
