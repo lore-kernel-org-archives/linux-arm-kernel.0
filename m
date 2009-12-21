@@ -1,31 +1,85 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 21 Dec 2009 12:17:26 +0100
-Subject: [PATCH 0/2] mx31moboard for 2.6.33-rc1
-In-Reply-To: <1261156293-13981-1-git-send-email-valentin.longchamp@epfl.ch>
-References: <1261156293-13981-1-git-send-email-valentin.longchamp@epfl.ch>
-Message-ID: <20091221111726.GF15126@pengutronix.de>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Mon, 21 Dec 2009 16:56:19 +0530
+Subject: CPU consumption is going as high as 95% on ARM Cortex A8
+In-Reply-To: <20091221105017.GB11669@n2100.arm.linux.org.uk>
+References: <19F8576C6E063C45BE387C64729E73940449F43857@dbde02.ent.ti.com>
+	<20091217095641.GA399@n2100.arm.linux.org.uk>
+	<19F8576C6E063C45BE387C64729E73940449F43E29@dbde02.ent.ti.com>
+	<20091221090750.GA11669@n2100.arm.linux.org.uk>
+	<19F8576C6E063C45BE387C64729E73940449F43EEE@dbde02.ent.ti.com>
+	<20091221105017.GB11669@n2100.arm.linux.org.uk>
+Message-ID: <19F8576C6E063C45BE387C64729E73940449F43F65@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2009 at 06:11:31PM +0100, Valentin Longchamp wrote:
-> I have tested mx31moboard with the first -rc. Here are two patches correcting the current problems. They should go to a next -rc.
+
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Monday, December 21, 2009 4:20 PM
+> To: Hiremath, Vaibhav
+> Cc: linux-arm-kernel at lists.infradead.org; linux-mm at kvack.org; linux-
+> omap at vger.kernel.org
+> Subject: Re: CPU consumption is going as high as 95% on ARM Cortex
+> A8
 > 
-> 1) The patches for usbh support were based on the bad branch, where
-> the platform_devices had been renamed. Now this prevents the mx3
-> config to build. The first patch reverts to the correct names.
+> On Mon, Dec 21, 2009 at 02:51:13PM +0530, Hiremath, Vaibhav wrote:
+> > > On Mon, Dec 21, 2009 at 11:56:23AM +0530, Hiremath, Vaibhav
+> wrote:
+<snip>...
+
+> >
+> > If I comment the line completely then I am seeing
+> > CPU consumption similar to when I was setting
+> PAGE_READONLY/PAGE_SHARED
+> > flag, which is 25-32%.
+> >
+> > > I suspect that will "solve" the problem - but you'll then no
+> longer
+> > > have
+> > > DMA coherency with userspace, so its not really a solution.
 > 
-> 2) The MC13783 voltage regulators with boot_on or always_on enabled
-> hang the kernel at boot. Remove these options from mx31moboard
-> configuration. Sascha, is this a correct behavior or is it a bug ?
+> So it _is_ down to purely the amount of time it takes to read from a
+> non-cacheable buffer.  I think you need to investigate the userspace
+> program and see whether it's doing anything silly - I don't think
+> the
+> lack of performance is a kernel problem as such.
+> 
+[Hiremath, Vaibhav] The User space application program is pretty simple, doing nothing as such - 
 
-AFAIK the boot_on indicate the regulator framework that this regulator
-is already enabled when the kernel starts. I don't see why this makes
-the kernel hang. Can you do a bit more debugging please?
+It is a loopback application where the captured frame is copied to display buffer -
 
-Sascha
+/*Display buffer mmap*/
+display_buff_info[i].start = mmap(NULL, buf.length,
+			PROT_READ | PROT_WRITE, MAP_SHARED, *display_fd, 
+			buf.m.offset);
+/*Capture Buffer mmap*/
+capture_buff_info[i].start = mmap(NULL, buf.length,
+			PROT_READ | PROT_WRITE, MAP_SHARED, *capture_fd,
+			buf.m.offset);
+while (1)
+	DEQUEUE BUFFER (blocking call)
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	for (h = 0; h < display_fmt.fmt.pix.height; h++) {
+		memcpy(dis_ptr, cap_ptr, display_fmt.fmt.pix.width * 2);
+		cap_ptr += capture_fmt.fmt.pix.width * 2;
+		dis_ptr += display_fmt.fmt.pix.width * 2;
+	}
+
+	QUEUE BUFFER
+}
+
+I will again review the application one more time and see whether I could get anything.
+
+> How large is this buffer? 
+[Hiremath, Vaibhav] The buffer size is 720x480x2, and we have 3 such buffers used in queue/dequeue operation.
+
+> What userspace program is reading from
+> it?
+[Hiremath, Vaibhav] Simple loopback application doing memcpy.
+
+> Could the userspace program be unnecessarily re-reading from the
+> multiple times for the same frame?
+[Hiremath, Vaibhav] Let me re-visit the code for both application and driver with respect to this suggestion, but I don't think application is reading twice.
+
+Thanks,
+Vaibhav
