@@ -1,56 +1,31 @@
-From: jamie.iles@picochip.com (Jamie Iles)
-Date: Mon, 21 Dec 2009 09:08:17 +0000
-Subject: [PATCH] armv6: invalidate cache on DMA_FROM_DEVICE/DMA_BIDIRECTIONAL
-In-Reply-To: <1261386497-2924-1-git-send-email-jamie.iles@picochip.com>
-References: <1261357222-18470-1-git-send-email-jamie.iles@picochip.com>
-	<1261386497-2924-1-git-send-email-jamie.iles@picochip.com>
-Message-ID: <1261386497-2924-2-git-send-email-jamie.iles@picochip.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Dec 2009 09:07:50 +0000
+Subject: CPU consumption is going as high as 95% on ARM Cortex A8
+In-Reply-To: <19F8576C6E063C45BE387C64729E73940449F43E29@dbde02.ent.ti.com>
+References: <19F8576C6E063C45BE387C64729E73940449F43857@dbde02.ent.ti.com>
+	<20091217095641.GA399@n2100.arm.linux.org.uk>
+	<19F8576C6E063C45BE387C64729E73940449F43E29@dbde02.ent.ti.com>
+Message-ID: <20091221090750.GA11669@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some ARMv6 cores will use speculative prefetching. This can be a problem
-when devices DMA to memory and the core prefetches data before the
-device has written it. This can result in stale data being stored in the
-cache. The DMA API will request the invalidation but this is currently a
-no-op on v6. Use the same dma_unmap_area implementation as for v7.
+On Mon, Dec 21, 2009 at 11:56:23AM +0530, Hiremath, Vaibhav wrote:
+> >         vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+> > 
+> > will result in the memory being mapped as 'Strongly Ordered',
+> > resulting
+> > in there being multiple mappings with differing types.  In later
+> > kernels, we have pgprot_dmacoherent() and I'd suggest changing the
+> > above
+> > macro for that.
+> > 
+> 
+> I tried with your suggestion above but unfortunately it didn't work for
+> me. I am seeing the same behavior with the pgprot_dmacoherent(). I
+> pulled your patch (which got applied cleanly on 2.6.32-rc5) -
 
-Additionally, simplify v6_dma_map_area() so that we clean the cache lines
-for DMA_TO_DEVICE and DMA_FROM_DEVICE but don't do any invalidation. This
-will be done when we unmap.
+What happens if you comment out the pgprot_dmacoherent() / pgprot_noncached()
+line completely?
 
-Signed-off-by: Jamie Iles <jamie.iles@picochip.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mm/cache-v6.S |   10 ++++++----
- 1 files changed, 6 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
-index a11934e..1dd9e0e 100644
---- a/arch/arm/mm/cache-v6.S
-+++ b/arch/arm/mm/cache-v6.S
-@@ -271,10 +271,9 @@ ENTRY(v6_dma_flush_range)
-  */
- ENTRY(v6_dma_map_area)
- 	add	r1, r1, r0
--	cmp	r2, #DMA_TO_DEVICE
--	beq	v6_dma_clean_range
--	bcs	v6_dma_inv_range
--	b	v6_dma_flush_range
-+	teq	r2, #DMA_FROM_DEVICE
-+	bne	v6_dma_clean_range
-+	mov	pc, lr
- ENDPROC(v6_dma_map_area)
- 
- /*
-@@ -284,6 +283,9 @@ ENDPROC(v6_dma_map_area)
-  *	- dir	- DMA direction
-  */
- ENTRY(v6_dma_unmap_area)
-+	add	r1, r1, r0
-+	teq	r2, #DMA_TO_DEVICE
-+	bne	v6_dma_inv_range
- 	mov	pc, lr
- ENDPROC(v6_dma_unmap_area)
- 
--- 
-1.6.5.4
+I suspect that will "solve" the problem - but you'll then no longer have
+DMA coherency with userspace, so its not really a solution.
