@@ -1,26 +1,36 @@
-From: buserror@gmail.com (M P)
-Date: Mon, 21 Dec 2009 13:26:34 +0000
-Subject: kernel boot failure on with s32440/mini2440 with git head
-	(dd59f6c76b2)
-In-Reply-To: <200912211410.12014.jbe@pengutronix.de>
-References: <4B2E4A65.8070207@walsimou.com>
-	<200912211410.12014.jbe@pengutronix.de>
-Message-ID: <dc447790912210526l3247b8fdxfc3f7c4c99706b04@mail.gmail.com>
+From: jpihet@mvista.com (Jean Pihet)
+Date: Mon, 21 Dec 2009 14:35:04 +0100
+Subject: Perf Event support for ARMv7 (was: Re: [PATCH 5/5]
+	arm/perfevents: implement perf event support for ARMv6)
+In-Reply-To: <20091221124318.GC4097@wear.picochip.com>
+References: <1260875712-29712-1-git-send-email-jamie.iles@picochip.com>
+	<000901ca8236$a0e1adf0$e2a509d0$@deacon@arm.com>
+	<20091221124318.GC4097@wear.picochip.com>
+Message-ID: <200912211435.05094.jpihet@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 21, 2009 at 1:10 PM, Juergen Beisert <jbe@pengutronix.de> wrote:
-> On Sonntag, 20. Dezember 2009, Gaye Abdoulaye Walsimou wrote:
->> Hello list,
->> I have here a boot Oops (see below) with the latest git revision of
->> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git,
->> which does not happen with 2.6.32.
->> Thanks in advance for comments.
->> Regards
+On Monday 21 December 2009 13:43:18 Jamie Iles wrote:
+> On Mon, Dec 21, 2009 at 12:10:46PM -0000, Will Deacon wrote:
+> > > I will post a new version with the corrections.
+> >
+> > Excellent. I can comment on things tomorrow as well, but then I'm off.
+> >
+> > > Cheers and a good celebration time,
+> >
+> > Thanks. I'll post my oprofile patches when I return. They cover these
+> > issues already so hopefully you can spot anything I've missed.
+>
+> It's my last working day today. When I return I'll post an updated patch
+> series for the generic arm perfcounters and v6 support. Hopefully we can
+> get these signed off then and base the v7 support off of these.
+OK, good! I am continuing on v7 and I will rebase my patches as soon as those 
+are out.
 
-I have a patch in my git that related to that :
-http://repo.or.cz/w/linux-2.6/mini2440.git/commit/db47bd31f00a06370795a9d94ed973f78060841a
+> Enjoy the break,
+Thx, the same for you!
 
-I need to push that to the list as soon as I rebase on 2.6.33.
+>
+> Jamie
 
-Michael
+Jean
