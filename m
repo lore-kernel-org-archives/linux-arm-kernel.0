@@ -1,100 +1,77 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Mon, 21 Dec 2009 11:56:23 +0530
-Subject: CPU consumption is going as high as 95% on ARM Cortex A8
-In-Reply-To: <20091217095641.GA399@n2100.arm.linux.org.uk>
-References: <19F8576C6E063C45BE387C64729E73940449F43857@dbde02.ent.ti.com>
-	<20091217095641.GA399@n2100.arm.linux.org.uk>
-Message-ID: <19F8576C6E063C45BE387C64729E73940449F43E29@dbde02.ent.ti.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 21 Dec 2009 08:40:17 +0100
+Subject: shared memory problem on ARM v5TE using threads
+In-Reply-To: <alpine.LFD.2.00.0912201727210.28241@xanadu.home>
+References: <alpine.LFD.2.00.0912071027480.31174@xanadu.home>
+	<20091207170546.GB26821@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.0912071219100.31174@xanadu.home>
+	<20091207175608.GE26821@n2100.arm.linux.org.uk>
+	<309002C0DA137042828828FC53D7A9347E2630EEC2@IL-MB01.marvell.com>
+	<20091213120033.GA10698@n2100.arm.linux.org.uk>
+	<20091218184518.GE1470@ucw.cz>
+	<alpine.LFD.2.00.0912181358580.28241@xanadu.home>
+	<20091220195143.GE23917@elf.ucw.cz>
+	<alpine.LFD.2.00.0912201727210.28241@xanadu.home>
+Message-ID: <20091221074017.GA16130@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun 2009-12-20 17:32:08, Nicolas Pitre wrote:
+> On Sun, 20 Dec 2009, Pavel Machek wrote:
+> 
+> > On Fri 2009-12-18 14:00:13, Nicolas Pitre wrote:
+> > > On Fri, 18 Dec 2009, Pavel Machek wrote:
+> > > 
+> > > > On Sun 2009-12-13 12:00:33, Russell King - ARM Linux wrote:
+> > > > > On Sun, Dec 13, 2009 at 01:48:48PM +0200, Ronen Shitrit wrote:
+> > > > > > Another idea is to change the shared mapping handling, in case of vivt with pipt L2, so it won't remap the shared area as non-cacheable:
+> > > > > > - make_coherent won't use adjust_pte and leave only the regular flush.
+> > > > > > - Flush L1 for all context switches, also for the case that the new process is using same mm (thread context switch).
+> > > > > 
+> > > > > That doesn't work.
+> > > > > 
+> > > > > Well, with a VIVT L1, we flush the L1 on all MM switches anyway.
+> > > > > Flushing it on any thread switch is not going to help that much.
+> > > > > 
+> > > > > The problem with shared mmaps is that if you have multiple within the
+> > > > > same thread, it is required that they are _all_ coherent with respect
+> > > > > to each other, whether or not a context switch has occurred.
+> > > > 
+> > > > But that's pretty unusual situation, right?
+> > > > 
+> > > > So what about...
+> > > > 
+> > > > a) flush L2 on context switch
+> > > 
+> > > No.  This is too big a performance killer.
+> > 
+> > Eek?
+> > 
+> > Alternative is "disable L2". I guess "use L2, but flush it
+> > occasionally" is still better than "disable L2".
+> > 
+> > Of course, it should be measured. It looks like hardware already is
+> > braindead, so maybe logic does not work there.
+> > 
+> > (And it may depend if you want max throughput or min latency).
+> 
+> Do you own such hardware?
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Thursday, December 17, 2009 3:27 PM
-> To: Hiremath, Vaibhav
-> Cc: linux-arm-kernel at lists.infradead.org; linux-mm at kvack.org; linux-
-> omap at vger.kernel.org
-> Subject: Re: CPU consumption is going as high as 95% on ARM Cortex
-> A8
-> 
-> On Thu, Dec 17, 2009 at 11:08:31AM +0530, Hiremath, Vaibhav wrote:
-> > Issue/Usage :-
-> > -------------
-> > The V4l2-Capture driver captures the data from video decoder into
-> buffer
-> > and the application does some processing on this buffer. The mmap
-> > implementation can be found at drivers/media/video/videobuf-dma-
-> contig.c,
-> > function__videobuf_mmap_mapper().
-> 
->         vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-> 
-> will result in the memory being mapped as 'Strongly Ordered',
-> resulting
-> in there being multiple mappings with differing types.  In later
-> kernels, we have pgprot_dmacoherent() and I'd suggest changing the
-> above
-> macro for that.
-> 
-[Hiremath, Vaibhav] Russell,
+No.
 
-I tried with your suggestion above but unfortunately it didn't work for me. I am seeing the same behavior with the pgprot_dmacoherent(). I pulled your patch (which got applied cleanly on 2.6.32-rc5) -
+> If no, why do you care?
 
------------------------------------------
-commit 26a26d329688ab018e068b412b03d43d7c299f0a
-Author: Russell King <rmk+kernel@arm.linux.org.uk>
-Date:   Fri Nov 20 21:06:43 2009 +0000
+Curiosity? You spreading statements that seem strange? Me wanting to
+understand VIVT caches?
 
-Subject: ARM: dma-mapping: switch ARMv7 DMA mappings to retain 'memory' attribute
------------------------------------------
+> For your information, a patch has been proposed already which does not 
+> imply disabling L2 nor flushing it on every context switches.  Would you 
+> care to familiarize yourself with it before commenting further please?
 
-Any other pointers/suggestions?
+Really? The patch seemed to solve cached vs. uncached accesses, but
+did not seem to solve two (cached) mappings of same file.
+									Pavel
 
-Thanks,
-Vaibhav
-
-> > Without PAGE_READONLY/PAGE_SHARED
-> >
-> > Important bits are [0-9] - 0x383
-> >
-> > With PAGE_READONLY/PAGE_SHARED set
-> >
-> > Important bits are [0-9] - 0x38F
-> 
-> So the difference is the C and B bits, which is more or less
-> expected
-> with the change you've made.
-> 
-> >
-> > The lines inside function "cpu_v7_set_pte_ext", is using the flag
-> as shown below -
-> >
-> >    tst     r1, #L_PTE_USER
-> >    orrne   r3, r3, #PTE_EXT_AP1
-> >    tstne   r3, #PTE_EXT_APX
-> >    bicne   r3, r3, #PTE_EXT_APX | PTE_EXT_AP0
-> >
-> > Without PAGE_READONLY/PAGE_SHARED		With flags set
-> >
-> > Access perm = reserved				Access Perm = Read
-> Only
-> 
-> The bits you quote above are L_PTE_* bits, so you need to be careful
-> decoding them.  0x383 gives
-> 
-> 	L_PTE_EXEC|L_PTE_USER|L_PTE_WRITE|L_PTE_YOUNG|L_PTE_PRESENT
-> 
-> which is as expected, and will be translated into: APX=0 AP1=1 AP0=0
-> which is user r/o, system r/w.  The same will be true of 0x38f.
-> 
-> > - I tried the same thing with another platform (ARM9) and it works
-> fine there.
-> >
-> > Can somebody help me to understand the flag
-> PAGE_SHARED/PAGE_READONLY
-> > and access permissions? Am I debugging this into right path? Does
-> > anybody have seen/observed similar issue before?
-> 
-> I think you're just seeing the effects of 'strongly ordered' memory
-> rather than anything actually wrong.
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
