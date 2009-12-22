@@ -1,122 +1,85 @@
 From: jeremy.kerr@canonical.com (Jeremy Kerr)
 Date: Tue, 22 Dec 2009 18:54:56 +0800
-Subject: [PATCH 05/11] arm-dt: Add CONFIG_ARM_DEVTREE
+Subject: [PATCH 01/11] arm: change command_line to cmd_line, and export it
 In-Reply-To: <1261479296.245235.191110925832.0.gpush@pororo>
-Message-ID: <1261479296.247114.799279819521.5.gpush@pororo>
+Message-ID: <1261479296.245647.957109336298.1.gpush@pororo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add some basic empty infrastructure for DT support on ARM.
+drivers/of/fdt expects a cmd_line symbol, while arm uses command_line.
+Change to the former and make accessible from setup.h, so that we can
+share with the fdt code.
+
+This means a change in section from .init.data to .data
 
 Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
 
 ---
- arch/arm/Kconfig            |   13 +++++++++++++
- arch/arm/include/asm/prom.h |   28 ++++++++++++++++++++++++++++
- arch/arm/kernel/setup.c     |   28 ++++++++++++++++++++++++++++
- 3 files changed, 69 insertions(+)
+ arch/arm/include/asm/setup.h |    6 ++++--
+ arch/arm/kernel/setup.c      |    8 ++++----
+ 2 files changed, 8 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 1c4119c..2e53d33 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1225,6 +1225,19 @@ endmenu
+diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
+index 5ccce0a..1e2ab1b 100644
+--- a/arch/arm/include/asm/setup.h
++++ b/arch/arm/include/asm/setup.h
+@@ -16,8 +16,6 @@
  
- menu "Boot options"
+ #include <linux/types.h>
  
-+config OF
-+	bool
-+	default n
+-#define COMMAND_LINE_SIZE 1024
+-
+ /* The list ends with an ATAG_NONE node. */
+ #define ATAG_NONE	0x00000000
+ 
+@@ -235,6 +233,10 @@ struct early_params {
+ static struct early_params __early_##fn __used			\
+ __attribute__((__section__(".early_param.init"))) = { name, fn }
+ 
++#define COMMAND_LINE_SIZE 1024
 +
-+config ARM_DEVTREE
-+	bool "Device tree support"
-+	default y
-+	depends on !DEBUG_LL
-+	select OF
-+	select OF_FLATTREE
-+	help
-+	  Support for OpenFirmware-style device trees
++extern char cmd_line[COMMAND_LINE_SIZE];
 +
- # Compressed boot loader in ROM.  Yes, we really want to ask about
- # TEXT and BSS so we preserve their values in the config files.
- config ZBOOT_ROM_TEXT
-diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
-new file mode 100644
-index 0000000..5260d22
---- /dev/null
-+++ b/arch/arm/include/asm/prom.h
-@@ -0,0 +1,28 @@
-+/*
-+ *  arch/arm/include/asm/prom.h
-+ *
-+ *  Copyright (C) 2009 Canonical Ltd. <jeremy.kerr@canonical.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+#ifndef __ASMARM_PROM_H
-+#define __ASMARM_PROM_H
-+
-+#include <asm/setup.h>
-+
-+#define OF_ROOT_NODE_ADDR_CELLS_DEFAULT	1
-+#define OF_ROOT_NODE_SIZE_CELLS_DEFAULT	1
-+
-+#define of_compat_cmp(s1, s2, l)	strncasecmp((s1), (s2), (l))
-+#define of_prop_cmp(s1, s2)		strcmp((s1), (s2))
-+#define of_node_cmp(s1, s2)		strcasecmp((s1), (s2))
-+
-+/* _ALIGN expects upwards alignment */
-+#define _ALIGN(addr, size)		(((addr)+((size)-1))&(~((size)-1)))
-+
-+extern struct device_node *of_chosen;
-+
-+#endif
+ #endif  /*  __KERNEL__  */
+ 
+ #endif
 diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 84fd876..e662d17 100644
+index c6c57b6..015803a 100644
 --- a/arch/arm/kernel/setup.c
 +++ b/arch/arm/kernel/setup.c
-@@ -47,6 +47,11 @@
- #include "atags.h"
- #include "tcm.h"
+@@ -117,7 +117,7 @@ EXPORT_SYMBOL(elf_platform);
  
-+#ifdef CONFIG_ARM_DEVTREE
-+#include <linux/of.h>
-+#include <linux/of_fdt.h>
-+#endif
-+
- #ifndef MEM_SIZE
- #define MEM_SIZE	(16*1024*1024)
- #endif
-@@ -659,6 +664,29 @@ static int __init customize_machine(void)
- }
- arch_initcall(customize_machine);
+ static const char *cpu_name;
+ static const char *machine_name;
+-static char __initdata command_line[COMMAND_LINE_SIZE];
++char cmd_line[COMMAND_LINE_SIZE];
  
-+/* arch-specific device tree handling */
-+#ifdef CONFIG_ARM_DEVTREE
-+void early_init_dt_scan_chosen_arch(unsigned long node) { }
-+
-+void early_init_dt_setup_initrd_arch(unsigned long start, unsigned long_end) { }
-+
-+void early_init_devtree_arch(void) { }
-+
-+int early_init_dt_scan_memory(unsigned long node, const char *uname,
-+			      int depth, void *data)
-+{
-+	return 0;
-+}
-+
-+int early_init_dt_scan_cpus(unsigned long node, const char *uname,
-+			    int depth, void *data)
-+{
-+	return 0;
-+}
-+
-+struct device_node *of_chosen;
-+#endif /* CONFIG_ARM_DEVTREE */
-+
- void __init setup_arch(char **cmdline_p)
+ static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
+ static union { char c[4]; unsigned long l; } endian_test __initdata = { { 'l', '?', '?', 'b' } };
+@@ -446,7 +446,7 @@ __early_param("mem=", early_mem);
+  */
+ static void __init parse_cmdline(char **cmdline_p, char *from)
  {
- 	struct tag *tags = (struct tag *)&init_tags;
+-	char c = ' ', *to = command_line;
++	char c = ' ', *to = cmd_line;
+ 	int len = 0;
+ 
+ 	for (;;) {
+@@ -458,7 +458,7 @@ static void __init parse_cmdline(char **cmdline_p, char *from)
+ 				int arglen = strlen(p->arg);
+ 
+ 				if (memcmp(from, p->arg, arglen) == 0) {
+-					if (to != command_line)
++					if (to != cmd_line)
+ 						to -= 1;
+ 					from += arglen;
+ 					p->fn(&from);
+@@ -477,7 +477,7 @@ static void __init parse_cmdline(char **cmdline_p, char *from)
+ 		*to++ = c;
+ 	}
+ 	*to = '\0';
+-	*cmdline_p = command_line;
++	*cmdline_p = cmd_line;
+ }
+ 
+ static void __init
