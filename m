@@ -1,31 +1,40 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 22 Dec 2009 09:12:33 -0700 (MST)
-Subject: [PATCH 1/1] ARM: OMAP4: PM: Remove the checks preventing OMAP4
-	clockdomain validation
-In-Reply-To: <1261391747-24066-1-git-send-email-abhijitpagare@ti.com>
-References: <1261391747-24066-1-git-send-email-abhijitpagare@ti.com>
-Message-ID: <alpine.DEB.2.00.0912220911160.5563@utopia.booyaka.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 22 Dec 2009 17:28:27 +0100
+Subject: [PATCH] pcmcia/at91_cf: don't redefine SZ_2K
+In-Reply-To: <20091222152827.GB17191@n2100.arm.linux.org.uk>
+References: <1261343434-3920-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20091222152827.GB17191@n2100.arm.linux.org.uk>
+Message-ID: <20091222162827.GA20681@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Abhijit,
-
-On Mon, 21 Dec 2009, Abhijit Pagare wrote:
-
-> The clockdomain related code beng in place it is now not necessary to have
-> some of the clock code commented out. This would help the validation of the
-> clockdomain functions using the clock level interfaces.
+On Tue, Dec 22, 2009 at 03:28:27PM +0000, Russell King - ARM Linux wrote:
+> On Sun, Dec 20, 2009 at 10:10:34PM +0100, Uwe Kleine-K?nig wrote:
+> > This fixes:
+> > 
+> > 	drivers/pcmcia/at91_cf.c:55:1: warning: "SZ_2K" redefined
+> > 
+> > Since
+> > 
+> > 	c1191b0 ([ARM] Kirkwood: create a mapping for the Security Accelerator SRAM)
 > 
-> Signed-off-by: Abhijit Pagare <abhijitpagare@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
+> Have you checked whether everything which uses at91_cf still builds after
+> this patch has been applied (eg, AVR32 stuff?)
+I wasn't aware that the driver is used on AVR32, too.
 
-Could you also deal with the TODO in mach-omap2/clock44xx_data.c ?
+Hmmmm, drivers/pcmcia/Kconfig has:
 
-Also, has this patch been tested?  If so, please list the platform it was 
-tested on in the commit message.
+	config AT91_CF
+		tristate "AT91 CompactFlash Controller"
+		depends on PCMCIA && ARCH_AT91RM9200
+		...
 
-thanks,
+So unless ARCH_AT91RM9200 is used on AVR32 there is no problem.
+Moreover AVR32 doesn't seem to provide <asm/sizes.h>.
 
-- Paul
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
