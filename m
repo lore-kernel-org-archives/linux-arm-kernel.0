@@ -1,9 +1,9 @@
 From: vitalywool@gmail.com (Vitaly Wool)
-Date: Tue, 22 Dec 2009 09:47:05 +0300
-Subject: [PATCH 1/10] ARM: PNX4008: convert to clkdev
-In-Reply-To: <083DF309106F364B939360100EC290F804F592E901@eu1rdcrdc1wx030.exi.nxp.com>
-References: <083DF309106F364B939360100EC290F804F592E901@eu1rdcrdc1wx030.exi.nxp.com>
-Message-ID: <acd2a5930912212247j2c3c7d43s879f86da92c0f01@mail.gmail.com>
+Date: Tue, 22 Dec 2009 09:48:15 +0300
+Subject: [PATCH 2/10] ARM: PNX4008: simplify clk enable/disable paths
+In-Reply-To: <083DF309106F364B939360100EC290F804F592E902@eu1rdcrdc1wx030.exi.nxp.com>
+References: <083DF309106F364B939360100EC290F804F592E902@eu1rdcrdc1wx030.exi.nxp.com>
+Message-ID: <acd2a5930912212248p41684181yb0f9e99dfaf029c9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,15 +17,10 @@ Acked-by: Vitaly Wool <vitalywool@gmail.com>
 
 
 > ---
->  arch/arm/Kconfig                            |    1 +
->  arch/arm/mach-pnx4008/clock.c               |   73
-> +++++++++++++++------------
->  arch/arm/mach-pnx4008/clock.h               |    2 -
->  arch/arm/mach-pnx4008/include/mach/clkdev.h |    7 +++
->  4 files changed, 48 insertions(+), 35 deletions(-)
->  create mode 100644 arch/arm/mach-pnx4008/include/mach/clkdev.h
->
+>  arch/arm/mach-pnx4008/clock.c |   56
+> +++++++++++++++++-----------------------
+>  1 files changed, 24 insertions(+), 32 deletions(-)
 >
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091222/4a33722f/attachment-0001.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091222/91942118/attachment-0001.htm>
