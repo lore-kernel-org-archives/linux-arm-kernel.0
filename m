@@ -1,51 +1,31 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 22 Dec 2009 09:07:51 -0700 (MST)
-Subject: [GIT PULL] OMAP clock/vmalloc fixes for 2.6.33-rc
-Message-ID: <alpine.DEB.2.00.0912220906130.5563@utopia.booyaka.com>
+Date: Tue, 22 Dec 2009 09:12:33 -0700 (MST)
+Subject: [PATCH 1/1] ARM: OMAP4: PM: Remove the checks preventing OMAP4
+	clockdomain validation
+In-Reply-To: <1261391747-24066-1-git-send-email-abhijitpagare@ti.com>
+References: <1261391747-24066-1-git-send-email-abhijitpagare@ti.com>
+Message-ID: <alpine.DEB.2.00.0912220911160.5563@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Abhijit,
 
-Hi Tony,
+On Mon, 21 Dec 2009, Abhijit Pagare wrote:
 
-The following changes since commit 55639353a0035052d9ea6cfe4dde0ac7fcbb2c9f:
-  Linus Torvalds (1):
-        Linux 2.6.33-rc1
+> The clockdomain related code beng in place it is now not necessary to have
+> some of the clock code commented out. This would help the validation of the
+> clockdomain functions using the clock level interfaces.
+> 
+> Signed-off-by: Abhijit Pagare <abhijitpagare@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
 
-are available in the git repository at:
+Could you also deal with the TODO in mach-omap2/clock44xx_data.c ?
 
-  git://git.pwsan.com/linux-2.6 for_2_6_33_rc_a
+Also, has this patch been tested?  If so, please list the platform it was 
+tested on in the commit message.
 
-Abhijit Pagare (1):
-      ARM: OMAP3: PM: Fix the Invalid CM_CLKSTCTRL reg access.
-
-Cory Maccarrone (1):
-      OMAP1 clock: Add missing clocks for OMAP 7xx
-
-Huang Weiyi (1):
-      OMAP2: remove duplicated #include
-
-Kevin Hilman (1):
-      OMAP3: clock: add clockdomains for UART1 & 2
-
-Paul Walmsley (4):
-      OMAP2xxx IO mapping: mark DSP mappings as being 2420-only
-      OMAP2420 IO mapping: move IVA mapping virtual address out of vmalloc space
-      OMAP3 clock: McBSP 2, 3, 4 functional clock parent is PER_96M_FCLK, not CORE_96M_FCLK
-      OMAP clock: remove incorrect EXPORT_SYMBOL()s
-
-Tuukka Toivonen (1):
-      OMAP3 clock: Add capability to change rate of dpll4_m5_ck
-
- arch/arm/mach-omap1/clock_data.c     |    4 +-
- arch/arm/mach-omap2/clock34xx.c      |    1 -
- arch/arm/mach-omap2/clock34xx_data.c |    6 ++++-
- arch/arm/mach-omap2/clockdomain.c    |    4 +-
- arch/arm/mach-omap2/io.c             |   19 ++++++++---------
- arch/arm/plat-omap/clock.c           |    6 -----
- arch/arm/plat-omap/include/plat/io.h |   36 +++++++++++++++------------------
- arch/arm/plat-omap/io.c              |   12 +++++-----
- 8 files changed, 40 insertions(+), 48 deletions(-)
-
+thanks,
 
 - Paul
