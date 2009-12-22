@@ -1,46 +1,25 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Tue, 22 Dec 2009 18:54:56 +0800
-Subject: [PATCH 04/11] arm-dt: Add ATAG_DEVTREE tag
-In-Reply-To: <1261479296.245235.191110925832.0.gpush@pororo>
-Message-ID: <1261479296.246767.738000991632.4.gpush@pororo>
+From: bonzini@gnu.org (Paolo Bonzini)
+Date: Tue, 22 Dec 2009 12:33:34 +0100
+Subject: [PATCH] ARM: Convert BUG() to use unreachable()
+In-Reply-To: <84fc9c000912170917y4b2772d0n47bb4dabc74b91ef@mail.gmail.com>
+References: <1260266138-17684-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20091217150120.GD24967@shareable.org>
+	<4B2A65C6.7080009@caviumnetworks.com>
+	<84fc9c000912170917y4b2772d0n47bb4dabc74b91ef@mail.gmail.com>
+Message-ID: <4B30AE8E.8060805@gnu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We'd like to provide a pointer to the device tree blob through the atags
-mechanism, so add a tag type containing a physical dtb pointer.
+On 12/17/2009 06:17 PM, Richard Guenther wrote:
+> It shouldn't as *(int *)0 = 0; might trap.  But if you want to be sure
+> use
+>     __builtin_trap ();
+> instead for the whole sequence (the unreachable is implied then).
+> GCC choses a size-optimal trap representation for your target then.
 
-We won't need a parser for this, as we'll need to do the devtree parsing
-a little earlier than other tags.
+Agree that it shouldn't but just to be sure I'd use
 
-Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+   *(volatile int *)0 = 0;
+   unreachable ();
 
----
- arch/arm/include/asm/setup.h |    8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
-index 3fa2555..99ba6db 100644
---- a/arch/arm/include/asm/setup.h
-+++ b/arch/arm/include/asm/setup.h
-@@ -141,6 +141,13 @@ struct tag_memclk {
- 	__u32 fmemclk;
- };
- 
-+/* OF device tree blob pointer */
-+#define ATAG_DEVTREE	0x5441000a
-+
-+struct tag_devtree {
-+	__u32 devtree;		/* physical address */
-+};
-+
- struct tag {
- 	struct tag_header hdr;
- 	union {
-@@ -153,6 +160,7 @@ struct tag {
- 		struct tag_revision	revision;
- 		struct tag_videolfb	videolfb;
- 		struct tag_cmdline	cmdline;
-+		struct tag_devtree	devtree;
- 
- 		/*
- 		 * Acorn specific
+Paolo
