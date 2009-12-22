@@ -1,44 +1,46 @@
 From: jeremy.kerr@canonical.com (Jeremy Kerr)
 Date: Tue, 22 Dec 2009 18:54:56 +0800
-Subject: [PATCH 03/11] arm: export arm_add_memory
+Subject: [PATCH 04/11] arm-dt: Add ATAG_DEVTREE tag
 In-Reply-To: <1261479296.245235.191110925832.0.gpush@pororo>
-Message-ID: <1261479296.246435.297518795208.3.gpush@pororo>
+Message-ID: <1261479296.246767.738000991632.4.gpush@pororo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We'd like to add memory from the device tree, so make arm_add_memory
-non-static and add a prototype in setup.h
+We'd like to provide a pointer to the device tree blob through the atags
+mechanism, so add a tag type containing a physical dtb pointer.
+
+We won't need a parser for this, as we'll need to do the devtree parsing
+a little earlier than other tags.
 
 Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
 
 ---
- arch/arm/include/asm/setup.h |    2 ++
- arch/arm/kernel/setup.c      |    2 +-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/setup.h |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
-index 3b6f461..3fa2555 100644
+index 3fa2555..99ba6db 100644
 --- a/arch/arm/include/asm/setup.h
 +++ b/arch/arm/include/asm/setup.h
-@@ -225,6 +225,8 @@ extern struct meminfo meminfo;
+@@ -141,6 +141,13 @@ struct tag_memclk {
+ 	__u32 fmemclk;
+ };
  
- extern char cmd_line[COMMAND_LINE_SIZE];
- 
-+extern int arm_add_memory(unsigned long start, unsigned long size);
++/* OF device tree blob pointer */
++#define ATAG_DEVTREE	0x5441000a
 +
- #endif  /*  __KERNEL__  */
++struct tag_devtree {
++	__u32 devtree;		/* physical address */
++};
++
+ struct tag {
+ 	struct tag_header hdr;
+ 	union {
+@@ -153,6 +160,7 @@ struct tag {
+ 		struct tag_revision	revision;
+ 		struct tag_videolfb	videolfb;
+ 		struct tag_cmdline	cmdline;
++		struct tag_devtree	devtree;
  
- #endif
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 4206286..84fd876 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -383,7 +383,7 @@ static struct machine_desc * __init setup_machine(unsigned int nr)
- 	return list;
- }
- 
--static int __init arm_add_memory(unsigned long start, unsigned long size)
-+int __init arm_add_memory(unsigned long start, unsigned long size)
- {
- 	struct membank *bank = &meminfo.bank[meminfo.nr_banks];
- 
+ 		/*
+ 		 * Acorn specific
