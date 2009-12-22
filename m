@@ -1,129 +1,37 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 22 Dec 2009 17:31:05 +0100
-Subject: [PATCH v3] imx/mx3: depend on USB_ULPI for otg_ulpi_create
-In-Reply-To: <1261410116-10382-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1261410116-10382-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1261499465-21504-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: filip.zyzniewski@gmail.com (Filip Zyzniewski)
+Date: Tue, 22 Dec 2009 17:33:30 +0100
+Subject: DMA/cache problems on SA1110/SA1111 (Was: Re: USB Host on a SA1111)
+Message-ID: <de2dcbb80912220833mdc1788cq6f60dd5522e7ab0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-otg_ulpi_create is defined in drivers/usb/otg/ulpi.c which depends on
-CONFIG_USB_ULPI.  So protect its usage by the same symbol.  Moreover
-mxc_ulpi_access_ops needs CONFIG_MXC_ULPI.
+On Thu, Dec 17, 2009 at 10:13 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Valentin Longchamp <valentin.longchamp@epfl.ch>
-Cc: Daniel Mack <daniel@caiaq.de>
----
-Hello,
+>> Russell you got any clues on this? From my point of view it really should
+>> just work. But Ive never done this myself.
+>
+> I've never really been that much involved with USB stuff, so can't really
+> comment.
+>
 
-ups, the last version introduced another FTBFS and a warning.  This patch is
-better.
+There was some discussion about this at linux-usb mailing list.
+The interesting part is here:
+http://thread.gmane.org/gmane.linux.usb.general/25732
 
-The old comment about not building drivers/usb/otg/ulpi.o into vmlinux
-still applies, so I reproduce the old text again:
+Especially the last post by Alan Stern:
 
-This is still not a complete fix, as with
-CONFIG_USB=m, CONFIG_PCI=n, CONFIG_USB_OTG_UTILS=n
-drivers/usb/otg/ulpi.o isn't included in drivers/builtin.o and so the
-linker still errors out.  Maybe USB_ULPI needs to select USB_OTG_UTILS?
-Then the line
+> I looked at one of these logs. ?Apparently there's a problem with the
+> memory caching and DMA. ?With some of the commands, the debugging
+> message shows incorrect data in the buffer. ?But later on, when the
+> data gets used, it obviously is correct.
+> This implies that something is wrong with the implementation of
+> dma_map_single() or dma_unmap_unsingle(). ?And it might explain why
+> changing the system's cache settings affects the behavior.
 
-	obj-$(CONFIG_USB_ULPI)          += otg/
+I don't know architecture handling details, could somebody more
+knowledgeable give me
+some clues about where to begin fixing this? What could be broken?
 
-in drivers/usb/Makefile becomes superflous as drivers/Makefile has
-
-	obj-$(CONFIG_USB_OTG_UTILS)     += usb/otg/
-
-.  OTOH drivers/usb/otg/ulpi.c doesn't seem to make use of anything
-defined in drivers/usb/otg/otg.c.
-
-Best regards
-Uwe
----
- arch/arm/mach-mx3/Kconfig            |    3 ++-
- arch/arm/mach-mx3/mach-mx31lite.c    |    4 ++++
- arch/arm/mach-mx3/mach-mx31moboard.c |    5 +++++
- 3 files changed, 11 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
-index ea8ed10..2829441 100644
---- a/arch/arm/mach-mx3/Kconfig
-+++ b/arch/arm/mach-mx3/Kconfig
-@@ -49,6 +49,7 @@ config MACH_PCM037_EET
- config MACH_MX31LITE
- 	bool "Support MX31 LITEKIT (LogicPD)"
- 	select ARCH_MX31
-+	select MXC_ULPI if USB_ULPI
- 	help
- 	  Include support for MX31 LITEKIT platform. This includes specific
- 	  configurations for the board and its peripherals.
-@@ -63,7 +64,7 @@ config MACH_MX31_3DS
- config MACH_MX31MOBOARD
- 	bool "Support mx31moboard platforms (EPFL Mobots group)"
- 	select ARCH_MX31
--	select MXC_ULPI
-+	select MXC_ULPI if USB_ULPI
- 	help
- 	  Include support for mx31moboard platform. This includes specific
- 	  configurations for the board and its peripherals.
-diff --git a/arch/arm/mach-mx3/mach-mx31lite.c b/arch/arm/mach-mx3/mach-mx31lite.c
-index db741be..1e26397 100644
---- a/arch/arm/mach-mx3/mach-mx31lite.c
-+++ b/arch/arm/mach-mx3/mach-mx31lite.c
-@@ -135,6 +135,7 @@ static struct spi_board_info mc13783_spi_dev __initdata = {
-  * USB
-  */
- 
-+#if defined(CONFIG_USB_ULPI)
- #define USB_PAD_CFG (PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST | PAD_CTL_HYS_CMOS | \
- 			PAD_CTL_ODE_CMOS | PAD_CTL_100K_PU)
- 
-@@ -180,6 +181,7 @@ static struct mxc_usbh_platform_data usbh2_pdata = {
- 	.portsc = MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
- 	.flags  = MXC_EHCI_POWER_PINS_ENABLED,
- };
-+#endif
- 
- /*
-  * NOR flash
-@@ -256,11 +258,13 @@ static void __init mxc_board_init(void)
- 	mxc_register_device(&mxc_spi_device1, &spi1_pdata);
- 	spi_register_board_info(&mc13783_spi_dev, 1);
- 
-+#if defined(CONFIG_USB_ULPI)
- 	/* USB */
- 	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
- 				USB_OTG_DRV_VBUS | USB_OTG_DRV_VBUS_EXT);
- 
- 	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
-+#endif
- 
- 	/* SMSC9117 IRQ pin */
- 	ret = gpio_request(IOMUX_TO_GPIO(MX31_PIN_SFS6), "sms9117-irq");
-diff --git a/arch/arm/mach-mx3/mach-mx31moboard.c b/arch/arm/mach-mx3/mach-mx31moboard.c
-index 949b4de..9428827 100644
---- a/arch/arm/mach-mx3/mach-mx31moboard.c
-+++ b/arch/arm/mach-mx3/mach-mx31moboard.c
-@@ -346,6 +346,8 @@ static struct fsl_usb2_platform_data usb_pdata = {
- 	.phy_mode	= FSL_USB2_PHY_ULPI,
- };
- 
-+#if defined(CONFIG_USB_ULPI)
-+
- #define USBH2_EN_B IOMUX_TO_GPIO(MX31_PIN_SCK6)
- 
- static int moboard_usbh2_hw_init(struct platform_device *pdev)
-@@ -394,6 +396,9 @@ static int __init moboard_usbh2_init(void)
- 
- 	return mxc_register_device(&mxc_usbh2, &usbh2_pdata);
- }
-+#else
-+static inline int moboard_usbh2_init(void) { return 0; }
-+#endif
- 
- 
- static struct gpio_led mx31moboard_leds[] = {
--- 
-1.6.5.2
+regards,
+Filip Zyzniewski
