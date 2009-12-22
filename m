@@ -1,85 +1,44 @@
 From: jeremy.kerr@canonical.com (Jeremy Kerr)
 Date: Tue, 22 Dec 2009 18:54:56 +0800
-Subject: [PATCH 01/11] arm: change command_line to cmd_line, and export it
+Subject: [PATCH 03/11] arm: export arm_add_memory
 In-Reply-To: <1261479296.245235.191110925832.0.gpush@pororo>
-Message-ID: <1261479296.245647.957109336298.1.gpush@pororo>
+Message-ID: <1261479296.246435.297518795208.3.gpush@pororo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drivers/of/fdt expects a cmd_line symbol, while arm uses command_line.
-Change to the former and make accessible from setup.h, so that we can
-share with the fdt code.
-
-This means a change in section from .init.data to .data
+We'd like to add memory from the device tree, so make arm_add_memory
+non-static and add a prototype in setup.h
 
 Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
 
 ---
- arch/arm/include/asm/setup.h |    6 ++++--
- arch/arm/kernel/setup.c      |    8 ++++----
- 2 files changed, 8 insertions(+), 6 deletions(-)
+ arch/arm/include/asm/setup.h |    2 ++
+ arch/arm/kernel/setup.c      |    2 +-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
-index 5ccce0a..1e2ab1b 100644
+index 3b6f461..3fa2555 100644
 --- a/arch/arm/include/asm/setup.h
 +++ b/arch/arm/include/asm/setup.h
-@@ -16,8 +16,6 @@
+@@ -225,6 +225,8 @@ extern struct meminfo meminfo;
  
- #include <linux/types.h>
+ extern char cmd_line[COMMAND_LINE_SIZE];
  
--#define COMMAND_LINE_SIZE 1024
--
- /* The list ends with an ATAG_NONE node. */
- #define ATAG_NONE	0x00000000
- 
-@@ -235,6 +233,10 @@ struct early_params {
- static struct early_params __early_##fn __used			\
- __attribute__((__section__(".early_param.init"))) = { name, fn }
- 
-+#define COMMAND_LINE_SIZE 1024
-+
-+extern char cmd_line[COMMAND_LINE_SIZE];
++extern int arm_add_memory(unsigned long start, unsigned long size);
 +
  #endif  /*  __KERNEL__  */
  
  #endif
 diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index c6c57b6..015803a 100644
+index 4206286..84fd876 100644
 --- a/arch/arm/kernel/setup.c
 +++ b/arch/arm/kernel/setup.c
-@@ -117,7 +117,7 @@ EXPORT_SYMBOL(elf_platform);
- 
- static const char *cpu_name;
- static const char *machine_name;
--static char __initdata command_line[COMMAND_LINE_SIZE];
-+char cmd_line[COMMAND_LINE_SIZE];
- 
- static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
- static union { char c[4]; unsigned long l; } endian_test __initdata = { { 'l', '?', '?', 'b' } };
-@@ -446,7 +446,7 @@ __early_param("mem=", early_mem);
-  */
- static void __init parse_cmdline(char **cmdline_p, char *from)
- {
--	char c = ' ', *to = command_line;
-+	char c = ' ', *to = cmd_line;
- 	int len = 0;
- 
- 	for (;;) {
-@@ -458,7 +458,7 @@ static void __init parse_cmdline(char **cmdline_p, char *from)
- 				int arglen = strlen(p->arg);
- 
- 				if (memcmp(from, p->arg, arglen) == 0) {
--					if (to != command_line)
-+					if (to != cmd_line)
- 						to -= 1;
- 					from += arglen;
- 					p->fn(&from);
-@@ -477,7 +477,7 @@ static void __init parse_cmdline(char **cmdline_p, char *from)
- 		*to++ = c;
- 	}
- 	*to = '\0';
--	*cmdline_p = command_line;
-+	*cmdline_p = cmd_line;
+@@ -383,7 +383,7 @@ static struct machine_desc * __init setup_machine(unsigned int nr)
+ 	return list;
  }
  
- static void __init
+-static int __init arm_add_memory(unsigned long start, unsigned long size)
++int __init arm_add_memory(unsigned long start, unsigned long size)
+ {
+ 	struct membank *bank = &meminfo.bank[meminfo.nr_banks];
+ 
