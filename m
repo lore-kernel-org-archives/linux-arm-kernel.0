@@ -1,94 +1,24 @@
-From: abhijitpagare@ti.com (Abhijit Pagare)
-Date: Wed, 23 Dec 2009 21:17:50 +0530
-Subject: [PATCH 1/1] ARM: OMAP4: PM: Remove the checks preventing OMAP4
-	clockdomain validation
-Message-ID: <1261583270-22267-1-git-send-email-abhijitpagare@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 23 Dec 2009 16:50:09 +0000
+Subject: Amba device porting
+In-Reply-To: <20091223101902.GA15537@nokia.com>
+References: <20091223101902.GA15537@nokia.com>
+Message-ID: <20091223165009.GA13900@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clockdomain related code being in place, it is not necessary to have
-some part of the clock code commented out. This would help the validation of
-the clockdomain functions using the clock level interfaces.
+On Wed, Dec 23, 2009 at 12:19:02PM +0200, Roman wrote:
+> Hi,
+> 
+> I planned to port the omap3 SDTI (Serial Debug Trace Interface) driver to amba based interface.
+> 
+> SDTI memory map is two parts composed:
+> 0x54500000 0x5450FFFF 4KB       SDTI module (configuration) - coresight based format.
+> 0x54510000 0x545FFFFF 1984KB    Reserved
+> 0x54600000 0x546FFFFF 1MB       SDTI module (window)
+> 
+> But amba interface seems to support only one memory region resource.
 
-Signed-off-by: Abhijit Pagare <abhijitpagare@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
----
-
-Compiled and Boot Tested on OMAP4430 simulator, ES1 Chip & OMAP3430 SDP.
-And also Compiled for OMAP2430 and OMAP2420
-
-This patch has a dependency on the earlier set of OMAP4 clock-domain patches.
-
- arch/arm/mach-omap2/clock.c          |    8 --------
- arch/arm/mach-omap2/clock44xx_data.c |    2 --
- 2 files changed, 0 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index 759c72a..a6d570a 100644
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -181,7 +181,6 @@ static int _dpll_test_fint(struct clk *clk, u8 n)
-  * clockdomain pointer, and save it into the struct clk.  Intended to be
-  * called during clk_register().  No return value.
-  */
--#ifndef CONFIG_ARCH_OMAP4 /* FIXME: Remove this once clkdm f/w is in place */
- void omap2_init_clk_clkdm(struct clk *clk)
- {
- 	struct clockdomain *clkdm;
-@@ -199,7 +198,6 @@ void omap2_init_clk_clkdm(struct clk *clk)
- 			 "clkdm %s\n", clk->name, clk->clkdm_name);
- 	}
- }
--#endif
- 
- /**
-  * omap2_init_clksel_parent - set a clksel clk's parent field from the hardware
-@@ -476,10 +474,8 @@ void omap2_clk_disable(struct clk *clk)
- 		_omap2_clk_disable(clk);
- 		if (clk->parent)
- 			omap2_clk_disable(clk->parent);
--#ifndef CONFIG_ARCH_OMAP4 /* FIXME: Remove this once clkdm f/w is in place */
- 		if (clk->clkdm)
- 			omap2_clkdm_clk_disable(clk->clkdm, clk);
--#endif
- 
- 	}
- }
-@@ -489,10 +485,8 @@ int omap2_clk_enable(struct clk *clk)
- 	int ret = 0;
- 
- 	if (clk->usecount++ == 0) {
--#ifndef CONFIG_ARCH_OMAP4 /* FIXME: Remove this once clkdm f/w is in place */
- 		if (clk->clkdm)
- 			omap2_clkdm_clk_enable(clk->clkdm, clk);
--#endif
- 
- 		if (clk->parent) {
- 			ret = omap2_clk_enable(clk->parent);
-@@ -511,10 +505,8 @@ int omap2_clk_enable(struct clk *clk)
- 	return ret;
- 
- err:
--#ifndef CONFIG_ARCH_OMAP4 /* FIXME: Remove this once clkdm f/w is in place */
- 	if (clk->clkdm)
- 		omap2_clkdm_clk_disable(clk->clkdm, clk);
--#endif
- 	clk->usecount--;
- 	return ret;
- }
-diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
-index 2210e22..f47ba9e 100644
---- a/arch/arm/mach-omap2/clock44xx_data.c
-+++ b/arch/arm/mach-omap2/clock44xx_data.c
-@@ -2749,9 +2749,7 @@ int __init omap2_clk_init(void)
- 		if (c->cpu & cpu_clkflg) {
- 			clkdev_add(&c->lk);
- 			clk_register(c->lk.clk);
--			/* TODO
- 			omap2_init_clk_clkdm(c->lk.clk);
--			*/
- 		}
- 
- 	recalculate_root_clocks();
--- 
-1.5.4.7
+The 'amba' interface is more a primecell interface.  Is SDTI a primecell
+peripheral?  If not, then it shouldn't be using the AMBA "primecell" bus
+support.
