@@ -1,60 +1,44 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 23 Dec 2009 21:45:28 +1100
-Subject: [PATCH 1/4] mfd: enable max8925
-In-Reply-To: <771cded00912230141o5f9cf872rd6579d9cda6720b1@mail.gmail.com>
-References: <771cded00912210445v67175632i876b7909de8afae3@mail.gmail.com>
-	<20091222043547.GA4411@verge.net.au>
-	<771cded00912230141o5f9cf872rd6579d9cda6720b1@mail.gmail.com>
-Message-ID: <20091223104528.GC16537@verge.net.au>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 23 Dec 2009 20:01:59 +0900
+Subject: [PATCH 3/7] ARM: S5P6440: Add IRQ support
+In-Reply-To: <20091223091655.0f59ee94@life-in-the-fast-lane>
+References: <1261127996-30253-1-git-send-email-kgene.kim@samsung.com>
+	<1261127996-30253-2-git-send-email-kgene.kim@samsung.com>
+	<1261127996-30253-3-git-send-email-kgene.kim@samsung.com>
+	<1261127996-30253-4-git-send-email-kgene.kim@samsung.com>
+	<1261127996-30253-5-git-send-email-kgene.kim@samsung.com>
+	<20091218145347.4ad08b97@life-in-the-fast-lane>
+	<000201ca838f$f7d25880$e7770980$%kim@samsung.com>
+	<20091223091655.0f59ee94@life-in-the-fast-lane>
+Message-ID: <000f01ca83bf$59aaabf0$0d0003d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 23, 2009 at 04:41:56AM -0500, Haojian Zhuang wrote:
-> On Mon, Dec 21, 2009 at 11:35 PM, Simon Horman <horms@verge.net.au> wrote:
-> > On Mon, Dec 21, 2009 at 07:45:27AM -0500, Haojian Zhuang wrote:
-> >> >From 567add422a0d2214e037c3ed1b424b21776dfe34 Mon Sep 17 00:00:00 2001
-> >> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> >> Date: Thu, 17 Dec 2009 12:30:16 -0500
-> >> Subject: [PATCH] mfd: enable max8925
-> >>
-> >> Max8925 is a Power Management IC from Maxim Semiconductor.
-> >>
-> >> Do basic support on accessing MAX8925.
-> >>
-> >> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> >
-> > Hi,
-> >
-> > It looks like max8925_device_init() needs to be annotated with __devinit
-> >
-> > $ make CONFIG_DEBUG_SECTION_MISMATCH=y
-> > WARNING: drivers/mfd/max8925.o(.text+0x28): Section mismatch in reference
-> > from the function max8925_device_init() to the function
-> > .devinit.text:device_gpm_init()
-> > The function max8925_device_init() references
-> > the function __devinit device_gpm_init().
-> > This is often because max8925_device_init lacks a __devinit
-> > annotation or the annotation of device_gpm_init is wrong.
-> >
-> > WARNING: drivers/mfd/max8925.o(.text+0x32): Section mismatch in reference
-> > from the function max8925_device_init() to the function
-> > .devinit.text:device_adc_init()
-> > The function max8925_device_init() references
-> > the function __devinit device_adc_init().
-> > This is often because max8925_device_init lacks a __devinit
-> > annotation or the annotation of device_adc_init is wrong.
-> >
-> >
+Marc Zyngier wrote:
+> On Wed, 23 Dec 2009 14:22:48 +0900
+> Kukjin Kim <kgene.kim@samsung.com> wrote:
 > 
-> Updated the patch.
+> Kukjin,
 > 
-> By the way, how to enable CONFIG_DEBUG_SECTION_MISMATCH? I found that
-> this config is dependant on CONFIG_UNDEFINED. I can't find who defines
-> CONFIG_UNDEFINED in kernel.
+> > > > +#define IRQ_EINT_GROUP8_NR	(11)
+> > >
+> > > Group 8 has interrupts numbered from 3 to 11, so this should read 12.
+> > According to the UM's '5.10 PORT P Control Registers', it has 11
+interrupts
+> > numbered from 3 to 10. So I think it's right.
+> 
+> Ah, it looks like a documentation bug, then... My UM describes
+> EINT8[8:11]. Probably yours is more correct.
 
-Thanks, the new version fixes the problem that I noticed.
+Marc,
 
-I've always just enabled CONFIG_DEBUG_SECTION_MISMATCH on the command
-line rather than through .config. That is, I run:
+Anyway, I will check another our UM.
+My UM version is Rev0.10_090728.
 
-make CONFIG_DEBUG_SECTION_MISMATCH=y
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+System LSI Division, SAMSUNG ELECTRONICS CO., LTD.
