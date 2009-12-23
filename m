@@ -1,28 +1,48 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 23 Dec 2009 13:37:39 +0000
-Subject: [PATCH] pxa: fix gpio_to_irq() for GPIOs on expander chips
-In-Reply-To: <f17812d70912230448k62f6d455s17b75050793975ad@mail.gmail.com>
-References: <1259148990-10372-1-git-send-email-mad_soft@inbox.ru>
-	<74d0deb30912140149hc20c19dy605a259dc3f6e6e0@mail.gmail.com>
-	<771cded00912230107v5d2cbb18y733b62b0d6303887@mail.gmail.com>
-	<20091223112306.4a45064e@life-in-the-fast-lane>
-	<f17812d70912230448k62f6d455s17b75050793975ad@mail.gmail.com>
-Message-ID: <20091223133739.GB4799@sirena.org.uk>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Wed, 23 Dec 2009 21:44:11 +0800
+Subject: [PATCH] NUC900: add timer 0-4 clk enabling definition
+Message-ID: <4B321EAB.3080606@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 23, 2009 at 08:48:21PM +0800, Eric Miao wrote:
-> On Wed, Dec 23, 2009 at 6:23 PM, Marc Zyngier <maz@misterjones.org> wrote:
+Dear sirs,
 
-> > We could mimic what s3c2410 does to provide some extra GPIO space for
-> > platforms that require it (arch/arm/mach-s3c2410/include/mach/gpio.h):
+Li Jie, please re-make your previous patch relative to this.
 
-> > #define ARCH_NR_GPIOS ?? (256 + CONFIG_S3C24XX_GPIO_EXTRA)
 
-> That's going to be making it impossible for mach-* to be built into a
-> single kernel (call me ambitious :-).
+Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
+---
+ arch/arm/mach-w90x900/cpu.c |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
 
-The S3C stuff does try to support this - S3C24XX_GPIO_EXTRA isn't
-selected directly but instead boards select other symbols with
-particular values and then "default if ..." is used in Kconfig to set
-the largest value that was asked for.
+diff --git a/arch/arm/mach-w90x900/cpu.c b/arch/arm/mach-w90x900/cpu.c
+index 20dc0c9..1192424 100644
+--- a/arch/arm/mach-w90x900/cpu.c
++++ b/arch/arm/mach-w90x900/cpu.c
+@@ -61,6 +61,11 @@ static DEFINE_CLK(usbd, 8);
+ static DEFINE_CLK(usbh, 9);
+ static DEFINE_CLK(g2d, 10);;
+ static DEFINE_CLK(pwm, 18);
++static DEFINE_CLK(timer0, 19);
++static DEFINE_CLK(timer1, 20);
++static DEFINE_CLK(timer2, 21);
++static DEFINE_CLK(timer3, 22);
++static DEFINE_CLK(timer4, 23);
+ static DEFINE_CLK(ps2, 24);
+ static DEFINE_CLK(kpi, 25);
+ static DEFINE_CLK(wdt, 26);
+@@ -90,6 +95,12 @@ static struct clk_lookup nuc900_clkregs[] = {
+ 	DEF_CLKLOOK(&clk_adc, "nuc900-adc", NULL),
+ 	DEF_CLKLOOK(&clk_usi, "nuc900-spi", NULL),
+ 	DEF_CLKLOOK(&clk_ext, NULL, "ext"),
++	DEF_CLKLOOK(&clk_timer0, NULL, "timer0"),
++	DEF_CLKLOOK(&clk_timer1, NULL, "timer1"),
++	DEF_CLKLOOK(&clk_timer2, NULL, "timer2"),
++	DEF_CLKLOOK(&clk_timer3, NULL, "timer3"),
++	DEF_CLKLOOK(&clk_timer4, NULL, "timer4"),
++
+ };
+
+ /* Initial serial platform data */
+-- 
+1.5.6.3
