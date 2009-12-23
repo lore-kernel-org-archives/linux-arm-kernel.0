@@ -1,53 +1,72 @@
-From: eltshanli@gmail.com (Li Jie)
-Date: Wed, 23 Dec 2009 17:33:28 +0800
-Subject: [PATCH] ARM: NUC900: Implement arch_reset() via WDT
-Message-ID: <8fb2581d0912230133g59e77898he857061911eab449@mail.gmail.com>
+From: vimal.newwork@gmail.com (Vimal Singh)
+Date: Wed, 23 Dec 2009 15:03:41 +0530
+Subject: Issue in oamp nand driver with 32-bit reads in prefetch mode
+Message-ID: <ce9ab5790912230133wae2c4dcw73051221b66cb40f@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Wan:
+In omap nand driver we used to do 32-bit reads (in function
+omap_read_buf_pref, using 'ioread32_rep' i.e.: __raw_readsl), and it
+was working fine till some time back. But now, somehow, this has got
+some problem. Reads are not being done successfully, and driver gives
+lots for error reprot like below:
 
-This patch implements the arch_reset() via WDT.
-reboot from shell become possible :)
+td->read(0x604 bytes from 0x1fc) returned ECC error
+uncorrectable error :
+uncorrectable error :
+uncorrectable error :
+uncorrectable error :
+uncorrectable error :
+uncorrectable error :
+mtd->read(0x520 bytes from 0x2e0) returned ECC error
 
-Signed-off-by: lijie <eltshanli@gmail.com>
----
- arch/arm/mach-w90x900/include/mach/system.h |   15 ++++++++++++++-
- 1 files changed, 14 insertions(+), 1 deletions(-)
+While if we change 32-bit reads to 16-bit reads (using 'ioread16_rep'
+i.e.: __raw_readwl) makes it working fine. (A patch to do this is
+listed below at the bottom of this mail.)
 
-diff --git a/arch/arm/mach-w90x900/include/mach/system.h
-b/arch/arm/mach-w90x900/include/mach/system.h
-index 9406400..ce228bd 100644
---- a/arch/arm/mach-w90x900/include/mach/system.h
-+++ b/arch/arm/mach-w90x900/include/mach/system.h
-@@ -15,7 +15,15 @@
-  *
-  */
+I have not seen any change in routine '__raw_readsl'.
+So, could someone help me find out the root cause the issue?
 
-+#include <linux/io.h>
- #include <asm/proc-fns.h>
-+#include <mach/map.h>
-+#include <mach/regs-timer.h>
-+
-+#define	WTCR	(TMR_BA + 0x1C)
-+#define	WTCLK	(1 << 10)
-+#define	WTE	(1 << 7)
-+#define	WTRE	(1 << 1)
-
- static void arch_idle(void)
- {
-@@ -23,6 +31,11 @@ static void arch_idle(void)
-
- static void arch_reset(char mode, const char *cmd)
- {
--	cpu_reset(0);
-+	if (mode == 's') {
-+		/* Jump into ROM@address 0 */
-+		cpu_reset(0);
-+	} else {
-+		__raw_writel(WTE | WTRE | WTCLK, WTCR);
-+	}
- }
+Thanks for any input.
 
 -- 
-1.6.5.4
+Regards,
+Vimal Singh
+
+diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+index aaef170..dc493f5 100644
+--- a/drivers/mtd/nand/omap2.c
++++ b/drivers/mtd/nand/omap2.c
+@@ -288,14 +288,14 @@ static void omap_read_buf_pref(struct mtd_info
+ 						struct omap_nand_info, mtd);
+ 	uint32_t pfpw_status = 0, r_count = 0;
+ 	int ret = 0;
+-	u32 *p = (u32 *)buf;
++	u16 *p = (u16 *)buf;
+
+ 	/* take care of subpage reads */
+-	for (; len % 4 != 0; ) {
++	for (; len % 2 != 0; ) {
+ 		*buf++ = __raw_readb(info->nand.IO_ADDR_R);
+ 		len--;
+ 	}
+-	p = (u32 *) buf;
++	p = (u16 *) buf;
+
+ 	/* configure and start prefetch transfer */
+ 	ret = gpmc_prefetch_enable(info->gpmc_cs, 0x0, len, 0x0);
+@@ -308,10 +308,10 @@ static void omap_read_buf_pref(struct mtd_info
+*mtd, u_char *buf, int len)
+ 	} else {
+ 		do {
+ 			pfpw_status = gpmc_prefetch_status();
+-			r_count = ((pfpw_status >> 24) & 0x7F) >> 2;
+-			ioread32_rep(info->nand_pref_fifo_add, p, r_count);
++			r_count = ((pfpw_status >> 24) & 0x7F) >> 1;
++			ioread16_rep(info->nand_pref_fifo_add, p, r_count);
+ 			p += r_count;
+-			len -= r_count << 2;
++			len -= r_count << 1;
+ 		} while (len);
+
+ 		/* disable and stop the PFPW engine */
