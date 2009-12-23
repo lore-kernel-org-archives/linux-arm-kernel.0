@@ -1,46 +1,28 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 23 Dec 2009 13:29:33 +0000
-Subject: [PATCH 1/2] gpio add interrupt support on pca953x
-In-Reply-To: <20091223121825.52b78fed@life-in-the-fast-lane>
-References: <771cded00912220429k141600c7yffc7d3955f220934@mail.gmail.com>
-	<f17812d70912220541g33cdfcffs6b2e51af805ae7b9@mail.gmail.com>
-	<20091222205947.39a1f53d@taxman.wild-wind.fr.eu.org>
-	<771cded00912230035j2b8b0da3p323e704ea93cc3d@mail.gmail.com>
-	<20091223121825.52b78fed@life-in-the-fast-lane>
-Message-ID: <20091223132932.GA4799@sirena.org.uk>
+Date: Wed, 23 Dec 2009 13:37:39 +0000
+Subject: [PATCH] pxa: fix gpio_to_irq() for GPIOs on expander chips
+In-Reply-To: <f17812d70912230448k62f6d455s17b75050793975ad@mail.gmail.com>
+References: <1259148990-10372-1-git-send-email-mad_soft@inbox.ru>
+	<74d0deb30912140149hc20c19dy605a259dc3f6e6e0@mail.gmail.com>
+	<771cded00912230107v5d2cbb18y733b62b0d6303887@mail.gmail.com>
+	<20091223112306.4a45064e@life-in-the-fast-lane>
+	<f17812d70912230448k62f6d455s17b75050793975ad@mail.gmail.com>
+Message-ID: <20091223133739.GB4799@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 23, 2009 at 12:18:25PM +0100, Marc Zyngier wrote:
-> On Wed, 23 Dec 2009 03:35:57 -0500
-> Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
-> > On Tue, Dec 22, 2009 at 2:59 PM, Marc Zyngier <maz@misterjones.org> wrote:
+On Wed, Dec 23, 2009 at 08:48:21PM +0800, Eric Miao wrote:
+> On Wed, Dec 23, 2009 at 6:23 PM, Marc Zyngier <maz@misterjones.org> wrote:
 
-> [Putting Mark Brown in the loop, as wm831x is the de-facto reference]
+> > We could mimic what s3c2410 does to provide some extra GPIO space for
+> > platforms that require it (arch/arm/mach-s3c2410/include/mach/gpio.h):
 
-Guys, could you please remember to cut unneeded context from replies?
+> > #define ARCH_NR_GPIOS ?? (256 + CONFIG_S3C24XX_GPIO_EXTRA)
 
-> > set_irq_nested_thread(irq, 1) will only mark IRQ_NESTED_THREAD on irq
-> > descriptor. It results that driver have to invoke request_thread_irq()
-> > with thread_fn parameter to declare IRQ. Device could be linked to
-> > GPIO directly or GPIO expander. We should keep to use request_irq()
-> > for compatible. set_irq_nested_thread() shouldn't use at here.
+> That's going to be making it impossible for mach-* to be built into a
+> single kernel (call me ambitious :-).
 
-> While I fully understand your point, I'm more worried about the
-> correctness of the approach. I'm under the impression that the use of
-> IRQ_NESTED_THREAD is mandatory if we're using a threaded handler.
-
-> @Mark Brown: what is your take on this? Is it possible to use
-> generic_handle_irq() from within a threaded handler?
-
-ICBW but I believe you'll find that you get into trouble with lockdep if
-try to do that - the TWL4030 drivers in current mainline jump through
-some hoops in the client drivers as a result of this if you want to look
-at some examples.  Once you're in a threaded IRQ you're in a slightly
-different context and need to take account of that.
-
-To the extent that this proves to be a problem in practical systems it's
-something that needs to be addressed in the genirq core rather than
-trying to jump through hoops in the individual drivers.  Trying to work
-around the genirq core is likely to be fragile for both the interrupt
-controller driver and the client drivers trying to use it.
+The S3C stuff does try to support this - S3C24XX_GPIO_EXTRA isn't
+selected directly but instead boards select other symbols with
+particular values and then "default if ..." is used in Kconfig to set
+the largest value that was asked for.
