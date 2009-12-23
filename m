@@ -1,56 +1,61 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 23 Dec 2009 04:39:59 -0500
-Subject: [PATCH 4/4] regulator: add max8925 support
-In-Reply-To: <1261418546.6971.343.camel@odin>
-References: <771cded00912210447jf040fd8s8da0e68db0c39c1a@mail.gmail.com>
-	<1261418546.6971.343.camel@odin>
-Message-ID: <771cded00912230139g23ea8554l866d55e16ae3ed58@mail.gmail.com>
+Date: Wed, 23 Dec 2009 04:41:56 -0500
+Subject: [PATCH 1/4] mfd: enable max8925
+In-Reply-To: <20091222043547.GA4411@verge.net.au>
+References: <771cded00912210445v67175632i876b7909de8afae3@mail.gmail.com>
+	<20091222043547.GA4411@verge.net.au>
+Message-ID: <771cded00912230141o5f9cf872rd6579d9cda6720b1@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 21, 2009 at 1:02 PM, Liam Girdwood <lrg@slimlogic.co.uk> wrote:
-> On Mon, 2009-12-21 at 07:47 -0500, Haojian Zhuang wrote:
->> >From a895458d62d28060abc60db25f6d3782edd6b7a1 Mon Sep 17 00:00:00 2001
+On Mon, Dec 21, 2009 at 11:35 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Dec 21, 2009 at 07:45:27AM -0500, Haojian Zhuang wrote:
+>> >From 567add422a0d2214e037c3ed1b424b21776dfe34 Mon Sep 17 00:00:00 2001
 >> From: Haojian Zhuang <haojian.zhuang@marvell.com>
->> Date: Fri, 18 Dec 2009 10:02:16 -0500
->> Subject: [PATCH] regulator: add max8925 support
+>> Date: Thu, 17 Dec 2009 12:30:16 -0500
+>> Subject: [PATCH] mfd: enable max8925
 >>
->> MAX8925 contains 3 Buck and 20 LDO regulator.
+>> Max8925 is a Power Management IC from Maxim Semiconductor.
+>>
+>> Do basic support on accessing MAX8925.
 >>
 >> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 >
-> Had a quick look, some minor issues below.
+> Hi,
 >
->> +#define SD1_DVM_STEP ? ? ? ? (50000)
->> +#define SD1_DVM_SHIFT ? ? ? ? ? ? ? ?(5) ? ? ? ? ? ? /* SDCTL1 bit5 */
->> +#define SD1_DVM_EN ? ? ? ? ? (6) ? ? ? ? ? ? /* SDV1 bit 6 */
+> It looks like max8925_device_init() needs to be annotated with __devinit
 >
-> Don't need parenthesis here.
+> $ make CONFIG_DEBUG_SECTION_MISMATCH=y
+> WARNING: drivers/mfd/max8925.o(.text+0x28): Section mismatch in reference
+> from the function max8925_device_init() to the function
+> .devinit.text:device_gpm_init()
+> The function max8925_device_init() references
+> the function __devinit device_gpm_init().
+> This is often because max8925_device_init lacks a __devinit
+> annotation or the annotation of device_gpm_init is wrong.
 >
->> + ? ? return (info->min_uV + index * info->step_uV);
+> WARNING: drivers/mfd/max8925.o(.text+0x32): Section mismatch in reference
+> from the function max8925_device_init() to the function
+> .devinit.text:device_adc_init()
+> The function max8925_device_init() references
+> the function __devinit device_adc_init().
+> This is often because max8925_device_init lacks a __devinit
+> annotation or the annotation of device_adc_init is wrong.
 >
-> extra () here too.
->
->> +
->> + ? ? if ((uV < SD1_DVM_VMIN) || (uV > SD1_DVM_VMAX))
->> + ? ? ? ? ? ? return -EINVAL;
->
-> and extra () here
->
->> + ? ? .vol_reg ? ? ? ?= MAX8925_SDV##_id, ? ? ? ? ? ? ? ? ? ? \
->> + ? ? .vol_shift ? ? ?= (0), ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->
-> () not needed here and a few more below
 >
 
-Updated th patch.
+Updated the patch.
+
+By the way, how to enable CONFIG_DEBUG_SECTION_MISMATCH? I found that
+this config is dependant on CONFIG_UNDEFINED. I can't find who defines
+CONFIG_UNDEFINED in kernel.
 
 Thanks
 Haojian
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: 0004-regulator-add-max8925-support.patch
+Name: 0001-mfd-enable-max8925.patch
 Type: text/x-patch
-Size: 11633 bytes
+Size: 17079 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091223/58e8beb3/attachment-0001.bin>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091223/58e61005/attachment.bin>
