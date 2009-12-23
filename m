@@ -1,71 +1,41 @@
-From: darkstar6262@gmail.com (Cory Maccarrone)
-Date: Tue, 22 Dec 2009 17:37:21 -0700
-Subject: [PATCH] [OMAP1] Clock fixups for OMAP1 and OMAP7xx
-In-Reply-To: <6cb013310912221628m1b2b820fy1a96a9a9102274e5@mail.gmail.com>
-References: <6cb013310912221628m1b2b820fy1a96a9a9102274e5@mail.gmail.com>
-Message-ID: <1261528641-22465-1-git-send-email-darkstar6262@gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 23 Dec 2009 09:34:58 +0800
+Subject: [PATCH 1/2] gpio add interrupt support on pca953x
+In-Reply-To: <20091222205947.39a1f53d@taxman.wild-wind.fr.eu.org>
+References: <771cded00912220429k141600c7yffc7d3955f220934@mail.gmail.com>
+	<f17812d70912220541g33cdfcffs6b2e51af805ae7b9@mail.gmail.com>
+	<20091222205947.39a1f53d@taxman.wild-wind.fr.eu.org>
+Message-ID: <f17812d70912221734i419af650p78b676b36edb424a@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change adds in some missing clocks that were needed as a result
-of 526505... (OMAP1 clock: convert mach-omap1/clock.h to
-mach-omap1/clock_data.c).  Prior to this, it was just assumed that
-these clocks existed for all devices, and it was used directly instead
-of calling it out with a clk_get call.  So, not having the CK_7XX
-meant these clocks weren't being used anymore for omap 7xx devices,
-which broke things badly.
+On Wed, Dec 23, 2009 at 3:59 AM, Marc Zyngier <maz@misterjones.org> wrote:
+> On Tue, 22 Dec 2009 21:41:51 +0800
+> Eric Miao <eric.y.miao@gmail.com> wrote:
+>
+> Eric, Haojian,
+>
+>> Marc Zyngier was doing the similar thing, and submitted a patch to
+>> Andrew Morton already, but I prefer a full-functional IRQ chip based
+>> solution, so you may want to work with him together on this.
+>>
+>> Marc,
+>>
+>> Do you have the link to your patch?
+>
+> Here's the current state of my tree, quickly rebased to 2.6.33-rc1.
+> To summarize, the main differences with Haojian's patch:
+> - uses threaded irqs/nested irqs
+> - setup is slightly more complicated (interrupt source mask and base
+> ?interrupt number), but more correct (no dependency on gpio_to_irq()
+> ?being a linear mapping, which is not always the case)
+>
 
-Additionally, that change added an __initdata decoration to the
-structure containing the clk_enable and clk_disable functions.  Once
-init data was freed, these pointers went to null, and the next enable
-or disable call caused the kernel to crash.  This change removes
-this decoration.
+Marc,
 
-Signed-off-by: Cory Maccarrone <darkstar6262@gmail.com>
----
- arch/arm/mach-omap1/clock_data.c |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
+This looks good work to me.
 
-diff --git a/arch/arm/mach-omap1/clock_data.c b/arch/arm/mach-omap1/clock_data.c
-index ab995a9..62f6ec3 100644
---- a/arch/arm/mach-omap1/clock_data.c
-+++ b/arch/arm/mach-omap1/clock_data.c
-@@ -599,15 +599,15 @@ static struct clk i2c_ick = {
- static struct omap_clk omap_clks[] = {
- 	/* non-ULPD clocks */
- 	CLK(NULL,	"ck_ref",	&ck_ref,	CK_16XX | CK_1510 | CK_310 | CK_7XX),
--	CLK(NULL,	"ck_dpll1",	&ck_dpll1,	CK_16XX | CK_1510 | CK_310),
-+	CLK(NULL,	"ck_dpll1",	&ck_dpll1,	CK_16XX | CK_1510 | CK_310 | CK_7XX),
- 	/* CK_GEN1 clocks */
- 	CLK(NULL,	"ck_dpll1out",	&ck_dpll1out.clk, CK_16XX),
- 	CLK(NULL,	"ck_sossi",	&sossi_ck,	CK_16XX),
- 	CLK(NULL,	"arm_ck",	&arm_ck,	CK_16XX | CK_1510 | CK_310),
--	CLK(NULL,	"armper_ck",	&armper_ck.clk,	CK_16XX | CK_1510 | CK_310),
-+	CLK(NULL,	"armper_ck",	&armper_ck.clk,	CK_16XX | CK_1510 | CK_310 | CK_7XX),
- 	CLK(NULL,	"arm_gpio_ck",	&arm_gpio_ck,	CK_1510 | CK_310),
- 	CLK(NULL,	"armxor_ck",	&armxor_ck.clk,	CK_16XX | CK_1510 | CK_310 | CK_7XX),
--	CLK(NULL,	"armtim_ck",	&armtim_ck.clk,	CK_16XX | CK_1510 | CK_310),
-+	CLK(NULL,	"armtim_ck",	&armtim_ck.clk,	CK_16XX | CK_1510 | CK_310 | CK_7XX),
- 	CLK("omap_wdt",	"fck",		&armwdt_ck.clk,	CK_16XX | CK_1510 | CK_310),
- 	CLK("omap_wdt",	"ick",		&armper_ck.clk,	CK_16XX),
- 	CLK("omap_wdt", "ick",		&dummy_ck,	CK_1510 | CK_310),
-@@ -627,7 +627,7 @@ static struct omap_clk omap_clks[] = {
- 	CLK(NULL,	"tc2_ck",	&tc2_ck,	CK_16XX),
- 	CLK(NULL,	"dma_ck",	&dma_ck,	CK_16XX | CK_1510 | CK_310),
- 	CLK(NULL,	"dma_lcdfree_ck", &dma_lcdfree_ck, CK_16XX),
--	CLK(NULL,	"api_ck",	&api_ck.clk,	CK_16XX | CK_1510 | CK_310),
-+	CLK(NULL,	"api_ck",	&api_ck.clk,	CK_16XX | CK_1510 | CK_310 | CK_7XX),
- 	CLK(NULL,	"lb_ck",	&lb_ck.clk,	CK_1510 | CK_310),
- 	CLK(NULL,	"rhea1_ck",	&rhea1_ck,	CK_16XX),
- 	CLK(NULL,	"rhea2_ck",	&rhea2_ck,	CK_16XX),
-@@ -674,7 +674,7 @@ static struct omap_clk omap_clks[] = {
-  * init
-  */
- 
--static struct clk_functions omap1_clk_functions __initdata = {
-+static struct clk_functions omap1_clk_functions = {
- 	.clk_enable		= omap1_clk_enable,
- 	.clk_disable		= omap1_clk_disable,
- 	.clk_round_rate		= omap1_clk_round_rate,
--- 
-1.6.3.3
+Haojian,
+
+Could you help review this patch and see if there's any gap that needs
+to be filled to support the platforms on your side?
