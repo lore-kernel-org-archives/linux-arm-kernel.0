@@ -1,84 +1,32 @@
-From: eltshanli@gmail.com (Li Jie)
-Date: Wed, 23 Dec 2009 16:15:02 +0800
-Subject: [PATCH] ARM: NUC900: Fix bugs of clocksource driver
-Message-ID: <8fb2581d0912230015p4d423e4eg44b13190b184cc4c@mail.gmail.com>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Wed, 23 Dec 2009 09:16:55 +0100
+Subject: [PATCH 3/7] ARM: S5P6440: Add IRQ support
+In-Reply-To: <000201ca838f$f7d25880$e7770980$%kim@samsung.com>
+References: <1261127996-30253-1-git-send-email-kgene.kim@samsung.com>
+	<1261127996-30253-2-git-send-email-kgene.kim@samsung.com>
+	<1261127996-30253-3-git-send-email-kgene.kim@samsung.com>
+	<1261127996-30253-4-git-send-email-kgene.kim@samsung.com>
+	<1261127996-30253-5-git-send-email-kgene.kim@samsung.com>
+	<20091218145347.4ad08b97@life-in-the-fast-lane>
+	<000201ca838f$f7d25880$e7770980$%kim@samsung.com>
+Message-ID: <20091223091655.0f59ee94@life-in-the-fast-lane>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wan:
+On Wed, 23 Dec 2009 14:22:48 +0900
+Kukjin Kim <kgene.kim@samsung.com> wrote:
 
-This patch fix following bugs of clocksource in nuc900 cpus:
+Kukjin,
 
-1. Enable timer1 before call clocksource_register(...)
-2. change mask, 32 -> 24, because the max value of TDR1 is 0xFFFFFF
-3. change shift. 20 -> 10, 20 is too big caused mult overflow
+> > > +#define IRQ_EINT_GROUP8_NR	(11)
+> > 
+> > Group 8 has interrupts numbered from 3 to 11, so this should read 12.
+> According to the UM's '5.10 PORT P Control Registers', it has 11 interrupts
+> numbered from 3 to 10. So I think it's right.
 
+Ah, it looks like a documentation bug, then... My UM describes
+EINT8[8:11]. Probably yours is more correct.
 
-Signed-off-by: lijie <eltshanli@gmail.com>
----
- arch/arm/mach-w90x900/time.c |   18 ++++++++++++++----
- 1 files changed, 14 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-w90x900/time.c b/arch/arm/mach-w90x900/time.c
-index 4128af8..b80e508 100644
---- a/arch/arm/mach-w90x900/time.c
-+++ b/arch/arm/mach-w90x900/time.c
-@@ -42,6 +42,10 @@
- #define TICKS_PER_SEC	100
- #define PRESCALE	0x63 /* Divider = prescale + 1 */
-
-+#define	TDR_SHIFT	24
-+#define	TDR_MASK	((1 << TDR_SHIFT) - 1)
-+
-+#define	TIMER1_CLKEN	(1 << 20)
- unsigned int timer0_load;
-
- static void nuc900_clockevent_setmode(enum clock_event_mode mode,
-@@ -110,6 +114,7 @@ static struct irqaction nuc900_timer0_irq = {
- 	.name		= "nuc900-timer0",
- 	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
- 	.handler	= nuc900_timer0_interrupt,
-+	.dev_id		= &nuc900_clockevent_device,
- };
-
- static void __init nuc900_clockevents_init(unsigned int rate)
-@@ -127,15 +132,15 @@ static void __init
-nuc900_clockevents_init(unsigned int rate)
-
- static cycle_t nuc900_get_cycles(struct clocksource *cs)
- {
--	return ~__raw_readl(REG_TDR1);
-+	return (~__raw_readl(REG_TDR1)) & TDR_MASK;
- }
-
- static struct clocksource clocksource_nuc900 = {
- 	.name	= "nuc900-timer1",
- 	.rating	= 200,
- 	.read	= nuc900_get_cycles,
--	.mask	= CLOCKSOURCE_MASK(32),
--	.shift	= 20,
-+	.mask	= CLOCKSOURCE_MASK(TDR_SHIFT),
-+	.shift	= 10,
- 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
- };
-
-@@ -143,10 +148,15 @@ static void __init
-nuc900_clocksource_init(unsigned int rate)
- {
- 	unsigned int val;
-
-+	/* enable timer1 clk */
-+	val = __raw_readl(W90X900_VA_CLKPWR);
-+	val |= TIMER1_CLKEN;
-+	__raw_writel(val, W90X900_VA_CLKPWR);
-+
- 	__raw_writel(0xffffffff, REG_TICR1);
-
- 	val = __raw_readl(REG_TCSR1);
--	val |= (COUNTEN | PERIOD);
-+	val |= (COUNTEN | PERIOD | PRESCALE);
- 	__raw_writel(val, REG_TCSR1);
-
- 	clocksource_nuc900.mult =
+	M.
 -- 
-1.6.5.4
+Fast. Cheap. Reliable. Pick two.
