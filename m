@@ -1,91 +1,73 @@
 From: p.osciak@samsung.com (Pawel Osciak)
-Date: Wed, 23 Dec 2009 11:07:32 +0100
-Subject: [PATCH v2 1/2] V4L: Add memory-to-memory device helper framework for
-	V4L2.
+Date: Wed, 23 Dec 2009 11:07:33 +0100
+Subject: [PATCH v2 2/2] V4L: Add a mem-to-mem V4L2 framework test device.
 In-Reply-To: <1261562854-26507-1-git-send-email-p.osciak@samsung.com>
 References: <1261562854-26507-1-git-send-email-p.osciak@samsung.com>
-Message-ID: <1261562854-26507-2-git-send-email-p.osciak@samsung.com>
+Message-ID: <1261562854-26507-3-git-send-email-p.osciak@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A mem-to-mem device is a device that uses memory buffers passed by
-userspace applications for both source and destination data. This is
-different from existing drivers, which use memory buffers for only one
-of those at once.
-
-In terms of V4L2 such a device would be both of OUTPUT and CAPTURE type.
-Although no such devices are present in the V4L2 framework, a demand for such
-a model exists, e.g. for 'resizer devices'.
-
-This patch also adds a separate kconfig submenu for mem-to-mem V4L devices.
+This is a virtual device driver for testing the mem-to-mem V4L2 framework.
+It simulates a device that uses memory buffers for both source and
+destination, processes the data and issues an "IRQ" (simulated by a timer).
+The device is capable of multi-instance, multi-buffer-per-transaction
+operation (via the mem2mem framework).
 
 Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Reviewed-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/media/video/Kconfig        |   16 +
- drivers/media/video/Makefile       |    2 +
- drivers/media/video/v4l2-mem2mem.c |  671 ++++++++++++++++++++++++++++++++++++
- include/media/v4l2-mem2mem.h       |  153 ++++++++
- 4 files changed, 842 insertions(+), 0 deletions(-)
- create mode 100644 drivers/media/video/v4l2-mem2mem.c
- create mode 100644 include/media/v4l2-mem2mem.h
+ drivers/media/video/Kconfig           |   10 +
+ drivers/media/video/Makefile          |    1 +
+ drivers/media/video/mem2mem_testdev.c | 1052 +++++++++++++++++++++++++++++++++
+ 3 files changed, 1063 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/media/video/mem2mem_testdev.c
 
 diff --git a/drivers/media/video/Kconfig b/drivers/media/video/Kconfig
-index 2f83be7..caefd7b 100644
+index caefd7b..6fe4b53 100644
 --- a/drivers/media/video/Kconfig
 +++ b/drivers/media/video/Kconfig
-@@ -45,6 +45,10 @@ config VIDEO_TUNER
- 	tristate
- 	depends on MEDIA_TUNER
+@@ -1090,4 +1090,14 @@ menuconfig V4L_MEM2MEM_DRIVERS
+ 	  to capture and output drivers, which use memory buffers for just
+ 	  one of those.
  
-+config V4L2_MEM2MEM_DEV
-+	tristate
-+	depends on VIDEOBUF_GEN
-+
- #
- # Multimedia Video device configuration
- #
-@@ -1075,3 +1079,15 @@ config USB_S2255
- 
- endif # V4L_USB_DRIVERS
- endif # VIDEO_CAPTURE_DRIVERS
-+
-+menuconfig V4L_MEM2MEM_DRIVERS
-+	bool "Memory-to-memory multimedia devices"
-+	depends on VIDEO_V4L2
++config VIDEO_MEM2MEM_TESTDEV
++	tristate "Virtual test device for mem2mem framework"
++	depends on VIDEO_DEV && VIDEO_V4L2
++	select VIDEOBUF_VMALLOC
++	select V4L2_MEM2MEM_DEV
 +	default n
 +	---help---
-+	  Say Y here to enable selecting drivers for V4L devices that
-+	  use system memory for both source and destination buffers, as opposed
-+	  to capture and output drivers, which use memory buffers for just
-+	  one of those.
++	  This is a virtual test device for the memory-to-memory driver
++	  framework.
 +
-+endif # V4L_MEM2MEM_DRIVERS
+ endif # V4L_MEM2MEM_DRIVERS
 diff --git a/drivers/media/video/Makefile b/drivers/media/video/Makefile
-index 2af68ee..9fe7d40 100644
+index 9fe7d40..8667f1c 100644
 --- a/drivers/media/video/Makefile
 +++ b/drivers/media/video/Makefile
-@@ -115,6 +115,8 @@ obj-$(CONFIG_VIDEOBUF_VMALLOC) += videobuf-vmalloc.o
- obj-$(CONFIG_VIDEOBUF_DVB) += videobuf-dvb.o
- obj-$(CONFIG_VIDEO_BTCX)  += btcx-risc.o
+@@ -149,6 +149,7 @@ obj-$(CONFIG_VIDEO_IVTV) += ivtv/
+ obj-$(CONFIG_VIDEO_CX18) += cx18/
  
-+obj-$(CONFIG_V4L2_MEM2MEM_DEV) += v4l2-mem2mem.o
-+
- obj-$(CONFIG_VIDEO_M32R_AR_M64278) += arv.o
+ obj-$(CONFIG_VIDEO_VIVI) += vivi.o
++obj-$(CONFIG_VIDEO_MEM2MEM_TESTDEV) += mem2mem_testdev.o
+ obj-$(CONFIG_VIDEO_CX23885) += cx23885/
  
- obj-$(CONFIG_VIDEO_CX2341X) += cx2341x.o
-diff --git a/drivers/media/video/v4l2-mem2mem.c b/drivers/media/video/v4l2-mem2mem.c
+ obj-$(CONFIG_VIDEO_OMAP2)		+= omap2cam.o
+diff --git a/drivers/media/video/mem2mem_testdev.c b/drivers/media/video/mem2mem_testdev.c
 new file mode 100644
-index 0000000..417ee2c
+index 0000000..ea54a68
 --- /dev/null
-+++ b/drivers/media/video/v4l2-mem2mem.c
-@@ -0,0 +1,671 @@
++++ b/drivers/media/video/mem2mem_testdev.c
+@@ -0,0 +1,1052 @@
 +/*
-+ * Memory-to-memory device framework for Video for Linux 2.
++ * A virtual v4l2-mem2mem example device.
 + *
-+ * Helper functions for devices that use memory buffers for both source
-+ * and destination.
++ * This is a virtual device driver for testing the mem-to-mem V4L2 framework.
++ * It simulates a device that uses memory buffers for both source and
++ * destination, processes the data and issues an "IRQ" (simulated by a timer).
++ * The device is capable of multi-instance, multi-buffer-per-transaction
++ * operation (via the mem2mem framework).
 + *
 + * Copyright (c) 2009 Samsung Electronics Co., Ltd.
 + * Pawel Osciak, <p.osciak@samsung.com>
@@ -96,820 +78,1039 @@ index 0000000..417ee2c
 + * Free Software Foundation; either version 2 of the
 + * License, or (at your option) any later version
 + */
-+
 +#include <linux/module.h>
++#include <linux/delay.h>
++#include <linux/fs.h>
++#include <linux/version.h>
++#include <linux/timer.h>
 +#include <linux/sched.h>
-+#include <media/videobuf-core.h>
-+#include <media/v4l2-mem2mem.h>
 +
-+MODULE_DESCRIPTION("Mem to mem device framework for V4L2");
++#include <linux/platform_device.h>
++#include <media/v4l2-mem2mem.h>
++#include <media/v4l2-device.h>
++#include <media/v4l2-ioctl.h>
++#include <media/videobuf-vmalloc.h>
++
++#define MEM2MEM_TEST_MODULE_NAME "mem2mem-testdev"
++
++MODULE_DESCRIPTION("Virtual device for mem2mem framework testing");
 +MODULE_AUTHOR("Pawel Osciak, <p.osciak@samsung.com>");
 +MODULE_LICENSE("GPL");
 +
-+static int debug;
-+module_param(debug, int, 0644);
 +
-+#define dprintk(fmt, arg...) do {\
-+	if (debug >= 1)\
-+		printk(KERN_DEBUG "%s: " fmt, __func__, ## arg); } while (0)
++#define MIN_W 32
++#define MIN_H 32
++#define MAX_W 640
++#define MAX_H 480
++#define DIM_ALIGN_MASK 0x08 /* 8-alignment for dimensions */
++
++/* Flags that indicate a format can be used for capture/output */
++#define MEM2MEM_CAPTURE	(1 << 0)
++#define MEM2MEM_OUTPUT	(1 << 1)
++
++#define MEM2MEM_MAX_INSTANCES	10
++#define MEM2MEM_NAME		"m2m-testdev"
++
++/* Per queue */
++#define MEM2MEM_DEF_NUM_BUFS	32
++/* In bytes, per queue */
++#define MEM2MEM_VID_MEM_LIMIT	(16 * 1024 * 1024)
++
++/* Default transaction time in msec */
++#define MEM2MEM_DEF_TRANSTIME	1000
++/* Default number of buffers per transaction */
++#define MEM2MEM_DEF_TRANSLEN	1
++#define MEM2MEM_COLOR_STEP	(0xff >> 4)
++#define MEM2MEM_NUM_TILES	10
++
++#define dprintk(dev, fmt, arg...) \
++	v4l2_dbg(1, 1, &dev->v4l2_dev, "%s: " fmt, __func__, ## arg)
 +
 +
-+/* The instance is already queued on the jobqueue */
-+#define TRANS_QUEUED		(1 << 0)
-+/* The instance is currently running in hardware */
-+#define TRANS_RUNNING		(1 << 1)
++void m2mtest_dev_release(struct device *dev)
++{}
 +
-+
-+/* Offset base for buffers on the destination queue - used to distinguish
-+ * between source and destination buffers when mmapping - they receive the same
-+ * offsets but for different queues */
-+#define DST_QUEUE_OFF_BASE	(TASK_SIZE / 2)
-+
-+
-+struct v4l2_m2m_dev {
-+	/* Currently running instance */
-+	struct v4l2_m2m_ctx	*curr_ctx;
-+	/* Instances queued to run */
-+	struct list_head	jobqueue;
-+	spinlock_t		job_spinlock;
-+
-+	struct v4l2_m2m_ops	*m2m_ops;
++static struct platform_device m2mtest_pdev = {
++	.name		= MEM2MEM_NAME,
++	.dev.release	= m2mtest_dev_release,
 +};
 +
-+static inline
-+struct v4l2_m2m_queue_ctx *get_queue_ctx(struct v4l2_m2m_ctx *m2m_ctx,
-+					 enum v4l2_buf_type type)
++struct m2mtest_fmt {
++	char	*name;
++	u32	fourcc;          /* v4l2 format id */
++	int	depth;
++	/* Types the format can be used for */
++	u32	types;
++};
++
++static struct m2mtest_fmt formats[] = {
++	{
++		.name	= "RGB565 (BE)",
++		.fourcc	= V4L2_PIX_FMT_RGB565X, /* rrrrrggg gggbbbbb */
++		.depth	= 16,
++		/* Both capture and output format */
++		.types	= MEM2MEM_CAPTURE | MEM2MEM_OUTPUT,
++	},
++	{
++		.name	= "4:2:2, packed, YUYV",
++		.fourcc	= V4L2_PIX_FMT_YUYV,
++		.depth	= 16,
++		/* Output-only format */
++		.types	= MEM2MEM_OUTPUT,
++	},
++};
++
++/* Per-queue, driver-specific private data */
++struct m2mtest_q_data
++{
++	unsigned int		width;
++	unsigned int		height;
++	unsigned int		sizeimage;
++	struct m2mtest_fmt	*fmt;
++};
++
++enum {
++	V4L2_M2M_SRC = 0,
++	V4L2_M2M_DST = 1,
++};
++
++/* Source and destination queue data */
++static struct m2mtest_q_data q_data[2];
++
++static struct m2mtest_q_data *get_q_data(enum v4l2_buf_type type)
 +{
 +	switch (type) {
-+	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
-+		return &m2m_ctx->cap_q_ctx;
 +	case V4L2_BUF_TYPE_VIDEO_OUTPUT:
-+		return &m2m_ctx->out_q_ctx;
++		return &q_data[V4L2_M2M_SRC];
++	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
++		return &q_data[V4L2_M2M_DST];
 +	default:
-+		printk(KERN_ERR "Invalid buffer type\n");
++		BUG();
 +		return NULL;
 +	}
 +}
 +
-+/**
-+ * v4l2_m2m_get_vq() - return videobuf_queue for the given type
-+ */
-+struct videobuf_queue *v4l2_m2m_get_vq(struct v4l2_m2m_ctx *m2m_ctx,
-+				       enum v4l2_buf_type type)
-+{
-+	struct v4l2_m2m_queue_ctx *q_ctx;
 +
-+	q_ctx = get_queue_ctx(m2m_ctx, type);
-+	if (!q_ctx)
++#define V4L2_CID_TRANS_TIME_MSEC	V4L2_CID_PRIVATE_BASE
++#define V4L2_CID_TRANS_NUM_BUFS		(V4L2_CID_PRIVATE_BASE + 1)
++
++static struct v4l2_queryctrl m2mtest_ctrls[] = {
++	{
++		.id		= V4L2_CID_TRANS_TIME_MSEC,
++		.type		= V4L2_CTRL_TYPE_INTEGER,
++		.name		= "Transaction time (msec)",
++		.minimum	= 1,
++		.maximum	= 10000,
++		.step		= 100,
++		.default_value	= 1000,
++		.flags		= 0,
++	}, {
++		.id		= V4L2_CID_TRANS_NUM_BUFS,
++		.type		= V4L2_CTRL_TYPE_INTEGER,
++		.name		= "Buffers per transaction",
++		.minimum	= 1,
++		.maximum	= MEM2MEM_DEF_NUM_BUFS,
++		.step		= 1,
++		.default_value	= 1,
++		.flags		= 0,
++	},
++};
++
++#define NUM_FORMATS ARRAY_SIZE(formats)
++
++static struct m2mtest_fmt *find_format(struct v4l2_format *f)
++{
++	struct m2mtest_fmt *fmt;
++	unsigned int k;
++
++	for (k = 0; k < NUM_FORMATS; k++) {
++		fmt = &formats[k];
++		if (fmt->fourcc == f->fmt.pix.pixelformat)
++			break;
++	}
++
++	if (k == NUM_FORMATS)
 +		return NULL;
 +
-+	return &q_ctx->q;
++	return &formats[k];
 +}
-+EXPORT_SYMBOL(v4l2_m2m_get_vq);
 +
-+/**
-+ * v4l2_m2m_get_src_vq() - return videobuf_queue for source buffers
-+ */
-+struct videobuf_queue *v4l2_m2m_get_src_vq(struct v4l2_m2m_ctx *m2m_ctx)
++struct m2mtest_dev {
++	struct v4l2_device	v4l2_dev;
++	struct video_device	*vfd;
++
++	atomic_t		num_inst;
++	struct mutex		dev_mutex;
++	spinlock_t		irqlock;
++
++	struct timer_list	timer;
++
++	struct v4l2_m2m_dev	*m2m_dev;
++};
++
++struct m2mtest_ctx {
++	struct m2mtest_dev	*dev;
++
++	/* Processed buffers in this transaction */
++	u8			num_processed;
++
++	/* Transaction length (i.e. how many buffers per transaction) */
++	u32			translen;
++	/* Transaction time (i.e. simulated processing time) in miliseconds */
++	u32			transtime;
++
++	/* Abort requested by m2m */
++	int			aborting;
++
++	struct v4l2_m2m_ctx	*m2m_ctx;
++};
++
++struct m2mtest_buffer {
++	/* vb must be first! */
++	struct videobuf_buffer	vb;
++};
++
++static struct v4l2_queryctrl *get_ctrl(int id)
 +{
-+	return v4l2_m2m_get_vq(m2m_ctx, V4L2_BUF_TYPE_VIDEO_OUTPUT);
-+}
-+EXPORT_SYMBOL(v4l2_m2m_get_src_vq);
++	int i;
 +
-+/**
-+ * v4l2_m2m_get_dst_vq() - return videobuf_queue for destination buffers
-+ */
-+struct videobuf_queue *v4l2_m2m_get_dst_vq(struct v4l2_m2m_ctx *m2m_ctx)
++	for (i = 0; i < ARRAY_SIZE(m2mtest_ctrls); ++i) {
++		if (id == m2mtest_ctrls[i].id) {
++			return &m2mtest_ctrls[i];
++		}
++	}
++
++	return NULL;
++}
++
++static int device_process(struct m2mtest_ctx *ctx,
++			  struct m2mtest_buffer *in_buf,
++			  struct m2mtest_buffer *out_buf)
 +{
-+	return v4l2_m2m_get_vq(m2m_ctx, V4L2_BUF_TYPE_VIDEO_CAPTURE);
-+}
-+EXPORT_SYMBOL(v4l2_m2m_get_dst_vq);
++	struct m2mtest_dev *dev = ctx->dev;
++	u8 *p_in, *p_out;
++	int x, y, t, w;
++	int tile_w, bytes_left;
++	struct videobuf_queue *src_q;
++	struct videobuf_queue *dst_q;
 +
-+/**
-+ * v4l2_m2m_next_buf() - return next buffer from the list of ready buffers
-+ */
-+static void *v4l2_m2m_next_buf(struct v4l2_m2m_ctx *m2m_ctx,
-+			       enum v4l2_buf_type type)
++	src_q = v4l2_m2m_get_src_vq(ctx->m2m_ctx);
++	dst_q = v4l2_m2m_get_dst_vq(ctx->m2m_ctx);
++	p_in = videobuf_queue_to_vmalloc(src_q, &in_buf->vb);
++	p_out = videobuf_queue_to_vmalloc(dst_q, &out_buf->vb);
++	if (!p_in || !p_out) {
++		v4l2_err(&dev->v4l2_dev,
++			 "Acquiring kernel pointers to buffers failed\n");
++		return 1;
++	}
++
++	if (in_buf->vb.size < out_buf->vb.size) {
++		v4l2_err(&dev->v4l2_dev, "Output buffer is too small\n");
++		return 1;
++	}
++
++	tile_w = (in_buf->vb.width * (q_data[V4L2_M2M_DST].fmt->depth >> 3))
++		/ MEM2MEM_NUM_TILES;
++	bytes_left = in_buf->vb.bytesperline - tile_w * MEM2MEM_NUM_TILES;
++	w = 0;
++
++	for (y = 0; y < in_buf->vb.height; ++y) {
++		for (t = 0; t < MEM2MEM_NUM_TILES; ++t) {
++			if (w & 0x1) {
++				for (x = 0; x < tile_w; ++x)
++					*p_out++ = *p_in++ + MEM2MEM_COLOR_STEP;
++			} else {
++				for (x = 0; x < tile_w; ++x)
++					*p_out++ = *p_in++ - MEM2MEM_COLOR_STEP;
++			}
++			++w;
++		}
++		p_in += bytes_left;
++		p_out += bytes_left;
++	}
++
++	return 0;
++}
++
++static void schedule_irq(struct m2mtest_dev *dev, int msec_timeout)
 +{
-+	struct v4l2_m2m_queue_ctx *q_ctx;
-+	struct videobuf_buffer *vb = NULL;
-+
-+	q_ctx = get_queue_ctx(m2m_ctx, type);
-+
-+	vb = list_entry(q_ctx->rdy_queue.next, struct videobuf_buffer, queue);
-+	vb->state = VIDEOBUF_ACTIVE;
-+
-+	return vb;
++	dprintk(dev, "Scheduling a fake irq\n");
++	mod_timer(&dev->timer, jiffies + msecs_to_jiffies(msec_timeout));
 +}
-+
-+/**
-+ * v4l2_m2m_next_src_buf() - return next source buffer from the list of ready
-+ * buffers
-+ */
-+inline void *v4l2_m2m_next_src_buf(struct v4l2_m2m_ctx *m2m_ctx)
-+{
-+	return v4l2_m2m_next_buf(m2m_ctx, V4L2_BUF_TYPE_VIDEO_OUTPUT);
-+}
-+EXPORT_SYMBOL(v4l2_m2m_next_src_buf);
-+
-+/**
-+ * v4l2_m2m_next_dst_buf() - return next destination buffer from the list of
-+ * ready buffers
-+ */
-+inline void *v4l2_m2m_next_dst_buf(struct v4l2_m2m_ctx *m2m_ctx)
-+{
-+	return v4l2_m2m_next_buf(m2m_ctx, V4L2_BUF_TYPE_VIDEO_CAPTURE);
-+}
-+EXPORT_SYMBOL(v4l2_m2m_next_dst_buf);
-+
-+/**
-+ * v4l2_m2m_buf_remove() - take off a buffer from the list of ready buffers and
-+ * return it
-+ */
-+static void *v4l2_m2m_buf_remove(struct v4l2_m2m_ctx *m2m_ctx,
-+				 enum v4l2_buf_type type)
-+{
-+	struct v4l2_m2m_queue_ctx *q_ctx;
-+	struct videobuf_buffer *vb = NULL;
-+	unsigned long flags = 0;
-+
-+	q_ctx = get_queue_ctx(m2m_ctx, type);
-+
-+	spin_lock_irqsave(q_ctx->q.irqlock, flags);
-+	vb = list_entry(q_ctx->rdy_queue.next, struct videobuf_buffer, queue);
-+	list_del(&vb->queue);
-+	q_ctx->num_rdy--;
-+	spin_unlock_irqrestore(q_ctx->q.irqlock, flags);
-+
-+	return vb;
-+}
-+
-+/**
-+ * v4l2_m2m_src_buf_remove() - take off a srouce buffer from the list of ready
-+ * buffers and return it
-+ */
-+void *v4l2_m2m_src_buf_remove(struct v4l2_m2m_ctx *m2m_ctx)
-+{
-+	return v4l2_m2m_buf_remove(m2m_ctx, V4L2_BUF_TYPE_VIDEO_OUTPUT);
-+}
-+EXPORT_SYMBOL(v4l2_m2m_src_buf_remove);
-+
-+/**
-+ * v4l2_m2m_dst_buf_remove() - take off a destination buffer from the list of
-+ * ready buffers and return it
-+ */
-+void *v4l2_m2m_dst_buf_remove(struct v4l2_m2m_ctx *m2m_ctx)
-+{
-+	return v4l2_m2m_buf_remove(m2m_ctx, V4L2_BUF_TYPE_VIDEO_CAPTURE);
-+
-+}
-+EXPORT_SYMBOL(v4l2_m2m_dst_buf_remove);
-+
 +
 +/*
-+ * Scheduling handlers
++ * mem2mem callbacks
 + */
 +
 +/**
-+ * v4l2_m2m_get_curr_priv() - return driver private data for the currently
-+ * running instance or NULL if no instance is running
++ * job_ready - check whether an instance is ready to be scheduled to run
 + */
-+void *v4l2_m2m_get_curr_priv(struct v4l2_m2m_dev *m2m_dev)
++static int job_ready(void *priv)
 +{
-+	if (!m2m_dev->curr_ctx)
-+		return NULL;
-+	else
-+		return m2m_dev->curr_ctx->priv;
++	struct m2mtest_ctx *ctx = priv;
++
++	if (v4l2_m2m_num_src_bufs_ready(ctx->m2m_ctx) < ctx->translen
++	    || v4l2_m2m_num_dst_bufs_ready(ctx->m2m_ctx) < ctx->translen) {
++		dprintk(ctx->dev, "Not enough buffers available\n");
++		return 0;
++	}
++
++	return 1;
 +}
-+EXPORT_SYMBOL(v4l2_m2m_get_curr_priv);
 +
-+/**
-+ * v4l2_m2m_try_run() - select next job to perform and run it if possible
-+ *
-+ * Get next transaction (if present) from the waiting jobs list and run it.
-+ */
-+static void v4l2_m2m_try_run(struct v4l2_m2m_dev *m2m_dev)
++static void job_abort(void *priv)
 +{
-+	unsigned long flags = 0;
++	struct m2mtest_ctx *ctx = priv;
 +
-+	spin_lock_irqsave(&m2m_dev->job_spinlock, flags);
-+	if (NULL != m2m_dev->curr_ctx) {
-+		spin_unlock_irqrestore(&m2m_dev->job_spinlock, flags);
-+		dprintk("Another instance is running, won't run now\n");
++	/* Will cancel the transaction in the next interrupt handler */
++	ctx->aborting = 1;
++}
++
++/* device_run() - prepares and starts the device
++ *
++ * This simulates all the immediate preparations required
++ * before starting a device.
++ * This should be called by the framework when it devides to
++ * schedule a particular instance.
++ */
++static void device_run(void *priv)
++{
++	struct m2mtest_ctx *ctx = priv;
++	struct m2mtest_dev *dev = ctx->dev;
++	struct m2mtest_buffer *src_buf, *dst_buf;
++
++	src_buf = v4l2_m2m_next_src_buf(ctx->m2m_ctx);
++	dst_buf = v4l2_m2m_next_dst_buf(ctx->m2m_ctx);
++
++	device_process(ctx, src_buf, dst_buf);
++
++	/* Run a timer, which simulates a hardware irq  */
++	schedule_irq(dev, ctx->transtime);
++}
++
++
++static void device_isr(unsigned long priv)
++{
++	struct m2mtest_dev *m2mtest_dev = (struct m2mtest_dev *)priv;
++	struct m2mtest_ctx *curr_ctx;
++	struct m2mtest_buffer *src_buf, *dst_buf;
++
++	curr_ctx = v4l2_m2m_get_curr_priv(m2mtest_dev->m2m_dev);
++
++	if (NULL == curr_ctx) {
++		printk(KERN_ERR
++			"Instance released before end of transaction\n");
 +		return;
 +	}
 +
-+	if (list_empty(&m2m_dev->jobqueue)) {
-+		spin_unlock_irqrestore(&m2m_dev->job_spinlock, flags);
-+		dprintk("No job pending\n");
-+		return;
++	src_buf = v4l2_m2m_src_buf_remove(curr_ctx->m2m_ctx);
++	dst_buf = v4l2_m2m_dst_buf_remove(curr_ctx->m2m_ctx);
++	curr_ctx->num_processed++;
++
++	if (curr_ctx->num_processed == curr_ctx->translen
++	    || curr_ctx->aborting) {
++		dprintk(curr_ctx->dev, "Finishing transaction\n");
++		curr_ctx->num_processed = 0;
++		v4l2_m2m_job_finish(m2mtest_dev->m2m_dev, curr_ctx->m2m_ctx);
++		src_buf->vb.state = dst_buf->vb.state = VIDEOBUF_DONE;
++		wake_up(&src_buf->vb.done);
++		wake_up(&dst_buf->vb.done);
++	} else {
++		src_buf->vb.state = dst_buf->vb.state = VIDEOBUF_DONE;
++		wake_up(&src_buf->vb.done);
++		wake_up(&dst_buf->vb.done);
++		device_run(curr_ctx);
 +	}
-+
-+	m2m_dev->curr_ctx = list_entry(m2m_dev->jobqueue.next,
-+				   struct v4l2_m2m_ctx, queue);
-+	m2m_dev->curr_ctx->job_flags |= TRANS_RUNNING;
-+	spin_unlock_irqrestore(&m2m_dev->job_spinlock, flags);
-+
-+	m2m_dev->m2m_ops->device_run(m2m_dev->curr_ctx->priv);
 +
 +	return;
 +}
 +
-+/**
-+ * v4l2_m2m_schedule() - add an instance to the pending job queue
-+ * @m2m_ctx:	The instance to be added to the pending job queue
-+ *
-+ * Called when an instance is fully prepared to run a transaction, i.e. the
-+ * instance will not sleep before finishing the transaction when run.
-+ * If an instance is already on the queue, it will not be added for the second
-+ * time and it is the responsibility of the instance to retry this at a later
-+ * time.
++
++/*
++ * video ioctls
 + */
-+static void v4l2_m2m_schedule(struct v4l2_m2m_ctx *m2m_ctx)
++
++static int vidioc_querycap(struct file *file, void *priv,
++			   struct v4l2_capability *cap)
 +{
-+	struct v4l2_m2m_dev *dev = m2m_ctx->m2m_dev;
-+	unsigned long flags = 0;
++	strncpy(cap->driver, MEM2MEM_NAME, sizeof(cap->driver) - 1);
++	strncpy(cap->card, MEM2MEM_NAME, sizeof(cap->card) - 1);
++	cap->bus_info[0] = 0;
++	cap->version = KERNEL_VERSION(0, 1, 0);
++	cap->capabilities = V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_VIDEO_OUTPUT
++			  | V4L2_CAP_STREAMING;
 +
-+	spin_lock_irqsave(&dev->job_spinlock, flags);
-+	if (!(m2m_ctx->job_flags & TRANS_QUEUED)) {
-+		list_add_tail(&m2m_ctx->queue, &dev->jobqueue);
-+		m2m_ctx->job_flags |= TRANS_QUEUED;
-+	}
-+	spin_unlock_irqrestore(&dev->job_spinlock, flags);
-+
-+	v4l2_m2m_try_run(dev);
++	return 0;
 +}
 +
-+/**
-+ * v4l2_m2m_try_schedule() - check whether an instance is ready to be added to
-+ * the pending job queue and add it if so.
-+ * @m2m_ctx:	m2m context assigned to the instance to be checked
-+ *
-+ * There are three basic requirements an instance has to meet to be able to run:
-+ * 1) at least one source buffer has to be queued,
-+ * 2) at least one destination buffer has to be queued,
-+ * 3) streaming has to be on.
-+ *
-+ * There can also be additional, custom requirements. In such case the driver
-+ * should supply a custom method (job_ready in v4l2_m2m_ops) that should
-+ * return 1 * if the instance is ready.
-+ * An example of the above could be an instance that requires more than one
-+ * src/dst buffer per transaction.
-+ */
-+static void v4l2_m2m_try_schedule(struct v4l2_m2m_ctx *m2m_ctx)
++static int enum_fmt(struct v4l2_fmtdesc *f, u32 type)
 +{
-+	struct v4l2_m2m_dev *m2m_dev;
-+	unsigned long flags = 0;
++	int i, num;
++	struct m2mtest_fmt *fmt;
 +
-+	m2m_dev = m2m_ctx->m2m_dev;
-+	dprintk("Trying to schedule a job for m2m_ctx: %p\n", m2m_ctx);
++	num = 0;
 +
-+	spin_lock_irqsave(&m2m_dev->job_spinlock, flags);
-+	if (m2m_ctx->job_flags & TRANS_QUEUED) {
-+		spin_unlock_irqrestore(&m2m_dev->job_spinlock, flags);
-+		dprintk("On job queue already\n");
-+		return;
-+	}
-+	spin_unlock_irqrestore(&m2m_dev->job_spinlock, flags);
-+
-+	/* Checking only one queue is enough, we always turn on both */
-+	if (!m2m_ctx->out_q_ctx.q.streaming) {
-+		dprintk("Streaming not on, will not schedule\n");
-+		return;
++	for (i = 0; i < NUM_FORMATS; ++i) {
++		if (formats[i].types & type) {
++			/* index-th format of type type found ? */
++			if (num == f->index)
++				break;
++			/* Correct type but haven't reached our index yet,
++			 * just increment per-type index */
++			++num;
++		}
 +	}
 +
-+	if (list_empty(&m2m_ctx->out_q_ctx.rdy_queue)) {
-+		dprintk("No input buffers available\n");
-+		return;
-+	}
-+	if (list_empty(&m2m_ctx->cap_q_ctx.rdy_queue)) {
-+		dprintk("No output buffers available\n");
-+		return;
-+	}
-+
-+	if (m2m_dev->m2m_ops->job_ready
-+		&& (!m2m_dev->m2m_ops->job_ready(m2m_ctx->priv))) {
-+		dprintk("Driver not ready\n");
-+		return;
++	if (i < NUM_FORMATS) {
++		/* Format found */
++		fmt = &formats[i];
++		strncpy(f->description, fmt->name, sizeof(f->description) - 1);
++		f->pixelformat = fmt->fourcc;
++		return 0;
 +	}
 +
-+	dprintk("Instance ready to be scheduled\n");
-+	v4l2_m2m_schedule(m2m_ctx);
++	/* Format not found */
++	return -EINVAL;
 +}
 +
-+/**
-+ * v4l2_m2m_job_finish() - inform the framework that a job has been finished
-+ * and have it clean up
-+ *
-+ * Called by a driver to yield back the device after it has finished with it.
-+ * Should be called as soon as possible after reaching a state which allows
-+ * other instances to take control of the device.
-+ *
-+ * TODO: An instance that fails to give back the device before a predefined
-+ * amount of time may have its device ownership taken away forcibly.
-+ */
-+void v4l2_m2m_job_finish(struct v4l2_m2m_dev *m2m_dev,
-+			 struct v4l2_m2m_ctx *m2m_ctx)
++static int vidioc_enum_fmt_vid_cap(struct file *file, void *priv,
++				   struct v4l2_fmtdesc *f)
 +{
-+	unsigned long flags = 0;
-+
-+	spin_lock_irqsave(&m2m_dev->job_spinlock, flags);
-+	if (!m2m_dev->curr_ctx || m2m_dev->curr_ctx != m2m_ctx) {
-+		spin_unlock_irqrestore(&m2m_dev->job_spinlock, flags);
-+		dprintk("Called by an instance not currently running\n");
-+		return;
-+	}
-+
-+	/*mutex_lock(&m2m_dev->dev_mutex);*/
-+	list_del(&m2m_dev->curr_ctx->queue);
-+	m2m_dev->curr_ctx->job_flags &= ~(TRANS_QUEUED | TRANS_RUNNING);
-+	m2m_dev->curr_ctx = NULL;
-+
-+	spin_unlock_irqrestore(&m2m_dev->job_spinlock, flags);
-+
-+	v4l2_m2m_try_run(m2m_dev);
++	return enum_fmt(f, MEM2MEM_CAPTURE);
 +}
-+EXPORT_SYMBOL(v4l2_m2m_job_finish);
 +
-+/**
-+ * v4l2_m2m_reqbufs() - multi-queue-aware REQBUFS multiplexer
-+ */
-+int v4l2_m2m_reqbufs(struct file *file, struct v4l2_m2m_ctx *m2m_ctx,
-+		     struct v4l2_requestbuffers *reqbufs)
++static int vidioc_enum_fmt_vid_out(struct file *file, void *priv,
++				   struct v4l2_fmtdesc *f)
++{
++	return enum_fmt(f, MEM2MEM_OUTPUT);
++}
++
++static int vidioc_g_fmt(struct m2mtest_ctx *ctx, struct v4l2_format *f)
 +{
 +	struct videobuf_queue *vq;
++	struct m2mtest_q_data *q_data;
 +
-+	vq = v4l2_m2m_get_vq(m2m_ctx, reqbufs->type);
-+	return videobuf_reqbufs(vq, reqbufs);
++	vq = v4l2_m2m_get_vq(ctx->m2m_ctx, f->type);
++	q_data = get_q_data(f->type);
++
++	f->fmt.pix.width	= q_data->width;
++	f->fmt.pix.height	= q_data->height;
++	f->fmt.pix.field	= vq->field;
++	f->fmt.pix.pixelformat	= q_data->fmt->fourcc;
++	f->fmt.pix.bytesperline	= (q_data->width * q_data->fmt->depth) >> 3;
++	f->fmt.pix.sizeimage	= q_data->sizeimage;
++
++	return 0;
 +}
-+EXPORT_SYMBOL_GPL(v4l2_m2m_reqbufs);
 +
-+/**
-+ * v4l2_m2m_querybuf() - multi-queue-aware QUERYBUF multiplexer
-+ *
-+ * See v4l2_m2m_mmap() documentation for details.
-+ */
-+int v4l2_m2m_querybuf(struct file *file, struct v4l2_m2m_ctx *m2m_ctx,
-+		      struct v4l2_buffer *buf)
++static int vidioc_g_fmt_vid_out(struct file *file, void *priv,
++				struct v4l2_format *f)
 +{
++	return vidioc_g_fmt(priv, f);
++}
++
++static int vidioc_g_fmt_vid_cap(struct file *file, void *priv,
++				struct v4l2_format *f)
++{
++	return vidioc_g_fmt(priv, f);
++}
++
++static int vidioc_try_fmt(struct v4l2_format *f, struct m2mtest_fmt *fmt)
++{
++	enum v4l2_field field;
++
++	field = f->fmt.pix.field;
++
++	if (field == V4L2_FIELD_ANY)
++		field = V4L2_FIELD_NONE;
++	else if (V4L2_FIELD_NONE != field)
++		return -EINVAL;
++
++	/* V4L2 specification suggests the driver corrects the format struct
++	 * if any of the dimensions is unsupported */
++	f->fmt.pix.field = field;
++
++	if (f->fmt.pix.height < MIN_H)
++		f->fmt.pix.height = MIN_H;
++	else if (f->fmt.pix.height > MAX_H)
++		f->fmt.pix.height = MAX_H;
++
++	if (f->fmt.pix.width < MIN_W)
++		f->fmt.pix.width = MIN_W;
++	else if (f->fmt.pix.width > MAX_W)
++		f->fmt.pix.width = MAX_W;
++
++	f->fmt.pix.width &= ~DIM_ALIGN_MASK;
++	f->fmt.pix.bytesperline = (f->fmt.pix.width * fmt->depth) >> 3;
++	f->fmt.pix.sizeimage = f->fmt.pix.height * f->fmt.pix.bytesperline;
++
++	return 0;
++}
++
++static int vidioc_try_fmt_vid_cap(struct file *file, void *priv,
++				  struct v4l2_format *f)
++{
++	struct m2mtest_fmt *fmt;
++	struct m2mtest_ctx *ctx = priv;
++
++	fmt = find_format(f);
++	if (!fmt || !(fmt->types & MEM2MEM_CAPTURE)) {
++		v4l2_err(&ctx->dev->v4l2_dev,
++			 "Fourcc format (0x%08x) invalid.\n",
++			 f->fmt.pix.pixelformat);
++		return -EINVAL;
++	}
++
++	return vidioc_try_fmt(f, fmt);
++}
++
++static int vidioc_try_fmt_vid_out(struct file *file, void *priv,
++				  struct v4l2_format *f)
++{
++	struct m2mtest_fmt *fmt;
++	struct m2mtest_ctx *ctx = priv;
++
++	fmt = find_format(f);
++	if (!fmt || !(fmt->types & MEM2MEM_OUTPUT)) {
++		v4l2_err(&ctx->dev->v4l2_dev,
++			 "Fourcc format (0x%08x) invalid.\n",
++			 f->fmt.pix.pixelformat);
++		return -EINVAL;
++	}
++
++	return vidioc_try_fmt(f, fmt);
++}
++
++static int vidioc_s_fmt(struct m2mtest_ctx *ctx, struct v4l2_format *f)
++{
++	struct m2mtest_q_data *q_data;
 +	struct videobuf_queue *vq;
 +	int ret = 0;
 +
-+	vq = v4l2_m2m_get_vq(m2m_ctx, buf->type);
-+	ret = videobuf_querybuf(vq, buf);
++	vq = v4l2_m2m_get_vq(ctx->m2m_ctx, f->type);
++	q_data = get_q_data(f->type);
++	if (!q_data)
++		return -EINVAL;
 +
-+	if (buf->memory == V4L2_MEMORY_MMAP
-+	    && vq->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
-+		buf->m.offset += DST_QUEUE_OFF_BASE;
++	mutex_lock(&vq->vb_lock);
++
++	if (videobuf_queue_is_busy(vq)) {
++		v4l2_err(&ctx->dev->v4l2_dev,
++			 "%s queue busy\n", __func__);
++		ret = -EBUSY;
++		goto out;
 +	}
++
++	q_data->fmt		= find_format(f);
++	q_data->width		= f->fmt.pix.width;
++	q_data->height		= f->fmt.pix.height;
++	q_data->sizeimage	= q_data->width * q_data->height
++				* q_data->fmt->depth >> 3;
++	vq->field		= f->fmt.pix.field;
++
++	dprintk(ctx->dev,
++		"Setting format for type %d, wxh: %dx%d, fmt: %d\n",
++		f->type, q_data->width, q_data->height, q_data->fmt->fourcc);
++
++out:
++	mutex_unlock(&vq->vb_lock);
++	return ret;
++}
++
++static int vidioc_s_fmt_vid_cap(struct file *file, void *priv,
++				struct v4l2_format *f)
++{
++	int ret;
++
++	ret = vidioc_try_fmt_vid_cap(file, priv, f);
++	if (ret)
++		return ret;
++
++	return vidioc_s_fmt(priv, f);
++}
++
++static int vidioc_s_fmt_vid_out(struct file *file, void *priv,
++				struct v4l2_format *f)
++{
++	int ret;
++
++	ret = vidioc_try_fmt_vid_out(file, priv, f);
++	if (ret)
++		return ret;
++
++	return vidioc_s_fmt(priv, f);
++}
++
++static int vidioc_reqbufs(struct file *file, void *priv,
++			  struct v4l2_requestbuffers *reqbufs)
++{
++	struct m2mtest_ctx *ctx = priv;
++
++	return v4l2_m2m_reqbufs(file, ctx->m2m_ctx, reqbufs);
++}
++
++static int vidioc_querybuf(struct file *file, void *priv,
++			   struct v4l2_buffer *buf)
++{
++	struct m2mtest_ctx *ctx = priv;
++
++	return v4l2_m2m_querybuf(file, ctx->m2m_ctx, buf);
++}
++
++static int vidioc_qbuf(struct file *file, void *priv, struct v4l2_buffer *buf)
++{
++	struct m2mtest_ctx *ctx = priv;
++
++	return v4l2_m2m_qbuf(file, ctx->m2m_ctx, buf);
++}
++
++static int vidioc_dqbuf(struct file *file, void *priv, struct v4l2_buffer *buf)
++{
++	struct m2mtest_ctx *ctx = priv;
++
++	return v4l2_m2m_dqbuf(file, ctx->m2m_ctx, buf);
++}
++
++static int vidioc_streamon(struct file *file, void *priv,
++			   enum v4l2_buf_type type)
++{
++	struct m2mtest_ctx *ctx = priv;
++
++	return v4l2_m2m_streamon(file, ctx->m2m_ctx, type);
++}
++
++static int vidioc_streamoff(struct file *file, void *priv,
++			    enum v4l2_buf_type type)
++{
++	struct m2mtest_ctx *ctx = priv;
++
++	return v4l2_m2m_streamoff(file, ctx->m2m_ctx, type);
++}
++
++static int vidioc_queryctrl(struct file *file, void *priv,
++			    struct v4l2_queryctrl *qc)
++{
++	struct v4l2_queryctrl *c;
++
++	c = get_ctrl(qc->id);
++	if (!c)
++		return -EINVAL;
++
++	*qc = *c;
++	return 0;
++}
++
++static int vidioc_g_ctrl(struct file *file, void *priv,
++			 struct v4l2_control *ctrl)
++{
++	struct m2mtest_ctx *ctx = priv;
++
++	switch (ctrl->id) {
++	case V4L2_CID_TRANS_TIME_MSEC:
++		ctrl->value = ctx->transtime;
++		break;
++
++	case V4L2_CID_TRANS_NUM_BUFS:
++		ctrl->value = ctx->translen;
++		break;
++
++	default:
++		v4l2_err(&ctx->dev->v4l2_dev, "Invalid control\n");
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static int check_ctrl_val(struct m2mtest_ctx *ctx, struct v4l2_control *ctrl)
++{
++	struct v4l2_queryctrl *c;
++
++	c = get_ctrl(ctrl->id);
++	if (!c)
++		return -EINVAL;
++
++	if (ctrl->value < c->minimum
++	    || ctrl->value > c->maximum) {
++		v4l2_err(&ctx->dev->v4l2_dev, "Value out of range\n");
++		return -ERANGE;
++	}
++
++	return 0;
++}
++
++static int vidioc_s_ctrl(struct file *file, void *priv,
++			 struct v4l2_control *ctrl)
++{
++	struct m2mtest_ctx *ctx = priv;
++	int ret = 0;
++
++	ret = check_ctrl_val(ctx, ctrl);
++	if (ret != 0)
++		return ret;
++
++	switch (ctrl->id) {
++	case V4L2_CID_TRANS_TIME_MSEC:
++		ctx->transtime = ctrl->value;
++		break;
++
++	case V4L2_CID_TRANS_NUM_BUFS:
++		ctx->translen = ctrl->value;
++		break;
++
++	default:
++		v4l2_err(&ctx->dev->v4l2_dev, "Invalid control\n");
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++
++static const struct v4l2_ioctl_ops m2mtest_ioctl_ops = {
++	.vidioc_querycap	= vidioc_querycap,
++
++	.vidioc_enum_fmt_vid_cap = vidioc_enum_fmt_vid_cap,
++	.vidioc_g_fmt_vid_cap	= vidioc_g_fmt_vid_cap,
++	.vidioc_try_fmt_vid_cap	= vidioc_try_fmt_vid_cap,
++	.vidioc_s_fmt_vid_cap	= vidioc_s_fmt_vid_cap,
++
++	.vidioc_enum_fmt_vid_out = vidioc_enum_fmt_vid_out,
++	.vidioc_g_fmt_vid_out	= vidioc_g_fmt_vid_out,
++	.vidioc_try_fmt_vid_out	= vidioc_try_fmt_vid_out,
++	.vidioc_s_fmt_vid_out	= vidioc_s_fmt_vid_out,
++
++	.vidioc_reqbufs		= vidioc_reqbufs,
++	.vidioc_querybuf	= vidioc_querybuf,
++
++	.vidioc_qbuf		= vidioc_qbuf,
++	.vidioc_dqbuf		= vidioc_dqbuf,
++
++	.vidioc_streamon	= vidioc_streamon,
++	.vidioc_streamoff	= vidioc_streamoff,
++
++	.vidioc_queryctrl	= vidioc_queryctrl,
++	.vidioc_g_ctrl		= vidioc_g_ctrl,
++	.vidioc_s_ctrl		= vidioc_s_ctrl,
++};
++
++
++/*
++ * Queue operations
++ */
++
++static void m2mtest_buf_release(struct videobuf_queue *vq,
++				struct videobuf_buffer *vb)
++{
++	struct m2mtest_ctx *ctx = vq->priv_data;
++
++	dprintk(ctx->dev, "type: %d, index: %d, state: %d\n",
++		vq->type, vb->i, vb->state);
++
++	videobuf_vmalloc_free(vb);
++	vb->state = VIDEOBUF_NEEDS_INIT;
++}
++
++static int m2mtest_buf_setup(struct videobuf_queue *vq, unsigned int *count,
++			  unsigned int *size)
++{
++	struct m2mtest_ctx *ctx = vq->priv_data;
++	struct m2mtest_q_data *q_data;
++
++	q_data = get_q_data(vq->type);
++
++	*size = q_data->width * q_data->height * q_data->fmt->depth >> 3;
++	dprintk(ctx->dev, "size:%d, w/h %d/%d, depth: %d\n",
++		*size, q_data->width, q_data->height, q_data->fmt->depth);
++
++	if (0 == *count)
++		*count = MEM2MEM_DEF_NUM_BUFS;
++
++	while (*size * *count > MEM2MEM_VID_MEM_LIMIT)
++		(*count)--;
++
++	v4l2_info(&ctx->dev->v4l2_dev,
++		  "%d buffers of size %d set up.\n", *count, *size);
++
++	return 0;
++}
++
++static int m2mtest_buf_prepare(struct videobuf_queue *vq,
++			       struct videobuf_buffer *vb,
++			       enum v4l2_field field)
++{
++	struct m2mtest_ctx *ctx = vq->priv_data;
++	struct m2mtest_q_data *q_data;
++	int ret;
++
++	dprintk(ctx->dev, "type: %d, index: %d, state: %d\n",
++		vq->type, vb->i, vb->state);
++
++	q_data = get_q_data(vq->type);
++
++	if (vb->baddr) {
++		/* User-provided buffer */
++		if (vb->bsize < q_data->sizeimage) {
++			/* Buffer too small to fit a frame */
++			v4l2_err(&ctx->dev->v4l2_dev,
++				 "User-provided buffer too small (%d < %d)\n",
++				 q_data->sizeimage, vb->bsize);
++			return -EINVAL;
++		}
++	} else if (vb->state != VIDEOBUF_NEEDS_INIT
++			&& vb->bsize < q_data->sizeimage) {
++		/* We provide the buffer, but it's already been inited
++		 * and is too small */
++		return -EINVAL;
++	}
++
++	vb->width	= q_data->width;
++	vb->height	= q_data->height;
++	vb->bytesperline = (q_data->width * q_data->fmt->depth) >> 3;
++	vb->size	= q_data->sizeimage;
++	vb->field	= field;
++
++	if (VIDEOBUF_NEEDS_INIT == vb->state) {
++		ret = videobuf_iolock(vq, vb, NULL);
++		if (ret) {
++			v4l2_err(&ctx->dev->v4l2_dev,
++				 "Iolock failed\n");
++			goto fail;
++		}
++	}
++
++	vb->state = VIDEOBUF_PREPARED;
++
++	return 0;
++fail:
++	m2mtest_buf_release(vq, vb);
++	return ret;
++}
++
++static void m2mtest_buf_queue(struct videobuf_queue *vq,
++			   struct videobuf_buffer *vb)
++{
++	struct m2mtest_ctx *ctx = vq->priv_data;
++
++	v4l2_m2m_buf_queue(ctx->m2m_ctx, vq, vb);
++}
++
++static struct videobuf_queue_ops m2mtest_qops = {
++	.buf_setup	= m2mtest_buf_setup,
++	.buf_prepare	= m2mtest_buf_prepare,
++	.buf_queue	= m2mtest_buf_queue,
++	.buf_release	= m2mtest_buf_release,
++};
++
++static void queue_init(void *priv, struct videobuf_queue *vq,
++		       enum v4l2_buf_type type)
++{
++	struct m2mtest_ctx *ctx = priv;
++
++	videobuf_queue_vmalloc_init(vq, &m2mtest_qops, ctx->dev->v4l2_dev.dev,
++				    &ctx->dev->irqlock, type, V4L2_FIELD_NONE,
++				    sizeof(struct m2mtest_buffer), priv);
++}
++
++
++/*
++ * File operations
++ */
++static int m2mtest_open(struct file *file)
++{
++	struct m2mtest_dev *dev = video_drvdata(file);
++	struct m2mtest_ctx *ctx = NULL;
++
++	atomic_inc(&dev->num_inst);
++
++	ctx = kzalloc(sizeof *ctx, GFP_KERNEL);
++	if (!ctx) {
++		atomic_dec(&dev->num_inst);
++		return -ENOMEM;
++	}
++
++	file->private_data = ctx;
++	ctx->dev = dev;
++	ctx->translen = MEM2MEM_DEF_TRANSLEN;
++	ctx->transtime = MEM2MEM_DEF_TRANSTIME;
++	ctx->num_processed = 0;
++
++	ctx->m2m_ctx = v4l2_m2m_ctx_init(ctx, dev->m2m_dev, queue_init);
++
++	if (IS_ERR(ctx->m2m_ctx)) {
++		kfree(ctx);
++		atomic_dec(&dev->num_inst);
++		return PTR_ERR(ctx->m2m_ctx);
++	}
++
++	dprintk(dev, "Created instance %p, m2m_ctx: %p\n", ctx, ctx->m2m_ctx);
++
++	return 0;
++}
++
++static int m2mtest_release(struct file *file)
++{
++	struct m2mtest_dev *dev = video_drvdata(file);
++	struct m2mtest_ctx *ctx = file->private_data;
++
++	dprintk(dev, "Releasing instance %p\n", ctx);
++
++	v4l2_m2m_ctx_release(ctx->m2m_ctx);
++	kfree(ctx);
++
++	atomic_dec(&dev->num_inst);
++
++	return 0;
++}
++
++static unsigned int m2mtest_poll(struct file *file,
++				 struct poll_table_struct *wait)
++{
++	struct m2mtest_ctx *ctx = (struct m2mtest_ctx *)file->private_data;
++
++	return v4l2_m2m_poll(file, ctx->m2m_ctx, wait);
++}
++
++static int m2mtest_mmap(struct file *file, struct vm_area_struct *vma)
++{
++	struct m2mtest_ctx *ctx = (struct m2mtest_ctx *)file->private_data;
++
++	return v4l2_m2m_mmap(file, ctx->m2m_ctx, vma);
++}
++
++static const struct v4l2_file_operations m2mtest_fops = {
++	.owner		= THIS_MODULE,
++	.open		= m2mtest_open,
++	.release	= m2mtest_release,
++	.poll		= m2mtest_poll,
++	.ioctl		= video_ioctl2,
++	.mmap		= m2mtest_mmap,
++};
++
++static struct video_device m2mtest_videodev = {
++	.name		= MEM2MEM_NAME,
++	.fops		= &m2mtest_fops,
++	.ioctl_ops	= &m2mtest_ioctl_ops,
++	.minor		= -1,
++	.release	= video_device_release,
++};
++
++static struct v4l2_m2m_ops m2m_ops = {
++	.device_run	= device_run,
++	.job_ready	= job_ready,
++	.job_abort	= job_abort,
++};
++
++static int m2mtest_probe(struct platform_device *pdev)
++{
++	struct m2mtest_dev *dev;
++	struct video_device *vfd;
++	int ret;
++
++	dev = kzalloc(sizeof *dev, GFP_KERNEL);
++	if (!dev)
++		return -ENOMEM;
++
++	spin_lock_init(&dev->irqlock);
++
++	ret = v4l2_device_register(&pdev->dev, &dev->v4l2_dev);
++	if (ret)
++		goto free_dev;
++
++	atomic_set(&dev->num_inst, 0);
++	mutex_init(&dev->dev_mutex);
++
++	vfd = video_device_alloc();
++	if (!vfd) {
++		v4l2_err(&dev->v4l2_dev, "Failed to allocate video device\n");
++		goto unreg_dev;
++	}
++
++	*vfd = m2mtest_videodev;
++
++	ret = video_register_device(vfd, VFL_TYPE_GRABBER, 0);
++	if (ret) {
++		v4l2_err(&dev->v4l2_dev, "Failed to register video device\n");
++		goto rel_vdev;
++	}
++
++	video_set_drvdata(vfd, dev);
++	snprintf(vfd->name, sizeof(vfd->name), "%s", m2mtest_videodev.name);
++	dev->vfd = vfd;
++	v4l2_info(&dev->v4l2_dev, MEM2MEM_TEST_MODULE_NAME
++			"Device registered as /dev/video%d\n", vfd->num);
++
++	setup_timer(&dev->timer, device_isr, (long)dev);
++	platform_set_drvdata(pdev, dev);
++
++	dev->m2m_dev = v4l2_m2m_init(&m2m_ops);
++	if (IS_ERR(dev->m2m_dev)) {
++		v4l2_err(&dev->v4l2_dev, "Failed to init mem2mem device\n");
++		ret = PTR_ERR(dev->m2m_dev);
++		goto err_m2m;
++	}
++
++	return 0;
++
++err_m2m:
++	video_unregister_device(dev->vfd);
++rel_vdev:
++	video_device_release(vfd);
++unreg_dev:
++	v4l2_device_unregister(&dev->v4l2_dev);
++free_dev:
++	kfree(dev);
 +
 +	return ret;
 +}
-+EXPORT_SYMBOL_GPL(v4l2_m2m_querybuf);
 +
-+/**
-+ * v4l2_m2m_qbuf() - enqueue a source or destination buffer, depending on
-+ * the type
-+ */
-+int v4l2_m2m_qbuf(struct file *file, struct v4l2_m2m_ctx *m2m_ctx,
-+		  struct v4l2_buffer *buf)
++static int m2mtest_remove(struct platform_device *pdev)
 +{
-+	struct videobuf_queue *vq;
++	struct m2mtest_dev *dev =
++		(struct m2mtest_dev *)platform_get_drvdata(pdev);
 +
-+	vq = v4l2_m2m_get_vq(m2m_ctx, buf->type);
-+	return videobuf_qbuf(vq, buf);
-+}
-+EXPORT_SYMBOL_GPL(v4l2_m2m_qbuf);
-+
-+/**
-+ * v4l2_m2m_dqbuf() - dequeue a source or destination buffer, depending on
-+ * the type
-+ */
-+int v4l2_m2m_dqbuf(struct file *file, struct v4l2_m2m_ctx *m2m_ctx,
-+		   struct v4l2_buffer *buf)
-+{
-+	struct videobuf_queue *vq;
-+
-+	vq = v4l2_m2m_get_vq(m2m_ctx, buf->type);
-+	return videobuf_dqbuf(vq, buf, file->f_flags & O_NONBLOCK);
-+}
-+EXPORT_SYMBOL_GPL(v4l2_m2m_dqbuf);
-+
-+/**
-+ * v4l2_M2m_streamon() - start streaming
-+ */
-+int v4l2_m2m_streamon(struct file *file, struct v4l2_m2m_ctx *m2m_ctx,
-+		      enum v4l2_buf_type type)
-+{
-+	int ret = 0;
-+
-+	/* These can fail only if the queues are in use,
-+	 * but they shouldn't be as we are managing instances manually */
-+	ret = videobuf_streamon(&m2m_ctx->out_q_ctx.q);
-+	if (ret) {
-+		printk(KERN_ERR "Streamon on output queue failed\n");
-+		return ret;
-+	}
-+
-+	ret = videobuf_streamon(&m2m_ctx->cap_q_ctx.q);
-+	if (ret) {
-+		printk(KERN_ERR "Streamon on capture queue failed\n");
-+		return ret;
-+	}
-+
-+	v4l2_m2m_try_schedule(m2m_ctx);
++	v4l2_info(&dev->v4l2_dev, "Removing " MEM2MEM_TEST_MODULE_NAME);
++	v4l2_m2m_release(dev->m2m_dev);
++	del_timer_sync(&dev->timer);
++	video_unregister_device(dev->vfd);
++	v4l2_device_unregister(&dev->v4l2_dev);
++	kfree(dev);
 +
 +	return 0;
 +}
-+EXPORT_SYMBOL_GPL(v4l2_m2m_streamon);
 +
-+/**
-+ * v4l2_m2m_streamoff() - stop streaming
-+ */
-+int v4l2_m2m_streamoff(struct file *file, struct v4l2_m2m_ctx *m2m_ctx,
-+		       enum v4l2_buf_type type)
++static struct platform_driver m2mtest_pdrv = {
++	.probe		= m2mtest_probe,
++	.remove		= m2mtest_remove,
++	.driver		= {
++		.name	= MEM2MEM_NAME,
++		.owner	= THIS_MODULE,
++	},
++};
++
++static void __exit m2mtest_exit(void)
 +{
-+	/* streamoff() fails only when we are not streaming */
-+	if (videobuf_streamoff(&m2m_ctx->out_q_ctx.q)
-+	    || videobuf_streamoff(&m2m_ctx->cap_q_ctx.q))
-+		return -EINVAL;
++	platform_driver_unregister(&m2mtest_pdrv);
++	platform_device_unregister(&m2mtest_pdev);
++}
++
++static int __init m2mtest_init(void)
++{
++	int ret;
++
++	ret = platform_device_register(&m2mtest_pdev);
++	if (ret)
++		return ret;
++
++	ret = platform_driver_register(&m2mtest_pdrv);
++	if (ret)
++		platform_device_unregister(&m2mtest_pdev);
 +
 +	return 0;
 +}
-+EXPORT_SYMBOL_GPL(v4l2_m2m_streamoff);
 +
-+/**
-+ * v4l2_m2m_poll() - poll replacement, for destination buffers only
-+ *
-+ * Call from driver's poll() function. Will poll the destination queue only.
-+ */
-+unsigned int v4l2_m2m_poll(struct file *file, struct v4l2_m2m_ctx *m2m_ctx,
-+			   struct poll_table_struct *wait)
-+{
-+	struct videobuf_queue *dst_q = NULL;
-+	struct videobuf_buffer *vb = NULL;
-+	unsigned int rc = 0;
-+
-+	dst_q = v4l2_m2m_get_dst_vq(m2m_ctx);
-+
-+	mutex_lock(&dst_q->vb_lock);
-+
-+	if (dst_q->streaming) {
-+		if (!list_empty(&dst_q->stream))
-+			vb = list_entry(dst_q->stream.next,
-+					struct videobuf_buffer, stream);
-+	}
-+	
-+	if (!vb)
-+		rc = POLLERR;
-+
-+	if (0 == rc) {
-+		poll_wait(file, &vb->done, wait);
-+		if (vb->state == VIDEOBUF_DONE || vb->state == VIDEOBUF_ERROR)
-+			rc = POLLOUT | POLLRDNORM;
-+	}
-+
-+	mutex_unlock(&dst_q->vb_lock);
-+	return rc;
-+}
-+EXPORT_SYMBOL_GPL(v4l2_m2m_poll);
-+
-+/**
-+ * v4l2_m2m_mmap() - source and destination queues-aware mmap multiplexer
-+ *
-+ * Call from driver's mmap() function. Will handle mmap() for both queues
-+ * seamlessly for videobuffer, which will receive normal per-queue offsets and
-+ * proper videobuf queue pointers. The differentation is made outside videobuf
-+ * by adding a predefined offset to buffers from one of the queues and
-+ * subtracting it before passing it back to videobuf. Only drivers (and
-+ * thus applications) receive modified offsets.
-+ */
-+int v4l2_m2m_mmap(struct file *file, struct v4l2_m2m_ctx *m2m_ctx,
-+			 struct vm_area_struct *vma)
-+{
-+	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
-+	struct videobuf_queue *vq;
-+
-+	if (offset < DST_QUEUE_OFF_BASE) {
-+		vq = v4l2_m2m_get_src_vq(m2m_ctx);
-+	} else {
-+		vq = v4l2_m2m_get_dst_vq(m2m_ctx);
-+		vma->vm_pgoff -= (DST_QUEUE_OFF_BASE >> PAGE_SHIFT);
-+	}
-+
-+	return videobuf_mmap_mapper(vq, vma);
-+}
-+EXPORT_SYMBOL(v4l2_m2m_mmap);
-+
-+/**
-+ * v4l2_m2m_init() - initialize per-driver m2m data
-+ *
-+ * Usually called from driver's probe() function.
-+ */
-+struct v4l2_m2m_dev *v4l2_m2m_init(struct v4l2_m2m_ops *m2m_ops)
-+{
-+	struct v4l2_m2m_dev *m2m_dev;
-+
-+	if (!m2m_ops)
-+		return ERR_PTR(-EINVAL);
-+
-+	/*BUG_ON(!m2m_ops->job_ready);*/
-+	BUG_ON(!m2m_ops->device_run);
-+	BUG_ON(!m2m_ops->job_abort);
-+
-+	m2m_dev = kzalloc(sizeof *m2m_dev, GFP_KERNEL);
-+	if (!m2m_dev)
-+		return ERR_PTR(-ENOMEM);
-+
-+	m2m_dev->curr_ctx = NULL;
-+	m2m_dev->m2m_ops = m2m_ops;
-+	INIT_LIST_HEAD(&m2m_dev->jobqueue);
-+	spin_lock_init(&m2m_dev->job_spinlock);
-+
-+	return m2m_dev;
-+}
-+EXPORT_SYMBOL_GPL(v4l2_m2m_init);
-+
-+/**
-+ * v4l2_m2m_release() - cleans up and frees a m2m_dev structure
-+ *
-+ * Usually called from driver's remove() function.
-+ */
-+void v4l2_m2m_release(struct v4l2_m2m_dev *m2m_dev)
-+{
-+	kfree(m2m_dev);
-+}
-+EXPORT_SYMBOL_GPL(v4l2_m2m_release);
-+
-+/**
-+ * v4l2_m2m_ctx_init() - allocate and initialize a m2m context
-+ * @priv - driver's instance private data
-+ * @m2m_dev - a previously initialized m2m_dev struct
-+ * @vq_init - a callback for queue type-specific initialization function to be
-+ * used for initializing videobuf_queues
-+ *
-+ * Usually called from driver's open() function.
-+ */
-+struct v4l2_m2m_ctx *v4l2_m2m_ctx_init(void *priv, struct v4l2_m2m_dev *m2m_dev,
-+			void (*vq_init)(void *priv, struct videobuf_queue *,
-+					enum v4l2_buf_type))
-+{
-+	struct v4l2_m2m_ctx *m2m_ctx;
-+	struct v4l2_m2m_queue_ctx *out_q_ctx;
-+	struct v4l2_m2m_queue_ctx *cap_q_ctx;
-+
-+	if (!vq_init)
-+		return ERR_PTR(-EINVAL);
-+
-+	m2m_ctx = kzalloc(sizeof *m2m_ctx, GFP_KERNEL);
-+	if (!m2m_ctx)
-+		return ERR_PTR(-ENOMEM);
-+
-+	m2m_ctx->priv = priv;
-+	m2m_ctx->m2m_dev = m2m_dev;
-+
-+	out_q_ctx = get_queue_ctx(m2m_ctx, V4L2_BUF_TYPE_VIDEO_OUTPUT);
-+	cap_q_ctx = get_queue_ctx(m2m_ctx, V4L2_BUF_TYPE_VIDEO_CAPTURE);
-+
-+	INIT_LIST_HEAD(&out_q_ctx->rdy_queue);
-+	INIT_LIST_HEAD(&cap_q_ctx->rdy_queue);
-+
-+	/*spin_lock_init(&m2m_ctx->queue_lock);*/
-+	INIT_LIST_HEAD(&m2m_ctx->queue);
-+
-+	vq_init(priv, &out_q_ctx->q, V4L2_BUF_TYPE_VIDEO_OUTPUT);
-+	vq_init(priv, &cap_q_ctx->q, V4L2_BUF_TYPE_VIDEO_CAPTURE);
-+	out_q_ctx->q.priv_data = cap_q_ctx->q.priv_data = priv;
-+
-+	return m2m_ctx;
-+}
-+EXPORT_SYMBOL_GPL(v4l2_m2m_ctx_init);
-+
-+/**
-+ * v4l2_m2m_ctx_release() - release m2m context
-+ *
-+ * Usually called from driver's release() function.
-+ */
-+void v4l2_m2m_ctx_release(struct v4l2_m2m_ctx *m2m_ctx)
-+{
-+	struct v4l2_m2m_dev *m2m_dev;
-+	struct videobuf_buffer *vb;
-+	unsigned long flags = 0;
-+
-+	m2m_dev = m2m_ctx->m2m_dev;
-+
-+	spin_lock_irqsave(&m2m_dev->job_spinlock, flags);
-+	if (m2m_ctx->job_flags & TRANS_RUNNING) {
-+		spin_unlock_irqrestore(&m2m_dev->job_spinlock, flags);
-+		m2m_dev->m2m_ops->job_abort(m2m_ctx->priv);
-+		dprintk("m2m_ctx %p running, will wait to complete", m2m_ctx);
-+		vb = v4l2_m2m_next_dst_buf(m2m_ctx);
-+		BUG_ON(NULL == vb);
-+		wait_event(vb->done, vb->state != VIDEOBUF_ACTIVE
-+				     && vb->state != VIDEOBUF_QUEUED);
-+	} else if (m2m_ctx->job_flags & TRANS_QUEUED) {
-+		list_del(&m2m_ctx->queue);
-+		m2m_ctx->job_flags &= ~(TRANS_QUEUED | TRANS_RUNNING);
-+		spin_unlock_irqrestore(&m2m_dev->job_spinlock, flags);
-+		dprintk("m2m_ctx: %p had been on queue and was removed\n",
-+			m2m_ctx);
-+	} else {
-+		/* Do nothing, was not on queue/running */
-+		spin_unlock_irqrestore(&m2m_dev->job_spinlock, flags);
-+	}
-+
-+	videobuf_stop(&m2m_ctx->cap_q_ctx.q);
-+	videobuf_stop(&m2m_ctx->out_q_ctx.q);
-+
-+	videobuf_mmap_free(&m2m_ctx->cap_q_ctx.q);
-+	videobuf_mmap_free(&m2m_ctx->out_q_ctx.q);
-+
-+	kfree(m2m_ctx);
-+}
-+EXPORT_SYMBOL_GPL(v4l2_m2m_ctx_release);
-+
-+/**
-+ * v4l2_m2m_buf_queue() - add a buffer to the proper ready buffers list.
-+ *
-+ * Call from withing buf_queue() videobuf_queue_ops callback.
-+ */
-+/* Locking: Caller holds q->irqlock */
-+void v4l2_m2m_buf_queue(struct v4l2_m2m_ctx *m2m_ctx, struct videobuf_queue *vq,
-+			struct videobuf_buffer *vb)
-+{
-+	struct v4l2_m2m_queue_ctx *q_ctx;
-+
-+	q_ctx = get_queue_ctx(m2m_ctx, vq->type);
-+	if (!q_ctx)
-+		return;
-+
-+	list_add_tail(&vb->queue, &q_ctx->rdy_queue);
-+	q_ctx->num_rdy++;
-+
-+	vb->state = VIDEOBUF_QUEUED;
-+
-+	v4l2_m2m_try_schedule(m2m_ctx);
-+}
-+EXPORT_SYMBOL_GPL(v4l2_m2m_buf_queue);
-+
-diff --git a/include/media/v4l2-mem2mem.h b/include/media/v4l2-mem2mem.h
-new file mode 100644
-index 0000000..a5ac3ec
---- /dev/null
-+++ b/include/media/v4l2-mem2mem.h
-@@ -0,0 +1,153 @@
-+/*
-+ * Memory-to-memory device framework for Video for Linux 2.
-+ *
-+ * Helper functions for devices that use memory buffers for both source
-+ * and destination.
-+ *
-+ * Copyright (c) 2009 Samsung Electronics Co., Ltd.
-+ * Pawel Osciak, <p.osciak@samsung.com>
-+ * Marek Szyprowski, <m.szyprowski@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by the
-+ * Free Software Foundation; either version 2 of the
-+ * License, or (at your option) any later version
-+ */
-+
-+#ifndef _MEDIA_V4L2_MEM2MEM_H
-+#define _MEDIA_V4L2_MEM2MEM_H
-+
-+#include <media/videobuf-core.h>
-+
-+/**
-+ * struct v4l2_m2m_ops - mem-to-mem device driver callbacks
-+ * @device_run:	required. Begin the actual job (transaction) inside this
-+ *		callback.
-+ *		The job does NOT have to end before this callback returns
-+ *		(and it will be the usual case). When the job finishes,
-+ *		v4l2_m2m_job_finish() has to be called.
-+ * @job_ready:	optional. Should return 0 if the driver does not have a job
-+ *		fully prepared to run yet (i.e. it will not be able to finish a
-+ *		transactio without sleeping). If not provided, it will be
-+ *		assumed that one source and one destination buffer are all
-+ *		that is required for the driver to perform one full transaction.
-+ * @job_abort:	required. Informs the driver that it has to abort the currently
-+ *		running transaction as soon as possible (i.e. as soon as it can
-+ *		stop the device safely; e.g. in the next interrupt handler),
-+ *		even if the transaction would not have been finished by then.
-+ *		After the driver performs the necessary steps, it has to call
-+ *		v4l2_m2m_job_finish() (as if the transaction ended normally).
-+ *		This function does not have to (and will usually not) wait
-+ *		until the device enters a state when it can be stopped.
-+ */
-+struct v4l2_m2m_ops {
-+	void (*device_run)(void *priv);
-+	int (*job_ready)(void *priv);
-+	void (*job_abort)(void *priv);
-+};
-+
-+struct v4l2_m2m_dev;
-+
-+struct v4l2_m2m_queue_ctx {
-+/* private: internal use only */
-+	struct videobuf_queue	q;
-+
-+	/* Base value for offsets of mmaped buffers on this queue */
-+	unsigned long		offset_base;
-+
-+	/* Queue for buffers ready to be processed as soon as this
-+	 * instance receives access to the device */
-+	struct list_head	rdy_queue;
-+	u8			num_rdy;
-+};
-+
-+struct v4l2_m2m_ctx {
-+/* private: internal use only */
-+	struct v4l2_m2m_dev		*m2m_dev;
-+
-+	/* Capture (output to memory) queue context */
-+	struct v4l2_m2m_queue_ctx	cap_q_ctx;
-+
-+	/* Output (input from memory) queue context */
-+	struct v4l2_m2m_queue_ctx	out_q_ctx;
-+
-+	/* For device job queue */
-+	struct list_head		queue;
-+	unsigned long			job_flags;
-+
-+	/* Instance private data */
-+	void				*priv;
-+};
-+
-+void *v4l2_m2m_get_curr_priv(struct v4l2_m2m_dev *m2m_dev);
-+
-+struct videobuf_queue *v4l2_m2m_get_src_vq(struct v4l2_m2m_ctx *m2m_ctx);
-+struct videobuf_queue *v4l2_m2m_get_dst_vq(struct v4l2_m2m_ctx *m2m_ctx);
-+struct videobuf_queue *v4l2_m2m_get_vq(struct v4l2_m2m_ctx *m2m_ctx,
-+				       enum v4l2_buf_type type);
-+
-+void v4l2_m2m_job_finish(struct v4l2_m2m_dev *m2m_dev,
-+			 struct v4l2_m2m_ctx *m2m_ctx);
-+
-+void *v4l2_m2m_next_src_buf(struct v4l2_m2m_ctx *m2m_ctx);
-+void *v4l2_m2m_next_dst_buf(struct v4l2_m2m_ctx *m2m_ctx);
-+
-+void *v4l2_m2m_src_buf_remove(struct v4l2_m2m_ctx *m2m_ctx);
-+void *v4l2_m2m_dst_buf_remove(struct v4l2_m2m_ctx *m2m_ctx);
-+
-+
-+int v4l2_m2m_reqbufs(struct file *file, struct v4l2_m2m_ctx *m2m_ctx,
-+		     struct v4l2_requestbuffers *reqbufs);
-+
-+int v4l2_m2m_querybuf(struct file *file, struct v4l2_m2m_ctx *m2m_ctx,
-+		      struct v4l2_buffer *buf);
-+
-+int v4l2_m2m_qbuf(struct file *file, struct v4l2_m2m_ctx *m2m_ctx,
-+		  struct v4l2_buffer *buf);
-+int v4l2_m2m_dqbuf(struct file *file, struct v4l2_m2m_ctx *m2m_ctx,
-+		   struct v4l2_buffer *buf);
-+
-+int v4l2_m2m_streamon(struct file *file, struct v4l2_m2m_ctx *m2m_ctx,
-+		      enum v4l2_buf_type type);
-+int v4l2_m2m_streamoff(struct file *file, struct v4l2_m2m_ctx *m2m_ctx,
-+		       enum v4l2_buf_type type);
-+
-+unsigned int v4l2_m2m_poll(struct file *file, struct v4l2_m2m_ctx *m2m_ctx,
-+			   struct poll_table_struct *wait);
-+
-+int v4l2_m2m_mmap(struct file *file, struct v4l2_m2m_ctx *m2m_ctx,
-+		  struct vm_area_struct *vma);
-+
-+struct v4l2_m2m_dev *v4l2_m2m_init(struct v4l2_m2m_ops *m2m_ops);
-+void v4l2_m2m_release(struct v4l2_m2m_dev *m2m_dev);
-+
-+struct v4l2_m2m_ctx *v4l2_m2m_ctx_init(void *priv, struct v4l2_m2m_dev *m2m_dev,
-+			void (*vq_init)(void *priv, struct videobuf_queue *,
-+					enum v4l2_buf_type));
-+void v4l2_m2m_ctx_release(struct v4l2_m2m_ctx *m2m_ctx);
-+
-+void v4l2_m2m_buf_queue(struct v4l2_m2m_ctx *m2m_ctx, struct videobuf_queue *vq,
-+			struct videobuf_buffer *vb);
-+
-+/**
-+ * v4l2_m2m_num_src_bufs_ready() - return the number of source buffers ready for
-+ * use
-+ */
-+static inline
-+unsigned int v4l2_m2m_num_src_bufs_ready(struct v4l2_m2m_ctx *m2m_ctx)
-+{
-+	return m2m_ctx->cap_q_ctx.num_rdy;
-+}
-+
-+/**
-+ * v4l2_m2m_num_src_bufs_ready() - return the number of destination buffers
-+ * ready for use
-+ */
-+static inline
-+unsigned int v4l2_m2m_num_dst_bufs_ready(struct v4l2_m2m_ctx *m2m_ctx)
-+{
-+	return m2m_ctx->out_q_ctx.num_rdy;
-+}
-+
-+#endif /* _MEDIA_V4L2_MEM2MEM_H */
++module_init(m2mtest_init);
++module_exit(m2mtest_exit);
 +
 -- 
 1.6.4.2.253.g0b1fac
