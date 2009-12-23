@@ -1,83 +1,70 @@
 From: p.osciak@samsung.com (Pawel Osciak)
-Date: Wed, 23 Dec 2009 11:07:34 +0100
-Subject: [EXAMPLE v2] Mem-to-mem userspace test application.
-In-Reply-To: <1261562854-26507-1-git-send-email-p.osciak@samsung.com>
-References: <1261562854-26507-1-git-send-email-p.osciak@samsung.com>
-Message-ID: <1261562854-26507-4-git-send-email-p.osciak@samsung.com>
+Date: Wed, 23 Dec 2009 11:08:53 +0100
+Subject: [EXAMPLE] S3C/S5P image rotator test application
+In-Reply-To: <1261562933-26987-1-git-send-email-p.osciak@samsung.com>
+References: <1261562933-26987-1-git-send-email-p.osciak@samsung.com>
+Message-ID: <1261562933-26987-4-git-send-email-p.osciak@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is an example application for testing mem-to-mem framework using
-mem2mem-testdev device.
+This is an example application for testing the S3C/S5P rotator device.
+It uses framebuffer memory for its source and destination buffers, as the
+device requires them to be in contiguous memory.
+Source image is read from a file passed as an argument and saved to another
+file, which name is also passed as an argument.
 
-It is intended to be executed multiple times in parallel to test multi-instance
-operation and scheduling. Each process can be configured differently using
-command-line arguments.
+Configurable parameters: video_node in_file, out_file, format, width, height,
+                         rotation, flip
 
-The application opens video test device and framebuffer, sets up params,
-queues src/dst buffers and displays processed results on the framebuffer.
+Where:
+video_node: video node number
+in_file/out_file: source/destination raw image data
+format: 0: 420, 1: 422, 2: 565, 3: 888
+width/height: dimensions of both images
+rotation: 90, 180, 270
+flip (when rotation==0): 1: horizontal, 2: vertical
 
-Configurable parameters: starting point on the framebuffer, width/height of
-buffers, transaction length (in buffers), transaction duration, total number
-of frames to be processed.
-
-
-Tested on a 800x480 framebuffer with the following script:
-
-#!/bin/bash
-for i in {0..3}
-do
-    ((x=$i * 100))
-    ./process-vmalloc 0 $(($i + 1)) $((2000 - $i * 500)) $((($i+1) * 4)) \
-        $x $x 100 100 &
-done
-
-
-Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
-Reviewed-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
 
 --- /dev/null	2009-11-17 07:51:25.574927259 +0100
-+++ process-vmalloc.c	2009-11-26 11:00:26.000000000 +0100
-@@ -0,0 +1,420 @@
-+/**
-+ * process-vmalloc.c
-+ * Capture+output (process) V4L2 device tester.
++++ rotator-dma-contig.c	2009-12-22 17:22:25.000000000 +0100
+@@ -0,0 +1,375 @@
++/*
++ * Samsung S3C/S5P image rotator test application.
 + *
-+ * Pawel Osciak, p.osciak at samsung.com
-+ * 2009, Samsung Electronics Co., Ltd.
++ * Copyright (c) 2009 Samsung Electronics Co., Ltd.
++ * Pawel Osciak, <p.osciak@samsung.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by the
-+ * Free Software Foundation; either version 2 of the License, or (at your
-+ * option) any later version
++ * Free Software Foundation; either version 2 of the
++ * License, or (at your option) any later version
 + */
-+
 +#include <stdio.h>
 +#include <stdlib.h>
 +#include <string.h>
 +#include <assert.h>
-+#include <time.h>
 +#include <errno.h>
++#include <time.h>
 +
 +#include <fcntl.h>
 +#include <unistd.h>
 +#include <sys/ioctl.h>
 +#include <sys/types.h>
++#include <sys/stat.h>
++#include <sys/mman.h>
 +#include <stdint.h>
 +
 +#include <linux/fb.h>
 +#include <linux/videodev2.h>
 +
-+#include <sys/mman.h>
-+
-+#define V4L2_CID_TRANS_TIME_MSEC        (V4L2_CID_PRIVATE_BASE)
-+#define V4L2_CID_TRANS_NUM_BUFS         (V4L2_CID_PRIVATE_BASE + 1)
-+
-+#define VIDEO_DEV_NAME	"/dev/video0"
++#define VIDEO_DEV_NAME	"/dev/video"
 +#define FB_DEV_NAME	"/dev/fb0"
-+#define NUM_BUFS	4
-+#define NUM_FRAMES	16
++
++#define NUM_SRC_BUFS	1
++#define NUM_DST_BUFS	1
++
++#define V4L2_CID_PRIVATE_ROTATE (V4L2_CID_PRIVATE_BASE + 0)
 +
 +#define perror_exit(cond, func)\
 +	if (cond) {\
@@ -86,9 +73,9 @@ Reviewed-by: Kyungmin Park <kyungmin.park@samsung.com>
 +		exit(EXIT_FAILURE);\
 +	}
 +
-+#define error_exit(cond, func)\
++#define error_exit(cond, msg)\
 +	if (cond) {\
-+		fprintf(stderr, "%s:%d: failed\n", func, __LINE__);\
++		fprintf(stderr, "%s:%d: " msg "\n", __func__, __LINE__);\
 +		exit(EXIT_FAILURE);\
 +	}
 +
@@ -102,69 +89,105 @@ Reviewed-by: Kyungmin Park <kyungmin.park@samsung.com>
 +#define memzero(x)\
 +	memset(&(x), 0, sizeof (x));
 +
-+#define PROCESS_DEBUG 1
-+#ifdef PROCESS_DEBUG
++#ifdef _DEBUG
 +#define debug(msg, ...)\
 +	fprintf(stderr, "%s: " msg, __func__, ##__VA_ARGS__);
 +#else
 +#define debug(msg, ...)
 +#endif
 +
-+static int vid_fd, fb_fd;
-+static void *fb_addr;
-+static char *p_src_buf[NUM_BUFS], *p_dst_buf[NUM_BUFS];
-+static size_t src_buf_size[NUM_BUFS], dst_buf_size[NUM_BUFS];
-+static uint32_t num_src_bufs = 0, num_dst_bufs = 0;
++struct buffer {
++	char *addr;
++	unsigned long size;
++	unsigned int index;
++};
 +
-+/* Command-line params */
-+int initial_delay = 0;
-+int fb_x, fb_y, width, height;
-+int translen = 1;
-+/* For displaying multi-buffer transaction simulations, indicates current
-+ * buffer in an ongoing transaction */
-+int curr_buf = 0;
-+int transtime = 1000;
-+int num_frames = 0;
-+off_t fb_off, fb_line_w, fb_buf_w;
-+struct fb_var_screeninfo fbinfo;
++static int vid_fd, fb_fd, src_fd, dst_fd;
++static void *fb_addr, *src_addr, *dst_addr;
++static char *in_file, *out_file;
++static int width, height;
++static off_t fb_line_w, fb_buf_w, fb_size;
++static struct fb_var_screeninfo fbinfo;
++static int in_size;
++static int vid_node = 0;
++static int format, framesize, rotation, flip;
 +
-+static void init_video_dev(void)
++static void set_rotation(int angle)
 +{
-+	int ret;
-+	struct v4l2_capability cap;
-+	struct v4l2_format fmt;
 +	struct v4l2_control ctrl;
++	int ret;
 +
-+	vid_fd = open(VIDEO_DEV_NAME, O_RDWR | O_NONBLOCK, 0);
-+	perror_exit(vid_fd < 0, "open");
-+
-+	ctrl.id = V4L2_CID_TRANS_TIME_MSEC;
-+	ctrl.value = transtime;
++	memzero(ctrl);
++	ctrl.id = V4L2_CID_PRIVATE_ROTATE;
++	ctrl.value = angle;
 +	ret = ioctl(vid_fd, VIDIOC_S_CTRL, &ctrl);
 +	perror_exit(ret != 0, "ioctl");
++}
 +
-+	ctrl.id = V4L2_CID_TRANS_NUM_BUFS;
-+	ctrl.value = translen;
++static void set_flip(int flip)
++{
++	struct v4l2_control ctrl;
++	int ret;
++
++	memzero(ctrl);
++	switch (flip) {
++	case 1:
++		ctrl.id = V4L2_CID_HFLIP;
++		break;
++	case 2:
++		ctrl.id = V4L2_CID_VFLIP;
++		break;
++	default:
++		error_exit(1, "Invalid params\n");
++	}
++
++	ctrl.value = 1;
++
 +	ret = ioctl(vid_fd, VIDIOC_S_CTRL, &ctrl);
 +	perror_exit(ret != 0, "ioctl");
++}
 +
-+	ret = ioctl(vid_fd, VIDIOC_QUERYCAP, &cap);
-+	perror_exit(ret != 0, "ioctl");
++static void set_fmt(uint32_t format)
++{
++	struct v4l2_format fmt;
++	int ret;
++	long page_size;
++	
++	memzero(fmt);
++	switch (format) {
++	case 0:
++		fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
++		framesize = width * height * 2;
++		fb_buf_w = width * 2;
++		break;
++	case 1:
++		fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUV420;
++		framesize = (width * height * 3) / 2;
++		fb_buf_w = width * 3 / 2;
++		break;
++	case 2:
++		fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_RGB565X;
++		framesize = width * height * 2;
++		fb_buf_w = width * 2;
++		break;
++	case 3:
++		fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_BGR32;
++		framesize = width * height * 4;
++		fb_buf_w = width * 4;
++		break;
++	default:
++		error_exit(1, "Invalid params\n");
++		break;
++	}
 +
-+	if (!(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE)) {
-+		fprintf(stderr, "Device does not support capture\n");
-+		exit(EXIT_FAILURE);
-+	}
-+	if (!(cap.capabilities & V4L2_CAP_VIDEO_OUTPUT)) {
-+		fprintf(stderr, "Device does not support output\n");
-+		exit(EXIT_FAILURE);
-+	}
++	page_size = sysconf(_SC_PAGESIZE);
++	framesize = (framesize + page_size - 1) & ~(page_size - 1);
++	debug("Framesize: %d\n", framesize);
 +
 +	/* Set format for capture */
 +	fmt.type		= V4L2_BUF_TYPE_VIDEO_CAPTURE;
 +	fmt.fmt.pix.width	= width;
 +	fmt.fmt.pix.height	= height;
-+	fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_RGB565X;
 +	fmt.fmt.pix.field	= V4L2_FIELD_ANY;
 +
 +	ret = ioctl(vid_fd, VIDIOC_S_FMT, &fmt);
@@ -174,144 +197,48 @@ Reviewed-by: Kyungmin Park <kyungmin.park@samsung.com>
 +	fmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
 +	fmt.fmt.pix.width	= width;
 +	fmt.fmt.pix.height	= height;
-+	fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_RGB565X;
 +	fmt.fmt.pix.field	= V4L2_FIELD_ANY;
 +	
 +	ret = ioctl(vid_fd, VIDIOC_S_FMT, &fmt);
 +	perror_exit(ret != 0, "ioctl");
 +}
 +
-+static void gen_src_buf(void *p, size_t size)
-+{
-+	uint8_t val;
 +
-+	val = rand() % 256;
-+	memset(p, val, size);
-+}
-+
-+static void gen_dst_buf(void *p, size_t size)
++static void verify_caps(void)
 +{
-+	/* White */
-+	memset(p, 255, 0);
-+}
-+
-+static int read_frame(int last)
-+{
-+	struct v4l2_buffer buf;
++	struct v4l2_capability cap;
 +	int ret;
-+	int j;
-+	char * p_fb = fb_addr + fb_off;
 +
-+	memzero(buf);
++	memzero(cap);
++	ret = ioctl(vid_fd, VIDIOC_QUERYCAP, &cap);
++	perror_exit(ret != 0, "ioctl");
 +
-+	buf.type	= V4L2_BUF_TYPE_VIDEO_OUTPUT;
-+	buf.memory	= V4L2_MEMORY_MMAP;
++	if (!(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE))
++		error_exit(1, "Device does not support capture\n");
 +
-+	ret = ioctl(vid_fd, VIDIOC_DQBUF, &buf);
-+	debug("Dequeued source buffer, index: %d\n", buf.index);
-+	if (ret) {
-+		switch (errno) {
-+		case EAGAIN:
-+			debug("Got EAGAIN\n");
-+			return 0;
++	if (!(cap.capabilities & V4L2_CAP_VIDEO_OUTPUT))
++		error_exit(1, "Device does not support output\n");
 +
-+		case EIO:
-+			debug("Got EIO\n");
-+			return 0;
-+
-+		default:
-+			perror("ioctl");
-+			return 0;
-+		}
-+	}
-+
-+	/* Verify we've got a correct buffer */
-+	assert(buf.index < num_src_bufs);
-+
-+	/* Enqueue back the buffer (note that the index is preserved) */
-+	if (!last) {
-+		gen_src_buf(p_src_buf[buf.index], src_buf_size[buf.index]);
-+		buf.type	= V4L2_BUF_TYPE_VIDEO_OUTPUT;
-+		buf.memory	= V4L2_MEMORY_MMAP;
-+		ret = ioctl(vid_fd, VIDIOC_QBUF, &buf);
-+		perror_ret(ret != 0, "ioctl");
-+	}
-+
-+
-+	buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-+
-+	debug("Dequeuing destination buffer\n");
-+	ret = ioctl(vid_fd, VIDIOC_DQBUF, &buf);
-+	if (ret) {
-+		switch (errno) {
-+		case EAGAIN:
-+			debug("Got EAGAIN\n");
-+			return 0;
-+
-+		case EIO:
-+			debug("Got EIO\n");
-+			return 0;
-+
-+		default:
-+			perror("ioctl");
-+			return 1;
-+		}
-+	}
-+	debug("Dequeued dst buffer, index: %d\n", buf.index);
-+	/* Verify we've got a correct buffer */
-+	assert(buf.index < num_dst_bufs);
-+
-+	debug("Current buffer in the transaction: %d\n", curr_buf);
-+	p_fb += curr_buf * (height / translen) * fb_line_w;
-+	++curr_buf;
-+	if (curr_buf >= translen)
-+		curr_buf = 0;
-+
-+	/* Display results */
-+	for (j = 0; j < height / translen; ++j) {
-+		memcpy(p_fb, (void *)p_dst_buf[buf.index], fb_buf_w);
-+		p_fb += fb_line_w;
-+	}
-+
-+	/* Enqueue back the buffer */
-+	if (!last) {
-+		gen_dst_buf(p_dst_buf[buf.index], dst_buf_size[buf.index]);
-+		ret = ioctl(vid_fd, VIDIOC_QBUF, &buf);
-+		perror_ret(ret != 0, "ioctl");
-+		debug("Enqueued back dst buffer\n");
-+	}
-+
-+	return 0;
++	if (!(cap.capabilities & V4L2_CAP_STREAMING))
++		error_exit(1, "Device does not support streaming\n");
 +}
 +
-+void init_usage(int argc, char *argv[])
++static void init_video_dev(void)
 +{
-+	if (argc != 9) {
-+		printf("Usage: %s initial_delay bufs_per_transaction "
-+			"trans_length_msec num_frames fb_offset_x fb_offset_y "
-+			"width height\n", argv[0]);
-+		exit(EXIT_FAILURE);
-+	}
++	char devname[64];
 +
-+	initial_delay = atoi(argv[1]);
-+	translen = atoi(argv[2]);
-+	transtime = atoi(argv[3]);
-+	num_frames = atoi(argv[4]);
-+	fb_x = atoi(argv[5]);
-+	fb_y = atoi(argv[6]);
-+	width = atoi(argv[7]);
-+	height = atoi(argv[8]);
-+	debug("NEW PROCESS: fb_x: %d, fb_y: %d, width: %d, height: %d, "
-+		"translen: %d, transtime: %d, num_frames: %d\n",
-+		fb_x, fb_y, width, height, translen, transtime, num_frames);
++	snprintf(devname, 64, "%s%d", VIDEO_DEV_NAME, vid_node);
++	vid_fd = open(devname, O_RDWR | O_NONBLOCK, 0);
++	perror_exit(vid_fd < 0, "open");
++
++	verify_caps();
 +}
 +
 +void init_fb(void)
 +{
 +	int ret;
-+	size_t map_size;
 +
-+	fb_fd = open(FB_DEV_NAME, O_RDWR, 0);
++	fb_fd = open(FB_DEV_NAME, O_RDWR);
 +	perror_exit(fb_fd < 0, "open");
 +
 +	ret = ioctl(fb_fd, FBIOGET_VSCREENINFO, &fbinfo);
@@ -320,143 +247,160 @@ Reviewed-by: Kyungmin Park <kyungmin.park@samsung.com>
 +		fbinfo.xres, fbinfo.xres_virtual,
 +		fbinfo.yres, fbinfo.yres_virtual);
 +
-+	fb_line_w= fbinfo.xres_virtual * (fbinfo.bits_per_pixel >> 3);
-+	fb_off = fb_y * fb_line_w + fb_x * (fbinfo.bits_per_pixel >> 3);
-+	fb_buf_w = width * (fbinfo.bits_per_pixel >> 3);
-+	map_size = fb_line_w * fbinfo.yres_virtual;
++	fb_line_w = fbinfo.xres_virtual * (fbinfo.bits_per_pixel >> 3);
++	debug("fb_buf_w: %d, fb_line_w: %d\n", fb_buf_w, fb_line_w);
++	fb_size = fb_line_w * fbinfo.yres_virtual;
 +
-+	fb_addr = mmap(0, map_size, PROT_WRITE | PROT_READ,
++	fb_addr = mmap(0, fb_size, PROT_WRITE | PROT_READ,
 +			MAP_SHARED, fb_fd, 0);
 +	perror_exit(fb_addr == MAP_FAILED, "mmap");
 +}
 +
-+int main(int argc, char *argv[])
++static void parse_args(int argc, char *argv[])
 +{
-+	int ret = 0;
-+	int i;
-+	struct v4l2_buffer buf;
++	if (argc != 9) {
++		fprintf(stderr, "Usage: "
++			"%s video_node in_file, out_file, format, width, "
++			"height, rotation, flip\n"
++			"rotations: 90, 180, 270;\n"
++			"flip (when rotation==0): 1 - horiz, 2 - vert\n"
++			"formats: 0: 420, 1: 422, 2: 565, 3: 888\n",
++			argv[0]);
++		error_exit(1, "Invalid number of arguments\n");
++	}
++
++	vid_node = atoi(argv[1]);
++	in_file = argv[2];
++	out_file = argv[3];
++	format = atoi(argv[4]);
++	width = atoi(argv[5]);
++	height = atoi(argv[6]);
++	rotation = atoi(argv[7]);
++	flip = atoi(argv[8]);
++}
++
++static void get_buffer(struct buffer *buf, unsigned int i)
++{
++	if ((i+1) * framesize > fb_size)
++		error_exit(1, "Framebuffer memory won't fit in the buffer\n");
++
++	buf->addr = fb_addr + i * framesize;
++	buf->size = framesize;
++}
++
++static void request_buffers(unsigned int *num_src_bufs,
++			    unsigned int *num_dst_bufs)
++{
 +	struct v4l2_requestbuffers reqbuf;
-+	enum v4l2_buf_type type;
-+	int last = 0;
-+
-+	init_usage(argc, argv);
-+	init_fb();
-+
-+	srand(time(NULL) ^ getpid());
-+	sleep(initial_delay);
-+
-+	init_video_dev();
++	int ret;
 +
 +	memzero(reqbuf);
-+	reqbuf.count	= NUM_BUFS;
++	reqbuf.count	= *num_src_bufs;
 +	reqbuf.type	= V4L2_BUF_TYPE_VIDEO_OUTPUT;
-+	type		= V4L2_BUF_TYPE_VIDEO_OUTPUT;
-+	reqbuf.memory	= V4L2_MEMORY_MMAP;
++	reqbuf.memory	= V4L2_MEMORY_USERPTR;
 +	ret = ioctl(vid_fd, VIDIOC_REQBUFS, &reqbuf);
 +	perror_exit(ret != 0, "ioctl");
-+	num_src_bufs = reqbuf.count;
-+	debug("Got %d src buffers\n", num_src_bufs);
++	*num_src_bufs	= reqbuf.count;
 +
-+	reqbuf.count	= NUM_BUFS;
++
++	reqbuf.count	= *num_dst_bufs;
 +	reqbuf.type	= V4L2_BUF_TYPE_VIDEO_CAPTURE;
-+	type		= V4L2_BUF_TYPE_VIDEO_CAPTURE;
 +	ret = ioctl(vid_fd, VIDIOC_REQBUFS, &reqbuf);
 +	perror_exit(ret != 0, "ioctl");
-+	num_dst_bufs = reqbuf.count;
-+	debug("Got %d dst buffers\n", num_dst_bufs);
++	*num_dst_bufs	= reqbuf.count;
++}
 +
-+	for (i = 0; i < num_src_bufs; ++i) {
-+		buf.type	= V4L2_BUF_TYPE_VIDEO_OUTPUT;
-+		buf.memory	= V4L2_MEMORY_MMAP;
-+		buf.index	= i;
++static int process(struct buffer *src_buf, struct buffer *dst_buf)
++{
++	struct v4l2_buffer buf;
++	enum v4l2_buf_type type;
++	fd_set read_fds;
++	int r;
++	int ret;
 +
-+		ret = ioctl(vid_fd, VIDIOC_QUERYBUF, &buf);
-+		perror_exit(ret != 0, "ioctl");
-+		debug("QUERYBUF returned offset: %x\n", buf.m.offset);
++	memzero(buf);
++	buf.type	= V4L2_BUF_TYPE_VIDEO_OUTPUT;
++	buf.memory	= V4L2_MEMORY_USERPTR;
++	buf.index	= src_buf->index;
++	buf.m.userptr	= (unsigned long)src_buf->addr;
++	buf.length	= src_buf->size;
++	type		= V4L2_BUF_TYPE_VIDEO_OUTPUT;
++	ret = ioctl(vid_fd, VIDIOC_QBUF, &buf);
++	perror_ret(ret, "ioctl");
 +
-+		src_buf_size[i] = buf.length;
-+		p_src_buf[i] = mmap(NULL, buf.length,
-+				    PROT_READ | PROT_WRITE, MAP_SHARED,
-+				    vid_fd, buf.m.offset);
-+		perror_exit(MAP_FAILED == p_src_buf[i], "mmap");
-+	}
-+
-+	for (i = 0; i < num_dst_bufs; ++i) {
-+		buf.type	= V4L2_BUF_TYPE_VIDEO_CAPTURE;
-+		buf.memory	= V4L2_MEMORY_MMAP;
-+		buf.index	= i;
-+
-+		ret = ioctl(vid_fd, VIDIOC_QUERYBUF, &buf);
-+		perror_exit(ret != 0, "ioctl");
-+		debug("QUERYBUF returned offset: %x\n", buf.m.offset);
-+
-+		dst_buf_size[i] = buf.length;
-+		p_dst_buf[i] = mmap(NULL, buf.length,
-+				    PROT_READ | PROT_WRITE, MAP_SHARED,
-+				    vid_fd, buf.m.offset);
-+		perror_exit(MAP_FAILED == p_dst_buf[i], "mmap");
-+	}
-+
-+	for (i = 0; i < num_src_bufs; ++i) {
-+
-+		gen_src_buf(p_src_buf[i], src_buf_size[i]);
-+
-+		memzero(buf);
-+		buf.type	= V4L2_BUF_TYPE_VIDEO_OUTPUT;
-+		buf.memory	= V4L2_MEMORY_MMAP;
-+		buf.index	= i;
-+
-+		ret = ioctl(vid_fd, VIDIOC_QBUF, &buf);
-+		perror_exit(ret != 0, "ioctl");
-+	}
-+
-+	for (i = 0; i < num_dst_bufs; ++i) {
-+		memzero(buf);
-+		buf.type	= V4L2_BUF_TYPE_VIDEO_CAPTURE;
-+		buf.memory	= V4L2_MEMORY_MMAP;
-+		buf.index	= i;
-+
-+		ret = ioctl(vid_fd, VIDIOC_QBUF, &buf);
-+		perror_exit(ret != 0, "ioctl");
-+	}
++	buf.type	= V4L2_BUF_TYPE_VIDEO_CAPTURE;
++	buf.index	= dst_buf->index;
++	buf.m.userptr	= (unsigned long)dst_buf->addr;
++	buf.length	= dst_buf->size;
++	type		= V4L2_BUF_TYPE_VIDEO_CAPTURE;
++	ret = ioctl(vid_fd, VIDIOC_QBUF, &buf);
++	perror_ret(ret, "ioctl");
 +
 +	ret = ioctl(vid_fd, VIDIOC_STREAMON, &type);
-+	debug("STREAMON (%d): %d\n", VIDIOC_STREAMON, ret);
-+	perror_exit(ret != 0, "ioctl");
++	perror_ret(ret, "ioctl");
 +
-+	while (num_frames) {
-+		fd_set read_fds;
-+		int r;
++	FD_ZERO(&read_fds);
++	FD_SET(vid_fd, &read_fds);
++	r = select(vid_fd + 1, &read_fds, NULL, NULL, 0);
++	perror_ret(ret, "ioctl");
 +
-+		FD_ZERO(&read_fds);
-+		FD_SET(vid_fd, &read_fds);
++	ret = ioctl(vid_fd, VIDIOC_STREAMOFF, &type);
++	perror_ret(ret, "ioctl");
 +
-+		debug("Before select");
-+		r = select(vid_fd + 1, &read_fds, NULL, NULL, 0);
-+		perror_exit(r < 0, "select");
-+		debug("After select");
++	return 0;
++}
 +
-+		if (num_frames == 1)
-+			last = 1;
-+		if (read_frame(last)) {
-+			fprintf(stderr, "Read frame failed\n");
-+			break;
-+		}
-+		--num_frames;
-+		printf("FRAMES LEFT: %d\n", num_frames);
-+	}
++/* Usage: video_node in_file, out_file, format, width, height, rotation, flip
++ * rotations: 90, 180, 270; flip (when rotation==0): 1 - horiz, 2 - vert
++ * formats: 0: 420, 1: 422, 2: 565, 3: 888 */
++int main(int argc, char *argv[])
++{
++	struct stat in_stat;
++	struct buffer src_buffer;
++	struct buffer dst_buffer;
++	int ret = 0;
++	unsigned int num_src_buffers = NUM_SRC_BUFS;
++	unsigned int num_dst_buffers = NUM_DST_BUFS;
 +
++	parse_args(argc, argv);
 +
-+done:
-+	close(vid_fd);
-+	close(fb_fd);
++	src_fd = open(in_file, O_RDONLY);
++	perror_exit(src_fd < 0, in_file);
++	fstat(src_fd, &in_stat);
++	in_size = in_stat.st_size;
++	src_addr = mmap(0, in_size, PROT_READ, MAP_SHARED, src_fd, 0);
++	perror_exit(src_addr == MAP_FAILED, "mmap");
 +
-+	for (i = 0; i < num_src_bufs; ++i)
-+		munmap(p_src_buf[i], src_buf_size[i]);
++	init_fb();
 +
-+	for (i = 0; i < num_dst_bufs; ++i)
-+		munmap(p_dst_buf[i], dst_buf_size[i]);
++	dst_fd = open(out_file, O_RDWR | O_TRUNC | O_CREAT,
++			S_IRUSR | S_IWUSR );
++	perror_exit(dst_fd < 0, out_file);
++	ftruncate(dst_fd, in_size);
++	dst_addr = mmap(0, in_size, PROT_WRITE, MAP_SHARED, dst_fd, 0);
++	perror_exit(dst_addr == MAP_FAILED, "mmap");
 +
-+	return ret;
++	init_video_dev();
++	set_fmt(format);
++
++	if (rotation)
++		set_rotation(rotation);
++	else
++		set_flip(flip);
++
++	request_buffers(&num_src_buffers, &num_dst_buffers);
++	get_buffer(&src_buffer, 0);
++	src_buffer.index = 0;
++	get_buffer(&dst_buffer, 1);
++	dst_buffer.index = 0;
++
++	memcpy(src_buffer.addr, src_addr, framesize);
++	ret = process(&src_buffer, &dst_buffer);
++	if (ret)
++		return ret;
++
++	memcpy(dst_addr, dst_buffer.addr, framesize);
++
++	return 0;
 +}
 +
