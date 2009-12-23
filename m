@@ -1,108 +1,59 @@
-From: ospite@studenti.unina.it (Antonio Ospite)
-Date: Wed, 23 Dec 2009 00:53:13 +0100
-Subject: [BUG] pxa27x_udc: possible recursive locking detected in
-	pxa_ep_queue
-In-Reply-To: <87ocltsda3.fsf@free.fr>
-References: <20091205115754.7e1dc0fd.ospite@studenti.unina.it>
-	<87fx7guuzg.fsf@free.fr>
-	<20091212173140.f9ac2a7b.ospite@studenti.unina.it>
-	<87ocltsda3.fsf@free.fr>
-Message-ID: <20091223005313.13ba5061.ospite@studenti.unina.it>
+From: darkstar6262@gmail.com (Cory Maccarrone)
+Date: Tue, 22 Dec 2009 17:28:00 -0700
+Subject: [PATCH] OMAP1 clock: Add missing clocks for OMAP 7xx
+In-Reply-To: <alpine.DEB.2.00.0912220901360.5563@utopia.booyaka.com>
+References: <alpine.DEB.2.00.0912220901360.5563@utopia.booyaka.com>
+Message-ID: <6cb013310912221628m1b2b820fy1a96a9a9102274e5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 20 Dec 2009 19:36:52 +0100
-Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-
-> Antonio Ospite <ospite@studenti.unina.it> writes:
+On Tue, Dec 22, 2009 at 9:03 AM, Paul Walmsley <paul@pwsan.com> wrote:
 >
-[...]
-> > =================================
-> > [ INFO: inconsistent lock state ]
-> > 2.6.32-ezxdev #45
-> > ---------------------------------
-> <snip>
-> 
-> Hi Antonio,
-> 
-> I tried to trigger the same message, to no avail. Even after activating spinlock
-> debugging and plugging/unplugging like a mad man, nothing ...
-> Well, I must rely on your testing I'm afraid. Could you test this patch ? I
-> rebased my tree on v2.6.32 so you will have no git-am complaint.
+> From: Cory Maccarrone <darkstar6262@gmail.com>
+>
+> This change adds in some missing clocks that were needed as a result
+> of 526505... (OMAP1 clock: convert mach-omap1/clock.h to
+> mach-omap1/clock_data.c). ?Prior to this, it was just assumed that
+> these clocks existed for all devices, and it was used directly instead
+> of calling it out with a clock_get call or similar. ?So, not having
+> the CK_7XX meant these clocks weren't being used anymore for omap 7xx
+> devices, which broke things badly.
+>
+> Signed-off-by: Cory Maccarrone <darkstar6262@gmail.com>
+> [paul at pwsan.com: commit message edited]
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> ---
+> ?arch/arm/mach-omap1/clock_data.c | ? ?4 ++--
+> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap1/clock_data.c b/arch/arm/mach-omap1/clock_data.c
+> index ab995a9..31fba07 100644
+> --- a/arch/arm/mach-omap1/clock_data.c
+> +++ b/arch/arm/mach-omap1/clock_data.c
+> @@ -599,7 +599,7 @@ static struct clk i2c_ick = {
+> ?static struct omap_clk omap_clks[] = {
+> ? ? ? ?/* non-ULPD clocks */
+> ? ? ? ?CLK(NULL, ? ? ? "ck_ref", ? ? ? &ck_ref, ? ? ? ?CK_16XX | CK_1510 | CK_310 | CK_7XX),
+> - ? ? ? CLK(NULL, ? ? ? "ck_dpll1", ? ? &ck_dpll1, ? ? ?CK_16XX | CK_1510 | CK_310),
+> + ? ? ? CLK(NULL, ? ? ? "ck_dpll1", ? ? &ck_dpll1, ? ? ?CK_16XX | CK_1510 | CK_310 | CK_7XX),
+> ? ? ? ?/* CK_GEN1 clocks */
+> ? ? ? ?CLK(NULL, ? ? ? "ck_dpll1out", ?&ck_dpll1out.clk, CK_16XX),
+> ? ? ? ?CLK(NULL, ? ? ? "ck_sossi", ? ? &sossi_ck, ? ? ?CK_16XX),
+> @@ -627,7 +627,7 @@ static struct omap_clk omap_clks[] = {
+> ? ? ? ?CLK(NULL, ? ? ? "tc2_ck", ? ? ? &tc2_ck, ? ? ? ?CK_16XX),
+> ? ? ? ?CLK(NULL, ? ? ? "dma_ck", ? ? ? &dma_ck, ? ? ? ?CK_16XX | CK_1510 | CK_310),
+> ? ? ? ?CLK(NULL, ? ? ? "dma_lcdfree_ck", &dma_lcdfree_ck, CK_16XX),
+> - ? ? ? CLK(NULL, ? ? ? "api_ck", ? ? ? &api_ck.clk, ? ?CK_16XX | CK_1510 | CK_310),
+> + ? ? ? CLK(NULL, ? ? ? "api_ck", ? ? ? &api_ck.clk, ? ?CK_16XX | CK_1510 | CK_310 | CK_7XX),
+> ? ? ? ?CLK(NULL, ? ? ? "lb_ck", ? ? ? ?&lb_ck.clk, ? ? CK_1510 | CK_310),
+> ? ? ? ?CLK(NULL, ? ? ? "rhea1_ck", ? ? &rhea1_ck, ? ? ?CK_16XX),
+> ? ? ? ?CLK(NULL, ? ? ? "rhea2_ck", ? ? &rhea2_ck, ? ? ?CK_16XX),
+> --
+> 1.6.6.rc2.5.g49666
 >
 
-With your latest patch on top of 2.6.32 I get the "possible recursive
-locking" message at the *first* cable unplug/plug cycle, I am appending
-it here, the log is partial because I dumped it from RAM and something
-was lost.
+I'd like to amend this patch -- there's more wrong in this file than
+simply missing clocks, as it turns out.  I'll submit my new patch for
+review shortly.
 
-=============================================
-[ INFO: possible recursive locking detected ]
-2.6.32-ezxdev #5
----------------------------------------------
-swapper/0 is trying to acquire lock:
- (&ep->lock){-.....}, at: [<c019c6e0>] pxa_ep_queue+0x78/0x300
-
-but task is already holding lock:
- (&ep->lock){-.....}, at: [<c019c158>] pxa_udc_irq+0x43c/0x7fc
-
-other info that might help us debug this:
-1 lock held by swapper/0:
- #0:  (&ep->lock){-.....}, at: [<c019c158>] pxa_udc_irq+0x43c/0x7fc
-
-stack backtrace:
-[<c002febc>] (unwind_backtrace+0x0/0xe0) from [<c0068484>] (validate_chain+0x5b0/0xdd8)
-[<c0068484>] (validate_chain+0x5b0/0xdd8) from [<c00694ec>] (__lock_acquire+0x840/0x918)
-[<c00694ec>] (__lock_acquire+0x840/0x918) from [<c006a49c>] (lock_acquire+0x60/0x74)
-[<c006a49c>] (lock_acquire+0x60/0x74) from [<c02a4d24>] (_spin_lock_irqsave+0x4c/0x60)
-[<c02a4d24>] (_spin_lock_irqsave+0x4c/0x60) from [<c019c6e0>] (pxa_ep_queue+0x78/0x300)
-[<c019c6e0>] (pxa_ep_queue+0x78/0x300) from [<c019f348>] (composite_setup+0x764/0x7b0)
-[<c019f348>] (composite_setup+0x764/0x7b0) from [<c019c29c>] (pxa_udc_irq+0x580/0x7fc)
-[<c019c29c>] (pxa_udc_irq+0x580/0x7fc) from [<c0075ccc>] (handle_IRQ_event+0x28/0xf8)
-[<c0075ccc>] (handle_IRQ_event+0x28/0xf8) from [<c0077f98>] (handle_level_irq+0x118/0x130)
-[<c0077f98>] (handle_level_irq+0x118/0x130) from [<c0029070>] (asm_do_IRQ+0x70/0x94)
-[<c0029070>] (asm_do_IRQ+0x70/0x94) from [<c0029ad0>] (__irq_svc+0x50/0xe0)
-Exception stack(0xc039ff78 to 0xc039ffc0)
-ff60:                                                       00000001 00000004
-ff80: 00000001 20000013 c039e000 c03a217c c03cd568 c03a2170 a0024e98 69054117
-ffa0: a0024d60 00000000 c039ff10 c039ffc0 c0066f7c c002b618 20000013 ffffffff
-[<c0029ad0>] (__irq_svc+0x50/0xe0) from [<c002b618>] (default_idle+0x30/0x38)
-[<c002b618>] (default_idle+0x30/0x38) from [<c002b4f4>] (cpu_idle+0x64/0xc0)
-[<c002b4f4>] (cpu_idle+0x64/0xc0) from [<c0008aac>] (start_kernel+0x31c/0x38c)
-[<c0008aac>] (start_kernel+0x31c/0x38c) from [<a0008034>] (0xa0008034)
-BUG: spinlock lockup on CPU#0, swapper/0, c03c19d0
-[<c002febc>] (unwind_backtrace+0x0/0xe0) from [<c013ebf4>] (_raw_spin_lock+0xe8/0x124)
-[<c013ebf4>] (_raw_spin_lock+0xe8/0x124) from [<c02a4d2c>] (_spin_lock_irqsave+0x54/0x60)
-[<c02a4d2c>] (_spin_lock_irqsave+0x54/0x60) from [<c019c6e0>] (pxa_ep_queue+0x78/0x300)
-[<c019c6e0>] (pxa_ep_queue+0x78/0x300) from [<c019f348>] (composite_setup+0x764/0x7b0)
-           ] (composite_setup+0x764/0x7b0) from [<c019c29c>] (pxa_udc_irq+0x580/0x7fc)
-[<c019c29c>] (pxa_udc_irq+0x580/0x7fc) from [<c0075ccc>] (handle_IRQ_event+0x28/0xf8)
-[<c0075ccc>] (handle_IRQ_event+0x28/0xf8) from [<c0077f98>] (handle_level_irq+0x118/0x130)
-...
-
-Could any furher info about my platform be useful to find out why you can't
-reproduce the issue?
-
-Thanks for your time.
-
-All the best,
-   Antonio
-
--- 
-Antonio Ospite
-http://ao2.it
-
-PGP public key ID: 0x4553B001
-
-A: Because it messes up the order in which people normally read text.
-   See http://en.wikipedia.org/wiki/Posting_style
-Q: Why is top-posting such a bad thing?
-A: Top-posting.
-Q: What is the most annoying thing in e-mail?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091223/cc831f9d/attachment.sig>
+- Cory
