@@ -1,44 +1,48 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 24 Dec 2009 12:09:21 +0100
-Subject: [RFC][PATCH 2/14] Convert arm to read/update_persistent_clock
-In-Reply-To: <1261540902.3508.63.camel@localhost.localdomain>
-References: <1261540762.3508.61.camel@localhost.localdomain>
-	<1261540826.3508.62.camel@localhost.localdomain>
-	<1261540902.3508.63.camel@localhost.localdomain>
-Message-ID: <20091224110921.GA14511@pengutronix.de>
+Date: Thu, 24 Dec 2009 12:23:17 +0100
+Subject: please pull FTBFS fixes (Was: [PATCH v3] imx/mx3: depend on
+	USB_ULPI for otg_ulpi_create)
+In-Reply-To: <1261499465-21504-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1261410116-10382-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1261499465-21504-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20091224112317.GA569@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-On Tue, Dec 22, 2009 at 08:01:42PM -0800, john stultz wrote:
-> This patch converts the arm architecture to use the generic
-> read_persistent_clock and update_persistent_clock interfaces, reducing
-> the amount of arch specific code we have to maintain, and allowing for
-> further cleanups in the future.
-> 
-> Also removes a direct xtime access, replacing it with
-> current_kernel_time()
-> 
-> I have not built or tested this patch, so help from arch maintainers
-> would be appreciated.
-I havn't tested either, but built footbridge_defconfig successfully.
-bloat-o-meter reports:
+the two patches sent in this thread together with the fix for
 
-add/remove: 4/1 grow/shrink: 2/2 up/down: 388/-196 (192)
-function                                     old     new   delta
-sync_cmos_clock                                -     240    +240
-update_persistent_clock                        -      52     +52
-sync_cmos_work                                 -      40     +40
-do_adjtimex                                 1924    1956     +32
-save_time_delta                               56      76     +20
-no_sync_cmos_clock                             -       4      +4
-next_rtc_update                                4       -      -4
-set_isa_cmos_time                            372     364      -8
-timer_tick                                   324     140    -184
+	arch/arm/mm/copypage-v6.c: In function 'v6_copy_user_highpage_nonaliasing':
+	arch/arm/mm/copypage-v6.c:51: error: implicit declaration of function '__cpuc_flush_dcache_page'
 
-Best regards
-Uwe
+that is already in your tree make the mx3 related defconfigs build
+again.
+
+Sascha is currently on vacation and won't be back until next year.
+
+So you can pull from my tree:
+
+The following changes since commit 55639353a0035052d9ea6cfe4dde0ac7fcbb2c9f:
+  Linus Torvalds (1):
+        Linux 2.6.33-rc1
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/ukl/linux-2.6.git imx-for-rmk
+
+Uwe Kleine-K?nig (1):
+      imx/mx3: depend on USB_ULPI for otg_ulpi_create
+
+Valentin Longchamp (1):
+      imx/mx31moboard: fix usbh device names
+
+ arch/arm/mach-mx3/Kconfig                |    3 ++-
+ arch/arm/mach-mx3/mx31lite.c             |    4 ++++
+ arch/arm/mach-mx3/mx31moboard-devboard.c |    2 +-
+ arch/arm/mach-mx3/mx31moboard-marxbot.c  |    2 +-
+ arch/arm/mach-mx3/mx31moboard.c          |    7 ++++++-
+ 5 files changed, 14 insertions(+), 4 deletions(-)
 
 -- 
 Pengutronix e.K.                              | Uwe Kleine-K?nig            |
