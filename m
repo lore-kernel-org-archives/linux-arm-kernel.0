@@ -1,131 +1,45 @@
-From: eltshanli@gmail.com (Li Jie)
-Date: Thu, 24 Dec 2009 14:45:59 +0800
-Subject: [PATCH v2] ARM: NUC900: Fix bugs of clocksource driver
-Message-ID: <8fb2581d0912232245ie92859ekf3840e9c0c574a06@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 24 Dec 2009 12:09:21 +0100
+Subject: [RFC][PATCH 2/14] Convert arm to read/update_persistent_clock
+In-Reply-To: <1261540902.3508.63.camel@localhost.localdomain>
+References: <1261540762.3508.61.camel@localhost.localdomain>
+	<1261540826.3508.62.camel@localhost.localdomain>
+	<1261540902.3508.63.camel@localhost.localdomain>
+Message-ID: <20091224110921.GA14511@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Wan:
+Hello,
 
-v2:  use clk_xxx() api to enable timer0 and timer1 clock.
+On Tue, Dec 22, 2009 at 08:01:42PM -0800, john stultz wrote:
+> This patch converts the arm architecture to use the generic
+> read_persistent_clock and update_persistent_clock interfaces, reducing
+> the amount of arch specific code we have to maintain, and allowing for
+> further cleanups in the future.
+> 
+> Also removes a direct xtime access, replacing it with
+> current_kernel_time()
+> 
+> I have not built or tested this patch, so help from arch maintainers
+> would be appreciated.
+I havn't tested either, but built footbridge_defconfig successfully.
+bloat-o-meter reports:
 
+add/remove: 4/1 grow/shrink: 2/2 up/down: 388/-196 (192)
+function                                     old     new   delta
+sync_cmos_clock                                -     240    +240
+update_persistent_clock                        -      52     +52
+sync_cmos_work                                 -      40     +40
+do_adjtimex                                 1924    1956     +32
+save_time_delta                               56      76     +20
+no_sync_cmos_clock                             -       4      +4
+next_rtc_update                                4       -      -4
+set_isa_cmos_time                            372     364      -8
+timer_tick                                   324     140    -184
 
-Signed-off-by: lijie <eltshanli@gmail.com>
----
- arch/arm/mach-w90x900/time.c |   62 ++++++++++++++++++++++++-----------------
- 1 files changed, 36 insertions(+), 26 deletions(-)
+Best regards
+Uwe
 
-diff --git a/arch/arm/mach-w90x900/time.c b/arch/arm/mach-w90x900/time.c
-index 4128af8..40ee87a 100644
---- a/arch/arm/mach-w90x900/time.c
-+++ b/arch/arm/mach-w90x900/time.c
-@@ -42,7 +42,10 @@
- #define TICKS_PER_SEC	100
- #define PRESCALE	0x63 /* Divider = prescale + 1 */
-
--unsigned int timer0_load;
-+#define	TDR_SHIFT	24
-+#define	TDR_MASK	((1 << TDR_SHIFT) - 1)
-+
-+static unsigned int timer0_load;
-
- static void nuc900_clockevent_setmode(enum clock_event_mode mode,
- 		struct clock_event_device *clk)
-@@ -112,8 +115,23 @@ static struct irqaction nuc900_timer0_irq = {
- 	.handler	= nuc900_timer0_interrupt,
- };
-
--static void __init nuc900_clockevents_init(unsigned int rate)
-+static void __init nuc900_clockevents_init(void)
- {
-+	unsigned int rate;
-+	struct clk *clk = clk_get(NULL, "timer0");
-+
-+	BUG_ON(IS_ERR(clk));
-+
-+	__raw_writel(0x00, REG_TCSR0);
-+
-+	clk_enable(clk);
-+	rate = clk_get_rate(clk) / (PRESCALE + 1);
-+
-+	timer0_load = (rate / TICKS_PER_SEC);
-+
-+	__raw_writel(RESETINT, REG_TISR);
-+	setup_irq(IRQ_TIMER0, &nuc900_timer0_irq);
-+
- 	nuc900_clockevent_device.mult = div_sc(rate, NSEC_PER_SEC,
- 					nuc900_clockevent_device.shift);
- 	nuc900_clockevent_device.max_delta_ns = clockevent_delta2ns(0xffffffff,
-@@ -127,26 +145,35 @@ static void __init
-nuc900_clockevents_init(unsigned int rate)
-
- static cycle_t nuc900_get_cycles(struct clocksource *cs)
- {
--	return ~__raw_readl(REG_TDR1);
-+	return (~__raw_readl(REG_TDR1)) & TDR_MASK;
- }
-
- static struct clocksource clocksource_nuc900 = {
- 	.name	= "nuc900-timer1",
- 	.rating	= 200,
- 	.read	= nuc900_get_cycles,
--	.mask	= CLOCKSOURCE_MASK(32),
--	.shift	= 20,
-+	.mask	= CLOCKSOURCE_MASK(TDR_SHIFT),
-+	.shift	= 10,
- 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
- };
-
--static void __init nuc900_clocksource_init(unsigned int rate)
-+static void __init nuc900_clocksource_init(void)
- {
- 	unsigned int val;
-+	unsigned int rate;
-+	struct clk *clk = clk_get(NULL, "timer1");
-+
-+	BUG_ON(IS_ERR(clk));
-+
-+	__raw_writel(0x00, REG_TCSR1);
-+
-+	clk_enable(clk);
-+	rate = clk_get_rate(clk) / (PRESCALE + 1);
-
- 	__raw_writel(0xffffffff, REG_TICR1);
-
- 	val = __raw_readl(REG_TCSR1);
--	val |= (COUNTEN | PERIOD);
-+	val |= (COUNTEN | PERIOD | PRESCALE);
- 	__raw_writel(val, REG_TCSR1);
-
- 	clocksource_nuc900.mult =
-@@ -156,25 +183,8 @@ static void __init
-nuc900_clocksource_init(unsigned int rate)
-
- static void __init nuc900_timer_init(void)
- {
--	struct clk *ck_ext = clk_get(NULL, "ext");
--	unsigned int	rate;
--
--	BUG_ON(IS_ERR(ck_ext));
--
--	rate = clk_get_rate(ck_ext);
--	clk_put(ck_ext);
--	rate = rate / (PRESCALE + 0x01);
--
--	 /* set a known state */
--	__raw_writel(0x00, REG_TCSR0);
--	__raw_writel(0x00, REG_TCSR1);
--	__raw_writel(RESETINT, REG_TISR);
--	timer0_load = (rate / TICKS_PER_SEC);
--
--	setup_irq(IRQ_TIMER0, &nuc900_timer0_irq);
--
--	nuc900_clocksource_init(rate);
--	nuc900_clockevents_init(rate);
-+	nuc900_clocksource_init();
-+	nuc900_clockevents_init();
- }
-
- struct sys_timer nuc900_timer = {
 -- 
-1.6.5.4
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
