@@ -1,56 +1,51 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 24 Dec 2009 21:31:22 -0500
-Subject: [PATCH v2] Add interrupt handling capability to pca953x
-In-Reply-To: <f17812d70912241616t7f78627aq3eacfcfb222277a8@mail.gmail.com>
-References: <20091224185240.07474930@taxman.wild-wind.fr.eu.org>
-	<20091224183718.GA12572@opensource.wolfsonmicro.com>
-	<f17812d70912241616t7f78627aq3eacfcfb222277a8@mail.gmail.com>
-Message-ID: <771cded00912241831g24ddc7efib01a63061f68cd2c@mail.gmail.com>
+From: mkl0301@hotmail.com (mkl lin)
+Date: Fri, 25 Dec 2009 03:13:27 +0000
+Subject: SMP issues on ARM11 MPCore
+In-Reply-To: <4B33CAEB.3070705@googlemail.com>
+References: <SNT109-W391FD03251D32533FAE84DA77F0@phx.gbl>,
+	<4B33CAEB.3070705@googlemail.com>
+Message-ID: <SNT109-W3551598CC008DC37CFB180A77E0@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 24, 2009 at 7:16 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Fri, Dec 25, 2009 at 2:37 AM, Mark Brown
-> <broonie@opensource.wolfsonmicro.com> wrote:
->> On Thu, Dec 24, 2009 at 06:52:40PM +0100, Marc Zyngier wrote:
->>
->>> Pending problems to be solved:
->>> - Modular build is broken, as handle_edge_irq, set_irq_flags and
->>> ? irq_to_desc are not exported, among others. First approach would be
->>> ? to disable the irq_chip when build modular, but I really don't like
->>> ? it.
->>
->> The other approach here is just to not support modular builds; it's what
->> the IRQ core wants you to do and what I ended up doing for wm831x. ?Or
->> speak to Ingo and Thomas and see if they'll relax the requirement that
->> interrupt controller drivers be built in.
->>
->>> - request_irq vs request_threaded_irq: genirq is a bit of a mess in
->>> ? this respect. We'd love a consistent API...
->>
->> What's the problem here? ?Are you referring to the consumer side or
->> something that the driver itself has to deal with - from the point of
->> view of the interrupt controller itself this is pretty much transparent.
->>
->> Like I said in my previous mail a threaded interrupt context is
->> fundamentally not a non-threaded one so users do need to be aware of
->> which context they're running in - you can do more things in a threaded
->> context but you also have more possibility for concurrency issues to
->> creep in. ?This means that the visible difference between the two
->> handlers always seemed reasonable to me.
 
-How about invoke local_irq_disable()/local_irq_enable() in
-pxa953x_irq_handler()? If we do this, we can prevent concurrency in
-customer IRQ handler that are depend on pxa953x_irq_handler().
+> Could you do your tests again with
+> 2.6.32
+> and additionally following three patches applied
+>
+> 1. Global ASID allocation on SMP
+> http://www.linux-arm.org/git?p=linux-2.6.git;a=commit;h=64e1c582dc57ab5278e43c4479f6ba8c967b1d1a
+I have tested linux-2.6.33-rc1, which have
 
->>
->> It would be nice to have a third option for handlers which can cope with
->> either context, though. ?Actually, using request_threaded_irq and
->> supplying the same function for both primary and secondary handler may
->> DTRT in that case but I'd need to check. ?This is another thing we
->> really ought to bring up with Ingo and Thomas rather than discussing
->> here, though.
->>
->
-> Then, let's get them involved. Thomas and Ingo CC'ed.
->
+??????? commit 82213c680f9be0215fcdd3d6dfdc17c7089491ac
+??????? Author: Catalin Marinas <catalin.marinas@arm.com>
+??????? Date:?? Fri Dec 18 11:30:59 2009 +0000
+
+??????? ??? Global ASID allocation on SMP
+
+> 2. dma_cache_maint_contiguous should be patched as dma_cache_maint do
+> http://lists.arm.linux.org.uk/lurker/message/20091210.171543.745c2f3f.en.html
+I have the patch in my linux-2.6.33-rc1 port. I am using IPI patch instead of the RFO patch, for performance consideration.
+However, my test have nothing to do with DMA, it should be irrelevant.
+
+> 3. ARM: Fix a race in the vfp_notifier() function on SMPsystems
+> http://lists.arm.linux.org.uk/lurker/message/20091222.153615.c803c376.en.html
+linux-2.6.33-rc1 have the patch
+??????? commit ac154e12c2a436830ce6745c1e9b197f7ae19afc
+??????? Author: Catalin Marinas <catalin.marinas@arm.com>
+??????? Date:?? Fri Dec 18 12:44:38 2009 +0000
+
+??????? ??? Fix a race in the vfp_notifier() function on SMP systems
+It seems the same issue but the patch is totally different. Is it just another solution of the same issue or what? Should I apply the patch you mentioned with? or without this one?
+
+>> BTW, I have done a quick port to linux-2.6.33-rc1, branch master, based on commit f2d9a06. With DCache and CONFIG_LOCAL_TIMERS, I have seen case 1, which means this issue is not fixed yet.
+As I've said, I have the same issue on linux-2.6.33-rc1.
+
+Best Regards,
+Mac Lin.
+
+
+ 		 	   		  
+_________________________________________________________________
+Windows Live: Keep your friends up to date with what you do online.
+http://www.microsoft.com/middleeast/windows/windowslive/see-it-in-action/social-network-basics.aspx?ocid=PID23461::T:WLMTAGL:ON:WL:en-xm:SI_SB_1:092010
