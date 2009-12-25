@@ -1,28 +1,47 @@
-From: vitalywool@gmail.com (Vitaly Wool)
-Date: Tue, 22 Dec 2009 09:53:52 +0300
-Subject: [PATCH 10/10] ARM: PNX4008: get i2c clock rate from clk API
-In-Reply-To: <083DF309106F364B939360100EC290F804F592E90A@eu1rdcrdc1wx030.exi.nxp.com>
-References: <083DF309106F364B939360100EC290F804F592E90A@eu1rdcrdc1wx030.exi.nxp.com>
-Message-ID: <acd2a5930912212253w1c6d9296v4c68c0ad392c6fd5@mail.gmail.com>
+From: richardliu@ms1.techarea.org (Richard Liu)
+Date: Sat, 26 Dec 2009 05:58:05 +0800
+Subject: [PATCH] PCI Domains Support
+In-Reply-To: <20091222045540.GB4411@verge.net.au>
+References: <4B28EB0F.3070409@ms1.techarea.org>	<20091217000620.GC22449@verge.net.au>	<4B2A2B92.6020809@ms1.techarea.org>	<20091220012728.GD12578@verge.net.au>	<4B2F0EF9.101@ms1.techarea.org>
+	<20091222045540.GB4411@verge.net.au>
+Message-ID: <4B35356D.7090604@ms1.techarea.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 22, 2009 at 2:23 AM, Kevin Wells <kevin.wells@nxp.com> wrote:
-
+Simon Horman wrote:
+>> Actually, most ARM platforms didn't need PCI domains.
+>>
+>> So, original patch is
+>>
+>> +config PCI_DOMAINS
+>> +        def_bool y
+>> +        depends on PCI && ARCH_CXXXXXX
+>> +
+>>
+>> But I removed the "&& ARCH_CXXXXXXX" before I provided the patch.
+>> Because ARCH_CXXXXXXX is not exist in ARM Linux kernel now (maybe it
+>> would be committed at someday)
+>>     
 >
-> Signed-off-by: Kevin Wells <kevin.wells@nxp.com>
+> Ok, now I am completely confused. Nothing currently in-tree should
+> use PCI_DOMAINS, but it defaults to y and nothing switches it to n?
 >
-
-Acked-by: Vitaly Wool <vitalywool@gmail.com>
-
-
-> ---
->  arch/arm/mach-pnx4008/clock.c |    9 ++++++---
->  arch/arm/mach-pnx4008/i2c.c   |    9 ---------
->  drivers/i2c/busses/i2c-pnx.c  |   15 ++++-----------
->  include/linux/i2c-pnx.h       |    1 -
->  4 files changed, 10 insertions(+), 24 deletions(-)
+> Perhaps the following would be more appropriate:
 >
+> config PCI_DOMAINS
+>         bool
+>
+> And then platforms can "select PCI_DOMAINS" as needed.
+>
+>   
+You are right,
+Don't use def_bool is right choice.
+
+I only maintain one arch, so I didn't think too much.
+
+Should I regenerate a new patch, or you will handle it ?
+
+
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091222/3f238ecc/attachment-0001.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091226/b630705f/attachment-0001.htm>
