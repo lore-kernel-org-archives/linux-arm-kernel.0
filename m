@@ -1,32 +1,33 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 26 Dec 2009 16:41:41 +0800
-Subject: [ARM] pxafb: fix building issue of incorrect reference
-Message-ID: <f17812d70912260041m64f55550v6d478556ca11c468@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 26 Dec 2009 09:51:56 +0100
+Subject: [patch] GPIO support for HTC Dream
+In-Reply-To: <1261784950.17445.13.camel@desktop>
+References: <BD79186B4FD85F4B8E60E381CAEE190901FB0F92@mi8nycmail19.Mi8.com>
+	<20091211221015.GB24456@elf.ucw.cz>
+	<BD79186B4FD85F4B8E60E381CAEE190901FB10EA@mi8nycmail19.Mi8.com>
+	<20091214064545.GK5114@elf.ucw.cz>
+	<BD79186B4FD85F4B8E60E381CAEE19090200E9E6@mi8nycmail19.Mi8.com>
+	<20091215194725.GH24406@elf.ucw.cz>
+	<BD79186B4FD85F4B8E60E381CAEE19090200EBE8@mi8nycmail19.Mi8.com>
+	<20091215211634.GP24406@elf.ucw.cz> <20091225171031.GD1581@ucw.cz>
+	<1261784950.17445.13.camel@desktop>
+Message-ID: <20091226085156.GA1553@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-    [ARM] pxafb: fix building issue of incorrect reference
+On Fri 2009-12-25 15:49:10, Daniel Walker wrote:
+> On Fri, 2009-12-25 at 18:10 +0100, Pavel Machek wrote:
+> > Hi!
+> > 
+> > Daniel, can we get it merged? It is perfect(TM) :-).
+> 
+> Yeah, but the one you originally sent was tab damaged .. So could you
+> resend it?
 
-    Commit "d2a34c1 drivers/video: Move dereference after NULL test" introduced
-    a build error of "fbi->dev->platform_data->smart_update" being unknown type
-    to the compiler, fix this by removing the unnecessary test of 'fbi'.
-
-    Cc: Julia Lawall <julia@diku.dk>
-    Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
-
-diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
-index 415858b..825b665 100644
---- a/drivers/video/pxafb.c
-+++ b/drivers/video/pxafb.c
-@@ -1221,9 +1221,9 @@ static void setup_smart_timing(struct pxafb_info *fbi,
- static int pxafb_smart_thread(void *arg)
- {
- 	struct pxafb_info *fbi = arg;
--	struct pxafb_mach_info *inf;
-+	struct pxafb_mach_info *inf = fbi->dev->platform_data;
-
--	if (!fbi || !fbi->dev->platform_data->smart_update) {
-+	if (!inf->smart_update) {
- 		pr_err("%s: not properly initialized, thread terminated\n",
- 				__func__);
- 		return -EINVAL;
+Ok, I'll resend it privately. Tell  me if it arrives damaged. Aha, do
+you mean real tab damage, or "spaces used instead of tabs in gpio.h"?
+I see the second problem.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
