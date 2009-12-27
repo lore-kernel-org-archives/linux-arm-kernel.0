@@ -1,38 +1,57 @@
-From: roman.tereshonkov@nokia.com (Roman)
-Date: Mon, 28 Dec 2009 13:02:25 +0200
-Subject: Amba device porting
-In-Reply-To: <20091223165009.GA13900@n2100.arm.linux.org.uk>
-References: <20091223101902.GA15537@nokia.com>
-	<20091223165009.GA13900@n2100.arm.linux.org.uk>
-Message-ID: <20091228110225.GB12341@nokia.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 27 Dec 2009 11:18:24 +0100
+Subject: tree with htc dream support
+In-Reply-To: <a55d774e0912271646m1b82687cy427083e64e91e323@mail.gmail.com>
+References: <1260627482.20913.7.camel@desktop>
+	<d6200be20912121434x1a247837w75c518ba20fe684f@mail.gmail.com>
+	<20091213212504.GD5114@elf.ucw.cz>
+	<d6200be20912142234ia050c67p34fd2672e7248170@mail.gmail.com>
+	<20091227093537.GD11737@elf.ucw.cz>
+	<20091227201514.GA29174@elf.ucw.cz>
+	<a55d774e0912271220p1d102b1dr398e0524c9386702@mail.gmail.com>
+	<20091227203704.GK11737@elf.ucw.cz>
+	<20091227211322.GB29174@elf.ucw.cz>
+	<a55d774e0912271646m1b82687cy427083e64e91e323@mail.gmail.com>
+Message-ID: <20091227101824.GB1478@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 23, 2009 at 05:50:09PM +0100, ext Russell King - ARM Linux wrote:
-> On Wed, Dec 23, 2009 at 12:19:02PM +0200, Roman wrote:
-> > Hi,
-> > 
-> > I planned to port the omap3 SDTI (Serial Debug Trace Interface) driver to amba based interface.
-> > 
-> > SDTI memory map is two parts composed:
-> > 0x54500000 0x5450FFFF 4KB       SDTI module (configuration) - coresight based format.
-> > 0x54510000 0x545FFFFF 1984KB    Reserved
-> > 0x54600000 0x546FFFFF 1MB       SDTI module (window)
-> > 
-> > But amba interface seems to support only one memory region resource.
+Hi!
+
+> > Switch smd code to the version in staging. Something to apply to
+> > dream/ tree I'd say... and yes, it still works.
 > 
-> The 'amba' interface is more a primecell interface.  Is SDTI a primecell
-> peripheral?  If not, then it shouldn't be using the AMBA "primecell" bus
-> support.
+> I think we might want to consider leaving at least the core smd code
+> under mach-msm.
 
-Yes, SDTI can be considered as a PrimeCell IP.
-SDTI is the Coresight component which is the subgroup of PrimeCell.
+In the long run, I agree.
 
-So my question is still valid.
-How does the 'amba' interface handle the fragmented memory regions?
-I understand that for the right Coresight IP it should not happen and the whole register space should be continous and ended by the Peripherial and Component Ids.
-If I use SDTI module (window) memory region as a static definition inside driver will my patch be accepted?
+In the short run... the code is staging quality, so it should be in
+staging... and you'll not have to mainain so huge diff. (-20 kLoc).
 
+> To start with it's specific to the 7k/8k platform, not dream (though
+> that may just be a quirk of how things are named in staging).  Also
+> the lowest layers (proc_comm and smsm_state stuff) are required for
+> clock control and basic power management to work -- they're kinda
+> joined at the hip with the platform.  It seems weird to me to have the
+> necessary bits to implement clock/power/pm outside of the mach/arch
+> space.
 
-Regards
-Roman Tereshonkov
+Agreed, but... I don't see much effort merging 7k/8k patches. And I
+believe its better to use code that's already in staging/ to keep
+diffs small. Renames are easy with git, and yes, we'll need to do some
+moving when code is clean enough.
+
+But that's how staging/ works: all the code there will need to be
+moved to the proper places...
+
+> The higher level stuff (qmi, rpcrouter, smdtty, etc) could easily live
+> elsewhere (though I'm not sure where the best space in the drivers
+> hierarchy for them would be).
+
+drivers/mfd? Yes, we'll have to rename once the code is clean enough.
+
+	     	  	     	       	    	     	Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
