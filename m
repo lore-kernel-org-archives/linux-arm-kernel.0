@@ -1,66 +1,55 @@
-From: maz@misterjones.org (Marc Zyngier)
-Date: Sat, 26 Dec 2009 21:25:50 +0100
-Subject: [PATCH 4/4] pxa/zeus: provide power-source information when APM is
-	enabled
-In-Reply-To: <1261859150-17335-4-git-send-email-maz@misterjones.org>
-References: <1261859150-17335-1-git-send-email-maz@misterjones.org>
-	<1261859150-17335-2-git-send-email-maz@misterjones.org>
-	<1261859150-17335-3-git-send-email-maz@misterjones.org>
-	<1261859150-17335-4-git-send-email-maz@misterjones.org>
-Message-ID: <1261859150-17335-5-git-send-email-maz@misterjones.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 27 Dec 2009 10:35:38 +0100
+Subject: tree with htc dream support
+In-Reply-To: <d6200be20912142234ia050c67p34fd2672e7248170@mail.gmail.com>
+References: <20091205221100.GA32522@elf.ucw.cz>
+	<1260054737.23633.35.camel@desktop>
+	<a55d774e0912051638u7858878cg7cf62905c3c005c1@mail.gmail.com>
+	<d6200be20912112142r7bdf8f18o31edd4457aa64998@mail.gmail.com>
+	<1260627482.20913.7.camel@desktop>
+	<d6200be20912121434x1a247837w75c518ba20fe684f@mail.gmail.com>
+	<20091213212504.GD5114@elf.ucw.cz>
+	<d6200be20912142234ia050c67p34fd2672e7248170@mail.gmail.com>
+Message-ID: <20091227093537.GD11737@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marc Zyngier <maz@misterjones.org>
----
- arch/arm/mach-pxa/zeus.c |   21 +++++++++++++++++++++
- 1 files changed, 21 insertions(+), 0 deletions(-)
+Hi!
 
-diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
-index 7ddd265..e1c9b1a 100644
---- a/arch/arm/mach-pxa/zeus.c
-+++ b/arch/arm/mach-pxa/zeus.c
-@@ -25,6 +25,7 @@
- #include <linux/mtd/physmap.h>
- #include <linux/i2c.h>
- #include <linux/i2c/pca953x.h>
-+#include <linux/apm-emulation.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -626,6 +627,25 @@ static void zeus_power_off(void)
- 	pxa27x_cpu_suspend(PWRMODE_DEEPSLEEP);
- }
- 
-+#ifdef CONFIG_APM_EMULATION
-+static void zeus_get_power_status(struct apm_power_info *info)
-+{
-+	/* Power supply is always present */
-+	info->ac_line_status	= APM_AC_ONLINE;
-+	info->battery_status	= APM_BATTERY_STATUS_NOT_PRESENT;
-+	info->battery_flag	= APM_BATTERY_FLAG_NOT_PRESENT;
-+}
-+
-+static inline void zeus_setup_apm(void)
-+{
-+	apm_get_power_status = zeus_get_power_status;
-+}
-+#else
-+static inline void zeus_setup_apm(void)
-+{
-+}
-+#endif
-+
- static int zeus_get_pcb_info(struct i2c_client *client, unsigned gpio,
- 			     unsigned ngpio, void *context)
- {
-@@ -747,6 +767,7 @@ static void __init zeus_init(void)
- 	MSC1 = (MSC1 & 0xffff0000) | dm9000_msc;
- 
- 	pm_power_off = zeus_power_off;
-+	zeus_setup_apm();
- 
- 	pxa2xx_mfp_config(ARRAY_AND_SIZE(zeus_pin_config));
- 
+> > One more wish list item: many drivers are now available in
+> > drivers/staging/dream, and are being slowly cleaned up. Would it be
+> > possible to start using those for android-msm-2.6.32 tree?
+> >
+> > You'll need to reapply some stuff I had to remove (like wakelocks),
+> > but it should be still better/less work long term to patch those back
+> > in than maintaining separate copy. Diff should get much smaller...
+> 
+> I do plan to look at these, but I don't know when I'll get to it.
+
+So... this switches qdsp5 code from private version to version in
+staging. It actually boots.
+
+It should be followed by git rm of around 12K lines of code from your
+patch... (And yes, it actually boots; I tested camera, it worked).
+
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
+
+									Pavel
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index 49f85b4..94623a4 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -15,7 +15,7 @@ obj-$(CONFIG_MSM_ONCRPCROUTER) += smd_rpcrouter_device.o
+ obj-$(CONFIG_MSM_ONCRPCROUTER) += smd_rpcrouter_servers.o
+ obj-$(CONFIG_MSM_RPCSERVERS) += rpc_server_dog_keepalive.o
+ obj-$(CONFIG_MSM_RPCSERVERS) += rpc_server_time_remote.o
+-obj-$(CONFIG_MSM_ADSP) += qdsp5/
++obj-$(CONFIG_MSM_ADSP) += ../../../drivers/staging/dream/qdsp5/
+ obj-$(CONFIG_MSM_HW3D) += hw3d.o
+ obj-$(CONFIG_PM) += pm.o
+ obj-$(CONFIG_CPU_FREQ) += cpufreq.o
+
+
 -- 
-1.6.5.7
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
