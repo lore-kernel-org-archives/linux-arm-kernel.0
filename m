@@ -1,18 +1,17 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sun, 27 Dec 2009 18:23:26 +0100
-Subject: [PATCH 1/2] Littleton: add UART3 GPIO config
-Message-ID: <200912271823.27031.marek.vasut@gmail.com>
+Date: Sun, 27 Dec 2009 18:24:25 +0100
+Subject: [PATCH 2/2] Littleton: Select CPU_PXA300 and CPU_PXA310
+Message-ID: <200912271824.25751.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-this is just a trivial thing to get UART3 properly configured on LT. Eric, could 
-you please merge this? Thanks
+And this is the thing that prevented me from booting LT properly. Please 
+consider applying, thanks!
+Cheers!
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: 0001-Littleton-add-UART3-GPIO-config.patch
+Name: 0002-Littleton-Select-CPU_PXA300-and-CPU_PXA310.patch
 Type: text/x-patch
-Size: 840 bytes
+Size: 823 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091227/0e5d0cf1/attachment.bin>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091227/c3f51c7b/attachment.bin>
