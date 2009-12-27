@@ -1,46 +1,50 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 27 Dec 2009 21:37:04 +0100
-Subject: tree with htc dream support
-In-Reply-To: <a55d774e0912271220p1d102b1dr398e0524c9386702@mail.gmail.com>
-References: <1260054737.23633.35.camel@desktop>
-	<a55d774e0912051638u7858878cg7cf62905c3c005c1@mail.gmail.com>
-	<d6200be20912112142r7bdf8f18o31edd4457aa64998@mail.gmail.com>
-	<1260627482.20913.7.camel@desktop>
-	<d6200be20912121434x1a247837w75c518ba20fe684f@mail.gmail.com>
-	<20091213212504.GD5114@elf.ucw.cz>
-	<d6200be20912142234ia050c67p34fd2672e7248170@mail.gmail.com>
-	<20091227093537.GD11737@elf.ucw.cz>
-	<20091227201514.GA29174@elf.ucw.cz>
-	<a55d774e0912271220p1d102b1dr398e0524c9386702@mail.gmail.com>
-Message-ID: <20091227203704.GK11737@elf.ucw.cz>
+From: julia@diku.dk (Julia Lawall)
+Date: Sun, 27 Dec 2009 22:26:54 +0100 (CET)
+Subject: [PATCH 1/5] arch/arm: Correct NULL test
+Message-ID: <Pine.LNX.4.64.0912272226360.20548@ask.diku.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+From: Julia Lawall <julia@diku.dk>
 
-> >> > I do plan to look at these, but I don't know when I'll get to it.
-> >>
-> >> So... this switches qdsp5 code from private version to version in
-> >> staging. It actually boots.
-> >
-> > And when I replace .c's in qdsp5 with -msm version, it also works,
-> > with diff being reasonably small.
-> >
-> > Now... how does camera driver work? I did not drivers/media/video/msm/
-> > driver into the kernel, but camera application seems to still
-> > work...?!
-> 
-> Depends which version of the camera userspace code you've got.  The
-> stuff for cupcake/donut talks directly to the DSP and the DSP
-> interacts with the VFE (video frontend, the camera data transport).  I
-> believe the new camera driver bypasses some (all?) of that and deals
-> with the VFE directly.  At least on 8k that's how it works (no DSP
-> involvement at all).
+Test the just-allocated value for NULL rather than some other value.
 
-I have 1.5 listed as "firmware version" under "about phone". I guess
-that means "cupcake". Ok, so that looks like I do not have easy way of
-testing camera driver, because my userland does not need it...
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+The semantic patch that makes this change is as follows:
+(http://coccinelle.lip6.fr/)
+
+// <smpl>
+@@
+expression x,y;
+statement S;
+@@
+
+x = \(kmalloc\|kcalloc\|kzalloc\)(...);
+(
+if ((x) == NULL) S
+|
+if (
+-   y
++   x
+       == NULL)
+ S
+)
+// </smpl>
+
+Signed-off-by: Julia Lawall <julia@diku.dk>
+
+---
+ arch/arm/plat-pxa/dma.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff -u -p a/arch/arm/plat-pxa/dma.c b/arch/arm/plat-pxa/dma.c
+--- a/arch/arm/plat-pxa/dma.c
++++ b/arch/arm/plat-pxa/dma.c
+@@ -244,7 +244,7 @@ static void pxa_dma_init_debugfs(void)
+ 
+ 	dbgfs_chan = kmalloc(sizeof(*dbgfs_state) * num_dma_channels,
+ 			     GFP_KERNEL);
+-	if (!dbgfs_state)
++	if (!dbgfs_chan)
+ 		goto err_alloc;
+ 
+ 	chandir = debugfs_create_dir("channels", dbgfs_root);
