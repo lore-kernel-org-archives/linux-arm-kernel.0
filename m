@@ -1,43 +1,66 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 28 Dec 2009 22:44:36 +0000
-Subject: Ethernet in a cold climate / SMDK6410
-In-Reply-To: <4B391941.6000906@warmcat.com>
-References: <4B38FB80.9050609@warmcat.com>
-	<20091228190009.GB14799@sirena.org.uk> <4B3901E3.20004@warmcat.com>
-	<20091228192244.GD14799@sirena.org.uk>
-	<4B390AC3.2060702@warmcat.com>
-	<20091228202123.GA16524@sirena.org.uk>
-	<4B391941.6000906@warmcat.com>
-Message-ID: <20091228224435.GA23617@sirena.org.uk>
+From: ospite@studenti.unina.it (Antonio Ospite)
+Date: Tue, 29 Dec 2009 00:03:06 +0100
+Subject: [BUG] pxa27x_udc: possible recursive locking detected in
+	pxa_ep_queue
+In-Reply-To: <87vdfqx2xw.fsf@free.fr>
+References: <20091205115754.7e1dc0fd.ospite@studenti.unina.it>
+	<87fx7guuzg.fsf@free.fr>
+	<20091212173140.f9ac2a7b.ospite@studenti.unina.it>
+	<87ocltsda3.fsf@free.fr>
+	<20091223005313.13ba5061.ospite@studenti.unina.it>
+	<87vdfqx2xw.fsf@free.fr>
+Message-ID: <20091229000306.78948000.ospite@studenti.unina.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 28, 2009 at 08:46:57PM +0000, Andy Green wrote:
+On Mon, 28 Dec 2009 21:23:55 +0100
+Robert Jarzmik <robert.jarzmik@free.fr> wrote:
 
-> I would suggest that relying on (mysterious, changeable) bootloader to  
-> set up stuff like nCS timing and which nCS would be a dependency that  
-> would be good to avoid.  People are trying to use the dev board as a  
-> basis for their own designs and they have to ship an actual  
-> non-quantum-mist bootloader with that.
+> Antonio Ospite <ospite@studenti.unina.it> writes:
+> 
+> > With your latest patch on top of 2.6.32 I get the "possible recursive
+> > locking" message at the *first* cable unplug/plug cycle, I am appending
+> > it here, the log is partial because I dumped it from RAM and something
+> > was lost.
+> 
+> Thanks.
+> Now, lets have another try. This patch is a bit saner, and though I got the
+> "locking detected" you noticed without it, I didn't manage to get it with this
+> patch applied.
+> 
+> As your test platform is far better than mine, would you mind a bit of testing
+> ... again. This patch applies on top of v2.6.32.
+>
 
-Like I say, I wasn't aware that these were soft configurable in the
-first place - I'd never needed to look beyond the hookup of the device
-in the Samsung kernel plus some detective work with the IRQ polarity
-configuration in the driver since the board miswires it.  I do agree
-that if these things are software configurable then we ought to be doing
-it in the kernel, I strongly suspect that any setup done by the
-bootloader is only being done when booting over the network.
+Just FYI our repository has been updated to 2.6.33-rc2 and I haven't
+been able to reproduce the message here yet _without_ the patch.
+I'll go back to 2.6.32 and test again with and without this patch in
+next days, and report promptly.
 
->> It sounds like you've at least got a completely different bootloader (or
->> the source is highly misleading).  The other thing to check is which rev
->> of the board you have, there have been several revisions though I don't
->> recall any changes in the networking.
+> Cheers.
+> 
+> --
+> Robert
+> 
 
-> Right I wrote Qi bootloader support for s3c6410.  This allows true SD  
-> boot from SMDK.  "True SD boot" means that the bootloader itself is on  
-> SD Card and is brought over into RAM by the CPU ROM, so there is nothing  
-> to brick on the device itself.
+Thanks,
+   Antonio
 
-Qi would be a massive step back for me in terms of usability
-unfortunately - having to transfer things to an SD card to boot them
-would add a lot to my edit, compile run cycle compared to netboot.
+-- 
+Antonio Ospite
+http://ao2.it
+
+PGP public key ID: 0x4553B001
+
+A: Because it messes up the order in which people normally read text.
+   See http://en.wikipedia.org/wiki/Posting_style
+Q: Why is top-posting such a bad thing?
+A: Top-posting.
+Q: What is the most annoying thing in e-mail?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091229/3e2548c6/attachment.sig>
