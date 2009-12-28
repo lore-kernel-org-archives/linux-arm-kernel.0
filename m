@@ -1,28 +1,42 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 28 Dec 2009 14:55:41 +0900
-Subject: [PATCH 0/5] V7/Cortex/omap34xx fixes for 2.6.33-rc1: DCC, kexec,
-	atags
-In-Reply-To: <20091219034151.26198.26570.stgit@localhost>
-References: <20091219034151.26198.26570.stgit@localhost>
-Message-ID: <aec7e5c30912272155s41ce8914hd03a5e4c740a5b9d@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 28 Dec 2009 14:58:14 +0900
+Subject: [PATCH v2 0/7] ARM: S5P6440: Add support for Samsung's S5P6440 SoC
+Message-ID: <001d01ca8782$bebff5b0$3c3fe110$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi all,
 
-On Sat, Dec 19, 2009 at 12:45 PM, Tony Lindgren <tony@atomide.com> wrote:
-> Here are some v7 fixes, mostly to make kexec work.
->
-> Using 2.6.33-rc1, these fixes, and kexec from kexec-tools
-> git repo, I can reboot my n900 in a loop reliably.
+This is the second version of the patch set that adds basic support
+for Samsung's S5P6440 SoC. The feature set that is added are clock,
+timer, uart and interrupts.
 
-Thanks for your work on this. I previously tested kexec on ARM V6 and
-V7 and noticed that V7 didn't work. I revisited my V7 test after
-becoming aware of your patches. The single patch below unbreaks V7 on
-my target system.
+The clock changes are based on Harald Welte's patch. This patch is
+also based on Ben's plat-samsung patch.
 
-> ? ? ?arm: Fix cpu_proc_fin() for proc-v7.S and make kexec work
+This patch set includes the following patches.
 
-Cheers,
+[PATCH v2 1/7] ARM: S5P6440: Add new CPU initialization support
+[PATCH v2 2/7] ARM: S5P6440: Add Clock and PLL support
+[PATCH v2 3/7] ARM: S5P6440: Add IRQ support
+[PATCH v2 4/7] ARM: S5P6440: Add Timer support
+[PATCH v2 5/7] ARM: S5P6440: Add new Kconfig and Makefiles
+[PATCH v2 6/7] ARM: S5P6440: Add Board and configuration file
+[PATCH v2 7/7] ARM: S5P6440: Add serial port support
 
-/ magnus
+Changes since v1:
+
+1. Changed code as per comments from Marc Zyngier
+
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Adityapratap Sharma <aditya.ps@samsung.com>
+Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+Signed-off-by: Atul Dahiya <atul.dahiya@samsung.com>
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+System LSI Division, SAMSUNG ELECTRONICS CO., LTD.
