@@ -1,53 +1,47 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Mon, 28 Dec 2009 12:09:04 -0500
-Subject: [PATCH 1/5] arch/arm: Correct NULL test
-In-Reply-To: <Pine.LNX.4.64.0912281747570.6928@ask.diku.dk>
-References: <Pine.LNX.4.64.0912272226360.20548@ask.diku.dk><20091227215106.GA18317@pengutronix.de>
-	<Pine.LNX.4.64.0912272307310.20548@ask.diku.dk>
-	<BD79186B4FD85F4B8E60E381CAEE19090200F461@mi8nycmail19.Mi8.com>
-	<Pine.LNX.4.64.0912281747570.6928@ask.diku.dk>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE19090200F46E@mi8nycmail19.Mi8.com>
+From: andy@warmcat.com (Andy Green)
+Date: Mon, 28 Dec 2009 18:40:00 +0000
+Subject: Ethernet in a cold climate / SMDK6410
+Message-ID: <4B38FB80.9050609@warmcat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, December 28, 2009 9:51 AM, Julia Lawall wrote:
-> On Mon, 28 Dec 2009, H Hartley Sweeten wrote:
->
->> On Sunday, December 27, 2009 3:08 PM, Julia Lawall wrote:
->>>>>  	dbgfs_chan = kmalloc(sizeof(*dbgfs_state) * num_dma_channels,
->>>>>  			     GFP_KERNEL);
->>>>> -	if (!dbgfs_state)
->>>>> +	if (!dbgfs_chan)
->>>>>  		goto err_alloc;
->>>> Shouldn't the malloc line read:
->>>> 
->>>> 	... = kmalloc(sizeof(*dbgfs_chan) * ...)
->>>> 	                      ^^^^^^^^^^
->>>> 
->>>> ?
->>>
->>> Good point, thanks.  I will send a revised patch.
->> 
->> Wouldn't this be clearer?
->> 
->> 	... = kmalloc(sizeof(struct dentry) * ...)
->
-> Documentation/CodingStyle thinks otherwise:
->
-> "The preferred form for passing a size of a struct is the following:
->
-> 	p = kmalloc(sizeof(*p), ...);
->
-> The alternative form where struct name is spelled out hurts readability 
-> and introduces an opportunity for a bug when the pointer variable type is 
-> changed but the corresponding sizeof that is passed to a memory allocator 
-> is not."
->
-> And actually, in this case, sizeof(struct dentry) would be wrong, because 
-> the type of dbgfs_chan is struct dentry **, not struct dentry *.  What is 
-> wanted is an array of pointers.
+Hi -
 
-Ah, missed that.  Thanks for pointing it out.
+I broke out my old SMDK6410 last night and tried linux-next then Ben's 
+git on it (currently next-s3c64xx-updates) started from s3c6410 Qi / SD 
+Card boot.
 
-Regards,
-Hartley
+It's basically happy but OTG doesn't seem workable for Ethernet gadget. 
+  Well it's dumping a lot of debug messages so I guess maybe that's 
+where it got up to, fair enough.
+
+I eyeballed the back of the SMDK and I see a CS8900A and a SMSC LAN9115 
+both sitting there, coming out on separate RJ45s.  When I look at the 
+machine init file, I see Mark added
+
+static struct resource smdk6410_smsc911x_resources[] = {
+	[0] = {
+		.start = 0x18000000,
+		.end   = 0x18000000 + SZ_64K - 1,
+		.flags = IORESOURCE_MEM,
+	},
+...
+
+What is the deal with that in terms of SDMK settings and assumptions 
+about bootloader prepping nCS signals?  SMDK docs I have let me twiddle 
+switches and get "ethernet" connected to various selects.  What does 
+0x18000000 represent and how should the board be set so CS8900A doesn't 
+crash the party?
+
+After some debug-by-printk, I see smsc911x probe is failing with:
+
+smsc911x: BYTE_TEST: 0xFFFFFFFF
+smsc911x: top 16 bits equal to bottom 16 bits
+smsc911x: This may mean the chip is set for 32 bit while the bus is 
+reading 16 bit
+smsc911x: init failed
+
+So I am guessing the nCS pin is not configured, something is missing a 
+clock... one of the dozens of mini DIP switches is "wrong"?
+
+-Andy
