@@ -1,60 +1,45 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 28 Dec 2009 20:21:23 +0000
-Subject: Ethernet in a cold climate / SMDK6410
-In-Reply-To: <4B390AC3.2060702@warmcat.com>
-References: <4B38FB80.9050609@warmcat.com>
-	<20091228190009.GB14799@sirena.org.uk> <4B3901E3.20004@warmcat.com>
-	<20091228192244.GD14799@sirena.org.uk>
-	<4B390AC3.2060702@warmcat.com>
-Message-ID: <20091228202123.GA16524@sirena.org.uk>
+From: swetland@google.com (Brian Swetland)
+Date: Mon, 28 Dec 2009 12:24:20 -0800
+Subject: tree with htc dream support
+In-Reply-To: <20091227101824.GB1478@ucw.cz>
+References: <1260627482.20913.7.camel@desktop>
+	<20091213212504.GD5114@elf.ucw.cz>
+	<d6200be20912142234ia050c67p34fd2672e7248170@mail.gmail.com>
+	<20091227093537.GD11737@elf.ucw.cz>
+	<20091227201514.GA29174@elf.ucw.cz>
+	<a55d774e0912271220p1d102b1dr398e0524c9386702@mail.gmail.com>
+	<20091227203704.GK11737@elf.ucw.cz>
+	<20091227211322.GB29174@elf.ucw.cz>
+	<a55d774e0912271646m1b82687cy427083e64e91e323@mail.gmail.com>
+	<20091227101824.GB1478@ucw.cz>
+Message-ID: <a55d774e0912281224y7360dfdbu8a251743026bdd28@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 28, 2009 at 07:45:07PM +0000, Andy Green wrote:
-> On 12/28/09 19:22, Somebody in the thread at some point said:
+On Sun, Dec 27, 2009 at 2:18 AM, Pavel Machek <pavel@ucw.cz> wrote:
+> Hi!
+>
+>> > Switch smd code to the version in staging. Something to apply to
+>> > dream/ tree I'd say... and yes, it still works.
+>>
+>> I think we might want to consider leaving at least the core smd code
+>> under mach-msm.
+>
+> In the long run, I agree.
+>
+> In the short run... the code is staging quality, so it should be in
+> staging... and you'll not have to mainain so huge diff. (-20 kLoc).
 
->> Yes, whatever was flashed on it when Samsung last had the board.  The
->> bootloader does explicitly say it's looking for the SMSC chip when
->> setting it up.
+The core smd stuff is really not that large.  The central smd.[ch] are
+about 1300 lines, and proc_comm.[ch] are about 400 lines.  Is it
+possible to get some review/feedback as to what's "staging quality"
+about this code so we can clean it up?  I'd rather just fix the issues
+and get the core stuff in there so clock, power, etc support is there
+for the platform rather than have it live in staging purgatory.
 
-> I went and looked at the sources for that I got from Samsung, it talks  
-> only about CS8900.
+Since this stuff is integral to mach-msm, required for essential
+operation of the platform, and makes sense to be part of the mach-msm
+codebase, why not just fix it there rather than move it out into
+staging and then back?  I'm not sure what that gains us.
 
-That's...  interesting.  To be honest I don't think I've ever seen the
-source code for the bootloaders, but none of the SMDK boards I've had
-have defaulted to using the CS8900 - I've never actually seen software
-that talked to it to my knowledge, the Samsung bootloaders and kernels
-were all using the SMSC chip and obviously that's what mainline has been
-doing too.
-
->> I'm not sure what you mean by the "machine definition file" here?  The
-
-> I meant mach-smdk6410.c, since it wants to configure Linux to use stuff  
-> that has dependencies it doesn't control.  If it's going to claim  
-> something is there at 0x18000000 for a particular machine then it's at  
-> least arguable it should configure any soft prerequisites (nCS)  
-> accordingly and document the ones out of its control.
-
-Oh, sure - you were saying it should configure stuff and obviously most
-of these things are completely out of scope for software which wasn't
-very clear at all.  I quite frankly wasn't aware that there were any
-relevant soft controls at all.
-
-By the way, the other thing to watch out for with the Samsung boards is
-that as well as the DIP switches there's a bunch of resistor fit options
-that can be changed as well.
-
-> I understand that you might be able to get that working and yet not  
-> understand the intricacies of the dev board, and we're still ahead that  
-> you managed to get anything working.
-
-Right, and hopefully this is the sort of thing that Samsung are going to
-be doing with their mainline work.
-
-> My board is as shipped with the switches AFAIK except configured for SD  
-> Card boot according to Samsung docs.
-
-It sounds like you've at least got a completely different bootloader (or
-the source is highly misleading).  The other thing to check is which rev
-of the board you have, there have been several revisions though I don't
-recall any changes in the networking.
+Brian
