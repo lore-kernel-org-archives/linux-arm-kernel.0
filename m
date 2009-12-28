@@ -1,268 +1,242 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 28 Dec 2009 13:18:05 +0800
-Subject: [PATCH 4/7] [ARM] locomo: allow cascaded IRQ base to be specified by
-	platforms
+Date: Mon, 28 Dec 2009 13:18:08 +0800
+Subject: [PATCH 7/7] [ARM] pxa: move board board IRQ definitions out of irqs.h
 In-Reply-To: <1261977488-18271-1-git-send-email-eric.y.miao@gmail.com>
 References: <1261977488-18271-1-git-send-email-eric.y.miao@gmail.com>
-Message-ID: <1261977488-18271-5-git-send-email-eric.y.miao@gmail.com>
+Message-ID: <1261977488-18271-8-git-send-email-eric.y.miao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
 ---
- arch/arm/common/locomo.c                 |   49 +++++++++++++++++-------------
- arch/arm/include/asm/hardware/locomo.h   |    4 ++
- arch/arm/mach-pxa/include/mach/irqs.h    |    6 ----
- arch/arm/mach-pxa/poodle.c               |    7 ++++
- arch/arm/mach-sa1100/collie.c            |    4 ++
- arch/arm/mach-sa1100/include/mach/irqs.h |   11 +-----
- 6 files changed, 45 insertions(+), 36 deletions(-)
+ arch/arm/include/asm/hardware/it8152.h     |   12 +++++
+ arch/arm/mach-pxa/include/mach/balloon3.h  |   10 ++++
+ arch/arm/mach-pxa/include/mach/irqs.h      |   67 +---------------------------
+ arch/arm/mach-pxa/include/mach/lpd270.h    |    4 ++
+ arch/arm/mach-pxa/include/mach/lubbock.h   |   11 +++++
+ arch/arm/mach-pxa/include/mach/mainstone.h |   17 +++++++
+ arch/arm/mach-pxa/include/mach/pcm027.h    |    7 +++
+ drivers/usb/gadget/pxa25x_udc.c            |    4 ++
+ 8 files changed, 66 insertions(+), 66 deletions(-)
 
-diff --git a/arch/arm/common/locomo.c b/arch/arm/common/locomo.c
-index a16df07..aef6cc4 100644
---- a/arch/arm/common/locomo.c
-+++ b/arch/arm/common/locomo.c
-@@ -32,6 +32,12 @@
- 
- #include <asm/hardware/locomo.h>
- 
-+/* LoCoMo Interrupts */
-+#define IRQ_LOCOMO_KEY		(0)
-+#define IRQ_LOCOMO_GPIO		(1)
-+#define IRQ_LOCOMO_LT		(2)
-+#define IRQ_LOCOMO_SPI		(3)
+diff --git a/arch/arm/include/asm/hardware/it8152.h b/arch/arm/include/asm/hardware/it8152.h
+index 74b5fff..6700c7f 100644
+--- a/arch/arm/include/asm/hardware/it8152.h
++++ b/arch/arm/include/asm/hardware/it8152.h
+@@ -75,6 +75,18 @@ extern unsigned long it8152_base_address;
+   IT8152_PD_IRQ(1)  USB (USBR)
+   IT8152_PD_IRQ(0)  Audio controller (ACR)
+  */
++#define IT8152_IRQ(x)   (IRQ_BOARD_END + (x))
 +
- /* M62332 output channel selection */
- #define M62332_EVR_CH	1	/* M62332 volume channel number  */
- 				/*   0 : CH.1 , 1 : CH. 2        */
-@@ -58,6 +64,7 @@ struct locomo {
- 	struct device *dev;
- 	unsigned long phys;
- 	unsigned int irq;
-+	int irq_base;
- 	spinlock_t lock;
- 	void __iomem *base;
- #ifdef CONFIG_PM
-@@ -81,9 +88,7 @@ struct locomo_dev_info {
- static struct locomo_dev_info locomo_devices[] = {
- 	{
- 		.devid 		= LOCOMO_DEVID_KEYBOARD,
--		.irq = {
--			IRQ_LOCOMO_KEY,
--		},
-+		.irq		= { IRQ_LOCOMO_KEY },
- 		.name		= "locomo-keyboard",
- 		.offset		= LOCOMO_KEYBOARD,
- 		.length		= 16,
-@@ -135,18 +140,18 @@ static struct locomo_dev_info locomo_devices[] = {
- 
- static void locomo_handler(unsigned int irq, struct irq_desc *desc)
- {
-+	struct locomo *lchip = get_irq_chip_data(irq);
- 	int req, i;
--	void __iomem *mapbase = get_irq_chip_data(irq);
- 
- 	/* Acknowledge the parent IRQ */
- 	desc->chip->ack(irq);
- 
- 	/* check why this interrupt was generated */
--	req = locomo_readl(mapbase + LOCOMO_ICR) & 0x0f00;
-+	req = locomo_readl(lchip->base + LOCOMO_ICR) & 0x0f00;
- 
- 	if (req) {
- 		/* generate the next interrupt(s) */
--		irq = IRQ_LOCOMO_KEY;
-+		irq = lchip->irq_base;
- 		for (i = 0; i <= 3; i++, irq++) {
- 			if (req & (0x0100 << i)) {
- 				generic_handle_irq(irq);
-@@ -162,20 +167,20 @@ static void locomo_ack_irq(unsigned int irq)
- 
- static void locomo_mask_irq(unsigned int irq)
- {
--	void __iomem *mapbase = get_irq_chip_data(irq);
-+	struct locomo *lchip = get_irq_chip_data(irq);
- 	unsigned int r;
--	r = locomo_readl(mapbase + LOCOMO_ICR);
--	r &= ~(0x0010 << (irq - IRQ_LOCOMO_KEY));
--	locomo_writel(r, mapbase + LOCOMO_ICR);
-+	r = locomo_readl(lchip->base + LOCOMO_ICR);
-+	r &= ~(0x0010 << (irq - lchip->irq_base));
-+	locomo_writel(r, lchip->base + LOCOMO_ICR);
- }
- 
- static void locomo_unmask_irq(unsigned int irq)
- {
--	void __iomem *mapbase = get_irq_chip_data(irq);
-+	struct locomo *lchip = get_irq_chip_data(irq);
- 	unsigned int r;
--	r = locomo_readl(mapbase + LOCOMO_ICR);
--	r |= (0x0010 << (irq - IRQ_LOCOMO_KEY));
--	locomo_writel(r, mapbase + LOCOMO_ICR);
-+	r = locomo_readl(lchip->base + LOCOMO_ICR);
-+	r |= (0x0010 << (irq - lchip->irq_base));
-+	locomo_writel(r, lchip->base + LOCOMO_ICR);
- }
- 
- static struct irq_chip locomo_chip = {
-@@ -187,20 +192,19 @@ static struct irq_chip locomo_chip = {
- 
- static void locomo_setup_irq(struct locomo *lchip)
- {
--	int irq;
--	void __iomem *irqbase = lchip->base;
-+	int irq = lchip->irq_base;
- 
- 	/*
- 	 * Install handler for IRQ_LOCOMO_HW.
- 	 */
- 	set_irq_type(lchip->irq, IRQ_TYPE_EDGE_FALLING);
--	set_irq_chip_data(lchip->irq, irqbase);
-+	set_irq_chip_data(lchip->irq, lchip);
- 	set_irq_chained_handler(lchip->irq, locomo_handler);
- 
- 	/* Install handlers for IRQ_LOCOMO_* */
--	for (irq = IRQ_LOCOMO_KEY; irq <= IRQ_LOCOMO_SPI; irq++) {
-+	for ( ; irq <= lchip->irq_base + 3; irq++) {
- 		set_irq_chip(irq, &locomo_chip);
--		set_irq_chip_data(irq, irqbase);
-+		set_irq_chip_data(irq, lchip);
- 		set_irq_handler(irq, handle_level_irq);
- 		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
- 	}
-@@ -247,7 +251,8 @@ locomo_init_one_child(struct locomo *lchip, struct locomo_dev_info *info)
- 		dev->mapbase = 0;
- 	dev->length = info->length;
- 
--	memmove(dev->irq, info->irq, sizeof(dev->irq));
-+	dev->irq[0] = (lchip->irq_base == NO_IRQ) ?
-+			NO_IRQ : lchip->irq_base + info->irq[0];
- 
- 	ret = device_register(&dev->dev);
- 	if (ret) {
-@@ -364,6 +369,7 @@ static int locomo_resume(struct platform_device *dev)
- static int
- __locomo_probe(struct device *me, struct resource *mem, int irq)
- {
-+	struct locomo_platform_data *pdata = me->platform_data;
- 	struct locomo *lchip;
- 	unsigned long r;
- 	int i, ret = -ENODEV;
-@@ -379,6 +385,7 @@ __locomo_probe(struct device *me, struct resource *mem, int irq)
- 
- 	lchip->phys = mem->start;
- 	lchip->irq = irq;
-+	lchip->irq_base = (pdata) ? pdata->irq_base : NO_IRQ;
- 
- 	/*
- 	 * Map the whole region.  This also maps the
-@@ -445,7 +452,7 @@ __locomo_probe(struct device *me, struct resource *mem, int irq)
- 	 * The interrupt controller must be initialised before any
- 	 * other device to ensure that the interrupts are available.
- 	 */
--	if (lchip->irq != NO_IRQ)
-+	if (lchip->irq != NO_IRQ && lchip->irq_base != NO_IRQ)
- 		locomo_setup_irq(lchip);
- 
- 	for (i = 0; i < ARRAY_SIZE(locomo_devices); i++)
-diff --git a/arch/arm/include/asm/hardware/locomo.h b/arch/arm/include/asm/hardware/locomo.h
-index 954b1be..74e51d6 100644
---- a/arch/arm/include/asm/hardware/locomo.h
-+++ b/arch/arm/include/asm/hardware/locomo.h
-@@ -214,4 +214,8 @@ void locomo_m62332_senddata(struct locomo_dev *ldev, unsigned int dac_data, int
- /* Frontlight control */
- void locomo_frontlight_set(struct locomo_dev *dev, int duty, int vr, int bpwf);
- 
-+struct locomo_platform_data {
-+	int	irq_base;	/* IRQ base for cascaded on-chip IRQs */
-+};
++/* IRQ-sources in 3 groups - local devices, LPC (serial), and external PCI */
++#define IT8152_LD_IRQ_COUNT     9
++#define IT8152_LP_IRQ_COUNT     16
++#define IT8152_PD_IRQ_COUNT     15
 +
++/* Priorities: */
++#define IT8152_PD_IRQ(i)        IT8152_IRQ(i)
++#define IT8152_LP_IRQ(i)        (IT8152_IRQ(i) + IT8152_PD_IRQ_COUNT)
++#define IT8152_LD_IRQ(i)        (IT8152_IRQ(i) + IT8152_PD_IRQ_COUNT + IT8152_LP_IRQ_COUNT)
++
+ /* frequently used interrupts */
+ #define IT8152_PCISERR		IT8152_PD_IRQ(14)
+ #define IT8152_H2PTADR		IT8152_PD_IRQ(13)
+diff --git a/arch/arm/mach-pxa/include/mach/balloon3.h b/arch/arm/mach-pxa/include/mach/balloon3.h
+index bfec09b..1a74106 100644
+--- a/arch/arm/mach-pxa/include/mach/balloon3.h
++++ b/arch/arm/mach-pxa/include/mach/balloon3.h
+@@ -129,6 +129,16 @@ enum balloon3_features {
+ #define CPLD_AROUTING_LOONR2INT_BIT    6
+ #define CPLD_AROUTING_LOONR2EXT_BIT    7
+ 
++/* Balloon3 Interrupts */
++#define BALLOON3_IRQ(x)		(IRQ_BOARD_START + (x))
++
++#define BALLOON3_BP_CF_NRDY_IRQ	BALLOON3_IRQ(0)
++#define BALLOON3_BP_NSTSCHG_IRQ	BALLOON3_IRQ(1)
++
++#define BALLOON3_AUX_NIRQ	IRQ_GPIO(BALLOON3_GPIO_AUX_NIRQ)
++#define BALLOON3_CODEC_IRQ	IRQ_GPIO(BALLOON3_GPIO_CODEC_IRQ)
++#define BALLOON3_S0_CD_IRQ	IRQ_GPIO(BALLOON3_GPIO_S0_CD)
++
+ extern int balloon3_has(enum balloon3_features feature);
+ 
  #endif
 diff --git a/arch/arm/mach-pxa/include/mach/irqs.h b/arch/arm/mach-pxa/include/mach/irqs.h
-index 56a2c61..83b14f1 100644
+index b35b3ac..ffc8314 100644
 --- a/arch/arm/mach-pxa/include/mach/irqs.h
 +++ b/arch/arm/mach-pxa/include/mach/irqs.h
-@@ -247,12 +247,6 @@
- #define BALLOON3_CODEC_IRQ	IRQ_GPIO(BALLOON3_GPIO_CODEC_IRQ)
- #define BALLOON3_S0_CD_IRQ	IRQ_GPIO(BALLOON3_GPIO_S0_CD)
- 
--/* LoCoMo Interrupts (CONFIG_SHARP_LOCOMO) */
--#define IRQ_LOCOMO_KEY		(IRQ_BOARD_START + 0)
--#define IRQ_LOCOMO_GPIO		(IRQ_BOARD_START + 1)
--#define IRQ_LOCOMO_LT		(IRQ_BOARD_START + 2)
--#define IRQ_LOCOMO_SPI		(IRQ_BOARD_START + 3)
--
- /* phyCORE-PXA270 (PCM027) Interrupts */
- #define PCM027_IRQ(x)          (IRQ_BOARD_START + (x))
- #define PCM027_BTDET_IRQ       PCM027_IRQ(0)
-diff --git a/arch/arm/mach-pxa/poodle.c b/arch/arm/mach-pxa/poodle.c
-index c2b938a..35ce7ea 100644
---- a/arch/arm/mach-pxa/poodle.c
-+++ b/arch/arm/mach-pxa/poodle.c
-@@ -193,11 +193,18 @@ static struct resource locomo_resources[] = {
- 	},
- };
- 
-+static struct locomo_platform_data locomo_info = {
-+	.irq_base	= IRQ_BOARD_START,
-+};
-+
- struct platform_device poodle_locomo_device = {
- 	.name		= "locomo",
- 	.id		= 0,
- 	.num_resources	= ARRAY_SIZE(locomo_resources),
- 	.resource	= locomo_resources,
-+	.dev		= {
-+		.platform_data	= &locomo_info,
-+	},
- };
- 
- EXPORT_SYMBOL(poodle_locomo_device);
-diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
-index 9982c5c..5d5f330 100644
---- a/arch/arm/mach-sa1100/collie.c
-+++ b/arch/arm/mach-sa1100/collie.c
-@@ -234,6 +234,10 @@ static struct resource locomo_resources[] = {
- 	},
- };
- 
-+static struct locomo_platform_data locomo_info = {
-+	.irq_base	= IRQ_BOARD_START,
-+};
-+
- struct platform_device collie_locomo_device = {
- 	.name		= "locomo",
- 	.id		= 0,
-diff --git a/arch/arm/mach-sa1100/include/mach/irqs.h b/arch/arm/mach-sa1100/include/mach/irqs.h
-index a8dc68e..bc67722 100644
---- a/arch/arm/mach-sa1100/include/mach/irqs.h
-+++ b/arch/arm/mach-sa1100/include/mach/irqs.h
-@@ -124,13 +124,13 @@
-  * Figure out the MAX IRQ number.
-  *
-  * If we have an SA1111, the max IRQ is S1_BVD1_STSCHG+1.
-- * If we have an LoCoMo, the max IRQ is IRQ_LOCOMO_SPI_TEND+1
-+ * If we have an LoCoMo, the max IRQ is IRQ_BOARD_START + 4
-  * Otherwise, we have the standard IRQs only.
-  */
- #ifdef CONFIG_SA1111
- #define NR_IRQS			(IRQ_S1_BVD1_STSCHG + 1)
- #elif CONFIG_SHARPSL_LOCOMO
--#define NR_IRQS			(IRQ_LOCOMO_SPI + 1)
-+#define NR_IRQS			(IRQ_BOARD_START + 4)
- #else
+@@ -150,74 +150,9 @@
  #define NR_IRQS			(IRQ_BOARD_START)
  #endif
-@@ -142,10 +142,3 @@
- #define IRQ_NEPONSET_SMC9196	(IRQ_BOARD_START + 0)
- #define IRQ_NEPONSET_USAR	(IRQ_BOARD_START + 1)
- #define IRQ_NEPONSET_SA1111	(IRQ_BOARD_START + 2)
+ 
+-/*
+- * Board specific IRQs.  Define them here.
+- * Do not surround them with ifdefs.
+- */
+-#define LUBBOCK_IRQ(x)		(IRQ_BOARD_START + (x))
+-#define LUBBOCK_SD_IRQ		LUBBOCK_IRQ(0)
+-#define LUBBOCK_SA1111_IRQ	LUBBOCK_IRQ(1)
+-#define LUBBOCK_USB_IRQ		LUBBOCK_IRQ(2)  /* usb connect */
+-#define LUBBOCK_ETH_IRQ		LUBBOCK_IRQ(3)
+-#define LUBBOCK_UCB1400_IRQ	LUBBOCK_IRQ(4)
+-#define LUBBOCK_BB_IRQ		LUBBOCK_IRQ(5)
+-#define LUBBOCK_USB_DISC_IRQ	LUBBOCK_IRQ(6)  /* usb disconnect */
+-#define LUBBOCK_LAST_IRQ	LUBBOCK_IRQ(6)
 -
--/* LoCoMo Interrupts (CONFIG_SHARP_LOCOMO) */
--#define IRQ_LOCOMO_KEY		(IRQ_BOARD_START + 0)
--#define IRQ_LOCOMO_GPIO		(IRQ_BOARD_START + 1)
--#define IRQ_LOCOMO_LT		(IRQ_BOARD_START + 2)
--#define IRQ_LOCOMO_SPI		(IRQ_BOARD_START + 3)
+-#define LPD270_IRQ(x)		(IRQ_BOARD_START + (x))
+-#define LPD270_USBC_IRQ		LPD270_IRQ(2)
+-#define LPD270_ETHERNET_IRQ	LPD270_IRQ(3)
+-#define LPD270_AC97_IRQ		LPD270_IRQ(4)
 -
+-#define MAINSTONE_IRQ(x)	(IRQ_BOARD_START + (x))
+-#define MAINSTONE_MMC_IRQ	MAINSTONE_IRQ(0)
+-#define MAINSTONE_USIM_IRQ	MAINSTONE_IRQ(1)
+-#define MAINSTONE_USBC_IRQ	MAINSTONE_IRQ(2)
+-#define MAINSTONE_ETHERNET_IRQ	MAINSTONE_IRQ(3)
+-#define MAINSTONE_AC97_IRQ	MAINSTONE_IRQ(4)
+-#define MAINSTONE_PEN_IRQ	MAINSTONE_IRQ(5)
+-#define MAINSTONE_MSINS_IRQ	MAINSTONE_IRQ(6)
+-#define MAINSTONE_EXBRD_IRQ	MAINSTONE_IRQ(7)
+-#define MAINSTONE_S0_CD_IRQ	MAINSTONE_IRQ(9)
+-#define MAINSTONE_S0_STSCHG_IRQ	MAINSTONE_IRQ(10)
+-#define MAINSTONE_S0_IRQ	MAINSTONE_IRQ(11)
+-#define MAINSTONE_S1_CD_IRQ	MAINSTONE_IRQ(13)
+-#define MAINSTONE_S1_STSCHG_IRQ	MAINSTONE_IRQ(14)
+-#define MAINSTONE_S1_IRQ	MAINSTONE_IRQ(15)
+-
+-/* Balloon3 Interrupts */
+-#define BALLOON3_IRQ(x)		(IRQ_BOARD_START + (x))
+-
+-#define BALLOON3_BP_CF_NRDY_IRQ	BALLOON3_IRQ(0)
+-#define BALLOON3_BP_NSTSCHG_IRQ	BALLOON3_IRQ(1)
+-
+-#define BALLOON3_AUX_NIRQ	IRQ_GPIO(BALLOON3_GPIO_AUX_NIRQ)
+-#define BALLOON3_CODEC_IRQ	IRQ_GPIO(BALLOON3_GPIO_CODEC_IRQ)
+-#define BALLOON3_S0_CD_IRQ	IRQ_GPIO(BALLOON3_GPIO_S0_CD)
+-
+-/* phyCORE-PXA270 (PCM027) Interrupts */
+-#define PCM027_IRQ(x)          (IRQ_BOARD_START + (x))
+-#define PCM027_BTDET_IRQ       PCM027_IRQ(0)
+-#define PCM027_FF_RI_IRQ       PCM027_IRQ(1)
+-#define PCM027_MMCDET_IRQ      PCM027_IRQ(2)
+-#define PCM027_PM_5V_IRQ       PCM027_IRQ(3)
+-
+-/* ITE8152 irqs */
+ /* add IT8152 IRQs beyond BOARD_END */
+ #ifdef CONFIG_PCI_HOST_ITE8152
+-#define IT8152_IRQ(x)   (IRQ_BOARD_END + (x))
+-
+-/* IRQ-sources in 3 groups - local devices, LPC (serial), and external PCI */
+-#define IT8152_LD_IRQ_COUNT     9
+-#define IT8152_LP_IRQ_COUNT     16
+-#define IT8152_PD_IRQ_COUNT     15
+-
+-/* Priorities: */
+-#define IT8152_PD_IRQ(i)        IT8152_IRQ(i)
+-#define IT8152_LP_IRQ(i)        (IT8152_IRQ(i) + IT8152_PD_IRQ_COUNT)
+-#define IT8152_LD_IRQ(i)        (IT8152_IRQ(i) + IT8152_PD_IRQ_COUNT + IT8152_LP_IRQ_COUNT)
+-
+-#define IT8152_LAST_IRQ         IT8152_LD_IRQ(IT8152_LD_IRQ_COUNT - 1)
++#define IT8152_LAST_IRQ         (IRQ_BOARD_END + 40)
+ 
+ #if NR_IRQS < (IT8152_LAST_IRQ+1)
+ #undef NR_IRQS
+diff --git a/arch/arm/mach-pxa/include/mach/lpd270.h b/arch/arm/mach-pxa/include/mach/lpd270.h
+index f89fb71..0e6440c 100644
+--- a/arch/arm/mach-pxa/include/mach/lpd270.h
++++ b/arch/arm/mach-pxa/include/mach/lpd270.h
+@@ -34,5 +34,9 @@
+ #define LPD270_INT_ETHERNET	(1 << 3)  /* Ethernet controller IRQ */
+ #define LPD270_INT_USBC		(1 << 2)  /* USB client cable detection IRQ */
+ 
++#define LPD270_IRQ(x)		(IRQ_BOARD_START + (x))
++#define LPD270_USBC_IRQ		LPD270_IRQ(2)
++#define LPD270_ETHERNET_IRQ	LPD270_IRQ(3)
++#define LPD270_AC97_IRQ		LPD270_IRQ(4)
+ 
+ #endif
+diff --git a/arch/arm/mach-pxa/include/mach/lubbock.h b/arch/arm/mach-pxa/include/mach/lubbock.h
+index 751b748..a0d4247 100644
+--- a/arch/arm/mach-pxa/include/mach/lubbock.h
++++ b/arch/arm/mach-pxa/include/mach/lubbock.h
+@@ -34,6 +34,17 @@
+ #define LUB_IRQ_SET_CLR		__LUB_REG(LUBBOCK_FPGA_PHYS + 0x0d0)
+ #define LUB_GP			__LUB_REG(LUBBOCK_FPGA_PHYS + 0x100)
+ 
++/* Board specific IRQs */
++#define LUBBOCK_IRQ(x)		(IRQ_BOARD_START + (x))
++#define LUBBOCK_SD_IRQ		LUBBOCK_IRQ(0)
++#define LUBBOCK_SA1111_IRQ	LUBBOCK_IRQ(1)
++#define LUBBOCK_USB_IRQ		LUBBOCK_IRQ(2)  /* usb connect */
++#define LUBBOCK_ETH_IRQ		LUBBOCK_IRQ(3)
++#define LUBBOCK_UCB1400_IRQ	LUBBOCK_IRQ(4)
++#define LUBBOCK_BB_IRQ		LUBBOCK_IRQ(5)
++#define LUBBOCK_USB_DISC_IRQ	LUBBOCK_IRQ(6)  /* usb disconnect */
++#define LUBBOCK_LAST_IRQ	LUBBOCK_IRQ(6)
++
+ #ifndef __ASSEMBLY__
+ extern void lubbock_set_misc_wr(unsigned int mask, unsigned int set);
+ #endif
+diff --git a/arch/arm/mach-pxa/include/mach/mainstone.h b/arch/arm/mach-pxa/include/mach/mainstone.h
+index 3461c43..86e623a 100644
+--- a/arch/arm/mach-pxa/include/mach/mainstone.h
++++ b/arch/arm/mach-pxa/include/mach/mainstone.h
+@@ -117,4 +117,21 @@
+ #define MST_PCMCIA_PWR_VCC_33   0x8	   /* voltage VCC = 3.3V */
+ #define MST_PCMCIA_PWR_VCC_50   0x4	   /* voltage VCC = 5.0V */
+ 
++/* board specific IRQs */
++#define MAINSTONE_IRQ(x)	(IRQ_BOARD_START + (x))
++#define MAINSTONE_MMC_IRQ	MAINSTONE_IRQ(0)
++#define MAINSTONE_USIM_IRQ	MAINSTONE_IRQ(1)
++#define MAINSTONE_USBC_IRQ	MAINSTONE_IRQ(2)
++#define MAINSTONE_ETHERNET_IRQ	MAINSTONE_IRQ(3)
++#define MAINSTONE_AC97_IRQ	MAINSTONE_IRQ(4)
++#define MAINSTONE_PEN_IRQ	MAINSTONE_IRQ(5)
++#define MAINSTONE_MSINS_IRQ	MAINSTONE_IRQ(6)
++#define MAINSTONE_EXBRD_IRQ	MAINSTONE_IRQ(7)
++#define MAINSTONE_S0_CD_IRQ	MAINSTONE_IRQ(9)
++#define MAINSTONE_S0_STSCHG_IRQ	MAINSTONE_IRQ(10)
++#define MAINSTONE_S0_IRQ	MAINSTONE_IRQ(11)
++#define MAINSTONE_S1_CD_IRQ	MAINSTONE_IRQ(13)
++#define MAINSTONE_S1_STSCHG_IRQ	MAINSTONE_IRQ(14)
++#define MAINSTONE_S1_IRQ	MAINSTONE_IRQ(15)
++
+ #endif
+diff --git a/arch/arm/mach-pxa/include/mach/pcm027.h b/arch/arm/mach-pxa/include/mach/pcm027.h
+index 4dcd2e8..0408326 100644
+--- a/arch/arm/mach-pxa/include/mach/pcm027.h
++++ b/arch/arm/mach-pxa/include/mach/pcm027.h
+@@ -23,6 +23,13 @@
+  * Definitions of CPU card resources only
+  */
+ 
++/* phyCORE-PXA270 (PCM027) Interrupts */
++#define PCM027_IRQ(x)          (IRQ_BOARD_START + (x))
++#define PCM027_BTDET_IRQ       PCM027_IRQ(0)
++#define PCM027_FF_RI_IRQ       PCM027_IRQ(1)
++#define PCM027_MMCDET_IRQ      PCM027_IRQ(2)
++#define PCM027_PM_5V_IRQ       PCM027_IRQ(3)
++
+ /* I2C RTC */
+ #define PCM027_RTC_IRQ_GPIO	0
+ #define PCM027_RTC_IRQ		IRQ_GPIO(PCM027_RTC_IRQ_GPIO)
+diff --git a/drivers/usb/gadget/pxa25x_udc.c b/drivers/usb/gadget/pxa25x_udc.c
+index e6fedbd..be5fb34 100644
+--- a/drivers/usb/gadget/pxa25x_udc.c
++++ b/drivers/usb/gadget/pxa25x_udc.c
+@@ -65,6 +65,10 @@
+ #include <mach/pxa25x-udc.h>
+ #endif
+ 
++#ifdef CONFIG_ARCH_LUBBOCK
++#include <mach/lubbock.h>
++#endif
++
+ #include <asm/mach/udc_pxa2xx.h>
+ 
+ 
 -- 
 1.6.3.3
