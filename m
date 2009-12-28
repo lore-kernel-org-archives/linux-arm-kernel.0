@@ -1,98 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 28 Dec 2009 11:47:31 -0800
-Subject: [PATCH 1/1] ARM: OMAP4: PM: Remove the checks preventing OMAP4
-	clockdomain validation
-In-Reply-To: <1261391747-24066-1-git-send-email-abhijitpagare@ti.com>
-References: <1261391747-24066-1-git-send-email-abhijitpagare@ti.com>
-Message-ID: <20091228194731.GL3512@atomide.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 28 Dec 2009 20:21:23 +0000
+Subject: Ethernet in a cold climate / SMDK6410
+In-Reply-To: <4B390AC3.2060702@warmcat.com>
+References: <4B38FB80.9050609@warmcat.com>
+	<20091228190009.GB14799@sirena.org.uk> <4B3901E3.20004@warmcat.com>
+	<20091228192244.GD14799@sirena.org.uk>
+	<4B390AC3.2060702@warmcat.com>
+Message-ID: <20091228202123.GA16524@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Abhijit Pagare <abhijitpagare@ti.com> [091221 02:34]:
-> The clockdomain related code beng in place it is now not necessary to have
-> some of the clock code commented out. This would help the validation of the
-> clockdomain functions using the clock level interfaces.
+On Mon, Dec 28, 2009 at 07:45:07PM +0000, Andy Green wrote:
+> On 12/28/09 19:22, Somebody in the thread at some point said:
 
-Why are tagging clock related  patches as "PM" in the subject?
+>> Yes, whatever was flashed on it when Samsung last had the board.  The
+>> bootloader does explicitly say it's looking for the SMSC chip when
+>> setting it up.
 
-All the clock related patches should be done directly against
-the mainline kernel.
+> I went and looked at the sources for that I got from Samsung, it talks  
+> only about CS8900.
 
-If there is some dependency to the pm branch, that should be
-fixed and removed ASAP.
+That's...  interesting.  To be honest I don't think I've ever seen the
+source code for the bootloaders, but none of the SMDK boards I've had
+have defaulted to using the CS8900 - I've never actually seen software
+that talked to it to my knowledge, the Samsung bootloaders and kernels
+were all using the SMSC chip and obviously that's what mainline has been
+doing too.
 
-Regards,
+>> I'm not sure what you mean by the "machine definition file" here?  The
 
-Tony
+> I meant mach-smdk6410.c, since it wants to configure Linux to use stuff  
+> that has dependencies it doesn't control.  If it's going to claim  
+> something is there at 0x18000000 for a particular machine then it's at  
+> least arguable it should configure any soft prerequisites (nCS)  
+> accordingly and document the ones out of its control.
 
+Oh, sure - you were saying it should configure stuff and obviously most
+of these things are completely out of scope for software which wasn't
+very clear at all.  I quite frankly wasn't aware that there were any
+relevant soft controls at all.
 
+By the way, the other thing to watch out for with the Samsung boards is
+that as well as the DIP switches there's a bunch of resistor fit options
+that can be changed as well.
 
- 
-> Signed-off-by: Abhijit Pagare <abhijitpagare@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> ---
->  arch/arm/mach-omap2/clock.c |    8 --------
->  1 files changed, 0 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-> index 759c72a..a6d570a 100644
-> --- a/arch/arm/mach-omap2/clock.c
-> +++ b/arch/arm/mach-omap2/clock.c
-> @@ -181,7 +181,6 @@ static int _dpll_test_fint(struct clk *clk, u8 n)
->   * clockdomain pointer, and save it into the struct clk.  Intended to be
->   * called during clk_register().  No return value.
->   */
-> -#ifndef CONFIG_ARCH_OMAP4 /* FIXME: Remove this once clkdm f/w is in place */
->  void omap2_init_clk_clkdm(struct clk *clk)
->  {
->  	struct clockdomain *clkdm;
-> @@ -199,7 +198,6 @@ void omap2_init_clk_clkdm(struct clk *clk)
->  			 "clkdm %s\n", clk->name, clk->clkdm_name);
->  	}
->  }
-> -#endif
->  
->  /**
->   * omap2_init_clksel_parent - set a clksel clk's parent field from the hardware
-> @@ -476,10 +474,8 @@ void omap2_clk_disable(struct clk *clk)
->  		_omap2_clk_disable(clk);
->  		if (clk->parent)
->  			omap2_clk_disable(clk->parent);
-> -#ifndef CONFIG_ARCH_OMAP4 /* FIXME: Remove this once clkdm f/w is in place */
->  		if (clk->clkdm)
->  			omap2_clkdm_clk_disable(clk->clkdm, clk);
-> -#endif
->  
->  	}
->  }
-> @@ -489,10 +485,8 @@ int omap2_clk_enable(struct clk *clk)
->  	int ret = 0;
->  
->  	if (clk->usecount++ == 0) {
-> -#ifndef CONFIG_ARCH_OMAP4 /* FIXME: Remove this once clkdm f/w is in place */
->  		if (clk->clkdm)
->  			omap2_clkdm_clk_enable(clk->clkdm, clk);
-> -#endif
->  
->  		if (clk->parent) {
->  			ret = omap2_clk_enable(clk->parent);
-> @@ -511,10 +505,8 @@ int omap2_clk_enable(struct clk *clk)
->  	return ret;
->  
->  err:
-> -#ifndef CONFIG_ARCH_OMAP4 /* FIXME: Remove this once clkdm f/w is in place */
->  	if (clk->clkdm)
->  		omap2_clkdm_clk_disable(clk->clkdm, clk);
-> -#endif
->  	clk->usecount--;
->  	return ret;
->  }
-> -- 
-> 1.5.4.7
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> I understand that you might be able to get that working and yet not  
+> understand the intricacies of the dev board, and we're still ahead that  
+> you managed to get anything working.
+
+Right, and hopefully this is the sort of thing that Samsung are going to
+be doing with their mainline work.
+
+> My board is as shipped with the switches AFAIK except configured for SD  
+> Card boot according to Samsung docs.
+
+It sounds like you've at least got a completely different bootloader (or
+the source is highly misleading).  The other thing to check is which rev
+of the board you have, there have been several revisions though I don't
+recall any changes in the networking.
