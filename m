@@ -1,19 +1,37 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 28 Dec 2009 13:18:01 +0800
-Subject: [PATCH 0/7] pxa/sa1100: irqs.h cleanup
-Message-ID: <1261977488-18271-1-git-send-email-eric.y.miao@gmail.com>
+Date: Mon, 28 Dec 2009 13:18:02 +0800
+Subject: [PATCH 1/7] [ARM] sa1100: remove unreferenced IRQ definitions
+In-Reply-To: <1261977488-18271-1-git-send-email-eric.y.miao@gmail.com>
+References: <1261977488-18271-1-git-send-email-eric.y.miao@gmail.com>
+Message-ID: <1261977488-18271-2-git-send-email-eric.y.miao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Companion chip's IRQs and board specific IRQs should really be
-moved outside of irqs.h, which keeps irqs.h generic enough.
+These IRQ definitions related to LOCOMO are never referenced anywhere,
+thus could be safely removed.
 
-This patch series includes the following:
+Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+---
+ arch/arm/mach-sa1100/include/mach/collie.h |    7 -------
+ 1 files changed, 0 insertions(+), 7 deletions(-)
 
-[PATCH 1/7] [ARM] sa1100: remove unreferenced IRQ definitions
-[PATCH 2/7] [ARM] locomo: avoid the unnecessary cascade of keyboard IRQ
-[PATCH 3/7] [ARM] locomo: remove unused IRQs and avoid unnecessary cascade
-[PATCH 4/7] [ARM] locomo: allow cascaded IRQ base to be specified by platforms
-[PATCH 5/7] [ARM] sa1111: avoid using hardcoded IRQ numbers for PCMCIA driver
-[PATCH 6/7] [ARM] sa1111: allow cascaded IRQs to be used by platforms
-[PATCH 7/7] [ARM] pxa: move board board IRQ definitions out of irqs.h
+diff --git a/arch/arm/mach-sa1100/include/mach/collie.h b/arch/arm/mach-sa1100/include/mach/collie.h
+index 71a0b3f..52acda7 100644
+--- a/arch/arm/mach-sa1100/include/mach/collie.h
++++ b/arch/arm/mach-sa1100/include/mach/collie.h
+@@ -72,13 +72,6 @@
+ #define COLLIE_IRQ_GPIO_GA_INT		IRQ_GPIO25
+ #define COLLIE_IRQ_GPIO_MAIN_BAT_LOW	IRQ_GPIO26
+ 
+-#define COLLIE_LCM_IRQ_GPIO_RTS		IRQ_LOCOMO_GPIO0
+-#define COLLIE_LCM_IRQ_GPIO_CTS		IRQ_LOCOMO_GPIO1
+-#define COLLIE_LCM_IRQ_GPIO_DSR		IRQ_LOCOMO_GPIO2
+-#define COLLIE_LCM_IRQ_GPIO_DTR		IRQ_LOCOMO_GPIO3
+-#define COLLIE_LCM_IRQ_GPIO_nSD_DETECT	IRQ_LOCOMO_GPIO13
+-#define COLLIE_LCM_IRQ_GPIO_nSD_WP	IRQ_LOCOMO_GPIO14
+-
+ /* GPIO's on the TC35143AF (Toshiba Analog Frontend) */
+ #define COLLIE_TC35143_GPIO_BASE	(GPIO_MAX + 13)
+ #define COLLIE_TC35143_GPIO_VERSION0    UCB_IO_0
+-- 
+1.6.3.3
