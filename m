@@ -1,16 +1,15 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 28 Dec 2009 21:30:57 +0800
-Subject: [PATCH 2/2] Littleton: Select CPU_PXA300 and CPU_PXA310
-In-Reply-To: <200912271824.25751.marek.vasut@gmail.com>
-References: <200912271824.25751.marek.vasut@gmail.com>
-Message-ID: <f17812d70912280530s36c564f6jc30950dbae657cae@mail.gmail.com>
+Date: Mon, 28 Dec 2009 21:33:24 +0800
+Subject: [PATCH 2/4] pxa/zeus: Make internal zeus_get_pcb_info static
+In-Reply-To: <1261859150-17335-3-git-send-email-maz@misterjones.org>
+References: <1261859150-17335-1-git-send-email-maz@misterjones.org>
+	<1261859150-17335-2-git-send-email-maz@misterjones.org>
+	<1261859150-17335-3-git-send-email-maz@misterjones.org>
+Message-ID: <f17812d70912280533y18f36b2bx374d418645012cf5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 28, 2009 at 1:24 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> And this is the thing that prevented me from booting LT properly. Please
-> consider applying, thanks!
-> Cheers!
->
+On Sun, Dec 27, 2009 at 4:25 AM, Marc Zyngier <maz@misterjones.org> wrote:
+> Signed-off-by: Marc Zyngier <maz@misterjones.org>
 
 Applied.
