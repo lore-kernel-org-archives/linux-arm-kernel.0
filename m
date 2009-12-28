@@ -1,350 +1,232 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 28 Dec 2009 15:07:38 +0900
-Subject: [PATCH v2 4/7] ARM: S5P6440: Add Timer support
-Message-ID: <1261980458-25364-1-git-send-email-kgene.kim@samsung.com>
+Date: Mon, 28 Dec 2009 15:30:16 +0900
+Subject: [PATCH v2 5/7] ARM: S5P6440: Add new Kconfig and Makefiles
+Message-ID: <1261981816-5953-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds timer support for S5P6440 CPU.
+This patch adds the Kconfig and Makefile for the new S5P6440 machine
+and platform directories. It also updates arch/arm Kconfig and Makefiles
+to include the support for the new S5P6440 CPU.
 
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Adityapratap Sharma <aditya.ps@samsung.com>
 Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
 Signed-off-by: Atul Dahiya <atul.dahiya@samsung.com>
 ---
- arch/arm/mach-s5p6440/include/mach/pwm-clock.h |   58 ++++++
- arch/arm/mach-s5p6440/include/mach/tick.h      |   24 +++
- arch/arm/plat-s5p/time.c                       |  226 ++++++++++++++++++++++++
- 3 files changed, 308 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5p6440/include/mach/pwm-clock.h
- create mode 100644 arch/arm/mach-s5p6440/include/mach/tick.h
- create mode 100644 arch/arm/plat-s5p/time.c
+ arch/arm/Kconfig                    |   12 ++++++++-
+ arch/arm/Makefile                   |    2 +
+ arch/arm/mach-s5p6440/Kconfig       |   16 ++++++++++++
+ arch/arm/mach-s5p6440/Makefile      |   19 +++++++++++++++
+ arch/arm/mach-s5p6440/Makefile.boot |    2 +
+ arch/arm/plat-s5p/Kconfig           |   44 +++++++++++++++++++++++++++++++++++
+ arch/arm/plat-s5p/Makefile          |   25 +++++++++++++++++++
+ 7 files changed, 119 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-s5p6440/Kconfig
+ create mode 100644 arch/arm/mach-s5p6440/Makefile
+ create mode 100644 arch/arm/mach-s5p6440/Makefile.boot
+ create mode 100644 arch/arm/plat-s5p/Kconfig
+ create mode 100644 arch/arm/plat-s5p/Makefile
 
-diff --git a/arch/arm/mach-s5p6440/include/mach/pwm-clock.h b/arch/arm/mach-s5p6440/include/mach/pwm-clock.h
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 78b6060..16c4f7e 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -588,6 +588,13 @@ config ARCH_S3C64XX
+ 	help
+ 	  Samsung S3C64XX series based systems
+ 
++config ARCH_S5P6440
++	bool "Samsung S5P6440"
++	select GENERIC_GPIO
++	select HAVE_CLK
++	help
++	  Samsung S5P6440 CPU based systems
++
+ config ARCH_S5PC1XX
+ 	bool "Samsung S5PC1XX"
+ 	select GENERIC_GPIO
+@@ -707,6 +714,7 @@ source "arch/arm/plat-samsung/Kconfig"
+ source "arch/arm/plat-s3c24xx/Kconfig"
+ source "arch/arm/plat-s3c64xx/Kconfig"
+ source "arch/arm/plat-s3c/Kconfig"
++source "arch/arm/plat-s5p/Kconfig"
+ source "arch/arm/plat-s5pc1xx/Kconfig"
+ 
+ if ARCH_S3C2410
+@@ -723,6 +731,8 @@ source "arch/arm/mach-s3c6400/Kconfig"
+ source "arch/arm/mach-s3c6410/Kconfig"
+ endif
+ 
++source "arch/arm/mach-s5p6440/Kconfig"
++
+ source "arch/arm/plat-stmp3xxx/Kconfig"
+ 
+ if ARCH_S5PC1XX
+@@ -1005,7 +1015,7 @@ config PREEMPT
+ config HZ
+ 	int
+ 	default 128 if ARCH_L7200
+-	default 200 if ARCH_EBSA110 || ARCH_S3C2410
++	default 200 if ARCH_EBSA110 || ARCH_S3C2410 || ARCH_S5P6440
+ 	default OMAP_32K_TIMER_HZ if ARCH_OMAP && OMAP_32K_TIMER
+ 	default AT91_TIMER_HZ if ARCH_AT91
+ 	default 100
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index a026565..74609a8 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -150,6 +150,7 @@ machine-$(CONFIG_ARCH_RPC)		:= rpc
+ machine-$(CONFIG_ARCH_S3C2410)		:= s3c2410 s3c2400 s3c2412 s3c2440 s3c2442 s3c2443
+ machine-$(CONFIG_ARCH_S3C24A0)		:= s3c24a0
+ machine-$(CONFIG_ARCH_S3C64XX)		:= s3c6400 s3c6410
++machine-$(CONFIG_ARCH_S5P6440)		:= s5p6440
+ machine-$(CONFIG_ARCH_S5PC1XX)		:= s5pc100
+ machine-$(CONFIG_ARCH_SA1100)		:= sa1100
+ machine-$(CONFIG_ARCH_SHARK)		:= shark
+@@ -170,6 +171,7 @@ plat-$(CONFIG_PLAT_PXA)		:= pxa
+ plat-$(CONFIG_PLAT_S3C24XX)	:= s3c24xx s3c samsung
+ plat-$(CONFIG_PLAT_S3C64XX)	:= s3c64xx s3c samsung
+ plat-$(CONFIG_PLAT_S5PC1XX)	:= s5pc1xx s3c samsung
++plat-$(CONFIG_PLAT_S5P)		:= s5p samsung s3c
+ plat-$(CONFIG_ARCH_STMP3XXX)	:= stmp3xxx
+ 
+ ifeq ($(CONFIG_ARCH_EBSA110),y)
+diff --git a/arch/arm/mach-s5p6440/Kconfig b/arch/arm/mach-s5p6440/Kconfig
 new file mode 100644
-index 0000000..f6a6c30
+index 0000000..60f0985
 --- /dev/null
-+++ b/arch/arm/mach-s5p6440/include/mach/pwm-clock.h
-@@ -0,0 +1,58 @@
-+/* linux/arch/arm/mach-s5p6440/include/mach/pwm-clock.h
-+ *
-+ * Copyright 2009 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * S5P6440 - pwm clock and timer support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
++++ b/arch/arm/mach-s5p6440/Kconfig
+@@ -0,0 +1,16 @@
++if ARCH_S5P6440
 +
-+/**
-+ * pwm_cfg_src_is_tclk() - return whether the given mux config is a tclk
-+ * @cfg: The timer TCFG1 register bits shifted down to 0.
-+ *
-+ * Return true if the given configuration from TCFG1 is a TCLK instead
-+ * any of the TDIV clocks.
-+ */
-+static inline int pwm_cfg_src_is_tclk(unsigned long tcfg)
-+{
-+	return tcfg == S3C2410_TCFG1_MUX_TCLK;
-+}
++config CPU_S5P6440
++	bool
++	select CPU_S5P6440_INIT
++	select CPU_S5P6440_CLOCK
++	help
++	  Enable S5P6440 CPU support
 +
-+/**
-+ * tcfg_to_divisor() - convert tcfg1 setting to a divisor
-+ * @tcfg1: The tcfg1 setting, shifted down.
-+ *
-+ * Get the divisor value for the given tcfg1 setting. We assume the
-+ * caller has already checked to see if this is not a TCLK source.
-+ */
-+static inline unsigned long tcfg_to_divisor(unsigned long tcfg1)
-+{
-+	return 1 << (1 + tcfg1);
-+}
++config MACH_SMDK6440
++	bool "SMDK6440"
++	select CPU_S5P6440
++	help
++	  Machine support for the Samsung SMDK6440
 +
-+/**
-+ * pwm_tdiv_has_div1() - does the tdiv setting have a /1
-+ *
-+ * Return true if we have a /1 in the tdiv setting.
-+ */
-+static inline unsigned int pwm_tdiv_has_div1(void)
-+{
-+	return 0;
-+}
-+
-+/**
-+ * pwm_tdiv_div_bits() - calculate TCFG1 divisor value.
-+ * @div: The divisor to calculate the bit information for.
-+ *
-+ * Turn a divisor into the necessary bit field for TCFG1.
-+ */
-+static inline unsigned long pwm_tdiv_div_bits(unsigned int div)
-+{
-+	return ilog2(div) - 1;
-+}
-+
-+#define S3C_TCFG1_MUX_TCLK S3C2410_TCFG1_MUX_TCLK
-diff --git a/arch/arm/mach-s5p6440/include/mach/tick.h b/arch/arm/mach-s5p6440/include/mach/tick.h
++endif
+diff --git a/arch/arm/mach-s5p6440/Makefile b/arch/arm/mach-s5p6440/Makefile
 new file mode 100644
-index 0000000..70d1f37
+index 0000000..a3ffda9
 --- /dev/null
-+++ b/arch/arm/mach-s5p6440/include/mach/tick.h
-@@ -0,0 +1,24 @@
-+/* linux/arch/arm/mach-s5p6440/include/mach/tick.h
-+ *
-+ * Copyright (c) 2009 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * S5P6440 - Timer tick support definitions
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
++++ b/arch/arm/mach-s5p6440/Makefile
+@@ -0,0 +1,19 @@
++# arch/arm/mach-s5p6440/Makefile
++#
++# Copyright (c) 2009 Samsung Electronics Co., Ltd.
++# 		http://www.samsung.com/
++#
++# Licensed under GPLv2
 +
-+#ifndef __ASM_ARCH_TICK_H
-+#define __ASM_ARCH_TICK_H __FILE__
++obj-y				:=
++obj-m				:=
++obj-n				:=
++obj-				:=
 +
-+/* s3c compatibility definition */
-+static inline u32 s3c24xx_ostimer_pending(void)
-+{
-+	return 0;
-+}
++# Core support for S5P6440 system
 +
-+#define TICK_MAX	(0xffffffff)
++obj-$(CONFIG_CPU_S5P6440)	+= cpu.o
 +
-+#endif /* __ASM_ARCH_TICK_H */
-diff --git a/arch/arm/plat-s5p/time.c b/arch/arm/plat-s5p/time.c
++# machine support
++
++obj-$(CONFIG_MACH_SMDK6440)	+= mach-smdk6440.o
+diff --git a/arch/arm/mach-s5p6440/Makefile.boot b/arch/arm/mach-s5p6440/Makefile.boot
 new file mode 100644
-index 0000000..4045049
+index 0000000..ff90aa1
 --- /dev/null
-+++ b/arch/arm/plat-s5p/time.c
-@@ -0,0 +1,226 @@
-+/* linux/arch/arm/plat-s5p/time.c
-+ *
-+ * Copyright (c) 2009 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * S5P Timer support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
++++ b/arch/arm/mach-s5p6440/Makefile.boot
+@@ -0,0 +1,2 @@
++   zreladdr-y	:= 0x20008000
++params_phys-y	:= 0x20000100
+diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
+new file mode 100644
+index 0000000..bc25a7c
+--- /dev/null
++++ b/arch/arm/plat-s5p/Kconfig
+@@ -0,0 +1,44 @@
++# arch/arm/plat-s5p/Kconfig
++#
++# Copyright (c) 2009 Samsung Electronics Co., Ltd.
++#		http://www.samsung.com/
++#
++# Licensed under GPLv2
 +
-+#include <linux/kernel.h>
-+#include <linux/sched.h>
-+#include <linux/init.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/err.h>
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <linux/platform_device.h>
++config PLAT_S5P
++	bool
++	depends on ARCH_S5P6440
++	select CPU_V6
++	select PLAT_S3C
++	select ARM_VIC
++	default y
++	select NO_IOPORT
++	select ARCH_REQUIRE_GPIOLIB
++	select S3C_GPIO_TRACK
++	select PLAT_SAMSUNG
++	select SAMSUNG_CLKSRC
++	help
++	  Base platform code for Samsung's S5P series SoC.
 +
-+#include <asm/system.h>
-+#include <asm/mach-types.h>
++if PLAT_S5P
 +
-+#include <asm/irq.h>
-+#include <mach/map.h>
-+#include <plat/regs-timer.h>
-+#include <mach/regs-irq.h>
-+#include <asm/mach/time.h>
-+#include <mach/tick.h>
++# Configuration options shared by all S5P64XX implementations
 +
-+#include <plat/clock.h>
-+#include <plat/cpu.h>
++config CPU_S5P6440_INIT
++	bool
++	help
++	 Initialisation code for the S5P6440.
 +
-+static unsigned long timer_startval;
-+static unsigned long timer_usec_ticks;
++config CPU_S5P6440_CLOCK
++	bool
++	help
++	  Clock support code for the S5P6440.
 +
-+#ifndef TICK_MAX
-+#define TICK_MAX (0xffff)
-+#endif
++config S5P_GPIO_EXTRA
++	int "Number of additional GPIO pins"
++	default 0
++	help
++	  Use additional GPIO space in addition to the GPIO's the SOC
++	  provides. This allows expanding the GPIO space for use with
++	  GPIO expanders.
++endif
+diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
+new file mode 100644
+index 0000000..63dcff0
+--- /dev/null
++++ b/arch/arm/plat-s5p/Makefile
+@@ -0,0 +1,25 @@
++# arch/arm/plat-s5p/Makefile
++#
++# Copyright (c) 2009 Samsung Electronics Co., Ltd.
++# 		http://www.samsung.com/
++#
++# Licensed under GPLv2
 +
-+#define TIMER_USEC_SHIFT		16
++obj-y				:=
++obj-m				:=
++obj-n				:= dummy.o
++obj-				:=
 +
-+#define S5P6440_TCFG1_MUX4_DIV1	(0<<16)
-+#define S5P6440_TCFG1_MUX4_DIV2	(1<<16)
-+#define S5P6440_TCFG1_MUX4_DIV4	(2<<16)
-+#define S5P6440_TCFG1_MUX4_DIV8	(3<<16)
-+#define S5P6440_TCFG1_MUX4_DIV16	(4<<16)
++# Core files
 +
-+/* we use the shifted arithmetic to work out the ratio of timer ticks
-+ * to usecs, as often the peripheral clock is not a nice even multiple
-+ * of 1MHz.
-+ *
-+ * shift of 14 and 15 are too low for the 12MHz, 16 seems to be ok
-+ * for the current HZ value of 200 without producing overflows.
-+ *
-+ * Original patch by Dimitry Andric, updated by Ben Dooks
-+*/
++obj-y				+= dev-uart.o
++obj-y				+= cpu.o
++obj-y				+= clock.o
++obj-y				+= irq.o
++obj-y				+= time.o
++obj-y				+= setup-i2c0.o
 +
-+/* timer_mask_usec_ticks
-+ *
-+ * given a clock and divisor, make the value to pass into timer_ticks_to_usec
-+ * to scale the ticks into usecs
-+*/
++# CPU support
 +
-+static inline unsigned long
-+timer_mask_usec_ticks(unsigned long scaler, unsigned long pclk)
-+{
-+	unsigned long den = pclk / 1000;
-+
-+	return ((1000 << TIMER_USEC_SHIFT) * scaler + (den >> 1)) / den;
-+}
-+
-+/* timer_ticks_to_usec
-+ *
-+ * convert timer ticks to usec.
-+*/
-+
-+static inline unsigned long timer_ticks_to_usec(unsigned long ticks)
-+{
-+	unsigned long res;
-+
-+	res = ticks * timer_usec_ticks;
-+	res += 1 << (TIMER_USEC_SHIFT - 4);	/* round up slightly */
-+
-+	return res >> TIMER_USEC_SHIFT;
-+}
-+
-+/* note, the timer interrutps turn up in 2 places, the vic and then
-+ * the timer block. We take the VIC as the base at the moment.
-+*/
-+
-+static inline u32 s5p_ostimer_pending(void)
-+{
-+	u32 pend = __raw_readl(S5P_VA_VIC0 + VIC_RAW_STATUS);
-+	return pend & (1 << (IRQ_TIMER4_VIC - S5P_IRQ_VIC0(0)));
-+}
-+
-+/* Returns microsecond  since last clock interrupt.  Note that interrupts
-+ * will have been disabled by do_gettimeoffset()
-+ * IRQs are disabled before entering here from do_gettimeofday()
-+*/
-+
-+static unsigned long s5p6440_gettimeoffset(void)
-+{
-+	unsigned long tdone;
-+	unsigned long tval;
-+
-+	/* work out how many ticks have gone since last timer interrupt */
-+
-+	tval =  __raw_readl(S3C2410_TCNTO(4));
-+	tdone = timer_startval - tval;
-+
-+	/* check to see if there is an interrupt pending */
-+
-+	if (s5p_ostimer_pending()) {
-+
-+		/* re-read the timer, and try and fix up for the missed
-+		 * interrupt. Note, the interrupt may go off before the
-+		 * timer has re-loaded from wrapping.
-+		 */
-+
-+		tval =  __raw_readl(S3C2410_TCNTO(4));
-+		tdone = timer_startval - tval;
-+
-+		if (tval != 0)
-+			tdone += timer_startval;
-+	}
-+
-+	return timer_ticks_to_usec(tdone);
-+}
-+
-+/* IRQ handler for the timer */
-+
-+static irqreturn_t s5p6440_timer_interrupt(int irq, void *dev_id)
-+{
-+	timer_tick();
-+	return IRQ_HANDLED;
-+}
-+
-+static struct irqaction s5p6440_timer_irq = {
-+	.name		= "S5P6440 Timer Tick",
-+	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.handler	= s5p6440_timer_interrupt,
-+};
-+
-+static void s5p6440_timer_setup(void)
-+{
-+	unsigned long tcon;
-+	unsigned long tcnt;
-+	unsigned long tcfg1;
-+	unsigned long tcfg0;
-+	unsigned long pclk;
-+	struct clk *clk;
-+
-+	tcnt = TICK_MAX;  /* default value for tcnt */
-+
-+	/* read the current timer configuration bits */
-+
-+	tcon = __raw_readl(S3C2410_TCON);
-+	tcfg1 = __raw_readl(S3C2410_TCFG1);
-+	tcfg0 = __raw_readl(S3C2410_TCFG0);
-+
-+	clk = clk_get(NULL, "timers");
-+	if (IS_ERR(clk))
-+		panic("failed to get clock for system timer");
-+
-+	clk_enable(clk);
-+	pclk = clk_get_rate(clk);
-+
-+	/* configure clock tick */
-+
-+	timer_usec_ticks = timer_mask_usec_ticks(6, pclk);
-+
-+	tcfg1 &= ~S3C2410_TCFG1_MUX4_MASK;
-+	tcfg1 |= S5P6440_TCFG1_MUX4_DIV1;
-+	tcfg0 &= ~S3C2410_TCFG_PRESCALER1_MASK;
-+	tcfg0 |= (6) << S3C2410_TCFG_PRESCALER1_SHIFT;
-+	tcnt = (pclk / 7) / HZ;
-+
-+	/* timers reload after counting zero, so reduce the count by 1 */
-+
-+	tcnt--;
-+
-+	/* check to see if timer is within 16bit range... */
-+
-+	if (tcnt > TICK_MAX) {
-+		panic("setup_timer: HZ is too small, cannot configure timer!");
-+		return;
-+	}
-+
-+	__raw_writel(tcfg1, S3C2410_TCFG1);
-+	__raw_writel(tcfg0, S3C2410_TCFG0);
-+
-+	timer_startval = tcnt;
-+	__raw_writel(tcnt, S3C2410_TCNTB(4));
-+
-+	/* ensure timer is stopped... */
-+
-+	tcon &= ~(7<<20);
-+	tcon |= S3C2410_TCON_T4RELOAD;
-+	tcon |= S3C2410_TCON_T4MANUALUPD;
-+
-+	__raw_writel(tcon, S3C2410_TCON);
-+	__raw_writel(tcnt, S3C2410_TCNTB(4));
-+	__raw_writel(tcnt, S3C2410_TCMPB(4));
-+
-+	/* start the timer running */
-+
-+	tcon |= S3C2410_TCON_T4START;
-+	tcon &= ~S3C2410_TCON_T4MANUALUPD;
-+	__raw_writel(tcon, S3C2410_TCON);
-+}
-+
-+static void __init s5p6440_timer_init(void)
-+{
-+	s5p6440_timer_setup();
-+	setup_irq(IRQ_TIMER4, &s5p6440_timer_irq);
-+}
-+
-+struct sys_timer s5p6440_timer = {
-+	.init		= s5p6440_timer_init,
-+	.offset		= s5p6440_gettimeoffset,
-+	.resume		= s5p6440_timer_setup
-+};
++obj-$(CONFIG_CPU_S5P6440_INIT)	+= s5p6440-init.o
++obj-$(CONFIG_CPU_S5P6440_CLOCK)	+= s5p6440-clock.o
 -- 
 1.6.2.5
