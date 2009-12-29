@@ -1,46 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 29 Dec 2009 14:07:05 -0800
-Subject: [PATCH 0/5] V7/Cortex/omap34xx fixes for 2.6.33-rc1: DCC,
-	kexec, atags
-In-Reply-To: <aec7e5c30912272155s41ce8914hd03a5e4c740a5b9d@mail.gmail.com>
-References: <20091219034151.26198.26570.stgit@localhost>
-	<aec7e5c30912272155s41ce8914hd03a5e4c740a5b9d@mail.gmail.com>
-Message-ID: <20091229220705.GM3512@atomide.com>
+From: felipe.balbi@nokia.com (Felipe Balbi)
+Date: Wed, 30 Dec 2009 00:59:18 +0200
+Subject: [patch-v2.6.34 0/9] arm omap patches for -next merge window
+Message-ID: <1262127567-15202-1-git-send-email-felipe.balbi@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Tony,
 
-* Magnus Damm <magnus.damm@gmail.com> [091227 21:54]:
-> Hi Tony,
-> 
-> On Sat, Dec 19, 2009 at 12:45 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > Here are some v7 fixes, mostly to make kexec work.
-> >
-> > Using 2.6.33-rc1, these fixes, and kexec from kexec-tools
-> > git repo, I can reboot my n900 in a loop reliably.
-> 
-> Thanks for your work on this. I previously tested kexec on ARM V6 and
-> V7 and noticed that V7 didn't work. I revisited my V7 test after
-> becoming aware of your patches. The single patch below unbreaks V7 on
-> my target system.
-> 
-> > ? ? ?arm: Fix cpu_proc_fin() for proc-v7.S and make kexec work
+here are the patches I have prepared for you for
+the next merge window.
 
-Cool. Thank you for fixing the kexec source :)
+There's one patch on musb which is a dependency for
+for not passing the clk name down to the driver.
 
-Are you seeing the occasional crc errors when uncompressing the
-new kernel on your v7?
+The same patch will be going through Greg so you don't
+need to queue that patch on your tree.
 
-I'm seeing those maybe 1 out of 10 times on omap3430 boards unless if
-I do an extra (and wrong) flush_cache_all after local_flush_tlb_all
-at the end of setup_mm_for_reboot.
+Felipe Balbi (9):
+  arm: omap: musb: remove unused data
+  arm: omap: musb: we can use clk framework
+  arm: omap: musb: remove unused soft_con field
+  arm: omap: musb: remove unused dma data
+  arm: omap: musb: remove unnecessary return
+  arm: omap: gpmc: avoid section definitions on headers
+  usb: musb: use only clk framework for clk handling
+  arm: omap: musb: do not pass clock name to driver
+  arm: omap: musb: get rid of dyn_fifo
 
-If you're not seeing the crc errors, do you have L2 cache on?
-
-Also, what's the Cortex version on your v7? It's rev r2p3 on
-omap3430.
-
-Regards,
-
-Tony
+ arch/arm/mach-omap2/usb-musb.c         |   71 +-------------------------------
+ arch/arm/plat-omap/include/plat/gpmc.h |    2 +-
+ drivers/usb/musb/musb_core.c           |   48 +++++++--------------
+ drivers/usb/musb/musb_core.h           |    2 -
+ drivers/usb/musb/omap2430.c            |   10 +----
+ drivers/usb/musb/tusb6010.c            |   16 +++----
+ include/linux/usb/musb.h               |    4 +-
+ 7 files changed, 28 insertions(+), 125 deletions(-)
