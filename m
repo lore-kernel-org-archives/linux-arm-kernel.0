@@ -1,53 +1,27 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 29 Dec 2009 14:19:33 +0800
-Subject: [GIT PULL] pxa: fixes for v2.6.33-rc2
-In-Reply-To: <f17812d70912282218n77e1fe38tdb6259059cbe8eac@mail.gmail.com>
-References: <f17812d70912282218n77e1fe38tdb6259059cbe8eac@mail.gmail.com>
-Message-ID: <f17812d70912282219m580f7aeeo500b1d037a1649bf@mail.gmail.com>
+From: pulluru.linux@rediffmail.com (pulluru )
+Date: 29 Dec 2009 07:19:10 -0000
+Subject: =?utf-8?B?QXJtIGxpbnV4IEFzeW1tZXRyaWMgbXVsdGljb3JlIHByb2dyYW1taW5n?=
+Message-ID: <20091229071910.21683.qmail@f6mail-145-191.rediffmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Hi,
 
-The following changes since commit 6b7b284958d47b77d06745b36bc7f36dab769d9b:
-?Linus Torvalds (1):
-? ? ? ?Linux 2.6.33-rc2
 
-are available in the git repository at:
 
-?git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
+I have an multi-core arm processor. I have a requirement to make core1 run Linux and to utilize core2(currently in WFI state) for specific application, say example: running a network packet engine on core2, for increasing performance.
 
-Eric Miao (2):
-? ? ?[ARM] pxafb: fix building issue of incorrect reference
-? ? ?[ARM] pxa/poodle: fix incorrect 'gpio_card_detect' of MMC
 
-H Hartley Sweeten (1):
-? ? ?[ARM] pxa: use resource_size() in pwm.c
 
-Haojian Zhuang (1):
-? ? ?[ARM] pxa/zylonite: simplify reduntant gpio settings on mmc slot
+I am a beginner to arm and kernel programming. I would like to wake-up the core2 from WFI state and run my own program.
 
-Marc Zyngier (3):
-? ? ?[ARM] pxa/zeus: make internal zeus_get_pcb_info static
-? ? ?[ARM] pxa/zeus: relax memory timings on Zeus ethernet ports
-? ? ?[ARM] pxa/zeus: provide power-source information when APM is enabled
 
-Marek Vasut (2):
-? ? ?[ARM] pxa/littleton: add UART3 GPIO config
-? ? ?[ARM] pxa/littleton: select CPU_PXA300 and CPU_PXA310
 
-Uwe Kleine-K?nig (1):
-? ? ?[ARM] pxa/ttc_dkb: remove duplicate macro definition
+Could you please give me some pointers to the linux arch/kernel code where the CPU core initialization happens?
 
-?arch/arm/mach-mmp/ttc_dkb.c ? ? ? ? ? ? ? | ? ?2 -
-?arch/arm/mach-pxa/Kconfig ? ? ? ? ? ? ? ? | ? ?2 +
-?arch/arm/mach-pxa/include/mach/zylonite.h | ? ?7 --
-?arch/arm/mach-pxa/littleton.c ? ? ? ? ? ? | ? ?6 ++
-?arch/arm/mach-pxa/poodle.c ? ? ? ? ? ? ? ?| ? ?2 +-
-?arch/arm/mach-pxa/zeus.c ? ? ? ? ? ? ? ? ?| ? 36 +++++++++++-
-?arch/arm/mach-pxa/zylonite.c ? ? ? ? ? ? ?| ? 87 +++++------------------------
-?arch/arm/mach-pxa/zylonite_pxa300.c ? ? ? | ? 12 +---
-?arch/arm/mach-pxa/zylonite_pxa320.c ? ? ? | ? ?4 -
-?arch/arm/plat-pxa/pwm.c ? ? ? ? ? ? ? ? ? | ? ?8 +-
-?drivers/video/pxafb.c ? ? ? ? ? ? ? ? ? ? | ? ?4 +-
-?11 files changed, 64 insertions(+), 106 deletions(-)
+
+
+Thanks.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091229/6b671165/attachment-0001.htm>
