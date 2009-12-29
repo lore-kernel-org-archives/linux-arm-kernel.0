@@ -1,27 +1,31 @@
-From: pulluru.linux@rediffmail.com (pulluru )
-Date: 29 Dec 2009 07:19:10 -0000
-Subject: =?utf-8?B?QXJtIGxpbnV4IEFzeW1tZXRyaWMgbXVsdGljb3JlIHByb2dyYW1taW5n?=
-Message-ID: <20091229071910.21683.qmail@f6mail-145-191.rediffmail.com>
+From: soumendra.satapathy@gmail.com (soumendra.satapathy at gmail.com)
+Date: Tue, 29 Dec 2009 23:56:13 +0530
+Subject: Mach-Id query
+Message-ID: <01895E84-95EF-4312-BF54-F393CF54FBE8@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear All,
+
+I am working a proprietary ARM development board.
+
+I have registered the machine ID for this @www.arm.linux.org.uk
+
+Now i addded this to mach-types file in arm/tools/mach-types file.
+
+Now before compiling i need to have the defualt config file which is
+
+found in the directory arch/arm/configs for variuos boards.
+
+How are these genarated for lets say omap_2430sdp_defconfig (this is a  
+automatically generated file is what i can see) ??
+
+All replies are humbly appreciated.
+
+regards,
+som
 
 
-
-I have an multi-core arm processor. I have a requirement to make core1 run Linux and to utilize core2(currently in WFI state) for specific application, say example: running a network packet engine on core2, for increasing performance.
-
-
-
-I am a beginner to arm and kernel programming. I would like to wake-up the core2 from WFI state and run my own program.
-
-
-
-Could you please give me some pointers to the linux arch/kernel code where the CPU core initialization happens?
-
-
-
-Thanks.
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091229/6b671165/attachment-0001.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091229/14c51ac8/attachment-0001.htm>
