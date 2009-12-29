@@ -1,45 +1,47 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Mon, 28 Dec 2009 17:25:13 -0800
-Subject: tree with htc dream support
-In-Reply-To: <20091228204848.GB1637@ucw.cz>
-References: <20091213212504.GD5114@elf.ucw.cz>
-	<d6200be20912142234ia050c67p34fd2672e7248170@mail.gmail.com>
-	<20091227093537.GD11737@elf.ucw.cz> <20091227201514.GA29174@elf.ucw.cz>
-	<a55d774e0912271220p1d102b1dr398e0524c9386702@mail.gmail.com>
-	<20091227203704.GK11737@elf.ucw.cz> <20091227211322.GB29174@elf.ucw.cz>
-	<a55d774e0912271646m1b82687cy427083e64e91e323@mail.gmail.com>
-	<20091227101824.GB1478@ucw.cz>
-	<a55d774e0912281224y7360dfdbu8a251743026bdd28@mail.gmail.com>
-	<20091228204848.GB1637@ucw.cz>
-Message-ID: <1262049913.17445.27.camel@desktop>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 29 Dec 2009 11:49:47 +0800
+Subject: [patch 2/4] [ARM] mmp: support marvell ARMADA610
+In-Reply-To: <771cded00912062219p79048babs669abf275419a2b9@mail.gmail.com>
+References: <771cded00912062219p79048babs669abf275419a2b9@mail.gmail.com>
+Message-ID: <f17812d70912281949r57e1ca83q65c3fb38c4675056@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2009-12-28 at 21:48 +0100, Pavel Machek wrote:
-> Hi!
-> 
-> > >> > Switch smd code to the version in staging. Something to apply to
-> > >> > dream/ tree I'd say... and yes, it still works.
-> > >>
-> > >> I think we might want to consider leaving at least the core smd code
-> > >> under mach-msm.
-> > >
-> > > In the long run, I agree.
-> > >
-> > > In the short run... the code is staging quality, so it should be in
-> > > staging... and you'll not have to mainain so huge diff. (-20 kLoc).
-> > 
-> > The core smd stuff is really not that large.  The central smd.[ch] are
-> > about 1300 lines, and proc_comm.[ch] are about 400 lines.  Is it
-> > possible to get some review/feedback as to what's "staging quality"
-> > about this code so we can clean it up?  I'd rather just fix the
-> > issues
-> 
-> Just submit it to Daniel W., ccing rmk and l-a-k, and I'm sure you'll
-> get feedback.
+Haojian,
 
-I have it in my tree already .. My tree has some duplication over
-staging, for instance the rpc code is mostly in my tree, as is the smd
-code.
+Several suggestions:
 
-Daniel
+1. entry-macro.S, could we simplify (and improve the performance a bit) to
+something like (haven't tested yet - let me know the result):
+
+	.macro	get_irqnr_preamble, base, tmp
+	mrc	p15, 0, \tmp, c0, c0, 0		@ CPUID
+	mov	\tmp, \tmp, lsr #4
+	and	\tmp, \tmp, #0xfff
+	cmp	\tmp, #0x581			@ MMP2
+	moveq	\base, #MMP2_ICU_PJ4_IRQ_SEL
+	movne	\base, #ICU_AP_IRQ_SEL_INT_NUM
+	.endm
+
+	.macro	arch_ret_to_user, tmp1, tmp2
+	.endm
+
+	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+	ldr	\tmp, [\base, #0]
+	and	\irqnr, \tmp, #0x3f		@ Interrupt Number
+	tst	\tmp, #(1 << 6)			@ Interrupt Pending ?
+	.endm
+
+2. arch/arm/mach-mmp/irq.c
+
+We could well separate irq.c to irq-pxa168.c and irq-mmp2.c since the
+difference looks much.
+
+3. ARMADA610 - I'd still prefer it being called MMP2
+
+4. in timer_config()
+
+would be nicer to have: ccr &= (cpu_is_mmp2()) ? TMR_CCR_CS_0(0) :
+TMR_CCR_CS_0(3)
+
+a little bit cleaner - but it is nit picking indeed :)
