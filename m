@@ -1,35 +1,35 @@
 From: felipe.balbi@nokia.com (Felipe Balbi)
-Date: Wed, 30 Dec 2009 00:59:22 +0200
-Subject: [patch-v2.6.34 4/9] arm: omap: musb: remove unused dma data
+Date: Wed, 30 Dec 2009 00:59:23 +0200
+Subject: [patch-v2.6.34 5/9] arm: omap: musb: remove unnecessary return
 In-Reply-To: <1262127567-15202-1-git-send-email-felipe.balbi@nokia.com>
 References: <1262127567-15202-1-git-send-email-felipe.balbi@nokia.com>
-Message-ID: <1262127567-15202-5-git-send-email-felipe.balbi@nokia.com>
+Message-ID: <1262127567-15202-6-git-send-email-felipe.balbi@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-we don't use those anywhere on musb driver, so
-let's remove those old stuff.
+trivial patch, no functional changes.
 
 Cc: linux-usb at vger.kernel.org
 Signed-off-by: Felipe Balbi <felipe.balbi@nokia.com>
 ---
- arch/arm/mach-omap2/usb-musb.c |    3 ---
- 1 files changed, 0 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/usb-musb.c |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
-index 600286f..e0050c5 100644
+index e0050c5..ec8869a 100644
 --- a/arch/arm/mach-omap2/usb-musb.c
 +++ b/arch/arm/mach-omap2/usb-musb.c
-@@ -50,10 +50,7 @@ static struct resource musb_resources[] = {
- static struct musb_hdrc_config musb_config = {
- 	.multipoint	= 1,
- 	.dyn_fifo	= 1,
--	.dma		= 1,
- 	.num_eps	= 16,
--	.dma_channels	= 7,
--	.dma_req_chan	= (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3),
- 	.ram_bits	= 12,
- };
+@@ -91,10 +91,8 @@ void __init usb_musb_init(enum musb_mode mode, unsigned power)
+ 	musb_plat.power = power >> 1;
+ 	musb_plat.mode = mode;
  
+-	if (platform_device_register(&musb_device) < 0) {
++	if (platform_device_register(&musb_device) < 0)
+ 		printk(KERN_ERR "Unable to register HS-USB (MUSB) device\n");
+-		return;
+-	}
+ }
+ 
+ #else
 -- 
 1.6.6.35.g1d85d
