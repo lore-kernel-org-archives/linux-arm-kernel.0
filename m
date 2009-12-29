@@ -1,35 +1,31 @@
 From: felipe.balbi@nokia.com (Felipe Balbi)
-Date: Wed, 30 Dec 2009 00:59:23 +0200
-Subject: [patch-v2.6.34 5/9] arm: omap: musb: remove unnecessary return
+Date: Wed, 30 Dec 2009 00:59:24 +0200
+Subject: [patch-v2.6.34 6/9] arm: omap: gpmc: avoid section definitions on
+	headers
 In-Reply-To: <1262127567-15202-1-git-send-email-felipe.balbi@nokia.com>
 References: <1262127567-15202-1-git-send-email-felipe.balbi@nokia.com>
-Message-ID: <1262127567-15202-6-git-send-email-felipe.balbi@nokia.com>
+Message-ID: <1262127567-15202-7-git-send-email-felipe.balbi@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 trivial patch, no functional changes.
 
-Cc: linux-usb at vger.kernel.org
 Signed-off-by: Felipe Balbi <felipe.balbi@nokia.com>
 ---
- arch/arm/mach-omap2/usb-musb.c |    4 +---
- 1 files changed, 1 insertions(+), 3 deletions(-)
+ arch/arm/plat-omap/include/plat/gpmc.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
-index e0050c5..ec8869a 100644
---- a/arch/arm/mach-omap2/usb-musb.c
-+++ b/arch/arm/mach-omap2/usb-musb.c
-@@ -91,10 +91,8 @@ void __init usb_musb_init(enum musb_mode mode, unsigned power)
- 	musb_plat.power = power >> 1;
- 	musb_plat.mode = mode;
+diff --git a/arch/arm/plat-omap/include/plat/gpmc.h b/arch/arm/plat-omap/include/plat/gpmc.h
+index e081338..3f3609a 100644
+--- a/arch/arm/plat-omap/include/plat/gpmc.h
++++ b/arch/arm/plat-omap/include/plat/gpmc.h
+@@ -110,6 +110,6 @@ extern void gpmc_prefetch_reset(void);
+ extern int gpmc_prefetch_status(void);
+ extern void omap3_gpmc_save_context(void);
+ extern void omap3_gpmc_restore_context(void);
+-extern void __init gpmc_init(void);
++extern void gpmc_init(void);
  
--	if (platform_device_register(&musb_device) < 0) {
-+	if (platform_device_register(&musb_device) < 0)
- 		printk(KERN_ERR "Unable to register HS-USB (MUSB) device\n");
--		return;
--	}
- }
- 
- #else
+ #endif
 -- 
 1.6.6.35.g1d85d
