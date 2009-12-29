@@ -1,36 +1,32 @@
 From: felipe.balbi@nokia.com (Felipe Balbi)
-Date: Wed, 30 Dec 2009 00:51:32 +0200
-Subject: [patch-v2.6.33-rc2+ 12/12] arm: omap: perseus: kill compile warning
-	on board-perseus2.c
+Date: Wed, 30 Dec 2009 00:51:21 +0200
+Subject: [patch-v2.6.33-rc2+ 01/12] arm: omap: musb: ioremap only what's ours
 In-Reply-To: <1262127092-14878-1-git-send-email-felipe.balbi@nokia.com>
 References: <1262127092-14878-1-git-send-email-felipe.balbi@nokia.com>
-Message-ID: <1262127092-14878-13-git-send-email-felipe.balbi@nokia.com>
+Message-ID: <1262127092-14878-2-git-send-email-felipe.balbi@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-that address is used by struct map_desc, which expects
-an unsigned long instead of a void __iomem *. Fix it.
+omap3430 TRM says the OTG address space is 4k, not 8k.
 
+Cc: linux-usb at vger.kernel.org
 Signed-off-by: Felipe Balbi <felipe.balbi@nokia.com>
 ---
- arch/arm/plat-omap/include/plat/fpga.h |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/usb-musb.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-omap/include/plat/fpga.h b/arch/arm/plat-omap/include/plat/fpga.h
-index f1864a6..023b3eb 100644
---- a/arch/arm/plat-omap/include/plat/fpga.h
-+++ b/arch/arm/plat-omap/include/plat/fpga.h
-@@ -34,9 +34,9 @@ extern void omap1510_fpga_init_irq(void);
-  * ---------------------------------------------------------------------------
-  */
- /* maps in the FPGA registers and the ETHR registers */
--#define H2P2_DBG_FPGA_BASE		IOMEM(0xE8000000)	/* VA */
-+#define H2P2_DBG_FPGA_BASE		0xE8000000		/* VA */
- #define H2P2_DBG_FPGA_SIZE		SZ_4K			/* SIZE */
--#define H2P2_DBG_FPGA_START		0x04000000		/* PA */
-+#define H2P2_DBG_FPGA_START		IOMEM(0x04000000)	/* PA */
+diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
+index a80441d..ba71f76 100644
+--- a/arch/arm/mach-omap2/usb-musb.c
++++ b/arch/arm/mach-omap2/usb-musb.c
+@@ -152,7 +152,7 @@ void __init usb_musb_init(void)
+ 		musb_resources[0].start = OMAP243X_HS_BASE;
+ 	else
+ 		musb_resources[0].start = OMAP34XX_HSUSB_OTG_BASE;
+-	musb_resources[0].end = musb_resources[0].start + SZ_8K - 1;
++	musb_resources[0].end = musb_resources[0].start + SZ_4K - 1;
  
- #define H2P2_DBG_FPGA_ETHR_START	(H2P2_DBG_FPGA_START + 0x300)
- #define H2P2_DBG_FPGA_FPGA_REV		(H2P2_DBG_FPGA_BASE + 0x10)	/* FPGA Revision */
+ 	/*
+ 	 * REVISIT: This line can be removed once all the platforms using
 -- 
 1.6.6.35.g1d85d
