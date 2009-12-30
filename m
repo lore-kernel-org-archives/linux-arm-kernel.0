@@ -1,69 +1,54 @@
-From: swami.iyer@ti.com (Subbrathnam, Swaminathan)
-Date: Wed, 30 Dec 2009 18:32:56 +0530
-Subject: [PATCH RFC 1/2] MUSB: CPPI 4.1 DMA driver (take 4)
-In-Reply-To: <20091230122441.GA16585@gandalf>
-References: <19F8576C6E063C45BE387C64729E7394044A2779F5@dbde02.ent.ti.com>
-	<19F8576C6E063C45BE387C64729E7394044A2779F6@dbde02.ent.ti.com>
-	<20091229125403.GD17147@nokia.com>
-	<FCCFB4CDC6E5564B9182F639FC35608702FFF44876@dbde02.ent.ti.com>,
-	<20091230122441.GA16585@gandalf>
-Message-ID: <FCCFB4CDC6E5564B9182F639FC35608702FFF4487C@dbde02.ent.ti.com>
+From: me@felipebalbi.com (Felipe Balbi)
+Date: Wed, 30 Dec 2009 15:14:41 +0200
+Subject: [patch-v2.6.34 7/9] usb: musb: use only clk framework for clk
+	handling
+In-Reply-To: <4B3B504B.4020602@ru.mvista.com>
+References: <1262127567-15202-1-git-send-email-felipe.balbi@nokia.com>
+	<1262127567-15202-8-git-send-email-felipe.balbi@nokia.com>
+	<4B3B3720.9070205@ru.mvista.com> <1262174012.28789.178.camel@gandalf>
+	<4B3B504B.4020602@ru.mvista.com>
+Message-ID: <1262178881.17250.1.camel@gandalf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe,
-
-This code is also being used for other architectures such as OMAP3517,
-OMAPL13x etc.
-
-Given this I do not think we can locate it under a mach-* directory.
-
-Have corrected the wrap issue.  Thanks for point it out.
-
-regards
-swami
-
-________________________________________
-From: Felipe Balbi [me at felipebalbi.com]
-Sent: Wednesday, December 30, 2009 5:54 PM
-To: Subbrathnam, Swaminathan
-Cc: felipe.balbi at nokia.com; Gupta, Ajay Kumar; linux-usb at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Sergei Shtylyov
-Subject: Re: [PATCH RFC 1/2] MUSB: CPPI 4.1 DMA driver (take 4)
-
 Hi,
 
-please wrap your mails at 80 characters
+On Wed, 2009-12-30 at 16:06 +0300, Sergei Shtylyov wrote:
+> Hello.
+> 
+> Felipe Balbi wrote:
+> 
+> >>    Why always "ick"?! Do you think OMAPs are the only boards using MUSB 
+> >> out there?
+> >>     
+> >
+> > err, I'm afraid you have to read more about clock framework. The clock
+> > name should not matter when you issue clk_get().
+> 
+>    It depends on the matching type determined from a clkdev matching 
+> table -- see dm644x_clks[] in arch/mach-davinci/dm644x.c as an example: 
+> 'struct davinci_clk' incorporates 'struct clk_lookup', and where its 1st 
+> member is initialized, the matching is done by device, where its second 
+> member is initialized, the matching is done by clock name -- see 
+> clk_find() in arch/arm/common/clkdev.c for the logic.
 
-On Wed, Dec 30, 2009 at 09:16:08AM +0530, Subbrathnam, Swaminathan
-wrote:
-> We have been on this front months together now!!! Ideally the place
-> holder would be a place independant of platforms as this piece of code
-> is more of a platform independant library relating to TI CPPI DMA
-> operations.  This would be used during initialization and confiuration
-> of CPPI4.x based peripherals.  Though today USB is the only peripheral
-> that falls in that catagory ideally other like TI EMAC could fall in
-> the same space.
->
-> Having said that I also see that there seems to be no roadmap/plan for
-> any other peripheral other than USB to use CPPI4.x in the near future.
-> TI EMAC seems to continue use CPPI3.x.
->
-> This was the reason I had recommended earlier to locate this generic
-> CPPI 4.x functionality within MUSB.  This definitely helps in having a
-> functional peripheral in the near (and most probably long) term.
->
-> I think it is prudent to locate this functionality in the musb
-> directory for now.  In future if need arises we can relook at this
-> later (I am sure this in all probabilities would not be required).
->
-> In either way I would really appreiciate if we can come to a
-> conclusion at the earliest.  Appreciate everybody's feedback and
-> direction.
+diff --git a/arch/arm/mach-davinci/dm644x.c
+b/arch/arm/mach-davinci/dm644x.c
+index 2cd0081..a0ad7b6 100644
+--- a/arch/arm/mach-davinci/dm644x.c
++++ b/arch/arm/mach-davinci/dm644x.c
+@@ -306,7 +306,7 @@ struct davinci_clk dm644x_clks[] = {
+        CLK("davinci_mmc.0", NULL, &mmcsd_clk),
+        CLK(NULL, "spi", &spi_clk),
+        CLK(NULL, "gpio", &gpio_clk),
+-       CLK(NULL, "usb", &usb_clk),
++       CLK("musb_hdrc", "usb", &usb_clk),
+        CLK(NULL, "vlynq", &vlynq_clk),
+        CLK(NULL, "aemif", &aemif_clk),
+        CLK(NULL, "pwm0", &pwm0_clk),
 
-You can do like omap and have the generic dma interface sitting in
-mach-davinci, then for musb, you'd have a series of wrappers to use the
-cppi dma code. Just look at arch/arm/plat-omap/dma.c and
-drivers/usb/musb/tusb6010_omap.c
 
---
+there you are...
+
+-- 
 balbi
