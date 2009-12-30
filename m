@@ -1,78 +1,50 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 30 Dec 2009 11:56:54 -0500
-Subject: [PATCH] ep93xx: define magic numbers for pll1 and pll2
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE19090200F622@mi8nycmail19.Mi8.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Wed, 30 Dec 2009 22:47:20 +0530
+Subject: [PATCH] ARM: fix "BUG: using smp_processor_id() in preemptible code"
+Message-ID: <1262193440-17794-1-git-send-email-rabin@rab.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add defines for the pll register magic numbers that determine if
-the pll's are bypassed and if pll2 is enabled.  Rename the clock
-set registers to more closely match the datasheet.  Also, remove
-the unnecessary braces since each conditional statement is a single
-statement.
+Fix the following warning, which appears when the register dump for a
+faulting process is printed in a kernel with SMP, DEBUG_PREEMPT, and
+DEBUG_USER (with user_debug=31) enabled:
 
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Ryan Mallon <ryan@bluewatersys.com>
+BUG: using smp_processor_id() in preemptible [00000000] code: init/1
+caller is __show_regs+0x18/0x234
+Backtrace:
+[<c0159e5c>] (dump_backtrace+0x0/0x114) from [<c01faf30>] (dump_stack+0x18/0x1c)
+ r6:c781a000 r5:c0157544 r4:00000001 r3:00000000
+[<c01faf18>] (dump_stack+0x0/0x1c) from [<c01e5230>] (debug_smp_processor_id+0xc4/0xf8)
+[<c01e516c>] (debug_smp_processor_id+0x0/0xf8) from [<c0157544>] (__show_regs+0x18/0x234)
+ r6:c781bfb0 r5:00000000 r4:c781bfb0 r3:00000000
+[<c015752c>] (__show_regs+0x0/0x234) from [<c01577a0>] (show_regs+0x40/0x50)
+[<c0157760>] (show_regs+0x0/0x50) from [<c015c968>] (__do_user_fault+0x5c/0xa4)
+ r4:c781c000 r3:00000000
+[<c015c90c>] (__do_user_fault+0x0/0xa4) from [<c015cbe0>] (do_page_fault+0x1b4/0x1e4)
+ r7:00000000 r6:00010000 r5:c781bfb0 r4:c781c000
+[<c015ca2c>] (do_page_fault+0x0/0x1e4) from [<c01554c8>] (do_DataAbort+0x3c/0xa0)
+[<c015548c>] (do_DataAbort+0x0/0xa0) from [<c01560c4>] (ret_from_exception+0x0/0x10)
 
+Signed-off-by: Rabin Vincent <rabin@rab.in>
 ---
+ arch/arm/kernel/process.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
-index 1d0f9d8..f77c410 100644
---- a/arch/arm/mach-ep93xx/clock.c
-+++ b/arch/arm/mach-ep93xx/clock.c
-@@ -447,25 +447,29 @@ static int __init ep93xx_clock_init(void)
- 	u32 value;
- 	int i;
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 6730413..b2b0bac 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -212,9 +212,10 @@ void __show_regs(struct pt_regs *regs)
+ 	char buf[64];
  
--	value = __raw_readl(EP93XX_SYSCON_CLOCK_SET1);
--	if (!(value & 0x00800000)) {			/* PLL1 bypassed?  */
-+	/* Determine the bootloader configured pll1 rate */
-+	value = __raw_readl(EP93XX_SYSCON_CLKSET1);
-+	if (!(value & EP93XX_SYSCON_CLKSET1_NBYP1))
- 		clk_pll1.rate = clk_xtali.rate;
--	} else {
-+	else
- 		clk_pll1.rate = calc_pll_rate(value);
--	}
-+
-+	/* Initialize the pll1 derived clocks */
- 	clk_f.rate = clk_pll1.rate / fclk_divisors[(value >> 25) & 0x7];
- 	clk_h.rate = clk_pll1.rate / hclk_divisors[(value >> 20) & 0x7];
- 	clk_p.rate = clk_h.rate / pclk_divisors[(value >> 18) & 0x3];
- 	ep93xx_dma_clock_init();
- 
-+	/* Determine the bootloader configured pll2 rate */
- 	value = __raw_readl(EP93XX_SYSCON_CLOCK_SET2);
--	if (!(value & 0x00080000)) {			/* PLL2 bypassed?  */
-+	if (!(value & EP93XX_SYSCON_CLKSET2_NBYP2))
- 		clk_pll2.rate = clk_xtali.rate;
--	} else if (value & 0x00040000) {		/* PLL2 enabled?  */
-+	else if (value & EP93XX_SYSCON_CLKSET2_PLL2_EN)
- 		clk_pll2.rate = calc_pll_rate(value);
--	} else {
-+	else
- 		clk_pll2.rate = 0;
--	}
-+
-+	/* Initialize the pll2 derived clocks */
- 	clk_usb_host.rate = clk_pll2.rate / (((value >> 28) & 0xf) + 1);
- 
- 	printk(KERN_INFO "ep93xx: PLL1 running at %ld MHz, PLL2 at %ld MHz\n",
-diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-index d55194a..cd35912 100644
---- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-+++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-@@ -167,8 +167,11 @@
- #define EP93XX_SYSCON_PWRCNT_DMA_M2P1	(1<<16)
- #define EP93XX_SYSCON_HALT		EP93XX_SYSCON_REG(0x08)
- #define EP93XX_SYSCON_STANDBY		EP93XX_SYSCON_REG(0x0c)
--#define EP93XX_SYSCON_CLOCK_SET1	EP93XX_SYSCON_REG(0x20)
--#define EP93XX_SYSCON_CLOCK_SET2	EP93XX_SYSCON_REG(0x24)
-+#define EP93XX_SYSCON_CLKSET1		EP93XX_SYSCON_REG(0x20)
-+#define EP93XX_SYSCON_CLKSET1_NBYP1	(1<<23)
-+#define EP93XX_SYSCON_CLKSET2		EP93XX_SYSCON_REG(0x24)
-+#define EP93XX_SYSCON_CLKSET2_NBYP2	(1<<19)
-+#define EP93XX_SYSCON_CLKSET2_PLL2_EN	(1<<18)
- #define EP93XX_SYSCON_DEVCFG		EP93XX_SYSCON_REG(0x80)
- #define EP93XX_SYSCON_DEVCFG_SWRST	(1<<31)
- #define EP93XX_SYSCON_DEVCFG_D1ONG	(1<<30) 
+ 	printk("CPU: %d    %s  (%s %.*s)\n",
+-		smp_processor_id(), print_tainted(), init_utsname()->release,
++		get_cpu(), print_tainted(), init_utsname()->release,
+ 		(int)strcspn(init_utsname()->version, " "),
+ 		init_utsname()->version);
++	put_cpu();
+ 	print_symbol("PC is at %s\n", instruction_pointer(regs));
+ 	print_symbol("LR is at %s\n", regs->ARM_lr);
+ 	printk("pc : [<%08lx>]    lr : [<%08lx>]    psr: %08lx\n"
+-- 
+1.6.5
