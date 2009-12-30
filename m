@@ -1,42 +1,29 @@
-From: soumendra.satapathy@gmail.com (soumendra satapathy)
-Date: Wed, 30 Dec 2009 09:49:21 +0530
-Subject: Mach-Id query
-In-Reply-To: <01895E84-95EF-4312-BF54-F393CF54FBE8@gmail.com>
-References: <01895E84-95EF-4312-BF54-F393CF54FBE8@gmail.com>
-Message-ID: <c2ba9c320912292019u7b17f820gc06b44ec546291@mail.gmail.com>
+From: doronsa@gmail.com (doron)
+Date: Wed, 30 Dec 2009 11:38:58 +0200
+Subject: add LCD to omap 35xx 
+Message-ID: <011201ca8933$eab50630$c01f1290$@com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-someone kindly please reply to my mail.... i am newbie and i am stuck :( :(
+Hi all
 
-rgds,
-som
+ 
 
-On Tue, Dec 29, 2009 at 11:56 PM, <soumendra.satapathy@gmail.com> wrote:
+I have the EVB omap35 from mistral .
 
-> Dear All,
->
-> I am working a proprietary ARM development board.
->
-> I have registered the machine ID for this @ <http://www.arm.linux.org.uk/>
-> www.arm.linux.org.uk
->
-> Now i addded this to mach-types file in arm/tools/mach-types file.
->
-> Now before compiling i need to have the defualt config file which is
->
-> found in the directory arch/arm/configs for variuos boards.
->
-> How are these genarated for lets say omap_2430sdp_defconfig (this is a
-> automatically generated file is what i can see) ??
->
-> All replies are humbly appreciated.
->
-> regards,
-> som
->
->
->
+I update the kernel to 2.6.32 my LCD (Hitachi TX17d01vm2caa 6.5")work on the
+half screen and I get 2 colors .(on the old kernel 2.6.23 all work fine) .
+
+What I need to do?
+
+ 
+
+Regard Doron sandroy
+
+AGMtonson 
+
+ 
+
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091230/54feb70a/attachment-0001.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091230/e1e3f347/attachment-0001.htm>
