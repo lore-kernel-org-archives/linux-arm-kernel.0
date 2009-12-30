@@ -1,67 +1,27 @@
 From: me@felipebalbi.com (Felipe Balbi)
-Date: Wed, 30 Dec 2009 15:20:20 +0200
-Subject: [patch-v2.6.34 7/9] usb: musb: use only clk framework for clk
-	handling
-In-Reply-To: <1262178881.17250.1.camel@gandalf>
-References: <1262127567-15202-1-git-send-email-felipe.balbi@nokia.com>
-	<1262127567-15202-8-git-send-email-felipe.balbi@nokia.com>
-	<4B3B3720.9070205@ru.mvista.com> <1262174012.28789.178.camel@gandalf>
-	<4B3B504B.4020602@ru.mvista.com>  <1262178881.17250.1.camel@gandalf>
-Message-ID: <1262179220.17250.4.camel@gandalf>
+Date: Wed, 30 Dec 2009 15:22:40 +0200
+Subject: [PATCH RFC 1/2] MUSB: CPPI 4.1 DMA driver (take 4)
+In-Reply-To: <4B3B5232.5030804@ru.mvista.com>
+References: <19F8576C6E063C45BE387C64729E7394044A2779F5@dbde02.ent.ti.com>
+	<19F8576C6E063C45BE387C64729E7394044A2779F6@dbde02.ent.ti.com>
+	<20091229125403.GD17147@nokia.com>
+	<FCCFB4CDC6E5564B9182F639FC35608702FFF44876@dbde02.ent.ti.com>
+	<20091230122441.GA16585@gandalf>  <4B3B5232.5030804@ru.mvista.com>
+Message-ID: <1262179360.17250.6.camel@gandalf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-adding Russell to Cc list as he might have comments.
+On Wed, 2009-12-30 at 16:14 +0300, Sergei Shtylyov wrote:
+>    We're currently having it there but the matter is it should be shred 
+> between different platforms, so arch/arm/common/ seems like the right 
+> place (which Russell didn't like, suggesting ill suited for that 
+> drivers/dma/ instead).
 
-On Wed, 2009-12-30 at 15:14 +0200, Felipe Balbi wrote:
-> Hi,
-> 
-> On Wed, 2009-12-30 at 16:06 +0300, Sergei Shtylyov wrote:
-> > Hello.
-> > 
-> > Felipe Balbi wrote:
-> > 
-> > >>    Why always "ick"?! Do you think OMAPs are the only boards using MUSB 
-> > >> out there?
-> > >>     
-> > >
-> > > err, I'm afraid you have to read more about clock framework. The clock
-> > > name should not matter when you issue clk_get().
-> > 
-> >    It depends on the matching type determined from a clkdev matching 
-> > table -- see dm644x_clks[] in arch/mach-davinci/dm644x.c as an example: 
-> > 'struct davinci_clk' incorporates 'struct clk_lookup', and where its 1st 
-> > member is initialized, the matching is done by device, where its second 
-> > member is initialized, the matching is done by clock name -- see 
-> > clk_find() in arch/arm/common/clkdev.c for the logic.
-> 
-> diff --git a/arch/arm/mach-davinci/dm644x.c
-> b/arch/arm/mach-davinci/dm644x.c
-> index 2cd0081..a0ad7b6 100644
-> --- a/arch/arm/mach-davinci/dm644x.c
-> +++ b/arch/arm/mach-davinci/dm644x.c
-> @@ -306,7 +306,7 @@ struct davinci_clk dm644x_clks[] = {
->         CLK("davinci_mmc.0", NULL, &mmcsd_clk),
->         CLK(NULL, "spi", &spi_clk),
->         CLK(NULL, "gpio", &gpio_clk),
-> -       CLK(NULL, "usb", &usb_clk),
-> +       CLK("musb_hdrc", "usb", &usb_clk),
->         CLK(NULL, "vlynq", &vlynq_clk),
->         CLK(NULL, "aemif", &aemif_clk),
->         CLK(NULL, "pwm0", &pwm0_clk),
-> 
-> 
-> there you are...
-
-and the point is that we want to stop passing clock names down to the
-driver so either we agree on using a generic name like "ick" or "usb",
-or the clockdev implementation for that particular clock will match
-device id. We sure need to think about clocks used by several devices,
-we want to keep device id NULL, for sure.
-
-Russell, how should we tackle this ?
+if it had to be shared between different platforms, it could very well
+live under drivers/usb/musb, problem is that it has to be shared among
+several devices. Then drivers/usb/musb is not the right place anymore.
 
 -- 
 balbi
