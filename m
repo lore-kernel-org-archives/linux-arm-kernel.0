@@ -1,50 +1,75 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 30 Dec 2009 16:50:47 +0800
-Subject: [PATCH 2/2] pxa: enable L2 if present in XSC3
-In-Reply-To: <771cded00912292328j459b5218r64703d59165fe98f@mail.gmail.com>
-References: <771cded00912292328j459b5218r64703d59165fe98f@mail.gmail.com>
-Message-ID: <f17812d70912300050p24c0fb2ayd6f68ffc01a67529@mail.gmail.com>
+Date: Wed, 30 Dec 2009 16:55:03 +0800
+Subject: [PATCH 1/2] pxa: unable to enable L2 in outer cache
+In-Reply-To: <771cded00912292327r2622e514wcfdef51594da0aa3@mail.gmail.com>
+References: <771cded00912292327r2622e514wcfdef51594da0aa3@mail.gmail.com>
+Message-ID: <f17812d70912300055k41b42ef6o621217ebc1a02fb0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 30, 2009 at 3:28 PM, Haojian Zhuang
+On Wed, Dec 30, 2009 at 3:27 PM, Haojian Zhuang
 <haojian.zhuang@gmail.com> wrote:
-> From 2c4a7d0e907df9a762c5c9f0ec48b3b7860e1f7c Mon Sep 17 00:00:00 2001
+> From fced0fdf9c13155169d27310c28ebdfef218b9dc Mon Sep 17 00:00:00 2001
 > From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Wed, 30 Dec 2009 10:02:57 -0500
-> Subject: [PATCH] [ARM] pxa: enable L2 if present in XSC3
+> Date: Wed, 30 Dec 2009 09:31:47 -0500
+> Subject: [PATCH] [ARM] pxa: unable to enable L2 in outer cache
 >
-> Check whether L2 is present or not in XSC3. If it's present, enable L2
-> immediately.
+> Outer cache checked whether L2 is enabled or not. If L2 isn't enabled in XSC3,
+> it would enable L2. This operation is evil that would make system hang.
 >
-> Disabling L2 after L2 is enabled that would result in unpredicatable behavior
-> of XSC3 processor.
+> In XSC3 core document, these words are mentioned in below.
+>
+> "Following reset, the L2 Unified Cache Enable bit is cleared. To enable the L2
+> Cache, software may set the bit to a '1' before or at the same time as enabling
+> the MMU. Enabling the L2 Cache after the MMU has been enabled or disabling the
+> L2 Cache after the L2 Cache has been enabled, may result in unpredictable
+> behavior of the processor."
+>
+> When outer cache is initialized, the MMU is already enabled. We couldn't enable
+> L2 after MMU enabled.
 >
 
-You may want to enclose this with #ifdef CONFIG_CACHE_XSC3L2 .. #endif
-at least, to allow L2 to remain disabled even if L2 is present.
+Yeah, whatever the manual said, it was actually tested on pxa320 and I remember
+Nico had proposed a way to enable this by disabling MMU first and then re-enable
+it.
+
+Haojian,
+
+Are you spotting this on pxa320 or some other processors?
 
 > Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 > ---
-> ?arch/arm/mm/proc-xsc3.S | ? ?5 +++++
-> ?1 files changed, 5 insertions(+), 0 deletions(-)
+> ?arch/arm/mm/cache-xsc3l2.c | ? 11 +++++------
+> ?1 files changed, 5 insertions(+), 6 deletions(-)
 >
-> diff --git a/arch/arm/mm/proc-xsc3.S b/arch/arm/mm/proc-xsc3.S
-> index 33515c2..8fbe21f 100644
-> --- a/arch/arm/mm/proc-xsc3.S
-> +++ b/arch/arm/mm/proc-xsc3.S
-> @@ -406,6 +406,11 @@ __xsc3_setup:
+> diff --git a/arch/arm/mm/cache-xsc3l2.c b/arch/arm/mm/cache-xsc3l2.c
+> index 5d180cb..c315492 100644
+> --- a/arch/arm/mm/cache-xsc3l2.c
+> +++ b/arch/arm/mm/cache-xsc3l2.c
+> @@ -221,15 +221,14 @@ static int __init xsc3_l2_init(void)
+> ? ? ? ?if (!cpu_is_xsc3() || !xsc3_l2_present())
+> ? ? ? ? ? ? ? ?return 0;
 >
-> ? ? ? ?adr ? ? r5, xsc3_crval
-> ? ? ? ?ldmia ? r5, {r5, r6}
-> +
-> + ? ? ? mrc ? ? p15, 1, r0, c0, c0, 1 ? ? ? ? ? @ get L2 present information
-> + ? ? ? ands ? ?r0, r0, #0xf8
-> + ? ? ? orrne ? r6, r6, #(1 << 26) ? ? ? ? ? ? ?@ enable L2 if present
-> +
-> ? ? ? ?mrc ? ? p15, 0, r0, c1, c0, 0 ? ? ? ? ? @ get control register
-> ? ? ? ?bic ? ? r0, r0, r5 ? ? ? ? ? ? ? ? ? ? ?@ ..V. ..R. .... ..A.
-> ? ? ? ?orr ? ? r0, r0, r6 ? ? ? ? ? ? ? ? ? ? ?@ ..VI Z..S .... .C.M (mmu)
+> - ? ? ? if (!(get_cr() & CR_L2)) {
+> + ? ? ? if (get_cr() & CR_L2) {
+> ? ? ? ? ? ? ? ?pr_info("XScale3 L2 cache enabled.\n");
+> - ? ? ? ? ? ? ? adjust_cr(CR_L2, CR_L2);
+> ? ? ? ? ? ? ? ?xsc3_l2_inv_all();
+> - ? ? ? }
+>
+> - ? ? ? outer_cache.inv_range = xsc3_l2_inv_range;
+> - ? ? ? outer_cache.clean_range = xsc3_l2_clean_range;
+> - ? ? ? outer_cache.flush_range = xsc3_l2_flush_range;
+> + ? ? ? ? ? ? ? outer_cache.inv_range = xsc3_l2_inv_range;
+> + ? ? ? ? ? ? ? outer_cache.clean_range = xsc3_l2_clean_range;
+> + ? ? ? ? ? ? ? outer_cache.flush_range = xsc3_l2_flush_range;
+> + ? ? ? }
+
+What's the difference here? Sorry am in gmail and cann't see exactly.
+
+>
+> ? ? ? ?return 0;
+> ?}
 > --
 > 1.5.6.5
 >
