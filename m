@@ -1,27 +1,34 @@
 From: me@felipebalbi.com (Felipe Balbi)
-Date: Wed, 30 Dec 2009 15:22:40 +0200
-Subject: [PATCH RFC 1/2] MUSB: CPPI 4.1 DMA driver (take 4)
-In-Reply-To: <4B3B5232.5030804@ru.mvista.com>
-References: <19F8576C6E063C45BE387C64729E7394044A2779F5@dbde02.ent.ti.com>
-	<19F8576C6E063C45BE387C64729E7394044A2779F6@dbde02.ent.ti.com>
-	<20091229125403.GD17147@nokia.com>
-	<FCCFB4CDC6E5564B9182F639FC35608702FFF44876@dbde02.ent.ti.com>
-	<20091230122441.GA16585@gandalf>  <4B3B5232.5030804@ru.mvista.com>
-Message-ID: <1262179360.17250.6.camel@gandalf>
+Date: Wed, 30 Dec 2009 15:29:55 +0200
+Subject: [patch-v2.6.34 7/9] usb: musb: use only clk framework for clk
+	handling
+In-Reply-To: <4B3B54E1.9010600@ru.mvista.com>
+References: <1262127567-15202-1-git-send-email-felipe.balbi@nokia.com>
+	<1262127567-15202-8-git-send-email-felipe.balbi@nokia.com>
+	<4B3B3720.9070205@ru.mvista.com> <1262174012.28789.178.camel@gandalf>
+	<4B3B504B.4020602@ru.mvista.com> <1262178881.17250.1.camel@gandalf>
+	<4B3B54E1.9010600@ru.mvista.com>
+Message-ID: <1262179795.17250.7.camel@gandalf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 2009-12-30 at 16:25 +0300, Sergei Shtylyov wrote:
+>    Gotcha. This will match in clk_find() by both device and clock name, 
+> so clk_get() will fail with your patch.
 
-On Wed, 2009-12-30 at 16:14 +0300, Sergei Shtylyov wrote:
->    We're currently having it there but the matter is it should be shred 
-> between different platforms, so arch/arm/common/ seems like the right 
-> place (which Russell didn't like, suggesting ill suited for that 
-> drivers/dma/ instead).
+then, when it doesn't find, it'll try device id only:
 
-if it had to be shared between different platforms, it could very well
-live under drivers/usb/musb, problem is that it has to be shared among
-several devices. Then drivers/usb/musb is not the right place anymore.
+/*
+ * Find the correct struct clk for the device and connection ID.
+ * We do slightly fuzzy matching here:
+ *  An entry with a NULL ID is assumed to be a wildcard.
+ *  If an entry has a device ID, it must match
+ *  If an entry has a connection ID, it must match
+ * Then we take the most specific entry - with the following
+ * order of precidence: dev+con > dev only > con only.
+ */
+
+and then we have found our clock :-)
 
 -- 
 balbi
