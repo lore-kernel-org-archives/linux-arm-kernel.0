@@ -1,105 +1,49 @@
-From: abhijitpagare@ti.com (Pagare, Abhijit)
-Date: Wed, 30 Dec 2009 17:38:42 +0530
-Subject: [PATCH 1/1] ARM: OMAP4: PM: Add check for avoiding dependency
-	related update.
-In-Reply-To: <alpine.DEB.2.00.0912300125320.24862@utopia.booyaka.com>
-References: <1261583238-22187-1-git-send-email-abhijitpagare@ti.com>
-	<alpine.DEB.2.00.0912300125320.24862@utopia.booyaka.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C02E919C@dbde02.ent.ti.com>
+From: me@felipebalbi.com (Felipe Balbi)
+Date: Wed, 30 Dec 2009 14:24:41 +0200
+Subject: [PATCH RFC 1/2] MUSB: CPPI 4.1 DMA driver (take 4)
+In-Reply-To: <FCCFB4CDC6E5564B9182F639FC35608702FFF44876@dbde02.ent.ti.com>
+References: <19F8576C6E063C45BE387C64729E7394044A2779F5@dbde02.ent.ti.com>
+	<19F8576C6E063C45BE387C64729E7394044A2779F6@dbde02.ent.ti.com>
+	<20091229125403.GD17147@nokia.com>
+	<FCCFB4CDC6E5564B9182F639FC35608702FFF44876@dbde02.ent.ti.com>
+Message-ID: <20091230122441.GA16585@gandalf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi,
 
+please wrap your mails at 80 characters
 
-> -----Original Message-----
-> From: Paul Walmsley [mailto:paul at pwsan.com]
-> Sent: Wednesday, December 30, 2009 2:02 PM
-> To: Pagare, Abhijit
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/1] ARM: OMAP4: PM: Add check for avoiding dependency
-> related update.
+On Wed, Dec 30, 2009 at 09:16:08AM +0530, Subbrathnam, Swaminathan
+wrote:
+> We have been on this front months together now!!! Ideally the place
+> holder would be a place independant of platforms as this piece of code
+> is more of a platform independant library relating to TI CPPI DMA
+> operations.  This would be used during initialization and confiuration
+> of CPPI4.x based peripherals.  Though today USB is the only peripheral
+> that falls in that catagory ideally other like TI EMAC could fall in
+> the same space.
 > 
-> Hello Abhijit,
+> Having said that I also see that there seems to be no roadmap/plan for
+> any other peripheral other than USB to use CPPI4.x in the near future.
+> TI EMAC seems to continue use CPPI3.x.
 > 
-> On Wed, 23 Dec 2009, Abhijit Pagare wrote:
+> This was the reason I had recommended earlier to locate this generic
+> CPPI 4.x functionality within MUSB.  This definitely helps in having a
+> functional peripheral in the near (and most probably long) term.
 > 
-> > A check is added for avoiding the sleep/wakeup dependency updates
-> > for OMAP4 as the structures for the dependencies are currently absent.
+> I think it is prudent to locate this functionality in the musb
+> directory for now.  In future if need arises we can relook at this
+> later (I am sure this in all probabilities would not be required).
 > 
-> As a threshold matter, code and data added in temporary hack patches like
-> this need to be marked with XXX or FIXME or something similar to indicate
-> that these are not intended features, but rather, temporary lines that
-> need to be removed in the near term.
+> In either way I would really appreiciate if we can come to a
+> conclusion at the earliest.  Appreciate everybody's feedback and
+> direction.
 
-I think I missed that. I will add the FIXME indication to the check below. I think that this check is essential for OMAP4 kernel boot-up as long as the dependency patches are not pushed in.
+You can do like omap and have the generic dma interface sitting in
+mach-davinci, then for musb, you'd have a series of wrappers to use the
+cppi dma code. Just look at arch/arm/plat-omap/dma.c and
+drivers/usb/musb/tusb6010_omap.c
 
-> 
-> But really, I'd rather not apply this patch.  The best way forward is to
-> apply a patch that adds the OMAP4 wakeup and sleep dependencies
-> themselves.  Have you had a chance to look at the series that I sent you a
-> few weeks ago off-list that reorganizes the wakeup and sleep dependencies
-> to determine if it is adequate for you to add the OMAP4 wakeup/sleep
-> dependencies afterwards?
-
-I had a look at the dependency patches that you had sent to me earlier and it seems feasible to add the OMAP4 related dependency data on top of those patches. A small change exists but can be taken care of.
-
-Regards,
-Abhijit
-
-> 
-> 
-> - Paul
-> 
-> >
-> > Signed-off-by: Abhijit Pagare <abhijitpagare@ti.com>
-> > Cc: Paul Walmsley <paul@pwsan.com>
-> > ---
-> >
-> > Compiled and Boot Tested on OMAP4430 simulator, ES1 Chip & OMAP3430 SDP.
-> > And also Compiled for OMAP2430 and OMAP2420
-> >
-> > This patch has a dependency on the earlier set of OMAP4 clock-domain
-> patches.
-> >
-> >  arch/arm/mach-omap2/clockdomain.c |   10 ++++++----
-> >  1 files changed, 6 insertions(+), 4 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-
-> omap2/clockdomain.c
-> > index 8c9e78c..6ec25ee 100644
-> > --- a/arch/arm/mach-omap2/clockdomain.c
-> > +++ b/arch/arm/mach-omap2/clockdomain.c
-> > @@ -507,8 +507,9 @@ void omap2_clkdm_allow_idle(struct clockdomain
-> *clkdm)
-> >  	pr_debug("clockdomain: enabling automatic idle transitions for
-> %s\n",
-> >  		 clkdm->name);
-> >
-> > -	if (atomic_read(&clkdm->usecount) > 0)
-> > -		_clkdm_add_autodeps(clkdm);
-> > +	if (!cpu_is_omap44xx())
-> > +		if (atomic_read(&clkdm->usecount) > 0)
-> > +			_clkdm_add_autodeps(clkdm);
-> >
-> >  	_omap2_clkdm_set_hwsup(clkdm, 1);
-> >
-> > @@ -540,8 +541,9 @@ void omap2_clkdm_deny_idle(struct clockdomain
-> *clkdm)
-> >
-> >  	_omap2_clkdm_set_hwsup(clkdm, 0);
-> >
-> > -	if (atomic_read(&clkdm->usecount) > 0)
-> > -		_clkdm_del_autodeps(clkdm);
-> > +	if (!cpu_is_omap44xx())
-> > +		if (atomic_read(&clkdm->usecount) > 0)
-> > +			_clkdm_del_autodeps(clkdm);
-> >  }
-> >
-> >
-> > --
-> > 1.5.4.7
-> >
-> 
-> 
-> - Paul
+-- 
+balbi
