@@ -1,27 +1,105 @@
-From: me@felipebalbi.com (Felipe Balbi)
-Date: Wed, 30 Dec 2009 13:55:06 +0200
-Subject: [patch-v2.6.34 8/9] arm: omap: musb: do not pass clock name to
-	driver
-In-Reply-To: <4B3B3818.5030804@ru.mvista.com>
-References: <1262127567-15202-1-git-send-email-felipe.balbi@nokia.com>
-	<1262127567-15202-9-git-send-email-felipe.balbi@nokia.com>
-	<4B3B3818.5030804@ru.mvista.com>
-Message-ID: <1262174106.28789.180.camel@gandalf>
+From: abhijitpagare@ti.com (Pagare, Abhijit)
+Date: Wed, 30 Dec 2009 17:38:42 +0530
+Subject: [PATCH 1/1] ARM: OMAP4: PM: Add check for avoiding dependency
+	related update.
+In-Reply-To: <alpine.DEB.2.00.0912300125320.24862@utopia.booyaka.com>
+References: <1261583238-22187-1-git-send-email-abhijitpagare@ti.com>
+	<alpine.DEB.2.00.0912300125320.24862@utopia.booyaka.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C02E919C@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Paul,
 
-On Wed, 2009-12-30 at 14:23 +0300, Sergei Shtylyov wrote:
->    It's not so actually. This depends on the matching mechanism 
-> established within clkdev: by device, by name, or by both. Not all 
-> implementations will match by device, e.g. DA8xx/OMAP-L1x will match by 
-> clock name.
 
-then it has to be fixed. The name shouldn't matter. This was a big
-discussion when Russell came up with the clkdev stuff and I remember
-clearly that clock names shouldn't be passed down to drivers because
-they don't matter.
+> -----Original Message-----
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Wednesday, December 30, 2009 2:02 PM
+> To: Pagare, Abhijit
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 1/1] ARM: OMAP4: PM: Add check for avoiding dependency
+> related update.
+> 
+> Hello Abhijit,
+> 
+> On Wed, 23 Dec 2009, Abhijit Pagare wrote:
+> 
+> > A check is added for avoiding the sleep/wakeup dependency updates
+> > for OMAP4 as the structures for the dependencies are currently absent.
+> 
+> As a threshold matter, code and data added in temporary hack patches like
+> this need to be marked with XXX or FIXME or something similar to indicate
+> that these are not intended features, but rather, temporary lines that
+> need to be removed in the near term.
 
--- 
-balbi
+I think I missed that. I will add the FIXME indication to the check below. I think that this check is essential for OMAP4 kernel boot-up as long as the dependency patches are not pushed in.
+
+> 
+> But really, I'd rather not apply this patch.  The best way forward is to
+> apply a patch that adds the OMAP4 wakeup and sleep dependencies
+> themselves.  Have you had a chance to look at the series that I sent you a
+> few weeks ago off-list that reorganizes the wakeup and sleep dependencies
+> to determine if it is adequate for you to add the OMAP4 wakeup/sleep
+> dependencies afterwards?
+
+I had a look at the dependency patches that you had sent to me earlier and it seems feasible to add the OMAP4 related dependency data on top of those patches. A small change exists but can be taken care of.
+
+Regards,
+Abhijit
+
+> 
+> 
+> - Paul
+> 
+> >
+> > Signed-off-by: Abhijit Pagare <abhijitpagare@ti.com>
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> > ---
+> >
+> > Compiled and Boot Tested on OMAP4430 simulator, ES1 Chip & OMAP3430 SDP.
+> > And also Compiled for OMAP2430 and OMAP2420
+> >
+> > This patch has a dependency on the earlier set of OMAP4 clock-domain
+> patches.
+> >
+> >  arch/arm/mach-omap2/clockdomain.c |   10 ++++++----
+> >  1 files changed, 6 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-
+> omap2/clockdomain.c
+> > index 8c9e78c..6ec25ee 100644
+> > --- a/arch/arm/mach-omap2/clockdomain.c
+> > +++ b/arch/arm/mach-omap2/clockdomain.c
+> > @@ -507,8 +507,9 @@ void omap2_clkdm_allow_idle(struct clockdomain
+> *clkdm)
+> >  	pr_debug("clockdomain: enabling automatic idle transitions for
+> %s\n",
+> >  		 clkdm->name);
+> >
+> > -	if (atomic_read(&clkdm->usecount) > 0)
+> > -		_clkdm_add_autodeps(clkdm);
+> > +	if (!cpu_is_omap44xx())
+> > +		if (atomic_read(&clkdm->usecount) > 0)
+> > +			_clkdm_add_autodeps(clkdm);
+> >
+> >  	_omap2_clkdm_set_hwsup(clkdm, 1);
+> >
+> > @@ -540,8 +541,9 @@ void omap2_clkdm_deny_idle(struct clockdomain
+> *clkdm)
+> >
+> >  	_omap2_clkdm_set_hwsup(clkdm, 0);
+> >
+> > -	if (atomic_read(&clkdm->usecount) > 0)
+> > -		_clkdm_del_autodeps(clkdm);
+> > +	if (!cpu_is_omap44xx())
+> > +		if (atomic_read(&clkdm->usecount) > 0)
+> > +			_clkdm_del_autodeps(clkdm);
+> >  }
+> >
+> >
+> > --
+> > 1.5.4.7
+> >
+> 
+> 
+> - Paul
