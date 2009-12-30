@@ -1,54 +1,40 @@
-From: me@felipebalbi.com (Felipe Balbi)
-Date: Wed, 30 Dec 2009 15:14:41 +0200
-Subject: [patch-v2.6.34 7/9] usb: musb: use only clk framework for clk
-	handling
-In-Reply-To: <4B3B504B.4020602@ru.mvista.com>
-References: <1262127567-15202-1-git-send-email-felipe.balbi@nokia.com>
-	<1262127567-15202-8-git-send-email-felipe.balbi@nokia.com>
-	<4B3B3720.9070205@ru.mvista.com> <1262174012.28789.178.camel@gandalf>
-	<4B3B504B.4020602@ru.mvista.com>
-Message-ID: <1262178881.17250.1.camel@gandalf>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 30 Dec 2009 13:16:00 +0000
+Subject: Ethernet in a cold climate / SMDK6410
+In-Reply-To: <4B39FB2C.4010608@warmcat.com>
+References: <20091228190009.GB14799@sirena.org.uk> <4B3901E3.20004@warmcat.com>
+	<20091228192244.GD14799@sirena.org.uk>
+	<4B390AC3.2060702@warmcat.com>
+	<20091228202123.GA16524@sirena.org.uk>
+	<4B391941.6000906@warmcat.com>
+	<20091228224435.GA23617@sirena.org.uk>
+	<4B39D439.9070909@warmcat.com>
+	<20091229123348.GB5784@opensource.wolfsonmicro.com>
+	<4B39FB2C.4010608@warmcat.com>
+Message-ID: <20091230131559.GA369@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Dec 29, 2009 at 12:50:52PM +0000, Andy Green wrote:
+> On 12/29/09 12:33, Somebody in the thread at some point said:
 
-On Wed, 2009-12-30 at 16:06 +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
-> Felipe Balbi wrote:
-> 
-> >>    Why always "ick"?! Do you think OMAPs are the only boards using MUSB 
-> >> out there?
-> >>     
-> >
-> > err, I'm afraid you have to read more about clock framework. The clock
-> > name should not matter when you issue clk_get().
-> 
->    It depends on the matching type determined from a clkdev matching 
-> table -- see dm644x_clks[] in arch/mach-davinci/dm644x.c as an example: 
-> 'struct davinci_clk' incorporates 'struct clk_lookup', and where its 1st 
-> member is initialized, the matching is done by device, where its second 
-> member is initialized, the matching is done by clock name -- see 
-> clk_find() in arch/arm/common/clkdev.c for the logic.
+> >Compared to NAND removable media can be a win, yes, though with fast
+> >JTAG having to rewrite the flash needn't be any slower so it's not quite
+> >that clear cut.
 
-diff --git a/arch/arm/mach-davinci/dm644x.c
-b/arch/arm/mach-davinci/dm644x.c
-index 2cd0081..a0ad7b6 100644
---- a/arch/arm/mach-davinci/dm644x.c
-+++ b/arch/arm/mach-davinci/dm644x.c
-@@ -306,7 +306,7 @@ struct davinci_clk dm644x_clks[] = {
-        CLK("davinci_mmc.0", NULL, &mmcsd_clk),
-        CLK(NULL, "spi", &spi_clk),
-        CLK(NULL, "gpio", &gpio_clk),
--       CLK(NULL, "usb", &usb_clk),
-+       CLK("musb_hdrc", "usb", &usb_clk),
-        CLK(NULL, "vlynq", &vlynq_clk),
-        CLK(NULL, "aemif", &aemif_clk),
-        CLK(NULL, "pwm0", &pwm0_clk),
+> Right, but if you can eliminate JTAG in the flow, especially at the
+> factory, that is a major simplification.
 
+An awful lot of production setups are capable of handling JTAG already
+so don't have much of an issue here.  Certainly as a developer my
+preference here would be for fast JTAG over SD card - it's at least as
+fast, there's only one system involved and it works just the same no
+matter what the state of the system is.
 
-there you are...
+> Again all I can say is it's specialized case.  For normal dev work
+> SD is either painless or hugely advantageous.
 
--- 
-balbi
+Assuming the hardware can cope with it, and there's component cost,
+board area and mechanical concerns to address before it gets designed
+in.  There are a lot of systems where it would be useful but there's
+drawbacks you have to bear in mind when pushing it.
