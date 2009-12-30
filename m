@@ -1,110 +1,50 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 30 Dec 2009 01:34:57 -0700 (MST)
-Subject: [PATCH 1/1] ARM: OMAP4: PM: Remove the checks preventing OMAP4
-	clockdomain validation
-In-Reply-To: <1261583270-22267-1-git-send-email-abhijitpagare@ti.com>
-References: <1261583270-22267-1-git-send-email-abhijitpagare@ti.com>
-Message-ID: <alpine.DEB.2.00.0912300134290.24862@utopia.booyaka.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 30 Dec 2009 16:50:47 +0800
+Subject: [PATCH 2/2] pxa: enable L2 if present in XSC3
+In-Reply-To: <771cded00912292328j459b5218r64703d59165fe98f@mail.gmail.com>
+References: <771cded00912292328j459b5218r64703d59165fe98f@mail.gmail.com>
+Message-ID: <f17812d70912300050p24c0fb2ayd6f68ffc01a67529@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Dec 2009, Abhijit Pagare wrote:
+On Wed, Dec 30, 2009 at 3:28 PM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> From 2c4a7d0e907df9a762c5c9f0ec48b3b7860e1f7c Mon Sep 17 00:00:00 2001
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date: Wed, 30 Dec 2009 10:02:57 -0500
+> Subject: [PATCH] [ARM] pxa: enable L2 if present in XSC3
+>
+> Check whether L2 is present or not in XSC3. If it's present, enable L2
+> immediately.
+>
+> Disabling L2 after L2 is enabled that would result in unpredicatable behavior
+> of XSC3 processor.
+>
 
-> The clockdomain related code being in place, it is not necessary to have
-> some part of the clock code commented out. This would help the validation of
-> the clockdomain functions using the clock level interfaces.
+You may want to enclose this with #ifdef CONFIG_CACHE_XSC3L2 .. #endif
+at least, to allow L2 to remain disabled even if L2 is present.
 
-... likewise, with this patch, please fix the subject line, per Tony's 
-E-mail.
-
-
-- Paul
-
-
-> 
-> Signed-off-by: Abhijit Pagare <abhijitpagare@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 > ---
-> 
-> Compiled and Boot Tested on OMAP4430 simulator, ES1 Chip & OMAP3430 SDP.
-> And also Compiled for OMAP2430 and OMAP2420
-> 
-> This patch has a dependency on the earlier set of OMAP4 clock-domain patches.
-> 
->  arch/arm/mach-omap2/clock.c          |    8 --------
->  arch/arm/mach-omap2/clock44xx_data.c |    2 --
->  2 files changed, 0 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-> index 759c72a..a6d570a 100644
-> --- a/arch/arm/mach-omap2/clock.c
-> +++ b/arch/arm/mach-omap2/clock.c
-> @@ -181,7 +181,6 @@ static int _dpll_test_fint(struct clk *clk, u8 n)
->   * clockdomain pointer, and save it into the struct clk.  Intended to be
->   * called during clk_register().  No return value.
->   */
-> -#ifndef CONFIG_ARCH_OMAP4 /* FIXME: Remove this once clkdm f/w is in place */
->  void omap2_init_clk_clkdm(struct clk *clk)
->  {
->  	struct clockdomain *clkdm;
-> @@ -199,7 +198,6 @@ void omap2_init_clk_clkdm(struct clk *clk)
->  			 "clkdm %s\n", clk->name, clk->clkdm_name);
->  	}
->  }
-> -#endif
->  
->  /**
->   * omap2_init_clksel_parent - set a clksel clk's parent field from the hardware
-> @@ -476,10 +474,8 @@ void omap2_clk_disable(struct clk *clk)
->  		_omap2_clk_disable(clk);
->  		if (clk->parent)
->  			omap2_clk_disable(clk->parent);
-> -#ifndef CONFIG_ARCH_OMAP4 /* FIXME: Remove this once clkdm f/w is in place */
->  		if (clk->clkdm)
->  			omap2_clkdm_clk_disable(clk->clkdm, clk);
-> -#endif
->  
->  	}
->  }
-> @@ -489,10 +485,8 @@ int omap2_clk_enable(struct clk *clk)
->  	int ret = 0;
->  
->  	if (clk->usecount++ == 0) {
-> -#ifndef CONFIG_ARCH_OMAP4 /* FIXME: Remove this once clkdm f/w is in place */
->  		if (clk->clkdm)
->  			omap2_clkdm_clk_enable(clk->clkdm, clk);
-> -#endif
->  
->  		if (clk->parent) {
->  			ret = omap2_clk_enable(clk->parent);
-> @@ -511,10 +505,8 @@ int omap2_clk_enable(struct clk *clk)
->  	return ret;
->  
->  err:
-> -#ifndef CONFIG_ARCH_OMAP4 /* FIXME: Remove this once clkdm f/w is in place */
->  	if (clk->clkdm)
->  		omap2_clkdm_clk_disable(clk->clkdm, clk);
-> -#endif
->  	clk->usecount--;
->  	return ret;
->  }
-> diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
-> index 2210e22..f47ba9e 100644
-> --- a/arch/arm/mach-omap2/clock44xx_data.c
-> +++ b/arch/arm/mach-omap2/clock44xx_data.c
-> @@ -2749,9 +2749,7 @@ int __init omap2_clk_init(void)
->  		if (c->cpu & cpu_clkflg) {
->  			clkdev_add(&c->lk);
->  			clk_register(c->lk.clk);
-> -			/* TODO
->  			omap2_init_clk_clkdm(c->lk.clk);
-> -			*/
->  		}
->  
->  	recalculate_root_clocks();
-> -- 
-> 1.5.4.7
-> 
-
-
-- Paul
+> ?arch/arm/mm/proc-xsc3.S | ? ?5 +++++
+> ?1 files changed, 5 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mm/proc-xsc3.S b/arch/arm/mm/proc-xsc3.S
+> index 33515c2..8fbe21f 100644
+> --- a/arch/arm/mm/proc-xsc3.S
+> +++ b/arch/arm/mm/proc-xsc3.S
+> @@ -406,6 +406,11 @@ __xsc3_setup:
+>
+> ? ? ? ?adr ? ? r5, xsc3_crval
+> ? ? ? ?ldmia ? r5, {r5, r6}
+> +
+> + ? ? ? mrc ? ? p15, 1, r0, c0, c0, 1 ? ? ? ? ? @ get L2 present information
+> + ? ? ? ands ? ?r0, r0, #0xf8
+> + ? ? ? orrne ? r6, r6, #(1 << 26) ? ? ? ? ? ? ?@ enable L2 if present
+> +
+> ? ? ? ?mrc ? ? p15, 0, r0, c1, c0, 0 ? ? ? ? ? @ get control register
+> ? ? ? ?bic ? ? r0, r0, r5 ? ? ? ? ? ? ? ? ? ? ?@ ..V. ..R. .... ..A.
+> ? ? ? ?orr ? ? r0, r0, r6 ? ? ? ? ? ? ? ? ? ? ?@ ..VI Z..S .... .C.M (mmu)
+> --
+> 1.5.6.5
+>
