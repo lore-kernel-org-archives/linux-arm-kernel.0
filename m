@@ -1,45 +1,36 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 30 Dec 2009 13:13:13 -0500
-Subject: [PATCH] ep93xx: use pr_fmt in dma-m2p.c
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE19090200F63A@mi8nycmail19.Mi8.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Wed, 30 Dec 2009 18:49:29 +0000
+Subject: [PATCH] Valid relocation symbol for FLAT format on ARM
+In-Reply-To: <52886e760912300830n2234e01bm2e300828141d226@mail.gmail.com>
+References: <52886e760912300830n2234e01bm2e300828141d226@mail.gmail.com>
+Message-ID: <20091230184929.GB22469@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use pr_fmt to prefix kernel output with the module name.
+Jun Sun wrote:
+>    (Sent to linux-kernel, but seems nobody cared. Hopefully someone here
+>    can pick it up)
 
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Ryan Mallon <ryan@bluewatersys.com>
+I've included uclinux-dev at uclinux.org, because that's where I've seen
+most discussion of FLAT format in general.
 
----
+>    Apparently newer GCC would generate ANCHOR symbols beyond the end of
+>    data/bss segment on ARM CPUs. As a result, the exiting validity checking
+>    for relocation symbols in FLAT format will fail for some programs.
 
-diff --git a/arch/arm/mach-ep93xx/dma-m2p.c b/arch/arm/mach-ep93xx/dma-m2p.c
-index dbcac9c..8904ca4 100644
---- a/arch/arm/mach-ep93xx/dma-m2p.c
-+++ b/arch/arm/mach-ep93xx/dma-m2p.c
-@@ -28,6 +28,8 @@
-  * with this implementation.
-  */
- 
-+#define pr_fmt(fmt) "ep93xx " KBUILD_MODNAME ": " fmt
-+
- #include <linux/kernel.h>
- #include <linux/clk.h>
- #include <linux/err.h>
-@@ -173,7 +175,7 @@ static irqreturn_t m2p_irq(int irq, void *dev_id)
- 
- 	switch (m2p_channel_state(ch)) {
- 	case STATE_IDLE:
--		pr_crit("m2p_irq: dma interrupt without a dma buffer\n");
-+		pr_crit("dma interrupt without a dma buffer\n");
- 		BUG();
- 		break;
- 
-@@ -197,7 +199,7 @@ static irqreturn_t m2p_irq(int irq, void *dev_id)
- 		break;
- 
- 	case STATE_NEXT:
--		pr_crit("m2p_irq: dma interrupt while next\n");
-+		pr_crit("dma interrupt while next\n");
- 		BUG();
- 		break;
- 	} 
+> -#define        flat_reloc_valid(reloc, size)           ((reloc) <= (size))
+> +#define        flat_reloc_valid(reloc, size)           ((reloc) <= (size) + 0x1000)
+
+Why 0x1000?  Is that an arbitrary number, or does it have a specific
+meaning for GCC?
+
+>    This also fixes a cosmetic error in printk. Text segment and data/bss
+>    segment are allocated from two different areas. It is not meaningful to
+>    give the diff between them in error reporting messages.
+
+That part looks fine to me.
+
+-- Jamie
+
+ps. Russell, proof that someone is using no-MMU ARM? :-)
+I'll get back to your earlier mail on that subject when I have more time, btw.
