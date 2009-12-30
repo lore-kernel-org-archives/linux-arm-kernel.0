@@ -1,33 +1,49 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 30 Dec 2009 13:06:05 -0500 (EST)
-Subject: [PATCH 2/2] pxa: enable L2 if present in XSC3
-In-Reply-To: <f17812d70912300050p24c0fb2ayd6f68ffc01a67529@mail.gmail.com>
-References: <771cded00912292328j459b5218r64703d59165fe98f@mail.gmail.com>
-	<f17812d70912300050p24c0fb2ayd6f68ffc01a67529@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.0912301305170.4177@xanadu.home>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 30 Dec 2009 13:09:23 -0500
+Subject: [PATCH] ep93xx: use pr_fmt in core.c
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE19090200F638@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Dec 2009, Eric Miao wrote:
+Use pr_fmt to prefix kernel output with the module name.
 
-> On Wed, Dec 30, 2009 at 3:28 PM, Haojian Zhuang
-> <haojian.zhuang@gmail.com> wrote:
-> > From 2c4a7d0e907df9a762c5c9f0ec48b3b7860e1f7c Mon Sep 17 00:00:00 2001
-> > From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> > Date: Wed, 30 Dec 2009 10:02:57 -0500
-> > Subject: [PATCH] [ARM] pxa: enable L2 if present in XSC3
-> >
-> > Check whether L2 is present or not in XSC3. If it's present, enable L2
-> > immediately.
-> >
-> > Disabling L2 after L2 is enabled that would result in unpredicatable behavior
-> > of XSC3 processor.
-> >
-> 
-> You may want to enclose this with #ifdef CONFIG_CACHE_XSC3L2 .. #endif
-> at least, to allow L2 to remain disabled even if L2 is present.
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <ryan@bluewatersys.com>
 
-Also... might be a good idea to invalidate L2 before enabling it.
+---
 
-
-Nicolas
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index 1f0d665..41064bd 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -14,6 +14,8 @@
+  * your option) any later version.
+  */
+ 
++#define pr_fmt(fmt) "ep93xx " KBUILD_MODNAME ": " fmt
++
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+@@ -318,8 +320,7 @@ static int ep93xx_gpio_irq_type(unsigned int irq, unsigned int type)
+ 		desc->handle_irq = handle_edge_irq;
+ 		break;
+ 	default:
+-		pr_err("ep93xx: failed to set irq type %d for gpio %d\n",
+-		       type, gpio);
++		pr_err("failed to set irq type %d for gpio %d\n", type, gpio);
+ 		return -EINVAL;
+ 	}
+ 
+@@ -572,9 +573,9 @@ void __init ep93xx_register_i2c(struct i2c_gpio_platform_data *data,
+ 	 * CMOS driver.
+ 	 */
+ 	if (data->sda_is_open_drain && data->sda_pin != EP93XX_GPIO_LINE_EEDAT)
+-		pr_warning("ep93xx: sda != EEDAT, open drain has no effect\n");
++		pr_warning("sda != EEDAT, open drain has no effect\n");
+ 	if (data->scl_is_open_drain && data->scl_pin != EP93XX_GPIO_LINE_EECLK)
+-		pr_warning("ep93xx: scl != EECLK, open drain has no effect\n");
++		pr_warning("scl != EECLK, open drain has no effect\n");
+ 
+ 	__raw_writel((data->sda_is_open_drain << 1) |
+ 		     (data->scl_is_open_drain << 0), 
