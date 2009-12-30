@@ -1,44 +1,28 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 30 Dec 2009 13:04:29 -0500 (EST)
-Subject: [PATCH 1/2] pxa: unable to enable L2 in outer cache
-In-Reply-To: <f17812d70912300055k41b42ef6o621217ebc1a02fb0@mail.gmail.com>
-References: <771cded00912292327r2622e514wcfdef51594da0aa3@mail.gmail.com>
-	<f17812d70912300055k41b42ef6o621217ebc1a02fb0@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.0912301302270.4177@xanadu.home>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 30 Dec 2009 20:32:11 +0100
+Subject: [RFC] preliminary support for sparse IRQ
+In-Reply-To: <f17812d70912272103p72765d66v1c77a081d00a1158@mail.gmail.com>
+References: <f17812d70912272103p72765d66v1c77a081d00a1158@mail.gmail.com>
+Message-ID: <20091230193211.GA11446@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Dec 2009, Eric Miao wrote:
+Hello Eric,
 
-> On Wed, Dec 30, 2009 at 3:27 PM, Haojian Zhuang
-> <haojian.zhuang@gmail.com> wrote:
-> > From fced0fdf9c13155169d27310c28ebdfef218b9dc Mon Sep 17 00:00:00 2001
-> > From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> > Date: Wed, 30 Dec 2009 09:31:47 -0500
-> > Subject: [PATCH] [ARM] pxa: unable to enable L2 in outer cache
-> >
-> > Outer cache checked whether L2 is enabled or not. If L2 isn't enabled in XSC3,
-> > it would enable L2. This operation is evil that would make system hang.
-> >
-> > In XSC3 core document, these words are mentioned in below.
-> >
-> > "Following reset, the L2 Unified Cache Enable bit is cleared. To enable the L2
-> > Cache, software may set the bit to a '1' before or at the same time as enabling
-> > the MMU. Enabling the L2 Cache after the MMU has been enabled or disabling the
-> > L2 Cache after the L2 Cache has been enabled, may result in unpredictable
-> > behavior of the processor."
-> >
-> > When outer cache is initialized, the MMU is already enabled. We couldn't enable
-> > L2 after MMU enabled.
-> >
+> index c6c57b6..747f4ad 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -629,7 +629,7 @@ __tagtable(ATAG_REVISION, parse_tag_revision);
 > 
-> Yeah, whatever the manual said, it was actually tested on pxa320 and I remember
-> Nico had proposed a way to enable this by disabling MMU first and then re-enable
-> it.
+>  static int __init parse_tag_cmdline(const struct tag *tag)
+>  {
+> -	strlcpy(default_command_line, tag->u.cmdline.cmdline, COMMAND_LINE_SIZE);
+> +	//strlcpy(default_command_line, tag->u.cmdline.cmdline, COMMAND_LINE_SIZE);
+I think this hunk isn't intended?
 
-Yes, but doing so while the system is already running is quite tricky.  
-I proposed some code at some point but since I don't have the hardware 
-to test with, my code didn't work on first try.
+Best regards
+Uwe
 
-
-Nicolas
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
