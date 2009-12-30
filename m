@@ -1,36 +1,44 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Wed, 30 Dec 2009 18:49:29 +0000
-Subject: [PATCH] Valid relocation symbol for FLAT format on ARM
-In-Reply-To: <52886e760912300830n2234e01bm2e300828141d226@mail.gmail.com>
-References: <52886e760912300830n2234e01bm2e300828141d226@mail.gmail.com>
-Message-ID: <20091230184929.GB22469@shareable.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 30 Dec 2009 13:04:29 -0500 (EST)
+Subject: [PATCH 1/2] pxa: unable to enable L2 in outer cache
+In-Reply-To: <f17812d70912300055k41b42ef6o621217ebc1a02fb0@mail.gmail.com>
+References: <771cded00912292327r2622e514wcfdef51594da0aa3@mail.gmail.com>
+	<f17812d70912300055k41b42ef6o621217ebc1a02fb0@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.0912301302270.4177@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jun Sun wrote:
->    (Sent to linux-kernel, but seems nobody cared. Hopefully someone here
->    can pick it up)
+On Wed, 30 Dec 2009, Eric Miao wrote:
 
-I've included uclinux-dev at uclinux.org, because that's where I've seen
-most discussion of FLAT format in general.
+> On Wed, Dec 30, 2009 at 3:27 PM, Haojian Zhuang
+> <haojian.zhuang@gmail.com> wrote:
+> > From fced0fdf9c13155169d27310c28ebdfef218b9dc Mon Sep 17 00:00:00 2001
+> > From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> > Date: Wed, 30 Dec 2009 09:31:47 -0500
+> > Subject: [PATCH] [ARM] pxa: unable to enable L2 in outer cache
+> >
+> > Outer cache checked whether L2 is enabled or not. If L2 isn't enabled in XSC3,
+> > it would enable L2. This operation is evil that would make system hang.
+> >
+> > In XSC3 core document, these words are mentioned in below.
+> >
+> > "Following reset, the L2 Unified Cache Enable bit is cleared. To enable the L2
+> > Cache, software may set the bit to a '1' before or at the same time as enabling
+> > the MMU. Enabling the L2 Cache after the MMU has been enabled or disabling the
+> > L2 Cache after the L2 Cache has been enabled, may result in unpredictable
+> > behavior of the processor."
+> >
+> > When outer cache is initialized, the MMU is already enabled. We couldn't enable
+> > L2 after MMU enabled.
+> >
+> 
+> Yeah, whatever the manual said, it was actually tested on pxa320 and I remember
+> Nico had proposed a way to enable this by disabling MMU first and then re-enable
+> it.
 
->    Apparently newer GCC would generate ANCHOR symbols beyond the end of
->    data/bss segment on ARM CPUs. As a result, the exiting validity checking
->    for relocation symbols in FLAT format will fail for some programs.
+Yes, but doing so while the system is already running is quite tricky.  
+I proposed some code at some point but since I don't have the hardware 
+to test with, my code didn't work on first try.
 
-> -#define        flat_reloc_valid(reloc, size)           ((reloc) <= (size))
-> +#define        flat_reloc_valid(reloc, size)           ((reloc) <= (size) + 0x1000)
 
-Why 0x1000?  Is that an arbitrary number, or does it have a specific
-meaning for GCC?
-
->    This also fixes a cosmetic error in printk. Text segment and data/bss
->    segment are allocated from two different areas. It is not meaningful to
->    give the diff between them in error reporting messages.
-
-That part looks fine to me.
-
--- Jamie
-
-ps. Russell, proof that someone is using no-MMU ARM? :-)
-I'll get back to your earlier mail on that subject when I have more time, btw.
+Nicolas
