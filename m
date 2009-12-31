@@ -1,54 +1,54 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 30 Dec 2009 21:03:31 -0500
-Subject: [PATCH 1/2] pxa: unable to enable L2 in outer cache
-In-Reply-To: <alpine.LFD.2.00.0912301302270.4177@xanadu.home>
-References: <771cded00912292327r2622e514wcfdef51594da0aa3@mail.gmail.com>
-	<f17812d70912300055k41b42ef6o621217ebc1a02fb0@mail.gmail.com>
-	<alpine.LFD.2.00.0912301302270.4177@xanadu.home>
-Message-ID: <771cded00912301803o496992c3qe7eca4101f90e3da@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 30 Dec 2009 21:19:19 -0500 (EST)
+Subject: [PATCH 2/2] pxa: enable L2 if present in XSC3
+In-Reply-To: <771cded00912301757t164b2f2cx829977547122eaff@mail.gmail.com>
+References: <771cded00912292328j459b5218r64703d59165fe98f@mail.gmail.com>
+	<f17812d70912300050p24c0fb2ayd6f68ffc01a67529@mail.gmail.com>
+	<alpine.LFD.2.00.0912301305170.4177@xanadu.home>
+	<771cded00912301757t164b2f2cx829977547122eaff@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.0912302115010.7330@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 30, 2009 at 1:04 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Wed, 30 Dec 2009, Eric Miao wrote:
->
->> On Wed, Dec 30, 2009 at 3:27 PM, Haojian Zhuang
->> <haojian.zhuang@gmail.com> wrote:
->> > From fced0fdf9c13155169d27310c28ebdfef218b9dc Mon Sep 17 00:00:00 2001
->> > From: Haojian Zhuang <haojian.zhuang@marvell.com>
->> > Date: Wed, 30 Dec 2009 09:31:47 -0500
->> > Subject: [PATCH] [ARM] pxa: unable to enable L2 in outer cache
->> >
->> > Outer cache checked whether L2 is enabled or not. If L2 isn't enabled in XSC3,
->> > it would enable L2. This operation is evil that would make system hang.
->> >
->> > In XSC3 core document, these words are mentioned in below.
->> >
->> > "Following reset, the L2 Unified Cache Enable bit is cleared. To enable the L2
->> > Cache, software may set the bit to a '1' before or at the same time as enabling
->> > the MMU. Enabling the L2 Cache after the MMU has been enabled or disabling the
->> > L2 Cache after the L2 Cache has been enabled, may result in unpredictable
->> > behavior of the processor."
->> >
->> > When outer cache is initialized, the MMU is already enabled. We couldn't enable
->> > L2 after MMU enabled.
->> >
->>
->> Yeah, whatever the manual said, it was actually tested on pxa320 and I remember
->> Nico had proposed a way to enable this by disabling MMU first and then re-enable
->> it.
->
-> Yes, but doing so while the system is already running is quite tricky.
-> I proposed some code at some point but since I don't have the hardware
-> to test with, my code didn't work on first try.
->
+On Wed, 30 Dec 2009, Haojian Zhuang wrote:
 
-Yes. Disabling MMU first and then re-enabling it with L2 is not
-complex. It requires that the virtual address is same to physical
-address. Since PC needs to be continued while MMU is disabled.
-Otherwise, ARM core will meet unpredicated instruction error. If we
-adopt this solution, we have to add this kind of map. It's too tricky,
-and it's not a good implementation.
+> On Wed, Dec 30, 2009 at 1:06 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> > On Wed, 30 Dec 2009, Eric Miao wrote:
+> >
+> >> On Wed, Dec 30, 2009 at 3:28 PM, Haojian Zhuang
+> >> <haojian.zhuang@gmail.com> wrote:
+> >> > From 2c4a7d0e907df9a762c5c9f0ec48b3b7860e1f7c Mon Sep 17 00:00:00 2001
+> >> > From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> >> > Date: Wed, 30 Dec 2009 10:02:57 -0500
+> >> > Subject: [PATCH] [ARM] pxa: enable L2 if present in XSC3
+> >> >
+> >> > Check whether L2 is present or not in XSC3. If it's present, enable L2
+> >> > immediately.
+> >> >
+> >> > Disabling L2 after L2 is enabled that would result in unpredicatable behavior
+> >> > of XSC3 processor.
+> >> >
+> >>
+> >> You may want to enclose this with #ifdef CONFIG_CACHE_XSC3L2 .. #endif
+> >> at least, to allow L2 to remain disabled even if L2 is present.
+> >
+> > Also... might be a good idea to invalidate L2 before enabling it.
+> >
+> 
+> XSC3 supports these L2 operations in below.
+> 1) invalidate L2 cache line (parameter is MVA)
+> 2) clean L2 cache line (parameter is MVA)
+> 3) clean L2 cache line (parameter is set/way)
+> 4) clean and invalidate L2 cache line (parameter is set/way)
+> 
+> The most important thing is we couldn't call these L2 operations while
+> L2 is disabled.
 
-Thanks
-Haojian
+Well... The idea behind invalidating L2 before enabling it is to make 
+sure it doesn't contain random stuff.  But if this is impossible to 
+perform while L2 is disabled then we can only assume it is always going 
+to be in a coherent state when it is enabled.  Furthermore there is no 
+way to only invalidate the entire L2.
+
+
+Nicolas
