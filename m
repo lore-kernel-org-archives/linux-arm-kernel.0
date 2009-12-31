@@ -1,57 +1,43 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Thu, 31 Dec 2009 21:19:54 +0800
-Subject: arm-unknown-linux-gnu-ld: no machine record defined
-In-Reply-To: <20091231113648.c438503d.kristoffer.ericson@gmail.com>
-References: <20091231113648.c438503d.kristoffer.ericson@gmail.com>
-Message-ID: <e68bb3470912310519q66a40fbcm15d85a0a5ed19a2f@mail.gmail.com>
+From: thommycheck@gmx.de (Thomas Kunze)
+Date: Thu, 31 Dec 2009 14:23:56 +0100
+Subject: [PATCH 1/7] [ARM] sa1100: remove unreferenced IRQ definitions
+In-Reply-To: <1261977488-18271-2-git-send-email-eric.y.miao@gmail.com>
+References: <1261977488-18271-1-git-send-email-eric.y.miao@gmail.com>
+	<1261977488-18271-2-git-send-email-eric.y.miao@gmail.com>
+Message-ID: <4B3CA5EC.30102@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2009/12/31 Kristoffer Ericson <kristoffer.ericson@gmail.com>:
-> Greetings,
+Eric Miao wrote:
+> These IRQ definitions related to LOCOMO are never referenced anywhere,
+> thus could be safely removed.
 >
-> Im adding support for the Dell AXIM X30. Ive created the machine file with relevant makefile/Kconfig option
-> and everything compiles nicely up to the linker that spits out no machine record defined.
+> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+> ---
+>  arch/arm/mach-sa1100/include/mach/collie.h |    7 -------
+>  1 files changed, 0 insertions(+), 7 deletions(-)
 >
-> Kconfig contains
-> config MACH_X30
-> ? ? ? bool "AximX30 platform"
-> ? ? ? select PXA27x
-> ? ? ? select IWMMXT
-> ? ? ? select PXA_HAVE_BOARDS_IRQ
->
+> diff --git a/arch/arm/mach-sa1100/include/mach/collie.h b/arch/arm/mach-sa1100/include/mach/collie.h
+> index 71a0b3f..52acda7 100644
+> --- a/arch/arm/mach-sa1100/include/mach/collie.h
+> +++ b/arch/arm/mach-sa1100/include/mach/collie.h
+> @@ -72,13 +72,6 @@
+>  #define COLLIE_IRQ_GPIO_GA_INT		IRQ_GPIO25
+>  #define COLLIE_IRQ_GPIO_MAIN_BAT_LOW	IRQ_GPIO26
+>  
+> -#define COLLIE_LCM_IRQ_GPIO_RTS		IRQ_LOCOMO_GPIO0
+> -#define COLLIE_LCM_IRQ_GPIO_CTS		IRQ_LOCOMO_GPIO1
+> -#define COLLIE_LCM_IRQ_GPIO_DSR		IRQ_LOCOMO_GPIO2
+> -#define COLLIE_LCM_IRQ_GPIO_DTR		IRQ_LOCOMO_GPIO3
+> -#define COLLIE_LCM_IRQ_GPIO_nSD_DETECT	IRQ_LOCOMO_GPIO13
+> -#define COLLIE_LCM_IRQ_GPIO_nSD_WP	IRQ_LOCOMO_GPIO14
+> -
+>  /* GPIO's on the TC35143AF (Toshiba Analog Frontend) */
+>  #define COLLIE_TC35143_GPIO_BASE	(GPIO_MAX + 13)
+>  #define COLLIE_TC35143_GPIO_VERSION0    UCB_IO_0
+>   
+Those definitions are used in out-of-tree drivers. So please don't 
+remove them.
 
-Please make sure above definition was really included in your current
-system at compiling time.
-
-
-> and aximx30.c got
-> MACHINE_START(X30, "Axim X30")
-> .......
->
->
-> Shouldnt that be enough for it to find the machine record?
->
-> mach-types got
-> X30 ? ? MACH_X30 ? ? ? ?X30 ? ? 655
->
-> Maybe im using too old toolchain? Using gcc-3.4.5 + glibc 2.3.5
->
-> Best wishes
-> Kristoffer Ericson
-> --
-> Kristoffer Ericson <kristoffer.ericson@gmail.com>
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
-
-
--- 
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Regards,
+Thomas
