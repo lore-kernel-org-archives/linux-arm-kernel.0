@@ -1,43 +1,147 @@
-From: thommycheck@gmx.de (Thomas Kunze)
-Date: Thu, 31 Dec 2009 14:23:56 +0100
-Subject: [PATCH 1/7] [ARM] sa1100: remove unreferenced IRQ definitions
-In-Reply-To: <1261977488-18271-2-git-send-email-eric.y.miao@gmail.com>
-References: <1261977488-18271-1-git-send-email-eric.y.miao@gmail.com>
-	<1261977488-18271-2-git-send-email-eric.y.miao@gmail.com>
-Message-ID: <4B3CA5EC.30102@gmx.de>
+From: mcuos.com@gmail.com (Zongshun Wan)
+Date: Thu, 31 Dec 2009 21:34:03 +0800
+Subject: [PATCH v2] ARM: NUC900: Fix bugs of clocksource driver
+In-Reply-To: <8fb2581d0912232245ie92859ekf3840e9c0c574a06@mail.gmail.com>
+References: <8fb2581d0912232245ie92859ekf3840e9c0c574a06@mail.gmail.com>
+Message-ID: <e68bb3470912310534w2b0b07fp646ef9318254521a@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric Miao wrote:
-> These IRQ definitions related to LOCOMO are never referenced anywhere,
-> thus could be safely removed.
->
-> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
-> ---
->  arch/arm/mach-sa1100/include/mach/collie.h |    7 -------
->  1 files changed, 0 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm/mach-sa1100/include/mach/collie.h b/arch/arm/mach-sa1100/include/mach/collie.h
-> index 71a0b3f..52acda7 100644
-> --- a/arch/arm/mach-sa1100/include/mach/collie.h
-> +++ b/arch/arm/mach-sa1100/include/mach/collie.h
-> @@ -72,13 +72,6 @@
->  #define COLLIE_IRQ_GPIO_GA_INT		IRQ_GPIO25
->  #define COLLIE_IRQ_GPIO_MAIN_BAT_LOW	IRQ_GPIO26
->  
-> -#define COLLIE_LCM_IRQ_GPIO_RTS		IRQ_LOCOMO_GPIO0
-> -#define COLLIE_LCM_IRQ_GPIO_CTS		IRQ_LOCOMO_GPIO1
-> -#define COLLIE_LCM_IRQ_GPIO_DSR		IRQ_LOCOMO_GPIO2
-> -#define COLLIE_LCM_IRQ_GPIO_DTR		IRQ_LOCOMO_GPIO3
-> -#define COLLIE_LCM_IRQ_GPIO_nSD_DETECT	IRQ_LOCOMO_GPIO13
-> -#define COLLIE_LCM_IRQ_GPIO_nSD_WP	IRQ_LOCOMO_GPIO14
-> -
->  /* GPIO's on the TC35143AF (Toshiba Analog Frontend) */
->  #define COLLIE_TC35143_GPIO_BASE	(GPIO_MAX + 13)
->  #define COLLIE_TC35143_GPIO_VERSION0    UCB_IO_0
->   
-Those definitions are used in out-of-tree drivers. So please don't 
-remove them.
+Okay!
 
-Regards,
-Thomas
+Acked-off-by: "Zongshun Wan" <mcuos.com@gmail.com>,
+
+
+2009/12/24 Li Jie <eltshanli@gmail.com>:
+> Hi, Wan:
+>
+> v2: ?use clk_xxx() api to enable timer0 and timer1 clock.
+>
+>
+> Signed-off-by: lijie <eltshanli@gmail.com>
+> ---
+> ?arch/arm/mach-w90x900/time.c | ? 62 ++++++++++++++++++++++++-----------------
+> ?1 files changed, 36 insertions(+), 26 deletions(-)
+>
+> diff --git a/arch/arm/mach-w90x900/time.c b/arch/arm/mach-w90x900/time.c
+> index 4128af8..40ee87a 100644
+> --- a/arch/arm/mach-w90x900/time.c
+> +++ b/arch/arm/mach-w90x900/time.c
+> @@ -42,7 +42,10 @@
+> ?#define TICKS_PER_SEC ?100
+> ?#define PRESCALE ? ? ? 0x63 /* Divider = prescale + 1 */
+>
+> -unsigned int timer0_load;
+> +#define ? ? ? ?TDR_SHIFT ? ? ? 24
+> +#define ? ? ? ?TDR_MASK ? ? ? ?((1 << TDR_SHIFT) - 1)
+> +
+> +static unsigned int timer0_load;
+>
+> ?static void nuc900_clockevent_setmode(enum clock_event_mode mode,
+> ? ? ? ? ? ? ? ?struct clock_event_device *clk)
+> @@ -112,8 +115,23 @@ static struct irqaction nuc900_timer0_irq = {
+> ? ? ? ?.handler ? ? ? ?= nuc900_timer0_interrupt,
+> ?};
+>
+> -static void __init nuc900_clockevents_init(unsigned int rate)
+> +static void __init nuc900_clockevents_init(void)
+> ?{
+> + ? ? ? unsigned int rate;
+> + ? ? ? struct clk *clk = clk_get(NULL, "timer0");
+> +
+> + ? ? ? BUG_ON(IS_ERR(clk));
+> +
+> + ? ? ? __raw_writel(0x00, REG_TCSR0);
+> +
+> + ? ? ? clk_enable(clk);
+> + ? ? ? rate = clk_get_rate(clk) / (PRESCALE + 1);
+> +
+> + ? ? ? timer0_load = (rate / TICKS_PER_SEC);
+> +
+> + ? ? ? __raw_writel(RESETINT, REG_TISR);
+> + ? ? ? setup_irq(IRQ_TIMER0, &nuc900_timer0_irq);
+> +
+> ? ? ? ?nuc900_clockevent_device.mult = div_sc(rate, NSEC_PER_SEC,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?nuc900_clockevent_device.shift);
+> ? ? ? ?nuc900_clockevent_device.max_delta_ns = clockevent_delta2ns(0xffffffff,
+> @@ -127,26 +145,35 @@ static void __init
+> nuc900_clockevents_init(unsigned int rate)
+>
+> ?static cycle_t nuc900_get_cycles(struct clocksource *cs)
+> ?{
+> - ? ? ? return ~__raw_readl(REG_TDR1);
+> + ? ? ? return (~__raw_readl(REG_TDR1)) & TDR_MASK;
+> ?}
+>
+> ?static struct clocksource clocksource_nuc900 = {
+> ? ? ? ?.name ? = "nuc900-timer1",
+> ? ? ? ?.rating = 200,
+> ? ? ? ?.read ? = nuc900_get_cycles,
+> - ? ? ? .mask ? = CLOCKSOURCE_MASK(32),
+> - ? ? ? .shift ?= 20,
+> + ? ? ? .mask ? = CLOCKSOURCE_MASK(TDR_SHIFT),
+> + ? ? ? .shift ?= 10,
+> ? ? ? ?.flags ?= CLOCK_SOURCE_IS_CONTINUOUS,
+> ?};
+>
+> -static void __init nuc900_clocksource_init(unsigned int rate)
+> +static void __init nuc900_clocksource_init(void)
+> ?{
+> ? ? ? ?unsigned int val;
+> + ? ? ? unsigned int rate;
+> + ? ? ? struct clk *clk = clk_get(NULL, "timer1");
+> +
+> + ? ? ? BUG_ON(IS_ERR(clk));
+> +
+> + ? ? ? __raw_writel(0x00, REG_TCSR1);
+> +
+> + ? ? ? clk_enable(clk);
+> + ? ? ? rate = clk_get_rate(clk) / (PRESCALE + 1);
+>
+> ? ? ? ?__raw_writel(0xffffffff, REG_TICR1);
+>
+> ? ? ? ?val = __raw_readl(REG_TCSR1);
+> - ? ? ? val |= (COUNTEN | PERIOD);
+> + ? ? ? val |= (COUNTEN | PERIOD | PRESCALE);
+> ? ? ? ?__raw_writel(val, REG_TCSR1);
+>
+> ? ? ? ?clocksource_nuc900.mult =
+> @@ -156,25 +183,8 @@ static void __init
+> nuc900_clocksource_init(unsigned int rate)
+>
+> ?static void __init nuc900_timer_init(void)
+> ?{
+> - ? ? ? struct clk *ck_ext = clk_get(NULL, "ext");
+> - ? ? ? unsigned int ? ?rate;
+> -
+> - ? ? ? BUG_ON(IS_ERR(ck_ext));
+> -
+> - ? ? ? rate = clk_get_rate(ck_ext);
+> - ? ? ? clk_put(ck_ext);
+> - ? ? ? rate = rate / (PRESCALE + 0x01);
+> -
+> - ? ? ? ?/* set a known state */
+> - ? ? ? __raw_writel(0x00, REG_TCSR0);
+> - ? ? ? __raw_writel(0x00, REG_TCSR1);
+> - ? ? ? __raw_writel(RESETINT, REG_TISR);
+> - ? ? ? timer0_load = (rate / TICKS_PER_SEC);
+> -
+> - ? ? ? setup_irq(IRQ_TIMER0, &nuc900_timer0_irq);
+> -
+> - ? ? ? nuc900_clocksource_init(rate);
+> - ? ? ? nuc900_clockevents_init(rate);
+> + ? ? ? nuc900_clocksource_init();
+> + ? ? ? nuc900_clockevents_init();
+> ?}
+>
+> ?struct sys_timer nuc900_timer = {
+> --
+> 1.6.5.4
+>
+
+
+
+-- 
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
