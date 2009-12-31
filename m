@@ -1,69 +1,62 @@
-From: kristoffer.ericson@gmail.com (Kristoffer Ericson)
-Date: Thu, 31 Dec 2009 18:27:47 +0100
-Subject: arm-unknown-linux-gnu-ld: no machine record defined
-In-Reply-To: <e68bb3470912310519q66a40fbcm15d85a0a5ed19a2f@mail.gmail.com>
-References: <20091231113648.c438503d.kristoffer.ericson@gmail.com>
-	<e68bb3470912310519q66a40fbcm15d85a0a5ed19a2f@mail.gmail.com>
-Message-ID: <20091231182747.ea8986e6.kristoffer.ericson@gmail.com>
+From: rpjday@crashcourse.ca (Robert P. J. Day)
+Date: Thu, 31 Dec 2009 15:32:02 -0500 (EST)
+Subject: [PATCH] ARM: Simplify param.h by simply including
+	<asm-generic/param.h>.
+Message-ID: <alpine.LFD.2.00.0912311531080.6866@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 31 Dec 2009 21:19:54 +0800
-Wan ZongShun <mcuos.com@gmail.com> wrote:
 
-> 2009/12/31 Kristoffer Ericson <kristoffer.ericson@gmail.com>:
-> > Greetings,
-> >
-> > Im adding support for the Dell AXIM X30. Ive created the machine file with relevant makefile/Kconfig option
-> > and everything compiles nicely up to the linker that spits out no machine record defined.
-> >
-> > Kconfig contains
-> > config MACH_X30
-> > ? ? ? bool "AximX30 platform"
-> > ? ? ? select PXA27x
-> > ? ? ? select IWMMXT
-> > ? ? ? select PXA_HAVE_BOARDS_IRQ
-> >
-> 
-> Please make sure above definition was really included in your current
-> system at compiling time.
-> 
+Signed-off-by: Robert P. J. Day <rpjday@crashcourse.ca>
 
-Ive made distclean/clean and recompiled numerous times and getting exactly same
-problem. So must be something else.
+---
 
-> 
-> > and aximx30.c got
-> > MACHINE_START(X30, "Axim X30")
-> > .......
-> >
-> >
-> > Shouldnt that be enough for it to find the machine record?
-> >
-> > mach-types got
-> > X30 ? ? MACH_X30 ? ? ? ?X30 ? ? 655
-> >
-> > Maybe im using too old toolchain? Using gcc-3.4.5 + glibc 2.3.5
-> >
-> > Best wishes
-> > Kristoffer Ericson
-> > --
-> > Kristoffer Ericson <kristoffer.ericson@gmail.com>
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >
-> 
-> 
-> 
-> -- 
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/include/asm/param.h b/arch/arm/include/asm/param.h
+index 8b24bf9..965d454 100644
+--- a/arch/arm/include/asm/param.h
++++ b/arch/arm/include/asm/param.h
+@@ -1,31 +1 @@
+-/*
+- *  arch/arm/include/asm/param.h
+- *
+- *  Copyright (C) 1995-1999 Russell King
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#ifndef __ASM_PARAM_H
+-#define __ASM_PARAM_H
+-
+-#ifdef __KERNEL__
+-# define HZ		CONFIG_HZ	/* Internal kernel timer frequency */
+-# define USER_HZ	100		/* User interfaces are in "ticks" */
+-# define CLOCKS_PER_SEC	(USER_HZ)	/* like times() */
+-#else
+-# define HZ		100
+-#endif
+-
+-#define EXEC_PAGESIZE	4096
+-
+-#ifndef NOGROUP
+-#define NOGROUP         (-1)
+-#endif
+-
+-/* max length of hostname */
+-#define MAXHOSTNAMELEN  64
+-
+-#endif
+-
++#include <asm-generic/param.h>
 
+rday
+--
 
--- 
-Kristoffer Ericson <kristoffer.ericson@gmail.com>
+========================================================================
+Robert P. J. Day                               Waterloo, Ontario, CANADA
+
+            Linux Consulting, Training and Kernel Pedantry.
+
+Web page:                                          http://crashcourse.ca
+Twitter:                                       http://twitter.com/rpjday
+========================================================================
