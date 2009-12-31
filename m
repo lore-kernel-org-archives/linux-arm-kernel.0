@@ -1,76 +1,69 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 31 Dec 2009 09:42:58 -0500
-Subject: [patch 2/4] [ARM] mmp: support marvell ARMADA610
-In-Reply-To: <f17812d70912281949r57e1ca83q65c3fb38c4675056@mail.gmail.com>
-References: <771cded00912062219p79048babs669abf275419a2b9@mail.gmail.com>
-	<f17812d70912281949r57e1ca83q65c3fb38c4675056@mail.gmail.com>
-Message-ID: <771cded00912310642x5ffeb071pcf6ade605138bb63@mail.gmail.com>
+From: kristoffer.ericson@gmail.com (Kristoffer Ericson)
+Date: Thu, 31 Dec 2009 18:27:47 +0100
+Subject: arm-unknown-linux-gnu-ld: no machine record defined
+In-Reply-To: <e68bb3470912310519q66a40fbcm15d85a0a5ed19a2f@mail.gmail.com>
+References: <20091231113648.c438503d.kristoffer.ericson@gmail.com>
+	<e68bb3470912310519q66a40fbcm15d85a0a5ed19a2f@mail.gmail.com>
+Message-ID: <20091231182747.ea8986e6.kristoffer.ericson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 28, 2009 at 10:49 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> Haojian,
->
-> Several suggestions:
->
-> 1. entry-macro.S, could we simplify (and improve the performance a bit) to
-> something like (haven't tested yet - let me know the result):
->
-> ? ? ? ?.macro ?get_irqnr_preamble, base, tmp
-> ? ? ? ?mrc ? ? p15, 0, \tmp, c0, c0, 0 ? ? ? ? @ CPUID
-> ? ? ? ?mov ? ? \tmp, \tmp, lsr #4
-> ? ? ? ?and ? ? \tmp, \tmp, #0xfff
+On Thu, 31 Dec 2009 21:19:54 +0800
+Wan ZongShun <mcuos.com@gmail.com> wrote:
 
-We shouldn't use #0xfff in and instruction. Immediate number shouldn't
-beyond 8bit. We have to use ldr instruction or multiple instrunctions.
+> 2009/12/31 Kristoffer Ericson <kristoffer.ericson@gmail.com>:
+> > Greetings,
+> >
+> > Im adding support for the Dell AXIM X30. Ive created the machine file with relevant makefile/Kconfig option
+> > and everything compiles nicely up to the linker that spits out no machine record defined.
+> >
+> > Kconfig contains
+> > config MACH_X30
+> > ? ? ? bool "AximX30 platform"
+> > ? ? ? select PXA27x
+> > ? ? ? select IWMMXT
+> > ? ? ? select PXA_HAVE_BOARDS_IRQ
+> >
+> 
+> Please make sure above definition was really included in your current
+> system at compiling time.
+> 
 
-> ? ? ? ?cmp ? ? \tmp, #0x581 ? ? ? ? ? ? ? ? ? ?@ MMP2
-> ? ? ? ?moveq ? \base, #MMP2_ICU_PJ4_IRQ_SEL
-> ? ? ? ?movne ? \base, #ICU_AP_IRQ_SEL_INT_NUM
-> ? ? ? ?.endm
->
-> ? ? ? ?.macro ?arch_ret_to_user, tmp1, tmp2
-> ? ? ? ?.endm
->
-> ? ? ? ?.macro ?get_irqnr_and_base, irqnr, irqstat, base, tmp
-> ? ? ? ?ldr ? ? \tmp, [\base, #0]
-> ? ? ? ?and ? ? \irqnr, \tmp, #0x3f ? ? ? ? ? ? @ Interrupt Number
-> ? ? ? ?tst ? ? \tmp, #(1 << 6) ? ? ? ? ? ? ? ? @ Interrupt Pending ?
-> ? ? ? ?.endm
->
+Ive made distclean/clean and recompiled numerous times and getting exactly same
+problem. So must be something else.
 
-I don't like this way. Although more jump instructions are used in irq
-entry, it can be extended easier for supporting more silicons.
+> 
+> > and aximx30.c got
+> > MACHINE_START(X30, "Axim X30")
+> > .......
+> >
+> >
+> > Shouldnt that be enough for it to find the machine record?
+> >
+> > mach-types got
+> > X30 ? ? MACH_X30 ? ? ? ?X30 ? ? 655
+> >
+> > Maybe im using too old toolchain? Using gcc-3.4.5 + glibc 2.3.5
+> >
+> > Best wishes
+> > Kristoffer Ericson
+> > --
+> > Kristoffer Ericson <kristoffer.ericson@gmail.com>
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
+> 
+> 
+> 
+> -- 
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-I've updated these patches in attached mail.
 
-Thanks
-Haojian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-mmp-support-marvell-MMP2.patch
-Type: text/x-patch
-Size: 21538 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091231/acb4ede1/attachment-0004.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0002-mmp-add-device-support-in-mmp2.patch
-Type: text/x-patch
-Size: 17396 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091231/acb4ede1/attachment-0005.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0003-mmp-support-flint-development-board.patch
-Type: text/x-patch
-Size: 3889 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091231/acb4ede1/attachment-0006.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0004--ARM-mmp-add-mmp2-configuration.patch
-Type: text/x-patch
-Size: 30784 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20091231/acb4ede1/attachment-0007.bin>
+-- 
+Kristoffer Ericson <kristoffer.ericson@gmail.com>
