@@ -1,64 +1,57 @@
-From: vimal.newwork@gmail.com (Vimal Singh)
-Date: Thu, 31 Dec 2009 17:50:44 +0530
-Subject: Issue in oamp nand driver with 32-bit reads in prefetch mode
-In-Reply-To: <5e088bd90912291347j370ab30cid7c6cfc558c2ed18@mail.gmail.com>
-References: <ce9ab5790912230133wae2c4dcw73051221b66cb40f@mail.gmail.com>
-	<20091223174429.GD3512@atomide.com>
-	<5e088bd90912291238t1f2aba64na94887b2f864454d@mail.gmail.com>
-	<5e088bd90912291347j370ab30cid7c6cfc558c2ed18@mail.gmail.com>
-Message-ID: <ce9ab5790912310420h20beb04csba060b3f5cfeee92@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 31 Dec 2009 12:27:28 +0000
+Subject: Ethernet / SD Boot
+In-Reply-To: <4B3B579E.8030105@warmcat.com>
+References: <20091228192244.GD14799@sirena.org.uk>
+	<4B390AC3.2060702@warmcat.com>
+	<20091228202123.GA16524@sirena.org.uk>
+	<4B391941.6000906@warmcat.com>
+	<20091228224435.GA23617@sirena.org.uk>
+	<4B39D439.9070909@warmcat.com>
+	<20091229123348.GB5784@opensource.wolfsonmicro.com>
+	<4B39FB2C.4010608@warmcat.com>
+	<20091230131559.GA369@opensource.wolfsonmicro.com>
+	<4B3B579E.8030105@warmcat.com>
+Message-ID: <20091231122727.GA5613@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 30, 2009 at 3:17 AM, Steve Sakoman <sakoman@gmail.com> wrote:
-> On Tue, Dec 29, 2009 at 12:38 PM, Steve Sakoman <sakoman@gmail.com> wrote:
->
->> I can confirm that this issue exists on Overo too. ?Sadly, switching
->> to 16 bit reads does not fix the issue for me. ?I'll start digging to
->> see if I can find what's broken.
->
-> I can also confirm that there are days when I am not even capable of
-> applying a patch properly :-(
->
-> Switching to 16 bit read accesses does indeed fix the ECC issue on Overo too.
->
-> Which still leaves us needing to find the root cause of the breakage . . .
+On Wed, Dec 30, 2009 at 01:37:34PM +0000, Andy Green wrote:
 
-There is a bug in nand prefetch read routine, which comes into effect
-only if nand device is a 16-bit device (as we have in zoom boards).
-This bug is effective only with below combination of conditions:
-1. nand deivce, in use, is a 16 bit device
-2. nand driver supports 'subpage' read
-3. SW ECC is in use
+> If you have JTAG gear that works reliably (I never had much luck
+> with OpenOCD, I only ever got it to work with the OM debug board
+> with one specific build of a library, not the latest one either).  I
+> have a Wind River JTAG dongle here that only works on Fedora 6 or
+> something, it's not really workable here or at a factory to set up
+> VMs to please this piece of test gear.  I guess you have better luck
+> depending on JTAG than I have, it certainly creates a burden to use
+> it in my experience.
 
-This was not seen old  kernel (ex: .23), because when, in early days,
-we tested this (nand prefetch read in LDP boards) there was no
-'subpage read' support.
-Later when we had subpage read in (.27) kernel, we had hw ecc enabled
-always in our internal tree. So, we missed this bug.
+The one I've had the most positive experience with was the BDI2000 - no
+host software required, it's controlled over the network via telnet (and
+possibly other things now) for non-debugging activity and provides a GDB
+stub for debugging.  Like everything else there are plenty of rubbish
+products out there.
 
-Here is a patch to fix this issue:
+> >Assuming the hardware can cope with it, and there's component cost,
+> >board area and mechanical concerns to address before it gets designed
+> >in.  There are a lot of systems where it would be useful but there's
+> >drawbacks you have to bear in mind when pushing it.
 
-diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-index 1bb799f..75004fe 100644
---- a/drivers/mtd/nand/omap2.c
-+++ b/drivers/mtd/nand/omap2.c
-@@ -295,11 +295,14 @@ static void omap_read_buf_pref(struct
- 	u32 *p = (u32 *)buf;
+> I don't really regard those as drawbacks.
 
- 	/* take care of subpage reads */
--	for (; len % 4 != 0; ) {
--		*buf++ = __raw_readb(info->nand.IO_ADDR_R);
--		len--;
-+	if (len % 4) {
-+		if (info->nand.options & NAND_BUSWIDTH_16)
-+			omap_read_buf16(mtd, buf, len % 4);
-+		else
-+			omap_read_buf8(mtd, buf, len % 4);
-+		p = (u32 *) (buf + len % 4);
-+		len -= len % 4;
- 	}
--	p = (u32 *) buf;
+> Component cost is just the connector and four pullups, I guess it's $0.70.
 
- 	/* configure and start prefetch transfer */
- 	ret = gpmc_prefetch_enable(info->gpmc_cs, 0x0, len, 0x0);
+That 70 cents does rather add up once you start to ship in volume, even
+a fraction of that would.
+
+> Yeah you need to make the uSD connector accessible if you remove a
+> cover, that's generally not hard.
+
+In some form factors.  In others it's very problematic.
+
+> CPUs in the class where it is useful (ARM11+) all tend to have one
+> or more SD peripheral unit on the CPU already, so that's for free.
+
+Assuming you've not used all the pins for something else, which is again
+a problem for some classes of device.
