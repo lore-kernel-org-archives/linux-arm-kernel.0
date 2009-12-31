@@ -1,54 +1,110 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 30 Dec 2009 21:19:19 -0500 (EST)
-Subject: [PATCH 2/2] pxa: enable L2 if present in XSC3
-In-Reply-To: <771cded00912301757t164b2f2cx829977547122eaff@mail.gmail.com>
-References: <771cded00912292328j459b5218r64703d59165fe98f@mail.gmail.com>
-	<f17812d70912300050p24c0fb2ayd6f68ffc01a67529@mail.gmail.com>
-	<alpine.LFD.2.00.0912301305170.4177@xanadu.home>
-	<771cded00912301757t164b2f2cx829977547122eaff@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.0912302115010.7330@xanadu.home>
+From: richardliu@ms1.techarea.org (Richard Liu)
+Date: Thu, 31 Dec 2009 11:37:10 +0800
+Subject: [PATCH] PCI Domains Support
+In-Reply-To: <20091223040710.GA3352@verge.net.au>
+References: <4B28EB0F.3070409@ms1.techarea.org>	<20091217000620.GC22449@verge.net.au>	<4B2A2B92.6020809@ms1.techarea.org>	<20091220012728.GD12578@verge.net.au>	<4B2F0EF9.101@ms1.techarea.org>	<20091222045540.GB4411@verge.net.au>	<4B35356D.7090604@ms1.techarea.org>
+	<20091223040710.GA3352@verge.net.au>
+Message-ID: <4B3C1C66.5050203@ms1.techarea.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Dec 2009, Haojian Zhuang wrote:
+Dear Simon:
 
-> On Wed, Dec 30, 2009 at 1:06 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> > On Wed, 30 Dec 2009, Eric Miao wrote:
-> >
-> >> On Wed, Dec 30, 2009 at 3:28 PM, Haojian Zhuang
-> >> <haojian.zhuang@gmail.com> wrote:
-> >> > From 2c4a7d0e907df9a762c5c9f0ec48b3b7860e1f7c Mon Sep 17 00:00:00 2001
-> >> > From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> >> > Date: Wed, 30 Dec 2009 10:02:57 -0500
-> >> > Subject: [PATCH] [ARM] pxa: enable L2 if present in XSC3
-> >> >
-> >> > Check whether L2 is present or not in XSC3. If it's present, enable L2
-> >> > immediately.
-> >> >
-> >> > Disabling L2 after L2 is enabled that would result in unpredicatable behavior
-> >> > of XSC3 processor.
-> >> >
-> >>
-> >> You may want to enclose this with #ifdef CONFIG_CACHE_XSC3L2 .. #endif
-> >> at least, to allow L2 to remain disabled even if L2 is present.
-> >
-> > Also... might be a good idea to invalidate L2 before enabling it.
-> >
-> 
-> XSC3 supports these L2 operations in below.
-> 1) invalidate L2 cache line (parameter is MVA)
-> 2) clean L2 cache line (parameter is MVA)
-> 3) clean L2 cache line (parameter is set/way)
-> 4) clean and invalidate L2 cache line (parameter is set/way)
-> 
-> The most important thing is we couldn't call these L2 operations while
-> L2 is disabled.
+    Regenerate the patch.
 
-Well... The idea behind invalidating L2 before enabling it is to make 
-sure it doesn't contain random stuff.  But if this is impossible to 
-perform while L2 is disabled then we can only assume it is always going 
-to be in a coherent state when it is enabled.  Furthermore there is no 
-way to only invalidate the entire L2.
+--
+ arch/arm/Kconfig                |    3 +++
+ arch/arm/include/asm/mach/pci.h |    6 ++++++
+ arch/arm/include/asm/pci.h      |    5 +++++
+ arch/arm/kernel/bios32.c        |   17 +++++++++++++++++
+ 4 files changed, 31 insertions(+), 0 deletions(-)
 
-
-Nicolas
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 233a222..cd3756c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -957,6 +957,9 @@ config PCI
+       your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
+       VESA. If you have PCI, say Y, otherwise N.
+ 
++config PCI_DOMAINS
++        depends on PCI
++
+ config PCI_SYSCALL
+     def_bool PCI
+ 
+diff --git a/arch/arm/include/asm/mach/pci.h
+b/arch/arm/include/asm/mach/pci.h
+index a38bdc7..e6f3ad7 100644
+--- a/arch/arm/include/asm/mach/pci.h
++++ b/arch/arm/include/asm/mach/pci.h
+@@ -20,6 +20,9 @@ struct hw_pci {
+     void        (*postinit)(void);
+     u8        (*swizzle)(struct pci_dev *dev, u8 *pin);
+     int        (*map_irq)(struct pci_dev *dev, u8 slot, u8 pin);
++#ifdef CONFIG_PCI_DOMAINS
++    int        nr_domains;
++#endif
+ };
+ 
+ /*
+@@ -37,6 +40,9 @@ struct pci_sys_data {
+                     /* IRQ mapping                */
+     int        (*map_irq)(struct pci_dev *, u8, u8);
+     struct hw_pci    *hw;
++#ifdef CONFIG_PCI_DOMAINS
++    int        domain;
++#endif
+ };
+ 
+ /*
+diff --git a/arch/arm/include/asm/pci.h b/arch/arm/include/asm/pci.h
+index 226cddd..6937d58 100644
+--- a/arch/arm/include/asm/pci.h
++++ b/arch/arm/include/asm/pci.h
+@@ -23,6 +23,11 @@ static inline void pcibios_penalize_isa_irq(int irq,
+int active)
+     /* We don't do dynamic PCI IRQ allocation */
+ }
+ 
++#ifdef CONFIG_PCI_DOMAINS
++int pci_domain_nr(struct pci_bus *bus);
++int pci_proc_domain(struct pci_bus *bus);
++#endif
++
+ /*
+  * The PCI address space does equal the physical memory address space.
+  * The networking and block device layers use this boolean for bounce
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 8096819..3a784a1 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -531,6 +531,7 @@ static void __init pcibios_init_hw(struct hw_pci *hw)
+         sys->busnr   = busnr;
+         sys->swizzle = hw->swizzle;
+         sys->map_irq = hw->map_irq;
++        sys->domain  = hw->nr_domains;
+         sys->resource[0] = &ioport_resource;
+         sys->resource[1] = &iomem_resource;
+ 
+@@ -694,3 +695,19 @@ int pci_mmap_page_range(struct pci_dev *dev, struct
+vm_area_struct *vma,
+ 
+     return 0;
+ }
++#ifdef CONFIG_PCI_DOMAINS
++int pci_domain_nr(struct pci_bus *bus)
++{
++
++        struct pci_sys_data *sd = bus->sysdata;
++        return sd->domain;
++
++}
++EXPORT_SYMBOL(pci_domain_nr);
++
++int pci_proc_domain(struct pci_bus *bus)
++{
++        return pci_domain_nr(bus);
++}
++EXPORT_SYMBOL(pci_proc_domain);
++#endif
