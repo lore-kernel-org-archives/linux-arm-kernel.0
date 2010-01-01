@@ -1,140 +1,63 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 1 Jan 2010 11:35:06 +0800
-Subject: [PATCH 2/7] [ARM] locomo: avoid the unnecessary cascade of
-	keyboard IRQ
-In-Reply-To: <4B3CAB66.6060102@gmx.de>
-References: <1261977488-18271-1-git-send-email-eric.y.miao@gmail.com>
-	<1261977488-18271-3-git-send-email-eric.y.miao@gmail.com>
-	<4B3CAB66.6060102@gmx.de>
-Message-ID: <f17812d70912311935m3069a99ei1720bd9981102982@mail.gmail.com>
+Date: Fri, 1 Jan 2010 11:46:14 +0800
+Subject: [patch 2/4] [ARM] mmp: support marvell ARMADA610
+In-Reply-To: <771cded00912310642x5ffeb071pcf6ade605138bb63@mail.gmail.com>
+References: <771cded00912062219p79048babs669abf275419a2b9@mail.gmail.com>
+	<f17812d70912281949r57e1ca83q65c3fb38c4675056@mail.gmail.com>
+	<771cded00912310642x5ffeb071pcf6ade605138bb63@mail.gmail.com>
+Message-ID: <f17812d70912311946n42b6eb13q78afdbd92d2708e9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 31, 2009 at 9:47 PM, Thomas Kunze <thommycheck@gmx.de> wrote:
-> Eric Miao wrote:
+On Thu, Dec 31, 2009 at 10:42 PM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> On Mon, Dec 28, 2009 at 10:49 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+>> Haojian,
 >>
->> It is not necessary and over-complicated that IRQ_LOCOMO_KEY is a cascaded
->> IRQ of IRQ_LOCOMO_KEY_BASE. Removed and introduced locomokbd_{open,close}
->> for masking/unmasking of the keyboard IRQ.
+>> Several suggestions:
 >>
->> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+>> 1. entry-macro.S, could we simplify (and improve the performance a bit) to
+>> something like (haven't tested yet - let me know the result):
+>>
+>> ? ? ? ?.macro ?get_irqnr_preamble, base, tmp
+>> ? ? ? ?mrc ? ? p15, 0, \tmp, c0, c0, 0 ? ? ? ? @ CPUID
+>> ? ? ? ?mov ? ? \tmp, \tmp, lsr #4
+>> ? ? ? ?and ? ? \tmp, \tmp, #0xfff
+>
+> We shouldn't use #0xfff in and instruction. Immediate number shouldn't
+> beyond 8bit. We have to use ldr instruction or multiple instrunctions.
+
+Well, 0xff0 then, or ldr, whichever I don't mind.
+
+>
+>> ? ? ? ?cmp ? ? \tmp, #0x581 ? ? ? ? ? ? ? ? ? ?@ MMP2
+>> ? ? ? ?moveq ? \base, #MMP2_ICU_PJ4_IRQ_SEL
+>> ? ? ? ?movne ? \base, #ICU_AP_IRQ_SEL_INT_NUM
+>> ? ? ? ?.endm
+>>
+>> ? ? ? ?.macro ?arch_ret_to_user, tmp1, tmp2
+>> ? ? ? ?.endm
+>>
+>> ? ? ? ?.macro ?get_irqnr_and_base, irqnr, irqstat, base, tmp
+>> ? ? ? ?ldr ? ? \tmp, [\base, #0]
+>> ? ? ? ?and ? ? \irqnr, \tmp, #0x3f ? ? ? ? ? ? @ Interrupt Number
+>> ? ? ? ?tst ? ? \tmp, #(1 << 6) ? ? ? ? ? ? ? ? @ Interrupt Pending ?
+>> ? ? ? ?.endm
 >>
 >
-> I think sth. similar could be done for the other locomo. But I don't see why
-> this is
-> preferable to the chained irq handlers.
+> I don't like this way. Although more jump instructions are used in irq
+> entry, it can be extended easier for supporting more silicons.
 >
 
-That's just un-necessary, think about a keypad controller. Why would it
-bother to introduce another level provided there is only one IRQ for it.
+It really hurt performance a lot. While the difference between MMP series
+is just the offset of the IRQ_NUM register, it could be calculated in
+get_irqnr_preamble, which doesn't have to be executed each time
+in the IRQ handling loop. See arch/arm/kernel/entry-armv.S
 
-And the SPI, it looks to me one IRQ for the SPI is enough instead of
-another level detailed in what caused that SPI IRQ, which can just be
-read from the status register.
+PXA is different since PXA25x checks the IRQ status by MMIO
+register while PXA27x and above check that by co-processor.
 
-So just a simplification, but I may overlooked something.
-
-> Regards,
-> Thomas
->>
->> ---
->> ?arch/arm/common/locomo.c ? ? ? ? ? | ? ?5 +++--
->> ?drivers/input/keyboard/locomokbd.c | ? 32
->> +++++++++++++++++++++++++++++++-
->> ?2 files changed, 34 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/common/locomo.c b/arch/arm/common/locomo.c
->> index bd36c77..43cdb5a 100644
->> --- a/arch/arm/common/locomo.c
->> +++ b/arch/arm/common/locomo.c
->> @@ -82,7 +82,7 @@ static struct locomo_dev_info locomo_devices[] = {
->> ? ? ? ?{
->> ? ? ? ? ? ? ? ?.devid ? ? ? ? ?= LOCOMO_DEVID_KEYBOARD,
->> ? ? ? ? ? ? ? ?.irq = {
->> - ? ? ? ? ? ? ? ? ? ? ? IRQ_LOCOMO_KEY,
->> + ? ? ? ? ? ? ? ? ? ? ? IRQ_LOCOMO_KEY_BASE,
->> ? ? ? ? ? ? ? ?},
->> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "locomo-keyboard",
->> ? ? ? ? ? ? ? ?.offset ? ? ? ? = LOCOMO_KEYBOARD,
->> @@ -470,7 +470,8 @@ static void locomo_setup_irq(struct locomo *lchip)
->> ? ? ? ?/* Install handlers for IRQ_LOCOMO_*_BASE */
->> ? ? ? ?set_irq_chip(IRQ_LOCOMO_KEY_BASE, &locomo_chip);
->> ? ? ? ?set_irq_chip_data(IRQ_LOCOMO_KEY_BASE, irqbase);
->> - ? ? ? set_irq_chained_handler(IRQ_LOCOMO_KEY_BASE, locomo_key_handler);
->> + ? ? ? set_irq_handler(IRQ_LOCOMO_KEY_BASE, handle_level_irq);
->> + ? ? ? set_irq_flags(IRQ_LOCOMO_KEY_BASE, IRQF_VALID | IRQF_PROBE);
->> ? ? ? ? ?set_irq_chip(IRQ_LOCOMO_GPIO_BASE, &locomo_chip);
->> ? ? ? ?set_irq_chip_data(IRQ_LOCOMO_GPIO_BASE, irqbase);
->> diff --git a/drivers/input/keyboard/locomokbd.c
->> b/drivers/input/keyboard/locomokbd.c
->> index 9caed30..b1ab298 100644
->> --- a/drivers/input/keyboard/locomokbd.c
->> +++ b/drivers/input/keyboard/locomokbd.c
->> @@ -192,11 +192,18 @@ static void locomokbd_scankeyboard(struct locomokbd
->> *locomokbd)
->> ?static irqreturn_t locomokbd_interrupt(int irq, void *dev_id)
->> ?{
->> ? ? ? ?struct locomokbd *locomokbd = dev_id;
->> + ? ? ? u16 r;
->> +
->> + ? ? ? r = locomo_readl(locomokbd->base + LOCOMO_KIC);
->> + ? ? ? if ((r & 0x0001) == 0)
->> + ? ? ? ? ? ? ? return IRQ_HANDLED;
->> +
->> + ? ? ? locomo_writel(r & ~0x0100, locomokbd->base + LOCOMO_KIC); /* Ack
->> */
->> +
->> ? ? ? ?/** wait chattering delay **/
->> ? ? ? ?udelay(100);
->> ? ? ? ? ?locomokbd_scankeyboard(locomokbd);
->> -
->> ? ? ? ?return IRQ_HANDLED;
->> ?}
->> ?@@ -210,6 +217,25 @@ static void locomokbd_timer_callback(unsigned long
->> data)
->> ? ? ? ?locomokbd_scankeyboard(locomokbd);
->> ?}
->> ?+static int locomokbd_open(struct input_dev *dev)
->> +{
->> + ? ? ? struct locomokbd *locomokbd = input_get_drvdata(dev);
->> + ? ? ? u16 r;
->> +
->> + ? ? ? r = locomo_readl(locomokbd->base + LOCOMO_KIC) | 0x0010;
->> + ? ? ? locomo_writel(r, locomokbd->base + LOCOMO_KIC);
->> + ? ? ? return 0;
->> +}
->> +
->> +static void locomokbd_close(struct input_dev *dev)
->> +{
->> + ? ? ? struct locomokbd *locomokbd = input_get_drvdata(dev);
->> + ? ? ? u16 r;
->> +
->> + ? ? ? r = locomo_readl(locomokbd->base + LOCOMO_KIC) & ~0x0010;
->> + ? ? ? locomo_writel(r, locomokbd->base + LOCOMO_KIC);
->> +}
->> +
->> ?static int __devinit locomokbd_probe(struct locomo_dev *dev)
->> ?{
->> ? ? ? ?struct locomokbd *locomokbd;
->> @@ -253,6 +279,8 @@ static int __devinit locomokbd_probe(struct locomo_dev
->> *dev)
->> ? ? ? ?input_dev->id.vendor = 0x0001;
->> ? ? ? ?input_dev->id.product = 0x0001;
->> ? ? ? ?input_dev->id.version = 0x0100;
->> + ? ? ? input_dev->open = locomokbd_open;
->> + ? ? ? input_dev->close = locomokbd_close;
->> ? ? ? ?input_dev->dev.parent = &dev->dev;
->> ? ? ? ? ?input_dev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_REP) |
->> @@ -261,6 +289,8 @@ static int __devinit locomokbd_probe(struct locomo_dev
->> *dev)
->> ? ? ? ?input_dev->keycodesize = sizeof(locomokbd_keycode[0]);
->> ? ? ? ?input_dev->keycodemax = ARRAY_SIZE(locomokbd_keycode);
->> ?+ ? ? ? input_set_drvdata(input_dev, locomokbd);
->> +
->> ? ? ? ?memcpy(locomokbd->keycode, locomokbd_keycode,
->> sizeof(locomokbd->keycode));
->> ? ? ? ?for (i = 0; i < LOCOMOKBD_NUMKEYS; i++)
->> ? ? ? ? ? ? ? ?set_bit(locomokbd->keycode[i], input_dev->keybit);
->>
+> I've updated these patches in attached mail.
 >
->
+
+Thanks, I'll take a look and happy new year.
