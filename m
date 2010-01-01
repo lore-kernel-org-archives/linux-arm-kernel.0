@@ -1,36 +1,52 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Fri, 01 Jan 2010 08:08:48 -0800
-Subject: tree with htc dream support
-In-Reply-To: <20100101151818.GI3944@atrey.karlin.mff.cuni.cz>
-References: <20091227093537.GD11737@elf.ucw.cz>
-	<20091227201514.GA29174@elf.ucw.cz>
-	<a55d774e0912271220p1d102b1dr398e0524c9386702@mail.gmail.com>
-	<20091227203704.GK11737@elf.ucw.cz> <20091227211322.GB29174@elf.ucw.cz>
-	<a55d774e0912271646m1b82687cy427083e64e91e323@mail.gmail.com>
-	<20091227101824.GB1478@ucw.cz>
-	<a55d774e0912281224y7360dfdbu8a251743026bdd28@mail.gmail.com>
-	<20091228204848.GB1637@ucw.cz> <1262049913.17445.27.camel@desktop>
-	<20100101151818.GI3944@atrey.karlin.mff.cuni.cz>
-Message-ID: <1262362128.2159.4.camel@m0nster>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 1 Jan 2010 20:12:52 +0000
+Subject: Amba device porting
+In-Reply-To: <20091228110225.GB12341@nokia.com>
+References: <20091223101902.GA15537@nokia.com>
+	<20091223165009.GA13900@n2100.arm.linux.org.uk>
+	<20091228110225.GB12341@nokia.com>
+Message-ID: <20100101201252.GA16220@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-01-01 at 16:18 +0100, Pavel Machek wrote:
-
-> > I have it in my tree already .. My tree has some duplication over
-> > staging, for instance the rpc code is mostly in my tree, as is the smd
-> > code.
+On Mon, Dec 28, 2009 at 01:02:25PM +0200, Roman wrote:
+> On Wed, Dec 23, 2009 at 05:50:09PM +0100, ext Russell King - ARM Linux wrote:
+> > On Wed, Dec 23, 2009 at 12:19:02PM +0200, Roman wrote:
+> > > Hi,
+> > > 
+> > > I planned to port the omap3 SDTI (Serial Debug Trace Interface) driver to amba based interface.
+> > > 
+> > > SDTI memory map is two parts composed:
+> > > 0x54500000 0x5450FFFF 4KB       SDTI module (configuration) - coresight based format.
+> > > 0x54510000 0x545FFFFF 1984KB    Reserved
+> > > 0x54600000 0x546FFFFF 1MB       SDTI module (window)
+> > > 
+> > > But amba interface seems to support only one memory region resource.
+> > 
+> > The 'amba' interface is more a primecell interface.  Is SDTI a primecell
+> > peripheral?  If not, then it shouldn't be using the AMBA "primecell" bus
+> > support.
 > 
-> Do you expect you can just merge those for 2.6.34? That would be
-> great.
+> Yes, SDTI can be considered as a PrimeCell IP.
+> SDTI is the Coresight component which is the subgroup of PrimeCell.
+> 
+> So my question is still valid.
+> How does the 'amba' interface handle the fragmented memory regions?
 
-I will try ..
+It doesn't.  Primecells have exactly one region and only one region.
+So I'm confused.
 
-One major thing I will not merge is the qdsp stuff .. So it's
-good that it's in staging.. With that I also wanted to mention that
-there is an alsa driver that (I think) uses the qdsp code.. I was
-thinking that the parts of the qdsp code that the alsa driver uses we
-could pull out and add into the alsa driver. Then clean up the alsa
-driver..
+> I understand that for the right Coresight IP it should not happen and the
+> whole register space should be continous and ended by the Peripherial and
+> Component Ids.
 
-Daniel
+Correct.  It could be that this Coresight stuff just calls itself a
+Primecell peripheral when it isn't actually a proper Primecell.  If
+it doesn't conform, maybe it's best that it doesn't use the AMBA bus
+support.
+
+> If I use SDTI module (window) memory region as a static definition inside
+> driver will my patch be accepted?
+
+That ties it firmly to the platform you created the driver for, making
+the driver useless on any other platform.
