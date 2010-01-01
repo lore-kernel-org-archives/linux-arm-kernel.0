@@ -1,34 +1,31 @@
-From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
-Date: Tue, 1 Dec 2009 05:23:38 +0530
-Subject: [PATCH] ARM U8500: add MAINTAINERS entry
-Message-ID: <1259625218.31690.5.camel@vinay-desktop>
+From: vapier@gentoo.org (Mike Frysinger)
+Date: Fri, 1 Jan 2010 01:23:48 -0500
+Subject: [uClinux-dev] [PATCH] Valid relocation symbol for FLAT format on
+	ARM, v2
+In-Reply-To: <20100101012645.GB16887@Pogoplug>
+References: <20100101012645.GB16887@Pogoplug>
+Message-ID: <201001010123.49951.vapier@gentoo.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add MAINTAINERS entry for U8500 SoC
+On Thursday 31 December 2009 20:26:45 Jun Sun wrote:
 
-Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-Acked-by: Andrea Gallo <andrea.gallo@stericsson.com>
----
- MAINTAINERS |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+when posting updates, you should put the "v2" and such inside of the "[patch]" 
+marker like so: [PATCH v2].  git will remove this automatically when applying.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index c824b4d..2c719e1 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -893,6 +893,12 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- W:	http://www.mcuos.com
- S:	Maintained
- 
-+ARM/U8500 ARM ARCHITECTURE
-+M:	Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	arch/arm/mach-ux500/
-+
- ARM/VFP SUPPORT
- M:	Russell King <linux@arm.linux.org.uk>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--- 
-1.6.3.GIT
+>  #define	flat_old_ram_flag(flags)	(flags)
+> -#define	flat_reloc_valid(reloc, size)	((reloc) <= (size))
+> +#define	flat_reloc_valid(reloc, size)	((reloc) <= (size) + 0x1000)
+> +/* [jsun] new gcc 4.x generates ANCHOR symbols in order to reduce the size
+
+comments go above the thing they're documenting, not below.  the "[jsun]" is 
+also not really useful -- no one who reads this after the fact will have any 
+idea what "[jsun]" means.
+-mike
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100101/e17b4972/attachment.sig>
