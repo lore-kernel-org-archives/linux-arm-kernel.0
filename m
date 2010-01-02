@@ -1,147 +1,41 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 2 Jan 2010 22:06:33 +0100
-Subject: 32-rc1 aka 32-rc2: warning at manage.c:361 (set_irq_wake),
-	matrix-keypad related?
-In-Reply-To: <20100102152723.GA10476@ucw.cz>
-References: <20090930200746.GA1384@ucw.cz>
-	<20091006050649.GH27881@core.coreip.homeip.net>
-	<20091006075816.GA1362@ucw.cz>
-	<20091007043603.GC10204@core.coreip.homeip.net>
-	<f17812d70910070742y5e27f9c3u38e3299b94f33613@mail.gmail.com>
-	<20091007163327.GA12053@core.coreip.homeip.net>
-	<20091007211225.GB17805@elf.ucw.cz>
-	<20091203031709.GE9121@core.coreip.homeip.net>
-	<20100102135608.GA5872@ucw.cz> <20100102152723.GA10476@ucw.cz>
-Message-ID: <20100102210633.GA3075@elf.ucw.cz>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Sat, 2 Jan 2010 23:07:08 +0000
+Subject: [uClinux-dev] [PATCH] Valid relocation symbol for FLAT format on
+	ARM, v2
+In-Reply-To: <201001010123.49951.vapier@gentoo.org>
+References: <20100101012645.GB16887@Pogoplug>
+	<201001010123.49951.vapier@gentoo.org>
+Message-ID: <20100102230708.GA32298@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat 2010-01-02 16:27:24, Pavel Machek wrote:
-> On Sat 2010-01-02 14:56:09, Pavel Machek wrote:
-> > Hi!
-> > 
-> > > > > We ignore the failure right now in the mainline but that causes stack
-> > > > > traces on resume as we trying to disable not enabled wakeup GPIOs. That
-> > > > > was original Pavel's complaint.
-> > > > 
-> > > > Yep...
-> > > > 
-> > > > I'd say that BUG() simply should not trigger if wakeup can not be
-> > > > enabled/disabled for particular source...?
-> > > 
-> > > Pavel,
-> > > 
-> > > Could you please try the patch below and let me know if it fixes the
-> > > problem for you?
-> > 
-> > (sorry for long delay).
-> > 
-> > With 33-rc1+your patch, warnings are no longer there. 
-> > 
-> > I still have one on irq191, but that's gpio button driver.
-> > 
-> > But please, hold the patch for few more days. I may have cleaner/nicer
-> > solution. It seems that zaurus is doing something very stupid in low
-> > layers.
-> 
-> I'm thinking that maybe something like this should do the trick.
+Mike Frysinger wrote:
+> when posting updates, you should put the "v2" and such inside of the
+> "[patch]" marker like so: [PATCH v2].  git will remove this
+> automatically when applying.
 
-And it does, simplyfing pxa-specific code. More testing would be nice,
-but I guess simplifying pxa is preferable to adding workarounds in
-input.
+Thanks; I didn't know this.
 
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> On Thursday 31 December 2009 20:26:45 Jun Sun wrote:
+> >  #define	flat_old_ram_flag(flags)	(flags)
+> > -#define	flat_reloc_valid(reloc, size)	((reloc) <= (size))
+> > +#define	flat_reloc_valid(reloc, size)	((reloc) <= (size) + 0x1000)
+> > +/* [jsun] new gcc 4.x generates ANCHOR symbols in order to reduce the size
+> 
+> comments go above the thing they're documenting, not below.  the "[jsun]" is 
+> also not really useful -- no one who reads this after the fact will have any 
+> idea what "[jsun]" means.
 
-> --- ./arch/arm.ofic/mach-pxa/mfp-pxa2xx.c	2009-09-10 00:13:59.000000000 +0200
-> +++ ./arch/arm/mach-pxa/mfp-pxa2xx.c	2009-12-29 03:16:40.000000000 +0100
-> @@ -34,7 +34,6 @@
->  struct gpio_desc {
->  	unsigned	valid		: 1;
->  	unsigned	can_wakeup	: 1;
-> -	unsigned	keypad_gpio	: 1;
->  	unsigned	dir_inverted	: 1;
->  	unsigned int	mask; /* bit mask in PWER or PKWR */
->  	unsigned int	mux_mask; /* bit mask of muxed gpio bits, 0 if no mux */
-> @@ -178,9 +177,6 @@
->  	if (!d->valid)
->  		return -EINVAL;
->  
-> -	if (d->keypad_gpio)
-> -		return -EINVAL;
-> -
->  	mux_taken = (PWER & d->mux_mask) & (~d->mask);
->  	if (on && mux_taken)
->  		return -EBUSY;
-> @@ -231,32 +227,6 @@
->  #endif /* CONFIG_PXA25x */
->  
->  #ifdef CONFIG_PXA27x
-> -static int pxa27x_pkwr_gpio[] = {
-> -	13, 16, 17, 34, 36, 37, 38, 39, 90, 91, 93, 94,
-> -	95, 96, 97, 98, 99, 100, 101, 102
-> -};
-> -
-> -int keypad_set_wake(unsigned int on)
-> -{
-> -	unsigned int i, gpio, mask = 0;
-> -
-> -	if (!on) {
-> -		PKWR = 0;
-> -		return 0;
-> -	}
-> -
-> -	for (i = 0; i < ARRAY_SIZE(pxa27x_pkwr_gpio); i++) {
-> -
-> -		gpio = pxa27x_pkwr_gpio[i];
-> -
-> -		if (gpio_desc[gpio].config & MFP_LPM_CAN_WAKEUP)
-> -			mask |= gpio_desc[gpio].mask;
-> -	}
-> -
-> -	PKWR = mask;
-> -	return 0;
-> -}
-> -
->  #define PWER_WEMUX2_GPIO38	(1 << 16)
->  #define PWER_WEMUX2_GPIO53	(2 << 16)
->  #define PWER_WEMUX2_GPIO40	(3 << 16)
-> @@ -273,6 +243,12 @@
->  	gpio_desc[(gpio)].mux_mask = PWER_ ## mux ## _MASK;	\
->  } while (0)
->  
-> +
-> +static int pxa27x_pkwr_gpio[] = {
-> +	13, 16, 17, 34, 36, 37, 38, 39, 90, 91, 93, 94,
-> +	95, 96, 97, 98, 99, 100, 101, 102
-> +};
-> +
->  static void __init pxa27x_mfp_init(void)
->  {
->  	int i, gpio;
-> @@ -291,7 +267,6 @@
->  	for (i = 0; i < ARRAY_SIZE(pxa27x_pkwr_gpio); i++) {
->  		gpio = pxa27x_pkwr_gpio[i];
->  		gpio_desc[gpio].can_wakeup = 1;
-> -		gpio_desc[gpio].keypad_gpio = 1;
->  		gpio_desc[gpio].mask = 1 << i;
->  	}
->  
-> --- ./arch/arm.ofic/mach-pxa/pxa27x.c	2009-09-10 00:13:59.000000000 +0200
-> +++ ./arch/arm/mach-pxa/pxa27x.c	2009-12-29 03:13:00.000000000 +0100
-> @@ -323,9 +323,6 @@
->  	if (gpio >= 0 && gpio < 128)
->  		return gpio_set_wake(gpio, on);
->  
-> -	if (irq == IRQ_KEYPAD)
-> -		return keypad_set_wake(on);
-> -
->  	switch (irq) {
->  	case IRQ_RTCAlrm:
->  		mask = PWER_RTC;
-> 
-> 
-> 
+I agree with everything Mike said.  Put the comment before the
+#define, and lose the "[jsun]".  If someone wants to know who wrote
+the comment they can use "git blame" and get your full email address.
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Actually I'd go a bit further: I think it's be tidier to put the
+comment and #define in their own block, separated by a blank line from
+the other #defines.
+
+I don't see how GCC can make the GOT smaller with relocs pointing
+_after_ the end of the BSS (middle yes, but after?), but given that it
+does, the patch looks good to me.
+
+-- Jamie
