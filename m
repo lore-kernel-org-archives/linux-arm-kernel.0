@@ -1,37 +1,47 @@
-From: jsun@junsun.net (Jun Sun)
-Date: Sat, 2 Jan 2010 09:31:15 -0800
-Subject: [PATCH v3] Valid relocation symbol for FLAT format on ARM
-Message-ID: <20100102173115.GA17233@Pogoplug>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 2 Jan 2010 14:56:09 +0100
+Subject: 32-rc1 aka 32-rc2: warning at manage.c:361 (set_irq_wake),
+	matrix-keypad related?
+In-Reply-To: <20091203031709.GE9121@core.coreip.homeip.net>
+References: <20090930200746.GA1384@ucw.cz>
+	<20091006050649.GH27881@core.coreip.homeip.net>
+	<20091006075816.GA1362@ucw.cz>
+	<20091007043603.GC10204@core.coreip.homeip.net>
+	<f17812d70910070742y5e27f9c3u38e3299b94f33613@mail.gmail.com>
+	<20091007163327.GA12053@core.coreip.homeip.net>
+	<20091007211225.GB17805@elf.ucw.cz>
+	<20091203031709.GE9121@core.coreip.homeip.net>
+Message-ID: <20100102135608.GA5872@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi!
 
-See below.
+> > > We ignore the failure right now in the mainline but that causes stack
+> > > traces on resume as we trying to disable not enabled wakeup GPIOs. That
+> > > was original Pavel's complaint.
+> > 
+> > Yep...
+> > 
+> > I'd say that BUG() simply should not trigger if wakeup can not be
+> > enabled/disabled for particular source...?
+> 
+> Pavel,
+> 
+> Could you please try the patch below and let me know if it fixes the
+> problem for you?
 
-Jun
--------------- next part --------------
+(sorry for long delay).
 
-Apparently newer GCC would generate ANCHOR symbols beyond the end of
-data/bss segment on ARM CPUs. As a result, the exiting validity checking
-for relocation symbols in FLAT format will fail.
+With 33-rc1+your patch, warnings are no longer there. 
 
-Signed-off-by: Jun Sun <jsun@junsun.net>
----
+I still have one on irq191, but that's gpio button driver.
 
-diff -Nru linux-2.6.32.2/arch/arm/include/asm/flat.h.orig linux-2.6.32.2/arch/arm/include/asm/flat.h
---- linux-2.6.32.2/arch/arm/include/asm/flat.h.orig	2009-12-18 14:27:07.000000000 -0800
-+++ linux-2.6.32.2/arch/arm/include/asm/flat.h	2010-01-02 09:15:03.000000000 -0800
-@@ -7,7 +7,12 @@
- 
- #define	flat_argvp_envp_on_stack()		1
- #define	flat_old_ram_flag(flags)		(flags)
--#define	flat_reloc_valid(reloc, size)		((reloc) <= (size))
-+/* New gcc 4.x generates ANCHOR symbols in order to reduce the size
-+ * of GOT table for PIC code. It is possible the ANCHOR is placed beyond
-+ * the end of data/bss segment up to 4K bytes(12 bits), because ARM allows
-+ * negative 12-bit offset. Thus we allow 0x1000 extra in reloc address range.
-+ */
-+#define	flat_reloc_valid(reloc, size)		((reloc) <= (size) + 0x1000)
- #define	flat_get_addr_from_rp(rp, relval, flags, persistent) get_unaligned(rp)
- #define	flat_put_addr_at_rp(rp, val, relval)	put_unaligned(val,rp)
- #define	flat_get_relocate_addr(rel)		(rel)
+But please, hold the patch for few more days. I may have cleaner/nicer
+solution. It seems that zaurus is doing something very stupid in low layers.
+
+Thanks,
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
