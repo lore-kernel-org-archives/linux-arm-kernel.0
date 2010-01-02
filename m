@@ -1,21 +1,32 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 2 Jan 2010 11:45:35 +0000
-Subject: [PATCH 3/7] [ARM] locomo: remove unused IRQs and avoid
-	unnecessary cascade
-In-Reply-To: <1261977488-18271-4-git-send-email-eric.y.miao@gmail.com>
-References: <1261977488-18271-1-git-send-email-eric.y.miao@gmail.com>
-	<1261977488-18271-4-git-send-email-eric.y.miao@gmail.com>
-Message-ID: <20100102114535.GD2529@n2100.arm.linux.org.uk>
+Date: Sat, 2 Jan 2010 12:06:19 +0000
+Subject: your mail
+In-Reply-To: <20091002145315.GB25736@avionic-design.de>
+References: <1250258343-14203-1-git-send-email-thierry.reding@avionic-design.de>
+	<20091002145315.GB25736@avionic-design.de>
+Message-ID: <20100102120618.GE2529@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 28, 2009 at 01:18:04PM +0800, Eric Miao wrote:
-> IRQ_LOCOMO_* are never used elsewhere, remove these definitions. As well
-> as the cascade of these IRQs. IRQ_LOCOMO_*_BASE changed to IRQ_LOCOMO_*.
+On Fri, Oct 02, 2009 at 04:53:15PM +0200, Thierry Reding wrote:
+> * Thierry Reding wrote:
+> > So it's been quite a while since I last posted this series and there have been
+> > a number of changes.
+> > 
+> > Support for T-Pid analog variants is dropped and will be handled in user-space
+> > instead. There hardware does not differ from the standard T-Pid. This gets rid 
+> > of some ugly platform-specific #ifdefs.
+> > 
+> > Front-panel controls are now handled in a separate driver, adx-keypad. That
+> > way backlight control can be moved to userspace.
+> > 
+> > This series also adds a watchdog driver that can be used on all Avionic Design
+> > Xanthos-based boards.
+> 
+> Russell,
+> 
+> with the watchdog and backlight drivers out of the way, would you like me to
+> get any of the other drivers (fb, keypad) in via seperate trees or can they go
+> in through the ARM tree?
 
-I think the removal of the KEY stuff should be part of the previous
-patch; the removal of the keyboard interrupt indirection as a whole
-forms one logical and self-contained change.
-
-The removal of the other unnecessary indirections should probably
-live as a separate patch.
+They should go in via the relevant driver trees.
