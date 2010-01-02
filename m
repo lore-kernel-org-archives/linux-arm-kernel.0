@@ -1,32 +1,27 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 02 Jan 2010 11:21:52 +0000
-Subject: [PATCH 17/18] ARM: PNX4008: i2c-pnx makes no use of asm/uaccess.h nor
-	asm/irq.h
-In-Reply-To: <20100102111849.GA2529@n2100.arm.linux.org.uk>
-References: <20100102111849.GA2529@n2100.arm.linux.org.uk>
-Message-ID: <15fc3233da81cf4beb4cea4edc476d06bc114bd5.1262431163.git.rmk+kernel@arm.linux.org.uk>
+Date: Sat, 2 Jan 2010 11:43:24 +0000
+Subject: [PATCH 2/7] [ARM] locomo: avoid the unnecessary cascade of
+	keyboard IRQ
+In-Reply-To: <1261977488-18271-3-git-send-email-eric.y.miao@gmail.com>
+References: <1261977488-18271-1-git-send-email-eric.y.miao@gmail.com>
+	<1261977488-18271-3-git-send-email-eric.y.miao@gmail.com>
+Message-ID: <20100102114324.GC2529@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove unnecessary includes
+On Mon, Dec 28, 2009 at 01:18:03PM +0800, Eric Miao wrote:
+> It is not necessary and over-complicated that IRQ_LOCOMO_KEY is a cascaded
+> IRQ of IRQ_LOCOMO_KEY_BASE. Removed and introduced locomokbd_{open,close}
+> for masking/unmasking of the keyboard IRQ.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/i2c/busses/i2c-pnx.c |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
+What about removing these as well:
 
-diff --git a/drivers/i2c/busses/i2c-pnx.c b/drivers/i2c/busses/i2c-pnx.c
-index a71cd93..34c5994 100644
---- a/drivers/i2c/busses/i2c-pnx.c
-+++ b/drivers/i2c/busses/i2c-pnx.c
-@@ -25,8 +25,6 @@
- 
- #include <mach/hardware.h>
- #include <mach/i2c.h>
--#include <asm/irq.h>
--#include <asm/uaccess.h>
- 
- #define I2C_PNX_TIMEOUT		10 /* msec */
- #define I2C_PNX_SPEED_KHZ	100
--- 
-1.6.2.5
+        /* install handlers for IRQ_LOCOMO_KEY_BASE generated interrupts */
+        set_irq_chip(LOCOMO_IRQ_KEY_START, &locomo_key_chip);
+        set_irq_chip_data(LOCOMO_IRQ_KEY_START, irqbase);
+        set_irq_handler(LOCOMO_IRQ_KEY_START, handle_edge_irq);
+        set_irq_flags(LOCOMO_IRQ_KEY_START, IRQF_VALID | IRQF_PROBE);
+
+the locomo_key_chip structure, locomo_key_handler() itself, and the
+associated handlers?  AFAICS, after this change, none of this is
+used anymore.
