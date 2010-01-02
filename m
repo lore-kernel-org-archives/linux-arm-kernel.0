@@ -1,137 +1,65 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 02 Jan 2010 11:20:32 +0000
-Subject: [PATCH 05/18] ARM: PNX4008: convert watchdog to use clk API
-	enable/disable calls
+Date: Sat, 02 Jan 2010 11:20:35 +0000
+Subject: [PATCH 06/18] ARM: PNX4008: convert i2c clocks to match by device only
 In-Reply-To: <20100102111849.GA2529@n2100.arm.linux.org.uk>
 References: <20100102111849.GA2529@n2100.arm.linux.org.uk>
-Message-ID: <0cb75da19348e1c5ba1155f917dfa9958ca38107.1262431163.git.rmk+kernel@arm.linux.org.uk>
+Message-ID: <6e3e30172aff6ba6b502b281e656bf8461c49bd4.1262431163.git.rmk+kernel@arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_set_rate() is not supposed to be used to turn clocks on and off.
-That's what clk_enable/clk_disable is for.
-
-Acked-by: Wim Van Sebroeck <wim@iguana.be>
 Acked-by: Vitaly Wool <vitalywool@gmail.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-pnx4008/clock.c  |    4 ++--
- drivers/watchdog/pnx4008_wdt.c |   37 ++++++++++++++++++++++++-------------
- 2 files changed, 26 insertions(+), 15 deletions(-)
+ arch/arm/mach-pnx4008/clock.c |    6 +++---
+ arch/arm/mach-pnx4008/i2c.c   |    8 ++------
+ 2 files changed, 5 insertions(+), 9 deletions(-)
 
 diff --git a/arch/arm/mach-pnx4008/clock.c b/arch/arm/mach-pnx4008/clock.c
-index d12e0b1..270c254 100644
+index 270c254..26659cd 100644
 --- a/arch/arm/mach-pnx4008/clock.c
 +++ b/arch/arm/mach-pnx4008/clock.c
-@@ -740,10 +740,10 @@ static struct clk wdt_ck = {
- 	.name = "wdt_ck",
- 	.parent = &per_ck,
- 	.flags = NEEDS_INITIALIZATION,
--	.round_rate = &on_off_round_rate,
--	.set_rate = &on_off_set_rate,
- 	.enable_shift = 0,
- 	.enable_reg = TIMCLKCTRL_REG,
-+	.enable = clk_reg_enable,
-+	.disable = clk_reg_disable,
- };
- 
- /* These clocks are visible outside this module
-diff --git a/drivers/watchdog/pnx4008_wdt.c b/drivers/watchdog/pnx4008_wdt.c
-index 8c5367f..c7a9479 100644
---- a/drivers/watchdog/pnx4008_wdt.c
-+++ b/drivers/watchdog/pnx4008_wdt.c
-@@ -96,9 +96,6 @@ static void wdt_enable(void)
+@@ -797,9 +797,9 @@ static struct clk_lookup onchip_clkreg[] = {
+ 	{ .clk = &jpeg_ck,	.con_id = "jpeg_ck"	},
+ 	{ .clk = &ms_ck,	.con_id = "ms_ck"	},
+ 	{ .clk = &touch_ck,	.con_id = "touch_ck"	},
+-	{ .clk = &i2c0_ck,	.con_id = "i2c0_ck"	},
+-	{ .clk = &i2c1_ck,	.con_id = "i2c1_ck"	},
+-	{ .clk = &i2c2_ck,	.con_id = "i2c2_ck"	},
++	{ .clk = &i2c0_ck,	.dev_id = "pnx-i2c.0"	},
++	{ .clk = &i2c1_ck,	.dev_id = "pnx-i2c.1"	},
++	{ .clk = &i2c2_ck,	.dev_id = "pnx-i2c.2"	},
+ 	{ .clk = &spi0_ck,	.con_id = "spi0_ck"	},
+ 	{ .clk = &spi1_ck,	.con_id = "spi1_ck"	},
+ 	{ .clk = &uart3_ck,	.con_id = "uart3_ck"	},
+diff --git a/arch/arm/mach-pnx4008/i2c.c b/arch/arm/mach-pnx4008/i2c.c
+index f3fea29..c986b3a 100644
+--- a/arch/arm/mach-pnx4008/i2c.c
++++ b/arch/arm/mach-pnx4008/i2c.c
+@@ -21,11 +21,9 @@
+ static int set_clock_run(struct platform_device *pdev)
  {
- 	spin_lock(&io_lock);
+ 	struct clk *clk;
+-	char name[10];
+ 	int retval = 0;
  
--	if (wdt_clk)
--		clk_set_rate(wdt_clk, 1);
--
- 	/* stop counter, initiate counter reset */
- 	__raw_writel(RESET_COUNT, WDTIM_CTRL(wdt_base));
- 	/*wait for reset to complete. 100% guarantee event */
-@@ -125,19 +122,25 @@ static void wdt_disable(void)
- 	spin_lock(&io_lock);
- 
- 	__raw_writel(0, WDTIM_CTRL(wdt_base));	/*stop counter */
--	if (wdt_clk)
--		clk_set_rate(wdt_clk, 0);
- 
- 	spin_unlock(&io_lock);
- }
- 
- static int pnx4008_wdt_open(struct inode *inode, struct file *file)
+-	snprintf(name, 10, "i2c%d_ck", pdev->id);
+-	clk = clk_get(&pdev->dev, name);
++	clk = clk_get(&pdev->dev, NULL);
+ 	if (!IS_ERR(clk)) {
+ 		clk_set_rate(clk, 1);
+ 		clk_put(clk);
+@@ -38,11 +36,9 @@ static int set_clock_run(struct platform_device *pdev)
+ static int set_clock_stop(struct platform_device *pdev)
  {
-+	int ret;
-+
- 	if (test_and_set_bit(WDT_IN_USE, &wdt_status))
- 		return -EBUSY;
+ 	struct clk *clk;
+-	char name[10];
+ 	int retval = 0;
  
- 	clear_bit(WDT_OK_TO_CLOSE, &wdt_status);
- 
-+	ret = clk_enable(wdt_clk);
-+	if (ret) {
-+		clear_bit(WDT_IN_USE, &wdt_status);
-+		return ret;
-+	}
-+
- 	wdt_enable();
- 
- 	return nonseekable_open(inode, file);
-@@ -225,6 +228,7 @@ static int pnx4008_wdt_release(struct inode *inode, struct file *file)
- 		printk(KERN_WARNING "WATCHDOG: Device closed unexpectdly\n");
- 
- 	wdt_disable();
-+	clk_disable(wdt_clk);
- 	clear_bit(WDT_IN_USE, &wdt_status);
- 	clear_bit(WDT_OK_TO_CLOSE, &wdt_status);
- 
-@@ -279,19 +283,27 @@ static int __devinit pnx4008_wdt_probe(struct platform_device *pdev)
- 		release_resource(wdt_mem);
- 		kfree(wdt_mem);
- 		goto out;
--	} else
--		clk_set_rate(wdt_clk, 1);
-+	}
-+
-+	ret = clk_enable(wdt_clk);
-+	if (ret) {
-+		release_resource(wdt_mem);
-+		kfree(wdt_mem);
-+		goto out;
-+	}
- 
- 	ret = misc_register(&pnx4008_wdt_miscdev);
- 	if (ret < 0) {
- 		printk(KERN_ERR MODULE_NAME "cannot register misc device\n");
- 		release_resource(wdt_mem);
- 		kfree(wdt_mem);
--		clk_set_rate(wdt_clk, 0);
-+		clk_disable(wdt_clk);
-+		clk_put(wdt_clk);
- 	} else {
- 		boot_status = (__raw_readl(WDTIM_RES(wdt_base)) & WDOG_RESET) ?
- 		    WDIOF_CARDRESET : 0;
- 		wdt_disable();		/*disable for now */
-+		clk_disable(wdt_clk);
- 		set_bit(WDT_DEVICE_INITED, &wdt_status);
- 	}
- 
-@@ -302,11 +314,10 @@ out:
- static int __devexit pnx4008_wdt_remove(struct platform_device *pdev)
- {
- 	misc_deregister(&pnx4008_wdt_miscdev);
--	if (wdt_clk) {
--		clk_set_rate(wdt_clk, 0);
--		clk_put(wdt_clk);
--		wdt_clk = NULL;
--	}
-+
-+	clk_disable(wdt_clk);
-+	clk_put(wdt_clk);
-+
- 	if (wdt_mem) {
- 		release_resource(wdt_mem);
- 		kfree(wdt_mem);
+-	snprintf(name, 10, "i2c%d_ck", pdev->id);
+-	clk = clk_get(&pdev->dev, name);
++	clk = clk_get(&pdev->dev, NULL);
+ 	if (!IS_ERR(clk)) {
+ 		clk_set_rate(clk, 0);
+ 		clk_put(clk);
 -- 
 1.6.2.5
