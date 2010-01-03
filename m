@@ -1,24 +1,66 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Sat, 2 Jan 2010 23:09:07 +0000
-Subject: [uClinux-dev] [PATCH] Valid relocation symbol for FLAT format on
-	ARM, v2
-In-Reply-To: <20100101012645.GB16887@Pogoplug>
-References: <20100101012645.GB16887@Pogoplug>
-Message-ID: <20100102230906.GB32298@shareable.org>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Sun, 03 Jan 2010 10:19:38 +0800
+Subject: [PATCH] NUC900: Add extern header file support for some driver
+In-Reply-To: <4B3F7EC3.7060707@ru.mvista.com>
+References: <4B3F69ED.2030404@gmail.com> <4B3F7EC3.7060707@ru.mvista.com>
+Message-ID: <4B3FFEBA.6010101@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jun Sun wrote:
-> +/* [jsun] new gcc 4.x generates ANCHOR symbols in order to reduce the size
-> + * of GOT table for PIC code. It is possible the ANCHOR is placed beyond
-> + * the end of data/bss segment up to 4K bytes(12 bits), because ARM allows
-> + * negative 12-bit offset. Thus we allow 0x1000 extra in reloc address range.
-> + */
+Dear  Sergei,
 
-Can you provide a small test program and *exact* GCC version and
-Binutils version which triggers this?  People have reported using GCC
-4.x on ARM uClinux for some time, and I haven't seen complaints
-about this problem before.
+You are right, and it reason from my mail client setting.
+Re-submit it.
 
-Thanks,
--- Jamie
+Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
+---
+  arch/arm/mach-w90x900/include/mach/clkdev.h |    3 +++
+  arch/arm/mach-w90x900/include/mach/mfp.h    |   23 +++++++++++++++++++++++
+  2 files changed, 26 insertions(+), 0 deletions(-)
+  create mode 100644 arch/arm/mach-w90x900/include/mach/mfp.h
+
+diff --git a/arch/arm/mach-w90x900/include/mach/clkdev.h 
+b/arch/arm/mach-w90x900/include/mach/clkdev.h
+index 04b37a8..b35f4bc 100644
+--- a/arch/arm/mach-w90x900/include/mach/clkdev.h
++++ b/arch/arm/mach-w90x900/include/mach/clkdev.h
+@@ -4,4 +4,7 @@
+  #define __clk_get(clk) ({ 1; })
+  #define __clk_put(clk) do { } while (0)
+
++extern void nuc900_driver_clksrc_div(struct device *dev, unsigned char *src,
++							unsigned char divider);
++
+  #endif
+diff --git a/arch/arm/mach-w90x900/include/mach/mfp.h 
+b/arch/arm/mach-w90x900/include/mach/mfp.h
+new file mode 100644
+index 0000000..69a094a
+--- /dev/null
++++ b/arch/arm/mach-w90x900/include/mach/mfp.h
+@@ -0,0 +1,23 @@
++/*
++ * arch/arm/mach-w90x900/include/mach/mfp.h
++ *
++ * Copyright (c) 2008 Nuvoton technology corporation
++ * All rights reserved.
++ *
++ * Wan ZongShun <mcuos.com@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ */
++#ifndef __ASM_ARM_MFP_H
++#define __ASM_ARM_MFP_H
++
++extern void mfp_set_groupf(struct device *dev);
++extern void mfp_set_groupc(struct device *dev);
++extern void mfp_set_groupi(struct device *dev);
++extern void mfp_set_groupg(struct device *dev);
++
++#endif /* __ASM_ARM_MFP_H */
+-- 
+1.5.6.3
