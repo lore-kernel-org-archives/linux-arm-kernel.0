@@ -1,66 +1,54 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Sun, 03 Jan 2010 10:19:38 +0800
-Subject: [PATCH] NUC900: Add extern header file support for some driver
-In-Reply-To: <4B3F7EC3.7060707@ru.mvista.com>
-References: <4B3F69ED.2030404@gmail.com> <4B3F7EC3.7060707@ru.mvista.com>
-Message-ID: <4B3FFEBA.6010101@gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Sat, 2 Jan 2010 23:57:33 -0800
+Subject: 32-rc1 aka 32-rc2: warning at manage.c:361 (set_irq_wake),
+	matrix-keypad related?
+In-Reply-To: <20100102135608.GA5872@ucw.cz>
+References: <20090930200746.GA1384@ucw.cz>
+	<20091006050649.GH27881@core.coreip.homeip.net>
+	<20091006075816.GA1362@ucw.cz>
+	<20091007043603.GC10204@core.coreip.homeip.net>
+	<f17812d70910070742y5e27f9c3u38e3299b94f33613@mail.gmail.com>
+	<20091007163327.GA12053@core.coreip.homeip.net>
+	<20091007211225.GB17805@elf.ucw.cz>
+	<20091203031709.GE9121@core.coreip.homeip.net>
+	<20100102135608.GA5872@ucw.cz>
+Message-ID: <20100103075733.GA1358@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear  Sergei,
+On Sat, Jan 02, 2010 at 02:56:09PM +0100, Pavel Machek wrote:
+> Hi!
+> 
+> > > > We ignore the failure right now in the mainline but that causes stack
+> > > > traces on resume as we trying to disable not enabled wakeup GPIOs. That
+> > > > was original Pavel's complaint.
+> > > 
+> > > Yep...
+> > > 
+> > > I'd say that BUG() simply should not trigger if wakeup can not be
+> > > enabled/disabled for particular source...?
+> > 
+> > Pavel,
+> > 
+> > Could you please try the patch below and let me know if it fixes the
+> > problem for you?
+> 
+> (sorry for long delay).
+> 
+> With 33-rc1+your patch, warnings are no longer there. 
+> 
 
-You are right, and it reason from my mail client setting.
-Re-submit it.
+Thank you for testing.
 
-Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
----
-  arch/arm/mach-w90x900/include/mach/clkdev.h |    3 +++
-  arch/arm/mach-w90x900/include/mach/mfp.h    |   23 +++++++++++++++++++++++
-  2 files changed, 26 insertions(+), 0 deletions(-)
-  create mode 100644 arch/arm/mach-w90x900/include/mach/mfp.h
+> I still have one on irq191, but that's gpio button driver.
+> 
+> But please, hold the patch for few more days. I may have cleaner/nicer
+> solution. It seems that zaurus is doing something very stupid in low layers.
 
-diff --git a/arch/arm/mach-w90x900/include/mach/clkdev.h 
-b/arch/arm/mach-w90x900/include/mach/clkdev.h
-index 04b37a8..b35f4bc 100644
---- a/arch/arm/mach-w90x900/include/mach/clkdev.h
-+++ b/arch/arm/mach-w90x900/include/mach/clkdev.h
-@@ -4,4 +4,7 @@
-  #define __clk_get(clk) ({ 1; })
-  #define __clk_put(clk) do { } while (0)
+Sorry, it is already upstream. However I do think that the change is
+needed. As long as set_irq_wake() may return an error the driver should
+handle such error. Especially matrix_keypad that operates with large
+number of GPIOs but has only one knob for enabling wakeup.
 
-+extern void nuc900_driver_clksrc_div(struct device *dev, unsigned char *src,
-+							unsigned char divider);
-+
-  #endif
-diff --git a/arch/arm/mach-w90x900/include/mach/mfp.h 
-b/arch/arm/mach-w90x900/include/mach/mfp.h
-new file mode 100644
-index 0000000..69a094a
---- /dev/null
-+++ b/arch/arm/mach-w90x900/include/mach/mfp.h
-@@ -0,0 +1,23 @@
-+/*
-+ * arch/arm/mach-w90x900/include/mach/mfp.h
-+ *
-+ * Copyright (c) 2008 Nuvoton technology corporation
-+ * All rights reserved.
-+ *
-+ * Wan ZongShun <mcuos.com@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ */
-+#ifndef __ASM_ARM_MFP_H
-+#define __ASM_ARM_MFP_H
-+
-+extern void mfp_set_groupf(struct device *dev);
-+extern void mfp_set_groupc(struct device *dev);
-+extern void mfp_set_groupi(struct device *dev);
-+extern void mfp_set_groupg(struct device *dev);
-+
-+#endif /* __ASM_ARM_MFP_H */
 -- 
-1.5.6.3
+Dmitry
