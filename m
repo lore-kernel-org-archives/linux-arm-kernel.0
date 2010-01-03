@@ -1,34 +1,46 @@
-From: joe@perches.com (Joe Perches)
-Date: Sun, 03 Jan 2010 09:29:41 -0800
-Subject: [PATCH] mach-osiris-dvs.c: Convert boolean bit tests to logical tests
-Message-ID: <1262539781.1932.128.camel@Joe-Laptop.home>
+From: teawater@gmail.com (Hui Zhu)
+Date: Mon, 4 Jan 2010 01:37:40 +0800
+Subject: [PATCH] stack2core: show stack message and convert it to core
+	file when kernel die
+In-Reply-To: <daef60381001030918r26658a26l52133d43d4342a16@mail.gmail.com>
+References: <daef60381001030705r93b3fbfkc50e7b9bbc62b334@mail.gmail.com>
+	<20100103160313.GA21156@n2100.arm.linux.org.uk>
+	<daef60381001030830u176c0cfavbb31358a2b42ed60@mail.gmail.com>
+	<20100103164414.GB21156@n2100.arm.linux.org.uk>
+	<daef60381001030855o3a39c3fdr879e2634fb85c491@mail.gmail.com>
+	<20100103171013.GC21156@n2100.arm.linux.org.uk>
+	<daef60381001030918r26658a26l52133d43d4342a16@mail.gmail.com>
+Message-ID: <daef60381001030937w16f0cc66x7376abdf14e36b4d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bit tests on booleans seem odd, logical tests more appropriate
+And gdb need a message that seems panic doesn't show:
+LKM address message. like:
+S2C:add-symbol-file e.ko 0xffffffffa0000000
 
-Signed-off-by: Joe Perches <joe@perches.com>
+Thanks,
+Hui
 
-diff --git a/arch/arm/mach-s3c2440/mach-osiris-dvs.c b/arch/arm/mach-s3c2440/mach-osiris-dvs.c
-index ad2792d..2367606 100644
---- a/arch/arm/mach-s3c2440/mach-osiris-dvs.c
-+++ b/arch/arm/mach-s3c2440/mach-osiris-dvs.c
-@@ -69,16 +69,14 @@ static int osiris_dvs_notify(struct notifier_block *nb,
- 
- 	switch (val) {
- 	case CPUFREQ_PRECHANGE:
--		if (old_dvs & !new_dvs ||
--		    cur_dvs & !new_dvs) {
-+		if ((old_dvs && !new_dvs) || (cur_dvs && !new_dvs)) {
- 			pr_debug("%s: exiting dvs\n", __func__);
- 			cur_dvs = false;
- 			gpio_set_value(OSIRIS_GPIO_DVS, 1);
- 		}
- 		break;
- 	case CPUFREQ_POSTCHANGE:
--		if (!old_dvs & new_dvs ||
--		    !cur_dvs & new_dvs) {
-+		if ((!old_dvs && new_dvs) || (!cur_dvs && new_dvs)) {
- 			pr_debug("entering dvs\n");
- 			cur_dvs = true;
- 			gpio_set_value(OSIRIS_GPIO_DVS, 0);
+On Mon, Jan 4, 2010 at 01:18, Hui Zhu <teawater@gmail.com> wrote:
+> Sorry I make a mistake, I sent the mail before I complete it. ?Maybe
+> some hotkey or something.
+>
+> The s2c can get the message from the current panic message is better.
+> I am not get them for now, maybe it need open some options or
+> something.
+>
+> Thanks,
+> Hui
+>
+> On Mon, Jan 4, 2010 at 01:10, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Mon, Jan 04, 2010 at 12:55:04AM +0800, Hui Zhu wrote:
+>>> I didn't give the user raw oopses.
+>>> I give him core file. When the kernel die, do we can get a core file now?
+>>
+>> I think there's a communication issue here... clearly you're not
+>> understanding what I've been trying to tell you.
+>>
+>> I don't think I can help you any further.
+>>
+>
