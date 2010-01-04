@@ -1,65 +1,61 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Mon, 04 Jan 2010 15:47:18 +0000
-Subject: [PATCH 4/4] regulator: add max8925 support
-In-Reply-To: <771cded00912242127k1b74a330k7d033d5cefd2169a@mail.gmail.com>
-References: <771cded00912210447jf040fd8s8da0e68db0c39c1a@mail.gmail.com>
-	<1261418546.6971.343.camel@odin>
-	<771cded00912230139g23ea8554l866d55e16ae3ed58@mail.gmail.com>
-	<20091223143016.GD14455@opensource.wolfsonmicro.com>
-	<771cded00912242127k1b74a330k7d033d5cefd2169a@mail.gmail.com>
-Message-ID: <1262620038.2968.23.camel@odin>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 4 Jan 2010 16:20:14 +0000
+Subject: [PXA320] dmac_flush_range and burst on SMEMC
+In-Reply-To: <354684.99618.qm@web23301.mail.ird.yahoo.com>
+References: <354684.99618.qm@web23301.mail.ird.yahoo.com>
+Message-ID: <20100104162014.GA14533@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2009-12-25 at 00:27 -0500, Haojian Zhuang wrote:
-> On Wed, Dec 23, 2009 at 9:30 AM, Mark Brown
-> <broonie@opensource.wolfsonmicro.com> wrote:
-> > On Wed, Dec 23, 2009 at 04:39:59AM -0500, Haojian Zhuang wrote:
-> >
-> >> +#define MAX8925_REGULATOR_DRIVER(_name)                              \
-> >> +{                                                            \
-> >> +     .driver         = {                                     \
-> >> +             .name   = "max8925-" #_name,                    \
-> >> +             .owner  = THIS_MODULE,                          \
-> >> +     },                                                      \
-> >> +     .probe          = max8925_regulator_probe,              \
-> >> +     .remove         = __devexit_p(max8925_regulator_remove),\
-> >> +}
-> >> +
-> >> +static struct platform_driver max8925_regulator_driver[] = {
-> >> +     MAX8925_REGULATOR_DRIVER(sd1),
-> >> +     MAX8925_REGULATOR_DRIVER(sd2),
-> >> +     MAX8925_REGULATOR_DRIVER(sd3),
-> >> +     MAX8925_REGULATOR_DRIVER(ldo1),
-> >> +     MAX8925_REGULATOR_DRIVER(ldo2),
-> >
-> > Since these driver structures differ only in name there seems to be no
-> > need to define more than one for the bucks and one for the LDOs - the
-> > code in the driver doesn't actually seem to need it.  The .id field of
-> > the driver structure can be set to give the device numbers.
-> >
-> >> +}
-> >> +module_init(max8925_regulator_init);
-> >
-> > subsys_initcall()
-> >
-> >> +MODULE_LICENSE("GPL");
-> >> +MODULE_AUTHOR("Haojian Zhuang <haojian.zhuang@marvell.com>");
-> >> +MODULE_DESCRIPTION("Regulator Driver for Maxim 8925 PMIC");
-> >> +MODULE_ALIAS("platform:max8925-regulator");
-> >
-> > This MODULE_ALIAS won't actually work - the name doesn't match up with
-> > the names of the drivers or the devices.
-> >
+On Fri, Dec 18, 2009 at 09:00:15AM +0000, Patrick wrote:
+> I am using a PXA320 with a FPGA connected on the VLIO memory bus. For
+> faster transfer between the PXA and the FPGA I would like to use burst
+> (supported by the SMEMC in VLIO).
 > 
-> Updated the serie of patches.
+> I was using a 2.6.26 kernel and burst was working very fine. I was using
+> ioremap_cached and after a loop of iowrite32 and a call to dmac_flush_range
+> to start the burst. It was working fine.
 
-I'm fine with this now but it doesn't apply against voltage for-next.
-Could you recreate against for-next.
+Note that this kind of abuse eventually runs into problems.  Just because
+dmac_flush_range() seems to do what you want, that doesn't mean it will
+always do so.
 
-Btw, what is the status of the other PMIC regulator patch you have.
-Iirc, it was waiting on some PMIC core change in it's mfd driver ?
+As an example, its counterparts, dmac_inv_range() and dmac_clean_range()
+will be removed in the next kernel version, because they need to be changed
+in order to support ARMv6 and ARMv7 CPUs with their speculative prefetching.
 
-Thanks
+I need the freedom to change the backend interfaces of the major APIs
+to ensure that the ARM kernel can continue to run on newer ARM CPUs.
+Abusing the backend interfaces makes that job much harder without
+causing breakage - and the more people who abuse the backend interfaces
+the more likely I'm just going to turn around and say "tough, eat the
+breakage, it's your problem".
 
-Liam
+Consider that when we get ARM CPUs which have DMA coherent caches, all
+the dmac_* functions will become no-ops for those CPUs - which means if
+you're using them for non-DMA purposes, suddenly they stop having the
+effect you want them to.
+
+> I have migrated to a 2.6.28 kernel with the same driver code. All the
+> data writed by the loop of iowrite32 is lost and only the last burst is
+> writed using PIO and no burst. It's like if dmac_flush_range is not
+> working and flush no cash at all.
+
+Nothing's changed with dmac_flush_range()... yet.  What you may be
+experiencing is the effect of the L2 cache - Xscale3 CPUs have an L2
+cache, and this isn't touched by dmac_flush_range().  outer_flush_range()
+will do this, but note that it takes physical addresses.
+
+> Do you have any idea ? Should I use another function than dmac_flush_range ?
+
+I'm afraid we don't have any interfaces for operating on ioremapped
+memory.
+
+I think what you actually want to be doing is using ioremap_wc() to get
+a write combining mapping, rather than a fully cached mapping, and using
+dmb() to provide memory barriers.
+
+(On dmb(), I think we should actually start moving ARMv6 and Xscale3 over
+to using write combining mappings for DMA memory and the like, and using
+proper mb(),rmb(),wmb() barriers, so that we don't end up with drivers
+directly using our own dmb(),dsb(),isb().)
