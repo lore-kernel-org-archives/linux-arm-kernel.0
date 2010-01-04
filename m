@@ -1,37 +1,50 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sun, 3 Jan 2010 22:29:26 -0500
-Subject: [patch 2/4] [ARM] mmp: support marvell ARMADA610
-In-Reply-To: <f17812d71001031849y294b0a99jdde0aa3e504a04fe@mail.gmail.com>
-References: <771cded00912062219p79048babs669abf275419a2b9@mail.gmail.com>
-	<f17812d70912281949r57e1ca83q65c3fb38c4675056@mail.gmail.com>
-	<771cded00912310642x5ffeb071pcf6ade605138bb63@mail.gmail.com>
-	<f17812d70912311946n42b6eb13q78afdbd92d2708e9@mail.gmail.com>
-	<771cded01001031827j28dc6aa9l5425669f2ceeb27a@mail.gmail.com>
-	<f17812d71001031849y294b0a99jdde0aa3e504a04fe@mail.gmail.com>
-Message-ID: <771cded01001031929w688217d3g257b395f7544ee7a@mail.gmail.com>
+From: ben@simtec.co.uk (Ben Dooks)
+Date: Mon, 04 Jan 2010 11:45:32 +0900
+Subject: [PATCH] mach-osiris-dvs.c: Convert boolean bit tests to logical
+	tests
+In-Reply-To: <1262539781.1932.128.camel@Joe-Laptop.home>
+References: <1262539781.1932.128.camel@Joe-Laptop.home>
+Message-ID: <4B41564C.6080802@simtec.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> It really hurt performance a lot. While the difference between MMP series
->>> is just the offset of the IRQ_NUM register, it could be calculated in
->>> get_irqnr_preamble, which doesn't have to be executed each time
->>> in the IRQ handling loop. See arch/arm/kernel/entry-armv.S
->>
->> get_irqnr_preamble can only carries one base parameter and one tmp
->> parameter. base parameter is already used for interrupt control
->> register. Only one tmp parameter is left for use. If we want to check
->> chip id, one parameter is not enought.
->>
->
-> I'm a bit confused, but those are just registers that the macro is able to use,
-> not something as parameters??
->
+Joe Perches wrote:
+> Bit tests on booleans seem odd, logical tests more appropriate
 
-I could totaly use two parameters / registers. One is already used for
-irq controller. Loading the value from irq controller register needs
-one register. Storing camparison needs another register. At least, I
-need two registers except irq controller register. But there's no
-enough parameter / register in get_irqnr_preamble.
+I think this is ok, don't currently have any hardware on hand to
+test it.
 
-Thanks
-Haojian
+> Signed-off-by: Joe Perches <joe@perches.com>
+
+Ackced-by: Ben Dooks <ben-linux@fluff.org>
+
+> diff --git a/arch/arm/mach-s3c2440/mach-osiris-dvs.c b/arch/arm/mach-s3c2440/mach-osiris-dvs.c
+> index ad2792d..2367606 100644
+> --- a/arch/arm/mach-s3c2440/mach-osiris-dvs.c
+> +++ b/arch/arm/mach-s3c2440/mach-osiris-dvs.c
+> @@ -69,16 +69,14 @@ static int osiris_dvs_notify(struct notifier_block *nb,
+>  
+>  	switch (val) {
+>  	case CPUFREQ_PRECHANGE:
+> -		if (old_dvs & !new_dvs ||
+> -		    cur_dvs & !new_dvs) {
+> +		if ((old_dvs && !new_dvs) || (cur_dvs && !new_dvs)) {
+>  			pr_debug("%s: exiting dvs\n", __func__);
+>  			cur_dvs = false;
+>  			gpio_set_value(OSIRIS_GPIO_DVS, 1);
+>  		}
+>  		break;
+>  	case CPUFREQ_POSTCHANGE:
+> -		if (!old_dvs & new_dvs ||
+> -		    !cur_dvs & new_dvs) {
+> +		if ((!old_dvs && new_dvs) || (!cur_dvs && new_dvs)) {
+>  			pr_debug("entering dvs\n");
+>  			cur_dvs = true;
+>  			gpio_set_value(OSIRIS_GPIO_DVS, 0);
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
