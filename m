@@ -1,31 +1,31 @@
-From: Leif.Lindholm@arm.com (Leif Lindholm)
-Date: Mon, 4 Jan 2010 18:18:55 +0000
-Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors (v2)
-In-Reply-To: <20091219172833.GA6187@n2100.arm.linux.org.uk>
-References: <20091218182007.GF5527@n2100.arm.linux.org.uk>
-	<1261243122.4637.9.camel@pc1117.cambridge.arm.com>
-	<20091219172833.GA6187@n2100.arm.linux.org.uk>
-Message-ID: <F74D5D79E8EA1244A97ECCA56C4D01DB771E2EDD86@BUNGLE.Emea.Arm.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Mon, 4 Jan 2010 18:49:19 +0000
+Subject: Ethernet / SD Boot
+In-Reply-To: <4B422545.2000509@warmcat.com>
+References: <20091228224435.GA23617@sirena.org.uk>
+	<4B39D439.9070909@warmcat.com>
+	<20091229123348.GB5784@opensource.wolfsonmicro.com>
+	<4B39FB2C.4010608@warmcat.com>
+	<20091230131559.GA369@opensource.wolfsonmicro.com>
+	<4B3B579E.8030105@warmcat.com>
+	<20091231122727.GA5613@opensource.wolfsonmicro.com>
+	<4B3CA02D.9000208@warmcat.com> <4B42169E.5040007@simtec.co.uk>
+	<4B422545.2000509@warmcat.com>
+Message-ID: <20100104184919.GA13537@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: 19 December 2009 17:29
+Fwiw:
 
-> > I wonder if there could be an exploit with Leif's current
-> > implementation. The LDREX/STREX pair to uncached or device memory may
-> > never complete. This way a user SWP to something like the frame
-> > buffer would lock the kernel.
->
-> That means we shouldn't consider applying it until that has been
-> investigated.
+1. 100% of CPUs I've used don't have SD boot.
+2. I don't want to fiddle about with removing and replacing an SD card
+   every time I change the kernel / bootloader.
+   Give me a cable and computer!
+3. It's good to have a debricking strategy, but even better if it's the
+   same as or similar to the regular development strategy - better
+   test coverage, less knowledge to get lost.
+4. Thus hardware USB boot is surely best, and TFTP the next best :-)
+5. JTAG board connectivity is sometimes done with Perl and parallel ports
+   too; it's not reserved only for expensive dev packages.
 
-What if I modify the patch such that a failed STREX causes the emulation to
-return success without readjusting the PC? This would result in the SWP
-instruction being executed again upon returning to the application - removing
-the potential kernel lockup.
-
-/
-        Leif
-
--- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
+-- Jamie
