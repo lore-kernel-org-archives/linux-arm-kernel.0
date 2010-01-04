@@ -1,42 +1,39 @@
-From: andy@warmcat.com (Andy Green)
-Date: Mon, 04 Jan 2010 18:09:26 +0000
-Subject: Ethernet / SD Boot
-In-Reply-To: <20100104174046.GC14533@n2100.arm.linux.org.uk>
-References: <20091228224435.GA23617@sirena.org.uk>
-	<4B39D439.9070909@warmcat.com>
-	<20091229123348.GB5784@opensource.wolfsonmicro.com>
-	<4B39FB2C.4010608@warmcat.com>
-	<20091230131559.GA369@opensource.wolfsonmicro.com>
-	<4B3B579E.8030105@warmcat.com>
-	<20091231122727.GA5613@opensource.wolfsonmicro.com>
-	<4B3CA02D.9000208@warmcat.com> <4B42169E.5040007@simtec.co.uk>
-	<4B422545.2000509@warmcat.com>
-	<20100104174046.GC14533@n2100.arm.linux.org.uk>
-Message-ID: <4B422ED6.1030306@warmcat.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon,  4 Jan 2010 18:24:50 +0000
+Subject: [PATCH 2/3] mx31ads: Allow enable/disable of switchable supplies
+In-Reply-To: <1262629491-18942-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1262629491-18942-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1262629491-18942-2-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/10 17:40, Somebody in the thread at some point said:
-> On Mon, Jan 04, 2010 at 05:28:37PM +0000, Andy Green wrote:
->> Otherwise, you should study carefully the advantages you can get from
->> true SD Boot in simplifying the hardware, software engineering and
->> production / test / debrick.  It has pretty revolutionary benefits.
->
-> Look, it's very obvious from every one of your replies that you think
-> the sun shines out of your SD cards, it's superiour to whatever else
-> people are using, and that everyone should use it.
->
-> You have an answer for every argument to the contrary.
+They will be automatically powered off at startup so users will
+need to enable them for use.
 
-Yeah, that's normally considered a good sign for a thesis.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-mx3/mx31ads.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-> Well, fine, you're entitled to that opinion.
->
-> Now can we stop discussing this and move on please.
-
-Sure.
-
-However if anyone else is interested in help setting up with it, feel 
-free to contact me direct.
-
--Andy
+diff --git a/arch/arm/mach-mx3/mx31ads.c b/arch/arm/mach-mx3/mx31ads.c
+index cda570b..718fbe6 100644
+--- a/arch/arm/mach-mx3/mx31ads.c
++++ b/arch/arm/mach-mx3/mx31ads.c
+@@ -302,6 +302,7 @@ static struct regulator_init_data ldo1_data = {
+ 		.min_uV = 2800000,
+ 		.max_uV = 2800000,
+ 		.valid_modes_mask = REGULATOR_MODE_NORMAL,
++		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+ 		.apply_uV = 1,
+ 	},
+ };
+@@ -318,6 +319,7 @@ static struct regulator_init_data ldo2_data = {
+ 		.min_uV = 3300000,
+ 		.max_uV = 3300000,
+ 		.valid_modes_mask = REGULATOR_MODE_NORMAL,
++		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+ 		.apply_uV = 1,
+ 	},
+ 	.num_consumer_supplies = ARRAY_SIZE(ldo2_consumers),
+-- 
+1.6.5.7
