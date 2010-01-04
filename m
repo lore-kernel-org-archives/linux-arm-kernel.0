@@ -1,105 +1,166 @@
 From: ben@simtec.co.uk (Ben Dooks)
-Date: Tue, 05 Jan 2010 01:26:06 +0900
-Subject: Ethernet / SD Boot
-In-Reply-To: <4B3CA02D.9000208@warmcat.com>
-References: <20091228192244.GD14799@sirena.org.uk>	<4B390AC3.2060702@warmcat.com>	<20091228202123.GA16524@sirena.org.uk>	<4B391941.6000906@warmcat.com>	<20091228224435.GA23617@sirena.org.uk>	<4B39D439.9070909@warmcat.com>	<20091229123348.GB5784@opensource.wolfsonmicro.com>	<4B39FB2C.4010608@warmcat.com>	<20091230131559.GA369@opensource.wolfsonmicro.com>	<4B3B579E.8030105@warmcat.com>	<20091231122727.GA5613@opensource.wolfsonmicro.com>
-	<4B3CA02D.9000208@warmcat.com>
-Message-ID: <4B42169E.5040007@simtec.co.uk>
+Date: Tue, 05 Jan 2010 01:29:41 +0900
+Subject: kernel boot failure on with s32440/mini2440 with git
+	head	(dd59f6c76b2)
+In-Reply-To: <200912211410.12014.jbe@pengutronix.de>
+References: <4B2E4A65.8070207@walsimou.com>
+	<200912211410.12014.jbe@pengutronix.de>
+Message-ID: <4B421775.90008@simtec.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andy Green wrote:
-> On 12/31/09 12:27, Somebody in the thread at some point said:
-> 
-> Hi -
-> 
->> The one I've had the most positive experience with was the BDI2000 - no
->> host software required, it's controlled over the network via telnet (and
->> possibly other things now) for non-debugging activity and provides a GDB
->> stub for debugging.  Like everything else there are plenty of rubbish
->> products out there.
-> 
-> Sounds pretty good, thanks for the tip.
-
-I pine for the BDI2000 I was lent...
-
-Of course, with bed of nails type systems it is probably possible to
-allow the system to boot off what you like, NAND is easily ~18
-connections to the board, SD is of course less.
-
->>>> Assuming the hardware can cope with it, and there's component cost,
->>>> board area and mechanical concerns to address before it gets designed
->>>> in.  There are a lot of systems where it would be useful but there's
->>>> drawbacks you have to bear in mind when pushing it.
+Juergen Beisert wrote:
+> On Sonntag, 20. Dezember 2009, Gaye Abdoulaye Walsimou wrote:
+>> Hello list,
+>> I have here a boot Oops (see below) with the latest git revision of
+>> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git,
+>> which does not happen with 2.6.32.
+>> Thanks in advance for comments.
+>> Regards
 >>
->>> I don't really regard those as drawbacks.
+>> ####Boot log ####
 >>
->>> Component cost is just the connector and four pullups, I guess it's
->>> $0.70.
->>
->> That 70 cents does rather add up once you start to ship in volume, even
->> a fraction of that would.
+>> Uncompressing
+>> Linux......................................................................
+>> ..................................... Linux version
+>> 2.6.33-rc1-00096-gdd59f6c
+>> (walsimou at wnotebook02.walsimou.com) (gcc version 4.4.2 (GCC) ) #71
+>> PREEMPT Sun Dec 209
+>> CPU: ARM920T [41129200] revision 0 (ARMv4T), cr=c0007177
+>> CPU: VIVT data cache, VIVT instruction cache
+>> Machine: MINI2440
+>> Memory policy: ECC disabled, Data cache writeback
+>> CPU S3C2440A (id 0x32440001)
+>> S3C24XX Clocks, Copyright 2004 Simtec Electronics
+>> S3C244X: core 400.000 MHz, memory 100.000 MHz, peripheral 50.000 MHz
+>> CLOCK: Slow mode (1.500 MHz), fast, MPLL on, UPLL on
+>> Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 16256
+>> Kernel command line: root=/dev/ram rw rootfstype=initramfs
+>> console=ttySAC0,115200 user_debug=31 rdinit=/sbin/init
+>> PID hash table entries: 256 (order: -2, 1024 bytes)
+>> Dentry cache hash table entries: 8192 (order: 3, 32768 bytes)
+>> Inode-cache hash table entries: 4096 (order: 2, 16384 bytes)
+>> Memory: 64MB = 64MB total
+>> Memory: 56568KB available (2476K code, 364K data, 5460K init, 0K highmem)
+>> Hierarchical RCU implementation.
+>> NR_IRQS:85
+>> irq: clearing subpending status 00000003
+>> irq: clearing subpending status 00000002
+>> Console: colour dummy device 80x30
+>> console [ttySAC0] enabled
+>> Calibrating delay loop... 199.47 BogoMIPS (lpj=498688)
+>> Mount-cache hash table entries: 512
+>> CPU: Testing write buffer coherency: ok
+>> NET: Registered protocol family 16
+>> MINI2440: Option string mini2440=0tb
+>> MINI2440: 't' ignored, touchscreen not compiled in
+>> MINI2440: LCD [0:240x320] 1:800x480 2:1024x768
+>> Unable to handle kernel NULL pointer dereference at virtual address
+>> 00000000 pgd = c0004000
+>> [00000000] *pgd=00000000
+>> Internal error: Oops: 5 [#1] PREEMPT
+>> last sysfs file:
+>> Modules linked in:
+>> CPU: 0    Not tainted  (2.6.33-rc1-00096-gdd59f6c #71)
+>> PC is at memcpy+0x64/0x29c
+>> LR is at kmemdup+0x30/0x38
+>> pc : [<c065bfc4>]    lr : [<c05b529c>]    psr: 00000013
+>> sp : c381dee4  ip : 0000001c  fp : c381df1c
+>> r10: c0556690  r9 : 00000000  r8 : c07cccc8
+>> r7 : c07cc640  r6 : 00000000  r5 : c3854360  r4 : 00000004
+>> r3 : c3805400  r2 : ffffffe4  r1 : 00000000  r0 : c3854360
+>> Flags: nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+>> Control: c000717f  Table: 30004000  DAC: 00000017
+>> Process swapper (pid: 1, stack limit = 0xc381c270)
+>> Stack: (0xc381dee4 to 0xc381e000)
+>> dee0:          c3854360 00000000 c07cc640 c07cccc8 c3854360 00000004
+>> c05b529c
+>> df00: c3854380 00000000 c38543a0 c07cc640 c381df3c c381df20 c000efb0
+>> c05b527c
+>> df20: 00000003 0000006c c0556804 c07cc640 c381df94 c381df40 c000db0c
+>> c000ef20
+>> df40: c06a6f7c 00000002 00000003 00000000 c07cc640 c0556690 00000000
+>> 00000000
+>> df60: 00000000 00000000 00000000 00000000 c000b6a0 c001f88c 00000001
+>> 00000000
+>> df80: 00000000 00000000 c381dfa4 c381df98 c000b6c0 c000d898 c381dfdc
+>> c381dfa8
+>> dfa0: c055d3e0 c000b6b0 00000054 c07d2108 00000000 00000000 c381dfdc
+>> c001f634
+>> dfc0: c001f88c 00000000 00000000 00000000 c381dff4 c381dfe0 c0008600
+>> c055d388
+>> dfe0: 00000000 00000000 00000000 c381dff8 c0575868 c0008560 33cc33cc
+>> 33cc37cc
+>> Backtrace:
+>> [<c05b526c>] (kmemdup+0x0/0x38) from [<c000efb0>]
+>> (s3c_nand_set_platdata+0xa0/0x10c)
+>>  r7:c07cc640 r6:c38543a0 r5:00000000 r4:c3854380
+>> [<c000ef10>] (s3c_nand_set_platdata+0x0/0x10c) from [<c000db0c>]
+>> (mini2440_init+0x284/0x30c)
+>>  r7:c07cc640 r6:c0556804 r5:0000006c r4:00000003
+>> [<c000d888>] (mini2440_init+0x0/0x30c) from [<c000b6c0>]
+>> (customize_machine+0x20/0x2c)
+>> [<c000b6a0>] (customize_machine+0x0/0x2c) from [<c055d3e0>]
+>> (do_one_initcall+0x68/0x1c4)
+>> [<c055d378>] (do_one_initcall+0x0/0x1c4) from [<c0008600>]
+>> (kernel_init+0xb0/0x12c)
+>>  r8:00000000 r7:00000000 r6:00000000 r5:c001f88c r4:c001f634
+>> [<c0008550>] (kernel_init+0x0/0x12c) from [<c0575868>] (do_exit+0x0/0x650)
+>>  r5:00000000 r4:00000000
+>> Code: e4915004 e4916004 e4917004 e4918004 (e491e004)
+>> ---[ end trace 2719ed1c0000000a ]---
+>> Kernel panic - not syncing: Attempted to kill init!
+>> Backtrace:
+>> [<c05618a0>] (dump_backtrace+0x0/0x114) from [<c074268c>]
+>> (dump_stack+0x18/0x1c)
+>>  r7:00000005 r6:c3819c40 r5:c07d0080 r4:c07de690
+>> [<c0742674>] (dump_stack+0x0/0x1c) from [<c07426e4>] (panic+0x54/0x12c)
+>> [<c0742690>] (panic+0x0/0x12c) from [<c05758d8>] (do_exit+0x70/0x650)
+>>  r3:c07d0080 r2:00000002 r1:c381dd44 r0:c0799fb8
+>> [<c0575868>] (do_exit+0x0/0x650) from [<c0561db8>] (die+0x190/0x1b4)
+>> [<c0561c28>] (die+0x0/0x1b4) from [<c05635fc>]
+>> (__do_kernel_fault+0x6c/0x7c) [<c0563590>] (__do_kernel_fault+0x0/0x7c)
+>> from [<c05637d8>]
+>> (do_page_fault+0x1cc/0x1e4)
+>>  r7:00000000 r6:00000000 r5:c381de9c r4:c3819c40
+>> [<c056360c>] (do_page_fault+0x0/0x1e4) from [<c0563894>]
+>> (do_translation_fault+0x18/0x7c)
+>> [<c056387c>] (do_translation_fault+0x0/0x7c) from [<c055d314>]
+>> (do_DataAbort+0x3c/0xa0)
+>>  r7:c381de9c r6:00000000 r5:c07cbd40 r4:00000005
+>> [<c055d2d8>] (do_DataAbort+0x0/0xa0) from [<c055db00>]
+>> (__dabt_svc+0x40/0x60)
+>> Exception stack(0xc381de9c to 0xc381dee4)
+>> de80:
+>> c3854360
+>> dea0: 00000000 ffffffe4 c3805400 00000004 c3854360 00000000 c07cc640
+>> c07cccc8
+>> dec0: 00000000 c0556690 c381df1c 0000001c c381dee4 c05b529c c065bfc4
+>> 00000013
+>> dee0: ffffffff
+>>  r7:c07cc640 r6:00000000 r5:c381ded0 r4:ffffffff
+>> [<c05b526c>] (kmemdup+0x0/0x38) from [<c000efb0>]
+>> (s3c_nand_set_platdata+0xa0/0x10c)
+>>  r7:c07cc640 r6:c38543a0 r5:00000000 r4:c3854380
+>> [<c000ef10>] (s3c_nand_set_platdata+0x0/0x10c) from [<c000db0c>]
+>> (mini2440_init+0x284/0x30c)
+>>  r7:c07cc640 r6:c0556804 r5:0000006c r4:00000003
+>> [<c000d888>] (mini2440_init+0x0/0x30c) from [<c000b6c0>]
+>> (customize_machine+0x20/0x2c)
+>> [<c000b6a0>] (customize_machine+0x0/0x2c) from [<c055d3e0>]
+>> (do_one_initcall+0x68/0x1c4)
+>> [<c055d378>] (do_one_initcall+0x0/0x1c4) from [<c0008600>]
+>> (kernel_init+0xb0/0x12c)
+>>  r8:00000000 r7:00000000 r6:00000000 r5:c001f88c r4:c001f634
+>> [<c0008550>] (kernel_init+0x0/0x12c) from [<c0575868>] (do_exit+0x0/0x650)
+>>  r5:00000000 r4:00000000
 > 
-> You did notice that you get to save money back from removing NAND and
-> JTAG connectors?
+> Some (or most?) of the __initdata are bogus in the 
+> arch/arm/mach-s3c2440/mach-mini2440.c. You must remove them.
 
-A lot of times these are done as 'bed of nails' pads on the PCB so
-hardly a bank breaker... Also, see PoP argument below.
+this is becoming less true, the problem here is the nand code
+that fails to correctly set the platform data after copying it.
 
-> Due to the other advantages of SD Boot basis you can also expect to get
-> your product to market quicker, spend less time in the factory, and have
-> less returns all of which save money.
+A fix has been pull-requested.
 
-And as shown by the nook, make it really easy for your users to root the
-thing without trying. You've been spoiled a bit by having an open design
-to play with, not everyone likes their users messing with the hardware
-once it has left the factory.
-
-Also as another cost item, a lot of the newer cpus with PoP style memory
-have some form of NAND/OneNAND built into the system already so adding
-an extra SD card is often seen as a waste of extant storage.
-
-> So I wouldn't let this notional $0.70 put you off.
-> 
->>> Yeah you need to make the uSD connector accessible if you remove a
->>> cover, that's generally not hard.
->>
->> In some form factors.  In others it's very problematic.
-> 
-> Dunno how problematic it can be actually, unless you dunk your board in
-> epoxy.  uSD connectors are very small footprint and low profile since
-> they're widely used in consumer equipment like phones.  Since you only
-> need access to it in a crisis due to bricking it, it's OK if you have to
-> remove a cover or whatever.  Space shouldn't be an issue due to what it
-> allows you to throw out from the board.  I'm sure there are special
-> cases but I maintain "generally, that's not hard".
-
-A lot of the time, the bigger manufacturers have enough money that a
-commercial JTAG system makes sense, as not only can it program the board
-but there are also connectivity checking systems that allow you to do
-signal connectiivty testing and other such wonderfullnesses for you.
-
-Smaller vendors tend to cobble together something using open-source
-tools, etc.
-
->>> CPUs in the class where it is useful (ARM11+) all tend to have one
->>> or more SD peripheral unit on the CPU already, so that's for free.
->>
->> Assuming you've not used all the pins for something else, which is again
->> a problem for some classes of device.
-> 
-> Yeah it's true, if the mux arrangements conflict with other peripheral
-> units you must have something's got to give.
-> 
-> But many chips have 2 or 3 SD units, mux arrangements that bring the
-> same things to different pins.  In the case of SD interface, it's a
-> given in context of phones where a lot of these chips go, so you tend
-> not to find other IO on those balls that is critical and does not also
-> appear on other ball muxes.  (It's only 6 balls anyway, it's not like a
-> memory bus).  It seems you can typically expect you're going to be able
-> to use SD unless you find a specific conflict because the chips are
-> deliberately designed to enable SD usage in typical design.
-
-and of course, a lot of modern mobile devices need SD for talking to
-other devices, such as WLAN chips, external storage cards, etc. It can
-soon take a toll on what is available.
+Please don't go round removing the initdata just yet.
