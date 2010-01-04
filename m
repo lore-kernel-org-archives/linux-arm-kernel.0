@@ -1,61 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 4 Jan 2010 16:20:14 +0000
-Subject: [PXA320] dmac_flush_range and burst on SMEMC
-In-Reply-To: <354684.99618.qm@web23301.mail.ird.yahoo.com>
-References: <354684.99618.qm@web23301.mail.ird.yahoo.com>
-Message-ID: <20100104162014.GA14533@n2100.arm.linux.org.uk>
+From: teawater@gmail.com (Hui Zhu)
+Date: Tue, 5 Jan 2010 00:22:02 +0800
+Subject: [PATCH] stack2core: show stack message and convert it to core
+	file when kernel die
+In-Reply-To: <20100103151406.20228c3a@infradead.org>
+References: <daef60381001030705r93b3fbfkc50e7b9bbc62b334@mail.gmail.com>
+	<4B411F14.1040302@kernel.org> <20100103150134.5bdab023@infradead.org>
+	<4B412341.2010002@kernel.org> <20100103151406.20228c3a@infradead.org>
+Message-ID: <daef60381001040822q188d7374te5a177c5f9877ac2@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2009 at 09:00:15AM +0000, Patrick wrote:
-> I am using a PXA320 with a FPGA connected on the VLIO memory bus. For
-> faster transfer between the PXA and the FPGA I would like to use burst
-> (supported by the SMEMC in VLIO).
-> 
-> I was using a 2.6.26 kernel and burst was working very fine. I was using
-> ioremap_cached and after a loop of iowrite32 and a call to dmac_flush_range
-> to start the burst. It was working fine.
+Thanks for your mail.
 
-Note that this kind of abuse eventually runs into problems.  Just because
-dmac_flush_range() seems to do what you want, that doesn't mean it will
-always do so.
+I am not sure s2c is not a duplicating work with with others or not.
 
-As an example, its counterparts, dmac_inv_range() and dmac_clean_range()
-will be removed in the next kernel version, because they need to be changed
-in order to support ARMv6 and ARMv7 CPUs with their speculative prefetching.
+The main work of it is give user a coredump when kernel die like a
+user level program die.
+The user can very easy use it with gdb.
+Now, it support x86/x8664/mips/arm.  It's very easy to extend.  To
+support a new arch is not a very hard work. (I use half a day make it
+support mips and mips64 include the test work.)
 
-I need the freedom to change the backend interfaces of the major APIs
-to ensure that the ARM kernel can continue to run on newer ARM CPUs.
-Abusing the backend interfaces makes that job much harder without
-causing breakage - and the more people who abuse the backend interfaces
-the more likely I'm just going to turn around and say "tough, eat the
-breakage, it's your problem".
+And the s2c convert program can run on every environment.  I try it in
+x86, x8664, mipsn32 . It didn't depend on any special lib.  User can
+compile it with "gcc s2c.c" to get it.  And run it in a small board
+that didn't have some script support.
 
-Consider that when we get ARM CPUs which have DMA coherent caches, all
-the dmac_* functions will become no-ops for those CPUs - which means if
-you're using them for non-DMA purposes, suddenly they stop having the
-effect you want them to.
+markup_oops.pl sames still not support cross compile environment.  It
+get module message with modinfo,right?  And use some objdump and so
+on.
+So even if it support cross compile environment, user use it will need
+set which objdump he want use.  Which mod dir  he want use.  Right?
 
-> I have migrated to a 2.6.28 kernel with the same driver code. All the
-> data writed by the loop of iowrite32 is lost and only the last burst is
-> writed using PIO and no burst. It's like if dmac_flush_range is not
-> working and flush no cash at all.
+For the s2c, user just "s2c < message >core" It did everything with itself.
+After that, gdb vmlinux core.
 
-Nothing's changed with dmac_flush_range()... yet.  What you may be
-experiencing is the effect of the L2 cache - Xscale3 CPUs have an L2
-cache, and this isn't touched by dmac_flush_range().  outer_flush_range()
-will do this, but note that it takes physical addresses.
+Best regards,
+Hui
 
-> Do you have any idea ? Should I use another function than dmac_flush_range ?
-
-I'm afraid we don't have any interfaces for operating on ioremapped
-memory.
-
-I think what you actually want to be doing is using ioremap_wc() to get
-a write combining mapping, rather than a fully cached mapping, and using
-dmb() to provide memory barriers.
-
-(On dmb(), I think we should actually start moving ARMv6 and Xscale3 over
-to using write combining mappings for DMA memory and the like, and using
-proper mb(),rmb(),wmb() barriers, so that we don't end up with drivers
-directly using our own dmb(),dsb(),isb().)
+On Mon, Jan 4, 2010 at 07:14, Arjan van de Ven <arjan@infradead.org> wrote:
+> On Mon, 04 Jan 2010 08:07:45 +0900
+> Tejun Heo <tj@kernel.org> wrote:
+>
+>> On 01/04/2010 08:01 AM, Arjan van de Ven wrote:
+>> > On Mon, 04 Jan 2010 07:49:56 +0900
+>> > Tejun Heo <tj@kernel.org> wrote:
+>> >>
+>> >> If implementing parsing of oops message in C is too awkward
+>> >> (unsurprising at all), maybe implementing a converter in perl or
+>> >> python is the easiest way so that it takes the oops message and
+>> >> puts out well formatted input for the s2c program?
+>> >
+>> > you mean like scripts/markup_oops.pl ?
+>>
+>> Whichever one works but s2c wouldn't require symbol decoding. ?Maybe
+>> we can simply add an option to tell it to just parse the oops and
+>> output it in machine friendly format. ?Oh, also, the patch does add
+>> new information the module load addresses. ?We should be able to add
+>> those to the oops message in a compact form.
+>
+> actually one does not need those; you know the start address of the
+> function already from the current oops output, and since you know the
+> address of the function within the module as well, you know the start
+> address of the module.
+>
+>
+> --
+> Arjan van de Ven ? ? ? ?Intel Open Source Technology Centre
+> For development, discussion and tips for power savings,
+> visit http://www.lesswatts.org
+>
