@@ -1,45 +1,43 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 4 Jan 2010 12:40:05 +0530
-Subject: [Patch v4] OMAP: sDMA driver: descriptor autoloading feature
-In-Reply-To: <618f0c911001032303p5d103f3et6271a71e1e5fbc96@mail.gmail.com>
-References: <618f0c910912110701p771dcf6fg655bb0a7b9bdc96d@mail.gmail.com>
-	<20091228214846.GP3512@atomide.com>
-	<618f0c911001032303p5d103f3et6271a71e1e5fbc96@mail.gmail.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C02E97E9@dbde02.ent.ti.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 4 Jan 2010 15:52:31 +0800
+Subject: [ARM] pxa: fix compiler warnings of unused variable 'id' in
+	cpu_is_pxa9*()
+Message-ID: <f17812d71001032352gec110bak2e0157f0d5cc89be@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: svenkatr at gmail.com [mailto:svenkatr at gmail.com] On Behalf Of S, Venkatraman
-> Sent: Monday, January 04, 2010 12:33 PM
-> To: Tony Lindgren
-> Cc: Russell King - ARM Linux; Shilimkar, Santosh; Kevin Hilman; linux-omap at vger.kernel.org; linux-
-> arm-kernel at lists.infradead.org
-> Subject: Re: [Patch v4] OMAP: sDMA driver: descriptor autoloading feature
-> 
-> On Tue, Dec 29, 2009 at 3:18 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Venkatraman S <svenkatr@ti.com> [091211 07:01]:
-> >> Here is the most updated version of the patch (thanks to Russell's
-> >> review). This patch is applicable to OMAP4xxx as well as OMAP3630
-> >> Reference to previous posts
-> >> v1 ?http://marc.info/?l=linux-omap&m=125012097403050&w=2
-> >> v2 ?http://marc.info/?l=linux-omap&m=125137152606644&w=2
-> >> v3 ?http://patchwork.kernel.org/patch/45408/
-> >
-> > Do you have a patch for drivers/mmc/host/omap_hsmmc.c to
-> > use this feature? Or some other driver?
-> >
-> > Regards,
-> >
-> > Tony
-> 
-> I am about to start working on omap_hsmmc to use the descriptor load
-> feature. If the DMA changes are acceptable, I can post the driver
-> patch as well.
+commit 0dfc84c9f54d8784f5bc6d303c079d88000ee5f7
+Author: Eric Miao <eric.y.miao@gmail.com>
+Date:   Mon Jan 4 14:44:42 2010 +0800
 
-I don't think doing this for hsmmc makes any sense considering, the IC in which DMA descriptor
-is available( OMAP3630 and OMAP4), the HSMMC controller is already equipped with its dedicated 
-DMA controller (ADMA)
+    [ARM] pxa: fix compiler warnings of unused variable 'id' in cpu_is_pxa9*()
 
-Regards,
-Santosh
+    Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+
+diff --git a/arch/arm/mach-pxa/include/mach/hardware.h
+b/arch/arm/mach-pxa/include/mach/hardware.h
+index 50f1297..e741bf1 100644
+--- a/arch/arm/mach-pxa/include/mach/hardware.h
++++ b/arch/arm/mach-pxa/include/mach/hardware.h
+@@ -250,20 +250,17 @@
+
+ #define cpu_is_pxa930()					\
+ 	({						\
+-		unsigned int id = read_cpuid(CPUID_ID);	\
+-		__cpu_is_pxa930(id);			\
++		__cpu_is_pxa930(read_cpuid_id());	\
+ 	 })
+
+ #define cpu_is_pxa935()					\
+ 	({						\
+-		unsigned int id = read_cpuid(CPUID_ID);	\
+-		__cpu_is_pxa935(id);			\
++		__cpu_is_pxa935(read_cpuid_id());	\
+ 	 })
+
+ #define cpu_is_pxa950()					\
+ 	({						\
+-		unsigned int id = read_cpuid(CPUID_ID);	\
+-		__cpu_is_pxa950(id);			\
++		__cpu_is_pxa950(read_cpuid_id());	\
+ 	 })
