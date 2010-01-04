@@ -1,40 +1,34 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Tue, 5 Jan 2010 06:26:54 +0800
-Subject: [PATCH 06/11] arm-dt: postpone machine detection until setup_arch
-	with CONFIG_ARM_DEVTREE
-In-Reply-To: <4B421903.4050200@simtec.co.uk>
-References: <1261479296.247430.731563214048.6.gpush@pororo>
-	<4B421903.4050200@simtec.co.uk>
-Message-ID: <201001050926.54286.jeremy.kerr@canonical.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Tue, 05 Jan 2010 08:03:50 +0900
+Subject: [PATCH] stack2core: show stack message and convert it to core
+	file when kernel die
+In-Reply-To: <daef60381001040822q188d7374te5a177c5f9877ac2@mail.gmail.com>
+References: <daef60381001030705r93b3fbfkc50e7b9bbc62b334@mail.gmail.com>
+	<4B411F14.1040302@kernel.org>
+	<20100103150134.5bdab023@infradead.org>
+	<4B412341.2010002@kernel.org>
+	<20100103151406.20228c3a@infradead.org>
+	<daef60381001040822q188d7374te5a177c5f9877ac2@mail.gmail.com>
+Message-ID: <4B4273D6.2010306@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+Hello,
 
-> > When we're using CONFIG_ARM_DEVTREE, we need to postpone machine
-> > detection until later in setup_arch. Because ARM_DEVTREE depends on
-> > !DEBUG_LL, we don't need the mdesc this early anyway.
-> >
-> > We'll add support for ARM_DEVTREE && DEBUG_LL later.
-> 
-> Why not add a specific machine type for 'this is device tree' and
-> then these routines don't even need to #ifdef. It would especially
-> be good as it allows dt and non-dt machines to coexist in the same
-> kernel together.
+On 01/05/2010 01:22 AM, Hui Zhu wrote:
+> For the s2c, user just "s2c < message >core" It did everything with itself.
+> After that, gdb vmlinux core.
 
-Mainly because this doesn't gain us much; the machine_desc that is discovered 
-from this new machine type would not have the correct data (phys_io & 
-io_pg_offset) required for early setup (used for DEBUG_LL).
+It is true that by making the kernel oops message more verbose, s2c
+can be made way simpler.  However, dependence on standard object tools
+or perl is already assumed and avoiding it doesn't really buy
+anything.  I really like the idea but unfortunately I'm doubtful that
+it will be able to go upstream in the current form.  The suggested
+solution (extending markup_oops.pl) won't be too much work, most of
+functionality will remain the same and will have much higher chance of
+getting included.
 
-We could conditionally skip the detection if we see a DT machine type, but 
-then we'd need to add similar checks for all the paths where the machine_desc 
-is used.
+Thanks.
 
-However, my goal is indeed to allow DT and non-DT machines to coexist as much 
-as possible, this patch is more a temporary workaround while I figure out how 
-to handle the DEBUG_LL stuff nicely for DT cases.
-
-Cheers,
-
-
-Jeremy
+-- 
+tejun
