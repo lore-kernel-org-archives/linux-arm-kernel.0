@@ -1,57 +1,31 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon,  4 Jan 2010 18:24:49 +0000
-Subject: [PATCH 1/3] mx31ads: Convert 1133-EV1 to use dev_name to specify
-	consumer devices
-Message-ID: <1262629491-18942-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: Leif.Lindholm@arm.com (Leif Lindholm)
+Date: Mon, 4 Jan 2010 18:18:55 +0000
+Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors (v2)
+In-Reply-To: <20091219172833.GA6187@n2100.arm.linux.org.uk>
+References: <20091218182007.GF5527@n2100.arm.linux.org.uk>
+	<1261243122.4637.9.camel@pc1117.cambridge.arm.com>
+	<20091219172833.GA6187@n2100.arm.linux.org.uk>
+Message-ID: <F74D5D79E8EA1244A97ECCA56C4D01DB771E2EDD86@BUNGLE.Emea.Arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This means we don't need to go running round working out struct
-devices at runtime.
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: 19 December 2009 17:29
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-mx3/mx31ads.c |   14 ++------------
- 1 files changed, 2 insertions(+), 12 deletions(-)
+> > I wonder if there could be an exploit with Leif's current
+> > implementation. The LDREX/STREX pair to uncached or device memory may
+> > never complete. This way a user SWP to something like the frame
+> > buffer would lock the kernel.
+>
+> That means we shouldn't consider applying it until that has been
+> investigated.
 
-diff --git a/arch/arm/mach-mx3/mx31ads.c b/arch/arm/mach-mx3/mx31ads.c
-index 0497c15..cda570b 100644
---- a/arch/arm/mach-mx3/mx31ads.c
-+++ b/arch/arm/mach-mx3/mx31ads.c
-@@ -307,12 +307,8 @@ static struct regulator_init_data ldo1_data = {
- };
- 
- static struct regulator_consumer_supply ldo2_consumers[] = {
--	{
--		.supply = "AVDD",
--	},
--	{
--		.supply = "HPVDD",
--	},
-+	{ .supply = "AVDD", .dev_name = "1-001a" },
-+	{ .supply = "HPVDD", .dev_name = "1-001a" },
- };
- 
- /* CODEC and SIM */
-@@ -382,8 +378,6 @@ static struct wm8350_audio_platform_data imx32ads_wm8350_setup = {
- 
- static int mx31_wm8350_init(struct wm8350 *wm8350)
- {
--	int i;
--
- 	wm8350_gpio_config(wm8350, 0, WM8350_GPIO_DIR_IN,
- 			   WM8350_GPIO0_PWR_ON_IN, WM8350_GPIO_ACTIVE_LOW,
- 			   WM8350_GPIO_PULL_UP, WM8350_GPIO_INVERT_OFF,
-@@ -419,10 +413,6 @@ static int mx31_wm8350_init(struct wm8350 *wm8350)
- 			   WM8350_GPIO_PULL_NONE, WM8350_GPIO_INVERT_OFF,
- 			   WM8350_GPIO_DEBOUNCE_OFF);
- 
--	/* Fix up for our own supplies. */
--	for (i = 0; i < ARRAY_SIZE(ldo2_consumers); i++)
--		ldo2_consumers[i].dev = wm8350->dev;
--
- 	wm8350_register_regulator(wm8350, WM8350_DCDC_1, &sw1a_data);
- 	wm8350_register_regulator(wm8350, WM8350_DCDC_3, &viohi_data);
- 	wm8350_register_regulator(wm8350, WM8350_DCDC_4, &violo_data);
--- 
-1.6.5.7
+What if I modify the patch such that a failed STREX causes the emulation to
+return success without readjusting the PC? This would result in the SWP
+instruction being executed again upon returning to the application - removing
+the potential kernel lockup.
+
+/
+        Leif
+
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
