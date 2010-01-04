@@ -1,38 +1,58 @@
-From: simon.kagstrom@netinsight.net (Simon Kagstrom)
-Date: Mon, 4 Jan 2010 09:11:56 +0100
-Subject: 21285 serial driver deadlock(?) fix
-In-Reply-To: <1262039226.28196.125.camel@localhost>
-References: <1262039226.28196.125.camel@localhost>
-Message-ID: <20100104091156.0f384dec@marrow.netinsight.se>
+From: svenkatr@ti.com (Venkatraman S)
+Date: Mon, 4 Jan 2010 14:18:50 +0530
+Subject: [Patch v4] OMAP: sDMA driver: descriptor autoloading feature
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C02E97E9@dbde02.ent.ti.com>
+References: <618f0c910912110701p771dcf6fg655bb0a7b9bdc96d@mail.gmail.com>
+	<20091228214846.GP3512@atomide.com>
+	<618f0c911001032303p5d103f3et6271a71e1e5fbc96@mail.gmail.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C02E97E9@dbde02.ent.ti.com>
+Message-ID: <618f0c911001040048h573b2137v4577b8e00b0121a3@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 28 Dec 2009 17:27:06 -0500
-Steve Moskovchenko <stevenm86@gmail.com> wrote:
+Santosh,
 
-> I've got a board with a StrongARM SA-110 and a 21285 "footbrtidge" on
-> it. The kernel's 21285 serial driver works for kernel messages but not
-> for I/O from userspace.
-> 
-> My kernel experience is pretty limited, but I believe the problem lies
-> in drivers/serial/21285.c.
-> 
-> As I understand it:
-> serial21285_tx_chars looks like an ISR, which likes to call
-> serial21285_stop_tx every once in a while. 
-> serial21285_stop_tx, in turn, calls disable_irq(), which waits for the
-> current instance of the ISR to finish before disabling that interrupt.
-> But, calling this from within an ISR results in deadlock and makes the
-> puppy very sad. 
-> 
-> I've modified the ISR to call a different version of stop_tx, which uses
-> disable_irq_nosync() instead. This gave me a working console.
+On Mon, Jan 4, 2010 at 12:40 PM, Shilimkar, Santosh
+<santosh.shilimkar@ti.com> wrote:
+>> -----Original Message-----
+>> From: svenkatr at gmail.com [mailto:svenkatr at gmail.com] On Behalf Of S, Venkatraman
+>> Sent: Monday, January 04, 2010 12:33 PM
+>> To: Tony Lindgren
+>> Cc: Russell King - ARM Linux; Shilimkar, Santosh; Kevin Hilman; linux-omap at vger.kernel.org; linux-
+>> arm-kernel at lists.infradead.org
+>> Subject: Re: [Patch v4] OMAP: sDMA driver: descriptor autoloading feature
+>>
+>> On Tue, Dec 29, 2009 at 3:18 AM, Tony Lindgren <tony@atomide.com> wrote:
+>> > * Venkatraman S <svenkatr@ti.com> [091211 07:01]:
+>> >> Here is the most updated version of the patch (thanks to Russell's
+>> >> review). This patch is applicable to OMAP4xxx as well as OMAP3630
+>> >> Reference to previous posts
+>> >> v1 ?http://marc.info/?l=linux-omap&m=125012097403050&w=2
+>> >> v2 ?http://marc.info/?l=linux-omap&m=125137152606644&w=2
+>> >> v3 ?http://patchwork.kernel.org/patch/45408/
+>> >
+>> > Do you have a patch for drivers/mmc/host/omap_hsmmc.c to
+>> > use this feature? Or some other driver?
+>> >
+>> > Regards,
+>> >
+>> > Tony
+>>
+>> I am about to start working on omap_hsmmc to use the descriptor load
+>> feature. If the DMA changes are acceptable, I can post the driver
+>> patch as well.
+>
+> I don't think doing this for hsmmc makes any sense considering, the IC in which DMA descriptor
+> is available( OMAP3630 and OMAP4), the HSMMC controller is already equipped with its dedicated
+> DMA controller (ADMA)
+>
+> Regards,
+> Santosh
+> --
 
-I sent a similar patch some weeks ago:
+AFAIK, 3630 does not have ADMA feature.
+In OMAP4, ADMA support is available for MMC controllers 1 and 2 only;
+the other 3 controllers still use sDMA.
 
-  http://www.spinics.net/lists/arm-kernel/msg77006.html
-
-which fixes the same problem for me. It would be good to get at least
-one of these in I think. My patch also uses _nosync for stop_rx.
-
-// Simon
+Best regards,
+Venkat.
