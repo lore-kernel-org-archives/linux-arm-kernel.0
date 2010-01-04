@@ -1,43 +1,38 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 4 Jan 2010 15:52:31 +0800
-Subject: [ARM] pxa: fix compiler warnings of unused variable 'id' in
-	cpu_is_pxa9*()
-Message-ID: <f17812d71001032352gec110bak2e0157f0d5cc89be@mail.gmail.com>
+From: simon.kagstrom@netinsight.net (Simon Kagstrom)
+Date: Mon, 4 Jan 2010 09:11:56 +0100
+Subject: 21285 serial driver deadlock(?) fix
+In-Reply-To: <1262039226.28196.125.camel@localhost>
+References: <1262039226.28196.125.camel@localhost>
+Message-ID: <20100104091156.0f384dec@marrow.netinsight.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 0dfc84c9f54d8784f5bc6d303c079d88000ee5f7
-Author: Eric Miao <eric.y.miao@gmail.com>
-Date:   Mon Jan 4 14:44:42 2010 +0800
+On Mon, 28 Dec 2009 17:27:06 -0500
+Steve Moskovchenko <stevenm86@gmail.com> wrote:
 
-    [ARM] pxa: fix compiler warnings of unused variable 'id' in cpu_is_pxa9*()
+> I've got a board with a StrongARM SA-110 and a 21285 "footbrtidge" on
+> it. The kernel's 21285 serial driver works for kernel messages but not
+> for I/O from userspace.
+> 
+> My kernel experience is pretty limited, but I believe the problem lies
+> in drivers/serial/21285.c.
+> 
+> As I understand it:
+> serial21285_tx_chars looks like an ISR, which likes to call
+> serial21285_stop_tx every once in a while. 
+> serial21285_stop_tx, in turn, calls disable_irq(), which waits for the
+> current instance of the ISR to finish before disabling that interrupt.
+> But, calling this from within an ISR results in deadlock and makes the
+> puppy very sad. 
+> 
+> I've modified the ISR to call a different version of stop_tx, which uses
+> disable_irq_nosync() instead. This gave me a working console.
 
-    Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+I sent a similar patch some weeks ago:
 
-diff --git a/arch/arm/mach-pxa/include/mach/hardware.h
-b/arch/arm/mach-pxa/include/mach/hardware.h
-index 50f1297..e741bf1 100644
---- a/arch/arm/mach-pxa/include/mach/hardware.h
-+++ b/arch/arm/mach-pxa/include/mach/hardware.h
-@@ -250,20 +250,17 @@
+  http://www.spinics.net/lists/arm-kernel/msg77006.html
 
- #define cpu_is_pxa930()					\
- 	({						\
--		unsigned int id = read_cpuid(CPUID_ID);	\
--		__cpu_is_pxa930(id);			\
-+		__cpu_is_pxa930(read_cpuid_id());	\
- 	 })
+which fixes the same problem for me. It would be good to get at least
+one of these in I think. My patch also uses _nosync for stop_rx.
 
- #define cpu_is_pxa935()					\
- 	({						\
--		unsigned int id = read_cpuid(CPUID_ID);	\
--		__cpu_is_pxa935(id);			\
-+		__cpu_is_pxa935(read_cpuid_id());	\
- 	 })
-
- #define cpu_is_pxa950()					\
- 	({						\
--		unsigned int id = read_cpuid(CPUID_ID);	\
--		__cpu_is_pxa950(id);			\
-+		__cpu_is_pxa950(read_cpuid_id());	\
- 	 })
+// Simon
