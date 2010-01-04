@@ -1,63 +1,65 @@
-From: siarhei.siamashka@nokia.com (Siarhei Siamashka)
-Date: Mon, 4 Jan 2010 17:36:17 +0200
-Subject: [RFC PATCH 2/2] ARM: VFP: preserve the HW context when calling
-	signal handlers
-In-Reply-To: <20090613170406.GA6926@n2100.arm.linux.org.uk>
-References: <c70d85c1a0b20b5f227f34b32db674c7b362d72d.1242734510.git.imre.deak@nokia.com>
-	<20090613164035.GE16220@shareable.org>
-	<20090613170406.GA6926@n2100.arm.linux.org.uk>
-Message-ID: <201001041736.17862.siarhei.siamashka@nokia.com>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Mon, 04 Jan 2010 15:47:18 +0000
+Subject: [PATCH 4/4] regulator: add max8925 support
+In-Reply-To: <771cded00912242127k1b74a330k7d033d5cefd2169a@mail.gmail.com>
+References: <771cded00912210447jf040fd8s8da0e68db0c39c1a@mail.gmail.com>
+	<1261418546.6971.343.camel@odin>
+	<771cded00912230139g23ea8554l866d55e16ae3ed58@mail.gmail.com>
+	<20091223143016.GD14455@opensource.wolfsonmicro.com>
+	<771cded00912242127k1b74a330k7d033d5cefd2169a@mail.gmail.com>
+Message-ID: <1262620038.2968.23.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 13 June 2009 20:04:06 ext Russell King - ARM Linux wrote:
-> On Sat, Jun 13, 2009 at 05:40:35PM +0100, Jamie Lokier wrote:
-> > Russell King - ARM Linux wrote:
-> > > It seems that people do want access to these registers in signal
-> > > handlers, yet there's still the original set of patches from Imre
-> > > in the patch system.
-> > >
-> > > I'm been holding off applying them because of this open question.
-> > >
-> > > What am I to do with them?  Are people happy with the existing
-> > > patches?
-> > >
-> > > (note that without the patch system, I'd have completely forgotten
-> > > about those two patches and so would not be sending this chase-up.)
+On Fri, 2009-12-25 at 00:27 -0500, Haojian Zhuang wrote:
+> On Wed, Dec 23, 2009 at 9:30 AM, Mark Brown
+> <broonie@opensource.wolfsonmicro.com> wrote:
+> > On Wed, Dec 23, 2009 at 04:39:59AM -0500, Haojian Zhuang wrote:
 > >
-> > The main thing is that all the machine state which affects user-space
-> > which is saved on entering a signal handler, and restored on leaving
-> > it, is accessible somehow through the arguments to the signal handler.
->
-> I agree that we need something.  However, there seemed to be some kind of
-> agreement in this thread that having access to these other registers from
-> signal handlers would be a good thing.
->
-> So, what I'm asking is, do I:
->
-> - merge the current two patches in the patch system, and then at a later
->   date have to change the layout when someone wants access to these other
->   registers, thereby causing an ABI visible change with all the problems
->   that goes with that
->
-> or
->
-> - wait for a new patch which includes these other registers and not have
->   any ABI visible changes to contend with
+> >> +#define MAX8925_REGULATOR_DRIVER(_name)                              \
+> >> +{                                                            \
+> >> +     .driver         = {                                     \
+> >> +             .name   = "max8925-" #_name,                    \
+> >> +             .owner  = THIS_MODULE,                          \
+> >> +     },                                                      \
+> >> +     .probe          = max8925_regulator_probe,              \
+> >> +     .remove         = __devexit_p(max8925_regulator_remove),\
+> >> +}
+> >> +
+> >> +static struct platform_driver max8925_regulator_driver[] = {
+> >> +     MAX8925_REGULATOR_DRIVER(sd1),
+> >> +     MAX8925_REGULATOR_DRIVER(sd2),
+> >> +     MAX8925_REGULATOR_DRIVER(sd3),
+> >> +     MAX8925_REGULATOR_DRIVER(ldo1),
+> >> +     MAX8925_REGULATOR_DRIVER(ldo2),
+> >
+> > Since these driver structures differ only in name there seems to be no
+> > need to define more than one for the bucks and one for the LDOs - the
+> > code in the driver doesn't actually seem to need it.  The .id field of
+> > the driver structure can be set to give the device numbers.
+> >
+> >> +}
+> >> +module_init(max8925_regulator_init);
+> >
+> > subsys_initcall()
+> >
+> >> +MODULE_LICENSE("GPL");
+> >> +MODULE_AUTHOR("Haojian Zhuang <haojian.zhuang@marvell.com>");
+> >> +MODULE_DESCRIPTION("Regulator Driver for Maxim 8925 PMIC");
+> >> +MODULE_ALIAS("platform:max8925-regulator");
+> >
+> > This MODULE_ALIAS won't actually work - the name doesn't match up with
+> > the names of the drivers or the devices.
+> >
+> 
+> Updated the serie of patches.
 
-Sorry for bumping this old thread, but what is the current status of these
-patches?
+I'm fine with this now but it doesn't apply against voltage for-next.
+Could you recreate against for-next.
 
-This bug shows up as image corruption (typically it looks like short
-horizontal stripes all over the screen) when using NEON optimized pixman
-library and scrolling pages in firefox for example.
+Btw, what is the status of the other PMIC regulator patch you have.
+Iirc, it was waiting on some PMIC core change in it's mfd driver ?
 
-X server uses signal handlers for processing input, and they corrupt content
-of NEON registers which are heavily used by pixman to process pixel data.
+Thanks
 
-The problem has been already encountered by the maintainers of several
-linux distributions (angstrom, ubuntu).
-
--- 
-Best regards,
-Siarhei Siamashka
+Liam
