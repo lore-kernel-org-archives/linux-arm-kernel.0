@@ -1,97 +1,69 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 4 Jan 2010 10:14:51 +0800
-Subject: [ARM] pxa: use chip->ack() instead of accessing GEDR directly
-Message-ID: <f17812d71001031814p52e99b6bhbcafd35c71439c47@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Sun, 3 Jan 2010 21:27:50 -0500
+Subject: [patch 2/4] [ARM] mmp: support marvell ARMADA610
+In-Reply-To: <f17812d70912311946n42b6eb13q78afdbd92d2708e9@mail.gmail.com>
+References: <771cded00912062219p79048babs669abf275419a2b9@mail.gmail.com>
+	<f17812d70912281949r57e1ca83q65c3fb38c4675056@mail.gmail.com>
+	<771cded00912310642x5ffeb071pcf6ade605138bb63@mail.gmail.com>
+	<f17812d70912311946n42b6eb13q78afdbd92d2708e9@mail.gmail.com>
+Message-ID: <771cded01001031827j28dc6aa9l5425669f2ceeb27a@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-    [ARM] pxa: use chip->ack() instead of accessing GEDR directly
+On Thu, Dec 31, 2009 at 10:46 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> On Thu, Dec 31, 2009 at 10:42 PM, Haojian Zhuang
+> <haojian.zhuang@gmail.com> wrote:
+>> On Mon, Dec 28, 2009 at 10:49 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+>>> Haojian,
+>>>
+>>> Several suggestions:
+>>>
+>>> 1. entry-macro.S, could we simplify (and improve the performance a bit) to
+>>> something like (haven't tested yet - let me know the result):
+>>>
+>>> ? ? ? ?.macro ?get_irqnr_preamble, base, tmp
+>>> ? ? ? ?mrc ? ? p15, 0, \tmp, c0, c0, 0 ? ? ? ? @ CPUID
+>>> ? ? ? ?mov ? ? \tmp, \tmp, lsr #4
+>>> ? ? ? ?and ? ? \tmp, \tmp, #0xfff
+>>
+>> We shouldn't use #0xfff in and instruction. Immediate number shouldn't
+>> beyond 8bit. We have to use ldr instruction or multiple instrunctions.
+>
+> Well, 0xff0 then, or ldr, whichever I don't mind.
+>
+>>
+>>> ? ? ? ?cmp ? ? \tmp, #0x581 ? ? ? ? ? ? ? ? ? ?@ MMP2
+>>> ? ? ? ?moveq ? \base, #MMP2_ICU_PJ4_IRQ_SEL
+>>> ? ? ? ?movne ? \base, #ICU_AP_IRQ_SEL_INT_NUM
+>>> ? ? ? ?.endm
+>>>
+>>> ? ? ? ?.macro ?arch_ret_to_user, tmp1, tmp2
+>>> ? ? ? ?.endm
+>>>
+>>> ? ? ? ?.macro ?get_irqnr_and_base, irqnr, irqstat, base, tmp
+>>> ? ? ? ?ldr ? ? \tmp, [\base, #0]
+>>> ? ? ? ?and ? ? \irqnr, \tmp, #0x3f ? ? ? ? ? ? @ Interrupt Number
+>>> ? ? ? ?tst ? ? \tmp, #(1 << 6) ? ? ? ? ? ? ? ? @ Interrupt Pending ?
+>>> ? ? ? ?.endm
+>>>
+>>
+>> I don't like this way. Although more jump instructions are used in irq
+>> entry, it can be extended easier for supporting more silicons.
+>>
+>
+> It really hurt performance a lot. While the difference between MMP series
+> is just the offset of the IRQ_NUM register, it could be calculated in
+> get_irqnr_preamble, which doesn't have to be executed each time
+> in the IRQ handling loop. See arch/arm/kernel/entry-armv.S
 
-    Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+get_irqnr_preamble can only carries one base parameter and one tmp
+parameter. base parameter is already used for interrupt control
+register. Only one tmp parameter is left for use. If we want to check
+chip id, one parameter is not enought.
 
-diff --git a/arch/arm/mach-pxa/cm-x2xx-pci.c b/arch/arm/mach-pxa/cm-x2xx-pci.c
-index 7873fa3..161fc2d 100644
---- a/arch/arm/mach-pxa/cm-x2xx-pci.c
-+++ b/arch/arm/mach-pxa/cm-x2xx-pci.c
-@@ -59,7 +59,7 @@ void __init cmx2xx_pci_adjust_zones(int node,
-unsigned long *zone_size,
- static void cmx2xx_it8152_irq_demux(unsigned int irq, struct irq_desc *desc)
- {
- 	/* clear our parent irq */
--	GEDR(cmx2xx_it8152_irq_gpio) = GPIO_bit(cmx2xx_it8152_irq_gpio);
-+	desc->chip->ack(irq);
+So putting these code into get_irqnr_and_base macro is more reasonable.
 
- 	it8152_irq_demux(irq, desc);
- }
-diff --git a/arch/arm/mach-pxa/lpd270.c b/arch/arm/mach-pxa/lpd270.c
-index 1373c22..c87abc3 100644
---- a/arch/arm/mach-pxa/lpd270.c
-+++ b/arch/arm/mach-pxa/lpd270.c
-@@ -121,7 +121,7 @@ static void lpd270_irq_handler(unsigned int irq,
-struct irq_desc *desc)
+Happy new year! :)
 
- 	pending = __raw_readw(LPD270_INT_STATUS) & lpd270_irq_enabled;
- 	do {
--		GEDR(0) = GPIO_bit(0);  /* clear useless edge notification */
-+		desc->chip->ack(irq);	/* clear useless edge notification */
- 		if (likely(pending)) {
- 			irq = LPD270_IRQ(0) + __ffs(pending);
- 			generic_handle_irq(irq);
-diff --git a/arch/arm/mach-pxa/lubbock.c b/arch/arm/mach-pxa/lubbock.c
-index 98ee7e5..d9982b1 100644
---- a/arch/arm/mach-pxa/lubbock.c
-+++ b/arch/arm/mach-pxa/lubbock.c
-@@ -158,7 +158,7 @@ static void lubbock_irq_handler(unsigned int irq,
-struct irq_desc *desc)
- {
- 	unsigned long pending = LUB_IRQ_SET_CLR & lubbock_irq_enabled;
- 	do {
--		GEDR(0) = GPIO_bit(0);	/* clear our parent irq */
-+		desc->chip->ack(irq);	/* clear our parent irq */
- 		if (likely(pending)) {
- 			irq = LUBBOCK_IRQ(0) + __ffs(pending);
- 			generic_handle_irq(irq);
-diff --git a/arch/arm/mach-pxa/mainstone.c b/arch/arm/mach-pxa/mainstone.c
-index 851ee0f..a8674aa 100644
---- a/arch/arm/mach-pxa/mainstone.c
-+++ b/arch/arm/mach-pxa/mainstone.c
-@@ -162,7 +162,7 @@ static void mainstone_irq_handler(unsigned int
-irq, struct irq_desc *desc)
- {
- 	unsigned long pending = MST_INTSETCLR & mainstone_irq_enabled;
- 	do {
--		GEDR(0) = GPIO_bit(0);  /* clear useless edge notification */
-+		desc->chip->ack(irq);	/* clear useless edge notification */
- 		if (likely(pending)) {
- 			irq = MAINSTONE_IRQ(0) + __ffs(pending);
- 			generic_handle_irq(irq);
-diff --git a/arch/arm/mach-pxa/pcm990-baseboard.c
-b/arch/arm/mach-pxa/pcm990-baseboard.c
-index d5255ae..e74bdfc 100644
---- a/arch/arm/mach-pxa/pcm990-baseboard.c
-+++ b/arch/arm/mach-pxa/pcm990-baseboard.c
-@@ -259,8 +259,7 @@ static void pcm990_irq_handler(unsigned int irq,
-struct irq_desc *desc)
- 	unsigned long pending = (~PCM990_INTSETCLR) & pcm990_irq_enabled;
-
- 	do {
--		GEDR(PCM990_CTRL_INT_IRQ_GPIO) =
--					GPIO_bit(PCM990_CTRL_INT_IRQ_GPIO);
-+		desc->chip->ack(irq);	/* clear our parent IRQ */
- 		if (likely(pending)) {
- 			irq = PCM027_IRQ(0) + __ffs(pending);
- 			generic_handle_irq(irq);
-diff --git a/arch/arm/mach-pxa/viper.c b/arch/arm/mach-pxa/viper.c
-index 5352b4e..886b13a 100644
---- a/arch/arm/mach-pxa/viper.c
-+++ b/arch/arm/mach-pxa/viper.c
-@@ -281,7 +281,7 @@ static void viper_irq_handler(unsigned int irq,
-struct irq_desc *desc)
- 	do {
- 		/* we're in a chained irq handler,
- 		 * so ack the interrupt by hand */
--		GEDR(VIPER_CPLD_GPIO) = GPIO_bit(VIPER_CPLD_GPIO);
-+		desc->chip->ack(irq);
-
- 		if (likely(pending)) {
- 			irq = viper_bit_to_irq(__ffs(pending));
+Best Regards
+Haojian
