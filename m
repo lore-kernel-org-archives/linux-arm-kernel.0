@@ -1,21 +1,65 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Tue, 5 Jan 2010 18:57:32 +0000
-Subject: [PATCH 3/5] arm: use the spinlocked, generic atomic64 support
-In-Reply-To: <1262602122-10373-4-git-send-email-jamie.iles@picochip.com>
-References: <1262602122-10373-1-git-send-email-jamie.iles@picochip.com>
-	<1262602122-10373-2-git-send-email-jamie.iles@picochip.com>
-	<1262602122-10373-3-git-send-email-jamie.iles@picochip.com>
-	<1262602122-10373-4-git-send-email-jamie.iles@picochip.com>
-Message-ID: <20100105185732.GF14376@shareable.org>
+From: bzolnier@gmail.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 5 Jan 2010 19:56:50 +0100
+Subject: [PATCH] add PATA host controller support for Cirrus Logic's
+	EP93xx CPUs
+In-Reply-To: <4B26B6EA.8050403@garzik.org>
+References: <200911261651.40928.bzolnier@gmail.com>
+	<4B26B0D6.4080809@bluewatersys.com> <4B26B6EA.8050403@garzik.org>
+Message-ID: <201001051956.50961.bzolnier@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jamie Iles wrote:
-> perf events require that we can support atomic64's. There is a generic,
-> spinlocked version that we can use until we have proper hardware
-> support.
+On Monday 14 December 2009 11:06:34 pm Jeff Garzik wrote:
+> On 12/14/2009 04:40 PM, Ryan Mallon wrote:
+> > I have added some of my own debugging. The problem appears to be that
+> > __pata_ep93xx_write gets called from probe (via ata_host_activate), but
+> > ap->private_data (ata_timing) is still null. The timing private_data is
+> > set by pata_ep93xx_set_piomode, but that needs adev->pio_mode set, but I
+> > don't know where this happens. I assume the ATA core handles this. Do I
+> > need to call pata_ep93xx_set_piomode from pata_ep93xx_probe before
+> > ata_host_activate, or should the private_data timing be set to some
+> > default in the probe?
+> 
+> 
+> ap->private_data is traditionally initialized in the ->port_start() hook.
 
-Is that simply waiting for LDREXD/STREXD-based atomic64's, or is it
-depending on something subtler?
+Ryan, this incremental patch should fix the OOPS (it adds ->port_start
+implementation which sets the default 'port PIO mode' to PIO0 so we have
+sane default setting before device probing takes place and ->set_piomode
+takes over), please retest the driver once you have a minute..
 
--- Jamie
+[ Thanks for debugging the problem and sorry for the delay.. ]
+
+---
+ drivers/ata/pata_ep93xx.c |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+Index: b/drivers/ata/pata_ep93xx.c
+===================================================================
+--- a/drivers/ata/pata_ep93xx.c
++++ b/drivers/ata/pata_ep93xx.c
+@@ -613,6 +613,15 @@ static void pata_ep93xx_postreset(struct
+ 	}
+ }
+ 
++static int pata_ep93xx_port_start(struct ata_port *ap)
++{
++	const struct ata_timing *cmd_t = ata_timing_find_mode(XFER_PIO_0);
++
++	ap->private_data = (void *)cmd_t;
++
++	return ata_sff_port_start(ap);
++}
++
+ static struct ata_port_operations pata_ep93xx_port_ops = {
+ 	.inherits		= &ata_sff_port_ops,
+ 
+@@ -631,6 +640,8 @@ static struct ata_port_operations pata_e
+ 	.freeze			= pata_ep93xx_freeze,
+ 	.softreset		= pata_ep93xx_softreset,
+ 	.postreset		= pata_ep93xx_postreset,
++
++	.port_start		= pata_ep93xx_port_start,
+ };
+ 
+ static int __init pata_ep93xx_probe(struct platform_device *pdev)
