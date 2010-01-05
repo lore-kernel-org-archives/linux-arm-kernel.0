@@ -1,30 +1,29 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 5 Jan 2010 13:30:25 +0100
-Subject: [PATCH 2/3] mx31ads: Allow enable/disable of switchable supplies
-In-Reply-To: <20100105122706.GB5189@sirena.org.uk>
-References: <1262629491-18942-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1262629491-18942-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<20100105121243.GG6923@pengutronix.de>
-	<20100105122706.GB5189@sirena.org.uk>
-Message-ID: <20100105123025.GK6923@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue,  5 Jan 2010 13:41:05 +0000
+Subject: [PATCH 1/2] mx31ads: Provide a name for EXPIO interrupt chip
+Message-ID: <1262698866-2780-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2010 at 12:27:07PM +0000, Mark Brown wrote:
-> On Tue, Jan 05, 2010 at 01:12:43PM +0100, Sascha Hauer wrote:
-> > On Mon, Jan 04, 2010 at 06:24:50PM +0000, Mark Brown wrote:
-> > > They will be automatically powered off at startup so users will
-> > > need to enable them for use.
-> > 
-> > Ok, scheduled for -next. Or do you wish to have this earlier?
-> 
-> It'd be nice to have it earlier if possible.
-> 
+This makes it a bit more obvious in genirq diagnostics that they
+aren't handled by the i.MX interrupt controller.
 
-ok.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-mx3/mx31ads.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/mach-mx3/mx31ads.c b/arch/arm/mach-mx3/mx31ads.c
+index a579f4c..c486c2f 100644
+--- a/arch/arm/mach-mx3/mx31ads.c
++++ b/arch/arm/mach-mx3/mx31ads.c
+@@ -173,6 +173,7 @@ static void expio_unmask_irq(u32 irq)
+ }
+ 
+ static struct irq_chip expio_irq_chip = {
++	.name = "EXPIO(CPLD)",
+ 	.ack = expio_ack_irq,
+ 	.mask = expio_mask_irq,
+ 	.unmask = expio_unmask_irq,
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.6.5.7
