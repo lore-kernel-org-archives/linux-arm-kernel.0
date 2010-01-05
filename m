@@ -1,60 +1,71 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 4 Jan 2010 20:36:16 -0500
-Subject: [PATCH 4/4] regulator: add max8925 support
-In-Reply-To: <1262620038.2968.23.camel@odin>
-References: <771cded00912210447jf040fd8s8da0e68db0c39c1a@mail.gmail.com>
-	<1261418546.6971.343.camel@odin>
-	<771cded00912230139g23ea8554l866d55e16ae3ed58@mail.gmail.com>
-	<20091223143016.GD14455@opensource.wolfsonmicro.com>
-	<771cded00912242127k1b74a330k7d033d5cefd2169a@mail.gmail.com>
-	<1262620038.2968.23.camel@odin>
-Message-ID: <771cded01001041736u3c3011d9w689b4c6ad8767d83@mail.gmail.com>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Tue, 5 Jan 2010 10:43:09 +0800
+Subject: [PATCH] NUC900: Add extern header file support for some driver
+In-Reply-To: <ae11f36b1001041826m2dea49dfvc0511aa9e1783ba9@mail.gmail.com>
+References: <4B3F69ED.2030404@gmail.com>
+	<20100104165827.GB14533@n2100.arm.linux.org.uk>
+	<ae11f36b1001041826m2dea49dfvc0511aa9e1783ba9@mail.gmail.com>
+Message-ID: <e68bb3471001041843s57085e98v324f977e6ae9f9c1@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2010/1/5 ?? <rurality.linux@gmail.com>:
 >
-> I'm fine with this now but it doesn't apply against voltage for-next.
-> Could you recreate against for-next.
 >
-> Btw, what is the status of the other PMIC regulator patch you have.
-> Iirc, it was waiting on some PMIC core change in it's mfd driver ?
+> 2010/1/5 Russell King - ARM Linux <linux@arm.linux.org.uk>
+>>
+>> On Sat, Jan 02, 2010 at 11:44:45PM +0800, Wan ZongShun wrote:
+>> > Dear Wang Qiang,
+>> >
+>> > This patch provides a API for your LCD driver or other drivers, if you
+>> > want to use those APIs, please include corresponding header file.
+>> >
+>> > Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
+>> > ---
+>> > ?arch/arm/mach-w90x900/include/mach/clkdev.h | ? ?3 +++
+>> > ?arch/arm/mach-w90x900/include/mach/mfp.h ? ?| ? 23
+>> > +++++++++++++++++++++++
+>> > ?2 files changed, 26 insertions(+), 0 deletions(-)
+>> > ?create mode 100644 arch/arm/mach-w90x900/include/mach/mfp.h
+>> >
+>> > diff --git a/arch/arm/mach-w90x900/include/mach/clkdev.h
+>> > b/arch/arm/mach-w90x900/include/mach/clkdev.h
+>> > index 04b37a8..b35f4bc 100644
+>> > --- a/arch/arm/mach-w90x900/include/mach/clkdev.h
+>> > +++ b/arch/arm/mach-w90x900/include/mach/clkdev.h
+>> > @@ -4,4 +4,7 @@
+>> > ?#define __clk_get(clk) ({ 1; })
+>> > ?#define __clk_put(clk) do { } while (0)
+>> >
+>> > +extern void nuc900_driver_clksrc_div(struct device *dev, unsigned char
+>> > *src,
+>> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned char
+>> > divider);
+>> > +
+>>
+>> I'd prefer it if this header didn't get used for non-clkdev<->plat code
+>> stuff.
 >
-> Thanks
->
-> Liam
->
+> So, you mean I can use this header in the LCD driver of?nuc900 plat?
 >
 
-Update these patches. By the way, I'm still waiting the comments from
-Samuel on mfd patches.
+Hmmm, I don't think so.
 
-Thanks
-Haojian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-mfd-enable-max8925.patch
-Type: text/x-patch
-Size: 17400 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100104/b3031317/attachment-0004.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0002-mfd-add-subdevs-in-max8925.patch
-Type: text/x-patch
-Size: 9233 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100104/b3031317/attachment-0005.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0003-backlight-enable-max8925-backlight.patch
-Type: text/x-patch
-Size: 7467 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100104/b3031317/attachment-0006.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0004-regulator-add-max8925-support.patch
-Type: text/x-patch
-Size: 10393 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100104/b3031317/attachment-0007.bin>
+I think it is better to implement other API as Ben Dooks mentioned,
+but if you want to use
+this API provided by me, we have to add the extern to other header
+file rather than the specific clkdev header file.
+
+So, please wait me for new patch.
+
+-- 
+*linux-arm-kernel mailing list
+mail addr:linux-arm-kernel at lists.infradead.org
+you can subscribe by:
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+* linux-arm-NUC900 mailing list
+mail addr:NUC900 at googlegroups.com
+main web: https://groups.google.com/group/NUC900
+you can subscribe it by sending me mail:
+mcuos.com at gmail.com
