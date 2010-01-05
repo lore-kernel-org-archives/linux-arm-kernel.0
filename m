@@ -1,19 +1,52 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 5 Jan 2010 11:08:59 +0000
-Subject: [PATCH 3/3] mx31ads: Provide an IRQ range to the WM835x on the
-	1133-EV1 module
-In-Reply-To: <1262629491-18942-3-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1262629491-18942-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1262629491-18942-3-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <20100105110859.GA5189@sirena.org.uk>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Tue, 5 Jan 2010 13:36:29 +0200
+Subject: [PATCH 0/5] V7/Cortex/omap34xx fixes for 2.6.33-rc1: DCC,
+	kexec, atags
+In-Reply-To: <20091229220705.GM3512@atomide.com>
+References: <20091219034151.26198.26570.stgit@localhost>
+	<aec7e5c30912272155s41ce8914hd03a5e4c740a5b9d@mail.gmail.com>
+	<20091229220705.GM3512@atomide.com>
+Message-ID: <20100105113629.GB8349@gw.healthdatacare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2010 at 06:24:51PM +0000, Mark Brown wrote:
-> The WM8350 core won't actually use the range yet, but it will in
-> future and the platform data to configure it is there now.
+On Tue, Dec 29, 2009 at 02:07:05PM -0800, Tony Lindgren wrote:
+> Hi,
+> 
+> * Magnus Damm <magnus.damm@gmail.com> [091227 21:54]:
+> > Hi Tony,
+> > 
+> > On Sat, Dec 19, 2009 at 12:45 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > > Here are some v7 fixes, mostly to make kexec work.
+> > >
+> > > Using 2.6.33-rc1, these fixes, and kexec from kexec-tools
+> > > git repo, I can reboot my n900 in a loop reliably.
+> > 
+> > Thanks for your work on this. I previously tested kexec on ARM V6 and
+> > V7 and noticed that V7 didn't work. I revisited my V7 test after
+> > becoming aware of your patches. The single patch below unbreaks V7 on
+> > my target system.
+> > 
+> > > ? ? ?arm: Fix cpu_proc_fin() for proc-v7.S and make kexec work
+> 
+> Cool. Thank you for fixing the kexec source :)
+> 
+> Are you seeing the occasional crc errors when uncompressing the
+> new kernel on your v7?
+> 
+> I'm seeing those maybe 1 out of 10 times on omap3430 boards unless if
+> I do an extra (and wrong) flush_cache_all after local_flush_tlb_all
+> at the end of setup_mm_for_reboot.
 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Hi,
 
-Please don't apply this one, there's already an IRQ expander on the
-board.  I'll send a revised patch later.
+I've also been playing with this patch.
+
+One thing I noticed is that If I disable L2 cache in cpu_v7_proc_fin()
+then kexec works fine and no crc errors from decompressor (I did
+~30 kexec boots). With L2 cache enabled, it fails almost immediately.
+
+Tested with OMAP3430 ES3.1.
+
+Thanks,
+MW
