@@ -1,100 +1,38 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 5 Jan 2010 14:57:28 +0100
-Subject: [PATCH 2/2] mx31ads: Provide an IRQ range to the WM835x on the
-	1133-EV1 module
-In-Reply-To: <1262698866-2780-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1262698866-2780-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1262698866-2780-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <20100105135728.GL6923@pengutronix.de>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Tue, 5 Jan 2010 15:17:40 +0100
+Subject: Ethernet / SD Boot
+In-Reply-To: <4B422ED6.1030306@warmcat.com>
+References: <20091228224435.GA23617@sirena.org.uk>
+	<4B39D439.9070909@warmcat.com>
+	<20091229123348.GB5784@opensource.wolfsonmicro.com>
+	<4B39FB2C.4010608@warmcat.com>
+	<20091230131559.GA369@opensource.wolfsonmicro.com>
+	<4B3B579E.8030105@warmcat.com>
+	<20091231122727.GA5613@opensource.wolfsonmicro.com>
+	<4B3CA02D.9000208@warmcat.com> <4B42169E.5040007@simtec.co.uk>
+	<4B422545.2000509@warmcat.com>
+	<20100104174046.GC14533@n2100.arm.linux.org.uk>
+	<4B422ED6.1030306@warmcat.com>
+Message-ID: <20100105151740.79f85e13@life-in-the-fast-lane>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2010 at 01:41:06PM +0000, Mark Brown wrote:
-> The WM8350 core won't actually use the range yet, but it will in
-> future and the platform data to configure it is there now.
-> 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/mach-mx3/mx31ads.c           |    1 +
->  arch/arm/plat-mxc/include/mach/irqs.h |    7 +++++++
->  2 files changed, 8 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx3/mx31ads.c b/arch/arm/mach-mx3/mx31ads.c
-> index c486c2f..ed8498a 100644
-> --- a/arch/arm/mach-mx3/mx31ads.c
-> +++ b/arch/arm/mach-mx3/mx31ads.c
-> @@ -452,6 +452,7 @@ static int mx31_wm8350_init(struct wm8350 *wm8350)
->  
->  static struct wm8350_platform_data __initdata mx31_wm8350_pdata = {
->  	.init = mx31_wm8350_init,
-> +	.irq_base = MXC_BOARD_IRQ_START + MXC_MAX_EXP_IO_LINES,
->  };
->  #endif
->  
-> diff --git a/arch/arm/plat-mxc/include/mach/irqs.h b/arch/arm/plat-mxc/include/mach/irqs.h
-> index ead9d59..ae801e5 100644
-> --- a/arch/arm/plat-mxc/include/mach/irqs.h
-> +++ b/arch/arm/plat-mxc/include/mach/irqs.h
-> @@ -37,7 +37,14 @@
->   * within sensible limits.
->   */
->  #define MXC_BOARD_IRQ_START	(MXC_INTERNAL_IRQS + MXC_GPIO_IRQS)
-> +
-> +#if defined(CONFIG_MACH_MX31ADS_WM1133_EV1) && !defined(MXC_BOARD_IRQS)
-> +#define MXC_BOARD_IRQS  80
-> +#endif
-> +
-> +#ifndef MXC_BOARD_IRQS
->  #define MXC_BOARD_IRQS	16
-> +#endif
+On Mon, 04 Jan 2010 18:09:26 +0000
+Andy Green <andy@warmcat.com> wrote:
 
-I just had a look how other architectures handle this and I like it how
-pxa does it:
+Hi Andy,
 
-/*
- * The following interrupts are for board specific purposes. Since
- * the kernel can only run on one machine at a time, we can re-use
- * these.  There will be 16 IRQs by default.  If it is not enough,
- * IRQ_BOARD_END is allowed be customized for each board, but keep
- * the numbers within sensible limits and in descending order, so
- * when multiple config options are selected, the maximum will be
- * used.
- */
-#define IRQ_BOARD_START		(PXA_GPIO_IRQ_BASE + PXA_GPIO_IRQ_NUM)
+> However if anyone else is interested in help setting up with it, feel 
+> free to contact me direct.
 
-#if defined(CONFIG_MACH_H4700)
-#define IRQ_BOARD_END		(IRQ_BOARD_START + 70)
-#elif defined(CONFIG_MACH_ZYLONITE)
-#define IRQ_BOARD_END		(IRQ_BOARD_START + 32)
-#elif defined(CONFIG_PXA_EZX)
-#define IRQ_BOARD_END		(IRQ_BOARD_START + 23)
-#else
-#define IRQ_BOARD_END		(IRQ_BOARD_START + 16)
-#endif
+I was trying to access your Qi tree
+(http://git.warmcat.com/cgi-bin/cgit/qi/), without any success (it
+times out after a while...).
 
+Is this intentional?
 
-Can we do the same, so something like this?
+Thanks,
 
-/*
- * The following interrupts are for board specific purposes. Since
- * the kernel can only run on one machine at a time, we can re-use
- * these.  There will be 16 IRQs by default.  If it is not enough,
- * MXC_BOARD_IRQS is allowed be customized for each board, but keep
- * the numbers within sensible limits and in descending order, so
- * when multiple config options are selected, the maximum will be
- * used.
- */
-
-#if defined(CONFIG_MACH_MX31ADS_WM1133_EV1)
-#define MXC_BOARD_IRQS 80
-#else
-#define MXC_BOARD_IRQS 16
-#endif
-
-Sascha
-
+	M.
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Fast. Cheap. Reliable. Pick two.
