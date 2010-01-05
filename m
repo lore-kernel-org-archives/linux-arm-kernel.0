@@ -1,26 +1,44 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 5 Jan 2010 12:17:06 -0800
-Subject: [PATCH] omap: Remove uninitialized warning for gpio.c
-Message-ID: <mailman.119.1262722826.2170.linux-arm-kernel@lists.infradead.org>
+Date: Tue, 5 Jan 2010 12:20:53 -0800
+Subject: [patch-v2.6.33-rc2+ 06/12] arm: omap: kill compile warning in
+	irq.c
+In-Reply-To: <1262127092-14878-7-git-send-email-felipe.balbi@nokia.com>
+References: <1262127092-14878-1-git-send-email-felipe.balbi@nokia.com>
+	<1262127092-14878-7-git-send-email-felipe.balbi@nokia.com>
+Message-ID: <20100105202053.GB14533@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Flags is not used on 15xx.
+* Felipe Balbi <felipe.balbi@nokia.com> [091229 14:54]:
+> intc_context is only used when omap3 is to be built,
+> so also put it under ifdef CONFIG_ARM_OMAP3 to avoid
+> the compile warning.
+> 
+> Signed-off-by: Felipe Balbi <felipe.balbi@nokia.com>
+> ---
+>  arch/arm/mach-omap2/irq.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
+> index e9bc782..d370052 100644
+> --- a/arch/arm/mach-omap2/irq.c
+> +++ b/arch/arm/mach-omap2/irq.c
+> @@ -62,7 +62,9 @@ struct omap3_intc_regs {
+>  	u32 mir[INTCPS_NR_MIR_REGS];
+>  };
+>  
+> +#ifdef CONFIG_ARCH_OMAP3
+>  static struct omap3_intc_regs intc_context[ARRAY_SIZE(irq_banks)];
+> +#endif
+>  
+>  /* INTC bank register get/set */
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+Can you please move the struct omap3_intc_regs intc_context into
+to right above save_context function where we have the a block
+already for ifdef CONFIG_ARCH_OMAP3?
 
-diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
-index 0484681..792be9f 100644
---- a/arch/arm/plat-omap/gpio.c
-+++ b/arch/arm/plat-omap/gpio.c
-@@ -1072,7 +1072,7 @@ static inline void _set_gpio_irqenable(struct gpio_bank *bank, int gpio, int ena
-  */
- static int _set_gpio_wakeup(struct gpio_bank *bank, int gpio, int enable)
- {
--	unsigned long flags;
-+	unsigned long uninitialized_var(flags);
- 
- 	switch (bank->method) {
- #ifdef CONFIG_ARCH_OMAP16XX
+That avoids adding a new ifdef block.
 
---Qxx1br4bt0+wmkIi--
+Regards,
+
+Tony
