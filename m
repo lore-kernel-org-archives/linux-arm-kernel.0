@@ -1,29 +1,52 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue,  5 Jan 2010 13:41:05 +0000
-Subject: [PATCH 1/2] mx31ads: Provide a name for EXPIO interrupt chip
-Message-ID: <1262698866-2780-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Tue,  5 Jan 2010 13:41:06 +0000
+Subject: [PATCH 2/2] mx31ads: Provide an IRQ range to the WM835x on the
+	1133-EV1 module
+In-Reply-To: <1262698866-2780-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1262698866-2780-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1262698866-2780-2-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This makes it a bit more obvious in genirq diagnostics that they
-aren't handled by the i.MX interrupt controller.
+The WM8350 core won't actually use the range yet, but it will in
+future and the platform data to configure it is there now.
 
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/mach-mx3/mx31ads.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx3/mx31ads.c           |    1 +
+ arch/arm/plat-mxc/include/mach/irqs.h |    7 +++++++
+ 2 files changed, 8 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-mx3/mx31ads.c b/arch/arm/mach-mx3/mx31ads.c
-index a579f4c..c486c2f 100644
+index c486c2f..ed8498a 100644
 --- a/arch/arm/mach-mx3/mx31ads.c
 +++ b/arch/arm/mach-mx3/mx31ads.c
-@@ -173,6 +173,7 @@ static void expio_unmask_irq(u32 irq)
- }
+@@ -452,6 +452,7 @@ static int mx31_wm8350_init(struct wm8350 *wm8350)
  
- static struct irq_chip expio_irq_chip = {
-+	.name = "EXPIO(CPLD)",
- 	.ack = expio_ack_irq,
- 	.mask = expio_mask_irq,
- 	.unmask = expio_unmask_irq,
+ static struct wm8350_platform_data __initdata mx31_wm8350_pdata = {
+ 	.init = mx31_wm8350_init,
++	.irq_base = MXC_BOARD_IRQ_START + MXC_MAX_EXP_IO_LINES,
+ };
+ #endif
+ 
+diff --git a/arch/arm/plat-mxc/include/mach/irqs.h b/arch/arm/plat-mxc/include/mach/irqs.h
+index ead9d59..ae801e5 100644
+--- a/arch/arm/plat-mxc/include/mach/irqs.h
++++ b/arch/arm/plat-mxc/include/mach/irqs.h
+@@ -37,7 +37,14 @@
+  * within sensible limits.
+  */
+ #define MXC_BOARD_IRQ_START	(MXC_INTERNAL_IRQS + MXC_GPIO_IRQS)
++
++#if defined(CONFIG_MACH_MX31ADS_WM1133_EV1) && !defined(MXC_BOARD_IRQS)
++#define MXC_BOARD_IRQS  80
++#endif
++
++#ifndef MXC_BOARD_IRQS
+ #define MXC_BOARD_IRQS	16
++#endif
+ 
+ #define MXC_IPU_IRQ_START	(MXC_BOARD_IRQ_START + MXC_BOARD_IRQS)
+ 
 -- 
 1.6.5.7
