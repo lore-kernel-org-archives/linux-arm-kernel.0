@@ -1,52 +1,73 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Tue, 5 Jan 2010 13:36:29 +0200
-Subject: [PATCH 0/5] V7/Cortex/omap34xx fixes for 2.6.33-rc1: DCC,
-	kexec, atags
-In-Reply-To: <20091229220705.GM3512@atomide.com>
-References: <20091219034151.26198.26570.stgit@localhost>
-	<aec7e5c30912272155s41ce8914hd03a5e4c740a5b9d@mail.gmail.com>
-	<20091229220705.GM3512@atomide.com>
-Message-ID: <20100105113629.GB8349@gw.healthdatacare.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 5 Jan 2010 13:11:18 +0100
+Subject: [PATCH 1/3] mx31ads: Convert 1133-EV1 to use dev_name to
+	specify consumer devices
+In-Reply-To: <1262629491-18942-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1262629491-18942-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <20100105121118.GF6923@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 29, 2009 at 02:07:05PM -0800, Tony Lindgren wrote:
-> Hi,
+On Mon, Jan 04, 2010 at 06:24:49PM +0000, Mark Brown wrote:
+> This means we don't need to go running round working out struct
+> devices at runtime.
+
+Ok, scheduled for -next.
+
+Sascha
+
 > 
-> * Magnus Damm <magnus.damm@gmail.com> [091227 21:54]:
-> > Hi Tony,
-> > 
-> > On Sat, Dec 19, 2009 at 12:45 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > > Here are some v7 fixes, mostly to make kexec work.
-> > >
-> > > Using 2.6.33-rc1, these fixes, and kexec from kexec-tools
-> > > git repo, I can reboot my n900 in a loop reliably.
-> > 
-> > Thanks for your work on this. I previously tested kexec on ARM V6 and
-> > V7 and noticed that V7 didn't work. I revisited my V7 test after
-> > becoming aware of your patches. The single patch below unbreaks V7 on
-> > my target system.
-> > 
-> > > ? ? ?arm: Fix cpu_proc_fin() for proc-v7.S and make kexec work
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+>  arch/arm/mach-mx3/mx31ads.c |   14 ++------------
+>  1 files changed, 2 insertions(+), 12 deletions(-)
 > 
-> Cool. Thank you for fixing the kexec source :)
+> diff --git a/arch/arm/mach-mx3/mx31ads.c b/arch/arm/mach-mx3/mx31ads.c
+> index 0497c15..cda570b 100644
+> --- a/arch/arm/mach-mx3/mx31ads.c
+> +++ b/arch/arm/mach-mx3/mx31ads.c
+> @@ -307,12 +307,8 @@ static struct regulator_init_data ldo1_data = {
+>  };
+>  
+>  static struct regulator_consumer_supply ldo2_consumers[] = {
+> -	{
+> -		.supply = "AVDD",
+> -	},
+> -	{
+> -		.supply = "HPVDD",
+> -	},
+> +	{ .supply = "AVDD", .dev_name = "1-001a" },
+> +	{ .supply = "HPVDD", .dev_name = "1-001a" },
+>  };
+>  
+>  /* CODEC and SIM */
+> @@ -382,8 +378,6 @@ static struct wm8350_audio_platform_data imx32ads_wm8350_setup = {
+>  
+>  static int mx31_wm8350_init(struct wm8350 *wm8350)
+>  {
+> -	int i;
+> -
+>  	wm8350_gpio_config(wm8350, 0, WM8350_GPIO_DIR_IN,
+>  			   WM8350_GPIO0_PWR_ON_IN, WM8350_GPIO_ACTIVE_LOW,
+>  			   WM8350_GPIO_PULL_UP, WM8350_GPIO_INVERT_OFF,
+> @@ -419,10 +413,6 @@ static int mx31_wm8350_init(struct wm8350 *wm8350)
+>  			   WM8350_GPIO_PULL_NONE, WM8350_GPIO_INVERT_OFF,
+>  			   WM8350_GPIO_DEBOUNCE_OFF);
+>  
+> -	/* Fix up for our own supplies. */
+> -	for (i = 0; i < ARRAY_SIZE(ldo2_consumers); i++)
+> -		ldo2_consumers[i].dev = wm8350->dev;
+> -
+>  	wm8350_register_regulator(wm8350, WM8350_DCDC_1, &sw1a_data);
+>  	wm8350_register_regulator(wm8350, WM8350_DCDC_3, &viohi_data);
+>  	wm8350_register_regulator(wm8350, WM8350_DCDC_4, &violo_data);
+> -- 
+> 1.6.5.7
 > 
-> Are you seeing the occasional crc errors when uncompressing the
-> new kernel on your v7?
 > 
-> I'm seeing those maybe 1 out of 10 times on omap3430 boards unless if
-> I do an extra (and wrong) flush_cache_all after local_flush_tlb_all
-> at the end of setup_mm_for_reboot.
 
-Hi,
-
-I've also been playing with this patch.
-
-One thing I noticed is that If I disable L2 cache in cpu_v7_proc_fin()
-then kexec works fine and no crc errors from decompressor (I did
-~30 kexec boots). With L2 cache enabled, it fails almost immediately.
-
-Tested with OMAP3430 ES3.1.
-
-Thanks,
-MW
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
