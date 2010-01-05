@@ -1,37 +1,82 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 5 Jan 2010 16:47:19 +0100
-Subject: [PATCH 2/2] mx31ads: Provide an IRQ range to the WM835x on the
-	1133-EV1 module
-In-Reply-To: <20100105152014.GA3752@rakim.wolfsonmicro.main>
-References: <20100105135728.GL6923@pengutronix.de>
-	<20100105152014.GA3752@rakim.wolfsonmicro.main>
-Message-ID: <20100105154719.GO6923@pengutronix.de>
+From: mkl0301@hotmail.com (mkl lin)
+Date: Tue, 5 Jan 2010 16:02:22 +0000
+Subject: SMP issues on ARM11 MPCore
+In-Reply-To: <20100101205850.GI16220@n2100.arm.linux.org.uk>
+References: <SNT109-W391FD03251D32533FAE84DA77F0@phx.gbl>,
+	<20100101205850.GI16220@n2100.arm.linux.org.uk>
+Message-ID: <SNT109-W597ECAF29FF35A1CFC84D0A7730@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2010 at 03:20:14PM +0000, Mark Brown wrote:
-> On Tue, Jan 05, 2010 at 02:57:28PM +0100, Sascha Hauer wrote:
-> 
-> > I just had a look how other architectures handle this and I like it how
-> > pxa does it:
-> 
-> Yeah, my thinking here was to achieve the same thing with something more
-> like the existing i.MX code plus a bit more whitespace for legibility -
-> the end result is pretty much the same but a little less dense.  You'd
-> wind up with an ordered stack of these ifdef blocks very much like those
-> that PXA has.  I'm not that fussed either way, really, but I do like a
-> bit more whitespace.
-
-Feel free to add more whitespaces. What I like about pxa is that it
-makes clear that MXC_BOARD_IRQS is defined exactly in this file (no
-additional #ifndef MXC_BOARD_IRQS) and that it describes how people
-should add additional irqs.
-
-Sascha
 
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> These two sounds like a problem with interrupts - userspace console IO
+> is interrupt driven, whereas kernel console IO is not.
+
+Thanks for Russell's
+advice, after some tracing, I found that my IER (Interrupt Enable
+Register) of the serial port is 0 under case 1!!
+
+Case 2 is
+actually the same with case 1. Case 1 would come first, if I don't keep
+input things and let it finish its slow printing, it would then become
+case 2.
+
+UART_BUG_THRE are detected and enabled on my platform, causing serial8250_backup_timeout to be used.
+
+There
+are many places that do ( get IER, clear IER, restore IER ), like
+serial8250_console_write called by printk, and
+serial8250_backup_timeout. serial8250_backup_timeout is not protected
+by spinlock, causing the race condition, and result in wrong IER value.
+
+Following patch fix this issue. Case 3 and Case 4 are still often seen, but not case 1 and case 2.
+
+Best Regards,
+Mac Lin
+diff --git a/kernels/linux-2.6.31.1-X/drivers/serial/8250.c b/kernels/linux-2.6.31.1-X/drivers/serial/8250.c
+index 288a0e4..55602c3 100644
+--- a/kernels/linux-2.6.31.1-cavm1/drivers/serial/8250.c
++++ b/kernels/linux-2.6.31.1-cavm1/drivers/serial/8250.c
+@@ -1752,6 +1758,8 @@ static void serial8250_backup_timeout(unsigned long data)
+  unsigned int iir, ier = 0, lsr;
+  unsigned long flags;
+ 
++
++ spin_lock_irqsave(&up->port.lock, flags);
+  /*
+   * Must disable interrupts or else we risk racing with the interrupt
+   * based handler.
+@@ -1769,10 +1777,8 @@ static void serial8250_backup_timeout(unsigned long data)
+   * the "Diva" UART used on the management processor on many HP
+   * ia64 and parisc boxes.
+   */
+- spin_lock_irqsave(&up->port.lock, flags);
+  lsr = serial_in(up, UART_LSR);
+  up->lsr_saved_flags |= lsr & LSR_SAVE_FLAGS;
+- spin_unlock_irqrestore(&up->port.lock, flags);
+  if ((iir & UART_IIR_NO_INT) && (up->ier & UART_IER_THRI) &&
+      (!uart_circ_empty(&up->port.info->xmit) || up->port.x_char) &&
+      (lsr & UART_LSR_THRE)) {
+@@ -1780,12 +1786,14 @@ static void serial8250_backup_timeout(unsigned long data)
+   iir |= UART_IIR_THRI;
+  }
+ 
+- if (!(iir & UART_IIR_NO_INT))
+-  serial8250_handle_port(up);
+-
+  if (is_real_interrupt(up->port.irq))
+   serial_out(up, UART_IER, ier);
+ 
++ spin_unlock_irqrestore(&up->port.lock, flags);
++
++ if (!(iir & UART_IIR_NO_INT))
++  serial8250_handle_port(up);
++
+  /* Standard timer interval plus 0.2s to keep the port running */
+  mod_timer(&up->timer,
+   jiffies + poll_timeout(up->port.timeout) + HZ / 5);
+ 		 	   		  
+_________________________________________________________________
+Windows Live Hotmail: Your friends can get your Facebook updates, right from Hotmail?.
+http://www.microsoft.com/middleeast/windows/windowslive/see-it-in-action/social-network-basics.aspx?ocid=PID23461::T:WLMTAGL:ON:WL:en-xm:SI_SB_4:092009
