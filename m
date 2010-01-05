@@ -1,48 +1,110 @@
-From: leif.lindholm@arm.com (Leif Lindholm)
-Date: Tue, 5 Jan 2010 18:09:39 -0000
-Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors (v2)
-In-Reply-To: <20100104193400.GB13537@shareable.org>
-References: <20091218182007.GF5527@n2100.arm.linux.org.uk>
-	<1261243122.4637.9.camel@pc1117.cambridge.arm.com>
-	<20091219172833.GA6187@n2100.arm.linux.org.uk>
-	<F74D5D79E8EA1244A97ECCA56C4D01DB771E2EDD86@BUNGLE.Emea.Arm.com>
-	<20100104193400.GB13537@shareable.org>
-Message-ID: <000001ca8e32$3f84feb0$be8efc10$@lindholm@arm.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Tue, 5 Jan 2010 19:15:42 +0100
+Subject: [PATCH 1/4] mfd: mc13783: Take care of semantic inversion
+	between read and write value of two bits in POWER_MISCELLANEUS
+	register.
+In-Reply-To: <1260813540.2022.174.camel@climbing-alby>
+References: <1260808880.2022.98.camel@climbing-alby>
+	<1260810776.2022.130.camel@climbing-alby>
+	<4B26799F.1020507@ru.mvista.com>
+	<1260813540.2022.174.camel@climbing-alby>
+Message-ID: <20100105181541.GE4274@sortiz.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Jamie Lokier [mailto:jamie at shareable.org]
-> Sent: 04 January 2010 19:34
+Hi Alberto,
 
-> There is no need to return to userspace, as you know that userspace
-> will immediately retry the instruction, or respond to a signal.
+On Mon, Dec 14, 2009 at 06:59:00PM +0100, Alberto Panizzo wrote:
+> Il giorno lun, 14/12/2009 alle 20.45 +0300, Sergei Shtylyov ha scritto:
+> > > +     if (offset == MC13783_REG_POWER_MISCELLANEOUS)
+> > > +             buf &= !(MC13783_REGCTRL_PWGT1SPIEN |
+> > >   
+> > 
+> >    Are you sure ! shouldn't be ~ here?
+> > 
+> > > +                      MC13783_REGCTRL_PWGT2SPIEN);
+> > >   
+> > 
+> >    !(MC13783_REGCTRL_PWGT1SPIEN | MC13783_REGCTRL_PWGT2SPIEN) would 
+> > evaluate to 0 which is most probably not what you want.
+> > 
+> > WBR, Sergei 
 > 
-> So you can loop, as long as you:
+> For sure, you are right. The correct patch below..
 > 
->    1. Allow other tasks to run by calling cond_resched().
->    2. Break out of the loop if signal_pending().
+> PWGT1DRV and PWGT1DRV are two digital output controlled by two corresponding
+> hardware signals (Pin PWGTnEN) that are meant to be used to control core power
+> supplies.
+> The register MC13783_REG_POWER_MISCELLANEOUS contain the two control and
+> status bit (PWGTnSPIEN) where write and read meaning is summarised by 
+> the following table:
+> 
+>  Bit PWGTxSPIEN | Pin PWGTxEN | PWGTxDRV |  Read Back
+>    0 = default  |             |          | PWGTxSPIEN
+>  ---------------+-------------+----------+------------
+>        1        |      x      |   Low    |     0
+>        0        |      0      |   High   |     1
+>        0        |      1      |   Low    |     0
+> 
+> Writing a 1 to those bits will turn off the corresponding core
+> power supply. As there is no way to read back the value of 
+> PWGTnSPIEN, 
+Nice hardware :(
 
-Thanks for these suggestions - I will be posting an updated patch that does
-this shortly.
- 
-> If someone executes SWP on uncached or device memory and it's not an
-> intentional DOS (e.g. worked with older ARMs), they won't expect the
-> instruction to loop at that point.
 
-True, but difficult to solve in a clean way (see below).
+> the behaviour chosen is to let always the hardware
+> control itself leaving those bits at the default value.
+> 
+> This patch is especially needed for manipulate the other bits
+> in the same register, where the read-modify-write operation
+> can produce unwanted power fault.
+> 
+> Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
+> ---
+>  drivers/mfd/mc13783-core.c |   10 ++++++++++
+>  1 files changed, 10 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/mfd/mc13783-core.c b/drivers/mfd/mc13783-core.c
+> index a1ade23..3953297 100644
+> --- a/drivers/mfd/mc13783-core.c
+> +++ b/drivers/mfd/mc13783-core.c
+> @@ -171,6 +171,9 @@ int mc13783_reg_read(struct mc13783 *mc13783, unsigned int offset, u32 *val)
+>  }
+>  EXPORT_SYMBOL(mc13783_reg_read);
+>  
+> +#define MC13783_REG_POWER_MISCELLANEOUS        34
+> +#define MC13783_REGCTRL_PWGT1SPIEN     (1 << 15)
+> +#define MC13783_REGCTRL_PWGT2SPIEN     (1 << 16)
+>  int mc13783_reg_write(struct mc13783 *mc13783, unsigned int offset, u32 val)
+>  {
+>         u32 buf;
+> @@ -187,6 +190,13 @@ int mc13783_reg_write(struct mc13783 *mc13783, unsigned int offset, u32 val)
+>  
+>         buf = 1 << 31 | offset << MC13783_REGOFFSET_SHIFT | val;
+>  
+> +       /* Take care of table 4-24 in Freescale MC13783IGPLDRM.pdf making
+> +        * the assumption that PWGTnDRV signals controls core power supplies
+> +        * that software must not disable. */
+> +       if (offset == MC13783_REG_POWER_MISCELLANEOUS)
+> +               buf &= ~(MC13783_REGCTRL_PWGT1SPIEN |
+> +                        MC13783_REGCTRL_PWGT2SPIEN);
+> +
+Although I see where you want to go, I dont really enjoy that solution.
+I would prefere to have specific register write/rmw routines for
+MC13783_REG_POWER_MISCELLANEOUS, and at the same time forbid to access the
+latter from the current mc13783_reg_* API.
 
-> Faulting would be better. Is it feasible to detect when this has
-> happened and send a SIGBUS signal instead of looping?
+Cheers,
+Samuel.
 
-Only if the processor implements it (the AXI spec explicitly permits a
-processor to treat an OKAY response, as opposed to EXOKAY, as an error -
-but it doesn't mandate it). I am not aware of any ARM processors that do
-this. Otherwise that would certainly be the best solution.
 
-Of course this means that if we want to "detect" an impossible situation
-in order to generate an abort, we need to resort to counters, and
-determining an arbitrary "highest possible" number of valid sequential
-failures...
+>         memset(&t, 0, sizeof(t));
+>  
+>         t.tx_buf = &buf;
+> -- 
+> 1.6.3.3
+> 
 
-/
-    Leif
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
