@@ -1,48 +1,40 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 05 Jan 2010 18:20:23 +0900
-Subject: [PATCH] stack2core: show stack message and convert it to core
-	file when kernel die
-In-Reply-To: <daef60381001050104u5d4adf11k16bec2406501fbd2@mail.gmail.com>
-References: <daef60381001030705r93b3fbfkc50e7b9bbc62b334@mail.gmail.com>
-	<4B411F14.1040302@kernel.org>
-	<20100103150134.5bdab023@infradead.org>
-	<4B412341.2010002@kernel.org>
-	<20100103151406.20228c3a@infradead.org>
-	<daef60381001040822q188d7374te5a177c5f9877ac2@mail.gmail.com>
-	<4B4273D6.2010306@kernel.org>
-	<daef60381001050104u5d4adf11k16bec2406501fbd2@mail.gmail.com>
-Message-ID: <4B430457.5020906@kernel.org>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 5 Jan 2010 18:24:51 +0900
+Subject: [PATCH 0/5] V7/Cortex/omap34xx fixes for 2.6.33-rc1: DCC, kexec,
+	atags
+In-Reply-To: <20091229220705.GM3512@atomide.com>
+References: <20091219034151.26198.26570.stgit@localhost>
+	<aec7e5c30912272155s41ce8914hd03a5e4c740a5b9d@mail.gmail.com>
+	<20091229220705.GM3512@atomide.com>
+Message-ID: <aec7e5c31001050124q5a0a7b7co872bd58ddfabe5f@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Dec 30, 2009 at 7:07 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Magnus Damm <magnus.damm@gmail.com> [091227 21:54]:
+>> > ? ? ?arm: Fix cpu_proc_fin() for proc-v7.S and make kexec work
+>
+> Are you seeing the occasional crc errors when uncompressing the
+> new kernel on your v7?
 
-On 01/05/2010 06:04 PM, Hui Zhu wrote:
-> I agree with read the current stack message is better.
-> 
-> About the extending, I have some question with it:
-> 1.  markup_oops.pl have itself idea, it try use dmesg| markup_oops.pl
-> show what happen to usr.  This is different with s2c.
-> I am not sure people like it have other function with it.  Too much
-> part of this file need to be change.  It need rewrite, just the oops
-> message parse part can be keep.
+Nope, it's very stable. I boot over USB with kexec for all my ARM
+kernel development and I have not seen any issues so far.
 
-Yeah, I think you'll need to refactor it and share only the parsing
-frontend.  Just adding a switch (-m or whatever) which puts it into
-machine-friendly translator mode should do the trick.
+> I'm seeing those maybe 1 out of 10 times on omap3430 boards unless if
+> I do an extra (and wrong) flush_cache_all after local_flush_tlb_all
+> at the end of setup_mm_for_reboot.
 
-> 2.  I use perl to work in a long time before, I know it good at parse
-> the text, but I am not sure it good at handle struct like:
+My second kernel does not need any workaround, however...
 
-You don't need to handle the data structure at all.  Just make it
-parse the dmesg and output machine-friendly formatted output which can
-be processed by s2c.  ie. just make it do the reformatting.
+> If you're not seeing the crc errors, do you have L2 cache on?
 
-> Even if what happen, I will keep a c s2c with myself.  :)
+I'm not sure at this point, but I think L2 is disabled. Will try to turn it on.
 
-That will be sad.  I really want it too.  :-)
+> Also, what's the Cortex version on your v7? It's rev r2p3 on
+> omap3430.
 
-Thanks.
+The data sheet of sh7377 says r2p3 as well.
 
--- 
-tejun
+Cheers,
+
+/ magnus
