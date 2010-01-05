@@ -1,119 +1,402 @@
-From: jpihet@mvista.com (Jean Pihet)
-Date: Tue, 5 Jan 2010 19:23:40 +0100
-Subject: [PATCH 5/5] arm/perfevents: implement perf event support for ARMv6
-In-Reply-To: <000401ca8e31$fac86820$f0593860$@deacon@arm.com>
-References: <1262602122-10373-1-git-send-email-jamie.iles@picochip.com>
-	<1262602122-10373-6-git-send-email-jamie.iles@picochip.com>
-	<000401ca8e31$fac86820$f0593860$@deacon@arm.com>
-Message-ID: <201001051923.40756.jpihet@mvista.com>
+From: leif.lindholm@arm.com (Leif Lindholm)
+Date: Tue, 05 Jan 2010 18:24:47 +0000
+Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors (v3)
+Message-ID: <20100105182447.5374.79579.stgit@e101986-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will, Jamie,
+The SWP instruction was deprecated in the ARMv6 architecture, superseded
+by the LDREX/STREX family of instructions for
+load-linked/store-conditional operations. The ARMv7 multiprocessing
+extensions mandate that SWP/SWPB instructions are treated as undefined
+from reset, with the ability to enable them through the System Control
+Register SW bit.
 
-On Tuesday 05 January 2010 19:07:44 Will Deacon wrote:
-> Hi Jamie,
->
-> I've been trying to test your patches with a quad-core ARM 11MPCore on a
-> Realview PB11MP board.
->
-> Unfortunately, I occasionally experience a complete system hang during some
-> profiling runs. I don't think it's your fault however, as it can occur even
-> when monitoring only software events. I've managed to reproduce this on the
-> tip/master branch and got the following information [I enabled lock
-> debugging]:
+This patch adds the alternative solution to emulate the SWP and SWPB
+instructions using LDREX/STREX sequences, and log statistics to
+/proc/cpu/swp_emulation. To correctly deal with copy-on-write, it also
+modifies cpu_v7_set_pte_ext to change the mappings to priviliged RO when
+user RO.
 
-This is the exact same problem as I have when stressing the system a little 
-bit.
+Signed-off-by: Leif Lindholm <leif.lindholm@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/kernel/Makefile      |    1 
+ arch/arm/kernel/swp_emulate.c |  297 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/Kconfig           |   20 +++
+ arch/arm/mm/proc-v7.S         |    6 +
+ 4 files changed, 324 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/kernel/swp_emulate.c
 
-Jean
->
-> =================================
-> [ INFO: inconsistent lock state ]
-> 2.6.33-rc2-tip+ #5
-> ---------------------------------
-> inconsistent {IN-HARDIRQ-W} -> {HARDIRQ-ON-W} usage.
-> perf/1463 [HC0[0]:SC0[0]:HE1:SE1] takes:
->  (&ctx->lock){?.....}, at: [<c009e538>] __perf_event_sched_in+0x20/0x168
-> {IN-HARDIRQ-W} state was registered at:
->   [<c00718b0>] __lock_acquire+0x5c8/0x17b4
->   [<c0072b70>] lock_acquire+0xd4/0xec
->   [<c0315700>] _raw_spin_lock+0x2c/0x3c
->   [<c00a20f8>] perf_ctx_adjust_freq+0xc/0x1dc
->   [<c00a230c>] perf_event_task_tick+0x44/0xb4
->   [<c0041f4c>] scheduler_tick+0xec/0x144
->   [<c0053eb8>] update_process_times+0x40/0x4c
->   [<c006d91c>] tick_periodic+0xdc/0x108
->   [<c006d96c>] tick_handle_periodic+0x24/0xf0
->   [<c0030124>] ipi_timer+0x34/0x44
->   [<c002a3cc>] do_local_timer+0x50/0x80
->   [<c002aca4>] __irq_svc+0x44/0xe0
->   [<c002c388>] default_idle+0x28/0x2c
->   [<c002c8ac>] cpu_idle+0x8c/0xe4
->   [<70008080>] 0x70008080
-> irq event stamp: 454
-> hardirqs last  enabled at (454): [<c0315d30>]
-> _raw_spin_unlock_irq+0x24/0x2c hardirqs last disabled at (453):
-> [<c0315784>] _raw_spin_lock_irq+0x18/0x50 softirqs last  enabled at (0):
-> [<c0045650>] copy_process+0x328/0xf70 softirqs last disabled at (0):
-> [<(null)>] (null)
->
-> other info that might help us debug this:
-> no locks held by perf/1463.
->
-> stack backtrace:
-> [<c0031694>] (unwind_backtrace+0x0/0xd4) from [<c006ff88>]
-> (print_usage_bug+0x16c/0x1ac) [<c006ff88>] (print_usage_bug+0x16c/0x1ac)
-> from [<c00702f0>] (mark_lock+0x328/0x5f0) [<c00702f0>]
-> (mark_lock+0x328/0x5f0) from [<c007193c>] (__lock_acquire+0x654/0x17b4)
-> [<c007193c>] (__lock_acquire+0x654/0x17b4) from [<c0072b70>]
-> (lock_acquire+0xd4/0xec) [<c0072b70>] (lock_acquire+0xd4/0xec) from
-> [<c0315700>] (_raw_spin_lock+0x2c/0x3c) [<c0315700>]
-> (_raw_spin_lock+0x2c/0x3c) from [<c009e538>]
-> (__perf_event_sched_in+0x20/0x168) [<c009e538>]
-> (__perf_event_sched_in+0x20/0x168) from [<c009e6c8>]
-> (perf_event_task_sched_in+0x48/0x58) [<c009e6c8>]
-> (perf_event_task_sched_in+0x48/0x58) from [<c003f2dc>]
-> (finish_task_switch+0x34/0xb4) [<c003f2dc>] (finish_task_switch+0x34/0xb4)
-> from [<c03133e0>] (schedule+0x728/0x834) [<c03133e0>]
-> (schedule+0x728/0x834) from [<c00d5190>] (pipe_wait+0x64/0x84) [<c00d5190>]
-> (pipe_wait+0x64/0x84) from [<c00d59d8>] (pipe_read+0x3ac/0x428)
-> [<c00d59d8>] (pipe_read+0x3ac/0x428) from [<c00cdd34>]
-> (do_sync_read+0x94/0xe0) [<c00cdd34>] (do_sync_read+0x94/0xe0) from
-> [<c00ce868>] (vfs_read+0xa8/0x150) [<c00ce868>] (vfs_read+0xa8/0x150) from
-> [<c00ce9bc>] (sys_read+0x3c/0x68) [<c00ce9bc>] (sys_read+0x3c/0x68) from
-> [<c002b140>] (ret_fast_syscall+0x0/0x38)
->
-> This occurs more frequently when profiling code that spawns child processes
-> [e.g. gcc] but I've see it happen with sleep too. It also happens if I pass
-> maxcpus=1 as a bootarg.
->
-> Have you seen this happen on your board? I've failed to reproduce it on my
-> x86 machine.
->
-> Will
->
-> * Jamie Iles wrote:
-> > This patch implements support for ARMv6 performance counters in the
-> > Linux performance events subsystem. ARMv6 architectures that have the
-> > performance counters should enable HW_PERF_EVENTS and define the
-> > interrupts for the counters in arch/arm/kernel/perf_event.c
-> >
-> > This implementation also provides an ARM PMU abstraction layer to allow
-> > ARMv7 and others to be supported in the future by adding new a
-> > 'struct arm_pmu'.
-> >
-> > Signed-off-by: Jamie Iles <jamie.iles@picochip.com>
-> > Cc: Peter Zijlstra <peterz@infradead.org>
-> > Cc: Ingo Molnar <mingo@elte.hu>
-> > Cc: Jean Pihet <jpihet@mvista.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm/Kconfig             |    8 +
-> >  arch/arm/kernel/Makefile     |    1 +
-> >  arch/arm/kernel/perf_event.c | 1338
-> > ++++++++++++++++++++++++++++++++++++++++++ 3 files changed, 1347
-> > insertions(+), 0 deletions(-)
-> >  create mode 100644 arch/arm/kernel/perf_event.c
->
-> <truncated>
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index dd00f74..d1befbc 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -38,6 +38,7 @@ obj-$(CONFIG_ARM_THUMBEE)	+= thumbee.o
+ obj-$(CONFIG_KGDB)		+= kgdb.o
+ obj-$(CONFIG_ARM_UNWIND)	+= unwind.o
+ obj-$(CONFIG_HAVE_TCM)		+= tcm.o
++obj-$(CONFIG_SWP_EMULATE)	+= swp_emulate.o
+ 
+ obj-$(CONFIG_CRUNCH)		+= crunch.o crunch-bits.o
+ AFLAGS_crunch-bits.o		:= -Wa,-mcpu=ep9312
+diff --git a/arch/arm/kernel/swp_emulate.c b/arch/arm/kernel/swp_emulate.c
+new file mode 100644
+index 0000000..c77040e
+--- /dev/null
++++ b/arch/arm/kernel/swp_emulate.c
+@@ -0,0 +1,297 @@
++/*
++ *  linux/arch/arm/kernel/swp_emulate.c
++ *
++ *  Copyright (C) 2009 ARM Limited
++ *  __user_* functions adapted from include/asm/uaccess.h
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ *  Implements emulation of the SWP/SWPB instructions using load-exclusive and
++ *  store-exclusive for processors that have them disabled (or future ones that
++ *  might not implement them).
++ *
++ *  Syntax of SWP{B} instruction: SWP{B}<c> <Rt>, <Rt2>, [<Rn>]
++ *  Where: Rt  = destination
++ *	   Rt2 = source
++ *	   Rn  = address
++ */
++
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/proc_fs.h>
++#include <linux/sched.h>
++#include <linux/syscalls.h>
++
++#include <asm/traps.h>
++#include <asm/uaccess.h>
++
++/*
++ * Error-checking SWP macros implemented using ldrex{b}/strex{b}
++ */
++#define __user_swp_asm(data, addr, res)				\
++	__asm__ __volatile__(					\
++	"	mov	r3, %1\n"				\
++	"0:	ldrex	%1, [%2]\n"				\
++	"1:	strex	%0, r3, [%2]\n"				\
++	"	cmp	%0, #0\n"				\
++	"	movne	%0, %3\n"				\
++	"2:\n"							\
++	"	.section .fixup,\"ax\"\n"			\
++	"	.align	2\n"					\
++	"3:	mov	%0, %4\n"				\
++	"	b	2b\n"					\
++	"	.previous\n"					\
++	"	.section __ex_table,\"a\"\n"			\
++	"	.align	3\n"					\
++	"	.long	0b, 3b\n"				\
++	"	.long	1b, 3b\n"				\
++	"	.previous"					\
++	: "=&r" (res), "+r" (data)				\
++	: "r" (addr), "i" (-EAGAIN), "i" (-EFAULT)		\
++	: "cc", "r3")
++
++#define __user_swpb_asm(data, addr, res)			\
++	__asm__ __volatile__(					\
++	"	mov	r3, %1\n"				\
++	"0:	ldrexb	%1, [%2]\n"				\
++	"1:	strexb	%0, r3, [%2]\n"				\
++	"	cmp	%0, #0\n"				\
++	"	movne	%0, %3\n"				\
++	"2:\n"							\
++	"	.section .fixup,\"ax\"\n"			\
++	"	.align	2\n"					\
++	"3:	mov	%0, %4\n"				\
++	"	b	2b\n"					\
++	"	.previous\n"					\
++	"	.section __ex_table,\"a\"\n"			\
++	"	.align	3\n"					\
++	"	.long	0b, 3b\n"				\
++	"	.long	1b, 3b\n"				\
++	"	.previous"					\
++	: "=&r" (res), "+r" (data)				\
++	: "r" (addr), "i" (-EAGAIN), "i" (-EFAULT)		\
++	: "cc", "r3")
++
++/*
++ * Macros/defines for extracting register numbers from instruction.
++ */
++#define EXTRACT_REG_NUM(instruction, offset) \
++  (((instruction) & (0xf << (offset))) >> (offset))
++#define RN_OFFSET  16
++#define RT_OFFSET  12
++#define RT2_OFFSET  0
++
++static unsigned int swpcounter;
++static unsigned int swpbcounter;
++static unsigned int abtcounter;
++static long	    previous_pid;
++
++#ifdef CONFIG_PROC_FS
++static int proc_read_status(char *page, char **start, off_t off, int count,
++			    int *eof, void *data)
++{
++	char *p = page;
++	int len;
++
++	p += sprintf(p, "Emulated SWP:\t\t%u\n", swpcounter);
++	p += sprintf(p, "Emulated SWPB:\t\t%u\n", swpbcounter);
++	p += sprintf(p, "Aborted SWP{B}:\t\t%u\n", abtcounter);
++	if (previous_pid != 0)
++		p += sprintf(p, "Last process:\t\t%ld\n", previous_pid);
++
++	len = (p - page) - off;
++	if (len < 0)
++		len = 0;
++
++	*eof = (len <= count) ? 1 : 0;
++	*start = page + off;
++
++	return len;
++}
++#endif
++
++/*
++ * Set up process info to signal segmentation fault - called on access error.
++ */
++static void set_segfault(struct pt_regs *regs, unsigned long addr)
++{
++	siginfo_t info;
++
++	if (find_vma(current->mm, addr) == NULL)
++		info.si_code = SEGV_MAPERR;
++	else
++		info.si_code = SEGV_ACCERR;
++
++	info.si_signo = SIGSEGV;
++	info.si_errno = 0;
++	info.si_addr  = (void __user *)regs->ARM_pc;
++
++	pr_debug("SWP{B} emulation: access caused memory abort!\n");
++	arm_notify_die("Illegal memory access", regs, &info, 0, 0);
++
++	if (abtcounter == UINT_MAX)
++		printk(KERN_WARNING \
++		       "SWP{B} emulation abort counter wrapped!\n");
++	abtcounter++;
++}
++
++static int emulate_swp(struct pt_regs *regs, unsigned int address,
++		       unsigned int destreg, unsigned int data)
++{
++	unsigned int res = 0;
++
++	if (address & 0x3) {
++		/* SWP to unaligned address not permitted */
++		pr_debug("SWP instruction on unaligned pointer!\n");
++		return -EFAULT;
++	}
++
++	do {
++		if (res == -EAGAIN)
++			cond_resched();
++
++		smp_mb();
++		__user_swp_asm(data, address, res);
++	} while ((res == -EAGAIN) && !signal_pending(current));
++
++	if (res == 0) {
++		smp_mb();
++		regs->uregs[destreg] = data;
++		if (swpcounter == UINT_MAX)
++			printk(KERN_WARNING \
++			       "SWP emulation counter wrapped!\n");
++		swpcounter++;
++	}
++
++	return res;
++}
++
++static int emulate_swpb(struct pt_regs *regs, unsigned int address,
++			unsigned int destreg, unsigned int data)
++{
++	unsigned int res = 0;
++
++	do {
++		if (res == -EAGAIN)
++			cond_resched();
++
++		smp_mb();
++		__user_swpb_asm(data, address, res);
++	} while ((res == -EAGAIN) && !signal_pending(current));
++
++	if (res == 0) {
++		smp_mb();
++		regs->uregs[destreg] = data;
++		if (swpbcounter == UINT_MAX)
++			printk(KERN_WARNING \
++			       "SWPB emulation counter wrapped!\n");
++		swpbcounter++;
++	}
++
++	return res;
++}
++
++/*
++ * swp_handler logs the id of calling process, dissects the instruction, sanity
++ * checks the memory location, calls dedicated functions for SWP/SWPB and deals
++ * with fixup/error handling before returning
++ */
++static int swp_handler(struct pt_regs *regs, unsigned int instr)
++{
++	unsigned int address, destreg, data;
++	unsigned int res = 0;
++
++	if (current->pid != previous_pid) {
++		pr_debug("\"%s\" (%ld) uses deprecated SWP{B} instruction\n",
++			 current->comm, (unsigned long)current->pid);
++		previous_pid = current->pid;
++	}
++
++	address = regs->uregs[EXTRACT_REG_NUM(instr, RN_OFFSET)];
++	data	= regs->uregs[EXTRACT_REG_NUM(instr, RT2_OFFSET)];
++	destreg = EXTRACT_REG_NUM(instr, RT_OFFSET);
++
++	pr_debug("addr in r%d->0x%08x, dest is r%d, source in r%d->0x%08x)\n",
++		 EXTRACT_REG_NUM(instr, RN_OFFSET), address,
++		 destreg, EXTRACT_REG_NUM(instr, RT2_OFFSET), data);
++
++	/* Check access in reasonable access range for both SWP and SWPB */
++	if (!access_ok(VERIFY_WRITE, (address & ~3), 4)) {
++		pr_debug("SWP{B} emulation: access to %p not allowed!\n",
++			 (void *)address);
++		res = -EFAULT;
++	} else {
++		/*
++		 * Bit 22 of the instruction distinguishes between the SWP and
++		 * SWPB variants (bit set means SWPB).
++		 */
++		if ((instr & (1 << 22)) == 0)
++			res = emulate_swp(regs, address, destreg, data);
++		else
++			res = emulate_swpb(regs, address, destreg, data);
++	}
++
++	if (res == 0) {
++		/*
++		 * On successful emulation, revert the adjustment to the PC
++		 * made in kernel/traps.c in order to resume execution@the
++		 * instruction following the SWP{B}.
++		 */
++		regs->ARM_pc += 4;
++	} else if (res == -EFAULT) {
++		/*
++		 * Memory errors do not mean emulation failed.
++		 * Set up signal info to return SEGV, then return OK
++		 */
++		set_segfault(regs, address);
++	}
++
++	return 0;
++}
++
++/*
++ * Only emulate SWP/SWPB executed in ARM state/User mode.
++ * The kernel must be SWP free and SWP{B} does not exist in Thumb/ThumbEE.
++ */
++static struct undef_hook swp_hook = {
++	.instr_mask = 0x0fb00ff0,
++	.instr_val  = 0x01000090,
++	.cpsr_mask  = MODE_MASK | PSR_T_BIT | PSR_J_BIT,
++	.cpsr_val   = USR_MODE,
++	.fn	    = swp_handler
++};
++
++/*
++ * Register handler and create status file in /proc/cpu
++ * Invoked as late_initcall, since not needed before init spawned.
++ */
++static int __init swp_emulation_init(void)
++{
++#ifdef CONFIG_PROC_FS
++	struct proc_dir_entry *res;
++
++#ifndef CONFIG_ALIGNMENT_TRAP
++	res = proc_mkdir("cpu", NULL);
++	if (!res)
++		return -ENOMEM;
++
++	res = create_proc_entry("swp_emulation", S_IRUGO, res);
++#else
++	res = create_proc_entry("cpu/swp_emulation", S_IRUGO, NULL);
++#endif
++
++	if (!res)
++		return -ENOMEM;
++
++	res->read_proc = proc_read_status;
++#endif /* CONFIG_PROC_FS */
++
++	printk(KERN_NOTICE "Registering SWP/SWPB emulation handler\n");
++	register_undef_hook(&swp_hook);
++
++	return 0;
++}
++
++late_initcall(swp_emulation_init);
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index dd4698c..c45b0d3 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -630,6 +630,26 @@ config ARM_THUMBEE
+ 	  Say Y here if you have a CPU with the ThumbEE extension and code to
+ 	  make use of it. Say N for code that can run on CPUs without ThumbEE.
+ 
++config SWP_EMULATE
++	bool "Emulate SWP/SWPB instructions"
++	depends on CPU_V7
++	default y if SMP
++	help
++	  ARMv6 architecture deprecates use of the SWP/SWPB instructions.
++	  ARMv7 multiprocessing extensions introduce the ability to disable
++	  these instructions, triggering an undefined instruction exception
++	  when executed. Say Y here to enable software emulation of these
++	  instructions for userspace (not kernel) using LDREX/STREX.
++	  Also creates /proc/cpu/swp_emulation for statistics.
++
++	  NOTE: when accessing uncached shared regions, LDREX/STREX rely
++	  on an external transaction monitoring block called a global
++	  monitor to maintain update atomicity. If your system does not
++	  implement a global monitor, this option can cause programs that
++	  are map uncached memory to deadlock.
++
++	  If unsure, say Y.
++
+ config CPU_BIG_ENDIAN
+ 	bool "Build big-endian kernel"
+ 	depends on ARCH_SUPPORTS_BIG_ENDIAN
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 3a28521..cb85aeb 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -147,8 +147,10 @@ ENTRY(cpu_v7_set_pte_ext)
+ 
+ 	tst	r1, #L_PTE_USER
+ 	orrne	r3, r3, #PTE_EXT_AP1
++#ifndef CONFIG_SWP_EMULATE
+ 	tstne	r3, #PTE_EXT_APX
+ 	bicne	r3, r3, #PTE_EXT_APX | PTE_EXT_AP0
++#endif
+ 
+ 	tst	r1, #L_PTE_EXEC
+ 	orreq	r3, r3, #PTE_EXT_XN
+@@ -275,6 +277,10 @@ __v7_setup:
+ #ifdef CONFIG_CPU_ENDIAN_BE8
+ 	orr	r6, r6, #1 << 25		@ big-endian page tables
+ #endif
++#ifdef CONFIG_SWP_EMULATE
++	orr     r5, r5, #(1 << 10)              @ set SW bit in "clear"
++	bic     r6, r6, #(1 << 10)              @ clear it in "mmuset"
++#endif
+    	mrc	p15, 0, r0, c1, c0, 0		@ read control register
+ 	bic	r0, r0, r5			@ clear bits them
+ 	orr	r0, r0, r6			@ set them
