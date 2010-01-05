@@ -1,64 +1,168 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 5 Jan 2010 15:30:56 +0800
-Subject: [patch 2/4] [ARM] mmp: support marvell ARMADA610
-In-Reply-To: <771cded01001040316j58e07a74gae37e0cabcd60f26@mail.gmail.com>
-References: <771cded00912062219p79048babs669abf275419a2b9@mail.gmail.com>
-	<771cded00912310642x5ffeb071pcf6ade605138bb63@mail.gmail.com>
-	<f17812d70912311946n42b6eb13q78afdbd92d2708e9@mail.gmail.com>
-	<771cded01001031827j28dc6aa9l5425669f2ceeb27a@mail.gmail.com>
-	<f17812d71001031849y294b0a99jdde0aa3e504a04fe@mail.gmail.com>
-	<771cded01001031929w688217d3g257b395f7544ee7a@mail.gmail.com>
-	<f17812d71001032027k17dba375pd29ccbca17034a46@mail.gmail.com>
-	<771cded01001040215g55a09005ra8248005fb396a1e@mail.gmail.com>
-	<20100104102740.GA9107@n2100.arm.linux.org.uk>
-	<771cded01001040316j58e07a74gae37e0cabcd60f26@mail.gmail.com>
-Message-ID: <f17812d71001042330p21da40dcr7b29a1316cf9a615@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 5 Jan 2010 10:24:29 +0200
+Subject: [PATCH 3/4] fec: add support for Freescale i.MX25 PDK (3DS)
+In-Reply-To: <20091216063402.GA13160@jasper.tkos.co.il>
+References: <cover.1260785451.git.baruch@tkos.co.il>
+	<fb518184b206ec2727deda111cc5364134ace69a.1260785451.git.baruch@tkos.co.il>
+	<20091214103348.GV15126@pengutronix.de>
+	<20091215083142.GB18290@jasper.tkos.co.il>
+	<4B277878.1050804@snapgear.com> <20091215201109.GA2621@tarshish>
+	<4B282644.8030104@snapgear.com>
+	<20091216063402.GA13160@jasper.tkos.co.il>
+Message-ID: <20100105082429.GB25571@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> OK. Update the patches.
->
+On Wed, Dec 16, 2009 at 08:34:06AM +0200, Baruch Siach wrote:
+> Hi Greg,
 
-Applied to branch 'mmp2' and made some changes as follows
-(please let me know your concerns and help test this):
+[snip]
 
-1. irq-mmp2.c: separate the difference into different irq_chip
-and individual demux handler for those MUXed IRQs, naming
-is changed a bit as well. Having a single irq_chip and demux
-handler isn't performance friendly - having to go through a lengthy
-condition branches each time - and that's why irq_chip is invented.
+> Thanks. The updated patch below.
 
-2. merge patch 1, 2, 3 together so mmp2 can build (my build
-here complains about no machine_desc defined if flint support
-isn't there)
+Ping?
 
-And I'd like you to help co-maintaine MMP2 together with me,
-please kindly Ack if you're fine with the patch follows:
+How should take care of this?
 
-commit 2004b15682f0f612b85088d730164e91fca2eec8
-Author: Eric Miao <eric.y.miao@gmail.com>
-Date:   Tue Jan 5 15:28:26 2010 +0800
+The platform code for i.MX25 PDK is going via Sascha's tree, and it depends on 
+this patch to compile.
 
-    MAINTAINERS: add maintainers for Marvell MMP2 (aka ARMADA610) support
+baruch
 
-    Cc: Haojian Zhuang <haojian.zhuang@marvell.com>
-    Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+> From 2d0751f868519978603b16baa197bfb9f9ec9e2e Mon Sep 17 00:00:00 2001
+> Message-Id: <2d0751f868519978603b16baa197bfb9f9ec9e2e.1260945080.git.baruch@tkos.co.il>
+> From: Baruch Siach <baruch@tkos.co.il>
+> Date: Mon, 14 Dec 2009 10:36:50 +0200
+> Subject: [PATCH] fec: add support for PHY interface platform data
+> 
+> The i.MX25 PDK uses RMII to communicate with its PHY. This patch adds the
+> ability to configure RMII, based on platform data.
+> 
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> Acked-by:  Greg Ungerer <gerg@uclinux.org>
+> ---
+>  drivers/net/fec.c   |   22 ++++++++++++++++++++++
+>  drivers/net/fec.h   |    2 ++
+>  include/linux/fec.h |   21 +++++++++++++++++++++
+>  3 files changed, 45 insertions(+), 0 deletions(-)
+>  create mode 100644 include/linux/fec.h
+> 
+> diff --git a/drivers/net/fec.c b/drivers/net/fec.c
+> index 16a1d58..a7cfe0d 100644
+> --- a/drivers/net/fec.c
+> +++ b/drivers/net/fec.c
+> @@ -40,6 +40,7 @@
+>  #include <linux/irq.h>
+>  #include <linux/clk.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/fec.h>
+>  
+>  #include <asm/cacheflush.h>
+>  
+> @@ -198,6 +199,7 @@ struct fec_enet_private {
+>  	uint	phy_speed;
+>  	phy_info_t const	*phy;
+>  	struct work_struct phy_task;
+> +	phy_interface_t	phy_interface;
+>  
+>  	uint	sequence_done;
+>  	uint	mii_phy_task_queued;
+> @@ -1810,6 +1812,21 @@ fec_restart(struct net_device *dev, int duplex)
+>  	/* Set MII speed */
+>  	writel(fep->phy_speed, fep->hwp + FEC_MII_SPEED);
+>  
+> +#ifdef FEC_MIIGSK_ENR
+> +	if (fep->phy_interface == PHY_INTERFACE_MODE_RMII) {
+> +		/* disable the gasket and wait */
+> +		writel(0, fep->hwp + FEC_MIIGSK_ENR);
+> +		while (readl(fep->hwp + FEC_MIIGSK_ENR) & 4)
+> +			udelay(1);
+> +
+> +		/* configure the gasket: RMII, 50 MHz, no loopback, no echo */
+> +		writel(1, fep->hwp + FEC_MIIGSK_CFGR);
+> +
+> +		/* re-enable the gasket */
+> +		writel(2, fep->hwp + FEC_MIIGSK_ENR);
+> +	}
+> +#endif
+> +
+>  	/* And last, enable the transmit and receive processing */
+>  	writel(2, fep->hwp + FEC_ECNTRL);
+>  	writel(0, fep->hwp + FEC_R_DES_ACTIVE);
+> @@ -1847,6 +1864,7 @@ static int __devinit
+>  fec_probe(struct platform_device *pdev)
+>  {
+>  	struct fec_enet_private *fep;
+> +	struct fec_platform_data *pdata;
+>  	struct net_device *ndev;
+>  	int i, irq, ret = 0;
+>  	struct resource *r;
+> @@ -1879,6 +1897,10 @@ fec_probe(struct platform_device *pdev)
+>  
+>  	platform_set_drvdata(pdev, ndev);
+>  
+> +	pdata = pdev->dev.platform_data;
+> +	if (pdata)
+> +		fep->phy_interface = pdata->phy;
+> +
+>  	/* This device has up to three irqs on some platforms */
+>  	for (i = 0; i < 3; i++) {
+>  		irq = platform_get_irq(pdev, i);
+> diff --git a/drivers/net/fec.h b/drivers/net/fec.h
+> index cc47f3f..2c48b25 100644
+> --- a/drivers/net/fec.h
+> +++ b/drivers/net/fec.h
+> @@ -43,6 +43,8 @@
+>  #define FEC_R_DES_START		0x180 /* Receive descriptor ring */
+>  #define FEC_X_DES_START		0x184 /* Transmit descriptor ring */
+>  #define FEC_R_BUFF_SIZE		0x188 /* Maximum receive buff size */
+> +#define FEC_MIIGSK_CFGR		0x300 /* MIIGSK Configuration reg */
+> +#define FEC_MIIGSK_ENR		0x308 /* MIIGSK Enable reg */
+>  
+>  #else
+>  
+> diff --git a/include/linux/fec.h b/include/linux/fec.h
+> new file mode 100644
+> index 0000000..5d3523d
+> --- /dev/null
+> +++ b/include/linux/fec.h
+> @@ -0,0 +1,21 @@
+> +/* include/linux/fec.h
+> + *
+> + * Copyright (c) 2009 Orex Computed Radiography
+> + *   Baruch Siach <baruch@tkos.co.il>
+> + *
+> + * Header file for the FEC platform data
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +#ifndef __LINUX_FEC_H__
+> +#define __LINUX_FEC_H__
+> +
+> +#include <linux/phy.h>
+> +
+> +struct fec_platform_data {
+> +	phy_interface_t phy;
+> +};
+> +
+> +#endif
+> -- 
+> 1.6.5
+> 
+> 
+> -- 
+>                                                      ~. .~   Tk Open Systems
+> =}------------------------------------------------ooO--U--Ooo------------{=
+>    - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 66f5f7d..33978ed 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -4439,6 +4439,13 @@ L:	linux-arm-kernel at lists.infradead.org
-(moderated for non-subscribers)
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git
- S:	Maintained
-
-+MMP2 SUPPORT (aka ARMADA610)
-+M:	Haojian Zhuang <haojian.zhuang@marvell.com>
-+M:	Eric Miao <eric.y.miao@gmail.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git
-+S:	Maintained
-+
- PXA MMCI DRIVER
- S:	Orphan
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
