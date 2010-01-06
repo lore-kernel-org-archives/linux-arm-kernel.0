@@ -1,7 +1,8 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed,  6 Jan 2010 10:32:16 -0800
-Subject: [PATCH 34/35] davinci: da850/omapl138: Specify reserved channels/slots
-In-Reply-To: <1262802737-6601-34-git-send-email-khilman@deeprootsystems.com>
+Date: Wed,  6 Jan 2010 10:32:17 -0800
+Subject: [PATCH 35/35] davinci: dm646x: Specify reserved EDMA channel/slots
+	for DM646x
+In-Reply-To: <1262802737-6601-35-git-send-email-khilman@deeprootsystems.com>
 References: <1262802737-6601-1-git-send-email-khilman@deeprootsystems.com>
 	<1262802737-6601-2-git-send-email-khilman@deeprootsystems.com>
 	<1262802737-6601-3-git-send-email-khilman@deeprootsystems.com>
@@ -36,83 +37,66 @@ References: <1262802737-6601-1-git-send-email-khilman@deeprootsystems.com>
 	<1262802737-6601-32-git-send-email-khilman@deeprootsystems.com>
 	<1262802737-6601-33-git-send-email-khilman@deeprootsystems.com>
 	<1262802737-6601-34-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1262802737-6601-35-git-send-email-khilman@deeprootsystems.com>
+	<1262802737-6601-35-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1262802737-6601-36-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudhakar Rajashekhara <sudhakar.raj@ti.com>
 
-Pass reserved EDMA channel/slots as platform data for da850/omap-l138.
+Pass reserved EDMA channel/slots as platform data for dm646x.
 
 Signed-off-by: Sudhakar Rajashekhara <sudhakar.raj@ti.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-davinci/devices-da8xx.c |   39 +++++++++++++++++++++++++++++++++
- 1 files changed, 39 insertions(+), 0 deletions(-)
+ arch/arm/mach-davinci/dm646x.c |   28 ++++++++++++++++++++++++++++
+ 1 files changed, 28 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index 9a5342b..7e0789f 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -134,6 +134,41 @@ static const s16 da830_dma_rsv_slots[][2] = {
- 	{-1, -1}
- };
+diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
+index de306ca..99224ec 100644
+--- a/arch/arm/mach-davinci/dm646x.c
++++ b/arch/arm/mach-davinci/dm646x.c
+@@ -511,6 +511,32 @@ static u8 dm646x_default_priorities[DAVINCI_N_AINTC_IRQ] = {
+ 
+ /*----------------------------------------------------------------------*/
  
 +/*
 + * The following EDMA channels/slots are not being used by drivers (for
-+ * example: Timer, GPIO, UART events etc) on da850/omap-l138, hence they
-+ * are being reserved for codecs on the DSP side.
++ * example: Timer, GPIO, UART events etc) on dm646x, hence they are being
++ * reserved for codecs on the DSP side.
 + */
-+static const s16 da850_dma0_rsv_chans[][2] = {
++static const s16 dm646x_dma_rsv_chans[][2] = {
 +	/* (offset, number) */
-+	{ 8,  6},
++	{ 0,  4},
++	{13,  3},
 +	{24,  4},
 +	{30,  2},
++	{54,  3},
 +	{-1, -1}
 +};
 +
-+static const s16 da850_dma0_rsv_slots[][2] = {
++static const s16 dm646x_dma_rsv_slots[][2] = {
 +	/* (offset, number) */
-+	{ 8,  6},
++	{ 0,  4},
++	{13,  3},
 +	{24,  4},
-+	{30, 50},
-+	{-1, -1}
-+};
-+
-+static const s16 da850_dma1_rsv_chans[][2] = {
-+	/* (offset, number) */
-+	{ 0, 28},
 +	{30,  2},
++	{54,  3},
++	{128, 384},
 +	{-1, -1}
 +};
 +
-+static const s16 da850_dma1_rsv_slots[][2] = {
-+	/* (offset, number) */
-+	{ 0, 28},
-+	{30, 90},
-+	{-1, -1}
-+};
-+
- static struct edma_soc_info da830_edma_info[] = {
- 	{
- 		.n_channel		= 32,
-@@ -155,6 +190,8 @@ static struct edma_soc_info da850_edma_info[] = {
- 		.n_slot			= 128,
- 		.n_tc			= 2,
+ /* Four Transfer Controllers on DM646x */
+ static const s8
+ dm646x_queue_tc_mapping[][2] = {
+@@ -539,6 +565,8 @@ static struct edma_soc_info dm646x_edma_info[] = {
+ 		.n_slot			= 512,
+ 		.n_tc			= 4,
  		.n_cc			= 1,
-+		.rsv_chans		= da850_dma0_rsv_chans,
-+		.rsv_slots		= da850_dma0_rsv_slots,
- 		.queue_tc_mapping	= da8xx_queue_tc_mapping,
- 		.queue_priority_mapping	= da8xx_queue_priority_mapping,
- 	},
-@@ -164,6 +201,8 @@ static struct edma_soc_info da850_edma_info[] = {
- 		.n_slot			= 128,
- 		.n_tc			= 1,
- 		.n_cc			= 1,
-+		.rsv_chans		= da850_dma1_rsv_chans,
-+		.rsv_slots		= da850_dma1_rsv_slots,
- 		.queue_tc_mapping	= da850_queue_tc_mapping,
- 		.queue_priority_mapping	= da850_queue_priority_mapping,
++		.rsv_chans		= dm646x_dma_rsv_chans,
++		.rsv_slots		= dm646x_dma_rsv_slots,
+ 		.queue_tc_mapping	= dm646x_queue_tc_mapping,
+ 		.queue_priority_mapping	= dm646x_queue_priority_mapping,
  	},
 -- 
 1.6.6.rc2.1.g42108
