@@ -1,97 +1,38 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 06 Jan 2010 13:44:21 -0700
-Subject: [PATCH 4/5] OMAP2 clock: dynamically allocate CPUFreq frequency table
+Date: Wed, 06 Jan 2010 13:44:17 -0700
+Subject: [PATCH 1/5] OMAP1 clock: remove __initdata from struct clk_functions
+	to prevent crash
 In-Reply-To: <20100106204346.15002.89343.stgit@localhost.localdomain>
 References: <20100106204346.15002.89343.stgit@localhost.localdomain>
-Message-ID: <20100106204420.15002.14534.stgit@localhost.localdomain>
+Message-ID: <20100106204415.15002.29833.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dynamically allocate the CPUFreq frequency table on OMAP2xxx chips.
-This fixes some compilation problems, since the kernel may not know
-what chip it is running on until boot-time.  This also reduces the size
-of the CPUFreq frequency table.
+From: Cory Maccarrone <darkstar6262@gmail.com>
 
-Problem reported by Felipe Balbi <felipe.balbi@nokia.com>.  Thanks also
-for comments on the patch from Felipe.
+Commit 52650505fbf3a6ab851c801f54e73e76c55ab8da added an __initdata
+decoration to the structure containing the clk_enable and clk_disable
+functions.  Once init data was freed, these pointers went to null, and
+the next enable or disable call caused the kernel to crash.  This
+change removes this decoration.
 
+Signed-off-by: Cory Maccarrone <darkstar6262@gmail.com>
+[paul at pwsan.com: patch manually split and commit message edited]
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Felipe Balbi <felipe.balbi@nokia.com>
 ---
- arch/arm/mach-omap2/clock2xxx.c |   45 ++++++++++++++++++++++++++++++++-------
- 1 files changed, 37 insertions(+), 8 deletions(-)
+ arch/arm/mach-omap1/clock_data.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clock2xxx.c b/arch/arm/mach-omap2/clock2xxx.c
-index ce6742f..3bfd045 100644
---- a/arch/arm/mach-omap2/clock2xxx.c
-+++ b/arch/arm/mach-omap2/clock2xxx.c
-@@ -449,14 +449,16 @@ int omap2_select_table_rate(struct clk *clk, unsigned long rate)
- #ifdef CONFIG_CPU_FREQ
- /*
-  * Walk PRCM rate table and fillout cpufreq freq_table
-+ * XXX This should be replaced by an OPP layer in the near future
+diff --git a/arch/arm/mach-omap1/clock_data.c b/arch/arm/mach-omap1/clock_data.c
+index 31fba07..8a85bbb 100644
+--- a/arch/arm/mach-omap1/clock_data.c
++++ b/arch/arm/mach-omap1/clock_data.c
+@@ -674,7 +674,7 @@ static struct omap_clk omap_clks[] = {
+  * init
   */
--static struct cpufreq_frequency_table freq_table[ARRAY_SIZE(rate_table)];
-+static struct cpufreq_frequency_table *freq_table;
  
- void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
- {
--	struct prcm_config *prcm;
-+	const struct prcm_config *prcm;
- 	long sys_ck_rate;
- 	int i = 0;
-+	int tbl_sz = 0;
- 
- 	sys_ck_rate = clk_get_rate(sclk);
- 
-@@ -470,17 +472,44 @@ void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
- 		if (prcm->dpll_speed == prcm->xtal_speed)
- 			continue;
- 
--		freq_table[i].index = i;
--		freq_table[i].frequency = prcm->mpu_speed / 1000;
--		i++;
-+		tbl_sz++;
- 	}
- 
--	if (i == 0) {
--		printk(KERN_WARNING "%s: failed to initialize frequency "
--		       "table\n", __func__);
-+	/*
-+	 * XXX Ensure that we're doing what CPUFreq expects for this error
-+	 * case and the following one
-+	 */
-+	if (tbl_sz == 0) {
-+		pr_warning("%s: no matching entries in rate_table\n",
-+			   __func__);
- 		return;
- 	}
- 
-+	/* Include the CPUFREQ_TABLE_END terminator entry */
-+	tbl_sz++;
-+
-+	freq_table = kzalloc(sizeof(struct cpufreq_frequency_table) * tbl_sz,
-+			     GFP_KERNEL);
-+	if (!freq_table) {
-+		pr_err("%s: could not kzalloc frequency table\n", __func__);
-+		return;
-+	}
-+
-+	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
-+		if (!(prcm->flags & cpu_mask))
-+			continue;
-+		if (prcm->xtal_speed != sys_ck_rate)
-+			continue;
-+
-+		/* don't put bypass rates in table */
-+		if (prcm->dpll_speed == prcm->xtal_speed)
-+			continue;
-+
-+		freq_table[i].index = i;
-+		freq_table[i].frequency = prcm->mpu_speed / 1000;
-+		i++;
-+	}
-+
- 	freq_table[i].index = i;
- 	freq_table[i].frequency = CPUFREQ_TABLE_END;
- 
+-static struct clk_functions omap1_clk_functions __initdata = {
++static struct clk_functions omap1_clk_functions = {
+ 	.clk_enable		= omap1_clk_enable,
+ 	.clk_disable		= omap1_clk_disable,
+ 	.clk_round_rate		= omap1_clk_round_rate,
