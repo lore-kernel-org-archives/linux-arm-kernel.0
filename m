@@ -1,51 +1,47 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Wed, 6 Jan 2010 18:07:05 +0000
-Subject: Sending UTF-8 patches (was: [PATCH 2/2] Remove now-defunct ts7250
-	nand driver)
-In-Reply-To: <1262784693.3181.8034.camel@macbook.infradead.org>
-References: <201001051459.58621.hartleys@visionengravers.com>
-	<1262784693.3181.8034.camel@macbook.infradead.org>
-Message-ID: <20100106180705.GC11773@shareable.org>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 06 Jan 2010 10:11:58 -0800
+Subject: [GIT PULL] davinci platform fixes for 2.6.33-rc4
+Message-ID: <87k4vvf6hd.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David Woodhouse wrote:
-> It looks like your patch has legacy garbage in it:
-> 
-> > - *   Copyright (C) 2004 Marius Gr<F6>ger (mag at sysgo.de)
-> 
-> It fails to apply because the ? (correctly represented as 0xc3 0xb6) has
-> been converted into a single byte 0xf6 in some legacy character set.
->
-> When applying patches, git-am does look at the Content-Type: header and
-> convert legacy crap into UTF-8 for the changelog, but it leaves the
-> patch itself alone.
+Linus,
 
-That's unfortunate.  An option to git-am or it's subsidiary tools to
-convert the patch as well as the commit would be useful.  After all it
-_is_ made clear in the MIME header how it's formatted.
-
-> Care to join us in the 21st century?
-
-You mean send the mail in UTF-8 format when it only contains
-characters in ISO-8859-1?  To make that the default behaviour of an
-email sender would possibly violate RFC2045, which as far as I can
-tell is still the prevailing standard, which is I guess why Mutt does
-not do that in its default configuration, and recodes the text from
-UTF-8 to 8859-1 when it can.  That's what 21st century tools do :-)
-
-I guess it's time for a "send-hook" to use a different setting
-specially for Linux mailing lists.
-
-Do you instead mean send the patch in UTF-8 embedded in a mail encoded
-as 8859-1?  That sounds quite difficult, if the patch is inline rather
-than attached.
-
-An option to git-am to DTRT sounds infinitely better to me.  Shame
-it's not there; unfortunately it doesn't emit enough information to
-make it easy with a wrapper script.
-
-What settings do you use to get this right?
+Please pull the fixes for the ARM/DaVinci platform for 2.6.33-rc4.
 
 Thanks,
--- Jamie
+
+Kevin
+
+
+The following changes since commit 74d2e4f8d79ae0c4b6ec027958d5b18058662eea:
+  Linus Torvalds (1):
+        Linux 2.6.33-rc3
+
+are available in the git repository at:
+
+  ssh://master.kernel.org/pub/scm/linux/kernel/git/khilman/linux-davinci.git davinci-fixes
+
+or
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-davinci.git davinci-fixes
+
+Miguel Aguilar (1):
+      DaVinci: DM365: Add the device_enable for the DaVinci Keyscan
+
+Sekhar Nori (3):
+      davinci: cp_intc: provide set_wake function
+      davinci: da8xx/omap-l1: mark RTC as a wakeup source
+      davinci: enable ARCH_HAS_HOLES_MEMORYMODEL for DaVinci
+
+Vaibhav Hiremath (1):
+      Davinci VPFE Capture: Take i2c adapter id through platform data
+
+ arch/arm/Kconfig                         |    1 +
+ arch/arm/mach-davinci/board-dm355-evm.c  |    1 +
+ arch/arm/mach-davinci/board-dm365-evm.c  |   11 ++++++-----
+ arch/arm/mach-davinci/board-dm644x-evm.c |    1 +
+ arch/arm/mach-davinci/cp_intc.c          |   11 +++++++++++
+ arch/arm/mach-davinci/devices-da8xx.c    |    9 ++++++++-
+ arch/arm/mach-davinci/dm365.c            |    1 -
+ 7 files changed, 28 insertions(+), 7 deletions(-)
