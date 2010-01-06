@@ -1,39 +1,17 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 06 Jan 2010 16:23:47 +0000
-Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors (v3)
-In-Reply-To: <20100105194328.GG14376@shareable.org>
-References: <20100105194328.GG14376@shareable.org>
-Message-ID: <1262795027.18401.28.camel@pc1117.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Jan 2010 16:27:31 +0000
+Subject: [PATCH 02/11] arm: use generic infrastructure for early params
+In-Reply-To: <1261479296.246097.171417450949.2.gpush@pororo>
+References: <1261479296.245235.191110925832.0.gpush@pororo>
+	<1261479296.246097.171417450949.2.gpush@pororo>
+Message-ID: <20100106162731.GB1728@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-01-05 at 19:43 +0000, Jamie Lokier wrote:
-> Leif Lindholm wrote:
-> > diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> > index 3a28521..cb85aeb 100644
-> > --- a/arch/arm/mm/proc-v7.S
-> > +++ b/arch/arm/mm/proc-v7.S
-> > @@ -147,8 +147,10 @@ ENTRY(cpu_v7_set_pte_ext)
-> > 
-> >       tst     r1, #L_PTE_USER
-> >       orrne   r3, r3, #PTE_EXT_AP1
-> > +#ifndef CONFIG_SWP_EMULATE
-> >       tstne   r3, #PTE_EXT_APX
-> >       bicne   r3, r3, #PTE_EXT_APX | PTE_EXT_AP0
-> > +#endif
-> 
-> Is this the part which changes kernel memory access to fault when
-> writing to user-read-only pages?  (I don't know anything about the
-> details of this, btw).
-> 
-> Is there any reason why this wasn't always like that?
+On Tue, Dec 22, 2009 at 06:54:56PM +0800, Jeremy Kerr wrote:
+> The ARM setup code includes its own parser for early params, there's
+> also one in the generic init code.
 
-On ARMv6 onwards (where this user RO, kernel RO is supported) we cannot
-easily differentiate between the vectors page and a normal kernel page
-unless we use another L_PTE_ bit. We need the vectors page to be
-writable if there is no TLS register in hardware (I guess we could use
-domain switching to override this though). But on ARMv7 we always have a
-TLS register, so no need to write to the vectors page.
-
--- 
-Catalin
+This is something which should be separate from the rest of the DT
+patch - could we have this as a patch which can be applied to the
+current kernel tree please?
