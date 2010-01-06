@@ -1,95 +1,66 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed,  6 Jan 2010 10:31:44 -0800
-Subject: [PATCH 02/35] davinci: move PLL wait time values to clock.h
-In-Reply-To: <1262802737-6601-2-git-send-email-khilman@deeprootsystems.com>
+Date: Wed,  6 Jan 2010 10:31:45 -0800
+Subject: [PATCH 03/35] davinci: move DDR2 controller defines to memory.h
+In-Reply-To: <1262802737-6601-3-git-send-email-khilman@deeprootsystems.com>
 References: <1262802737-6601-1-git-send-email-khilman@deeprootsystems.com>
 	<1262802737-6601-2-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1262802737-6601-3-git-send-email-khilman@deeprootsystems.com>
+	<1262802737-6601-3-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1262802737-6601-4-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sekhar Nori <nsekhar@ti.com>
 
-As suspend support is added, the code supporting
-the suspend operation needs to bypass PLLs and
-needs to access the same wait time values as the
-PLL code in clock.c.
-
-To facilitate this, move the PLL wait times to
-clock.h where they can be accessed by suspend code.
+Move defintions of DDR2 controller registers to memory.h
+from cpuidle.c. The motivation behind the change is to be
+able to use these defintions in assembly code that puts
+DDR2 in self-refresh and enables the SoC to enter suspend
+state.
 
 Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-davinci/clock.c |   15 +++------------
- arch/arm/mach-davinci/clock.h |   15 +++++++++++++++
- 2 files changed, 18 insertions(+), 12 deletions(-)
+ arch/arm/mach-davinci/cpuidle.c             |    5 +----
+ arch/arm/mach-davinci/include/mach/memory.h |    4 ++++
+ 2 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
-index baece65..0fa68c5 100644
---- a/arch/arm/mach-davinci/clock.c
-+++ b/arch/arm/mach-davinci/clock.c
-@@ -376,7 +376,7 @@ int davinci_set_pllrate(struct pll_data *pll, unsigned int prediv,
- 		locktime = ((2000 * prediv) / 100);
- 		prediv = (prediv - 1) | PLLDIV_EN;
- 	} else {
--		locktime = 20;
-+		locktime = PLL_LOCK_TIME;
- 	}
- 	if (postdiv)
- 		postdiv = (postdiv - 1) | PLLDIV_EN;
-@@ -389,12 +389,7 @@ int davinci_set_pllrate(struct pll_data *pll, unsigned int prediv,
- 	ctrl &= ~(PLLCTL_PLLENSRC | PLLCTL_PLLEN);
- 	__raw_writel(ctrl, pll->base + PLLCTL);
+diff --git a/arch/arm/mach-davinci/cpuidle.c b/arch/arm/mach-davinci/cpuidle.c
+index 97a90f3..beda3b5 100644
+--- a/arch/arm/mach-davinci/cpuidle.c
++++ b/arch/arm/mach-davinci/cpuidle.c
+@@ -19,6 +19,7 @@
+ #include <asm/proc-fns.h>
  
--	/*
--	 * Wait for 4 OSCIN/CLKIN cycles to ensure that the PLLC has switched
--	 * to bypass mode. Delay of 1us ensures we are good for all > 4MHz
--	 * OSCIN/CLKIN inputs. Typically the input is ~25MHz.
--	 */
--	udelay(1);
-+	udelay(PLL_BYPASS_TIME);
+ #include <mach/cpuidle.h>
++#include <mach/memory.h>
  
- 	/* Reset and enable PLL */
- 	ctrl &= ~(PLLCTL_PLLRST | PLLCTL_PLLDIS);
-@@ -408,11 +403,7 @@ int davinci_set_pllrate(struct pll_data *pll, unsigned int prediv,
- 	if (pll->flags & PLL_HAS_POSTDIV)
- 		__raw_writel(postdiv, pll->base + POSTDIV);
+ #define DAVINCI_CPUIDLE_MAX_STATES	2
  
--	/*
--	 * Wait for PLL to reset properly, OMAP-L138 datasheet says
--	 * 'min' time = 125ns
--	 */
--	udelay(1);
-+	udelay(PLL_RESET_TIME);
+@@ -39,10 +40,6 @@ static struct cpuidle_driver davinci_idle_driver = {
+ static DEFINE_PER_CPU(struct cpuidle_device, davinci_cpuidle_device);
+ static void __iomem *ddr2_reg_base;
  
- 	/* Bring PLL out of reset */
- 	ctrl |= PLLCTL_PLLRST;
-diff --git a/arch/arm/mach-davinci/clock.h b/arch/arm/mach-davinci/clock.h
-index c92d77a..eca4d99 100644
---- a/arch/arm/mach-davinci/clock.h
-+++ b/arch/arm/mach-davinci/clock.h
-@@ -53,6 +53,21 @@
- #define PLLDIV_EN       BIT(15)
- #define PLLDIV_RATIO_MASK 0x1f
+-#define DDR2_SDRCR_OFFSET	0xc
+-#define DDR2_SRPD_BIT		BIT(23)
+-#define DDR2_LPMODEN_BIT	BIT(31)
+-
+ static void davinci_save_ddr_power(int enter, bool pdown)
+ {
+ 	u32 val;
+diff --git a/arch/arm/mach-davinci/include/mach/memory.h b/arch/arm/mach-davinci/include/mach/memory.h
+index 80309ae..7aeaf46 100644
+--- a/arch/arm/mach-davinci/include/mach/memory.h
++++ b/arch/arm/mach-davinci/include/mach/memory.h
+@@ -31,6 +31,10 @@
+ #define PHYS_OFFSET DAVINCI_DDR_BASE
+ #endif
  
-+/*
-+ * OMAP-L138 system reference guide recommends a wait for 4 OSCIN/CLKIN
-+ * cycles to ensure that the PLLC has switched to bypass mode. Delay of 1us
-+ * ensures we are good for all > 4MHz OSCIN/CLKIN inputs. Typically the input
-+ * is ~25MHz. Units are micro seconds.
-+ */
-+#define PLL_BYPASS_TIME		1
-+/* From OMAP-L138 datasheet table 6-4. Units are micro seconds */
-+#define PLL_RESET_TIME		1
-+/*
-+ * From OMAP-L138 datasheet table 6-4; assuming prediv = 1, sqrt(pllm) = 4
-+ * Units are micro seconds.
-+ */
-+#define PLL_LOCK_TIME		20
++#define DDR2_SDRCR_OFFSET	0xc
++#define DDR2_SRPD_BIT		BIT(23)
++#define DDR2_LPMODEN_BIT	BIT(31)
 +
- struct pll_data {
- 	u32 phys_base;
- 	void __iomem *base;
+ /*
+  * Increase size of DMA-consistent memory region
+  */
 -- 
 1.6.6.rc2.1.g42108
