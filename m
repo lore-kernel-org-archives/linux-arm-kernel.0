@@ -1,102 +1,68 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed,  6 Jan 2010 10:32:17 -0800
-Subject: [PATCH 35/35] davinci: dm646x: Specify reserved EDMA channel/slots
-	for DM646x
-In-Reply-To: <1262802737-6601-35-git-send-email-khilman@deeprootsystems.com>
-References: <1262802737-6601-1-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-2-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-3-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-4-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-5-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-6-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-7-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-8-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-9-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-10-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-11-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-12-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-13-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-14-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-15-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-16-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-17-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-18-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-19-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-20-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-21-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-22-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-23-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-24-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-25-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-26-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-27-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-28-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-29-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-30-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-31-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-32-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-33-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-34-git-send-email-khilman@deeprootsystems.com>
-	<1262802737-6601-35-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1262802737-6601-36-git-send-email-khilman@deeprootsystems.com>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Wed, 06 Jan 2010 18:36:50 +0000
+Subject: Sending UTF-8 patches (was: [PATCH 2/2] Remove now-defunct
+	ts7250 nand driver)
+In-Reply-To: <20100106180705.GC11773@shareable.org>
+References: <201001051459.58621.hartleys@visionengravers.com>
+	<1262784693.3181.8034.camel@macbook.infradead.org>
+	<20100106180705.GC11773@shareable.org>
+Message-ID: <1262803010.3181.8484.camel@macbook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sudhakar Rajashekhara <sudhakar.raj@ti.com>
+On Wed, 2010-01-06 at 18:07 +0000, Jamie Lokier wrote:
+> David Woodhouse wrote:
+> > It looks like your patch has legacy garbage in it:
+> > 
+> > > - *   Copyright (C) 2004 Marius Gr<F6>ger (mag at sysgo.de)
+> > 
+> > It fails to apply because the ? (correctly represented as 0xc3 0xb6) has
+> > been converted into a single byte 0xf6 in some legacy character set.
+> >
+> > When applying patches, git-am does look at the Content-Type: header and
+> > convert legacy crap into UTF-8 for the changelog, but it leaves the
+> > patch itself alone.
+> 
+> That's unfortunate.  An option to git-am or it's subsidiary tools to
+> convert the patch as well as the commit would be useful.  After all it
+> _is_ made clear in the MIME header how it's formatted.
 
-Pass reserved EDMA channel/slots as platform data for dm646x.
+ISTR there was some resistance to that suggestion when git-am was first
+fixed to handle the Content-Type of mails. The idea was that the patch
+should be considered sacrosanct and shouldn't be mangled.
 
-Signed-off-by: Sudhakar Rajashekhara <sudhakar.raj@ti.com>
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
----
- arch/arm/mach-davinci/dm646x.c |   28 ++++++++++++++++++++++++++++
- 1 files changed, 28 insertions(+), 0 deletions(-)
+Personally, I suspect you're right, and it should be converted too.
 
-diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
-index de306ca..99224ec 100644
---- a/arch/arm/mach-davinci/dm646x.c
-+++ b/arch/arm/mach-davinci/dm646x.c
-@@ -511,6 +511,32 @@ static u8 dm646x_default_priorities[DAVINCI_N_AINTC_IRQ] = {
- 
- /*----------------------------------------------------------------------*/
- 
-+/*
-+ * The following EDMA channels/slots are not being used by drivers (for
-+ * example: Timer, GPIO, UART events etc) on dm646x, hence they are being
-+ * reserved for codecs on the DSP side.
-+ */
-+static const s16 dm646x_dma_rsv_chans[][2] = {
-+	/* (offset, number) */
-+	{ 0,  4},
-+	{13,  3},
-+	{24,  4},
-+	{30,  2},
-+	{54,  3},
-+	{-1, -1}
-+};
-+
-+static const s16 dm646x_dma_rsv_slots[][2] = {
-+	/* (offset, number) */
-+	{ 0,  4},
-+	{13,  3},
-+	{24,  4},
-+	{30,  2},
-+	{54,  3},
-+	{128, 384},
-+	{-1, -1}
-+};
-+
- /* Four Transfer Controllers on DM646x */
- static const s8
- dm646x_queue_tc_mapping[][2] = {
-@@ -539,6 +565,8 @@ static struct edma_soc_info dm646x_edma_info[] = {
- 		.n_slot			= 512,
- 		.n_tc			= 4,
- 		.n_cc			= 1,
-+		.rsv_chans		= dm646x_dma_rsv_chans,
-+		.rsv_slots		= dm646x_dma_rsv_slots,
- 		.queue_tc_mapping	= dm646x_queue_tc_mapping,
- 		.queue_priority_mapping	= dm646x_queue_priority_mapping,
- 	},
+But I still think it's useful to discourage people from sending patches
+in EBCDIC and other legacy crap.
+
+> > Care to join us in the 21st century?
+> 
+> You mean send the mail in UTF-8 format when it only contains
+> characters in ISO-8859-1?  To make that the default behaviour of an
+> email sender would possibly violate RFC2045, 
+
+Um, why? Can you point at the particular section you think would be
+violated?
+
+> Do you instead mean send the patch in UTF-8 embedded in a mail encoded
+> as 8859-1?  That sounds quite difficult, if the patch is inline rather
+> than attached.
+
+God no. Just send UTF-8.
+
+Would you advise that I send a mail as EBCDIC if it can fit into that?
+
+> What settings do you use to get this right?
+
+We've learned the hard way that marking text with encodings is
+complicated and error-prone. The only viable option is to eliminate that
+need as much as possible.
+
+The rule is simplesimple -- just use UTF-8 everywhere, for everything.
+
+Then the only time you have to deal with the issue of encodings is when
+you're taking legacy crap in from people who don't follow that rule.
+
 -- 
-1.6.6.rc2.1.g42108
+dwmw2
