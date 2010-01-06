@@ -1,198 +1,60 @@
-From: colin.tuckley@arm.com (Colin Tuckley)
-Date: Wed, 06 Jan 2010 14:54:27 +0000
-Subject: [PATCH] ARM: Fix the reset logic for ARM RealView boards
-Message-ID: <20100106145427.12791.34402.stgit@ARM03585.cambridge.arm.com>
+From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
+Date: Wed, 06 Jan 2010 16:16:06 +0100
+Subject: Perf Event support for ARMv7 (was: Re: [PATCH 5/5] arm/perfevents:
+	implement perf event support for ARMv6)
+In-Reply-To: <20091229163252.GA12409@gallagher>
+References: <1260875712-29712-1-git-send-email-jamie.iles@picochip.com>
+	<200912221751.39662.jpihet@mvista.com> <20091228075748.GC20039@elte.hu>
+	<200912291452.16856.jpihet@mvista.com>
+	<20091229163252.GA12409@gallagher>
+Message-ID: <op.u53904ge7p4s8u@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extend the patch from Philby John to the other "RealView" boards.
-Rename the constants and offsets to reflect their actual functions.
+>>> * Jean Pihet <jpihet@mvista.com> wrote:
+>>>> I am still facing some cross compilation problems of the
+>>>> tools/perf utility.
 
-Signed-off-by: Colin Tuckley <colin.tuckley@arm.com>
-Cc: Philby John <pjohn@in.mvista.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/mach-realview/include/mach/board-pb1176.h |    4 ++--
- arch/arm/mach-realview/include/mach/platform.h     |    2 +-
- arch/arm/mach-realview/realview_eb.c               |   15 +++++++++++++++
- arch/arm/mach-realview/realview_pb1176.c           |   10 ++++------
- arch/arm/mach-realview/realview_pb11mp.c           |   11 +++++------
- arch/arm/mach-realview/realview_pba8.c             |   15 +++++++++++++++
- arch/arm/mach-realview/realview_pbx.c              |   15 +++++++++++++++
- 7 files changed, 57 insertions(+), 15 deletions(-)
+>> On Monday 28 December 2009 08:57:48 Ingo Molnar wrote:
+>>> Have you managed to solve these cross-compilation problems?
+>>> If yes, it would be nice to merge the fixes into upstream perf.
 
-diff --git a/arch/arm/mach-realview/include/mach/board-pb1176.h b/arch/arm/mach-realview/include/mach/board-pb1176.h
-index 34b80b7..2f5ccb2 100644
---- a/arch/arm/mach-realview/include/mach/board-pb1176.h
-+++ b/arch/arm/mach-realview/include/mach/board-pb1176.h
-@@ -74,8 +74,8 @@
- #define REALVIEW_PB1176_L220_BASE		0x10110000 /* L220 registers */
- 
- /*
-- * Control register SYS_RESETCTL is set to 1 to force a soft reset
-+ * Control register SYS_RESETCTL Bit 8 is set to 1 to force a soft reset
-  */
--#define REALVIEW_PB1176_SYS_LOCKVAL_RSTCTL    0x0100
-+#define REALVIEW_PB1176_SYS_SOFT_RESET    0x0100
- 
- #endif	/* __ASM_ARCH_BOARD_PB1176_H */
-diff --git a/arch/arm/mach-realview/include/mach/platform.h b/arch/arm/mach-realview/include/mach/platform.h
-index 4f46bf7..86c0c44 100644
---- a/arch/arm/mach-realview/include/mach/platform.h
-+++ b/arch/arm/mach-realview/include/mach/platform.h
-@@ -140,7 +140,7 @@
-  *     SYS_CLD, SYS_BOOTCS
-  */
- #define REALVIEW_SYS_LOCK_LOCKED    (1 << 16)
--#define REALVIEW_SYS_LOCKVAL_MASK	0xA05F	       /* Enable write access */
-+#define REALVIEW_SYS_LOCK_VAL	0xA05F	       /* Enable write access */
- 
- /*
-  * REALVIEW_SYS_FLASH
-diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
-index 917f8ca..7d857d3 100644
---- a/arch/arm/mach-realview/realview_eb.c
-+++ b/arch/arm/mach-realview/realview_eb.c
-@@ -381,6 +381,20 @@ static struct sys_timer realview_eb_timer = {
- 	.init		= realview_eb_timer_init,
- };
- 
-+static void realview_eb_reset(char mode)
-+{
-+	void __iomem *reset_ctrl = __io_address(REALVIEW_SYS_RESETCTL);
-+	void __iomem *lock_ctrl = __io_address(REALVIEW_SYS_LOCK);
-+
-+	/*
-+	 * To reset, we hit the on-board reset register
-+	 * in the system FPGA
-+	 */
-+	__raw_writel(REALVIEW_SYS_LOCK_VAL, lock_ctrl);
-+	if (core_tile_eb11mp())
-+		__raw_writel(0x0008, reset_ctrl);
-+}
-+
- static void __init realview_eb_init(void)
- {
- 	int i;
-@@ -408,6 +422,7 @@ static void __init realview_eb_init(void)
- #ifdef CONFIG_LEDS
- 	leds_event = realview_leds_event;
- #endif
-+	realview_reset = realview_eb_reset;
- }
- 
- MACHINE_START(REALVIEW_EB, "ARM-RealView EB")
-diff --git a/arch/arm/mach-realview/realview_pb1176.c b/arch/arm/mach-realview/realview_pb1176.c
-index 7fb726d..44392e5 100644
---- a/arch/arm/mach-realview/realview_pb1176.c
-+++ b/arch/arm/mach-realview/realview_pb1176.c
-@@ -292,12 +292,10 @@ static struct sys_timer realview_pb1176_timer = {
- 
- static void realview_pb1176_reset(char mode)
- {
--	void __iomem *hdr_ctrl = __io_address(REALVIEW_SYS_BASE) +
--		REALVIEW_SYS_RESETCTL_OFFSET;
--	void __iomem *rst_hdr_ctrl = __io_address(REALVIEW_SYS_BASE) +
--		REALVIEW_SYS_LOCK_OFFSET;
--	__raw_writel(REALVIEW_SYS_LOCKVAL_MASK, rst_hdr_ctrl);
--	__raw_writel(REALVIEW_PB1176_SYS_LOCKVAL_RSTCTL, hdr_ctrl);
-+	void __iomem *reset_ctrl = __io_address(REALVIEW_SYS_RESETCTL);
-+	void __iomem *lock_ctrl = __io_address(REALVIEW_SYS_LOCK);
-+	__raw_writel(REALVIEW_SYS_LOCK_VAL, lock_ctrl);
-+	__raw_writel(REALVIEW_PB1176_SYS_SOFT_RESET, reset_ctrl);
- }
- 
- static void realview_pb1176_fixup(struct machine_desc *mdesc,
-diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
-index 9bbbfc0..3e02731 100644
---- a/arch/arm/mach-realview/realview_pb11mp.c
-+++ b/arch/arm/mach-realview/realview_pb11mp.c
-@@ -301,17 +301,16 @@ static struct sys_timer realview_pb11mp_timer = {
- 
- static void realview_pb11mp_reset(char mode)
- {
--	void __iomem *hdr_ctrl = __io_address(REALVIEW_SYS_BASE) +
--		REALVIEW_SYS_RESETCTL_OFFSET;
--	unsigned int val;
-+	void __iomem *reset_ctrl = __io_address(REALVIEW_SYS_RESETCTL);
-+	void __iomem *lock_ctrl = __io_address(REALVIEW_SYS_LOCK);
- 
- 	/*
- 	 * To reset, we hit the on-board reset register
- 	 * in the system FPGA
- 	 */
--	val = __raw_readl(hdr_ctrl);
--	val |= REALVIEW_PB11MP_SYS_CTRL_RESET_CONFIGCLR;
--	__raw_writel(val, hdr_ctrl);
-+	__raw_writel(REALVIEW_SYS_LOCK_VAL, lock_ctrl);
-+	__raw_writel(0x0000, reset_ctrl);
-+	__raw_writel(0x0004, reset_ctrl);
- }
- 
- static void __init realview_pb11mp_init(void)
-diff --git a/arch/arm/mach-realview/realview_pba8.c b/arch/arm/mach-realview/realview_pba8.c
-index fe861e9..fe4e25c 100644
---- a/arch/arm/mach-realview/realview_pba8.c
-+++ b/arch/arm/mach-realview/realview_pba8.c
-@@ -272,6 +272,20 @@ static struct sys_timer realview_pba8_timer = {
- 	.init		= realview_pba8_timer_init,
- };
- 
-+static void realview_pba8_reset(char mode)
-+{
-+	void __iomem *reset_ctrl = __io_address(REALVIEW_SYS_RESETCTL);
-+	void __iomem *lock_ctrl = __io_address(REALVIEW_SYS_LOCK);
-+
-+	/*
-+	 * To reset, we hit the on-board reset register
-+	 * in the system FPGA
-+	 */
-+	__raw_writel(REALVIEW_SYS_LOCK_VAL, lock_ctrl);
-+	__raw_writel(0x0000, reset_ctrl);
-+	__raw_writel(0x0004, reset_ctrl);
-+}
-+
- static void __init realview_pba8_init(void)
- {
- 	int i;
-@@ -291,6 +305,7 @@ static void __init realview_pba8_init(void)
- #ifdef CONFIG_LEDS
- 	leds_event = realview_leds_event;
- #endif
-+	realview_reset = realview_pba8_reset;
- }
- 
- MACHINE_START(REALVIEW_PBA8, "ARM-RealView PB-A8")
-diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
-index d0a3d0e..7469ce2 100644
---- a/arch/arm/mach-realview/realview_pbx.c
-+++ b/arch/arm/mach-realview/realview_pbx.c
-@@ -324,6 +324,20 @@ static void realview_pbx_fixup(struct machine_desc *mdesc, struct tag *tags,
- #endif
- }
- 
-+static void realview_pbx_reset(char mode)
-+{
-+	void __iomem *reset_ctrl = __io_address(REALVIEW_SYS_RESETCTL);
-+	void __iomem *lock_ctrl = __io_address(REALVIEW_SYS_LOCK);
-+
-+	/*
-+	 * To reset, we hit the on-board reset register
-+	 * in the system FPGA
-+	 */
-+	__raw_writel(REALVIEW_SYS_LOCK_VAL, lock_ctrl);
-+	__raw_writel(0x0000, reset_ctrl);
-+	__raw_writel(0x0004, reset_ctrl);
-+}
-+
- static void __init realview_pbx_init(void)
- {
- 	int i;
-@@ -358,6 +372,7 @@ static void __init realview_pbx_init(void)
- #ifdef CONFIG_LEDS
- 	leds_event = realview_leds_event;
- #endif
-+	realview_reset = realview_pbx_reset;
- }
- 
- MACHINE_START(REALVIEW_PBX, "ARM-RealView PBX")
+> On Tue, Dec 29, 2009 at 02:52:16PM +0100, Jean Pihet wrote:
+>> Yes I got them resolved but I needed to make a few changes:
+>> - -Werror removed from the CFLAGS definition in tools/perf/Makefile.
+>> Without the change the compilation stops after a warning about
+>> include paths.
+
+On Tue, 29 Dec 2009 17:32:52 +0100, Jamie Iles wrote:
+> I've found that for the embedded platform I'm working on I need
+> to build with NO_LIBPERL=1 otherwise the local include paths are
+> used for perl. Obviously perl scripting will not be available.
+
+>> - the rmb() macro in tools/perf/perf.h prevents the compilation.
+>> I changed it to the definition from arch/arm/include/asm/system.h
+>> (asm volatile("":::"memory")). Where is the original definition
+>> from? Why is it specific to perf_events?
+
+> I took this definition of rmb() from arch/arm/kernel/entry-armv.S.
+> This give a CPU independent way of a real memory barrier. This
+> compiles with the latest codesourcery toolchain and 2009q1.
+
+Since I've just started to investigate the performance counter
+architecture and will probably need to port tools/perf on ARM as well,
+would you care to post any patches of your work in this area? It will
+be greatly appreciated.  I couldn't find any of such patches posted
+anywhere or in the tree.
+
+Also, I would like to ask what's the idea behind tools/perf utility
+anyway. As far as I understand it provides only a few generalized
+events and all other events are accessed only via critic r### where
+### is hardware dependent number.  If that's the case the tools might
+be hard to use since users don't tend to remember such numbers.  This
+means that perf would require some kind of front-end which would
+provide a nice textual description for those mysterious r###.
+													
+-- 
+Best regards,                                           _     _
+  .o. | Liege of Serenely Enlightened Majesty of       o' \,=./ `o
+  ..o | Computer Science,  Micha? "mina86" Nazarewicz     (o o)
+  ooo +---<mina86@mina86.com>---<mina86@jabber.org>---ooO--(_)--Ooo--
