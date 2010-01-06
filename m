@@ -1,112 +1,190 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed,  6 Jan 2010 10:31:42 -0800
-Subject: [PATCH 00/35] davinci updates queued for 2.6.34
-Message-ID: <1262802737-6601-1-git-send-email-khilman@deeprootsystems.com>
+Date: Wed,  6 Jan 2010 10:31:43 -0800
+Subject: [PATCH 01/35] davinci: da8xx/omapl1: add support for the second
+	sysconfig module
+In-Reply-To: <1262802737-6601-1-git-send-email-khilman@deeprootsystems.com>
+References: <1262802737-6601-1-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1262802737-6601-2-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here's a set of DaVinci updates for review.
+From: Sekhar Nori <nsekhar@ti.com>
 
-Apologies for the large series, I've been meaning to send these in
-smaller batches, but hd lots to queue up from over the holidays.
+OMAP-L138 adds a second SYSCFG region having useful functionality
+like deep sleep, pull up/down control and SATA clock stop.
 
-Pending any review comments, these will be submitted to Linus during
-the next merge window.
+This patch makes provision for accessing registers from second
+SYSCFG region in da8xx code.
 
-Kevin
+Note that OMAP-L137 has a single SYSCFG region.
 
-Chaithrika U S (1):
-  davinci: clock: Check CLK_PSC flag before disabling PSC
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+---
+ arch/arm/mach-davinci/board-da830-evm.c    |    4 ++--
+ arch/arm/mach-davinci/board-da850-evm.c    |    2 +-
+ arch/arm/mach-davinci/da830.c              |    8 ++++----
+ arch/arm/mach-davinci/da850.c              |   20 ++++++++++++--------
+ arch/arm/mach-davinci/devices-da8xx.c      |    3 ++-
+ arch/arm/mach-davinci/include/mach/da8xx.h |   10 +++++++---
+ 6 files changed, 28 insertions(+), 19 deletions(-)
 
-Nageswari Srinivasan (2):
-  davinci: add support for CDCE949 clock synthesizer
-  davinci: add CDCE949 support on DM6467 EVM
-
-Sandeep Paulraj (1):
-  DaVinci: DM365: Changing default queue for DM365.
-
-Sekhar Nori (17):
-  davinci: da8xx/omapl1: add support for the second sysconfig module
-  davinci: move PLL wait time values to clock.h
-  davinci: move DDR2 controller defines to memory.h
-  davinci: move PSC register definitions from psc.c to psc.h
-  davinci: make it possible to include clock.h and psc.h in assembly
-    code
-  davinci: cpuidle: move mapping of DDR2 controller registers out of
-    driver
-  davinci: da850/omap-l138: unlock PLL registers during init
-  davinci: da850/omap-l138: create static map for SRAM
-  davinci: explain CLOCK_TICK_RATE of 27MHz in include/mach/timex.h
-  davinci: board-dm646x-evm.c: arrange related code together
-  davinci: add support for DM6467T EVM
-  davinci: clock framework: remove spinlock usage
-  davinci: make /proc/davinci_clocks display multi-rooted clock tree
-  davinci: move /proc/davinci_clocks to debugfs
-  davinci: add power management support
-  davinci: da850/omap-l138: add support for SoC suspend
-  davinci: da850/omap-l138 EVM: register for suspend support
-
-Sriramakrishnan (3):
-  TI Davinci EMAC : Re-use driver for other platforms.
-  TI Davinci EMAC : add platform specific interrupt enable/disable
-    logic.
-  TI Davinci EMAC : Abstract Buffer address translation logic.
-
-Sudhakar Rajashekhara (11):
-  davinci: da850/omap-l138: Modify NOR partition info
-  davinci: da850/omap-l138: Enable 4-bit ecc
-  davinci: Correct return value of edma_alloc_channel api
-  davinci: Keep count of channel controllers on a platform
-  davinci: Fix edma_alloc_channel api for EDMA_CHANNEL_ANY case
-  davinci: build list of unused EDMA events dynamically
-  davinci: support for EDMA resource sharing
-  davinci: da8xx/omap-l1xx: Add EDMA platform data for da850/omap-l138
-  davinci: da830/omapl137: Specify reserved channels/slots
-  davinci: da850/omapl138: Specify reserved channels/slots
-  davinci: dm646x: Specify reserved EDMA channel/slots for DM646x
-
- arch/arm/mach-davinci/Kconfig                |    4 +
- arch/arm/mach-davinci/Makefile               |    3 +-
- arch/arm/mach-davinci/board-da830-evm.c      |    4 +-
- arch/arm/mach-davinci/board-da850-evm.c      |   34 +++-
- arch/arm/mach-davinci/board-dm646x-evm.c     |  143 +++++++++----
- arch/arm/mach-davinci/cdce949.c              |  289 ++++++++++++++++++++++++++
- arch/arm/mach-davinci/clock.c                |  143 +++++--------
- arch/arm/mach-davinci/clock.h                |   29 ++-
- arch/arm/mach-davinci/common.c               |    2 +-
- arch/arm/mach-davinci/cpuidle.c              |   38 +---
- arch/arm/mach-davinci/da830.c                |   10 +-
- arch/arm/mach-davinci/da850.c                |   86 +++++++--
- arch/arm/mach-davinci/devices-da8xx.c        |  210 +++++++++++++++++--
- arch/arm/mach-davinci/dm355.c                |   12 +-
- arch/arm/mach-davinci/dm365.c                |    6 +-
- arch/arm/mach-davinci/dm644x.c               |   18 +--
- arch/arm/mach-davinci/dm646x.c               |   44 +++--
- arch/arm/mach-davinci/dma.c                  |  101 ++++++++--
- arch/arm/mach-davinci/include/mach/cdce949.h |   19 ++
- arch/arm/mach-davinci/include/mach/cpuidle.h |    1 +
- arch/arm/mach-davinci/include/mach/da8xx.h   |   18 ++-
- arch/arm/mach-davinci/include/mach/dm365.h   |    2 +-
- arch/arm/mach-davinci/include/mach/dm644x.h  |    2 +-
- arch/arm/mach-davinci/include/mach/dm646x.h  |    4 +-
- arch/arm/mach-davinci/include/mach/edma.h    |    4 +-
- arch/arm/mach-davinci/include/mach/emac.h    |   36 ----
- arch/arm/mach-davinci/include/mach/memory.h  |    5 +
- arch/arm/mach-davinci/include/mach/mux.h     |    1 +
- arch/arm/mach-davinci/include/mach/pm.h      |   54 +++++
- arch/arm/mach-davinci/include/mach/psc.h     |   15 ++
- arch/arm/mach-davinci/include/mach/timex.h   |    7 +-
- arch/arm/mach-davinci/pm.c                   |  158 ++++++++++++++
- arch/arm/mach-davinci/psc.c                  |   17 +-
- arch/arm/mach-davinci/sleep.S                |  224 ++++++++++++++++++++
- drivers/net/Kconfig                          |    2 +-
- drivers/net/davinci_emac.c                   |   55 ++++--
- include/linux/davinci_emac.h                 |   39 ++++
- 37 files changed, 1494 insertions(+), 345 deletions(-)
- create mode 100644 arch/arm/mach-davinci/cdce949.c
- create mode 100644 arch/arm/mach-davinci/include/mach/cdce949.h
- delete mode 100644 arch/arm/mach-davinci/include/mach/emac.h
- create mode 100644 arch/arm/mach-davinci/include/mach/pm.h
- create mode 100644 arch/arm/mach-davinci/pm.c
- create mode 100644 arch/arm/mach-davinci/sleep.S
- create mode 100644 include/linux/davinci_emac.h
+diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+index 31dc990..dc19870 100644
+--- a/arch/arm/mach-davinci/board-da830-evm.c
++++ b/arch/arm/mach-davinci/board-da830-evm.c
+@@ -112,7 +112,7 @@ static __init void da830_evm_usb_init(void)
+ 	 * Set up USB clock/mode in the CFGCHIP2 register.
+ 	 * FYI:  CFGCHIP2 is 0x0000ef00 initially.
+ 	 */
+-	cfgchip2 = __raw_readl(DA8XX_SYSCFG_VIRT(DA8XX_CFGCHIP2_REG));
++	cfgchip2 = __raw_readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+ 
+ 	/* USB2.0 PHY reference clock is 24 MHz */
+ 	cfgchip2 &= ~CFGCHIP2_REFFREQ;
+@@ -139,7 +139,7 @@ static __init void da830_evm_usb_init(void)
+ 	cfgchip2 |=  CFGCHIP2_SESENDEN | CFGCHIP2_VBDTCTEN;
+ #endif
+ 
+-	__raw_writel(cfgchip2, DA8XX_SYSCFG_VIRT(DA8XX_CFGCHIP2_REG));
++	__raw_writel(cfgchip2, DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+ 
+ 	/* USB_REFCLKIN is not used. */
+ 	ret = davinci_cfg_reg(DA830_USB0_DRVVBUS);
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index 07de8db..dba2241 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -537,7 +537,7 @@ static int __init da850_evm_config_emac(void)
+ 	if (!machine_is_davinci_da850_evm())
+ 		return 0;
+ 
+-	cfg_chip3_base = DA8XX_SYSCFG_VIRT(DA8XX_CFGCHIP3_REG);
++	cfg_chip3_base = DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG);
+ 
+ 	val = __raw_readl(cfg_chip3_base);
+ 
+diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
+index b22b5cf..5479605 100644
+--- a/arch/arm/mach-davinci/da830.c
++++ b/arch/arm/mach-davinci/da830.c
+@@ -1208,13 +1208,13 @@ static struct davinci_soc_info davinci_soc_info_da830 = {
+ 
+ void __init da830_init(void)
+ {
+-	da8xx_syscfg_base = ioremap(DA8XX_SYSCFG_BASE, SZ_4K);
+-	if (WARN(!da8xx_syscfg_base, "Unable to map syscfg module"))
++	da8xx_syscfg0_base = ioremap(DA8XX_SYSCFG0_BASE, SZ_4K);
++	if (WARN(!da8xx_syscfg0_base, "Unable to map syscfg0 module"))
+ 		return;
+ 
+ 	davinci_soc_info_da830.jtag_id_base =
+-					DA8XX_SYSCFG_VIRT(DA8XX_JTAG_ID_REG);
+-	davinci_soc_info_da830.pinmux_base = DA8XX_SYSCFG_VIRT(0x120);
++					DA8XX_SYSCFG0_VIRT(DA8XX_JTAG_ID_REG);
++	davinci_soc_info_da830.pinmux_base = DA8XX_SYSCFG0_VIRT(0x120);
+ 
+ 	davinci_common_init(&davinci_soc_info_da830);
+ }
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index 717806c..4f84ab4 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -838,12 +838,12 @@ static void da850_set_async3_src(int pllnum)
+ 		}
+        }
+ 
+-	v = __raw_readl(DA8XX_SYSCFG_VIRT(DA8XX_CFGCHIP3_REG));
++	v = __raw_readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG));
+ 	if (pllnum)
+ 		v |= CFGCHIP3_ASYNC3_CLKSRC;
+ 	else
+ 		v &= ~CFGCHIP3_ASYNC3_CLKSRC;
+-	__raw_writel(v, DA8XX_SYSCFG_VIRT(DA8XX_CFGCHIP3_REG));
++	__raw_writel(v, DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG));
+ }
+ 
+ #ifdef CONFIG_CPU_FREQ
+@@ -996,9 +996,9 @@ static int da850_set_pll0rate(struct clk *clk, unsigned long index)
+ 	postdiv = opp->postdiv;
+ 
+ 	/* Unlock writing to PLL registers */
+-	v = __raw_readl(DA8XX_SYSCFG_VIRT(DA8XX_CFGCHIP0_REG));
++	v = __raw_readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP0_REG));
+ 	v &= ~CFGCHIP0_PLL_MASTER_LOCK;
+-	__raw_writel(v, DA8XX_SYSCFG_VIRT(DA8XX_CFGCHIP0_REG));
++	__raw_writel(v, DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP0_REG));
+ 
+ 	ret = davinci_set_pllrate(pll, prediv, mult, postdiv);
+ 	if (WARN_ON(ret))
+@@ -1053,13 +1053,17 @@ static struct davinci_soc_info davinci_soc_info_da850 = {
+ 
+ void __init da850_init(void)
+ {
+-	da8xx_syscfg_base = ioremap(DA8XX_SYSCFG_BASE, SZ_4K);
+-	if (WARN(!da8xx_syscfg_base, "Unable to map syscfg module"))
++	da8xx_syscfg0_base = ioremap(DA8XX_SYSCFG0_BASE, SZ_4K);
++	if (WARN(!da8xx_syscfg0_base, "Unable to map syscfg0 module"))
++		return;
++
++	da8xx_syscfg1_base = ioremap(DA8XX_SYSCFG1_BASE, SZ_4K);
++	if (WARN(!da8xx_syscfg1_base, "Unable to map syscfg1 module"))
+ 		return;
+ 
+ 	davinci_soc_info_da850.jtag_id_base =
+-					DA8XX_SYSCFG_VIRT(DA8XX_JTAG_ID_REG);
+-	davinci_soc_info_da850.pinmux_base = DA8XX_SYSCFG_VIRT(0x120);
++					DA8XX_SYSCFG0_VIRT(DA8XX_JTAG_ID_REG);
++	davinci_soc_info_da850.pinmux_base = DA8XX_SYSCFG0_VIRT(0x120);
+ 
+ 	davinci_common_init(&davinci_soc_info_da850);
+ 
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index dd2d32c..8de5f9f 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -42,7 +42,8 @@
+ #define DA8XX_MDIO_REG_OFFSET		0x4000
+ #define DA8XX_EMAC_CTRL_RAM_SIZE	SZ_8K
+ 
+-void __iomem *da8xx_syscfg_base;
++void __iomem *da8xx_syscfg0_base;
++void __iomem *da8xx_syscfg1_base;
+ 
+ static struct plat_serial8250_port da8xx_serial_pdata[] = {
+ 	{
+diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
+index 9070491..bddc4d4 100644
+--- a/arch/arm/mach-davinci/include/mach/da8xx.h
++++ b/arch/arm/mach-davinci/include/mach/da8xx.h
+@@ -21,7 +21,8 @@
+ #include <mach/mmc.h>
+ #include <mach/usb.h>
+ 
+-extern void __iomem *da8xx_syscfg_base;
++extern void __iomem *da8xx_syscfg0_base;
++extern void __iomem *da8xx_syscfg1_base;
+ 
+ /*
+  * The cp_intc interrupt controller for the da8xx isn't in the same
+@@ -34,13 +35,16 @@ extern void __iomem *da8xx_syscfg_base;
+ #define DA8XX_CP_INTC_SIZE	SZ_8K
+ #define DA8XX_CP_INTC_VIRT	(IO_VIRT - DA8XX_CP_INTC_SIZE - SZ_4K)
+ 
+-#define DA8XX_SYSCFG_BASE	(IO_PHYS + 0x14000)
+-#define DA8XX_SYSCFG_VIRT(x)	(da8xx_syscfg_base + (x))
++#define DA8XX_SYSCFG0_BASE	(IO_PHYS + 0x14000)
++#define DA8XX_SYSCFG0_VIRT(x)	(da8xx_syscfg0_base + (x))
+ #define DA8XX_JTAG_ID_REG	0x18
+ #define DA8XX_CFGCHIP0_REG	0x17c
+ #define DA8XX_CFGCHIP2_REG	0x184
+ #define DA8XX_CFGCHIP3_REG	0x188
+ 
++#define DA8XX_SYSCFG1_BASE	(IO_PHYS + 0x22C000)
++#define DA8XX_SYSCFG1_VIRT(x)	(da8xx_syscfg1_base + (x))
++
+ #define DA8XX_PSC0_BASE		0x01c10000
+ #define DA8XX_PLL0_BASE		0x01c11000
+ #define DA8XX_TIMER64P0_BASE	0x01c20000
+-- 
+1.6.6.rc2.1.g42108
