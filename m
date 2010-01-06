@@ -1,103 +1,99 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 Jan 2010 19:36:41 +0000
-Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors (v3)
-In-Reply-To: <000001ca8f05$2fbb4150$8f31c3f0$@lindholm@arm.com>
-References: <20100105182447.5374.79579.stgit@e101986-lin>
-	<20100105194328.GG14376@shareable.org>
-	<000001ca8f05$2fbb4150$8f31c3f0$@lindholm@arm.com>
-Message-ID: <20100106193641.GD1728@n2100.arm.linux.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 06 Jan 2010 13:44:22 -0700
+Subject: [PATCH 5/5] OMAP clock/CPUFreq: avoid leaking the CPUFreq frequency
+	table
+In-Reply-To: <20100106204346.15002.89343.stgit@localhost.localdomain>
+References: <20100106204346.15002.89343.stgit@localhost.localdomain>
+Message-ID: <20100106204421.15002.51332.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 06, 2010 at 07:19:36PM -0000, Leif Lindholm wrote:
-> Good point, will do that in the next version.
->  
-> > > +#ifndef CONFIG_ALIGNMENT_TRAP
-> > > +	res = proc_mkdir("cpu", NULL);
-> 
-> > ?  Is that to work with different kernel versions?
-> 
-> It's to ensure it would work (without console warnings) even if someone
-> decides to disable ALIGNMENT_TRAP. An alternative would be to strip the
-> creation of /proc/cpu out from mm/alignment.c and put it somewhere else
-> (or move the stats file somewhere else - but it seemed logical to group
-> with /proc/alignment).
+OMAP2xxx uses a dynamically-allocated cpufreq_frequency_table array,
+so this patch ensures that it is freed if CPUFreq terminates.
 
-As I said when you previously posted this patch, that's definitely on
-the cards.  In fact, I'm about to commit the following patch for doing
-exactly this.
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/clock2xxx.c         |    7 +++++++
+ arch/arm/plat-omap/clock.c              |   10 ++++++++++
+ arch/arm/plat-omap/cpu-omap.c           |    1 +
+ arch/arm/plat-omap/include/plat/clock.h |    2 ++
+ 4 files changed, 20 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 233a222..faeee3e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -50,6 +50,9 @@ config HAVE_TCM
- 	bool
- 	select GENERIC_ALLOCATOR
+diff --git a/arch/arm/mach-omap2/clock2xxx.c b/arch/arm/mach-omap2/clock2xxx.c
+index 3bfd045..74f5586 100644
+--- a/arch/arm/mach-omap2/clock2xxx.c
++++ b/arch/arm/mach-omap2/clock2xxx.c
+@@ -515,6 +515,12 @@ void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
  
-+config HAVE_PROC_CPU
-+	bool
+ 	*table = &freq_table[0];
+ }
 +
- config NO_IOPORT
- 	bool
++void omap2_clk_exit_cpufreq_table(struct cpufreq_frequency_table **table)
++{
++	kfree(freq_table);
++}
++
+ #endif
  
-@@ -1226,6 +1229,7 @@ config ALIGNMENT_TRAP
- 	bool
- 	depends on CPU_CP15_MMU
- 	default y if !ARCH_EBSA110
-+	select HAVE_PROC_CPU if PROC_FS
- 	help
- 	  ARM processors cannot fetch/store information which is not
- 	  naturally aligned on the bus, i.e., a 4 byte fetch must start at an
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index c6c57b6..5357e48 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -24,6 +24,7 @@
- #include <linux/interrupt.h>
- #include <linux/smp.h>
- #include <linux/fs.h>
-+#include <linux/proc_fs.h>
+ struct clk_functions omap2_clk_functions = {
+@@ -526,6 +532,7 @@ struct clk_functions omap2_clk_functions = {
+ 	.clk_disable_unused	= omap2_clk_disable_unused,
+ #ifdef	CONFIG_CPU_FREQ
+ 	.clk_init_cpufreq_table	= omap2_clk_init_cpufreq_table,
++	.clk_exit_cpufreq_table	= omap2_clk_exit_cpufreq_table,
+ #endif
+ };
  
- #include <asm/unified.h>
- #include <asm/cpu.h>
-@@ -782,9 +783,21 @@ static int __init topology_init(void)
+diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
+index a64d84c..d9f8c84 100644
+--- a/arch/arm/plat-omap/clock.c
++++ b/arch/arm/plat-omap/clock.c
+@@ -329,6 +329,16 @@ void clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
+ 		arch_clock->clk_init_cpufreq_table(table);
+ 	spin_unlock_irqrestore(&clockfw_lock, flags);
+ }
++
++void clk_exit_cpufreq_table(struct cpufreq_frequency_table **table)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&clockfw_lock, flags);
++	if (arch_clock->clk_exit_cpufreq_table)
++		arch_clock->clk_exit_cpufreq_table(table);
++	spin_unlock_irqrestore(&clockfw_lock, flags);
++}
+ #endif
  
+ /*-------------------------------------------------------------------------*/
+diff --git a/arch/arm/plat-omap/cpu-omap.c b/arch/arm/plat-omap/cpu-omap.c
+index f8ddbdd..6d3d333 100644
+--- a/arch/arm/plat-omap/cpu-omap.c
++++ b/arch/arm/plat-omap/cpu-omap.c
+@@ -134,6 +134,7 @@ static int __init omap_cpu_init(struct cpufreq_policy *policy)
+ 
+ static int omap_cpu_exit(struct cpufreq_policy *policy)
+ {
++	clk_exit_cpufreq_table(&freq_table);
+ 	clk_put(mpu_clk);
  	return 0;
  }
--
- subsys_initcall(topology_init);
+diff --git a/arch/arm/plat-omap/include/plat/clock.h b/arch/arm/plat-omap/include/plat/clock.h
+index 309b6d1..94fe2a0 100644
+--- a/arch/arm/plat-omap/include/plat/clock.h
++++ b/arch/arm/plat-omap/include/plat/clock.h
+@@ -119,6 +119,7 @@ struct clk_functions {
+ 	void		(*clk_disable_unused)(struct clk *clk);
+ #ifdef CONFIG_CPU_FREQ
+ 	void		(*clk_init_cpufreq_table)(struct cpufreq_frequency_table **);
++	void		(*clk_exit_cpufreq_table)(struct cpufreq_frequency_table **);
+ #endif
+ };
  
-+#ifdef CONFIG_HAVE_PROC_CPU
-+static int __init proc_cpu_init(void)
-+{
-+	struct proc_dir_entry *res;
-+
-+	res = proc_mkdir("cpu", NULL);
-+	if (!res)
-+		return -ENOMEM;
-+	return 0;
-+}
-+fs_initcall(proc_cpu_init);
-+#endif
-+
- static const char *hwcap_str[] = {
- 	"swp",
- 	"half",
-diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-index b270d62..0c5eb69 100644
---- a/arch/arm/mm/alignment.c
-+++ b/arch/arm/mm/alignment.c
-@@ -898,11 +898,7 @@ static int __init alignment_init(void)
- #ifdef CONFIG_PROC_FS
- 	struct proc_dir_entry *res;
+@@ -135,6 +136,7 @@ extern unsigned long followparent_recalc(struct clk *clk);
+ extern void clk_enable_init_clocks(void);
+ #ifdef CONFIG_CPU_FREQ
+ extern void clk_init_cpufreq_table(struct cpufreq_frequency_table **table);
++extern void clk_exit_cpufreq_table(struct cpufreq_frequency_table **table);
+ #endif
  
--	res = proc_mkdir("cpu", NULL);
--	if (!res)
--		return -ENOMEM;
--
--	res = create_proc_entry("alignment", S_IWUSR | S_IRUGO, res);
-+	res = create_proc_entry("cpu/alignment", S_IWUSR | S_IRUGO, NULL);
- 	if (!res)
- 		return -ENOMEM;
- 
+ extern const struct clkops clkops_null;
