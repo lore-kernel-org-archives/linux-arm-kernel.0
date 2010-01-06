@@ -1,66 +1,77 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed,  6 Jan 2010 10:31:45 -0800
-Subject: [PATCH 03/35] davinci: move DDR2 controller defines to memory.h
-In-Reply-To: <1262802737-6601-3-git-send-email-khilman@deeprootsystems.com>
+Date: Wed,  6 Jan 2010 10:31:46 -0800
+Subject: [PATCH 04/35] davinci: move PSC register definitions from psc.c to
+	psc.h
+In-Reply-To: <1262802737-6601-4-git-send-email-khilman@deeprootsystems.com>
 References: <1262802737-6601-1-git-send-email-khilman@deeprootsystems.com>
 	<1262802737-6601-2-git-send-email-khilman@deeprootsystems.com>
 	<1262802737-6601-3-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1262802737-6601-4-git-send-email-khilman@deeprootsystems.com>
+	<1262802737-6601-4-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1262802737-6601-5-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sekhar Nori <nsekhar@ti.com>
 
-Move defintions of DDR2 controller registers to memory.h
-from cpuidle.c. The motivation behind the change is to be
-able to use these defintions in assembly code that puts
-DDR2 in self-refresh and enables the SoC to enter suspend
-state.
+The motivation behind the change is to use the same
+definitions in the assembly code responsible for
+suspending the SoC, a part of which is to clock gate
+the DDR2 clock.
+
+Note that the assembly code cannot invoke the C function
+meant for this. The main reason being that stack in DDR2
+cannot be accessed while DDR2 clock is being clock gated.
 
 Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-davinci/cpuidle.c             |    5 +----
- arch/arm/mach-davinci/include/mach/memory.h |    4 ++++
- 2 files changed, 5 insertions(+), 4 deletions(-)
+ arch/arm/mach-davinci/include/mach/psc.h |   11 +++++++++++
+ arch/arm/mach-davinci/psc.c              |   11 -----------
+ 2 files changed, 11 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/cpuidle.c b/arch/arm/mach-davinci/cpuidle.c
-index 97a90f3..beda3b5 100644
---- a/arch/arm/mach-davinci/cpuidle.c
-+++ b/arch/arm/mach-davinci/cpuidle.c
-@@ -19,6 +19,7 @@
- #include <asm/proc-fns.h>
+diff --git a/arch/arm/mach-davinci/include/mach/psc.h b/arch/arm/mach-davinci/include/mach/psc.h
+index 171173c..2776b23 100644
+--- a/arch/arm/mach-davinci/include/mach/psc.h
++++ b/arch/arm/mach-davinci/include/mach/psc.h
+@@ -180,6 +180,17 @@
+ #define DA8XX_LPSC1_CR_P3_SS		26
+ #define DA8XX_LPSC1_L3_CBA_RAM		31
  
- #include <mach/cpuidle.h>
-+#include <mach/memory.h>
- 
- #define DAVINCI_CPUIDLE_MAX_STATES	2
- 
-@@ -39,10 +40,6 @@ static struct cpuidle_driver davinci_idle_driver = {
- static DEFINE_PER_CPU(struct cpuidle_device, davinci_cpuidle_device);
- static void __iomem *ddr2_reg_base;
- 
--#define DDR2_SDRCR_OFFSET	0xc
--#define DDR2_SRPD_BIT		BIT(23)
--#define DDR2_LPMODEN_BIT	BIT(31)
--
- static void davinci_save_ddr_power(int enter, bool pdown)
- {
- 	u32 val;
-diff --git a/arch/arm/mach-davinci/include/mach/memory.h b/arch/arm/mach-davinci/include/mach/memory.h
-index 80309ae..7aeaf46 100644
---- a/arch/arm/mach-davinci/include/mach/memory.h
-+++ b/arch/arm/mach-davinci/include/mach/memory.h
-@@ -31,6 +31,10 @@
- #define PHYS_OFFSET DAVINCI_DDR_BASE
- #endif
- 
-+#define DDR2_SDRCR_OFFSET	0xc
-+#define DDR2_SRPD_BIT		BIT(23)
-+#define DDR2_LPMODEN_BIT	BIT(31)
++/* PSC register offsets */
++#define EPCPR		0x070
++#define PTCMD		0x120
++#define PTSTAT		0x128
++#define PDSTAT		0x200
++#define PDCTL1		0x304
++#define MDSTAT		0x800
++#define MDCTL		0xA00
 +
- /*
-  * Increase size of DMA-consistent memory region
-  */
++#define MDSTAT_STATE_MASK 0x1f
++
+ extern int davinci_psc_is_clk_active(unsigned int ctlr, unsigned int id);
+ extern void davinci_psc_config(unsigned int domain, unsigned int ctlr,
+ 		unsigned int id, char enable);
+diff --git a/arch/arm/mach-davinci/psc.c b/arch/arm/mach-davinci/psc.c
+index 04a3cb7..adf6b5c 100644
+--- a/arch/arm/mach-davinci/psc.c
++++ b/arch/arm/mach-davinci/psc.c
+@@ -25,17 +25,6 @@
+ #include <mach/cputype.h>
+ #include <mach/psc.h>
+ 
+-/* PSC register offsets */
+-#define EPCPR		0x070
+-#define PTCMD		0x120
+-#define PTSTAT		0x128
+-#define PDSTAT		0x200
+-#define PDCTL1		0x304
+-#define MDSTAT		0x800
+-#define MDCTL		0xA00
+-
+-#define MDSTAT_STATE_MASK 0x1f
+-
+ /* Return nonzero iff the domain's clock is active */
+ int __init davinci_psc_is_clk_active(unsigned int ctlr, unsigned int id)
+ {
 -- 
 1.6.6.rc2.1.g42108
