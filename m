@@ -1,32 +1,29 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 6 Jan 2010 14:09:58 -0700 (MST)
-Subject: [PATCH 1/1] ARM: OMAP4: PM: Add check for avoiding dependency
-	related update.
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C041BB3A@dbde02.ent.ti.com>
-References: <1261583238-22187-1-git-send-email-abhijitpagare@ti.com>
-	<alpine.DEB.2.00.0912300125320.24862@utopia.booyaka.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C02E919C@dbde02.ent.ti.com>
-	<alpine.DEB.2.00.1001051608340.21295@utopia.booyaka.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C041BB3A@dbde02.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1001061401560.10034@utopia.booyaka.com>
+From: roel.kluin@gmail.com (Roel Kluin)
+Date: Wed, 06 Jan 2010 23:24:35 +0100
+Subject: [PATCH] ARM: add missing parentheses
+Message-ID: <4B450DA3.5010305@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Abhijit,
+`!' has a higher precedence than `&' so parentheses are required.
 
-On Wed, 6 Jan 2010, Pagare, Abhijit wrote:
+Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
+---
+ arch/arm/mach-s3c2440/mach-osiris-dvs.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-> I checked the dependency patch-set. The complete stuff looks really 
-> neat. Applying OMAP4 on top of this would be feasible. The only thing is 
-> that till the point the OMAP4 dependency patches go in the "autodeps" 
-> variable in arch/arm/clockdomain.c would not be initialized which will 
-> cause a kernel boot-crash for the functions _clkdm_add_autodeps(clkdm) 
-> and _clkdm_del_autodeps(clkdm). Hence the hack patch referred to in the 
-> subject above is essential. Should I re-post it with the missing FIXME 
-> indication that you had recommended?
-
-My concern is that we don't want to forget about the OMAP4 sleep and 
-wakeup dependencies.  How long do you think it will take to add them?
-
-
-- Paul
+diff --git a/arch/arm/mach-s3c2440/mach-osiris-dvs.c b/arch/arm/mach-s3c2440/mach-osiris-dvs.c
+index ad2792d..0abcd38 100644
+--- a/arch/arm/mach-s3c2440/mach-osiris-dvs.c
++++ b/arch/arm/mach-s3c2440/mach-osiris-dvs.c
+@@ -77,8 +77,8 @@ static int osiris_dvs_notify(struct notifier_block *nb,
+ 		}
+ 		break;
+ 	case CPUFREQ_POSTCHANGE:
+-		if (!old_dvs & new_dvs ||
+-		    !cur_dvs & new_dvs) {
++		if (!(old_dvs & new_dvs) ||
++		    !(cur_dvs & new_dvs)) {
+ 			pr_debug("entering dvs\n");
+ 			cur_dvs = true;
+ 			gpio_set_value(OSIRIS_GPIO_DVS, 0);
