@@ -1,7 +1,7 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed,  6 Jan 2010 10:32:02 -0800
-Subject: [PATCH 20/35] davinci: clock: Check CLK_PSC flag before disabling PSC
-In-Reply-To: <1262802737-6601-20-git-send-email-khilman@deeprootsystems.com>
+Date: Wed,  6 Jan 2010 10:32:03 -0800
+Subject: [PATCH 21/35] DaVinci: DM365: Changing default queue for DM365.
+In-Reply-To: <1262802737-6601-21-git-send-email-khilman@deeprootsystems.com>
 References: <1262802737-6601-1-git-send-email-khilman@deeprootsystems.com>
 	<1262802737-6601-2-git-send-email-khilman@deeprootsystems.com>
 	<1262802737-6601-3-git-send-email-khilman@deeprootsystems.com>
@@ -22,38 +22,35 @@ References: <1262802737-6601-1-git-send-email-khilman@deeprootsystems.com>
 	<1262802737-6601-18-git-send-email-khilman@deeprootsystems.com>
 	<1262802737-6601-19-git-send-email-khilman@deeprootsystems.com>
 	<1262802737-6601-20-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1262802737-6601-21-git-send-email-khilman@deeprootsystems.com>
+	<1262802737-6601-21-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1262802737-6601-22-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chaithrika U S <chaithrika@ti.com>
+From: Sandeep Paulraj <s-paulraj@ti.com>
 
-Some modules do not have PSC to control their clocks.
-The 'lpsc' field in the clk structure is 0 for such clocks.
+In DM365 Q0, Q1 and Q2 are used by codecs.
+LSP drivers should use Q3.
+This patch changes the default queue for DM365.
 
-In the clock disable function check for CLK PSC flag before
-disabling the PSC. If this is not taken care of then it may
-so happen that module controlled by LPSC 0 is erroneously disabled.
-
-Signed-off-by: Chaithrika U S <chaithrika@ti.com>
+Signed-off-by: Sandeep Paulraj <s-paulraj@ti.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-davinci/clock.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ arch/arm/mach-davinci/dm365.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
-index e46a643..f097f8d 100644
---- a/arch/arm/mach-davinci/clock.c
-+++ b/arch/arm/mach-davinci/clock.c
-@@ -49,7 +49,8 @@ static void __clk_disable(struct clk *clk)
- {
- 	if (WARN_ON(atomic_read(&clk->usecount) == 0))
- 		return;
--	if (atomic_dec_and_test(&clk->usecount) && !(clk->flags & CLK_PLL))
-+	if (atomic_dec_and_test(&clk->usecount) && !(clk->flags & CLK_PLL)
-+						&& (clk->flags & CLK_PSC))
- 		davinci_psc_config(psc_domain(clk), clk->gpsc, clk->lpsc, 0);
- 	if (clk->parent)
- 		__clk_disable(clk->parent);
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index cc3bae4..62cec33 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -754,7 +754,7 @@ static struct edma_soc_info dm365_edma_info[] = {
+ 		.n_cc			= 1,
+ 		.queue_tc_mapping	= dm365_queue_tc_mapping,
+ 		.queue_priority_mapping	= dm365_queue_priority_mapping,
+-		.default_queue		= EVENTQ_2,
++		.default_queue		= EVENTQ_3,
+ 	},
+ };
+ 
 -- 
 1.6.6.rc2.1.g42108
