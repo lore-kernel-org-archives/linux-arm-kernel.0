@@ -1,47 +1,25 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 06 Jan 2010 10:11:58 -0800
-Subject: [GIT PULL] davinci platform fixes for 2.6.33-rc4
-Message-ID: <87k4vvf6hd.fsf@deeprootsystems.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Wed, 6 Jan 2010 18:17:05 +0000
+Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors (v3)
+In-Reply-To: <1262795027.18401.28.camel@pc1117.cambridge.arm.com>
+References: <20100105194328.GG14376@shareable.org>
+	<1262795027.18401.28.camel@pc1117.cambridge.arm.com>
+Message-ID: <20100106181705.GD11773@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+Catalin Marinas wrote:
+> > Is there any reason why this wasn't always like that?
+> 
+> On ARMv6 onwards (where this user RO, kernel RO is supported) we cannot
+> easily differentiate between the vectors page and a normal kernel page
+> unless we use another L_PTE_ bit. We need the vectors page to be
+> writable if there is no TLS register in hardware (I guess we could use
+> domain switching to override this though). But on ARMv7 we always have a
+> TLS register, so no need to write to the vectors page.
 
-Please pull the fixes for the ARM/DaVinci platform for 2.6.33-rc4.
+Could you map the TLS page writable (kernel access only) at another
+address at the same time, carefully choosing an aliasing address so
+that no cache flush is needed after writing?
 
-Thanks,
-
-Kevin
-
-
-The following changes since commit 74d2e4f8d79ae0c4b6ec027958d5b18058662eea:
-  Linus Torvalds (1):
-        Linux 2.6.33-rc3
-
-are available in the git repository at:
-
-  ssh://master.kernel.org/pub/scm/linux/kernel/git/khilman/linux-davinci.git davinci-fixes
-
-or
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-davinci.git davinci-fixes
-
-Miguel Aguilar (1):
-      DaVinci: DM365: Add the device_enable for the DaVinci Keyscan
-
-Sekhar Nori (3):
-      davinci: cp_intc: provide set_wake function
-      davinci: da8xx/omap-l1: mark RTC as a wakeup source
-      davinci: enable ARCH_HAS_HOLES_MEMORYMODEL for DaVinci
-
-Vaibhav Hiremath (1):
-      Davinci VPFE Capture: Take i2c adapter id through platform data
-
- arch/arm/Kconfig                         |    1 +
- arch/arm/mach-davinci/board-dm355-evm.c  |    1 +
- arch/arm/mach-davinci/board-dm365-evm.c  |   11 ++++++-----
- arch/arm/mach-davinci/board-dm644x-evm.c |    1 +
- arch/arm/mach-davinci/cp_intc.c          |   11 +++++++++++
- arch/arm/mach-davinci/devices-da8xx.c    |    9 ++++++++-
- arch/arm/mach-davinci/dm365.c            |    1 -
- 7 files changed, 28 insertions(+), 7 deletions(-)
+-- Jamie
