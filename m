@@ -1,29 +1,30 @@
-From: roel.kluin@gmail.com (Roel Kluin)
-Date: Wed, 06 Jan 2010 23:24:35 +0100
-Subject: [PATCH] ARM: add missing parentheses
-Message-ID: <4B450DA3.5010305@gmail.com>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Thu, 7 Jan 2010 09:31:00 +1100
+Subject: [PATCH 02/11] arm: use generic infrastructure for early params
+In-Reply-To: <20100106162731.GB1728@n2100.arm.linux.org.uk>
+References: <1261479296.245235.191110925832.0.gpush@pororo>
+	<1261479296.246097.171417450949.2.gpush@pororo>
+	<20100106162731.GB1728@n2100.arm.linux.org.uk>
+Message-ID: <201001070931.00811.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-`!' has a higher precedence than `&' so parentheses are required.
+Russell,
 
-Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
----
- arch/arm/mach-s3c2440/mach-osiris-dvs.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+> This is something which should be separate from the rest of the DT
+> patch - could we have this as a patch which can be applied to the
+> current kernel tree please?
 
-diff --git a/arch/arm/mach-s3c2440/mach-osiris-dvs.c b/arch/arm/mach-s3c2440/mach-osiris-dvs.c
-index ad2792d..0abcd38 100644
---- a/arch/arm/mach-s3c2440/mach-osiris-dvs.c
-+++ b/arch/arm/mach-s3c2440/mach-osiris-dvs.c
-@@ -77,8 +77,8 @@ static int osiris_dvs_notify(struct notifier_block *nb,
- 		}
- 		break;
- 	case CPUFREQ_POSTCHANGE:
--		if (!old_dvs & new_dvs ||
--		    !cur_dvs & new_dvs) {
-+		if (!(old_dvs & new_dvs) ||
-+		    !(cur_dvs & new_dvs)) {
- 			pr_debug("entering dvs\n");
- 			cur_dvs = true;
- 			gpio_set_value(OSIRIS_GPIO_DVS, 0);
+Sure, patch coming.
+
+The first three patches of this series (prefixed with arm:, rather than arm-
+dt:) are all generic arm patches that don't specifically add device tree 
+support, would you like the other two as well?
+
+I'm in the process of rebasing my work onto a merge or your and Grant Likely's 
+test-devicetree branch, so future patches should be easier to work with.
+
+Cheers,
+
+
+Jeremy
