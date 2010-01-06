@@ -1,46 +1,104 @@
-From: teawater@gmail.com (Hui Zhu)
-Date: Wed, 6 Jan 2010 15:07:18 +0800
-Subject: [PATCH] stack2core: show stack message and convert it to core
-	file when kernel die
-In-Reply-To: <4B430457.5020906@kernel.org>
-References: <daef60381001030705r93b3fbfkc50e7b9bbc62b334@mail.gmail.com>
-	<4B411F14.1040302@kernel.org> <20100103150134.5bdab023@infradead.org>
-	<4B412341.2010002@kernel.org> <20100103151406.20228c3a@infradead.org>
-	<daef60381001040822q188d7374te5a177c5f9877ac2@mail.gmail.com>
-	<4B4273D6.2010306@kernel.org>
-	<daef60381001050104u5d4adf11k16bec2406501fbd2@mail.gmail.com>
-	<4B430457.5020906@kernel.org>
-Message-ID: <daef60381001052307x3244442che26075e4a3e0d2f8@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 6 Jan 2010 08:10:26 +0100
+Subject: sharp c-3000 aka spitz: fix warn_on introduced in 2.6.32-rc1
+Message-ID: <20100106071026.GD1382@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Tue, Jan 5, 2010 at 17:20, Tejun Heo <tj@kernel.org> wrote:
-> Hello,
->
-> On 01/05/2010 06:04 PM, Hui Zhu wrote:
->> I agree with read the current stack message is better.
->>
->> About the extending, I have some question with it:
->> 1. ?markup_oops.pl have itself idea, it try use dmesg| markup_oops.pl
->> show what happen to usr. ?This is different with s2c.
->> I am not sure people like it have other function with it. ?Too much
->> part of this file need to be change. ?It need rewrite, just the oops
->> message parse part can be keep.
->
-> Yeah, I think you'll need to refactor it and share only the parsing
-> frontend. ?Just adding a switch (-m or whatever) which puts it into
-> machine-friendly translator mode should do the trick.
->
->> 2. ?I use perl to work in a long time before, I know it good at parse
->> the text, but I am not sure it good at handle struct like:
->
-> You don't need to handle the data structure at all. ?Just make it
-> parse the dmesg and output machine-friendly formatted output which can
-> be processed by s2c. ?ie. just make it do the reformatting.
+Sharp-SL code uses strange, complex grouping of gpios for wakeups
+toggling. Fortunately, it is unneeded in recent kernels (and actually
+provokes WARN_ONs during resume). Remove it.
 
-This idea is very cool.  I will do it.  Thanks for help.  :)
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-Best regards,
-Hui
+--- a/arch/arm/mach-pxa/mfp-pxa2xx.c	2009-09-10 00:13:59.000000000 +0200
++++ b/arch/arm/mach-pxa/mfp-pxa2xx.c	2009-12-29 03:16:40.000000000 +0100
+@@ -34,7 +34,6 @@
+ struct gpio_desc {
+ 	unsigned	valid		: 1;
+ 	unsigned	can_wakeup	: 1;
+-	unsigned	keypad_gpio	: 1;
+ 	unsigned	dir_inverted	: 1;
+ 	unsigned int	mask; /* bit mask in PWER or PKWR */
+ 	unsigned int	mux_mask; /* bit mask of muxed gpio bits, 0 if no mux */
+@@ -178,9 +177,6 @@
+ 	if (!d->valid)
+ 		return -EINVAL;
+ 
+-	if (d->keypad_gpio)
+-		return -EINVAL;
+-
+ 	mux_taken = (PWER & d->mux_mask) & (~d->mask);
+ 	if (on && mux_taken)
+ 		return -EBUSY;
+@@ -231,32 +227,6 @@
+ #endif /* CONFIG_PXA25x */
+ 
+ #ifdef CONFIG_PXA27x
+-static int pxa27x_pkwr_gpio[] = {
+-	13, 16, 17, 34, 36, 37, 38, 39, 90, 91, 93, 94,
+-	95, 96, 97, 98, 99, 100, 101, 102
+-};
+-
+-int keypad_set_wake(unsigned int on)
+-{
+-	unsigned int i, gpio, mask = 0;
+-
+-	if (!on) {
+-		PKWR = 0;
+-		return 0;
+-	}
+-
+-	for (i = 0; i < ARRAY_SIZE(pxa27x_pkwr_gpio); i++) {
+-
+-		gpio = pxa27x_pkwr_gpio[i];
+-
+-		if (gpio_desc[gpio].config & MFP_LPM_CAN_WAKEUP)
+-			mask |= gpio_desc[gpio].mask;
+-	}
+-
+-	PKWR = mask;
+-	return 0;
+-}
+-
+ #define PWER_WEMUX2_GPIO38	(1 << 16)
+ #define PWER_WEMUX2_GPIO53	(2 << 16)
+ #define PWER_WEMUX2_GPIO40	(3 << 16)
+@@ -273,6 +243,12 @@
+ 	gpio_desc[(gpio)].mux_mask = PWER_ ## mux ## _MASK;	\
+ } while (0)
+ 
++
++static int pxa27x_pkwr_gpio[] = {
++	13, 16, 17, 34, 36, 37, 38, 39, 90, 91, 93, 94,
++	95, 96, 97, 98, 99, 100, 101, 102
++};
++
+ static void __init pxa27x_mfp_init(void)
+ {
+ 	int i, gpio;
+@@ -291,7 +267,6 @@
+ 	for (i = 0; i < ARRAY_SIZE(pxa27x_pkwr_gpio); i++) {
+ 		gpio = pxa27x_pkwr_gpio[i];
+ 		gpio_desc[gpio].can_wakeup = 1;
+-		gpio_desc[gpio].keypad_gpio = 1;
+ 		gpio_desc[gpio].mask = 1 << i;
+ 	}
+ 
+--- a/arch/arm/mach-pxa/pxa27x.c	2009-09-10 00:13:59.000000000 +0200
++++ b/arch/arm/mach-pxa/pxa27x.c	2009-12-29 03:13:00.000000000 +0100
+@@ -323,9 +323,6 @@
+ 	if (gpio >= 0 && gpio < 128)
+ 		return gpio_set_wake(gpio, on);
+ 
+-	if (irq == IRQ_KEYPAD)
+-		return keypad_set_wake(on);
+-
+ 	switch (irq) {
+ 	case IRQ_RTCAlrm:
+ 		mask = PWER_RTC;
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
