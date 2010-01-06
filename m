@@ -1,43 +1,51 @@
-From: imre.deak@nokia.com (Imre Deak)
-Date: Wed, 6 Jan 2010 19:47:59 +0200
-Subject: [RFC PATCH 2/2] ARM: VFP: preserve the HW context when calling
-	signal handlers
-In-Reply-To: <201001041718.55150.siarhei.siamashka@nokia.com>
-References: <c70d85c1a0b20b5f227f34b32db674c7b362d72d.1242734510.git.imre.deak@nokia.com>
-	<201001041615.26490.siarhei.siamashka@nokia.com>
-	<20100104142549.GF9107@n2100.arm.linux.org.uk>
-	<201001041718.55150.siarhei.siamashka@nokia.com>
-Message-ID: <20100106174759.GB28921@localhost>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Wed, 6 Jan 2010 18:07:05 +0000
+Subject: Sending UTF-8 patches (was: [PATCH 2/2] Remove now-defunct ts7250
+	nand driver)
+In-Reply-To: <1262784693.3181.8034.camel@macbook.infradead.org>
+References: <201001051459.58621.hartleys@visionengravers.com>
+	<1262784693.3181.8034.camel@macbook.infradead.org>
+Message-ID: <20100106180705.GC11773@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2010 at 04:18:54PM +0100, Siamashka Siarhei (Nokia-D/Helsinki) wrote:
-> On Monday 04 January 2010 16:25:49 ext Russell King - ARM Linux wrote:
-> > On Mon, Jan 04, 2010 at 04:15:26PM +0200, Siarhei Siamashka wrote:
-> > > On Saturday 13 June 2009 20:04:06 ext Russell King - ARM Linux wrote:
-> > > > - wait for a new patch which includes these other registers and not
-> > > > have any ABI visible changes to contend with
-> > >
-> > > Sorry for bumping this old thread, but what is the current status of
-> > > these patches?
-> >
-> > What happened was that the 2nd option was decided upon, and then the
-> > thread died, and probably everyone forgot about it.
-> >
-> > So, I'm doing exactly what I said I'd do in the second option.  I'm just
-> > still waiting some six months on...
+David Woodhouse wrote:
+> It looks like your patch has legacy garbage in it:
 > 
-> OK, it's understandable. The issue just got a bit more popular now than it
-> used to be six months ago.
+> > - *   Copyright (C) 2004 Marius Gr<F6>ger (mag at sysgo.de)
 > 
-> > If someone comes up with a tested patch, then its something we should
-> > sort out.
-> 
-> Thanks for clarifying the situation.
+> It fails to apply because the ? (correctly represented as 0xc3 0xb6) has
+> been converted into a single byte 0xf6 in some legacy character set.
+>
+> When applying patches, git-am does look at the Content-Type: header and
+> convert legacy crap into UTF-8 for the changelog, but it leaves the
+> patch itself alone.
 
-Jamie, you raised the question of FP emulation in user space; could you
-provide the VFP registers needed for that in addition to the already saved
-ones? With that info I could update the patch so it's acceptable for everyone.
+That's unfortunate.  An option to git-am or it's subsidiary tools to
+convert the patch as well as the commit would be useful.  After all it
+_is_ made clear in the MIME header how it's formatted.
+
+> Care to join us in the 21st century?
+
+You mean send the mail in UTF-8 format when it only contains
+characters in ISO-8859-1?  To make that the default behaviour of an
+email sender would possibly violate RFC2045, which as far as I can
+tell is still the prevailing standard, which is I guess why Mutt does
+not do that in its default configuration, and recodes the text from
+UTF-8 to 8859-1 when it can.  That's what 21st century tools do :-)
+
+I guess it's time for a "send-hook" to use a different setting
+specially for Linux mailing lists.
+
+Do you instead mean send the patch in UTF-8 embedded in a mail encoded
+as 8859-1?  That sounds quite difficult, if the patch is inline rather
+than attached.
+
+An option to git-am to DTRT sounds infinitely better to me.  Shame
+it's not there; unfortunately it doesn't emit enough information to
+make it easy with a wrapper script.
+
+What settings do you use to get this right?
 
 Thanks,
-Imre
+-- Jamie
