@@ -1,38 +1,48 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 06 Jan 2010 13:44:17 -0700
-Subject: [PATCH 1/5] OMAP1 clock: remove __initdata from struct clk_functions
-	to prevent crash
+Date: Wed, 06 Jan 2010 13:44:19 -0700
+Subject: [PATCH 2/5] OMAP2xxx clock: clk2xxx.c doesn't compile if CPUFREQ is
+	enabled
 In-Reply-To: <20100106204346.15002.89343.stgit@localhost.localdomain>
 References: <20100106204346.15002.89343.stgit@localhost.localdomain>
-Message-ID: <20100106204415.15002.29833.stgit@localhost.localdomain>
+Message-ID: <20100106204418.15002.26107.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Cory Maccarrone <darkstar6262@gmail.com>
+From: Felipe Balbi <felipe.balbi@nokia.com>
 
-Commit 52650505fbf3a6ab851c801f54e73e76c55ab8da added an __initdata
-decoration to the structure containing the clk_enable and clk_disable
-functions.  Once init data was freed, these pointers went to null, and
-the next enable or disable call caused the kernel to crash.  This
-change removes this decoration.
+if we enable CPUFREQ we can't build omap2 for two reasons,
+one of them is fixed by the patch below.
 
-Signed-off-by: Cory Maccarrone <darkstar6262@gmail.com>
-[paul at pwsan.com: patch manually split and commit message edited]
+It's failing because the __must_be_array() check in
+ARRAY_SIZE() is failing and printing the following message:
+
+arch/arm/mach-omap2/clock2xxx.c:453: error: negative width in bit-field '<anonymous>'
+
+Signed-off-by: Felipe Balbi <felipe.balbi@nokia.com>
+[paul at pwsan.com: commit message updated; changed rate variable name]
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap1/clock_data.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/clock2xxx.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/clock_data.c b/arch/arm/mach-omap1/clock_data.c
-index 31fba07..8a85bbb 100644
---- a/arch/arm/mach-omap1/clock_data.c
-+++ b/arch/arm/mach-omap1/clock_data.c
-@@ -674,7 +674,7 @@ static struct omap_clk omap_clks[] = {
-  * init
-  */
+diff --git a/arch/arm/mach-omap2/clock2xxx.c b/arch/arm/mach-omap2/clock2xxx.c
+index d0e3fb7..ce6742f 100644
+--- a/arch/arm/mach-omap2/clock2xxx.c
++++ b/arch/arm/mach-omap2/clock2xxx.c
+@@ -455,12 +455,15 @@ static struct cpufreq_frequency_table freq_table[ARRAY_SIZE(rate_table)];
+ void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
+ {
+ 	struct prcm_config *prcm;
++	long sys_ck_rate;
+ 	int i = 0;
  
--static struct clk_functions omap1_clk_functions __initdata = {
-+static struct clk_functions omap1_clk_functions = {
- 	.clk_enable		= omap1_clk_enable,
- 	.clk_disable		= omap1_clk_disable,
- 	.clk_round_rate		= omap1_clk_round_rate,
++	sys_ck_rate = clk_get_rate(sclk);
++
+ 	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
+ 		if (!(prcm->flags & cpu_mask))
+ 			continue;
+-		if (prcm->xtal_speed != sys_ck.rate)
++		if (prcm->xtal_speed != sys_ck_rate)
+ 			continue;
+ 
+ 		/* don't put bypass rates in table */
