@@ -1,48 +1,32 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 06 Jan 2010 13:44:19 -0700
-Subject: [PATCH 2/5] OMAP2xxx clock: clk2xxx.c doesn't compile if CPUFREQ is
-	enabled
-In-Reply-To: <20100106204346.15002.89343.stgit@localhost.localdomain>
-References: <20100106204346.15002.89343.stgit@localhost.localdomain>
-Message-ID: <20100106204418.15002.26107.stgit@localhost.localdomain>
+Date: Wed, 6 Jan 2010 14:09:58 -0700 (MST)
+Subject: [PATCH 1/1] ARM: OMAP4: PM: Add check for avoiding dependency
+	related update.
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C041BB3A@dbde02.ent.ti.com>
+References: <1261583238-22187-1-git-send-email-abhijitpagare@ti.com>
+	<alpine.DEB.2.00.0912300125320.24862@utopia.booyaka.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C02E919C@dbde02.ent.ti.com>
+	<alpine.DEB.2.00.1001051608340.21295@utopia.booyaka.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C041BB3A@dbde02.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1001061401560.10034@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Felipe Balbi <felipe.balbi@nokia.com>
+Hello Abhijit,
 
-if we enable CPUFREQ we can't build omap2 for two reasons,
-one of them is fixed by the patch below.
+On Wed, 6 Jan 2010, Pagare, Abhijit wrote:
 
-It's failing because the __must_be_array() check in
-ARRAY_SIZE() is failing and printing the following message:
+> I checked the dependency patch-set. The complete stuff looks really 
+> neat. Applying OMAP4 on top of this would be feasible. The only thing is 
+> that till the point the OMAP4 dependency patches go in the "autodeps" 
+> variable in arch/arm/clockdomain.c would not be initialized which will 
+> cause a kernel boot-crash for the functions _clkdm_add_autodeps(clkdm) 
+> and _clkdm_del_autodeps(clkdm). Hence the hack patch referred to in the 
+> subject above is essential. Should I re-post it with the missing FIXME 
+> indication that you had recommended?
 
-arch/arm/mach-omap2/clock2xxx.c:453: error: negative width in bit-field '<anonymous>'
+My concern is that we don't want to forget about the OMAP4 sleep and 
+wakeup dependencies.  How long do you think it will take to add them?
 
-Signed-off-by: Felipe Balbi <felipe.balbi@nokia.com>
-[paul at pwsan.com: commit message updated; changed rate variable name]
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/clock2xxx.c |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clock2xxx.c b/arch/arm/mach-omap2/clock2xxx.c
-index d0e3fb7..ce6742f 100644
---- a/arch/arm/mach-omap2/clock2xxx.c
-+++ b/arch/arm/mach-omap2/clock2xxx.c
-@@ -455,12 +455,15 @@ static struct cpufreq_frequency_table freq_table[ARRAY_SIZE(rate_table)];
- void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
- {
- 	struct prcm_config *prcm;
-+	long sys_ck_rate;
- 	int i = 0;
- 
-+	sys_ck_rate = clk_get_rate(sclk);
-+
- 	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
- 		if (!(prcm->flags & cpu_mask))
- 			continue;
--		if (prcm->xtal_speed != sys_ck.rate)
-+		if (prcm->xtal_speed != sys_ck_rate)
- 			continue;
- 
- 		/* don't put bypass rates in table */
+- Paul
