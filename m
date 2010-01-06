@@ -1,49 +1,60 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 6 Jan 2010 12:14:41 +0000
-Subject: [PATCH 5/5] arm/perfevents: implement perf event support for ARMv6
-In-Reply-To: <000501ca8ec9$0c790970$256b1c50$@deacon@arm.com>
+Date: Wed, 6 Jan 2010 12:15:51 +0000
+Subject: [PATCH 1/5] arm: provide a mechanism to reserve performance
+	counters
+In-Reply-To: <op.u530zufm7p4s8u@localhost>
 References: <1262602122-10373-1-git-send-email-jamie.iles@picochip.com>
 	<1262602122-10373-2-git-send-email-jamie.iles@picochip.com>
-	<1262602122-10373-3-git-send-email-jamie.iles@picochip.com>
-	<1262602122-10373-4-git-send-email-jamie.iles@picochip.com>
-	<1262602122-10373-5-git-send-email-jamie.iles@picochip.com>
-	<1262602122-10373-6-git-send-email-jamie.iles@picochip.com>
-	<20100105222657.GK4179@wear.picochip.com>
-	<20100105223147.GB10941@n2100.arm.linux.org.uk>
-	<20100106001831.GM4179@wear.picochip.com>
-	<000501ca8ec9$0c790970$256b1c50$@deacon@arm.com>
-Message-ID: <20100106121441.GA21375@wear.picochip.com>
+	<op.u530zufm7p4s8u@localhost>
+Message-ID: <20100106121551.GU4179@wear.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 06, 2010 at 12:09:07PM -0000, Will Deacon wrote:
-> Hi Jamie,
-> 
-> * Jamie Iles wrote:
-> 
-> > Ok, I've tried 2 things:
-> > 	1. disabling interrupts around perf_event_task_sched_in()
-> > 	2. undefining __ARCH_WANT_INTERRUPTS_ON_CTXSW
-> > 
-> > As far as I can tell, both of these solutions work, although with 2, I had to
-> > define __ARCH_WANT_INTERRUPTS_ON_CTXSW.
-> 
-> I don't follow what you mean for point (2) when you say you have to define
-> __ARCH_WANT_INTERRUPTS_ON_CTXSW. I tried defining __ARCH_WANT_INTERRUPTS_ON_CTXSW
-> only when VIVT caches are present [as Russell mentioned], but I encountered
-> further locking problems with __new_context [see below].
-I got my define's mixed up. If you undef __ARCH_WANT_INTERRUPTS_ON_CTXSW then
-you also need to define __ARCH_WANT_UNLOCKED_CTXSW to avoid the locking
-problems you've described.
-> 
-> > Will, Jean - could you give the patch below a go and see if it works on your
-> > systems? I don't get any lockdep warnings on my platform with this and it
-> > still runs without the lock debugging.
-> 
-> This patch solves the issue for me. Should this be integrated into your patchset
-> as that is the first perf code for ARM?
-As long as no-one else has any objection.
+On Wed, Jan 06, 2010 at 01:00:56PM +0100, Micha? Nazarewicz wrote:
+>> +#else /* CONFIG_CPU_HAS_PMU */
+>> +
+>> +static inline const struct pmu_irqs *
+>> +reserve_pmu(void)
+>> +{
+>> +	ERR_PTR(-ENODEV);
+>
+> -	ERR_PTR(-ENODEV);
+> +	return ERR_PTR(-ENODEV);
+>
+>> +}
+>> +
+>> +static inline int
+>> +release_pmu(const struct pmu_irqs *irqs)
+>> +{
+>
+> +	return -ENODEV;
+>
+>> +}
+>> +
+>> +static inline int
+>> +init_pmu(void)
+>> +{
+>> +	return -ENODEV;
+>> +}
+>> +
+>> +#endif /* CONFIG_CPU_HAS_PMU */
+>> +
+>> +#endif /* __ARM_PMU_H__ */
+Thanks, well spotted!
+>> +static const struct pmu_irqs pmu_irqs = {
+>> +	.irqs	    = irqs,
+>> +	.num_irqs   = ARRAY_SIZE(irqs),
+>> +};
+>> +
+>> +static DECLARE_MUTEX(pmu_mutex);
+>
+> Isn't mutex an overkill? A bit field would be enough:
+>
+> -static DECLARE_MUTEX(pmu_mutex);
+> +static volatile long pmu_mutex;
+Yes, it probably is. I don't think performance is important here but that's a
+simpler solution so I'll make that change.
 
-Cheers,
+Thanks,
 
 Jamie
