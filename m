@@ -1,40 +1,39 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 6 Jan 2010 15:30:34 +0000
-Subject: Perf Event support for ARMv7 (was: Re: [PATCH 5/5]
-	arm/perfevents: implement perf event support for ARMv6)
-In-Reply-To: <op.u53904ge7p4s8u@localhost>
-References: <1260875712-29712-1-git-send-email-jamie.iles@picochip.com>
-	<200912221751.39662.jpihet@mvista.com>
-	<20091228075748.GC20039@elte.hu>
-	<200912291452.16856.jpihet@mvista.com>
-	<20091229163252.GA12409@gallagher> <op.u53904ge7p4s8u@localhost>
-Message-ID: <20100106153034.GV4179@wear.picochip.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 06 Jan 2010 16:23:47 +0000
+Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors (v3)
+In-Reply-To: <20100105194328.GG14376@shareable.org>
+References: <20100105194328.GG14376@shareable.org>
+Message-ID: <1262795027.18401.28.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 06, 2010 at 04:16:06PM +0100, Micha? Nazarewicz wrote:
-[snip]
-> Since I've just started to investigate the performance counter
-> architecture and will probably need to port tools/perf on ARM as well,
-> would you care to post any patches of your work in this area? It will
-> be greatly appreciated.  I couldn't find any of such patches posted
-> anywhere or in the tree.
-The patches are in tip/master. 58e9f94138c1d9c47f6a63632ca7a78fc6dcc15f and
-cc835752ae3634acd2d487fdf5152f6075f45aef should do the trick. They should also
-be in Linus' tree.
+On Tue, 2010-01-05 at 19:43 +0000, Jamie Lokier wrote:
+> Leif Lindholm wrote:
+> > diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> > index 3a28521..cb85aeb 100644
+> > --- a/arch/arm/mm/proc-v7.S
+> > +++ b/arch/arm/mm/proc-v7.S
+> > @@ -147,8 +147,10 @@ ENTRY(cpu_v7_set_pte_ext)
+> > 
+> >       tst     r1, #L_PTE_USER
+> >       orrne   r3, r3, #PTE_EXT_AP1
+> > +#ifndef CONFIG_SWP_EMULATE
+> >       tstne   r3, #PTE_EXT_APX
+> >       bicne   r3, r3, #PTE_EXT_APX | PTE_EXT_AP0
+> > +#endif
+> 
+> Is this the part which changes kernel memory access to fault when
+> writing to user-read-only pages?  (I don't know anything about the
+> details of this, btw).
+> 
+> Is there any reason why this wasn't always like that?
 
-> Also, I would like to ask what's the idea behind tools/perf utility
-> anyway. As far as I understand it provides only a few generalized
-> events and all other events are accessed only via critic r### where
-> ### is hardware dependent number.  If that's the case the tools might
-> be hard to use since users don't tend to remember such numbers.  This
-> means that perf would require some kind of front-end which would
-> provide a nice textual description for those mysterious r###.
-True. However, for simple profiling, cycle counts are often enough plus all of
-the software events are always available. I do wonder if it would be worth
-having a mechanism for implementations to register a list of supported events
-with the perf subsystem that could be exported through debugfs. The perf tools
-could then read this to produce the list of events and would show all events
-that were available.
+On ARMv6 onwards (where this user RO, kernel RO is supported) we cannot
+easily differentiate between the vectors page and a normal kernel page
+unless we use another L_PTE_ bit. We need the vectors page to be
+writable if there is no TLS register in hardware (I guess we could use
+domain switching to override this though). But on ARMv7 we always have a
+TLS register, so no need to write to the vectors page.
 
-Jamie
+-- 
+Catalin
