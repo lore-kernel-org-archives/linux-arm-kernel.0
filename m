@@ -1,84 +1,89 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 7 Jan 2010 15:39:16 +0100
-Subject: SMP issues on ARM11 MPCore
-In-Reply-To: <1687fa361001070545q73e6738apd6ce5650316eca26@mail.gmail.com>
-References: <SNT109-W391FD03251D32533FAE84DA77F0@phx.gbl>
-	<1687fa361001070250l62628061h4bebaca1c03d2638@mail.gmail.com>
-	<1687fa361001070545q73e6738apd6ce5650316eca26@mail.gmail.com>
-Message-ID: <20100107143916.GA24990@pengutronix.de>
+From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
+Date: Thu, 07 Jan 2010 18:02:27 +0100
+Subject: Perf Event support for ARMv7 (was: Re: [PATCH 5/5] arm/perfevents:
+	implement perf event support for ARMv6)
+In-Reply-To: <20100106153034.GV4179@wear.picochip.com>
+References: <1260875712-29712-1-git-send-email-jamie.iles@picochip.com>
+	<200912221751.39662.jpihet@mvista.com> <20091228075748.GC20039@elte.hu>
+	<200912291452.16856.jpihet@mvista.com>
+	<20091229163252.GA12409@gallagher>
+	<op.u53904ge7p4s8u@localhost> <20100106153034.GV4179@wear.picochip.com>
+Message-ID: <op.u559mdlm7p4s8u@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dirk,
+> On Wed, Jan 06, 2010 at 04:16:06PM +0100, Micha? Nazarewicz wrote:
+>> Since I [...] will probably need to port tools/perf on ARM as well,
+>> would you care to post any patches of your work in this area?
 
-On Thu, Jan 07, 2010 at 02:45:11PM +0100, Dirk Behme wrote:
-> > ?Unable to handle kernel NULL pointer dereference at virtual address 00000000
-> > ?pgd = cc37c000
-> > ?[00000000] *pgd=8c38f031, *pte=00000000, *ppte=00000000
-> > ?Internal error: Oops: 17 [#1] SMP
-> > ?last sysfs file:
-> > ?Modules linked in: [last unloaded: module]
-> > ?CPU: 0 ? ?Not tainted ?(2.6.32-00012-g89b993e-dirty #17)
-> > ?PC is at strcmp+0x8/0x34
-> > ?LR is at sysfs_find_dirent+0x18/0x38
-> > ?pc : [<c094bd8c>] ? ?lr : [<c08ede4c>] ? ?psr: a0000013
-> > ?sp : cc26bef8 ?ip : 00000000 ?fp : 00000000
-> > ?r10: 40025000 ?r9 : cc26a000 ?r8 : 00000880
-> > ?r7 : cc26bf44 ?r6 : 00000000 ?r5 : 00000000 ?r4 : cc326428
-> > ?r3 : 000009b3 ?r2 : 00000000 ?r1 : 00000000 ?r0 : 00000000
-> > ?Flags: NzCv ?IRQs on ?FIQs on ?Mode SVC_32 ?ISA ARM ?Segment user
-> > ?Control: 08c5787d ?Table: 8c37c00a ?DAC: 00000015
-> > ?Process rmmod (pid: 378, stack limit = 0xcc26a270)
-> > ?Stack: (0xcc26bef8 to 0xcc26c000)
-> > ?bee0: ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cc3263f8 00000000
-> > ?bf00: 00000000 c08ec918 cc3263f8 00000000 00000000 00000000 00000000 ccd961e0
-> > ?bf20: 00000000 c087de50 bf000074 bf000074 00000000 c087e214 00000000 c087e550
-> > ?bf40: 00000001 75646f6d cc00656c cc37d000 cc25ba20 cc25ba64 cc25ba54 00000000
-> > ?bf60: 40025000 00000000 40025000 00000001 cc26a000 4002501c bef869c4 0089e8e8
-> > ?bf80: bf000074 00000880 cc26bf8c 00000000 be00656c 400256c0 00000000 00000081
-> > ?bfa0: c0842224 c08420a0 be00656c 400256c0 bef86b80 00000880 00000000 75646f6d
-> > ?bfc0: be00656c 400256c0 00000000 00000081 00000059 00000000 40025000 00000000
-> > ?bfe0: bef86b80 bef86b70 00012fe0 400e7740 60000010 bef86b80 00000000 00000000
-> > ?[<c094bd8c>] (strcmp+0x8/0x34) from [<c08ede4c>] (sysfs_find_dirent+0x18/0x38)
-> > ?[<c08ede4c>] (sysfs_find_dirent+0x18/0x38) from [<c08ec918>]
-> > (sysfs_hash_and_remove+0x28/0x60)
-> > ?[<c08ec918>] (sysfs_hash_and_remove+0x28/0x60) from [<c087de50>]
-> > (free_notes_attrs+0x2c/0x4c)
-> > ?[<c087de50>] (free_notes_attrs+0x2c/0x4c) from [<c087e214>]
-> > (free_module+0x2c/0xdc)
-> > ?[<c087e214>] (free_module+0x2c/0xdc) from [<c087e550>]
-> > (sys_delete_module+0x214/0x250)
-> > ?[<c087e550>] (sys_delete_module+0x214/0x250) from [<c08420a0>]
-> > (ret_fast_syscall+0x0/0x2c)
-> 
-> Debugging of above call stack shows:
-> 
-> strcmp() fails due to both parameters, cs and ct being NULL.
-> 
-> Function free_module() gets 'struct module *mod' as parameter. This
-> has an element
-> 
-> mod->notes_attrs->attrs[0].attr.name
-> 
-> In case of module's init and exit function are _both_ marked with
-> __init/__exit, this name is NULL. This is then parsed down by above
-> call stack and let strcmp() fail.
-> 
-> In case init and/or exit function in above module don't have
-> __init/__exit, name is a valid pointer.
-> 
-> Any idea what might cause this?
-> 
-> Many thanks and best regards
-does
+On Wed, 06 Jan 2010 16:30:34 +0100, Jamie Iles <jamie@jamieiles.com> wrote:
+> The patches are in tip/master. [...] They should also be in Linus' tree.
 
-	http://svn.debian.org/wsvn/kernel/dists/trunk/linux-2.6/debian/patches/bugfix/all/modules-Skip-empty-section-notes.patch
+Ah, thank you.  Now I don't know why I couldn't find it previously...
 
-help you?
+BTW. Did anyone got problems with stack protector? My ld complained it
+could not find ssp_nonshared when checking for libelf.  I think the "-c"
+should be dropped from the -fstack-protector-all support checking in
+Makefile (diff included at the end of mail).
 
-Best regards
-Uwe
+
+>> what's the idea behind tools/perf utility. As far as I understand it
+>> provides a few generalized events and all other events are accessed via
+>> critic r### [...] tool might be hard to use since users don't tend to
+>> remember such numbers.  [...] perf would require front-end which would
+>> provide textual description for those mysterious r###.
+
+> True. However, for simple profiling, cycle counts are often enough plus all of
+> the software events are always available. I do wonder if it would be worth
+> having a mechanism for implementations to register a list of supported events
+> with the perf subsystem that could be exported through debugfs. The perf tools
+> could then read this to produce the list of events and would show all events
+> that were available.
+
+I would also consider using sysfs (/sys/devices/system/cpu/perf-events?) since
+one may lack debugfs in their kernel.  It can be argued that if someone wants
+to use performance counters we might just require debugfs however personally
+I'd hate such requirement and prefer this information to be placed in sysfs.
+
+
+Lets not argue about details though.  More important question is whether
+such information is needed at all and I believe it is.
+
+I agree that in many (if not most) cases the generalized events are enough
+but imagine this poor fellow who needs to look through 1k-page CPU reference
+manual to find "raw" event number because he wants to do more in-depth
+profiling.
+
+In my opinion, if the utility is to be widely used such database will be
+created at one point or another and it can be either in kernel or user
+space (some front-ends for pref cold emerge or maybe there'll be some other
+utility that uses the same API and has its own database).  Furthermore,
+I believe it's better done in kernel because it knows better what CPU
+system is running on and what it supports.
+
+So if you ask me I say that such list is needed, is needed to be done
+in kernel and besides raw numbers should provide some textual names for
+events so for example the same name can be used on two different
+ARM CPUs which use different event number for the very same event.
+
+
+And promised diff:
+--
+diff --git a/tools/perf/Makefile b/tools/perf/Makefile
+index 652a470..434c5ec 100644
+--- a/tools/perf/Makefile
++++ b/tools/perf/Makefile
+@@ -250,7 +250,7 @@ PTHREAD_LIBS = -lpthread
+  # explicitly what architecture to check for. Fix this up for yours..
+  SPARSE_FLAGS = -D__BIG_ENDIAN__ -D__powerpc__
+
+-ifeq ($(shell sh -c "echo 'int foo(void) {char X[2]; return 3;}' | $(CC) -x c -c -Werror -fstack-protector-all - -o /dev/null "$(QUIET_STDERR)" && echo y"), y)
++ifeq ($(shell sh -c "echo 'int foo(void) {char X[2]; return 3;}' | $(CC) -x c -Werror -fstack-protector-all - -o /dev/null "$(QUIET_STDERR)" && echo y"), y)
+    CFLAGS := $(CFLAGS) -fstack-protector-all
+  endif
 
 -- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Best regards,                                           _     _
+  .o. | Liege of Serenely Enlightened Majesty of       o' \,=./ `o
+  ..o | Computer Science,  Micha? "mina86" Nazarewicz     (o o)
+  ooo +---<mina86@mina86.com>---<mina86@jabber.org>---ooO--(_)--Ooo--
