@@ -1,71 +1,50 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Thu, 07 Jan 2010 14:39:21 +1100
-Subject: [PATCH 2/3] arm: change command_line to cmd_line, and export it
-In-Reply-To: <1262835561.887063.943450380979.0.gpush@pororo>
-Message-ID: <1262835561.887931.658428747865.2.gpush@pororo>
+From: abhijitpagare@ti.com (Pagare, Abhijit)
+Date: Thu, 7 Jan 2010 10:15:16 +0530
+Subject: [PATCH 1/1] ARM: OMAP4: PM: Add check for avoiding dependency
+	related update.
+In-Reply-To: <alpine.DEB.2.00.1001061401560.10034@utopia.booyaka.com>
+References: <1261583238-22187-1-git-send-email-abhijitpagare@ti.com>
+	<alpine.DEB.2.00.0912300125320.24862@utopia.booyaka.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C02E919C@dbde02.ent.ti.com>
+	<alpine.DEB.2.00.1001051608340.21295@utopia.booyaka.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C041BB3A@dbde02.ent.ti.com>
+	<alpine.DEB.2.00.1001061401560.10034@utopia.booyaka.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C041BF11@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drivers/of/fdt expects a cmd_line symbol, while arm uses command_line.
-Change to the former and make accessible from setup.h, so that we can
-share with the fdt code.
 
-This means a change in section from .init.data to .data
+Hello Paul,
 
-Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+> -----Original Message-----
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Thursday, January 07, 2010 2:40 AM
+> To: Pagare, Abhijit
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: RE: [PATCH 1/1] ARM: OMAP4: PM: Add check for avoiding dependency
+> related update.
+> 
+> Hello Abhijit,
+> 
+> On Wed, 6 Jan 2010, Pagare, Abhijit wrote:
+> 
+> > I checked the dependency patch-set. The complete stuff looks really
+> > neat. Applying OMAP4 on top of this would be feasible. The only thing is
+> > that till the point the OMAP4 dependency patches go in the "autodeps"
+> > variable in arch/arm/clockdomain.c would not be initialized which will
+> > cause a kernel boot-crash for the functions _clkdm_add_autodeps(clkdm)
+> > and _clkdm_del_autodeps(clkdm). Hence the hack patch referred to in the
+> > subject above is essential. Should I re-post it with the missing FIXME
+> > indication that you had recommended?
+> 
+> My concern is that we don't want to forget about the OMAP4 sleep and
+> wakeup dependencies.  How long do you think it will take to add them?
 
----
- arch/arm/include/asm/setup.h |    6 ++++--
- arch/arm/kernel/setup.c      |    8 ++++----
- 2 files changed, 8 insertions(+), 6 deletions(-)
+It shouldn't take all that long. I will internally send you the auto-generated file having the dependency details soon. Do let me know if you want any modification in it. If all that's done in a couple of days then the patch above can be skipped.
 
-diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
-index f392fb4..3b6f461 100644
---- a/arch/arm/include/asm/setup.h
-+++ b/arch/arm/include/asm/setup.h
-@@ -16,8 +16,6 @@
- 
- #include <linux/types.h>
- 
--#define COMMAND_LINE_SIZE 1024
--
- /* The list ends with an ATAG_NONE node. */
- #define ATAG_NONE	0x00000000
- 
-@@ -223,6 +221,10 @@ extern struct meminfo meminfo;
- #define bank_phys_end(bank)	((bank)->start + (bank)->size)
- #define bank_phys_size(bank)	(bank)->size
- 
-+#define COMMAND_LINE_SIZE 1024
-+
-+extern char cmd_line[COMMAND_LINE_SIZE];
-+
- #endif  /*  __KERNEL__  */
- 
- #endif
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 4aa67cd..4206286 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -117,7 +117,7 @@ EXPORT_SYMBOL(elf_platform);
- 
- static const char *cpu_name;
- static const char *machine_name;
--static char __initdata command_line[COMMAND_LINE_SIZE];
-+char cmd_line[COMMAND_LINE_SIZE];
- 
- static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
- static union { char c[4]; unsigned long l; } endian_test __initdata = { { 'l', '?', '?', 'b' } };
-@@ -706,9 +706,9 @@ void __init setup_arch(char **cmdline_p)
- 	/* parse_early_param needs a boot_command_line */
- 	strlcpy(boot_command_line, from, COMMAND_LINE_SIZE);
- 
--	/* populate command_line too for later use, preserving boot_command_line */
--	strlcpy(command_line, boot_command_line, COMMAND_LINE_SIZE);
--	*cmdline_p = command_line;
-+	/* populate cmd_line too for later use, preserving boot_command_line */
-+	strlcpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE);
-+	*cmdline_p = cmd_line;
- 
- 	parse_early_param();
- 
+Regards,
+Abhijit
+
+> 
+> 
+> - Paul
