@@ -1,45 +1,58 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 7 Jan 2010 17:50:54 -0500
-Subject: [PATCH] arch/arm/common/vic.c: code reorganization
-In-Reply-To: <63386a3d1001071415r5a832252lf16b19c3261f2c62@mail.gmail.com>
-References: <BD79186B4FD85F4B8E60E381CAEE190901CBF46D@mi8nycmail19.Mi8.com>
-	<63386a3d0909180155s3032d6e7jc18b36e1b62a288f@mail.gmail.com>
-	<BD79186B4FD85F4B8E60E381CAEE190901D41EF4@mi8nycmail19.Mi8.com>
-	<20090918163111.GA2284@n2100.arm.linux.org.uk>
-	<BD79186B4FD85F4B8E60E381CAEE190901D42615@mi8nycmail19.Mi8.com>
-	<BD79186B4FD85F4B8E60E381CAEE190901DB7709@mi8nycmail19.Mi8.com>
-	<BD79186B4FD85F4B8E60E381CAEE190901DB7D84@mi8nycmail19.Mi8.com>
-	<63386a3d0910120202u5144bc7ep6b2008a71089369e@mail.gmail.com>
-	<BD79186B4FD85F4B8E60E381CAEE190901DB7EFD@mi8nycmail19.Mi8.com>
-	<BD79186B4FD85F4B8E60E381CAEE19090200F124@mi8nycmail19.Mi8.com>
-	<63386a3d1001071415r5a832252lf16b19c3261f2c62@mail.gmail.com>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE1909020895EA@mi8nycmail19.Mi8.com>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Fri, 08 Jan 2010 10:44:12 +1100
+Subject: [RFC,PATCH 2/7] arm: generic support for fixed-rate clocks
+In-Reply-To: <1262907852.736281.78480196040.1.gpush@pororo>
+Message-ID: <1262907852.736710.514100290928.2.gpush@pororo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, January 07, 2010 3:16 PM, Linus Walleij wrote:
-> 2009/12/21 H Hartley Sweeten <hartleys@visionengravers.com>:
->
->> [ARM] vic.c: reorganize code
->> This reorganizes the vic.c code in anticipation of a second patch
->> to use struct vic_device as the data stored in set_irq_chip_data().
->
-> I would love to test this patch but again cannot *for my life* decode
-> this QP stuff, having tried now for half an hour. Can you send it
-> directly as an attachment instead or even put it in Russells patch
-> tracker?
+Since we have a few fixed rate clocks, define a simple clk_fixed
+with a single rate property.
 
-What QP stuff?
+Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
 
-Russell does not like the patch tracker used as a patch review system.
-I have attached the patch, hopefully you have better results with that.
+---
+ arch/arm/common/clk.c      |    8 ++++++++
+ arch/arm/include/asm/clk.h |   13 +++++++++++++
+ 2 files changed, 21 insertions(+)
 
-Regards,
-Hartley
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: vic_reorg.patch
-Type: application/octet-stream
-Size: 9765 bytes
-Desc: vic_reorg.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100107/bcfb9b64/attachment-0001.obj>
+diff --git a/arch/arm/common/clk.c b/arch/arm/common/clk.c
+index 0357d02..699bb28 100644
+--- a/arch/arm/common/clk.c
++++ b/arch/arm/common/clk.c
+@@ -76,3 +76,11 @@ struct clk *clk_get_parent(struct clk *clk)
+ 	return ERR_PTR(-ENOSYS);
+ }
+ EXPORT_SYMBOL(clk_get_parent);
++
++#define to_clk_fixed(clk) (container_of(clk, struct clk_fixed, clk))
++
++unsigned long clk_fixed_get_rate(struct clk *clk)
++{
++	return to_clk_fixed(clk)->rate;
++}
++EXPORT_SYMBOL(clk_fixed_get_rate);
+diff --git a/arch/arm/include/asm/clk.h b/arch/arm/include/asm/clk.h
+index 87fcfae..1547fa5 100644
+--- a/arch/arm/include/asm/clk.h
++++ b/arch/arm/include/asm/clk.h
+@@ -28,6 +28,19 @@ struct clk {
+        struct clk*     (*get_parent)(struct clk *);
+ };
+ 
++/* Simple fixed-rate clock */
++struct clk_fixed {
++	struct clk	clk;
++	unsigned long	rate;
++};
++
++extern unsigned long clk_fixed_get_rate(struct clk *clk);
++
++#define DEFINE_CLK_FIXED(r) { \
++	.clk = { .get_rate = clk_fixed_get_rate }, \
++	.rate = (r) \
++};
++
+ #else /* CONFIG_HAVE_COMMON_STRUCT_CLK */
+ 
+ struct clk;
