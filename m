@@ -1,78 +1,74 @@
-From: svenkatr@ti.com (S, Venkatraman)
-Date: Thu, 7 Jan 2010 15:06:02 +0530
-Subject: [Patch v4] OMAP: sDMA driver: descriptor autoloading feature
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C041C1BD@dbde02.ent.ti.com>
-References: <1262851175.3933.5.camel@Nokia-N900-51-1>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C041C1BD@dbde02.ent.ti.com>
-Message-ID: <0680EC522D0CC943BC586913CF3768C003AF886DA0@dbde02.ent.ti.com>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Thu, 7 Jan 2010 11:46:23 +0200
+Subject: [PATCH 05/12] omap1: Add 7xx clocks and pin muxes for SPI
+In-Reply-To: <20100107001934.21352.83656.stgit@baageli.muru.com>
+References: <20100107001728.21352.38471.stgit@baageli.muru.com>
+	<20100107001934.21352.83656.stgit@baageli.muru.com>
+Message-ID: <6ed0b2681001070146x4dbf52d9h406d128ccea826cf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Venkatraman S wrote: 
-> > On Wed, Jan 6, 2010 at 6:46 PM, Adrian Hunter 
-> > <adrian.hunter@nokia.com>
-> > wrote: 
-> > > Venkatraman S wrote: 
-> > > > 
-> > > > On Tue, Dec 29, 2009 at 3:18 AM, Tony Lindgren 
-> <tony@atomide.com>
-> > wrote: 
-> > > > > 
-> > > > > * Venkatraman S <svenkatr@ti.com> [091211 07:01]: 
-> > > > > > 
-> > > > > > Here is the most updated version of the patch (thanks to 
-> > > > > > Russell's review). This patch is applicable to OMAP4xxx as 
-> > > > > > well as OMAP3630 Reference to previous posts
-> > > > > > v1? http://marc.info/?l=linux-omap&m=125012097403050&w=2
-> > > > > > v2? http://marc.info/?l=linux-omap&m=125137152606644&w=2
-> > > > > > v3? http://patchwork.kernel.org/patch/45408/
-> > > > > 
-> > > > > Do you have a patch for drivers/mmc/host/omap_hsmmc.c to use 
-> > > > > this feature? Or some other driver?
-> > > > > 
-> > > > > Regards,
-> > > > > 
-> > > > > Tony
-> > > > 
-> > > > I am about to start working on omap_hsmmc to use the descriptor 
-> > > > load feature. If the DMA changes are acceptable, I can post the 
-> > > > driver patch as well.
-> > > 
-> > > I presume this is about performance.? How does it compare 
-> to chained
-> > DMA? 
-> > > We have a patch for omap_hsmmc for chained DMA that we are still
-> > testing. 
-> > > 
-> >? The main difference would be the number of logical channels used. 
-> > With chaining, I assume you'd request for (or the API internally
-> > reserves) as many logical channels as there are segments. Here a  
-> >single logical channel would do.
-> > 
-> 
-> How does the performance compare? Which is faster? Does 
-> descriptor autoloading reduce the number of interrupts? 
-> >>
-> This should improve the perforamance compared to chaining  
-> case. This features emulates scatter gather transfers 
-> capability with minimum MPU support by removing the 
-> successive channel configuration processing and the 
-> associated interrupt handling overheads. 
-> This is apart from optimize channel resources by enabling 
-> efficient transfer ?serialization? on a single logical 
-> channel versus concurrent (multiple) logical channel usage. 
-> 
-> Regards,
-> Santosh
-> 
+<snip>
 
-We have not done full benchmark tests yet, but as Santosh mentioned,
-1) Only one logical channel is used.
-2) No interrupts are generated till the end of transfer of the entire scatterlist.
-(Infact, multiple scatterlists can be combined by the user driver to a single
-descriptor list, and no IRQs would be generated till the entire transfer completes.
-If needed, the descriptors can be programmed to generate interrupt(s) at any point.)
-This should yield better performance / CPU utilization than chaining.
+> diff --git a/arch/arm/mach-omap1/devices.c b/arch/arm/mach-omap1/devices.c
+> index 23ded2d..17ebb47 100644
+> --- a/arch/arm/mach-omap1/devices.c
+> +++ b/arch/arm/mach-omap1/devices.c
+> @@ -14,6 +14,7 @@
+> ?#include <linux/init.h>
+> ?#include <linux/platform_device.h>
+> ?#include <linux/io.h>
+> +#include <linux/spi/spi.h>
+>
+> ?#include <mach/hardware.h>
+> ?#include <asm/mach/map.h>
+> @@ -23,6 +24,7 @@
+> ?#include <plat/mux.h>
+> ?#include <mach/gpio.h>
+> ?#include <plat/mmc.h>
+> +#include <plat/omap7xx.h>
+>
+> ?/*-------------------------------------------------------------------------*/
+>
+> @@ -196,6 +198,38 @@ void __init omap1_init_mmc(struct omap_mmc_platform_data **mmc_data,
+>
+> ?/*-------------------------------------------------------------------------*/
+>
+> +/* OMAP7xx SPI support */
+> +#if defined(CONFIG_SPI_OMAP_100K) || defined(CONFIG_SPI_OMAP_100K_MODULE)
+> +
+> +struct platform_device omap_spi1 = {
+> + ? ? ? .name ? ? ? ? ? = "omap1_spi100k",
+> + ? ? ? .id ? ? ? ? ? ? = 1,
+> +};
+> +
+> +struct platform_device omap_spi2 = {
+> + ? ? ? .name ? ? ? ? ? = "omap1_spi100k",
+> + ? ? ? .id ? ? ? ? ? ? = 2,
+> +};
+> +
+> +static void omap_init_spi100k(void)
+> +{
+> + ? ? ? omap_spi1.dev.platform_data = ioremap(OMAP7XX_SPI1_BASE, 0x7ff);
+> + ? ? ? if (omap_spi1.dev.platform_data)
+> + ? ? ? ? ? ? ? platform_device_register(&omap_spi1);
+> +
+> + ? ? ? omap_spi2.dev.platform_data = ioremap(OMAP7XX_SPI2_BASE, 0x7ff);
+> + ? ? ? ifi (omap_spi2.dev.platform_data)
 
-Regards,
-Venkat.
+a typo here?
+
+> + ? ? ? ? ? ? ? platform_device_register(&omap_spi2);
+> +}
+> +
+> +#else
+> +static inline void omap_init_spi100k(void)
+> +{
+> +}
+> +#endif
+> +
+> +/*-------------------------------------------------------------------------*/
+> +
+> ?#if defined(CONFIG_OMAP_STI)
+>
+> ?#define OMAP1_STI_BASE ? ? ? ? 0xfffea000
