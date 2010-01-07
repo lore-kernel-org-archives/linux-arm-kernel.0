@@ -1,118 +1,76 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 06 Jan 2010 18:22:26 -0700
-Subject: [PATCH v2 5/5] OMAP2 clock: dynamically allocate CPUFreq frequency
-	table
+Date: Wed, 06 Jan 2010 18:22:22 -0700
+Subject: [PATCH v2 4/5] OMAP clock/CPUFreq: add clk_exit_cpufreq_table()
 In-Reply-To: <20100107011932.3551.75659.stgit@localhost.localdomain>
 References: <20100107011932.3551.75659.stgit@localhost.localdomain>
-Message-ID: <20100107012222.3551.97749.stgit@localhost.localdomain>
+Message-ID: <20100107012209.3551.29357.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dynamically allocate the CPUFreq frequency table on OMAP2xxx chips.
-This fixes some compilation problems, since the kernel may not know
-what chip it is running on until boot-time.  This also reduces the size
-of the CPUFreq frequency table.
-
-Problem originally reported by Felipe Balbi <felipe.balbi@nokia.com>.
-Thanks also for comments on the patch from Felipe and Kevin.
+A subsequent patch adds code on OMAP2xxx to dynamically allocate the
+CPUFreq frequency table in clk_init_cpufreq_table(), so for it to
+avoid a leak, it will need a corresponding function to free the
+memory.  This patch adds clk_exit_cpufreq_table() with generic
+code to call a chip-specific variant inside the clockfw_lock spinlock via
+struct clk_functions.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Felipe Balbi <felipe.balbi@nokia.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/clock2xxx.c |   52 +++++++++++++++++++++++++++++++++------
- 1 files changed, 44 insertions(+), 8 deletions(-)
+ arch/arm/plat-omap/clock.c              |   10 ++++++++++
+ arch/arm/plat-omap/cpu-omap.c           |    1 +
+ arch/arm/plat-omap/include/plat/clock.h |    2 ++
+ 3 files changed, 13 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clock2xxx.c b/arch/arm/mach-omap2/clock2xxx.c
-index ce6742f..5420356 100644
---- a/arch/arm/mach-omap2/clock2xxx.c
-+++ b/arch/arm/mach-omap2/clock2xxx.c
-@@ -449,14 +449,16 @@ int omap2_select_table_rate(struct clk *clk, unsigned long rate)
- #ifdef CONFIG_CPU_FREQ
- /*
-  * Walk PRCM rate table and fillout cpufreq freq_table
-+ * XXX This should be replaced by an OPP layer in the near future
-  */
--static struct cpufreq_frequency_table freq_table[ARRAY_SIZE(rate_table)];
-+static struct cpufreq_frequency_table *freq_table;
- 
- void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
- {
--	struct prcm_config *prcm;
-+	const struct prcm_config *prcm;
- 	long sys_ck_rate;
- 	int i = 0;
-+	int tbl_sz = 0;
- 
- 	sys_ck_rate = clk_get_rate(sclk);
- 
-@@ -470,22 +472,55 @@ void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
- 		if (prcm->dpll_speed == prcm->xtal_speed)
- 			continue;
- 
--		freq_table[i].index = i;
--		freq_table[i].frequency = prcm->mpu_speed / 1000;
--		i++;
-+		tbl_sz++;
- 	}
- 
--	if (i == 0) {
--		printk(KERN_WARNING "%s: failed to initialize frequency "
--		       "table\n", __func__);
-+	/*
-+	 * XXX Ensure that we're doing what CPUFreq expects for this error
-+	 * case and the following one
-+	 */
-+	if (tbl_sz == 0) {
-+		pr_warning("%s: no matching entries in rate_table\n",
-+			   __func__);
- 		return;
- 	}
- 
-+	/* Include the CPUFREQ_TABLE_END terminator entry */
-+	tbl_sz++;
-+
-+	freq_table = kzalloc(sizeof(struct cpufreq_frequency_table) * tbl_sz,
-+			     GFP_ATOMIC);
-+	if (!freq_table) {
-+		pr_err("%s: could not kzalloc frequency table\n", __func__);
-+		return;
-+	}
-+
-+	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
-+		if (!(prcm->flags & cpu_mask))
-+			continue;
-+		if (prcm->xtal_speed != sys_ck_rate)
-+			continue;
-+
-+		/* don't put bypass rates in table */
-+		if (prcm->dpll_speed == prcm->xtal_speed)
-+			continue;
-+
-+		freq_table[i].index = i;
-+		freq_table[i].frequency = prcm->mpu_speed / 1000;
-+		i++;
-+	}
-+
- 	freq_table[i].index = i;
- 	freq_table[i].frequency = CPUFREQ_TABLE_END;
- 
- 	*table = &freq_table[0];
+diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
+index a64d84c..d9f8c84 100644
+--- a/arch/arm/plat-omap/clock.c
++++ b/arch/arm/plat-omap/clock.c
+@@ -329,6 +329,16 @@ void clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
+ 		arch_clock->clk_init_cpufreq_table(table);
+ 	spin_unlock_irqrestore(&clockfw_lock, flags);
  }
 +
-+void omap2_clk_exit_cpufreq_table(struct cpufreq_frequency_table **table)
++void clk_exit_cpufreq_table(struct cpufreq_frequency_table **table)
 +{
-+	kfree(freq_table);
-+}
++	unsigned long flags;
 +
++	spin_lock_irqsave(&clockfw_lock, flags);
++	if (arch_clock->clk_exit_cpufreq_table)
++		arch_clock->clk_exit_cpufreq_table(table);
++	spin_unlock_irqrestore(&clockfw_lock, flags);
++}
  #endif
  
- struct clk_functions omap2_clk_functions = {
-@@ -497,6 +532,7 @@ struct clk_functions omap2_clk_functions = {
- 	.clk_disable_unused	= omap2_clk_disable_unused,
- #ifdef	CONFIG_CPU_FREQ
- 	.clk_init_cpufreq_table	= omap2_clk_init_cpufreq_table,
-+	.clk_exit_cpufreq_table	= omap2_clk_exit_cpufreq_table,
+ /*-------------------------------------------------------------------------*/
+diff --git a/arch/arm/plat-omap/cpu-omap.c b/arch/arm/plat-omap/cpu-omap.c
+index f8ddbdd..6d3d333 100644
+--- a/arch/arm/plat-omap/cpu-omap.c
++++ b/arch/arm/plat-omap/cpu-omap.c
+@@ -134,6 +134,7 @@ static int __init omap_cpu_init(struct cpufreq_policy *policy)
+ 
+ static int omap_cpu_exit(struct cpufreq_policy *policy)
+ {
++	clk_exit_cpufreq_table(&freq_table);
+ 	clk_put(mpu_clk);
+ 	return 0;
+ }
+diff --git a/arch/arm/plat-omap/include/plat/clock.h b/arch/arm/plat-omap/include/plat/clock.h
+index 309b6d1..94fe2a0 100644
+--- a/arch/arm/plat-omap/include/plat/clock.h
++++ b/arch/arm/plat-omap/include/plat/clock.h
+@@ -119,6 +119,7 @@ struct clk_functions {
+ 	void		(*clk_disable_unused)(struct clk *clk);
+ #ifdef CONFIG_CPU_FREQ
+ 	void		(*clk_init_cpufreq_table)(struct cpufreq_frequency_table **);
++	void		(*clk_exit_cpufreq_table)(struct cpufreq_frequency_table **);
  #endif
  };
  
+@@ -135,6 +136,7 @@ extern unsigned long followparent_recalc(struct clk *clk);
+ extern void clk_enable_init_clocks(void);
+ #ifdef CONFIG_CPU_FREQ
+ extern void clk_init_cpufreq_table(struct cpufreq_frequency_table **table);
++extern void clk_exit_cpufreq_table(struct cpufreq_frequency_table **table);
+ #endif
+ 
+ extern const struct clkops clkops_null;
