@@ -1,32 +1,34 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 06 Jan 2010 16:20:21 -0800
-Subject: [PATCH 09/12] omap3: add missing parentheses
+Date: Wed, 06 Jan 2010 16:20:32 -0800
+Subject: [PATCH 10/12] omap3: add missing parentheses
 In-Reply-To: <20100107001728.21352.38471.stgit@baageli.muru.com>
 References: <20100107001728.21352.38471.stgit@baageli.muru.com>
-Message-ID: <20100107002021.21352.68495.stgit@baageli.muru.com>
+Message-ID: <20100107002032.21352.77140.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Roel Kluin <roel.kluin@gmail.com>
 
-not(!) has a higher precedence than bit and(&).
+`!' has a higher precedence than `&' so parentheses are required.
 
 Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/plat-omap/include/plat/control.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/pm34xx.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/plat-omap/include/plat/control.h b/arch/arm/plat-omap/include/plat/control.h
-index 2ae8843..a745d62 100644
---- a/arch/arm/plat-omap/include/plat/control.h
-+++ b/arch/arm/plat-omap/include/plat/control.h
-@@ -147,7 +147,7 @@
- #define OMAP343X_CONTROL_IVA2_BOOTADDR	(OMAP2_CONTROL_GENERAL + 0x0190)
- #define OMAP343X_CONTROL_IVA2_BOOTMOD	(OMAP2_CONTROL_GENERAL + 0x0194)
- #define OMAP343X_CONTROL_DEBOBS(i)	(OMAP2_CONTROL_GENERAL + 0x01B0 \
--					+ ((i) >> 1) * 4 + (!(i) & 1) * 2)
-+					+ ((i) >> 1) * 4 + (!((i) & 1)) * 2)
- #define OMAP343X_CONTROL_PROG_IO0	(OMAP2_CONTROL_GENERAL + 0x01D4)
- #define OMAP343X_CONTROL_PROG_IO1	(OMAP2_CONTROL_GENERAL + 0x01D8)
- #define OMAP343X_CONTROL_DSS_DPLL_SPREADING	(OMAP2_CONTROL_GENERAL + 0x01E0)
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 81ed252..c6cc809 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -124,8 +124,8 @@ static void omap3_core_save_context(void)
+ 	control_padconf_off |= START_PADCONF_SAVE;
+ 	omap_ctrl_writel(control_padconf_off, OMAP343X_CONTROL_PADCONF_OFF);
+ 	/* wait for the save to complete */
+-	while (!omap_ctrl_readl(OMAP343X_CONTROL_GENERAL_PURPOSE_STATUS)
+-			& PADCONF_SAVE_DONE)
++	while (!(omap_ctrl_readl(OMAP343X_CONTROL_GENERAL_PURPOSE_STATUS)
++			& PADCONF_SAVE_DONE))
+ 		;
+ 	/* Save the Interrupt controller context */
+ 	omap_intc_save_context();
