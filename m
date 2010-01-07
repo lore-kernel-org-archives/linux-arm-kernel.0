@@ -1,45 +1,48 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 06 Jan 2010 18:21:59 -0700
-Subject: [PATCH v2 0/5] OMAP clock/OPP fixes for 2.6.33-rc
-Message-ID: <20100107011932.3551.75659.stgit@localhost.localdomain>
+Date: Wed, 06 Jan 2010 18:22:05 -0700
+Subject: [PATCH v2 2/5] OMAP2xxx clock: clk2xxx.c doesn't compile if CPUFREQ
+	is enabled
+In-Reply-To: <20100107011932.3551.75659.stgit@localhost.localdomain>
+References: <20100107011932.3551.75659.stgit@localhost.localdomain>
+Message-ID: <20100107012201.3551.91538.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Felipe Balbi <felipe.balbi@nokia.com>
 
-This series contains OMAP clock/OPP fixes for 2.6.33-rc.  It
-applies against the last set of fixes sent to Tony, which in turn
-applies against 2.6.33-rc3.
+if we enable CPUFREQ we can't build omap2 for two reasons,
+one of them is fixed by the patch below.
 
-The most important patch here is Cory's OMAP1 clock fix; the
-others are relatively minor.
+It's failing because the __must_be_array() check in
+ARRAY_SIZE() is failing and printing the following message:
 
-This second version of this series rearranges the patches to add
-clk_exit_cpufreq_table() first, then rolls the OMAP2xxx deallocation
-table together with the allocation patch.
+arch/arm/mach-omap2/clock2xxx.c:453: error: negative width in bit-field '<anonymous>'
 
-
-- Paul
-
+Signed-off-by: Felipe Balbi <felipe.balbi@nokia.com>
+[paul at pwsan.com: commit message updated; changed rate variable name]
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
+ arch/arm/mach-omap2/clock2xxx.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
 
-Cory Maccarrone (1):
-      OMAP1 clock: remove __initdata from struct clk_functions to prevent crash
-
-Felipe Balbi (1):
-      OMAP2xxx clock: clk2xxx.c doesn't compile if CPUFREQ is enabled
-
-Paul Walmsley (3):
-      OMAP2xxx OPP: clean up comments in OPP data
-      OMAP clock/CPUFreq: add clk_exit_cpufreq_table()
-      OMAP2 clock: dynamically allocate CPUFreq frequency table
-
-
- arch/arm/mach-omap1/clock_data.c        |    2 +
- arch/arm/mach-omap2/clock2xxx.c         |   57 ++++++++++++++++++++++++++-----
- arch/arm/mach-omap2/opp2420_data.c      |   38 +++++++++++----------
- arch/arm/mach-omap2/opp2430_data.c      |   30 ++++++++--------
- arch/arm/plat-omap/clock.c              |   10 +++++
- arch/arm/plat-omap/cpu-omap.c           |    1 +
- arch/arm/plat-omap/include/plat/clock.h |    2 +
- 7 files changed, 97 insertions(+), 43 deletions(-)
+diff --git a/arch/arm/mach-omap2/clock2xxx.c b/arch/arm/mach-omap2/clock2xxx.c
+index d0e3fb7..ce6742f 100644
+--- a/arch/arm/mach-omap2/clock2xxx.c
++++ b/arch/arm/mach-omap2/clock2xxx.c
+@@ -455,12 +455,15 @@ static struct cpufreq_frequency_table freq_table[ARRAY_SIZE(rate_table)];
+ void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
+ {
+ 	struct prcm_config *prcm;
++	long sys_ck_rate;
+ 	int i = 0;
+ 
++	sys_ck_rate = clk_get_rate(sclk);
++
+ 	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
+ 		if (!(prcm->flags & cpu_mask))
+ 			continue;
+-		if (prcm->xtal_speed != sys_ck.rate)
++		if (prcm->xtal_speed != sys_ck_rate)
+ 			continue;
+ 
+ 		/* don't put bypass rates in table */
