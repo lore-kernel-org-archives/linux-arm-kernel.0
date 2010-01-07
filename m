@@ -1,46 +1,65 @@
 From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 7 Jan 2010 13:14:57 +0530
-Subject: [PATCH] ARM: include needed linux/cpu.h in asm/cpu.h
-In-Reply-To: <1262518489-6867-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1262518489-6867-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C041C104@dbde02.ent.ti.com>
+Date: Thu, 7 Jan 2010 14:35:59 +0530
+Subject: [Patch v4] OMAP: sDMA driver: descriptor autoloading feature
+In-Reply-To: <1262851175.3933.5.camel@Nokia-N900-51-1>
+References: <1262851175.3933.5.camel@Nokia-N900-51-1>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C041C1BD@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
-Any comments on this patch ?
-> -----Original Message-----
-> From: Shilimkar, Santosh
-> Sent: Sunday, January 03, 2010 5:05 PM
-> To: linux at arm.linux.org.uk
-> Cc: linux-arm-kernel at lists.infradead.org; tony at atomide.com; Shilimkar, Santosh
-> Subject: [PATCH] ARM: include needed linux/cpu.h in asm/cpu.h
+
+________________________________________
+From: adrian.hunter@nokia.com [mailto:adrian.hunter at nokia.com] 
+Sent: Thursday, January 07, 2010 1:30 PM
+To: S, Venkatraman
+Cc: tony at atomide.com; linux at arm.linux.org.uk; Shilimkar, Santosh; khilman at deeprootsystems.com; linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; jarkko.lavinen at nokia.com
+Subject: Re: [Patch v4] OMAP: sDMA driver: descriptor autoloading feature
+
+Venkatraman S wrote: 
+> On Wed, Jan 6, 2010 at 6:46 PM, Adrian Hunter <adrian.hunter@nokia.com> 
+> wrote: 
+> > Venkatraman S wrote: 
+> > > 
+> > > On Tue, Dec 29, 2009 at 3:18 AM, Tony Lindgren <tony@atomide.com> 
+> wrote: 
+> > > > 
+> > > > * Venkatraman S <svenkatr@ti.com> [091211 07:01]: 
+> > > > > 
+> > > > > Here is the most updated version of the patch (thanks to Russell's 
+> > > > > review). This patch is applicable to OMAP4xxx as well as OMAP3630 
+> > > > > Reference to previous posts 
+> > > > > v1? http://marc.info/?l=linux-omap&m=125012097403050&w=2 
+> > > > > v2? http://marc.info/?l=linux-omap&m=125137152606644&w=2 
+> > > > > v3? http://patchwork.kernel.org/patch/45408/ 
+> > > > 
+> > > > Do you have a patch for drivers/mmc/host/omap_hsmmc.c to 
+> > > > use this feature? Or some other driver? 
+> > > > 
+> > > > Regards, 
+> > > > 
+> > > > Tony 
+> > > 
+> > > I am about to start working on omap_hsmmc to use the descriptor load 
+> > > feature. If the DMA changes are acceptable, I can post the driver 
+> > > patch as well. 
+> > 
+> > I presume this is about performance.? How does it compare to chained 
+> DMA? 
+> > We have a patch for omap_hsmmc for chained DMA that we are still 
+> testing. 
+> > 
+>? The main difference would be the number of logical channels used. 
+> With chaining, I assume you'd request for (or the API internally 
+> reserves) as many logical channels as there are segments. Here a 
+> single logical channel would do. 
 > 
-> The file arch/arm/include/asm/cpu.h needs to include 'linux/cpu.h' to
-> meet its dependency. Otherwise when using "struct cpuinfo_arm" and including
-> just 'asm/cpu.h' throws below error -
-> 	arch/arm/include/asm/cpu.h:16: error: field 'cpu' has incomplete type
-> 
-> To fix this  otherway, one can also include both linux/cpu.h and asm/cpu.h
-> ubut it shoudn't be that way. So this patch fixes this by including the
-> linux/cpu.h in asm/cpu.h,so that including alone asm/cpu.h is enough.
-> 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/include/asm/cpu.h |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/cpu.h b/arch/arm/include/asm/cpu.h
-> index 634b2d7..7939681 100644
-> --- a/arch/arm/include/asm/cpu.h
-> +++ b/arch/arm/include/asm/cpu.h
-> @@ -11,6 +11,7 @@
->  #define __ASM_ARM_CPU_H
-> 
->  #include <linux/percpu.h>
-> +#include <linux/cpu.h>
-> 
->  struct cpuinfo_arm {
->  	struct cpu	cpu;
-> --
-> 1.6.0.4
+
+How does the performance compare? Which is faster? Does descriptor autoloading reduce the number of interrupts? 
+>>
+This should improve the perforamance compared to chaining  case. This features emulates
+scatter gather transfers capability with minimum MPU support by removing the
+successive channel configuration processing and the associated interrupt handling overheads. 
+This is apart from optimize channel resources by enabling efficient transfer ?serialization? on a single logical channel versus concurrent (multiple) logical channel usage. 
+
+Regards,
+Santosh
