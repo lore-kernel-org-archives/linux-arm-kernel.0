@@ -1,33 +1,69 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 6 Jan 2010 23:40:21 -0700 (MST)
-Subject: [PATCH 1/1] ARM: OMAP4: PM: Add check for avoiding dependency
-	related update.
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C041BF11@dbde02.ent.ti.com>
-References: <1261583238-22187-1-git-send-email-abhijitpagare@ti.com>
-	<alpine.DEB.2.00.0912300125320.24862@utopia.booyaka.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C02E919C@dbde02.ent.ti.com>
-	<alpine.DEB.2.00.1001051608340.21295@utopia.booyaka.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C041BB3A@dbde02.ent.ti.com>
-	<alpine.DEB.2.00.1001061401560.10034@utopia.booyaka.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C041BF11@dbde02.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1001062334540.10034@utopia.booyaka.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 7 Jan 2010 07:52:32 +0100
+Subject: sharp c-3000 aka spitz: fix warn_on introduced in 2.6.32-rc1
+In-Reply-To: <f17812d71001052317h2bf25fady6bd729b35ef6db63@mail.gmail.com>
+References: <20100106071026.GD1382@ucw.cz>
+	<f17812d71001052317h2bf25fady6bd729b35ef6db63@mail.gmail.com>
+Message-ID: <20100107065230.GA1303@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Jan 2010, Pagare, Abhijit wrote:
+On Wed 2010-01-06 15:17:39, Eric Miao wrote:
+> On Wed, Jan 6, 2010 at 3:10 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> >
+> > Sharp-SL code uses strange, complex grouping of gpios for wakeups
+> > toggling. Fortunately, it is unneeded in recent kernels (and actually
+> > provokes WARN_ONs during resume). Remove it.
+> >
+> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> 
+> Pavel,
+> 
+> The code to be removed below is used to support pxa27x_keypad
+> to be able to resume from sleep. What's the exact reason to remove
+> this on spitz?
 
-> It shouldn't take all that long. I will internally send you the 
-> auto-generated file having the dependency details soon. Do let me know 
-> if you want any modification in it. If all that's done in a couple of 
-> days then the patch above can be skipped.
+Well, otherwise I get this during resume: (2.6.32 regression)
 
-That sounds great.  As far as I know, the only public branch that contains 
-your OMAP4 patches so far is the for_2.6.34 branch on my git server.  It's 
-not in mainline yet.  So let's see if we can get that fixed up with the 
-sleep and wakeup dependencies.
+(and similar for matrix-keypad, but dmitry worked around that
+already).
 
-If people are actually using code from the for_2.6.34 branch to boot their 
-OMAP4 SDPs, I'd be happy to post a derivative branch with your temporary 
-fixup patch added for them to use instead.  Would that be useful?
+Problem is that gpio-keys and matrix-keypad want to set_wake for each
+gpio individually, hw can do that, but pxa27x.c breaks it.
 
-- Paul
+I don't get it; what is pxa27x_keypad used on? It looks like
+matrix-keypad subset.
+
+								Pavel
+
+pxa2xx-spi pxa2xx-spi.2: resume
+sharp-scoop sharp-scoop.0: resume
+matrix-keypad matrix-keypad: resume
+gpio-keys gpio-keys: resume
+------------[ cut here ]------------
+WARNING: at kernel/irq/manage.c:361 set_irq_wake+0x7c/0x138()
+Unbalanced IRQ 191 wake disable
+Modules linked in:
+[<c0024900>] (unwind_backtrace+0x0/0xe4) from [<c00354f4>] (warn_slowpath_common+0x4c/0x80)
+[<c00354f4>] (warn_slowpath_common+0x4c/0x80) from [<c0035564>] (warn_slowpath_fmt+0x28/0x38)
+[<c0035564>] (warn_slowpath_fmt+0x28/0x38) from [<c00622f4>] (set_irq_wake+0x7c/0x138)
+[<c00622f4>] (set_irq_wake+0x7c/0x138) from [<c01d2370>] (gpio_keys_resume+0x94/0xd0)
+[<c01d2370>] (gpio_keys_resume+0x94/0xd0) from [<c0193a50>] (platform_pm_resume+0x30/0x54)
+[<c0193a50>] (platform_pm_resume+0x30/0x54) from [<c01961e4>] (pm_op+0xa0/0xc0)
+[<c01961e4>] (pm_op+0xa0/0xc0) from [<c0196c94>] (dpm_resume_end+0x100/0x474)
+[<c0196c94>] (dpm_resume_end+0x100/0x474) from [<c005ef7c>] (suspend_devices_and_enter+0x8c/0x1dc)
+[<c005ef7c>] (suspend_devices_and_enter+0x8c/0x1dc) from [<c005f1b4>] (enter_state+0xe8/0x120)
+[<c005f1b4>] (enter_state+0xe8/0x120) from [<c005e8b8>] (state_store+0x90/0xc4)
+[<c005e8b8>] (state_store+0x90/0xc4) from [<c01481a4>] (kobj_attr_store+0x1c/0x24)
+[<c01481a4>] (kobj_attr_store+0x1c/0x24) from [<c00daab0>] (sysfs_write_file+0x104/0x18c)
+[<c00daab0>] (sysfs_write_file+0x104/0x18c) from [<c00922cc>] (vfs_write+0xb0/0x164)
+[<c00922cc>] (vfs_write+0xb0/0x164) from [<c0092450>] (sys_write+0x40/0x70)
+[<c0092450>] (sys_write+0x40/0x70) from [<c001ff60>] (ret_fast_syscall+0x0/0x28)
+---[ end trace d1b2070efbc838e4 ]---
+leds-gpio leds-gpio: resume
+sharpsl-nand sharpsl-nand: resume
+
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
