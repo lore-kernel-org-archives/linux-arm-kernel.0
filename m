@@ -1,100 +1,17 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 7 Jan 2010 14:13:30 +0000
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 7 Jan 2010 15:39:16 +0100
 Subject: SMP issues on ARM11 MPCore
 In-Reply-To: <1687fa361001070545q73e6738apd6ce5650316eca26@mail.gmail.com>
 References: <SNT109-W391FD03251D32533FAE84DA77F0@phx.gbl>
 	<1687fa361001070250l62628061h4bebaca1c03d2638@mail.gmail.com>
 	<1687fa361001070545q73e6738apd6ce5650316eca26@mail.gmail.com>
-Message-ID: <20100107141330.GA899@n2100.arm.linux.org.uk>
+Message-ID: <20100107143916.GA24990@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I think you need to ask the authors of the module code / note code.
+Hi Dirk,
 
 On Thu, Jan 07, 2010 at 02:45:11PM +0100, Dirk Behme wrote:
-> On Thu, Jan 7, 2010 at 11:50 AM, Dirk Behme <dirk.behme@googlemail.com> wrote:
-> > On Thu, Dec 24, 2009 at 4:27 PM, mkl lin <mkl0301@hotmail.com> wrote:
-> >>
-> >> hi,
-> >>
-> >> I'm using ARM11 MPCore with 2 CPU, Linux-2.6.31.1, SMP enabled, L1 enabled, L2 disabled
-> >>
-> >> Under SMP environment, I have observed following issues:
-> >>
-> >> case 1
-> >> Sometimes, console became extremely slow, print 1 character for 1-2 seconds
-> >> RVDS say that both CPU are idling. ?kernel seems find because messages ?response to inserting USB flash is quick and correct.
-> >>
-> >> case 2
-> >> Sometimes, ?the Linux console halt and canot accept any input.
-> >> RVDS say that both CPU are idling. ?kernel seems fine because messages ?response to inserting USB flash is quick and correct.
-> >>
-> >> case 3
-> >> Sometimes, the test stop with no reason or some fault like segmantation fault and return to console prompt or login prompt.
-> >>
-> >> case 4
-> >> Sometimes,
-> >> the test stop with no reason, but not returning to console prompt. The
-> >> console can accept input, but no further response, nor prompt.
-> >>
-> >> RVDS says that one CPU is idling, the other is in IRQ context, at
-> >> entry-armv.S(676) after __pabt_usr, seems like it's keeps getting
-> >> prefetch abort.
-> >>
-> >>
-> >> I can duplicate case 1 by keep inserting a simple test module.
-> >>
-> >> -------
-> >>
-> >> #include <linux/init.h>
-> >> #include <linux/module.h>
-> >>
-> >>
-> >> static int __init MYDRIVER_init(void)
-> >> {
-> >>
-> >> printk("%s: \n",__func__);
-> >> return 0;
-> >> }
-> >>
-> >> static void __exit MYDRIVER_exit(void)
-> >> {
-> >> printk("%s: \n",__func__);
-> >> }
-> >>
-> >> MODULE_AUTHOR("Mac Lin");
-> >> MODULE_DESCRIPTION("MYDRIVER");
-> >> MODULE_LICENSE("GPL");
-> >>
-> >> module_init(MYDRIVER_init);
-> >> module_exit(MYDRIVER_exit);
-> >> -------
-> >
-> > We tested above simple module on a 4 CPU ARM11 MPCore system using
-> > 2.6.32, too. Script to do this is very simple
-> >
-> >> cat test.sh
-> > insmod module.ko
-> > rmmod module.ko
-> > insmod module.ko
-> > ....
-> >
-> > This immediately results in [1] ?(user_debug=31 enabled).
-> >
-> > Doing some further investigation, we found that [1] happens only if
-> > module init and exit function are _both_ marked with __init/__exit.
-> > Removing __init or __exit or both seems to make the test (~50 times)
-> > run fine.
-> >
-> > Any further proposals for testing or debugging?
-> >
-> > Best regards
-> >
-> > Dirk
-> >
-> > [1] ~ # ./test.sh
-> > ?MYDRIVER_init
-> > ?MYDRIVER_exit
 > > ?Unable to handle kernel NULL pointer dereference at virtual address 00000000
 > > ?pgd = cc37c000
 > > ?[00000000] *pgd=8c38f031, *pte=00000000, *ppte=00000000
@@ -153,10 +70,15 @@ On Thu, Jan 07, 2010 at 02:45:11PM +0100, Dirk Behme wrote:
 > Any idea what might cause this?
 > 
 > Many thanks and best regards
-> 
-> Dirk
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+does
+
+	http://svn.debian.org/wsvn/kernel/dists/trunk/linux-2.6/debian/patches/bugfix/all/modules-Skip-empty-section-notes.patch
+
+help you?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
