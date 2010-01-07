@@ -1,35 +1,45 @@
-From: utx@penguin.cz (Stanislav Brabec)
-Date: Thu, 07 Jan 2010 23:31:23 +0100
-Subject: [patch] fix strange characters in zaurus gpio .desc
-In-Reply-To: <20100107203104.GA22681@elf.ucw.cz>
-References: <20100107203104.GA22681@elf.ucw.cz>
-Message-ID: <1262903483.5722.7.camel@utx.utx.cz>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 7 Jan 2010 17:50:54 -0500
+Subject: [PATCH] arch/arm/common/vic.c: code reorganization
+In-Reply-To: <63386a3d1001071415r5a832252lf16b19c3261f2c62@mail.gmail.com>
+References: <BD79186B4FD85F4B8E60E381CAEE190901CBF46D@mi8nycmail19.Mi8.com>
+	<63386a3d0909180155s3032d6e7jc18b36e1b62a288f@mail.gmail.com>
+	<BD79186B4FD85F4B8E60E381CAEE190901D41EF4@mi8nycmail19.Mi8.com>
+	<20090918163111.GA2284@n2100.arm.linux.org.uk>
+	<BD79186B4FD85F4B8E60E381CAEE190901D42615@mi8nycmail19.Mi8.com>
+	<BD79186B4FD85F4B8E60E381CAEE190901DB7709@mi8nycmail19.Mi8.com>
+	<BD79186B4FD85F4B8E60E381CAEE190901DB7D84@mi8nycmail19.Mi8.com>
+	<63386a3d0910120202u5144bc7ep6b2008a71089369e@mail.gmail.com>
+	<BD79186B4FD85F4B8E60E381CAEE190901DB7EFD@mi8nycmail19.Mi8.com>
+	<BD79186B4FD85F4B8E60E381CAEE19090200F124@mi8nycmail19.Mi8.com>
+	<63386a3d1001071415r5a832252lf16b19c3261f2c62@mail.gmail.com>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE1909020895EA@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pavel Machek wrote:
-> From: Cyril Hrubis <metan@ucw.cz>
->     
-> Somehow,
-Some = my Evolution Mail
+On Thursday, January 07, 2010 3:16 PM, Linus Walleij wrote:
+> 2009/12/21 H Hartley Sweeten <hartleys@visionengravers.com>:
+>
+>> [ARM] vic.c: reorganize code
+>> This reorganizes the vic.c code in anticipation of a second patch
+>> to use struct vic_device as the data stored in set_irq_chip_data().
+>
+> I would love to test this patch but again cannot *for my life* decode
+> this QP stuff, having tried now for half an hour. Can you send it
+> directly as an attachment instead or even put it in Russells patch
+> tracker?
 
-I remember that I prepared a patch and fixed capitalization of these
-strings in the mail body in the last minute before sending.
+What QP stuff?
 
-> strange characters made their way zaurus gpio .desc
-> fields. Fix it.
->     
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+Russell does not like the patch tracker used as a patch review system.
+I have attached the patch, hopefully you have better results with that.
 
-Acked-by: Stanislav Brabec <utx@penguin.cz>
-
-Hint: If you use Evolution Mail for sending mails, never edit anything
-inside inlined patch and never use old mail as a template, otherwise
-Evolution Mail will include invisible characters to your mail.
-
-Let's see whether it is fixed in the evolution-2.28.
-
-
-________________________________________________________________________
-Stanislav Brabec
-http://www.penguin.cz/~utx/zaurus
+Regards,
+Hartley
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: vic_reorg.patch
+Type: application/octet-stream
+Size: 9765 bytes
+Desc: vic_reorg.patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100107/bcfb9b64/attachment-0001.obj>
