@@ -1,76 +1,56 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 06 Jan 2010 18:22:22 -0700
-Subject: [PATCH v2 4/5] OMAP clock/CPUFreq: add clk_exit_cpufreq_table()
-In-Reply-To: <20100107011932.3551.75659.stgit@localhost.localdomain>
-References: <20100107011932.3551.75659.stgit@localhost.localdomain>
-Message-ID: <20100107012209.3551.29357.stgit@localhost.localdomain>
+From: PeterHuewe@gmx.de (Peter Huewe)
+Date: Thu, 7 Jan 2010 02:50:13 +0100
+Subject: [PATCH] arch/arm: Fix build failure for defconfigs without
+	CONFIG_ISA_DMA_API set
+Message-ID: <201001070250.14063.PeterHuewe@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A subsequent patch adds code on OMAP2xxx to dynamically allocate the
-CPUFreq frequency table in clk_init_cpufreq_table(), so for it to
-avoid a leak, it will need a corresponding function to free the
-memory.  This patch adds clk_exit_cpufreq_table() with generic
-code to call a chip-specific variant inside the clockfw_lock spinlock via
-struct clk_functions.
+From: Peter Huewe <peterhuewe@gmx.de>
+Date: Thu, 7 Jan 2010 02:34:44 +0100
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
+A lot of ARM-defconfigs (those without CONFIG_ISA_DMA_API set) fail to
+build [1][2][3] due to the changes of the patch
+    [PATCH] PCI: Clean up build for CONFIG_PCI_QUIRKS unset
+    by Rafael J. Wysocki (Sat, 2 Jan 2010 22:57:24 +0100) [4]
+as the referenced variable 'isa_dma_bridge_buggy' in asm/dma.h is
+enclosed by the CONFIG_ISA_DMA_API conditional all configs without this
+setting fail to build.
+
+I'm not sure wether moving the condition is the right way to solve the
+issue, but atleast it fixes the issue :)
+
+References:
+[1] http://kisskb.ellerman.id.au/kisskb/buildresult/1983354/
+[2] http://kisskb.ellerman.id.au/kisskb/buildresult/1983333/
+[3] http://kisskb.ellerman.id.au/kisskb/buildresult/1983337/
+[4] http://lkml.org/lkml/2010/1/2/102
+
+Patch against Linus' tree.
+
+Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
 ---
- arch/arm/plat-omap/clock.c              |   10 ++++++++++
- arch/arm/plat-omap/cpu-omap.c           |    1 +
- arch/arm/plat-omap/include/plat/clock.h |    2 ++
- 3 files changed, 13 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/dma.h |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
-index a64d84c..d9f8c84 100644
---- a/arch/arm/plat-omap/clock.c
-+++ b/arch/arm/plat-omap/clock.c
-@@ -329,6 +329,16 @@ void clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
- 		arch_clock->clk_init_cpufreq_table(table);
- 	spin_unlock_irqrestore(&clockfw_lock, flags);
- }
+diff --git a/arch/arm/include/asm/dma.h b/arch/arm/include/asm/dma.h
+index 7edf353..ca51143 100644
+--- a/arch/arm/include/asm/dma.h
++++ b/arch/arm/include/asm/dma.h
+@@ -138,12 +138,12 @@ extern int  get_dma_residue(unsigned int chan);
+ #define NO_DMA	255
+ #endif
+ 
++#endif /* CONFIG_ISA_DMA_API */
 +
-+void clk_exit_cpufreq_table(struct cpufreq_frequency_table **table)
-+{
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&clockfw_lock, flags);
-+	if (arch_clock->clk_exit_cpufreq_table)
-+		arch_clock->clk_exit_cpufreq_table(table);
-+	spin_unlock_irqrestore(&clockfw_lock, flags);
-+}
+ #ifdef CONFIG_PCI
+ extern int isa_dma_bridge_buggy;
+ #else
+ #define isa_dma_bridge_buggy    (0)
  #endif
  
- /*-------------------------------------------------------------------------*/
-diff --git a/arch/arm/plat-omap/cpu-omap.c b/arch/arm/plat-omap/cpu-omap.c
-index f8ddbdd..6d3d333 100644
---- a/arch/arm/plat-omap/cpu-omap.c
-+++ b/arch/arm/plat-omap/cpu-omap.c
-@@ -134,6 +134,7 @@ static int __init omap_cpu_init(struct cpufreq_policy *policy)
- 
- static int omap_cpu_exit(struct cpufreq_policy *policy)
- {
-+	clk_exit_cpufreq_table(&freq_table);
- 	clk_put(mpu_clk);
- 	return 0;
- }
-diff --git a/arch/arm/plat-omap/include/plat/clock.h b/arch/arm/plat-omap/include/plat/clock.h
-index 309b6d1..94fe2a0 100644
---- a/arch/arm/plat-omap/include/plat/clock.h
-+++ b/arch/arm/plat-omap/include/plat/clock.h
-@@ -119,6 +119,7 @@ struct clk_functions {
- 	void		(*clk_disable_unused)(struct clk *clk);
- #ifdef CONFIG_CPU_FREQ
- 	void		(*clk_init_cpufreq_table)(struct cpufreq_frequency_table **);
-+	void		(*clk_exit_cpufreq_table)(struct cpufreq_frequency_table **);
- #endif
- };
- 
-@@ -135,6 +136,7 @@ extern unsigned long followparent_recalc(struct clk *clk);
- extern void clk_enable_init_clocks(void);
- #ifdef CONFIG_CPU_FREQ
- extern void clk_init_cpufreq_table(struct cpufreq_frequency_table **table);
-+extern void clk_exit_cpufreq_table(struct cpufreq_frequency_table **table);
- #endif
- 
- extern const struct clkops clkops_null;
+-#endif /* CONFIG_ISA_DMA_API */
+-
+ #endif /* __ASM_ARM_DMA_H */
+-- 
+1.6.4.4
