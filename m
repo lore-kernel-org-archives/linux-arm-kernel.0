@@ -1,56 +1,45 @@
-From: PeterHuewe@gmx.de (Peter Huewe)
-Date: Thu, 7 Jan 2010 02:50:13 +0100
-Subject: [PATCH] arch/arm: Fix build failure for defconfigs without
-	CONFIG_ISA_DMA_API set
-Message-ID: <201001070250.14063.PeterHuewe@gmx.de>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 7 Jan 2010 10:45:01 +0800
+Subject: [PATCH 1/3] mmp: fix the clock rate of mmp2
+In-Reply-To: <771cded01001060606h22592839x89ff1a9df0d695d6@mail.gmail.com>
+References: <771cded01001060606h22592839x89ff1a9df0d695d6@mail.gmail.com>
+Message-ID: <f17812d71001061845t5134f350we87c32a5e8c58fcf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Peter Huewe <peterhuewe@gmx.de>
-Date: Thu, 7 Jan 2010 02:34:44 +0100
+Haojian,
 
-A lot of ARM-defconfigs (those without CONFIG_ISA_DMA_API set) fail to
-build [1][2][3] due to the changes of the patch
-    [PATCH] PCI: Clean up build for CONFIG_PCI_QUIRKS unset
-    by Rafael J. Wysocki (Sat, 2 Jan 2010 22:57:24 +0100) [4]
-as the referenced variable 'isa_dma_bridge_buggy' in asm/dma.h is
-enclosed by the CONFIG_ISA_DMA_API conditional all configs without this
-setting fail to build.
+We don't need this anymore, CLOCK_TICK_RATE is for legacy use,
+provided it is exclusive between different SoCs (think about MMP3
+using a different one, while it can be built with MMP2 together).
+Are there any specific errors of this?
 
-I'm not sure wether moving the condition is the right way to solve the
-issue, but atleast it fixes the issue :)
-
-References:
-[1] http://kisskb.ellerman.id.au/kisskb/buildresult/1983354/
-[2] http://kisskb.ellerman.id.au/kisskb/buildresult/1983333/
-[3] http://kisskb.ellerman.id.au/kisskb/buildresult/1983337/
-[4] http://lkml.org/lkml/2010/1/2/102
-
-Patch against Linus' tree.
-
-Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
----
- arch/arm/include/asm/dma.h |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/include/asm/dma.h b/arch/arm/include/asm/dma.h
-index 7edf353..ca51143 100644
---- a/arch/arm/include/asm/dma.h
-+++ b/arch/arm/include/asm/dma.h
-@@ -138,12 +138,12 @@ extern int  get_dma_residue(unsigned int chan);
- #define NO_DMA	255
- #endif
- 
-+#endif /* CONFIG_ISA_DMA_API */
-+
- #ifdef CONFIG_PCI
- extern int isa_dma_bridge_buggy;
- #else
- #define isa_dma_bridge_buggy    (0)
- #endif
- 
--#endif /* CONFIG_ISA_DMA_API */
--
- #endif /* __ASM_ARM_DMA_H */
--- 
-1.6.4.4
+On Wed, Jan 6, 2010 at 10:06 PM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> From d2a97d0b83a139c9771d1cece544c7ef2454741c Mon Sep 17 00:00:00 2001
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date: Wed, 6 Jan 2010 16:48:24 -0500
+> Subject: [PATCH] [ARM] mmp: fix the clock rate of mmp2
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> ---
+> ?arch/arm/mach-mmp/include/mach/timex.h | ? ?4 ++++
+> ?1 files changed, 4 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-mmp/include/mach/timex.h
+> b/arch/arm/mach-mmp/include/mach/timex.h
+> index 6cebbd0..70c9f1d 100644
+> --- a/arch/arm/mach-mmp/include/mach/timex.h
+> +++ b/arch/arm/mach-mmp/include/mach/timex.h
+> @@ -6,4 +6,8 @@
+> ?* published by the Free Software Foundation.
+> ?*/
+>
+> +#ifdef CONFIG_CPU_MMP2
+> +#define CLOCK_TICK_RATE ? ? ? ? ? ? ? ?6500000
+> +#else
+> ?#define CLOCK_TICK_RATE ? ? ? ? ? ? ? ?3250000
+> +#endif
+> --
+> 1.5.6.5
+>
