@@ -1,74 +1,50 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 7 Jan 2010 20:11:11 -0500
-Subject: [RFC, PATCH 6/7] arm/icst307: use common struct clk,
-	unify realview and versatile clocks
-In-Reply-To: <1262907852.738282.3449449719.6.gpush@pororo>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Fri, 8 Jan 2010 12:20:14 +1100
+Subject: [RFC,PATCH 1/7] arm: add a common struct clk
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190902089611@mi8nycmail19.Mi8.com>
 References: <1262907852.736281.78480196040.1.gpush@pororo>
-	<1262907852.738282.3449449719.6.gpush@pororo>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE190902089619@mi8nycmail19.Mi8.com>
+	<BD79186B4FD85F4B8E60E381CAEE190902089611@mi8nycmail19.Mi8.com>
+Message-ID: <201001081220.14485.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, January 07, 2010 4:44 PM, Jeremy Kerr wrote:
-> Both the realview and versatile platforms use an icst307 clock, but have
-> their own clock structures.
+Hi Hartley,
+
+> > +config HAVE_COMMON_STRUCT_CLK
+> > +	bool
+> > +	default n
 > 
-> This change introduces a struct icst307_clk, which is common between
-> realview and versatile. This allows us to take out the platform-specific
-> clock defintions.
+> default n is not needed
+
+OK, can remove this.
+
+> Probably should have here, and in all the other functions, something like:
 > 
-> Tested on versatile, compiled only on realview.
+> 	if (!clk)
+> 		return -EINVAL;
+
+Is it at all valid to call the clock API functions with a NULL clock?
+
+> Also, is any locking needed?
+
+That's up to the implementer. For example, fixed rate clocks do not require 
+locking.
+
+> For clocks that are not configurable it might be a good idea to add:
 > 
-> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+> 	unsigned long	rate;
 > 
-> ---
+> to struct clk and then:
+> 
+> 	return clk->rate;
+> 
+> for the non-get_rate() condition.
 
-[snip]
+Check out the clk_fixed patch (2/7), this implements fixed-rate clocks. I'm 
+relucant to add anything to struct clock that isn't part of the kernel-wide 
+API.
 
-> +unsigned long clk_icst307_get_rate(struct clk *clk)
-> +{
-> +	return to_clk_icst307(clk)->rate;
-> +}
-> +
-> +long clk_icst307_round_rate(struct clk *clk, unsigned long rate)
+Cheers,
 
-I think the return value here should be 'unsigned long'
 
-> +{
-> +	const struct icst307_params *params = &to_clk_icst307(clk)->params;
-> +	struct icst307_vco vco;
-
-Add a whitespace here please.
-
-> +	vco = icst307_khz_to_vco(params, rate / 1000);
-> +	return icst307_khz(params, vco) * 1000;
-> +}
-> +
-> +int clk_icst307_set_rate(struct clk *clk, unsigned long rate)
-> +{
-> +	struct clk_icst307 *v_clk = to_clk_icst307(clk);
-> +	struct icst307_vco vco;
-> +
-> +	vco = icst307_khz_to_vco(&v_clk->params, rate / 1000);
-> +	v_clk->rate = icst307_khz(&v_clk->params, vco) * 1000;
-> +	v_clk->setvco(v_clk, vco);
-> +
-> +	return 0;
-> +}
-
-Could struct icst307_vco be part of struct clk_icst307?
-
-If so, clk_icst307_set_rate could use clk_icst307_round_rate like this:
-
-int clk_icst307_set_rate(struct clk *clk, unsigned long rate)
-{
-	struct clk_icst307 *v_clk = to_clk_icst307(clk);
-
-	v_clk->rate = clk_icst307_round_rate(clk, rate);
-	v_clk->setvco(v_clk);
-
-	return 0;
-}
-
-Regards,
-Hartley
+Jeremy
