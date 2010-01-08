@@ -1,40 +1,46 @@
-From: rpurdie@rpsys.net (Richard Purdie)
-Date: Fri, 08 Jan 2010 12:27:28 +0000
-Subject: [PATCH v2 06/09] backlight: enable backlight in 88pm860x
-In-Reply-To: <20100108110646.GB3734@sortiz.org>
-References: <771cded00912090515k39cccec9od78addb8e127f491@mail.gmail.com>
-	<20100108110646.GB3734@sortiz.org>
-Message-ID: <1262953648.10097.34.camel@dax.rpnet.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 8 Jan 2010 12:59:34 +0000
+Subject: [RFC,PATCH 1/7] arm: add a common struct clk
+In-Reply-To: <1262951103.585.40.camel@pasglop>
+References: <1262907852.736281.78480196040.1.gpush@pororo>
+	<BD79186B4FD85F4B8E60E381CAEE190902089611@mi8nycmail19.Mi8.com>
+	<201001081220.14485.jeremy.kerr@canonical.com>
+	<201001081426.09754.jk@ozlabs.org>
+	<20100108094214.GA23420@n2100.arm.linux.org.uk>
+	<1262944873.585.17.camel@pasglop>
+	<20100108111831.GA25082@n2100.arm.linux.org.uk>
+	<1262951103.585.40.camel@pasglop>
+Message-ID: <20100108125934.GA27567@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-01-08 at 12:06 +0100, Samuel Ortiz wrote:
-> Hi Haojian, Richard,
-> 
-> On Wed, Dec 09, 2009 at 08:15:28AM -0500, Haojian Zhuang wrote:
-> > From 8d2bc9826f758f113fde6f3fd01723111fbf2a91 Mon Sep 17 00:00:00 2001
-> > From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> > Date: Mon, 9 Nov 2009 12:41:07 -0500
-> > Subject: [PATCH] backlight: enable backlight in 88pm860x
-> > 
-> > At most, three backlight device can be supported in 88pm860x driver.
-> I applied this patch and the LED one to my for-next branch.
-> Richard, whenever you have time for that, could you please quickly check if
-> they oook ok to you ? They're 2.6.34 material, so no rush here.
+On Fri, Jan 08, 2010 at 10:45:03PM +1100, Benjamin Herrenschmidt wrote:
+> I don't think Jeremy (again he will have to confirm) is aiming toward a
+> common implementation of the entire clock subsystem. The idea is that
+> the struct clk is a clock object. You can have many struct clk, they can
+> have many different capabilities and features.
 
-I had a look through, they look basically ok. 
+Taking the two machine types that are most likely to want to use this:
 
-In the LED patch I'm not sure I like the SET_BRIGHTNESS and SET_BLINK
-sharing of a workqueue though. Its not going to crash, I can just see
-values potentially getting lost as the code has a race condition. It
-would be easier if it just compared led->current_brightness to
-led->brightness acting if needed and something similar for LED blinking.
+On PXA, there are 67 struct clk's, each of which has a single pointer
+to an operations structure.  Each operations structure is three pointers
+and there are 11 such structures.  That's 67 * 4 + 11 * 12 = 400 bytes.
+PXA is simple enough that these operations structures can be swallowed
+up into this struct clk.  So, switching PXA to this will mean 67 * 32 =
+2144 bytes.  That's an increase in overhead of 5x.
 
-Cheers,
+On OMAP, there are 16 clkops structures of 16 bytes each, and each
+struct clk has a pointer to this structure.  Due to the way OMAP works,
+these can't be directly called from the proposed generic version
+because of the additional clock domain/power domain code, so we can
+discount these.
 
-Richard
+There are two function pointers in the struct clk which would be
+identical to the versions proposed in this generic struct clk.
+There's a total of 219 clk structures in OMAP3.  So, 219 * (4 + 8)
+= 2628.  Switching OMAP means 219 * (4 + 32) = 7884, which is an
+increase in overhead of 3x.
 
-
--- 
-Richard Purdie
-Intel Open Source Technology Centre
+This is the problem - you can have "generic" versions of stuff provided
+you're willing to put up with the additional overhead that comes with
+it.
