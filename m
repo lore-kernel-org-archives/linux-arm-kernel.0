@@ -1,518 +1,65 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri,  8 Jan 2010 17:17:12 +0100
-Subject: [PATCH 05/25] imx/mach-mx3: use constants namespaced by the
-	corresponding SOC (easy part)
-In-Reply-To: <1262967452-24353-4-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Fri,  8 Jan 2010 17:17:09 +0100
+Subject: [PATCH 02/25] imx/clock-imx21: use a macro to define registers
+In-Reply-To: <1262967452-24353-1-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <20100108161551.GA19007@pengutronix.de>
 	<1262967452-24353-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-2-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-3-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1262967452-24353-4-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1262967452-24353-5-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1262967452-24353-2-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This just leaves cpu.c, devices.c and mm.c to clean up.  As these files
-are used on more than one SOC they need some more work.
+This way the base address isn't hard coded in each register definition
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Alberto Panizzo <maramaopercheseimorto@gmail.com>
-Cc: Valentin Longchamp <valentin.longchamp@epfl.ch>
-Cc: Daniel Mack <daniel@caiaq.de>
-Cc: Guennadi Liakhovetski <lg@denx.de>
-Cc: Yoichi Yuasa <yuasa@linux-mips.org>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Magnus Lilja <lilja.magnus@gmail.com>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Harro Haan <hrhaan@yahoo.com>
-Cc: Jean Delvare <khali@linux-fr.org>
-Cc: Luotao Fu <l.fu@pengutronix.de>
-Cc: Ilya Yanok <yanok@emcraft.com>
+Cc: Holger Schurig <hs4233@mail.mn-solutions.de>
+Cc: Rabin Vincent <rabin@rab.in>
 ---
- arch/arm/mach-mx3/armadillo5x0.c                |   12 ++++++------
- arch/arm/mach-mx3/clock-imx35.c                 |    4 ++--
- arch/arm/mach-mx3/clock.c                       |    4 ++--
- arch/arm/mach-mx3/crm_regs.h                    |    2 +-
- arch/arm/mach-mx3/iomux.c                       |    2 +-
- arch/arm/mach-mx3/kzmarm11.c                    |   20 ++++++++++----------
- arch/arm/mach-mx3/mx31ads.c                     |   14 +++++++-------
- arch/arm/mach-mx3/mx31lilly.c                   |    8 ++++----
- arch/arm/mach-mx3/mx31lite.c                    |   14 +++++++-------
- arch/arm/mach-mx3/mx31moboard.c                 |    4 ++--
- arch/arm/mach-mx3/mx31pdk.c                     |   10 +++++-----
- arch/arm/mach-mx3/mx35pdk.c                     |    4 ++--
- arch/arm/mach-mx3/pcm037.c                      |   16 ++++++++--------
- arch/arm/mach-mx3/pcm043.c                      |    4 ++--
- arch/arm/mach-mx3/qong.c                        |   14 +++++++-------
- arch/arm/plat-mxc/include/mach/board-kzmarm11.h |   18 +++++++++---------
- 16 files changed, 75 insertions(+), 75 deletions(-)
+ arch/arm/mach-mx2/clock_imx21.c |   30 ++++++++++++++++--------------
+ 1 files changed, 16 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/mach-mx3/armadillo5x0.c b/arch/arm/mach-mx3/armadillo5x0.c
-index 54aab40..aac5f81 100644
---- a/arch/arm/mach-mx3/armadillo5x0.c
-+++ b/arch/arm/mach-mx3/armadillo5x0.c
-@@ -182,8 +182,8 @@ static struct physmap_flash_data armadillo5x0_nor_flash_pdata = {
+diff --git a/arch/arm/mach-mx2/clock_imx21.c b/arch/arm/mach-mx2/clock_imx21.c
+index df3ad38..1922e53 100644
+--- a/arch/arm/mach-mx2/clock_imx21.c
++++ b/arch/arm/mach-mx2/clock_imx21.c
+@@ -28,21 +28,23 @@
+ #include <asm/clkdev.h>
+ #include <asm/div64.h>
  
- static struct resource armadillo5x0_nor_flash_resource = {
- 	.flags		= IORESOURCE_MEM,
--	.start		= CS0_BASE_ADDR,
--	.end		= CS0_BASE_ADDR + SZ_64M - 1,
-+	.start		= MX31_CS0_BASE_ADDR,
-+	.end		= MX31_CS0_BASE_ADDR + SZ_64M - 1,
- };
++#define IO_ADDR_CCM(off)	(IO_ADDRESS(CCM_BASE_ADDR) + (off))
++
+ /* Register offsets */
+-#define CCM_CSCR		(IO_ADDRESS(CCM_BASE_ADDR) + 0x0)
+-#define CCM_MPCTL0		(IO_ADDRESS(CCM_BASE_ADDR) + 0x4)
+-#define CCM_MPCTL1		(IO_ADDRESS(CCM_BASE_ADDR) + 0x8)
+-#define CCM_SPCTL0		(IO_ADDRESS(CCM_BASE_ADDR) + 0xC)
+-#define CCM_SPCTL1		(IO_ADDRESS(CCM_BASE_ADDR) + 0x10)
+-#define CCM_OSC26MCTL		(IO_ADDRESS(CCM_BASE_ADDR) + 0x14)
+-#define CCM_PCDR0		(IO_ADDRESS(CCM_BASE_ADDR) + 0x18)
+-#define CCM_PCDR1		(IO_ADDRESS(CCM_BASE_ADDR) + 0x1c)
+-#define CCM_PCCR0		(IO_ADDRESS(CCM_BASE_ADDR) + 0x20)
+-#define CCM_PCCR1		(IO_ADDRESS(CCM_BASE_ADDR) + 0x24)
+-#define CCM_CCSR		(IO_ADDRESS(CCM_BASE_ADDR) + 0x28)
+-#define CCM_PMCTL		(IO_ADDRESS(CCM_BASE_ADDR) + 0x2c)
+-#define CCM_PMCOUNT		(IO_ADDRESS(CCM_BASE_ADDR) + 0x30)
+-#define CCM_WKGDCTL		(IO_ADDRESS(CCM_BASE_ADDR) + 0x34)
++#define CCM_CSCR		IO_ADDR_CCM(0x0)
++#define CCM_MPCTL0		IO_ADDR_CCM(0x4)
++#define CCM_MPCTL1		IO_ADDR_CCM(0x8)
++#define CCM_SPCTL0		IO_ADDR_CCM(0xc)
++#define CCM_SPCTL1		IO_ADDR_CCM(0x10)
++#define CCM_OSC26MCTL		IO_ADDR_CCM(0x14)
++#define CCM_PCDR0		IO_ADDR_CCM(0x18)
++#define CCM_PCDR1		IO_ADDR_CCM(0x1c)
++#define CCM_PCCR0		IO_ADDR_CCM(0x20)
++#define CCM_PCCR1		IO_ADDR_CCM(0x24)
++#define CCM_CCSR		IO_ADDR_CCM(0x28)
++#define CCM_PMCTL		IO_ADDR_CCM(0x2c)
++#define CCM_PMCOUNT		IO_ADDR_CCM(0x30)
++#define CCM_WKGDCTL		IO_ADDR_CCM(0x34)
  
- static struct platform_device armadillo5x0_nor_flash = {
-@@ -311,8 +311,8 @@ static struct imxmmc_platform_data sdhc_pdata = {
-  */
- static struct resource armadillo5x0_smc911x_resources[] = {
- 	{
--		.start	= CS3_BASE_ADDR,
--		.end	= CS3_BASE_ADDR + SZ_32M - 1,
-+		.start	= MX31_CS3_BASE_ADDR,
-+		.end	= MX31_CS3_BASE_ADDR + SZ_32M - 1,
- 		.flags	= IORESOURCE_MEM,
- 	}, {
- 		.start	= IOMUX_TO_IRQ(MX31_PIN_GPIO1_0),
-@@ -406,8 +406,8 @@ static struct sys_timer armadillo5x0_timer = {
- 
- MACHINE_START(ARMADILLO5X0, "Armadillo-500")
- 	/* Maintainer: Alberto Panizzo  */
--	.phys_io	= AIPS1_BASE_ADDR,
--	.io_pg_offst	= ((AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
-+	.phys_io	= MX31_AIPS1_BASE_ADDR,
-+	.io_pg_offst	= ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
- 	.boot_params	= PHYS_OFFSET + 0x00000100,
- 	.map_io		= mx31_map_io,
- 	.init_irq	= mx31_init_irq,
-diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
-index 7584b4c..e65e862 100644
---- a/arch/arm/mach-mx3/clock-imx35.c
-+++ b/arch/arm/mach-mx3/clock-imx35.c
-@@ -28,7 +28,7 @@
- #include <mach/hardware.h>
- #include <mach/common.h>
- 
--#define CCM_BASE	IO_ADDRESS(CCM_BASE_ADDR)
-+#define CCM_BASE	IO_ADDRESS(MX35_CCM_BASE_ADDR)
- 
- #define CCM_CCMR        0x00
- #define CCM_PDR0        0x04
-@@ -504,7 +504,7 @@ int __init mx35_clocks_init()
- 	__raw_writel((3 << 26) | ll, CCM_BASE + CCM_CGR2);
- 	__raw_writel(0, CCM_BASE + CCM_CGR3);
- 
--	mxc_timer_init(&gpt_clk, IO_ADDRESS(GPT1_BASE_ADDR), MXC_INT_GPT);
-+	mxc_timer_init(&gpt_clk, IO_ADDRESS(MX35_GPT1_BASE_ADDR), MX35_INT_GPT);
- 
- 	return 0;
- }
-diff --git a/arch/arm/mach-mx3/clock.c b/arch/arm/mach-mx3/clock.c
-index 27a318a..cc03a61 100644
---- a/arch/arm/mach-mx3/clock.c
-+++ b/arch/arm/mach-mx3/clock.c
-@@ -618,14 +618,14 @@ int __init mx31_clocks_init(unsigned long fref)
- 
- 	mx31_read_cpu_rev();
- 
--	if (mx31_revision() >= CHIP_REV_2_0) {
-+	if (mx31_revision() >= MX31_CHIP_REV_2_0) {
- 		reg = __raw_readl(MXC_CCM_PMCR1);
- 		/* No PLL restart on DVFS switch; enable auto EMI handshake */
- 		reg |= MXC_CCM_PMCR1_PLLRDIS | MXC_CCM_PMCR1_EMIRQ_EN;
- 		__raw_writel(reg, MXC_CCM_PMCR1);
- 	}
- 
--	mxc_timer_init(&ipg_clk, IO_ADDRESS(GPT1_BASE_ADDR), MXC_INT_GPT);
-+	mxc_timer_init(&ipg_clk, IO_ADDRESS(MX31_GPT1_BASE_ADDR), MX31_INT_GPT);
- 
- 	return 0;
- }
-diff --git a/arch/arm/mach-mx3/crm_regs.h b/arch/arm/mach-mx3/crm_regs.h
-index adfa362..e25cd92 100644
---- a/arch/arm/mach-mx3/crm_regs.h
-+++ b/arch/arm/mach-mx3/crm_regs.h
-@@ -24,7 +24,7 @@
- #define CKIH_CLK_FREQ_27MHZ     27000000
- #define CKIL_CLK_FREQ           32768
- 
--#define MXC_CCM_BASE		IO_ADDRESS(CCM_BASE_ADDR)
-+#define MXC_CCM_BASE		IO_ADDRESS(MX31_CCM_BASE_ADDR)
- 
- /* Register addresses */
- #define MXC_CCM_CCMR		(MXC_CCM_BASE + 0x00)
-diff --git a/arch/arm/mach-mx3/iomux.c b/arch/arm/mach-mx3/iomux.c
-index c66ccbc..6381e56 100644
---- a/arch/arm/mach-mx3/iomux.c
-+++ b/arch/arm/mach-mx3/iomux.c
-@@ -29,7 +29,7 @@
- /*
-  * IOMUX register (base) addresses
-  */
--#define IOMUX_BASE	IO_ADDRESS(IOMUXC_BASE_ADDR)
-+#define IOMUX_BASE	IO_ADDRESS(MX31_IOMUXC_BASE_ADDR)
- #define IOMUXINT_OBS1	(IOMUX_BASE + 0x000)
- #define IOMUXINT_OBS2	(IOMUX_BASE + 0x004)
- #define IOMUXGPR	(IOMUX_BASE + 0x008)
-diff --git a/arch/arm/mach-mx3/kzmarm11.c b/arch/arm/mach-mx3/kzmarm11.c
-index 6fa99ce..849631e 100644
---- a/arch/arm/mach-mx3/kzmarm11.c
-+++ b/arch/arm/mach-mx3/kzmarm11.c
-@@ -128,8 +128,8 @@ static struct smsc911x_platform_config kzm_smsc9118_config = {
- 
- static struct resource kzm_smsc9118_resources[] = {
- 	{
--		.start	= CS5_BASE_ADDR,
--		.end	= CS5_BASE_ADDR + SZ_128K - 1,
-+		.start	= MX31_CS5_BASE_ADDR,
-+		.end	= MX31_CS5_BASE_ADDR + SZ_128K - 1,
- 		.flags	= IORESOURCE_MEM,
- 	},
- 	{
-@@ -222,15 +222,15 @@ static void __init kzm_board_init(void)
-  */
- static struct map_desc kzm_io_desc[] __initdata = {
- 	{
--		.virtual	= CS4_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(CS4_BASE_ADDR),
--		.length		= CS4_SIZE,
-+		.virtual	= MX31_CS4_BASE_ADDR_VIRT,
-+		.pfn		= __phys_to_pfn(MX31_CS4_BASE_ADDR),
-+		.length		= MX31_CS4_SIZE,
- 		.type		= MT_DEVICE
- 	},
- 	{
--		.virtual	= CS5_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(CS5_BASE_ADDR),
--		.length		= CS5_SIZE,
-+		.virtual	= MX31_CS5_BASE_ADDR_VIRT,
-+		.pfn		= __phys_to_pfn(MX31_CS5_BASE_ADDR),
-+		.length		= MX31_CS5_SIZE,
- 		.type		= MT_DEVICE
- 	},
- };
-@@ -258,8 +258,8 @@ static struct sys_timer kzm_timer = {
-  * initialize __mach_desc_KZM_ARM11_01 data structure.
-  */
- MACHINE_START(KZM_ARM11_01, "Kyoto Microcomputer Co., Ltd. KZM-ARM11-01")
--	.phys_io        = AIPS1_BASE_ADDR,
--	.io_pg_offst    = ((AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
-+	.phys_io        = MX31_AIPS1_BASE_ADDR,
-+	.io_pg_offst    = ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
- 	.boot_params    = PHYS_OFFSET + 0x100,
- 	.map_io         = kzm_map_io,
- 	.init_irq       = mx31_init_irq,
-diff --git a/arch/arm/mach-mx3/mx31ads.c b/arch/arm/mach-mx3/mx31ads.c
-index 3e7bafa..6699116 100644
---- a/arch/arm/mach-mx3/mx31ads.c
-+++ b/arch/arm/mach-mx3/mx31ads.c
-@@ -60,7 +60,7 @@
- static struct plat_serial8250_port serial_platform_data[] = {
- 	{
- 		.membase  = (void *)(PBC_BASE_ADDRESS + PBC_SC16C652_UARTA),
--		.mapbase  = (unsigned long)(CS4_BASE_ADDR + PBC_SC16C652_UARTA),
-+		.mapbase  = (unsigned long)(MX31_CS4_BASE_ADDR + PBC_SC16C652_UARTA),
- 		.irq      = EXPIO_INT_XUART_INTA,
- 		.uartclk  = 14745600,
- 		.regshift = 0,
-@@ -68,7 +68,7 @@ static struct plat_serial8250_port serial_platform_data[] = {
- 		.flags    = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_AUTO_IRQ,
- 	}, {
- 		.membase  = (void *)(PBC_BASE_ADDRESS + PBC_SC16C652_UARTB),
--		.mapbase  = (unsigned long)(CS4_BASE_ADDR + PBC_SC16C652_UARTB),
-+		.mapbase  = (unsigned long)(MX31_CS4_BASE_ADDR + PBC_SC16C652_UARTB),
- 		.irq      = EXPIO_INT_XUART_INTB,
- 		.uartclk  = 14745600,
- 		.regshift = 0,
-@@ -494,9 +494,9 @@ static void mxc_init_i2c(void)
-  */
- static struct map_desc mx31ads_io_desc[] __initdata = {
- 	{
--		.virtual	= CS4_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(CS4_BASE_ADDR),
--		.length		= CS4_SIZE / 2,
-+		.virtual	= MX31_CS4_BASE_ADDR_VIRT,
-+		.pfn		= __phys_to_pfn(MX31_CS4_BASE_ADDR),
-+		.length		= MX31_CS4_SIZE / 2,
- 		.type		= MT_DEVICE
- 	},
- };
-@@ -541,8 +541,8 @@ static struct sys_timer mx31ads_timer = {
-  */
- MACHINE_START(MX31ADS, "Freescale MX31ADS")
- 	/* Maintainer: Freescale Semiconductor, Inc. */
--	.phys_io	= AIPS1_BASE_ADDR,
--	.io_pg_offst	= ((AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
-+	.phys_io	= MX31_AIPS1_BASE_ADDR,
-+	.io_pg_offst	= ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
- 	.boot_params    = PHYS_OFFSET + 0x100,
- 	.map_io         = mx31ads_map_io,
- 	.init_irq       = mx31ads_init_irq,
-diff --git a/arch/arm/mach-mx3/mx31lilly.c b/arch/arm/mach-mx3/mx31lilly.c
-index 9ce029f..ffccea9 100644
---- a/arch/arm/mach-mx3/mx31lilly.c
-+++ b/arch/arm/mach-mx3/mx31lilly.c
-@@ -57,8 +57,8 @@
- 
- static struct resource smsc91x_resources[] = {
- 	{
--		.start	= CS4_BASE_ADDR,
--		.end	= CS4_BASE_ADDR + 0xffff,
-+		.start	= MX31_CS4_BASE_ADDR,
-+		.end	= MX31_CS4_BASE_ADDR + 0xffff,
- 		.flags	= IORESOURCE_MEM,
- 	},
- 	{
-@@ -195,8 +195,8 @@ static struct sys_timer mx31lilly_timer = {
- };
- 
- MACHINE_START(LILLY1131, "INCO startec LILLY-1131")
--	.phys_io	= AIPS1_BASE_ADDR,
--	.io_pg_offst	= ((AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
-+	.phys_io	= MX31_AIPS1_BASE_ADDR,
-+	.io_pg_offst	= ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
- 	.boot_params	= PHYS_OFFSET + 0x100,
- 	.map_io		= mx31_map_io,
- 	.init_irq	= mx31_init_irq,
-diff --git a/arch/arm/mach-mx3/mx31lite.c b/arch/arm/mach-mx3/mx31lite.c
-index 789b20d..1e26397 100644
---- a/arch/arm/mach-mx3/mx31lite.c
-+++ b/arch/arm/mach-mx3/mx31lite.c
-@@ -82,8 +82,8 @@ static struct smsc911x_platform_config smsc911x_config = {
- 
- static struct resource smsc911x_resources[] = {
- 	{
--		.start		= CS4_BASE_ADDR,
--		.end		= CS4_BASE_ADDR + 0x100,
-+		.start		= MX31_CS4_BASE_ADDR,
-+		.end		= MX31_CS4_BASE_ADDR + 0x100,
- 		.flags		= IORESOURCE_MEM,
- 	}, {
- 		.start		= IOMUX_TO_IRQ(MX31_PIN_SFS6),
-@@ -214,9 +214,9 @@ static struct platform_device physmap_flash_device = {
-  */
- static struct map_desc mx31lite_io_desc[] __initdata = {
- 	{
--		.virtual = CS4_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(CS4_BASE_ADDR),
--		.length = CS4_SIZE,
-+		.virtual = MX31_CS4_BASE_ADDR_VIRT,
-+		.pfn = __phys_to_pfn(MX31_CS4_BASE_ADDR),
-+		.length = MX31_CS4_SIZE,
- 		.type = MT_DEVICE
- 	}
- };
-@@ -287,8 +287,8 @@ struct sys_timer mx31lite_timer = {
- 
- MACHINE_START(MX31LITE, "LogicPD i.MX31 SOM")
- 	/* Maintainer: Freescale Semiconductor, Inc. */
--	.phys_io        = AIPS1_BASE_ADDR,
--	.io_pg_offst    = ((AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
-+	.phys_io        = MX31_AIPS1_BASE_ADDR,
-+	.io_pg_offst    = ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
- 	.boot_params    = PHYS_OFFSET + 0x100,
- 	.map_io         = mx31lite_map_io,
- 	.init_irq       = mx31_init_irq,
-diff --git a/arch/arm/mach-mx3/mx31moboard.c b/arch/arm/mach-mx3/mx31moboard.c
-index cfd605d..9428827 100644
---- a/arch/arm/mach-mx3/mx31moboard.c
-+++ b/arch/arm/mach-mx3/mx31moboard.c
-@@ -569,8 +569,8 @@ struct sys_timer mx31moboard_timer = {
- 
- MACHINE_START(MX31MOBOARD, "EPFL Mobots mx31moboard")
- 	/* Maintainer: Valentin Longchamp, EPFL Mobots group */
--	.phys_io	= AIPS1_BASE_ADDR,
--	.io_pg_offst	= ((AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
-+	.phys_io	= MX31_AIPS1_BASE_ADDR,
-+	.io_pg_offst	= ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
- 	.boot_params    = PHYS_OFFSET + 0x100,
- 	.map_io         = mx31_map_io,
- 	.init_irq       = mx31_init_irq,
-diff --git a/arch/arm/mach-mx3/mx31pdk.c b/arch/arm/mach-mx3/mx31pdk.c
-index 18715f1..e71e3b4 100644
---- a/arch/arm/mach-mx3/mx31pdk.c
-+++ b/arch/arm/mach-mx3/mx31pdk.c
-@@ -211,9 +211,9 @@ static int __init mx31pdk_init_expio(void)
-  */
- static struct map_desc mx31pdk_io_desc[] __initdata = {
- 	{
--		.virtual = CS5_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(CS5_BASE_ADDR),
--		.length = CS5_SIZE,
-+		.virtual = MX31_CS5_BASE_ADDR_VIRT,
-+		.pfn = __phys_to_pfn(MX31_CS5_BASE_ADDR),
-+		.length = MX31_CS5_SIZE,
- 		.type = MT_DEVICE,
- 	},
- };
-@@ -256,8 +256,8 @@ static struct sys_timer mx31pdk_timer = {
-  */
- MACHINE_START(MX31_3DS, "Freescale MX31PDK (3DS)")
- 	/* Maintainer: Freescale Semiconductor, Inc. */
--	.phys_io	= AIPS1_BASE_ADDR,
--	.io_pg_offst	= ((AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
-+	.phys_io	= MX31_AIPS1_BASE_ADDR,
-+	.io_pg_offst	= ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
- 	.boot_params    = PHYS_OFFSET + 0x100,
- 	.map_io         = mx31pdk_map_io,
- 	.init_irq       = mx31_init_irq,
-diff --git a/arch/arm/mach-mx3/mx35pdk.c b/arch/arm/mach-mx3/mx35pdk.c
-index 0bbc65e..2d11bf0 100644
---- a/arch/arm/mach-mx3/mx35pdk.c
-+++ b/arch/arm/mach-mx3/mx35pdk.c
-@@ -106,8 +106,8 @@ struct sys_timer mx35pdk_timer = {
- 
- MACHINE_START(MX35_3DS, "Freescale MX35PDK")
- 	/* Maintainer: Freescale Semiconductor, Inc */
--	.phys_io	= AIPS1_BASE_ADDR,
--	.io_pg_offst	= ((AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
-+	.phys_io	= MX35_AIPS1_BASE_ADDR,
-+	.io_pg_offst	= ((MX35_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
- 	.boot_params    = PHYS_OFFSET + 0x100,
- 	.map_io         = mx35_map_io,
- 	.init_irq       = mx35_init_irq,
-diff --git a/arch/arm/mach-mx3/pcm037.c b/arch/arm/mach-mx3/pcm037.c
-index 5be3969..701fac9 100644
---- a/arch/arm/mach-mx3/pcm037.c
-+++ b/arch/arm/mach-mx3/pcm037.c
-@@ -248,8 +248,8 @@ static struct imxuart_platform_data uart_pdata = {
- 
- static struct resource smsc911x_resources[] = {
- 	{
--		.start		= CS1_BASE_ADDR + 0x300,
--		.end		= CS1_BASE_ADDR + 0x300 + SZ_64K - 1,
-+		.start		= MX31_CS1_BASE_ADDR + 0x300,
-+		.end		= MX31_CS1_BASE_ADDR + 0x300 + SZ_64K - 1,
- 		.flags		= IORESOURCE_MEM,
- 	}, {
- 		.start		= IOMUX_TO_IRQ(MX31_PIN_GPIO3_1),
-@@ -281,8 +281,8 @@ static struct platdata_mtd_ram pcm038_sram_data = {
- };
- 
- static struct resource pcm038_sram_resource = {
--	.start = CS4_BASE_ADDR,
--	.end   = CS4_BASE_ADDR + 512 * 1024 - 1,
-+	.start = MX31_CS4_BASE_ADDR,
-+	.end   = MX31_CS4_BASE_ADDR + 512 * 1024 - 1,
- 	.flags = IORESOURCE_MEM,
- };
- 
-@@ -536,8 +536,8 @@ static struct mx3fb_platform_data mx3fb_pdata = {
- 
- static struct resource pcm970_sja1000_resources[] = {
- 	{
--		.start   = CS5_BASE_ADDR,
--		.end     = CS5_BASE_ADDR + 0x100 - 1,
-+		.start   = MX31_CS5_BASE_ADDR,
-+		.end     = MX31_CS5_BASE_ADDR + 0x100 - 1,
- 		.flags   = IORESOURCE_MEM,
- 	}, {
- 		.start   = IOMUX_TO_IRQ(IOMUX_PIN(48, 105)),
-@@ -636,8 +636,8 @@ struct sys_timer pcm037_timer = {
- 
- MACHINE_START(PCM037, "Phytec Phycore pcm037")
- 	/* Maintainer: Pengutronix */
--	.phys_io	= AIPS1_BASE_ADDR,
--	.io_pg_offst	= ((AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
-+	.phys_io	= MX31_AIPS1_BASE_ADDR,
-+	.io_pg_offst	= ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
- 	.boot_params    = PHYS_OFFSET + 0x100,
- 	.map_io         = mx31_map_io,
- 	.init_irq       = mx31_init_irq,
-diff --git a/arch/arm/mach-mx3/pcm043.c b/arch/arm/mach-mx3/pcm043.c
-index e3aa829..1212194 100644
---- a/arch/arm/mach-mx3/pcm043.c
-+++ b/arch/arm/mach-mx3/pcm043.c
-@@ -248,8 +248,8 @@ struct sys_timer pcm043_timer = {
- 
- MACHINE_START(PCM043, "Phytec Phycore pcm043")
- 	/* Maintainer: Pengutronix */
--	.phys_io	= AIPS1_BASE_ADDR,
--	.io_pg_offst	= ((AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
-+	.phys_io	= MX35_AIPS1_BASE_ADDR,
-+	.io_pg_offst	= ((MX35_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
- 	.boot_params    = PHYS_OFFSET + 0x100,
- 	.map_io         = mx35_map_io,
- 	.init_irq       = mx35_init_irq,
-diff --git a/arch/arm/mach-mx3/qong.c b/arch/arm/mach-mx3/qong.c
-index 044511f..3c1e736 100644
---- a/arch/arm/mach-mx3/qong.c
-+++ b/arch/arm/mach-mx3/qong.c
-@@ -43,7 +43,7 @@
- #define QONG_FPGA_VERSION(major, minor, rev)	\
- 	(((major & 0xF) << 12) | ((minor & 0xF) << 8) | (rev & 0xFF))
- 
--#define QONG_FPGA_BASEADDR 		CS1_BASE_ADDR
-+#define QONG_FPGA_BASEADDR 		MX31_CS1_BASE_ADDR
- #define QONG_FPGA_PERIPH_SIZE 		(1 << 24)
- 
- #define QONG_FPGA_CTRL_BASEADDR		QONG_FPGA_BASEADDR
-@@ -115,8 +115,8 @@ static struct physmap_flash_data qong_flash_data = {
- };
- 
- static struct resource qong_flash_resource = {
--	.start = CS0_BASE_ADDR,
--	.end = CS0_BASE_ADDR + QONG_NOR_SIZE - 1,
-+	.start = MX31_CS0_BASE_ADDR,
-+	.end = MX31_CS0_BASE_ADDR + QONG_NOR_SIZE - 1,
- 	.flags = IORESOURCE_MEM,
- };
- 
-@@ -180,8 +180,8 @@ static struct platform_nand_data qong_nand_data = {
- };
- 
- static struct resource qong_nand_resource = {
--	.start  	= CS3_BASE_ADDR,
--	.end    	= CS3_BASE_ADDR + SZ_32M - 1,
-+	.start  	= MX31_CS3_BASE_ADDR,
-+	.end    	= MX31_CS3_BASE_ADDR + SZ_32M - 1,
- 	.flags		= IORESOURCE_MEM,
- };
- 
-@@ -275,8 +275,8 @@ static struct sys_timer qong_timer = {
- 
- MACHINE_START(QONG, "Dave/DENX QongEVB-LITE")
- 	/* Maintainer: DENX Software Engineering GmbH */
--	.phys_io        = AIPS1_BASE_ADDR,
--	.io_pg_offst    = ((AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
-+	.phys_io        = MX31_AIPS1_BASE_ADDR,
-+	.io_pg_offst    = ((MX31_AIPS1_BASE_ADDR_VIRT) >> 18) & 0xfffc,
- 	.boot_params    = PHYS_OFFSET + 0x100,
- 	.map_io         = mx31_map_io,
- 	.init_irq       = mx31_init_irq,
-diff --git a/arch/arm/plat-mxc/include/mach/board-kzmarm11.h b/arch/arm/plat-mxc/include/mach/board-kzmarm11.h
-index 05ff2f3..93cc66f 100644
---- a/arch/arm/plat-mxc/include/mach/board-kzmarm11.h
-+++ b/arch/arm/plat-mxc/include/mach/board-kzmarm11.h
-@@ -21,19 +21,19 @@
- /*
-  *  KZM-ARM11-01 Board Control Registers on FPGA
-  */
--#define KZM_ARM11_CTL1		(CS4_BASE_ADDR + 0x1000)
--#define KZM_ARM11_CTL2		(CS4_BASE_ADDR + 0x1001)
--#define KZM_ARM11_RSW1		(CS4_BASE_ADDR + 0x1002)
--#define KZM_ARM11_BACK_LIGHT	(CS4_BASE_ADDR + 0x1004)
--#define KZM_ARM11_FPGA_REV	(CS4_BASE_ADDR + 0x1008)
--#define KZM_ARM11_7SEG_LED	(CS4_BASE_ADDR + 0x1010)
--#define KZM_ARM11_LEDS		(CS4_BASE_ADDR + 0x1020)
--#define KZM_ARM11_DIPSW2	(CS4_BASE_ADDR + 0x1003)
-+#define KZM_ARM11_CTL1		(MX31_CS4_BASE_ADDR + 0x1000)
-+#define KZM_ARM11_CTL2		(MX31_CS4_BASE_ADDR + 0x1001)
-+#define KZM_ARM11_RSW1		(MX31_CS4_BASE_ADDR + 0x1002)
-+#define KZM_ARM11_BACK_LIGHT	(MX31_CS4_BASE_ADDR + 0x1004)
-+#define KZM_ARM11_FPGA_REV	(MX31_CS4_BASE_ADDR + 0x1008)
-+#define KZM_ARM11_7SEG_LED	(MX31_CS4_BASE_ADDR + 0x1010)
-+#define KZM_ARM11_LEDS		(MX31_CS4_BASE_ADDR + 0x1020)
-+#define KZM_ARM11_DIPSW2	(MX31_CS4_BASE_ADDR + 0x1003)
- 
- /*
-  * External UART for touch panel on FPGA
-  */
--#define KZM_ARM11_16550		(CS4_BASE_ADDR + 0x1050)
-+#define KZM_ARM11_16550		(MX31_CS4_BASE_ADDR + 0x1050)
- 
- #endif /* __ARM_ARCH_BOARD_KZM_ARM11_H */
- 
+ #define CCM_CSCR_PRESC_OFFSET	29
+ #define CCM_CSCR_PRESC_MASK	(0x7 << CCM_CSCR_PRESC_OFFSET)
 -- 
 1.6.5.2
