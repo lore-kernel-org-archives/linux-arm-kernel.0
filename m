@@ -1,247 +1,218 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri,  8 Jan 2010 02:37:02 +0000
-Subject: [PATCH] ARM: SAMSUNG: Move IRQ UART handling for newer devices to
-	plat-samsung
+Date: Fri,  8 Jan 2010 02:37:01 +0000
+Subject: [PATCH] ARM: SAMSUNG: Move IRQ VIC timer handling out to common
+	header files
 In-Reply-To: <1262918223-26529-1-git-send-email-ben-linux@fluff.org>
 References: <1262918223-26529-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1262918223-26529-6-git-send-email-ben-linux@fluff.org>
+Message-ID: <1262918223-26529-5-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the handling for the UART interrupts out of the s3c64xx specific
-code and into plat-samsung so that it can be used by all implementations
-that need it.
+Move the VIC based timer interrupt handling out of plat-s3c64xx and
+into plat-samsung to be re-used for other systems. This also reduces
+the code size as we now have a common init routine and use the irq_desc
+to store the interrupt number of the timer.
 
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/plat-s3c64xx/Kconfig                 |    1 +
- arch/arm/plat-s3c64xx/irq.c                   |  117 +--------------------
- arch/arm/plat-samsung/Kconfig                 |    5 +
- arch/arm/plat-samsung/Makefile                |    1 +
- arch/arm/plat-samsung/include/plat/irq-uart.h |   20 ++++
- arch/arm/plat-samsung/irq-uart.c              |  143 +++++++++++++++++++++++++
- 6 files changed, 173 insertions(+), 114 deletions(-)
- create mode 100644 arch/arm/plat-samsung/include/plat/irq-uart.h
- create mode 100644 arch/arm/plat-samsung/irq-uart.c
+ arch/arm/plat-s3c64xx/Kconfig                      |    1 +
+ arch/arm/plat-s3c64xx/irq.c                        |   90 ++------------------
+ arch/arm/plat-samsung/Kconfig                      |    7 ++
+ arch/arm/plat-samsung/Makefile                     |    2 +
+ arch/arm/plat-samsung/include/plat/irq-vic-timer.h |   13 +++
+ arch/arm/plat-samsung/irq-vic-timer.c              |   86 +++++++++++++++++++
+ 6 files changed, 116 insertions(+), 83 deletions(-)
+ create mode 100644 arch/arm/plat-samsung/include/plat/irq-vic-timer.h
+ create mode 100644 arch/arm/plat-samsung/irq-vic-timer.c
 
 diff --git a/arch/arm/plat-s3c64xx/Kconfig b/arch/arm/plat-s3c64xx/Kconfig
-index 02d716f..0fba1f9 100644
+index bec1224..02d716f 100644
 --- a/arch/arm/plat-s3c64xx/Kconfig
 +++ b/arch/arm/plat-s3c64xx/Kconfig
-@@ -15,6 +15,7 @@ config PLAT_S3C64XX
+@@ -14,6 +14,7 @@ config PLAT_S3C64XX
+ 	select NO_IOPORT
  	select ARCH_REQUIRE_GPIOLIB
  	select SAMSUNG_CLKSRC
- 	select SAMSUNG_IRQ_VIC_TIMER
-+	select SAMSUNG_IRQ_UART
++	select SAMSUNG_IRQ_VIC_TIMER
  	select S3C_GPIO_TRACK
  	select S3C_GPIO_PULL_UPDOWN
  	select S3C_GPIO_CFG_S3C24XX
 diff --git a/arch/arm/plat-s3c64xx/irq.c b/arch/arm/plat-s3c64xx/irq.c
-index 8b69bca..b98451e 100644
+index 8dc5b6d..8b69bca 100644
 --- a/arch/arm/plat-s3c64xx/irq.c
 +++ b/arch/arm/plat-s3c64xx/irq.c
-@@ -22,19 +22,10 @@
+@@ -21,78 +21,10 @@
+ #include <asm/hardware/vic.h>
  
  #include <mach/map.h>
- #include <plat/irq-vic-timer.h>
--#include <plat/regs-serial.h>
-+#include <plat/irq-uart.h>
++#include <plat/irq-vic-timer.h>
+ #include <plat/regs-serial.h>
+-#include <plat/regs-timer.h>
  #include <plat/cpu.h>
  
--struct uart_irq {
--	void __iomem	*regs;
--	unsigned int	 base_irq;
--	unsigned int	 parent_irq;
+-/* Timer interrupt handling */
+-
+-static void s3c_irq_demux_timer(unsigned int base_irq, unsigned int sub_irq)
+-{
+-	generic_handle_irq(sub_irq);
+-}
+-
+-static void s3c_irq_demux_timer0(unsigned int irq, struct irq_desc *desc)
+-{
+-	s3c_irq_demux_timer(irq, IRQ_TIMER0);
+-}
+-
+-static void s3c_irq_demux_timer1(unsigned int irq, struct irq_desc *desc)
+-{
+-	s3c_irq_demux_timer(irq, IRQ_TIMER1);
+-}
+-
+-static void s3c_irq_demux_timer2(unsigned int irq, struct irq_desc *desc)
+-{
+-	s3c_irq_demux_timer(irq, IRQ_TIMER2);
+-}
+-
+-static void s3c_irq_demux_timer3(unsigned int irq, struct irq_desc *desc)
+-{
+-	s3c_irq_demux_timer(irq, IRQ_TIMER3);
+-}
+-
+-static void s3c_irq_demux_timer4(unsigned int irq, struct irq_desc *desc)
+-{
+-	s3c_irq_demux_timer(irq, IRQ_TIMER4);
+-}
+-
+-/* We assume the IRQ_TIMER0..IRQ_TIMER4 range is continuous. */
+-
+-static void s3c_irq_timer_mask(unsigned int irq)
+-{
+-	u32 reg = __raw_readl(S3C64XX_TINT_CSTAT);
+-
+-	reg &= 0x1f;  /* mask out pending interrupts */
+-	reg &= ~(1 << (irq - IRQ_TIMER0));
+-	__raw_writel(reg, S3C64XX_TINT_CSTAT);
+-}
+-
+-static void s3c_irq_timer_unmask(unsigned int irq)
+-{
+-	u32 reg = __raw_readl(S3C64XX_TINT_CSTAT);
+-
+-	reg &= 0x1f;  /* mask out pending interrupts */
+-	reg |= 1 << (irq - IRQ_TIMER0);
+-	__raw_writel(reg, S3C64XX_TINT_CSTAT);
+-}
+-
+-static void s3c_irq_timer_ack(unsigned int irq)
+-{
+-	u32 reg = __raw_readl(S3C64XX_TINT_CSTAT);
+-
+-	reg &= 0x1f;
+-	reg |= (1 << 5) << (irq - IRQ_TIMER0);
+-	__raw_writel(reg, S3C64XX_TINT_CSTAT);
+-}
+-
+-static struct irq_chip s3c_irq_timer = {
+-	.name		= "s3c-timer",
+-	.mask		= s3c_irq_timer_mask,
+-	.unmask		= s3c_irq_timer_unmask,
+-	.ack		= s3c_irq_timer_ack,
 -};
 -
--/* Note, we make use of the fact that the parent IRQs, IRQ_UART[0..3]
-- * are consecutive when looking up the interrupt in the demux routines.
-- */
--static struct uart_irq uart_irqs[] = {
-+static struct s3c_uart_irq uart_irqs[] = {
- 	[0] = {
- 		.regs		= S3C_VA_UART0,
- 		.base_irq	= IRQ_S3CUART_BASE0,
-@@ -57,110 +48,9 @@ static struct uart_irq uart_irqs[] = {
- 	},
- };
- 
--static inline void __iomem *s3c_irq_uart_base(unsigned int irq)
--{
--	struct uart_irq *uirq = get_irq_chip_data(irq);
--	return uirq->regs;
--}
--
--static inline unsigned int s3c_irq_uart_bit(unsigned int irq)
--{
--	return irq & 3;
--}
--
--/* UART interrupt registers, not worth adding to seperate include header */
--
--static void s3c_irq_uart_mask(unsigned int irq)
--{
--	void __iomem *regs = s3c_irq_uart_base(irq);
--	unsigned int bit = s3c_irq_uart_bit(irq);
--	u32 reg;
--
--	reg = __raw_readl(regs + S3C64XX_UINTM);
--	reg |= (1 << bit);
--	__raw_writel(reg, regs + S3C64XX_UINTM);
--}
--
--static void s3c_irq_uart_maskack(unsigned int irq)
--{
--	void __iomem *regs = s3c_irq_uart_base(irq);
--	unsigned int bit = s3c_irq_uart_bit(irq);
--	u32 reg;
--
--	reg = __raw_readl(regs + S3C64XX_UINTM);
--	reg |= (1 << bit);
--	__raw_writel(reg, regs + S3C64XX_UINTM);
--	__raw_writel(1 << bit, regs + S3C64XX_UINTP);
--}
--
--static void s3c_irq_uart_unmask(unsigned int irq)
--{
--	void __iomem *regs = s3c_irq_uart_base(irq);
--	unsigned int bit = s3c_irq_uart_bit(irq);
--	u32 reg;
--
--	reg = __raw_readl(regs + S3C64XX_UINTM);
--	reg &= ~(1 << bit);
--	__raw_writel(reg, regs + S3C64XX_UINTM);
--}
--
--static void s3c_irq_uart_ack(unsigned int irq)
--{
--	void __iomem *regs = s3c_irq_uart_base(irq);
--	unsigned int bit = s3c_irq_uart_bit(irq);
--
--	__raw_writel(1 << bit, regs + S3C64XX_UINTP);
--}
--
--static void s3c_irq_demux_uart(unsigned int irq, struct irq_desc *desc)
--{
--	struct uart_irq *uirq = &uart_irqs[irq - IRQ_UART0];
--	u32 pend = __raw_readl(uirq->regs + S3C64XX_UINTP);
--	int base = uirq->base_irq;
--
--	if (pend & (1 << 0))
--		generic_handle_irq(base);
--	if (pend & (1 << 1))
--		generic_handle_irq(base + 1);
--	if (pend & (1 << 2))
--		generic_handle_irq(base + 2);
--	if (pend & (1 << 3))
--		generic_handle_irq(base + 3);
--}
--
--static struct irq_chip s3c_irq_uart = {
--	.name		= "s3c-uart",
--	.mask		= s3c_irq_uart_mask,
--	.unmask		= s3c_irq_uart_unmask,
--	.mask_ack	= s3c_irq_uart_maskack,
--	.ack		= s3c_irq_uart_ack,
--};
--
--static void __init s3c64xx_uart_irq(struct uart_irq *uirq)
--{
--	void __iomem *reg_base = uirq->regs;
--	unsigned int irq;
--	int offs;
--
--	/* mask all interrupts at the start. */
--	__raw_writel(0xf, reg_base + S3C64XX_UINTM);
--
--	for (offs = 0; offs < 3; offs++) {
--		irq = uirq->base_irq + offs;
--
--		set_irq_chip(irq, &s3c_irq_uart);
--		set_irq_chip_data(irq, uirq);
--		set_irq_handler(irq, handle_level_irq);
--		set_irq_flags(irq, IRQF_VALID);
--	}
--
--	set_irq_chained_handler(uirq->parent_irq, s3c_irq_demux_uart);
--}
+ struct uart_irq {
+ 	void __iomem	*regs;
+ 	unsigned int	 base_irq;
+@@ -227,7 +159,7 @@ static void __init s3c64xx_uart_irq(struct uart_irq *uirq)
  
  void __init s3c64xx_init_irq(u32 vic0_valid, u32 vic1_valid)
  {
--	int uart;
--
+-	int uart, irq;
++	int uart;
+ 
  	printk(KERN_DEBUG "%s: initialising interrupts\n", __func__);
  
- 	/* initialise the pair of VICs */
-@@ -175,6 +65,5 @@ void __init s3c64xx_init_irq(u32 vic0_valid, u32 vic1_valid)
- 	s3c_init_vic_timer_irq(IRQ_TIMER3_VIC, IRQ_TIMER3);
- 	s3c_init_vic_timer_irq(IRQ_TIMER4_VIC, IRQ_TIMER4);
+@@ -237,20 +169,12 @@ void __init s3c64xx_init_irq(u32 vic0_valid, u32 vic1_valid)
  
--	for (uart = 0; uart < ARRAY_SIZE(uart_irqs); uart++)
--		s3c64xx_uart_irq(&uart_irqs[uart]);
-+	s3c_init_uart_irqs(uart_irqs, ARRAY_SIZE(uart_irqs));
+ 	/* add the timer sub-irqs */
+ 
+-	set_irq_chained_handler(IRQ_TIMER0_VIC, s3c_irq_demux_timer0);
+-	set_irq_chained_handler(IRQ_TIMER1_VIC, s3c_irq_demux_timer1);
+-	set_irq_chained_handler(IRQ_TIMER2_VIC, s3c_irq_demux_timer2);
+-	set_irq_chained_handler(IRQ_TIMER3_VIC, s3c_irq_demux_timer3);
+-	set_irq_chained_handler(IRQ_TIMER4_VIC, s3c_irq_demux_timer4);
+-
+-	for (irq = IRQ_TIMER0; irq <= IRQ_TIMER4; irq++) {
+-		set_irq_chip(irq, &s3c_irq_timer);
+-		set_irq_handler(irq, handle_level_irq);
+-		set_irq_flags(irq, IRQF_VALID);
+-	}
++	s3c_init_vic_timer_irq(IRQ_TIMER0_VIC, IRQ_TIMER0);
++	s3c_init_vic_timer_irq(IRQ_TIMER1_VIC, IRQ_TIMER1);
++	s3c_init_vic_timer_irq(IRQ_TIMER2_VIC, IRQ_TIMER2);
++	s3c_init_vic_timer_irq(IRQ_TIMER3_VIC, IRQ_TIMER3);
++	s3c_init_vic_timer_irq(IRQ_TIMER4_VIC, IRQ_TIMER4);
+ 
+ 	for (uart = 0; uart < ARRAY_SIZE(uart_irqs); uart++)
+ 		s3c64xx_uart_irq(&uart_irqs[uart]);
  }
+-
+-
 diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index cedecd8..900b463 100644
+index 9e7daf2..cedecd8 100644
 --- a/arch/arm/plat-samsung/Kconfig
 +++ b/arch/arm/plat-samsung/Kconfig
-@@ -26,6 +26,11 @@ config SAMSUNG_IRQ_VIC_TIMER
-        help
-          Internal configuration to build the VIC timer interrupt code.
+@@ -19,6 +19,13 @@ config SAMSUNG_CLKSRC
+ 	  Select the clock code for the clksrc implementation
+ 	  used by newer systems such as the S3C64XX.
  
-+config SAMSUNG_IRQ_UART
++# options for IRQ support
++
++config SAMSUNG_IRQ_VIC_TIMER
 +       bool
 +       help
-+         Internal configuration to build the IRQ UART demux code.
++         Internal configuration to build the VIC timer interrupt code.
 +
  # options for gpio configuration support
  
  config S3C_GPIO_CFG_S3C24XX
 diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-index aa048c7..aeb7e12 100644
+index 2c01437..aa048c7 100644
 --- a/arch/arm/plat-samsung/Makefile
 +++ b/arch/arm/plat-samsung/Makefile
-@@ -17,6 +17,7 @@ obj-y				+= gpio-config.o
+@@ -17,6 +17,8 @@ obj-y				+= gpio-config.o
  
  obj-$(CONFIG_SAMSUNG_CLKSRC)	+= clock-clksrc.o
  
-+obj-$(CONFIG_SAMSUNG_IRQ_UART)	+= irq-uart.o
- obj-$(CONFIG_SAMSUNG_IRQ_VIC_TIMER) += irq-vic-timer.o
- 
++obj-$(CONFIG_SAMSUNG_IRQ_VIC_TIMER) += irq-vic-timer.o
++
  # devices
-diff --git a/arch/arm/plat-samsung/include/plat/irq-uart.h b/arch/arm/plat-samsung/include/plat/irq-uart.h
+ 
+ obj-$(CONFIG_S3C_DEV_HSMMC)	+= dev-hsmmc.o
+diff --git a/arch/arm/plat-samsung/include/plat/irq-vic-timer.h b/arch/arm/plat-samsung/include/plat/irq-vic-timer.h
 new file mode 100644
-index 0000000..a9331e4
+index 0000000..a90b534
 --- /dev/null
-+++ b/arch/arm/plat-samsung/include/plat/irq-uart.h
-@@ -0,0 +1,20 @@
-+/* arch/arm/plat-samsung/include/plat/irq-uart.h
++++ b/arch/arm/plat-samsung/include/plat/irq-vic-timer.h
+@@ -0,0 +1,13 @@
++/* arch/arm/plat-samsung/include/plat/irq-vic-timer.h
 + *
 + * Copyright (c) 2010 Simtec Electronics
 + *	Ben Dooks <ben@simtec.co.uk>
 + *
-+ * Header file for Samsung SoC UART IRQ demux for S3C64XX and later
++ * Header file for Samsung SoC IRQ VIC timer
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 +*/
 +
-+struct s3c_uart_irq {
-+	void __iomem	*regs;
-+	unsigned int	 base_irq;
-+	unsigned int	 parent_irq;
-+};
-+
-+extern void s3c_init_uart_irqs(struct s3c_uart_irq *irq, unsigned int nr_irqs);
-+
-diff --git a/arch/arm/plat-samsung/irq-uart.c b/arch/arm/plat-samsung/irq-uart.c
++extern void s3c_init_vic_timer_irq(unsigned int vic, unsigned int timer);
+diff --git a/arch/arm/plat-samsung/irq-vic-timer.c b/arch/arm/plat-samsung/irq-vic-timer.c
 new file mode 100644
-index 0000000..4f8c102
+index 0000000..0270519
 --- /dev/null
-+++ b/arch/arm/plat-samsung/irq-uart.c
-@@ -0,0 +1,143 @@
-+/* arch/arm/plat-samsung/irq-uart.c
++++ b/arch/arm/plat-samsung/irq-vic-timer.c
+@@ -0,0 +1,86 @@
++/* arch/arm/plat-samsung/irq-vic-timer.c
 + *	originally part of arch/arm/plat-s3c64xx/irq.c
 + *
 + * Copyright 2008 Openmoko, Inc.
@@ -249,7 +220,7 @@ index 0000000..4f8c102
 + *      Ben Dooks <ben@simtec.co.uk>
 + *      http://armlinux.simtec.co.uk/
 + *
-+ * Samsung- UART Interrupt handling
++ * S3C64XX - Interrupt handling
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -258,131 +229,74 @@ index 0000000..4f8c102
 +
 +#include <linux/kernel.h>
 +#include <linux/interrupt.h>
-+#include <linux/serial_core.h>
 +#include <linux/irq.h>
 +#include <linux/io.h>
 +
 +#include <mach/map.h>
-+#include <plat/irq-uart.h>
-+#include <plat/regs-serial.h>
-+#include <plat/cpu.h>
++#include <plat/irq-vic-timer.h>
++#include <plat/regs-timer.h>
 +
-+/* Note, we make use of the fact that the parent IRQs, IRQ_UART[0..3]
-+ * are consecutive when looking up the interrupt in the demux routines.
-+ */
-+
-+static inline void __iomem *s3c_irq_uart_base(unsigned int irq)
++static void s3c_irq_demux_vic_timer(unsigned int irq, struct irq_desc *desc)
 +{
-+	struct s3c_uart_irq *uirq = get_irq_chip_data(irq);
-+	return uirq->regs;
++	generic_handle_irq((int)desc->handler_data);
 +}
 +
-+static inline unsigned int s3c_irq_uart_bit(unsigned int irq)
++/* We assume the IRQ_TIMER0..IRQ_TIMER4 range is continuous. */
++
++static void s3c_irq_timer_mask(unsigned int irq)
 +{
-+	return irq & 3;
++	u32 reg = __raw_readl(S3C64XX_TINT_CSTAT);
++
++	reg &= 0x1f;  /* mask out pending interrupts */
++	reg &= ~(1 << (irq - IRQ_TIMER0));
++	__raw_writel(reg, S3C64XX_TINT_CSTAT);
 +}
 +
-+static void s3c_irq_uart_mask(unsigned int irq)
++static void s3c_irq_timer_unmask(unsigned int irq)
 +{
-+	void __iomem *regs = s3c_irq_uart_base(irq);
-+	unsigned int bit = s3c_irq_uart_bit(irq);
-+	u32 reg;
++	u32 reg = __raw_readl(S3C64XX_TINT_CSTAT);
 +
-+	reg = __raw_readl(regs + S3C64XX_UINTM);
-+	reg |= (1 << bit);
-+	__raw_writel(reg, regs + S3C64XX_UINTM);
++	reg &= 0x1f;  /* mask out pending interrupts */
++	reg |= 1 << (irq - IRQ_TIMER0);
++	__raw_writel(reg, S3C64XX_TINT_CSTAT);
 +}
 +
-+static void s3c_irq_uart_maskack(unsigned int irq)
++static void s3c_irq_timer_ack(unsigned int irq)
 +{
-+	void __iomem *regs = s3c_irq_uart_base(irq);
-+	unsigned int bit = s3c_irq_uart_bit(irq);
-+	u32 reg;
++	u32 reg = __raw_readl(S3C64XX_TINT_CSTAT);
 +
-+	reg = __raw_readl(regs + S3C64XX_UINTM);
-+	reg |= (1 << bit);
-+	__raw_writel(reg, regs + S3C64XX_UINTM);
-+	__raw_writel(1 << bit, regs + S3C64XX_UINTP);
++	reg &= 0x1f;
++	reg |= (1 << 5) << (irq - IRQ_TIMER0);
++	__raw_writel(reg, S3C64XX_TINT_CSTAT);
 +}
 +
-+static void s3c_irq_uart_unmask(unsigned int irq)
-+{
-+	void __iomem *regs = s3c_irq_uart_base(irq);
-+	unsigned int bit = s3c_irq_uart_bit(irq);
-+	u32 reg;
-+
-+	reg = __raw_readl(regs + S3C64XX_UINTM);
-+	reg &= ~(1 << bit);
-+	__raw_writel(reg, regs + S3C64XX_UINTM);
-+}
-+
-+static void s3c_irq_uart_ack(unsigned int irq)
-+{
-+	void __iomem *regs = s3c_irq_uart_base(irq);
-+	unsigned int bit = s3c_irq_uart_bit(irq);
-+
-+	__raw_writel(1 << bit, regs + S3C64XX_UINTP);
-+}
-+
-+static void s3c_irq_demux_uart(unsigned int irq, struct irq_desc *desc)
-+{
-+	struct s3c_uart_irq *uirq = desc->handler_data;
-+	u32 pend = __raw_readl(uirq->regs + S3C64XX_UINTP);
-+	int base = uirq->base_irq;
-+
-+	if (pend & (1 << 0))
-+		generic_handle_irq(base);
-+	if (pend & (1 << 1))
-+		generic_handle_irq(base + 1);
-+	if (pend & (1 << 2))
-+		generic_handle_irq(base + 2);
-+	if (pend & (1 << 3))
-+		generic_handle_irq(base + 3);
-+}
-+
-+static struct irq_chip s3c_irq_uart = {
-+	.name		= "s3c-uart",
-+	.mask		= s3c_irq_uart_mask,
-+	.unmask		= s3c_irq_uart_unmask,
-+	.mask_ack	= s3c_irq_uart_maskack,
-+	.ack		= s3c_irq_uart_ack,
++static struct irq_chip s3c_irq_timer = {
++	.name		= "s3c-timer",
++	.mask		= s3c_irq_timer_mask,
++	.unmask		= s3c_irq_timer_unmask,
++	.ack		= s3c_irq_timer_ack,
 +};
 +
-+static void __init s3c_init_uart_irq(struct s3c_uart_irq *uirq)
-+{
-+	struct irq_desc *desc = irq_to_desc(uirq->parent_irq);
-+	void __iomem *reg_base = uirq->regs;
-+	unsigned int irq;
-+	int offs;
-+
-+	/* mask all interrupts at the start. */
-+	__raw_writel(0xf, reg_base + S3C64XX_UINTM);
-+
-+	for (offs = 0; offs < 3; offs++) {
-+		irq = uirq->base_irq + offs;
-+
-+		set_irq_chip(irq, &s3c_irq_uart);
-+		set_irq_chip_data(irq, uirq);
-+		set_irq_handler(irq, handle_level_irq);
-+		set_irq_flags(irq, IRQF_VALID);
-+	}
-+
-+	desc->handler_data = uirq;
-+	set_irq_chained_handler(uirq->parent_irq, s3c_irq_demux_uart);
-+}
-+
 +/**
-+ * s3c_init_uart_irqs() - initialise UART IRQs and the necessary demuxing
-+ * @irq: The interrupt data for registering
-+ * @nr_irqs: The number of interrupt descriptions in @irq.
++ * s3c_init_vic_timer_irq() - initialise timer irq chanined off VIC.\
++ * @parent_irq: The parent IRQ on the VIC for the timer.
++ * @timer_irq: The IRQ to be used for the timer.
 + *
-+ * Register the UART interrupts specified by @irq including the demuxing
-+ * routines. This supports the S3C6400 and newer style of devices.
++ * Register the necessary IRQ chaining and support for the timer IRQs
++ * chained of the VIC.
 + */
-+void __init s3c_init_uart_irqs(struct s3c_uart_irq *irq, unsigned int nr_irqs)
++void __init s3c_init_vic_timer_irq(unsigned int parent_irq,
++				   unsigned int timer_irq)
 +{
-+	for (; nr_irqs > 0; nr_irqs--, irq++)
-+		s3c_init_uart_irq(irq);
++	struct irq_desc *desc = irq_to_desc(parent_irq);
++
++	set_irq_chained_handler(parent_irq, s3c_irq_demux_vic_timer);
++
++	set_irq_chip(timer_irq, &s3c_irq_timer);
++	set_irq_handler(timer_irq, handle_level_irq);
++	set_irq_flags(timer_irq, IRQF_VALID);
++
++	desc->handler_data = (void *)timer_irq;
 +}
 -- 
 1.6.0.4
