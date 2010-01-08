@@ -1,41 +1,29 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Fri, 8 Jan 2010 14:19:18 +0000
-Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors (v3)
-In-Reply-To: <1262858349.2695.7.camel@pc1117.cambridge.arm.com>
-References: <20100106181705.GD11773@shareable.org>
-	<1262858349.2695.7.camel@pc1117.cambridge.arm.com>
-Message-ID: <20100108141918.GC19328@shareable.org>
+From: mkl0301@hotmail.com (mkl lin)
+Date: Fri, 8 Jan 2010 15:09:49 +0000
+Subject: SMP issues on ARM11 MPCore
+In-Reply-To: <1687fa361001080514g57ff7a33k4521961fe5fdeb64@mail.gmail.com>
+References: <SNT109-W391FD03251D32533FAE84DA77F0@phx.gbl>,
+	<1687fa361001070250l62628061h4bebaca1c03d2638@mail.gmail.com>,
+	<1687fa361001070545q73e6738apd6ce5650316eca26@mail.gmail.com>,
+	<20100107143916.GA24990@pengutronix.de>,
+	<1687fa361001080514g57ff7a33k4521961fe5fdeb64@mail.gmail.com>
+Message-ID: <SNT109-W17F04458915DBA5AA1D665A7700@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas wrote:
-> On Wed, 2010-01-06 at 18:17 +0000, Jamie Lokier wrote:
-> > Catalin Marinas wrote:
-> > > > Is there any reason why this wasn't always like that?
-> > >
-> > > On ARMv6 onwards (where this user RO, kernel RO is supported) we cannot
-> > > easily differentiate between the vectors page and a normal kernel page
-> > > unless we use another L_PTE_ bit. We need the vectors page to be
-> > > writable if there is no TLS register in hardware (I guess we could use
-> > > domain switching to override this though). But on ARMv7 we always have a
-> > > TLS register, so no need to write to the vectors page.
-> > 
-> > Could you map the TLS page writable (kernel access only) at another
-> > address at the same time, carefully choosing an aliasing address so
-> > that no cache flush is needed after writing?
-> 
-> It could be but I'm not sure it's worth. Leif's patch is intended for
-> ARMv7 where we always have a hardware TLS register. The FIQ handler
-> installation could probably be done by first calling set_fs(KERNEL_DS).
 
-You're right.
 
-I was confused about the meaning of (user RO == kernel RW) pages,
-thinking that like on a 386, it makes copy_to_user expensive.
+> Having this patch applied and having mkl lin's test module working
+> now, it seems to me that I'm not able to reproduce mkl lin's issues,
+> though. I will do some additional tests.
 
-But I've just remembered that ARM uses ldrt and strt instructions for
-user memory access... doh!
+I think my issues is because of my serial driver detected and enabled the workaround for UART_BUG_THRE. I'm not sure whether should it be or not. If I force it not to enable the workaround, the serial driver works just fine, even without the previous patch. You could ensure that whether UART_BUG_THRE is enabled or not. if not, there is nothing to race with.
 
-So user RO == kernel RW hardly matters.
+And if you want to try my test, you should not have it in a script file. I have it all in one command line, and keep repeat <up-arrow><enter><up-arrow><enter>... in a very fast speed, not waiting the last finish printing. The purpose is to have kernel (printk) and user space(sh) keep printing at the same time, so the printk would have race condition with serial8250_backup_timeout.
 
--- Jamie
+Best Regards,
+Mac Lin
+ 		 	   		  
+_________________________________________________________________
+Windows Live: Friends get your Flickr, Yelp, and Digg updates when they e-mail you.
+http://www.microsoft.com/middleeast/windows/windowslive/see-it-in-action/social-network-basics.aspx?ocid=PID23461::T:WLMTAGL:ON:WL:en-xm:SI_SB_3:092010
