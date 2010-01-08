@@ -1,55 +1,48 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 8 Jan 2010 05:34:45 -0500
-Subject: [PATCH 1/4] mfd: enable max8925
-In-Reply-To: <20100108000126.GE11239@sortiz.org>
-References: <771cded00912210445v67175632i876b7909de8afae3@mail.gmail.com>
-	<20100108000126.GE11239@sortiz.org>
-Message-ID: <771cded01001080234h735d2e7dxafeb5c5a952dc218@mail.gmail.com>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Fri, 08 Jan 2010 11:53:31 +0100
+Subject: [PATCH 1/4] mfd: mc13783: Take care of semantic inversion
+	between read and write value of two bits in POWER_MISCELLANEUS
+	register.
+In-Reply-To: <20100105195520.GA8555@pengutronix.de>
+References: <1260808880.2022.98.camel@climbing-alby>
+	<1260810776.2022.130.camel@climbing-alby>
+	<4B26799F.1020507@ru.mvista.com>
+	<1260813540.2022.174.camel@climbing-alby>
+	<20100105181541.GE4274@sortiz.org>
+	<20100105195520.GA8555@pengutronix.de>
+Message-ID: <1262948011.2050.3.camel@climbing-alby>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 7, 2010 at 7:01 PM, Samuel Ortiz <sameo@linux.intel.com> wrote:
-> Hi Haojian,
->
-> On Mon, Dec 21, 2009 at 07:45:27AM -0500, Haojian Zhuang wrote:
->> From 567add422a0d2214e037c3ed1b424b21776dfe34 Mon Sep 17 00:00:00 2001
->> From: Haojian Zhuang <haojian.zhuang@marvell.com>
->> Date: Thu, 17 Dec 2009 12:30:16 -0500
->> Subject: [PATCH] mfd: enable max8925
->>
->> Max8925 is a Power Management IC from Maxim Semiconductor.
->>
->> Do basic support on accessing MAX8925.
-> The patch looks quite good to me. I have some minor comments/suggestions
-> though:
->
->> ?obj-$(CONFIG_PMIC_DA903X) ? ?+= da903x.o
->> +max8925-objs ? ? ? ? ? ? ? ? := max8925-core.o max8925-i2c.o
->> +obj-$(CONFIG_MFD_MAX8925) ? ?+= max8925.o
-> No big deal, but it could just be:
-> obj-$(CONFIG_MFD_MAX8925) ? ?+= max8925-core.o max8925-i2c.o
->
+Sorry for late response.. as Uwe said, we have discuss about this 
+and I will prepare another patch that involve the regulator driver.
 
-I prefer to still use this way. If I write it as your way, it will be
-built to max8925-core.ko and max8925-i2c.ko when built as module. I
-just want to make it built as max8925.ko.
+Alberto!
 
-Others are updated. Since it impacts the second one, I upload both #1
-and #2 patches.
-
-Thanks
-Haojian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-mfd-enable-max8925.patch
-Type: text/x-patch
-Size: 17867 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100108/25c2178f/attachment-0002.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0002-mfd-add-subdevs-in-max8925.patch
-Type: text/x-patch
-Size: 9291 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100108/25c2178f/attachment-0003.bin>
+Il giorno mar, 05/01/2010 alle 20.55 +0100, Uwe Kleine-K?nig ha scritto:
+> On Tue, Jan 05, 2010 at 07:15:42PM +0100, Samuel Ortiz wrote:
+> > > @@ -187,6 +190,13 @@ int mc13783_reg_write(struct mc13783 *mc13783, unsigned int offset, u32 val)
+> > >  
+> > >         buf = 1 << 31 | offset << MC13783_REGOFFSET_SHIFT | val;
+> > >  
+> > > +       /* Take care of table 4-24 in Freescale MC13783IGPLDRM.pdf making
+> > > +        * the assumption that PWGTnDRV signals controls core power supplies
+> > > +        * that software must not disable. */
+> > > +       if (offset == MC13783_REG_POWER_MISCELLANEOUS)
+> > > +               buf &= ~(MC13783_REGCTRL_PWGT1SPIEN |
+> > > +                        MC13783_REGCTRL_PWGT2SPIEN);
+> > > +
+> > Although I see where you want to go, I dont really enjoy that solution.
+> > I would prefere to have specific register write/rmw routines for
+> > MC13783_REG_POWER_MISCELLANEOUS, and at the same time forbid to access the
+> > latter from the current mc13783_reg_* API.
+> Ack.  This is what I already suggested in
+> 
+> 	http://thread.gmane.org/gmane.linux.kernel/927112/focus=930317
+> 
+> (This happend to be a reply to patch 2/4 as I replied to Alberto's ping
+> for patches 1 and 2.)
+> 
+> Best regards
+> Uwe
+> 
