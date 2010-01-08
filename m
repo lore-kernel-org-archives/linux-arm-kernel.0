@@ -1,53 +1,25 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 8 Jan 2010 14:50:23 -0800
-Subject: [GIT PULL] omap fixes for 2.6.33-rc3
-In-Reply-To: <alpine.LFD.2.00.1001081430210.7821@localhost.localdomain>
-References: <20100108180912.GC6831@atomide.com>
-	<alpine.LFD.2.00.1001081014090.7821@localhost.localdomain>
-	<20100108182236.GE6831@atomide.com>
-	<alpine.DEB.2.00.1001081502480.19243@utopia.booyaka.com>
-	<20100108222715.GC2879@atomide.com>
-	<alpine.LFD.2.00.1001081430210.7821@localhost.localdomain>
-Message-ID: <20100108225023.GD2879@atomide.com>
+From: r-woodruff2@ti.com (Woodruff, Richard)
+Date: Fri, 8 Jan 2010 17:06:09 -0600
+Subject: [PATCH] armv6: invalidate cache on
+	DMA_FROM_DEVICE/DMA_BIDIRECTIONAL
+In-Reply-To: <20091221124438.GC11669@n2100.arm.linux.org.uk>
+References: <1261357222-18470-1-git-send-email-jamie.iles@picochip.com>
+	<1261386497-2924-1-git-send-email-jamie.iles@picochip.com>
+	<1261386497-2924-2-git-send-email-jamie.iles@picochip.com>
+	<20091221124438.GC11669@n2100.arm.linux.org.uk>
+Message-ID: <13B9B4C6EF24D648824FF11BE896716203A85EB687@dlee02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Torvalds <torvalds@linux-foundation.org> [100108 14:38]:
-> 
-> 
-> On Fri, 8 Jan 2010, Tony Lindgren wrote:
-> > 
-> > $ git log --pretty=oneline --author=".(none)" --committer=".(none)" v2.6.33-rc1..
-> 
-> Well, that will catch one particular common case of it, but..
-> 
-> > Should we have some check like this in place for all pulls?
-> 
-> .. it would probably make more sense to warn about it earlier in the 
-> chain, so that people with bad configurations can fix them. By the time 
-> somebody pulls, it's pretty late in the game.
-> 
-> Sadly, git doesn't do any real sanity checking, and now it's pretty much 
-> too late. It takes about a year or two for new git versions to percolate 
-> out, with things like Debian-stable etc, so making git warn about 
-> suspicious-looking names is not necessarily going to help (and with 
-> scripting and importing from other SCM's, it may be wrong to warn in 
-> general).
 
-Yeah..
- 
-> It's _fairly_ easy to set up a hook at commit-time to check for random 
-> thigns, but obviously if the problem is that people haven't configured 
-> their git setup, then "add a hook" is not going to work. In that sense, 
-> pull-time may be better, as a way to see it automatically after-the-fact.
-> 
-> Doing a post-merge hook would catch it, and could be used to warn about 
-> the fact that you merged something odd.
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Russell King - ARM Linux
+> Sent: Monday, December 21, 2009 6:45 AM
 
-Hmm, sounds like it might make sense to check for that in Stephen's
-for-next tree then. Added Stephen to the loop, let's see if what he
-thinks.
+> I was thinking about doing this for ARMv6, but I thought the concensus
+> was that ARMv6 didn't have speculative prefetching.
+
+If you bolt on a unified L2 cache won't normal branch prediction result in some possible erroneous data in L2 cache range (assume mmu execution flag is set I suppose)?
 
 Regards,
-
-Tony
+Richard W.
