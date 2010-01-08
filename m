@@ -1,61 +1,53 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Fri, 8 Jan 2010 10:44:24 +0100
-Subject: Module Compilation Error in linux-2.6.15  using floating point
-In-Reply-To: <4B46FC7E.9050406@cdotb.ernet.in>
-References: <4B46FC7E.9050406@cdotb.ernet.in>
-Message-ID: <19270.65144.480771.919712@ipc1.ka-ro>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 08 Jan 2010 21:01:13 +1100
+Subject: [RFC,PATCH 1/7] arm: add a common struct clk
+In-Reply-To: <20100108094214.GA23420@n2100.arm.linux.org.uk>
+References: <1262907852.736281.78480196040.1.gpush@pororo>
+	<BD79186B4FD85F4B8E60E381CAEE190902089611@mi8nycmail19.Mi8.com>
+	<201001081220.14485.jeremy.kerr@canonical.com>
+	<201001081426.09754.jk@ozlabs.org>
+	<20100108094214.GA23420@n2100.arm.linux.org.uk>
+Message-ID: <1262944873.585.17.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 2010-01-08 at 09:42 +0000, Russell King - ARM Linux wrote:
+> What is clear from the clk API as implemented today is that what's
+> right
+> for one platform isn't right for another platform.  That's why we have
+> each platform implementing struct clk in their own way. 
 
->          I am using arm9 based fujitsu card . I have compiled and ported linux-2.6.15 
-> with eldk4.2. I am trying to insert a module in which I am using floating point operations.
-> 
-> While compiling this module , the following errors occur :
-> 
-> *** Warning: "__subdf3" [/export/home1/suchita/bws_linux/bws_menu.ko] 
-> undefined!
-> *** Warning: "__gedf2" [/export/home1/suchita/bws_linux/bws_menu.ko] 
-> undefined!
-> *** Warning: "__truncdfsf2" 
-> [/export/home1/suchita/bws_linux/bws_menu.ko] undefined!
-> *** Warning: "__ltsf2" [/export/home1/suchita/bws_linux/bws_menu.ko] 
-> undefined!
-> *** Warning: "__muldf3" [/export/home1/suchita/bws_linux/bws_menu.ko] 
-> undefined!
-> *** Warning: "__divdf3" [/export/home1/suchita/bws_linux/bws_menu.ko] 
-> undefined!
-> *** Warning: "__ledf2" [/export/home1/suchita/bws_linux/bws_menu.ko] 
-> undefined!
-> *** Warning: "__gtsf2" [/export/home1/suchita/bws_linux/bws_menu.ko] 
-> undefined!
-> *** Warning: "__floatunsidf" 
-> [/export/home1/suchita/bws_linux/bws_menu.ko] undefined!
-> *** Warning: "__adddf3" [/export/home1/suchita/bws_linux/bws_menu.ko] 
-> undefined!
-> *** Warning: "__extendsfdf2" 
-> [/export/home1/suchita/bws_linux/bws_menu.ko] undefined!
-> *** Warning: "__fixunsdfsi" 
-> [/export/home1/suchita/bws_linux/bws_menu.ko] undefined!
-> *** Warning: "__ltdf2" [/export/home1/suchita/bws_linux/bws_menu.ko] 
-> undefined!
-> *** Warning: "__floatsidf" [/export/home1/suchita/bws_linux/bws_menu.ko] 
-> undefined!
-> 
-> Please suggest a solution to overcome these errors.
->
-Don't use floating point in the kernel.
+Such platforms would just not set CONFIG_HAVE_COMMON_STRUCT_CLK then.
 
+I think what Jeremy is trying to achieve is a way for platforms that
+which to use the device-tree to retrieve the clock binding to be able to
+chose to do so, using as much common code as possible.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+The problem with the more "static" variants of struct clk is that while
+they are probably fine for a single SoC with a reasonably unified clock
+mechanism, having more than one clock source programmed differently and
+wanting to deal with potentially out-of-SoC clock links between devices
+becomes quickly prohibitive without function pointers.
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+The moment you start having function pointers, you may as well have a
+common infrastructure for "indirect" clk ops since that eases code
+re-use. Which you do already in some of the ARM platforms afaik.
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+For example, while discussing the porting of struct clk to powerpc a
+while back with some ARM folks, some people told me one issue they had
+was to use it to represent clocks between an external i2c PLL chip and
+an external device.
+
+Such a scenario becomes trivial to deal with using the device-tree, as
+the i2c clock provider "registers" with the device-tree aware clock
+infrastructure, which will then transparently, bind the device to the
+clock provider and provide the right struct clk to the device.
+
+But again, if a platform choice to use or not to use that facility. If a
+platform prefers not to use the facility, for example for performances
+reasons, or because of a lot of existing code which would be hard to
+update or not worth changing, that platform then just needs to not set
+CONFIG_HAVE_COMMON_STRUCT_CLK.
+
+Cheers,
+Ben.
