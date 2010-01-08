@@ -1,36 +1,43 @@
-From: r-woodruff2@ti.com (Woodruff, Richard)
-Date: Fri, 8 Jan 2010 16:32:05 -0600
-Subject: [PATCH 0/5] V7/Cortex/omap34xx fixes for 2.6.33-rc1: DCC,
-	kexec, atags
-In-Reply-To: <alpine.DEB.2.00.1001051053000.2083@utopia.booyaka.com>
-References: <20091219034151.26198.26570.stgit@localhost>
-	<aec7e5c30912272155s41ce8914hd03a5e4c740a5b9d@mail.gmail.com>
-	<20091229220705.GM3512@atomide.com>
-	<alpine.DEB.2.00.1001051053000.2083@utopia.booyaka.com>
-Message-ID: <13B9B4C6EF24D648824FF11BE896716203A8571CA0@dlee02.ent.ti.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Fri, 8 Jan 2010 14:39:30 -0800 (PST)
+Subject: [GIT PULL] omap fixes for 2.6.33-rc3
+In-Reply-To: <20100108222715.GC2879@atomide.com>
+References: <20100108180912.GC6831@atomide.com>
+	<alpine.LFD.2.00.1001081014090.7821@localhost.localdomain>
+	<20100108182236.GE6831@atomide.com>
+	<alpine.DEB.2.00.1001081502480.19243@utopia.booyaka.com>
+	<20100108222715.GC2879@atomide.com>
+Message-ID: <alpine.LFD.2.00.1001081430210.7821@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of Paul Walmsley
-> Sent: Tuesday, January 05, 2010 11:54 AM
 
-> > Also, what's the Cortex version on your v7? It's rev r2p3 on
-> > omap3430.
->
-> Just a quick note - I think it is r1p3 on OMAP34xx ES3.1 and below, and
-> r1p7 on ES3.1.2.
+On Fri, 8 Jan 2010, Tony Lindgren wrote:
+> 
+> $ git log --pretty=oneline --author=".(none)" --committer=".(none)" v2.6.33-rc1..
 
-Not quite accurate for the 'below' but as they are non-production they are not so impacting.
+Well, that will catch one particular common case of it, but..
 
-Current production CortexA8 chips for 3430:
-        es3.2   :       r1p7
-        es3.1   :       r1p3
-        Earlier esX.Y used r0p0, r1p1, r1p2
+> Should we have some check like this in place for all pulls?
 
-Production candidate chips for 3630:
-        es1.x   :       r3p2
+.. it would probably make more sense to warn about it earlier in the 
+chain, so that people with bad configurations can fix them. By the time 
+somebody pulls, it's pretty late in the game.
 
-Regards,
-Richard W.
+Sadly, git doesn't do any real sanity checking, and now it's pretty much 
+too late. It takes about a year or two for new git versions to percolate 
+out, with things like Debian-stable etc, so making git warn about 
+suspicious-looking names is not necessarily going to help (and with 
+scripting and importing from other SCM's, it may be wrong to warn in 
+general).
+
+It's _fairly_ easy to set up a hook at commit-time to check for random 
+thigns, but obviously if the problem is that people haven't configured 
+their git setup, then "add a hook" is not going to work. In that sense, 
+pull-time may be better, as a way to see it automatically after-the-fact.
+
+Doing a post-merge hook would catch it, and could be used to warn about 
+the fact that you merged something odd.
+
+			Linus
