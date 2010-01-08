@@ -1,48 +1,375 @@
-From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Fri, 08 Jan 2010 11:53:31 +0100
-Subject: [PATCH 1/4] mfd: mc13783: Take care of semantic inversion
-	between read and write value of two bits in POWER_MISCELLANEUS
-	register.
-In-Reply-To: <20100105195520.GA8555@pengutronix.de>
-References: <1260808880.2022.98.camel@climbing-alby>
-	<1260810776.2022.130.camel@climbing-alby>
-	<4B26799F.1020507@ru.mvista.com>
-	<1260813540.2022.174.camel@climbing-alby>
-	<20100105181541.GE4274@sortiz.org>
-	<20100105195520.GA8555@pengutronix.de>
-Message-ID: <1262948011.2050.3.camel@climbing-alby>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Fri, 8 Jan 2010 12:06:47 +0100
+Subject: [PATCH v2 06/09] backlight: enable backlight in 88pm860x
+In-Reply-To: <771cded00912090515k39cccec9od78addb8e127f491@mail.gmail.com>
+References: <771cded00912090515k39cccec9od78addb8e127f491@mail.gmail.com>
+Message-ID: <20100108110646.GB3734@sortiz.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for late response.. as Uwe said, we have discuss about this 
-and I will prepare another patch that involve the regulator driver.
+Hi Haojian, Richard,
 
-Alberto!
+On Wed, Dec 09, 2009 at 08:15:28AM -0500, Haojian Zhuang wrote:
+> From 8d2bc9826f758f113fde6f3fd01723111fbf2a91 Mon Sep 17 00:00:00 2001
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date: Mon, 9 Nov 2009 12:41:07 -0500
+> Subject: [PATCH] backlight: enable backlight in 88pm860x
+> 
+> At most, three backlight device can be supported in 88pm860x driver.
+I applied this patch and the LED one to my for-next branch.
+Richard, whenever you have time for that, could you please quickly check if
+they oook ok to you ? They're 2.6.34 material, so no rush here.
 
-Il giorno mar, 05/01/2010 alle 20.55 +0100, Uwe Kleine-K?nig ha scritto:
-> On Tue, Jan 05, 2010 at 07:15:42PM +0100, Samuel Ortiz wrote:
-> > > @@ -187,6 +190,13 @@ int mc13783_reg_write(struct mc13783 *mc13783, unsigned int offset, u32 val)
-> > >  
-> > >         buf = 1 << 31 | offset << MC13783_REGOFFSET_SHIFT | val;
-> > >  
-> > > +       /* Take care of table 4-24 in Freescale MC13783IGPLDRM.pdf making
-> > > +        * the assumption that PWGTnDRV signals controls core power supplies
-> > > +        * that software must not disable. */
-> > > +       if (offset == MC13783_REG_POWER_MISCELLANEOUS)
-> > > +               buf &= ~(MC13783_REGCTRL_PWGT1SPIEN |
-> > > +                        MC13783_REGCTRL_PWGT2SPIEN);
-> > > +
-> > Although I see where you want to go, I dont really enjoy that solution.
-> > I would prefere to have specific register write/rmw routines for
-> > MC13783_REG_POWER_MISCELLANEOUS, and at the same time forbid to access the
-> > latter from the current mc13783_reg_* API.
-> Ack.  This is what I already suggested in
+Cheers,
+Samuel.
+
+
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> ---
+>  drivers/video/backlight/88pm860x_bl.c |  304 +++++++++++++++++++++++++++++++++
+>  drivers/video/backlight/Kconfig       |    6 +
+>  drivers/video/backlight/Makefile      |    1 +
+>  3 files changed, 311 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/video/backlight/88pm860x_bl.c
 > 
-> 	http://thread.gmane.org/gmane.linux.kernel/927112/focus=930317
+> diff --git a/drivers/video/backlight/88pm860x_bl.c
+> b/drivers/video/backlight/88pm860x_bl.c
+> new file mode 100644
+> index 0000000..b8f705c
+> --- /dev/null
+> +++ b/drivers/video/backlight/88pm860x_bl.c
+> @@ -0,0 +1,304 @@
+> +/*
+> + * Backlight driver for Marvell Semiconductor 88PM8606
+> + *
+> + * Copyright (C) 2009 Marvell International Ltd.
+> + *	Haojian Zhuang <haojian.zhuang@marvell.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/kernel.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/fb.h>
+> +#include <linux/i2c.h>
+> +#include <linux/backlight.h>
+> +#include <linux/mfd/88pm860x.h>
+> +
+> +#define MAX_BRIGHTNESS		(0xFF)
+> +#define MIN_BRIGHTNESS		(0)
+> +
+> +#define CURRENT_MASK		(0x1F << 1)
+> +
+> +struct pm860x_backlight_data {
+> +	struct pm860x_chip *chip;
+> +	struct i2c_client *i2c;
+> +	int	current_brightness;
+> +	int	port;
+> +	int	pwm;
+> +	int	iset;
+> +};
+> +
+> +static inline int wled_a(int port)
+> +{
+> +	int ret;
+> +
+> +	ret = ((port - PM8606_BACKLIGHT1) << 1) + 2;
+> +	return ret;
+> +}
+> +
+> +static inline int wled_b(int port)
+> +{
+> +	int ret;
+> +
+> +	ret = ((port - PM8606_BACKLIGHT1) << 1) + 3;
+> +	return ret;
+> +}
+> +
+> +/* WLED2 & WLED3 share the same IDC */
+> +static inline int wled_idc(int port)
+> +{
+> +	int ret;
+> +
+> +	switch (port) {
+> +	case PM8606_BACKLIGHT1:
+> +	case PM8606_BACKLIGHT2:
+> +		ret = ((port - PM8606_BACKLIGHT1) << 1) + 3;
+> +		break;
+> +	case PM8606_BACKLIGHT3:
+> +	default:
+> +		ret = ((port - PM8606_BACKLIGHT2) << 1) + 3;
+> +		break;
+> +	}
+> +	return ret;
+> +}
+> +
+> +static int pm860x_backlight_set(struct backlight_device *bl, int brightness)
+> +{
+> +	struct pm860x_backlight_data *data = bl_get_data(bl);
+> +	struct pm860x_chip *chip = data->chip;
+> +	unsigned char value;
+> +	int ret;
+> +
+> +	if (brightness > MAX_BRIGHTNESS)
+> +		value = MAX_BRIGHTNESS;
+> +	else
+> +		value = brightness;
+> +
+> +	ret = pm860x_reg_write(data->i2c, wled_a(data->port), value);
+> +	if (ret < 0)
+> +		goto out;
+> +
+> +	if ((data->current_brightness == 0) && brightness) {
+> +		if (data->iset) {
+> +			ret = pm860x_set_bits(data->i2c, wled_idc(data->port),
+> +					      CURRENT_MASK, data->iset);
+> +			if (ret < 0)
+> +				goto out;
+> +		}
+> +		if (data->pwm) {
+> +			ret = pm860x_set_bits(data->i2c, PM8606_PWM,
+> +					      PM8606_PWM_FREQ_MASK, data->pwm);
+> +			if (ret < 0)
+> +				goto out;
+> +		}
+> +		if (brightness == MAX_BRIGHTNESS) {
+> +			/* set WLED_ON bit as 100% */
+> +			ret = pm860x_set_bits(data->i2c, wled_b(data->port),
+> +					      PM8606_WLED_ON, PM8606_WLED_ON);
+> +		}
+> +	} else {
+> +		if (brightness == MAX_BRIGHTNESS) {
+> +			/* set WLED_ON bit as 100% */
+> +			ret = pm860x_set_bits(data->i2c, wled_b(data->port),
+> +					      PM8606_WLED_ON, PM8606_WLED_ON);
+> +		} else {
+> +			/* clear WLED_ON bit since it's not 100% */
+> +			ret = pm860x_set_bits(data->i2c, wled_b(data->port),
+> +					      PM8606_WLED_ON, 0);
+> +		}
+> +	}
+> +	if (ret < 0)
+> +		goto out;
+> +
+> +	dev_dbg(chip->dev, "set brightness %d\n", value);
+> +	data->current_brightness = value;
+> +	return 0;
+> +out:
+> +	dev_dbg(chip->dev, "set brightness %d failure with return "
+> +		"value:%d\n", value, ret);
+> +	return ret;
+> +}
+> +
+> +static int pm860x_backlight_update_status(struct backlight_device *bl)
+> +{
+> +	int brightness = bl->props.brightness;
+> +
+> +	if (bl->props.power != FB_BLANK_UNBLANK)
+> +		brightness = 0;
+> +
+> +	if (bl->props.fb_blank != FB_BLANK_UNBLANK)
+> +		brightness = 0;
+> +
+> +	if (bl->props.state & BL_CORE_SUSPENDED)
+> +		brightness = 0;
+> +
+> +	return pm860x_backlight_set(bl, brightness);
+> +}
+> +
+> +static int pm860x_backlight_get_brightness(struct backlight_device *bl)
+> +{
+> +	struct pm860x_backlight_data *data = bl_get_data(bl);
+> +	struct pm860x_chip *chip = data->chip;
+> +	int ret;
+> +
+> +	ret = pm860x_reg_read(data->i2c, wled_a(data->port));
+> +	if (ret < 0)
+> +		goto out;
+> +	data->current_brightness = ret;
+> +	dev_dbg(chip->dev, "get brightness %d\n", data->current_brightness);
+> +	return data->current_brightness;
+> +out:
+> +	return -EINVAL;
+> +}
+> +
+> +static struct backlight_ops pm860x_backlight_ops = {
+> +	.options	= BL_CORE_SUSPENDRESUME,
+> +	.update_status	= pm860x_backlight_update_status,
+> +	.get_brightness	= pm860x_backlight_get_brightness,
+> +};
+> +
+> +static int __check_device(struct pm860x_backlight_pdata *pdata, char *name)
+> +{
+> +	struct pm860x_backlight_pdata *p = pdata;
+> +	int ret = -EINVAL;
+> +
+> +	while (p && p->id) {
+> +		if ((p->id != PM8606_ID_BACKLIGHT) || (p->flags < 0))
+> +			break;
+> +
+> +		if (!strncmp(name, pm860x_backlight_name[p->flags],
+> +			MFD_NAME_SIZE)) {
+> +			ret = (int)p->flags;
+> +			break;
+> +		}
+> +		p++;
+> +	}
+> +	return ret;
+> +}
+> +
+> +static int pm860x_backlight_probe(struct platform_device *pdev)
+> +{
+> +	struct pm860x_chip *chip = dev_get_drvdata(pdev->dev.parent);
+> +	struct pm860x_platform_data *pm860x_pdata;
+> +	struct pm860x_backlight_pdata *pdata = NULL;
+> +	struct pm860x_backlight_data *data;
+> +	struct backlight_device *bl;
+> +	struct resource *res;
+> +	unsigned char value;
+> +	char name[MFD_NAME_SIZE];
+> +	int ret;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_IO, 0);
+> +	if (res == NULL) {
+> +		dev_err(&pdev->dev, "No I/O resource!\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	if (pdev->dev.parent->platform_data) {
+> +		pm860x_pdata = pdev->dev.parent->platform_data;
+> +		pdata = pm860x_pdata->backlight;
+> +	}
+> +	if (pdata == NULL) {
+> +		dev_err(&pdev->dev, "platform data isn't assigned to "
+> +			"backlight\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	data = kzalloc(sizeof(struct pm860x_backlight_data), GFP_KERNEL);
+> +	if (data == NULL)
+> +		return -ENOMEM;
+> +	strncpy(name, res->name, MFD_NAME_SIZE);
+> +	data->chip = chip;
+> +	data->i2c = (chip->id == CHIP_PM8606) ? chip->client	\
+> +			: chip->companion;
+> +	data->current_brightness = MAX_BRIGHTNESS;
+> +	data->pwm = pdata->pwm;
+> +	data->iset = pdata->iset;
+> +	data->port = __check_device(pdata, name);
+> +	if (data->port < 0) {
+> +		dev_err(&pdev->dev, "wrong platform data is assigned");
+> +		return -EINVAL;
+> +	}
+> +
+> +	bl = backlight_device_register(name, &pdev->dev, data,
+> +					&pm860x_backlight_ops);
+> +	if (IS_ERR(bl)) {
+> +		dev_err(&pdev->dev, "failed to register backlight\n");
+> +		kfree(data);
+> +		return PTR_ERR(bl);
+> +	}
+> +	bl->props.max_brightness = MAX_BRIGHTNESS;
+> +	bl->props.brightness = MAX_BRIGHTNESS;
+> +
+> +	platform_set_drvdata(pdev, bl);
+> +
+> +	/* Enable reference VSYS */
+> +	ret = pm860x_reg_read(data->i2c, PM8606_VSYS);
+> +	if (ret < 0)
+> +		goto out;
+> +	if ((ret & PM8606_VSYS_EN) == 0) {
+> +		value = ret | PM8606_VSYS_EN;
+> +		ret = pm860x_reg_write(data->i2c, PM8606_VSYS, value);
+> +		if (ret < 0)
+> +			goto out;
+> +	}
+> +	/* Enable reference OSC */
+> +	ret = pm860x_reg_read(data->i2c, PM8606_MISC);
+> +	if (ret < 0)
+> +		goto out;
+> +	if ((ret & PM8606_MISC_OSC_EN) == 0) {
+> +		value = ret | PM8606_MISC_OSC_EN;
+> +		ret = pm860x_reg_write(data->i2c, PM8606_MISC, value);
+> +		if (ret < 0)
+> +			goto out;
+> +	}
+> +	/* read current backlight */
+> +	ret = pm860x_backlight_get_brightness(bl);
+> +	if (ret < 0)
+> +		goto out;
+> +
+> +	backlight_update_status(bl);
+> +	return 0;
+> +out:
+> +	kfree(data);
+> +	return ret;
+> +}
+> +
+> +static int pm860x_backlight_remove(struct platform_device *pdev)
+> +{
+> +	struct backlight_device *bl = platform_get_drvdata(pdev);
+> +	struct pm860x_backlight_data *data = bl_get_data(bl);
+> +
+> +	backlight_device_unregister(bl);
+> +	kfree(data);
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver pm860x_backlight_driver = {
+> +	.driver		= {
+> +		.name	= "88pm860x-backlight",
+> +		.owner	= THIS_MODULE,
+> +	},
+> +	.probe		= pm860x_backlight_probe,
+> +	.remove		= pm860x_backlight_remove,
+> +};
+> +
+> +static int __init pm860x_backlight_init(void)
+> +{
+> +	return platform_driver_register(&pm860x_backlight_driver);
+> +}
+> +module_init(pm860x_backlight_init);
+> +
+> +static void __exit pm860x_backlight_exit(void)
+> +{
+> +	platform_driver_unregister(&pm860x_backlight_driver);
+> +}
+> +module_exit(pm860x_backlight_exit);
+> +
+> +MODULE_DESCRIPTION("Backlight Driver for Marvell Semiconductor 88PM8606");
+> +MODULE_AUTHOR("Haojian Zhuang <haojian.zhuang@marvell.com>");
+> +MODULE_LICENSE("GPL");
+> +MODULE_ALIAS("platform:88pm860x-backlight");
+> diff --git a/drivers/video/backlight/Kconfig b/drivers/video/backlight/Kconfig
+> index 09bfa96..96a6b30 100644
+> --- a/drivers/video/backlight/Kconfig
+> +++ b/drivers/video/backlight/Kconfig
+> @@ -262,3 +262,9 @@ config BACKLIGHT_ADP5520
+>  	  To compile this driver as a module, choose M here: the module will
+>  	  be called adp5520_bl.
 > 
-> (This happend to be a reply to patch 2/4 as I replied to Alberto's ping
-> for patches 1 and 2.)
+> +config BACKLIGHT_88PM860X
+> +	tristate "Backlight Driver for 88PM8606 using WLED"
+> +	depends on BACKLIGHT_CLASS_DEVICE && MFD_88PM860X
+> +	help
+> +	  Say Y to enable the backlight driver for Marvell 88PM8606.
+> +
+> diff --git a/drivers/video/backlight/Makefile b/drivers/video/backlight/Makefile
+> index 9a40554..802d467 100644
+> --- a/drivers/video/backlight/Makefile
+> +++ b/drivers/video/backlight/Makefile
+> @@ -28,4 +28,5 @@ obj-$(CONFIG_BACKLIGHT_SAHARA)	+= kb3886_bl.o
+>  obj-$(CONFIG_BACKLIGHT_WM831X)	+= wm831x_bl.o
+>  obj-$(CONFIG_BACKLIGHT_ADX)    += adx_bl.o
+>  obj-$(CONFIG_BACKLIGHT_ADP5520)	+= adp5520_bl.o
+> +obj-$(CONFIG_BACKLIGHT_88PM860X) += 88pm860x_bl.o
 > 
-> Best regards
-> Uwe
-> 
+> -- 
+> 1.5.6.5
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
