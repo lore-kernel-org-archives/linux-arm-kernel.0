@@ -1,67 +1,55 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri,  8 Jan 2010 17:17:10 +0100
-Subject: [PATCH 03/25] imx/clock-imx27: use a macro to define registers
-In-Reply-To: <1262967452-24353-2-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Fri,  8 Jan 2010 17:17:13 +0100
+Subject: [PATCH 06/25] imx/mx3: rename clock.c and iomux.c to {clock,
+	iomux}-imx31.c
+In-Reply-To: <1262967452-24353-5-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <20100108161551.GA19007@pengutronix.de>
 	<1262967452-24353-1-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1262967452-24353-2-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1262967452-24353-3-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-3-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-4-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-5-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1262967452-24353-6-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This way the base address isn't hard coded in each register definition
+These files are only used on imx31.  This makes the name consistent with
+the imx35 files.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Rabin Vincent <rabin@rab.in>
-Cc: Javier Martin <javier.martin@vista-silicon.com>
+Cc: Daniel Mack <daniel@caiaq.de>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
 Cc: Valentin Longchamp <valentin.longchamp@epfl.ch>
 ---
- arch/arm/mach-mx2/clock_imx27.c |   30 ++++++++++++++++--------------
- 1 files changed, 16 insertions(+), 14 deletions(-)
+ arch/arm/mach-mx3/Makefile                   |    2 +-
+ arch/arm/mach-mx3/{clock.c => clock-imx31.c} |    0
+ arch/arm/mach-mx3/{iomux.c => iomux-imx31.c} |    0
+ 3 files changed, 1 insertions(+), 1 deletions(-)
+ rename arch/arm/mach-mx3/{clock.c => clock-imx31.c} (100%)
+ rename arch/arm/mach-mx3/{iomux.c => iomux-imx31.c} (100%)
 
-diff --git a/arch/arm/mach-mx2/clock_imx27.c b/arch/arm/mach-mx2/clock_imx27.c
-index b010bf9..a533208 100644
---- a/arch/arm/mach-mx2/clock_imx27.c
-+++ b/arch/arm/mach-mx2/clock_imx27.c
-@@ -29,21 +29,23 @@
- #include <mach/common.h>
- #include <mach/hardware.h>
+diff --git a/arch/arm/mach-mx3/Makefile b/arch/arm/mach-mx3/Makefile
+index 93c7b29..03e25d6 100644
+--- a/arch/arm/mach-mx3/Makefile
++++ b/arch/arm/mach-mx3/Makefile
+@@ -5,7 +5,7 @@
+ # Object file lists.
  
-+#define IO_ADDR_CCM(off)	(IO_ADDRESS(CCM_BASE_ADDR) + (off))
-+
- /* Register offsets */
--#define CCM_CSCR                (IO_ADDRESS(CCM_BASE_ADDR) + 0x0)
--#define CCM_MPCTL0              (IO_ADDRESS(CCM_BASE_ADDR) + 0x4)
--#define CCM_MPCTL1              (IO_ADDRESS(CCM_BASE_ADDR) + 0x8)
--#define CCM_SPCTL0              (IO_ADDRESS(CCM_BASE_ADDR) + 0xC)
--#define CCM_SPCTL1              (IO_ADDRESS(CCM_BASE_ADDR) + 0x10)
--#define CCM_OSC26MCTL           (IO_ADDRESS(CCM_BASE_ADDR) + 0x14)
--#define CCM_PCDR0               (IO_ADDRESS(CCM_BASE_ADDR) + 0x18)
--#define CCM_PCDR1               (IO_ADDRESS(CCM_BASE_ADDR) + 0x1c)
--#define CCM_PCCR0               (IO_ADDRESS(CCM_BASE_ADDR) + 0x20)
--#define CCM_PCCR1               (IO_ADDRESS(CCM_BASE_ADDR) + 0x24)
--#define CCM_CCSR                (IO_ADDRESS(CCM_BASE_ADDR) + 0x28)
--#define CCM_PMCTL               (IO_ADDRESS(CCM_BASE_ADDR) + 0x2c)
--#define CCM_PMCOUNT             (IO_ADDRESS(CCM_BASE_ADDR) + 0x30)
--#define CCM_WKGDCTL             (IO_ADDRESS(CCM_BASE_ADDR) + 0x34)
-+#define CCM_CSCR		IO_ADDR_CCM(0x0)
-+#define CCM_MPCTL0		IO_ADDR_CCM(0x4)
-+#define CCM_MPCTL1		IO_ADDR_CCM(0x8)
-+#define CCM_SPCTL0		IO_ADDR_CCM(0xc)
-+#define CCM_SPCTL1		IO_ADDR_CCM(0x10)
-+#define CCM_OSC26MCTL		IO_ADDR_CCM(0x14)
-+#define CCM_PCDR0		IO_ADDR_CCM(0x18)
-+#define CCM_PCDR1		IO_ADDR_CCM(0x1c)
-+#define CCM_PCCR0		IO_ADDR_CCM(0x20)
-+#define CCM_PCCR1		IO_ADDR_CCM(0x24)
-+#define CCM_CCSR		IO_ADDR_CCM(0x28)
-+#define CCM_PMCTL		IO_ADDR_CCM(0x2c)
-+#define CCM_PMCOUNT		IO_ADDR_CCM(0x30)
-+#define CCM_WKGDCTL		IO_ADDR_CCM(0x34)
- 
- #define CCM_CSCR_UPDATE_DIS	(1 << 31)
- #define CCM_CSCR_SSI2		(1 << 23)
+ obj-y				:= mm.o devices.o cpu.o
+-obj-$(CONFIG_ARCH_MX31)		+= clock.o iomux.o
++obj-$(CONFIG_ARCH_MX31)		+= clock-imx31.o iomux-imx31.o
+ obj-$(CONFIG_ARCH_MX35)		+= clock-imx35.o
+ obj-$(CONFIG_MACH_MX31ADS)	+= mx31ads.o
+ obj-$(CONFIG_MACH_MX31LILLY)	+= mx31lilly.o mx31lilly-db.o
+diff --git a/arch/arm/mach-mx3/clock.c b/arch/arm/mach-mx3/clock-imx31.c
+similarity index 100%
+rename from arch/arm/mach-mx3/clock.c
+rename to arch/arm/mach-mx3/clock-imx31.c
+diff --git a/arch/arm/mach-mx3/iomux.c b/arch/arm/mach-mx3/iomux-imx31.c
+similarity index 100%
+rename from arch/arm/mach-mx3/iomux.c
+rename to arch/arm/mach-mx3/iomux-imx31.c
 -- 
 1.6.5.2
