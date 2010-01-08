@@ -1,42 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 8 Jan 2010 14:27:15 -0800
-Subject: [GIT PULL] omap fixes for 2.6.33-rc3
-In-Reply-To: <alpine.DEB.2.00.1001081502480.19243@utopia.booyaka.com>
-References: <20100108180912.GC6831@atomide.com>
-	<alpine.LFD.2.00.1001081014090.7821@localhost.localdomain>
-	<20100108182236.GE6831@atomide.com>
-	<alpine.DEB.2.00.1001081502480.19243@utopia.booyaka.com>
-Message-ID: <20100108222715.GC2879@atomide.com>
+From: r-woodruff2@ti.com (Woodruff, Richard)
+Date: Fri, 8 Jan 2010 16:32:05 -0600
+Subject: [PATCH 0/5] V7/Cortex/omap34xx fixes for 2.6.33-rc1: DCC,
+	kexec, atags
+In-Reply-To: <alpine.DEB.2.00.1001051053000.2083@utopia.booyaka.com>
+References: <20091219034151.26198.26570.stgit@localhost>
+	<aec7e5c30912272155s41ce8914hd03a5e4c740a5b9d@mail.gmail.com>
+	<20091229220705.GM3512@atomide.com>
+	<alpine.DEB.2.00.1001051053000.2083@utopia.booyaka.com>
+Message-ID: <13B9B4C6EF24D648824FF11BE896716203A8571CA0@dlee02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [100108 14:03]:
-> Hello Linus, Tony,
-> 
-> On Fri, 8 Jan 2010, Tony Lindgren wrote:
-> 
-> > * Linus Torvalds <torvalds@linux-foundation.org> [100108 10:18]:
-> > > 
-> > > There are other problems with that branch too - the "committer" 
-> > > information is pure sh*t. It says "paul <paul@twilight.(none)>", so quite 
-> > > frankly, somebody hasn't even read the very first chapter of just about 
-> > > every single git documentation that is out there.
-> > > 
-> > > And now that I noticed, I see that the crap-for-brains committer info has 
-> > > been going on for a long time, and I just hadn't looked closely enough 
-> > > before. I didn't look closely enough to see if the rebase problem had also 
-> > > happened before.
-> 
-> Sorry - I seem to be the crap-for-brains committer.  Will fix -
 
-Here's a check for unconfigured GIT_AUTHOR_EMAIL and GIT_COMMITTER_EMAIL:
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Paul Walmsley
+> Sent: Tuesday, January 05, 2010 11:54 AM
 
-$ git log --pretty=oneline --author=".(none)" --committer=".(none)" v2.6.33-rc1..
+> > Also, what's the Cortex version on your v7? It's rev r2p3 on
+> > omap3430.
+>
+> Just a quick note - I think it is r1p3 on OMAP34xx ES3.1 and below, and
+> r1p7 on ES3.1.2.
 
-If it returns results, something is wrong.
+Not quite accurate for the 'below' but as they are non-production they are not so impacting.
 
-Should we have some check like this in place for all pulls?
+Current production CortexA8 chips for 3430:
+        es3.2   :       r1p7
+        es3.1   :       r1p3
+        Earlier esX.Y used r0p0, r1p1, r1p2
+
+Production candidate chips for 3630:
+        es1.x   :       r3p2
 
 Regards,
-
-Tony
+Richard W.
