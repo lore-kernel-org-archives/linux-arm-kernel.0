@@ -1,22 +1,21 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 8 Jan 2010 16:37:38 +0000
-Subject: [PATCH 2/3] arm: change command_line to cmd_line, and export it
-In-Reply-To: <1262835561.887931.658428747865.2.gpush@pororo>
+Date: Fri, 8 Jan 2010 16:39:05 +0000
+Subject: [PATCH 3/3] arm: export arm_add_memory
+In-Reply-To: <1262835561.888252.461260980683.3.gpush@pororo>
 References: <1262835561.887063.943450380979.0.gpush@pororo>
-	<1262835561.887931.658428747865.2.gpush@pororo>
-Message-ID: <20100108163738.GE32558@n2100.arm.linux.org.uk>
+	<1262835561.888252.461260980683.3.gpush@pororo>
+Message-ID: <20100108163905.GF32558@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Jan 07, 2010 at 02:39:21PM +1100, Jeremy Kerr wrote:
-> drivers/of/fdt expects a cmd_line symbol, while arm uses command_line.
-> Change to the former and make accessible from setup.h, so that we can
-> share with the fdt code.
+> We'd like to add memory from the device tree, so make arm_add_memory
+> non-static and add a prototype in setup.h
+> 
+> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
 
-Until the dt code gets merged, I'd prefer to keep the 'command_line'
-or 'cmd_line' static.  Also, please leave 'COMMAND_LINE_SIZE' visible
-to stuff outside kernel-space (it could be used by boot loaders, which
-borrow this file.)
-
-In other words, can I have a patch in the patch system which just does
-the renaming?
+I've been thinking about this a bit, and rather than indirecting the
+DT stuff through an inline function, I think we should rename the
+function instead to something that's compatible with DT.  Yes, that
+means changing the arguments, but in the longer term, we're likely
+to need to pass more than 32-bits of memory start/size to the kernel.
