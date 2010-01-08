@@ -1,159 +1,105 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri,  8 Jan 2010 02:30:11 +0000
-Subject: [S3C-CLK] ARM: S3C64XX: Cleanup common init code in s3c6400-clock.c
+Date: Fri,  8 Jan 2010 02:30:18 +0000
+Subject: [S3C-CLK] ARM: S3C64XX: Avoid announcing clksrc clocks twice
 In-Reply-To: <1262917822-26004-1-git-send-email-ben-linux@fluff.org>
 References: <1262917822-26004-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1262917822-26004-4-git-send-email-ben-linux@fluff.org>
+Message-ID: <1262917822-26004-11-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the four fields from clksrc_clk.clk which are always the same
-and init them when the clock is registered. This helps remove the amount
-of repeated code.
+The new code calls the clock setup code on registration which
+can be before the clock system has been fully initialised. The
+following code re-does this setup at the end of the clock
+registration and thus we get two printings.
 
-This is a re-work of Harald Welte's clock changes for the latest kernel.
+Update the calls to only print on the last pass or when doing
+the necessary resume work.
 
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/plat-s3c64xx/s3c6400-clock.c |   49 +++-----------------------------
- 1 files changed, 5 insertions(+), 44 deletions(-)
+ arch/arm/plat-s3c64xx/s3c6400-clock.c             |    4 ++--
+ arch/arm/plat-samsung/clock-clksrc.c              |   16 +++++++++++-----
+ arch/arm/plat-samsung/include/plat/clock-clksrc.h |   10 +++++++++-
+ 3 files changed, 22 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/plat-s3c64xx/s3c6400-clock.c b/arch/arm/plat-s3c64xx/s3c6400-clock.c
-index ffd56de..aba08c7 100644
+index 555d1aa..cb2bf4b 100644
 --- a/arch/arm/plat-s3c64xx/s3c6400-clock.c
 +++ b/arch/arm/plat-s3c64xx/s3c6400-clock.c
-@@ -360,10 +360,6 @@ static struct clksrc_clk clk_mmc0 = {
- 		.id		= 0,
- 		.ctrlbit        = S3C_CLKCON_SCLK_MMC0,
- 		.enable		= s3c64xx_sclk_ctrl,
--		.set_parent	= s3c64xx_setparent_clksrc,
--		.get_rate	= s3c64xx_getrate_clksrc,
--		.set_rate	= s3c64xx_setrate_clksrc,
--		.round_rate	= s3c64xx_roundrate_clksrc,
- 	},
- 	.shift		= S3C6400_CLKSRC_MMC0_SHIFT,
- 	.mask		= S3C6400_CLKSRC_MMC0_MASK,
-@@ -378,10 +374,6 @@ static struct clksrc_clk clk_mmc1 = {
- 		.id		= 1,
- 		.ctrlbit        = S3C_CLKCON_SCLK_MMC1,
- 		.enable		= s3c64xx_sclk_ctrl,
--		.get_rate	= s3c64xx_getrate_clksrc,
--		.set_rate	= s3c64xx_setrate_clksrc,
--		.set_parent	= s3c64xx_setparent_clksrc,
--		.round_rate	= s3c64xx_roundrate_clksrc,
- 	},
- 	.shift		= S3C6400_CLKSRC_MMC1_SHIFT,
- 	.mask		= S3C6400_CLKSRC_MMC1_MASK,
-@@ -396,10 +388,6 @@ static struct clksrc_clk clk_mmc2 = {
- 		.id		= 2,
- 		.ctrlbit        = S3C_CLKCON_SCLK_MMC2,
- 		.enable		= s3c64xx_sclk_ctrl,
--		.get_rate	= s3c64xx_getrate_clksrc,
--		.set_rate	= s3c64xx_setrate_clksrc,
--		.set_parent	= s3c64xx_setparent_clksrc,
--		.round_rate	= s3c64xx_roundrate_clksrc,
- 	},
- 	.shift		= S3C6400_CLKSRC_MMC2_SHIFT,
- 	.mask		= S3C6400_CLKSRC_MMC2_MASK,
-@@ -414,10 +402,6 @@ static struct clksrc_clk clk_usbhost = {
- 		.id		= -1,
- 		.ctrlbit        = S3C_CLKCON_SCLK_UHOST,
- 		.enable		= s3c64xx_sclk_ctrl,
--		.set_parent	= s3c64xx_setparent_clksrc,
--		.get_rate	= s3c64xx_getrate_clksrc,
--		.set_rate	= s3c64xx_setrate_clksrc,
--		.round_rate	= s3c64xx_roundrate_clksrc,
- 	},
- 	.shift		= S3C6400_CLKSRC_UHOST_SHIFT,
- 	.mask		= S3C6400_CLKSRC_UHOST_MASK,
-@@ -432,10 +416,6 @@ static struct clksrc_clk clk_uart_uclk1 = {
- 		.id		= -1,
- 		.ctrlbit        = S3C_CLKCON_SCLK_UART,
- 		.enable		= s3c64xx_sclk_ctrl,
--		.set_parent	= s3c64xx_setparent_clksrc,
--		.get_rate	= s3c64xx_getrate_clksrc,
--		.set_rate	= s3c64xx_setrate_clksrc,
--		.round_rate	= s3c64xx_roundrate_clksrc,
- 	},
- 	.shift		= S3C6400_CLKSRC_UART_SHIFT,
- 	.mask		= S3C6400_CLKSRC_UART_MASK,
-@@ -452,10 +432,6 @@ static struct clksrc_clk clk_spi0 = {
- 		.id		= 0,
- 		.ctrlbit        = S3C_CLKCON_SCLK_SPI0,
- 		.enable		= s3c64xx_sclk_ctrl,
--		.set_parent	= s3c64xx_setparent_clksrc,
--		.get_rate	= s3c64xx_getrate_clksrc,
--		.set_rate	= s3c64xx_setrate_clksrc,
--		.round_rate	= s3c64xx_roundrate_clksrc,
- 	},
- 	.shift		= S3C6400_CLKSRC_SPI0_SHIFT,
- 	.mask		= S3C6400_CLKSRC_SPI0_MASK,
-@@ -470,10 +446,6 @@ static struct clksrc_clk clk_spi1 = {
- 		.id		= 1,
- 		.ctrlbit        = S3C_CLKCON_SCLK_SPI1,
- 		.enable		= s3c64xx_sclk_ctrl,
--		.set_parent	= s3c64xx_setparent_clksrc,
--		.get_rate	= s3c64xx_getrate_clksrc,
--		.set_rate	= s3c64xx_setrate_clksrc,
--		.round_rate	= s3c64xx_roundrate_clksrc,
- 	},
- 	.shift		= S3C6400_CLKSRC_SPI1_SHIFT,
- 	.mask		= S3C6400_CLKSRC_SPI1_MASK,
-@@ -516,10 +488,6 @@ static struct clksrc_clk clk_audio0 = {
- 		.id		= 0,
- 		.ctrlbit        = S3C_CLKCON_SCLK_AUDIO0,
- 		.enable		= s3c64xx_sclk_ctrl,
--		.set_parent	= s3c64xx_setparent_clksrc,
--		.get_rate	= s3c64xx_getrate_clksrc,
--		.set_rate	= s3c64xx_setrate_clksrc,
--		.round_rate	= s3c64xx_roundrate_clksrc,
- 	},
- 	.shift		= S3C6400_CLKSRC_AUDIO0_SHIFT,
- 	.mask		= S3C6400_CLKSRC_AUDIO0_MASK,
-@@ -547,10 +515,6 @@ static struct clksrc_clk clk_audio1 = {
- 		.id		= 1,
- 		.ctrlbit        = S3C_CLKCON_SCLK_AUDIO1,
- 		.enable		= s3c64xx_sclk_ctrl,
--		.set_parent	= s3c64xx_setparent_clksrc,
--		.get_rate	= s3c64xx_getrate_clksrc,
--		.set_rate	= s3c64xx_setrate_clksrc,
--		.round_rate	= s3c64xx_roundrate_clksrc,
- 	},
- 	.shift		= S3C6400_CLKSRC_AUDIO1_SHIFT,
- 	.mask		= S3C6400_CLKSRC_AUDIO1_MASK,
-@@ -565,10 +529,6 @@ static struct clksrc_clk clk_irda = {
- 		.id		= 0,
- 		.ctrlbit        = S3C_CLKCON_SCLK_IRDA,
- 		.enable		= s3c64xx_sclk_ctrl,
--		.set_parent	= s3c64xx_setparent_clksrc,
--		.get_rate	= s3c64xx_getrate_clksrc,
--		.set_rate	= s3c64xx_setrate_clksrc,
--		.round_rate	= s3c64xx_roundrate_clksrc,
- 	},
- 	.shift		= S3C6400_CLKSRC_IRDA_SHIFT,
- 	.mask		= S3C6400_CLKSRC_IRDA_MASK,
-@@ -592,10 +552,6 @@ static struct clksrc_clk clk_camif = {
- 		.id		= -1,
- 		.ctrlbit        = S3C_CLKCON_SCLK_CAM,
- 		.enable		= s3c64xx_sclk_ctrl,
--		.set_parent	= s3c64xx_setparent_clksrc,
--		.get_rate	= s3c64xx_getrate_clksrc,
--		.set_rate	= s3c64xx_setrate_clksrc,
--		.round_rate	= s3c64xx_roundrate_clksrc,
- 	},
- 	.shift		= 0,
- 	.mask		= 0,
-@@ -637,6 +593,11 @@ static void __init_or_cpufreq s3c6400_set_clksrc(struct clksrc_clk *clk)
- 		return;
- 	}
+@@ -486,10 +486,10 @@ void __init_or_cpufreq s3c6400_setup_clocks(void)
+ 	clk_f.rate = fclk;
  
-+	clk->clk.get_rate = s3c64xx_getrate_clksrc;
-+	clk->clk.set_rate = s3c64xx_setrate_clksrc;
-+	clk->clk.set_parent = s3c64xx_setparent_clksrc;
-+	clk->clk.round_rate = s3c64xx_roundrate_clksrc;
-+
+ 	for (ptr = 0; ptr < ARRAY_SIZE(init_parents); ptr++)
+-		s3c_set_clksrc(init_parents[ptr]);
++		s3c_set_clksrc(init_parents[ptr], true);
+ 
+ 	for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
+-		s3c_set_clksrc(&clksrcs[ptr]);
++		s3c_set_clksrc(&clksrcs[ptr], true);
+ }
+ 
+ static struct clk *clks[] __initdata = {
+diff --git a/arch/arm/plat-samsung/clock-clksrc.c b/arch/arm/plat-samsung/clock-clksrc.c
+index ad4e872..12129f8 100644
+--- a/arch/arm/plat-samsung/clock-clksrc.c
++++ b/arch/arm/plat-samsung/clock-clksrc.c
+@@ -125,7 +125,7 @@ static unsigned long s3c_roundrate_clksrc(struct clk *clk,
+ 
+ /* Clock initialisation code */
+ 
+-void __init_or_cpufreq s3c_set_clksrc(struct clksrc_clk *clk)
++void __init_or_cpufreq s3c_set_clksrc(struct clksrc_clk *clk, bool announce)
+ {
+ 	struct clksrc_sources *srcs = clk->sources;
+ 	u32 mask = bit_mask(clk->reg_src.shift, clk->reg_src.size);
+@@ -145,9 +145,10 @@ void __init_or_cpufreq s3c_set_clksrc(struct clksrc_clk *clk)
+ 
  	clk->clk.parent = srcs->sources[clksrc];
  
- 	printk(KERN_INFO "%s: source is %s (%d), rate is %ld\n",
+-	printk(KERN_INFO "%s: source is %s (%d), rate is %ld\n",
+-	       clk->clk.name, clk->clk.parent->name, clksrc,
+-	       clk_get_rate(&clk->clk));
++	if (announce)
++		printk(KERN_INFO "%s: source is %s (%d), rate is %ld\n",
++		       clk->clk.name, clk->clk.parent->name, clksrc,
++		       clk_get_rate(&clk->clk));
+ }
+ 
+ static struct clk_ops clksrc_ops = {
+@@ -166,7 +167,12 @@ void __init s3c_register_clksrc(struct clksrc_clk *clksrc, int size)
+ 		if (!clksrc->clk.ops)
+ 			clksrc->clk.ops = &clksrc_ops;
+ 
+-		s3c_set_clksrc(clksrc);
++		/* setup the clocksource, but do not announce it
++		 * as it may be re-set by the setup routines
++		 * called after the rest of the clocks have been
++		 * registered
++		 */
++		s3c_set_clksrc(clksrc, false);
+ 
+ 		ret = s3c24xx_register_clock(&clksrc->clk);
+ 
+diff --git a/arch/arm/plat-samsung/include/plat/clock-clksrc.h b/arch/arm/plat-samsung/include/plat/clock-clksrc.h
+index 283dfa0..50a8ca7 100644
+--- a/arch/arm/plat-samsung/include/plat/clock-clksrc.h
++++ b/arch/arm/plat-samsung/include/plat/clock-clksrc.h
+@@ -63,7 +63,15 @@ struct clksrc_clk {
+ 	struct clksrc_reg	reg_div;
+ };
+ 
+-extern void s3c_set_clksrc(struct clksrc_clk *clk);
++/**
++ * s3c_set_clksrc() - setup the clock from the register settings
++ * @clk: The clock to setup.
++ * @announce: true to announce the setting to printk().
++ *
++ * Setup the clock from the current register settings, for when the
++ * kernel boots or if it is resuming from a possibly unknown state.
++ */
++extern void s3c_set_clksrc(struct clksrc_clk *clk, bool announce);
+ 
+ /**
+  * s3c_register_clksrc() register clocks from an array of clksrc clocks
 -- 
 1.6.0.4
