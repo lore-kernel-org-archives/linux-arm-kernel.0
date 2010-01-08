@@ -1,54 +1,58 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri,  8 Jan 2010 02:30:22 +0000
-Subject: [S3C-CLK] ARM: SAMSUNG: Do not register set_parent call if no source
+Date: Fri,  8 Jan 2010 02:30:19 +0000
+Subject: [S3C-CLK] ARM: SAMSUNG: Move clock.c to arch/arm/plat-samsung
 In-Reply-To: <1262917822-26004-1-git-send-email-ben-linux@fluff.org>
 References: <1262917822-26004-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1262917822-26004-15-git-send-email-ben-linux@fluff.org>
+Message-ID: <1262917822-26004-12-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If there is no source register defined, do not register a clksrc
-clock with a valid .set_parent in the ops.
+This is the core implementation of the clock code for all Samsung based
+SoCs, so move it to arch/arm/plat-samsung (the clock.h file has already
+been moved).
+
+Since the file is built for every Samsung SoC, no changes are needed to the
+Kconfig system.
 
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/plat-samsung/clock-clksrc.c |   10 +++++++++-
- 1 files changed, 9 insertions(+), 1 deletions(-)
+ arch/arm/plat-s3c/Makefile                  |    3 +--
+ arch/arm/plat-samsung/Makefile              |    4 ++++
+ arch/arm/{plat-s3c => plat-samsung}/clock.c |    0
+ 3 files changed, 5 insertions(+), 2 deletions(-)
+ rename arch/arm/{plat-s3c => plat-samsung}/clock.c (100%)
 
-diff --git a/arch/arm/plat-samsung/clock-clksrc.c b/arch/arm/plat-samsung/clock-clksrc.c
-index aaf7d5e..33c633a 100644
---- a/arch/arm/plat-samsung/clock-clksrc.c
-+++ b/arch/arm/plat-samsung/clock-clksrc.c
-@@ -86,7 +86,7 @@ static int s3c_setparent_clksrc(struct clk *clk, struct clk *parent)
- 			break;
- 		}
+diff --git a/arch/arm/plat-s3c/Makefile b/arch/arm/plat-s3c/Makefile
+index 50444da..99f91ad 100644
+--- a/arch/arm/plat-s3c/Makefile
++++ b/arch/arm/plat-s3c/Makefile
+@@ -11,9 +11,8 @@ obj-				:=
  
--	if (src_nr >= 0 && sclk->reg_src.reg) {
-+	if (src_nr >= 0) {
- 		clk->parent = parent;
+ # Core support for all Samsung SoCs
  
- 		clksrc &= ~mask;
-@@ -162,6 +162,12 @@ static struct clk_ops clksrc_ops_nodiv = {
- 	.set_parent	= s3c_setparent_clksrc,
- };
+-obj-y				+=  init.o
++obj-y				+= init.o
+ obj-y				+= time.o
+-obj-y				+= clock.o
+ obj-y				+= pwm-clock.o
+ obj-y				+= gpio.o
+ obj-y				+= gpio-config.o
+diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+index ce736ce..7612198 100644
+--- a/arch/arm/plat-samsung/Makefile
++++ b/arch/arm/plat-samsung/Makefile
+@@ -9,4 +9,8 @@ obj-m				:=
+ obj-n				:= dummy.o
+ obj-				:=
  
-+static struct clk_ops clksrc_ops_nosrc = {
-+	.get_rate	= s3c_getrate_clksrc,
-+	.set_rate	= s3c_setrate_clksrc,
-+	.round_rate	= s3c_roundrate_clksrc,
-+};
++# Objects we always build independent of SoC choice
 +
- void __init s3c_register_clksrc(struct clksrc_clk *clksrc, int size)
- {
- 	int ret;
-@@ -174,6 +180,8 @@ void __init s3c_register_clksrc(struct clksrc_clk *clksrc, int size)
- 		if (!clksrc->clk.ops) {
- 			if (!clksrc->reg_div.reg)
- 				clksrc->clk.ops = &clksrc_ops_nodiv;
-+			else if (!clksrc->reg_src.reg)
-+				clksrc->clk.ops = &clksrc_ops_nosrc;
- 			else
- 				clksrc->clk.ops = &clksrc_ops;
- 		}
++obj-y				+= clock.o
++
+ obj-$(CONFIG_SAMSUNG_CLKSRC)	+= clock-clksrc.o
+diff --git a/arch/arm/plat-s3c/clock.c b/arch/arm/plat-samsung/clock.c
+similarity index 100%
+rename from arch/arm/plat-s3c/clock.c
+rename to arch/arm/plat-samsung/clock.c
 -- 
 1.6.0.4
