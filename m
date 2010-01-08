@@ -1,21 +1,94 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 8 Jan 2010 21:33:14 +0800
-Subject: [PATCH 1/1] pxa168: avenergs lite board bring up
-In-Reply-To: <771cded01001080054y14ca6ac9n469a59ec77bf0a9e@mail.gmail.com>
-References: <771cded01001080054y14ca6ac9n469a59ec77bf0a9e@mail.gmail.com>
-Message-ID: <f17812d71001080533l7e555cf6wf90a345a83999e7d@mail.gmail.com>
+From: saaguirre@ti.com (Aguirre, Sergio)
+Date: Fri, 8 Jan 2010 08:01:05 -0600
+Subject: [PATCH] ARM: OMAP4: Power Domains: Remove the return as power
+	domain framework is in place
+In-Reply-To: <1262951944-7693-1-git-send-email-abhijitpagare@ti.com>
+References: <1262951944-7693-1-git-send-email-abhijitpagare@ti.com>
+Message-ID: <A24693684029E5489D1D202277BE89445131204D@dlee02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +/* Avengers lite MFP configurations */
-> +static unsigned long avengers_lite_pin_config_V16F[] __initdata = {
-> + ? ? ? /* DEBUG_UART */
-> + ? ? ? MFP_CFG(GPIO88, AF2),
-> + ? ? ? MFP_CFG(GPIO89, AF2),
-> +};
-> +
+Abhijit,
 
-We may add these two definitions into mfp-pxa168.h so that other
-pxa168-based platform can reuse.
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Pagare, Abhijit
+> Sent: Friday, January 08, 2010 5:59 AM
+> To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Cc: Pagare, Abhijit; Paul Walmsley
+> Subject: [PATCH] ARM: OMAP4: Power Domains: Remove the return as power
+> domain framework is in place
+> 
+> The return prevents the power domains from getting registered.
+> Hence removing it to allow the frameworks model to work.
+> 
+> Signed-off-by: Abhijit Pagare <abhijitpagare@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> ---
+> 
+> Compiled and Boot Tested on OMAP4430 simulator and ES1 Chip
+> Compiled and Boot Tested on OMAP3430 SDP
+> Compiled for OMAP2430 and OMAP2420
+> 
+>  arch/arm/mach-omap2/id.c |    1 -
+>  1 files changed, 0 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+> index a779240..6d1e97b 100644
+> --- a/arch/arm/mach-omap2/id.c
+> +++ b/arch/arm/mach-omap2/id.c
+> @@ -362,7 +362,6 @@ void __init omap2_check_revision(void)
+>  		omap3_cpuinfo();
+>  	} else if (cpu_is_omap44xx()) {
+>  		omap4_check_revision();
+> -		return;
+>  	} else {
+>  		pr_err("OMAP revision unknown, please fix!\n");
+>  	}
 
-Otherwise looks OK to me.
+I don't have an OMAP4 with me, but I found something weird in your reported behaviour...
+
+The code that was being skipped is:
+
+	/*
+	 * OK, now we know the exact revision. Initialize omap_chip bits
+	 * for powerdowmain and clockdomain code.
+	 */
+	if (cpu_is_omap243x()) {
+		/* Currently only supports 2430ES2.1 and 2430-all */
+		omap_chip.oc |= CHIP_IS_OMAP2430;
+	} else if (cpu_is_omap242x()) {
+		/* Currently only supports 2420ES2.1.1 and 2420-all */
+		omap_chip.oc |= CHIP_IS_OMAP2420;
+	} else if (cpu_is_omap3505() || cpu_is_omap3517()) {
+		omap_chip.oc = CHIP_IS_OMAP3430 | CHIP_IS_OMAP3430ES3_1;
+	} else if (cpu_is_omap343x()) {
+		omap_chip.oc = CHIP_IS_OMAP3430;
+		if (omap_rev() == OMAP3430_REV_ES1_0)
+			omap_chip.oc |= CHIP_IS_OMAP3430ES1;
+		else if (omap_rev() >= OMAP3430_REV_ES2_0 &&
+			 omap_rev() <= OMAP3430_REV_ES2_1)
+			omap_chip.oc |= CHIP_IS_OMAP3430ES2;
+		else if (omap_rev() == OMAP3430_REV_ES3_0)
+			omap_chip.oc |= CHIP_IS_OMAP3430ES3_0;
+		else if (omap_rev() == OMAP3430_REV_ES3_1)
+			omap_chip.oc |= CHIP_IS_OMAP3430ES3_1;
+		else if (omap_rev() == OMAP3630_REV_ES1_0)
+			omap_chip.oc |= CHIP_IS_OMAP3630ES1;
+	} else {
+		pr_err("Uninitialized omap_chip, please fix!\n");
+	}
+
+And, in theory, in OMAP4 case, you SHOULDN'T be doing anything here, as there's no case for cpu_is_omap443x or similar. So you should be _only_ seeing a print in console saying: "Uninitialized omap_chip, please fix!", right?
+
+Is OMAP4 chip giving positive on cpu_is_omap343x() test then??
+
+Regards,
+Sergio
+> --
+> 1.5.4.7
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
