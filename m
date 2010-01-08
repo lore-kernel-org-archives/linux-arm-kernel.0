@@ -1,46 +1,89 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 8 Jan 2010 12:59:34 +0000
-Subject: [RFC,PATCH 1/7] arm: add a common struct clk
-In-Reply-To: <1262951103.585.40.camel@pasglop>
-References: <1262907852.736281.78480196040.1.gpush@pororo>
-	<BD79186B4FD85F4B8E60E381CAEE190902089611@mi8nycmail19.Mi8.com>
-	<201001081220.14485.jeremy.kerr@canonical.com>
-	<201001081426.09754.jk@ozlabs.org>
-	<20100108094214.GA23420@n2100.arm.linux.org.uk>
-	<1262944873.585.17.camel@pasglop>
-	<20100108111831.GA25082@n2100.arm.linux.org.uk>
-	<1262951103.585.40.camel@pasglop>
-Message-ID: <20100108125934.GA27567@n2100.arm.linux.org.uk>
+From: dirk.behme@googlemail.com (Dirk Behme)
+Date: Fri, 8 Jan 2010 14:14:33 +0100
+Subject: SMP issues on ARM11 MPCore
+In-Reply-To: <20100107143916.GA24990@pengutronix.de>
+References: <SNT109-W391FD03251D32533FAE84DA77F0@phx.gbl>
+	<1687fa361001070250l62628061h4bebaca1c03d2638@mail.gmail.com>
+	<1687fa361001070545q73e6738apd6ce5650316eca26@mail.gmail.com>
+	<20100107143916.GA24990@pengutronix.de>
+Message-ID: <1687fa361001080514g57ff7a33k4521961fe5fdeb64@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 08, 2010 at 10:45:03PM +1100, Benjamin Herrenschmidt wrote:
-> I don't think Jeremy (again he will have to confirm) is aiming toward a
-> common implementation of the entire clock subsystem. The idea is that
-> the struct clk is a clock object. You can have many struct clk, they can
-> have many different capabilities and features.
+2010/1/7 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hi Dirk,
+>
+> On Thu, Jan 07, 2010 at 02:45:11PM +0100, Dirk Behme wrote:
+>> > ?Unable to handle kernel NULL pointer dereference at virtual address 00000000
+>> > ?pgd = cc37c000
+>> > ?[00000000] *pgd=8c38f031, *pte=00000000, *ppte=00000000
+>> > ?Internal error: Oops: 17 [#1] SMP
+>> > ?last sysfs file:
+>> > ?Modules linked in: [last unloaded: module]
+>> > ?CPU: 0 ? ?Not tainted ?(2.6.32-00012-g89b993e-dirty #17)
+>> > ?PC is at strcmp+0x8/0x34
+>> > ?LR is at sysfs_find_dirent+0x18/0x38
+>> > ?pc : [<c094bd8c>] ? ?lr : [<c08ede4c>] ? ?psr: a0000013
+>> > ?sp : cc26bef8 ?ip : 00000000 ?fp : 00000000
+>> > ?r10: 40025000 ?r9 : cc26a000 ?r8 : 00000880
+>> > ?r7 : cc26bf44 ?r6 : 00000000 ?r5 : 00000000 ?r4 : cc326428
+>> > ?r3 : 000009b3 ?r2 : 00000000 ?r1 : 00000000 ?r0 : 00000000
+>> > ?Flags: NzCv ?IRQs on ?FIQs on ?Mode SVC_32 ?ISA ARM ?Segment user
+>> > ?Control: 08c5787d ?Table: 8c37c00a ?DAC: 00000015
+>> > ?Process rmmod (pid: 378, stack limit = 0xcc26a270)
+>> > ?Stack: (0xcc26bef8 to 0xcc26c000)
+>> > ?bee0: ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cc3263f8 00000000
+>> > ?bf00: 00000000 c08ec918 cc3263f8 00000000 00000000 00000000 00000000 ccd961e0
+>> > ?bf20: 00000000 c087de50 bf000074 bf000074 00000000 c087e214 00000000 c087e550
+>> > ?bf40: 00000001 75646f6d cc00656c cc37d000 cc25ba20 cc25ba64 cc25ba54 00000000
+>> > ?bf60: 40025000 00000000 40025000 00000001 cc26a000 4002501c bef869c4 0089e8e8
+>> > ?bf80: bf000074 00000880 cc26bf8c 00000000 be00656c 400256c0 00000000 00000081
+>> > ?bfa0: c0842224 c08420a0 be00656c 400256c0 bef86b80 00000880 00000000 75646f6d
+>> > ?bfc0: be00656c 400256c0 00000000 00000081 00000059 00000000 40025000 00000000
+>> > ?bfe0: bef86b80 bef86b70 00012fe0 400e7740 60000010 bef86b80 00000000 00000000
+>> > ?[<c094bd8c>] (strcmp+0x8/0x34) from [<c08ede4c>] (sysfs_find_dirent+0x18/0x38)
+>> > ?[<c08ede4c>] (sysfs_find_dirent+0x18/0x38) from [<c08ec918>]
+>> > (sysfs_hash_and_remove+0x28/0x60)
+>> > ?[<c08ec918>] (sysfs_hash_and_remove+0x28/0x60) from [<c087de50>]
+>> > (free_notes_attrs+0x2c/0x4c)
+>> > ?[<c087de50>] (free_notes_attrs+0x2c/0x4c) from [<c087e214>]
+>> > (free_module+0x2c/0xdc)
+>> > ?[<c087e214>] (free_module+0x2c/0xdc) from [<c087e550>]
+>> > (sys_delete_module+0x214/0x250)
+>> > ?[<c087e550>] (sys_delete_module+0x214/0x250) from [<c08420a0>]
+>> > (ret_fast_syscall+0x0/0x2c)
+>>
+>> Debugging of above call stack shows:
+>>
+>> strcmp() fails due to both parameters, cs and ct being NULL.
+>>
+>> Function free_module() gets 'struct module *mod' as parameter. This
+>> has an element
+>>
+>> mod->notes_attrs->attrs[0].attr.name
+>>
+>> In case of module's init and exit function are _both_ marked with
+>> __init/__exit, this name is NULL. This is then parsed down by above
+>> call stack and let strcmp() fail.
+>>
+>> In case init and/or exit function in above module don't have
+>> __init/__exit, name is a valid pointer.
+>>
+>> Any idea what might cause this?
+>>
+>> Many thanks and best regards
+> does
+>
+> ? ? ? ?http://svn.debian.org/wsvn/kernel/dists/trunk/linux-2.6/debian/patches/bugfix/all/modules-Skip-empty-section-notes.patch
+>
+> help you?
 
-Taking the two machine types that are most likely to want to use this:
+Yes :) Thanks.
 
-On PXA, there are 67 struct clk's, each of which has a single pointer
-to an operations structure.  Each operations structure is three pointers
-and there are 11 such structures.  That's 67 * 4 + 11 * 12 = 400 bytes.
-PXA is simple enough that these operations structures can be swallowed
-up into this struct clk.  So, switching PXA to this will mean 67 * 32 =
-2144 bytes.  That's an increase in overhead of 5x.
+Having this patch applied and having mkl lin's test module working
+now, it seems to me that I'm not able to reproduce mkl lin's issues,
+though. I will do some additional tests.
 
-On OMAP, there are 16 clkops structures of 16 bytes each, and each
-struct clk has a pointer to this structure.  Due to the way OMAP works,
-these can't be directly called from the proposed generic version
-because of the additional clock domain/power domain code, so we can
-discount these.
+Best regards
 
-There are two function pointers in the struct clk which would be
-identical to the versions proposed in this generic struct clk.
-There's a total of 219 clk structures in OMAP3.  So, 219 * (4 + 8)
-= 2628.  Switching OMAP means 219 * (4 + 32) = 7884, which is an
-increase in overhead of 3x.
-
-This is the problem - you can have "generic" versions of stuff provided
-you're willing to put up with the additional overhead that comes with
-it.
+Dirk
