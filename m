@@ -1,7 +1,7 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri,  8 Jan 2010 17:17:28 +0100
-Subject: [PATCH 21/25] imx: only define deprecated symbols conditionally
-In-Reply-To: <1262967452-24353-20-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Fri,  8 Jan 2010 17:17:29 +0100
+Subject: [PATCH 22/25] imx: remove mx1ads defconfig
+In-Reply-To: <1262967452-24353-21-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <20100108161551.GA19007@pengutronix.de>
 	<1262967452-24353-1-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1262967452-24353-2-git-send-email-u.kleine-koenig@pengutronix.de>
@@ -23,205 +23,769 @@ References: <20100108161551.GA19007@pengutronix.de>
 	<1262967452-24353-18-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1262967452-24353-19-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1262967452-24353-20-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1262967452-24353-21-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-21-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1262967452-24353-22-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define deprecated symbols in an #ifdef IMX_NEEDS_DEPRECATED_SYMBOLS ...
-
-All files that still depend on the old definitions get
--DIMX_NEEDS_DEPRECATED_SYMBOLS passed to the compiler.
-
-When all remaining users are fixed this allows including the soc
-specific headers unconditionally.
+For some time now the defconfig for mx1ads produces a kernel for
+a versatile board.  As CONFIG_ARCH_MX1ADS is included in the mx1
+defconfig just get rid of mx1ads_defconfig.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Eric Benard <eric@eukrea.com>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Alan Carvalho de Assis <acassis@gmail.com>
-Cc: Daniel Mack <daniel@caiaq.de>
-Cc: Alberto Panizzo <maramaopercheseimorto@gmail.com>
-Cc: Ilya Yanok <yanok@emcraft.com>
-Cc: Holger Schurig <hs4233@mail.mn-solutions.de>
-Cc: Jiri Kosina <jkosina@suse.cz>
-Cc: Magnus Lilja <lilja.magnus@gmail.com>
 ---
- arch/arm/mach-mx2/Makefile            |    3 +++
- arch/arm/mach-mx3/Makefile            |    4 ++++
- arch/arm/plat-mxc/Makefile            |    4 ++++
- arch/arm/plat-mxc/include/mach/mx21.h |    2 ++
- arch/arm/plat-mxc/include/mach/mx27.h |    2 ++
- arch/arm/plat-mxc/include/mach/mx2x.h |    2 ++
- arch/arm/plat-mxc/include/mach/mx31.h |    2 ++
- arch/arm/plat-mxc/include/mach/mx35.h |    2 ++
- arch/arm/plat-mxc/include/mach/mx3x.h |    2 ++
- 9 files changed, 23 insertions(+), 0 deletions(-)
+ arch/arm/configs/mx1ads_defconfig |  742 -------------------------------------
+ 1 files changed, 0 insertions(+), 742 deletions(-)
+ delete mode 100644 arch/arm/configs/mx1ads_defconfig
 
-diff --git a/arch/arm/mach-mx2/Makefile b/arch/arm/mach-mx2/Makefile
-index 3710893..a9c94e3 100644
---- a/arch/arm/mach-mx2/Makefile
-+++ b/arch/arm/mach-mx2/Makefile
-@@ -5,6 +5,9 @@
- # Object file lists.
- 
- obj-y	:=  generic.o devices.o serial.o
-+CFLAGS_generic.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
-+CFLAGS_devices.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
-+CFLAGS_serial.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
- 
- obj-$(CONFIG_MACH_MX21) += clock_imx21.o
- 
-diff --git a/arch/arm/mach-mx3/Makefile b/arch/arm/mach-mx3/Makefile
-index 670fbb5..62b6093 100644
---- a/arch/arm/mach-mx3/Makefile
-+++ b/arch/arm/mach-mx3/Makefile
-@@ -5,6 +5,9 @@
- # Object file lists.
- 
- obj-y				:= mm.o devices.o cpu.o
-+CFLAGS_mm.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
-+CFLAGS_devices.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
-+CFLAGS_cpu.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
- obj-$(CONFIG_ARCH_MX31)		+= clock-imx31.o iomux-imx31.o
- obj-$(CONFIG_ARCH_MX35)		+= clock-imx35.o
- obj-$(CONFIG_MACH_MX31ADS)	+= mach-mx31ads.o
-@@ -13,6 +16,7 @@ obj-$(CONFIG_MACH_MX31LITE)	+= mach-mx31lite.o mx31lite-db.o
- obj-$(CONFIG_MACH_PCM037)	+= mach-pcm037.o
- obj-$(CONFIG_MACH_PCM037_EET)	+= mach-pcm037_eet.o
- obj-$(CONFIG_MACH_MX31_3DS)	+= mach-mx31_3ds.o
-+CFLAGS_mach-mx31_3ds.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
- obj-$(CONFIG_MACH_MX31MOBOARD)	+= mach-mx31moboard.o mx31moboard-devboard.o \
- 				   mx31moboard-marxbot.o
- obj-$(CONFIG_MACH_QONG)		+= mach-qong.o
-diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
-index 996cbac..7322bca 100644
---- a/arch/arm/plat-mxc/Makefile
-+++ b/arch/arm/plat-mxc/Makefile
-@@ -7,9 +7,13 @@ obj-y := irq.o clock.o gpio.o time.o devices.o cpu.o system.o
- 
- obj-$(CONFIG_ARCH_MX1) += iomux-mx1-mx2.o dma-mx1-mx2.o
- obj-$(CONFIG_ARCH_MX2) += iomux-mx1-mx2.o dma-mx1-mx2.o
-+CFLAGS_iomux-mx1-mx2.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
-+CFLAGS_dma-mx1-mx2.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
- obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
- obj-$(CONFIG_MXC_PWM)  += pwm.o
- obj-$(CONFIG_USB_EHCI_MXC) += ehci.o
- obj-$(CONFIG_MXC_ULPI) += ulpi.o
- obj-$(CONFIG_ARCH_MXC_AUDMUX_V1) += audmux-v1.o
-+CFLAGS_audmux-v1.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
- obj-$(CONFIG_ARCH_MXC_AUDMUX_V2) += audmux-v2.o
-+CFLAGS_audmux-v2.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
-diff --git a/arch/arm/plat-mxc/include/mach/mx21.h b/arch/arm/plat-mxc/include/mach/mx21.h
-index 5b9f062..5e2f16e 100644
---- a/arch/arm/plat-mxc/include/mach/mx21.h
-+++ b/arch/arm/plat-mxc/include/mach/mx21.h
-@@ -184,6 +184,7 @@
- #define MX21_DMA_REQ_CSI_STAT	30
- #define MX21_DMA_REQ_CSI_RX	31
- 
-+#ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
- /* these should go away */
- #define SDRAM_BASE_ADDR MX21_SDRAM_BASE_ADDR
- #define CSD1_BASE_ADDR MX21_CSD1_BASE_ADDR
-@@ -216,5 +217,6 @@
- #define DMA_REQ_FIRI_RX MX21_DMA_REQ_FIRI_RX
- #define DMA_REQ_BMI_TX MX21_DMA_REQ_BMI_TX
- #define DMA_REQ_BMI_RX MX21_DMA_REQ_BMI_RX
-+#endif
- 
- #endif /* __ASM_ARCH_MXC_MX21_H__ */
-diff --git a/arch/arm/plat-mxc/include/mach/mx27.h b/arch/arm/plat-mxc/include/mach/mx27.h
-index cd292ff..62746c0 100644
---- a/arch/arm/plat-mxc/include/mach/mx27.h
-+++ b/arch/arm/plat-mxc/include/mach/mx27.h
-@@ -230,6 +230,7 @@
- extern int mx27_revision(void);
- #endif
- 
-+#ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
- /* these should go away */
- #define MSHC_BASE_ADDR MX27_MSHC_BASE_ADDR
- #define GPT5_BASE_ADDR MX27_GPT5_BASE_ADDR
-@@ -297,5 +298,6 @@ extern int mx27_revision(void);
- #define DMA_REQ_UART6_RX MX27_DMA_REQ_UART6_RX
- #define DMA_REQ_SDHC3 MX27_DMA_REQ_SDHC3
- #define DMA_REQ_NFC MX27_DMA_REQ_NFC
-+#endif
- 
- #endif /* __ASM_ARCH_MXC_MX27_H__ */
-diff --git a/arch/arm/plat-mxc/include/mach/mx2x.h b/arch/arm/plat-mxc/include/mach/mx2x.h
-index f2eaf14..396470e 100644
---- a/arch/arm/plat-mxc/include/mach/mx2x.h
-+++ b/arch/arm/plat-mxc/include/mach/mx2x.h
-@@ -176,6 +176,7 @@
- #define MX2x_DMA_REQ_CSI_STAT	30
- #define MX2x_DMA_REQ_CSI_RX	31
- 
-+#ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
- /* these should go away */
- #define AIPI_BASE_ADDR MX2x_AIPI_BASE_ADDR
- #define AIPI_BASE_ADDR_VIRT MX2x_AIPI_BASE_ADDR_VIRT
-@@ -287,5 +288,6 @@
- #define DMA_REQ_UART1_TX MX2x_DMA_REQ_UART1_TX
- #define DMA_REQ_CSI_STAT MX2x_DMA_REQ_CSI_STAT
- #define DMA_REQ_CSI_RX MX2x_DMA_REQ_CSI_RX
-+#endif
- 
- #endif /* __ASM_ARCH_MXC_MX2x_H__ */
-diff --git a/arch/arm/plat-mxc/include/mach/mx31.h b/arch/arm/plat-mxc/include/mach/mx31.h
-index 0c005af..53da4c5 100644
---- a/arch/arm/plat-mxc/include/mach/mx31.h
-+++ b/arch/arm/plat-mxc/include/mach/mx31.h
-@@ -193,6 +193,7 @@
- #define MX31_SYSTEM_REV_MIN		MX31_CHIP_REV_1_0
- #define MX31_SYSTEM_REV_NUM		3
- 
-+#ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
- /* these should go away */
- #define ATA_BASE_ADDR MX31_ATA_BASE_ADDR
- #define UART4_BASE_ADDR MX31_UART4_BASE_ADDR
-@@ -223,3 +224,4 @@
- #define MXC_INT_UART5 MX31_INT_UART5
- #define MXC_INT_CCM MX31_INT_CCM
- #define MXC_INT_PCMCIA MX31_INT_PCMCIA
-+#endif
-diff --git a/arch/arm/plat-mxc/include/mach/mx35.h b/arch/arm/plat-mxc/include/mach/mx35.h
-index 0e453b3..ff2d2f0 100644
---- a/arch/arm/plat-mxc/include/mach/mx35.h
-+++ b/arch/arm/plat-mxc/include/mach/mx35.h
-@@ -187,6 +187,7 @@
- #define MX35_SYSTEM_REV_MIN		MX35_CHIP_REV_1_0
- #define MX35_SYSTEM_REV_NUM		3
- 
-+#ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
- /* these should go away */
- #define MXC_FEC_BASE_ADDR MX35_FEC_BASE_ADDR
- #define MXC_INT_OWIRE MX35_INT_OWIRE
-@@ -202,3 +203,4 @@
- #define MXC_INT_MLB MX35_INT_MLB
- #define MXC_INT_SPDIF MX35_INT_SPDIF
- #define MXC_INT_FEC MX35_INT_FEC
-+#endif
-diff --git a/arch/arm/plat-mxc/include/mach/mx3x.h b/arch/arm/plat-mxc/include/mach/mx3x.h
-index be69272..5ae0b00 100644
---- a/arch/arm/plat-mxc/include/mach/mx3x.h
-+++ b/arch/arm/plat-mxc/include/mach/mx3x.h
-@@ -269,6 +269,7 @@ static inline int mx31_revision(void)
- }
- #endif
- 
-+#ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
- /* these should go away */
- #define L2CC_BASE_ADDR MX3x_L2CC_BASE_ADDR
- #define L2CC_SIZE MX3x_L2CC_SIZE
-@@ -401,5 +402,6 @@ static inline int mx31_revision(void)
- #define CHIP_REV_3_2 MX3x_CHIP_REV_3_2
- #define SYSTEM_REV_MIN MX3x_SYSTEM_REV_MIN
- #define SYSTEM_REV_NUM MX3x_SYSTEM_REV_NUM
-+#endif
- 
- #endif /*  __ASM_ARCH_MXC_MX31_H__ */
+diff --git a/arch/arm/configs/mx1ads_defconfig b/arch/arm/configs/mx1ads_defconfig
+deleted file mode 100644
+index 3cabbb6..0000000
+--- a/arch/arm/configs/mx1ads_defconfig
++++ /dev/null
+@@ -1,742 +0,0 @@
+-#
+-# Automatically generated make config: don't edit
+-# Linux kernel version: 2.6.12-rc1-bk2
+-# Sun Mar 27 02:15:46 2005
+-#
+-CONFIG_ARM=y
+-CONFIG_MMU=y
+-CONFIG_UID16=y
+-CONFIG_RWSEM_GENERIC_SPINLOCK=y
+-CONFIG_GENERIC_CALIBRATE_DELAY=y
+-CONFIG_GENERIC_IOMAP=y
+-
+-#
+-# Code maturity level options
+-#
+-CONFIG_EXPERIMENTAL=y
+-CONFIG_CLEAN_COMPILE=y
+-CONFIG_BROKEN_ON_SMP=y
+-CONFIG_LOCK_KERNEL=y
+-
+-#
+-# General setup
+-#
+-CONFIG_LOCALVERSION=""
+-CONFIG_SWAP=y
+-CONFIG_SYSVIPC=y
+-# CONFIG_POSIX_MQUEUE is not set
+-# CONFIG_BSD_PROCESS_ACCT is not set
+-# CONFIG_SYSCTL is not set
+-# CONFIG_AUDIT is not set
+-# CONFIG_HOTPLUG is not set
+-CONFIG_KOBJECT_UEVENT=y
+-# CONFIG_IKCONFIG is not set
+-CONFIG_EMBEDDED=y
+-# CONFIG_KALLSYMS is not set
+-CONFIG_BASE_FULL=y
+-CONFIG_FUTEX=y
+-CONFIG_EPOLL=y
+-CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+-CONFIG_SHMEM=y
+-CONFIG_CC_ALIGN_FUNCTIONS=0
+-CONFIG_CC_ALIGN_LABELS=0
+-CONFIG_CC_ALIGN_LOOPS=0
+-CONFIG_CC_ALIGN_JUMPS=0
+-# CONFIG_TINY_SHMEM is not set
+-CONFIG_BASE_SMALL=0
+-
+-#
+-# Loadable module support
+-#
+-CONFIG_MODULES=y
+-CONFIG_MODULE_UNLOAD=y
+-# CONFIG_MODULE_FORCE_UNLOAD is not set
+-CONFIG_OBSOLETE_MODPARM=y
+-# CONFIG_MODVERSIONS is not set
+-# CONFIG_MODULE_SRCVERSION_ALL is not set
+-CONFIG_KMOD=y
+-
+-#
+-# System Type
+-#
+-# CONFIG_ARCH_CLPS7500 is not set
+-# CONFIG_ARCH_CLPS711X is not set
+-# CONFIG_ARCH_CO285 is not set
+-# CONFIG_ARCH_EBSA110 is not set
+-# CONFIG_ARCH_FOOTBRIDGE is not set
+-# CONFIG_ARCH_INTEGRATOR is not set
+-# CONFIG_ARCH_IOP3XX is not set
+-# CONFIG_ARCH_IXP4XX is not set
+-# CONFIG_ARCH_IXP2000 is not set
+-# CONFIG_ARCH_L7200 is not set
+-# CONFIG_ARCH_PXA is not set
+-# CONFIG_ARCH_RPC is not set
+-# CONFIG_ARCH_SA1100 is not set
+-# CONFIG_ARCH_S3C2410 is not set
+-# CONFIG_ARCH_SHARK is not set
+-# CONFIG_ARCH_LH7A40X is not set
+-# CONFIG_ARCH_OMAP is not set
+-# CONFIG_ARCH_VERSATILE is not set
+-CONFIG_ARCH_IMX=y
+-# CONFIG_ARCH_H720X is not set
+-
+-#
+-# IMX Implementations
+-#
+-CONFIG_ARCH_MX1ADS=y
+-
+-#
+-# Processor Type
+-#
+-CONFIG_CPU_ARM920T=y
+-CONFIG_CPU_32v4=y
+-CONFIG_CPU_ABRT_EV4T=y
+-CONFIG_CPU_CACHE_V4WT=y
+-CONFIG_CPU_CACHE_VIVT=y
+-CONFIG_CPU_COPY_V4WB=y
+-CONFIG_CPU_TLB_V4WBI=y
+-
+-#
+-# Processor Features
+-#
+-# CONFIG_ARM_THUMB is not set
+-# CONFIG_CPU_ICACHE_DISABLE is not set
+-# CONFIG_CPU_DCACHE_DISABLE is not set
+-# CONFIG_CPU_DCACHE_WRITETHROUGH is not set
+-
+-#
+-# Bus support
+-#
+-CONFIG_ISA=y
+-
+-#
+-# PCCARD (PCMCIA/CardBus) support
+-#
+-# CONFIG_PCCARD is not set
+-
+-#
+-# Kernel Features
+-#
+-CONFIG_PREEMPT=y
+-# CONFIG_LEDS is not set
+-CONFIG_ALIGNMENT_TRAP=y
+-
+-#
+-# Boot options
+-#
+-CONFIG_ZBOOT_ROM_TEXT=0x0
+-CONFIG_ZBOOT_ROM_BSS=0x0
+-CONFIG_CMDLINE="console=ttySMX0,57600n8 ip=bootp root=/dev/nfs"
+-# CONFIG_XIP_KERNEL is not set
+-
+-#
+-# Floating point emulation
+-#
+-
+-#
+-# At least one emulation must be selected
+-#
+-CONFIG_FPE_NWFPE=y
+-CONFIG_FPE_NWFPE_XP=y
+-CONFIG_FPE_FASTFPE=y
+-
+-#
+-# Userspace binary formats
+-#
+-CONFIG_BINFMT_ELF=y
+-# CONFIG_BINFMT_AOUT is not set
+-# CONFIG_BINFMT_MISC is not set
+-# CONFIG_ARTHUR is not set
+-
+-#
+-# Power management options
+-#
+-# CONFIG_PM is not set
+-
+-#
+-# Device Drivers
+-#
+-
+-#
+-# Generic Driver Options
+-#
+-CONFIG_STANDALONE=y
+-CONFIG_PREVENT_FIRMWARE_BUILD=y
+-# CONFIG_FW_LOADER is not set
+-# CONFIG_DEBUG_DRIVER is not set
+-
+-#
+-# Memory Technology Devices (MTD)
+-#
+-CONFIG_MTD=y
+-# CONFIG_MTD_DEBUG is not set
+-# CONFIG_MTD_CONCAT is not set
+-CONFIG_MTD_PARTITIONS=y
+-# CONFIG_MTD_REDBOOT_PARTS is not set
+-# CONFIG_MTD_CMDLINE_PARTS is not set
+-# CONFIG_MTD_AFS_PARTS is not set
+-
+-#
+-# User Modules And Translation Layers
+-#
+-CONFIG_MTD_CHAR=y
+-CONFIG_MTD_BLOCK=y
+-# CONFIG_FTL is not set
+-# CONFIG_NFTL is not set
+-# CONFIG_INFTL is not set
+-
+-#
+-# RAM/ROM/Flash chip drivers
+-#
+-# CONFIG_MTD_CFI is not set
+-# CONFIG_MTD_JEDECPROBE is not set
+-CONFIG_MTD_MAP_BANK_WIDTH_1=y
+-CONFIG_MTD_MAP_BANK_WIDTH_2=y
+-CONFIG_MTD_MAP_BANK_WIDTH_4=y
+-# CONFIG_MTD_MAP_BANK_WIDTH_8 is not set
+-# CONFIG_MTD_MAP_BANK_WIDTH_16 is not set
+-# CONFIG_MTD_MAP_BANK_WIDTH_32 is not set
+-CONFIG_MTD_CFI_I1=y
+-CONFIG_MTD_CFI_I2=y
+-# CONFIG_MTD_CFI_I4 is not set
+-# CONFIG_MTD_CFI_I8 is not set
+-# CONFIG_MTD_RAM is not set
+-CONFIG_MTD_ROM=y
+-# CONFIG_MTD_ABSENT is not set
+-
+-#
+-# Mapping drivers for chip access
+-#
+-# CONFIG_MTD_COMPLEX_MAPPINGS is not set
+-
+-#
+-# Self-contained MTD device drivers
+-#
+-# CONFIG_MTD_SLRAM is not set
+-# CONFIG_MTD_PHRAM is not set
+-# CONFIG_MTD_MTDRAM is not set
+-# CONFIG_MTD_BLKMTD is not set
+-# CONFIG_MTD_BLOCK2MTD is not set
+-
+-#
+-# Disk-On-Chip Device Drivers
+-#
+-# CONFIG_MTD_DOC2000 is not set
+-# CONFIG_MTD_DOC2001 is not set
+-# CONFIG_MTD_DOC2001PLUS is not set
+-
+-#
+-# NAND Flash Device Drivers
+-#
+-# CONFIG_MTD_NAND is not set
+-
+-#
+-# Parallel port support
+-#
+-# CONFIG_PARPORT is not set
+-
+-#
+-# Plug and Play support
+-#
+-# CONFIG_PNP is not set
+-
+-#
+-# Block devices
+-#
+-# CONFIG_BLK_DEV_FD is not set
+-# CONFIG_BLK_DEV_XD is not set
+-# CONFIG_BLK_DEV_COW_COMMON is not set
+-CONFIG_BLK_DEV_LOOP=y
+-# CONFIG_BLK_DEV_CRYPTOLOOP is not set
+-# CONFIG_BLK_DEV_NBD is not set
+-# CONFIG_BLK_DEV_RAM is not set
+-CONFIG_BLK_DEV_RAM_COUNT=16
+-CONFIG_INITRAMFS_SOURCE=""
+-# CONFIG_CDROM_PKTCDVD is not set
+-
+-#
+-# IO Schedulers
+-#
+-CONFIG_IOSCHED_NOOP=y
+-# CONFIG_IOSCHED_AS is not set
+-CONFIG_IOSCHED_DEADLINE=y
+-CONFIG_IOSCHED_CFQ=y
+-# CONFIG_ATA_OVER_ETH is not set
+-
+-#
+-# SCSI device support
+-#
+-# CONFIG_SCSI is not set
+-
+-#
+-# Multi-device support (RAID and LVM)
+-#
+-# CONFIG_MD is not set
+-
+-#
+-# Fusion MPT device support
+-#
+-
+-#
+-# IEEE 1394 (FireWire) support
+-#
+-
+-#
+-# I2O device support
+-#
+-
+-#
+-# Networking support
+-#
+-CONFIG_NET=y
+-
+-#
+-# Networking options
+-#
+-CONFIG_PACKET=m
+-CONFIG_PACKET_MMAP=y
+-# CONFIG_NETLINK_DEV is not set
+-CONFIG_UNIX=y
+-# CONFIG_NET_KEY is not set
+-CONFIG_INET=y
+-# CONFIG_IP_MULTICAST is not set
+-# CONFIG_IP_ADVANCED_ROUTER is not set
+-CONFIG_IP_PNP=y
+-CONFIG_IP_PNP_DHCP=y
+-CONFIG_IP_PNP_BOOTP=y
+-# CONFIG_IP_PNP_RARP is not set
+-# CONFIG_NET_IPIP is not set
+-# CONFIG_NET_IPGRE is not set
+-# CONFIG_ARPD is not set
+-# CONFIG_SYN_COOKIES is not set
+-# CONFIG_INET_AH is not set
+-# CONFIG_INET_ESP is not set
+-# CONFIG_INET_IPCOMP is not set
+-# CONFIG_INET_TUNNEL is not set
+-CONFIG_IP_TCPDIAG=y
+-# CONFIG_IP_TCPDIAG_IPV6 is not set
+-# CONFIG_IPV6 is not set
+-# CONFIG_NETFILTER is not set
+-
+-#
+-# SCTP Configuration (EXPERIMENTAL)
+-#
+-# CONFIG_IP_SCTP is not set
+-# CONFIG_ATM is not set
+-# CONFIG_BRIDGE is not set
+-# CONFIG_VLAN_8021Q is not set
+-# CONFIG_DECNET is not set
+-# CONFIG_LLC2 is not set
+-# CONFIG_IPX is not set
+-# CONFIG_ATALK is not set
+-# CONFIG_X25 is not set
+-# CONFIG_LAPB is not set
+-# CONFIG_NET_DIVERT is not set
+-# CONFIG_ECONET is not set
+-# CONFIG_WAN_ROUTER is not set
+-
+-#
+-# QoS and/or fair queueing
+-#
+-# CONFIG_NET_SCHED is not set
+-# CONFIG_NET_CLS_ROUTE is not set
+-
+-#
+-# Network testing
+-#
+-# CONFIG_NET_PKTGEN is not set
+-# CONFIG_NETPOLL is not set
+-# CONFIG_NET_POLL_CONTROLLER is not set
+-# CONFIG_HAMRADIO is not set
+-# CONFIG_IRDA is not set
+-# CONFIG_BT is not set
+-CONFIG_NETDEVICES=y
+-# CONFIG_DUMMY is not set
+-# CONFIG_BONDING is not set
+-# CONFIG_EQUALIZER is not set
+-# CONFIG_TUN is not set
+-
+-#
+-# ARCnet devices
+-#
+-# CONFIG_ARCNET is not set
+-
+-#
+-# Ethernet (10 or 100Mbit)
+-#
+-CONFIG_NET_ETHERNET=y
+-CONFIG_MII=y
+-# CONFIG_NET_VENDOR_3COM is not set
+-# CONFIG_LANCE is not set
+-# CONFIG_NET_VENDOR_SMC is not set
+-# CONFIG_SMC91X is not set
+-# CONFIG_NET_VENDOR_RACAL is not set
+-# CONFIG_AT1700 is not set
+-# CONFIG_DEPCA is not set
+-# CONFIG_HP100 is not set
+-# CONFIG_NET_ISA is not set
+-# CONFIG_NET_PCI is not set
+-# CONFIG_NET_POCKET is not set
+-
+-#
+-# Ethernet (1000 Mbit)
+-#
+-
+-#
+-# Ethernet (10000 Mbit)
+-#
+-
+-#
+-# Token Ring devices
+-#
+-# CONFIG_TR is not set
+-
+-#
+-# Wireless LAN (non-hamradio)
+-#
+-# CONFIG_NET_RADIO is not set
+-
+-#
+-# Wan interfaces
+-#
+-# CONFIG_WAN is not set
+-CONFIG_PPP=y
+-# CONFIG_PPP_MULTILINK is not set
+-CONFIG_PPP_FILTER=y
+-CONFIG_PPP_ASYNC=y
+-# CONFIG_PPP_SYNC_TTY is not set
+-CONFIG_PPP_DEFLATE=y
+-CONFIG_PPP_BSDCOMP=y
+-# CONFIG_PPPOE is not set
+-# CONFIG_SLIP is not set
+-# CONFIG_SHAPER is not set
+-# CONFIG_NETCONSOLE is not set
+-
+-#
+-# ISDN subsystem
+-#
+-# CONFIG_ISDN is not set
+-
+-#
+-# Input device support
+-#
+-# CONFIG_INPUT is not set
+-
+-#
+-# Hardware I/O ports
+-#
+-# CONFIG_SERIO is not set
+-# CONFIG_GAMEPORT is not set
+-CONFIG_SOUND_GAMEPORT=y
+-
+-#
+-# Character devices
+-#
+-# CONFIG_VT is not set
+-# CONFIG_SERIAL_NONSTANDARD is not set
+-
+-#
+-# Serial drivers
+-#
+-# CONFIG_SERIAL_8250 is not set
+-
+-#
+-# Non-8250 serial port support
+-#
+-CONFIG_SERIAL_IMX=y
+-CONFIG_SERIAL_IMX_CONSOLE=y
+-CONFIG_SERIAL_CORE=y
+-CONFIG_SERIAL_CORE_CONSOLE=y
+-CONFIG_UNIX98_PTYS=y
+-# CONFIG_LEGACY_PTYS is not set
+-
+-#
+-# IPMI
+-#
+-# CONFIG_IPMI_HANDLER is not set
+-
+-#
+-# Watchdog Cards
+-#
+-# CONFIG_WATCHDOG is not set
+-# CONFIG_NVRAM is not set
+-CONFIG_RTC=m
+-# CONFIG_DTLK is not set
+-# CONFIG_R3964 is not set
+-
+-#
+-# Ftape, the floppy tape device driver
+-#
+-# CONFIG_DRM is not set
+-# CONFIG_RAW_DRIVER is not set
+-
+-#
+-# TPM devices
+-#
+-# CONFIG_TCG_TPM is not set
+-
+-#
+-# I2C support
+-#
+-# CONFIG_I2C is not set
+-
+-#
+-# Misc devices
+-#
+-
+-#
+-# Multimedia devices
+-#
+-# CONFIG_VIDEO_DEV is not set
+-
+-#
+-# Digital Video Broadcasting Devices
+-#
+-# CONFIG_DVB is not set
+-
+-#
+-# Graphics support
+-#
+-# CONFIG_FB is not set
+-
+-#
+-# Sound
+-#
+-# CONFIG_SOUND is not set
+-
+-#
+-# USB support
+-#
+-CONFIG_USB_ARCH_HAS_HCD=y
+-# CONFIG_USB_ARCH_HAS_OHCI is not set
+-# CONFIG_USB is not set
+-
+-#
+-# USB Gadget Support
+-#
+-# CONFIG_USB_GADGET is not set
+-
+-#
+-# MMC/SD Card support
+-#
+-# CONFIG_MMC is not set
+-
+-#
+-# File systems
+-#
+-# CONFIG_EXT2_FS is not set
+-# CONFIG_EXT3_FS is not set
+-# CONFIG_JBD is not set
+-# CONFIG_REISERFS_FS is not set
+-# CONFIG_JFS_FS is not set
+-
+-#
+-# XFS support
+-#
+-# CONFIG_XFS_FS is not set
+-# CONFIG_MINIX_FS is not set
+-# CONFIG_ROMFS_FS is not set
+-# CONFIG_QUOTA is not set
+-CONFIG_DNOTIFY=y
+-# CONFIG_AUTOFS_FS is not set
+-# CONFIG_AUTOFS4_FS is not set
+-
+-#
+-# CD-ROM/DVD Filesystems
+-#
+-# CONFIG_ISO9660_FS is not set
+-# CONFIG_UDF_FS is not set
+-
+-#
+-# DOS/FAT/NT Filesystems
+-#
+-CONFIG_FAT_FS=y
+-CONFIG_MSDOS_FS=y
+-CONFIG_VFAT_FS=y
+-CONFIG_FAT_DEFAULT_CODEPAGE=437
+-CONFIG_FAT_DEFAULT_IOCHARSET="iso8859-1"
+-# CONFIG_NTFS_FS is not set
+-
+-#
+-# Pseudo filesystems
+-#
+-CONFIG_PROC_FS=y
+-CONFIG_SYSFS=y
+-CONFIG_DEVFS_FS=y
+-CONFIG_DEVFS_MOUNT=y
+-# CONFIG_DEVFS_DEBUG is not set
+-# CONFIG_DEVPTS_FS_XATTR is not set
+-CONFIG_TMPFS=y
+-# CONFIG_TMPFS_XATTR is not set
+-# CONFIG_HUGETLB_PAGE is not set
+-CONFIG_RAMFS=y
+-
+-#
+-# Miscellaneous filesystems
+-#
+-# CONFIG_ADFS_FS is not set
+-# CONFIG_AFFS_FS is not set
+-# CONFIG_HFS_FS is not set
+-# CONFIG_HFSPLUS_FS is not set
+-# CONFIG_BEFS_FS is not set
+-# CONFIG_BFS_FS is not set
+-# CONFIG_EFS_FS is not set
+-# CONFIG_JFFS_FS is not set
+-CONFIG_JFFS2_FS=y
+-CONFIG_JFFS2_FS_DEBUG=0
+-# CONFIG_JFFS2_FS_NAND is not set
+-# CONFIG_JFFS2_FS_NOR_ECC is not set
+-# CONFIG_JFFS2_COMPRESSION_OPTIONS is not set
+-CONFIG_JFFS2_ZLIB=y
+-CONFIG_JFFS2_RTIME=y
+-# CONFIG_JFFS2_RUBIN is not set
+-CONFIG_CRAMFS=y
+-# CONFIG_VXFS_FS is not set
+-# CONFIG_HPFS_FS is not set
+-# CONFIG_QNX4FS_FS is not set
+-# CONFIG_SYSV_FS is not set
+-# CONFIG_UFS_FS is not set
+-
+-#
+-# Network File Systems
+-#
+-CONFIG_NFS_FS=y
+-CONFIG_NFS_V3=y
+-# CONFIG_NFS_V4 is not set
+-# CONFIG_NFS_DIRECTIO is not set
+-# CONFIG_NFSD is not set
+-CONFIG_ROOT_NFS=y
+-CONFIG_LOCKD=y
+-CONFIG_LOCKD_V4=y
+-CONFIG_SUNRPC=y
+-# CONFIG_RPCSEC_GSS_KRB5 is not set
+-# CONFIG_RPCSEC_GSS_SPKM3 is not set
+-# CONFIG_SMB_FS is not set
+-# CONFIG_CIFS is not set
+-# CONFIG_NCP_FS is not set
+-# CONFIG_CODA_FS is not set
+-# CONFIG_AFS_FS is not set
+-
+-#
+-# Partition Types
+-#
+-# CONFIG_PARTITION_ADVANCED is not set
+-CONFIG_MSDOS_PARTITION=y
+-
+-#
+-# Native Language Support
+-#
+-CONFIG_NLS=y
+-CONFIG_NLS_DEFAULT="iso8859-1"
+-# CONFIG_NLS_CODEPAGE_437 is not set
+-# CONFIG_NLS_CODEPAGE_737 is not set
+-# CONFIG_NLS_CODEPAGE_775 is not set
+-# CONFIG_NLS_CODEPAGE_850 is not set
+-# CONFIG_NLS_CODEPAGE_852 is not set
+-# CONFIG_NLS_CODEPAGE_855 is not set
+-# CONFIG_NLS_CODEPAGE_857 is not set
+-# CONFIG_NLS_CODEPAGE_860 is not set
+-# CONFIG_NLS_CODEPAGE_861 is not set
+-# CONFIG_NLS_CODEPAGE_862 is not set
+-# CONFIG_NLS_CODEPAGE_863 is not set
+-# CONFIG_NLS_CODEPAGE_864 is not set
+-# CONFIG_NLS_CODEPAGE_865 is not set
+-# CONFIG_NLS_CODEPAGE_866 is not set
+-# CONFIG_NLS_CODEPAGE_869 is not set
+-# CONFIG_NLS_CODEPAGE_936 is not set
+-# CONFIG_NLS_CODEPAGE_950 is not set
+-# CONFIG_NLS_CODEPAGE_932 is not set
+-# CONFIG_NLS_CODEPAGE_949 is not set
+-# CONFIG_NLS_CODEPAGE_874 is not set
+-# CONFIG_NLS_ISO8859_8 is not set
+-# CONFIG_NLS_CODEPAGE_1250 is not set
+-# CONFIG_NLS_CODEPAGE_1251 is not set
+-# CONFIG_NLS_ASCII is not set
+-# CONFIG_NLS_ISO8859_1 is not set
+-# CONFIG_NLS_ISO8859_2 is not set
+-# CONFIG_NLS_ISO8859_3 is not set
+-# CONFIG_NLS_ISO8859_4 is not set
+-# CONFIG_NLS_ISO8859_5 is not set
+-# CONFIG_NLS_ISO8859_6 is not set
+-# CONFIG_NLS_ISO8859_7 is not set
+-# CONFIG_NLS_ISO8859_9 is not set
+-# CONFIG_NLS_ISO8859_13 is not set
+-# CONFIG_NLS_ISO8859_14 is not set
+-# CONFIG_NLS_ISO8859_15 is not set
+-# CONFIG_NLS_KOI8_R is not set
+-# CONFIG_NLS_KOI8_U is not set
+-# CONFIG_NLS_UTF8 is not set
+-
+-#
+-# Profiling support
+-#
+-# CONFIG_PROFILING is not set
+-
+-#
+-# Kernel hacking
+-#
+-# CONFIG_PRINTK_TIME is not set
+-CONFIG_DEBUG_KERNEL=y
+-CONFIG_MAGIC_SYSRQ=y
+-CONFIG_LOG_BUF_SHIFT=14
+-# CONFIG_SCHEDSTATS is not set
+-# CONFIG_DEBUG_SLAB is not set
+-CONFIG_DEBUG_PREEMPT=y
+-# CONFIG_DEBUG_SPINLOCK is not set
+-# CONFIG_DEBUG_SPINLOCK_SLEEP is not set
+-# CONFIG_DEBUG_KOBJECT is not set
+-CONFIG_DEBUG_BUGVERBOSE=y
+-CONFIG_DEBUG_INFO=y
+-# CONFIG_DEBUG_FS is not set
+-CONFIG_FRAME_POINTER=y
+-CONFIG_DEBUG_USER=y
+-CONFIG_DEBUG_ERRORS=y
+-# CONFIG_DEBUG_LL is not set
+-
+-#
+-# Security options
+-#
+-# CONFIG_KEYS is not set
+-# CONFIG_SECURITY is not set
+-
+-#
+-# Cryptographic options
+-#
+-CONFIG_CRYPTO=y
+-# CONFIG_CRYPTO_HMAC is not set
+-# CONFIG_CRYPTO_NULL is not set
+-# CONFIG_CRYPTO_MD4 is not set
+-# CONFIG_CRYPTO_MD5 is not set
+-# CONFIG_CRYPTO_SHA1 is not set
+-# CONFIG_CRYPTO_SHA256 is not set
+-# CONFIG_CRYPTO_SHA512 is not set
+-# CONFIG_CRYPTO_WP512 is not set
+-# CONFIG_CRYPTO_TGR192 is not set
+-# CONFIG_CRYPTO_DES is not set
+-# CONFIG_CRYPTO_BLOWFISH is not set
+-# CONFIG_CRYPTO_TWOFISH is not set
+-# CONFIG_CRYPTO_SERPENT is not set
+-# CONFIG_CRYPTO_AES is not set
+-# CONFIG_CRYPTO_CAST5 is not set
+-# CONFIG_CRYPTO_CAST6 is not set
+-# CONFIG_CRYPTO_TEA is not set
+-# CONFIG_CRYPTO_ARC4 is not set
+-# CONFIG_CRYPTO_KHAZAD is not set
+-# CONFIG_CRYPTO_ANUBIS is not set
+-# CONFIG_CRYPTO_DEFLATE is not set
+-# CONFIG_CRYPTO_MICHAEL_MIC is not set
+-# CONFIG_CRYPTO_CRC32C is not set
+-# CONFIG_CRYPTO_TEST is not set
+-
+-#
+-# Hardware crypto devices
+-#
+-
+-#
+-# Library routines
+-#
+-CONFIG_CRC_CCITT=y
+-CONFIG_CRC32=y
+-# CONFIG_LIBCRC32C is not set
+-CONFIG_ZLIB_INFLATE=y
+-CONFIG_ZLIB_DEFLATE=y
 -- 
 1.6.5.2
