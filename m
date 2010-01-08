@@ -1,33 +1,41 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Fri, 8 Jan 2010 10:35:18 +0100
-Subject: S3C2440 : DM9000 link down when writing on NAND flash
-In-Reply-To: <20100108100805.15e4b558@jvermillard-portable>
-References: <20100108100805.15e4b558@jvermillard-portable>
-Message-ID: <19270.64598.451295.134378@ipc1.ka-ro>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 8 Jan 2010 09:42:14 +0000
+Subject: [RFC,PATCH 1/7] arm: add a common struct clk
+In-Reply-To: <201001081426.09754.jk@ozlabs.org>
+References: <1262907852.736281.78480196040.1.gpush@pororo>
+	<BD79186B4FD85F4B8E60E381CAEE190902089611@mi8nycmail19.Mi8.com>
+	<201001081220.14485.jeremy.kerr@canonical.com>
+	<201001081426.09754.jk@ozlabs.org>
+Message-ID: <20100108094214.GA23420@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> I'm using a DM9000E with a S3C2440 CPU running 2.6.30.1. The DM9K is
-> connected on the CS4 (like the mini2440). I already had troubles with
-> the ethernet, and we applied (as suggested here) the DM900 errata
-> consisting in gating IOR & CS. The DM9000 is working better now, but
-> when I write some file on the NAND Flash, the DM900 is reseting (link
-> down, link up). Reading from NAND flash is fine.
+On Fri, Jan 08, 2010 at 02:26:09PM +1100, Jeremy Kerr wrote:
+> Hi Hartley,
 > 
-I remember to have seen this before. You should search the archives of
-the old linux-arm-kernel mailinglist.
+> > I'm relucant to add anything to struct clock that isn't part of the kernel-
+> > wide API.
+> 
+> This may have been a little cryptic, I'm sorry. The reason for not adding a 
+> 'rate' member to the public clock API is that there would be now two methods 
+> for getting the rate of a clock: calling clk->get_rate or accessing clk->rate 
+> directly. The latter is not always guaranteed to work (perhaps there's a clock 
+> out there that needs an explicit HW query to get the rate), so we don't want 
+> generic drivers to be able to access this.
 
+Having struct clk be a set of function pointers gets really expensive on
+some platforms due to the shere number of struct clks - about 900; this
+will be a bar to them adopting this not only due to the size but the
+problems of ensuring correct initialisation.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+Conversely, having those platforms use a pointer to a set of clk operations
+structures is also prohibitive - some operations such as enable and disable
+can be common, but the rest are extremely variable.
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+Plus there are platforms where struct clk is _valid_ a NULL pointer; they
+only have one clock to deal with.  Why should they need to declare a
+struct clk structure just for one fixed clock?
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+What is clear from the clk API as implemented today is that what's right
+for one platform isn't right for another platform.  That's why we have
+each platform implementing struct clk in their own way.
