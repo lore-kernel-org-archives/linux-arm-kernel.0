@@ -1,29 +1,47 @@
-From: mkl0301@hotmail.com (mkl lin)
-Date: Fri, 8 Jan 2010 15:09:49 +0000
-Subject: SMP issues on ARM11 MPCore
-In-Reply-To: <1687fa361001080514g57ff7a33k4521961fe5fdeb64@mail.gmail.com>
-References: <SNT109-W391FD03251D32533FAE84DA77F0@phx.gbl>,
-	<1687fa361001070250l62628061h4bebaca1c03d2638@mail.gmail.com>,
-	<1687fa361001070545q73e6738apd6ce5650316eca26@mail.gmail.com>,
-	<20100107143916.GA24990@pengutronix.de>,
-	<1687fa361001080514g57ff7a33k4521961fe5fdeb64@mail.gmail.com>
-Message-ID: <SNT109-W17F04458915DBA5AA1D665A7700@phx.gbl>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri,  8 Jan 2010 15:23:27 +0000
+Subject: [PATCH] SMDK6410: Set up interrupt range for WM835x on 1190-EV1 PMIC
+	board
+Message-ID: <1262964207-18832-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The WM835x driver won't actually use this yet but it will in the
+future when the changes converting it to genirq are merged.
 
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c6410/mach-smdk6410.c     |    1 +
+ arch/arm/plat-s3c64xx/include/plat/irqs.h |    4 ++++
+ 2 files changed, 5 insertions(+), 0 deletions(-)
 
-> Having this patch applied and having mkl lin's test module working
-> now, it seems to me that I'm not able to reproduce mkl lin's issues,
-> though. I will do some additional tests.
-
-I think my issues is because of my serial driver detected and enabled the workaround for UART_BUG_THRE. I'm not sure whether should it be or not. If I force it not to enable the workaround, the serial driver works just fine, even without the previous patch. You could ensure that whether UART_BUG_THRE is enabled or not. if not, there is nothing to race with.
-
-And if you want to try my test, you should not have it in a script file. I have it all in one command line, and keep repeat <up-arrow><enter><up-arrow><enter>... in a very fast speed, not waiting the last finish printing. The purpose is to have kernel (printk) and user space(sh) keep printing at the same time, so the printk would have race condition with serial8250_backup_timeout.
-
-Best Regards,
-Mac Lin
- 		 	   		  
-_________________________________________________________________
-Windows Live: Friends get your Flickr, Yelp, and Digg updates when they e-mail you.
-http://www.microsoft.com/middleeast/windows/windowslive/see-it-in-action/social-network-basics.aspx?ocid=PID23461::T:WLMTAGL:ON:WL:en-xm:SI_SB_3:092010
+diff --git a/arch/arm/mach-s3c6410/mach-smdk6410.c b/arch/arm/mach-s3c6410/mach-smdk6410.c
+index 3e9f8c9..d79b0aa 100644
+--- a/arch/arm/mach-s3c6410/mach-smdk6410.c
++++ b/arch/arm/mach-s3c6410/mach-smdk6410.c
+@@ -388,6 +388,7 @@ static int __init smdk6410_wm8350_init(struct wm8350 *wm8350)
+ static struct wm8350_platform_data __initdata smdk6410_wm8350_pdata = {
+ 	.init = smdk6410_wm8350_init,
+ 	.irq_high = 1,
++	.irq_base = IRQ_BOARD_START,
+ };
+ #endif
+ 
+diff --git a/arch/arm/plat-s3c64xx/include/plat/irqs.h b/arch/arm/plat-s3c64xx/include/plat/irqs.h
+index 176fe15..a227581 100644
+--- a/arch/arm/plat-s3c64xx/include/plat/irqs.h
++++ b/arch/arm/plat-s3c64xx/include/plat/irqs.h
+@@ -198,7 +198,11 @@
+  * interrupt controllers). */
+ #define IRQ_BOARD_START (IRQ_EINT_GROUP9_BASE + IRQ_EINT_GROUP9_NR + 1)
+ 
++#ifdef CONFIG_SMDK6410_WM1190_EV1
++#define IRQ_BOARD_NR 64
++#else
+ #define IRQ_BOARD_NR 16
++#endif
+ 
+ #define IRQ_BOARD_END (IRQ_BOARD_START + IRQ_BOARD_NR)
+ 
+-- 
+1.6.6
