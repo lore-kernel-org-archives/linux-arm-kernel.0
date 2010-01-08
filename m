@@ -1,8 +1,8 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri,  8 Jan 2010 17:17:31 +0100
-Subject: [PATCH 24/25] imx: properly protect mach/mx{1,
-	[25][157x]}.h from multiple inclusion
-In-Reply-To: <1262967452-24353-23-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Fri,  8 Jan 2010 17:17:32 +0100
+Subject: [PATCH 25/25] imx: define functions to configure chip selects in the
+	WEIM
+In-Reply-To: <1262967452-24353-24-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <20100108161551.GA19007@pengutronix.de>
 	<1262967452-24353-1-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1262967452-24353-2-git-send-email-u.kleine-koenig@pengutronix.de>
@@ -27,179 +27,157 @@ References: <20100108161551.GA19007@pengutronix.de>
 	<1262967452-24353-21-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1262967452-24353-22-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1262967452-24353-23-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1262967452-24353-24-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-24-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1262967452-24353-25-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some headers have used (now) wrong names or havn't had protection at
-all.  This is needed before adding static inline functions to the
-headers.
+This has the addional effect that the macros CSCR_U, CSCR_L and CSCR_A
+are not used anymore in mach-pcm038.c and mach-qong.c.  These still use
+the deprecated IO_ADDRESS macro and shouldn't be used in new code.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Magnus Lilja <lilja.magnus@gmail.com>
 Cc: Holger Schurig <hs4233@mail.mn-solutions.de>
-Cc: Jiri Kosina <jkosina@suse.cz>
-Cc: Daniel Mack <daniel@caiaq.de>
+Cc: Dmitriy Taychenachev <dimichxp@gmail.com>
 ---
- arch/arm/plat-mxc/include/mach/mx1.h  |    6 +++---
- arch/arm/plat-mxc/include/mach/mx21.h |    6 +++---
- arch/arm/plat-mxc/include/mach/mx25.h |    2 +-
- arch/arm/plat-mxc/include/mach/mx27.h |    6 +++---
- arch/arm/plat-mxc/include/mach/mx2x.h |    6 +++---
- arch/arm/plat-mxc/include/mach/mx31.h |    5 +++++
- arch/arm/plat-mxc/include/mach/mx35.h |    4 ++++
- arch/arm/plat-mxc/include/mach/mx3x.h |    6 +++---
- 8 files changed, 25 insertions(+), 16 deletions(-)
+ arch/arm/mach-mx2/mach-pcm038.c       |    4 +---
+ arch/arm/mach-mx3/mach-qong.c         |    4 +---
+ arch/arm/plat-mxc/include/mach/mx27.h |   19 +++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/mx31.h |   19 +++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/mxc.h  |    1 +
+ 5 files changed, 41 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/mx1.h b/arch/arm/plat-mxc/include/mach/mx1.h
-index 1b2890a..b652a9c 100644
---- a/arch/arm/plat-mxc/include/mach/mx1.h
-+++ b/arch/arm/plat-mxc/include/mach/mx1.h
-@@ -9,8 +9,8 @@
-  * published by the Free Software Foundation.
-  */
+diff --git a/arch/arm/mach-mx2/mach-pcm038.c b/arch/arm/mach-mx2/mach-pcm038.c
+index a2e2ea1..9636bb8 100644
+--- a/arch/arm/mach-mx2/mach-pcm038.c
++++ b/arch/arm/mach-mx2/mach-pcm038.c
+@@ -173,9 +173,7 @@ static struct platform_device *platform_devices[] __initdata = {
+  * setup other stuffs to access the sram. */
+ static void __init pcm038_init_sram(void)
+ {
+-	__raw_writel(0x0000d843, CSCR_U(1));
+-	__raw_writel(0x22252521, CSCR_L(1));
+-	__raw_writel(0x22220a00, CSCR_A(1));
++	mx27_setup_weimcs(1, 0x0000d843, 0x22252521, 0x22220a00);
+ }
  
--#ifndef __ASM_ARCH_MXC_MX1_H__
--#define __ASM_ARCH_MXC_MX1_H__
-+#ifndef __MACH_MX1_H__
-+#define __MACH_MX1_H__
+ static struct imxi2c_platform_data pcm038_i2c_1_data = {
+diff --git a/arch/arm/mach-mx3/mach-qong.c b/arch/arm/mach-mx3/mach-qong.c
+index 93991f1..fdb819a 100644
+--- a/arch/arm/mach-mx3/mach-qong.c
++++ b/arch/arm/mach-mx3/mach-qong.c
+@@ -198,9 +198,7 @@ static struct platform_device qong_nand_device = {
+ static void __init qong_init_nand_mtd(void)
+ {
+ 	/* init CS */
+-	__raw_writel(0x00004f00, CSCR_U(3));
+-	__raw_writel(0x20013b31, CSCR_L(3));
+-	__raw_writel(0x00020800, CSCR_A(3));
++	mx31_setup_weimcs(3, 0x00004f00, 0x20013b31, 0x00020800);
+ 	mxc_iomux_set_gpr(MUX_SDCTL_CSD1_SEL, true);
  
- #include <mach/vmalloc.h>
- 
-@@ -161,4 +161,4 @@
- #define DMA_REQ_UART1_T		30
- #define DMA_REQ_UART1_R		31
- 
--#endif /*  __ASM_ARCH_MXC_MX1_H__ */
-+#endif /* ifndef __MACH_MX1_H__ */
-diff --git a/arch/arm/plat-mxc/include/mach/mx21.h b/arch/arm/plat-mxc/include/mach/mx21.h
-index 5e2f16e..ed98b9c 100644
---- a/arch/arm/plat-mxc/include/mach/mx21.h
-+++ b/arch/arm/plat-mxc/include/mach/mx21.h
-@@ -22,8 +22,8 @@
-  * MA  02110-1301, USA.
-  */
- 
--#ifndef __ASM_ARCH_MXC_MX21_H__
--#define __ASM_ARCH_MXC_MX21_H__
-+#ifndef __MACH_MX21_H__
-+#define __MACH_MX21_H__
- 
- #define MX21_AIPI_BASE_ADDR		0x10000000
- #define MX21_AIPI_BASE_ADDR_VIRT	0xf4000000
-@@ -219,4 +219,4 @@
- #define DMA_REQ_BMI_RX MX21_DMA_REQ_BMI_RX
- #endif
- 
--#endif /* __ASM_ARCH_MXC_MX21_H__ */
-+#endif /* ifndef __MACH_MX21_H__ */
-diff --git a/arch/arm/plat-mxc/include/mach/mx25.h b/arch/arm/plat-mxc/include/mach/mx25.h
-index 7a8982d..18eb44c 100644
---- a/arch/arm/plat-mxc/include/mach/mx25.h
-+++ b/arch/arm/plat-mxc/include/mach/mx25.h
-@@ -34,4 +34,4 @@
- 
- #define MX25_INT_FEC	57
- 
--#endif /* __MACH_MX25_H__ */
-+#endif /* ifndef __MACH_MX25_H__ */
+ 	/* enable pin */
 diff --git a/arch/arm/plat-mxc/include/mach/mx27.h b/arch/arm/plat-mxc/include/mach/mx27.h
-index 62746c0..832b580 100644
+index 832b580..bae9cd7 100644
 --- a/arch/arm/plat-mxc/include/mach/mx27.h
 +++ b/arch/arm/plat-mxc/include/mach/mx27.h
-@@ -21,8 +21,8 @@
-  * MA  02110-1301, USA.
-  */
+@@ -24,6 +24,10 @@
+ #ifndef __MACH_MX27_H__
+ #define __MACH_MX27_H__
  
--#ifndef __ASM_ARCH_MXC_MX27_H__
--#define __ASM_ARCH_MXC_MX27_H__
-+#ifndef __MACH_MX27_H__
-+#define __MACH_MX27_H__
- 
++#ifndef __ASSEMBLER__
++#include <linux/io.h>
++#endif
++
  #define MX27_AIPI_BASE_ADDR		0x10000000
  #define MX27_AIPI_BASE_ADDR_VIRT	0xf4000000
-@@ -300,4 +300,4 @@ extern int mx27_revision(void);
- #define DMA_REQ_NFC MX27_DMA_REQ_NFC
- #endif
+ #define MX27_AIPI_SIZE			SZ_1M
+@@ -109,6 +113,11 @@
+ #define MX27_M3IF_BASE_ADDR			(MX27_X_MEMC_BASE_ADDR + 0x3000)
+ #define MX27_PCMCIA_CTL_BASE_ADDR		(MX27_X_MEMC_BASE_ADDR + 0x4000)
  
--#endif /* __ASM_ARCH_MXC_MX27_H__ */
-+#endif /* ifndef __MACH_MX27_H__ */
-diff --git a/arch/arm/plat-mxc/include/mach/mx2x.h b/arch/arm/plat-mxc/include/mach/mx2x.h
-index 396470e..afb895a 100644
---- a/arch/arm/plat-mxc/include/mach/mx2x.h
-+++ b/arch/arm/plat-mxc/include/mach/mx2x.h
-@@ -20,8 +20,8 @@
-  * MA  02110-1301, USA.
-  */
++#define MX27_WEIM_CSCRx_BASE_ADDR(cs)	(MX27_WEIM_BASE_ADDR + (cs) * 0x10)
++#define MX27_WEIM_CSCRxU(cs)			(MX27_WEIM_CSCRx_BASE_ADDR(cs))
++#define MX27_WEIM_CSCRxL(cs)			(MX27_WEIM_CSCRx_BASE_ADDR(cs) + 0x4)
++#define MX27_WEIM_CSCRxA(cs)			(MX27_WEIM_CSCRx_BASE_ADDR(cs) + 0x8)
++
+ #define MX27_PCMCIA_MEM_BASE_ADDR	0xdc000000
  
--#ifndef __ASM_ARCH_MXC_MX2x_H__
--#define __ASM_ARCH_MXC_MX2x_H__
-+#ifndef __MACH_MX2x_H__
-+#define __MACH_MX2x_H__
+ /* IRAM */
+@@ -119,6 +128,16 @@
+ 	IMX_IO_ADDRESS(x, MX27_SAHB1) ?:				\
+ 	IMX_IO_ADDRESS(x, MX27_X_MEMC))
  
- /* The following addresses are common between i.MX21 and i.MX27 */
- 
-@@ -290,4 +290,4 @@
- #define DMA_REQ_CSI_RX MX2x_DMA_REQ_CSI_RX
- #endif
- 
--#endif /* __ASM_ARCH_MXC_MX2x_H__ */
-+#endif /* ifndef __MACH_MX2x_H__ */
++#ifndef __ASSEMBLER__
++static inline void mx27_setup_weimcs(size_t cs,
++		unsigned upper, unsigned lower, unsigned addional)
++{
++	__raw_writel(upper, MX27_IO_ADDRESS(MX27_WEIM_CSCRxU(cs)));
++	__raw_writel(lower, MX27_IO_ADDRESS(MX27_WEIM_CSCRxL(cs)));
++	__raw_writel(addional, MX27_IO_ADDRESS(MX27_WEIM_CSCRxA(cs)));
++}
++#endif
++
+ /* fixed interrupt numbers */
+ #define MX27_INT_I2C2		1
+ #define MX27_INT_GPT6		2
 diff --git a/arch/arm/plat-mxc/include/mach/mx31.h b/arch/arm/plat-mxc/include/mach/mx31.h
-index 53da4c5..62d26da 100644
+index 62d26da..fb90e11 100644
 --- a/arch/arm/plat-mxc/include/mach/mx31.h
 +++ b/arch/arm/plat-mxc/include/mach/mx31.h
-@@ -1,3 +1,6 @@
-+#ifndef __MACH_MX31_H__
-+#define __MACH_MX31_H__
+@@ -1,6 +1,10 @@
+ #ifndef __MACH_MX31_H__
+ #define __MACH_MX31_H__
+ 
++#ifndef __ASSEMBLER__
++#include <linux/io.h>
++#endif
 +
  /*
   * IRAM
   */
-@@ -225,3 +228,5 @@
- #define MXC_INT_CCM MX31_INT_CCM
- #define MXC_INT_PCMCIA MX31_INT_PCMCIA
- #endif
+@@ -110,6 +114,11 @@
+ #define MX31_EMI_CTL_BASE_ADDR			(MX31_X_MEMC_BASE_ADDR + 0x4000)
+ #define MX31_PCMCIA_CTL_BASE_ADDR		MX31_EMI_CTL_BASE_ADDR
+ 
++#define MX31_WEIM_CSCRx_BASE_ADDR(cs)	(MX31_WEIM_BASE_ADDR + (cs) * 0x10)
++#define MX31_WEIM_CSCRxU(cs)			(MX31_WEIM_CSCRx_BASE_ADDR(cs))
++#define MX31_WEIM_CSCRxL(cs)			(MX31_WEIM_CSCRx_BASE_ADDR(cs) + 0x4)
++#define MX31_WEIM_CSCRxA(cs)			(MX31_WEIM_CSCRx_BASE_ADDR(cs) + 0x8)
 +
-+#endif /* ifndef __MACH_MX31_H__ */
-diff --git a/arch/arm/plat-mxc/include/mach/mx35.h b/arch/arm/plat-mxc/include/mach/mx35.h
-index ff2d2f0..526a558 100644
---- a/arch/arm/plat-mxc/include/mach/mx35.h
-+++ b/arch/arm/plat-mxc/include/mach/mx35.h
-@@ -1,3 +1,5 @@
-+#ifndef __MACH_MX35_H__
-+#define __MACH_MX35_H__
- /*
-  * IRAM
-  */
-@@ -204,3 +206,5 @@
- #define MXC_INT_SPDIF MX35_INT_SPDIF
- #define MXC_INT_FEC MX35_INT_FEC
- #endif
+ #define MX31_PCMCIA_MEM_BASE_ADDR	0xbc000000
+ 
+ #define MX31_IO_ADDRESS(x) (						\
+@@ -119,6 +128,16 @@
+ 	IMX_IO_ADDRESS(x, MX31_X_MEMC) ?:				\
+ 	IMX_IO_ADDRESS(x, MX31_SPBA0))
+ 
++#ifndef __ASSEMBLER__
++static inline void mx31_setup_weimcs(size_t cs,
++		unsigned upper, unsigned lower, unsigned addional)
++{
++	__raw_writel(upper, MX31_IO_ADDRESS(MX31_WEIM_CSCRxU(cs)));
++	__raw_writel(lower, MX31_IO_ADDRESS(MX31_WEIM_CSCRxL(cs)));
++	__raw_writel(addional, MX31_IO_ADDRESS(MX31_WEIM_CSCRxA(cs)));
++}
++#endif
 +
-+#endif /* ifndef __MACH_MX35_H__ */
-diff --git a/arch/arm/plat-mxc/include/mach/mx3x.h b/arch/arm/plat-mxc/include/mach/mx3x.h
-index 5ae0b00..7a356de 100644
---- a/arch/arm/plat-mxc/include/mach/mx3x.h
-+++ b/arch/arm/plat-mxc/include/mach/mx3x.h
-@@ -8,8 +8,8 @@
-  * published by the Free Software Foundation.
-  */
- 
--#ifndef __ASM_ARCH_MXC_MX31_H__
--#define __ASM_ARCH_MXC_MX31_H__
-+#ifndef __MACH_MX3x_H__
-+#define __MACH_MX3x_H__
- 
- /*
-  * MX31 memory map:
-@@ -404,4 +404,4 @@ static inline int mx31_revision(void)
- #define SYSTEM_REV_NUM MX3x_SYSTEM_REV_NUM
+ #define MX31_INT_I2C3		3
+ #define MX31_INT_I2C2		4
+ #define MX31_INT_MPEG4_ENCODER	5
+diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
+index 2b14126..800ae2a 100644
+--- a/arch/arm/plat-mxc/include/mach/mxc.h
++++ b/arch/arm/plat-mxc/include/mach/mxc.h
+@@ -121,6 +121,7 @@ extern unsigned int __mxc_cpu_type;
  #endif
  
--#endif /*  __ASM_ARCH_MXC_MX31_H__ */
-+#endif /* ifndef __MACH_MX3x_H__ */
+ #if defined(CONFIG_ARCH_MX3) || defined(CONFIG_ARCH_MX2)
++/* These are deprecated, use mx[23][157]_setup_weimcs instead. */
+ #define CSCR_U(n) (IO_ADDRESS(WEIM_BASE_ADDR + n * 0x10))
+ #define CSCR_L(n) (IO_ADDRESS(WEIM_BASE_ADDR + n * 0x10 + 0x4))
+ #define CSCR_A(n) (IO_ADDRESS(WEIM_BASE_ADDR + n * 0x10 + 0x8))
 -- 
 1.6.5.2
