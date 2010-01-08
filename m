@@ -1,321 +1,1172 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri,  8 Jan 2010 02:30:13 +0000
-Subject: [S3C-CLK] ARM: SAMSUNG: Add core clock implementation for clksrc
-	based clocks
+Date: Fri,  8 Jan 2010 02:30:16 +0000
+Subject: [S3C-CLK] ARM: SAMSUNG: Reduce size of struct clk.
 In-Reply-To: <1262917822-26004-1-git-send-email-ben-linux@fluff.org>
 References: <1262917822-26004-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1262917822-26004-6-git-send-email-ben-linux@fluff.org>
+Message-ID: <1262917822-26004-9-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Harald Welte <laforge@gnumonks.org>
+Reduce the size of struct clk by 12 bytes and make defining clocks with
+common implementation functions easier by moving the set_rate, get_rate,
+round_rate and set_parent calls into a new structure called 'struct clk_ops'
+and using that instead.
 
-Add a core for the clksrc clock implementation, which is found in many of
-the newer Samsung SoCs into plat-samsung.
+This change does make a few clocks larger as they need their own clk_ops,
+but this is outweighed by the number of clocks with either no ops or having
+a common set of ops.
 
-Signed-off-by: Harald Welte <laforge@gnumonks.org>
-[ben-linux at fluff.org: split from original patch to make change smaller]
-[ben-linux at fluff.org: split clk and clksrc changes]
-[ben-linux at fluff.org: moved to plat-samsung from plat-s3c]
-[ben-linux at fluff.org: re-wrote headers after splits]
-[ben-linux at fluff.org: added better documentation to headers]
+Update all the users of this.
+
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/plat-samsung/Kconfig                     |    5 +
- arch/arm/plat-samsung/Makefile                    |    1 +
- arch/arm/plat-samsung/clock-clksrc.c              |  177 +++++++++++++++++++++
- arch/arm/plat-samsung/include/plat/clock-clksrc.h |   75 +++++++++
- 4 files changed, 258 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-samsung/clock-clksrc.c
- create mode 100644 arch/arm/plat-samsung/include/plat/clock-clksrc.h
+ arch/arm/mach-s3c2412/clock.c              |   52 +++++++----
+ arch/arm/mach-s3c2440/clock.c              |    6 +-
+ arch/arm/mach-s3c2442/clock.c              |    6 +-
+ arch/arm/mach-s3c2443/clock.c              |   88 +++++++++++++-------
+ arch/arm/plat-s3c/clock.c                  |   31 ++++---
+ arch/arm/plat-s3c/pwm-clock.c              |   94 +++++++++++----------
+ arch/arm/plat-s3c24xx/clock-dclk.c         |   22 +++--
+ arch/arm/plat-s3c24xx/s3c244x-clock.c      |    4 +-
+ arch/arm/plat-s3c64xx/s3c6400-clock.c      |   14 ++-
+ arch/arm/plat-s5pc1xx/clock.c              |    8 ++-
+ arch/arm/plat-s5pc1xx/s5pc100-clock.c      |  126 ++++++++++++----------------
+ arch/arm/plat-samsung/clock-clksrc.c       |   17 ++--
+ arch/arm/plat-samsung/include/plat/clock.h |   29 ++++++-
+ 13 files changed, 286 insertions(+), 211 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index 486a0d6..e3ae684 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -13,5 +13,10 @@ config PLAT_SAMSUNG
+diff --git a/arch/arm/mach-s3c2412/clock.c b/arch/arm/mach-s3c2412/clock.c
+index a037df5..0c0505b 100644
+--- a/arch/arm/mach-s3c2412/clock.c
++++ b/arch/arm/mach-s3c2412/clock.c
+@@ -124,7 +124,9 @@ static struct clk clk_usysclk = {
+ 	.name		= "usysclk",
+ 	.id		= -1,
+ 	.parent		= &clk_xtal,
+-	.set_parent	= s3c2412_setparent_usysclk,
++	.ops		= &(struct clk_ops) {
++		.set_parent	= s3c2412_setparent_usysclk,
++	},
+ };
  
- if PLAT_SAMSUNG
+ static struct clk clk_mrefclk = {
+@@ -199,10 +201,12 @@ static int s3c2412_setrate_usbsrc(struct clk *clk, unsigned long rate)
+ static struct clk clk_usbsrc = {
+ 	.name		= "usbsrc",
+ 	.id		= -1,
+-	.get_rate	= s3c2412_getrate_usbsrc,
+-	.set_rate	= s3c2412_setrate_usbsrc,
+-	.round_rate	= s3c2412_roundrate_usbsrc,
+-	.set_parent	= s3c2412_setparent_usbsrc,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s3c2412_getrate_usbsrc,
++		.set_rate	= s3c2412_setrate_usbsrc,
++		.round_rate	= s3c2412_roundrate_usbsrc,
++		.set_parent	= s3c2412_setparent_usbsrc,
++	},
+ };
  
-+config SAMSUNG_CLKSRC
-+	bool
-+	help
-+	  Select the clock code for the clksrc implementation
-+	  used by newer systems such as the S3C64XX.
+ static int s3c2412_setparent_msysclk(struct clk *clk, struct clk *parent)
+@@ -225,7 +229,9 @@ static int s3c2412_setparent_msysclk(struct clk *clk, struct clk *parent)
+ static struct clk clk_msysclk = {
+ 	.name		= "msysclk",
+ 	.id		= -1,
+-	.set_parent	= s3c2412_setparent_msysclk,
++	.ops		= &(struct clk_ops) {
++		.set_parent	= s3c2412_setparent_msysclk,
++	},
+ };
  
- endif
-diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-index 4478b9f..ce736ce 100644
---- a/arch/arm/plat-samsung/Makefile
-+++ b/arch/arm/plat-samsung/Makefile
-@@ -9,3 +9,4 @@ obj-m				:=
- obj-n				:= dummy.o
- obj-				:=
+ static int s3c2412_setparent_armclk(struct clk *clk, struct clk *parent)
+@@ -264,7 +270,9 @@ static struct clk clk_armclk = {
+ 	.name		= "armclk",
+ 	.id		= -1,
+ 	.parent		= &clk_msysclk,
+-	.set_parent	= s3c2412_setparent_armclk,
++	.ops		= &(struct clk_ops) {
++		.set_parent	= s3c2412_setparent_armclk,
++	},
+ };
  
-+obj-$(CONFIG_SAMSUNG_CLKSRC)	+= clock-clksrc.o
+ /* these next clocks have an divider immediately after them,
+@@ -337,10 +345,12 @@ static int s3c2412_setrate_uart(struct clk *clk, unsigned long rate)
+ static struct clk clk_uart = {
+ 	.name		= "uartclk",
+ 	.id		= -1,
+-	.get_rate	= s3c2412_getrate_uart,
+-	.set_rate	= s3c2412_setrate_uart,
+-	.set_parent	= s3c2412_setparent_uart,
+-	.round_rate	= s3c2412_roundrate_clksrc,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s3c2412_getrate_uart,
++		.set_rate	= s3c2412_setrate_uart,
++		.set_parent	= s3c2412_setparent_uart,
++		.round_rate	= s3c2412_roundrate_clksrc,
++	},
+ };
+ 
+ static int s3c2412_setparent_i2s(struct clk *clk, struct clk *parent)
+@@ -388,10 +398,12 @@ static int s3c2412_setrate_i2s(struct clk *clk, unsigned long rate)
+ static struct clk clk_i2s = {
+ 	.name		= "i2sclk",
+ 	.id		= -1,
+-	.get_rate	= s3c2412_getrate_i2s,
+-	.set_rate	= s3c2412_setrate_i2s,
+-	.set_parent	= s3c2412_setparent_i2s,
+-	.round_rate	= s3c2412_roundrate_clksrc,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s3c2412_getrate_i2s,
++		.set_rate	= s3c2412_setrate_i2s,
++		.set_parent	= s3c2412_setparent_i2s,
++		.round_rate	= s3c2412_roundrate_clksrc,
++	},
+ };
+ 
+ static int s3c2412_setparent_cam(struct clk *clk, struct clk *parent)
+@@ -438,10 +450,12 @@ static int s3c2412_setrate_cam(struct clk *clk, unsigned long rate)
+ static struct clk clk_cam = {
+ 	.name		= "camif-upll",	/* same as 2440 name */
+ 	.id		= -1,
+-	.get_rate	= s3c2412_getrate_cam,
+-	.set_rate	= s3c2412_setrate_cam,
+-	.set_parent	= s3c2412_setparent_cam,
+-	.round_rate	= s3c2412_roundrate_clksrc,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s3c2412_getrate_cam,
++		.set_rate	= s3c2412_setrate_cam,
++		.set_parent	= s3c2412_setparent_cam,
++		.round_rate	= s3c2412_roundrate_clksrc,
++	},
+ };
+ 
+ /* standard clock definitions */
+diff --git a/arch/arm/mach-s3c2440/clock.c b/arch/arm/mach-s3c2440/clock.c
+index d1c29b2..3dc2426 100644
+--- a/arch/arm/mach-s3c2440/clock.c
++++ b/arch/arm/mach-s3c2440/clock.c
+@@ -98,8 +98,10 @@ static struct clk s3c2440_clk_cam = {
+ static struct clk s3c2440_clk_cam_upll = {
+ 	.name		= "camif-upll",
+ 	.id		= -1,
+-	.set_rate	= s3c2440_camif_upll_setrate,
+-	.round_rate	= s3c2440_camif_upll_round,
++	.ops		= &(struct clk_ops) {
++		.set_rate	= s3c2440_camif_upll_setrate,
++		.round_rate	= s3c2440_camif_upll_round,
++	},
+ };
+ 
+ static struct clk s3c2440_clk_ac97 = {
+diff --git a/arch/arm/mach-s3c2442/clock.c b/arch/arm/mach-s3c2442/clock.c
+index ea1aa1f..d9b692a 100644
+--- a/arch/arm/mach-s3c2442/clock.c
++++ b/arch/arm/mach-s3c2442/clock.c
+@@ -109,8 +109,10 @@ static struct clk s3c2442_clk_cam = {
+ static struct clk s3c2442_clk_cam_upll = {
+ 	.name		= "camif-upll",
+ 	.id		= -1,
+-	.set_rate	= s3c2442_camif_upll_setrate,
+-	.round_rate	= s3c2442_camif_upll_round,
++	.ops		= &(struct clk_ops) {
++		.set_rate	= s3c2442_camif_upll_setrate,
++		.round_rate	= s3c2442_camif_upll_round,
++	},
+ };
+ 
+ static int s3c2442_clk_add(struct sys_device *sysdev)
+diff --git a/arch/arm/mach-s3c2443/clock.c b/arch/arm/mach-s3c2443/clock.c
+index 2785d69..91db4f5 100644
+--- a/arch/arm/mach-s3c2443/clock.c
++++ b/arch/arm/mach-s3c2443/clock.c
+@@ -187,7 +187,9 @@ static int s3c2443_setparent_epllref(struct clk *clk, struct clk *parent)
+ static struct clk clk_epllref = {
+ 	.name		= "epllref",
+ 	.id		= -1,
+-	.set_parent	= s3c2443_setparent_epllref,
++	.ops		= &(struct clk_ops) {
++		.set_parent	= s3c2443_setparent_epllref,
++	},
+ };
+ 
+ static unsigned long s3c2443_getrate_mdivclk(struct clk *clk)
+@@ -205,7 +207,9 @@ static struct clk clk_mdivclk = {
+ 	.name		= "mdivclk",
+ 	.parent		= &clk_mpllref,
+ 	.id		= -1,
+-	.get_rate	= s3c2443_getrate_mdivclk,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s3c2443_getrate_mdivclk,
++	},
+ };
+ 
+ static int s3c2443_setparent_msysclk(struct clk *clk, struct clk *parent)
+@@ -232,7 +236,9 @@ static struct clk clk_msysclk = {
+ 	.name		= "msysclk",
+ 	.parent		= &clk_xtal,
+ 	.id		= -1,
+-	.set_parent	= s3c2443_setparent_msysclk,
++	.ops		= &(struct clk_ops) {
++		.set_parent	= s3c2443_setparent_msysclk,
++	},
+ };
+ 
+ /* armdiv
+@@ -273,7 +279,9 @@ static int s3c2443_setparent_armclk(struct clk *clk, struct clk *parent)
+ static struct clk clk_arm = {
+ 	.name		= "armclk",
+ 	.id		= -1,
+-	.set_parent	= s3c2443_setparent_armclk,
++	.ops		= &(struct clk_ops) {
++		.set_parent	= s3c2443_setparent_armclk,
++	},
+ };
+ 
+ /* esysclk
+@@ -302,7 +310,9 @@ static struct clk clk_esysclk = {
+ 	.name		= "esysclk",
+ 	.parent		= &clk_epll,
+ 	.id		= -1,
+-	.set_parent	= s3c2443_setparent_esysclk,
++	.ops		= &(struct clk_ops) {
++		.set_parent	= s3c2443_setparent_esysclk,
++	},
+ };
+ 
+ /* uartclk
+@@ -341,9 +351,11 @@ static struct clk clk_uart = {
+ 	.name		= "uartclk",
+ 	.id		= -1,
+ 	.parent		= &clk_esysclk,
+-	.get_rate	= s3c2443_getrate_uart,
+-	.set_rate	= s3c2443_setrate_uart,
+-	.round_rate	= s3c2443_roundrate_clksrc16,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s3c2443_getrate_uart,
++		.set_rate	= s3c2443_setrate_uart,
++		.round_rate	= s3c2443_roundrate_clksrc16,
++	},
+ };
+ 
+ /* hsspi
+@@ -384,9 +396,11 @@ static struct clk clk_hsspi = {
+ 	.parent		= &clk_esysclk,
+ 	.ctrlbit	= S3C2443_SCLKCON_HSSPICLK,
+ 	.enable		= s3c2443_clkcon_enable_s,
+-	.get_rate	= s3c2443_getrate_hsspi,
+-	.set_rate	= s3c2443_setrate_hsspi,
+-	.round_rate	= s3c2443_roundrate_clksrc4,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s3c2443_getrate_hsspi,
++		.set_rate	= s3c2443_setrate_hsspi,
++		.round_rate	= s3c2443_roundrate_clksrc4,
++	},
+ };
+ 
+ /* usbhost
+@@ -426,9 +440,11 @@ static struct clk clk_usb_bus_host = {
+ 	.parent		= &clk_esysclk,
+ 	.ctrlbit	= S3C2443_SCLKCON_USBHOST,
+ 	.enable		= s3c2443_clkcon_enable_s,
+-	.get_rate	= s3c2443_getrate_usbhost,
+-	.set_rate	= s3c2443_setrate_usbhost,
+-	.round_rate	= s3c2443_roundrate_clksrc4,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s3c2443_getrate_usbhost,
++		.set_rate	= s3c2443_setrate_usbhost,
++		.round_rate	= s3c2443_roundrate_clksrc4,
++	},
+ };
+ 
+ /* clk_hsmcc_div
+@@ -468,9 +484,11 @@ static struct clk clk_hsmmc_div = {
+ 	.name		= "hsmmc-div",
+ 	.id		= -1,
+ 	.parent		= &clk_esysclk,
+-	.get_rate	= s3c2443_getrate_hsmmc_div,
+-	.set_rate	= s3c2443_setrate_hsmmc_div,
+-	.round_rate	= s3c2443_roundrate_clksrc4,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s3c2443_getrate_hsmmc_div,
++		.set_rate	= s3c2443_setrate_hsmmc_div,
++		.round_rate	= s3c2443_roundrate_clksrc4,
++	},
+ };
+ 
+ static int s3c2443_setparent_hsmmc(struct clk *clk, struct clk *parent)
+@@ -505,7 +523,9 @@ static struct clk clk_hsmmc = {
+ 	.id		= -1,
+ 	.parent		= &clk_hsmmc_div,
+ 	.enable		= s3c2443_enable_hsmmc,
+-	.set_parent	= s3c2443_setparent_hsmmc,
++	.ops		= &(struct clk_ops) {
++		.set_parent	= s3c2443_setparent_hsmmc,
++	},
+ };
+ 
+ /* i2s_eplldiv
+@@ -543,9 +563,11 @@ static struct clk clk_i2s_eplldiv = {
+ 	.name		= "i2s-eplldiv",
+ 	.id		= -1,
+ 	.parent		= &clk_esysclk,
+-	.get_rate	= s3c2443_getrate_i2s_eplldiv,
+-	.set_rate	= s3c2443_setrate_i2s_eplldiv,
+-	.round_rate	= s3c2443_roundrate_clksrc16,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s3c2443_getrate_i2s_eplldiv,
++		.set_rate	= s3c2443_setrate_i2s_eplldiv,
++		.round_rate	= s3c2443_roundrate_clksrc16,
++	},
+ };
+ 
+ /* i2s-ref
+@@ -578,7 +600,9 @@ static struct clk clk_i2s = {
+ 	.parent		= &clk_i2s_eplldiv,
+ 	.ctrlbit	= S3C2443_SCLKCON_I2SCLK,
+ 	.enable		= s3c2443_clkcon_enable_s,
+-	.set_parent	= s3c2443_setparent_i2s,
++	.ops		= &(struct clk_ops) {
++		.set_parent	= s3c2443_setparent_i2s,
++	},
+ };
+ 
+ /* cam-if
+@@ -618,9 +642,11 @@ static struct clk clk_cam = {
+ 	.parent		= &clk_esysclk,
+ 	.ctrlbit	= S3C2443_SCLKCON_CAMCLK,
+ 	.enable		= s3c2443_clkcon_enable_s,
+-	.get_rate	= s3c2443_getrate_cam,
+-	.set_rate	= s3c2443_setrate_cam,
+-	.round_rate	= s3c2443_roundrate_clksrc16,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s3c2443_getrate_cam,
++		.set_rate	= s3c2443_setrate_cam,
++		.round_rate	= s3c2443_roundrate_clksrc16,
++	},
+ };
+ 
+ /* display-if
+@@ -660,9 +686,11 @@ static struct clk clk_display = {
+ 	.parent		= &clk_esysclk,
+ 	.ctrlbit	= S3C2443_SCLKCON_DISPCLK,
+ 	.enable		= s3c2443_clkcon_enable_s,
+-	.get_rate	= s3c2443_getrate_display,
+-	.set_rate	= s3c2443_setrate_display,
+-	.round_rate	= s3c2443_roundrate_clksrc256,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s3c2443_getrate_display,
++		.set_rate	= s3c2443_setrate_display,
++		.round_rate	= s3c2443_roundrate_clksrc256,
++	},
+ };
+ 
+ /* prediv
+@@ -685,7 +713,9 @@ static struct clk clk_prediv = {
+ 	.name		= "prediv",
+ 	.id		= -1,
+ 	.parent		= &clk_msysclk,
+-	.get_rate	= s3c2443_prediv_getrate,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s3c2443_prediv_getrate,
++	},
+ };
+ 
+ /* standard clock definitions */
+diff --git a/arch/arm/plat-s3c/clock.c b/arch/arm/plat-s3c/clock.c
+index 619cfa8..fa91125 100644
+--- a/arch/arm/plat-s3c/clock.c
++++ b/arch/arm/plat-s3c/clock.c
+@@ -150,8 +150,8 @@ unsigned long clk_get_rate(struct clk *clk)
+ 	if (clk->rate != 0)
+ 		return clk->rate;
+ 
+-	if (clk->get_rate != NULL)
+-		return (clk->get_rate)(clk);
++	if (clk->ops != NULL && clk->ops->get_rate != NULL)
++		return (clk->ops->get_rate)(clk);
+ 
+ 	if (clk->parent != NULL)
+ 		return clk_get_rate(clk->parent);
+@@ -161,8 +161,8 @@ unsigned long clk_get_rate(struct clk *clk)
+ 
+ long clk_round_rate(struct clk *clk, unsigned long rate)
+ {
+-	if (!IS_ERR(clk) && clk->round_rate)
+-		return (clk->round_rate)(clk, rate);
++	if (!IS_ERR(clk) && clk->ops && clk->ops->round_rate)
++		return (clk->ops->round_rate)(clk, rate);
+ 
+ 	return rate;
+ }
+@@ -178,13 +178,14 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
+ 	 * the clock may have been made this way by choice.
+ 	 */
+ 
+-	WARN_ON(clk->set_rate == NULL);
++	WARN_ON(clk->ops == NULL);
++	WARN_ON(clk->ops && clk->ops->set_rate == NULL);
+ 
+-	if (clk->set_rate == NULL)
++	if (clk->ops == NULL || clk->ops->set_rate == NULL)
+ 		return -EINVAL;
+ 
+ 	spin_lock(&clocks_lock);
+-	ret = (clk->set_rate)(clk, rate);
++	ret = (clk->ops->set_rate)(clk, rate);
+ 	spin_unlock(&clocks_lock);
+ 
+ 	return ret;
+@@ -204,8 +205,8 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+ 
+ 	spin_lock(&clocks_lock);
+ 
+-	if (clk->set_parent)
+-		ret = (clk->set_parent)(clk, parent);
++	if (clk->ops && clk->ops->set_parent)
++		ret = (clk->ops->set_parent)(clk, parent);
+ 
+ 	spin_unlock(&clocks_lock);
+ 
+@@ -230,6 +231,10 @@ static int clk_default_setrate(struct clk *clk, unsigned long rate)
+ 	return 0;
+ }
+ 
++static struct clk_ops clk_ops_def_setrate = {
++	.set_rate	= clk_default_setrate,
++};
++
+ struct clk clk_xtal = {
+ 	.name		= "xtal",
+ 	.id		= -1,
+@@ -251,7 +256,7 @@ struct clk clk_epll = {
+ struct clk clk_mpll = {
+ 	.name		= "mpll",
+ 	.id		= -1,
+-	.set_rate	= clk_default_setrate,
++	.ops		= &clk_ops_def_setrate,
+ };
+ 
+ struct clk clk_upll = {
+@@ -267,7 +272,6 @@ struct clk clk_f = {
+ 	.rate		= 0,
+ 	.parent		= &clk_mpll,
+ 	.ctrlbit	= 0,
+-	.set_rate	= clk_default_setrate,
+ };
+ 
+ struct clk clk_h = {
+@@ -276,7 +280,7 @@ struct clk clk_h = {
+ 	.rate		= 0,
+ 	.parent		= NULL,
+ 	.ctrlbit	= 0,
+-	.set_rate	= clk_default_setrate,
++	.ops		= &clk_ops_def_setrate,
+ };
+ 
+ struct clk clk_p = {
+@@ -285,7 +289,7 @@ struct clk clk_p = {
+ 	.rate		= 0,
+ 	.parent		= NULL,
+ 	.ctrlbit	= 0,
+-	.set_rate	= clk_default_setrate,
++	.ops		= &clk_ops_def_setrate,
+ };
+ 
+ struct clk clk_usb_bus = {
+@@ -296,7 +300,6 @@ struct clk clk_usb_bus = {
+ };
+ 
+ 
+-
+ struct clk s3c24xx_uclk = {
+ 	.name		= "uclk",
+ 	.id		= -1,
+diff --git a/arch/arm/plat-s3c/pwm-clock.c b/arch/arm/plat-s3c/pwm-clock.c
+index a318215..1808fa8 100644
+--- a/arch/arm/plat-s3c/pwm-clock.c
++++ b/arch/arm/plat-s3c/pwm-clock.c
+@@ -130,20 +130,22 @@ static int clk_pwm_scaler_set_rate(struct clk *clk, unsigned long rate)
+ 	return 0;
+ }
+ 
++static struct clk_ops clk_pwm_scaler_ops = {
++	.get_rate	= clk_pwm_scaler_get_rate,
++	.set_rate	= clk_pwm_scaler_set_rate,
++	.round_rate	= clk_pwm_scaler_round_rate,
++};
++
+ static struct clk clk_timer_scaler[] = {
+ 	[0]	= {
+ 		.name		= "pwm-scaler0",
+ 		.id		= -1,
+-		.get_rate	= clk_pwm_scaler_get_rate,
+-		.set_rate	= clk_pwm_scaler_set_rate,
+-		.round_rate	= clk_pwm_scaler_round_rate,
++		.ops		= &clk_pwm_scaler_ops,
+ 	},
+ 	[1]	= {
+ 		.name		= "pwm-scaler1",
+ 		.id		= -1,
+-		.get_rate	= clk_pwm_scaler_get_rate,
+-		.set_rate	= clk_pwm_scaler_set_rate,
+-		.round_rate	= clk_pwm_scaler_round_rate,
++		.ops		= &clk_pwm_scaler_ops,
+ 	},
+ };
+ 
+@@ -256,50 +258,46 @@ static int clk_pwm_tdiv_set_rate(struct clk *clk, unsigned long rate)
+ 	return 0;
+ }
+ 
++static struct clk_ops clk_tdiv_ops = {
++	.get_rate	= clk_pwm_tdiv_get_rate,
++	.set_rate	= clk_pwm_tdiv_set_rate,
++	.round_rate	= clk_pwm_tdiv_round_rate,
++};
++
+ static struct pwm_tdiv_clk clk_timer_tdiv[] = {
+ 	[0]	= {
+ 		.clk	= {
+-			.name		= "pwm-tdiv",
+-			.parent		= &clk_timer_scaler[0],
+-			.get_rate	= clk_pwm_tdiv_get_rate,
+-			.set_rate	= clk_pwm_tdiv_set_rate,
+-			.round_rate	= clk_pwm_tdiv_round_rate,
++			.name	= "pwm-tdiv",
++			.ops	= &clk_tdiv_ops,
++			.parent	= &clk_timer_scaler[0],
+ 		},
+ 	},
+ 	[1]	= {
+ 		.clk	= {
+-			.name		= "pwm-tdiv",
+-			.parent		= &clk_timer_scaler[0],
+-			.get_rate	= clk_pwm_tdiv_get_rate,
+-			.set_rate	= clk_pwm_tdiv_set_rate,
+-			.round_rate	= clk_pwm_tdiv_round_rate,
++			.name	= "pwm-tdiv",
++			.ops	= &clk_tdiv_ops,
++			.parent	= &clk_timer_scaler[0],
+ 		}
+ 	},
+ 	[2]	= {
+ 		.clk	= {
+-			.name		= "pwm-tdiv",
+-			.parent		= &clk_timer_scaler[1],
+-			.get_rate	= clk_pwm_tdiv_get_rate,
+-			.set_rate	= clk_pwm_tdiv_set_rate,
+-			.round_rate	= clk_pwm_tdiv_round_rate,
++			.name	= "pwm-tdiv",
++			.ops	= &clk_tdiv_ops,
++			.parent	= &clk_timer_scaler[1],
+ 		},
+ 	},
+ 	[3]	= {
+ 		.clk	= {
+-			.name		= "pwm-tdiv",
+-			.parent		= &clk_timer_scaler[1],
+-			.get_rate	= clk_pwm_tdiv_get_rate,
+-			.set_rate	= clk_pwm_tdiv_set_rate,
+-			.round_rate	= clk_pwm_tdiv_round_rate,
++			.name	= "pwm-tdiv",
++			.ops	= &clk_tdiv_ops,
++			.parent	= &clk_timer_scaler[1],
+ 		},
+ 	},
+ 	[4]	= {
+ 		.clk	= {
+-			.name		= "pwm-tdiv",
+-			.parent		= &clk_timer_scaler[1],
+-			.get_rate	= clk_pwm_tdiv_get_rate,
+-			.set_rate	= clk_pwm_tdiv_set_rate,
+-			.round_rate	= clk_pwm_tdiv_round_rate,
++			.name	= "pwm-tdiv",
++			.ops	= &clk_tdiv_ops,
++			.parent	= &clk_timer_scaler[1],
+ 		},
+ 	},
+ };
+@@ -356,31 +354,35 @@ static int clk_pwm_tin_set_parent(struct clk *clk, struct clk *parent)
+ 	return 0;
+ }
+ 
++static struct clk_ops clk_tin_ops = {
++	.set_parent	= clk_pwm_tin_set_parent,
++};
++
+ static struct clk clk_tin[] = {
+ 	[0]	= {
+-		.name		= "pwm-tin",
+-		.id		= 0,
+-		.set_parent	= clk_pwm_tin_set_parent,
++		.name	= "pwm-tin",
++		.id	= 0,
++		.ops	= &clk_tin_ops,
+ 	},
+ 	[1]	= {
+-		.name		= "pwm-tin",
+-		.id		= 1,
+-		.set_parent	= clk_pwm_tin_set_parent,
++		.name	= "pwm-tin",
++		.id	= 1,
++		.ops	= &clk_tin_ops,
+ 	},
+ 	[2]	= {
+-		.name		= "pwm-tin",
+-		.id		= 2,
+-		.set_parent	= clk_pwm_tin_set_parent,
++		.name	= "pwm-tin",
++		.id	= 2,
++		.ops	= &clk_tin_ops,
+ 	},
+ 	[3]	= {
+-		.name		= "pwm-tin",
+-		.id		= 3,
+-		.set_parent	= clk_pwm_tin_set_parent,
++		.name	= "pwm-tin",
++		.id	= 3,
++		.ops	= &clk_tin_ops,
+ 	},
+ 	[4]	= {
+-		.name		= "pwm-tin",
+-		.id		= 4,
+-		.set_parent	= clk_pwm_tin_set_parent,
++		.name	= "pwm-tin",
++		.id	= 4,
++		.ops	= &clk_tin_ops,
+ 	},
+ };
+ 
+diff --git a/arch/arm/plat-s3c24xx/clock-dclk.c b/arch/arm/plat-s3c24xx/clock-dclk.c
+index ac061a1..cf97caa 100644
+--- a/arch/arm/plat-s3c24xx/clock-dclk.c
++++ b/arch/arm/plat-s3c24xx/clock-dclk.c
+@@ -161,14 +161,18 @@ static int s3c24xx_clkout_setparent(struct clk *clk, struct clk *parent)
+ 
+ /* external clock definitions */
+ 
++static struct clk_ops dclk_ops = {
++	.set_parent	= s3c24xx_dclk_setparent,
++	.set_rate	= s3c24xx_set_dclk_rate,
++	.round_rate	= s3c24xx_round_dclk_rate,
++};
++
+ struct clk s3c24xx_dclk0 = {
+ 	.name		= "dclk0",
+ 	.id		= -1,
+ 	.ctrlbit	= S3C2410_DCLKCON_DCLK0EN,
+ 	.enable	        = s3c24xx_dclk_enable,
+-	.set_parent	= s3c24xx_dclk_setparent,
+-	.set_rate	= s3c24xx_set_dclk_rate,
+-	.round_rate	= s3c24xx_round_dclk_rate,
++	.ops		= &dclk_ops,
+ };
+ 
+ struct clk s3c24xx_dclk1 = {
+@@ -176,19 +180,21 @@ struct clk s3c24xx_dclk1 = {
+ 	.id		= -1,
+ 	.ctrlbit	= S3C2410_DCLKCON_DCLK1EN,
+ 	.enable		= s3c24xx_dclk_enable,
+-	.set_parent	= s3c24xx_dclk_setparent,
+-	.set_rate	= s3c24xx_set_dclk_rate,
+-	.round_rate	= s3c24xx_round_dclk_rate,
++	.ops		= &dclk_ops,
++};
++
++static struct clk_ops clkout_ops = {
++	.set_parent	= s3c24xx_clkout_setparent,
+ };
+ 
+ struct clk s3c24xx_clkout0 = {
+ 	.name		= "clkout0",
+ 	.id		= -1,
+-	.set_parent	= s3c24xx_clkout_setparent,
++	.ops		= &clkout_ops,
+ };
+ 
+ struct clk s3c24xx_clkout1 = {
+ 	.name		= "clkout1",
+ 	.id		= -1,
+-	.set_parent	= s3c24xx_clkout_setparent,
++	.ops		= &clkout_ops,
+ };
+diff --git a/arch/arm/plat-s3c24xx/s3c244x-clock.c b/arch/arm/plat-s3c24xx/s3c244x-clock.c
+index 7937109..f8d9613 100644
+--- a/arch/arm/plat-s3c24xx/s3c244x-clock.c
++++ b/arch/arm/plat-s3c24xx/s3c244x-clock.c
+@@ -68,7 +68,9 @@ static int s3c2440_setparent_armclk(struct clk *clk, struct clk *parent)
+ static struct clk clk_arm = {
+ 	.name		= "armclk",
+ 	.id		= -1,
+-	.set_parent	= s3c2440_setparent_armclk,
++	.ops		= &(struct clk_ops) {
++		.set_parent	= s3c2440_setparent_armclk,
++	},
+ };
+ 
+ static int s3c244x_clk_add(struct sys_device *sysdev)
+diff --git a/arch/arm/plat-s3c64xx/s3c6400-clock.c b/arch/arm/plat-s3c64xx/s3c6400-clock.c
+index 20af0c2..f85406a 100644
+--- a/arch/arm/plat-s3c64xx/s3c6400-clock.c
++++ b/arch/arm/plat-s3c64xx/s3c6400-clock.c
+@@ -165,9 +165,11 @@ static struct clk clk_arm = {
+ 	.name		= "armclk",
+ 	.id		= -1,
+ 	.parent		= &clk_mout_apll.clk,
+-	.get_rate	= s3c64xx_clk_arm_get_rate,
+-	.set_rate	= s3c64xx_clk_arm_set_rate,
+-	.round_rate	= s3c64xx_clk_arm_round_rate,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s3c64xx_clk_arm_get_rate,
++		.set_rate	= s3c64xx_clk_arm_set_rate,
++		.round_rate	= s3c64xx_clk_arm_round_rate,
++	},
+ };
+ 
+ static unsigned long s3c64xx_clk_doutmpll_get_rate(struct clk *clk)
+@@ -182,11 +184,15 @@ static unsigned long s3c64xx_clk_doutmpll_get_rate(struct clk *clk)
+ 	return rate;
+ }
+ 
++static struct clk_ops clk_dout_ops = {
++	.get_rate	= s3c64xx_clk_doutmpll_get_rate,
++};
++
+ static struct clk clk_dout_mpll = {
+ 	.name		= "dout_mpll",
+ 	.id		= -1,
+ 	.parent		= &clk_mout_mpll.clk,
+-	.get_rate	= s3c64xx_clk_doutmpll_get_rate,
++	.ops		= &clk_dout_ops,
+ };
+ 
+ static struct clk *clkset_spi_mmc_list[] = {
+diff --git a/arch/arm/plat-s5pc1xx/clock.c b/arch/arm/plat-s5pc1xx/clock.c
+index 26c21d8..2f4d8d4 100644
+--- a/arch/arm/plat-s5pc1xx/clock.c
++++ b/arch/arm/plat-s5pc1xx/clock.c
+@@ -70,6 +70,10 @@ static int clk_default_setrate(struct clk *clk, unsigned long rate)
+ 	return 0;
+ }
+ 
++static struct clk_ops clk_ops_default_setrate = {
++	.set_rate	= clk_default_setrate,
++};
++
+ static int clk_dummy_enable(struct clk *clk, int enable)
+ {
+ 	return 0;
+@@ -81,8 +85,8 @@ struct clk clk_hd0 = {
+ 	.rate		= 0,
+ 	.parent		= NULL,
+ 	.ctrlbit	= 0,
+-	.set_rate	= clk_default_setrate,
+ 	.enable		= clk_dummy_enable,
++	.ops		= &clk_ops_default_setrate,
+ };
+ 
+ struct clk clk_pd0 = {
+@@ -91,7 +95,7 @@ struct clk clk_pd0 = {
+ 	.rate		= 0,
+ 	.parent		= NULL,
+ 	.ctrlbit	= 0,
+-	.set_rate	= clk_default_setrate,
++	.ops		= &clk_ops_default_setrate,
+ 	.enable		= clk_dummy_enable,
+ };
+ 
+diff --git a/arch/arm/plat-s5pc1xx/s5pc100-clock.c b/arch/arm/plat-s5pc1xx/s5pc100-clock.c
+index b436d44..16f0b90 100644
+--- a/arch/arm/plat-s5pc1xx/s5pc100-clock.c
++++ b/arch/arm/plat-s5pc1xx/s5pc100-clock.c
+@@ -111,7 +111,9 @@ static struct clk clk_dout_apll = {
+ 	.name		= "dout_apll",
+ 	.id		= -1,
+ 	.parent		= &clk_mout_apll.clk,
+-	.get_rate	= s5pc100_clk_dout_apll_get_rate,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s5pc100_clk_dout_apll_get_rate,
++	},
+ };
+ 
+ static unsigned long s5pc100_clk_arm_get_rate(struct clk *clk)
+@@ -165,9 +167,11 @@ static struct clk clk_arm = {
+ 	.name		= "armclk",
+ 	.id		= -1,
+ 	.parent		= &clk_dout_apll,
+-	.get_rate	= s5pc100_clk_arm_get_rate,
+-	.set_rate	= s5pc100_clk_arm_set_rate,
+-	.round_rate	= s5pc100_clk_arm_round_rate,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s5pc100_clk_arm_get_rate,
++		.set_rate	= s5pc100_clk_arm_set_rate,
++		.round_rate	= s5pc100_clk_arm_round_rate,
++	},
+ };
+ 
+ static unsigned long s5pc100_clk_dout_d0_bus_get_rate(struct clk *clk)
+@@ -185,7 +189,9 @@ static struct clk clk_dout_d0_bus = {
+ 	.name		= "dout_d0_bus",
+ 	.id		= -1,
+ 	.parent		= &clk_arm,
+-	.get_rate	= s5pc100_clk_dout_d0_bus_get_rate,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s5pc100_clk_dout_d0_bus_get_rate,
++	},
+ };
+ 
+ static unsigned long s5pc100_clk_dout_pclkd0_get_rate(struct clk *clk)
+@@ -203,7 +209,9 @@ static struct clk clk_dout_pclkd0 = {
+ 	.name		= "dout_pclkd0",
+ 	.id		= -1,
+ 	.parent		= &clk_dout_d0_bus,
+-	.get_rate	= s5pc100_clk_dout_pclkd0_get_rate,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s5pc100_clk_dout_pclkd0_get_rate,
++	},
+ };
+ 
+ static unsigned long s5pc100_clk_dout_apll2_get_rate(struct clk *clk)
+@@ -221,7 +229,9 @@ static struct clk clk_dout_apll2 = {
+ 	.name		= "dout_apll2",
+ 	.id		= -1,
+ 	.parent		= &clk_mout_apll.clk,
+-	.get_rate	= s5pc100_clk_dout_apll2_get_rate,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s5pc100_clk_dout_apll2_get_rate,
++	},
+ };
+ 
+ /* MPLL */
+@@ -284,7 +294,9 @@ static struct clk clk_dout_d1_bus = {
+ 	.name		= "dout_d1_bus",
+ 	.id		= -1,
+ 	.parent		= &clk_mout_am.clk,
+-	.get_rate	= s5pc100_clk_dout_d1_bus_get_rate,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s5pc100_clk_dout_d1_bus_get_rate,
++	},
+ };
+ 
+ static struct clk *clkset_onenand_list[] = {
+@@ -325,7 +337,9 @@ static struct clk clk_dout_pclkd1 = {
+ 	.name		= "dout_pclkd1",
+ 	.id		= -1,
+ 	.parent		= &clk_dout_d1_bus,
+-	.get_rate	= s5pc100_clk_dout_pclkd1_get_rate,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s5pc100_clk_dout_pclkd1_get_rate,
++	},
+ };
+ 
+ static unsigned long s5pc100_clk_dout_mpll2_get_rate(struct clk *clk)
+@@ -345,7 +359,9 @@ static struct clk clk_dout_mpll2 = {
+ 	.name		= "dout_mpll2",
+ 	.id		= -1,
+ 	.parent		= &clk_mout_am.clk,
+-	.get_rate	= s5pc100_clk_dout_mpll2_get_rate,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s5pc100_clk_dout_mpll2_get_rate,
++	},
+ };
+ 
+ static unsigned long s5pc100_clk_dout_cam_get_rate(struct clk *clk)
+@@ -365,7 +381,9 @@ static struct clk clk_dout_cam = {
+ 	.name		= "dout_cam",
+ 	.id		= -1,
+ 	.parent		= &clk_dout_mpll2,
+-	.get_rate	= s5pc100_clk_dout_cam_get_rate,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s5pc100_clk_dout_cam_get_rate,
++	},
+ };
+ 
+ static unsigned long s5pc100_clk_dout_mpll_get_rate(struct clk *clk)
+@@ -385,7 +403,9 @@ static struct clk clk_dout_mpll = {
+ 	.name		= "dout_mpll",
+ 	.id		= -1,
+ 	.parent		= &clk_mout_am.clk,
+-	.get_rate	= s5pc100_clk_dout_mpll_get_rate,
++	.ops		= &(struct clk_ops) {
++		.get_rate	= s5pc100_clk_dout_mpll_get_rate,
++	},
+ };
+ 
+ /* EPLL */
+@@ -540,6 +560,13 @@ static unsigned long s5pc100_roundrate_clksrc(struct clk *clk,
+ 	return rate;
+ }
+ 
++static struct clk_ops s5pc100_clksrc_ops = {
++	.set_parent	= s5pc100_setparent_clksrc,
++	.get_rate	= s5pc100_getrate_clksrc,
++	.set_rate	= s5pc100_setrate_clksrc,
++	.round_rate	= s5pc100_roundrate_clksrc,
++};
++
+ static struct clk *clkset_spi_list[] = {
+ 	&clk_mout_epll.clk,
+ 	&clk_dout_mpll2,
+@@ -558,10 +585,7 @@ static struct clksrc_clk clk_spi0 = {
+ 		.id		= 0,
+ 		.ctrlbit	= S5PC100_CLKGATE_SCLK0_SPI0,
+ 		.enable		= s5pc100_sclk0_ctrl,
+-		.set_parent	= s5pc100_setparent_clksrc,
+-		.get_rate	= s5pc100_getrate_clksrc,
+-		.set_rate	= s5pc100_setrate_clksrc,
+-		.round_rate	= s5pc100_roundrate_clksrc,
++
+ 	},
+ 	.shift		= S5PC100_CLKSRC1_SPI0_SHIFT,
+ 	.mask		= S5PC100_CLKSRC1_SPI0_MASK,
+@@ -577,10 +601,7 @@ static struct clksrc_clk clk_spi1 = {
+ 		.id		= 1,
+ 		.ctrlbit	= S5PC100_CLKGATE_SCLK0_SPI1,
+ 		.enable		= s5pc100_sclk0_ctrl,
+-		.set_parent	= s5pc100_setparent_clksrc,
+-		.get_rate	= s5pc100_getrate_clksrc,
+-		.set_rate	= s5pc100_setrate_clksrc,
+-		.round_rate	= s5pc100_roundrate_clksrc,
++		.ops		= &s5pc100_clksrc_ops,
+ 	},
+ 	.shift		= S5PC100_CLKSRC1_SPI1_SHIFT,
+ 	.mask		= S5PC100_CLKSRC1_SPI1_MASK,
+@@ -596,10 +617,7 @@ static struct clksrc_clk clk_spi2 = {
+ 		.id		= 2,
+ 		.ctrlbit	= S5PC100_CLKGATE_SCLK0_SPI2,
+ 		.enable		= s5pc100_sclk0_ctrl,
+-		.set_parent	= s5pc100_setparent_clksrc,
+-		.get_rate	= s5pc100_getrate_clksrc,
+-		.set_rate	= s5pc100_setrate_clksrc,
+-		.round_rate	= s5pc100_roundrate_clksrc,
++		.ops		= &s5pc100_clksrc_ops,
+ 	},
+ 	.shift		= S5PC100_CLKSRC1_SPI2_SHIFT,
+ 	.mask		= S5PC100_CLKSRC1_SPI2_MASK,
+@@ -625,10 +643,7 @@ static struct clksrc_clk clk_uart_uclk1 = {
+ 		.id		= -1,
+ 		.ctrlbit        = S5PC100_CLKGATE_SCLK0_UART,
+ 		.enable		= s5pc100_sclk0_ctrl,
+-		.set_parent	= s5pc100_setparent_clksrc,
+-		.get_rate	= s5pc100_getrate_clksrc,
+-		.set_rate	= s5pc100_setrate_clksrc,
+-		.round_rate	= s5pc100_roundrate_clksrc,
++		.ops		= &s5pc100_clksrc_ops,
+ 	},
+ 	.shift		= S5PC100_CLKSRC1_UART_SHIFT,
+ 	.mask		= S5PC100_CLKSRC1_UART_MASK,
+@@ -683,10 +698,7 @@ static struct clksrc_clk clk_audio0 = {
+ 		.id		= 0,
+ 		.ctrlbit	= S5PC100_CLKGATE_SCLK1_AUDIO0,
+ 		.enable		= s5pc100_sclk1_ctrl,
+-		.set_parent	= s5pc100_setparent_clksrc,
+-		.get_rate	= s5pc100_getrate_clksrc,
+-		.set_rate	= s5pc100_setrate_clksrc,
+-		.round_rate	= s5pc100_roundrate_clksrc,
++		.ops		= &s5pc100_clksrc_ops,
+ 	},
+ 	.shift		= S5PC100_CLKSRC3_AUDIO0_SHIFT,
+ 	.mask		= S5PC100_CLKSRC3_AUDIO0_MASK,
+@@ -716,10 +728,7 @@ static struct clksrc_clk clk_audio1 = {
+ 		.id		= 1,
+ 		.ctrlbit	= S5PC100_CLKGATE_SCLK1_AUDIO1,
+ 		.enable		= s5pc100_sclk1_ctrl,
+-		.set_parent	= s5pc100_setparent_clksrc,
+-		.get_rate	= s5pc100_getrate_clksrc,
+-		.set_rate	= s5pc100_setrate_clksrc,
+-		.round_rate	= s5pc100_roundrate_clksrc,
++		.ops		= &s5pc100_clksrc_ops,
+ 	},
+ 	.shift		= S5PC100_CLKSRC3_AUDIO1_SHIFT,
+ 	.mask		= S5PC100_CLKSRC3_AUDIO1_MASK,
+@@ -748,10 +757,7 @@ static struct clksrc_clk clk_audio2 = {
+ 		.id		= 2,
+ 		.ctrlbit	= S5PC100_CLKGATE_SCLK1_AUDIO2,
+ 		.enable		= s5pc100_sclk1_ctrl,
+-		.set_parent	= s5pc100_setparent_clksrc,
+-		.get_rate	= s5pc100_getrate_clksrc,
+-		.set_rate	= s5pc100_setrate_clksrc,
+-		.round_rate	= s5pc100_roundrate_clksrc,
++		.ops		= &s5pc100_clksrc_ops,
+ 	},
+ 	.shift		= S5PC100_CLKSRC3_AUDIO2_SHIFT,
+ 	.mask		= S5PC100_CLKSRC3_AUDIO2_MASK,
+@@ -801,10 +807,7 @@ static struct clksrc_clk clk_lcd = {
+ 		.id		= -1,
+ 		.ctrlbit	= S5PC100_CLKGATE_SCLK1_LCD,
+ 		.enable		= s5pc100_sclk1_ctrl,
+-		.set_parent	= s5pc100_setparent_clksrc,
+-		.get_rate	= s5pc100_getrate_clksrc,
+-		.set_rate	= s5pc100_setrate_clksrc,
+-		.round_rate	= s5pc100_roundrate_clksrc,
++		.ops		= &s5pc100_clksrc_ops,
+ 	},
+ 	.shift		= S5PC100_CLKSRC2_LCD_SHIFT,
+ 	.mask		= S5PC100_CLKSRC2_LCD_MASK,
+@@ -820,10 +823,7 @@ static struct clksrc_clk clk_fimc0 = {
+ 		.id		= 0,
+ 		.ctrlbit	= S5PC100_CLKGATE_SCLK1_FIMC0,
+ 		.enable		= s5pc100_sclk1_ctrl,
+-		.set_parent	= s5pc100_setparent_clksrc,
+-		.get_rate	= s5pc100_getrate_clksrc,
+-		.set_rate	= s5pc100_setrate_clksrc,
+-		.round_rate	= s5pc100_roundrate_clksrc,
++		.ops		= &s5pc100_clksrc_ops,
+ 	},
+ 	.shift		= S5PC100_CLKSRC2_FIMC0_SHIFT,
+ 	.mask		= S5PC100_CLKSRC2_FIMC0_MASK,
+@@ -839,10 +839,7 @@ static struct clksrc_clk clk_fimc1 = {
+ 		.id		= 1,
+ 		.ctrlbit	= S5PC100_CLKGATE_SCLK1_FIMC1,
+ 		.enable		= s5pc100_sclk1_ctrl,
+-		.set_parent	= s5pc100_setparent_clksrc,
+-		.get_rate	= s5pc100_getrate_clksrc,
+-		.set_rate	= s5pc100_setrate_clksrc,
+-		.round_rate	= s5pc100_roundrate_clksrc,
++		.ops		= &s5pc100_clksrc_ops,
+ 	},
+ 	.shift		= S5PC100_CLKSRC2_FIMC1_SHIFT,
+ 	.mask		= S5PC100_CLKSRC2_FIMC1_MASK,
+@@ -858,10 +855,7 @@ static struct clksrc_clk clk_fimc2 = {
+ 		.id		= 2,
+ 		.ctrlbit	= S5PC100_CLKGATE_SCLK1_FIMC2,
+ 		.enable		= s5pc100_sclk1_ctrl,
+-		.set_parent	= s5pc100_setparent_clksrc,
+-		.get_rate	= s5pc100_getrate_clksrc,
+-		.set_rate	= s5pc100_setrate_clksrc,
+-		.round_rate	= s5pc100_roundrate_clksrc,
++		.ops		= &s5pc100_clksrc_ops,
+ 	},
+ 	.shift		= S5PC100_CLKSRC2_FIMC2_SHIFT,
+ 	.mask		= S5PC100_CLKSRC2_FIMC2_MASK,
+@@ -889,10 +883,7 @@ static struct clksrc_clk clk_mmc0 = {
+ 		.id		= 0,
+ 		.ctrlbit	= S5PC100_CLKGATE_SCLK0_MMC0,
+ 		.enable		= s5pc100_sclk0_ctrl,
+-		.set_parent	= s5pc100_setparent_clksrc,
+-		.get_rate	= s5pc100_getrate_clksrc,
+-		.set_rate	= s5pc100_setrate_clksrc,
+-		.round_rate	= s5pc100_roundrate_clksrc,
++		.ops		= &s5pc100_clksrc_ops,
+ 	},
+ 	.shift		= S5PC100_CLKSRC2_MMC0_SHIFT,
+ 	.mask		= S5PC100_CLKSRC2_MMC0_MASK,
+@@ -908,10 +899,7 @@ static struct clksrc_clk clk_mmc1 = {
+ 		.id		= 1,
+ 		.ctrlbit	= S5PC100_CLKGATE_SCLK0_MMC1,
+ 		.enable		= s5pc100_sclk0_ctrl,
+-		.set_parent	= s5pc100_setparent_clksrc,
+-		.get_rate	= s5pc100_getrate_clksrc,
+-		.set_rate	= s5pc100_setrate_clksrc,
+-		.round_rate	= s5pc100_roundrate_clksrc,
++		.ops		= &s5pc100_clksrc_ops,
+ 	},
+ 	.shift		= S5PC100_CLKSRC2_MMC1_SHIFT,
+ 	.mask		= S5PC100_CLKSRC2_MMC1_MASK,
+@@ -927,10 +915,7 @@ static struct clksrc_clk clk_mmc2 = {
+ 		.id		= 2,
+ 		.ctrlbit	= S5PC100_CLKGATE_SCLK0_MMC2,
+ 		.enable		= s5pc100_sclk0_ctrl,
+-		.set_parent	= s5pc100_setparent_clksrc,
+-		.get_rate	= s5pc100_getrate_clksrc,
+-		.set_rate	= s5pc100_setrate_clksrc,
+-		.round_rate	= s5pc100_roundrate_clksrc,
++		.ops		= &s5pc100_clksrc_ops,
+ 	},
+ 	.shift		= S5PC100_CLKSRC2_MMC2_SHIFT,
+ 	.mask		= S5PC100_CLKSRC2_MMC2_MASK,
+@@ -959,10 +944,7 @@ static struct clksrc_clk clk_usbhost = {
+ 		.id		= -1,
+ 		.ctrlbit        = S5PC100_CLKGATE_SCLK0_USBHOST,
+ 		.enable		= s5pc100_sclk0_ctrl,
+-		.set_parent	= s5pc100_setparent_clksrc,
+-		.get_rate	= s5pc100_getrate_clksrc,
+-		.set_rate	= s5pc100_setrate_clksrc,
+-		.round_rate	= s5pc100_roundrate_clksrc,
++		.ops		= &s5pc100_clksrc_ops,
+ 	},
+ 	.shift		= S5PC100_CLKSRC1_UHOST_SHIFT,
+ 	.mask		= S5PC100_CLKSRC1_UHOST_MASK,
 diff --git a/arch/arm/plat-samsung/clock-clksrc.c b/arch/arm/plat-samsung/clock-clksrc.c
-new file mode 100644
-index 0000000..5872f0b
---- /dev/null
+index 5872f0b..ad4e872 100644
+--- a/arch/arm/plat-samsung/clock-clksrc.c
 +++ b/arch/arm/plat-samsung/clock-clksrc.c
-@@ -0,0 +1,177 @@
-+/* linux/arch/arm/plat-samsung/clock-clksrc.c
-+ *
-+ * Copyright 2008 Simtec Electronics
-+ *	Ben Dooks <ben@simtec.co.uk>
-+ *	http://armlinux.simtec.co.uk/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/kernel.h>
-+#include <linux/list.h>
-+#include <linux/errno.h>
-+#include <linux/err.h>
-+#include <linux/clk.h>
-+#include <linux/sysdev.h>
-+#include <linux/io.h>
-+
-+#include <plat/clock.h>
-+#include <plat/clock-clksrc.h>
-+#include <plat/cpu-freq.h>
-+
-+static inline struct clksrc_clk *to_clksrc(struct clk *clk)
-+{
-+	return container_of(clk, struct clksrc_clk, clk);
-+}
-+
-+static inline u32 bit_mask(u32 shift, u32 nr_bits)
-+{
-+	u32 mask = 0xffffffff >> (32 - nr_bits);
-+
-+	return mask << shift;
-+}
-+
-+static unsigned long s3c_getrate_clksrc(struct clk *clk)
-+{
-+	struct clksrc_clk *sclk = to_clksrc(clk);
-+	unsigned long rate = clk_get_rate(clk->parent);
-+	u32 clkdiv = __raw_readl(sclk->reg_div.reg);
-+	u32 mask = bit_mask(sclk->reg_div.shift, sclk->reg_div.size);
-+
-+	clkdiv &= mask;
-+	clkdiv >>= sclk->reg_div.shift;
-+	clkdiv++;
-+
-+	rate /= clkdiv;
-+	return rate;
-+}
-+
-+static int s3c_setrate_clksrc(struct clk *clk, unsigned long rate)
-+{
-+	struct clksrc_clk *sclk = to_clksrc(clk);
-+	void __iomem *reg = sclk->reg_div.reg;
-+	unsigned int div;
-+	u32 mask = bit_mask(sclk->reg_div.shift, sclk->reg_div.size);
-+	u32 val;
-+
-+	rate = clk_round_rate(clk, rate);
-+	div = clk_get_rate(clk->parent) / rate;
-+	if (div > 16)
-+		return -EINVAL;
-+
-+	val = __raw_readl(reg);
-+	val &= ~mask;
-+	val |= (div - 1) << sclk->reg_div.shift;
-+	__raw_writel(val, reg);
-+
-+	return 0;
-+}
-+
-+static int s3c_setparent_clksrc(struct clk *clk, struct clk *parent)
-+{
-+	struct clksrc_clk *sclk = to_clksrc(clk);
-+	struct clksrc_sources *srcs = sclk->sources;
-+	u32 clksrc = __raw_readl(sclk->reg_src.reg);
-+	u32 mask = bit_mask(sclk->reg_src.shift, sclk->reg_src.size);
-+	int src_nr = -1;
-+	int ptr;
-+
-+	for (ptr = 0; ptr < srcs->nr_sources; ptr++)
-+		if (srcs->sources[ptr] == parent) {
-+			src_nr = ptr;
-+			break;
-+		}
-+
-+	if (src_nr >= 0 && sclk->reg_src.reg) {
-+		clk->parent = parent;
-+
-+		clksrc &= ~mask;
-+		clksrc |= src_nr << sclk->reg_src.shift;
-+
-+		__raw_writel(clksrc, sclk->reg_src.reg);
-+		return 0;
-+	}
-+
-+	return -EINVAL;
-+}
-+
-+static unsigned long s3c_roundrate_clksrc(struct clk *clk,
-+					      unsigned long rate)
-+{
-+	unsigned long parent_rate = clk_get_rate(clk->parent);
-+	int div;
-+
-+	if (rate >= parent_rate)
-+		rate = parent_rate;
-+	else {
-+		div = parent_rate / rate;
-+		if (parent_rate % rate)
-+			div++;
-+
-+		if (div == 0)
-+			div = 1;
-+		if (div > 16)
-+			div = 16;
-+
-+		rate = parent_rate / div;
-+	}
-+
-+	return rate;
-+}
-+
-+/* Clock initialisation code */
-+
-+void __init_or_cpufreq s3c_set_clksrc(struct clksrc_clk *clk)
-+{
-+	struct clksrc_sources *srcs = clk->sources;
-+	u32 mask = bit_mask(clk->reg_src.shift, clk->reg_src.size);
-+	u32 clksrc = 0;
-+
-+	if (clk->reg_src.reg)
-+		clksrc = __raw_readl(clk->reg_src.reg);
-+
-+	clksrc &= mask;
-+	clksrc >>= clk->reg_src.shift;
-+
-+	if (clksrc > srcs->nr_sources || !srcs->sources[clksrc]) {
-+		printk(KERN_ERR "%s: bad source %d\n",
-+		       clk->clk.name, clksrc);
-+		return;
-+	}
-+
-+	clk->clk.parent = srcs->sources[clksrc];
-+
-+	printk(KERN_INFO "%s: source is %s (%d), rate is %ld\n",
-+	       clk->clk.name, clk->clk.parent->name, clksrc,
-+	       clk_get_rate(&clk->clk));
-+}
-+
-+void __init s3c_register_clksrc(struct clksrc_clk *clksrc, int size)
-+{
-+	int ret;
-+
-+	for (; size > 0; size--, clksrc++) {
-+		/* fill in the default functions */
-+		if (!clksrc->clk.set_parent)
-+			clksrc->clk.set_parent = s3c_setparent_clksrc;
-+		if (!clksrc->clk.get_rate)
-+			clksrc->clk.get_rate = s3c_getrate_clksrc;
-+		if (!clksrc->clk.set_rate)
-+			clksrc->clk.set_rate = s3c_setrate_clksrc;
-+		if (!clksrc->clk.round_rate)
-+			clksrc->clk.round_rate = s3c_roundrate_clksrc;
-+
-+		s3c_set_clksrc(clksrc);
-+
-+		ret = s3c24xx_register_clock(&clksrc->clk);
-+
-+		if (ret < 0) {
-+			printk(KERN_ERR "%s: failed to register %s (%d)\n",
-+			       __func__, clksrc->clk.name, ret);
-+		}
-+	}
-+}
-diff --git a/arch/arm/plat-samsung/include/plat/clock-clksrc.h b/arch/arm/plat-samsung/include/plat/clock-clksrc.h
-new file mode 100644
-index 0000000..283dfa0
---- /dev/null
-+++ b/arch/arm/plat-samsung/include/plat/clock-clksrc.h
-@@ -0,0 +1,75 @@
-+/* linux/arch/arm/plat-samsung/include/plat/clock-clksrc.h
-+ *
-+ * Parts taken from arch/arm/plat-s3c64xx/clock.c
-+ *	Copyright 2008 Openmoko, Inc.
-+ *	Copyright 2008 Simtec Electronics
-+ *		Ben Dooks <ben@simtec.co.uk>
-+ *		http://armlinux.simtec.co.uk/
-+ *
-+ * Copyright 2009 Ben Dooks <ben-linux@fluff.org>
-+ * Copyright 2009 Harald Welte
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+/**
-+ * struct clksrc_sources - list of sources for a given clock
-+ * @sources: array of pointers to clocks
-+ * @nr_sources: The size of @sources
-+ */
-+struct clksrc_sources {
-+	unsigned int	nr_sources;
-+	struct clk	**sources;
+@@ -150,20 +150,21 @@ void __init_or_cpufreq s3c_set_clksrc(struct clksrc_clk *clk)
+ 	       clk_get_rate(&clk->clk));
+ }
+ 
++static struct clk_ops clksrc_ops = {
++	.set_parent	= s3c_setparent_clksrc,
++	.get_rate	= s3c_getrate_clksrc,
++	.set_rate	= s3c_setrate_clksrc,
++	.round_rate	= s3c_roundrate_clksrc,
 +};
 +
+ void __init s3c_register_clksrc(struct clksrc_clk *clksrc, int size)
+ {
+ 	int ret;
+ 
+ 	for (; size > 0; size--, clksrc++) {
+ 		/* fill in the default functions */
+-		if (!clksrc->clk.set_parent)
+-			clksrc->clk.set_parent = s3c_setparent_clksrc;
+-		if (!clksrc->clk.get_rate)
+-			clksrc->clk.get_rate = s3c_getrate_clksrc;
+-		if (!clksrc->clk.set_rate)
+-			clksrc->clk.set_rate = s3c_setrate_clksrc;
+-		if (!clksrc->clk.round_rate)
+-			clksrc->clk.round_rate = s3c_roundrate_clksrc;
++		if (!clksrc->clk.ops)
++			clksrc->clk.ops = &clksrc_ops;
+ 
+ 		s3c_set_clksrc(clksrc);
+ 
+diff --git a/arch/arm/plat-samsung/include/plat/clock.h b/arch/arm/plat-samsung/include/plat/clock.h
+index d86af84..43324af 100644
+--- a/arch/arm/plat-samsung/include/plat/clock.h
++++ b/arch/arm/plat-samsung/include/plat/clock.h
+@@ -11,6 +11,30 @@
+ 
+ #include <linux/spinlock.h>
+ 
++struct clk;
++
 +/**
-+ * struct clksrc_reg - register definition for clock control bits
-+ * @reg: pointer to the register in virtual memory.
-+ * @shift: the shift in bits to where the bitfield is.
-+ * @size: the size in bits of the bitfield.
++ * struct clk_ops - standard clock operations
++ * @set_rate: set the clock rate, see clk_set_rate().
++ * @get_rate: get the clock rate, see clk_get_rate().
++ * @round_rate: round a given clock rate, see clk_round_rate().
++ * @set_parent: set the clock's parent, see clk_set_parent().
 + *
-+ * This specifies the size and position of the bits we are interested
-+ * in within the register specified by @reg.
++ * Group the common clock implementations together so that we
++ * don't have to keep setting the same fiels again. We leave
++ * enable in struct clk.
++ *
++ * Adding an extra layer of indirection into the process should
++ * not be a problem as it is unlikely these operations are going
++ * to need to be called quickly.
 + */
-+struct clksrc_reg {
-+	void __iomem		*reg;
-+	unsigned short		shift;
-+	unsigned short		size;
++struct clk_ops {
++	int		    (*set_rate)(struct clk *c, unsigned long rate);
++	unsigned long	    (*get_rate)(struct clk *c);
++	unsigned long	    (*round_rate)(struct clk *c, unsigned long rate);
++	int		    (*set_parent)(struct clk *c, struct clk *parent);
 +};
 +
-+/**
-+ * struct clksrc_clk - class of clock for newer style samsung devices.
-+ * @clk: the standard clock representation
-+ * @sources: the sources for this clock
-+ * @reg_src: the register definition for selecting the clock's source
-+ * @reg_div: the register definition for the clock's output divisor
-+ *
-+ * This clock implements the features required by the newer SoCs where
-+ * the standard clock block provides an input mux and a post-mux divisor
-+ * to provide the periperhal's clock.
-+ *
-+ * The array of @sources provides the mapping of mux position to the
-+ * clock, and @reg_src shows the code where to modify to change the mux
-+ * position. The @reg_div defines how to change the divider settings on
-+ * the output.
-+ */
-+struct clksrc_clk {
-+	struct clk		clk;
-+	struct clksrc_sources	*sources;
-+
-+	struct clksrc_reg	reg_src;
-+	struct clksrc_reg	reg_div;
-+};
-+
-+extern void s3c_set_clksrc(struct clksrc_clk *clk);
-+
-+/**
-+ * s3c_register_clksrc() register clocks from an array of clksrc clocks
-+ * @srcs: The array of clocks to register
-+ * @size: The size of the @srcs array.
-+ *
-+ * Initialise and register the array of clocks described by @srcs.
-+ */
-+extern void s3c_register_clksrc(struct clksrc_clk *srcs, int size);
+ struct clk {
+ 	struct list_head      list;
+ 	struct module        *owner;
+@@ -21,11 +45,8 @@ struct clk {
+ 	unsigned long         rate;
+ 	unsigned long         ctrlbit;
+ 
++	struct clk_ops		*ops;
+ 	int		    (*enable)(struct clk *, int enable);
+-	int		    (*set_rate)(struct clk *c, unsigned long rate);
+-	unsigned long	    (*get_rate)(struct clk *c);
+-	unsigned long	    (*round_rate)(struct clk *c, unsigned long rate);
+-	int		    (*set_parent)(struct clk *c, struct clk *parent);
+ };
+ 
+ /* other clocks which may be registered by board support */
 -- 
 1.6.0.4
