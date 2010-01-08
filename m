@@ -1,53 +1,118 @@
-From: gdavis@mvista.com (George G. Davis)
-Date: Fri, 8 Jan 2010 12:44:44 -0500
-Subject: SMP issues on ARM11 MPCore
-In-Reply-To: <SNT109-W597ECAF29FF35A1CFC84D0A7730@phx.gbl>
-References: <SNT109-W391FD03251D32533FAE84DA77F0@phx.gbl>
-	<20100101205850.GI16220@n2100.arm.linux.org.uk>
-	<SNT109-W597ECAF29FF35A1CFC84D0A7730@phx.gbl>
-Message-ID: <20100108174444.GA824@mvista.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 8 Jan 2010 10:09:12 -0800
+Subject: [GIT PULL] omap fixes for 2.6.33-rc3
+Message-ID: <20100108180912.GC6831@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mac Lin,
+Linus,
 
-On Tue, Jan 05, 2010 at 04:02:22PM +0000, mkl lin wrote:
-> 
-> 
-> > These two sounds like a problem with interrupts - userspace console IO
-> > is interrupt driven, whereas kernel console IO is not.
-> 
-> Thanks for Russell's
-> advice, after some tracing, I found that my IER (Interrupt Enable
-> Register) of the serial port is 0 under case 1!!
-> 
-> Case 2 is
-> actually the same with case 1. Case 1 would come first, if I don't keep
-> input things and let it finish its slow printing, it would then become
-> case 2.
-> 
-> UART_BUG_THRE are detected and enabled on my platform, causing serial8250_backup_timeout to be used.
-> 
-> There
-> are many places that do ( get IER, clear IER, restore IER ), like
-> serial8250_console_write called by printk, and
-> serial8250_backup_timeout. serial8250_backup_timeout is not protected
-> by spinlock, causing the race condition, and result in wrong IER value.
-> 
-> Following patch fix this issue. Case 3 and Case 4 are still often seen, but not case 1 and case 2.
-> 
-> Best Regards,
-> Mac Lin
-> diff --git a/kernels/linux-2.6.31.1-X/drivers/serial/8250.c b/kernels/linux-2.6.31.1-X/drivers/serial/8250.c
-> index 288a0e4..55602c3 100644
-> --- a/kernels/linux-2.6.31.1-cavm1/drivers/serial/8250.c
-> +++ b/kernels/linux-2.6.31.1-cavm1/drivers/serial/8250.c
-> @@ -1752,6 +1758,8 @@ static void serial8250_backup_timeout(unsigned long data)
+Please pull omap fixes from:
 
-If you still need resolution on the serial8250_backup_timeout problem,
-you should probably consider submitting an RFC/PATCH to the
-linux-serial at vger.kernel.org or  linux-kernel at vger.kernel.org.
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
 
---
 Regards,
-George
+
+Tony
+
+
+The following changes since commit 74d2e4f8d79ae0c4b6ec027958d5b18058662eea:
+  Linus Torvalds (1):
+        Linux 2.6.33-rc3
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+
+Abhijit Pagare (2):
+      ARM: OMAP3: PM: Fix the Invalid CM_CLKSTCTRL reg access.
+      ARM: OMAP3: PM: Fix the Invalid CM_CLKSTCTRL reg access.
+
+Alexander Shishkin (1):
+      omap2/3: make serial_in_override() address the right uart port
+
+Cory Maccarrone (5):
+      OMAP1 clock: Add missing clocks for OMAP 7xx
+      OMAP1 clock: Add missing clocks for OMAP 7xx
+      OMAP1 clock: remove __initdata from struct clk_functions to prevent crash
+      omap: gpio: Simultaneously requested rising and falling edge
+      omap1: Add 7xx clocks and pin muxes for SPI
+
+Felipe Balbi (1):
+      OMAP2xxx clock: clk2xxx.c doesn't compile if CPUFREQ is enabled
+
+Huang Weiyi (2):
+      OMAP2: remove duplicated #include
+      OMAP2: remove duplicated #include
+
+Janusz Krzysztofik (1):
+      omap: McBSP: Fix possible port lockout
+
+Kevin Hilman (2):
+      OMAP3: clock: add clockdomains for UART1 & 2
+      OMAP3: clock: add clockdomains for UART1 & 2
+
+Paul Walmsley (11):
+      OMAP2xxx IO mapping: mark DSP mappings as being 2420-only
+      OMAP2420 IO mapping: move IVA mapping virtual address out of vmalloc space
+      OMAP3 clock: McBSP 2, 3, 4 functional clock parent is PER_96M_FCLK, not CORE_96M_FCLK
+      OMAP clock: remove incorrect EXPORT_SYMBOL()s
+      OMAP2xxx IO mapping: mark DSP mappings as being 2420-only
+      OMAP2420 IO mapping: move IVA mapping virtual address out of vmalloc space
+      OMAP3 clock: McBSP 2, 3, 4 functional clock parent is PER_96M_FCLK, not CORE_96M_FCLK
+      OMAP clock: remove incorrect EXPORT_SYMBOL()s
+      OMAP2xxx OPP: clean up comments in OPP data
+      OMAP clock/CPUFreq: add clk_exit_cpufreq_table()
+      OMAP2 clock: dynamically allocate CPUFreq frequency table
+
+Roel Kluin (3):
+      omap: &&/|| confusion in iommu_put()
+      omap3: add missing parentheses
+      omap3: add missing parentheses
+
+Tony Lindgren (5):
+      Merge branch 'for_2_6_33_rc_a' of git://git.pwsan.com/linux-2.6 into omap-fixes-2.6.33-rc3
+      Merge branch 'for_2.6.33rc_b' of git://git.pwsan.com/linux-2.6 into omap-fixes-for-linus
+      omap: Remove uninitialized warning for gpio.c
+      omap1: Fix compile for omap1_bl.c
+      omap3: Fix booting if package is uninitialized
+
+Tuukka Toivonen (2):
+      OMAP3 clock: Add capability to change rate of dpll4_m5_ck
+      OMAP3 clock: Add capability to change rate of dpll4_m5_ck
+
+Vaibhav Hiremath (1):
+      omap3: EVM: Choose OMAP_PACKAGE_CBB
+
+Vimal Singh (1):
+      omap2/3: ZOOM: Correcting key mapping for few keys
+
+ arch/arm/mach-omap1/clock_data.c             |   10 +++-
+ arch/arm/mach-omap1/devices.c                |   35 ++++++++++++++
+ arch/arm/mach-omap1/mux.c                    |    8 +++
+ arch/arm/mach-omap2/Kconfig                  |    1 +
+ arch/arm/mach-omap2/board-zoom-peripherals.c |    8 ++--
+ arch/arm/mach-omap2/clock2xxx.c              |   57 +++++++++++++++++++----
+ arch/arm/mach-omap2/clock34xx.c              |    1 -
+ arch/arm/mach-omap2/clock34xx_data.c         |    6 ++-
+ arch/arm/mach-omap2/clockdomain.c            |    4 +-
+ arch/arm/mach-omap2/io.c                     |   19 ++++----
+ arch/arm/mach-omap2/mux.c                    |    6 ++-
+ arch/arm/mach-omap2/opp2420_data.c           |   38 ++++++++-------
+ arch/arm/mach-omap2/opp2430_data.c           |   30 ++++++------
+ arch/arm/mach-omap2/pm34xx.c                 |    4 +-
+ arch/arm/mach-omap2/serial.c                 |   12 ++++-
+ arch/arm/plat-omap/clock.c                   |   16 ++++---
+ arch/arm/plat-omap/cpu-omap.c                |    1 +
+ arch/arm/plat-omap/gpio.c                    |   63 +++++++++++++++++++++++++-
+ arch/arm/plat-omap/include/plat/board.h      |    1 -
+ arch/arm/plat-omap/include/plat/clock.h      |    2 +
+ arch/arm/plat-omap/include/plat/control.h    |    2 +-
+ arch/arm/plat-omap/include/plat/io.h         |   36 +++++++--------
+ arch/arm/plat-omap/include/plat/mux.h        |    8 +++
+ arch/arm/plat-omap/include/plat/omap7xx.h    |    3 +
+ arch/arm/plat-omap/io.c                      |   12 +++---
+ arch/arm/plat-omap/iommu.c                   |    2 +-
+ arch/arm/plat-omap/mcbsp.c                   |   20 +++++++-
+ drivers/video/backlight/omap1_bl.c           |    2 -
+ 28 files changed, 296 insertions(+), 111 deletions(-)
