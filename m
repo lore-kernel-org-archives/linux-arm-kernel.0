@@ -1,43 +1,20 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 8 Jan 2010 10:03:43 +0800
-Subject: [GIT PULL] pxa: 5 more fixes for v2.6.33-rc2
-Message-ID: <f17812d71001071803j5b8a51b7g10db53beb247f604@mail.gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Fri, 08 Jan 2010 02:10:53 +0000
+Subject: Please pull bjdooks' for-linus/samsung
+Message-ID: <E1NT4JR-0006WN-6J@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
-
-The following changes since commit 91a86a964f0773fdf466fe02577c8494ca8e2083:
-  Eric Miao (1):
-        [ARM] pxa/poodle: fix incorrect 'gpio_card_detect' of MMC
+The following changes since commit c5974b835a909ff15c3b7e6cf6789b5eb919f419:
+  Linus Torvalds (1):
+        Merge branch 'limits_cleanup' of git://decibel.fi.muni.cz/~xslaby/linux
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
+  git://git.fluff.org/bjdooks/linux.git for-linus/samsung
 
-Cyril Hrubis (1):
-      [ARM] pxa: fix strange characters in zaurus gpio .desc
+Ben Dooks (1):
+      ARM: S3C64XX: Fix possible clock look in EPLL and MPLL clock chains
 
-Eric Miao (2):
-      [ARM] pxa: update pwm_backlight->notify() to include missed
-'struct device *'
-      [ARM] pxa: fix compiler warnings of unused variable 'id' in cpu_is_pxa9*()
-
-Haojian Zhuang (2):
-      [ARM] pxa: do not enable L2 after MMU is enabled
-      [ARM] pxa: enable L2 if present in XSC3
-
- arch/arm/mach-pxa/include/mach/hardware.h |    9 +++------
- arch/arm/mach-pxa/magician.c              |    2 +-
- arch/arm/mach-pxa/palmld.c                |    2 +-
- arch/arm/mach-pxa/palmt5.c                |    2 +-
- arch/arm/mach-pxa/palmtc.c                |    2 +-
- arch/arm/mach-pxa/palmte2.c               |    2 +-
- arch/arm/mach-pxa/palmtreo.c              |    2 +-
- arch/arm/mach-pxa/palmtx.c                |    2 +-
- arch/arm/mach-pxa/palmz72.c               |    2 +-
- arch/arm/mach-pxa/spitz.c                 |    4 ++--
- arch/arm/mach-pxa/viper.c                 |    2 +-
- arch/arm/mm/cache-xsc3l2.c                |   11 +++++------
- arch/arm/mm/proc-xsc3.S                   |    7 +++++++
- 13 files changed, 26 insertions(+), 23 deletions(-)
+ arch/arm/plat-s3c64xx/s3c6400-clock.c |   10 +---------
+ 1 files changed, 1 insertions(+), 9 deletions(-)
