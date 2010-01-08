@@ -1,30 +1,48 @@
-From: jvermillard@archean.fr (Julien Vermillard)
-Date: Fri, 8 Jan 2010 10:08:05 +0100
-Subject: S3C2440 : DM9000 link down when writing on NAND flash
-Message-ID: <20100108100805.15e4b558@jvermillard-portable>
+From: jyothi@cdotb.ernet.in (jyothi)
+Date: Fri, 08 Jan 2010 15:05:58 +0530
+Subject: Module Compilation Error in linux-2.6.15  using floating point
+Message-ID: <4B46FC7E.9050406@cdotb.ernet.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-I'm using a DM9000E with a S3C2440 CPU running 2.6.30.1. The DM9K is
-connected on the CS4 (like the mini2440). I already had troubles with
-the ethernet, and we applied (as suggested here) the DM900 errata
-consisting in gating IOR & CS. The DM9000 is working better now, but
-when I write some file on the NAND Flash, the DM900 is reseting (link
-down, link up). Reading from NAND flash is fine.
+Hello ,
+         I am using arm9 based fujitsu card . I have compiled and ported linux-2.6.15 
+with eldk4.2. I am trying to insert a module in which I am using floating point operations.
 
-If I put the whole rootfs in the SD card, I have no problems.
+While compiling this module , the following errors occur :
 
-Here the schematics of the DM9000 and how it's plugged on the CPU :
-http://people.apache.org/~jvermillard/atsarm9/
+*** Warning: "__subdf3" [/export/home1/suchita/bws_linux/bws_menu.ko] 
+undefined!
+*** Warning: "__gedf2" [/export/home1/suchita/bws_linux/bws_menu.ko] 
+undefined!
+*** Warning: "__truncdfsf2" 
+[/export/home1/suchita/bws_linux/bws_menu.ko] undefined!
+*** Warning: "__ltsf2" [/export/home1/suchita/bws_linux/bws_menu.ko] 
+undefined!
+*** Warning: "__muldf3" [/export/home1/suchita/bws_linux/bws_menu.ko] 
+undefined!
+*** Warning: "__divdf3" [/export/home1/suchita/bws_linux/bws_menu.ko] 
+undefined!
+*** Warning: "__ledf2" [/export/home1/suchita/bws_linux/bws_menu.ko] 
+undefined!
+*** Warning: "__gtsf2" [/export/home1/suchita/bws_linux/bws_menu.ko] 
+undefined!
+*** Warning: "__floatunsidf" 
+[/export/home1/suchita/bws_linux/bws_menu.ko] undefined!
+*** Warning: "__adddf3" [/export/home1/suchita/bws_linux/bws_menu.ko] 
+undefined!
+*** Warning: "__extendsfdf2" 
+[/export/home1/suchita/bws_linux/bws_menu.ko] undefined!
+*** Warning: "__fixunsdfsi" 
+[/export/home1/suchita/bws_linux/bws_menu.ko] undefined!
+*** Warning: "__ltdf2" [/export/home1/suchita/bws_linux/bws_menu.ko] 
+undefined!
+*** Warning: "__floatsidf" [/export/home1/suchita/bws_linux/bws_menu.ko] 
+undefined!
 
-Any suggestion ?
+Please suggest a solution to overcome these errors.
+Thanks in advance.
 
-Julien
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100108/187907b3/attachment.sig>
+
+Regards,
+Jyothi
