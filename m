@@ -1,7 +1,7 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri,  8 Jan 2010 17:17:23 +0100
-Subject: [PATCH 16/25] imx31: define and use MX31_IO_ADDRESS
-In-Reply-To: <1262967452-24353-15-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Fri,  8 Jan 2010 17:17:27 +0100
+Subject: [PATCH 20/25] imx: mangle addresses after adding the offset
+In-Reply-To: <1262967452-24353-19-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <20100108161551.GA19007@pengutronix.de>
 	<1262967452-24353-1-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1262967452-24353-2-git-send-email-u.kleine-koenig@pengutronix.de>
@@ -18,118 +18,94 @@ References: <20100108161551.GA19007@pengutronix.de>
 	<1262967452-24353-13-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1262967452-24353-14-git-send-email-u.kleine-koenig@pengutronix.de>
 	<1262967452-24353-15-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1262967452-24353-16-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-16-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-17-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-18-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1262967452-24353-19-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1262967452-24353-20-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+don't use
+
+	IO_ADDRESS($base) + $offset
+
+but
+
+	IO_ADDRESS($base + $offset)
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Holger Schurig <hs4233@mail.mn-solutions.de>
+Cc: Rabin Vincent <rabin@rab.in>
+Cc: "Agust?n Ferr?n Pozuelo" <gatoguan-os@yahoo.com>
+Cc: Javier Martin <javier.martin@vista-silicon.com>
+Cc: Valentin Longchamp <valentin.longchamp@epfl.ch>
 Cc: Daniel Mack <daniel@caiaq.de>
-Cc: Greg Kroah-Hartman <gregkh@suse.de>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Magnus Lilja <lilja.magnus@gmail.com>
+Cc: Dmitriy Taychenachev <dimichxp@gmail.com>
 ---
- arch/arm/mach-mx3/clock-imx31.c                |    3 ++-
- arch/arm/mach-mx3/crm_regs.h                   |    2 +-
- arch/arm/mach-mx3/iomux-imx31.c                |    2 +-
- arch/arm/plat-mxc/ehci.c                       |    4 ++--
- arch/arm/plat-mxc/include/mach/board-mx31ads.h |    2 +-
- arch/arm/plat-mxc/include/mach/mx31.h          |    7 +++++++
- 6 files changed, 14 insertions(+), 6 deletions(-)
+ arch/arm/mach-mx2/clock_imx21.c      |    2 +-
+ arch/arm/mach-mx2/clock_imx27.c      |    2 +-
+ arch/arm/mach-mx3/cpu.c              |    2 +-
+ arch/arm/plat-mxc/include/mach/mxc.h |    6 +++---
+ 4 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-mx3/clock-imx31.c b/arch/arm/mach-mx3/clock-imx31.c
-index cc03a61..d22a66f 100644
---- a/arch/arm/mach-mx3/clock-imx31.c
-+++ b/arch/arm/mach-mx3/clock-imx31.c
-@@ -625,7 +625,8 @@ int __init mx31_clocks_init(unsigned long fref)
- 		__raw_writel(reg, MXC_CCM_PMCR1);
- 	}
+diff --git a/arch/arm/mach-mx2/clock_imx21.c b/arch/arm/mach-mx2/clock_imx21.c
+index 2367b6c..8974faf 100644
+--- a/arch/arm/mach-mx2/clock_imx21.c
++++ b/arch/arm/mach-mx2/clock_imx21.c
+@@ -28,7 +28,7 @@
+ #include <asm/clkdev.h>
+ #include <asm/div64.h>
  
--	mxc_timer_init(&ipg_clk, IO_ADDRESS(MX31_GPT1_BASE_ADDR), MX31_INT_GPT);
-+	mxc_timer_init(&ipg_clk, MX31_IO_ADDRESS(MX31_GPT1_BASE_ADDR),
-+			MX31_INT_GPT);
+-#define IO_ADDR_CCM(off)	(MX21_IO_ADDRESS(MX21_CCM_BASE_ADDR) + (off))
++#define IO_ADDR_CCM(off)	(MX21_IO_ADDRESS(MX21_CCM_BASE_ADDR + (off)))
  
- 	return 0;
- }
-diff --git a/arch/arm/mach-mx3/crm_regs.h b/arch/arm/mach-mx3/crm_regs.h
-index e25cd92..37a8a07 100644
---- a/arch/arm/mach-mx3/crm_regs.h
-+++ b/arch/arm/mach-mx3/crm_regs.h
-@@ -24,7 +24,7 @@
- #define CKIH_CLK_FREQ_27MHZ     27000000
- #define CKIL_CLK_FREQ           32768
- 
--#define MXC_CCM_BASE		IO_ADDRESS(MX31_CCM_BASE_ADDR)
-+#define MXC_CCM_BASE		MX31_IO_ADDRESS(MX31_CCM_BASE_ADDR)
- 
- /* Register addresses */
- #define MXC_CCM_CCMR		(MXC_CCM_BASE + 0x00)
-diff --git a/arch/arm/mach-mx3/iomux-imx31.c b/arch/arm/mach-mx3/iomux-imx31.c
-index 6381e56..a1d7fa5 100644
---- a/arch/arm/mach-mx3/iomux-imx31.c
-+++ b/arch/arm/mach-mx3/iomux-imx31.c
+ /* Register offsets */
+ #define CCM_CSCR		IO_ADDR_CCM(0x0)
+diff --git a/arch/arm/mach-mx2/clock_imx27.c b/arch/arm/mach-mx2/clock_imx27.c
+index bb9f603..68bf93e 100644
+--- a/arch/arm/mach-mx2/clock_imx27.c
++++ b/arch/arm/mach-mx2/clock_imx27.c
 @@ -29,7 +29,7 @@
- /*
-  * IOMUX register (base) addresses
-  */
--#define IOMUX_BASE	IO_ADDRESS(MX31_IOMUXC_BASE_ADDR)
-+#define IOMUX_BASE	MX31_IO_ADDRESS(MX31_IOMUXC_BASE_ADDR)
- #define IOMUXINT_OBS1	(IOMUX_BASE + 0x000)
- #define IOMUXINT_OBS2	(IOMUX_BASE + 0x004)
- #define IOMUXGPR	(IOMUX_BASE + 0x008)
-diff --git a/arch/arm/plat-mxc/ehci.c b/arch/arm/plat-mxc/ehci.c
-index 41599be..8df03f3 100644
---- a/arch/arm/plat-mxc/ehci.c
-+++ b/arch/arm/plat-mxc/ehci.c
-@@ -43,7 +43,7 @@ int mxc_set_usbcontrol(int port, unsigned int flags)
- 	unsigned int v;
- 
- 	if (cpu_is_mx31()) {
--		v = readl(IO_ADDRESS(MX31_OTG_BASE_ADDR +
-+		v = readl(MX31_IO_ADDRESS(MX31_OTG_BASE_ADDR +
- 				     USBCTRL_OTGBASE_OFFSET));
- 
- 		switch (port) {
-@@ -79,7 +79,7 @@ int mxc_set_usbcontrol(int port, unsigned int flags)
- 			break;
- 		}
- 
--		writel(v, IO_ADDRESS(MX31_OTG_BASE_ADDR +
-+		writel(v, MX31_IO_ADDRESS(MX31_OTG_BASE_ADDR +
- 				     USBCTRL_OTGBASE_OFFSET));
- 		return 0;
- 	}
-diff --git a/arch/arm/plat-mxc/include/mach/board-mx31ads.h b/arch/arm/plat-mxc/include/mach/board-mx31ads.h
-index 2cbfa35..095a199 100644
---- a/arch/arm/plat-mxc/include/mach/board-mx31ads.h
-+++ b/arch/arm/plat-mxc/include/mach/board-mx31ads.h
-@@ -14,7 +14,7 @@
+ #include <mach/common.h>
  #include <mach/hardware.h>
  
- /* Base address of PBC controller */
--#define PBC_BASE_ADDRESS        IO_ADDRESS(CS4_BASE_ADDR)
-+#define PBC_BASE_ADDRESS        MX31_CS4_BASE_ADDR_VIRT
- /* Offsets for the PBC Controller register */
+-#define IO_ADDR_CCM(off)	(MX27_IO_ADDRESS(MX27_CCM_BASE_ADDR) + (off))
++#define IO_ADDR_CCM(off)	(MX27_IO_ADDRESS(MX27_CCM_BASE_ADDR + (off)))
  
- /* PBC Board status register offset */
-diff --git a/arch/arm/plat-mxc/include/mach/mx31.h b/arch/arm/plat-mxc/include/mach/mx31.h
-index b8b47d1..0c005af 100644
---- a/arch/arm/plat-mxc/include/mach/mx31.h
-+++ b/arch/arm/plat-mxc/include/mach/mx31.h
-@@ -109,6 +109,13 @@
+ /* Register offsets */
+ #define CCM_CSCR		IO_ADDR_CCM(0x0)
+diff --git a/arch/arm/mach-mx3/cpu.c b/arch/arm/mach-mx3/cpu.c
+index db82880..861afe0 100644
+--- a/arch/arm/mach-mx3/cpu.c
++++ b/arch/arm/mach-mx3/cpu.c
+@@ -41,7 +41,7 @@ void __init mx31_read_cpu_rev(void)
+ 	u32 i, srev;
  
- #define MX31_PCMCIA_MEM_BASE_ADDR	0xbc000000
+ 	/* read SREV register from IIM module */
+-	srev = __raw_readl(IO_ADDRESS(IIM_BASE_ADDR) + MXC_IIMSREV);
++	srev = __raw_readl(IO_ADDRESS(IIM_BASE_ADDR + MXC_IIMSREV));
  
-+#define MX31_IO_ADDRESS(x) (						\
-+	IMX_IO_ADDRESS(x, MX31_AIPS1) ?:				\
-+	IMX_IO_ADDRESS(x, MX31_AIPS2) ?:				\
-+	IMX_IO_ADDRESS(x, MX31_AVIC) ?:					\
-+	IMX_IO_ADDRESS(x, MX31_X_MEMC) ?:				\
-+	IMX_IO_ADDRESS(x, MX31_SPBA0))
-+
- #define MX31_INT_I2C3		3
- #define MX31_INT_I2C2		4
- #define MX31_INT_MPEG4_ENCODER	5
+ 	for (i = 0; i < ARRAY_SIZE(mx31_cpu_type); i++)
+ 		if (srev == mx31_cpu_type[i].srev) {
+diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
+index 5199053..2b14126 100644
+--- a/arch/arm/plat-mxc/include/mach/mxc.h
++++ b/arch/arm/plat-mxc/include/mach/mxc.h
+@@ -121,9 +121,9 @@ extern unsigned int __mxc_cpu_type;
+ #endif
+ 
+ #if defined(CONFIG_ARCH_MX3) || defined(CONFIG_ARCH_MX2)
+-#define CSCR_U(n) (IO_ADDRESS(WEIM_BASE_ADDR) + n * 0x10)
+-#define CSCR_L(n) (IO_ADDRESS(WEIM_BASE_ADDR) + n * 0x10 + 0x4)
+-#define CSCR_A(n) (IO_ADDRESS(WEIM_BASE_ADDR) + n * 0x10 + 0x8)
++#define CSCR_U(n) (IO_ADDRESS(WEIM_BASE_ADDR + n * 0x10))
++#define CSCR_L(n) (IO_ADDRESS(WEIM_BASE_ADDR + n * 0x10 + 0x4))
++#define CSCR_A(n) (IO_ADDRESS(WEIM_BASE_ADDR + n * 0x10 + 0x8))
+ #endif
+ 
+ #define cpu_is_mx3()	(cpu_is_mx31() || cpu_is_mx35() || cpu_is_mxc91231())
 -- 
 1.6.5.2
