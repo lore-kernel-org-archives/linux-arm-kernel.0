@@ -1,25 +1,22 @@
 From: darkstar6262@gmail.com (Cory Maccarrone)
-Date: Sat, 9 Jan 2010 10:01:35 -0800
-Subject: [PATCH] [OMAP1] Clock fixups for OMAP1 and OMAP7xx
-In-Reply-To: <alpine.DEB.2.00.0912300116350.24862@utopia.booyaka.com>
-References: <6cb013310912221628m1b2b820fy1a96a9a9102274e5@mail.gmail.com>
-	<1261528641-22465-1-git-send-email-darkstar6262@gmail.com>
-	<alpine.DEB.2.00.0912300116350.24862@utopia.booyaka.com>
-Message-ID: <6cb013311001091001k6cb91341x9970a7865d84b57e@mail.gmail.com>
+Date: Sat, 9 Jan 2010 10:02:42 -0800
+Subject: [PATCH 05/12] omap1: Add 7xx clocks and pin muxes for SPI
+In-Reply-To: <20100107191502.GH11511@atomide.com>
+References: <20100107001728.21352.38471.stgit@baageli.muru.com>
+	<20100107001934.21352.83656.stgit@baageli.muru.com>
+	<6ed0b2681001070146x4dbf52d9h406d128ccea826cf@mail.gmail.com>
+	<20100107191502.GH11511@atomide.com>
+Message-ID: <6cb013311001091002m4669e425h8dd23f808365b621@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 30, 2009 at 12:19 AM, Paul Walmsley <paul@pwsan.com> wrote:
-> Hi Cory,
+On Thu, Jan 7, 2010 at 11:15 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Grazvydas Ignotas <notasas@gmail.com> [100107 01:44]:
 >
-> On Tue, 22 Dec 2009, Cory Maccarrone wrote:
->
-> Could you please split these two patches, since they fix different
-> problems? ?Also the first patch is pertinent only to OMAP7xx-family
-> chips and the second is OMAP1-wide. ?I've already got your first patch, so
-> no need to resend that.
+> Thanks, for pointing that out, my fault for editing the patch.. Fixed below
+> and now compile tested with omap1_spi100k enabled :)
 >
 
-Looks like you got to it before I did.  Thanks for taking care of that :)
+Run-time tested here too, everything looks good.
 
 - Cory
