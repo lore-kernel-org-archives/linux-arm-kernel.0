@@ -1,37 +1,32 @@
-From: r-woodruff2@ti.com (Woodruff, Richard)
-Date: Fri, 8 Jan 2010 17:20:24 -0600
-Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors
-In-Reply-To: <20091218203154.GE1205@shareable.org>
-References: <20091217175416.9317.66257.stgit@e101986-lin>
-	<13B9B4C6EF24D648824FF11BE896716203A7FA69CC@dlee02.ent.ti.com>
-	<20091217191602.GC362@shareable.org>
-	<13B9B4C6EF24D648824FF11BE896716203A7FA6BF4@dlee02.ent.ti.com>
-	<20091218203154.GE1205@shareable.org>
-Message-ID: <13B9B4C6EF24D648824FF11BE896716203A85EB6B1@dlee02.ent.ti.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Fri, 08 Jan 2010 17:30:06 -0700
+Subject: [PATCH] iop: use generic clock mult/shift compute functions
+In-Reply-To: <20100108172654.GK32558@n2100.arm.linux.org.uk>
+References: <19258.8113.311122.46281@pilspetsen.it.uu.se>
+	<20100108172654.GK32558@n2100.arm.linux.org.uk>
+Message-ID: <1262997006.20537.5.camel@dwillia2-linux.ch.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 2010-01-08 at 10:26 -0700, Russell King - ARM Linux wrote:
+> On Tue, Dec 29, 2009 at 04:26:41PM +0100, Mikael Pettersson wrote:
+> > The 2.6.33-rc kernel now has generic functions for computing
+> > mult and shift factors for clocksources and clockevents. Thus
+> > we can remove the equivalent private code from the ARM IOP
+> > platform and use the generic code instead.
+> > 
+> > Tested on an n2100 iop32x machine. Verfied to result in the
+> > exact same mult and shift factors as before.
+> 
+> Good, can we have it in the patch system please?
 
-> From: Jamie Lokier [mailto:jamie at shareable.org]
-> Sent: Friday, December 18, 2009 2:32 PM
-> To: Woodruff, Richard
+It's pushed out to the 'fixes' branch of xscaleiop.git.  Please pull
+from:
 
-> > Performance point was mainly about coordination with non-coherent
-> > external masters (outside of cluster).  Blocking all external people
-> > for a small range is not optimal.
->
-> Sure, but doesn't your patch break any program which tries to do
-> that, due to the lack of LDREX/STREX global monitor reaching to
-> external masters, so that case isn't relevant?
+git://git.kernel.org/pub/scm/linux/kernel/git/djbw/xscaleiop.git fixes
 
-I didn't submit patch, just commented on how it might change out of cluster behavior and suggested a comment added to documentation.
+I was going to check it out on my iop13xx, but the board is occupied and
+I doubt it will cause problems given the other testing.
 
-A swp out of cluster is atomic as the bus makes it so. A bus-bridge translated-neutered lwrex/strex will not necessary be atomic.
-
-> So (correct me if I'm wrong) the interesting case is only about
-> accesses within the cluster.  Is that really slower with SWP/SWPB?
-
-I think I've lost context over holidays to answer.  I have not looked at implementation details in cluster to know which sequence is faster. Inside the cluster many things which are normally slower as perceived by the ARM core can be optimized away in lower hardware layers (misaligned access as an example).
-
-Regards,
-Richard W.
+--
+Dan
