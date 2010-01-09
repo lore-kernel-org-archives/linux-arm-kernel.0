@@ -1,37 +1,28 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 9 Jan 2010 09:51:06 +0100
-Subject: trouble compiling dwalker's for-next tree
-Message-ID: <20100109085106.GA23290@elf.ucw.cz>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Sat, 9 Jan 2010 10:39:37 +0100
+Subject: [PATCH] arch/arm: Remove unnecessary semicolons
+In-Reply-To: <1263019425.20926.12.camel@Joe-Laptop.home>
+References: <1263019425.20926.12.camel@Joe-Laptop.home>
+Message-ID: <20100109093937.GA15632@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
 
-It is great to have all changes merged, but I ran into some trouble:
+On Fri, Jan 08, 2010 at 10:43:45PM -0800, Joe Perches wrote:
+> Signed-off-by: Joe Perches <joe@perches.com>
 
-1) mmc.h was missing.
+First I just wanted to ack the mxc-part, but it looks all obviously correct,
+so:
 
-2)   CC      arch/arm/mach-msm/rpc_hsusb.o
-arch/arm/mach-msm/rpc_hsusb.c: In function 'msm_chg_rpc_connect':
-arch/arm/mach-msm/rpc_hsusb.c:156: error: implicit declaration of
-function 'machine_is_msm7201a_surf'
-arch/arm/mach-msm/rpc_hsusb.c:156: error: implicit declaration of
-function 'machine_is_msm7x27_surf'
-arch/arm/mach-msm/rpc_hsusb.c:157: error: implicit declaration of
-function 'machine_is_qsd8x50_surf'
-make[1]: *** [arch/arm/mach-msm/rpc_hsusb.o] Error 1
-
-(I provided missing inlines)
-
-3)   CC      arch/arm/mach-msm/acpuclock.o
-arch/arm/mach-msm/acpuclock.c:31:35: error: linux/remote_spinlock.h:
-No such file or directory
-arch/arm/mach-msm/acpuclock.c:106: error: expected '=', ',', ';',
-'asm' or '__attribute__' before 'pll_lock'
-
-(I'm currently stuck here).
-								Pavel
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100109/4dc83a6d/attachment.sig>
