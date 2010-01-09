@@ -1,32 +1,44 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Fri, 08 Jan 2010 17:30:06 -0700
-Subject: [PATCH] iop: use generic clock mult/shift compute functions
-In-Reply-To: <20100108172654.GK32558@n2100.arm.linux.org.uk>
-References: <19258.8113.311122.46281@pilspetsen.it.uu.se>
-	<20100108172654.GK32558@n2100.arm.linux.org.uk>
-Message-ID: <1262997006.20537.5.camel@dwillia2-linux.ch.intel.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Sat, 9 Jan 2010 13:47:31 +1100
+Subject: [GIT PULL] omap fixes for 2.6.33-rc3
+In-Reply-To: <20100108225023.GD2879@atomide.com>
+References: <20100108180912.GC6831@atomide.com>
+	<alpine.LFD.2.00.1001081014090.7821@localhost.localdomain>
+	<20100108182236.GE6831@atomide.com>
+	<alpine.DEB.2.00.1001081502480.19243@utopia.booyaka.com>
+	<20100108222715.GC2879@atomide.com>
+	<alpine.LFD.2.00.1001081430210.7821@localhost.localdomain>
+	<20100108225023.GD2879@atomide.com>
+Message-ID: <20100109134731.a1bca240.sfr@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-01-08 at 10:26 -0700, Russell King - ARM Linux wrote:
-> On Tue, Dec 29, 2009 at 04:26:41PM +0100, Mikael Pettersson wrote:
-> > The 2.6.33-rc kernel now has generic functions for computing
-> > mult and shift factors for clocksources and clockevents. Thus
-> > we can remove the equivalent private code from the ARM IOP
-> > platform and use the generic code instead.
-> > 
-> > Tested on an n2100 iop32x machine. Verfied to result in the
-> > exact same mult and shift factors as before.
-> 
-> Good, can we have it in the patch system please?
+Hi Tony,
 
-It's pushed out to the 'fixes' branch of xscaleiop.git.  Please pull
-from:
+On Fri, 8 Jan 2010 14:50:23 -0800 Tony Lindgren <tony@atomide.com> wrote:
+>
+> Hmm, sounds like it might make sense to check for that in Stephen's
+> for-next tree then. Added Stephen to the loop, let's see if what he
+> thinks.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/djbw/xscaleiop.git fixes
+I can certainly add hooks to my tree if someone can suggest what should
+be in them (I didn't get enough context here ...).  That way I could send
+the tree maintainer a warning email letting them know something is
+fishy ...
 
-I was going to check it out on my iop13xx, but the board is occupied and
-I doubt it will cause problems given the other testing.
+Of course, this only helps those who don't mind rebasing their trees,
+right?  The non-rebasing tree maintainers should do these checks
+themselves.  Maybe we could propogate a suggested (or mandatory) set of
+hooks?
 
---
-Dan
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+http://www.canb.auug.org.au/~sfr/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100109/a58dc3e4/attachment.sig>
