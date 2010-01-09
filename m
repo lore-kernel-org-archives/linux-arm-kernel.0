@@ -1,44 +1,81 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Sat, 9 Jan 2010 13:47:31 +1100
-Subject: [GIT PULL] omap fixes for 2.6.33-rc3
-In-Reply-To: <20100108225023.GD2879@atomide.com>
-References: <20100108180912.GC6831@atomide.com>
-	<alpine.LFD.2.00.1001081014090.7821@localhost.localdomain>
-	<20100108182236.GE6831@atomide.com>
-	<alpine.DEB.2.00.1001081502480.19243@utopia.booyaka.com>
-	<20100108222715.GC2879@atomide.com>
-	<alpine.LFD.2.00.1001081430210.7821@localhost.localdomain>
-	<20100108225023.GD2879@atomide.com>
-Message-ID: <20100109134731.a1bca240.sfr@canb.auug.org.au>
+From: joe@perches.com (Joe Perches)
+Date: Fri, 08 Jan 2010 22:43:45 -0800
+Subject: [PATCH] arch/arm: Remove unnecessary semicolons
+Message-ID: <1263019425.20926.12.camel@Joe-Laptop.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Signed-off-by: Joe Perches <joe@perches.com>
+---
+ arch/arm/mach-at91/at91cap9_devices.c    |    2 +-
+ arch/arm/mach-at91/at91sam9g45_devices.c |    2 +-
+ arch/arm/mach-at91/at91sam9rl_devices.c  |    2 +-
+ arch/arm/mach-w90x900/cpu.c              |    2 +-
+ arch/arm/plat-mxc/irq.c                  |    2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
 
-On Fri, 8 Jan 2010 14:50:23 -0800 Tony Lindgren <tony@atomide.com> wrote:
->
-> Hmm, sounds like it might make sense to check for that in Stephen's
-> for-next tree then. Added Stephen to the loop, let's see if what he
-> thinks.
-
-I can certainly add hooks to my tree if someone can suggest what should
-be in them (I didn't get enough context here ...).  That way I could send
-the tree maintainer a warning email letting them know something is
-fishy ...
-
-Of course, this only helps those who don't mind rebasing their trees,
-right?  The non-rebasing tree maintainers should do these checks
-themselves.  Maybe we could propogate a suggested (or mandatory) set of
-hooks?
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-http://www.canb.auug.org.au/~sfr/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100109/a58dc3e4/attachment.sig>
+diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
+index d1f775e..308ce7a 100644
+--- a/arch/arm/mach-at91/at91cap9_devices.c
++++ b/arch/arm/mach-at91/at91cap9_devices.c
+@@ -171,7 +171,7 @@ void __init at91_add_device_usba(struct usba_platform_data *data)
+ 	 */
+ 	usba_udc_data.pdata.vbus_pin = -EINVAL;
+ 	usba_udc_data.pdata.num_ep = ARRAY_SIZE(usba_udc_ep);
+-	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));;
++	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));
+ 
+ 	if (data && data->vbus_pin > 0) {
+ 		at91_set_gpio_input(data->vbus_pin, 0);
+diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+index 809114d..b27ef60 100644
+--- a/arch/arm/mach-at91/at91sam9g45_devices.c
++++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+@@ -254,7 +254,7 @@ void __init at91_add_device_usba(struct usba_platform_data *data)
+ {
+ 	usba_udc_data.pdata.vbus_pin = -EINVAL;
+ 	usba_udc_data.pdata.num_ep = ARRAY_SIZE(usba_udc_ep);
+-	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));;
++	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));
+ 
+ 	if (data && data->vbus_pin > 0) {
+ 		at91_set_gpio_input(data->vbus_pin, 0);
+diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
+index 53aaa94..c49262b 100644
+--- a/arch/arm/mach-at91/at91sam9rl_devices.c
++++ b/arch/arm/mach-at91/at91sam9rl_devices.c
+@@ -145,7 +145,7 @@ void __init at91_add_device_usba(struct usba_platform_data *data)
+ 	 */
+ 	usba_udc_data.pdata.vbus_pin = -EINVAL;
+ 	usba_udc_data.pdata.num_ep = ARRAY_SIZE(usba_udc_ep);
+-	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));;
++	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));
+ 
+ 	if (data && data->vbus_pin > 0) {
+ 		at91_set_gpio_input(data->vbus_pin, 0);
+diff --git a/arch/arm/mach-w90x900/cpu.c b/arch/arm/mach-w90x900/cpu.c
+index 20dc0c9..4d51d5b 100644
+--- a/arch/arm/mach-w90x900/cpu.c
++++ b/arch/arm/mach-w90x900/cpu.c
+@@ -59,7 +59,7 @@ static DEFINE_CLK(emc, 7);
+ static DEFINE_SUBCLK(rmii, 2);
+ static DEFINE_CLK(usbd, 8);
+ static DEFINE_CLK(usbh, 9);
+-static DEFINE_CLK(g2d, 10);;
++static DEFINE_CLK(g2d, 10);
+ static DEFINE_CLK(pwm, 18);
+ static DEFINE_CLK(ps2, 24);
+ static DEFINE_CLK(kpi, 25);
+diff --git a/arch/arm/plat-mxc/irq.c b/arch/arm/plat-mxc/irq.c
+index 778ddfe..e74f32a 100644
+--- a/arch/arm/plat-mxc/irq.c
++++ b/arch/arm/plat-mxc/irq.c
+@@ -53,7 +53,7 @@ int imx_irq_set_priority(unsigned char irq, unsigned char prio)
+ 	unsigned int mask = 0x0F << irq % 8 * 4;
+ 
+ 	if (irq >= MXC_INTERNAL_IRQS)
+-		return -EINVAL;;
++		return -EINVAL;
+ 
+ 	temp = __raw_readl(avic_base + AVIC_NIPRIORITY(irq / 8));
+ 	temp &= ~mask;
