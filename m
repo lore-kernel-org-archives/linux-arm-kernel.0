@@ -1,24 +1,58 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 9 Jan 2010 22:03:39 +0100
-Subject: [PATCH] S3C: Remove unneeded __init symbols
-In-Reply-To: <20100109100430.5258.8254.stgit@localhost>
-References: <20100109100430.5258.8254.stgit@localhost>
-Message-ID: <20100109210339.GB10587@pengutronix.de>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Sun, 10 Jan 2010 10:46:35 +0200
+Subject: Issue in oamp nand driver with 32-bit reads in prefetch mode
+In-Reply-To: <ce9ab5790912310420h20beb04csba060b3f5cfeee92@mail.gmail.com>
+References: <ce9ab5790912230133wae2c4dcw73051221b66cb40f@mail.gmail.com>
+	<20091223174429.GD3512@atomide.com>
+	<5e088bd90912291238t1f2aba64na94887b2f864454d@mail.gmail.com>
+	<5e088bd90912291347j370ab30cid7c6cfc558c2ed18@mail.gmail.com>
+	<ce9ab5790912310420h20beb04csba060b3f5cfeee92@mail.gmail.com>
+Message-ID: <1263113195.7315.129.camel@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nelson,
+On Thu, 2009-12-31 at 17:50 +0530, Vimal Singh wrote:
+> There is a bug in nand prefetch read routine, which comes into effect
+> only if nand device is a 16-bit device (as we have in zoom boards).
+> This bug is effective only with below combination of conditions:
+> 1. nand deivce, in use, is a 16 bit device
+> 2. nand driver supports 'subpage' read
+> 3. SW ECC is in use
+> 
+> This was not seen old  kernel (ex: .23), because when, in early days,
+> we tested this (nand prefetch read in LDP boards) there was no
+> 'subpage read' support.
+> Later when we had subpage read in (.27) kernel, we had hw ecc enabled
+> always in our internal tree. So, we missed this bug.
+> 
+> Here is a patch to fix this issue:
+> 
+> diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+> index 1bb799f..75004fe 100644
+> --- a/drivers/mtd/nand/omap2.c
+> +++ b/drivers/mtd/nand/omap2.c
+> @@ -295,11 +295,14 @@ static void omap_read_buf_pref(struct
+>  	u32 *p = (u32 *)buf;
+> 
+>  	/* take care of subpage reads */
+> -	for (; len % 4 != 0; ) {
+> -		*buf++ = __raw_readb(info->nand.IO_ADDR_R);
+> -		len--;
+> +	if (len % 4) {
+> +		if (info->nand.options & NAND_BUSWIDTH_16)
+> +			omap_read_buf16(mtd, buf, len % 4);
+> +		else
+> +			omap_read_buf8(mtd, buf, len % 4);
+> +		p = (u32 *) (buf + len % 4);
+> +		len -= len % 4;
+>  	}
+> -	p = (u32 *) buf;
+> 
+>  	/* configure and start prefetch transfer */
+>  	ret = gpmc_prefetch_enable(info->gpmc_cs, 0x0, len, 0x0);
 
-On Sat, Jan 09, 2010 at 05:04:30AM -0500, Nelson Castillo wrote:
-> Two functions defined with __init are also exported.
-> Let's remove the __init symbols in order to avoid two warnings.
-Can you quote the warnings please?
-
-And I thought you agreed that "unneeded" for __init isn't optimal.
-
-Best regards
-Uwe
+Pushed this patch to my l2-mtd-2.6.git/dunno.
 
 -- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Best Regards,
+Artem Bityutskiy (????? ????????)
