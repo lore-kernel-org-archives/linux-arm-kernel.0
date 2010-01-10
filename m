@@ -1,28 +1,31 @@
 From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Mon, 11 Jan 2010 08:32:44 +1100
-Subject: [PATCH 3/3] arm: export arm_add_memory
-In-Reply-To: <20100108163905.GF32558@n2100.arm.linux.org.uk>
-References: <1262835561.887063.943450380979.0.gpush@pororo>
-	<1262835561.888252.461260980683.3.gpush@pororo>
-	<20100108163905.GF32558@n2100.arm.linux.org.uk>
-Message-ID: <201001110832.44274.jeremy.kerr@canonical.com>
+Date: Mon, 11 Jan 2010 09:23:31 +1100
+Subject: [PATCH] Consolidate clks_register() and similar
+In-Reply-To: <20100110172825.GB8639@n2100.arm.linux.org.uk>
+References: <20100110172825.GB8639@n2100.arm.linux.org.uk>
+Message-ID: <201001110923.31809.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Russell,
- 
-> I've been thinking about this a bit, and rather than indirecting the
-> DT stuff through an inline function, I think we should rename the
-> function instead to something that's compatible with DT.  Yes, that
-> means changing the arguments, but in the longer term, we're likely
-> to need to pass more than 32-bits of memory start/size to the kernel.
 
-Any thoughts on using the generic LMB infrastructure to manage this instead?
+> --- a/arch/arm/mach-bcmring/core.c
+> +++ b/arch/arm/mach-bcmring/core.c
+> @@ -142,8 +142,7 @@ void __init bcmring_amba_init(void)
+> 
+>  	chipcHw_busInterfaceClockEnable(bus_clock);
+> 
+> -	for (i = 0; i < ARRAY_SIZE(lookups); i++)
+> -		clkdev_add(&lookups[i]);
+> +	clkdev_add_table(lookups, ARRAY_SIEZ(lookups));
 
-The DT code is written for arches that have LMB support, so the main reason 
-for this patch is to provide a hook into non-LMB arches.
+SIEZ -> SIZE.
+
+Also, perhaps a macro to simplify this common usage?
+
+#define clkdev_add_table(clks) __clkdev_add_table(clks, ARRAY_SIZE(clks))
 
 Cheers,
 
 
-Jeremy 
+Jeremy
