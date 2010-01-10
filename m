@@ -1,46 +1,37 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 10 Jan 2010 23:06:58 +0000
-Subject: [PATCH 3/3] arm: export arm_add_memory
-In-Reply-To: <201001110832.44274.jeremy.kerr@canonical.com>
-References: <1262835561.887063.943450380979.0.gpush@pororo>
-	<1262835561.888252.461260980683.3.gpush@pororo>
-	<20100108163905.GF32558@n2100.arm.linux.org.uk>
-	<201001110832.44274.jeremy.kerr@canonical.com>
-Message-ID: <20100110230658.GC15812@n2100.arm.linux.org.uk>
+Date: Sun, 10 Jan 2010 23:12:32 +0000
+Subject: [PATCH] Consolidate clks_register() and similar
+In-Reply-To: <201001110923.31809.jeremy.kerr@canonical.com>
+References: <20100110172825.GB8639@n2100.arm.linux.org.uk>
+	<201001110923.31809.jeremy.kerr@canonical.com>
+Message-ID: <20100110231232.GD15812@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2010 at 08:32:44AM +1100, Jeremy Kerr wrote:
+On Mon, Jan 11, 2010 at 09:23:31AM +1100, Jeremy Kerr wrote:
 > Russell,
->  
-> > I've been thinking about this a bit, and rather than indirecting the
-> > DT stuff through an inline function, I think we should rename the
-> > function instead to something that's compatible with DT.  Yes, that
-> > means changing the arguments, but in the longer term, we're likely
-> > to need to pass more than 32-bits of memory start/size to the kernel.
 > 
-> Any thoughts on using the generic LMB infrastructure to manage this instead?
+> > --- a/arch/arm/mach-bcmring/core.c
+> > +++ b/arch/arm/mach-bcmring/core.c
+> > @@ -142,8 +142,7 @@ void __init bcmring_amba_init(void)
+> > 
+> >  	chipcHw_busInterfaceClockEnable(bus_clock);
+> > 
+> > -	for (i = 0; i < ARRAY_SIZE(lookups); i++)
+> > -		clkdev_add(&lookups[i]);
+> > +	clkdev_add_table(lookups, ARRAY_SIEZ(lookups));
 > 
-> The DT code is written for arches that have LMB support, so the main reason 
-> for this patch is to provide a hook into non-LMB arches.
+> SIEZ -> SIZE.
 
-Maybe when we go to 64-bit memory; until that time it looks like it
-doesn't meet our needs and would be additional bloat.
+Fied.
 
-It certainly would need some modification - the auto-coalescing which
-it currently does would be a problem - we explicitly split our memory
-information if it overlaps a lowmem/highmem boundary, and where it
-splits sparsemem/discontig zones.  We also sort our memory information
-into ascending address, which LMB also doesn't do.
+> Also, perhaps a macro to simplify this common usage?
+> 
+> #define clkdev_add_table(clks) __clkdev_add_table(clks, ARRAY_SIZE(clks))
 
-We certainly don't need the lmb allocation stuff, and I don't understand
-why LMB is trying to implement this functionality.  Bootmem was supposed
-to get around the problem of early kernel allocations (before the main
-page allocator and therefore kmalloc) were up and running - and it does
-this fairly well.  The only down-side to it is you need to find some way
-of placing its bitmap for registering the allocated/free areas.  That's
-fairly easy to do (and we've done it on ARM with no problems.)
+I'm not a fan of that kind of clean up - it leads people into
+thinking that they can pass a normal pointer instead of an array to
+clkdev_add_table() - and then they'll get a surprise.
 
-So why do we need an early-early allocator?  (Should we expect to see in
-a few years an early-early-early allocator and an early-early-early-early
-allocator as well? :P)
+PXA has ARRAY_AND_SIZE() which I think is rather nice for this kind of
+thing, but other people had other thoughts on that...
