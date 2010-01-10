@@ -1,46 +1,43 @@
-From: thommycheck@gmx.de (Thomas Kunze)
-Date: Sun, 10 Jan 2010 15:31:46 +0100
-Subject: [PATCH 3/7] [ARM] locomo: remove unused IRQs and avoid unnecessary
-	cascade
-In-Reply-To: <f17812d70912311859w597e4174s6c0101b670d758a@mail.gmail.com>
-References: <1261977488-18271-1-git-send-email-eric.y.miao@gmail.com>
-	<1261977488-18271-4-git-send-email-eric.y.miao@gmail.com>
-	<4B3CAA54.1040301@gmx.de>
-	<f17812d70912311859w597e4174s6c0101b670d758a@mail.gmail.com>
-Message-ID: <4B49E4D2.8000801@gmx.de>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Sun, 10 Jan 2010 07:19:05 -0800
+Subject: trouble compiling dwalker's for-next tree
+In-Reply-To: <20100109085106.GA23290@elf.ucw.cz>
+References: <20100109085106.GA23290@elf.ucw.cz>
+Message-ID: <1263136745.2446.13.camel@desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric Miao schrieb:
-> On Thu, Dec 31, 2009 at 9:42 PM, Thomas Kunze <thommycheck@gmx.de> wrote:
->   
->> Eric Miao wrote:
->>     
->>> IRQ_LOCOMO_* are never used elsewhere, remove these definitions. As well
->>> as the cascade of these IRQs. IRQ_LOCOMO_*_BASE changed to IRQ_LOCOMO_*.
->>>
->>> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
->>>
->>>       
->> Unlike poodle which AFAIK only uses locomo for keyboard Collie needs most of
->> these irqs for various subdevices (for example SD-Card on SPI bus) . The
->> drivers for these devices
->> will find their way into mainline as time permits. So please don't remove
->> this functionality.
->>
->>     
->
-> The LoCoMo driver is really weird, it has a second cascade of the IRQ
-> which looks to me unnecessary.
->
-> Could you look into the possibility that the subdevices driver on collie
-> can make use only of the first level IRQ?
->
-> The GPIO IRQs, which I'm seeking alternate solution with dynamic IRQ.
->   
-I think all devices but GPIO can use these base irqs. Unfortunately I 
-don't have a real network connection available until
-end of january. I will test this then.
+On Sat, 2010-01-09 at 09:51 +0100, Pavel Machek wrote:
+> Hi!
+> 
+> It is great to have all changes merged, but I ran into some trouble:
+> 
+> 1) mmc.h was missing.
+> 
+> 2)   CC      arch/arm/mach-msm/rpc_hsusb.o
+> arch/arm/mach-msm/rpc_hsusb.c: In function 'msm_chg_rpc_connect':
+> arch/arm/mach-msm/rpc_hsusb.c:156: error: implicit declaration of
+> function 'machine_is_msm7201a_surf'
+> arch/arm/mach-msm/rpc_hsusb.c:156: error: implicit declaration of
+> function 'machine_is_msm7x27_surf'
+> arch/arm/mach-msm/rpc_hsusb.c:157: error: implicit declaration of
+> function 'machine_is_qsd8x50_surf'
+> make[1]: *** [arch/arm/mach-msm/rpc_hsusb.o] Error 1
+> 
+> (I provided missing inlines)
+> 
+> 3)   CC      arch/arm/mach-msm/acpuclock.o
+> arch/arm/mach-msm/acpuclock.c:31:35: error: linux/remote_spinlock.h:
+> No such file or directory
+> arch/arm/mach-msm/acpuclock.c:106: error: expected '=', ',', ';',
+> 'asm' or '__attribute__' before 'pll_lock'
+> 
 
-Regards,
-Thomas
+It's still really really un-cooked .. There's tons of compile failures
+that still need to be cleanup .. Most of the targets aren't going to
+compile without tuning the config some..
+
+What config are you using? I can try to correct some of the compile
+failure ..
+
+Daniel
