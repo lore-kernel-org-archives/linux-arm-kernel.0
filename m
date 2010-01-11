@@ -1,37 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 10 Jan 2010 23:12:32 +0000
-Subject: [PATCH] Consolidate clks_register() and similar
-In-Reply-To: <201001110923.31809.jeremy.kerr@canonical.com>
-References: <20100110172825.GB8639@n2100.arm.linux.org.uk>
-	<201001110923.31809.jeremy.kerr@canonical.com>
-Message-ID: <20100110231232.GD15812@n2100.arm.linux.org.uk>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Mon, 11 Jan 2010 14:04:08 +1300
+Subject: [PATCH] ep93xx: use pr_fmt in clock.c
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE19090200F61D@mi8nycmail19.Mi8.com>
+References: <BD79186B4FD85F4B8E60E381CAEE19090200F61D@mi8nycmail19.Mi8.com>
+Message-ID: <4B4A7908.6030906@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2010 at 09:23:31AM +1100, Jeremy Kerr wrote:
-> Russell,
+H Hartley Sweeten wrote:
+> Use pr_fmt to prefix kernel output with the module name and change
+> all printk messages to pr_<level> format.
 > 
-> > --- a/arch/arm/mach-bcmring/core.c
-> > +++ b/arch/arm/mach-bcmring/core.c
-> > @@ -142,8 +142,7 @@ void __init bcmring_amba_init(void)
-> > 
-> >  	chipcHw_busInterfaceClockEnable(bus_clock);
-> > 
-> > -	for (i = 0; i < ARRAY_SIZE(lookups); i++)
-> > -		clkdev_add(&lookups[i]);
-> > +	clkdev_add_table(lookups, ARRAY_SIEZ(lookups));
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <ryan@bluewatersys.com>
 > 
-> SIEZ -> SIZE.
-
-Fied.
-
-> Also, perhaps a macro to simplify this common usage?
+> ---
 > 
-> #define clkdev_add_table(clks) __clkdev_add_table(clks, ARRAY_SIZE(clks))
+> diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
+> index 1d0f9d8..07a58d0 100644
+> --- a/arch/arm/mach-ep93xx/clock.c
+> +++ b/arch/arm/mach-ep93xx/clock.c
+> @@ -10,6 +10,8 @@
+>   * your option) any later version.
+>   */
+>  
+> +#define pr_fmt(fmt) "ep93xx " KBUILD_MODNAME ": " fmt
+> +
+>  #include <linux/kernel.h>
+>  #include <linux/clk.h>
+>  #include <linux/err.h>
+> @@ -468,9 +470,9 @@ static int __init ep93xx_clock_init(void)
+>  	}
+>  	clk_usb_host.rate = clk_pll2.rate / (((value >> 28) & 0xf) + 1);
+>  
+> -	printk(KERN_INFO "ep93xx: PLL1 running at %ld MHz, PLL2 at %ld MHz\n",
+> +	pr_info("PLL1 running at %ld MHz, PLL2 at %ld MHz\n",
+>  		clk_pll1.rate / 1000000, clk_pll2.rate / 1000000);
+> -	printk(KERN_INFO "ep93xx: FCLK %ld MHz, HCLK %ld MHz, PCLK %ld MHz\n",
+> +	pr_info("FCLK %ld MHz, HCLK %ld MHz, PCLK %ld MHz\n",
+>  		clk_f.rate / 1000000, clk_h.rate / 1000000,
+>  		clk_p.rate / 1000000);
+>   
 
-I'm not a fan of that kind of clean up - it leads people into
-thinking that they can pass a normal pointer instead of an array to
-clkdev_add_table() - and then they'll get a surprise.
+Acked-by: Ryan Mallon <ryan@bluewatersys.com>
 
-PXA has ARRAY_AND_SIZE() which I think is rather nice for this kind of
-thing, but other people had other thoughts on that...
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
