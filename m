@@ -1,94 +1,85 @@
 From: dwalker@codeaurora.org (Daniel Walker)
-Date: Mon, 11 Jan 2010 14:47:23 -0800
-Subject: [RFC 04/18] arm: cache-l2x0: add l2x0 suspend and resume functions
+Date: Mon, 11 Jan 2010 14:47:26 -0800
+Subject: [RFC 07/18] arm: mm: retry on QSD icache parity errors
 In-Reply-To: <1263250057-26692-1-git-send-email-dwalker@codeaurora.org>
 References: <1263250057-26692-1-git-send-email-dwalker@codeaurora.org>
-Message-ID: <1263250057-26692-5-git-send-email-dwalker@codeaurora.org>
+Message-ID: <1263250057-26692-8-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Willie Ruan <wruan@quicinc.com>
+From: Steve Muckle <smuckle@quicinc.com>
 
-Suspend function should be called before L2 cache power is turned off
-to save power. Resume function should be called when the power is
-reapplied.
+Parity errors in the icache on QSD can be worked around either by
+retrying the access, or invalidating the icache. The whole icache
+must be invalidated since the data abort is imprecise (the faulting
+address is not known).
 
-Signed-off-by: Willie Ruan <wruan@quicinc.com>
+Signed-off-by: Steve Muckle <smuckle@quicinc.com>
 Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 ---
- arch/arm/include/asm/hardware/cache-l2x0.h |    3 ++
- arch/arm/mm/cache-l2x0.c                   |   29 ++++++++++++++++++++++++++++
- 2 files changed, 32 insertions(+), 0 deletions(-)
+ arch/arm/mm/fault.c |   36 +++++++++++++++++++++++++++++++++++-
+ 1 files changed, 35 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
-index cdb9022..a86b948 100644
---- a/arch/arm/include/asm/hardware/cache-l2x0.h
-+++ b/arch/arm/include/asm/hardware/cache-l2x0.h
-@@ -55,4 +55,7 @@
- extern void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
- #endif
- 
-+extern void l2x0_suspend(void);
-+extern void l2x0_resume(int collapsed);
-+
- #endif
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index cb8fc65..05765f6 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index 10e0680..bea3e75 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
 @@ -2,6 +2,7 @@
-  * arch/arm/mm/cache-l2x0.c - L210/L220 cache controller support
+  *  linux/arch/arm/mm/fault.c
   *
-  * Copyright (C) 2007 ARM Limited
-+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+  *  Copyright (C) 1995  Linus Torvalds
++ *  Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+  *  Modifications for ARM processor (c) 1995-2004 Russell King
   *
   * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -26,6 +27,7 @@
- #define CACHE_LINE_SIZE		32
- 
- static void __iomem *l2x0_base;
-+static uint32_t aux_ctrl_save;
- static DEFINE_SPINLOCK(l2x0_lock);
- 
- static inline void cache_wait(void __iomem *reg, unsigned long mask)
-@@ -54,6 +56,13 @@ static inline void l2x0_inv_all(void)
- 	spin_unlock_irqrestore(&l2x0_lock, flags);
+@@ -442,6 +443,39 @@ do_bad(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 	return 1;
  }
  
-+static inline void l2x0_flush_all(void)
++static int
++do_imprecise_ext(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 +{
-+	/* clean and invalidate all ways */
-+	sync_writel(0xff, L2X0_CLEAN_INV_WAY, 0xff);
-+	cache_sync();
++#ifdef CONFIG_ARCH_MSM_SCORPION
++	unsigned int regval;
++	static unsigned char flush_toggle;
++
++	asm("mrc p15, 0, %0, c5, c1, 0\n" /* read adfsr for fault status */
++	    : "=r" (regval));
++	if (regval == 0x2) {
++		/* Fault was caused by icache parity error. Alternate
++		 * simply retrying the access and flushing the icache. */
++		flush_toggle ^= 1;
++		if (flush_toggle)
++			asm("mcr p15, 0, %0, c7, c5, 0\n"
++			    :
++			    : "r" (regval)); /* input value is ignored */
++		/* Clear fault in EFSR. */
++		asm("mcr p15, 7, %0, c15, c0, 1\n"
++		    :
++		    : "r" (regval));
++		/* Clear fault in ADFSR. */
++		regval = 0;
++		asm("mcr p15, 0, %0, c5, c1, 0\n"
++		    :
++		    : "r" (regval));
++		return 0;
++	}
++#endif
++
++	return 1;
 +}
 +
- static void l2x0_inv_range(unsigned long start, unsigned long end)
- {
- 	void __iomem *base = l2x0_base;
-@@ -176,3 +185,23 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
- 
- 	printk(KERN_INFO "L2X0 cache controller enabled\n");
- }
-+
-+void l2x0_suspend(void)
-+{
-+	/* Save aux control register value */
-+	aux_ctrl_save = readl(l2x0_base + L2X0_AUX_CTRL);
-+	/* Flush all cache */
-+	l2x0_flush_all();
-+	/* Disable the cache */
-+	writel(0, l2x0_base + L2X0_CTRL);
-+}
-+
-+void l2x0_resume(int collapsed)
-+{
-+	if (collapsed)
-+		/* Restore aux control register value */
-+		writel(aux_ctrl_save, l2x0_base + L2X0_AUX_CTRL);
-+
-+	/* Enable the cache */
-+	writel(1, l2x0_base + L2X0_CTRL);
-+}
+ static struct fsr_info {
+ 	int	(*fn)(unsigned long addr, unsigned int fsr, struct pt_regs *regs);
+ 	int	sig;
+@@ -479,7 +513,7 @@ static struct fsr_info {
+ 	{ do_bad,		SIGBUS,  0,		"unknown 19"			   },
+ 	{ do_bad,		SIGBUS,  0,		"lock abort"			   }, /* xscale */
+ 	{ do_bad,		SIGBUS,  0,		"unknown 21"			   },
+-	{ do_bad,		SIGBUS,  BUS_OBJERR,	"imprecise external abort"	   }, /* xscale */
++	{ do_imprecise_ext,	SIGBUS,  BUS_OBJERR,	"imprecise external abort"	   }, /* xscale */
+ 	{ do_bad,		SIGBUS,  0,		"unknown 23"			   },
+ 	{ do_bad,		SIGBUS,  0,		"dcache parity error"		   }, /* xscale */
+ 	{ do_bad,		SIGBUS,  0,		"unknown 25"			   },
 -- 
 1.6.3.3
