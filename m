@@ -1,7 +1,7 @@
 From: hongjiujing@gmail.com (tommy tommy)
-Date: Mon, 11 Jan 2010 19:20:39 +0800
-Subject: about usb tablet 2.6.27/2.6.24
-Message-ID: <48cbf6bf1001110320r2073161fq975da68f69156f8@mail.gmail.com>
+Date: Mon, 11 Jan 2010 20:02:05 +0800
+Subject: about usb tablet
+Message-ID: <48cbf6bf1001110402h10506d79v174fc0a9ce97442c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -475,13 +475,13 @@ it is ok under 2.6.27/2.6.28 linux by electronic pen to test,but i want it
 use in 2.6.24.2 linux .i have tested it in ubuntu8.04 2.6.24.2,it is
 wrong,can't know him.
 
-and i have trace http://www.*linux*-usb.org/usb.ids,can't find
-"0ED1,7801",is it a issue? just
+and i have trace http://www.linux-usb.org/usb.ids,can't find "0ED1,7801",is
+it a issue? just
 
 0ed1  WinMaxGroup
-	6660  Flash Disk 64M-C
-	6680  Flash Disk 64M-B
-	7634  MP3 Player
+    6660  Flash Disk 64M-C
+    6680  Flash Disk 64M-B
+    7634  MP3 Player
 
 
 how can i solve this problem quickly?
@@ -491,9 +491,8 @@ B.R
 
 Tommy
 
-
 -- 
 Achievement provides the only real pleasure in life!
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100111/17a08b96/attachment-0001.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100111/e274af57/attachment-0001.htm>
