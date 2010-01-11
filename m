@@ -1,44 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Jan 2010 17:28:25 +0000
-Subject: [PATCH] Consolidate clks_register() and similar
-In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE1909020898E7@mi8nycmail19.Mi8.com>
-References: <20100110172825.GB8639@n2100.arm.linux.org.uk>
-	<BD79186B4FD85F4B8E60E381CAEE1909020898E7@mi8nycmail19.Mi8.com>
-Message-ID: <20100111172825.GA7925@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 11 Jan 2010 18:59:40 +0100
+Subject: [PATCH] imxfb: correct location of callbacks in suspend and resume
+In-Reply-To: <1263226881-28008-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1263226881-28008-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20100111175940.GZ6923@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2010 at 12:26:12PM -0500, H Hartley Sweeten wrote:
-> On Sunday, January 10, 2010 10:28 AM, Russell King wrote:
-> > diff --git a/arch/arm/include/asm/clkdev.h b/arch/arm/include/asm/clkdev.h
-> > index b6ec7c6..7a0690d 100644
-> > --- a/arch/arm/include/asm/clkdev.h
-> > +++ b/arch/arm/include/asm/clkdev.h
-> > @@ -27,4 +27,7 @@ struct clk_lookup *clkdev_alloc(struct clk *clk, const char *con_id,
-> >  void clkdev_add(struct clk_lookup *cl);
-> >  void clkdev_drop(struct clk_lookup *cl);
-> >  
-> > +void clkdev_add_table(struct clk_lookup *, size_t);
-> > +int clk_add_alias(const char *, const char *, char *, struct device *);
+On Mon, Jan 11, 2010 at 05:21:21PM +0100, Uwe Kleine-K?nig wrote:
+> The probe function passes a pointer to a struct fb_info to
+> platform_set_drvdata, so don't interpret the return value of
+> platform_get_drvdata as a pointer to struct imxfb_info.
 > 
-> clk_add_alias does not seem to be related to this patch.
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: linux-arm-kernel at lists.infradead.org
 
-True, but it might as well get cleaned up along with the rest of this.
-For some reason, the prototype was never moved there.
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-> > @@ -474,8 +473,7 @@ static int __init ep93xx_clock_init(void)
-> >  		clk_f.rate / 1000000, clk_h.rate / 1000000,
-> >  		clk_p.rate / 1000000);
-> >  
-> > -	for (i = 0; i < ARRAY_SIZE(clocks); i++)
-> > -		clkdev_add(&clocks[i]);
-> > +	clkdev_add_table(clocks, ARRAY_SIZE(clocks));
-> >  	return 0;
-> >  }
-> >  arch_initcall(ep93xx_clock_init);
+> ---
+>  drivers/video/imxfb.c |    6 ++++--
+>  1 files changed, 4 insertions(+), 2 deletions(-)
 > 
-> For ep93xx.
+> diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+> index 66358fa..b4b6dec 100644
+> --- a/drivers/video/imxfb.c
+> +++ b/drivers/video/imxfb.c
+> @@ -593,7 +593,8 @@ static int imxfb_activate_var(struct fb_var_screeninfo *var, struct fb_info *inf
+>   */
+>  static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
+>  {
+> -	struct imxfb_info *fbi = platform_get_drvdata(dev);
+> +	struct fb_info *info = platform_get_drvdata(dev);
+> +	struct imxfb_info *fbi = info->par;
+>  
+>  	pr_debug("%s\n", __func__);
+>  
+> @@ -603,7 +604,8 @@ static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
+>  
+>  static int imxfb_resume(struct platform_device *dev)
+>  {
+> -	struct imxfb_info *fbi = platform_get_drvdata(dev);
+> +	struct fb_info *info = platform_get_drvdata(dev);
+> +	struct imxfb_info *fbi = info->par;
+>  
+>  	pr_debug("%s\n", __func__);
+>  
+> -- 
+> 1.6.5.2
 > 
-> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> 
 
-Thanks.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
