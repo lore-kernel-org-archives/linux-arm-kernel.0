@@ -1,46 +1,19 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Mon, 11 Jan 2010 23:10:27 +0000
-Subject: 32-bit Thumb-2 breakpoints
-In-Reply-To: <20100111225436.GA7408@caradoc.them.org>
-References: <20100111215816.GA1068@caradoc.them.org>
-	<20100111223503.GD7925@n2100.arm.linux.org.uk>
-	<20100111225436.GA7408@caradoc.them.org>
-Message-ID: <20100111231027.GA30714@shareable.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Jan 2010 23:11:43 +0000
+Subject: [RFC 18/18] arm: mm: qsd8x50: Fix incorrect permission faults
+In-Reply-To: <1263250057-26692-19-git-send-email-dwalker@codeaurora.org>
+References: <1263250057-26692-1-git-send-email-dwalker@codeaurora.org>
+	<1263250057-26692-19-git-send-email-dwalker@codeaurora.org>
+Message-ID: <20100111231143.GF7925@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Jacobowitz wrote:
-> In the example from my mail:
+On Mon, Jan 11, 2010 at 02:47:37PM -0800, Daniel Walker wrote:
+> From: Dave Estes <cestes@quicinc.com>
 > 
->    cmp   r0, r0
->    itt   eq
-> A: cmpeq r0, r1
-> B: moveq r0, r2
-> C: nop
-> 
-> The cmpeq can be an adcs.w, eors.w, et cetera.  We're at A, trying to
-> figure out whether to put a breakpoint on B or C (both of which could
-> validly be branches).
->
-> It's possible I've missed something obvious, of course!
+> Handle incorrectly reported permission faults for qsd8650.  On
+> permission faults, retry MVA to PA conversion.  If retry detects
+> translation fault.  Report as translation fault.
 
-I couldn't really tell from a quick glance at the net, which only
-half-explained itt, so I'll ask some newbie-sounding questions just in
-case it is something obvious.
-
-Isn't the itt sequence for Thumb-2 supposed to be consistent with the
-condition sequence for ARM, so that it should be:
-
-    cmp   r0, r0
-    itt   eq
- A: cmpeq r0, r1
- B: movne r0, r2   <- that is, ne not eq, because it's the "then" branch
- C: nop
-
-And does the cmp at A really affect execution of the instructions at B
-and C in a Thumb-2 itt sequence, rather than the condition being
-checked once@the time of the itt instruction and played out for the
-following 3 instructions?
-
-Thanks,
--- Jamie
+This is totally unacceptable to add such a demanding copyright header to
+any file, imposing this notice upon pre-existing code.  Please remove it.
