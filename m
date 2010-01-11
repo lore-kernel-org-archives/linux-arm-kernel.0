@@ -1,48 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Jan 2010 23:07:29 +0000
-Subject: [RFC 14/18] arm: msm: add v7 support for compiler version-4.1.1
-In-Reply-To: <1263250057-26692-15-git-send-email-dwalker@codeaurora.org>
-References: <1263250057-26692-1-git-send-email-dwalker@codeaurora.org>
-	<1263250057-26692-15-git-send-email-dwalker@codeaurora.org>
-Message-ID: <20100111230729.GE7925@n2100.arm.linux.org.uk>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Mon, 11 Jan 2010 23:10:27 +0000
+Subject: 32-bit Thumb-2 breakpoints
+In-Reply-To: <20100111225436.GA7408@caradoc.them.org>
+References: <20100111215816.GA1068@caradoc.them.org>
+	<20100111223503.GD7925@n2100.arm.linux.org.uk>
+	<20100111225436.GA7408@caradoc.them.org>
+Message-ID: <20100111231027.GA30714@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Is it really worth adding support for these old (and probably buggy)
-compiler versions?
+Daniel Jacobowitz wrote:
+> In the example from my mail:
+> 
+>    cmp   r0, r0
+>    itt   eq
+> A: cmpeq r0, r1
+> B: moveq r0, r2
+> C: nop
+> 
+> The cmpeq can be an adcs.w, eors.w, et cetera.  We're at A, trying to
+> figure out whether to put a breakpoint on B or C (both of which could
+> validly be branches).
+>
+> It's possible I've missed something obvious, of course!
 
-In any case, certainly not in this way.  Detect options by using the
-cc-option makefile call, rather than writing your own way to get the
-compiler version.
+I couldn't really tell from a quick glance at the net, which only
+half-explained itt, so I'll ask some newbie-sounding questions just in
+case it is something obvious.
 
-On Mon, Jan 11, 2010 at 02:47:33PM -0800, Daniel Walker wrote:
-> From: Taniya Das <tdas@qualcomm.com>
-> 
-> Signed-off-by: Taniya Das <tdas@qualcomm.com>
-> Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
-> ---
->  arch/arm/Makefile |    8 +++++++-
->  1 files changed, 7 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index e9da084..aa32b39 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -50,7 +50,13 @@ comma = ,
->  # Note that GCC does not numerically define an architecture version
->  # macro, but instead defines a whole series of macros which makes
->  # testing for a specific architecture or later rather impossible.
-> -arch-$(CONFIG_CPU_32v7)		:=-D__LINUX_ARM_ARCH__=7 $(call cc-option,-march=armv7-a,-march=armv5t -Wa$(comma)-march=armv7-a)
-> +CONFIG_SHELL	:=/bin/sh
-> +GCC_VERSION	:= $(shell $(CONFIG_SHELL) $(PWD)/scripts/gcc-version.sh $(CROSS_COMPILE)gcc)
-> +ifeq ($(GCC_VERSION),0401)
-> +arch-$(CONFIG_CPU_32v7)		:=-D__LINUX_ARM_ARCH__=7 $(call cc-option,-march=armv7a,-march=armv5t -Wa$(comma)-march=armv7a)
-> +else
-> +arch-$(CONFIG_CPU_32v7)		:=-D__LINUX_ARM_ARCH__=7 $(call cc-option,-march=armv7-a,-march=armv5t -Wa$(comma)-march=armv7a)
-> +endif
->  arch-$(CONFIG_CPU_32v6)		:=-D__LINUX_ARM_ARCH__=6 $(call cc-option,-march=armv6,-march=armv5t -Wa$(comma)-march=armv6)
->  # Only override the compiler option if ARMv6. The ARMv6K extensions are
->  # always available in ARMv7
-> -- 
-> 1.6.3.3
-> 
+Isn't the itt sequence for Thumb-2 supposed to be consistent with the
+condition sequence for ARM, so that it should be:
+
+    cmp   r0, r0
+    itt   eq
+ A: cmpeq r0, r1
+ B: movne r0, r2   <- that is, ne not eq, because it's the "then" branch
+ C: nop
+
+And does the cmp at A really affect execution of the instructions at B
+and C in a Thumb-2 itt sequence, rather than the condition being
+checked once@the time of the itt instruction and played out for the
+following 3 instructions?
+
+Thanks,
+-- Jamie
