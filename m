@@ -1,47 +1,35 @@
 From: dwalker@codeaurora.org (Daniel Walker)
-Date: Mon, 11 Jan 2010 14:47:31 -0800
-Subject: [RFC 12/18] arm: msm: Enable frequency scaling.
+Date: Mon, 11 Jan 2010 14:47:30 -0800
+Subject: [RFC 11/18] arm: msm: add ARCH_MSM_SCORPION to CPU_V7
 In-Reply-To: <1263250057-26692-1-git-send-email-dwalker@codeaurora.org>
 References: <1263250057-26692-1-git-send-email-dwalker@codeaurora.org>
-Message-ID: <1263250057-26692-13-git-send-email-dwalker@codeaurora.org>
+Message-ID: <1263250057-26692-12-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Praveen Chidambaram <pchidamb@quicinc.com>
+From: Steve Muckle <smuckle@quicinc.com>
 
-Acked-by: Saravana Kannan <skannan@quicinc.com>
-Signed-off-by: Praveen Chidambaram <pchidamb@quicinc.com>
+ARCH_MSM_SCORPION supports Qualcomm SnapDragon chipsets.
+
+Signed-off-by: Steve Muckle <smuckle@quicinc.com>
 Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 ---
- arch/arm/Kconfig |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+ arch/arm/mm/Kconfig |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c752b7d..2db3739 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -573,6 +573,7 @@ config ARCH_PXA
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 155c7a3..c721880 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -409,7 +409,8 @@ config CPU_32v6K
  
- config ARCH_MSM
- 	bool "Qualcomm MSM"
-+	select ARCH_HAS_CPUFREQ
- 	select GENERIC_TIME
- 	select GENERIC_CLOCKEVENTS
- 	help
-@@ -1437,6 +1438,14 @@ source "drivers/cpuidle/Kconfig"
- 
- endmenu
- 
-+config CPU_FREQ_MSM
-+	bool
-+	depends on CPU_FREQ && ARCH_MSM
-+	default y
-+	help
-+	  This enables the CPUFreq driver for Qualcomm CPUs.
-+	  If in doubt, say Y.
-+
- menu "Floating point emulation"
- 
- comment "At least one emulation must be selected"
+ # ARMv7
+ config CPU_V7
+-	bool "Support ARM V7 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
++	bool "Support ARM V7 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX || ARCH_MSM_SCORPION
++	default y if ARCH_MSM_SCORPION
+ 	select CPU_32v6K
+ 	select CPU_32v7
+ 	select CPU_ABRT_EV7
 -- 
 1.6.3.3
