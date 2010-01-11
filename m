@@ -1,27 +1,31 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Jan 2010 23:37:20 +0000
-Subject: [RFC 05/18] arm: msm: implement ioremap_strongly_ordered
-In-Reply-To: <1263250057-26692-6-git-send-email-dwalker@codeaurora.org>
+Date: Mon, 11 Jan 2010 23:39:24 +0000
+Subject: [RFC 06/18] arm: msm: implement proper dmb() for 7x27
+In-Reply-To: <1263250057-26692-7-git-send-email-dwalker@codeaurora.org>
 References: <1263250057-26692-1-git-send-email-dwalker@codeaurora.org>
-	<1263250057-26692-6-git-send-email-dwalker@codeaurora.org>
-Message-ID: <20100111233720.GK7925@n2100.arm.linux.org.uk>
+	<1263250057-26692-7-git-send-email-dwalker@codeaurora.org>
+Message-ID: <20100111233924.GL7925@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2010 at 02:47:24PM -0800, Daniel Walker wrote:
+On Mon, Jan 11, 2010 at 02:47:25PM -0800, Daniel Walker wrote:
 > From: Larry Bassel <lbassel@quicinc.com>
 > 
-> Both the clean and invalidate functionality needed
-> for the video encoder and 7x27 barrier code
-> need to have a strongly ordered mapping set up
-> so that one may perform a write to strongly ordered
-> memory. The generic ARM code does not provide this.
+> For 7x27 it is necessary to write to strongly
+> ordered memory after executing the coprocessor 15
+> instruction dmb instruction.
 > 
-> The generic ARM code does provide MT_DEVICE, which starts
-> as strongly ordered, but the code later turns the buffered flag
-> on for ARMv6 in order to make the device shared. This is not
-> suitable for my purpose, so this patch adds code for a
-> MT_DEVICE_STRONGLY_ORDERED mapping type.
+> This is only for data barrier dmb().
+> Note that the test for 7x27 is done on all MSM platforms
+> (even ones such as 7201a whose kernel is distinct from
+> that of 7x25/7x27).
+> 
+> Acked-by: Willie Ruan <wruan@quicinc.com>
+> Signed-off-by: Larry Bassel <lbassel@quicinc.com>
+> Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 
-This doesn't really describe what "my purpose" is; the patch description
-is too vague to ascertain why this is required.
+Can only see half of this change - what's the actual implementation of
+arch_barrier_extra()?
+
+I'd prefer not to include asm/memory.h into asm/system.h to avoid
+needlessly polluting headers.
