@@ -1,123 +1,114 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 11 Jan 2010 22:04:20 +0800
-Subject: [PATCH 12/16] [ARM] pxa/corgi: use generic GPIO API and remove
+Date: Mon, 11 Jan 2010 22:04:21 +0800
+Subject: [PATCH 13/16] [ARM] pxa/spitz: use generic GPIO API and remove
 	pxa_gpio_mode()
 In-Reply-To: <1263218664-11546-1-git-send-email-eric.y.miao@gmail.com>
 References: <1263218664-11546-1-git-send-email-eric.y.miao@gmail.com>
-Message-ID: <1263218664-11546-13-git-send-email-eric.y.miao@gmail.com>
+Message-ID: <1263218664-11546-14-git-send-email-eric.y.miao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+REVISIT: change to GPIO18 is ugly, need to make sure whether that's
+really necessary - GPIO18_RDY as an VLIO input signal - we don't
+normally need to do such kind of trick during low power mode.
+
 Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
 ---
- arch/arm/mach-pxa/corgi.c    |    8 ++++++--
- arch/arm/mach-pxa/corgi_pm.c |   38 +++++++++++++++++++-------------------
- 2 files changed, 25 insertions(+), 21 deletions(-)
+ arch/arm/mach-pxa/spitz.c    |    4 +++-
+ arch/arm/mach-pxa/spitz_pm.c |   28 +++++++++++++++++++++-------
+ 2 files changed, 24 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/corgi.c b/arch/arm/mach-pxa/corgi.c
-index 74446cf..ae496b6 100644
---- a/arch/arm/mach-pxa/corgi.c
-+++ b/arch/arm/mach-pxa/corgi.c
-@@ -130,11 +130,15 @@ static unsigned long corgi_pin_config[] __initdata = {
- 	/* GPIO */
- 	GPIO9_GPIO,	/* CORGI_GPIO_nSD_DETECT */
- 	GPIO7_GPIO,	/* CORGI_GPIO_nSD_WP */
--	GPIO33_GPIO,	/* CORGI_GPIO_SD_PWR */
-+	GPIO21_GPIO,	/* CORGI_GPIO_ADC_TEMP */
- 	GPIO22_GPIO,	/* CORGI_GPIO_IR_ON */
-+	GPIO33_GPIO,	/* CORGI_GPIO_SD_PWR */
-+	GPIO38_GPIO,	/* CORGI_GPIO_CHRG_ON */
-+	GPIO43_GPIO,	/* CORGI_GPIO_CHRG_UKN */
- 	GPIO44_GPIO,	/* CORGI_GPIO_HSYNC */
+diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+index 6d9c472..70b17b6 100644
+--- a/arch/arm/mach-pxa/spitz.c
++++ b/arch/arm/mach-pxa/spitz.c
+@@ -86,6 +86,7 @@ static unsigned long spitz_pin_config[] __initdata = {
+ 
+ 	/* GPIOs */
+ 	GPIO9_GPIO,	/* SPITZ_GPIO_nSD_DETECT */
++	GPIO16_GPIO,	/* SPITZ_GPIO_SYNC */
+ 	GPIO81_GPIO,	/* SPITZ_GPIO_nSD_WP */
+ 	GPIO41_GPIO,	/* SPITZ_GPIO_USB_CONNECT */
+ 	GPIO37_GPIO,	/* SPITZ_GPIO_USB_HOST */
+@@ -119,7 +120,8 @@ static unsigned long spitz_pin_config[] __initdata = {
+ 	GPIO117_I2C_SCL,
+ 	GPIO118_I2C_SDA,
  
 -	GPIO1_GPIO | WAKEUP_ON_EDGE_RISE,
-+	GPIO0_GPIO | WAKEUP_ON_EDGE_BOTH,	/* CORGI_GPIO_KEY_INT */
-+	GPIO1_GPIO | WAKEUP_ON_EDGE_RISE,	/* CORGI_GPIO_AC_IN */
++	GPIO0_GPIO | WAKEUP_ON_EDGE_RISE,	/* SPITZ_GPIO_KEY_INT */
++	GPIO1_GPIO | WAKEUP_ON_EDGE_FALL,	/* SPITZ_GPIO_RESET */
  };
  
  /*
-diff --git a/arch/arm/mach-pxa/corgi_pm.c b/arch/arm/mach-pxa/corgi_pm.c
-index d4a0733..bb68347 100644
---- a/arch/arm/mach-pxa/corgi_pm.c
-+++ b/arch/arm/mach-pxa/corgi_pm.c
-@@ -14,6 +14,7 @@
- #include <linux/init.h>
- #include <linux/kernel.h>
- #include <linux/delay.h>
-+#include <linux/gpio.h>
- #include <linux/interrupt.h>
- #include <linux/platform_device.h>
- #include <linux/apm-emulation.h>
-@@ -25,7 +26,8 @@
+diff --git a/arch/arm/mach-pxa/spitz_pm.c b/arch/arm/mach-pxa/spitz_pm.c
+index fc5a70c..4209ddf 100644
+--- a/arch/arm/mach-pxa/spitz_pm.c
++++ b/arch/arm/mach-pxa/spitz_pm.c
+@@ -24,9 +24,10 @@
+ 
  #include <mach/sharpsl.h>
- #include <mach/corgi.h>
- #include <mach/pxa2xx-regs.h>
+ #include <mach/spitz.h>
+-#include <mach/pxa2xx-regs.h>
 -#include <mach/pxa2xx-gpio.h>
++#include <mach/pxa27x.h>
 +
-+#include "generic.h"
  #include "sharpsl.h"
++#include "generic.h"
  
  #define SHARPSL_CHARGE_ON_VOLT         0x99  /* 2.9V */
-@@ -35,44 +37,42 @@
- #define SHARPSL_FATAL_ACIN_VOLT        182   /* 3.45V */
- #define SHARPSL_FATAL_NOACIN_VOLT      170   /* 3.40V */
+ #define SHARPSL_CHARGE_ON_TEMP         0xe0  /* 2.9V */
+@@ -37,10 +38,17 @@
  
-+static struct gpio charger_gpios[] = {
-+	{ CORGI_GPIO_ADC_TEMP_ON, GPIOF_OUT_INIT_LOW, "ADC Temp On" },
-+	{ CORGI_GPIO_CHRG_ON,	  GPIOF_OUT_INIT_LOW, "Charger On" },
-+	{ CORGI_GPIO_CHRG_UKN,	  GPIOF_OUT_INIT_LOW, "Charger Unknown" },
-+	{ CORGI_GPIO_KEY_INT,	  GPIOF_IN, "Key Interrupt" },
+ static int spitz_last_ac_status;
+ 
++static struct gpio spitz_charger_gpios[] = {
++	{ SPITZ_GPIO_KEY_INT,	GPIOF_IN, "Keyboard Interrupt" },
++	{ SPITZ_GPIO_SYNC,	GPIOF_IN, "Sync" },
++	{ SPITZ_GPIO_ADC_TEMP_ON, GPIOF_OUT_INIT_LOW, "ADC Temp On" },
++	{ SPITZ_GPIO_JK_B,	  GPIOF_OUT_INIT_LOW, "JK B" },
++	{ SPITZ_GPIO_CHRG_ON,	  GPIOF_OUT_INIT_LOW, "Charger On" },
 +};
 +
- static void corgi_charger_init(void)
+ static void spitz_charger_init(void)
  {
--	pxa_gpio_mode(CORGI_GPIO_ADC_TEMP_ON | GPIO_OUT);
--	pxa_gpio_mode(CORGI_GPIO_CHRG_ON | GPIO_OUT);
--	pxa_gpio_mode(CORGI_GPIO_CHRG_UKN | GPIO_OUT);
--	pxa_gpio_mode(CORGI_GPIO_KEY_INT | GPIO_IN);
-+	gpio_request_array(ARRAY_AND_SIZE(charger_gpios));
+-	pxa_gpio_mode(SPITZ_GPIO_KEY_INT | GPIO_IN);
+-	pxa_gpio_mode(SPITZ_GPIO_SYNC | GPIO_IN);
++	gpio_request_array(ARRAY_AND_SIZE(spitz_charger_gpios));
  }
  
- static void corgi_measure_temp(int on)
- {
--	if (on)
--		GPSR(CORGI_GPIO_ADC_TEMP_ON) = GPIO_bit(CORGI_GPIO_ADC_TEMP_ON);
--	else
--		GPCR(CORGI_GPIO_ADC_TEMP_ON) = GPIO_bit(CORGI_GPIO_ADC_TEMP_ON);
-+	gpio_set_value(CORGI_GPIO_ADC_TEMP_ON, on);
+ static void spitz_measure_temp(int on)
+@@ -76,6 +84,11 @@ static void spitz_discharge1(int on)
+ 	gpio_set_value(SPITZ_GPIO_LED_GREEN, on);
  }
  
- static void corgi_charge(int on)
++static unsigned long gpio18_config[] = {
++	GPIO18_RDY,
++	GPIO18_GPIO,
++};
++
+ static void spitz_presuspend(void)
  {
- 	if (on) {
- 		if (machine_is_corgi() && (sharpsl_pm.flags & SHARPSL_SUSPENDED)) {
--			GPCR(CORGI_GPIO_CHRG_ON) = GPIO_bit(CORGI_GPIO_CHRG_ON);
--			GPSR(CORGI_GPIO_CHRG_UKN) = GPIO_bit(CORGI_GPIO_CHRG_UKN);
-+			gpio_set_value(CORGI_GPIO_CHRG_ON, 0);
-+			gpio_set_value(CORGI_GPIO_CHRG_UKN, 1);
- 		} else {
--			GPSR(CORGI_GPIO_CHRG_ON) = GPIO_bit(CORGI_GPIO_CHRG_ON);
--			GPCR(CORGI_GPIO_CHRG_UKN) = GPIO_bit(CORGI_GPIO_CHRG_UKN);
-+			gpio_set_value(CORGI_GPIO_CHRG_ON, 1);
-+			gpio_set_value(CORGI_GPIO_CHRG_UKN, 0);
- 		}
- 	} else {
--		GPCR(CORGI_GPIO_CHRG_ON) = GPIO_bit(CORGI_GPIO_CHRG_ON);
--		GPCR(CORGI_GPIO_CHRG_UKN) = GPIO_bit(CORGI_GPIO_CHRG_UKN);
-+		gpio_set_value(CORGI_GPIO_CHRG_ON, 0);
-+		gpio_set_value(CORGI_GPIO_CHRG_UKN, 0);
- 	}
+ 	spitz_last_ac_status = sharpsl_pm.machinfo->read_devdata(SHARPSL_STATUS_ACIN);
+@@ -97,7 +110,9 @@ static void spitz_presuspend(void)
+ 	PGSR3 &= ~SPITZ_GPIO_G3_STROBE_BIT;
+ 	PGSR2 |= GPIO_bit(SPITZ_GPIO_KEY_STROBE0);
+ 
+-	pxa_gpio_mode(GPIO18_RDY|GPIO_OUT | GPIO_DFLT_HIGH);
++	pxa2xx_mfp_config(&gpio18_config[0], 1);
++	gpio_request_one(18, GPIOF_OUT_INIT_HIGH, "Unknown");
++	gpio_free(18);
+ 
+ 	PRER = GPIO_bit(SPITZ_GPIO_KEY_INT);
+ 	PFER = GPIO_bit(SPITZ_GPIO_KEY_INT) | GPIO_bit(SPITZ_GPIO_RESET);
+@@ -114,8 +129,7 @@ static void spitz_presuspend(void)
+ 
+ static void spitz_postsuspend(void)
+ {
+-	pxa_gpio_mode(GPIO18_RDY_MD);
+-	pxa_gpio_mode(10 | GPIO_IN);
++	pxa2xx_mfp_config(&gpio18_config[1], 1);
  }
  
- static void corgi_discharge(int on)
- {
--	if (on)
--		GPSR(CORGI_GPIO_DISCHARGE_ON) = GPIO_bit(CORGI_GPIO_DISCHARGE_ON);
--	else
--		GPCR(CORGI_GPIO_DISCHARGE_ON) = GPIO_bit(CORGI_GPIO_DISCHARGE_ON);
-+	gpio_set_value(CORGI_GPIO_DISCHARGE_ON, on);
- }
- 
- static void corgi_presuspend(void)
+ static int spitz_should_wakeup(unsigned int resume_on_alarm)
 -- 
 1.6.3.3
