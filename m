@@ -1,131 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 11 Jan 2010 15:44:13 -0800
-Subject: [PATCH] ARM: OMAP4: Power Domains: Remove the return as power
-	domain framework is in place
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C0508F99@dbde02.ent.ti.com>
-References: <1262951944-7693-1-git-send-email-abhijitpagare@ti.com>
-	<A24693684029E5489D1D202277BE89445131204D@dlee02.ent.ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C0508F99@dbde02.ent.ti.com>
-Message-ID: <20100111234413.GI5055@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Jan 2010 23:44:24 +0000
+Subject: [RFC 04/18] arm: cache-l2x0: add l2x0 suspend and resume functions
+In-Reply-To: <1263250057-26692-5-git-send-email-dwalker@codeaurora.org>
+References: <1263250057-26692-1-git-send-email-dwalker@codeaurora.org>
+	<1263250057-26692-5-git-send-email-dwalker@codeaurora.org>
+Message-ID: <20100111234424.GM7925@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pagare, Abhijit <abhijitpagare@ti.com> [100110 21:57]:
-> Sergio,
-> 	I have taken care of that in my other patches, which I had posted earlier. They are not in mainline yet but are lined up for the next release. You can find the same here.
+On Mon, Jan 11, 2010 at 02:47:23PM -0800, Daniel Walker wrote:
+> From: Willie Ruan <wruan@quicinc.com>
 > 
-> http://marc.info/?l=linux-omap&m=126088474831309&w=2
-> 
-> Do let me know if you have any further questions.
+> Suspend function should be called before L2 cache power is turned off
+> to save power. Resume function should be called when the power is
+> reapplied.
 
-Please update your other patch to include this change.
+What is this 'collapsed' argument for?  Who is responsible for calling
+the suspend/resume functions?
 
-Regards,
+This is clearly a case where inappropriate commenting is a problem:
 
-Tony
+> +void l2x0_resume(int collapsed)
+> +{
+> +	if (collapsed)
+> +		/* Restore aux control register value */
+> +		writel(aux_ctrl_save, l2x0_base + L2X0_AUX_CTRL);
+> +
+> +	/* Enable the cache */
+> +	writel(1, l2x0_base + L2X0_CTRL);
+> +}
 
-> 
-> Best Regards,
-> Abhijit Pagare
-> 
-> > -----Original Message-----
-> > From: Aguirre, Sergio
-> > Sent: Friday, January 08, 2010 7:31 PM
-> > To: Pagare, Abhijit; linux-omap at vger.kernel.org; linux-arm-
-> > kernel at lists.infradead.org
-> > Cc: Paul Walmsley
-> > Subject: RE: [PATCH] ARM: OMAP4: Power Domains: Remove the return as power
-> > domain framework is in place
-> > 
-> > Abhijit,
-> > 
-> > > -----Original Message-----
-> > > From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> > > owner at vger.kernel.org] On Behalf Of Pagare, Abhijit
-> > > Sent: Friday, January 08, 2010 5:59 AM
-> > > To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> > > Cc: Pagare, Abhijit; Paul Walmsley
-> > > Subject: [PATCH] ARM: OMAP4: Power Domains: Remove the return as power
-> > > domain framework is in place
-> > >
-> > > The return prevents the power domains from getting registered.
-> > > Hence removing it to allow the frameworks model to work.
-> > >
-> > > Signed-off-by: Abhijit Pagare <abhijitpagare@ti.com>
-> > > Cc: Paul Walmsley <paul@pwsan.com>
-> > > ---
-> > >
-> > > Compiled and Boot Tested on OMAP4430 simulator and ES1 Chip
-> > > Compiled and Boot Tested on OMAP3430 SDP
-> > > Compiled for OMAP2430 and OMAP2420
-> > >
-> > >  arch/arm/mach-omap2/id.c |    1 -
-> > >  1 files changed, 0 insertions(+), 1 deletions(-)
-> > >
-> > > diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-> > > index a779240..6d1e97b 100644
-> > > --- a/arch/arm/mach-omap2/id.c
-> > > +++ b/arch/arm/mach-omap2/id.c
-> > > @@ -362,7 +362,6 @@ void __init omap2_check_revision(void)
-> > >  		omap3_cpuinfo();
-> > >  	} else if (cpu_is_omap44xx()) {
-> > >  		omap4_check_revision();
-> > > -		return;
-> > >  	} else {
-> > >  		pr_err("OMAP revision unknown, please fix!\n");
-> > >  	}
-> > 
-> > I don't have an OMAP4 with me, but I found something weird in your
-> > reported behaviour...
-> > 
-> > The code that was being skipped is:
-> > 
-> > 	/*
-> > 	 * OK, now we know the exact revision. Initialize omap_chip bits
-> > 	 * for powerdowmain and clockdomain code.
-> > 	 */
-> > 	if (cpu_is_omap243x()) {
-> > 		/* Currently only supports 2430ES2.1 and 2430-all */
-> > 		omap_chip.oc |= CHIP_IS_OMAP2430;
-> > 	} else if (cpu_is_omap242x()) {
-> > 		/* Currently only supports 2420ES2.1.1 and 2420-all */
-> > 		omap_chip.oc |= CHIP_IS_OMAP2420;
-> > 	} else if (cpu_is_omap3505() || cpu_is_omap3517()) {
-> > 		omap_chip.oc = CHIP_IS_OMAP3430 | CHIP_IS_OMAP3430ES3_1;
-> > 	} else if (cpu_is_omap343x()) {
-> > 		omap_chip.oc = CHIP_IS_OMAP3430;
-> > 		if (omap_rev() == OMAP3430_REV_ES1_0)
-> > 			omap_chip.oc |= CHIP_IS_OMAP3430ES1;
-> > 		else if (omap_rev() >= OMAP3430_REV_ES2_0 &&
-> > 			 omap_rev() <= OMAP3430_REV_ES2_1)
-> > 			omap_chip.oc |= CHIP_IS_OMAP3430ES2;
-> > 		else if (omap_rev() == OMAP3430_REV_ES3_0)
-> > 			omap_chip.oc |= CHIP_IS_OMAP3430ES3_0;
-> > 		else if (omap_rev() == OMAP3430_REV_ES3_1)
-> > 			omap_chip.oc |= CHIP_IS_OMAP3430ES3_1;
-> > 		else if (omap_rev() == OMAP3630_REV_ES1_0)
-> > 			omap_chip.oc |= CHIP_IS_OMAP3630ES1;
-> > 	} else {
-> > 		pr_err("Uninitialized omap_chip, please fix!\n");
-> > 	}
-> > 
-> > And, in theory, in OMAP4 case, you SHOULDN'T be doing anything here, as
-> > there's no case for cpu_is_omap443x or similar. So you should be _only_
-> > seeing a print in console saying: "Uninitialized omap_chip, please fix!",
-> > right?
-> > 
-> > Is OMAP4 chip giving positive on cpu_is_omap343x() test then??
-> > 
-> > Regards,
-> > Sergio
-> > > --
-> > > 1.5.4.7
-> > >
-> > > --
-> > > To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> > > the body of a message to majordomo at vger.kernel.org
-> > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+The above comments provide little in the way of useful value - they
+just tell the already informed reader what's going on, but not why.
+Eg, a comment before the function describing what this 'collapsed'
+argument is would be much more useful, and describing when this
+should be called.
