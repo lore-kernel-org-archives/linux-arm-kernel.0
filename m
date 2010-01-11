@@ -1,39 +1,44 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 11 Jan 2010 07:31:57 -0800
-Subject: [PATCH 00/35] davinci updates queued for 2.6.34
-In-Reply-To: <20100110135950.GA8639@n2100.arm.linux.org.uk> (Russell King's
-	message of "Sun\, 10 Jan 2010 13\:59\:50 +0000")
-References: <1262802737-6601-1-git-send-email-khilman@deeprootsystems.com>
-	<20100110135950.GA8639@n2100.arm.linux.org.uk>
-Message-ID: <874omsr72q.fsf@deeprootsystems.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon, 11 Jan 2010 17:21:21 +0100
+Subject: [PATCH] imxfb: correct location of callbacks in suspend and resume
+Message-ID: <1263226881-28008-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+The probe function passes a pointer to a struct fb_info to
+platform_set_drvdata, so don't interpret the return value of
+platform_get_drvdata as a pointer to struct imxfb_info.
 
-> On Wed, Jan 06, 2010 at 10:31:42AM -0800, Kevin Hilman wrote:
->> Apologies for the large series, I've been meaning to send these in
->> smaller batches, but hd lots to queue up from over the holidays.
->> 
->> Pending any review comments, these will be submitted to Linus during
->> the next merge window.
->
-> Nothing specific on this series.
->
-> However, while looking at adding a standard clkdev_add_table() to replace
-> all those clks_register() implementations found in various machine files
-> (and open-coded versions of the same) I'm wondering why davinci wraps
-> the clk_lookup structure without adding anything to it.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ drivers/video/imxfb.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
-It's no longer needed.  In initial implementation, I had some extra
-fields like in OMAP, but then dropped them. 
-
-> Could davinci get rid of this seemingly useless wrapping (presumably
-> copied from OMAP) and so be able to switch over to use clkdev_add_table()
-> instead?
-
-Yes, I'll drop the wrapping.
-
-Thanks for the reviews,
-
-Kevin
+diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+index 66358fa..b4b6dec 100644
+--- a/drivers/video/imxfb.c
++++ b/drivers/video/imxfb.c
+@@ -593,7 +593,8 @@ static int imxfb_activate_var(struct fb_var_screeninfo *var, struct fb_info *inf
+  */
+ static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
+ {
+-	struct imxfb_info *fbi = platform_get_drvdata(dev);
++	struct fb_info *info = platform_get_drvdata(dev);
++	struct imxfb_info *fbi = info->par;
+ 
+ 	pr_debug("%s\n", __func__);
+ 
+@@ -603,7 +604,8 @@ static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
+ 
+ static int imxfb_resume(struct platform_device *dev)
+ {
+-	struct imxfb_info *fbi = platform_get_drvdata(dev);
++	struct fb_info *info = platform_get_drvdata(dev);
++	struct imxfb_info *fbi = info->par;
+ 
+ 	pr_debug("%s\n", __func__);
+ 
+-- 
+1.6.5.2
