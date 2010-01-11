@@ -1,44 +1,29 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 11 Jan 2010 17:21:21 +0100
-Subject: [PATCH] imxfb: correct location of callbacks in suspend and resume
-Message-ID: <1263226881-28008-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 11 Jan 2010 16:26:30 +0000
+Subject: [PATCH v3] ARM: L2 : Errata 588369: Clean & Invalidate do
+	notinvalidate clean lines
+In-Reply-To: <20100111152333.GB4109@n2100.arm.linux.org.uk>
+References: <1261390161-20196-1-git-send-email-santosh.shilimkar@ti.com>
+	<1263220628.6305.44.camel@pc1117.cambridge.arm.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C0509409@dbde02.ent.ti.com>
+	<20100111152333.GB4109@n2100.arm.linux.org.uk>
+Message-ID: <1263227190.6305.51.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The probe function passes a pointer to a struct fb_info to
-platform_set_drvdata, so don't interpret the return value of
-platform_get_drvdata as a pointer to struct imxfb_info.
+On Mon, 2010-01-11 at 15:23 +0000, Russell King - ARM Linux wrote:
+> On Mon, Jan 11, 2010 at 08:48:37PM +0530, Shilimkar, Santosh wrote:
+> > > Do you need to specify "r12" as well? What about "cc", are they
+> > > preserved by the secure monitor?
+> >
+> > r12 and reset of the registers are preserved. Lr needs to be saved but
+> > because of function call, the compiler saves/restores it.
+> 
+> That's not guaranteed; the compiler can re-use lr for its own purposes
+> within a function.  You need to add lr to the list of clobbered registers.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
----
- drivers/video/imxfb.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+Do we need to specify "r12" in the list of clobbered registers as the
+inline asm explicitly modifies it? Or the compiler doesn't touch it.
 
-diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-index 66358fa..b4b6dec 100644
---- a/drivers/video/imxfb.c
-+++ b/drivers/video/imxfb.c
-@@ -593,7 +593,8 @@ static int imxfb_activate_var(struct fb_var_screeninfo *var, struct fb_info *inf
-  */
- static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
- {
--	struct imxfb_info *fbi = platform_get_drvdata(dev);
-+	struct fb_info *info = platform_get_drvdata(dev);
-+	struct imxfb_info *fbi = info->par;
- 
- 	pr_debug("%s\n", __func__);
- 
-@@ -603,7 +604,8 @@ static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
- 
- static int imxfb_resume(struct platform_device *dev)
- {
--	struct imxfb_info *fbi = platform_get_drvdata(dev);
-+	struct fb_info *info = platform_get_drvdata(dev);
-+	struct imxfb_info *fbi = info->par;
- 
- 	pr_debug("%s\n", __func__);
- 
 -- 
-1.6.5.2
+Catalin
