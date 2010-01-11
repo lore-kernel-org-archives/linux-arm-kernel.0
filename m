@@ -1,85 +1,38 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 11 Jan 2010 18:44:32 +0900
-Subject: [PATCH 3/3] ARM: SAMSUNG: Add idle support
-Message-ID: <1263203072-29282-1-git-send-email-kgene.kim@samsung.com>
+Date: Mon, 11 Jan 2010 18:44:06 +0900
+Subject: [PATCH 1/3] ARM: SAMSUNG: Add config option for number of additional
+	GPIO pins.
+Message-ID: <1263203046-29219-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds common idle functionality for all Samsung SoC's.
+This patch adds a configuration option for specifing the number
+of additional GPIO pins to be used in addition to the GPIO pins
+supported onchip.
 
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/plat-samsung/include/mach/idle.h   |   18 +++++++++++++
- arch/arm/plat-samsung/include/mach/system.h |   36 +++++++++++++++++++++++++++
- 2 files changed, 54 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-samsung/include/mach/idle.h
- create mode 100644 arch/arm/plat-samsung/include/mach/system.h
+ arch/arm/plat-samsung/Kconfig |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/include/mach/idle.h b/arch/arm/plat-samsung/include/mach/idle.h
-new file mode 100644
-index 0000000..f3b5034
---- /dev/null
-+++ b/arch/arm/plat-samsung/include/mach/idle.h
-@@ -0,0 +1,18 @@
-+/* linux/arch/arm/plat-samsung/include/mach/idle.h
-+ *
-+ * Copyright (c) 2009 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * Idle support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index 900b463..faec4b8 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -66,6 +66,14 @@ config S3C_GPIO_PULL_UP
+ 	help
+ 	  Internal configuration to enable the correct GPIO pull helper
+ 
++config SAMSUNG_GPIO_EXTRA
++	int "Number of additional GPIO pins"
++	default 0
++	help
++	  Use additional GPIO space in addition to the GPIO's the SOC
++	  provides. This allows expanding the GPIO space for use with
++	  GPIO expanders.
 +
-+#ifndef __ASM_PLAT_IDLE_H
-+#define __ASM_PLAT_IDLE_H __FILE__
-+
-+extern void (*s3c_idle_fn)(void);
-+
-+#endif /* __ASM_PLAT_IDLE_H */
-diff --git a/arch/arm/plat-samsung/include/mach/system.h b/arch/arm/plat-samsung/include/mach/system.h
-new file mode 100644
-index 0000000..5377792
---- /dev/null
-+++ b/arch/arm/plat-samsung/include/mach/system.h
-@@ -0,0 +1,36 @@
-+/* linux/arch/arm/plat-samsung/include/mach/idle.h
-+ *
-+ * Copyright (c) 2009 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * Idle support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#ifndef __ASM_PLAT_SYSTEM_H
-+#define __ASM_PLAT_SYSTEM_H __FILE__
-+
-+void (*s3c_idle_fn)(void);
-+
-+static void s3c_default_idle(void)
-+{
-+	/* nothing here yet */
-+}
-+
-+static void arch_idle(void)
-+{
-+	if (s3c_idle_fn != NULL)
-+		(s3c_idle_fn)();
-+	else
-+		s3c_default_idle();
-+}
-+
-+static void arch_reset(char mode, const char *cmd)
-+{
-+	/* nothing here yet */
-+}
-+
-+#endif /* __ASM_PLAT_SYSTEM_H */
+ # device definitions to compile in
+ 
+ config S3C_DEV_HSMMC
 -- 
 1.6.2.5
