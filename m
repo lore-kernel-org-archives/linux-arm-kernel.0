@@ -1,9 +1,9 @@
 From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Mon, 11 Jan 2010 14:06:31 +1300
-Subject: [PATCH] ep93xx: use pr_fmt in core.c
-In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE19090200F638@mi8nycmail19.Mi8.com>
-References: <BD79186B4FD85F4B8E60E381CAEE19090200F638@mi8nycmail19.Mi8.com>
-Message-ID: <4B4A7997.2030002@bluewatersys.com>
+Date: Mon, 11 Jan 2010 14:07:10 +1300
+Subject: [PATCH] ep93xx: use pr_fmt in dma-m2p.c
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE19090200F63A@mi8nycmail19.Mi8.com>
+References: <BD79186B4FD85F4B8E60E381CAEE19090200F63A@mi8nycmail19.Mi8.com>
+Message-ID: <4B4A79BE.6080302@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,41 +15,37 @@ H Hartley Sweeten wrote:
 > 
 > ---
 > 
-> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-> index 1f0d665..41064bd 100644
-> --- a/arch/arm/mach-ep93xx/core.c
-> +++ b/arch/arm/mach-ep93xx/core.c
-> @@ -14,6 +14,8 @@
->   * your option) any later version.
+> diff --git a/arch/arm/mach-ep93xx/dma-m2p.c b/arch/arm/mach-ep93xx/dma-m2p.c
+> index dbcac9c..8904ca4 100644
+> --- a/arch/arm/mach-ep93xx/dma-m2p.c
+> +++ b/arch/arm/mach-ep93xx/dma-m2p.c
+> @@ -28,6 +28,8 @@
+>   * with this implementation.
 >   */
 >  
 > +#define pr_fmt(fmt) "ep93xx " KBUILD_MODNAME ": " fmt
 > +
 >  #include <linux/kernel.h>
->  #include <linux/init.h>
->  #include <linux/platform_device.h>
-> @@ -318,8 +320,7 @@ static int ep93xx_gpio_irq_type(unsigned int irq, unsigned int type)
->  		desc->handle_irq = handle_edge_irq;
+>  #include <linux/clk.h>
+>  #include <linux/err.h>
+> @@ -173,7 +175,7 @@ static irqreturn_t m2p_irq(int irq, void *dev_id)
+>  
+>  	switch (m2p_channel_state(ch)) {
+>  	case STATE_IDLE:
+> -		pr_crit("m2p_irq: dma interrupt without a dma buffer\n");
+> +		pr_crit("dma interrupt without a dma buffer\n");
+>  		BUG();
 >  		break;
->  	default:
-> -		pr_err("ep93xx: failed to set irq type %d for gpio %d\n",
-> -		       type, gpio);
-> +		pr_err("failed to set irq type %d for gpio %d\n", type, gpio);
->  		return -EINVAL;
->  	}
 >  
-> @@ -572,9 +573,9 @@ void __init ep93xx_register_i2c(struct i2c_gpio_platform_data *data,
->  	 * CMOS driver.
->  	 */
->  	if (data->sda_is_open_drain && data->sda_pin != EP93XX_GPIO_LINE_EEDAT)
-> -		pr_warning("ep93xx: sda != EEDAT, open drain has no effect\n");
-> +		pr_warning("sda != EEDAT, open drain has no effect\n");
->  	if (data->scl_is_open_drain && data->scl_pin != EP93XX_GPIO_LINE_EECLK)
-> -		pr_warning("ep93xx: scl != EECLK, open drain has no effect\n");
-> +		pr_warning("scl != EECLK, open drain has no effect\n");
+> @@ -197,7 +199,7 @@ static irqreturn_t m2p_irq(int irq, void *dev_id)
+>  		break;
 >  
->  	__raw_writel((data->sda_is_open_drain << 1) |
->  		     (data->scl_is_open_drain << 0), 
+>  	case STATE_NEXT:
+> -		pr_crit("m2p_irq: dma interrupt while next\n");
+> +		pr_crit("dma interrupt while next\n");
+>  		BUG();
+>  		break;
+>  	} 
 
 Acked-by: Ryan Mallon <ryan@bluewatersys.com>
 
