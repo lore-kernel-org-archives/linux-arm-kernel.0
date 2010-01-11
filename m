@@ -1,44 +1,41 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 11 Jan 2010 22:04:14 +0800
-Subject: [PATCH 06/16] [ARM] pxa: fix the incorrect naming of AC97 reset pin
-	config for pxa26x
+Date: Mon, 11 Jan 2010 22:04:15 +0800
+Subject: [PATCH 07/16] [ARM] pxa: remove the unnecessary restoring of MFP
+	registers
 In-Reply-To: <1263218664-11546-1-git-send-email-eric.y.miao@gmail.com>
 References: <1263218664-11546-1-git-send-email-eric.y.miao@gmail.com>
-Message-ID: <1263218664-11546-7-git-send-email-eric.y.miao@gmail.com>
+Message-ID: <1263218664-11546-8-git-send-email-eric.y.miao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPIO89_AC97_nRESET is really a PXA26x specific option and was
-incorrectly named.
+MFP registers are saved and restored by the mfp sys_device before all
+other platform devices, and it is unnecessary here.
 
 Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
 ---
- arch/arm/mach-pxa/include/mach/mfp-pxa25x.h |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+ sound/arm/pxa2xx-ac97-lib.c |   10 ----------
+ 1 files changed, 0 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/include/mach/mfp-pxa25x.h b/arch/arm/mach-pxa/include/mach/mfp-pxa25x.h
-index 8910a3b..cafadc3 100644
---- a/arch/arm/mach-pxa/include/mach/mfp-pxa25x.h
-+++ b/arch/arm/mach-pxa/include/mach/mfp-pxa25x.h
-@@ -169,7 +169,6 @@
- #define GPIO86_nSDCS2		MFP_CFG_OUT(GPIO86, AF0, DRIVE_HIGH)
- #define GPIO87_nSDCS3		MFP_CFG_OUT(GPIO87, AF0, DRIVE_HIGH)
- #define GPIO88_RDnWR		MFP_CFG_OUT(GPIO88, AF0, DRIVE_HIGH)
--#define GPIO89_nACRESET		MFP_CFG_OUT(GPIO89, AF0, DRIVE_HIGH)
+diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
+index 6fdca97..7587a74 100644
+--- a/sound/arm/pxa2xx-ac97-lib.c
++++ b/sound/arm/pxa2xx-ac97-lib.c
+@@ -345,16 +345,6 @@ EXPORT_SYMBOL_GPL(pxa2xx_ac97_hw_suspend);
  
- /* USB */
- #define GPIO9_USB_RCV		MFP_CFG_IN(GPIO9, AF1)
-@@ -186,7 +185,10 @@
- #define GPIO30_ASSP_TXD		MFP_CFG_OUT(GPIO30, AF3, DRIVE_LOW)
- #define GPIO31_ASSP_SFRM_IN	MFP_CFG_IN(GPIO31, AF1)
- #define GPIO31_ASSP_SFRM_OUT	MFP_CFG_OUT(GPIO31, AF3, DRIVE_LOW)
--#endif
-+
-+/* AC97 */
-+#define GPIO89_AC97_nRESET	MFP_CFG_OUT(GPIO89, AF0, DRIVE_HIGH)
-+#endif	/* CONFIG_CPU_PXA26x */
- 
- /* commonly used pin configurations */
- #define GPIOxx_LCD_16BPP	\
+ int pxa2xx_ac97_hw_resume(void)
+ {
+-	if (cpu_is_pxa25x() || cpu_is_pxa27x()) {
+-		pxa_gpio_mode(GPIO31_SYNC_AC97_MD);
+-		pxa_gpio_mode(GPIO30_SDATA_OUT_AC97_MD);
+-		pxa_gpio_mode(GPIO28_BITCLK_AC97_MD);
+-		pxa_gpio_mode(GPIO29_SDATA_IN_AC97_MD);
+-	}
+-	if (cpu_is_pxa27x()) {
+-		/* Use GPIO 113 or 95 as AC97 Reset on Bulverde */
+-		set_resetgpio_mode(RESETGPIO_NORMAL_ALTFUNC);
+-	}
+ 	clk_enable(ac97_clk);
+ 	return 0;
+ }
 -- 
 1.6.3.3
