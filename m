@@ -1,95 +1,48 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Mon, 11 Jan 2010 14:05:32 +1300
-Subject: [PATCH] ep93xx: define magic numbers for pll1 and pll2
-In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE19090200F622@mi8nycmail19.Mi8.com>
-References: <BD79186B4FD85F4B8E60E381CAEE19090200F622@mi8nycmail19.Mi8.com>
-Message-ID: <4B4A795C.8000507@bluewatersys.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Mon, 11 Jan 2010 01:04:52 +0000
+Subject: [PATCH] Consolidate clks_register() and similar
+In-Reply-To: <20100110231232.GD15812@n2100.arm.linux.org.uk>
+References: <20100110172825.GB8639@n2100.arm.linux.org.uk>
+	<201001110923.31809.jeremy.kerr@canonical.com>
+	<20100110231232.GD15812@n2100.arm.linux.org.uk>
+Message-ID: <20100111010452.GF1224@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-H Hartley Sweeten wrote:
-> Add defines for the pll register magic numbers that determine if
-> the pll's are bypassed and if pll2 is enabled.  Rename the clock
-> set registers to more closely match the datasheet.  Also, remove
-> the unnecessary braces since each conditional statement is a single
-> statement.
+On Sun, Jan 10, 2010 at 11:12:32PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Jan 11, 2010 at 09:23:31AM +1100, Jeremy Kerr wrote:
+> > Russell,
+> > 
+> > > --- a/arch/arm/mach-bcmring/core.c
+> > > +++ b/arch/arm/mach-bcmring/core.c
+> > > @@ -142,8 +142,7 @@ void __init bcmring_amba_init(void)
+> > > 
+> > >  	chipcHw_busInterfaceClockEnable(bus_clock);
+> > > 
+> > > -	for (i = 0; i < ARRAY_SIZE(lookups); i++)
+> > > -		clkdev_add(&lookups[i]);
+> > > +	clkdev_add_table(lookups, ARRAY_SIEZ(lookups));
+> > 
+> > SIEZ -> SIZE.
 > 
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <ryan@bluewatersys.com>
+> Fied.
 > 
-> ---
+> > Also, perhaps a macro to simplify this common usage?
+> > 
+> > #define clkdev_add_table(clks) __clkdev_add_table(clks, ARRAY_SIZE(clks))
 > 
-> diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
-> index 1d0f9d8..f77c410 100644
-> --- a/arch/arm/mach-ep93xx/clock.c
-> +++ b/arch/arm/mach-ep93xx/clock.c
-> @@ -447,25 +447,29 @@ static int __init ep93xx_clock_init(void)
->  	u32 value;
->  	int i;
->  
-> -	value = __raw_readl(EP93XX_SYSCON_CLOCK_SET1);
-> -	if (!(value & 0x00800000)) {			/* PLL1 bypassed?  */
-> +	/* Determine the bootloader configured pll1 rate */
-> +	value = __raw_readl(EP93XX_SYSCON_CLKSET1);
-> +	if (!(value & EP93XX_SYSCON_CLKSET1_NBYP1))
->  		clk_pll1.rate = clk_xtali.rate;
-> -	} else {
-> +	else
->  		clk_pll1.rate = calc_pll_rate(value);
-> -	}
-> +
-> +	/* Initialize the pll1 derived clocks */
->  	clk_f.rate = clk_pll1.rate / fclk_divisors[(value >> 25) & 0x7];
->  	clk_h.rate = clk_pll1.rate / hclk_divisors[(value >> 20) & 0x7];
->  	clk_p.rate = clk_h.rate / pclk_divisors[(value >> 18) & 0x3];
->  	ep93xx_dma_clock_init();
->  
-> +	/* Determine the bootloader configured pll2 rate */
->  	value = __raw_readl(EP93XX_SYSCON_CLOCK_SET2);
-> -	if (!(value & 0x00080000)) {			/* PLL2 bypassed?  */
-> +	if (!(value & EP93XX_SYSCON_CLKSET2_NBYP2))
->  		clk_pll2.rate = clk_xtali.rate;
-> -	} else if (value & 0x00040000) {		/* PLL2 enabled?  */
-> +	else if (value & EP93XX_SYSCON_CLKSET2_PLL2_EN)
->  		clk_pll2.rate = calc_pll_rate(value);
-> -	} else {
-> +	else
->  		clk_pll2.rate = 0;
-> -	}
-> +
-> +	/* Initialize the pll2 derived clocks */
->  	clk_usb_host.rate = clk_pll2.rate / (((value >> 28) & 0xf) + 1);
->  
->  	printk(KERN_INFO "ep93xx: PLL1 running at %ld MHz, PLL2 at %ld MHz\n",
-> diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-> index d55194a..cd35912 100644
-> --- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-> +++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-> @@ -167,8 +167,11 @@
->  #define EP93XX_SYSCON_PWRCNT_DMA_M2P1	(1<<16)
->  #define EP93XX_SYSCON_HALT		EP93XX_SYSCON_REG(0x08)
->  #define EP93XX_SYSCON_STANDBY		EP93XX_SYSCON_REG(0x0c)
-> -#define EP93XX_SYSCON_CLOCK_SET1	EP93XX_SYSCON_REG(0x20)
-> -#define EP93XX_SYSCON_CLOCK_SET2	EP93XX_SYSCON_REG(0x24)
-> +#define EP93XX_SYSCON_CLKSET1		EP93XX_SYSCON_REG(0x20)
-> +#define EP93XX_SYSCON_CLKSET1_NBYP1	(1<<23)
-> +#define EP93XX_SYSCON_CLKSET2		EP93XX_SYSCON_REG(0x24)
-> +#define EP93XX_SYSCON_CLKSET2_NBYP2	(1<<19)
-> +#define EP93XX_SYSCON_CLKSET2_PLL2_EN	(1<<18)
->  #define EP93XX_SYSCON_DEVCFG		EP93XX_SYSCON_REG(0x80)
->  #define EP93XX_SYSCON_DEVCFG_SWRST	(1<<31)
->  #define EP93XX_SYSCON_DEVCFG_D1ONG	(1<<30) 
+> I'm not a fan of that kind of clean up - it leads people into
+> thinking that they can pass a normal pointer instead of an array to
+> clkdev_add_table() - and then they'll get a surprise.
+> 
+> PXA has ARRAY_AND_SIZE() which I think is rather nice for this kind of
+> thing, but other people had other thoughts on that...
 
-Looks okay. If the clock registers are only ever used inside clock.c
-should we move them there to cut down the size of ep93xx-regs.h?
-
-~Ryan
+I liked it, there are so many places in the kernel where this could
+be used that I would love to se it added...
 
 -- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
+Ben
 
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan@bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
