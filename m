@@ -1,31 +1,94 @@
 From: dwalker@codeaurora.org (Daniel Walker)
-Date: Mon, 11 Jan 2010 14:47:21 -0800
-Subject: [RFC 02/18] arm: msm: add oprofile pmu support
+Date: Mon, 11 Jan 2010 14:47:23 -0800
+Subject: [RFC 04/18] arm: cache-l2x0: add l2x0 suspend and resume functions
 In-Reply-To: <1263250057-26692-1-git-send-email-dwalker@codeaurora.org>
 References: <1263250057-26692-1-git-send-email-dwalker@codeaurora.org>
-Message-ID: <1263250057-26692-3-git-send-email-dwalker@codeaurora.org>
+Message-ID: <1263250057-26692-5-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add oprofile pmu support for msm.
+From: Willie Ruan <wruan@quicinc.com>
 
+Suspend function should be called before L2 cache power is turned off
+to save power. Resume function should be called when the power is
+reapplied.
+
+Signed-off-by: Willie Ruan <wruan@quicinc.com>
 Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 ---
- arch/arm/oprofile/op_model_v6.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/hardware/cache-l2x0.h |    3 ++
+ arch/arm/mm/cache-l2x0.c                   |   29 ++++++++++++++++++++++++++++
+ 2 files changed, 32 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/oprofile/op_model_v6.c b/arch/arm/oprofile/op_model_v6.c
-index f7d2ec5..b240adb 100644
---- a/arch/arm/oprofile/op_model_v6.c
-+++ b/arch/arm/oprofile/op_model_v6.c
-@@ -32,6 +32,8 @@
- static int irqs[] = {
- #ifdef CONFIG_ARCH_OMAP2
- 	3,
-+#elif defined(CONFIG_ARCH_MSM_ARM11)
-+	INT_ARM11_PMU,
+diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+index cdb9022..a86b948 100644
+--- a/arch/arm/include/asm/hardware/cache-l2x0.h
++++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+@@ -55,4 +55,7 @@
+ extern void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
  #endif
- #ifdef CONFIG_ARCH_BCMRING
- 	IRQ_PMUIRQ, /* for BCMRING, ARM PMU interrupt is 43 */
+ 
++extern void l2x0_suspend(void);
++extern void l2x0_resume(int collapsed);
++
+ #endif
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index cb8fc65..05765f6 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -2,6 +2,7 @@
+  * arch/arm/mm/cache-l2x0.c - L210/L220 cache controller support
+  *
+  * Copyright (C) 2007 ARM Limited
++ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -26,6 +27,7 @@
+ #define CACHE_LINE_SIZE		32
+ 
+ static void __iomem *l2x0_base;
++static uint32_t aux_ctrl_save;
+ static DEFINE_SPINLOCK(l2x0_lock);
+ 
+ static inline void cache_wait(void __iomem *reg, unsigned long mask)
+@@ -54,6 +56,13 @@ static inline void l2x0_inv_all(void)
+ 	spin_unlock_irqrestore(&l2x0_lock, flags);
+ }
+ 
++static inline void l2x0_flush_all(void)
++{
++	/* clean and invalidate all ways */
++	sync_writel(0xff, L2X0_CLEAN_INV_WAY, 0xff);
++	cache_sync();
++}
++
+ static void l2x0_inv_range(unsigned long start, unsigned long end)
+ {
+ 	void __iomem *base = l2x0_base;
+@@ -176,3 +185,23 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+ 
+ 	printk(KERN_INFO "L2X0 cache controller enabled\n");
+ }
++
++void l2x0_suspend(void)
++{
++	/* Save aux control register value */
++	aux_ctrl_save = readl(l2x0_base + L2X0_AUX_CTRL);
++	/* Flush all cache */
++	l2x0_flush_all();
++	/* Disable the cache */
++	writel(0, l2x0_base + L2X0_CTRL);
++}
++
++void l2x0_resume(int collapsed)
++{
++	if (collapsed)
++		/* Restore aux control register value */
++		writel(aux_ctrl_save, l2x0_base + L2X0_AUX_CTRL);
++
++	/* Enable the cache */
++	writel(1, l2x0_base + L2X0_CTRL);
++}
 -- 
 1.6.3.3
