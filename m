@@ -1,48 +1,63 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 11 Jan 2010 01:04:52 +0000
-Subject: [PATCH] Consolidate clks_register() and similar
-In-Reply-To: <20100110231232.GD15812@n2100.arm.linux.org.uk>
-References: <20100110172825.GB8639@n2100.arm.linux.org.uk>
-	<201001110923.31809.jeremy.kerr@canonical.com>
-	<20100110231232.GD15812@n2100.arm.linux.org.uk>
-Message-ID: <20100111010452.GF1224@trinity.fluff.org>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Mon, 11 Jan 2010 14:06:31 +1300
+Subject: [PATCH] ep93xx: use pr_fmt in core.c
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE19090200F638@mi8nycmail19.Mi8.com>
+References: <BD79186B4FD85F4B8E60E381CAEE19090200F638@mi8nycmail19.Mi8.com>
+Message-ID: <4B4A7997.2030002@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 10, 2010 at 11:12:32PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 11, 2010 at 09:23:31AM +1100, Jeremy Kerr wrote:
-> > Russell,
-> > 
-> > > --- a/arch/arm/mach-bcmring/core.c
-> > > +++ b/arch/arm/mach-bcmring/core.c
-> > > @@ -142,8 +142,7 @@ void __init bcmring_amba_init(void)
-> > > 
-> > >  	chipcHw_busInterfaceClockEnable(bus_clock);
-> > > 
-> > > -	for (i = 0; i < ARRAY_SIZE(lookups); i++)
-> > > -		clkdev_add(&lookups[i]);
-> > > +	clkdev_add_table(lookups, ARRAY_SIEZ(lookups));
-> > 
-> > SIEZ -> SIZE.
+H Hartley Sweeten wrote:
+> Use pr_fmt to prefix kernel output with the module name.
 > 
-> Fied.
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <ryan@bluewatersys.com>
 > 
-> > Also, perhaps a macro to simplify this common usage?
-> > 
-> > #define clkdev_add_table(clks) __clkdev_add_table(clks, ARRAY_SIZE(clks))
+> ---
 > 
-> I'm not a fan of that kind of clean up - it leads people into
-> thinking that they can pass a normal pointer instead of an array to
-> clkdev_add_table() - and then they'll get a surprise.
-> 
-> PXA has ARRAY_AND_SIZE() which I think is rather nice for this kind of
-> thing, but other people had other thoughts on that...
+> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+> index 1f0d665..41064bd 100644
+> --- a/arch/arm/mach-ep93xx/core.c
+> +++ b/arch/arm/mach-ep93xx/core.c
+> @@ -14,6 +14,8 @@
+>   * your option) any later version.
+>   */
+>  
+> +#define pr_fmt(fmt) "ep93xx " KBUILD_MODNAME ": " fmt
+> +
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+>  #include <linux/platform_device.h>
+> @@ -318,8 +320,7 @@ static int ep93xx_gpio_irq_type(unsigned int irq, unsigned int type)
+>  		desc->handle_irq = handle_edge_irq;
+>  		break;
+>  	default:
+> -		pr_err("ep93xx: failed to set irq type %d for gpio %d\n",
+> -		       type, gpio);
+> +		pr_err("failed to set irq type %d for gpio %d\n", type, gpio);
+>  		return -EINVAL;
+>  	}
+>  
+> @@ -572,9 +573,9 @@ void __init ep93xx_register_i2c(struct i2c_gpio_platform_data *data,
+>  	 * CMOS driver.
+>  	 */
+>  	if (data->sda_is_open_drain && data->sda_pin != EP93XX_GPIO_LINE_EEDAT)
+> -		pr_warning("ep93xx: sda != EEDAT, open drain has no effect\n");
+> +		pr_warning("sda != EEDAT, open drain has no effect\n");
+>  	if (data->scl_is_open_drain && data->scl_pin != EP93XX_GPIO_LINE_EECLK)
+> -		pr_warning("ep93xx: scl != EECLK, open drain has no effect\n");
+> +		pr_warning("scl != EECLK, open drain has no effect\n");
+>  
+>  	__raw_writel((data->sda_is_open_drain << 1) |
+>  		     (data->scl_is_open_drain << 0), 
 
-I liked it, there are so many places in the kernel where this could
-be used that I would love to se it added...
+Acked-by: Ryan Mallon <ryan@bluewatersys.com>
 
 -- 
-Ben
+Bluewater Systems Ltd - ARM Technology Solution Centre
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
