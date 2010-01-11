@@ -1,108 +1,123 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 11 Jan 2010 22:04:19 +0800
-Subject: [PATCH 11/16] gpio: introduce gpio_request_one() and friends
+Date: Mon, 11 Jan 2010 22:04:20 +0800
+Subject: [PATCH 12/16] [ARM] pxa/corgi: use generic GPIO API and remove
+	pxa_gpio_mode()
 In-Reply-To: <1263218664-11546-1-git-send-email-eric.y.miao@gmail.com>
 References: <1263218664-11546-1-git-send-email-eric.y.miao@gmail.com>
-Message-ID: <1263218664-11546-12-git-send-email-eric.y.miao@gmail.com>
+Message-ID: <1263218664-11546-13-git-send-email-eric.y.miao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gpio_request() without initial configuration of the GPIO is normally
-useless, introduce gpio_request_one() together with GPIOF_ flags for
-input/output direction and initial output level.
-
-gpio_{request,free}_array() for multiple GPIOs.
-
-Cc: David Brownell <dbrownell@users.sourceforge.net>
 Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
 ---
- drivers/gpio/gpiolib.c     |   42 ++++++++++++++++++++++++++++++++++++++++++
- include/asm-generic/gpio.h |   20 ++++++++++++++++++++
- 2 files changed, 62 insertions(+), 0 deletions(-)
+ arch/arm/mach-pxa/corgi.c    |    8 ++++++--
+ arch/arm/mach-pxa/corgi_pm.c |   38 +++++++++++++++++++-------------------
+ 2 files changed, 25 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-index a25ad28..e80a1f8 100644
---- a/drivers/gpio/gpiolib.c
-+++ b/drivers/gpio/gpiolib.c
-@@ -1239,6 +1239,48 @@ void gpio_free(unsigned gpio)
- }
- EXPORT_SYMBOL_GPL(gpio_free);
+diff --git a/arch/arm/mach-pxa/corgi.c b/arch/arm/mach-pxa/corgi.c
+index 74446cf..ae496b6 100644
+--- a/arch/arm/mach-pxa/corgi.c
++++ b/arch/arm/mach-pxa/corgi.c
+@@ -130,11 +130,15 @@ static unsigned long corgi_pin_config[] __initdata = {
+ 	/* GPIO */
+ 	GPIO9_GPIO,	/* CORGI_GPIO_nSD_DETECT */
+ 	GPIO7_GPIO,	/* CORGI_GPIO_nSD_WP */
+-	GPIO33_GPIO,	/* CORGI_GPIO_SD_PWR */
++	GPIO21_GPIO,	/* CORGI_GPIO_ADC_TEMP */
+ 	GPIO22_GPIO,	/* CORGI_GPIO_IR_ON */
++	GPIO33_GPIO,	/* CORGI_GPIO_SD_PWR */
++	GPIO38_GPIO,	/* CORGI_GPIO_CHRG_ON */
++	GPIO43_GPIO,	/* CORGI_GPIO_CHRG_UKN */
+ 	GPIO44_GPIO,	/* CORGI_GPIO_HSYNC */
  
-+int gpio_request_one(unsigned gpio, unsigned long flags, const char *label)
-+{
-+	int err;
-+
-+	err = gpio_request(gpio, label);
-+	if (err)
-+		return err;
-+
-+	if (flags & GPIOF_DIR_IN)
-+		err = gpio_direction_input(gpio);
-+	else
-+		err = gpio_direction_output(gpio,
-+				(flags & GPIOF_INIT_HIGH) ? 1 : 0);
-+
-+	return err;
-+}
-+EXPORT_SYMBOL_GPL(gpio_request_one);
-+
-+int gpio_request_array(struct gpio *array, size_t num)
-+{
-+	int i, err;
-+
-+	for (i = 0; i < num; i++, array++) {
-+		err = gpio_request_one(array->gpio, array->flags, array->label);
-+		if (err)
-+			goto err_free;
-+	}
-+	return 0;
-+
-+err_free:
-+	while (i--)
-+		gpio_free((--array)->gpio);
-+	return err;
-+}
-+EXPORT_SYMBOL_GPL(gpio_request_array);
-+
-+void gpio_free_array(struct gpio *array, size_t num)
-+{
-+	while (num--)
-+		gpio_free((array++)->gpio);
-+}
-+EXPORT_SYMBOL_GPL(gpio_free_array);
- 
- /**
-  * gpiochip_is_requested - return string iff signal was requested
-diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
-index 485eeb6..5aaa56e 100644
---- a/include/asm-generic/gpio.h
-+++ b/include/asm-generic/gpio.h
-@@ -136,6 +136,26 @@ extern int __gpio_cansleep(unsigned gpio);
- 
- extern int __gpio_to_irq(unsigned gpio);
- 
-+#define GPIOF_DIR_OUT	(0 << 0)
-+#define GPIOF_DIR_IN	(1 << 0)
-+
-+#define GPIOF_INIT_LOW	(0 << 1)
-+#define GPIOF_INIT_HIGH	(1 << 1)
-+
-+#define GPIOF_IN		(GPIOF_DIR_IN)
-+#define GPIOF_OUT_INIT_LOW	(GPIOF_DIR_OUT | GPIOF_INIT_LOW)
-+#define GPIOF_OUT_INIT_HIGH	(GPIOF_DIR_OUT | GPIOF_INIT_HIGH)
-+
-+struct gpio {
-+	unsigned	gpio;
-+	unsigned long	flags;
-+	const char	*label;
-+};
-+
-+extern int gpio_request_one(unsigned gpio, unsigned long flags, const char *label);
-+extern int gpio_request_array(struct gpio *array, size_t num);
-+extern void gpio_free_array(struct gpio *array, size_t num);
-+
- #ifdef CONFIG_GPIO_SYSFS
+-	GPIO1_GPIO | WAKEUP_ON_EDGE_RISE,
++	GPIO0_GPIO | WAKEUP_ON_EDGE_BOTH,	/* CORGI_GPIO_KEY_INT */
++	GPIO1_GPIO | WAKEUP_ON_EDGE_RISE,	/* CORGI_GPIO_AC_IN */
+ };
  
  /*
+diff --git a/arch/arm/mach-pxa/corgi_pm.c b/arch/arm/mach-pxa/corgi_pm.c
+index d4a0733..bb68347 100644
+--- a/arch/arm/mach-pxa/corgi_pm.c
++++ b/arch/arm/mach-pxa/corgi_pm.c
+@@ -14,6 +14,7 @@
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+ #include <linux/delay.h>
++#include <linux/gpio.h>
+ #include <linux/interrupt.h>
+ #include <linux/platform_device.h>
+ #include <linux/apm-emulation.h>
+@@ -25,7 +26,8 @@
+ #include <mach/sharpsl.h>
+ #include <mach/corgi.h>
+ #include <mach/pxa2xx-regs.h>
+-#include <mach/pxa2xx-gpio.h>
++
++#include "generic.h"
+ #include "sharpsl.h"
+ 
+ #define SHARPSL_CHARGE_ON_VOLT         0x99  /* 2.9V */
+@@ -35,44 +37,42 @@
+ #define SHARPSL_FATAL_ACIN_VOLT        182   /* 3.45V */
+ #define SHARPSL_FATAL_NOACIN_VOLT      170   /* 3.40V */
+ 
++static struct gpio charger_gpios[] = {
++	{ CORGI_GPIO_ADC_TEMP_ON, GPIOF_OUT_INIT_LOW, "ADC Temp On" },
++	{ CORGI_GPIO_CHRG_ON,	  GPIOF_OUT_INIT_LOW, "Charger On" },
++	{ CORGI_GPIO_CHRG_UKN,	  GPIOF_OUT_INIT_LOW, "Charger Unknown" },
++	{ CORGI_GPIO_KEY_INT,	  GPIOF_IN, "Key Interrupt" },
++};
++
+ static void corgi_charger_init(void)
+ {
+-	pxa_gpio_mode(CORGI_GPIO_ADC_TEMP_ON | GPIO_OUT);
+-	pxa_gpio_mode(CORGI_GPIO_CHRG_ON | GPIO_OUT);
+-	pxa_gpio_mode(CORGI_GPIO_CHRG_UKN | GPIO_OUT);
+-	pxa_gpio_mode(CORGI_GPIO_KEY_INT | GPIO_IN);
++	gpio_request_array(ARRAY_AND_SIZE(charger_gpios));
+ }
+ 
+ static void corgi_measure_temp(int on)
+ {
+-	if (on)
+-		GPSR(CORGI_GPIO_ADC_TEMP_ON) = GPIO_bit(CORGI_GPIO_ADC_TEMP_ON);
+-	else
+-		GPCR(CORGI_GPIO_ADC_TEMP_ON) = GPIO_bit(CORGI_GPIO_ADC_TEMP_ON);
++	gpio_set_value(CORGI_GPIO_ADC_TEMP_ON, on);
+ }
+ 
+ static void corgi_charge(int on)
+ {
+ 	if (on) {
+ 		if (machine_is_corgi() && (sharpsl_pm.flags & SHARPSL_SUSPENDED)) {
+-			GPCR(CORGI_GPIO_CHRG_ON) = GPIO_bit(CORGI_GPIO_CHRG_ON);
+-			GPSR(CORGI_GPIO_CHRG_UKN) = GPIO_bit(CORGI_GPIO_CHRG_UKN);
++			gpio_set_value(CORGI_GPIO_CHRG_ON, 0);
++			gpio_set_value(CORGI_GPIO_CHRG_UKN, 1);
+ 		} else {
+-			GPSR(CORGI_GPIO_CHRG_ON) = GPIO_bit(CORGI_GPIO_CHRG_ON);
+-			GPCR(CORGI_GPIO_CHRG_UKN) = GPIO_bit(CORGI_GPIO_CHRG_UKN);
++			gpio_set_value(CORGI_GPIO_CHRG_ON, 1);
++			gpio_set_value(CORGI_GPIO_CHRG_UKN, 0);
+ 		}
+ 	} else {
+-		GPCR(CORGI_GPIO_CHRG_ON) = GPIO_bit(CORGI_GPIO_CHRG_ON);
+-		GPCR(CORGI_GPIO_CHRG_UKN) = GPIO_bit(CORGI_GPIO_CHRG_UKN);
++		gpio_set_value(CORGI_GPIO_CHRG_ON, 0);
++		gpio_set_value(CORGI_GPIO_CHRG_UKN, 0);
+ 	}
+ }
+ 
+ static void corgi_discharge(int on)
+ {
+-	if (on)
+-		GPSR(CORGI_GPIO_DISCHARGE_ON) = GPIO_bit(CORGI_GPIO_DISCHARGE_ON);
+-	else
+-		GPCR(CORGI_GPIO_DISCHARGE_ON) = GPIO_bit(CORGI_GPIO_DISCHARGE_ON);
++	gpio_set_value(CORGI_GPIO_DISCHARGE_ON, on);
+ }
+ 
+ static void corgi_presuspend(void)
 -- 
 1.6.3.3
