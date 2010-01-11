@@ -1,97 +1,44 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 11 Jan 2010 22:04:13 +0800
-Subject: [PATCH 05/16] [ARM] pxa/cm-x270: avoid direct access of GPIO/MFP
-	registers
+Date: Mon, 11 Jan 2010 22:04:14 +0800
+Subject: [PATCH 06/16] [ARM] pxa: fix the incorrect naming of AC97 reset pin
+	config for pxa26x
 In-Reply-To: <1263218664-11546-1-git-send-email-eric.y.miao@gmail.com>
 References: <1263218664-11546-1-git-send-email-eric.y.miao@gmail.com>
-Message-ID: <1263218664-11546-6-git-send-email-eric.y.miao@gmail.com>
+Message-ID: <1263218664-11546-7-git-send-email-eric.y.miao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+GPIO89_AC97_nRESET is really a PXA26x specific option and was
+incorrectly named.
+
 Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
 ---
- arch/arm/mach-pxa/cm-x270.c |   62 ++++++++++++++++++++++++++++++------------
- 1 files changed, 44 insertions(+), 18 deletions(-)
+ arch/arm/mach-pxa/include/mach/mfp-pxa25x.h |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/cm-x270.c b/arch/arm/mach-pxa/cm-x270.c
-index 425efbc..ce503f4 100644
---- a/arch/arm/mach-pxa/cm-x270.c
-+++ b/arch/arm/mach-pxa/cm-x270.c
-@@ -178,31 +178,57 @@ static struct resource cmx270_2700G_resource[] = {
+diff --git a/arch/arm/mach-pxa/include/mach/mfp-pxa25x.h b/arch/arm/mach-pxa/include/mach/mfp-pxa25x.h
+index 8910a3b..cafadc3 100644
+--- a/arch/arm/mach-pxa/include/mach/mfp-pxa25x.h
++++ b/arch/arm/mach-pxa/include/mach/mfp-pxa25x.h
+@@ -169,7 +169,6 @@
+ #define GPIO86_nSDCS2		MFP_CFG_OUT(GPIO86, AF0, DRIVE_HIGH)
+ #define GPIO87_nSDCS3		MFP_CFG_OUT(GPIO87, AF0, DRIVE_HIGH)
+ #define GPIO88_RDnWR		MFP_CFG_OUT(GPIO88, AF0, DRIVE_HIGH)
+-#define GPIO89_nACRESET		MFP_CFG_OUT(GPIO89, AF0, DRIVE_HIGH)
  
- static unsigned long save_lcd_regs[10];
+ /* USB */
+ #define GPIO9_USB_RCV		MFP_CFG_IN(GPIO9, AF1)
+@@ -186,7 +185,10 @@
+ #define GPIO30_ASSP_TXD		MFP_CFG_OUT(GPIO30, AF3, DRIVE_LOW)
+ #define GPIO31_ASSP_SFRM_IN	MFP_CFG_IN(GPIO31, AF1)
+ #define GPIO31_ASSP_SFRM_OUT	MFP_CFG_OUT(GPIO31, AF3, DRIVE_LOW)
+-#endif
++
++/* AC97 */
++#define GPIO89_AC97_nRESET	MFP_CFG_OUT(GPIO89, AF0, DRIVE_HIGH)
++#endif	/* CONFIG_CPU_PXA26x */
  
-+static unsigned long cmx270_marathon_on[] = {
-+	GPIO58_GPIO,
-+	GPIO59_GPIO,
-+	GPIO60_GPIO,
-+	GPIO61_GPIO,
-+	GPIO62_GPIO,
-+	GPIO63_GPIO,
-+	GPIO64_GPIO,
-+	GPIO65_GPIO,
-+	GPIO66_GPIO,
-+	GPIO67_GPIO,
-+	GPIO68_GPIO,
-+	GPIO69_GPIO,
-+	GPIO70_GPIO,
-+	GPIO71_GPIO,
-+	GPIO72_GPIO,
-+	GPIO73_GPIO,
-+	GPIO74_GPIO,
-+	GPIO75_GPIO,
-+	GPIO76_GPIO,
-+	GPIO77_GPIO,
-+};
-+
-+static unsigned long cmx270_marathon_off[] = {
-+	GPIOxx_LCD_TFT_16BPP,
-+};
-+
- static int cmx270_marathon_probe(struct fb_info *fb)
- {
--	/* save PXA-270 pin settings before enabling 2700G */
--	save_lcd_regs[0] = GPDR1;
--	save_lcd_regs[1] = GPDR2;
--	save_lcd_regs[2] = GAFR1_U;
--	save_lcd_regs[3] = GAFR2_L;
--	save_lcd_regs[4] = GAFR2_U;
--
--	/* Disable PXA-270 on-chip controller driving pins */
--	GPDR1 &= ~(0xfc000000);
--	GPDR2 &= ~(0x00c03fff);
--	GAFR1_U &= ~(0xfff00000);
--	GAFR2_L &= ~(0x0fffffff);
--	GAFR2_U &= ~(0x0000f000);
-+	int gpio, err;
-+
-+	for (gpio = 58; gpio <= 77; gpio++) {
-+		err = gpio_request(gpio, "LCD");
-+		if (err)
-+			return err;
-+		gpio_direction_input(gpio);
-+	}
-+
-+	pxa2xx_mfp_config(ARRAY_AND_SIZE(cmx270_marathon_on));
- 	return 0;
- }
- 
- static int cmx270_marathon_remove(struct fb_info *fb)
- {
--	GPDR1 =   save_lcd_regs[0];
--	GPDR2 =   save_lcd_regs[1];
--	GAFR1_U = save_lcd_regs[2];
--	GAFR2_L = save_lcd_regs[3];
--	GAFR2_U = save_lcd_regs[4];
-+	int gpio;
-+
-+	pxa2xx_mfp_config(ARRAY_AND_SIZE(cmx270_marathon_off));
-+
-+	for (gpio = 58; gpio <= 77; gpio++)
-+		gpio_free(gpio);
-+
- 	return 0;
- }
- 
+ /* commonly used pin configurations */
+ #define GPIOxx_LCD_16BPP	\
 -- 
 1.6.3.3
