@@ -1,63 +1,130 @@
 From: dwalker@codeaurora.org (Daniel Walker)
-Date: Mon, 11 Jan 2010 14:47:28 -0800
-Subject: [RFC 09/18] arm: mm: support error reporting in L1/L2 caches on QSD
+Date: Mon, 11 Jan 2010 14:47:37 -0800
+Subject: [RFC 18/18] arm: mm: qsd8x50: Fix incorrect permission faults
 In-Reply-To: <1263250057-26692-1-git-send-email-dwalker@codeaurora.org>
 References: <1263250057-26692-1-git-send-email-dwalker@codeaurora.org>
-Message-ID: <1263250057-26692-10-git-send-email-dwalker@codeaurora.org>
+Message-ID: <1263250057-26692-19-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steve Muckle <smuckle@quicinc.com>
+From: Dave Estes <cestes@quicinc.com>
 
-The Scorpion processor supports reporting L2 errors, L1 icache parity
-errors, and L1 dcache parity errors as imprecise external aborts. If
-this option is not enabled these errors will go unreported and data
-corruption will occur.
+Handle incorrectly reported permission faults for qsd8650.  On
+permission faults, retry MVA to PA conversion.  If retry detects
+translation fault.  Report as translation fault.
 
-Signed-off-by: Steve Muckle <smuckle@quicinc.com>
+Signed-off-by: Dave Estes <cestes@quicinc.com>
 Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 ---
- arch/arm/mm/Kconfig   |    8 ++++++++
- arch/arm/mm/proc-v7.S |    8 ++++++++
- 2 files changed, 16 insertions(+), 0 deletions(-)
+ arch/arm/mm/Kconfig     |    3 ++
+ arch/arm/mm/abort-ev7.S |   78 +++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 81 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index baf6384..8ae3fce 100644
+index 9c745ca..1f17def 100644
 --- a/arch/arm/mm/Kconfig
 +++ b/arch/arm/mm/Kconfig
-@@ -687,6 +687,14 @@ config CPU_DCACHE_SIZE
- 	  If your SoC is configured to have a different size, define the value
- 	  here with proper conditions.
+@@ -575,6 +575,9 @@ config CPU_TLB_V7
  
-+config CPU_CACHE_ERR_REPORT
-+	bool "Report errors in the L1 and L2 caches"
-+	depends on ARCH_MSM_SCORPION
-+	default y
-+	help
-+	  Say Y here to have errors in the L1 and L2 caches reported as
-+	  imprecise data aborts.
+ config EMULATE_DOMAIN_MANAGER_V7
+ 	bool
 +
- config CPU_DCACHE_WRITETHROUGH
- 	bool "Force write through D-cache"
- 	depends on (CPU_ARM740T || CPU_ARM920T || CPU_ARM922T || CPU_ARM925T || CPU_ARM926T || CPU_ARM940T || CPU_ARM946E || CPU_ARM1020 || CPU_FA526) && !CPU_DCACHE_DISABLE
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index b331f23..88da392 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -241,6 +241,14 @@ __v7_setup:
- #ifdef CONFIG_ARCH_MSM_SCORPION
- 	mov     r0, #0x77
- 	mcr     p15, 3, r0, c15, c0, 3          @ set L2CR1
++config VERIFY_PERMISSION_FAULT
++	bool
+ endif
+ 
+ config CPU_HAS_ASID
+diff --git a/arch/arm/mm/abort-ev7.S b/arch/arm/mm/abort-ev7.S
+index 2e6dc04..8a75c21 100644
+--- a/arch/arm/mm/abort-ev7.S
++++ b/arch/arm/mm/abort-ev7.S
+@@ -1,3 +1,60 @@
++/*
++ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are met:
++ *     * Redistributions of source code must retain the above copyright
++ *       notice, this list of conditions and the following disclaimer.
++ *     * Redistributions in binary form must reproduce the above copyright
++ *       notice, this list of conditions and the following disclaimer in the
++ *       documentation and/or other materials provided with the distribution.
++ *     * Neither the name of Code Aurora Forum nor
++ *       the names of its contributors may be used to endorse or promote
++ *       products derived from this software without specific prior written
++ *       permission.
++ *
++ * Alternatively, provided that this notice is retained in full, this software
++ * may be relicensed by the recipient under the terms of the GNU General Public
++ * License version 2 ("GPL") and only version 2, in which case the provisions of
++ * the GPL apply INSTEAD OF those given above.  If the recipient relicenses the
++ * software under the GPL, then the identification text in the MODULE_LICENSE
++ * macro must be changed to reflect "GPLv2" instead of "Dual BSD/GPL".  Once a
++ * recipient changes the license terms to the GPL, subsequent recipients shall
++ * not relicense under alternate licensing terms, including the BSD or dual
++ * BSD/GPL terms.  In addition, the following license statement immediately
++ * below and between the words START and END shall also then apply when this
++ * software is relicensed under the GPL:
++ *
++ * START
++ *
++ * This program is free software; you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License version 2 and only version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
++ * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
++ * details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
++ *
++ * END
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
++ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
++ */
 +
-+	mrc     p15, 0, r0, c1, c0, 1           @ read ACTLR
-+#ifdef CONFIG_CPU_CACHE_ERR_REPORT
-+	orr     r0, r0, #0x37                   @ turn on L1/L2 error reporting
-+#else
-+	bic     r0, r0, #0x37
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
+ /*
+@@ -29,5 +86,26 @@ ENTRY(v7_early_abort)
+ 	 * V6 code adjusts the returned DFSR.
+ 	 * New designs should not need to patch up faults.
+ 	 */
++
++#if defined(CONFIG_VERIFY_PERMISSION_FAULT)
++	/*
++	 * Detect erroneous permission failures and fix
++	 */
++	ldr	r3, =0x40d			@ On permission fault
++	and	r3, r1, r3
++	cmp	r3, #0x0d
++	movne	pc, lr
++
++	mcr	p15, 0, r0, c7, c8, 0   	@ Retranslate FAR
++	isb
++	mrc	p15, 0, r2, c7, c4, 0   	@ Read the PAR
++	and	r3, r2, #0x7b   		@ On translation fault
++	cmp	r3, #0x0b
++	movne	pc, lr
++	bic	r1, r1, #0xf			@ Fix up FSR FS[5:0]
++	and	r2, r2, #0x7e
++	orr	r1, r1, r2, LSR #1
 +#endif
-+	mcr     p15, 0, r0, c1, c0, 1           @ write ACTLR
- #endif
- 	/*
- 	 * Memory region attributes with SCTLR.TRE=1
++
+ 	mov	pc, lr
+ ENDPROC(v7_early_abort)
 -- 
 1.6.3.3
