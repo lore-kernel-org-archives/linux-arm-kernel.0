@@ -1,55 +1,55 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 11 Jan 2010 22:04:22 +0800
-Subject: [PATCH 14/16] [ARM] pxa: fix irq suspend/resume for pxa25x
+Date: Mon, 11 Jan 2010 22:04:23 +0800
+Subject: [PATCH 15/16] [ARM] pxa: add MFP_LPM_KEEP_OUTPUT flag to pin config
 In-Reply-To: <1263218664-11546-1-git-send-email-eric.y.miao@gmail.com>
 References: <1263218664-11546-1-git-send-email-eric.y.miao@gmail.com>
-Message-ID: <1263218664-11546-15-git-send-email-eric.y.miao@gmail.com>
+Message-ID: <1263218664-11546-16-git-send-email-eric.y.miao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PXA25x does not have IPR registers, saving and restoring should happen
-only for pxa27x and pxa3xx.
+Some pins are expected to keep their last level during suspend, and
+introduce MFP_LPM_KEEP_OUTPUT for this.
 
 Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
 ---
- arch/arm/mach-pxa/irq.c |   14 ++++++++++----
- 1 files changed, 10 insertions(+), 4 deletions(-)
+ arch/arm/mach-pxa/include/mach/mfp-pxa2xx.h |    2 ++
+ arch/arm/mach-pxa/mfp-pxa2xx.c              |   11 +++++++++++
+ 2 files changed, 13 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
-index 6112af4..1beb40f 100644
---- a/arch/arm/mach-pxa/irq.c
-+++ b/arch/arm/mach-pxa/irq.c
-@@ -164,8 +164,11 @@ static int pxa_irq_suspend(struct sys_device *dev, pm_message_t state)
- 		saved_icmr[i] = _ICMR(irq);
- 		_ICMR(irq) = 0;
- 	}
--	for (i = 0; i < pxa_internal_irq_nr; i++)
--		saved_ipr[i] = IPR(i);
-+
-+	if (cpu_is_pxa27x() || cpu_is_pxa3xx()) {
-+		for (i = 0; i < pxa_internal_irq_nr; i++)
-+			saved_ipr[i] = IPR(i);
-+	}
+diff --git a/arch/arm/mach-pxa/include/mach/mfp-pxa2xx.h b/arch/arm/mach-pxa/include/mach/mfp-pxa2xx.h
+index 658b28e..c54cef2 100644
+--- a/arch/arm/mach-pxa/include/mach/mfp-pxa2xx.h
++++ b/arch/arm/mach-pxa/include/mach/mfp-pxa2xx.h
+@@ -25,6 +25,8 @@
+ #define MFP_DIR(x)		(((x) >> 23) & 0x1)
  
- 	return 0;
- }
-@@ -174,12 +177,15 @@ static int pxa_irq_resume(struct sys_device *dev)
+ #define MFP_LPM_CAN_WAKEUP	(0x1 << 24)
++#define MFP_LPM_KEEP_OUTPUT	(0x1 << 25)
++
+ #define WAKEUP_ON_EDGE_RISE	(MFP_LPM_CAN_WAKEUP | MFP_LPM_EDGE_RISE)
+ #define WAKEUP_ON_EDGE_FALL	(MFP_LPM_CAN_WAKEUP | MFP_LPM_EDGE_FALL)
+ #define WAKEUP_ON_EDGE_BOTH	(MFP_LPM_CAN_WAKEUP | MFP_LPM_EDGE_BOTH)
+diff --git a/arch/arm/mach-pxa/mfp-pxa2xx.c b/arch/arm/mach-pxa/mfp-pxa2xx.c
+index cf6b720..c98b5a8 100644
+--- a/arch/arm/mach-pxa/mfp-pxa2xx.c
++++ b/arch/arm/mach-pxa/mfp-pxa2xx.c
+@@ -328,6 +328,17 @@ static int pxa2xx_mfp_suspend(struct sys_device *d, pm_message_t state)
  {
- 	int i, irq = PXA_IRQ(0);
+ 	int i;
  
-+	if (cpu_is_pxa27x() || cpu_is_pxa3xx()) {
-+		for (i = 0; i < pxa_internal_irq_nr; i++)
-+			IPR(i) = saved_ipr[i];
++	/* set corresponding PGSR bit of those marked MFP_LPM_KEEP_OUTPUT */
++	for (i = 0; i < pxa_last_gpio; i++) {
++		if ((gpio_desc[i].config & MFP_LPM_KEEP_OUTPUT) &&
++		    (GPDR(i) & GPIO_bit(i))) {
++			if (GPLR(i) & GPIO_bit(i))
++				PGSR(i) |= GPIO_bit(i);
++			else
++				PGSR(i) &= ~GPIO_bit(i);
++		}
 +	}
 +
- 	for (i = 0; irq < PXA_IRQ(pxa_internal_irq_nr); i++, irq += 32) {
- 		_ICMR(irq) = saved_icmr[i];
- 		_ICLR(irq) = 0;
- 	}
--	for (i = 0; i < pxa_internal_irq_nr; i++)
--		IPR(i) = saved_ipr[i];
+ 	for (i = 0; i <= gpio_to_bank(pxa_last_gpio); i++) {
  
- 	ICCR = 1;
- 	return 0;
+ 		saved_gafr[0][i] = GAFR_L(i);
 -- 
 1.6.3.3
