@@ -1,31 +1,131 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Jan 2010 23:39:24 +0000
-Subject: [RFC 06/18] arm: msm: implement proper dmb() for 7x27
-In-Reply-To: <1263250057-26692-7-git-send-email-dwalker@codeaurora.org>
-References: <1263250057-26692-1-git-send-email-dwalker@codeaurora.org>
-	<1263250057-26692-7-git-send-email-dwalker@codeaurora.org>
-Message-ID: <20100111233924.GL7925@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 11 Jan 2010 15:44:13 -0800
+Subject: [PATCH] ARM: OMAP4: Power Domains: Remove the return as power
+	domain framework is in place
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C0508F99@dbde02.ent.ti.com>
+References: <1262951944-7693-1-git-send-email-abhijitpagare@ti.com>
+	<A24693684029E5489D1D202277BE89445131204D@dlee02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C0508F99@dbde02.ent.ti.com>
+Message-ID: <20100111234413.GI5055@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2010 at 02:47:25PM -0800, Daniel Walker wrote:
-> From: Larry Bassel <lbassel@quicinc.com>
+* Pagare, Abhijit <abhijitpagare@ti.com> [100110 21:57]:
+> Sergio,
+> 	I have taken care of that in my other patches, which I had posted earlier. They are not in mainline yet but are lined up for the next release. You can find the same here.
 > 
-> For 7x27 it is necessary to write to strongly
-> ordered memory after executing the coprocessor 15
-> instruction dmb instruction.
+> http://marc.info/?l=linux-omap&m=126088474831309&w=2
 > 
-> This is only for data barrier dmb().
-> Note that the test for 7x27 is done on all MSM platforms
-> (even ones such as 7201a whose kernel is distinct from
-> that of 7x25/7x27).
-> 
-> Acked-by: Willie Ruan <wruan@quicinc.com>
-> Signed-off-by: Larry Bassel <lbassel@quicinc.com>
-> Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
+> Do let me know if you have any further questions.
 
-Can only see half of this change - what's the actual implementation of
-arch_barrier_extra()?
+Please update your other patch to include this change.
 
-I'd prefer not to include asm/memory.h into asm/system.h to avoid
-needlessly polluting headers.
+Regards,
+
+Tony
+
+> 
+> Best Regards,
+> Abhijit Pagare
+> 
+> > -----Original Message-----
+> > From: Aguirre, Sergio
+> > Sent: Friday, January 08, 2010 7:31 PM
+> > To: Pagare, Abhijit; linux-omap at vger.kernel.org; linux-arm-
+> > kernel at lists.infradead.org
+> > Cc: Paul Walmsley
+> > Subject: RE: [PATCH] ARM: OMAP4: Power Domains: Remove the return as power
+> > domain framework is in place
+> > 
+> > Abhijit,
+> > 
+> > > -----Original Message-----
+> > > From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> > > owner at vger.kernel.org] On Behalf Of Pagare, Abhijit
+> > > Sent: Friday, January 08, 2010 5:59 AM
+> > > To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> > > Cc: Pagare, Abhijit; Paul Walmsley
+> > > Subject: [PATCH] ARM: OMAP4: Power Domains: Remove the return as power
+> > > domain framework is in place
+> > >
+> > > The return prevents the power domains from getting registered.
+> > > Hence removing it to allow the frameworks model to work.
+> > >
+> > > Signed-off-by: Abhijit Pagare <abhijitpagare@ti.com>
+> > > Cc: Paul Walmsley <paul@pwsan.com>
+> > > ---
+> > >
+> > > Compiled and Boot Tested on OMAP4430 simulator and ES1 Chip
+> > > Compiled and Boot Tested on OMAP3430 SDP
+> > > Compiled for OMAP2430 and OMAP2420
+> > >
+> > >  arch/arm/mach-omap2/id.c |    1 -
+> > >  1 files changed, 0 insertions(+), 1 deletions(-)
+> > >
+> > > diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+> > > index a779240..6d1e97b 100644
+> > > --- a/arch/arm/mach-omap2/id.c
+> > > +++ b/arch/arm/mach-omap2/id.c
+> > > @@ -362,7 +362,6 @@ void __init omap2_check_revision(void)
+> > >  		omap3_cpuinfo();
+> > >  	} else if (cpu_is_omap44xx()) {
+> > >  		omap4_check_revision();
+> > > -		return;
+> > >  	} else {
+> > >  		pr_err("OMAP revision unknown, please fix!\n");
+> > >  	}
+> > 
+> > I don't have an OMAP4 with me, but I found something weird in your
+> > reported behaviour...
+> > 
+> > The code that was being skipped is:
+> > 
+> > 	/*
+> > 	 * OK, now we know the exact revision. Initialize omap_chip bits
+> > 	 * for powerdowmain and clockdomain code.
+> > 	 */
+> > 	if (cpu_is_omap243x()) {
+> > 		/* Currently only supports 2430ES2.1 and 2430-all */
+> > 		omap_chip.oc |= CHIP_IS_OMAP2430;
+> > 	} else if (cpu_is_omap242x()) {
+> > 		/* Currently only supports 2420ES2.1.1 and 2420-all */
+> > 		omap_chip.oc |= CHIP_IS_OMAP2420;
+> > 	} else if (cpu_is_omap3505() || cpu_is_omap3517()) {
+> > 		omap_chip.oc = CHIP_IS_OMAP3430 | CHIP_IS_OMAP3430ES3_1;
+> > 	} else if (cpu_is_omap343x()) {
+> > 		omap_chip.oc = CHIP_IS_OMAP3430;
+> > 		if (omap_rev() == OMAP3430_REV_ES1_0)
+> > 			omap_chip.oc |= CHIP_IS_OMAP3430ES1;
+> > 		else if (omap_rev() >= OMAP3430_REV_ES2_0 &&
+> > 			 omap_rev() <= OMAP3430_REV_ES2_1)
+> > 			omap_chip.oc |= CHIP_IS_OMAP3430ES2;
+> > 		else if (omap_rev() == OMAP3430_REV_ES3_0)
+> > 			omap_chip.oc |= CHIP_IS_OMAP3430ES3_0;
+> > 		else if (omap_rev() == OMAP3430_REV_ES3_1)
+> > 			omap_chip.oc |= CHIP_IS_OMAP3430ES3_1;
+> > 		else if (omap_rev() == OMAP3630_REV_ES1_0)
+> > 			omap_chip.oc |= CHIP_IS_OMAP3630ES1;
+> > 	} else {
+> > 		pr_err("Uninitialized omap_chip, please fix!\n");
+> > 	}
+> > 
+> > And, in theory, in OMAP4 case, you SHOULDN'T be doing anything here, as
+> > there's no case for cpu_is_omap443x or similar. So you should be _only_
+> > seeing a print in console saying: "Uninitialized omap_chip, please fix!",
+> > right?
+> > 
+> > Is OMAP4 chip giving positive on cpu_is_omap343x() test then??
+> > 
+> > Regards,
+> > Sergio
+> > > --
+> > > 1.5.4.7
+> > >
+> > > --
+> > > To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> > > the body of a message to majordomo at vger.kernel.org
+> > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
