@@ -1,19 +1,29 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 11 Jan 2010 12:49:27 +0000
-Subject: [PATCH 1/3] ARM: SAMSUNG: Add config option for number of
-	additional GPIO pins.
-In-Reply-To: <20100111122715.GG1224@trinity.fluff.org>
-References: <1263203046-29219-1-git-send-email-kgene.kim@samsung.com>
-	<20100111103338.GA3440@sirena.org.uk>
-	<20100111122715.GG1224@trinity.fluff.org>
-Message-ID: <20100111124927.GB27161@rakim.wolfsonmicro.main>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 11 Jan 2010 22:04:08 +0800
+Subject: [RFC PATCH 00/16] pxa gpio API cleanup
+Message-ID: <1263218664-11546-1-git-send-email-eric.y.miao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2010 at 12:27:15PM +0000, Ben Dooks wrote:
+These are mostly RFC, and there needs to be some cleanup still. Yet pasted
+here firstly so any significant issues can be found. Anyway, this might be
+the thing I'd like to get into .34, please help review.
 
-> Having this as a user settable field might be useful if plugging on
-> GPIO expanders at runtime.
+Thanks.
 
-If that gets to be anything other than an extremely niche use case the
-GPIO allocation would need to have a dynamic limit anyway, though.
+[PATCH 01/16] [ARM] pxa/tosa: make use of the matrix keypad driver
+[PATCH 02/16] [ARM] pxa: use chip->ack() instead of accessing GEDR directly
+[PATCH 03/16] [ARM] pxa: simplify the LCD pin configuration for pxa25x platforms
+[PATCH 04/16] [ARM] pxa: simplify the LCD pin configuration for pxa27x platforms
+[PATCH 05/16] [ARM] pxa/cm-x270: avoid direct access of GPIO/MFP registers
+[PATCH 06/16] [ARM] pxa: fix the incorrect naming of AC97 reset pin config for pxa26x
+[PATCH 07/16] [ARM] pxa: remove the unnecessary restoring of MFP registers
+[PATCH 08/16] [ARM] pxa: introduce processor specific pxa27x_assert_ac97reset()
+[PATCH 09/16] [ARM] pxa: add the missing AC97 pin configurations
+[PATCH 10/16] [ARM] pxa: remove now unnecessary pxa_gpio_mode() calls in ac97
+[PATCH 11/16] gpio: introduce gpio_request_one() and friends
+[PATCH 12/16] [ARM] pxa/corgi: use generic GPIO API and remove pxa_gpio_mode()
+[PATCH 13/16] [ARM] pxa/spitz: use generic GPIO API and remove pxa_gpio_mode()
+[PATCH 14/16] [ARM] pxa: fix irq suspend/resume for pxa25x
+[PATCH 15/16] [ARM] pxa: add MFP_LPM_KEEP_OUTPUT flag to pin config
+[PATCH 16/16] [ARM] pxa/corgi: cleanup GPIO configurations and low power mode settings
