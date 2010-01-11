@@ -1,79 +1,104 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 11 Jan 2010 20:48:37 +0530
-Subject: [PATCH v3] ARM: L2 : Errata 588369: Clean & Invalidate do not
-	invalidate clean lines
-In-Reply-To: <1263220628.6305.44.camel@pc1117.cambridge.arm.com>
-References: <1261390161-20196-1-git-send-email-santosh.shilimkar@ti.com>
-	<1263220628.6305.44.camel@pc1117.cambridge.arm.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C0509409@dbde02.ent.ti.com>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Mon, 11 Jan 2010 17:19:42 +0200
+Subject: [PATCH 05/16] [ARM] pxa/cm-x270: avoid direct access of GPIO/MFP
+	registers
+In-Reply-To: <1263218664-11546-6-git-send-email-eric.y.miao@gmail.com>
+References: <1263218664-11546-1-git-send-email-eric.y.miao@gmail.com>
+	<1263218664-11546-6-git-send-email-eric.y.miao@gmail.com>
+Message-ID: <4B4B418E.6050909@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for cooments !!
-> -----Original Message-----
-> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
-> Sent: Monday, January 11, 2010 8:07 PM
-> To: Shilimkar, Santosh
-> Cc: linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org;
-> tony at atomide.com; Woodruff, Richard
-> Subject: Re: [PATCH v3] ARM: L2 : Errata 588369: Clean & Invalidate do not invalidate clean lines
+Eric Miao wrote:
+> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+> ---
+>  arch/arm/mach-pxa/cm-x270.c |   62 ++++++++++++++++++++++++++++++------------
+>  1 files changed, 44 insertions(+), 18 deletions(-)
 > 
-> On Mon, 2009-12-21 at 10:09 +0000, Santosh Shilimkar wrote:
-> > diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> > index cb8fc65..5443c0d 100644
-> > --- a/arch/arm/mm/cache-l2x0.c
-> > +++ b/arch/arm/mm/cache-l2x0.c
-> > @@ -28,6 +28,24 @@
-> >  static void __iomem *l2x0_base;
-> >  static DEFINE_SPINLOCK(l2x0_lock);
-> >
-> > +#ifdef CONFIG_PL310_ERRATA_588369
-> > +static void debug_writel(unsigned long val)
-> > +{
-> > +       register unsigned long r0 asm("r0") = val;
-> > +       /*
-> > +        * Texas Instrument secure monitor api to modify the PL310
-> > +        * Debug Control Register.
-> > +        */
-> > +       __asm__ __volatile__(
-> > +               __asmeq("%0", "r0")
-> > +               "ldr r12, =0x100\n"
-> > +               "dsb\n"
-> > +               "smc\n"
-> > +               : : "r" (r0)
-> > +               : "r4", "r5", "r6", "r7", "r8");
-> 
-> Does your secure monitor corrupt r4-r8? Maybe you could add a comment
-> with a few words on this API.
-Yes they are corrupted. I will add some comments on the API.
-> Do you need to specify "r12" as well? What about "cc", are they
-> preserved by the secure monitor?
-r12 and reset of the registers are preserved. Lr needs to be saved but
-because of function call, the compiler saves/restores it.
-I didn't get your this comment "What about "cc", are they preserved
-by the secure monitor ?  Do you mean rest of the register. If yes then
-the secure monitor don't tamper those registers.
- 
-> > @@ -139,7 +184,12 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
-> >                         spin_lock_irqsave(&l2x0_lock, flags);
-> >                 }
-> >         }
-> > +#ifdef CONFIG_PL310_ERRATA_588369
-> > +       cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
-> > +       cache_wait(base + L2X0_INV_LINE_PA, 1);
-> > +#else
-> >         cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
-> > +#endif
-> 
-> I don't think we need to way on two separate registers here. AFAICT, bit
-> 1 of those registers is shared for all the operations.
-> 
-> As a general comment, maybe an inline function called something like
-> wait_writel(before/after) would be better than a lot of ifdefs in the
-> code, especially if one has a different workaround other than using TI's
-> secure monitor.
-I agree. As suggested by Russell, we don't need above #ifdef and can 
-be removed 
+> diff --git a/arch/arm/mach-pxa/cm-x270.c b/arch/arm/mach-pxa/cm-x270.c
+> index 425efbc..ce503f4 100644
+> --- a/arch/arm/mach-pxa/cm-x270.c
+> +++ b/arch/arm/mach-pxa/cm-x270.c
+> @@ -178,31 +178,57 @@ static struct resource cmx270_2700G_resource[] = {
+>  
+>  static unsigned long save_lcd_regs[10];
 
-Regards,
-Santosh
+This can be dropped as well.
+
+> +static unsigned long cmx270_marathon_on[] = {
+> +	GPIO58_GPIO,
+> +	GPIO59_GPIO,
+> +	GPIO60_GPIO,
+> +	GPIO61_GPIO,
+> +	GPIO62_GPIO,
+> +	GPIO63_GPIO,
+> +	GPIO64_GPIO,
+> +	GPIO65_GPIO,
+> +	GPIO66_GPIO,
+> +	GPIO67_GPIO,
+> +	GPIO68_GPIO,
+> +	GPIO69_GPIO,
+> +	GPIO70_GPIO,
+> +	GPIO71_GPIO,
+> +	GPIO72_GPIO,
+> +	GPIO73_GPIO,
+> +	GPIO74_GPIO,
+> +	GPIO75_GPIO,
+> +	GPIO76_GPIO,
+> +	GPIO77_GPIO,
+> +};
+> +
+> +static unsigned long cmx270_marathon_off[] = {
+> +	GPIOxx_LCD_TFT_16BPP,
+> +};
+> +
+>  static int cmx270_marathon_probe(struct fb_info *fb)
+>  {
+> -	/* save PXA-270 pin settings before enabling 2700G */
+> -	save_lcd_regs[0] = GPDR1;
+> -	save_lcd_regs[1] = GPDR2;
+> -	save_lcd_regs[2] = GAFR1_U;
+> -	save_lcd_regs[3] = GAFR2_L;
+> -	save_lcd_regs[4] = GAFR2_U;
+> -
+> -	/* Disable PXA-270 on-chip controller driving pins */
+> -	GPDR1 &= ~(0xfc000000);
+> -	GPDR2 &= ~(0x00c03fff);
+> -	GAFR1_U &= ~(0xfff00000);
+> -	GAFR2_L &= ~(0x0fffffff);
+> -	GAFR2_U &= ~(0x0000f000);
+> +	int gpio, err;
+> +
+> +	for (gpio = 58; gpio <= 77; gpio++) {
+> +		err = gpio_request(gpio, "LCD");
+> +		if (err)
+> +			return err;
+> +		gpio_direction_input(gpio);
+> +	}
+> +
+> +	pxa2xx_mfp_config(ARRAY_AND_SIZE(cmx270_marathon_on));
+>  	return 0;
+>  }
+>  
+>  static int cmx270_marathon_remove(struct fb_info *fb)
+>  {
+> -	GPDR1 =   save_lcd_regs[0];
+> -	GPDR2 =   save_lcd_regs[1];
+> -	GAFR1_U = save_lcd_regs[2];
+> -	GAFR2_L = save_lcd_regs[3];
+> -	GAFR2_U = save_lcd_regs[4];
+> +	int gpio;
+> +
+> +	pxa2xx_mfp_config(ARRAY_AND_SIZE(cmx270_marathon_off));
+> +
+> +	for (gpio = 58; gpio <= 77; gpio++)
+> +		gpio_free(gpio);
+> +
+>  	return 0;
+>  }
+>  
+
+
+-- 
+Sincerely yours,
+Mike.
