@@ -1,51 +1,48 @@
-From: dan@debian.org (Daniel Jacobowitz)
-Date: Mon, 11 Jan 2010 17:54:36 -0500
-Subject: 32-bit Thumb-2 breakpoints
-In-Reply-To: <20100111223503.GD7925@n2100.arm.linux.org.uk>
-References: <20100111215816.GA1068@caradoc.them.org>
-	<20100111223503.GD7925@n2100.arm.linux.org.uk>
-Message-ID: <20100111225436.GA7408@caradoc.them.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Jan 2010 23:07:29 +0000
+Subject: [RFC 14/18] arm: msm: add v7 support for compiler version-4.1.1
+In-Reply-To: <1263250057-26692-15-git-send-email-dwalker@codeaurora.org>
+References: <1263250057-26692-1-git-send-email-dwalker@codeaurora.org>
+	<1263250057-26692-15-git-send-email-dwalker@codeaurora.org>
+Message-ID: <20100111230729.GE7925@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2010 at 10:35:03PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 11, 2010 at 04:58:16PM -0500, Daniel Jacobowitz wrote:
-> > The problem I'm solving is that of stepping through IT blocks.  We
-> > shouldn't use the BKPT instruction, which would interfere with an
-> > attached hardware debugger.  The undefined instruction pattern
-> > currently used as a breakpoint will not trigger an exception if the IT
-> > block flags prevent its execution.  And without adding most of a
-> > Thumb-2 simulator to GDB, we can't statically predict what the
-> > next instruction will do to the CPSR flags, so we don't know which
-> > of the following instructions in the IT block will be executed.
+Is it really worth adding support for these old (and probably buggy)
+compiler versions?
+
+In any case, certainly not in this way.  Detect options by using the
+cc-option makefile call, rather than writing your own way to get the
+compiler version.
+
+On Mon, Jan 11, 2010 at 02:47:33PM -0800, Daniel Walker wrote:
+> From: Taniya Das <tdas@qualcomm.com>
 > 
-> Can't you read the CPSR in gdb, and look at the IT state bits?  See
-> A2.5.2 and CPSR register format in the ARM ARM.
-
-I already have code to do that, but it's not enough on its own.
-
-It's easy to tell whether the instruction at the current pc will be
-executed, but hard to tell whether the following instruction will be
-executed.  Software single step works by computing the pc after
-execution of the next instruction, and setting a breakpoint there; but
-to get this right GDB would have to simulate the flag setting effects
-of every possible 32-bit Thumb instruction (the 16-bit ones mostly
-don't set flags inside the IT block).
-
-In the example from my mail:
-
-   cmp   r0, r0
-   itt   eq
-A: cmpeq r0, r1
-B: moveq r0, r2
-C: nop
-
-The cmpeq can be an adcs.w, eors.w, et cetera.  We're at A, trying to
-figure out whether to put a breakpoint on B or C (both of which could
-validly be branches).
-
-It's possible I've missed something obvious, of course!
-
--- 
-Daniel Jacobowitz
-CodeSourcery
+> Signed-off-by: Taniya Das <tdas@qualcomm.com>
+> Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
+> ---
+>  arch/arm/Makefile |    8 +++++++-
+>  1 files changed, 7 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index e9da084..aa32b39 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -50,7 +50,13 @@ comma = ,
+>  # Note that GCC does not numerically define an architecture version
+>  # macro, but instead defines a whole series of macros which makes
+>  # testing for a specific architecture or later rather impossible.
+> -arch-$(CONFIG_CPU_32v7)		:=-D__LINUX_ARM_ARCH__=7 $(call cc-option,-march=armv7-a,-march=armv5t -Wa$(comma)-march=armv7-a)
+> +CONFIG_SHELL	:=/bin/sh
+> +GCC_VERSION	:= $(shell $(CONFIG_SHELL) $(PWD)/scripts/gcc-version.sh $(CROSS_COMPILE)gcc)
+> +ifeq ($(GCC_VERSION),0401)
+> +arch-$(CONFIG_CPU_32v7)		:=-D__LINUX_ARM_ARCH__=7 $(call cc-option,-march=armv7a,-march=armv5t -Wa$(comma)-march=armv7a)
+> +else
+> +arch-$(CONFIG_CPU_32v7)		:=-D__LINUX_ARM_ARCH__=7 $(call cc-option,-march=armv7-a,-march=armv5t -Wa$(comma)-march=armv7a)
+> +endif
+>  arch-$(CONFIG_CPU_32v6)		:=-D__LINUX_ARM_ARCH__=6 $(call cc-option,-march=armv6,-march=armv5t -Wa$(comma)-march=armv6)
+>  # Only override the compiler option if ARMv6. The ARMv6K extensions are
+>  # always available in ARMv7
+> -- 
+> 1.6.3.3
+> 
