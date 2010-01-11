@@ -1,34 +1,53 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Mon, 11 Jan 2010 15:43:30 -0500
-Subject: [PATCH] ep93xx: define magic numbers for pll1 and pll2
-In-Reply-To: <4B4B7F6E.5010304@bluewatersys.com>
-References: <BD79186B4FD85F4B8E60E381CAEE19090200F622@mi8nycmail19.Mi8.com>
-	<4B4A795C.8000507@bluewatersys.com>
-	<BD79186B4FD85F4B8E60E381CAEE190902089912@mi8nycmail19.Mi8.com>
-	<4B4B7F6E.5010304@bluewatersys.com>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE190902089960@mi8nycmail19.Mi8.com>
+From: dan@debian.org (Daniel Jacobowitz)
+Date: Mon, 11 Jan 2010 16:58:16 -0500
+Subject: 32-bit Thumb-2 breakpoints
+Message-ID: <20100111215816.GA1068@caradoc.them.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, January 11, 2010 12:44 PM, Ryan Mallon wrote:
-> H Hartley Sweeten wrote:
->> On Sunday, January 10, 2010 6:06 PM, Ryan Mallon wrote:
->>> H Hartley Sweeten wrote:
->>>> Add defines for the pll register magic numbers that determine if
->>>> the pll's are bypassed and if pll2 is enabled.  Rename the clock
->>>> set registers to more closely match the datasheet.  Also, remove
->>>> the unnecessary braces since each conditional statement is a single
->>>> statement.
->>>>
->>>> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
->>>> Cc: Ryan Mallon <ryan@bluewatersys.com>
->>>>
->>>> ---
->>>>
+I have been working the past week on GDB support for Thumb-2.  It
+turns out that there's a case where we need a 32-bit software
+breakpoint instruction to get things right (explanation below).
 
-Acked-by: Ryan Mallon <ryan@bluewatersys.com>
+The kernel currently reserves two architecturally undefined
+instructions for breakpoints, one ARM and one Thumb.  I suggest
+another for Thumb-2, provisionally 0xfff7 0xffcf, but I'm open
+to any other suggestion.  Any comments?  If that sounds OK,
+I can put together a patch.
 
-Thanks. This and the other ones are now in the patch system.
+The problem I'm solving is that of stepping through IT blocks.  We
+shouldn't use the BKPT instruction, which would interfere with an
+attached hardware debugger.  The undefined instruction pattern
+currently used as a breakpoint will not trigger an exception if the IT
+block flags prevent its execution.  And without adding most of a
+Thumb-2 simulator to GDB, we can't statically predict what the
+next instruction will do to the CPSR flags, so we don't know which
+of the following instructions in the IT block will be executed.
+For example:
 
-Regards,
-Hartley
+   cmp   r0, r0
+   itt   eq
+A: cmpeq r0, r1
+B: moveq r0, r2
+C: nop
+
+At A, we try to single-step.  Unless we simulate the cmp instruction,
+we do not know whether B or C will be executed next.  So we have to
+set a breakpoint at each of the two possibilities.  If we set a 16-bit
+breakpoint on a 32-bit instruction and it is not taken, then the
+second half of that 32-bit instruction will be treated as the next
+instruction.
+
+This approach keeps the single-stepping code considerably simpler than
+if it had to recognize and simulate every flag-setting instruction (~
+40 instruction forms).  It's not the only approach, obviously; if
+someone has a good reason why I ought to simulate every possible
+flag-setting instruction, I can write the code to do that instead.
+
+GDB can work around receiving a SIGILL so a patched GDB will mostly
+work on existing kernels; for best results and abstract correctness,
+though, there should be a reserved instruction pattern for SIGTRAP.
+
+-- 
+Daniel Jacobowitz
+CodeSourcery
