@@ -1,33 +1,15 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 12 Jan 2010 16:53:39 +0530
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Jan 2010 11:44:41 +0000
 Subject: [RFC 08/18] arm: msm: set L2CR1 to enable prefetch and burston
 	Scorpion.
 In-Reply-To: <1263293501.29654.40.camel@pc1117.cambridge.arm.com>
 References: <20100111234540.GN7925@n2100.arm.linux.org.uk>
 	<1263293501.29654.40.camel@pc1117.cambridge.arm.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C060CAC4@dbde02.ent.ti.com>
+Message-ID: <20100112114441.GB27771@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Catalin Marinas
-> Sent: Tuesday, January 12, 2010 4:22 PM
-> To: Russell King - ARM Linux
-> Cc: Larry Bassel; Daniel Walker; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [RFC 08/18] arm: msm: set L2CR1 to enable prefetch and burston Scorpion.
-> 
-> On Mon, 2010-01-11 at 23:45 +0000, Russell King - ARM Linux wrote:
-> > On Mon, Jan 11, 2010 at 02:47:27PM -0800, Daniel Walker wrote:
-> > > From: Larry Bassel <lbassel@quicinc.com>
-> > >
-> > > This change improves the following LMBench benchmarks
-> > > by over 15%:
-> >
-> > Is this something that could be done in the platform initialisation code
-> > rather than the processor code?  It's clearly not specific to all ARMv7
-> > CPUs.
-> 
+On Tue, Jan 12, 2010 at 10:51:41AM +0000, Catalin Marinas wrote:
 > We discussed in the past but the thread died. There are various bits
 > that may need to be enabled before the CPU is initialised but it is
 > highly dependent on the hardware configuration and not only the CPU
@@ -40,13 +22,28 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > up? A pointer in the machine_desc structure to an asm routine would also
 > work assuming that care is taken to calculate the phys address and the
 > code is position independent.
-Thanks for bringing out this. A per-platform macro would be usefull and
-easy to populate and surely needed one.
+
+What you're asking for is bith platform and CPU dependent - which makes
+it much more difficult to generalize.  It also throws a spanner in the
+works for the DT people.
+
 > An alternative would be to briefly enable the MMU for the initialisation
 > (using a temporary page table) than disable it and switch to the proper
 > one built via create_mapping(). This would allow some initialisation
 > code to be written in C (though I'm not sure it's worth the effort).
-> 
 
-Regards,
-Santosh
+How would that work?  You're saying on one hand that there's initialization
+which needs to be done before the MMU is initialized, and in this paragraph
+you're saying it can be done while the MMU is initialized and enabled.
+
+Well, if it can be done while the MMU is initialized and enabled, why can't
+it be done later?
+
+Actually, what you describe is what's already being done by the head.S
+code - we already build a temporary page table and enable the MMU so that
+we can get the C code running to setup the page tables properly.
+
+It strikes me that things are just becoming excessively complicated with
+these seemingly "catch-22" issues.  Maybe a totally different approach is
+needed - such as requiring some of this low level setup to be done by the
+platform's boot loader?
