@@ -1,60 +1,89 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 12 Jan 2010 15:21:31 -0500 (EST)
-Subject: [RFC 08/18] arm: msm: set L2CR1 to enable prefetch and burston
-	Scorpion.
-In-Reply-To: <20100112114441.GB27771@n2100.arm.linux.org.uk>
-References: <20100111234540.GN7925@n2100.arm.linux.org.uk>
-	<1263293501.29654.40.camel@pc1117.cambridge.arm.com>
-	<20100112114441.GB27771@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1001121429360.10143@xanadu.home>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 12 Jan 2010 15:46:26 -0500
+Subject: [PATCH 1/3] ARM: SAMSUNG: Add config option for number
+	ofadditional GPIO pins.
+In-Reply-To: <20100112001526.GH1224@trinity.fluff.org>
+References: <1263203046-29219-1-git-send-email-kgene.kim@samsung.com><20100111103338.GA3440@sirena.org.uk><20100111122715.GG1224@trinity.fluff.org><20100111124927.GB27161@rakim.wolfsonmicro.main>
+	<20100112001526.GH1224@trinity.fluff.org>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190902089AF8@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Jan 2010, Russell King - ARM Linux wrote:
+On Monday, January 11, 2010 5:15 PM, Ben Dooks wrote:
+> On Mon, Jan 11, 2010 at 12:49:27PM +0000, Mark Brown wrote:
+>> On Mon, Jan 11, 2010 at 12:27:15PM +0000, Ben Dooks wrote:
+>> 
+>>> Having this as a user settable field might be useful if plugging on
+>>> GPIO expanders at runtime.
+>> 
+>> If that gets to be anything other than an extremely niche use case the
+>> GPIO allocation would need to have a dynamic limit anyway, though.
+>
+> Yes, however a kconfig case where you can set the minimum value of an
+> integer would make the whole extra-gpio configuration much cleaner and
+> avoid having toadd further configuration symbols when someone wants an
+> extra 256 or whatever GPIOS.
+>
+> Having a dynamic GPIO range would also be nice, someone should look at
+> adding it to the GPIO code.
 
-> On Tue, Jan 12, 2010 at 10:51:41AM +0000, Catalin Marinas wrote:
-> > We discussed in the past but the thread died. There are various bits
-> > that may need to be enabled before the CPU is initialised but it is
-> > highly dependent on the hardware configuration and not only the CPU
-> > type. For example, Cortex-A8/A9 may have some bits in the ACTLR register
-> > which are fine to set on RealView but not on OMAP because the kernel
-> > there is running in non-secure mode. Now Scorpion has other needs.
-> > 
-> > Since such initialisation would run before the MMU is enabled, should we
-> > add an additional per-platform macro to be invoked before the CPU is set
-> > up? A pointer in the machine_desc structure to an asm routine would also
-> > work assuming that care is taken to calculate the phys address and the
-> > code is position independent.
-> 
-> What you're asking for is bith platform and CPU dependent - which makes
-> it much more difficult to generalize.  It also throws a spanner in the
-> works for the DT people.
+I would also like to see a dynamic GPIO range but it looks like it will
+create a lot of overhead for all the gpiolib calls.
 
-We have a similar issue with the latest Marvell SOCs.  Those are using a 
-PJ4 core which is available in two variants: ARMv6 compatible and ARMv7 
-compatible. The problem is that both variants have the same main CPU ID: 
-0x560f5810.  Now that the architecture level field has been obsoleted by 
-ARM Ltd (it contains 0xf) therefore the architecture has to be 
-determined through other means.  There is unfortunately no other 
-standard register with a simple architecture level value like this field 
-used to hold.
+The only way I can see to make it dynamic is by putting gpio_desc (one
+for each gpio) into a list and adding the gpio number to struct gpio_desc:
 
-Of course we want a single kernel image to be able to work with both 
-variants.  That means that we need to find a way at runtime to select 
-between service functions from proc-v6.S or proc-v7.S, but the current 
-simple value/mask scheme doesn't work anymore.
+struct gpio_desc {
+	struct gpio_chip	*chip;
++	unsigned		nr;
+	unsigned long	flags;
+...
+- static struct gpio_desc gpio_desc[MAX_NR_GPIOS];
++ struct gpio_dev {
++	struct list_head	list;
++	struct gpio_desc	*gpio_desc;
++ };
++
++ static LIST_HEAD(gpio_devices);
 
-So...  Maybe a new scheme could be used instead without impacting 
-backward compatibility.  For example, what about replacing the mask 
-field with a probe function address?  Whenever the recorded CPU ID value 
-in the proc_info structure is 0xffffff then the CPU mask value is 
-instead a probe function that should return success/failure, and 
-therefore the CPU probing could be as elaborate as it needs to be.  And 
-if special initializations have to be performed before the MMU is turned 
-on then that could be the place to perform them before success is 
-returned.
+Then changing the inline gpio_to_chip so that it works thru the list
+in order to find the proper gpio_desc for the gpio in order to return
+the chip.
 
-What do you think?
+-/* caller holds gpio_lock *OR* gpio is marked as requested */
+-static inline struct gpio_chip *gpio_to_chip(unsigned gpio)
+-{
+-	return gpio_desc[gpio].chip;
+-}
++/* is the locking needed for the list? */
++static struct gpio_chip *gpio_to_chip(unsigned gpio)
++{
++	struct gpio_chip *chip;
++	unsigned long flags;
++
++	spin_lock_irqsave(&gpio_lock, flags);
++	list_for_each_entry(gpio_dev, &gpio_devices, list) {
++		if (gpio_dev->gpio_desc->nr == gpio) {
++			chip = gpio_dev->gpio_desc->chip;
++			goto found;
++		}
++	}
++	chip = NULL;
++found:
++	spin_unlock(&gpio_lock);
++	return chip;
++}
 
+Plus, a similar function will be needed to get gpio_desc for
+everything in gpiolib that currently uses gpio_desc[].  I'm sure
+there are a lot of other issues but I'm just trying to work out
+a way to make the GPIO range dynamic.
 
-Nicolas
+An alternative would be to just put each gpio chip into a list.
+Each gpio chip would then contain another list of the individual
+gpio's.
+
+Any other ideas?
+
+Regards,
+Hartley
