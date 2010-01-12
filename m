@@ -1,49 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Jan 2010 11:44:41 +0000
-Subject: [RFC 08/18] arm: msm: set L2CR1 to enable prefetch and burston
-	Scorpion.
-In-Reply-To: <1263293501.29654.40.camel@pc1117.cambridge.arm.com>
-References: <20100111234540.GN7925@n2100.arm.linux.org.uk>
-	<1263293501.29654.40.camel@pc1117.cambridge.arm.com>
-Message-ID: <20100112114441.GB27771@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 12 Jan 2010 11:51:56 +0000
+Subject: [PATCH 01/01] regulator: support max8649
+In-Reply-To: <771cded01001120051l44fd76bx80d2fd4b6f60bd0b@mail.gmail.com>
+References: <771cded01001120041ue24edabk8e4638ef7151c947@mail.gmail.com>
+	<771cded01001120051l44fd76bx80d2fd4b6f60bd0b@mail.gmail.com>
+Message-ID: <20100112115156.GA546@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2010 at 10:51:41AM +0000, Catalin Marinas wrote:
-> We discussed in the past but the thread died. There are various bits
-> that may need to be enabled before the CPU is initialised but it is
-> highly dependent on the hardware configuration and not only the CPU
-> type. For example, Cortex-A8/A9 may have some bits in the ACTLR register
-> which are fine to set on RealView but not on OMAP because the kernel
-> there is running in non-secure mode. Now Scorpion has other needs.
-> 
-> Since such initialisation would run before the MMU is enabled, should we
-> add an additional per-platform macro to be invoked before the CPU is set
-> up? A pointer in the machine_desc structure to an asm routine would also
-> work assuming that care is taken to calculate the phys address and the
-> code is position independent.
+On Tue, Jan 12, 2010 at 03:51:09AM -0500, Haojian Zhuang wrote:
 
-What you're asking for is bith platform and CPU dependent - which makes
-it much more difficult to generalize.  It also throws a spanner in the
-works for the DT people.
+> Enable Maxim max8649 regulator driver.
 
-> An alternative would be to briefly enable the MMU for the initialisation
-> (using a temporary page table) than disable it and switch to the proper
-> one built via create_mapping(). This would allow some initialisation
-> code to be written in C (though I'm not sure it's worth the effort).
+This seems basically fine but there's a few relatively minor issues
+below, mostly coding style rather than anything serious.
 
-How would that work?  You're saying on one hand that there's initialization
-which needs to be done before the MMU is initialized, and in this paragraph
-you're saying it can be done while the MMU is initialized and enabled.
+> +static int max8649_list_voltage(struct regulator_dev *rdev, unsigned index)
+> +{
+> +	return MAX8649_DCDC_VMIN + index * MAX8649_DCDC_STEP;
+> +}
 
-Well, if it can be done while the MMU is initialized and enabled, why can't
-it be done later?
+Brackets here would help legibility even if not strictly required.
 
-Actually, what you describe is what's already being done by the head.S
-code - we already build a temporary page table and enable the MMU so that
-we can get the C code running to setup the page tables properly.
+> +	data= (min_uV - MAX8649_DCDC_VMIN + MAX8649_DCDC_STEP - 1)
+> +		/ MAX8649_DCDC_STEP;
 
-It strikes me that things are just becoming excessively complicated with
-these seemingly "catch-22" issues.  Maybe a totally different approach is
-needed - such as requiring some of this low level setup to be done by the
-platform's boot loader?
+Should be "data ="
+
+> +static struct regulator_desc dcdc_desc = {
+> +	.name		= "DCDC",
+
+MAX8649 might be a better name but it doesn't really make any odds.
+
+> +	.ops		= &max8649_dcdc_ops,
+> +	.type		= REGULATOR_VOLTAGE,
+> +	.n_voltages	= 1 << 7,
+
+Use the max index value you have above?
+
+> +	info->vol_reg = (info->mode == 0) ? MAX8649_MODE0
+> +			: ((info->mode == 1) ? MAX8649_MODE1
+> +			: ((info->mode == 2) ? MAX8649_MODE2
+> +			: MAX8649_MODE3));
+
+This should really be a switch statement for legibility.  In general the
+ternery operator should be used very sparingly, and if you've got more
+than one of them it's not a good sign.
+
+> +	/* enable/disable auto enter power save mode */
+> +	info->powersave = pdata->powersave;
+> +	data = (info->powersave) ? 0 : MAX8649_POWER_SAVE;
+> +	max8649_set_bits(info->i2c, info->vol_reg, MAX8649_POWER_SAVE, data);
+
+I'm not sure what this power save mode is but I suspect it'd map well
+onto the regulator_set_mode() API - normal mode for power saving, fast
+mode for power saving disabled.
+
+> +	if (pdata->ramp_timing) {
+> +		info->ramp_timing = pdata->ramp_timing;
+> +		max8649_set_bits(info->i2c, MAX8649_RAMP, MAX8649_RAMP_MASK,
+> +				 info->ramp_timing << 5);
+> +	}
+
+You might want to implement the new enable_time() API for this.
+
+> +	pr_info("Max8649 regulator device is detected.\n");
+
+This should be at most debug level, and should be dev_() to distinguish
+between multiple devices.
