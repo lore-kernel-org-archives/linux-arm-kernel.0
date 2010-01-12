@@ -1,113 +1,60 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 12 Jan 2010 14:55:24 -0500 (EST)
-Subject: question about ARM11MP cpu architecture identification
-In-Reply-To: <20100112172422.GD5633@n2100.arm.linux.org.uk>
-References: <c70ff3ad1001120821u1f546480nd0229e560d84293@mail.gmail.com>
-	<1263313572.29654.105.camel@pc1117.cambridge.arm.com>
-	<20100112164220.GJ27771@n2100.arm.linux.org.uk>
-	<1263315302.29654.110.camel@pc1117.cambridge.arm.com>
-	<c70ff3ad1001120903i62b96731ld8c1820be00fb41b@mail.gmail.com>
-	<20100112171733.GC5633@n2100.arm.linux.org.uk>
-	<20100112172422.GD5633@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1001121453560.10143@xanadu.home>
+Date: Tue, 12 Jan 2010 15:21:31 -0500 (EST)
+Subject: [RFC 08/18] arm: msm: set L2CR1 to enable prefetch and burston
+	Scorpion.
+In-Reply-To: <20100112114441.GB27771@n2100.arm.linux.org.uk>
+References: <20100111234540.GN7925@n2100.arm.linux.org.uk>
+	<1263293501.29654.40.camel@pc1117.cambridge.arm.com>
+	<20100112114441.GB27771@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1001121429360.10143@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 12 Jan 2010, Russell King - ARM Linux wrote:
 
-> On Tue, Jan 12, 2010 at 05:17:33PM +0000, Russell King - ARM Linux wrote:
-> > On Tue, Jan 12, 2010 at 07:03:35PM +0200, saeed bishara wrote:
-> > > On Tue, Jan 12, 2010 at 6:55 PM, Catalin Marinas
-> > > <catalin.marinas@arm.com> wrote:
-> > > > On Tue, 2010-01-12 at 16:42 +0000, Russell King - ARM Linux wrote:
-> > > >> On Tue, Jan 12, 2010 at 04:26:12PM +0000, Catalin Marinas wrote:
-> > > >> > On Tue, 2010-01-12 at 16:21 +0000, saeed bishara wrote:
-> > > >> > > ? ? The ARM11MP (rev r2p0) cpu architecture is ARMv6, and according to
-> > > >> > > the http://infocenter.arm.com, its Main ID register is 0x410FB024, and
-> > > >> > > the MMFR[3:0] is 3. but it looks to me that the cpu_architecture()
-> > > >> > > will identify it as ARMv7, and if the kernel was configured with
-> > > >> > > CPU_V7 only, then the lookup_processor_type() function also will
-> > > >> > > identify it as ARMv7. Am I missing something here?
-> > > >> >
-> > > >> > cpu_architecture() returns the architecture version of the supported MMU
-> > > >> > which on ARM11MPCore is the same as on ARMv7.
-> > > >> >
-> > > >> > Even if it is possible to configure both v6 and v7 in the same kernel, I
-> > > >> > don't think it is currently possible to successfully run such kernel.
-> > > >>
-> > > >> What makes you think that? ?I've been building v6+v7 kernels for Realview
-> > > >> (with a patch to provide the right build options for the ARMv7 arch/arm/mm
-> > > >> files) and ISTR it works fine on my Realview board.
-> > > >
-> > > > I don't remember exactly but it didn't work for me some time ago. I
-> > > > think it failed to build (though I could have worked around this with
-> > > > something like -march=all).
-> > > >
-> > > I think you need the attached patch from Lennert (it was planned to be
-> > > sent later by me)
+> On Tue, Jan 12, 2010 at 10:51:41AM +0000, Catalin Marinas wrote:
+> > We discussed in the past but the thread died. There are various bits
+> > that may need to be enabled before the CPU is initialised but it is
+> > highly dependent on the hardware configuration and not only the CPU
+> > type. For example, Cortex-A8/A9 may have some bits in the ACTLR register
+> > which are fine to set on RealView but not on OMAP because the kernel
+> > there is running in non-secure mode. Now Scorpion has other needs.
 > > 
-> > Using -Wa,-march= for assembler options is actually a better idea.
-> > I'll update my patch with that (which actually reflects what I did
-> > for Integrator/CP with ARM926 + v6).
+> > Since such initialisation would run before the MMU is enabled, should we
+> > add an additional per-platform macro to be invoked before the CPU is set
+> > up? A pointer in the machine_desc structure to an asm routine would also
+> > work assuming that care is taken to calculate the phys address and the
+> > code is position independent.
 > 
-> Ok, here's the combined patch.  Ack?
+> What you're asking for is bith platform and CPU dependent - which makes
+> it much more difficult to generalize.  It also throws a spanner in the
+> works for the DT people.
 
-We need this as well so please consider adding it to your tree.
+We have a similar issue with the latest Marvell SOCs.  Those are using a 
+PJ4 core which is available in two variants: ARMv6 compatible and ARMv7 
+compatible. The problem is that both variants have the same main CPU ID: 
+0x560f5810.  Now that the architecture level field has been obsoleted by 
+ARM Ltd (it contains 0xf) therefore the architecture has to be 
+determined through other means.  There is unfortunately no other 
+standard register with a simple architecture level value like this field 
+used to hold.
 
-Acked-by: Nicolas Pitre <nico@marvell.com>
+Of course we want a single kernel image to be able to work with both 
+variants.  That means that we need to find a way at runtime to select 
+between service functions from proc-v6.S or proc-v7.S, but the current 
+simple value/mask scheme doesn't work anymore.
+
+So...  Maybe a new scheme could be used instead without impacting 
+backward compatibility.  For example, what about replacing the mask 
+field with a probe function address?  Whenever the recorded CPU ID value 
+in the proc_info structure is 0xffffff then the CPU mask value is 
+instead a probe function that should return success/failure, and 
+therefore the CPU probing could be as elaborate as it needs to be.  And 
+if special initializations have to be performed before the MMU is turned 
+on then that could be the place to perform them before success is 
+returned.
+
+What do you think?
 
 
-> 
->  arch/arm/mm/Makefile |   12 ++++++++++++
->  1 files changed, 12 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
-> index 827e238..e8d34a8 100644
-> --- a/arch/arm/mm/Makefile
-> +++ b/arch/arm/mm/Makefile
-> @@ -27,6 +27,9 @@ obj-$(CONFIG_CPU_ABRT_EV5TJ)	+= abort-ev5tj.o
->  obj-$(CONFIG_CPU_ABRT_EV6)	+= abort-ev6.o
->  obj-$(CONFIG_CPU_ABRT_EV7)	+= abort-ev7.o
->  
-> +AFLAGS_abort-ev6.o	:=-Wa,-march=armv6k
-> +AFLAGS_abort-ev7.o	:=-Wa,-march=armv7-a
-> +
->  obj-$(CONFIG_CPU_PABRT_LEGACY)	+= pabort-legacy.o
->  obj-$(CONFIG_CPU_PABRT_V6)	+= pabort-v6.o
->  obj-$(CONFIG_CPU_PABRT_V7)	+= pabort-v7.o
-> @@ -39,6 +42,9 @@ obj-$(CONFIG_CPU_CACHE_V6)	+= cache-v6.o
->  obj-$(CONFIG_CPU_CACHE_V7)	+= cache-v7.o
->  obj-$(CONFIG_CPU_CACHE_FA)	+= cache-fa.o
->  
-> +AFLAGS_cache-v6.o	:=-Wa,-march=armv6
-> +AFLAGS_cache-v7.o	:=-Wa,-march=armv7-a
-> +
->  obj-$(CONFIG_CPU_COPY_V3)	+= copypage-v3.o
->  obj-$(CONFIG_CPU_COPY_V4WT)	+= copypage-v4wt.o
->  obj-$(CONFIG_CPU_COPY_V4WB)	+= copypage-v4wb.o
-> @@ -58,6 +64,9 @@ obj-$(CONFIG_CPU_TLB_V6)	+= tlb-v6.o
->  obj-$(CONFIG_CPU_TLB_V7)	+= tlb-v7.o
->  obj-$(CONFIG_CPU_TLB_FA)	+= tlb-fa.o
->  
-> +AFLAGS_tlb-v6.o		:=-Wa,-march=armv6
-> +AFLAGS_tlb-v7.o		:=-Wa,-march=armv7-a
-> +
->  obj-$(CONFIG_CPU_ARM610)	+= proc-arm6_7.o
->  obj-$(CONFIG_CPU_ARM710)	+= proc-arm6_7.o
->  obj-$(CONFIG_CPU_ARM7TDMI)	+= proc-arm7tdmi.o
-> @@ -84,6 +93,9 @@ obj-$(CONFIG_CPU_FEROCEON)	+= proc-feroceon.o
->  obj-$(CONFIG_CPU_V6)		+= proc-v6.o
->  obj-$(CONFIG_CPU_V7)		+= proc-v7.o
->  
-> +AFLAGS_proc-v6.o	:=-Wa,-march=armv6
-> +AFLAGS_proc-v7.o	:=-Wa,-march=armv7-a
-> +
->  obj-$(CONFIG_CACHE_FEROCEON_L2)	+= cache-feroceon-l2.o
->  obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o
->  obj-$(CONFIG_CACHE_XSC3L2)	+= cache-xsc3l2.o
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Nicolas
