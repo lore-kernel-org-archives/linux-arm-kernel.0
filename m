@@ -1,73 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Jan 2010 17:06:22 +0000
-Subject: question about ARM11MP cpu architecture identification
-In-Reply-To: <1263315302.29654.110.camel@pc1117.cambridge.arm.com>
-References: <c70ff3ad1001120821u1f546480nd0229e560d84293@mail.gmail.com>
-	<1263313572.29654.105.camel@pc1117.cambridge.arm.com>
-	<20100112164220.GJ27771@n2100.arm.linux.org.uk>
-	<1263315302.29654.110.camel@pc1117.cambridge.arm.com>
-Message-ID: <20100112170622.GB5633@n2100.arm.linux.org.uk>
+From: stevenm86@gmail.com (Steve M)
+Date: Tue, 12 Jan 2010 20:12:36 +0300
+Subject: 21285 serial driver deadlock(?) fix
+In-Reply-To: <20100111105724.6a9f799c@marrow.netinsight.se>
+References: <1262039226.28196.125.camel@localhost>
+	<20100104091156.0f384dec@marrow.netinsight.se>
+	<20dd1d411001051037o74fb1187j608889fae0271547@mail.gmail.com>
+	<20100111105724.6a9f799c@marrow.netinsight.se>
+Message-ID: <20dd1d411001120912v3d8ec07aofa28282ff10accd8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2010 at 04:55:01PM +0000, Catalin Marinas wrote:
-> On Tue, 2010-01-12 at 16:42 +0000, Russell King - ARM Linux wrote:
-> > On Tue, Jan 12, 2010 at 04:26:12PM +0000, Catalin Marinas wrote:
-> > > On Tue, 2010-01-12 at 16:21 +0000, saeed bishara wrote:
-> > > >     The ARM11MP (rev r2p0) cpu architecture is ARMv6, and according to
-> > > > the http://infocenter.arm.com, its Main ID register is 0x410FB024, and
-> > > > the MMFR[3:0] is 3. but it looks to me that the cpu_architecture()
-> > > > will identify it as ARMv7, and if the kernel was configured with
-> > > > CPU_V7 only, then the lookup_processor_type() function also will
-> > > > identify it as ARMv7. Am I missing something here?
-> > >
-> > > cpu_architecture() returns the architecture version of the supported MMU
-> > > which on ARM11MPCore is the same as on ARMv7.
-> > >
-> > > Even if it is possible to configure both v6 and v7 in the same kernel, I
-> > > don't think it is currently possible to successfully run such kernel.
-> > 
-> > What makes you think that?  I've been building v6+v7 kernels for Realview
-> > (with a patch to provide the right build options for the ARMv7 arch/arm/mm
-> > files) and ISTR it works fine on my Realview board.
-> 
-> I don't remember exactly but it didn't work for me some time ago. I
-> think it failed to build (though I could have worked around this with
-> something like -march=all).
-> 
-> If you have a clean patch, please push it upstream.
+I was worried about the regular UART ops wanting a synced version, so I made
+a nonsynced version specifically to be called from the interrupt handler. I
+am attaching that patch for reference.
 
-This is what I use, as part of my patches for running the kernel on the
-model.  I have a similar patch for ARMv6 as well.
+On Mon, Jan 11, 2010 at 12:57 PM, Simon Kagstrom <
+simon.kagstrom@netinsight.net> wrote:
 
-diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
-index 055cb2a..35b889c 100644
---- a/arch/arm/mm/Makefile
-+++ b/arch/arm/mm/Makefile
-@@ -39,6 +39,8 @@ obj-$(CONFIG_CPU_CACHE_V6)	+= cache-v6.o
- obj-$(CONFIG_CPU_CACHE_V7)	+= cache-v7.o
- obj-$(CONFIG_CPU_CACHE_FA)	+= cache-fa.o
- 
-+AFLAGS_cache-v7.o	:=-march=armv7-a
-+
- obj-$(CONFIG_CPU_COPY_V3)	+= copypage-v3.o
- obj-$(CONFIG_CPU_COPY_V4WT)	+= copypage-v4wt.o
- obj-$(CONFIG_CPU_COPY_V4WB)	+= copypage-v4wb.o
-@@ -58,6 +60,8 @@ obj-$(CONFIG_CPU_TLB_V6)	+= tlb-v6.o
- obj-$(CONFIG_CPU_TLB_V7)	+= tlb-v7.o
- obj-$(CONFIG_CPU_TLB_FA)	+= tlb-fa.o
- 
-+AFLAGS_tlb-v7.o		:=-march=armv7-a
-+
- obj-$(CONFIG_CPU_ARM610)	+= proc-arm6_7.o
- obj-$(CONFIG_CPU_ARM710)	+= proc-arm6_7.o
- obj-$(CONFIG_CPU_ARM7TDMI)	+= proc-arm7tdmi.o
-@@ -84,6 +88,8 @@ obj-$(CONFIG_CPU_FEROCEON)	+= proc-feroceon.o
- obj-$(CONFIG_CPU_V6)		+= proc-v6.o
- obj-$(CONFIG_CPU_V7)		+= proc-v7.o
- 
-+AFLAGS_proc-v7.o	:=-march=armv7-a
-+
- obj-$(CONFIG_CACHE_FEROCEON_L2)	+= cache-feroceon-l2.o
- obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o
- obj-$(CONFIG_CACHE_XSC3L2)	+= cache-xsc3l2.o
+> (Added the list to To: as well)
+>
+> On Tue, 5 Jan 2010 21:37:42 +0300
+> Steve M <stevenm86@gmail.com> wrote:
+>
+> > I know little of the serial layer, but I am not certain that it is a good
+> > idea to put _nosync directly into the stop_tx function, since this is a
+> > function whose pointer is given out to the upper layer. We may only want
+> the
+> > nosync behavior from within the ISR, but waiting for the ISR to complete
+> in
+> > other cases may be more appropriate.
+>
+> Well, I think serial21285_stop_tx also needs _nosync since it too is
+> called from an interrupt handler:
+>
+>  static irqreturn_t serial21285_tx_chars(int irq, void *dev_id)
+>  {
+>        [...]
+>        if (uart_circ_empty(xmit))
+>                serial21285_stop_tx(port);
+>  }
+>
+> Of course, we could make an unsynced version of the stop_tx/stop_rx
+> which is called from the local interrupt handlers, and a synchronous
+> one which gets called from the structure.
+>
+>
+> I don't know if the function pointers in uart_ops would run into some
+> problem with the _nosync versions? I haven't seen any problems during
+> my tests here with them at least.
+>
+> // Simon
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100112/c904b24d/attachment.htm>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: footbridge-serial-deadlock.patch
+Type: application/octet-stream
+Size: 776 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100112/c904b24d/attachment.obj>
