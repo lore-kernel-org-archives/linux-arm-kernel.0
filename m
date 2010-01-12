@@ -1,27 +1,38 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Tue, 12 Jan 2010 10:23:10 -0800
-Subject: [RFC 08/18] arm: msm: set L2CR1 to enable prefetch
-	andburstonScorpion.
-In-Reply-To: <1263307279.29654.102.camel@pc1117.cambridge.arm.com>
-References: <20100111234540.GN7925@n2100.arm.linux.org.uk>
-	<1263293501.29654.40.camel@pc1117.cambridge.arm.com>
-	<20100112114441.GB27771@n2100.arm.linux.org.uk>
-	<1263303176.29654.71.camel@pc1117.cambridge.arm.com>
-	<20100112135859.GF27771@n2100.arm.linux.org.uk>
-	<1263307279.29654.102.camel@pc1117.cambridge.arm.com>
-Message-ID: <1263320590.3497.3.camel@c-dwalke-linux.qualcomm.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 12 Jan 2010 13:43:33 -0500 (EST)
+Subject: [PATCH] Fix wrong dmb
+In-Reply-To: <20100112170206.GA5633@n2100.arm.linux.org.uk>
+References: <20100112170206.GA5633@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1001121343090.10143@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-01-12 at 14:41 +0000, Catalin Marinas wrote:
-> My argument was that ACTLR is implementation-defined, so other cores
-> like Scorpion may have a different meaning for such bits (Daniel's
-> patches are probably held in the moderation queue, I only saw your
-> replies). 
+On Tue, 12 Jan 2010, Russell King - ARM Linux wrote:
 
-Yeah, they are being held for moderator approval ("Message has a
-suspicious header") .. I see a lot of other patchsets going through,
-does anyone have a location for the right method to submit a series to
-this list?
+> The __kuser_cmpxchg code uses an ARMv6 dmb instruction, rather than
+> one based upon the architecture being built for.  Switch to using
+> the macro provided for this purpose, which also eliminates the
+> need for an ifdef.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Daniel
+Acked-by: Nicolas Pitre <nico@fluxnic.net>
+
+
+> 
+> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+> index d2903e3..6c5cf36 100644
+> --- a/arch/arm/kernel/entry-armv.S
+> +++ b/arch/arm/kernel/entry-armv.S
+> @@ -957,9 +957,7 @@ kuser_cmpxchg_fixup:
+>  
+>  #else
+>  
+> -#ifdef CONFIG_SMP
+> -	mcr	p15, 0, r0, c7, c10, 5	@ dmb
+> -#endif
+> +	smp_dmb
+>  1:	ldrex	r3, [r2]
+>  	subs	r3, r3, r0
+>  	strexeq	r3, r1, [r2]
+> 
