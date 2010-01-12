@@ -1,71 +1,52 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 12 Jan 2010 11:58:46 +0100
-Subject: [PATCH 1/2 RESEND#2] i2c/pxa: remove unused macro
-In-Reply-To: <20091209091146.78e8d7bb@hyperion.delvare>
-References: <1257754721-17325-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258658141-30340-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20091208211810.GB13706@pengutronix.de>
-	<20091208224456.0baf422b@hyperion.delvare>
-	<20091208220724.GA14696@pengutronix.de>
-	<20091209091146.78e8d7bb@hyperion.delvare>
-Message-ID: <20100112105846.GA31145@pengutronix.de>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 12 Jan 2010 16:53:39 +0530
+Subject: [RFC 08/18] arm: msm: set L2CR1 to enable prefetch and burston
+	Scorpion.
+In-Reply-To: <1263293501.29654.40.camel@pc1117.cambridge.arm.com>
+References: <20100111234540.GN7925@n2100.arm.linux.org.uk>
+	<1263293501.29654.40.camel@pc1117.cambridge.arm.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C060CAC4@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Ben,
-
-On Wed, Dec 09, 2009 at 09:11:46AM +0100, Jean Delvare wrote:
-> On Tue, 8 Dec 2009 23:07:24 +0100, Uwe Kleine-K?nig wrote:
-> > Hi Jean,
-> > 
-> > On Tue, Dec 08, 2009 at 10:44:56PM +0100, Jean Delvare wrote:
-> > > On Tue, 8 Dec 2009 22:18:10 +0100, Uwe Kleine-K?nig wrote:
-> > > > Hi Jean,
-> > > > 
-> > > > On Thu, Nov 19, 2009 at 08:15:40PM +0100, Uwe Kleine-K?nig wrote:
-> > > > > Commit
-> > > > > 
-> > > > > 	beea494 ([ARM] Remove EEPROM slave emulation from i2c-pxa driver.)
-> > > > > 
-> > > > > removed all uses of eedbg, so the definition can go, too.
-> > > > do you have comments to my patches?  I think they should go in via your
-> > > > tree.
-> > > 
-> > > I think you should read MAINTAINERS again.
-> > Ah, so the maintainer is Ben Dooks, but the tree seems to be your's.
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Catalin Marinas
+> Sent: Tuesday, January 12, 2010 4:22 PM
+> To: Russell King - ARM Linux
+> Cc: Larry Bassel; Daniel Walker; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [RFC 08/18] arm: msm: set L2CR1 to enable prefetch and burston Scorpion.
+> 
+> On Mon, 2010-01-11 at 23:45 +0000, Russell King - ARM Linux wrote:
+> > On Mon, Jan 11, 2010 at 02:47:27PM -0800, Daniel Walker wrote:
+> > > From: Larry Bassel <lbassel@quicinc.com>
+> > >
+> > > This change improves the following LMBench benchmarks
+> > > by over 15%:
 > >
-> > So I assume you take it when Ben give's his S-o-b or Ben has write
-> > access to the tree?
+> > Is this something that could be done in the platform initialisation code
+> > rather than the processor code?  It's clearly not specific to all ARMv7
+> > CPUs.
 > 
-> No. I have my tree, Ben has its own. Ben's isn't listed in MAINTAINERS,
-> thus the confusion.
+> We discussed in the past but the thread died. There are various bits
+> that may need to be enabled before the CPU is initialised but it is
+> highly dependent on the hardware configuration and not only the CPU
+> type. For example, Cortex-A8/A9 may have some bits in the ACTLR register
+> which are fine to set on RealView but not on OMAP because the kernel
+> there is running in non-secure mode. Now Scorpion has other needs.
 > 
-> Ben, can you please add your tree to MAINTAINERS to make things clearer
-> for contributors?
-In the meantime I have three i2c patches without any feedback by you.
-As Jean is convinced that you are responsible to take them can you
-please have a look and comment?
+> Since such initialisation would run before the MMU is enabled, should we
+> add an additional per-platform macro to be invoked before the CPU is set
+> up? A pointer in the machine_desc structure to an asm routine would also
+> work assuming that care is taken to calculate the phys address and the
+> code is position independent.
+Thanks for bringing out this. A per-platform macro would be usefull and
+easy to populate and surely needed one.
+> An alternative would be to briefly enable the MMU for the initialisation
+> (using a temporary page table) than disable it and switch to the proper
+> one built via create_mapping(). This would allow some initialisation
+> code to be written in C (though I'm not sure it's worth the effort).
+> 
 
-My patches are also available via git at
-
-	git://git.pengutronix.de/git/ukl/linux-2.6.git next/i2c
-
-Shortlog and diffstat can be found below.
-
-Best regards
-Uwe
-
-Uwe Kleine-K?nig (2):
-      i2c/pxa: remove unused macro
-      i2c-imx: call ioremap only after request_mem_region
-
-Wolfram Sang (1):
-      i2c/pxa: only define 'blue_murder'-function if DEBUG is #defined
-
- drivers/i2c/busses/i2c-imx.c |   21 +++++++++++----------
- drivers/i2c/busses/i2c-pxa.c |   26 ++++++++++++++------------
- 2 files changed, 25 insertions(+), 22 deletions(-)
-
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Regards,
+Santosh
