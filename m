@@ -1,54 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Jan 2010 18:57:57 +0000
-Subject: [PATCH] Consolidate clks_register() and similar
-In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE190902089AAB@mi8nycmail19.Mi8.com>
-References: <20100112121723.GC27771@n2100.arm.linux.org.uk>
-	<BD79186B4FD85F4B8E60E381CAEE190902089AA3@mi8nycmail19.Mi8.com>
-	<20100112173516.GE5633@n2100.arm.linux.org.uk>
-	<BD79186B4FD85F4B8E60E381CAEE190902089AAB@mi8nycmail19.Mi8.com>
-Message-ID: <20100112185757.GG5633@n2100.arm.linux.org.uk>
+From: bahadir@l4dev.org (Bahadir Balban)
+Date: Tue, 12 Jan 2010 21:15:08 +0200
+Subject: Split page tables
+In-Reply-To: <1263288689.29654.8.camel@pc1117.cambridge.arm.com>
+References: <4B4B830D.20309@l4dev.org>
+	<1263288689.29654.8.camel@pc1117.cambridge.arm.com>
+Message-ID: <4B4CCA3C.9090502@l4dev.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2010 at 12:43:54PM -0500, H Hartley Sweeten wrote:
-> You must have merged you patch first.  The removal of line 448:
-
-No - the ep93xx was merged as a whole with the miscellaneous branch,
-resulting in no conflicts.  Git is occasionally good with merging.
-
-> -	int i;
+Catalin Marinas wrote:
+> Hi Bahadir,
 > 
-> Probably produced a one line fuzz for both patches.  Is everything ok still
-> for those two patches?
+> (good to see you around :-))
+> 
 
-$ diff -u <(pdb getpatch 5879/1) <(git diff-tree -u 346e34abb2c56695ee4bd6af924141c97a0babfb )
---- /proc/self/fd/63	2010-01-12 18:53:48.958011270 +0000
-+++ /proc/self/fd/62	2010-01-12 18:53:48.981135820 +0000
-@@ -1,13 +1,9 @@
---------------------------------------------------------------------------------
-- arch/arm/mach-ep93xx/clock.c                    |   20 ++++++++++++--------
-- arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |    7 +++++--
-- 2 files changed, 17 insertions(+), 10 deletions(-)
---------------------------------------------------------------------------------
-+346e34abb2c56695ee4bd6af924141c97a0babfb
- diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
--index 1d0f9d8..f77c410 100644
-+index 07a58d0..27e3351 100644
- --- a/arch/arm/mach-ep93xx/clock.c
- +++ b/arch/arm/mach-ep93xx/clock.c
--@@ -447,25 +447,29 @@ static int __init ep93xx_clock_init(void)
-+@@ -449,25 +449,29 @@ static int __init ep93xx_clock_init(void)
-  	u32 value;
-  	int i;
-  
-@@ -44,7 +40,7 @@
- +	/* Initialize the pll2 derived clocks */
-  	clk_usb_host.rate = clk_pll2.rate / (((value >> 28) & 0xf) + 1);
-  
-- 	printk(KERN_INFO "ep93xx: PLL1 running at %ld MHz, PLL2 at %ld MHz\n",
-+ 	pr_info("PLL1 running at %ld MHz, PLL2 at %ld MHz\n",
- diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
- index d55194a..cd35912 100644
- --- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+Good to see you too, Catalin.
 
-So the only difference in the patch is the pr_info line.
+> You can configure a 2:2 split and if you want you can set TTBR1 to the
+> kernel TTBR but I don't think you'd gain much. You only save about 2K of
+> the user TTBR but since we allocate a 1 x 4K page pgd, there isn't any
+> difference. Note the translation table entries for the kernel would
+> contain either level 1 section entries or entries pointing to level 2
+> tables which would be shared between all the pgd tables. I think the
+> only gain is probably a memcpy of the kernel pgd into the user pgd
+> during process creation.
+> 
+
+I understand that level 2 tables are already shared on global mappings.
+After taking a glance in pgtable.h, I see that there are 8-byte pgd 
+entries and extra linux tables to make it fit for linux requirements. 
+But still, it seems like instead of 16KB level1 tables per-space, a 2:2 
+split would need 8KB level1 table per space which results in 8KB savings 
+per-space. Am I missing something?
+
+That said, with linux pte duplicates on every 2nd level table, it might 
+not be a significant gain. Perhaps you had done the correlation long ago 
+- but extra bits from tex remap and access flag is not enough to support 
+linux bits directly on the hardware pte?
+
+
+Thanks,
+
+--
+Bahadir
