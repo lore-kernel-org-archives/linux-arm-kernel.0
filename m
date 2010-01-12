@@ -1,47 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Jan 2010 13:58:59 +0000
-Subject: [RFC 08/18] arm: msm: set L2CR1 to enable prefetch and
-	burstonScorpion.
-In-Reply-To: <1263303176.29654.71.camel@pc1117.cambridge.arm.com>
-References: <20100111234540.GN7925@n2100.arm.linux.org.uk>
-	<1263293501.29654.40.camel@pc1117.cambridge.arm.com>
-	<20100112114441.GB27771@n2100.arm.linux.org.uk>
-	<1263303176.29654.71.camel@pc1117.cambridge.arm.com>
-Message-ID: <20100112135859.GF27771@n2100.arm.linux.org.uk>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Tue, 12 Jan 2010 14:18:53 +0000
+Subject: [PATCH 3/3] ARM: SAMSUNG: Add idle support
+In-Reply-To: <20100112101226.GA27771@n2100.arm.linux.org.uk>
+References: <1263203072-29282-1-git-send-email-kgene.kim@samsung.com>
+	<20100111100253.GA30556@n2100.arm.linux.org.uk>
+	<20100112000606.GR3738@trinity.fluff.org>
+	<20100112101226.GA27771@n2100.arm.linux.org.uk>
+Message-ID: <20100112141853.GC18532@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2010 at 01:32:56PM +0000, Catalin Marinas wrote:
-> On Tue, 2010-01-12 at 11:44 +0000, Russell King - ARM Linux wrote:
-> > What you're asking for is bith platform and CPU dependent - which makes
-> > it much more difficult to generalize.  It also throws a spanner in the
-> > works for the DT people.
-> 
-> If it would only be CPU dependent, we could just add some ID checking in
-> proc-v*.S and but for some cases it's also platform dependent (like
-> secure vs. non-secure vs. secure monitor API).
-> 
-> > > An alternative would be to briefly enable the MMU for the initialisation
-> > > (using a temporary page table) than disable it and switch to the proper
-> > > one built via create_mapping(). This would allow some initialisation
-> > > code to be written in C (though I'm not sure it's worth the effort).
+On Tue, Jan 12, 2010 at 10:12:26AM +0000, Russell King - ARM Linux wrote:
+> On Tue, Jan 12, 2010 at 12:06:06AM +0000, Ben Dooks wrote:
+> > On Mon, Jan 11, 2010 at 10:02:54AM +0000, Russell King - ARM Linux wrote:
+> > > On Mon, Jan 11, 2010 at 06:44:32PM +0900, Kukjin Kim wrote:
+> > > > This patch adds common idle functionality for all Samsung SoC's.
+> > > 
+> > > NAK.  Please use the existing support already provided.  There's no point
+> > > in double-indirection - it just makes the code harder to follow.
+> > > 
+> > > Just set pm_idle to your idle function.
 > > 
-> > How would that work?  You're saying on one hand that there's initialization
-> > which needs to be done before the MMU is initialized, and in this paragraph
-> > you're saying it can be done while the MMU is initialized and enabled.
+> > Hmm, the default_idle() function that pm_idle is set to at init time does
+> > more than what arch_idle() does. We'd end up having to copy the logic in
+> > default_idle() into each of our idle routines. How difficult would it be
+> > to change the callers of pm_idle() to check whether it actually needs
+> > calling and to re-enable the interrupt state after calling it?
 > 
-> Standard (architecture) MMU initialisation without additional
-> optimisation bits (similar to what we have in the decompressor). It
-> won't support SMP, shared page tables etc.
-
-That's more or less what is done already - up to the point where the
-proper page tables are setup by paging_init().
-
-> > Actually, what you describe is what's already being done by the head.S
-> > code - we already build a temporary page table and enable the MMU so that
-> > we can get the C code running to setup the page tables properly.
+> Not possible without changing all the other architectures - pm_idle() is
+> the standard interface for hooking into the idle code, and is used by
+> things like cpuidle, APM, ACPI, etc.
 > 
-> Yes, that's the table I was referring to. It could be even made not to
-> depend on CONFIG_SMP and always make it UP (no shared bit, this way it
-> would be simpler to run SMP kernel on UP hardware by doing some checks
-> later).
+> Please use the standard cross-architecture pm_idle() hook if you want to
+> dynamically override the default idle code.
+
+So basically i've got to copy the default_idle() and the necessary cpu code
+for each of the cpus that are supported? I'd much rather just do it once
+and have a pointer to the bits that change thanks.
+
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
