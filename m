@@ -1,13 +1,14 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 12 Jan 2010 16:26:12 +0000
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Jan 2010 16:34:03 +0000
 Subject: question about ARM11MP cpu architecture identification
 In-Reply-To: <c70ff3ad1001120821u1f546480nd0229e560d84293@mail.gmail.com>
 References: <c70ff3ad1001120821u1f546480nd0229e560d84293@mail.gmail.com>
-Message-ID: <1263313572.29654.105.camel@pc1117.cambridge.arm.com>
+Message-ID: <20100112163403.GI27771@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-01-12 at 16:21 +0000, saeed bishara wrote:
+On Tue, Jan 12, 2010 at 06:21:50PM +0200, saeed bishara wrote:
+> Hi,
 >     The ARM11MP (rev r2p0) cpu architecture is ARMv6, and according to
 > the http://infocenter.arm.com, its Main ID register is 0x410FB024, and
 > the MMFR[3:0] is 3. but it looks to me that the cpu_architecture()
@@ -15,11 +16,8 @@ On Tue, 2010-01-12 at 16:21 +0000, saeed bishara wrote:
 > CPU_V7 only, then the lookup_processor_type() function also will
 > identify it as ARMv7. Am I missing something here?
 
-cpu_architecture() returns the architecture version of the supported MMU
-which on ARM11MPCore is the same as on ARMv7.
+Welcome to the wonderful world of *unprintable*.  The age of being
+able to reliably tell what type of CPU you are running on has sadly
+well and truely passed into history.
 
-Even if it is possible to configure both v6 and v7 in the same kernel, I
-don't think it is currently possible to successfully run such kernel.
-
--- 
-Catalin
+I'm afraid it's now a hit-and-miss affair.
