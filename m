@@ -1,98 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Jan 2010 17:24:22 +0000
-Subject: question about ARM11MP cpu architecture identification
-In-Reply-To: <20100112171733.GC5633@n2100.arm.linux.org.uk>
-References: <c70ff3ad1001120821u1f546480nd0229e560d84293@mail.gmail.com>
-	<1263313572.29654.105.camel@pc1117.cambridge.arm.com>
-	<20100112164220.GJ27771@n2100.arm.linux.org.uk>
-	<1263315302.29654.110.camel@pc1117.cambridge.arm.com>
-	<c70ff3ad1001120903i62b96731ld8c1820be00fb41b@mail.gmail.com>
-	<20100112171733.GC5633@n2100.arm.linux.org.uk>
-Message-ID: <20100112172422.GD5633@n2100.arm.linux.org.uk>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 12 Jan 2010 12:29:00 -0500
+Subject: [PATCH] Consolidate clks_register() and similar
+In-Reply-To: <20100112121723.GC27771@n2100.arm.linux.org.uk>
+References: <20100110172825.GB8639@n2100.arm.linux.org.uk><87my0kmh4f.fsf@deeprootsystems.com>
+	<20100112121723.GC27771@n2100.arm.linux.org.uk>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190902089AA3@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2010 at 05:17:33PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Jan 12, 2010 at 07:03:35PM +0200, saeed bishara wrote:
-> > On Tue, Jan 12, 2010 at 6:55 PM, Catalin Marinas
-> > <catalin.marinas@arm.com> wrote:
-> > > On Tue, 2010-01-12 at 16:42 +0000, Russell King - ARM Linux wrote:
-> > >> On Tue, Jan 12, 2010 at 04:26:12PM +0000, Catalin Marinas wrote:
-> > >> > On Tue, 2010-01-12 at 16:21 +0000, saeed bishara wrote:
-> > >> > > ? ? The ARM11MP (rev r2p0) cpu architecture is ARMv6, and according to
-> > >> > > the http://infocenter.arm.com, its Main ID register is 0x410FB024, and
-> > >> > > the MMFR[3:0] is 3. but it looks to me that the cpu_architecture()
-> > >> > > will identify it as ARMv7, and if the kernel was configured with
-> > >> > > CPU_V7 only, then the lookup_processor_type() function also will
-> > >> > > identify it as ARMv7. Am I missing something here?
-> > >> >
-> > >> > cpu_architecture() returns the architecture version of the supported MMU
-> > >> > which on ARM11MPCore is the same as on ARMv7.
-> > >> >
-> > >> > Even if it is possible to configure both v6 and v7 in the same kernel, I
-> > >> > don't think it is currently possible to successfully run such kernel.
-> > >>
-> > >> What makes you think that? ?I've been building v6+v7 kernels for Realview
-> > >> (with a patch to provide the right build options for the ARMv7 arch/arm/mm
-> > >> files) and ISTR it works fine on my Realview board.
-> > >
-> > > I don't remember exactly but it didn't work for me some time ago. I
-> > > think it failed to build (though I could have worked around this with
-> > > something like -march=all).
-> > >
-> > I think you need the attached patch from Lennert (it was planned to be
-> > sent later by me)
-> 
-> Using -Wa,-march= for assembler options is actually a better idea.
-> I'll update my patch with that (which actually reflects what I did
-> for Integrator/CP with ARM926 + v6).
+On Tuesday, January 12, 2010 5:17 AM, Russell King wrote,
+> On Mon, Jan 11, 2010 at 02:06:08PM -0800, Kevin Hilman wrote:
+>> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+>> 
+>>> Most machine classes want some way to register a block of clk_lookup
+>>> structures, and most do it by implementing a clks_register() type
+>>> function which walks an array, or by open-coding a loop.
+>>>
+>>> Consolidate all this into clkdev_add_table().
+>>>
+>>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>>
+>> Reviewed-by: Kevin Hilman <khilman@deeprootsystems.com>
+>> 
+>> Are you planning this for 2.6.33-rc?  or 2.6.34?
+>
+> I don't think it's -rc material (not a bug fix) so 2.6.34.
 
-Ok, here's the combined patch.  Ack?
+It's not a bug fix but due to how often people patch the various
+clock sources it might be better to get this is soon so that merge
+conflicts don't show up.
 
- arch/arm/mm/Makefile |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+>
+>> This should take care of davinci.  Tested on v2.6.33-rc3 + $SUBJECT patch.
+>
+> Shall I queue this for merging after my patch, or are there likely to
+> be conflicts in this area?
 
-diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
-index 827e238..e8d34a8 100644
---- a/arch/arm/mm/Makefile
-+++ b/arch/arm/mm/Makefile
-@@ -27,6 +27,9 @@ obj-$(CONFIG_CPU_ABRT_EV5TJ)	+= abort-ev5tj.o
- obj-$(CONFIG_CPU_ABRT_EV6)	+= abort-ev6.o
- obj-$(CONFIG_CPU_ABRT_EV7)	+= abort-ev7.o
- 
-+AFLAGS_abort-ev6.o	:=-Wa,-march=armv6k
-+AFLAGS_abort-ev7.o	:=-Wa,-march=armv7-a
-+
- obj-$(CONFIG_CPU_PABRT_LEGACY)	+= pabort-legacy.o
- obj-$(CONFIG_CPU_PABRT_V6)	+= pabort-v6.o
- obj-$(CONFIG_CPU_PABRT_V7)	+= pabort-v7.o
-@@ -39,6 +42,9 @@ obj-$(CONFIG_CPU_CACHE_V6)	+= cache-v6.o
- obj-$(CONFIG_CPU_CACHE_V7)	+= cache-v7.o
- obj-$(CONFIG_CPU_CACHE_FA)	+= cache-fa.o
- 
-+AFLAGS_cache-v6.o	:=-Wa,-march=armv6
-+AFLAGS_cache-v7.o	:=-Wa,-march=armv7-a
-+
- obj-$(CONFIG_CPU_COPY_V3)	+= copypage-v3.o
- obj-$(CONFIG_CPU_COPY_V4WT)	+= copypage-v4wt.o
- obj-$(CONFIG_CPU_COPY_V4WB)	+= copypage-v4wb.o
-@@ -58,6 +64,9 @@ obj-$(CONFIG_CPU_TLB_V6)	+= tlb-v6.o
- obj-$(CONFIG_CPU_TLB_V7)	+= tlb-v7.o
- obj-$(CONFIG_CPU_TLB_FA)	+= tlb-fa.o
- 
-+AFLAGS_tlb-v6.o		:=-Wa,-march=armv6
-+AFLAGS_tlb-v7.o		:=-Wa,-march=armv7-a
-+
- obj-$(CONFIG_CPU_ARM610)	+= proc-arm6_7.o
- obj-$(CONFIG_CPU_ARM710)	+= proc-arm6_7.o
- obj-$(CONFIG_CPU_ARM7TDMI)	+= proc-arm7tdmi.o
-@@ -84,6 +93,9 @@ obj-$(CONFIG_CPU_FEROCEON)	+= proc-feroceon.o
- obj-$(CONFIG_CPU_V6)		+= proc-v6.o
- obj-$(CONFIG_CPU_V7)		+= proc-v7.o
- 
-+AFLAGS_proc-v6.o	:=-Wa,-march=armv6
-+AFLAGS_proc-v7.o	:=-Wa,-march=armv7-a
-+
- obj-$(CONFIG_CACHE_FEROCEON_L2)	+= cache-feroceon-l2.o
- obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o
- obj-$(CONFIG_CACHE_XSC3L2)	+= cache-xsc3l2.o
+BTW, arch/arm/mach-ep93xx/clock.c might need to be rebased due to you
+applying 5875/1 and 5879/1 to your git-curr (ep93xx branch).
+
+Regards,
+Hartley
