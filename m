@@ -1,22 +1,118 @@
-From: dan@debian.org (Daniel Jacobowitz)
-Date: Mon, 11 Jan 2010 18:51:52 -0500
-Subject: 32-bit Thumb-2 breakpoints
-In-Reply-To: <20100111233143.GI7925@n2100.arm.linux.org.uk>
-References: <20100111215816.GA1068@caradoc.them.org>
-	<20100111223503.GD7925@n2100.arm.linux.org.uk>
-	<20100111225436.GA7408@caradoc.them.org>
-	<20100111233143.GI7925@n2100.arm.linux.org.uk>
-Message-ID: <20100111235152.GA12051@caradoc.them.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Jan 2010 00:01:42 +0000
+Subject: [RFC 06/18] arm: msm: implement proper dmb() for 7x27
+In-Reply-To: <1263253516.26505.42.camel@c-dwalke-linux.qualcomm.com>
+References: <1263250057-26692-1-git-send-email-dwalker@codeaurora.org>
+	<1263250057-26692-7-git-send-email-dwalker@codeaurora.org>
+	<20100111233924.GL7925@n2100.arm.linux.org.uk>
+	<1263253516.26505.42.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <20100112000142.GO7925@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2010 at 11:31:43PM +0000, Russell King - ARM Linux wrote:
-> It sounds rather evil - maybe the first question that should be asked
-> is whether it is legal to change the PSR flags in the middle of an IT
-> block.
+On Mon, Jan 11, 2010 at 03:45:16PM -0800, Daniel Walker wrote:
+> On Mon, 2010-01-11 at 23:39 +0000, Russell King - ARM Linux wrote:
+> > On Mon, Jan 11, 2010 at 02:47:25PM -0800, Daniel Walker wrote:
+> > > From: Larry Bassel <lbassel@quicinc.com>
+> > > 
+> > > For 7x27 it is necessary to write to strongly
+> > > ordered memory after executing the coprocessor 15
+> > > instruction dmb instruction.
+> > > 
+> > > This is only for data barrier dmb().
+> > > Note that the test for 7x27 is done on all MSM platforms
+> > > (even ones such as 7201a whose kernel is distinct from
+> > > that of 7x25/7x27).
+> > > 
+> > > Acked-by: Willie Ruan <wruan@quicinc.com>
+> > > Signed-off-by: Larry Bassel <lbassel@quicinc.com>
+> > > Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
+> > 
+> > Can only see half of this change - what's the actual implementation of
+> > arch_barrier_extra()?
+> > 
+> > I'd prefer not to include asm/memory.h into asm/system.h to avoid
+> > needlessly polluting headers.
+> 
+> I don't have a real patch for it yet, but here are the pieces ..
+> 
+> +#define arch_barrier_extra() do \
+> +       { if (machine_is_msm7x27_surf() || machine_is_msm7x27_ffa())  \
+> +               write_to_strongly_ordered_memory(); \
+> +       } while (0)
+> 
+> (btw, the machine types above registered either..)
 
-I'm pretty sure it is.  Catalin, do you know for sure?
+Hmm.  We can do far better than this.  Rather than do two tests and call
+a function, wouldn't it be better to do something like:
 
--- 
-Daniel Jacobowitz
-CodeSourcery
+#ifdef CONFIG_ARM_DMB_MEM
+extern int *dmb_mem;
+#define dmb_extra() do { if (dmb_mem) *dmb_mem = 0; } while (0)
+#else
+#define dmb_extra() do { } while (0)
+#endif
+
+in asm/system.h, and only set dmb_mem for the affected platforms?
+
+> static void map_zero_page_strongly_ordered(void)
+> {
+> 	if (zero_page_strongly_ordered)
+> 		return;
+> 
+> 	zero_page_strongly_ordered =
+> 		ioremap_strongly_ordered(page_to_pfn(empty_zero_page)
+> 		<< PAGE_SHIFT, PAGE_SIZE);
+
+This can't work.  You're not allowed to map the same memory with differing
+memory types from ARMv7.  This ends up mapping 'empty_zero_page' as both
+cacheable memory and strongly ordered.  That's illegal according to the
+ARM ARM.
+
+You need to find something else to map - allocating a page of system
+memory for this won't work either (it'll have the same issue.)
+
+(This is a new problem to the ARM architecture, one which we're only just
+getting to grips with - many of our old tricks with remapping DMA memory
+no longer work on these latest CPUs.  You really must not take the
+remapping which the kernel does today as a good idea anymore.)
+
+> void flush_axi_bus_buffer(void)
+> {
+> 	__asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" \
+> 				    : : "r" (0) : "memory");
+> 	write_to_strongly_ordered_memory();
+
+Isn't this just one of your modified dmb()s ?
+
+> }
+> 
+> void *alloc_bootmem_aligned(unsigned long size, unsigned long alignment)
+> {
+> 	void *unused_addr = NULL;
+> 	unsigned long addr, tmp_size, unused_size;
+> 
+> 	/* Allocate maximum size needed, see where it ends up.
+> 	 * Then free it -- in this path there are no other allocators
+> 	 * so we can depend on getting the same address back
+> 	 * when we allocate a smaller piece that is aligned
+> 	 * at the end (if necessary) and the piece we really want,
+> 	 * then free the unused first piece.
+> 	 */
+> 
+> 	tmp_size = size + alignment - PAGE_SIZE;
+> 	addr = (unsigned long)alloc_bootmem(tmp_size);
+> 	free_bootmem(__pa(addr), tmp_size);
+> 
+> 	unused_size = alignment - (addr % alignment);
+> 	if (unused_size)
+> 		unused_addr = alloc_bootmem(unused_size);
+> 
+> 	addr = (unsigned long)alloc_bootmem(size);
+> 	if (unused_size)
+> 		free_bootmem(__pa(unused_addr), unused_size);
+> 
+> 	return (void *)addr;
+
+Erm, there is __alloc_bootmem(size, align, 0) - the bootmem allocator
+already does alignment.
