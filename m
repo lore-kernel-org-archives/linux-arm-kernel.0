@@ -1,45 +1,48 @@
-From: bahadir@l4dev.org (Bahadir Balban)
-Date: Tue, 12 Jan 2010 21:15:08 +0200
-Subject: Split page tables
-In-Reply-To: <1263288689.29654.8.camel@pc1117.cambridge.arm.com>
-References: <4B4B830D.20309@l4dev.org>
-	<1263288689.29654.8.camel@pc1117.cambridge.arm.com>
-Message-ID: <4B4CCA3C.9090502@l4dev.org>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 12 Jan 2010 11:16:40 -0800
+Subject: [PATCH] Consolidate clks_register() and similar
+In-Reply-To: <20100112121723.GC27771@n2100.arm.linux.org.uk> (Russell King's
+	message of "Tue\, 12 Jan 2010 12\:17\:23 +0000")
+References: <20100110172825.GB8639@n2100.arm.linux.org.uk>
+	<87my0kmh4f.fsf@deeprootsystems.com>
+	<20100112121723.GC27771@n2100.arm.linux.org.uk>
+Message-ID: <8763779lrb.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas wrote:
-> Hi Bahadir,
-> 
-> (good to see you around :-))
-> 
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-Good to see you too, Catalin.
+> On Mon, Jan 11, 2010 at 02:06:08PM -0800, Kevin Hilman wrote:
+>> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+>> 
+>> > Most machine classes want some way to register a block of clk_lookup
+>> > structures, and most do it by implementing a clks_register() type
+>> > function which walks an array, or by open-coding a loop.
+>> >
+>> > Consolidate all this into clkdev_add_table().
+>> >
+>> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> 
+>> Reviewed-by: Kevin Hilman <khilman@deeprootsystems.com>
+>> 
+>> Are you planning this for 2.6.33-rc?  or 2.6.34?
+>
+> I don't think it's -rc material (not a bug fix) so 2.6.34.
 
-> You can configure a 2:2 split and if you want you can set TTBR1 to the
-> kernel TTBR but I don't think you'd gain much. You only save about 2K of
-> the user TTBR but since we allocate a 1 x 4K page pgd, there isn't any
-> difference. Note the translation table entries for the kernel would
-> contain either level 1 section entries or entries pointing to level 2
-> tables which would be shared between all the pgd tables. I think the
-> only gain is probably a memcpy of the kernel pgd into the user pgd
-> during process creation.
-> 
+ok
 
-I understand that level 2 tables are already shared on global mappings.
-After taking a glance in pgtable.h, I see that there are 8-byte pgd 
-entries and extra linux tables to make it fit for linux requirements. 
-But still, it seems like instead of 16KB level1 tables per-space, a 2:2 
-split would need 8KB level1 table per space which results in 8KB savings 
-per-space. Am I missing something?
+>> This should take care of davinci.  Tested on v2.6.33-rc3 + $SUBJECT patch.
+>
+> Shall I queue this for merging after my patch, or are there likely to
+> be conflicts in this area?
 
-That said, with linux pte duplicates on every 2nd level table, it might 
-not be a significant gain. Perhaps you had done the correlation long ago 
-- but extra bits from tex remap and access flag is not enough to support 
-linux bits directly on the hardware pte?
+There are likely to be conflicts with other davinci patches, so since
+it's independent from yours, I'll queue in my 2.6.34 queue along with
+the rest of the davinci changes.
 
+As long as your patch is included in linux-next, there shouldn't be
+any problems keeping them separate.
 
 Thanks,
 
---
-Bahadir
+Kevin
