@@ -1,87 +1,55 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 11 Jan 2010 17:46:24 -0700
-Subject: [PATCH 2/5] OMAP3 clock: reorganize CK_* platform flags
+Date: Mon, 11 Jan 2010 17:46:23 -0700
+Subject: [PATCH 1/5] AM35xx: Add AM35xx specific control module registers
 In-Reply-To: <20100112004326.24684.91321.stgit@localhost.localdomain>
 References: <20100112004326.24684.91321.stgit@localhost.localdomain>
-Message-ID: <20100112004623.24684.75044.stgit@localhost.localdomain>
+Message-ID: <20100112004621.24684.38120.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add CK_* flags for the two new Sitara chips, AM3505 and AM3517, and
-the OMAP34xx die shrink, OMAP36xx/OMAP37xx.  Introduce a new CK_*
-flag, CK_3XXX, that marks all clocks that are common to OMAP3 family
-chips.  CK_343X now refers to clocks that are available only on
-OMAP34{1,2,3,4}0 (WTBU) and OMAP35{03,15,25,30} (any version).
-At some point, the RATE_IN_* flags should be updated also.
+From: Ranjith Lohithakshan <ranjithl@ti.com>
 
-While here, add some documentation describing the chip families
-covered by these clock flags.
+AM3517/05 has a few additional control module registers defined mainly
+to control the new IP's. This patch adds support for those new registers.
 
-This patch is partially based on patches from Ranjith Lohithakshan
-<ranjithl@ti.com> and Vishwanath Sripathy <vishwanath.bs@ti.com>.
-
+Signed-off-by: Ranjith Lohithakshan <ranjithl@ti.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Ranjith Lohithakshan <ranjithl@ti.com>
-Cc: Vishwanath Sripathy <vishwanath.bs@ti.com>
 ---
- arch/arm/mach-omap2/clock34xx_data.c          |    4 ++--
- arch/arm/plat-omap/include/plat/clkdev_omap.h |   26 ++++++++++++++++---------
- 2 files changed, 19 insertions(+), 11 deletions(-)
+ arch/arm/plat-omap/include/plat/control.h |   17 +++++++++++++++++
+ 1 files changed, 17 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clock34xx_data.c b/arch/arm/mach-omap2/clock34xx_data.c
-index c6031d7..59b0903 100644
---- a/arch/arm/mach-omap2/clock34xx_data.c
-+++ b/arch/arm/mach-omap2/clock34xx_data.c
-@@ -3220,11 +3220,11 @@ int __init omap2_clk_init(void)
- 	/* struct prcm_config *prcm; */
- 	struct omap_clk *c;
- 	/* u32 clkrate; */
--	u32 cpu_clkflg;
-+	u32 cpu_clkflg = CK_3XXX;
+diff --git a/arch/arm/plat-omap/include/plat/control.h b/arch/arm/plat-omap/include/plat/control.h
+index a745d62..61e7b8a 100644
+--- a/arch/arm/plat-omap/include/plat/control.h
++++ b/arch/arm/plat-omap/include/plat/control.h
+@@ -160,6 +160,14 @@
+ #define OMAP343X_CONTROL_SRAMLDO5	(OMAP2_CONTROL_GENERAL + 0x02C0)
+ #define OMAP343X_CONTROL_CSI		(OMAP2_CONTROL_GENERAL + 0x02C4)
  
- 	if (cpu_is_omap34xx()) {
- 		cpu_mask = RATE_IN_343X;
--		cpu_clkflg = CK_343X;
-+		cpu_clkflg |= CK_343X;
++/* AM35XX only CONTROL_GENERAL register offsets */
++#define AM35XX_CONTROL_MSUSPENDMUX_6    (OMAP2_CONTROL_GENERAL + 0x0038)
++#define AM35XX_CONTROL_DEVCONF2         (OMAP2_CONTROL_GENERAL + 0x0310)
++#define AM35XX_CONTROL_DEVCONF3         (OMAP2_CONTROL_GENERAL + 0x0314)
++#define AM35XX_CONTROL_CBA_PRIORITY     (OMAP2_CONTROL_GENERAL + 0x0320)
++#define AM35XX_CONTROL_LVL_INTR_CLEAR   (OMAP2_CONTROL_GENERAL + 0x0324)
++#define AM35XX_CONTROL_IP_SW_RESET      (OMAP2_CONTROL_GENERAL + 0x0328)
++#define AM35XX_CONTROL_IPSS_CLK_CTRL    (OMAP2_CONTROL_GENERAL + 0x032C)
  
- 		/*
- 		 * Update this if there are further clock changes between ES2
-diff --git a/arch/arm/plat-omap/include/plat/clkdev_omap.h b/arch/arm/plat-omap/include/plat/clkdev_omap.h
-index 35b36ca..bb937f3 100644
---- a/arch/arm/plat-omap/include/plat/clkdev_omap.h
-+++ b/arch/arm/plat-omap/include/plat/clkdev_omap.h
-@@ -25,17 +25,25 @@ struct omap_clk {
- 		},			\
- 	}
+ /* 34xx PADCONF register offsets */
+ #define OMAP343X_PADCONF_ETK(i)		(OMAP2_CONTROL_PADCONFS + 0x5a8 + \
+@@ -257,6 +265,15 @@
+ #define OMAP343X_SCRATCHPAD		(OMAP343X_CTRL_BASE + 0x910)
+ #define OMAP343X_SCRATCHPAD_ROM_OFFSET	0x19C
  
--
-+/* Platform flags for the clkdev-OMAP integration code */
- #define CK_310		(1 << 0)
--#define CK_7XX		(1 << 1)
-+#define CK_7XX		(1 << 1)	/* 7xx, 850 */
- #define CK_1510		(1 << 2)
--#define CK_16XX		(1 << 3)
--#define CK_243X		(1 << 4)
--#define CK_242X		(1 << 5)
--#define CK_343X		(1 << 6)
--#define CK_3430ES1	(1 << 7)
--#define CK_3430ES2	(1 << 8)
--#define CK_443X		(1 << 9)
-+#define CK_16XX		(1 << 3)	/* 16xx, 17xx, 5912 */
-+#define CK_242X		(1 << 4)
-+#define CK_243X		(1 << 5)
-+#define CK_3XXX		(1 << 6)	/* OMAP3 + AM3 common clocks*/
-+#define CK_343X		(1 << 7)	/* OMAP34xx common clocks */
-+#define CK_3430ES1	(1 << 8)	/* 34xxES1 only */
-+#define CK_3430ES2	(1 << 9)	/* 34xxES2, ES3, non-Sitara 35xx only */
-+#define CK_3505		(1 << 10)
-+#define CK_3517		(1 << 11)
-+#define CK_36XX		(1 << 12)	/* OMAP36xx/37xx-specific clocks */
-+#define CK_443X		(1 << 13)
++/* AM35XX_CONTROL_IPSS_CLK_CTRL bits */
++#define AM35XX_USBOTG_VBUSP_CLK_SHIFT   0
++#define AM35XX_CPGMAC_VBUSP_CLK_SHIFT   1
++#define AM35XX_VPFE_VBUSP_CLK_SHIFT     2
++#define AM35XX_HECC_VBUSP_CLK_SHIFT     3
++#define AM35XX_USBOTG_FCLK_SHIFT        8
++#define AM35XX_CPGMAC_FCLK_SHIFT        9
++#define AM35XX_VPFE_FCLK_SHIFT          10
 +
-+#define CK_AM35XX	(CK_3505 | CK_3517)	/* all Sitara AM35xx */
-+
-+
- 
- #endif
- 
+ /*
+  * CONTROL OMAP STATUS register to identify OMAP3 features
+  */
