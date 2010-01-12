@@ -1,118 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Jan 2010 00:01:42 +0000
-Subject: [RFC 06/18] arm: msm: implement proper dmb() for 7x27
-In-Reply-To: <1263253516.26505.42.camel@c-dwalke-linux.qualcomm.com>
-References: <1263250057-26692-1-git-send-email-dwalker@codeaurora.org>
-	<1263250057-26692-7-git-send-email-dwalker@codeaurora.org>
-	<20100111233924.GL7925@n2100.arm.linux.org.uk>
-	<1263253516.26505.42.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <20100112000142.GO7925@n2100.arm.linux.org.uk>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Tue, 12 Jan 2010 00:06:06 +0000
+Subject: [PATCH 3/3] ARM: SAMSUNG: Add idle support
+In-Reply-To: <20100111100253.GA30556@n2100.arm.linux.org.uk>
+References: <1263203072-29282-1-git-send-email-kgene.kim@samsung.com>
+	<20100111100253.GA30556@n2100.arm.linux.org.uk>
+Message-ID: <20100112000606.GR3738@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2010 at 03:45:16PM -0800, Daniel Walker wrote:
-> On Mon, 2010-01-11 at 23:39 +0000, Russell King - ARM Linux wrote:
-> > On Mon, Jan 11, 2010 at 02:47:25PM -0800, Daniel Walker wrote:
-> > > From: Larry Bassel <lbassel@quicinc.com>
-> > > 
-> > > For 7x27 it is necessary to write to strongly
-> > > ordered memory after executing the coprocessor 15
-> > > instruction dmb instruction.
-> > > 
-> > > This is only for data barrier dmb().
-> > > Note that the test for 7x27 is done on all MSM platforms
-> > > (even ones such as 7201a whose kernel is distinct from
-> > > that of 7x25/7x27).
-> > > 
-> > > Acked-by: Willie Ruan <wruan@quicinc.com>
-> > > Signed-off-by: Larry Bassel <lbassel@quicinc.com>
-> > > Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
-> > 
-> > Can only see half of this change - what's the actual implementation of
-> > arch_barrier_extra()?
-> > 
-> > I'd prefer not to include asm/memory.h into asm/system.h to avoid
-> > needlessly polluting headers.
+On Mon, Jan 11, 2010 at 10:02:54AM +0000, Russell King - ARM Linux wrote:
+> On Mon, Jan 11, 2010 at 06:44:32PM +0900, Kukjin Kim wrote:
+> > This patch adds common idle functionality for all Samsung SoC's.
 > 
-> I don't have a real patch for it yet, but here are the pieces ..
+> NAK.  Please use the existing support already provided.  There's no point
+> in double-indirection - it just makes the code harder to follow.
 > 
-> +#define arch_barrier_extra() do \
-> +       { if (machine_is_msm7x27_surf() || machine_is_msm7x27_ffa())  \
-> +               write_to_strongly_ordered_memory(); \
-> +       } while (0)
-> 
-> (btw, the machine types above registered either..)
+> Just set pm_idle to your idle function.
 
-Hmm.  We can do far better than this.  Rather than do two tests and call
-a function, wouldn't it be better to do something like:
+Hmm, the default_idle() function that pm_idle is set to at init time does
+more than what arch_idle() does. We'd end up having to copy the logic in
+default_idle() into each of our idle routines. How difficult would it be
+to change the callers of pm_idle() to check whether it actually needs
+calling and to re-enable the interrupt state after calling it?
 
-#ifdef CONFIG_ARM_DMB_MEM
-extern int *dmb_mem;
-#define dmb_extra() do { if (dmb_mem) *dmb_mem = 0; } while (0)
-#else
-#define dmb_extra() do { } while (0)
-#endif
+We did this originally as before we issue the WFI co-processor instruction
+we need to set the sleep mode. A number of the Samsung SoC have the WFI
+line on the cpu routed via a mux to various functions, such as IDLE or
+much deeper sleep modes such as the SUSPEND state.
 
-in asm/system.h, and only set dmb_mem for the affected platforms?
+I've no data on whether the write is needed before each sleep or not, so
+my preference would be to ensure that this mux is setup before each call,
+but it might be possible to simply ensure that it is setup correctly on
+init and after suspend/resume.
 
-> static void map_zero_page_strongly_ordered(void)
-> {
-> 	if (zero_page_strongly_ordered)
-> 		return;
-> 
-> 	zero_page_strongly_ordered =
-> 		ioremap_strongly_ordered(page_to_pfn(empty_zero_page)
-> 		<< PAGE_SHIFT, PAGE_SIZE);
+-- 
+Ben
 
-This can't work.  You're not allowed to map the same memory with differing
-memory types from ARMv7.  This ends up mapping 'empty_zero_page' as both
-cacheable memory and strongly ordered.  That's illegal according to the
-ARM ARM.
-
-You need to find something else to map - allocating a page of system
-memory for this won't work either (it'll have the same issue.)
-
-(This is a new problem to the ARM architecture, one which we're only just
-getting to grips with - many of our old tricks with remapping DMA memory
-no longer work on these latest CPUs.  You really must not take the
-remapping which the kernel does today as a good idea anymore.)
-
-> void flush_axi_bus_buffer(void)
-> {
-> 	__asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" \
-> 				    : : "r" (0) : "memory");
-> 	write_to_strongly_ordered_memory();
-
-Isn't this just one of your modified dmb()s ?
-
-> }
-> 
-> void *alloc_bootmem_aligned(unsigned long size, unsigned long alignment)
-> {
-> 	void *unused_addr = NULL;
-> 	unsigned long addr, tmp_size, unused_size;
-> 
-> 	/* Allocate maximum size needed, see where it ends up.
-> 	 * Then free it -- in this path there are no other allocators
-> 	 * so we can depend on getting the same address back
-> 	 * when we allocate a smaller piece that is aligned
-> 	 * at the end (if necessary) and the piece we really want,
-> 	 * then free the unused first piece.
-> 	 */
-> 
-> 	tmp_size = size + alignment - PAGE_SIZE;
-> 	addr = (unsigned long)alloc_bootmem(tmp_size);
-> 	free_bootmem(__pa(addr), tmp_size);
-> 
-> 	unused_size = alignment - (addr % alignment);
-> 	if (unused_size)
-> 		unused_addr = alloc_bootmem(unused_size);
-> 
-> 	addr = (unsigned long)alloc_bootmem(size);
-> 	if (unused_size)
-> 		free_bootmem(__pa(unused_addr), unused_size);
-> 
-> 	return (void *)addr;
-
-Erm, there is __alloc_bootmem(size, align, 0) - the bootmem allocator
-already does alignment.
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
