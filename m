@@ -1,312 +1,278 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 11 Jan 2010 18:05:35 -0700
-Subject: [PATCH 02/10] OMAP2/3 clockdomains: split shared structures so
-	usecounting works
+Date: Mon, 11 Jan 2010 18:05:38 -0700
+Subject: [PATCH 05/10] OMAP clockdomains: add usecounting for wakeup and sleep
+	dependencies
 In-Reply-To: <20100112010258.6275.97999.stgit@localhost.localdomain>
 References: <20100112010258.6275.97999.stgit@localhost.localdomain>
-Message-ID: <20100112010534.6275.67561.stgit@localhost.localdomain>
+Message-ID: <20100112010537.6275.74977.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previously some of the clockdomain wakeup/sleep dependency structures
-were shared between several domains.  For the subsequent wakeup and sleep
-dependency usecounting patch to work, these can no longer be
-shared.  This patch splits the shared structures apart.
+Add usecounting for wakeup and sleep dependencies.  In the current
+situation, if several functions add dependencies on the same clockdomains,
+when the first dependency removal function is called, the dependency will
+be incorrectly removed from the hardware.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/clockdomains.h |  163 ++++++++++++++++++++++++++++--------
- 1 files changed, 127 insertions(+), 36 deletions(-)
+ arch/arm/mach-omap2/clockdomain.c             |  150 ++++++++++++++++++++++---
+ arch/arm/plat-omap/include/plat/clockdomain.h |    6 +
+ 2 files changed, 135 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clockdomains.h b/arch/arm/mach-omap2/clockdomains.h
-index ff216f2..9629ef1 100644
---- a/arch/arm/mach-omap2/clockdomains.h
-+++ b/arch/arm/mach-omap2/clockdomains.h
-@@ -52,6 +52,8 @@
-  * 2420/2430 PM_WKDEP_GFX: CORE, MPU, WKUP
-  * 3430ES1 PM_WKDEP_GFX: adds IVA2, removes CORE
-  * 3430ES2 PM_WKDEP_SGX: adds IVA2, removes CORE
-+ * These can share data since they will never be present simultaneously
-+ * on the same device.
-  */
- static struct clkdm_dep gfx_sgx_wkdeps[] = {
- 	{
-@@ -86,11 +88,32 @@ static struct clkdm_dep gfx_sgx_wkdeps[] = {
+diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
+index 2af9996..d039df7 100644
+--- a/arch/arm/mach-omap2/clockdomain.c
++++ b/arch/arm/mach-omap2/clockdomain.c
+@@ -113,7 +113,6 @@ static struct clkdm_dep *_clkdm_deps_lookup(struct clockdomain *clkdm,
+ 		return ERR_PTR(-EINVAL);
  
- /* Wakeup dependency source arrays */
+ 	for (cd = deps; cd->clkdm_name; cd++) {
+-
+ 		if (!omap_chip_is(cd->omap_chip))
+ 			continue;
  
-+/* 2420/2430 PM_WKDEP_DSP: CORE, MPU, WKUP */
-+static struct clkdm_dep dsp_24xx_wkdeps[] = {
-+	{
-+		.clkdm_name = "core_l3_clkdm",
-+		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP24XX)
-+	},
-+	{
-+		.clkdm_name = "core_l4_clkdm",
-+		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP24XX)
-+	},
-+	{
-+		.clkdm_name = "mpu_clkdm",
-+		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP24XX)
-+	},
-+	{
-+		.clkdm_name = "wkup_clkdm",
-+		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP24XX)
-+	},
-+	{ NULL },
-+};
+@@ -122,7 +121,6 @@ static struct clkdm_dep *_clkdm_deps_lookup(struct clockdomain *clkdm,
+ 
+ 		if (cd->clkdm == clkdm)
+ 			break;
+-
+ 	}
+ 
+ 	if (!cd->clkdm_name)
+@@ -254,6 +252,96 @@ static void _omap2_clkdm_set_hwsup(struct clockdomain *clkdm, int enable)
+ 
+ }
+ 
++/**
++ * _init_wkdep_usecount - initialize wkdep usecounts to match hardware
++ * @clkdm: clockdomain to initialize wkdep usecounts
++ *
++ * Initialize the wakeup dependency usecount variables for clockdomain @clkdm.
++ * If a wakeup dependency is present in the hardware, the usecount will be
++ * set to 1; otherwise, it will be set to 0.  Software should clear all
++ * software wakeup dependencies prior to calling this function if it wishes
++ * to ensure that all usecounts start at 0.  No return value.
++ */
++static void _init_wkdep_usecount(struct clockdomain *clkdm)
++{
++	u32 v;
++	struct clkdm_dep *cd;
 +
- /*
-- * 2420/2430 PM_WKDEP_DSP: CORE, MPU, WKUP
-- * 2420/2430 PM_WKDEP_MDM: same as DSP
-+ * 2420/2430 PM_WKDEP_MDM: CORE, MPU, WKUP
-+ * XXX This is probably 2430-only; 2420 did not have a stacked modem config.
-  */
--static struct clkdm_dep dsp_mdm_24xx_wkdeps[] = {
-+static struct clkdm_dep mdm_24xx_wkdeps[] = {
- 	{
- 		.clkdm_name = "core_l3_clkdm",
- 		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP24XX)
-@@ -172,11 +195,8 @@ static struct clkdm_dep core_24xx_wkdeps[] = {
- 
- #ifdef CONFIG_ARCH_OMAP34XX
- 
--/*
-- * 3430: PM_WKDEP_{PER,USBHOST}: CORE, IVA2, MPU, WKUP
-- * (USBHOST is ES2 only)
-- */
--static struct clkdm_dep per_usbhost_wkdeps[] = {
-+/* 3430: PM_WKDEP_PER: CORE, IVA2, MPU, WKUP */
-+static struct clkdm_dep per_wkdeps[] = {
- 	{
- 		.clkdm_name = "core_l3_clkdm",
- 		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
-@@ -200,9 +220,32 @@ static struct clkdm_dep per_usbhost_wkdeps[] = {
- 	{ NULL },
- };
- 
--/*
-- * 3430 PM_WKDEP_MPU: CORE, IVA2, DSS, PER
-- */
-+/* 3430ES2: PM_WKDEP_USBHOST: CORE, IVA2, MPU, WKUP */
-+static struct clkdm_dep usbhost_wkdeps[] = {
-+	{
-+		.clkdm_name = "core_l3_clkdm",
-+		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
-+	},
-+	{
-+		.clkdm_name = "core_l4_clkdm",
-+		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
-+	},
-+	{
-+		.clkdm_name = "iva2_clkdm",
-+		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
-+	},
-+	{
-+		.clkdm_name = "mpu_clkdm",
-+		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
-+	},
-+	{
-+		.clkdm_name = "wkup_clkdm",
-+		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
-+	},
-+	{ NULL },
-+};
++	if (!clkdm->wkdep_srcs)
++		return;
 +
-+/* 3430 PM_WKDEP_MPU: CORE, IVA2, DSS, PER */
- static struct clkdm_dep mpu_34xx_wkdeps[] = {
- 	{
- 		.clkdm_name = "core_l3_clkdm",
-@@ -227,9 +270,7 @@ static struct clkdm_dep mpu_34xx_wkdeps[] = {
- 	{ NULL },
- };
- 
--/*
-- * 3430 PM_WKDEP_IVA2: CORE, MPU, WKUP, DSS, PER
-- */
-+/* 3430 PM_WKDEP_IVA2: CORE, MPU, WKUP, DSS, PER */
- static struct clkdm_dep iva2_wkdeps[] = {
- 	{
- 		.clkdm_name = "core_l3_clkdm",
-@@ -259,8 +300,25 @@ static struct clkdm_dep iva2_wkdeps[] = {
- };
- 
- 
--/* 3430 PM_WKDEP_{CAM,DSS}: IVA2, MPU, WKUP */
--static struct clkdm_dep cam_dss_wkdeps[] = {
-+/* 3430 PM_WKDEP_CAM: IVA2, MPU, WKUP */
-+static struct clkdm_dep cam_wkdeps[] = {
-+	{
-+		.clkdm_name = "iva2_clkdm",
-+		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
-+	},
-+	{
-+		.clkdm_name = "mpu_clkdm",
-+		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
-+	},
-+	{
-+		.clkdm_name = "wkup_clkdm",
-+		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
-+	},
-+	{ NULL },
-+};
++	for (cd = clkdm->wkdep_srcs; cd->clkdm_name; cd++) {
++		if (!omap_chip_is(cd->omap_chip))
++			continue;
 +
-+/* 3430 PM_WKDEP_DSS: IVA2, MPU, WKUP */
-+static struct clkdm_dep dss_wkdeps[] = {
- 	{
- 		.clkdm_name = "iva2_clkdm",
- 		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
-@@ -288,11 +346,8 @@ static struct clkdm_dep neon_wkdeps[] = {
- 
- /* Sleep dependency source arrays for 34xx-specific clkdms - 34XX only */
- 
--/*
-- * 3430: CM_SLEEPDEP_{DSS,PER}: MPU, IVA
-- * 3430ES2: CM_SLEEPDEP_USBHOST: MPU, IVA
-- */
--static struct clkdm_dep dss_per_usbhost_sleepdeps[] = {
-+/* 3430: CM_SLEEPDEP_DSS: MPU, IVA */
-+static struct clkdm_dep dss_sleepdeps[] = {
- 	{
- 		.clkdm_name = "mpu_clkdm",
- 		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
-@@ -304,12 +359,48 @@ static struct clkdm_dep dss_per_usbhost_sleepdeps[] = {
- 	{ NULL },
- };
- 
-+/* 3430: CM_SLEEPDEP_PER: MPU, IVA */
-+static struct clkdm_dep per_sleepdeps[] = {
-+	{
-+		.clkdm_name = "mpu_clkdm",
-+		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
-+	},
-+	{
-+		.clkdm_name = "iva2_clkdm",
-+		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
-+	},
-+	{ NULL },
-+};
++		if (!cd->clkdm && cd->clkdm_name)
++			cd->clkdm = _clkdm_lookup(cd->clkdm_name);
 +
-+/* 3430ES2: CM_SLEEPDEP_USBHOST: MPU, IVA */
-+static struct clkdm_dep usbhost_sleepdeps[] = {
-+	{
-+		.clkdm_name = "mpu_clkdm",
-+		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
-+	},
-+	{
-+		.clkdm_name = "iva2_clkdm",
-+		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
-+	},
-+	{ NULL },
-+};
++		if (!cd->clkdm) {
++			WARN(!cd->clkdm, "clockdomain: %s: wkdep clkdm %s not "
++			     "found\n", clkdm->name, cd->clkdm_name);
++			continue;
++		}
 +
-+/* 3430: CM_SLEEPDEP_CAM: MPU */
-+static struct clkdm_dep cam_sleepdeps[] = {
-+	{
-+		.clkdm_name = "mpu_clkdm",
-+		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
-+	},
-+	{ NULL },
-+};
++		v = prm_read_mod_bits_shift(clkdm->pwrdm.ptr->prcm_offs,
++					    PM_WKDEP,
++					    (1 << cd->clkdm->dep_bit));
 +
- /*
-- * 3430: CM_SLEEPDEP_CAM: MPU
-  * 3430ES1: CM_SLEEPDEP_GFX: MPU
-  * 3430ES2: CM_SLEEPDEP_SGX: MPU
-+ * These can share data since they will never be present simultaneously
-+ * on the same device.
-  */
--static struct clkdm_dep cam_gfx_sleepdeps[] = {
-+static struct clkdm_dep gfx_sgx_sleepdeps[] = {
- 	{
- 		.clkdm_name = "mpu_clkdm",
- 		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
-@@ -376,7 +467,7 @@ static struct clockdomain iva1_2420_clkdm = {
- 	.clkstctrl_reg  = OMAP2420_CM_REGADDR(OMAP24XX_DSP_MOD,
- 						 OMAP2_CM_CLKSTCTRL),
- 	.dep_bit	= OMAP24XX_PM_WKDEP_MPU_EN_DSP_SHIFT,
--	.wkdep_srcs	= dsp_mdm_24xx_wkdeps,
-+	.wkdep_srcs	= dsp_24xx_wkdeps,
- 	.clktrctrl_mask = OMAP2420_AUTOSTATE_IVA_MASK,
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2420),
- };
-@@ -458,7 +549,7 @@ static struct clockdomain mdm_clkdm = {
- 	.clkstctrl_reg  = OMAP2430_CM_REGADDR(OMAP2430_MDM_MOD,
- 						 OMAP2_CM_CLKSTCTRL),
- 	.dep_bit	= OMAP2430_PM_WKDEP_MPU_EN_MDM_SHIFT,
--	.wkdep_srcs	= dsp_mdm_24xx_wkdeps,
-+	.wkdep_srcs	= mdm_24xx_wkdeps,
- 	.clktrctrl_mask = OMAP2430_AUTOSTATE_MDM_MASK,
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2430),
- };
-@@ -470,7 +561,7 @@ static struct clockdomain dsp_2430_clkdm = {
- 	.clkstctrl_reg  = OMAP2430_CM_REGADDR(OMAP24XX_DSP_MOD,
- 						 OMAP2_CM_CLKSTCTRL),
- 	.dep_bit	= OMAP24XX_PM_WKDEP_MPU_EN_DSP_SHIFT,
--	.wkdep_srcs	= dsp_mdm_24xx_wkdeps,
-+	.wkdep_srcs	= dsp_24xx_wkdeps,
- 	.clktrctrl_mask = OMAP24XX_AUTOSTATE_DSP_MASK,
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2430),
- };
-@@ -575,7 +666,7 @@ static struct clockdomain gfx_3430es1_clkdm = {
- 	.flags		= CLKDM_CAN_HWSUP_SWSUP,
- 	.clkstctrl_reg	= OMAP34XX_CM_REGADDR(GFX_MOD, OMAP2_CM_CLKSTCTRL),
- 	.wkdep_srcs	= gfx_sgx_wkdeps,
--	.sleepdep_srcs	= cam_gfx_sleepdeps,
-+	.sleepdep_srcs	= gfx_sgx_sleepdeps,
- 	.clktrctrl_mask = OMAP3430ES1_CLKTRCTRL_GFX_MASK,
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430ES1),
- };
-@@ -587,7 +678,7 @@ static struct clockdomain sgx_clkdm = {
- 	.clkstctrl_reg	= OMAP34XX_CM_REGADDR(OMAP3430ES2_SGX_MOD,
- 						 OMAP2_CM_CLKSTCTRL),
- 	.wkdep_srcs	= gfx_sgx_wkdeps,
--	.sleepdep_srcs	= cam_gfx_sleepdeps,
-+	.sleepdep_srcs	= gfx_sgx_sleepdeps,
- 	.clktrctrl_mask = OMAP3430ES2_CLKTRCTRL_SGX_MASK,
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_GE_OMAP3430ES2),
- };
-@@ -646,8 +737,8 @@ static struct clockdomain dss_34xx_clkdm = {
- 	.clkstctrl_reg	= OMAP34XX_CM_REGADDR(OMAP3430_DSS_MOD,
- 						 OMAP2_CM_CLKSTCTRL),
- 	.dep_bit	= OMAP3430_PM_WKDEP_MPU_EN_DSS_SHIFT,
--	.wkdep_srcs	= cam_dss_wkdeps,
--	.sleepdep_srcs	= dss_per_usbhost_sleepdeps,
-+	.wkdep_srcs	= dss_wkdeps,
-+	.sleepdep_srcs	= dss_sleepdeps,
- 	.clktrctrl_mask = OMAP3430_CLKTRCTRL_DSS_MASK,
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
- };
-@@ -658,8 +749,8 @@ static struct clockdomain cam_clkdm = {
- 	.flags		= CLKDM_CAN_HWSUP_SWSUP,
- 	.clkstctrl_reg	= OMAP34XX_CM_REGADDR(OMAP3430_CAM_MOD,
- 						 OMAP2_CM_CLKSTCTRL),
--	.wkdep_srcs	= cam_dss_wkdeps,
--	.sleepdep_srcs	= cam_gfx_sleepdeps,
-+	.wkdep_srcs	= cam_wkdeps,
-+	.sleepdep_srcs	= cam_sleepdeps,
- 	.clktrctrl_mask = OMAP3430_CLKTRCTRL_CAM_MASK,
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
- };
-@@ -670,8 +761,8 @@ static struct clockdomain usbhost_clkdm = {
- 	.flags		= CLKDM_CAN_HWSUP_SWSUP,
- 	.clkstctrl_reg	= OMAP34XX_CM_REGADDR(OMAP3430ES2_USBHOST_MOD,
- 						 OMAP2_CM_CLKSTCTRL),
--	.wkdep_srcs	= per_usbhost_wkdeps,
--	.sleepdep_srcs	= dss_per_usbhost_sleepdeps,
-+	.wkdep_srcs	= usbhost_wkdeps,
-+	.sleepdep_srcs	= usbhost_sleepdeps,
- 	.clktrctrl_mask = OMAP3430ES2_CLKTRCTRL_USBHOST_MASK,
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_GE_OMAP3430ES2),
- };
-@@ -683,8 +774,8 @@ static struct clockdomain per_clkdm = {
- 	.clkstctrl_reg	= OMAP34XX_CM_REGADDR(OMAP3430_PER_MOD,
- 						 OMAP2_CM_CLKSTCTRL),
- 	.dep_bit	= OMAP3430_EN_PER_SHIFT,
--	.wkdep_srcs	= per_usbhost_wkdeps,
--	.sleepdep_srcs	= dss_per_usbhost_sleepdeps,
-+	.wkdep_srcs	= per_wkdeps,
-+	.sleepdep_srcs	= per_sleepdeps,
- 	.clktrctrl_mask = OMAP3430_CLKTRCTRL_PER_MASK,
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
- };
++		if (v)
++			pr_debug("clockdomain: %s: wakeup dependency already "
++				 "set to wake up when %s wakes\n",
++				 clkdm->name, cd->clkdm->name);
++
++		atomic_set(&cd->wkdep_usecount, (v) ? 1 : 0);
++	}
++}
++
++/**
++ * _init_sleepdep_usecount - initialize sleepdep usecounts to match hardware
++ * @clkdm: clockdomain to initialize sleepdep usecounts
++ *
++ * Initialize the sleep dependency usecount variables for clockdomain @clkdm.
++ * If a sleep dependency is present in the hardware, the usecount will be
++ * set to 1; otherwise, it will be set to 0.  Software should clear all
++ * software sleep dependencies prior to calling this function if it wishes
++ * to ensure that all usecounts start at 0.  No return value.
++ */
++static void _init_sleepdep_usecount(struct clockdomain *clkdm)
++{
++	u32 v;
++	struct clkdm_dep *cd;
++
++	if (!cpu_is_omap34xx())
++		return;
++
++	if (!clkdm->sleepdep_srcs)
++		return;
++
++	for (cd = clkdm->sleepdep_srcs; cd->clkdm_name; cd++) {
++		if (!omap_chip_is(cd->omap_chip))
++			continue;
++
++		if (!cd->clkdm && cd->clkdm_name)
++			cd->clkdm = _clkdm_lookup(cd->clkdm_name);
++
++		if (!cd->clkdm) {
++			WARN(!cd->clkdm, "clockdomain: %s: sleepdep clkdm %s "
++			     "not found\n", clkdm->name, cd->clkdm_name);
++			continue;
++		}
++
++		v = prm_read_mod_bits_shift(clkdm->pwrdm.ptr->prcm_offs,
++					    OMAP3430_CM_SLEEPDEP,
++					    (1 << cd->clkdm->dep_bit));
++
++		if (v)
++			pr_debug("clockdomain: %s: sleep dependency already "
++				 "set to prevent from idling until %s "
++				 "idles\n", clkdm->name, cd->clkdm->name);
++
++		atomic_set(&cd->sleepdep_usecount, (v) ? 1 : 0);
++	}
++};
+ 
+ /* Public functions */
+ 
+@@ -272,6 +360,7 @@ void clkdm_init(struct clockdomain **clkdms,
+ 		struct clkdm_autodep *init_autodeps)
+ {
+ 	struct clockdomain **c = NULL;
++	struct clockdomain *clkdm;
+ 	struct clkdm_autodep *autodep = NULL;
+ 
+ 	if (clkdms)
+@@ -282,6 +371,15 @@ void clkdm_init(struct clockdomain **clkdms,
+ 	if (autodeps)
+ 		for (autodep = autodeps; autodep->clkdm.ptr; autodep++)
+ 			_autodep_lookup(autodep);
++
++	/*
++	 * Ensure that the *dep_usecount registers reflect the current
++	 * state of the PRCM.
++	 */
++	list_for_each_entry(clkdm, &clkdm_list, node) {
++		_init_wkdep_usecount(clkdm);
++		_init_sleepdep_usecount(clkdm);
++	}
+ }
+ 
+ /**
+@@ -387,11 +485,13 @@ int clkdm_add_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
+ 		return PTR_ERR(cd);
+ 	}
+ 
+-	pr_debug("clockdomain: hardware will wake up %s when %s wakes up\n",
+-		 clkdm1->name, clkdm2->name);
++	if (atomic_inc_return(&cd->wkdep_usecount) == 1) {
++		pr_debug("clockdomain: hardware will wake up %s when %s wakes "
++			 "up\n", clkdm1->name, clkdm2->name);
+ 
+-	prm_set_mod_reg_bits((1 << clkdm2->dep_bit),
+-			     clkdm1->pwrdm.ptr->prcm_offs, PM_WKDEP);
++		prm_set_mod_reg_bits((1 << clkdm2->dep_bit),
++				     clkdm1->pwrdm.ptr->prcm_offs, PM_WKDEP);
++	}
+ 
+ 	return 0;
+ }
+@@ -420,11 +520,13 @@ int clkdm_del_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
+ 		return PTR_ERR(cd);
+ 	}
+ 
+-	pr_debug("clockdomain: hardware will no longer wake up %s after %s "
+-		 "wakes up\n", clkdm1->name, clkdm2->name);
++	if (atomic_dec_return(&cd->wkdep_usecount) == 0) {
++		pr_debug("clockdomain: hardware will no longer wake up %s "
++			 "after %s wakes up\n", clkdm1->name, clkdm2->name);
+ 
+-	prm_clear_mod_reg_bits((1 << clkdm2->dep_bit),
+-			       clkdm1->pwrdm.ptr->prcm_offs, PM_WKDEP);
++		prm_clear_mod_reg_bits((1 << clkdm2->dep_bit),
++				       clkdm1->pwrdm.ptr->prcm_offs, PM_WKDEP);
++	}
+ 
+ 	return 0;
+ }
+@@ -457,6 +559,7 @@ int clkdm_read_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
+ 		return PTR_ERR(cd);
+ 	}
+ 
++	/* XXX It's faster to return the atomic wkdep_usecount */
+ 	return prm_read_mod_bits_shift(clkdm1->pwrdm.ptr->prcm_offs, PM_WKDEP,
+ 				       (1 << clkdm2->dep_bit));
+ }
+@@ -491,12 +594,14 @@ int clkdm_add_sleepdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
+ 		return PTR_ERR(cd);
+ 	}
+ 
+-	pr_debug("clockdomain: will prevent %s from sleeping if %s is active\n",
+-		 clkdm1->name, clkdm2->name);
++	if (atomic_inc_return(&cd->sleepdep_usecount) == 1) {
++		pr_debug("clockdomain: will prevent %s from sleeping if %s "
++			 "is active\n", clkdm1->name, clkdm2->name);
+ 
+-	cm_set_mod_reg_bits((1 << clkdm2->dep_bit),
+-			    clkdm1->pwrdm.ptr->prcm_offs,
+-			    OMAP3430_CM_SLEEPDEP);
++		cm_set_mod_reg_bits((1 << clkdm2->dep_bit),
++				    clkdm1->pwrdm.ptr->prcm_offs,
++				    OMAP3430_CM_SLEEPDEP);
++	}
+ 
+ 	return 0;
+ }
+@@ -531,12 +636,15 @@ int clkdm_del_sleepdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
+ 		return PTR_ERR(cd);
+ 	}
+ 
+-	pr_debug("clockdomain: will no longer prevent %s from sleeping if "
+-		 "%s is active\n", clkdm1->name, clkdm2->name);
++	if (atomic_dec_return(&cd->sleepdep_usecount) == 0) {
++		pr_debug("clockdomain: will no longer prevent %s from "
++			 "sleeping if %s is active\n", clkdm1->name,
++			 clkdm2->name);
+ 
+-	cm_clear_mod_reg_bits((1 << clkdm2->dep_bit),
+-			      clkdm1->pwrdm.ptr->prcm_offs,
+-			      OMAP3430_CM_SLEEPDEP);
++		cm_clear_mod_reg_bits((1 << clkdm2->dep_bit),
++				      clkdm1->pwrdm.ptr->prcm_offs,
++				      OMAP3430_CM_SLEEPDEP);
++	}
+ 
+ 	return 0;
+ }
+@@ -575,12 +683,12 @@ int clkdm_read_sleepdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
+ 		return PTR_ERR(cd);
+ 	}
+ 
++	/* XXX It's faster to return the atomic sleepdep_usecount */
+ 	return prm_read_mod_bits_shift(clkdm1->pwrdm.ptr->prcm_offs,
+ 				       OMAP3430_CM_SLEEPDEP,
+ 				       (1 << clkdm2->dep_bit));
+ }
+ 
+-
+ /**
+  * omap2_clkdm_clktrctrl_read - read the clkdm's current state transition mode
+  * @clk: struct clk * of a clockdomain
+diff --git a/arch/arm/plat-omap/include/plat/clockdomain.h b/arch/arm/plat-omap/include/plat/clockdomain.h
+index 2286971..192cc95 100644
+--- a/arch/arm/plat-omap/include/plat/clockdomain.h
++++ b/arch/arm/plat-omap/include/plat/clockdomain.h
+@@ -70,6 +70,12 @@ struct clkdm_dep {
+ 	/* Clockdomain pointer - resolved by the clockdomain code */
+ 	struct clockdomain *clkdm;
+ 
++	/* Number of wakeup dependencies causing this clkdm to wake  */
++	atomic_t wkdep_usecount;
++
++	/* Number of sleep dependencies that could prevent clkdm from idle */
++	atomic_t sleepdep_usecount;
++
+ 	/* Flags to mark OMAP chip restrictions, etc. */
+ 	const struct omap_chip_id omap_chip;
+ 
