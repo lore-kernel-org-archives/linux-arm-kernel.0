@@ -1,28 +1,32 @@
-From: dan@debian.org (Daniel Jacobowitz)
-Date: Mon, 11 Jan 2010 19:22:01 -0500
-Subject: 32-bit Thumb-2 breakpoints
-In-Reply-To: <20100112001728.GB4465@shareable.org>
-References: <20100111215816.GA1068@caradoc.them.org>
-	<20100111223503.GD7925@n2100.arm.linux.org.uk>
-	<20100111225436.GA7408@caradoc.them.org>
-	<20100111231027.GA30714@shareable.org>
-	<20100111231702.GA9485@caradoc.them.org>
-	<20100112001728.GB4465@shareable.org>
-Message-ID: <20100112002201.GA14280@caradoc.them.org>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Mon, 11 Jan 2010 16:28:53 -0800
+Subject: [RFC 16/18] arm: msm: add arch_has_speculative_dfetch()
+In-Reply-To: <20100111233356.GJ7925@n2100.arm.linux.org.uk>
+References: <1263250057-26692-1-git-send-email-dwalker@codeaurora.org>
+	<1263250057-26692-17-git-send-email-dwalker@codeaurora.org>
+	<20100111233356.GJ7925@n2100.arm.linux.org.uk>
+Message-ID: <1263256133.26505.49.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2010 at 12:17:28AM +0000, Jamie Lokier wrote:
-> And therefore, would it be possible to modify the CPSR when
-> single-stepping to change the IT state so that the instruction
-> following the next one, i.e. the breakpoint, is unconditional?
-> So you only need one breakpoint after all.
+On Mon, 2010-01-11 at 23:33 +0000, Russell King - ARM Linux wrote:
+> On Mon, Jan 11, 2010 at 02:47:35PM -0800, Daniel Walker wrote:
+> > From: Steve Muckle <smuckle@quicinc.com>
+> > 
+> > The Scorpion CPU speculatively reads data into the cache. This
+> > may occur while a region of memory is being written via DMA, so
+> > that region must be invalidated when it is brought under CPU
+> > control after the DMA transaction finishes, assuming the DMA
+> > was either bidirectional or from the device.
+> > 
+> > Currently both a clean and invalidate are being done for
+> > DMA_BIDIRECTIONAL in dma_unmap_single. Only an invalidate should be
+> > required here. There are drivers that currently rely on the clean
+> > however so this will be removed when those drivers are updated.
+> 
+> NAK.  There are patches around (and potentially queued) for the next
+> merge window which properly address this.
 
-Yes, I thought about doing this.  However, the many combinations of
-ways you'd have to restore the modified CPSR gave me a fright.  I
-don't think it's a robust solution.  It's just different enough from
-out-of-line stepping to be unable to share the code.
+Do you have any hints on who's doing the development ?
 
--- 
-Daniel Jacobowitz
-CodeSourcery
+Daniel
