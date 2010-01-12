@@ -1,43 +1,33 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 12 Jan 2010 14:24:04 +0000
-Subject: [RFC,PATCH 1/7 v2] Add a common struct clk
-In-Reply-To: <20100112090149.GB26435@n2100.arm.linux.org.uk>
-References: <1263279511.160551.332624337260.1.gpush@pororo>
-	<4B4C376C.6080705@st.com>
-	<20100112090149.GB26435@n2100.arm.linux.org.uk>
-Message-ID: <20100112142404.GD18532@trinity.fluff.org>
+From: dan@debian.org (Daniel Jacobowitz)
+Date: Tue, 12 Jan 2010 09:25:23 -0500
+Subject: 32-bit Thumb-2 breakpoints
+In-Reply-To: <1263292498.29654.26.camel@pc1117.cambridge.arm.com>
+References: <20100111215816.GA1068@caradoc.them.org>
+	<1263292498.29654.26.camel@pc1117.cambridge.arm.com>
+Message-ID: <20100112142523.GA28804@caradoc.them.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2010 at 09:01:49AM +0000, Russell King - ARM Linux wrote:
-> On Tue, Jan 12, 2010 at 09:48:44AM +0100, Francesco VIRLINZI wrote:
-> > Hi Jeremy
-> > In November I already sent a proposal on
-> >  a generic linux clk framework.
-> > On that I would suggest:
-> >
-> >>
-> >> +struct clk {
-> >> +	const struct clk_operations *ops;
-> >>    
-> >            spinlock_t lock;
-> >            const char *name;
-> >            int id;
+On Tue, Jan 12, 2010 at 10:34:58AM +0000, Catalin Marinas wrote:
+> On Mon, 2010-01-11 at 21:58 +0000, Daniel Jacobowitz wrote:
+> > The kernel currently reserves two architecturally undefined
+> > instructions for breakpoints, one ARM and one Thumb.  I suggest
+> > another for Thumb-2, provisionally 0xfff7 0xffcf, but I'm open
+> > to any other suggestion.  Any comments?  If that sounds OK,
+> > I can put together a patch.
 > 
-> Name and ID are totally pointless, unless you insist on using the clk
-> API in the wrong way (like S3C does.)
+> I find the reasons good enough to add a 32-bit Thumb-2 breakpoint
+> instruction.
+> 
+> Regarding the opcode, can we not use a permanently undefined one? There
+> is A6.3.4 in the ARM ARM defining such encoding. Maybe something like
+> 0xf7f0 a000 (or 0xa000 f7f0 if you write it as a 32-bit word).
 
-I do intend to change the clock lookup on the Samsung series, but we're
-currently in the process of trying to do a whole pile of work on not
-only adding new SoCs but also cleaning up the existing support and making
-a whole pile of code common to all the Samsung SoC family.
+Thanks, I meant to but messed up the byte ordering (and more).  I got
+something currently undefined, and didn't notice :-(
 
-I never got the time to go throughly through Francesco's clock framework
-but it seemed rathe rcomplicated for our current requirements and also
-had a whole pile of style problems that made it really difficult to read.
+I'll plan on 0xf7f0 0xa000.
 
 -- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Daniel Jacobowitz
+CodeSourcery
