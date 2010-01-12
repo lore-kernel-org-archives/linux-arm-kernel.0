@@ -1,39 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Jan 2010 16:25:39 +0000
-Subject: [RFC,PATCH 3/7 v2] arm/versatile: use generic struct clk
-In-Reply-To: <1263279511.161193.484965724912.3.gpush@pororo>
-References: <1263279511.160127.576969496193.0.gpush@pororo>
-	<1263279511.161193.484965724912.3.gpush@pororo>
-Message-ID: <20100112162539.GH27771@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 12 Jan 2010 16:26:12 +0000
+Subject: question about ARM11MP cpu architecture identification
+In-Reply-To: <c70ff3ad1001120821u1f546480nd0229e560d84293@mail.gmail.com>
+References: <c70ff3ad1001120821u1f546480nd0229e560d84293@mail.gmail.com>
+Message-ID: <1263313572.29654.105.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2010 at 05:58:31PM +1100, Jeremy Kerr wrote:
-> diff --git a/arch/arm/common/clkdev.c b/arch/arm/common/clkdev.c
-> index aae5bc0..71e7596 100644
-> --- a/arch/arm/common/clkdev.c
-> +++ b/arch/arm/common/clkdev.c
-> @@ -85,11 +85,13 @@ struct clk *clk_get(struct device *dev, const char *con_id)
->  }
->  EXPORT_SYMBOL(clk_get);
->  
-> +#ifndef CONFIG_USE_COMMON_STRUCT_CLK
->  void clk_put(struct clk *clk)
->  {
->  	__clk_put(clk);
->  }
->  EXPORT_SYMBOL(clk_put);
-> +#endif /* CONFIG_USE_COMMON_STRUCT_CLK */
+On Tue, 2010-01-12 at 16:21 +0000, saeed bishara wrote:
+>     The ARM11MP (rev r2p0) cpu architecture is ARMv6, and according to
+> the http://infocenter.arm.com, its Main ID register is 0x410FB024, and
+> the MMFR[3:0] is 3. but it looks to me that the cpu_architecture()
+> will identify it as ARMv7, and if the kernel was configured with
+> CPU_V7 only, then the lookup_processor_type() function also will
+> identify it as ARMv7. Am I missing something here?
 
-This doesn't make any sense.  What are you trying to do here?
+cpu_architecture() returns the architecture version of the supported MMU
+which on ARM11MPCore is the same as on ARMv7.
 
-The get/put operations go together as one logical set - that's why you
-get both if you're using clkdev, and why you're asked to implement both
-__clk_get() and __clk_put() in arch code to do whatever's necessary
-with the clock.
+Even if it is possible to configure both v6 and v7 in the same kernel, I
+don't think it is currently possible to successfully run such kernel.
 
-Let me guess, and say that clk_put() is not a release method.  It's a
-method for drivers to say "I'm done with this clock" and for the arch
-code to reverse the effects of __clk_get()/clk_get().
-
-Currently, its only user is to balance module counts.
+-- 
+Catalin
