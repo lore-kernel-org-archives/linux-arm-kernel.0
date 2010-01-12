@@ -1,74 +1,134 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 11 Jan 2010 18:05:31 -0700
-Subject: [PATCH 00/10] OMAP2/3/4 clockdomains/powerdomains: split shared
-	dependencies and clean up - for 2.6.34
-Message-ID: <20100112010258.6275.97999.stgit@localhost.localdomain>
+Date: Mon, 11 Jan 2010 18:05:36 -0700
+Subject: [PATCH 03/10] OMAP2 clockdomain: modem clockdomain is only present on
+	OMAP2430
+In-Reply-To: <20100112010258.6275.97999.stgit@localhost.localdomain>
+References: <20100112010258.6275.97999.stgit@localhost.localdomain>
+Message-ID: <20100112010535.6275.64343.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+For some reason, previously, we included the MDM clockdomain on all 24xx,
+but the stacked die-on-die modem configuration (chassis mode) is only
+available on OMAP2430.
 
-this series has already been posted on linux-omap, but is being
-reposted here on linux-arm-kernel in case others wish to comment
-before sending upstream to the for-next tree for 2.6.34 merging.
-
-- Paul
-
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
+ arch/arm/mach-omap2/clockdomains.h |   49 ++++++++++++++++++++----------------
+ 1 files changed, 27 insertions(+), 22 deletions(-)
 
-Hi,
-
-This series moves wakeup and sleep dependencies on the OMAP2/3 chips from
-the powerdomain layer to the clockdomain layer, where they belong.  It also
-adds usecounting for clockdomain dependency usecounting, which fixes the
-obvious problem that occurs when several different pieces of code need
-to add clockdomain dependencies, and then one removes the dependency.
-(To add usecounting, the dependencies that were shared between
-clockdomains have been split into separate records.)  These changes should
-prepare the clockdomain code for OMAP4 clockdomain dependencies.
-
-The series also does some cleanup.  struct powerdomain is packed, the
-dead function pwrdm_clk_state_switch() is removed, documentation is improved,
-the nonexistent MDM clockdomain is removed from OMAP2420.
-
-Boot-tested on N800, 2430SDP, and OMAP3 Beagle.  Compile-tested with
-omap_osk_5912_defconfig.
-
-Applies on the 'for_2.6.34' branch of git://git.pwsan.com/linux-2.6
-
-
-- Paul
-
----
-
-   text    data     bss     dec     hex filename
-3622921  198528  102984 3924433  3be1d1 vmlinux.beagle.orig
-3623325  199168  102984 3925477  3be5e5 vmlinux.beagle
-
-Paul Walmsley (10):
-      OMAP2/3 clkdm/pwrdm: move wkdep/sleepdep handling from pwrdm to clkdm
-      OMAP2/3 clockdomains: split shared structures so usecounting works
-      OMAP2 clockdomain: modem clockdomain is only present on OMAP2430
-      OMAP clockdomain/powerdomain: remove runtime register/unregister
-      OMAP clockdomains: add usecounting for wakeup and sleep dependencies
-      OMAP2/3/4 clockdomain: add clkdm_clear_all_{wkdep,sleepdep}s()
-      OMAP powerdomain/PM: use symbolic constants for the max number of power states
-      OMAP powerdomain: rearrange struct powerdomain to save some memory
-      OMAP powerdomain: remove pwrdm_clk_state_switch
-      OMAP clockdomain/powerdomain: improve documentation
-
-
- arch/arm/mach-omap2/clockdomain.c             |  691 +++++++++++++++++++------
- arch/arm/mach-omap2/clockdomains.h            |  474 +++++++++++++++++
- arch/arm/mach-omap2/io.c                      |    2 
- arch/arm/mach-omap2/omap_hwmod.c              |   10 
- arch/arm/mach-omap2/pm34xx.c                  |   10 
- arch/arm/mach-omap2/powerdomain.c             |  570 ++++-----------------
- arch/arm/mach-omap2/powerdomains.h            |   88 ---
- arch/arm/mach-omap2/powerdomains24xx.h        |   87 ---
- arch/arm/mach-omap2/powerdomains34xx.h        |  145 -----
- arch/arm/mach-omap2/prcm.c                    |   12 
- arch/arm/plat-omap/include/plat/clockdomain.h |   99 ++--
- arch/arm/plat-omap/include/plat/powerdomain.h |   78 +--
- arch/arm/plat-omap/include/plat/prcm.h        |    8 
- 13 files changed, 1241 insertions(+), 1033 deletions(-)
+diff --git a/arch/arm/mach-omap2/clockdomains.h b/arch/arm/mach-omap2/clockdomains.h
+index 9629ef1..fb026da 100644
+--- a/arch/arm/mach-omap2/clockdomains.h
++++ b/arch/arm/mach-omap2/clockdomains.h
+@@ -110,10 +110,10 @@ static struct clkdm_dep dsp_24xx_wkdeps[] = {
+ };
+ 
+ /*
+- * 2420/2430 PM_WKDEP_MDM: CORE, MPU, WKUP
+- * XXX This is probably 2430-only; 2420 did not have a stacked modem config.
++ * 2420 PM_WKDEP_MPU: CORE, DSP, WKUP
++ * 2430 adds MDM
+  */
+-static struct clkdm_dep mdm_24xx_wkdeps[] = {
++static struct clkdm_dep mpu_24xx_wkdeps[] = {
+ 	{
+ 		.clkdm_name = "core_l3_clkdm",
+ 		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP24XX)
+@@ -123,31 +123,35 @@ static struct clkdm_dep mdm_24xx_wkdeps[] = {
+ 		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP24XX)
+ 	},
+ 	{
+-		.clkdm_name = "mpu_clkdm",
++		.clkdm_name = "dsp_clkdm",
+ 		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP24XX)
+ 	},
+ 	{
+ 		.clkdm_name = "wkup_clkdm",
+ 		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP24XX)
+ 	},
++	{
++		.clkdm_name = "mdm_clkdm",
++		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP2430)
++	},
+ 	{ NULL },
+ };
+ 
+ /*
+- * 2420 PM_WKDEP_MPU: CORE, DSP, WKUP
++ * 2420 PM_WKDEP_CORE: DSP, GFX, MPU, WKUP
+  * 2430 adds MDM
+  */
+-static struct clkdm_dep mpu_24xx_wkdeps[] = {
++static struct clkdm_dep core_24xx_wkdeps[] = {
+ 	{
+-		.clkdm_name = "core_l3_clkdm",
++		.clkdm_name = "dsp_clkdm",
+ 		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP24XX)
+ 	},
+ 	{
+-		.clkdm_name = "core_l4_clkdm",
++		.clkdm_name = "gfx_clkdm",
+ 		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP24XX)
+ 	},
+ 	{
+-		.clkdm_name = "dsp_clkdm",
++		.clkdm_name = "mpu_clkdm",
+ 		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP24XX)
+ 	},
+ 	{
+@@ -161,17 +165,21 @@ static struct clkdm_dep mpu_24xx_wkdeps[] = {
+ 	{ NULL },
+ };
+ 
+-/*
+- * 2420 PM_WKDEP_CORE: DSP, GFX, MPU, WKUP
+- * 2430 adds MDM
+- */
+-static struct clkdm_dep core_24xx_wkdeps[] = {
++#endif
++
++
++/* 2430-specific possible wakeup dependencies */
++
++#ifdef CONFIG_ARCH_OMAP2430
++
++/* 2430 PM_WKDEP_MDM: CORE, MPU, WKUP */
++static struct clkdm_dep mdm_2430_wkdeps[] = {
+ 	{
+-		.clkdm_name = "dsp_clkdm",
++		.clkdm_name = "core_l3_clkdm",
+ 		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP24XX)
+ 	},
+ 	{
+-		.clkdm_name = "gfx_clkdm",
++		.clkdm_name = "core_l4_clkdm",
+ 		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP24XX)
+ 	},
+ 	{
+@@ -182,14 +190,11 @@ static struct clkdm_dep core_24xx_wkdeps[] = {
+ 		.clkdm_name = "wkup_clkdm",
+ 		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP24XX)
+ 	},
+-	{
+-		.clkdm_name = "mdm_clkdm",
+-		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP2430)
+-	},
+ 	{ NULL },
+ };
+ 
+-#endif
++#endif /* CONFIG_ARCH_OMAP2430 */
++
+ 
+ /* 34XX-specific possible dependencies */
+ 
+@@ -549,7 +554,7 @@ static struct clockdomain mdm_clkdm = {
+ 	.clkstctrl_reg  = OMAP2430_CM_REGADDR(OMAP2430_MDM_MOD,
+ 						 OMAP2_CM_CLKSTCTRL),
+ 	.dep_bit	= OMAP2430_PM_WKDEP_MPU_EN_MDM_SHIFT,
+-	.wkdep_srcs	= mdm_24xx_wkdeps,
++	.wkdep_srcs	= mdm_2430_wkdeps,
+ 	.clktrctrl_mask = OMAP2430_AUTOSTATE_MDM_MASK,
+ 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2430),
+ };
