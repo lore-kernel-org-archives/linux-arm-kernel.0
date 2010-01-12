@@ -1,32 +1,93 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Mon, 11 Jan 2010 16:28:53 -0800
-Subject: [RFC 16/18] arm: msm: add arch_has_speculative_dfetch()
-In-Reply-To: <20100111233356.GJ7925@n2100.arm.linux.org.uk>
-References: <1263250057-26692-1-git-send-email-dwalker@codeaurora.org>
-	<1263250057-26692-17-git-send-email-dwalker@codeaurora.org>
-	<20100111233356.GJ7925@n2100.arm.linux.org.uk>
-Message-ID: <1263256133.26505.49.camel@c-dwalke-linux.qualcomm.com>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Tue, 12 Jan 2010 01:40:14 +0100
+Subject: [PATCH] Add S3C64XX RTC platform driver
+Message-ID: <b2e8f9f71001111640y155d819es4187f4d9398fb956@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-01-11 at 23:33 +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 11, 2010 at 02:47:35PM -0800, Daniel Walker wrote:
-> > From: Steve Muckle <smuckle@quicinc.com>
-> > 
-> > The Scorpion CPU speculatively reads data into the cache. This
-> > may occur while a region of memory is being written via DMA, so
-> > that region must be invalidated when it is brought under CPU
-> > control after the DMA transaction finishes, assuming the DMA
-> > was either bidirectional or from the device.
-> > 
-> > Currently both a clean and invalidate are being done for
-> > DMA_BIDIRECTIONAL in dma_unmap_single. Only an invalidate should be
-> > required here. There are drivers that currently rely on the clean
-> > however so this will be removed when those drivers are updated.
-> 
-> NAK.  There are patches around (and potentially queued) for the next
-> merge window which properly address this.
+Add S3C64XX RTC platform driver
 
-Do you have any hints on who's doing the development ?
+Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
+---
+ arch/arm/mach-s3c6400/include/mach/map.h |    1 +
+ arch/arm/plat-s3c64xx/Makefile           |    1 +
+ arch/arm/plat-s3c64xx/dev-rtc.c          |   43 ++++++++++++++++++++++++++++++
+ 3 files changed, 45 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-s3c64xx/dev-rtc.c
 
-Daniel
+diff --git a/arch/arm/mach-s3c6400/include/mach/map.h
+b/arch/arm/mach-s3c6400/include/mach/map.h
+index 106ee13..793fb8b 100644
+--- a/arch/arm/mach-s3c6400/include/mach/map.h
++++ b/arch/arm/mach-s3c6400/include/mach/map.h
+@@ -42,6 +42,7 @@
+ #define S3C64XX_PA_FB		(0x77100000)
+ #define S3C64XX_PA_USB_HSOTG	(0x7C000000)
+ #define S3C64XX_PA_WATCHDOG	(0x7E004000)
++#define S3C64XX_PA_RTC		(0x7E005000)
+ #define S3C64XX_PA_SYSCON	(0x7E00F000)
+ #define S3C64XX_PA_AC97		(0x7F001000)
+ #define S3C64XX_PA_IIS0		(0x7F002000)
+diff --git a/arch/arm/plat-s3c64xx/Makefile b/arch/arm/plat-s3c64xx/Makefile
+index b85b435..e66dbd7 100644
+--- a/arch/arm/plat-s3c64xx/Makefile
++++ b/arch/arm/plat-s3c64xx/Makefile
+@@ -13,6 +13,7 @@ obj-				:=
+ # Core files
+
+ obj-y				+= dev-uart.o
++obj-y				+= dev-rtc.o
+ obj-y				+= cpu.o
+ obj-y				+= irq.o
+ obj-y				+= irq-eint.o
+diff --git a/arch/arm/plat-s3c64xx/dev-rtc.c b/arch/arm/plat-s3c64xx/dev-rtc.c
+new file mode 100644
+index 0000000..b9e7a05
+--- /dev/null
++++ b/arch/arm/plat-s3c64xx/dev-rtc.c
+@@ -0,0 +1,43 @@
++/* linux/arch/arm/plat-s3c64xx/dev-rtc.c
++ *
++ * Copyright 2009 by Maurus Cuelenaere <mcuelenaere@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/kernel.h>
++#include <linux/string.h>
++#include <linux/platform_device.h>
++
++#include <mach/irqs.h>
++#include <mach/map.h>
++
++#include <plat/devs.h>
++
++static struct resource s3c_rtc_resource[] = {
++	[0] = {
++		.start = S3C64XX_PA_RTC,
++		.end   = S3C64XX_PA_RTC + 0xff,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_RTC_ALARM,
++		.end   = IRQ_RTC_ALARM,
++		.flags = IORESOURCE_IRQ,
++	},
++	[2] = {
++		.start = IRQ_RTC_TIC,
++		.end   = IRQ_RTC_TIC,
++		.flags = IORESOURCE_IRQ
++	}
++};
++
++struct platform_device s3c_device_rtc = {
++	.name		  = "s3c64xx-rtc",
++	.id		  = -1,
++	.num_resources	  = ARRAY_SIZE(s3c_rtc_resource),
++	.resource	  = s3c_rtc_resource,
++};
++EXPORT_SYMBOL(s3c_device_rtc);
+-- 
+1.6.6
