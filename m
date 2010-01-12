@@ -1,242 +1,94 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 12 Jan 2010 14:30:19 +0000
-Subject: [RFC,PATCH 1/7 v2] Add a common struct clk
-In-Reply-To: <1263279511.160551.332624337260.1.gpush@pororo>
-References: <1263279511.160127.576969496193.0.gpush@pororo>
-	<1263279511.160551.332624337260.1.gpush@pororo>
-Message-ID: <20100112143019.GF18532@trinity.fluff.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 12 Jan 2010 14:41:18 +0000
+Subject: [RFC 08/18] arm: msm: set L2CR1 to enable prefetch
+	andburstonScorpion.
+In-Reply-To: <20100112135859.GF27771@n2100.arm.linux.org.uk>
+References: <20100111234540.GN7925@n2100.arm.linux.org.uk>
+	<1263293501.29654.40.camel@pc1117.cambridge.arm.com>
+	<20100112114441.GB27771@n2100.arm.linux.org.uk>
+	<1263303176.29654.71.camel@pc1117.cambridge.arm.com>
+	<20100112135859.GF27771@n2100.arm.linux.org.uk>
+Message-ID: <1263307279.29654.102.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2010 at 05:58:31PM +1100, Jeremy Kerr wrote:
-> We currently have 21 definitions of struct clk in the ARM architecture,
-> each defined on a per-platform basis. This makes it difficult to define
-> platform- (or architecture-) independent clock sources without making
-> assumptions about struct clk.
+On Tue, 2010-01-12 at 13:58 +0000, Russell King - ARM Linux wrote:
+> On Tue, Jan 12, 2010 at 01:32:56PM +0000, Catalin Marinas wrote:
+> > On Tue, 2010-01-12 at 11:44 +0000, Russell King - ARM Linux wrote:
+> > > Actually, what you describe is what's already being done by the head.S
+> > > code - we already build a temporary page table and enable the MMU so that
+> > > we can get the C code running to setup the page tables properly.
+> >
+> > Yes, that's the table I was referring to. It could be even made not to
+> > depend on CONFIG_SMP and always make it UP (no shared bit, this way it
+> > would be simpler to run SMP kernel on UP hardware by doing some checks
+> > later).
 > 
-> This change is an effort to unify struct clk where possible, by defining
-> a common struct clk, containing a set of clock operations. Different
-> clock implementations can set their own operations, and have a standard
-> interface for generic code. The callback interface is exposed to the
-> kernel proper, while the clock implementations only need to be seen by
-> the platform internals.
-> 
-> This allows us to share clock code among platforms, and makes it
-> possible to dynamically create clock devices in platform-independent
-> code.
-> 
-> Platforms can enable the generic struct clock through
-> CONFIG_USE_COMMON_STRUCT_CLK.
-> 
-> The common clock definitions are based on a development patch from Ben
-> Herrenschmidt <benh@kernel.crashing.org>.
-> 
-> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
-> 
-> ---
->  arch/Kconfig        |    3 
->  include/linux/clk.h |  134 +++++++++++++++++++++++++++++++++++---------
->  2 files changed, 110 insertions(+), 27 deletions(-)
-> 
-> diff --git a/arch/Kconfig b/arch/Kconfig
-> index 9d055b4..cefc026 100644
-> --- a/arch/Kconfig
-> +++ b/arch/Kconfig
-> @@ -140,4 +140,7 @@ config HAVE_HW_BREAKPOINT
->  config HAVE_USER_RETURN_NOTIFIER
->  	bool
->  
-> +config USE_COMMON_STRUCT_CLK
-> +	bool
-> +
->  source "kernel/gcov/Kconfig"
-> diff --git a/include/linux/clk.h b/include/linux/clk.h
-> index 1d37f42..1a6199e 100644
-> --- a/include/linux/clk.h
-> +++ b/include/linux/clk.h
-> @@ -11,36 +11,101 @@
->  #ifndef __LINUX_CLK_H
->  #define __LINUX_CLK_H
->  
-> -struct device;
-> +#include <linux/err.h>
->  
-> -/*
-> - * The base API.
-> +#ifdef CONFIG_USE_COMMON_STRUCT_CLK
-> +
-> +/* If we're using the common struct clk, we define the base clk object here,
-> + * which will be 'subclassed' by device-specific implementations. For example:
-> + *
-> + *  struct clk_foo {
-> + *      struct clk;
-> + *      [device specific fields]
-> + *  };
-> + *
-> + * We define the common clock API through a set of static inlines that call the
-> + * corresponding clk_operations. The API is exactly the same as that documented
-> + * in the !CONFIG_USE_COMMON_STRUCT_CLK case.
->   */
->  
-> +struct clk {
-> +	const struct clk_operations *ops;
-> +};
-> +
-> +struct clk_operations {
-> +       int             (*enable)(struct clk *);
+> From what I remember, there's a problem where the TTB flags don't match
+> the memory which the page tables live in, so we had to make the two
+> match - and it's not possible to change the TTB flags and the page
+> tables simultaneously, certainly not without turning the MMU off, doing
+> the modification and turning it back on again.
 
-Personaly I'd leave the enable/disable as one call which takes
-(struct clk *, bool on). these code paths tend to be pretty much the
-same read/modify/write with only the modify changing depending on the
-on parameter.
+Indeed, it would need turning the MMU off and on again when switching to
+a new page table.
 
-> +       void            (*disable)(struct clk *);
-> +       unsigned long   (*get_rate)(struct clk *);
-> +       void            (*put)(struct clk *);
-> +       long            (*round_rate)(struct clk *, unsigned long);
-> +       int             (*set_rate)(struct clk *, unsigned long);
-> +       int             (*set_parent)(struct clk *, struct clk *);
-> +       struct clk*     (*get_parent)(struct clk *);
-> +};
-> +
-> +static inline int clk_enable(struct clk *clk)
-> +{
-> +	if (clk->ops->enable)
-> +		return clk->ops->enable(clk);
-> +	return 0;
-> +}
-> +
-> +static inline void clk_disable(struct clk *clk)
-> +{
-> +	if (clk->ops->disable)
-> +		clk->ops->disable(clk);
-> +}
-> +
-> +static inline unsigned long clk_get_rate(struct clk *clk)
-> +{
-> +	if (clk->ops->get_rate)
-> +		return clk->ops->get_rate(clk);
-> +	return 0;
-> +}
-> +
-> +static inline void clk_put(struct clk *clk)
-> +{
-> +	if (clk->ops->put)
-> +		clk->ops->put(clk);
-> +}
-> +
-> +static inline long clk_round_rate(struct clk *clk, unsigned long rate)
-> +{
-> +	if (clk->ops->round_rate)
-> +		return clk->ops->round_rate(clk, rate);
-> +	return -ENOSYS;
-> +}
-> +
-> +static inline int clk_set_rate(struct clk *clk, unsigned long rate)
-> +{
-> +	if (clk->ops->set_rate)
-> +		return clk->ops->set_rate(clk, rate);
-> +	return -ENOSYS;
-> +}
-> +
-> +static inline int clk_set_parent(struct clk *clk, struct clk *parent)
-> +{
-> +	if (clk->ops->set_parent)
-> +		return clk->ops->set_parent(clk, parent);
-> +	return -ENOSYS;
-> +}
-> +
-> +static inline struct clk *clk_get_parent(struct clk *clk)
-> +{
-> +	if (clk->ops->get_parent)
-> +		return clk->ops->get_parent(clk);
-> +	return ERR_PTR(-ENOSYS);
-> +}
+I tried in the past to run an SMP kernel on UP platform (and gave up
+because of lack of time) and the main issue was the shared setting of
+the page tables where exclusives wound no longer work on UP. Anyway, I
+think this subject diverges from the original discussion (maybe for a
+different thread).
 
-In the Samsung impelemtnations, the clk keeps a parent pointer and
-we just return that as the esult of the clk_get_parent nless the clock
-wants to override it.
-
-> +
-> +#else /* !CONFIG_USE_COMMON_STRUCT_CLK */
->  
->  /*
-> - * struct clk - an machine class defined object / cookie.
-> + * Global clock object, actual structure is declared per-machine
->   */
->  struct clk;
->  
->  /**
-> - * clk_get - lookup and obtain a reference to a clock producer.
-> - * @dev: device for clock "consumer"
-> - * @id: clock comsumer ID
-> - *
-> - * Returns a struct clk corresponding to the clock producer, or
-> - * valid IS_ERR() condition containing errno.  The implementation
-> - * uses @dev and @id to determine the clock consumer, and thereby
-> - * the clock producer.  (IOW, @id may be identical strings, but
-> - * clk_get may return different clock producers depending on @dev.)
-> - *
-> - * Drivers must assume that the clock source is not enabled.
-> - *
-> - * clk_get should not be called from within interrupt context.
-> - */
-> -struct clk *clk_get(struct device *dev, const char *id);
-> -
-> -/**
->   * clk_enable - inform the system when the clock source should be running.
->   * @clk: clock source
->   *
-> @@ -83,12 +148,6 @@ unsigned long clk_get_rate(struct clk *clk);
->   */
->  void clk_put(struct clk *clk);
->  
-> -
-> -/*
-> - * The remaining APIs are optional for machine class support.
-> - */
-> -
-> -
->  /**
->   * clk_round_rate - adjust a rate to the exact rate a clock can provide
->   * @clk: clock source
-> @@ -125,6 +184,27 @@ int clk_set_parent(struct clk *clk, struct clk *parent);
->   */
->  struct clk *clk_get_parent(struct clk *clk);
->  
-> +#endif /* !CONFIG_USE_COMMON_STRUCT_CLK */
-> +
-> +struct device;
-> +
-> +/**
-> + * clk_get - lookup and obtain a reference to a clock producer.
-> + * @dev: device for clock "consumer"
-> + * @id: clock comsumer ID
-> + *
-> + * Returns a struct clk corresponding to the clock producer, or
-> + * valid IS_ERR() condition containing errno.  The implementation
-> + * uses @dev and @id to determine the clock consumer, and thereby
-> + * the clock producer.  (IOW, @id may be identical strings, but
-> + * clk_get may return different clock producers depending on @dev.)
-> + *
-> + * Drivers must assume that the clock source is not enabled.
-> + *
-> + * clk_get should not be called from within interrupt context.
-> + */
-> +struct clk *clk_get(struct device *dev, const char *id);
-> +
->  /**
->   * clk_get_sys - get a clock based upon the device name
->   * @dev_id: device name
+> > We still have things like the SMP/nAMP mode which is Cortex-A9 and
+> > ARM11MPCore specific. There is also the TLB ops broadcasting bit in
+> > ACTLR which is also specific to ARM Ltd cores and some of these bits
+> > may not be accessible directly if you run in non-secure mode.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> If you're running in non-secure mode and the parts of the system you
+> don't have access to haven't already been setup, you're running in a
+> crippled environment - so this isn't really an argument.
+
+My argument was that ACTLR is implementation-defined, so other cores
+like Scorpion may have a different meaning for such bits (Daniel's
+patches are probably held in the moderation queue, I only saw your
+replies).
+
+> > > It strikes me that things are just becoming excessively complicated with
+> > > these seemingly "catch-22" issues.  Maybe a totally different approach is
+> > > needed - such as requiring some of this low level setup to be done by the
+> > > platform's boot loader?
+> >
+> > Ideally, yes, it would be nice if these were done by the boot loader. We
+> > would have to define some clear requirements or at least saying that
+> > Linux only touches the architectured registers and not the
+> > implementation defined ones. But I'm not sure how feasible this would
+> > be.
+> 
+> Unless we do something like this, we're going to end up with lots of
+> bits of additional platform specific non-conditional assembly in the
+> early kernel boot path.
+
+As a gatekeeper, maybe you could just reject such patches and enforce
+the implementation-specific bits setting in the boot loader. That's also
+true for the SMP/nAMP mode setting on A9 and 11MPCore.
+
+> > There is also the CPU hotplug case where CPUs come back via the setup
+> > function and may need to touch bits like SMP/nAMP. This should work
+> > together with a boot monitor.
+> 
+> How does the CPU get back to the setup function?  Is the hardware aware
+> of the address of our setup function?  I don't think so, so I don't buy
+> this argument.
+> 
+> If the CPU is reset (eg, because power has been removed), it's going to
+> want to start executing from the reset vector - which means it will come
+> back to us via the boot loader.
+
+It depends on what you put in the reset vector (on RealView, address 0
+gets remapped to RAM). It is true that it can come back online via the
+boot loader (especially if Linux is running in non-secure mode). There
+are a few complications like the boot loader being around (flash) and
+the kernel knowing its address but it's doable.
 
 -- 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Catalin
