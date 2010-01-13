@@ -1,69 +1,25 @@
-From: acassis@gmail.com (Alan Carvalho de Assis)
-Date: Wed, 13 Jan 2010 16:33:21 -0200
-Subject: [PATCH] RFC: mx27: Add soc_camera support
-In-Reply-To: <eedb5541001040431j3f14ec55g66ed4dd44a2a840e@mail.gmail.com>
-References: <1260885686-8478-1-git-send-email-acassis@gmail.com>
-	<37367b3a0912150607v713edc32y3578fa2a0c8c61db@mail.gmail.com>
-	<eedb5541001032340n66205fb8s57e09d2ba413b322@mail.gmail.com>
-	<37367b3a1001040412k280f3366p4868e36f5a7f71e4@mail.gmail.com>
-	<eedb5541001040425h2a3c07dcn534c71a0918b322b@mail.gmail.com>
-	<eedb5541001040431j3f14ec55g66ed4dd44a2a840e@mail.gmail.com>
-Message-ID: <37367b3a1001131033u74c30ad6q8da1dbc35982e008@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 13 Jan 2010 19:02:26 +0000
+Subject: [PATCH] Offer 'uncacheable memory' as DMA coherent memory for
+	ARMv6
+In-Reply-To: <A24693684029E5489D1D202277BE8944514AD02C@dlee02.ent.ti.com>
+References: <20100113180327.GE28292@n2100.arm.linux.org.uk>
+	<A24693684029E5489D1D202277BE8944514AD02C@dlee02.ent.ti.com>
+Message-ID: <20100113190226.GF28292@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+On Wed, Jan 13, 2010 at 12:22:11PM -0600, Aguirre, Sergio wrote:
+> (Replacing linux-arm-kernel at lists.arm.linux.org.uk with linux-arm-kernel at lists.infradead.org, as I got a SMTP error: "550 Please direct your message to the new mailing lists on lists.infradead.org")
 
-On 1/4/10, javier Martin <javier.martin@vista-silicon.com> wrote:
-> 2010/1/4 javier Martin <javier.martin@vista-silicon.com>
->
->>
->>
->> 2010/1/4 Alan Carvalho de Assis <acassis@gmail.com>
->>
->> Hi Javier,
->>>
->>> On 1/4/10, javier Martin <javier.martin@vista-silicon.com> wrote:
->>> > Alan,
->>> > please, could you point me against which kernel version did you exactly
->>> test
->>> > this patch?
->>>
->>> It applies on current kernel from
->>> git.pengutronix.de/git/imx/linux-2.6.git
->>>
->>> Thank you for your feedback Alan.
->>
->>> > Also it would be fine to know which video sensor did you use.
->>> >
->>>
->>> I'm planning to use an OV2640 camera.
->>>
->> Does this mean that this patch you are sending has been only
->> compile-tested?
->>
->
-> Argh, sorry, you pointed this in your previous mail.
->
-> Too bad we don't have any sensor available currently in mainline to do a
-> fast test.
->
+Oops.
 
-Unfortunately my camera is not responding to I2C commands, I already
-slow it down to 10kbps with no success. I can see on oscilloscope
-i.MX27 send I2C commands, but the camera doesn't respond to it.
+> > +config ARM_DMA_MEM_BUFFERABLE
+> > +	bool "Use non-cacheable memory for DMA" if CPU_V6 && !CPU_V7
+> > +	default y
+> 
+> Perhaps you meant here:
+> 
+> default y if CPU_V6 && !CPU_V7
 
-Then I tested using the MT9T31 driver and change the it to my I2C
-commands, as I2C is failing I force the probe to return 0. But the
-soc_camera still failing:
-
-Linux video capture interface: v2.00
-write: -5
-MT9T31 Read register 0xFF = -5
-Forcing mt9t031_video_probe to return OK!
-mx27-camera mx27-camera.0: initialising
-mx27-camera: probe of mx27-camera.0 failed with error -2
-
-Best Regards,
-
-Alan
+No - default y if CPU_V6 || CPU_V7 - we need it enabled for V7 CPUs.
