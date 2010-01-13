@@ -1,55 +1,33 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 13 Jan 2010 21:55:38 +0800
-Subject: [PATCH 3/3] [ARM] pxa: fix irq suspend/resume for pxa25x
-In-Reply-To: <1263390938-3354-1-git-send-email-eric.y.miao@gmail.com>
-References: <1263390938-3354-1-git-send-email-eric.y.miao@gmail.com>
-Message-ID: <1263390938-3354-3-git-send-email-eric.y.miao@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 13 Jan 2010 13:57:04 +0000
+Subject: [PATCH 2.6.33] SMDK6410: Specify no GPIO for B_PWR_5V regulator
+Message-ID: <1263391024-29502-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PXA25x does not have IPR registers, saving and restoring should happen
-only for pxa27x and pxa3xx.
+Since the fixed voltage regulator grew support for GPIO based
+enables and GPIO 0 is valid on some systems we need to specify
+that there is no valid GPIO enable control.
 
-Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/mach-pxa/irq.c |   14 ++++++++++----
- 1 files changed, 10 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
-index 6112af4..1beb40f 100644
---- a/arch/arm/mach-pxa/irq.c
-+++ b/arch/arm/mach-pxa/irq.c
-@@ -164,8 +164,11 @@ static int pxa_irq_suspend(struct sys_device *dev, pm_message_t state)
- 		saved_icmr[i] = _ICMR(irq);
- 		_ICMR(irq) = 0;
- 	}
--	for (i = 0; i < pxa_internal_irq_nr; i++)
--		saved_ipr[i] = IPR(i);
-+
-+	if (cpu_is_pxa27x() || cpu_is_pxa3xx()) {
-+		for (i = 0; i < pxa_internal_irq_nr; i++)
-+			saved_ipr[i] = IPR(i);
-+	}
+Sorry, resend due to thinkoed list address.
+
+ arch/arm/mach-s3c6410/mach-smdk6410.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-s3c6410/mach-smdk6410.c b/arch/arm/mach-s3c6410/mach-smdk6410.c
+index 8eb8d2c..bc3b1fd 100644
+--- a/arch/arm/mach-s3c6410/mach-smdk6410.c
++++ b/arch/arm/mach-s3c6410/mach-smdk6410.c
+@@ -211,6 +211,7 @@ static struct fixed_voltage_config smdk6410_b_pwr_5v_pdata = {
+ 	.supply_name = "B_PWR_5V",
+ 	.microvolts = 5000000,
+ 	.init_data = &smdk6410_b_pwr_5v_data,
++	.gpio = -EINVAL,
+ };
  
- 	return 0;
- }
-@@ -174,12 +177,15 @@ static int pxa_irq_resume(struct sys_device *dev)
- {
- 	int i, irq = PXA_IRQ(0);
- 
-+	if (cpu_is_pxa27x() || cpu_is_pxa3xx()) {
-+		for (i = 0; i < pxa_internal_irq_nr; i++)
-+			IPR(i) = saved_ipr[i];
-+	}
-+
- 	for (i = 0; irq < PXA_IRQ(pxa_internal_irq_nr); i++, irq += 32) {
- 		_ICMR(irq) = saved_icmr[i];
- 		_ICLR(irq) = 0;
- 	}
--	for (i = 0; i < pxa_internal_irq_nr; i++)
--		IPR(i) = saved_ipr[i];
- 
- 	ICCR = 1;
- 	return 0;
+ static struct platform_device smdk6410_b_pwr_5v = {
 -- 
-1.6.3.3
+1.6.6
