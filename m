@@ -1,40 +1,31 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 13 Jan 2010 15:26:14 +0100
-Subject: [PATCH] ARM: Fix uncompress code compile for different defines
-	of static(void)
-In-Reply-To: <20100113084937.GA19352@pengutronix.de>
-References: <20100113021939.GE2986@atomide.com>
-	<20100113084937.GA19352@pengutronix.de>
-Message-ID: <20100113142614.GA1252@pengutronix.de>
+From: arhuaco@freaks-unidos.net (Nelson Castillo)
+Date: Wed, 13 Jan 2010 09:39:11 -0500
+Subject: [PATCH] S3C: Remove unneeded __init symbols
+In-Reply-To: <20100109210339.GB10587@pengutronix.de>
+References: <20100109100430.5258.8254.stgit@localhost>
+	<20100109210339.GB10587@pengutronix.de>
+Message-ID: <2accc2ff1001130639p2d33e95aj3d0730964c074bdf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+2010/1/9 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hi Nelson,
+>
+> On Sat, Jan 09, 2010 at 05:04:30AM -0500, Nelson Castillo wrote:
+>> Two functions defined with __init are also exported.
+>> Let's remove the __init symbols in order to avoid two warnings.
+> Can you quote the warnings please?
 
-On Wed, Jan 13, 2010 at 09:49:37AM +0100, Uwe Kleine-K?nig wrote:
-> On Tue, Jan 12, 2010 at 06:19:40PM -0800, Tony Lindgren wrote:
-> > Because of the include of the decompress_inflate.c file from
-> > boot/compress/misc.c, there are different flush() defines:
-> > 
-> > In file included from arch/arm/boot/compressed/misc.c:249:
-> > arch/arm/boot/compressed/../../../../lib/decompress_inflate.c:138:29: error: macro "flush" passed 2 arguments, but takes just 0
-> > 
-> > Fix this by removing the define of flush() in misc.c for
-> > CONFIG_DEBUG_ICEDCC as it's already defined in mach/uncompress.h,
-> > and that is being included unconditionally.
-> > 
-> > Also use a static inline function instead of define
-> > for mach-mxc and mach-gemini to avoid similar bug
-> > for those platforms.
-> As arch/arm/boot/compressed/misc.c is compiled with -Dstatic= and this
-> is AFAIK the only user of uncompress.h I'd skip "static" and/or add a
-> comment telling that static is redundant here.
-while reading my reply I noticed that I don't understand the subject.
-"different defines of static(void)"?
+Done. Patch attached.
 
-Best regards
-Uwe
+> And I thought you agreed that "unneeded" for __init isn't optimal.
 
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+I also changed the subject. I don't know if it's optimal but it's
+better now IMHO :-P
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: s3c-remove-unneeded-init-annotations.patch
+Type: text/x-diff
+Size: 2176 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100113/c54a46ba/attachment.bin>
