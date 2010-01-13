@@ -1,34 +1,39 @@
-From: ramaxlo@gmail.com (Ramax Lo)
-Date: Thu, 14 Jan 2010 01:31:24 +0800
-Subject: [PATCH] S3C: NAND: Check the existence of nr_map before copying
-In-Reply-To: <>
-References: <>
-Message-ID: <1263403884-8495-1-git-send-email-ramaxlo@gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 13 Jan 2010 13:11:49 -0500
+Subject: [PATCH] ARM: Fix uncompress code compile for different definesof
+	static(void)
+In-Reply-To: <20100113084937.GA19352@pengutronix.de>
+References: <20100113021939.GE2986@atomide.com>
+	<20100113084937.GA19352@pengutronix.de>
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE190902089C39@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to check whether the chip number map is provided to avoid unexpected
-NULL pointer exception.
+On Wednesday, January 13, 2010 1:50 AM, Uwe Kleine-K?nig wrote:
+>> Also use a static inline function instead of define
+>> for mach-mxc and mach-gemini to avoid similar bug
+>> for those platforms.
+> As arch/arm/boot/compressed/misc.c is compiled with -Dstatic= and this
+> is AFAIK the only user of uncompress.h I'd skip "static" and/or add a
+> comment telling that static is redundant here.
 
-Signed-off-by: Ramax Lo <ramaxlo@gmail.com>
----
- arch/arm/plat-s3c/dev-nand.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+So that's what causes the sparse warning!
 
-diff --git a/arch/arm/plat-s3c/dev-nand.c b/arch/arm/plat-s3c/dev-nand.c
-index 84808cc..34697de 100644
---- a/arch/arm/plat-s3c/dev-nand.c
-+++ b/arch/arm/plat-s3c/dev-nand.c
-@@ -58,8 +58,8 @@ static int __init s3c_nand_copy_set(struct s3c2410_nand_set *set)
- 			return -ENOMEM;
- 	}
- 	
--	size = sizeof(int) * set->nr_chips;
--	if (size) {
-+	if (set->nr_map) {
-+		size = sizeof(int) * set->nr_chips;
- 		ptr = kmemdup(set->nr_map, size, GFP_KERNEL);
- 		set->nr_map = ptr;
- 
--- 
-1.5.4.3
+Compiling misc.c produces a bunch of sparse warnings to the type:
+
+arch/arm/boot/compressed/misc.c:19:14: warning: symbol '__machine_arch_type' was not declared. Should it be static?
+arch/arm/mach-ep93xx/include/mach/uncompress.h:75:13: warning: symbol 'ethernet_reset' was not declared. Should it be static?
+arch/arm/mach-ep93xx/include/mach/uncompress.h:109:13: warning: symbol 'enable_early_uart' was not declared. Should it be static?
+arch/arm/mach-ep93xx/include/mach/uncompress.h:152:13: warning: symbol 'arch_decomp_setup' was not declared. Should it be static?
+arch/arm/boot/compressed/misc.c:201:12: warning: symbol 'inbuf' was not declared. Should it be static?
+arch/arm/boot/compressed/misc.c:202:12: warning: symbol 'window' was not declared. Should it be static?
+arch/arm/boot/compressed/misc.c:204:17: warning: symbol 'insize' was not declared. Should it be static?
+arch/arm/boot/compressed/misc.c:205:17: warning: symbol 'inptr' was not declared. Should it be static?
+arch/arm/boot/compressed/misc.c:206:17: warning: symbol 'outcnt' was not declared. Should it be static?
+
+Etc..
+
+Any ideas on how to suppress the warnings?
+
+Regards,
+Hartley
