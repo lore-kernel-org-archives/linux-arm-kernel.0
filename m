@@ -1,53 +1,29 @@
-From: utx@penguin.cz (Stanislav Brabec)
-Date: Wed, 13 Jan 2010 14:42:41 +0100
-Subject: Possible suspend/resume regression in .32-rc?
-In-Reply-To: <20100113114651.GJ8970@buzzloop.caiaq.de>
-References: <20091031013427.GL14091@buzzloop.caiaq.de>
-	<20091101205449.GT14091@buzzloop.caiaq.de>
-	<20091101213343.GA31345@elf.ucw.cz> <20091101220341.GA16698@elf.ucw.cz>
-	<771cded00911020122o3bb5cc96q957c8be1ce7cae46@mail.gmail.com>
-	<1257155873.5642.14.camel@utx.utx.cz>
-	<771cded00911021931x41cfa51bh2959d3748db5ac0@mail.gmail.com>
-	<1257241821.4269.5.camel@utx.utx.cz>
-	<771cded00911042106u39fd3655mae50a89bd419411b@mail.gmail.com>
-	<20100113114651.GJ8970@buzzloop.caiaq.de>
-Message-ID: <1263390161.5419.9.camel@hammer.suse.cz>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 13 Jan 2010 21:55:36 +0800
+Subject: [PATCH 1/3] [ARM] pxa/corgi: fix incorrect default GPIO for UDC Vbus
+Message-ID: <1263390938-3354-1-git-send-email-eric.y.miao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Mack wrote:
+There is no such GPIO for udc vbus sensing, put '-1' instead of default
+'0' as '0' does mean a valid GPIO.
 
-> It seems Stanislav's patch is still unmerged in the current git HEAD.
-> Any idea why it is held back? I have it applied locally since quite a
-> while here, and it works well. So if it helps, take my Tested-by: for
-> it.
+Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+---
+ arch/arm/mach-pxa/corgi.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-It seems to be on the right way:
-
-From: gregkh@suse.de
-Subject: patch serial-core-resume-serial-hardware-with-no_console_suspend.patch added to gregkh-2.6 tree
-Date: Tue, 22 Dec 2009 12:22:35 -0800
-
-This is a note to let you know that I've just added the patch titled
-
-    Subject: serial-core: resume serial hardware with no_console_suspend
-
-to my gregkh-2.6 tree.  Its filename is
-
-    serial-core-resume-serial-hardware-with-no_console_suspend.patch
-
-This tree can be found at 
-
-http://www.kernel.org/pub/linux/kernel/people/gregkh/gregkh-2.6/patches/
-
-
+diff --git a/arch/arm/mach-pxa/corgi.c b/arch/arm/mach-pxa/corgi.c
+index 74446cf..da3156d 100644
+--- a/arch/arm/mach-pxa/corgi.c
++++ b/arch/arm/mach-pxa/corgi.c
+@@ -457,6 +457,7 @@ static struct pxaficp_platform_data corgi_ficp_platform_data = {
+  * USB Device Controller
+  */
+ static struct pxa2xx_udc_mach_info udc_info __initdata = {
++	.gpio_vbus		= -1,
+ 	/* no connect GPIO; corgi can't tell connection status */
+ 	.gpio_pullup		= CORGI_GPIO_USB_PULLUP,
+ };
 -- 
-Best Regards / S pozdravem,
-
-Stanislav Brabec
-software developer
----------------------------------------------------------------------
-SUSE LINUX, s. r. o.                          e-mail: sbrabec at suse.cz
-Lihovarsk? 1060/12           tel: +420 284 028 966, +49 911 740538747
-190 00 Praha 9                                  fax: +420 284 028 951
-Czech Republic                                    http://www.suse.cz/
+1.6.3.3
