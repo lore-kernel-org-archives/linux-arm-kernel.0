@@ -1,31 +1,107 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Thu, 14 Jan 2010 00:38:15 +0100
-Subject: Fwd: [PATCH 0/2] plat-samsung ADC driver
-In-Reply-To: <b2e8f9f71001131530rc90fe3dk4f4f227677f4db48@mail.gmail.com>
-References: <b2e8f9f71001131530rc90fe3dk4f4f227677f4db48@mail.gmail.com>
-Message-ID: <b2e8f9f71001131538o2da12021oc358f72016e19c3@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 14 Jan 2010 08:51:47 +0900
+Subject: [PATCH 3/3] ARM: SAMSUNG: Add idle support
+In-Reply-To: <20100113001248.GI18532@trinity.fluff.org>
+References: <1263203072-29282-1-git-send-email-kgene.kim@samsung.com>
+	<20100113001248.GI18532@trinity.fluff.org>
+Message-ID: <000001ca94ab$5ea0b7b0$1be22710$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, forgot CC'ing linux-arm-kernel..
+Ben Dooks wrote:
+> On Mon, Jan 11, 2010 at 06:44:32PM +0900, Kukjin Kim wrote:
+> > This patch adds common idle functionality for all Samsung SoC's.
+> 
+> Kukjin, for expediency please do as Russell suggested and hook the pm_idle
+> call for the s5p6440 case.
 
-For interested people, patches are at:
+Ok, I will do it.
+Thanks.
 
-http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/502
-http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/503
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > ---
+> >  arch/arm/plat-samsung/include/mach/idle.h   |   18 +++++++++++++
+> >  arch/arm/plat-samsung/include/mach/system.h |   36
+> +++++++++++++++++++++++++++
+> >  2 files changed, 54 insertions(+), 0 deletions(-)
+> >  create mode 100644 arch/arm/plat-samsung/include/mach/idle.h
+> >  create mode 100644 arch/arm/plat-samsung/include/mach/system.h
+> >
+> > diff --git a/arch/arm/plat-samsung/include/mach/idle.h b/arch/arm/plat-
+> samsung/include/mach/idle.h
+> > new file mode 100644
+> > index 0000000..f3b5034
+> > --- /dev/null
+> > +++ b/arch/arm/plat-samsung/include/mach/idle.h
+> > @@ -0,0 +1,18 @@
+> > +/* linux/arch/arm/plat-samsung/include/mach/idle.h
+> > + *
+> > + * Copyright (c) 2009 Samsung Electronics Co., Ltd.
+> > + *		http://www.samsung.com/
+> > + *
+> > + * Idle support
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > +*/
+> > +
+> > +#ifndef __ASM_PLAT_IDLE_H
+> > +#define __ASM_PLAT_IDLE_H __FILE__
+> > +
+> > +extern void (*s3c_idle_fn)(void);
+> > +
+> > +#endif /* __ASM_PLAT_IDLE_H */
+> > diff --git a/arch/arm/plat-samsung/include/mach/system.h b/arch/arm/plat-
+> samsung/include/mach/system.h
+> > new file mode 100644
+> > index 0000000..5377792
+> > --- /dev/null
+> > +++ b/arch/arm/plat-samsung/include/mach/system.h
+> > @@ -0,0 +1,36 @@
+> > +/* linux/arch/arm/plat-samsung/include/mach/idle.h
+> > + *
+> > + * Copyright (c) 2009 Samsung Electronics Co., Ltd.
+> > + *		http://www.samsung.com/
+> > + *
+> > + * Idle support
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > +*/
+> > +
+> > +#ifndef __ASM_PLAT_SYSTEM_H
+> > +#define __ASM_PLAT_SYSTEM_H __FILE__
+> > +
+> > +void (*s3c_idle_fn)(void);
+> > +
+> > +static void s3c_default_idle(void)
+> > +{
+> > +	/* nothing here yet */
+> > +}
+> > +
+> > +static void arch_idle(void)
+> > +{
+> > +	if (s3c_idle_fn != NULL)
+> > +		(s3c_idle_fn)();
+> > +	else
+> > +		s3c_default_idle();
+> > +}
+> > +
+> > +static void arch_reset(char mode, const char *cmd)
+> > +{
+> > +	/* nothing here yet */
+> > +}
+> > +
+> > +#endif /* __ASM_PLAT_SYSTEM_H */
+> > --
+> > 1.6.2.5
+> >
+> >
 
----------- Forwarded message ----------
-From: Maurus Cuelenaere <mcuelenaere@gmail.com>
-Date: Thu, Jan 14, 2010 at 00:30
-Subject: [PATCH 0/2] plat-samsung ADC driver
-
-
-Hi,
-
-these patches move the S3C24XX ADC driver to plat-samsung and add S3C64XX
-support.
-
-Please note that these have only been built-tested.
-
-Regards,
-Maurus Cuelenaere
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+System LSI Division, SAMSUNG ELECTRONICS CO., LTD.
