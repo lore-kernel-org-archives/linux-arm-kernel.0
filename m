@@ -1,24 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 13 Jan 2010 08:42:03 +0000
-Subject: [PATCH 0/7] dma-mapping: Cortex A9 speculative prefetch fixes
-In-Reply-To: <f20fa6c61001122237o44b1fc96jd3a0481cd5df6188@mail.gmail.com>
-References: <20091120182539.GG16920@n2100.arm.linux.org.uk>
-	<20091121140037.GI6741@wear.picochip.com>
-	<20091123102955.GB16050@n2100.arm.linux.org.uk>
-	<f20fa6c61001122237o44b1fc96jd3a0481cd5df6188@mail.gmail.com>
-Message-ID: <20100113084203.GA23367@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 13 Jan 2010 09:49:37 +0100
+Subject: [PATCH] ARM: Fix uncompress code compile for different defines
+	of static(void)
+In-Reply-To: <20100113021939.GE2986@atomide.com>
+References: <20100113021939.GE2986@atomide.com>
+Message-ID: <20100113084937.GA19352@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2010 at 10:37:27PM -0800, muni anda wrote:
-> Hi Russell,
-> 
-> > We're a little too late for 2.6.32, but it'll be merged
-> > during the post 2.6.32 window.
-> 
-> Did these "Cortex speculative Prefetch" changes made it into ARM git?
-> You changes are working on our end for quite some time, but would like
-> to cherry-pick or merge the upstream commits.
+Hello,
 
-No, it's far too large to merge during the -rc period.  It is going to
-have to wait for the next merge window.
+On Tue, Jan 12, 2010 at 06:19:40PM -0800, Tony Lindgren wrote:
+> Because of the include of the decompress_inflate.c file from
+> boot/compress/misc.c, there are different flush() defines:
+> 
+> In file included from arch/arm/boot/compressed/misc.c:249:
+> arch/arm/boot/compressed/../../../../lib/decompress_inflate.c:138:29: error: macro "flush" passed 2 arguments, but takes just 0
+> 
+> Fix this by removing the define of flush() in misc.c for
+> CONFIG_DEBUG_ICEDCC as it's already defined in mach/uncompress.h,
+> and that is being included unconditionally.
+> 
+> Also use a static inline function instead of define
+> for mach-mxc and mach-gemini to avoid similar bug
+> for those platforms.
+As arch/arm/boot/compressed/misc.c is compiled with -Dstatic= and this
+is AFAIK the only user of uncompress.h I'd skip "static" and/or add a
+comment telling that static is redundant here.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
