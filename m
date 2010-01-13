@@ -1,23 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 13 Jan 2010 11:36:57 +0000
-Subject: question about ARM11MP cpu architecture identification
-In-Reply-To: <c70ff3ad1001130327n2816c42cj13ac97cf18cf4613@mail.gmail.com>
-References: <c70ff3ad1001120821u1f546480nd0229e560d84293@mail.gmail.com>
-	<1263313572.29654.105.camel@pc1117.cambridge.arm.com>
-	<20100112164220.GJ27771@n2100.arm.linux.org.uk>
-	<1263315302.29654.110.camel@pc1117.cambridge.arm.com>
-	<c70ff3ad1001120903i62b96731ld8c1820be00fb41b@mail.gmail.com>
-	<20100112171733.GC5633@n2100.arm.linux.org.uk>
-	<20100112172422.GD5633@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1001121453560.10143@xanadu.home>
-	<c70ff3ad1001130327n2816c42cj13ac97cf18cf4613@mail.gmail.com>
-Message-ID: <20100113113656.GA27053@n2100.arm.linux.org.uk>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Wed, 13 Jan 2010 12:46:51 +0100
+Subject: Possible suspend/resume regression in .32-rc?
+In-Reply-To: <771cded00911042106u39fd3655mae50a89bd419411b@mail.gmail.com>
+References: <20091031013427.GL14091@buzzloop.caiaq.de>
+	<20091101205449.GT14091@buzzloop.caiaq.de>
+	<20091101213343.GA31345@elf.ucw.cz>
+	<20091101220341.GA16698@elf.ucw.cz>
+	<771cded00911020122o3bb5cc96q957c8be1ce7cae46@mail.gmail.com>
+	<1257155873.5642.14.camel@utx.utx.cz>
+	<771cded00911021931x41cfa51bh2959d3748db5ac0@mail.gmail.com>
+	<1257241821.4269.5.camel@utx.utx.cz>
+	<771cded00911042106u39fd3655mae50a89bd419411b@mail.gmail.com>
+Message-ID: <20100113114651.GJ8970@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 13, 2010 at 01:27:43PM +0200, saeed bishara wrote:
-> looks fine to me too.
+On Thu, Nov 05, 2009 at 12:06:13AM -0500, Haojian Zhuang wrote:
+> On Tue, Nov 3, 2009 at 4:50 AM, Stanislav Brabec <utx@penguin.cz> wrote:
+> > Haojian Zhuang wrote:
+> >> On Mon, Nov 2, 2009 at 5:57 AM, Stanislav Brabec <utx@penguin.cz> wrote:
+> >> > Haojian Zhuang wrote:
+> >> >
+> >> >> Commit b5b82df6, from May 2007, breaks no_console_suspend on the OLPC
+> >> >> XO laptop. Basically what happens is that upon returning from resume,
+> >> >> serial8250_resume_port() will reconfigure the port for high speed
+> >> >> mode and all console output will be garbled, making debug of the
+> >> >> resume path painful. This patch modifies uart_resume_port() to
+> >> >> reset the port to the state it was in before we suspended.
+> >> >
+> >> > See my patch waiting for approval in LKML thread
+> >> > "serial-core: resume serial hardware with no_console_suspend".
+> >> >
+> >> > It attempts to fix it, but I was not yet able to test it due to spitz
+> >> > resume breakage.
+> >> >
+> >>
+> >> Hi Stanislav,
+> >>
+> >> At first, your patch can't be applied into my latest codebase. I have
+> >> to update the patch. But the console resume is still blocked after
+> >> applied your patch. It works only after I merge some old code back. My
+> >> modified patch is in below.
+> >
+> > Yes, code changed there a bit. I sent rebased patch later in the thread.
+> > Did you try this one? (Well I did not test it yet - in time of sending
+> > resume did not work at all on my Zaurus.)
+> >
+> > Your patch is a bit different. I'll test both as soon as possible.
+> >
+> >
 > 
-> On Tue, Jan 12, 2010 at 9:55 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> Your latest patch works well in my platform. Thanks a lot.
 
-You're both a little too late; it's already in Linus' tree.
+It seems Stanislav's patch is still unmerged in the current git HEAD.
+Any idea why it is held back? I have it applied locally since quite a
+while here, and it works well. So if it helps, take my Tested-by: for
+it.
+
+Daniel
