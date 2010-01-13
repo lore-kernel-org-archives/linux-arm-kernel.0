@@ -1,60 +1,38 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Wed, 13 Jan 2010 12:46:51 +0100
-Subject: Possible suspend/resume regression in .32-rc?
-In-Reply-To: <771cded00911042106u39fd3655mae50a89bd419411b@mail.gmail.com>
-References: <20091031013427.GL14091@buzzloop.caiaq.de>
-	<20091101205449.GT14091@buzzloop.caiaq.de>
-	<20091101213343.GA31345@elf.ucw.cz>
-	<20091101220341.GA16698@elf.ucw.cz>
-	<771cded00911020122o3bb5cc96q957c8be1ce7cae46@mail.gmail.com>
-	<1257155873.5642.14.camel@utx.utx.cz>
-	<771cded00911021931x41cfa51bh2959d3748db5ac0@mail.gmail.com>
-	<1257241821.4269.5.camel@utx.utx.cz>
-	<771cded00911042106u39fd3655mae50a89bd419411b@mail.gmail.com>
-Message-ID: <20100113114651.GJ8970@buzzloop.caiaq.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 13 Jan 2010 11:57:46 +0000
+Subject: Samsung SoC clock updates
+In-Reply-To: <20100112235019.GH18532@trinity.fluff.org>
+References: <1262917822-26004-1-git-send-email-ben-linux@fluff.org>
+	<20100112091608.GD26435@n2100.arm.linux.org.uk>
+	<20100112220351.GG18532@trinity.fluff.org>
+	<20100112224833.GA19957@sirena.org.uk>
+	<20100112235019.GH18532@trinity.fluff.org>
+Message-ID: <20100113115746.GA27473@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 05, 2009 at 12:06:13AM -0500, Haojian Zhuang wrote:
-> On Tue, Nov 3, 2009 at 4:50 AM, Stanislav Brabec <utx@penguin.cz> wrote:
-> > Haojian Zhuang wrote:
-> >> On Mon, Nov 2, 2009 at 5:57 AM, Stanislav Brabec <utx@penguin.cz> wrote:
-> >> > Haojian Zhuang wrote:
-> >> >
-> >> >> Commit b5b82df6, from May 2007, breaks no_console_suspend on the OLPC
-> >> >> XO laptop. Basically what happens is that upon returning from resume,
-> >> >> serial8250_resume_port() will reconfigure the port for high speed
-> >> >> mode and all console output will be garbled, making debug of the
-> >> >> resume path painful. This patch modifies uart_resume_port() to
-> >> >> reset the port to the state it was in before we suspended.
-> >> >
-> >> > See my patch waiting for approval in LKML thread
-> >> > "serial-core: resume serial hardware with no_console_suspend".
-> >> >
-> >> > It attempts to fix it, but I was not yet able to test it due to spitz
-> >> > resume breakage.
-> >> >
-> >>
-> >> Hi Stanislav,
-> >>
-> >> At first, your patch can't be applied into my latest codebase. I have
-> >> to update the patch. But the console resume is still blocked after
-> >> applied your patch. It works only after I merge some old code back. My
-> >> modified patch is in below.
-> >
-> > Yes, code changed there a bit. I sent rebased patch later in the thread.
-> > Did you try this one? (Well I did not test it yet - in time of sending
-> > resume did not work at all on my Zaurus.)
-> >
-> > Your patch is a bit different. I'll test both as soon as possible.
-> >
-> >
-> 
-> Your latest patch works well in my platform. Thanks a lot.
+On Tue, Jan 12, 2010 at 11:50:19PM +0000, Ben Dooks wrote:
+> On Tue, Jan 12, 2010 at 10:48:34PM +0000, Mark Brown wrote:
 
-It seems Stanislav's patch is still unmerged in the current git HEAD.
-Any idea why it is held back? I have it applied locally since quite a
-while here, and it works well. So if it helps, take my Tested-by: for
-it.
+> > I don't understand what the problem is with that?  That's exactly what
+> > I'd expect to see a driver doing (possibly with NULL instead of a
+> > specific name).
 
-Daniel
+> From what I've looked at, the driver _should_ use clk_get(dev, NULL) for
+> the bus clock, and use named clocks only for extra clocks it may need
+> such as a codec clock for an audio device. I belive this is what Russell's
+> initial complaint about the implementation is.
+
+AFAICT that's a relatively cosmetic issue, but I don't know how Russell
+feels about that one.  If the block has multiple clocks it can actually
+get a bit confusing trying to remember what the default clock should be.
+
+The issues I've noticed have been that at the minute the lookups are
+essentially using a global namespace for the clocks (since the only bit
+of the struct device that gets looked at when doing lookups is the id
+field) and that the muxes for clock sources are handled in individual
+drivers (which means the drivers need to know about the clock tree of
+the SoC they're running on).  Given the way the Samsung SoCs structure
+their clock trees the name issue isn't quite so pressing as it might be,
+it'd probably only really bite if Samsung decide to change the names of
+the clocks.
