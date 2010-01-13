@@ -1,103 +1,60 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Wed, 13 Jan 2010 12:17:36 +1100
-Subject: [RFC,PATCH 0/7 v2] Common struct clk implementation
-In-Reply-To: <20100112091324.GC26435@n2100.arm.linux.org.uk>
-References: <1263279511.160127.576969496193.0.gpush@pororo>
-	<20100112091324.GC26435@n2100.arm.linux.org.uk>
-Message-ID: <201001131217.36575.jeremy.kerr@canonical.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 12 Jan 2010 18:19:40 -0800
+Subject: [PATCH] ARM: Fix uncompress code compile for different defines of
+	static(void)
+Message-ID: <20100113021939.GE2986@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Because of the include of the decompress_inflate.c file from
+boot/compress/misc.c, there are different flush() defines:
 
-> But the point I was trying to convey is that OMAP doesn't work with
-> _either_ a pure operations struct _or_ a bunch of per-clock function
-> pointers - it currently uses a mixture of the two.
+In file included from arch/arm/boot/compressed/misc.c:249:
+arch/arm/boot/compressed/../../../../lib/decompress_inflate.c:138:29: error: macro "flush" passed 2 arguments, but takes just 0
 
-With the common clk, you can do exactly that:
+Fix this by removing the define of flush() in misc.c for
+CONFIG_DEBUG_ICEDCC as it's already defined in mach/uncompress.h,
+and that is being included unconditionally.
 
-struct clk_foo {
-	/* ->ops provides functions common to clk_foo */
-	struct clk;
+Also use a static inline function instead of define
+for mach-mxc and mach-gemini to avoid similar bug
+for those platforms.
 
-	/* provides a function for only this clock */
-	int (*single_clock_func)(struct clk_foo *);
-}
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-The only real difference is that the public API is provided through struct clk 
-rather than redefined clk_* functions; whatever is implementing the clock-
-type-specific struct clk can add whatever fields necessary.
-
->From your earlier mail about sizes on omap:
-
-> There are two function pointers in the struct clk which would be
-> identical to the versions proposed in this generic struct clk.
-> There's a total of 219 clk structures in OMAP3.  So, 219 * (4 + 8)
-> = 2628.  Switching OMAP means 219 * (4 + 32) = 7884, which is an
-> increase in overhead of 3x.
-
-But we also can reduce the size of the struct clk in most cases; I believe the 
-separate clk_operations in v2 of this series will help with this.
-
-Taking OMAP3 for example (I'm not very familiar with that platform, so am 
-basing this on a brief look through the clock code), the first step to a 
-common clk port would be to wrap the existing struct clk:
-
-struct clk_omap {
-	struct clk			clk;
-	struct list_head		node;
-	const struct clkops	*ops;
-    [...]
-};
-
-and define the clk_operations to be the current omap clk_* functions.
-
-This results in one extra pointer per clock, plus the clk_operations, so 908 
-bytes (4 * 219 + 32) overhead.
-
-Next, we can start removing fields that are not used by all clocks; the fixed 
-top-level clocks would be a good start; it looks like we can represent those 
-with a:
-
-struct clk_omap_fixed {
-	struct clk	clk;
-	char			*name;
-	unsigned long	rate;
-}
-
-[For these fixed clocks, we don't need to propagate changes to children, hence 
-I'm assuming no child/sibling members]
-
-The original struct clk is 96 bytes; clk_omap_fixed is 12, but we still need 
-one clk_operations (32 bytes). Since there are 8 of these, we save 640 bytes 
-((96 - 12) * 8 - 32).
-
-If we then take the 'follow parent' clocks, it looks like we can represent 
-those with something like:
-
-struct clk_omap_followparent = {
-	struct clk	clk;
-	char			*name;
-	struct clk	*parent;
-	struct list_head children, siblings;
-	unsigned long	rate;
-	void __iomem	*enable_reg;
-	__u8			enable_bit;
-	char			*clkdm_name;
-	int			flags;
-};
-
-This would be 48 bytes, there are 140 of these, saving 6688 bytes ( (96 - 48) 
-* 140 - 32).
-
-Now, we could stop here, or keep looking for common usage patterns of struct 
-clk to find cases where creating another clock type makes sense.
-
-I know I've only looked at the easy OMAP cases here, but the principle still 
-applies: keep the original struct clk around as a fallback, but use the 
-smaller struct clks where possible.
-
-Cheers,
-
-
-Jeremy
+--- a/arch/arm/boot/compressed/misc.c
++++ b/arch/arm/boot/compressed/misc.c
+@@ -100,7 +100,6 @@ static void icedcc_putc(int ch)
+ #endif
+ 
+ #define putc(ch)	icedcc_putc(ch)
+-#define flush()	do { } while (0)
+ #endif
+ 
+ static void putstr(const char *ptr)
+--- a/arch/arm/mach-gemini/include/mach/uncompress.h
++++ b/arch/arm/mach-gemini/include/mach/uncompress.h
+@@ -30,7 +30,9 @@ static inline void putc(char c)
+ 	UART[UART_TX] = c;
+ }
+ 
+-#define flush() do { } while (0)
++static inline void flush(void)
++{
++}
+ 
+ /*
+  * nothing to do
+--- a/arch/arm/plat-mxc/include/mach/uncompress.h
++++ b/arch/arm/plat-mxc/include/mach/uncompress.h
+@@ -60,7 +60,9 @@ static void putc(int ch)
+ 	UART(TXR) = ch;
+ }
+ 
+-#define flush() do { } while (0)
++static inline void flush(void)
++{
++}
+ 
+ #define MX1_UART1_BASE_ADDR	0x00206000
+ #define MX25_UART1_BASE_ADDR	0x43f90000
