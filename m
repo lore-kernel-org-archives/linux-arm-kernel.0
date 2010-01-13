@@ -1,117 +1,103 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 12 Jan 2010 18:11:28 -0700
-Subject: [PATCH] ep93xx: move timer defines into core.c and document
-Message-ID: <201001121811.28763.hartleys@visionengravers.com>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Wed, 13 Jan 2010 12:17:36 +1100
+Subject: [RFC,PATCH 0/7 v2] Common struct clk implementation
+In-Reply-To: <20100112091324.GC26435@n2100.arm.linux.org.uk>
+References: <1263279511.160127.576969496193.0.gpush@pororo>
+	<20100112091324.GC26435@n2100.arm.linux.org.uk>
+Message-ID: <201001131217.36575.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ep93xx: move timer defines into core.c and document
+Hi Russell,
 
-The timer defines are only used in core.c. Move them so
-they will not be globaly exposed.
+> But the point I was trying to convey is that OMAP doesn't work with
+> _either_ a pure operations struct _or_ a bunch of per-clock function
+> pointers - it currently uses a mixture of the two.
 
-While here, add additional defines to document the magic
-numbers used in the registers. Also, add some comments
-for clarification.
+With the common clk, you can do exactly that:
 
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Ryan Mallon <ryan@bluewatersus.com>
+struct clk_foo {
+	/* ->ops provides functions common to clk_foo */
+	struct clk;
 
----
+	/* provides a function for only this clock */
+	int (*single_clock_func)(struct clk_foo *);
+}
 
-diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index 41064bd..d8b8802 100644
---- a/arch/arm/mach-ep93xx/core.c
-+++ b/arch/arm/mach-ep93xx/core.c
-@@ -84,13 +84,40 @@ void __init ep93xx_map_io(void)
-  * to use this timer for something else.  We also use timer 4 for keeping
-  * track of lost jiffies.
-  */
--static unsigned int last_jiffy_time;
--
-+#define EP93XX_TIMER_REG(x)		(EP93XX_TIMER_BASE + (x))
-+#define EP93XX_TIMER1_LOAD		EP93XX_TIMER_REG(0x00)
-+#define EP93XX_TIMER1_VALUE		EP93XX_TIMER_REG(0x04)
-+#define EP93XX_TIMER1_CONTROL		EP93XX_TIMER_REG(0x08)
-+#define EP93XX_TIMER123_CONTROL_ENABLE	(1 << 7)
-+#define EP93XX_TIMER123_CONTROL_MODE	(1 << 6)
-+#define EP93XX_TIMER123_CONTROL_CLKSEL	(1 << 3)
-+#define EP93XX_TIMER1_CLEAR		EP93XX_TIMER_REG(0x0c)
-+#define EP93XX_TIMER2_LOAD		EP93XX_TIMER_REG(0x20)
-+#define EP93XX_TIMER2_VALUE		EP93XX_TIMER_REG(0x24)
-+#define EP93XX_TIMER2_CONTROL		EP93XX_TIMER_REG(0x28)
-+#define EP93XX_TIMER2_CLEAR		EP93XX_TIMER_REG(0x2c)
-+#define EP93XX_TIMER4_VALUE_LOW		EP93XX_TIMER_REG(0x60)
-+#define EP93XX_TIMER4_VALUE_HIGH	EP93XX_TIMER_REG(0x64)
-+#define EP93XX_TIMER4_VALUE_HIGH_ENABLE	(1 << 8)
-+#define EP93XX_TIMER3_LOAD		EP93XX_TIMER_REG(0x80)
-+#define EP93XX_TIMER3_VALUE		EP93XX_TIMER_REG(0x84)
-+#define EP93XX_TIMER3_CONTROL		EP93XX_TIMER_REG(0x88)
-+#define EP93XX_TIMER3_CLEAR		EP93XX_TIMER_REG(0x8c)
-+
-+#define EP93XX_TIMER123_CLOCK		508469
-+#define EP93XX_TIMER4_CLOCK		983040
-+
-+#define TIMER1_RELOAD			((EP93XX_TIMER123_CLOCK / HZ) - 1)
- #define TIMER4_TICKS_PER_JIFFY		DIV_ROUND_CLOSEST(CLOCK_TICK_RATE, HZ)
- 
-+static unsigned int last_jiffy_time;
-+
- static irqreturn_t ep93xx_timer_interrupt(int irq, void *dev_id)
- {
-+	/* Writing any value clears the timer interrupt */
- 	__raw_writel(1, EP93XX_TIMER1_CLEAR);
-+
-+	/* Recover lost jiffies */
- 	while ((signed long)
- 		(__raw_readl(EP93XX_TIMER4_VALUE_LOW) - last_jiffy_time)
- 						>= TIMER4_TICKS_PER_JIFFY) {
-@@ -109,13 +136,18 @@ static struct irqaction ep93xx_timer_irq = {
- 
- static void __init ep93xx_timer_init(void)
- {
-+	u32 tmode = EP93XX_TIMER123_CONTROL_MODE |
-+		    EP93XX_TIMER123_CONTROL_CLKSEL;
-+
- 	/* Enable periodic HZ timer.  */
--	__raw_writel(0x48, EP93XX_TIMER1_CONTROL);
--	__raw_writel((508469 / HZ) - 1, EP93XX_TIMER1_LOAD);
--	__raw_writel(0xc8, EP93XX_TIMER1_CONTROL);
-+	__raw_writel(tmode, EP93XX_TIMER1_CONTROL);
-+	__raw_writel(TIMER1_RELOAD, EP93XX_TIMER1_LOAD);
-+	__raw_writel(tmode | EP93XX_TIMER123_CONTROL_ENABLE,
-+			EP93XX_TIMER1_CONTROL);
- 
- 	/* Enable lost jiffy timer.  */
--	__raw_writel(0x100, EP93XX_TIMER4_VALUE_HIGH);
-+	__raw_writel(EP93XX_TIMER4_VALUE_HIGH_ENABLE,
-+			EP93XX_TIMER4_VALUE_HIGH);
- 
- 	setup_irq(IRQ_EP93XX_TIMER1, &ep93xx_timer_irq);
- }
-diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-index cd35912..93e2ecc 100644
---- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-+++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-@@ -92,21 +92,6 @@
- 
- /* APB peripherals */
- #define EP93XX_TIMER_BASE		EP93XX_APB_IOMEM(0x00010000)
--#define EP93XX_TIMER_REG(x)		(EP93XX_TIMER_BASE + (x))
--#define EP93XX_TIMER1_LOAD		EP93XX_TIMER_REG(0x00)
--#define EP93XX_TIMER1_VALUE		EP93XX_TIMER_REG(0x04)
--#define EP93XX_TIMER1_CONTROL		EP93XX_TIMER_REG(0x08)
--#define EP93XX_TIMER1_CLEAR		EP93XX_TIMER_REG(0x0c)
--#define EP93XX_TIMER2_LOAD		EP93XX_TIMER_REG(0x20)
--#define EP93XX_TIMER2_VALUE		EP93XX_TIMER_REG(0x24)
--#define EP93XX_TIMER2_CONTROL		EP93XX_TIMER_REG(0x28)
--#define EP93XX_TIMER2_CLEAR		EP93XX_TIMER_REG(0x2c)
--#define EP93XX_TIMER4_VALUE_LOW		EP93XX_TIMER_REG(0x60)
--#define EP93XX_TIMER4_VALUE_HIGH	EP93XX_TIMER_REG(0x64)
--#define EP93XX_TIMER3_LOAD		EP93XX_TIMER_REG(0x80)
--#define EP93XX_TIMER3_VALUE		EP93XX_TIMER_REG(0x84)
--#define EP93XX_TIMER3_CONTROL		EP93XX_TIMER_REG(0x88)
--#define EP93XX_TIMER3_CLEAR		EP93XX_TIMER_REG(0x8c)
- 
- #define EP93XX_I2S_BASE			EP93XX_APB_IOMEM(0x00020000)
- 
+The only real difference is that the public API is provided through struct clk 
+rather than redefined clk_* functions; whatever is implementing the clock-
+type-specific struct clk can add whatever fields necessary.
+
+>From your earlier mail about sizes on omap:
+
+> There are two function pointers in the struct clk which would be
+> identical to the versions proposed in this generic struct clk.
+> There's a total of 219 clk structures in OMAP3.  So, 219 * (4 + 8)
+> = 2628.  Switching OMAP means 219 * (4 + 32) = 7884, which is an
+> increase in overhead of 3x.
+
+But we also can reduce the size of the struct clk in most cases; I believe the 
+separate clk_operations in v2 of this series will help with this.
+
+Taking OMAP3 for example (I'm not very familiar with that platform, so am 
+basing this on a brief look through the clock code), the first step to a 
+common clk port would be to wrap the existing struct clk:
+
+struct clk_omap {
+	struct clk			clk;
+	struct list_head		node;
+	const struct clkops	*ops;
+    [...]
+};
+
+and define the clk_operations to be the current omap clk_* functions.
+
+This results in one extra pointer per clock, plus the clk_operations, so 908 
+bytes (4 * 219 + 32) overhead.
+
+Next, we can start removing fields that are not used by all clocks; the fixed 
+top-level clocks would be a good start; it looks like we can represent those 
+with a:
+
+struct clk_omap_fixed {
+	struct clk	clk;
+	char			*name;
+	unsigned long	rate;
+}
+
+[For these fixed clocks, we don't need to propagate changes to children, hence 
+I'm assuming no child/sibling members]
+
+The original struct clk is 96 bytes; clk_omap_fixed is 12, but we still need 
+one clk_operations (32 bytes). Since there are 8 of these, we save 640 bytes 
+((96 - 12) * 8 - 32).
+
+If we then take the 'follow parent' clocks, it looks like we can represent 
+those with something like:
+
+struct clk_omap_followparent = {
+	struct clk	clk;
+	char			*name;
+	struct clk	*parent;
+	struct list_head children, siblings;
+	unsigned long	rate;
+	void __iomem	*enable_reg;
+	__u8			enable_bit;
+	char			*clkdm_name;
+	int			flags;
+};
+
+This would be 48 bytes, there are 140 of these, saving 6688 bytes ( (96 - 48) 
+* 140 - 32).
+
+Now, we could stop here, or keep looking for common usage patterns of struct 
+clk to find cases where creating another clock type makes sense.
+
+I know I've only looked at the easy OMAP cases here, but the principle still 
+applies: keep the original struct clk around as a fallback, but use the 
+smaller struct clks where possible.
+
+Cheers,
+
+
+Jeremy
