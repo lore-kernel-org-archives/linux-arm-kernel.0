@@ -1,89 +1,68 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 14 Jan 2010 08:45:47 +0900
-Subject: [PATCH v2 3/3] ARM: SAMSUNG: Add idle support
-Message-ID: <1263426347-13668-1-git-send-email-kgene.kim@samsung.com>
+Date: Thu, 14 Jan 2010 08:57:07 +0900
+Subject: [PATCH v5 0/8] ARM: S5P6440: Add support for Samsung's S5P6440 SoC
+Message-ID: <000101ca94ac$1d06ef80$5714ce80$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds common idle functionality for all Samsung SoC's.
+Hi All,
 
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/plat-samsung/include/mach/idle.h   |   19 +++++++++++++
- arch/arm/plat-samsung/include/mach/system.h |   39 +++++++++++++++++++++++++++
- 2 files changed, 58 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-samsung/include/mach/idle.h
- create mode 100644 arch/arm/plat-samsung/include/mach/system.h
+This patches add basic support for Samsung's S5P6440 SoC.
+The feature set that is added are clock, timer, uart and interrupts.
 
-diff --git a/arch/arm/plat-samsung/include/mach/idle.h b/arch/arm/plat-samsung/include/mach/idle.h
-new file mode 100644
-index 0000000..b5b92d2
---- /dev/null
-+++ b/arch/arm/plat-samsung/include/mach/idle.h
-@@ -0,0 +1,19 @@
-+/* linux/arch/arm/plat-samsung/include/mach/idle.h
-+ *
-+ * Copyright (c) 2009 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * Idle support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#ifndef __ASM_PLAT_IDLE_H
-+#define __ASM_PLAT_IDLE_H __FILE__
-+
-+extern void (*s3c_idle_fn)(void);
-+extern void samsung_idle(void);
-+
-+#endif /* __ASM_PLAT_IDLE_H */
-diff --git a/arch/arm/plat-samsung/include/mach/system.h b/arch/arm/plat-samsung/include/mach/system.h
-new file mode 100644
-index 0000000..1e49fb3
---- /dev/null
-+++ b/arch/arm/plat-samsung/include/mach/system.h
-@@ -0,0 +1,39 @@
-+/* linux/arch/arm/plat-samsung/include/mach/idle.h
-+ *
-+ * Copyright (c) 2009 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * Idle support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#ifndef __ASM_PLAT_SYSTEM_H
-+#define __ASM_PLAT_SYSTEM_H __FILE__
-+
-+void (*s3c_idle_fn)(void);
-+
-+void samsung_idle(void)
-+{
-+	/* can add generic idle functionality here, if any */
-+
-+	if (!need_resched()) {
-+		if (s3c_idle_fn != NULL)
-+			(s3c_idle_fn)();
-+	}
-+	local_irq_enable();
-+}
-+
-+static void arch_idle(void)
-+{
-+	/* nothing */
-+}
-+
-+static void arch_reset(char mode, const char *cmd)
-+{
-+	/* nothing here yet */
-+}
-+
-+#endif /* __ASM_PLAT_SYSTEM_H */
--- 
-1.6.2.5
+The clock changes are based on Harald Welte's patch. This patch is
+also based on Ben's plat-samsung patch.
+
+This patch set includes the following patches.
+
+[PATCH v5 1/8] ARM: S5P6440: Add new CPU initialization support
+[PATCH v5 2/8] ARM: S5P6440: Add Clock and PLL support
+[PATCH v5 3/8] ARM: S5P6440: Add IRQ support
+[PATCH v5 4/8] ARM: S5P6440: Add Timer support
+[PATCH v5 5/8] ARM: S5P6440: Add new Kconfig and Makefiles
+[PATCH v5 6/8] ARM: S5P6440: Add Board support file
+[PATCH v5 7/8] ARM: S5P6440: Add configuration file
+[PATCH v5 8/8] ARM: S5P6440: Add serial port support
+
+This patch set depends on the following patches.
+
+1. [PATCH 1/3] ARM: SAMSUNG: Add config option for number of additional GPIO
+pins.
+2. [PATCH 2/3] ARM: SAMSUNG: Make clk_default_setrate and clk_ops_def_setrate
+visible to other code.
+3. [PATCH v2 3/3] ARM: SAMSUNG: Add idle support.
+
+Changes since v4:
+
+1. Changed idle support function as Russell suggested
+2. Changed some codes in plat-s5p for supporting other S5P SoCs.
+
+Changes since v3:
+
+1. Fixed code as per comments from Ben in linux-samsung-soc mailing list.
+
+Changes since v2:
+
+1. Removed unused clock module defines.
+2. Modified PLL code to be generic.
+3. IRQ Timer and IRQ UART code use common code.
+4. S5P timer code is removed and common code in plat-s3c is used.
+5. Moved some of the code from plat-s5p to plat-samsung.
+
+Changes since v1:
+
+1. Corrected parent clock sources for all the clocks.
+2. Corrected the HCLK_LOW frequency calculation issue.
+3. Added a menuconfig option "S5P_GPIO_EXTRA" to select the number
+   of additional GPIO's required in file arch/arm/plat-s5p/Kconfig
+4. Add PCLK_LOW and UCLK1 as clock sources for UART module.
+5. Removed conditional inclusion of mach-s5p6440/Kconfig.
+6. Other fixes and changes.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+System LSI Division, SAMSUNG ELECTRONICS CO., LTD.
