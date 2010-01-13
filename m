@@ -1,53 +1,52 @@
-From: imre.deak@nokia.com (Imre Deak)
-Date: Wed, 13 Jan 2010 18:01:42 +0200
-Subject: [RFC PATCH 2/2] ARM: VFP: preserve the HW context when
-	callingsignal handlers
-In-Reply-To: <1263397782.32612.56.camel@pc1117.cambridge.arm.com>
-References: <c70d85c1a0b20b5f227f34b32db674c7b362d72d.1242734510.git.imre.deak@nokia.com>
-	<201001041615.26490.siarhei.siamashka@nokia.com>
-	<20100104142549.GF9107@n2100.arm.linux.org.uk>
-	<201001041718.55150.siarhei.siamashka@nokia.com>
-	<20100106174759.GB28921@localhost>
-	<1263397782.32612.56.camel@pc1117.cambridge.arm.com>
-Message-ID: <20100113160142.GB11726@localhost>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 13 Jan 2010 09:14:41 -0800
+Subject: [PATCH] ARM: Fix uncompress code compile for different defines
+	of static(void)
+In-Reply-To: <20100113142614.GA1252@pengutronix.de>
+References: <20100113021939.GE2986@atomide.com>
+	<20100113084937.GA19352@pengutronix.de>
+	<20100113142614.GA1252@pengutronix.de>
+Message-ID: <20100113171441.GF2986@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 13, 2010 at 04:49:42PM +0100, ext Catalin Marinas wrote:
-> On Wed, 2010-01-06 at 17:47 +0000, Imre Deak wrote:
-> > On Mon, Jan 04, 2010 at 04:18:54PM +0100, Siamashka Siarhei (Nokia-D/Helsinki) wrote:
-> > > On Monday 04 January 2010 16:25:49 ext Russell King - ARM Linux wrote:
-> > > > On Mon, Jan 04, 2010 at 04:15:26PM +0200, Siarhei Siamashka wrote:
-> > > > > On Saturday 13 June 2009 20:04:06 ext Russell King - ARM Linux wrote:
-> > > > > > - wait for a new patch which includes these other registers and not
-> > > > > > have any ABI visible changes to contend with
-> > > > >
-> > > > > Sorry for bumping this old thread, but what is the current status of
-> > > > > these patches?
-> > > >
-> > > > What happened was that the 2nd option was decided upon, and then the
-> > > > thread died, and probably everyone forgot about it.
-> > > >
-> > > > So, I'm doing exactly what I said I'd do in the second option.  I'm just
-> > > > still waiting some six months on...
-> > >
-> > > OK, it's understandable. The issue just got a bit more popular now than it
-> > > used to be six months ago.
-> > >
-> > > > If someone comes up with a tested patch, then its something we should
-> > > > sort out.
-> > >
-> > > Thanks for clarifying the situation.
-> > 
-> > Jamie, you raised the question of FP emulation in user space; could you
-> > provide the VFP registers needed for that in addition to the already saved
-> > ones? With that info I could update the patch so it's acceptable for everyone.
+* Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [100113 06:24]:
+> Hello,
 > 
-> I think you need to save all of FPSCR, FPEXC, FPINST, FPINST2. The
-> information in the latter 2 registers is only relevant if corresponding
-> bits in FPEXC are set (like EX and FP2V). A signal handler could decide
-> whether to use them or not.
+> On Wed, Jan 13, 2010 at 09:49:37AM +0100, Uwe Kleine-K?nig wrote:
+> > On Tue, Jan 12, 2010 at 06:19:40PM -0800, Tony Lindgren wrote:
+> > > Because of the include of the decompress_inflate.c file from
+> > > boot/compress/misc.c, there are different flush() defines:
+> > > 
+> > > In file included from arch/arm/boot/compressed/misc.c:249:
+> > > arch/arm/boot/compressed/../../../../lib/decompress_inflate.c:138:29: error: macro "flush" passed 2 arguments, but takes just 0
+> > > 
+> > > Fix this by removing the define of flush() in misc.c for
+> > > CONFIG_DEBUG_ICEDCC as it's already defined in mach/uncompress.h,
+> > > and that is being included unconditionally.
+> > > 
+> > > Also use a static inline function instead of define
+> > > for mach-mxc and mach-gemini to avoid similar bug
+> > > for those platforms.
+> > As arch/arm/boot/compressed/misc.c is compiled with -Dstatic= and this
+> > is AFAIK the only user of uncompress.h I'd skip "static" and/or add a
+> > comment telling that static is redundant here.
 
-Thanks for the info, I'll try to update my patches based on this.
+Maybe we should do another patch for the merge window to remove
+the static for flus from all uncompress.h files?
 
---Imre
+> while reading my reply I noticed that I don't understand the subject.
+> "different defines of static(void)"?
+
+Oops, typo. The subject should have been flush(void) instead of
+static(void) :)
+
+There's int(*flush)(void*, unsigned int) in lib/decompress_inflate.c,
+and there's static inline void flush(void) in uncompress.h.
+
+As decompress_inflate.c is included into misc.c, then the define
+flush() do { } while (0) causes confusion.
+
+Regards,
+
+Tony
