@@ -1,93 +1,50 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Wed, 13 Jan 2010 21:15:36 +0530
-Subject: [PATCH] spinlock: don't use deprecated barriers on ARMv7
-Message-ID: <1263397536-15736-1-git-send-email-rabin@rab.in>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 13 Jan 2010 15:49:42 +0000
+Subject: [RFC PATCH 2/2] ARM: VFP: preserve the HW context when
+	callingsignal handlers
+In-Reply-To: <20100106174759.GB28921@localhost>
+References: <c70d85c1a0b20b5f227f34b32db674c7b362d72d.1242734510.git.imre.deak@nokia.com>
+	<201001041615.26490.siarhei.siamashka@nokia.com>
+	<20100104142549.GF9107@n2100.arm.linux.org.uk>
+	<201001041718.55150.siarhei.siamashka@nokia.com>
+	<20100106174759.GB28921@localhost>
+Message-ID: <1263397782.32612.56.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARMv7, the use of the cp15 operations for barriers is deprecated in
-favour of the isb, dsb, and dmb instructions.  Change the locking
-functions to use the appropriate type of dsb for the architecture being
-built for.
+On Wed, 2010-01-06 at 17:47 +0000, Imre Deak wrote:
+> On Mon, Jan 04, 2010 at 04:18:54PM +0100, Siamashka Siarhei (Nokia-D/Helsinki) wrote:
+> > On Monday 04 January 2010 16:25:49 ext Russell King - ARM Linux wrote:
+> > > On Mon, Jan 04, 2010 at 04:15:26PM +0200, Siarhei Siamashka wrote:
+> > > > On Saturday 13 June 2009 20:04:06 ext Russell King - ARM Linux wrote:
+> > > > > - wait for a new patch which includes these other registers and not
+> > > > > have any ABI visible changes to contend with
+> > > >
+> > > > Sorry for bumping this old thread, but what is the current status of
+> > > > these patches?
+> > >
+> > > What happened was that the 2nd option was decided upon, and then the
+> > > thread died, and probably everyone forgot about it.
+> > >
+> > > So, I'm doing exactly what I said I'd do in the second option.  I'm just
+> > > still waiting some six months on...
+> >
+> > OK, it's understandable. The issue just got a bit more popular now than it
+> > used to be six months ago.
+> >
+> > > If someone comes up with a tested patch, then its something we should
+> > > sort out.
+> >
+> > Thanks for clarifying the situation.
+> 
+> Jamie, you raised the question of FP emulation in user space; could you
+> provide the VFP registers needed for that in addition to the already saved
+> ones? With that info I could update the patch so it's acceptable for everyone.
 
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
- arch/arm/include/asm/spinlock.h |   20 +++++++-------------
- arch/arm/include/asm/system.h   |    8 ++++++++
- 2 files changed, 15 insertions(+), 13 deletions(-)
+I think you need to save all of FPSCR, FPEXC, FPINST, FPINST2. The
+information in the latter 2 registers is only relevant if corresponding
+bits in FPEXC are set (like EX and FP2V). A signal handler could decide
+whether to use them or not.
 
-diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
-index c91c64c..9ed1064 100644
---- a/arch/arm/include/asm/spinlock.h
-+++ b/arch/arm/include/asm/spinlock.h
-@@ -69,13 +69,11 @@ static inline void arch_spin_unlock(arch_spinlock_t *lock)
- 
- 	__asm__ __volatile__(
- "	str	%1, [%0]\n"
--#ifdef CONFIG_CPU_32v6K
--"	mcr	p15, 0, %1, c7, c10, 4\n" /* DSB */
--"	sev"
--#endif
- 	:
- 	: "r" (&lock->lock), "r" (0)
- 	: "cc");
-+
-+	smp_sev();
- }
- 
- /*
-@@ -132,13 +130,11 @@ static inline void arch_write_unlock(arch_rwlock_t *rw)
- 
- 	__asm__ __volatile__(
- 	"str	%1, [%0]\n"
--#ifdef CONFIG_CPU_32v6K
--"	mcr	p15, 0, %1, c7, c10, 4\n" /* DSB */
--"	sev\n"
--#endif
- 	:
- 	: "r" (&rw->lock), "r" (0)
- 	: "cc");
-+
-+	smp_sev();
- }
- 
- /* write_can_lock - would write_trylock() succeed? */
-@@ -188,14 +184,12 @@ static inline void arch_read_unlock(arch_rwlock_t *rw)
- "	strex	%1, %0, [%2]\n"
- "	teq	%1, #0\n"
- "	bne	1b"
--#ifdef CONFIG_CPU_32v6K
--"\n	cmp	%0, #0\n"
--"	mcreq   p15, 0, %0, c7, c10, 4\n"
--"	seveq"
--#endif
- 	: "=&r" (tmp), "=&r" (tmp2)
- 	: "r" (&rw->lock)
- 	: "cc");
-+
-+	if (tmp == 0)
-+		smp_sev();
- }
- 
- static inline int arch_read_trylock(arch_rwlock_t *rw)
-diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-index 058e7e9..0b371ba 100644
---- a/arch/arm/include/asm/system.h
-+++ b/arch/arm/include/asm/system.h
-@@ -164,6 +164,14 @@ extern unsigned int user_debug;
- #define set_mb(var, value)	do { var = value; smp_mb(); } while (0)
- #define nop() __asm__ __volatile__("mov\tr0,r0\t@ nop\n\t");
- 
-+static inline void smp_sev(void)
-+{
-+#if defined(CONFIG_SMP) && defined(CONFIG_CPU_32v6K)
-+	dsb();
-+	__asm__ __volatile__ ("sev" : : : "memory");
-+#endif
-+}
-+
- extern unsigned long cr_no_alignment;	/* defined in entry-armv.S */
- extern unsigned long cr_alignment;	/* defined in entry-armv.S */
- 
 -- 
-1.6.5
+Catalin
