@@ -1,52 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 13 Jan 2010 09:14:41 -0800
-Subject: [PATCH] ARM: Fix uncompress code compile for different defines
-	of static(void)
-In-Reply-To: <20100113142614.GA1252@pengutronix.de>
-References: <20100113021939.GE2986@atomide.com>
-	<20100113084937.GA19352@pengutronix.de>
-	<20100113142614.GA1252@pengutronix.de>
-Message-ID: <20100113171441.GF2986@atomide.com>
+From: ramaxlo@gmail.com (Ramax Lo)
+Date: Thu, 14 Jan 2010 01:31:24 +0800
+Subject: [PATCH] S3C: NAND: Check the existence of nr_map before copying
+In-Reply-To: <>
+References: <>
+Message-ID: <1263403884-8495-1-git-send-email-ramaxlo@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [100113 06:24]:
-> Hello,
-> 
-> On Wed, Jan 13, 2010 at 09:49:37AM +0100, Uwe Kleine-K?nig wrote:
-> > On Tue, Jan 12, 2010 at 06:19:40PM -0800, Tony Lindgren wrote:
-> > > Because of the include of the decompress_inflate.c file from
-> > > boot/compress/misc.c, there are different flush() defines:
-> > > 
-> > > In file included from arch/arm/boot/compressed/misc.c:249:
-> > > arch/arm/boot/compressed/../../../../lib/decompress_inflate.c:138:29: error: macro "flush" passed 2 arguments, but takes just 0
-> > > 
-> > > Fix this by removing the define of flush() in misc.c for
-> > > CONFIG_DEBUG_ICEDCC as it's already defined in mach/uncompress.h,
-> > > and that is being included unconditionally.
-> > > 
-> > > Also use a static inline function instead of define
-> > > for mach-mxc and mach-gemini to avoid similar bug
-> > > for those platforms.
-> > As arch/arm/boot/compressed/misc.c is compiled with -Dstatic= and this
-> > is AFAIK the only user of uncompress.h I'd skip "static" and/or add a
-> > comment telling that static is redundant here.
+We need to check whether the chip number map is provided to avoid unexpected
+NULL pointer exception.
 
-Maybe we should do another patch for the merge window to remove
-the static for flus from all uncompress.h files?
+Signed-off-by: Ramax Lo <ramaxlo@gmail.com>
+---
+ arch/arm/plat-s3c/dev-nand.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-> while reading my reply I noticed that I don't understand the subject.
-> "different defines of static(void)"?
-
-Oops, typo. The subject should have been flush(void) instead of
-static(void) :)
-
-There's int(*flush)(void*, unsigned int) in lib/decompress_inflate.c,
-and there's static inline void flush(void) in uncompress.h.
-
-As decompress_inflate.c is included into misc.c, then the define
-flush() do { } while (0) causes confusion.
-
-Regards,
-
-Tony
+diff --git a/arch/arm/plat-s3c/dev-nand.c b/arch/arm/plat-s3c/dev-nand.c
+index 84808cc..34697de 100644
+--- a/arch/arm/plat-s3c/dev-nand.c
++++ b/arch/arm/plat-s3c/dev-nand.c
+@@ -58,8 +58,8 @@ static int __init s3c_nand_copy_set(struct s3c2410_nand_set *set)
+ 			return -ENOMEM;
+ 	}
+ 	
+-	size = sizeof(int) * set->nr_chips;
+-	if (size) {
++	if (set->nr_map) {
++		size = sizeof(int) * set->nr_chips;
+ 		ptr = kmemdup(set->nr_map, size, GFP_KERNEL);
+ 		set->nr_map = ptr;
+ 
+-- 
+1.5.4.3
