@@ -1,23 +1,49 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 14 Jan 2010 09:12:18 +0800
-Subject: [PATCH - 2nd attempt] ARM: Support for Embedian MXM-8x10 eval kit
-In-Reply-To: <20100113155454.GC28292@n2100.arm.linux.org.uk>
-References: <201001131730.24535.epeer@tmtservices.co.za>
-	<20100113155454.GC28292@n2100.arm.linux.org.uk>
-Message-ID: <f17812d71001131712i72e62565ob1afab8542efb966@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 14 Jan 2010 10:15:14 +0900
+Subject: [PATCH] ARM: SAMSUNG: Add system.h file
+Message-ID: <1263431714-2922-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +
-> > +static void __init capc7117_ide_init(void)
-> > +{
-> > + ? ? pxa3xx_mfp_write(MFP_PIN_GPIO76, 0xa0c0); ? ? ? /* EXT_IRQ3 */
->
-> I'm not sure that pxa3xx_mfp_write is supposed to be used. ?Eric?
->
+This patch adds system.h file into plat-samsung.
 
-No, we don't. Having magic number there is really painful to
-understand and maintain. I guess for the statement above, one
-can easily write this in a pin config array with macro:
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/plat-samsung/include/mach/system.h |   26 ++++++++++++++++++++++++++
+ 1 files changed, 26 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-samsung/include/mach/system.h
 
-GPIO76_GPIO,    /* EXT_IRQ3 */
+diff --git a/arch/arm/plat-samsung/include/mach/system.h b/arch/arm/plat-samsung/include/mach/system.h
+new file mode 100644
+index 0000000..596fe8d
+--- /dev/null
++++ b/arch/arm/plat-samsung/include/mach/system.h
+@@ -0,0 +1,26 @@
++/* linux/arch/arm/plat-samsung/include/mach/system.h
++ *
++ * Copyright (c) 2009 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
++ * Idle support
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#ifndef __ASM_PLAT_SYSTEM_H
++#define __ASM_PLAT_SYSTEM_H __FILE__
++
++static void arch_idle(void)
++{
++	/* nothing here yet */
++}
++
++static void arch_reset(char mode, const char *cmd)
++{
++	/* nothing here yet */
++}
++
++#endif /* __ASM_PLAT_SYSTEM_H */
+-- 
+1.6.2.5
