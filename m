@@ -1,60 +1,68 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 14 Jan 2010 01:40:40 +0000
-Subject: [PATCH] ARM: SAMSUNG: Add system.h file
-In-Reply-To: <1263431714-2922-1-git-send-email-kgene.kim@samsung.com>
-References: <1263431714-2922-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20100114014039.GP18532@trinity.fluff.org>
+From: ramaxlo@gmail.com (Ramax Lo)
+Date: Thu, 14 Jan 2010 09:48:22 +0800
+Subject: [PATCH] S3C: NAND: Check the existence of nr_map before copying
+In-Reply-To: <A24693684029E5489D1D202277BE8944514AD033@dlee02.ent.ti.com>
+References: <1263403884-8495-1-git-send-email-ramaxlo@gmail.com>
+	<A24693684029E5489D1D202277BE8944514AD033@dlee02.ent.ti.com>
+Message-ID: <901c91091001131748i3a85ec57i49e6910de2b28379@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2010 at 10:15:14AM +0900, Kukjin Kim wrote:
-> This patch adds system.h file into plat-samsung.
-> 
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  arch/arm/plat-samsung/include/mach/system.h |   26 ++++++++++++++++++++++++++
->  1 files changed, 26 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/plat-samsung/include/mach/system.h
-> 
-> diff --git a/arch/arm/plat-samsung/include/mach/system.h b/arch/arm/plat-samsung/include/mach/system.h
-> new file mode 100644
-> index 0000000..596fe8d
-> --- /dev/null
-> +++ b/arch/arm/plat-samsung/include/mach/system.h
-> @@ -0,0 +1,26 @@
-> +/* linux/arch/arm/plat-samsung/include/mach/system.h
-> + *
-> + * Copyright (c) 2009 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com/
-> + *
-> + * Idle support
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#ifndef __ASM_PLAT_SYSTEM_H
-> +#define __ASM_PLAT_SYSTEM_H __FILE__
-> +
-> +static void arch_idle(void)
-> +{
-> +	/* nothing here yet */
-> +}
-> +
-> +static void arch_reset(char mode, const char *cmd)
-> +{
-> +	/* nothing here yet */
-> +}
-> +
-> +#endif /* __ASM_PLAT_SYSTEM_H */
+2010/1/14 Aguirre, Sergio <saaguirre@ti.com>:
+> Ramax,
+>
+>> -----Original Message-----
+>> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+>> kernel-bounces at lists.infradead.org] On Behalf Of Ramax Lo
+>> Sent: Wednesday, January 13, 2010 11:31 AM
+>> To: linux-arm-kernel at lists.infradead.org
+>> Cc: ben-linux at fluff.org
+>> Subject: [PATCH] S3C: NAND: Check the existence of nr_map before copying
+>>
+>> We need to check whether the chip number map is provided to avoid
+>> unexpected
+>> NULL pointer exception.
+>>
+>> Signed-off-by: Ramax Lo <ramaxlo@gmail.com>
+>> ---
+>> ?arch/arm/plat-s3c/dev-nand.c | ? ?4 ++--
+>> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/plat-s3c/dev-nand.c b/arch/arm/plat-s3c/dev-nand.c
+>> index 84808cc..34697de 100644
+>> --- a/arch/arm/plat-s3c/dev-nand.c
+>> +++ b/arch/arm/plat-s3c/dev-nand.c
+>> @@ -58,8 +58,8 @@ static int __init s3c_nand_copy_set(struct
+>> s3c2410_nand_set *set)
+>> ? ? ? ? ? ? ? ? ? ? ? return -ENOMEM;
+>> ? ? ? }
+>>
+>> - ? ? size = sizeof(int) * set->nr_chips;
+>> - ? ? if (size) {
+>> + ? ? if (set->nr_map) {
+>
+> Shouldn't the above condition be:
+>
+> ? ? ? ?if (set->nr_map && set->nr_chips) {
+>
+> ?
 
-ok, but at the moment this is only useful for the s5p6440,all the other
-<mach/system.h> implementations have something in them even it is just for
-arch_reset().
+Ok, I will fix that.
 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+>
+> Regards,
+> Sergio
+>
+>> + ? ? ? ? ? ? size = sizeof(int) * set->nr_chips;
+>> ? ? ? ? ? ? ? ptr = kmemdup(set->nr_map, size, GFP_KERNEL);
+>> ? ? ? ? ? ? ? set->nr_map = ptr;
+>>
+>> --
+>> 1.5.4.3
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
