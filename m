@@ -1,43 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Jan 2010 11:38:15 -0800
-Subject: [PATCH] ARM: Fix uncompress code compile for different
-	definesof static(void)
-In-Reply-To: <20100114091556.GB19197@n2100.arm.linux.org.uk>
-References: <20100113021939.GE2986@atomide.com>
-	<20100113084937.GA19352@pengutronix.de>
-	<BD79186B4FD85F4B8E60E381CAEE190902089C39@mi8nycmail19.Mi8.com>
-	<20100114082952.GA657@pengutronix.de>
-	<20100114091556.GB19197@n2100.arm.linux.org.uk>
-Message-ID: <20100114193815.GA7339@atomide.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Fri, 15 Jan 2010 08:50:14 +1300
+Subject: [PATCH] Updated: Fix soft lockup in at91 udc driver
+Message-ID: <4B4F7576.9090008@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [100114 01:14]:
-> On Thu, Jan 14, 2010 at 09:29:52AM +0100, Uwe Kleine-K?nig wrote:
-> > I think the cleanest solution would be to remove -Dstatic=.  I don't
-> > know the exact reason for it being there.
-> 
-> Thereby breaking the ability to build a relocatable decompressor.
-> 
-> > Russell, maybe these toolchain problems are gone in the meantime?
-> 
-> I don't think it was toolchain problems.  Having the text and data
-> segments independently relocatable is actually an abuse of the ELF
-> format - it's not something it directly supports.
-> 
-> From what I remember, having 'static' in there results in either
-> function calls or static data being indirected through the GOT table,
-> which means it has to be relocated along side the data segment - which
-> makes the offset between the text and data segments fixed.
-> 
-> I would not believe that the "problems" have gone because the toolchain
-> is working how it's supposed to.
-> 
-> The -Dstatic= stays.
+Fix a potential soft lockup in the AT91 UDC driver by ensuring that the
+UDC clock is enabled inside the interrupt handler. If the UDC clock is
+not enabled then the UDC registers cannot be written to and the
+interrupt cannot be cleared or masked.
 
-I've added the compile fix with the subject fixed into Russell's
-patch system as 5882/1.
+Note that this patch (and other parts of the existing AT91 UDC driver)
+is potentially racy for preempt-rt kernels, but is okay for mainline.
 
-Regards,
+Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
+Tested-by: Remy Bohmer <linux@bohmer.net>
+Cc: Andrew Victor <avictor.za@gmail.com>
+Cc: David Brownell <dbrownell@users.sourceforge.net>
 
-Tony
+----
+
+diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
+index c4997e9..5ba8319 100644
+--- a/drivers/usb/gadget/at91_udc.c
++++ b/drivers/usb/gadget/at91_udc.c
+@@ -1370,6 +1370,12 @@ static irqreturn_t at91_udc_irq (int irq, void *_udc)
+ {
+ 	struct at91_udc		*udc = _udc;
+ 	u32			rescans = 5;
++	int			disable_clock = 0;
++
++	if (!udc->clocked) {
++		clk_on(udc);
++		disable_clock = 1;
++	}
+ 
+ 	while (rescans--) {
+ 		u32 status;
+@@ -1458,6 +1464,9 @@ static irqreturn_t at91_udc_irq (int irq, void *_udc)
+ 		}
+ 	}
+ 
++	if (disable_clock)
++		clk_off(udc);
++
+ 	return IRQ_HANDLED;
+ }
+ 
