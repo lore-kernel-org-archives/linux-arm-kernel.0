@@ -1,69 +1,41 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 14 Jan 2010 11:24:14 +0200
-Subject: [PATCH 2/3] mx25: add NAND support
+Date: Thu, 14 Jan 2010 11:24:15 +0200
+Subject: [PATCH 3/3] mx25pdk: add NAND device support
 In-Reply-To: <cover.1263460321.git.baruch@tkos.co.il>
 References: <cover.1263460321.git.baruch@tkos.co.il>
-Message-ID: <adbbcd2564fc70155fabca32218cf3a913af9fe1.1263460321.git.baruch@tkos.co.il>
+Message-ID: <810d2b67056503ed2c38907bfe8f5d11aaeb15ac.1263460321.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 ---
- arch/arm/mach-mx25/devices.c          |   20 ++++++++++++++++++++
- arch/arm/mach-mx25/devices.h          |    1 +
- arch/arm/plat-mxc/include/mach/mx25.h |    2 ++
- 3 files changed, 23 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx25/mx25pdk.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mx25/devices.c b/arch/arm/mach-mx25/devices.c
-index 9fdeea1..dd40697 100644
---- a/arch/arm/mach-mx25/devices.c
-+++ b/arch/arm/mach-mx25/devices.c
-@@ -438,3 +438,23 @@ struct platform_device mx25_fec_device = {
- 	.num_resources	= ARRAY_SIZE(mx25_fec_resources),
- 	.resource	= mx25_fec_resources,
- };
-+
-+static struct resource mxc_nand_resources[] = {
-+	{
-+		.start	= MX25_NFC_BASE_ADDR,
-+		.end	= MX25_NFC_BASE_ADDR + 0x1fff,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		.start	= MX25_INT_NANDFC,
-+		.end	= MX25_INT_NANDFC,
-+		.flags	= IORESOURCE_IRQ,
-+	},
+diff --git a/arch/arm/mach-mx25/mx25pdk.c b/arch/arm/mach-mx25/mx25pdk.c
+index 921bc99..c8b1d3b 100644
+--- a/arch/arm/mach-mx25/mx25pdk.c
++++ b/arch/arm/mach-mx25/mx25pdk.c
+@@ -77,6 +77,12 @@ static void __init mx25pdk_fec_reset(void)
+ 	gpio_set_value(FEC_RESET_B_GPIO, 1);
+ }
+ 
++static struct mxc_nand_platform_data mx25pdk_nand_board_info = {
++	.width		= 1,
++	.hw_ecc		= 1,
++	.flash_bbt	= 1,
 +};
 +
-+struct platform_device mxc_nand_device = {
-+	.name		= "mxc_nand",
-+	.id		= 0,
-+	.num_resources	= ARRAY_SIZE(mxc_nand_resources),
-+	.resource	= mxc_nand_resources,
-+};
-diff --git a/arch/arm/mach-mx25/devices.h b/arch/arm/mach-mx25/devices.h
-index fe5420f..8f55300 100644
---- a/arch/arm/mach-mx25/devices.h
-+++ b/arch/arm/mach-mx25/devices.h
-@@ -18,3 +18,4 @@ extern struct platform_device mxc_i2c_device0;
- extern struct platform_device mxc_i2c_device1;
- extern struct platform_device mxc_i2c_device2;
- extern struct platform_device mx25_fec_device;
-+extern struct platform_device mxc_nand_device;
-diff --git a/arch/arm/plat-mxc/include/mach/mx25.h b/arch/arm/plat-mxc/include/mach/mx25.h
-index 854e2dc..58e0bd3 100644
---- a/arch/arm/plat-mxc/include/mach/mx25.h
-+++ b/arch/arm/plat-mxc/include/mach/mx25.h
-@@ -42,7 +42,9 @@
- #define UART2_BASE_ADDR			0x43f94000
+ static void __init mx25pdk_init(void)
+ {
+ 	mxc_iomux_v3_setup_multiple_pads(mx25pdk_pads,
+@@ -84,6 +90,7 @@ static void __init mx25pdk_init(void)
  
- #define MX25_FEC_BASE_ADDR		0x50038000
-+#define MX25_NFC_BASE_ADDR		0xbb000000
+ 	mxc_register_device(&mxc_uart_device0, &uart_pdata);
+ 	mxc_register_device(&mxc_usbh2, NULL);
++	mxc_register_device(&mxc_nand_device, &mx25pdk_nand_board_info);
  
- #define MX25_INT_FEC	57
-+#define MX25_INT_NANDFC	33
- 
- #endif /* __MACH_MX25_H__ */
+ 	mx25pdk_fec_reset();
+ 	mxc_register_device(&mx25_fec_device, &mx25_fec_pdata);
 -- 
 1.6.5
