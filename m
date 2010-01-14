@@ -1,55 +1,81 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Jan 2010 11:24:32 +0000
-Subject: pxa320: change uart configuration
-In-Reply-To: <20100114115225.94334g603pqhe1d5@webmail.tu-cottbus.de>
-References: <20100112183000.14575jy4enpsv6ag@webmail.tu-cottbus.de>
-	<20100112173606.GF5633@n2100.arm.linux.org.uk>
-	<20100114115225.94334g603pqhe1d5@webmail.tu-cottbus.de>
-Message-ID: <20100114112432.GA21385@n2100.arm.linux.org.uk>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 14 Jan 2010 12:29:21 +0100
+Subject: [PATCH 03/21] ARM: S5PC1XX: create sub-platform for S5PC100 SoCs
+In-Reply-To: <1263468579-5732-1-git-send-email-m.szyprowski@samsung.com>
+References: <1263468579-5732-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1263468579-5732-4-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2010 at 11:52:25AM +0100, Judith Baumgarten wrote:
-> Zitat von Russell King - ARM Linux <linux@arm.linux.org.uk>:
->
->> On Tue, Jan 12, 2010 at 06:30:00PM +0100, Judith Baumgarten wrote:
->>> I want to change the uart configuration of the pxa serial ports in order
->>> to be able to connect to different devices. The problem is, that it jumps
->>> back to its initial configuration, when it receives some data. I used
->>> stty of busybox 1.14.3 as well as the termios-structure to change the
->>> configuration, but it always remained the same. I could protect some
->>> configurations by using the TIOCSLCKTRMIOS ioctl, but the baudrate still
->>> jumps back.
->>
->> Something will be changing it back.  A getty maybe?
->
-> We have no getty on our system. Inittab contains just the following entries:
->
-> ::sysinit:/etc/init.d/rcS
-> ttyS0::respawn:-/bin/sh
-> ttyS1::respawn:-/bin/sh
-> tty1::respawn:-/bin/sh
-> tty2::respawn:-/bin/sh
-> ::ctrlaltdel:/bin/umount -a -r
->
-> and a "ps ax | grep tty" has no result.
+From: Kyungmin Park <kyungmin.park@samsung.com>
 
-You have two shells - one on ttyS0 and one on ttyS1.  While these are
-running on these ports, they will want to control the settings - so
-if you try to make use of these two serial ports, you're going to
-cause confusion.
+Samsung S5PC100 and S5PC110 SoCs differs a lot in register map and other
+core platform definitions, so it is not possible to have both SoCs in
+the current platform framework without runtime hacks. To address this
+issue a sub-platform has been introduced, so each SoC in sub-platform
+can have its own set of include files (register map, irq&gpio
+definitions, etc)
 
-Firstly, the shells will fight you with your termios settings.  Secondly,
-any received characters will be delivered randomly between the shell and
-your program - some characters will be seen by the shell, others will
-be seen by your program.
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ arch/arm/Makefile             |    2 +-
+ arch/arm/mach-s5pc100/Kconfig |    4 ++++
+ arch/arm/plat-s5pc1xx/Kconfig |   10 ++++++++++
+ 3 files changed, 15 insertions(+), 1 deletions(-)
 
-This is just something you do not want to do.  If you want to control a
-port, you need exclusive access to it - which means not starting any
-other program on the port.  In the case of serial ports, there's a
-locking mechanism for programs for serial ports (getty, uucp, minicom,
-etc) which involves creating lock files - eg, /var/lock/LCK..ttyS0.
-
-http://tldp.org/HOWTO/Serial-HOWTO.html#toc14.2
-
-covers some of the issues there.
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index e9da084..f00d2d8 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -161,7 +161,7 @@ machine-$(CONFIG_ARCH_RPC)		:= rpc
+ machine-$(CONFIG_ARCH_S3C2410)		:= s3c2410 s3c2400 s3c2412 s3c2440 s3c2442 s3c2443
+ machine-$(CONFIG_ARCH_S3C24A0)		:= s3c24a0
+ machine-$(CONFIG_ARCH_S3C64XX)		:= s3c6400 s3c6410
+-machine-$(CONFIG_ARCH_S5PC1XX)		:= s5pc100
++machine-$(CONFIG_ARCH_S5PC100)		:= s5pc100
+ machine-$(CONFIG_ARCH_SA1100)		:= sa1100
+ machine-$(CONFIG_ARCH_SHARK)		:= shark
+ machine-$(CONFIG_ARCH_STMP378X)		:= stmp378x
+diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
+index 27ec167..0628bc3 100644
+--- a/arch/arm/mach-s5pc100/Kconfig
++++ b/arch/arm/mach-s5pc100/Kconfig
+@@ -3,6 +3,8 @@
+ #
+ # Licensed under GPLv2
+ 
++if ARCH_S5PC100
++
+ # Configuration options for the S5PC100 CPU
+ 
+ config CPU_S5PC100
+@@ -32,3 +34,5 @@ config MACH_SMDKC100
+ 	select S5PC100_SETUP_SDHCI
+ 	help
+ 	  Machine support for the Samsung SMDKC100
++
++endif
+diff --git a/arch/arm/plat-s5pc1xx/Kconfig b/arch/arm/plat-s5pc1xx/Kconfig
+index c7ccdf2..38f8998 100644
+--- a/arch/arm/plat-s5pc1xx/Kconfig
++++ b/arch/arm/plat-s5pc1xx/Kconfig
+@@ -24,6 +24,16 @@ config PLAT_S5PC1XX
+ 
+ if PLAT_S5PC1XX
+ 
++choice
++	prompt "S5PC1xx SoC Type"
++	default ARCH_S5PC100
++
++config ARCH_S5PC100
++	bool "S5PC100"
++
++endchoice
++
++
+ # Configuration options shared by all S3C64XX implementations
+ 
+ config CPU_S5PC100_INIT
+-- 
+1.6.4
