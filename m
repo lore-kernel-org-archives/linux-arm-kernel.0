@@ -1,32 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 14 Jan 2010 17:53:14 +0000
-Subject: [PATCH] Offer 'uncacheable memory' as DMA coherent memory for
-	ARMv6
-In-Reply-To: <20100113180327.GE28292@n2100.arm.linux.org.uk>
-References: <20100113180327.GE28292@n2100.arm.linux.org.uk>
-Message-ID: <1263491595.3964.85.camel@pc1117.cambridge.arm.com>
+From: jason.wessel@windriver.com (Jason Wessel)
+Date: Thu, 14 Jan 2010 12:57:35 -0600
+Subject: [PATCH 20/40] arm,
+	kgdb: Add hook to catch an oops with debugger
+In-Reply-To: <20100114174821.GB21385@n2100.arm.linux.org.uk>
+References: <1263481176-1897-1-git-send-email-jason.wessel@windriver.com><1263481176-1897-21-git-send-email-jason.wessel@windriver.com>
+	<20100114174821.GB21385@n2100.arm.linux.org.uk>
+Message-ID: <4B4F691F.3030500@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-01-13 at 18:03 +0000, Russell King - ARM Linux wrote:
-> ARMv7 uses 'uncacheable normal memory' to implement DMA coherent memory,
-> since mapping the same memory as two different types is defined to be
-> unpredictable.
-> 
-> The same is strictly true for ARMv6 as well, although no bad behaviour
-> has been observed thus far.  However, we do want to move ARMv6 to be
-> architecturally compliant.  The down side is that some drivers may only
-> have been tested on ARMv6, and may be missing the necessary barriers to
-> make them work.
-> 
-> So, offer this as a configuration option, defaulting to enabled (to
-> encourage drivers to be fixed.)
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Russell King - ARM Linux wrote:
+> On Thu, Jan 14, 2010 at 08:59:16AM -0600, Jason Wessel wrote:
+>   
+>> Add in a low level hook to catch calls to die() in the debugger.
+>>
+>> After the debugger is done, the standard system rules will be in play
+>> for the original exception.
+>>
+>> The kdb debugger wants a chance to catch these sorts of exceptions for
+>> analysis.
+>>     
+>
+> NAK.  I have a similar patch which implements the hook properly - but
+> with one caveat.  It needs a review to ensure that its safe to return
+> from die().  Until that's established, this patch can not be merged.
+>   
 
-Looks ok to me.
+I dropped the patch which you NAK'ed from the series.
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+As for your included patch, I will try it out  against the various
+regression tests I have, which exercise the oops and exception paths.
 
--- 
-Catalin
+> Please also ensure that the linux-arm-kernel list is copied with ARM
+> patches.
+>
+>   
+
+Check.
+
+
+Thanks,
+Jason.
