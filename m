@@ -1,46 +1,36 @@
-From: acassis@gmail.com (Alan Carvalho de Assis)
-Date: Thu, 14 Jan 2010 10:25:06 -0200
-Subject: [PATCH] RFC: mx27: Add soc_camera support
-In-Reply-To: <eedb5541001132328w3e1f1a4dj48e20bbad63acf96@mail.gmail.com>
-References: <1260885686-8478-1-git-send-email-acassis@gmail.com>
-	<37367b3a0912150607v713edc32y3578fa2a0c8c61db@mail.gmail.com>
-	<eedb5541001032340n66205fb8s57e09d2ba413b322@mail.gmail.com>
-	<37367b3a1001040412k280f3366p4868e36f5a7f71e4@mail.gmail.com>
-	<eedb5541001040425h2a3c07dcn534c71a0918b322b@mail.gmail.com>
-	<eedb5541001040431j3f14ec55g66ed4dd44a2a840e@mail.gmail.com>
-	<37367b3a1001131033u74c30ad6q8da1dbc35982e008@mail.gmail.com>
-	<eedb5541001132328w3e1f1a4dj48e20bbad63acf96@mail.gmail.com>
-Message-ID: <37367b3a1001140425g1dbb0dcfu3e771ef6d488e9e2@mail.gmail.com>
+From: leif.lindholm@arm.com (Leif Lindholm)
+Date: Thu, 14 Jan 2010 13:08:08 -0000
+Subject: [PATCH] ARM: Add SWP/SWPB emulation for ARMv7 processors (v3)
+In-Reply-To: <20100106193641.GD1728@n2100.arm.linux.org.uk>
+References: <20100105182447.5374.79579.stgit@e101986-lin>
+	<20100105194328.GG14376@shareable.org>
+	<000001ca8f05$2fbb4150$8f31c3f0$@lindholm@arm.com>
+	<20100106193641.GD1728@n2100.arm.linux.org.uk>
+Message-ID: <000001ca951a$9e1009e0$da301da0$@lindholm@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
-
-On 1/14/10, javier Martin <javier.martin@vista-silicon.com> wrote:
-> No idea what can be causing this. Maybe I2C address is bad in board specific
-> code?
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: 06 January 2010 19:37
 >
+> > It's to ensure it would work (without console warnings) even if
+> > someone decides to disable ALIGNMENT_TRAP. An alternative would be to
+> > strip the creation of /proc/cpu out from mm/alignment.c and put it
+> > somewhere else (or move the stats file somewhere else - but it seemed
+> > logical to group with /proc/alignment).
+> 
+> As I said when you previously posted this patch, that's definitely on
+> the cards.  In fact, I'm about to commit the following patch for doing
+> exactly this.
 
-I don't know, I will check carefully.
+Excellent, thanks. I'm just about to submit the next version, which relies
+on that patch, and no longer checks ALIGNMENT_TRAP for anything.
 
->> Linux video capture interface: v2.00
->> write: -5
->> MT9T31 Read register 0xFF = -5
->> Forcing mt9t031_video_probe to return OK!
->> mx27-camera mx27-camera.0: initialising
->> mx27-camera: probe of mx27-camera.0 failed with error -2
->>
->
-> As far as I know, video buffers are allocated in probe() function. Maybe you
-> have a memory fragmentation problem and you need to move buffer allocation
-> to init().
-> We have faced this problem many times in the past.
->
+Other changes:
+- Code restructured a bit, from Jamie's comments. It did end up quite a bit
+  cleaner because of this.
+- Comments added for memory barriers, as pointed out by Jamie.
+- Added description in Documentation/arm/swp_emulation.
 
-Hmm, great Javier, in fact it could be the issue!
-
-Thank you very much.
-
-Best Regards,
-
-Alan
+/
+	Leif
