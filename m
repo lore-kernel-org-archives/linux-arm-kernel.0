@@ -1,96 +1,111 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 13 Jan 2010 19:11:44 -0500
-Subject: Question: __ARM_EABI__
-In-Reply-To: <19278.22412.764361.337948@pilspetsen.it.uu.se>
-References: <BD79186B4FD85F4B8E60E381CAEE190902089C63@mi8nycmail19.Mi8.com><19278.11469.95923.629825@pilspetsen.it.uu.se><BD79186B4FD85F4B8E60E381CAEE190902089C95@mi8nycmail19.Mi8.com><20100113210503.GG28292@n2100.arm.linux.org.uk><BD79186B4FD85F4B8E60E381CAEE190902089C9B@mi8nycmail19.Mi8.com><20100113211725.GH28292@n2100.arm.linux.org.uk><BD79186B4FD85F4B8E60E381CAEE190902089CA8@mi8nycmail19.Mi8.com>
-	<19278.22412.764361.337948@pilspetsen.it.uu.se>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE190902089CD2@mi8nycmail19.Mi8.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Thu, 14 Jan 2010 00:28:23 +0000
+Subject: [PATCH v2 3/3] ARM: SAMSUNG: Add idle support
+In-Reply-To: <1263426347-13668-1-git-send-email-kgene.kim@samsung.com>
+References: <1263426347-13668-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20100114002823.GL18532@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, January 13, 2010 4:30 PM, Mikael Pettersson wrote:
-> H Hartley Sweeten writes:
->> But, I'm actually getting the wrong message.
->> 
->> Alessandro Rubini pointed out that I could use "-dM" in the preprocessor
->> to dump the defines.  My toolchain has these particular defines:
->> 
->> #define __GNUC__ 4
->> #define __GNUC_MINOR__ 3
->> #define __ARM_EABI__ 1
->> 
->> 4.3.2 might not support unwinding correctly but I still should not get
->> any of the warning messages.
->> 
->> Confused...
->
-> Indeed, I dug out my old gcc-4.3 eabi cross-gcc and it produced no such
-> warnings, with or without CONFIG_ARM_UNWIND.
->
-> make ARCH=arm mrproper, reinstate your .config, make V=1 and show us
-> the complete command-line and messages for the compilation of unwind.c.
->
-> Do you have CONFIG_AEABI=y in your .config?
+On Thu, Jan 14, 2010 at 08:45:47AM +0900, Kukjin Kim wrote:
+> This patch adds common idle functionality for all Samsung SoC's.
+> 
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  arch/arm/plat-samsung/include/mach/idle.h   |   19 +++++++++++++
+>  arch/arm/plat-samsung/include/mach/system.h |   39 +++++++++++++++++++++++++++
+>  2 files changed, 58 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/plat-samsung/include/mach/idle.h
+>  create mode 100644 arch/arm/plat-samsung/include/mach/system.h
+> 
+> diff --git a/arch/arm/plat-samsung/include/mach/idle.h b/arch/arm/plat-samsung/include/mach/idle.h
+> new file mode 100644
+> index 0000000..b5b92d2
+> --- /dev/null
+> +++ b/arch/arm/plat-samsung/include/mach/idle.h
+> @@ -0,0 +1,19 @@
+> +/* linux/arch/arm/plat-samsung/include/mach/idle.h
+> + *
+> + * Copyright (c) 2009 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com/
+> + *
+> + * Idle support
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +#ifndef __ASM_PLAT_IDLE_H
+> +#define __ASM_PLAT_IDLE_H __FILE__
+> +
+> +extern void (*s3c_idle_fn)(void);
+> +extern void samsung_idle(void);
+> +
+> +#endif /* __ASM_PLAT_IDLE_H */
 
-CONFIG_AEABI=y is in my .config
+Sorry, but I beliveve Russell's original statement was that pm_idle shoudl be
+used instead of having another idle pointer, so the s5p6440 idle code
+will need to be changed to hook pm_idle and this patch removed from the
+series.
 
-Looks like this might be a sparse issue.
+> diff --git a/arch/arm/plat-samsung/include/mach/system.h b/arch/arm/plat-samsung/include/mach/system.h
+> new file mode 100644
+> index 0000000..1e49fb3
+> --- /dev/null
+> +++ b/arch/arm/plat-samsung/include/mach/system.h
+> @@ -0,0 +1,39 @@
+> +/* linux/arch/arm/plat-samsung/include/mach/idle.h
+> + *
+> + * Copyright (c) 2009 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com/
+> + *
+> + * Idle support
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +#ifndef __ASM_PLAT_SYSTEM_H
+> +#define __ASM_PLAT_SYSTEM_H __FILE__
+> +
+> +void (*s3c_idle_fn)(void);
+> +
+> +void samsung_idle(void)
+> +{
+> +	/* can add generic idle functionality here, if any */
+> +
+> +	if (!need_resched()) {
+> +		if (s3c_idle_fn != NULL)
+> +			(s3c_idle_fn)();
+> +	}
+> +	local_irq_enable();
+> +}
+> +
+> +static void arch_idle(void)
+> +{
+> +	/* nothing */
+> +}
+> +
+> +static void arch_reset(char mode, const char *cmd)
+> +{
+> +	/* nothing here yet */
+> +}
+> +
+> +#endif /* __ASM_PLAT_SYSTEM_H */
+> -- 
+> 1.6.2.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-A normal build of the kernel (make or make V=1) does not produce the
-Warning messages.  But a sparse build (make C=2 or make C=2 V=1) does
-make the warnings appear.
+-- 
+-- 
+Ben
 
-The complete command line with V=1 for both is quite long.  The only
-differences are (broken down for readability):
-
-$ make V=1
-...
-  /home/bigguiness/toolchain/x-tools/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-gcc
-	# common command-line options removed
- 	-c 
-  	-o arch/arm/kernel/unwind.o arch/arm/kernel/unwind.c
-...
-
-$ make C=2 V=1
-...
-  sparse 
-  	-D__linux__ 
-  	-Dlinux 
-  	-D__STDC__ 
-  	-Dunix 
-  	-D__unix__ 
-  	-Wbitwise 
-  	-Wno-return-void  
-  	-D__arm__  
-  	-nostdinc 
-  	-isystem /home/bigguiness/toolchain/x-tools/arm-unknown-linux-gnueabi/lib/gcc/arm-unknown-linux-gnueabi/4.3.2/include 
-	# common command-line options removed
-   	arch/arm/kernel/unwind.c ;
-arch/arm/kernel/unwind.c:30:2: warning: Your compiler does not have EABI support.
-arch/arm/kernel/unwind.c:31:2: warning: ARM unwind is known to compile only with EABI compilers.
-arch/arm/kernel/unwind.c:32:2: warning: Change compiler or disable ARM_UNWIND option.
-arch/arm/kernel/unwind.c:51:6: warning: symbol '__aeabi_unwind_cpp_pr0' was not declared. Should it be static?
-arch/arm/kernel/unwind.c:56:6: warning: symbol '__aeabi_unwind_cpp_pr1' was not declared. Should it be static?
-arch/arm/kernel/unwind.c:61:6: warning: symbol '__aeabi_unwind_cpp_pr2' was not declared. Should it be static?
-...
-
-Following are the actual command-lines.
-
-$ make V=1
-...
-  /home/bigguiness/toolchain/x-tools/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-gcc -Wp,-MD,arch/arm/kernel/.unwind.o.d  -nostdinc -isystem /home/bigguiness/toolchain/x-tools/arm-unknown-linux-gnueabi/lib/gcc/arm-unknown-linux-gnueabi/4.3.2/include -Iinclude  -I/home/bigguiness/buildroot/output/build/linux-2.6.32.3/arch/arm/include -include include/linux/autoconf.h -D__KERNEL__ -mlittle-endian -Iarch/arm/mach-ep93xx/include -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -Os -marm -mabi=aapcs-linux -mno-thumb-interwork -funwind-tables -D__LINUX_ARM_ARCH__=4 -march=armv4t -mtune=arm9tdmi -msoft-float -Uarm -fno-stack-protector -fomit-frame-pointer -g -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow   -D"KBUILD_STR(s)=#s" -D"KBUILD_BASENAME=KBUILD_STR(unwind)"  -D"KBUILD_MODNAME=KBUILD_STR(unwind)"  -c -o arch/arm/kernel/unwind.o arch/arm/kernel/unwind.c
-...
-
-$ make C=2 V=1
-...
-  sparse -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ -Wbitwise -Wno-return-void  -D__arm__  -nostdinc -isystem /home/bigguiness/toolchain/x-tools/arm-unknown-linux-gnueabi/lib/gcc/arm-unknown-linux-gnueabi/4.3.2/include -Wp,-MD,arch/arm/kernel/.unwind.o.d  -nostdinc -isystem /home/bigguiness/toolchain/x-tools/arm-unknown-linux-gnueabi/lib/gcc/arm-unknown-linux-gnueabi/4.3.2/include -Iinclude  -I/home/bigguiness/buildroot/output/build/linux-2.6.32.3/arch/arm/include -include include/linux/autoconf.h -D__KERNEL__ -mlittle-endian -Iarch/arm/mach-ep93xx/include -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -Os -marm -mabi=aapcs-linux -mno-thumb-interwork -funwind-tables -D__LINUX_ARM_ARCH__=4 -march=armv4t -mtune=arm9tdmi -msoft-float -Uarm -fno-stack-protector -fomit-frame-pointer -g -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow   -D"KBUILD_STR(s)=#s" -D"KBUILD_BASENAME=KBUILD_STR(unwind)"  -D"KBUILD_MODNAME=KBUILD_STR(unwind)"  arch/arm/kernel/unwind.c ;
-arch/arm/kernel/unwind.c:30:2: warning: Your compiler does not have EABI support.
-arch/arm/kernel/unwind.c:31:2: warning: ARM unwind is known to compile only with EABI compilers.
-arch/arm/kernel/unwind.c:32:2: warning: Change compiler or disable ARM_UNWIND option.
-arch/arm/kernel/unwind.c:51:6: warning: symbol '__aeabi_unwind_cpp_pr0' was not declared. Should it be static?
-arch/arm/kernel/unwind.c:56:6: warning: symbol '__aeabi_unwind_cpp_pr1' was not declared. Should it be static?
-arch/arm/kernel/unwind.c:61:6: warning: symbol '__aeabi_unwind_cpp_pr2' was not declared. Should it be static?
-...
-
-Regards,
-Hartley
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
