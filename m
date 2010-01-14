@@ -1,92 +1,53 @@
-From: v.sitdikov@gmail.com (Valentin Sitdikov)
-Date: Thu, 14 Jan 2010 10:05:04 +0300
-Subject: DesignWare DMA Controller on at91sam9263
-In-Reply-To: <4B4DC7C1.5010803@atmel.com>
-References: <719c3e781001130408u1a126c2es7c7b6a047aa8c15b@mail.gmail.com>
-	<20100113132044.01a7f15c@hskinnemoen-d830>
-	<4B4DC7C1.5010803@atmel.com>
-Message-ID: <719c3e781001132305i4520dba1t4dc6c2658d39b105@mail.gmail.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Thu, 14 Jan 2010 08:28:02 +0100
+Subject: [PATCH] RFC: mx27: Add soc_camera support
+In-Reply-To: <37367b3a1001131033u74c30ad6q8da1dbc35982e008@mail.gmail.com>
+References: <1260885686-8478-1-git-send-email-acassis@gmail.com>
+	<37367b3a0912150607v713edc32y3578fa2a0c8c61db@mail.gmail.com>
+	<eedb5541001032340n66205fb8s57e09d2ba413b322@mail.gmail.com>
+	<37367b3a1001040412k280f3366p4868e36f5a7f71e4@mail.gmail.com>
+	<eedb5541001040425h2a3c07dcn534c71a0918b322b@mail.gmail.com>
+	<eedb5541001040431j3f14ec55g66ed4dd44a2a840e@mail.gmail.com>
+	<37367b3a1001131033u74c30ad6q8da1dbc35982e008@mail.gmail.com>
+Message-ID: <eedb5541001132328w3e1f1a4dj48e20bbad63acf96@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Nicolas.
-Thanks a lot for your answer!
+> Unfortunately my camera is not responding to I2C commands, I already
+> slow it down to 10kbps with no success. I can see on oscilloscope
+> i.MX27 send I2C commands, but the camera doesn't respond to it.
+>
 
-My intention was to use for ATA/CF.
-How do you think is it worth to do?
-
-If the DMAC is not so powerful why it exists?
-Best regards,
-Valentin.
+No idea what can be causing this. Maybe I2C address is bad in board specific
+code?
 
 
-On Wed, Jan 13, 2010 at 4:16 PM, Nicolas Ferre <nicolas.ferre@atmel.com>wrote:
+> Then I tested using the MT9T31 driver and change the it to my I2C
+> commands, as I2C is failing I force the probe to return 0. But the
+> soc_camera still failing:
+>
+> Linux video capture interface: v2.00
+> write: -5
+> MT9T31 Read register 0xFF = -5
+> Forcing mt9t031_video_probe to return OK!
+> mx27-camera mx27-camera.0: initialising
+> mx27-camera: probe of mx27-camera.0 failed with error -2
+>
 
-> Le 13/01/2010 13:20, Haavard Skinnemoen :
-> > Hi,
-> >
-> > The DMA Controller is very configurable, and I am not familiar with how
-> > it is configured on the SAM9 devices. I'm Cc'ing one of our SAM9 gurus;
-> > hopefully he can help you.
-> >
-> > Haavard
-> >
-> > (fullquoting so that Nicolas can see your questions)
-> >
-> > Valentin Sitdikov <v.sitdikov@gmail.com> wrote:
-> >> Hello Haavard.
-> >>
-> >> Could you please comment something on my problem?
-> >>
-> >> Currently i am working on getting at91sam9263 dmac working under
-> demaenige
-> >> framework.
-> >> So I have investigating that it is a kind of copy Synopsys DesignWare
-> DMA
-> >> Controller which is used in AVR32.
-> >> But there is at least one difference:
-> >> AVR32 BLOCK_TS is 11 bit wide but at91sam9263 BLOCK_TS is 5 bit size
-> >> So your driver is working on at91sam9263 taking in to account this
-> >> difference.
-> >>
-> >> As you can imagine to have such a small dma transaction is not quite
-> >> convenient.
-> >> May be you can recommend something to overcome 5 bit restriction?
->
-> As you noted, AT91SAM9263 has significantly reduced block size for
-> transfers, this lead into max transfer size of 124B in a single block
-> transfer:
-> ref. DMAC_CTLxL field SRC_TR_WIDTH (32 bits)
-> DMAC_CTLxH with BLOCK_TS (5 bits)  , Max value = 31
->
-> Single Block Size = Max_Block_TS (31) * Max_TR_Width (4) = 124B
->
-> Unless you loop on a reduced set of addresses, we usually consider it as
-> not so useful (you finally find it less resource consuming to retrieve
-> data using CPU power).
->
-> I have no workaround for this.
-> A dirty way to do mem2mem transfer is to use a peripheral in loopback
-> mode with PDC (SPI loopback for instance). But I suppose you will get
-> quite poor performance)...
->
-> >> There is also bit field in config register which is called MAX_ABRST the
-> >> meaning of
-> >> which is not quite clear. It is 10 bits long,
-> >> So why it 10 bits long if BLOCK_TS only 5 bits long?
-> >> What real meaning has it ?
->
-> It is related to the burst length that the AHB master can request on the
-> internal bus (here the AHB master is the DMA controller itself): in
-> short, in case of internal bus availability, the total amount of data
-> that this master can transfer on the internal bus without stopping burst.
-> It has nothing to do with the internal possibilities of the DMA controller.
->
-> Best regards,
-> --
-> Nicolas Ferre
->
->
+As far as I know, video buffers are allocated in probe() function. Maybe you
+have a memory fragmentation problem and you need to move buffer allocation
+to init().
+We have faced this problem many times in the past.
+
+
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100114/672d2272/attachment-0001.htm>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100114/ba02bb26/attachment-0001.htm>
