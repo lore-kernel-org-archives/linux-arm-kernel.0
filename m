@@ -1,160 +1,55 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 14 Jan 2010 06:28:48 +0000
-Subject: [PATCH v5 6/8] ARM: S5P6440: Add Board support file
-In-Reply-To: <1263426643-14987-1-git-send-email-kgene.kim@samsung.com>
-References: <1263426643-14987-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20100114062848.GP3738@trinity.fluff.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 14 Jan 2010 15:55:48 +0900
+Subject: [PATCH v5 1/8 RE-SEND] ARM: S5P6440: Add new CPU	initialization
+	support
+In-Reply-To: <20100114061322.GN3738@trinity.fluff.org>
+References: <1263443210-31699-1-git-send-email-kgene.kim@samsung.com>
+	<20100114061322.GN3738@trinity.fluff.org>
+Message-ID: <000f01ca94e6$9a93d910$cfbb8b30$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2010 at 08:50:43AM +0900, Kukjin Kim wrote:
-> This patch adds Samsung's SMDK6440 board support file.
+Ben Dooks wrote:
+> On Thu, Jan 14, 2010 at 01:26:50PM +0900, Kukjin Kim wrote:
+> > This patch adds Samsung's S5P6440 CPU support.
+> >
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > ---
+
+(snip)
+
+> > diff --git a/arch/arm/plat-s3c/include/plat/cpu.h b/arch/arm/plat-
+> s3c/include/plat/cpu.h
+> > index d1131ca..d8e134c 100644
+> > --- a/arch/arm/plat-s3c/include/plat/cpu.h
+> > +++ b/arch/arm/plat-s3c/include/plat/cpu.h
+> > @@ -48,9 +48,11 @@ extern void s3c_init_cpu(unsigned long idcode,
+> >
+> >  extern void s3c24xx_init_irq(void);
+> >  extern void s3c64xx_init_irq(u32 vic0, u32 vic1);
+> > +extern void s5p_init_irq(u32 *vic, u32 num_vic);
+> >
+> >  extern void s3c24xx_init_io(struct map_desc *mach_desc, int size);
+> >  extern void s3c64xx_init_io(struct map_desc *mach_desc, int size);
+> > +extern void s5p_init_io(struct map_desc *mach_desc, int size);
 > 
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  arch/arm/mach-s5p6440/mach-smdk6440.c |  115 +++++++++++++++++++++++++++++++++
->  1 files changed, 115 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-s5p6440/mach-smdk6440.c
-> 
-> diff --git a/arch/arm/mach-s5p6440/mach-smdk6440.c b/arch/arm/mach-s5p6440/mach-smdk6440.c
-> new file mode 100644
-> index 0000000..e3a49af
-> --- /dev/null
-> +++ b/arch/arm/mach-s5p6440/mach-smdk6440.c
-> @@ -0,0 +1,115 @@
-> +/* linux/arch/arm/mach-s5p6440/mach-smdk6440.c
-> + *
-> + * Copyright (c) 2009 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com/
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/types.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/list.h>
-> +#include <linux/timer.h>
-> +#include <linux/delay.h>
-> +#include <linux/init.h>
-> +#include <linux/serial_core.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/clk.h>
-> +
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/map.h>
-> +
-> +#include <mach/hardware.h>
-> +#include <mach/map.h>
-> +
-> +#include <asm/irq.h>
-> +#include <asm/mach-types.h>
-> +
-> +#include <plat/regs-serial.h>
-> +
-> +#include <plat/s5p6440.h>
-> +#include <plat/clock.h>
-> +#include <mach/regs-clock.h>
-> +#include <plat/devs.h>
-> +#include <plat/cpu.h>
-> +#include <plat/pll.h>
-> +
-> +#define S5P6440_UCON_DEFAULT    (S3C2410_UCON_TXILEVEL |	\
-> +				S3C2410_UCON_RXILEVEL |		\
-> +				S3C2410_UCON_TXIRQMODE |	\
-> +				S3C2410_UCON_RXIRQMODE |	\
-> +				S3C2410_UCON_RXFIFO_TOI |	\
-> +				S3C2443_UCON_RXERR_IRQEN)
-> +
-> +#define S5P6440_ULCON_DEFAULT	S3C2410_LCON_CS8
-> +
-> +#define S5P6440_UFCON_DEFAULT   (S3C2410_UFCON_FIFOMODE |	\
-> +				S3C2440_UFCON_TXTRIG16 |	\
-> +				S3C2410_UFCON_RXTRIG8)
-> +
-> +static struct s3c2410_uartcfg smdk6440_uartcfgs[] __initdata = {
-> +	[0] = {
-> +		.hwport	     = 0,
-> +		.flags	     = 0,
-> +		.ucon	     = S5P6440_UCON_DEFAULT,
-> +		.ulcon	     = S5P6440_ULCON_DEFAULT,
-> +		.ufcon	     = S5P6440_UFCON_DEFAULT,
-> +	},
-> +	[1] = {
-> +		.hwport	     = 1,
-> +		.flags	     = 0,
-> +		.ucon	     = S5P6440_UCON_DEFAULT,
-> +		.ulcon	     = S5P6440_ULCON_DEFAULT,
-> +		.ufcon	     = S5P6440_UFCON_DEFAULT,
-> +	},
-> +	[2] = {
-> +		.hwport	     = 2,
-> +		.flags	     = 0,
-> +		.ucon	     = S5P6440_UCON_DEFAULT,
-> +		.ulcon	     = S5P6440_ULCON_DEFAULT,
-> +		.ufcon	     = S5P6440_UFCON_DEFAULT,
-> +	},
-> +	[3] = {
-> +		.hwport	     = 3,
-> +		.flags	     = 0,
-> +		.ucon	     = S5P6440_UCON_DEFAULT,
-> +		.ulcon	     = S5P6440_ULCON_DEFAULT,
-> +		.ufcon	     = S5P6440_UFCON_DEFAULT,
-> +	},
-> +};
-> +
-> +static struct map_desc smdk6440_iodesc[] = {
-> +};
+> This is being used by smdk6440 with three arguments, which is causing
+> the build of the overall series to fail.
 
-I'd really like to see this gone and just pass (NULL, 0) as the first
-arguments to s5p_init_io().
+Hi Ben,
 
-> +static struct platform_device *smdk6440_devices[] __initdata = {
-> +};
-> +
-> +static void __init smdk6440_map_io(void)
-> +{
-> +	s5p_init_io(smdk6440_iodesc, ARRAY_SIZE(smdk6440_iodesc),
-> +			(u32)S5P_SYS_ID);
+Yes, you're right.
+I missed something.
+So I will re-send.
 
-This does not match the declaration of s5p_init_io() which only has two
-arguments. The second comment is why is S5P_SYS_ID being cast to (u32),
-shouldn't the s5p_init_io() take the correct type?
+> >  extern void s3c24xx_init_uarts(struct s3c2410_uartcfg *cfg, int no);
+> >
 
-If S5P_SYS_ID is a pointer to the identity register which might change
-depending on the SoC, then why is it called S5P and not S5P6440_SYS_ID ?
 
-> +	s3c24xx_init_clocks(12000000);
-> +	s3c24xx_init_uarts(smdk6440_uartcfgs, ARRAY_SIZE(smdk6440_uartcfgs));
-> +}
-> +
-> +static void __init smdk6440_machine_init(void)
-> +{
-> +	platform_add_devices(smdk6440_devices, ARRAY_SIZE(smdk6440_devices));
-> +}
-> +
-> +MACHINE_START(SMDK6440, "SMDK6440")
-> +	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
-> +	.phys_io	= S5P_PA_UART & 0xfff00000,
-> +	.io_pg_offst	= (((u32)S5P_VA_UART) >> 18) & 0xfffc,
-> +	.boot_params	= S5P_PA_SDRAM + 0x100,
-> +
-> +	.init_irq	= s5p6440_init_irq,
-> +	.map_io		= smdk6440_map_io,
-> +	.init_machine	= smdk6440_machine_init,
-> +	.timer		= &s3c24xx_timer,
-> +MACHINE_END
-> -- 
-> 1.6.2.5
-> 
+Thanks.
 
--- 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+System LSI Division, SAMSUNG ELECTRONICS CO., LTD.
