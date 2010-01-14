@@ -1,323 +1,185 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 14 Jan 2010 12:29:27 +0100
-Subject: [PATCH 09/21] ARM: S5PC1XX: move common s5pc1xx s3c-fb regs to
-	platform directory
+Date: Thu, 14 Jan 2010 12:29:29 +0100
+Subject: [PATCH 11/21] ARM: S5PC1XX: add S5PC110 memory map
 In-Reply-To: <1263468579-5732-1-git-send-email-m.szyprowski@samsung.com>
 References: <1263468579-5732-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1263468579-5732-10-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1263468579-5732-12-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pawel Osciak <p.osciak@samsung.com>
+From: Kyungmin Park <kyungmin.park@samsung.com>
 
-Framebuffer register blocks on S5PC100 and S5PC110 differ only slightly.
-This patch moves all register definitions that are common for S5PC100
-and S5PC110 to plat-s3c/plat/regs-fb-v5.h.
+Samsung S5PC110 SoC are newer Samsung SoCs. Like S5PC100 they are based
+on CortexA8 ARM CPU, but have much more powerfull integrated periperals.
+This patch adds register map for S5PC110 sub-platform.
 
-Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Byungho Min <bhmin@samsung.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/mach-s5pc100/include/mach/regs-fb.h |  133 ++-----------------------
- arch/arm/plat-s3c/include/plat/regs-fb-v5.h  |  138 ++++++++++++++++++++++++++
- 2 files changed, 146 insertions(+), 125 deletions(-)
- create mode 100644 arch/arm/plat-s3c/include/plat/regs-fb-v5.h
+ arch/arm/mach-s5pc110/include/mach/map.h |  154 ++++++++++++++++++++++++++++++
+ 1 files changed, 154 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-s5pc110/include/mach/map.h
 
-diff --git a/arch/arm/mach-s5pc100/include/mach/regs-fb.h b/arch/arm/mach-s5pc100/include/mach/regs-fb.h
-index 1732cd2..49764cb 100644
---- a/arch/arm/mach-s5pc100/include/mach/regs-fb.h
-+++ b/arch/arm/mach-s5pc100/include/mach/regs-fb.h
-@@ -1,139 +1,22 @@
--/* arch/arm/mach-s5pc100/include/mach/regs-fb.h
-- *
-+/*
-  * Copyright 2009 Samsung Electronics Co.
-  *   Pawel Osciak <p.osciak@samsung.com>
-  *
-- * Framebuffer register definitions for Samsung S5PC100.
-+ * Machine-specific framebuffer definitions for Samsung S5PC100.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
--*/
--
--#ifndef __ASM_ARCH_REGS_FB_H
--#define __ASM_ARCH_REGS_FB_H __FILE__
--
--#include <plat/regs-fb-v4.h>
--
--/* VP1 interface timing control */
--#define VP1CON0						(0x118)
--#define VP1_RATECON_EN					(1 << 31)
--#define VP1_CLKRATE_MASK				(0xff)
--
--#define VP1CON1						(0x11c)
--#define VP1_VTREGCON_EN					(1 << 31)
--#define VP1_VBPD_MASK					(0xfff)
--#define VP1_VBPD_SHIFT					(16)
--
--
--#define WPALCON_H					(0x19c)
--#define WPALCON_L					(0x1a0)
--
--/* Pallete contro for WPAL0 and WPAL1 is the same as in S3C64xx, but
-- * different for WPAL2-4
-- */
--/* In WPALCON_L (aka WPALCON) */
--#define WPALCON_W1PAL_32BPP_A888			(0x7 << 3)
--#define WPALCON_W0PAL_32BPP_A888			(0x7 << 0)
--
--/* To set W2PAL-W4PAL consist of one bit from WPALCON_L and two from WPALCON_H,
-- * e.g. W2PAL[2..0] is made of (WPALCON_H[10..9], WPALCON_L[6]).
-- */
--#define WPALCON_L_WxPAL_L_MASK				(0x1)
--#define WPALCON_L_W2PAL_L_SHIFT				(6)
--#define WPALCON_L_W3PAL_L_SHIFT				(7)
--#define WPALCON_L_W4PAL_L_SHIFT				(8)
--
--#define WPALCON_L_WxPAL_H_MASK				(0x3)
--#define WPALCON_H_W2PAL_H_SHIFT				(9)
--#define WPALCON_H_W3PAL_H_SHIFT				(13)
--#define WPALCON_H_W4PAL_H_SHIFT				(17)
--
--/* Per-window alpha value registers */
--/* For window 0 8-bit alpha values are in VIDW0ALPHAx,
-- * for windows 1-4 alpha values consist of two parts, the 4 low bits are
-- * taken from VIDWxALPHAx and 4 high bits are from VIDOSDxC,
-- * e.g. WIN1_ALPHA0_B[7..0] = (VIDOSD1C[3..0], VIDW1ALPHA0[3..0])
-- */
--#define VIDWxALPHA0(_win)				(0x200 + (_win * 8))
--#define VIDWxALPHA1(_win)				(0x204 + (_win * 8))
--
--/* Only for window 0 in VIDW0ALPHAx. */
--#define VIDW0ALPHAx_R(_x)				((_x) << 16)
--#define VIDW0ALPHAx_R_MASK				(0xff << 16)
--#define VIDW0ALPHAx_R_SHIFT				(16)
--#define VIDW0ALPHAx_G(_x)				((_x) << 8)
--#define VIDW0ALPHAx_G_MASK				(0xff << 8)
--#define VIDW0ALPHAx_G_SHIFT				(8)
--#define VIDW0ALPHAx_B(_x)				((_x) << 0)
--#define VIDW0ALPHAx_B_MASK				(0xff << 0)
--#define VIDW0ALPHAx_B_SHIFT				(0)
--
--/* Low 4 bits of alpha0-1 for windows 1-4 */
--#define VIDW14ALPHAx_R_L(_x)				((_x) << 16)
--#define VIDW14ALPHAx_R_L_MASK				(0xf << 16)
--#define VIDW14ALPHAx_R_L_SHIFT				(16)
--#define VIDW14ALPHAx_G_L(_x)				((_x) << 8)
--#define VIDW14ALPHAx_G_L_MASK				(0xf << 8)
--#define VIDW14ALPHAx_G_L_SHIFT				(8)
--#define VIDW14ALPHAx_B_L(_x)				((_x) << 0)
--#define VIDW14ALPHAx_B_L_MASK				(0xf << 0)
--#define VIDW14ALPHAx_B_L_SHIFT				(0)
--
--
--/* Per-window blending equation control registers */
--#define BLENDEQx(_win)					(0x244 + ((_win) * 4))
--#define BLENDEQ1					(0x244)
--#define BLENDEQ2					(0x248)
--#define BLENDEQ3					(0x24c)
--#define BLENDEQ4					(0x250)
--
--#define BLENDEQx_Q_FUNC(_x)				((_x) << 18)
--#define BLENDEQx_Q_FUNC_MASK				(0xf << 18)
--#define BLENDEQx_P_FUNC(_x)				((_x) << 12)
--#define BLENDEQx_P_FUNC_MASK				(0xf << 12)
--#define BLENDEQx_B_FUNC(_x)				((_x) << 6)
--#define BLENDEQx_B_FUNC_MASK				(0xf << 6)
--#define BLENDEQx_A_FUNC(_x)				((_x) << 0)
--#define BLENDEQx_A_FUNC_MASK				(0xf << 0)
--
--#define BLENDCON					(0x260)
--#define BLENDCON_8BIT_ALPHA				(1 << 0)
--
--/* Per-window palette base addresses (start of palette memory).
-- * Each window palette area consists of 256 32-bit entries.
-- * START is the first address (entry 0th), END is the address of 255th entry.
-  */
--#define WIN0_PAL_BASE					(0x2400)
--#define WIN0_PAL_END					(0x27fc)
--#define WIN1_PAL_BASE					(0x2800)
--#define WIN1_PAL_END					(0x2bfc)
--#define WIN2_PAL_BASE					(0x2c00)
--#define WIN2_PAL_END					(0x2ffc)
--#define WIN3_PAL_BASE					(0x3000)
--#define WIN3_PAL_END					(0x33fc)
--#define WIN4_PAL_BASE					(0x3400)
--#define WIN4_PAL_END					(0x37fc)
- 
--#define WIN0_PAL(_entry)			(WIN0_PAL_BASE + ((_entry) * 4))
--#define WIN1_PAL(_entry)			(WIN1_PAL_BASE + ((_entry) * 4))
--#define WIN2_PAL(_entry)			(WIN2_PAL_BASE + ((_entry) * 4))
--#define WIN3_PAL(_entry)			(WIN3_PAL_BASE + ((_entry) * 4))
--#define WIN4_PAL(_entry)			(WIN4_PAL_BASE + ((_entry) * 4))
-+#ifndef __ASM_ARCH_MACH_REGS_FB_H
-+#define __ASM_ARCH_MACH_REGS_FB_H __FILE__
- 
--static inline unsigned int s3c_fb_pal_reg(unsigned int window, int reg)
--{
--	switch (window) {
--	case 0: return WIN0_PAL(reg);
--	case 1: return WIN1_PAL(reg);
--	case 2: return WIN2_PAL(reg);
--	case 3: return WIN3_PAL(reg);
--	case 4: return WIN4_PAL(reg);
--	}
-+#include <plat/regs-fb-v5.h>
- 
--	BUG();
--}
-+#define PRTCON						(0xc)
-+#define PRTCON_PROTECT					(1 << 11)
- 
- 
--#endif /* __ASM_ARCH_REGS_FB_H */
-+#endif /* __ASM_ARCH_MACH_REGS_FB_H */
- 
-diff --git a/arch/arm/plat-s3c/include/plat/regs-fb-v5.h b/arch/arm/plat-s3c/include/plat/regs-fb-v5.h
+diff --git a/arch/arm/mach-s5pc110/include/mach/map.h b/arch/arm/mach-s5pc110/include/mach/map.h
 new file mode 100644
-index 0000000..0e0686d
+index 0000000..af9ce84
 --- /dev/null
-+++ b/arch/arm/plat-s3c/include/plat/regs-fb-v5.h
-@@ -0,0 +1,138 @@
-+/*
-+ * Copyright 2009 Samsung Electronics Co.
-+ *   Pawel Osciak <p.osciak@samsung.com>
++++ b/arch/arm/mach-s5pc110/include/mach/map.h
+@@ -0,0 +1,154 @@
++/* linux/arch/arm/mach-s5pc110/include/mach/map.h
 + *
-+ * Common framebuffer register definitions for Samsung S5PC1xx family.
++ * Copyright 2009 Samsung Electronics Co.
++ *	Byungho Min <bhmin@samsung.com>
++ *
++ * Based on mach-s3c6400/include/mach/map.h
++ *
++ * S5PC110 - Memory map definitions
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
++*/
++
++#ifndef __ASM_ARCH_MAP_H
++#define __ASM_ARCH_MAP_H __FILE__
++
++#include <plat/map-base.h>
++
++/*
++ * map-base.h has already defined virtual memory address
++ * S3C_VA_IRQ		S3C_ADDR(0x00000000)	irq controller(s)
++ * S3C_VA_SYS		S3C_ADDR(0x00100000)	system control
++ * S3C_VA_MEM		S3C_ADDR(0x00200000)	system control (not used)
++ * S3C_VA_TIMER		S3C_ADDR(0x00300000)	timer block
++ * S3C_VA_WATCHDOG	S3C_ADDR(0x00400000)	watchdog
++ * S3C_VA_UART		S3C_ADDR(0x01000000)	UART
++ *
++ * S5PC110 specific virtual memory address can be defined here
++ * S5PC1XX_VA_GPIO	S3C_ADDR(0x00500000)	GPIO
++ *
 + */
 +
-+#ifndef __ASM_ARCH_REGS_FB_V5_H
-+#define __ASM_ARCH_REGS_FB_V5_H __FILE__
++/* Chip ID */
++#define S5PC110_PA_CHIPID	(0xE0000000)
++#define S5PC1XX_PA_CHIPID	S5PC110_PA_CHIPID
++#define S5PC1XX_VA_CHIPID	S3C_VA_SYS
 +
-+#include <plat/regs-fb-v4.h>
++/* System */
++#define S5PC110_PA_CLK		(0xE0100000)
++#define S5PC110_PA_PWR		(0xE010C000)
++#define S5PC1XX_PA_CLK		S5PC110_PA_CLK
++#define S5PC1XX_PA_PWR		S5PC110_PA_PWR
++#define S5PC1XX_VA_CLK		(S3C_VA_SYS + 0x10000)
++#define S5PC1XX_VA_PWR		(S3C_VA_SYS + 0x20000)
++#define S5PC1XX_SZ_CLK		SZ_32K
++#define S5PC1XX_SZ_PWR		SZ_16K
 +
-+/* VP1 interface timing control */
-+#define VP1CON0						(0x118)
-+#define VP1_RATECON_EN					(1 << 31)
-+#define VP1_CLKRATE_MASK				(0xff)
++/* GPIO */
++#define S5PC110_PA_GPIO		(0xE0200000)
++#define S5PC1XX_PA_GPIO		S5PC110_PA_GPIO
++#define S5PC1XX_VA_GPIO		S3C_ADDR(0x00500000)
 +
-+#define VP1CON1						(0x11c)
-+#define VP1_VTREGCON_EN					(1 << 31)
-+#define VP1_VBPD_MASK					(0xfff)
-+#define VP1_VBPD_SHIFT					(16)
++/* Interrupt */
++#define S5PC110_PA_VIC		(0xF2000000)
++#define S5PC110_PA_VIC_OFFSET	0x100000
++#define S5PC1XX_PA_VIC(x)	(S5PC110_PA_VIC + ((x) * S5PC110_PA_VIC_OFFSET))
++#define S5PC110_VA_VIC		S3C_VA_IRQ
++#define S5PC110_VA_VIC_OFFSET	0x10000
++#define S5PC1XX_VA_VIC(x)	(S5PC110_VA_VIC + ((x) * S5PC110_VA_VIC_OFFSET))
 +
++/* DMA */
++#define S5PC110_PA_MDMA		(0xFA200000)
++#define S5PC110_PA_PDMA0	(0xE0900000)
++#define S5PC110_PA_PDMA1	(0xE0A00000)
 +
-+#define WPALCON_H					(0x19c)
-+#define WPALCON_L					(0x1a0)
++/* Timer */
++#define S5PC110_PA_TIMER	(0xE2500000)
++#define S5PC1XX_PA_TIMER	S5PC110_PA_TIMER
++#define S5PC1XX_VA_TIMER	S3C_VA_TIMER
 +
-+/* Pallete contro for WPAL0 and WPAL1 is the same as in S3C64xx, but
-+ * different for WPAL2-4
-+ */
-+/* In WPALCON_L (aka WPALCON) */
-+#define WPALCON_W1PAL_32BPP_A888			(0x7 << 3)
-+#define WPALCON_W0PAL_32BPP_A888			(0x7 << 0)
++/* RTC */
++#define S5PC110_PA_RTC		(0xE2800000)
++#define S5PC1XX_PA_RTC		S5PC110_PA_RTC
 +
-+/* W2PAL-W4PAL consist of one bit from WPALCON_L and two from WPALCON_H,
-+ * e.g. W2PAL[2..0] is made of (WPALCON_H[10..9], WPALCON_L[6]).
-+ */
-+#define WPALCON_L_WxPAL_L_MASK				(0x1)
-+#define WPALCON_L_W2PAL_L_SHIFT				(6)
-+#define WPALCON_L_W3PAL_L_SHIFT				(7)
-+#define WPALCON_L_W4PAL_L_SHIFT				(8)
++/* UART */
++#define S5PC110_PA_UART		(0xE2900000)
++#define S5PC1XX_PA_UART		S5PC110_PA_UART
++#define S5PC110_PA_UART0	(S5PC110_PA_UART + 0x0)
++#define S5PC110_PA_UART1	(S5PC110_PA_UART + 0x400)
++#define S5PC110_PA_UART2	(S5PC110_PA_UART + 0x800)
++#define S5PC110_PA_UART3	(S5PC110_PA_UART + 0xC00)
++#define S5PC1XX_VA_UART		S3C_VA_UART
 +
-+#define WPALCON_L_WxPAL_H_MASK				(0x3)
-+#define WPALCON_H_W2PAL_H_SHIFT				(9)
-+#define WPALCON_H_W3PAL_H_SHIFT				(13)
-+#define WPALCON_H_W4PAL_H_SHIFT				(17)
++/* I2C */
++#define S5PC110_PA_I2C		(0xE1800000)
++#define S5PC110_PA_I2C1		(0xFAB00000)
++#define S5PC110_PA_I2C2		(0xE1A00000)
 +
-+/* Per-window alpha value registers */
-+/* For window 0 8-bit alpha values are in VIDW0ALPHAx,
-+ * for windows 1-4 alpha values consist of two parts, the 4 low bits are
-+ * taken from VIDWxALPHAx and 4 high bits are from VIDOSDxC,
-+ * e.g. WIN1_ALPHA0_B[7..0] = (VIDOSD1C[3..0], VIDW1ALPHA0[3..0])
-+ */
-+#define VIDWxALPHA0(_win)				(0x200 + (_win * 8))
-+#define VIDWxALPHA1(_win)				(0x204 + (_win * 8))
++/* USB HS OTG */
++#define S5PC110_PA_USB_HSOTG	(0xEC000000)
++#define S5PC110_PA_USB_HSPHY	(0xEC100000)
 +
-+/* Only for window 0 in VIDW0ALPHAx. */
-+#define VIDW0ALPHAx_R(_x)				((_x) << 16)
-+#define VIDW0ALPHAx_R_MASK				(0xff << 16)
-+#define VIDW0ALPHAx_R_SHIFT				(16)
-+#define VIDW0ALPHAx_G(_x)				((_x) << 8)
-+#define VIDW0ALPHAx_G_MASK				(0xff << 8)
-+#define VIDW0ALPHAx_G_SHIFT				(8)
-+#define VIDW0ALPHAx_B(_x)				((_x) << 0)
-+#define VIDW0ALPHAx_B_MASK				(0xff << 0)
-+#define VIDW0ALPHAx_B_SHIFT				(0)
++/* SD/MMC */
++#define S5PC110_PA_HSMMC(x)	(0xEB000000 + ((x) * 0x100000))
++#define S5PC110_PA_HSMMC0	S5PC110_PA_HSMMC(0)
++#define S5PC110_PA_HSMMC1	S5PC110_PA_HSMMC(1)
++#define S5PC110_PA_HSMMC2	S5PC110_PA_HSMMC(2)
++#define S5PC110_PA_HSMMC3	S5PC110_PA_HSMMC(2)
 +
-+/* Low 4 bits of alpha0-1 for windows 1-4 */
-+#define VIDW14ALPHAx_R_L(_x)				((_x) << 16)
-+#define VIDW14ALPHAx_R_L_MASK				(0xf << 16)
-+#define VIDW14ALPHAx_R_L_SHIFT				(16)
-+#define VIDW14ALPHAx_G_L(_x)				((_x) << 8)
-+#define VIDW14ALPHAx_G_L_MASK				(0xf << 8)
-+#define VIDW14ALPHAx_G_L_SHIFT				(8)
-+#define VIDW14ALPHAx_B_L(_x)				((_x) << 0)
-+#define VIDW14ALPHAx_B_L_MASK				(0xf << 0)
-+#define VIDW14ALPHAx_B_L_SHIFT				(0)
++/* LCD */
++#define S5PC110_PA_FB		(0xF8000000)
 +
++/* Multimedia */
++#define S5PC110_PA_MFC		(0xF1700000)
++#define S5PC110_SZ_MFC		(0x0000FFFF)
 +
-+/* Per-window blending equation control registers */
-+#define BLENDEQx(_win)					(0x244 + ((_win) * 4))
-+#define BLENDEQ1					(0x244)
-+#define BLENDEQ2					(0x248)
-+#define BLENDEQ3					(0x24c)
-+#define BLENDEQ4					(0x250)
++/* I2S */
++#define S5PC110_PA_I2S0		(0xEEE30000)
++#define S5PC110_PA_I2S1		(0xE2100000)
++#define S5PC110_PA_I2S2		(0xE2A00000)
 +
-+#define BLENDEQx_Q_FUNC(_x)				((_x) << 18)
-+#define BLENDEQx_Q_FUNC_MASK				(0xf << 18)
-+#define BLENDEQx_P_FUNC(_x)				((_x) << 12)
-+#define BLENDEQx_P_FUNC_MASK				(0xf << 12)
-+#define BLENDEQx_B_FUNC(_x)				((_x) << 6)
-+#define BLENDEQx_B_FUNC_MASK				(0xf << 6)
-+#define BLENDEQx_A_FUNC(_x)				((_x) << 0)
-+#define BLENDEQx_A_FUNC_MASK				(0xf << 0)
++/* KEYPAD */
++#define S5PC110_PA_KEYPAD	(0xE1600000)
 +
-+#define BLENDCON					(0x260)
-+#define BLENDCON_8BIT_ALPHA				(1 << 0)
++/* ADC & TouchScreen */
++#define S5PC110_PA_TSADC	(0xE1700000)
 +
-+/* Per-window palette base addresses (start of palette memory).
-+ * Each window palette area consists of 256 32-bit entries.
-+ * START is the first address (entry 0th), END is the address of 255th entry.
-+ */
-+#define WIN0_PAL_BASE					(0x2400)
-+#define WIN0_PAL_END					(0x27fc)
-+#define WIN1_PAL_BASE					(0x2800)
-+#define WIN1_PAL_END					(0x2bfc)
-+#define WIN2_PAL_BASE					(0x2c00)
-+#define WIN2_PAL_END					(0x2ffc)
-+#define WIN3_PAL_BASE					(0x3000)
-+#define WIN3_PAL_END					(0x33fc)
-+#define WIN4_PAL_BASE					(0x3400)
-+#define WIN4_PAL_END					(0x37fc)
++/* ETC */
++#define S5PC110_PA_SDRAM	(0x30000000)
++#define S5PC1XX_PA_SDRAM	S5PC110_PA_SDRAM
 +
-+#define WIN0_PAL(_entry)			(WIN0_PAL_BASE + ((_entry) * 4))
-+#define WIN1_PAL(_entry)			(WIN1_PAL_BASE + ((_entry) * 4))
-+#define WIN2_PAL(_entry)			(WIN2_PAL_BASE + ((_entry) * 4))
-+#define WIN3_PAL(_entry)			(WIN3_PAL_BASE + ((_entry) * 4))
-+#define WIN4_PAL(_entry)			(WIN4_PAL_BASE + ((_entry) * 4))
++/* compatibility defines. */
++#define S3C_PA_RTC		S5PC1XX_PA_RTC
++#define S3C_PA_UART		S5PC1XX_PA_UART
++#define S3C_PA_UART0		S5PC110_PA_UART0
++#define S3C_PA_UART1		S5PC110_PA_UART1
++#define S3C_PA_UART2		S5PC110_PA_UART2
++#define S3C_PA_UART3		S5PC110_PA_UART3
 +
-+static inline unsigned int s3c_fb_pal_reg(unsigned int window, int reg)
-+{
-+	switch (window) {
-+	case 0: return WIN0_PAL(reg);
-+	case 1: return WIN1_PAL(reg);
-+	case 2: return WIN2_PAL(reg);
-+	case 3: return WIN3_PAL(reg);
-+	case 4: return WIN4_PAL(reg);
-+	}
++#define S3C_VA_UART0		(S3C_VA_UART + 0x0)
++#define S3C_VA_UART1		(S3C_VA_UART + 0x400)
++#define S3C_VA_UART2		(S3C_VA_UART + 0x800)
++#define S3C_VA_UART3		(S3C_VA_UART + 0xC00)
++#define S3C_UART_OFFSET		0x400
++#define S3C_VA_UARTx(x)		(S3C_VA_UART + ((x) * S3C_UART_OFFSET))
 +
-+	BUG();
-+}
++#define S3C_PA_FB		S5PC110_PA_FB
++#define S3C_VA_VIC0		(S3C_VA_IRQ + 0x0)
++#define S3C_VA_VIC1		(S3C_VA_IRQ + 0x10000)
++#define S3C_VA_VIC2		(S3C_VA_IRQ + 0x20000)
++#define S3C_VA_VIC3		(S3C_VA_IRQ + 0x30000)
++#define S3C_PA_IIC		S5PC110_PA_I2C
++#define S3C_PA_IIC1		S5PC110_PA_I2C1
++#define S3C_PA_IIC2		S5PC110_PA_I2C2
++#define S3C_PA_USB_HSOTG	S5PC110_PA_USB_HSOTG
++#define S3C_PA_USB_HSPHY	S5PC110_PA_USB_HSPHY
++#define S3C_PA_HSMMC0		S5PC110_PA_HSMMC0
++#define S3C_PA_HSMMC1		S5PC110_PA_HSMMC1
++#define S3C_PA_HSMMC2		S5PC110_PA_HSMMC2
++#define S3C_PA_KEYPAD		S5PC110_PA_KEYPAD
++#define S3C_PA_TSADC		S5PC110_PA_TSADC
 +
-+
-+#endif /* __ASM_ARCH_REGS_FB_V5_H */
-+
++#endif /* __ASM_ARCH_C100_MAP_H */
 -- 
 1.6.4
