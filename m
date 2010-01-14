@@ -1,170 +1,55 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 14 Jan 2010 12:29:37 +0100
-Subject: [PATCH 19/21] ARM: S5PC1XX: add framebuffer platform helpers for
-	s5pc110 sub-platform
+Date: Thu, 14 Jan 2010 12:29:33 +0100
+Subject: [PATCH 15/21] ARM: S5PC1XX: add support for s5pc110 gpio
 In-Reply-To: <1263468579-5732-1-git-send-email-m.szyprowski@samsung.com>
 References: <1263468579-5732-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1263468579-5732-20-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1263468579-5732-16-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pawel Osciak <p.osciak@samsung.com>
-
 Samsung S5PC110 SoC are newer Samsung SoCs. Like S5PC100 they are based
 on CortexA8 ARM CPU, but have much more powerfull integrated periperals.
-This patch adds common framebuffer device helpers and register defines
-for S5PC110 sub-platform.
+This patch adds gpiolib support for S5PC110 sub-platform.
 
-Signed-off-by: Pawel Osciak <p.osciak@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Byungho Min <bhmin@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-s5pc110/Kconfig                |    5 ++
- arch/arm/mach-s5pc110/Makefile               |    1 +
- arch/arm/mach-s5pc110/include/mach/regs-fb.h |   91 ++++++++++++++++++++++++++
- arch/arm/mach-s5pc110/setup-fb-24bpp.c       |   67 +++++++++++++++++++
- arch/arm/plat-s3c/include/plat/fb.h          |    7 ++
- 5 files changed, 171 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5pc110/include/mach/regs-fb.h
- create mode 100644 arch/arm/mach-s5pc110/setup-fb-24bpp.c
+ arch/arm/mach-s5pc110/Makefile                 |    1 +
+ arch/arm/mach-s5pc110/gpio-chips.c             |   66 +++++++++
+ arch/arm/mach-s5pc110/include/mach/gpio.h      |  187 ++++++++++++++++++++++++
+ arch/arm/mach-s5pc110/include/plat/regs-gpio.h |   65 ++++++++
+ 4 files changed, 319 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-s5pc110/gpio-chips.c
+ create mode 100644 arch/arm/mach-s5pc110/include/mach/gpio.h
+ create mode 100644 arch/arm/mach-s5pc110/include/plat/regs-gpio.h
 
-diff --git a/arch/arm/mach-s5pc110/Kconfig b/arch/arm/mach-s5pc110/Kconfig
-index 0e13f54..ef2f940 100644
---- a/arch/arm/mach-s5pc110/Kconfig
-+++ b/arch/arm/mach-s5pc110/Kconfig
-@@ -14,6 +14,11 @@ config CPU_S5PC110
- 	help
- 	  Enable S5PC110 CPU support
- 
-+config S5PC110_SETUP_FB_24BPP
-+	bool
-+	help
-+          Common setup code for S5PC110 with an 24bpp RGB display helper.
-+
- config S5PC110_SETUP_I2C0
- 	bool
- 	default y
 diff --git a/arch/arm/mach-s5pc110/Makefile b/arch/arm/mach-s5pc110/Makefile
-index cf8f4ef..d7e03b6 100644
+index 4dfb306..3849e27 100644
 --- a/arch/arm/mach-s5pc110/Makefile
 +++ b/arch/arm/mach-s5pc110/Makefile
-@@ -18,6 +18,7 @@ obj-$(CONFIG_CPU_S5PC110)	+= plls.o
+@@ -13,6 +13,7 @@ obj-                            :=
+ 
+ obj-$(CONFIG_CPU_S5PC110)	+= cpu.o
+ obj-$(CONFIG_CPU_S5PC110)	+= clocks.o
++obj-$(CONFIG_CPU_S5PC110)	+= gpio-chips.o
+ obj-$(CONFIG_CPU_S5PC110)	+= plls.o
  obj-$(CONFIG_CPU_S5PC110)	+= uarts.o
  
- # Helper and device support
-+obj-$(CONFIG_S5PC110_SETUP_FB_24BPP)	+= setup-fb-24bpp.o
- obj-$(CONFIG_S5PC110_SETUP_I2C0)	+= setup-i2c0.o
- obj-$(CONFIG_S5PC110_SETUP_I2C1)	+= setup-i2c1.o
- obj-$(CONFIG_S5PC110_SETUP_I2C2)	+= setup-i2c2.o
-diff --git a/arch/arm/mach-s5pc110/include/mach/regs-fb.h b/arch/arm/mach-s5pc110/include/mach/regs-fb.h
+diff --git a/arch/arm/mach-s5pc110/gpio-chips.c b/arch/arm/mach-s5pc110/gpio-chips.c
 new file mode 100644
-index 0000000..27fa497
+index 0000000..4f1e591
 --- /dev/null
-+++ b/arch/arm/mach-s5pc110/include/mach/regs-fb.h
-@@ -0,0 +1,91 @@
++++ b/arch/arm/mach-s5pc110/gpio-chips.c
+@@ -0,0 +1,66 @@
 +/*
-+ * Copyright 2009 Samsung Electronics Co.
-+ *   Pawel Osciak <p.osciak@samsung.com>
++ * linux/arch/arm/mach-s5pc110/gpio-chips.c
 + *
-+ * Machine-specific framebuffer definitions for Samsung S5PC110.
++ *  Copyright 2009 Samsung Electronics Co
++ *  Kyungmin Park <kyungmin.park@samsung.com>
++ *  Marek Szyprowski <m.szyprowski@samsung.com>
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __ASM_ARCH_MACH_REGS_FB_H
-+#define __ASM_ARCH_MACH_REGS_FB_H __FILE__
-+
-+#include <plat/regs-fb-v5.h>
-+
-+/* WINCONx */
-+#define WINCONx_BUFSTATUS_H				(1 << 31)
-+#define WINCONx_BUFSEL_H				(1 << 30)
-+#define WINCONx_LIMIT_ON				(1 << 29)
-+#define WINCONx_EQ709					(1 << 28)
-+
-+
-+/* VIDCON3 */
-+#define VIDCON3						(0x0c)
-+#define VIDCON3_VE_ON					(1 << 20)
-+#define VIDCON3_CG_ON					(1 << 18)
-+#define VIDCON3_GM_ON					(1 << 16)
-+#define VIDCON3_HU_CSC_F_NARROW				(1 << 14)
-+#define VIDCON3_HU_CSC_F_EQ709				(1 << 13)
-+#define VIDCON3_HU_CSC_F_EN				(1 << 12)
-+#define VIDCON3_HU_CSC_B_NARROW				(1 << 10)
-+#define VIDCON3_HU_CSC_B_EQ709				(1 << 9)
-+#define VIDCON3_HU_CSC_B_EN				(1 << 8)
-+#define VIDCON3_HUE_EN					(1 << 7)
-+#define VIDCON3_PC_DIR_NEG				(1 << 1)
-+#define VIDCON3_PC_EN					(1 << 0)
-+
-+
-+/* VIDTCON3 */
-+#define VIDTCON3					(0x1c)
-+#define VIDTCON3_VSYNC_EN				(1 << 31)
-+#define VIDTCON3_FRM_EN					(1 << 29)
-+#define VIDTCON3_INVFRM_LOW				(1 << 28)
-+#define VIDTCON3_FRMVRATE_MASK				0xf
-+#define VIDTCON3_FRMVRATE_SHIFT				(24)
-+#define VIDTCON3_FRMVFPD_MASK				0xff
-+#define VIDTCON3_FRMVFPD_SHIFT				(8)
-+#define VIDTCON3_FRMVSPW_MASK				0xff
-+#define VIDTCON3_FRMVSPW_SHIFT				(0)
-+
-+
-+#define SHADOWCON					(0x34)
-+/* Set to disable window 4-0 shadow registers' update */
-+#define SHADOWCON_W4_PROTECT				(1 << 14)
-+#define SHADOWCON_W3_PROTECT				(1 << 13)
-+#define SHADOWCON_W2_PROTECT				(1 << 12)
-+#define SHADOWCON_W1_PROTECT				(1 << 11)
-+#define SHADOWCON_W0_PROTECT				(1 << 10)
-+
-+
-+/* Video buffer address shadow registers (read-only) */
-+#define VIDW_BUF_START_SHADOW(_buf)			(0x20a0 + ((_buf) * 8))
-+#define VIDW_BUF_END_SHADOW(_buf)			(0x20d0 + ((_buf) * 8))
-+
-+/* For windows 1-4 */
-+#define WxKEY_ALPHA(_win)				(0x160 + ((_win) * 4))
-+
-+#define COLORGAINCON					(0x1c0)
-+#define VESFRCON0					(0x1c4)
-+#define VESFRCON1					(0x1c8)
-+#define VESFRCON2					(0x1cc)
-+
-+/* Hue matrix coefficients */
-+#define HUECOEF00					(0x1ec)
-+#define HUECOEF01					(0x1f0)
-+#define HUECOEF10					(0x1f4)
-+#define HUECOEF11					(0x1f8)
-+#define HUEOFFSET					(0x1fc)
-+
-+/* RTQOS control for windows 0-4*/
-+#define WxRTQOSCON(_win)				(0x264 + ((_win) * 4))
-+
-+/* Gamma LUT data for index I1 and I0, where
-+ * I0 = _index, I1 = _index + 1.
-+ */
-+#define GAMMALUT_BASE					(0x37c)
-+#define GAMMALUT_I1I0(_index)			(GAMMALUT_BASE + ((_index) * 4))
-+
-+#endif /* __ASM_ARCH_MACH_REGS_FB_H */
-+
-diff --git a/arch/arm/mach-s5pc110/setup-fb-24bpp.c b/arch/arm/mach-s5pc110/setup-fb-24bpp.c
-new file mode 100644
-index 0000000..993504e
---- /dev/null
-+++ b/arch/arm/mach-s5pc110/setup-fb-24bpp.c
-@@ -0,0 +1,67 @@
-+/*
-+ * linux/arch/arm/plat-s5pc100/setup-fb-24bpp.c
-+ *
-+ * Copyright 2009 Samsung Electronics
-+ *
-+ * Base S5PC110 setup information for 24bpp LCD framebuffer
++ * S5PC110 - GPIOlib chip definitions
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -172,75 +57,320 @@ index 0000000..993504e
 + */
 +
 +#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <linux/fb.h>
++#include <linux/irq.h>
++#include <linux/io.h>
++#include <linux/gpio.h>
 +
-+#include <mach/regs-fb.h>
-+#include <mach/gpio.h>
 +#include <mach/map.h>
-+#include <plat/fb.h>
-+#include <plat/regs-clock.h>
++#include <mach/gpio-core.h>
++
 +#include <plat/gpio-cfg.h>
-+#include <plat/gpio-cfg-s5pc1xx.h>
++#include <plat/gpio-cfg-helpers.h>
++#include <plat/gpio-s5pc1xx.h>
++#include <plat/regs-gpio.h>
 +
-+void s5pc110_fb_gpio_setup_24bpp(void)
-+{
-+	unsigned int gpio = 0;
++static struct s5pc1xx_gpio_chip s5pc110_gpio_chips[] = {
++	S5PC1XX_INT_CHIP_DEF(S5PC110, A0),
++	S5PC1XX_INT_CHIP_DEF(S5PC110, A1),
++	S5PC1XX_INT_CHIP_DEF(S5PC110, B),
++	S5PC1XX_INT_CHIP_DEF(S5PC110, C0),
++	S5PC1XX_INT_CHIP_DEF(S5PC110, C1),
++	S5PC1XX_INT_CHIP_DEF(S5PC110, D0),
++	S5PC1XX_INT_CHIP_DEF(S5PC110, D1),
++	S5PC1XX_INT_CHIP_DEF(S5PC110, E0),
++	S5PC1XX_INT_CHIP_DEF(S5PC110, E1),
++	S5PC1XX_INT_CHIP_DEF(S5PC110, F0),
++	S5PC1XX_INT_CHIP_DEF(S5PC110, F1),
++	S5PC1XX_INT_CHIP_DEF(S5PC110, F2),
++	S5PC1XX_INT_CHIP_DEF(S5PC110, F3),
++	S5PC1XX_INT_CHIP_DEF(S5PC110, G0),
++	S5PC1XX_INT_CHIP_DEF(S5PC110, G1),
++	S5PC1XX_INT_CHIP_DEF(S5PC110, G2),
++	S5PC1XX_INT_CHIP_DEF(S5PC110, G3),
++	S5PC1XX_EINT_CHIP_DEF(S5PC110, H0),
++	S5PC1XX_EINT_CHIP_DEF(S5PC110, H1),
++	S5PC1XX_EINT_CHIP_DEF(S5PC110, H2),
++	S5PC1XX_EINT_CHIP_DEF(S5PC110, H3),
++	S5PC1XX_NOINT_CHIP_DEF(S5PC110, I),
++	S5PC1XX_INT_CHIP_DEF(S5PC110, J0),
++	S5PC1XX_INT_CHIP_DEF(S5PC110, J1),
++	S5PC1XX_INT_CHIP_DEF(S5PC110, J2),
++	S5PC1XX_INT_CHIP_DEF(S5PC110, J3),
++	S5PC1XX_INT_CHIP_DEF(S5PC110, J4),
++	S5PC1XX_MP_CHIP_DEF(S5PC110, MP0_1),
++	S5PC1XX_MP_CHIP_DEF(S5PC110, MP0_2),
++	S5PC1XX_MP_CHIP_DEF(S5PC110, MP0_3),
++	S5PC1XX_MP_CHIP_DEF(S5PC110, MP0_4),
++	S5PC1XX_MP_CHIP_DEF(S5PC110, MP0_5),
++};
 +
-+	for (gpio = S5PC110_GPF0(0); gpio <= S5PC110_GPF0(7); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		s5p_gpio_set_drvstr(gpio, gpio-S5PC110_GPF0(0),
-+				    S5P_GPIO_DRVSTR_LV4);
-+	}
-+
-+	for (gpio = S5PC110_GPF1(0); gpio <= S5PC110_GPF1(7); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		s5p_gpio_set_drvstr(gpio, gpio-S5PC110_GPF1(0),
-+				    S5P_GPIO_DRVSTR_LV4);
-+	}
-+
-+	for (gpio = S5PC110_GPF2(0); gpio <= S5PC110_GPF2(7); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		s5p_gpio_set_drvstr(gpio, gpio-S5PC110_GPF2(0),
-+				    S5P_GPIO_DRVSTR_LV4);
-+	}
-+
-+	for (gpio = S5PC110_GPF3(0); gpio <= S5PC110_GPF3(3); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		s5p_gpio_set_drvstr(gpio, gpio-S5PC110_GPF3(0),
-+				    S5P_GPIO_DRVSTR_LV4);
-+	}
-+
-+	/* Set DISPLAY_CONTROL register for Display path selection.
-+	 *
-+	 * ouput   |   RGB   |   I80   |   ITU
-+	 * -----------------------------------
-+	 *  00     |   MIE   |  FIMD   |  FIMD
-+	 *  01     | MDNIE   | MDNIE   |  FIMD
-+	 *  10     |  FIMD   |  FIMD   |  FIMD
-+	 *  11     |  FIMD   |  FIMD   |  FIMD
-+	 */
-+	writel(0x2, S5PC110_MDNIE_SEL);
-+}
-diff --git a/arch/arm/plat-s3c/include/plat/fb.h b/arch/arm/plat-s3c/include/plat/fb.h
-index f8db879..ee5cdd0 100644
---- a/arch/arm/plat-s3c/include/plat/fb.h
-+++ b/arch/arm/plat-s3c/include/plat/fb.h
-@@ -77,4 +77,11 @@ extern void s3c64xx_fb_gpio_setup_24bpp(void);
-  */
- extern void s5pc100_fb_gpio_setup_24bpp(void);
- 
-+/**
-+ * s5pc110_fb_gpio_setup_24bpp() - S5PC110 setup function for 24bpp LCD
++struct s5pc1xx_gpio s5pc1xx_gpio_chips = {
++	.chips = s5pc110_gpio_chips,
++	.count = ARRAY_SIZE(s5pc110_gpio_chips),
++};
+diff --git a/arch/arm/mach-s5pc110/include/mach/gpio.h b/arch/arm/mach-s5pc110/include/mach/gpio.h
+new file mode 100644
+index 0000000..ae36f1e
+--- /dev/null
++++ b/arch/arm/mach-s5pc110/include/mach/gpio.h
+@@ -0,0 +1,187 @@
++/* arch/arm/mach-s5pc110/include/mach/gpio.h
 + *
-+ * Initialise the GPIO for an 24bpp LCD display on the RGB interface.
-+ */
-+extern void s5pc110_fb_gpio_setup_24bpp(void);
++ * Copyright 2009 Samsung Electronics Co.
++ *	Byungho Min <bhmin@samsung.com>
++ *
++ * S5PC110 - GPIO lib support
++ *
++ * Base on mach-s3c6400/include/mach/gpio.h
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
 +
- #endif /* __PLAT_S3C_FB_H */
++#define gpio_get_value	__gpio_get_value
++#define gpio_set_value	__gpio_set_value
++#define gpio_cansleep	__gpio_cansleep
++#define gpio_to_irq	__gpio_to_irq
++
++/* GPIO bank sizes */
++#define S5PC110_GPIO_A0_NR	(8)
++#define S5PC110_GPIO_A1_NR	(8)
++#define S5PC110_GPIO_B_NR	(8)
++#define S5PC110_GPIO_C0_NR	(8)
++#define S5PC110_GPIO_C1_NR	(8)
++#define S5PC110_GPIO_D0_NR	(8)
++#define S5PC110_GPIO_D1_NR	(8)
++#define S5PC110_GPIO_E0_NR	(8)
++#define S5PC110_GPIO_E1_NR	(8)
++#define S5PC110_GPIO_F0_NR	(8)
++#define S5PC110_GPIO_F1_NR	(8)
++#define S5PC110_GPIO_F2_NR	(8)
++#define S5PC110_GPIO_F3_NR	(8)
++#define S5PC110_GPIO_G0_NR	(8)
++#define S5PC110_GPIO_G1_NR	(8)
++#define S5PC110_GPIO_G2_NR	(8)
++#define S5PC110_GPIO_G3_NR	(8)
++#define S5PC110_GPIO_H0_NR	(8)
++#define S5PC110_GPIO_H1_NR	(8)
++#define S5PC110_GPIO_H2_NR	(8)
++#define S5PC110_GPIO_H3_NR	(8)
++#define S5PC110_GPIO_I_NR	(8)
++#define S5PC110_GPIO_J0_NR	(8)
++#define S5PC110_GPIO_J1_NR	(8)
++#define S5PC110_GPIO_J2_NR	(8)
++#define S5PC110_GPIO_J3_NR	(8)
++#define S5PC110_GPIO_J4_NR	(8)
++#define S5PC110_GPIO_MP0_1_NR	(8)
++#define S5PC110_GPIO_MP0_2_NR	(8)
++#define S5PC110_GPIO_MP0_3_NR	(8)
++#define S5PC110_GPIO_MP0_4_NR	(8)
++#define S5PC110_GPIO_MP0_5_NR	(8)
++#define S5PC110_GPIO_MP0_6_NR	(8)
++
++/* GPIO bank numbes */
++
++/* CONFIG_S3C_GPIO_SPACE allows the user to select extra
++ * space for debugging purposes so that any accidental
++ * change from one gpio bank to another can be caught.
++*/
++
++#define S5PC1XX_GPIO_NEXT(__gpio) \
++	((__gpio##_START) + (__gpio##_NR) + CONFIG_S3C_GPIO_SPACE + 1)
++
++enum s5pc110_gpio_number {
++	S5PC110_GPIO_A0_START	= 0,
++	S5PC110_GPIO_A1_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_A0),
++	S5PC110_GPIO_B_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_A1),
++	S5PC110_GPIO_C0_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_B),
++	S5PC110_GPIO_C1_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_C0),
++	S5PC110_GPIO_D0_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_C1),
++	S5PC110_GPIO_D1_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_D0),
++	S5PC110_GPIO_E0_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_D1),
++	S5PC110_GPIO_E1_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_E0),
++	S5PC110_GPIO_F0_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_E1),
++	S5PC110_GPIO_F1_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_F0),
++	S5PC110_GPIO_F2_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_F1),
++	S5PC110_GPIO_F3_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_F2),
++	S5PC110_GPIO_G0_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_F3),
++	S5PC110_GPIO_G1_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_G0),
++	S5PC110_GPIO_G2_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_G1),
++	S5PC110_GPIO_G3_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_G2),
++	S5PC110_GPIO_H0_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_G3),
++	S5PC110_GPIO_H1_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_H0),
++	S5PC110_GPIO_H2_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_H1),
++	S5PC110_GPIO_H3_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_H2),
++	S5PC110_GPIO_I_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_H3),
++	S5PC110_GPIO_J0_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_I),
++	S5PC110_GPIO_J1_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_J0),
++	S5PC110_GPIO_J2_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_J1),
++	S5PC110_GPIO_J3_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_J2),
++	S5PC110_GPIO_J4_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_J3),
++	S5PC110_GPIO_MP0_1_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_J4),
++	S5PC110_GPIO_MP0_2_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_MP0_1),
++	S5PC110_GPIO_MP0_3_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_MP0_2),
++	S5PC110_GPIO_MP0_4_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_MP0_3),
++	S5PC110_GPIO_MP0_5_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_MP0_4),
++	S5PC110_GPIO_MP0_6_START	= S5PC1XX_GPIO_NEXT(S5PC110_GPIO_MP0_5),
++	S5PC110_GPIO_END        = S5PC1XX_GPIO_NEXT(S5PC110_GPIO_MP0_6),
++};
++
++#define S5PC110_GPA0(_nr)	(S5PC110_GPIO_A0_START + (_nr))
++#define S5PC110_GPA1(_nr)	(S5PC110_GPIO_A1_START + (_nr))
++#define S5PC110_GPB(_nr)	(S5PC110_GPIO_B_START + (_nr))
++#define S5PC110_GPC0(_nr)	(S5PC110_GPIO_C0_START + (_nr))
++#define S5PC110_GPC1(_nr)	(S5PC110_GPIO_C1_START + (_nr))
++#define S5PC110_GPD0(_nr)	(S5PC110_GPIO_D0_START + (_nr))
++#define S5PC110_GPD1(_nr)	(S5PC110_GPIO_D1_START + (_nr))
++#define S5PC110_GPE0(_nr)	(S5PC110_GPIO_E0_START + (_nr))
++#define S5PC110_GPE1(_nr)	(S5PC110_GPIO_E1_START + (_nr))
++#define S5PC110_GPF0(_nr)	(S5PC110_GPIO_F0_START + (_nr))
++#define S5PC110_GPF1(_nr)	(S5PC110_GPIO_F1_START + (_nr))
++#define S5PC110_GPF2(_nr)	(S5PC110_GPIO_F2_START + (_nr))
++#define S5PC110_GPF3(_nr)	(S5PC110_GPIO_F3_START + (_nr))
++#define S5PC110_GPG0(_nr)	(S5PC110_GPIO_G0_START + (_nr))
++#define S5PC110_GPG1(_nr)	(S5PC110_GPIO_G1_START + (_nr))
++#define S5PC110_GPG2(_nr)	(S5PC110_GPIO_G2_START + (_nr))
++#define S5PC110_GPG3(_nr)	(S5PC110_GPIO_G3_START + (_nr))
++#define S5PC110_GPH0(_nr)	(S5PC110_GPIO_H0_START + (_nr))
++#define S5PC110_GPH1(_nr)	(S5PC110_GPIO_H1_START + (_nr))
++#define S5PC110_GPH2(_nr)	(S5PC110_GPIO_H2_START + (_nr))
++#define S5PC110_GPH3(_nr)	(S5PC110_GPIO_H3_START + (_nr))
++#define S5PC110_GPI(_nr)	(S5PC110_GPIO_I_START + (_nr))
++#define S5PC110_GPJ0(_nr)	(S5PC110_GPIO_J0_START + (_nr))
++#define S5PC110_GPJ1(_nr)	(S5PC110_GPIO_J1_START + (_nr))
++#define S5PC110_GPJ2(_nr)	(S5PC110_GPIO_J2_START + (_nr))
++#define S5PC110_GPJ3(_nr)	(S5PC110_GPIO_J3_START + (_nr))
++#define S5PC110_GPJ4(_nr)	(S5PC110_GPIO_J4_START + (_nr))
++#define S5PC110_MP0_1(_nr)	(S5PC110_GPIO_MP0_1_START + (_nr))
++#define S5PC110_MP0_2(_nr)	(S5PC110_GPIO_MP0_2_START + (_nr))
++#define S5PC110_MP0_3(_nr)	(S5PC110_GPIO_MP0_3_START + (_nr))
++#define S5PC110_MP0_4(_nr)	(S5PC110_GPIO_MP0_4_START + (_nr))
++#define S5PC110_MP0_5(_nr)	(S5PC110_GPIO_MP0_5_START + (_nr))
++#define S5PC110_MP0_6(_nr)	(S5PC110_GPIO_MP0_6_START + (_nr))
++
++/* It used the end of the S5PC100 gpios */
++#define S3C_GPIO_END		S5PC110_GPIO_END
++
++/* define the number of gpios we need to the one after the MP05() range */
++#define ARCH_NR_GPIOS		(S5PC110_GPIO_END + 1)
++
++/* Offset of the bank in the interrupt group registers */
++#define S5PC110_GPIO_A0_INT_GROUP	(0)
++#define S5PC110_GPIO_A1_INT_GROUP	(1)
++#define S5PC110_GPIO_B_INT_GROUP	(2)
++#define S5PC110_GPIO_C0_INT_GROUP	(3)
++#define S5PC110_GPIO_C1_INT_GROUP	(4)
++#define S5PC110_GPIO_D0_INT_GROUP	(5)
++#define S5PC110_GPIO_D1_INT_GROUP	(6)
++#define S5PC110_GPIO_E0_INT_GROUP	(7)
++#define S5PC110_GPIO_E1_INT_GROUP	(8)
++#define S5PC110_GPIO_F0_INT_GROUP	(9)
++#define S5PC110_GPIO_F1_INT_GROUP	(10)
++#define S5PC110_GPIO_F2_INT_GROUP	(11)
++#define S5PC110_GPIO_F3_INT_GROUP	(12)
++#define S5PC110_GPIO_G0_INT_GROUP	(13)
++#define S5PC110_GPIO_G1_INT_GROUP	(14)
++#define S5PC110_GPIO_G2_INT_GROUP	(15)
++#define S5PC110_GPIO_G3_INT_GROUP	(16)
++#define S5PC110_GPIO_J0_INT_GROUP	(17)
++#define S5PC110_GPIO_J1_INT_GROUP	(18)
++#define S5PC110_GPIO_J2_INT_GROUP	(19)
++#define S5PC110_GPIO_J3_INT_GROUP	(20)
++#define S5PC110_GPIO_J4_INT_GROUP	(21)
++#define S5PC110_GPIO_H0_INT_GROUP	(-1)
++#define S5PC110_GPIO_H1_INT_GROUP	(-1)
++#define S5PC110_GPIO_H2_INT_GROUP	(-1)
++#define S5PC110_GPIO_H3_INT_GROUP	(-1)
++#define S5PC110_GPIO_I_INT_GROUP	(-1)
++#define S5PC110_GPIO_MP0_1_INT_GROUP	(-1)
++#define S5PC110_GPIO_MP0_2_INT_GROUP	(-1)
++#define S5PC110_GPIO_MP0_3_INT_GROUP	(-1)
++#define S5PC110_GPIO_MP0_4_INT_GROUP	(-1)
++#define S5PC110_GPIO_MP0_5_INT_GROUP	(-1)
++#define S5PC110_GPIO_MP0_6_INT_GROUP	(-1)
++
++#define S5PC110_GPIO_INT_GROUP_END	(S5PC110_GPIO_J4_INT_GROUP + 1)
++
++/* Common compatibility defines */
++#define S5PC1XX_GPIO_EINT_SFN	S3C_GPIO_SFN(0xf)
++#define S5PC1XX_GPH0(n)		S5PC110_GPH0(n)
++#define S5PC1XX_GPH1(n)		S5PC110_GPH1(n)
++#define S5PC1XX_GPH2(n)		S5PC110_GPH2(n)
++#define S5PC1XX_GPH3(n)		S5PC110_GPH3(n)
++#define S5PC1XX_GPIO_INT_GROUP_END	S5PC110_GPIO_INT_GROUP_END
++
++#include <asm-generic/gpio.h>
+diff --git a/arch/arm/mach-s5pc110/include/plat/regs-gpio.h b/arch/arm/mach-s5pc110/include/plat/regs-gpio.h
+new file mode 100644
+index 0000000..24663b8
+--- /dev/null
++++ b/arch/arm/mach-s5pc110/include/plat/regs-gpio.h
+@@ -0,0 +1,65 @@
++/* linux/arch/arm/plat-s5pc1xx/include/plat/regs-gpio.h
++ *
++ * Copyright 2009 Samsung Electronics Co.
++ *      Byungho Min <bhmin@samsung.com>
++ *
++ * S5PC110 - GPIO register definitions
++ */
++
++#ifndef __ASM_PLAT_S5PC1XX_REGS_GPIO_H
++#define __ASM_PLAT_S5PC1XX_REGS_GPIO_H __FILE__
++
++#include <mach/map.h>
++
++/* S5PC110 */
++#define S5PC110_GPIO_BASE	S5PC1XX_VA_GPIO
++#define S5PC110_GPA0_BASE	(S5PC110_GPIO_BASE + 0x0000)
++#define S5PC110_GPA1_BASE	(S5PC110_GPIO_BASE + 0x0020)
++#define S5PC110_GPB_BASE	(S5PC110_GPIO_BASE + 0x0040)
++#define S5PC110_GPC0_BASE	(S5PC110_GPIO_BASE + 0x0060)
++#define S5PC110_GPC1_BASE	(S5PC110_GPIO_BASE + 0x0080)
++#define S5PC110_GPD0_BASE	(S5PC110_GPIO_BASE + 0x00A0)
++#define S5PC110_GPD1_BASE	(S5PC110_GPIO_BASE + 0x00C0)
++#define S5PC110_GPE0_BASE	(S5PC110_GPIO_BASE + 0x00E0)
++#define S5PC110_GPE1_BASE	(S5PC110_GPIO_BASE + 0x0100)
++#define S5PC110_GPF0_BASE	(S5PC110_GPIO_BASE + 0x0120)
++#define S5PC110_GPF1_BASE	(S5PC110_GPIO_BASE + 0x0140)
++#define S5PC110_GPF2_BASE	(S5PC110_GPIO_BASE + 0x0160)
++#define S5PC110_GPF3_BASE	(S5PC110_GPIO_BASE + 0x0180)
++#define S5PC110_GPG0_BASE	(S5PC110_GPIO_BASE + 0x01A0)
++#define S5PC110_GPG1_BASE	(S5PC110_GPIO_BASE + 0x01C0)
++#define S5PC110_GPG2_BASE	(S5PC110_GPIO_BASE + 0x01E0)
++#define S5PC110_GPG3_BASE	(S5PC110_GPIO_BASE + 0x0200)
++#define S5PC110_GPH0_BASE	(S5PC110_GPIO_BASE + 0x0C00)
++#define S5PC110_GPH1_BASE	(S5PC110_GPIO_BASE + 0x0C20)
++#define S5PC110_GPH2_BASE	(S5PC110_GPIO_BASE + 0x0C40)
++#define S5PC110_GPH3_BASE	(S5PC110_GPIO_BASE + 0x0C60)
++#define S5PC110_GPI_BASE	(S5PC110_GPIO_BASE + 0x0220)
++#define S5PC110_GPJ0_BASE	(S5PC110_GPIO_BASE + 0x0240)
++#define S5PC110_GPJ1_BASE	(S5PC110_GPIO_BASE + 0x0260)
++#define S5PC110_GPJ2_BASE	(S5PC110_GPIO_BASE + 0x0280)
++#define S5PC110_GPJ3_BASE	(S5PC110_GPIO_BASE + 0x02A0)
++#define S5PC110_GPJ4_BASE	(S5PC110_GPIO_BASE + 0x02C0)
++#define S5PC110_MP0_1_BASE	(S5PC110_GPIO_BASE + 0x02E0)
++#define S5PC110_MP0_2_BASE	(S5PC110_GPIO_BASE + 0x0300)
++#define S5PC110_MP0_3_BASE	(S5PC110_GPIO_BASE + 0x0320)
++#define S5PC110_MP0_4_BASE	(S5PC110_GPIO_BASE + 0x0340)
++#define S5PC110_MP0_5_BASE	(S5PC110_GPIO_BASE + 0x0360)
++#define S5PC110_EXT_INT_BASE	(S5PC110_GPIO_BASE + 0x0E00)
++#define S5PC110_PDNEN		(S5PC110_GPIO_BASE + 0x0F80)
++#define S5PC100_PDNEN_NORMAL	(0 << 0)
++
++#define S5PC110_PDNEN_CFG_PDNEN	(1 << 1)
++#define S5PC110_PDNEN_CFG_AUTO	(0 << 1)
++#define S5PC110_PDNEN_POWERDOWN	(1 << 0)
++#define S5PC110_PDNEN_NORMAL	(0 << 0)
++
++/* Common part */
++#define S5PC1XX_EINT_BASE	(S5PC110_EXT_INT_BASE)
++
++#define S5PC1XX_GPx_INPUT(__gpio)	(0x0 << ((__gpio) * 4))
++#define S5PC1XX_GPx_OUTPUT(__gpio)	(0x1 << ((__gpio) * 4))
++#define S5PC1XX_GPx_CONMASK(__gpio)	(0xf << ((__gpio) * 4))
++
++#endif /* __ASM_PLAT_S5PC1XX_REGS_GPIO_H */
++
 -- 
 1.6.4
