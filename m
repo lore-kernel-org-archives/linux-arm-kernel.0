@@ -1,39 +1,36 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 14 Jan 2010 13:53:22 -0700
-Subject: [PATCH] ep93xx: include correct irq.h in core.c
-Message-ID: <201001141353.23018.hartleys@visionengravers.com>
+From: roel.kluin@gmail.com (Roel Kluin)
+Date: Thu, 14 Jan 2010 22:11:19 +0100
+Subject: [PATCH] Gemini: wrong registers used to set reg_level in
+	gpio_set_irq_type()?
+Message-ID: <4B4F8877.6080105@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ep93xx: include correct irq.h in core.c
+It appears the wrong GPIO registers were used
 
-Currently <asm/mach/irq.h> is included by core.c. This header
-includes <linux/irq.h> and defines a number of internal functions.
-These internal functions are not needed by this file. Change the
-include so that we just get what is needed.
-
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Ryan Mallon <ryan@bluewatersys.com>
-
+Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
 ---
+I am not sure whether this is right so please review.
 
-diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index 1f0d665..2f39264 100644
---- a/arch/arm/mach-ep93xx/core.c
-+++ b/arch/arm/mach-ep93xx/core.c
-@@ -20,6 +20,7 @@
- #include <linux/interrupt.h>
- #include <linux/dma-mapping.h>
- #include <linux/timex.h>
-+#include <linux/irq.h>
- #include <linux/io.h>
- #include <linux/gpio.h>
- #include <linux/leds.h>
-@@ -35,7 +36,6 @@
+diff --git a/arch/arm/mach-gemini/gpio.c b/arch/arm/mach-gemini/gpio.c
+index e726385..fe3bd5a 100644
+--- a/arch/arm/mach-gemini/gpio.c
++++ b/arch/arm/mach-gemini/gpio.c
+@@ -86,7 +86,7 @@ static int gpio_set_irq_type(unsigned int irq, unsigned int type)
+ 	unsigned int reg_both, reg_level, reg_type;
  
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
--#include <asm/mach/irq.h>
+ 	reg_type = __raw_readl(base + GPIO_INT_TYPE);
+-	reg_level = __raw_readl(base + GPIO_INT_BOTH_EDGE);
++	reg_level = __raw_readl(base + GPIO_INT_LEVEL);
+ 	reg_both = __raw_readl(base + GPIO_INT_BOTH_EDGE);
  
- #include <asm/hardware/vic.h>
+ 	switch (type) {
+@@ -117,7 +117,7 @@ static int gpio_set_irq_type(unsigned int irq, unsigned int type)
+ 	}
  
+ 	__raw_writel(reg_type, base + GPIO_INT_TYPE);
+-	__raw_writel(reg_level, base + GPIO_INT_BOTH_EDGE);
++	__raw_writel(reg_level, base + GPIO_INT_LEVEL);
+ 	__raw_writel(reg_both, base + GPIO_INT_BOTH_EDGE);
+ 
+ 	gpio_ack_irq(irq);
