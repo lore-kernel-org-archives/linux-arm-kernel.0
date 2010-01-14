@@ -1,40 +1,36 @@
-From: andreas.fenkart@streamunlimited.com (Andreas Fenkart)
-Date: Thu, 14 Jan 2010 11:36:10 +0100
-Subject: [PATCH 5/5] Add PKMAP area description to memory.txt.
-In-Reply-To: <1263465370-4192-5-git-send-email-andreas.fenkart@streamunlimited.com>
-References: <20090810213905.GA4046@n2100.arm.linux.org.uk>
-	<1263465370-4192-1-git-send-email-andreas.fenkart@streamunlimited.com>
-	<1263465370-4192-2-git-send-email-andreas.fenkart@streamunlimited.com>
-	<1263465370-4192-3-git-send-email-andreas.fenkart@streamunlimited.com>
-	<1263465370-4192-4-git-send-email-andreas.fenkart@streamunlimited.com>
-	<1263465370-4192-5-git-send-email-andreas.fenkart@streamunlimited.com>
-Message-ID: <1263465370-4192-6-git-send-email-andreas.fenkart@streamunlimited.com>
+From: judith.baumgarten@tu-cottbus.de (Judith Baumgarten)
+Date: Thu, 14 Jan 2010 11:52:25 +0100
+Subject: pxa320: change uart configuration
+In-Reply-To: <20100112173606.GF5633@n2100.arm.linux.org.uk>
+References: <20100112183000.14575jy4enpsv6ag@webmail.tu-cottbus.de>
+	<20100112173606.GF5633@n2100.arm.linux.org.uk>
+Message-ID: <20100114115225.94334g603pqhe1d5@webmail.tu-cottbus.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also adapts delimiters of neighbouring modules area.
+Zitat von Russell King - ARM Linux <linux@arm.linux.org.uk>:
 
-Signed-off-by: Andreas Fenkart <andreas.fenkart@streamunlimited.com>
----
- Documentation/arm/memory.txt |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
+> On Tue, Jan 12, 2010 at 06:30:00PM +0100, Judith Baumgarten wrote:
+>> I want to change the uart configuration of the pxa serial ports in order
+>> to be able to connect to different devices. The problem is, that it jumps
+>> back to its initial configuration, when it receives some data. I used
+>> stty of busybox 1.14.3 as well as the termios-structure to change the
+>> configuration, but it always remained the same. I could protect some
+>> configurations by using the TIOCSLCKTRMIOS ioctl, but the baudrate still
+>> jumps back.
+>
+> Something will be changing it back.  A getty maybe?
 
-diff --git a/Documentation/arm/memory.txt b/Documentation/arm/memory.txt
-index 9d58c7c..eb0fae1 100644
---- a/Documentation/arm/memory.txt
-+++ b/Documentation/arm/memory.txt
-@@ -59,7 +59,11 @@ PAGE_OFFSET	high_memory-1	Kernel direct-mapped RAM region.
- 				This maps the platforms RAM, and typically
- 				maps all platform RAM in a 1:1 relationship.
- 
--TASK_SIZE	PAGE_OFFSET-1	Kernel module space
-+PKMAP_BASE	PAGE_OFFSET-1	Permanent kernel mappings
-+				One way of mapping HIGHMEM pages into kernel
-+				space.
-+
-+MODULES_VADDR	MODULES_END-1	Kernel module space
- 				Kernel modules inserted via insmod are
- 				placed here using dynamic mappings.
- 
--- 
-1.6.6
+We have no getty on our system. Inittab contains just the following entries:
+
+::sysinit:/etc/init.d/rcS
+ttyS0::respawn:-/bin/sh
+ttyS1::respawn:-/bin/sh
+tty1::respawn:-/bin/sh
+tty2::respawn:-/bin/sh
+::ctrlaltdel:/bin/umount -a -r
+
+and a "ps ax | grep tty" has no result.
+
+----------------------------------------------------------------
+This message was sent using IMP, the Internet Messaging Program.
