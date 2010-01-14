@@ -1,84 +1,134 @@
-From: walsimou@walsimou.com (Gaye Abdoulaye Walsimou)
-Date: Thu, 14 Jan 2010 08:12:55 +0100
-Subject: kernel boot failure on with s32440/mini2440 with git head
-	(dd59f6c76b2)
-In-Reply-To: <4B4E5646.20300@simtec.co.uk>
-References: <4B2E4A65.8070207@walsimou.com>	
-	<200912211410.12014.jbe@pengutronix.de>	
-	<dc447790912210526l3247b8fdxfc3f7c4c99706b04@mail.gmail.com>	
-	<4B37A6D4.9000301@walsimou.com> <4B4217E7.5000207@simtec.co.uk>
-	<c7df016d1001130624s596ad2d3ub302f2bcea481234@mail.gmail.com>
-	<4B4E5646.20300@simtec.co.uk>
-Message-ID: <4B4EC3F7.8060908@walsimou.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 14 Jan 2010 16:19:04 +0900
+Subject: [PATCH v5 6/8 RE-SEND] ARM: S5P6440: Add Board support file
+Message-ID: <1263453544-3915-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Dooks wrote:
->>
->> Dear all,
->>
->> I still get the same issue with kernel 2.6.33-rc4 (see log).
->> Any idea?
->>
->> Regards,
->> Uri Yosef
->>
->> Uncompressing Linux... done, booting the kernel.
->> Linux version 2.6.33-rc4 (uri at mylinux) (gcc version 4.4.1 (Sourcery
->> G++ Lite 2009q3-67) ) #1 Wed Jan 13 16:00:38 IST 2010
->> CPU: ARM920T [41129200] revision 0 (ARMv4T), cr=c0007177
->> CPU: VIVT data cache, VIVT instruction cache
->> Machine: MINI2440
->> Memory policy: ECC disabled, Data cache writeback
->> CPU S3C2440A (id 0x32440001)
->> S3C24XX Clocks, Copyright 2004 Simtec Electronics
->> S3C244X: core 405.000 MHz, memory 101.250 MHz, peripheral 50.625 MHz
->> CLOCK: Slow mode (1.500 MHz), fast, MPLL on, UPLL on
->> Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 16256
->> Kernel command line: root=/dev/mtdblock3 console=ttySAC0,115200 mini2440=1tb
->> PID hash table entries: 256 (order: -2, 1024 bytes)
->> Dentry cache hash table entries: 8192 (order: 3, 32768 bytes)
->> Inode-cache hash table entries: 4096 (order: 2, 16384 bytes)
->> Memory: 64MB = 64MB total
->> Memory: 61048KB available (3260K code, 351K data, 120K init, 0K highmem)
->> SLUB: Genslabs=11, HWalign=32, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
->> Hierarchical RCU implementation.
->> NR_IRQS:85
->> irq: clearing subpending status 00000002
->> Console: colour dummy device 80x30
->> console [ttySAC0] enabled
->> Calibrating delay loop... 201.93 BogoMIPS (lpj=504832)
->> Mount-cache hash table entries: 512
->> CPU: Testing write buffer coherency: ok
->> devtmpfs: initialized
->> NET: Registered protocol family 16
->> MINI2440: Option string mini2440=1tb
->> MINI2440: 't' ignored, touchscreen not compiled in
->> MINI2440: LCD 0:240x320 [1:800x480] 2:1024x768
->> Unable to handle kernel NULL pointer dereference at virtual address 00000000
->> pgd = c0004000
->> [00000000] *pgd=00000000
->> Internal error: Oops: 5 [#1]
->> last sysfs file:
->> Modules linked in:
->> CPU: 0    Not tainted  (2.6.33-rc4 #1)
->> PC is at memcpy+0x64/0x29c
->> LR is at kmemdup+0x2c/0x34
->>     
->
-> This looks like a new issue to me, please compile your kernel
-> with sufficient debug information so that a full backtrace can
-> be generated and we can find out where this is happening.
->
->   
+This patch adds Samsung's SMDK6440 board support file.
 
-No this is not a new issue, it's the same I reported. As I said
-previously reverting
-the changes introduced by commit[1] in mini2440 code, make the board to
-be able boot again.
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-s5p6440/mach-smdk6440.c |  115 +++++++++++++++++++++++++++++++++
+ 1 files changed, 115 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-s5p6440/mach-smdk6440.c
 
-[1]  ARM: S3C: Add NAND device platform data set call:
-http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=2a3a18045b136487b22733d57410e6dccd34ac84
-
-Best regards,
-AWG
+diff --git a/arch/arm/mach-s5p6440/mach-smdk6440.c b/arch/arm/mach-s5p6440/mach-smdk6440.c
+new file mode 100644
+index 0000000..e3a49af
+--- /dev/null
++++ b/arch/arm/mach-s5p6440/mach-smdk6440.c
+@@ -0,0 +1,111 @@
++/* linux/arch/arm/mach-s5p6440/mach-smdk6440.c
++ *
++ * Copyright (c) 2009 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#include <linux/kernel.h>
++#include <linux/types.h>
++#include <linux/interrupt.h>
++#include <linux/list.h>
++#include <linux/timer.h>
++#include <linux/delay.h>
++#include <linux/init.h>
++#include <linux/serial_core.h>
++#include <linux/platform_device.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/clk.h>
++
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++
++#include <mach/hardware.h>
++#include <mach/map.h>
++
++#include <asm/irq.h>
++#include <asm/mach-types.h>
++
++#include <plat/regs-serial.h>
++
++#include <plat/s5p6440.h>
++#include <plat/clock.h>
++#include <mach/regs-clock.h>
++#include <plat/devs.h>
++#include <plat/cpu.h>
++#include <plat/pll.h>
++
++#define S5P6440_UCON_DEFAULT    (S3C2410_UCON_TXILEVEL |	\
++				S3C2410_UCON_RXILEVEL |		\
++				S3C2410_UCON_TXIRQMODE |	\
++				S3C2410_UCON_RXIRQMODE |	\
++				S3C2410_UCON_RXFIFO_TOI |	\
++				S3C2443_UCON_RXERR_IRQEN)
++
++#define S5P6440_ULCON_DEFAULT	S3C2410_LCON_CS8
++
++#define S5P6440_UFCON_DEFAULT   (S3C2410_UFCON_FIFOMODE |	\
++				S3C2440_UFCON_TXTRIG16 |	\
++				S3C2410_UFCON_RXTRIG8)
++
++static struct s3c2410_uartcfg smdk6440_uartcfgs[] __initdata = {
++	[0] = {
++		.hwport	     = 0,
++		.flags	     = 0,
++		.ucon	     = S5P6440_UCON_DEFAULT,
++		.ulcon	     = S5P6440_ULCON_DEFAULT,
++		.ufcon	     = S5P6440_UFCON_DEFAULT,
++	},
++	[1] = {
++		.hwport	     = 1,
++		.flags	     = 0,
++		.ucon	     = S5P6440_UCON_DEFAULT,
++		.ulcon	     = S5P6440_ULCON_DEFAULT,
++		.ufcon	     = S5P6440_UFCON_DEFAULT,
++	},
++	[2] = {
++		.hwport	     = 2,
++		.flags	     = 0,
++		.ucon	     = S5P6440_UCON_DEFAULT,
++		.ulcon	     = S5P6440_ULCON_DEFAULT,
++		.ufcon	     = S5P6440_UFCON_DEFAULT,
++	},
++	[3] = {
++		.hwport	     = 3,
++		.flags	     = 0,
++		.ucon	     = S5P6440_UCON_DEFAULT,
++		.ulcon	     = S5P6440_ULCON_DEFAULT,
++		.ufcon	     = S5P6440_UFCON_DEFAULT,
++	},
++};
++
++static struct platform_device *smdk6440_devices[] __initdata = {
++};
++
++static void __init smdk6440_map_io(void)
++{
++	s5p_init_io(NULL, 0, S5P_SYS_ID);
++	s3c24xx_init_clocks(12000000);
++	s3c24xx_init_uarts(smdk6440_uartcfgs, ARRAY_SIZE(smdk6440_uartcfgs));
++}
++
++static void __init smdk6440_machine_init(void)
++{
++	platform_add_devices(smdk6440_devices, ARRAY_SIZE(smdk6440_devices));
++}
++
++MACHINE_START(SMDK6440, "SMDK6440")
++	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
++	.phys_io	= S5P_PA_UART & 0xfff00000,
++	.io_pg_offst	= (((u32)S5P_VA_UART) >> 18) & 0xfffc,
++	.boot_params	= S5P_PA_SDRAM + 0x100,
++
++	.init_irq	= s5p6440_init_irq,
++	.map_io		= smdk6440_map_io,
++	.init_machine	= smdk6440_machine_init,
++	.timer		= &s3c24xx_timer,
++MACHINE_END
+-- 
+1.6.2.5
