@@ -1,43 +1,63 @@
-From: jason.wessel@windriver.com (Jason Wessel)
-Date: Thu, 14 Jan 2010 12:57:35 -0600
-Subject: [PATCH 20/40] arm,
-	kgdb: Add hook to catch an oops with debugger
-In-Reply-To: <20100114174821.GB21385@n2100.arm.linux.org.uk>
-References: <1263481176-1897-1-git-send-email-jason.wessel@windriver.com><1263481176-1897-21-git-send-email-jason.wessel@windriver.com>
-	<20100114174821.GB21385@n2100.arm.linux.org.uk>
-Message-ID: <4B4F691F.3030500@windriver.com>
+From: linux@bohmer.net (Remy Bohmer)
+Date: Thu, 14 Jan 2010 20:31:30 +0100
+Subject: [PATCH] Fix soft lockup in at91 udc driver
+In-Reply-To: <4B4E55C9.6090703@bluewatersys.com>
+References: <4990882D.3050302@bluewatersys.com>
+	<4999C24F.9050906@bluewatersys.com>
+	<3efb10971001131500i1ee520d1l983a04787c0a4c6c@mail.gmail.com>
+	<4B4E55C9.6090703@bluewatersys.com>
+Message-ID: <3efb10971001141131r79e7b2cfk254c364d61753cae@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Thu, Jan 14, 2010 at 08:59:16AM -0600, Jason Wessel wrote:
->   
->> Add in a low level hook to catch calls to die() in the debugger.
+Hi Ryan,
+
+2010/1/14 Ryan Mallon <ryan@bluewatersys.com>:
+> Remy Bohmer wrote:
+>> Hi Ryan,
 >>
->> After the debugger is done, the standard system rules will be in play
->> for the original exception.
+>> 2009/2/16 Ryan Mallon <ryan@bluewatersys.com>:
+>>> Ryan Mallon wrote:
+>>>> The udc registers are only writeable if the udc clocks are enabled, but
+>>>> udc interrupts can still occur. This can lead to a situation where an
+>>>> interrupt is perpetually received when the clocks are disabled and is
+>>>> never cleared or masked, which causes a lockup. The following patch
+>>>> ensures that the clocks are enabled while handling an interrupt:
+>>> Any comments on this patch? Has anybody else had problems with the AT91
+>>> UDC driver causing soft lockups?
 >>
->> The kdb debugger wants a chance to catch these sorts of exceptions for
->> analysis.
->>     
+>> Although this patch is now almost a year old, we first encountered
+>> this type of bug just a few weeks ago.
+>> The problem description you mention fits the problem we see. We also
+>> noticed that the clocks were disabled in the case our lockup occurs.
 >
-> NAK.  I have a similar patch which implements the hook properly - but
-> with one caveat.  It needs a review to ensure that its safe to return
-> from die().  Until that's established, this patch can not be merged.
->   
-
-I dropped the patch which you NAK'ed from the series.
-
-As for your included patch, I will try it out  against the various
-regression tests I have, which exercise the oops and exception paths.
-
-> Please also ensure that the linux-arm-kernel list is copied with ARM
-> patches.
+> Awesome, thanks. The patch certainly fixed the problem on our board
+> (from memory I originally wrote this for our 2.6.20 kernel), but the
+> patch does seem valid even if the occurrence of the problem is rare. I
+> never bothered following up on it, because nobody else was reporting
+> problems.
 >
->   
+> If you could test and give me a Tested-by or Acked-by, then I'll rebase
+> and repost the patch.
 
-Check.
+Well, this patch works and solves the problem we have seen for now.
+So, that is the good news.
+Looking deeper into this patch we have some doubts if this is the best
+way to solve the problem, since it could be racy if interrupt handlers
+run in thread context as on preempt-rt. The code is fluttered with
+local_irq_disable/enable and the peripheral clock is sometimes
+enabled/disabled without any locking. So that should be replaced by a
+more decent locking mechanism. I will look into this soon.
 
+But anyway, it applies without any problem to 2.6.31 since the code
+has not been changed for ages...
 
-Thanks,
-Jason.
+Thus, for mainline only I do not see a functional problem with this
+patch, for preempt-rt the driver code in general might need some
+improvements.
+So, if you want to push it further upstream:
+Tested-by: Remy Bohmer <linux@bohmer.net>
+
+Kind regards,
+
+Remy
