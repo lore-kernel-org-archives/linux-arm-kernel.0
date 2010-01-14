@@ -1,29 +1,27 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 14 Jan 2010 11:24:10 +0100
-Subject: [PATCH 00/20] imx cleanup series
-In-Reply-To: <20100108161551.GA19007@pengutronix.de>
-References: <20091216185046.GA16984@pengutronix.de>
-	<20100108161551.GA19007@pengutronix.de>
-Message-ID: <20100114102410.GD23110@pengutronix.de>
+Date: Thu, 14 Jan 2010 11:24:40 +0100
+Subject: [PATCH 0/3] mx25: NAND support
+In-Reply-To: <cover.1263460321.git.baruch@tkos.co.il>
+References: <cover.1263460321.git.baruch@tkos.co.il>
+Message-ID: <20100114102440.GE23110@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 08, 2010 at 05:15:51PM +0100, Uwe Kleine-K?nig wrote:
-> Hi,
+On Thu, Jan 14, 2010 at 11:24:12AM +0200, Baruch Siach wrote:
+> This patch series add support for NAND chips on the i.MX25 platform, using the 
+> recently merged support for this platform in the mxc_nand driver.
 > 
-> I updated most patches based on feed-back here and further work.  Some
-> patches are completely new.
+> I tested this code on the i.MX25 PDK platform.
 > 
-> > The patch by Wolfgang Denk is included because otherwise it would
-> > conflict with the series.
-> I rebased onto Sascha's last pull request which included Wolfgang's
-> patch, so this isn't true any more.
-> 
-> As usual you can find diffstat and shortlog below.
+> Baruch Siach (3):
+>   mtd: mxc_nand: add MX25 to Kconfig
+>   mx25: add NAND support
+>   mx25pdk: add NAND device support
 
-Ok, added to mxc-master
+Ok, added to mxc-master.
 
 Sascha
+
 
 -- 
 Pengutronix e.K.                           |                             |
