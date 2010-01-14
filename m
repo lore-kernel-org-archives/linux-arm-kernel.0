@@ -1,249 +1,218 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 14 Jan 2010 12:29:28 +0100
-Subject: [PATCH 10/21] drivers: serial: add support for Samsung S5PC110 SoC
-	uart
+Date: Thu, 14 Jan 2010 12:29:25 +0100
+Subject: [PATCH 07/21] ARM: S5PC1XX: cleanup of s5pc1xx common code
 In-Reply-To: <1263468579-5732-1-git-send-email-m.szyprowski@samsung.com>
 References: <1263468579-5732-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1263468579-5732-11-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1263468579-5732-8-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kyungmin Park <kyungmin.park@samsung.com>
+This patch removes all useless definitions from plat/s5pc100.h and
+introduces new common plat/s5pc1xx.h include.
 
-Samsung S5PC110 SoCs have UART that differs a bit from the one known
-from the previous Samsung SoCs. This patch adds support for this new
-driver.
-
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/plat-s3c/include/plat/regs-serial.h |   31 ++++++
- drivers/serial/Kconfig                       |    7 ++
- drivers/serial/Makefile                      |    1 +
- drivers/serial/s5pc110.c                     |  143 ++++++++++++++++++++++++++
- 4 files changed, 182 insertions(+), 0 deletions(-)
- create mode 100644 drivers/serial/s5pc110.c
+ arch/arm/mach-s5pc100/cpu.c                     |    2 +-
+ arch/arm/mach-s5pc100/include/plat/regs-clock.h |    8 ++--
+ arch/arm/mach-s5pc100/mach-smdkc100.c           |    2 +-
+ arch/arm/mach-s5pc100/plls.c                    |    2 +-
+ arch/arm/mach-s5pc100/uarts.c                   |    5 +-
+ arch/arm/plat-s5pc1xx/cpu.c                     |    2 +-
+ arch/arm/plat-s5pc1xx/include/plat/s5pc100.h    |   51 ++++++-----------------
+ arch/arm/plat-s5pc1xx/include/plat/s5pc1xx.h    |   21 +++++++++
+ 8 files changed, 45 insertions(+), 48 deletions(-)
+ create mode 100644 arch/arm/plat-s5pc1xx/include/plat/s5pc1xx.h
 
-diff --git a/arch/arm/plat-s3c/include/plat/regs-serial.h b/arch/arm/plat-s3c/include/plat/regs-serial.h
-index 85d8904..f38b852 100644
---- a/arch/arm/plat-s3c/include/plat/regs-serial.h
-+++ b/arch/arm/plat-s3c/include/plat/regs-serial.h
-@@ -194,6 +194,37 @@
- #define S3C64XX_UINTSP		0x34
- #define S3C64XX_UINTM		0x38
+diff --git a/arch/arm/mach-s5pc100/cpu.c b/arch/arm/mach-s5pc100/cpu.c
+index 41fdecf..f383e33 100644
+--- a/arch/arm/mach-s5pc100/cpu.c
++++ b/arch/arm/mach-s5pc100/cpu.c
+@@ -41,7 +41,7 @@
+ #include <plat/clock.h>
+ #include <plat/sdhci.h>
+ #include <plat/iic-core.h>
+-#include <plat/s5pc100.h>
++#include <plat/s5pc1xx.h>
  
-+/* S5PC110 UCON */
-+#define S5PC110_UCON_CLKMASK	(1<<10)
-+#define S5PC110_UCON_PCLK	(0<<10)
-+#define S5PC110_UCON_SCLK_UART	(1<<10)
-+
-+/* S5PC110 FIFO trigger levels */
-+#define S5PC110_UFCON_RXTRIG1	(0<<4)
-+#define S5PC110_UFCON_RXTRIG4	(1<<4)
-+#define S5PC110_UFCON_RXTRIG8	(2<<4)
-+#define S5PC110_UFCON_RXTRIG16	(3<<4)
-+#define S5PC110_UFCON_RXTRIG32	(4<<4)
-+#define S5PC110_UFCON_RXTRIG64	(5<<4)
-+#define S5PC110_UFCON_RXTRIG128	(6<<4)
-+#define S5PC110_UFCON_RXTRIG256	(7<<4)
-+
-+#define S5PC110_UFCON_TXTRIG1	(0<<8)
-+#define S5PC110_UFCON_TXTRIG4	(1<<8)
-+#define S5PC110_UFCON_TXTRIG8	(2<<8)
-+#define S5PC110_UFCON_TXTRIG16	(3<<8)
-+#define S5PC110_UFCON_TXTRIG32	(4<<8)
-+#define S5PC110_UFCON_TXTRIG64	(5<<8)
-+#define S5PC110_UFCON_TXTRIG128	(6<<8)
-+#define S5PC110_UFCON_TXTRIG256	(7<<8)
-+
-+#define S5PC110_UFSTAT_TXFULL	(1<<24)
-+#define S5PC110_UFSTAT_RXFULL	(1<<8)
-+#define S5PC110_UFSTAT_TXSHIFT	(16)
-+#define S5PC110_UFSTAT_RXSHIFT	(0)
-+#define S5PC110_UFSTAT_TXMASK	(255<<16)
-+#define S5PC110_UFSTAT_RXMASK	(255)
-+
- #ifndef __ASSEMBLY__
+ /* Initial IO mappings */
  
- /* struct s3c24xx_uart_clksrc
-diff --git a/drivers/serial/Kconfig b/drivers/serial/Kconfig
-index b8158a5..228f25f 100644
---- a/drivers/serial/Kconfig
-+++ b/drivers/serial/Kconfig
-@@ -533,6 +533,13 @@ config SERIAL_S3C6400
- 	  Serial port support for the Samsung S3C6400, S3C6410 and
- 	  S5PC100 SoCs
+diff --git a/arch/arm/mach-s5pc100/include/plat/regs-clock.h b/arch/arm/mach-s5pc100/include/plat/regs-clock.h
+index fc6ec1b..03ecc0c 100644
+--- a/arch/arm/mach-s5pc100/include/plat/regs-clock.h
++++ b/arch/arm/mach-s5pc100/include/plat/regs-clock.h
+@@ -234,10 +234,10 @@
+ #define S5PC100_HDMI_PHY_CON0	S5PC100_CLKREG_OTHER(0x420)
  
-+config SERIAL_S5PC110
-+	tristate "Samsung S5PC110 Serial port support"
-+	depends on SERIAL_SAMSUNG && CPU_S5PC110
-+	default y
-+	help
-+	  Serial port support for the Samsung S5PC110 SoCs
+ #define S5PC100_SWRESET_RESETVAL	0xc100
+-#define S5PC100_OTHER_SYS_INT	24
+-#define S5PC100_OTHER_STA_TYPE	23
+-#define STA_TYPE_EXPON		0
+-#define STA_TYPE_SFR		1
++#define S5PC100_OTHERS_PMU_INT_DISALBE		(1 << 24)
++#define S5PC100_OTHERS_STABLE_COUNTER_TYPE_MASK	(1 << 23)
++#define S5PC100_OTHERS_STABLE_COUNTER_TYPE_SFR	(1 << 23)
++#define S5PC100_OTHERS_STABLE_COUNTER_TYPE_EXP	(0 << 23)
+ 
+ #define S5PC100_SLEEP_CFG_OSC_EN	0
+ 
+diff --git a/arch/arm/mach-s5pc100/mach-smdkc100.c b/arch/arm/mach-s5pc100/mach-smdkc100.c
+index ae3c52c..29b95f1 100644
+--- a/arch/arm/mach-s5pc100/mach-smdkc100.c
++++ b/arch/arm/mach-s5pc100/mach-smdkc100.c
+@@ -40,7 +40,7 @@
+ #include <plat/clock.h>
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
+-#include <plat/s5pc100.h>
++#include <plat/s5pc1xx.h>
+ #include <plat/fb.h>
+ #include <plat/iic.h>
+ 
+diff --git a/arch/arm/mach-s5pc100/plls.c b/arch/arm/mach-s5pc100/plls.c
+index 49c51a0..32fb0ca 100644
+--- a/arch/arm/mach-s5pc100/plls.c
++++ b/arch/arm/mach-s5pc100/plls.c
+@@ -33,7 +33,7 @@
+ #include <plat/cpu.h>
+ #include <plat/pll.h>
+ #include <plat/devs.h>
+-#include <plat/s5pc100.h>
++#include <plat/s5pc1xx.h>
+ 
+ /* fin_apll, fin_mpll and fin_epll are all the same clock, which we call
+  * ext_xtal_mux for want of an actual name from the manual.
+diff --git a/arch/arm/mach-s5pc100/uarts.c b/arch/arm/mach-s5pc100/uarts.c
+index 32972f2..6bab6d2 100644
+--- a/arch/arm/mach-s5pc100/uarts.c
++++ b/arch/arm/mach-s5pc100/uarts.c
+@@ -13,14 +13,15 @@
+ #include <linux/kernel.h>
+ #include <linux/types.h>
+ #include <linux/init.h>
++#include <linux/clk.h>
+ 
+ #include <plat/cpu.h>
+ #include <plat/devs.h>
+-#include <plat/s5pc100.h>
++#include <plat/s5pc1xx.h>
+ 
+ /* uart registration process */
+ 
+-void __init s5pc100_common_init_uarts(struct s3c2410_uartcfg *cfg, int no)
++void __init s5pc100_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+ {
+ 	/* The driver name is s3c6400-uart to reuse s3c6400_serial_drv  */
+ 	s3c24xx_init_uartdevs("s3c6400-uart", s5pc1xx_uart_resources, cfg, no);
+diff --git a/arch/arm/plat-s5pc1xx/cpu.c b/arch/arm/plat-s5pc1xx/cpu.c
+index ecd6d38..d30998d 100644
+--- a/arch/arm/plat-s5pc1xx/cpu.c
++++ b/arch/arm/plat-s5pc1xx/cpu.c
+@@ -31,7 +31,7 @@
+ #include <plat/devs.h>
+ #include <plat/clock.h>
+ 
+-#include <plat/s5pc100.h>
++#include <plat/s5pc1xx.h>
+ 
+ /* table of supported CPUs */
+ 
+diff --git a/arch/arm/plat-s5pc1xx/include/plat/s5pc100.h b/arch/arm/plat-s5pc1xx/include/plat/s5pc100.h
+index 2531f34..32eb6e7 100644
+--- a/arch/arm/plat-s5pc1xx/include/plat/s5pc100.h
++++ b/arch/arm/plat-s5pc1xx/include/plat/s5pc100.h
+@@ -13,52 +13,27 @@
+ */
+ 
+ /* Common init code for S5PC100 related SoCs */
 +
- config SERIAL_MAX3100
- 	tristate "MAX3100 support"
- 	depends on SPI
-diff --git a/drivers/serial/Makefile b/drivers/serial/Makefile
-index ce8c17f..02328c5 100644
---- a/drivers/serial/Makefile
-+++ b/drivers/serial/Makefile
-@@ -44,6 +44,7 @@ obj-$(CONFIG_SERIAL_S3C2412) += s3c2412.o
- obj-$(CONFIG_SERIAL_S3C2440) += s3c2440.o
- obj-$(CONFIG_SERIAL_S3C24A0) += s3c24a0.o
- obj-$(CONFIG_SERIAL_S3C6400) += s3c6400.o
-+obj-$(CONFIG_SERIAL_S5PC110) += s5pc110.o
- obj-$(CONFIG_SERIAL_MAX3100) += max3100.o
- obj-$(CONFIG_SERIAL_IP22_ZILOG) += ip22zilog.o
- obj-$(CONFIG_SERIAL_MUX) += mux.o
-diff --git a/drivers/serial/s5pc110.c b/drivers/serial/s5pc110.c
++#ifdef CONFIG_CPU_S5PC100
++
+ extern  int s5pc100_init(void);
+ extern void s5pc100_map_io(void);
+ extern void s5pc100_init_clocks(int xtal);
+ extern  int s5pc100_register_baseclocks(unsigned long xtal);
+ extern void s5pc100_init_irq(void);
+ extern void s5pc100_init_io(struct map_desc *mach_desc, int size);
+-extern void s5pc100_common_init_uarts(struct s3c2410_uartcfg *cfg, int no);
++extern void s5pc100_init_uarts(struct s3c2410_uartcfg *cfg, int no);
+ extern void s5pc100_register_clocks(void);
+ extern void s5pc100_setup_clocks(void);
+-extern struct sysdev_class s5pc100_sysclass;
+-
+-#define s5pc100_init_uarts s5pc100_common_init_uarts
+-
+-/* Some day, belows will be moved to plat-s5pc/include/plat/cpu.h */
+-extern void s5pc1xx_init_irq(u32 *vic_valid, int num);
+-extern void s5pc1xx_init_io(struct map_desc *mach_desc, int size);
+-
+-/* Some day, belows will be moved to plat-s5pc/include/plat/clock.h */
+-extern struct clk clk_hpll;
+-extern struct clk clk_hd0;
+-extern struct clk clk_pd0;
++extern  int s5pc100_sclk0_ctrl(struct clk *clk, int enable);
++extern  int s5pc100_sclk1_ctrl(struct clk *clk, int enable);
+ extern struct clk clk_54m;
+-extern void s5pc1xx_register_clocks(void);
+-extern int s5pc100_sclk0_ctrl(struct clk *clk, int enable);
+-extern int s5pc100_sclk1_ctrl(struct clk *clk, int enable);
+ 
+-/* Some day, belows will be moved to plat-s5pc/include/plat/devs.h */
+-extern struct s3c24xx_uart_resources s5pc1xx_uart_resources[];
+-extern struct platform_device s3c_device_g2d;
+-extern struct platform_device s3c_device_g3d;
+-extern struct platform_device s3c_device_vpp;
+-extern struct platform_device s3c_device_tvenc;
+-extern struct platform_device s3c_device_tvscaler;
+-extern struct platform_device s3c_device_rotator;
+-extern struct platform_device s3c_device_jpeg;
+-extern struct platform_device s3c_device_onenand;
+-extern struct platform_device s3c_device_usb_otghcd;
+-extern struct platform_device s3c_device_keypad;
+-extern struct platform_device s3c_device_ts;
+-extern struct platform_device s3c_device_g3d;
+-extern struct platform_device s3c_device_smc911x;
+-extern struct platform_device s3c_device_fimc0;
+-extern struct platform_device s3c_device_fimc1;
+-extern struct platform_device s3c_device_mfc;
+-extern struct platform_device s3c_device_ac97;
+-extern struct platform_device s3c_device_fimc0;
+-extern struct platform_device s3c_device_fimc1;
+-extern struct platform_device s3c_device_fimc2;
++#else
++
++#define s5pc100_map_io NULL
++#define s5pc100_init_clocks NULL
++#define s5pc100_init_uarts NULL
++#define s5pc100_init NULL
+ 
++#endif
+diff --git a/arch/arm/plat-s5pc1xx/include/plat/s5pc1xx.h b/arch/arm/plat-s5pc1xx/include/plat/s5pc1xx.h
 new file mode 100644
-index 0000000..1e1e229
+index 0000000..398251f
 --- /dev/null
-+++ b/drivers/serial/s5pc110.c
-@@ -0,0 +1,143 @@
-+/*
-+ * linux/drivers/serial/s5pc110.c
++++ b/arch/arm/plat-s5pc1xx/include/plat/s5pc1xx.h
+@@ -0,0 +1,21 @@
++/* arch/arm/plat-s5pc1xx/include/plat/s5pc100.h
 + *
-+ * Driver for Samsung S5PC110 SoC onboard UARTs.
++ * Copyright 2009 Samsung Electronics Co.
++ *	Marek Szyprowski <m.szyprowski@samsung.com>
 + *
-+ *  Copyright 2009 Samsung Electronics
-+ *  Kyungin Park <kyungmin.park@samsung.com>
++ * Header file for s5pc1xx cpu support
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
-+ */
++*/
 +
-+#include <linux/module.h>
-+#include <linux/ioport.h>
-+#include <linux/io.h>
-+#include <linux/platform_device.h>
-+#include <linux/init.h>
-+#include <linux/serial_core.h>
-+#include <linux/serial.h>
++/* Common init code for S5PC1XX related SoCs */
 +
-+#include <asm/irq.h>
-+#include <mach/hardware.h>
++extern void s5pc1xx_init_irq(u32 *vic_valid, int num);
++extern void s5pc1xx_init_io(struct map_desc *mach_desc, int size);
++extern void s5pc1xx_register_clocks(void);
 +
-+#include <plat/regs-serial.h>
++extern struct s3c24xx_uart_resources s5pc1xx_uart_resources[];
 +
-+#include "samsung.h"
-+
-+static int s5pc110_serial_setsource(struct uart_port *port,
-+				    struct s3c24xx_uart_clksrc *clk)
-+{
-+	unsigned long ucon = rd_regl(port, S3C2410_UCON);
-+
-+	if (strcmp(clk->name, "uclk0") == 0)
-+		ucon |= S5PC110_UCON_SCLK_UART;
-+	else if (strcmp(clk->name, "pclk") == 0)
-+		/* See notes about transitioning from UCLK to PCLK */
-+		ucon &= ~S5PC110_UCON_SCLK_UART;
-+	else {
-+		printk(KERN_ERR "unknown clock source %s\n", clk->name);
-+		return -EINVAL;
-+	}
-+
-+	wr_regl(port, S3C2410_UCON, ucon);
-+	return 0;
-+}
-+
-+static int s5pc110_serial_getsource(struct uart_port *port,
-+				    struct s3c24xx_uart_clksrc *clk)
-+{
-+	u32 ucon = rd_regl(port, S3C2410_UCON);
-+
-+	clk->divisor = 1;
-+
-+	switch (ucon & S5PC110_UCON_CLKMASK) {
-+	case S5PC110_UCON_SCLK_UART:
-+		clk->name = "uclk0";
-+		break;
-+
-+	case S5PC110_UCON_PCLK:
-+		clk->name = "pclk";
-+		break;
-+	}
-+
-+	return 0;
-+}
-+
-+static int s5pc110_serial_resetport(struct uart_port *port,
-+				    struct s3c2410_uartcfg *cfg)
-+{
-+	unsigned long ucon = rd_regl(port, S3C2410_UCON);
-+
-+	dbg("s5pc110_serial_resetport: port=%p (%08lx), cfg=%p\n",
-+	    port, port->mapbase, cfg);
-+
-+	/* ensure we don't change the clock settings... */
-+
-+	ucon &= S5PC110_UCON_CLKMASK;
-+
-+	wr_regl(port, S3C2410_UCON,  ucon | cfg->ucon);
-+	wr_regl(port, S3C2410_ULCON, cfg->ulcon);
-+
-+	/* reset both fifos */
-+
-+	wr_regl(port, S3C2410_UFCON, cfg->ufcon | S3C2410_UFCON_RESETBOTH);
-+	wr_regl(port, S3C2410_UFCON, cfg->ufcon);
-+
-+	return 0;
-+}
-+
-+static struct s3c24xx_uart_info s5pc110_uart_inf = {
-+	.name		= "Samsung S5PC110 UART",
-+	.type		= PORT_S3C6400,
-+	.fifosize	= 16,
-+	.has_divslot	= 1,
-+	.rx_fifomask	= S5PC110_UFSTAT_RXMASK,
-+	.rx_fifoshift	= S5PC110_UFSTAT_RXSHIFT,
-+	.rx_fifofull	= S5PC110_UFSTAT_RXFULL,
-+	.tx_fifofull	= S5PC110_UFSTAT_TXFULL,
-+	.tx_fifomask	= S5PC110_UFSTAT_TXMASK,
-+	.tx_fifoshift	= S5PC110_UFSTAT_TXSHIFT,
-+	.get_clksrc	= s5pc110_serial_getsource,
-+	.set_clksrc	= s5pc110_serial_setsource,
-+	.reset_port	= s5pc110_serial_resetport,
-+};
-+
-+/* device management */
-+
-+static int s5pc110_serial_probe(struct platform_device *dev)
-+{
-+	dbg("s5pc110_serial_probe: dev=%p\n", dev);
-+
-+	return s3c24xx_serial_probe(dev, &s5pc110_uart_inf);
-+}
-+
-+static struct platform_driver s5pc110_serial_driver = {
-+	.probe		= s5pc110_serial_probe,
-+	.remove		= __devexit_p(s3c24xx_serial_remove),
-+	.driver		= {
-+		.name	= "s5pc110-uart",
-+		.owner	= THIS_MODULE,
-+	},
-+};
-+
-+s3c24xx_console_init(&s5pc110_serial_driver, &s5pc110_uart_inf);
-+
-+static int __init s5pc110_serial_init(void)
-+{
-+	return s3c24xx_serial_init(&s5pc110_serial_driver, &s5pc110_uart_inf);
-+}
-+
-+static void __exit s5pc110_serial_exit(void)
-+{
-+	platform_driver_unregister(&s5pc110_serial_driver);
-+}
-+
-+module_init(s5pc110_serial_init);
-+module_exit(s5pc110_serial_exit);
-+
-+MODULE_DESCRIPTION("Samsung S5PC110 SoC Serial port driver");
-+MODULE_AUTHOR("Kyungmin Park <kyungmin.park@samsung.com>");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:s5pc110-uart");
++#include <plat/s5pc100.h>
 -- 
 1.6.4
