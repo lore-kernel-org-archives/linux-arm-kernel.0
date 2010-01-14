@@ -1,45 +1,50 @@
 From: jamie.iles@picochip.com (Jamie Iles)
-Date: Thu, 14 Jan 2010 12:14:11 +0000
-Subject: ARM perf events support v5
-Message-ID: <1263471256-3739-1-git-send-email-jamie.iles@picochip.com>
+Date: Thu, 14 Jan 2010 12:14:14 +0000
+Subject: [PATCH 3/5] arm: use the spinlocked, generic atomic64 support
+In-Reply-To: <1263471256-3739-3-git-send-email-jamie.iles@picochip.com>
+References: <1263471256-3739-1-git-send-email-jamie.iles@picochip.com>
+	<1263471256-3739-2-git-send-email-jamie.iles@picochip.com>
+	<1263471256-3739-3-git-send-email-jamie.iles@picochip.com>
+Message-ID: <1263471256-3739-4-git-send-email-jamie.iles@picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here is the 5th revision of the ARM performance events support. This initially
-targets software events on all platforms and hardware events on v6 platforms
-with hooks for later platforms to be added later.
+perf events require that we can support atomic64's. There is a generic,
+spinlocked version that we can use until we have proper hardware
+support.
 
-Changes since the previous revison are:
-	- compile fixes for systems without a pmu.
-	- remove mutex from pmu.c and replace with bitset based lock
-	- removal of BUG()'s and replace with warnings
+Signed-off-by: Jamie Iles <jamie.iles@picochip.com>
+---
+ arch/arm/Kconfig              |    1 +
+ arch/arm/include/asm/atomic.h |    4 ++++
+ 2 files changed, 5 insertions(+), 0 deletions(-)
 
-Also required are:
-	ARM: 5866/1: arm ptrace: use unsigned types for kernel pt_regs
-	sched/perf: Make sure irqs are disabled for perf_event_task_sched_in()
-
-Both of these can be found in tip/master.
-
-Jamie Iles (5):
-      arm: provide a mechanism to reserve performance counters
-      arm/oprofile: reserve the PMU when starting
-      arm: use the spinlocked, generic atomic64 support
-      arm: enable support for software perf events
-      arm/perfevents: implement perf event support for ARMv6
-
- arch/arm/Kconfig                        |   16 +
- arch/arm/include/asm/atomic.h           |    4 +
- arch/arm/include/asm/perf_event.h       |   31 +
- arch/arm/include/asm/pmu.h              |   75 ++
- arch/arm/kernel/Makefile                |    2 +
- arch/arm/kernel/perf_event.c            | 1342 +++++++++++++++++++++++++++++++
- arch/arm/kernel/pmu.c                   |  105 +++
- arch/arm/mm/fault.c                     |    7 +
- arch/arm/oprofile/op_model_arm11_core.c |    4 +-
- arch/arm/oprofile/op_model_arm11_core.h |    4 +-
- arch/arm/oprofile/op_model_mpcore.c     |   42 +-
- arch/arm/oprofile/op_model_v6.c         |   30 +-
- arch/arm/oprofile/op_model_v7.c         |   30 +-
- arch/arm/oprofile/op_model_v7.h         |    4 +-
- arch/arm/oprofile/op_model_xscale.c     |   35 +-
- 15 files changed, 1667 insertions(+), 64 deletions(-)
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 31d52ed..293a879 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -20,6 +20,7 @@ config ARM
+ 	select HAVE_GENERIC_DMA_COHERENT
+ 	select HAVE_KERNEL_GZIP
+ 	select HAVE_KERNEL_LZO
++	select GENERIC_ATOMIC64
+ 	help
+ 	  The ARM series is a line of low-power-consumption RISC chip designs
+ 	  licensed by ARM Ltd and targeted at embedded applications and
+diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
+index d0daeab..ff286a8 100644
+--- a/arch/arm/include/asm/atomic.h
++++ b/arch/arm/include/asm/atomic.h
+@@ -15,6 +15,10 @@
+ #include <linux/types.h>
+ #include <asm/system.h>
+ 
++#ifdef CONFIG_GENERIC_ATOMIC64
++#include <asm-generic/atomic64.h>
++#endif
++
+ #define ATOMIC_INIT(i)	{ (i) }
+ 
+ #ifdef __KERNEL__
+-- 
+1.6.5.4
