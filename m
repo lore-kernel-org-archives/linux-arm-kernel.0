@@ -1,24 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Jan 2010 09:15:56 +0000
-Subject: [PATCH] ARM: Fix uncompress code compile for different
-	definesof static(void)
-In-Reply-To: <20100114082952.GA657@pengutronix.de>
-References: <20100113021939.GE2986@atomide.com>
-	<20100113084937.GA19352@pengutronix.de>
-	<BD79186B4FD85F4B8E60E381CAEE190902089C39@mi8nycmail19.Mi8.com>
-	<20100114082952.GA657@pengutronix.de>
-Message-ID: <20100114091556.GB19197@n2100.arm.linux.org.uk>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 14 Jan 2010 11:24:12 +0200
+Subject: [PATCH 0/3] mx25: NAND support
+Message-ID: <cover.1263460321.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2010 at 09:29:52AM +0100, Uwe Kleine-K?nig wrote:
-> I think the cleanest solution would be to remove -Dstatic=.  I don't
-> know the exact reason for it being there.
+This patch series add support for NAND chips on the i.MX25 platform, using the 
+recently merged support for this platform in the mxc_nand driver.
 
-Thereby breaking the ability to build a relocatable decompressor.
+I tested this code on the i.MX25 PDK platform.
 
-> Russell, maybe these toolchain problems are gone in the meantime?
+Baruch Siach (3):
+  mtd: mxc_nand: add MX25 to Kconfig
+  mx25: add NAND support
+  mx25pdk: add NAND device support
 
-I don't think it was toolchain problems.  Having the text and data
-segments independently relocatable is actually an abuse of the ELF
-format - it's not something it directly supports.
+ arch/arm/mach-mx25/devices.c          |   20 ++++++++++++++++++++
+ arch/arm/mach-mx25/devices.h          |    1 +
+ arch/arm/mach-mx25/mx25pdk.c          |    7 +++++++
+ arch/arm/plat-mxc/include/mach/mx25.h |    2 ++
+ drivers/mtd/nand/Kconfig              |    2 +-
+ 5 files changed, 31 insertions(+), 1 deletions(-)
