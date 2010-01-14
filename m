@@ -1,136 +1,29 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Jan 2010 17:48:21 +0000
-Subject: [PATCH 20/40] arm,kgdb: Add hook to catch an oops with debugger
-In-Reply-To: <1263481176-1897-21-git-send-email-jason.wessel@windriver.com>
-References: <1263481176-1897-1-git-send-email-jason.wessel@windriver.com>
-	<1263481176-1897-21-git-send-email-jason.wessel@windriver.com>
-Message-ID: <20100114174821.GB21385@n2100.arm.linux.org.uk>
+Date: Thu, 14 Jan 2010 17:48:52 +0000
+Subject: [PATCH] armv6: invalidate cache
+	onDMA_FROM_DEVICE/DMA_BIDIRECTIONAL
+In-Reply-To: <1263491271.3964.82.camel@pc1117.cambridge.arm.com>
+References: <13B9B4C6EF24D648824FF11BE896716203A85EB687@dlee02.ent.ti.com>
+	<1263491271.3964.82.camel@pc1117.cambridge.arm.com>
+Message-ID: <20100114174852.GC21385@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2010 at 08:59:16AM -0600, Jason Wessel wrote:
-> Add in a low level hook to catch calls to die() in the debugger.
+On Thu, Jan 14, 2010 at 05:47:51PM +0000, Catalin Marinas wrote:
+> On Fri, 2010-01-08 at 23:06 +0000, Woodruff, Richard wrote:
+> > 
+> > > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-
+> > > bounces at lists.infradead.org] On Behalf Of Russell King - ARM Linux
+> > > Sent: Monday, December 21, 2009 6:45 AM
+> > 
+> > > I was thinking about doing this for ARMv6, but I thought the concensus
+> > > was that ARMv6 didn't have speculative prefetching.
+> > 
+> > If you bolt on a unified L2 cache won't normal branch prediction
+> > result in some possible erroneous data in L2 cache range (assume mmu
+> > execution flag is set I suppose)?
 > 
-> After the debugger is done, the standard system rules will be in play
-> for the original exception.
-> 
-> The kdb debugger wants a chance to catch these sorts of exceptions for
-> analysis.
+> I think that's possible, in which case we should treat ARMv6 in a
+> similar way to ARMv7, in case we have an external L2 cache.
 
-NAK.  I have a similar patch which implements the hook properly - but
-with one caveat.  It needs a review to ensure that its safe to return
-from die().  Until that's established, this patch can not be merged.
-
-Please also ensure that the linux-arm-kernel list is copied with ARM
-patches.
-
-diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-index d65b2f5..5b66e51 100644
---- a/arch/arm/include/asm/system.h
-+++ b/arch/arm/include/asm/system.h
-@@ -73,8 +73,7 @@ extern unsigned int mem_fclk_21285;
- 
- struct pt_regs;
- 
--void die(const char *msg, struct pt_regs *regs, int err)
--		__attribute__((noreturn));
-+void die(const char *msg, struct pt_regs *regs, int err);
- 
- struct siginfo;
- void arm_notify_die(const char *str, struct pt_regs *regs, struct siginfo *info,
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index f838f36..29a0f4a 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -12,15 +12,17 @@
-  *  'linux/arch/arm/lib/traps.S'.  Mostly a debugging aid, but will probably
-  *  kill the offending process.
-  */
--#include <linux/module.h>
- #include <linux/signal.h>
--#include <linux/spinlock.h>
- #include <linux/personality.h>
- #include <linux/kallsyms.h>
--#include <linux/delay.h>
-+#include <linux/spinlock.h>
-+#include <linux/uaccess.h>
- #include <linux/hardirq.h>
-+#include <linux/kdebug.h>
-+#include <linux/module.h>
-+#include <linux/kexec.h>
-+#include <linux/delay.h>
- #include <linux/init.h>
--#include <linux/uaccess.h>
- 
- #include <asm/atomic.h>
- #include <asm/cacheflush.h>
-@@ -224,14 +226,21 @@ void show_stack(struct task_struct *tsk, unsigned long *sp)
- #define S_SMP ""
- #endif
- 
--static void __die(const char *str, int err, struct thread_info *thread, struct pt_regs *regs)
-+static int __die(const char *str, int err, struct thread_info *thread, struct pt_regs *regs)
- {
- 	struct task_struct *tsk = thread->task;
- 	static int die_counter;
-+	int ret;
- 
- 	printk(KERN_EMERG "Internal error: %s: %x [#%d]" S_PREEMPT S_SMP "\n",
- 	       str, err, ++die_counter);
- 	sysfs_printk_last_file();
-+
-+	/* trap and error numbers are mostly meaningless on ARM */
-+	ret = notify_die(DIE_OOPS, str, regs, err, tsk->thread.trap_no, SIGSEGV);
-+	if (ret == NOTIFY_STOP)
-+		return ret;
-+
- 	print_modules();
- 	__show_regs(regs);
- 	printk(KERN_EMERG "Process %.*s (pid: %d, stack limit = 0x%p)\n",
-@@ -243,6 +252,8 @@ static void __die(const char *str, int err, struct thread_info *thread, struct p
- 		dump_backtrace(regs, tsk);
- 		dump_instr(KERN_EMERG, regs);
- 	}
-+
-+	return ret;
- }
- 
- DEFINE_SPINLOCK(die_lock);
-@@ -250,16 +261,21 @@ DEFINE_SPINLOCK(die_lock);
- /*
-  * This function is protected against re-entrancy.
-  */
--NORET_TYPE void die(const char *str, struct pt_regs *regs, int err)
-+void die(const char *str, struct pt_regs *regs, int err)
- {
- 	struct thread_info *thread = current_thread_info();
-+	int ret;
- 
- 	oops_enter();
- 
- 	spin_lock_irq(&die_lock);
- 	console_verbose();
- 	bust_spinlocks(1);
--	__die(str, err, thread, regs);
-+	ret = __die(str, err, thread, regs);
-+
-+	if (regs && kexec_should_crash(thread->task))
-+		crash_kexec(regs);
-+
- 	bust_spinlocks(0);
- 	add_taint(TAINT_DIE);
- 	spin_unlock_irq(&die_lock);
-@@ -267,11 +283,10 @@ NORET_TYPE void die(const char *str, struct pt_regs *regs, int err)
- 
- 	if (in_interrupt())
- 		panic("Fatal exception in interrupt");
--
- 	if (panic_on_oops)
- 		panic("Fatal exception");
--
--	do_exit(SIGSEGV);
-+	if (ret != NOTIFY_STOP)
-+		do_exit(SIGSEGV);
- }
- 
- void arm_notify_die(const char *str, struct pt_regs *regs,
+My patches already do.
