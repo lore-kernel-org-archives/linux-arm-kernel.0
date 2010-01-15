@@ -1,49 +1,44 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Fri, 15 Jan 2010 23:14:30 +0100
-Subject: [suspend/resume] Re: userspace notification from module
-In-Reply-To: <20100115200310.GG1345@ucw.cz>
-References: <686edb2c.6263643a.4b3f4a3b.b60b3@o2.pl>
-	<201001091440.46434.rjw@sisk.pl> <20100115200310.GG1345@ucw.cz>
-Message-ID: <201001152314.30355.rjw@sisk.pl>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 Jan 2010 22:53:51 +0000
+Subject: [PATCH 0/5] Adding x86-like memory map printks to ARM.
+In-Reply-To: <1263465370-4192-1-git-send-email-andreas.fenkart@streamunlimited.com>
+References: <20090810213905.GA4046@n2100.arm.linux.org.uk>
+	<1263465370-4192-1-git-send-email-andreas.fenkart@streamunlimited.com>
+Message-ID: <20100115225351.GB28222@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 January 2010, Pavel Machek wrote:
-> On Sat 2010-01-09 14:40:46, Rafael J. Wysocki wrote:
-> > On Saturday 09 January 2010, Pavel Machek wrote:
+On Thu, Jan 14, 2010 at 11:36:05AM +0100, Andreas Fenkart wrote:
+> This version has the following changes:
 > 
-> > > > Perhaps I don't understand correctly what you're trying to achieve, but at the
-> > > > moment suspend is always started from user space, this way or another, and on
-> > > 
-> > > At least zaurus (arm) suspends from kernel on battery critical.
-> > 
-> > I wasn't aware of this.
-> > 
-> > That may be a good reason for adding kernel-based suspend notification,
-> > although I'd prefer ARM to notify the user space about the critical battery
-> > status allowing it to decide what to do.
+> * Reworked UL() macro usage, as suggested
 > 
-> Hard to do, without breaking compatibility that goes down to 2.4.X.
-
-Sending a battery-critical notification to the user space is not equivalent to
-removing the existing kernel-based mechanism.  They can exist both at the
-same time if the notification is sent earlier than the kernel suspends
-everything. 
-
-> > IMhO automatic suspend without something like the Android's wakelocks hurts
-> > more than it helps.
+> * Appended 'UL' to VMALLOC_END define of new machines:
+> mach-dove
+> mach-u300
+> mach-ux500
 > 
-> It really makes sense on zaurus. Those machines are simple, no
-> smartbattery and no embedded controller subsystems. Battery will not
-> protect itself, and its kernel job. (Should work on init=/bin/bash).
+> * Patch 'Make totalhigh_pages unsigned long' has been submitted separately
 > 
-> As power-off consumption is same as suspend power consumption (I
-> beleive zaurus simply does not have true power off), suspend on
-> critical makes some sense. (Note that it is set lower than on pcs, and
-> that we declare battery critical sooner than that.)
+> * Removed superfluous (VMALLOC_START < VMALLOC_END) boundary check
+> 
 
-The problem with that is it catches at least some applications unprepared and
-notifying them that "we're suspending right now" doesn't really help, because
-they won't have any time to react anyway.
+What I get from the Integrator/CP platform is this:
 
-Rafael
+virtual kernel memory layout:                                                   
+    vector  : 0xffff0000 - 0xffff1000   (   4 kB)                               
+    fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)                               
+    DMA     : 0xffc00000 - 0xffe00000   (   2 MB)                               
+    vmalloc : 0xc8800000 - 0xd0000000   ( 120 MB)                               
+    lowmem  : 0x00001000 - 0xc8000000   (3199 MB)                               
+    pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)                               
+    modules : 0xbf000000 - 0xbfe00000   (  14 MB)                               
+      .init : 0xc0008000 - 0xc0024000   ( 112 kB)                               
+      .text : 0xc0024000 - 0xc0325000   (3076 kB)                               
+      .data : 0xc0326000 - 0xc033f360   ( 101 kB)                               
+
+which looks fine, except for the 'lowmem' entry - the start of it should
+be PAGE_OFFSET, not PAGE_SIZE.  Apart from that, seems fine.
+
+If you can correct that bug, and no one else has any objections, it can
+go into the patch system.  Thanks.
