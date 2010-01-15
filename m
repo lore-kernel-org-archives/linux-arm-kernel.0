@@ -1,20 +1,38 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 15 Jan 2010 09:03:39 +0000
-Subject: Pull request for bjdooks' next-samsung tree
-In-Reply-To: <20100115081602.GA14598@trinity.fluff.org>
-References: <20100115081602.GA14598@trinity.fluff.org>
-Message-ID: <20100115090339.GD3738@trinity.fluff.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 15 Jan 2010 02:06:52 -0700
+Subject: [PATCH 01/18] OMAP3 clock: move OMAP3-specific DPLL functions to
+	dpll3xxx.c
+In-Reply-To: <20100115090613.30690.49355.stgit@localhost.localdomain>
+References: <20100115090613.30690.49355.stgit@localhost.localdomain>
+Message-ID: <20100115090650.30690.52329.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Can we hold off on this, found a build error on s3c24xx.
+Mark the OMAP3-specific DPLL functions as being OMAP3-specific by moving
+them from mach-omap2/dpll.c to mach-omap2/dpll3xxx.c.
 
-Kukjin: please remove __init from the front of s5p_init_io definition
-in arch/arm/plat-s3c/include/plat/cpu.h and re-submit the relevant
-patch.
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/Makefile   |    2 +-
+ arch/arm/mach-omap2/dpll3xxx.c |    0 
+ 2 files changed, 1 insertions(+), 1 deletions(-)
+ rename arch/arm/mach-omap2/{dpll.c => dpll3xxx.c} (100%)
 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 64de2fd..7d46fde 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -6,7 +6,7 @@
+ obj-y := id.o io.o control.o mux.o devices.o serial.o gpmc.o timer-gp.o
+ 
+ omap-2-3-common				= irq.o sdrc.o omap_hwmod.o
+-omap-3-4-common				= dpll.o
++omap-3-4-common				= dpll3xxx.o
+ prcm-common				= prcm.o powerdomain.o
+ clock-common				= clock.o clock_common_data.o clockdomain.o
+ 
+diff --git a/arch/arm/mach-omap2/dpll.c b/arch/arm/mach-omap2/dpll3xxx.c
+similarity index 100%
+rename from arch/arm/mach-omap2/dpll.c
+rename to arch/arm/mach-omap2/dpll3xxx.c
