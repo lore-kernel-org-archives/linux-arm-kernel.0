@@ -1,76 +1,29 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 15 Jan 2010 10:11:05 -0700 (MST)
-Subject: [PATCH] OMAP: hwmod: add read/write API for SYSCONFIG - for 2.6.34
-Message-ID: <alpine.DEB.2.00.1001151009280.9529@utopia.booyaka.com>
+From: valentin.longchamp@epfl.ch (Valentin Longchamp)
+Date: Fri, 15 Jan 2010 18:32:11 +0100
+Subject: [PATCH] otg Kconfig: add missing select USB_OTG_UTILS to USB_ULPI
+	option
+Message-ID: <1263576731-26075-1-git-send-email-valentin.longchamp@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Fixes a link error for mx3 platforms with ULPI host devices enabled. Should go for rc5 since it completes http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=f9ffaa9ca9889f17ef30b82bc0bf954d141280f8 that was introduced in rc4.
 
-Hi,
-
-this patch is currently queued for 2.6.34, but is being posted here in 
-case anyone has any further comments.
-
-
-- Paul
-
-
-From: Kevin Hilman <khilman@deeprootsystems.com>
-Date: Mon, 23 Nov 2009 09:41:54 -0800
-Subject: [PATCH 2/2] OMAP: hwmod: add API for slave idlemode setting
-
-Some HW blocks have errata which requires specific slave idle mode
-under certain conditions.
-
-This patch adds an hwmod API to allow setting slave idlemode
-ensuring that any SYSCONFIG register updates go through hwmod.
-
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+Signed-off-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
 ---
- arch/arm/mach-omap2/omap_hwmod.c             |   17 +++++++++++++++++
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    2 ++
- 2 files changed, 19 insertions(+), 0 deletions(-)
+ drivers/usb/otg/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index d8c8545..3bc47dc 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -993,6 +993,23 @@ void omap_hwmod_writel(u32 v, struct omap_hwmod *oh, u16 reg_offs)
- 	__raw_writel(v, oh->_rt_va + reg_offs);
- }
- 
-+int omap_hwmod_set_slave_idlemode(struct omap_hwmod *oh, u8 idlemode)
-+{
-+	u32 v;
-+	int retval = 0;
-+
-+	if (!oh)
-+		return -EINVAL;
-+
-+	v = oh->_sysc_cache;
-+
-+	retval = _set_slave_idlemode(oh, idlemode, &v);
-+	if (!retval)
-+		_write_sysconfig(v, oh);
-+
-+	return retval;
-+}
-+
- /**
-  * omap_hwmod_register - register a struct omap_hwmod
-  * @oh: struct omap_hwmod *
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index 007935a..1f57330 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -440,6 +440,8 @@ int omap_hwmod_shutdown(struct omap_hwmod *oh);
- int omap_hwmod_enable_clocks(struct omap_hwmod *oh);
- int omap_hwmod_disable_clocks(struct omap_hwmod *oh);
- 
-+int omap_hwmod_set_slave_idlemode(struct omap_hwmod *oh, u8 idlemode);
-+
- int omap_hwmod_reset(struct omap_hwmod *oh);
- void omap_hwmod_ocp_barrier(struct omap_hwmod *oh);
- 
+diff --git a/drivers/usb/otg/Kconfig b/drivers/usb/otg/Kconfig
+index de56b3d..3d2d3e5 100644
+--- a/drivers/usb/otg/Kconfig
++++ b/drivers/usb/otg/Kconfig
+@@ -44,6 +44,7 @@ config ISP1301_OMAP
+ config USB_ULPI
+ 	bool "Generic ULPI Transceiver Driver"
+ 	depends on ARM
++	select USB_OTG_UTILS
+ 	help
+ 	  Enable this to support ULPI connected USB OTG transceivers which
+ 	  are likely found on embedded boards.
 -- 
-1.6.6
+1.6.3.3
