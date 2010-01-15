@@ -1,141 +1,164 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 15 Jan 2010 02:07:07 -0700
-Subject: [PATCH 15/18] OMAP2/3/4 clock: omap2_clk_prepare_for_reboot() is
-	OMAP2xxx-only
+Date: Fri, 15 Jan 2010 02:07:08 -0700
+Subject: [PATCH 16/18] OMAP3 DPLL: reorganize static functions
 In-Reply-To: <20100115090613.30690.49355.stgit@localhost.localdomain>
 References: <20100115090613.30690.49355.stgit@localhost.localdomain>
-Message-ID: <20100115090706.30690.34855.stgit@localhost.localdomain>
+Message-ID: <20100115090707.30690.33928.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap2_clk_prepare_for_reboot() is only applicable to OMAP2xxx chips,
-so rename it to omap2xxx_clk_prepare_for_reboot() and only call it when
-running on OMAP2xxx chips.  Remove the old stub in the OMAP3 clock code.
+Move all static functions up to the top of the file to match the
+practice in other OMAP clock code.  Make omap3_noncore_dpll_program()
+static (noted by sparse) and prepend an underscore to the function
+name to mark that it is file-local.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/clock.h     |    1 -
- arch/arm/mach-omap2/clock2xxx.c |    2 +-
- arch/arm/mach-omap2/clock2xxx.h |    1 +
- arch/arm/mach-omap2/clock34xx.c |   21 ++-------------------
- arch/arm/mach-omap2/clock44xx.c |    5 -----
- arch/arm/mach-omap2/prcm.c      |    8 +++++---
- 6 files changed, 9 insertions(+), 29 deletions(-)
+ arch/arm/mach-omap2/dpll3xxx.c |  113 +++++++++++++++++++++-------------------
+ 1 files changed, 58 insertions(+), 55 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
-index dcd58cd..be5a55f 100644
---- a/arch/arm/mach-omap2/clock.h
-+++ b/arch/arm/mach-omap2/clock.h
-@@ -84,7 +84,6 @@ int omap2_clksel_set_parent(struct clk *clk, struct clk *new_parent);
- u32 omap2_get_dpll_rate(struct clk *clk);
- void omap2_init_dpll_parent(struct clk *clk);
- int omap2_wait_clock_ready(void __iomem *reg, u32 cval, const char *name);
--void omap2_clk_prepare_for_reboot(void);
- int omap2_dflt_clk_enable(struct clk *clk);
- void omap2_dflt_clk_disable(struct clk *clk);
- void omap2_clk_dflt_find_companion(struct clk *clk, void __iomem **other_reg,
-diff --git a/arch/arm/mach-omap2/clock2xxx.c b/arch/arm/mach-omap2/clock2xxx.c
-index e98f48b..a48b01a 100644
---- a/arch/arm/mach-omap2/clock2xxx.c
-+++ b/arch/arm/mach-omap2/clock2xxx.c
-@@ -71,7 +71,7 @@ const struct clkops clkops_omap2430_i2chs_wait = {
- /*
-  * Set clocks for bypass mode for reboot to work.
-  */
--void omap2_clk_prepare_for_reboot(void)
-+void omap2xxx_clk_prepare_for_reboot(void)
- {
- 	u32 rate;
+diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+index f6055b4..2b559fc 100644
+--- a/arch/arm/mach-omap2/dpll3xxx.c
++++ b/arch/arm/mach-omap2/dpll3xxx.c
+@@ -44,17 +44,7 @@
  
-diff --git a/arch/arm/mach-omap2/clock2xxx.h b/arch/arm/mach-omap2/clock2xxx.h
-index c14061b..bed294a 100644
---- a/arch/arm/mach-omap2/clock2xxx.h
-+++ b/arch/arm/mach-omap2/clock2xxx.h
-@@ -18,6 +18,7 @@ int omap2_reprogram_dpllcore(struct clk *clk, unsigned long rate);
- unsigned long omap2xxx_clk_get_core_rate(struct clk *clk);
- u32 omap2xxx_get_apll_clkin(void);
- u32 omap2xxx_get_sysclkdiv(void);
-+void omap2xxx_clk_prepare_for_reboot(void);
+ #define MAX_DPLL_WAIT_TRIES		1000000
  
- /* REVISIT: These should be set dynamically for CONFIG_MULTI_OMAP2 */
- #ifdef CONFIG_ARCH_OMAP2420
-diff --git a/arch/arm/mach-omap2/clock34xx.c b/arch/arm/mach-omap2/clock34xx.c
-index 8a7db7a..34d3950 100644
---- a/arch/arm/mach-omap2/clock34xx.c
-+++ b/arch/arm/mach-omap2/clock34xx.c
-@@ -150,25 +150,6 @@ int omap3_dpll4_set_rate(struct clk *clk, unsigned long rate)
- 	return omap3_noncore_dpll_set_rate(clk, rate);
- }
- 
--/* Common clock code */
 -
--/*
-- * Set clocks for bypass mode for reboot to work.
+-/**
+- * omap3_dpll_recalc - recalculate DPLL rate
+- * @clk: DPLL struct clk
+- *
+- * Recalculate and propagate the DPLL rate.
 - */
--void omap2_clk_prepare_for_reboot(void)
+-unsigned long omap3_dpll_recalc(struct clk *clk)
 -{
--	/* REVISIT: Not ready for 343x */
--#if 0
--	u32 rate;
--
--	if (vclk == NULL || sclk == NULL)
--		return;
--
--	rate = clk_get_rate(sclk);
--	clk_set_rate(vclk, rate);
--#endif
+-	return omap2_get_dpll_rate(clk);
 -}
--
- void omap3_clk_lock_dpll5(void)
- {
- 	struct clk *dpll5_clk;
-@@ -191,6 +172,8 @@ void omap3_clk_lock_dpll5(void)
- 	return;
++/* Private functions */
+ 
+ /* _omap3_dpll_write_clken - write clken_bits arg to a DPLL's enable bits */
+ static void _omap3_dpll_write_clken(struct clk *clk, u8 clken_bits)
+@@ -136,8 +126,6 @@ static u16 _omap3_dpll_compute_freqsel(struct clk *clk, u8 n)
+ 	return f;
  }
  
-+/* Common clock code */
-+
- /* REVISIT: Move this init stuff out into clock.c */
- 
- /*
-diff --git a/arch/arm/mach-omap2/clock44xx.c b/arch/arm/mach-omap2/clock44xx.c
-index 08dd642..c238717 100644
---- a/arch/arm/mach-omap2/clock44xx.c
-+++ b/arch/arm/mach-omap2/clock44xx.c
-@@ -17,8 +17,3 @@ const struct clkops clkops_noncore_dpll_ops = {
- 	.enable		= &omap3_noncore_dpll_enable,
- 	.disable	= &omap3_noncore_dpll_disable,
- };
+-/* Non-CORE DPLL (e.g., DPLLs that do not control SDRC) clock functions */
 -
--void omap2_clk_prepare_for_reboot(void)
--{
--	return;
--}
-diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
-index 63330d2..814376a 100644
---- a/arch/arm/mach-omap2/prcm.c
-+++ b/arch/arm/mach-omap2/prcm.c
-@@ -29,6 +29,7 @@
- #include <plat/control.h>
+ /*
+  * _omap3_noncore_dpll_lock - instruct a DPLL to lock and wait for readiness
+  * @clk: pointer to a DPLL struct clk
+@@ -237,6 +225,63 @@ static int _omap3_noncore_dpll_stop(struct clk *clk)
+ 	return 0;
+ }
  
- #include "clock.h"
-+#include "clock2xxx.h"
- #include "cm.h"
- #include "prm.h"
- #include "prm-regbits-24xx.h"
-@@ -136,11 +137,12 @@ EXPORT_SYMBOL(omap_prcm_get_reset_sources);
- void omap_prcm_arch_reset(char mode)
- {
- 	s16 prcm_offs;
--	omap2_clk_prepare_for_reboot();
- 
--	if (cpu_is_omap24xx())
-+	if (cpu_is_omap24xx()) {
-+		omap2xxx_clk_prepare_for_reboot();
++/*
++ * _omap3_noncore_dpll_program - set non-core DPLL M,N values directly
++ * @clk: struct clk * of DPLL to set
++ * @m: DPLL multiplier to set
++ * @n: DPLL divider to set
++ * @freqsel: FREQSEL value to set
++ *
++ * Program the DPLL with the supplied M, N values, and wait for the DPLL to
++ * lock..  Returns -EINVAL upon error, or 0 upon success.
++ */
++static int omap3_noncore_dpll_program(struct clk *clk, u16 m, u8 n, u16 freqsel)
++{
++	struct dpll_data *dd = clk->dpll_data;
++	u32 v;
 +
- 		prcm_offs = WKUP_MOD;
--	else if (cpu_is_omap34xx()) {
-+	} else if (cpu_is_omap34xx()) {
- 		u32 l;
++	/* 3430 ES2 TRM: 4.7.6.9 DPLL Programming Sequence */
++	_omap3_noncore_dpll_bypass(clk);
++
++	/* Set jitter correction */
++	if (!cpu_is_omap44xx()) {
++		v = __raw_readl(dd->control_reg);
++		v &= ~dd->freqsel_mask;
++		v |= freqsel << __ffs(dd->freqsel_mask);
++		__raw_writel(v, dd->control_reg);
++	}
++
++	/* Set DPLL multiplier, divider */
++	v = __raw_readl(dd->mult_div1_reg);
++	v &= ~(dd->mult_mask | dd->div1_mask);
++	v |= m << __ffs(dd->mult_mask);
++	v |= (n - 1) << __ffs(dd->div1_mask);
++	__raw_writel(v, dd->mult_div1_reg);
++
++	/* We let the clock framework set the other output dividers later */
++
++	/* REVISIT: Set ramp-up delay? */
++
++	_omap3_noncore_dpll_lock(clk);
++
++	return 0;
++}
++
++/* Public functions */
++
++/**
++ * omap3_dpll_recalc - recalculate DPLL rate
++ * @clk: DPLL struct clk
++ *
++ * Recalculate and propagate the DPLL rate.
++ */
++unsigned long omap3_dpll_recalc(struct clk *clk)
++{
++	return omap2_get_dpll_rate(clk);
++}
++
++/* Non-CORE DPLL (e.g., DPLLs that do not control SDRC) clock functions */
++
+ /**
+  * omap3_noncore_dpll_enable - instruct a DPLL to enter bypass or lock mode
+  * @clk: pointer to a DPLL struct clk
+@@ -292,48 +337,6 @@ void omap3_noncore_dpll_disable(struct clk *clk)
  
- 		prcm_offs = OMAP3430_GR_MOD;
+ /* Non-CORE DPLL rate set code */
+ 
+-/*
+- * omap3_noncore_dpll_program - set non-core DPLL M,N values directly
+- * @clk: struct clk * of DPLL to set
+- * @m: DPLL multiplier to set
+- * @n: DPLL divider to set
+- * @freqsel: FREQSEL value to set
+- *
+- * Program the DPLL with the supplied M, N values, and wait for the DPLL to
+- * lock..  Returns -EINVAL upon error, or 0 upon success.
+- */
+-int omap3_noncore_dpll_program(struct clk *clk, u16 m, u8 n, u16 freqsel)
+-{
+-	struct dpll_data *dd = clk->dpll_data;
+-	u32 v;
+-
+-	/* 3430 ES2 TRM: 4.7.6.9 DPLL Programming Sequence */
+-	_omap3_noncore_dpll_bypass(clk);
+-
+-	/* Set jitter correction */
+-	if (!cpu_is_omap44xx()) {
+-		v = __raw_readl(dd->control_reg);
+-		v &= ~dd->freqsel_mask;
+-		v |= freqsel << __ffs(dd->freqsel_mask);
+-		__raw_writel(v, dd->control_reg);
+-	}
+-
+-	/* Set DPLL multiplier, divider */
+-	v = __raw_readl(dd->mult_div1_reg);
+-	v &= ~(dd->mult_mask | dd->div1_mask);
+-	v |= m << __ffs(dd->mult_mask);
+-	v |= (n - 1) << __ffs(dd->div1_mask);
+-	__raw_writel(v, dd->mult_div1_reg);
+-
+-	/* We let the clock framework set the other output dividers later */
+-
+-	/* REVISIT: Set ramp-up delay? */
+-
+-	_omap3_noncore_dpll_lock(clk);
+-
+-	return 0;
+-}
+-
+ /**
+  * omap3_noncore_dpll_set_rate - set non-core DPLL rate
+  * @clk: struct clk * of DPLL to set
