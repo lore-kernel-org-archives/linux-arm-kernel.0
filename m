@@ -1,42 +1,34 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 15 Jan 2010 21:03:10 +0100
-Subject: [suspend/resume] Re: userspace notification from module
-In-Reply-To: <201001091440.46434.rjw@sisk.pl>
-References: <686edb2c.6263643a.4b3f4a3b.b60b3@o2.pl>
-	<201001022201.04281.rjw@sisk.pl> <20100109103212.GA1429@ucw.cz>
-	<201001091440.46434.rjw@sisk.pl>
-Message-ID: <20100115200310.GG1345@ucw.cz>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 Jan 2010 21:26:26 +0000
+Subject: [RFC 03/18] arm: boot: remove old ARM ID for QSD
+In-Reply-To: <1263250057-26692-4-git-send-email-dwalker@codeaurora.org>
+References: <1263250057-26692-1-git-send-email-dwalker@codeaurora.org>
+	<1263250057-26692-4-git-send-email-dwalker@codeaurora.org>
+Message-ID: <20100115212625.GA28222@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat 2010-01-09 14:40:46, Rafael J. Wysocki wrote:
-> On Saturday 09 January 2010, Pavel Machek wrote:
-
-> > > Perhaps I don't understand correctly what you're trying to achieve, but at the
-> > > moment suspend is always started from user space, this way or another, and on
-> > 
-> > At least zaurus (arm) suspends from kernel on battery critical.
+On Mon, Jan 11, 2010 at 02:47:22PM -0800, Daniel Walker wrote:
+> From: Steve Muckle <smuckle@quicinc.com>
 > 
-> I wasn't aware of this.
+> The mask and ID pattern for older ARM IDs in the kernel
+> decompressor matches the CPU ID for Scorpion, causing the
+> v7 caching routines not to be run and kernel decompression
+> to take significantly longer.
 > 
-> That may be a good reason for adding kernel-based suspend notification,
-> although I'd prefer ARM to notify the user space about the critical battery
-> status allowing it to decide what to do.
+> QSD may eventually use CPUs other than Scorpion, but they
+> will adhere to the new ARM CPU ID format, which is
+> incompatible with the entry for older ARM CPU IDs.
 
-Hard to do, without breaking compatibility that goes down to 2.4.X.
+Actually, we need to change this.
 
-> IMhO automatic suspend without something like the Android's wakelocks hurts
-> more than it helps.
+> +#ifndef CONFIG_ARCH_MSM_SCORPION
+>  		.word	0x00000000		@ old ARM ID
+>  		.word	0x0000f000
 
-It really makes sense on zaurus. Those machines are simple, no
-smartbattery and no embedded controller subsystems. Battery will not
-protect itself, and its kernel job. (Should work on init=/bin/bash).
+		.word	0x41000000		@ old ARM ID
+		.word	0xff00f000
 
-As power-off consumption is same as suspend power consumption (I
-beleive zaurus simply does not have true power off), suspend on
-critical makes some sense. (Note that it is set lower than on pcs, and
-that we declare battery critical sooner than that.)
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+would be more appropriate - but I don't know if this means we'll miss
+out on some CPUs.  However, the latest spec indicates that this is
+how it should be for matching ARMv2 and v3 architectures.
