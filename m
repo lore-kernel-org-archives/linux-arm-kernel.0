@@ -1,49 +1,47 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 15 Jan 2010 02:06:58 -0700
-Subject: [PATCH 06/18] OMAP2xxx clock: move the DPLL+CORE composite clock code
-	into clkt2xxx_dpllcore.c
+Date: Fri, 15 Jan 2010 02:06:54 -0700
+Subject: [PATCH 03/18] OMAP2/3/4 clock: move clksel clock functions into
+	clkt_clksel.c
 In-Reply-To: <20100115090613.30690.49355.stgit@localhost.localdomain>
 References: <20100115090613.30690.49355.stgit@localhost.localdomain>
-Message-ID: <20100115090657.30690.54188.stgit@localhost.localdomain>
+Message-ID: <20100115090653.30690.846.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the DPLL+CORE composite clock functions from clock2xxx.c to
-clkt2xxx_dpllcore.c to improve maintainability.
+Move all clksel-related clock functions from mach-omap2/clock.c to
+clkt_clksel.c to improve maintainability.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Richard Woodruff <r-woodruff2@ti.com>
 ---
- arch/arm/mach-omap2/Makefile            |    4 +
- arch/arm/mach-omap2/clkt2xxx_dpllcore.c |  172 +++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/clock2xxx.c         |  136 -------------------------
- 3 files changed, 175 insertions(+), 137 deletions(-)
- create mode 100644 arch/arm/mach-omap2/clkt2xxx_dpllcore.c
+ arch/arm/mach-omap2/Makefile      |    3 
+ arch/arm/mach-omap2/clkt_clksel.c |  413 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/clock.c       |  377 ----------------------------------
+ arch/arm/mach-omap2/clock.h       |    2 
+ 4 files changed, 420 insertions(+), 375 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/clkt_clksel.c
 
 diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 9ecc58d..04ce372 100644
+index 1a135c8..9ecc58d 100644
 --- a/arch/arm/mach-omap2/Makefile
 +++ b/arch/arm/mach-omap2/Makefile
-@@ -11,8 +11,10 @@ prcm-common				= prcm.o powerdomain.o
+@@ -9,7 +9,8 @@ omap-2-3-common				= irq.o sdrc.o omap_hwmod.o
+ omap-3-4-common				= dpll3xxx.o
+ prcm-common				= prcm.o powerdomain.o
  clock-common				= clock.o clock_common_data.o \
- 					  clockdomain.o clkt_dpll.o \
- 					  clkt_clksel.o
-+clock-omap2xxx				= clkt2xxx_dpllcore.o
+-					  clockdomain.o clkt_dpll.o
++					  clockdomain.o clkt_dpll.o \
++					  clkt_clksel.o
  
--obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common) $(prcm-common) $(clock-common)
-+obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common) $(prcm-common) $(clock-common) \
-+			    $(clock-omap2xxx)
+ obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common) $(prcm-common) $(clock-common)
  obj-$(CONFIG_ARCH_OMAP3) += $(omap-2-3-common) $(prcm-common) $(clock-common) \
- 			    $(omap-3-4-common)
- obj-$(CONFIG_ARCH_OMAP4) += $(omap-3-4-common) $(prcm-common) $(clock-common)
-diff --git a/arch/arm/mach-omap2/clkt2xxx_dpllcore.c b/arch/arm/mach-omap2/clkt2xxx_dpllcore.c
+diff --git a/arch/arm/mach-omap2/clkt_clksel.c b/arch/arm/mach-omap2/clkt_clksel.c
 new file mode 100644
-index 0000000..e615663
+index 0000000..8ab34e3
 --- /dev/null
-+++ b/arch/arm/mach-omap2/clkt2xxx_dpllcore.c
-@@ -0,0 +1,172 @@
++++ b/arch/arm/mach-omap2/clkt_clksel.c
+@@ -0,0 +1,413 @@
 +/*
-+ * clkt2xxx_dpllcore.c - DPLL + CORE_CLK composite clock functions
++ * clkt_clksel.c - OMAP2/3/4 clksel clock functions
 + *
 + * Copyright (C) 2005-2008 Texas Instruments, Inc.
 + * Copyright (C) 2004-2010 Nokia Corporation
@@ -52,14 +50,12 @@ index 0000000..e615663
 + * Richard Woodruff <r-woodruff2@ti.com>
 + * Paul Walmsley
 + *
-+ * Based on earlier work by Tuukka Tikkanen, Tony Lindgren,
-+ * Gordon McNutt and RidgeRun, Inc.
-+ *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + *
-+ * XXX The DPLL and DPLL divider clocks should be split.
++ * XXX At some point these clksel clocks should be split into
++ * "divider" clocks and "mux" clocks to better match the hardware.
 + */
 +#undef DEBUG
 +
@@ -69,309 +65,834 @@ index 0000000..e615663
 +#include <linux/io.h>
 +
 +#include <plat/clock.h>
-+#include <plat/sram.h>
-+#include <plat/sdrc.h>
 +
 +#include "clock.h"
-+#include "clock2xxx.h"
-+#include "opp2xxx.h"
 +#include "cm.h"
 +#include "cm-regbits-24xx.h"
++#include "cm-regbits-34xx.h"
 +
-+/* #define DOWN_VARIABLE_DPLL 1 */		/* Experimental */
++/* Private functions */
 +
 +/**
-+ * omap2xxx_clk_get_core_rate - return the CORE_CLK rate
-+ * @clk: pointer to the combined dpll_ck + core_ck (currently "dpll_ck")
++ * _omap2_get_clksel_by_parent - return clksel struct for a given clk & parent
++ * @clk: OMAP struct clk ptr to inspect
++ * @src_clk: OMAP struct clk ptr of the parent clk to search for
 + *
-+ * Returns the CORE_CLK rate.  CORE_CLK can have one of three rate
-+ * sources on OMAP2xxx: the DPLL CLKOUT rate, DPLL CLKOUTX2, or 32KHz
-+ * (the latter is unusual).  This currently should be called with
-+ * struct clk *dpll_ck, which is a composite clock of dpll_ck and
-+ * core_ck.
++ * Scan the struct clksel array associated with the clock to find
++ * the element associated with the supplied parent clock address.
++ * Returns a pointer to the struct clksel on success or NULL on error.
 + */
-+unsigned long omap2xxx_clk_get_core_rate(struct clk *clk)
++static const struct clksel *_omap2_get_clksel_by_parent(struct clk *clk,
++							struct clk *src_clk)
 +{
-+	long long core_clk;
-+	u32 v;
++	const struct clksel *clks;
 +
-+	core_clk = omap2_get_dpll_rate(clk);
++	if (!clk->clksel)
++		return NULL;
 +
-+	v = cm_read_mod_reg(PLL_MOD, CM_CLKSEL2);
-+	v &= OMAP24XX_CORE_CLK_SRC_MASK;
++	for (clks = clk->clksel; clks->parent; clks++) {
++		if (clks->parent == src_clk)
++			break; /* Found the requested parent */
++	}
 +
-+	if (v == CORE_CLK_SRC_32K)
-+		core_clk = 32768;
-+	else
-+		core_clk *= v;
++	if (!clks->parent) {
++		printk(KERN_ERR "clock: Could not find parent clock %s in "
++		       "clksel array of clock %s\n", src_clk->name,
++		       clk->name);
++		return NULL;
++	}
 +
-+	return core_clk;
++	return clks;
 +}
 +
 +/*
-+ * Uses the current prcm set to tell if a rate is valid.
-+ * You can go slower, but not faster within a given rate set.
++ * Converts encoded control register address into a full address
++ * On error, the return value (parent_div) will be 0.
 + */
-+static long omap2_dpllcore_round_rate(unsigned long target_rate)
++static u32 _omap2_clksel_get_src_field(struct clk *src_clk, struct clk *clk,
++				       u32 *field_val)
 +{
-+	u32 high, low, core_clk_src;
++	const struct clksel *clks;
++	const struct clksel_rate *clkr;
 +
-+	core_clk_src = cm_read_mod_reg(PLL_MOD, CM_CLKSEL2);
-+	core_clk_src &= OMAP24XX_CORE_CLK_SRC_MASK;
++	clks = _omap2_get_clksel_by_parent(clk, src_clk);
++	if (!clks)
++		return 0;
 +
-+	if (core_clk_src == CORE_CLK_SRC_DPLL) {	/* DPLL clockout */
-+		high = curr_prcm_set->dpll_speed * 2;
-+		low = curr_prcm_set->dpll_speed;
-+	} else {				/* DPLL clockout x 2 */
-+		high = curr_prcm_set->dpll_speed;
-+		low = curr_prcm_set->dpll_speed / 2;
++	for (clkr = clks->rates; clkr->div; clkr++) {
++		if (clkr->flags & cpu_mask && clkr->flags & DEFAULT_RATE)
++			break; /* Found the default rate for this platform */
 +	}
 +
-+#ifdef DOWN_VARIABLE_DPLL
-+	if (target_rate > high)
-+		return high;
-+	else
-+		return target_rate;
-+#else
-+	if (target_rate > low)
-+		return high;
-+	else
-+		return low;
-+#endif
++	if (!clkr->div) {
++		printk(KERN_ERR "clock: Could not find default rate for "
++		       "clock %s parent %s\n", clk->name,
++		       src_clk->parent->name);
++		return 0;
++	}
 +
++	/* Should never happen.  Add a clksel mask to the struct clk. */
++	WARN_ON(clk->clksel_mask == 0);
++
++	*field_val = clkr->val;
++
++	return clkr->div;
 +}
 +
-+unsigned long omap2_dpllcore_recalc(struct clk *clk)
++
++/* Public functions */
++
++/**
++ * omap2_init_clksel_parent - set a clksel clk's parent field from the hardware
++ * @clk: OMAP clock struct ptr to use
++ *
++ * Given a pointer to a source-selectable struct clk, read the hardware
++ * register and determine what its parent is currently set to.  Update the
++ * clk->parent field with the appropriate clk ptr.
++ */
++void omap2_init_clksel_parent(struct clk *clk)
 +{
-+	return omap2xxx_clk_get_core_rate(clk);
-+}
++	const struct clksel *clks;
++	const struct clksel_rate *clkr;
++	u32 r, found = 0;
 +
-+int omap2_reprogram_dpllcore(struct clk *clk, unsigned long rate)
-+{
-+	u32 cur_rate, low, mult, div, valid_rate, done_rate;
-+	u32 bypass = 0;
-+	struct prcm_config tmpset;
-+	const struct dpll_data *dd;
++	if (!clk->clksel)
++		return;
 +
-+	cur_rate = omap2xxx_clk_get_core_rate(dclk);
-+	mult = cm_read_mod_reg(PLL_MOD, CM_CLKSEL2);
-+	mult &= OMAP24XX_CORE_CLK_SRC_MASK;
++	r = __raw_readl(clk->clksel_reg) & clk->clksel_mask;
++	r >>= __ffs(clk->clksel_mask);
 +
-+	if ((rate == (cur_rate / 2)) && (mult == 2)) {
-+		omap2xxx_sdrc_reprogram(CORE_CLK_SRC_DPLL, 1);
-+	} else if ((rate == (cur_rate * 2)) && (mult == 1)) {
-+		omap2xxx_sdrc_reprogram(CORE_CLK_SRC_DPLL_X2, 1);
-+	} else if (rate != cur_rate) {
-+		valid_rate = omap2_dpllcore_round_rate(rate);
-+		if (valid_rate != rate)
-+			return -EINVAL;
-+
-+		if (mult == 1)
-+			low = curr_prcm_set->dpll_speed;
-+		else
-+			low = curr_prcm_set->dpll_speed / 2;
-+
-+		dd = clk->dpll_data;
-+		if (!dd)
-+			return -EINVAL;
-+
-+		tmpset.cm_clksel1_pll = __raw_readl(dd->mult_div1_reg);
-+		tmpset.cm_clksel1_pll &= ~(dd->mult_mask |
-+					   dd->div1_mask);
-+		div = ((curr_prcm_set->xtal_speed / 1000000) - 1);
-+		tmpset.cm_clksel2_pll = cm_read_mod_reg(PLL_MOD, CM_CLKSEL2);
-+		tmpset.cm_clksel2_pll &= ~OMAP24XX_CORE_CLK_SRC_MASK;
-+		if (rate > low) {
-+			tmpset.cm_clksel2_pll |= CORE_CLK_SRC_DPLL_X2;
-+			mult = ((rate / 2) / 1000000);
-+			done_rate = CORE_CLK_SRC_DPLL_X2;
-+		} else {
-+			tmpset.cm_clksel2_pll |= CORE_CLK_SRC_DPLL;
-+			mult = (rate / 1000000);
-+			done_rate = CORE_CLK_SRC_DPLL;
++	for (clks = clk->clksel; clks->parent && !found; clks++) {
++		for (clkr = clks->rates; clkr->div && !found; clkr++) {
++			if ((clkr->flags & cpu_mask) && (clkr->val == r)) {
++				if (clk->parent != clks->parent) {
++					pr_debug("clock: inited %s parent "
++						 "to %s (was %s)\n",
++						 clk->name, clks->parent->name,
++						 ((clk->parent) ?
++						  clk->parent->name : "NULL"));
++					clk_reparent(clk, clks->parent);
++				};
++				found = 1;
++			}
 +		}
-+		tmpset.cm_clksel1_pll |= (div << __ffs(dd->mult_mask));
-+		tmpset.cm_clksel1_pll |= (mult << __ffs(dd->div1_mask));
-+
-+		/* Worst case */
-+		tmpset.base_sdrc_rfr = SDRC_RFR_CTRL_BYPASS;
-+
-+		if (rate == curr_prcm_set->xtal_speed)	/* If asking for 1-1 */
-+			bypass = 1;
-+
-+		/* For omap2xxx_sdrc_init_params() */
-+		omap2xxx_sdrc_reprogram(CORE_CLK_SRC_DPLL_X2, 1);
-+
-+		/* Force dll lock mode */
-+		omap2_set_prcm(tmpset.cm_clksel1_pll, tmpset.base_sdrc_rfr,
-+			       bypass);
-+
-+		/* Errata: ret dll entry state */
-+		omap2xxx_sdrc_init_params(omap2xxx_sdrc_dll_is_unlocked());
-+		omap2xxx_sdrc_reprogram(done_rate, 0);
 +	}
++
++	if (!found)
++		printk(KERN_ERR "clock: init parent: could not find "
++		       "regval %0x for clock %s\n", r,  clk->name);
++
++	return;
++}
++
++/*
++ * Used for clocks that are part of CLKSEL_xyz governed clocks.
++ * REVISIT: Maybe change to use clk->enable() functions like on omap1?
++ */
++unsigned long omap2_clksel_recalc(struct clk *clk)
++{
++	unsigned long rate;
++	u32 div = 0;
++
++	pr_debug("clock: recalc'ing clksel clk %s\n", clk->name);
++
++	div = omap2_clksel_get_divisor(clk);
++	if (div == 0)
++		return clk->rate;
++
++	rate = clk->parent->rate / div;
++
++	pr_debug("clock: new clock rate is %ld (div %d)\n", rate, div);
++
++	return rate;
++}
++
++/**
++ * omap2_clksel_round_rate_div - find divisor for the given clock and rate
++ * @clk: OMAP struct clk to use
++ * @target_rate: desired clock rate
++ * @new_div: ptr to where we should store the divisor
++ *
++ * Finds 'best' divider value in an array based on the source and target
++ * rates.  The divider array must be sorted with smallest divider first.
++ * Note that this will not work for clocks which are part of CONFIG_PARTICIPANT,
++ * they are only settable as part of virtual_prcm set.
++ *
++ * Returns the rounded clock rate or returns 0xffffffff on error.
++ */
++u32 omap2_clksel_round_rate_div(struct clk *clk, unsigned long target_rate,
++				u32 *new_div)
++{
++	unsigned long test_rate;
++	const struct clksel *clks;
++	const struct clksel_rate *clkr;
++	u32 last_div = 0;
++
++	pr_debug("clock: clksel_round_rate_div: %s target_rate %ld\n",
++		 clk->name, target_rate);
++
++	*new_div = 1;
++
++	clks = _omap2_get_clksel_by_parent(clk, clk->parent);
++	if (!clks)
++		return ~0;
++
++	for (clkr = clks->rates; clkr->div; clkr++) {
++		if (!(clkr->flags & cpu_mask))
++			continue;
++
++		/* Sanity check */
++		if (clkr->div <= last_div)
++			pr_err("clock: clksel_rate table not sorted "
++			       "for clock %s", clk->name);
++
++		last_div = clkr->div;
++
++		test_rate = clk->parent->rate / clkr->div;
++
++		if (test_rate <= target_rate)
++			break; /* found it */
++	}
++
++	if (!clkr->div) {
++		pr_err("clock: Could not find divisor for target "
++		       "rate %ld for clock %s parent %s\n", target_rate,
++		       clk->name, clk->parent->name);
++		return ~0;
++	}
++
++	*new_div = clkr->div;
++
++	pr_debug("clock: new_div = %d, new_rate = %ld\n", *new_div,
++		 (clk->parent->rate / clkr->div));
++
++	return clk->parent->rate / clkr->div;
++}
++
++/**
++ * omap2_clksel_round_rate - find rounded rate for the given clock and rate
++ * @clk: OMAP struct clk to use
++ * @target_rate: desired clock rate
++ *
++ * Compatibility wrapper for OMAP clock framework
++ * Finds best target rate based on the source clock and possible dividers.
++ * rates. The divider array must be sorted with smallest divider first.
++ * Note that this will not work for clocks which are part of CONFIG_PARTICIPANT,
++ * they are only settable as part of virtual_prcm set.
++ *
++ * Returns the rounded clock rate or returns 0xffffffff on error.
++ */
++long omap2_clksel_round_rate(struct clk *clk, unsigned long target_rate)
++{
++	u32 new_div;
++
++	return omap2_clksel_round_rate_div(clk, target_rate, &new_div);
++}
++
++
++/* Given a clock and a rate apply a clock specific rounding function */
++long omap2_clk_round_rate(struct clk *clk, unsigned long rate)
++{
++	if (clk->round_rate)
++		return clk->round_rate(clk, rate);
++
++	if (clk->flags & RATE_FIXED)
++		printk(KERN_ERR "clock: generic omap2_clk_round_rate called "
++		       "on fixed-rate clock %s\n", clk->name);
++
++	return clk->rate;
++}
++
++/**
++ * omap2_clksel_to_divisor() - turn clksel field value into integer divider
++ * @clk: OMAP struct clk to use
++ * @field_val: register field value to find
++ *
++ * Given a struct clk of a rate-selectable clksel clock, and a register field
++ * value to search for, find the corresponding clock divisor.  The register
++ * field value should be pre-masked and shifted down so the LSB is at bit 0
++ * before calling.  Returns 0 on error
++ */
++u32 omap2_clksel_to_divisor(struct clk *clk, u32 field_val)
++{
++	const struct clksel *clks;
++	const struct clksel_rate *clkr;
++
++	clks = _omap2_get_clksel_by_parent(clk, clk->parent);
++	if (!clks)
++		return 0;
++
++	for (clkr = clks->rates; clkr->div; clkr++) {
++		if ((clkr->flags & cpu_mask) && (clkr->val == field_val))
++			break;
++	}
++
++	if (!clkr->div) {
++		printk(KERN_ERR "clock: Could not find fieldval %d for "
++		       "clock %s parent %s\n", field_val, clk->name,
++		       clk->parent->name);
++		return 0;
++	}
++
++	return clkr->div;
++}
++
++/**
++ * omap2_divisor_to_clksel() - turn clksel integer divisor into a field value
++ * @clk: OMAP struct clk to use
++ * @div: integer divisor to search for
++ *
++ * Given a struct clk of a rate-selectable clksel clock, and a clock divisor,
++ * find the corresponding register field value.  The return register value is
++ * the value before left-shifting.  Returns ~0 on error
++ */
++u32 omap2_divisor_to_clksel(struct clk *clk, u32 div)
++{
++	const struct clksel *clks;
++	const struct clksel_rate *clkr;
++
++	/* should never happen */
++	WARN_ON(div == 0);
++
++	clks = _omap2_get_clksel_by_parent(clk, clk->parent);
++	if (!clks)
++		return ~0;
++
++	for (clkr = clks->rates; clkr->div; clkr++) {
++		if ((clkr->flags & cpu_mask) && (clkr->div == div))
++			break;
++	}
++
++	if (!clkr->div) {
++		printk(KERN_ERR "clock: Could not find divisor %d for "
++		       "clock %s parent %s\n", div, clk->name,
++		       clk->parent->name);
++		return ~0;
++	}
++
++	return clkr->val;
++}
++
++/**
++ * omap2_clksel_get_divisor - get current divider applied to parent clock.
++ * @clk: OMAP struct clk to use.
++ *
++ * Returns the integer divisor upon success or 0 on error.
++ */
++u32 omap2_clksel_get_divisor(struct clk *clk)
++{
++	u32 v;
++
++	if (!clk->clksel_mask)
++		return 0;
++
++	v = __raw_readl(clk->clksel_reg) & clk->clksel_mask;
++	v >>= __ffs(clk->clksel_mask);
++
++	return omap2_clksel_to_divisor(clk, v);
++}
++
++int omap2_clksel_set_rate(struct clk *clk, unsigned long rate)
++{
++	u32 v, field_val, validrate, new_div = 0;
++
++	if (!clk->clksel_mask)
++		return -EINVAL;
++
++	validrate = omap2_clksel_round_rate_div(clk, rate, &new_div);
++	if (validrate != rate)
++		return -EINVAL;
++
++	field_val = omap2_divisor_to_clksel(clk, new_div);
++	if (field_val == ~0)
++		return -EINVAL;
++
++	v = __raw_readl(clk->clksel_reg);
++	v &= ~clk->clksel_mask;
++	v |= field_val << __ffs(clk->clksel_mask);
++	__raw_writel(v, clk->clksel_reg);
++	v = __raw_readl(clk->clksel_reg); /* OCP barrier */
++
++	clk->rate = clk->parent->rate / new_div;
++
++	omap2xxx_clk_commit(clk);
 +
 +	return 0;
 +}
 +
-diff --git a/arch/arm/mach-omap2/clock2xxx.c b/arch/arm/mach-omap2/clock2xxx.c
-index bef5574..419ae80 100644
---- a/arch/arm/mach-omap2/clock2xxx.c
-+++ b/arch/arm/mach-omap2/clock2xxx.c
-@@ -54,8 +54,6 @@
- #define APLLS_CLKIN_13MHZ		2
- #define APLLS_CLKIN_12MHZ		3
++int omap2_clksel_set_parent(struct clk *clk, struct clk *new_parent)
++{
++	u32 field_val, v, parent_div;
++
++	if (!clk->clksel)
++		return -EINVAL;
++
++	parent_div = _omap2_clksel_get_src_field(new_parent, clk, &field_val);
++	if (!parent_div)
++		return -EINVAL;
++
++	/* Set new source value (previous dividers if any in effect) */
++	v = __raw_readl(clk->clksel_reg);
++	v &= ~clk->clksel_mask;
++	v |= field_val << __ffs(clk->clksel_mask);
++	__raw_writel(v, clk->clksel_reg);
++	v = __raw_readl(clk->clksel_reg);    /* OCP barrier */
++
++	omap2xxx_clk_commit(clk);
++
++	clk_reparent(clk, new_parent);
++
++	/* CLKSEL clocks follow their parents' rates, divided by a divisor */
++	clk->rate = new_parent->rate;
++
++	if (parent_div > 0)
++		clk->rate /= parent_div;
++
++	pr_debug("clock: set parent of %s to %s (new rate %ld)\n",
++		 clk->name, clk->parent->name, clk->rate);
++
++	return 0;
++}
+diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+index 9819628..d3ebb74 100644
+--- a/arch/arm/mach-omap2/clock.c
++++ b/arch/arm/mach-omap2/clock.c
+@@ -43,14 +43,14 @@ u8 cpu_mask;
+  *-------------------------------------------------------------------------*/
  
--/* #define DOWN_VARIABLE_DPLL 1 */		/* Experimental */
--
- const struct prcm_config *curr_prcm_set;
- const struct prcm_config *rate_table;
+ /**
+- * _omap2xxx_clk_commit - commit clock parent/rate changes in hardware
++ * omap2xxx_clk_commit - commit clock parent/rate changes in hardware
+  * @clk: struct clk *
+  *
+  * If @clk has the DELAYED_APP flag set, meaning that parent/rate changes
+  * don't take effect until the VALID_CONFIG bit is written, write the
+  * VALID_CONFIG bit and wait for the write to complete.  No return value.
+  */
+-static void _omap2xxx_clk_commit(struct clk *clk)
++void omap2xxx_clk_commit(struct clk *clk)
+ {
+ 	if (!cpu_is_omap24xx())
+ 		return;
+@@ -91,49 +91,6 @@ void omap2_init_clk_clkdm(struct clk *clk)
+ }
  
-@@ -94,34 +92,6 @@ const struct clkops clkops_omap2430_i2chs_wait = {
- 	.find_companion = omap2_clk_dflt_find_companion,
- };
- 
--/**
-- * omap2xxx_clk_get_core_rate - return the CORE_CLK rate
-- * @clk: pointer to the combined dpll_ck + core_ck (currently "dpll_ck")
+ /**
+- * omap2_init_clksel_parent - set a clksel clk's parent field from the hardware
+- * @clk: OMAP clock struct ptr to use
 - *
-- * Returns the CORE_CLK rate.  CORE_CLK can have one of three rate
-- * sources on OMAP2xxx: the DPLL CLKOUT rate, DPLL CLKOUTX2, or 32KHz
-- * (the latter is unusual).  This currently should be called with
-- * struct clk *dpll_ck, which is a composite clock of dpll_ck and
-- * core_ck.
+- * Given a pointer to a source-selectable struct clk, read the hardware
+- * register and determine what its parent is currently set to.  Update the
+- * clk->parent field with the appropriate clk ptr.
 - */
--unsigned long omap2xxx_clk_get_core_rate(struct clk *clk)
+-void omap2_init_clksel_parent(struct clk *clk)
 -{
--	long long core_clk;
--	u32 v;
+-	const struct clksel *clks;
+-	const struct clksel_rate *clkr;
+-	u32 r, found = 0;
 -
--	core_clk = omap2_get_dpll_rate(clk);
+-	if (!clk->clksel)
+-		return;
 -
--	v = cm_read_mod_reg(PLL_MOD, CM_CLKSEL2);
--	v &= OMAP24XX_CORE_CLK_SRC_MASK;
+-	r = __raw_readl(clk->clksel_reg) & clk->clksel_mask;
+-	r >>= __ffs(clk->clksel_mask);
 -
--	if (v == CORE_CLK_SRC_32K)
--		core_clk = 32768;
--	else
--		core_clk *= v;
+-	for (clks = clk->clksel; clks->parent && !found; clks++) {
+-		for (clkr = clks->rates; clkr->div && !found; clkr++) {
+-			if ((clkr->flags & cpu_mask) && (clkr->val == r)) {
+-				if (clk->parent != clks->parent) {
+-					pr_debug("clock: inited %s parent "
+-						 "to %s (was %s)\n",
+-						 clk->name, clks->parent->name,
+-						 ((clk->parent) ?
+-						  clk->parent->name : "NULL"));
+-					clk_reparent(clk, clks->parent);
+-				};
+-				found = 1;
+-			}
+-		}
+-	}
 -
--	return core_clk;
+-	if (!found)
+-		printk(KERN_ERR "clock: init parent: could not find "
+-		       "regval %0x for clock %s\n", r,  clk->name);
+-
+-	return;
 -}
 -
- static int omap2_enable_osc_ck(struct clk *clk)
- {
- 	u32 pcc;
-@@ -215,112 +185,6 @@ const struct clkops clkops_apll54 = {
- 	.disable	= omap2_clk_apll_disable,
- };
+-/**
+  * omap2_clk_dflt_find_companion - find companion clock to @clk
+  * @clk: struct clk * to find the companion clock of
+  * @other_reg: void __iomem ** to return the companion clock CM_*CLKEN va in
+@@ -335,274 +292,6 @@ err:
+ 	return ret;
+ }
  
 -/*
-- * Uses the current prcm set to tell if a rate is valid.
-- * You can go slower, but not faster within a given rate set.
+- * Used for clocks that are part of CLKSEL_xyz governed clocks.
+- * REVISIT: Maybe change to use clk->enable() functions like on omap1?
 - */
--long omap2_dpllcore_round_rate(unsigned long target_rate)
+-unsigned long omap2_clksel_recalc(struct clk *clk)
 -{
--	u32 high, low, core_clk_src;
+-	unsigned long rate;
+-	u32 div = 0;
 -
--	core_clk_src = cm_read_mod_reg(PLL_MOD, CM_CLKSEL2);
--	core_clk_src &= OMAP24XX_CORE_CLK_SRC_MASK;
+-	pr_debug("clock: recalc'ing clksel clk %s\n", clk->name);
 -
--	if (core_clk_src == CORE_CLK_SRC_DPLL) {	/* DPLL clockout */
--		high = curr_prcm_set->dpll_speed * 2;
--		low = curr_prcm_set->dpll_speed;
--	} else {				/* DPLL clockout x 2 */
--		high = curr_prcm_set->dpll_speed;
--		low = curr_prcm_set->dpll_speed / 2;
--	}
+-	div = omap2_clksel_get_divisor(clk);
+-	if (div == 0)
+-		return clk->rate;
 -
--#ifdef DOWN_VARIABLE_DPLL
--	if (target_rate > high)
--		return high;
--	else
--		return target_rate;
--#else
--	if (target_rate > low)
--		return high;
--	else
--		return low;
--#endif
+-	rate = clk->parent->rate / div;
 -
+-	pr_debug("clock: new clock rate is %ld (div %d)\n", rate, div);
+-
+-	return rate;
 -}
 -
--unsigned long omap2_dpllcore_recalc(struct clk *clk)
+-/**
+- * omap2_get_clksel_by_parent - return clksel struct for a given clk & parent
+- * @clk: OMAP struct clk ptr to inspect
+- * @src_clk: OMAP struct clk ptr of the parent clk to search for
+- *
+- * Scan the struct clksel array associated with the clock to find
+- * the element associated with the supplied parent clock address.
+- * Returns a pointer to the struct clksel on success or NULL on error.
+- */
+-static const struct clksel *omap2_get_clksel_by_parent(struct clk *clk,
+-						       struct clk *src_clk)
 -{
--	return omap2xxx_clk_get_core_rate(clk);
+-	const struct clksel *clks;
+-
+-	if (!clk->clksel)
+-		return NULL;
+-
+-	for (clks = clk->clksel; clks->parent; clks++) {
+-		if (clks->parent == src_clk)
+-			break; /* Found the requested parent */
+-	}
+-
+-	if (!clks->parent) {
+-		printk(KERN_ERR "clock: Could not find parent clock %s in "
+-		       "clksel array of clock %s\n", src_clk->name,
+-		       clk->name);
+-		return NULL;
+-	}
+-
+-	return clks;
 -}
 -
--int omap2_reprogram_dpllcore(struct clk *clk, unsigned long rate)
+-/**
+- * omap2_clksel_round_rate_div - find divisor for the given clock and rate
+- * @clk: OMAP struct clk to use
+- * @target_rate: desired clock rate
+- * @new_div: ptr to where we should store the divisor
+- *
+- * Finds 'best' divider value in an array based on the source and target
+- * rates.  The divider array must be sorted with smallest divider first.
+- * Note that this will not work for clocks which are part of CONFIG_PARTICIPANT,
+- * they are only settable as part of virtual_prcm set.
+- *
+- * Returns the rounded clock rate or returns 0xffffffff on error.
+- */
+-u32 omap2_clksel_round_rate_div(struct clk *clk, unsigned long target_rate,
+-				u32 *new_div)
 -{
--	u32 cur_rate, low, mult, div, valid_rate, done_rate;
--	u32 bypass = 0;
--	struct prcm_config tmpset;
--	const struct dpll_data *dd;
+-	unsigned long test_rate;
+-	const struct clksel *clks;
+-	const struct clksel_rate *clkr;
+-	u32 last_div = 0;
 -
--	cur_rate = omap2xxx_clk_get_core_rate(dclk);
--	mult = cm_read_mod_reg(PLL_MOD, CM_CLKSEL2);
--	mult &= OMAP24XX_CORE_CLK_SRC_MASK;
+-	pr_debug("clock: clksel_round_rate_div: %s target_rate %ld\n",
+-		 clk->name, target_rate);
 -
--	if ((rate == (cur_rate / 2)) && (mult == 2)) {
--		omap2xxx_sdrc_reprogram(CORE_CLK_SRC_DPLL, 1);
--	} else if ((rate == (cur_rate * 2)) && (mult == 1)) {
--		omap2xxx_sdrc_reprogram(CORE_CLK_SRC_DPLL_X2, 1);
--	} else if (rate != cur_rate) {
--		valid_rate = omap2_dpllcore_round_rate(rate);
--		if (valid_rate != rate)
--			return -EINVAL;
+-	*new_div = 1;
 -
--		if (mult == 1)
--			low = curr_prcm_set->dpll_speed;
--		else
--			low = curr_prcm_set->dpll_speed / 2;
+-	clks = omap2_get_clksel_by_parent(clk, clk->parent);
+-	if (!clks)
+-		return ~0;
 -
--		dd = clk->dpll_data;
--		if (!dd)
--			return -EINVAL;
+-	for (clkr = clks->rates; clkr->div; clkr++) {
+-		if (!(clkr->flags & cpu_mask))
+-		    continue;
 -
--		tmpset.cm_clksel1_pll = __raw_readl(dd->mult_div1_reg);
--		tmpset.cm_clksel1_pll &= ~(dd->mult_mask |
--					   dd->div1_mask);
--		div = ((curr_prcm_set->xtal_speed / 1000000) - 1);
--		tmpset.cm_clksel2_pll = cm_read_mod_reg(PLL_MOD, CM_CLKSEL2);
--		tmpset.cm_clksel2_pll &= ~OMAP24XX_CORE_CLK_SRC_MASK;
--		if (rate > low) {
--			tmpset.cm_clksel2_pll |= CORE_CLK_SRC_DPLL_X2;
--			mult = ((rate / 2) / 1000000);
--			done_rate = CORE_CLK_SRC_DPLL_X2;
--		} else {
--			tmpset.cm_clksel2_pll |= CORE_CLK_SRC_DPLL;
--			mult = (rate / 1000000);
--			done_rate = CORE_CLK_SRC_DPLL;
--		}
--		tmpset.cm_clksel1_pll |= (div << __ffs(dd->mult_mask));
--		tmpset.cm_clksel1_pll |= (mult << __ffs(dd->div1_mask));
+-		/* Sanity check */
+-		if (clkr->div <= last_div)
+-			pr_err("clock: clksel_rate table not sorted "
+-			       "for clock %s", clk->name);
 -
--		/* Worst case */
--		tmpset.base_sdrc_rfr = SDRC_RFR_CTRL_BYPASS;
+-		last_div = clkr->div;
 -
--		if (rate == curr_prcm_set->xtal_speed)	/* If asking for 1-1 */
--			bypass = 1;
+-		test_rate = clk->parent->rate / clkr->div;
 -
--		/* For omap2xxx_sdrc_init_params() */
--		omap2xxx_sdrc_reprogram(CORE_CLK_SRC_DPLL_X2, 1);
--
--		/* Force dll lock mode */
--		omap2_set_prcm(tmpset.cm_clksel1_pll, tmpset.base_sdrc_rfr,
--			       bypass);
--
--		/* Errata: ret dll entry state */
--		omap2xxx_sdrc_init_params(omap2xxx_sdrc_dll_is_unlocked());
--		omap2xxx_sdrc_reprogram(done_rate, 0);
+-		if (test_rate <= target_rate)
+-			break; /* found it */
 -	}
+-
+-	if (!clkr->div) {
+-		pr_err("clock: Could not find divisor for target "
+-		       "rate %ld for clock %s parent %s\n", target_rate,
+-		       clk->name, clk->parent->name);
+-		return ~0;
+-	}
+-
+-	*new_div = clkr->div;
+-
+-	pr_debug("clock: new_div = %d, new_rate = %ld\n", *new_div,
+-		 (clk->parent->rate / clkr->div));
+-
+-	return (clk->parent->rate / clkr->div);
+-}
+-
+-/**
+- * omap2_clksel_round_rate - find rounded rate for the given clock and rate
+- * @clk: OMAP struct clk to use
+- * @target_rate: desired clock rate
+- *
+- * Compatibility wrapper for OMAP clock framework
+- * Finds best target rate based on the source clock and possible dividers.
+- * rates. The divider array must be sorted with smallest divider first.
+- * Note that this will not work for clocks which are part of CONFIG_PARTICIPANT,
+- * they are only settable as part of virtual_prcm set.
+- *
+- * Returns the rounded clock rate or returns 0xffffffff on error.
+- */
+-long omap2_clksel_round_rate(struct clk *clk, unsigned long target_rate)
+-{
+-	u32 new_div;
+-
+-	return omap2_clksel_round_rate_div(clk, target_rate, &new_div);
+-}
+-
+-
+-/* Given a clock and a rate apply a clock specific rounding function */
+-long omap2_clk_round_rate(struct clk *clk, unsigned long rate)
+-{
+-	if (clk->round_rate)
+-		return clk->round_rate(clk, rate);
+-
+-	if (clk->flags & RATE_FIXED)
+-		printk(KERN_ERR "clock: generic omap2_clk_round_rate called "
+-		       "on fixed-rate clock %s\n", clk->name);
+-
+-	return clk->rate;
+-}
+-
+-/**
+- * omap2_clksel_to_divisor() - turn clksel field value into integer divider
+- * @clk: OMAP struct clk to use
+- * @field_val: register field value to find
+- *
+- * Given a struct clk of a rate-selectable clksel clock, and a register field
+- * value to search for, find the corresponding clock divisor.  The register
+- * field value should be pre-masked and shifted down so the LSB is at bit 0
+- * before calling.  Returns 0 on error
+- */
+-u32 omap2_clksel_to_divisor(struct clk *clk, u32 field_val)
+-{
+-	const struct clksel *clks;
+-	const struct clksel_rate *clkr;
+-
+-	clks = omap2_get_clksel_by_parent(clk, clk->parent);
+-	if (!clks)
+-		return 0;
+-
+-	for (clkr = clks->rates; clkr->div; clkr++) {
+-		if ((clkr->flags & cpu_mask) && (clkr->val == field_val))
+-			break;
+-	}
+-
+-	if (!clkr->div) {
+-		printk(KERN_ERR "clock: Could not find fieldval %d for "
+-		       "clock %s parent %s\n", field_val, clk->name,
+-		       clk->parent->name);
+-		return 0;
+-	}
+-
+-	return clkr->div;
+-}
+-
+-/**
+- * omap2_divisor_to_clksel() - turn clksel integer divisor into a field value
+- * @clk: OMAP struct clk to use
+- * @div: integer divisor to search for
+- *
+- * Given a struct clk of a rate-selectable clksel clock, and a clock divisor,
+- * find the corresponding register field value.  The return register value is
+- * the value before left-shifting.  Returns ~0 on error
+- */
+-u32 omap2_divisor_to_clksel(struct clk *clk, u32 div)
+-{
+-	const struct clksel *clks;
+-	const struct clksel_rate *clkr;
+-
+-	/* should never happen */
+-	WARN_ON(div == 0);
+-
+-	clks = omap2_get_clksel_by_parent(clk, clk->parent);
+-	if (!clks)
+-		return ~0;
+-
+-	for (clkr = clks->rates; clkr->div; clkr++) {
+-		if ((clkr->flags & cpu_mask) && (clkr->div == div))
+-			break;
+-	}
+-
+-	if (!clkr->div) {
+-		printk(KERN_ERR "clock: Could not find divisor %d for "
+-		       "clock %s parent %s\n", div, clk->name,
+-		       clk->parent->name);
+-		return ~0;
+-	}
+-
+-	return clkr->val;
+-}
+-
+-/**
+- * omap2_clksel_get_divisor - get current divider applied to parent clock.
+- * @clk: OMAP struct clk to use.
+- *
+- * Returns the integer divisor upon success or 0 on error.
+- */
+-u32 omap2_clksel_get_divisor(struct clk *clk)
+-{
+-	u32 v;
+-
+-	if (!clk->clksel_mask)
+-		return 0;
+-
+-	v = __raw_readl(clk->clksel_reg) & clk->clksel_mask;
+-	v >>= __ffs(clk->clksel_mask);
+-
+-	return omap2_clksel_to_divisor(clk, v);
+-}
+-
+-int omap2_clksel_set_rate(struct clk *clk, unsigned long rate)
+-{
+-	u32 v, field_val, validrate, new_div = 0;
+-
+-	if (!clk->clksel_mask)
+-		return -EINVAL;
+-
+-	validrate = omap2_clksel_round_rate_div(clk, rate, &new_div);
+-	if (validrate != rate)
+-		return -EINVAL;
+-
+-	field_val = omap2_divisor_to_clksel(clk, new_div);
+-	if (field_val == ~0)
+-		return -EINVAL;
+-
+-	v = __raw_readl(clk->clksel_reg);
+-	v &= ~clk->clksel_mask;
+-	v |= field_val << __ffs(clk->clksel_mask);
+-	__raw_writel(v, clk->clksel_reg);
+-	v = __raw_readl(clk->clksel_reg); /* OCP barrier */
+-
+-	clk->rate = clk->parent->rate / new_div;
+-
+-	_omap2xxx_clk_commit(clk);
 -
 -	return 0;
 -}
 -
- /**
-  * omap2_table_mpu_recalc - just return the MPU speed
-  * @clk: virt_prcm_set struct clk
+-
+ /* Set the clock rate for a clock source */
+ int omap2_clk_set_rate(struct clk *clk, unsigned long rate)
+ {
+@@ -622,75 +311,15 @@ int omap2_clk_set_rate(struct clk *clk, unsigned long rate)
+ 	return ret;
+ }
+ 
+-/*
+- * Converts encoded control register address into a full address
+- * On error, the return value (parent_div) will be 0.
+- */
+-static u32 _omap2_clksel_get_src_field(struct clk *src_clk, struct clk *clk,
+-				       u32 *field_val)
+-{
+-	const struct clksel *clks;
+-	const struct clksel_rate *clkr;
+-
+-	clks = omap2_get_clksel_by_parent(clk, src_clk);
+-	if (!clks)
+-		return 0;
+-
+-	for (clkr = clks->rates; clkr->div; clkr++) {
+-		if (clkr->flags & cpu_mask && clkr->flags & DEFAULT_RATE)
+-			break; /* Found the default rate for this platform */
+-	}
+-
+-	if (!clkr->div) {
+-		printk(KERN_ERR "clock: Could not find default rate for "
+-		       "clock %s parent %s\n", clk->name,
+-		       src_clk->parent->name);
+-		return 0;
+-	}
+-
+-	/* Should never happen.  Add a clksel mask to the struct clk. */
+-	WARN_ON(clk->clksel_mask == 0);
+-
+-	*field_val = clkr->val;
+-
+-	return clkr->div;
+-}
+-
+ int omap2_clk_set_parent(struct clk *clk, struct clk *new_parent)
+ {
+-	u32 field_val, v, parent_div;
+-
+ 	if (clk->flags & CONFIG_PARTICIPANT)
+ 		return -EINVAL;
+ 
+ 	if (!clk->clksel)
+ 		return -EINVAL;
+ 
+-	parent_div = _omap2_clksel_get_src_field(new_parent, clk, &field_val);
+-	if (!parent_div)
+-		return -EINVAL;
+-
+-	/* Set new source value (previous dividers if any in effect) */
+-	v = __raw_readl(clk->clksel_reg);
+-	v &= ~clk->clksel_mask;
+-	v |= field_val << __ffs(clk->clksel_mask);
+-	__raw_writel(v, clk->clksel_reg);
+-	v = __raw_readl(clk->clksel_reg);    /* OCP barrier */
+-
+-	_omap2xxx_clk_commit(clk);
+-
+-	clk_reparent(clk, new_parent);
+-
+-	/* CLKSEL clocks follow their parents' rates, divided by a divisor */
+-	clk->rate = new_parent->rate;
+-
+-	if (parent_div > 0)
+-		clk->rate /= parent_div;
+-
+-	pr_debug("clock: set parent of %s to %s (new rate %ld)\n",
+-		 clk->name, clk->parent->name, clk->rate);
+-
+-	return 0;
++	return omap2_clksel_set_parent(clk, new_parent);
+ }
+ 
+ /*-------------------------------------------------------------------------
+diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
+index 0d70dc0..0d21702 100644
+--- a/arch/arm/mach-omap2/clock.h
++++ b/arch/arm/mach-omap2/clock.h
+@@ -80,6 +80,7 @@ u32 omap2_clksel_to_divisor(struct clk *clk, u32 field_val);
+ u32 omap2_divisor_to_clksel(struct clk *clk, u32 div);
+ long omap2_clksel_round_rate(struct clk *clk, unsigned long target_rate);
+ int omap2_clksel_set_rate(struct clk *clk, unsigned long rate);
++int omap2_clksel_set_parent(struct clk *clk, struct clk *new_parent);
+ u32 omap2_get_dpll_rate(struct clk *clk);
+ void omap2_init_dpll_parent(struct clk *clk);
+ int omap2_wait_clock_ready(void __iomem *reg, u32 cval, const char *name);
+@@ -90,6 +91,7 @@ void omap2_clk_dflt_find_companion(struct clk *clk, void __iomem **other_reg,
+ 				   u8 *other_bit);
+ void omap2_clk_dflt_find_idlest(struct clk *clk, void __iomem **idlest_reg,
+ 				u8 *idlest_bit);
++void omap2xxx_clk_commit(struct clk *clk);
+ 
+ extern u8 cpu_mask;
+ 
