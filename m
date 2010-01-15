@@ -1,97 +1,141 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 15 Jan 2010 02:07:05 -0700
-Subject: [PATCH 13/18] OMAP2/3 clock: clean up omap*_clk_arch_init()
+Date: Fri, 15 Jan 2010 02:07:07 -0700
+Subject: [PATCH 15/18] OMAP2/3/4 clock: omap2_clk_prepare_for_reboot() is
+	OMAP2xxx-only
 In-Reply-To: <20100115090613.30690.49355.stgit@localhost.localdomain>
 References: <20100115090613.30690.49355.stgit@localhost.localdomain>
-Message-ID: <20100115090704.30690.11508.stgit@localhost.localdomain>
+Message-ID: <20100115090706.30690.34855.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the OMAP3xxx clock code, remove the #ifdef CONFIG_ARCH_OMAP3 in
-clock34xx.c, since this file is only compiled for OMAP3xxx builds.  Also,
-rename omap2_clk_arch_init in this file to omap3xxx_clk_arch_init() to
-pave the way for multi-OMAP kernels.  Ensure that it is not executed
-on non-OMAP3xxx systems.
-
-In the OMAP2xxx clock code, rename omap2_clk_arch_init in this file to
-omap2xxx_clk_arch_init() to pave the way for multi-OMAP kernels.
-Ensure that it is not executed on non-OMAP2xxx systems.
+omap2_clk_prepare_for_reboot() is only applicable to OMAP2xxx chips,
+so rename it to omap2xxx_clk_prepare_for_reboot() and only call it when
+running on OMAP2xxx chips.  Remove the old stub in the OMAP3 clock code.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/clock2xxx.c |    7 +++++--
- arch/arm/mach-omap2/clock34xx.c |   16 +++++-----------
- 2 files changed, 10 insertions(+), 13 deletions(-)
+ arch/arm/mach-omap2/clock.h     |    1 -
+ arch/arm/mach-omap2/clock2xxx.c |    2 +-
+ arch/arm/mach-omap2/clock2xxx.h |    1 +
+ arch/arm/mach-omap2/clock34xx.c |   21 ++-------------------
+ arch/arm/mach-omap2/clock44xx.c |    5 -----
+ arch/arm/mach-omap2/prcm.c      |    8 +++++---
+ 6 files changed, 9 insertions(+), 29 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
+index dcd58cd..be5a55f 100644
+--- a/arch/arm/mach-omap2/clock.h
++++ b/arch/arm/mach-omap2/clock.h
+@@ -84,7 +84,6 @@ int omap2_clksel_set_parent(struct clk *clk, struct clk *new_parent);
+ u32 omap2_get_dpll_rate(struct clk *clk);
+ void omap2_init_dpll_parent(struct clk *clk);
+ int omap2_wait_clock_ready(void __iomem *reg, u32 cval, const char *name);
+-void omap2_clk_prepare_for_reboot(void);
+ int omap2_dflt_clk_enable(struct clk *clk);
+ void omap2_dflt_clk_disable(struct clk *clk);
+ void omap2_clk_dflt_find_companion(struct clk *clk, void __iomem **other_reg,
 diff --git a/arch/arm/mach-omap2/clock2xxx.c b/arch/arm/mach-omap2/clock2xxx.c
-index e5b9851..b7e81ec 100644
+index e98f48b..a48b01a 100644
 --- a/arch/arm/mach-omap2/clock2xxx.c
 +++ b/arch/arm/mach-omap2/clock2xxx.c
-@@ -101,11 +101,14 @@ void omap2_clk_prepare_for_reboot(void)
-  * Switch the MPU rate if specified on cmdline.
-  * We cannot do this early until cmdline is parsed.
-  */
--static int __init omap2_clk_arch_init(void)
-+static int __init omap2xxx_clk_arch_init(void)
- {
- 	struct clk *virt_prcm_set, *sys_ck, *dpll_ck, *mpu_ck;
- 	unsigned long sys_ck_rate;
- 
-+	if (!cpu_is_omap24xx())
-+		return 0;
-+
- 	if (!mpurate)
- 		return -EINVAL;
- 
-@@ -129,6 +132,6 @@ static int __init omap2_clk_arch_init(void)
- 
- 	return 0;
- }
--arch_initcall(omap2_clk_arch_init);
-+arch_initcall(omap2xxx_clk_arch_init);
- 
- 
-diff --git a/arch/arm/mach-omap2/clock34xx.c b/arch/arm/mach-omap2/clock34xx.c
-index 552ad30..d38ad44 100644
---- a/arch/arm/mach-omap2/clock34xx.c
-+++ b/arch/arm/mach-omap2/clock34xx.c
-@@ -163,12 +163,6 @@ int omap3_dpll4_set_rate(struct clk *clk, unsigned long rate)
- /* Common clock code */
- 
+@@ -71,7 +71,7 @@ const struct clkops clkops_omap2430_i2chs_wait = {
  /*
-- * As it is structured now, this will prevent an OMAP2/3 multiboot
-- * kernel from compiling.  This will need further attention.
-- */
--#if defined(CONFIG_ARCH_OMAP3)
--
--/*
   * Set clocks for bypass mode for reboot to work.
   */
- void omap2_clk_prepare_for_reboot(void)
-@@ -213,11 +207,14 @@ void omap3_clk_lock_dpll5(void)
-  * Switch the MPU rate if specified on cmdline.
-  * We cannot do this early until cmdline is parsed.
-  */
--static int __init omap2_clk_arch_init(void)
-+static int __init omap3xxx_clk_arch_init(void)
+-void omap2_clk_prepare_for_reboot(void)
++void omap2xxx_clk_prepare_for_reboot(void)
  {
- 	struct clk *osc_sys_ck, *dpll1_ck, *arm_fck, *core_ck;
- 	unsigned long osc_sys_rate;
+ 	u32 rate;
  
-+	if (!cpu_is_omap34xx())
-+		return 0;
-+
- 	if (!mpurate)
- 		return -EINVAL;
+diff --git a/arch/arm/mach-omap2/clock2xxx.h b/arch/arm/mach-omap2/clock2xxx.h
+index c14061b..bed294a 100644
+--- a/arch/arm/mach-omap2/clock2xxx.h
++++ b/arch/arm/mach-omap2/clock2xxx.h
+@@ -18,6 +18,7 @@ int omap2_reprogram_dpllcore(struct clk *clk, unsigned long rate);
+ unsigned long omap2xxx_clk_get_core_rate(struct clk *clk);
+ u32 omap2xxx_get_apll_clkin(void);
+ u32 omap2xxx_get_sysclkdiv(void);
++void omap2xxx_clk_prepare_for_reboot(void);
  
-@@ -246,9 +243,6 @@ static int __init omap2_clk_arch_init(void)
- 
- 	return 0;
+ /* REVISIT: These should be set dynamically for CONFIG_MULTI_OMAP2 */
+ #ifdef CONFIG_ARCH_OMAP2420
+diff --git a/arch/arm/mach-omap2/clock34xx.c b/arch/arm/mach-omap2/clock34xx.c
+index 8a7db7a..34d3950 100644
+--- a/arch/arm/mach-omap2/clock34xx.c
++++ b/arch/arm/mach-omap2/clock34xx.c
+@@ -150,25 +150,6 @@ int omap3_dpll4_set_rate(struct clk *clk, unsigned long rate)
+ 	return omap3_noncore_dpll_set_rate(clk, rate);
  }
--arch_initcall(omap2_clk_arch_init);
+ 
+-/* Common clock code */
 -
+-/*
+- * Set clocks for bypass mode for reboot to work.
+- */
+-void omap2_clk_prepare_for_reboot(void)
+-{
+-	/* REVISIT: Not ready for 343x */
+-#if 0
+-	u32 rate;
 -
+-	if (vclk == NULL || sclk == NULL)
+-		return;
+-
+-	rate = clk_get_rate(sclk);
+-	clk_set_rate(vclk, rate);
 -#endif
-+arch_initcall(omap3xxx_clk_arch_init);
+-}
+-
+ void omap3_clk_lock_dpll5(void)
+ {
+ 	struct clk *dpll5_clk;
+@@ -191,6 +172,8 @@ void omap3_clk_lock_dpll5(void)
+ 	return;
+ }
  
++/* Common clock code */
++
+ /* REVISIT: Move this init stuff out into clock.c */
  
+ /*
+diff --git a/arch/arm/mach-omap2/clock44xx.c b/arch/arm/mach-omap2/clock44xx.c
+index 08dd642..c238717 100644
+--- a/arch/arm/mach-omap2/clock44xx.c
++++ b/arch/arm/mach-omap2/clock44xx.c
+@@ -17,8 +17,3 @@ const struct clkops clkops_noncore_dpll_ops = {
+ 	.enable		= &omap3_noncore_dpll_enable,
+ 	.disable	= &omap3_noncore_dpll_disable,
+ };
+-
+-void omap2_clk_prepare_for_reboot(void)
+-{
+-	return;
+-}
+diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
+index 63330d2..814376a 100644
+--- a/arch/arm/mach-omap2/prcm.c
++++ b/arch/arm/mach-omap2/prcm.c
+@@ -29,6 +29,7 @@
+ #include <plat/control.h>
+ 
+ #include "clock.h"
++#include "clock2xxx.h"
+ #include "cm.h"
+ #include "prm.h"
+ #include "prm-regbits-24xx.h"
+@@ -136,11 +137,12 @@ EXPORT_SYMBOL(omap_prcm_get_reset_sources);
+ void omap_prcm_arch_reset(char mode)
+ {
+ 	s16 prcm_offs;
+-	omap2_clk_prepare_for_reboot();
+ 
+-	if (cpu_is_omap24xx())
++	if (cpu_is_omap24xx()) {
++		omap2xxx_clk_prepare_for_reboot();
++
+ 		prcm_offs = WKUP_MOD;
+-	else if (cpu_is_omap34xx()) {
++	} else if (cpu_is_omap34xx()) {
+ 		u32 l;
+ 
+ 		prcm_offs = OMAP3430_GR_MOD;
