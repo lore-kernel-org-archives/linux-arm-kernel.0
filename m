@@ -1,38 +1,139 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 15 Jan 2010 02:06:52 -0700
-Subject: [PATCH 01/18] OMAP3 clock: move OMAP3-specific DPLL functions to
-	dpll3xxx.c
+Date: Fri, 15 Jan 2010 02:06:55 -0700
+Subject: [PATCH 04/18] OMAP2 clock: move all static functions to the top of
+	the file
 In-Reply-To: <20100115090613.30690.49355.stgit@localhost.localdomain>
 References: <20100115090613.30690.49355.stgit@localhost.localdomain>
-Message-ID: <20100115090650.30690.52329.stgit@localhost.localdomain>
+Message-ID: <20100115090654.30690.46792.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark the OMAP3-specific DPLL functions as being OMAP3-specific by moving
-them from mach-omap2/dpll.c to mach-omap2/dpll3xxx.c.
+Move static functions to the top of the file and ensure that their names
+are prefixed with an underscore to conform with the practice in the newer
+OMAP clock code files.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
 ---
- arch/arm/mach-omap2/Makefile   |    2 +-
- arch/arm/mach-omap2/dpll3xxx.c |    0 
- 2 files changed, 1 insertions(+), 1 deletions(-)
- rename arch/arm/mach-omap2/{dpll.c => dpll3xxx.c} (100%)
+ arch/arm/mach-omap2/clock.c |   88 ++++++++++++++++++++++---------------------
+ 1 files changed, 46 insertions(+), 42 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 64de2fd..7d46fde 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -6,7 +6,7 @@
- obj-y := id.o io.o control.o mux.o devices.o serial.o gpmc.o timer-gp.o
+diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+index d3ebb74..0d54fde 100644
+--- a/arch/arm/mach-omap2/clock.c
++++ b/arch/arm/mach-omap2/clock.c
+@@ -42,6 +42,51 @@ u8 cpu_mask;
+  * OMAP2/3/4 specific clock functions
+  *-------------------------------------------------------------------------*/
  
- omap-2-3-common				= irq.o sdrc.o omap_hwmod.o
--omap-3-4-common				= dpll.o
-+omap-3-4-common				= dpll3xxx.o
- prcm-common				= prcm.o powerdomain.o
- clock-common				= clock.o clock_common_data.o clockdomain.o
++/* Private functions */
++
++/**
++ * _omap2_module_wait_ready - wait for an OMAP module to leave IDLE
++ * @clk: struct clk * belonging to the module
++ *
++ * If the necessary clocks for the OMAP hardware IP block that
++ * corresponds to clock @clk are enabled, then wait for the module to
++ * indicate readiness (i.e., to leave IDLE).  This code does not
++ * belong in the clock code and will be moved in the medium term to
++ * module-dependent code.  No return value.
++ */
++static void _omap2_module_wait_ready(struct clk *clk)
++{
++	void __iomem *companion_reg, *idlest_reg;
++	u8 other_bit, idlest_bit;
++
++	/* Not all modules have multiple clocks that their IDLEST depends on */
++	if (clk->ops->find_companion) {
++		clk->ops->find_companion(clk, &companion_reg, &other_bit);
++		if (!(__raw_readl(companion_reg) & (1 << other_bit)))
++			return;
++	}
++
++	clk->ops->find_idlest(clk, &idlest_reg, &idlest_bit);
++
++	omap2_cm_wait_idlest(idlest_reg, (1 << idlest_bit), clk->name);
++}
++
++/* Enables clock without considering parent dependencies or use count
++ * REVISIT: Maybe change this to use clk->enable like on omap1?
++ */
++static int _omap2_clk_enable(struct clk *clk)
++{
++	return clk->ops->enable(clk);
++}
++
++/* Disables clock without considering parent dependencies or use count */
++static void _omap2_clk_disable(struct clk *clk)
++{
++	clk->ops->disable(clk);
++}
++
++/* Public functions */
++
+ /**
+  * omap2xxx_clk_commit - commit clock parent/rate changes in hardware
+  * @clk: struct clk *
+@@ -149,33 +194,6 @@ void omap2_clk_dflt_find_idlest(struct clk *clk, void __iomem **idlest_reg,
+ 	*idlest_bit = clk->enable_bit;
+ }
  
-diff --git a/arch/arm/mach-omap2/dpll.c b/arch/arm/mach-omap2/dpll3xxx.c
-similarity index 100%
-rename from arch/arm/mach-omap2/dpll.c
-rename to arch/arm/mach-omap2/dpll3xxx.c
+-/**
+- * omap2_module_wait_ready - wait for an OMAP module to leave IDLE
+- * @clk: struct clk * belonging to the module
+- *
+- * If the necessary clocks for the OMAP hardware IP block that
+- * corresponds to clock @clk are enabled, then wait for the module to
+- * indicate readiness (i.e., to leave IDLE).  This code does not
+- * belong in the clock code and will be moved in the medium term to
+- * module-dependent code.  No return value.
+- */
+-static void omap2_module_wait_ready(struct clk *clk)
+-{
+-	void __iomem *companion_reg, *idlest_reg;
+-	u8 other_bit, idlest_bit;
+-
+-	/* Not all modules have multiple clocks that their IDLEST depends on */
+-	if (clk->ops->find_companion) {
+-		clk->ops->find_companion(clk, &companion_reg, &other_bit);
+-		if (!(__raw_readl(companion_reg) & (1 << other_bit)))
+-			return;
+-	}
+-
+-	clk->ops->find_idlest(clk, &idlest_reg, &idlest_bit);
+-
+-	omap2_cm_wait_idlest(idlest_reg, (1 << idlest_bit), clk->name);
+-}
+-
+ int omap2_dflt_clk_enable(struct clk *clk)
+ {
+ 	u32 v;
+@@ -195,7 +213,7 @@ int omap2_dflt_clk_enable(struct clk *clk)
+ 	v = __raw_readl(clk->enable_reg); /* OCP barrier */
+ 
+ 	if (clk->ops->find_idlest)
+-		omap2_module_wait_ready(clk);
++		_omap2_module_wait_ready(clk);
+ 
+ 	return 0;
+ }
+@@ -235,20 +253,6 @@ const struct clkops clkops_omap2_dflt = {
+ 	.disable	= omap2_dflt_clk_disable,
+ };
+ 
+-/* Enables clock without considering parent dependencies or use count
+- * REVISIT: Maybe change this to use clk->enable like on omap1?
+- */
+-static int _omap2_clk_enable(struct clk *clk)
+-{
+-	return clk->ops->enable(clk);
+-}
+-
+-/* Disables clock without considering parent dependencies or use count */
+-static void _omap2_clk_disable(struct clk *clk)
+-{
+-	clk->ops->disable(clk);
+-}
+-
+ void omap2_clk_disable(struct clk *clk)
+ {
+ 	if (clk->usecount > 0 && !(--clk->usecount)) {
