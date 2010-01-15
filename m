@@ -1,29 +1,42 @@
-From: valentin.longchamp@epfl.ch (Valentin Longchamp)
-Date: Fri, 15 Jan 2010 18:32:11 +0100
-Subject: [PATCH] otg Kconfig: add missing select USB_OTG_UTILS to USB_ULPI
-	option
-Message-ID: <1263576731-26075-1-git-send-email-valentin.longchamp@epfl.ch>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 15 Jan 2010 21:03:10 +0100
+Subject: [suspend/resume] Re: userspace notification from module
+In-Reply-To: <201001091440.46434.rjw@sisk.pl>
+References: <686edb2c.6263643a.4b3f4a3b.b60b3@o2.pl>
+	<201001022201.04281.rjw@sisk.pl> <20100109103212.GA1429@ucw.cz>
+	<201001091440.46434.rjw@sisk.pl>
+Message-ID: <20100115200310.GG1345@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes a link error for mx3 platforms with ULPI host devices enabled. Should go for rc5 since it completes http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=f9ffaa9ca9889f17ef30b82bc0bf954d141280f8 that was introduced in rc4.
+On Sat 2010-01-09 14:40:46, Rafael J. Wysocki wrote:
+> On Saturday 09 January 2010, Pavel Machek wrote:
 
-Signed-off-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
----
- drivers/usb/otg/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+> > > Perhaps I don't understand correctly what you're trying to achieve, but at the
+> > > moment suspend is always started from user space, this way or another, and on
+> > 
+> > At least zaurus (arm) suspends from kernel on battery critical.
+> 
+> I wasn't aware of this.
+> 
+> That may be a good reason for adding kernel-based suspend notification,
+> although I'd prefer ARM to notify the user space about the critical battery
+> status allowing it to decide what to do.
 
-diff --git a/drivers/usb/otg/Kconfig b/drivers/usb/otg/Kconfig
-index de56b3d..3d2d3e5 100644
---- a/drivers/usb/otg/Kconfig
-+++ b/drivers/usb/otg/Kconfig
-@@ -44,6 +44,7 @@ config ISP1301_OMAP
- config USB_ULPI
- 	bool "Generic ULPI Transceiver Driver"
- 	depends on ARM
-+	select USB_OTG_UTILS
- 	help
- 	  Enable this to support ULPI connected USB OTG transceivers which
- 	  are likely found on embedded boards.
+Hard to do, without breaking compatibility that goes down to 2.4.X.
+
+> IMhO automatic suspend without something like the Android's wakelocks hurts
+> more than it helps.
+
+It really makes sense on zaurus. Those machines are simple, no
+smartbattery and no embedded controller subsystems. Battery will not
+protect itself, and its kernel job. (Should work on init=/bin/bash).
+
+As power-off consumption is same as suspend power consumption (I
+beleive zaurus simply does not have true power off), suspend on
+critical makes some sense. (Note that it is set lower than on pcs, and
+that we declare battery critical sooner than that.)
+								Pavel
 -- 
-1.6.3.3
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
