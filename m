@@ -1,46 +1,47 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 15 Jan 2010 02:06:53 -0700
-Subject: [PATCH 02/18] OMAP2/3/4 clock: move DPLL clock functions into
-	clkt_dpll.c
+Date: Fri, 15 Jan 2010 02:06:59 -0700
+Subject: [PATCH 07/18] OMAP2xxx clock: move the DVFS virtual clock code into
+	clkt2xxx_virt_prcm_set.c
 In-Reply-To: <20100115090613.30690.49355.stgit@localhost.localdomain>
 References: <20100115090613.30690.49355.stgit@localhost.localdomain>
-Message-ID: <20100115090652.30690.12700.stgit@localhost.localdomain>
+Message-ID: <20100115090658.30690.5714.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move all DPLL-related clock functions from mach-omap2/clock.c to
-clkt_dpll.c to improve maintainability.
+Move the DVFS virtual clock functions from clock2xxx.c to
+clkt2xxx_virt_prcm_set.c to improve maintainability.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Richard Woodruff <r-woodruff2@ti.com>
 ---
- arch/arm/mach-omap2/Makefile    |    3 
- arch/arm/mach-omap2/clkt_dpll.c |  386 +++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/clock.c     |  355 ------------------------------------
- 3 files changed, 388 insertions(+), 356 deletions(-)
- create mode 100644 arch/arm/mach-omap2/clkt_dpll.c
+ arch/arm/mach-omap2/Makefile                 |    3 
+ arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |  245 ++++++++++++++++++++++++++
+ arch/arm/mach-omap2/clock2xxx.c              |  211 ----------------------
+ 3 files changed, 247 insertions(+), 212 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
 
 diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 7d46fde..1a135c8 100644
+index 04ce372..2b58363 100644
 --- a/arch/arm/mach-omap2/Makefile
 +++ b/arch/arm/mach-omap2/Makefile
-@@ -8,7 +8,8 @@ obj-y := id.o io.o control.o mux.o devices.o serial.o gpmc.o timer-gp.o
- omap-2-3-common				= irq.o sdrc.o omap_hwmod.o
- omap-3-4-common				= dpll3xxx.o
- prcm-common				= prcm.o powerdomain.o
--clock-common				= clock.o clock_common_data.o clockdomain.o
-+clock-common				= clock.o clock_common_data.o \
-+					  clockdomain.o clkt_dpll.o
+@@ -11,7 +11,8 @@ prcm-common				= prcm.o powerdomain.o
+ clock-common				= clock.o clock_common_data.o \
+ 					  clockdomain.o clkt_dpll.o \
+ 					  clkt_clksel.o
+-clock-omap2xxx				= clkt2xxx_dpllcore.o
++clock-omap2xxx				= clkt2xxx_dpllcore.o \
++					  clkt2xxx_virt_prcm_set.o
  
- obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common) $(prcm-common) $(clock-common)
- obj-$(CONFIG_ARCH_OMAP3) += $(omap-2-3-common) $(prcm-common) $(clock-common) \
-diff --git a/arch/arm/mach-omap2/clkt_dpll.c b/arch/arm/mach-omap2/clkt_dpll.c
+ obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common) $(prcm-common) $(clock-common) \
+ 			    $(clock-omap2xxx)
+diff --git a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
 new file mode 100644
-index 0000000..c332e59
+index 0000000..3018af7
 --- /dev/null
-+++ b/arch/arm/mach-omap2/clkt_dpll.c
-@@ -0,0 +1,386 @@
++++ b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
+@@ -0,0 +1,245 @@
 +/*
-+ * clkt_dpll.c - OMAP2/3/4 DPLL clock functions
++ * clkt2xxx_virt_prcm_set.c - OMAP2xxx DVFS virtual clock functions
 + *
 + * Copyright (C) 2005-2008 Texas Instruments, Inc.
 + * Copyright (C) 2004-2010 Nokia Corporation
@@ -48,6 +49,9 @@ index 0000000..c332e59
 + * Contacts:
 + * Richard Woodruff <r-woodruff2@ti.com>
 + * Paul Walmsley
++ *
++ * Based on earlier work by Tuukka Tikkanen, Tony Lindgren,
++ * Gordon McNutt and RidgeRun, Inc.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -59,770 +63,454 @@ index 0000000..c332e59
 +#include <linux/errno.h>
 +#include <linux/clk.h>
 +#include <linux/io.h>
-+
-+#include <asm/div64.h>
++#include <linux/cpufreq.h>
 +
 +#include <plat/clock.h>
++#include <plat/sram.h>
++#include <plat/sdrc.h>
 +
 +#include "clock.h"
++#include "clock2xxx.h"
++#include "opp2xxx.h"
 +#include "cm.h"
 +#include "cm-regbits-24xx.h"
-+#include "cm-regbits-34xx.h"
 +
-+/* DPLL rate rounding: minimum DPLL multiplier, divider values */
-+#define DPLL_MIN_MULTIPLIER		1
-+#define DPLL_MIN_DIVIDER		1
-+
-+/* Possible error results from _dpll_test_mult */
-+#define DPLL_MULT_UNDERFLOW		-1
-+
-+/*
-+ * Scale factor to mitigate roundoff errors in DPLL rate rounding.
-+ * The higher the scale factor, the greater the risk of arithmetic overflow,
-+ * but the closer the rounded rate to the target rate.  DPLL_SCALE_FACTOR
-+ * must be a power of DPLL_SCALE_BASE.
-+ */
-+#define DPLL_SCALE_FACTOR		64
-+#define DPLL_SCALE_BASE			2
-+#define DPLL_ROUNDING_VAL		((DPLL_SCALE_BASE / 2) * \
-+					 (DPLL_SCALE_FACTOR / DPLL_SCALE_BASE))
-+
-+/* DPLL valid Fint frequency band limits - from 34xx TRM Section 4.7.6.2 */
-+#define DPLL_FINT_BAND1_MIN		750000
-+#define DPLL_FINT_BAND1_MAX		2100000
-+#define DPLL_FINT_BAND2_MIN		7500000
-+#define DPLL_FINT_BAND2_MAX		21000000
-+
-+/* _dpll_test_fint() return codes */
-+#define DPLL_FINT_UNDERFLOW		-1
-+#define DPLL_FINT_INVALID		-2
-+
-+/* Private functions */
-+
-+/*
-+ * _dpll_test_fint - test whether an Fint value is valid for the DPLL
-+ * @clk: DPLL struct clk to test
-+ * @n: divider value (N) to test
-+ *
-+ * Tests whether a particular divider @n will result in a valid DPLL
-+ * internal clock frequency Fint. See the 34xx TRM 4.7.6.2 "DPLL Jitter
-+ * Correction".  Returns 0 if OK, -1 if the enclosing loop can terminate
-+ * (assuming that it is counting N upwards), or -2 if the enclosing loop
-+ * should skip to the next iteration (again assuming N is increasing).
-+ */
-+static int _dpll_test_fint(struct clk *clk, u8 n)
-+{
-+	struct dpll_data *dd;
-+	long fint;
-+	int ret = 0;
-+
-+	dd = clk->dpll_data;
-+
-+	/* DPLL divider must result in a valid jitter correction val */
-+	fint = clk->parent->rate / (n + 1);
-+	if (fint < DPLL_FINT_BAND1_MIN) {
-+
-+		pr_debug("rejecting n=%d due to Fint failure, "
-+			 "lowering max_divider\n", n);
-+		dd->max_divider = n;
-+		ret = DPLL_FINT_UNDERFLOW;
-+
-+	} else if (fint > DPLL_FINT_BAND1_MAX &&
-+		   fint < DPLL_FINT_BAND2_MIN) {
-+
-+		pr_debug("rejecting n=%d due to Fint failure\n", n);
-+		ret = DPLL_FINT_INVALID;
-+
-+	} else if (fint > DPLL_FINT_BAND2_MAX) {
-+
-+		pr_debug("rejecting n=%d due to Fint failure, "
-+			 "boosting min_divider\n", n);
-+		dd->min_divider = n;
-+		ret = DPLL_FINT_INVALID;
-+
-+	}
-+
-+	return ret;
-+}
-+
-+static unsigned long _dpll_compute_new_rate(unsigned long parent_rate,
-+					    unsigned int m, unsigned int n)
-+{
-+	unsigned long long num;
-+
-+	num = (unsigned long long)parent_rate * m;
-+	do_div(num, n);
-+	return num;
-+}
-+
-+/*
-+ * _dpll_test_mult - test a DPLL multiplier value
-+ * @m: pointer to the DPLL m (multiplier) value under test
-+ * @n: current DPLL n (divider) value under test
-+ * @new_rate: pointer to storage for the resulting rounded rate
-+ * @target_rate: the desired DPLL rate
-+ * @parent_rate: the DPLL's parent clock rate
-+ *
-+ * This code tests a DPLL multiplier value, ensuring that the
-+ * resulting rate will not be higher than the target_rate, and that
-+ * the multiplier value itself is valid for the DPLL.  Initially, the
-+ * integer pointed to by the m argument should be prescaled by
-+ * multiplying by DPLL_SCALE_FACTOR.  The code will replace this with
-+ * a non-scaled m upon return.  This non-scaled m will result in a
-+ * new_rate as close as possible to target_rate (but not greater than
-+ * target_rate) given the current (parent_rate, n, prescaled m)
-+ * triple. Returns DPLL_MULT_UNDERFLOW in the event that the
-+ * non-scaled m attempted to underflow, which can allow the calling
-+ * function to bail out early; or 0 upon success.
-+ */
-+static int _dpll_test_mult(int *m, int n, unsigned long *new_rate,
-+			   unsigned long target_rate,
-+			   unsigned long parent_rate)
-+{
-+	int r = 0, carry = 0;
-+
-+	/* Unscale m and round if necessary */
-+	if (*m % DPLL_SCALE_FACTOR >= DPLL_ROUNDING_VAL)
-+		carry = 1;
-+	*m = (*m / DPLL_SCALE_FACTOR) + carry;
-+
-+	/*
-+	 * The new rate must be <= the target rate to avoid programming
-+	 * a rate that is impossible for the hardware to handle
-+	 */
-+	*new_rate = _dpll_compute_new_rate(parent_rate, *m, n);
-+	if (*new_rate > target_rate) {
-+		(*m)--;
-+		*new_rate = 0;
-+	}
-+
-+	/* Guard against m underflow */
-+	if (*m < DPLL_MIN_MULTIPLIER) {
-+		*m = DPLL_MIN_MULTIPLIER;
-+		*new_rate = 0;
-+		r = DPLL_MULT_UNDERFLOW;
-+	}
-+
-+	if (*new_rate == 0)
-+		*new_rate = _dpll_compute_new_rate(parent_rate, *m, n);
-+
-+	return r;
-+}
-+
-+/* Public functions */
-+
-+void omap2_init_dpll_parent(struct clk *clk)
-+{
-+	u32 v;
-+	struct dpll_data *dd;
-+
-+	dd = clk->dpll_data;
-+	if (!dd)
-+		return;
-+
-+	/* Return bypass rate if DPLL is bypassed */
-+	v = __raw_readl(dd->control_reg);
-+	v &= dd->enable_mask;
-+	v >>= __ffs(dd->enable_mask);
-+
-+	/* Reparent in case the dpll is in bypass */
-+	if (cpu_is_omap24xx()) {
-+		if (v == OMAP2XXX_EN_DPLL_LPBYPASS ||
-+		    v == OMAP2XXX_EN_DPLL_FRBYPASS)
-+			clk_reparent(clk, dd->clk_bypass);
-+	} else if (cpu_is_omap34xx()) {
-+		if (v == OMAP3XXX_EN_DPLL_LPBYPASS ||
-+		    v == OMAP3XXX_EN_DPLL_FRBYPASS)
-+			clk_reparent(clk, dd->clk_bypass);
-+	} else if (cpu_is_omap44xx()) {
-+		if (v == OMAP4XXX_EN_DPLL_LPBYPASS ||
-+		    v == OMAP4XXX_EN_DPLL_FRBYPASS ||
-+		    v == OMAP4XXX_EN_DPLL_MNBYPASS)
-+			clk_reparent(clk, dd->clk_bypass);
-+	}
-+	return;
-+}
++const struct prcm_config *curr_prcm_set;
++const struct prcm_config *rate_table;
 +
 +/**
-+ * omap2_get_dpll_rate - returns the current DPLL CLKOUT rate
-+ * @clk: struct clk * of a DPLL
++ * omap2_table_mpu_recalc - just return the MPU speed
++ * @clk: virt_prcm_set struct clk
 + *
-+ * DPLLs can be locked or bypassed - basically, enabled or disabled.
-+ * When locked, the DPLL output depends on the M and N values.  When
-+ * bypassed, on OMAP2xxx, the output rate is either the 32KiHz clock
-+ * or sys_clk.  Bypass rates on OMAP3 depend on the DPLL: DPLLs 1 and
-+ * 2 are bypassed with dpll1_fclk and dpll2_fclk respectively
-+ * (generated by DPLL3), while DPLL 3, 4, and 5 bypass rates are sys_clk.
-+ * Returns the current DPLL CLKOUT rate (*not* CLKOUTX2) if the DPLL is
-+ * locked, or the appropriate bypass rate if the DPLL is bypassed, or 0
-+ * if the clock @clk is not a DPLL.
++ * Set virt_prcm_set's rate to the mpu_speed field of the current PRCM set.
 + */
-+u32 omap2_get_dpll_rate(struct clk *clk)
++unsigned long omap2_table_mpu_recalc(struct clk *clk)
 +{
-+	long long dpll_clk;
-+	u32 dpll_mult, dpll_div, v;
-+	struct dpll_data *dd;
-+
-+	dd = clk->dpll_data;
-+	if (!dd)
-+		return 0;
-+
-+	/* Return bypass rate if DPLL is bypassed */
-+	v = __raw_readl(dd->control_reg);
-+	v &= dd->enable_mask;
-+	v >>= __ffs(dd->enable_mask);
-+
-+	if (cpu_is_omap24xx()) {
-+		if (v == OMAP2XXX_EN_DPLL_LPBYPASS ||
-+		    v == OMAP2XXX_EN_DPLL_FRBYPASS)
-+			return dd->clk_bypass->rate;
-+	} else if (cpu_is_omap34xx()) {
-+		if (v == OMAP3XXX_EN_DPLL_LPBYPASS ||
-+		    v == OMAP3XXX_EN_DPLL_FRBYPASS)
-+			return dd->clk_bypass->rate;
-+	} else if (cpu_is_omap44xx()) {
-+		if (v == OMAP4XXX_EN_DPLL_LPBYPASS ||
-+		    v == OMAP4XXX_EN_DPLL_FRBYPASS ||
-+		    v == OMAP4XXX_EN_DPLL_MNBYPASS)
-+			return dd->clk_bypass->rate;
-+	}
-+
-+	v = __raw_readl(dd->mult_div1_reg);
-+	dpll_mult = v & dd->mult_mask;
-+	dpll_mult >>= __ffs(dd->mult_mask);
-+	dpll_div = v & dd->div1_mask;
-+	dpll_div >>= __ffs(dd->div1_mask);
-+
-+	dpll_clk = (long long)dd->clk_ref->rate * dpll_mult;
-+	do_div(dpll_clk, dpll_div + 1);
-+
-+	return dpll_clk;
++	return curr_prcm_set->mpu_speed;
 +}
 +
-+/* DPLL rate rounding code */
-+
-+/**
-+ * omap2_dpll_set_rate_tolerance: set the error tolerance during rate rounding
-+ * @clk: struct clk * of the DPLL
-+ * @tolerance: maximum rate error tolerance
++/*
++ * Look for a rate equal or less than the target rate given a configuration set.
 + *
-+ * Set the maximum DPLL rate error tolerance for the rate rounding
-+ * algorithm.  The rate tolerance is an attempt to balance DPLL power
-+ * saving (the least divider value "n") vs. rate fidelity (the least
-+ * difference between the desired DPLL target rate and the rounded
-+ * rate out of the algorithm).  So, increasing the tolerance is likely
-+ * to decrease DPLL power consumption and increase DPLL rate error.
-+ * Returns -EINVAL if provided a null clock ptr or a clk that is not a
-+ * DPLL; or 0 upon success.
++ * What's not entirely clear is "which" field represents the key field.
++ * Some might argue L3-DDR, others ARM, others IVA. This code is simple and
++ * just uses the ARM rates.
 + */
-+int omap2_dpll_set_rate_tolerance(struct clk *clk, unsigned int tolerance)
++long omap2_round_to_table_rate(struct clk *clk, unsigned long rate)
 +{
-+	if (!clk || !clk->dpll_data)
++	const struct prcm_config *ptr;
++	long highest_rate;
++	long sys_ck_rate;
++
++	sys_ck_rate = clk_get_rate(sclk);
++
++	highest_rate = -EINVAL;
++
++	for (ptr = rate_table; ptr->mpu_speed; ptr++) {
++		if (!(ptr->flags & cpu_mask))
++			continue;
++		if (ptr->xtal_speed != sys_ck_rate)
++			continue;
++
++		highest_rate = ptr->mpu_speed;
++
++		/* Can check only after xtal frequency check */
++		if (ptr->mpu_speed <= rate)
++			break;
++	}
++	return highest_rate;
++}
++
++/* Sets basic clocks based on the specified rate */
++int omap2_select_table_rate(struct clk *clk, unsigned long rate)
++{
++	u32 cur_rate, done_rate, bypass = 0, tmp;
++	const struct prcm_config *prcm;
++	unsigned long found_speed = 0;
++	unsigned long flags;
++	long sys_ck_rate;
++
++	sys_ck_rate = clk_get_rate(sclk);
++
++	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
++		if (!(prcm->flags & cpu_mask))
++			continue;
++
++		if (prcm->xtal_speed != sys_ck_rate)
++			continue;
++
++		if (prcm->mpu_speed <= rate) {
++			found_speed = prcm->mpu_speed;
++			break;
++		}
++	}
++
++	if (!found_speed) {
++		printk(KERN_INFO "Could not set MPU rate to %luMHz\n",
++		       rate / 1000000);
 +		return -EINVAL;
++	}
 +
-+	clk->dpll_data->rate_tolerance = tolerance;
++	curr_prcm_set = prcm;
++	cur_rate = omap2xxx_clk_get_core_rate(dclk);
++
++	if (prcm->dpll_speed == cur_rate / 2) {
++		omap2xxx_sdrc_reprogram(CORE_CLK_SRC_DPLL, 1);
++	} else if (prcm->dpll_speed == cur_rate * 2) {
++		omap2xxx_sdrc_reprogram(CORE_CLK_SRC_DPLL_X2, 1);
++	} else if (prcm->dpll_speed != cur_rate) {
++		local_irq_save(flags);
++
++		if (prcm->dpll_speed == prcm->xtal_speed)
++			bypass = 1;
++
++		if ((prcm->cm_clksel2_pll & OMAP24XX_CORE_CLK_SRC_MASK) ==
++		    CORE_CLK_SRC_DPLL_X2)
++			done_rate = CORE_CLK_SRC_DPLL_X2;
++		else
++			done_rate = CORE_CLK_SRC_DPLL;
++
++		/* MPU divider */
++		cm_write_mod_reg(prcm->cm_clksel_mpu, MPU_MOD, CM_CLKSEL);
++
++		/* dsp + iva1 div(2420), iva2.1(2430) */
++		cm_write_mod_reg(prcm->cm_clksel_dsp,
++				 OMAP24XX_DSP_MOD, CM_CLKSEL);
++
++		cm_write_mod_reg(prcm->cm_clksel_gfx, GFX_MOD, CM_CLKSEL);
++
++		/* Major subsystem dividers */
++		tmp = cm_read_mod_reg(CORE_MOD, CM_CLKSEL1) & OMAP24XX_CLKSEL_DSS2_MASK;
++		cm_write_mod_reg(prcm->cm_clksel1_core | tmp, CORE_MOD,
++				 CM_CLKSEL1);
++
++		if (cpu_is_omap2430())
++			cm_write_mod_reg(prcm->cm_clksel_mdm,
++					 OMAP2430_MDM_MOD, CM_CLKSEL);
++
++		/* x2 to enter omap2xxx_sdrc_init_params() */
++		omap2xxx_sdrc_reprogram(CORE_CLK_SRC_DPLL_X2, 1);
++
++		omap2_set_prcm(prcm->cm_clksel1_pll, prcm->base_sdrc_rfr,
++			       bypass);
++
++		omap2xxx_sdrc_init_params(omap2xxx_sdrc_dll_is_unlocked());
++		omap2xxx_sdrc_reprogram(done_rate, 0);
++
++		local_irq_restore(flags);
++	}
 +
 +	return 0;
 +}
 +
-+/**
-+ * omap2_dpll_round_rate - round a target rate for an OMAP DPLL
-+ * @clk: struct clk * for a DPLL
-+ * @target_rate: desired DPLL clock rate
-+ *
-+ * Given a DPLL, a desired target rate, and a rate tolerance, round
-+ * the target rate to a possible, programmable rate for this DPLL.
-+ * Rate tolerance is assumed to be set by the caller before this
-+ * function is called.  Attempts to select the minimum possible n
-+ * within the tolerance to reduce power consumption.  Stores the
-+ * computed (m, n) in the DPLL's dpll_data structure so set_rate()
-+ * will not need to call this (expensive) function again.  Returns ~0
-+ * if the target rate cannot be rounded, either because the rate is
-+ * too low or because the rate tolerance is set too tightly; or the
-+ * rounded rate upon success.
++#ifdef CONFIG_CPU_FREQ
++/*
++ * Walk PRCM rate table and fillout cpufreq freq_table
++ * XXX This should be replaced by an OPP layer in the near future
 + */
-+long omap2_dpll_round_rate(struct clk *clk, unsigned long target_rate)
++static struct cpufreq_frequency_table *freq_table;
++
++void omap2xxx_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
 +{
-+	int m, n, r, e, scaled_max_m;
-+	unsigned long scaled_rt_rp, new_rate;
-+	int min_e = -1, min_e_m = -1, min_e_n = -1;
-+	struct dpll_data *dd;
++	const struct prcm_config *prcm;
++	long sys_ck_rate;
++	int i = 0;
++	int tbl_sz = 0;
 +
-+	if (!clk || !clk->dpll_data)
-+		return ~0;
++	if (!cpu_is_omap2xxx())
++		return;
 +
-+	dd = clk->dpll_data;
++	sys_ck_rate = clk_get_rate(sclk);
 +
-+	pr_debug("clock: starting DPLL round_rate for clock %s, target rate "
-+		 "%ld\n", clk->name, target_rate);
-+
-+	scaled_rt_rp = target_rate / (dd->clk_ref->rate / DPLL_SCALE_FACTOR);
-+	scaled_max_m = dd->max_multiplier * DPLL_SCALE_FACTOR;
-+
-+	dd->last_rounded_rate = 0;
-+
-+	for (n = dd->min_divider; n <= dd->max_divider; n++) {
-+
-+		/* Is the (input clk, divider) pair valid for the DPLL? */
-+		r = _dpll_test_fint(clk, n);
-+		if (r == DPLL_FINT_UNDERFLOW)
-+			break;
-+		else if (r == DPLL_FINT_INVALID)
++	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
++		if (!(prcm->flags & cpu_mask))
++			continue;
++		if (prcm->xtal_speed != sys_ck_rate)
 +			continue;
 +
-+		/* Compute the scaled DPLL multiplier, based on the divider */
-+		m = scaled_rt_rp * n;
-+
-+		/*
-+		 * Since we're counting n up, a m overflow means we
-+		 * can bail out completely (since as n increases in
-+		 * the next iteration, there's no way that m can
-+		 * increase beyond the current m)
-+		 */
-+		if (m > scaled_max_m)
-+			break;
-+
-+		r = _dpll_test_mult(&m, n, &new_rate, target_rate,
-+				    dd->clk_ref->rate);
-+
-+		/* m can't be set low enough for this n - try with a larger n */
-+		if (r == DPLL_MULT_UNDERFLOW)
++		/* don't put bypass rates in table */
++		if (prcm->dpll_speed == prcm->xtal_speed)
 +			continue;
 +
-+		e = target_rate - new_rate;
-+		pr_debug("clock: n = %d: m = %d: rate error is %d "
-+			 "(new_rate = %ld)\n", n, m, e, new_rate);
-+
-+		if (min_e == -1 ||
-+		    min_e >= (int)(abs(e) - dd->rate_tolerance)) {
-+			min_e = e;
-+			min_e_m = m;
-+			min_e_n = n;
-+
-+			pr_debug("clock: found new least error %d\n", min_e);
-+
-+			/* We found good settings -- bail out now */
-+			if (min_e <= dd->rate_tolerance)
-+				break;
-+		}
++		tbl_sz++;
 +	}
 +
-+	if (min_e < 0) {
-+		pr_debug("clock: error: target rate or tolerance too low\n");
-+		return ~0;
++	/*
++	 * XXX Ensure that we're doing what CPUFreq expects for this error
++	 * case and the following one
++	 */
++	if (tbl_sz == 0) {
++		pr_warning("%s: no matching entries in rate_table\n",
++			   __func__);
++		return;
 +	}
 +
-+	dd->last_rounded_m = min_e_m;
-+	dd->last_rounded_n = min_e_n;
-+	dd->last_rounded_rate = _dpll_compute_new_rate(dd->clk_ref->rate,
-+						       min_e_m,  min_e_n);
++	/* Include the CPUFREQ_TABLE_END terminator entry */
++	tbl_sz++;
 +
-+	pr_debug("clock: final least error: e = %d, m = %d, n = %d\n",
-+		 min_e, min_e_m, min_e_n);
-+	pr_debug("clock: final rate: %ld  (target rate: %ld)\n",
-+		 dd->last_rounded_rate, target_rate);
++	freq_table = kzalloc(sizeof(struct cpufreq_frequency_table) * tbl_sz,
++			     GFP_ATOMIC);
++	if (!freq_table) {
++		pr_err("%s: could not kzalloc frequency table\n", __func__);
++		return;
++	}
 +
-+	return dd->last_rounded_rate;
++	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
++		if (!(prcm->flags & cpu_mask))
++			continue;
++		if (prcm->xtal_speed != sys_ck_rate)
++			continue;
++
++		/* don't put bypass rates in table */
++		if (prcm->dpll_speed == prcm->xtal_speed)
++			continue;
++
++		freq_table[i].index = i;
++		freq_table[i].frequency = prcm->mpu_speed / 1000;
++		i++;
++	}
++
++	freq_table[i].index = i;
++	freq_table[i].frequency = CPUFREQ_TABLE_END;
++
++	*table = &freq_table[0];
 +}
 +
-diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index d88b255..9819628 100644
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -28,10 +28,7 @@
- #include <plat/clockdomain.h>
- #include <plat/cpu.h>
- #include <plat/prcm.h>
--#include <asm/div64.h>
++void omap2xxx_clk_exit_cpufreq_table(struct cpufreq_frequency_table **table)
++{
++	if (!cpu_is_omap2xxx())
++		return;
++
++	kfree(freq_table);
++}
++
++#endif
+diff --git a/arch/arm/mach-omap2/clock2xxx.c b/arch/arm/mach-omap2/clock2xxx.c
+index 419ae80..11d6edb 100644
+--- a/arch/arm/mach-omap2/clock2xxx.c
++++ b/arch/arm/mach-omap2/clock2xxx.c
+@@ -54,9 +54,6 @@
+ #define APLLS_CLKIN_13MHZ		2
+ #define APLLS_CLKIN_12MHZ		3
  
--#include <plat/sdrc.h>
--#include "sdrc.h"
- #include "clock.h"
- #include "prm.h"
- #include "prm-regbits-24xx.h"
-@@ -39,72 +36,12 @@
- #include "cm-regbits-24xx.h"
- #include "cm-regbits-34xx.h"
- 
--/* DPLL rate rounding: minimum DPLL multiplier, divider values */
--#define DPLL_MIN_MULTIPLIER		1
--#define DPLL_MIN_DIVIDER		1
+-const struct prcm_config *curr_prcm_set;
+-const struct prcm_config *rate_table;
 -
--/* Possible error results from _dpll_test_mult */
--#define DPLL_MULT_UNDERFLOW		-1
+ struct clk *vclk, *sclk, *dclk;
+ 
+ void __iomem *prcm_clksrc_ctrl;
+@@ -185,214 +182,6 @@ const struct clkops clkops_apll54 = {
+ 	.disable	= omap2_clk_apll_disable,
+ };
+ 
+-/**
+- * omap2_table_mpu_recalc - just return the MPU speed
+- * @clk: virt_prcm_set struct clk
+- *
+- * Set virt_prcm_set's rate to the mpu_speed field of the current PRCM set.
+- */
+-unsigned long omap2_table_mpu_recalc(struct clk *clk)
+-{
+-	return curr_prcm_set->mpu_speed;
+-}
 -
 -/*
-- * Scale factor to mitigate roundoff errors in DPLL rate rounding.
-- * The higher the scale factor, the greater the risk of arithmetic overflow,
-- * but the closer the rounded rate to the target rate.  DPLL_SCALE_FACTOR
-- * must be a power of DPLL_SCALE_BASE.
+- * Look for a rate equal or less than the target rate given a configuration set.
+- *
+- * What's not entirely clear is "which" field represents the key field.
+- * Some might argue L3-DDR, others ARM, others IVA. This code is simple and
+- * just uses the ARM rates.
 - */
--#define DPLL_SCALE_FACTOR		64
--#define DPLL_SCALE_BASE			2
--#define DPLL_ROUNDING_VAL		((DPLL_SCALE_BASE / 2) * \
--					 (DPLL_SCALE_FACTOR / DPLL_SCALE_BASE))
--
--/* DPLL valid Fint frequency band limits - from 34xx TRM Section 4.7.6.2 */
--#define DPLL_FINT_BAND1_MIN		750000
--#define DPLL_FINT_BAND1_MAX		2100000
--#define DPLL_FINT_BAND2_MIN		7500000
--#define DPLL_FINT_BAND2_MAX		21000000
--
--/* _dpll_test_fint() return codes */
--#define DPLL_FINT_UNDERFLOW		-1
--#define DPLL_FINT_INVALID		-2
--
- u8 cpu_mask;
- 
- /*-------------------------------------------------------------------------
-  * OMAP2/3/4 specific clock functions
-  *-------------------------------------------------------------------------*/
- 
--void omap2_init_dpll_parent(struct clk *clk)
+-long omap2_round_to_table_rate(struct clk *clk, unsigned long rate)
 -{
--	u32 v;
--	struct dpll_data *dd;
+-	const struct prcm_config *ptr;
+-	long highest_rate;
+-	long sys_ck_rate;
 -
--	dd = clk->dpll_data;
--	if (!dd)
--		return;
+-	sys_ck_rate = clk_get_rate(sclk);
 -
--	/* Return bypass rate if DPLL is bypassed */
--	v = __raw_readl(dd->control_reg);
--	v &= dd->enable_mask;
--	v >>= __ffs(dd->enable_mask);
+-	highest_rate = -EINVAL;
 -
--	/* Reparent in case the dpll is in bypass */
--	if (cpu_is_omap24xx()) {
--		if (v == OMAP2XXX_EN_DPLL_LPBYPASS ||
--		    v == OMAP2XXX_EN_DPLL_FRBYPASS)
--			clk_reparent(clk, dd->clk_bypass);
--	} else if (cpu_is_omap34xx()) {
--		if (v == OMAP3XXX_EN_DPLL_LPBYPASS ||
--		    v == OMAP3XXX_EN_DPLL_FRBYPASS)
--			clk_reparent(clk, dd->clk_bypass);
--	} else if (cpu_is_omap44xx()) {
--		if (v == OMAP4XXX_EN_DPLL_LPBYPASS ||
--		    v == OMAP4XXX_EN_DPLL_FRBYPASS ||
--		    v == OMAP4XXX_EN_DPLL_MNBYPASS)
--			clk_reparent(clk, dd->clk_bypass);
+-	for (ptr = rate_table; ptr->mpu_speed; ptr++) {
+-		if (!(ptr->flags & cpu_mask))
+-			continue;
+-		if (ptr->xtal_speed != sys_ck_rate)
+-			continue;
+-
+-		highest_rate = ptr->mpu_speed;
+-
+-		/* Can check only after xtal frequency check */
+-		if (ptr->mpu_speed <= rate)
+-			break;
 -	}
--	return;
+-	return highest_rate;
 -}
 -
- /**
-  * _omap2xxx_clk_commit - commit clock parent/rate changes in hardware
-  * @clk: struct clk *
-@@ -127,52 +64,6 @@ static void _omap2xxx_clk_commit(struct clk *clk)
- 	prm_read_mod_reg(OMAP24XX_GR_MOD, OMAP2_PRCM_CLKCFG_CTRL_OFFSET);
- }
- 
--/*
-- * _dpll_test_fint - test whether an Fint value is valid for the DPLL
-- * @clk: DPLL struct clk to test
-- * @n: divider value (N) to test
-- *
-- * Tests whether a particular divider @n will result in a valid DPLL
-- * internal clock frequency Fint. See the 34xx TRM 4.7.6.2 "DPLL Jitter
-- * Correction".  Returns 0 if OK, -1 if the enclosing loop can terminate
-- * (assuming that it is counting N upwards), or -2 if the enclosing loop
-- * should skip to the next iteration (again assuming N is increasing).
-- */
--static int _dpll_test_fint(struct clk *clk, u8 n)
+-/* Sets basic clocks based on the specified rate */
+-int omap2_select_table_rate(struct clk *clk, unsigned long rate)
 -{
--	struct dpll_data *dd;
--	long fint;
--	int ret = 0;
+-	u32 cur_rate, done_rate, bypass = 0, tmp;
+-	const struct prcm_config *prcm;
+-	unsigned long found_speed = 0;
+-	unsigned long flags;
+-	long sys_ck_rate;
 -
--	dd = clk->dpll_data;
+-	sys_ck_rate = clk_get_rate(sclk);
 -
--	/* DPLL divider must result in a valid jitter correction val */
--	fint = clk->parent->rate / (n + 1);
--	if (fint < DPLL_FINT_BAND1_MIN) {
+-	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
+-		if (!(prcm->flags & cpu_mask))
+-			continue;
 -
--		pr_debug("rejecting n=%d due to Fint failure, "
--			 "lowering max_divider\n", n);
--		dd->max_divider = n;
--		ret = DPLL_FINT_UNDERFLOW;
+-		if (prcm->xtal_speed != sys_ck_rate)
+-			continue;
 -
--	} else if (fint > DPLL_FINT_BAND1_MAX &&
--		   fint < DPLL_FINT_BAND2_MIN) {
--
--		pr_debug("rejecting n=%d due to Fint failure\n", n);
--		ret = DPLL_FINT_INVALID;
--
--	} else if (fint > DPLL_FINT_BAND2_MAX) {
--
--		pr_debug("rejecting n=%d due to Fint failure, "
--			 "boosting min_divider\n", n);
--		dd->min_divider = n;
--		ret = DPLL_FINT_INVALID;
--
+-		if (prcm->mpu_speed <= rate) {
+-			found_speed = prcm->mpu_speed;
+-			break;
+-		}
 -	}
 -
--	return ret;
--}
--
- /**
-  * omap2_init_clk_clkdm - look up a clockdomain name, store pointer in clk
-  * @clk: OMAP clock struct ptr to use
-@@ -243,62 +134,6 @@ void omap2_init_clksel_parent(struct clk *clk)
- }
- 
- /**
-- * omap2_get_dpll_rate - returns the current DPLL CLKOUT rate
-- * @clk: struct clk * of a DPLL
-- *
-- * DPLLs can be locked or bypassed - basically, enabled or disabled.
-- * When locked, the DPLL output depends on the M and N values.  When
-- * bypassed, on OMAP2xxx, the output rate is either the 32KiHz clock
-- * or sys_clk.  Bypass rates on OMAP3 depend on the DPLL: DPLLs 1 and
-- * 2 are bypassed with dpll1_fclk and dpll2_fclk respectively
-- * (generated by DPLL3), while DPLL 3, 4, and 5 bypass rates are sys_clk.
-- * Returns the current DPLL CLKOUT rate (*not* CLKOUTX2) if the DPLL is
-- * locked, or the appropriate bypass rate if the DPLL is bypassed, or 0
-- * if the clock @clk is not a DPLL.
-- */
--u32 omap2_get_dpll_rate(struct clk *clk)
--{
--	long long dpll_clk;
--	u32 dpll_mult, dpll_div, v;
--	struct dpll_data *dd;
--
--	dd = clk->dpll_data;
--	if (!dd)
--		return 0;
--
--	/* Return bypass rate if DPLL is bypassed */
--	v = __raw_readl(dd->control_reg);
--	v &= dd->enable_mask;
--	v >>= __ffs(dd->enable_mask);
--
--	if (cpu_is_omap24xx()) {
--		if (v == OMAP2XXX_EN_DPLL_LPBYPASS ||
--		    v == OMAP2XXX_EN_DPLL_FRBYPASS)
--			return dd->clk_bypass->rate;
--	} else if (cpu_is_omap34xx()) {
--		if (v == OMAP3XXX_EN_DPLL_LPBYPASS ||
--		    v == OMAP3XXX_EN_DPLL_FRBYPASS)
--			return dd->clk_bypass->rate;
--	} else if (cpu_is_omap44xx()) {
--		if (v == OMAP4XXX_EN_DPLL_LPBYPASS ||
--		    v == OMAP4XXX_EN_DPLL_FRBYPASS ||
--		    v == OMAP4XXX_EN_DPLL_MNBYPASS)
--			return dd->clk_bypass->rate;
--	}
--
--	v = __raw_readl(dd->mult_div1_reg);
--	dpll_mult = v & dd->mult_mask;
--	dpll_mult >>= __ffs(dd->mult_mask);
--	dpll_div = v & dd->div1_mask;
--	dpll_div >>= __ffs(dd->div1_mask);
--
--	dpll_clk = (long long)dd->clk_ref->rate * dpll_mult;
--	do_div(dpll_clk, dpll_div + 1);
--
--	return dpll_clk;
--}
--
--/**
-  * omap2_clk_dflt_find_companion - find companion clock to @clk
-  * @clk: struct clk * to find the companion clock of
-  * @other_reg: void __iomem ** to return the companion clock CM_*CLKEN va in
-@@ -858,196 +693,6 @@ int omap2_clk_set_parent(struct clk *clk, struct clk *new_parent)
- 	return 0;
- }
- 
--/* DPLL rate rounding code */
--
--/**
-- * omap2_dpll_set_rate_tolerance: set the error tolerance during rate rounding
-- * @clk: struct clk * of the DPLL
-- * @tolerance: maximum rate error tolerance
-- *
-- * Set the maximum DPLL rate error tolerance for the rate rounding
-- * algorithm.  The rate tolerance is an attempt to balance DPLL power
-- * saving (the least divider value "n") vs. rate fidelity (the least
-- * difference between the desired DPLL target rate and the rounded
-- * rate out of the algorithm).  So, increasing the tolerance is likely
-- * to decrease DPLL power consumption and increase DPLL rate error.
-- * Returns -EINVAL if provided a null clock ptr or a clk that is not a
-- * DPLL; or 0 upon success.
-- */
--int omap2_dpll_set_rate_tolerance(struct clk *clk, unsigned int tolerance)
--{
--	if (!clk || !clk->dpll_data)
+-	if (!found_speed) {
+-		printk(KERN_INFO "Could not set MPU rate to %luMHz\n",
+-		       rate / 1000000);
 -		return -EINVAL;
+-	}
 -
--	clk->dpll_data->rate_tolerance = tolerance;
+-	curr_prcm_set = prcm;
+-	cur_rate = omap2xxx_clk_get_core_rate(dclk);
+-
+-	if (prcm->dpll_speed == cur_rate / 2) {
+-		omap2xxx_sdrc_reprogram(CORE_CLK_SRC_DPLL, 1);
+-	} else if (prcm->dpll_speed == cur_rate * 2) {
+-		omap2xxx_sdrc_reprogram(CORE_CLK_SRC_DPLL_X2, 1);
+-	} else if (prcm->dpll_speed != cur_rate) {
+-		local_irq_save(flags);
+-
+-		if (prcm->dpll_speed == prcm->xtal_speed)
+-			bypass = 1;
+-
+-		if ((prcm->cm_clksel2_pll & OMAP24XX_CORE_CLK_SRC_MASK) ==
+-		    CORE_CLK_SRC_DPLL_X2)
+-			done_rate = CORE_CLK_SRC_DPLL_X2;
+-		else
+-			done_rate = CORE_CLK_SRC_DPLL;
+-
+-		/* MPU divider */
+-		cm_write_mod_reg(prcm->cm_clksel_mpu, MPU_MOD, CM_CLKSEL);
+-
+-		/* dsp + iva1 div(2420), iva2.1(2430) */
+-		cm_write_mod_reg(prcm->cm_clksel_dsp,
+-				 OMAP24XX_DSP_MOD, CM_CLKSEL);
+-
+-		cm_write_mod_reg(prcm->cm_clksel_gfx, GFX_MOD, CM_CLKSEL);
+-
+-		/* Major subsystem dividers */
+-		tmp = cm_read_mod_reg(CORE_MOD, CM_CLKSEL1) & OMAP24XX_CLKSEL_DSS2_MASK;
+-		cm_write_mod_reg(prcm->cm_clksel1_core | tmp, CORE_MOD,
+-				 CM_CLKSEL1);
+-
+-		if (cpu_is_omap2430())
+-			cm_write_mod_reg(prcm->cm_clksel_mdm,
+-					 OMAP2430_MDM_MOD, CM_CLKSEL);
+-
+-		/* x2 to enter omap2xxx_sdrc_init_params() */
+-		omap2xxx_sdrc_reprogram(CORE_CLK_SRC_DPLL_X2, 1);
+-
+-		omap2_set_prcm(prcm->cm_clksel1_pll, prcm->base_sdrc_rfr,
+-			       bypass);
+-
+-		omap2xxx_sdrc_init_params(omap2xxx_sdrc_dll_is_unlocked());
+-		omap2xxx_sdrc_reprogram(done_rate, 0);
+-
+-		local_irq_restore(flags);
+-	}
 -
 -	return 0;
 -}
 -
--static unsigned long _dpll_compute_new_rate(unsigned long parent_rate,
--					    unsigned int m, unsigned int n)
--{
--	unsigned long long num;
--
--	num = (unsigned long long)parent_rate * m;
--	do_div(num, n);
--	return num;
--}
--
+-#ifdef CONFIG_CPU_FREQ
 -/*
-- * _dpll_test_mult - test a DPLL multiplier value
-- * @m: pointer to the DPLL m (multiplier) value under test
-- * @n: current DPLL n (divider) value under test
-- * @new_rate: pointer to storage for the resulting rounded rate
-- * @target_rate: the desired DPLL rate
-- * @parent_rate: the DPLL's parent clock rate
-- *
-- * This code tests a DPLL multiplier value, ensuring that the
-- * resulting rate will not be higher than the target_rate, and that
-- * the multiplier value itself is valid for the DPLL.  Initially, the
-- * integer pointed to by the m argument should be prescaled by
-- * multiplying by DPLL_SCALE_FACTOR.  The code will replace this with
-- * a non-scaled m upon return.  This non-scaled m will result in a
-- * new_rate as close as possible to target_rate (but not greater than
-- * target_rate) given the current (parent_rate, n, prescaled m)
-- * triple. Returns DPLL_MULT_UNDERFLOW in the event that the
-- * non-scaled m attempted to underflow, which can allow the calling
-- * function to bail out early; or 0 upon success.
+- * Walk PRCM rate table and fillout cpufreq freq_table
+- * XXX This should be replaced by an OPP layer in the near future
 - */
--static int _dpll_test_mult(int *m, int n, unsigned long *new_rate,
--			   unsigned long target_rate,
--			   unsigned long parent_rate)
--{
--	int r = 0, carry = 0;
+-static struct cpufreq_frequency_table *freq_table;
 -
--	/* Unscale m and round if necessary */
--	if (*m % DPLL_SCALE_FACTOR >= DPLL_ROUNDING_VAL)
--		carry = 1;
--	*m = (*m / DPLL_SCALE_FACTOR) + carry;
+-void omap2xxx_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
+-{
+-	const struct prcm_config *prcm;
+-	long sys_ck_rate;
+-	int i = 0;
+-	int tbl_sz = 0;
+-
+-	if (!cpu_is_omap2xxx())
+-		return;
+-
+-	sys_ck_rate = clk_get_rate(sclk);
+-
+-	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
+-		if (!(prcm->flags & cpu_mask))
+-			continue;
+-		if (prcm->xtal_speed != sys_ck_rate)
+-			continue;
+-
+-		/* don't put bypass rates in table */
+-		if (prcm->dpll_speed == prcm->xtal_speed)
+-			continue;
+-
+-		tbl_sz++;
+-	}
 -
 -	/*
--	 * The new rate must be <= the target rate to avoid programming
--	 * a rate that is impossible for the hardware to handle
+-	 * XXX Ensure that we're doing what CPUFreq expects for this error
+-	 * case and the following one
 -	 */
--	*new_rate = _dpll_compute_new_rate(parent_rate, *m, n);
--	if (*new_rate > target_rate) {
--		(*m)--;
--		*new_rate = 0;
+-	if (tbl_sz == 0) {
+-		pr_warning("%s: no matching entries in rate_table\n",
+-			   __func__);
+-		return;
 -	}
 -
--	/* Guard against m underflow */
--	if (*m < DPLL_MIN_MULTIPLIER) {
--		*m = DPLL_MIN_MULTIPLIER;
--		*new_rate = 0;
--		r = DPLL_MULT_UNDERFLOW;
+-	/* Include the CPUFREQ_TABLE_END terminator entry */
+-	tbl_sz++;
+-
+-	freq_table = kzalloc(sizeof(struct cpufreq_frequency_table) * tbl_sz,
+-			     GFP_ATOMIC);
+-	if (!freq_table) {
+-		pr_err("%s: could not kzalloc frequency table\n", __func__);
+-		return;
 -	}
 -
--	if (*new_rate == 0)
--		*new_rate = _dpll_compute_new_rate(parent_rate, *m, n);
+-	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
+-		if (!(prcm->flags & cpu_mask))
+-			continue;
+-		if (prcm->xtal_speed != sys_ck_rate)
+-			continue;
 -
--	return r;
+-		/* don't put bypass rates in table */
+-		if (prcm->dpll_speed == prcm->xtal_speed)
+-			continue;
+-
+-		freq_table[i].index = i;
+-		freq_table[i].frequency = prcm->mpu_speed / 1000;
+-		i++;
+-	}
+-
+-	freq_table[i].index = i;
+-	freq_table[i].frequency = CPUFREQ_TABLE_END;
+-
+-	*table = &freq_table[0];
 -}
 -
--/**
-- * omap2_dpll_round_rate - round a target rate for an OMAP DPLL
-- * @clk: struct clk * for a DPLL
-- * @target_rate: desired DPLL clock rate
-- *
-- * Given a DPLL, a desired target rate, and a rate tolerance, round
-- * the target rate to a possible, programmable rate for this DPLL.
-- * Rate tolerance is assumed to be set by the caller before this
-- * function is called.  Attempts to select the minimum possible n
-- * within the tolerance to reduce power consumption.  Stores the
-- * computed (m, n) in the DPLL's dpll_data structure so set_rate()
-- * will not need to call this (expensive) function again.  Returns ~0
-- * if the target rate cannot be rounded, either because the rate is
-- * too low or because the rate tolerance is set too tightly; or the
-- * rounded rate upon success.
-- */
--long omap2_dpll_round_rate(struct clk *clk, unsigned long target_rate)
+-void omap2xxx_clk_exit_cpufreq_table(struct cpufreq_frequency_table **table)
 -{
--	int m, n, r, e, scaled_max_m;
--	unsigned long scaled_rt_rp, new_rate;
--	int min_e = -1, min_e_m = -1, min_e_n = -1;
--	struct dpll_data *dd;
+-	if (!cpu_is_omap2xxx())
+-		return;
 -
--	if (!clk || !clk->dpll_data)
--		return ~0;
--
--	dd = clk->dpll_data;
--
--	pr_debug("clock: starting DPLL round_rate for clock %s, target rate "
--		 "%ld\n", clk->name, target_rate);
--
--	scaled_rt_rp = target_rate / (dd->clk_ref->rate / DPLL_SCALE_FACTOR);
--	scaled_max_m = dd->max_multiplier * DPLL_SCALE_FACTOR;
--
--	dd->last_rounded_rate = 0;
--
--	for (n = dd->min_divider; n <= dd->max_divider; n++) {
--
--		/* Is the (input clk, divider) pair valid for the DPLL? */
--		r = _dpll_test_fint(clk, n);
--		if (r == DPLL_FINT_UNDERFLOW)
--			break;
--		else if (r == DPLL_FINT_INVALID)
--			continue;
--
--		/* Compute the scaled DPLL multiplier, based on the divider */
--		m = scaled_rt_rp * n;
--
--		/*
--		 * Since we're counting n up, a m overflow means we
--		 * can bail out completely (since as n increases in
--		 * the next iteration, there's no way that m can
--		 * increase beyond the current m)
--		 */
--		if (m > scaled_max_m)
--			break;
--
--		r = _dpll_test_mult(&m, n, &new_rate, target_rate,
--				    dd->clk_ref->rate);
--
--		/* m can't be set low enough for this n - try with a larger n */
--		if (r == DPLL_MULT_UNDERFLOW)
--			continue;
--
--		e = target_rate - new_rate;
--		pr_debug("clock: n = %d: m = %d: rate error is %d "
--			 "(new_rate = %ld)\n", n, m, e, new_rate);
--
--		if (min_e == -1 ||
--		    min_e >= (int)(abs(e) - dd->rate_tolerance)) {
--			min_e = e;
--			min_e_m = m;
--			min_e_n = n;
--
--			pr_debug("clock: found new least error %d\n", min_e);
--
--			/* We found good settings -- bail out now */
--			if (min_e <= dd->rate_tolerance)
--				break;
--		}
--	}
--
--	if (min_e < 0) {
--		pr_debug("clock: error: target rate or tolerance too low\n");
--		return ~0;
--	}
--
--	dd->last_rounded_m = min_e_m;
--	dd->last_rounded_n = min_e_n;
--	dd->last_rounded_rate = _dpll_compute_new_rate(dd->clk_ref->rate,
--						       min_e_m,  min_e_n);
--
--	pr_debug("clock: final least error: e = %d, m = %d, n = %d\n",
--		 min_e, min_e_m, min_e_n);
--	pr_debug("clock: final rate: %ld  (target rate: %ld)\n",
--		 dd->last_rounded_rate, target_rate);
--
--	return dd->last_rounded_rate;
+-	kfree(freq_table);
 -}
 -
- /*-------------------------------------------------------------------------
-  * Omap2 clock reset and init functions
-  *-------------------------------------------------------------------------*/
+-#endif
+-
+ static u32 omap2_get_apll_clkin(void)
+ {
+ 	u32 aplls, srate = 0;
