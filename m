@@ -1,153 +1,151 @@
 From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Sat, 16 Jan 2010 16:34:34 +0530
-Subject: [PATCH 2/4] omap: Make uncompress code and DEBUG_LL code generic
-In-Reply-To: <20100116013515.10065.30649.stgit@baageli.muru.com>
+Date: Sat, 16 Jan 2010 16:54:44 +0530
+Subject: [PATCH 4/4] omap: Make get_irqnr_and_base common for mach-omap2
+	multiboot
+In-Reply-To: <20100116013520.10065.17921.stgit@baageli.muru.com>
 References: <20100116013205.10065.95921.stgit@baageli.muru.com>
-	<20100116013515.10065.30649.stgit@baageli.muru.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C06F902C@dbde02.ent.ti.com>
+	<20100116013520.10065.17921.stgit@baageli.muru.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C06F9033@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-<snip>
+This too is nice fix for multiboot.
 > -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org 
-> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Tony Lindgren
+> From: linux-arm-kernel-bounces at lists.infradead.org 
+> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On 
+> Behalf Of Tony Lindgren
 > Sent: Saturday, January 16, 2010 7:05 AM
 > To: linux-arm-kernel at lists.infradead.org
 > Cc: linux-omap at vger.kernel.org
-> Subject: [PATCH 2/4] omap: Make uncompress code and DEBUG_LL 
-> code generic
+> Subject: [PATCH 4/4] omap: Make get_irqnr_and_base common for 
+> mach-omap2 multiboot
 > 
-> Define arch_decomp_setup() the same way as some other
-> architectures do. Use arch_id to configure the debug uart
-> based on the machine_is by storing it into the uart
-> scratchpad register for DEBUG_LL code to use.
+> Make get_irqnr_and_base common for mach-omap2 multiboot
+> 
+> Note that this will only work currently for 24xx and 34xx.
+> 
+> The overhead of this should be minimal, it basically adds one
+> cmp to see if omap_irq_base has been configured already.
+> If necessary, we can set separate optimized get_irqnr_and_base
+> for non-multiboot configurations.
+Well there is an overhead of two instructions for every interrupt,
+so probably having two version of "get_irqnr_and_base" would be good.
+> 
+> Support for 44xx can be added later on for basic multiboot,
+> and similar patch should be done for mach-omap1/entry-macro.S.
 > 
 > Signed-off-by: Tony Lindgren <tony@atomide.com>
 > ---
->  arch/arm/mach-omap1/include/mach/debug-macro.S |   67 +++++++++-
->  arch/arm/mach-omap1/serial.c                   |   12 ++
->  arch/arm/mach-omap2/include/mach/debug-macro.S |   76 ++++++++---
->  arch/arm/mach-omap2/serial.c                   |   11 ++
->  arch/arm/plat-omap/include/plat/serial.h       |   18 +++
->  arch/arm/plat-omap/include/plat/uncompress.h   |  168 
-> +++++++++++++++++-------
->  6 files changed, 276 insertions(+), 76 deletions(-)
+>  arch/arm/mach-omap2/include/mach/entry-macro.S |   55 
+> ++++++++++++++++--------
+>  1 files changed, 37 insertions(+), 18 deletions(-)
 > 
-....
-
->  static struct plat_serial8250_port serial_platform_data[] = {
-> diff --git a/arch/arm/mach-omap2/include/mach/debug-macro.S 
-> b/arch/arm/mach-omap2/include/mach/debug-macro.S
-> index 0c96e1c..1b83584 100644
-> --- a/arch/arm/mach-omap2/include/mach/debug-macro.S
-> +++ b/arch/arm/mach-omap2/include/mach/debug-macro.S
-> @@ -15,32 +15,66 @@
+> diff --git a/arch/arm/mach-omap2/include/mach/entry-macro.S 
+> b/arch/arm/mach-omap2/include/mach/entry-macro.S
+> index c7f1720..3f75a09 100644
+> --- a/arch/arm/mach-omap2/include/mach/entry-macro.S
+> +++ b/arch/arm/mach-omap2/include/mach/entry-macro.S
+> @@ -17,18 +17,7 @@
 >  
->  #include <plat/serial.h>
->  
-> +omap_uart_phys:	.word	0x0
-> +omap_uart_virt:	.word	0x0
-> +
-> +		/*
-> +		 * Note that this code won't work if the 
-> bootloader passes
-> +		 * a wrong machine ID number in r1. To debug, 
-> just hardcode
-> +		 * the desired UART phys and virt addresses 
-> temporarily into
-> +		 * the omap_uart_phys and omap_uart_virt above.
-> +		 */
->  		.macro	addruart,rx
-> +
-> +		/* Use omap_uart_phys/virt if already configured */
-> +10:		mrc	p15, 0, \rx, c1, c0
-> +		tst	\rx, #1			@ MMU enabled?
-> +		ldreq	\rx, omap_uart_phys	@ physical base address
-> +		ldrne	\rx, omap_uart_virt	@ virtual base
-> +		cmp	\rx, #0			@ is port configured?
-> +		bne	99f			@ already configured
-> +
-> +		/* Check UART1 scratchpad register for uart to use */
->  		mrc	p15, 0, \rx, c1, c0
->  		tst	\rx, #1			@ MMU enabled?
-> -#ifdef  CONFIG_ARCH_OMAP2
->  		moveq	\rx, #0x48000000	@ physical base address
->  		movne	\rx, #0xfa000000	@ virtual base
-> -		orr	\rx, \rx, #0x0006a000
-> -#ifdef CONFIG_OMAP_LL_DEBUG_UART2
-> -		add	\rx, \rx, #0x00002000	@ UART 2
-> -#endif
-> -#ifdef CONFIG_OMAP_LL_DEBUG_UART3
-> -		add	\rx, \rx, #0x00004000	@ UART 3
-> -#endif
+>  #include <plat/omap24xx.h>
+>  #include <plat/omap34xx.h>
 > -
-> -#elif defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
-> -		moveq	\rx, #0x48000000	@ physical base address
-> -		movne	\rx, #0xfa000000	@ virtual base
-> -		orr	\rx, \rx, #0x0006a000
-> -#ifdef CONFIG_OMAP_LL_DEBUG_UART2
-> -		add	\rx, \rx, #0x00002000	@ UART 2
+> -/* REVISIT: This should be set dynamically if 
+> CONFIG_MULTI_OMAP2 is selected */
+> -#if defined(CONFIG_ARCH_OMAP2420) || defined(CONFIG_ARCH_OMAP2430)
+> -#define OMAP2_VA_IC_BASE		
+> OMAP2_L4_IO_ADDRESS(OMAP24XX_IC_BASE)
+> -#elif defined(CONFIG_ARCH_OMAP34XX)
+> -#define OMAP2_VA_IC_BASE		
+> OMAP2_L4_IO_ADDRESS(OMAP34XX_IC_BASE)
 > -#endif
-> -#ifdef CONFIG_OMAP_LL_DEBUG_UART3
-> -		add	\rx, \rx, #0x00fb0000	@ UART 3
-> -		add	\rx, \rx, #0x00006000
+> -#if defined(CONFIG_ARCH_OMAP4)
+>  #include <plat/omap44xx.h>
 > -#endif
-> -#endif
-> +		orr	\rx, \rx, #0x0006a000	@ uart1 on omap2/3/4
-> +		ldrb	\rx, [\rx, #(UART_SCR << 
-> OMAP_PORT_SHIFT)] @ scratchpad
-> +
-> +		/* Select the UART to use based on the UART1 
-> scratchpad value */
-> +		cmp	\rx, #0			@ no port configured?
-> +		beq	21f			@ if none, try 
-> to use UART1
-> +		cmp	\rx, #OMAP2UART1	@ OMAP2/3/4UART1
-> +		beq	21f			@ configure 
-> OMAP2/3/4UART1
-> +		cmp	\rx, #OMAP2UART2	@ OMAP2/3/4UART2
-> +		beq	22f			@ configure 
-> OMAP2/3/4UART2
-> +		cmp	\rx, #OMAP2UART3	@ only on 24xx
-> +		beq	23f			@ configure OMAP2UART3
-> +		cmp	\rx, #OMAP3UART3	@ only on 34xx
-> +		beq	33f			@ configure OMAP3UART3
-Can you please add add OMAP4 UART3 case as well here using 
-"OMAP4UART3". 
-
-Attached patch fixes UART3 support for OMAP4 on top of your patches. Tested 
-this on OMAP4430 SDP. You can fold this patch if you like
-
-		@ configure OMAP4UART3
-> +
-> +		/* Configure the UART offset from the phys/virt base */
-> +21:		mov	\rx, #0x0006a000	@ OMAP2/3/4UART1
-> +22:		mov	\rx, #0x0006a000
-> +		add	\rx, \rx, #0x00002000	@ OMAP2/3/4UART2
-> +		b	98f
-> +23:		mov	\rx, #0x0006a000	@ OMAP2/3/4UART1
-> +		add	\rx, \rx, #0x00004000	@ OMAP2UART3
-> +		b	98f
-> +33:		mov	\rx, #0x0006a000	@ OMAP2/3/4UART1
-> +		add	\rx, \rx, #0x00fb0000
-> +		add	\rx, \rx, #0x00006000	@ OMAP3UART3
-> +
-> +		/* Store both phys and virt address for the uart */
-> +98:		add	\rx, \rx, #0x48000000	@ phys base
-> +		str	\rx, omap_uart_phys
-> +		sub	\rx, \rx, #0x48000000	@ phys base
-> +		add	\rx, \rx, #0xfa000000	@ virt base
-> +		str	\rx, omap_uart_virt
-> +		b	10b
-> +99:
+> -#define INTCPS_SIR_IRQ_OFFSET	0x0040		/* 
+> Active interrupt offset */
+> -#define	ACTIVEIRQ_MASK		0x7f		/* 
+> Active interrupt bits */
+>  
+>  		.macro	disable_fiq
+>  		.endm
+> @@ -39,23 +28,53 @@
+>  		.macro  arch_ret_to_user, tmp1, tmp2
 >  		.endm
 >  
->  		.macro	senduart,rd,rx
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-Update-DEBUG_LL-for-OMAP4.patch
-Type: application/octet-stream
-Size: 1271 bytes
-Desc: 0001-Update-DEBUG_LL-for-OMAP4.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100116/d90886a2/attachment-0001.obj>
+> -#ifndef CONFIG_ARCH_OMAP4
+> +#if defined(CONFIG_ARCH_OMAP2420) || 
+> defined(CONFIG_ARCH_OMAP2430) || \
+> +	defined(CONFIG_ARCH_OMAP34XX)
+> +
+> +#define INTCPS_SIR_IRQ_OFFSET	0x0040		/* 
+> Active interrupt offset */
+> +#define	ACTIVEIRQ_MASK		0x7f		/* 
+> Active interrupt bits */
+> +
+> +omap_irq_base:	.word	0x0
+> +
+>  		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+> -		ldr	\base, =OMAP2_VA_IC_BASE
+> -		ldr	\irqnr, [\base, #0x98] /* IRQ pending reg 1 */
+> +		ldr	\base, omap_irq_base
+> +		cmp	\base, #0		@ is irq base 
+> configured?
+> +		bne	9998f			@ already configured
+> +
+> +		/* Check the processor type */
+> +		mrc	p15, 0, \tmp, c0, c0, 0	@ get processor revision
+> +		and	\tmp, \tmp, #0x000f0000	@ only check 
+> architecture
+> +		cmp	\tmp, #0x00060000	@ is v6?
+> +		beq	2400f			@ found v6 so 
+> it's omap24xx
+> +		cmp	\tmp, #0x000f0000	@ is cortex?
+> +		beq	3400f			@ found v7 so 
+> it's omap34xx
+> +
+> +2400:		ldr	\base, 
+> =OMAP2_L4_IO_ADDRESS(OMAP24XX_IC_BASE)
+> +		str	\base, omap_irq_base
+> +		b	9998f
+> +
+> +3400:		ldr	\base, 
+> =OMAP2_L4_IO_ADDRESS(OMAP34XX_IC_BASE)
+> +		str	\base, omap_irq_base
+> +
+> +		/* Check the pending interrupts */
+> +9998:		ldr	\irqnr, [\base, #0x98] /* IRQ 
+> pending reg 1 */
+>  		cmp	\irqnr, #0x0
+> -		bne	2222f
+> +		bne	9999f
+>  		ldr	\irqnr, [\base, #0xb8] /* IRQ pending reg 2 */
+>  		cmp	\irqnr, #0x0
+> -		bne	2222f
+> +		bne	9999f
+>  		ldr	\irqnr, [\base, #0xd8] /* IRQ pending reg 3 */
+>  		cmp	\irqnr, #0x0
+> -2222:
+> +9999:
+>  		ldrne	\irqnr, [\base, #INTCPS_SIR_IRQ_OFFSET]
+>  		and	\irqnr, \irqnr, #ACTIVEIRQ_MASK /* 
+> Clear spurious bits */
+>  
+>  		.endm
+> -#else
+> +#endif
+> +
+> +
+> +#ifdef CONFIG_ARCH_OMAP4
+> +
+>  #define OMAP44XX_VA_GIC_CPU_BASE	
+> OMAP2_L4_IO_ADDRESS(OMAP44XX_GIC_CPU_BASE)
+>  
+>  		/*
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
