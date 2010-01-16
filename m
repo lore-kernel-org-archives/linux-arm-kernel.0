@@ -1,64 +1,74 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 16 Jan 2010 11:00:33 +0800
-Subject: [suspend/resume] Re: userspace notification from module
-In-Reply-To: <201001152314.30355.rjw@sisk.pl>
-References: <686edb2c.6263643a.4b3f4a3b.b60b3@o2.pl>
-	<201001091440.46434.rjw@sisk.pl>
-	<20100115200310.GG1345@ucw.cz> <201001152314.30355.rjw@sisk.pl>
-Message-ID: <f17812d71001151900x35959e88jc5f275573ee02177@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Sat, 16 Jan 2010 13:18:33 +0530
+Subject: [PATCH 1/4] omap: Clean the serial port defines
+In-Reply-To: <20100116013510.10065.59461.stgit@baageli.muru.com>
+References: <20100116013205.10065.95921.stgit@baageli.muru.com>
+	<20100116013510.10065.59461.stgit@baageli.muru.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C06F9005@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 16, 2010 at 6:14 AM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> On Friday 15 January 2010, Pavel Machek wrote:
->> On Sat 2010-01-09 14:40:46, Rafael J. Wysocki wrote:
->> > On Saturday 09 January 2010, Pavel Machek wrote:
->>
->> > > > Perhaps I don't understand correctly what you're trying to achieve, but at the
->> > > > moment suspend is always started from user space, this way or another, and on
->> > >
->> > > At least zaurus (arm) suspends from kernel on battery critical.
->> >
->> > I wasn't aware of this.
->> >
->> > That may be a good reason for adding kernel-based suspend notification,
->> > although I'd prefer ARM to notify the user space about the critical battery
->> > status allowing it to decide what to do.
->>
->> Hard to do, without breaking compatibility that goes down to 2.4.X.
->
-> Sending a battery-critical notification to the user space is not equivalent to
-> removing the existing kernel-based mechanism. ?They can exist both at the
-> same time if the notification is sent earlier than the kernel suspends
-> everything.
->
+Thanks for the nice cleanup.
+<snip>
 
-Pavel,
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org 
+> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Tony Lindgren
+> Sent: Saturday, January 16, 2010 7:05 AM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: linux-omap at vger.kernel.org
+> Subject: [PATCH 1/4] omap: Clean the serial port defines
+> 
+> This way we don't have conflicts with the defines
+> with compiling in multiple omaps. Set the addresses
+> for uarts in struct omap_globals for the early serial
+> init code.
+> 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap1/include/mach/debug-macro.S |   16 +++++----
+>  arch/arm/mach-omap1/serial.c                   |    6 ++-
+>  arch/arm/mach-omap2/include/mach/debug-macro.S |   15 ++++----
+>  arch/arm/mach-omap2/serial.c                   |   15 ++++++--
+>  arch/arm/plat-omap/common.c                    |   18 ++++++++++
+>  arch/arm/plat-omap/include/plat/common.h       |    5 +++
+>  arch/arm/plat-omap/include/plat/serial.h       |   44 
+> +++++++++++++-----------
+>  7 files changed, 77 insertions(+), 42 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap1/include/mach/debug-macro.S 
+> b/arch/arm/mach-omap1/include/mach/debug-macro.S
+> index aedb746..23e4724 100644
+> --- a/arch/arm/mach-omap1/include/mach/debug-macro.S
+> +++ b/arch/arm/mach-omap1/include/mach/debug-macro.S
+> @@ -11,6 +11,10 @@
+...
 
-I'd agree with Rafael that we need to move battery management forward to
-a more standard way though we can keep the compatibility atm. The code
-of sharpsl-pm.c is no way clean and maintainable. Having a battery driver
-instead would be a better way to go in a long run.
+> diff --git a/arch/arm/mach-omap2/serial.c 
+> b/arch/arm/mach-omap2/serial.c
+> index 837b347..21e51c5 100644
+> --- a/arch/arm/mach-omap2/serial.c
+> +++ b/arch/arm/mach-omap2/serial.c
+> @@ -74,7 +74,6 @@ static LIST_HEAD(uart_list);
 
-And the other way we may need to look into what API the current userland
-apps on zaurus is depending on this 2.4 compatibility and make changes
-slowly to those apps.
+...
 
->> > IMhO automatic suspend without something like the Android's wakelocks hurts
->> > more than it helps.
->>
->> It really makes sense on zaurus. Those machines are simple, no
->> smartbattery and no embedded controller subsystems. Battery will not
->> protect itself, and its kernel job. (Should work on init=/bin/bash).
->>
->> As power-off consumption is same as suspend power consumption (I
->> beleive zaurus simply does not have true power off), suspend on
->> critical makes some sense. (Note that it is set lower than on pcs, and
->> that we declare battery critical sooner than that.)
->
-> The problem with that is it catches at least some applications unprepared and
-> notifying them that "we're suspending right now" doesn't really help, because
-> they won't have any time to react anyway.
->
-> Rafael
->
+
+> diff --git a/arch/arm/plat-omap/include/plat/common.h 
+> b/arch/arm/plat-omap/include/plat/common.h
+> index 32c2227..a8fa0d7 100644
+> --- a/arch/arm/plat-omap/include/plat/common.h
+> +++ b/arch/arm/plat-omap/include/plat/common.h
+> @@ -47,6 +47,10 @@ struct omap_globals {
+>  	void __iomem	*prm;		/* Power and Reset Management */
+>  	void __iomem	*cm;		/* Clock Management */
+>  	void __iomem	*cm2;
+> +	unsigned long	uart1_phys;
+> +	unsigned long	uart2_phys;
+> +	unsigned long	uart3_phys;
+> +	unsigned long	uart4_phys;
+Considering they are register base address, can
+these be declared as "void __iomem" instead of "unsigned long"
+
+Regards
+Santosh
