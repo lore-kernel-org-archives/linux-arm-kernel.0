@@ -1,41 +1,42 @@
-From: alex@digriz.org.uk (Alexander Clouter)
-Date: Sat, 16 Jan 2010 00:16:13 +0000
-Subject: Kirkwood/OpenRD-Base System Crash from DMA
-References: <20100116001307.GH16062@voodoowarez.com>
-Message-ID: <d3d727-505.ln1@chipmunk.wormnet.eu>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 15 Jan 2010 17:35:07 -0800
+Subject: [PATCH 0/4] omap multiboot improvments for merge window after 2.6.34
+Message-ID: <20100116013205.10065.95921.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-rektide <rektide@voodoowarez.com> wrote:
->
-> I'm attempting to use 2.6.32.3 on a Kirkwood/OpenRD-Base system.  This 
-> system has been serving fine playing MP3's via PulseAudio and MPD for 
-> >5 months now.  However other activities will sometime cause the 
-> system to lock up.  The most reliable activity is to do a "git pull", 
-> from anywhere.  Secondly, writing files onto the system via a Samba 
-> share causes a lockup.
-> 
-> [snipped]
-> 
-> There's a thread on the OpenRD google group with multiple people confirming the issue:
-> http://groups.google.com/group/openrd/browse_thread/thread/d435787eb4e4ffd0
-> 
-> One person has confirmed the issue goes away when CONFIG_NET_DMA and 
-> CONFIG_ASYNC_TX_DMA are disabled.  I'm building a kernel now to 
-> confirm this myself, and will report back tomorrow.
-> 
-I can say it's a "me too" on mine, however I never reported the issue as 
-it's a known problem:
+Hi all,
 
-http://marc.info/?l=linux-raid&m=123606440522693&w=2
+Here are some multiboot improvments for review. These patches
+are intended for the 2.6.34 merge window.
 
-I ran into it on a USB key RAID setup when I started up a huge rsync.  I 
-didn't even get a trace in that situation, just a hard lockup.
+Comments and testing would be nice, I've tested them so far
+on osk, 770, n800, rx51 and overo.
 
-Not looked at it since.
+Regards,
 
-Cheers
+Tony
+
+---
+
+Tony Lindgren (4):
+      omap: Clean the serial port defines
+      omap: Make uncompress code and DEBUG_LL code generic
+      omap: Remove old DEBUG_LL serial port options
+      omap: Make get_irqnr_and_base common for mach-omap2 multiboot
+
+
+ arch/arm/mach-omap1/include/mach/debug-macro.S |   83 ++++++++++--
+ arch/arm/mach-omap1/serial.c                   |   18 ++-
+ arch/arm/mach-omap2/include/mach/debug-macro.S |   91 +++++++++----
+ arch/arm/mach-omap2/include/mach/entry-macro.S |   55 +++++---
+ arch/arm/mach-omap2/serial.c                   |   26 +++-
+ arch/arm/plat-omap/Kconfig                     |   19 ---
+ arch/arm/plat-omap/common.c                    |   18 +++
+ arch/arm/plat-omap/include/plat/common.h       |    5 +
+ arch/arm/plat-omap/include/plat/serial.h       |   62 ++++++---
+ arch/arm/plat-omap/include/plat/uncompress.h   |  168 +++++++++++++++++-------
+ 10 files changed, 390 insertions(+), 155 deletions(-)
 
 -- 
-Alexander Clouter
-.sigmonster says: A dwarf is passing out somewhere in Detroit!
+Signature
