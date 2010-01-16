@@ -1,37 +1,76 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Sat, 16 Jan 2010 23:31:15 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 16 Jan 2010 22:32:30 +0000
 Subject: [suspend/resume] Re: userspace notification from module
-In-Reply-To: <20100116222529.GA8618@elf.ucw.cz>
+In-Reply-To: <201001162305.56972.rjw@sisk.pl>
 References: <686edb2c.6263643a.4b3f4a3b.b60b3@o2.pl>
-	<20100116221929.GB8425@elf.ucw.cz>
-	<20100116222529.GA8618@elf.ucw.cz>
-Message-ID: <201001162331.15405.rjw@sisk.pl>
+	<1263661258.6596.10.camel@utx.utx.cz>
+	<20100116181253.GC1603@ucw.cz> <201001162305.56972.rjw@sisk.pl>
+Message-ID: <20100116223230.GB23092@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 16 January 2010, Pavel Machek wrote:
-> > > IMHO it should just plain shutdown in that case.  Suspending doesn't really
-> > > solve the problem, because the battery is going to drain still.  Unless you
-> > > mean suspend=hibernate, but I guess you don't.
+On Sat, Jan 16, 2010 at 11:05:56PM +0100, Rafael J. Wysocki wrote:
+> On Saturday 16 January 2010, Pavel Machek wrote:
+> > On Sat 2010-01-16 18:00:58, Stanislav Brabec wrote:
+> > > Eric Miao wrote:
+> > > 
+> > > > And the other way we may need to look into what API the current userland
+> > > > apps on zaurus is depending on this 2.4 compatibility and make changes
+> > > > slowly to those apps.
+> > > 
+> > > I guess that 2.4 compatibility is not an issue. Most modern Zaurus
+> > > distributions are even unable to run Sharp ROM compatible binaries.
+> > > 
+> > > Distributions either stay on 2.4 kernel or use modern systems based on
+> > > modern kernel 2.6 API.
+> > > 
+> > > Distributions that decided to migrate to kernel 2.6 are far from
+> > > finished state. Any change that allows to use modern applications using
+> > > standard kernel API is welcome.
+> > 
+> > There is no API involved. It is just ... if you leave zaurus in
+> >  init=/bin/bash mode, it must not kill the battery. Smart and
+> >  currently implemented way to do that is to suspend.
 > 
-> BTW I was talking spitz before, but there's collie, too. It was
-> shipped in configuration where all user data was in RAM and RAMdisk --
-> no writable flash. On such machine, shutdown is never option. (And
-> yes, such design was very common in windowsCE days).
-> 
-> Spitz got disk, but inherited that powermanagement design; and it
-> works very well.
-> 
-> And now, if you want collie for a year (or two), you can have
-> mine... it still works and battery still lasted for 5 hours 2 years
-> ago -- not bad for 10 year old battery. You'll note that it is very
-> different design from PC.
+> IMHO it should just plain shutdown in that case.  Suspending doesn't really
+> solve the problem, because the battery is going to drain still.  Unless you
+> mean suspend=hibernate, but I guess you don't.
 
-Well, I guess I wouldn't have the time to study it anyway, so thanks. :-)
+FYI, most handheld/palm-based devices don't have a "power off" mode,
+short of opening them up and disconnecting the battery.  The "on/off"
+button is really just a "suspend/resume" button.
 
-All in all, it looks like these particular platforms are just specific design
-having special requirements.  And even on these platforms sending a battery
-critical notification to the user space before the kernel emergency suspends
-(or shuts down or whatever) the system seems to be a good idea in general.
+So, when the battery gets critically low, your only option is to suspend.
+If the battery continues to be drained, and it's a properly manufacturered
+li-ion battery, it will have a discharge protection circuit inside the
+battery which will effectively disconnect the battery until it's recharged.
+There is no warning of this event.
 
-Rafael
+The whole idea here is in a low battery sitution, is to place the system
+into as low power state as possible to try to retain the users data.
+
+(Some protection circuits monitor each li-ion cell, which means if you
+have a single weak cell, it can trip before you get the critical suspend
+notification.)
+
+There are also some SoCs which have a battery fault input, which forces a
+transition to suspend mode with no software intervention what so ever,
+placing the SDRAM into self-refresh (data retention) mode.  Wakeup from
+such a mode can only be done by total SoC reset once the fault input has
+been removed.
+
+Either way, the issue here is that when you get a critical low battery
+notification, there may be seconds of power left if the system is fully
+operational, and you must suspend as quickly as possible before the
+hardware does something more destructive to your state.
+
+Probably the best way of thinking about this is a layered set of
+notifications:
+
+- monitor battery level, cleanly suspend when down to N%
+- if ignored, you get a critical low battery notification which forces
+  an unclean suspend transition, retaining most device, CPU and RAM state.
+- if ignored, a hardware initiated suspend transition occurs, retaining
+  just RAM state.
+- if that doesn't work, the battery itself cuts power and all state is
+  lost.
