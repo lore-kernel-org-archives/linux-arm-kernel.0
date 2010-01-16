@@ -1,70 +1,50 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 15 Jan 2010 18:54:27 -0500
-Subject: [PATCH 0/5] Adding x86-like memory map printks to ARM.
-In-Reply-To: <20100115225351.GB28222@n2100.arm.linux.org.uk>
-References: <20090810213905.GA4046@n2100.arm.linux.org.uk><1263465370-4192-1-git-send-email-andreas.fenkart@streamunlimited.com>
-	<20100115225351.GB28222@n2100.arm.linux.org.uk>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE19090208A01D@mi8nycmail19.Mi8.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 15 Jan 2010 18:06:17 -0700 (MST)
+Subject: [PATCH] OMAP1 clock: fix for "BUG: spinlock lockup on CPU#0"
+Message-ID: <alpine.DEB.2.00.1001151805130.11569@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, January 15, 2010 3:54 PM, Russell King wrote:
-> On Thu, Jan 14, 2010 at 11:36:05AM +0100, Andreas Fenkart wrote:
->> This version has the following changes:
->> 
->> * Reworked UL() macro usage, as suggested
->> 
->> * Appended 'UL' to VMALLOC_END define of new machines:
->> mach-dove
->> mach-u300
->> mach-ux500
->> 
->> * Patch 'Make totalhigh_pages unsigned long' has been submitted separately
->> 
->> * Removed superfluous (VMALLOC_START < VMALLOC_END) boundary check
->> 
->
-> What I get from the Integrator/CP platform is this:
->
-> virtual kernel memory layout:                                                   
->     vector  : 0xffff0000 - 0xffff1000   (   4 kB)                               
->     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)                               
->     DMA     : 0xffc00000 - 0xffe00000   (   2 MB)                               
->     vmalloc : 0xc8800000 - 0xd0000000   ( 120 MB)                               
->     lowmem  : 0x00001000 - 0xc8000000   (3199 MB)                               
->     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)                               
->     modules : 0xbf000000 - 0xbfe00000   (  14 MB)                               
->       .init : 0xc0008000 - 0xc0024000   ( 112 kB)                               
->       .text : 0xc0024000 - 0xc0325000   (3076 kB)                               
->       .data : 0xc0326000 - 0xc033f360   ( 101 kB)                               
->
-> which looks fine, except for the 'lowmem' entry - the start of it should
-> be PAGE_OFFSET, not PAGE_SIZE.  Apart from that, seems fine.
->
-> If you can correct that bug, and no one else has any objections, it can
-> go into the patch system.  Thanks.
 
-Almost forgot about this....
+Commit 52650505fbf3a6ab851c801f54e73e76c55ab8da caused clock initialization
+to fail on OMAP1 with "BUG: spinlock lockup on CPU#0" -- this is because
+omap1_select_table_rate() and omap1_round_to_table_rate() call clk_get_rate()
+with the clockfw spinlock held.  Fix by accessing the rate directly from
+the internal clock framework functions.
 
-With Russell's corrected bug and his request to capitalize the first letter
-I get the following on the ep93xx platform:
+Thanks to Tony Lindgren <tony@atomide.com> for reporting and testing the fix.
 
-Virtual kernel memory layout:
-    vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-    fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
-    DMA     : 0xffc00000 - 0xffe00000   (   2 MB)
-    vmalloc : 0xc6800000 - 0xfe800000   ( 896 MB)
-    lowmem  : 0xc0000000 - 0xc6000000   (  96 MB)
-    modules : 0xbf000000 - 0xc0000000   (  16 MB)
-      .init : 0xc0008000 - 0xc0028000   ( 128 kB)
-      .text : 0xc0028000 - 0xc03a0000   (3552 kB)
-      .data : 0xc03ba000 - 0xc03e2aa0   ( 163 kB)
+Queued for 2.6.33-rcX fixes.
 
-which looks fine.  My only issue is, shouldn't the 'end' values all be -1.
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap1/clock.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-Other than that you can add for ep93xx:
-
-Tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-
-Regards,
-Hartley
+diff --git a/arch/arm/mach-omap1/clock.c b/arch/arm/mach-omap1/clock.c
+index 2ba9ab9..04f1d29 100644
+--- a/arch/arm/mach-omap1/clock.c
++++ b/arch/arm/mach-omap1/clock.c
+@@ -214,8 +214,8 @@ int omap1_select_table_rate(struct clk *clk, unsigned long rate)
+ 	struct mpu_rate * ptr;
+ 	unsigned long dpll1_rate, ref_rate;
+ 
+-	dpll1_rate = clk_get_rate(ck_dpll1_p);
+-	ref_rate = clk_get_rate(ck_ref_p);
++	dpll1_rate = ck_dpll1_p->rate;
++	ref_rate = ck_ref_p->rate;
+ 
+ 	for (ptr = omap1_rate_table; ptr->rate; ptr++) {
+ 		if (ptr->xtal != ref_rate)
+@@ -306,7 +306,7 @@ long omap1_round_to_table_rate(struct clk *clk, unsigned long rate)
+ 	long highest_rate;
+ 	unsigned long ref_rate;
+ 
+-	ref_rate = clk_get_rate(ck_ref_p);
++	ref_rate = ck_ref_p->rate;
+ 
+ 	highest_rate = -EINVAL;
+ 
+-- 
+1.6.6.rc2.5.g49666
