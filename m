@@ -1,42 +1,57 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 16 Jan 2010 19:12:53 +0100
-Subject: [suspend/resume] Re: userspace notification from module
-In-Reply-To: <1263661258.6596.10.camel@utx.utx.cz>
-References: <686edb2c.6263643a.4b3f4a3b.b60b3@o2.pl>
-	<201001091440.46434.rjw@sisk.pl> <20100115200310.GG1345@ucw.cz>
-	<201001152314.30355.rjw@sisk.pl>
-	<f17812d71001151900x35959e88jc5f275573ee02177@mail.gmail.com>
-	<1263661258.6596.10.camel@utx.utx.cz>
-Message-ID: <20100116181253.GC1603@ucw.cz>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 16 Jan 2010 11:12:44 -0800
+Subject: [PATCH 4/4] omap: Make get_irqnr_and_base common for
+	mach-omap2 multiboot
+In-Reply-To: <20100116115503.GA15904@n2100.arm.linux.org.uk>
+References: <20100116013205.10065.95921.stgit@baageli.muru.com>
+	<20100116013520.10065.17921.stgit@baageli.muru.com>
+	<20100116115503.GA15904@n2100.arm.linux.org.uk>
+Message-ID: <20100116191244.GH10318@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat 2010-01-16 18:00:58, Stanislav Brabec wrote:
-> Eric Miao wrote:
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [100116 03:53]:
+> On Fri, Jan 15, 2010 at 05:35:20PM -0800, Tony Lindgren wrote:
+> > -#ifndef CONFIG_ARCH_OMAP4
+> > +#if defined(CONFIG_ARCH_OMAP2420) || defined(CONFIG_ARCH_OMAP2430) || \
+> > +	defined(CONFIG_ARCH_OMAP34XX)
+> > +
+> > +#define INTCPS_SIR_IRQ_OFFSET	0x0040		/* Active interrupt offset */
+> > +#define	ACTIVEIRQ_MASK		0x7f		/* Active interrupt bits */
+> > +
+> > +omap_irq_base:	.word	0x0
 > 
-> > And the other way we may need to look into what API the current userland
-> > apps on zaurus is depending on this 2.4 compatibility and make changes
-> > slowly to those apps.
-> 
-> I guess that 2.4 compatibility is not an issue. Most modern Zaurus
-> distributions are even unable to run Sharp ROM compatible binaries.
-> 
-> Distributions either stay on 2.4 kernel or use modern systems based on
-> modern kernel 2.6 API.
-> 
-> Distributions that decided to migrate to kernel 2.6 are far from
-> finished state. Any change that allows to use modern applications using
-> standard kernel API is welcome.
+> You have no idea where this word will be placed - it could be in the middle
+> of a read only section, which might really be read only.  It might also be
+> out of reach of the "ldr \base, [pc, #offset]" instructions you're using
+> below - which is what an "ldr \base, address" instruction really is.
 
-There is no API involved. It is just ... if you leave zaurus in
- init=/bin/bash mode, it must not kill the battery. Smart and
- currently implemented way to do that is to suspend.
+OK
+ 
+> > +
+> >  		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+> > -		ldr	\base, =OMAP2_VA_IC_BASE
+> > -		ldr	\irqnr, [\base, #0x98] /* IRQ pending reg 1 */
+> > +		ldr	\base, omap_irq_base
+> > +		cmp	\base, #0		@ is irq base configured?
+> > +		bne	9998f			@ already configured
+> 
+> First thing, why not use get_irqnr_preamble to load the base address?
+> That means you only do all this computation once per group of IRQs
+> processed.
 
-That's counterexample to rjw, but it does not matter -- reasonable
-userland should never ever hit that, in a same way PCs should not hit
-emergency power cut...
-									Pavel
+Thanks for the tip, will do.
+ 
+> Secondly, is this really worth the overhead, or can't you move
+> omap_irq_base into the data section, and have your IRQ initialization
+> function set the pointer?
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Sounds like a good plan. We can have optimized versions for non-multiomap
+configurations.
+ 
+> You then don't have to make these two tests every time you check for
+> an interrupt/enter to process interrupts.
+
+Great, that will make things much nicer.
+
+Tony
