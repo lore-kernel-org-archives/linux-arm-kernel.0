@@ -1,42 +1,38 @@
-From: paulius.zaleckas@gmail.com (Paulius Zaleckas)
-Date: Sun, 17 Jan 2010 21:37:52 +0200
-Subject: [PATCH] Gemini: wrong registers used to set reg_level in
-	gpio_set_irq_type()?
-In-Reply-To: <4B4F8877.6080105@gmail.com>
-References: <4B4F8877.6080105@gmail.com>
-Message-ID: <4B536710.4010304@gmail.com>
+From: peterhuewe@gmx.de (Peter Huewe)
+Date: Sun, 17 Jan 2010 21:46:02 +0100
+Subject: [PATCH] arch/arm: Fix build failure for msm_defconfig caused by wrong
+	include path
+Message-ID: <1263761162-9447-1-git-send-email-peterhuewe@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/14/2010 11:11 PM, Roel Kluin wrote:
-> It appears the wrong GPIO registers were used
->
-> Signed-off-by: Roel Kluin<roel.kluin@gmail.com>
-> ---
-> I am not sure whether this is right so please review.
+This patch fixes a build failure [1] due to a wrong include path.
 
-Yes, you are right. Thanks for spotting.
-I put this patch in my queue.
+References:
+[1] http://kisskb.ellerman.id.au/kisskb/buildresult/2020066/
 
-> diff --git a/arch/arm/mach-gemini/gpio.c b/arch/arm/mach-gemini/gpio.c
-> index e726385..fe3bd5a 100644
-> --- a/arch/arm/mach-gemini/gpio.c
-> +++ b/arch/arm/mach-gemini/gpio.c
-> @@ -86,7 +86,7 @@ static int gpio_set_irq_type(unsigned int irq, unsigned int type)
->   	unsigned int reg_both, reg_level, reg_type;
->
->   	reg_type = __raw_readl(base + GPIO_INT_TYPE);
-> -	reg_level = __raw_readl(base + GPIO_INT_BOTH_EDGE);
-> +	reg_level = __raw_readl(base + GPIO_INT_LEVEL);
->   	reg_both = __raw_readl(base + GPIO_INT_BOTH_EDGE);
->
->   	switch (type) {
-> @@ -117,7 +117,7 @@ static int gpio_set_irq_type(unsigned int irq, unsigned int type)
->   	}
->
->   	__raw_writel(reg_type, base + GPIO_INT_TYPE);
-> -	__raw_writel(reg_level, base + GPIO_INT_BOTH_EDGE);
-> +	__raw_writel(reg_level, base + GPIO_INT_LEVEL);
->   	__raw_writel(reg_both, base + GPIO_INT_BOTH_EDGE);
->
->   	gpio_ack_irq(irq);
+Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
+---
+Patch against Linux-next of So 17. Jan 21:24:00 CET 2010
+KernelVersion: next-20100114
+
+Resending this patch as I got some errors from my mail-server, sorry for
+the inconvenience
+ arch/arm/mach-msm/devices.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-msm/devices.c b/arch/arm/mach-msm/devices.c
+index a64578f..737fd09 100644
+--- a/arch/arm/mach-msm/devices.c
++++ b/arch/arm/mach-msm/devices.c
+@@ -29,7 +29,7 @@
+ #include <linux/mtd/nand.h>
+ #include <linux/mtd/partitions.h>
+ 
+-#include <asm/mach/mmc.h>
++#include <mach/mmc.h>
+ 
+ static struct resource resources_uart1[] = {
+ 	{
+-- 
+1.6.4.4
