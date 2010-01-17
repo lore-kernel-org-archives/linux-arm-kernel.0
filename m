@@ -1,63 +1,72 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Sun, 17 Jan 2010 05:40:11 +0200
-Subject: [PATCH] IMX serial: Check platform data pointer before use
-In-Reply-To: <1263677310-14244-1-git-send-email-jekhor@gmail.com>
-References: <1263677310-14244-1-git-send-email-jekhor@gmail.com>
-Message-ID: <20100117034010.GA11157@tarshish>
+From: ospite@studenti.unina.it (Antonio Ospite)
+Date: Sun, 17 Jan 2010 13:41:38 +0100
+Subject: [BUG] pxa27x_udc: possible recursive locking detected in
+	pxa_ep_queue
+In-Reply-To: <20091229000306.78948000.ospite@studenti.unina.it>
+References: <20091205115754.7e1dc0fd.ospite@studenti.unina.it>
+	<87fx7guuzg.fsf@free.fr>
+	<20091212173140.f9ac2a7b.ospite@studenti.unina.it>
+	<87ocltsda3.fsf@free.fr>
+	<20091223005313.13ba5061.ospite@studenti.unina.it>
+	<87vdfqx2xw.fsf@free.fr>
+	<20091229000306.78948000.ospite@studenti.unina.it>
+Message-ID: <20100117134138.8d814ed6.ospite@studenti.unina.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yauhen,
+On Tue, 29 Dec 2009 00:03:06 +0100
+Antonio Ospite <ospite@studenti.unina.it> wrote:
 
-On Sat, Jan 16, 2010 at 11:28:30PM +0200, Yauhen Kharuzhy wrote:
-> pdev->dev.platform_data can be NULL in driver probe function. This is
-> should be checked before any use of imxuart_platform_data structure.
+> On Mon, 28 Dec 2009 21:23:55 +0100
+> Robert Jarzmik <robert.jarzmik@free.fr> wrote:
 > 
-> Signed-off-by: Yauhen Kharuzhy <jekhor@gmail.com>
-
-A similar patch is already in Greg's tty tree.
-
-http://www.kernel.org/pub/linux/kernel/people/gregkh/gregkh-2.6/patches/tty/serial-imx-fix-null-dereference-oops-when-pdata-null.patch
-
-> ---
->  drivers/serial/imx.c |    6 +++---
->  1 files changed, 3 insertions(+), 3 deletions(-)
+> > Antonio Ospite <ospite@studenti.unina.it> writes:
+> > 
+> > > With your latest patch on top of 2.6.32 I get the "possible recursive
+> > > locking" message at the *first* cable unplug/plug cycle, I am appending
+> > > it here, the log is partial because I dumped it from RAM and something
+> > > was lost.
+> > 
+> > Thanks.
+> > Now, lets have another try. This patch is a bit saner, and though I got the
+> > "locking detected" you noticed without it, I didn't manage to get it with this
+> > patch applied.
+> > 
+> > As your test platform is far better than mine, would you mind a bit of testing
+> > ... again. This patch applies on top of v2.6.32.
+> >
 > 
-> diff --git a/drivers/serial/imx.c b/drivers/serial/imx.c
-> index 18130f1..8c0dd13 100644
-> --- a/drivers/serial/imx.c
-> +++ b/drivers/serial/imx.c
-> @@ -1279,7 +1279,7 @@ static int serial_imx_probe(struct platform_device *pdev)
->  		sport->use_irda = 1;
->  #endif
->  
-> -	if (pdata->init) {
-> +	if (pdata && pdata->init) {
->  		ret = pdata->init(pdev);
->  		if (ret)
->  			goto clkput;
-> @@ -1292,7 +1292,7 @@ static int serial_imx_probe(struct platform_device *pdev)
->  
->  	return 0;
->  deinit:
-> -	if (pdata->exit)
-> +	if (pdata && pdata->exit)
->  		pdata->exit(pdev);
->  clkput:
->  	clk_put(sport->clk);
-> @@ -1321,7 +1321,7 @@ static int serial_imx_remove(struct platform_device *pdev)
->  
->  	clk_disable(sport->clk);
->  
-> -	if (pdata->exit)
-> +	if (pdata && pdata->exit)
->  		pdata->exit(pdev);
->  
->  	iounmap(sport->port.membase);
-> -- 
-> 1.6.5.7
+> Just FYI our repository has been updated to 2.6.33-rc2 and I haven't
+> been able to reproduce the message here yet _without_ the patch.
+> I'll go back to 2.6.32 and test again with and without this patch in
+> next days, and report promptly.
+> 
+
+Hi Robert,
+
+Only today I've found some time to test the patch in a 2.6.32 setup, I
+am not able to reproduce the issue with your latest patch _applied_,
+while it it still there with unpatched code, so I'd say it is an
+improvement.
+
+Thanks,
+   Antonio
 
 -- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Antonio Ospite
+http://ao2.it
+
+PGP public key ID: 0x4553B001
+
+A: Because it messes up the order in which people normally read text.
+   See http://en.wikipedia.org/wiki/Posting_style
+Q: Why is top-posting such a bad thing?
+A: Top-posting.
+Q: What is the most annoying thing in e-mail?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100117/85c09e71/attachment.sig>
