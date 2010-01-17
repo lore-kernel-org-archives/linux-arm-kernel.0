@@ -1,39 +1,63 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sun, 17 Jan 2010 10:00:10 +0800
-Subject: s3c-hsotg driver problem
-In-Reply-To: <4B51B36C.6040308@gmail.com>
-References: <4B51B36C.6040308@gmail.com>
-Message-ID: <3c17e3571001161800m14ca30cas1cca155f9880513d@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Sun, 17 Jan 2010 05:40:11 +0200
+Subject: [PATCH] IMX serial: Check platform data pointer before use
+In-Reply-To: <1263677310-14244-1-git-send-email-jekhor@gmail.com>
+References: <1263677310-14244-1-git-send-email-jekhor@gmail.com>
+Message-ID: <20100117034010.GA11157@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In fact, I once used 12Mhz  external crystal, after setting PHYCLK
-right,  both USB 1.1 as host and 2.0 as gadget can work. The kernel
-version I used is 2.6.28.
+Hi Yauhen,
 
-On Sat, Jan 16, 2010 at 8:39 PM, Maurus Cuelenaere
-<mcuelenaere@gmail.com> wrote:
-> Hi,
->
-> I'm trying to get the USB OTG port working on my device (S3C6410 board), but
-> am running into problems.
-> This board doesn't have a 48Mhz clock, so I set the reference clock in the
-> USB PLL to a 12Mhz external crystal (see patch).
->
-> Still, I'm having trouble getting it to work; I'm seeing these messages (see
-> attachment for full log):
->
-> s3c-hsotg s3c-hsotg: s3c_hsotg_rx_data: FIFO 8 bytes on ep0 but no req
-> (DxEPCTl=0x00028000)
-> hub 1-0:1.0: connect-debounce failed, port 2 disabled
->
-> This looks like the hardware is configured correctly, but the
-> currently-in-use gadget isn't setting up an EP0 RX transfer?
-> I've tried Mass Storage, serial, Ethernet, ... gadgets and they all give the
-> same errors.
->
-> Any hints/pointers would be welcome!
->
-> Thanks,
-> Maurus Cuelenaere
->
+On Sat, Jan 16, 2010 at 11:28:30PM +0200, Yauhen Kharuzhy wrote:
+> pdev->dev.platform_data can be NULL in driver probe function. This is
+> should be checked before any use of imxuart_platform_data structure.
+> 
+> Signed-off-by: Yauhen Kharuzhy <jekhor@gmail.com>
+
+A similar patch is already in Greg's tty tree.
+
+http://www.kernel.org/pub/linux/kernel/people/gregkh/gregkh-2.6/patches/tty/serial-imx-fix-null-dereference-oops-when-pdata-null.patch
+
+> ---
+>  drivers/serial/imx.c |    6 +++---
+>  1 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/serial/imx.c b/drivers/serial/imx.c
+> index 18130f1..8c0dd13 100644
+> --- a/drivers/serial/imx.c
+> +++ b/drivers/serial/imx.c
+> @@ -1279,7 +1279,7 @@ static int serial_imx_probe(struct platform_device *pdev)
+>  		sport->use_irda = 1;
+>  #endif
+>  
+> -	if (pdata->init) {
+> +	if (pdata && pdata->init) {
+>  		ret = pdata->init(pdev);
+>  		if (ret)
+>  			goto clkput;
+> @@ -1292,7 +1292,7 @@ static int serial_imx_probe(struct platform_device *pdev)
+>  
+>  	return 0;
+>  deinit:
+> -	if (pdata->exit)
+> +	if (pdata && pdata->exit)
+>  		pdata->exit(pdev);
+>  clkput:
+>  	clk_put(sport->clk);
+> @@ -1321,7 +1321,7 @@ static int serial_imx_remove(struct platform_device *pdev)
+>  
+>  	clk_disable(sport->clk);
+>  
+> -	if (pdata->exit)
+> +	if (pdata && pdata->exit)
+>  		pdata->exit(pdev);
+>  
+>  	iounmap(sport->port.membase);
+> -- 
+> 1.6.5.7
+
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
