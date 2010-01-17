@@ -1,76 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 16 Jan 2010 22:32:30 +0000
-Subject: [suspend/resume] Re: userspace notification from module
-In-Reply-To: <201001162305.56972.rjw@sisk.pl>
-References: <686edb2c.6263643a.4b3f4a3b.b60b3@o2.pl>
-	<1263661258.6596.10.camel@utx.utx.cz>
-	<20100116181253.GC1603@ucw.cz> <201001162305.56972.rjw@sisk.pl>
-Message-ID: <20100116223230.GB23092@n2100.arm.linux.org.uk>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sun, 17 Jan 2010 10:00:10 +0800
+Subject: s3c-hsotg driver problem
+In-Reply-To: <4B51B36C.6040308@gmail.com>
+References: <4B51B36C.6040308@gmail.com>
+Message-ID: <3c17e3571001161800m14ca30cas1cca155f9880513d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 16, 2010 at 11:05:56PM +0100, Rafael J. Wysocki wrote:
-> On Saturday 16 January 2010, Pavel Machek wrote:
-> > On Sat 2010-01-16 18:00:58, Stanislav Brabec wrote:
-> > > Eric Miao wrote:
-> > > 
-> > > > And the other way we may need to look into what API the current userland
-> > > > apps on zaurus is depending on this 2.4 compatibility and make changes
-> > > > slowly to those apps.
-> > > 
-> > > I guess that 2.4 compatibility is not an issue. Most modern Zaurus
-> > > distributions are even unable to run Sharp ROM compatible binaries.
-> > > 
-> > > Distributions either stay on 2.4 kernel or use modern systems based on
-> > > modern kernel 2.6 API.
-> > > 
-> > > Distributions that decided to migrate to kernel 2.6 are far from
-> > > finished state. Any change that allows to use modern applications using
-> > > standard kernel API is welcome.
-> > 
-> > There is no API involved. It is just ... if you leave zaurus in
-> >  init=/bin/bash mode, it must not kill the battery. Smart and
-> >  currently implemented way to do that is to suspend.
-> 
-> IMHO it should just plain shutdown in that case.  Suspending doesn't really
-> solve the problem, because the battery is going to drain still.  Unless you
-> mean suspend=hibernate, but I guess you don't.
+In fact, I once used 12Mhz  external crystal, after setting PHYCLK
+right,  both USB 1.1 as host and 2.0 as gadget can work. The kernel
+version I used is 2.6.28.
 
-FYI, most handheld/palm-based devices don't have a "power off" mode,
-short of opening them up and disconnecting the battery.  The "on/off"
-button is really just a "suspend/resume" button.
-
-So, when the battery gets critically low, your only option is to suspend.
-If the battery continues to be drained, and it's a properly manufacturered
-li-ion battery, it will have a discharge protection circuit inside the
-battery which will effectively disconnect the battery until it's recharged.
-There is no warning of this event.
-
-The whole idea here is in a low battery sitution, is to place the system
-into as low power state as possible to try to retain the users data.
-
-(Some protection circuits monitor each li-ion cell, which means if you
-have a single weak cell, it can trip before you get the critical suspend
-notification.)
-
-There are also some SoCs which have a battery fault input, which forces a
-transition to suspend mode with no software intervention what so ever,
-placing the SDRAM into self-refresh (data retention) mode.  Wakeup from
-such a mode can only be done by total SoC reset once the fault input has
-been removed.
-
-Either way, the issue here is that when you get a critical low battery
-notification, there may be seconds of power left if the system is fully
-operational, and you must suspend as quickly as possible before the
-hardware does something more destructive to your state.
-
-Probably the best way of thinking about this is a layered set of
-notifications:
-
-- monitor battery level, cleanly suspend when down to N%
-- if ignored, you get a critical low battery notification which forces
-  an unclean suspend transition, retaining most device, CPU and RAM state.
-- if ignored, a hardware initiated suspend transition occurs, retaining
-  just RAM state.
-- if that doesn't work, the battery itself cuts power and all state is
-  lost.
+On Sat, Jan 16, 2010 at 8:39 PM, Maurus Cuelenaere
+<mcuelenaere@gmail.com> wrote:
+> Hi,
+>
+> I'm trying to get the USB OTG port working on my device (S3C6410 board), but
+> am running into problems.
+> This board doesn't have a 48Mhz clock, so I set the reference clock in the
+> USB PLL to a 12Mhz external crystal (see patch).
+>
+> Still, I'm having trouble getting it to work; I'm seeing these messages (see
+> attachment for full log):
+>
+> s3c-hsotg s3c-hsotg: s3c_hsotg_rx_data: FIFO 8 bytes on ep0 but no req
+> (DxEPCTl=0x00028000)
+> hub 1-0:1.0: connect-debounce failed, port 2 disabled
+>
+> This looks like the hardware is configured correctly, but the
+> currently-in-use gadget isn't setting up an EP0 RX transfer?
+> I've tried Mass Storage, serial, Ethernet, ... gadgets and they all give the
+> same errors.
+>
+> Any hints/pointers would be welcome!
+>
+> Thanks,
+> Maurus Cuelenaere
+>
