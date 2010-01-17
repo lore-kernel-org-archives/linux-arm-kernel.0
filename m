@@ -1,72 +1,31 @@
-From: ospite@studenti.unina.it (Antonio Ospite)
-Date: Sun, 17 Jan 2010 13:41:38 +0100
-Subject: [BUG] pxa27x_udc: possible recursive locking detected in
-	pxa_ep_queue
-In-Reply-To: <20091229000306.78948000.ospite@studenti.unina.it>
-References: <20091205115754.7e1dc0fd.ospite@studenti.unina.it>
-	<87fx7guuzg.fsf@free.fr>
-	<20091212173140.f9ac2a7b.ospite@studenti.unina.it>
-	<87ocltsda3.fsf@free.fr>
-	<20091223005313.13ba5061.ospite@studenti.unina.it>
-	<87vdfqx2xw.fsf@free.fr>
-	<20091229000306.78948000.ospite@studenti.unina.it>
-Message-ID: <20100117134138.8d814ed6.ospite@studenti.unina.it>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Sun, 17 Jan 2010 13:57:04 +0100
+Subject: s3c-hsotg driver problem
+In-Reply-To: <3c17e3571001161800m14ca30cas1cca155f9880513d@mail.gmail.com>
+References: <4B51B36C.6040308@gmail.com>
+	<3c17e3571001161800m14ca30cas1cca155f9880513d@mail.gmail.com>
+Message-ID: <4B530920.5020901@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Dec 2009 00:03:06 +0100
-Antonio Ospite <ospite@studenti.unina.it> wrote:
+Op 17-01-10 03:00, Barry Song schreef:
+> In fact, I once used 12Mhz  external crystal, after setting PHYCLK
+> right,  both USB 1.1 as host and 2.0 as gadget can work. The kernel
+> version I used is 2.6.28.
+>    
 
-> On Mon, 28 Dec 2009 21:23:55 +0100
-> Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> 
-> > Antonio Ospite <ospite@studenti.unina.it> writes:
-> > 
-> > > With your latest patch on top of 2.6.32 I get the "possible recursive
-> > > locking" message at the *first* cable unplug/plug cycle, I am appending
-> > > it here, the log is partial because I dumped it from RAM and something
-> > > was lost.
-> > 
-> > Thanks.
-> > Now, lets have another try. This patch is a bit saner, and though I got the
-> > "locking detected" you noticed without it, I didn't manage to get it with this
-> > patch applied.
-> > 
-> > As your test platform is far better than mine, would you mind a bit of testing
-> > ... again. This patch applies on top of v2.6.32.
-> >
-> 
-> Just FYI our repository has been updated to 2.6.33-rc2 and I haven't
-> been able to reproduce the message here yet _without_ the patch.
-> I'll go back to 2.6.32 and test again with and without this patch in
-> next days, and report promptly.
-> 
+You say the kernel version you used is 2.6.28, I'm betting you weren't 
+using Ben Dooks' driver then and this was Samsung's tree?
+The kernel that is currently shipped with the device I'm porting for 
+(SmartQ 7) is using 2.6.24, which also has Samsung's patches applied 
+(and uses other drivers than in mainline).
 
-Hi Robert,
+AFAIK there are 2 (?) 'main' trees floating around with Samsung patches: 
+2.6.24 and 2.6.28, then there are 2.6.29 and 2.6.31 (and newer) trees 
+which contain patches from a mix of both and mainline.
 
-Only today I've found some time to test the patch in a 2.6.32 setup, I
-am not able to reproduce the issue with your latest patch _applied_,
-while it it still there with unpatched code, so I'd say it is an
-improvement.
+What I'm looking for is getting everything to work with *mainline* 
+drivers, so in the end I can push the SmartQ boards to mainline.
 
-Thanks,
-   Antonio
-
--- 
-Antonio Ospite
-http://ao2.it
-
-PGP public key ID: 0x4553B001
-
-A: Because it messes up the order in which people normally read text.
-   See http://en.wikipedia.org/wiki/Posting_style
-Q: Why is top-posting such a bad thing?
-A: Top-posting.
-Q: What is the most annoying thing in e-mail?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100117/85c09e71/attachment.sig>
+Regards,
+Maurus Cuelenaere
