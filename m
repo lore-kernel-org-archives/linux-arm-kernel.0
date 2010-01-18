@@ -1,36 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Jan 2010 13:33:04 +0000
-Subject: flush_dcache_page does too much?
-In-Reply-To: <20100118131346.GA11589@desktop>
-References: <20100118131346.GA11589@desktop>
-Message-ID: <20100118133304.GA29645@n2100.arm.linux.org.uk>
+From: koyo.take@gmail.com (Koyo Takenoshita)
+Date: Mon, 18 Jan 2010 22:35:26 +0900
+Subject: ioctl() returns EFAULT / MMU domain problem?
+Message-ID: <ac4446ac1001180535u299fa2f8rc2fdb3317a566066@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 18, 2010 at 09:13:46PM +0800, anfei wrote:
-> I'm studying the cache alias problem especially of VIPT, I found
-> function flush_dcache_page() does much more operations on ARM than MIPS.
-> Can we not flush the userspace mappings and icache, just like MIPS?
-> Are the cache more consistent with these operations?
-> 
-> As far as I know, flush_dcache_page is usually used as this:
->         kmap_atomic(page, ...);
->         write the page;
->         flush_dcache_page(page);
->         kunmap_atomic(...);
-> called in the path of write()/..., but since mmap() + write() is not
-> ensured to work (even on ARM currently), it's the userspace to consider
-> msync()/munmap(), it looks okay without flush the userspace mappings
-> here.  Other cases seem the same if the userspace takes charge of the 
-> cache problem.
+Hello,
 
-On VIPT on ARM, flush_dcache_page() flushes:
+I'm testing OSS function on my i.MX25 board.
 
-1. the direct kernel mapping and aliases of that (which read()/write()
-   will touch.)
+I get ioctl(fd, SNDCTL_DSP_GETBLKSIZE, &size) returns -EFAULT in rare
+case.
 
-2. the user aliases, which may not be coherent with the direct kernel
-   mapping.
+In kernel code, copy_to_user in snd_pcm_hw_params_user was failed when
+ioctl returns -EFAULT.
 
-It is unsafe to avoid dealing with any of those - and doing so will cause
-shared mappings to be incoherent with filesystem IO.
+The second argment of the copy_to_user() is an address of kernel
+region which allocated by kmalloc at snd_pcm_oss_change_params. So
+that, the kernel domain's access type is set to manager mode at
+snd_pcm_kernel_ioctl by set_fs(KERNEL_DS) before copy_to_user is
+called.
+
+I checked CP15 domain register when copy_to_user was failed, then the
+value was 0x15. It means that kernel domain's access type is client
+mode.
+
+I think that the problem is that there is a possibility of schedule
+while doing set_fs(KERNEL_DS) and copy_to_user.
+
+No one has same problem?
+
+Thanks,
+Koyo
