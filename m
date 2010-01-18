@@ -1,38 +1,13 @@
-From: peterhuewe@gmx.de (Peter Huewe)
-Date: Sun, 17 Jan 2010 21:46:02 +0100
-Subject: [PATCH] arch/arm: Fix build failure for msm_defconfig caused by wrong
-	include path
-Message-ID: <1263761162-9447-1-git-send-email-peterhuewe@gmx.de>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Mon, 18 Jan 2010 02:38:35 +0000
+Subject: Samsung GPIO updates
+Message-ID: <1263782319-20775-1-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes a build failure [1] due to a wrong include path.
+This is the current contents of next-samsung-gpio1, which contains
+the Kukjin moves for supporting common gpio code and the s5p6440
+updates which have already been on the list.
 
-References:
-[1] http://kisskb.ellerman.id.au/kisskb/buildresult/2020066/
-
-Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
----
-Patch against Linux-next of So 17. Jan 21:24:00 CET 2010
-KernelVersion: next-20100114
-
-Resending this patch as I got some errors from my mail-server, sorry for
-the inconvenience
- arch/arm/mach-msm/devices.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-msm/devices.c b/arch/arm/mach-msm/devices.c
-index a64578f..737fd09 100644
---- a/arch/arm/mach-msm/devices.c
-+++ b/arch/arm/mach-msm/devices.c
-@@ -29,7 +29,7 @@
- #include <linux/mtd/nand.h>
- #include <linux/mtd/partitions.h>
- 
--#include <asm/mach/mmc.h>
-+#include <mach/mmc.h>
- 
- static struct resource resources_uart1[] = {
- 	{
--- 
-1.6.4.4
+Also contains my moves to get the common gpio code and gpio-pm code
+into plat-samsung.
