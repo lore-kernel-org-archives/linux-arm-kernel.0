@@ -1,43 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Jan 2010 15:01:52 +0000
-Subject: flush_dcache_page does too much?
-In-Reply-To: <20100118145731.GA14523@desktop>
-References: <20100118131346.GA11589@desktop>
-	<20100118133304.GA29645@n2100.arm.linux.org.uk>
-	<20100118135431.GA12496@desktop>
-	<20100118140005.GD2695@n2100.arm.linux.org.uk>
-	<20100118141530.GA13394@desktop>
-	<20100118144418.GE2695@n2100.arm.linux.org.uk>
-	<20100118145731.GA14523@desktop>
-Message-ID: <20100118150152.GF2695@n2100.arm.linux.org.uk>
+From: schen@mvista.com (Steve Chen)
+Date: Mon, 18 Jan 2010 09:39:03 -0600
+Subject: Kernel Start-up Time
+In-Reply-To: <201001181054.59214.caglarakyuz@gmail.com>
+References: <201001181010.01975.caglarakyuz@gmail.com>
+	<4B541E3F.9040205@windriver.com>
+	<201001181054.59214.caglarakyuz@gmail.com>
+Message-ID: <1263829143.3207.34.camel@linux-1lbu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 18, 2010 at 10:57:31PM +0800, anfei wrote:
-> On Mon, Jan 18, 2010 at 02:44:18PM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Jan 18, 2010 at 10:15:30PM +0800, anfei wrote:
-> > > On Mon, Jan 18, 2010 at 02:00:05PM +0000, Russell King - ARM Linux wrote:
-> > > > On Mon, Jan 18, 2010 at 09:54:31PM +0800, anfei wrote:
-> > > > > Do you mean this implementation can ensure the coherence between write
-> > > > > and shared mmapings?  But it's easy to reproduce the alias problem by
-> > > > > this simple testcase (w/o error handler) on omap2430 with VIPT cache:
-> > > > 
-> > > > Your program doesn't do anything to identify any problem.  You don't
-> > > > even say _what_ problem you see with this program.
-> > > > 
-> > > Sorry for that.
-> > > 
-> > > > If you have a specific case which fails, please show the problem, please
-> > > > describe exactly the behaviour that you see, and what you expect to see.
+On Mon, 2010-01-18 at 10:54 +0200, Caglar Akyuz wrote:
+> On Monday 18 January 2010 10:39:27 am Tonyliu wrote:
+> > Caglar Akyuz wrote:
+> > > Hello,
+> > >
+> > > While measuring Linux start-up time, I see that printing version string
+> > > in "start_kernel" takes ~1.3 seconds. I guess this is the time between
+> > > from "bootloader jumping to uImage" and "printing version string in
+> > > generic start_kernel code". Relevant part of my boot log is attached.
+> > >
+> > > My question: is it normal this 1.3 sec init time? My system is 297 MHZ
+> > > arm926ej-s with a 162MHZ DDR2 memory.
 > > 
-> > Are you using a write allocate cache?
+> > It depends on where you start to measure it?
+> >     Starting from when power is turned on.
+> >     Starting from when the first instruction executes.
+> >     Start from the bootloader tries to load the kernel image.
+> > ...
 > 
-> I guess not, because this line is neccessary to reproduce the issue:
-> 	tmp = *(addr+0);
-> If it's write allocate, this line may not be neccessary, since it's just
-> a read (and cache the data).
+> That number is relative, it is the time passing from u-boot jumping to kernel 
+> and kernel starting.
+> 
+> > I think this type of mearsurement  makes no much sense to you, since
+> > normally
+> > people want to know
+> >    When the kernel loads userspace or
+> >     When the first app starts to run.
+> > 
+> 
+> First application starts in ~4 second. This time consists of:
+> 
+> 1) ~1 sec for application start.
+> 2) ~1 sec for userspace init, mouting filesys, etc.
+> 3) ~1 sec for kernel init for drivers and machine specific code
+> 4) ~1 sec for the aforementioned delay.
+>  
+> > These are more meaningful for specific product.
+> > 
+> 
+> It is number 4 that I'm trying to understand. I think it has the highest 
+> chance to contribute to end goal. But if it is as expected, then no room for 
+> optimization there.
+> 
 
-It makes no sense then - without write allocate, writes will go straight
-through to the underlying page, bypassing the cache.
+Well, "no room for optimization" is a pretty strong statement.  Last
+year Monta Vista demo the 1 second boot.
 
-Sorry, no idea.
+http://mvista.com/press_release_detail.php?fid=news/2009/Ultra-fast-boot.html&d=
+
+I realized that it is a different and faster processor, but I'm pretty
+sure there are plenty of places you can trim the boot time.   It is a
+matter of time and effort.  You may want to start with the system
+requirement to see if 4 seconds is good enough and go from there.
+
+Regards,
+
+Steve
