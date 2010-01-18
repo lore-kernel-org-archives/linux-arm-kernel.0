@@ -1,54 +1,99 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 18 Jan 2010 11:44:10 +0100
-Subject: [PATCH] ARM: Fix uncompress code compile for different
-	definesof static(void)
-In-Reply-To: <20100114193815.GA7339@atomide.com>
-References: <20100113021939.GE2986@atomide.com>
-	<20100113084937.GA19352@pengutronix.de>
-	<BD79186B4FD85F4B8E60E381CAEE190902089C39@mi8nycmail19.Mi8.com>
-	<20100114082952.GA657@pengutronix.de>
-	<20100114091556.GB19197@n2100.arm.linux.org.uk>
-	<20100114193815.GA7339@atomide.com>
-Message-ID: <20100118104410.GA31345@pengutronix.de>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Mon, 18 Jan 2010 12:13:34 +0100
+Subject: [PATCH] ARM: SAMSUNG: Add initial documentation directory and
+	overview
+In-Reply-To: <1263804317-8996-4-git-send-email-ben-linux@fluff.org>
+References: <1263804317-8996-1-git-send-email-ben-linux@fluff.org>
+	<1263804317-8996-4-git-send-email-ben-linux@fluff.org>
+Message-ID: <4B54425E.8020400@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+Op 18-01-10 09:45, Ben Dooks schreef:
+> Start Documentation/arm/Samsung and add an initial overview file
+> which whilst is not complete, is better than nothing.
+>
+> Signed-off-by: Ben Dooks<ben-linux@fluff.org>
+> ---
+>   Documentation/arm/Samsung/Overview.txt |   63 ++++++++++++++++++++++++++++++++
+>   1 files changed, 63 insertions(+), 0 deletions(-)
+>   create mode 100644 Documentation/arm/Samsung/Overview.txt
+>
+> diff --git a/Documentation/arm/Samsung/Overview.txt b/Documentation/arm/Samsung/Overview.txt
+> new file mode 100644
+> index 0000000..c3d2f44
+> --- /dev/null
+> +++ b/Documentation/arm/Samsung/Overview.txt
+> @@ -0,0 +1,63 @@
+> +		Samsung ARM Linux Overview
+> +		==========================
+> +
+> +Introduction
+> +------------
+> +
+> +  The Samsung range of ARM SoCs spans many similar devices, from the initial
+> +  ARM9 through to the newest ARM cores. This document shows an overview of
+> +  the current kernel support, how to use it and where to find the code
+> +  that supports this.
+> +
+> +  The currently supported SoCs are:
+> +
+> +  - S3C24XX: See Documentation/arm/Samsung-S3C24XX/Overview.txt for full list
+> +  - S3C64XX: S3C6400 and S3C6410
+> +
+> +  S5PC100 and S5PC110 support is currently being merged
+> +
+> +
+> +S3C24XX Systems
+> +---------------
+> +
+> +  There is still documentation in Docuemntation/arm/Samsung-S3C24XX/ which
+>    
 
-On Thu, Jan 14, 2010 at 11:38:15AM -0800, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [100114 01:14]:
-> > On Thu, Jan 14, 2010 at 09:29:52AM +0100, Uwe Kleine-K?nig wrote:
-> > > I think the cleanest solution would be to remove -Dstatic=.  I don't
-> > > know the exact reason for it being there.
-> > 
-> > Thereby breaking the ability to build a relocatable decompressor.
-> > 
-> > > Russell, maybe these toolchain problems are gone in the meantime?
-> > 
-> > I don't think it was toolchain problems.  Having the text and data
-> > segments independently relocatable is actually an abuse of the ELF
-> > format - it's not something it directly supports.
-> > 
-> > From what I remember, having 'static' in there results in either
-> > function calls or static data being indirected through the GOT table,
-> > which means it has to be relocated along side the data segment - which
-> > makes the offset between the text and data segments fixed.
-> > 
-> > I would not believe that the "problems" have gone because the toolchain
-> > is working how it's supposed to.
-> > 
-> > The -Dstatic= stays.
-> 
-> I've added the compile fix with the subject fixed into Russell's
-> patch system as 5882/1.
-can you please take this patch as currently all imx based machines fail
-the compile test because of this.
+Same typo as before? Docuemntation ->  Documentation
 
-You can interpret this as an Acked-by: or Tested-by: or both.
 
-Thanks
-Uwe
+> +  deals with the architecture and drivers specific to these devices.
+> +
+> +  See Documentation/arm/Samsung-S3C24XX/Overview.txt for more information
+> +  on the implementation details and specific support.
+> +
+> +
+> +Configuration
+> +-------------
+> +
+> +  A number of configurations are supplied, as there is no current way of
+> +  unifying all the SoCs into one kernel.
+> +
+> +  [ to finish ]
+> +
+> +Layout
+> +------
+> +
+> +  [ to finish ]
+> +
+> +
+> +Port Contributors
+> +-----------------
+> +
+> +  Ben Dooks (BJD)
+> +  Vincent Sanders
+> +  Herbert Potzl
+> +  Arnaud Patard (RTP)
+> +  Roc Wu
+> +  Klaus Fetscher
+> +  Dimitry Andric
+> +  Shannon Holland
+> +  Guillaume Gourat (NexVision)
+> +  Christer Weinigel (wingel) (Acer N30)
+> +  Lucas Correia Villa Real (S3C2400 port)
+> +
+> +
+> +Document Author
+> +---------------
+> +
+> +Copyright 2009 Ben Dooks<ben-linux@fluff.org>
+>    
 
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Regards,
+Maurus Cuelenaere
