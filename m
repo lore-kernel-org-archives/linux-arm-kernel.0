@@ -1,34 +1,30 @@
-From: koyo.take@gmail.com (Koyo Takenoshita)
-Date: Mon, 18 Jan 2010 22:35:26 +0900
-Subject: ioctl() returns EFAULT / MMU domain problem?
-Message-ID: <ac4446ac1001180535u299fa2f8rc2fdb3317a566066@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 18 Jan 2010 14:41:20 +0100
+Subject: Use of data types
+In-Reply-To: <2703439e1001180443t761947e0idc144ced64ca3a4f@mail.gmail.com>
+References: <2703439e1001180443t761947e0idc144ced64ca3a4f@mail.gmail.com>
+Message-ID: <20100118134120.GB31345@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-I'm testing OSS function on my i.MX25 board.
+On Mon, Jan 18, 2010 at 09:43:12PM +0900, Khushhua Mogambo wrote:
+> Hi
+>   I starting to port Linux kernel to my companies new ARM based
+> SoC and development board.
+> 
+> Some of the regs is 16bits wide and some is 32bits width. I ask if
+> my using u16 and u32 in place of 'unsigned short' and 'unsigned int'
+> in the whole porting would be acceptable or not?
+> 
+> In different wording, using only u16 and u32 always is considered good
+> quality or bad?
+I prefer using u32 over int.  Still more if your register space isn't uniform.
 
-I get ioctl(fd, SNDCTL_DSP_GETBLKSIZE, &size) returns -EFAULT in rare
-case.
+Best regards
+Uwe
 
-In kernel code, copy_to_user in snd_pcm_hw_params_user was failed when
-ioctl returns -EFAULT.
-
-The second argment of the copy_to_user() is an address of kernel
-region which allocated by kmalloc at snd_pcm_oss_change_params. So
-that, the kernel domain's access type is set to manager mode at
-snd_pcm_kernel_ioctl by set_fs(KERNEL_DS) before copy_to_user is
-called.
-
-I checked CP15 domain register when copy_to_user was failed, then the
-value was 0x15. It means that kernel domain's access type is client
-mode.
-
-I think that the problem is that there is a possibility of schedule
-while doing set_fs(KERNEL_DS) and copy_to_user.
-
-No one has same problem?
-
-Thanks,
-Koyo
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
