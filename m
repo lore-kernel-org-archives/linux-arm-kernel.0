@@ -1,5 +1,5 @@
 From: anfei.zhou@gmail.com (anfei)
-Date: Mon, 18 Jan 2010 22:53:07 +0800
+Date: Mon, 18 Jan 2010 22:57:31 +0800
 Subject: flush_dcache_page does too much?
 In-Reply-To: <20100118144418.GE2695@n2100.arm.linux.org.uk>
 References: <20100118131346.GA11589@desktop>
@@ -8,7 +8,7 @@ References: <20100118131346.GA11589@desktop>
 	<20100118140005.GD2695@n2100.arm.linux.org.uk>
 	<20100118141530.GA13394@desktop>
 	<20100118144418.GE2695@n2100.arm.linux.org.uk>
-Message-ID: <20100118145307.GA14306@desktop>
+Message-ID: <20100118145731.GA14523@desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -30,4 +30,7 @@ On Mon, Jan 18, 2010 at 02:44:18PM +0000, Russell King - ARM Linux wrote:
 > 
 > Are you using a write allocate cache?
 
-I'm not sure, I can get more information tomorrow.
+I guess not, because this line is neccessary to reproduce the issue:
+	tmp = *(addr+0);
+If it's write allocate, this line may not be neccessary, since it's just
+a read (and cache the data).
