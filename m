@@ -1,46 +1,49 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 18 Jan 2010 08:42:55 +0000
-Subject: [PATCH] ARM: SAMSUNG: Fix clksrc-clk's checks for bad register
-	settings
+Date: Mon, 18 Jan 2010 08:42:54 +0000
+Subject: [PATCH] ARM: SAMSUNG: Add check to ensure that clksrc_clk does have
+	multiple clock sources
 In-Reply-To: <1263804176-8417-1-git-send-email-ben-linux@fluff.org>
 References: <1263804176-8417-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1263804176-8417-4-git-send-email-ben-linux@fluff.org>
+Message-ID: <1263804176-8417-3-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The WARN_ON() was only checking the first clock in the array, instead of
-being executed for each clksrc clock being registered.
+From: Thomas Abraham <thomas.ab@samsung.com>
 
-Since this is an array of clocks, WARN_ON() does not provide a lot of
-useful information about the problem, so change to using printk(KERN_ERR)
-to report the problem to the console.
+Adds a additional check in s3c_set_clksrc function to ensure that the clksrc_clk
+does have a choice of multiple clock sources. In addition to this, a check is
+added to ensure that a parent is assigned to the clksrc_clk in case it does not
+have a choice of parent clocks.
 
-As a note, we still try and register the clock even if these problems are
-present just in case and to avoid changing the behaviour of the registration
-process.
-
+Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/plat-samsung/clock-clksrc.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/plat-samsung/clock-clksrc.c |   11 ++++++++---
+ 1 files changed, 8 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/plat-samsung/clock-clksrc.c b/arch/arm/plat-samsung/clock-clksrc.c
-index 98c6b88..656c70e 100644
+index 33c633a..98c6b88 100644
 --- a/arch/arm/plat-samsung/clock-clksrc.c
 +++ b/arch/arm/plat-samsung/clock-clksrc.c
-@@ -177,9 +177,11 @@ void __init s3c_register_clksrc(struct clksrc_clk *clksrc, int size)
+@@ -129,11 +129,16 @@ void __init_or_cpufreq s3c_set_clksrc(struct clksrc_clk *clk, bool announce)
  {
- 	int ret;
+ 	struct clksrc_sources *srcs = clk->sources;
+ 	u32 mask = bit_mask(clk->reg_src.shift, clk->reg_src.size);
+-	u32 clksrc = 0;
++	u32 clksrc;
  
--	WARN_ON(!clksrc->reg_div.reg && !clksrc->reg_src.reg);
--
- 	for (; size > 0; size--, clksrc++) {
-+		if (!clksrc->reg_div.reg && !clksrc->reg_src.reg)
-+			printk(KERN_ERR "%s: clock %s has no registers set\n",
-+			       __func__, clksrc->clk.name);
-+
- 		/* fill in the default functions */
+-	if (clk->reg_src.reg)
+-		clksrc = __raw_readl(clk->reg_src.reg);
++	if (!clk->reg_src.reg) {
++		if (!clk->clk.parent)
++			printk(KERN_ERR "%s: no parent clock specified\n",
++				clk->clk.name);
++		return;
++	}
  
- 		if (!clksrc->clk.ops) {
++	clksrc = __raw_readl(clk->reg_src.reg);
+ 	clksrc &= mask;
+ 	clksrc >>= clk->reg_src.shift;
+ 
 -- 
 1.6.0.4
