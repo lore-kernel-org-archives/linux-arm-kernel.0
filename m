@@ -1,99 +1,19 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Mon, 18 Jan 2010 12:13:34 +0100
-Subject: [PATCH] ARM: SAMSUNG: Add initial documentation directory and
-	overview
-In-Reply-To: <1263804317-8996-4-git-send-email-ben-linux@fluff.org>
-References: <1263804317-8996-1-git-send-email-ben-linux@fluff.org>
-	<1263804317-8996-4-git-send-email-ben-linux@fluff.org>
-Message-ID: <4B54425E.8020400@gmail.com>
+From: mogambo.kztrj@gmail.com (Khushhua Mogambo)
+Date: Mon, 18 Jan 2010 21:43:12 +0900
+Subject: Use of data types
+Message-ID: <2703439e1001180443t761947e0idc144ced64ca3a4f@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Op 18-01-10 09:45, Ben Dooks schreef:
-> Start Documentation/arm/Samsung and add an initial overview file
-> which whilst is not complete, is better than nothing.
->
-> Signed-off-by: Ben Dooks<ben-linux@fluff.org>
-> ---
->   Documentation/arm/Samsung/Overview.txt |   63 ++++++++++++++++++++++++++++++++
->   1 files changed, 63 insertions(+), 0 deletions(-)
->   create mode 100644 Documentation/arm/Samsung/Overview.txt
->
-> diff --git a/Documentation/arm/Samsung/Overview.txt b/Documentation/arm/Samsung/Overview.txt
-> new file mode 100644
-> index 0000000..c3d2f44
-> --- /dev/null
-> +++ b/Documentation/arm/Samsung/Overview.txt
-> @@ -0,0 +1,63 @@
-> +		Samsung ARM Linux Overview
-> +		==========================
-> +
-> +Introduction
-> +------------
-> +
-> +  The Samsung range of ARM SoCs spans many similar devices, from the initial
-> +  ARM9 through to the newest ARM cores. This document shows an overview of
-> +  the current kernel support, how to use it and where to find the code
-> +  that supports this.
-> +
-> +  The currently supported SoCs are:
-> +
-> +  - S3C24XX: See Documentation/arm/Samsung-S3C24XX/Overview.txt for full list
-> +  - S3C64XX: S3C6400 and S3C6410
-> +
-> +  S5PC100 and S5PC110 support is currently being merged
-> +
-> +
-> +S3C24XX Systems
-> +---------------
-> +
-> +  There is still documentation in Docuemntation/arm/Samsung-S3C24XX/ which
->    
+Hi
+  I starting to port Linux kernel to my companies new ARM based
+SoC and development board.
 
-Same typo as before? Docuemntation ->  Documentation
+Some of the regs is 16bits wide and some is 32bits width. I ask if
+my using u16 and u32 in place of 'unsigned short' and 'unsigned int'
+in the whole porting would be acceptable or not?
 
+In different wording, using only u16 and u32 always is considered good
+quality or bad?
 
-> +  deals with the architecture and drivers specific to these devices.
-> +
-> +  See Documentation/arm/Samsung-S3C24XX/Overview.txt for more information
-> +  on the implementation details and specific support.
-> +
-> +
-> +Configuration
-> +-------------
-> +
-> +  A number of configurations are supplied, as there is no current way of
-> +  unifying all the SoCs into one kernel.
-> +
-> +  [ to finish ]
-> +
-> +Layout
-> +------
-> +
-> +  [ to finish ]
-> +
-> +
-> +Port Contributors
-> +-----------------
-> +
-> +  Ben Dooks (BJD)
-> +  Vincent Sanders
-> +  Herbert Potzl
-> +  Arnaud Patard (RTP)
-> +  Roc Wu
-> +  Klaus Fetscher
-> +  Dimitry Andric
-> +  Shannon Holland
-> +  Guillaume Gourat (NexVision)
-> +  Christer Weinigel (wingel) (Acer N30)
-> +  Lucas Correia Villa Real (S3C2400 port)
-> +
-> +
-> +Document Author
-> +---------------
-> +
-> +Copyright 2009 Ben Dooks<ben-linux@fluff.org>
->    
-
-Regards,
-Maurus Cuelenaere
+many thanks.
