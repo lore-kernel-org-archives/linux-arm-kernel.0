@@ -1,41 +1,21 @@
-From: matthias@kaehlcke.net (Matthias Kaehlcke)
-Date: Mon, 18 Jan 2010 14:42:15 +0100
-Subject: Use of data types
-In-Reply-To: <20100118134120.GB31345@pengutronix.de>
-References: <2703439e1001180443t761947e0idc144ced64ca3a4f@mail.gmail.com>
-	<20100118134120.GB31345@pengutronix.de>
-Message-ID: <20100118134215.GB16182@darwin>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 18 Jan 2010 13:47:23 +0000
+Subject: ioctl() returns EFAULT / MMU domain problem?
+In-Reply-To: <ac4446ac1001180535u299fa2f8rc2fdb3317a566066@mail.gmail.com>
+References: <ac4446ac1001180535u299fa2f8rc2fdb3317a566066@mail.gmail.com>
+Message-ID: <20100118134723.GA2695@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El Mon, Jan 18, 2010 at 02:41:20PM +0100 Uwe Kleine-K?nig ha dit:
+On Mon, Jan 18, 2010 at 10:35:26PM +0900, Koyo Takenoshita wrote:
+> I think that the problem is that there is a possibility of schedule
+> while doing set_fs(KERNEL_DS) and copy_to_user.
 
-> On Mon, Jan 18, 2010 at 09:43:12PM +0900, Khushhua Mogambo wrote:
-> > Hi
-> >   I starting to port Linux kernel to my companies new ARM based
-> > SoC and development board.
-> > 
-> > Some of the regs is 16bits wide and some is 32bits width. I ask if
-> > my using u16 and u32 in place of 'unsigned short' and 'unsigned int'
-> > in the whole porting would be acceptable or not?
-> > 
-> > In different wording, using only u16 and u32 always is considered good
-> > quality or bad?
-> I prefer using u32 over int.  Still more if your register space isn't uniform.
+The domain register setting is stored in the per-thread cpu_domain
+variable (current_thread_info()->cpu_domain).  set_fs() modifies
+this according to KERNEL_DS vs USER_DS.
 
-ditto
-
-how about using the C99 types uint32_t, ... in the kernel? 
-
--- 
-Matthias Kaehlcke
-Embedded Linux Developer
-Barcelona
-
-              Insanity: doing the same thing over and over
-                again and expecting different results
-                            (Albert Einstein)
-                                                                 .''`.
-    using free software / Debian GNU/Linux | http://debian.org  : :'  :
-                                                                `. `'`
-gpg --keyserver pgp.mit.edu --recv-keys 47D8E5D4                  `-
+On context switches, the domain register is reloaded from cpu_domain,
+so it will be preserved across context switches for the same thread;
+if it wasn't, kernel boot wouldn't work (because the kernel boot uses
+KERNEL_DS to be able to call execve(), open(), etc.)
