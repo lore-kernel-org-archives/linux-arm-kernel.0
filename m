@@ -1,54 +1,29 @@
-From: caglarakyuz@gmail.com (Caglar Akyuz)
-Date: Mon, 18 Jan 2010 10:54:59 +0200
-Subject: Kernel Start-up Time
-In-Reply-To: <4B541E3F.9040205@windriver.com>
-References: <201001181010.01975.caglarakyuz@gmail.com>
-	<4B541E3F.9040205@windriver.com>
-Message-ID: <201001181054.59214.caglarakyuz@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 18 Jan 2010 09:56:30 +0100
+Subject: NetSilicon support
+In-Reply-To: <20091121105009.GD7998@n2100.arm.linux.org.uk>
+References: <20091121105009.GD7998@n2100.arm.linux.org.uk>
+Message-ID: <20100118085630.GB15054@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 January 2010 10:39:27 am Tonyliu wrote:
-> Caglar Akyuz wrote:
-> > Hello,
-> >
-> > While measuring Linux start-up time, I see that printing version string
-> > in "start_kernel" takes ~1.3 seconds. I guess this is the time between
-> > from "bootloader jumping to uImage" and "printing version string in
-> > generic start_kernel code". Relevant part of my boot log is attached.
-> >
-> > My question: is it normal this 1.3 sec init time? My system is 297 MHZ
-> > arm926ej-s with a 162MHZ DDR2 memory.
-> 
-> It depends on where you start to measure it?
->     Starting from when power is turned on.
->     Starting from when the first instruction executes.
->     Start from the bootloader tries to load the kernel image.
-> ...
+Hello Russell,
 
-That number is relative, it is the time passing from u-boot jumping to kernel 
-and kernel starting.
+On Sat, Nov 21, 2009 at 10:50:09AM +0000, Russell King - ARM Linux wrote:
+> What's happening with NetSilicon NS9xxx support?  The code which has been
+> merged looks mostly non-functional (it doesn't declare any devices nor any
+> clocks) and doesn't appear to have had any progress since it was initially
+> merged.
+I discussed this a bit with engineering management at Digi and their
+plan is to submit their code when they next update the BSPs to a recent
+kernel version.  This is planned to happen later this year.
 
-> I think this type of mearsurement  makes no much sense to you, since
-> normally
-> people want to know
->    When the kernel loads userspace or
->     When the first app starts to run.
-> 
+I suggest to keep the ns9xxx code for now.  If nothing happens until end
+of year I'll reping them.
 
-First application starts in ~4 second. This time consists of:
+Best regards
+Uwe
 
-1) ~1 sec for application start.
-2) ~1 sec for userspace init, mouting filesys, etc.
-3) ~1 sec for kernel init for drivers and machine specific code
-4) ~1 sec for the aforementioned delay.
- 
-> These are more meaningful for specific product.
-> 
-
-It is number 4 that I'm trying to understand. I think it has the highest 
-chance to contribute to end goal. But if it is as expected, then no room for 
-optimization there.
-
-Regards,
-Caglar
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
