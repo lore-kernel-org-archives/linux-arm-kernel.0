@@ -1,61 +1,43 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 18 Jan 2010 06:33:20 +0000
-Subject: [PATCH] ARM: SAMSUNG: Add check to ensure that clksrc_clk does
-	have multiple clock sources
-In-Reply-To: <1263792616-19507-1-git-send-email-thomas.ab@samsung.com>
-References: <1263792616-19507-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <20100118063320.GL10014@trinity.fluff.org>
+From: caglarakyuz@gmail.com (Caglar Akyuz)
+Date: Mon, 18 Jan 2010 10:10:01 +0200
+Subject: Kernel Start-up Time
+Message-ID: <201001181010.01975.caglarakyuz@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 18, 2010 at 02:30:16PM +0900, Thomas Abraham wrote:
-> Adds a additional check in s3c_set_clksrc function to ensure that the clksrc_clk
-> does have a choice of multiple clock sources. In addition to this, a check is
-> added to ensure that a parent is assigned to the clksrc_clk in case it does not
-> have a choice of parent clocks.
+Hello,
 
-Applied to next-samsung-clock2.
- 
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> ---
->  arch/arm/plat-samsung/clock-clksrc.c |   11 ++++++++---
->  1 files changed, 8 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/plat-samsung/clock-clksrc.c b/arch/arm/plat-samsung/clock-clksrc.c
-> index 33c633a..98c6b88 100644
-> --- a/arch/arm/plat-samsung/clock-clksrc.c
-> +++ b/arch/arm/plat-samsung/clock-clksrc.c
-> @@ -129,11 +129,16 @@ void __init_or_cpufreq s3c_set_clksrc(struct clksrc_clk *clk, bool announce)
->  {
->  	struct clksrc_sources *srcs = clk->sources;
->  	u32 mask = bit_mask(clk->reg_src.shift, clk->reg_src.size);
-> -	u32 clksrc = 0;
-> +	u32 clksrc;
->  
-> -	if (clk->reg_src.reg)
-> -		clksrc = __raw_readl(clk->reg_src.reg);
-> +	if (!clk->reg_src.reg) {
-> +		if (!clk->clk.parent)
-> +			printk(KERN_ERR "%s: no parent clock specified\n",
-> +				clk->clk.name);
-> +		return;
-> +	}
->  
-> +	clksrc = __raw_readl(clk->reg_src.reg);
->  	clksrc &= mask;
->  	clksrc >>= clk->reg_src.shift;
->  
-> -- 
-> 1.6.3.3
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+While measuring Linux start-up time, I see that printing version string in 
+"start_kernel" takes ~1.3 seconds. I guess this is the time between from 
+"bootloader jumping to uImage" and "printing version string in generic 
+start_kernel code". Relevant part of my boot log is attached.
 
--- 
--- 
-Ben
+My question: is it normal this 1.3 sec init time? My system is 297 MHZ 
+arm926ej-s with a 162MHZ DDR2 memory.
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Sorry for my ignorance but I'm not good at ARM assembly, so I'm unable to 
+bench early boot.
+
+Thanks,
+Caglar
+
+_____________________________________________________________________ 
+
+[    4.390970] Bytes transferred = 3349376 (331b80 hex)                                                                                                                             
+[    4.663038] ## Booting kernel from Legacy Image at 80700000 ...                                                                                                                  
+[    4.668940]    Image Name:   Linux-2.6.30-davinci1-06079-g4e7                                                                                                                    
+[    4.672999]    Image Type:   ARM Linux Kernel Image (uncompressed)                                                                                                               
+[    4.677999]    Data Size:    3349312 Bytes =  3.2 MB                                                                                                                             
+[    4.681965]    Load Address: 80008000                                                                                                                                            
+[    4.684007]    Entry Point:  80008000                                                                                                                                            
+[    4.686043]    Loading Kernel Image ... OK                                                                                                                                       
+[    4.696911] OK                                                                                                                                                                   
+[    4.700878]                                                                                                                                                                      
+[    4.700896] Starting kernel ...                                                                                                                                                  
+[    4.702971]                                                                                                                                                                      
+[    5.966039] [    0.000000] Linux version 2.6.30-davinci1-06079-g4e73fae-
+dirty (caglar at ycaserv) (gcc version 4.3.3 (GCC) ) #393 PREEMPT Mon Jan 18 
+10:03:47 EET 2010              
+[    5.979054] [    0.000000] CPU: ARM926EJ-S [41069265] revision 5 
+(ARMv5TEJ), cr=00053177                                                                                         
+[    5.985952] [    0.000000] CPU: VIVT data cache, VIVT instruction cache
