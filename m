@@ -1,52 +1,117 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 18 Jan 2010 02:38:38 +0000
-Subject: [PATCH] ARM: SAMSUNG: Move pm-gpio into plat-samsung
-In-Reply-To: <1263782319-20775-1-git-send-email-ben-linux@fluff.org>
-References: <1263782319-20775-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1263782319-20775-4-git-send-email-ben-linux@fluff.org>
+Date: Mon, 18 Jan 2010 05:15:13 +0000
+Subject: [PATCH] ARM: SAMSUNG: Add initial documentation directory and
+	overview
+In-Reply-To: <4B504A6B.5020101@gmail.com>
+References: <1263551977-15090-1-git-send-email-ben-linux@fluff.org>
+	<1263551977-15090-4-git-send-email-ben-linux@fluff.org>
+	<4B504A6B.5020101@gmail.com>
+Message-ID: <20100118051513.GA26562@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the pm-gpio code into plat-samsung.
+On Fri, Jan 15, 2010 at 11:58:51AM +0100, Maurus Cuelenaere wrote:
+> Op 15-01-10 11:39, Ben Dooks schreef:
+>> Start Documentation/arm/Samsung and add an initial overview file
+>> which whilst is not complete, is better than nothing.
+>>
+>> Signed-off-by: Ben Dooks<ben-linux@fluff.org>
 
-Note, this should be changed later to properly compile the 4bit code if
-the 4bit settings are enabled.
+Thanks, although this shouldn't really have been in this series in the
+first place.
 
-Signed-off-by: Ben Dooks <ben-linux@fluff.org>
----
- arch/arm/plat-s3c/Makefile                    |    1 -
- arch/arm/plat-samsung/Makefile                |    4 ++++
- arch/arm/{plat-s3c => plat-samsung}/pm-gpio.c |    0
- 3 files changed, 4 insertions(+), 1 deletions(-)
- rename arch/arm/{plat-s3c => plat-samsung}/pm-gpio.c (100%)
+>> ---
+>>   Documentation/arm/Samsung/Overview.txt |   63 ++++++++++++++++++++++++++++++++
+>>   1 files changed, 63 insertions(+), 0 deletions(-)
+>>   create mode 100644 Documentation/arm/Samsung/Overview.txt
+>>
+>> diff --git a/Documentation/arm/Samsung/Overview.txt b/Documentation/arm/Samsung/Overview.txt
+>> new file mode 100644
+>> index 0000000..c3d2f44
+>> --- /dev/null
+>> +++ b/Documentation/arm/Samsung/Overview.txt
+>> @@ -0,0 +1,63 @@
+>> +		Samsung ARM Linux Overview
+>> +		==========================
+>> +
+>> +Introduction
+>> +------------
+>> +
+>> +  The Samsung range of ARM SoCs spans many similar devices, from the initial
+>> +  ARM9 through to the newest ARM cores. This document shows an overview of
+>> +  the current kernel support, how to use it and where to find the code
+>> +  that supports this.
+>> +
+>> +  The currently supported SoCs are:
+>> +
+>> +  - S3C24XX: See Documentation/arm/Samsung-S3C24XX/Overview.txt for full list
+>> +  - S3C64XX: S3C6400 and S3C6410
+>> +
+>> +  S5PC100 and S5PC110 support is currently being merged
+>> +
+>> +
+>> +S3C24XX Systems
+>> +---------------
+>> +
+>> +  There is still documentation in Docuemntation/arm/Samsung-S3C24XX/ which
+>>    
+>
+> Typo: Docuemntation -> Documentation
+>> +  deals with the architecture and drivers specific to these devices.
+>> +
+>> +  See Documentation/arm/Samsung-S3C24XX/Overview.txt for more information
+>> +  on the implementation details and specific support.
+>> +
+>> +
+>> +Configuration
+>> +-------------
+>> +
+>> +  A number of configurations are supplied, as there is no current way of
+>> +  unifying all the SoCs into one kernel.
+>> +
+>> +  [ to finish ]
+>> +
+>> +Layout
+>> +------
+>> +
+>> +  [ to finish ]
+>> +
+>> +
+>> +Port Contributors
+>> +-----------------
+>> +
+>> +  Ben Dooks (BJD)
+>> +  Vincent Sanders
+>> +  Herbert Potzl
+>> +  Arnaud Patard (RTP)
+>> +  Roc Wu
+>> +  Klaus Fetscher
+>> +  Dimitry Andric
+>> +  Shannon Holland
+>> +  Guillaume Gourat (NexVision)
+>> +  Christer Weinigel (wingel) (Acer N30)
+>> +  Lucas Correia Villa Real (S3C2400 port)
+>> +
+>> +
+>> +Document Author
+>> +---------------
+>> +
+>> +Copyright 2009 Ben Dooks<ben-linux@fluff.org>
+>>    
+>
+>
+> Regards,
+> Maurus Cuelenaere
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-diff --git a/arch/arm/plat-s3c/Makefile b/arch/arm/plat-s3c/Makefile
-index ea4a001..ac12ba5 100644
---- a/arch/arm/plat-s3c/Makefile
-+++ b/arch/arm/plat-s3c/Makefile
-@@ -22,7 +22,6 @@ obj-$(CONFIG_S3C_DMA)		+= dma.o
- # PM support
- 
- obj-$(CONFIG_PM)		+= pm.o
--obj-$(CONFIG_PM)		+= pm-gpio.o
- obj-$(CONFIG_S3C2410_PM_CHECK)	+= pm-check.o
- 
- # PWM support
-diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-index 1425a45..0310e04 100644
---- a/arch/arm/plat-samsung/Makefile
-+++ b/arch/arm/plat-samsung/Makefile
-@@ -36,3 +36,7 @@ obj-$(CONFIG_S3C_DEV_FB)	+= dev-fb.o
- obj-$(CONFIG_S3C_DEV_USB_HOST)	+= dev-usb.o
- obj-$(CONFIG_S3C_DEV_USB_HSOTG)	+= dev-usb-hsotg.o
- obj-$(CONFIG_S3C_DEV_NAND)	+= dev-nand.o
-+
-+# PM support
-+
-+obj-$(CONFIG_PM)		+= pm-gpio.o
-diff --git a/arch/arm/plat-s3c/pm-gpio.c b/arch/arm/plat-samsung/pm-gpio.c
-similarity index 100%
-rename from arch/arm/plat-s3c/pm-gpio.c
-rename to arch/arm/plat-samsung/pm-gpio.c
 -- 
-1.6.0.4
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
