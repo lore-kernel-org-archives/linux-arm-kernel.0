@@ -1,34 +1,235 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 18 Jan 2010 09:32:19 +0000
-Subject: [PATCH] ARM: S3C64XX: SPI: Add SPI controller register base
+Date: Mon, 18 Jan 2010 09:32:22 +0000
+Subject: [PATCH] ARM: S3C64XX: SPI: Define SPI controller devices
 In-Reply-To: <1263807142-13186-1-git-send-email-ben-linux@fluff.org>
 References: <1263807142-13186-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1263807142-13186-2-git-send-email-ben-linux@fluff.org>
+Message-ID: <1263807142-13186-5-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jassi Brar <jassi.brar@samsung.com>
 
-Added SPI controller register base.
+Platform devices for SPI Controller of S3C64XX are defined and exported for
+machines to include. Also, controller setup helper functions are defined for
+machine code to set runtime configuration of the controller and the bus.
 
 Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/mach-s3c6400/include/mach/map.h |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/plat-s3c/include/plat/devs.h |    3 +
+ arch/arm/plat-s3c64xx/Makefile        |    1 +
+ arch/arm/plat-s3c64xx/dev-spi.c       |  180 +++++++++++++++++++++++++++++++++
+ 3 files changed, 184 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-s3c64xx/dev-spi.c
 
-diff --git a/arch/arm/mach-s3c6400/include/mach/map.h b/arch/arm/mach-s3c6400/include/mach/map.h
-index 3e17adf..801c1c0 100644
---- a/arch/arm/mach-s3c6400/include/mach/map.h
-+++ b/arch/arm/mach-s3c6400/include/mach/map.h
-@@ -64,6 +64,8 @@
- #define S3C64XX_PA_IIS1		(0x7F003000)
- #define S3C64XX_PA_TIMER	(0x7F006000)
- #define S3C64XX_PA_IIC0		(0x7F004000)
-+#define S3C64XX_PA_SPI0		(0x7F00B000)
-+#define S3C64XX_PA_SPI1		(0x7F00C000)
- #define S3C64XX_PA_PCM0		(0x7F009000)
- #define S3C64XX_PA_PCM1		(0x7F00A000)
- #define S3C64XX_PA_IISV4	(0x7F00D000)
+diff --git a/arch/arm/plat-s3c/include/plat/devs.h b/arch/arm/plat-s3c/include/plat/devs.h
+index 8a4153b..f4a7e57 100644
+--- a/arch/arm/plat-s3c/include/plat/devs.h
++++ b/arch/arm/plat-s3c/include/plat/devs.h
+@@ -29,6 +29,9 @@ extern struct platform_device s3c64xx_device_iis0;
+ extern struct platform_device s3c64xx_device_iis1;
+ extern struct platform_device s3c64xx_device_iisv4;
+ 
++extern struct platform_device s3c64xx_device_spi0;
++extern struct platform_device s3c64xx_device_spi1;
++
+ extern struct platform_device s3c64xx_device_pcm0;
+ extern struct platform_device s3c64xx_device_pcm1;
+ 
+diff --git a/arch/arm/plat-s3c64xx/Makefile b/arch/arm/plat-s3c64xx/Makefile
+index b241f36..80255a5 100644
+--- a/arch/arm/plat-s3c64xx/Makefile
++++ b/arch/arm/plat-s3c64xx/Makefile
+@@ -47,3 +47,4 @@ obj-$(CONFIG_S3C64XX_SETUP_I2C1) += setup-i2c1.o
+ obj-$(CONFIG_S3C64XX_SETUP_FB_24BPP) += setup-fb-24bpp.o
+ obj-$(CONFIG_S3C64XX_SETUP_SDHCI_GPIO) += setup-sdhci-gpio.o
+ obj-$(CONFIG_SND_S3C24XX_SOC) += dev-audio.o
++obj-$(CONFIG_SPI_S3C64XX) += dev-spi.o
+diff --git a/arch/arm/plat-s3c64xx/dev-spi.c b/arch/arm/plat-s3c64xx/dev-spi.c
+new file mode 100644
+index 0000000..6b6d7af
+--- /dev/null
++++ b/arch/arm/plat-s3c64xx/dev-spi.c
+@@ -0,0 +1,180 @@
++/* linux/arch/arm/plat-s3c64xx/dev-spi.c
++ *
++ * Copyright (C) 2009 Samsung Electronics Ltd.
++ *	Jaswinder Singh <jassi.brar@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/kernel.h>
++#include <linux/string.h>
++#include <linux/platform_device.h>
++#include <linux/dma-mapping.h>
++
++#include <mach/dma.h>
++#include <mach/map.h>
++#include <mach/gpio.h>
++
++#include <plat/spi-clocks.h>
++#include <plat/s3c64xx-spi.h>
++#include <plat/gpio-bank-c.h>
++#include <plat/gpio-cfg.h>
++#include <plat/irqs.h>
++
++static char *spi_src_clks[] = {
++	[S3C64XX_SPI_SRCCLK_PCLK] = "pclk",
++	[S3C64XX_SPI_SRCCLK_SPIBUS] = "spi-bus",
++	[S3C64XX_SPI_SRCCLK_48M] = "spi_48m",
++};
++
++/* SPI Controller platform_devices */
++
++/* Since we emulate multi-cs capability, we do not touch the GPC-3,7.
++ * The emulated CS is toggled by board specific mechanism, as it can
++ * be either some immediate GPIO or some signal out of some other
++ * chip in between ... or some yet another way.
++ * We simply do not assume anything about CS.
++ */
++static int s3c64xx_spi_cfg_gpio(struct platform_device *pdev)
++{
++	switch (pdev->id) {
++	case 0:
++		s3c_gpio_cfgpin(S3C64XX_GPC(0), S3C64XX_GPC0_SPI_MISO0);
++		s3c_gpio_cfgpin(S3C64XX_GPC(1), S3C64XX_GPC1_SPI_CLKO);
++		s3c_gpio_cfgpin(S3C64XX_GPC(2), S3C64XX_GPC2_SPI_MOSIO);
++		s3c_gpio_setpull(S3C64XX_GPC(0), S3C_GPIO_PULL_UP);
++		s3c_gpio_setpull(S3C64XX_GPC(1), S3C_GPIO_PULL_UP);
++		s3c_gpio_setpull(S3C64XX_GPC(2), S3C_GPIO_PULL_UP);
++		break;
++
++	case 1:
++		s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C64XX_GPC4_SPI_MISO1);
++		s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C64XX_GPC5_SPI_CLK1);
++		s3c_gpio_cfgpin(S3C64XX_GPC(6), S3C64XX_GPC6_SPI_MOSI1);
++		s3c_gpio_setpull(S3C64XX_GPC(4), S3C_GPIO_PULL_UP);
++		s3c_gpio_setpull(S3C64XX_GPC(5), S3C_GPIO_PULL_UP);
++		s3c_gpio_setpull(S3C64XX_GPC(6), S3C_GPIO_PULL_UP);
++		break;
++
++	default:
++		dev_err(&pdev->dev, "Invalid SPI Controller number!");
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static struct resource s3c64xx_spi0_resource[] = {
++	[0] = {
++		.start = S3C64XX_PA_SPI0,
++		.end   = S3C64XX_PA_SPI0 + 0x100 - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = DMACH_SPI0_TX,
++		.end   = DMACH_SPI0_TX,
++		.flags = IORESOURCE_DMA,
++	},
++	[2] = {
++		.start = DMACH_SPI0_RX,
++		.end   = DMACH_SPI0_RX,
++		.flags = IORESOURCE_DMA,
++	},
++	[3] = {
++		.start = IRQ_SPI0,
++		.end   = IRQ_SPI0,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static struct s3c64xx_spi_info s3c64xx_spi0_pdata = {
++	.cfg_gpio = s3c64xx_spi_cfg_gpio,
++	.fifo_lvl_mask = 0x7f,
++	.rx_lvl_offset = 13,
++};
++
++static u64 spi_dmamask = DMA_BIT_MASK(32);
++
++struct platform_device s3c64xx_device_spi0 = {
++	.name		  = "s3c64xx-spi",
++	.id		  = 0,
++	.num_resources	  = ARRAY_SIZE(s3c64xx_spi0_resource),
++	.resource	  = s3c64xx_spi0_resource,
++	.dev = {
++		.dma_mask		= &spi_dmamask,
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++		.platform_data = &s3c64xx_spi0_pdata,
++	},
++};
++EXPORT_SYMBOL(s3c64xx_device_spi0);
++
++static struct resource s3c64xx_spi1_resource[] = {
++	[0] = {
++		.start = S3C64XX_PA_SPI1,
++		.end   = S3C64XX_PA_SPI1 + 0x100 - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = DMACH_SPI1_TX,
++		.end   = DMACH_SPI1_TX,
++		.flags = IORESOURCE_DMA,
++	},
++	[2] = {
++		.start = DMACH_SPI1_RX,
++		.end   = DMACH_SPI1_RX,
++		.flags = IORESOURCE_DMA,
++	},
++	[3] = {
++		.start = IRQ_SPI1,
++		.end   = IRQ_SPI1,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static struct s3c64xx_spi_info s3c64xx_spi1_pdata = {
++	.cfg_gpio = s3c64xx_spi_cfg_gpio,
++	.fifo_lvl_mask = 0x7f,
++	.rx_lvl_offset = 13,
++};
++
++struct platform_device s3c64xx_device_spi1 = {
++	.name		  = "s3c64xx-spi",
++	.id		  = 1,
++	.num_resources	  = ARRAY_SIZE(s3c64xx_spi1_resource),
++	.resource	  = s3c64xx_spi1_resource,
++	.dev = {
++		.dma_mask		= &spi_dmamask,
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++		.platform_data = &s3c64xx_spi1_pdata,
++	},
++};
++EXPORT_SYMBOL(s3c64xx_device_spi1);
++
++void __init s3c64xx_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
++{
++	/* Reject invalid configuration */
++	if (!num_cs || src_clk_nr < 0
++			|| src_clk_nr > S3C64XX_SPI_SRCCLK_48M) {
++		printk(KERN_ERR "%s: Invalid SPI configuration\n", __func__);
++		return;
++	}
++
++	switch (cntrlr) {
++	case 0:
++		s3c64xx_spi0_pdata.num_cs = num_cs;
++		s3c64xx_spi0_pdata.src_clk_nr = src_clk_nr;
++		s3c64xx_spi0_pdata.src_clk_name = spi_src_clks[src_clk_nr];
++		break;
++	case 1:
++		s3c64xx_spi1_pdata.num_cs = num_cs;
++		s3c64xx_spi1_pdata.src_clk_nr = src_clk_nr;
++		s3c64xx_spi1_pdata.src_clk_name = spi_src_clks[src_clk_nr];
++		break;
++	default:
++		printk(KERN_ERR "%s: Invalid SPI controller(%d)\n",
++							__func__, cntrlr);
++		return;
++	}
++}
 -- 
 1.6.0.4
