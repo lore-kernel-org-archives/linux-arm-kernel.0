@@ -1,68 +1,186 @@
-From: schen@mvista.com (Steve Chen)
-Date: Mon, 18 Jan 2010 09:39:03 -0600
-Subject: Kernel Start-up Time
-In-Reply-To: <201001181054.59214.caglarakyuz@gmail.com>
-References: <201001181010.01975.caglarakyuz@gmail.com>
-	<4B541E3F.9040205@windriver.com>
-	<201001181054.59214.caglarakyuz@gmail.com>
-Message-ID: <1263829143.3207.34.camel@linux-1lbu>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Mon, 18 Jan 2010 17:02:03 +0100
+Subject: [PATCH] regulator: mc13783: consider Power Gates as digital
+	regulators.
+Message-ID: <1263830523.3632.22.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-01-18 at 10:54 +0200, Caglar Akyuz wrote:
-> On Monday 18 January 2010 10:39:27 am Tonyliu wrote:
-> > Caglar Akyuz wrote:
-> > > Hello,
-> > >
-> > > While measuring Linux start-up time, I see that printing version string
-> > > in "start_kernel" takes ~1.3 seconds. I guess this is the time between
-> > > from "bootloader jumping to uImage" and "printing version string in
-> > > generic start_kernel code". Relevant part of my boot log is attached.
-> > >
-> > > My question: is it normal this 1.3 sec init time? My system is 297 MHZ
-> > > arm926ej-s with a 162MHZ DDR2 memory.
-> > 
-> > It depends on where you start to measure it?
-> >     Starting from when power is turned on.
-> >     Starting from when the first instruction executes.
-> >     Start from the bootloader tries to load the kernel image.
-> > ...
-> 
-> That number is relative, it is the time passing from u-boot jumping to kernel 
-> and kernel starting.
-> 
-> > I think this type of mearsurement  makes no much sense to you, since
-> > normally
-> > people want to know
-> >    When the kernel loads userspace or
-> >     When the first app starts to run.
-> > 
-> 
-> First application starts in ~4 second. This time consists of:
-> 
-> 1) ~1 sec for application start.
-> 2) ~1 sec for userspace init, mouting filesys, etc.
-> 3) ~1 sec for kernel init for drivers and machine specific code
-> 4) ~1 sec for the aforementioned delay.
->  
-> > These are more meaningful for specific product.
-> > 
-> 
-> It is number 4 that I'm trying to understand. I think it has the highest 
-> chance to contribute to end goal. But if it is as expected, then no room for 
-> optimization there.
-> 
+GPO regulators are digital outputs that can be enabled or disabled by a
+dedicated bit in mc13783 POWERMISC register.
+In this family can be count in also Power Gates (PWGT1 and 2): enabled by
+a dedicated pin a Power Gate is an hardware driven supply where the output
+(PWGTnDRV) follow this law:
 
-Well, "no room for optimization" is a pretty strong statement.  Last
-year Monta Vista demo the 1 second boot.
+ Bit PWGTxSPIEN | Pin PWGTxEN | PWGTxDRV |  Read Back
+   0 = default  |             |          | PWGTxSPIEN
+ ---------------+-------------+----------+------------
+       1        |      x      |   Low    |     0
+       0        |      0      |   High   |     1
+       0        |      1      |   Low    |     0
 
-http://mvista.com/press_release_detail.php?fid=news/2009/Ultra-fast-boot.html&d=
+As read back value of control bit reflects the PWGTxDRV state and not the
+control value previously written, a dedicated function to manage bits of 
+POWERMISC register is created and the state of PWGTxEN bits is stored in memory.
 
-I realized that it is a different and faster processor, but I'm pretty
-sure there are plenty of places you can trim the boot time.   It is a
-matter of time and effort.  You may want to start with the system
-requirement to see if 4 seconds is good enough and go from there.
+All POWERMISC users _must_ make use of the new function to not accidentally
+disable Power Gates supplies.
 
-Regards,
 
-Steve
+Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
+---
+ drivers/regulator/mc13783-regulator.c |   97 ++++++++++++++++++++++++++++++++-
+ include/linux/mfd/mc13783.h           |    2 +
+ 2 files changed, 98 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/regulator/mc13783-regulator.c b/drivers/regulator/mc13783-regulator.c
+index a40e35a..8570fce 100644
+--- a/drivers/regulator/mc13783-regulator.c
++++ b/drivers/regulator/mc13783-regulator.c
+@@ -82,6 +82,10 @@
+ #define MC13783_REG_POWERMISC_GPO2EN			(1 << 8)
+ #define MC13783_REG_POWERMISC_GPO3EN			(1 << 10)
+ #define MC13783_REG_POWERMISC_GPO4EN			(1 << 12)
++#define MC13783_REG_POWERMISC_PWGTSPI_M			(3 << 15)
++#define MC13783_REG_POWERMISC_PWGT1SPIEN		(1 << 15)
++#define MC13783_REG_POWERMISC_PWGT2SPIEN		(1 << 16)
++
+ 
+ struct mc13783_regulator {
+ 	struct regulator_desc desc;
+@@ -163,6 +167,7 @@ static const int const mc13783_vrf_val[] = {
+ 
+ static struct regulator_ops mc13783_regulator_ops;
+ static struct regulator_ops mc13783_fixed_regulator_ops;
++static struct regulator_ops mc13783_regulator_ops_gpo;
+ 
+ #define MC13783_DEFINE(prefix, _name, _reg, _vsel_reg, _voltages)	\
+ 	[MC13783_ ## prefix ## _ ## _name] = {				\
+@@ -201,7 +206,7 @@ static struct regulator_ops mc13783_fixed_regulator_ops;
+ 	[MC13783_ ## prefix ## _ ## _name] = {				\
+ 		.desc = {						\
+ 			.name = #prefix "_" #_name,			\
+-			.ops = &mc13783_regulator_ops,			\
++			.ops = &mc13783_regulator_ops_gpo,		\
+ 			.type = REGULATOR_VOLTAGE,			\
+ 			.id = MC13783_ ## prefix ## _ ## _name,		\
+ 			.owner = THIS_MODULE,				\
+@@ -253,6 +258,8 @@ static struct mc13783_regulator mc13783_regulators[] = {
+ 	MC13783_GPO_DEFINE(REGU, GPO2, POWERMISC),
+ 	MC13783_GPO_DEFINE(REGU, GPO3, POWERMISC),
+ 	MC13783_GPO_DEFINE(REGU, GPO4, POWERMISC),
++	MC13783_GPO_DEFINE(REGU, PWGT1SPI, POWERMISC),
++	MC13783_GPO_DEFINE(REGU, PWGT2SPI, POWERMISC),
+ };
+ 
+ struct mc13783_regulator_priv {
+@@ -445,6 +452,94 @@ static struct regulator_ops mc13783_fixed_regulator_ops = {
+ 	.get_voltage = mc13783_fixed_regulator_get_voltage,
+ };
+ 
++int mc13783_state_powermisc_pwgt;
++int mc13783_reg_rmw_powermisc(struct mc13783 *mc13783, u32 mask, u32 val)
++{
++	int ret;
++	u32 valread;
++
++	BUG_ON(val & ~mask);
++
++	/* Update the stored state for Power Gates.
++	 * As from specs the meaning is inverted (0: en, 1: dis) */
++	if (mask & MC13783_REG_POWERMISC_PWGTSPI_M)
++		mc13783_state_powermisc_pwgt =
++			(mc13783_state_powermisc_pwgt & ~mask) |
++			((val ^ mask) & MC13783_REG_POWERMISC_PWGTSPI_M);
++
++	ret = mc13783_reg_read(mc13783, MC13783_REG_POWERMISC, &valread);
++	if (ret)
++		return ret;
++
++	valread = (valread & ~mask) | val;
++
++	/* Re propose the stored state for Power Gates */
++	valread = (valread & ~MC13783_REG_POWERMISC_PWGTSPI_M) |
++						mc13783_state_powermisc_pwgt;
++
++	return mc13783_reg_write(mc13783, MC13783_REG_POWERMISC, valread);
++}
++
++static int mc13783_regulator_enable_gpo(struct regulator_dev *rdev)
++{
++	struct mc13783_regulator_priv *priv = rdev_get_drvdata(rdev);
++	int id = rdev_get_id(rdev);
++	int ret;
++
++	dev_dbg(rdev_get_dev(rdev), "%s id: %d\n", __func__, id);
++
++	mc13783_lock(priv->mc13783);
++	ret = mc13783_reg_rmw_powermisc(priv->mc13783,
++			mc13783_regulators[id].enable_bit,
++			mc13783_regulators[id].enable_bit);
++	mc13783_unlock(priv->mc13783);
++
++	return ret;
++}
++
++static int mc13783_regulator_disable_gpo(struct regulator_dev *rdev)
++{
++	struct mc13783_regulator_priv *priv = rdev_get_drvdata(rdev);
++	int id = rdev_get_id(rdev);
++	int ret;
++
++	dev_dbg(rdev_get_dev(rdev), "%s id: %d\n", __func__, id);
++
++	mc13783_lock(priv->mc13783);
++	ret = mc13783_reg_rmw_powermisc(priv->mc13783,
++			mc13783_regulators[id].enable_bit, 0);
++	mc13783_unlock(priv->mc13783);
++
++	return ret;
++}
++
++static int mc13783_regulator_is_enabled_gpo(struct regulator_dev *rdev)
++{
++	struct mc13783_regulator_priv *priv = rdev_get_drvdata(rdev);
++	int ret, id = rdev_get_id(rdev);
++	unsigned int val;
++
++	mc13783_lock(priv->mc13783);
++	ret = mc13783_reg_read(priv->mc13783, mc13783_regulators[id].reg, &val);
++	mc13783_unlock(priv->mc13783);
++
++	/* Power Gates state is stored in mc13783_state_powermisc_pwgt
++	 * where the meaning is inverted */
++	val = (val & ~MC13783_REG_POWERMISC_PWGTSPI_M) |
++	      (mc13783_state_powermisc_pwgt ^ MC13783_REG_POWERMISC_PWGTSPI_M);
++
++	if (ret)
++		return ret;
++
++	return (val & mc13783_regulators[id].enable_bit) != 0;
++}
++
++static struct regulator_ops mc13783_regulator_ops_gpo = {
++	.enable = mc13783_regulator_enable_gpo,
++	.disable = mc13783_regulator_disable_gpo,
++	.is_enabled = mc13783_regulator_is_enabled_gpo,
++};
++
+ static int __devinit mc13783_regulator_probe(struct platform_device *pdev)
+ {
+ 	struct mc13783_regulator_priv *priv;
+diff --git a/include/linux/mfd/mc13783.h b/include/linux/mfd/mc13783.h
+index 3568040..94cb51a 100644
+--- a/include/linux/mfd/mc13783.h
++++ b/include/linux/mfd/mc13783.h
+@@ -108,6 +108,8 @@ int mc13783_adc_do_conversion(struct mc13783 *mc13783, unsigned int mode,
+ #define	MC13783_REGU_V2		28
+ #define	MC13783_REGU_V3		29
+ #define	MC13783_REGU_V4		30
++#define	MC13783_REGU_PWGT1SPI	31
++#define	MC13783_REGU_PWGT2SPI	32
+ 
+ #define MC13783_IRQ_ADCDONE	0
+ #define MC13783_IRQ_ADCBISDONE	1
+-- 
+1.6.3.3
