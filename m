@@ -1,118 +1,51 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 19 Jan 2010 09:19:35 -0800
-Subject: [PATCH 2/4] omap: Make uncompress code and DEBUG_LL code generic
-In-Reply-To: <FCCFB4CDC6E5564B9182F639FC356087030070F293@dbde02.ent.ti.com>
-References: <20100116013205.10065.95921.stgit@baageli.muru.com>
-	<20100116013515.10065.30649.stgit@baageli.muru.com>
-	<FCCFB4CDC6E5564B9182F639FC356087030070F293@dbde02.ent.ti.com>
-Message-ID: <1263921575.3376.13.camel@localhost>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Tue, 19 Jan 2010 17:28:35 +0000
+Subject: [RFC 06/18] arm: msm: implement proper dmb() for 7x27
+In-Reply-To: <20100112000142.GO7925@n2100.arm.linux.org.uk>
+References: <1263250057-26692-1-git-send-email-dwalker@codeaurora.org>
+	<1263250057-26692-7-git-send-email-dwalker@codeaurora.org>
+	<20100111233924.GL7925@n2100.arm.linux.org.uk>
+	<1263253516.26505.42.camel@c-dwalke-linux.qualcomm.com>
+	<20100112000142.GO7925@n2100.arm.linux.org.uk>
+Message-ID: <20100119172835.GC1323@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-01-19 at 06:56 +0530, Pandita, Vikram wrote:
+Russell King - ARM Linux wrote:
+> > 	zero_page_strongly_ordered =
+> > 		ioremap_strongly_ordered(page_to_pfn(empty_zero_page)
+> > 		<< PAGE_SHIFT, PAGE_SIZE);
 > 
-> >-----Original Message-----
-> >From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Tony
-> >Lindgren
-> >Sent: Friday, January 15, 2010 7:35 PM
-> >To: linux-arm-kernel at lists.infradead.org
-> >Cc: linux-omap at vger.kernel.org
-> >Subject: [PATCH 2/4] omap: Make uncompress code and DEBUG_LL code generic
-> 
-> UART_SCR 		-> this is the scratchpad register 
-> UART_OMAP_SCR	-> This is TI-only Supplementary control register
-> 
-> You probably confused the two (as rightly so since SCR is same name).
-> So there is no need to save/restore the UART_SCR register as you have done, see inlined -- 
-> 
-> >
-> >Define arch_decomp_setup() the same way as some other
-> >architectures do. Use arch_id to configure the debug uart
-> >based on the machine_is by storing it into the uart
-> >scratchpad register for DEBUG_LL code to use.
-> >
-> >Signed-off-by: Tony Lindgren <tony@atomide.com>
-> <snip>
-> >--- a/arch/arm/mach-omap2/serial.c
-> >+++ b/arch/arm/mach-omap2/serial.c
-> >@@ -161,11 +161,22 @@ static inline void serial_write_reg(struct plat_serial8250_port *p, int offset,
-> > static inline void __init omap_uart_reset(struct omap_uart_state *uart)
-> > {
-> > 	struct plat_serial8250_port *p = uart->p;
-> >+	u8 scratchpad = 0;
-> >+
-> >+	/*
-> >+	 * Save UART1 scratchpad register value for UART1 for DEBUG_LL.
-> >+	 * See also include/plat/uncompress.h and include/mach/debug-macro.S.
-> >+	 */
-> >+	if (p->mapbase == OMAP2_UART1_BASE)	/* OMAP2/3/4UART1_BASE */
-> >+		scratchpad = serial_read_reg(p, UART_SCR);
-> 
-> No need to save and restore the UART_SCR register. 
-> This never gets used in this function.
-> 
-> What gets used is UART_OMAP_SCR which is OMAP specific supplimantry control register 
-> and not scratchpad.
-> 
-> >
-> > 	serial_write_reg(p, UART_OMAP_MDR1, 0x07);
-> > 	serial_write_reg(p, UART_OMAP_SCR, 0x08);
-> > 	serial_write_reg(p, UART_OMAP_MDR1, 0x00);
-> > 	serial_write_reg(p, UART_OMAP_SYSC, (0x02 << 3) | (1 << 2) | (1 << 0));
-> >+
-> >+	if (p->mapbase == OMAP2_UART1_BASE)	/* OMAP2/3/4UART1_BASE */
-> >+		serial_write_reg(p, UART_SCR, scratchpad);
-> 
-> Remove this as well. No need. 
-> 
-> 
-> <snip>
-> >diff --git a/arch/arm/plat-omap/include/plat/uncompress.h b/arch/arm/plat-
-> >omap/include/plat/uncompress.h
-> >index 13c305d..479bac8 100644
-> >--- a/arch/arm/plat-omap/include/plat/uncompress.h
-> >+++ b/arch/arm/plat-omap/include/plat/uncompress.h
-> >@@ -19,62 +19,36 @@
-> >
-> > #include <linux/types.h>
-> > #include <linux/serial_reg.h>
-> >+
-> >+#include <asm/mach-types.h>
-> >+
-> > #include <plat/serial.h>
-> >
-> >-unsigned int system_rev;
-> >+static volatile u8 *uart1_base;
-> >+static volatile u8 *uart_base;
-> >+static volatile int uart_shift;
-> 
-> Just like uart_base is stored in scratchpad,
-> Somehow the uart_shift also needs to be stored so that boards with different uart_shift requirements can be addressed. Where can we store this another variable? 
+> This can't work.  You're not allowed to map the same memory with differing
+> memory types from ARMv7.  This ends up mapping 'empty_zero_page' as both
+> cacheable memory and strongly ordered.  That's illegal according to the
+> ARM ARM.
 
-Since the base addresses are aligned, how about store the shift in the
-least-significant 2 bits, and the rest is the base address.
+It's not an ARMv7, otherwise it wouldn't be using the mcr version of
+dmb().  Does that make the mapping ok, since it's been ok for years on
+< ARMv7?  Or are we trying to get away from doing that on all ARMs?
 
-Kevin
+Actually it is only used on two very specific CPUs.  Perhaps it can be
+confirmed as Not A Problem(tm) on those, with a comment to say why
+it's ok in the mapping call?
 
-> <snip>
-> 
-> > /*
-> >+ * Macros to configure UART1 and debug UART
-> >+ */
-> >+#define _DEBUG_LL_ENTRY(mach, uart1, dbg_uart, shift, dbg_id, reset_fn)	\
-> >+	if (machine_is_##mach()) {					\
-> >+		uart1_base = (volatile u8 *)(uart1);			\
-> >+		uart_base = (volatile u8 *)(dbg_uart);			\
-> >+		uart_shift = (shift);					\
-> >+		port = (dbg_id);					\
-> >+		reset_fn;						\
-> >+		break;							\
-> >+	}
-> 
-> Nice Idea... you are the man !!
-> 
-> <snip>
-> NrybX?v^)?{.n+{f{ay
-??,jfhz
-w
-j:+vwjmzZ+?j"!
+> You need to find something else to map - allocating a page of system
+> memory for this won't work either (it'll have the same issue.)
+
+Is strongly ordered RAM or even uncached RAM used at all for anything
+at the moment?  It looks quite tricky to allocate a little RAM that
+never becomes part of the kernel direct mapping.
+
+> > [alloc_bootmem_aligned]
+>
+> Erm, there is __alloc_bootmem(size, align, 0) - the bootmem allocator
+> already does alignment.
+
+I agree.
+Best use the provided API.
+
+If there _was_ a need for a new function, then the right place for it
+would have been a patch to mm/bootmem.c, where everyone can see what
+it does and avoid breaking it if they change how bootmem works.
+
+-- Jamie
