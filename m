@@ -1,82 +1,116 @@
-From: anfei.zhou@gmail.com (anfei)
-Date: Tue, 19 Jan 2010 08:16:36 +0800
-Subject: flush_dcache_page does too much?
-In-Reply-To: <20100118150152.GF2695@n2100.arm.linux.org.uk>
-References: <20100118131346.GA11589@desktop>
-	<20100118133304.GA29645@n2100.arm.linux.org.uk>
-	<20100118135431.GA12496@desktop>
-	<20100118140005.GD2695@n2100.arm.linux.org.uk>
-	<20100118141530.GA13394@desktop>
-	<20100118144418.GE2695@n2100.arm.linux.org.uk>
-	<20100118145731.GA14523@desktop>
-	<20100118150152.GF2695@n2100.arm.linux.org.uk>
-Message-ID: <20100119001636.GA4401@desktop>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Tue, 19 Jan 2010 00:35:21 +0000
+Subject: [PATCH] ARM: SAMSUNG: Add initial documentation directory and
+	overview
+In-Reply-To: <4B54425E.8020400@gmail.com>
+References: <1263804317-8996-1-git-send-email-ben-linux@fluff.org>
+	<1263804317-8996-4-git-send-email-ben-linux@fluff.org>
+	<4B54425E.8020400@gmail.com>
+Message-ID: <20100119003520.GB26562@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 18, 2010 at 03:01:52PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 18, 2010 at 10:57:31PM +0800, anfei wrote:
-> > On Mon, Jan 18, 2010 at 02:44:18PM +0000, Russell King - ARM Linux wrote:
-> > > On Mon, Jan 18, 2010 at 10:15:30PM +0800, anfei wrote:
-> > > > On Mon, Jan 18, 2010 at 02:00:05PM +0000, Russell King - ARM Linux wrote:
-> > > > > On Mon, Jan 18, 2010 at 09:54:31PM +0800, anfei wrote:
-> > > > > > Do you mean this implementation can ensure the coherence between write
-> > > > > > and shared mmapings?  But it's easy to reproduce the alias problem by
-> > > > > > this simple testcase (w/o error handler) on omap2430 with VIPT cache:
-> > > > > 
-> > > > > Your program doesn't do anything to identify any problem.  You don't
-> > > > > even say _what_ problem you see with this program.
-> > > > > 
-> > > > Sorry for that.
-> > > > 
-> > > > > If you have a specific case which fails, please show the problem, please
-> > > > > describe exactly the behaviour that you see, and what you expect to see.
-> > > 
-> > > Are you using a write allocate cache?
-> > 
-> > I guess not, because this line is neccessary to reproduce the issue:
-> > 	tmp = *(addr+0);
-> > If it's write allocate, this line may not be neccessary, since it's just
-> > a read (and cache the data).
-> 
-> It makes no sense then - without write allocate, writes will go straight
-> through to the underlying page, bypassing the cache.
-> 
-Because of the read, the write is cache hitted too even on read allocate:
-       *(addr+0) = 0x44444444;	<- bypass the cache
-       tmp = *(addr+0);		<- read allocate
-       *(addr+1) = 0x77777777;	<- same cacheline, cache hitted
+On Mon, Jan 18, 2010 at 12:13:34PM +0100, Maurus Cuelenaere wrote:
+> Op 18-01-10 09:45, Ben Dooks schreef:
+>> Start Documentation/arm/Samsung and add an initial overview file
+>> which whilst is not complete, is better than nothing.
+>>
+>> Signed-off-by: Ben Dooks<ben-linux@fluff.org>
+>> ---
+>>   Documentation/arm/Samsung/Overview.txt |   63 ++++++++++++++++++++++++++++++++
+>>   1 files changed, 63 insertions(+), 0 deletions(-)
+>>   create mode 100644 Documentation/arm/Samsung/Overview.txt
+>>
+>> diff --git a/Documentation/arm/Samsung/Overview.txt b/Documentation/arm/Samsung/Overview.txt
+>> new file mode 100644
+>> index 0000000..c3d2f44
+>> --- /dev/null
+>> +++ b/Documentation/arm/Samsung/Overview.txt
+>> @@ -0,0 +1,63 @@
+>> +		Samsung ARM Linux Overview
+>> +		==========================
+>> +
+>> +Introduction
+>> +------------
+>> +
+>> +  The Samsung range of ARM SoCs spans many similar devices, from the initial
+>> +  ARM9 through to the newest ARM cores. This document shows an overview of
+>> +  the current kernel support, how to use it and where to find the code
+>> +  that supports this.
+>> +
+>> +  The currently supported SoCs are:
+>> +
+>> +  - S3C24XX: See Documentation/arm/Samsung-S3C24XX/Overview.txt for full list
+>> +  - S3C64XX: S3C6400 and S3C6410
+>> +
+>> +  S5PC100 and S5PC110 support is currently being merged
+>> +
+>> +
+>> +S3C24XX Systems
+>> +---------------
+>> +
+>> +  There is still documentation in Docuemntation/arm/Samsung-S3C24XX/ which
+>>    
+>
+> Same typo as before? Docuemntation ->  Documentation
 
-So the two write values are cached, then the sequence in sys_write
-cannot guarantee the coherence:
-	kmap_atomic(page);
-	copy to page;
-	kunmap_atomic(page);
-	flush_dcache_page(page);
+Fixed in next-samsung-doc1 branch, forgot to remove this one from this
+series.
 
-It should call flush_dcache_page()@the beginning too in order to
-flush the shared mapping.  Actually, I think it's better to split this
-function into two, such as:
-	flush_dcache_user_page(page);
-	copy to page;
-	kunmap_atomic(page);
-	flush_dcache_kern_page(page);
+>> +  deals with the architecture and drivers specific to these devices.
+>> +
+>> +  See Documentation/arm/Samsung-S3C24XX/Overview.txt for more information
+>> +  on the implementation details and specific support.
+>> +
+>> +
+>> +Configuration
+>> +-------------
+>> +
+>> +  A number of configurations are supplied, as there is no current way of
+>> +  unifying all the SoCs into one kernel.
+>> +
+>> +  [ to finish ]
+>> +
+>> +Layout
+>> +------
+>> +
+>> +  [ to finish ]
+>> +
+>> +
+>> +Port Contributors
+>> +-----------------
+>> +
+>> +  Ben Dooks (BJD)
+>> +  Vincent Sanders
+>> +  Herbert Potzl
+>> +  Arnaud Patard (RTP)
+>> +  Roc Wu
+>> +  Klaus Fetscher
+>> +  Dimitry Andric
+>> +  Shannon Holland
+>> +  Guillaume Gourat (NexVision)
+>> +  Christer Weinigel (wingel) (Acer N30)
+>> +  Lucas Correia Villa Real (S3C2400 port)
+>> +
+>> +
+>> +Document Author
+>> +---------------
+>> +
+>> +Copyright 2009 Ben Dooks<ben-linux@fluff.org>
+>>    
+>
+> Regards,
+> Maurus Cuelenaere
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-And this patch seems to fix it, any other fs doesn't call it need to add
-that too.
+-- 
+-- 
+Ben
 
-
-diff --git a/mm/filemap.c b/mm/filemap.c
-index 96ac6b0..07056fb 100644
---- a/mm/filemap.c
-+++ b/mm/filemap.c
-@@ -2196,6 +2196,9 @@ again:
- 		if (unlikely(status))
- 			break;
- 
-+		if (mapping_writably_mapped(mapping))
-+			flush_dcache_page(page);
-+
- 		pagefault_disable();
- 		copied = iov_iter_copy_from_user_atomic(page, i, offset, bytes);
- 		pagefault_enable();
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
