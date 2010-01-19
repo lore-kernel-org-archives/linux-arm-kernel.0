@@ -1,49 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 Jan 2010 18:09:39 +0000
-Subject: [RFC 18/18] arm: mm: qsd8x50: Fix incorrect permission faults
-In-Reply-To: <20100119174313.GE1323@shareable.org>
-References: <20100119171033.GA1323@shareable.org>
-	<1263922428.1951.63.camel@m0nster>
-	<20100119174313.GE1323@shareable.org>
-Message-ID: <20100119180939.GD1886@n2100.arm.linux.org.uk>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Tue, 19 Jan 2010 18:33:29 +0000
+Subject: flush_dcache_page does too much?
+In-Reply-To: <20100119174450.GB1886@n2100.arm.linux.org.uk>
+References: <20100118133304.GA29645@n2100.arm.linux.org.uk>
+	<20100118135431.GA12496@desktop>
+	<20100118140005.GD2695@n2100.arm.linux.org.uk>
+	<20100118141530.GA13394@desktop>
+	<20100118144418.GE2695@n2100.arm.linux.org.uk>
+	<20100118145731.GA14523@desktop>
+	<20100118150152.GF2695@n2100.arm.linux.org.uk>
+	<20100119001636.GA4401@desktop> <20100119130547.GA6285@desktop>
+	<20100119174450.GB1886@n2100.arm.linux.org.uk>
+Message-ID: <20100119183328.GG1323@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 19, 2010 at 05:43:13PM +0000, Jamie Lokier wrote:
-> Daniel Walker wrote:
-> > Everything I release will ultimately be licensed under the GPLv2
-> > regardless of the license in the current files.. So it's just a matter
-> > of removing that old license ..
+Russell King - ARM Linux wrote:
+> On Tue, Jan 19, 2010 at 09:05:47PM +0800, anfei wrote:
+> > Do you think this is a bug and I can send the patch, or it's the problem
+> > of the test case?
 > 
-> Ok.  Please do :-)
-> 
-> > > For another file, I'm not sure that adding "All rights reserved" is ok.
-> > > Under the GPL, all rights are _not_ reserved:
-> > 
-> > This would be a problem because our lawyers mandate this.. AFAIK, it
-> > doesn't change the licensing tho.
-> 
-> If it doesn't change the license, why is it mandated?
-> 
-> Sounds like your lawyers aren't very familiar with open source licensing.
+> Yes, it's a bug, but it needs to be reported elsewhere; neither this
+> list nor I can sanction patches to generic code.
 
-It is quite normal to do:
+It's not necessarily a bug if the appropriate msync() call fixes the
+test.  Linux doesn't guarantee coherence between mappings and
+read/write without msync() on some architectures, but I haven't seen
+an official statement of whether it *should* or not in this type of
+case.
 
- (C) 2010 Joe Bloggs, All Rights Reserved.
+I have looked at this in some detail a few years ago.  When I looked
+at MIPS and some other architecture code, I wasn't sure it was correct
+even with msync() calls everywhere.  It looked distinctly undertested.
 
- GPLv2 boiler plate.
+The Linux msync(2) man page says:
 
-Here's some examples:
+       msync()  flushes  changes  made  to the in-core copy of a file that was
+       mapped into memory using mmap(2) back to disk.   Without  use  of  this
+       call  there  is  no guarantee that changes are written back before mun?
+       map(2) is called.  To be more precise, the part of the file that corre?
+       sponds  to the memory area starting at addr and having length length is
+       updated.
 
- * Copyright (C) 2007 Red Hat, Inc.  All rights reserved.  This copyrighted
- * material is made available to anyone wishing to use, modify, copy, or
- * redistribute it subject to the terms and conditions of the GNU General
- * Public License v.2.
+It's not a great description.  MS_INVALIDATE talks about invalidating
+"other mappings", not this one, in the Linux man page.
 
- *   Copyright 2000-2008 H. Peter Anvin - All Rights Reserved
+But on other OSes (SunOS, HP-UX for example), MS_INVALIDATE
+invalidates _this_ mapping so that it sees the latest data written by
+write() to the file.
 
- * Copyright (C) 2008 Silicon Graphics, Inc. All rights reserved.
+In other words, Linux is a complete mess in this area.  It happens to
+work on some architectures, it's broken a little bit on others, broken
+a lot on some, and despite reading a fair bit of code I'm still not
+sure what the kernel is trying to promise.
 
- *      Copyright (C) IBM Corporation, 2004. All rights reserved
+Probably different people have different ideas about what's expected,
+which is why MIPS and ARM kernels differ.
 
- *   Copyright 2007 rPath, Inc. - All Rights Reserved
+-- Jamie
