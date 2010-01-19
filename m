@@ -1,251 +1,40 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Tue, 19 Jan 2010 10:26:56 +0000
-Subject: [PATCH] regulator: mc13783: consider Power Gates as digital
-	regulators.
-In-Reply-To: <1263848512.3632.74.camel@realization>
-References: <1263830523.3632.22.camel@realization>
-	<20100118190445.GA16989@pengutronix.de>
-	<1263848512.3632.74.camel@realization>
-Message-ID: <1263896816.3089.40.camel@odin>
+From: linux@bohmer.net (Remy Bohmer)
+Date: Tue, 19 Jan 2010 11:46:23 +0100
+Subject: [PATCH] Updated: Fix soft lockup in at91 udc driver
+In-Reply-To: <20100119085304.GA17708@pengutronix.de>
+References: <4B4F7576.9090008@bluewatersys.com>
+	<20100119085304.GA17708@pengutronix.de>
+Message-ID: <3efb10971001190246t3c47d2afg76ffde05d77ab33d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks a lot better. Just one question below.
+Hi,
 
-On Mon, 2010-01-18 at 22:01 +0100, Alberto Panizzo wrote:
-> On lun, 2010-01-18 at 20:04 +0100, Uwe Kleine-K?nig wrote:
-> > Hello Alberto,
-> Hello Uwe!
-> 
-> > 
-> > Can you post an updated patch addressing the discussion with Mark,
-> > please?
-> > 
-> > From the first look I don't like the name
-> > MC13783_REG_POWERMISC_PWGTSPI_M as I don't understand it's purpose
-> 
-> >From now the present driver naming schema is mask ends in _M.
-> 
-> > 
-> > What is the base for your patch?  (Hm, it seems next could work.
-> 
-> Yes, this patch is based on: 
-> git://git.kernel.org/pub/scm/linux/kernel/git/lrg/voltage-2.6.git for-next
-> 
-> > mc13783-regulator seems to have gotten some more #defines ending in _M.
-> > You seem to mean "mask".  IMHO it's a bit unfortunate, because the
-> > nameing scheme doesn't match the already existing names :-()
-> 
-> If the naming schema adopted, conflicts other I will propose a correction..
-> 
-> > 
-> > Shouldn't mc13783_state_powermisc_pwgt be a per-device variable instead
-> > of a static variable?
-> 
-> Thanks for point me out this. It should.
-> 
-> 
-> the new patch below:
-> 
-> --------------------------------------------------------------------------
-> GPO regulators are digital outputs that can be enabled or disabled by a
-> dedicated bit in mc13783 POWERMISC register.
-> In this family can be count in also Power Gates (PWGT1 and 2): enabled by
-> a dedicated pin a Power Gate is an hardware driven supply where the output
-> (PWGTnDRV) follow this law:
-> 
->  Bit PWGTxSPIEN | Pin PWGTxEN | PWGTxDRV |  Read Back
->    0 = default  |             |          | PWGTxSPIEN
->  ---------------+-------------+----------+------------
->        1        |      x      |   Low    |     0
->        0        |      0      |   High   |     1
->        0        |      1      |   Low    |     0
-> 
-> As read back value of control bit reflects the PWGTxDRV state (not the
-> control value previously written) and mc13783 POWERMISC register contain
-> only regulator related bits, a dedicated function to manage these bits is 
-> created here with the aim of tracing the real value of PWGTxSPIEN bits
-> and reproduce it on next writes.
-> 
-> All POWERMISC users _must_ use the new function to not accidentally
-> disable Power Gates supplies.
-> 
-> Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
-> ---
->  drivers/regulator/mc13783-regulator.c |  109 ++++++++++++++++++++++++++++++++-
->  include/linux/mfd/mc13783.h           |    2 +
->  2 files changed, 110 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/regulator/mc13783-regulator.c b/drivers/regulator/mc13783-regulator.c
-> index a40e35a..555eb29 100644
-> --- a/drivers/regulator/mc13783-regulator.c
-> +++ b/drivers/regulator/mc13783-regulator.c
-> @@ -82,6 +82,11 @@
->  #define MC13783_REG_POWERMISC_GPO2EN			(1 << 8)
->  #define MC13783_REG_POWERMISC_GPO3EN			(1 << 10)
->  #define MC13783_REG_POWERMISC_GPO4EN			(1 << 12)
-> +#define MC13783_REG_POWERMISC_PWGT1SPIEN		(1 << 15)
-> +#define MC13783_REG_POWERMISC_PWGT2SPIEN		(1 << 16)
-> +
-> +#define MC13783_REG_POWERMISC_PWGTSPI_M			(3 << 15)
-> +
->  
->  struct mc13783_regulator {
->  	struct regulator_desc desc;
-> @@ -163,6 +168,7 @@ static const int const mc13783_vrf_val[] = {
->  
->  static struct regulator_ops mc13783_regulator_ops;
->  static struct regulator_ops mc13783_fixed_regulator_ops;
-> +static struct regulator_ops mc13783_gpo_regulator_ops;
->  
->  #define MC13783_DEFINE(prefix, _name, _reg, _vsel_reg, _voltages)	\
->  	[MC13783_ ## prefix ## _ ## _name] = {				\
-> @@ -201,7 +207,7 @@ static struct regulator_ops mc13783_fixed_regulator_ops;
->  	[MC13783_ ## prefix ## _ ## _name] = {				\
->  		.desc = {						\
->  			.name = #prefix "_" #_name,			\
-> -			.ops = &mc13783_regulator_ops,			\
-> +			.ops = &mc13783_gpo_regulator_ops,		\
->  			.type = REGULATOR_VOLTAGE,			\
->  			.id = MC13783_ ## prefix ## _ ## _name,		\
->  			.owner = THIS_MODULE,				\
-> @@ -253,10 +259,13 @@ static struct mc13783_regulator mc13783_regulators[] = {
->  	MC13783_GPO_DEFINE(REGU, GPO2, POWERMISC),
->  	MC13783_GPO_DEFINE(REGU, GPO3, POWERMISC),
->  	MC13783_GPO_DEFINE(REGU, GPO4, POWERMISC),
-> +	MC13783_GPO_DEFINE(REGU, PWGT1SPI, POWERMISC),
-> +	MC13783_GPO_DEFINE(REGU, PWGT2SPI, POWERMISC),
->  };
->  
->  struct mc13783_regulator_priv {
->  	struct mc13783 *mc13783;
-> +	u32 powermisc_pwgt_state;
->  	struct regulator_dev *regulators[];
->  };
->  
-> @@ -445,6 +454,104 @@ static struct regulator_ops mc13783_fixed_regulator_ops = {
->  	.get_voltage = mc13783_fixed_regulator_get_voltage,
->  };
->  
-> +int mc13783_powermisc_rmw(struct mc13783_regulator_priv *priv, u32 mask,
-> +									u32 val)
-> +{
-> +	struct mc13783 *mc13783 = priv->mc13783;
-> +	int ret;
-> +	u32 valread;
-> +
-> +	BUG_ON(val & ~mask);
-> +
-> +	ret = mc13783_reg_read(mc13783, MC13783_REG_POWERMISC, &valread);
-> +	if (ret)
-> +		return ret;
-> +
-> +	/* Update the stored state for Power Gates. */
-> +	priv->powermisc_pwgt_state =
-> +				(priv->powermisc_pwgt_state & ~mask) | val;
-> +	priv->powermisc_pwgt_state &= MC13783_REG_POWERMISC_PWGTSPI_M;
-> +
-> +	/* Construct the new register value */
-> +	valread = (valread & ~mask) | val;
-> +	/* Overwrite the PWGTxEN with the stored version */
-> +	valread = (valread & ~MC13783_REG_POWERMISC_PWGTSPI_M) |
-> +						priv->powermisc_pwgt_state;
-> +
-> +	return mc13783_reg_write(mc13783, MC13783_REG_POWERMISC, valread);
-> +}
-> +
-> +static int mc13783_gpo_regulator_enable(struct regulator_dev *rdev)
-> +{
-> +	struct mc13783_regulator_priv *priv = rdev_get_drvdata(rdev);
-> +	int id = rdev_get_id(rdev);
-> +	int ret;
-> +	u32 en_val = mc13783_regulators[id].enable_bit;
-> +
-> +	dev_dbg(rdev_get_dev(rdev), "%s id: %d\n", __func__, id);
-> +
-> +	/* Power Gate enable value is 0 */
-> +	if (id == MC13783_REGU_PWGT1SPI ||
-> +	    id == MC13783_REGU_PWGT2SPI)
-> +		en_val = 0;
-> +
-> +	mc13783_lock(priv->mc13783);
-> +	ret = mc13783_powermisc_rmw(priv, mc13783_regulators[id].enable_bit,
-> +					en_val);
-> +	mc13783_unlock(priv->mc13783);
-> +
-> +	return ret;
-> +}
-> +
-> +static int mc13783_gpo_regulator_disable(struct regulator_dev *rdev)
-> +{
-> +	struct mc13783_regulator_priv *priv = rdev_get_drvdata(rdev);
-> +	int id = rdev_get_id(rdev);
-> +	int ret;
-> +	u32 dis_val = 0;
-> +
-> +	dev_dbg(rdev_get_dev(rdev), "%s id: %d\n", __func__, id);
-> +
-> +	/* Power Gate disable value is 1 */
-> +	if (id == MC13783_REGU_PWGT1SPI ||
-> +	    id == MC13783_REGU_PWGT2SPI)
-> +		dis_val = mc13783_regulators[id].enable_bit;
-> +
-> +	mc13783_lock(priv->mc13783);
-> +	ret = mc13783_powermisc_rmw(priv, mc13783_regulators[id].enable_bit,
-> +					dis_val);
-> +	mc13783_unlock(priv->mc13783);
-> +
-> +	return ret;
-> +}
-> +
-> +static int mc13783_gpo_regulator_is_enabled(struct regulator_dev *rdev)
-> +{
-> +	struct mc13783_regulator_priv *priv = rdev_get_drvdata(rdev);
-> +	int ret, id = rdev_get_id(rdev);
-> +	unsigned int val;
-> +
-> +	mc13783_lock(priv->mc13783);
-> +	ret = mc13783_reg_read(priv->mc13783, mc13783_regulators[id].reg, &val);
-> +	mc13783_unlock(priv->mc13783);
-> +
-> +	if (ret)
-> +		return ret;
-> +
-> +	/* Power Gates state is stored in powermisc_pwgt_state
-> +	 * where the meaning of bits is negated */
-> +	val = (val & ~MC13783_REG_POWERMISC_PWGTSPI_M) |
-> +	      (priv->powermisc_pwgt_state ^ MC13783_REG_POWERMISC_PWGTSPI_M);
-> +
-> +	return (val & mc13783_regulators[id].enable_bit) != 0;
-> +}
-> +
-> +static struct regulator_ops mc13783_gpo_regulator_ops = {
-> +	.enable = mc13783_gpo_regulator_enable,
-> +	.disable = mc13783_gpo_regulator_disable,
-> +	.is_enabled = mc13783_gpo_regulator_is_enabled,
+2010/1/19 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello,
+>
+> On Fri, Jan 15, 2010 at 08:50:14AM +1300, Ryan Mallon wrote:
+>> Fix a potential soft lockup in the AT91 UDC driver by ensuring that the
+>> UDC clock is enabled inside the interrupt handler. If the UDC clock is
+>> not enabled then the UDC registers cannot be written to and the
+>> interrupt cannot be cleared or masked.
+> Wouldn't it be cleaner to assert that the clock is already on when an
+> irq comes in? ?That is enable the clock and let it enabled when
+> configuring the device to generate irqs?
+>
+> Just my 2?
 
-How is the voltage output on the GPO regulator governed. Is it
-controlled by a parent regulator or fixed ?
+What we have seen here is that there is a condition during host-suspend.
+When the host-suspends (3ms idle) the clocks are being disabled, after
+a short time the host wakes up again and does a device reset.
+This reset triggers a resume interrupt with the clocks disabled. BUT,
+it only behaves like this with only a few host controllers. This
+results in a hanging interrupt.
+The locking code of this driver is not completely clean and that needs
+some rework, especially for preempt-rt.
+We want to rework this, but that takes more time. Until then this
+patch at least solves the issue and can be used safely.
 
-We probably want a way to query the voltage here or specify the parent
-relationship. 
+Kind regards,
 
-
-> +};
-> +
->  static int __devinit mc13783_regulator_probe(struct platform_device *pdev)
->  {
->  	struct mc13783_regulator_priv *priv;
-> diff --git a/include/linux/mfd/mc13783.h b/include/linux/mfd/mc13783.h
-> index 3568040..94cb51a 100644
-> --- a/include/linux/mfd/mc13783.h
-> +++ b/include/linux/mfd/mc13783.h
-> @@ -108,6 +108,8 @@ int mc13783_adc_do_conversion(struct mc13783 *mc13783, unsigned int mode,
->  #define	MC13783_REGU_V2		28
->  #define	MC13783_REGU_V3		29
->  #define	MC13783_REGU_V4		30
-> +#define	MC13783_REGU_PWGT1SPI	31
-> +#define	MC13783_REGU_PWGT2SPI	32
->  
->  #define MC13783_IRQ_ADCDONE	0
->  #define MC13783_IRQ_ADCBISDONE	1
+Remy
