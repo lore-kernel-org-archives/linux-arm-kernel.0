@@ -1,20 +1,39 @@
-From: simon.kagstrom@netinsight.net (Simon Kagstrom)
-Date: Tue, 19 Jan 2010 07:32:45 +0100
-Subject: [PATCHv4] [ARM] kirkwood: combine support for openrd
-	base/client support
-In-Reply-To: <b08f27-emk.ln1@chipmunk.wormnet.eu>
-References: <b08f27-emk.ln1@chipmunk.wormnet.eu>
-Message-ID: <20100119073245.0979f8fe@marrow.netinsight.se>
+From: koyo.take@gmail.com (Koyo Takenoshita)
+Date: Tue, 19 Jan 2010 15:35:23 +0900
+Subject: ioctl() returns EFAULT / MMU domain problem?
+In-Reply-To: <20100118134723.GA2695@n2100.arm.linux.org.uk>
+References: <ac4446ac1001180535u299fa2f8rc2fdb3317a566066@mail.gmail.com>
+	<20100118134723.GA2695@n2100.arm.linux.org.uk>
+Message-ID: <ac4446ac1001182235m2efde18dl902c7ecc9fc6b100@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Jan 2010 23:38:19 +0000
-Alexander Clouter <alex@digriz.org.uk> wrote:
+2010/1/18 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Mon, Jan 18, 2010 at 10:35:26PM +0900, Koyo Takenoshita wrote:
+>> I think that the problem is that there is a possibility of schedule
+>> while doing set_fs(KERNEL_DS) and copy_to_user.
+>
+> The domain register setting is stored in the per-thread cpu_domain
+> variable (current_thread_info()->cpu_domain). ?set_fs() modifies
+> this according to KERNEL_DS vs USER_DS.
+Yes,
 
-> Inspired by the mach-ep93xx flattening work, there is really not
-> much difference between the OpenRD base and client board support
-> so they should be merged together.
+But, Neither current_thread_info()->cpu_domain nor CP15 domain register were
+matched in my case.
 
-Yes, this is a good idea and looks well done, so:
+The variables are
+current_thread_info()->addr_limit=0x0       (KERNEL_DS)
+current_thread_info()->cpu_domain=0x17  (DOMAIN_KERNEL is DOMAIN_MANAGER)
+CP15 domain register = 0x15                   (DOMAIN_KERNEL is DOMAIN_CLIENT)
 
-Acked-by: Simon Kagstrom <simon.kagstrom@netinsight.net>
+It seems that "A" has been changed where i don't know.
+
+> On context switches, the domain register is reloaded from cpu_domain,
+> so it will be preserved across context switches for the same thread;
+> if it wasn't, kernel boot wouldn't work (because the kernel boot uses
+> KERNEL_DS to be able to call execve(), open(), etc.)
+Would you please tell me where the context switch is done in kernel code?
+And, Is there any other point to change the domain register?
+
+regards,
+Koyo
