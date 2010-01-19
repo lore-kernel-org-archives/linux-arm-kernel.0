@@ -1,36 +1,31 @@
-From: bahadir@l4dev.org (Bahadir Balban)
-Date: Tue, 19 Jan 2010 13:04:04 +0200
-Subject: Kernel Start-up Time
-In-Reply-To: <201001181010.01975.caglarakyuz@gmail.com>
-References: <201001181010.01975.caglarakyuz@gmail.com>
-Message-ID: <4B5591A4.2050807@l4dev.org>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Tue, 19 Jan 2010 12:12:30 +0100
+Subject: [PATCH] regulator: mc13783: consider Power Gates as digital
+	regulators.
+In-Reply-To: <1263896816.3089.40.camel@odin>
+References: <1263830523.3632.22.camel@realization>
+	<20100118190445.GA16989@pengutronix.de>
+	<1263848512.3632.74.camel@realization> <1263896816.3089.40.camel@odin>
+Message-ID: <1263899550.6669.21.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Caglar Akyuz wrote:
-> Hello,
+On mar, 2010-01-19 at 10:26 +0000, Liam Girdwood wrote:
+> > +static struct regulator_ops mc13783_gpo_regulator_ops = {
+> > +     .enable = mc13783_gpo_regulator_enable,
+> > +     .disable = mc13783_gpo_regulator_disable,
+> > +     .is_enabled = mc13783_gpo_regulator_is_enabled,
 > 
-> While measuring Linux start-up time, I see that printing version string in 
-> "start_kernel" takes ~1.3 seconds. I guess this is the time between from 
-> "bootloader jumping to uImage" and "printing version string in generic 
-> start_kernel code".
-
-> Thanks,
-> Caglar
+> How is the voltage output on the GPO regulator governed. Is it
+> controlled by a parent regulator or fixed ?
 > 
-> _____________________________________________________________________ 
->                                                                                                                                                                   
-> [    4.700896] Starting kernel ...                                                                                                                                                  
-> [    4.702971]                                                                                                                                                                      
-> [    5.966039] [    0.000000] Linux version 2.6.30-davinci1-06079-g4e73fae-
+> We probably want a way to query the voltage here or specify the parent
+> relationship. 
 
-Hi Caglar,
+Good question.
+>From datasheet GPO's are marked as LV (Low Voltage)-> 3.1V
+Power Gates Driver are marked as EMV (Extended Medium Voltage) -> 5.5V
 
-This sounds like the kernel decompression is taking time. Have you tried
-booting an uncompressed kernel? See if you can print on physical uart
-address from files under arch/arm/boot/compressed
+and no way to modify that -> they are fixed regulators.
 
-Thanks,
-
--- 
-Bahadir
+I will add voltage query capability.
