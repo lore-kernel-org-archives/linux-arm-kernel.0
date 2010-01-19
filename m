@@ -1,32 +1,44 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 19 Jan 2010 11:21:39 +0900
-Subject: [PATCH] ARM: S5P6440: Add IO descriptor for ChipID block.
-Message-ID: <1263867699-28672-1-git-send-email-kgene.kim@samsung.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 19 Jan 2010 06:15:38 +0100
+Subject: [suspend/resume] Re: userspace notification from module
+In-Reply-To: <20100117132618.GA742@n2100.arm.linux.org.uk>
+References: <686edb2c.6263643a.4b3f4a3b.b60b3@o2.pl>
+	<201001162305.56972.rjw@sisk.pl> <20100116221929.GB8425@elf.ucw.cz>
+	<201001162326.09092.rjw@sisk.pl> <20100117130739.GA2035@ucw.cz>
+	<20100117132618.GA742@n2100.arm.linux.org.uk>
+Message-ID: <20100119051537.GA22153@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the IO descriptor for ChipID block in S5P6440.
+On Sun 2010-01-17 13:26:18, Russell King - ARM Linux wrote:
+> On Sun, Jan 17, 2010 at 02:07:39PM +0100, Pavel Machek wrote:
+> > AFAICT following message would be nice.
+> > 
+> > 1) battery is critical, userspace please do something
+> > 
+> > On zaurus and similar, you could add
+> > 
+> > 2) oh and btw we had power failure so we suspended (or maybe -- so
+> > hardware suspended itself -- rmk's examples and old apm systems); we
+> > are now back and running
+> > 
+> > notification... but... ideally those power failures should never
+> > happen anyway, so... having this notification is in no way neccessary.
+> 
+> There's another consideration here: the more complex the emergency
+> procedure, the higher the chance of _something_ causing it to fail,
+> and if it does fail, the result is data loss.
 
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/mach-s5p6440/include/mach/map.h |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+That's why I propose to only send notification after we resume from
+emergency suspend :-).
 
-diff --git a/arch/arm/mach-s5p6440/include/mach/map.h b/arch/arm/mach-s5p6440/include/mach/map.h
-index b370329..dc922d6 100644
---- a/arch/arm/mach-s5p6440/include/mach/map.h
-+++ b/arch/arm/mach-s5p6440/include/mach/map.h
-@@ -15,6 +15,11 @@
- 
- #include <plat/map-base.h>
- 
-+/* Chip ID */
-+#define S5P6440_PA_CHIPID	(0xE0000000)
-+#define S5P_PA_CHIPID		S5P6440_PA_CHIPID
-+#define S5P_VA_CHIPID		S3C_ADDR(0x00700000)
-+
- /* SYSCON */
- #define S5P6440_PA_SYSCON	(0xE0100000)
- #define S5P_PA_SYSCON		S5P6440_PA_SYSCON
+> In a properly running system, this isn't something that's going to
+> get a lot of testing, so there's a higher chance that there will be
+> bugs, so the simpler the solution, the better.
+
+Unfortunately, with old battery in zaurus, I tested it rather a lot. I
+have new one now, but I can still use old one for testing.
+									Pavel
 -- 
-1.6.2.5
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
