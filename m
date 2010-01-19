@@ -1,47 +1,50 @@
-From: koyo.take@gmail.com (Koyo Takenoshita)
-Date: Tue, 19 Jan 2010 15:37:18 +0900
-Subject: ioctl() returns EFAULT / MMU domain problem?
-In-Reply-To: <ac4446ac1001182235m2efde18dl902c7ecc9fc6b100@mail.gmail.com>
-References: <ac4446ac1001180535u299fa2f8rc2fdb3317a566066@mail.gmail.com>
-	<20100118134723.GA2695@n2100.arm.linux.org.uk>
-	<ac4446ac1001182235m2efde18dl902c7ecc9fc6b100@mail.gmail.com>
-Message-ID: <ac4446ac1001182237j34e40dn7e472692feebfd11@mail.gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Tue, 19 Jan 2010 07:16:16 +0000
+Subject: [PATCH] ARM: S5P6440: Add IO descriptor for ChipID block.
+In-Reply-To: <1263867699-28672-1-git-send-email-kgene.kim@samsung.com>
+References: <1263867699-28672-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20100119071616.GC26562@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/1/19 Koyo Takenoshita <koyo.take@gmail.com>:
-> 2010/1/18 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->> On Mon, Jan 18, 2010 at 10:35:26PM +0900, Koyo Takenoshita wrote:
->>> I think that the problem is that there is a possibility of schedule
->>> while doing set_fs(KERNEL_DS) and copy_to_user.
->>
->> The domain register setting is stored in the per-thread cpu_domain
->> variable (current_thread_info()->cpu_domain). ?set_fs() modifies
->> this according to KERNEL_DS vs USER_DS.
-> Yes,
->
-> But, Neither current_thread_info()->cpu_domain nor CP15 domain register were
-> matched in my case.
->
-> The variables are
-> current_thread_info()->addr_limit=0x0 ? ? ? (KERNEL_DS)
-> current_thread_info()->cpu_domain=0x17 ?(DOMAIN_KERNEL is DOMAIN_MANAGER)
-> CP15 domain register = 0x15 ? ? ? ? ? ? ? ? ? (DOMAIN_KERNEL is DOMAIN_CLIENT)
->
-> It seems that "A" has been changed where i don't know.
-typo
-It seems that "domain register" has been changed where i don't know.
+On Tue, Jan 19, 2010 at 11:21:39AM +0900, Kukjin Kim wrote:
+> This patch adds the IO descriptor for ChipID block in S5P6440.
 
-sorry for my poor english.
+ok, willapply.
+ 
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  arch/arm/mach-s5p6440/include/mach/map.h |    5 +++++
+>  1 files changed, 5 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s5p6440/include/mach/map.h b/arch/arm/mach-s5p6440/include/mach/map.h
+> index b370329..dc922d6 100644
+> --- a/arch/arm/mach-s5p6440/include/mach/map.h
+> +++ b/arch/arm/mach-s5p6440/include/mach/map.h
+> @@ -15,6 +15,11 @@
+>  
+>  #include <plat/map-base.h>
+>  
+> +/* Chip ID */
+> +#define S5P6440_PA_CHIPID	(0xE0000000)
+> +#define S5P_PA_CHIPID		S5P6440_PA_CHIPID
+> +#define S5P_VA_CHIPID		S3C_ADDR(0x00700000)
+> +
+>  /* SYSCON */
+>  #define S5P6440_PA_SYSCON	(0xE0100000)
+>  #define S5P_PA_SYSCON		S5P6440_PA_SYSCON
+> -- 
+> 1.6.2.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
->
->> On context switches, the domain register is reloaded from cpu_domain,
->> so it will be preserved across context switches for the same thread;
->> if it wasn't, kernel boot wouldn't work (because the kernel boot uses
->> KERNEL_DS to be able to call execve(), open(), etc.)
-> Would you please tell me where the context switch is done in kernel code?
-> And, Is there any other point to change the domain register?
->
-> regards,
-> Koyo
->
+-- 
+-- 
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
