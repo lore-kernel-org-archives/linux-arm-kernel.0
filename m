@@ -1,47 +1,61 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 19 Jan 2010 11:36:06 -0700 (MST)
-Subject: [PATCH 12/18] OMAP3 clock: split out DPLL3 M2 divider functions
-	into clkt3xxx_dpll3m2.c
-In-Reply-To: <20100115125014.GK29059@shisha.kicks-ass.net>
-References: <20100115090613.30690.49355.stgit@localhost.localdomain>
-	<20100115090703.30690.171.stgit@localhost.localdomain>
-	<20100115125014.GK29059@shisha.kicks-ass.net>
-Message-ID: <alpine.DEB.2.00.1001191128120.3977@utopia.booyaka.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Wed, 20 Jan 2010 09:26:41 +1300
+Subject: make PHYS_OFFSET determined at run time (unfinished)
+In-Reply-To: <20100119083803.GA17904@pengutronix.de>
+References: <20100119083803.GA17904@pengutronix.de>
+Message-ID: <4B561581.6060400@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(cc'ing Ranjith)
-
-Hi Alexander,
-
-On Fri, 15 Jan 2010, Alexander Shishkin wrote:
-
-> On Fri, Jan 15, 2010 at 02:07:04 -0700, Paul Walmsley wrote:
-> > Split the DPLL3 M2 divider clock functions out of clock34xx.c and move them
-> > into clkt3xxx_dpll3m2.c to improve maintainability.
+Uwe Kleine-K?nig wrote:
+> Hello,
 > 
-> I'm not very familiar with maintainability issues of dpll3m2, so
-> forgive me if it is ignorant for me to ask you to elaborate on this.
+> I'm looking into making PHYS_OFFSET determined at run time.  I saw a
+> patch for it that already made it a few times on the list[1].
+> 
+> I'm not yet done, but first want to announce that I look into that to
+> prevent duplicate work---so if you intended to do the same let's look
+> together---and to post some clean up patches that are the result up to
+> now of my digging in the boot code.
+> 
+> I will send now three patches in reply to this mail, and later hopefully
+> more.
+> 
+> Best regards
+> Uwe
+> 
+> [1] e.g. http://thread.gmane.org/gmane.linux.ports.arm.kernel/53793/
+> 
 
-That is a very good point, those original patch changelogs are pretty 
-crappy.  "OMAP clock code - same great taste, now with more 
-maintainability!"  I will update them and repost with more detail.
+One of the problems that got brought up previously was the 'make uImage'
+can end up generating unbootable images with runtime PHYS_OFFSET. The
+older format uImage's (pre 1.3.3) encode a load address (zrealaddr), so
+uImage's need to have a fixed load address encoded.
 
-> It does look like a bit of an overkill to have a separate file for
-> a divider. But again, I might well be missing the point.
+As I stated in the previous thread, this is _not_ a kernel issue,
+however it is no good having a kernel which contains support for two
+boards which boot from different address and then generating a uImage
+which can only boot on one of them without warning the user about this
+problem. Otherwise you are going to start getting "I did make uImage and
+my board won't boot" problems.
 
-Yep, this is definitely a borderline case where it might be more 
-appropriate to keep it in the clock34xx.c file.  What ultimately motivated 
-splitting it out was the thought that the AM3517/3505 chips probably won't 
-need this function, since I don't believe they support DVFS [1], so we 
-could skip compiling this function for kernels built for those devices via 
-the Makefile, and not need #ifdefs. 
+There are a few solutions to this problem:
+1) Drop uImage make support and require users generate them manually.
+2) Have a uImage offset config option to allow uImage users to specify
+what they want the load address to be. See:
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/53151/focus=53230
+3) Print an error if "make uImage" is run for a kernel which has more
+than one boot address (possible?)
+4) Use FIT U-Boot images. This is supported from U-Boot 1.3.3 onwards,
+however a number of people are still using older U-Boots.
 
-Ranjith, could you correct me if I am wrong about the DVFS part?
+~Ryan
 
-regards,
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
 
-- Paul
-
-1. AM35x ARM Microprocessor Technical Reference Manual, 
-   http://www.ti.com/litv/pdf/sprugr0
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
