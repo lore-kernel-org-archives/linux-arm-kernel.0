@@ -1,47 +1,48 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 19 Jan 2010 15:26:56 +0000
-Subject: [PATCH] SMDK6410: Set up interrupt range for WM835x on 1190-EV1 PMIC
-	board
-Message-ID: <1263914816-19317-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 19 Jan 2010 07:54:50 -0800
+Subject: [PATCH] staging/dream: add missing include files/fix compilation
+In-Reply-To: <20100119054516.GB22153@elf.ucw.cz>
+References: <20091225205917.GA25761@elf.ucw.cz>
+	<20100115002419.GA25643@kroah.com>
+	<20100119054516.GB22153@elf.ucw.cz>
+Message-ID: <20100119155450.GA15505@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The WM835x driver won't actually use this yet but it will in the
-future when the changes converting it to genirq are merged.
+On Tue, Jan 19, 2010 at 06:45:17AM +0100, Pavel Machek wrote:
+> On Thu 2010-01-14 16:24:19, Greg KH wrote:
+> > On Fri, Dec 25, 2009 at 09:59:18PM +0100, Pavel Machek wrote:
+> > > This adds missing include files, so it should now compile. ifdef
+> > > guards were added to Kconfig, so it should not cause problems on
+> > > non-arch-msm machines.
+> > > 
+> > > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > 
+> > Odd, this doesn't apply to the linux-next tree, some of the files are
+> > already there.
+> 
+> Strange, it seems it is almost all already in. Well, good :-).
+> 
+> But there's small problem. linux-next now contains dwalker's tree, and
+> I could not get it to compile, even with staging disabled. I'll need
+> to look into that.
+> 
+> Here are remaining few patches, now easy to read. (It also shows that
+> at least CONFIG_AMSS_VERSION and CONFIG_GPIO should really be in
+> arch/arm. I believe it will get there in .34 or so...)
+> 
+> ---
+> 
+> Guard whole dream/ specific Kconfig with CONFIG_DREAM so that we don't
+> cause compile failures in other architectures. Add missing pieces so
+> that it compiles.
+> 
+> I am not sure if this is ready for staging. I guess we should wait
+> till I get tree to compile in -next...?
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c6410/mach-smdk6410.c     |    1 +
- arch/arm/plat-s3c64xx/include/plat/irqs.h |    4 ++++
- 2 files changed, 5 insertions(+), 0 deletions(-)
+Ok, I'll wait for you to get things building.  Feel free to send the
+patch to me after that.
 
-diff --git a/arch/arm/mach-s3c6410/mach-smdk6410.c b/arch/arm/mach-s3c6410/mach-smdk6410.c
-index 461935c..4691ded 100644
---- a/arch/arm/mach-s3c6410/mach-smdk6410.c
-+++ b/arch/arm/mach-s3c6410/mach-smdk6410.c
-@@ -400,6 +400,7 @@ static int __init smdk6410_wm8350_init(struct wm8350 *wm8350)
- static struct wm8350_platform_data __initdata smdk6410_wm8350_pdata = {
- 	.init = smdk6410_wm8350_init,
- 	.irq_high = 1,
-+	.irq_base = IRQ_BOARD_START,
- };
- #endif
- 
-diff --git a/arch/arm/plat-s3c64xx/include/plat/irqs.h b/arch/arm/plat-s3c64xx/include/plat/irqs.h
-index 176fe15..a227581 100644
---- a/arch/arm/plat-s3c64xx/include/plat/irqs.h
-+++ b/arch/arm/plat-s3c64xx/include/plat/irqs.h
-@@ -198,7 +198,11 @@
-  * interrupt controllers). */
- #define IRQ_BOARD_START (IRQ_EINT_GROUP9_BASE + IRQ_EINT_GROUP9_NR + 1)
- 
-+#ifdef CONFIG_SMDK6410_WM1190_EV1
-+#define IRQ_BOARD_NR 64
-+#else
- #define IRQ_BOARD_NR 16
-+#endif
- 
- #define IRQ_BOARD_END (IRQ_BOARD_START + IRQ_BOARD_NR)
- 
--- 
-1.6.6
+thanks,
+
+greg k-h
