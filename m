@@ -1,19 +1,21 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Tue, 19 Jan 2010 17:38:11 +0000
-Subject: [RFC 08/18] arm: msm: set L2CR1 to enable prefetch
-	andburstonScorpion.
-In-Reply-To: <1263378987.32612.17.camel@pc1117.cambridge.arm.com>
-References: <1263320590.3497.3.camel@c-dwalke-linux.qualcomm.com>
-	<1263378987.32612.17.camel@pc1117.cambridge.arm.com>
-Message-ID: <20100119173811.GD1323@shareable.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 19 Jan 2010 17:42:45 +0000
+Subject: Use of data types
+In-Reply-To: <2703439e1001190357r65a507d2v668bbfca1a07c176@mail.gmail.com>
+References: <2703439e1001180443t761947e0idc144ced64ca3a4f@mail.gmail.com>
+	<20100118134120.GB31345@pengutronix.de>
+	<20100118134215.GB16182@darwin> <4B546900.3020506@ru.mvista.com>
+	<2703439e1001190357r65a507d2v668bbfca1a07c176@mail.gmail.com>
+Message-ID: <20100119174245.GA1886@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas wrote:
-> If you use Git, it has some options to send patches unthreaded (which I
-> don't particularly like but that's a way around this problem; an
-> alternative is to convince the moderator to remove this rule).
+On Tue, Jan 19, 2010 at 08:57:03PM +0900, Khushhua Mogambo wrote:
+> from thread, i understand that u32 is encouraged whenever we have reason. I m
+> going to use u8,16,32 heavily.
 
-Or add a rule to recognise Git patches.
+Incorrect.
 
--- Jamie
+As I said, use u8,u16,u32 when you need something that's of that size
+(eg, for storing values from hardware registers.)  If you don't require
+something of a specific size, then don't use them.
