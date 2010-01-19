@@ -1,10 +1,19 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 19 Jan 2010 14:14:08 -0700 (MST)
-Subject: [PATCH] OMAP CPU ID: fix OMAP4 build failure
-Message-ID: <alpine.DEB.2.00.1001191412130.3977@utopia.booyaka.com>
+Date: Tue, 19 Jan 2010 14:25:18 -0700 (MST)
+Subject: [PATCH] OMAP CPU ID: fix OMAP4 build failure (fwd)
+Message-ID: <alpine.DEB.2.00.1001191424430.3977@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+
+Resending with Abhijit's correct E-mail address.
+
+- Paul
+
+---------- Forwarded message ----------
+Date: Tue, 19 Jan 2010 14:14:08 -0700 (MST)
+From: Paul Walmsley <paul@pwsan.com>
+Subject: [PATCH] OMAP CPU ID: fix OMAP4 build failure
 
 Hello Abhijit,
 
