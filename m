@@ -1,44 +1,56 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 19 Jan 2010 06:15:38 +0100
-Subject: [suspend/resume] Re: userspace notification from module
-In-Reply-To: <20100117132618.GA742@n2100.arm.linux.org.uk>
-References: <686edb2c.6263643a.4b3f4a3b.b60b3@o2.pl>
-	<201001162305.56972.rjw@sisk.pl> <20100116221929.GB8425@elf.ucw.cz>
-	<201001162326.09092.rjw@sisk.pl> <20100117130739.GA2035@ucw.cz>
-	<20100117132618.GA742@n2100.arm.linux.org.uk>
-Message-ID: <20100119051537.GA22153@elf.ucw.cz>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 19 Jan 2010 13:29:43 +0800
+Subject: [PATCH - 3rd attempt] ARM: Support for Embedian MXM-8x10 eval kit
+In-Reply-To: <4B55400C.1050109@tmtservices.co.za>
+References: <201001182134.14226.epeer@tmtservices.co.za>
+	<20100118215124.GE8970@buzzloop.caiaq.de>
+	<4B55400C.1050109@tmtservices.co.za>
+Message-ID: <f17812d71001182129v30b93f0dw72a950cec630bf10@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun 2010-01-17 13:26:18, Russell King - ARM Linux wrote:
-> On Sun, Jan 17, 2010 at 02:07:39PM +0100, Pavel Machek wrote:
-> > AFAICT following message would be nice.
-> > 
-> > 1) battery is critical, userspace please do something
-> > 
-> > On zaurus and similar, you could add
-> > 
-> > 2) oh and btw we had power failure so we suspended (or maybe -- so
-> > hardware suspended itself -- rmk's examples and old apm systems); we
-> > are now back and running
-> > 
-> > notification... but... ideally those power failures should never
-> > happen anyway, so... having this notification is in no way neccessary.
-> 
-> There's another consideration here: the more complex the emergency
-> procedure, the higher the chance of _something_ causing it to fail,
-> and if it does fail, the result is data loss.
+On Tue, Jan 19, 2010 at 1:15 PM, Hennie van der Merwe
+<hvdmerwe@tmtservices.co.za> wrote:
+> Hi Daniel,
+>
+> Thanks for the comments.
+>
+> Daniel Mack wrote:
+>>>
+>>> +inline void mxm_8x10_mmc_init(void)
+>>> +{
+>>> +}
+>>>
+>>
+>> You should make that inline function static.
+>>
+>
+> I originally wrote it like this because I wanted the option for the machine
+> implementing the MXM-8x10 module to initialise the MMC or not. I'm not sure
+> static is appropriate (as it is exported in the header). Could we perhaps
+> drop the inline and just ?make it a void __init instead?
+>
 
-That's why I propose to only send notification after we resume from
-emergency suspend :-).
+You could make this declaration in .h file, e.g.
 
-> In a properly running system, this isn't something that's going to
-> get a lot of testing, so there's a higher chance that there will be
-> bugs, so the simpler the solution, the better.
+#ifdef ...
+extern void mxm_8x10_mmc_init(void);
+#else
+static inline void mxm_8x10_mmc_init(void) {}
+#endif
 
-Unfortunately, with old battery in zaurus, I tested it rather a lot. I
-have new one now, but I can still use old one for testing.
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+which will be optimized away by the compiler. Having a null global
+function isn't very interesting.
+
+>>> +inline mxm_8x10_nand_init(void)
+>>> +{
+>>> +}
+>>
+>> ?and it should return void.
+>
+> Agreed. This one must have just slipped by... Too much coffee, not enough
+> sleep :)
+>
+> Thanks,
+> Hennie
+>
