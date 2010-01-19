@@ -1,31 +1,46 @@
-From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Tue, 19 Jan 2010 12:12:30 +0100
-Subject: [PATCH] regulator: mc13783: consider Power Gates as digital
-	regulators.
-In-Reply-To: <1263896816.3089.40.camel@odin>
-References: <1263830523.3632.22.camel@realization>
-	<20100118190445.GA16989@pengutronix.de>
-	<1263848512.3632.74.camel@realization> <1263896816.3089.40.camel@odin>
-Message-ID: <1263899550.6669.21.camel@realization>
+From: mogambo.kztrj@gmail.com (Khushhua Mogambo)
+Date: Tue, 19 Jan 2010 20:57:03 +0900
+Subject: Use of data types
+In-Reply-To: <4B546900.3020506@ru.mvista.com>
+References: <2703439e1001180443t761947e0idc144ced64ca3a4f@mail.gmail.com>
+	<20100118134120.GB31345@pengutronix.de>
+	<20100118134215.GB16182@darwin> <4B546900.3020506@ru.mvista.com>
+Message-ID: <2703439e1001190357r65a507d2v668bbfca1a07c176@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On mar, 2010-01-19 at 10:26 +0000, Liam Girdwood wrote:
-> > +static struct regulator_ops mc13783_gpo_regulator_ops = {
-> > +     .enable = mc13783_gpo_regulator_enable,
-> > +     .disable = mc13783_gpo_regulator_disable,
-> > +     .is_enabled = mc13783_gpo_regulator_is_enabled,
-> 
-> How is the voltage output on the GPO regulator governed. Is it
-> controlled by a parent regulator or fixed ?
-> 
-> We probably want a way to query the voltage here or specify the parent
-> relationship. 
+On Mon, Jan 18, 2010 at 10:58 PM, Sergei Shtylyov
+<sshtylyov@ru.mvista.com> wrote:
+> Hello.
+>
+> Matthias Kaehlcke wrote:
+>
+>>>> Hi
+>>>> ?I starting to port Linux kernel to my companies new ARM based
+>>>> SoC and development board.
+>>>>
+>>>> Some of the regs is 16bits wide and some is 32bits width. I ask if
+>>>> my using u16 and u32 in place of 'unsigned short' and 'unsigned int'
+>>>> in the whole porting would be acceptable or not?
+>>>>
+>>>> In different wording, using only u16 and u32 always is considered good
+>>>> quality or bad?
+>>>>
+>>>
+>>> I prefer using u32 over int. ?Still more if your register space isn't
+>>> uniform.
+>>>
+>>
+>> ditto
+>>
+>> how about using the C99 types uint32_t, ... in the kernel?
+>
+> ?They are actually used in some places but this is generally frowned upon.
+> They are for userspace.
+>
+> WBR, Sergei
 
-Good question.
->From datasheet GPO's are marked as LV (Low Voltage)-> 3.1V
-Power Gates Driver are marked as EMV (Extended Medium Voltage) -> 5.5V
+from thread, i understand that u32 is encouraged whenever we have reason. I m
+going to use u8,16,32 heavily.
 
-and no way to modify that -> they are fixed regulators.
-
-I will add voltage query capability.
+Thanks to every one who replied and helped me.
