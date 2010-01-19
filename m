@@ -1,27 +1,27 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 19 Jan 2010 16:36:19 -0700
-Subject: [PATCH v2 10/18] OMAP2xxx clock: move sys_clk code into
-	mach-omap2/clkt2xxx_sys.c
+Date: Tue, 19 Jan 2010 16:36:16 -0700
+Subject: [PATCH v2 09/18] OMAP2xxx clock: move osc_clk code into
+	mach-omap2/clkt2xxx_osc.c
 In-Reply-To: <20100119232900.26047.98263.stgit@localhost.localdomain>
 References: <20100119232900.26047.98263.stgit@localhost.localdomain>
-Message-ID: <20100119233616.26047.12477.stgit@localhost.localdomain>
+Message-ID: <20100119233613.26047.28399.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the sys_clk clock functions from clock2xxx.c to
-mach-omap2/clkt2xxx_sys.c.  This is intended to make the clock code
+Move the osc_clk clock functions from clock2xxx.c to
+mach-omap2/clkt2xxx_osc.  This is intended to make the clock code
 easier to understand, since all of the functions needed to manage the
-sys_clk are now located in their own file, rather than being mixed
+osc_clk are now located in their own file, rather than being mixed
 with other, unrelated functions.
 
 Clock debugging is also now more finely-grained, since the DEBUG
-macro can now be defined for the sys_clk clock alone.  This
+macro can now be defined for osc_clk clocks alone.  This
 should reduce unnecessary console noise when debugging.
 
-Also, if at some future point the mach-omap2/ directory is split into
-OMAP2/3/4 variants, this clkt file can be placed in the mach-omap2xxx/
-directory, rather than shared with other chip types that don't use
-this clock type.
+Also, if at some future point the mach-omap2/ directory is split
+into OMAP2/3/4 variants, this clkt file can be placed in the mach-omap2xxx/
+directory, rather than shared with other chip types that don't use this
+clock type.
 
 Thanks to Alexander Shishkin <virtuoso@slind.org> for his comments to
 improve the patch description.
@@ -29,36 +29,34 @@ improve the patch description.
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 Cc: Alexander Shishkin <virtuoso@slind.org>
 ---
- arch/arm/mach-omap2/Makefile         |    3 +-
- arch/arm/mach-omap2/clkt2xxx_sys.c   |   50 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/clock2xxx.c      |   30 --------------------
- arch/arm/mach-omap2/clock2xxx.h      |    3 +-
- arch/arm/mach-omap2/clock2xxx_data.c |    4 +--
- 5 files changed, 55 insertions(+), 35 deletions(-)
- create mode 100644 arch/arm/mach-omap2/clkt2xxx_sys.c
+ arch/arm/mach-omap2/Makefile       |    2 +
+ arch/arm/mach-omap2/clkt2xxx_osc.c |   62 ++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/clock2xxx.c    |   34 +-------------------
+ arch/arm/mach-omap2/clock2xxx.h    |    1 +
+ 4 files changed, 66 insertions(+), 33 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/clkt2xxx_osc.c
 
 diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 51178bf..7ce5fea 100644
+index 825c303..51178bf 100644
 --- a/arch/arm/mach-omap2/Makefile
 +++ b/arch/arm/mach-omap2/Makefile
-@@ -13,7 +13,8 @@ clock-common				= clock.o clock_common_data.o \
+@@ -13,7 +13,7 @@ clock-common				= clock.o clock_common_data.o \
  					  clkt_clksel.o
  clock-omap2xxx				= clkt2xxx_dpllcore.o \
  					  clkt2xxx_virt_prcm_set.o \
--					  clkt2xxx_apll.o clkt2xxx_osc.o
-+					  clkt2xxx_apll.o clkt2xxx_osc.o \
-+					  clkt2xxx_sys.o
+-					  clkt2xxx_apll.o
++					  clkt2xxx_apll.o clkt2xxx_osc.o
  
  obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common) $(prcm-common) $(clock-common) \
  			    $(clock-omap2xxx)
-diff --git a/arch/arm/mach-omap2/clkt2xxx_sys.c b/arch/arm/mach-omap2/clkt2xxx_sys.c
+diff --git a/arch/arm/mach-omap2/clkt2xxx_osc.c b/arch/arm/mach-omap2/clkt2xxx_osc.c
 new file mode 100644
-index 0000000..822b5a7
+index 0000000..2167be8
 --- /dev/null
-+++ b/arch/arm/mach-omap2/clkt2xxx_sys.c
-@@ -0,0 +1,50 @@
++++ b/arch/arm/mach-omap2/clkt2xxx_osc.c
+@@ -0,0 +1,62 @@
 +/*
-+ * OMAP2xxx sys_clk-specific clock code
++ * OMAP2xxx osc_clk-specific clock code
 + *
 + * Copyright (C) 2005-2008 Texas Instruments, Inc.
 + * Copyright (C) 2004-2010 Nokia Corporation
@@ -76,6 +74,7 @@ index 0000000..822b5a7
 + */
 +#undef DEBUG
 +
++#include <linux/module.h>
 +#include <linux/kernel.h>
 +#include <linux/errno.h>
 +#include <linux/clk.h>
@@ -88,107 +87,106 @@ index 0000000..822b5a7
 +#include "prm.h"
 +#include "prm-regbits-24xx.h"
 +
-+void __iomem *prcm_clksrc_ctrl;
-+
-+u32 omap2xxx_get_sysclkdiv(void)
++static int omap2_enable_osc_ck(struct clk *clk)
 +{
-+	u32 div;
++	u32 pcc;
 +
-+	div = __raw_readl(prcm_clksrc_ctrl);
-+	div &= OMAP_SYSCLKDIV_MASK;
-+	div >>= OMAP_SYSCLKDIV_SHIFT;
++	pcc = __raw_readl(prcm_clksrc_ctrl);
 +
-+	return div;
++	__raw_writel(pcc & ~OMAP_AUTOEXTCLKMODE_MASK, prcm_clksrc_ctrl);
++
++	return 0;
 +}
 +
-+unsigned long omap2xxx_sys_clk_recalc(struct clk *clk)
++static void omap2_disable_osc_ck(struct clk *clk)
 +{
-+	return clk->parent->rate / omap2xxx_get_sysclkdiv();
++	u32 pcc;
++
++	pcc = __raw_readl(prcm_clksrc_ctrl);
++
++	__raw_writel(pcc | OMAP_AUTOEXTCLKMODE_MASK, prcm_clksrc_ctrl);
 +}
 +
++const struct clkops clkops_oscck = {
++	.enable		= omap2_enable_osc_ck,
++	.disable	= omap2_disable_osc_ck,
++};
++
++unsigned long omap2_osc_clk_recalc(struct clk *clk)
++{
++	return omap2xxx_get_apll_clkin() * omap2xxx_get_sysclkdiv();
++}
 +
 diff --git a/arch/arm/mach-omap2/clock2xxx.c b/arch/arm/mach-omap2/clock2xxx.c
-index 62c3b02..b59cb1d 100644
+index 88077e7..62c3b02 100644
 --- a/arch/arm/mach-omap2/clock2xxx.c
 +++ b/arch/arm/mach-omap2/clock2xxx.c
-@@ -46,8 +46,6 @@
- 
- struct clk *vclk, *sclk, *dclk;
- 
--void __iomem *prcm_clksrc_ctrl;
--
- /*-------------------------------------------------------------------------
-  * Omap24xx specific clock functions
-  *-------------------------------------------------------------------------*/
-@@ -79,34 +77,6 @@ const struct clkops clkops_omap2430_i2chs_wait = {
+@@ -79,31 +79,6 @@ const struct clkops clkops_omap2430_i2chs_wait = {
  	.find_companion = omap2_clk_dflt_find_companion,
  };
  
--#ifdef OLD_CK
--/* Recalculate SYST_CLK */
--static void omap2_sys_clk_recalc(struct clk *clk)
+-static int omap2_enable_osc_ck(struct clk *clk)
 -{
--	u32 div = PRCM_CLKSRC_CTRL;
--	div &= (1 << 7) | (1 << 6);	/* Test if ext clk divided by 1 or 2 */
--	div >>= clk->rate_offset;
--	clk->rate = (clk->parent->rate / div);
--	propagate_rate(clk);
--}
--#endif	/* OLD_CK */
+-	u32 pcc;
 -
--u32 omap2xxx_get_sysclkdiv(void)
--{
--	u32 div;
+-	pcc = __raw_readl(prcm_clksrc_ctrl);
 -
--	div = __raw_readl(prcm_clksrc_ctrl);
--	div &= OMAP_SYSCLKDIV_MASK;
--	div >>= OMAP_SYSCLKDIV_SHIFT;
+-	__raw_writel(pcc & ~OMAP_AUTOEXTCLKMODE_MASK, prcm_clksrc_ctrl);
 -
--	return div;
+-	return 0;
 -}
 -
--unsigned long omap2_sys_clk_recalc(struct clk *clk)
+-static void omap2_disable_osc_ck(struct clk *clk)
 -{
--	return clk->parent->rate / omap2xxx_get_sysclkdiv();
+-	u32 pcc;
+-
+-	pcc = __raw_readl(prcm_clksrc_ctrl);
+-
+-	__raw_writel(pcc | OMAP_AUTOEXTCLKMODE_MASK, prcm_clksrc_ctrl);
 -}
 -
+-const struct clkops clkops_oscck = {
+-	.enable		= omap2_enable_osc_ck,
+-	.disable	= omap2_disable_osc_ck,
+-};
+-
+ #ifdef OLD_CK
+ /* Recalculate SYST_CLK */
+ static void omap2_sys_clk_recalc(struct clk *clk)
+@@ -116,7 +91,7 @@ static void omap2_sys_clk_recalc(struct clk *clk)
+ }
+ #endif	/* OLD_CK */
+ 
+-static u32 omap2_get_sysclkdiv(void)
++u32 omap2xxx_get_sysclkdiv(void)
+ {
+ 	u32 div;
+ 
+@@ -127,14 +102,9 @@ static u32 omap2_get_sysclkdiv(void)
+ 	return div;
+ }
+ 
+-unsigned long omap2_osc_clk_recalc(struct clk *clk)
+-{
+-	return omap2xxx_get_apll_clkin() * omap2_get_sysclkdiv();
+-}
+-
+ unsigned long omap2_sys_clk_recalc(struct clk *clk)
+ {
+-	return clk->parent->rate / omap2_get_sysclkdiv();
++	return clk->parent->rate / omap2xxx_get_sysclkdiv();
+ }
+ 
  /*
-  * Set clocks for bypass mode for reboot to work.
-  */
 diff --git a/arch/arm/mach-omap2/clock2xxx.h b/arch/arm/mach-omap2/clock2xxx.h
-index 3b0610d..c14061b 100644
+index 3f1672e..3b0610d 100644
 --- a/arch/arm/mach-omap2/clock2xxx.h
 +++ b/arch/arm/mach-omap2/clock2xxx.h
-@@ -11,9 +11,8 @@
- unsigned long omap2_table_mpu_recalc(struct clk *clk);
- int omap2_select_table_rate(struct clk *clk, unsigned long rate);
- long omap2_round_to_table_rate(struct clk *clk, unsigned long rate);
--unsigned long omap2_sys_clk_recalc(struct clk *clk);
-+unsigned long omap2xxx_sys_clk_recalc(struct clk *clk);
- unsigned long omap2_osc_clk_recalc(struct clk *clk);
--unsigned long omap2_sys_clk_recalc(struct clk *clk);
- unsigned long omap2_dpllcore_recalc(struct clk *clk);
+@@ -18,6 +18,7 @@ unsigned long omap2_dpllcore_recalc(struct clk *clk);
  int omap2_reprogram_dpllcore(struct clk *clk, unsigned long rate);
  unsigned long omap2xxx_clk_get_core_rate(struct clk *clk);
-diff --git a/arch/arm/mach-omap2/clock2xxx_data.c b/arch/arm/mach-omap2/clock2xxx_data.c
-index 402115f..3a435bb 100644
---- a/arch/arm/mach-omap2/clock2xxx_data.c
-+++ b/arch/arm/mach-omap2/clock2xxx_data.c
-@@ -79,7 +79,7 @@ static struct clk sys_ck = {		/* (*12, *13, 19.2, 26, 38.4)MHz */
- 	.ops		= &clkops_null,
- 	.parent		= &osc_ck,
- 	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &omap2_sys_clk_recalc,
-+	.recalc		= &omap2xxx_sys_clk_recalc,
- };
+ u32 omap2xxx_get_apll_clkin(void);
++u32 omap2xxx_get_sysclkdiv(void);
  
- static struct clk alt_ck = {		/* Typical 54M or 48M, may not exist */
-@@ -2264,7 +2264,7 @@ int __init omap2_clk_init(void)
- 
- 	osc_ck.rate = omap2_osc_clk_recalc(&osc_ck);
- 	propagate_rate(&osc_ck);
--	sys_ck.rate = omap2_sys_clk_recalc(&sys_ck);
-+	sys_ck.rate = omap2xxx_sys_clk_recalc(&sys_ck);
- 	propagate_rate(&sys_ck);
- 
- 	for (c = omap24xx_clks; c < omap24xx_clks + ARRAY_SIZE(omap24xx_clks); c++)
+ /* REVISIT: These should be set dynamically for CONFIG_MULTI_OMAP2 */
+ #ifdef CONFIG_ARCH_OMAP2420
