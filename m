@@ -1,40 +1,61 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 19 Jan 2010 09:32:31 -0700 (MST)
-Subject: [PATCH 0/3] OMAP4: prcm/clock fixes
-In-Reply-To: <alpine.DEB.2.00.1001190911530.3977@utopia.booyaka.com>
-References: <5A47E75E594F054BAF48C5E4FC4B92AB031E2EC077@dbde02.ent.ti.com>
-	<alpine.DEB.2.00.1001190911530.3977@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1001190931480.3977@utopia.booyaka.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Tue, 19 Jan 2010 17:10:33 +0000
+Subject: [RFC 18/18] arm: mm: qsd8x50: Fix incorrect permission faults
+In-Reply-To: <20100111231143.GF7925@n2100.arm.linux.org.uk>
+Message-ID: <20100119171033.GA1323@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Jan 2010, Paul Walmsley wrote:
-
-> On Tue, 19 Jan 2010, Nayak, Rajendra wrote:
-> 
-> > >-----Original Message-----
-> > >From: Paul Walmsley [mailto:paul at pwsan.com] 
-> > >
-> > >Hi Rajendra,
-> > >
-> > >On Mon, 18 Jan 2010, Nayak, Rajendra wrote:
-> > >
-> > >> Ok, so I will repost it as an attachement since its too big.
-> > >> Hope that's fine.
-> > >
-> > >How about either posting it on a website somewhere and sending 
-> > >a link? Or 
-> > >send it to me and I will post it on the website here.
+Russell King - ARM Linux wrote:
+> On Mon, Jan 11, 2010 at 02:47:37PM -0800, Daniel Walker wrote:
+> > From: Dave Estes <cestes@quicinc.com>
 > > 
-> > Ok, I will send you the patch off the list.
+> > Handle incorrectly reported permission faults for qsd8650.  On
+> > permission faults, retry MVA to PA conversion.  If retry detects
+> > translation fault.  Report as translation fault.
 > 
-> This patch is now posted for any comments or review:
-> 
-> http://www.pwsan.com/omap/patches/omap4_clk_fix/0001-OMAP4-PRCM-Define-shift-macros-as-n-instead-of-1.patch
+> This is totally unacceptable to add such a demanding copyright header to
+> any file, imposing this notice upon pre-existing code.  Please remove it.
 
-Thanks, this is a total "brown paper bag" bug :-(
+Other files also.
 
-Queued for 2.6.33-rc.
+I was going to enquire about another file in this patch, wondering if
+the long copyright header is compatible with the GPLv2 used for the
+kernel tree as a whole:
+
+--- /dev/null
++++ b/Documentation/arm/msm/emulate_domain_manager.txt
+@@ -0,0 +1,282 @@
++Copyright (c) 2009, Code Aurora Forum. All rights reserved.
++
++[... longish license header, like new BSD but different...
+
+Notably:
+
++Redistributions in source form must retain the above copyright notice, this
++list of conditions and the following disclaimer as the first lines of this
++file unmodified.
+
+So nobody can add a title to the documentation, add another copyright
+year and name, convert it to Docbook, etc....?
+
+But also, the simple fact that it is not a standard license raises the
+question of whether it's acceptable at all.
 
 
-- Paul
+For another file, I'm not sure that adding "All rights reserved" is ok.
+Under the GPL, all rights are _not_ reserved:
+
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -2,6 +2,7 @@
+  *  linux/arch/arm/mm/fault.c
+  *
+  *  Copyright (C) 1995  Linus Torvalds
++ *  Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+  *  Modifications for ARM processor (c) 1995-2004 Russell King
+  *
+  * This program is free software; you can redistribute it and/or modify
+
+
+-- Jamie
