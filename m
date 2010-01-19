@@ -1,53 +1,108 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 Jan 2010 23:11:11 +0000
-Subject: [RFC 06/18] arm: msm: implement proper dmb() for 7x27
-In-Reply-To: <20100119211244.GH1323@shareable.org>
-References: <1263250057-26692-1-git-send-email-dwalker@codeaurora.org>
-	<1263250057-26692-7-git-send-email-dwalker@codeaurora.org>
-	<20100111233924.GL7925@n2100.arm.linux.org.uk>
-	<1263253516.26505.42.camel@c-dwalke-linux.qualcomm.com>
-	<20100112000142.GO7925@n2100.arm.linux.org.uk>
-	<20100119172835.GC1323@shareable.org>
-	<20100119180424.GC1886@n2100.arm.linux.org.uk>
-	<20100119211244.GH1323@shareable.org>
-Message-ID: <20100119231111.GA5891@n2100.arm.linux.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 19 Jan 2010 16:35:45 -0700
+Subject: [PATCH v2 00/18] OMAP2/3/4 clock: split out code for clock types and
+	clean up
+Message-ID: <20100119232900.26047.98263.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 19, 2010 at 09:12:44PM +0000, Jamie Lokier wrote:
-> Fair enough.  Is it like this?
-> 
->    1. Data ends up in cache lines from access via the cached mapping.
->    2. Access via the strongly ordered mapping may still look at the cache,
->       because it's easier that way and it's not supposed to have any data.
->    3. Cache effectively intercepts the access.
->    4. Bus does not see strongly ordered access.
+Hi,
 
-Yes, that's one possible scenario.
+This second version of this series improves the patch changelogs
+and adds some code comments.
 
-> Isn't the above sequence of events you described earlier even _more_
-> likely to occur when there are simultaneous cacheable and
-> non-cacheable mappings?
+This patch series splits clock2xxx.c and clock34xx.c by
+clock "type", e.g., DPLLs, APLLs, clksel clocks, etc.  The point
+is to make the code easier to read and easier to debug (by
+restricting the scope of DEBUG defines).  This also lays the
+groundwork for further generalization of the clock code and prepares
+for a multi-OMAP2/3/4 kernel.
 
-I guess it depends how the access hardware is designed - and what
-effect an access resulting in a device or strongly ordered type access
-(thereby having one set of ordering requirements) has when it hits a
-cache line, which will have different ordering requirements.
+The series also cleans up a few other minor aspects of the clock
+code: the various struct omap2_clk_functions are combined; a
+warning identified by sparse is resolved; unnecessary includes
+have been trimmed; and some formerly-common code is now only
+compiled for the chips that need it.
 
-With ARMv6 and above, it's no longer just about cache policy, as with
-previous CPUs.  There's ordering requirements to ensure that (eg) device
-accesses occur on the busses in program order rather than out of order,
-and this will require hardware - which could be confused by a device
-access hitting the cache.
+There are a few minor functional changes, documented in some of
+the patch descriptions, but nothing significant.
 
-The difference between this and differing cache policies, the ordering
-requirement is the same.
+Compile-tested with n8x0_defconfig, omap_2430sdp_defconfig, and
+omap3_beagle_defconfig.  Boot-tested on Beagle and N800.
 
-(ISTR ARM Ltd's architecture folk know about the problem Linux has with
-cache policies, and although this requirement is written into the arch
-manual, they're aware that Linux will have major problems with it.  I
-believe the only unpredictability that results from this that a NC
-region may end up with cache lines allocated, which may or may not be
-hit.  That's not to say that it _won't_ become a problem with later
-ARM CPUs, but let's pray that when it does, we have coherent DMA
-support.)
+Applies on the "for_2.6.34" branch of git://git.pwsan.com/linux-2.6 
+
+Thanks to Alexander Shishkin <virtuoso@slind.org> for his comments.
+
+
+- Paul
+
+---
+
+size:
+   text    data     bss     dec     hex filename
+2338183	 126432	  64056	2528671	 26959f	vmlinux.n8x0.orig
+2338299	 126432	  64056	2528787	 269613	vmlinux.n8x0.patched
+3427989	 179488	 146848	3754325	 394955	vmlinux.2430sdp.orig
+3428069	 179488	 146848	3754405	 3949a5	vmlinux.2430sdp.patched
+3635559	 199232	 102984	3937775	 3c15ef	vmlinux.beagle.orig
+3635443	 199232	 102984	3937659	 3c157b	vmlinux.beagle.patched
+2038356	 169664	  65380	2273400	 22b078	vmlinux.4430sdp.orig
+2038448	 169664	  65380	2273492	 22b0d4	vmlinux.4430sdp.patched
+
+Paul Walmsley (18):
+      OMAP3 clock: move OMAP3-specific DPLL functions to dpll3xxx.c
+      OMAP2/3/4 clock: move DPLL clock functions into mach-omap2/clkt_dpll.c
+      OMAP2/3/4 clock: move clksel clock functions into mach-omap2/clkt_clksel.c
+      OMAP2 clock: move all static functions to the top of the file
+      OMAP2/3/4 clock: combine all omap2_clk_functions
+      OMAP2xxx clock: move the DPLL+CORE composite clock code into mach-omap2/clkt2xxx_dpllcore.c
+      OMAP2xxx clock: move the DVFS virtual clock code into mach-omap2/clkt2xxx_virt_prcm_set.c
+      OMAP2xxx clock: move the APLL clock code into mach-omap2/clkt2xxx_apll.c
+      OMAP2xxx clock: move osc_clk code into mach-omap2/clkt2xxx_osc.c
+      OMAP2xxx clock: move sys_clk code into mach-omap2/clkt2xxx_sys.c
+      OMAP2 clock: don't compile OMAP2430-only functions on non-2430 builds
+      OMAP3 clock: split out DPLL3 M2 divider functions into mach-omap2/clkt3xxx_dpll3m2.c
+      OMAP2/3 clock: clean up omap*_clk_arch_init()
+      OMAP2/3 clock: remove unnecessary includes and clean up header
+      OMAP2/3/4 clock: omap2_clk_prepare_for_reboot() is OMAP2xxx-only
+      OMAP3 DPLL: reorganize static functions
+      OMAP clock: resolve all remaining sparse warnings
+      OMAP2/3/4 clock: rename and clean the omap2_clk_init() functions
+
+
+ arch/arm/mach-omap2/Makefile                 |   18 -
+ arch/arm/mach-omap2/clkt2xxx_apll.c          |  120 ++++
+ arch/arm/mach-omap2/clkt2xxx_dpllcore.c      |  173 +++++
+ arch/arm/mach-omap2/clkt2xxx_osc.c           |   62 ++
+ arch/arm/mach-omap2/clkt2xxx_sys.c           |   50 ++
+ arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |  254 ++++++++
+ arch/arm/mach-omap2/clkt3xxx_dpll3m2.c       |  120 ++++
+ arch/arm/mach-omap2/clkt_clksel.c            |  417 +++++++++++++
+ arch/arm/mach-omap2/clkt_dpll.c              |  386 ++++++++++++
+ arch/arm/mach-omap2/clock.c                  |  825 ++------------------------
+ arch/arm/mach-omap2/clock.h                  |   11 
+ arch/arm/mach-omap2/clock2xxx.c              |  548 +----------------
+ arch/arm/mach-omap2/clock2xxx.h              |    7 
+ arch/arm/mach-omap2/clock2xxx_data.c         |    6 
+ arch/arm/mach-omap2/clock34xx.c              |  154 -----
+ arch/arm/mach-omap2/clock34xx.h              |    1 
+ arch/arm/mach-omap2/clock34xx_data.c         |   19 -
+ arch/arm/mach-omap2/clock44xx.c              |   14 
+ arch/arm/mach-omap2/clock44xx.h              |    2 
+ arch/arm/mach-omap2/clock44xx_data.c         |    4 
+ arch/arm/mach-omap2/dpll3xxx.c               |  113 ++--
+ arch/arm/mach-omap2/io.c                     |   15 
+ arch/arm/mach-omap2/prcm.c                   |    8 
+ arch/arm/plat-omap/clock.c                   |    2 
+ arch/arm/plat-omap/include/plat/clock.h      |    2 
+ 25 files changed, 1788 insertions(+), 1543 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/clkt2xxx_apll.c
+ create mode 100644 arch/arm/mach-omap2/clkt2xxx_dpllcore.c
+ create mode 100644 arch/arm/mach-omap2/clkt2xxx_osc.c
+ create mode 100644 arch/arm/mach-omap2/clkt2xxx_sys.c
+ create mode 100644 arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
+ create mode 100644 arch/arm/mach-omap2/clkt3xxx_dpll3m2.c
+ create mode 100644 arch/arm/mach-omap2/clkt_clksel.c
+ create mode 100644 arch/arm/mach-omap2/clkt_dpll.c
+ rename arch/arm/mach-omap2/{dpll.c => dpll3xxx.c} (98%)
