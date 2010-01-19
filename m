@@ -1,91 +1,38 @@
-From: anfei.zhou@gmail.com (anfei)
-Date: Tue, 19 Jan 2010 21:05:47 +0800
-Subject: flush_dcache_page does too much?
-In-Reply-To: <20100119001636.GA4401@desktop>
-References: <20100118131346.GA11589@desktop>
-	<20100118133304.GA29645@n2100.arm.linux.org.uk>
-	<20100118135431.GA12496@desktop>
-	<20100118140005.GD2695@n2100.arm.linux.org.uk>
-	<20100118141530.GA13394@desktop>
-	<20100118144418.GE2695@n2100.arm.linux.org.uk>
-	<20100118145731.GA14523@desktop>
-	<20100118150152.GF2695@n2100.arm.linux.org.uk>
-	<20100119001636.GA4401@desktop>
-Message-ID: <20100119130547.GA6285@desktop>
+From: caglarakyuz@gmail.com (Caglar Akyuz)
+Date: Tue, 19 Jan 2010 16:31:49 +0200
+Subject: Kernel Start-up Time
+In-Reply-To: <20100119090235.GC24447@n2100.arm.linux.org.uk>
+References: <201001181010.01975.caglarakyuz@gmail.com>
+	<201001191036.21594.caglarakyuz@gmail.com>
+	<20100119090235.GC24447@n2100.arm.linux.org.uk>
+Message-ID: <201001191631.49874.caglarakyuz@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Tuesday 19 January 2010 11:02:35 am Russell King - ARM Linux wrote:
+> On Tue, Jan 19, 2010 at 10:36:21AM +0200, Caglar Akyuz wrote:
+> > What I'm looking for is whether early arm boot sequence is 1.3 secs or
+> > not. I may be wrong but my guess is before jumping to generic
+> > "start_kernel" function following files are executed:
+> >
+> > * arch/arm/kernel/head.S
+> > * arch/arm/kernel/head-common.S
+> > * arch/arm/mm/proc-arm926.S
+> >
+> > And these 3 files cost me 1.3 seconds. Initializing page tables, caches
+> > etc costing that much doesn't seem optimal to me. This is what I'm trying
+> > to find out.
+> 
+> Only if your CPU is really inefficient when caches are turned off will
+> it take 1.3 seconds.
+> 
+> Try reading a cycle counter at the start of head.S, save it in memory.
+> Read it again in start_kernel() and save it somewhere again, and
+> compare the two values.  I think you'll find that it's not this code
+> which is taking 1.3 seconds.
+> 
 
-On Tue, Jan 19, 2010 at 08:16:36AM +0800, anfei wrote:
-> On Mon, Jan 18, 2010 at 03:01:52PM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Jan 18, 2010 at 10:57:31PM +0800, anfei wrote:
-> > > On Mon, Jan 18, 2010 at 02:44:18PM +0000, Russell King - ARM Linux wrote:
-> > > > On Mon, Jan 18, 2010 at 10:15:30PM +0800, anfei wrote:
-> > > > > On Mon, Jan 18, 2010 at 02:00:05PM +0000, Russell King - ARM Linux wrote:
-> > > > > > On Mon, Jan 18, 2010 at 09:54:31PM +0800, anfei wrote:
-> > > > > > > Do you mean this implementation can ensure the coherence between write
-> > > > > > > and shared mmapings?  But it's easy to reproduce the alias problem by
-> > > > > > > this simple testcase (w/o error handler) on omap2430 with VIPT cache:
-> > > > > > 
-> > > > > > Your program doesn't do anything to identify any problem.  You don't
-> > > > > > even say _what_ problem you see with this program.
-> > > > > > 
-> > > > > Sorry for that.
-> > > > > 
-> > > > > > If you have a specific case which fails, please show the problem, please
-> > > > > > describe exactly the behaviour that you see, and what you expect to see.
-> > > > 
-> > > > Are you using a write allocate cache?
-> > > 
-> > > I guess not, because this line is neccessary to reproduce the issue:
-> > > 	tmp = *(addr+0);
-> > > If it's write allocate, this line may not be neccessary, since it's just
-> > > a read (and cache the data).
-> > 
-> > It makes no sense then - without write allocate, writes will go straight
-> > through to the underlying page, bypassing the cache.
-> > 
-> Because of the read, the write is cache hitted too even on read allocate:
->        *(addr+0) = 0x44444444;	<- bypass the cache
->        tmp = *(addr+0);		<- read allocate
->        *(addr+1) = 0x77777777;	<- same cacheline, cache hitted
-> 
-> So the two write values are cached, then the sequence in sys_write
-> cannot guarantee the coherence:
-> 	kmap_atomic(page);
-> 	copy to page;
-> 	kunmap_atomic(page);
-> 	flush_dcache_page(page);
-> 
-> It should call flush_dcache_page() at the beginning too in order to
-> flush the shared mapping.  Actually, I think it's better to split this
-> function into two, such as:
-> 	flush_dcache_user_page(page);
-> 	copy to page;
-> 	kunmap_atomic(page);
-> 	flush_dcache_kern_page(page);
-> 
-> And this patch seems to fix it, any other fs doesn't call it need to add
-> that too.
-> 
-Do you think this is a bug and I can send the patch, or it's the problem
-of the test case?
+Thanks, you were right. This part is only taking 3 milliseconds. It turns out 
+that my usage of early printk was wrong.
 
-Thanks,
-Anfei.
-> 
-> diff --git a/mm/filemap.c b/mm/filemap.c
-> index 96ac6b0..07056fb 100644
-> --- a/mm/filemap.c
-> +++ b/mm/filemap.c
-> @@ -2196,6 +2196,9 @@ again:
->  		if (unlikely(status))
->  			break;
->  
-> +		if (mapping_writably_mapped(mapping))
-> +			flush_dcache_page(page);
-> +
->  		pagefault_disable();
->  		copied = iov_iter_copy_from_user_atomic(page, i, offset, bytes);
->  		pagefault_enable();
+Caglar
