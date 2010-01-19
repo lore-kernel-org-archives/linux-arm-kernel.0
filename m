@@ -1,60 +1,47 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Tue, 19 Jan 2010 18:33:29 +0000
-Subject: flush_dcache_page does too much?
-In-Reply-To: <20100119174450.GB1886@n2100.arm.linux.org.uk>
-References: <20100118133304.GA29645@n2100.arm.linux.org.uk>
-	<20100118135431.GA12496@desktop>
-	<20100118140005.GD2695@n2100.arm.linux.org.uk>
-	<20100118141530.GA13394@desktop>
-	<20100118144418.GE2695@n2100.arm.linux.org.uk>
-	<20100118145731.GA14523@desktop>
-	<20100118150152.GF2695@n2100.arm.linux.org.uk>
-	<20100119001636.GA4401@desktop> <20100119130547.GA6285@desktop>
-	<20100119174450.GB1886@n2100.arm.linux.org.uk>
-Message-ID: <20100119183328.GG1323@shareable.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 19 Jan 2010 11:36:06 -0700 (MST)
+Subject: [PATCH 12/18] OMAP3 clock: split out DPLL3 M2 divider functions
+	into clkt3xxx_dpll3m2.c
+In-Reply-To: <20100115125014.GK29059@shisha.kicks-ass.net>
+References: <20100115090613.30690.49355.stgit@localhost.localdomain>
+	<20100115090703.30690.171.stgit@localhost.localdomain>
+	<20100115125014.GK29059@shisha.kicks-ass.net>
+Message-ID: <alpine.DEB.2.00.1001191128120.3977@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Tue, Jan 19, 2010 at 09:05:47PM +0800, anfei wrote:
-> > Do you think this is a bug and I can send the patch, or it's the problem
-> > of the test case?
+(cc'ing Ranjith)
+
+Hi Alexander,
+
+On Fri, 15 Jan 2010, Alexander Shishkin wrote:
+
+> On Fri, Jan 15, 2010 at 02:07:04 -0700, Paul Walmsley wrote:
+> > Split the DPLL3 M2 divider clock functions out of clock34xx.c and move them
+> > into clkt3xxx_dpll3m2.c to improve maintainability.
 > 
-> Yes, it's a bug, but it needs to be reported elsewhere; neither this
-> list nor I can sanction patches to generic code.
+> I'm not very familiar with maintainability issues of dpll3m2, so
+> forgive me if it is ignorant for me to ask you to elaborate on this.
 
-It's not necessarily a bug if the appropriate msync() call fixes the
-test.  Linux doesn't guarantee coherence between mappings and
-read/write without msync() on some architectures, but I haven't seen
-an official statement of whether it *should* or not in this type of
-case.
+That is a very good point, those original patch changelogs are pretty 
+crappy.  "OMAP clock code - same great taste, now with more 
+maintainability!"  I will update them and repost with more detail.
 
-I have looked at this in some detail a few years ago.  When I looked
-at MIPS and some other architecture code, I wasn't sure it was correct
-even with msync() calls everywhere.  It looked distinctly undertested.
+> It does look like a bit of an overkill to have a separate file for
+> a divider. But again, I might well be missing the point.
 
-The Linux msync(2) man page says:
+Yep, this is definitely a borderline case where it might be more 
+appropriate to keep it in the clock34xx.c file.  What ultimately motivated 
+splitting it out was the thought that the AM3517/3505 chips probably won't 
+need this function, since I don't believe they support DVFS [1], so we 
+could skip compiling this function for kernels built for those devices via 
+the Makefile, and not need #ifdefs. 
 
-       msync()  flushes  changes  made  to the in-core copy of a file that was
-       mapped into memory using mmap(2) back to disk.   Without  use  of  this
-       call  there  is  no guarantee that changes are written back before mun?
-       map(2) is called.  To be more precise, the part of the file that corre?
-       sponds  to the memory area starting at addr and having length length is
-       updated.
+Ranjith, could you correct me if I am wrong about the DVFS part?
 
-It's not a great description.  MS_INVALIDATE talks about invalidating
-"other mappings", not this one, in the Linux man page.
+regards,
 
-But on other OSes (SunOS, HP-UX for example), MS_INVALIDATE
-invalidates _this_ mapping so that it sees the latest data written by
-write() to the file.
+- Paul
 
-In other words, Linux is a complete mess in this area.  It happens to
-work on some architectures, it's broken a little bit on others, broken
-a lot on some, and despite reading a fair bit of code I'm still not
-sure what the kernel is trying to promise.
-
-Probably different people have different ideas about what's expected,
-which is why MIPS and ARM kernels differ.
-
--- Jamie
+1. AM35x ARM Microprocessor Technical Reference Manual, 
+   http://www.ti.com/litv/pdf/sprugr0
