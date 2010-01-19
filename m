@@ -1,16 +1,32 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 Jan 2010 08:54:44 +0000
-Subject: [PATCH] arm: remove support for old way to pass kernel parameters
-In-Reply-To: <1263890623-14952-3-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20100119083803.GA17904@pengutronix.de>
-	<1263890623-14952-3-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20100119085444.GB24447@n2100.arm.linux.org.uk>
+Date: Tue, 19 Jan 2010 09:02:35 +0000
+Subject: Kernel Start-up Time
+In-Reply-To: <201001191036.21594.caglarakyuz@gmail.com>
+References: <201001181010.01975.caglarakyuz@gmail.com>
+	<201001181054.59214.caglarakyuz@gmail.com>
+	<1263829143.3207.34.camel@linux-1lbu>
+	<201001191036.21594.caglarakyuz@gmail.com>
+Message-ID: <20100119090235.GC24447@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 19, 2010 at 09:43:43AM +0100, Uwe Kleine-K?nig wrote:
-> This was deprecated in 2001 and announced to live on for 5 years.
+On Tue, Jan 19, 2010 at 10:36:21AM +0200, Caglar Akyuz wrote:
+> What I'm looking for is whether early arm boot sequence is 1.3 secs or not. I 
+> may be wrong but my guess is before jumping to generic "start_kernel" function 
+> following files are executed:
+> 
+> * arch/arm/kernel/head.S
+> * arch/arm/kernel/head-common.S
+> * arch/arm/mm/proc-arm926.S
+> 
+> And these 3 files cost me 1.3 seconds. Initializing page tables, caches etc 
+> costing that much doesn't seem optimal to me. This is what I'm trying to find 
+> out.
 
-Unfortunately, there are still boot loaders around which use the old
-way (eg, my firewall and server machines) - maybe make it a config
-option for the time being.
+Only if your CPU is really inefficient when caches are turned off will
+it take 1.3 seconds.
+
+Try reading a cycle counter at the start of head.S, save it in memory.
+Read it again in start_kernel() and save it somewhere again, and
+compare the two values.  I think you'll find that it's not this code
+which is taking 1.3 seconds.
