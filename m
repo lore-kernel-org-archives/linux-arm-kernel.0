@@ -1,25 +1,23 @@
-From: 914059751@qq.com (=?gbk?B?uvrR7sr3?=)
-Date: Tue, 19 Jan 2010 15:42:53 +0800
+From: rubini-list@gnudd.com (Alessandro Rubini)
+Date: Tue, 19 Jan 2010 09:21:19 +0100
 Subject: Query about loops_per_jiffy
-Message-ID: <tencent_5CA6CD330328846756327199@qq.com>
+In-Reply-To: <tencent_5CA6CD330328846756327199@qq.com>
+References: <tencent_5CA6CD330328846756327199@qq.com> 
+Message-ID: <20100119082119.GA20977@morgana.gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, oldhands:)
-     
-I have a question about how loops_per_jiffy converted to BogoMips, 
+> (loops_per_jiffy * HZ)/1000,000   will give a BogoMips value.
 
-loops_per_jiffy * HZ  <-----------  that's number of instructions CPU executes in a second
-BogoMips <-------------------------- Millions of instructions CPU executes in a second
+No, it will give a BogoLips (loops per second). A loop is two instructions,
+in ./arch/arm/lib/delay.S (function __delay) called by init/calibrate.c .
+To have bogomips you need to multiply by two.
 
-so , do the math!
-(loops_per_jiffy * HZ)/1000,000   will give a BogoMips value.
+> then why calibrate_delay do it like the following:
+> 	printk(KERN_CONT "%lu.%02lu BogoMIPS (lpj=%lu)\n",
+> 			loops_per_jiffy/(500000/HZ),
+> 			(loops_per_jiffy/(5000/HZ)) % 100, loops_per_jiffy);
 
-then why calibrate_delay do it like the following:
-	printk(KERN_CONT "%lu.%02lu BogoMIPS (lpj=%lu)\n",
-			loops_per_jiffy/(500000/HZ),
-			(loops_per_jiffy/(5000/HZ)) % 100, loops_per_jiffy);
+It's correct, using normal integer aritmetics care.
 
-
-Am I missing something ?
-Great thanks for any tips!
+/alessandro
