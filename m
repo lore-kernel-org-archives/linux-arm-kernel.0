@@ -1,180 +1,251 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 19 Jan 2010 10:12:19 +0000
-Subject: [PULL] Please pull bjdooks' for-rmk/samsung2
-Message-ID: <20100119101219.GA1072@trinity.fluff.org>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Tue, 19 Jan 2010 10:26:56 +0000
+Subject: [PATCH] regulator: mc13783: consider Power Gates as digital
+	regulators.
+In-Reply-To: <1263848512.3632.74.camel@realization>
+References: <1263830523.3632.22.camel@realization>
+	<20100118190445.GA16989@pengutronix.de>
+	<1263848512.3632.74.camel@realization>
+Message-ID: <1263896816.3089.40.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please pull the following tree which contains further updates since the
-last set of machine additions (and thus should go via RMK's trees)
+Looks a lot better. Just one question below.
 
-The following changes since commit 501dae90b3ae4dd3d8efdacfcb072c3d65eb5a33:
-  Kukjin Kim (1):
-        ARM: S5P6440: Add serial port support
+On Mon, 2010-01-18 at 22:01 +0100, Alberto Panizzo wrote:
+> On lun, 2010-01-18 at 20:04 +0100, Uwe Kleine-K?nig wrote:
+> > Hello Alberto,
+> Hello Uwe!
+> 
+> > 
+> > Can you post an updated patch addressing the discussion with Mark,
+> > please?
+> > 
+> > From the first look I don't like the name
+> > MC13783_REG_POWERMISC_PWGTSPI_M as I don't understand it's purpose
+> 
+> >From now the present driver naming schema is mask ends in _M.
+> 
+> > 
+> > What is the base for your patch?  (Hm, it seems next could work.
+> 
+> Yes, this patch is based on: 
+> git://git.kernel.org/pub/scm/linux/kernel/git/lrg/voltage-2.6.git for-next
+> 
+> > mc13783-regulator seems to have gotten some more #defines ending in _M.
+> > You seem to mean "mask".  IMHO it's a bit unfortunate, because the
+> > nameing scheme doesn't match the already existing names :-()
+> 
+> If the naming schema adopted, conflicts other I will propose a correction..
+> 
+> > 
+> > Shouldn't mc13783_state_powermisc_pwgt be a per-device variable instead
+> > of a static variable?
+> 
+> Thanks for point me out this. It should.
+> 
+> 
+> the new patch below:
+> 
+> --------------------------------------------------------------------------
+> GPO regulators are digital outputs that can be enabled or disabled by a
+> dedicated bit in mc13783 POWERMISC register.
+> In this family can be count in also Power Gates (PWGT1 and 2): enabled by
+> a dedicated pin a Power Gate is an hardware driven supply where the output
+> (PWGTnDRV) follow this law:
+> 
+>  Bit PWGTxSPIEN | Pin PWGTxEN | PWGTxDRV |  Read Back
+>    0 = default  |             |          | PWGTxSPIEN
+>  ---------------+-------------+----------+------------
+>        1        |      x      |   Low    |     0
+>        0        |      0      |   High   |     1
+>        0        |      1      |   Low    |     0
+> 
+> As read back value of control bit reflects the PWGTxDRV state (not the
+> control value previously written) and mc13783 POWERMISC register contain
+> only regulator related bits, a dedicated function to manage these bits is 
+> created here with the aim of tracing the real value of PWGTxSPIEN bits
+> and reproduce it on next writes.
+> 
+> All POWERMISC users _must_ use the new function to not accidentally
+> disable Power Gates supplies.
+> 
+> Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
+> ---
+>  drivers/regulator/mc13783-regulator.c |  109 ++++++++++++++++++++++++++++++++-
+>  include/linux/mfd/mc13783.h           |    2 +
+>  2 files changed, 110 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/regulator/mc13783-regulator.c b/drivers/regulator/mc13783-regulator.c
+> index a40e35a..555eb29 100644
+> --- a/drivers/regulator/mc13783-regulator.c
+> +++ b/drivers/regulator/mc13783-regulator.c
+> @@ -82,6 +82,11 @@
+>  #define MC13783_REG_POWERMISC_GPO2EN			(1 << 8)
+>  #define MC13783_REG_POWERMISC_GPO3EN			(1 << 10)
+>  #define MC13783_REG_POWERMISC_GPO4EN			(1 << 12)
+> +#define MC13783_REG_POWERMISC_PWGT1SPIEN		(1 << 15)
+> +#define MC13783_REG_POWERMISC_PWGT2SPIEN		(1 << 16)
+> +
+> +#define MC13783_REG_POWERMISC_PWGTSPI_M			(3 << 15)
+> +
+>  
+>  struct mc13783_regulator {
+>  	struct regulator_desc desc;
+> @@ -163,6 +168,7 @@ static const int const mc13783_vrf_val[] = {
+>  
+>  static struct regulator_ops mc13783_regulator_ops;
+>  static struct regulator_ops mc13783_fixed_regulator_ops;
+> +static struct regulator_ops mc13783_gpo_regulator_ops;
+>  
+>  #define MC13783_DEFINE(prefix, _name, _reg, _vsel_reg, _voltages)	\
+>  	[MC13783_ ## prefix ## _ ## _name] = {				\
+> @@ -201,7 +207,7 @@ static struct regulator_ops mc13783_fixed_regulator_ops;
+>  	[MC13783_ ## prefix ## _ ## _name] = {				\
+>  		.desc = {						\
+>  			.name = #prefix "_" #_name,			\
+> -			.ops = &mc13783_regulator_ops,			\
+> +			.ops = &mc13783_gpo_regulator_ops,		\
+>  			.type = REGULATOR_VOLTAGE,			\
+>  			.id = MC13783_ ## prefix ## _ ## _name,		\
+>  			.owner = THIS_MODULE,				\
+> @@ -253,10 +259,13 @@ static struct mc13783_regulator mc13783_regulators[] = {
+>  	MC13783_GPO_DEFINE(REGU, GPO2, POWERMISC),
+>  	MC13783_GPO_DEFINE(REGU, GPO3, POWERMISC),
+>  	MC13783_GPO_DEFINE(REGU, GPO4, POWERMISC),
+> +	MC13783_GPO_DEFINE(REGU, PWGT1SPI, POWERMISC),
+> +	MC13783_GPO_DEFINE(REGU, PWGT2SPI, POWERMISC),
+>  };
+>  
+>  struct mc13783_regulator_priv {
+>  	struct mc13783 *mc13783;
+> +	u32 powermisc_pwgt_state;
+>  	struct regulator_dev *regulators[];
+>  };
+>  
+> @@ -445,6 +454,104 @@ static struct regulator_ops mc13783_fixed_regulator_ops = {
+>  	.get_voltage = mc13783_fixed_regulator_get_voltage,
+>  };
+>  
+> +int mc13783_powermisc_rmw(struct mc13783_regulator_priv *priv, u32 mask,
+> +									u32 val)
+> +{
+> +	struct mc13783 *mc13783 = priv->mc13783;
+> +	int ret;
+> +	u32 valread;
+> +
+> +	BUG_ON(val & ~mask);
+> +
+> +	ret = mc13783_reg_read(mc13783, MC13783_REG_POWERMISC, &valread);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* Update the stored state for Power Gates. */
+> +	priv->powermisc_pwgt_state =
+> +				(priv->powermisc_pwgt_state & ~mask) | val;
+> +	priv->powermisc_pwgt_state &= MC13783_REG_POWERMISC_PWGTSPI_M;
+> +
+> +	/* Construct the new register value */
+> +	valread = (valread & ~mask) | val;
+> +	/* Overwrite the PWGTxEN with the stored version */
+> +	valread = (valread & ~MC13783_REG_POWERMISC_PWGTSPI_M) |
+> +						priv->powermisc_pwgt_state;
+> +
+> +	return mc13783_reg_write(mc13783, MC13783_REG_POWERMISC, valread);
+> +}
+> +
+> +static int mc13783_gpo_regulator_enable(struct regulator_dev *rdev)
+> +{
+> +	struct mc13783_regulator_priv *priv = rdev_get_drvdata(rdev);
+> +	int id = rdev_get_id(rdev);
+> +	int ret;
+> +	u32 en_val = mc13783_regulators[id].enable_bit;
+> +
+> +	dev_dbg(rdev_get_dev(rdev), "%s id: %d\n", __func__, id);
+> +
+> +	/* Power Gate enable value is 0 */
+> +	if (id == MC13783_REGU_PWGT1SPI ||
+> +	    id == MC13783_REGU_PWGT2SPI)
+> +		en_val = 0;
+> +
+> +	mc13783_lock(priv->mc13783);
+> +	ret = mc13783_powermisc_rmw(priv, mc13783_regulators[id].enable_bit,
+> +					en_val);
+> +	mc13783_unlock(priv->mc13783);
+> +
+> +	return ret;
+> +}
+> +
+> +static int mc13783_gpo_regulator_disable(struct regulator_dev *rdev)
+> +{
+> +	struct mc13783_regulator_priv *priv = rdev_get_drvdata(rdev);
+> +	int id = rdev_get_id(rdev);
+> +	int ret;
+> +	u32 dis_val = 0;
+> +
+> +	dev_dbg(rdev_get_dev(rdev), "%s id: %d\n", __func__, id);
+> +
+> +	/* Power Gate disable value is 1 */
+> +	if (id == MC13783_REGU_PWGT1SPI ||
+> +	    id == MC13783_REGU_PWGT2SPI)
+> +		dis_val = mc13783_regulators[id].enable_bit;
+> +
+> +	mc13783_lock(priv->mc13783);
+> +	ret = mc13783_powermisc_rmw(priv, mc13783_regulators[id].enable_bit,
+> +					dis_val);
+> +	mc13783_unlock(priv->mc13783);
+> +
+> +	return ret;
+> +}
+> +
+> +static int mc13783_gpo_regulator_is_enabled(struct regulator_dev *rdev)
+> +{
+> +	struct mc13783_regulator_priv *priv = rdev_get_drvdata(rdev);
+> +	int ret, id = rdev_get_id(rdev);
+> +	unsigned int val;
+> +
+> +	mc13783_lock(priv->mc13783);
+> +	ret = mc13783_reg_read(priv->mc13783, mc13783_regulators[id].reg, &val);
+> +	mc13783_unlock(priv->mc13783);
+> +
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* Power Gates state is stored in powermisc_pwgt_state
+> +	 * where the meaning of bits is negated */
+> +	val = (val & ~MC13783_REG_POWERMISC_PWGTSPI_M) |
+> +	      (priv->powermisc_pwgt_state ^ MC13783_REG_POWERMISC_PWGTSPI_M);
+> +
+> +	return (val & mc13783_regulators[id].enable_bit) != 0;
+> +}
+> +
+> +static struct regulator_ops mc13783_gpo_regulator_ops = {
+> +	.enable = mc13783_gpo_regulator_enable,
+> +	.disable = mc13783_gpo_regulator_disable,
+> +	.is_enabled = mc13783_gpo_regulator_is_enabled,
 
-are available in the git repository at:
+How is the voltage output on the GPO regulator governed. Is it
+controlled by a parent regulator or fixed ?
 
-  git://git.fluff.org/bjdooks/linux.git for-rmk/samsung2
-
-Andy Green (4):
-      ARM: S3C64XX: Add SROM register definitions
-      ARM: SMDK6410: Add nC1 chipselect SROM setup
-      ARM: S3C64XX: Add virtual mapping for S3C64XX SROM area
-      ARM: SMDK6410: Add comments on ethernet connectivity
-
-Ben Dooks (25):
-      ARM: S3C: Rename s3c_device_usb to s3c_device_ohci
-      ARM: S3C2412: Fixup commented out device in SMDK2413
-      ARM: Merge next-s3c64xx
-      ARM: S5PC1XX: Register pd0 and hd0 clocks, remove unecessary dummy_enable
-      ARM: SAMSUNG: Fix clksrc-clk's checks for bad register settings
-      ARM: SAMSUNG: Fix bug in clksrc-clk round_rate call.
-      ARM: SAMSUNG: Make UART device code common
-      ARM: SAMSUNG: Add platform data registration for OHCI
-      ARM: MINI2440: Remove commented out devices from device array
-      ARM: S3C24XX: Add mci platform data set call s3c24xx_mci_set_platdata().
-      ARM: Merge next-samsung-mc-adc
-      ARM: Merge next-s3c6410-andygreen
-      ARM: Merge next-jassi-spi
-      ARM: Merge next-samsung-devupdates1
-      ARM: Merge next-samsung-clock2
-      ARM: Merge next-jassi-spi
-      ARM: Merge next-samsung-devupdates1
-      ARM: Merge next-samsung-clock2
-      ARM: Merge next-samsung-serial1
-      ARM: SAMSUNG: Move pm-gpio into plat-samsung
-      ARM: SAMSUNG: Move gpiolib support in gpio.c to plat-samsung
-      ARM: SAMSUNG: Move GPIO headers to plat-samsung
-      ARM: SAMSUNG: Remove empty gpio-core.h and use central plat/gpio-core.h
-      ARM: SAMSUNG: Add initial documentation directory and overview
-      ARM: Merge next-samsung-s5p6440-iodec
-
-Jassi Brar (5):
-      ARM: S3C64XX: Add I2S resources in platform code
-      ARM: S3C64XX: SPI: Add SPI controller register base
-      ARM: S3C64XX: SPI: Define SPI-48M clock sources
-      ARM: S3C64XX: SPI: Header for passing platform data
-      ARM: S3C64XX: SPI: Define SPI controller devices
-
-Kukjin Kim (3):
-      ARM: SAMSUNG: Move GPIO common functions to plat-samsung
-      ARM: S5P6440: Add S5P6440 GPIO support
-      ARM: S5P6440: Add IO descriptor for ChipID block.
-
-Maurus Cuelenaere (3):
-      ARM: S3C64XX: Add S3C64XX RTC platform driver
-      ARM: SAMSUNG: Move S3C24XX ADC driver to plat-samsung
-      ARM: S3C64XX: Add S3C64XX support to the generic Samsung ADC driver
-
-Thomas Abraham (2):
-      ARM: SAMSUNG: Add check to ensure that clksrc_clk does have multiple clock sources
-      ARM: SAMSUNG: serial: Modify console initialization.
-
- Documentation/arm/Samsung/Overview.txt             |   86 ++++++
- arch/arm/configs/mini2440_defconfig                |    2 +-
- arch/arm/configs/s3c2410_defconfig                 |    2 +-
- .../include/mach/{gpio-core.h => gpio-track.h}     |    1 -
- arch/arm/mach-s3c2410/mach-amlm5900.c              |    2 +-
- arch/arm/mach-s3c2410/mach-bast.c                  |    2 +-
- arch/arm/mach-s3c2410/mach-h1940.c                 |    7 +-
- arch/arm/mach-s3c2410/mach-n30.c                   |    2 +-
- arch/arm/mach-s3c2410/mach-otom.c                  |    2 +-
- arch/arm/mach-s3c2410/mach-qt2410.c                |    2 +-
- arch/arm/mach-s3c2410/mach-smdk2410.c              |    2 +-
- arch/arm/mach-s3c2410/mach-tct_hammer.c            |    2 +-
- arch/arm/mach-s3c2410/mach-vr1000.c                |    2 +-
- arch/arm/mach-s3c2410/usb-simtec.c                 |    4 +-
- arch/arm/mach-s3c2412/mach-jive.c                  |    2 +-
- arch/arm/mach-s3c2412/mach-smdk2413.c              |    3 +-
- arch/arm/mach-s3c2412/mach-vstms.c                 |    2 +-
- arch/arm/mach-s3c2440/mach-anubis.c                |    2 +-
- arch/arm/mach-s3c2440/mach-at2440evb.c             |    7 +-
- arch/arm/mach-s3c2440/mach-mini2440.c              |    8 +-
- arch/arm/mach-s3c2440/mach-nexcoder.c              |    2 +-
- arch/arm/mach-s3c2440/mach-rx3715.c                |    2 +-
- arch/arm/mach-s3c2440/mach-smdk2440.c              |    2 +-
- arch/arm/mach-s3c2442/mach-gta02.c                 |    7 +-
- arch/arm/mach-s3c6400/include/mach/gpio-core.h     |   21 --
- arch/arm/mach-s3c6400/include/mach/map.h           |   18 ++
- arch/arm/mach-s3c6410/mach-hmt.c                   |    2 +-
- arch/arm/mach-s3c6410/mach-smdk6410.c              |   39 +++-
- arch/arm/mach-s5p6440/Makefile                     |    2 +-
- arch/arm/mach-s5p6440/include/mach/gpio-core.h     |   19 --
- arch/arm/mach-s5p6440/include/mach/map.h           |    5 +
- arch/arm/mach-s5p6440/include/mach/regs-gpio.h     |   54 ++++
- arch/arm/mach-s5p6440/s5p6440-gpio.c               |  322 ++++++++++++++++++++
- arch/arm/mach-s5pc100/include/mach/gpio-core.h     |   21 --
- arch/arm/plat-s3c/Makefile                         |    2 -
- arch/arm/plat-s3c/include/plat/devs.h              |    5 +-
- arch/arm/plat-s3c/include/plat/regs-adc.h          |    3 +
- arch/arm/plat-s3c/include/plat/usb-control.h       |    2 +
- arch/arm/plat-s3c24xx/Kconfig                      |    7 -
- arch/arm/plat-s3c24xx/Makefile                     |    1 -
- arch/arm/plat-s3c24xx/devs.c                       |   41 +--
- arch/arm/plat-s3c24xx/gpiolib.c                    |    2 +-
- arch/arm/plat-s3c24xx/include/plat/mci.h           |    9 +
- arch/arm/plat-s3c64xx/Kconfig                      |    1 +
- arch/arm/plat-s3c64xx/Makefile                     |    6 +
- arch/arm/plat-s3c64xx/clock.c                      |   12 +
- arch/arm/plat-s3c64xx/cpu.c                        |    5 +
- arch/arm/plat-s3c64xx/dev-adc.c                    |   46 +++
- arch/arm/plat-s3c64xx/dev-audio.c                  |   91 ++++++-
- arch/arm/plat-s3c64xx/dev-rtc.c                    |   43 +++
- arch/arm/plat-s3c64xx/dev-spi.c                    |  180 +++++++++++
- arch/arm/plat-s3c64xx/dev-uart.c                   |   29 --
- arch/arm/plat-s3c64xx/gpiolib.c                    |  164 +----------
- arch/arm/plat-s3c64xx/include/plat/regs-srom.h     |   59 ++++
- arch/arm/plat-s3c64xx/include/plat/spi-clocks.h    |   18 ++
- arch/arm/plat-s5p/Kconfig                          |    4 +
- arch/arm/plat-s5p/dev-uart.c                       |   28 --
- arch/arm/plat-s5pc1xx/clock.c                      |    9 +-
- arch/arm/plat-s5pc1xx/dev-uart.c                   |   29 --
- arch/arm/plat-s5pc1xx/gpio-config.c                |    2 +-
- arch/arm/plat-s5pc1xx/gpiolib.c                    |    2 +-
- arch/arm/plat-samsung/Kconfig                      |   16 +
- arch/arm/plat-samsung/Makefile                     |   11 +
- arch/arm/{plat-s3c24xx => plat-samsung}/adc.c      |   31 ++-
- arch/arm/plat-samsung/clock-clksrc.c               |   25 +-
- arch/arm/plat-samsung/dev-uart.c                   |   44 +++
- arch/arm/plat-samsung/dev-usb.c                    |   25 ++-
- arch/arm/plat-samsung/gpio-config.c                |    2 +-
- arch/arm/{plat-s3c => plat-samsung}/gpio.c         |    2 +-
- arch/arm/plat-samsung/gpiolib.c                    |  197 ++++++++++++
- .../{plat-s3c => plat-samsung}/include/plat/adc.h  |    4 +-
- .../include/plat/gpio-cfg-helpers.h                |    0
- .../include/plat/gpio-cfg.h                        |    0
- .../include/plat/gpio-core.h                       |   30 ++
- arch/arm/plat-samsung/include/plat/s3c64xx-spi.h   |   67 ++++
- arch/arm/{plat-s3c => plat-samsung}/pm-gpio.c      |    2 +-
- drivers/serial/samsung.c                           |    6 +-
- drivers/serial/samsung.h                           |   19 +-
- 78 files changed, 1507 insertions(+), 432 deletions(-)
- create mode 100644 Documentation/arm/Samsung/Overview.txt
- rename arch/arm/mach-s3c2410/include/mach/{gpio-core.h => gpio-track.h} (96%)
- delete mode 100644 arch/arm/mach-s3c6400/include/mach/gpio-core.h
- delete mode 100644 arch/arm/mach-s5p6440/include/mach/gpio-core.h
- create mode 100644 arch/arm/mach-s5p6440/include/mach/regs-gpio.h
- create mode 100644 arch/arm/mach-s5p6440/s5p6440-gpio.c
- delete mode 100644 arch/arm/mach-s5pc100/include/mach/gpio-core.h
- create mode 100644 arch/arm/plat-s3c64xx/dev-adc.c
- create mode 100644 arch/arm/plat-s3c64xx/dev-rtc.c
- create mode 100644 arch/arm/plat-s3c64xx/dev-spi.c
- create mode 100644 arch/arm/plat-s3c64xx/include/plat/regs-srom.h
- create mode 100644 arch/arm/plat-s3c64xx/include/plat/spi-clocks.h
- rename arch/arm/{plat-s3c24xx => plat-samsung}/adc.c (93%)
- create mode 100644 arch/arm/plat-samsung/dev-uart.c
- rename arch/arm/{plat-s3c => plat-samsung}/gpio.c (99%)
- create mode 100644 arch/arm/plat-samsung/gpiolib.c
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/adc.h (92%)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/gpio-cfg-helpers.h (100%)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/gpio-cfg.h (100%)
- rename arch/arm/{plat-s3c => plat-samsung}/include/plat/gpio-core.h (76%)
- create mode 100644 arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
- rename arch/arm/{plat-s3c => plat-samsung}/pm-gpio.c (99%)
+We probably want a way to query the voltage here or specify the parent
+relationship. 
 
 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+> +};
+> +
+>  static int __devinit mc13783_regulator_probe(struct platform_device *pdev)
+>  {
+>  	struct mc13783_regulator_priv *priv;
+> diff --git a/include/linux/mfd/mc13783.h b/include/linux/mfd/mc13783.h
+> index 3568040..94cb51a 100644
+> --- a/include/linux/mfd/mc13783.h
+> +++ b/include/linux/mfd/mc13783.h
+> @@ -108,6 +108,8 @@ int mc13783_adc_do_conversion(struct mc13783 *mc13783, unsigned int mode,
+>  #define	MC13783_REGU_V2		28
+>  #define	MC13783_REGU_V3		29
+>  #define	MC13783_REGU_V4		30
+> +#define	MC13783_REGU_PWGT1SPI	31
+> +#define	MC13783_REGU_PWGT2SPI	32
+>  
+>  #define MC13783_IRQ_ADCDONE	0
+>  #define MC13783_IRQ_ADCBISDONE	1
