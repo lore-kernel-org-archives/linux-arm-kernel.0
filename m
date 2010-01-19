@@ -1,64 +1,64 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 19 Jan 2010 16:36:13 -0700
-Subject: [PATCH v2 08/18] OMAP2xxx clock: move the APLL clock code into
-	mach-omap2/clkt2xxx_apll.c
+Date: Tue, 19 Jan 2010 16:36:19 -0700
+Subject: [PATCH v2 10/18] OMAP2xxx clock: move sys_clk code into
+	mach-omap2/clkt2xxx_sys.c
 In-Reply-To: <20100119232900.26047.98263.stgit@localhost.localdomain>
 References: <20100119232900.26047.98263.stgit@localhost.localdomain>
-Message-ID: <20100119233610.26047.42591.stgit@localhost.localdomain>
+Message-ID: <20100119233616.26047.12477.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the APLL-related clock functions from clock2xxx.c to
-mach-omap2/clkt2xxx_apll.c.  This is intended to make the clock code
-easier to understand, since all of the functions needed to manage APLLs
-are now located in their own file, rather than being mixed with other,
-unrelated functions.
+Move the sys_clk clock functions from clock2xxx.c to
+mach-omap2/clkt2xxx_sys.c.  This is intended to make the clock code
+easier to understand, since all of the functions needed to manage the
+sys_clk are now located in their own file, rather than being mixed
+with other, unrelated functions.
 
 Clock debugging is also now more finely-grained, since the DEBUG
-macro can now be defined for APLL clocks alone.  This
+macro can now be defined for the sys_clk clock alone.  This
 should reduce unnecessary console noise when debugging.
 
-Also, if at some future point the mach-omap2/ directory is split
-into OMAP2/3/4 variants, this clkt file can be placed in the mach-omap2xxx/
-directory, rather than shared with other chip types that don't use this
-clock type.
+Also, if at some future point the mach-omap2/ directory is split into
+OMAP2/3/4 variants, this clkt file can be placed in the mach-omap2xxx/
+directory, rather than shared with other chip types that don't use
+this clock type.
 
 Thanks to Alexander Shishkin <virtuoso@slind.org> for his comments to
 improve the patch description.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Richard Woodruff <r-woodruff2@ti.com>
 Cc: Alexander Shishkin <virtuoso@slind.org>
 ---
- arch/arm/mach-omap2/Makefile        |    3 +
- arch/arm/mach-omap2/clkt2xxx_apll.c |  120 +++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/clock2xxx.c     |   86 -------------------------
- arch/arm/mach-omap2/clock2xxx.h     |    1 
- 4 files changed, 124 insertions(+), 86 deletions(-)
- create mode 100644 arch/arm/mach-omap2/clkt2xxx_apll.c
+ arch/arm/mach-omap2/Makefile         |    3 +-
+ arch/arm/mach-omap2/clkt2xxx_sys.c   |   50 ++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/clock2xxx.c      |   30 --------------------
+ arch/arm/mach-omap2/clock2xxx.h      |    3 +-
+ arch/arm/mach-omap2/clock2xxx_data.c |    4 +--
+ 5 files changed, 55 insertions(+), 35 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/clkt2xxx_sys.c
 
 diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 2b58363..825c303 100644
+index 51178bf..7ce5fea 100644
 --- a/arch/arm/mach-omap2/Makefile
 +++ b/arch/arm/mach-omap2/Makefile
-@@ -12,7 +12,8 @@ clock-common				= clock.o clock_common_data.o \
- 					  clockdomain.o clkt_dpll.o \
+@@ -13,7 +13,8 @@ clock-common				= clock.o clock_common_data.o \
  					  clkt_clksel.o
  clock-omap2xxx				= clkt2xxx_dpllcore.o \
--					  clkt2xxx_virt_prcm_set.o
-+					  clkt2xxx_virt_prcm_set.o \
-+					  clkt2xxx_apll.o
+ 					  clkt2xxx_virt_prcm_set.o \
+-					  clkt2xxx_apll.o clkt2xxx_osc.o
++					  clkt2xxx_apll.o clkt2xxx_osc.o \
++					  clkt2xxx_sys.o
  
  obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common) $(prcm-common) $(clock-common) \
  			    $(clock-omap2xxx)
-diff --git a/arch/arm/mach-omap2/clkt2xxx_apll.c b/arch/arm/mach-omap2/clkt2xxx_apll.c
+diff --git a/arch/arm/mach-omap2/clkt2xxx_sys.c b/arch/arm/mach-omap2/clkt2xxx_sys.c
 new file mode 100644
-index 0000000..fc32ff8
+index 0000000..822b5a7
 --- /dev/null
-+++ b/arch/arm/mach-omap2/clkt2xxx_apll.c
-@@ -0,0 +1,120 @@
++++ b/arch/arm/mach-omap2/clkt2xxx_sys.c
+@@ -0,0 +1,50 @@
 +/*
-+ * OMAP2xxx APLL clock control functions
++ * OMAP2xxx sys_clk-specific clock code
 + *
 + * Copyright (C) 2005-2008 Texas Instruments, Inc.
 + * Copyright (C) 2004-2010 Nokia Corporation
@@ -77,226 +77,118 @@ index 0000000..fc32ff8
 +#undef DEBUG
 +
 +#include <linux/kernel.h>
++#include <linux/errno.h>
 +#include <linux/clk.h>
 +#include <linux/io.h>
 +
 +#include <plat/clock.h>
-+#include <plat/prcm.h>
 +
 +#include "clock.h"
 +#include "clock2xxx.h"
-+#include "cm.h"
-+#include "cm-regbits-24xx.h"
++#include "prm.h"
++#include "prm-regbits-24xx.h"
 +
-+/* CM_CLKEN_PLL.EN_{54,96}M_PLL options (24XX) */
-+#define EN_APLL_STOPPED			0
-+#define EN_APLL_LOCKED			3
++void __iomem *prcm_clksrc_ctrl;
 +
-+/* CM_CLKSEL1_PLL.APLLS_CLKIN options (24XX) */
-+#define APLLS_CLKIN_19_2MHZ		0
-+#define APLLS_CLKIN_13MHZ		2
-+#define APLLS_CLKIN_12MHZ		3
-+
-+/* Private functions */
-+
-+/* Enable an APLL if off */
-+static int omap2_clk_apll_enable(struct clk *clk, u32 status_mask)
++u32 omap2xxx_get_sysclkdiv(void)
 +{
-+	u32 cval, apll_mask;
++	u32 div;
 +
-+	apll_mask = EN_APLL_LOCKED << clk->enable_bit;
++	div = __raw_readl(prcm_clksrc_ctrl);
++	div &= OMAP_SYSCLKDIV_MASK;
++	div >>= OMAP_SYSCLKDIV_SHIFT;
 +
-+	cval = cm_read_mod_reg(PLL_MOD, CM_CLKEN);
-+
-+	if ((cval & apll_mask) == apll_mask)
-+		return 0;   /* apll already enabled */
-+
-+	cval &= ~apll_mask;
-+	cval |= apll_mask;
-+	cm_write_mod_reg(cval, PLL_MOD, CM_CLKEN);
-+
-+	omap2_cm_wait_idlest(OMAP_CM_REGADDR(PLL_MOD, CM_IDLEST), status_mask,
-+			     clk->name);
-+
-+	/*
-+	 * REVISIT: Should we return an error code if omap2_wait_clock_ready()
-+	 * fails?
-+	 */
-+	return 0;
++	return div;
 +}
 +
-+static int omap2_clk_apll96_enable(struct clk *clk)
++unsigned long omap2xxx_sys_clk_recalc(struct clk *clk)
 +{
-+	return omap2_clk_apll_enable(clk, OMAP24XX_ST_96M_APLL);
++	return clk->parent->rate / omap2xxx_get_sysclkdiv();
 +}
 +
-+static int omap2_clk_apll54_enable(struct clk *clk)
-+{
-+	return omap2_clk_apll_enable(clk, OMAP24XX_ST_54M_APLL);
-+}
-+
-+/* Stop APLL */
-+static void omap2_clk_apll_disable(struct clk *clk)
-+{
-+	u32 cval;
-+
-+	cval = cm_read_mod_reg(PLL_MOD, CM_CLKEN);
-+	cval &= ~(EN_APLL_LOCKED << clk->enable_bit);
-+	cm_write_mod_reg(cval, PLL_MOD, CM_CLKEN);
-+}
-+
-+/* Public data */
-+
-+const struct clkops clkops_apll96 = {
-+	.enable		= omap2_clk_apll96_enable,
-+	.disable	= omap2_clk_apll_disable,
-+};
-+
-+const struct clkops clkops_apll54 = {
-+	.enable		= omap2_clk_apll54_enable,
-+	.disable	= omap2_clk_apll_disable,
-+};
-+
-+/* Public functions */
-+
-+u32 omap2xxx_get_apll_clkin(void)
-+{
-+	u32 aplls, srate = 0;
-+
-+	aplls = cm_read_mod_reg(PLL_MOD, CM_CLKSEL1);
-+	aplls &= OMAP24XX_APLLS_CLKIN_MASK;
-+	aplls >>= OMAP24XX_APLLS_CLKIN_SHIFT;
-+
-+	if (aplls == APLLS_CLKIN_19_2MHZ)
-+		srate = 19200000;
-+	else if (aplls == APLLS_CLKIN_13MHZ)
-+		srate = 13000000;
-+	else if (aplls == APLLS_CLKIN_12MHZ)
-+		srate = 12000000;
-+
-+	return srate;
-+}
 +
 diff --git a/arch/arm/mach-omap2/clock2xxx.c b/arch/arm/mach-omap2/clock2xxx.c
-index 11d6edb..88077e7 100644
+index 62c3b02..b59cb1d 100644
 --- a/arch/arm/mach-omap2/clock2xxx.c
 +++ b/arch/arm/mach-omap2/clock2xxx.c
-@@ -44,16 +44,6 @@
- #include "cm.h"
- #include "cm-regbits-24xx.h"
+@@ -46,8 +46,6 @@
  
--
--/* CM_CLKEN_PLL.EN_{54,96}M_PLL options (24XX) */
--#define EN_APLL_STOPPED			0
--#define EN_APLL_LOCKED			3
--
--/* CM_CLKSEL1_PLL.APLLS_CLKIN options (24XX) */
--#define APLLS_CLKIN_19_2MHZ		0
--#define APLLS_CLKIN_13MHZ		2
--#define APLLS_CLKIN_12MHZ		3
--
  struct clk *vclk, *sclk, *dclk;
  
- void __iomem *prcm_clksrc_ctrl;
-@@ -126,80 +116,6 @@ static void omap2_sys_clk_recalc(struct clk *clk)
- }
- #endif	/* OLD_CK */
+-void __iomem *prcm_clksrc_ctrl;
+-
+ /*-------------------------------------------------------------------------
+  * Omap24xx specific clock functions
+  *-------------------------------------------------------------------------*/
+@@ -79,34 +77,6 @@ const struct clkops clkops_omap2430_i2chs_wait = {
+ 	.find_companion = omap2_clk_dflt_find_companion,
+ };
  
--/* Enable an APLL if off */
--static int omap2_clk_apll_enable(struct clk *clk, u32 status_mask)
+-#ifdef OLD_CK
+-/* Recalculate SYST_CLK */
+-static void omap2_sys_clk_recalc(struct clk *clk)
 -{
--	u32 cval, apll_mask;
+-	u32 div = PRCM_CLKSRC_CTRL;
+-	div &= (1 << 7) | (1 << 6);	/* Test if ext clk divided by 1 or 2 */
+-	div >>= clk->rate_offset;
+-	clk->rate = (clk->parent->rate / div);
+-	propagate_rate(clk);
+-}
+-#endif	/* OLD_CK */
 -
--	apll_mask = EN_APLL_LOCKED << clk->enable_bit;
+-u32 omap2xxx_get_sysclkdiv(void)
+-{
+-	u32 div;
 -
--	cval = cm_read_mod_reg(PLL_MOD, CM_CLKEN);
+-	div = __raw_readl(prcm_clksrc_ctrl);
+-	div &= OMAP_SYSCLKDIV_MASK;
+-	div >>= OMAP_SYSCLKDIV_SHIFT;
 -
--	if ((cval & apll_mask) == apll_mask)
--		return 0;   /* apll already enabled */
--
--	cval &= ~apll_mask;
--	cval |= apll_mask;
--	cm_write_mod_reg(cval, PLL_MOD, CM_CLKEN);
--
--	omap2_cm_wait_idlest(OMAP_CM_REGADDR(PLL_MOD, CM_IDLEST), status_mask,
--			     clk->name);
--
--	/*
--	 * REVISIT: Should we return an error code if omap2_wait_clock_ready()
--	 * fails?
--	 */
--	return 0;
+-	return div;
 -}
 -
--static int omap2_clk_apll96_enable(struct clk *clk)
+-unsigned long omap2_sys_clk_recalc(struct clk *clk)
 -{
--	return omap2_clk_apll_enable(clk, OMAP24XX_ST_96M_APLL);
+-	return clk->parent->rate / omap2xxx_get_sysclkdiv();
 -}
 -
--static int omap2_clk_apll54_enable(struct clk *clk)
--{
--	return omap2_clk_apll_enable(clk, OMAP24XX_ST_54M_APLL);
--}
--
--/* Stop APLL */
--static void omap2_clk_apll_disable(struct clk *clk)
--{
--	u32 cval;
--
--	cval = cm_read_mod_reg(PLL_MOD, CM_CLKEN);
--	cval &= ~(EN_APLL_LOCKED << clk->enable_bit);
--	cm_write_mod_reg(cval, PLL_MOD, CM_CLKEN);
--}
--
--const struct clkops clkops_apll96 = {
--	.enable		= omap2_clk_apll96_enable,
--	.disable	= omap2_clk_apll_disable,
--};
--
--const struct clkops clkops_apll54 = {
--	.enable		= omap2_clk_apll54_enable,
--	.disable	= omap2_clk_apll_disable,
--};
--
--static u32 omap2_get_apll_clkin(void)
--{
--	u32 aplls, srate = 0;
--
--	aplls = cm_read_mod_reg(PLL_MOD, CM_CLKSEL1);
--	aplls &= OMAP24XX_APLLS_CLKIN_MASK;
--	aplls >>= OMAP24XX_APLLS_CLKIN_SHIFT;
--
--	if (aplls == APLLS_CLKIN_19_2MHZ)
--		srate = 19200000;
--	else if (aplls == APLLS_CLKIN_13MHZ)
--		srate = 13000000;
--	else if (aplls == APLLS_CLKIN_12MHZ)
--		srate = 12000000;
--
--	return srate;
--}
--
- static u32 omap2_get_sysclkdiv(void)
- {
- 	u32 div;
-@@ -213,7 +129,7 @@ static u32 omap2_get_sysclkdiv(void)
- 
- unsigned long omap2_osc_clk_recalc(struct clk *clk)
- {
--	return omap2_get_apll_clkin() * omap2_get_sysclkdiv();
-+	return omap2xxx_get_apll_clkin() * omap2_get_sysclkdiv();
- }
- 
- unsigned long omap2_sys_clk_recalc(struct clk *clk)
+ /*
+  * Set clocks for bypass mode for reboot to work.
+  */
 diff --git a/arch/arm/mach-omap2/clock2xxx.h b/arch/arm/mach-omap2/clock2xxx.h
-index e35efde..3f1672e 100644
+index 3b0610d..c14061b 100644
 --- a/arch/arm/mach-omap2/clock2xxx.h
 +++ b/arch/arm/mach-omap2/clock2xxx.h
-@@ -17,6 +17,7 @@ unsigned long omap2_sys_clk_recalc(struct clk *clk);
+@@ -11,9 +11,8 @@
+ unsigned long omap2_table_mpu_recalc(struct clk *clk);
+ int omap2_select_table_rate(struct clk *clk, unsigned long rate);
+ long omap2_round_to_table_rate(struct clk *clk, unsigned long rate);
+-unsigned long omap2_sys_clk_recalc(struct clk *clk);
++unsigned long omap2xxx_sys_clk_recalc(struct clk *clk);
+ unsigned long omap2_osc_clk_recalc(struct clk *clk);
+-unsigned long omap2_sys_clk_recalc(struct clk *clk);
  unsigned long omap2_dpllcore_recalc(struct clk *clk);
  int omap2_reprogram_dpllcore(struct clk *clk, unsigned long rate);
  unsigned long omap2xxx_clk_get_core_rate(struct clk *clk);
-+u32 omap2xxx_get_apll_clkin(void);
+diff --git a/arch/arm/mach-omap2/clock2xxx_data.c b/arch/arm/mach-omap2/clock2xxx_data.c
+index 402115f..3a435bb 100644
+--- a/arch/arm/mach-omap2/clock2xxx_data.c
++++ b/arch/arm/mach-omap2/clock2xxx_data.c
+@@ -79,7 +79,7 @@ static struct clk sys_ck = {		/* (*12, *13, 19.2, 26, 38.4)MHz */
+ 	.ops		= &clkops_null,
+ 	.parent		= &osc_ck,
+ 	.clkdm_name	= "wkup_clkdm",
+-	.recalc		= &omap2_sys_clk_recalc,
++	.recalc		= &omap2xxx_sys_clk_recalc,
+ };
  
- /* REVISIT: These should be set dynamically for CONFIG_MULTI_OMAP2 */
- #ifdef CONFIG_ARCH_OMAP2420
+ static struct clk alt_ck = {		/* Typical 54M or 48M, may not exist */
+@@ -2264,7 +2264,7 @@ int __init omap2_clk_init(void)
+ 
+ 	osc_ck.rate = omap2_osc_clk_recalc(&osc_ck);
+ 	propagate_rate(&osc_ck);
+-	sys_ck.rate = omap2_sys_clk_recalc(&sys_ck);
++	sys_ck.rate = omap2xxx_sys_clk_recalc(&sys_ck);
+ 	propagate_rate(&sys_ck);
+ 
+ 	for (c = omap24xx_clks; c < omap24xx_clks + ARRAY_SIZE(omap24xx_clks); c++)
