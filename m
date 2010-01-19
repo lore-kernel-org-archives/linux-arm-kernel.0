@@ -1,25 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 Jan 2010 17:44:50 +0000
-Subject: flush_dcache_page does too much?
-In-Reply-To: <20100119130547.GA6285@desktop>
-References: <20100118131346.GA11589@desktop>
-	<20100118133304.GA29645@n2100.arm.linux.org.uk>
-	<20100118135431.GA12496@desktop>
-	<20100118140005.GD2695@n2100.arm.linux.org.uk>
-	<20100118141530.GA13394@desktop>
-	<20100118144418.GE2695@n2100.arm.linux.org.uk>
-	<20100118145731.GA14523@desktop>
-	<20100118150152.GF2695@n2100.arm.linux.org.uk>
-	<20100119001636.GA4401@desktop> <20100119130547.GA6285@desktop>
-Message-ID: <20100119174450.GB1886@n2100.arm.linux.org.uk>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Tue, 19 Jan 2010 09:49:29 -0800
+Subject: [RFC 18/18] arm: mm: qsd8x50: Fix incorrect permission faults
+In-Reply-To: <20100119174313.GE1323@shareable.org>
+References: <20100119171033.GA1323@shareable.org>
+	<1263922428.1951.63.camel@m0nster>
+	<20100119174313.GE1323@shareable.org>
+Message-ID: <1263923369.1951.68.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 19, 2010 at 09:05:47PM +0800, anfei wrote:
-> Do you think this is a bug and I can send the patch, or it's the problem
-> of the test case?
+On Tue, 2010-01-19 at 17:43 +0000, Jamie Lokier wrote:
+> Daniel Walker wrote:
+> > Everything I release will ultimately be licensed under the GPLv2
+> > regardless of the license in the current files.. So it's just a matter
+> > of removing that old license ..
+> 
+> Ok.  Please do :-)
+> 
+> > > For another file, I'm not sure that adding "All rights reserved" is ok.
+> > > Under the GPL, all rights are _not_ reserved:
+> > 
+> > This would be a problem because our lawyers mandate this.. AFAIK, it
+> > doesn't change the licensing tho.
+> 
+> If it doesn't change the license, why is it mandated?
 
-Yes, it's a bug, but it needs to be reported elsewhere; neither this
-list nor I can sanction patches to generic code.
+I don't know .. But I would guess it has to do with re-licensing under a
+BSD license potentially .
 
-It needs to be reported to the linux-kernel and linux-mm mailing lists.
+> Sounds like your lawyers aren't very familiar with open source licensing.
+
+I'm not sure how familiar they are with it ..
+
+Daniel
