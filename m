@@ -1,40 +1,32 @@
-From: linux@bohmer.net (Remy Bohmer)
-Date: Tue, 19 Jan 2010 11:46:23 +0100
-Subject: [PATCH] Updated: Fix soft lockup in at91 udc driver
-In-Reply-To: <20100119085304.GA17708@pengutronix.de>
-References: <4B4F7576.9090008@bluewatersys.com>
-	<20100119085304.GA17708@pengutronix.de>
-Message-ID: <3efb10971001190246t3c47d2afg76ffde05d77ab33d@mail.gmail.com>
+From: js@sig21.net (Johannes Stezenbach)
+Date: Tue, 19 Jan 2010 12:04:08 +0100
+Subject: Kernel Start-up Time
+In-Reply-To: <201001181010.01975.caglarakyuz@gmail.com>
+References: <201001181010.01975.caglarakyuz@gmail.com>
+Message-ID: <20100119110408.GB9187@sig21.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jan 18, 2010 at 10:10:01AM +0200, Caglar Akyuz wrote:
+> 
+> While measuring Linux start-up time, I see that printing version string in 
+> "start_kernel" takes ~1.3 seconds. I guess this is the time between from 
+> "bootloader jumping to uImage" and "printing version string in generic 
+> start_kernel code". Relevant part of my boot log is attached.
+> 
+> My question: is it normal this 1.3 sec init time? My system is 297 MHZ 
+> arm926ej-s with a 162MHZ DDR2 memory.
 
-2010/1/19 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello,
->
-> On Fri, Jan 15, 2010 at 08:50:14AM +1300, Ryan Mallon wrote:
->> Fix a potential soft lockup in the AT91 UDC driver by ensuring that the
->> UDC clock is enabled inside the interrupt handler. If the UDC clock is
->> not enabled then the UDC registers cannot be written to and the
->> interrupt cannot be cleared or masked.
-> Wouldn't it be cleaner to assert that the clock is already on when an
-> irq comes in? ?That is enable the clock and let it enabled when
-> configuring the device to generate irqs?
->
-> Just my 2?
+> [    4.700896] Starting kernel ...
+> [    4.702971]
+> [    5.966039] [    0.000000] Linux version 2.6.30-davinci1-06079-g4e73fae-
 
-What we have seen here is that there is a condition during host-suspend.
-When the host-suspends (3ms idle) the clocks are being disabled, after
-a short time the host wakes up again and does a device reset.
-This reset triggers a resume interrupt with the clocks disabled. BUT,
-it only behaves like this with only a few host controllers. This
-results in a hanging interrupt.
-The locking code of this driver is not completely clean and that needs
-some rework, especially for preempt-rt.
-We want to rework this, but that takes more time. Until then this
-patch at least solves the issue and can be used safely.
+Actually printk goes to a buffer which is output only after the
+serial console has been initialized (unless you use some
+kind of early printk).  So to find out what causes the delay
+look further down in your kernel messages, and look at the kernel
+timestamps not the ptx_ts ones.
 
-Kind regards,
 
-Remy
+HTH
+Johannes
