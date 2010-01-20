@@ -1,39 +1,49 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 20 Jan 2010 15:43:56 +0100
-Subject: make PHYS_OFFSET determined at run time (unfinished)
-In-Reply-To: <1263998346.3207.83.camel@linux-1lbu>
-References: <20100119083803.GA17904@pengutronix.de>
-	<4B561581.6060400@bluewatersys.com>
-	<20100120005505.GD26562@trinity.fluff.org>
-	<1263954112.3207.73.camel@linux-1lbu>
-	<20100120023255.GV10014@trinity.fluff.org>
-	<1263998346.3207.83.camel@linux-1lbu>
-Message-ID: <20100120144356.GA20271@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 20 Jan 2010 14:45:56 +0000
+Subject: [PATCH/RFC v1 0/2] Human readable performance event
+	description in sysfs
+In-Reply-To: <1263997609.4283.1067.camel@laptop>
+References: <1263978706-15499-1-git-send-email-t.fujak@samsung.com>
+	<1263978999.4283.823.camel@laptop> <op.u6tslipz7p4s8u@pikus>
+	<20100120133145.GE4089@wear.picochip.com>
+	<1263994779.4283.1057.camel@laptop>
+	<20100120135553.GA22897@n2100.arm.linux.org.uk>
+	<1263996080.4283.1064.camel@laptop> <op.u6t4atd07p4s8u@pikus>
+	<1263996979.4283.1066.camel@laptop>
+	<1263997609.4283.1067.camel@laptop>
+Message-ID: <20100120144556.GC22897@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Steve,
-
-> > > Is there a clean way to pass kernel parameters and machine type from
-> > > u-boot to zImage?  Last time I boot zImage in u-boot, some ugly hack was
-> > > needed in ARM startup code.  Just wondering if there is a better way.
+On Wed, Jan 20, 2010 at 03:26:49PM +0100, Peter Zijlstra wrote:
+> On Wed, 2010-01-20 at 15:16 +0100, Peter Zijlstra wrote:
+> > On Wed, 2010-01-20 at 15:09 +0100, Micha? Nazarewicz wrote:
+> > > On Wed, 20 Jan 2010 15:01:20 +0100, Peter Zijlstra <peterz@infradead.org> wrote:
+> > > > It seems to me userspace might care about the exact platform they're
+> > > > running on.
+> > > 
+> > > In my humble opinion, user space should never care about platform it's
+> > > running on.  Interfaces provided by kernel should suffice to implement
+> > > abstraction layer between user space and hardware.  If we abandon that
+> > > we're back in DOS times.  But hey, again, that's just my opinion.
 > > 
-> > u-boot should be doing the right thing, I thought uImage was simply a
-> > zImage wrapped in the right uboot descriptors to tell uboot it was a
-> > kernel and where to load it.
-> > 
-> > Certianly uboots i've used can boto zImage just fine.
+> > Well, you're completely right. But the often sad reality is that perfect
+> > abstraction is either impossible or prohibitively expensive.
 > 
-> I'm also able to boot zImage under u-boot.  However, I had to set r1
-> manually, and I don't know how to pass kernel parameters (stuff passed
-> into kernel uImage via bootargs) to zImage.  Any tips will be greatly
-> appreciated.
-Maybe this doesn't help you much, but barebox (aka. u-boot-v2) can boot
-zImages just fine and passes the cmdline as with booting an uImage.
+> And then there is the simple matter of knowing what kind of box it is
+> without having to resort to a screwdriver or worse.
 
-Best regards
-Uwe
+If you're expecting the CPU to tell you that, give up now.  The CPU
+will tell you about the CPU core, not the SoC.
 
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+All SoCs that have an ARM926 core in report that they are an ARM926
+CPU; that doesn't tell you that the surrounding hardware is an Atmel
+SoC, Samsung SoC, etc.
+
+Even some buggy CPUs which aren't an ARM926 report themselves as an
+ARM926 (Feroceon) while being incompatible with the ARM926 on several
+levels.  (Apparantly, the argument being that they wanted ARM926
+software to run on Feroceon, or something like that.)
+
+That's why we have the value passed in from the boot loader; there's
+no other way to tell what SoC you're running on.
