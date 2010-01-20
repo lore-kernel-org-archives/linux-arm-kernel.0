@@ -1,57 +1,97 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 20 Jan 2010 05:25:53 +0000
-Subject: Use of data types
-In-Reply-To: <2703439e1001190357r65a507d2v668bbfca1a07c176@mail.gmail.com>
-References: <2703439e1001180443t761947e0idc144ced64ca3a4f@mail.gmail.com>
-	<20100118134120.GB31345@pengutronix.de>
-	<20100118134215.GB16182@darwin> <4B546900.3020506@ru.mvista.com>
-	<2703439e1001190357r65a507d2v668bbfca1a07c176@mail.gmail.com>
-Message-ID: <20100120052552.GF26562@trinity.fluff.org>
+From: abhijitpagare@ti.com (Pagare, Abhijit)
+Date: Wed, 20 Jan 2010 12:25:17 +0530
+Subject: [PATCH] OMAP CPU ID: fix OMAP4 build failure
+In-Reply-To: <alpine.DEB.2.00.1001191412130.3977@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1001191412130.3977@utopia.booyaka.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C07CC987@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 19, 2010 at 08:57:03PM +0900, Khushhua Mogambo wrote:
-> On Mon, Jan 18, 2010 at 10:58 PM, Sergei Shtylyov
-> <sshtylyov@ru.mvista.com> wrote:
-> > Hello.
-> >
-> > Matthias Kaehlcke wrote:
-> >
-> >>>> Hi
-> >>>> ?I starting to port Linux kernel to my companies new ARM based
-> >>>> SoC and development board.
-> >>>>
-> >>>> Some of the regs is 16bits wide and some is 32bits width. I ask if
-> >>>> my using u16 and u32 in place of 'unsigned short' and 'unsigned int'
-> >>>> in the whole porting would be acceptable or not?
-> >>>>
-> >>>> In different wording, using only u16 and u32 always is considered good
-> >>>> quality or bad?
-> >>>>
-> >>>
-> >>> I prefer using u32 over int. ?Still more if your register space isn't
-> >>> uniform.
-> >>>
-> >>
-> >> ditto
-> >>
-> >> how about using the C99 types uint32_t, ... in the kernel?
-> >
-> > ?They are actually used in some places but this is generally frowned upon.
-> > They are for userspace.
-> >
-> > WBR, Sergei
+
+Hello Paul,
+
+
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Paul Walmsley
+> Sent: Wednesday, January 20, 2010 2:44 AM
+> To: abhijit.pagare at ti.com
+> Cc: tony at atomide.com; linux-omap at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: [PATCH] OMAP CPU ID: fix OMAP4 build failure
 > 
-> from thread, i understand that u32 is encouraged whenever we have reason. I m
-> going to use u8,16,32 heavily.
+> 
+> Hello Abhijit,
+> 
+> it seems that my for_2.6.34 branch does not build unless the following
+> patch, or one like it, is included.  Any comments?
+> 
+> 
+> - Paul
+> 
+> 
+> From: Paul Walmsley <paul@pwsan.com>
+> 
+> 
+> omap_4430sdp_defconfig currently does not build due to some missing CPU
+> IDs:
+> 
+> In file included from arch/arm/mach-omap2/powerdomains.h:59,
+>                  from arch/arm/mach-omap2/io.c:42:
+> arch/arm/mach-omap2/powerdomains44xx.h:39: error: 'CHIP_IS_OMAP4430'
+> undeclared here (not in a function)
+> 
+> ... so add CHIP_IS_OMAP4430ES1.  Note that this is not yet set by
+> mach-omap2/id.c; this is for TI to fix.
+> 
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Abhijit Pagare <abhijit.pagare@ti.com>
+> ---
+>  arch/arm/plat-omap/include/plat/cpu.h |    4 +++-
+>  1 files changed, 3 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-
+> omap/include/plat/cpu.h
+> index 9a028bd..8ada0ef 100644
+> --- a/arch/arm/plat-omap/include/plat/cpu.h
+> +++ b/arch/arm/plat-omap/include/plat/cpu.h
+> @@ -44,7 +44,7 @@
+>  int omap_type(void);
+> 
+>  struct omap_chip_id {
+> -	u8 oc;
+> +	u16 oc;
 
-It can depend on where it is being used, passing u8 and u16 around from
-function to function can cost as the compiler tends to output code
-to restrict the range of the registers' contents, thus u32 can end up
-being a better choice.
+I think the latest patch-set that I had posted has this change in it. You can refer to the patch in the link below
 
--- 
-Ben
+http://marc.info/?l=linux-omap&m=126088474831309&w=2
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+>  	u8 type;
+>  };
+> 
+> @@ -470,8 +470,10 @@ IS_OMAP_TYPE(3517, 0x3517)
+>  #define CHIP_IS_OMAP3430ES3_0		(1 << 5)
+>  #define CHIP_IS_OMAP3430ES3_1		(1 << 6)
+>  #define CHIP_IS_OMAP3630ES1		(1 << 7)
+> +#define CHIP_IS_OMAP4430ES1		(1 << 8)
+> 
+>  #define CHIP_IS_OMAP24XX		(CHIP_IS_OMAP2420 | CHIP_IS_OMAP2430)
+> +#define CHIP_IS_OMAP4430		CHIP_IS_OMAP4430ES1
+
+I had used this flag earlier as there was nothing fixed as to name it as ES1 that time. So now it can be migrated from CHIP_IS_OMAP4430 to CHIP_IS_OMAP4430ES1. I think CHIP_IS_OMAP4430 would be redundant in that case and should be removed. A patch would be essential to take care of that in the places where it is used. If you feel the same I can send a patch for fixing this.
+
+
+Regards,
+Abhijit
+
+> 
+>  /*
+>   * "GE" here represents "greater than or equal to" in terms of ES
+> --
+> 1.6.6.rc2.5.g49666
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
