@@ -1,37 +1,25 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 20 Jan 2010 12:05:55 +0000
-Subject: [PATCH] S3C64XX: Fix dev-audio build
-Message-ID: <1263989155-7075-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: mogambo.kztrj@gmail.com (Khushhua Mogambo)
+Date: Wed, 20 Jan 2010 21:15:13 +0900
+Subject: Use of data types
+In-Reply-To: <20100119174245.GA1886@n2100.arm.linux.org.uk>
+References: <2703439e1001180443t761947e0idc144ced64ca3a4f@mail.gmail.com>
+	<20100118134120.GB31345@pengutronix.de>
+	<20100118134215.GB16182@darwin> <4B546900.3020506@ru.mvista.com>
+	<2703439e1001190357r65a507d2v668bbfca1a07c176@mail.gmail.com>
+	<20100119174245.GA1886@n2100.arm.linux.org.uk>
+Message-ID: <2703439e1001200415u1ba829bag643d9aded5e6d4b7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As reported when the patch was posted commit 71269364 ("ARM: S3C64XX:
-Add I2S resources in platform code") uses pin names for the IISv4
-data output pins which are not present in mainline, causing dev-audio
-to fail to build. Fix this by using the defines which are actually
-present in the kernel source.
-
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/plat-s3c64xx/dev-audio.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/plat-s3c64xx/dev-audio.c b/arch/arm/plat-s3c64xx/dev-audio.c
-index cdba3a7..5b89344 100644
---- a/arch/arm/plat-s3c64xx/dev-audio.c
-+++ b/arch/arm/plat-s3c64xx/dev-audio.c
-@@ -51,9 +51,9 @@ static int s3c64xx_i2sv3_cfg_gpio(struct platform_device *pdev)
- 
- static int s3c64xx_i2sv4_cfg_gpio(struct platform_device *pdev)
- {
--	s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C64XX_GPC4_I2S0_V40_DO);
--	s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C64XX_GPC5_I2S1_V40_DO);
--	s3c_gpio_cfgpin(S3C64XX_GPC(7), S3C64XX_GPC7_I2S2_V40_DO);
-+	s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C64XX_GPC4_I2S_V40_DO0);
-+	s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C64XX_GPC5_I2S_V40_DO1);
-+	s3c_gpio_cfgpin(S3C64XX_GPC(7), S3C64XX_GPC7_I2S_V40_DO2);
- 	s3c_gpio_cfgpin(S3C64XX_GPH(6), S3C64XX_GPH6_I2S_V40_BCLK);
- 	s3c_gpio_cfgpin(S3C64XX_GPH(7), S3C64XX_GPH7_I2S_V40_CDCLK);
- 	s3c_gpio_cfgpin(S3C64XX_GPH(8), S3C64XX_GPH8_I2S_V40_LRCLK);
--- 
-1.6.6
+On Wed, Jan 20, 2010 at 2:42 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jan 19, 2010 at 08:57:03PM +0900, Khushhua Mogambo wrote:
+>> from thread, i understand that u32 is encouraged whenever we have reason. I m
+>> going to use u8,16,32 heavily.
+>
+> Incorrect.
+>
+> As I said, use u8,u16,u32 when you need something that's of that size
+> (eg, for storing values from hardware registers.) ?If you don't require
+> something of a specific size, then don't use them.
+ok I undrstand. thanking you very much.
