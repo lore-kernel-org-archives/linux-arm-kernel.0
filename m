@@ -1,77 +1,61 @@
-From: schen@mvista.com (Steve Chen)
-Date: Wed, 20 Jan 2010 08:39:06 -0600
-Subject: make PHYS_OFFSET determined at run time (unfinished)
-In-Reply-To: <20100120023255.GV10014@trinity.fluff.org>
-References: <20100119083803.GA17904@pengutronix.de>
-	<4B561581.6060400@bluewatersys.com>
-	<20100120005505.GD26562@trinity.fluff.org>
-	<1263954112.3207.73.camel@linux-1lbu>
-	<20100120023255.GV10014@trinity.fluff.org>
-Message-ID: <1263998346.3207.83.camel@linux-1lbu>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 20 Jan 2010 14:41:40 +0000
+Subject: [PATCH/RFC v1 0/2] Human readable performance event
+	description in sysfs
+In-Reply-To: <1263996080.4283.1064.camel@laptop>
+References: <1263978706-15499-1-git-send-email-t.fujak@samsung.com>
+	<1263978999.4283.823.camel@laptop> <op.u6tslipz7p4s8u@pikus>
+	<20100120133145.GE4089@wear.picochip.com>
+	<1263994779.4283.1057.camel@laptop>
+	<20100120135553.GA22897@n2100.arm.linux.org.uk>
+	<1263996080.4283.1064.camel@laptop>
+Message-ID: <20100120144140.GB22897@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-01-20 at 02:32 +0000, Ben Dooks wrote:
-> On Tue, Jan 19, 2010 at 08:21:52PM -0600, Steve Chen wrote:
-> > On Wed, 2010-01-20 at 00:55 +0000, Ben Dooks wrote:
-> > > On Wed, Jan 20, 2010 at 09:26:41AM +1300, Ryan Mallon wrote:
-> > > > Uwe Kleine-K?nig wrote:
-> > > > > Hello,
-> > > > > 
-> > > > > I'm looking into making PHYS_OFFSET determined at run time.  I saw a
-> > > > > patch for it that already made it a few times on the list[1].
-> > > > > 
-> > > > > I'm not yet done, but first want to announce that I look into that to
-> > > > > prevent duplicate work---so if you intended to do the same let's look
-> > > > > together---and to post some clean up patches that are the result up to
-> > > > > now of my digging in the boot code.
-> > > > > 
-> > > > > I will send now three patches in reply to this mail, and later hopefully
-> > > > > more.
-> > > > > 
-> > > > > Best regards
-> > > > > Uwe
-> > > > > 
-> > > > > [1] e.g. http://thread.gmane.org/gmane.linux.ports.arm.kernel/53793/
-> > > > > 
-> > > > 
-> > > > One of the problems that got brought up previously was the 'make uImage'
-> > > > can end up generating unbootable images with runtime PHYS_OFFSET. The
-> > > > older format uImage's (pre 1.3.3) encode a load address (zrealaddr), so
-> > > > uImage's need to have a fixed load address encoded.
-> > > > 
-> > > > As I stated in the previous thread, this is _not_ a kernel issue,
-> > > > however it is no good having a kernel which contains support for two
-> > > > boards which boot from different address and then generating a uImage
-> > > > which can only boot on one of them without warning the user about this
-> > > > problem. Otherwise you are going to start getting "I did make uImage and
-> > > > my board won't boot" problems.
-> > > > 
-> > > > There are a few solutions to this problem:
-> > > > 1) Drop uImage make support and require users generate them manually.
-> > > > 2) Have a uImage offset config option to allow uImage users to specify
-> > > > what they want the load address to be. See:
-> > > > http://thread.gmane.org/gmane.linux.ports.arm.kernel/53151/focus=53230
-> > > > 3) Print an error if "make uImage" is run for a kernel which has more
-> > > > than one boot address (possible?)
-> > > > 4) Use FIT U-Boot images. This is supported from U-Boot 1.3.3 onwards,
-> > > > however a number of people are still using older U-Boots.
-> > > 
-> > > Or of course, boot zImages. I belive u-boot has support for zImage.
+On Wed, Jan 20, 2010 at 03:01:20PM +0100, Peter Zijlstra wrote:
+> On Wed, 2010-01-20 at 13:55 +0000, Russell King - ARM Linux wrote:
 > > 
-> > Is there a clean way to pass kernel parameters and machine type from
-> > u-boot to zImage?  Last time I boot zImage in u-boot, some ugly hack was
-> > needed in ARM startup code.  Just wondering if there is a better way.
+> > Unfortunately, it isn't.  CPU identification has become a fairly murky
+> > business on ARM that the information exported from /proc/cpuinfo can
+> > no longer precisely identify the CPU itself.
+> > 
+> > For example, we just treat Cortex A8 and A9 as "ARMv7" because from the
+> > kernel's point of view, they're the same. 
 > 
-> u-boot should be doing the right thing, I thought uImage was simply a
-> zImage wrapped in the right uboot descriptors to tell uboot it was a
-> kernel and where to load it.
-> 
-> Certianly uboots i've used can boto zImage just fine.
+> Would it make sense to extend arm's cpuinfo to include enough
+> information so that userspace can indeed do this?
 
-I'm also able to boot zImage under u-boot.  However, I had to set r1
-manually, and I don't know how to pass kernel parameters (stuff passed
-into kernel uImage via bootargs) to zImage.  Any tips will be greatly
-appreciated.
+The idea that "I'm running on a Cortex A9" is no longer provided by the
+new CPU ID scheme.  Instead, what's now provided is a set of registers
+which describe various individual features of the CPU:
 
-Steve
+- ThumbEE ISA level, Jazelle ISA level, Thumb ISA level, ARM ISA level.
+- Programmer model (not much here that userspace would be interested in)
+- Debug model (memory mapped/co-processor, v6 debug architecture, v7 debug
+  architecture.)
+- Four 32-bit registers describing the memory model.
+
+Note that pre-ARMv6k does not provide this information.  Plus, the
+interpretation of these registers change between ARMv6k and ARMv7 -
+and I wouldn't be surprised if the interpretation changes in the
+future - just like the 'cache type' register completely changed format
+on ARMv7.
+
+> It seems to me userspace might care about the exact platform they're
+> running on.
+
+It may wanted to care at one time, but as time goes on, knowing what
+the high-level chip is will be come irrelevent, and is actually the
+wrong question.
+
+The real questions that userspace needs to ask are the specific ones,
+such as "what ARM ISA level is supported?  what Thumb ISA level is
+supported?  what debug model is implemented?"
+
+Given that history has shown that identification schemes on ARM change
+in extremely annoying ways, I don't think decoding these registers to
+some kind of textual representation for /proc/cpuinfo is the right
+approach.  It might instead make more sense to just export the entire
+set of CPU ID registers to userspace, and let userspace grapple with
+the complexities of decoding the information it wants from them.
