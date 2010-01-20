@@ -1,54 +1,40 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 20 Jan 2010 11:59:24 +0100
-Subject: [PATCH 1/2] s3cmci: Initialize default platform data no_wprotect
-	and no_detect with 1
-In-Reply-To: <4B56DE8A.70209@ru.mvista.com>
-References: <1263975361-29376-1-git-send-email-lars@metafoo.de>
-	<4B56DE8A.70209@ru.mvista.com>
-Message-ID: <4B56E20C.3020207@metafoo.de>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Wed, 20 Jan 2010 12:12:53 +0100
+Subject: [PATCH] mx3fb: some debug and initialisation fixes.
+In-Reply-To: <Pine.LNX.4.64.0912201744490.14323@axis700.grange>
+References: <1261152262.3356.69.camel@climbing-alby>
+	<Pine.LNX.4.64.0912201744490.14323@axis700.grange>
+Message-ID: <1263985973.3083.28.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+On dom, 2009-12-20 at 17:45 +0100, Guennadi Liakhovetski wrote:
+> On Fri, 18 Dec 2009, Alberto Panizzo wrote:
+> 
+> > Fix the kernel oops when dev_dbg is called with mx3_fbi->txd == NULL
+> > 
+> > Fix the late initialisation of mx3fb->backlight_level.
+> > If not, in the chain of function started by init_fb_chan(), in
+> __blank() call 
+> > sdc_set_brightness(mx3fb, mx3fb->backlight_level) that will shut
+> down
+> > the CONTRAST PWM output. 
+> > 
+> > 
+> > Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
+> 
+> Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> 
+> Thanks
+> Guennadi 
 
-Sergei Shtylyov wrote:
-> Hello.
->
-> Lars-Peter Clausen wrote:
->
->> If no platform_data was givin to the device it's going to use it's
->> default
->> platform data struct which has all fields initialized to zero.
->> As a result the driver is going to try to request gpio0 both as
->> write protect
->> and card detect pin. Which of course will fail and makes the driver
->> unusable
->>
->> Previously to the introduction of no_wprotect and no_detect the
->> behavior was
->> to assume that if no platform data was given there is no write
->> protect or card
->> detect pin.
->> This patch restores that behavior.
->>  
->
->   The very idea of the default platform data seems dubious...
->
-> WBR, Sergei
-Hi
+Thanks Guennadi for Acking.
+Forgive me, but I not understand well the correct path for pulling this 
+patch to linus tree.
+I thought that Sascha was the right maintainer so I cc-ed him. But
+I am wrong right?
 
-Could you please elaborate a bit more what makes you think so? Cause
-with my current knowledge I tend to disagree, but I've you'd given an
-argument it might had convinced me otherwise. Or if not, I could have
-given you a reason why I tend to disagree. :)
+Please can you point me to the right mailing list or maintainer?
 
-- - Lars
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.9 (GNU/Linux)
-Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org
-
-iEYEARECAAYFAktW4gsACgkQBX4mSR26RiM1+QCeIDuvTZUL3lkvZ0eX6i98FRR/
-gBsAn3L8Lw1cceaqeN+Fst3l965X01Vh
-=x4MP
------END PGP SIGNATURE-----
+Thanks
+Alberto!
