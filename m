@@ -1,35 +1,39 @@
-From: jamie.iles@picochip.com (Jamie Iles)
-Date: Wed, 20 Jan 2010 15:03:03 +0000
-Subject: [PATCH/RFC v1 0/2] Human readable performance event
-	description in sysfs
-In-Reply-To: <20100120144140.GB22897@n2100.arm.linux.org.uk>
-References: <1263978706-15499-1-git-send-email-t.fujak@samsung.com>
-	<1263978999.4283.823.camel@laptop> <op.u6tslipz7p4s8u@pikus>
-	<20100120133145.GE4089@wear.picochip.com>
-	<1263994779.4283.1057.camel@laptop>
-	<20100120135553.GA22897@n2100.arm.linux.org.uk>
-	<1263996080.4283.1064.camel@laptop>
-	<20100120144140.GB22897@n2100.arm.linux.org.uk>
-Message-ID: <20100120150303.GG4089@wear.picochip.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 20 Jan 2010 16:30:27 +0100
+Subject: git pre-commit hook running checkpatch.pl
+In-Reply-To: <20100120100155.GA851@sirena.org.uk>
+References: <20100120020202.GE26562@trinity.fluff.org>
+	<20100120100155.GA851@sirena.org.uk>
+Message-ID: <20100120153027.GB20271@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 20, 2010 at 02:41:40PM +0000, Russell King - ARM Linux wrote:
-> Given that history has shown that identification schemes on ARM change
-> in extremely annoying ways, I don't think decoding these registers to
-> some kind of textual representation for /proc/cpuinfo is the right
-> approach.  It might instead make more sense to just export the entire
-> set of CPU ID registers to userspace, and let userspace grapple with
-> the complexities of decoding the information it wants from them.
-Yes, this would probably be the best generic solution, but in the specific
-case of ARM perfevents, the kernel code already has to decode some of the CPU
-ID registers to work out what set of events to use. Why make userspace do all
-of this decoding again? The x86 code sets up the x86_pmu depending on CPU type
-so this is doing a similar thing (although it is easier for x86).
+On Wed, Jan 20, 2010 at 10:01:55AM +0000, Mark Brown wrote:
+> On Wed, Jan 20, 2010 at 02:02:02AM +0000, Ben Dooks wrote:
+> 
+> > I've written a git pre-commit[1] hook which stops any commits happening if
+> > checkpatch.pl reports problems with the patch. Any comments?
+> 
+> > [1] http://www.fluff.org/ben/linux/githooks/pre-commit
+> 
+> Checkpatch does sometimes generate the occasional false positive which
+> can be annoying when they trigger.  It can also be a problem when doing
+> bugfixes IME - if an existing file has lots of checkpatch issues then a
+> fix which maintains the same coding style as the surrounding code can
+> trigger checkpatch issues which would if fixed make the code not fit in
+> with the rest of the file.  Obviously it'd be desirable to fix the file
+> but that's a bit unreasonable for people submitting bug fixes,
+> especially when pushing fixes to Linus and stable.
+> 
+> That said, monitoring for checkpatch issues is useful.
+Maybe only print the warnings instead of stopping a commit?  I'd not
+like me stopping here not only for the reasons pointed out by Mark and
+Russell, but also as I frequently do wip-commits that not necessarily
+are checkpatch-clean.
 
-Having perf do all of this decoding for all of the supported CPU types when
-the kernel has already done it once and maintaining 2 sets of event lists
-seems a bit fiddly compared to simply exporting the supported events from the
-kernel...
+Best regards
+Uwe
 
-Jamie
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
