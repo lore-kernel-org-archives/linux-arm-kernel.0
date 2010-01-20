@@ -1,36 +1,33 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 20 Jan 2010 16:33:08 -0500
-Subject: Question: locomo_{read/write}l macros
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE1909020E8DFF@mi8nycmail19.Mi8.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 20 Jan 2010 13:23:43 -0800
+Subject: [PATCH 4/4] OMAP: dma_chan[lch_head].flag & OMAP_DMA_ACTIVE tested
+	twice in omap_dma_unlink_lch()
+In-Reply-To: <20100120212248.25335.55761.stgit@baageli.muru.com>
+References: <20100120212248.25335.55761.stgit@baageli.muru.com>
+Message-ID: <20100120212343.25335.73402.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+From: Roel Kluin <roel.kluin@gmail.com>
 
-Is there a reason why the locomo stuff is using custom
-macros for {read/write}l access?
+The same flag and bits were tested twice.
 
-In arch/arm/include/asm/hardware/locomo.h:
+Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/plat-omap/dma.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-#define locomo_writel(val,addr)	({ *(volatile u16 *)(addr) = (val); })
-#define locomo_readl(addr)	(*(volatile u16 *)(addr))
-
-It appears that these are just non-typesafe versions of the
-__raw_{read/write}w macros in arch/arm/include/asm/io.h:
-
-#define __raw_writew(v,a)	(__chk_io_ptr(a), *(volatile unsigned short __force *)(a) = (v))
-#define __raw_readw(a)		(__chk_io_ptr(a), *(volatile unsigned short __force *)(a))
-
-Is there any reason not to change them all (other than
-having to then fix all the callers to be typesafe)?
-
-It appears the only users are in:
-
-arch/arm/common/locomo.c
-arch/arm/include/asm/hardware/locomo.h
-drivers/input/keyboard/locomokbd.c
-drivers/leds/leds-locomo.c
-drivers/video/backlight/locomolcd.c
-
-Thanks,
-Hartley
+diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+index 09d82b3..728c642 100644
+--- a/arch/arm/plat-omap/dma.c
++++ b/arch/arm/plat-omap/dma.c
+@@ -1183,7 +1183,7 @@ void omap_dma_unlink_lch(int lch_head, int lch_queue)
+ 	}
+ 
+ 	if ((dma_chan[lch_head].flags & OMAP_DMA_ACTIVE) ||
+-	    (dma_chan[lch_head].flags & OMAP_DMA_ACTIVE)) {
++	    (dma_chan[lch_queue].flags & OMAP_DMA_ACTIVE)) {
+ 		printk(KERN_ERR "omap_dma: You need to stop the DMA channels "
+ 		       "before unlinking\n");
+ 		dump_stack();
