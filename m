@@ -1,23 +1,37 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 20 Jan 2010 11:54:14 +0000
-Subject: [PATCH] mx3fb: some debug and initialisation fixes.
-In-Reply-To: <1263985973.3083.28.camel@realization>
-References: <1261152262.3356.69.camel@climbing-alby>
-	<Pine.LNX.4.64.0912201744490.14323@axis700.grange>
-	<1263985973.3083.28.camel@realization>
-Message-ID: <20100120115413.GA7725@sirena.org.uk>
+Date: Wed, 20 Jan 2010 12:05:55 +0000
+Subject: [PATCH] S3C64XX: Fix dev-audio build
+Message-ID: <1263989155-7075-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 20, 2010 at 12:12:53PM +0100, Alberto Panizzo wrote:
+As reported when the patch was posted commit 71269364 ("ARM: S3C64XX:
+Add I2S resources in platform code") uses pin names for the IISv4
+data output pins which are not present in mainline, causing dev-audio
+to fail to build. Fix this by using the defines which are actually
+present in the kernel source.
 
-> Thanks Guennadi for Acking.
-> Forgive me, but I not understand well the correct path for pulling this 
-> patch to linus tree.
-> I thought that Sascha was the right maintainer so I cc-ed him. But
-> I am wrong right?
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/plat-s3c64xx/dev-audio.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-> Please can you point me to the right mailing list or maintainer?
-
-scripts/get_maintainer.pl should be able to tell you - the general
-framebuffer subsystem path is via akpm at the moment.
+diff --git a/arch/arm/plat-s3c64xx/dev-audio.c b/arch/arm/plat-s3c64xx/dev-audio.c
+index cdba3a7..5b89344 100644
+--- a/arch/arm/plat-s3c64xx/dev-audio.c
++++ b/arch/arm/plat-s3c64xx/dev-audio.c
+@@ -51,9 +51,9 @@ static int s3c64xx_i2sv3_cfg_gpio(struct platform_device *pdev)
+ 
+ static int s3c64xx_i2sv4_cfg_gpio(struct platform_device *pdev)
+ {
+-	s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C64XX_GPC4_I2S0_V40_DO);
+-	s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C64XX_GPC5_I2S1_V40_DO);
+-	s3c_gpio_cfgpin(S3C64XX_GPC(7), S3C64XX_GPC7_I2S2_V40_DO);
++	s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C64XX_GPC4_I2S_V40_DO0);
++	s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C64XX_GPC5_I2S_V40_DO1);
++	s3c_gpio_cfgpin(S3C64XX_GPC(7), S3C64XX_GPC7_I2S_V40_DO2);
+ 	s3c_gpio_cfgpin(S3C64XX_GPH(6), S3C64XX_GPH6_I2S_V40_BCLK);
+ 	s3c_gpio_cfgpin(S3C64XX_GPH(7), S3C64XX_GPH7_I2S_V40_CDCLK);
+ 	s3c_gpio_cfgpin(S3C64XX_GPH(8), S3C64XX_GPH8_I2S_V40_LRCLK);
+-- 
+1.6.6
