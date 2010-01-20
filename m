@@ -1,67 +1,46 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 20 Jan 2010 13:06:05 +0000
-Subject: [PATCH 2/2] SAMSUNG: Staticise gpiolib implementation functions
-In-Reply-To: <1263992765-28479-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1263992765-28479-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <1263992765-28479-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: jamie.iles@picochip.com (Jamie Iles)
+Date: Wed, 20 Jan 2010 13:31:45 +0000
+Subject: [PATCH/RFC v1 0/2] Human readable performance event description
+	in sysfs
+In-Reply-To: <op.u6tslipz7p4s8u@pikus>
+References: <1263978706-15499-1-git-send-email-t.fujak@samsung.com>
+	<1263978999.4283.823.camel@laptop> <op.u6tslipz7p4s8u@pikus>
+Message-ID: <20100120133145.GE4089@wear.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-They are not exported, they are referenced via vtables.
+On Wed, Jan 20, 2010 at 10:57:08AM +0100, Micha? Nazarewicz wrote:
+>>> The following patches provide a sysfs entry with hardware event human
+>>> readable description in the form of "0x%llx\t%lld-%lld\t%s\t%s" %
+>>> (event_value, minval, maxval, name, description) and means to populate
+>>> the file.
+>>>
+>>> The intended use is twofold: for users to read the list directly and
+>>> for tools (like perf).
+>
+> On Wed, 20 Jan 2010 10:16:39 +0100, Peter Zijlstra <peterz@infradead.org> wrote:
+>> Why do this in kernel space? Listing available events seems like
+>> something we can do from userspace just fine.
+>
+> IMO kernel knows better what hardware it's running on and user space
+> should not care and if this list were to be kept in user space it
+> would have to detect the processor it's running on and act accordingly.
+>
+> Also, keeping the list in user space could lead to different software
+> maintaining separate lists which would get out of sync.  I think it's
+> easier to update a single list in kernel then wait till all the
+> software packages update theirs.
+>
+> This also means that different tools would use different names and
+> descriptions for the events which would only increase confusion.
+Personally I think this is a good idea. At the moment 'perf list' gives lots
+of events that the system isn't capable of counting. Admittedly it's fairly
+easy to see if they are supported but it would be nice if the list reflected
+the countable events. perf already does this for the tracing events so it
+would be nice if it did the same for the hardware events. I guess the same
+hierarchy would be nice too.
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/plat-samsung/gpiolib.c |   16 +++++++++-------
- 1 files changed, 9 insertions(+), 7 deletions(-)
+The main problem I can envisage is that different CPUs could use slightly
+different names for the same event.
 
-diff --git a/arch/arm/plat-samsung/gpiolib.c b/arch/arm/plat-samsung/gpiolib.c
-index 3419b67..8a8ba8b 100644
---- a/arch/arm/plat-samsung/gpiolib.c
-+++ b/arch/arm/plat-samsung/gpiolib.c
-@@ -44,7 +44,8 @@
-  * the output.
- */
- 
--int samsung_gpiolib_4bit_input(struct gpio_chip *chip, unsigned int offset)
-+static int samsung_gpiolib_4bit_input(struct gpio_chip *chip,
-+				      unsigned int offset)
- {
- 	struct s3c_gpio_chip *ourchip = to_s3c_gpio(chip);
- 	void __iomem *base = ourchip->base;
-@@ -59,8 +60,8 @@ int samsung_gpiolib_4bit_input(struct gpio_chip *chip, unsigned int offset)
- 	return 0;
- }
- 
--int samsung_gpiolib_4bit_output(struct gpio_chip *chip,
--				unsigned int offset, int value)
-+static int samsung_gpiolib_4bit_output(struct gpio_chip *chip,
-+				       unsigned int offset, int value)
- {
- 	struct s3c_gpio_chip *ourchip = to_s3c_gpio(chip);
- 	void __iomem *base = ourchip->base;
-@@ -106,9 +107,10 @@ int samsung_gpiolib_4bit_output(struct gpio_chip *chip,
-  * To allow us to use the s3c_gpiolib_get and s3c_gpiolib_set routines we
-  * store the 'base + 0x4' address so that these routines see the data
-  * register at ourchip->base + 0x04.
--*/
-+ */
- 
--int samsung_gpiolib_4bit2_input(struct gpio_chip *chip, unsigned int offset)
-+static int samsung_gpiolib_4bit2_input(struct gpio_chip *chip,
-+				       unsigned int offset)
- {
- 	struct s3c_gpio_chip *ourchip = to_s3c_gpio(chip);
- 	void __iomem *base = ourchip->base;
-@@ -129,8 +131,8 @@ int samsung_gpiolib_4bit2_input(struct gpio_chip *chip, unsigned int offset)
- 	return 0;
- }
- 
--int samsung_gpiolib_4bit2_output(struct gpio_chip *chip,
--				 unsigned int offset, int value)
-+static int samsung_gpiolib_4bit2_output(struct gpio_chip *chip,
-+					unsigned int offset, int value)
- {
- 	struct s3c_gpio_chip *ourchip = to_s3c_gpio(chip);
- 	void __iomem *base = ourchip->base;
--- 
-1.6.6
+Jamie
