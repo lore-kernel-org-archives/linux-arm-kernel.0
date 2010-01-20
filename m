@@ -1,46 +1,149 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 Jan 2010 13:23:34 -0800
-Subject: [PATCH 1/4] omap: Fix cmdline muxing
+Date: Wed, 20 Jan 2010 13:23:41 -0800
+Subject: [PATCH 3/4] omap3: Fix cpu detection
 In-Reply-To: <20100120212248.25335.55761.stgit@baageli.muru.com>
 References: <20100120212248.25335.55761.stgit@baageli.muru.com>
-Message-ID: <20100120212334.25335.50876.stgit@baageli.muru.com>
+Message-ID: <20100120212341.25335.46975.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks like cmdline muxing got broken at some point when we
-decided to limit muxing to __init code. Currently omap_mux_entry
-list is not yet initialized when we try to initialize cmdline
-muxing.
+We need to set the omap_chip.oc carefully for the clocks to work.
 
-Fix this by calling omap_mux_init_list() before calling
-omap_mux_set_cmdline_signals().
+To fix this, set the omap_chip.oc in omap3_check_features() based
+on the CONTROL_IDCODE and silicon revision registers.
 
-Reported-by: Philip Balister <philip@balister.org>
-Tested-by: Philip Balister <philip@balister.org>
+Also add handling for 34xx es3.1.2 as es3.1 for now.
+
+Fixes booting on at least overo board.
+
+Based on an earlier patch by Paul Walmsley <paul@pwsan.com>.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/mux.c |    7 +++++--
- 1 files changed, 5 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/id.c              |   41 +++++++++++++++++++--------------
+ arch/arm/plat-omap/include/plat/cpu.h |    1 +
+ 2 files changed, 24 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
-index 459ef23..40ea9fd 100644
---- a/arch/arm/mach-omap2/mux.c
-+++ b/arch/arm/mach-omap2/mux.c
-@@ -998,12 +998,15 @@ int __init omap_mux_init(u32 mux_pbase, u32 mux_size,
- 		omap_mux_package_fixup(package_subset, superset);
- 	if (package_balls)
- 		omap_mux_package_init_balls(package_balls, superset);
--	omap_mux_set_cmdline_signals();
--	omap_mux_set_board_signals(board_mux);
- #endif
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index a091b53..3d65c50 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -188,6 +188,8 @@ void __init omap3_check_revision(void)
+ 	u16 hawkeye;
+ 	u8 rev;
  
- 	omap_mux_init_list(superset);
- 
-+#ifdef CONFIG_OMAP_MUX
-+	omap_mux_set_cmdline_signals();
-+	omap_mux_set_board_signals(board_mux);
-+#endif
++	omap_chip.oc = CHIP_IS_OMAP3430;
 +
- 	return 0;
+ 	/*
+ 	 * We cannot access revision registers on ES1.0.
+ 	 * If the processor type is Cortex-A8 and the revision is 0x0
+@@ -196,6 +198,7 @@ void __init omap3_check_revision(void)
+ 	cpuid = read_cpuid(CPUID_ID);
+ 	if ((((cpuid >> 4) & 0xfff) == 0xc08) && ((cpuid & 0xf) == 0x0)) {
+ 		omap_revision = OMAP3430_REV_ES1_0;
++		omap_chip.oc |= CHIP_IS_OMAP3430ES1;
+ 		return;
+ 	}
+ 
+@@ -216,18 +219,28 @@ void __init omap3_check_revision(void)
+ 		case 0: /* Take care of early samples */
+ 		case 1:
+ 			omap_revision = OMAP3430_REV_ES2_0;
++			omap_chip.oc |= CHIP_IS_OMAP3430ES2;
+ 			break;
+ 		case 2:
+ 			omap_revision = OMAP3430_REV_ES2_1;
++			omap_chip.oc |= CHIP_IS_OMAP3430ES2;
+ 			break;
+ 		case 3:
+ 			omap_revision = OMAP3430_REV_ES3_0;
++			omap_chip.oc |= CHIP_IS_OMAP3430ES3_0;
+ 			break;
+ 		case 4:
++			omap_revision = OMAP3430_REV_ES3_1;
++			omap_chip.oc |= CHIP_IS_OMAP3430ES3_1;
++			break;
++		case 7:
+ 		/* FALLTHROUGH */
+ 		default:
+ 			/* Use the latest known revision as default */
+-			omap_revision = OMAP3430_REV_ES3_1;
++			omap_revision = OMAP3430_REV_ES3_1_2;
++
++			/* REVISIT: Add CHIP_IS_OMAP3430ES3_1_2? */
++			omap_chip.oc |= CHIP_IS_OMAP3430ES3_1;
+ 		}
+ 		break;
+ 	case 0xb868:
+@@ -235,14 +248,18 @@ void __init omap3_check_revision(void)
+ 		 *
+ 		 * Set the device to be OMAP3505 here. Actual device
+ 		 * is identified later based on the features.
++		 *
++		 * REVISIT: AM3505/AM3517 should have their own CHIP_IS
+ 		 */
+ 		omap_revision = OMAP3505_REV(rev);
++		omap_chip.oc |= CHIP_IS_OMAP3430ES3_1;
+ 		break;
+ 	case 0xb891:
+ 	/* FALLTHROUGH */
+ 	default:
+ 		/* Unknown default to latest silicon rev as default*/
+ 		omap_revision = OMAP3630_REV_ES1_0;
++		omap_chip.oc |= CHIP_IS_OMAP3630ES1;
+ 	}
  }
+ 
+@@ -360,6 +377,7 @@ void __init omap2_check_revision(void)
+ 		omap3_check_revision();
+ 		omap3_check_features();
+ 		omap3_cpuinfo();
++		return;
+ 	} else if (cpu_is_omap44xx()) {
+ 		omap4_check_revision();
+ 		return;
+@@ -374,27 +392,14 @@ void __init omap2_check_revision(void)
+ 	if (cpu_is_omap243x()) {
+ 		/* Currently only supports 2430ES2.1 and 2430-all */
+ 		omap_chip.oc |= CHIP_IS_OMAP2430;
++		return;
+ 	} else if (cpu_is_omap242x()) {
+ 		/* Currently only supports 2420ES2.1.1 and 2420-all */
+ 		omap_chip.oc |= CHIP_IS_OMAP2420;
+-	} else if (cpu_is_omap3505() || cpu_is_omap3517()) {
+-		omap_chip.oc = CHIP_IS_OMAP3430 | CHIP_IS_OMAP3430ES3_1;
+-	} else if (cpu_is_omap343x()) {
+-		omap_chip.oc = CHIP_IS_OMAP3430;
+-		if (omap_rev() == OMAP3430_REV_ES1_0)
+-			omap_chip.oc |= CHIP_IS_OMAP3430ES1;
+-		else if (omap_rev() >= OMAP3430_REV_ES2_0 &&
+-			 omap_rev() <= OMAP3430_REV_ES2_1)
+-			omap_chip.oc |= CHIP_IS_OMAP3430ES2;
+-		else if (omap_rev() == OMAP3430_REV_ES3_0)
+-			omap_chip.oc |= CHIP_IS_OMAP3430ES3_0;
+-		else if (omap_rev() == OMAP3430_REV_ES3_1)
+-			omap_chip.oc |= CHIP_IS_OMAP3430ES3_1;
+-		else if (omap_rev() == OMAP3630_REV_ES1_0)
+-			omap_chip.oc |= CHIP_IS_OMAP3630ES1;
+-	} else {
+-		pr_err("Uninitialized omap_chip, please fix!\n");
++		return;
+ 	}
++
++	pr_err("Uninitialized omap_chip, please fix!\n");
+ }
+ 
+ /*
+diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
+index 9a028bd..a162f58 100644
+--- a/arch/arm/plat-omap/include/plat/cpu.h
++++ b/arch/arm/plat-omap/include/plat/cpu.h
+@@ -434,6 +434,7 @@ IS_OMAP_TYPE(3517, 0x3517)
+ #define OMAP3430_REV_ES2_1	0x34302034
+ #define OMAP3430_REV_ES3_0	0x34303034
+ #define OMAP3430_REV_ES3_1	0x34304034
++#define OMAP3430_REV_ES3_1_2	0x34305034
+ 
+ #define OMAP3630_REV_ES1_0	0x36300034
  
