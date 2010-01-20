@@ -1,28 +1,96 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Wed, 20 Jan 2010 15:01:20 +0100
-Subject: [PATCH/RFC v1 0/2] Human readable performance event
-	description in sysfs
-In-Reply-To: <20100120135553.GA22897@n2100.arm.linux.org.uk>
-References: <1263978706-15499-1-git-send-email-t.fujak@samsung.com>
-	<1263978999.4283.823.camel@laptop> <op.u6tslipz7p4s8u@pikus>
-	<20100120133145.GE4089@wear.picochip.com>
-	<1263994779.4283.1057.camel@laptop>
-	<20100120135553.GA22897@n2100.arm.linux.org.uk>
-Message-ID: <1263996080.4283.1064.camel@laptop>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 20 Jan 2010 19:39:06 +0530
+Subject: [PATCH] ARM: L2 : Add maintainace by line helper functions
+Message-ID: <1263996546-18629-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-01-20 at 13:55 +0000, Russell King - ARM Linux wrote:
-> 
-> Unfortunately, it isn't.  CPU identification has become a fairly murky
-> business on ARM that the information exported from /proc/cpuinfo can
-> no longer precisely identify the CPU itself.
-> 
-> For example, we just treat Cortex A8 and A9 as "ARMv7" because from the
-> kernel's point of view, they're the same. 
+This patch adds the cache maintainance by line helper functions.
 
-Would it make sense to extend arm's cpuinfo to include enough
-information so that userspace can indeed do this?
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/mm/cache-l2x0.c |   36 ++++++++++++++++++++++++++----------
+ 1 files changed, 26 insertions(+), 10 deletions(-)
 
-It seems to me userspace might care about the exact platform they're
-running on.
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index cb8fc65..1a14d18 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -42,6 +42,27 @@ static inline void cache_sync(void)
+ 	cache_wait(base + L2X0_CACHE_SYNC, 1);
+ }
+ 
++static inline void l2x0_clean_line(unsigned long addr)
++{
++	void __iomem *base = l2x0_base;
++	cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
++	writel(addr, base + L2X0_CLEAN_LINE_PA);
++}
++
++static inline void l2x0_inv_line(unsigned long addr)
++{
++	void __iomem *base = l2x0_base;
++	cache_wait(base + L2X0_INV_LINE_PA, 1);
++	writel(addr, base + L2X0_INV_LINE_PA);
++}
++
++static inline void l2x0_flush_line(unsigned long addr)
++{
++	void __iomem *base = l2x0_base;
++	cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
++	writel(addr, base + L2X0_CLEAN_INV_LINE_PA);
++}
++
+ static inline void l2x0_inv_all(void)
+ {
+ 	unsigned long flags;
+@@ -62,23 +83,20 @@ static void l2x0_inv_range(unsigned long start, unsigned long end)
+ 	spin_lock_irqsave(&l2x0_lock, flags);
+ 	if (start & (CACHE_LINE_SIZE - 1)) {
+ 		start &= ~(CACHE_LINE_SIZE - 1);
+-		cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
+-		writel(start, base + L2X0_CLEAN_INV_LINE_PA);
++		l2x0_flush_line(start);
+ 		start += CACHE_LINE_SIZE;
+ 	}
+ 
+ 	if (end & (CACHE_LINE_SIZE - 1)) {
+ 		end &= ~(CACHE_LINE_SIZE - 1);
+-		cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
+-		writel(end, base + L2X0_CLEAN_INV_LINE_PA);
++		l2x0_flush_line(end);
+ 	}
+ 
+ 	while (start < end) {
+ 		unsigned long blk_end = start + min(end - start, 4096UL);
+ 
+ 		while (start < blk_end) {
+-			cache_wait(base + L2X0_INV_LINE_PA, 1);
+-			writel(start, base + L2X0_INV_LINE_PA);
++			l2x0_inv_line(start);
+ 			start += CACHE_LINE_SIZE;
+ 		}
+ 
+@@ -103,8 +121,7 @@ static void l2x0_clean_range(unsigned long start, unsigned long end)
+ 		unsigned long blk_end = start + min(end - start, 4096UL);
+ 
+ 		while (start < blk_end) {
+-			cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
+-			writel(start, base + L2X0_CLEAN_LINE_PA);
++			l2x0_clean_line(start);
+ 			start += CACHE_LINE_SIZE;
+ 		}
+ 
+@@ -129,8 +146,7 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
+ 		unsigned long blk_end = start + min(end - start, 4096UL);
+ 
+ 		while (start < blk_end) {
+-			cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
+-			writel(start, base + L2X0_CLEAN_INV_LINE_PA);
++			l2x0_flush_line(start);
+ 			start += CACHE_LINE_SIZE;
+ 		}
+ 
+-- 
+1.6.0.4
