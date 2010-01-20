@@ -1,39 +1,71 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 20 Jan 2010 16:30:27 +0100
-Subject: git pre-commit hook running checkpatch.pl
-In-Reply-To: <20100120100155.GA851@sirena.org.uk>
-References: <20100120020202.GE26562@trinity.fluff.org>
-	<20100120100155.GA851@sirena.org.uk>
-Message-ID: <20100120153027.GB20271@pengutronix.de>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Wed, 20 Jan 2010 15:34:11 +0000
+Subject: too much memory for node
+Message-ID: <20100120153411.GG26562@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 20, 2010 at 10:01:55AM +0000, Mark Brown wrote:
-> On Wed, Jan 20, 2010 at 02:02:02AM +0000, Ben Dooks wrote:
-> 
-> > I've written a git pre-commit[1] hook which stops any commits happening if
-> > checkpatch.pl reports problems with the patch. Any comments?
-> 
-> > [1] http://www.fluff.org/ben/linux/githooks/pre-commit
-> 
-> Checkpatch does sometimes generate the occasional false positive which
-> can be annoying when they trigger.  It can also be a problem when doing
-> bugfixes IME - if an existing file has lots of checkpatch issues then a
-> fix which maintains the same coding style as the surrounding code can
-> trigger checkpatch issues which would if fixed make the code not fit in
-> with the rest of the file.  Obviously it'd be desirable to fix the file
-> but that's a bit unreasonable for people submitting bug fixes,
-> especially when pushing fixes to Linus and stable.
-> 
-> That said, monitoring for checkpatch issues is useful.
-Maybe only print the warnings instead of stopping a commit?  I'd not
-like me stopping here not only for the reasons pointed out by Mark and
-Russell, but also as I frequently do wip-commits that not necessarily
-are checkpatch-clean.
+I've been looking at support for a new machine type where the
+current system is using DISCONTIGMEM as the 1G memory map has
+4x256M RAM ranges which may not all be filled.
 
-Best regards
-Uwe
+After removing a hack in the machine support file which fills in
+its own memory table thus obliteratign the bootloader supplied ATAG_MEM
+I found a problem. The board has the full complement of memory and is
+being passed a single ATAG_MEM from the bootloader for all 1G.
+
+This causes arm_add_memory to add a membank that has more memory
+than the bank.node it is describing and thus the memory setup code
+is then failing.
+
+My current hack to get this working is to do a check for the end
+of memory being in the same node as the start, as so:
+
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index c6c57b6..a5f7b21 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -410,6 +410,21 @@ static int __init arm_add_memory(unsigned long start, unsigned long size)
+ 		return -EINVAL;
+ 
+ 	meminfo.nr_banks++;
++
++	if (PHYS_TO_NID(start + size) != bank->node) {
++		/* more memory than a single node can handle */
++
++		unsigned long next = (1024*1024);
++
++		while (PHYS_TO_NID(start + next) == bank->node) 
++			next += (1024*1024); 
++
++		bank->size = next;
++		printk(KERN_INFO "adding new bank 0x%08x size 0x%08x\n",
++				start + next, size - next);
++		arm_add_memory(start + next, size - next);
++	}
++
+ 	return 0;
+ }
+ 
+Note, this code uses a search as I couldn't find a good way of calculating
+how mucch space was left in a node given a starting address.
+
+Another option is to do similar to sanity_check_meminfo() in the mmu
+setup code (we would still need some form of nodemask or similar from
+the memory.h). Is NODE_MEM_SIZE_MASK usable if !CONIFG_DISCONTIGMEM
+to allow us to avoid the search and still have compilable code?
+
+A third option is to add some code to the specific cpu type to sanitise
+the memory info in the machine fixups, but this is getting into hack
+teritory.
+
+There is the option of changing the bootloader, but this would required
+updating a number of extant boards and would also require the kernel to
+at least warn if the problems happens instead of stopping before the
+console is started.
 
 -- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
