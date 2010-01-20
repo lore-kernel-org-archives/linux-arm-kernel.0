@@ -1,149 +1,79 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 Jan 2010 13:23:41 -0800
-Subject: [PATCH 3/4] omap3: Fix cpu detection
-In-Reply-To: <20100120212248.25335.55761.stgit@baageli.muru.com>
-References: <20100120212248.25335.55761.stgit@baageli.muru.com>
-Message-ID: <20100120212341.25335.46975.stgit@baageli.muru.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Thu, 21 Jan 2010 10:59:51 +1300
+Subject: [PATCH] ep93xx: Add support for Simplemachines Sim.One board
+In-Reply-To: <BD79186B4FD85F4B8E60E381CAEE1909020E8DF3@mi8nycmail19.Mi8.com>
+References: <4B57609E.6050904@bluewatersys.com>
+	<BD79186B4FD85F4B8E60E381CAEE1909020E8DDA@mi8nycmail19.Mi8.com>
+	<4B576907.8050008@bluewatersys.com>
+	<BD79186B4FD85F4B8E60E381CAEE1909020E8DF3@mi8nycmail19.Mi8.com>
+Message-ID: <4B577CD7.2050805@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to set the omap_chip.oc carefully for the clocks to work.
+H Hartley Sweeten wrote:
+> On Wednesday, January 20, 2010 1:35 PM, Ryan Mallon wrote:
+>   
+>> H Hartley Sweeten wrote:
+>>     
+>>
+>
+> Two minor nitpicks below...
+>
+>   
+>> --- /dev/null
+>> +++ b/arch/arm/mach-ep93xx/simone.c
+>> @@ -0,0 +1,97 @@
+>> +/*
+>> + * arch/arm/mach-ep93xx/simone.c
+>> + * Simplemachines Sim.One support.
+>> + *
+>> + * Copyright (C) 2009 Ryan Mallon <ryan@bluewatersys.com>
+>>     
+>
+> 2010?
+>   
+I started writing the patch last year, hence the 2009. Can update if
+necessary.
+>> +static struct ep93xxfb_mach_info simone_fb_info = {
+>> +	.num_modes	= EP93XXFB_USE_MODEDB,
+>> +	.bpp		= 16,
+>> +	.flags		= EP93XXFB_USE_SDCSN0 | EP93XXFB_PCLK_FALLING,
+>> +};
+>>     
+>
+> Nitpick.. Please put the fb stuff above after the i2c stuff below.
+>   
+Can do if necessary. Its pretty minor though.
+>
+> Did you happen to look at the patch I sent on 12/23/2009 with subject
+> [PATCH] ep93xx: add missing SDRAM options for EDB93xx
+>
+> I think the EP93XX_SDCE0_PHYS_BASE can be changed to PHYS_OFFSET in
+> all the ep93xx platform init code.  I'm not sure what Uwe Kleine-K?nig
+> is going to do with the run time determined PHYS_OFFSET but I think
+> that would at least get ep93xx ready for it.
+>   
+The other boards are all still using the old way. I can change this
+board now, or just leave as is and we can change all of the boards later?
+>  
+> Other that that, looks good to me.  This pretty much matches what I had
+> pending.  Have you at least compile tested this?
+>
+> It would be nice if someone could actually test this to make sure the
+> kernel boots correctly on the Sim.One.  But for what it's worth:
+>
+> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+>   
+I'll wait on the guys from Simplemachines to have their say before I put
+this into the patch system.
 
-To fix this, set the omap_chip.oc in omap3_check_features() based
-on the CONTROL_IDCODE and silicon revision registers.
+~Ryan
 
-Also add handling for 34xx es3.1.2 as es3.1 for now.
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
 
-Fixes booting on at least overo board.
-
-Based on an earlier patch by Paul Walmsley <paul@pwsan.com>.
-
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/id.c              |   41 +++++++++++++++++++--------------
- arch/arm/plat-omap/include/plat/cpu.h |    1 +
- 2 files changed, 24 insertions(+), 18 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index a091b53..3d65c50 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -188,6 +188,8 @@ void __init omap3_check_revision(void)
- 	u16 hawkeye;
- 	u8 rev;
- 
-+	omap_chip.oc = CHIP_IS_OMAP3430;
-+
- 	/*
- 	 * We cannot access revision registers on ES1.0.
- 	 * If the processor type is Cortex-A8 and the revision is 0x0
-@@ -196,6 +198,7 @@ void __init omap3_check_revision(void)
- 	cpuid = read_cpuid(CPUID_ID);
- 	if ((((cpuid >> 4) & 0xfff) == 0xc08) && ((cpuid & 0xf) == 0x0)) {
- 		omap_revision = OMAP3430_REV_ES1_0;
-+		omap_chip.oc |= CHIP_IS_OMAP3430ES1;
- 		return;
- 	}
- 
-@@ -216,18 +219,28 @@ void __init omap3_check_revision(void)
- 		case 0: /* Take care of early samples */
- 		case 1:
- 			omap_revision = OMAP3430_REV_ES2_0;
-+			omap_chip.oc |= CHIP_IS_OMAP3430ES2;
- 			break;
- 		case 2:
- 			omap_revision = OMAP3430_REV_ES2_1;
-+			omap_chip.oc |= CHIP_IS_OMAP3430ES2;
- 			break;
- 		case 3:
- 			omap_revision = OMAP3430_REV_ES3_0;
-+			omap_chip.oc |= CHIP_IS_OMAP3430ES3_0;
- 			break;
- 		case 4:
-+			omap_revision = OMAP3430_REV_ES3_1;
-+			omap_chip.oc |= CHIP_IS_OMAP3430ES3_1;
-+			break;
-+		case 7:
- 		/* FALLTHROUGH */
- 		default:
- 			/* Use the latest known revision as default */
--			omap_revision = OMAP3430_REV_ES3_1;
-+			omap_revision = OMAP3430_REV_ES3_1_2;
-+
-+			/* REVISIT: Add CHIP_IS_OMAP3430ES3_1_2? */
-+			omap_chip.oc |= CHIP_IS_OMAP3430ES3_1;
- 		}
- 		break;
- 	case 0xb868:
-@@ -235,14 +248,18 @@ void __init omap3_check_revision(void)
- 		 *
- 		 * Set the device to be OMAP3505 here. Actual device
- 		 * is identified later based on the features.
-+		 *
-+		 * REVISIT: AM3505/AM3517 should have their own CHIP_IS
- 		 */
- 		omap_revision = OMAP3505_REV(rev);
-+		omap_chip.oc |= CHIP_IS_OMAP3430ES3_1;
- 		break;
- 	case 0xb891:
- 	/* FALLTHROUGH */
- 	default:
- 		/* Unknown default to latest silicon rev as default*/
- 		omap_revision = OMAP3630_REV_ES1_0;
-+		omap_chip.oc |= CHIP_IS_OMAP3630ES1;
- 	}
- }
- 
-@@ -360,6 +377,7 @@ void __init omap2_check_revision(void)
- 		omap3_check_revision();
- 		omap3_check_features();
- 		omap3_cpuinfo();
-+		return;
- 	} else if (cpu_is_omap44xx()) {
- 		omap4_check_revision();
- 		return;
-@@ -374,27 +392,14 @@ void __init omap2_check_revision(void)
- 	if (cpu_is_omap243x()) {
- 		/* Currently only supports 2430ES2.1 and 2430-all */
- 		omap_chip.oc |= CHIP_IS_OMAP2430;
-+		return;
- 	} else if (cpu_is_omap242x()) {
- 		/* Currently only supports 2420ES2.1.1 and 2420-all */
- 		omap_chip.oc |= CHIP_IS_OMAP2420;
--	} else if (cpu_is_omap3505() || cpu_is_omap3517()) {
--		omap_chip.oc = CHIP_IS_OMAP3430 | CHIP_IS_OMAP3430ES3_1;
--	} else if (cpu_is_omap343x()) {
--		omap_chip.oc = CHIP_IS_OMAP3430;
--		if (omap_rev() == OMAP3430_REV_ES1_0)
--			omap_chip.oc |= CHIP_IS_OMAP3430ES1;
--		else if (omap_rev() >= OMAP3430_REV_ES2_0 &&
--			 omap_rev() <= OMAP3430_REV_ES2_1)
--			omap_chip.oc |= CHIP_IS_OMAP3430ES2;
--		else if (omap_rev() == OMAP3430_REV_ES3_0)
--			omap_chip.oc |= CHIP_IS_OMAP3430ES3_0;
--		else if (omap_rev() == OMAP3430_REV_ES3_1)
--			omap_chip.oc |= CHIP_IS_OMAP3430ES3_1;
--		else if (omap_rev() == OMAP3630_REV_ES1_0)
--			omap_chip.oc |= CHIP_IS_OMAP3630ES1;
--	} else {
--		pr_err("Uninitialized omap_chip, please fix!\n");
-+		return;
- 	}
-+
-+	pr_err("Uninitialized omap_chip, please fix!\n");
- }
- 
- /*
-diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
-index 9a028bd..a162f58 100644
---- a/arch/arm/plat-omap/include/plat/cpu.h
-+++ b/arch/arm/plat-omap/include/plat/cpu.h
-@@ -434,6 +434,7 @@ IS_OMAP_TYPE(3517, 0x3517)
- #define OMAP3430_REV_ES2_1	0x34302034
- #define OMAP3430_REV_ES3_0	0x34303034
- #define OMAP3430_REV_ES3_1	0x34304034
-+#define OMAP3430_REV_ES3_1_2	0x34305034
- 
- #define OMAP3630_REV_ES1_0	0x36300034
- 
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751 
+Fax:   +64 3 3779135			  USA 1800 261 2934
