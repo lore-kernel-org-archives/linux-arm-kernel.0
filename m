@@ -1,44 +1,25 @@
-From: abhijitpagare@ti.com (Pagare, Abhijit)
-Date: Wed, 20 Jan 2010 14:14:04 +0530
-Subject: [PATCH] OMAP CPU ID: fix OMAP4 build failure
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C07CC9A7@dbde02.ent.ti.com>
-References: <alpine.DEB.2.00.1001191412130.3977@utopia.booyaka.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C07CC987@dbde02.ent.ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C07CC9A7@dbde02.ent.ti.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C07CCA5A@dbde02.ent.ti.com>
+From: t.fujak@samsung.com (Tomasz Fujak)
+Date: Wed, 20 Jan 2010 10:11:44 +0100
+Subject: [PATCH/RFC v1 0/2] Human readable performance event description in
+	sysfs
+Message-ID: <1263978706-15499-1-git-send-email-t.fujak@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh,
+Hi,
 
-> -----Original Message-----
-> From: Shilimkar, Santosh
-> Sent: Wednesday, January 20, 2010 12:52 PM
-> To: Pagare, Abhijit; Paul Walmsley; Pagare, Abhijit
-> Cc: tony at atomide.com; linux-omap at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: RE: [PATCH] OMAP CPU ID: fix OMAP4 build failure
-> 
-> Abhijit,
-> 
-> <snip>
-> 
-> > I had used this flag earlier as there was nothing fixed as to name it as
-> ES1 that time. So now it can
-> > be migrated from CHIP_IS_OMAP4430 to CHIP_IS_OMAP4430ES1. I think
-> CHIP_IS_OMAP4430 would be redundant
-> > in that case and should be removed. A patch would be essential to take
-> care of that in the places
-> > where it is used. If you feel the same I can send a patch for fixing
-> this.
-> >
-> 
-> Tony has already created the patch. Please use that and test it on OMAP4.
+While I managed to build and run the early version (back from December), I was unable to find the newest sources (infra + ARMv6, ARMv7 support).
+Where do I find them?
 
-I will test it on OMAP4 but my point was as follows,
+The following patches provide a sysfs entry with hardware event human readable description in the form of "0x%llx\t%lld-%lld\t%s\t%s" % (event_value, minval, maxval, name, description) and means to populate the file.
+The version posted contains ARMv6, ARMv7 (Cortex-A[89]) support in this matter.
 
-The patch that is sent has both the definitions of CHIP_IS_OMAP4430 and CHIP_IS_OMAP4430ES1 where the later is initialized with the former's value. I was actually wondering why the former is required anyways. It is a redundant thing and can be replaced totally.
+The intended use is twofold: for users to read the list directly and for tools (like perf).
 
-> 
-> Regards,
-> Santosh
+This series includes:
+[PATCH v1 1/2] perfevent: Add performance event structure definition and 'extevents' sysfs entry
+[PATCH v1 2/2] [ARM] perfevent: Event description list for ARMv6, Cortex-A8 and Cortex-A9 exported
+
+Thanks,
+-- 
+Tomasz Fujak
