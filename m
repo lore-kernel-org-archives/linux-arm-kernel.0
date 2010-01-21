@@ -1,30 +1,33 @@
-From: vzapolskiy@gmail.com (Vladimir Zapolskiy)
-Date: Thu, 21 Jan 2010 12:12:52 +0300
-Subject: [PATCH] ARM: MX3: Fixed typo in declared enum type name.
-Message-ID: <1264065172-22494-1-git-send-email-vzapolskiy@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 21 Jan 2010 10:23:29 +0100
+Subject: [PATCH/RFC] arm: Enable backtrace printing on oops when PC is
+	corrupted
+Message-ID: <1264065809-7893-1-git-send-email-laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To distinguish between mx31lite and mx31lilly boards better to use
-different enum types.
+If PC points outside kernel text, start printing the backtrace at LR
+instead.
 
-Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
+Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- arch/arm/plat-mxc/include/mach/board-mx31lite.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/kernel/unwind.c |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/board-mx31lite.h b/arch/arm/plat-mxc/include/mach/board-mx31lite.h
-index 0184b63..2b2da03 100644
---- a/arch/arm/plat-mxc/include/mach/board-mx31lite.h
-+++ b/arch/arm/plat-mxc/include/mach/board-mx31lite.h
-@@ -25,7 +25,7 @@
- 
- #ifndef __ASSEMBLY__
- 
--enum mx31lilly_boards {
-+enum mx31lite_boards {
- 	MX31LITE_NOBOARD	= 0,
- 	MX31LITE_DB		= 1,
- };
+diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
+index 786ac2b..50292cd 100644
+--- a/arch/arm/kernel/unwind.c
++++ b/arch/arm/kernel/unwind.c
+@@ -359,7 +359,9 @@ void unwind_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+ 		frame.fp = regs->ARM_fp;
+ 		frame.sp = regs->ARM_sp;
+ 		frame.lr = regs->ARM_lr;
+-		frame.pc = regs->ARM_pc;
++		/* PC might be corrupted, use LR in that case. */
++		frame.pc = kernel_text_address(regs->ARM_pc)
++			 ? regs->ARM_pc : regs->ARM_lr;
+ 	} else if (tsk == current) {
+ 		frame.fp = (unsigned long)__builtin_frame_address(0);
+ 		frame.sp = current_sp;
 -- 
-1.6.5.4
+1.6.4.4
