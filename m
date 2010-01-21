@@ -1,47 +1,35 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 21 Jan 2010 14:37:38 +0100
-Subject: [PATCH] ARM: MX3: Fixed typo in declared enum type name.
-In-Reply-To: <1264065172-22494-1-git-send-email-vzapolskiy@gmail.com>
-References: <1264065172-22494-1-git-send-email-vzapolskiy@gmail.com>
-Message-ID: <20100121133738.GP7200@pengutronix.de>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 21 Jan 2010 15:47:16 +0200
+Subject: [PATCH 0/3] mx25: NAND support
+In-Reply-To: <20100114102440.GE23110@pengutronix.de>
+References: <cover.1263460321.git.baruch@tkos.co.il>
+	<20100114102440.GE23110@pengutronix.de>
+Message-ID: <20100121134716.GH4772@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 21, 2010 at 12:12:52PM +0300, Vladimir Zapolskiy wrote:
-> To distinguish between mx31lite and mx31lilly boards better to use
-> different enum types.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
+Hi Sascha,
 
-Ok, scheduled for -rc.
-
-Sascha
-
-
-> ---
->  arch/arm/plat-mxc/include/mach/board-mx31lite.h |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+On Thu, Jan 14, 2010 at 11:24:40AM +0100, Sascha Hauer wrote:
+> On Thu, Jan 14, 2010 at 11:24:12AM +0200, Baruch Siach wrote:
+> > This patch series add support for NAND chips on the i.MX25 platform, using the 
+> > recently merged support for this platform in the mxc_nand driver.
+> > 
+> > I tested this code on the i.MX25 PDK platform.
+> > 
+> > Baruch Siach (3):
+> >   mtd: mxc_nand: add MX25 to Kconfig
+> >   mx25: add NAND support
+> >   mx25pdk: add NAND device support
 > 
-> diff --git a/arch/arm/plat-mxc/include/mach/board-mx31lite.h b/arch/arm/plat-mxc/include/mach/board-mx31lite.h
-> index 0184b63..2b2da03 100644
-> --- a/arch/arm/plat-mxc/include/mach/board-mx31lite.h
-> +++ b/arch/arm/plat-mxc/include/mach/board-mx31lite.h
-> @@ -25,7 +25,7 @@
->  
->  #ifndef __ASSEMBLY__
->  
-> -enum mx31lilly_boards {
-> +enum mx31lite_boards {
->  	MX31LITE_NOBOARD	= 0,
->  	MX31LITE_DB		= 1,
->  };
-> -- 
-> 1.6.5.4
-> 
-> 
+> Ok, added to mxc-master.
+
+Should these patches be visible in the mxc-master of the imx/linux-2.6.git 
+tree? I don't see them there.
+
+baruch
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
