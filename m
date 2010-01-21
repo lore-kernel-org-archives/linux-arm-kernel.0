@@ -1,42 +1,65 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 21 Jan 2010 11:52:47 -0500
-Subject: Question: locomo_{read/write}l macros
-In-Reply-To: <4B581CD2.9010007@ru.mvista.com>
-References: <BD79186B4FD85F4B8E60E381CAEE1909020E8DFF@mi8nycmail19.Mi8.com>
-	<4B581CD2.9010007@ru.mvista.com>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE1909020E8EFF@mi8nycmail19.Mi8.com>
+From: thommycheck@gmx.de (Thomas Kunze)
+Date: Thu, 21 Jan 2010 19:01:31 +0100
+Subject: [PATCH 1/7] [ARM] sa1100: remove unreferenced IRQ definitions
+In-Reply-To: <201001101804.06642.marek.vasut@gmail.com>
+References: <1261977488-18271-1-git-send-email-eric.y.miao@gmail.com>	<1261977488-18271-2-git-send-email-eric.y.miao@gmail.com>	<4B3CA5EC.30102@gmx.de>
+	<201001101804.06642.marek.vasut@gmail.com>
+Message-ID: <4B58967B.30406@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, January 21, 2010 2:22 AM, Sergei Shtylyov wrote:
-> Hello.
-> 
-> H Hartley Sweeten wrote:
-> 
->> Hello all,
->>
->> Is there a reason why the locomo stuff is using custom
->> macros for {read/write}l access?
->>
->> In arch/arm/include/asm/hardware/locomo.h:
->>
->> #define locomo_writel(val,addr)	({ *(volatile u16 *)(addr) = (val); })
->> #define locomo_readl(addr)	(*(volatile u16 *)(addr))
->>
->> It appears that these are just non-typesafe versions of the
->> __raw_{read/write}w macros in arch/arm/include/asm/io.h:
->>   
+Marek Vasut schrieb:
+> Dne ?t 31. prosince 2009 14:23:56 Thomas Kunze napsal(a):
+>   
+>> Eric Miao wrote:
+>>     
+>>> These IRQ definitions related to LOCOMO are never referenced anywhere,
+>>> thus could be safely removed.
+>>>
+>>> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+>>> ---
+>>>  arch/arm/mach-sa1100/include/mach/collie.h |    7 -------
+>>>  1 files changed, 0 insertions(+), 7 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-sa1100/include/mach/collie.h
+>>> b/arch/arm/mach-sa1100/include/mach/collie.h index 71a0b3f..52acda7
+>>> 100644
+>>> --- a/arch/arm/mach-sa1100/include/mach/collie.h
+>>> +++ b/arch/arm/mach-sa1100/include/mach/collie.h
+>>> @@ -72,13 +72,6 @@
+>>>  #define COLLIE_IRQ_GPIO_GA_INT		IRQ_GPIO25
+>>>  #define COLLIE_IRQ_GPIO_MAIN_BAT_LOW	IRQ_GPIO26
+>>>
+>>> -#define COLLIE_LCM_IRQ_GPIO_RTS		IRQ_LOCOMO_GPIO0
+>>> -#define COLLIE_LCM_IRQ_GPIO_CTS		IRQ_LOCOMO_GPIO1
+>>> -#define COLLIE_LCM_IRQ_GPIO_DSR		IRQ_LOCOMO_GPIO2
+>>> -#define COLLIE_LCM_IRQ_GPIO_DTR		IRQ_LOCOMO_GPIO3
+>>> -#define COLLIE_LCM_IRQ_GPIO_nSD_DETECT	IRQ_LOCOMO_GPIO13
+>>> -#define COLLIE_LCM_IRQ_GPIO_nSD_WP	IRQ_LOCOMO_GPIO14
+>>> -
+>>>  /* GPIO's on the TC35143AF (Toshiba Analog Frontend) */
+>>>  #define COLLIE_TC35143_GPIO_BASE	(GPIO_MAX + 13)
+>>>  #define COLLIE_TC35143_GPIO_VERSION0    UCB_IO_0
+>>>       
+>> Those definitions are used in out-of-tree drivers. So please don't
+>> remove them.
+>>     
 >
->   You mean __raw_{read/write}l for sure?
-
-No.
-
-The locomo_* macros are both using u16 *.  The equivalent __raw_*
-macros would be the unsigned short * type which is __raw_{read/write}w.
-
-Plus, all the masking used with locomo_{read/write}l uses 16-bit
-values.  My guess is the names used for the locomo_* macros are
-wrong.
-
-Regards,
-Hartley
+> Why aren't those in-the-tree already?
+>   
+Because I always seem to miss the right time to submit pull requests.
+>> Regards,
+>> Thomas
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>>     
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>   
