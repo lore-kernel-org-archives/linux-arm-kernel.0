@@ -1,57 +1,76 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 20 Jan 2010 22:12:31 -0800
-Subject: [PATCH] gpiolib: add gpio_lookup_chip() to get chip information
-	for gpio
-In-Reply-To: <1262932348-2888-2-git-send-email-ben-linux@fluff.org>
-References: <1262932348-2888-1-git-send-email-ben-linux@fluff.org>
-	<1262932348-2888-2-git-send-email-ben-linux@fluff.org>
-Message-ID: <20100120221231.573ebca6.akpm@linux-foundation.org>
+From: abhijitpagare@ti.com (Pagare, Abhijit)
+Date: Thu, 21 Jan 2010 11:51:32 +0530
+Subject: [PATCH] OMAP CPU ID: fix OMAP4 build failure
+In-Reply-To: <alpine.DEB.2.00.1001202008530.3977@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1001191412130.3977@utopia.booyaka.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C07CC987@dbde02.ent.ti.com>
+	<alpine.DEB.2.00.1001202008530.3977@utopia.booyaka.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02C07CCF8B@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  8 Jan 2010 06:32:28 +0000 Ben Dooks <ben-linux@fluff.org> wrote:
+Hello Paul,
 
-> Add a call to get the 'struct gpio_chip' pointer for a given gpio, so
-> that core implementations which want to use gpiolib gpio numbering for
-> things like mux configuration can get back to the gpio_chip that they
-> registered without having to have their own list of gpio.
+
+> -----Original Message-----
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Thursday, January 21, 2010 8:50 AM
+> To: Pagare, Abhijit
+> Cc: tony at atomide.com; linux-omap at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: RE: [PATCH] OMAP CPU ID: fix OMAP4 build failure
 > 
-> This is especially useful for the Samsung S3C64XX series where the GPIO
-> bank sizes can vary from 32 down to 3, making it difficult to store an
-> array to convert a number to chip.
+> Hello Abhijit,
 > 
-> ...
->  
-> +/**
-> + * gpio_lookup_chip - return the chip for a given gpio
-> + * @gpio: The GPIO number to lookup
-> + *
-> + * Returns NULL if the GPIO chip is not valid or there is no chip registered
-> + * for that GPIO. This call is available for core code to turn a GPIO number
-> + * into a chip so that further information can be looked up.
-> + *
-> + * This call makes no guarantees about the actuall gpio_chip's state, or
-> + * whether the @gpio itself is requested.
-> + */
-> +struct gpio_chip *gpio_lookup_chip(unsigned gpio)
-> +{
-> +	struct gpio_chip *chip;
-> +	unsigned long flags;
-> +
-> +	if (!gpio_is_valid(gpio))
-> +		return NULL;
-> +
-> +	spin_lock_irqsave(&gpio_lock, flags);
-> +	chip = gpio_to_chip(gpio);
-> +	spin_unlock_irqrestore(&gpio_lock, flags);
-> +
-> +	return chip;
-> +}
-> +
+> On Wed, 20 Jan 2010, Pagare, Abhijit wrote:
+> 
+> > I think the latest patch-set that I had posted has this change in it.
+> > You can refer to the patch in the link below
+> >
+> > http://marc.info/?l=linux-omap&m=126088474831309&w=2
+> 
+> Looks like this patch had somehow not made it into the for_2.6.34 branch;
+> this has now been fixed, which resolves the problem.  But this part we
+> should discuss further:
+> 
+> > I had used this flag earlier as there was nothing fixed as to name it as
+> > ES1 that time.
+> 
+> Yep, I understand.
+> 
+> > So now it can be migrated from CHIP_IS_OMAP4430 to CHIP_IS_OMAP4430ES1.
+> > I think CHIP_IS_OMAP4430 would be redundant in that case and should be
+> > removed. A patch would be essential to take care of that in the places
+> > where it is used. If you feel the same I can send a patch for fixing
+> > this.
+> 
+> In the past, there have been some clock, clockdomain, powerdomain, IP
+> block, etc. changes going from ES1 to ES2 revisions.  But most clocks,
+> etc. stay the same.  So it seems best to keep the actual CHIP_IS_* bits
+> ES-level sensitive, then define a rollup macro like CHIP_IS_OMAP4430 for
+> what stays the same.  Until ES2 details are available, this shouldn't
+> require any further changes to the codebase aside from id.c.
 
-The locking looks fishy.  What's the point in locking the array lookup and
-then returning the thing which was looked up after dropping the lock?
+Sounds okay.
 
-Should this function have been exported to modules?
+> 
+> We don't currently define a rollup macro for CHIP_IS_OMAP3430, but it's
+> planned for 2.6.34 to include all of the individual CHIP_IS_OMAP* bits.
+> We'd do the same thing for OMAP2xxx but most of the 2xxx data in the
+> kernel tree has no ES-level information, so we'll probably leave those
+> as-is.  We'll probably add in a Sitara CHIP_IS_* bit in there also.
+> 
+> Anyway, there's no need for you to change your patch, now that it's
+> included in the for_2.6.34 branch.  But keep in mind that we'll probably
+> post another id.c cleanup patch to change things around as described
+> above, unless you or others have some strong reason not to...
 
-Please cc myself and David Brownell on gpio patches.
+Yes a patch will be essential for cleaning the id.c as we would have to also match up to the changes made by Tony for OMAP3 in his recently posted "OMAP3: Fix cpu detection" patch.
+I can send the patch when we need to push that change in for OMAP4.
+
+Thanks & Regards,
+Abhijit
+
+> 
+> 
+> - Paul
