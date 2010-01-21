@@ -1,27 +1,68 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 20 Jan 2010 22:06:14 -0700 (MST)
-Subject: [PATCH] OMAP CPU ID: fix OMAP4 build failure
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C07CCEB1@dbde02.ent.ti.com>
-References: <alpine.DEB.2.00.1001191412130.3977@utopia.booyaka.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C07CC987@dbde02.ent.ti.com>
-	<alpine.DEB.2.00.1001202008530.3977@utopia.booyaka.com>
-	<alpine.DEB.2.00.1001202025410.3977@utopia.booyaka.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02C07CCEB1@dbde02.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1001202205510.24456@utopia.booyaka.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Thu, 21 Jan 2010 05:21:06 +0000
+Subject: [PATCH] ARM: S3C64XX: Tidy up common code in s3c64xx_spi_set_info()
+In-Reply-To: <1264051266-18754-1-git-send-email-ben-linux@fluff.org>
+References: <1264051266-18754-1-git-send-email-ben-linux@fluff.org>
+Message-ID: <1264051266-18754-2-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Jan 2010, Shilimkar, Santosh wrote:
+The s3c64xx_spi_set_info() sets one of two platform data structures depending
+on which controller is being specified. Change to taking a pointer to the
+relevant platform data structure and then having one set of code to place
+the data into the area being pointed to.
 
-> > -----Original Message-----
-> > From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Paul
-> > Walmsley
-> > 
-> > I guess the rollup should probably be CHIP_IS_OMAP44XX.  Do you happen to
-> > know whether software will be able to discriminate between 4430 and 4440
-> > chips at run-time, and if so, what mechanism to use?
-> ID_CODE would be different which can be used for this.
+Cc: Jassi Brar <jassi.brar@samsung.com>
+Signed-off-by: Ben Dooks <ben-linux@fluff.org>
+---
+ arch/arm/plat-s3c64xx/dev-spi.c |   15 +++++++++------
+ 1 files changed, 9 insertions(+), 6 deletions(-)
 
-Okay, great.
-
-- Paul
+diff --git a/arch/arm/plat-s3c64xx/dev-spi.c b/arch/arm/plat-s3c64xx/dev-spi.c
+index 6b6d7af..ca10388 100644
+--- a/arch/arm/plat-s3c64xx/dev-spi.c
++++ b/arch/arm/plat-s3c64xx/dev-spi.c
+@@ -18,6 +18,7 @@
+ #include <mach/gpio.h>
+ 
+ #include <plat/spi-clocks.h>
++
+ #include <plat/s3c64xx-spi.h>
+ #include <plat/gpio-bank-c.h>
+ #include <plat/gpio-cfg.h>
+@@ -154,6 +155,8 @@ EXPORT_SYMBOL(s3c64xx_device_spi1);
+ 
+ void __init s3c64xx_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
+ {
++	struct s3c64xx_spi_info *pd;
++
+ 	/* Reject invalid configuration */
+ 	if (!num_cs || src_clk_nr < 0
+ 			|| src_clk_nr > S3C64XX_SPI_SRCCLK_48M) {
+@@ -163,18 +166,18 @@ void __init s3c64xx_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
+ 
+ 	switch (cntrlr) {
+ 	case 0:
+-		s3c64xx_spi0_pdata.num_cs = num_cs;
+-		s3c64xx_spi0_pdata.src_clk_nr = src_clk_nr;
+-		s3c64xx_spi0_pdata.src_clk_name = spi_src_clks[src_clk_nr];
++		pd = &s3c64xx_spi0_pdata;
+ 		break;
+ 	case 1:
+-		s3c64xx_spi1_pdata.num_cs = num_cs;
+-		s3c64xx_spi1_pdata.src_clk_nr = src_clk_nr;
+-		s3c64xx_spi1_pdata.src_clk_name = spi_src_clks[src_clk_nr];
++		pd = &s3c64xx_spi1_pdata;
+ 		break;
+ 	default:
+ 		printk(KERN_ERR "%s: Invalid SPI controller(%d)\n",
+ 							__func__, cntrlr);
+ 		return;
+ 	}
++
++	pd->num_cs = num_cs;
++	pd->src_clk_nr = src_clk_nr;
++	pd->src_clk_name = spi_src_clks[src_clk_nr];
+ }
+-- 
+1.6.0.4
