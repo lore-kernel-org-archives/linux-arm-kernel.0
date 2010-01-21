@@ -1,50 +1,54 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 20 Jan 2010 21:59:59 -0500
-Subject: [PATCH] locomo.c: make irq register access typesafe
-In-Reply-To: <f17812d71001201841w34abc3b5w49b8c2986897dbe8@mail.gmail.com>
-References: <201001201110.44583.hartleys@visionengravers.com>
-	<f17812d71001201813hf93c33wbfc9f50452ec38fa@mail.gmail.com>
-	<BD79186B4FD85F4B8E60E381CAEE1909020E8E46@mi8nycmail19.Mi8.com>
-	<f17812d71001201841w34abc3b5w49b8c2986897dbe8@mail.gmail.com>
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE1909020E8E4B@mi8nycmail19.Mi8.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 20 Jan 2010 20:20:28 -0700 (MST)
+Subject: [PATCH] OMAP CPU ID: fix OMAP4 build failure
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02C07CC987@dbde02.ent.ti.com>
+References: <alpine.DEB.2.00.1001191412130.3977@utopia.booyaka.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02C07CC987@dbde02.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1001202008530.3977@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, January 20, 2010 7:42 PM, Eric Miao wrote:
-> On Thu, Jan 21, 2010 at 10:31 AM, H Hartley Sweeten
-> <hartleys@visionengravers.com> wrote:
->> On Wednesday, January 20, 2010 7:13 PM, Eric Miao wrote:
->>> On Thu, Jan 21, 2010 at 2:10 AM, H Hartley Sweeten
->>> <hartleys@visionengravers.com> wrote:
->>>> In locomo_setup_irq a void __iomem * is stored by set_irq_chip_data
->>>> to hold the base address for the irq registers. ?Unfortunately chip_data
->>>> is a void *. This will cause a number of (different address space) sparse
->>>> warnings.
->>>>
->>>
->>> That's actually been fixed as a side effect in my previous proposed
->>> irq cleanup patches. The way is to pass locomo chip as the data
->>> instead of a raw pointer. Please let me know how you think, the
->>> specific patch follows:
->>
->> There must be some other patches to locomo.c that remove the locomo_key_*,
->> locomo_gpio_*, locomo_lt_*, and locomo_spi_* related stuff. ?Were all of
->> them merged into common code? ?Where can I find a reference to the
->> original patches?
->>
->
-> Cannot find the reference atm but they were posted weeks ago.
+Hello Abhijit,
 
-Located them at:
+On Wed, 20 Jan 2010, Pagare, Abhijit wrote:
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2009-December/thread.html
+> I think the latest patch-set that I had posted has this change in it. 
+> You can refer to the patch in the link below
+> 
+> http://marc.info/?l=linux-omap&m=126088474831309&w=2
 
-I'll try to take a good look at them tomorrow and give you any feedback
-I have.
+Looks like this patch had somehow not made it into the for_2.6.34 branch; 
+this has now been fixed, which resolves the problem.  But this part we 
+should discuss further:
 
->> Other than that it looks good to me.
->
-> Thanks.
+> I had used this flag earlier as there was nothing fixed as to name it as 
+> ES1 that time.
 
-Regards,
-Hartley
+Yep, I understand.
+
+> So now it can be migrated from CHIP_IS_OMAP4430 to CHIP_IS_OMAP4430ES1. 
+> I think CHIP_IS_OMAP4430 would be redundant in that case and should be 
+> removed. A patch would be essential to take care of that in the places 
+> where it is used. If you feel the same I can send a patch for fixing 
+> this.
+
+In the past, there have been some clock, clockdomain, powerdomain, IP 
+block, etc. changes going from ES1 to ES2 revisions.  But most clocks, 
+etc. stay the same.  So it seems best to keep the actual CHIP_IS_* bits 
+ES-level sensitive, then define a rollup macro like CHIP_IS_OMAP4430 for 
+what stays the same.  Until ES2 details are available, this shouldn't 
+require any further changes to the codebase aside from id.c.
+
+We don't currently define a rollup macro for CHIP_IS_OMAP3430, but it's 
+planned for 2.6.34 to include all of the individual CHIP_IS_OMAP* bits.  
+We'd do the same thing for OMAP2xxx but most of the 2xxx data in the 
+kernel tree has no ES-level information, so we'll probably leave those 
+as-is.  We'll probably add in a Sitara CHIP_IS_* bit in there also.
+
+Anyway, there's no need for you to change your patch, now that it's 
+included in the for_2.6.34 branch.  But keep in mind that we'll probably 
+post another id.c cleanup patch to change things around as described 
+above, unless you or others have some strong reason not to...
+
+
+- Paul
