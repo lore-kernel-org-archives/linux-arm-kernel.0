@@ -1,67 +1,30 @@
-From: jpihet@mvista.com (Jean Pihet)
-Date: Thu, 21 Jan 2010 13:42:48 +0100
-Subject: [PATCH 5/5] arm/perfevents: implement perf event support for ARMv6
-In-Reply-To: <001a01ca9a96$0f7024a0$2e506de0$@deacon@arm.com>
-References: <1263471256-3739-1-git-send-email-jamie.iles@picochip.com>
-	<201001211321.44682.jpihet@mvista.com>
-	<001a01ca9a96$0f7024a0$2e506de0$@deacon@arm.com>
-Message-ID: <201001211342.48751.jpihet@mvista.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 21 Jan 2010 13:43:38 +0100
+Subject: make PHYS_OFFSET determined at run time (unfinished)
+In-Reply-To: <1264074184.3207.109.camel@linux-1lbu>
+References: <20100119083803.GA17904@pengutronix.de>
+	<4B561581.6060400@bluewatersys.com>
+	<20100120005505.GD26562@trinity.fluff.org>
+	<1263954112.3207.73.camel@linux-1lbu>
+	<20100120023255.GV10014@trinity.fluff.org>
+	<1263998346.3207.83.camel@linux-1lbu>
+	<1b68c6791001201728ma5ce62dyb1d4825cedb8f9df@mail.gmail.com>
+	<1264074184.3207.109.camel@linux-1lbu>
+Message-ID: <20100121124338.GA17146@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi Steve,
 
-On Thursday 21 January 2010 13:34:22 Will Deacon wrote:
-> Hi Jean,
->
-> * Jean Pihet wrote:
-> > Agree. Here is the latest version of the detection code, after merging
-> > Jamie's latest version:
-> >
-> >         unsigned long cpuid = read_cpuid_id() & CPUID_MASK;
-> >
-> >         switch (cpuid) {
-> >         case 0xB360:    /* ARM1136 */
-> >         case 0xB560:    /* ARM1156 */
-> >         case 0xB760:    /* ARM1176 */
-> > 	    ...
-> >                 break;
-> >         case 0xB020:    /* ARM11mpcore */
-> > 	    ...
-> >                 break;
-> >         case 0xC080:    /* Cortex-A8 */
-> > 	    ...
-> >                 break;
-> >         case 0xC090:    /* Cortex-A9 */
-> > 	    ...
-> >                 break;
-> >         default:
-> >                 pr_info("no hardware support available\n");
-> >                 perf_max_events = -1;
-> >        }
-> >        ...
-> >
-> > Is that OK if we just add 'if (implementor == 0x41) {' before the switch
-> > statement, as proposed above?
->
-> For the v7 PMU, we can do a bit better than that because the PMU
-> is defined by the architecture. If you read the DIDR[19:16] and it
-> returns either 3 or 4, you have a v7 PMU present so you can make use of
-> the architecturally defined events regardless of the implementer.
->
-> So, in response to your question, I reckon you should wrap the switch
-> statement with the implementer check, but add a DIDR check in the else
-> block so that cores with a v7 PMU will at least get support for the
-> standard events.
-That makes sense. Are such chipsets already out or planned in the near future?
-I propose to have the current code working and merged in before supporting the 
-generic v7 cores. Doing so requires to add new set of events mappings.
+> Yes, I did use go instead of bootm.  I'll give this a try.  I'm using
+> u-boot version 1.3.3.  Based on Uwe's comment, there is a good chance
+> that I'll need to upgrade my u-boot.  Thank you all for the feedback.
+note I only pointed out that barebox (aka. u-boot-v2) can boot zImages.
+I don't know about u-boot-v1.
 
-What do you think?
->
-> Cheers,
->
-> Will
+Best regards
+Uwe
 
-Cheers,
-Jean
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
