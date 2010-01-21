@@ -1,65 +1,76 @@
-From: thommycheck@gmx.de (Thomas Kunze)
-Date: Thu, 21 Jan 2010 19:01:31 +0100
-Subject: [PATCH 1/7] [ARM] sa1100: remove unreferenced IRQ definitions
-In-Reply-To: <201001101804.06642.marek.vasut@gmail.com>
-References: <1261977488-18271-1-git-send-email-eric.y.miao@gmail.com>	<1261977488-18271-2-git-send-email-eric.y.miao@gmail.com>	<4B3CA5EC.30102@gmx.de>
-	<201001101804.06642.marek.vasut@gmail.com>
-Message-ID: <4B58967B.30406@gmx.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 21 Jan 2010 11:03:38 -0800
+Subject: [PATCH 2/4] omap: Make uncompress code and DEBUG_LL code generic
+In-Reply-To: <20100116193313.GA23092@n2100.arm.linux.org.uk>
+References: <20100116013205.10065.95921.stgit@baageli.muru.com>
+	<20100116013515.10065.30649.stgit@baageli.muru.com>
+	<20100116093555.GA13596@n2100.arm.linux.org.uk>
+	<20100116191820.GI10318@atomide.com>
+	<20100116193313.GA23092@n2100.arm.linux.org.uk>
+Message-ID: <20100121190337.GN23467@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Vasut schrieb:
-> Dne ?t 31. prosince 2009 14:23:56 Thomas Kunze napsal(a):
->   
->> Eric Miao wrote:
->>     
->>> These IRQ definitions related to LOCOMO are never referenced anywhere,
->>> thus could be safely removed.
->>>
->>> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
->>> ---
->>>  arch/arm/mach-sa1100/include/mach/collie.h |    7 -------
->>>  1 files changed, 0 insertions(+), 7 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-sa1100/include/mach/collie.h
->>> b/arch/arm/mach-sa1100/include/mach/collie.h index 71a0b3f..52acda7
->>> 100644
->>> --- a/arch/arm/mach-sa1100/include/mach/collie.h
->>> +++ b/arch/arm/mach-sa1100/include/mach/collie.h
->>> @@ -72,13 +72,6 @@
->>>  #define COLLIE_IRQ_GPIO_GA_INT		IRQ_GPIO25
->>>  #define COLLIE_IRQ_GPIO_MAIN_BAT_LOW	IRQ_GPIO26
->>>
->>> -#define COLLIE_LCM_IRQ_GPIO_RTS		IRQ_LOCOMO_GPIO0
->>> -#define COLLIE_LCM_IRQ_GPIO_CTS		IRQ_LOCOMO_GPIO1
->>> -#define COLLIE_LCM_IRQ_GPIO_DSR		IRQ_LOCOMO_GPIO2
->>> -#define COLLIE_LCM_IRQ_GPIO_DTR		IRQ_LOCOMO_GPIO3
->>> -#define COLLIE_LCM_IRQ_GPIO_nSD_DETECT	IRQ_LOCOMO_GPIO13
->>> -#define COLLIE_LCM_IRQ_GPIO_nSD_WP	IRQ_LOCOMO_GPIO14
->>> -
->>>  /* GPIO's on the TC35143AF (Toshiba Analog Frontend) */
->>>  #define COLLIE_TC35143_GPIO_BASE	(GPIO_MAX + 13)
->>>  #define COLLIE_TC35143_GPIO_VERSION0    UCB_IO_0
->>>       
->> Those definitions are used in out-of-tree drivers. So please don't
->> remove them.
->>     
->
-> Why aren't those in-the-tree already?
->   
-Because I always seem to miss the right time to submit pull requests.
->> Regards,
->> Thomas
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->>     
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->   
+Hi,
+
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [100116 11:31]:
+> On Sat, Jan 16, 2010 at 11:18:20AM -0800, Tony Lindgren wrote:
+> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [100116 01:33]:
+> > > On Fri, Jan 15, 2010 at 05:35:15PM -0800, Tony Lindgren wrote:
+> > > > diff --git a/arch/arm/mach-omap1/include/mach/debug-macro.S b/arch/arm/mach-omap1/include/mach/debug-macro.S
+> > > > index 23e4724..0174858 100644
+> > > > --- a/arch/arm/mach-omap1/include/mach/debug-macro.S
+> > > > +++ b/arch/arm/mach-omap1/include/mach/debug-macro.S
+> > > > @@ -15,18 +15,71 @@
+> > > >  
+> > > >  #include <plat/serial.h>
+> > > >  
+> > > > +omap_uart_phys:	.word	0x0
+> > > > +omap_uart_virt:	.word	0x0
+> > > 
+> > > I assume that you have no plans for XIP kernel support on OMAP, since
+> > > these will be placed in the .text section, and is therefore read-only
+> > > on XIP kernels.
+> > 
+> > Did not think of that.. Maybe some addruart_premable solution here would.
+> > Or adding \tmp register for addruart and just do the detection for each
+> > character.
+
+<snip>
+ 
+> Why not do something like this:
+> 
+> 		.pushsection .data
+> omap_uart_phys:	.word 0
+> omap_uart_virt:	.word 0
+> 		.popsection
+> 
+> 		.macro addruart, rx
+> ...		
+> +               ldreq   \rx, =omap_uart_phys    @ physical base address
+> +               ldrne   \rx, =omap_uart_virt    @ virtual base
+> 		ldr	\rx, [\rx]
+> +               cmp     \rx, #0                 @ is port configured?
+> +               bne     99f                     @ already configured
+> ...
+> 
+> ?
+
+Works fine, but it add one issue. Looks like we need to add tmp register
+into addruart to initially save the omap_uart_phys and omap_uart_virt:
+
++		/* Store both phys and virt address for the uart */
++98:		add	\rx, \rx, #0x48000000	@ phys base
++		ldr	\tmp, =omap_uart_phys
++		str	\rx, [\tmp, #0]
++		sub	\rx, \rx, #0x48000000	@ phys base
++		add	\rx, \rx, #0xfa000000	@ virt base
++		ldr	\tmp, =omap_uart_virt
++		str	\rx, [\tmp, #0]
+
+Does the following patch look OK to you, or do you have some other way
+in mind for doing it?
+
+Regards,
+
+Tony
