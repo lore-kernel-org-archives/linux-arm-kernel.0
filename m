@@ -1,49 +1,70 @@
-From: vzapolskiy@gmail.com (Vladimir Zapolskiy)
-Date: Thu, 21 Jan 2010 12:35:22 +0300
-Subject: [PATCH] ARM: MX3: Fixed typo in declared enum type name.
-In-Reply-To: <20100121092619.GV8970@buzzloop.caiaq.de>
-References: <1264065172-22494-1-git-send-email-vzapolskiy@gmail.com>
-	<20100121092619.GV8970@buzzloop.caiaq.de>
-Message-ID: <fcda838a1001210135w38a52098m112c6055324b60e1@mail.gmail.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Thu, 21 Jan 2010 09:39:17 +0000
+Subject: [PATCH 5/5] arm/perfevents: implement perf event support for ARMv6
+In-Reply-To: <1263471256-3739-6-git-send-email-jamie.iles@picochip.com>
+References: <1263471256-3739-1-git-send-email-jamie.iles@picochip.com>
+	<1263471256-3739-2-git-send-email-jamie.iles@picochip.com>
+	<1263471256-3739-3-git-send-email-jamie.iles@picochip.com>
+	<1263471256-3739-4-git-send-email-jamie.iles@picochip.com>
+	<1263471256-3739-5-git-send-email-jamie.iles@picochip.com>
+	<1263471256-3739-6-git-send-email-jamie.iles@picochip.com>
+Message-ID: <20100121093917.GB4908@wear.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to this issue I have not met problems with mx31lite board,
-surely that's just a typo. Anyway I plan to continue to work with this
-board setup for a while and make some tests of the recent changes
-found in 2.6.33.
+On Thu, Jan 14, 2010 at 12:14:16PM +0000, Jamie Iles wrote:
+> This patch implements support for ARMv6 performance counters in the
+> Linux performance events subsystem. ARMv6 architectures that have the
+> performance counters should enable HW_PERF_EVENTS and define the
+> interrupts for the counters in arch/arm/kernel/perf_event.c
+The commit message needs a tweak before submitting as the IRQs are listed in
+arch/arm/kernel/pmu.c now rather than perf_event.c.
 
-On Thu, Jan 21, 2010 at 12:26 PM, Daniel Mack <daniel@caiaq.de> wrote:
-> On Thu, Jan 21, 2010 at 12:12:52PM +0300, Vladimir Zapolskiy wrote:
->> To distinguish between mx31lite and mx31lilly boards better to use
->> different enum types.
->
-> True, even though it shouldn't have any impact unless you include both
-> headers. I assume you didn't meet any real-life problem with that?
->
->> Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
->
-> Acked-by: Daniel Mack <daniel@caiaq.de>
->
->
->> ---
->> ?arch/arm/plat-mxc/include/mach/board-mx31lite.h | ? ?2 +-
->> ?1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/plat-mxc/include/mach/board-mx31lite.h b/arch/arm/plat-mxc/include/mach/board-mx31lite.h
->> index 0184b63..2b2da03 100644
->> --- a/arch/arm/plat-mxc/include/mach/board-mx31lite.h
->> +++ b/arch/arm/plat-mxc/include/mach/board-mx31lite.h
->> @@ -25,7 +25,7 @@
->>
->> ?#ifndef __ASSEMBLY__
->>
->> -enum mx31lilly_boards {
->> +enum mx31lite_boards {
->> ? ? ? MX31LITE_NOBOARD ? ? ? ?= 0,
->> ? ? ? MX31LITE_DB ? ? ? ? ? ? = 1,
->> ?};
->> --
->> 1.6.5.4
->>
->
+> +static int __init
+> +init_hw_perf_events(void)
+> +{
+> +#define CPUID_MASK	0xFFF0
+> +	unsigned long cpuid = read_cpuid_id() & CPUID_MASK;
+> +
+> +	switch (cpuid) {
+> +	case 0xB360:	/* ARM1136 */
+> +	case 0xB560:	/* ARM1156 */
+> +	case 0xB760:	/* ARM1176 */
+> +		armpmu = &armv6pmu;
+> +		memcpy(armpmu_perf_cache_map, armv6_perf_cache_map,
+> +				sizeof(armv6_perf_cache_map));
+> +		perf_max_events	= armv6pmu.num_events;
+> +		break;
+> +	case 0xB020:	/* ARM11mpcore */
+> +		armpmu = &armv6mpcore_pmu;
+> +		memcpy(armpmu_perf_cache_map, armv6mpcore_perf_cache_map,
+> +				sizeof(armv6mpcore_perf_cache_map));
+> +		perf_max_events = armv6mpcore_pmu.num_events;
+> +		break;
+> +	default:
+> +		pr_info("no hardware support available\n");
+> +		perf_max_events = -1;
+> +	}
+> +
+> +	if (armpmu)
+> +		pr_info("enabled with %s PMU driver\n",
+> +				armpmu->name);
+> +
+> +	return 0;
+> +}
+> +arch_initcall(init_hw_perf_events);
+Given the difficulty in determining the CPU type 100%, this should be changed
+to:
+
+	unsigned long cpuid = read_cpuid_id();
+	unsigned long implementor = (cpuid & 0xFF000000) >> 24;
+	unsigned long part_number = (cpuid & 0xFFF0);
+	
+	/* We only support ARM CPUs implemented by ARM at the moment. */
+	if (implementor == 0x41) {
+		switch (part_number) {
+		case 0xB360:
+		case 0xB560:
+			etc
+
+Jamie
