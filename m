@@ -1,38 +1,89 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Thu, 21 Jan 2010 01:37:28 +0100
-Subject: [PATCH] ARM: S3C64XX: Fix typo in s3c-hsotg platform data
-Message-ID: <b2e8f9f71001201637ua278aa2v56c313d605aa7d13@mail.gmail.com>
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Thu, 21 Jan 2010 10:28:50 +0900
+Subject: make PHYS_OFFSET determined at run time (unfinished)
+In-Reply-To: <1263998346.3207.83.camel@linux-1lbu>
+References: <20100119083803.GA17904@pengutronix.de>
+	<4B561581.6060400@bluewatersys.com>
+	<20100120005505.GD26562@trinity.fluff.org>
+	<1263954112.3207.73.camel@linux-1lbu>
+	<20100120023255.GV10014@trinity.fluff.org>
+	<1263998346.3207.83.camel@linux-1lbu>
+Message-ID: <1b68c6791001201728ma5ce62dyb1d4825cedb8f9df@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM: S3C64XX: Fix typo in s3c-hsotg platform data
+On Wed, Jan 20, 2010 at 11:39 PM, Steve Chen <schen@mvista.com> wrote:
+> On Wed, 2010-01-20 at 02:32 +0000, Ben Dooks wrote:
+>> On Tue, Jan 19, 2010 at 08:21:52PM -0600, Steve Chen wrote:
+>> > On Wed, 2010-01-20 at 00:55 +0000, Ben Dooks wrote:
+>> > > On Wed, Jan 20, 2010 at 09:26:41AM +1300, Ryan Mallon wrote:
+>> > > > Uwe Kleine-K?nig wrote:
+>> > > > > Hello,
+>> > > > >
+>> > > > > I'm looking into making PHYS_OFFSET determined at run time. ?I saw a
+>> > > > > patch for it that already made it a few times on the list[1].
+>> > > > >
+>> > > > > I'm not yet done, but first want to announce that I look into that to
+>> > > > > prevent duplicate work---so if you intended to do the same let's look
+>> > > > > together---and to post some clean up patches that are the result up to
+>> > > > > now of my digging in the boot code.
+>> > > > >
+>> > > > > I will send now three patches in reply to this mail, and later hopefully
+>> > > > > more.
+>> > > > >
+>> > > > > Best regards
+>> > > > > Uwe
+>> > > > >
+>> > > > > [1] e.g. http://thread.gmane.org/gmane.linux.ports.arm.kernel/53793/
+>> > > > >
+>> > > >
+>> > > > One of the problems that got brought up previously was the 'make uImage'
+>> > > > can end up generating unbootable images with runtime PHYS_OFFSET. The
+>> > > > older format uImage's (pre 1.3.3) encode a load address (zrealaddr), so
+>> > > > uImage's need to have a fixed load address encoded.
+>> > > >
+>> > > > As I stated in the previous thread, this is _not_ a kernel issue,
+>> > > > however it is no good having a kernel which contains support for two
+>> > > > boards which boot from different address and then generating a uImage
+>> > > > which can only boot on one of them without warning the user about this
+>> > > > problem. Otherwise you are going to start getting "I did make uImage and
+>> > > > my board won't boot" problems.
+>> > > >
+>> > > > There are a few solutions to this problem:
+>> > > > 1) Drop uImage make support and require users generate them manually.
+>> > > > 2) Have a uImage offset config option to allow uImage users to specify
+>> > > > what they want the load address to be. See:
+>> > > > http://thread.gmane.org/gmane.linux.ports.arm.kernel/53151/focus=53230
+>> > > > 3) Print an error if "make uImage" is run for a kernel which has more
+>> > > > than one boot address (possible?)
+>> > > > 4) Use FIT U-Boot images. This is supported from U-Boot 1.3.3 onwards,
+>> > > > however a number of people are still using older U-Boots.
+>> > >
+>> > > Or of course, boot zImages. I belive u-boot has support for zImage.
+>> >
+>> > Is there a clean way to pass kernel parameters and machine type from
+>> > u-boot to zImage? ?Last time I boot zImage in u-boot, some ugly hack was
+>> > needed in ARM startup code. ?Just wondering if there is a better way.
+>>
+>> u-boot should be doing the right thing, I thought uImage was simply a
+>> zImage wrapped in the right uboot descriptors to tell uboot it was a
+>> kernel and where to load it.
+>>
+>> Certianly uboots i've used can boto zImage just fine.
+>
+> I'm also able to boot zImage under u-boot. ?However, I had to set r1
+> manually, and I don't know how to pass kernel parameters (stuff passed
+> into kernel uImage via bootargs) to zImage. ?Any tips will be greatly
+> appreciated.
+Perhaps you use 'go' instead of 'bootm' command in u-boot?
+How about:-
 
-Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
----
- arch/arm/plat-s3c/include/plat/udc-hs.h |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ u-boot # <load zImage@_addr_ by some means>
 
-diff --git a/arch/arm/plat-s3c/include/plat/udc-hs.h
-b/arch/arm/plat-s3c/include/plat/udc-hs.h
-index dd04db0..a22a4f2 100644
---- a/arch/arm/plat-s3c/include/plat/udc-hs.h
-+++ b/arch/arm/plat-s3c/include/plat/udc-hs.h
-@@ -12,7 +12,7 @@
-  * published by the Free Software Foundation.
- */
+ u-boot # setenv machid <your machine ID in hex without the '0x'>
+ u-boot # saveenv //persistently save the machid
+             // now you don't need to set machid even after cold reset
 
--enum s3c_hostg_dmamode {
-+enum s3c_hsotg_dmamode {
- 	S3C_HSOTG_DMA_NONE,	/* do not use DMA at-all */
- 	S3C_HSOTG_DMA_ONLY,	/* always use DMA */
- 	S3C_HSOTG_DMA_DRV,	/* DMA is chosen by driver */
-@@ -24,6 +24,6 @@ enum s3c_hostg_dmamode {
-  * @is_osc: The clock source is an oscillator, not a crystal
-  */
- struct s3c_hsotg_plat {
--	enum s3c_hostg_dmamode	dma;
-+	enum s3c_hsotg_dmamode	dma;
- 	unsigned int		is_osc : 1;
- };
--- 
-1.6.6
+ u-boot # bootm _addr_
+
+hth.
