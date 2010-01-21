@@ -1,59 +1,81 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 21 Jan 2010 17:00:22 +0200
-Subject: [PATCH 1/2] mx25: remove unused mx25_clocks_init() argument
+Date: Thu, 21 Jan 2010 17:00:23 +0200
+Subject: [PATCH 2/2] mx25: properly initialize clocks, fix time accounting
 In-Reply-To: <cover.1264085584.git.baruch@tkos.co.il>
 References: <cover.1264085584.git.baruch@tkos.co.il>
-Message-ID: <62743e533ee2fc3527cc1dda75933f03704e7a63.1264085584.git.baruch@tkos.co.il>
+Message-ID: <d05c786d8d87c1bb35e3f13d4fc9b8f4ddf18b3b.1264085584.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The fref is needless on mx25 since the reference clock is fixed at 24MHz.
+For some odd reason the GPT module has run the timer counter at 100MHz, while
+the rate reported by the gpt_clk has been 133MHz. This caused a significant
+drift in time accounting.
+
+This patch disables all unnecessary clock in mx25_clocks_init() to make a clean
+start, the same as is being done for the rest of the i.MX chips.
+
+To preserve the uart and fec functionality, this patch temporarily enables the
+respective clocks in mx25_clocks_init(). The real fix for this is to use the
+.secondary field of the mxc clk struct, and enable these clocks from there.
+
+This patch was tested on i.MX25 PDK.
 
 Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 ---
- arch/arm/mach-mx25/clock.c              |    2 +-
- arch/arm/mach-mx25/mx25pdk.c            |    2 +-
- arch/arm/plat-mxc/include/mach/common.h |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-mx25/clock.c |   27 ++++++++++++++++++++++++++-
+ 1 files changed, 26 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-mx25/clock.c b/arch/arm/mach-mx25/clock.c
-index 6e838b8..a4ba334 100644
+index a4ba334..b1aadd5 100644
 --- a/arch/arm/mach-mx25/clock.c
 +++ b/arch/arm/mach-mx25/clock.c
-@@ -208,7 +208,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
- };
- 
--int __init mx25_clocks_init(unsigned long fref)
-+int __init mx25_clocks_init(void)
- {
- 	int i;
- 
-diff --git a/arch/arm/mach-mx25/mx25pdk.c b/arch/arm/mach-mx25/mx25pdk.c
-index c8b1d3b..232f9ca 100644
---- a/arch/arm/mach-mx25/mx25pdk.c
-+++ b/arch/arm/mach-mx25/mx25pdk.c
-@@ -98,7 +98,7 @@ static void __init mx25pdk_init(void)
- 
- static void __init mx25pdk_timer_init(void)
- {
--	mx25_clocks_init(26000000);
-+	mx25_clocks_init();
+@@ -119,6 +119,11 @@ static unsigned long get_rate_nfc(struct clk *clk)
+ 	return get_rate_per(8);
  }
  
- static struct sys_timer mx25pdk_timer = {
-diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
-index 286cb9b..4bf1068 100644
---- a/arch/arm/plat-mxc/include/mach/common.h
-+++ b/arch/arm/plat-mxc/include/mach/common.h
-@@ -32,7 +32,7 @@ extern void mxc91231_init_irq(void);
- extern void mxc_timer_init(struct clk *timer_clk, void __iomem *, int);
- extern int mx1_clocks_init(unsigned long fref);
- extern int mx21_clocks_init(unsigned long lref, unsigned long fref);
--extern int mx25_clocks_init(unsigned long fref);
-+extern int mx25_clocks_init(void);
- extern int mx27_clocks_init(unsigned long fref);
- extern int mx31_clocks_init(unsigned long fref);
- extern int mx35_clocks_init(void);
++static unsigned long get_rate_gpt(struct clk *clk)
++{
++	return get_rate_per(5);
++}
++
+ static unsigned long get_rate_otg(struct clk *clk)
+ {
+ 	return 48000000; /* FIXME */
+@@ -155,7 +160,7 @@ static void clk_cgcr_disable(struct clk *clk)
+ 		.disable	= clk_cgcr_disable,	\
+ 	}
+ 
+-DEFINE_CLOCK(gpt_clk,    0, CCM_CGCR0,  5, get_rate_ipg, NULL);
++DEFINE_CLOCK(gpt_clk,    0, CCM_CGCR0,  5, get_rate_gpt, NULL);
+ DEFINE_CLOCK(cspi1_clk,  0, CCM_CGCR1,  5, get_rate_ipg, NULL);
+ DEFINE_CLOCK(cspi2_clk,  0, CCM_CGCR1,  6, get_rate_ipg, NULL);
+ DEFINE_CLOCK(cspi3_clk,  0, CCM_CGCR1,  7, get_rate_ipg, NULL);
+@@ -215,6 +220,26 @@ int __init mx25_clocks_init(void)
+ 	for (i = 0; i < ARRAY_SIZE(lookups); i++)
+ 		clkdev_add(&lookups[i]);
+ 
++	/* Turn off all clocks except the ones we need to survive, namely:
++	 * EMI, GPIO1-3 (CCM_CGCR1[18:16]), GPT1, IOMUXC (CCM_CGCR1[27]), IIM,
++	 * SCC
++	 */
++	__raw_writel((1 << 19), CRM_BASE + CCM_CGCR0);
++	__raw_writel((0xf << 16) | (3 << 26), CRM_BASE + CCM_CGCR1);
++	__raw_writel((1 << 5), CRM_BASE + CCM_CGCR2);
++
++	/* Enable FEC IPG
++	 * FIXME: implement secondary clock
++	 */
++	__raw_writel(__raw_readl(CRM_BASE + CCM_CGCR1) | (1 << 15),
++			CRM_BASE + CCM_CGCR1);
++
++	/* Enable uart PER
++	 * FIXME: implement secondary clock
++	 */
++	__raw_writel(__raw_readl(CRM_BASE + CCM_CGCR0) | (1 << 15),
++			CRM_BASE + CCM_CGCR0);
++
+ 	mxc_timer_init(&gpt_clk, MX25_IO_ADDRESS(MX25_GPT1_BASE_ADDR), 54);
+ 
+ 	return 0;
 -- 
 1.6.5
