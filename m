@@ -1,31 +1,90 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Thu, 21 Jan 2010 22:56:58 +0100
-Subject: [PATCH] hmt: adjust for new pwm_backlight->notify prototype
-Message-ID: <1264111018-20920-1-git-send-email-jacmet@sunsite.dk>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 21 Jan 2010 23:06:53 +0100
+Subject: [PATCH] serial imx.c: fix CTS trigger level lower to avoid
+	lost chars
+In-Reply-To: <1264109163-28739-1-git-send-email-valentin.longchamp@epfl.ch>
+References: <1264109163-28739-1-git-send-email-valentin.longchamp@epfl.ch>
+Message-ID: <20100121220653.GA21010@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit cfc38999f (backlight: Pass device through notify callback)
-added a struct device argument to the notify callback, but didn't
-update the user of it in mach-hmt.c
+CCing linux-serial
 
-Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
----
- arch/arm/mach-s3c6410/mach-hmt.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+On Thu, Jan 21, 2010 at 10:26:03PM +0100, Valentin Longchamp wrote:
+> The imx CTS trigger level is left at its reset value that is 32
+> chars. Since the RX FIFO has 32 entries, when CTS is raised, the
+> FIFO already is full. However, some serial port devices first empty
+> their TX FIFO before stopping when CTS is raised, resulting in lost
+> chars.
 
-diff --git a/arch/arm/mach-s3c6410/mach-hmt.c b/arch/arm/mach-s3c6410/mach-hmt.c
-index cdd4b53..7619456 100644
---- a/arch/arm/mach-s3c6410/mach-hmt.c
-+++ b/arch/arm/mach-s3c6410/mach-hmt.c
-@@ -82,7 +82,7 @@ static int hmt_bl_init(struct device *dev)
- 	return ret;
- }
- 
--static int hmt_bl_notify(int brightness)
-+static int hmt_bl_notify(struct device *dev, int brightness)
- {
- 	/*
- 	 * translate from CIELUV/CIELAB L*->brightness, E.G. from
+? Isn't that a flaw of the other side? Have you spotted other serial drivers
+doing the same as your patch?
+
+> 
+> This patch sets the trigger level lower so that other chars arrive
+> after CTS is raised, there is still room for 16 of them.
+> 
+> Signed-off-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
+> Tested-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
+> ---
+>  drivers/serial/imx.c |   10 +++++++++-
+>  1 files changed, 9 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/serial/imx.c b/drivers/serial/imx.c
+> index 18130f1..f7d2da5 100644
+> --- a/drivers/serial/imx.c
+> +++ b/drivers/serial/imx.c
+> @@ -119,7 +119,8 @@
+>  #define  MX2_UCR3_RXDMUXSEL	 (1<<2)  /* RXD Muxed Input Select, on mx2/mx3 */
+>  #define  UCR3_INVT  	 (1<<1)  /* Inverted Infrared transmission */
+>  #define  UCR3_BPEN  	 (1<<0)  /* Preset registers enable */
+> -#define  UCR4_CTSTL_32   (32<<10) /* CTS trigger level (32 chars) */
+> +#define  UCR4_CTSTL_SHF  10      /* CTS trigger level shift */
+> +#define  UCR4_CTSTL_MASK 0x3F    /* CTS trigger is 6 bits wide */
+>  #define  UCR4_INVR  	 (1<<9)  /* Inverted infrared reception */
+>  #define  UCR4_ENIRI 	 (1<<8)  /* Serial infrared interrupt enable */
+>  #define  UCR4_WKEN  	 (1<<7)  /* Wake interrupt enable */
+> @@ -590,6 +591,8 @@ static int imx_setup_ufcr(struct imx_port *sport, unsigned int mode)
+>  	return 0;
+>  }
+>  
+> +#define CTSTL 16
+> +
+>  static int imx_startup(struct uart_port *port)
+>  {
+>  	struct imx_port *sport = (struct imx_port *)port;
+> @@ -606,6 +609,11 @@ static int imx_startup(struct uart_port *port)
+>  	if (USE_IRDA(sport))
+>  		temp |= UCR4_IRSC;
+>  
+> +	/* set the trigger level for CTS to 16 by default
+> +	 */
+> +	temp &= ~(UCR4_CTSTL_MASK << UCR4_CTSTL_SHF);
+> +	temp |= CTSTL << UCR4_CTSTL_SHF;
+> +
+>  	writel(temp & ~UCR4_DREN, sport->port.membase + UCR4);
+>  
+>  	if (USE_IRDA(sport)) {
+> -- 
+> 1.6.3.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+Regards,
+
+   Wolfram
+
 -- 
-1.6.5
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100121/c5fcc27e/attachment.sig>
