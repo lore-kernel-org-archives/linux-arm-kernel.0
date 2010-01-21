@@ -1,44 +1,70 @@
-From: rnayak@ti.com (Nayak, Rajendra)
-Date: Thu, 21 Jan 2010 11:16:49 +0530
-Subject: [PATCH 0/3] OMAP4: prcm/clock fixes
-In-Reply-To: <alpine.DEB.2.00.1001201346070.3977@utopia.booyaka.com>
-References: <5A47E75E594F054BAF48C5E4FC4B92AB031E2EC077@dbde02.ent.ti.com>
-	<alpine.DEB.2.00.1001190911530.3977@utopia.booyaka.com>
-	<alpine.DEB.2.00.1001190931480.3977@utopia.booyaka.com>
-	<alpine.DEB.2.00.1001201346070.3977@utopia.booyaka.com>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB031E3F0B6A@dbde02.ent.ti.com>
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Thu, 21 Jan 2010 15:11:05 +0900
+Subject: [PATCH] ARM: S3C64XX: Tidy up common code in
+	s3c64xx_spi_set_info()
+In-Reply-To: <1264051266-18754-2-git-send-email-ben-linux@fluff.org>
+References: <1264051266-18754-1-git-send-email-ben-linux@fluff.org>
+	<1264051266-18754-2-git-send-email-ben-linux@fluff.org>
+Message-ID: <1b68c6791001202211m7ead63e8i82c186f2e3830241@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Paul Walmsley [mailto:paul at pwsan.com] 
-> Sent: Thursday, January 21, 2010 2:17 AM
-> To: Nayak, Rajendra
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: RE: [PATCH 0/3] OMAP4: prcm/clock fixes
-> 
-> Hi,
-> 
-> On Tue, 19 Jan 2010, Paul Walmsley wrote:
-> 
-> > On Tue, 19 Jan 2010, Paul Walmsley wrote:
-> > > This patch is now posted for any comments or review:
-> > > 
-> > > 
-> http://www.pwsan.com/omap/patches/omap4_clk_fix/0001-OMAP4-PRC
-> M-Define-shift-macros-as-n-instead-of-1.patch
-> > 
-> > Thanks, this is a total "brown paper bag" bug :-(
-> > 
-> > Queued for 2.6.33-rc.
-> 
-> Based on some advice from Tony, this patch has been moved to the 
-> for_2.6.34 branch.  Please let me know if this causes any problems.
-
-Thanks Paul, that should be just fine.
-
-> 
-> - Paul
-> 
+On Thu, Jan 21, 2010 at 2:21 PM, Ben Dooks <ben-linux@fluff.org> wrote:
+> The s3c64xx_spi_set_info() sets one of two platform data structures depending
+> on which controller is being specified. Change to taking a pointer to the
+> relevant platform data structure and then having one set of code to place
+> the data into the area being pointed to.
+>
+> Cc: Jassi Brar <jassi.brar@samsung.com>
+> Signed-off-by: Ben Dooks <ben-linux@fluff.org>
+> ---
+> ?arch/arm/plat-s3c64xx/dev-spi.c | ? 15 +++++++++------
+> ?1 files changed, 9 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/plat-s3c64xx/dev-spi.c b/arch/arm/plat-s3c64xx/dev-spi.c
+> index 6b6d7af..ca10388 100644
+> --- a/arch/arm/plat-s3c64xx/dev-spi.c
+> +++ b/arch/arm/plat-s3c64xx/dev-spi.c
+> @@ -18,6 +18,7 @@
+> ?#include <mach/gpio.h>
+>
+> ?#include <plat/spi-clocks.h>
+> +
+> ?#include <plat/s3c64xx-spi.h>
+> ?#include <plat/gpio-bank-c.h>
+> ?#include <plat/gpio-cfg.h>
+> @@ -154,6 +155,8 @@ EXPORT_SYMBOL(s3c64xx_device_spi1);
+>
+> ?void __init s3c64xx_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
+> ?{
+> + ? ? ? struct s3c64xx_spi_info *pd;
+> +
+> ? ? ? ?/* Reject invalid configuration */
+> ? ? ? ?if (!num_cs || src_clk_nr < 0
+> ? ? ? ? ? ? ? ? ? ? ? ?|| src_clk_nr > S3C64XX_SPI_SRCCLK_48M) {
+> @@ -163,18 +166,18 @@ void __init s3c64xx_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
+>
+> ? ? ? ?switch (cntrlr) {
+> ? ? ? ?case 0:
+> - ? ? ? ? ? ? ? s3c64xx_spi0_pdata.num_cs = num_cs;
+> - ? ? ? ? ? ? ? s3c64xx_spi0_pdata.src_clk_nr = src_clk_nr;
+> - ? ? ? ? ? ? ? s3c64xx_spi0_pdata.src_clk_name = spi_src_clks[src_clk_nr];
+> + ? ? ? ? ? ? ? pd = &s3c64xx_spi0_pdata;
+> ? ? ? ? ? ? ? ?break;
+> ? ? ? ?case 1:
+> - ? ? ? ? ? ? ? s3c64xx_spi1_pdata.num_cs = num_cs;
+> - ? ? ? ? ? ? ? s3c64xx_spi1_pdata.src_clk_nr = src_clk_nr;
+> - ? ? ? ? ? ? ? s3c64xx_spi1_pdata.src_clk_name = spi_src_clks[src_clk_nr];
+> + ? ? ? ? ? ? ? pd = &s3c64xx_spi1_pdata;
+> ? ? ? ? ? ? ? ?break;
+> ? ? ? ?default:
+> ? ? ? ? ? ? ? ?printk(KERN_ERR "%s: Invalid SPI controller(%d)\n",
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__func__, cntrlr);
+> ? ? ? ? ? ? ? ?return;
+> ? ? ? ?}
+> +
+> + ? ? ? pd->num_cs = num_cs;
+> + ? ? ? pd->src_clk_nr = src_clk_nr;
+> + ? ? ? pd->src_clk_name = spi_src_clks[src_clk_nr];
+> ?}
+acked-by: Jassi Brar <jassi.brar@samsung.com>
