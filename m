@@ -1,81 +1,49 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 21 Jan 2010 17:00:23 +0200
-Subject: [PATCH 2/2] mx25: properly initialize clocks, fix time accounting
-In-Reply-To: <cover.1264085584.git.baruch@tkos.co.il>
-References: <cover.1264085584.git.baruch@tkos.co.il>
-Message-ID: <d05c786d8d87c1bb35e3f13d4fc9b8f4ddf18b3b.1264085584.git.baruch@tkos.co.il>
+From: schen@mvista.com (Steve Chen)
+Date: Thu, 21 Jan 2010 09:22:22 -0600
+Subject: make PHYS_OFFSET determined at run time (unfinished)
+In-Reply-To: <1264074184.3207.109.camel@linux-1lbu>
+References: <20100119083803.GA17904@pengutronix.de>
+	<4B561581.6060400@bluewatersys.com>
+	<20100120005505.GD26562@trinity.fluff.org>
+	<1263954112.3207.73.camel@linux-1lbu>
+	<20100120023255.GV10014@trinity.fluff.org>
+	<1263998346.3207.83.camel@linux-1lbu>
+	<1b68c6791001201728ma5ce62dyb1d4825cedb8f9df@mail.gmail.com>
+	<1264074184.3207.109.camel@linux-1lbu>
+Message-ID: <1264087342.3207.163.camel@linux-1lbu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For some odd reason the GPT module has run the timer counter at 100MHz, while
-the rate reported by the gpt_clk has been 133MHz. This caused a significant
-drift in time accounting.
+On Thu, 2010-01-21 at 05:43 -0600, Steve Chen wrote:
+> On Thu, 2010-01-21 at 10:28 +0900, jassi brar wrote:
+> > >
+> > > I'm also able to boot zImage under u-boot.  However, I had to set r1
+> > > manually, and I don't know how to pass kernel parameters (stuff passed
+> > > into kernel uImage via bootargs) to zImage.  Any tips will be greatly
+> > > appreciated.
+> > Perhaps you use 'go' instead of 'bootm' command in u-boot?
+> > How about:-
+> > 
+> >  u-boot # <load zImage@_addr_ by some means>
+> > 
+> >  u-boot # setenv machid <your machine ID in hex without the '0x'>
+> >  u-boot # saveenv //persistently save the machid
+> >              // now you don't need to set machid even after cold reset
+> > 
+> >  u-boot # bootm _addr_
+> > 
+> > hth.
+> 
+> Yes, I did use go instead of bootm.  I'll give this a try.  I'm using
+> u-boot version 1.3.3.  Based on Uwe's comment, there is a good chance
+> that I'll need to upgrade my u-boot.  Thank you all for the feedback.
+> 
+I did a quick test, and I got
 
-This patch disables all unnecessary clock in mx25_clocks_init() to make a clean
-start, the same as is being done for the rest of the i.MX chips.
+U-Boot > bootm 0xc0700000
+Wrong Image Format for bootm command
+ERROR: can't get kernel image!
 
-To preserve the uart and fec functionality, this patch temporarily enables the
-respective clocks in mx25_clocks_init(). The real fix for this is to use the
-.secondary field of the mxc clk struct, and enable these clocks from there.
+It appears that I need a newer u-boot.
 
-This patch was tested on i.MX25 PDK.
-
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm/mach-mx25/clock.c |   27 ++++++++++++++++++++++++++-
- 1 files changed, 26 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-mx25/clock.c b/arch/arm/mach-mx25/clock.c
-index a4ba334..b1aadd5 100644
---- a/arch/arm/mach-mx25/clock.c
-+++ b/arch/arm/mach-mx25/clock.c
-@@ -119,6 +119,11 @@ static unsigned long get_rate_nfc(struct clk *clk)
- 	return get_rate_per(8);
- }
- 
-+static unsigned long get_rate_gpt(struct clk *clk)
-+{
-+	return get_rate_per(5);
-+}
-+
- static unsigned long get_rate_otg(struct clk *clk)
- {
- 	return 48000000; /* FIXME */
-@@ -155,7 +160,7 @@ static void clk_cgcr_disable(struct clk *clk)
- 		.disable	= clk_cgcr_disable,	\
- 	}
- 
--DEFINE_CLOCK(gpt_clk,    0, CCM_CGCR0,  5, get_rate_ipg, NULL);
-+DEFINE_CLOCK(gpt_clk,    0, CCM_CGCR0,  5, get_rate_gpt, NULL);
- DEFINE_CLOCK(cspi1_clk,  0, CCM_CGCR1,  5, get_rate_ipg, NULL);
- DEFINE_CLOCK(cspi2_clk,  0, CCM_CGCR1,  6, get_rate_ipg, NULL);
- DEFINE_CLOCK(cspi3_clk,  0, CCM_CGCR1,  7, get_rate_ipg, NULL);
-@@ -215,6 +220,26 @@ int __init mx25_clocks_init(void)
- 	for (i = 0; i < ARRAY_SIZE(lookups); i++)
- 		clkdev_add(&lookups[i]);
- 
-+	/* Turn off all clocks except the ones we need to survive, namely:
-+	 * EMI, GPIO1-3 (CCM_CGCR1[18:16]), GPT1, IOMUXC (CCM_CGCR1[27]), IIM,
-+	 * SCC
-+	 */
-+	__raw_writel((1 << 19), CRM_BASE + CCM_CGCR0);
-+	__raw_writel((0xf << 16) | (3 << 26), CRM_BASE + CCM_CGCR1);
-+	__raw_writel((1 << 5), CRM_BASE + CCM_CGCR2);
-+
-+	/* Enable FEC IPG
-+	 * FIXME: implement secondary clock
-+	 */
-+	__raw_writel(__raw_readl(CRM_BASE + CCM_CGCR1) | (1 << 15),
-+			CRM_BASE + CCM_CGCR1);
-+
-+	/* Enable uart PER
-+	 * FIXME: implement secondary clock
-+	 */
-+	__raw_writel(__raw_readl(CRM_BASE + CCM_CGCR0) | (1 << 15),
-+			CRM_BASE + CCM_CGCR0);
-+
- 	mxc_timer_init(&gpt_clk, MX25_IO_ADDRESS(MX25_GPT1_BASE_ADDR), 54);
- 
- 	return 0;
--- 
-1.6.5
+Steve
