@@ -1,62 +1,21 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Thu, 21 Jan 2010 10:52:42 +0100
-Subject: [PATCH] ARM: MX3: Fixed typo in declared enum type name.
-In-Reply-To: <fcda838a1001210135w38a52098m112c6055324b60e1@mail.gmail.com>
-References: <1264065172-22494-1-git-send-email-vzapolskiy@gmail.com>
-	<20100121092619.GV8970@buzzloop.caiaq.de>
-	<fcda838a1001210135w38a52098m112c6055324b60e1@mail.gmail.com>
-Message-ID: <20100121095242.GX8970@buzzloop.caiaq.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 21 Jan 2010 10:11:29 +0000
+Subject: [PATCH 1/2] S3C64XX: Staticise audio platform data
+In-Reply-To: <20100121014530.GY10014@trinity.fluff.org>
+References: <1263992765-28479-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<20100121014530.GY10014@trinity.fluff.org>
+Message-ID: <20100121101128.GA21621@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 21, 2010 at 12:35:22PM +0300, Vladimir Zapolskiy wrote:
-> According to this issue I have not met problems with mx31lite board,
-> surely that's just a typo. Anyway I plan to continue to work with this
-> board setup for a while and make some tests of the recent changes
-> found in 2.6.33.
+On Thu, Jan 21, 2010 at 01:45:30AM +0000, Ben Dooks wrote:
+> On Wed, Jan 20, 2010 at 01:06:04PM +0000, Mark Brown wrote:
+> > It's not exported.
 
-Good to hear, more testing is certainly needed.
+> applied these all to next-samsung-s3c64xx2, will merge into next-samsung
 
-Thanks,
-Daniel
+> next time, please add ARM: to the prefix, it would save time when applying
+> to the tree.
 
-
-> On Thu, Jan 21, 2010 at 12:26 PM, Daniel Mack <daniel@caiaq.de> wrote:
-> > On Thu, Jan 21, 2010 at 12:12:52PM +0300, Vladimir Zapolskiy wrote:
-> >> To distinguish between mx31lite and mx31lilly boards better to use
-> >> different enum types.
-> >
-> > True, even though it shouldn't have any impact unless you include both
-> > headers. I assume you didn't meet any real-life problem with that?
-> >
-> >> Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
-> >
-> > Acked-by: Daniel Mack <daniel@caiaq.de>
-> >
-> >
-> >> ---
-> >> ?arch/arm/plat-mxc/include/mach/board-mx31lite.h | ? ?2 +-
-> >> ?1 files changed, 1 insertions(+), 1 deletions(-)
-> >>
-> >> diff --git a/arch/arm/plat-mxc/include/mach/board-mx31lite.h b/arch/arm/plat-mxc/include/mach/board-mx31lite.h
-> >> index 0184b63..2b2da03 100644
-> >> --- a/arch/arm/plat-mxc/include/mach/board-mx31lite.h
-> >> +++ b/arch/arm/plat-mxc/include/mach/board-mx31lite.h
-> >> @@ -25,7 +25,7 @@
-> >>
-> >> ?#ifndef __ASSEMBLY__
-> >>
-> >> -enum mx31lilly_boards {
-> >> +enum mx31lite_boards {
-> >> ? ? ? MX31LITE_NOBOARD ? ? ? ?= 0,
-> >> ? ? ? MX31LITE_DB ? ? ? ? ? ? = 1,
-> >> ?};
-> >> --
-> >> 1.6.5.4
-> >>
-> >
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Is that definite?  The ARM generic bit of the prefix seems to waver
+between [ARM] and ARM:.
