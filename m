@@ -1,26 +1,55 @@
-From: pjohn@in.mvista.com (Philby John)
-Date: Thu, 21 Jan 2010 15:42:23 +0530
-Subject: [PATCH] ARM: Fix the reset logic for ARM RealView boards
-In-Reply-To: <20100106145427.12791.34402.stgit@ARM03585.cambridge.arm.com>
-References: <20100106145427.12791.34402.stgit@ARM03585.cambridge.arm.com>
-Message-ID: <1264068743.3370.0.camel@localhost.localdomain>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 21 Jan 2010 10:28:26 -0000
+Subject: [PATCH 5/5] arm/perfevents: implement perf event support for	ARMv6
+In-Reply-To: <20100121093917.GB4908@wear.picochip.com>
+References: <1263471256-3739-1-git-send-email-jamie.iles@picochip.com>
+	<1263471256-3739-2-git-send-email-jamie.iles@picochip.com>
+	<1263471256-3739-3-git-send-email-jamie.iles@picochip.com>
+	<1263471256-3739-4-git-send-email-jamie.iles@picochip.com>
+	<1263471256-3739-5-git-send-email-jamie.iles@picochip.com>
+	<1263471256-3739-6-git-send-email-jamie.iles@picochip.com>
+	<20100121093917.GB4908@wear.picochip.com>
+Message-ID: <001501ca9a84$77ff48a0$67fdd9e0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-01-06 at 14:54 +0000, Colin Tuckley wrote:
-> Extend the patch from Philby John to the other "RealView" boards.
-> Rename the constants and offsets to reflect their actual functions.
+
+Hi Jamie,
+
+* Jamie Iles wrote:
+
+> Given the difficulty in determining the CPU type 100%, this should be changed
+> to:
 > 
-> Signed-off-by: Colin Tuckley <colin.tuckley@arm.com>
-> Cc: Philby John <pjohn@in.mvista.com>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> 	unsigned long cpuid = read_cpuid_id();
+> 	unsigned long implementor = (cpuid & 0xFF000000) >> 24;
+> 	unsigned long part_number = (cpuid & 0xFFF0);
+> 
+> 	/* We only support ARM CPUs implemented by ARM at the moment. */
+> 	if (implementor == 0x41) {
+> 		switch (part_number) {
+> 		case 0xB360:
+> 		case 0xB560:
+> 			etc
 
+Whilst I understand that the whole cpuid thing is a complete mess [I saw the
+lkml posts yesterday], I'm not sure this is necessary for v7 cores. For v7,
+the PMU is part of the architecture and so *must* be implemented in the way
+described in the ARM ARM [Chapter 9], regardless of the implementer.
 
-Good work on extending reset functionality to all Realview boards. I see
-that this is now applied by the Patch system.
+However, for v6 you're right - checking that ARM is the implementer is a sensible
+thing to do. This does rely on the implementer setting those bits correctly
+though :)
 
-(Test Resending 4th attempt: host bombadil.infradead.org[18.85.46.34] refused to
-talk to me.421 SMTP command timeout closing connection)
+Additionally, it's quite possible for an implementer to extend the hardware
+counters on a v7 SoC. This means that you would have the PMU as described in the
+ARM ARM, but then additional counters, perhaps outside the core that can be
+accessed in a different way. In this case, switching on the implementer ID is
+essential to determine extra features, but the base features can be assumed to be
+present.
 
-Regards,
-Philby
+All food for thought.
+
+Cheers,
+
+Will
