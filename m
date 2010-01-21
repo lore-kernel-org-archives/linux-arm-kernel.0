@@ -1,46 +1,59 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 21 Jan 2010 01:43:58 +0000
-Subject: [PATCH] ARM: S3C64XX: Fix typo in s3c-hsotg platform data
-In-Reply-To: <b2e8f9f71001201637ua278aa2v56c313d605aa7d13@mail.gmail.com>
-References: <b2e8f9f71001201637ua278aa2v56c313d605aa7d13@mail.gmail.com>
-Message-ID: <20100121014358.GX10014@trinity.fluff.org>
+Date: Thu, 21 Jan 2010 01:45:30 +0000
+Subject: [PATCH 1/2] S3C64XX: Staticise audio platform data
+In-Reply-To: <1263992765-28479-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1263992765-28479-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <20100121014530.GY10014@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 21, 2010 at 01:37:28AM +0100, Maurus Cuelenaere wrote:
-> ARM: S3C64XX: Fix typo in s3c-hsotg platform data
+On Wed, Jan 20, 2010 at 01:06:04PM +0000, Mark Brown wrote:
+> It's not exported.
 
-applied to next-samsung-s3c64xx2, will merge into next-samsung.
+applied these all to next-samsung-s3c64xx2, will merge into next-samsung
+
+next time, please add ARM: to the prefix, it would save time when applying
+to the tree.
  
-> Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 > ---
->  arch/arm/plat-s3c/include/plat/udc-hs.h |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+>  arch/arm/plat-s3c64xx/dev-audio.c |    6 +++---
+>  1 files changed, 3 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm/plat-s3c/include/plat/udc-hs.h
-> b/arch/arm/plat-s3c/include/plat/udc-hs.h
-> index dd04db0..a22a4f2 100644
-> --- a/arch/arm/plat-s3c/include/plat/udc-hs.h
-> +++ b/arch/arm/plat-s3c/include/plat/udc-hs.h
-> @@ -12,7 +12,7 @@
->   * published by the Free Software Foundation.
->  */
-> 
-> -enum s3c_hostg_dmamode {
-> +enum s3c_hsotg_dmamode {
->  	S3C_HSOTG_DMA_NONE,	/* do not use DMA at-all */
->  	S3C_HSOTG_DMA_ONLY,	/* always use DMA */
->  	S3C_HSOTG_DMA_DRV,	/* DMA is chosen by driver */
-> @@ -24,6 +24,6 @@ enum s3c_hostg_dmamode {
->   * @is_osc: The clock source is an oscillator, not a crystal
->   */
->  struct s3c_hsotg_plat {
-> -	enum s3c_hostg_dmamode	dma;
-> +	enum s3c_hsotg_dmamode	dma;
->  	unsigned int		is_osc : 1;
+> diff --git a/arch/arm/plat-s3c64xx/dev-audio.c b/arch/arm/plat-s3c64xx/dev-audio.c
+> index 5b89344..f6b7bfb 100644
+> --- a/arch/arm/plat-s3c64xx/dev-audio.c
+> +++ b/arch/arm/plat-s3c64xx/dev-audio.c
+> @@ -80,7 +80,7 @@ static struct resource s3c64xx_iis0_resource[] = {
+>  	},
 >  };
+>  
+> -struct s3c_audio_pdata s3c_i2s0_pdata = {
+> +static struct s3c_audio_pdata s3c_i2s0_pdata = {
+>  	.cfg_gpio = s3c64xx_i2sv3_cfg_gpio,
+>  };
+>  
+> @@ -113,7 +113,7 @@ static struct resource s3c64xx_iis1_resource[] = {
+>  	},
+>  };
+>  
+> -struct s3c_audio_pdata s3c_i2s1_pdata = {
+> +static struct s3c_audio_pdata s3c_i2s1_pdata = {
+>  	.cfg_gpio = s3c64xx_i2sv3_cfg_gpio,
+>  };
+>  
+> @@ -146,7 +146,7 @@ static struct resource s3c64xx_iisv4_resource[] = {
+>  	},
+>  };
+>  
+> -struct s3c_audio_pdata s3c_i2sv4_pdata = {
+> +static struct s3c_audio_pdata s3c_i2sv4_pdata = {
+>  	.cfg_gpio = s3c64xx_i2sv4_cfg_gpio,
+>  };
+>  
 > -- 
 > 1.6.6
+> 
 
 -- 
 -- 
