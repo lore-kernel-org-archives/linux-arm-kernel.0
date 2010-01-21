@@ -1,30 +1,34 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 21 Jan 2010 13:43:38 +0100
-Subject: make PHYS_OFFSET determined at run time (unfinished)
-In-Reply-To: <1264074184.3207.109.camel@linux-1lbu>
-References: <20100119083803.GA17904@pengutronix.de>
-	<4B561581.6060400@bluewatersys.com>
-	<20100120005505.GD26562@trinity.fluff.org>
-	<1263954112.3207.73.camel@linux-1lbu>
-	<20100120023255.GV10014@trinity.fluff.org>
-	<1263998346.3207.83.camel@linux-1lbu>
-	<1b68c6791001201728ma5ce62dyb1d4825cedb8f9df@mail.gmail.com>
-	<1264074184.3207.109.camel@linux-1lbu>
-Message-ID: <20100121124338.GA17146@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 21 Jan 2010 12:45:37 +0000
+Subject: [PATCH 5/5] arm/perfevents: implement perf event support for ARMv6
+In-Reply-To: <001a01ca9a96$0f7024a0$2e506de0$@deacon@arm.com>
+References: <1263471256-3739-1-git-send-email-jamie.iles@picochip.com>
+	<20100121093917.GB4908@wear.picochip.com>
+	<20100121103803.GA15663@n2100.arm.linux.org.uk>
+	<201001211321.44682.jpihet@mvista.com>
+	<001a01ca9a96$0f7024a0$2e506de0$@deacon@arm.com>
+Message-ID: <20100121124537.GA19210@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
+On Thu, Jan 21, 2010 at 12:34:22PM -0000, Will Deacon wrote:
+> For the v7 PMU, we can do a bit better than that because the PMU
+> is defined by the architecture. If you read the DIDR[19:16] and it
+> returns either 3 or 4, you have a v7 PMU present so you can make use of
+> the architecturally defined events regardless of the implementer.
 
-> Yes, I did use go instead of bootm.  I'll give this a try.  I'm using
-> u-boot version 1.3.3.  Based on Uwe's comment, there is a good chance
-> that I'll need to upgrade my u-boot.  Thank you all for the feedback.
-note I only pointed out that barebox (aka. u-boot-v2) can boot zImages.
-I don't know about u-boot-v1.
+However, you can't just check DIDR - DIDR doesn't exist unless you have
+the new ID scheme - and you can tell that by:
 
-Best regards
-Uwe
+if MIDR[31:28] != 0x41 || (MIDR[12:15] != 0 && MIDR[12:15] != 7)
+	newid = MIDR[19:16] == 15
+else
+	newid = 0
 
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+or currently check for cpu_architecture() >= CPU_ARCH_ARMv6 &&
+MIDR[19:16] == 15 (the additional qualification is needed because ARMv6
+CPUs can have either the old or new schemes.)
+
+However, what also needs checking is how DIDR is specified for ARMv6,
+and whether that clashes with the ARMv7 version - as I mentioned before,
+the new ID scheme is not without its own set of weird changes as well.
