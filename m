@@ -1,25 +1,25 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 22 Jan 2010 09:17:20 +0900
-Subject: [PATCH v3 5/9] ARM: S5PV210: Add SMDKV210 board support file
-Message-ID: <1264119440-14597-1-git-send-email-kgene.kim@samsung.com>
+Date: Fri, 22 Jan 2010 09:17:26 +0900
+Subject: [PATCH v3 6/9] ARM: S5PV210: Add SMDKC110 board support file
+Message-ID: <1264119446-14630-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds SMDKV210 board support file.
+This patch adds SMDKC110 board support file.
 
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s5pv210/mach-smdkv210.c |   98 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-s5pv210/mach-smdkc110.c |   98 +++++++++++++++++++++++++++++++++
  1 files changed, 98 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5pv210/mach-smdkv210.c
+ create mode 100644 arch/arm/mach-s5pv210/mach-smdkc110.c
 
-diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
+diff --git a/arch/arm/mach-s5pv210/mach-smdkc110.c b/arch/arm/mach-s5pv210/mach-smdkc110.c
 new file mode 100644
-index 0000000..93d9d99
+index 0000000..aba7b7f
 --- /dev/null
-+++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
++++ b/arch/arm/mach-s5pv210/mach-smdkc110.c
 @@ -0,0 +1,98 @@
-+/* linux/arch/arm/mach-s5pv210/mach-smdkv210.c
++/* linux/arch/arm/mach-s5pv210/mach-smdkc110.c
 + *
 + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
 + *		http://www.samsung.com/
@@ -92,29 +92,29 @@ index 0000000..93d9d99
 +	},
 +};
 +
-+static struct platform_device *smdkv210_devices[] __initdata = {
++static struct platform_device *smdkc110_devices[] __initdata = {
 +};
 +
-+static void __init smdkv210_map_io(void)
++static void __init smdkc110_map_io(void)
 +{
 +	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
 +	s3c24xx_init_clocks(24000000);
 +	s3c24xx_init_uarts(smdkv210_uartcfgs, ARRAY_SIZE(smdkv210_uartcfgs));
 +}
 +
-+static void __init smdkv210_machine_init(void)
++static void __init smdkc110_machine_init(void)
 +{
-+	platform_add_devices(smdkv210_devices, ARRAY_SIZE(smdkv210_devices));
++	platform_add_devices(smdkc110_devices, ARRAY_SIZE(smdkc110_devices));
 +}
 +
-+MACHINE_START(SMDKV210, "SMDKV210")
++MACHINE_START(SMDKC110, "SMDKC110")
 +	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
 +	.phys_io	= S5P_PA_UART & 0xfff00000,
 +	.io_pg_offst	= (((u32)S5P_VA_UART) >> 18) & 0xfffc,
 +	.boot_params	= S5P_PA_SDRAM + 0x100,
 +	.init_irq	= s5pv210_init_irq,
-+	.map_io		= smdkv210_map_io,
-+	.init_machine	= smdkv210_machine_init,
++	.map_io		= smdkc110_map_io,
++	.init_machine	= smdkc110_machine_init,
 +	.timer		= &s3c24xx_timer,
 +MACHINE_END
 -- 
