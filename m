@@ -1,113 +1,112 @@
 From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Fri, 22 Jan 2010 23:47:11 +0100
-Subject: [PATCH 2/4] ARM: SAMSUNG: Rename s3c24xx touchscreen interface to s3c
-Message-ID: <b2e8f9f71001221447k897b5cfs213447084543ee55@mail.gmail.com>
+Date: Fri, 22 Jan 2010 23:47:14 +0100
+Subject: [PATCH 3/4] ARM: S3C64XX: Add touchscreen platform device definition
+Message-ID: <b2e8f9f71001221447h66136f0djc8652fe96093eb12@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM: SAMSUNG: Rename s3c24xx touchscreen interface to s3c
+ARM: S3C64XX: Add touchscreen platform device definition
 
 Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
 ---
- arch/arm/mach-s3c2410/mach-h1940.c      |    4 ++--
- arch/arm/plat-s3c24xx/devs.c            |   10 +++++-----
- arch/arm/plat-samsung/include/plat/ts.h |    4 ++--
- drivers/input/touchscreen/s3c2410_ts.c  |    4 ++--
- 4 files changed, 11 insertions(+), 11 deletions(-)
+ arch/arm/plat-s3c64xx/Kconfig  |    5 +++
+ arch/arm/plat-s3c64xx/Makefile |    4 +++
+ arch/arm/plat-s3c64xx/dev-ts.c |   58 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 67 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-s3c64xx/dev-ts.c
 
-diff --git a/arch/arm/mach-s3c2410/mach-h1940.c
-b/arch/arm/mach-s3c2410/mach-h1940.c
-index 75e3ffb..76392f2 100644
---- a/arch/arm/mach-s3c2410/mach-h1940.c
-+++ b/arch/arm/mach-s3c2410/mach-h1940.c
-@@ -141,7 +141,7 @@ static struct s3c2410_udc_mach_info h1940_udc_cfg
-__initdata = {
- 	.vbus_pin_inverted	= 1,
- };
+diff --git a/arch/arm/plat-s3c64xx/Kconfig b/arch/arm/plat-s3c64xx/Kconfig
+index 37b4519..7b5b417 100644
+--- a/arch/arm/plat-s3c64xx/Kconfig
++++ b/arch/arm/plat-s3c64xx/Kconfig
+@@ -72,4 +72,9 @@ config S3C64XX_SETUP_SDHCI_GPIO
+ 	help
+ 	  Common setup code for S3C64XX SDHCI GPIO configurations
 
--static struct s3c2410_ts_mach_info h1940_ts_cfg __initdata = {
-+static struct s3c_ts_mach_info h1940_ts_cfg __initdata = {
- 		.delay = 10000,
- 		.presc = 49,
- 		.oversampling_shift = 2,
-@@ -313,7 +313,7 @@ static void __init h1940_init(void)
- 	s3c24xx_fb_set_platdata(&h1940_fb_info);
- 	s3c24xx_mci_set_platdata(&h1940_mmc_cfg);
-  	s3c24xx_udc_set_platdata(&h1940_udc_cfg);
--	s3c24xx_ts_set_platdata(&h1940_ts_cfg);
-+	s3c_ts_set_platdata(&h1940_ts_cfg);
- 	s3c_i2c0_set_platdata(NULL);
++config S3C64XX_DEV_TS
++	bool
++	help
++	  Common platform code for S3C64XX touchscreen device
++
+ endif
+diff --git a/arch/arm/plat-s3c64xx/Makefile b/arch/arm/plat-s3c64xx/Makefile
+index 80255a5..74fb958 100644
+--- a/arch/arm/plat-s3c64xx/Makefile
++++ b/arch/arm/plat-s3c64xx/Makefile
+@@ -40,6 +40,10 @@ obj-$(CONFIG_S3C64XX_DMA)	+= dma.o
 
- 	/* Turn off suspend on both USB ports, and switch the
-diff --git a/arch/arm/plat-s3c24xx/devs.c b/arch/arm/plat-s3c24xx/devs.c
-index 3e55bdd..f1c1426 100644
---- a/arch/arm/plat-s3c24xx/devs.c
-+++ b/arch/arm/plat-s3c24xx/devs.c
-@@ -163,14 +163,14 @@ struct platform_device s3c_device_ts = {
- };
- EXPORT_SYMBOL(s3c_device_ts);
+ obj-$(CONFIG_S3C_ADC)		+= dev-adc.o
 
--static struct s3c2410_ts_mach_info s3c2410ts_info;
-+static struct s3c_ts_mach_info s3c2410ts_info;
++# TS support
++
++obj-$(CONFIG_S3C64XX_DEV_TS)	+= dev-ts.o
++
+ # Device setup
 
--void __init s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info
-*hard_s3c2410ts_info)
-+void __init s3c_ts_set_platdata(struct s3c_ts_mach_info *hard_s3cts_info)
- {
--	memcpy(&s3c2410ts_info, hard_s3c2410ts_info, sizeof(struct
-s3c2410_ts_mach_info));
--	s3c_device_ts.dev.platform_data = &s3c2410ts_info;
-+	memcpy(&s3cts_info, hard_s3cts_info, sizeof(struct s3c_ts_mach_info));
-+	s3c_device_ts.dev.platform_data = &s3cts_info;
- }
--EXPORT_SYMBOL(s3c24xx_ts_set_platdata);
+ obj-$(CONFIG_S3C64XX_SETUP_I2C0) += setup-i2c0.o
+diff --git a/arch/arm/plat-s3c64xx/dev-ts.c b/arch/arm/plat-s3c64xx/dev-ts.c
+new file mode 100644
+index 0000000..11ccd33
+--- /dev/null
++++ b/arch/arm/plat-s3c64xx/dev-ts.c
+@@ -0,0 +1,58 @@
++/* linux/arch/arm/plat-s3c64xx/dev-ts.c
++ *
++ * Copyright 2010 Maurus Cuelenaere
++ *
++ * S3C64XX series device definition for touchscreen device
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#include <linux/kernel.h>
++#include <linux/string.h>
++#include <linux/platform_device.h>
++
++#include <mach/irqs.h>
++#include <mach/map.h>
++
++#include <plat/devs.h>
++#include <plat/ts.h>
++
++static struct resource s3c_ts_resource[] = {
++	[0] = {
++		.start = S3C64XX_PA_ADC,
++		.end   = S3C64XX_PA_ADC + SZ_256 - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_TC,
++		.end   = IRQ_TC,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device s3c_device_ts = {
++	.name		= "s3c64xx-ts",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(s3c_ts_resource),
++	.resource	= s3c_ts_resource,
++};
++EXPORT_SYMBOL(s3c_device_ts);
++
++void __init s3c_ts_set_platdata(struct s3c_ts_mach_info *pd)
++{
++	struct s3c_ts_mach_info *npd;
++
++	if (!pd) {
++		printk(KERN_ERR "%s: no platform data\n", __func__);
++		return;
++	}
++
++	npd = kmemdup(pd, sizeof(struct s3c_ts_mach_info), GFP_KERNEL);
++	if (!npd)
++		printk(KERN_ERR "%s: no memory for platform data\n", __func__);
++
++	s3c_device_ts.dev.platform_data = npd;
++}
 +EXPORT_SYMBOL(s3c_ts_set_platdata);
-
- /* USB Device (Gadget)*/
-
-diff --git a/arch/arm/plat-samsung/include/plat/ts.h
-b/arch/arm/plat-samsung/include/plat/ts.h
-index 8a51675..ed5a1d7 100644
---- a/arch/arm/plat-samsung/include/plat/ts.h
-+++ b/arch/arm/plat-samsung/include/plat/ts.h
-@@ -10,12 +10,12 @@
- #ifndef __ASM_ARM_TS_H
- #define __ASM_ARM_TS_H
-
--struct s3c2410_ts_mach_info {
-+struct s3c_ts_mach_info {
-        int             delay;
-        int             presc;
-        int             oversampling_shift;
- };
-
--extern void s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info *);
-+extern void s3c_ts_set_platdata(struct s3c_ts_mach_info *);
-
- #endif /* __ASM_ARM_TS_H */
-diff --git a/drivers/input/touchscreen/s3c2410_ts.c
-b/drivers/input/touchscreen/s3c2410_ts.c
-index 0cd0ca6..3debbc2 100644
---- a/drivers/input/touchscreen/s3c2410_ts.c
-+++ b/drivers/input/touchscreen/s3c2410_ts.c
-@@ -247,7 +247,7 @@ static void s3c24xx_ts_select(struct
-s3c_adc_client *client, unsigned select)
-  */
- static int __devinit s3c2410ts_probe(struct platform_device *pdev)
- {
--	struct s3c2410_ts_mach_info *info;
-+	struct s3c_ts_mach_info *info;
- 	struct device *dev = &pdev->dev;
- 	struct input_dev *input_dev;
- 	struct resource *res;
-@@ -398,7 +398,7 @@ static int s3c2410ts_suspend(struct device *dev)
- static int s3c2410ts_resume(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
--	struct s3c2410_ts_mach_info *info = pdev->dev.platform_data;
-+	struct s3c_ts_mach_info *info = pdev->dev.platform_data;
-
- 	clk_enable(ts.clock);
-
 -- 
 1.6.6.1
