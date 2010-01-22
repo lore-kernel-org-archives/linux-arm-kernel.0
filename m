@@ -1,138 +1,89 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Fri, 22 Jan 2010 23:47:17 +0100
-Subject: [PATCH 4/4] ARM: S3C64XX: Add s3c64xx support to touchscreen driver
-Message-ID: <b2e8f9f71001221447u550c9713l9f04aeec030c86db@mail.gmail.com>
+From: vikram.pandita@ti.com (Pandita, Vikram)
+Date: Sat, 23 Jan 2010 04:40:20 +0530
+Subject: [PATCH 2/4] omap: Make uncompress code and DEBUG_LL code
+	generic, v2
+In-Reply-To: <20100122211052.GE11835@atomide.com>
+References: <20100116013515.10065.30649.stgit@baageli.muru.com>
+	<20100116093555.GA13596@n2100.arm.linux.org.uk>
+	<20100116191820.GI10318@atomide.com>
+	<20100116193313.GA23092@n2100.arm.linux.org.uk>
+	<20100116200003.GL10318@atomide.com>
+	<FCCFB4CDC6E5564B9182F639FC356087030070F296@dbde02.ent.ti.com>
+	<20100122030711.GP23467@atomide.com>
+	<FCCFB4CDC6E5564B9182F639FC35608703007F2289@dbde02.ent.ti.com>
+	<20100122205511.GB11835@atomide.com>
+	<FCCFB4CDC6E5564B9182F639FC35608703007F232B@dbde02.ent.ti.com>
+	<20100122211052.GE11835@atomide.com>
+Message-ID: <FCCFB4CDC6E5564B9182F639FC35608703007F2340@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM: S3C64XX: Add s3c64xx support to touchscreen driver
+Tony
 
-This ack's the extra interrupt s3c64xx platforms have in the touchscreen driver.
+>-----Original Message-----
+>From: Tony Lindgren [mailto:tony at atomide.com]
+>Sent: Friday, January 22, 2010 3:11 PM
+>To: Pandita, Vikram
+>Cc: Russell King - ARM Linux; linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
+>Subject: Re: [PATCH 2/4] omap: Make uncompress code and DEBUG_LL code generic, v2
+>
+>* Pandita, Vikram <vikram.pandita@ti.com> [100122 12:56]:
+>>
+>>
+>> >-----Original Message-----
+>> >From: Tony Lindgren [mailto:tony at atomide.com]
+>> >Sent: Friday, January 22, 2010 2:55 PM
+>> >To: Pandita, Vikram
+>> >Cc: Russell King - ARM Linux; linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
+>> >Subject: Re: [PATCH 2/4] omap: Make uncompress code and DEBUG_LL code generic, v2
+>> >
+>> >* Pandita, Vikram <vikram.pandita@ti.com> [100122 06:46]:
+>> >> >
+>> >> >OK, I've added that too, but for mach-omap2 only. I've also
+>> >> >added an experimental zoom2/3 support.
+>> >> >
+>> >> >Care to take try it out and see what happens on a zoom?
+>> >>
+>> >> Test on zoom3 failed with multi-omap branch.
+>> >> Debugging the same, should have a zoom correction patch out today.
+>> >
+>> >Heh OK. I just pushed more updates into the multi-omap branch
+>> >if you want to try to boot zoom2/zoom3 using the same .config.
+>>
+>> Refreshed my tree and I don't see your patches yet.
+>
+>Takes a few minutes to get mirrored from master.kernel.org..
 
-Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
----
- drivers/input/touchscreen/Kconfig      |    6 +++---
- drivers/input/touchscreen/s3c2410_ts.c |   28 ++++++++++++++++++++++++----
- 2 files changed, 27 insertions(+), 7 deletions(-)
+Yes I tried with new branch and zoom2/3 does not work.
+Root cause: 
+There is a very basic issue in low level code.
 
-diff --git a/drivers/input/touchscreen/Kconfig
-b/drivers/input/touchscreen/Kconfig
-index dfafc76..0378b3d 100644
---- a/drivers/input/touchscreen/Kconfig
-+++ b/drivers/input/touchscreen/Kconfig
-@@ -146,11 +146,11 @@ config TOUCHSCREEN_FUJITSU
- 	  module will be called fujitsu-ts.
+We are allowed to create only one Physical to Virtual mapping using MACHINE_START() phys_io and io_pg_offst of size 0x100000(1MB).
 
- config TOUCHSCREEN_S3C2410
--	tristate "Samsung S3C2410 touchscreen input driver"
--	depends on ARCH_S3C2410
-+	tristate "Samsung S3C touchscreen input driver"
-+	depends on ARCH_S3C2410 || ARCH_S3C64XX
- 	select S3C24XX_ADC
- 	help
--	  Say Y here if you have the s3c2410 touchscreen.
-+	  Say Y here if you have the s3c touchscreen.
+Now for zoom2/3 we need to do following:
+MACHINE_START(OMAP_ZOOM3, "OMAP Zoom3 board")
+-       .phys_io        = 0x48000000,
+-       .io_pg_offst    = ((0xfa000000) >> 18) & 0xfffc,
++       .phys_io        = 0x1000000, /*ZOOM_UART_BASE*/
++       .io_pg_offst    = ((0xfb000000) >> 18) & 0xfffc, /*ZOOM_UART_VIRT*/
+        .boot_params    = 0x80000100,
+        .map_io         = omap_zoom_map_io,
+        .init_irq       = omap_zoom_init_irq,
 
- 	  If unsure, say N.
+This will create mapping:
+0x1000000 <-> 0xfb000000 of 1MB
 
-diff --git a/drivers/input/touchscreen/s3c2410_ts.c
-b/drivers/input/touchscreen/s3c2410_ts.c
-index 3debbc2..7dfbc38 100644
---- a/drivers/input/touchscreen/s3c2410_ts.c
-+++ b/drivers/input/touchscreen/s3c2410_ts.c
-@@ -40,7 +40,9 @@
- #include <plat/regs-adc.h>
- #include <plat/ts.h>
+Now that leaves the phy address 0x4800000 omap register mapping, unmapped.
 
-+#ifdef PLAT_S3C24XX
- #include <mach/regs-gpio.h>
-+#endif
+So the code to get scratchpad contents will abort:
+arch/arm/mach-omap2/include/mach/debug-macro.S
+	moveq   \rx, #0x48000000        @ physical base address
+	movne   \rx, #0xfa000000        @ virtual base
+	orr     \rx, \rx, #0x0006a000   @ uart1 on omap2/3/4
 
- #define TSC_SLEEP  (S3C2410_ADCTSC_PULL_UP_DISABLE | S3C2410_ADCTSC_XY_PST(0))
 
-@@ -88,6 +90,12 @@ struct s3c2410ts {
+This seems to be a basic limitation of low level code and I have not clue how to circumvent this.
+Thoughts?
 
- static struct s3c2410ts ts;
-
-+enum s3c_cpu_type {
-+	TYPE_S3C2410,
-+	TYPE_S3C2440,
-+	TYPE_S3C64XX,
-+};
-+
- /**
-  * s3c2410_ts_connect - configure gpio for s3c2410 systems
-  *
-@@ -95,6 +103,7 @@ static struct s3c2410ts ts;
-  * connected to the device (later systems such as the S3C2440 integrate
-  * these into the device).
- */
-+#ifdef PLAT_S3C24XX
- static inline void s3c2410_ts_connect(void)
- {
- 	s3c2410_gpio_cfgpin(S3C2410_GPG(12), S3C2410_GPG12_XMON);
-@@ -102,6 +111,7 @@ static inline void s3c2410_ts_connect(void)
- 	s3c2410_gpio_cfgpin(S3C2410_GPG(14), S3C2410_GPG14_YMON);
- 	s3c2410_gpio_cfgpin(S3C2410_GPG(15), S3C2410_GPG15_nYPON);
- }
-+#endif
-
- /**
-  * get_down - return the down state of the pen
-@@ -169,6 +179,7 @@ static DEFINE_TIMER(touch_timer, touch_timer_fire, 0, 0);
-  */
- static irqreturn_t stylus_irq(int irq, void *dev_id)
- {
-+	struct platform_device *pdev = to_platform_device(ts.dev);
- 	unsigned long data0;
- 	unsigned long data1;
- 	bool down;
-@@ -187,6 +198,12 @@ static irqreturn_t stylus_irq(int irq, void *dev_id)
- 	else
- 		dev_info(ts.dev, "%s: count=%d\n", __func__, ts.count);
-
-+
-+	if (platform_get_device_id(pdev)->driver_data == TYPE_S3C64XX) {
-+		/* Clear pen down/up interrupt */
-+		writel(0x0, ts.io + S3C64XX_ADCCLRINTPNDNUP);
-+	}
-+
- 	return IRQ_HANDLED;
- }
-
-@@ -295,9 +312,11 @@ static int __devinit s3c2410ts_probe(struct
-platform_device *pdev)
- 		goto err_clk;
- 	}
-
-+#ifdef PLAT_S3C24XX
- 	/* Configure the touchscreen external FETs on the S3C2410 */
--	if (!platform_get_device_id(pdev)->driver_data)
-+	if (platform_get_device_id(pdev)->driver_data == TYPE_S3C2410)
- 		s3c2410_ts_connect();
-+#endif
-
- 	ts.client = s3c_adc_register(pdev, s3c24xx_ts_select,
- 				     s3c24xx_ts_conversion, 1);
-@@ -418,15 +437,16 @@ static struct dev_pm_ops s3c_ts_pmops = {
- #endif
-
- static struct platform_device_id s3cts_driver_ids[] = {
--	{ "s3c2410-ts", 0 },
--	{ "s3c2440-ts", 1 },
-+	{ "s3c2410-ts", TYPE_S3C2410 },
-+	{ "s3c2440-ts", TYPE_S3C2440 },
-+	{ "s3c64xx-ts", TYPE_S3C64XX },
- 	{ }
- };
- MODULE_DEVICE_TABLE(platform, s3cts_driver_ids);
-
- static struct platform_driver s3c_ts_driver = {
- 	.driver         = {
--		.name   = "s3c24xx-ts",
-+		.name   = "s3c-ts",
- 		.owner  = THIS_MODULE,
- #ifdef CONFIG_PM
- 		.pm	= &s3c_ts_pmops,
--- 
-1.6.6.1
+Regards,
+Vikram 
