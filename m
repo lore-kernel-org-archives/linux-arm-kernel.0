@@ -1,162 +1,50 @@
-From: acme@infradead.org (Arnaldo Carvalho de Melo)
-Date: Fri, 22 Jan 2010 10:26:07 -0200
-Subject: [PATCH v1 1/1] Extended events (platform-specific) support in perf
-In-Reply-To: <1264162139-26788-2-git-send-email-t.fujak@samsung.com>
-References: <1264162139-26788-1-git-send-email-t.fujak@samsung.com>
-	<1264162139-26788-2-git-send-email-t.fujak@samsung.com>
-Message-ID: <20100122122607.GE1244@ghostprotocols.net>
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Fri, 22 Jan 2010 21:32:09 +0900
+Subject: make PHYS_OFFSET determined at run time (unfinished)
+In-Reply-To: <1264087342.3207.163.camel@linux-1lbu>
+References: <20100119083803.GA17904@pengutronix.de>
+	<4B561581.6060400@bluewatersys.com>
+	<20100120005505.GD26562@trinity.fluff.org>
+	<1263954112.3207.73.camel@linux-1lbu>
+	<20100120023255.GV10014@trinity.fluff.org>
+	<1263998346.3207.83.camel@linux-1lbu>
+	<1b68c6791001201728ma5ce62dyb1d4825cedb8f9df@mail.gmail.com>
+	<1264074184.3207.109.camel@linux-1lbu>
+	<1264087342.3207.163.camel@linux-1lbu>
+Message-ID: <1b68c6791001220432u6ae3635bg679f2f3ecde23360@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Fri, Jan 22, 2010 at 01:08:59PM +0100, Tomasz Fujak escreveu:
-> Signed-off-by: Tomasz Fujak <t.fujak@samsung.com>
-> Reviewed-by: Pawel Osciak <p.osciak@samsung.com>
-> Reviewed-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Reviewed-by: Kyungmin Park <kuyngmin.park@samsung.com>
-
-"Extended" seems vague, I think in this context "platform_" would be a
-better namespace specifier.
- 
-> ---
->  tools/perf/util/parse-events.c |  224 ++++++++++++++++++++++++++++++++++++++--
->  1 files changed, 213 insertions(+), 11 deletions(-)
-> 
-> diff --git a/tools/perf/util/parse-events.c b/tools/perf/util/parse-events.c
-> index 05d0c5c..3e32198 100644
-> --- a/tools/perf/util/parse-events.c
-> +++ b/tools/perf/util/parse-events.c
-> @@ -9,6 +9,9 @@
->  #include "header.h"
->  #include "debugfs.h"
->  
-> +#define			EXTENDED_EVENT_PATH	\
-> +			"/sys/devices/system/cpu/perf_events/extevents"
-> +
->  int				nr_counters;
->  
->  struct perf_event_attr		attrs[MAX_COUNTERS];
-> @@ -60,6 +63,10 @@ static struct event_symbol event_symbols[] = {
->  #define PERF_EVENT_TYPE(config)	__PERF_EVENT_FIELD(config, TYPE)
->  #define PERF_EVENT_ID(config)		__PERF_EVENT_FIELD(config, EVENT)
->  
-> +static struct event_symbol *extended_event_symbols;
-> +static unsigned int 	extended_event_count;
-> +static int 			extended_events_initialized;
-> +
->  static const char *hw_event_names[] = {
->  	"cycles",
->  	"instructions",
-> @@ -241,6 +248,157 @@ static const char *tracepoint_id_to_name(u64 config)
->  	return buf;
->  }
->  
-> +static unsigned count_lines(const char *str, unsigned size)
-> +{
-> +	unsigned count = 0;
-> +
-> +	while (size--)
-> +		count += ('\n' == *str++);
-> +	return count;
-> +}
-> +
-> +#define	BYTES_PER_CHUNK 4096
-> +/* returns the number of lines read;
-> +   on fail the return is negative and no memory is allocated
-> +   otherwise the *buf contains a memory chunk of which first
-> +   *size bytes are used for file contents
-> + */
-> +static int read_file(int fd, char **buf, unsigned *size)
-> +{
-> +	unsigned bytes = BYTES_PER_CHUNK;
-> +	int lines = 0;
-> +	char *ptr = malloc(bytes);
-
-malloc can fail... Also why is that you can't process the lines one by
-one instead of reading the whole (albeit small) file at once?
-
-> +	*size = 0;
-> +	do {
-> +		int ret = read(fd, ptr + *size, bytes - *size);
-> +		if (ret < 0) {
-> +			if (EINTR == errno)
-> +				continue;
-> +			else {
-> +				free(ptr);
-> +				return -1;
-> +			}
-> +		}
-> +
-> +		if (!ret)
-> +			break;
-> +
-> +		lines += count_lines(ptr + *size, ret);
-> +		*size += ret;
-> +
-> +		if (*size == bytes) {
-> +			char *tmp = realloc(ptr, bytes <<= 1);
-> +			if (!tmp) {
-> +				free(ptr);
-> +				return -1;
-> +			}
-> +			ptr = tmp;
-> +		}
-> +	} while (1);
-> +
-> +	*buf = ptr;
-> +	return lines;
-> +}
-> +
-> +static int parse_extevent_file(struct event_symbol *symbols,
-> +			unsigned lines, char *buf)
-> +{
-> +	char *name, *description, *ptr, *end;
-> +	unsigned offset = 0, count = 0;
-> +	int items, eaten;
-> +	unsigned long long discard;
-> +
-> +/* each line format should be "0x%llx\t%s\t%lld-%lld\t%s\n" */
-> +	while (lines--) {
-> +		items = sscanf(buf + offset + 2, "%llx",
-> +				&symbols[count].config);
-> +		if (1 != items)
-> +			continue;
-> +
-> +		/* skip 0x%llx\t */
-> +		ptr = strchr(buf + offset, '\t') + 1;
-> +
-> +		name = description = NULL;
-> +
-> +		end = strchr(ptr, '\t');
-> +		if (end) {
-> +			name = strndup(ptr, end - ptr);
-> +			ptr = end + 1;
-> +		}
-> +
-> +		ptr = end;
-> +		items = sscanf(ptr, "%lld-%lld\t%n", &discard, &discard,
-> +			 &eaten);
-> +		if (2 != items)
-> +			continue;
-> +
-> +		ptr += eaten;
-> +		end = strchr(ptr, '\n');
-> +		if (end) {
-> +			description = strndup(ptr, end - ptr);
-> +			offset = end - buf + 1;
-> +		} else
-> +			break;
-> +
-> +		if (name && description) {
-> +			symbols[count].symbol = name;
-> +			symbols[count].alias = "";
-> +			++count;
-> +			/* description gets lost here */
-> +			free(description);
-> +		} else {
-> +			free(description);
-> +			free(name);
-> +		}
-
-Having "free(description);" in both cases seems funny :-)
-
-- Arnaldo
+On Fri, Jan 22, 2010 at 12:22 AM, Steve Chen <schen@mvista.com> wrote:
+> On Thu, 2010-01-21 at 05:43 -0600, Steve Chen wrote:
+>> On Thu, 2010-01-21 at 10:28 +0900, jassi brar wrote:
+>> > >
+>> > > I'm also able to boot zImage under u-boot. ?However, I had to set r1
+>> > > manually, and I don't know how to pass kernel parameters (stuff passed
+>> > > into kernel uImage via bootargs) to zImage. ?Any tips will be greatly
+>> > > appreciated.
+>> > Perhaps you use 'go' instead of 'bootm' command in u-boot?
+>> > How about:-
+>> >
+>> > ?u-boot # <load zImage@_addr_ by some means>
+>> >
+>> > ?u-boot # setenv machid <your machine ID in hex without the '0x'>
+>> > ?u-boot # saveenv //persistently save the machid
+>> > ? ? ? ? ? ? ?// now you don't need to set machid even after cold reset
+>> >
+>> > ?u-boot # bootm _addr_
+>> >
+>> > hth.
+>>
+>> Yes, I did use go instead of bootm. ?I'll give this a try. ?I'm using
+>> u-boot version 1.3.3. ?Based on Uwe's comment, there is a good chance
+>> that I'll need to upgrade my u-boot. ?Thank you all for the feedback.
+>>
+> I did a quick test, and I got
+>
+> U-Boot > bootm 0xc0700000
+> Wrong Image Format for bootm command
+> ERROR: can't get kernel image!
+>
+> It appears that I need a newer u-boot.
+I use u-boot-1.3.4 though
