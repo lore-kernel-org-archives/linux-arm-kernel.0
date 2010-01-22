@@ -1,55 +1,43 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 22 Jan 2010 12:49:35 +0100
-Subject: [PATCH] serial imx.c: fix CTS trigger level lower to avoid
-	lost chars
-In-Reply-To: <20100122113130.GB10449@n2100.arm.linux.org.uk>
-References: <1264109163-28739-1-git-send-email-valentin.longchamp@epfl.ch>
-	<20100121220653.GA21010@pengutronix.de>
-	<20100121221133.GA30419@n2100.arm.linux.org.uk>
-	<4B597A82.4020906@epfl.ch> <20100122110701.GA15699@shareable.org>
-	<20100122113130.GB10449@n2100.arm.linux.org.uk>
-Message-ID: <20100122114934.GE4782@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 22 Jan 2010 12:58:31 +0100
+Subject: make PHYS_OFFSET determined at run time (unfinished)
+In-Reply-To: <20100119083803.GA17904@pengutronix.de>
+References: <20100119083803.GA17904@pengutronix.de>
+Message-ID: <20100122115831.GA8377@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> What you're assuming is that flow control was there to prevent overruns
-> on the hardware receiver.  That's not the way it works on these devices;
-> flow control is entirely managed in software - there is no hardware
-> assistance.
-> 
-> The flow control implemented for non-FIFO and non-hardware assisted
-> UARTs is purely to do with preventing the software buffer behind the
-> UART from overflowing - it can't prevent the device's receiver buffering
-> from overrunning.  (Non-FIFO devices have the shift register and a
-> buffer register - complete reception of a second character before the
-> first is read causes an overrun condition.)
-> 
-> If you have overruns on the receiver, that's an interrupt latency
-> problem and its an error that's reported to the receiver side only.
-> 
-> Yes, later devices have the ability in hardware to deassert RTS when
-> the receiver FIFO gets above a certain threshold to /help/ prevent
-> overruns occuring when there's high interrupt latency - but normal
-> system operation should still ensure that the FIFO is emptied in a
-> timely manner.
-> 
-> They also gained the ability to stop the transmitter once CTS is
-> deasserted, mainly because the transmitter FIFOs in these devices
-> is soo large (maybe 32 to 128 bytes deep.)
+Hello,
 
-Russell, thanks for this explanation. Patch seems principally OK to me, then.
+just a short status report:  The code seems to work OK if PHYS_OFFSET is
+determined correctly.
 
-Regards,
+The problem is when it does not.  Currently I place arch/arm/boot/Image
+at 0xa1008000[1] with PHYS_OFFSET being 0xa0000000.  Then
+arch/arm/boot/head.S guesses PHYS_OFFSET to be 0xa1000000 resulting
+__va(bank->start) of my only bank to be 0xbf000000.  And so this bank is
+discarded by sanity_check_meminfo as 0xbf000000 overlaps the vmalloc
+region.
 
-   Wolfram
+So how to proceed?  These possiblities come to (my) mind:
+
+ - parse the atag list to better guess phys_offset
+   (both zImage and Image would need to do that)
+ - require that zImage and Image are placed such that the guess is done
+   right (which is stupid for zImage as then the decompressor needs to
+   move the decompressed image)
+ - require the bootloader to pass phys_offset (r3?)
+ - make the ram mapping non-linear
+ - don't discard the whole bank, only the addresses overlaping the
+   vmalloc region
+
+Anything else?  Preferences?  Thoughts?
+
+Best regards
+Uwe
+
+[1] I think the same happens with zImage placed at 0xa1008000
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100122/5e70afe5/attachment-0001.sig>
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
