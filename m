@@ -1,43 +1,84 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 22 Jan 2010 12:58:31 +0100
-Subject: make PHYS_OFFSET determined at run time (unfinished)
-In-Reply-To: <20100119083803.GA17904@pengutronix.de>
-References: <20100119083803.GA17904@pengutronix.de>
-Message-ID: <20100122115831.GA8377@pengutronix.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 22 Jan 2010 12:58:53 +0100
+Subject: [PATCH] serial imx.c: fix CTS trigger level lower to avoid
+	lost chars
+In-Reply-To: <1264109163-28739-1-git-send-email-valentin.longchamp@epfl.ch>
+References: <1264109163-28739-1-git-send-email-valentin.longchamp@epfl.ch>
+Message-ID: <20100122115853.GF4782@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, Jan 21, 2010 at 10:26:03PM +0100, Valentin Longchamp wrote:
+> The imx CTS trigger level is left at its reset value that is 32
+> chars. Since the RX FIFO has 32 entries, when CTS is raised, the
+> FIFO already is full. However, some serial port devices first empty
+> their TX FIFO before stopping when CTS is raised, resulting in lost
+> chars.
+> 
+> This patch sets the trigger level lower so that other chars arrive
+> after CTS is raised, there is still room for 16 of them.
+> 
+> Signed-off-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
+> Tested-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
 
-just a short status report:  The code seems to work OK if PHYS_OFFSET is
-determined correctly.
+If you fix the comment, feel free to add my:
 
-The problem is when it does not.  Currently I place arch/arm/boot/Image
-at 0xa1008000[1] with PHYS_OFFSET being 0xa0000000.  Then
-arch/arm/boot/head.S guesses PHYS_OFFSET to be 0xa1000000 resulting
-__va(bank->start) of my only bank to be 0xbf000000.  And so this bank is
-discarded by sanity_check_meminfo as 0xbf000000 overlaps the vmalloc
-region.
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
 
-So how to proceed?  These possiblities come to (my) mind:
+> ---
+>  drivers/serial/imx.c |   10 +++++++++-
+>  1 files changed, 9 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/serial/imx.c b/drivers/serial/imx.c
+> index 18130f1..f7d2da5 100644
+> --- a/drivers/serial/imx.c
+> +++ b/drivers/serial/imx.c
+> @@ -119,7 +119,8 @@
+>  #define  MX2_UCR3_RXDMUXSEL	 (1<<2)  /* RXD Muxed Input Select, on mx2/mx3 */
+>  #define  UCR3_INVT  	 (1<<1)  /* Inverted Infrared transmission */
+>  #define  UCR3_BPEN  	 (1<<0)  /* Preset registers enable */
+> -#define  UCR4_CTSTL_32   (32<<10) /* CTS trigger level (32 chars) */
+> +#define  UCR4_CTSTL_SHF  10      /* CTS trigger level shift */
+> +#define  UCR4_CTSTL_MASK 0x3F    /* CTS trigger is 6 bits wide */
+>  #define  UCR4_INVR  	 (1<<9)  /* Inverted infrared reception */
+>  #define  UCR4_ENIRI 	 (1<<8)  /* Serial infrared interrupt enable */
+>  #define  UCR4_WKEN  	 (1<<7)  /* Wake interrupt enable */
+> @@ -590,6 +591,8 @@ static int imx_setup_ufcr(struct imx_port *sport, unsigned int mode)
+>  	return 0;
+>  }
+>  
+> +#define CTSTL 16
+> +
 
- - parse the atag list to better guess phys_offset
-   (both zImage and Image would need to do that)
- - require that zImage and Image are placed such that the guess is done
-   right (which is stupid for zImage as then the decompressor needs to
-   move the decompressed image)
- - require the bootloader to pass phys_offset (r3?)
- - make the ram mapping non-linear
- - don't discard the whole bank, only the addresses overlaping the
-   vmalloc region
+Maybe a comment that it is set to half the buffer size? Dunno...
 
-Anything else?  Preferences?  Thoughts?
+>  static int imx_startup(struct uart_port *port)
+>  {
+>  	struct imx_port *sport = (struct imx_port *)port;
+> @@ -606,6 +609,11 @@ static int imx_startup(struct uart_port *port)
+>  	if (USE_IRDA(sport))
+>  		temp |= UCR4_IRSC;
+>  
+> +	/* set the trigger level for CTS to 16 by default
+> +	 */
 
-Best regards
-Uwe
+Make this comment a one-liner. Also remove the "to 16 by default" part as this
+value is #defined and, who knows, it may change.
 
-[1] I think the same happens with zImage placed at 0xa1008000
+> +	temp &= ~(UCR4_CTSTL_MASK << UCR4_CTSTL_SHF);
+> +	temp |= CTSTL << UCR4_CTSTL_SHF;
+> +
+>  	writel(temp & ~UCR4_DREN, sport->port.membase + UCR4);
+>  
+>  	if (USE_IRDA(sport)) {
 
 -- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100122/7de68086/attachment.sig>
