@@ -1,29 +1,61 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 26 Jan 2010 09:35:00 +0100
-Subject: [PATCH] RFC: make struct platform_driver.id_table const
-In-Reply-To: <f17812d71001252201n215f2a9y1906fef630726dbe@mail.gmail.com>
-References: <1264179837-22999-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20100125013421.GL26562@trinity.fluff.org>
-	<4B5CFEBE.2070906@gmail.com>
-	<20100125074242.GA12480@pengutronix.de>
-	<4B5E092B.3070801@gmail.com>
-	<f17812d71001252201n215f2a9y1906fef630726dbe@mail.gmail.com>
-Message-ID: <20100126083500.GA20792@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe Kleine-K�nig)
+Date: Fri, 22 Jan 2010 17:59:46 +0100
+Subject: [PATCH] make struct platform_driver.id_table const
+Message-ID: <mailman.174.1264494918.2170.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg,
+This fixes a warning on several pxa based machines:
 
-On Tue, Jan 26, 2010 at 02:01:15PM +0800, Eric Miao wrote:
-> I seems to remember a similar patch sent to GregKH weeks ago and
-> should be sitting somewhere but this one looks to be more complete.
-Yes, it's
-	gregkh-2.6/gregkh-05-driver-core/driver-core-make-platform_device_id-table-const.patch
+	arch/arm/mach-pxa/ssp.c:475: warning: initialization discards qualifiers from pointer target type
 
-Below you can find the current state with all Acks it has got until now.
-(Eric: I considered your mail as Ack, too.  OK?)
-As I don't know how to change the log message with an incremental patch
-you have to tell me if you prefer this way.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Acked-by: Vikram Dhillon <dhillonv10@gmail.com>
+Acked-by: Eric Miao <eric.y.miao@gmail.com>
+Cc: Greg Kroah-Hartman <gregkh@suse.de>
+---
+ drivers/base/platform.c         |    2 +-
+ include/linux/platform_device.h |    4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-Best regards
-Uwe
+diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+index 58efaf2..962246c 100644
+--- a/drivers/base/platform.c
++++ b/drivers/base/platform.c
+@@ -578,7 +578,7 @@ static int platform_uevent(struct device *dev, struct kobj_uevent_env *env)
+ }
+ 
+ static const struct platform_device_id *platform_match_id(
+-			struct platform_device_id *id,
++			const struct platform_device_id *id,
+ 			struct platform_device *pdev)
+ {
+ 	while (id->name[0]) {
+diff --git a/include/linux/platform_device.h b/include/linux/platform_device.h
+index 71ff887..3a6201e 100644
+--- a/include/linux/platform_device.h
++++ b/include/linux/platform_device.h
+@@ -21,7 +21,7 @@ struct platform_device {
+ 	u32		num_resources;
+ 	struct resource	* resource;
+ 
+-	struct platform_device_id	*id_entry;
++	const struct platform_device_id	*id_entry;
+ 
+ 	/* arch specific additions */
+ 	struct pdev_archdata	archdata;
+@@ -62,7 +62,7 @@ struct platform_driver {
+ 	int (*suspend)(struct platform_device *, pm_message_t state);
+ 	int (*resume)(struct platform_device *);
+ 	struct device_driver driver;
+-	struct platform_device_id *id_table;
++	const struct platform_device_id *id_table;
+ };
+ 
+ extern int platform_driver_register(struct platform_driver *);
+-- 
+1.6.6
+
+-- 
+Pengutronix e.K.                              | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                    | http://www.pengutronix.de/  |
