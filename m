@@ -1,29 +1,28 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 22 Jan 2010 17:56:49 +0100
-Subject: [PATCH] pcmcia/at91_cf: don't redefine SZ_2K
-In-Reply-To: <cd73a99e0912231226r49dd53b8wfd7555b3db08a712@mail.gmail.com>
-References: <1261343434-3920-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20091222152827.GB17191@n2100.arm.linux.org.uk>
-	<20091222162827.GA20681@pengutronix.de>
-	<cd73a99e0912231226r49dd53b8wfd7555b3db08a712@mail.gmail.com>
-Message-ID: <20100122165649.GC13718@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 22 Jan 2010 16:57:19 +0000
+Subject: [PATCH] serial imx.c: fix CTS trigger level lower to avoid
+	lost chars
+In-Reply-To: <20100122164713.GA21907@shareable.org>
+References: <1264109163-28739-1-git-send-email-valentin.longchamp@epfl.ch>
+	<20100121220653.GA21010@pengutronix.de>
+	<20100121221133.GA30419@n2100.arm.linux.org.uk>
+	<4B597A82.4020906@epfl.ch> <20100122110701.GA15699@shareable.org>
+	<20100122113130.GB10449@n2100.arm.linux.org.uk>
+	<20100122164713.GA21907@shareable.org>
+Message-ID: <20100122165719.GB18461@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 23, 2009 at 10:26:56PM +0200, Andrew Victor wrote:
-> hi,
-> >> Have you checked whether everything which uses at91_cf still builds after
-> >> this patch has been applied (eg, AVR32 stuff?)
-> 
-> > I wasn't aware that the driver is used on AVR32, too.
-> 
-> I don't think the AVR32 arch uses this driver.  So the patch should be
-> fine to apply.
-I assume this is an Ack?
+On Fri, Jan 22, 2010 at 04:47:13PM +0000, Jamie Lokier wrote:
+> Any tips on how to make the serial receive irq latency more reliable
+> on ARM, with a boringly generic serial driver?
 
-Best regards
-Uwe
+What you could do is arrange for a backtrace to be printed when
+you read an overrun condition from the UART - if interrupts were
+disabled by something taking a long time, and then enabled, you
+should see the point where they were just enabled in the backtrace.
 
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+It could be down to another IRQF_DISABLED interrupt - in which case
+you won't see it in the backtrace.
+
+Of course, printing a backtrace will cause subsequent overruns...
