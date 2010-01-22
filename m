@@ -1,241 +1,40 @@
-From: roel.kluin@gmail.com (Roel Kluin)
-Date: Fri, 22 Jan 2010 19:57:05 +0100
-Subject: [PATCH] mach-pnx4008/dma.c: clean up duplication in
-	pnx4008_dma_split_{head, ll}_entry()
-Message-ID: <4B59F501.6010607@gmail.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Fri, 22 Jan 2010 20:13:27 +0100
+Subject: [PATCH] pcmcia/at91_cf: don't redefine SZ_2K
+In-Reply-To: <cd73a99e1001221050w398bd9epfd4fc79f91d36189@mail.gmail.com>
+References: <cd73a99e1001221050w398bd9epfd4fc79f91d36189@mail.gmail.com>
+Message-ID: <1264187607-14468-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It appears unnecessary to duplicate these loops.
+This fixes:
 
-Signed-off-by: Roel Kluin <roel.kluin@gmail.com>
+	drivers/pcmcia/at91_cf.c:55:1: warning: "SZ_2K" redefined
+
+Since
+
+	c1191b0 ([ARM] Kirkwood: create a mapping for the Security Accelerator SRAM)
+
+SZ_2K is defined in arch/arm/include/asm/sizes.h.
+
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Acked-by: Andrew Victor <linux@maxim.org.za>
 ---
- arch/arm/mach-pnx4008/dma.c |  198 +++++++++++++++----------------------------
- 1 files changed, 67 insertions(+), 131 deletions(-)
+ drivers/pcmcia/at91_cf.c |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-pnx4008/dma.c b/arch/arm/mach-pnx4008/dma.c
-index 425f718..d9302d3 100644
---- a/arch/arm/mach-pnx4008/dma.c
-+++ b/arch/arm/mach-pnx4008/dma.c
-@@ -731,78 +731,46 @@ void pnx4008_dma_split_head_entry(struct pnx4008_dma_config * config,
- 	}
- 	if (num_entries != 0) {
- 		struct pnx4008_dma_ll *ll = NULL;
-+		struct pnx4008_dma_ll *ll_old;
-+		unsigned long ll_dma_old;
- 		config->ch_ctrl &= ~0x7ff;
- 		config->ch_ctrl |= new_len;
--		if (!config->is_ll) {
--			config->is_ll = 1;
--			while (num_entries) {
--				if (!ll) {
--					config->ll =
--					    pnx4008_alloc_ll_entry(&config->
--								   ll_dma);
--					ll = config->ll;
--				} else {
--					ll->next =
--					    pnx4008_alloc_ll_entry(&ll->
--								   next_dma);
--					ll = ll->next;
--				}
--
--				if (ctrl->si)
--					ll->src_addr =
--					    config->src_addr +
--					    src_width * new_len * count;
--				else
--					ll->src_addr = config->src_addr;
--				if (ctrl->di)
--					ll->dest_addr =
--					    config->dest_addr +
--					    dest_width * new_len * count;
--				else
--					ll->dest_addr = config->dest_addr;
--				ll->ch_ctrl = config->ch_ctrl & 0x7fffffff;
--				ll->next_dma = 0;
--				ll->next = NULL;
--				num_entries--;
--				count++;
--			}
--		} else {
--			struct pnx4008_dma_ll *ll_old = config->ll;
--			unsigned long ll_dma_old = config->ll_dma;
--			while (num_entries) {
--				if (!ll) {
--					config->ll =
--					    pnx4008_alloc_ll_entry(&config->
--								   ll_dma);
--					ll = config->ll;
--				} else {
--					ll->next =
--					    pnx4008_alloc_ll_entry(&ll->
--								   next_dma);
--					ll = ll->next;
--				}
--
--				if (ctrl->si)
--					ll->src_addr =
--					    config->src_addr +
--					    src_width * new_len * count;
--				else
--					ll->src_addr = config->src_addr;
--				if (ctrl->di)
--					ll->dest_addr =
--					    config->dest_addr +
--					    dest_width * new_len * count;
--				else
--					ll->dest_addr = config->dest_addr;
--				ll->ch_ctrl = config->ch_ctrl & 0x7fffffff;
--				ll->next_dma = 0;
--				ll->next = NULL;
--				num_entries--;
--				count++;
-+		if (config->is_ll) {
-+			ll_old = config->ll;
-+			config->ll_dma;
-+		}
-+		while (num_entries) {
-+			if (!ll) {
-+				config->ll = pnx4008_alloc_ll_entry(
-+						&config->ll_dma);
-+				ll = config->ll;
-+			} else {
-+				ll->next = pnx4008_alloc_ll_entry(
-+						&ll-> next_dma);
-+				ll = ll->next;
- 			}
-+
-+			if (ctrl->si)
-+				ll->src_addr = config->src_addr +
-+					src_width * new_len * count;
-+			else
-+				ll->src_addr = config->src_addr;
-+			if (ctrl->di)
-+				ll->dest_addr = config->dest_addr +
-+					dest_width * new_len * count;
-+			else
-+				ll->dest_addr = config->dest_addr;
-+			ll->ch_ctrl = config->ch_ctrl & 0x7fffffff;
-+			ll->next_dma = 0;
-+			ll->next = NULL;
-+			num_entries--;
-+			count++;
-+		}
-+		if (config->is_ll) {
- 			ll->next_dma = ll_dma_old;
- 			ll->next = ll_old;
- 		}
-+		config->is_ll = 1;
- 		/* adjust last length/tc */
- 		ll->ch_ctrl = config->ch_ctrl & (~0x7ff);
- 		ll->ch_ctrl |= old_len - new_len * (count - 1);
-@@ -853,75 +821,43 @@ void pnx4008_dma_split_ll_entry(struct pnx4008_dma_ll * cur_ll,
- 	}
- 	if (num_entries != 0) {
- 		struct pnx4008_dma_ll *ll = NULL;
-+		struct pnx4008_dma_ll *ll_old;
-+		unsigned long ll_dma_old;
- 		cur_ll->ch_ctrl &= ~0x7ff;
- 		cur_ll->ch_ctrl |= new_len;
--		if (!cur_ll->next) {
--			while (num_entries) {
--				if (!ll) {
--					cur_ll->next =
--					    pnx4008_alloc_ll_entry(&cur_ll->
--								   next_dma);
--					ll = cur_ll->next;
--				} else {
--					ll->next =
--					    pnx4008_alloc_ll_entry(&ll->
--								   next_dma);
--					ll = ll->next;
--				}
--
--				if (ctrl->si)
--					ll->src_addr =
--					    cur_ll->src_addr +
--					    src_width * new_len * count;
--				else
--					ll->src_addr = cur_ll->src_addr;
--				if (ctrl->di)
--					ll->dest_addr =
--					    cur_ll->dest_addr +
--					    dest_width * new_len * count;
--				else
--					ll->dest_addr = cur_ll->dest_addr;
--				ll->ch_ctrl = cur_ll->ch_ctrl & 0x7fffffff;
--				ll->next_dma = 0;
--				ll->next = NULL;
--				num_entries--;
--				count++;
--			}
--		} else {
--			struct pnx4008_dma_ll *ll_old = cur_ll->next;
--			unsigned long ll_dma_old = cur_ll->next_dma;
--			while (num_entries) {
--				if (!ll) {
--					cur_ll->next =
--					    pnx4008_alloc_ll_entry(&cur_ll->
--								   next_dma);
--					ll = cur_ll->next;
--				} else {
--					ll->next =
--					    pnx4008_alloc_ll_entry(&ll->
--								   next_dma);
--					ll = ll->next;
--				}
--
--				if (ctrl->si)
--					ll->src_addr =
--					    cur_ll->src_addr +
--					    src_width * new_len * count;
--				else
--					ll->src_addr = cur_ll->src_addr;
--				if (ctrl->di)
--					ll->dest_addr =
--					    cur_ll->dest_addr +
--					    dest_width * new_len * count;
--				else
--					ll->dest_addr = cur_ll->dest_addr;
--				ll->ch_ctrl = cur_ll->ch_ctrl & 0x7fffffff;
--				ll->next_dma = 0;
--				ll->next = NULL;
--				num_entries--;
--				count++;
-+
-+		if (cur_ll->next) {
-+			ll_old = cur_ll->next;
-+			ll_dma_old = cur_ll->next_dma;
-+		}
-+		while (num_entries) {
-+			if (!ll) {
-+				cur_ll->next = pnx4008_alloc_ll_entry(
-+						&cur_ll->next_dma);
-+				ll = cur_ll->next;
-+			} else {
-+				ll->next = pnx4008_alloc_ll_entry(
-+						&ll->next_dma);
-+				ll = ll->next;
- 			}
+diff --git a/drivers/pcmcia/at91_cf.c b/drivers/pcmcia/at91_cf.c
+index e1dcced..5d22807 100644
+--- a/drivers/pcmcia/at91_cf.c
++++ b/drivers/pcmcia/at91_cf.c
+@@ -52,8 +52,6 @@ struct at91_cf_socket {
+ 	unsigned long		phys_baseaddr;
+ };
  
-+			if (ctrl->si)
-+				ll->src_addr = cur_ll->src_addr +
-+					src_width * new_len * count;
-+			else
-+				ll->src_addr = cur_ll->src_addr;
-+			if (ctrl->di)
-+				ll->dest_addr = cur_ll->dest_addr +
-+				    dest_width * new_len * count;
-+			else
-+				ll->dest_addr = cur_ll->dest_addr;
-+			ll->ch_ctrl = cur_ll->ch_ctrl & 0x7fffffff;
-+			ll->next_dma = 0;
-+			ll->next = NULL;
-+			num_entries--;
-+			count++;
-+		}
-+		if (cur_ll->next) {
- 			ll->next_dma = ll_dma_old;
- 			ll->next = ll_old;
- 		}
+-#define	SZ_2K			(2 * SZ_1K)
+-
+ static inline int at91_cf_present(struct at91_cf_socket *cf)
+ {
+ 	return !gpio_get_value(cf->board->det_pin);
+-- 
+1.6.6
