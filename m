@@ -1,25 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Jan 2010 22:11:33 +0000
-Subject: [PATCH] serial imx.c: fix CTS trigger level lower to avoid
-	lost chars
-In-Reply-To: <20100121220653.GA21010@pengutronix.de>
-References: <1264109163-28739-1-git-send-email-valentin.longchamp@epfl.ch>
-	<20100121220653.GA21010@pengutronix.de>
-Message-ID: <20100121221133.GA30419@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 22 Jan 2010 09:21:05 +0900
+Subject: [PATCH v3 0/9] ARM: S5PV210: Add support for Samsung's S5PV210 CPU
+Message-ID: <007101ca9af8$c9d273e0$5d775ba0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 21, 2010 at 11:06:53PM +0100, Wolfram Sang wrote:
-> CCing linux-serial
-> 
-> On Thu, Jan 21, 2010 at 10:26:03PM +0100, Valentin Longchamp wrote:
-> > The imx CTS trigger level is left at its reset value that is 32
-> > chars. Since the RX FIFO has 32 entries, when CTS is raised, the
-> > FIFO already is full. However, some serial port devices first empty
-> > their TX FIFO before stopping when CTS is raised, resulting in lost
-> > chars.
-> 
-> ? Isn't that a flaw of the other side? Have you spotted other serial drivers
-> doing the same as your patch?
 
-Arguably, but it's common behaviour of 16550A's and similar.
+This patch set adds support for Samsung's S5PV210 CPU. The S5PV210 integrates
+a ARM Cortex A8 microprocessor with several other peripherals to support
+features such as multimedia, storage, graphics and gaming. The S5PV210 can be
+used in products such as Netbooks and Mobile devices.
+
+This patch set consists of the following patches.
+
+[PATCH v3 1/9] ARM: S5PV210: Add Samsung S5PV210 CPU support
+[PATCH v3 2/9] ARM: S5PV210: Add clock support for S5PV210
+[PATCH v3 3/9] ARM: S5PV210: Add IRQ support
+[PATCH v3 4/9] ARM: S5PV210: Update Kconfig and Makefiles
+[PATCH v3 5/9] ARM: S5PV210: Add SMDKV210 board support file
+[PATCH v3 6/9] ARM: S5PV210: Add SMDKC110 board support file
+[PATCH v3 7/9] ARM: S5PV210: Add S5PV210 configuration file
+[PATCH v3 8/9] ARM: S5PV210: Add S5PC110 configuration file
+[PATCH v3 9/9] ARM: S5PV210: Add serial port support
+
+
+Changes since v2 :
+
+1. Use SPARSEMEM as Russell suggested.
+2. Fixed code as per comments from Ben in linux-samsung-soc mailing list.
+
+
+Changes since v1 :
+
+1. Removed mach/s5pv210/include/mach/gpio-core.h file.
+2. Removed unused clock gate defines.
+3. Removed machine fixup code from smdkv210 and smdkc110 board support.
+4. Merged Kconfig and Makefiles with other source code patches.
+5. Replaced multiple definition of UART info with macro.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+System LSI Division, SAMSUNG ELECTRONICS CO., LTD.
