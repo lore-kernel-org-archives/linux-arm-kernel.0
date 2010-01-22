@@ -1,87 +1,54 @@
-From: t.fujak@samsung.com (Tomasz Fujak)
-Date: Fri, 22 Jan 2010 14:08:35 +0100
-Subject: [PATCH v1 1/1] Extended events (platform-specific) support in perf
-In-Reply-To: <20100122122607.GE1244@ghostprotocols.net>
-References: <1264162139-26788-1-git-send-email-t.fujak@samsung.com>
-	<1264162139-26788-2-git-send-email-t.fujak@samsung.com>
-	<20100122122607.GE1244@ghostprotocols.net>
-Message-ID: <034a01ca9b64$01863d10$0492b730$%fujak@samsung.com>
+From: vikram.pandita@ti.com (Pandita, Vikram)
+Date: Fri, 22 Jan 2010 20:18:14 +0530
+Subject: [PATCH 2/4] omap: Make uncompress code and DEBUG_LL code
+	generic, v2
+In-Reply-To: <20100122030711.GP23467@atomide.com>
+References: <20100116013205.10065.95921.stgit@baageli.muru.com>
+	<20100116013515.10065.30649.stgit@baageli.muru.com>
+	<20100116093555.GA13596@n2100.arm.linux.org.uk>
+	<20100116191820.GI10318@atomide.com>
+	<20100116193313.GA23092@n2100.arm.linux.org.uk>
+	<20100116200003.GL10318@atomide.com>
+	<FCCFB4CDC6E5564B9182F639FC356087030070F296@dbde02.ent.ti.com>
+	<20100122030711.GP23467@atomide.com>
+Message-ID: <FCCFB4CDC6E5564B9182F639FC35608703007F2289@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> kernel-bounces at lists.infradead.org] On Behalf Of Arnaldo Carvalho de
-> Melo
-> Sent: Friday, January 22, 2010 1:26 PM
-> To: Tomasz Fujak
-> Cc: jpihet at mvista.com; peterz at infradead.org; p.osciak at samsung.com;
-> jamie.iles at picochip.com; will.deacon at arm.com; linux-
-> kernel at vger.kernel.org; kyungmin.park at samsung.com; mingo at elte.hu;
-> linux-arm-kernel at lists.infradead.org; m.szyprowski at samsung.com
-> Subject: Re: [PATCH v1 1/1] Extended events (platform-specific) support
-> in perf
-> 
-> Em Fri, Jan 22, 2010 at 01:08:59PM +0100, Tomasz Fujak escreveu:
-> > Signed-off-by: Tomasz Fujak <t.fujak@samsung.com>
-> > Reviewed-by: Pawel Osciak <p.osciak@samsung.com>
-> > Reviewed-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Reviewed-by: Kyungmin Park <kuyngmin.park@samsung.com>
-> 
-> "Extended" seems vague, I think in this context "platform_" would be a
-> better namespace specifier.
 
-Right.
 
-> > +#define	BYTES_PER_CHUNK 4096
-> > +/* returns the number of lines read;
-> > +   on fail the return is negative and no memory is allocated
-> > +   otherwise the *buf contains a memory chunk of which first
-> > +   *size bytes are used for file contents
-> > + */
-> > +static int read_file(int fd, char **buf, unsigned *size)
-> > +{
-> > +	unsigned bytes = BYTES_PER_CHUNK;
-> > +	int lines = 0;
-> > +	char *ptr = malloc(bytes);
-> 
-> malloc can fail... Also why is that you can't process the lines one by
-> one instead of reading the whole (albeit small) file at once?
+>-----Original Message-----
+>From: Tony Lindgren [mailto:tony at atomide.com]
+>Sent: Thursday, January 21, 2010 9:07 PM
+>To: Pandita, Vikram
+>Cc: Russell King - ARM Linux; linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
+>Subject: Re: [PATCH 2/4] omap: Make uncompress code and DEBUG_LL code generic, v2
+>
+>* Pandita, Vikram <vikram.pandita@ti.com> [100118 17:48]:
+>>
+>> >* Russell King - ARM Linux <linux@arm.linux.org.uk> [100116 11:31]:
+>> >
+>> >> Why not do something like this:
+>> >>
+>> >> 		.pushsection .data
+>> >> omap_uart_phys:	.word 0
+>> >> omap_uart_virt:	.word 0
+>> >> 		.popsection
+>
+>Updated patch below using .data. This assumes getting an additional
+>tmp register passed to addruart as in the patch I posted earlier.
+>
+>> Also We may need a:
+>> 	 omap_uart_shift: .word 0
+>> Since shift also varies depending on different omap boards
+>> (external debug board shift=1, internal omap has shift=2)
+>
+>OK, I've added that too, but for mach-omap2 only. I've also
+>added an experimental zoom2/3 support.
+>
+>Care to take try it out and see what happens on a zoom?
 
-Right, no malloc check.
-The purpose of not processing line-by-line is that then the collection needs
-to be dynamic.
+Test on zoom3 failed with multi-omap branch.
+Debugging the same, should have a zoom correction patch out today.
 
-Since the file buffer gets dropped after it's processed, the overallocated
-memory is returned to the system.
-In case of the collection (here an array and a counter) it'd require tricks
-not to overallocate, and still be O(#events).
-
-But you're right I didn't do it right - in case the a line does not parse,
-memory reserved for it is not freed. Fixing.
-
-> > +
-> > +		if (name && description) {
-> > +			symbols[count].symbol = name;
-> > +			symbols[count].alias = "";
-> > +			++count;
-> > +			/* description gets lost here */
-> > +			free(description);
-> > +		} else {
-> > +			free(description);
-> > +			free(name);
-> > +		}
-> 
-> Having "free(description);" in both cases seems funny :-)
-
-I wasn't so bold as to upgrade the perf with human-readable event
-description.
-Otherwise yes, moving it outside.
-
-> 
-> - Arnaldo
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
