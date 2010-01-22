@@ -1,68 +1,58 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Sun, 31 Jan 2010 18:01:17 -0800
-Subject: [PATCH v6] input: IMX: add imx-keypad driver to support the
-	Keypad Port present in the imx application processors family.
-In-Reply-To: <1264945351.2433.10.camel@realization>
-References: <1264852407.2587.4.camel@realization>
-	<20100131090802.GD12320@core.coreip.homeip.net>
-	<1264945351.2433.10.camel@realization>
-Message-ID: <20100201020117.GA24188@core.coreip.homeip.net>
+From: 914059751@qq.com (rocky)
+Date: Fri, 22 Jan 2010 09:11:29 +0800
+Subject: =?gb2312?B?tPC4tDogUXVlcnkgYWJvdXQgbG9vcHNfcGVyX2ppZmZ5?=
+In-Reply-To: <tencent_2543180B1828B0D317DCD9FC@qq.com>
+References: <tencent_2543180B1828B0D317DCD9FC@qq.com>
+Message-ID: <6134FC3AD99C4CA8A47F7E3D5E71C470@dufan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alberto,
+Green hand apology for the unintended CC, I should make this query personal.
 
-On Sun, Jan 31, 2010 at 02:42:31PM +0100, Alberto Panizzo wrote:
-> On dom, 2010-01-31 at 01:08 -0800, Dmitry Torokhov wrote:
-> > Hi Alberto,
-> > 
-> > On Sat, Jan 30, 2010 at 12:53:27PM +0100, Alberto Panizzo wrote:
-> > > 
-> > > Changes in v6:
-> > > -MXC to IMX pattern change (apart of Kconfig dependencies)
-> > > -Comment style fixes
-> > > -Greater check delay in debouncing process (10). 
-> > > -Improve the usage of keypad->exit_flag: now it is false only
-> > between open and 
-> > >  close functions. And if we handle an interrupt out there, leave all
-> > interrupts
-> > >  masked, and wait for another open to re enable they.
-> > > -Remove unnecessary "free events" mechanism (tested with evtest).
-> > > 
-> > 
-> > I took the liberty of making some changes to the driver, could you
-> > please give the patch below a try and if I did not mess it up I will
-> > fold it into your v6 version and apply to next.
-> > 
-> > Thank you.
-> > 
-> > -- 
-> > Dmitry 
-> 
-> For me it is ok. Your patch looks good and I tested your changes and all
-> goes well.
+ 
 
-Great, thanks a lot.
+  _____  
 
-> I have to work on my English and other changes make the 
-> source code more readable.
-> Dmitry, put also your Signed-off line in v6 patch after merge if you
-> feel to wont this. (I've already thought to ask you this before this
-> patch fix) You help me a lot on building this version and an Acked-by
-> maybe is not fair about your work.
+???: linux-arm-kernel-bounces at lists.infradead.org
+[mailto:linux-arm-kernel-bounces at lists.infradead.org] ?? ???
+????: 2010?1?19? 21:38
+???: Alessandro Rubini
+??: linux-arm-kernel
+??: Re: Query about loops_per_jiffy
 
-Yes, I will fold this patch into your original v6 patch and will add my
-sign-off. BTW, adding sign-off does not imply in any way that a person
-had more or less involvement in the development of a driver/feature;
-this is just to track the path of patricular code reaching mainline.
-I am adding my sign-offs to all patches that are applied to my tree as
-do all the other maintainers, the authorship of the patch is conveyed
-via git's 'author' field.
+ 
 
-OK, so the driver is applied to the 'next' branch of my tree and should
-be in mainline when 2.6.34 merge window opens.
+Are you  Alessandro Rubini of LINUX DEVICE DRIVER?
 
-Thank you.
+------------------ Original ------------------
 
--- 
-Dmitry
+From:  "Alessandro Rubini"<rubini-list@gnudd.com>;
+
+Date:  Tue, Jan 19, 2010 04:21 PM
+
+To:  "914059751"<914059751@qq.com>; 
+
+Cc:  "linux-arm-kernel"<linux-arm-kernel@lists.infradead.org>; 
+
+Subject:  Re: Query about loops_per_jiffy
+
+ 
+
+> (loops_per_jiffy * HZ)/1000,000   will give a BogoMips value.
+
+No, it will give a BogoLips (loops per second). A loop is two instructions,
+in ./arch/arm/lib/delay.S (function __delay) called by init/calibrate.c ..
+To have bogomips you need to multiply by two.
+
+> then why calibrate_delay do it like the following:
+>     printk(KERN_CONT "%lu.%02lu BogoMIPS (lpj=%lu)\n",
+>             loops_per_jiffy/(500000/HZ),
+>             (loops_per_jiffy/(5000/HZ)) % 100, loops_per_jiffy);
+
+It's correct, using normal integer aritmetics care.
+
+/alessandro
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100122/fc3ec93b/attachment.htm>
