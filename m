@@ -1,55 +1,28 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 22 Jan 2010 17:52:38 +0100
-Subject: [PATCH 1/2] arm/at91: Don't disable irqs in set_next_event and
-	set_mode callbacks
-In-Reply-To: <20100122163658.GA18461@n2100.arm.linux.org.uk>
-References: <1259231164-21242-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1261056821-28521-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20100122160824.GA13718@pengutronix.de>
-	<20100122163658.GA18461@n2100.arm.linux.org.uk>
-Message-ID: <20100122165238.GB13718@pengutronix.de>
+Date: Fri, 22 Jan 2010 17:56:49 +0100
+Subject: [PATCH] pcmcia/at91_cf: don't redefine SZ_2K
+In-Reply-To: <cd73a99e0912231226r49dd53b8wfd7555b3db08a712@mail.gmail.com>
+References: <1261343434-3920-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20091222152827.GB17191@n2100.arm.linux.org.uk>
+	<20091222162827.GA20681@pengutronix.de>
+	<cd73a99e0912231226r49dd53b8wfd7555b3db08a712@mail.gmail.com>
+Message-ID: <20100122165649.GC13718@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
-
-On Fri, Jan 22, 2010 at 04:36:58PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Jan 22, 2010 at 05:08:24PM +0100, Uwe Kleine-K?nig wrote:
-> > You can pull them from
-> > 
-> > 	git://git.pengutronix.de/git/ukl/linux-2.6.git arm/clock-event
+On Wed, Dec 23, 2009 at 10:26:56PM +0200, Andrew Victor wrote:
+> hi,
+> >> Have you checked whether everything which uses at91_cf still builds after
+> >> this patch has been applied (eg, AVR32 stuff?)
 > 
-> I really don't like pulling git urls which I don't know what I'm pulling.
-> Please include at least a diffstat and shortlog of the commits you're
-> expecting to be sent.
+> > I wasn't aware that the driver is used on AVR32, too.
 > 
-> Something like the output from git request-pull would be ideal.
-OK, appended below.  Actually I expected you to make me sending them to
-the patch system.  But as I prefer when you pull from me, I'm happy to
-provide you with diffstat and shortlog.
+> I don't think the AVR32 arch uses this driver.  So the patch should be
+> fine to apply.
+I assume this is an Ack?
 
 Best regards
 Uwe
-
-The following changes since commit 066000dd856709b6980123eb39b957fe26993f7b:
-  Ananth N Mavinakayanahalli (1):
-        Revert "x86, apic: Use logical flat on intel with <= 8 logical cpus"
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/ukl/linux-2.6.git arm/clock-event
-
-Uwe Kleine-K?nig (2):
-      arm/at91: Don't disable irqs in set_next_event and set_mode callbacks
-      arm/{pxa,sa1100,nomadik}: Don't disable irqs in set_next_event and set_mode
-
- arch/arm/mach-at91/at91rm9200_time.c  |   20 ++++++--------------
- arch/arm/mach-at91/at91sam926x_time.c |   11 ++++++-----
- arch/arm/mach-pxa/time.c              |   10 +---------
- arch/arm/mach-sa1100/time.c           |    8 +-------
- arch/arm/plat-nomadik/timer.c         |    9 +--------
- 5 files changed, 15 insertions(+), 43 deletions(-)
-
 
 -- 
 Pengutronix e.K.                              | Uwe Kleine-K?nig            |
