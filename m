@@ -1,132 +1,113 @@
 From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Fri, 22 Jan 2010 23:47:08 +0100
-Subject: [PATCH 1/4] ARM: SAMSUNG: Move mach/ts.h to plat/ts.h
-Message-ID: <b2e8f9f71001221447r7feb098fx2e5b06126c1556da@mail.gmail.com>
+Date: Fri, 22 Jan 2010 23:47:11 +0100
+Subject: [PATCH 2/4] ARM: SAMSUNG: Rename s3c24xx touchscreen interface to s3c
+Message-ID: <b2e8f9f71001221447k897b5cfs213447084543ee55@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM: SAMSUNG: Move mach/ts.h to plat/ts.h
-
-This moves mach-s3c2410/include/mach/ts.h to plat-samsung/include/plat/ts.h in
-order to prepare for s3c64xx support in the touchscreen driver.
+ARM: SAMSUNG: Rename s3c24xx touchscreen interface to s3c
 
 Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
 ---
- arch/arm/mach-s3c2410/include/mach/ts.h |   21 ---------------------
- arch/arm/mach-s3c2410/mach-h1940.c      |    2 +-
- arch/arm/plat-s3c24xx/devs.c            |    3 +--
- arch/arm/plat-samsung/include/plat/ts.h |   21 +++++++++++++++++++++
- drivers/input/touchscreen/s3c2410_ts.c  |    2 +-
- 5 files changed, 24 insertions(+), 25 deletions(-)
- delete mode 100644 arch/arm/mach-s3c2410/include/mach/ts.h
- create mode 100644 arch/arm/plat-samsung/include/plat/ts.h
+ arch/arm/mach-s3c2410/mach-h1940.c      |    4 ++--
+ arch/arm/plat-s3c24xx/devs.c            |   10 +++++-----
+ arch/arm/plat-samsung/include/plat/ts.h |    4 ++--
+ drivers/input/touchscreen/s3c2410_ts.c  |    4 ++--
+ 4 files changed, 11 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2410/include/mach/ts.h
-b/arch/arm/mach-s3c2410/include/mach/ts.h
-deleted file mode 100644
-index dc36170..0000000
---- a/arch/arm/mach-s3c2410/include/mach/ts.h
-+++ /dev/null
-@@ -1,21 +0,0 @@
--/* linux/include/asm/arch-s3c2410/ts.h
-- *
-- * Copyright (c) 2005 Arnaud Patard <arnaud.patard@rtp-net.org>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#ifndef __ASM_ARM_TS_H
--#define __ASM_ARM_TS_H
--
--struct s3c2410_ts_mach_info {
--       int             delay;
--       int             presc;
--       int             oversampling_shift;
--};
--
--extern void s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info *);
--
--#endif /* __ASM_ARM_TS_H */
 diff --git a/arch/arm/mach-s3c2410/mach-h1940.c
 b/arch/arm/mach-s3c2410/mach-h1940.c
-index fbedd07..75e3ffb 100644
+index 75e3ffb..76392f2 100644
 --- a/arch/arm/mach-s3c2410/mach-h1940.c
 +++ b/arch/arm/mach-s3c2410/mach-h1940.c
-@@ -46,7 +46,6 @@
- #include <mach/h1940.h>
- #include <mach/h1940-latch.h>
- #include <mach/fb.h>
--#include <mach/ts.h>
- #include <plat/udc.h>
- #include <plat/iic.h>
+@@ -141,7 +141,7 @@ static struct s3c2410_udc_mach_info h1940_udc_cfg
+__initdata = {
+ 	.vbus_pin_inverted	= 1,
+ };
 
-@@ -56,6 +55,7 @@
- #include <plat/pll.h>
- #include <plat/pm.h>
- #include <plat/mci.h>
-+#include <plat/ts.h>
+-static struct s3c2410_ts_mach_info h1940_ts_cfg __initdata = {
++static struct s3c_ts_mach_info h1940_ts_cfg __initdata = {
+ 		.delay = 10000,
+ 		.presc = 49,
+ 		.oversampling_shift = 2,
+@@ -313,7 +313,7 @@ static void __init h1940_init(void)
+ 	s3c24xx_fb_set_platdata(&h1940_fb_info);
+ 	s3c24xx_mci_set_platdata(&h1940_mmc_cfg);
+  	s3c24xx_udc_set_platdata(&h1940_udc_cfg);
+-	s3c24xx_ts_set_platdata(&h1940_ts_cfg);
++	s3c_ts_set_platdata(&h1940_ts_cfg);
+ 	s3c_i2c0_set_platdata(NULL);
 
- static struct map_desc h1940_iodesc[] __initdata = {
- 	[0] = {
+ 	/* Turn off suspend on both USB ports, and switch the
 diff --git a/arch/arm/plat-s3c24xx/devs.c b/arch/arm/plat-s3c24xx/devs.c
-index 986d4e5..3e55bdd 100644
+index 3e55bdd..f1c1426 100644
 --- a/arch/arm/plat-s3c24xx/devs.c
 +++ b/arch/arm/plat-s3c24xx/devs.c
-@@ -37,8 +37,7 @@
- #include <plat/devs.h>
- #include <plat/cpu.h>
- #include <plat/regs-spi.h>
--
--#include <mach/ts.h>
-+#include <plat/ts.h>
+@@ -163,14 +163,14 @@ struct platform_device s3c_device_ts = {
+ };
+ EXPORT_SYMBOL(s3c_device_ts);
 
- /* Serial port registrations */
+-static struct s3c2410_ts_mach_info s3c2410ts_info;
++static struct s3c_ts_mach_info s3c2410ts_info;
+
+-void __init s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info
+*hard_s3c2410ts_info)
++void __init s3c_ts_set_platdata(struct s3c_ts_mach_info *hard_s3cts_info)
+ {
+-	memcpy(&s3c2410ts_info, hard_s3c2410ts_info, sizeof(struct
+s3c2410_ts_mach_info));
+-	s3c_device_ts.dev.platform_data = &s3c2410ts_info;
++	memcpy(&s3cts_info, hard_s3cts_info, sizeof(struct s3c_ts_mach_info));
++	s3c_device_ts.dev.platform_data = &s3cts_info;
+ }
+-EXPORT_SYMBOL(s3c24xx_ts_set_platdata);
++EXPORT_SYMBOL(s3c_ts_set_platdata);
+
+ /* USB Device (Gadget)*/
 
 diff --git a/arch/arm/plat-samsung/include/plat/ts.h
 b/arch/arm/plat-samsung/include/plat/ts.h
-new file mode 100644
-index 0000000..8a51675
---- /dev/null
+index 8a51675..ed5a1d7 100644
+--- a/arch/arm/plat-samsung/include/plat/ts.h
 +++ b/arch/arm/plat-samsung/include/plat/ts.h
-@@ -0,0 +1,21 @@
-+/* arch/arm/plat-samsung/include/plat/ts.h
-+ *
-+ * Copyright (c) 2005 Arnaud Patard <arnaud.patard@rtp-net.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#ifndef __ASM_ARM_TS_H
-+#define __ASM_ARM_TS_H
-+
-+struct s3c2410_ts_mach_info {
-+       int             delay;
-+       int             presc;
-+       int             oversampling_shift;
-+};
-+
-+extern void s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info *);
-+
-+#endif /* __ASM_ARM_TS_H */
+@@ -10,12 +10,12 @@
+ #ifndef __ASM_ARM_TS_H
+ #define __ASM_ARM_TS_H
+
+-struct s3c2410_ts_mach_info {
++struct s3c_ts_mach_info {
+        int             delay;
+        int             presc;
+        int             oversampling_shift;
+ };
+
+-extern void s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info *);
++extern void s3c_ts_set_platdata(struct s3c_ts_mach_info *);
+
+ #endif /* __ASM_ARM_TS_H */
 diff --git a/drivers/input/touchscreen/s3c2410_ts.c
 b/drivers/input/touchscreen/s3c2410_ts.c
-index 6386b44..0cd0ca6 100644
+index 0cd0ca6..3debbc2 100644
 --- a/drivers/input/touchscreen/s3c2410_ts.c
 +++ b/drivers/input/touchscreen/s3c2410_ts.c
-@@ -38,9 +38,9 @@
+@@ -247,7 +247,7 @@ static void s3c24xx_ts_select(struct
+s3c_adc_client *client, unsigned select)
+  */
+ static int __devinit s3c2410ts_probe(struct platform_device *pdev)
+ {
+-	struct s3c2410_ts_mach_info *info;
++	struct s3c_ts_mach_info *info;
+ 	struct device *dev = &pdev->dev;
+ 	struct input_dev *input_dev;
+ 	struct resource *res;
+@@ -398,7 +398,7 @@ static int s3c2410ts_suspend(struct device *dev)
+ static int s3c2410ts_resume(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+-	struct s3c2410_ts_mach_info *info = pdev->dev.platform_data;
++	struct s3c_ts_mach_info *info = pdev->dev.platform_data;
 
- #include <plat/adc.h>
- #include <plat/regs-adc.h>
-+#include <plat/ts.h>
-
- #include <mach/regs-gpio.h>
--#include <mach/ts.h>
-
- #define TSC_SLEEP  (S3C2410_ADCTSC_PULL_UP_DISABLE | S3C2410_ADCTSC_XY_PST(0))
+ 	clk_enable(ts.clock);
 
 -- 
 1.6.6.1
