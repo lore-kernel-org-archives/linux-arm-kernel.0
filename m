@@ -1,40 +1,53 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 22 Jan 2010 20:13:27 +0100
-Subject: [PATCH] pcmcia/at91_cf: don't redefine SZ_2K
-In-Reply-To: <cd73a99e1001221050w398bd9epfd4fc79f91d36189@mail.gmail.com>
-References: <cd73a99e1001221050w398bd9epfd4fc79f91d36189@mail.gmail.com>
-Message-ID: <1264187607-14468-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 22 Jan 2010 12:39:53 -0800
+Subject: [PATCH 4/4] omap: Make get_irqnr_and_base common for
+	mach-omap2 multiboot, v2
+In-Reply-To: <20100116115503.GA15904@n2100.arm.linux.org.uk>
+References: <20100116013205.10065.95921.stgit@baageli.muru.com>
+	<20100116013520.10065.17921.stgit@baageli.muru.com>
+	<20100116115503.GA15904@n2100.arm.linux.org.uk>
+Message-ID: <20100122203953.GA11835@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes:
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [100116 03:53]:
+> On Fri, Jan 15, 2010 at 05:35:20PM -0800, Tony Lindgren wrote:
+> > -#ifndef CONFIG_ARCH_OMAP4
+> > +#if defined(CONFIG_ARCH_OMAP2420) || defined(CONFIG_ARCH_OMAP2430) || \
+> > +	defined(CONFIG_ARCH_OMAP34XX)
+> > +
+> > +#define INTCPS_SIR_IRQ_OFFSET	0x0040		/* Active interrupt offset */
+> > +#define	ACTIVEIRQ_MASK		0x7f		/* Active interrupt bits */
+> > +
+> > +omap_irq_base:	.word	0x0
+> 
+> You have no idea where this word will be placed - it could be in the middle
+> of a read only section, which might really be read only.  It might also be
+> out of reach of the "ldr \base, [pc, #offset]" instructions you're using
+> below - which is what an "ldr \base, address" instruction really is.
+> 
+> > +
+> >  		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+> > -		ldr	\base, =OMAP2_VA_IC_BASE
+> > -		ldr	\irqnr, [\base, #0x98] /* IRQ pending reg 1 */
+> > +		ldr	\base, omap_irq_base
+> > +		cmp	\base, #0		@ is irq base configured?
+> > +		bne	9998f			@ already configured
+> 
+> First thing, why not use get_irqnr_preamble to load the base address?
+> That means you only do all this computation once per group of IRQs
+> processed.
+> 
+> Secondly, is this really worth the overhead, or can't you move
+> omap_irq_base into the data section, and have your IRQ initialization
+> function set the pointer?
+> 
+> You then don't have to make these two tests every time you check for
+> an interrupt/enter to process interrupts.
 
-	drivers/pcmcia/at91_cf.c:55:1: warning: "SZ_2K" redefined
+Here's this patch updated. It should now be actually more optimized for
+non-multi-omap configurations as it uses the get_irqnr_preamble :)
 
-Since
+Regards,
 
-	c1191b0 ([ARM] Kirkwood: create a mapping for the Security Accelerator SRAM)
-
-SZ_2K is defined in arch/arm/include/asm/sizes.h.
-
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Acked-by: Andrew Victor <linux@maxim.org.za>
----
- drivers/pcmcia/at91_cf.c |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/pcmcia/at91_cf.c b/drivers/pcmcia/at91_cf.c
-index e1dcced..5d22807 100644
---- a/drivers/pcmcia/at91_cf.c
-+++ b/drivers/pcmcia/at91_cf.c
-@@ -52,8 +52,6 @@ struct at91_cf_socket {
- 	unsigned long		phys_baseaddr;
- };
- 
--#define	SZ_2K			(2 * SZ_1K)
--
- static inline int at91_cf_present(struct at91_cf_socket *cf)
- {
- 	return !gpio_get_value(cf->board->det_pin);
--- 
-1.6.6
+Tony
