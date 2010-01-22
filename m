@@ -1,27 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 22 Jan 2010 16:36:58 +0000
-Subject: [PATCH 1/2] arm/at91: Don't disable irqs in set_next_event and
-	set_mode callbacks
-In-Reply-To: <20100122160824.GA13718@pengutronix.de>
-References: <1259231164-21242-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1261056821-28521-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20100122160824.GA13718@pengutronix.de>
-Message-ID: <20100122163658.GA18461@n2100.arm.linux.org.uk>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Fri, 22 Jan 2010 16:47:13 +0000
+Subject: [PATCH] serial imx.c: fix CTS trigger level lower to avoid lost
+	chars
+In-Reply-To: <20100122113130.GB10449@n2100.arm.linux.org.uk>
+References: <1264109163-28739-1-git-send-email-valentin.longchamp@epfl.ch>
+	<20100121220653.GA21010@pengutronix.de>
+	<20100121221133.GA30419@n2100.arm.linux.org.uk>
+	<4B597A82.4020906@epfl.ch> <20100122110701.GA15699@shareable.org>
+	<20100122113130.GB10449@n2100.arm.linux.org.uk>
+Message-ID: <20100122164713.GA21907@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 22, 2010 at 05:08:24PM +0100, Uwe Kleine-K?nig wrote:
-> Hello Russell,
+Russell King - ARM Linux wrote:
+> On Fri, Jan 22, 2010 at 11:07:01AM +0000, Jamie Lokier wrote:
+> > Valentin Longchamp wrote:
+> > > First I wanted to fix the fact that the imx serial hardware only raises 
+> > > the CTS pin when the oferflowing char begins to be set. I would have 
+> > > solved this by setting the CTS trigger value to 31 instead of 32. But 
+> > > when I talked with one colleague he told me about 16550A (that is 
+> > > present nearly everywhere) that empty their TX FIFO, so I
+> > > lowered it to 16.
+> > 
+> > That seems quite peculiar because a 16550A only has a 16 byte receive
+> > buffer, doesn't it?  And therefore it would have trouble talking
+> > reliably to another 16550A if it worked like that.  I wonder what I'm
+> > not seeing in this picture.
 > 
-> I havn't got any more feedback but I think these are OK after the last
-> comments.  Do you take them?
+> What you're assuming is that flow control was there to prevent overruns
+> on the hardware receiver.  That's not the way it works on these devices;
+> flow control is entirely managed in software - there is no hardware
+> assistance.
 > 
-> You can pull them from
-> 
-> 	git://git.pengutronix.de/git/ukl/linux-2.6.git arm/clock-event
+> The flow control implemented for non-FIFO and non-hardware assisted
+> UARTs is purely to do with preventing the software buffer behind the
+> UART from overflowing - it can't prevent the device's receiver buffering
+> from overrunning.  (Non-FIFO devices have the shift register and a
+> buffer register - complete reception of a second character before the
+> first is read causes an overrun condition.)
 
-I really don't like pulling git urls which I don't know what I'm pulling.
-Please include at least a diffstat and shortlog of the commits you're
-expecting to be sent.
+Thanks.  That is an excellent explanation.
 
-Something like the output from git request-pull would be ideal.
+> If you have overruns on the receiver, that's an interrupt latency
+> problem and its an error that's reported to the receiver side only.
+
+Yeah :-/ On an ARM-related note, I have a 166MHz ARM device here which
+cannot receive reliably at 38400 baud.  The serial port isn't an ARM
+one, but it's quite straightforward and has a 16 byte FIFO, which
+translates to 240 irqs per second.  I believe the problem is an
+interrupt latency problem, especially when it's busy doing other
+things too like disk and network access, but surprisingly even when
+it's not very active with other things.
+
+Any tips on how to make the serial receive irq latency more reliable
+on ARM, with a boringly generic serial driver?
+
+> Yes, later devices have the ability in hardware to deassert RTS when
+> the receiver FIFO gets above a certain threshold to /help/ prevent
+> overruns occuring when there's high interrupt latency - but normal
+> system operation should still ensure that the FIFO is emptied in a
+> timely manner.
+> 
+> They also gained the ability to stop the transmitter once CTS is
+> deasserted, mainly because the transmitter FIFOs in these devices
+> is soo large (maybe 32 to 128 bytes deep.)
+
+If only they were all like that. :-/
+
+-- Jamie
