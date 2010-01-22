@@ -1,84 +1,57 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 22 Jan 2010 12:58:53 +0100
-Subject: [PATCH] serial imx.c: fix CTS trigger level lower to avoid
-	lost chars
-In-Reply-To: <1264109163-28739-1-git-send-email-valentin.longchamp@epfl.ch>
-References: <1264109163-28739-1-git-send-email-valentin.longchamp@epfl.ch>
-Message-ID: <20100122115853.GF4782@pengutronix.de>
+From: rurality.linux@gmail.com (Qiang Wang)
+Date: Fri, 22 Jan 2010 21:04:06 +0900
+Subject: [PATCH]NUC900 clk enable problem fix
+Message-ID: <71413c851001220404v14c0ae9bq43c926179ef7c599@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 21, 2010 at 10:26:03PM +0100, Valentin Longchamp wrote:
-> The imx CTS trigger level is left at its reset value that is 32
-> chars. Since the RX FIFO has 32 entries, when CTS is raised, the
-> FIFO already is full. However, some serial port devices first empty
-> their TX FIFO before stopping when CTS is raised, resulting in lost
-> chars.
-> 
-> This patch sets the trigger level lower so that other chars arrive
-> after CTS is raised, there is still room for 16 of them.
-> 
-> Signed-off-by: Valentin Longchamp <valentin.longchamp@epfl.ch>
-> Tested-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
+hello, Wan
 
-If you fix the comment, feel free to add my:
+  There is the patch of nuc900 clk enable problem of timers.
+  I tested it  in 950 env-board, and shell can come correctly.
 
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
 
-> ---
->  drivers/serial/imx.c |   10 +++++++++-
->  1 files changed, 9 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/serial/imx.c b/drivers/serial/imx.c
-> index 18130f1..f7d2da5 100644
-> --- a/drivers/serial/imx.c
-> +++ b/drivers/serial/imx.c
-> @@ -119,7 +119,8 @@
->  #define  MX2_UCR3_RXDMUXSEL	 (1<<2)  /* RXD Muxed Input Select, on mx2/mx3 */
->  #define  UCR3_INVT  	 (1<<1)  /* Inverted Infrared transmission */
->  #define  UCR3_BPEN  	 (1<<0)  /* Preset registers enable */
-> -#define  UCR4_CTSTL_32   (32<<10) /* CTS trigger level (32 chars) */
-> +#define  UCR4_CTSTL_SHF  10      /* CTS trigger level shift */
-> +#define  UCR4_CTSTL_MASK 0x3F    /* CTS trigger is 6 bits wide */
->  #define  UCR4_INVR  	 (1<<9)  /* Inverted infrared reception */
->  #define  UCR4_ENIRI 	 (1<<8)  /* Serial infrared interrupt enable */
->  #define  UCR4_WKEN  	 (1<<7)  /* Wake interrupt enable */
-> @@ -590,6 +591,8 @@ static int imx_setup_ufcr(struct imx_port *sport, unsigned int mode)
->  	return 0;
->  }
->  
-> +#define CTSTL 16
-> +
 
-Maybe a comment that it is set to half the buffer size? Dunno...
+Signed-off-by: Wang Qiang <rurality.linux@gmail.com>
 
->  static int imx_startup(struct uart_port *port)
->  {
->  	struct imx_port *sport = (struct imx_port *)port;
-> @@ -606,6 +609,11 @@ static int imx_startup(struct uart_port *port)
->  	if (USE_IRDA(sport))
->  		temp |= UCR4_IRSC;
->  
-> +	/* set the trigger level for CTS to 16 by default
-> +	 */
+---
+ arch/arm/mach-w90x900/cpu.c |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
-Make this comment a one-liner. Also remove the "to 16 by default" part as this
-value is #defined and, who knows, it may change.
+diff --git a/arch/arm/mach-w90x900/cpu.c b/arch/arm/mach-w90x900/cpu.c
+index 20dc0c9..dd8e1fd 100644
+--- a/arch/arm/mach-w90x900/cpu.c
++++ b/arch/arm/mach-w90x900/cpu.c
+@@ -68,6 +68,11 @@ static DEFINE_CLK(gdma, 27);
+ static DEFINE_CLK(adc, 28);
+ static DEFINE_CLK(usi, 29);
+ static DEFINE_CLK(ext, 0);
++static DEFINE_CLK(timer0, 19);
++static DEFINE_CLK(timer1, 20);
++static DEFINE_CLK(timer2, 21);
++static DEFINE_CLK(timer3, 22);
++static DEFINE_CLK(timer4, 23);
 
-> +	temp &= ~(UCR4_CTSTL_MASK << UCR4_CTSTL_SHF);
-> +	temp |= CTSTL << UCR4_CTSTL_SHF;
-> +
->  	writel(temp & ~UCR4_DREN, sport->port.membase + UCR4);
->  
->  	if (USE_IRDA(sport)) {
+ static struct clk_lookup nuc900_clkregs[] = {
+ 	DEF_CLKLOOK(&clk_lcd, "nuc900-lcd", NULL),
+@@ -90,6 +95,11 @@ static struct clk_lookup nuc900_clkregs[] = {
+ 	DEF_CLKLOOK(&clk_adc, "nuc900-adc", NULL),
+ 	DEF_CLKLOOK(&clk_usi, "nuc900-spi", NULL),
+ 	DEF_CLKLOOK(&clk_ext, NULL, "ext"),
++	DEF_CLKLOOK(&clk_timer0, NULL, "timer0"),
++	DEF_CLKLOOK(&clk_timer1, NULL, "timer1"),
++	DEF_CLKLOOK(&clk_timer2, NULL, "timer2"),
++	DEF_CLKLOOK(&clk_timer3, NULL, "timer3"),
++	DEF_CLKLOOK(&clk_timer4, NULL, "timer4"),
+ };
 
+ /* Initial serial platform data */
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.6.6
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100122/7de68086/attachment.sig>
+Name: 0001-fix-the-timer-clk-enable-problem.patch
+Type: application/octet-stream
+Size: 1179 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100122/f3e596f0/attachment.obj>
