@@ -1,224 +1,272 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 22 Jan 2010 09:17:10 +0900
-Subject: [PATCH v3 3/9] ARM: S5PV210: Add IRQ support
-Message-ID: <1264119430-14386-1-git-send-email-kgene.kim@samsung.com>
+Date: Fri, 22 Jan 2010 09:17:38 +0900
+Subject: [PATCH 8/8] ARM: S5P6442: Add serial port support
+Message-ID: <1264119458-14698-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds IRQ support for S5PV210. This patch adds interrupt
-register definitions, IRQ definitions for various interrupt sources
-and new VIC base for VIC2 and VIC3 in plat-s5p common irq code.
+From: Atul Dahiya <atul.dahiya@samsung.com>
 
+This patch adds UART serial port support for S5P6442 CPU.
+
+Signed-off-by: Aditya Paratap Sharma <aditya.ps@samsung.com>
+Signed-off-by: Atul Dahiya <atul.dahiya@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s5pv210/include/mach/irqs.h     |  146 +++++++++++++++++++++++++
- arch/arm/mach-s5pv210/include/mach/regs-irq.h |   19 +++
- arch/arm/plat-s5p/include/plat/irqs.h         |    6 +-
- 3 files changed, 170 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-s5pv210/include/mach/irqs.h
- create mode 100644 arch/arm/mach-s5pv210/include/mach/regs-irq.h
+ arch/arm/plat-s3c/include/plat/regs-serial.h |    8 ++
+ arch/arm/plat-s5p/dev-uart.c                 |    2 +
+ drivers/serial/Kconfig                       |    7 +
+ drivers/serial/Makefile                      |    1 +
+ drivers/serial/s5p6442.c                     |  172 ++++++++++++++++++++++++++
+ 5 files changed, 190 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/serial/s5p6442.c
 
-diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-s5pv210/include/mach/irqs.h
+diff --git a/arch/arm/plat-s3c/include/plat/regs-serial.h b/arch/arm/plat-s3c/include/plat/regs-serial.h
+index 85d8904..b67d8e9 100644
+--- a/arch/arm/plat-s3c/include/plat/regs-serial.h
++++ b/arch/arm/plat-s3c/include/plat/regs-serial.h
+@@ -171,6 +171,14 @@
+ #define S3C2440_UFSTAT_TXMASK	  (63<<8)
+ #define S3C2440_UFSTAT_RXMASK	  (63)
+ 
++/* UFSTAT S5P6442 */
++#define S5P6442_UFSTAT_RXMASK	(255<<0)
++#define S5P6442_UFSTAT_RXSHIFT	(0)
++#define S5P6442_UFSTAT_RXFULL	(1<<8)
++#define S5P6442_UFSTAT_TXFULL	(1<<24)
++#define S5P6442_UFSTAT_TXMASK	(255<<16)
++#define S5P6442_UFSTAT_TXSHIFT	(16)
++
+ #define S3C2410_UTRSTAT_TXE	  (1<<2)
+ #define S3C2410_UTRSTAT_TXFE	  (1<<1)
+ #define S3C2410_UTRSTAT_RXDR	  (1<<0)
+diff --git a/arch/arm/plat-s5p/dev-uart.c b/arch/arm/plat-s5p/dev-uart.c
+index 23c7531..a89331e 100644
+--- a/arch/arm/plat-s5p/dev-uart.c
++++ b/arch/arm/plat-s5p/dev-uart.c
+@@ -95,6 +95,7 @@ static struct resource s5p_uart2_resource[] = {
+ };
+ 
+ static struct resource s5p_uart3_resource[] = {
++#if CONFIG_SERIAL_SAMSUNG_UARTS > 3
+ 	[0] = {
+ 		.start	= S5P_PA_UART3,
+ 		.end	= S5P_PA_UART3 + S5P_SZ_UART,
+@@ -115,6 +116,7 @@ static struct resource s5p_uart3_resource[] = {
+ 		.end	= IRQ_S5P_UART_ERR3,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
++#endif
+ };
+ 
+ struct s3c24xx_uart_resources s5p_uart_resources[] __initdata = {
+diff --git a/drivers/serial/Kconfig b/drivers/serial/Kconfig
+index d7d687f..b7950c1 100644
+--- a/drivers/serial/Kconfig
++++ b/drivers/serial/Kconfig
+@@ -533,6 +533,13 @@ config SERIAL_S3C6400
+ 	  Serial port support for the Samsung S3C6400, S3C6410 and S5P6440
+ 	  SoCs
+ 
++config SERIAL_S5P6442
++	tristate "Samsung S5P6442 Serial port support"
++	depends on SERIAL_SAMSUNG && CPU_S5P6442
++	default y
++	help
++	  Serial port support for the Samsung S5P6442 SoCs
++
+ config SERIAL_S5PC100
+ 	tristate "Samsung S5PC100 Serial port support"
+ 	depends on SERIAL_SAMSUNG && CPU_S5PC100
+diff --git a/drivers/serial/Makefile b/drivers/serial/Makefile
+index 5548fe7..2a8d745 100644
+--- a/drivers/serial/Makefile
++++ b/drivers/serial/Makefile
+@@ -45,6 +45,7 @@ obj-$(CONFIG_SERIAL_S3C2440) += s3c2440.o
+ obj-$(CONFIG_SERIAL_S3C24A0) += s3c24a0.o
+ obj-$(CONFIG_SERIAL_S3C6400) += s3c6400.o
+ obj-$(CONFIG_SERIAL_S5PC100) += s3c6400.o
++obj-$(CONFIG_SERIAL_S5P6442) += s5p6442.o
+ obj-$(CONFIG_SERIAL_MAX3100) += max3100.o
+ obj-$(CONFIG_SERIAL_IP22_ZILOG) += ip22zilog.o
+ obj-$(CONFIG_SERIAL_MUX) += mux.o
+diff --git a/drivers/serial/s5p6442.c b/drivers/serial/s5p6442.c
 new file mode 100644
-index 0000000..82bf5e2
+index 0000000..b66f194
 --- /dev/null
-+++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
-@@ -0,0 +1,146 @@
-+/* linux/arch/arm/mach-s5pv210/include/mach/irqs.h
++++ b/drivers/serial/s5p6442.c
+@@ -0,0 +1,172 @@
++/* linux/drivers/serial/s5p6442.c
 + *
-+ * Copyright 2010 Samsung Electronics Co., Ltd.
++ * Based on drivers/serial/s3c6400.c
++ *
++ * Copyright (c) 2009 Samsung Electronics Co., Ltd.
 + *		http://www.samsung.com/
 + *
-+ * S5PV210 - IRQ definitions
++ * Driver for Samsung S5P6442 SoC onboard UARTs.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 +*/
 +
-+#ifndef __ASM_ARCH_IRQS_H
-+#define __ASM_ARCH_IRQS_H __FILE__
++#include <linux/module.h>
++#include <linux/ioport.h>
++#include <linux/io.h>
++#include <linux/platform_device.h>
++#include <linux/init.h>
++#include <linux/serial_core.h>
++#include <linux/serial.h>
++#include <asm/irq.h>
++#include <mach/hardware.h>
++#include <plat/regs-serial.h>
++#include "samsung.h"
 +
-+#include <plat/irqs.h>
++static int uart_portno;
 +
-+/* VIC0: System, DMA, Timer */
++static int s5p6442_serial_setsource(struct uart_port *port,
++				    struct s3c24xx_uart_clksrc *clk)
++{
++	unsigned long ucon = rd_regl(port, S3C2410_UCON);
 +
-+#define IRQ_EINT0		S5P_IRQ_VIC0(0)
-+#define IRQ_EINT1		S5P_IRQ_VIC0(1)
-+#define IRQ_EINT2		S5P_IRQ_VIC0(2)
-+#define IRQ_EINT3		S5P_IRQ_VIC0(3)
-+#define IRQ_EINT4		S5P_IRQ_VIC0(4)
-+#define IRQ_EINT5		S5P_IRQ_VIC0(5)
-+#define IRQ_EINT6		S5P_IRQ_VIC0(6)
-+#define IRQ_EINT7		S5P_IRQ_VIC0(7)
-+#define IRQ_EINT8		S5P_IRQ_VIC0(8)
-+#define IRQ_EINT9		S5P_IRQ_VIC0(9)
-+#define IRQ_EINT10		S5P_IRQ_VIC0(10)
-+#define IRQ_EINT11		S5P_IRQ_VIC0(11)
-+#define IRQ_EINT12		S5P_IRQ_VIC0(12)
-+#define IRQ_EINT13		S5P_IRQ_VIC0(13)
-+#define IRQ_EINT14		S5P_IRQ_VIC0(14)
-+#define IRQ_EINT15		S5P_IRQ_VIC0(15)
-+#define IRQ_EINT16_31		S5P_IRQ_VIC0(16)
-+#define IRQ_BATF		S5P_IRQ_VIC0(17)
-+#define IRQ_MDMA		S5P_IRQ_VIC0(18)
-+#define IRQ_PDMA0		S5P_IRQ_VIC0(19)
-+#define IRQ_PDMA1		S5P_IRQ_VIC0(20)
-+#define IRQ_TIMER0_VIC		S5P_IRQ_VIC0(21)
-+#define IRQ_TIMER1_VIC		S5P_IRQ_VIC0(22)
-+#define IRQ_TIMER2_VIC		S5P_IRQ_VIC0(23)
-+#define IRQ_TIMER3_VIC		S5P_IRQ_VIC0(24)
-+#define IRQ_TIMER4_VIC		S5P_IRQ_VIC0(25)
-+#define IRQ_SYSTIMER		S5P_IRQ_VIC0(26)
-+#define IRQ_WDT			S5P_IRQ_VIC0(27)
-+#define IRQ_RTC_ALARM		S5P_IRQ_VIC0(28)
-+#define IRQ_RTC_TIC		S5P_IRQ_VIC0(29)
-+#define IRQ_GPIOINT		S5P_IRQ_VIC0(30)
-+#define IRQ_FIMC3		S5P_IRQ_VIC0(31)
++	if (strcmp(clk->name, "uclk0") == 0) {
++		ucon &= ~S3C6400_UCON_CLKMASK;
++		ucon |= S3C6400_UCON_UCLK0;
++	} else if (strcmp(clk->name, "uclk1") == 0)
++		ucon |= S3C6400_UCON_UCLK1;
++	else if (strcmp(clk->name, "pclk") == 0) {
++		/* See notes about transitioning from UCLK to PCLK */
++		ucon &= ~S3C6400_UCON_UCLK0;
++	} else {
++		printk(KERN_ERR "unknown clock source %s\n", clk->name);
++		return -EINVAL;
++	}
 +
-+/* VIC1: ARM, Power, Memory, Connectivity, Storage */
++	wr_regl(port, S3C2410_UCON, ucon);
++	return 0;
++}
 +
-+#define IRQ_CORTEX0		S5P_IRQ_VIC1(0)
-+#define IRQ_CORTEX1		S5P_IRQ_VIC1(1)
-+#define IRQ_CORTEX2		S5P_IRQ_VIC1(2)
-+#define IRQ_CORTEX3		S5P_IRQ_VIC1(3)
-+#define IRQ_CORTEX4		S5P_IRQ_VIC1(4)
-+#define IRQ_IEMAPC		S5P_IRQ_VIC1(5)
-+#define IRQ_IEMIEC		S5P_IRQ_VIC1(6)
-+#define IRQ_ONENAND		S5P_IRQ_VIC1(7)
-+#define IRQ_NFC			S5P_IRQ_VIC1(8)
-+#define IRQ_CFC			S5P_IRQ_VIC1(9)
-+#define IRQ_UART0		S5P_IRQ_VIC1(10)
-+#define IRQ_UART1		S5P_IRQ_VIC1(11)
-+#define IRQ_UART2		S5P_IRQ_VIC1(12)
-+#define IRQ_UART3		S5P_IRQ_VIC1(13)
-+#define IRQ_IIC			S5P_IRQ_VIC1(14)
-+#define IRQ_SPI0		S5P_IRQ_VIC1(15)
-+#define IRQ_SPI1		S5P_IRQ_VIC1(16)
-+#define IRQ_SPI2		S5P_IRQ_VIC1(17)
-+#define IRQ_IRDA		S5P_IRQ_VIC1(18)
-+#define IRQ_CAN0		S5P_IRQ_VIC1(19)
-+#define IRQ_CAN1		S5P_IRQ_VIC1(20)
-+#define IRQ_HSIRX		S5P_IRQ_VIC1(21)
-+#define IRQ_HSITX		S5P_IRQ_VIC1(22)
-+#define IRQ_UHOST		S5P_IRQ_VIC1(23)
-+#define IRQ_OTG			S5P_IRQ_VIC1(24)
-+#define IRQ_MSM			S5P_IRQ_VIC1(25)
-+#define IRQ_HSMMC0		S5P_IRQ_VIC1(26)
-+#define IRQ_HSMMC1		S5P_IRQ_VIC1(27)
-+#define IRQ_HSMMC2		S5P_IRQ_VIC1(28)
-+#define IRQ_MIPICSI		S5P_IRQ_VIC1(29)
-+#define IRQ_MIPIDSI		S5P_IRQ_VIC1(30)
-+#define IRQ_ONENAND_AUDI	S5P_IRQ_VIC1(31)
++static int s5p6442_serial_getsource(struct uart_port *port,
++				    struct s3c24xx_uart_clksrc *clk)
++{
++	u32 ucon = rd_regl(port, S3C2410_UCON);
 +
-+/* VIC2: Multimedia, Audio, Security */
++	clk->divisor = 1;
 +
-+#define IRQ_LCD0		S5P_IRQ_VIC2(0)
-+#define IRQ_LCD1		S5P_IRQ_VIC2(1)
-+#define IRQ_LCD2		S5P_IRQ_VIC2(2)
-+#define IRQ_LCD3		S5P_IRQ_VIC2(3)
-+#define IRQ_ROTATOR		S5P_IRQ_VIC2(4)
-+#define IRQ_FIMC0		S5P_IRQ_VIC2(5)
-+#define IRQ_FIMC1		S5P_IRQ_VIC2(6)
-+#define IRQ_FIMC2		S5P_IRQ_VIC2(7)
-+#define IRQ_JPEG		S5P_IRQ_VIC2(8)
-+#define IRQ_2D			S5P_IRQ_VIC2(9)
-+#define IRQ_3D			S5P_IRQ_VIC2(10)
-+#define IRQ_MIXER		S5P_IRQ_VIC2(11)
-+#define IRQ_HDMI		S5P_IRQ_VIC2(12)
-+#define IRQ_IIC1		S5P_IRQ_VIC2(13)
-+#define IRQ_MFC			S5P_IRQ_VIC2(14)
-+#define IRQ_TVENC		S5P_IRQ_VIC2(15)
-+#define IRQ_I2S0		S5P_IRQ_VIC2(16)
-+#define IRQ_I2S1		S5P_IRQ_VIC2(17)
-+#define IRQ_I2S2		S5P_IRQ_VIC2(18)
-+#define IRQ_AC97		S5P_IRQ_VIC2(19)
-+#define IRQ_PCM0		S5P_IRQ_VIC2(20)
-+#define IRQ_PCM1		S5P_IRQ_VIC2(21)
-+#define IRQ_SPDIF		S5P_IRQ_VIC2(22)
-+#define IRQ_ADC			S5P_IRQ_VIC2(23)
-+#define IRQ_PENDN		S5P_IRQ_VIC2(24)
-+#define IRQ_TC			IRQ_PENDN
-+#define IRQ_KEYPAD		S5P_IRQ_VIC2(25)
-+#define IRQ_CG			S5P_IRQ_VIC2(26)
-+#define IRQ_SEC			S5P_IRQ_VIC2(27)
-+#define IRQ_SECRX		S5P_IRQ_VIC2(28)
-+#define IRQ_SECTX		S5P_IRQ_VIC2(29)
-+#define IRQ_SDMIRQ		S5P_IRQ_VIC2(30)
-+#define IRQ_SDMFIQ		S5P_IRQ_VIC2(31)
++	switch (ucon & S3C6400_UCON_CLKMASK) {
++	case S3C6400_UCON_UCLK1:
++		clk->name = "uclk1";
++		break;
 +
-+/* VIC3: Etc */
++	case S3C6400_UCON_PCLK:
++	case S3C6400_UCON_PCLK2:
++		clk->name = "pclk";
++		break;
++	}
++	return 0;
++}
 +
-+#define IRQ_IPC			S5P_IRQ_VIC3(0)
-+#define IRQ_HOSTIF		S5P_IRQ_VIC3(1)
-+#define IRQ_MMC3		S5P_IRQ_VIC3(2)
-+#define IRQ_CEC			S5P_IRQ_VIC3(3)
-+#define IRQ_TSI			S5P_IRQ_VIC3(4)
-+#define IRQ_MDNIE0		S5P_IRQ_VIC3(5)
-+#define IRQ_MDNIE1		S5P_IRQ_VIC3(6)
-+#define IRQ_MDNIE2		S5P_IRQ_VIC3(7)
-+#define IRQ_MDNIE3		S5P_IRQ_VIC3(8)
-+#define IRQ_VIC_END		S5P_IRQ_VIC3(31)
++static int s5p6442_serial_resetport(struct uart_port *port,
++				    struct s3c2410_uartcfg *cfg)
++{
++	unsigned long ucon = rd_regl(port, S3C2410_UCON);
 +
-+#define S5P_IRQ_EINT_BASE	(IRQ_VIC_END + 1)
++	dbg("s5p6442_serial_resetport: port=%p (%08lx), cfg=%p\n",
++					port, port->mapbase, cfg);
 +
-+#define S5P_EINT(x)		((x) + S5P_IRQ_EINT_BASE)
-+#define IRQ_EINT(x)		S5P_EINT(x)
++	ucon &= S3C6400_UCON_CLKMASK;
 +
-+/* Set the default NR_IRQS */
++	wr_regl(port, S3C2410_UCON,  ucon | cfg->ucon);
++	wr_regl(port, S3C2410_ULCON, cfg->ulcon);
 +
-+#define NR_IRQS 		(IRQ_EINT(31) + 1)
++	/* reset both fifos */
++	wr_regl(port, S3C2410_UFCON, cfg->ufcon | S3C2410_UFCON_RESETBOTH);
++	wr_regl(port, S3C2410_UFCON, cfg->ufcon);
 +
-+#endif /* ASM_ARCH_IRQS_H */
-diff --git a/arch/arm/mach-s5pv210/include/mach/regs-irq.h b/arch/arm/mach-s5pv210/include/mach/regs-irq.h
-new file mode 100644
-index 0000000..5c3b104
---- /dev/null
-+++ b/arch/arm/mach-s5pv210/include/mach/regs-irq.h
-@@ -0,0 +1,19 @@
-+/* linux/arch/arm/mach-s5pv210/include/mach/regs-irq.h
-+ *
-+ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * S5PV210 - IRQ register definitions
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
++	return 0;
++}
 +
-+#ifndef __ASM_ARCH_REGS_IRQ_H
-+#define __ASM_ARCH_REGS_IRQ_H __FILE__
++static struct s3c24xx_uart_info s5p6442_uart_inf[] = {
++	[0] = {
++		.name		= "Samsung S5P6442 UART0",
++		.type		= PORT_S3C6400,
++		.fifosize	= 256,
++		.rx_fifomask	= S5P6442_UFSTAT_RXMASK,
++		.rx_fifoshift	= S5P6442_UFSTAT_RXSHIFT,
++		.rx_fifofull	= S5P6442_UFSTAT_RXFULL,
++		.tx_fifofull	= S5P6442_UFSTAT_TXFULL,
++		.tx_fifomask	= S5P6442_UFSTAT_TXMASK,
++		.tx_fifoshift	= S5P6442_UFSTAT_TXSHIFT,
++		.get_clksrc	= s5p6442_serial_getsource,
++		.set_clksrc	= s5p6442_serial_setsource,
++		.reset_port	= s5p6442_serial_resetport,
++	},
++	[1] = {
++		.name		= "Samsung S5P6442 UART1",
++		.type		= PORT_S3C6400,
++		.fifosize	= 64,
++		.rx_fifomask	= S5P6442_UFSTAT_RXMASK,
++		.rx_fifoshift	= S5P6442_UFSTAT_RXSHIFT,
++		.rx_fifofull	= S5P6442_UFSTAT_RXFULL,
++		.tx_fifofull	= S5P6442_UFSTAT_TXFULL,
++		.tx_fifomask	= S5P6442_UFSTAT_TXMASK,
++		.tx_fifoshift	= S5P6442_UFSTAT_TXSHIFT,
++		.get_clksrc	= s5p6442_serial_getsource,
++		.set_clksrc	= s5p6442_serial_setsource,
++		.reset_port	= s5p6442_serial_resetport,
++	},
++	[2] = {
++		.name		= "Samsung S5P6442 UART2",
++		.type		= PORT_S3C6400,
++		.fifosize	= 16,
++		.rx_fifomask	= S5P6442_UFSTAT_RXMASK,
++		.rx_fifoshift	= S5P6442_UFSTAT_RXSHIFT,
++		.rx_fifofull	= S5P6442_UFSTAT_RXFULL,
++		.tx_fifofull	= S5P6442_UFSTAT_TXFULL,
++		.tx_fifomask	= S5P6442_UFSTAT_TXMASK,
++		.tx_fifoshift	= S5P6442_UFSTAT_TXSHIFT,
++		.get_clksrc	= s5p6442_serial_getsource,
++		.set_clksrc	= s5p6442_serial_setsource,
++		.reset_port	= s5p6442_serial_resetport,
++	},
++};
 +
-+#include <asm/hardware/vic.h>
-+#include <mach/map.h>
++/* device management */
++static int s5p6442_serial_probe(struct platform_device *dev)
++{
++	int ret;
++	ret = s3c24xx_serial_probe(dev, &s5p6442_uart_inf[uart_portno]);
++	uart_portno++;
++	return ret;
++}
 +
-+#endif /* __ASM_ARCH_REGS_IRQ_H */
-diff --git a/arch/arm/plat-s5p/include/plat/irqs.h b/arch/arm/plat-s5p/include/plat/irqs.h
-index 5d7937d..81d5c38 100644
---- a/arch/arm/plat-s5p/include/plat/irqs.h
-+++ b/arch/arm/plat-s5p/include/plat/irqs.h
-@@ -28,6 +28,8 @@
- 
- #define S5P_VIC0_BASE		S5P_IRQ(0)
- #define S5P_VIC1_BASE		S5P_IRQ(32)
-+#define S5P_VIC2_BASE		S5P_IRQ(64)
-+#define S5P_VIC3_BASE		S5P_IRQ(96)
- 
- #define IRQ_VIC0_BASE		S5P_VIC0_BASE
- #define IRQ_VIC1_BASE		S5P_VIC1_BASE
-@@ -71,8 +73,10 @@
- 
- #define S5P_IRQ_VIC0(x)		(S5P_VIC0_BASE + (x))
- #define S5P_IRQ_VIC1(x)		(S5P_VIC1_BASE + (x))
-+#define S5P_IRQ_VIC2(x)		(S5P_VIC2_BASE + (x))
-+#define S5P_IRQ_VIC3(x)		(S5P_VIC3_BASE + (x))
- 
--#define S5P_TIMER_IRQ(x)	S5P_IRQ(64 + (x))
-+#define S5P_TIMER_IRQ(x)	S5P_IRQ(128 + (x))
- 
- #define IRQ_TIMER0		S5P_TIMER_IRQ(0)
- #define IRQ_TIMER1		S5P_TIMER_IRQ(1)
++static struct platform_driver s5p6442_serial_drv = {
++	.probe		= s5p6442_serial_probe,
++	.remove		= s3c24xx_serial_remove,
++	.driver		= {
++		.name	= "s5p6442-uart",
++		.owner	= THIS_MODULE,
++	},
++};
++
++s3c24xx_console_init(&s5p6442_serial_drv, s5p6442_uart_inf);
++
++static int __init s5p6442_serial_init(void)
++{
++	return s3c24xx_serial_init(&s5p6442_serial_drv, s5p6442_uart_inf);
++}
++
++static void __exit s5p6442_serial_exit(void)
++{
++	platform_driver_unregister(&s5p6442_serial_drv);
++}
++
++module_init(s5p6442_serial_init);
++module_exit(s5p6442_serial_exit);
++
++MODULE_DESCRIPTION("Samsung S5P6442 Serial driver, based on S3C6400 driver");
++MODULE_AUTHOR("Aditya Pratap <aditya.ps@samsung.com");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:s5p6442-uart");
 -- 
 1.6.2.5
