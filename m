@@ -1,32 +1,21 @@
 From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Fri, 22 Jan 2010 23:29:16 +0100
-Subject: [PATCH] ARM: SAMSUNG: Fix null pointer dereference in ADC driver
-Message-ID: <b2e8f9f71001221429l5ea24cd8j3046e7a24546320a@mail.gmail.com>
+Date: Fri, 22 Jan 2010 23:47:05 +0100
+Subject: [PATCH 0/4] Add s3c64xx support to touchscreen driver
+Message-ID: <b2e8f9f71001221447r56b29abboa81736fb1451cdde@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM: SAMSUNG: Fix null pointer dereference in ADC driver
+Hi,
 
-Use struct adc_device instead of relying on client (which could be
-NULL) when checking for SoC type.
+these patches add support for the s3c64xx platforms to the touchscreen driver.
+This was based on next-samsung in Ben Dook's tree.
 
-Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
----
- arch/arm/plat-samsung/adc.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+These depend on:
+[PATCH] ARM: SAMSUNG: Fix null pointer dereference in ADC driver
 
-diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
-index 120b790..c7659b7 100644
---- a/arch/arm/plat-samsung/adc.c
-+++ b/arch/arm/plat-samsung/adc.c
-@@ -295,7 +295,7 @@ static irqreturn_t s3c_adc_irq(int irq, void *pw)
- 	}
+I'm not quite sure regarding the resources in patch 3, perhaps these should be
+somehow shared with the ADC driver? (I also can't seem to figure out how the
+s3c24xx handles this at the moment..)
 
- exit:
--	if (platform_get_device_id(client->pdev)->driver_data == TYPE_S3C64XX) {
-+	if (platform_get_device_id(adc->pdev)->driver_data == TYPE_S3C64XX) {
- 		/* Clear ADC interrupt */
- 		writel(0, adc->regs + S3C64XX_ADCCLRINT);
- 	}
--- 
-1.6.6.1
+Regards,
+Maurus Cuelenaere
