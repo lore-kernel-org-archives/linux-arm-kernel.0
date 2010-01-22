@@ -1,112 +1,138 @@
 From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Fri, 22 Jan 2010 23:47:14 +0100
-Subject: [PATCH 3/4] ARM: S3C64XX: Add touchscreen platform device definition
-Message-ID: <b2e8f9f71001221447h66136f0djc8652fe96093eb12@mail.gmail.com>
+Date: Fri, 22 Jan 2010 23:47:17 +0100
+Subject: [PATCH 4/4] ARM: S3C64XX: Add s3c64xx support to touchscreen driver
+Message-ID: <b2e8f9f71001221447u550c9713l9f04aeec030c86db@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM: S3C64XX: Add touchscreen platform device definition
+ARM: S3C64XX: Add s3c64xx support to touchscreen driver
+
+This ack's the extra interrupt s3c64xx platforms have in the touchscreen driver.
 
 Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
 ---
- arch/arm/plat-s3c64xx/Kconfig  |    5 +++
- arch/arm/plat-s3c64xx/Makefile |    4 +++
- arch/arm/plat-s3c64xx/dev-ts.c |   58 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 67 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-s3c64xx/dev-ts.c
+ drivers/input/touchscreen/Kconfig      |    6 +++---
+ drivers/input/touchscreen/s3c2410_ts.c |   28 ++++++++++++++++++++++++----
+ 2 files changed, 27 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/plat-s3c64xx/Kconfig b/arch/arm/plat-s3c64xx/Kconfig
-index 37b4519..7b5b417 100644
---- a/arch/arm/plat-s3c64xx/Kconfig
-+++ b/arch/arm/plat-s3c64xx/Kconfig
-@@ -72,4 +72,9 @@ config S3C64XX_SETUP_SDHCI_GPIO
+diff --git a/drivers/input/touchscreen/Kconfig
+b/drivers/input/touchscreen/Kconfig
+index dfafc76..0378b3d 100644
+--- a/drivers/input/touchscreen/Kconfig
++++ b/drivers/input/touchscreen/Kconfig
+@@ -146,11 +146,11 @@ config TOUCHSCREEN_FUJITSU
+ 	  module will be called fujitsu-ts.
+
+ config TOUCHSCREEN_S3C2410
+-	tristate "Samsung S3C2410 touchscreen input driver"
+-	depends on ARCH_S3C2410
++	tristate "Samsung S3C touchscreen input driver"
++	depends on ARCH_S3C2410 || ARCH_S3C64XX
+ 	select S3C24XX_ADC
  	help
- 	  Common setup code for S3C64XX SDHCI GPIO configurations
+-	  Say Y here if you have the s3c2410 touchscreen.
++	  Say Y here if you have the s3c touchscreen.
 
-+config S3C64XX_DEV_TS
-+	bool
-+	help
-+	  Common platform code for S3C64XX touchscreen device
-+
- endif
-diff --git a/arch/arm/plat-s3c64xx/Makefile b/arch/arm/plat-s3c64xx/Makefile
-index 80255a5..74fb958 100644
---- a/arch/arm/plat-s3c64xx/Makefile
-+++ b/arch/arm/plat-s3c64xx/Makefile
-@@ -40,6 +40,10 @@ obj-$(CONFIG_S3C64XX_DMA)	+= dma.o
+ 	  If unsure, say N.
 
- obj-$(CONFIG_S3C_ADC)		+= dev-adc.o
+diff --git a/drivers/input/touchscreen/s3c2410_ts.c
+b/drivers/input/touchscreen/s3c2410_ts.c
+index 3debbc2..7dfbc38 100644
+--- a/drivers/input/touchscreen/s3c2410_ts.c
++++ b/drivers/input/touchscreen/s3c2410_ts.c
+@@ -40,7 +40,9 @@
+ #include <plat/regs-adc.h>
+ #include <plat/ts.h>
 
-+# TS support
-+
-+obj-$(CONFIG_S3C64XX_DEV_TS)	+= dev-ts.o
-+
- # Device setup
++#ifdef PLAT_S3C24XX
+ #include <mach/regs-gpio.h>
++#endif
 
- obj-$(CONFIG_S3C64XX_SETUP_I2C0) += setup-i2c0.o
-diff --git a/arch/arm/plat-s3c64xx/dev-ts.c b/arch/arm/plat-s3c64xx/dev-ts.c
-new file mode 100644
-index 0000000..11ccd33
---- /dev/null
-+++ b/arch/arm/plat-s3c64xx/dev-ts.c
-@@ -0,0 +1,58 @@
-+/* linux/arch/arm/plat-s3c64xx/dev-ts.c
-+ *
-+ * Copyright 2010 Maurus Cuelenaere
-+ *
-+ * S3C64XX series device definition for touchscreen device
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <linux/kernel.h>
-+#include <linux/string.h>
-+#include <linux/platform_device.h>
-+
-+#include <mach/irqs.h>
-+#include <mach/map.h>
-+
-+#include <plat/devs.h>
-+#include <plat/ts.h>
-+
-+static struct resource s3c_ts_resource[] = {
-+	[0] = {
-+		.start = S3C64XX_PA_ADC,
-+		.end   = S3C64XX_PA_ADC + SZ_256 - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start = IRQ_TC,
-+		.end   = IRQ_TC,
-+		.flags = IORESOURCE_IRQ,
-+	},
+ #define TSC_SLEEP  (S3C2410_ADCTSC_PULL_UP_DISABLE | S3C2410_ADCTSC_XY_PST(0))
+
+@@ -88,6 +90,12 @@ struct s3c2410ts {
+
+ static struct s3c2410ts ts;
+
++enum s3c_cpu_type {
++	TYPE_S3C2410,
++	TYPE_S3C2440,
++	TYPE_S3C64XX,
 +};
 +
-+struct platform_device s3c_device_ts = {
-+	.name		= "s3c64xx-ts",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(s3c_ts_resource),
-+	.resource	= s3c_ts_resource,
-+};
-+EXPORT_SYMBOL(s3c_device_ts);
+ /**
+  * s3c2410_ts_connect - configure gpio for s3c2410 systems
+  *
+@@ -95,6 +103,7 @@ static struct s3c2410ts ts;
+  * connected to the device (later systems such as the S3C2440 integrate
+  * these into the device).
+ */
++#ifdef PLAT_S3C24XX
+ static inline void s3c2410_ts_connect(void)
+ {
+ 	s3c2410_gpio_cfgpin(S3C2410_GPG(12), S3C2410_GPG12_XMON);
+@@ -102,6 +111,7 @@ static inline void s3c2410_ts_connect(void)
+ 	s3c2410_gpio_cfgpin(S3C2410_GPG(14), S3C2410_GPG14_YMON);
+ 	s3c2410_gpio_cfgpin(S3C2410_GPG(15), S3C2410_GPG15_nYPON);
+ }
++#endif
+
+ /**
+  * get_down - return the down state of the pen
+@@ -169,6 +179,7 @@ static DEFINE_TIMER(touch_timer, touch_timer_fire, 0, 0);
+  */
+ static irqreturn_t stylus_irq(int irq, void *dev_id)
+ {
++	struct platform_device *pdev = to_platform_device(ts.dev);
+ 	unsigned long data0;
+ 	unsigned long data1;
+ 	bool down;
+@@ -187,6 +198,12 @@ static irqreturn_t stylus_irq(int irq, void *dev_id)
+ 	else
+ 		dev_info(ts.dev, "%s: count=%d\n", __func__, ts.count);
+
 +
-+void __init s3c_ts_set_platdata(struct s3c_ts_mach_info *pd)
-+{
-+	struct s3c_ts_mach_info *npd;
-+
-+	if (!pd) {
-+		printk(KERN_ERR "%s: no platform data\n", __func__);
-+		return;
++	if (platform_get_device_id(pdev)->driver_data == TYPE_S3C64XX) {
++		/* Clear pen down/up interrupt */
++		writel(0x0, ts.io + S3C64XX_ADCCLRINTPNDNUP);
 +	}
 +
-+	npd = kmemdup(pd, sizeof(struct s3c_ts_mach_info), GFP_KERNEL);
-+	if (!npd)
-+		printk(KERN_ERR "%s: no memory for platform data\n", __func__);
-+
-+	s3c_device_ts.dev.platform_data = npd;
-+}
-+EXPORT_SYMBOL(s3c_ts_set_platdata);
+ 	return IRQ_HANDLED;
+ }
+
+@@ -295,9 +312,11 @@ static int __devinit s3c2410ts_probe(struct
+platform_device *pdev)
+ 		goto err_clk;
+ 	}
+
++#ifdef PLAT_S3C24XX
+ 	/* Configure the touchscreen external FETs on the S3C2410 */
+-	if (!platform_get_device_id(pdev)->driver_data)
++	if (platform_get_device_id(pdev)->driver_data == TYPE_S3C2410)
+ 		s3c2410_ts_connect();
++#endif
+
+ 	ts.client = s3c_adc_register(pdev, s3c24xx_ts_select,
+ 				     s3c24xx_ts_conversion, 1);
+@@ -418,15 +437,16 @@ static struct dev_pm_ops s3c_ts_pmops = {
+ #endif
+
+ static struct platform_device_id s3cts_driver_ids[] = {
+-	{ "s3c2410-ts", 0 },
+-	{ "s3c2440-ts", 1 },
++	{ "s3c2410-ts", TYPE_S3C2410 },
++	{ "s3c2440-ts", TYPE_S3C2440 },
++	{ "s3c64xx-ts", TYPE_S3C64XX },
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(platform, s3cts_driver_ids);
+
+ static struct platform_driver s3c_ts_driver = {
+ 	.driver         = {
+-		.name   = "s3c24xx-ts",
++		.name   = "s3c-ts",
+ 		.owner  = THIS_MODULE,
+ #ifdef CONFIG_PM
+ 		.pm	= &s3c_ts_pmops,
 -- 
 1.6.6.1
