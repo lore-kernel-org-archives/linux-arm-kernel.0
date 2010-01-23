@@ -1,105 +1,64 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 23 Jan 2010 09:13:17 -0800
-Subject: [PATCH 2/4] omap: Make uncompress code and DEBUG_LL code
-	generic, v2
-In-Reply-To: <FCCFB4CDC6E5564B9182F639FC35608703007F2340@dbde02.ent.ti.com>
-References: <20100116191820.GI10318@atomide.com>
-	<20100116193313.GA23092@n2100.arm.linux.org.uk>
-	<20100116200003.GL10318@atomide.com>
-	<FCCFB4CDC6E5564B9182F639FC356087030070F296@dbde02.ent.ti.com>
-	<20100122030711.GP23467@atomide.com>
-	<FCCFB4CDC6E5564B9182F639FC35608703007F2289@dbde02.ent.ti.com>
-	<20100122205511.GB11835@atomide.com>
-	<FCCFB4CDC6E5564B9182F639FC35608703007F232B@dbde02.ent.ti.com>
-	<20100122211052.GE11835@atomide.com>
-	<FCCFB4CDC6E5564B9182F639FC35608703007F2340@dbde02.ent.ti.com>
-Message-ID: <20100123171317.GA6836@atomide.com>
+From: utx@penguin.cz (Stanislav Brabec)
+Date: Sat, 23 Jan 2010 20:41:09 +0100
+Subject: sharp c-3000 aka spitz: fix warn_on introduced in 2.6.32-rc1
+In-Reply-To: <f17812d71001062333y2e49fa21scf91718da9ae3091@mail.gmail.com>
+References: <20100106071026.GD1382@ucw.cz>
+	<f17812d71001052317h2bf25fady6bd729b35ef6db63@mail.gmail.com>
+	<20100107065230.GA1303@ucw.cz>
+	<f17812d71001062333y2e49fa21scf91718da9ae3091@mail.gmail.com>
+Message-ID: <1264275669.9100.11.camel@utx.utx.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pandita, Vikram <vikram.pandita@ti.com> [100122 15:08]:
-> Tony
-> 
-> >-----Original Message-----
-> >From: Tony Lindgren [mailto:tony at atomide.com]
-> >Sent: Friday, January 22, 2010 3:11 PM
-> >To: Pandita, Vikram
-> >Cc: Russell King - ARM Linux; linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
-> >Subject: Re: [PATCH 2/4] omap: Make uncompress code and DEBUG_LL code generic, v2
+Eric Miao wrote:
 > >
-> >* Pandita, Vikram <vikram.pandita@ti.com> [100122 12:56]:
-> >>
-> >>
-> >> >-----Original Message-----
-> >> >From: Tony Lindgren [mailto:tony at atomide.com]
-> >> >Sent: Friday, January 22, 2010 2:55 PM
-> >> >To: Pandita, Vikram
-> >> >Cc: Russell King - ARM Linux; linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
-> >> >Subject: Re: [PATCH 2/4] omap: Make uncompress code and DEBUG_LL code generic, v2
-> >> >
-> >> >* Pandita, Vikram <vikram.pandita@ti.com> [100122 06:46]:
-> >> >> >
-> >> >> >OK, I've added that too, but for mach-omap2 only. I've also
-> >> >> >added an experimental zoom2/3 support.
-> >> >> >
-> >> >> >Care to take try it out and see what happens on a zoom?
-> >> >>
-> >> >> Test on zoom3 failed with multi-omap branch.
-> >> >> Debugging the same, should have a zoom correction patch out today.
-> >> >
-> >> >Heh OK. I just pushed more updates into the multi-omap branch
-> >> >if you want to try to boot zoom2/zoom3 using the same .config.
-> >>
-> >> Refreshed my tree and I don't see your patches yet.
-> >
-> >Takes a few minutes to get mirrored from master.kernel.org..
-> 
-> Yes I tried with new branch and zoom2/3 does not work.
-> Root cause: 
-> There is a very basic issue in low level code.
-> 
-> We are allowed to create only one Physical to Virtual mapping using MACHINE_START() phys_io and io_pg_offst of size 0x100000(1MB).
-> 
-> Now for zoom2/3 we need to do following:
-> MACHINE_START(OMAP_ZOOM3, "OMAP Zoom3 board")
-> -       .phys_io        = 0x48000000,
-> -       .io_pg_offst    = ((0xfa000000) >> 18) & 0xfffc,
-> +       .phys_io        = 0x1000000, /*ZOOM_UART_BASE*/
-> +       .io_pg_offst    = ((0xfb000000) >> 18) & 0xfffc, /*ZOOM_UART_VIRT*/
->         .boot_params    = 0x80000100,
->         .map_io         = omap_zoom_map_io,
->         .init_irq       = omap_zoom_init_irq,
-> 
-> This will create mapping:
-> 0x1000000 <-> 0xfb000000 of 1MB
-> 
-> Now that leaves the phy address 0x4800000 omap register mapping, unmapped.
+> > I don't get it; what is pxa27x_keypad used on? It looks like
+> > matrix-keypad subset.
 
-Right, we really need 0x48000000 mapped :)
- 
-> So the code to get scratchpad contents will abort:
-> arch/arm/mach-omap2/include/mach/debug-macro.S
-> 	moveq   \rx, #0x48000000        @ physical base address
-> 	movne   \rx, #0xfa000000        @ virtual base
-> 	orr     \rx, \rx, #0x0006a000   @ uart1 on omap2/3/4
-> 
-> 
-> This seems to be a basic limitation of low level code and I have not clue how to circumvent this.
-> Thoughts?
+> pxa27x has its own specific keypad controller. And since we now
+> use enable_irq_wake, and the keypad controller has only one
+> such IRQ_KEYPAD, will have to setup the keypad GPIO wakeup
+> as a whole.
 
-Please take a look at arch/arm/kernel/head.S where you can add
-the extra mapping early on.
+Looking deeper into it, the problem seems to be elsewhere:
+I just added debug message to start and end of set_irq_wake().
 
-Hmm, I wonder if we cand nowadays do the extra mapping for zoom
-external uart in arch/arm/kernel/early_printk.c?
+And here is what I got during suspend:
 
-Are you getting anything out of the zoom uart before MMU is
-enabled?
+set_irq_wake() started IRQ: 191 to 1, desc->wake_depth: 0
+set_irq_wake() done IRQ: 191 to 1, desc->wake_depth: 0
+set_irq_wake() started IRQ: 108 to 1, desc->wake_depth: 0
+set_irq_wake() done IRQ: 108 to 1, desc->wake_depth: 1
+set_irq_wake() started IRQ: 113 to 1, desc->wake_depth: 0
+set_irq_wake() done IRQ: 113 to 1, desc->wake_depth: 0
+set_irq_wake() started IRQ: 187 to 1, desc->wake_depth: 0
+set_irq_wake() done IRQ: 187 to 1, desc->wake_depth: 0
+set_irq_wake() started IRQ: 130 to 1, desc->wake_depth: 0
+set_irq_wake() done IRQ: 130 to 1, desc->wake_depth: 0
+set_irq_wake() started IRQ: 132 to 1, desc->wake_depth: 0
+set_irq_wake() done IRQ: 132 to 1, desc->wake_depth: 0
+set_irq_wake() started IRQ: 134 to 1, desc->wake_depth: 0
+set_irq_wake() done IRQ: 134 to 1, desc->wake_depth: 0
+set_irq_wake() started IRQ: 135 to 1, desc->wake_depth: 0
+set_irq_wake() done IRQ: 135 to 1, desc->wake_depth: 0
+set_irq_wake() started IRQ: 31 to 1, desc->wake_depth: 0
+set_irq_wake() done IRQ: 31 to 1, desc->wake_depth: 1
 
-To test this you can temporarily break your kernel by commenting
-out the start_kernel line in head-common.S. Then the code falls
-through to __error_p and prints out a processor error..
+I think that if (desc->wake_depth == 0) when set_irq_wake(foo, 1) is
+done, then something went wrong. And it is not surprise, that it reports
+Unbalanced IRQ on resume.
 
-Regards,
+Note that other people (Cyril Hrubi?) with a bit different .config
+report success with gpio keys driver turned on.
 
-Tony
+My config:
+http://www.penguin.cz/~utx/zaurus/feed/images/spitz/config-2.6.33-rc4-spitz
+
+OT: Serial console resume did not work properly even with
+no_console_suspend and my patch:
+[PATCH 4/8] serial-core: resume serial hardware with no_console_suspend
+
+
+________________________________________________________________________
+Stanislav Brabec
+http://www.penguin.cz/~utx/zaurus
