@@ -1,89 +1,39 @@
-From: vikram.pandita@ti.com (Pandita, Vikram)
-Date: Sat, 23 Jan 2010 04:40:20 +0530
-Subject: [PATCH 2/4] omap: Make uncompress code and DEBUG_LL code
-	generic, v2
-In-Reply-To: <20100122211052.GE11835@atomide.com>
-References: <20100116013515.10065.30649.stgit@baageli.muru.com>
-	<20100116093555.GA13596@n2100.arm.linux.org.uk>
-	<20100116191820.GI10318@atomide.com>
-	<20100116193313.GA23092@n2100.arm.linux.org.uk>
-	<20100116200003.GL10318@atomide.com>
-	<FCCFB4CDC6E5564B9182F639FC356087030070F296@dbde02.ent.ti.com>
-	<20100122030711.GP23467@atomide.com>
-	<FCCFB4CDC6E5564B9182F639FC35608703007F2289@dbde02.ent.ti.com>
-	<20100122205511.GB11835@atomide.com>
-	<FCCFB4CDC6E5564B9182F639FC35608703007F232B@dbde02.ent.ti.com>
-	<20100122211052.GE11835@atomide.com>
-Message-ID: <FCCFB4CDC6E5564B9182F639FC35608703007F2340@dbde02.ent.ti.com>
+From: shivdas.tech@gmail.com (Shivdas Gujare)
+Date: Fri, 22 Jan 2010 23:31:43 -0800
+Subject: measureing kernel & application boottime's
+Message-ID: <cf70f0211001222331y17af1f56oe7d4e61c1d38d7d3@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony
+Hi Tim/all,
 
->-----Original Message-----
->From: Tony Lindgren [mailto:tony at atomide.com]
->Sent: Friday, January 22, 2010 3:11 PM
->To: Pandita, Vikram
->Cc: Russell King - ARM Linux; linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
->Subject: Re: [PATCH 2/4] omap: Make uncompress code and DEBUG_LL code generic, v2
->
->* Pandita, Vikram <vikram.pandita@ti.com> [100122 12:56]:
->>
->>
->> >-----Original Message-----
->> >From: Tony Lindgren [mailto:tony at atomide.com]
->> >Sent: Friday, January 22, 2010 2:55 PM
->> >To: Pandita, Vikram
->> >Cc: Russell King - ARM Linux; linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
->> >Subject: Re: [PATCH 2/4] omap: Make uncompress code and DEBUG_LL code generic, v2
->> >
->> >* Pandita, Vikram <vikram.pandita@ti.com> [100122 06:46]:
->> >> >
->> >> >OK, I've added that too, but for mach-omap2 only. I've also
->> >> >added an experimental zoom2/3 support.
->> >> >
->> >> >Care to take try it out and see what happens on a zoom?
->> >>
->> >> Test on zoom3 failed with multi-omap branch.
->> >> Debugging the same, should have a zoom correction patch out today.
->> >
->> >Heh OK. I just pushed more updates into the multi-omap branch
->> >if you want to try to boot zoom2/zoom3 using the same .config.
->>
->> Refreshed my tree and I don't see your patches yet.
->
->Takes a few minutes to get mirrored from master.kernel.org..
+I am trying to measure kernel boottime along with measuring
+application process start time on ARM V6 platform.
+Because of few reasons, I have to stick to kernel 2.6.25(can't upgrade
+it to latest).
 
-Yes I tried with new branch and zoom2/3 does not work.
-Root cause: 
-There is a very basic issue in low level code.
+While measuring application process times, I use "cat /proc/uptime"
+when I start a process (I am not sure, if this is the best way to
+measure time , please suggest if any).
+For kernel, I use CONFIG_PRINTK_TIME macro. my application loads a
+kernel module.
+So, my question is how "/proc/uptime" relates to PRINTK_TIME timestamps?
 
-We are allowed to create only one Physical to Virtual mapping using MACHINE_START() phys_io and io_pg_offst of size 0x100000(1MB).
+I see, "uptime" uses
+        do_posix_clock_monotonic_gettime(&uptime);
+        monotonic_to_bootbased(&uptime);
 
-Now for zoom2/3 we need to do following:
-MACHINE_START(OMAP_ZOOM3, "OMAP Zoom3 board")
--       .phys_io        = 0x48000000,
--       .io_pg_offst    = ((0xfa000000) >> 18) & 0xfffc,
-+       .phys_io        = 0x1000000, /*ZOOM_UART_BASE*/
-+       .io_pg_offst    = ((0xfb000000) >> 18) & 0xfffc, /*ZOOM_UART_VIRT*/
-        .boot_params    = 0x80000100,
-        .map_io         = omap_zoom_map_io,
-        .init_irq       = omap_zoom_init_irq,
+while PRINTK_TIME does only, "cpu_clock(printk_cpu); "
+but I am not able to understand practical difference between above two logics.
 
-This will create mapping:
-0x1000000 <-> 0xfb000000 of 1MB
+So, how do I correlate the time information from kernel dmesg , when
+kernel module is loaded by my application(i.e. uptime measures just
+before starting an application which loads kernel module).
 
-Now that leaves the phy address 0x4800000 omap register mapping, unmapped.
-
-So the code to get scratchpad contents will abort:
-arch/arm/mach-omap2/include/mach/debug-macro.S
-	moveq   \rx, #0x48000000        @ physical base address
-	movne   \rx, #0xfa000000        @ virtual base
-	orr     \rx, \rx, #0x0006a000   @ uart1 on omap2/3/4
+Also, Is there any best method to measure application start time
+(except bootchart, can't use it)?
+Thanks for all your help.
 
 
-This seems to be a basic limitation of low level code and I have not clue how to circumvent this.
-Thoughts?
-
-Regards,
-Vikram 
+Thanks and Regards,
+Shivdas Gujare
