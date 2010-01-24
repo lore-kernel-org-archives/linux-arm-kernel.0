@@ -1,21 +1,33 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 24 Jan 2010 12:30:17 +0100
-Subject: [PATCH] Alter name of U300 watchdog resource
-In-Reply-To: <1264280677-23498-1-git-send-email-linus.walleij@stericsson.com>
-References: <1264280677-23498-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20100124113017.GB18782@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 24 Jan 2010 20:42:33 +0000
+Subject: [PATCH] spinlock: don't use deprecated barriers on ARMv7
+In-Reply-To: <1263397536-15736-1-git-send-email-rabin@rab.in>
+References: <1263397536-15736-1-git-send-email-rabin@rab.in>
+Message-ID: <20100124204233.GA25665@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 23, 2010 at 10:04:37PM +0100, Linus Walleij wrote:
-> This changes the bus name of the U300 watchdog from just "wdog"
-> to "coh901327_wdog" which is used to match the corresponding
-> driver. This makes the watchdog prope properly.
-s/prope/probe/
+On Wed, Jan 13, 2010 at 09:15:36PM +0530, Rabin Vincent wrote:
+> On ARMv7, the use of the cp15 operations for barriers is deprecated in
+> favour of the isb, dsb, and dmb instructions.  Change the locking
+> functions to use the appropriate type of dsb for the architecture being
+> built for.
 
-Best regards
-Uwe
+Umm...
 
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+> diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+> index 058e7e9..0b371ba 100644
+> --- a/arch/arm/include/asm/system.h
+> +++ b/arch/arm/include/asm/system.h
+> @@ -164,6 +164,14 @@ extern unsigned int user_debug;
+>  #define set_mb(var, value)	do { var = value; smp_mb(); } while (0)
+>  #define nop() __asm__ __volatile__("mov\tr0,r0\t@ nop\n\t");
+>  
+> +static inline void smp_sev(void)
+> +{
+> +#if defined(CONFIG_SMP) && defined(CONFIG_CPU_32v6K)
+> +	dsb();
+> +	__asm__ __volatile__ ("sev" : : : "memory");
+
+Why are you introducing a compiler memory barrier where there was none
+before?
