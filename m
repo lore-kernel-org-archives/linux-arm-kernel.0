@@ -1,33 +1,116 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 24 Jan 2010 20:42:33 +0000
-Subject: [PATCH] spinlock: don't use deprecated barriers on ARMv7
-In-Reply-To: <1263397536-15736-1-git-send-email-rabin@rab.in>
-References: <1263397536-15736-1-git-send-email-rabin@rab.in>
-Message-ID: <20100124204233.GA25665@n2100.arm.linux.org.uk>
+From: erikbenada@yahoo.ca (Erik Benada)
+Date: Sun, 24 Jan 2010 13:43:04 -0800 (PST)
+Subject: [PATCH] mach-orion5x: D-link DNS-323 rev. B1 power-off
+Message-ID: <953961.24356.qm@web39605.mail.mud.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 13, 2010 at 09:15:36PM +0530, Rabin Vincent wrote:
-> On ARMv7, the use of the cp15 operations for barriers is deprecated in
-> favour of the isb, dsb, and dmb instructions.  Change the locking
-> functions to use the appropriate type of dsb for the architecture being
-> built for.
+This patch fixes power LED blinking and power-off on DNS-323 rev. B1.
 
-Umm...
+GPIO pin 3 has to be set to 1 to stop power LED blinking and to allow the LED to be controlled via leds-gpio. This pin has to be also set to 1 for power-off to work.
+To power-off the rev. B1 machine, pin 8 has to be set to 1 and then set to 0 to do actual power-off.
 
-> diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-> index 058e7e9..0b371ba 100644
-> --- a/arch/arm/include/asm/system.h
-> +++ b/arch/arm/include/asm/system.h
-> @@ -164,6 +164,14 @@ extern unsigned int user_debug;
->  #define set_mb(var, value)	do { var = value; smp_mb(); } while (0)
->  #define nop() __asm__ __volatile__("mov\tr0,r0\t@ nop\n\t");
->  
-> +static inline void smp_sev(void)
-> +{
-> +#if defined(CONFIG_SMP) && defined(CONFIG_CPU_32v6K)
-> +	dsb();
-> +	__asm__ __volatile__ ("sev" : : : "memory");
+Tested on my DNS-323 rev. B1
 
-Why are you introducing a compiler memory barrier where there was none
-before?
+Signed-off-by: Erik Benada <erikbenada@yahoo.ca>
+---
+diff --git a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323-setup.c
+index b31ca4c..3e54324 100644
+--- a/arch/arm/mach-orion5x/dns323-setup.c
++++ b/arch/arm/mach-orion5x/dns323-setup.c
+@@ -10,6 +10,7 @@
+  *
+  */
+ 
++#include <linux/delay.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+@@ -32,6 +33,7 @@
+ 
+ #define DNS323_GPIO_LED_RIGHT_AMBER    1
+ #define DNS323_GPIO_LED_LEFT_AMBER    2
++#define DNS323_GPIO_SYSTEM_UP        3
+ #define DNS323_GPIO_LED_POWER        5
+ #define DNS323_GPIO_OVERTEMP        6
+ #define DNS323_GPIO_RTC            7
+@@ -239,7 +241,7 @@ static struct gpio_led dns323_leds[] = {
+     {
+         .name = "power:blue",
+         .gpio = DNS323_GPIO_LED_POWER,
+-        .active_low = 1,
++        .default_state = LEDS_GPIO_DEFSTATE_ON,
+     }, {
+         .name = "right:amber",
+         .gpio = DNS323_GPIO_LED_RIGHT_AMBER,
+@@ -334,7 +336,7 @@ static struct orion5x_mpp_mode dns323_mv88f5182_mpp_modes[] __initdata = {
+     {  0, MPP_UNUSED },
+     {  1, MPP_GPIO },        /* right amber LED (sata ch0) */
+     {  2, MPP_GPIO },        /* left amber LED (sata ch1) */
+-    {  3, MPP_UNUSED },
++    {  3, MPP_GPIO },        /* system up flag */
+     {  4, MPP_GPIO },        /* power button LED */
+     {  5, MPP_GPIO },        /* power button LED */
+     {  6, MPP_GPIO },        /* GMT G751-2f overtemp */
+@@ -372,13 +374,23 @@ static struct i2c_board_info __initdata dns323_i2c_devices[] = {
+     },
+ };
+ 
+-/* DNS-323 specific power off method */
+-static void dns323_power_off(void)
++/* DNS-323 rev. A specific power off method */
++static void dns323a_power_off(void)
+ {
+     pr_info("%s: triggering power-off...\n", __func__);
+     gpio_set_value(DNS323_GPIO_POWER_OFF, 1);
+ }
+ 
++/* DNS-323 rev B specific power off method */
++static void dns323b_power_off(void)
++{
++    pr_info("%s: triggering power-off...\n", __func__);
++    /* Pin has to be changed to 1 and back to 0 to do actual power off. */
++    gpio_set_value(DNS323_GPIO_POWER_OFF, 1);
++    mdelay(100);
++    gpio_set_value(DNS323_GPIO_POWER_OFF, 0);
++}
++
+ static void __init dns323_init(void)
+ {
+     /* Setup basic Orion functions. Need to be called early. */
+@@ -424,11 +436,20 @@ static void __init dns323_init(void)
+     if (dns323_dev_id() == MV88F5182_DEV_ID)
+         orion5x_sata_init(&dns323_sata_data);
+ 
+-    /* register dns323 specific power-off method */
++    /* The 5182 has flag to indicate the system is up. Without this flag
++     * set, power LED will flash and cannot be controlled via leds-gpio.
++     */
++    if (dns323_dev_id() == MV88F5182_DEV_ID)
++        gpio_set_value(DNS323_GPIO_SYSTEM_UP, 1);
++
++    /* Register dns323 specific power-off method */
+     if (gpio_request(DNS323_GPIO_POWER_OFF, "POWEROFF") != 0 ||
+         gpio_direction_output(DNS323_GPIO_POWER_OFF, 0) != 0)
+         pr_err("DNS323: failed to setup power-off GPIO\n");
+-    pm_power_off = dns323_power_off;
++    if (dns323_dev_id() == MV88F5182_DEV_ID)
++        pm_power_off = dns323b_power_off;
++    else
++        pm_power_off = dns323a_power_off;
+ }
+ 
+ /* Warning: D-Link uses a wrong mach-type (=526) in their bootloader */
+
+
+      __________________________________________________________________
+Looking for the perfect gift? Give the gift of Flickr! 
+
+http://www.flickr.com/gift/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: dns323-poweroff.patch
+Type: application/octet-stream
+Size: 3000 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100124/776b3fd5/attachment.obj>
