@@ -1,15 +1,8 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 25 Jan 2010 01:40:24 +0000
-Subject: whoever is using ymiao3@marvell.com please stop it
-Message-ID: <20100125014024.GA4609@trinity.fluff.org>
+Date: Mon, 25 Jan 2010 01:57:18 +0000
+Subject: S3C/SAMSUNG: clock fixes and updates
+Message-ID: <1264384641-8211-1-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Getting bounces for ymiao3 at marvell.com from marvell.com after replying
-to the platform device changes from Uwe Kleine-K???i
-
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Clock fixes and updates for next-samsung.
