@@ -1,49 +1,42 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 25 Jan 2010 10:28:50 +0100
-Subject: [PATCH 1/2 RESEND#2] i2c/pxa: remove unused macro
-In-Reply-To: <20100112105846.GA31145@pengutronix.de>
-References: <1257754721-17325-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1258658141-30340-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20091208211810.GB13706@pengutronix.de>
-	<20091208224456.0baf422b@hyperion.delvare>
-	<20091208220724.GA14696@pengutronix.de>
-	<20091209091146.78e8d7bb@hyperion.delvare>
-	<20100112105846.GA31145@pengutronix.de>
-Message-ID: <20100125092850.GA7378@pengutronix.de>
+From: colin.tuckley@arm.com (Colin Tuckley)
+Date: Mon, 25 Jan 2010 09:34:02 +0000
+Subject: [PATCH] ARM: Remove the unused RealView mmc1 data structure.
+Message-ID: <20100125093402.30530.22680.stgit@ARM03585.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Ben,
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/mach-realview/core.c |    6 ------
+ arch/arm/mach-realview/core.h |    1 -
+ 2 files changed, 0 insertions(+), 7 deletions(-)
 
-> > Ben, can you please add your tree to MAINTAINERS to make things clearer
-> > for contributors?
-I just sent out a patch for that to linux-i2c.
-
-> In the meantime I have three i2c patches without any feedback by you.
-> As Jean is convinced that you are responsible to take them can you
-> please have a look and comment?
-> 
-> My patches are also available via git at
-> 
-> 	git://git.pengutronix.de/git/ukl/linux-2.6.git next/i2c
-> 
-> Shortlog and diffstat can be found below.
-> 
-> Best regards
-> Uwe
-> 
-> Uwe Kleine-K?nig (2):
->       i2c/pxa: remove unused macro
->       i2c-imx: call ioremap only after request_mem_region
-> 
-> Wolfram Sang (1):
->       i2c/pxa: only define 'blue_murder'-function if DEBUG is #defined
-hmm, you took one of those (the i2c-imx patch) but not the other two
-with still no comment?!
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
+index 81cf0aa..d6ebf8b 100644
+--- a/arch/arm/mach-realview/core.c
++++ b/arch/arm/mach-realview/core.c
+@@ -244,12 +244,6 @@ struct mmci_platform_data realview_mmc0_plat_data = {
+ 	.gpio_cd	= 16,
+ };
+ 
+-struct mmci_platform_data realview_mmc1_plat_data = {
+-	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
+-	.gpio_wp	= 19,
+-	.gpio_cd	= 18,
+-};
+-
+ /*
+  * Clock handling
+  */
+diff --git a/arch/arm/mach-realview/core.h b/arch/arm/mach-realview/core.h
+index 781bca6..c136282 100644
+--- a/arch/arm/mach-realview/core.h
++++ b/arch/arm/mach-realview/core.h
+@@ -51,7 +51,6 @@ extern struct platform_device realview_flash_device;
+ extern struct platform_device realview_cf_device;
+ extern struct platform_device realview_i2c_device;
+ extern struct mmci_platform_data realview_mmc0_plat_data;
+-extern struct mmci_platform_data realview_mmc1_plat_data;
+ extern struct clcd_board clcd_plat_data;
+ extern void __iomem *gic_cpu_base_addr;
+ extern void __iomem *timer0_va_base;
