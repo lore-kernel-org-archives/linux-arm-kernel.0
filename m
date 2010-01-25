@@ -1,51 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 25 Jan 2010 14:59:35 +0000
-Subject: Default machine include placements
-In-Reply-To: <20100125135445.GU26562@trinity.fluff.org>
-References: <20100125040255.GN26562@trinity.fluff.org>
-	<20100125100546.GA16340@n2100.arm.linux.org.uk>
-	<20100125103216.GB5772@digital-scurf.org>
-	<20100125104425.GO26562@trinity.fluff.org>
-	<20100125104959.GC5772@digital-scurf.org>
-	<20100125105503.GQ26562@trinity.fluff.org>
-	<20100125111940.GC16340@n2100.arm.linux.org.uk>
-	<20100125115344.GS26562@trinity.fluff.org>
-	<20100125120454.GD16340@n2100.arm.linux.org.uk>
-	<20100125135445.GU26562@trinity.fluff.org>
-Message-ID: <20100125145935.GB22481@n2100.arm.linux.org.uk>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 25 Jan 2010 17:01:40 +0200
+Subject: [PATCH 3/4] mx25: fix time accounting
+In-Reply-To: <19293.31818.225869.565911@ipc1.ka-ro>
+References: <20100125105439.GE6724@jasper.tkos.co.il>
+	<fe6ca311cc749bf23a8f99e27ad460ff0aafa69a.1264416923.git.baruch@tkos.co.il>
+	<19293.31818.225869.565911@ipc1.ka-ro>
+Message-ID: <20100125150140.GG6724@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2010 at 01:54:45PM +0000, Ben Dooks wrote:
-> On Mon, Jan 25, 2010 at 12:04:54PM +0000, Russell King - ARM Linux wrote:
-> > Given the above, and the "mass population" hasn't happened, maybe part
-> > of the solution to the duplicated header file problem is to start
-> > combining some of these directories?
-> 
-> For plat-s3c64xx/mach-s3c6400/mach-s3c6410 how about moving the
-> plat-s3c64xx in with the machine definitions, as it is quite clear
-> now that it is unlikely to have any friends to join it (dev work is
-> on s5p and onwards).
-> 
-> Either arch/arm/mach-s3c64xx and have all s3c6400 and s3c6410 machines
-> in there, or keep the two mach- directories... I think i'd prefer to
-> see the two directories culled into one.
+Hi Lothar,
 
-I'd prefer that too.
+On Mon, Jan 25, 2010 at 12:11:06PM +0100, Lothar Wa?mann wrote:
+> Baruch Siach writes:
 
-> For the s3c24xx case, it probably is the best case to merges s3c2440 and
-> s3c2442 into mach-s3c244x as they are pretty similar.
-> 
-> s3c2443 is on list of things to expand, it is a different beast to the
-> predecessors.
+[snip]
 
-Sounds like a reason to keep it separate for the time being.
+> > -DEFINE_CLOCK(gpt_clk,    0, CCM_CGCR0,  5, get_rate_ipg, NULL, NULL);
+> > +DEFINE_CLOCK(gpt_clk,    0, CCM_CGCR0,  5, get_rate_gpt, NULL, NULL);
+> >  DEFINE_CLOCK(uart_per_clk, 0, CCM_CGCR0, 15, get_rate_uart, NULL, NULL);
+> >  DEFINE_CLOCK(cspi1_clk,  0, CCM_CGCR1,  5, get_rate_ipg, NULL, NULL);
+> >  DEFINE_CLOCK(cspi2_clk,  0, CCM_CGCR1,  6, get_rate_ipg, NULL, NULL);
+> >
+> IMO all those clocks should have the appropriate parent clocks, which
+> would fix the problem with the GPT clock rate without the need for a
+> special get_rate_*() functions and woould also make sure the parent
+> clock is enabled when the child clock is being enabled:
+> |DEFINE_CLOCK(gpt1_clk1,   0, CCM_CGCR1, 19, NULL, NULL, &ipg_clk);
+> |DEFINE_CLOCK(gpt1_clk,    0, CCM_CGCR0,  5, NULL, &gpt1_clk1, &per_clk5);
 
-> I'll try making patches for this tomorrow and see what people think?
+The i.MX25 clock configuration infrastructure clearly needs more work. This 
+patch only fixes a critical bug while doing the minimal possible change.
 
-I'm not sure where mach-s3c24a0 fits in to this stuff - the only thing
-it seems to contain is a load of include files.
+baruch
 
-With these changes, it's going to take it from 10 mach-s[35]* directories
-down to 8.  Not sure if it makes much material difference to mach/*.h
-includes though.
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
