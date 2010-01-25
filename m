@@ -1,36 +1,55 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 25 Jan 2010 12:04:13 -0500 (EST)
-Subject: [RFC 17/18] arm: mm: Add SW emulation for ARM domain manager
-	feature
-In-Reply-To: <1264437609.6275.110.camel@pc1117.cambridge.arm.com>
-References: <1263250057-26692-18-git-send-email-dwalker@codeaurora.org>
-	<1264437609.6275.110.camel@pc1117.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.00.1001251157140.1681@xanadu.home>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 25 Jan 2010 12:12:24 -0500
+Subject: [PATCH] locomo.c: fix missing spin_unlock_irqrestore
+Message-ID: <BD79186B4FD85F4B8E60E381CAEE1909020E920D@mi8nycmail19.Mi8.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Jan 2010, Catalin Marinas wrote:
+The function locomo_m62332_senddata sends a three byte i2c message to
+a M62332 DAC. This entire function is guarded with a spin_lock_irqsave
+at the start of the function and a spin_unlock_irqrestore at the end.
 
-> Hi Daniel,
-> 
-> On Mon, 2010-01-11 at 22:47 +0000, Daniel Walker wrote:
-> > Do not set domain manager bits in cp15 dacr.  Emulate using SW.  Add
-> > kernel hooks to handle domain changes, permission faults, and context
-> > switches.
-> 
-> In case you were not aware, there's a patch around (I think since 2007)
-> that removes the domain switching entirely from the kernel (given that
-> they have been deprecated for some time and may disappear completely in
-> the future):
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2009-December/005616.html
+As each byte is transferred, the ACK from the DAC is checked. Currently,
+If the ACK is missing the function simply returns without the unlock.
+It also leaves the i2c bus in an invalid state since the last byte
+transferred did not have a "stop" condition and leave the bus idle.
 
-Also the manager domain doesn't Honor the nx bit, and that is causing 
-issues with speculative prefetching as DMA coherent memory area may end 
-up being speculatively prefetched unexpectedly.  The on-going DMA 
-handling rework takes care of the bigger issue, but the nx bit not being 
-observed in all domains is another one for which this patch is a nice 
-"fix".
+Fix this by adding an exit path using goto.
 
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 
-Nicolas
+---
+
+diff --git a/arch/arm/common/locomo.c b/arch/arm/common/locomo.c
+index bd36c77..2f693da 100644
+--- a/arch/arm/common/locomo.c
++++ b/arch/arm/common/locomo.c
+@@ -1007,7 +1007,7 @@ void locomo_m62332_senddata(struct locomo_dev *ldev, unsigned int dac_data, int
+????????udelay(DAC_SCL_HIGH_HOLD_TIME);?/* 4.7 usec */
+????????if (locomo_readl(mapbase + LOCOMO_DAC) & LOCOMO_DAC_SDAOEB) {???/* High is error */
+????????????????printk(KERN_WARNING "locomo: m62332_senddata Error 1\n");
+-???????????????return;
++???????????????goto out;
+????????}
+?
+????????/* Send Sub address (LSB is channel select) */
+@@ -1035,7 +1035,7 @@ void locomo_m62332_senddata(struct locomo_dev *ldev, unsigned int dac_data, int
+????????udelay(DAC_SCL_HIGH_HOLD_TIME);?/* 4.7 usec */
+????????if (locomo_readl(mapbase + LOCOMO_DAC) & LOCOMO_DAC_SDAOEB) {???/* High is error */
+????????????????printk(KERN_WARNING "locomo: m62332_senddata Error 2\n");
+-???????????????return;
++???????????????goto out;
+????????}
+?
+????????/* Send DAC data */
+@@ -1060,9 +1060,9 @@ void locomo_m62332_senddata(struct locomo_dev *ldev, unsigned int dac_data, int
+????????udelay(DAC_SCL_HIGH_HOLD_TIME);?/* 4.7 usec */
+????????if (locomo_readl(mapbase + LOCOMO_DAC) & LOCOMO_DAC_SDAOEB) {???/* High is error */
+????????????????printk(KERN_WARNING "locomo: m62332_senddata Error 3\n");
+-???????????????return;
+????????}
+?
++out:
+????????/* stop */
+????????r = locomo_readl(mapbase + LOCOMO_DAC);
+????????r &= ?~(LOCOMO_DAC_SCLOEB);
