@@ -1,46 +1,59 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 25 Jan 2010 16:37:34 +0100
-Subject: [PATCH] imxfb: correct location of callbacks in suspend and resume
-In-Reply-To: <1263226881-28008-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1263226881-28008-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1264433854-878-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 25 Jan 2010 16:40:09 +0000
+Subject: [RFC 17/18] arm: mm: Add SW emulation for ARM domain manager
+	feature
+In-Reply-To: <1263250057-26692-18-git-send-email-dwalker@codeaurora.org>
+References: <1263250057-26692-18-git-send-email-dwalker@codeaurora.org>
+Message-ID: <1264437609.6275.110.camel@pc1117.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The probe function passes a pointer to a struct fb_info to
-platform_set_drvdata, so don't interpret the return value of
-platform_get_drvdata as a pointer to struct imxfb_info.
+Hi Daniel,
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Acked-by: Sascha Hauer <kernel@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
----
- drivers/video/imxfb.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+On Mon, 2010-01-11 at 22:47 +0000, Daniel Walker wrote:
+> Do not set domain manager bits in cp15 dacr.  Emulate using SW.  Add
+> kernel hooks to handle domain changes, permission faults, and context
+> switches.
 
-diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-index 66358fa..b4b6dec 100644
---- a/drivers/video/imxfb.c
-+++ b/drivers/video/imxfb.c
-@@ -593,7 +593,8 @@ static int imxfb_activate_var(struct fb_var_screeninfo *var, struct fb_info *inf
-  */
- static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
- {
--	struct imxfb_info *fbi = platform_get_drvdata(dev);
-+	struct fb_info *info = platform_get_drvdata(dev);
-+	struct imxfb_info *fbi = info->par;
- 
- 	pr_debug("%s\n", __func__);
- 
-@@ -603,7 +604,8 @@ static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
- 
- static int imxfb_resume(struct platform_device *dev)
- {
--	struct imxfb_info *fbi = platform_get_drvdata(dev);
-+	struct fb_info *info = platform_get_drvdata(dev);
-+	struct imxfb_info *fbi = info->par;
- 
- 	pr_debug("%s\n", __func__);
- 
+In case you were not aware, there's a patch around (I think since 2007)
+that removes the domain switching entirely from the kernel (given that
+they have been deprecated for some time and may disappear completely in
+the future):
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2009-December/005616.html
+
+It doesn't require handling domain faults and works on SMP as well.
+Another advantage is that we can re-implement functions like
+copy_from_user etc. only using LDR/LDM rather than LDRT with some
+performance improvements.
+
+Of course, being my patch, I'm pushing for it :-) but I think longer
+term is a better approach that the domains emulation. Any thoughts on
+this?
+
+> --- /dev/null
+> +++ b/Documentation/arm/msm/emulate_domain_manager.txt
+[...]
+> +Software description
+> +====================
+> +
+> +In order to disable domain manager mode the equivalent HW functionality must
+> +be emulated in SW.  Any attempts to enable domain manager mode, must be
+> +intercepted.
+> +
+> +Because domain manager mode is not enabled, permissions for the
+> +associated domain will remain restricted.  Permission faults will be generated.
+> +The permission faults will be intercepted.  The faulted pages/sections will
+> +be modified to grant full access and execute permissions.
+> +
+> +The modified page tables must be restored when exiting domain manager mode.
+
+BTW, on the current (unpatched) kernel, what happens if after a
+set_fs(KERNEL_DS) call the kernel is preempted and a user space
+application executed? Does it gain access to the kernel pages? Something
+like this may affect your patches as well.
+
+Thanks.
+
 -- 
-1.6.6
+Catalin
