@@ -1,19 +1,14 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 25 Jan 2010 10:28:03 +0000
+From: dsilvers@simtec.co.uk (Daniel Silverstone)
+Date: Mon, 25 Jan 2010 10:32:16 +0000
 Subject: Default machine include placements
 In-Reply-To: <20100125100546.GA16340@n2100.arm.linux.org.uk>
 References: <20100125040255.GN26562@trinity.fluff.org>
 	<20100125100546.GA16340@n2100.arm.linux.org.uk>
-Message-ID: <20100125102803.GV10014@trinity.fluff.org>
+Message-ID: <20100125103216.GB5772@digital-scurf.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Jan 25, 2010 at 10:05:47AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 25, 2010 at 04:02:56AM +0000, Ben Dooks wrote:
-> > Currently in the s3c/s5p familt we're seeing quite a number of the
-> > same things being repeated for items like entry-macro.S, hardware.h
-> > and so on.
-> > 
 > > The first question is about adding include/mach directories to
 > > eitehr plat-s5p or plat-samsung to mop up the files that keep
 > > getting repeated (since the plat-* directories are processed after
@@ -35,13 +30,17 @@ On Mon, Jan 25, 2010 at 10:05:47AM +0000, Russell King - ARM Linux wrote:
 > only have to look at glibc to know that - where you have to search the
 > entire source looking for the header file you want.
 
-Ok, but this is going to make it really interesting once we sort out
-multiple machine building on the s5p series like the s3c24xx series
-currently has. Is there any suggestion about what to do then when
-we may end up including many arch/arm/mach-*/include/mach?
+As a suggestion; how about one of symbolic links; or headers of the form:
+
+/* arch/arm/mach-s5pc100/include/mach/foo.h
+ *
+ */
+
+#include <plat-samsung/include/mach/generic-foo.h>
+
+?
+
+D.
 
 -- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Daniel Silverstone                              http://www.simtec.co.uk/
