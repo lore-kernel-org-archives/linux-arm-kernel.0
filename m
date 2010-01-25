@@ -1,32 +1,32 @@
-From: dsilvers@simtec.co.uk (Daniel Silverstone)
-Date: Mon, 25 Jan 2010 10:49:59 +0000
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Mon, 25 Jan 2010 10:49:56 +0000
 Subject: Default machine include placements
-In-Reply-To: <20100125104425.GO26562@trinity.fluff.org>
+In-Reply-To: <20100125040255.GN26562@trinity.fluff.org>
 References: <20100125040255.GN26562@trinity.fluff.org>
-	<20100125100546.GA16340@n2100.arm.linux.org.uk>
-	<20100125103216.GB5772@digital-scurf.org>
-	<20100125104425.GO26562@trinity.fluff.org>
-Message-ID: <20100125104959.GC5772@digital-scurf.org>
+Message-ID: <20100125104956.GP26562@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2010 at 10:44:25AM +0000, Ben Dooks wrote:
-> We do a bit of #include <plat/xxx-base.h> already for some things.
-> The 'empty' headers always seme to end up catching more copyright
-> statement than the space they end up saving.
+On Mon, Jan 25, 2010 at 04:02:56AM +0000, Ben Dooks wrote:
+> Currently in the s3c/s5p familt we're seeing quite a number of the
+> same things being repeated for items like entry-macro.S, hardware.h
+> and so on.
+> 
+> The first question is about adding include/mach directories to
+> eitehr plat-s5p or plat-samsung to mop up the files that keep
+> getting repeated (since the plat-* directories are processed after
+> the machine directory includes the mach-xxx are still free to overide
+> these as necessary)
 
-I guess it depends if you're aiming for space savings or "only one place to fix
-a bug" in that case.
-
-> Not sure how git deals with symlinks, and I think this will just leave
-> us a mess on systems that don't really understand symlinks.
-
-Does the kernel even build on systems which don't properly support symbolic
-links?  I thought we had more problems with caseless filesystems anyway?
-
-Regards,
-
-Daniel.
+As context, this is part of the work that I am currently doing with
+Samsung to improve the mainlining of the newer SoC series. Part of this
+is to try and cut down on the amount of repetition that gets done by
+some of the porting teams. This is generally to stop things like the
+replication of the serial drivers or ending up with complete new copies
+of the SDHCI core simply because they could.
 
 -- 
-Daniel Silverstone                              http://www.simtec.co.uk/
+Ben
+
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
