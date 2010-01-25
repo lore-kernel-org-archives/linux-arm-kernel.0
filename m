@@ -1,56 +1,44 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Tue, 26 Jan 2010 08:32:25 +1300
-Subject: change boot requirements [Was: make PHYS_OFFSET determined at
-	run time (unfinished)]
-In-Reply-To: <20100125173201.GA14834@pengutronix.de>
-References: <20100119083803.GA17904@pengutronix.de>
-	<20100122115831.GA8377@pengutronix.de>
-	<20100125173201.GA14834@pengutronix.de>
-Message-ID: <4B5DF1C9.6090102@bluewatersys.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 25 Jan 2010 11:58:14 -0800
+Subject: [PATCH] Flush dcache before writing into page to avoid alias
+In-Reply-To: <20100125133308.GA26799@desktop>
+References: <979dd0561001202107v4ddc1eb7xa59a7c16c452f7a2@mail.gmail.com>
+	<20100125133308.GA26799@desktop>
+Message-ID: <20100125115814.156d401d.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe Kleine-K?nig wrote:
-> Hello,
+On Mon, 25 Jan 2010 21:33:08 +0800 anfei <anfei.zhou@gmail.com> wrote:
+
+> Hi Andrew,
 > 
-> On Fri, Jan 22, 2010 at 12:58:31PM +0100, Uwe Kleine-K?nig wrote:
->> just a short status report:  The code seems to work OK if PHYS_OFFSET is
->> determined correctly.
->>
->> The problem is when it does not.  Currently I place arch/arm/boot/Image
->> at 0xa1008000[1] with PHYS_OFFSET being 0xa0000000.  Then
->> arch/arm/boot/head.S guesses PHYS_OFFSET to be 0xa1000000 resulting
->> __va(bank->start) of my only bank to be 0xbf000000.  And so this bank is
->> discarded by sanity_check_meminfo as 0xbf000000 overlaps the vmalloc
->> region.
->>
->> So how to proceed?  These possiblities come to (my) mind:
->>
->>  - parse the atag list to better guess phys_offset
->>    (both zImage and Image would need to do that)
->>  - require that zImage and Image are placed such that the guess is done
->>    right (which is stupid for zImage as then the decompressor needs to
->>    move the decompressed image)
->>  - require the bootloader to pass phys_offset (r3?)
->>  - make the ram mapping non-linear
->>  - don't discard the whole bank, only the addresses overlaping the
->>    vmalloc region
->>
->> Anything else?  Preferences?  Thoughts?
-> I'd like to go forward here and if I don't hear anything here I'll start
-> requiring that the bootloader sets r3=PHYS_OFFSET as this seems the most
-> robust solution to me.
+> On Thu, Jan 21, 2010 at 01:07:57PM +0800, anfei zhou wrote:
+> > The cache alias problem will happen if the changes of user shared mapping
+> > is not flushed before copying, then user and kernel mapping may be mapped
+> > into two different cache line, it is impossible to guarantee the coherence
+> > after iov_iter_copy_from_user_atomic.  So the right steps should be:
+> > 	flush_dcache_page(page);
+> > 	kmap_atomic(page);
+> > 	write to page;
+> > 	kunmap_atomic(page);
+> > 	flush_dcache_page(page);
+> > More precisely, we might create two new APIs flush_dcache_user_page and
+> > flush_dcache_kern_page to replace the two flush_dcache_page accordingly.
+> > 
+> > Here is a snippet tested on omap2430 with VIPT cache, and I think it is
+> > not ARM-specific:
+> > 	int val = 0x11111111;
+> > 	fd = open("abc", O_RDWR);
+> > 	addr = mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+> > 	*(addr+0) = 0x44444444;
+> > 	tmp = *(addr+0);
+> > 	*(addr+1) = 0x77777777;
+> > 	write(fd, &val, sizeof(int));
+> > 	close(fd);
+> > The results are not always 0x11111111 0x77777777 at the beginning as expected.
+> > 
+> Is this a real bug or not necessary to support?
 
-As long as you can still build images the old way. There will be some
-people who cannot modify their bootloaders to support this.
-
-~Ryan
-
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+Bug.  If variable `addr' has type int* then the contents of that file
+should be 0x11111111 0x77777777.  You didn't tell us what the contents
+were in the incorrect case, but I guess it doesn't matter.
