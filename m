@@ -1,55 +1,44 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Mon, 25 Jan 2010 12:12:24 -0500
-Subject: [PATCH] locomo.c: fix missing spin_unlock_irqrestore
-Message-ID: <BD79186B4FD85F4B8E60E381CAEE1909020E920D@mi8nycmail19.Mi8.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon, 25 Jan 2010 18:23:04 +0100
+Subject: [PATCH] mx2/mx3: debug-macro.S needs deprecated symbols
+Message-ID: <1264440184-1740-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function locomo_m62332_senddata sends a three byte i2c message to
-a M62332 DAC. This entire function is guarded with a spin_lock_irqsave
-at the start of the function and a spin_unlock_irqrestore at the end.
+This fixes:
 
-As each byte is transferred, the ACK from the DAC is checked. Currently,
-If the ACK is missing the function simply returns without the unlock.
-It also leaves the i2c bus in an invalid state since the last byte
-transferred did not have a "stop" condition and leave the bus idle.
+	arch/arm/kernel/debug.S:147: Error: constant expression expected -- `ldrne r3,=(((UART1_BASE_ADDR)-AIPI_BASE_ADDR)+AIPI_BASE_ADDR_VIRT)'
+	arch/arm/kernel/debug.S:163: Error: constant expression expected -- `ldrne r3,=(((UART1_BASE_ADDR)-AIPI_BASE_ADDR)+AIPI_BASE_ADDR_VIRT)'
 
-Fix this by adding an exit path using goto.
+when compiling for mx2 with CONFIG_DEBUG_LL=y.  A similar error exists
+on mx3 and is fixed by this commit, too.
 
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+These were introduced by aae7019382896cf1075a93acc564e42601bc44a2.
 
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
+Hello,
 
-diff --git a/arch/arm/common/locomo.c b/arch/arm/common/locomo.c
-index bd36c77..2f693da 100644
---- a/arch/arm/common/locomo.c
-+++ b/arch/arm/common/locomo.c
-@@ -1007,7 +1007,7 @@ void locomo_m62332_senddata(struct locomo_dev *ldev, unsigned int dac_data, int
-????????udelay(DAC_SCL_HIGH_HOLD_TIME);?/* 4.7 usec */
-????????if (locomo_readl(mapbase + LOCOMO_DAC) & LOCOMO_DAC_SDAOEB) {???/* High is error */
-????????????????printk(KERN_WARNING "locomo: m62332_senddata Error 1\n");
--???????????????return;
-+???????????????goto out;
-????????}
-?
-????????/* Send Sub address (LSB is channel select) */
-@@ -1035,7 +1035,7 @@ void locomo_m62332_senddata(struct locomo_dev *ldev, unsigned int dac_data, int
-????????udelay(DAC_SCL_HIGH_HOLD_TIME);?/* 4.7 usec */
-????????if (locomo_readl(mapbase + LOCOMO_DAC) & LOCOMO_DAC_SDAOEB) {???/* High is error */
-????????????????printk(KERN_WARNING "locomo: m62332_senddata Error 2\n");
--???????????????return;
-+???????????????goto out;
-????????}
-?
-????????/* Send DAC data */
-@@ -1060,9 +1060,9 @@ void locomo_m62332_senddata(struct locomo_dev *ldev, unsigned int dac_data, int
-????????udelay(DAC_SCL_HIGH_HOLD_TIME);?/* 4.7 usec */
-????????if (locomo_readl(mapbase + LOCOMO_DAC) & LOCOMO_DAC_SDAOEB) {???/* High is error */
-????????????????printk(KERN_WARNING "locomo: m62332_senddata Error 3\n");
--???????????????return;
-????????}
-?
-+out:
-????????/* stop */
-????????r = locomo_readl(mapbase + LOCOMO_DAC);
-????????r &= ?~(LOCOMO_DAC_SCLOEB);
+the offending commit is currently in mxc-master but not yet in rmk's
+tree.
+
+Best regards
+Uwe
+
+ arch/arm/plat-mxc/include/mach/debug-macro.S |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
+index 15b2b14..21e0f07 100644
+--- a/arch/arm/plat-mxc/include/mach/debug-macro.S
++++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
+@@ -10,6 +10,7 @@
+  * published by the Free Software Foundation.
+  *
+  */
++#define IMX_NEEDS_DEPRECATED_SYMBOLS
+ 
+ #ifdef CONFIG_ARCH_MX1
+ #include <mach/mx1.h>
+-- 
+1.6.6
