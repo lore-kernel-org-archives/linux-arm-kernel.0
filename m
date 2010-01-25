@@ -1,50 +1,45 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 25 Jan 2010 06:55:50 -0500
-Subject: [PATCH 3/4] rtc: enable rtc in max8925
-In-Reply-To: <20100125122231.3d4ddc02@linux.lan.towertech.it>
-References: <771cded01001250309x33f85bbah4db8b526f6706309@mail.gmail.com>
-	<20100125122231.3d4ddc02@linux.lan.towertech.it>
-Message-ID: <771cded01001250355p71099663j385d25fc63a5d63d@mail.gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Mon, 25 Jan 2010 11:58:13 +0000
+Subject: too much memory for node
+In-Reply-To: <20100120161053.GD27507@n2100.arm.linux.org.uk>
+References: <20100120153411.GG26562@trinity.fluff.org>
+	<20100120155510.GB27507@n2100.arm.linux.org.uk>
+	<20100120160525.GW10014@trinity.fluff.org>
+	<20100120161053.GD27507@n2100.arm.linux.org.uk>
+Message-ID: <20100125115813.GT26562@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2010 at 6:22 AM, Alessandro Zummo <a.zummo@towertech.it> wrote:
-> On Mon, 25 Jan 2010 06:09:04 -0500
-> Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
->
->> +
->> +static struct platform_driver max8925_rtc_driver = {
->> + ? ? .driver ? ? ? ? = {
->> + ? ? ? ? ? ? .name ? = "max8925-rtc",
->> + ? ? ? ? ? ? .owner ?= THIS_MODULE,
->> + ? ? },
->> + ? ? .probe ? ? ? ? ?= max8925_rtc_probe,
->> + ? ? .remove ? ? ? ? = __devexit_p(max8925_rtc_remove),
->> +};
->> +
->> +static int __init max8925_rtc_init(void)
->> +{
->> + ? ? return platform_driver_register(&max8925_rtc_driver);
->> +}
->> +module_init(max8925_rtc_init);
->> +
->> +static void __exit max8925_rtc_exit(void)
->
-> ?this should be __devexit since you used __devexit_p
->
+On Wed, Jan 20, 2010 at 04:10:53PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Jan 20, 2010 at 04:05:25PM +0000, Ben Dooks wrote:
+> > On Wed, Jan 20, 2010 at 03:55:10PM +0000, Russell King - ARM Linux wrote:
+> > > On Wed, Jan 20, 2010 at 03:34:11PM +0000, Ben Dooks wrote:
+> > > > I've been looking at support for a new machine type where the
+> > > > current system is using DISCONTIGMEM as the 1G memory map has
+> > > > 4x256M RAM ranges which may not all be filled.
+> > > 
+> > > Firstly, use sparsemem, unless you intentionally want to spend more
+> > > cycles in the kernel.
+> > 
+> > Ok, any idea if that will fix the problem in this case?
+> 
+> It _may_ do, because it doesn't have the concept of NUMA nodes (which
+> is what discontigmem is all about.)
+> 
+> > Should I send a patch to detect bad DISCONTIGMEM setup? I think that
+> > a check of PHYS_TO_PFN((start+end) != PHYS_TO_PFN(start)) should be
+> > safe in all cases?
+> 
+> Just move away from discontigmem completely.  Sparsemem can do everything
+> we need on ARM at a lesser cost.  As I say above, discontigmem is really
+> for NUMA platforms, and ARM is not a NUMA platform.  No one on ARM should
+> be going anywhere near discontigmem.
 
-I declared __devexit_p on max8925_rtc_remove. So I need to use
-__devexit on max8925_rtc_remove. I needn't use __devexit on
-max8925_rtc_exit, is it?
+Thanks, we seem to have working sparsemem support now so I will try and
+ensure that is what gets sumitted.
 
-Others are updated.
+-- 
+Ben
 
-Thanks
-Haojian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0003-rtc-enable-rtc-in-max8925.patch
-Type: text/x-patch
-Size: 10270 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100125/d0157fcc/attachment-0001.bin>
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
