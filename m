@@ -1,45 +1,44 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 25 Jan 2010 11:58:13 +0000
-Subject: too much memory for node
-In-Reply-To: <20100120161053.GD27507@n2100.arm.linux.org.uk>
-References: <20100120153411.GG26562@trinity.fluff.org>
-	<20100120155510.GB27507@n2100.arm.linux.org.uk>
-	<20100120160525.GW10014@trinity.fluff.org>
-	<20100120161053.GD27507@n2100.arm.linux.org.uk>
-Message-ID: <20100125115813.GT26562@trinity.fluff.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 25 Jan 2010 11:59:32 +0000
+Subject: [PATCH 2/4] mfd: update irq handler in max8925
+In-Reply-To: <771cded01001250308mfd2b3d2l76bc2a2df88e7b93@mail.gmail.com>
+References: <771cded01001250308mfd2b3d2l76bc2a2df88e7b93@mail.gmail.com>
+Message-ID: <20100125115930.GE22909@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 20, 2010 at 04:10:53PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 20, 2010 at 04:05:25PM +0000, Ben Dooks wrote:
-> > On Wed, Jan 20, 2010 at 03:55:10PM +0000, Russell King - ARM Linux wrote:
-> > > On Wed, Jan 20, 2010 at 03:34:11PM +0000, Ben Dooks wrote:
-> > > > I've been looking at support for a new machine type where the
-> > > > current system is using DISCONTIGMEM as the 1G memory map has
-> > > > 4x256M RAM ranges which may not all be filled.
-> > > 
-> > > Firstly, use sparsemem, unless you intentionally want to spend more
-> > > cycles in the kernel.
-> > 
-> > Ok, any idea if that will fix the problem in this case?
-> 
-> It _may_ do, because it doesn't have the concept of NUMA nodes (which
-> is what discontigmem is all about.)
-> 
-> > Should I send a patch to detect bad DISCONTIGMEM setup? I think that
-> > a check of PHYS_TO_PFN((start+end) != PHYS_TO_PFN(start)) should be
-> > safe in all cases?
-> 
-> Just move away from discontigmem completely.  Sparsemem can do everything
-> we need on ARM at a lesser cost.  As I say above, discontigmem is really
-> for NUMA platforms, and ARM is not a NUMA platform.  No one on ARM should
-> be going anywhere near discontigmem.
+On Mon, Jan 25, 2010 at 06:08:19AM -0500, Haojian Zhuang wrote:
 
-Thanks, we seem to have working sparsemem support now so I will try and
-ensure that is what gets sumitted.
+> +static struct resource power_supply_resources[] = {
+> +	{
+> +		.name	= "max8925-power",
+> +		.start	= MAX8925_CHG_IRQ1,
+> +		.end	= MAX8925_CHG_IRQ1,
+> +		.flags	= IORESOURCE_IO,
 
--- 
-Ben
+These should be IORESOURCE_IRQ.
 
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+> +		else if (value & irq_data->offs) {
+> +			dev_err(chip->dev, "Noboday cares IRQ #%d. Mask it\n",
+> +				chip->irq_base + i);
+> +			max8925_set_bits(i2c, irq_data->mask_reg,
+> +					irq_data->offs, irq_data->offs);
+
+genirq ought to be handling this for you?
+
+> +	for (i = 0; i < ARRAY_SIZE(max8925_irqs); i++) {
+> +		irq_data = &max8925_irqs[i];
+> +		/* non TSC IRQ should be serviced in max8925_irq() */
+> +		if (!irq_data->tsc_irq)
+> +			continue;
+
+Shouldn't the interrupt handlers be able to avoid having to iterate
+through the array?  It's unlikely to be expensive in the context of the
+I/O but it looks a bit odd.
+
+> + * clear_irq: operation on clearing status of nIRQ pin in platform
+> + * clear_tsc_irq: operation on clearing status of nTIRQ pin in platform
+> + */
+
+Shouldn't these also be handled by genirq as functions of the interrupt
+controller that the chip is chained from?
