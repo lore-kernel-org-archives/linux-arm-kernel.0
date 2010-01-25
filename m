@@ -1,76 +1,52 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 25 Jan 2010 13:56:28 +0000
-Subject: [PATCH 01/01] regulator: support max8649
-In-Reply-To: <771cded01001250301q465a9f8ma484f597ae9a292f@mail.gmail.com>
-References: <771cded01001120041ue24edabk8e4638ef7151c947@mail.gmail.com>
-	<771cded01001120051l44fd76bx80d2fd4b6f60bd0b@mail.gmail.com>
-	<20100112115156.GA546@rakim.wolfsonmicro.main>
-	<771cded01001250301q465a9f8ma484f597ae9a292f@mail.gmail.com>
-Message-ID: <20100125135628.GB26613@rakim.wolfsonmicro.main>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Mon, 25 Jan 2010 14:03:47 +0000
+Subject: Default machine include placements
+In-Reply-To: <20100125120454.GD16340@n2100.arm.linux.org.uk>
+References: <20100125040255.GN26562@trinity.fluff.org>
+	<20100125100546.GA16340@n2100.arm.linux.org.uk>
+	<20100125103216.GB5772@digital-scurf.org>
+	<20100125104425.GO26562@trinity.fluff.org>
+	<20100125104959.GC5772@digital-scurf.org>
+	<20100125105503.GQ26562@trinity.fluff.org>
+	<20100125111940.GC16340@n2100.arm.linux.org.uk>
+	<20100125115344.GS26562@trinity.fluff.org>
+	<20100125120454.GD16340@n2100.arm.linux.org.uk>
+Message-ID: <20100125140347.GV26562@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2010 at 06:01:41AM -0500, Haojian Zhuang wrote:
-> On Tue, Jan 12, 2010 at 6:51 AM, Mark Brown
+On Mon, Jan 25, 2010 at 12:04:54PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Jan 25, 2010 at 11:53:44AM +0000, Ben Dooks wrote:
+> > > I personally think that the proliferation of mach-s* directories for
+> > > Samsung is becoming a problem in itself - some of these directories
+> > > contain next to nothing, and others are duplications with minimal
+> > > changes.
+> > > 
+> > > For example, the differences between s3c6400 and s3c6410 are minimal,
+> > > yet they have most of the contained non-board code duplicated.
+> > 
+> > I would disagree on that, most of the common s3c6400 and s3c6410 is
+> > contained in plat-s3c64xx with the machine directories containing the
+> > cpu sepcific initialisation bits, such as the changes in the ARM CLKDIV
+> > the VIC popuilation and the extra devices that the s3c6410 have.
+> 
+> You may disagree, but my comment was based upon diffing the two
+> directories, and comparing mach-s3c6400/s3c6400.c with mach-s3c6410/cpu.c:
 
-> >> + ? ? if (pdata->ramp_timing) {
-> >> + ? ? ? ? ? ? info->ramp_timing = pdata->ramp_timing;
-> >> + ? ? ? ? ? ? max8649_set_bits(info->i2c, MAX8649_RAMP, MAX8649_RAMP_MASK,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?info->ramp_timing << 5);
-> >> + ? ? }
+Sorry, I did think that I had tried hard to eliminate the common code
+from the two SoCs... looking at it after the event it seems that there
+is still a bit of work to do.
+ 
+This unfrotunately doesn't really solve the solution fully for the
+plat-s5p case just yet, as these SoCs may be similar but have a few
+problems with respect to the peripheral placement and some of the
+more interestesting configurations.
 
-> > You might want to implement the new enable_time() API for this.
+It may be we just accept the compromise of repeated header files and
+deal with this once we've sorted out exactly what we want to do.
 
-> This ramp timing is the time interval of each step on adjusting
-> voltage. I just want to control the timing in initialization.
+-- 
+Ben
 
-If this applies to any voltage change at all then rather than just power
-on I need to finish off the stuff I've been sitting on for handling slew
-times for voltage changes.  If the regulator hasn't yet reached the
-requested output when the consumer tries using it the consumer might get
-broken.
-
-If the ramp also gets applied when initially turning on the regulator
-you'd still want to implement enable_time() for the same reason.
-
-> enable_time() is only called before enabling regulator. And I don't
-> understand what would be done in enable_time().
-
-You'd return the amount of time taken to turn on the regulator and get
-the output voltage stable in the current configuration.  This will then
-be used by the core to ensure that the consumer only tries to use the
-regulator once it's fully enabled.
-
-> +static int max8649_set_mode(struct regulator_dev *rdev, unsigned int mode)
-> +{
-> +	struct max8649_regulator_info *info = rdev_get_drvdata(rdev);
-> +
-> +	switch (mode) {
-> +	case REGULATOR_MODE_FAST:
-> +	case REGULATOR_MODE_NORMAL:
-> +		max8649_set_bits(info->i2c, info->vol_reg, MAX8649_FORCE_PWM,
-> +				 MAX8649_FORCE_PWM);
-> +		break;
-
-Are you sure about this?  I'd expect to see force PWM used only for
-_FAST, for _NORMAL pulse skipping is usually desired behaviour.
-
-> +	case REGULATOR_MODE_IDLE:
-> +	case REGULATOR_MODE_STANDBY:
-> +		max8649_set_bits(info->i2c, info->vol_reg,
-> +				 MAX8649_FORCE_PWM, 0);
-
-I'd just leave these unimplemented (there's no need to support all
-modes) and make sure that this ties in with...
-
-> +static unsigned int max8649_get_mode(struct regulator_dev *rdev)
-> +{
-> +	struct max8649_regulator_info *info = rdev_get_drvdata(rdev);
-> +	int ret;
-> +
-> +	ret = max8649_reg_read(info->i2c, info->vol_reg);
-> +	if (ret & MAX8649_FORCE_PWM)
-> +		return REGULATOR_MODE_NORMAL;
-> +	return REGULATOR_MODE_IDLE;
-
-...this.
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
