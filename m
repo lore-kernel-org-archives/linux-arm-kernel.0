@@ -1,68 +1,55 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Mon, 25 Jan 2010 12:11:06 +0100
-Subject: [PATCH 3/4] mx25: fix time accounting
-In-Reply-To: <fe6ca311cc749bf23a8f99e27ad460ff0aafa69a.1264416923.git.baruch@tkos.co.il>
-References: <20100125105439.GE6724@jasper.tkos.co.il>
-	<fe6ca311cc749bf23a8f99e27ad460ff0aafa69a.1264416923.git.baruch@tkos.co.il>
-Message-ID: <19293.31818.225869.565911@ipc1.ka-ro>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 25 Jan 2010 11:19:40 +0000
+Subject: Default machine include placements
+In-Reply-To: <20100125105503.GQ26562@trinity.fluff.org>
+References: <20100125040255.GN26562@trinity.fluff.org>
+	<20100125100546.GA16340@n2100.arm.linux.org.uk>
+	<20100125103216.GB5772@digital-scurf.org>
+	<20100125104425.GO26562@trinity.fluff.org>
+	<20100125104959.GC5772@digital-scurf.org>
+	<20100125105503.GQ26562@trinity.fluff.org>
+Message-ID: <20100125111940.GC16340@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Baruch Siach writes:
-> The gpt_clk rate function doesn't consider the PER divider. This causes a
-> significant drift in time accounting. Fix this by introducing the correct rate
-> calculation function.
+On Mon, Jan 25, 2010 at 10:55:03AM +0000, Ben Dooks wrote:
+> On Mon, Jan 25, 2010 at 10:49:59AM +0000, Daniel Silverstone wrote:
+> > On Mon, Jan 25, 2010 at 10:44:25AM +0000, Ben Dooks wrote:
+> > > We do a bit of #include <plat/xxx-base.h> already for some things.
+> > > The 'empty' headers always seme to end up catching more copyright
+> > > statement than the space they end up saving.
+> > 
+> > I guess it depends if you're aiming for space savings or "only one place to fix
+> > a bug" in that case.
 > 
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> ---
->  arch/arm/mach-mx25/clock.c |    7 ++++++-
->  1 files changed, 6 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx25/clock.c b/arch/arm/mach-mx25/clock.c
-> index 08aaa38..c003ac4 100644
-> --- a/arch/arm/mach-mx25/clock.c
-> +++ b/arch/arm/mach-mx25/clock.c
-> @@ -119,6 +119,11 @@ static unsigned long get_rate_nfc(struct clk *clk)
->  	return get_rate_per(8);
->  }
->  
-> +static unsigned long get_rate_gpt(struct clk *clk)
-> +{
-> +	return get_rate_per(5);
-> +}
-> +
->  static unsigned long get_rate_otg(struct clk *clk)
->  {
->  	return 48000000; /* FIXME */
-> @@ -156,7 +161,7 @@ static void clk_cgcr_disable(struct clk *clk)
->  		.secondary	= s,			\
->  	}
->  
-> -DEFINE_CLOCK(gpt_clk,    0, CCM_CGCR0,  5, get_rate_ipg, NULL, NULL);
-> +DEFINE_CLOCK(gpt_clk,    0, CCM_CGCR0,  5, get_rate_gpt, NULL, NULL);
->  DEFINE_CLOCK(uart_per_clk, 0, CCM_CGCR0, 15, get_rate_uart, NULL, NULL);
->  DEFINE_CLOCK(cspi1_clk,  0, CCM_CGCR1,  5, get_rate_ipg, NULL, NULL);
->  DEFINE_CLOCK(cspi2_clk,  0, CCM_CGCR1,  6, get_rate_ipg, NULL, NULL);
->
-IMO all those clocks should have the appropriate parent clocks, which
-would fix the problem with the GPT clock rate without the need for a
-special get_rate_*() functions and woould also make sure the parent
-clock is enabled when the child clock is being enabled:
-|DEFINE_CLOCK(gpt1_clk1,   0, CCM_CGCR1, 19, NULL, NULL, &ipg_clk);
-|DEFINE_CLOCK(gpt1_clk,    0, CCM_CGCR0,  5, NULL, &gpt1_clk1, &per_clk5);
-...
+> The big one is bug repetition, which happened with the s3c64xx clksrc
+> code. The internal Samsung trees ended up with 4 similar copies of this
+> code, each with its own unique problems. Whilst this problem is quite
+> easy to fix (and it is now fixed in the current kernel) the other problem
+> is the size of submission for each new CPU support.
 
+You're talking about .c files here, not header files.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+> One solution is just to make mach-s5p and stick all s5p implementations
+> in there, but this could end up with one quite big directory or a large
+> number of sub directiories springing up for CPU specific support.
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+CPU or SoC?  Please don't confuse the two terms - they're entirely
+different things.  There's no need what so ever to separate out CPU
+specific support because the kernel already does that for you.
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+SoC specific is what I think you mean.
+
+I personally think that the proliferation of mach-s* directories for
+Samsung is becoming a problem in itself - some of these directories
+contain next to nothing, and others are duplications with minimal
+changes.
+
+For example, the differences between s3c6400 and s3c6410 are minimal,
+yet they have most of the contained non-board code duplicated.  Also,
+the mach-s3c2442 directory seems to only support one board - GTA02,
+and mach-s3c2443 seems to be a similar story.
+
+You're worried about a mach-*/ directory becoming too big, but you
+don't seem to have noticed that the arch/arm directory has 15 (!)
+Samsung directories.
