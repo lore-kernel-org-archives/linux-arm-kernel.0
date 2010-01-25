@@ -1,24 +1,26 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sun, 24 Jan 2010 21:54:01 -0500 (EST)
-Subject: [PATCH] mach-orion5x: D-link DNS-323 rev. B1 power-off
-In-Reply-To: <953961.24356.qm@web39605.mail.mud.yahoo.com>
-References: <953961.24356.qm@web39605.mail.mud.yahoo.com>
-Message-ID: <alpine.LFD.2.00.1001242151060.1681@xanadu.home>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Mon, 25 Jan 2010 04:02:56 +0000
+Subject: Default machine include placements
+Message-ID: <20100125040255.GN26562@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 24 Jan 2010, Erik Benada wrote:
+Currently in the s3c/s5p familt we're seeing quite a number of the
+same things being repeated for items like entry-macro.S, hardware.h
+and so on.
 
-> This patch fixes power LED blinking and power-off on DNS-323 rev. B1.
-> 
-> GPIO pin 3 has to be set to 1 to stop power LED blinking and to allow the LED to be controlled via leds-gpio. This pin has to be also set to 1 for power-off to work.
-> To power-off the rev. B1 machine, pin 8 has to be set to 1 and then set to 0 to do actual power-off.
-> 
-> Tested on my DNS-323 rev. B1
-> 
-> Signed-off-by: Erik Benada <erikbenada@yahoo.ca>
+The first question is about adding include/mach directories to
+eitehr plat-s5p or plat-samsung to mop up the files that keep
+getting repeated (since the plat-* directories are processed after
+the machine directory includes the mach-xxx are still free to overide
+these as necessary)
 
-What is this patch based on?  I get only rejects when trying to apply it.
+The second question is whether some of these files should have defaults
+in arch/arm/include? I think this might be less useful as build failures
+for new ports ensure that at-least these files are thought about
 
+-- 
+Ben
 
-Nicolas
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
