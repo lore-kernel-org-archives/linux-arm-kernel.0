@@ -1,45 +1,73 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 25 Jan 2010 12:05:43 +0000
-Subject: [PATCH 4/4] power_supply: enable power supply of max8925
-In-Reply-To: <771cded01001250309k64efaa98n6a68f56678986228@mail.gmail.com>
-References: <771cded01001250309k64efaa98n6a68f56678986228@mail.gmail.com>
-Message-ID: <20100125120543.GF22909@sirena.org.uk>
+From: colin.tuckley@arm.com (Colin Tuckley)
+Date: Mon, 25 Jan 2010 12:58:20 +0000
+Subject: [PATCH] ARM: RealView SD/MMC Card detection and write-protect using
+	GPIOLIB
+Message-ID: <20100125125820.5028.29129.stgit@ARM03585.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2010 at 06:09:50AM -0500, Haojian Zhuang wrote:
+The switch to using GPIOLIB broke the sd/mmc card detection on the
+RealView development boards because ARCH_REQUIRE_GPIOLIB
+and GPIO_PL061 were not always selected. Forcing the use of gpiolib also
+means that the write-protect detection works.
 
-> +	case MAX8925_IRQ_VCHG_DC_R:
-> +		info->ac_online = 1;
-> +		__set_charger(info, 1);
-> +		dev_dbg(chip->dev, "Adapter is insertion\n");
+Signed-off-by: Colin Tuckley <colin.tuckley@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/Kconfig              |    3 ++-
+ arch/arm/mach-realview/core.c |   20 --------------------
+ 2 files changed, 2 insertions(+), 21 deletions(-)
 
-Grammar nit "Adapter inserted".
-
-> +	case MAX8925_IRQ_VCHG_SYSLOW_R:
-> +		/* VSYS is low */
-> +		dev_dbg(chip->dev, "Sys power is too low\n");
-> +		break;
-
-This probably ought to be printed by default - with most PMICs if the
-system power rail goes low this is an indication of impending system
-power failure so it'd be good to make an effort to get the message out
-on the console.  Not much use in production but it can be very helpful
-during development.
-
-> +static ssize_t charger_state_show(struct device *dev,
-> +				  struct device_attribute *attr, char *buf)
-> +{
-> +	struct max8925_power_info *info = dev_get_drvdata(dev);
-> +	char *charge = NULL;
-> +	int ret;
-> +
-> +	ret = max8925_reg_read(info->gpm, MAX8925_CHG_STATUS);
-> +	ret = (ret & MAX8925_CHG_STAT_MODE_MASK) >> 2;
-> +	switch (ret) {
-> +	case 1:
-> +		charge = "Fast charging";
-> +		break;
-
-There's now a standard power supply property for this so this sysfs file
-could be removed and that used instead - POWER_SUPPLY_PROP_CHARGE_TYPE.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 233a222..7303f62 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -232,7 +232,8 @@ config ARCH_REALVIEW
+ 	select ICST307
+ 	select GENERIC_TIME
+ 	select GENERIC_CLOCKEVENTS
+-	select ARCH_WANT_OPTIONAL_GPIOLIB
++	select ARCH_REQUIRE_GPIOLIB
++	select GPIO_PL061
+ 	help
+ 	  This enables support for ARM Ltd RealView boards.
+ 
+diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
+index 27e2338..81cf0aa 100644
+--- a/arch/arm/mach-realview/core.c
++++ b/arch/arm/mach-realview/core.c
+@@ -238,34 +238,14 @@ static int __init realview_i2c_init(void)
+ }
+ arch_initcall(realview_i2c_init);
+ 
+-#define REALVIEW_SYSMCI	(__io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_MCI_OFFSET)
+-
+-/*
+- * This is only used if GPIOLIB support is disabled
+- */
+-static unsigned int realview_mmc_status(struct device *dev)
+-{
+-	struct amba_device *adev = container_of(dev, struct amba_device, dev);
+-	u32 mask;
+-
+-	if (adev->res.start == REALVIEW_MMCI0_BASE)
+-		mask = 1;
+-	else
+-		mask = 2;
+-
+-	return readl(REALVIEW_SYSMCI) & mask;
+-}
+-
+ struct mmci_platform_data realview_mmc0_plat_data = {
+ 	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
+-	.status		= realview_mmc_status,
+ 	.gpio_wp	= 17,
+ 	.gpio_cd	= 16,
+ };
+ 
+ struct mmci_platform_data realview_mmc1_plat_data = {
+ 	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
+-	.status		= realview_mmc_status,
+ 	.gpio_wp	= 19,
+ 	.gpio_cd	= 18,
+ };
