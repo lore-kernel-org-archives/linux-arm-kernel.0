@@ -1,34 +1,74 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Mon, 25 Jan 2010 11:35:41 +1100
-Subject: [RFC,PATCH 3/7 v2] arm/versatile: use generic struct clk
-In-Reply-To: <20100112162539.GH27771@n2100.arm.linux.org.uk>
-References: <1263279511.160127.576969496193.0.gpush@pororo>
-	<1263279511.161193.484965724912.3.gpush@pororo>
-	<20100112162539.GH27771@n2100.arm.linux.org.uk>
-Message-ID: <201001251135.41611.jeremy.kerr@canonical.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Mon, 25 Jan 2010 01:34:21 +0000
+Subject: [PATCH] RFC: make struct platform_driver.id_table const
+In-Reply-To: <1264179837-22999-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1264179837-22999-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20100125013421.GL26562@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-> This doesn't make any sense.  What are you trying to do here?
+On Fri, Jan 22, 2010 at 06:03:57PM +0100, Uwe Kleine-K?nig wrote:
+> This fixes a warning on several pxa based machines:
 > 
-> The get/put operations go together as one logical set - that's why you
-> get both if you're using clkdev, and why you're asked to implement both
-> __clk_get() and __clk_put() in arch code to do whatever's necessary
-> with the clock.
+> 	arch/arm/mach-pxa/ssp.c:475: warning: initialization discards qualifiers from pointer target type
 
-I'm assuming that clk_put will be specific to the implementation; fixed clocks 
-probably won't need to do anything, but others may need a refcount, etc.
+this looks sane to me.
+ 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: Eric Miao <eric.miao@marvell.com>
+> Cc: Greg Kroah-Hartman <gregkh@suse.de>
+> ---
+>  drivers/base/platform.c         |    2 +-
+>  include/linux/platform_device.h |    4 ++--
+>  2 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+> index 58efaf2..962246c 100644
+> --- a/drivers/base/platform.c
+> +++ b/drivers/base/platform.c
+> @@ -578,7 +578,7 @@ static int platform_uevent(struct device *dev, struct kobj_uevent_env *env)
+>  }
+>  
+>  static const struct platform_device_id *platform_match_id(
+> -			struct platform_device_id *id,
+> +			const struct platform_device_id *id,
+>  			struct platform_device *pdev)
+>  {
+>  	while (id->name[0]) {
+> diff --git a/include/linux/platform_device.h b/include/linux/platform_device.h
+> index 71ff887..3a6201e 100644
+> --- a/include/linux/platform_device.h
+> +++ b/include/linux/platform_device.h
+> @@ -21,7 +21,7 @@ struct platform_device {
+>  	u32		num_resources;
+>  	struct resource	* resource;
+>  
+> -	struct platform_device_id	*id_entry;
+> +	const struct platform_device_id	*id_entry;
+>  
+>  	/* arch specific additions */
+>  	struct pdev_archdata	archdata;
+> @@ -62,7 +62,7 @@ struct platform_driver {
+>  	int (*suspend)(struct platform_device *, pm_message_t state);
+>  	int (*resume)(struct platform_device *);
+>  	struct device_driver driver;
+> -	struct platform_device_id *id_table;
+> +	const struct platform_device_id *id_table;
+>  };
+>  
+>  extern int platform_driver_register(struct platform_driver *);
+> -- 
+> 1.6.6
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-We don't have a struct clk to use clk_get on, so it remains a non-clock-
-specific function.
+-- 
+-- 
+Ben
 
-We'll probably need the symmetry for some cases though, I think that a 
-__clk_get(struct clk *) member of clk_operations would work for this, to be 
-called by clk_get.
-
-Cheers,
-
-
-Jeremy
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
