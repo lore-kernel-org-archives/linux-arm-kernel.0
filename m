@@ -1,55 +1,32 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 25 Jan 2010 10:44:25 +0000
+From: dsilvers@simtec.co.uk (Daniel Silverstone)
+Date: Mon, 25 Jan 2010 10:49:59 +0000
 Subject: Default machine include placements
-In-Reply-To: <20100125103216.GB5772@digital-scurf.org>
+In-Reply-To: <20100125104425.GO26562@trinity.fluff.org>
 References: <20100125040255.GN26562@trinity.fluff.org>
 	<20100125100546.GA16340@n2100.arm.linux.org.uk>
 	<20100125103216.GB5772@digital-scurf.org>
-Message-ID: <20100125104425.GO26562@trinity.fluff.org>
+	<20100125104425.GO26562@trinity.fluff.org>
+Message-ID: <20100125104959.GC5772@digital-scurf.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2010 at 10:32:16AM +0000, Daniel Silverstone wrote:
-> On Mon, Jan 25, 2010 at 10:05:47AM +0000, Russell King - ARM Linux wrote:
-> > > The first question is about adding include/mach directories to
-> > > eitehr plat-s5p or plat-samsung to mop up the files that keep
-> > > getting repeated (since the plat-* directories are processed after
-> > > the machine directory includes the mach-xxx are still free to overide
-> > > these as necessary)
-> > > 
-> > > The second question is whether some of these files should have defaults
-> > > in arch/arm/include? I think this might be less useful as build failures
-> > > for new ports ensure that at-least these files are thought about
-> > 
-> > No - doing this means it's harder to find out what's going on.  Rather
-> > than being able to look in arch/arm/mach-*/include for the relevant
-> > mach header file and know you've got the right one, you have to instead
-> > consider whether the one you're using is the one found in
-> > arch/arm/mach-*/include/mach, arch/arm/plat-*/include/mach or
-> > arch/arm/include/mach.
-> > 
-> > Having multiple places where include files can live is a nightmare; you
-> > only have to look at glibc to know that - where you have to search the
-> > entire source looking for the header file you want.
-> 
-> As a suggestion; how about one of symbolic links; or headers of the form:
-> 
-> /* arch/arm/mach-s5pc100/include/mach/foo.h
->  *
->  */
-> 
-> #include <plat-samsung/include/mach/generic-foo.h>
+On Mon, Jan 25, 2010 at 10:44:25AM +0000, Ben Dooks wrote:
+> We do a bit of #include <plat/xxx-base.h> already for some things.
+> The 'empty' headers always seme to end up catching more copyright
+> statement than the space they end up saving.
 
-We do a bit of #include <plat/xxx-base.h> already for some things.
+I guess it depends if you're aiming for space savings or "only one place to fix
+a bug" in that case.
 
-The 'empty' headers always seme to end up catching more copyright
-statement than the space they end up saving.
+> Not sure how git deals with symlinks, and I think this will just leave
+> us a mess on systems that don't really understand symlinks.
 
-Not sure how git deals with symlinks, and I think this will just leave
-us a mess on systems that don't really understand symlinks.
+Does the kernel even build on systems which don't properly support symbolic
+links?  I thought we had more problems with caseless filesystems anyway?
+
+Regards,
+
+Daniel.
 
 -- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Daniel Silverstone                              http://www.simtec.co.uk/
