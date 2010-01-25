@@ -1,46 +1,36 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 25 Jan 2010 06:01:41 -0500
-Subject: [PATCH 01/01] regulator: support max8649
-In-Reply-To: <20100112115156.GA546@rakim.wolfsonmicro.main>
-References: <771cded01001120041ue24edabk8e4638ef7151c947@mail.gmail.com>
-	<771cded01001120051l44fd76bx80d2fd4b6f60bd0b@mail.gmail.com>
-	<20100112115156.GA546@rakim.wolfsonmicro.main>
-Message-ID: <771cded01001250301q465a9f8ma484f597ae9a292f@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 25 Jan 2010 11:01:16 +0000
+Subject: Default machine include placements
+In-Reply-To: <20100125104956.GP26562@trinity.fluff.org>
+References: <20100125040255.GN26562@trinity.fluff.org>
+	<20100125104956.GP26562@trinity.fluff.org>
+Message-ID: <20100125110116.GB16340@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2010 at 6:51 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Tue, Jan 12, 2010 at 03:51:09AM -0500, Haojian Zhuang wrote:
->
->> Enable Maxim max8649 regulator driver.
->
-> This seems basically fine but there's a few relatively minor issues
-> below, mostly coding style rather than anything serious.
->
->
->> + ? ? if (pdata->ramp_timing) {
->> + ? ? ? ? ? ? info->ramp_timing = pdata->ramp_timing;
->> + ? ? ? ? ? ? max8649_set_bits(info->i2c, MAX8649_RAMP, MAX8649_RAMP_MASK,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?info->ramp_timing << 5);
->> + ? ? }
->
-> You might want to implement the new enable_time() API for this.
->
+On Mon, Jan 25, 2010 at 10:49:56AM +0000, Ben Dooks wrote:
+> On Mon, Jan 25, 2010 at 04:02:56AM +0000, Ben Dooks wrote:
+> > Currently in the s3c/s5p familt we're seeing quite a number of the
+> > same things being repeated for items like entry-macro.S, hardware.h
+> > and so on.
+> > 
+> > The first question is about adding include/mach directories to
+> > eitehr plat-s5p or plat-samsung to mop up the files that keep
+> > getting repeated (since the plat-* directories are processed after
+> > the machine directory includes the mach-xxx are still free to overide
+> > these as necessary)
+> 
+> As context, this is part of the work that I am currently doing with
+> Samsung to improve the mainlining of the newer SoC series. Part of this
+> is to try and cut down on the amount of repetition that gets done by
+> some of the porting teams. This is generally to stop things like the
+> replication of the serial drivers or ending up with complete new copies
+> of the SDHCI core simply because they could.
 
-This ramp timing is the time interval of each step on adjusting
-voltage. I just want to control the timing in initialization.
-enable_time() is only called before enabling regulator. And I don't
-understand what would be done in enable_time().
+Changing the policy wrt include files isn't going to stop drivers
+and core code being copy-n-edited.
 
-Others are updated in this attached patch.
-
-Thanks
-Haojian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-regulator-enable-max8649-regulator-driver.patch
-Type: text/x-patch
-Size: 13015 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100125/0b788f4a/attachment.bin>
+The copy-n-edit is a culture thing - it's something that people
+needlessly do because that's how they've worked in the past and don't
+know any better.  The solution to that is education, not changing the
+way we layout files in the kernel tree.
