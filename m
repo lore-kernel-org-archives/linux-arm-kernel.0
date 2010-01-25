@@ -1,26 +1,18 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 25 Jan 2010 04:02:56 +0000
-Subject: Default machine include placements
-Message-ID: <20100125040255.GN26562@trinity.fluff.org>
+From: sasak.1983@gmail.com (Sasa Sasa)
+Date: Mon, 25 Jan 2010 11:45:28 +0530
+Subject: Cortex-m3 Kernel Port.
+Message-ID: <aecf5e531001242215g5f2c42c8q458637f024a40521@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently in the s3c/s5p familt we're seeing quite a number of the
-same things being repeated for items like entry-macro.S, hardware.h
-and so on.
+Hi Catalin/others,
 
-The first question is about adding include/mach directories to
-eitehr plat-s5p or plat-samsung to mop up the files that keep
-getting repeated (since the plat-* directories are processed after
-the machine directory includes the mach-xxx are still free to overide
-these as necessary)
+What is the status of the cortex-m3 kernel port ? Is it merged to mailine ?
+I cannot find the sources anymore on the links provided at
+http://www.linux-arm.org/LinuxKernel/LinuxM3
+(has it moved somewhere else....where ?)
 
-The second question is whether some of these files should have defaults
-in arch/arm/include? I think this might be less useful as build failures
-for new ports ensure that at-least these files are thought about
+Let me know.
 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Thanks
+Sasa
