@@ -1,40 +1,46 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 25 Jan 2010 17:01:40 +0200
-Subject: [PATCH 3/4] mx25: fix time accounting
-In-Reply-To: <19293.31818.225869.565911@ipc1.ka-ro>
-References: <20100125105439.GE6724@jasper.tkos.co.il>
-	<fe6ca311cc749bf23a8f99e27ad460ff0aafa69a.1264416923.git.baruch@tkos.co.il>
-	<19293.31818.225869.565911@ipc1.ka-ro>
-Message-ID: <20100125150140.GG6724@jasper.tkos.co.il>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon, 25 Jan 2010 16:37:34 +0100
+Subject: [PATCH] imxfb: correct location of callbacks in suspend and resume
+In-Reply-To: <1263226881-28008-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1263226881-28008-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1264433854-878-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lothar,
+The probe function passes a pointer to a struct fb_info to
+platform_set_drvdata, so don't interpret the return value of
+platform_get_drvdata as a pointer to struct imxfb_info.
 
-On Mon, Jan 25, 2010 at 12:11:06PM +0100, Lothar Wa?mann wrote:
-> Baruch Siach writes:
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Acked-by: Sascha Hauer <kernel@pengutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ drivers/video/imxfb.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
-[snip]
-
-> > -DEFINE_CLOCK(gpt_clk,    0, CCM_CGCR0,  5, get_rate_ipg, NULL, NULL);
-> > +DEFINE_CLOCK(gpt_clk,    0, CCM_CGCR0,  5, get_rate_gpt, NULL, NULL);
-> >  DEFINE_CLOCK(uart_per_clk, 0, CCM_CGCR0, 15, get_rate_uart, NULL, NULL);
-> >  DEFINE_CLOCK(cspi1_clk,  0, CCM_CGCR1,  5, get_rate_ipg, NULL, NULL);
-> >  DEFINE_CLOCK(cspi2_clk,  0, CCM_CGCR1,  6, get_rate_ipg, NULL, NULL);
-> >
-> IMO all those clocks should have the appropriate parent clocks, which
-> would fix the problem with the GPT clock rate without the need for a
-> special get_rate_*() functions and woould also make sure the parent
-> clock is enabled when the child clock is being enabled:
-> |DEFINE_CLOCK(gpt1_clk1,   0, CCM_CGCR1, 19, NULL, NULL, &ipg_clk);
-> |DEFINE_CLOCK(gpt1_clk,    0, CCM_CGCR0,  5, NULL, &gpt1_clk1, &per_clk5);
-
-The i.MX25 clock configuration infrastructure clearly needs more work. This 
-patch only fixes a critical bug while doing the minimal possible change.
-
-baruch
-
+diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+index 66358fa..b4b6dec 100644
+--- a/drivers/video/imxfb.c
++++ b/drivers/video/imxfb.c
+@@ -593,7 +593,8 @@ static int imxfb_activate_var(struct fb_var_screeninfo *var, struct fb_info *inf
+  */
+ static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
+ {
+-	struct imxfb_info *fbi = platform_get_drvdata(dev);
++	struct fb_info *info = platform_get_drvdata(dev);
++	struct imxfb_info *fbi = info->par;
+ 
+ 	pr_debug("%s\n", __func__);
+ 
+@@ -603,7 +604,8 @@ static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
+ 
+ static int imxfb_resume(struct platform_device *dev)
+ {
+-	struct imxfb_info *fbi = platform_get_drvdata(dev);
++	struct fb_info *info = platform_get_drvdata(dev);
++	struct imxfb_info *fbi = info->par;
+ 
+ 	pr_debug("%s\n", __func__);
+ 
 -- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+1.6.6
