@@ -1,47 +1,24 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sun, 24 Jan 2010 22:19:01 -0500 (EST)
+Date: Sun, 24 Jan 2010 21:54:01 -0500 (EST)
 Subject: [PATCH] mach-orion5x: D-link DNS-323 rev. B1 power-off
-In-Reply-To: <248473.97169.qm@web39607.mail.mud.yahoo.com>
+In-Reply-To: <953961.24356.qm@web39605.mail.mud.yahoo.com>
 References: <953961.24356.qm@web39605.mail.mud.yahoo.com>
-	<alpine.LFD.2.00.1001242151060.1681@xanadu.home>
-	<248473.97169.qm@web39607.mail.mud.yahoo.com>
-Message-ID: <alpine.LFD.2.00.1001242218180.1681@xanadu.home>
+Message-ID: <alpine.LFD.2.00.1001242151060.1681@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sun, 24 Jan 2010, Erik Benada wrote:
 
-> ----- Original Message ----
+> This patch fixes power LED blinking and power-off on DNS-323 rev. B1.
 > 
-> > From: Nicolas Pitre <nico@fluxnic.net>
-> > To: Erik Benada <erikbenada@yahoo.ca>
-> > Cc: linux-arm-kernel at lists.infradead.org; Laurie Bradshaw <bradshaw.laurie@googlemail.com>; Martin Michlmayr <tbm@cyrius.com>
-> > Sent: Sun, January 24, 2010 9:54:01 PM
-> > Subject: Re: [PATCH] mach-orion5x: D-link DNS-323 rev. B1 power-off
-> > 
-> > On Sun, 24 Jan 2010, Erik Benada wrote:
-> > 
-> > > This patch fixes power LED blinking and power-off on DNS-323 rev. B1.
-> > > 
-> > > GPIO pin 3 has to be set to 1 to stop power LED blinking and to allow the LED 
-> > to be controlled via leds-gpio. This pin has to be also set to 1 for power-off 
-> > to work.
-> > > To power-off the rev. B1 machine, pin 8 has to be set to 1 and then set to 0 
-> > to do actual power-off.
-> > > 
-> > > Tested on my DNS-323 rev. B1
-> > > 
-> > > Signed-off-by: Erik Benada 
-> > 
-> > What is this patch based on?  I get only rejects when trying to apply it.
-> > 
-> > 
-> > Nicolas
+> GPIO pin 3 has to be set to 1 to stop power LED blinking and to allow the LED to be controlled via leds-gpio. This pin has to be also set to 1 for power-off to work.
+> To power-off the rev. B1 machine, pin 8 has to be set to 1 and then set to 0 to do actual power-off.
 > 
+> Tested on my DNS-323 rev. B1
 > 
-> It's based on latest Linus's tree. Maybe Yahoo messed up in-line code... Have you tried the attachment?
+> Signed-off-by: Erik Benada <erikbenada@yahoo.ca>
 
-OK the attachment was fine.
+What is this patch based on?  I get only rejects when trying to apply it.
 
 
 Nicolas
