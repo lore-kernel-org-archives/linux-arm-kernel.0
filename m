@@ -1,47 +1,13 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 25 Jan 2010 01:35:50 +0000
-Subject: [PATCH] ARM: SAMSUNG: Fix null pointer dereference in ADC driver
-In-Reply-To: <b2e8f9f71001221429l5ea24cd8j3046e7a24546320a@mail.gmail.com>
-References: <b2e8f9f71001221429l5ea24cd8j3046e7a24546320a@mail.gmail.com>
-Message-ID: <20100125013550.GM26562@trinity.fluff.org>
+Date: Mon, 25 Jan 2010 01:40:24 +0000
+Subject: whoever is using ymiao3@marvell.com please stop it
+Message-ID: <20100125014024.GA4609@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 22, 2010 at 11:29:16PM +0100, Maurus Cuelenaere wrote:
-> ARM: SAMSUNG: Fix null pointer dereference in ADC driver
-> 
-> Use struct adc_device instead of relying on client (which could be
-> NULL) when checking for SoC type.
+Getting bounces for ymiao3 at marvell.com from marvell.com after replying
+to the platform device changes from Uwe Kleine-K???i
 
-ok, will apply this to next-samsung tree.
- 
-> Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
-> ---
->  arch/arm/plat-samsung/adc.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
-> index 120b790..c7659b7 100644
-> --- a/arch/arm/plat-samsung/adc.c
-> +++ b/arch/arm/plat-samsung/adc.c
-> @@ -295,7 +295,7 @@ static irqreturn_t s3c_adc_irq(int irq, void *pw)
->  	}
-> 
->  exit:
-> -	if (platform_get_device_id(client->pdev)->driver_data == TYPE_S3C64XX) {
-> +	if (platform_get_device_id(adc->pdev)->driver_data == TYPE_S3C64XX) {
->  		/* Clear ADC interrupt */
->  		writel(0, adc->regs + S3C64XX_ADCCLRINT);
->  	}
-> -- 
-> 1.6.6.1
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
 -- 
 Ben
 
