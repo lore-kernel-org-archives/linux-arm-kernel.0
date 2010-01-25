@@ -1,59 +1,40 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 25 Jan 2010 12:58:19 +0200
-Subject: [PATCH 1/4] mx25: remove unused mx25_clocks_init() argument
+Date: Mon, 25 Jan 2010 12:58:20 +0200
+Subject: [PATCH 2/4] mx25: properly initialize clocks
 In-Reply-To: <20100125105439.GE6724@jasper.tkos.co.il>
 References: <20100125105439.GE6724@jasper.tkos.co.il>
-Message-ID: <ba759e33f51df8c813ffa3dcfbaca1d36d18cadd.1264416923.git.baruch@tkos.co.il>
+Message-ID: <5e4894af4009cbc44b69fb5eef925f98a2f44eb4.1264416923.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The fref is needless on mx25 since the reference clock is fixed at 24MHz.
+This patch disables all unnecessary clock in mx25_clocks_init() to make a clean
+start, the same as is being done for the rest of the i.MX chips.
+
+This patch was tested on i.MX25 PDK.
 
 Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 ---
- arch/arm/mach-mx25/clock.c              |    2 +-
- arch/arm/mach-mx25/mx25pdk.c            |    2 +-
- arch/arm/plat-mxc/include/mach/common.h |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-mx25/clock.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-mx25/clock.c b/arch/arm/mach-mx25/clock.c
-index 3be51dd..abd303b 100644
+index abd303b..08aaa38 100644
 --- a/arch/arm/mach-mx25/clock.c
 +++ b/arch/arm/mach-mx25/clock.c
-@@ -211,7 +211,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
- };
+@@ -218,6 +218,14 @@ int __init mx25_clocks_init(void)
+ 	for (i = 0; i < ARRAY_SIZE(lookups); i++)
+ 		clkdev_add(&lookups[i]);
  
--int __init mx25_clocks_init(unsigned long fref)
-+int __init mx25_clocks_init(void)
- {
- 	int i;
++	/* Turn off all clocks except the ones we need to survive, namely:
++	 * EMI, GPIO1-3 (CCM_CGCR1[18:16]), GPT1, IOMUXC (CCM_CGCR1[27]), IIM,
++	 * SCC
++	 */
++	__raw_writel((1 << 19), CRM_BASE + CCM_CGCR0);
++	__raw_writel((0xf << 16) | (3 << 26), CRM_BASE + CCM_CGCR1);
++	__raw_writel((1 << 5), CRM_BASE + CCM_CGCR2);
++
+ 	mxc_timer_init(&gpt_clk, MX25_IO_ADDRESS(MX25_GPT1_BASE_ADDR), 54);
  
-diff --git a/arch/arm/mach-mx25/mx25pdk.c b/arch/arm/mach-mx25/mx25pdk.c
-index c8b1d3b..232f9ca 100644
---- a/arch/arm/mach-mx25/mx25pdk.c
-+++ b/arch/arm/mach-mx25/mx25pdk.c
-@@ -98,7 +98,7 @@ static void __init mx25pdk_init(void)
- 
- static void __init mx25pdk_timer_init(void)
- {
--	mx25_clocks_init(26000000);
-+	mx25_clocks_init();
- }
- 
- static struct sys_timer mx25pdk_timer = {
-diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
-index 286cb9b..4bf1068 100644
---- a/arch/arm/plat-mxc/include/mach/common.h
-+++ b/arch/arm/plat-mxc/include/mach/common.h
-@@ -32,7 +32,7 @@ extern void mxc91231_init_irq(void);
- extern void mxc_timer_init(struct clk *timer_clk, void __iomem *, int);
- extern int mx1_clocks_init(unsigned long fref);
- extern int mx21_clocks_init(unsigned long lref, unsigned long fref);
--extern int mx25_clocks_init(unsigned long fref);
-+extern int mx25_clocks_init(void);
- extern int mx27_clocks_init(unsigned long fref);
- extern int mx31_clocks_init(unsigned long fref);
- extern int mx35_clocks_init(void);
+ 	return 0;
 -- 
 1.6.5
