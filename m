@@ -1,367 +1,80 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 26 Jan 2010 07:58:01 +0000
-Subject: [PATCH] ARM: S3C2442: Merge s3c2442.c and clock.c
+Date: Tue, 26 Jan 2010 07:58:04 +0000
+Subject: [PATCH] ARM: S3C24XX: Remove old mach-s3c2442
 In-Reply-To: <1264492686-16901-1-git-send-email-ben-linux@fluff.org>
 References: <1264492686-16901-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1264492686-16901-3-git-send-email-ben-linux@fluff.org>
+Message-ID: <1264492686-16901-6-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Merge s3c2442.c and clock.c as the s3c242.c does not contain much and
-the clock parts are always built for s3c2442 anyway.
+Remove the old mach-s3c2442 directory now all is merged into mach-s3c2440
+and remove it from the arch/arm build process.
 
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/mach-s3c2442/Makefile  |    1 -
- arch/arm/mach-s3c2442/clock.c   |  153 ---------------------------------------
- arch/arm/mach-s3c2442/s3c2442.c |  153 ++++++++++++++++++++++++++++++++++++---
- 3 files changed, 142 insertions(+), 165 deletions(-)
- delete mode 100644 arch/arm/mach-s3c2442/clock.c
+ arch/arm/Kconfig               |    1 -
+ arch/arm/Makefile              |    2 +-
+ arch/arm/mach-s3c2442/Kconfig  |    4 ----
+ arch/arm/mach-s3c2442/Makefile |   15 ---------------
+ 4 files changed, 1 insertions(+), 21 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c2442/Kconfig
+ delete mode 100644 arch/arm/mach-s3c2442/Makefile
 
-diff --git a/arch/arm/mach-s3c2442/Makefile b/arch/arm/mach-s3c2442/Makefile
-index 2a909c6..7e31ccd 100644
---- a/arch/arm/mach-s3c2442/Makefile
-+++ b/arch/arm/mach-s3c2442/Makefile
-@@ -10,7 +10,6 @@ obj-n				:=
- obj-				:=
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 3bc5169..63f726f 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -794,7 +794,6 @@ source "arch/arm/mach-s3c2400/Kconfig"
+ source "arch/arm/mach-s3c2410/Kconfig"
+ source "arch/arm/mach-s3c2412/Kconfig"
+ source "arch/arm/mach-s3c2440/Kconfig"
+-source "arch/arm/mach-s3c2442/Kconfig"
+ source "arch/arm/mach-s3c2443/Kconfig"
+ endif
  
- obj-$(CONFIG_CPU_S3C2442)	+= s3c2442.o
--obj-$(CONFIG_CPU_S3C2442)	+= clock.o
- 
- # Machine support
- 
-diff --git a/arch/arm/mach-s3c2442/clock.c b/arch/arm/mach-s3c2442/clock.c
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index bbcd512..893bcfc 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -158,7 +158,7 @@ machine-$(CONFIG_ARCH_PNX4008)		:= pnx4008
+ machine-$(CONFIG_ARCH_PXA)		:= pxa
+ machine-$(CONFIG_ARCH_REALVIEW)		:= realview
+ machine-$(CONFIG_ARCH_RPC)		:= rpc
+-machine-$(CONFIG_ARCH_S3C2410)		:= s3c2410 s3c2400 s3c2412 s3c2440 s3c2442 s3c2443
++machine-$(CONFIG_ARCH_S3C2410)		:= s3c2410 s3c2400 s3c2412 s3c2440 s3c2443
+ machine-$(CONFIG_ARCH_S3C24A0)		:= s3c24a0
+ machine-$(CONFIG_ARCH_S3C64XX)		:= s3c6400 s3c6410
+ machine-$(CONFIG_ARCH_S5P6440)		:= s5p6440
+diff --git a/arch/arm/mach-s3c2442/Kconfig b/arch/arm/mach-s3c2442/Kconfig
 deleted file mode 100644
-index d9b692a..0000000
---- a/arch/arm/mach-s3c2442/clock.c
+index 29ef066..0000000
+--- a/arch/arm/mach-s3c2442/Kconfig
 +++ /dev/null
-@@ -1,153 +0,0 @@
--/* linux/arch/arm/mach-s3c2442/clock.c
-- *
-- * Copyright (c) 2004-2005 Simtec Electronics
-- *	http://armlinux.simtec.co.uk/
-- *	Ben Dooks <ben@simtec.co.uk>
-- *
-- * S3C2442 Clock support
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
--*/
+@@ -1,4 +0,0 @@
+-# Copyright 2007 Simtec Electronics
+-#
+-# Licensed under GPLv2
 -
--#include <linux/init.h>
--#include <linux/module.h>
--#include <linux/kernel.h>
--#include <linux/list.h>
--#include <linux/errno.h>
--#include <linux/err.h>
--#include <linux/device.h>
--#include <linux/sysdev.h>
--#include <linux/interrupt.h>
--#include <linux/ioport.h>
--#include <linux/mutex.h>
--#include <linux/clk.h>
--#include <linux/io.h>
+diff --git a/arch/arm/mach-s3c2442/Makefile b/arch/arm/mach-s3c2442/Makefile
+deleted file mode 100644
+index 7e31ccd..0000000
+--- a/arch/arm/mach-s3c2442/Makefile
++++ /dev/null
+@@ -1,15 +0,0 @@
+-# arch/arm/mach-s3c2442/Makefile
+-#
+-# Copyright 2007 Simtec Electronics
+-#
+-# Licensed under GPLv2
 -
--#include <mach/hardware.h>
--#include <asm/atomic.h>
--#include <asm/irq.h>
+-obj-y				:=
+-obj-m				:=
+-obj-n				:=
+-obj-				:=
 -
--#include <mach/regs-clock.h>
+-obj-$(CONFIG_CPU_S3C2442)	+= s3c2442.o
 -
--#include <plat/clock.h>
--#include <plat/cpu.h>
+-# Machine support
 -
--/* S3C2442 extended clock support */
--
--static unsigned long s3c2442_camif_upll_round(struct clk *clk,
--					      unsigned long rate)
--{
--	unsigned long parent_rate = clk_get_rate(clk->parent);
--	int div;
--
--	if (rate > parent_rate)
--		return parent_rate;
--
--	div = parent_rate / rate;
--
--	if (div == 3)
--		return parent_rate / 3;
--
--	/* note, we remove the +/- 1 calculations for the divisor */
--
--	div /= 2;
--
--	if (div < 1)
--		div = 1;
--	else if (div > 16)
--		div = 16;
--
--	return parent_rate / (div * 2);
--}
--
--static int s3c2442_camif_upll_setrate(struct clk *clk, unsigned long rate)
--{
--	unsigned long parent_rate = clk_get_rate(clk->parent);
--	unsigned long camdivn =  __raw_readl(S3C2440_CAMDIVN);
--
--	rate = s3c2442_camif_upll_round(clk, rate);
--
--	camdivn &= ~S3C2442_CAMDIVN_CAMCLK_DIV3;
--
--	if (rate == parent_rate) {
--		camdivn &= ~S3C2440_CAMDIVN_CAMCLK_SEL;
--	} else if ((parent_rate / rate) == 3) {
--		camdivn |= S3C2440_CAMDIVN_CAMCLK_SEL;
--		camdivn |= S3C2442_CAMDIVN_CAMCLK_DIV3;
--	} else {
--		camdivn &= ~S3C2440_CAMDIVN_CAMCLK_MASK;
--		camdivn |= S3C2440_CAMDIVN_CAMCLK_SEL;
--		camdivn |= (((parent_rate / rate) / 2) - 1);
--	}
--
--	__raw_writel(camdivn, S3C2440_CAMDIVN);
--
--	return 0;
--}
--
--/* Extra S3C2442 clocks */
--
--static struct clk s3c2442_clk_cam = {
--	.name		= "camif",
--	.id		= -1,
--	.enable		= s3c2410_clkcon_enable,
--	.ctrlbit	= S3C2440_CLKCON_CAMERA,
--};
--
--static struct clk s3c2442_clk_cam_upll = {
--	.name		= "camif-upll",
--	.id		= -1,
--	.ops		= &(struct clk_ops) {
--		.set_rate	= s3c2442_camif_upll_setrate,
--		.round_rate	= s3c2442_camif_upll_round,
--	},
--};
--
--static int s3c2442_clk_add(struct sys_device *sysdev)
--{
--	struct clk *clock_upll;
--	struct clk *clock_h;
--	struct clk *clock_p;
--
--	clock_p = clk_get(NULL, "pclk");
--	clock_h = clk_get(NULL, "hclk");
--	clock_upll = clk_get(NULL, "upll");
--
--	if (IS_ERR(clock_p) || IS_ERR(clock_h) || IS_ERR(clock_upll)) {
--		printk(KERN_ERR "S3C2442: Failed to get parent clocks\n");
--		return -EINVAL;
--	}
--
--	s3c2442_clk_cam.parent = clock_h;
--	s3c2442_clk_cam_upll.parent = clock_upll;
--
--	s3c24xx_register_clock(&s3c2442_clk_cam);
--	s3c24xx_register_clock(&s3c2442_clk_cam_upll);
--
--	clk_disable(&s3c2442_clk_cam);
--
--	return 0;
--}
--
--static struct sysdev_driver s3c2442_clk_driver = {
--	.add	= s3c2442_clk_add,
--};
--
--static __init int s3c2442_clk_init(void)
--{
--	return sysdev_driver_register(&s3c2442_sysclass, &s3c2442_clk_driver);
--}
--
--arch_initcall(s3c2442_clk_init);
-diff --git a/arch/arm/mach-s3c2442/s3c2442.c b/arch/arm/mach-s3c2442/s3c2442.c
-index 4663bdc..188ad1e 100644
---- a/arch/arm/mach-s3c2442/s3c2442.c
-+++ b/arch/arm/mach-s3c2442/s3c2442.c
-@@ -1,27 +1,158 @@
- /* linux/arch/arm/mach-s3c2442/s3c2442.c
-  *
-- * Copyright (c) 2006 Simtec Electronics
-- *   Ben Dooks <ben@simtec.co.uk>
-+ * Copyright (c) 2004-2005 Simtec Electronics
-+ *	http://armlinux.simtec.co.uk/
-+ *	Ben Dooks <ben@simtec.co.uk>
-  *
-- * Samsung S3C2442 Mobile CPU support
-+ * S3C2442 core and lock support
-  *
-  * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- */
- 
-+#include <linux/init.h>
-+#include <linux/module.h>
- #include <linux/kernel.h>
--#include <linux/types.h>
--#include <linux/interrupt.h>
- #include <linux/list.h>
--#include <linux/timer.h>
--#include <linux/init.h>
--#include <linux/serial_core.h>
-+#include <linux/errno.h>
-+#include <linux/err.h>
-+#include <linux/device.h>
- #include <linux/sysdev.h>
-+#include <linux/interrupt.h>
-+#include <linux/ioport.h>
-+#include <linux/mutex.h>
-+#include <linux/clk.h>
-+#include <linux/io.h>
- 
--#include <plat/s3c2442.h>
-+#include <mach/hardware.h>
-+#include <asm/atomic.h>
-+#include <asm/irq.h>
-+
-+#include <mach/regs-clock.h>
-+
-+#include <plat/clock.h>
- #include <plat/cpu.h>
- 
-+/* S3C2442 extended clock support */
-+
-+static unsigned long s3c2442_camif_upll_round(struct clk *clk,
-+					      unsigned long rate)
-+{
-+	unsigned long parent_rate = clk_get_rate(clk->parent);
-+	int div;
-+
-+	if (rate > parent_rate)
-+		return parent_rate;
-+
-+	div = parent_rate / rate;
-+
-+	if (div == 3)
-+		return parent_rate / 3;
-+
-+	/* note, we remove the +/- 1 calculations for the divisor */
-+
-+	div /= 2;
-+
-+	if (div < 1)
-+		div = 1;
-+	else if (div > 16)
-+		div = 16;
-+
-+	return parent_rate / (div * 2);
-+}
-+
-+static int s3c2442_camif_upll_setrate(struct clk *clk, unsigned long rate)
-+{
-+	unsigned long parent_rate = clk_get_rate(clk->parent);
-+	unsigned long camdivn =  __raw_readl(S3C2440_CAMDIVN);
-+
-+	rate = s3c2442_camif_upll_round(clk, rate);
-+
-+	camdivn &= ~S3C2442_CAMDIVN_CAMCLK_DIV3;
-+
-+	if (rate == parent_rate) {
-+		camdivn &= ~S3C2440_CAMDIVN_CAMCLK_SEL;
-+	} else if ((parent_rate / rate) == 3) {
-+		camdivn |= S3C2440_CAMDIVN_CAMCLK_SEL;
-+		camdivn |= S3C2442_CAMDIVN_CAMCLK_DIV3;
-+	} else {
-+		camdivn &= ~S3C2440_CAMDIVN_CAMCLK_MASK;
-+		camdivn |= S3C2440_CAMDIVN_CAMCLK_SEL;
-+		camdivn |= (((parent_rate / rate) / 2) - 1);
-+	}
-+
-+	__raw_writel(camdivn, S3C2440_CAMDIVN);
-+
-+	return 0;
-+}
-+
-+/* Extra S3C2442 clocks */
-+
-+static struct clk s3c2442_clk_cam = {
-+	.name		= "camif",
-+	.id		= -1,
-+	.enable		= s3c2410_clkcon_enable,
-+	.ctrlbit	= S3C2440_CLKCON_CAMERA,
-+};
-+
-+static struct clk s3c2442_clk_cam_upll = {
-+	.name		= "camif-upll",
-+	.id		= -1,
-+	.ops		= &(struct clk_ops) {
-+		.set_rate	= s3c2442_camif_upll_setrate,
-+		.round_rate	= s3c2442_camif_upll_round,
-+	},
-+};
-+
-+static int s3c2442_clk_add(struct sys_device *sysdev)
-+{
-+	struct clk *clock_upll;
-+	struct clk *clock_h;
-+	struct clk *clock_p;
-+
-+	clock_p = clk_get(NULL, "pclk");
-+	clock_h = clk_get(NULL, "hclk");
-+	clock_upll = clk_get(NULL, "upll");
-+
-+	if (IS_ERR(clock_p) || IS_ERR(clock_h) || IS_ERR(clock_upll)) {
-+		printk(KERN_ERR "S3C2442: Failed to get parent clocks\n");
-+		return -EINVAL;
-+	}
-+
-+	s3c2442_clk_cam.parent = clock_h;
-+	s3c2442_clk_cam_upll.parent = clock_upll;
-+
-+	s3c24xx_register_clock(&s3c2442_clk_cam);
-+	s3c24xx_register_clock(&s3c2442_clk_cam_upll);
-+
-+	clk_disable(&s3c2442_clk_cam);
-+
-+	return 0;
-+}
-+
-+static struct sysdev_driver s3c2442_clk_driver = {
-+	.add	= s3c2442_clk_add,
-+};
-+
-+static __init int s3c2442_clk_init(void)
-+{
-+	return sysdev_driver_register(&s3c2442_sysclass, &s3c2442_clk_driver);
-+}
-+
-+arch_initcall(s3c2442_clk_init);
-+
-+
- static struct sys_device s3c2442_sysdev = {
- 	.cls		= &s3c2442_sysclass,
- };
 -- 
 1.6.0.4
