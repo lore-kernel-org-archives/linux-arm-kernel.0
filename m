@@ -1,28 +1,30 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 26 Jan 2010 12:00:58 +0000
-Subject: [PATCH 01/01] regulator: support max8649
-In-Reply-To: <771cded01001260354y7c7db25bqa8bbfe000e0c0380@mail.gmail.com>
-References: <771cded01001120041ue24edabk8e4638ef7151c947@mail.gmail.com>
-	<771cded01001120051l44fd76bx80d2fd4b6f60bd0b@mail.gmail.com>
-	<20100112115156.GA546@rakim.wolfsonmicro.main>
-	<771cded01001250301q465a9f8ma484f597ae9a292f@mail.gmail.com>
-	<20100125135628.GB26613@rakim.wolfsonmicro.main>
-	<771cded01001252226k342723b3p3ea235fe79c46843@mail.gmail.com>
-	<20100126110420.GI15759@rakim.wolfsonmicro.main>
-	<771cded01001260354y7c7db25bqa8bbfe000e0c0380@mail.gmail.com>
-Message-ID: <20100126120058.GN15759@rakim.wolfsonmicro.main>
+Date: Tue, 26 Jan 2010 12:04:02 +0000
+Subject: [PATCH 2/3] ASoC: AC97: S3C: Add controller driver
+In-Reply-To: <1b68c6791001260357p62b5c10dpfa2a5ddcae0704dd@mail.gmail.com>
+References: <1264485101-13782-1-git-send-email-jassisinghbrar@gmail.com>
+	<1264485101-13782-2-git-send-email-jassisinghbrar@gmail.com>
+	<20100126102343.GA24843@trinity.fluff.org>
+	<1b68c6791001260303m38e6e689p2ee8c2c4c6ac2af3@mail.gmail.com>
+	<20100126110945.GJ15759@rakim.wolfsonmicro.main>
+	<1b68c6791001260357p62b5c10dpfa2a5ddcae0704dd@mail.gmail.com>
+Message-ID: <20100126120402.GO15759@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2010 at 06:54:48AM -0500, Haojian Zhuang wrote:
-> On Tue, Jan 26, 2010 at 6:04 AM, Mark Brown
+On Tue, Jan 26, 2010 at 08:57:56PM +0900, jassi brar wrote:
+> On Tue, Jan 26, 2010 at 8:09 PM, Mark Brown
 
-> > I'd expect the time taken to enable to be the voltage multipled by the
-> > step size rather than divided by the step size?
+> > If they both work equally well please just go ahead and remove the old
+> > driver. ?Keeping the old driver around if it doesn't work is likely to
+> > result in any fixups going into that.
 
-> I don't agree at this point. The unit of step is uV/uSec. The function
-> should return uSec. So voltage divided by the step is more reasonable.
+> ok, will submit a patch for that too.
+> Btw, I don't have ln2440sbc and don't know how would it take the change,
+> though I sincerely think it should be just fine.
 
-Ah, then the variable step is confusingly named since it's actually a
-rate of change rather than a step size - I'd suggest rate or something
-like that instead.
+CC the original author on the patch updating it, if they don't reply
+then a build test is fine - I'd also expect it'll work fine (though
+thinking about it you'll need to add the platform data for the GPIO
+configuration to the 2443 instance of the struct device, I'm not sure if
+that was there or not?).
