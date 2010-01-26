@@ -1,54 +1,88 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 26 Jan 2010 09:10:17 -0800
-Subject: whoever is using ymiao3@marvell.com please stop it
-In-Reply-To: <20100126113534.GF20792@pengutronix.de>
-References: <20100125014024.GA4609@trinity.fluff.org>
-	<f17812d71001251730p4747199bhd4176d5835073b56@mail.gmail.com>
-	<20100126052317.GY10014@trinity.fluff.org>
-	<20100126113534.GF20792@pengutronix.de>
-Message-ID: <1264525817.30778.139.camel@Joe-Laptop.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 26 Jan 2010 09:22:21 -0800
+Subject: [PATCH 2/4] omap: Make uncompress code and DEBUG_LL code generic
+In-Reply-To: <FCCFB4CDC6E5564B9182F639FC356087030070F293@dbde02.ent.ti.com>
+References: <20100116013205.10065.95921.stgit@baageli.muru.com>
+	<20100116013515.10065.30649.stgit@baageli.muru.com>
+	<FCCFB4CDC6E5564B9182F639FC356087030070F293@dbde02.ent.ti.com>
+Message-ID: <20100126172221.GB17449@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-01-26 at 12:35 +0100, Uwe Kleine-K?nig wrote:
-> On Tue, Jan 26, 2010 at 05:23:18AM +0000, Ben Dooks wrote:
-> > On Tue, Jan 26, 2010 at 09:30:39AM +0800, Eric Miao wrote:
-> > > That's mine original email, and is invalid now. Everyone please stop using it.
-> I already run into that several times as I frequently use
-> scripts/get_maintainer.pl.  IMHO we need a mechanism to deprecate email
-> addresses, preferably using .mailmap as data source.
+Hi,
 
-As is, I think it's not much of a problem.
-People move around and email addresses become invalid.
+* Pandita, Vikram <vikram.pandita@ti.com> [100118 17:24]:
+> 
+> 
+> >-----Original Message-----
+> >From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Tony
+> >Lindgren
+> >Sent: Friday, January 15, 2010 7:35 PM
+> >To: linux-arm-kernel at lists.infradead.org
+> >Cc: linux-omap at vger.kernel.org
+> >Subject: [PATCH 2/4] omap: Make uncompress code and DEBUG_LL code generic
+> 
+> UART_SCR 		-> this is the scratchpad register 
+> UART_OMAP_SCR	-> This is TI-only Supplementary control register
+> 
+> You probably confused the two (as rightly so since SCR is same name).
+> So there is no need to save/restore the UART_SCR register as you have done, see inlined -- 
+> 
+> >
+> >Define arch_decomp_setup() the same way as some other
+> >architectures do. Use arch_id to configure the debug uart
+> >based on the machine_is by storing it into the uart
+> >scratchpad register for DEBUG_LL code to use.
+> >
+> >Signed-off-by: Tony Lindgren <tony@atomide.com>
+> <snip>
+> >--- a/arch/arm/mach-omap2/serial.c
+> >+++ b/arch/arm/mach-omap2/serial.c
+> >@@ -161,11 +161,22 @@ static inline void serial_write_reg(struct plat_serial8250_port *p, int offset,
+> > static inline void __init omap_uart_reset(struct omap_uart_state *uart)
+> > {
+> > 	struct plat_serial8250_port *p = uart->p;
+> >+	u8 scratchpad = 0;
+> >+
+> >+	/*
+> >+	 * Save UART1 scratchpad register value for UART1 for DEBUG_LL.
+> >+	 * See also include/plat/uncompress.h and include/mach/debug-macro.S.
+> >+	 */
+> >+	if (p->mapbase == OMAP2_UART1_BASE)	/* OMAP2/3/4UART1_BASE */
+> >+		scratchpad = serial_read_reg(p, UART_SCR);
+> 
+> No need to save and restore the UART_SCR register. 
+> This never gets used in this function.
+> 
+> What gets used is UART_OMAP_SCR which is OMAP specific supplimantry control register 
+> and not scratchpad.
+> 
+> >
+> > 	serial_write_reg(p, UART_OMAP_MDR1, 0x07);
+> > 	serial_write_reg(p, UART_OMAP_SCR, 0x08);
+> > 	serial_write_reg(p, UART_OMAP_MDR1, 0x00);
+> > 	serial_write_reg(p, UART_OMAP_SYSC, (0x02 << 3) | (1 << 2) | (1 << 0));
+> >+
+> >+	if (p->mapbase == OMAP2_UART1_BASE)	/* OMAP2/3/4UART1_BASE */
+> >+		serial_write_reg(p, UART_SCR, scratchpad);
+> 
+> Remove this as well. No need. 
 
-Over short periods of time, these problems are resolved
-without effort or intervention.
+Just to clarify, the uncompress.h code is using the UART_SCR to store the
+DEBUG_LL port number based on the machine ID.
 
-scripts/get_maintainer.pl uses first MAINTAINERS patterns
-and maintainer name/address, then git history.  The most
-recent git name/address combination is used and multiple
-address are ignored by default.
+The reason this code is not needed is that the earlyprintk code prints
+out something already before we get to this code.
 
-If multiple people with identical names are contributing,
-a flag --noremove-duplicates exists to stop name/address
-merging.
+If earlyprintk did not print anything before this code, we would need
+to save UART_SCR here as the debug serial port gets initialized the first
+time something is printed.
 
-http://lkml.org/lkml/2009/8/5/518
+Although the code above uses UART_OMAP_SCR and not UART_SCR, it resets
+the uart so we lose UART_SCR.
 
-> I'd suggest to check if the address is listed in .mailmap and use the
-> first entry for that person.  This would need some work to adapt
-> .mailmap, as .mailmap mainly collects wrong entries.
+So in any case I've dropped the code above.
 
-Make sure you adapt git as well.
+Regards,
 
-One thing you could do would be to update
-scripts/get_maintainer.pl to scan all MAINTAINERS sections
-for a matching name and use that address if it differs from
-git log history.
-
-That could update the case where the person has a MAINTAINERS
-entry, is not a listed maintainer for a particular file and
-had last submitted patches for that file using an old/invalid
-address.
-
-I will not be submitting such a patch.
+Tony
