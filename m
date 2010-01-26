@@ -1,92 +1,125 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 26 Jan 2010 01:26:08 -0500
-Subject: [PATCH 01/01] regulator: support max8649
-In-Reply-To: <20100125135628.GB26613@rakim.wolfsonmicro.main>
-References: <771cded01001120041ue24edabk8e4638ef7151c947@mail.gmail.com>
-	<771cded01001120051l44fd76bx80d2fd4b6f60bd0b@mail.gmail.com>
-	<20100112115156.GA546@rakim.wolfsonmicro.main>
-	<771cded01001250301q465a9f8ma484f597ae9a292f@mail.gmail.com>
-	<20100125135628.GB26613@rakim.wolfsonmicro.main>
-Message-ID: <771cded01001252226k342723b3p3ea235fe79c46843@mail.gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Tue, 26 Jan 2010 07:03:01 +0000
+Subject: [PATCH] ARM: S3C64XX: Merge s3c6400-init.c into cpu.c
+In-Reply-To: <1264489385-13345-1-git-send-email-ben-linux@fluff.org>
+References: <1264489385-13345-1-git-send-email-ben-linux@fluff.org>
+Message-ID: <1264489385-13345-11-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2010 at 8:56 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Mon, Jan 25, 2010 at 06:01:41AM -0500, Haojian Zhuang wrote:
->> On Tue, Jan 12, 2010 at 6:51 AM, Mark Brown
->
->> >> + ? ? if (pdata->ramp_timing) {
->> >> + ? ? ? ? ? ? info->ramp_timing = pdata->ramp_timing;
->> >> + ? ? ? ? ? ? max8649_set_bits(info->i2c, MAX8649_RAMP, MAX8649_RAMP_MASK,
->> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?info->ramp_timing << 5);
->> >> + ? ? }
->
->> > You might want to implement the new enable_time() API for this.
->
->> This ramp timing is the time interval of each step on adjusting
->> voltage. I just want to control the timing in initialization.
->
-> If this applies to any voltage change at all then rather than just power
-> on I need to finish off the stuff I've been sitting on for handling slew
-> times for voltage changes. ?If the regulator hasn't yet reached the
-> requested output when the consumer tries using it the consumer might get
-> broken.
->
-> If the ramp also gets applied when initially turning on the regulator
-> you'd still want to implement enable_time() for the same reason.
->
->> enable_time() is only called before enabling regulator. And I don't
->> understand what would be done in enable_time().
->
-> You'd return the amount of time taken to turn on the regulator and get
-> the output voltage stable in the current configuration. ?This will then
-> be used by the core to ensure that the consumer only tries to use the
-> regulator once it's fully enabled.
->
->> +static int max8649_set_mode(struct regulator_dev *rdev, unsigned int mode)
->> +{
->> + ? ? struct max8649_regulator_info *info = rdev_get_drvdata(rdev);
->> +
->> + ? ? switch (mode) {
->> + ? ? case REGULATOR_MODE_FAST:
->> + ? ? case REGULATOR_MODE_NORMAL:
->> + ? ? ? ? ? ? max8649_set_bits(info->i2c, info->vol_reg, MAX8649_FORCE_PWM,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?MAX8649_FORCE_PWM);
->> + ? ? ? ? ? ? break;
->
-> Are you sure about this? ?I'd expect to see force PWM used only for
-> _FAST, for _NORMAL pulse skipping is usually desired behaviour.
->
->> + ? ? case REGULATOR_MODE_IDLE:
->> + ? ? case REGULATOR_MODE_STANDBY:
->> + ? ? ? ? ? ? max8649_set_bits(info->i2c, info->vol_reg,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?MAX8649_FORCE_PWM, 0);
->
-> I'd just leave these unimplemented (there's no need to support all
-> modes) and make sure that this ties in with...
->
->> +static unsigned int max8649_get_mode(struct regulator_dev *rdev)
->> +{
->> + ? ? struct max8649_regulator_info *info = rdev_get_drvdata(rdev);
->> + ? ? int ret;
->> +
->> + ? ? ret = max8649_reg_read(info->i2c, info->vol_reg);
->> + ? ? if (ret & MAX8649_FORCE_PWM)
->> + ? ? ? ? ? ? return REGULATOR_MODE_NORMAL;
->> + ? ? return REGULATOR_MODE_IDLE;
->
-> ...this.
->
+Since this file is small, and is compiled for both systems in this
+architecture merge it into the cpu support file and remove the original
+instead of moving it.
 
-update patch now.
+Signed-off-by: Ben Dooks <ben-linux@fluff.org>
+---
+ arch/arm/mach-s3c64xx/Kconfig        |    2 --
+ arch/arm/mach-s3c64xx/cpu.c          |    6 ++++++
+ arch/arm/plat-s3c64xx/Kconfig        |    6 ------
+ arch/arm/plat-s3c64xx/Makefile       |    1 -
+ arch/arm/plat-s3c64xx/s3c6400-init.c |   29 -----------------------------
+ 5 files changed, 6 insertions(+), 38 deletions(-)
+ delete mode 100644 arch/arm/plat-s3c64xx/s3c6400-init.c
 
-Thanks
-Haojian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-regulator-enable-max8649-regulator-driver.patch
-Type: text/x-patch
-Size: 13561 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100126/533e3f15/attachment-0001.bin>
+diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+index 15e065e..495b6e3 100644
+--- a/arch/arm/mach-s3c64xx/Kconfig
++++ b/arch/arm/mach-s3c64xx/Kconfig
+@@ -7,14 +7,12 @@
+ 
+ config CPU_S3C6400
+ 	bool
+-	select CPU_S3C6400_INIT
+ 	select CPU_S3C6400_CLOCK
+ 	help
+ 	  Enable S3C6400 CPU support
+ 
+ config CPU_S3C6410
+ 	bool
+-	select CPU_S3C6400_INIT
+ 	select CPU_S3C6400_CLOCK
+ 	help
+ 	  Enable S3C6410 CPU support
+diff --git a/arch/arm/mach-s3c64xx/cpu.c b/arch/arm/mach-s3c64xx/cpu.c
+index 410d688..374e45e 100644
+--- a/arch/arm/mach-s3c64xx/cpu.c
++++ b/arch/arm/mach-s3c64xx/cpu.c
+@@ -129,6 +129,12 @@ static struct sys_device s3c64xx_sysdev = {
+ 	.cls	= &s3c64xx_sysclass,
+ };
+ 
++/* uart registration process */
++
++void __init s3c6400_common_init_uarts(struct s3c2410_uartcfg *cfg, int no)
++{
++	s3c24xx_init_uartdevs("s3c6400-uart", s3c64xx_uart_resources, cfg, no);
++}
+ 
+ /* read cpu identification code */
+ 
+diff --git a/arch/arm/plat-s3c64xx/Kconfig b/arch/arm/plat-s3c64xx/Kconfig
+index 4edb580..6998f85 100644
+--- a/arch/arm/plat-s3c64xx/Kconfig
++++ b/arch/arm/plat-s3c64xx/Kconfig
+@@ -30,12 +30,6 @@ if PLAT_S3C64XX
+ 
+ # Configuration options shared by all S3C64XX implementations
+ 
+-config CPU_S3C6400_INIT
+-	bool
+-	help
+-	  Common initialisation code for the S3C6400 that is shared
+-	  by other CPUs in the series, such as the S3C6410.
+-
+ config CPU_S3C6400_CLOCK
+ 	bool
+ 	help
+diff --git a/arch/arm/plat-s3c64xx/Makefile b/arch/arm/plat-s3c64xx/Makefile
+index 60d7990..1d9513c 100644
+--- a/arch/arm/plat-s3c64xx/Makefile
++++ b/arch/arm/plat-s3c64xx/Makefile
+@@ -12,7 +12,6 @@ obj-				:=
+ 
+ # CPU support
+ 
+-obj-$(CONFIG_CPU_S3C6400_INIT)	+= s3c6400-init.o
+ obj-$(CONFIG_CPU_S3C6400_CLOCK)	+= s3c6400-clock.o
+ obj-$(CONFIG_CPU_FREQ_S3C64XX)  += cpufreq.o
+ 
+diff --git a/arch/arm/plat-s3c64xx/s3c6400-init.c b/arch/arm/plat-s3c64xx/s3c6400-init.c
+deleted file mode 100644
+index e64caa4..0000000
+--- a/arch/arm/plat-s3c64xx/s3c6400-init.c
++++ /dev/null
+@@ -1,29 +0,0 @@
+-/* linux/arch/arm/plat-s3c64xx/s3c6400-init.c
+- *
+- * Copyright 2008 Openmoko, Inc.
+- * Copyright 2008 Simtec Electronics
+- *      Ben Dooks <ben@simtec.co.uk>
+- *      http://armlinux.simtec.co.uk/
+- *
+- * S3C6400 - CPU initialisation (common with other S3C64XX chips)
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/types.h>
+-#include <linux/init.h>
+-
+-#include <plat/cpu.h>
+-#include <plat/devs.h>
+-#include <mach/s3c6400.h>
+-#include <mach/s3c6410.h>
+-
+-/* uart registration process */
+-
+-void __init s3c6400_common_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+-{
+-	s3c24xx_init_uartdevs("s3c6400-uart", s3c64xx_uart_resources, cfg, no);
+-}
+-- 
+1.6.0.4
