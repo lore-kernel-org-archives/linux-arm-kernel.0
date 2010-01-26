@@ -1,197 +1,417 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Jan 2010 12:12:48 -0800
-Subject: [PATCH 06/14] omap: Fix dmtimer.c for multi-omap boot
+Date: Tue, 26 Jan 2010 12:12:51 -0800
+Subject: [PATCH 07/14] omap2/3/4: Fix omap2_map_common_io for multi-omap
 In-Reply-To: <20100126200646.15382.52167.stgit@baageli.muru.com>
 References: <20100126200646.15382.52167.stgit@baageli.muru.com>
-Message-ID: <20100126201248.15382.66154.stgit@baageli.muru.com>
+Message-ID: <20100126201251.15382.42461.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix dmtimer.c for multi-omap boot. Also remove legacy
-clk_enable/disable wrappers that are no longer needed.
-
-Note that the clock handling should be further improved
-to make use of the clock aliases.
+Fix omap2_map_common_io for multi-omap
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/plat-omap/dmtimer.c |   90 ++++++++++++++++++------------------------
- 1 files changed, 39 insertions(+), 51 deletions(-)
+ arch/arm/mach-omap2/board-2430sdp.c        |    2 +
+ arch/arm/mach-omap2/board-3430sdp.c        |    2 +
+ arch/arm/mach-omap2/board-3630sdp.c        |    2 +
+ arch/arm/mach-omap2/board-4430sdp.c        |    2 +
+ arch/arm/mach-omap2/board-am3517evm.c      |    2 +
+ arch/arm/mach-omap2/board-apollon.c        |    2 +
+ arch/arm/mach-omap2/board-cm-t35.c         |    2 +
+ arch/arm/mach-omap2/board-generic.c        |    2 +
+ arch/arm/mach-omap2/board-h4.c             |    2 +
+ arch/arm/mach-omap2/board-igep0020.c       |    2 +
+ arch/arm/mach-omap2/board-ldp.c            |    2 +
+ arch/arm/mach-omap2/board-n8x0.c           |    2 +
+ arch/arm/mach-omap2/board-omap3beagle.c    |    2 +
+ arch/arm/mach-omap2/board-omap3evm.c       |    2 +
+ arch/arm/mach-omap2/board-omap3pandora.c   |    2 +
+ arch/arm/mach-omap2/board-omap3touchbook.c |    2 +
+ arch/arm/mach-omap2/board-overo.c          |    2 +
+ arch/arm/mach-omap2/board-rx51.c           |    2 +
+ arch/arm/mach-omap2/board-zoom2.c          |    2 +
+ arch/arm/mach-omap2/board-zoom3.c          |    2 +
+ arch/arm/mach-omap2/io.c                   |   51 +++++++++++++++++++---------
+ arch/arm/plat-omap/include/plat/io.h       |   33 ++++++++++++++++++
+ 22 files changed, 86 insertions(+), 38 deletions(-)
 
-diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index 08ccf89..c588cdf 100644
---- a/arch/arm/plat-omap/dmtimer.c
-+++ b/arch/arm/plat-omap/dmtimer.c
-@@ -163,20 +163,9 @@ struct omap_dm_timer {
- 	unsigned posted:1;
+diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
+index e508904..1a61978 100644
+--- a/arch/arm/mach-omap2/board-2430sdp.c
++++ b/arch/arm/mach-omap2/board-2430sdp.c
+@@ -215,7 +215,7 @@ static void __init omap_2430sdp_init(void)
+ static void __init omap_2430sdp_map_io(void)
+ {
+ 	omap2_set_globals_243x();
+-	omap2_map_common_io();
++	omap243x_map_common_io();
+ }
+ 
+ MACHINE_START(OMAP_2430SDP, "OMAP2430 sdp2430 board")
+diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
+index c90b0d0..eda4f64 100644
+--- a/arch/arm/mach-omap2/board-3430sdp.c
++++ b/arch/arm/mach-omap2/board-3430sdp.c
+@@ -674,7 +674,7 @@ static void __init omap_3430sdp_init(void)
+ static void __init omap_3430sdp_map_io(void)
+ {
+ 	omap2_set_globals_343x();
+-	omap2_map_common_io();
++	omap34xx_map_common_io();
+ }
+ 
+ MACHINE_START(OMAP_3430SDP, "OMAP3430 3430SDP board")
+diff --git a/arch/arm/mach-omap2/board-3630sdp.c b/arch/arm/mach-omap2/board-3630sdp.c
+index c178e68..4386d2b 100755
+--- a/arch/arm/mach-omap2/board-3630sdp.c
++++ b/arch/arm/mach-omap2/board-3630sdp.c
+@@ -69,7 +69,7 @@ static struct ehci_hcd_omap_platform_data ehci_pdata __initconst = {
+ static void __init omap_sdp_map_io(void)
+ {
+ 	omap2_set_globals_36xx();
+-	omap2_map_common_io();
++	omap34xx_map_common_io();
+ }
+ 
+ static struct omap_board_config_kernel sdp_config[] __initdata = {
+diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+index 0c6be6b..cc4c00d 100644
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@ -87,7 +87,7 @@ static void __init omap_4430sdp_init(void)
+ static void __init omap_4430sdp_map_io(void)
+ {
+ 	omap2_set_globals_443x();
+-	omap2_map_common_io();
++	omap44xx_map_common_io();
+ }
+ 
+ MACHINE_START(OMAP_4430SDP, "OMAP4430 4430SDP board")
+diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
+index b4e6eca..3966846 100644
+--- a/arch/arm/mach-omap2/board-am3517evm.c
++++ b/arch/arm/mach-omap2/board-am3517evm.c
+@@ -83,7 +83,7 @@ static void __init am3517_evm_init(void)
+ static void __init am3517_evm_map_io(void)
+ {
+ 	omap2_set_globals_343x();
+-	omap2_map_common_io();
++	omap34xx_map_common_io();
+ }
+ 
+ MACHINE_START(OMAP3517EVM, "OMAP3517/AM3517 EVM")
+diff --git a/arch/arm/mach-omap2/board-apollon.c b/arch/arm/mach-omap2/board-apollon.c
+index fbbd68d..aa69fb9 100644
+--- a/arch/arm/mach-omap2/board-apollon.c
++++ b/arch/arm/mach-omap2/board-apollon.c
+@@ -337,7 +337,7 @@ static void __init omap_apollon_init(void)
+ static void __init omap_apollon_map_io(void)
+ {
+ 	omap2_set_globals_242x();
+-	omap2_map_common_io();
++	omap242x_map_common_io();
+ }
+ 
+ MACHINE_START(OMAP_APOLLON, "OMAP24xx Apollon")
+diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
+index 2626a9f..65c96bc 100644
+--- a/arch/arm/mach-omap2/board-cm-t35.c
++++ b/arch/arm/mach-omap2/board-cm-t35.c
+@@ -479,7 +479,7 @@ static void __init cm_t35_init_irq(void)
+ static void __init cm_t35_map_io(void)
+ {
+ 	omap2_set_globals_343x();
+-	omap2_map_common_io();
++	omap34xx_map_common_io();
+ }
+ 
+ static struct omap_board_mux board_mux[] __initdata = {
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 7e6e6ca..16cc068 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -50,7 +50,7 @@ static void __init omap_generic_init(void)
+ static void __init omap_generic_map_io(void)
+ {
+ 	omap2_set_globals_242x(); /* should be 242x, 243x, or 343x */
+-	omap2_map_common_io();
++	omap242x_map_common_io();
+ }
+ 
+ MACHINE_START(OMAP_GENERIC, "Generic OMAP24xx")
+diff --git a/arch/arm/mach-omap2/board-h4.c b/arch/arm/mach-omap2/board-h4.c
+index cfb7f12..5c49c40 100644
+--- a/arch/arm/mach-omap2/board-h4.c
++++ b/arch/arm/mach-omap2/board-h4.c
+@@ -370,7 +370,7 @@ static void __init omap_h4_init(void)
+ static void __init omap_h4_map_io(void)
+ {
+ 	omap2_set_globals_242x();
+-	omap2_map_common_io();
++	omap242x_map_common_io();
+ }
+ 
+ MACHINE_START(OMAP_H4, "OMAP2420 H4 board")
+diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
+index 117b8fd..9f75433 100644
+--- a/arch/arm/mach-omap2/board-igep0020.c
++++ b/arch/arm/mach-omap2/board-igep0020.c
+@@ -246,7 +246,7 @@ static void __init igep2_init(void)
+ static void __init igep2_map_io(void)
+ {
+ 	omap2_set_globals_343x();
+-	omap2_map_common_io();
++	omap34xx_map_common_io();
+ }
+ 
+ MACHINE_START(IGEP0020, "IGEP v2 board")
+diff --git a/arch/arm/mach-omap2/board-ldp.c b/arch/arm/mach-omap2/board-ldp.c
+index 995d4a2..f169967 100644
+--- a/arch/arm/mach-omap2/board-ldp.c
++++ b/arch/arm/mach-omap2/board-ldp.c
+@@ -404,7 +404,7 @@ static void __init omap_ldp_init(void)
+ static void __init omap_ldp_map_io(void)
+ {
+ 	omap2_set_globals_343x();
+-	omap2_map_common_io();
++	omap34xx_map_common_io();
+ }
+ 
+ MACHINE_START(OMAP_LDP, "OMAP LDP board")
+diff --git a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
+index 764ab1e..9de03f8 100644
+--- a/arch/arm/mach-omap2/board-n8x0.c
++++ b/arch/arm/mach-omap2/board-n8x0.c
+@@ -99,7 +99,7 @@ static void __init n8x0_onenand_init(void) {}
+ static void __init n8x0_map_io(void)
+ {
+ 	omap2_set_globals_242x();
+-	omap2_map_common_io();
++	omap242x_map_common_io();
+ }
+ 
+ static void __init n8x0_init_irq(void)
+diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+index 231cb4e..bf91bf7 100644
+--- a/arch/arm/mach-omap2/board-omap3beagle.c
++++ b/arch/arm/mach-omap2/board-omap3beagle.c
+@@ -455,7 +455,7 @@ static void __init omap3_beagle_init(void)
+ static void __init omap3_beagle_map_io(void)
+ {
+ 	omap2_set_globals_343x();
+-	omap2_map_common_io();
++	omap34xx_map_common_io();
+ }
+ 
+ MACHINE_START(OMAP3_BEAGLE, "OMAP3 Beagle Board")
+diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
+index 34de178..fde27cf 100644
+--- a/arch/arm/mach-omap2/board-omap3evm.c
++++ b/arch/arm/mach-omap2/board-omap3evm.c
+@@ -478,7 +478,7 @@ static void __init omap3_evm_init(void)
+ static void __init omap3_evm_map_io(void)
+ {
+ 	omap2_set_globals_343x();
+-	omap2_map_common_io();
++	omap34xx_map_common_io();
+ }
+ 
+ MACHINE_START(OMAP3EVM, "OMAP3 EVM")
+diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
+index ef17cf1..bc482ab 100644
+--- a/arch/arm/mach-omap2/board-omap3pandora.c
++++ b/arch/arm/mach-omap2/board-omap3pandora.c
+@@ -423,7 +423,7 @@ static void __init omap3pandora_init(void)
+ static void __init omap3pandora_map_io(void)
+ {
+ 	omap2_set_globals_343x();
+-	omap2_map_common_io();
++	omap34xx_map_common_io();
+ }
+ 
+ MACHINE_START(OMAP3_PANDORA, "Pandora Handheld Console")
+diff --git a/arch/arm/mach-omap2/board-omap3touchbook.c b/arch/arm/mach-omap2/board-omap3touchbook.c
+index fe3d22c..63436e9 100644
+--- a/arch/arm/mach-omap2/board-omap3touchbook.c
++++ b/arch/arm/mach-omap2/board-omap3touchbook.c
+@@ -557,7 +557,7 @@ static void __init omap3_touchbook_init(void)
+ static void __init omap3_touchbook_map_io(void)
+ {
+ 	omap2_set_globals_343x();
+-	omap2_map_common_io();
++	omap34xx_map_common_io();
+ }
+ 
+ MACHINE_START(TOUCHBOOK, "OMAP3 touchbook Board")
+diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
+index d192dd9..61abe09 100644
+--- a/arch/arm/mach-omap2/board-overo.c
++++ b/arch/arm/mach-omap2/board-overo.c
+@@ -469,7 +469,7 @@ static void __init overo_init(void)
+ static void __init overo_map_io(void)
+ {
+ 	omap2_set_globals_343x();
+-	omap2_map_common_io();
++	omap34xx_map_common_io();
+ }
+ 
+ MACHINE_START(OVERO, "Gumstix Overo")
+diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
+index 67bb347..6a49f91 100644
+--- a/arch/arm/mach-omap2/board-rx51.c
++++ b/arch/arm/mach-omap2/board-rx51.c
+@@ -93,7 +93,7 @@ static void __init rx51_init(void)
+ static void __init rx51_map_io(void)
+ {
+ 	omap2_set_globals_343x();
+-	omap2_map_common_io();
++	omap34xx_map_common_io();
+ }
+ 
+ MACHINE_START(NOKIA_RX51, "Nokia RX-51 board")
+diff --git a/arch/arm/mach-omap2/board-zoom2.c b/arch/arm/mach-omap2/board-zoom2.c
+index bb87cf7..9a26f84 100644
+--- a/arch/arm/mach-omap2/board-zoom2.c
++++ b/arch/arm/mach-omap2/board-zoom2.c
+@@ -87,7 +87,7 @@ static void __init omap_zoom2_init(void)
+ static void __init omap_zoom2_map_io(void)
+ {
+ 	omap2_set_globals_343x();
+-	omap2_map_common_io();
++	omap34xx_map_common_io();
+ }
+ 
+ MACHINE_START(OMAP_ZOOM2, "OMAP Zoom2 board")
+diff --git a/arch/arm/mach-omap2/board-zoom3.c b/arch/arm/mach-omap2/board-zoom3.c
+index 456b690..5e20894 100644
+--- a/arch/arm/mach-omap2/board-zoom3.c
++++ b/arch/arm/mach-omap2/board-zoom3.c
+@@ -27,7 +27,7 @@
+ static void __init omap_zoom_map_io(void)
+ {
+ 	omap2_set_globals_36xx();
+-	omap2_map_common_io();
++	omap34xx_map_common_io();
+ }
+ 
+ static struct omap_board_config_kernel zoom_config[] __initdata = {
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 5a79964..fcae090 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -234,37 +234,54 @@ static struct map_desc omap44xx_io_desc[] __initdata = {
  };
+ #endif
  
--#ifdef CONFIG_ARCH_OMAP1
--
--#define omap_dm_clk_enable(x)
--#define omap_dm_clk_disable(x)
--#define omap2_dm_timers			NULL
--#define omap2_dm_source_names		NULL
--#define omap2_dm_source_clocks		NULL
--#define omap3_dm_timers			NULL
--#define omap3_dm_source_names		NULL
--#define omap3_dm_source_clocks		NULL
--#define omap4_dm_timers			NULL
--#define omap4_dm_source_names		NULL
--#define omap4_dm_source_clocks		NULL
-+static int dm_timer_count;
+-void __init omap2_map_common_io(void)
++static void __init _omap2_map_common_io(void)
++{
++	/* Normally devicemaps_init() would flush caches and tlb after
++	 * mdesc->map_io(), but we must also do it here because of the CPU
++	 * revision check below.
++	 */
++	local_flush_tlb_all();
++	flush_cache_all();
++
++	omap2_check_revision();
++	omap_sram_init();
++	omapfb_reserve_sdram();
++	omap_vram_reserve_sdram();
++}
++
++#ifdef CONFIG_ARCH_OMAP2420
++void __init omap242x_map_common_io()
+ {
+-#if defined(CONFIG_ARCH_OMAP2420)
+ 	iotable_init(omap24xx_io_desc, ARRAY_SIZE(omap24xx_io_desc));
+ 	iotable_init(omap242x_io_desc, ARRAY_SIZE(omap242x_io_desc));
++	_omap2_map_common_io();
++}
+ #endif
  
-+#ifdef CONFIG_ARCH_OMAP1
- static struct omap_dm_timer omap1_dm_timers[] = {
- 	{ .phys_base = 0xfffb1400, .irq = INT_1610_GPTIMER1 },
- 	{ .phys_base = 0xfffb1c00, .irq = INT_1610_GPTIMER2 },
-@@ -188,20 +177,14 @@ static struct omap_dm_timer omap1_dm_timers[] = {
- 	{ .phys_base = 0xfffbd400, .irq = INT_1610_GPTIMER8 },
- };
+-#if defined(CONFIG_ARCH_OMAP2430)
++#ifdef CONFIG_ARCH_OMAP2430
++void __init omap243x_map_common_io()
++{
+ 	iotable_init(omap24xx_io_desc, ARRAY_SIZE(omap24xx_io_desc));
+ 	iotable_init(omap243x_io_desc, ARRAY_SIZE(omap243x_io_desc));
++	_omap2_map_common_io();
++}
+ #endif
  
--static const int dm_timer_count = ARRAY_SIZE(omap1_dm_timers);
--
--#elif defined(CONFIG_ARCH_OMAP2)
-+static const int omap1_dm_timer_count = ARRAY_SIZE(omap1_dm_timers);
+-#if defined(CONFIG_ARCH_OMAP34XX)
++#ifdef CONFIG_ARCH_OMAP34XX
++void __init omap34xx_map_common_io()
++{
+ 	iotable_init(omap34xx_io_desc, ARRAY_SIZE(omap34xx_io_desc));
++	_omap2_map_common_io();
++}
+ #endif
  
--#define omap_dm_clk_enable(x)		clk_enable(x)
--#define omap_dm_clk_disable(x)		clk_disable(x)
-+#else
- #define omap1_dm_timers			NULL
--#define omap3_dm_timers			NULL
--#define omap3_dm_source_names		NULL
--#define omap3_dm_source_clocks		NULL
--#define omap4_dm_timers			NULL
--#define omap4_dm_source_names		NULL
--#define omap4_dm_source_clocks		NULL
-+#define omap1_dm_timer_count		0
-+#endif	/* CONFIG_ARCH_OMAP1 */
- 
-+#ifdef CONFIG_ARCH_OMAP2
- static struct omap_dm_timer omap2_dm_timers[] = {
- 	{ .phys_base = 0x48028000, .irq = INT_24XX_GPTIMER1 },
- 	{ .phys_base = 0x4802a000, .irq = INT_24XX_GPTIMER2 },
-@@ -225,20 +208,16 @@ static const char *omap2_dm_source_names[] __initdata = {
- };
- 
- static struct clk *omap2_dm_source_clocks[3];
--static const int dm_timer_count = ARRAY_SIZE(omap2_dm_timers);
--
--#elif defined(CONFIG_ARCH_OMAP3)
-+static const int omap2_dm_timer_count = ARRAY_SIZE(omap2_dm_timers);
- 
--#define omap_dm_clk_enable(x)		clk_enable(x)
--#define omap_dm_clk_disable(x)		clk_disable(x)
--#define omap1_dm_timers			NULL
-+#else
- #define omap2_dm_timers			NULL
-+#define omap2_dm_timer_count		0
- #define omap2_dm_source_names		NULL
- #define omap2_dm_source_clocks		NULL
--#define omap4_dm_timers			NULL
--#define omap4_dm_source_names		NULL
--#define omap4_dm_source_clocks		NULL
-+#endif	/* CONFIG_ARCH_OMAP2 */
- 
-+#ifdef CONFIG_ARCH_OMAP3
- static struct omap_dm_timer omap3_dm_timers[] = {
- 	{ .phys_base = 0x48318000, .irq = INT_24XX_GPTIMER1 },
- 	{ .phys_base = 0x49032000, .irq = INT_24XX_GPTIMER2 },
-@@ -261,20 +240,16 @@ static const char *omap3_dm_source_names[] __initdata = {
- };
- 
- static struct clk *omap3_dm_source_clocks[2];
--static const int dm_timer_count = ARRAY_SIZE(omap3_dm_timers);
--
--#elif defined(CONFIG_ARCH_OMAP4)
-+static const int omap3_dm_timer_count = ARRAY_SIZE(omap3_dm_timers);
- 
--#define omap_dm_clk_enable(x)		clk_enable(x)
--#define omap_dm_clk_disable(x)		clk_disable(x)
--#define omap1_dm_timers			NULL
--#define omap2_dm_timers			NULL
--#define omap2_dm_source_names		NULL
--#define omap2_dm_source_clocks		NULL
-+#else
- #define omap3_dm_timers			NULL
-+#define omap3_dm_timer_count		0
- #define omap3_dm_source_names		NULL
- #define omap3_dm_source_clocks		NULL
-+#endif	/* CONFIG_ARCH_OMAP3 */
- 
+-#if defined(CONFIG_ARCH_OMAP4)
 +#ifdef CONFIG_ARCH_OMAP4
- static struct omap_dm_timer omap4_dm_timers[] = {
- 	{ .phys_base = 0x4a318000, .irq = INT_44XX_GPTIMER1 },
- 	{ .phys_base = 0x48032000, .irq = INT_44XX_GPTIMER2 },
-@@ -295,13 +270,14 @@ static const char *omap4_dm_source_names[] __initdata = {
- 	NULL
- };
- static struct clk *omap4_dm_source_clocks[2];
--static const int dm_timer_count = ARRAY_SIZE(omap4_dm_timers);
-+static const int omap4_dm_timer_count = ARRAY_SIZE(omap4_dm_timers);
- 
- #else
--
--#error OMAP architecture not supported!
--
++void __init omap44xx_map_common_io()
++{
+ 	iotable_init(omap44xx_io_desc, ARRAY_SIZE(omap44xx_io_desc));
 -#endif
-+#define omap4_dm_timers			NULL
-+#define omap4_dm_timer_count		0
-+#define omap4_dm_source_names		NULL
-+#define omap4_dm_source_clocks		NULL
-+#endif	/* CONFIG_ARCH_OMAP4 */
- 
- static struct omap_dm_timer *dm_timers;
- static const char **dm_source_names;
-@@ -450,8 +426,12 @@ void omap_dm_timer_enable(struct omap_dm_timer *timer)
- 	if (timer->enabled)
- 		return;
- 
--	omap_dm_clk_enable(timer->fclk);
--	omap_dm_clk_enable(timer->iclk);
-+#ifdef CONFIG_ARCH_OMAP2PLUS
-+	if (cpu_class_is_omap2()) {
-+		clk_enable(timer->fclk);
-+		clk_enable(timer->iclk);
-+	}
+-	/* Normally devicemaps_init() would flush caches and tlb after
+-	 * mdesc->map_io(), but we must also do it here because of the CPU
+-	 * revision check below.
+-	 */
+-	local_flush_tlb_all();
+-	flush_cache_all();
+-
+-	omap2_check_revision();
+-	omap_sram_init();
+-	omapfb_reserve_sdram();
+-	omap_vram_reserve_sdram();
++	_omap2_map_common_io();
+ }
 +#endif
  
- 	timer->enabled = 1;
- }
-@@ -462,8 +442,12 @@ void omap_dm_timer_disable(struct omap_dm_timer *timer)
- 	if (!timer->enabled)
- 		return;
+ /*
+  * omap2_init_reprogram_sdrc - reprogram SDRC timing parameters
+diff --git a/arch/arm/plat-omap/include/plat/io.h b/arch/arm/plat-omap/include/plat/io.h
+index a3e7b47..19257bb 100644
+--- a/arch/arm/plat-omap/include/plat/io.h
++++ b/arch/arm/plat-omap/include/plat/io.h
+@@ -268,7 +268,38 @@ struct omap_sdrc_params;
+ extern void omap1_map_common_io(void);
+ extern void omap1_init_common_hw(void);
  
--	omap_dm_clk_disable(timer->iclk);
--	omap_dm_clk_disable(timer->fclk);
-+#ifdef CONFIG_ARCH_OMAP2PLUS
-+	if (cpu_class_is_omap2()) {
-+		clk_disable(timer->iclk);
-+		clk_disable(timer->fclk);
-+	}
+-extern void omap2_map_common_io(void);
++#ifdef CONFIG_ARCH_OMAP2420
++extern void omap242x_map_common_io(void);
++#else
++static inline void omap242x_map_common_io(void)
++{
++}
 +#endif
++
++#ifdef CONFIG_ARCH_OMAP2430
++extern void omap243x_map_common_io(void);
++#else
++static inline void omap243x_map_common_io(void)
++{
++}
++#endif
++
++#ifdef CONFIG_ARCH_OMAP34XX
++extern void omap34xx_map_common_io(void);
++#else
++static inline void omap34xx_map_common_io(void)
++{
++}
++#endif
++
++#ifdef CONFIG_ARCH_OMAP4
++extern void omap44xx_map_common_io(void);
++#else
++static inline void omap44xx_map_common_io(void)
++{
++}
++#endif
++
+ extern void omap2_init_common_hw(struct omap_sdrc_params *sdrc_cs0,
+ 				 struct omap_sdrc_params *sdrc_cs1);
  
- 	timer->enabled = 0;
- }
-@@ -764,17 +748,21 @@ int __init omap_dm_timer_init(void)
- 
- 	if (cpu_class_is_omap1()) {
- 		dm_timers = omap1_dm_timers;
-+		dm_timer_count = omap1_dm_timer_count;
- 		map_size = SZ_2K;
- 	} else if (cpu_is_omap24xx()) {
- 		dm_timers = omap2_dm_timers;
-+		dm_timer_count = omap2_dm_timer_count;
- 		dm_source_names = omap2_dm_source_names;
- 		dm_source_clocks = omap2_dm_source_clocks;
- 	} else if (cpu_is_omap34xx()) {
- 		dm_timers = omap3_dm_timers;
-+		dm_timer_count = omap3_dm_timer_count;
- 		dm_source_names = omap3_dm_source_names;
- 		dm_source_clocks = omap3_dm_source_clocks;
- 	} else if (cpu_is_omap44xx()) {
- 		dm_timers = omap4_dm_timers;
-+		dm_timer_count = omap4_dm_timer_count;
- 		dm_source_names = omap4_dm_source_names;
- 		dm_source_clocks = omap4_dm_source_clocks;
- 	}
