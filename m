@@ -1,1152 +1,286 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 26 Jan 2010 07:03:03 +0000
-Subject: [PATCH] ARM: S3C64XX: Merge s3c6400-clock.c and clock.c into
-	mach-s3c64xx
+Date: Tue, 26 Jan 2010 07:03:00 +0000
+Subject: [PATCH] ARM: S3C64XX: Move cpu,
+	clock and gpiolib and PM support to mach-s3c64xx
 In-Reply-To: <1264489385-13345-1-git-send-email-ben-linux@fluff.org>
 References: <1264489385-13345-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1264489385-13345-13-git-send-email-ben-linux@fluff.org>
+Message-ID: <1264489385-13345-10-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Merge plat-s3c64xx/s3c6400-clock.c mach-s3c64xx/clock.c placing all the
-clock code into one place.
-
-Note, no effort is made in this patch to squash the init functions
-together.
+Move the core S3C64XX support to mach-s3c64xx as it is unlikely to be used
+outside of this directory. Also move the SoC header files in with it.
 
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/mach-s3c64xx/Kconfig         |    2 -
- arch/arm/mach-s3c64xx/clock.c         |  507 +++++++++++++++++++++++++++++++
- arch/arm/plat-s3c64xx/Kconfig         |   12 -
- arch/arm/plat-s3c64xx/Makefile        |    3 -
- arch/arm/plat-s3c64xx/s3c6400-clock.c |  536 ---------------------------------
- 5 files changed, 507 insertions(+), 553 deletions(-)
- delete mode 100644 arch/arm/plat-s3c64xx/s3c6400-clock.c
+ arch/arm/{plat-s3c64xx => mach-s3c6410}/pm.c       |    0
+ arch/arm/mach-s3c64xx/Makefile                     |    7 +++++++
+ arch/arm/{plat-s3c64xx => mach-s3c64xx}/clock.c    |    2 ++
+ arch/arm/{plat-s3c64xx => mach-s3c64xx}/cpu.c      |    4 ++--
+ arch/arm/{plat-s3c64xx => mach-s3c64xx}/gpiolib.c  |    0
+ .../plat => mach-s3c64xx/include/mach}/pll.h       |    0
+ .../plat => mach-s3c64xx/include/mach}/s3c6400.h   |    3 +--
+ .../plat => mach-s3c64xx/include/mach}/s3c6410.h   |    2 +-
+ arch/arm/mach-s3c64xx/mach-anw6410.c               |    2 +-
+ arch/arm/mach-s3c64xx/mach-hmt.c                   |    2 +-
+ arch/arm/mach-s3c64xx/mach-ncp.c                   |    2 +-
+ arch/arm/mach-s3c64xx/mach-smdk6400.c              |    2 +-
+ arch/arm/mach-s3c64xx/mach-smdk6410.c              |    2 +-
+ arch/arm/mach-s3c64xx/s3c6400.c                    |    2 +-
+ arch/arm/mach-s3c64xx/s3c6410.c                    |    4 ++--
+ arch/arm/{plat-s3c64xx => mach-s3c64xx}/sleep.S    |    0
+ arch/arm/plat-s3c64xx/Makefile                     |   10 ----------
+ arch/arm/plat-s3c64xx/s3c6400-init.c               |    4 ++--
+ 18 files changed, 23 insertions(+), 25 deletions(-)
+ rename arch/arm/{plat-s3c64xx => mach-s3c6410}/pm.c (100%)
+ rename arch/arm/{plat-s3c64xx => mach-s3c64xx}/clock.c (99%)
+ rename arch/arm/{plat-s3c64xx => mach-s3c64xx}/cpu.c (98%)
+ rename arch/arm/{plat-s3c64xx => mach-s3c64xx}/gpiolib.c (100%)
+ rename arch/arm/{plat-s3c64xx/include/plat => mach-s3c64xx/include/mach}/pll.h (100%)
+ rename arch/arm/{plat-s3c64xx/include/plat => mach-s3c64xx/include/mach}/s3c6400.h (95%)
+ rename arch/arm/{plat-s3c64xx/include/plat => mach-s3c64xx/include/mach}/s3c6410.h (93%)
+ rename arch/arm/{plat-s3c64xx => mach-s3c64xx}/sleep.S (100%)
 
-diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-index 33d82b1..8c2c89c 100644
---- a/arch/arm/mach-s3c64xx/Kconfig
-+++ b/arch/arm/mach-s3c64xx/Kconfig
-@@ -7,13 +7,11 @@
+diff --git a/arch/arm/plat-s3c64xx/pm.c b/arch/arm/mach-s3c6410/pm.c
+similarity index 100%
+rename from arch/arm/plat-s3c64xx/pm.c
+rename to arch/arm/mach-s3c6410/pm.c
+diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
+index 49b71d5..ef8bec8 100644
+--- a/arch/arm/mach-s3c64xx/Makefile
++++ b/arch/arm/mach-s3c64xx/Makefile
+@@ -10,6 +10,11 @@ obj-m				:=
+ obj-n				:=
+ obj-				:=
  
- config CPU_S3C6400
- 	bool
--	select CPU_S3C6400_CLOCK
- 	help
- 	  Enable S3C6400 CPU support
++# Core files
++obj-y				+= cpu.o
++obj-y				+= clock.o
++obj-y				+= gpiolib.o
++
+ # Core support for S3C6400 system
  
- config CPU_S3C6410
- 	bool
--	select CPU_S3C6400_CLOCK
- 	help
- 	  Enable S3C6410 CPU support
+ obj-$(CONFIG_CPU_S3C6400)	+= s3c6400.o
+@@ -28,6 +33,8 @@ obj-$(CONFIG_S3C64XX_SETUP_SDHCI_GPIO) += setup-sdhci-gpio.o
  
-diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
-index 229bb3b..9b587e2 100644
---- a/arch/arm/mach-s3c64xx/clock.c
+ # PM
+ 
++obj-$(CONFIG_PM)		+= pm.o
++obj-$(CONFIG_PM)		+= sleep.o
+ obj-$(CONFIG_PM)		+= irq-pm.o
+ 
+ # Machine support
+diff --git a/arch/arm/plat-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
+similarity index 99%
+rename from arch/arm/plat-s3c64xx/clock.c
+rename to arch/arm/mach-s3c64xx/clock.c
+index 64439de..229bb3b 100644
+--- a/arch/arm/plat-s3c64xx/clock.c
 +++ b/arch/arm/mach-s3c64xx/clock.c
-@@ -16,6 +16,8 @@
- #include <linux/module.h>
- #include <linux/interrupt.h>
- #include <linux/ioport.h>
-+#include <linux/clk.h>
-+#include <linux/err.h>
- #include <linux/io.h>
+@@ -23,6 +23,8 @@
  
- #include <mach/hardware.h>
-@@ -27,7 +29,25 @@
- 
+ #include <mach/regs-sys.h>
+ #include <mach/regs-clock.h>
++#include <mach/pll.h>
++
  #include <plat/cpu.h>
  #include <plat/devs.h>
-+#include <plat/cpu-freq.h>
  #include <plat/clock.h>
-+#include <plat/clock-clksrc.h>
-+
-+/* fin_apll, fin_mpll and fin_epll are all the same clock, which we call
-+ * ext_xtal_mux for want of an actual name from the manual.
-+*/
-+
-+static struct clk clk_ext_xtal_mux = {
-+	.name		= "ext_xtal",
-+	.id		= -1,
-+};
-+
-+#define clk_fin_apll clk_ext_xtal_mux
-+#define clk_fin_mpll clk_ext_xtal_mux
-+#define clk_fin_epll clk_ext_xtal_mux
-+
-+#define clk_fout_mpll	clk_mpll
-+#define clk_fout_epll	clk_epll
+diff --git a/arch/arm/plat-s3c64xx/cpu.c b/arch/arm/mach-s3c64xx/cpu.c
+similarity index 98%
+rename from arch/arm/plat-s3c64xx/cpu.c
+rename to arch/arm/mach-s3c64xx/cpu.c
+index bc7ca18..410d688 100644
+--- a/arch/arm/plat-s3c64xx/cpu.c
++++ b/arch/arm/mach-s3c64xx/cpu.c
+@@ -33,8 +33,8 @@
+ #include <plat/devs.h>
+ #include <plat/clock.h>
  
- struct clk clk_h2 = {
- 	.name		= "hclk2",
-@@ -273,6 +293,493 @@ static struct clk init_clocks[] = {
- 	}
- };
+-#include <plat/s3c6400.h>
+-#include <plat/s3c6410.h>
++#include <mach/s3c6400.h>
++#include <mach/s3c6410.h>
  
-+
-+static struct clk clk_fout_apll = {
-+	.name		= "fout_apll",
-+	.id		= -1,
-+};
-+
-+static struct clk *clk_src_apll_list[] = {
-+	[0] = &clk_fin_apll,
-+	[1] = &clk_fout_apll,
-+};
-+
-+static struct clksrc_sources clk_src_apll = {
-+	.sources	= clk_src_apll_list,
-+	.nr_sources	= ARRAY_SIZE(clk_src_apll_list),
-+};
-+
-+static struct clksrc_clk clk_mout_apll = {
-+	.clk	= {
-+		.name		= "mout_apll",
-+		.id		= -1,
-+	},
-+	.reg_src	= { .reg = S3C_CLK_SRC, .shift = 0, .size = 1  },
-+	.sources	= &clk_src_apll,
-+};
-+
-+static struct clk *clk_src_epll_list[] = {
-+	[0] = &clk_fin_epll,
-+	[1] = &clk_fout_epll,
-+};
-+
-+static struct clksrc_sources clk_src_epll = {
-+	.sources	= clk_src_epll_list,
-+	.nr_sources	= ARRAY_SIZE(clk_src_epll_list),
-+};
-+
-+static struct clksrc_clk clk_mout_epll = {
-+	.clk	= {
-+		.name		= "mout_epll",
-+		.id		= -1,
-+	},
-+	.reg_src	= { .reg = S3C_CLK_SRC, .shift = 2, .size = 1  },
-+	.sources	= &clk_src_epll,
-+};
-+
-+static struct clk *clk_src_mpll_list[] = {
-+	[0] = &clk_fin_mpll,
-+	[1] = &clk_fout_mpll,
-+};
-+
-+static struct clksrc_sources clk_src_mpll = {
-+	.sources	= clk_src_mpll_list,
-+	.nr_sources	= ARRAY_SIZE(clk_src_mpll_list),
-+};
-+
-+static struct clksrc_clk clk_mout_mpll = {
-+	.clk = {
-+		.name		= "mout_mpll",
-+		.id		= -1,
-+	},
-+	.reg_src	= { .reg = S3C_CLK_SRC, .shift = 1, .size = 1  },
-+	.sources	= &clk_src_mpll,
-+};
-+
-+static unsigned int armclk_mask;
-+
-+static unsigned long s3c64xx_clk_arm_get_rate(struct clk *clk)
-+{
-+	unsigned long rate = clk_get_rate(clk->parent);
-+	u32 clkdiv;
-+
-+	/* divisor mask starts at bit0, so no need to shift */
-+	clkdiv = __raw_readl(S3C_CLK_DIV0) & armclk_mask;
-+
-+	return rate / (clkdiv + 1);
-+}
-+
-+static unsigned long s3c64xx_clk_arm_round_rate(struct clk *clk,
-+						unsigned long rate)
-+{
-+	unsigned long parent = clk_get_rate(clk->parent);
-+	u32 div;
-+
-+	if (parent < rate)
-+		return parent;
-+
-+	div = (parent / rate) - 1;
-+	if (div > armclk_mask)
-+		div = armclk_mask;
-+
-+	return parent / (div + 1);
-+}
-+
-+static int s3c64xx_clk_arm_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	unsigned long parent = clk_get_rate(clk->parent);
-+	u32 div;
-+	u32 val;
-+
-+	if (rate < parent / (armclk_mask + 1))
-+		return -EINVAL;
-+
-+	rate = clk_round_rate(clk, rate);
-+	div = clk_get_rate(clk->parent) / rate;
-+
-+	val = __raw_readl(S3C_CLK_DIV0);
-+	val &= ~armclk_mask;
-+	val |= (div - 1);
-+	__raw_writel(val, S3C_CLK_DIV0);
-+
-+	return 0;
-+
-+}
-+
-+static struct clk clk_arm = {
-+	.name		= "armclk",
-+	.id		= -1,
-+	.parent		= &clk_mout_apll.clk,
-+	.ops		= &(struct clk_ops) {
-+		.get_rate	= s3c64xx_clk_arm_get_rate,
-+		.set_rate	= s3c64xx_clk_arm_set_rate,
-+		.round_rate	= s3c64xx_clk_arm_round_rate,
-+	},
-+};
-+
-+static unsigned long s3c64xx_clk_doutmpll_get_rate(struct clk *clk)
-+{
-+	unsigned long rate = clk_get_rate(clk->parent);
-+
-+	printk(KERN_DEBUG "%s: parent is %ld\n", __func__, rate);
-+
-+	if (__raw_readl(S3C_CLK_DIV0) & S3C6400_CLKDIV0_MPLL_MASK)
-+		rate /= 2;
-+
-+	return rate;
-+}
-+
-+static struct clk_ops clk_dout_ops = {
-+	.get_rate	= s3c64xx_clk_doutmpll_get_rate,
-+};
-+
-+static struct clk clk_dout_mpll = {
-+	.name		= "dout_mpll",
-+	.id		= -1,
-+	.parent		= &clk_mout_mpll.clk,
-+	.ops		= &clk_dout_ops,
-+};
-+
-+static struct clk *clkset_spi_mmc_list[] = {
-+	&clk_mout_epll.clk,
-+	&clk_dout_mpll,
-+	&clk_fin_epll,
-+	&clk_27m,
-+};
-+
-+static struct clksrc_sources clkset_spi_mmc = {
-+	.sources	= clkset_spi_mmc_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_spi_mmc_list),
-+};
-+
-+static struct clk *clkset_irda_list[] = {
-+	&clk_mout_epll.clk,
-+	&clk_dout_mpll,
-+	NULL,
-+	&clk_27m,
-+};
-+
-+static struct clksrc_sources clkset_irda = {
-+	.sources	= clkset_irda_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_irda_list),
-+};
-+
-+static struct clk *clkset_uart_list[] = {
-+	&clk_mout_epll.clk,
-+	&clk_dout_mpll,
-+	NULL,
-+	NULL
-+};
-+
-+static struct clksrc_sources clkset_uart = {
-+	.sources	= clkset_uart_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_uart_list),
-+};
-+
-+static struct clk *clkset_uhost_list[] = {
-+	&clk_48m,
-+	&clk_mout_epll.clk,
-+	&clk_dout_mpll,
-+	&clk_fin_epll,
-+};
-+
-+static struct clksrc_sources clkset_uhost = {
-+	.sources	= clkset_uhost_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_uhost_list),
-+};
-+
-+/* The peripheral clocks are all controlled via clocksource followed
-+ * by an optional divider and gate stage. We currently roll this into
-+ * one clock which hides the intermediate clock from the mux.
-+ *
-+ * Note, the JPEG clock can only be an even divider...
-+ *
-+ * The scaler and LCD clocks depend on the S3C64XX version, and also
-+ * have a common parent divisor so are not included here.
-+ */
-+
-+/* clocks that feed other parts of the clock source tree */
-+
-+static struct clk clk_iis_cd0 = {
-+	.name		= "iis_cdclk0",
-+	.id		= -1,
-+};
-+
-+static struct clk clk_iis_cd1 = {
-+	.name		= "iis_cdclk1",
-+	.id		= -1,
-+};
-+
-+static struct clk clk_pcm_cd = {
-+	.name		= "pcm_cdclk",
-+	.id		= -1,
-+};
-+
-+static struct clk *clkset_audio0_list[] = {
-+	[0] = &clk_mout_epll.clk,
-+	[1] = &clk_dout_mpll,
-+	[2] = &clk_fin_epll,
-+	[3] = &clk_iis_cd0,
-+	[4] = &clk_pcm_cd,
-+};
-+
-+static struct clksrc_sources clkset_audio0 = {
-+	.sources	= clkset_audio0_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_audio0_list),
-+};
-+
-+static struct clk *clkset_audio1_list[] = {
-+	[0] = &clk_mout_epll.clk,
-+	[1] = &clk_dout_mpll,
-+	[2] = &clk_fin_epll,
-+	[3] = &clk_iis_cd1,
-+	[4] = &clk_pcm_cd,
-+};
-+
-+static struct clksrc_sources clkset_audio1 = {
-+	.sources	= clkset_audio1_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_audio1_list),
-+};
-+
-+static struct clk *clkset_camif_list[] = {
-+	&clk_h2,
-+};
-+
-+static struct clksrc_sources clkset_camif = {
-+	.sources	= clkset_camif_list,
-+	.nr_sources	= ARRAY_SIZE(clkset_camif_list),
-+};
-+
-+static struct clksrc_clk clksrcs[] = {
-+	{
-+		.clk	= {
-+			.name		= "mmc_bus",
-+			.id		= 0,
-+			.ctrlbit        = S3C_CLKCON_SCLK_MMC0,
-+			.enable		= s3c64xx_sclk_ctrl,
-+		},
-+		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 18, .size = 2  },
-+		.reg_div	= { .reg = S3C_CLK_DIV1, .shift = 0, .size = 4  },
-+		.sources	= &clkset_spi_mmc,
-+	}, {
-+		.clk	= {
-+			.name		= "mmc_bus",
-+			.id		= 1,
-+			.ctrlbit        = S3C_CLKCON_SCLK_MMC1,
-+			.enable		= s3c64xx_sclk_ctrl,
-+		},
-+		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 20, .size = 2  },
-+		.reg_div	= { .reg = S3C_CLK_DIV1, .shift = 4, .size = 4  },
-+		.sources	= &clkset_spi_mmc,
-+	}, {
-+		.clk	= {
-+			.name		= "mmc_bus",
-+			.id		= 2,
-+			.ctrlbit        = S3C_CLKCON_SCLK_MMC2,
-+			.enable		= s3c64xx_sclk_ctrl,
-+		},
-+		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 22, .size = 2  },
-+		.reg_div 	= { .reg = S3C_CLK_DIV1, .shift = 8, .size = 4  },
-+		.sources	= &clkset_spi_mmc,
-+	}, {
-+		.clk	= {
-+			.name		= "usb-bus-host",
-+			.id		= -1,
-+			.ctrlbit        = S3C_CLKCON_SCLK_UHOST,
-+			.enable		= s3c64xx_sclk_ctrl,
-+		},
-+		.reg_src 	= { .reg = S3C_CLK_SRC, .shift = 5, .size = 2  },
-+		.reg_div	= { .reg = S3C_CLK_DIV1, .shift = 20, .size = 4  },
-+		.sources	= &clkset_uhost,
-+	}, {
-+		.clk	= {
-+			.name		= "uclk1",
-+			.id		= -1,
-+			.ctrlbit        = S3C_CLKCON_SCLK_UART,
-+			.enable		= s3c64xx_sclk_ctrl,
-+		},
-+		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 13, .size = 1  },
-+		.reg_div	= { .reg = S3C_CLK_DIV2, .shift = 16, .size = 4  },
-+		.sources	= &clkset_uart,
-+	}, {
-+/* Where does UCLK0 come from? */
-+		.clk	= {
-+			.name		= "spi-bus",
-+			.id		= 0,
-+			.ctrlbit        = S3C_CLKCON_SCLK_SPI0,
-+			.enable		= s3c64xx_sclk_ctrl,
-+		},
-+		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 14, .size = 2  },
-+		.reg_div	= { .reg = S3C_CLK_DIV2, .shift = 0, .size = 4  },
-+		.sources	= &clkset_spi_mmc,
-+	}, {
-+		.clk	= {
-+			.name		= "spi-bus",
-+			.id		= 1,
-+			.ctrlbit        = S3C_CLKCON_SCLK_SPI1,
-+			.enable		= s3c64xx_sclk_ctrl,
-+		},
-+		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 16, .size = 2  },
-+		.reg_div	= { .reg = S3C_CLK_DIV2, .shift = 4, .size = 4  },
-+		.sources	= &clkset_spi_mmc,
-+	}, {
-+		.clk	= {
-+			.name		= "audio-bus",
-+			.id		= 0,
-+			.ctrlbit        = S3C_CLKCON_SCLK_AUDIO0,
-+			.enable		= s3c64xx_sclk_ctrl,
-+		},
-+		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 7, .size = 3  },
-+		.reg_div	= { .reg = S3C_CLK_DIV2, .shift = 8, .size = 4  },
-+		.sources	= &clkset_audio0,
-+	}, {
-+		.clk	= {
-+			.name		= "audio-bus",
-+			.id		= 1,
-+			.ctrlbit        = S3C_CLKCON_SCLK_AUDIO1,
-+			.enable		= s3c64xx_sclk_ctrl,
-+		},
-+		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 10, .size = 3  },
-+		.reg_div	= { .reg = S3C_CLK_DIV2, .shift = 12, .size = 4  },
-+		.sources	= &clkset_audio1,
-+	}, {
-+		.clk	= {
-+			.name		= "irda-bus",
-+			.id		= 0,
-+			.ctrlbit        = S3C_CLKCON_SCLK_IRDA,
-+			.enable		= s3c64xx_sclk_ctrl,
-+		},
-+		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 24, .size = 2  },
-+		.reg_div	= { .reg = S3C_CLK_DIV2, .shift = 20, .size = 4  },
-+		.sources	= &clkset_irda,
-+	}, {
-+		.clk	= {
-+			.name		= "camera",
-+			.id		= -1,
-+			.ctrlbit        = S3C_CLKCON_SCLK_CAM,
-+			.enable		= s3c64xx_sclk_ctrl,
-+		},
-+		.reg_div	= { .reg = S3C_CLK_DIV0, .shift = 20, .size = 4  },
-+		.reg_src	= { .reg = NULL, .shift = 0, .size = 0  },
-+		.sources	= &clkset_camif,
-+	},
-+};
-+
-+/* Clock initialisation code */
-+
-+static struct clksrc_clk *init_parents[] = {
-+	&clk_mout_apll,
-+	&clk_mout_epll,
-+	&clk_mout_mpll,
-+};
-+
-+#define GET_DIV(clk, field) ((((clk) & field##_MASK) >> field##_SHIFT) + 1)
-+
-+void __init_or_cpufreq s3c6400_setup_clocks(void)
-+{
-+	struct clk *xtal_clk;
-+	unsigned long xtal;
-+	unsigned long fclk;
-+	unsigned long hclk;
-+	unsigned long hclk2;
-+	unsigned long pclk;
-+	unsigned long epll;
-+	unsigned long apll;
-+	unsigned long mpll;
-+	unsigned int ptr;
-+	u32 clkdiv0;
-+
-+	printk(KERN_DEBUG "%s: registering clocks\n", __func__);
-+
-+	clkdiv0 = __raw_readl(S3C_CLK_DIV0);
-+	printk(KERN_DEBUG "%s: clkdiv0 = %08x\n", __func__, clkdiv0);
-+
-+	xtal_clk = clk_get(NULL, "xtal");
-+	BUG_ON(IS_ERR(xtal_clk));
-+
-+	xtal = clk_get_rate(xtal_clk);
-+	clk_put(xtal_clk);
-+
-+	printk(KERN_DEBUG "%s: xtal is %ld\n", __func__, xtal);
-+
-+	/* For now assume the mux always selects the crystal */
-+	clk_ext_xtal_mux.parent = xtal_clk;
-+
-+	epll = s3c6400_get_epll(xtal);
-+	mpll = s3c6400_get_pll(xtal, __raw_readl(S3C_MPLL_CON));
-+	apll = s3c6400_get_pll(xtal, __raw_readl(S3C_APLL_CON));
-+
-+	fclk = mpll;
-+
-+	printk(KERN_INFO "S3C64XX: PLL settings, A=%ld, M=%ld, E=%ld\n",
-+	       apll, mpll, epll);
-+
-+	hclk2 = mpll / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK2);
-+	hclk = hclk2 / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK);
-+	pclk = hclk2 / GET_DIV(clkdiv0, S3C6400_CLKDIV0_PCLK);
-+
-+	printk(KERN_INFO "S3C64XX: HCLK2=%ld, HCLK=%ld, PCLK=%ld\n",
-+	       hclk2, hclk, pclk);
-+
-+	clk_fout_mpll.rate = mpll;
-+	clk_fout_epll.rate = epll;
-+	clk_fout_apll.rate = apll;
-+
-+	clk_h2.rate = hclk2;
-+	clk_h.rate = hclk;
-+	clk_p.rate = pclk;
-+	clk_f.rate = fclk;
-+
-+	for (ptr = 0; ptr < ARRAY_SIZE(init_parents); ptr++)
-+		s3c_set_clksrc(init_parents[ptr], true);
-+
-+	for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
-+		s3c_set_clksrc(&clksrcs[ptr], true);
-+}
-+
-+static struct clk *clks1[] __initdata = {
-+	&clk_ext_xtal_mux,
-+	&clk_iis_cd0,
-+	&clk_iis_cd1,
-+	&clk_pcm_cd,
-+	&clk_mout_epll.clk,
-+	&clk_mout_mpll.clk,
-+	&clk_dout_mpll,
-+	&clk_arm,
-+};
-+
-+/**
-+ * s3c6400_register_clocks - register clocks for s3c6400 and above
-+ * @armclk_divlimit: Divisor mask for ARMCLK
-+ *
-+ * Register the clocks for the S3C6400 and above SoC range, such
-+ * as ARMCLK and the clocks which have divider chains attached.
-+ *
-+ * This call does not setup the clocks, which is left to the
-+ * s3c6400_setup_clocks() call which may be needed by the cpufreq
-+ * or resume code to re-set the clocks if the bootloader has changed
-+ * them.
-+ */
-+void __init s3c6400_register_clocks(unsigned armclk_divlimit)
-+{
-+	struct clk *clkp;
-+	int ret;
-+	int ptr;
-+
-+	armclk_mask = armclk_divlimit;
-+
-+	for (ptr = 0; ptr < ARRAY_SIZE(clks1); ptr++) {
-+		clkp = clks1[ptr];
-+		ret = s3c24xx_register_clock(clkp);
-+		if (ret < 0) {
-+			printk(KERN_ERR "Failed to register clock %s (%d)\n",
-+			       clkp->name, ret);
-+		}
-+	}
-+
-+	s3c_register_clksrc(clksrcs, ARRAY_SIZE(clksrcs));
-+}
-+
- static struct clk *clks[] __initdata = {
- 	&clk_ext,
- 	&clk_epll,
-diff --git a/arch/arm/plat-s3c64xx/Kconfig b/arch/arm/plat-s3c64xx/Kconfig
-index cc30089..94ac74e 100644
---- a/arch/arm/plat-s3c64xx/Kconfig
-+++ b/arch/arm/plat-s3c64xx/Kconfig
-@@ -25,15 +25,3 @@ config PLAT_S3C64XX
- 	select SAMSUNG_GPIOLIB_4BIT
- 	help
- 	  Base platform code for any Samsung S3C64XX device
+ /* table of supported CPUs */
+ 
+diff --git a/arch/arm/plat-s3c64xx/gpiolib.c b/arch/arm/mach-s3c64xx/gpiolib.c
+similarity index 100%
+rename from arch/arm/plat-s3c64xx/gpiolib.c
+rename to arch/arm/mach-s3c64xx/gpiolib.c
+diff --git a/arch/arm/plat-s3c64xx/include/plat/pll.h b/arch/arm/mach-s3c64xx/include/mach/pll.h
+similarity index 100%
+rename from arch/arm/plat-s3c64xx/include/plat/pll.h
+rename to arch/arm/mach-s3c64xx/include/mach/pll.h
+diff --git a/arch/arm/plat-s3c64xx/include/plat/s3c6400.h b/arch/arm/mach-s3c64xx/include/mach/s3c6400.h
+similarity index 95%
+rename from arch/arm/plat-s3c64xx/include/plat/s3c6400.h
+rename to arch/arm/mach-s3c64xx/include/mach/s3c6400.h
+index 11f2e1e..2bc7c07 100644
+--- a/arch/arm/plat-s3c64xx/include/plat/s3c6400.h
++++ b/arch/arm/mach-s3c64xx/include/mach/s3c6400.h
+@@ -1,4 +1,4 @@
+-/* arch/arm/plat-s3c64xx/include/plat/s3c6400.h
++/* arch/arm/mach-s3c64xx/include/macht/s3c6400.h
+  *
+  * Copyright 2008 Openmoko, Inc.
+  * Copyright 2008 Simtec Electronics
+@@ -33,4 +33,3 @@ extern void s3c6400_init_clocks(int xtal);
+ #define s3c6400_map_io NULL
+ #define s3c6400_init NULL
+ #endif
 -
--if PLAT_S3C64XX
--
--# Configuration options shared by all S3C64XX implementations
--
--config CPU_S3C6400_CLOCK
--	bool
--	help
--	  Common clock support code for the S3C6400 that is shared
--	  by other CPUs in the series, such as the S3C6410.
--
--endif
+diff --git a/arch/arm/plat-s3c64xx/include/plat/s3c6410.h b/arch/arm/mach-s3c64xx/include/mach/s3c6410.h
+similarity index 93%
+rename from arch/arm/plat-s3c64xx/include/plat/s3c6410.h
+rename to arch/arm/mach-s3c64xx/include/mach/s3c6410.h
+index 50dcdd6..24f1141 100644
+--- a/arch/arm/plat-s3c64xx/include/plat/s3c6410.h
++++ b/arch/arm/mach-s3c64xx/include/mach/s3c6410.h
+@@ -1,4 +1,4 @@
+-/* arch/arm/plat-s3c64xx/include/plat/s3c6410.h
++/* arch/arm/mach-s3c64xx/include/mach/s3c6410.h
+  *
+  * Copyright 2008 Openmoko,  Inc.
+  * Copyright 2008 Simtec Electronics
+diff --git a/arch/arm/mach-s3c64xx/mach-anw6410.c b/arch/arm/mach-s3c64xx/mach-anw6410.c
+index 06d8fe5..4a0bb24 100644
+--- a/arch/arm/mach-s3c64xx/mach-anw6410.c
++++ b/arch/arm/mach-s3c64xx/mach-anw6410.c
+@@ -45,7 +45,7 @@
+ #include <plat/iic.h>
+ #include <plat/fb.h>
+ 
+-#include <plat/s3c6410.h>
++#include <mach/s3c6410.h>
+ #include <plat/clock.h>
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
+diff --git a/arch/arm/mach-s3c64xx/mach-hmt.c b/arch/arm/mach-s3c64xx/mach-hmt.c
+index 284886c..a6d91c3 100644
+--- a/arch/arm/mach-s3c64xx/mach-hmt.c
++++ b/arch/arm/mach-s3c64xx/mach-hmt.c
+@@ -38,7 +38,7 @@
+ #include <plat/fb.h>
+ #include <plat/nand.h>
+ 
+-#include <plat/s3c6410.h>
++#include <mach/s3c6410.h>
+ #include <plat/clock.h>
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
+diff --git a/arch/arm/mach-s3c64xx/mach-ncp.c b/arch/arm/mach-s3c64xx/mach-ncp.c
+index 9be92dd..bf65747 100644
+--- a/arch/arm/mach-s3c64xx/mach-ncp.c
++++ b/arch/arm/mach-s3c64xx/mach-ncp.c
+@@ -40,7 +40,7 @@
+ #include <plat/iic.h>
+ #include <plat/fb.h>
+ 
+-#include <plat/s3c6410.h>
++#include <mach/s3c6410.h>
+ #include <plat/clock.h>
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
+diff --git a/arch/arm/mach-s3c64xx/mach-smdk6400.c b/arch/arm/mach-s3c64xx/mach-smdk6400.c
+index ba8a052..f7b1898 100644
+--- a/arch/arm/mach-s3c64xx/mach-smdk6400.c
++++ b/arch/arm/mach-s3c64xx/mach-smdk6400.c
+@@ -31,7 +31,7 @@
+ 
+ #include <plat/regs-serial.h>
+ 
+-#include <plat/s3c6400.h>
++#include <mach/s3c6400.h>
+ #include <plat/clock.h>
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
+diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+index 021670e..fdf8f75 100644
+--- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
++++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+@@ -54,7 +54,7 @@
+ #include <plat/fb.h>
+ #include <plat/gpio-cfg.h>
+ 
+-#include <plat/s3c6410.h>
++#include <mach/s3c6410.h>
+ #include <plat/clock.h>
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
+diff --git a/arch/arm/mach-s3c64xx/s3c6400.c b/arch/arm/mach-s3c64xx/s3c6400.c
+index 2fba1b2..720d0d1 100644
+--- a/arch/arm/mach-s3c64xx/s3c6400.c
++++ b/arch/arm/mach-s3c64xx/s3c6400.c
+@@ -37,7 +37,7 @@
+ #include <plat/clock.h>
+ #include <plat/sdhci.h>
+ #include <plat/iic-core.h>
+-#include <plat/s3c6400.h>
++#include <mach/s3c6400.h>
+ 
+ void __init s3c6400_map_io(void)
+ {
+diff --git a/arch/arm/mach-s3c64xx/s3c6410.c b/arch/arm/mach-s3c64xx/s3c6410.c
+index b881d6a..fd457cc 100644
+--- a/arch/arm/mach-s3c64xx/s3c6410.c
++++ b/arch/arm/mach-s3c64xx/s3c6410.c
+@@ -38,8 +38,8 @@
+ #include <plat/clock.h>
+ #include <plat/sdhci.h>
+ #include <plat/iic-core.h>
+-#include <plat/s3c6400.h>
+-#include <plat/s3c6410.h>
++#include <mach/s3c6400.h>
++#include <mach/s3c6410.h>
+ 
+ void __init s3c6410_map_io(void)
+ {
+diff --git a/arch/arm/plat-s3c64xx/sleep.S b/arch/arm/mach-s3c64xx/sleep.S
+similarity index 100%
+rename from arch/arm/plat-s3c64xx/sleep.S
+rename to arch/arm/mach-s3c64xx/sleep.S
 diff --git a/arch/arm/plat-s3c64xx/Makefile b/arch/arm/plat-s3c64xx/Makefile
-index 62fc253..7ca1c09 100644
+index 187b779..60d7990 100644
 --- a/arch/arm/plat-s3c64xx/Makefile
 +++ b/arch/arm/plat-s3c64xx/Makefile
-@@ -10,6 +10,3 @@ obj-m				:=
+@@ -10,22 +10,12 @@ obj-m				:=
  obj-n				:= dummy.o
  obj-				:=
  
--# CPU support
--
--obj-$(CONFIG_CPU_S3C6400_CLOCK)	+= s3c6400-clock.o
-diff --git a/arch/arm/plat-s3c64xx/s3c6400-clock.c b/arch/arm/plat-s3c64xx/s3c6400-clock.c
-deleted file mode 100644
-index 85f7bb0..0000000
---- a/arch/arm/plat-s3c64xx/s3c6400-clock.c
-+++ /dev/null
-@@ -1,536 +0,0 @@
--/* linux/arch/arm/plat-s3c64xx/s3c6400-clock.c
-- *
-- * Copyright 2008 Openmoko, Inc.
-- * Copyright 2008 Simtec Electronics
-- *	Ben Dooks <ben@simtec.co.uk>
-- *	http://armlinux.simtec.co.uk/
-- *
-- * S3C6400 based common clock support
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#include <linux/init.h>
--#include <linux/module.h>
--#include <linux/kernel.h>
--#include <linux/list.h>
--#include <linux/errno.h>
--#include <linux/err.h>
--#include <linux/clk.h>
--#include <linux/sysdev.h>
--#include <linux/io.h>
--
--#include <mach/hardware.h>
--#include <mach/map.h>
--
--#include <plat/cpu-freq.h>
--
--#include <mach/regs-clock.h>
--#include <plat/clock.h>
--#include <plat/clock-clksrc.h>
--#include <plat/cpu.h>
--#include <plat/pll.h>
--
--/* fin_apll, fin_mpll and fin_epll are all the same clock, which we call
-- * ext_xtal_mux for want of an actual name from the manual.
--*/
--
--static struct clk clk_ext_xtal_mux = {
--	.name		= "ext_xtal",
--	.id		= -1,
--};
--
--#define clk_fin_apll clk_ext_xtal_mux
--#define clk_fin_mpll clk_ext_xtal_mux
--#define clk_fin_epll clk_ext_xtal_mux
--
--#define clk_fout_mpll	clk_mpll
--#define clk_fout_epll	clk_epll
--
--static struct clk clk_fout_apll = {
--	.name		= "fout_apll",
--	.id		= -1,
--};
--
--static struct clk *clk_src_apll_list[] = {
--	[0] = &clk_fin_apll,
--	[1] = &clk_fout_apll,
--};
--
--static struct clksrc_sources clk_src_apll = {
--	.sources	= clk_src_apll_list,
--	.nr_sources	= ARRAY_SIZE(clk_src_apll_list),
--};
--
--static struct clksrc_clk clk_mout_apll = {
--	.clk	= {
--		.name		= "mout_apll",
--		.id		= -1,
--	},
--	.reg_src	= { .reg = S3C_CLK_SRC, .shift = 0, .size = 1  },
--	.sources	= &clk_src_apll,
--};
--
--static struct clk *clk_src_epll_list[] = {
--	[0] = &clk_fin_epll,
--	[1] = &clk_fout_epll,
--};
--
--static struct clksrc_sources clk_src_epll = {
--	.sources	= clk_src_epll_list,
--	.nr_sources	= ARRAY_SIZE(clk_src_epll_list),
--};
--
--static struct clksrc_clk clk_mout_epll = {
--	.clk	= {
--		.name		= "mout_epll",
--		.id		= -1,
--	},
--	.reg_src	= { .reg = S3C_CLK_SRC, .shift = 2, .size = 1  },
--	.sources	= &clk_src_epll,
--};
--
--static struct clk *clk_src_mpll_list[] = {
--	[0] = &clk_fin_mpll,
--	[1] = &clk_fout_mpll,
--};
--
--static struct clksrc_sources clk_src_mpll = {
--	.sources	= clk_src_mpll_list,
--	.nr_sources	= ARRAY_SIZE(clk_src_mpll_list),
--};
--
--static struct clksrc_clk clk_mout_mpll = {
--	.clk = {
--		.name		= "mout_mpll",
--		.id		= -1,
--	},
--	.reg_src	= { .reg = S3C_CLK_SRC, .shift = 1, .size = 1  },
--	.sources	= &clk_src_mpll,
--};
--
--static unsigned int armclk_mask;
--
--static unsigned long s3c64xx_clk_arm_get_rate(struct clk *clk)
--{
--	unsigned long rate = clk_get_rate(clk->parent);
--	u32 clkdiv;
--
--	/* divisor mask starts at bit0, so no need to shift */
--	clkdiv = __raw_readl(S3C_CLK_DIV0) & armclk_mask;
--
--	return rate / (clkdiv + 1);
--}
--
--static unsigned long s3c64xx_clk_arm_round_rate(struct clk *clk,
--						unsigned long rate)
--{
--	unsigned long parent = clk_get_rate(clk->parent);
--	u32 div;
--
--	if (parent < rate)
--		return parent;
--
--	div = (parent / rate) - 1;
--	if (div > armclk_mask)
--		div = armclk_mask;
--
--	return parent / (div + 1);
--}
--
--static int s3c64xx_clk_arm_set_rate(struct clk *clk, unsigned long rate)
--{
--	unsigned long parent = clk_get_rate(clk->parent);
--	u32 div;
--	u32 val;
--
--	if (rate < parent / (armclk_mask + 1))
--		return -EINVAL;
--
--	rate = clk_round_rate(clk, rate);
--	div = clk_get_rate(clk->parent) / rate;
--
--	val = __raw_readl(S3C_CLK_DIV0);
--	val &= ~armclk_mask;
--	val |= (div - 1);
--	__raw_writel(val, S3C_CLK_DIV0);
--
--	return 0;
--
--}
--
--static struct clk clk_arm = {
--	.name		= "armclk",
--	.id		= -1,
--	.parent		= &clk_mout_apll.clk,
--	.ops		= &(struct clk_ops) {
--		.get_rate	= s3c64xx_clk_arm_get_rate,
--		.set_rate	= s3c64xx_clk_arm_set_rate,
--		.round_rate	= s3c64xx_clk_arm_round_rate,
--	},
--};
--
--static unsigned long s3c64xx_clk_doutmpll_get_rate(struct clk *clk)
--{
--	unsigned long rate = clk_get_rate(clk->parent);
--
--	printk(KERN_DEBUG "%s: parent is %ld\n", __func__, rate);
--
--	if (__raw_readl(S3C_CLK_DIV0) & S3C6400_CLKDIV0_MPLL_MASK)
--		rate /= 2;
--
--	return rate;
--}
--
--static struct clk_ops clk_dout_ops = {
--	.get_rate	= s3c64xx_clk_doutmpll_get_rate,
--};
--
--static struct clk clk_dout_mpll = {
--	.name		= "dout_mpll",
--	.id		= -1,
--	.parent		= &clk_mout_mpll.clk,
--	.ops		= &clk_dout_ops,
--};
--
--static struct clk *clkset_spi_mmc_list[] = {
--	&clk_mout_epll.clk,
--	&clk_dout_mpll,
--	&clk_fin_epll,
--	&clk_27m,
--};
--
--static struct clksrc_sources clkset_spi_mmc = {
--	.sources	= clkset_spi_mmc_list,
--	.nr_sources	= ARRAY_SIZE(clkset_spi_mmc_list),
--};
--
--static struct clk *clkset_irda_list[] = {
--	&clk_mout_epll.clk,
--	&clk_dout_mpll,
--	NULL,
--	&clk_27m,
--};
--
--static struct clksrc_sources clkset_irda = {
--	.sources	= clkset_irda_list,
--	.nr_sources	= ARRAY_SIZE(clkset_irda_list),
--};
--
--static struct clk *clkset_uart_list[] = {
--	&clk_mout_epll.clk,
--	&clk_dout_mpll,
--	NULL,
--	NULL
--};
--
--static struct clksrc_sources clkset_uart = {
--	.sources	= clkset_uart_list,
--	.nr_sources	= ARRAY_SIZE(clkset_uart_list),
--};
--
--static struct clk *clkset_uhost_list[] = {
--	&clk_48m,
--	&clk_mout_epll.clk,
--	&clk_dout_mpll,
--	&clk_fin_epll,
--};
--
--static struct clksrc_sources clkset_uhost = {
--	.sources	= clkset_uhost_list,
--	.nr_sources	= ARRAY_SIZE(clkset_uhost_list),
--};
--
--/* The peripheral clocks are all controlled via clocksource followed
-- * by an optional divider and gate stage. We currently roll this into
-- * one clock which hides the intermediate clock from the mux.
-- *
-- * Note, the JPEG clock can only be an even divider...
-- *
-- * The scaler and LCD clocks depend on the S3C64XX version, and also
-- * have a common parent divisor so are not included here.
-- */
--
--/* clocks that feed other parts of the clock source tree */
--
--static struct clk clk_iis_cd0 = {
--	.name		= "iis_cdclk0",
--	.id		= -1,
--};
--
--static struct clk clk_iis_cd1 = {
--	.name		= "iis_cdclk1",
--	.id		= -1,
--};
--
--static struct clk clk_pcm_cd = {
--	.name		= "pcm_cdclk",
--	.id		= -1,
--};
--
--static struct clk *clkset_audio0_list[] = {
--	[0] = &clk_mout_epll.clk,
--	[1] = &clk_dout_mpll,
--	[2] = &clk_fin_epll,
--	[3] = &clk_iis_cd0,
--	[4] = &clk_pcm_cd,
--};
--
--static struct clksrc_sources clkset_audio0 = {
--	.sources	= clkset_audio0_list,
--	.nr_sources	= ARRAY_SIZE(clkset_audio0_list),
--};
--
--static struct clk *clkset_audio1_list[] = {
--	[0] = &clk_mout_epll.clk,
--	[1] = &clk_dout_mpll,
--	[2] = &clk_fin_epll,
--	[3] = &clk_iis_cd1,
--	[4] = &clk_pcm_cd,
--};
--
--static struct clksrc_sources clkset_audio1 = {
--	.sources	= clkset_audio1_list,
--	.nr_sources	= ARRAY_SIZE(clkset_audio1_list),
--};
--
--static struct clk *clkset_camif_list[] = {
--	&clk_h2,
--};
--
--static struct clksrc_sources clkset_camif = {
--	.sources	= clkset_camif_list,
--	.nr_sources	= ARRAY_SIZE(clkset_camif_list),
--};
--
--static struct clksrc_clk clksrcs[] = {
--	{
--		.clk	= {
--			.name		= "mmc_bus",
--			.id		= 0,
--			.ctrlbit        = S3C_CLKCON_SCLK_MMC0,
--			.enable		= s3c64xx_sclk_ctrl,
--		},
--		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 18, .size = 2  },
--		.reg_div	= { .reg = S3C_CLK_DIV1, .shift = 0, .size = 4  },
--		.sources	= &clkset_spi_mmc,
--	}, {
--		.clk	= {
--			.name		= "mmc_bus",
--			.id		= 1,
--			.ctrlbit        = S3C_CLKCON_SCLK_MMC1,
--			.enable		= s3c64xx_sclk_ctrl,
--		},
--		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 20, .size = 2  },
--		.reg_div	= { .reg = S3C_CLK_DIV1, .shift = 4, .size = 4  },
--		.sources	= &clkset_spi_mmc,
--	}, {
--		.clk	= {
--			.name		= "mmc_bus",
--			.id		= 2,
--			.ctrlbit        = S3C_CLKCON_SCLK_MMC2,
--			.enable		= s3c64xx_sclk_ctrl,
--		},
--		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 22, .size = 2  },
--		.reg_div 	= { .reg = S3C_CLK_DIV1, .shift = 8, .size = 4  },
--		.sources	= &clkset_spi_mmc,
--	}, {
--		.clk	= {
--			.name		= "usb-bus-host",
--			.id		= -1,
--			.ctrlbit        = S3C_CLKCON_SCLK_UHOST,
--			.enable		= s3c64xx_sclk_ctrl,
--		},
--		.reg_src 	= { .reg = S3C_CLK_SRC, .shift = 5, .size = 2  },
--		.reg_div	= { .reg = S3C_CLK_DIV1, .shift = 20, .size = 4  },
--		.sources	= &clkset_uhost,
--	}, {
--		.clk	= {
--			.name		= "uclk1",
--			.id		= -1,
--			.ctrlbit        = S3C_CLKCON_SCLK_UART,
--			.enable		= s3c64xx_sclk_ctrl,
--		},
--		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 13, .size = 1  },
--		.reg_div	= { .reg = S3C_CLK_DIV2, .shift = 16, .size = 4  },
--		.sources	= &clkset_uart,
--	}, {
--/* Where does UCLK0 come from? */
--		.clk	= {
--			.name		= "spi-bus",
--			.id		= 0,
--			.ctrlbit        = S3C_CLKCON_SCLK_SPI0,
--			.enable		= s3c64xx_sclk_ctrl,
--		},
--		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 14, .size = 2  },
--		.reg_div	= { .reg = S3C_CLK_DIV2, .shift = 0, .size = 4  },
--		.sources	= &clkset_spi_mmc,
--	}, {
--		.clk	= {
--			.name		= "spi-bus",
--			.id		= 1,
--			.ctrlbit        = S3C_CLKCON_SCLK_SPI1,
--			.enable		= s3c64xx_sclk_ctrl,
--		},
--		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 16, .size = 2  },
--		.reg_div	= { .reg = S3C_CLK_DIV2, .shift = 4, .size = 4  },
--		.sources	= &clkset_spi_mmc,
--	}, {
--		.clk	= {
--			.name		= "audio-bus",
--			.id		= 0,
--			.ctrlbit        = S3C_CLKCON_SCLK_AUDIO0,
--			.enable		= s3c64xx_sclk_ctrl,
--		},
--		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 7, .size = 3  },
--		.reg_div	= { .reg = S3C_CLK_DIV2, .shift = 8, .size = 4  },
--		.sources	= &clkset_audio0,
--	}, {
--		.clk	= {
--			.name		= "audio-bus",
--			.id		= 1,
--			.ctrlbit        = S3C_CLKCON_SCLK_AUDIO1,
--			.enable		= s3c64xx_sclk_ctrl,
--		},
--		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 10, .size = 3  },
--		.reg_div	= { .reg = S3C_CLK_DIV2, .shift = 12, .size = 4  },
--		.sources	= &clkset_audio1,
--	}, {
--		.clk	= {
--			.name		= "irda-bus",
--			.id		= 0,
--			.ctrlbit        = S3C_CLKCON_SCLK_IRDA,
--			.enable		= s3c64xx_sclk_ctrl,
--		},
--		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 24, .size = 2  },
--		.reg_div	= { .reg = S3C_CLK_DIV2, .shift = 20, .size = 4  },
--		.sources	= &clkset_irda,
--	}, {
--		.clk	= {
--			.name		= "camera",
--			.id		= -1,
--			.ctrlbit        = S3C_CLKCON_SCLK_CAM,
--			.enable		= s3c64xx_sclk_ctrl,
--		},
--		.reg_div	= { .reg = S3C_CLK_DIV0, .shift = 20, .size = 4  },
--		.reg_src	= { .reg = NULL, .shift = 0, .size = 0  },
--		.sources	= &clkset_camif,
--	},
--};
--
--/* Clock initialisation code */
--
--static struct clksrc_clk *init_parents[] = {
--	&clk_mout_apll,
--	&clk_mout_epll,
--	&clk_mout_mpll,
--};
--
--#define GET_DIV(clk, field) ((((clk) & field##_MASK) >> field##_SHIFT) + 1)
--
--void __init_or_cpufreq s3c6400_setup_clocks(void)
--{
--	struct clk *xtal_clk;
--	unsigned long xtal;
--	unsigned long fclk;
--	unsigned long hclk;
--	unsigned long hclk2;
--	unsigned long pclk;
--	unsigned long epll;
--	unsigned long apll;
--	unsigned long mpll;
--	unsigned int ptr;
--	u32 clkdiv0;
--
--	printk(KERN_DEBUG "%s: registering clocks\n", __func__);
--
--	clkdiv0 = __raw_readl(S3C_CLK_DIV0);
--	printk(KERN_DEBUG "%s: clkdiv0 = %08x\n", __func__, clkdiv0);
--
--	xtal_clk = clk_get(NULL, "xtal");
--	BUG_ON(IS_ERR(xtal_clk));
--
--	xtal = clk_get_rate(xtal_clk);
--	clk_put(xtal_clk);
--
--	printk(KERN_DEBUG "%s: xtal is %ld\n", __func__, xtal);
--
--	/* For now assume the mux always selects the crystal */
--	clk_ext_xtal_mux.parent = xtal_clk;
--
--	epll = s3c6400_get_epll(xtal);
--	mpll = s3c6400_get_pll(xtal, __raw_readl(S3C_MPLL_CON));
--	apll = s3c6400_get_pll(xtal, __raw_readl(S3C_APLL_CON));
--
--	fclk = mpll;
--
--	printk(KERN_INFO "S3C64XX: PLL settings, A=%ld, M=%ld, E=%ld\n",
--	       apll, mpll, epll);
--
--	hclk2 = mpll / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK2);
--	hclk = hclk2 / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK);
--	pclk = hclk2 / GET_DIV(clkdiv0, S3C6400_CLKDIV0_PCLK);
--
--	printk(KERN_INFO "S3C64XX: HCLK2=%ld, HCLK=%ld, PCLK=%ld\n",
--	       hclk2, hclk, pclk);
--
--	clk_fout_mpll.rate = mpll;
--	clk_fout_epll.rate = epll;
--	clk_fout_apll.rate = apll;
--
--	clk_h2.rate = hclk2;
--	clk_h.rate = hclk;
--	clk_p.rate = pclk;
--	clk_f.rate = fclk;
--
--	for (ptr = 0; ptr < ARRAY_SIZE(init_parents); ptr++)
--		s3c_set_clksrc(init_parents[ptr], true);
--
--	for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
--		s3c_set_clksrc(&clksrcs[ptr], true);
--}
--
--static struct clk *clks[] __initdata = {
--	&clk_ext_xtal_mux,
--	&clk_iis_cd0,
--	&clk_iis_cd1,
--	&clk_pcm_cd,
--	&clk_mout_epll.clk,
--	&clk_mout_mpll.clk,
--	&clk_dout_mpll,
--	&clk_arm,
--};
--
--/**
-- * s3c6400_register_clocks - register clocks for s3c6400 and above
-- * @armclk_divlimit: Divisor mask for ARMCLK
-- *
-- * Register the clocks for the S3C6400 and above SoC range, such
-- * as ARMCLK and the clocks which have divider chains attached.
-- *
-- * This call does not setup the clocks, which is left to the
-- * s3c6400_setup_clocks() call which may be needed by the cpufreq
-- * or resume code to re-set the clocks if the bootloader has changed
-- * them.
-- */
--void __init s3c6400_register_clocks(unsigned armclk_divlimit)
--{
--	struct clk *clkp;
--	int ret;
--	int ptr;
--
--	armclk_mask = armclk_divlimit;
--
--	for (ptr = 0; ptr < ARRAY_SIZE(clks); ptr++) {
--		clkp = clks[ptr];
--		ret = s3c24xx_register_clock(clkp);
--		if (ret < 0) {
--			printk(KERN_ERR "Failed to register clock %s (%d)\n",
--			       clkp->name, ret);
--		}
--	}
--
--	s3c_register_clksrc(clksrcs, ARRAY_SIZE(clksrcs));
--}
+-# Core files
+-obj-y				+= cpu.o
+-obj-y				+= clock.o
+-obj-y				+= gpiolib.o
+-
+ # CPU support
+ 
+ obj-$(CONFIG_CPU_S3C6400_INIT)	+= s3c6400-init.o
+ obj-$(CONFIG_CPU_S3C6400_CLOCK)	+= s3c6400-clock.o
+ obj-$(CONFIG_CPU_FREQ_S3C64XX)  += cpufreq.o
+ 
+-# PM support
+-
+-obj-$(CONFIG_PM)		+= pm.o
+-obj-$(CONFIG_PM)		+= sleep.o
+-
+ # DMA support
+ 
+ obj-$(CONFIG_S3C64XX_DMA)	+= dma.o
+diff --git a/arch/arm/plat-s3c64xx/s3c6400-init.c b/arch/arm/plat-s3c64xx/s3c6400-init.c
+index 6c28f39..e64caa4 100644
+--- a/arch/arm/plat-s3c64xx/s3c6400-init.c
++++ b/arch/arm/plat-s3c64xx/s3c6400-init.c
+@@ -18,8 +18,8 @@
+ 
+ #include <plat/cpu.h>
+ #include <plat/devs.h>
+-#include <plat/s3c6400.h>
+-#include <plat/s3c6410.h>
++#include <mach/s3c6400.h>
++#include <mach/s3c6410.h>
+ 
+ /* uart registration process */
+ 
 -- 
 1.6.0.4
