@@ -1,108 +1,55 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 25 Jan 2010 16:53:42 -0800
-Subject: [GIT PULL] omap-fixes for 2.6.33-rc5
-Message-ID: <20100126005342.GE2879@atomide.com>
+From: anfei.zhou@gmail.com (anfei zhou)
+Date: Tue, 26 Jan 2010 09:01:10 +0800
+Subject: [PATCH] Flush dcache before writing into page to avoid alias
+In-Reply-To: <20100125115814.156d401d.akpm@linux-foundation.org>
+References: <979dd0561001202107v4ddc1eb7xa59a7c16c452f7a2@mail.gmail.com>
+	<20100125133308.GA26799@desktop>
+	<20100125115814.156d401d.akpm@linux-foundation.org>
+Message-ID: <979dd0561001251701y76f35b8as545c390135b34da2@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
-
-Please pull omap-fixes from:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+On Tue, Jan 26, 2010 at 3:58 AM, Andrew Morton
+<akpm@linux-foundation.org> wrote:
+> On Mon, 25 Jan 2010 21:33:08 +0800 anfei <anfei.zhou@gmail.com> wrote:
+>
+>> Hi Andrew,
+>>
+>> On Thu, Jan 21, 2010 at 01:07:57PM +0800, anfei zhou wrote:
+>> > The cache alias problem will happen if the changes of user shared mapping
+>> > is not flushed before copying, then user and kernel mapping may be mapped
+>> > into two different cache line, it is impossible to guarantee the coherence
+>> > after iov_iter_copy_from_user_atomic. ?So the right steps should be:
+>> > ? ? flush_dcache_page(page);
+>> > ? ? kmap_atomic(page);
+>> > ? ? write to page;
+>> > ? ? kunmap_atomic(page);
+>> > ? ? flush_dcache_page(page);
+>> > More precisely, we might create two new APIs flush_dcache_user_page and
+>> > flush_dcache_kern_page to replace the two flush_dcache_page accordingly.
+>> >
+>> > Here is a snippet tested on omap2430 with VIPT cache, and I think it is
+>> > not ARM-specific:
+>> > ? ? int val = 0x11111111;
+>> > ? ? fd = open("abc", O_RDWR);
+>> > ? ? addr = mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+>> > ? ? *(addr+0) = 0x44444444;
+>> > ? ? tmp = *(addr+0);
+>> > ? ? *(addr+1) = 0x77777777;
+>> > ? ? write(fd, &val, sizeof(int));
+>> > ? ? close(fd);
+>> > The results are not always 0x11111111 0x77777777 at the beginning as expected.
+>> >
+>> Is this a real bug or not necessary to support?
+>
+> Bug. ?If variable `addr' has type int* then the contents of that file
+> should be 0x11111111 0x77777777. ?You didn't tell us what the contents
+> were in the incorrect case, but I guess it doesn't matter.
+>
+Sorry, I didn't give the details, here is the old thread with more details:
+  http://linux.derkeiler.com/Mailing-Lists/Kernel/2010-01/msg07124.html
 
 Regards,
-
-Tony
-
-
-The following changes since commit 92dcffb916d309aa01778bf8963a6932e4014d07:
-  Linus Torvalds (1):
-        Linux 2.6.33-rc5
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-
-Kevin Hilman (1):
-      OMAP: timekeeping: time should not stop during suspend
-
-Manjunatha GK (1):
-      OMAP3: PM debug: fix build error when !CONFIG_DEBUG_FS
-
-Olof Johansson (1):
-      omap: Enable GPMC clock in gpmc_init
-
-Paul Walmsley (1):
-      OMAP1 clock: fix for "BUG: spinlock lockup on CPU#0"
-
-Peter Ujfalusi (1):
-      OMAP3: PM: Enable wake-up from McBSP2, 3 and 4 modules
-
-Rajendra Nayak (2):
-      OMAP4: PRCM: Fix the base address for CHIRONSS reg defines
-      OMAP4: clocks: Fix the clksel_rate struct DPLL divs
-
-Roel Kluin (2):
-      OMAP: dma_chan[lch_head].flag & OMAP_DMA_ACTIVE tested twice in omap_dma_unlink_lch()
-      OMAP: omap3_pm_get_suspend_state() error ignored in pwrdm_suspend_get()
-
-Russell King (1):
-      OMAP3: clock: Remove unnecessarily .init initializers from OMAP3 clocks
-
-Sanjeev Premi (1):
-      OMAP3: PM: Remove duplicate code blocks
-
-Sergio Aguirre (1):
-      PM debug: Fix warning when no CONFIG_DEBUG_FS
-
-Sripathy, Vishwanath (1):
-      OMAP3: PM: Removing redundant and potentially dangerous PRCM configration
-
-Subramani Venkatesh (1):
-      OMAP3: PM: DSS PM_WKEN to refill DMA
-
-Tero Kristo (7):
-      OMAP3: PM: Ack pending interrupts before entering suspend
-      OMAP3: PM: Enable system control module autoidle
-      OMAP3: PM: Disable interrupt controller AUTOIDLE before WFI
-      OMAP3: CPUidle: Fixed timer resolution
-      OMAP3: Fixed ARM aux ctrl register save/restore
-      OMAP3: PM: Force write last pad config register into save area
-      OMAP2/3: DMTIMER: Clear pending interrupts when stopping a timer
-
-Thara Gopinath (1):
-      OMAP3: hwmod: Adding flag to prevent caching of sysconfig register.
-
-Tony Lindgren (6):
-      omap: Fix cmdline muxing
-      omap: Fix functions for dynamic remuxing of pins
-      omap3: Fix cpu detection
-      Merge branch 'for_2.6.33rc_d' of git://git.pwsan.com/linux-2.6 into omap-fixes-for-linus
-      Merge branch 'pm-fixes' of master.kernel.org:/.../khilman/linux-omap-pm into omap-fixes-for-linus
-      Merge branch 'omap-fixes' into omap-fixes-for-linus
-
- arch/arm/mach-omap1/clock.c                  |    6 +-
- arch/arm/mach-omap2/clock34xx_data.c         |    4 --
- arch/arm/mach-omap2/clock44xx_data.c         |   62 +++++++++++++-------------
- arch/arm/mach-omap2/cpuidle34xx.c            |    2 +-
- arch/arm/mach-omap2/gpmc.c                   |    2 +
- arch/arm/mach-omap2/id.c                     |   41 ++++++++++-------
- arch/arm/mach-omap2/irq.c                    |   18 +++++++
- arch/arm/mach-omap2/mux.c                    |   27 ++++++-----
- arch/arm/mach-omap2/mux.h                    |   24 ++++++++++
- arch/arm/mach-omap2/omap_hwmod.c             |    3 +-
- arch/arm/mach-omap2/pm-debug.c               |   12 +++---
- arch/arm/mach-omap2/pm.h                     |    8 +++-
- arch/arm/mach-omap2/pm34xx.c                 |   47 +++++++++++---------
- arch/arm/mach-omap2/prcm.c                   |   11 -----
- arch/arm/mach-omap2/prm.h                    |    2 +
- arch/arm/mach-omap2/prm44xx.h                |   32 +++++++-------
- arch/arm/mach-omap2/sleep34xx.S              |   13 ++++--
- arch/arm/plat-omap/common.c                  |   26 +++++++++++
- arch/arm/plat-omap/dma.c                     |    2 +-
- arch/arm/plat-omap/dmtimer.c                 |   13 +++++
- arch/arm/plat-omap/include/plat/cpu.h        |    1 +
- arch/arm/plat-omap/include/plat/irqs.h       |    3 +
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 +
- 23 files changed, 229 insertions(+), 131 deletions(-)
+Anfei.
+>
+>
