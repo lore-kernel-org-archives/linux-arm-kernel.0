@@ -1,190 +1,134 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 26 Jan 2010 07:58:06 +0000
-Subject: [PATCH] ARM: S3C244X: Merge <plat/s3c2440.h> and <plat/s3c2442.h>
-	into <plat/s3c244x.h>
+Date: Tue, 26 Jan 2010 07:58:00 +0000
+Subject: [PATCH] ARM: S3C24XX: Merge s3c2442 and s3c2440 machines into
+	mach-s3c2440
 In-Reply-To: <1264492686-16901-1-git-send-email-ben-linux@fluff.org>
 References: <1264492686-16901-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1264492686-16901-8-git-send-email-ben-linux@fluff.org>
+Message-ID: <1264492686-16901-2-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Merge these two headers into one.
-
-Note, correct fault in mach-smdk2443.h including the wrong header.
+Move the pair of machines in arch/arm/mach-s3c2442 into the mach-s3c2440
+directory as the S3C2440 and S3C2442 are very close.
 
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/mach-s3c2440/dsc.c                  |    2 +-
- arch/arm/mach-s3c2440/mach-nexcoder.c        |    2 +-
- arch/arm/mach-s3c2440/mach-smdk2440.c        |    2 +-
- arch/arm/mach-s3c2440/s3c2440.c              |    2 +-
- arch/arm/mach-s3c2440/s3c244x.c              |    1 -
- arch/arm/mach-s3c2443/mach-smdk2443.c        |    2 +-
- arch/arm/plat-s3c24xx/cpu.c                  |    2 --
- arch/arm/plat-s3c24xx/include/plat/s3c2440.h |   17 -----------------
- arch/arm/plat-s3c24xx/include/plat/s3c2442.h |   17 -----------------
- arch/arm/plat-s3c24xx/include/plat/s3c244x.h |   12 ++++++++++++
- 10 files changed, 17 insertions(+), 42 deletions(-)
- delete mode 100644 arch/arm/plat-s3c24xx/include/plat/s3c2440.h
- delete mode 100644 arch/arm/plat-s3c24xx/include/plat/s3c2442.h
+ arch/arm/mach-s3c2440/Kconfig                      |   20 ++++++++++++++++-
+ arch/arm/mach-s3c2440/Makefile                     |    1 +
+ .../include/mach/gta02.h                           |    0
+ .../{mach-s3c2442 => mach-s3c2440}/mach-gta02.c    |    0
+ arch/arm/mach-s3c2442/Kconfig                      |   22 --------------------
+ arch/arm/mach-s3c2442/Makefile                     |    2 -
+ 6 files changed, 19 insertions(+), 26 deletions(-)
+ rename arch/arm/{mach-s3c2442 => mach-s3c2440}/include/mach/gta02.h (100%)
+ rename arch/arm/{mach-s3c2442 => mach-s3c2440}/mach-gta02.c (100%)
 
-diff --git a/arch/arm/mach-s3c2440/dsc.c b/arch/arm/mach-s3c2440/dsc.c
-index 5540442..9ea66e3 100644
---- a/arch/arm/mach-s3c2440/dsc.c
-+++ b/arch/arm/mach-s3c2440/dsc.c
-@@ -28,7 +28,7 @@
- #include <mach/regs-dsc.h>
+diff --git a/arch/arm/mach-s3c2440/Kconfig b/arch/arm/mach-s3c2440/Kconfig
+index 8087935..5486929 100644
+--- a/arch/arm/mach-s3c2440/Kconfig
++++ b/arch/arm/mach-s3c2440/Kconfig
+@@ -21,8 +21,7 @@ config S3C2440_DMA
+ 	help
+ 	  Support for S3C2440 specific DMA code5A
  
- #include <plat/cpu.h>
--#include <plat/s3c2440.h>
-+#include <plat/s3c244x.h>
- 
- int s3c2440_set_dsc(unsigned int pin, unsigned int value)
- {
-diff --git a/arch/arm/mach-s3c2440/mach-nexcoder.c b/arch/arm/mach-s3c2440/mach-nexcoder.c
-index 86a243b..3420415 100644
---- a/arch/arm/mach-s3c2440/mach-nexcoder.c
-+++ b/arch/arm/mach-s3c2440/mach-nexcoder.c
-@@ -41,7 +41,7 @@
- #include <plat/iic.h>
- 
- #include <plat/s3c2410.h>
--#include <plat/s3c2440.h>
-+#include <plat/s3c244x.h>
- #include <plat/clock.h>
- #include <plat/devs.h>
- #include <plat/cpu.h>
-diff --git a/arch/arm/mach-s3c2440/mach-smdk2440.c b/arch/arm/mach-s3c2440/mach-smdk2440.c
-index df3e9a3..3ac3d63 100644
---- a/arch/arm/mach-s3c2440/mach-smdk2440.c
-+++ b/arch/arm/mach-s3c2440/mach-smdk2440.c
-@@ -40,7 +40,7 @@
- #include <plat/iic.h>
- 
- #include <plat/s3c2410.h>
--#include <plat/s3c2440.h>
-+#include <plat/s3c244x.h>
- #include <plat/clock.h>
- #include <plat/devs.h>
- #include <plat/cpu.h>
-diff --git a/arch/arm/mach-s3c2440/s3c2440.c b/arch/arm/mach-s3c2440/s3c2440.c
-index ac1f7ea..2b68f7e 100644
---- a/arch/arm/mach-s3c2440/s3c2440.c
-+++ b/arch/arm/mach-s3c2440/s3c2440.c
-@@ -29,9 +29,9 @@
- #include <mach/hardware.h>
- #include <asm/irq.h>
- 
--#include <plat/s3c2440.h>
- #include <plat/devs.h>
- #include <plat/cpu.h>
-+#include <plat/s3c244x.h>
- 
- static struct sys_device s3c2440_sysdev = {
- 	.cls		= &s3c2440_sysclass,
-diff --git a/arch/arm/mach-s3c2440/s3c244x.c b/arch/arm/mach-s3c2440/s3c244x.c
-index 46e13db..5e4a97e 100644
---- a/arch/arm/mach-s3c2440/s3c244x.c
-+++ b/arch/arm/mach-s3c2440/s3c244x.c
-@@ -38,7 +38,6 @@
- #include <mach/regs-dsc.h>
- 
- #include <plat/s3c2410.h>
--#include <plat/s3c2440.h>
- #include <plat/s3c244x.h>
- #include <plat/clock.h>
- #include <plat/devs.h>
-diff --git a/arch/arm/mach-s3c2443/mach-smdk2443.c b/arch/arm/mach-s3c2443/mach-smdk2443.c
-index 039a462..d65afde 100644
---- a/arch/arm/mach-s3c2443/mach-smdk2443.c
-+++ b/arch/arm/mach-s3c2443/mach-smdk2443.c
-@@ -40,7 +40,7 @@
- #include <plat/iic.h>
- 
- #include <plat/s3c2410.h>
--#include <plat/s3c2440.h>
-+#include <plat/s3c2443.h>
- #include <plat/clock.h>
- #include <plat/devs.h>
- #include <plat/cpu.h>
-diff --git a/arch/arm/plat-s3c24xx/cpu.c b/arch/arm/plat-s3c24xx/cpu.c
-index 6ecf87a..9ca64df 100644
---- a/arch/arm/plat-s3c24xx/cpu.c
-+++ b/arch/arm/plat-s3c24xx/cpu.c
-@@ -50,8 +50,6 @@
- #include <plat/s3c2410.h>
- #include <plat/s3c2412.h>
- #include <plat/s3c244x.h>
--#include <plat/s3c2440.h>
--#include <plat/s3c2442.h>
- #include <plat/s3c2443.h>
- 
- /* table of supported CPUs */
-diff --git a/arch/arm/plat-s3c24xx/include/plat/s3c2440.h b/arch/arm/plat-s3c24xx/include/plat/s3c2440.h
-deleted file mode 100644
-index 107853b..0000000
---- a/arch/arm/plat-s3c24xx/include/plat/s3c2440.h
-+++ /dev/null
-@@ -1,17 +0,0 @@
--/* linux/include/asm-arm/plat-s3c24xx/s3c2440.h
-- *
-- * Copyright (c) 2004-2005 Simtec Electronics
-- *	Ben Dooks <ben@simtec.co.uk>
-- *
-- * Header file for s3c2440 cpu support
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
 -
--#ifdef CONFIG_CPU_S3C2440
--extern  int s3c2440_init(void);
--#else
--#define s3c2440_init NULL
--#endif
-diff --git a/arch/arm/plat-s3c24xx/include/plat/s3c2442.h b/arch/arm/plat-s3c24xx/include/plat/s3c2442.h
-deleted file mode 100644
-index 451a23a..0000000
---- a/arch/arm/plat-s3c24xx/include/plat/s3c2442.h
-+++ /dev/null
-@@ -1,17 +0,0 @@
--/* linux/include/asm-arm/plat-s3c24xx/s3c2442.h
-- *
-- * Copyright (c) 2006 Simtec Electronics
-- *	Ben Dooks <ben@simtec.co.uk>
-- *
-- * Header file for s3c2442 cpu support
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
+-menu "S3C2440 Machines"
++menu "S3C2440 and S3C2442 Machines"
+ 
+ config MACH_ANUBIS
+ 	bool "Simtec Electronics ANUBIS"
+@@ -37,6 +36,18 @@ config MACH_ANUBIS
+ 	  Say Y here if you are using the Simtec Electronics ANUBIS
+ 	  development system
+ 
++config MACH_NEO1973_GTA02
++	bool "Openmoko GTA02 / Freerunner phone"
++	select CPU_S3C2442
++	select MFD_PCF50633
++	select PCF50633_GPIO
++	select I2C
++	select POWER_SUPPLY
++	select MACH_NEO1973
++	select S3C2410_PWM
++	help
++	   Say Y here if you are using the Openmoko GTA02 / Freerunner GSM Phone
++
+ config MACH_OSIRIS
+ 	bool "Simtec IM2440D20 (OSIRIS) module"
+ 	select CPU_S3C2440
+@@ -99,6 +110,11 @@ config SMDK2440_CPU2440
+ 	select S3C2440_XTAL_16934400
+ 	select CPU_S3C2440
+ 
++config SMDK2440_CPU2442
++	bool "SMDM2440 with S3C2442 CPU module"
++	depends on ARCH_S3C2440
++	select CPU_S3C2442
++
+ config MACH_AT2440EVB
+ 	bool "Avantech AT2440EVB development board"
+ 	select CPU_S3C2440
+diff --git a/arch/arm/mach-s3c2440/Makefile b/arch/arm/mach-s3c2440/Makefile
+index 5f32245..e51497c 100644
+--- a/arch/arm/mach-s3c2440/Makefile
++++ b/arch/arm/mach-s3c2440/Makefile
+@@ -23,6 +23,7 @@ obj-$(CONFIG_ARCH_S3C2440)	+= mach-smdk2440.o
+ obj-$(CONFIG_MACH_NEXCODER_2440) += mach-nexcoder.o
+ obj-$(CONFIG_MACH_AT2440EVB) += mach-at2440evb.o
+ obj-$(CONFIG_MACH_MINI2440) += mach-mini2440.o
++obj-$(CONFIG_MACH_NEO1973_GTA02) += mach-gta02.o
+ 
+ # extra machine support
+ 
+diff --git a/arch/arm/mach-s3c2442/include/mach/gta02.h b/arch/arm/mach-s3c2440/include/mach/gta02.h
+similarity index 100%
+rename from arch/arm/mach-s3c2442/include/mach/gta02.h
+rename to arch/arm/mach-s3c2440/include/mach/gta02.h
+diff --git a/arch/arm/mach-s3c2442/mach-gta02.c b/arch/arm/mach-s3c2440/mach-gta02.c
+similarity index 100%
+rename from arch/arm/mach-s3c2442/mach-gta02.c
+rename to arch/arm/mach-s3c2440/mach-gta02.c
+diff --git a/arch/arm/mach-s3c2442/Kconfig b/arch/arm/mach-s3c2442/Kconfig
+index 8d38118..4832cd6 100644
+--- a/arch/arm/mach-s3c2442/Kconfig
++++ b/arch/arm/mach-s3c2442/Kconfig
+@@ -13,25 +13,3 @@ config CPU_S3C2442
+ 	select CPU_LLSERIAL_S3C2440
+ 	help
+ 	  Support for S3C2442 Samsung Mobile CPU based systems.
 -
--#ifdef CONFIG_CPU_S3C2442
--extern  int s3c2442_init(void);
--#else
--#define s3c2442_init NULL
--#endif
-diff --git a/arch/arm/plat-s3c24xx/include/plat/s3c244x.h b/arch/arm/plat-s3c24xx/include/plat/s3c244x.h
-index 8da0904..307248d 100644
---- a/arch/arm/plat-s3c24xx/include/plat/s3c244x.h
-+++ b/arch/arm/plat-s3c24xx/include/plat/s3c244x.h
-@@ -23,3 +23,15 @@ extern void s3c244x_init_clocks(int xtal);
- #define s3c244x_init_uarts NULL
- #define s3c244x_map_io NULL
- #endif
-+
-+#ifdef CONFIG_CPU_S3C2440
-+extern  int s3c2440_init(void);
-+#else
-+#define s3c2440_init NULL
-+#endif
-+
-+#ifdef CONFIG_CPU_S3C2442
-+extern  int s3c2442_init(void);
-+#else
-+#define s3c2442_init NULL
-+#endif
+-
+-menu "S3C2442 Machines"
+-
+-config SMDK2440_CPU2442
+-	bool "SMDM2440 with S3C2442 CPU module"
+-	depends on ARCH_S3C2440
+-	select CPU_S3C2442
+-
+-config MACH_NEO1973_GTA02
+-	bool "Openmoko GTA02 / Freerunner phone"
+-	select CPU_S3C2442
+-	select MFD_PCF50633
+-	select PCF50633_GPIO
+-	select I2C
+-	select POWER_SUPPLY
+-	select MACH_NEO1973
+-	select S3C2410_PWM
+-	help
+-	   Say Y here if you are using the Openmoko GTA02 / Freerunner GSM Phone
+-
+-endmenu
+diff --git a/arch/arm/mach-s3c2442/Makefile b/arch/arm/mach-s3c2442/Makefile
+index 2a19113..2a909c6 100644
+--- a/arch/arm/mach-s3c2442/Makefile
++++ b/arch/arm/mach-s3c2442/Makefile
+@@ -12,7 +12,5 @@ obj-				:=
+ obj-$(CONFIG_CPU_S3C2442)	+= s3c2442.o
+ obj-$(CONFIG_CPU_S3C2442)	+= clock.o
+ 
+-obj-$(CONFIG_MACH_NEO1973_GTA02) += mach-gta02.o
+-
+ # Machine support
+ 
 -- 
 1.6.0.4
