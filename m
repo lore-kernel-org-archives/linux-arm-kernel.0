@@ -1,76 +1,63 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 25 Jan 2010 22:14:21 -0500
-Subject: [PATCH 2/4] mfd: update irq handler in max8925
-In-Reply-To: <771cded01001251912q67c9c2a5w3db61e9d7fe53cf9@mail.gmail.com>
-References: <771cded01001250308mfd2b3d2l76bc2a2df88e7b93@mail.gmail.com>
-	<20100125115930.GE22909@sirena.org.uk>
-	<771cded01001251912q67c9c2a5w3db61e9d7fe53cf9@mail.gmail.com>
-Message-ID: <771cded01001251914k3acbd300q652ea2123911e7af@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 26 Jan 2010 11:58:30 +0800
+Subject: gpio_keys and how PXA27x sets gpio_set_wake() (was Re: sharp
+	c-3000 aka spitz: fix warn_on introduced in 2.6.32-rc1)
+In-Reply-To: <1264286611.11766.49.camel@utx.utx.cz>
+References: <20100106071026.GD1382@ucw.cz>
+	<f17812d71001052317h2bf25fady6bd729b35ef6db63@mail.gmail.com>
+	<20100107065230.GA1303@ucw.cz>
+	<f17812d71001062333y2e49fa21scf91718da9ae3091@mail.gmail.com>
+	<1264275669.9100.11.camel@utx.utx.cz>
+	<1264286611.11766.49.camel@utx.utx.cz>
+Message-ID: <f17812d71001251958t377e158bxc64aac0cb426110b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2010 at 10:12 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> On Mon, Jan 25, 2010 at 6:59 AM, Mark Brown
-> <broonie@opensource.wolfsonmicro.com> wrote:
->> On Mon, Jan 25, 2010 at 06:08:19AM -0500, Haojian Zhuang wrote:
->>
->>> +static struct resource power_supply_resources[] = {
->>> + ? ? {
->>> + ? ? ? ? ? ? .name ? = "max8925-power",
->>> + ? ? ? ? ? ? .start ?= MAX8925_CHG_IRQ1,
->>> + ? ? ? ? ? ? .end ? ?= MAX8925_CHG_IRQ1,
->>> + ? ? ? ? ? ? .flags ?= IORESOURCE_IO,
->>
->> These should be IORESOURCE_IRQ.
->>
-> Now I changed .start and .end. I only need declare IO resources.
+> 2) gpio_keys driver should be capable to set IRQF_TRIGGER_* and no
+> settings of wake-up registers in spitz_pm.c would not be needed.
 >
->>> + ? ? ? ? ? ? else if (value & irq_data->offs) {
->>> + ? ? ? ? ? ? ? ? ? ? dev_err(chip->dev, "Noboday cares IRQ #%d. Mask it\n",
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? chip->irq_base + i);
->>> + ? ? ? ? ? ? ? ? ? ? max8925_set_bits(i2c, irq_data->mask_reg,
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? irq_data->offs, irq_data->offs);
->>
->> genirq ought to be handling this for you?
->>
-> No, genirq doesn't know this. I let the thread_fn to take this job.
+> On platforms with shared interrupts it would introduce possible multiple
+> trigger initialization (not a big problem). But it would easily
+> introduce breakage if programmer makes a mistake and configures
+> interrupt with different trigger in different drivers.
 >
->>> + ? ? for (i = 0; i < ARRAY_SIZE(max8925_irqs); i++) {
->>> + ? ? ? ? ? ? irq_data = &max8925_irqs[i];
->>> + ? ? ? ? ? ? /* non TSC IRQ should be serviced in max8925_irq() */
->>> + ? ? ? ? ? ? if (!irq_data->tsc_irq)
->>> + ? ? ? ? ? ? ? ? ? ? continue;
->>
->> Shouldn't the interrupt handlers be able to avoid having to iterate
->> through the array? ?It's unlikely to be expensive in the context of the
->> I/O but it looks a bit odd.
->>
-> There're multiple IRQ & IRQ_MASK registers. If I use bitmap at here, I
-> would use more code on composing it. Since some bits are not defined
-> in IRQ, I need to take care on it. If I use array at here, the code is
-> clean and simple. Although it looks a bit odd.
 >
->>> + * clear_irq: operation on clearing status of nIRQ pin in platform
->>> + * clear_tsc_irq: operation on clearing status of nTIRQ pin in platform
->>> + */
->>
->> Shouldn't these also be handled by genirq as functions of the interrupt
->> controller that the chip is chained from?
->>
-> Because PMIC IRQ is connected to the special pin of CPU. CPU needs to
-> clear pin status in external. genirq shouldn't take care on it. I have
-> to use this ugly way to clear pin status.
->
-> Thanks
-> Haojian
+> I am not sure what solution of these two is in spirit of modern kernels.
+> I guess that 2. Especially because somebody may want to use gpio_keys on
+> a different machine/GPIO layout that would require different
+> IRQF_TRIGGER_*.
 >
 
-Update the patch now.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0002-mfd-update-irq-handler-in-max8925.patch
-Type: text/x-patch
-Size: 29103 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100125/31cf6460/attachment-0001.bin>
+I prefer 2) - the ugly and hardcoded setup in spitz_pm.c should really
+be removed. That's why the gpio_set_wake() and keypad_set_wake()
+are introduced.
+
+keypad_set_wake() is really specifically introduced for use by pxa27x_keypad
+and no generic GPIO stuffs. So it's really annoying a GPIO will use
+the PKWR as a wakeup GPIO, I'd recommend one still get this hard coded
+into the platform file, with combination of WAKEUP_ON_LEVEL_HIGH (which
+is specifically designed for keypad GPIOs) and keypad_set_wake().
+
+The spitz, however, is doing a good job on this though it's using a GPIO
+emulated matrix keypad, that there is a separate SPITZ_GPIO_KEY_INT,
+which triggers whenever there is any key press on this matrix (I don't
+know how that's designed in HW, but it seems to do that job), and
+which can be setup as a GPIO wakeup.
+
+>
+> Notes:
+>
+> Automatic PKWR/PWER logic is impossible for PXA270. GPIO 38 can be
+> programmed to use both PKWR or PWER.
+>
+
+That's a shame of pxa27x, but so far no awkward usage of this
+has ever been seen.
+
+> The gpio_keys seems to have problems with debounce - in 50% of all
+> resumes, Zaurus goes back to sleep in a second or so.
+>
+
+There is a routine checking wakeup source (cause) which will put the
+system back into sleep in some cases, I guess you need to check if
+something weird there.
