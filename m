@@ -1,105 +1,55 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 26 Jan 2010 18:57:23 +0100
-Subject: [PATCH v2] ARM: IMX31: configure pins iomux for SDHC setup on
-	litekit board.
-In-Reply-To: <1264503640-16948-1-git-send-email-vzapolskiy@gmail.com>
-References: <fcda838a1001260257i1ba38e1chc886a72cc4a3193f@mail.gmail.com>
-	<1264503640-16948-1-git-send-email-vzapolskiy@gmail.com>
-Message-ID: <20100126175723.GD19551@pengutronix.de>
+Date: Tue, 26 Jan 2010 18:57:53 +0100
+Subject: [PATCH] mx2/mx3: debug-macro.S needs deprecated symbols
+In-Reply-To: <1264440184-1740-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1264440184-1740-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20100126175753.GE19551@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2010 at 02:00:40PM +0300, Vladimir Zapolskiy wrote:
-> This patch adds SDHC support, and corrects current pins setup.
-> Added irq handling on card removal.
+On Mon, Jan 25, 2010 at 06:23:04PM +0100, Uwe Kleine-K?nig wrote:
+> This fixes:
+> 
+> 	arch/arm/kernel/debug.S:147: Error: constant expression expected -- `ldrne r3,=(((UART1_BASE_ADDR)-AIPI_BASE_ADDR)+AIPI_BASE_ADDR_VIRT)'
+> 	arch/arm/kernel/debug.S:163: Error: constant expression expected -- `ldrne r3,=(((UART1_BASE_ADDR)-AIPI_BASE_ADDR)+AIPI_BASE_ADDR_VIRT)'
+> 
+> when compiling for mx2 with CONFIG_DEBUG_LL=y.  A similar error exists
+> on mx3 and is fixed by this commit, too.
 
-Ok, added to mxc-master
+Ok, added to mxc-master.
 
 Sascha
 
 > 
-> Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
-> Cc: Daniel Mack <daniel@caiaq.de>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  arch/arm/mach-mx3/mx31lite-db.c |   30 +++++++++++++++++++++---------
->  1 files changed, 21 insertions(+), 9 deletions(-)
+> These were introduced by aae7019382896cf1075a93acc564e42601bc44a2.
 > 
-> diff --git a/arch/arm/mach-mx3/mx31lite-db.c b/arch/arm/mach-mx3/mx31lite-db.c
-> index 694611d..ccd8742 100644
-> --- a/arch/arm/mach-mx3/mx31lite-db.c
-> +++ b/arch/arm/mach-mx3/mx31lite-db.c
-> @@ -67,6 +67,13 @@ static unsigned int litekit_db_board_pins[] __initdata = {
->  	MX31_PIN_CSPI1_SS0__SS0,
->  	MX31_PIN_CSPI1_SS1__SS1,
->  	MX31_PIN_CSPI1_SS2__SS2,
-> +	/* SDHC1 */
-> +	MX31_PIN_SD1_DATA0__SD1_DATA0,
-> +	MX31_PIN_SD1_DATA1__SD1_DATA1,
-> +	MX31_PIN_SD1_DATA2__SD1_DATA2,
-> +	MX31_PIN_SD1_DATA3__SD1_DATA3,
-> +	MX31_PIN_SD1_CLK__SD1_CLK,
-> +	MX31_PIN_SD1_CMD__SD1_CMD,
->  };
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+> Hello,
+> 
+> the offending commit is currently in mxc-master but not yet in rmk's
+> tree.
+> 
+> Best regards
+> Uwe
+> 
+>  arch/arm/plat-mxc/include/mach/debug-macro.S |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
+> index 15b2b14..21e0f07 100644
+> --- a/arch/arm/plat-mxc/include/mach/debug-macro.S
+> +++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
+> @@ -10,6 +10,7 @@
+>   * published by the Free Software Foundation.
+>   *
+>   */
+> +#define IMX_NEEDS_DEPRECATED_SYMBOLS
 >  
->  /* UART */
-> @@ -79,11 +86,11 @@ static struct imxuart_platform_data uart_pdata __initdata = {
->  static int gpio_det, gpio_wp;
->  
->  #define MMC_PAD_CFG (PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST | PAD_CTL_HYS_CMOS | \
-> -			PAD_CTL_ODE_CMOS | PAD_CTL_100K_PU)
-> +		     PAD_CTL_ODE_CMOS)
->  
->  static int mxc_mmc1_get_ro(struct device *dev)
->  {
-> -	return gpio_get_value(IOMUX_TO_GPIO(MX31_PIN_LCS0));
-> +	return gpio_get_value(IOMUX_TO_GPIO(MX31_PIN_GPIO1_6));
->  }
->  
->  static int mxc_mmc1_init(struct device *dev,
-> @@ -94,12 +101,17 @@ static int mxc_mmc1_init(struct device *dev,
->  	gpio_det = IOMUX_TO_GPIO(MX31_PIN_DCD_DCE1);
->  	gpio_wp = IOMUX_TO_GPIO(MX31_PIN_GPIO1_6);
->  
-> -	mxc_iomux_set_pad(MX31_PIN_SD1_DATA0, MMC_PAD_CFG);
-> -	mxc_iomux_set_pad(MX31_PIN_SD1_DATA1, MMC_PAD_CFG);
-> -	mxc_iomux_set_pad(MX31_PIN_SD1_DATA2, MMC_PAD_CFG);
-> -	mxc_iomux_set_pad(MX31_PIN_SD1_DATA3, MMC_PAD_CFG);
-> +	mxc_iomux_set_pad(MX31_PIN_SD1_DATA0,
-> +			  MMC_PAD_CFG | PAD_CTL_PUE_PUD | PAD_CTL_100K_PU);
-> +	mxc_iomux_set_pad(MX31_PIN_SD1_DATA1,
-> +			  MMC_PAD_CFG | PAD_CTL_PUE_PUD | PAD_CTL_100K_PU);
-> +	mxc_iomux_set_pad(MX31_PIN_SD1_DATA2,
-> +			  MMC_PAD_CFG | PAD_CTL_PUE_PUD | PAD_CTL_100K_PU);
-> +	mxc_iomux_set_pad(MX31_PIN_SD1_DATA3,
-> +			  MMC_PAD_CFG | PAD_CTL_PUE_PUD | PAD_CTL_100K_PU);
-> +	mxc_iomux_set_pad(MX31_PIN_SD1_CMD,
-> +			  MMC_PAD_CFG | PAD_CTL_PUE_PUD | PAD_CTL_100K_PU);
->  	mxc_iomux_set_pad(MX31_PIN_SD1_CLK, MMC_PAD_CFG);
-> -	mxc_iomux_set_pad(MX31_PIN_SD1_CMD, MMC_PAD_CFG);
->  
->  	ret = gpio_request(gpio_det, "MMC detect");
->  	if (ret)
-> @@ -113,7 +125,7 @@ static int mxc_mmc1_init(struct device *dev,
->  	gpio_direction_input(gpio_wp);
->  
->  	ret = request_irq(IOMUX_TO_IRQ(MX31_PIN_DCD_DCE1), detect_irq,
-> -			  IRQF_DISABLED | IRQF_TRIGGER_FALLING,
-> +			  IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
->  			  "MMC detect", data);
->  	if (ret)
->  		goto exit_free_wp;
-> @@ -133,7 +145,7 @@ static void mxc_mmc1_exit(struct device *dev, void *data)
->  {
->  	gpio_free(gpio_det);
->  	gpio_free(gpio_wp);
-> -	free_irq(IOMUX_TO_IRQ(MX31_PIN_GPIO1_1), data);
-> +	free_irq(IOMUX_TO_IRQ(MX31_PIN_DCD_DCE1), data);
->  }
->  
->  static struct imxmmc_platform_data mmc_pdata = {
+>  #ifdef CONFIG_ARCH_MX1
+>  #include <mach/mx1.h>
 > -- 
-> 1.6.5.4
+> 1.6.6
 > 
 > 
 
