@@ -1,93 +1,44 @@
-From: jassisinghbrar@gmail.com (jassi brar)
-Date: Tue, 26 Jan 2010 21:11:55 +0900
-Subject: [PATCH 2/3] ASoC: AC97: S3C: Add controller driver
-In-Reply-To: <20100126115258.GM15759@rakim.wolfsonmicro.main>
-References: <1264485101-13782-1-git-send-email-jassisinghbrar@gmail.com>
-	<1264485101-13782-2-git-send-email-jassisinghbrar@gmail.com>
-	<20100126104723.GF15759@rakim.wolfsonmicro.main>
-	<1b68c6791001260317k44893521vc0310ea35bac8ee1@mail.gmail.com>
-	<20100126115258.GM15759@rakim.wolfsonmicro.main>
-Message-ID: <1b68c6791001260411u2b39d8actf35a0f3541fda92d@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 26 Jan 2010 07:14:14 -0500
+Subject: [PATCH 01/01] regulator: support max8649
+In-Reply-To: <20100126120058.GN15759@rakim.wolfsonmicro.main>
+References: <771cded01001120041ue24edabk8e4638ef7151c947@mail.gmail.com>
+	<771cded01001120051l44fd76bx80d2fd4b6f60bd0b@mail.gmail.com>
+	<20100112115156.GA546@rakim.wolfsonmicro.main>
+	<771cded01001250301q465a9f8ma484f597ae9a292f@mail.gmail.com>
+	<20100125135628.GB26613@rakim.wolfsonmicro.main>
+	<771cded01001252226k342723b3p3ea235fe79c46843@mail.gmail.com>
+	<20100126110420.GI15759@rakim.wolfsonmicro.main>
+	<771cded01001260354y7c7db25bqa8bbfe000e0c0380@mail.gmail.com>
+	<20100126120058.GN15759@rakim.wolfsonmicro.main>
+Message-ID: <771cded01001260414q4c8df1e0k303772b87bc725eb@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2010 at 8:52 PM, Mark Brown
+On Tue, Jan 26, 2010 at 7:00 AM, Mark Brown
 <broonie@opensource.wolfsonmicro.com> wrote:
-> On Tue, Jan 26, 2010 at 08:17:25PM +0900, jassi brar wrote:
->> On Tue, Jan 26, 2010 at 7:47 PM, Mark Brown
+> On Tue, Jan 26, 2010 at 06:54:48AM -0500, Haojian Zhuang wrote:
+>> On Tue, Jan 26, 2010 at 6:04 AM, Mark Brown
 >
->> >> + ? ? default:
->> >> + ? ? ? ? ? ? s3c_ac97_cold_reset(ac97);
->> >> + ? ? ? ? ? ? s3c_ac97_warm_reset(ac97);
->> >> + ? ? ? ? ? ? break;
->> >> + ? ? }
+>> > I'd expect the time taken to enable to be the voltage multipled by the
+>> > step size rather than divided by the step size?
 >
->> > This automatic cold and warm reset looks a bit fishy - obviously if this
->> > code path ever gets hit in normal operation then it's going to seriously
->> > disrupt things since it'll reset the CODEC registers. ?A warm reset by
->> > itself wouldn't be a problem but I'd rather see explicit cold resets in
->> > the callers where that's required.
+>> I don't agree at this point. The unit of step is uV/uSec. The function
+>> should return uSec. So voltage divided by the step is more reasonable.
 >
->> Before read/write we need to ensure the link is active. And to reach the
->> active state we have to do that as suggested by the FSM shown in SoCs' Manual.
+> Ah, then the variable step is confusingly named since it's actually a
+> rate of change rather than a step size - I'd suggest rate or something
+> like that instead.
 >
-> That's not addressing the problem, though - the big issue is not
-> bringing up the AC97 link, it's the fact that you're doing an
-> uncontrolled cold reset. ?If we hit this code path it'll revert the
-> device registers to default which will upset the drivers for the CODEC
-> rather badly. ?There should be no possibility of that happening, if it
-> is happening it's something that callers really should know about.
-It should never be reached after the link is up and running. Only if something
-goes wrong at runtime, would the controller state be changed. And
-this is an attempt to recover from that failure. If the upper layer should
-know of such failure, then maybe we should not do it.
-I have never seen such runtime error though.
 
->> Also, this helps not relying on codec/core to perform particular steps
->> of initializations.
->
-> Equally well if the controller driver diverges from what other drivers
-> do it's going to lead to interoperability skew for drivers.
->
-> For the warm reset function I'd suggest adding something which checks to
-> see if the link is already active and suppresses the warm reset in that
-> case. ?That will avoid slowing everything down with spurious warm resets
-> when the link is already runnning and other drivers assume they need to
-> bring it up - with the way things are structured at present many warm
-> resets requested by other drivers are likely to be spurious.
-ok, i will add the check in warm reset.
+update this patch.
 
-> Ideally the core would keep track of this and transparently trigger the
-> warm reset when required, but driver local is fine since that's not
-> there yet.
->
->> >> + ? ? ac_glbctrl = S3C_AC97_GLBCTRL_ACLINKON;
->> >> + ? ? writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
->> >> + ? ? msleep(1);
->
->> > This also looks a bit odd, ACLINKON sounds like bringing up the link
->> > which is what a warm reset does.
->
->> As shown in FSM of SoCs manual, this sets the controller state to READY.
->> Please have a look at any manual's AC97 chapter.
->
-> Right, but why is this being done by this function and not, for example,
-> by the warm reset? ?It's the structure of the code I'm commenting on
-> rather than the operations that get performed on the hardware.
-I assume the ALSA definition of cold/warm reset is same as that of
-the AC97 controller. Anything remaining should be done only when necessary.
-For ex, the ALSA might want to leave controller after just cold/warm
-reset ... as
-the SoC manual says it's in low-power mode without the AC-link on.
-
->> >> +lb5:
->> >> + ? ? free_irq(irq_res->start, NULL);
->
->> > Perhaps a better name than 'lb' - err, or fail or something. ?lb means
->> > nothing to me at least.
->
->> means label to me :)
->
-> If you'd spelt out label I'd probably have been OK, but in English lb is
-> normally only an abbreviation for pounds as a unit of weight.
-ok, will rename the labels.
+Thanks
+Haojian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-regulator-enable-max8649-regulator-driver.patch
+Type: text/x-patch
+Size: 13589 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100126/29942fc8/attachment-0001.bin>
