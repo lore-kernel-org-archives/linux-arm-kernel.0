@@ -1,27 +1,93 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 26 Jan 2010 12:06:02 +0000
-Subject: [PATCH 2/4] mfd: update irq handler in max8925
-In-Reply-To: <771cded01001260331u541cc931x361d0719cd8fe00@mail.gmail.com>
-References: <771cded01001250308mfd2b3d2l76bc2a2df88e7b93@mail.gmail.com>
-	<20100125115930.GE22909@sirena.org.uk>
-	<771cded01001251912q67c9c2a5w3db61e9d7fe53cf9@mail.gmail.com>
-	<20100126112800.GL15759@rakim.wolfsonmicro.main>
-	<771cded01001260331u541cc931x361d0719cd8fe00@mail.gmail.com>
-Message-ID: <20100126120602.GP15759@rakim.wolfsonmicro.main>
+From: jassisinghbrar@gmail.com (jassi brar)
+Date: Tue, 26 Jan 2010 21:11:55 +0900
+Subject: [PATCH 2/3] ASoC: AC97: S3C: Add controller driver
+In-Reply-To: <20100126115258.GM15759@rakim.wolfsonmicro.main>
+References: <1264485101-13782-1-git-send-email-jassisinghbrar@gmail.com>
+	<1264485101-13782-2-git-send-email-jassisinghbrar@gmail.com>
+	<20100126104723.GF15759@rakim.wolfsonmicro.main>
+	<1b68c6791001260317k44893521vc0310ea35bac8ee1@mail.gmail.com>
+	<20100126115258.GM15759@rakim.wolfsonmicro.main>
+Message-ID: <1b68c6791001260411u2b39d8actf35a0f3541fda92d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2010 at 06:31:56AM -0500, Haojian Zhuang wrote:
-> On Tue, Jan 26, 2010 at 6:28 AM, Mark Brown
+On Tue, Jan 26, 2010 at 8:52 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Tue, Jan 26, 2010 at 08:17:25PM +0900, jassi brar wrote:
+>> On Tue, Jan 26, 2010 at 7:47 PM, Mark Brown
+>
+>> >> + ? ? default:
+>> >> + ? ? ? ? ? ? s3c_ac97_cold_reset(ac97);
+>> >> + ? ? ? ? ? ? s3c_ac97_warm_reset(ac97);
+>> >> + ? ? ? ? ? ? break;
+>> >> + ? ? }
+>
+>> > This automatic cold and warm reset looks a bit fishy - obviously if this
+>> > code path ever gets hit in normal operation then it's going to seriously
+>> > disrupt things since it'll reset the CODEC registers. ?A warm reset by
+>> > itself wouldn't be a problem but I'd rather see explicit cold resets in
+>> > the callers where that's required.
+>
+>> Before read/write we need to ensure the link is active. And to reach the
+>> active state we have to do that as suggested by the FSM shown in SoCs' Manual.
+>
+> That's not addressing the problem, though - the big issue is not
+> bringing up the AC97 link, it's the fact that you're doing an
+> uncontrolled cold reset. ?If we hit this code path it'll revert the
+> device registers to default which will upset the drivers for the CODEC
+> rather badly. ?There should be no possibility of that happening, if it
+> is happening it's something that callers really should know about.
+It should never be reached after the link is up and running. Only if something
+goes wrong at runtime, would the controller state be changed. And
+this is an attempt to recover from that failure. If the upper layer should
+know of such failure, then maybe we should not do it.
+I have never seen such runtime error though.
 
-> > and call handle_nested_irq() unconditionally, genirq should generate a
-> > warning and mask the IRQ if it's not handled which is what your code
-> > here is doing.
+>> Also, this helps not relying on codec/core to perform particular steps
+>> of initializations.
+>
+> Equally well if the controller driver diverges from what other drivers
+> do it's going to lead to interoperability skew for drivers.
+>
+> For the warm reset function I'd suggest adding something which checks to
+> see if the link is already active and suppresses the warm reset in that
+> case. ?That will avoid slowing everything down with spurious warm resets
+> when the link is already runnning and other drivers assume they need to
+> bring it up - with the way things are structured at present many warm
+> resets requested by other drivers are likely to be spurious.
+ok, i will add the check in warm reset.
 
-> Actually I can't find genirq reports any warning. I only find my code
-> reports warning message.
+> Ideally the core would keep track of this and transparently trigger the
+> warm reset when required, but driver local is fine since that's not
+> there yet.
+>
+>> >> + ? ? ac_glbctrl = S3C_AC97_GLBCTRL_ACLINKON;
+>> >> + ? ? writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+>> >> + ? ? msleep(1);
+>
+>> > This also looks a bit odd, ACLINKON sounds like bringing up the link
+>> > which is what a warm reset does.
+>
+>> As shown in FSM of SoCs manual, this sets the controller state to READY.
+>> Please have a look at any manual's AC97 chapter.
+>
+> Right, but why is this being done by this function and not, for example,
+> by the warm reset? ?It's the structure of the code I'm commenting on
+> rather than the operations that get performed on the hardware.
+I assume the ALSA definition of cold/warm reset is same as that of
+the AC97 controller. Anything remaining should be done only when necessary.
+For ex, the ALSA might want to leave controller after just cold/warm
+reset ... as
+the SoC manual says it's in low-power mode without the AC-link on.
 
-There's a threashold before the warning starts displaying, IIRC.  In any
-case, the handling of spurious IRQs isn't really an IRQ controller
-driver issue - it's a generic issue that affects all interrupt
-controllers.
+>> >> +lb5:
+>> >> + ? ? free_irq(irq_res->start, NULL);
+>
+>> > Perhaps a better name than 'lb' - err, or fail or something. ?lb means
+>> > nothing to me at least.
+>
+>> means label to me :)
+>
+> If you'd spelt out label I'd probably have been OK, but in English lb is
+> normally only an abbreviation for pounds as a unit of weight.
+ok, will rename the labels.
