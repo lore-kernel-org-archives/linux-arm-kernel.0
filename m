@@ -1,95 +1,41 @@
-From: vzapolskiy@gmail.com (Vladimir Zapolskiy)
-Date: Tue, 26 Jan 2010 14:00:40 +0300
-Subject: [PATCH v2] ARM: IMX31: configure pins iomux for SDHC setup on litekit
-	board.
-In-Reply-To: <fcda838a1001260257i1ba38e1chc886a72cc4a3193f@mail.gmail.com>
-References: <fcda838a1001260257i1ba38e1chc886a72cc4a3193f@mail.gmail.com>
-Message-ID: <1264503640-16948-1-git-send-email-vzapolskiy@gmail.com>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Tue, 26 Jan 2010 11:01:41 +0000
+Subject: [PATCH 01/01] regulator: support max8649
+In-Reply-To: <771cded01001252226k342723b3p3ea235fe79c46843@mail.gmail.com>
+References: <771cded01001120041ue24edabk8e4638ef7151c947@mail.gmail.com>
+	<771cded01001120051l44fd76bx80d2fd4b6f60bd0b@mail.gmail.com>
+	<20100112115156.GA546@rakim.wolfsonmicro.main>
+	<771cded01001250301q465a9f8ma484f597ae9a292f@mail.gmail.com>
+	<20100125135628.GB26613@rakim.wolfsonmicro.main>
+	<771cded01001252226k342723b3p3ea235fe79c46843@mail.gmail.com>
+Message-ID: <1264503701.3067.69.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds SDHC support, and corrects current pins setup.
-Added irq handling on card removal.
+On Tue, 2010-01-26 at 01:26 -0500, Haojian Zhuang wrote:
+> From 2b5a73c336d2b5dc48c8cf1f2a804b6968659f78 Mon Sep 17 00:00:00 2001
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date: Mon, 25 Jan 2010 10:24:09 -0500
+> Subject: [PATCH] regulator: enable max8649 regulator driver
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 
-Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
-Cc: Daniel Mack <daniel@caiaq.de>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-mx3/mx31lite-db.c |   30 +++++++++++++++++++++---------
- 1 files changed, 21 insertions(+), 9 deletions(-)
+Can you confirm all the changes compared to the last version. 
 
-diff --git a/arch/arm/mach-mx3/mx31lite-db.c b/arch/arm/mach-mx3/mx31lite-db.c
-index 694611d..ccd8742 100644
---- a/arch/arm/mach-mx3/mx31lite-db.c
-+++ b/arch/arm/mach-mx3/mx31lite-db.c
-@@ -67,6 +67,13 @@ static unsigned int litekit_db_board_pins[] __initdata = {
- 	MX31_PIN_CSPI1_SS0__SS0,
- 	MX31_PIN_CSPI1_SS1__SS1,
- 	MX31_PIN_CSPI1_SS2__SS2,
-+	/* SDHC1 */
-+	MX31_PIN_SD1_DATA0__SD1_DATA0,
-+	MX31_PIN_SD1_DATA1__SD1_DATA1,
-+	MX31_PIN_SD1_DATA2__SD1_DATA2,
-+	MX31_PIN_SD1_DATA3__SD1_DATA3,
-+	MX31_PIN_SD1_CLK__SD1_CLK,
-+	MX31_PIN_SD1_CMD__SD1_CMD,
- };
- 
- /* UART */
-@@ -79,11 +86,11 @@ static struct imxuart_platform_data uart_pdata __initdata = {
- static int gpio_det, gpio_wp;
- 
- #define MMC_PAD_CFG (PAD_CTL_DRV_MAX | PAD_CTL_SRE_FAST | PAD_CTL_HYS_CMOS | \
--			PAD_CTL_ODE_CMOS | PAD_CTL_100K_PU)
-+		     PAD_CTL_ODE_CMOS)
- 
- static int mxc_mmc1_get_ro(struct device *dev)
- {
--	return gpio_get_value(IOMUX_TO_GPIO(MX31_PIN_LCS0));
-+	return gpio_get_value(IOMUX_TO_GPIO(MX31_PIN_GPIO1_6));
- }
- 
- static int mxc_mmc1_init(struct device *dev,
-@@ -94,12 +101,17 @@ static int mxc_mmc1_init(struct device *dev,
- 	gpio_det = IOMUX_TO_GPIO(MX31_PIN_DCD_DCE1);
- 	gpio_wp = IOMUX_TO_GPIO(MX31_PIN_GPIO1_6);
- 
--	mxc_iomux_set_pad(MX31_PIN_SD1_DATA0, MMC_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_SD1_DATA1, MMC_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_SD1_DATA2, MMC_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_SD1_DATA3, MMC_PAD_CFG);
-+	mxc_iomux_set_pad(MX31_PIN_SD1_DATA0,
-+			  MMC_PAD_CFG | PAD_CTL_PUE_PUD | PAD_CTL_100K_PU);
-+	mxc_iomux_set_pad(MX31_PIN_SD1_DATA1,
-+			  MMC_PAD_CFG | PAD_CTL_PUE_PUD | PAD_CTL_100K_PU);
-+	mxc_iomux_set_pad(MX31_PIN_SD1_DATA2,
-+			  MMC_PAD_CFG | PAD_CTL_PUE_PUD | PAD_CTL_100K_PU);
-+	mxc_iomux_set_pad(MX31_PIN_SD1_DATA3,
-+			  MMC_PAD_CFG | PAD_CTL_PUE_PUD | PAD_CTL_100K_PU);
-+	mxc_iomux_set_pad(MX31_PIN_SD1_CMD,
-+			  MMC_PAD_CFG | PAD_CTL_PUE_PUD | PAD_CTL_100K_PU);
- 	mxc_iomux_set_pad(MX31_PIN_SD1_CLK, MMC_PAD_CFG);
--	mxc_iomux_set_pad(MX31_PIN_SD1_CMD, MMC_PAD_CFG);
- 
- 	ret = gpio_request(gpio_det, "MMC detect");
- 	if (ret)
-@@ -113,7 +125,7 @@ static int mxc_mmc1_init(struct device *dev,
- 	gpio_direction_input(gpio_wp);
- 
- 	ret = request_irq(IOMUX_TO_IRQ(MX31_PIN_DCD_DCE1), detect_irq,
--			  IRQF_DISABLED | IRQF_TRIGGER_FALLING,
-+			  IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
- 			  "MMC detect", data);
- 	if (ret)
- 		goto exit_free_wp;
-@@ -133,7 +145,7 @@ static void mxc_mmc1_exit(struct device *dev, void *data)
- {
- 	gpio_free(gpio_det);
- 	gpio_free(gpio_wp);
--	free_irq(IOMUX_TO_IRQ(MX31_PIN_GPIO1_1), data);
-+	free_irq(IOMUX_TO_IRQ(MX31_PIN_DCD_DCE1), data);
- }
- 
- static struct imxmmc_platform_data mmc_pdata = {
--- 
-1.6.5.4
+> +static int max8649_get_voltage(struct regulator_dev *rdev)
+> +{
+> +       struct max8649_regulator_info *info = rdev_get_drvdata(rdev);
+> +       unsigned char data;
+> +       int ret;
+> +
+> +       ret = max8649_reg_read(info->i2c, info->vol_reg);
+> +       if (ret < 0)
+> +               return ret;
+> +       data = (unsigned char)ret & MAX8649_VOL_MASK;
+> +       return (max8649_list_voltage(rdev, data));
+
+Any reason why we have extra () here ?
+
+Thanks
+
+Liam
