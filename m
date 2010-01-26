@@ -1,39 +1,65 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 26 Jan 2010 12:35:34 +0100
-Subject: whoever is using ymiao3@marvell.com please stop it
-In-Reply-To: <20100126052317.GY10014@trinity.fluff.org>
-References: <20100125014024.GA4609@trinity.fluff.org>
-	<f17812d71001251730p4747199bhd4176d5835073b56@mail.gmail.com>
-	<20100126052317.GY10014@trinity.fluff.org>
-Message-ID: <20100126113534.GF20792@pengutronix.de>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 26 Jan 2010 19:39:40 +0800
+Subject: gpio_keys and how PXA27x sets gpio_set_wake() (was Re: sharp
+	c-3000 aka spitz: fix warn_on introduced in 2.6.32-rc1)
+In-Reply-To: <1264502668.4480.97.camel@utx.utx.cz>
+References: <20100106071026.GD1382@ucw.cz>
+	<f17812d71001052317h2bf25fady6bd729b35ef6db63@mail.gmail.com>
+	<20100107065230.GA1303@ucw.cz>
+	<f17812d71001062333y2e49fa21scf91718da9ae3091@mail.gmail.com>
+	<1264275669.9100.11.camel@utx.utx.cz>
+	<1264286611.11766.49.camel@utx.utx.cz>
+	<f17812d71001251958t377e158bxc64aac0cb426110b@mail.gmail.com>
+	<1264500824.4480.79.camel@utx.utx.cz>
+	<f17812d71001260220v5d03b0e1u1e3bc229827c37c8@mail.gmail.com>
+	<1264502668.4480.97.camel@utx.utx.cz>
+Message-ID: <f17812d71001260339h6184c82bj25ff13a168284c24@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+2010/1/26 Stanislav Brabec <utx@penguin.cz>:
+> Eric Miao wrote:
+>> 2010/1/26 Stanislav Brabec <utx@penguin.cz>:
+>
+>> > Handling platform specific edge/level wake setup would only complicate
+>> > the code. (In fact, even the PXA270 platform code does not exist yet -
+>> > arch/arm/mach-pxa/mfp-pxa2xx.c:__mfp_config_gpio() is not capable to
+>> > configure Power Manager Keyboard Wake-Up Enable Register (PKWR).)
+>> That's why WAKEUP_ON_EDGE_* is introduced, no need for gpio-keys
+>> to know this.
+>
+> But WAKEUP_ON_EDGE_* is impossible for GPIO 95,
+> enable_irq_wake()/gpio_set_wake() returns EINVAL and disable_irq_wake()
+> complains on "Unbalanced IRQ 191".
+>
 
-On Tue, Jan 26, 2010 at 05:23:18AM +0000, Ben Dooks wrote:
-> On Tue, Jan 26, 2010 at 09:30:39AM +0800, Eric Miao wrote:
-> > That's mine original email, and is invalid now. Everyone please stop using it.
-I already run into that several times as I frequently use
-scripts/get_maintainer.pl.  IMHO we need a mechanism to deprecate email
-addresses, preferably using .mailmap as data source.  Other addresses
-that would need similar handling are (at least):
+Now I see, but I don't know why disable_irq_wake() will complains about
+unbalance since it should really manage it well.
 
-	12o3l at tiscali.nl -> roel.kluin at gmail.com
-	damm at igel.co.jp -> damm at opensource.se
-	eric.miao at marvell.com -> eric.y.miao at gmail.com
-	jarkko.nikula at nokia.com -> jhnikula at gmail.com
-	pavel at suse.cz -> pavel at ucw.cz
-	spyro at f2s.com -> ian at mnementh.co.uk
-	x0044955 at ti.com -> ??
+A quick dirty solution would be the platform to call keypad_set_wake()
+directly somewhere. Otherwise we have to let gpio_set_wake() to handle
+those keypad GPIOs and to live together with keypad_set_wake() happily,
+which is really difficult.
 
-I'd suggest to check if the address is listed in .mailmap and use the
-first entry for that person.  This would need some work to adapt
-.mailmap, as .mailmap mainly collects wrong entries.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                              | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                    | http://www.pengutronix.de/  |
+> In case of Zaurus, gpio_keys.c have to live with wakeup on level (PKWR)
+> when using enable/disable_irq_wake().
+>
+>> > The problem affects gpio_keys: It is a driver implementing "one key per
+>> > gpio". It now handles On/Off and lid switches on Zaurus. Lid switches
+>> > are on "normal" GPIOs, On/Off switch is wired to PKWR capable GPIO.
+>> Ain't On/Off switch one of the matrix key? And so SPITZ_GPIO_KEY_INT
+>> could be used to handle that?
+>
+> No. On/Off is connected directly to GPIO 95. Other keys use strobe/sense
+> matrix keypad.
+>
+> SPITZ_GPIO_KEY_INT is a bit unspecific. I think it means: Charger was
+> inserted or key was pressed or On/Off was pressed.
+>
+>
+>
+> ________________________________________________________________________
+> Stanislav Brabec
+> http://www.penguin.cz/~utx/zaurus
+>
+>
