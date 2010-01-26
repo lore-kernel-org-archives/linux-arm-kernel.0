@@ -1,87 +1,658 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 26 Jan 2010 18:20:13 +0800
-Subject: gpio_keys and how PXA27x sets gpio_set_wake() (was Re: sharp
-	c-3000 aka spitz: fix warn_on introduced in 2.6.32-rc1)
-In-Reply-To: <1264500824.4480.79.camel@utx.utx.cz>
-References: <20100106071026.GD1382@ucw.cz>
-	<f17812d71001052317h2bf25fady6bd729b35ef6db63@mail.gmail.com>
-	<20100107065230.GA1303@ucw.cz>
-	<f17812d71001062333y2e49fa21scf91718da9ae3091@mail.gmail.com>
-	<1264275669.9100.11.camel@utx.utx.cz>
-	<1264286611.11766.49.camel@utx.utx.cz>
-	<f17812d71001251958t377e158bxc64aac0cb426110b@mail.gmail.com>
-	<1264500824.4480.79.camel@utx.utx.cz>
-Message-ID: <f17812d71001260220v5d03b0e1u1e3bc229827c37c8@mail.gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Tue, 26 Jan 2010 10:23:43 +0000
+Subject: [PATCH 2/3] ASoC: AC97: S3C: Add controller driver
+In-Reply-To: <1264485101-13782-2-git-send-email-jassisinghbrar@gmail.com>
+References: <1264485101-13782-1-git-send-email-jassisinghbrar@gmail.com>
+	<1264485101-13782-2-git-send-email-jassisinghbrar@gmail.com>
+Message-ID: <20100126102343.GA24843@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/1/26 Stanislav Brabec <utx@penguin.cz>:
-> Eric Miao wrota:
->
->> I prefer 2) - the ugly and hardcoded setup in spitz_pm.c should really
->> be removed. That's why the gpio_set_wake() and keypad_set_wake()
->> are introduced.
->
-> I am unsure, whether gpio_keys driver is interested in the way, how wake
-> happens. I guess that is interested only in the fact, that wake
-> happened.
->
-> Handling platform specific edge/level wake setup would only complicate
-> the code. (In fact, even the PXA270 platform code does not exist yet -
-> arch/arm/mach-pxa/mfp-pxa2xx.c:__mfp_config_gpio() is not capable to
-> configure Power Manager Keyboard Wake-Up Enable Register (PKWR).)
->
+On Tue, Jan 26, 2010 at 02:51:40PM +0900, jassisinghbrar at gmail.com wrote:
+> From: Jassi Brar <jassi.brar@samsung.com>
+> 
+> Add the AC97 controller driver for Samsung SoCs that have one.
+> 
+> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
+> ---
+>  sound/soc/s3c24xx/Kconfig    |    6 +-
+>  sound/soc/s3c24xx/Makefile   |    3 +-
+>  sound/soc/s3c24xx/s3c-ac97.c |  535 ++++++++++++++++++++++++++++++++++++++++++
+>  sound/soc/s3c24xx/s3c-ac97.h |   23 ++
+>  4 files changed, 565 insertions(+), 2 deletions(-)
+>  create mode 100644 sound/soc/s3c24xx/s3c-ac97.c
+>  create mode 100644 sound/soc/s3c24xx/s3c-ac97.h
+> 
+> diff --git a/sound/soc/s3c24xx/Kconfig b/sound/soc/s3c24xx/Kconfig
+> index b489f1a..ad3690e 100644
+> --- a/sound/soc/s3c24xx/Kconfig
+> +++ b/sound/soc/s3c24xx/Kconfig
+> @@ -32,7 +32,11 @@ config SND_S3C2443_SOC_AC97
+>  	select S3C2410_DMA
+>  	select AC97_BUS
+>  	select SND_SOC_AC97_BUS
+> -	
+> +
+> +config SND_S3C_SOC_AC97
+> +	tristate
+> +	select SND_SOC_AC97_BUS
+> +
+>  config SND_S3C24XX_SOC_NEO1973_WM8753
+>  	tristate "SoC I2S Audio support for NEO1973 - WM8753"
+>  	depends on SND_S3C24XX_SOC && MACH_NEO1973_GTA01
+> diff --git a/sound/soc/s3c24xx/Makefile b/sound/soc/s3c24xx/Makefile
+> index b744657..b7411bd 100644
+> --- a/sound/soc/s3c24xx/Makefile
+> +++ b/sound/soc/s3c24xx/Makefile
+> @@ -4,12 +4,14 @@ snd-soc-s3c24xx-i2s-objs := s3c24xx-i2s.o
+>  snd-soc-s3c2412-i2s-objs := s3c2412-i2s.o
+>  snd-soc-s3c64xx-i2s-objs := s3c64xx-i2s.o
+>  snd-soc-s3c2443-ac97-objs := s3c2443-ac97.o
+> +snd-soc-s3c-ac97-objs := s3c-ac97.o
+>  snd-soc-s3c-i2s-v2-objs := s3c-i2s-v2.o
+>  snd-soc-s3c-pcm-objs := s3c-pcm.o
+>  
+>  obj-$(CONFIG_SND_S3C24XX_SOC) += snd-soc-s3c24xx.o
+>  obj-$(CONFIG_SND_S3C24XX_SOC_I2S) += snd-soc-s3c24xx-i2s.o
+>  obj-$(CONFIG_SND_S3C2443_SOC_AC97) += snd-soc-s3c2443-ac97.o
+> +obj-$(CONFIG_SND_S3C_SOC_AC97) += snd-soc-s3c-ac97.o
+>  obj-$(CONFIG_SND_S3C2412_SOC_I2S) += snd-soc-s3c2412-i2s.o
+>  obj-$(CONFIG_SND_S3C64XX_SOC_I2S) += snd-soc-s3c64xx-i2s.o
+>  obj-$(CONFIG_SND_S3C_I2SV2_SOC) += snd-soc-s3c-i2s-v2.o
+> @@ -37,4 +39,3 @@ obj-$(CONFIG_SND_S3C24XX_SOC_SIMTEC) += snd-soc-s3c24xx-simtec.o
+>  obj-$(CONFIG_SND_S3C24XX_SOC_SIMTEC_HERMES) += snd-soc-s3c24xx-simtec-hermes.o
+>  obj-$(CONFIG_SND_S3C24XX_SOC_SIMTEC_TLV320AIC23) += snd-soc-s3c24xx-simtec-tlv320aic23.o
+>  obj-$(CONFIG_SND_S3C64XX_SOC_WM8580) += snd-soc-smdk64xx-wm8580.o
+> -
+> diff --git a/sound/soc/s3c24xx/s3c-ac97.c b/sound/soc/s3c24xx/s3c-ac97.c
+> new file mode 100644
+> index 0000000..acb8f51
+> --- /dev/null
+> +++ b/sound/soc/s3c24xx/s3c-ac97.c
+> @@ -0,0 +1,535 @@
+> +/* sound/soc/s3c24xx/s3c-ac97.c
+> + *
+> + * ALSA SoC Audio Layer - S3C AC97 Controller driver
+> + * 	Evolved from s3c2443-ac97.c
+> + *
+> + * Copyright (c) 2010 Samsung Electronics Co. Ltd
+> + * 	Author: Jaswinder Singh <jassi.brar@samsung.com>
+> + * 	Credits: Graeme Gregory, Sean Choi
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/module.h>
+> +#include <linux/io.h>
+> +#include <linux/delay.h>
+> +#include <linux/clk.h>
+> +
+> +#include <sound/soc.h>
+> +
+> +#include <plat/regs-ac97.h>
+> +#include <mach/dma.h>
+> +#include <plat/audio.h>
+> +
+> +#include "s3c-dma.h"
+> +#include "s3c-ac97.h"
+> +
+> +#define AC_CMD_ADDR(x) (x << 16)
+> +#define AC_CMD_DATA(x) (x & 0xffff)
+> +
+> +struct s3c_ac97_info {
+> +	unsigned           state;
+> +	struct clk         *ac97_clk;
+> +	void __iomem	   *regs;
+> +	struct mutex       lock;
+> +	struct completion  done;
+> +};
+> +static struct s3c_ac97_info s3c_ac97;
+> +
+> +static struct s3c2410_dma_client s3c_dma_client_out = {
+> +	.name = "AC97 PCMOut"
+> +};
+> +
+> +static struct s3c2410_dma_client s3c_dma_client_in = {
+> +	.name = "AC97 PCMIn"
+> +};
+> +
+> +static struct s3c2410_dma_client s3c_dma_client_micin = {
+> +	.name = "AC97 MicIn"
+> +};
+> +
+> +static struct s3c_dma_params s3c_ac97_pcm_out = {
+> +	.client		= &s3c_dma_client_out,
+> +	.dma_size	= 4,
+> +};
+> +
+> +static struct s3c_dma_params s3c_ac97_pcm_in = {
+> +	.client		= &s3c_dma_client_in,
+> +	.dma_size	= 4,
+> +};
+> +
+> +static struct s3c_dma_params s3c_ac97_mic_in = {
+> +	.client		= &s3c_dma_client_micin,
+> +	.dma_size	= 4,
+> +};
+> +
+> +static void s3c_ac97_cold_reset(struct snd_ac97 *ac97)
+> +{
+> +	writel(S3C_AC97_GLBCTRL_COLDRESET,
+> +			s3c_ac97.regs + S3C_AC97_GLBCTRL);
+> +	msleep(1);
+> +
+> +	writel(0, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+> +	msleep(1);
+> +}
+> +
+> +static void s3c_ac97_warm_reset(struct snd_ac97 *ac97)
+> +{
+> +	writel(S3C_AC97_GLBCTRL_WARMRESET, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+> +	msleep(1);
+> +
+> +	writel(0, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+> +	msleep(1);
+> +}
 
-That's why WAKEUP_ON_EDGE_* is introduced, no need for gpio-keys
-to know this.
+It would be nice t osee something to convert a 'struct snd_ac97' to a 
+'struct s3c_ac97_info' as this is being passed in to most place and
+would also help if there is ever >1 block.
 
-> I talked to Vojt?ch Pavl?k and he told that 1 is correct: Follow
-> include/linux/interrupt.h. Setting edge/level wake mode should be done
-> in the platform file. The driver could use just irq_set_wake() and don't
-> care about details. And irq_set_wake() should do something useful even
-> for PKWR capable GPIO.
->
+> +static void s3c_ac97_activate(struct snd_ac97 *ac97)
+> +{
+> +	u32 ac_glbctrl, stat;
+> +
+> +	stat = readl(s3c_ac97.regs + S3C_AC97_GLBSTAT) & 0x7;
+> +	switch (stat) {
+> +	case S3C_AC97_GLBSTAT_MAINSTATE_ACTIVE:
+> +		return;
+> +	case S3C_AC97_GLBSTAT_MAINSTATE_READY:
+> +	case S3C_AC97_GLBSTAT_MAINSTATE_INIT:
+> +		break;
+> +	default:
+> +		s3c_ac97_cold_reset(ac97);
+> +		s3c_ac97_warm_reset(ac97);
+> +		break;
+> +	}
+> +
+> +	ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
+> +	ac_glbctrl = S3C_AC97_GLBCTRL_ACLINKON;
+> +	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+> +	msleep(1);
+> +
+> +	ac_glbctrl |= S3C_AC97_GLBCTRL_TRANSFERDATAENABLE;
+> +	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+> +	msleep(1);
+> +
+> +	ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
+> +	ac_glbctrl |= S3C_AC97_GLBCTRL_CODECREADYIE;
+> +	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+> +
+> +	INIT_COMPLETION(s3c_ac97.done);
+> +
+> +	if (!wait_for_completion_timeout(&s3c_ac97.done, HZ))
+> +		printk(KERN_ERR "AC97: Unable to activate!");
+> +}
+> +
+> +static unsigned short s3c_ac97_read(struct snd_ac97 *ac97,
+> +	unsigned short reg)
+> +{
+> +	u32 ac_glbctrl, ac_codec_cmd;
+> +	u32 stat, addr, data;
+> +
+> +	mutex_lock(&s3c_ac97.lock);
+> +
+> +	s3c_ac97_activate(ac97);
+> +
+> +	ac_codec_cmd = readl(s3c_ac97.regs + S3C_AC97_CODEC_CMD);
+> +	ac_codec_cmd = S3C_AC97_CODEC_CMD_READ | AC_CMD_ADDR(reg);
+> +	writel(ac_codec_cmd, s3c_ac97.regs + S3C_AC97_CODEC_CMD);
+> +
+> +	udelay(50);
+> +
+> +	ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
+> +	ac_glbctrl |= S3C_AC97_GLBCTRL_CODECREADYIE;
+> +	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+> +
+> +	INIT_COMPLETION(s3c_ac97.done);
+> +
+> +	if (!wait_for_completion_timeout(&s3c_ac97.done, HZ))
+> +		printk(KERN_ERR "AC97: Unable to read!");
+> +
+> +	stat = readl(s3c_ac97.regs + S3C_AC97_STAT);
+> +	addr = (stat >> 16) & 0x7f;
+> +	data = (stat & 0xffff);
+> +
+> +	if (addr != reg)
+> +		printk(KERN_ERR "s3c-ac97: req addr = %02x,"
+> +				" rep addr = %02x\n", reg, addr);
+> +
+> +	mutex_unlock(&s3c_ac97.lock);
+> +
+> +	return (unsigned short)data;
+> +}
+> +
+> +static void s3c_ac97_write(struct snd_ac97 *ac97, unsigned short reg,
+> +	unsigned short val)
+> +{
+> +	u32 ac_glbctrl, ac_codec_cmd;
+> +
+> +	mutex_lock(&s3c_ac97.lock);
+> +
+> +	s3c_ac97_activate(ac97);
+> +
+> +	ac_codec_cmd = readl(s3c_ac97.regs + S3C_AC97_CODEC_CMD);
+> +	ac_codec_cmd = AC_CMD_ADDR(reg) | AC_CMD_DATA(val);
+> +	writel(ac_codec_cmd, s3c_ac97.regs + S3C_AC97_CODEC_CMD);
+> +
+> +	udelay(50);
+> +
+> +	ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
+> +	ac_glbctrl |= S3C_AC97_GLBCTRL_CODECREADYIE;
+> +	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+> +
+> +	INIT_COMPLETION(s3c_ac97.done);
+> +
+> +	if (!wait_for_completion_timeout(&s3c_ac97.done, HZ))
+> +		printk(KERN_ERR "AC97: Unable to write!");
+> +
+> +	ac_codec_cmd = readl(s3c_ac97.regs + S3C_AC97_CODEC_CMD);
+> +	ac_codec_cmd |= S3C_AC97_CODEC_CMD_READ;
+> +	writel(ac_codec_cmd, s3c_ac97.regs + S3C_AC97_CODEC_CMD);
+> +
+> +	mutex_unlock(&s3c_ac97.lock);
+> +}
+> +
+> +static irqreturn_t s3c_ac97_irq(int irq, void *dev_id)
+> +{
+> +	u32 ac_glbctrl, ac_glbstat;
+> +
+> +	ac_glbstat = readl(s3c_ac97.regs + S3C_AC97_GLBSTAT);
+> +
+> +	if (ac_glbstat & S3C_AC97_GLBSTAT_CODECREADY) {
+> +
+> +		ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
+> +		ac_glbctrl &= ~S3C_AC97_GLBCTRL_CODECREADYIE;
+> +		writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+> +
+> +		ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
+> +		ac_glbctrl |= (1<<30); /* Clear interrupt */
+> +		writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+> +
+> +		complete(&s3c_ac97.done);
+> +	}
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +struct snd_ac97_bus_ops soc_ac97_ops = {
+> +	.read       = s3c_ac97_read,
+> +	.write      = s3c_ac97_write,
+> +	.warm_reset = s3c_ac97_warm_reset,
+> +	.reset      = s3c_ac97_cold_reset,
+> +};
+> +EXPORT_SYMBOL_GPL(soc_ac97_ops);
+> +
+> +static int s3c_ac97_hw_params(struct snd_pcm_substream *substream,
+> +				  struct snd_pcm_hw_params *params,
+> +				  struct snd_soc_dai *dai)
+> +{
+> +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+> +	struct snd_soc_dai *cpu_dai = rtd->dai->cpu_dai;
+> +
+> +	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+> +		cpu_dai->dma_data = &s3c_ac97_pcm_out;
+> +	else
+> +		cpu_dai->dma_data = &s3c_ac97_pcm_in;
+> +
+> +	return 0;
+> +}
+> +
+> +static int s3c_ac97_trigger(struct snd_pcm_substream *substream, int cmd,
+> +				struct snd_soc_dai *dai)
+> +{
+> +	u32 ac_glbctrl;
+> +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+> +	int channel = ((struct s3c_dma_params *)
+> +		  rtd->dai->cpu_dai->dma_data)->channel;
+> +
+> +	ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
+> +	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
+> +		ac_glbctrl &= ~S3C_AC97_GLBCTRL_PCMINTM_MASK;
+> +	else
+> +		ac_glbctrl &= ~S3C_AC97_GLBCTRL_PCMOUTTM_MASK;
+> +
+> +	switch (cmd) {
+> +	case SNDRV_PCM_TRIGGER_START:
+> +	case SNDRV_PCM_TRIGGER_RESUME:
+> +	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+> +		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
+> +			ac_glbctrl |= S3C_AC97_GLBCTRL_PCMINTM_DMA;
+> +		else
+> +			ac_glbctrl |= S3C_AC97_GLBCTRL_PCMOUTTM_DMA;
+> +		break;
+> +
+> +	case SNDRV_PCM_TRIGGER_STOP:
+> +	case SNDRV_PCM_TRIGGER_SUSPEND:
+> +	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+> +		break;
+> +	}
+> +
+> +	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+> +
+> +	s3c2410_dma_ctrl(channel, S3C2410_DMAOP_STARTED);
+> +
+> +	return 0;
+> +}
+> +
+> +static int s3c_ac97_hw_mic_params(struct snd_pcm_substream *substream,
+> +				      struct snd_pcm_hw_params *params,
+> +				      struct snd_soc_dai *dai)
+> +{
+> +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+> +	struct snd_soc_dai *cpu_dai = rtd->dai->cpu_dai;
+> +
+> +	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+> +		return -ENODEV;
+> +	else
+> +		cpu_dai->dma_data = &s3c_ac97_mic_in;
+> +
+> +	return 0;
+> +}
+> +
+> +static int s3c_ac97_mic_trigger(struct snd_pcm_substream *substream,
+> +				    int cmd, struct snd_soc_dai *dai)
+> +{
+> +	u32 ac_glbctrl;
+> +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+> +	int channel = ((struct s3c_dma_params *)
+> +		  rtd->dai->cpu_dai->dma_data)->channel;
+> +
+> +	ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
+> +	ac_glbctrl &= ~S3C_AC97_GLBCTRL_MICINTM_MASK;
+> +
+> +	switch (cmd) {
+> +	case SNDRV_PCM_TRIGGER_START:
+> +	case SNDRV_PCM_TRIGGER_RESUME:
+> +	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+> +		ac_glbctrl |= S3C_AC97_GLBCTRL_MICINTM_DMA;
+> +		break;
+> +
+> +	case SNDRV_PCM_TRIGGER_STOP:
+> +	case SNDRV_PCM_TRIGGER_SUSPEND:
+> +	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+> +		break;
+> +	}
+> +
+> +	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+> +
+> +	s3c2410_dma_ctrl(channel, S3C2410_DMAOP_STARTED);
+> +
+> +	return 0;
+> +}
+> +
+> +#define S3C_AC97_RATES (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_11025 |\
+> +		SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_22050 | \
+> +		SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_44100 | \
+> +		SNDRV_PCM_RATE_48000)
+> +
+> +static struct snd_soc_dai_ops s3c_ac97_dai_ops = {
+> +	.hw_params	= s3c_ac97_hw_params,
+> +	.trigger	= s3c_ac97_trigger,
+> +};
+> +
+> +static struct snd_soc_dai_ops s3c_ac97_mic_dai_ops = {
+> +	.hw_params	= s3c_ac97_hw_mic_params,
+> +	.trigger	= s3c_ac97_mic_trigger,
+> +};
+> +
+> +struct snd_soc_dai s3c_ac97_dai[] = {
+> +	[S3C_AC97_DAI_PCM] = {
+> +		.name =	"s3c-ac97",
+> +		.id = S3C_AC97_DAI_PCM,
+> +		.ac97_control = 1,
+> +		.playback = {
+> +			.stream_name = "AC97 Playback",
+> +			.channels_min = 2,
+> +			.channels_max = 2,
+> +			.rates = S3C_AC97_RATES,
+> +			.formats = SNDRV_PCM_FMTBIT_S16_LE,},
+> +		.capture = {
+> +			.stream_name = "AC97 Capture",
+> +			/* NOTE: If the codec ouputs just one slot,
+> +			 * it *seems* our AC97 controller reads the only
+> +			 * valid slot(if either 3 or 4) for PCM-In.
+> +			 * For such cases, we record Mono.
+> +			 */
+> +			.channels_min = 1,
+> +			.channels_max = 2,
+> +			.rates = S3C_AC97_RATES,
+> +			.formats = SNDRV_PCM_FMTBIT_S16_LE,},
+> +		.ops = &s3c_ac97_dai_ops,
+> +	},
+> +	[S3C_AC97_DAI_MIC] = {
+> +		.name = "s3c-ac97-mic",
+> +		.id = S3C_AC97_DAI_MIC,
+> +		.ac97_control = 1,
+> +		.capture = {
+> +			.stream_name = "AC97 Mic Capture",
+> +			.channels_min = 1,
+> +			/* NOTE: If the codec(like WM9713) can't ouput just
+> +			 * one slot, it *seems* our AC97 controller reads
+> +			 * two slots(if one of them is Slot-6) for MIC also.
+> +			 * For such cases, we record Stereo.
+> +			 */
+> +			.channels_max = 2,
+> +			.rates = S3C_AC97_RATES,
+> +			.formats = SNDRV_PCM_FMTBIT_S16_LE,},
+> +		.ops = &s3c_ac97_mic_dai_ops,
+> +	},
+> +};
+> +EXPORT_SYMBOL_GPL(s3c_ac97_dai);
+> +
+> +static __devinit int s3c_ac97_probe(struct platform_device *pdev)
+> +{
+> +	struct resource *mem_res, *dmatx_res, *dmarx_res, *dmamic_res, *irq_res;
+> +	struct s3c_audio_pdata *ac97_pdata;
+> +	int ret;
+> +
+> +	ac97_pdata = pdev->dev.platform_data;
+> +	if (!ac97_pdata || !ac97_pdata->cfg_gpio) {
+> +		dev_err(&pdev->dev, "cfg_gpio callback not provided!\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* Check for availability of necessary resource */
+> +	dmatx_res = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+> +	if (!dmatx_res) {
+> +		dev_err(&pdev->dev, "Unable to get AC97-TX dma resource\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	dmarx_res = platform_get_resource(pdev, IORESOURCE_DMA, 1);
+> +	if (!dmarx_res) {
+> +		dev_err(&pdev->dev, "Unable to get AC97-RX dma resource\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	dmamic_res = platform_get_resource(pdev, IORESOURCE_DMA, 2);
+> +	if (!dmamic_res) {
+> +		dev_err(&pdev->dev, "Unable to get AC97-MIC dma resource\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!mem_res) {
+> +		dev_err(&pdev->dev, "Unable to get register resource\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> +	if (!irq_res) {
+> +		dev_err(&pdev->dev, "AC97 IRQ not provided!\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	if (!request_mem_region(mem_res->start,
+> +				resource_size(mem_res), "s3c-ac97")) {
+> +		dev_err(&pdev->dev, "Unable to request register region\n");
+> +		return -EBUSY;
+> +	}
+> +
+> +	s3c_ac97_pcm_out.channel = dmatx_res->start;
+> +	s3c_ac97_pcm_out.dma_addr = mem_res->start + S3C_AC97_PCM_DATA;
+> +	s3c_ac97_pcm_in.channel = dmarx_res->start;
+> +	s3c_ac97_pcm_in.dma_addr = mem_res->start + S3C_AC97_PCM_DATA;
+> +	s3c_ac97_mic_in.channel = dmamic_res->start;
+> +	s3c_ac97_mic_in.dma_addr = mem_res->start + S3C_AC97_MIC_DATA;
+> +
+> +	init_completion(&s3c_ac97.done);
+> +	mutex_init(&s3c_ac97.lock);
+> +
+> +	s3c_ac97.regs = ioremap(mem_res->start, resource_size(mem_res));
+> +	if (s3c_ac97.regs == NULL) {
+> +		dev_err(&pdev->dev, "Unable to ioremap register region\n");
+> +		ret = -ENXIO;
+> +		goto lb1;
+> +	}
+> +
+> +	s3c_ac97.ac97_clk = clk_get(&pdev->dev, "ac97");
+> +	if (IS_ERR(s3c_ac97.ac97_clk)) {
+> +		dev_err(&pdev->dev, "s3c-ac97 failed to get ac97_clock\n");
+> +		ret = -ENODEV;
+> +		goto lb2;
+> +	}
+> +	clk_enable(s3c_ac97.ac97_clk);
+> +
+> +	if (ac97_pdata->cfg_gpio(pdev)) {
+> +		dev_err(&pdev->dev, "Unable to configure gpio\n");
+> +		ret = -EINVAL;
+> +		goto lb3;
+> +	}
+> +
+> +	ret = request_irq(irq_res->start, s3c_ac97_irq,
+> +					IRQF_DISABLED, "AC97", NULL);
+> +	if (ret < 0) {
+> +		printk(KERN_ERR "s3c-ac97: interrupt request failed.\n");
+> +		goto lb4;
+> +	}
+> +
+> +	s3c_ac97_dai[S3C_AC97_DAI_PCM].dev = &pdev->dev;
+> +	s3c_ac97_dai[S3C_AC97_DAI_MIC].dev = &pdev->dev;
+> +
+> +	ret = snd_soc_register_dais(s3c_ac97_dai, ARRAY_SIZE(s3c_ac97_dai));
+> +	if (ret)
+> +		goto lb5;
+> +
+> +	return 0;
+> +
+> +lb5:
+> +	free_irq(irq_res->start, NULL);
+> +lb4:
+> +lb3:
+> +	clk_disable(s3c_ac97.ac97_clk);
+> +	clk_put(s3c_ac97.ac97_clk);
+> +lb2:
+> +	iounmap(s3c_ac97.regs);
+> +lb1:
+> +	release_mem_region(mem_res->start, resource_size(mem_res));
+> +
+> +	return ret;
+> +}
+> +
+> +static __devexit int s3c_ac97_remove(struct platform_device *pdev)
+> +{
+> +	struct resource *mem_res, *irq_res;
+> +
+> +	snd_soc_unregister_dais(s3c_ac97_dai, ARRAY_SIZE(s3c_ac97_dai));
+> +
+> +	irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> +	if (irq_res)
+> +		free_irq(irq_res->start, NULL);
+> +
+> +	clk_disable(s3c_ac97.ac97_clk);
+> +	clk_put(s3c_ac97.ac97_clk);
+> +
+> +	iounmap(s3c_ac97.regs);
+> +
+> +	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (mem_res)
+> +		release_mem_region(mem_res->start, resource_size(mem_res));
+> +
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver s3c_ac97_driver = {
+> +	.probe  = s3c_ac97_probe,
+> +	.remove = s3c_ac97_remove,
+> +	.driver = {
+> +		.name = "s3c-ac97",
+> +		.owner = THIS_MODULE,
+> +	},
+> +};
+> +
+> +static int __init s3c_ac97_init(void)
+> +{
+> +	return platform_driver_register(&s3c_ac97_driver);
+> +}
+> +module_init(s3c_ac97_init);
+> +
+> +static void __exit s3c_ac97_exit(void)
+> +{
+> +	platform_driver_unregister(&s3c_ac97_driver);
+> +}
+> +module_exit(s3c_ac97_exit);
+> +
+> +MODULE_AUTHOR("Jaswinder Singh, <jassi.brar@samsung.com>");
+> +MODULE_DESCRIPTION("AC97 driver for the Samsung SoC");
+> +MODULE_LICENSE("GPL");
+> diff --git a/sound/soc/s3c24xx/s3c-ac97.h b/sound/soc/s3c24xx/s3c-ac97.h
+> new file mode 100644
+> index 0000000..2781983
+> --- /dev/null
+> +++ b/sound/soc/s3c24xx/s3c-ac97.h
+> @@ -0,0 +1,23 @@
+> +/* sound/soc/s3c24xx/s3c-ac97.h
+> + *
+> + * ALSA SoC Audio Layer - S3C AC97 Controller driver
+> + * 	Evolved from s3c2443-ac97.h
+> + *
+> + * Copyright (c) 2010 Samsung Electronics Co. Ltd
+> + * 	Author: Jaswinder Singh <jassi.brar@samsung.com>
+> + * 	Credits: Graeme Gregory, Sean Choi
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __S3C_AC97_H_
+> +#define __S3C_AC97_H_
+> +
+> +#define S3C_AC97_DAI_PCM 0
+> +#define S3C_AC97_DAI_MIC 1
+> +
+> +extern struct snd_soc_dai s3c_ac97_dai[];
+> +
+> +#endif /* __S3C_AC97_H_ */
+> -- 
+> 1.6.2.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-I don't mind if IRQF_TRIGGER_ will always be correct regarding the
-wakeup edge/level settings in MFP, but honestly - I don't think so.
 
->> keypad_set_wake() is really specifically introduced for use by pxa27x_keypad
->> and no generic GPIO stuffs. So it's really annoying a GPIO will use
->> the PKWR as a wakeup GPIO, I'd recommend one still get this hard coded
->> into the platform file, with combination of WAKEUP_ON_LEVEL_HIGH (which
->> is specifically designed for keypad GPIOs) and keypad_set_wake().
->
-> Well, keypad_set_wake() seems to be possibly broken for GPIO 38. Imagine
-> a device, that has a small keypad, but GPIO 38 has a different purpose
-> that requires an edge triggered wakeup (PWER). I think that
-> keypad_set_wake() reprograms it to PKWR.
+Out of interest, how similar are the two blocks and could the s3c2443
+case be elided into this one with some minimal checks for which one is
+currently in use?
 
-Unless someone specifies that by
+-- 
+Ben
 
-GPIO38_GPIO | WAKEUP_ON_LEVEL_HIGH,
-
-keypad_set_wake() will never try to enable the bit in PKWR.
-
->
-> The problem affects gpio_keys: It is a driver implementing "one key per
-> gpio". It now handles On/Off and lid switches on Zaurus. Lid switches
-> are on "normal" GPIOs, On/Off switch is wired to PKWR capable GPIO.
->
-
-Ain't On/Off switch one of the matrix key? And so SPITZ_GPIO_KEY_INT
-could be used to handle that?
-
->> The spitz, however, is doing a good job on this though it's using a GPIO
->> emulated matrix keypad, that there is a separate SPITZ_GPIO_KEY_INT,
->> which triggers whenever there is any key press on this matrix (I don't
->> know how that's designed in HW, but it seems to do that job), and
->> which can be setup as a GPIO wakeup.
->
-> SPITZ_GPIO_KEY_INT happens if AC adapter is connected or key is pressed.
-> Surprisingly, the key press logic is part of NAND flash controller CPLD.
-> SPITZ_GPIO_KEY_INT==0 - it makes possible to wake Zaurus even from deep
-> sleep by any key press. It would be impossible only with PKWR.
->
-> I guess that this and implementation of keypad_set_wake() is a reason,
-> why most devices suspend and resume correctly even if the irq_set_wake()
-> refuses to configure wake and the warning is only visible symptom.
+Q:      What's a light-year?
+A:      One-third less calories than a regular year.
