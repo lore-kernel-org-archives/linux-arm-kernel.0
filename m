@@ -1,63 +1,51 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 26 Jan 2010 22:28:40 +0100
-Subject: [PATCH 1/4] zImage: fix comments for cache_on,
-	cache_off and cache_clean_flush
+Date: Tue, 26 Jan 2010 22:28:43 +0100
+Subject: [PATCH 4/4] zImage: annotate debug functions about corrupted registers
 In-Reply-To: <20100126203835.GC17642@pengutronix.de>
 References: <20100126203835.GC17642@pengutronix.de>
-Message-ID: <1264541323-3454-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1264541323-3454-4-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds missing registers to the list of corrupted registers and
-removes a wrong comment about r9 on entry
-
-While at it the formatting of the comment to cache_off is changed to
-resemble the other two.
-
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/boot/compressed/head.S |   14 ++++++++------
- 1 files changed, 8 insertions(+), 6 deletions(-)
+ arch/arm/boot/compressed/head.S |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 4fddc50..7cbab3c 100644
+index 15534ea..04bb6b4 100644
 --- a/arch/arm/boot/compressed/head.S
 +++ b/arch/arm/boot/compressed/head.S
-@@ -339,9 +339,8 @@ params:		ldr	r0, =params_phys
-  *  r6 = processor ID
-  *  r7 = architecture number
-  *  r8 = atags pointer
-- *  r9 = run-time address of "start"  (???)
-  * On exit,
-- *  r1, r2, r3, r9, r10, r12 corrupted
-+ *  r0, r1, r2, r3, r9, r10, r12 corrupted
-  * This routine must preserve:
-  *  r4, r5, r6, r7, r8
-  */
-@@ -778,9 +777,12 @@ proc_types:
-  * Turn off the Cache and MMU.  ARMv3 does not support
-  * reading the control register, but ARMv4 does.
-  *
-- * On entry,  r6 = processor ID
-- * On exit,   r0, r1, r2, r3, r12 corrupted
-- * This routine must preserve: r4, r6, r7
-+ * On entry,
-+ *  r6 = processor ID
-+ * On exit,
-+ *  r0, r1, r2, r3, r10, r12 corrupted
-+ * This routine must preserve:
-+ *  r4, r6, r7
-  */
- 		.align	5
- cache_off:	mov	r3, #12			@ cache_off function
-@@ -855,7 +857,7 @@ __armv3_mmu_cache_off:
-  * On entry,
-  *  r6 = processor ID
-  * On exit,
-- *  r1, r2, r3, r11, r12 corrupted
-+ *  r1, r2, r3, r10, r11, r12 corrupted
-  * This routine must preserve:
-  *  r0, r4, r5, r6, r7
-  */
+@@ -1016,6 +1016,7 @@ __armv3_mpu_cache_flush:
+ phexbuf:	.space	12
+ 		.size	phexbuf, . - phexbuf
+ 
++@ phex corrupts {r0, r1, r2, r3}
+ phex:		adr	r3, phexbuf
+ 		mov	r2, #0
+ 		strb	r2, [r3, r1]
+@@ -1030,6 +1031,7 @@ phex:		adr	r3, phexbuf
+ 		strb	r2, [r3, r1]
+ 		b	1b
+ 
++@ puts corrupts {r0, r1, r2, r3}
+ puts:		loadsp	r3
+ 1:		ldrb	r2, [r0], #1
+ 		teq	r2, #0
+@@ -1044,12 +1046,14 @@ puts:		loadsp	r3
+ 		teq	r0, #0
+ 		bne	1b
+ 		mov	pc, lr
++@ putc corrupts {r0, r1, r2, r3}
+ putc:
+ 		mov	r2, r0
+ 		mov	r0, #0
+ 		loadsp	r3
+ 		b	2b
+ 
++@ memdump corrupts {r0, r1, r2, r3, r10, r11, r12, lr}
+ memdump:	mov	r12, r0
+ 		mov	r10, lr
+ 		mov	r11, #0
 -- 
 1.6.6
