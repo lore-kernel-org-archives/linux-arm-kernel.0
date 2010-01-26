@@ -1,48 +1,134 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Jan 2010 12:12:41 -0800
-Subject: [PATCH 03/14] omap: Remove old DEBUG_LL serial port options
+Date: Tue, 26 Jan 2010 12:12:43 -0800
+Subject: [PATCH 04/14] omap2/3: Make get_irqnr_and_base common for mach-omap2
+	multiboot
 In-Reply-To: <20100126200646.15382.52167.stgit@baageli.muru.com>
 References: <20100126200646.15382.52167.stgit@baageli.muru.com>
-Message-ID: <20100126201241.15382.82490.stgit@baageli.muru.com>
+Message-ID: <20100126201243.15382.49505.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are no longer needed. Note that zoom boards
-should now set their own function in uncompress.h
-and debug-macro.S for the external UART.
+Make get_irqnr_and_base common for mach-omap2 multiboot
+
+Thanks to a tip from Russell King <rmk+kernel@arm.linux.org.uk>,
+this also optimizes the code for non-multiboot configurations by
+using get_irqnr_preamble.
+
+Note that this will only work currently for 24xx and 34xx.
+Support for 44xx can be added later on for basic multiboot,
+and similar patch should be done for mach-omap1/entry-macro.S.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/plat-omap/Kconfig |   19 -------------------
- 1 files changed, 0 insertions(+), 19 deletions(-)
+ arch/arm/mach-omap2/include/mach/entry-macro.S |   77 ++++++++++++++++++------
+ 1 files changed, 57 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-index e2ea04a..484d6a9 100644
---- a/arch/arm/plat-omap/Kconfig
-+++ b/arch/arm/plat-omap/Kconfig
-@@ -141,25 +141,6 @@ config OMAP_DM_TIMER
- 	help
- 	 Select this option if you want to use OMAP Dual-Mode timers.
+diff --git a/arch/arm/mach-omap2/include/mach/entry-macro.S b/arch/arm/mach-omap2/include/mach/entry-macro.S
+index c7f1720..4fd6b1b 100644
+--- a/arch/arm/mach-omap2/include/mach/entry-macro.S
++++ b/arch/arm/mach-omap2/include/mach/entry-macro.S
+@@ -17,47 +17,84 @@
  
--choice
--	prompt "Low-level debug console UART"
--	depends on ARCH_OMAP
--	default OMAP_LL_DEBUG_NONE
+ #include <plat/omap24xx.h>
+ #include <plat/omap34xx.h>
 -
--config OMAP_LL_DEBUG_UART1
--	bool "UART1"
+-/* REVISIT: This should be set dynamically if CONFIG_MULTI_OMAP2 is selected */
+-#if defined(CONFIG_ARCH_OMAP2420) || defined(CONFIG_ARCH_OMAP2430)
+-#define OMAP2_VA_IC_BASE		OMAP2_L4_IO_ADDRESS(OMAP24XX_IC_BASE)
+-#elif defined(CONFIG_ARCH_OMAP34XX)
+-#define OMAP2_VA_IC_BASE		OMAP2_L4_IO_ADDRESS(OMAP34XX_IC_BASE)
+-#endif
+-#if defined(CONFIG_ARCH_OMAP4)
+ #include <plat/omap44xx.h>
+-#endif
+-#define INTCPS_SIR_IRQ_OFFSET	0x0040		/* Active interrupt offset */
+-#define	ACTIVEIRQ_MASK		0x7f		/* Active interrupt bits */
+ 
+ 		.macro	disable_fiq
+ 		.endm
+ 
+-		.macro  get_irqnr_preamble, base, tmp
+-		.endm
 -
--config OMAP_LL_DEBUG_UART2
--	bool "UART2"
--
--config OMAP_LL_DEBUG_UART3
--	bool "UART3"
--
--config OMAP_LL_DEBUG_NONE
--	bool "None"
--
--endchoice
--
- config OMAP_SERIAL_WAKE
- 	bool "Enable wake-up events for serial ports"
- 	depends on ARCH_OMAP1 && OMAP_MUX
+ 		.macro  arch_ret_to_user, tmp1, tmp2
+ 		.endm
+ 
+-#ifndef CONFIG_ARCH_OMAP4
++#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
++
++#define OMAP2_IRQ_BASE		OMAP2_L4_IO_ADDRESS(OMAP24XX_IC_BASE)
++#define OMAP3_IRQ_BASE		OMAP2_L4_IO_ADDRESS(OMAP34XX_IC_BASE)
++#define INTCPS_SIR_IRQ_OFFSET	0x0040		/* Active interrupt offset */
++#define	ACTIVEIRQ_MASK		0x7f		/* Active interrupt bits */
++
++		.pushsection .data
++omap_irq_base:	.word	0
++		.popsection
++
++#if defined(CONFIG_ARCH_OMAP2) && defined(CONFIG_ARCH_OMAP3)
++		/* Configure the interrupt base on the first interrupt */
++		.macro  get_irqnr_preamble, base, tmp
++9:
++		ldr	\base, =omap_irq_base	@ irq base address
++		ldr	\base, [\base, #0]	@ irq base value
++		cmp	\base, #0		@ already configured?
++		bne	9998f			@ nothing to do
++
++		mrc	p15, 0, \tmp, c0, c0, 0	@ get processor revision
++		and	\tmp, \tmp, #0x000f0000	@ only check architecture
++		cmp	\tmp, #0x00060000	@ is v6?
++		beq	2400f			@ found v6 so it's omap24xx
++		cmp	\tmp, #0x000f0000	@ is cortex?
++		beq	3400f			@ found v7 so it's omap34xx
++2400:		ldr	\base, =OMAP2_IRQ_BASE
++		ldr	\tmp, =omap_irq_base
++		str	\base, [\tmp, #0]
++		b	9b
++3400:		ldr	\base, =OMAP3_IRQ_BASE
++		ldr	\tmp, =omap_irq_base
++		str	\base, [\tmp, #0]
++		b	9b
++9998:
++		.endm
++#else
++		.macro  get_irqnr_preamble, base, tmp
++#ifdef CONFIG_ARCH_OMAP2
++		ldr	\base, =OMAP2_IRQ_BASE
++#else
++		ldr	\base, =OMAP3_IRQ_BASE
++#endif
++		.endm
++#endif
++		/* Check the pending interrupts. Note that base already set */
+ 		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+-		ldr	\base, =OMAP2_VA_IC_BASE
+ 		ldr	\irqnr, [\base, #0x98] /* IRQ pending reg 1 */
+ 		cmp	\irqnr, #0x0
+-		bne	2222f
++		bne	9999f
+ 		ldr	\irqnr, [\base, #0xb8] /* IRQ pending reg 2 */
+ 		cmp	\irqnr, #0x0
+-		bne	2222f
++		bne	9999f
+ 		ldr	\irqnr, [\base, #0xd8] /* IRQ pending reg 3 */
+ 		cmp	\irqnr, #0x0
+-2222:
++9999:
+ 		ldrne	\irqnr, [\base, #INTCPS_SIR_IRQ_OFFSET]
+ 		and	\irqnr, \irqnr, #ACTIVEIRQ_MASK /* Clear spurious bits */
+ 
+ 		.endm
+-#else
++#endif
++
++
++#ifdef CONFIG_ARCH_OMAP4
++
+ #define OMAP44XX_VA_GIC_CPU_BASE	OMAP2_L4_IO_ADDRESS(OMAP44XX_GIC_CPU_BASE)
+ 
++		.macro  get_irqnr_preamble, base, tmp
++		.endm
++
+ 		/*
+ 		 * The interrupt numbering scheme is defined in the
+ 		 * interrupt controller spec.  To wit:
