@@ -1,113 +1,20 @@
-From: t.fujak@samsung.com (Tomasz Fujak)
-Date: Tue, 26 Jan 2010 17:03:44 +0100
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 26 Jan 2010 16:09:29 +0000
 Subject: [PATCH 5/5] arm/perfevents: implement perf event support for ARMv6
-In-Reply-To: <201001211321.44682.jpihet@mvista.com>
+In-Reply-To: <000f01ca9ea1$22ca5890$685f09b0$%fujak@samsung.com>
 References: <1263471256-3739-1-git-send-email-jamie.iles@picochip.com>
 	<20100121093917.GB4908@wear.picochip.com>
 	<20100121103803.GA15663@n2100.arm.linux.org.uk>
 	<201001211321.44682.jpihet@mvista.com>
-Message-ID: <000f01ca9ea1$22ca5890$685f09b0$%fujak@samsung.com>
+	<000f01ca9ea1$22ca5890$685f09b0$%fujak@samsung.com>
+Message-ID: <20100126160929.GG4260@wear.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Where do I find a repository that contains the latest performance events/ARM
-efforts?
+On Tue, Jan 26, 2010 at 05:03:44PM +0100, Tomasz Fujak wrote:
+> Where do I find a repository that contains the latest performance events/ARM
+> efforts?
+I've just submitted the generic/ARMv6 stuff to the patch system. Hopefully
+this will end up in Russell's tree soon.
 
-
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> kernel-bounces at lists.infradead.org] On Behalf Of Jean Pihet
-> Sent: Thursday, January 21, 2010 1:22 PM
-> To: Russell King - ARM Linux
-> Cc: 'Jamie Iles'; Will Deacon; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 5/5] arm/perfevents: implement perf event support
-> for ARMv6
-> 
-> On Thursday 21 January 2010 11:38:03 Russell King - ARM Linux wrote:
-> > On Thu, Jan 21, 2010 at 10:28:26AM -0000, Will Deacon wrote:
-> > > Hi Jamie,
-> > >
-> > > * Jamie Iles wrote:
-> > > > Given the difficulty in determining the CPU type 100%, this
-> should be
-> > > > changed to:
-> > > >
-> > > > 	unsigned long cpuid = read_cpuid_id();
-> > > > 	unsigned long implementor = (cpuid & 0xFF000000) >> 24;
-> > > > 	unsigned long part_number = (cpuid & 0xFFF0);
-> > > >
-> > > > 	/* We only support ARM CPUs implemented by ARM at the
-> moment. */
-> > > > 	if (implementor == 0x41) {
-> > > > 		switch (part_number) {
-> > > > 		case 0xB360:
-> > > > 		case 0xB560:
-> > > > 			etc
-> > >
-> > > Whilst I understand that the whole cpuid thing is a complete mess
-> [I saw
-> > > the lkml posts yesterday], I'm not sure this is necessary for v7
-> cores.
-> > > For v7, the PMU is part of the architecture and so *must* be
-> implemented
-> > > in the way described in the ARM ARM [Chapter 9], regardless of the
-> > > implementer.
-> >
-> > This function is called whenever the PMU support is built in - and
-> > this is the first place a decision is made about how to handle stuff.
-> >
-> > Merely checking the part number without checking the implementer is
-> > nonsense - the part number is defined by the implmenter, not ARM, so
-> > the part number can only be interpreted with knowledge of the
-> > implementer.
-> >
-> > So, when v7 gets added, checking the main ID register is the wrong
-> > thing to do.
-> >
-> > Given that cpu_architecture() appears to have been redefined to
-> return
-> > the MMU architecture, we have no real way to properly determine if we
-> > have a v7 PMU present - in fact, the whole "are we v6 or v7 or
-> something
-> > later" question seems to be extremely muddy and indeterminant.
-> >
-> > So I don't think even checking cpu_architecture() == CPU_ARCH_ARMv7
-> > is the right thing either.
-> Agree. Here is the latest version of the detection code, after merging
-> Jamie's
-> latest version:
-> 
->         unsigned long cpuid = read_cpuid_id() & CPUID_MASK;
-> 
->         switch (cpuid) {
->         case 0xB360:    /* ARM1136 */
->         case 0xB560:    /* ARM1156 */
->         case 0xB760:    /* ARM1176 */
-> 	    ...
->                 break;
->         case 0xB020:    /* ARM11mpcore */
-> 	    ...
->                 break;
->         case 0xC080:    /* Cortex-A8 */
-> 	    ...
->                 break;
->         case 0xC090:    /* Cortex-A9 */
-> 	    ...
->                 break;
->         default:
->                 pr_info("no hardware support available\n");
->                 perf_max_events = -1;
->        }
->        ...
-> 
-> Is that OK if we just add 'if (implementor == 0x41) {' before the
-> switch
-> statement, as proposed above?
-> 
-> Jean
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Jamie
