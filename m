@@ -1,231 +1,367 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 26 Jan 2010 07:58:05 +0000
-Subject: [PATCH] ARM: S3C24XX: Move S3C2440/S3C2442 support from plat-s3c24xx
-	to mach-s3c2440
+Date: Tue, 26 Jan 2010 07:58:01 +0000
+Subject: [PATCH] ARM: S3C2442: Merge s3c2442.c and clock.c
 In-Reply-To: <1264492686-16901-1-git-send-email-ben-linux@fluff.org>
 References: <1264492686-16901-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <1264492686-16901-7-git-send-email-ben-linux@fluff.org>
+Message-ID: <1264492686-16901-3-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the old common S3C2440 and S3C2442 SoC support from plat-s3c24xx
-into mach-s3c2440 now this directory is serving both SoCs.
+Merge s3c2442.c and clock.c as the s3c242.c does not contain much and
+the clock parts are always built for s3c2442 anyway.
 
 Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/mach-s3c2440/Kconfig                      |   42 ++++++++++++++++++++
- arch/arm/mach-s3c2440/Makefile                     |    8 ++++
- .../{plat-s3c24xx => mach-s3c2440}/s3c244x-clock.c |    0
- .../{plat-s3c24xx => mach-s3c2440}/s3c244x-irq.c   |    0
- arch/arm/{plat-s3c24xx => mach-s3c2440}/s3c244x.c  |    2 +-
- arch/arm/plat-s3c24xx/Kconfig                      |   41 -------------------
- arch/arm/plat-s3c24xx/Makefile                     |    7 ---
- arch/arm/plat-s3c24xx/cpu.c                        |    2 +-
- arch/arm/plat-s3c24xx/{ => include/plat}/s3c244x.h |    2 +-
- 9 files changed, 53 insertions(+), 51 deletions(-)
- rename arch/arm/{plat-s3c24xx => mach-s3c2440}/s3c244x-clock.c (100%)
- rename arch/arm/{plat-s3c24xx => mach-s3c2440}/s3c244x-irq.c (100%)
- rename arch/arm/{plat-s3c24xx => mach-s3c2440}/s3c244x.c (99%)
- rename arch/arm/plat-s3c24xx/{ => include/plat}/s3c244x.h (92%)
+ arch/arm/mach-s3c2442/Makefile  |    1 -
+ arch/arm/mach-s3c2442/clock.c   |  153 ---------------------------------------
+ arch/arm/mach-s3c2442/s3c2442.c |  153 ++++++++++++++++++++++++++++++++++++---
+ 3 files changed, 142 insertions(+), 165 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c2442/clock.c
 
-diff --git a/arch/arm/mach-s3c2440/Kconfig b/arch/arm/mach-s3c2440/Kconfig
-index f496385..7f46526 100644
---- a/arch/arm/mach-s3c2440/Kconfig
-+++ b/arch/arm/mach-s3c2440/Kconfig
-@@ -27,6 +27,48 @@ config CPU_S3C2442
- 	help
- 	  Support for S3C2442 Samsung Mobile CPU based systems.
+diff --git a/arch/arm/mach-s3c2442/Makefile b/arch/arm/mach-s3c2442/Makefile
+index 2a909c6..7e31ccd 100644
+--- a/arch/arm/mach-s3c2442/Makefile
++++ b/arch/arm/mach-s3c2442/Makefile
+@@ -10,7 +10,6 @@ obj-n				:=
+ obj-				:=
  
-+config CPU_S3C244X
-+	bool
-+	depends on ARCH_S3C2410 && (CPU_S3C2440 || CPU_S3C2442)
-+	help
-+	  Support for S3C2440 and S3C2442 Samsung Mobile CPU based systems.
-+
-+
-+
-+config S3C2440_CPUFREQ
-+	bool "S3C2440/S3C2442 CPU Frequency scaling support"
-+	depends on CPU_FREQ_S3C24XX && (CPU_S3C2440 || CPU_S3C2442)
-+	select S3C2410_CPUFREQ_UTILS
-+	default y
-+	help
-+	  CPU Frequency scaling support for S3C2440 and S3C2442 SoC CPUs.
-+
-+config S3C2440_XTAL_12000000
-+	bool
-+	help
-+	  Indicate that the build needs to support 12MHz system
-+	  crystal.
-+
-+config S3C2440_XTAL_16934400
-+	bool
-+	help
-+	  Indicate that the build needs to support 16.9344MHz system
-+	  crystal.
-+
-+config S3C2440_PLL_12000000
-+	bool
-+	depends on S3C2440_CPUFREQ && S3C2440_XTAL_12000000
-+	default y if CPU_FREQ_S3C24XX_PLL
-+	help
-+	  PLL tables for S3C2440 or S3C2442 CPUs with 12MHz crystals.
-+
-+config S3C2440_PLL_16934400
-+	bool
-+	depends on S3C2440_CPUFREQ && S3C2440_XTAL_16934400
-+	default y if CPU_FREQ_S3C24XX_PLL
-+	help
-+	  PLL tables for S3C2440 or S3C2442 CPUs with 16.934MHz crystals.
-+
- config S3C2440_DMA
- 	bool
- 	depends on ARCH_S3C2410 && CPU_S3C24405B
-diff --git a/arch/arm/mach-s3c2440/Makefile b/arch/arm/mach-s3c2440/Makefile
-index e8412b3..c85ba32 100644
---- a/arch/arm/mach-s3c2440/Makefile
-+++ b/arch/arm/mach-s3c2440/Makefile
-@@ -16,6 +16,14 @@ obj-$(CONFIG_CPU_S3C2440)	+= irq.o
- obj-$(CONFIG_CPU_S3C2440)	+= clock.o
- obj-$(CONFIG_S3C2440_DMA)	+= dma.o
+ obj-$(CONFIG_CPU_S3C2442)	+= s3c2442.o
+-obj-$(CONFIG_CPU_S3C2442)	+= clock.o
  
-+obj-$(CONFIG_CPU_S3C244X)	+= s3c244x.o
-+obj-$(CONFIG_CPU_S3C244X)	+= s3c244x-irq.o
-+obj-$(CONFIG_CPU_S3C244X)	+= s3c244x-clock.o
-+obj-$(CONFIG_S3C2440_CPUFREQ)	+= s3c2440-cpufreq.o
-+
-+obj-$(CONFIG_S3C2440_PLL_12000000) += s3c2440-pll-12000000.o
-+obj-$(CONFIG_S3C2440_PLL_16934400) += s3c2440-pll-16934400.o
-+
  # Machine support
  
- obj-$(CONFIG_MACH_ANUBIS)	+= mach-anubis.o
-diff --git a/arch/arm/plat-s3c24xx/s3c244x-clock.c b/arch/arm/mach-s3c2440/s3c244x-clock.c
-similarity index 100%
-rename from arch/arm/plat-s3c24xx/s3c244x-clock.c
-rename to arch/arm/mach-s3c2440/s3c244x-clock.c
-diff --git a/arch/arm/plat-s3c24xx/s3c244x-irq.c b/arch/arm/mach-s3c2440/s3c244x-irq.c
-similarity index 100%
-rename from arch/arm/plat-s3c24xx/s3c244x-irq.c
-rename to arch/arm/mach-s3c2440/s3c244x-irq.c
-diff --git a/arch/arm/plat-s3c24xx/s3c244x.c b/arch/arm/mach-s3c2440/s3c244x.c
-similarity index 99%
-rename from arch/arm/plat-s3c24xx/s3c244x.c
-rename to arch/arm/mach-s3c2440/s3c244x.c
-index 12623a4..46e13db 100644
---- a/arch/arm/plat-s3c24xx/s3c244x.c
-+++ b/arch/arm/mach-s3c2440/s3c244x.c
-@@ -39,7 +39,7 @@
- 
- #include <plat/s3c2410.h>
- #include <plat/s3c2440.h>
--#include "s3c244x.h"
-+#include <plat/s3c244x.h>
- #include <plat/clock.h>
- #include <plat/devs.h>
- #include <plat/cpu.h>
-diff --git a/arch/arm/plat-s3c24xx/Kconfig b/arch/arm/plat-s3c24xx/Kconfig
-index a806f35..0cc5760 100644
---- a/arch/arm/plat-s3c24xx/Kconfig
-+++ b/arch/arm/plat-s3c24xx/Kconfig
-@@ -27,46 +27,6 @@ config S3C24XX_DCLK
- 	help
- 	  Clock code for supporting DCLK/CLKOUT on S3C24XX architectures
- 
--config CPU_S3C244X
--	bool
--	depends on ARCH_S3C2410 && (CPU_S3C2440 || CPU_S3C2442)
--	help
--	  Support for S3C2440 and S3C2442 Samsung Mobile CPU based systems.
+diff --git a/arch/arm/mach-s3c2442/clock.c b/arch/arm/mach-s3c2442/clock.c
+deleted file mode 100644
+index d9b692a..0000000
+--- a/arch/arm/mach-s3c2442/clock.c
++++ /dev/null
+@@ -1,153 +0,0 @@
+-/* linux/arch/arm/mach-s3c2442/clock.c
+- *
+- * Copyright (c) 2004-2005 Simtec Electronics
+- *	http://armlinux.simtec.co.uk/
+- *	Ben Dooks <ben@simtec.co.uk>
+- *
+- * S3C2442 Clock support
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+-*/
 -
--config S3C2440_CPUFREQ
--	bool "S3C2440/S3C2442 CPU Frequency scaling support"
--	depends on CPU_FREQ_S3C24XX && (CPU_S3C2440 || CPU_S3C2442)
--	select S3C2410_CPUFREQ_UTILS
--	default y
--	help
--	  CPU Frequency scaling support for S3C2440 and S3C2442 SoC CPUs.
+-#include <linux/init.h>
+-#include <linux/module.h>
+-#include <linux/kernel.h>
+-#include <linux/list.h>
+-#include <linux/errno.h>
+-#include <linux/err.h>
+-#include <linux/device.h>
+-#include <linux/sysdev.h>
+-#include <linux/interrupt.h>
+-#include <linux/ioport.h>
+-#include <linux/mutex.h>
+-#include <linux/clk.h>
+-#include <linux/io.h>
 -
--config S3C2440_XTAL_12000000
--	bool
--	help
--	  Indicate that the build needs to support 12MHz system
--	  crystal.
+-#include <mach/hardware.h>
+-#include <asm/atomic.h>
+-#include <asm/irq.h>
 -
--config S3C2440_XTAL_16934400
--	bool
--	help
--	  Indicate that the build needs to support 16.9344MHz system
--	  crystal.
+-#include <mach/regs-clock.h>
 -
--config S3C2440_PLL_12000000
--	bool
--	depends on S3C2440_CPUFREQ && S3C2440_XTAL_12000000
--	default y if CPU_FREQ_S3C24XX_PLL
--	help
--	  PLL tables for S3C2440 or S3C2442 CPUs with 12MHz crystals.
+-#include <plat/clock.h>
+-#include <plat/cpu.h>
 -
--config S3C2440_PLL_16934400
--	bool
--	depends on S3C2440_CPUFREQ && S3C2440_XTAL_16934400
--	default y if CPU_FREQ_S3C24XX_PLL
--	help
--	  PLL tables for S3C2440 or S3C2442 CPUs with 16.934MHz crystals.
+-/* S3C2442 extended clock support */
 -
- config S3C24XX_PWM
- 	bool "PWM device support"
- 	select HAVE_PWM
-@@ -74,7 +34,6 @@ config S3C24XX_PWM
- 	  Support for exporting the PWM timer blocks via the pwm device
- 	  system.
- 
+-static unsigned long s3c2442_camif_upll_round(struct clk *clk,
+-					      unsigned long rate)
+-{
+-	unsigned long parent_rate = clk_get_rate(clk->parent);
+-	int div;
 -
- # gpio configurations
- 
- config S3C24XX_GPIO_EXTRA
-diff --git a/arch/arm/plat-s3c24xx/Makefile b/arch/arm/plat-s3c24xx/Makefile
-index e010026..c2237c4 100644
---- a/arch/arm/plat-s3c24xx/Makefile
-+++ b/arch/arm/plat-s3c24xx/Makefile
-@@ -25,13 +25,6 @@ obj-$(CONFIG_CPU_FREQ_S3C24XX_DEBUGFS) += cpu-freq-debugfs.o
- 
- # Architecture dependant builds
- 
--obj-$(CONFIG_CPU_S3C244X)	+= s3c244x.o
--obj-$(CONFIG_CPU_S3C244X)	+= s3c244x-irq.o
--obj-$(CONFIG_CPU_S3C244X)	+= s3c244x-clock.o
--obj-$(CONFIG_S3C2440_CPUFREQ)	+= s3c2440-cpufreq.o
--obj-$(CONFIG_S3C2440_PLL_12000000) += s3c2440-pll-12000000.o
--obj-$(CONFIG_S3C2440_PLL_16934400) += s3c2440-pll-16934400.o
+-	if (rate > parent_rate)
+-		return parent_rate;
 -
- obj-$(CONFIG_PM_SIMTEC)		+= pm-simtec.o
- obj-$(CONFIG_PM)		+= pm.o
- obj-$(CONFIG_PM)		+= irq-pm.o
-diff --git a/arch/arm/plat-s3c24xx/cpu.c b/arch/arm/plat-s3c24xx/cpu.c
-index 4af9dd9..6ecf87a 100644
---- a/arch/arm/plat-s3c24xx/cpu.c
-+++ b/arch/arm/plat-s3c24xx/cpu.c
-@@ -49,7 +49,7 @@
- #include <plat/s3c2400.h>
- #include <plat/s3c2410.h>
- #include <plat/s3c2412.h>
--#include "s3c244x.h"
-+#include <plat/s3c244x.h>
- #include <plat/s3c2440.h>
- #include <plat/s3c2442.h>
- #include <plat/s3c2443.h>
-diff --git a/arch/arm/plat-s3c24xx/s3c244x.h b/arch/arm/plat-s3c24xx/include/plat/s3c244x.h
-similarity index 92%
-rename from arch/arm/plat-s3c24xx/s3c244x.h
-rename to arch/arm/plat-s3c24xx/include/plat/s3c244x.h
-index 6aab5ea..8da0904 100644
---- a/arch/arm/plat-s3c24xx/s3c244x.h
-+++ b/arch/arm/plat-s3c24xx/include/plat/s3c244x.h
-@@ -1,4 +1,4 @@
--/* linux/arch/arm/plat-s3c24xx/s3c244x.h
-+/* linux/arch/arm/plat-s3c24xx/include/plat/s3c244x.h
+-	div = parent_rate / rate;
+-
+-	if (div == 3)
+-		return parent_rate / 3;
+-
+-	/* note, we remove the +/- 1 calculations for the divisor */
+-
+-	div /= 2;
+-
+-	if (div < 1)
+-		div = 1;
+-	else if (div > 16)
+-		div = 16;
+-
+-	return parent_rate / (div * 2);
+-}
+-
+-static int s3c2442_camif_upll_setrate(struct clk *clk, unsigned long rate)
+-{
+-	unsigned long parent_rate = clk_get_rate(clk->parent);
+-	unsigned long camdivn =  __raw_readl(S3C2440_CAMDIVN);
+-
+-	rate = s3c2442_camif_upll_round(clk, rate);
+-
+-	camdivn &= ~S3C2442_CAMDIVN_CAMCLK_DIV3;
+-
+-	if (rate == parent_rate) {
+-		camdivn &= ~S3C2440_CAMDIVN_CAMCLK_SEL;
+-	} else if ((parent_rate / rate) == 3) {
+-		camdivn |= S3C2440_CAMDIVN_CAMCLK_SEL;
+-		camdivn |= S3C2442_CAMDIVN_CAMCLK_DIV3;
+-	} else {
+-		camdivn &= ~S3C2440_CAMDIVN_CAMCLK_MASK;
+-		camdivn |= S3C2440_CAMDIVN_CAMCLK_SEL;
+-		camdivn |= (((parent_rate / rate) / 2) - 1);
+-	}
+-
+-	__raw_writel(camdivn, S3C2440_CAMDIVN);
+-
+-	return 0;
+-}
+-
+-/* Extra S3C2442 clocks */
+-
+-static struct clk s3c2442_clk_cam = {
+-	.name		= "camif",
+-	.id		= -1,
+-	.enable		= s3c2410_clkcon_enable,
+-	.ctrlbit	= S3C2440_CLKCON_CAMERA,
+-};
+-
+-static struct clk s3c2442_clk_cam_upll = {
+-	.name		= "camif-upll",
+-	.id		= -1,
+-	.ops		= &(struct clk_ops) {
+-		.set_rate	= s3c2442_camif_upll_setrate,
+-		.round_rate	= s3c2442_camif_upll_round,
+-	},
+-};
+-
+-static int s3c2442_clk_add(struct sys_device *sysdev)
+-{
+-	struct clk *clock_upll;
+-	struct clk *clock_h;
+-	struct clk *clock_p;
+-
+-	clock_p = clk_get(NULL, "pclk");
+-	clock_h = clk_get(NULL, "hclk");
+-	clock_upll = clk_get(NULL, "upll");
+-
+-	if (IS_ERR(clock_p) || IS_ERR(clock_h) || IS_ERR(clock_upll)) {
+-		printk(KERN_ERR "S3C2442: Failed to get parent clocks\n");
+-		return -EINVAL;
+-	}
+-
+-	s3c2442_clk_cam.parent = clock_h;
+-	s3c2442_clk_cam_upll.parent = clock_upll;
+-
+-	s3c24xx_register_clock(&s3c2442_clk_cam);
+-	s3c24xx_register_clock(&s3c2442_clk_cam_upll);
+-
+-	clk_disable(&s3c2442_clk_cam);
+-
+-	return 0;
+-}
+-
+-static struct sysdev_driver s3c2442_clk_driver = {
+-	.add	= s3c2442_clk_add,
+-};
+-
+-static __init int s3c2442_clk_init(void)
+-{
+-	return sysdev_driver_register(&s3c2442_sysclass, &s3c2442_clk_driver);
+-}
+-
+-arch_initcall(s3c2442_clk_init);
+diff --git a/arch/arm/mach-s3c2442/s3c2442.c b/arch/arm/mach-s3c2442/s3c2442.c
+index 4663bdc..188ad1e 100644
+--- a/arch/arm/mach-s3c2442/s3c2442.c
++++ b/arch/arm/mach-s3c2442/s3c2442.c
+@@ -1,27 +1,158 @@
+ /* linux/arch/arm/mach-s3c2442/s3c2442.c
   *
-  * Copyright (c) 2004-2005 Simtec Electronics
-  *	Ben Dooks <ben@simtec.co.uk>
+- * Copyright (c) 2006 Simtec Electronics
+- *   Ben Dooks <ben@simtec.co.uk>
++ * Copyright (c) 2004-2005 Simtec Electronics
++ *	http://armlinux.simtec.co.uk/
++ *	Ben Dooks <ben@simtec.co.uk>
+  *
+- * Samsung S3C2442 Mobile CPU support
++ * S3C2442 core and lock support
+  *
+  * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+ 
++#include <linux/init.h>
++#include <linux/module.h>
+ #include <linux/kernel.h>
+-#include <linux/types.h>
+-#include <linux/interrupt.h>
+ #include <linux/list.h>
+-#include <linux/timer.h>
+-#include <linux/init.h>
+-#include <linux/serial_core.h>
++#include <linux/errno.h>
++#include <linux/err.h>
++#include <linux/device.h>
+ #include <linux/sysdev.h>
++#include <linux/interrupt.h>
++#include <linux/ioport.h>
++#include <linux/mutex.h>
++#include <linux/clk.h>
++#include <linux/io.h>
+ 
+-#include <plat/s3c2442.h>
++#include <mach/hardware.h>
++#include <asm/atomic.h>
++#include <asm/irq.h>
++
++#include <mach/regs-clock.h>
++
++#include <plat/clock.h>
+ #include <plat/cpu.h>
+ 
++/* S3C2442 extended clock support */
++
++static unsigned long s3c2442_camif_upll_round(struct clk *clk,
++					      unsigned long rate)
++{
++	unsigned long parent_rate = clk_get_rate(clk->parent);
++	int div;
++
++	if (rate > parent_rate)
++		return parent_rate;
++
++	div = parent_rate / rate;
++
++	if (div == 3)
++		return parent_rate / 3;
++
++	/* note, we remove the +/- 1 calculations for the divisor */
++
++	div /= 2;
++
++	if (div < 1)
++		div = 1;
++	else if (div > 16)
++		div = 16;
++
++	return parent_rate / (div * 2);
++}
++
++static int s3c2442_camif_upll_setrate(struct clk *clk, unsigned long rate)
++{
++	unsigned long parent_rate = clk_get_rate(clk->parent);
++	unsigned long camdivn =  __raw_readl(S3C2440_CAMDIVN);
++
++	rate = s3c2442_camif_upll_round(clk, rate);
++
++	camdivn &= ~S3C2442_CAMDIVN_CAMCLK_DIV3;
++
++	if (rate == parent_rate) {
++		camdivn &= ~S3C2440_CAMDIVN_CAMCLK_SEL;
++	} else if ((parent_rate / rate) == 3) {
++		camdivn |= S3C2440_CAMDIVN_CAMCLK_SEL;
++		camdivn |= S3C2442_CAMDIVN_CAMCLK_DIV3;
++	} else {
++		camdivn &= ~S3C2440_CAMDIVN_CAMCLK_MASK;
++		camdivn |= S3C2440_CAMDIVN_CAMCLK_SEL;
++		camdivn |= (((parent_rate / rate) / 2) - 1);
++	}
++
++	__raw_writel(camdivn, S3C2440_CAMDIVN);
++
++	return 0;
++}
++
++/* Extra S3C2442 clocks */
++
++static struct clk s3c2442_clk_cam = {
++	.name		= "camif",
++	.id		= -1,
++	.enable		= s3c2410_clkcon_enable,
++	.ctrlbit	= S3C2440_CLKCON_CAMERA,
++};
++
++static struct clk s3c2442_clk_cam_upll = {
++	.name		= "camif-upll",
++	.id		= -1,
++	.ops		= &(struct clk_ops) {
++		.set_rate	= s3c2442_camif_upll_setrate,
++		.round_rate	= s3c2442_camif_upll_round,
++	},
++};
++
++static int s3c2442_clk_add(struct sys_device *sysdev)
++{
++	struct clk *clock_upll;
++	struct clk *clock_h;
++	struct clk *clock_p;
++
++	clock_p = clk_get(NULL, "pclk");
++	clock_h = clk_get(NULL, "hclk");
++	clock_upll = clk_get(NULL, "upll");
++
++	if (IS_ERR(clock_p) || IS_ERR(clock_h) || IS_ERR(clock_upll)) {
++		printk(KERN_ERR "S3C2442: Failed to get parent clocks\n");
++		return -EINVAL;
++	}
++
++	s3c2442_clk_cam.parent = clock_h;
++	s3c2442_clk_cam_upll.parent = clock_upll;
++
++	s3c24xx_register_clock(&s3c2442_clk_cam);
++	s3c24xx_register_clock(&s3c2442_clk_cam_upll);
++
++	clk_disable(&s3c2442_clk_cam);
++
++	return 0;
++}
++
++static struct sysdev_driver s3c2442_clk_driver = {
++	.add	= s3c2442_clk_add,
++};
++
++static __init int s3c2442_clk_init(void)
++{
++	return sysdev_driver_register(&s3c2442_sysclass, &s3c2442_clk_driver);
++}
++
++arch_initcall(s3c2442_clk_init);
++
++
+ static struct sys_device s3c2442_sysdev = {
+ 	.cls		= &s3c2442_sysclass,
+ };
 -- 
 1.6.0.4
