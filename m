@@ -1,36 +1,57 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 26 Jan 2010 10:25:32 +0100
-Subject: S5PC100 squashing
-In-Reply-To: <20100126083201.GZ10014@trinity.fluff.org>
-References: <20100126083201.GZ10014@trinity.fluff.org>
-Message-ID: <000001ca9e69$85087880$8f196980$%szyprowski@samsung.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 26 Jan 2010 01:52:17 -0800
+Subject: [PATCH v2] input: MXC: add mxc-keypad driver to support the
+	Keypad Port present in the mxc application processors family.
+In-Reply-To: <1263664125.4350.18.camel@realization>
+References: <1262977099.2050.75.camel@climbing-alby>
+	<BD79186B4FD85F4B8E60E381CAEE190902089738@mi8nycmail19.Mi8.com>
+	<1263664125.4350.18.camel@realization>
+Message-ID: <20100126095217.GC3480@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Alberto,
 
-On Tuesday, January 26, 2010 9:32 AM Ben Dooks wrote:
+On Sat, Jan 16, 2010 at 06:48:45PM +0100, Alberto Panizzo wrote:
+> Version 2 for this driver proposal.
+> --------------------------------------------------------------------------------
+> The MXC family of Application Processors is shipped with a Keypad Port 
+> supported now by this driver.
+> 
+> The peripheral can control up to an 8x8 matrix key pad where all the scanning 
+> procedure is done via software.
+> 
+> The hardware provide two interrupts: one for a key pressed (KDI) and one for 
+> all key releases (KRI). There is also a simple circuit for glitch reduction 
+> (said for synchronization) made by two series of 3 D-latches clocked by the 
+> keypad-clock that stabilize the interrupts sources.
+> KDI and KRI are fired only if the respective conditions are maintained for at 
+> last 4 keypad-clock cycle.
+> 
+> Those simple synchronization circuits are used also for multiple key pressures: 
+> between a KDI and a KRI the driver reset the sync circuit and re-enable the KDI
+> interrupt so after 3 keypad-clock cycle another KDI is fired making possible to
+> repeat the matrix scan operation.
+> 
 
-> Does anyone have any opinion on whether plat-s5pc1xx should stay? At the
-> moment it is only servicing mach-s5pc100 and thenew support for v210 and
-> s5pc110 seem to be using plat-s5p and not plat-s5pc1xx.
+Nicely looking driver, thank you.
 
-I vote for moving s5pc100 support to plat-s5p directory and removing
-plat-s5pc1xx dir completely. I want to prepare patches for this, but
-waited until S5PV210 support gets merged.
+> This algorithm is done via a threaded management of the keypad interrupt source
+> and delayed by a proper (and longer) debounce interval controlled by the 
+> platform initialization.
 
-> From the looks of it, s5pc100-init.c could probably be pushed into
-> the arch/arm/mach-s5pc100/cpu.c file. The s5pc100-clock.c should be
-> moved into arch/arm/mach-s5pc100/ as well.
+This I am not so sure about - the core of the matrix scan routine does
+not sleep so I wonder if starting a separate thread is not too wasteful
+in this case - you can easily do whan you want with a timer, no?
 
-Right.
+> +
+> +	/*
+> +	 * Search for rows and cols enabled
+> +	 */
+> +	keymap_data = (struct matrix_keymap_data *) pdata->keymap_data;
 
-> Not sure yet what to do with the rest.
+Why do you need to cast away constness instead of declaring keymap_data
+as const pointer?
 
-Most of c100-specific code should be moved to mach-s5pc100 directory.
-The rest can be probably shared with all S5P platforms. 
-
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+-- 
+Dmitry
