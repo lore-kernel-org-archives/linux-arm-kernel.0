@@ -1,61 +1,76 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 25 Jan 2010 22:13:31 -0500
-Subject: [PATCH 4/4] power_supply: enable power supply of max8925
-In-Reply-To: <20100125120543.GF22909@sirena.org.uk>
-References: <771cded01001250309k64efaa98n6a68f56678986228@mail.gmail.com>
-	<20100125120543.GF22909@sirena.org.uk>
-Message-ID: <771cded01001251913x31e98129h895c92b9c0a0e0bc@mail.gmail.com>
+Date: Mon, 25 Jan 2010 22:14:21 -0500
+Subject: [PATCH 2/4] mfd: update irq handler in max8925
+In-Reply-To: <771cded01001251912q67c9c2a5w3db61e9d7fe53cf9@mail.gmail.com>
+References: <771cded01001250308mfd2b3d2l76bc2a2df88e7b93@mail.gmail.com>
+	<20100125115930.GE22909@sirena.org.uk>
+	<771cded01001251912q67c9c2a5w3db61e9d7fe53cf9@mail.gmail.com>
+Message-ID: <771cded01001251914k3acbd300q652ea2123911e7af@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2010 at 7:05 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Mon, Jan 25, 2010 at 06:09:50AM -0500, Haojian Zhuang wrote:
+On Mon, Jan 25, 2010 at 10:12 PM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> On Mon, Jan 25, 2010 at 6:59 AM, Mark Brown
+> <broonie@opensource.wolfsonmicro.com> wrote:
+>> On Mon, Jan 25, 2010 at 06:08:19AM -0500, Haojian Zhuang wrote:
+>>
+>>> +static struct resource power_supply_resources[] = {
+>>> + ? ? {
+>>> + ? ? ? ? ? ? .name ? = "max8925-power",
+>>> + ? ? ? ? ? ? .start ?= MAX8925_CHG_IRQ1,
+>>> + ? ? ? ? ? ? .end ? ?= MAX8925_CHG_IRQ1,
+>>> + ? ? ? ? ? ? .flags ?= IORESOURCE_IO,
+>>
+>> These should be IORESOURCE_IRQ.
+>>
+> Now I changed .start and .end. I only need declare IO resources.
 >
->> + ? ? case MAX8925_IRQ_VCHG_DC_R:
->> + ? ? ? ? ? ? info->ac_online = 1;
->> + ? ? ? ? ? ? __set_charger(info, 1);
->> + ? ? ? ? ? ? dev_dbg(chip->dev, "Adapter is insertion\n");
+>>> + ? ? ? ? ? ? else if (value & irq_data->offs) {
+>>> + ? ? ? ? ? ? ? ? ? ? dev_err(chip->dev, "Noboday cares IRQ #%d. Mask it\n",
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? chip->irq_base + i);
+>>> + ? ? ? ? ? ? ? ? ? ? max8925_set_bits(i2c, irq_data->mask_reg,
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? irq_data->offs, irq_data->offs);
+>>
+>> genirq ought to be handling this for you?
+>>
+> No, genirq doesn't know this. I let the thread_fn to take this job.
 >
-> Grammar nit "Adapter inserted".
+>>> + ? ? for (i = 0; i < ARRAY_SIZE(max8925_irqs); i++) {
+>>> + ? ? ? ? ? ? irq_data = &max8925_irqs[i];
+>>> + ? ? ? ? ? ? /* non TSC IRQ should be serviced in max8925_irq() */
+>>> + ? ? ? ? ? ? if (!irq_data->tsc_irq)
+>>> + ? ? ? ? ? ? ? ? ? ? continue;
+>>
+>> Shouldn't the interrupt handlers be able to avoid having to iterate
+>> through the array? ?It's unlikely to be expensive in the context of the
+>> I/O but it looks a bit odd.
+>>
+> There're multiple IRQ & IRQ_MASK registers. If I use bitmap at here, I
+> would use more code on composing it. Since some bits are not defined
+> in IRQ, I need to take care on it. If I use array at here, the code is
+> clean and simple. Although it looks a bit odd.
 >
->> + ? ? case MAX8925_IRQ_VCHG_SYSLOW_R:
->> + ? ? ? ? ? ? /* VSYS is low */
->> + ? ? ? ? ? ? dev_dbg(chip->dev, "Sys power is too low\n");
->> + ? ? ? ? ? ? break;
+>>> + * clear_irq: operation on clearing status of nIRQ pin in platform
+>>> + * clear_tsc_irq: operation on clearing status of nTIRQ pin in platform
+>>> + */
+>>
+>> Shouldn't these also be handled by genirq as functions of the interrupt
+>> controller that the chip is chained from?
+>>
+> Because PMIC IRQ is connected to the special pin of CPU. CPU needs to
+> clear pin status in external. genirq shouldn't take care on it. I have
+> to use this ugly way to clear pin status.
 >
-> This probably ought to be printed by default - with most PMICs if the
-> system power rail goes low this is an indication of impending system
-> power failure so it'd be good to make an effort to get the message out
-> on the console. ?Not much use in production but it can be very helpful
-> during development.
->
->> +static ssize_t charger_state_show(struct device *dev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct device_attribute *attr, char *buf)
->> +{
->> + ? ? struct max8925_power_info *info = dev_get_drvdata(dev);
->> + ? ? char *charge = NULL;
->> + ? ? int ret;
->> +
->> + ? ? ret = max8925_reg_read(info->gpm, MAX8925_CHG_STATUS);
->> + ? ? ret = (ret & MAX8925_CHG_STAT_MODE_MASK) >> 2;
->> + ? ? switch (ret) {
->> + ? ? case 1:
->> + ? ? ? ? ? ? charge = "Fast charging";
->> + ? ? ? ? ? ? break;
->
-> There's now a standard power supply property for this so this sysfs file
-> could be removed and that used instead - POWER_SUPPLY_PROP_CHARGE_TYPE.
+> Thanks
+> Haojian
 >
 
 Update the patch now.
-
-Thanks
-Haojian
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: 0004-power_supply-enable-power-supply-of-max8925.patch
+Name: 0002-mfd-update-irq-handler-in-max8925.patch
 Type: text/x-patch
-Size: 16296 bytes
+Size: 29103 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100125/e9f628a2/attachment.bin>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100125/31cf6460/attachment-0001.bin>
