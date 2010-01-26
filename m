@@ -1,20 +1,43 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 26 Jan 2010 16:09:29 +0000
-Subject: [PATCH 5/5] arm/perfevents: implement perf event support for ARMv6
-In-Reply-To: <000f01ca9ea1$22ca5890$685f09b0$%fujak@samsung.com>
-References: <1263471256-3739-1-git-send-email-jamie.iles@picochip.com>
-	<20100121093917.GB4908@wear.picochip.com>
-	<20100121103803.GA15663@n2100.arm.linux.org.uk>
-	<201001211321.44682.jpihet@mvista.com>
-	<000f01ca9ea1$22ca5890$685f09b0$%fujak@samsung.com>
-Message-ID: <20100126160929.GG4260@wear.picochip.com>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Tue, 26 Jan 2010 16:10:49 +0000
+Subject: [PATCH 01/01] regulator: support max8649
+In-Reply-To: <771cded01001260414q4c8df1e0k303772b87bc725eb@mail.gmail.com>
+References: <771cded01001120041ue24edabk8e4638ef7151c947@mail.gmail.com>
+	<771cded01001120051l44fd76bx80d2fd4b6f60bd0b@mail.gmail.com>
+	<20100112115156.GA546@rakim.wolfsonmicro.main>
+	<771cded01001250301q465a9f8ma484f597ae9a292f@mail.gmail.com>
+	<20100125135628.GB26613@rakim.wolfsonmicro.main>
+	<771cded01001252226k342723b3p3ea235fe79c46843@mail.gmail.com>
+	<20100126110420.GI15759@rakim.wolfsonmicro.main>
+	<771cded01001260354y7c7db25bqa8bbfe000e0c0380@mail.gmail.com>
+	<20100126120058.GN15759@rakim.wolfsonmicro.main>
+	<771cded01001260414q4c8df1e0k303772b87bc725eb@mail.gmail.com>
+Message-ID: <1264522249.3067.79.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2010 at 05:03:44PM +0100, Tomasz Fujak wrote:
-> Where do I find a repository that contains the latest performance events/ARM
-> efforts?
-I've just submitted the generic/ARMv6 stuff to the patch system. Hopefully
-this will end up in Russell's tree soon.
+On Tue, 2010-01-26 at 07:14 -0500, Haojian Zhuang wrote:
+> On Tue, Jan 26, 2010 at 7:00 AM, Mark Brown
+> <broonie@opensource.wolfsonmicro.com> wrote:
+> > On Tue, Jan 26, 2010 at 06:54:48AM -0500, Haojian Zhuang wrote:
+> >> On Tue, Jan 26, 2010 at 6:04 AM, Mark Brown
+> >
+> >> > I'd expect the time taken to enable to be the voltage multipled by the
+> >> > step size rather than divided by the step size?
+> >
+> >> I don't agree at this point. The unit of step is uV/uSec. The function
+> >> should return uSec. So voltage divided by the step is more reasonable.
+> >
+> > Ah, then the variable step is confusingly named since it's actually a
+> > rate of change rather than a step size - I'd suggest rate or something
+> > like that instead.
+> >
+> 
+> update this patch.
+> 
 
-Jamie
+Applied.
+
+Thanks
+
+Liam
